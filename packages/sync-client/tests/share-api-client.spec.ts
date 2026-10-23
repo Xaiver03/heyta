@@ -103,6 +103,27 @@ describe('ShareApiClient', () => {
     expect(sent.keyEnvelope).toEqual({ recipientFingerprint: 'f', ciphertext: 'c' });
   });
 
+  it('签名公钥自证发布 PUT /members/:id/signing-key：体里只有那一格（不带信封、不带世代）', async () => {
+    responder = () => ({ status: 200, body: { memberId: 'm2', signingPublicKey: 'B'.repeat(43) } });
+    const client = makeClient();
+    const result = await client.putMemberSigningKey('share-1', 'm2', 'B'.repeat(43));
+    expect(result.signingPublicKey).toBe('B'.repeat(43));
+    expect(lastRequest!.method).toBe('PUT');
+    expect(lastRequest!.url).toBe('https://api.example/api/shares/share-1/members/m2/signing-key');
+    expect(JSON.parse(lastRequest!.body!)).toEqual({ signingPublicKey: 'B'.repeat(43) });
+  });
+
+  it('接受邀请：带了签名公钥就一起上行，没带就不编造那一格', async () => {
+    responder = () => ({ status: 200, body: { shareId: 'share-1', memberId: 'm2', role: 'editor', keyEpoch: 1 } });
+    const client = makeClient();
+    await client.acceptInvitation({ token: 'tok', identityPublicKey: 'A'.repeat(43), signingPublicKey: 'B'.repeat(43) });
+    expect(JSON.parse(lastRequest!.body!)).toEqual({
+      token: 'tok', identityPublicKey: 'A'.repeat(43), signingPublicKey: 'B'.repeat(43),
+    });
+    await client.acceptInvitation({ token: 'tok', identityPublicKey: 'A'.repeat(43) });
+    expect('signingPublicKey' in JSON.parse(lastRequest!.body!)).toBe(false);
+  });
+
   it('移除成员：DELETE 到位', async () => {
     responder = () => ({ status: 200, body: { removed: true } });
     const client = makeClient();

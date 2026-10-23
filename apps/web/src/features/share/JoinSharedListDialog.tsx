@@ -231,6 +231,9 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
       const accepted = await api.acceptInvitation({
         token: tokenFromInput,
         identityPublicKey: toBase64(identity.x25519PublicKey),
+        // 同一次入群把自己的签名公钥也交上去（ADR-0069 裁决二）：少了这一格，
+        // 这个人此后每一条共享 op 都会在上传边界被判「未签名」而永久拒。
+        signingPublicKey: toBase64(identity.ed25519PublicKey),
       });
       await storeShareIdentity({
         storage: localStorage, cipher,

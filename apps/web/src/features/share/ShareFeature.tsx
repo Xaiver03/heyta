@@ -49,13 +49,14 @@ import { useProjectStore } from '../projects/store.js';
 import { getWebVaultSession } from '../../lib/vault-session.js';
 import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { text } from '../../lib/text.js';
-import { forgetShareLocally, shareTransferFailure, type ShareTransferFailure } from '@heyta/app-host';
+import { forgetShareLocally, publishShareSigningKey, shareTransferFailure, type ShareTransferFailure } from '@heyta/app-host';
 import { clearStorageShareLog } from './comment-actions.js';
 import { resetWebShareSession } from './share-session.js';
 import { createWebShareKeyRotation } from './share-rotation.js';
 import {
   getShareKeyEntry,
   deleteShareKey,
+  readShareOwnIdentity,
   unwrapShareListKey,
   wrapAndStoreShareKey,
 } from './share-key-store.js';
@@ -259,6 +260,10 @@ export function ShareFeature(props: ShareFeatureProps) {
         recipientX25519PublicKey: identity.x25519PublicKey,
       });
       await api.putMemberEnvelope(created.shareId, created.memberId, { keyEpoch: 1, keyEnvelope: envelope });
+      // 🔴 建 share 那条 POST **不带任何公钥**（owner 的成员行是空身份行），所以
+      // 签名公钥只能在这之后由本人发一次 —— 少了这一跳，这台设备此后每一条共享 op
+      // 都会被上传边界的验签永久拒（ADR-0069 裁决六）。
+      await api.putMemberSigningKey(created.shareId, created.memberId, toBase64(identity.ed25519PublicKey));
       await wrapAndStoreShareKey({
         storage: localStorage,
         cipher,
@@ -349,6 +354,35 @@ export function ShareFeature(props: ShareFeatureProps) {
     if (phase.kind !== 'panel' || detail === undefined) return;
     void autoSeal(phase.shareId);
   }, [phase, detail, members, autoSeal]);
+
+  // ── 签名公钥补发（ADR-0069 裁决二的那条"老成员也能上路"的腿） ──────────────
+  // 升级前建好的共享 —— owner 空身份行、以及没带公钥入群的老成员 —— 靠这一跳把
+  // 自己的 Ed25519 公钥送进成员行。同值不重发、异值不覆盖，判据都在
+  // `@heyta/app-host` 的 `publishShareSigningKey` 里（宿主不自己决定"该不该发"）。
+  const ensureSigningKey = useCallback(async (shareId: string) => {
+    if (api === undefined) return;
+    const cipher = await getPayloadCipher();
+    // 未解锁 ⇒ 这一轮什么都不做（不是"没有身份"，下一轮 reload 还会再试）。
+    if (cipher === undefined) return;
+    const own = await readShareOwnIdentity({ storage: localStorage, cipher, shareId });
+    if (own === undefined) return;
+    const row = members.find((m) => m.memberId === own.memberId);
+    if (row === undefined) return;
+    try {
+      await publishShareSigningKey({
+        api,
+        shareId,
+        memberId: own.memberId,
+        signingPublicKey: toBase64(own.ed25519PublicKey),
+        registeredPublicKey: row.signingPublicKey ?? null,
+      });
+    } catch { /* 发不出去就下一轮再发；这台设备的共享写会被服务端拒，不靠这里兜。 */ }
+  }, [api, getPayloadCipher, members]);
+
+  useEffect(() => {
+    if (phase.kind !== 'panel' || detail === undefined) return;
+    void ensureSigningKey(phase.shareId);
+  }, [phase, detail, members, ensureSigningKey]);
 
   // ── 移除成员（owner）：一次点击 = 移除 + 当场换钥（M3 的一个用户意图）────────
   // 🔴 这两半不能拆开做。只移除不换钥，人走了、他手里那把钥仍然解得开你们以后写的内容；

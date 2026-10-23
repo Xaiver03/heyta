@@ -349,6 +349,11 @@ model ShareMember {
   /// 成员在**接受邀请时**发布的 X25519 封装公钥（base64）。公钥本来就是公开的；
   /// 不设全局身份目录 —— 它是 share 作用域的（ADR-0062 决策 9 的同一条纪律）。
   identityPublicKey String? @map("identity_public_key")
+  /// 成员的 Ed25519 **签名**公钥（base64，解码后 32 字节）。它与上面那枚封装公钥来自
+  /// 同一份身份种子的两个 HKDF 子派生，用途不同：X25519 只能封钥、数学上不能签（ADR-0069 裁决一）。
+  /// nullable = 入群那一步之前没有它。🔴 没交签名公钥的成员上传共享 op 会被具名拒绝，
+  /// 不是"先收下以后再说"。
+  signingPublicKey String? @map("signing_public_key")
   /// owner 用成员公钥封好的 listKey 信封（ECIES 形状，packages/sync-core
   /// `share-keys.ts`）。服务端只有密文信封，一个成员最多一行当前信封。
   keyEnvelope Json?  @map("key_envelope")
@@ -410,6 +415,13 @@ model ShareOperation {
   clientTimestamp    BigInt  @map("client_timestamp")
   receivedAt         BigInt  @default(0) @map("received_at")
   isPayloadEncrypted Boolean @default(false) @map("is_payload_encrypted")
+  /// 写这条 op 的**成员行 id**。🔴 服务端按认证的上传者写入，不接受客户端声明
+  /// （ADR-0069 裁决四：作者必须等于上传者，不许代签）。它同时在签名域里 ——
+  /// 不在的话服务端改这一格就能把一条真成员写的 op 重署名给别人。
+  signerMemberId String? @map("signer_member_id")
+  /// 这条 op 的 Ed25519 签名（base64）。签名域见 ADR-0069 裁决三。
+  /// nullable 只为兼容签名启用之前落库的历史 op；**新的无签上传会被具名拒绝**（裁决六）。
+  signature      String? @map("signature")
 
   share Share @relation(fields: [shareId], references: [id], onDelete: Cascade)
 

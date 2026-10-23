@@ -29,6 +29,8 @@ export const SHARE_ERROR_CODES = {
   OWNER_CANNOT_LEAVE: 'SHARE_OWNER_CANNOT_LEAVE',
   // B-10：转让的接收方手里没有当前世代的清单钥（信封为空或世代落后）。
   TRANSFER_TARGET_UNSEALED: 'SHARE_TRANSFER_TARGET_UNSEALED',
+  // ADR-0069 裁决二：签名公钥已在册且不同 ⇒ 补发被拒（不换钥）。
+  SIGNING_KEY_CONFLICT: 'SHARE_SIGNING_KEY_CONFLICT',
 } as const;
 
 export type ShareApiErrorCode =
@@ -82,6 +84,11 @@ export interface ShareMemberRow {
   hasEnvelope: boolean;
   memberKeyEpoch: number;
   identityPublicKey?: string | null;
+  /**
+   * Ed25519 签名公钥（ADR-0069 裁决二/三）—— 读侧用它把「这条 op 是谁写的」钉死。
+   * `null`/缺省 = 这个人还没自证 ⇒ 他的 op 只能读成「未签名」，不许当成「已验证」。
+   */
+  signingPublicKey?: string | null;
   keyEnvelope?: unknown;
 }
 
@@ -187,7 +194,7 @@ export class ShareApiClient {
     return this.call('DELETE', `/api/shares/${shareId}/invitations/${invitationId}`);
   }
 
-  acceptInvitation(input: { token: string; identityPublicKey: string }):
+  acceptInvitation(input: { token: string; identityPublicKey: string; signingPublicKey?: string }):
     Promise<{ shareId: string; memberId: string; role: string; keyEpoch: number }> {
     return this.call('POST', '/api/shares/invitations/accept', input);
   }
@@ -203,6 +210,19 @@ export class ShareApiClient {
   putMemberEnvelope(shareId: string, memberId: string, input: { keyEpoch: number; keyEnvelope: object }):
     Promise<{ memberId: string; memberKeyEpoch: number }> {
     return this.call('PUT', `/api/shares/${shareId}/members/${memberId}/envelope`, input);
+  }
+
+  /**
+   * 发布/补发自己的 Ed25519 签名公钥（ADR-0069 裁决二）。
+   *
+   * 🔴 只有**本人**这一条腿：服务端把 `memberId` 不等于调用者成员行的请求一律打 404。
+   * 信封可以由 owner 代填（他替别人持清单钥），签名公钥不行 —— 那一格代表
+   * "这把私钥的主人是谁"，让第三人填得动就等于把判定权交出去。
+   * 幂等：重发同一枚公钥是成功；发第二枚不同的公钥 ⇒ `SIGNING_KEY_CONFLICT`。
+   */
+  putMemberSigningKey(shareId: string, memberId: string, signingPublicKey: string):
+    Promise<{ memberId: string; signingPublicKey: string }> {
+    return this.call('PUT', `/api/shares/${shareId}/members/${memberId}/signing-key`, { signingPublicKey });
   }
 
   removeMember(shareId: string, memberId: string): Promise<{ removed: boolean }> {

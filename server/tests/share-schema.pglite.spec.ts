@@ -272,3 +272,86 @@ describe('迁移：四张表与五组 CHECK 真的在库里', () => {
     expect(members.rows[0]!.n).toBe(0);
   });
 });
+
+/**
+ * M4 逐 op 签名（ADR-0069）那三枚列**在库里**的证据。
+ *
+ * 为什么这一层不能只靠 `schema.prisma`：Prisma 的模型与库里的列是两件事。
+ * 生成器跑过（`prisma generate`）而迁移没落地时，服务端每次 `SELECT` 都会带上
+ * 一条不存在的列 ⇒ 500，而 HTTP 层的契约测试全绿（它们 mock 了 prisma）。
+ * 这里读的是**发布中的那份 migration.sql**，所以"注释里说加了"不算。
+ */
+describe('迁移：逐 op 签名的三枚可空列（ADR-0069）', () => {
+  const insertOp = async (shareId: string, extra: Record<string, unknown> = {}): Promise<void> => {
+    const row = {
+      id: `op-${Math.random().toString(36).slice(2)}`,
+      share_id: shareId,
+      client_id: 'client-a',
+      server_seq: Math.floor(Math.random() * 1_000_000),
+      action_type: 'add task',
+      op_type: 'CRT',
+      entity_type: 'TASK',
+      payload: {},
+      vector_clock: {},
+      schema_version: 1,
+      client_timestamp: 1n,
+      received_at: 1n,
+      ...extra,
+    };
+    const cols = Object.keys(row);
+    const placeholders = cols.map((_, i) => `$${String(i + 1)}`).join(', ');
+    await db.query(
+      `INSERT INTO share_operations (${cols.join(', ')}) VALUES (${placeholders})`,
+      Object.values(row),
+    );
+  };
+
+  it('三枚列都存在，且都是可空列 —— 「未签名」是一个表示得出来的状态', async () => {
+    const res = await db.query<{ table_name: string; column_name: string; is_nullable: string }>(
+      `SELECT table_name, column_name, is_nullable FROM information_schema.columns
+        WHERE (table_name = 'share_members'    AND column_name = 'signing_public_key')
+           OR (table_name = 'share_operations' AND column_name = ANY($1::text[]))`,
+      [['signer_member_id', 'signature']],
+    );
+    expect(res.rows.map((r) => `${r.table_name}.${r.column_name}`).sort()).toEqual([
+      'share_members.signing_public_key',
+      'share_operations.signature',
+      'share_operations.signer_member_id',
+    ]);
+    // 🔴 可空是裁决六的形状：签名启用之前的历史 op 不追签，所以"空"必须能存；
+    // 加 NOT NULL 会把它变成"必须回填"，而回填等于伪造作者时点。
+    for (const r of res.rows) expect(r.is_nullable).toBe('YES');
+  });
+
+  it('成员行与 op 行不带签名也进得去（历史行 / 未自证的人）', async () => {
+    const owner = await freshUser();
+    const shareId = await freshShare(owner);
+    await insertMember(shareId, await freshUser());
+    await insertOp(shareId);
+    const rows = await db.query<{ n: number }>(
+      'SELECT count(*)::int AS n FROM share_operations WHERE share_id = $1 AND signature IS NULL',
+      [shareId],
+    );
+    expect(rows.rows[0]!.n).toBe(1);
+  });
+
+  it('公钥与签名逐字节存得进去、也读得出来（不被截断或改写）', async () => {
+    const owner = await freshUser();
+    const shareId = await freshShare(owner);
+    const signingKey = 'K3pGx0vJm1uXb9wQz2rTn4sLc5dHe8fA6gI0jK2mN4o';
+    await insertMember(shareId, await freshUser(), { signing_public_key: signingKey });
+    const member = await db.query<{ signing_public_key: string | null }>(
+      'SELECT signing_public_key FROM share_members WHERE share_id = $1 AND signing_public_key IS NOT NULL',
+      [shareId],
+    );
+    expect(member.rows[0]!.signing_public_key).toBe(signingKey);
+
+    const signature = `${signingKey}+5Z3x7Vm9qL2wN4rT6yU8iO0pAsDfGhJkLZxcT5Y=`;
+    await insertOp(shareId, { signature, signer_member_id: 'member-1' });
+    const op = await db.query<{ signature: string | null; signer_member_id: string | null }>(
+      'SELECT signature, signer_member_id FROM share_operations WHERE share_id = $1 AND signature IS NOT NULL',
+      [shareId],
+    );
+    expect(op.rows[0]).toEqual({ signature, signer_member_id: 'member-1' });
+  });
+});

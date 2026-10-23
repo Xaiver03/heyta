@@ -1056,3 +1056,4 @@ export * from './share-conflicts.js';
 export * from './conflict-routing.js';
 export * from './share-rekey.js';
 export * from './share-signals.js';
+export * from './share-signing-key.js';

@@ -529,6 +529,14 @@ export interface ShareOpSignatureParts {
   clientId: string;
   shareId: string;
   keyEpoch: number;
+  /**
+   * 写这条 op 的**成员行 id**（share 作用域，不是 userId）。
+   *
+   * 🔴 它必须在签名域里：读侧要挑出"该用谁的钥验"，而这个号是服务端写进库的
+   * （上传者是谁由认证决定，不由客户端声明）。不在域里的话，服务端改这一格
+   * 就能把一条真成员写的 op **重署名**成另一个人，而签名照样成立。
+   */
+  signerMemberId?: string | null;
   ciphertext: string;
   actionType?: string | null;
   opType?: string | null;
@@ -593,6 +601,7 @@ export const buildShareOpSignatureMessage = (parts: ShareOpSignatureParts): Uint
       typeof parts.ciphertext !== 'string' || parts.ciphertext.length === 0) {
     throw new Error('Invalid share op signature parts');
   }
+  assertOptionalString(parts.signerMemberId, 'signerMemberId');
   assertOptionalString(parts.actionType, 'actionType');
   assertOptionalString(parts.opType, 'opType');
   assertOptionalString(parts.entityType, 'entityType');
@@ -615,6 +624,7 @@ export const buildShareOpSignatureMessage = (parts: ShareOpSignatureParts): Uint
     parts.clientId,
     parts.shareId,
     parts.keyEpoch,
+    parts.signerMemberId ?? null,
     parts.actionType ?? null,
     parts.opType ?? null,
     parts.entityType ?? null,
