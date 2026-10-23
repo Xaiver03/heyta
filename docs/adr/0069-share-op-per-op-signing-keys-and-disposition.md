@@ -27,6 +27,8 @@ ADR-0067 裁决四的原话是「逐 op 签名要加 `signature` 字段（写侧
 
 ## 事实基线（每条带现量命令，别按本节文字推断）
 
+> ⚠️ 这一节是**立这份 ADR 那一刻**（2026-10-23 上午）的基线，写它是为了钉住"为什么必须现在定"。
+> 第 1 条那句"零消费者**今天**成立"随 M4 落地已翻 —— 改口与复量命令在文末**实施记录**，别照本节施工。
 1. **签名原语在、零消费者**。`packages/sync-core/src/share-keys.ts` 里有
    `buildShareOpSignatureMessage` / `signShareOperation:543` / `verifyShareOperationSignature:552`，
    且带单测（`packages/sync-core/tests/share-keys.spec.ts:288-308`）。
@@ -203,7 +205,7 @@ ADR-0067 裁决四的原话是「逐 op 签名要加 `signature` 字段（写侧
 1. **验签名单必须含已移除成员** —— 见裁决五那条 🔴 修订。新增 `GET /shares/:id/signing-keys`，
    web 的 `verifiersFor` 改取它；`verify-collab-sync.mjs` 的两处宿主同形。
 2. **签名域不含 `keyEpoch`**（裁决三实施时确认）：它在密文信封头 9 字节里自描述，而信封整体就是域里那枚
-   `payload` ⇒ 改世代必然改被签的字节。签名件因此不需要认识信封格式，替身加密器也签得出来。
+   `ciphertext` ⇒ 改世代必然改被签的字节。签名件因此不需要认识信封格式，替身加密器也签得出来。
 3. **`signature` 必须从**原始请求体**读**：`SuperSyncOperationSchema` 是 strip 的 `z.object`，
    从校验后的对象读会永远读到 `undefined`，症状是"每一枚合法上传都被判成没签，而服务端一句错都不报"。
 
