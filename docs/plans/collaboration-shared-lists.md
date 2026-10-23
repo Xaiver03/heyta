@@ -562,10 +562,12 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 > 本节是 §9.3 那行 M4 从"没做"变 ✅ 的凭据。**为什么这么定**（签名域取哪些字节、钥从哪来、
 > 失败怎么处置、存量追不追签）在 [ADR-0069](../adr/0069-share-op-per-op-signing-keys-and-disposition.md)
 > 的六条裁决与文末实施记录里；这里只放**这一趟亲自跑出来的读数**，一句结论都不复述那份 ADR。
+> 📌 开工前那三格现量（签名原语零消费者 / 在册那枚是 X25519 封装钥 / 线协议里没有 `signature` 也没有作者列）
+> 记在同一份 ADR 的「事实基线」一节，每条带复量命令 —— 那是**当时的基线**，本节就是它的改口。
 
 | 哪一层 | 落到哪儿 | 现量读数 |
 |---|---|---|
-| ① 纯函数层：签名域 + 封闭词表 + "改一个字节必被拒" | `packages/sync-core/src/share-keys.ts` 的 `shareOpSignatureMessage` / `signShareOpWire` / `classifyShareOpSignature`；词表就四枚 `verified` / `unsigned` / `invalid` / `signer-unregistered`，函数回别的值本身算红 | `pnpm --filter @heyta/sync-core test` ⇒ 364 passed（逐字节翻转、换作者、换 share、空域、非法 base64 各一枚臂都在里面） |
+| ① 纯函数层：签名域 + 封闭词表 + "改一个字节必被拒" | `packages/sync-core/src/share-keys.ts` 的 `buildShareOpSignatureMessage` / `signShareOpWire` / `classifyShareOpSignature`；词表就四枚 `verified` / `unsigned` / `invalid` / `signer-unregistered`，函数回别的值本身算红 | `pnpm --filter @heyta/sync-core test` ⇒ 364 passed。域内那几只数组的**形状**由一枚用例单独钉住（"顺序即协议"），失法臂各一枚：改载荷一个字节 / `signerMemberId` 被改写 / 跨清单重放同一枚签名 / 四态不许互相顶包 / 先判钥再判签 / 畸形输入只回 false 不抛 |
 | ② 服务端层：上传边界验签 ⇒ **具名错误** + **永久拒绝**（不落库） | `server/src/shares/share.routes.ts` 里 `classifyShareOpSignature` 那一支，三枚码 `SHARE_OP_UNSIGNED` / `SHARE_OP_SIGNATURE_INVALID` / `SHARE_OP_SIGNING_KEY_UNREGISTERED`；判序是**先钥后人**（没在册就是 `signer-unregistered`，不去猜他是谁） | `pnpm --filter server test` ⇒ 2998 passed；常驻腿在 `verify:collab-sync` 第 13 步：13.1 伪造作者 / 13.2 无签 / 13.3 改一个字节 / 13.4 未在册 / 13.5 已移除成员的名册 / 13.6 拒了之后游标仍停在那条之前（读数逐条见下） |
 | ③ 宿主与界面层：跨账号写 ⇒ 落库带可验签名；盘上那枚签名被改 ⇒ 另一台读到**具名失败**而不是静默的错数据 | 写侧 `packages/app-host/src/share-client.ts` 的 `signShareOpWire`（私钥只在装配点用一次，不上线不进日志）；读侧 `packages/app-host/src/share-verify.ts` 的三态 + **不物化**；web 只注入两个端口（`signerFor` / `verifiersFor`） | `pnpm verify:collab-sync` ⇒ `RESULT=OK steps=13`，其中第 13 步打印"游标停在 7（被拒那条 8 之前）、再拉仍报同一条"；`pnpm --filter @heyta/app-host test` ⇒ 2018 passed |
 | 签名公钥在册（发布那条腿） | 接受邀请时带 `signingPublicKey` + 补发端点 `PUT /shares/:shareId/members/:memberId/signing-key`（**只本人**、**只允许「没有→有」**、值不同 ⇒ 409 `SHARE_SIGNING_KEY_CONFLICT`）；服务端新列走 `cd server && sh scripts/migrate-deploy.sh` | `verify:collab-sync` 第 2/3 步（owner 补发 + bob 接受即在册，回读 `signingPublicKey` 非空）；`server/tests/share-routes.spec.ts` 用**生产签名件**当夹具 |
