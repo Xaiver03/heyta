@@ -1315,3 +1315,32 @@ export {
   type DangerDialogLabels,
   type DangerDialogProps,
 } from './overlay/DangerDialog.js';
+
+/* 底部面板（适配层 §4 T7）。
+   它与 `OverlayModal` **分开**而不是合成一个"带 placement 参数的模态"：
+   两者的几何（居中 vs 贴底升起）与关闭语言（Esc vs 下拉）都不同，
+   塞进同一个组件只会再造一个"名字叫 Sheet 其实是居中弹窗" —— 那正是
+   移动端 4 个 `*Sheet.tsx` 现在的形状。
+   `sheet-detents.ts` 是纯模型（不碰主题），与 `dismissal.ts` 同形状。 */
+export {
+  DETENT_FRACTION,
+  SHEET_DETENTS,
+  detentForHeight,
+  detentHeight,
+  dismissThresholdPx,
+  largestDetent,
+  nextDetent,
+  normalizeDetents,
+  resolveInitialDetent,
+  shouldDismissOnRelease,
+  smallestDetent,
+  type NonEmptyDetents,
+  type SheetDetent,
+} from './overlay/sheet-detents.js';
+export {
+  BottomSheet,
+  type BottomSheetClass,
+  type BottomSheetDismissVia,
+  type BottomSheetLabels,
+  type BottomSheetProps,
+} from './overlay/BottomSheet.js';
