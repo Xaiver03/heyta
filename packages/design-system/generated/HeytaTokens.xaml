@@ -193,6 +193,8 @@
     <x:Double x:Key="HeytaSizeFieldHeight">44</x:Double>
     <x:Double x:Key="HeytaSizeFieldPaddingX">12</x:Double>
     <x:Double x:Key="HeytaSizeProgressHeight">6</x:Double>
+    <x:Double x:Key="HeytaSizeGrabberWidth">36</x:Double>
+    <x:Double x:Key="HeytaSizeGrabberHeight">5</x:Double>
     <x:Double x:Key="HeytaSizeFocusRing">180</x:Double>
     <x:Double x:Key="HeytaSizeFocusRingStroke">10</x:Double>
     <x:Double x:Key="HeytaTrackingDisplay">-0.022</x:Double>

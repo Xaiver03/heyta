@@ -213,6 +213,8 @@ export interface HeytaNativeTokens {
   readonly 'size.field-height': number;
   readonly 'size.field-padding-x': number;
   readonly 'size.progress-height': number;
+  readonly 'size.grabber-width': number;
+  readonly 'size.grabber-height': number;
   readonly 'size.focus-ring': number;
   readonly 'size.focus-ring-stroke': number;
   /** 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。 */
@@ -434,6 +436,8 @@ export const lightTokens: HeytaNativeTokens = {
   'size.field-height': 44,
   'size.field-padding-x': 12,
   'size.progress-height': 6,
+  'size.grabber-width': 36,
+  'size.grabber-height': 5,
   'size.focus-ring': 180,
   'size.focus-ring-stroke': 10,
   'tracking.display': -0.022,
@@ -651,6 +655,8 @@ export const darkTokens: HeytaNativeTokens = {
   'size.field-height': 44,
   'size.field-padding-x': 12,
   'size.progress-height': 6,
+  'size.grabber-width': 36,
+  'size.grabber-height': 5,
   'size.focus-ring': 180,
   'size.focus-ring-stroke': 10,
   'tracking.display': -0.022,
