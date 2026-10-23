@@ -64,3 +64,7 @@ export * from './assistant-turn.js';
 // ADR-0062 W3：共享清单里任务评论的**判定**（一条评论=一个实体；
 // 正文上限 / 空白拒绝 / 线程顺序只在这里定义 —— UI 与动作层都从这里取）。
 export * from './comments.js';
+// 危险操作的**档位判定**（轻/中/重/重+键入名称）。通用判据住在全局 Skill
+// `overlay-feedback-patterns`，这里是本仓唯一一份可被调用的阈值实现 ——
+// 各页自判会让「删一条」和「删一批」的摩擦差异由页面作者临时决定。
+export * from './danger-tier.js';

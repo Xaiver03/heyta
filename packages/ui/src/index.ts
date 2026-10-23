@@ -1286,3 +1286,32 @@ export {
    相同的副本，已删（两份画法 = 两套裁决标准，漂移表现为两端数字对不上）。
    这一枚留在本包是因为它数的是 `Project` 的**父子关系**，那一层归共享 UI 层。 */
 export { directChildCountsByProject } from './projects/model.js';
+
+/* 浮层原语与关闭策略（适配层 §4 T2）。
+   为什么必须在共享层：本仓 17 处 `aria-modal` 各页自绘，滚动锁 / 焦点陷阱 /
+   焦点归还各抄一份，而**关闭策略（点背景算不算关）全仓 0 处显式约定**。
+   判据的正文住在全局 Skill `overlay-feedback-patterns`，
+   `dismissal.ts` 那张表是它在代码里的唯一实现，`DangerTier` 的阈值在 `@heyta/domain`。 */
+export {
+  CLOSED_OVERLAYS,
+  closePolicyOf,
+  dismissActionFor,
+  hasExplicitClose,
+  type ClosedOverlay,
+  type ClosePolicy,
+  type DismissAction,
+  type DismissOutcome,
+} from './overlay/dismissal.js';
+export {
+  OverlayModal,
+  type OverlayDismissVia,
+  type OverlayModalClass,
+  type OverlayModalLabels,
+  type OverlayModalProps,
+} from './overlay/OverlayModal.js';
+export {
+  DangerDialog,
+  type DangerConfirmTier,
+  type DangerDialogLabels,
+  type DangerDialogProps,
+} from './overlay/DangerDialog.js';
