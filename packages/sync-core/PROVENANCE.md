@@ -149,3 +149,23 @@ heyta 自己的逻辑**不应该写在这里**。集成代码请放在 `packages
 ## 2026-10-03 A3 压缩前提勘误（heyta 原创）
 
 `src/causal-clock.ts` 的压缩要求原操作时钟支配或等于前沿。仅接收端确认前沿不够：事后下载的前沿不能增加离线旧操作的因果依赖。只省略相等计数；更大计数和前沿未知键原样保留。`tests/causal-clock.spec.ts` 包含拒绝不支配前沿、101 设备生成时钟的精确往返和比较等价判据。HTTP 签名与协商位于 server/shared-schema/sync-client，不进入 vendored 算法层。
+
+## 2026-10-23 M4 第 1 批：`src/share-keys.ts` 的签名域（heyta 原创文件，非上游）
+
+🔴 **先纠正本文件自己的一处会误导人的话**：上面第 111 行写"除此之外，`src/` 的代码与上游一致"，
+而 `src/share-keys.ts`（ECIES 入群信封、多世代密钥环、op 签名原语）与 `tests/share-keys.spec.ts`
+是 **2026-10-08 那批（W1 密钥协议纯函数层，落在 `9fa53ab9a`）由 heyta 新增的文件，上游根本没有**。
+同样，第 142 行"不要修改本包代码"拦的是**改上游那批文件**（改了跟随上游就变贵）；
+heyta 原创文件不在它的射程内 —— 但这两句并排读起来像"整个包动不得"，
+于是下一次要动 `share-keys.ts` 的人只能二选一：要么违规，要么把原创代码再复制一份到别处（更糟）。
+本节的用途就是把这条边界写成明文。
+
+本批改动（只碰 heyta 原创的那两枚文件，零上游文件）：
+`buildShareOpSignatureMessage` 的签名域从「七元组」扩到「线协议里除 `serverSeq` / `receivedAt` 之外的全部字段」，
+并加递归排序键名的 JSON 规范化（`vector_clock` 在服务端是 jsonb，不保留键序 ⇒ 不规范化就会让合法签名被
+非签名者读成失败）。理由与逐格裁决见 [ADR-0069](../../docs/adr/0069-share-op-per-op-signing-keys-and-disposition.md) 裁决三。
+判据：`packages/sync-core/tests/share-keys.spec.ts` 的 `op signatures` 那一节
+（一枚字段一条"改一个字节必被拒" + 键序稳定性 + 集合语义 + 缺省归一 + 响亮失败）。
+改域成本为 0 的理由：这三枚函数今天**零消费者**（`grep -rn "signShareOperation" packages/*/src apps/*/src server/src`
+只命中定义与导出）。
+

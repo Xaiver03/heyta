@@ -205,17 +205,30 @@ export async function unwrapShareKeyRing(args: {
 }
 
 /**
- * 解出本机在这份共享里的身份（成员行 id + 那对 X25519 键）。
+ * 解出本机在这份共享里的身份（成员行 id + 那两对钥）。
  *
  * 🔴 换钥的两条腿都要它：owner 要**公钥**给自己封一枚新信封（那是他换设备后
  * 唯一能找回这把钥的通道），成员要**私钥**解自己收到的新信封。
  * 没有身份种子 / 解不开 ⇒ `undefined`（= 需要解锁，不是"没有这份共享"）。
+ *
+ * Ed25519 那一半是 ADR-0069 裁决一选的**签名钥**（同一份身份种子的 HKDF 子派生，
+ * 不另立第三把钥）：写侧签共享 op、接受邀请时把公钥交上去。X25519 只能封钥、
+ * 数学上不能签，所以两对都得露出来 —— 选哪一对用是宿主的事，"有没有"是这一层的事。
  */
 export async function readShareOwnIdentity(args: {
   storage: Storage;
   cipher: SyncPayloadCipher;
   shareId: string;
-}): Promise<{ memberId: string; x25519PublicKey: Uint8Array; x25519SecretKey: Uint8Array } | undefined> {
+}): Promise<
+  | {
+      memberId: string;
+      x25519PublicKey: Uint8Array;
+      x25519SecretKey: Uint8Array;
+      ed25519PublicKey: Uint8Array;
+      ed25519SecretKey: Uint8Array;
+    }
+  | undefined
+> {
   const entry = getShareKeyEntry(args.storage, args.shareId);
   if (entry?.ownMemberId === undefined) return undefined;
   const seed = await unwrapShareIdentitySeed(args);
@@ -225,6 +238,8 @@ export async function readShareOwnIdentity(args: {
     memberId: entry.ownMemberId,
     x25519PublicKey: pair.x25519PublicKey,
     x25519SecretKey: pair.x25519SecretKey,
+    ed25519PublicKey: pair.ed25519PublicKey,
+    ed25519SecretKey: pair.ed25519SecretKey,
   };
 }
 

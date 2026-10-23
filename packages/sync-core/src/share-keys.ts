@@ -514,14 +514,78 @@ export const reencryptShareRecord = async (args: {
   return { id: record.id, keyEpoch: toEpoch, ciphertext: encodeRecordEnvelope(toEpoch, iv, body) };
 };
 
-/** Canonical op-signature message: binds the op identity to its ciphertext. */
-export const buildShareOpSignatureMessage = (parts: {
+/**
+ * Canonical op-signature message.
+ *
+ * 🔴 域里放的是**服务端能看见、且读侧会据以判定的一切字段**（除 `serverSeq` / `receivedAt` ——
+ * 它们由服务端分配，客户端签的那一刻还不可知，见 ADR-0069 裁决三）。
+ * 为什么不是"只签密文"：那些元数据今天已经被 AEAD 的 AAD 绑住（`opRecordAad`），改它们会解不开；
+ * 但 `vectorClock` **没有**被任何完整性机制绑住，而并发判定与冲突可见性读的正是它 ——
+ * 服务端重写它就能把两条并发伪装成有先后，而签名对此保持沉默。
+ * 签全部可见字段还有一层作用：服务端没有清单钥，它**唯一**能在上传边界做的完整性检查就是这一枚签名。
+ */
+export interface ShareOpSignatureParts {
   opId: string;
   clientId: string;
   shareId: string;
   keyEpoch: number;
   ciphertext: string;
-}): Uint8Array => {
+  actionType?: string | null;
+  opType?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  /** 批量作用域。集合语义 ⇒ 顺序**不**进签名域（见下）。 */
+  entityIds?: readonly string[] | null;
+  schemaVersion?: number | null;
+  /** 线协议上的毫秒数（`number`）。传 `bigint` 会响亮失败，不会被静默丢字段。 */
+  clientTimestamp?: number | null;
+  vectorClock?: unknown;
+}
+
+/**
+ * 递归排序对象键的 JSON 规范化。
+ *
+ * 🔴 为什么必须规范而不是直接 `JSON.stringify`：`vector_clock` 与 `payload` 在服务端是
+ * **jsonb** —— 它不保留键的插入顺序，还会去重。签名方与验签方各自 stringify 一份"逻辑上相同"
+ * 的时钟，拿到的字节可以不同，于是每一台非签名者的设备都会把这枚合法签名读成失败。
+ * 数组顺序**保留**（数组的语义是有序的），对象按键名排序。
+ */
+const canonicalSignatureValue = (value: unknown): unknown => {
+  if (value === null || value === undefined) return null;
+  if (Array.isArray(value)) return value.map(canonicalSignatureValue);
+  switch (typeof value) {
+    case 'string':
+    case 'boolean':
+      return value;
+    case 'number':
+      if (!Number.isFinite(value)) throw new Error('Invalid share op signature value');
+      return value;
+    case 'object': {
+      const source = value as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const key of Object.keys(source).sort()) out[key] = canonicalSignatureValue(source[key]);
+      return out;
+    }
+    default:
+      // bigint / function / symbol：宁可抛，不要在 JSON 里悄悄变成一个不同的值。
+      throw new Error('Invalid share op signature value');
+  }
+};
+
+const assertOptionalString = (value: unknown, label: string): void => {
+  if (value !== null && value !== undefined && typeof value !== 'string') {
+    throw new Error(`Invalid share op signature ${label}`);
+  }
+};
+
+const assertOptionalPositiveInt = (value: unknown, label: string): void => {
+  if (value === null || value === undefined) return;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`Invalid share op signature ${label}`);
+  }
+};
+
+export const buildShareOpSignatureMessage = (parts: ShareOpSignatureParts): Uint8Array => {
   assertShareId(parts.shareId);
   assertSafeEpoch(parts.keyEpoch);
   if (typeof parts.opId !== 'string' || parts.opId.length === 0 ||
@@ -529,6 +593,21 @@ export const buildShareOpSignatureMessage = (parts: {
       typeof parts.ciphertext !== 'string' || parts.ciphertext.length === 0) {
     throw new Error('Invalid share op signature parts');
   }
+  assertOptionalString(parts.actionType, 'actionType');
+  assertOptionalString(parts.opType, 'opType');
+  assertOptionalString(parts.entityType, 'entityType');
+  assertOptionalString(parts.entityId, 'entityId');
+  assertOptionalPositiveInt(parts.schemaVersion, 'schemaVersion');
+  if (parts.clientTimestamp !== null && parts.clientTimestamp !== undefined &&
+      (typeof parts.clientTimestamp !== 'number' || !Number.isFinite(parts.clientTimestamp))) {
+    throw new Error('Invalid share op signature clientTimestamp');
+  }
+  const entityIds = parts.entityIds === null || parts.entityIds === undefined
+    ? null
+    : [...parts.entityIds].map((id) => {
+        if (typeof id !== 'string' || id.length === 0) throw new Error('Invalid share op signature entityIds');
+        return id;
+      }).sort();
   return getTextEncoder().encode(JSON.stringify([
     'heyta:share-op-sig',
     SHARE_KEYS_FORMAT_VERSION,
@@ -536,6 +615,14 @@ export const buildShareOpSignatureMessage = (parts: {
     parts.clientId,
     parts.shareId,
     parts.keyEpoch,
+    parts.actionType ?? null,
+    parts.opType ?? null,
+    parts.entityType ?? null,
+    parts.entityId ?? null,
+    entityIds,
+    parts.schemaVersion ?? null,
+    parts.clientTimestamp ?? null,
+    canonicalSignatureValue(parts.vectorClock),
     parts.ciphertext,
   ]));
 };
