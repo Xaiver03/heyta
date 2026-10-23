@@ -59,8 +59,26 @@ cd "$SHELL_DIR"
 #    同步，于是"跑过 pnpm check 的机器能打包、干净检出打不出包"（实测：隔离 worktree
 #    从 HEAD 直接跑本脚本 ⇒ 构建失败）。打包路径必须自带这一步，不能依赖别人先跑过门禁。
 bash "$SHELL_DIR/scripts/sync-tokens.sh" || { echo "🔴 同步设计系统生成物失败"; exit 1; }
-swift build -c release --product HeytaMac 2>&1 | grep -E "error:|warning:|Build complete" | awk '{print "  " $0}'
-BIN="$(swift build -c release --product HeytaMac --show-bin-path)/HeytaMac"
+# 🔴 SwiftPM 编译 Package.swift 要经 sandbox-exec 套一层限制性 profile，而
+#    **已有沙箱里**再套会 `sandbox_apply: Operation not permitted` ⇒
+#    `error: Invalid manifest`。症状指向"清单写坏了"，实际是环境 —— 与
+#    `evidence/storage-host/README.md`（2026-09-30）记的是同一条：那一轮只给
+#    **复现命令**手写了 `--disable-sandbox`，打包路径没沾上，于是同一个环境里
+#    "能跑 smoke、打不出安装包"。（macOS 的 Seatbelt 沙箱会**继承给子孙进程**，
+#    所以在受沙箱约束的运行时里跑本脚本必然中招，且与工具链版本无关。）
+#    先探一次：探得过就照旧带 sandbox 跑（一根头发都不动）；探不过才给
+#    swift build 加 `--disable-sandbox`（帮助原文：Disable the sandbox when
+#    executing subprocesses）。这不是放宽安全边界的选择题 —— 不能用的环境里
+#    不加这个开关，这条路 100% 走不下去，而没有任何环境变量救得回来。
+# ⚠️ bash 3.2 下 `set -u` 与空数组的 `"${arr[@]}"` 同现即 unbound variable
+#    （本仓库一律按 bash 3.2 写）⇒ 用标量 + 非引用展开，空串会被词分割吃掉。
+SWIFT_SANDBOX_FLAG=""
+if ! sandbox-exec -p '(version 1)(deny default)(allow file-read*)' /bin/echo >/dev/null 2>&1; then
+  SWIFT_SANDBOX_FLAG="--disable-sandbox"
+  echo "  ⚠️ 本环境套不上限制性 sandbox profile（sandbox_apply EPERM，多为继承来的沙箱）⇒ 本趟 swift build 带 --disable-sandbox"
+fi
+swift build -c release --product HeytaMac $SWIFT_SANDBOX_FLAG 2>&1 | grep -E "error:|warning:|Build complete" | awk '{print "  " $0}'
+BIN="$(swift build -c release --product HeytaMac $SWIFT_SANDBOX_FLAG --show-bin-path)/HeytaMac"
 [ -x "$BIN" ] || { echo "🔴 找不到 release 可执行：$BIN"; exit 1; }
 echo "  可执行：$BIN ($(stat -f%z "$BIN") 字节)"
 
