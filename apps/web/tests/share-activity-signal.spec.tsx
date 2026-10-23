@@ -24,6 +24,10 @@ import { DEFAULT_NOTIFICATION_PREFS, type ShareNotificationPrefs } from '@heyta/
 vi.mock('../src/lib/oplog.js', () => ({
   hasEngine: () => true,
   requireEngine: () => ({ getClientId: () => 'device-test' }),
+  // `knownShareIds` 读的是清单行绑定（`shareIdsOnDevice(currentState())`）。
+  // 这一枚替身给的是"本机没有绑定任何 share"—— 这一臂靠 storage 替身那条 `list()`
+  // 走到"认得"那一支；绑定那一支的判据在 app-host 的 `share-signals.spec.ts` 里。
+  currentState: () => ({ projects: {} }),
 }));
 
 /**

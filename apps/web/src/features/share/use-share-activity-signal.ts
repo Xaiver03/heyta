@@ -16,12 +16,12 @@
 
 import { useEffect, useMemo } from 'react';
 
-import { createShareOpsSignalHandler } from '@heyta/app-host';
+import { createShareOpsSignalHandler, shareIdsOnDevice } from '@heyta/app-host';
 import { selectNotifiedActivities } from '@heyta/ui';
 import { useI18n } from '@heyta/i18n';
 
 import { useSyncStore } from '../sync/store.js';
-import { hasEngine, requireEngine } from '../../lib/oplog.js';
+import { currentState, hasEngine, requireEngine } from '../../lib/oplog.js';
 import { emitShareRepaint, setShareSignalSink } from '../../lib/share-signal-sink.js';
 import { createStorageShareLog } from './comment-actions.js';
 import { ensureWebShareSession } from './share-session.js';
@@ -42,8 +42,9 @@ export function useShareActivitySignal(): void {
           ? t('common.share.activity.added')
           : kind === 'deleted'
             ? t('common.share.activity.deleted')
-            : // "完成"这一档今天到不了这里：共享日志里还没有 TASK 的 op（M2 的路由）。
-              // 留一条兜底文案而不是留白 —— 真到了那一天它会被判据抓到并要求写清楚。
+            : // "完成"这一档今天还不会有输入：M2 之后共享任务的 op 已经在 share log 里，
+              // 缺的是**档位映射与措辞**（`ShareSignalActivity` 只到 added/deleted，见 app-host 那段）。
+              // 留一条兜底文案而不是留白 —— 真接上那一档时它会被判据抓到并要求写清楚。
               t('common.share.notif.activityCompleted'),
     }),
     [t],
@@ -62,12 +63,18 @@ export function useShareActivitySignal(): void {
       // 要落进合并视图读的那份缓存，落进另一份等于"拉到了但没人看得见"。
       const comments = await ensureWebShareSession();
       if (comments === undefined) {
-        // vault 没解锁 ⇒ 解不开信封也解不开密文。信号丢掉：不响是对的，
-        // 用户解锁之后下一次信号或下一次进评论区都会补上（游标还没推进）。
+        // vault 没解锁 ⇒ 解不开信封也解不开密文。信号丢掉：不响是对的（游标还没推进），
+        // 解锁之后**下一次**信号会补上。⚠️ 这句只覆盖"信号恰好再来一次"：
+        // 对方写完就不再动的话，这一份内容要等下一次有人进评论区才拉得到 ——
+        // 那是这条链今天已知的那一格，不是"迟早会自己好"。
         return;
       }
       const handler = createShareOpsSignalHandler({
         storage: createStorageShareLog(window.localStorage),
+        // 🔴 本机认得的 share 名单：读的是**清单行绑定**，不是"这份日志落过盘"。
+        // 刚入群那台设备一次都没拉过，索引是空的 —— 只认索引的话它会永远收不到第一份
+        // 内容（不拉就不进索引，进了索引才允许拉）。判据与实测见 app-host 那侧纪律 ①。
+        knownShareIds: () => shareIdsOnDevice(currentState()),
         pull: comments.pullShareOps,
         myClientId,
       });

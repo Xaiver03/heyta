@@ -13,11 +13,15 @@
  * 第 10 步补上了以前缺的那一半：**下行经真宿主**（`@heyta/app-host` 的
  * `createShareCommentsHost` + 真 `ShareApiClient`），也就是文件头那句
  * "引擎接线落地后应改走真实客户端 SDK"的落地。
- * 仍然没接的是**上传队列与 op-log 的 share 分区**（共享清单里的 TASK/PROJECT 还没
- * 路由进 share log —— 计划 §9.3 的 M2），所以"两台设备在界面上互相看到同一条任务"
- * 这一腿今天量不到，只能量到宿主层。
+ * 第 12 步补的是**内容类型那一半**：任务族的写意图交经**生产路由**
+ * （`createShareRoutingDispatcher`）分流，跨账号搬到对面并物化进合并视图，
+ * 并发改同一格时两台上都**看得见**那枚冲突（ADR-0067 裁决一 + 补三 + 裁决三）。
  *
- * 十一步：
+ * ⚠️ 仍然量不到的那一腿，如实说：这一步到**宿主层**为止。
+ * "两台真浏览器里 B 看见 A 改的任务"归 `pnpm verify:collab-journey`（界面腿），
+ * 因为这里没有 DOM、没有登录面板、也没有那枚共享入口的实验开关。
+ *
+ * 十二步：
  *   1. 两个账号（owner / bob，TEST_MODE 真实 JWT）。
  *   2. owner 建共享 + 发邀请（裸 token 只出现一次）。
  *   3. bob 凭 token 接受（带封装公钥）→ editor。
@@ -37,11 +41,15 @@
  *  11. 🔴 实时信号（M5）：真 `createRealtimeClient` 挂在这份共享上 → 有人写评论 ⇒
  *      服务端经 WS 扇出 `new_share_ops(shareId, latestSeq)` → 宿主拉一次 ⇒
  *      旁观设备报 `["added"]`，而写它的那一台同样拉到内容却**零活动**。
+ *  12. 🔴 任务族走**生产路由**（M2）：owner 在共享清单里新建/改名一条任务，意图先交
+ *      `createShareRoutingDispatcher` 判 ⇒ 个人 log 零写入、bob 拉回并物化、合并视图把它
+ *      挂到 **bob 自己**那条清单行；两台各改同一格且都没读过对方 ⇒ 两台各见**恰好一枚**
+ *      具名冲突、两侧内容都在；裁一次 ⇒ 冲突归零且对面读到那一句。第二份 share 仍零明文。
  *
  * 用法：
  *   node scripts/verify-collab-sync.mjs [--port 3211]
  *
- * 失败退出码 1 并打印 `RESULT=FAIL step=N`；通过打印 `RESULT=OK steps=11`。
+ * 失败退出码 1 并打印 `RESULT=FAIL step=N`；通过打印 `RESULT=OK steps=12`。
  */
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -375,11 +383,12 @@ stepOk('rekey 世代推进；新 op 正常上行；bob 仍在门外');
 // 另一台设备经同一个宿主的 `pullShareOps` 拉回来、解得开、物化得出来、游标推得动。
 //
 // ⚠️ 两处如实的边界（不包装）：
-//   · 路由数据（任务 → 清单 → shareId）由本脚本**摆出来**，因为共享清单里的
-//     TASK/PROJECT 本身还没进 share log —— 那是 M2（写路径路由）的活，
-//     所以"两台设备在界面上互相看到同一条评论"这一腿今天量不到，只能量到宿主层。
+//   · 这一步的**内容类型是评论**，且它的路由数据（任务 → 清单 → shareId）由本脚本摆出来 ——
+//     它量的是"下行链路 + 宿主读路径"，不是"这条写进哪本 log"。后者从第 12 步起交**真路由件**判。
+//     "两台设备在界面上互相看到同一条评论"这一腿仍然不在这里量：这里没有 DOM，那是
+//     `verify:collab-journey` 的界面腿。
 //   · bob 在第 8 步已被移除、第 9 步 rekey，所以这一腿用 owner 的**第二台设备**
-//     （新宿主 + 空日志 + 自己的游标），跨账号收敛仍由第 6 步负责。
+//     （新宿主 + 空日志 + 自己的游标），跨账号收敛由第 6 步与第 12 步负责。
 step = 10;
 const HOST_TASK = `task-host-${runId}`;
 const HOST_COMMENT_BODY = `宿主写下的评论 ${runId}`;
@@ -474,8 +483,10 @@ stepOk(
 //   · 宿主没有 `onOpen` 回调，连接是异步建立的，所以这里**写一条等一轮**地重试（最多 6 轮）。
 //     每轮都真写一条评论、服务端每次都扇出 ⇒ 最坏情况只是多写几条，而不是把判据放宽。
 //     `rounds` 与 `signals.length` 一起打出来，让下一位看得见花了多少轮。
-//   · 这一腿量不到"浏览器里弹出一条通知"：Notification 属于界面，而共享任务的路由
-//     （TASK op 进 share log）还没做（M2），所以"完成"那一档今天没有输入。
+//   · 这一腿量不到"浏览器里弹出一条通知"：Notification 属于界面（归 `verify:collab-journey`）。
+//     而"完成"那一档**即使**M2 之后共享任务的 op 已经进了这份日志，也不会在这里响 ——
+//     活动映射今天只认 COMMENT（理由写在 `packages/app-host/src/share-signals.ts` 那个联合类型上），
+//     给任务族加档位要连同通知偏好的两句措辞一起另判，不在本步的范围里。
 step = 11;
 const signals = [];
 const signalDevice = client.createRealtimeClient({
@@ -513,6 +524,8 @@ const preCursor = readerStore.cursor(shareId);
 
 const watcher = appHost.createShareOpsSignalHandler({
   storage: readerStore,
+  // 这台设备认得这份 share：本机清单行绑着它（宿主层没有 UI 状态，直接给名单）。
+  knownShareIds: () => [shareId],
   pull: (sid) => reader.pullShareOps(sid),
   myClientId: 'device-C-signal',
 });
@@ -531,6 +544,7 @@ const selfHost = buildHost(selfStore, 'device-B-host');
 const authorView = await appHost
   .createShareOpsSignalHandler({
     storage: selfStore,
+    knownShareIds: () => [shareId],
     pull: (sid) => selfHost.pullShareOps(sid),
     // 这批 op 是 device-A-host 写的：写它的那一台不需要被通知自己。
     myClientId: 'device-A-host',
@@ -550,5 +564,171 @@ stepOk(
     `作者设备同样拉到 ${String(authorView.added)} 条却零活动`,
 );
 
+// ── 12. 🔴 任务族走**生产路由**（ADR-0067 裁决一 + 补三 + 裁决三）
+//
+// 第 10/11 步那两腿走的是**评论**那一族 —— 那曾是唯一进得了 share log 的内容类型。
+// M2 之后任务族也进得来，而"搬运"必须在**路由判定本身**上验：意图要先交给
+// `createShareRoutingDispatcher`（生产件，它判"进哪本 log"），通道用 web 同一种装配
+// （`createShareCommentDispatch` 交出来的 dispatch/stateFor/conflicts/resolveConflict），
+// 读侧用 `createShareViewMerger`（ADR-0068 裁决二那一份）。三件都是生产件，零 mock。
+//
+// 个人那本 log 用一只**计数替身**：这一步判的就是"共享的一条都不许悄悄落本机"，
+// 替身数的正是那一件事；把真引擎搬进来只会多一层与本步判据无关的依赖。
+step = 12;
+
+// 第 8 步把 bob 移出、第 9 步换了钥 ⇒ 第一份共享不能再用来看跨账号，这里另起一份，
+// 并把信封下发/解钥那一条**真路径**再走一遍（不复制钥匙）。
+const share2Res = await api('POST', '/api/shares', tokenOwner, {});
+if (share2Res.status !== 201 || !share2Res.json?.shareId) {
+  fail(`第二份共享建不出来：${JSON.stringify(share2Res.json)?.slice(0, 200)}`);
+}
+const share2 = share2Res.json.shareId;
+const listKey2 = core.generateShareListKey();
+const invite2 = await api('POST', `/api/shares/${share2}/invitations`, tokenOwner, {
+  invitedEmail: `share-bob-${runId}@example.test`,
+});
+if (invite2.status !== 201 || !invite2.json?.token) fail(`第二份发邀请失败：${JSON.stringify(invite2.json)?.slice(0, 200)}`);
+const accept2 = await api('POST', '/api/shares/invitations/accept', tokenBob, {
+  token: invite2.json.token, identityPublicKey: bobPubB64,
+});
+if (accept2.status !== 200) fail(`bob 加入第二份失败：${JSON.stringify(accept2.json)?.slice(0, 200)}`);
+const env2 = await core.sealListKeyForRecipient({
+  listKey: listKey2, shareId: share2, keyEpoch: 1,
+  recipientX25519PublicKey: bobIdentity.x25519PublicKey,
+});
+const putEnv2 = await api('PUT', `/api/shares/${share2}/members/${accept2.json.memberId}/envelope`, tokenOwner, {
+  keyEpoch: 1, keyEnvelope: env2,
+});
+if (putEnv2.status !== 200) fail(`第二份信封下发失败：${JSON.stringify(putEnv2.json)?.slice(0, 200)}`);
+const members2 = await api('GET', `/api/shares/${share2}/members`, tokenBob);
+const ownRow2 = (members2.json?.members ?? []).find((m) => m.memberId === accept2.json.memberId);
+if (!ownRow2?.keyEnvelope) fail('bob 在第二份的成员表里拿不到自己的信封');
+const bobListKey2 = await core.openListKeyEnvelope({
+  envelope: ownRow2.keyEnvelope, recipientX25519SecretKey: bobIdentity.x25519SecretKey,
+});
+if (hex(bobListKey2) !== hex(listKey2)) fail('bob 解出的第二份清单密钥与 owner 不一致');
+
+const TASK2 = `task-m2-${runId}`;
+const TITLE_CREATE = 'owner 在共享清单里新建的任务';
+const TITLE_RENAMED = 'owner 后来改过的标题';
+const TITLE_A_FINAL = '甲刷的最后一版';
+const TITLE_B_FINAL = '乙刷的最后一版';
+
+/** 一台设备：一份盘 + 一个共享通道 + 一个生产路由派发器 + 一台计数用的个人 log。 */
+function makeM2Device(token, userId, clientId, listKey) {
+  const store = makeLogStore();
+  const dispatch = appHost.createShareCommentDispatch({
+    api: new client.ShareApiClient({ baseUrl: BASE, getToken: () => token }),
+    cipherFor: async () => client.createSharePayloadCipher({
+      current: { shareId: share2, keyEpoch: 1, listKey },
+    }),
+    storage: store,
+    currentUserId: () => userId,
+    clientId,
+    schemaVersion: 1,
+    isSignedIn: () => true,
+  });
+  /** 与 `apps/web/src/features/share/comment-actions.ts` 同一份装配（四个端口，不多不少）。 */
+  const channel = {
+    dispatch: dispatch.dispatchShareOp,
+    stateFor: dispatch.stateFor,
+    conflicts: dispatch.conflicts,
+    resolveConflict: dispatch.resolveConflict,
+  };
+  const personalWrites = [];
+  // 这台设备**自己**那条清单行（ADR-0068 裁决一：清单记录本身是个人的，只带 shareId）。
+  const rowId = `p2-${clientId}`;
+  const personalState = opLog.emptyState();
+  personalState.projects[rowId] = { id: rowId, name: '共享清单二', shareId: share2 };
+  const mergeView = appHost.createShareViewMerger({ stateFor: (sid) => channel.stateFor(sid) });
+  const route = appHost.createShareRoutingDispatcher({
+    personalDispatch: async (intent) => { personalWrites.push(intent); },
+    channel: async () => channel,
+    // 🔴 判据与读视图必须同源（ADR-0068 裁决二）：这里喂的是合并视图，不是个人状态。
+    getState: () => mergeView(personalState),
+  });
+  return { store, dispatch, channel, personalWrites, personalState, rowId, mergeView, route };
+}
+
+const bobUserId = jwtSub(tokenBob) ?? `bob-${runId}`;
+const devA = makeM2Device(tokenOwner, ownerUserId, 'device-A-m2', listKey2);
+const devB = makeM2Device(tokenBob, bobUserId, 'device-B-m2', bobListKey2);
+
+// 12.1 新建那一形（补三）：CRT 进 share，个人那本一条都不许多。
+await devA.route({
+  entityType: 'TASK', entityId: TASK2, opType: 'CRT',
+  payload: { title: TITLE_CREATE, projectId: devA.rowId },
+});
+if (devA.personalWrites.length !== 0) {
+  fail(`共享清单里新建一条任务写进了个人 log（${devA.personalWrites.length} 条）—— 补三那一格又开了`);
+}
+const b1 = await devB.dispatch.pullShareOps(share2);
+if (b1.added < 1) fail(`bob 没拉到那条新建的任务（fetched=${b1.fetched} added=${b1.added}）`);
+if (devB.channel.stateFor(share2).tasks[TASK2]?.title !== TITLE_CREATE) {
+  fail(`bob 物化出来的标题不对：${String(devB.channel.stateFor(share2).tasks[TASK2]?.title)}`);
+}
+// 读侧合并：这条任务挂到 **bob 本机**那条清单行上，不是作者本机那个 id。
+const mergedB1 = devB.mergeView(devB.personalState);
+if (mergedB1.tasks[TASK2]?.projectId !== devB.rowId) {
+  fail(`合并视图没把它挂到 bob 本机那行：${String(mergedB1.tasks[TASK2]?.projectId)}`);
+}
+
+// 12.2 改名（UPD 同样在搬运范围内）：对面拉一次就换字，个人那本仍然零写入。
+await devA.route({ entityType: 'TASK', entityId: TASK2, opType: 'UPD', payload: { title: TITLE_RENAMED } });
+const b2 = await devB.dispatch.pullShareOps(share2);
+if (b2.added < 1) fail(`bob 没拉到那次改名（added=${b2.added}）`);
+if (devB.mergeView(devB.personalState).tasks[TASK2]?.title !== TITLE_RENAMED) {
+  fail('bob 那台的合并视图还是旧标题');
+}
+
+// 12.3 🔴 并发同字段必须可见（裁决三）：两台各改同一格一次，**且都没读过对方**。
+await devA.route({ entityType: 'TASK', entityId: TASK2, opType: 'UPD', payload: { title: TITLE_A_FINAL } });
+await devB.route({ entityType: 'TASK', entityId: TASK2, opType: 'UPD', payload: { title: TITLE_B_FINAL } });
+await devA.dispatch.pullShareOps(share2);
+await devB.dispatch.pullShareOps(share2);
+const conflictsA = devA.channel.conflicts();
+const conflictsB = devB.channel.conflicts();
+if (conflictsA.length !== 1 || conflictsB.length !== 1) {
+  fail(`并发改同一格后两台应各见恰好一枚冲突，实际 A=${conflictsA.length} B=${conflictsB.length}`);
+}
+if (conflictsA[0].id !== conflictsB[0].id) {
+  fail(`两台报的不是同一处：${conflictsA[0].id} vs ${conflictsB[0].id}`);
+}
+if (conflictsA[0].errorCode !== 'CONFLICT_CONCURRENT') fail(`冲突编码不对：${conflictsA[0].errorCode}`);
+if (!conflictsA[0].fields.includes('title')) fail(`冲突没点到那一格：${JSON.stringify(conflictsA[0].fields)}`);
+// 两侧内容都得在（"不静默丢任一侧"就是这一句）：冲突件交回的是**那两条真上过线的 op**。
+const bothSides = [conflictsA[0].local.payload.title, conflictsA[0].remote.payload.title].sort().join('|');
+if (bothSides !== [TITLE_A_FINAL, TITLE_B_FINAL].sort().join('|')) fail(`两侧内容没都在：${bothSides}`);
+
+// 12.4 裁一次 = 发**一条** op，冲突自己就消失（不写第二份状态、服务端不记账）。
+const keptTitle = conflictsA[0].local.payload.title;
+await devA.channel.resolveConflict(conflictsA[0], 'keep-local');
+await devB.dispatch.pullShareOps(share2);
+await devA.dispatch.pullShareOps(share2);
+if (devA.channel.conflicts().length !== 0 || devB.channel.conflicts().length !== 0) {
+  fail(`裁完还在报冲突：A=${devA.channel.conflicts().length} B=${devB.channel.conflicts().length}`);
+}
+const mergedAfterResolve = devB.mergeView(devB.personalState);
+if (mergedAfterResolve.tasks[TASK2]?.title !== keptTitle) {
+  fail(`裁决没落到对面那台：期望「${keptTitle}」，实际「${String(mergedAfterResolve.tasks[TASK2]?.title)}」`);
+}
+if (devA.personalWrites.length + devB.personalWrites.length !== 0) {
+  fail(`共享任务的改动漏进了个人 log：A=${devA.personalWrites.length} B=${devB.personalWrites.length}`);
+}
+
+// 12.5 任务族同样零明文（第 7 步那一条判据换个内容类型再量一次）。
+const dump2 = run('psql', ['-tA', PSQL_URL, '-c',
+  `SELECT payload::text FROM share_operations WHERE share_id = '${share2}'`]);
+if (!dump2.ok) fail(`搜第二份的库失败：${dump2.out.slice(-200)}`);
+for (const plain of [TITLE_CREATE, TITLE_RENAMED, TITLE_A_FINAL, TITLE_B_FINAL]) {
+  if (dump2.out.includes(plain)) fail(`服务端库里出现了任务标题明文：${plain}`);
+}
+
+stepOk(
+  `任务族走生产路由：新建 + 改名跨账号搬运（bob 两次各拉到 ${b1.added}/${b2.added} 条，` +
+    `两台个人 log 零写入）；并发改同一格 ⇒ 两台各见 1 枚具名冲突、两侧内容都在；` +
+    `裁一次（保留「${keptTitle}」）⇒ 冲突归零且对面读到该版本；第二份 share 全表仍是信封`,
+);
+
 cleanup();
-console.log('\nRESULT=OK steps=11');
+console.log('\nRESULT=OK steps=12');
