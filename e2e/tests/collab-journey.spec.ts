@@ -8,8 +8,8 @@
  *    密码学（身份种子 / 信封 / ECIES 全在浏览器里真跑）。
  *
  * 旅程（用户视角，一镜到底）：
- *   owner：建清单 → 清单头「共享」→ PIPL 单独同意（方案 a）→ 面板（自己是
- *         所有者）→ 输邮箱邀请 → 一次性凭证显示（读出 token）。
+ *   owner：建清单 → 清单头「共享」（**默认态就在**，P-1 已翻案）→ PIPL 单独同意（方案 a）
+ *         → 面板（自己是所有者）→ 输邮箱邀请 → 一次性凭证显示（读出 token）。
  *   bob：  侧栏「加入共享清单」→ 贴 token → 接受（带公钥）→ 等 owner 自动
  *         下发信封 → 解出同一把密钥 → 清单出现在自己侧栏。
  *   owner：面板轮询看到 bob 成员行（信封已发）。
@@ -120,32 +120,6 @@ async function establishVault(page: Page, passphrase: string): Promise<void> {
   await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
 }
 
-/**
- * 打开「共享清单（实验）」开关（设置 → 同步）。
- *
- * 🔴 这一趟走的是**真实用户路径**，不是往 localStorage 里塞值：入口默认关是产品裁决
- * P-1（`docs/plans/collaboration-shared-lists.md` §9.2），所以"谁能打开它"本身就是
- * 今天这条链的一部分，得被验一遍。默认态不可达那一句由
- * `apps/web/tests/share-entry-experimental.spec.tsx` 在行为层钉，
- * `check:share-entry-hidden` 在源码层钉。
- */
-async function enableShareExperimental(page: Page): Promise<void> {
-  await page.getByTestId('account-menu-avatar').click();
-  await page.getByTestId('account-menu-settings').click();
-  await selectSettingsSection(page, 'sync');
-  const toggle = page.getByTestId('share-experimental-toggle');
-  await expect(toggle).toBeVisible();
-  // 先留图再点：这枚开关的**措辞**就是 P-1 的交付内容（"看不到彼此改动"必须写在界面上），
-  // 只断言可点击证不了那句话还在。名字用 01b 是为了不动既有 02–07 的引用。
-  // 🔴 必须先滚到它：这一节比一屏长，第一版留的图里开关和那句话**根本不在画面内**
-  //   （`toBeVisible()` 只要求有盒子，不要求在视口里 —— 一张看不到判据的图等于没取证）。
-  await toggle.scrollIntoViewIfNeeded();
-  await evidenceShot(page, '01b-owner-experimental-switch.png');
-  await toggle.check();
-  await page.getByTestId('settings-sheet-close').click();
-  await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
-}
-
 /** 建清单并停在它上面（侧栏 + → 填名 → 创建 → 点它）。 */
 async function createProjectAndOpen(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: '新建清单', exact: true }).click();
@@ -236,9 +210,11 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
   await createProjectAndOpen(ownerPage, '家庭装修');
   await evidenceShot(ownerPage, '01-owner-list-ready.png');
 
-  // 🔴 P-1 的默认态：停在自己的清单上、同步也配好了，入口**仍然不在**（不是隐藏样式，是不进 DOM）。
-  await expect(ownerPage.getByTestId('share-open-button')).toHaveCount(0);
-  await enableShareExperimental(ownerPage);
+  // 🔴 P-1 已在 2026-10-23 翻案（翻案条件就是这条旅程的"两台互见"那一格，见计划 §9.11）：
+  // 停在自己的清单上 + 同步配好了，入口**必须直接在那儿** —— 不需要任何实验开关。
+  // 这一发同时是反向判据：入口若还被什么按住，这里就红（源码层那一份在
+  // `scripts/check-share-entry-visible.mjs`，行为层在 `apps/web/tests/share-entry-visible.spec.tsx`）。
+  await expect(ownerPage.getByTestId('share-open-button')).toBeVisible();
 
   // 头部「共享」→ PIPL 同意模态（方案 a）→ 确认。
   await ownerPage.getByTestId('share-open-button').click();

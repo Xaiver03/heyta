@@ -145,10 +145,6 @@ import {
   type ShellModuleKey,
 } from './features/shell/modules.js';
 import { DetailColumnResizer, SidebarResizer } from './features/shell/ColumnResizer.js';
-import {
-  loadShareExperimentalEnabled,
-  saveShareExperimentalEnabled,
-} from './lib/share-experimental.js';
 import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
 import { TaskActionError } from './features/tasks/TaskActionError.js';
@@ -330,14 +326,6 @@ export function App(): React.JSX.Element {
    */
   const [enabledModules, setEnabledModules] = useState<ReadonlySet<ShellModuleKey>>(
     loadEnabledModules,
-  );
-
-  /**
-   * 🔴 共享入口的默认态是**关**（产品裁决 P-1）。理由、翻案条件都只写在
-   * `lib/share-experimental.ts` 文件头那一份里，这里不重复论证。
-   */
-  const [shareExperimental, setShareExperimental] = useState<boolean>(
-    loadShareExperimentalEnabled,
   );
 
   /**
@@ -2089,14 +2077,6 @@ export function App(): React.JSX.Element {
     });
   }, []);
 
-  const onToggleShareExperimental = useCallback(() => {
-    setShareExperimental((current) => {
-      const next = !current;
-      saveShareExperimentalEnabled(next);
-      return next;
-    });
-  }, []);
-
 
   /**
    * AI 面：**一个 Agent，一个聊天入口**。
@@ -2404,14 +2384,13 @@ export function App(): React.JSX.Element {
               已共享的清单换 aria-label（管理共享 vs 共享此清单），图标相同：
               入口稳定、状态用文案说。
 
-              🔴 第三道条件 `shareExperimental` 是产品裁决 P-1：元数据面全在而**内容面整段断**
-              （下行没接、任务写路径仍进个人 op-log ⇒ 成员互相看不到改动），
-              所以入口默认不放出来，只留设置 → 同步里那条措辞明确的实验开关。
-              默认值、理由与**翻案条件**唯一一份在 `lib/share-experimental.ts`。
-              判据：`check:share-entry-hidden`（钉"默认态不可达"）+
-              `apps/web/tests/share-entry-experimental.spec.tsx`（行为层两条）。
+              这道入口**不再**藏在实验开关后面：P-1 那条降级（内容面到不了用户眼前 ⇒
+              入口先按住）的翻案条件在 2026-10-23 由 `verify:collab-journey` 的
+              "两台真浏览器互见"那一格满足并验过（读数见计划 §9.11）。
+              判据反过来钉"可达"：`check:share-entry-visible`（源码层）+
+              `apps/web/tests/share-entry-visible.spec.tsx`（行为层）+ 旅程里那枚默认态断言。
             */}
-            {currentProject !== undefined && syncConfigured && shareExperimental ? (
+            {currentProject !== undefined && syncConfigured ? (
               <button
                 type="button"
                 className="ht-btn ht-btn--ghost"
@@ -3280,8 +3259,6 @@ export function App(): React.JSX.Element {
               */}
               <SyncSettingsPanel
                 active={activeSettingsSection === 'settings-group-sync'}
-                shareExperimental={shareExperimental}
-                onToggleShareExperimental={onToggleShareExperimental}
               />
               {/*
                 共享协作的**本地**通知偏好（W5）：跟同步同一组 —— 它是同步的下游
