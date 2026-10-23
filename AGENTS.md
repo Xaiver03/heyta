@@ -82,6 +82,7 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 | [`docs/agents/hard-constraints.md`](docs/agents/hard-constraints.md) | **硬性约束**：可维护性门槛 / 许可证 / schema / op-log / 宿主边界 | 加依赖、改协议、碰 `apps/*` |
 | [`docs/agents/db-migrations.md`](docs/agents/db-migrations.md) | **数据库迁移纪律**：CONCURRENTLY 形状 / 锁超时 / 校验器 | 任何迁移改动 |
 | [`docs/agents/design-system.md`](docs/agents/design-system.md) | **设计系统**：三条硬规则 / 文字层级 / 对比度 / 常见错 | 写任何 UI |
+| [`docs/agents/overlay-feedback.md`](docs/agents/overlay-feedback.md) | **浮层与反馈**：提需求的四要素 / 危险四档 / 关闭策略表 / 债务账本门禁 | 写任何浮层、确认框、操作回执 |
 | [`docs/agents/commands.md`](docs/agents/commands.md) | **常用命令**：install / build / typecheck / test / 各 `verify:*` / 各 `check:*` | 跑任何命令前 |
 | [`docs/agents/multi-end-build.md`](docs/agents/multi-end-build.md) | **多端构建与固定收尾**：`pnpm reinstall:all` 四端重装、各端判据 | 交付一轮之前 |
 | [`docs/agents/ui-acceptance.md`](docs/agents/ui-acceptance.md) | **界面验收两条硬性规定**：Playwright 必须真跑+真看截图 / 不许抢前台 | 写验收、跑 GUI 测试 |
