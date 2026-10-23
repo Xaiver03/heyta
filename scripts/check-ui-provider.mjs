@@ -370,6 +370,16 @@ const PROVIDER_DEPENDENT = [
    * 跟着变成假话。六个 AI 输出面的接线因此各自钉了 testID 判据。
    */
   'AiGeneratedLabel',
+  /**
+   * 浮层原语（适配层 §4 T2）。两者都透过 `useHeytaUiTheme` / `useHeytaTokens`
+   * / `useHeytaText` 取 token，宿主放在 `<HeytaUiProvider>` 之外会运行时抛错。
+   *
+   * 🔴 `DangerDialog` 尤其要登记：它在 Provider 之外不是"样式难看"，
+   * 是**整层渲染不出来** —— 而注销账号、彻底删除、撤销授权都走这一层。
+   * ⚠️ 同目录的 `closePolicyOf` / `isScrimClosable` 是纯函数、不碰主题，**不登记**。
+   */
+  'OverlayModal',
+  'DangerDialog',
 ];
 const PROVIDER_DEPENDENT_SET = new Set(PROVIDER_DEPENDENT);
 
