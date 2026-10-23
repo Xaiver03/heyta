@@ -542,3 +542,18 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 真正语义（密钥世代 + 删除语义那一族）、共享任务完成档的通知措辞。P-1 的**理由**留在 §9.2 ——
 下一次内容面再断，那三格条件就是重新按住它的判据。
 
+⚠️ **逐张看图时抓到的一格读数，登记成"未判定"而不是"缺陷"**：`07-owner-sees-bob.png` 里 bob 那行成员
+仍标「等待所有者授权」（`common.share.member.waitingForEnvelope`，由 `memberCanHoldOwnership` 为假驱动），
+而 `10-bob-sees-owner-task.png` 证明他**手里有钥并且用上了**（他解得开 owner 写的那条）。
+最坏的那种成因已按代码排除：入群那条腿 `acceptInvitation({ token, identityPublicKey })`
+（`packages/sync-client/src/share-api-client.ts:190`）确实把加入者的身份公钥交给了服务端，
+而 `GET /shares/:id/members` 把它回给 owner（`server/src/shares/share.routes.ts:464`）⇒
+`ShareFeature.tsx:328` 那行 `identityPublicKey === null ⇒ continue` 不会挡住 bob。
+剩下的两种都可能，且**现有任何尺子都量不到**：① 截图那一刻 `autoSeal` 的补封往返还没落地
+（面板 3s 轮询，旅程在那之后立刻拍图）⇒ 瞬态；② 补封真的没跑成 ⇒ owner 那台**永远**看不到
+"转让给 bob"（B-10 那道门按 `hasEnvelope` 判）。
+判它只要一条：在旅程第 7 段之后 `await expect(ownerPage.getByText('等待所有者授权')).toHaveCount(0)`
+（等 ≥ 一个轮询周期），要么它现在就绿（证明是瞬态、把这句留在册当回归钉），要么它红得有意义。
+🔴 这一格**不在本批判据内**，也没被用它改过任何代码 —— 写下它是为了别把它弄丢。
+
+
