@@ -181,7 +181,8 @@ export {
  * 🔴 **它不走 `ctx.dispatch`**：COMMENT 在个人 op-log 上会被永久拒绝
  * （白名单 + role 门都在服务端，见 `op-log/src/state.ts` 的 `comments` 桶注释），
  * 所以写入经注入端口 `CommentActionsOptions.dispatchShareOp` 出去。
- * 本段只定义那个端口并调用，**不实现传输**（share 引擎/加密/签名是下一段）。
+ * 本段只定义那个端口并调用，**不实现传输**（share 引擎/加密/签名住在
+ * `share-comments.ts` 与 `share-client.ts` 那两层，不在本文件）。
  *
  * 排序、"软删不进线程"、正文上限与空白拒绝全在 `@heyta/domain` 的 `comments.ts`。
  */

@@ -11210,6 +11210,15 @@ COMMENT  action ✅  1 处   家族 createCommentActions   宿主调用点 0 处
 清墓碑被 JSON 丢掉）各自 `rc=1`。
 
 **为什么断言 C 只能保持红（三条独立指认）**
+> 🔴 **2026-10-23 现量改口（M4 落地那一批，读数在本线计划 §9.12）**：下面这三条指认是 **2026-10-16 的读数**，
+> 今天**三条都不成立**，而断言 C 已经绿（现量：`node scripts/check-reachability.mjs --entity=COMMENT` ⇒ 四条断言全过）。
+> 第 1 条那句"**零消费者**"翻得最彻底：`signShareOpWire` 在 `packages/app-host/src/share-client.ts` 的写路径上、
+> `classifyShareOpSignature` 同时被 `server/src/shares/share.routes.ts` 的上传边界和
+> `packages/app-host/src/share-verify.ts` 的读路径调用，`uploadOps` / `downloadOps` 各有生产消费者
+> （现量：`grep -rn "signShareOpWire\|classifyShareOpSignature" packages/*/src apps/*/src server/src`）。
+> 第 2 条（没有 per-share 存储面）随 M1 的下行链路与游标落盘闭合，第 3 条（没有宿主能给出真会到达别人的
+> `dispatchShareOp`）随 M2 的路由 + M5 的信号 + `apps/web` 那处构造闭合。
+> **留着这三条原文**是为了说明"当时为什么宁可让门禁红" —— 它抓到的形状（登记齐全但没人能生成）就是后来那批活的靶子。
 1. 共享平面的**原语**在 `packages/sync-core/src/share-keys.ts`（`deriveShareOperationKey:226` /
    `signShareOperation:543` / `verifyShareOperationSignature:552`），**传输**在
    `packages/sync-client/src/share-api-client.ts`（`uploadOps:224` / `downloadOps:228`）——

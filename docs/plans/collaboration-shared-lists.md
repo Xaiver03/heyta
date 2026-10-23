@@ -309,7 +309,8 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 
 🔴 仍然到不了的，别写成"做完了"：
 · **移动端零接入**（M6 那六段，现量见 §9.4）；
-· **逐 op 签名**没有（M4，`shared-schema` 线协议 = 不可逆层）；
+· **逐 op 签名**已落地（M4，2026-10-23，读数见 §9.12）：写侧签、服务端验、验不过就不落库也不物化。
+  但它今天只覆盖**新写入**的 op（存量不追签，ADR-0069 裁决二/三），且**移动端一条都签不出来**（M6 没接）；
 · **跨清单搬迁**仍按补二具名拒绝 —— 界面上那三处"换清单"目的地现在**灰掉并说一句为什么**
   （2026-10-23 补：以前是把注定失败的动作摆出来，报错文案还是"你的改动还在本地，可以重试"，那句是假的）；
 · **库里旧密文不重加密**（追加模型，M3 就登记过）；
@@ -356,7 +357,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | **M1 🟡**（2026-10-21 宿主层已闭，读数见 §9.8） | **下行链路接通**：`downloadOps` 接进宿主（游标持久化、分页收敛、解密回放、离线补拉） | 🔴 **判据按实测改口**（原句写的是"今天走不通的那一族"）：~~A 改一条任务标题 → B 读到新标题~~ —— `TASK/PROJECT` 的 op 至今仍进**个人** op-log（那是 M2 那一步路由的事），所以下行腿今天能搬运的只有 `COMMENT`。现判据 = **两台独立宿主**：A 发一条评论 → B 拉回并物化、再拉一次零新增、游标落在盘上（`verify:collab-sync` 第 10 步，读数 `RESULT=OK steps=10`）。变异臂三臂见 §9.8，红集精确匹配 | 只需 `packages/app-host` + `apps/web`，不碰线协议 ⇒ **可以先做**；"任务标题那一半"随 M2 一起判 | 工程直接做 |
 | **M2 ✅**（2026-10-22 立 ADR-0067，2026-10-23 收尾，读数见 §9.11） | **任务/清单的写路径路由**：共享清单里的 `TASK/TAG/NOTE/COMMENT` op 进 share log（**清单这条记录本身按 ADR-0068 裁决一仍走个人 log** —— 原句把 PROJECT 也列进来了，那一句在实施时被推翻并写进 0068） | 判据按实测**加硬**成三层：① 路由判据唯一一份在 `packages/app-host/src/share-routing.ts`，端壳只装配（`check:layering` 拦壳里的业务判断）② 跨账号搬运 + 并发同字段必须可见由 `verify:collab-sync` 第 12 步在**真服务端 + 生产路由**上证 ③ 用户可见那一格由 `verify:collab-journey` 的「两台真浏览器互见」钉。红形都真红过：未共享写进 share / 共享写进个人 log ⇒ 红；新建那一形不回退问载荷 ⇒ 4 枚红；通道没装上退回个人 log ⇒ 普通与 CAS 两条派发器各红一组 | 前置已满足：[ADR-0067](../adr/0067-shared-list-write-routing-and-merge.md) 已立（含一·补三格），`Project.shareId` 已在册，**零 schema bump** | 工程 + 一份新 ADR ✅ |
 | **M3 🟡**（2026-10-21 落地，读数与两件刻意没做的见 §9.9） | **rekey 落地**：移除/退出/撤销 → `keyEpoch` 推进 → 重封给在册成员；撤销后旧成员解不开新内容 | 实测到的判据形状：`verify:collab-revoke` 从"手搓迁移循环"改成**吃生产函数**（`removeMemberAndRekey` + `adoptRotatedShareKey` + 真 `ShareApiClient`），8 步含 psql 现量（`shares.key_epoch = 2`、他那行 `key_envelope IS NULL`）与"第三个人 carol 换钥后仍读得到新旧两代"；变异臂四臂 `ARMS=pass (4/4)` 红集精确匹配（原句那句"摘掉 `autoSeal` 那一步 ⇒ 必红"已由 `verify:collab-journey` 那条臂覆盖，这一批补的是**换钥编排本身**能不能红） | 依赖 M1（下行要先能读，否则证不了"读不到"）—— 已满足 | 工程直接做 |
-| **M4** | **逐 op 签名**：线协议加 `signature`、写侧签、服务端验、失败按"永久拒绝"处置（对齐 ADR-0019 那条读侧对偶） | 封闭词表 + 一条"改一个字节必被拒"的臂 | 🔴 `shared-schema` 线协议 = 不可逆层，与 M2 同一份 ADR 承接 | 工程 + ADR |
+| **M4 ✅**（2026-10-23 落地，读数见 §9.12） | **逐 op 签名**：线协议加 `signature`、写侧签、服务端验、失败按"永久拒绝"处置（对齐 ADR-0019 那条读侧对偶） | 三层各真红过：① 纯函数层封闭词表 + 逐字节翻转臂（`packages/sync-core/tests/share-keys.spec.ts`）② 服务端层三枚具名码 + 不落库（`verify:collab-sync` 第 13 步的 13.1–13.6）③ 宿主层盘上改一枚签名 ⇒ 另一台读到具名失败且**游标停在那条之前**（同一步，读数"游标停在 7、再拉仍报同一条"）。四臂变异装置 `mutate-collab-upload-gate.mjs` ⇒ `ARMS=pass (4/4)` | 🔴 `shared-schema` 线协议 = 不可逆层：**零 schema bump**（新字段全可选 + 运行时默认），服务端新列走 `migrate-deploy.sh`；口径由 [ADR-0069](../adr/0069-share-op-per-op-signing-keys-and-disposition.md) 承接 0067 裁决四 | 工程 + ADR ✅ |
 | **M5 ✅**（2026-10-21 落地，读数见 §9.10） | **实时与偏好接线**：客户端接 `new_share_ops`、活动谓词进通知路径 | 现量（不是"应该行"）：`verify:collab-sync` 第 11 步走真 WS + 真宿主 ⇒ 有信号就有拉取；`无订阅偏好 ⇒ 零打扰`钉在 `apps/web/tests/share-activity-notify.spec.ts`（10 枚）与 `share-activity-signal.spec.tsx`（6 枚，接线臂）。红形都真红过：谓词恒 true ⇒ 3 枚红；壳跳过闸门 ⇒ 2 枚红；拿掉客户端那条分支 ⇒ `RESULT=FAIL step=11` | M1 之后才有意义（信号语义是"有东西可拉"） | 工程直接做 |
 | **M6** | **移动端接入**：入口/路由、`setProjectShareId` 调用点、share 密钥落盘端口、`payloadCipher` 接线、同意态存储、`ShareFeature` 那层的 web-only 假设重写 | 与 web 同一条旅程在 iOS 模拟器 + Android 上走一遍（AGENTS §6.2：真跑 + 真看截图） | 六段缺段的现量清单见 9.4；🔴 Android 构建一律走 windows-pc | 工程直接做（体量大，可拆） |
 | **M7 ✅**（2026-10-21 落地，形状与读数见 §9.7） | **把判据变成常驻**：本线 `verify:collab-*` 与 journey 进链或有别的自动载体；`check:share-entry-hidden`（P-1 期间钉"不可达"）；变异臂从散文搬进 `research/tools/mutation-rigs/` | `check:gate-wiring` 那类"链外必须有可验消费方"的尺要能覆盖 `verify:*`（它今天只审 `check:*` ⇒ 本身要扩）—— **本线没替公共那把尺翻口径**，改立窄的 `check:collab-carrier`，理由写在 §9.7 末 | 无 | 工程直接做，**最先做也行** |
@@ -555,5 +556,41 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 判它只要一条：在旅程第 7 段之后 `await expect(ownerPage.getByText('等待所有者授权')).toHaveCount(0)`
 （等 ≥ 一个轮询周期），要么它现在就绿（证明是瞬态、把这句留在册当回归钉），要么它红得有意义。
 🔴 这一格**不在本批判据内**，也没被用它改过任何代码 —— 写下它是为了别把它弄丢。
+
+### 9.12 M4 落地（2026-10-23 第六批）—— 逐 op 签名的读数
+
+> 本节是 §9.3 那行 M4 从"没做"变 ✅ 的凭据。**为什么这么定**（签名域取哪些字节、钥从哪来、
+> 失败怎么处置、存量追不追签）在 [ADR-0069](../adr/0069-share-op-per-op-signing-keys-and-disposition.md)
+> 的六条裁决与文末实施记录里；这里只放**这一趟亲自跑出来的读数**，一句结论都不复述那份 ADR。
+
+| 哪一层 | 落到哪儿 | 现量读数 |
+|---|---|---|
+| ① 纯函数层：签名域 + 封闭词表 + "改一个字节必被拒" | `packages/sync-core/src/share-keys.ts` 的 `shareOpSignatureMessage` / `signShareOpWire` / `classifyShareOpSignature`；词表就四枚 `verified` / `unsigned` / `invalid` / `signer-unregistered`，函数回别的值本身算红 | `pnpm --filter @heyta/sync-core test` ⇒ 364 passed（逐字节翻转、换作者、换 share、空域、非法 base64 各一枚臂都在里面） |
+| ② 服务端层：上传边界验签 ⇒ **具名错误** + **永久拒绝**（不落库） | `server/src/shares/share.routes.ts` 里 `classifyShareOpSignature` 那一支，三枚码 `SHARE_OP_UNSIGNED` / `SHARE_OP_SIGNATURE_INVALID` / `SHARE_OP_SIGNING_KEY_UNREGISTERED`；判序是**先钥后人**（没在册就是 `signer-unregistered`，不去猜他是谁） | `pnpm --filter server test` ⇒ 2998 passed；常驻腿在 `verify:collab-sync` 第 13 步：13.1 伪造作者 / 13.2 无签 / 13.3 改一个字节 / 13.4 未在册 / 13.5 已移除成员的名册 / 13.6 拒了之后游标仍停在那条之前（读数逐条见下） |
+| ③ 宿主与界面层：跨账号写 ⇒ 落库带可验签名；盘上那枚签名被改 ⇒ 另一台读到**具名失败**而不是静默的错数据 | 写侧 `packages/app-host/src/share-client.ts` 的 `signShareOpWire`（私钥只在装配点用一次，不上线不进日志）；读侧 `packages/app-host/src/share-verify.ts` 的三态 + **不物化**；web 只注入两个端口（`signerFor` / `verifiersFor`） | `pnpm verify:collab-sync` ⇒ `RESULT=OK steps=13`，其中第 13 步打印"游标停在 7（被拒那条 8 之前）、再拉仍报同一条"；`pnpm --filter @heyta/app-host test` ⇒ 2018 passed |
+| 签名公钥在册（发布那条腿） | 接受邀请时带 `signingPublicKey` + 补发端点 `PUT /shares/:shareId/members/:memberId/signing-key`（**只本人**、**只允许「没有→有」**、值不同 ⇒ 409 `SHARE_SIGNING_KEY_CONFLICT`）；服务端新列走 `cd server && sh scripts/migrate-deploy.sh` | `verify:collab-sync` 第 2/3 步（owner 补发 + bob 接受即在册，回读 `signingPublicKey` 非空）；`server/tests/share-routes.spec.ts` 用**生产签名件**当夹具 |
+| 🔴 名册 ≠ 成员面板（这一批抓到的真缺陷） | 新端点 `GET /shares/:shareId/signing-keys`（**含已移除成员**）+ `ShareApiClient.listSigningKeys`；面板那侧仍走 `GET /members` | 缺陷形状：名册若复用 `/members`（只回在册成员），**把人移出清单的那一刻起，他写过的每一条与其后所有人的改动一起读不出来**。判据 = `verify:collab-sync` 第 13.5 臂；反证 = 变异臂 `roster-active-only` |
+| 关掉无签通道（裁决六） | 服务端对 `outcome !== 'verified'` 一律拒 ⇒ 三套手搓上传的载体当场变红，本批把它们改成"发布公钥 + 走生产签名件" | 改前实测红：`SHARE_OP_SIGNING_KEY_UNREGISTERED`（第 5 步）；改后 `verify:collab-sync` `RESULT=OK steps=13` / `verify:collab-revoke` `RESULT=OK steps=8` / `verify:collab-conflict` `RESULT=OK steps=6` |
+| 变异臂（能不能红，由装置回答） | `research/tools/mutation-rigs/mutate-collab-upload-gate.mjs` 四臂：放过无签 / 放过被改 / 作者列不落 / 名册只看在册 | `node research/tools/mutation-rigs/mutate-collab-upload-gate.mjs` ⇒ `ARMS=pass (4/4)`（BASELINE 与 RECHECK 均绿、`.mut-bak` 无残留）；两处预测漂移的如实对账写在该件与 `README.md` 那一行里 |
+
+**四把尺（2026-10-23 18:4x 现量，按当前 HEAD 串行一次一条）**
+
+| 尺 | 读数 |
+|---|---|
+| `pnpm -r typecheck` | rc=0 |
+| `pnpm -r test` | rc=0；分子分母同一条构造式（先去 ANSI 色再摘 `Tests ` 汇总行求和）⇒ **21 个测试包 / 14522 passed / 14 skipped / 14536 总计**，失败行数零命中 |
+| `pnpm -r build` | rc=0（18 段 `build: Done`，error 与 ELIFECYCLE 两类关键字零命中） |
+| `pnpm verify:collab-journey` | `RESULT=OK steps=3` + rc=0；`e2e/collab-journey-results/` 那 11 张**逐张肉眼看过**：09/10/11 三张证明两台真浏览器互见仍然成立（owner 那台写「换窗纱谁来约师傅」⇒ bob 那台只画出这一行；bob 写「量窗台周末去建材城」⇒ owner 那台两行），08 证明面板错误可见（红字「这一步没有完成：409 SHARE_MEMBER_LIMIT」），01–07 是入口/同意面/名册/凭证/入群链接/加入成功那一族 |
+
+⚠️ **一趟假红登记在这里，免得下一位当成回归**：`apps/web/tests/task-sort.spec.tsx` 的「批量完成」那一枚
+在并发的那趟 `pnpm -r test` 里红了一次（`expected undefined to be defined`，该文件耗时 8109ms），
+单独跑 ⇒ `8 passed`（1231ms）。判据没动、被测文件与它依赖的源文件对 HEAD 干净 ⇒ 记为**负载抖动**。
+教训（为什么"整趟绿"要单独一趟重跑而不是拿首趟读数凑）追加进环境陷阱，编号见文末。
+
+**这一批还剩什么**（不包装成"签名做完了"）：
+- **移动端零接入**（M6 那六段，现量见 §9.4）：移动端还没接 share 通道，所以它今天**写不出**带签名的 op —— 不是"签得不对"，是那条腿根本还没接。
+- 名册取不到时只有宿主层那个异常名（`ShareSignatureRosterUnavailableError`），**没有界面措辞** ⇒ 用户看到的是"没更新"，不是一句为什么。
+- 服务端可以把 `signature` 与 `signer_member_id` **一起**抹掉 ⇒ 读侧回落到"存量未签"那一形。这一格 ADR-0069 实施记录里如实写着没做到，翻案条件也在那一节。
+- 库里存量 op **不追签**（裁决二/三定的），所以"每一条都可验"只对**新写入**成立；判它的断言在 ADR 里，别在本节推断。
 
 
