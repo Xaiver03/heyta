@@ -517,18 +517,33 @@ export const reencryptShareRecord = async (args: {
 /**
  * Canonical op-signature message.
  *
- * 🔴 域里放的是**服务端能看见、且读侧会据以判定的一切字段**（除 `serverSeq` / `receivedAt` ——
- * 它们由服务端分配，客户端签的那一刻还不可知，见 ADR-0069 裁决三）。
+ * 🔴 定下来的规则（ADR-0069 裁决三）：**签名域 = 线协议里服务端看得见、且共享日志会据以判定的
+ * 全部字段** —— `serverSeq` / `receivedAt` 由服务端分配，客户端签的那一刻不可知，签不进去。
+ * 两枚个人日志专用字段（`syncImportReason` / `repairBaseServerSeq`）也**不在**域里：
+ * share 那张表从来没有这两列（现量：`grep -n "syncImportReason\|repairBaseServerSeq" server/prisma/schema.prisma`），
+ * 没有落库就没有"被改动后还读得出来"这件事。**翻案条件**：共享日志哪天开始存它们，它们必须同时进域。
+ *
+ * 🔴 **顺序即协议**：下面那一只数组就是签名域的字节形状，加字段一律**追加在末尾**、
+ * 不许插在中间（插在中间 = 让所有已签的 op 集体变成"验不过"，而这一步没有任何迁移能补救）。
+ *
+ * ⚠️ **密钥世代（`keyEpoch`）不单独进域**：它在密文信封的头 9 字节里自描述
+ * （`encodeRecordEnvelope`），而**整个信封就是域里那枚 `ciphertext`** ⇒ 改世代必然改密文字节，
+ * 签名照样废。单列它不增加任何完整性，只会多要签名者先解析一份信封格式（`shareRecordEpoch`）——
+ * 那等于把"签名的字节形状"绑在信封编码器上：任何不产出这个信封的加密实现（替身、
+ * 以后换的 AEAD 封装）都签不出来，而它签不出的原因是域里一枚**冗余**字段。
+ * **翻案条件**：哪天服务端把世代存成独立列并按列判定（不再从信封读回来），它必须同时进域。
+ *
  * 为什么不是"只签密文"：那些元数据今天已经被 AEAD 的 AAD 绑住（`opRecordAad`），改它们会解不开；
- * 但 `vectorClock` **没有**被任何完整性机制绑住，而并发判定与冲突可见性读的正是它 ——
- * 服务端重写它就能把两条并发伪装成有先后，而签名对此保持沉默。
- * 签全部可见字段还有一层作用：服务端没有清单钥，它**唯一**能在上传边界做的完整性检查就是这一枚签名。
+ * 但**服务端没有清单钥**，它永远做不了 AAD 一致性检查 —— 要让它能在上传边界就拒掉伪造件，
+ * 签名必须覆盖这些字段。另有一格从来不被任何完整性机制绑住：`vectorClock` 不在 AAD 里，
+ * 而并发判定与冲突可见性读的正是它 —— 服务端重写它就能把两条并发伪装成有先后。
+ * 读侧还要能分出**两种不同的失败**："签名无效"（有人在动我的数据）与"解不开"（世代/钥的问题，
+ * ADR-0016 那一族）。域里少一枚字段，这两类就会互相顶包。
  */
 export interface ShareOpSignatureParts {
   opId: string;
   clientId: string;
   shareId: string;
-  keyEpoch: number;
   /**
    * 写这条 op 的**成员行 id**（share 作用域，不是 userId）。
    *
@@ -548,6 +563,14 @@ export interface ShareOpSignatureParts {
   /** 线协议上的毫秒数（`number`）。传 `bigint` 会响亮失败，不会被静默丢字段。 */
   clientTimestamp?: number | null;
   vectorClock?: unknown;
+  /**
+   * 🔴 时钟是**完整前集**还是"对某个前沿的增量"（`vectorClockEncoding`）。
+   * 这一枚必须签：同一份 `vectorClock` 字节配上不同的 encoding 是两种意思，
+   * 而改这一格不需要动时钟本身 —— 不签它，"改序伪装成有先后"就又回来了一条路。
+   */
+  vectorClockEncoding?: string | null;
+  /** 载荷是不是密文。不签它，中间人翻掉这一格就能把密文读成明文形状。 */
+  isPayloadEncrypted?: boolean | null;
 }
 
 /**
@@ -595,7 +618,6 @@ const assertOptionalPositiveInt = (value: unknown, label: string): void => {
 
 export const buildShareOpSignatureMessage = (parts: ShareOpSignatureParts): Uint8Array => {
   assertShareId(parts.shareId);
-  assertSafeEpoch(parts.keyEpoch);
   if (typeof parts.opId !== 'string' || parts.opId.length === 0 ||
       typeof parts.clientId !== 'string' || parts.clientId.length === 0 ||
       typeof parts.ciphertext !== 'string' || parts.ciphertext.length === 0) {
@@ -606,24 +628,43 @@ export const buildShareOpSignatureMessage = (parts: ShareOpSignatureParts): Uint
   assertOptionalString(parts.opType, 'opType');
   assertOptionalString(parts.entityType, 'entityType');
   assertOptionalString(parts.entityId, 'entityId');
+  assertOptionalString(parts.vectorClockEncoding, 'vectorClockEncoding');
+  if (parts.isPayloadEncrypted !== null && parts.isPayloadEncrypted !== undefined &&
+      typeof parts.isPayloadEncrypted !== 'boolean') {
+    throw new Error('Invalid share op signature isPayloadEncrypted');
+  }
   assertOptionalPositiveInt(parts.schemaVersion, 'schemaVersion');
   if (parts.clientTimestamp !== null && parts.clientTimestamp !== undefined &&
       (typeof parts.clientTimestamp !== 'number' || !Number.isFinite(parts.clientTimestamp))) {
     throw new Error('Invalid share op signature clientTimestamp');
   }
-  const entityIds = parts.entityIds === null || parts.entityIds === undefined
+  const entityIds = parts.entityIds === null || parts.entityIds === undefined || parts.entityIds.length === 0
+    // 🔴 「没有批量作用域」与「作用域是空集合」必须是**同一个域值**：服务端把缺省落成
+    // `entity_ids: []`（jsonb 里不会是 null），读侧拿回来的就是 `[]`。写侧签的是"没传"、
+    // 读侧重建的是"空数组"，两者不同形 ⇒ 每台非签名者的设备把自己人的合法签名读成失败。
+    // 语义上这两句是同一句（"这条 op 不指向一批实体"），所以在这里折成一份。
     ? null
     : [...parts.entityIds].map((id) => {
         if (typeof id !== 'string' || id.length === 0) throw new Error('Invalid share op signature entityIds');
         return id;
       }).sort();
+  const vectorClock = parts.vectorClock
+    // 同上：`vector_clock` 在服务端是 jsonb，缺省的时钟存成 `{}`，读回来是 `{}` 而不是"没有"。
+    // `{}` 与"没有因果前集"是同一件事（`foldShareOps` 折出来的空钟就是 `{}`），所以折成 null。
+    && typeof parts.vectorClock === 'object' && !Array.isArray(parts.vectorClock)
+    && Object.keys(parts.vectorClock as Record<string, unknown>).length === 0
+      ? null
+      : parts.vectorClock;
   return getTextEncoder().encode(JSON.stringify([
     'heyta:share-op-sig',
     SHARE_KEYS_FORMAT_VERSION,
     parts.opId,
     parts.clientId,
     parts.shareId,
-    parts.keyEpoch,
+    // 世代（`keyEpoch`）在这里**不占一格**：它在下一格那枚信封的头 9 字节里，
+    // 动它必改动被签的字节。这一格是 M4 第三批删掉的 —— 当时全仓还一条带签名的 op
+    // 都没上过线（判据：`grep -rn "signShareOpWire" packages/*/src server/src apps/*/src`
+    // 只有装配点这一处），所以这是"中间不许动"这条纪律唯一一次免费执行的窗口。
     parts.signerMemberId ?? null,
     parts.actionType ?? null,
     parts.opType ?? null,
@@ -632,8 +673,12 @@ export const buildShareOpSignatureMessage = (parts: ShareOpSignatureParts): Uint
     entityIds,
     parts.schemaVersion ?? null,
     parts.clientTimestamp ?? null,
-    canonicalSignatureValue(parts.vectorClock),
+    canonicalSignatureValue(vectorClock),
     parts.ciphertext,
+    // 🔴 追加在末尾（见上面"顺序即协议"）：这两枚是 M4 第三批才进域的，插在中间会
+    // 让已签的字节形状整体位移 —— 现在还没有任何一条 op 带过签名，所以这一次是最后一次能白捡的。
+    parts.vectorClockEncoding ?? null,
+    parts.isPayloadEncrypted ?? null,
   ]));
 };
 
@@ -659,3 +704,134 @@ export const verifyShareOperationSignature = (
     return false;
   }
 };
+
+/**
+ * 线 op 里签名要读到的那几枚字段（**上传形状**，不是下载形状）。
+ *
+ * 🔴 `clientTimestamp` 是同一个数在三个地方的三个名字之一：写侧线 op 上叫 `timestamp`、
+ * 库里叫 `client_timestamp`、下载回来又叫 `clientTimestamp`。这一枚接口按**签名域里那个名字**
+ * 声明，于是三处调用点都必须显式交代"我这份时间是从线 op 拿的"：
+ * 写侧 `clientTimestamp: identity.timestamp`、服务端 `clientTimestamp: op.timestamp`、
+ * 读侧 `clientTimestamp: row.clientTimestamp`（同名字段，直接给）。
+ * 谁要是顺手填 `Date.now()`，填进去的字面量就不是这个名 —— 漂移留在原地，症状是每台
+ * 非签名者的设备把一枚合法签名读成失败。
+ */
+export interface ShareOpWireForSignature {
+  readonly id: string;
+  readonly clientId: string;
+  readonly actionType?: string | null;
+  readonly opType?: string | null;
+  readonly entityType?: string | null;
+  readonly entityId?: string | null;
+  readonly entityIds?: readonly string[] | null;
+  /** 密文信封（base64 字符串）。不是字符串就说明这条压根没走清单钥 ⇒ 装配处响亮抛错。 */
+  readonly payload: unknown;
+  readonly vectorClock?: unknown;
+  readonly schemaVersion?: number | null;
+  /** 线 op 上那枚 `vectorClockEncoding`（缺省 = 完整前集）。在域里，见 `ShareOpSignatureParts`。 */
+  readonly vectorClockEncoding?: string | null;
+  readonly isPayloadEncrypted?: boolean | null;
+  readonly clientTimestamp: number;
+}
+
+/**
+ * 从**线 op 那一份形状**装配签名消息 —— 写侧、服务端上传边界、读侧三处共用这一个装配器。
+ *
+ * 🔴 为什么必须共用："哪些字节进签名域"这件事一旦有两份实现，两份迟早漂一点，
+ * 症状是每台非签名者的设备都把一枚合法签名读成失败（比不签更坏 —— 它会让人以为
+ * 有完整性保护）。三处只有这一处知道域的形状，才是"协议只有一份定义"。
+ *
+ * `keyEpoch` **不上线也不单列**：它在密文信封头 9 字节里自描述，而信封整体就是域里那枚
+ * `payload` ⇒ 改世代必然改被签的字节。这里因此**不解析信封**：签名件不需要认识信封格式，
+ * 替身加密器（以及以后换的封装）也签得出来。翻案条件见 `ShareOpSignatureParts` 的注释。
+ */
+export const buildShareOpSignatureMessageFromWire = (
+  shareId: string,
+  signerMemberId: string | null | undefined,
+  wire: ShareOpWireForSignature,
+): Uint8Array => {
+  if (typeof wire.payload !== 'string' || wire.payload.length === 0) {
+    throw new Error('Invalid share op signature parts');
+  }
+  return buildShareOpSignatureMessage({
+    opId: wire.id,
+    clientId: wire.clientId,
+    shareId,
+    signerMemberId,
+    ciphertext: wire.payload,
+    actionType: wire.actionType ?? null,
+    opType: wire.opType ?? null,
+    entityType: wire.entityType ?? null,
+    entityId: wire.entityId ?? null,
+    entityIds: wire.entityIds ?? null,
+    schemaVersion: wire.schemaVersion ?? null,
+    vectorClockEncoding: wire.vectorClockEncoding ?? null,
+    isPayloadEncrypted: wire.isPayloadEncrypted ?? null,
+    clientTimestamp: wire.clientTimestamp,
+    vectorClock: wire.vectorClock ?? null,
+  });
+};
+
+/** 写侧：线 op ⇒ 线协议上那枚 base64 签名。装配域的那份知识只在上面那一处。 */
+export const signShareOpWire = (
+  ed25519SecretKey: Uint8Array,
+  args: { shareId: string; signerMemberId: string; wire: ShareOpWireForSignature },
+): string =>
+  encodeBase64(
+    signShareOperation(
+      ed25519SecretKey,
+      buildShareOpSignatureMessageFromWire(args.shareId, args.signerMemberId, args.wire),
+    ),
+  );
+
+/**
+ * 一条 op 的签名**结局**（封闭词表）。
+ *
+ * 🔴 四态而不是布尔：ADR-0069 裁决五要求读侧把「通过 / 未签名 / 失败」分开画，
+ * 而服务端还要多一档「这个人根本没登记签名公钥」（客户端唯一能自己修的一档：去补发）。
+ * 折叠成两态就等于让"世代没对上"顶包"有人在改我的数据"。
+ */
+export const SHARE_OP_SIGNATURE_OUTCOMES = ['verified', 'unsigned', 'invalid', 'signer-unregistered'] as const;
+export type ShareOpSignatureOutcome = (typeof SHARE_OP_SIGNATURE_OUTCOMES)[number];
+
+/**
+ * 验一枚线签名，回封闭词表里的一个结局 —— 服务端上传边界与读侧共用这一处判定。
+ *
+ * 判定顺序是**先钥后人**：在册公钥缺失排在签名缺失之前。不是随手排的 —— 「没登记公钥」是
+ * 这台设备能自己修的那一格（面板补发），而「没签名」它修不了；把可修的那一档报出去，
+ * 用户才有一条出路。
+ *
+ * ⚠️ 「存在但形状不对」一律算 `invalid` 而不是 `unsigned`：`signature: 123` 不是"没签"，
+ * 是有人在动这条 op。把伪造读成缺席，就是那条线一直防的"静默的错数据"。
+ */
+export const classifyShareOpSignature = (args: {
+  /** 成员行上登记的 Ed25519 公钥（base64）；`null`/空表示还没在册。 */
+  signingPublicKey: string | null | undefined;
+  shareId: string;
+  /** 服务端按**认证上传者**写进库的那个成员行 id；读侧传库里那一格。 */
+  signerMemberId: string | null | undefined;
+  wire: ShareOpWireForSignature;
+  /** 线 op 上那枚（未经校验的 `unknown`，由调用方从**原始**请求体里取 —— 严格 schema 会把它剥掉）。 */
+  signature: unknown;
+}): ShareOpSignatureOutcome => {
+  if (typeof args.signingPublicKey !== 'string' || args.signingPublicKey.length === 0) {
+    return 'signer-unregistered';
+  }
+  if (args.signature === null || args.signature === undefined) return 'unsigned';
+  if (typeof args.signature !== 'string' || args.signature.length === 0) return 'invalid';
+  try {
+    return verifyShareOperationSignature(
+      // ⚠️ `decodeBase64` 回的是 **ArrayBuffer**（`encryption/web-crypto.ts:207`），
+      // 直接递给 Ed25519 会被长度校验拒掉 —— 症状是"每一枚合法签名都验不过"，
+      // 看起来像有人在动数据。与 `decryptShareRecord` 同一处写法：先重新包成视图。
+      new Uint8Array(decodeBase64(args.signingPublicKey)),
+      buildShareOpSignatureMessageFromWire(args.shareId, args.signerMemberId, args.wire),
+      new Uint8Array(decodeBase64(args.signature)),
+    )
+      ? 'verified'
+      : 'invalid';
+  } catch {
+    // 域装配抛错（载荷不是信封、时钟里有 bigint…）= 这条 op 无法被证明，不是"没问题"。
+    return 'invalid';
+  }
+}

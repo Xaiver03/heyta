@@ -31,6 +31,10 @@ export const SHARE_ERROR_CODES = {
   TRANSFER_TARGET_UNSEALED: 'SHARE_TRANSFER_TARGET_UNSEALED',
   // ADR-0069 裁决二：签名公钥已在册且不同 ⇒ 补发被拒（不换钥）。
   SIGNING_KEY_CONFLICT: 'SHARE_SIGNING_KEY_CONFLICT',
+  // ADR-0069 裁决四：上传边界的逐 op 签名判定（三态各一枚，客户端据此决定"要不要再试"）。
+  OP_UNSIGNED: 'SHARE_OP_UNSIGNED',
+  OP_SIGNATURE_INVALID: 'SHARE_OP_SIGNATURE_INVALID',
+  OP_SIGNING_KEY_UNREGISTERED: 'SHARE_OP_SIGNING_KEY_UNREGISTERED',
 } as const;
 
 export type ShareApiErrorCode =
@@ -106,6 +110,13 @@ export interface ShareOpWire {
   schemaVersion: number;
   clientTimestamp: number | null;
   isPayloadEncrypted: boolean;
+  /**
+   * 写这条 op 的成员行 id（服务端按**认证上传者**写库，不是客户端声明）。
+   * `null` = 这条比签名还早（存量，ADR-0069 裁决六"不追签"）⇒ 读侧只能读成"未签名"。
+   */
+  signerMemberId?: string | null;
+  /** Ed25519 签名的 base64。`null`/缺省 = 未签名，**不等于**已验证。 */
+  signature?: string | null;
 }
 
 export interface ShareOpUploadResult {
