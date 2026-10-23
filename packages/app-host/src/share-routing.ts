@@ -224,6 +224,32 @@ export function crossesShareBoundary(state: MaterializedState, intent: OpIntent)
   return fromShare !== toShare;
 }
 
+/**
+ * 界面装配用的那一句：**这一次「换清单」会不会撞上补二那道门？**
+ *
+ * 🔴 判据**只有上面那一处**：这一枚只是把"目的地"包成一条意图再交给同一个
+ * `crossesShareBoundary`。写第二份的原因就是这条线一直在防的漂移 —— 端壳自己判一次、
+ * 派发器再判一次，两边一漂，症状是"界面上能点，点了报错"（补二那句"不许给出移出了的
+ * 错觉"钉的正是这一形），或者反过来"界面把能做的动作藏掉了"。
+ *
+ * 端壳拿它决定**要不要把这个目的地摆给用户看**（ADR-0067 补二的落地形状：M2 期间
+ * 界面上不提供这个动作），派发器拿它决定要不要抛具名错误。
+ */
+export function isCrossListMoveBlocked(
+  state: MaterializedState,
+  entityType: 'TASK' | 'NOTE',
+  entityId: string,
+  destinationProjectId: string | undefined,
+): boolean {
+  return crossesShareBoundary(state, {
+    entityType,
+    entityId,
+    opType: OpType.Update,
+    // 键必须在（`crossesShareBoundary` 靠它区分"没碰那一格"与"移到收集箱"）。
+    payload: { projectId: destinationProjectId },
+  });
+}
+
 /** 这条意图在写 `tagIds` 吗？是的话返回那组 tagId。 */
 function tagIdsIn(intent: OpIntent): string[] | undefined {
   if (intent.entityType !== 'TASK') return undefined;

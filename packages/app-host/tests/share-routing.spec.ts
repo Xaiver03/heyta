@@ -26,6 +26,7 @@ import { OpType } from '@heyta/sync-core';
 import {
   createShareRoutingCheckedDispatcher,
   crossesShareBoundary,
+  isCrossListMoveBlocked,
   routeShareIdForEntity,
   routeShareIdForIntent,
   ShareChannelUnavailableError,
@@ -223,6 +224,50 @@ describe('跨边界移动具名拒绝（补二）', () => {
     const { calls, dispatch } = harness(fixture());
     await dispatch({ entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { sortOrder: 3 } });
     expect(calls.share).toHaveLength(1);
+  });
+});
+
+describe('界面装配那句「这次换清单撞不撞补二那道门」（isCrossListMoveBlocked）', () => {
+  // 这一族判据钉的是**同源**：端壳拿它决定"要不要把这个目的地摆给用户看"，
+  // 派发器拿 `crossesShareBoundary` 决定要不要抛。两边各判一次就会漂成
+  // "能点，点了报错"或"能做的动作被藏掉"—— 两种都是界面上的谎。
+  const blocked = (entityId: string, dest: string | undefined, kind: 'TASK' | 'NOTE' = 'TASK') =>
+    isCrossListMoveBlocked(fixture(), kind, entityId, dest);
+
+  it('个人 → 个人（另一条清单）⇒ 不挡（这是今天最常用的那一下，不该被共享那套逻辑碰）', () => {
+    const state = fixture();
+    Object.assign(state.projects as object, { pPersonal2: { id: 'pPersonal2', name: '私人二' } });
+    expect(isCrossListMoveBlocked(state, 'TASK', 'tPersonal', 'pPersonal2')).toBe(false);
+  });
+
+  it('个人 → 共享 ⇒ 挡（进共享要把内容交给别人的钥）', () => {
+    expect(blocked('tPersonal', 'pShared')).toBe(true);
+  });
+
+  it('共享 → 个人 ⇒ 挡（收不回已经发给其他人的那份密文）', () => {
+    expect(blocked('tShared', 'pPersonal')).toBe(true);
+  });
+
+  it('共享 → 收集箱 ⇒ 同样挡（目的地是"没有清单"也是一次出界）', () => {
+    expect(blocked('tShared', undefined)).toBe(true);
+  });
+
+  it('共享 → 另一份共享 ⇒ 挡（两份 share 的密钥不同）', () => {
+    expect(blocked('tShared', 'pOtherShared')).toBe(true);
+  });
+
+  it('无归属（收集箱里那条）→ 共享 ⇒ 挡：源解析不出 shareId 不等于"不在共享之外"', () => {
+    expect(blocked('tLoose', 'pShared')).toBe(true);
+  });
+
+  it('便签同形（NOTE 与 TASK 共用这一句，壳里不许再写第二份）', () => {
+    const state = fixture();
+    Object.assign(state.notes as object, {
+      nShared: { id: 'nShared', body: '刷墙进度', projectId: 'pShared' },
+      nPersonal: { id: 'nPersonal', body: '牙医回执', projectId: 'pPersonal' },
+    });
+    expect(isCrossListMoveBlocked(state, 'NOTE', 'nShared', 'pPersonal')).toBe(true);
+    expect(isCrossListMoveBlocked(state, 'NOTE', 'nPersonal', 'pPersonal')).toBe(false);
   });
 });
 

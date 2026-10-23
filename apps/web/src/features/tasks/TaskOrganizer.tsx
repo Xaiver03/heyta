@@ -60,6 +60,7 @@ import type { Task } from '@heyta/domain';
 import { SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
 
 import { selectChildProjects, selectTopLevelProjects, useProjectStore } from '../projects/store.js';
+import { moveBlockedForTask } from '../share/share-move-guards.js';
 
 /** chip 与图标的统一尺寸。**不许在 JSX 里散落字面量。** */
 const CHIP_ICON_SIZE = 12;
@@ -138,6 +139,32 @@ export function OrganizerField({
     })),
   ]);
 
+  /*
+   * 🔴 ADR-0067 补二的**界面那一半**：跨共享边界的"换清单"在 M2 期间不提供。
+   * 判据不在这份文件里（`moveBlockedForTask` → app-host 的 `crossesShareBoundary`，
+   * 与派发器抛错用的是同一句），这里只做一件事：把做不到的目的地标成 `disabled`。
+   *
+   * ⚠️ 为什么是**灰掉**而不是从菜单里删掉：删掉的话用户看到的是"我的共享清单不见了"，
+   * 那是另一种"界面坏了"。灰掉 + 一句为什么，才是"这件事现在不能做"。
+   * 反过来，只把错误文案改对（"这一步没保存成功，可以重试"）也不够 —— 那句话在这里
+   * 是假的：重试多少次都不会成功。
+   */
+  const inboxBlocked = moveBlockedForTask(task.id, undefined);
+  const options = projectOptions.map((option) => ({
+    ...option,
+    blocked: moveBlockedForTask(task.id, option.id),
+  }));
+  /*
+   * "没有可去的目的地"判的是**去掉它现在所在那一格之后**还剩不剩得去的地方：
+   * 一条共享清单里的任务，它自己那条清单仍然"不跨边界"（原地不动当然合法），
+   * 所以只看"有没有灰的"会永远算不出"没地方可去"，那一枚下拉就会一直亮着、
+   * 而里面除了当前值什么都没有 —— 用户点开它看到的是一个只有一项的下拉框。
+   */
+  const moveUnavailable =
+    inboxBlocked === false
+      ? task.projectId === undefined
+      : options.every((option) => option.blocked || option.id === task.projectId);
+
   return (
     <>
       <label style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.1') }}>
@@ -149,6 +176,7 @@ export function OrganizerField({
           // 所以 aria-label 带上任务标题做区分。
           aria-label={t('web.organize.projectSelect', { title: task.title })}
           data-testid="organize-project-select"
+          disabled={moveUnavailable}
           value={task.projectId ?? ''}
           onChange={(event) => {
             const next = event.target.value;
@@ -157,13 +185,30 @@ export function OrganizerField({
             onMoveToProject(next === '' ? undefined : next);
           }}
         >
-          <option value="">{t('web.organize.inbox')}</option>
-          {projectOptions.map((option) => (
-            <option key={option.id} value={option.id}>
+          <option value="" disabled={inboxBlocked}>
+            {t('web.organize.inbox')}
+          </option>
+          {options.map((option) => (
+            <option
+              key={option.id}
+              value={option.id}
+              disabled={option.blocked}
+              title={option.blocked ? t('web.organize.moveBlockedShared') : undefined}
+            >
               {option.label}
             </option>
           ))}
         </select>
+        {moveUnavailable ? (
+          <p
+            className="ht-type-caption ht-settings__hint"
+            role="status"
+            data-testid="organize-move-blocked"
+            style={{ margin: 0 }}
+          >
+            {t('web.organize.moveBlockedShared')}
+          </p>
+        ) : null}
       </label>
 
       {projectState.tags.length === 0 ? (

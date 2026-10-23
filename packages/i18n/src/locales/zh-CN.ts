@@ -1831,6 +1831,7 @@ export const zhCN = {
   'web.organize.projectLabel': '清单',
   'web.organize.projectSelect': '任务「{title}」所属清单',
   'web.organize.inbox': '收集箱',
+  'web.organize.moveBlockedShared': '共享清单里的任务暂时不能换清单',
   'web.organize.tagsLegend': '标签',
   'web.organize.tagToggle': '给任务「{title}」加上或去掉标签「{name}」',
   'web.organize.noTags': '还没有标签 —— 在左侧「标签」里新建一个。',
