@@ -202,6 +202,15 @@ export const TOKEN_GROUPS = {
     'field-padding-x',
     'progress-height',
     /**
+     * 底部面板把手（grabber）那条小横杠的宽与高。
+     *
+     * 🔴 与进度条同一个理由进 token：把手由共享层 `BottomSheet` **四端一份**
+     * 实现，而共享层里的裸数字没有任何约束力 —— 一端改了粗细，另外三端
+     * 不会有任何提示（AGENTS §5）。
+     */
+    'grabber-width',
+    'grabber-height',
+    /**
      * 番茄钟进度环的直径与描边宽度。
      *
      * 🔴 为什么进 token 而不是让组件写两个数字：M3 第二刀把专注环收进了

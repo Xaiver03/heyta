@@ -229,6 +229,8 @@ enum HeytaTokens {
     static let sizeFieldHeight: Double = 44  // px
     static let sizeFieldPaddingX: Double = 12  // px
     static let sizeProgressHeight: Double = 6  // px
+    static let sizeGrabberWidth: Double = 36  // px
+    static let sizeGrabberHeight: Double = 5  // px
     static let sizeFocusRing: Double = 180  // px
     static let sizeFocusRingStroke: Double = 10  // px
     static let trackingDisplay: Double = -0.022  // em-ratio
