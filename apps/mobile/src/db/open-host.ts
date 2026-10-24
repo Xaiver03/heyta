@@ -24,6 +24,12 @@ import {
   isVaultRootAutoUnlockDisabled,
   loadVaultRootKey,
 } from '../lib/vault-secure-storage';
+import {
+  bindMobileOplogBase,
+  currentState as shareAwareState,
+  dispatchChecked as shareAwareDispatchChecked,
+  dispatchIntent as shareAwareDispatchIntent,
+} from '../share/wiring';
 import { opSqliteDriverFactory } from './op-sqlite-driver';
 
 const DB_NAME = 'heyta.sqlite';
@@ -43,14 +49,28 @@ let hostEpoch = 0;
  * 挂在写入口上，新增动作自动被覆盖，不需要任何人记得。
  *
  * ⚠️ 顺序：**先落库、后喊**。反过来会让同步先查队列、查不到刚写的那条。
+ *
+ * 🔴 M6 之后这里同时是**共享写路由的装配点**（`share/wiring.ts`，对应 web 的
+ * `lib/oplog.ts`）：交出去的是**原始宿主**的三件入口（路由判据在 app-host，
+ * 壳里一个字不判），而 `dispatch` / `dispatchChecked` / `getState` 三件都过同一份
+ * 晚绑定装配。**没装共享通道时逐字等于原来的 `dispatch`** ——
+ * `shareAwareDispatchIntent` 的未装配分支就是 `host.dispatch(intent)`。
  */
 function withWriteSignal(host: AppHost): AppHost {
   const widgetSource = hostPublishSource(host);
+  bindMobileOplogBase({
+    dispatch: (intent) => host.dispatch(intent),
+    dispatchChecked: (build) => host.dispatchChecked(build),
+    getState: () => host.getState(),
+  });
 
   return {
     ...host,
+    // 合并视图：没装共享通道时逐字 = `host.getState()`。
+    getState: () => shareAwareState(),
+    dispatchChecked: (build) => shareAwareDispatchChecked(build),
     dispatch: async (intent) => {
-      await host.dispatch(intent);
+      await shareAwareDispatchIntent(intent);
       emitLocalWrite();
 
       /**
@@ -165,4 +185,7 @@ export function resetTaskHostCache(): void {
   hostEpoch += 1;
   pending = null;
   resolvedHost = undefined;
+  // 🔴 路由装配也要跟着换代：不摘的话，下一次 `dispatchIntent` 还会写进
+  // 那个已按口径 B 拒绝读写的旧 adapter（症状是"写入静默成功、新库里看不见"）。
+  bindMobileOplogBase(undefined);
 }

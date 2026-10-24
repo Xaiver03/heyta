@@ -1069,3 +1069,4 @@ export * from './share-rekey.js';
 export * from './share-signals.js';
 export * from './share-roster-signals.js';
 export * from './share-signing-key.js';
+export * from './share-key-store.js';

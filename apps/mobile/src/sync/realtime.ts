@@ -42,6 +42,7 @@ import { createHostRealtimeClient, type RealtimeWiringOptions } from '@heyta/app
 import { readSyncConfig } from './config';
 import { privacyConsent } from '../privacy/consent-gate';
 import { legalRecheck } from '../legal-recheck/gate';
+import { bindShareSignalHost, handleShareOpsSignal, handleShareRosterSignal } from '../share/share-signals';
 
 /**
  * 可注入的依赖 —— **测试用假实现，生产调用点一个都不传**。
@@ -81,6 +82,17 @@ export interface RealtimeDeps {
    * 没有 React、没有原生模块的纯 node 进程里被验证。
    */
   dataEgressAllowed: () => boolean;
+  /**
+   * 🔴 共享内容信号（`new_share_ops`）的落点。默认接 `share/share-signals`。
+   *
+   * ⚠️ **不是** `syncNow()`：共享那条腿有自己的下行通道（按 shareId 拉、验签、折叠），
+   * 接到个人全量同步上会把一次共享评论推放大成整库同步，而且个人那条腿根本
+   * 看不见 share log。做成可注入依赖与 `networkAllowed` 同一条理由：判据要在
+   * 没有原生运行时的纯 node 进程里可验证。
+   */
+  shareOpsSignal: (shareId: string, latestSeq: number) => void;
+  /** 成员面信号（`share_roster_changed`）的落点。同上，也不许触发个人全量同步。 */
+  shareRosterSignal: (shareId: string) => void;
 }
 
 /**
@@ -124,6 +136,9 @@ function resolveDeps(over: Partial<RealtimeDeps>): RealtimeDeps {
         const { syncNow } = await import('./store');
         return syncNow();
       }),
+    // 默认落点在 `share/share-signals`：装配与调用点同批落地，不留"模块存在但没人接"的那格。
+    shareOpsSignal: over.shareOpsSignal ?? ((shareId, latestSeq) => handleShareOpsSignal(shareId, latestSeq)),
+    shareRosterSignal: over.shareRosterSignal ?? ((shareId) => handleShareRosterSignal(shareId)),
   };
 }
 
@@ -194,6 +209,9 @@ export async function startRealtime(over: Partial<RealtimeDeps> = {}): Promise<v
     // 同一个理由在任务屏、日历屏都写着（AGENTS.md §7 第 9 条）。
     const host = await deps.openHost();
 
+    // 共享信号的闸门要读这台宿主的清单行绑定（"本机认不认得这份 share"是本地事实）。
+    bindShareSignalHost(host);
+
     client = deps.makeClient({
       engine: host.engine,
       baseUrl: config.serverUrl,
@@ -212,6 +230,15 @@ export async function startRealtime(over: Partial<RealtimeDeps> = {}): Promise<v
           .finally(() => {
             inFlight = false;
           });
+      },
+      // 🔴 两类共享信号各走各的腿（ADR-0062 决策 7 / ADR-0070）：内容信号进
+      // `createShareOpsSignalHandler`（按 shareId 拉 share log），成员面信号进
+      // `createShareRosterSignalHandler`（只重取登记着的面板）。两者都**不碰** `syncNow`。
+      onNewShareOps: (shareId, latestSeq) => {
+        deps.shareOpsSignal(shareId, latestSeq);
+      },
+      onShareRosterChanged: (shareId) => {
+        deps.shareRosterSignal(shareId);
       },
     });
     client.connect();

@@ -98,8 +98,45 @@ export const MOBILE_FEATURE_ENTRIES = [
   },
 ] as const satisfies readonly MobileFeatureEntry[];
 
+/**
+ * 共享清单那一行的登记形状。
+ *
+ * 🔴 它**不进** `MOBILE_FEATURE_ENTRIES`，因为那张表按词表逐条判"在不在
+ * `FEATURE_MODULE_KEYS` 里"（本文件头第 1 条），而"共享"**不是那个词表的成员**：
+ * web 那端的共享入口也不走 rail 开关（M7 的 `check:share-entry-visible` 单独钉它）。
+ * 形状与那三行**逐字段相同**（key/labelKey/hintKey/testID/screen），所以「我的」页
+ * 第二层的生成、穷尽 switch、`feature-entries.spec.ts` 的接线判据**同一把尺量两条**，
+ * 不是又一份手写入口行。
+ */
+export interface MobileShareEntry {
+  readonly key: 'share';
+  readonly labelKey: MessageKey;
+  readonly hintKey: MessageKey;
+  readonly testID: string;
+  readonly screen: string;
+}
+
+export const MOBILE_SHARE_ENTRIES = [
+  {
+    key: 'share',
+    labelKey: 'mobile.share.entry',
+    hintKey: 'mobile.share.entry.hint',
+    testID: 'profile-entry-share',
+    screen: 'ShareSpaceScreen',
+  },
+] as const satisfies readonly MobileShareEntry[];
+
+/** 「我的」页第二层的全部行：功能域那三行 + 共享那一行（顺序 = 显示顺序）。 */
+export const MOBILE_PROFILE_ENTRIES = [
+  ...MOBILE_FEATURE_ENTRIES,
+  ...MOBILE_SHARE_ENTRIES,
+] as const;
+
 /** 这张表里出现过的 key（穷尽 switch 的联合类型就从这个推）。 */
 export type MobileFeatureEntryKey = (typeof MOBILE_FEATURE_ENTRIES)[number]['key'];
+
+/** 穷尽 switch 的判据类型：功能域 + 共享，一个都不能漏接屏。 */
+export type MobileProfileEntryKey = (typeof MOBILE_PROFILE_ENTRIES)[number]['key'];
 
 /** 按 key 取登记项；不在表里返回 `undefined`（不抛 —— 读的是本地状态）。 */
 export function mobileFeatureEntry(

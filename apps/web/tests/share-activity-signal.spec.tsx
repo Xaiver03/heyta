@@ -102,6 +102,7 @@ vi.mock('../src/features/share/share-session.js', () => ({
   }),
 }));
 
+import { CONSENT_STORAGE_KEY } from '../src/features/share/share-consent-store.js';
 import { PREFS_STORAGE_KEY } from '../src/features/share/share-notif-prefs.js';
 import { useShareActivitySignal } from '../src/features/share/use-share-activity-signal.js';
 import { dispatchShareSignal, hasShareSignalSink } from '../src/lib/share-signal-sink.js';
@@ -143,6 +144,10 @@ beforeEach(async () => {
   rig.pulled = 0;
   sent = [];
   localStorage.clear();
+  // ADR-0071 之后"同意"是这条通知能不能出现的前提；这一枚夹具钉的是**偏好闸门**，
+  // 所以把同意设成本机的默认态（同意过），"没同意 ⇒ 零打扰"那一形归
+  // `share-notification-content.spec.tsx` 判。
+  localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ consentAcceptedAt: 1_700_000_000_000 }));
   (globalThis as unknown as { Notification: unknown }).Notification = FakeNotification;
   useSyncStore.setState({
     baseUrl: 'http://sync.test',

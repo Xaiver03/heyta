@@ -4,12 +4,12 @@
  * 形状照 `features/reminders/notify.ts` 那一条：**选哪几条是纯的，只有
  * `new Notification(...)` 那一下不纯**，所以 ctor 可注入、测试能全断言。
  *
- * 🔴 这里**不判**"该不该响" —— 那是 `@heyta/ui` 的 `selectNotifiedActivities(prefs, kinds)`
- *    （ADR-0062 决策 7：偏好是本机的判断，判断只许有一份）。这一层收到的就是**已经过了闸门**的
- *    类别，它只负责：支不支持、有没有权限、以及投出去几条。
- * ⚠️ 正文**不含清单名与内容**：端到端加密下那些当然能在本机解出来，
- *    但把明文写进系统通知中心等于交给操作系统与它的同步去保管；
- *    要带名字得先定"通知里允许出现什么"这条口径（登记在计划 §9.10）。
+ * 🔴 这里**不判**"该不该响" —— 那是 `@heyta/ui` 的 `selectShareActivitiesToNotify`
+ *    （同意 + 本机偏好；偏好闸门仍是 `selectNotifiedActivities` 那一枚，ADR-0062 决策 7）。
+ *    这一层收到的就是**已经过了闸门**的类别，它只负责：支不支持、有没有权限、以及投出去几条。
+ * ⚠️ 正文里允许出现什么由 **ADR-0071** 定：清单名 + 活动种类，条目内容（任务标题、评论正文、
+ *    便签内容）一律不进 —— 那句话由 `shareActivityNotificationBody` 组装，`labels.body`
+ *    只是把组装好的句子交给系统。这一层拿不到、也不许去要任何条目内容。
  */
 
 import type { ShareActivityKind } from '@heyta/ui';

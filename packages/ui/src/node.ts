@@ -65,3 +65,35 @@ export { categorySlotToken, type CategoryColorToken } from './categories/model.j
 // `CategorySlot` 的真身在 `@heyta/domain`；`categories/model.ts` 只是 import 它，
 // 没有 re-export ⇒ 从这里 re-export 会报 TS2459，得直接说出处。
 export type { CategorySlot } from '@heyta/domain';
+/*
+ * M6-3a（移动端协作·界面腿）：共享通知偏好与同意态那两枚**纯模型**。
+ * `apps/mobile/src/share/share-activity-notify.ts` 与 `lib/share-local-store.ts`
+ * 要在 node 里被值导入（判据必须能真跑 `deliverShareActivities` 的闸门，
+ * 而不是只读它的源码文本），而主入口 `@heyta/ui` 在 node 加载即拖入 `react-native`
+ * —— 与本文件文件头那条边界同一个理由，这里只列不 import RN 的模块。
+ */
+export {
+  DEFAULT_NOTIFICATION_PREFS,
+  hasShareConsent,
+  isActivityEnabled,
+  selectNotifiedActivities,
+  selectShareActivitiesToNotify,
+  shareActivityNotificationBody,
+  shouldNotifyActivity,
+  shouldNotifyTaskReminder,
+  shouldAutoAcceptInvitation,
+  type ShareActivityBodyCopy,
+  type ShareActivityKind,
+  type ShareActivityPrefs,
+  type ShareNotificationPrefs,
+  type ShareTaskLike,
+  type TaskReminderScope,
+} from './sync/notification-model.js';
+export {
+  SHARE_CONSENT_SCOPE_KEYS,
+  applyShareConsent,
+  shouldShowConsent,
+  type ShareConsentDecision,
+  type ShareConsentResult,
+  type ShareConsentStore,
+} from './sync/share-consent-model.js';

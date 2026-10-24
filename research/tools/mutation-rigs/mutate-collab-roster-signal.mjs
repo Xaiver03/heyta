@@ -59,8 +59,10 @@ const ARMS = [
       }
 `,
     rep: `      // ${MARK}\n`,
-    mustInclude: ['A 不认得'],
-    expect: 1,
+    // 实测比预测多一枚：闸门放开后，"名单每次现取"那一臂也一起红 ——
+    // 它断言的是"先不认得、绑定之后才认得"，闸门恒真时前半句就塌了。两处都是真检出。
+    mustInclude: ['A 不认得', '名单是每次现取'],
+    expect: 2,
   },
   {
     id: 'no-tail',
@@ -73,8 +75,10 @@ const ARMS = [
       }
 `,
     rep: `      // ${MARK}\n`,
-    mustInclude: ['B 在途时', 'C 尾巴必须跑'],
-    expect: 2,
+    // 实测多一枚「尾巴那一次也炸」：那一臂数的就是"在途 + 尾巴"两次调用，
+    // 尾巴不补 ⇒ 它必然一起红。
+    mustInclude: ['B 在途时', 'C 尾巴必须跑', '尾巴那一次也炸'],
+    expect: 3,
   },
   {
     id: 'throw-propagates',
@@ -89,8 +93,10 @@ const ARMS = [
       // ${MARK}
       throw error;
 `,
-    mustInclude: ['D 抛穿', '尾巴那一次也炸'],
-    expect: 2,
+    // 实测多一枚「G 失败之后成功」：病灶把 failed 那一格也带走了（异常逃逸 ⇒ 永远记不上失败），
+    // 而那一臂钉的正是"失败要留读数、且成功后如实回落"。
+    mustInclude: ['D 抛穿', '尾巴那一次也炸', 'G 失败之后成功'],
+    expect: 3,
   },
   {
     id: 'shared-lock',

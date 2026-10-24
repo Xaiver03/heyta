@@ -46,7 +46,7 @@ import { FEATURE_MODULE_KEYS, isFeatureModuleKey } from '@heyta/domain';
 import { translate } from '@heyta/i18n';
 import { describe, expect, it } from 'vitest';
 
-import { MOBILE_FEATURE_ENTRIES } from '../src/nav/feature-entries';
+import { MOBILE_FEATURE_ENTRIES, MOBILE_PROFILE_ENTRIES, MOBILE_SHARE_ENTRIES } from '../src/nav/feature-entries';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, '../src');
@@ -137,8 +137,17 @@ describe('功能域词表：两端共用一份，不是两份抄件', () => {
 });
 
 describe('每一条登记的入口：词条取到字、屏接得上', () => {
+  it('🔴 M6：共享那一行的**登记项本身**存在（删掉这一行 = 红，不许静默少一个入口）', () => {
+    const share = MOBILE_SHARE_ENTRIES.find((entry) => entry.key === 'share');
+    expect(share, '移动端共享入口从注册表里消失了').toBeDefined();
+    expect(share!.screen).toBe('ShareSpaceScreen');
+    expect(share!.labelKey).toBe('mobile.share.entry');
+    // 「我的」页第二层由**合并表**生成 ⇒ 这一行确实会被渲染出来。
+    expect(MOBILE_PROFILE_ENTRIES.some((entry) => entry.key === 'share')).toBe(true);
+  });
+
   it('中英两条词条都**真的取得到字**（缺 key 会抛，不是返回空串）', () => {
-    for (const entry of MOBILE_FEATURE_ENTRIES) {
+    for (const entry of MOBILE_PROFILE_ENTRIES) {
       const zh = translate('zh-CN', entry.labelKey);
       const zhHint = translate('zh-CN', entry.hintKey);
       const en = translate('en', entry.labelKey);
@@ -159,15 +168,15 @@ describe('每一条登记的入口：词条取到字、屏接得上', () => {
   });
 
   it('testID 全局唯一且都挂在 `profile-entry-` 这一族上（设备验收指的就是它）', () => {
-    const ids = MOBILE_FEATURE_ENTRIES.map((entry) => entry.testID);
+    const ids = MOBILE_PROFILE_ENTRIES.map((entry) => entry.testID);
     expect(new Set(ids).size, '两个入口用了同一个 testID，设备脚本会点到错的那一行').toBe(ids.length);
     for (const id of ids) expect(id).toMatch(/^profile-entry-[a-z-]+$/);
   });
 
   it('🔴 `ProfileScreen` **消费了注册表**，并为每一项渲染注册表里那张屏', () => {
     const code = codeOf('screens/ProfileScreen.tsx');
-    expect(code, '入口行不再由注册表生成 ⇒ 回到了各写一遍').toContain('MOBILE_FEATURE_ENTRIES.map');
-    for (const entry of MOBILE_FEATURE_ENTRIES) {
+    expect(code, '入口行不再由注册表生成 ⇒ 回到了各写一遍').toContain('MOBILE_PROFILE_ENTRIES.map');
+    for (const entry of MOBILE_PROFILE_ENTRIES) {
       expect(code, `注册表里的 ${entry.key} 没有对应的 switch 分支`).toContain(
         `case '${entry.key}'`,
       );
@@ -181,7 +190,7 @@ describe('P10 仍然成立：功能域不占底部标签', () => {
     const code = codeOf('nav/TabBar.tsx');
     const tabs = [...code.matchAll(/\bkey:\s*'([a-z-]+)'/g)].map((m) => m[1] as string);
     expect(tabs, `底部标签数量变成 ${String(tabs.length)}`).toHaveLength(5);
-    for (const entry of MOBILE_FEATURE_ENTRIES) {
+    for (const entry of MOBILE_PROFILE_ENTRIES) {
       expect(
         tabs,
         `${entry.key} 变成了第 6 个 tab —— ADR-0015 §4 / P10 的连带（真机脚本的坐标）都要重算`,
@@ -195,7 +204,7 @@ describe('注册表里那个 `screen` 字符串：那张屏真的存在、真的
     // 为什么这一条不是重复上一条：上一条只查 `ProfileScreen` 里出现过 `<CountdownScreen`，
     // 而那**只证明 import 了**——把那张屏写成"还没有内容"的占位组件时上一条照样绿。
     // 这正是 `NotesSection` / `HabitsScreen` 都写"占位文件已删除"的原因（AGENTS §2 的 P2 行）。
-    for (const entry of MOBILE_FEATURE_ENTRIES) {
+    for (const entry of MOBILE_PROFILE_ENTRIES) {
       const file = join(SRC, 'screens', `${entry.screen}.tsx`);
       expect(existsSync(file), `${entry.key} 的屏不存在：apps/mobile/src/screens/${entry.screen}.tsx`).toBe(
         true,

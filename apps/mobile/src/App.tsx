@@ -33,7 +33,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppState, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { I18nProvider, type Locale } from '@heyta/i18n';
+import { I18nProvider, useI18n, type Locale } from '@heyta/i18n';
 import { ThemeProvider, useTheme, useTokens } from './theme';
 import { LocalePreferenceProvider } from './i18n/locale-preference';
 import { resolveDeviceLocale } from './i18n/locale';
@@ -62,6 +62,14 @@ import { DEFAULT_SERVER_URL, readSyncConfig } from './sync/config';
 import { hasSeenWelcome, markWelcomeSeen } from './prefs/device-prefs';
 import { reconcileNativeReminders, subscribeNativeReminderWrites } from './lib/native-reminder-scheduler';
 import { startMobileInboundWorker } from './inbound/lifecycle';
+import { armMobileShareSession } from './share/share-session';
+import { makeMobileSharePorts } from './share/share-ports';
+import { onCredentialsCleared } from './sync/config';
+import * as shareDeliveryDeps from './share/share-delivery-deps';
+import { installMobileShareActivityDelivery, appendShareActivityFeed, clearShareActivityFeed, bindShareDeliveryDeps } from './share/share-activity-notify';
+import { loadMobileShareNotificationPrefs } from './lib/share-local-store';
+import { localRowIdForShare } from '@heyta/app-host';
+import { currentState } from './share/wiring';
 
 /**
  * 🔴 **隐私闸门必须在任何一次渲染之前装好**（G-12）。
@@ -121,6 +129,54 @@ function Shell(): React.JSX.Element {
    * 并且返回停止函数 —— 正好是清理函数该有的形状。
    */
   useEffect(() => startAutoSync(), []);
+
+  /**
+   * M6：共享会话装配点。幂等、永不抛 —— 没登录/没解锁时它就停在"什么都没有"，
+   * 登录之后由这一问（或路由那一问）把实例催建出来。
+   *
+   * 🔴 端口必须**真的递进来**（M6-1 落盘端口 + 出站同意闸，见 `share/share-ports.ts`）：
+   * `armMobileShareSession()` 不带参数时长驻的就是"个人 log 原路 + 信号全丢"，
+   * 界面照常、共享静默失效 —— 判据 `share-session.spec.ts`「入口带真实端口」盯这一格。
+   *
+   * 同时挂上投递面（`installMobileShareActivityDelivery` 内部保证两条信号 sink 已装，
+   * 否则"垫片存在但没人订"又是一格不报错的静默）。登出那刀：`arm` 自己订阅了
+   * `onCredentialsCleared` 摘实例（先摘后建），这里补一格**应用内动态清零** ——
+   * 动态条目虽不含内容明文，但"你有过协作"这件事本身也分人。
+   */
+  // ⚠️ `t` 这个名字在本函数已被 `useTokens()` 占了（`t['color.background']` 是 token 表），
+  // 词条函数取名 `tr` —— 两个 "t" 混用会是一类最难读的 shadow bug。
+  const { t: tr } = useI18n();
+  useEffect(() => {
+    armMobileShareSession(makeMobileSharePorts());
+    bindShareDeliveryDeps(shareDeliveryDeps);
+    installMobileShareActivityDelivery({
+      labels: {
+        title: tr('common.brand'),
+        body: (kind) =>
+          kind === 'added'
+            ? tr('common.share.activity.added')
+            : kind === 'deleted'
+              ? tr('common.share.activity.deleted')
+              : // 「完成」那一档今天还不会有输入（词表只到 added/deleted，见
+                // `use-share-activity-signal.ts` 同一格的兜底理由）。留兜底句不留白。
+                tr('common.share.notif.activityCompleted'),
+      },
+      ports: {
+        // 偏好读本机磁盘（ADR-0062 决策 7：零请求）；清单行绑定读合并视图。
+        readPrefs: loadMobileShareNotificationPrefs,
+        projectIdFor: (shareId) => localRowIdForShare(currentState(), shareId) ?? '',
+        // 🔴 系统横幅这一格移动端今天做不到（原因与补上的那一步写在
+        // `share/share-activity-notify.ts` 文件头与 `screens/ShareSpaceScreen.tsx` 文件头），
+        // 所以这里**不传** `systemBanner` —— 端口是可注入的，将来只换实现。
+        inApp: appendShareActivityFeed,
+      },
+    });
+  }, [dataRevision, t]);
+
+  useEffect(
+    () => onCredentialsCleared(() => clearShareActivityFeed()),
+    [],
+  );
 
   // Automatic capture is a foreground worker on mobile. The shared loop
   // rechecks Vault, recipient-key, worker-token, route and consent readiness;
