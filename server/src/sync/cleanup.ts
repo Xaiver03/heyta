@@ -188,18 +188,22 @@ const runDailyCleanup = async (): Promise<void> => {
     Logger.error(`Cleanup [automation-entitlement-tickets] failed: ${error}`);
   }
 
-  // 9. 过期的**账号凭据列**、过期/无人在等的换绑请求行、过了 JWT 生命周期的会话行。
+  // 9. 过期的**账号凭据列**、过期/无人在等的换绑请求行、过了 JWT 生命周期的会话行，
+  //    以及孤儿会话（未激活 + 无口令的账号身上那些不该存在的 `access_sessions` 行）。
   // 🔴 这一条是"一次性令牌"与"留存 N 天"那两句对外政策的执行者：政策写的是形状
   // （只存 SHA-256、过期即无用），只有这一趟能把 hex 从库里拿掉。没有它，那句"一次性"
   // 说的只是"验证那一步会拒"，而那一串哈希与它的过期时刻会留到备份滚完为止 ——
   // 换绑那一行还多带一份**新邮箱明文**（`pending_email`）。
   // 计数为 0 也记日志（与 [old-ops]、[ai-usage-counters] 同一条理由）。
+  // ⚠️ `orphan-sessions` 那一格**正常应当永远是 0**：它不是"清扫在正常工作"的计数量，
+  // 而是"又有人在事务外铸了会话"的信号（见 `purgeOrphanSessions` 上面第 ② 段）。
   try {
     const swept = await sweepExpiredAccountCredentials(Date.now());
     Logger.info(
       `Cleanup [account-credentials]: verification=${swept.verificationTokens} ` +
         `reset=${swept.resetTokens} recovery=${swept.recoveryTokens} login=${swept.loginTokens} ` +
-        `change-requests=${swept.changeRequests} sessions=${swept.sessions}`,
+        `change-requests=${swept.changeRequests} sessions=${swept.sessions} ` +
+        `orphan-sessions=${swept.orphanSessions}`,
     );
   } catch (error) {
     Logger.error(`Cleanup [account-credentials] failed: ${error}`);
