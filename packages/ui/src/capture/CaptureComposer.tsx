@@ -76,8 +76,8 @@
  * 等价实现；`<input>` 在 iOS 上不存在。
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { CaptureExclusion, LocalDate } from '@heyta/domain';
 import { Plus, RotateCcw, X } from 'lucide';
@@ -176,6 +176,28 @@ export interface CaptureComposerProps {
    * 🔴 移动端把它放在**新建任务面板**里（一个 modal），弹出即该打字；
    * 而 web 把它内联在列表顶部 —— 一进页面就抢焦点会打断读屏与滚动。
    * 所以它是宿主决定的事，不是共享层的默认值。
+   *
+   * ⚠️ **原生端不把 `autoFocus` 直接交给 `TextInput`，而是自己排一个
+   * 延后 `focus()` + 卸载前 `blur()`**（见下面那个 `useEffect`）。原因是一次真实崩溃：
+   *
+   * 崩溃形状（`Heyta-2026-10-24-*.ips`，四次落在同一处）——
+   * 宿主把本组件包在条件渲染里（`{open && <CaptureComposer autoFocus/>}`），
+   * 于是**"聚焦"与"卸载"撞在同一帧**：`autoFocus` 让 view 抢第一响应者，
+   * 而 React 同时把子树 unmount。Fabric 的 `View` 命令（`focus` / `blur`）是
+   * **void 异步方法**，走 `ObjCTurboModule::performVoidMethodInvocation`；
+   * 那条路径上的 `@catch` 只做 `@throw exception`（`RCTTurboModule.mm:462-464`），
+   * 异常于是逃出 dispatch block ⇒ `std::terminate` ⇒ **`SIGABRT`**。
+   * 又因为 RN 那条分支**不**把异常转成 `JSError`，`.ips` 里**既没有 `asi`
+   * 也没有 `exceptionReason`** —— 拿到报告也读不出是哪一次调用。
+   * 所以这里不能"等抓到再说"，而要**从形状上消除这个竞态**。
+   *
+   * 两条纪律：
+   *   1. 聚焦推迟到下一拍，让父层 `KeyboardAvoidingView` 先完成订阅与测量
+   *      （这同时修掉了原先注释提过的"键盘先于父层出现"）；
+   *   2. 卸载前**先 `blur()`**，把第一响应者交还掉，再让 view 被摘下。
+   *
+   * web 上仍是原样透传 —— `react-native-web` 的 `TextInput` 没有这条原生命令，
+   * 不走 Fabric 那条路，也就没有这个竞态。
    */
   readonly autoFocus?: boolean;
   readonly testID?: string;
@@ -309,6 +331,21 @@ export function CaptureComposer({
   /** 用户显式忽略的识别。**是"这段字是标题的一部分"，不是"删掉这几个字"。** */
   const [ignored, setIgnored] = useState<readonly CaptureExclusion[]>([]);
 
+  /** 原生端自己控制焦点（见 `autoFocus` 的说明）；web 不需要。 */
+  const inputRef = useRef<TextInput>(null);
+  const managesFocusItself = autoFocus === true && Platform.OS !== 'web';
+
+  useEffect(() => {
+    if (!managesFocusItself) return;
+    // 延后一拍：父层（modal / KeyboardAvoidingView）先完成订阅与测量再抢焦点。
+    const timer = setTimeout(() => inputRef.current?.focus(), 0);
+    // 🔴 卸载前**先交还第一响应者**，再让 view 被摘下 —— 否则就是那次 SIGABRT。
+    return () => {
+      clearTimeout(timer);
+      inputRef.current?.blur();
+    };
+  }, [managesFocusItself]);
+
   /**
    * 同一次渲染里的"现在"。
    *
@@ -358,6 +395,7 @@ export function CaptureComposer({
     <View style={styles.wrap} testID={testID}>
       <View style={styles.compose}>
         <TextInput
+          ref={inputRef}
           style={[text['row-meta'], styles.input]}
           value={draft}
           placeholder={labels.placeholder}
@@ -366,7 +404,9 @@ export function CaptureComposer({
           onChangeText={onDraftChange}
           onSubmitEditing={submit}
           returnKeyType="done"
-          {...(autoFocus === undefined ? {} : { autoFocus })}
+          // 🔴 原生端**不**透传 `autoFocus`（那个竞态正是这么来的，见 prop 说明）；
+          // web 保持原样 —— 那边没有这条原生命令，也就没有卸载/聚焦相撞。
+          {...(autoFocus === undefined || managesFocusItself ? {} : { autoFocus })}
           testID="capture-input"
         />
         <Pressable

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { FormField } from '../../lib/form/FormField.js';
+import { SettingsInfoTip } from '../settings/SettingsInfoTip.js';
 import { useI18n } from '@heyta/i18n';
 import {
   HostedDeviceManagementError,
@@ -296,11 +298,11 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
       {sync.accountId !== undefined && sync.accountId !== '' && sync.baseUrl !== '' && sync.token !== undefined ? (
         <div data-testid="vault-devices" className="ht-settings__section">
           <strong>{t('web.sync.devices.title')}</strong>
-          <p className="ht-settings__hint">{t('web.sync.devices.description')}</p>
-          {devicesLoading ? <p className="ht-settings__hint">{t('web.sync.devices.loading')}</p> : null}
+          <p className="ht-settings__hint" role="status">{t('web.sync.devices.description')}</p>
+          {devicesLoading ? <p className="ht-settings__hint" role="status">{t('web.sync.devices.loading')}</p> : null}
           {deviceError !== undefined ? <SettingsNotice title={t(deviceError as never)} tone="danger" live /> : null}
           {!devicesLoading && deviceError === undefined && devices.length === 0 ? (
-            <p className="ht-settings__hint">{t('web.sync.devices.empty')}</p>
+            <p className="ht-settings__hint" role="status">{t('web.sync.devices.empty')}</p>
           ) : null}
           {devices.length > 0 ? (
             <ul>
@@ -326,17 +328,18 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
       {!loading && session !== undefined && !hasPackage && pending === undefined ? (
         <div data-testid="vault-create-form" className="ht-settings__section">
           <strong>{t('web.sync.vault.createTitle')}</strong>
-          <label className="ht-settings__field">
-            {t('web.sync.vault.passphrase')}
-            <input
-              data-testid="vault-create-passphrase"
-              type="password"
-              autoComplete="new-password"
-              value={passphrase}
-              onChange={(event) => setPassphrase(event.target.value)}
-              className="ht-input"
-            />
-          </label>
+          <FormField id="vault-create-passphrase" label={t('web.sync.vault.passphrase')}>
+            {(field) => (
+              <input
+                {...field}
+                data-testid="vault-create-passphrase"
+                type="password"
+                autoComplete="new-password"
+                value={passphrase}
+                onChange={(event) => setPassphrase(event.target.value)}
+              />
+            )}
+          </FormField>
           <div className="ht-settings__actions">
             <button
               type="button"
@@ -359,17 +362,18 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
       {!loading && session !== undefined && hasPackage && !unlocked && pending === undefined ? (
         <div data-testid="vault-unlock-form" className="ht-settings__section">
           <strong>{t('web.sync.vault.unlockTitle')}</strong>
-          <label className="ht-settings__field">
-            {t('web.sync.vault.passphrase')}
-            <input
-              data-testid="vault-passphrase"
-              type="password"
-              autoComplete="current-password"
-              value={passphrase}
-              onChange={(event) => setPassphrase(event.target.value)}
-              className="ht-input"
-            />
-          </label>
+          <FormField id="vault-passphrase" label={t('web.sync.vault.passphrase')}>
+            {(field) => (
+              <input
+                {...field}
+                data-testid="vault-passphrase"
+                type="password"
+                autoComplete="current-password"
+                value={passphrase}
+                onChange={(event) => setPassphrase(event.target.value)}
+              />
+            )}
+          </FormField>
           <div className="ht-settings__actions">
             <button type="button" className="ht-btn ht-btn--primary" data-testid="vault-unlock" disabled={busy || passphrase.length === 0} onClick={() => void run(async () => {
               await session.unlockWithPassphrase(passphrase);
@@ -382,10 +386,11 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
               {t('web.sync.vault.unlock')}
             </button>
           </div>
-          <label className="ht-settings__field">
-            {t('web.sync.vault.recoveryCode')}
-            <input data-testid="vault-recovery-code" type="text" autoComplete="off" value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value)} className="ht-input" />
-          </label>
+          <FormField id="vault-recovery-code" label={t('web.sync.vault.recoveryCode')}>
+            {(field) => (
+              <input {...field} data-testid="vault-recovery-code" type="text" autoComplete="off" value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value)} />
+            )}
+          </FormField>
           <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-unlock-recovery" disabled={busy || recoveryCode.length === 0} onClick={() => void run(async () => {
             await session.unlockWithRecoveryCode(recoveryCode);
             const restored = session.getPendingRootRotation();
@@ -408,10 +413,11 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
             <p data-testid="vault-recovery-resume" className="ht-settings__hint">{t('web.sync.vault.recoveryResume')}</p>
           )}
           <p className="ht-settings__hint">{t('web.sync.vault.recoveryHint')}</p>
-          <label className="ht-settings__field">
-            {t('web.sync.vault.recoveryConfirm')}
-            <input data-testid="vault-recovery-confirm" type="text" autoComplete="off" value={pendingCode} onChange={(event) => setPendingCode(event.target.value)} className="ht-input" />
-          </label>
+          <FormField id="vault-recovery-confirm" label={t('web.sync.vault.recoveryConfirm')}>
+            {(field) => (
+              <input {...field} data-testid="vault-recovery-confirm" type="text" autoComplete="off" value={pendingCode} onChange={(event) => setPendingCode(event.target.value)} />
+            )}
+          </FormField>
           <div className="ht-settings__actions">
             <button
               type="button"
@@ -461,20 +467,23 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
           {pendingAction === 'rotate' ? (
             <>
               <p className="ht-settings__hint">{t('web.sync.vault.rootRotationHint')}</p>
-              <label className="ht-settings__field">
-                {t('web.sync.vault.legacyPassphrase')}
-                <input
-                  data-testid="vault-legacy-passphrase"
-                  type="password"
-                  autoComplete="off"
-                  value={legacyPassphrase}
-                  onChange={(event) => setLegacyPassphrase(event.target.value)}
-                  className="ht-input"
-                />
-              </label>
-              <p className="ht-settings__hint">
-                {t('web.sync.vault.legacyPassphraseHint')}
-              </p>
+              <FormField id="vault-legacy-passphrase" label={t('web.sync.vault.legacyPassphrase')}>
+                {(field) => (
+                  <input
+                    {...field}
+                    data-testid="vault-legacy-passphrase"
+                    type="password"
+                    autoComplete="off"
+                    value={legacyPassphrase}
+                    onChange={(event) => setLegacyPassphrase(event.target.value)}
+                  />
+                )}
+              </FormField>
+              <SettingsInfoTip
+                testId="tip-vault-legacy"
+                label={t('web.sync.vault.legacyPassphrase')}
+                text={t('web.sync.vault.legacyPassphraseHint')}
+              />
             </>
           ) : null}
           {migrationProgress !== undefined ? <p className="ht-settings__hint" data-testid="vault-migration-progress">{t('web.sync.vault.rootRotationProgress', migrationProgress)}</p> : null}
@@ -491,10 +500,11 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
               {t('web.sync.vault.lock')}
             </button>
           </div>
-          <label className="ht-settings__field">
-            {t('web.sync.vault.newPassphrase')}
-            <input data-testid="vault-new-passphrase" type="password" autoComplete="new-password" value={newPassphrase} onChange={(event) => setNewPassphrase(event.target.value)} className="ht-input" />
-          </label>
+          <FormField id="vault-new-passphrase" label={t('web.sync.vault.newPassphrase')}>
+            {(field) => (
+              <input {...field} data-testid="vault-new-passphrase" type="password" autoComplete="new-password" value={newPassphrase} onChange={(event) => setNewPassphrase(event.target.value)} />
+            )}
+          </FormField>
           <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-change-passphrase" disabled={busy || newPassphrase.length === 0} onClick={() => void run(async () => {
             const next = await session.beginPassphraseChange(newPassphrase);
             setPending(next);

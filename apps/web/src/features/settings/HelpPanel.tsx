@@ -1,5 +1,6 @@
 /** Website content has a single home; this panel only provides browser entry points. */
 import { ICON_SIZE } from '@heyta/design-system';
+import { SettingsInfoTip } from './SettingsInfoTip.js';
 import { ArrowUpRight, BookOpen, ScrollText, Send, Tag } from 'lucide-react';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { isOfficialHostedInstance } from '@heyta/app-host';
@@ -87,7 +88,14 @@ export function HelpPanel(): React.JSX.Element {
           </a>
         ))}
       </div>
-      <p className="ht-settings__help-note ht-type-row-meta">{t('web.about.lead')}</p>
+      <p className="ht-settings__help-line ht-type-row-meta">
+        {t('web.about.lead')}
+        <SettingsInfoTip
+          testId="tip-about"
+          label={t('web.settings.nav.help')}
+          text={t('web.about.lead')}
+        />
+      </p>
 
       {/*
         运营者与备案号。
@@ -105,7 +113,11 @@ export function HelpPanel(): React.JSX.Element {
         核准那天它会**自己出现**，不需要再改这里。
       */}
       {isOfficialHostedInstance(serverUrl) ? (
-        <p className="ht-settings__help-note ht-type-row-meta" data-testid="about-operator">
+        <p
+          className="ht-settings__help-line ht-type-row-meta"
+          data-settings-disclosure="true"
+          data-testid="about-operator"
+        >
           {operatorFilingLine(OPERATOR)}
         </p>
       ) : null}

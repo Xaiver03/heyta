@@ -632,7 +632,10 @@ export function AuthPanel({
                   </button>
                   <p className="ht-auth-central__body">{t('web.auth.central.device.pairingLabel')}</p>
                   {/* 12 位大写十六进制按 4-4-4 分组展示：抄写是这条链路里唯一的人工步骤。 */}
-                  <p className="ht-auth-central__pairing" data-testid="central-device-pairing">
+                  <p
+                  className="ht-auth-central__pairing ht-type-numeric-summary"
+                  data-testid="central-device-pairing"
+                >
                     {deviceWaiting.pairingCode.replace(/(.{4})/g, '$1 ').trim()}
                   </p>
                   <p className="ht-auth-central__note">{t('web.auth.central.device.waitingNote')}</p>

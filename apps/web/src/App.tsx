@@ -86,6 +86,7 @@ import {
   type TaskFilter,
 } from './features/tasks/store.js';
 import { wantsSignInOnLoad } from './lib/auth-deep-link.js';
+import { settingsSectionOnLoad } from './lib/settings-deep-link.js';
 import { type DueDisplayMode } from './lib/due-display.js';
 import { TaskRowMeta } from './features/tasks/row-meta.js';
 import { loadDueDisplay, saveDueDisplay } from './features/tasks/due-display-pref.js';
@@ -151,6 +152,7 @@ import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.j
 import { TaskActionError } from './features/tasks/TaskActionError.js';
 import { ShareSignatureNotice } from './features/share/ShareSignatureNotice.js';
 import { RenewPanel } from './features/subscription/RenewPanel.js';
+import { SubscriptionPanel } from './features/subscription/SubscriptionPanel.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { moveBlockedForTask } from './features/share/share-move-guards.js';
 import { ShareFeature } from './features/share/ShareFeature.js';
@@ -190,6 +192,7 @@ import { SettingsAccountGate } from './features/settings/SettingsAccountGate.js'
 // 个人信息（R10）：昵称与头像的增删改查。入口在头像菜单的「编辑个人信息」，
 // 面板本体开在设置浮层第一段 —— 它需要令牌，而令牌就住在同步设置里。
 import { ProfilePanel } from './features/settings/ProfilePanel.js';
+import { SettingsInfoTip } from './features/settings/SettingsInfoTip.js';
 import { ProfileOverview } from './features/settings/ProfileOverview.js';
 // 隐私同意的**撤回**入口（PIPL 第 15 条：撤回要比同意更容易做到）。
 // 同意面板只在首启弹一次，之后用户要改只能从这里改 —— 没有它，一次点击就成了永久决定。
@@ -251,6 +254,55 @@ const SETTINGS_NAV_ITEMS = [
 ] as const satisfies readonly { id: string; labelKey: MessageKey }[];
 
 type SettingsSectionId = (typeof SETTINGS_NAV_ITEMS)[number]['id'];
+
+/**
+ * 某个字符串是不是设置节的 id。
+ *
+ * 🔴 深链（`?settings=<id>`）进来的值**来自 URL**，不能直接断言成
+ * `SettingsSectionId` —— 一个手打的地址或一条旧链接会带着认不出的 id 进来，
+ * 而 `setSettingsSection('随便什么' as SettingsSectionId)` 骗得过编译器、骗不过界面：
+ * 结果是**每一节都 hidden**（`activeSettingsSection` 不等于任何一节），
+ * 用户看到一张空白设置页。所以这里显式收窄，认不出就落在默认节。
+ */
+function isSettingsSectionId(value: string): value is SettingsSectionId {
+  return SETTINGS_NAV_ITEMS.some((item) => item.id === value);
+}
+
+/**
+ * 每一节的开头：**一个**页面标题 + 一句"这一页管什么"。
+ *
+ * 🔴 为什么值得单开一个组件：设置页原来的毛病不是"控件不对"，而是**每节的开头不一样** ——
+ * 七节里只有两节有说明，有的面板又自带一个和节标题几乎同名的 `<h2>`，
+ * 于是同一屏出现"设置 / 个人资料 / 个人信息"三行近义标题（2026-10-24 实拍）。
+ * 现在标题与那句说明都从这里出，谁也长不出第二个。
+ */
+function SettingsSectionHead({
+  id,
+  title,
+  lead,
+}: {
+  id: string;
+  title: string;
+  /**
+   * 这一节"管什么"的那一句。
+   *
+   * 🔴 2026-10-24 晚：它原来是标题下面**常驻的一行说明**，产品负责人第二次发火之后
+   * （「严禁说明文字出现……只允许一个圈里一个问号」「彻底禁止」）搬进了标题旁边的 `?`。
+   * 句子一个字没改 —— 换的是**什么时候读到它**：想确认"这页管什么"时点一下，
+   * 而不是每次进设置都先读八行。
+   * 判据：`pnpm check:settings-prose`（账本只许变小）。
+   */
+  lead: string;
+}): React.JSX.Element {
+  return (
+    <header className="ht-settings__head">
+      <h2 className="ht-settings__group-title ht-type-section-title" id={id}>
+        {title}
+        <SettingsInfoTip testId={`tip-section-${id}`} label={title} text={lead} />
+      </h2>
+    </header>
+  );
+}
 
 function SettingsSectionNav({ active, onSelect }: {
   active: SettingsSectionId;
@@ -868,6 +920,31 @@ export function App(): React.JSX.Element {
     setSettingsAnchor('sync');
     useSyncStore.getState().closeSettings();
   }, [syncSettingsRequested]);
+
+  /**
+   * 深链：`?settings=<节 id>` ⇒ 打开设置并**落在那一节**（2026-10-24）。
+   *
+   * 为什么需要它：落地页付费两档要变成"能买"的入口，而落地页**不**该自己拉一份收银台
+   * （AGENTS §3.5）。它能做的最诚实的事是把人送进应用里**已经存在**的那一节
+   * （设置 → 订阅 → `RenewPanel` → `startCheckout`）。没有这条参数时，
+   * 「立即购买」只能把人丢到任务列表让他自己找 —— 那不是购买按钮。
+   *
+   * 🔴 两条纪律：
+   *   1. **只在挂载时跑一次**（`[]`），它不是状态、是一次性意图；跟着 URL 变化重跑
+   *      会在用户手动切节之后又把他拽回去。
+   *   2. **认不出的 id 不猜**：落到默认节，而不是把一整页 hidden 掉（见 `isSettingsSectionId`）。
+   * 参数名的唯一事实源在 `lib/settings-deep-link.ts`（落地页抄了一份字面量，判据钉着相等）。
+   */
+  useEffect(() => {
+    const wanted = settingsSectionOnLoad();
+    if (wanted === null || !isSettingsSectionId(wanted)) return;
+    setSecondaryAccountSurface('settings');
+    setSettingsReturnSurface(undefined);
+    setSettingsFocus(undefined);
+    setSettingsAnchor(undefined);
+    setSettingsSection(wanted);
+    setView('settings');
+  }, []);
 
   /**
    * 侧栏里点一个筛选（智能清单 / 象限 / 清单）。
@@ -3092,8 +3169,17 @@ export function App(): React.JSX.Element {
                     </h1>
                   </>
                 ) : null}
+                {/*
+                  🔴 这一屏原来有一句常驻副句（"昵称和头像只保存在本机…"），
+                  2026-10-24 之后它也进了 `?`（挂在下面的 `h1` 上）——
+                  设置里**一句常驻说明都不留**，这是那条禁令的字面意思。
+                */}
                 {secondaryAccountSurface === 'profile' ? (
-                  <p className="ht-settings__lead">{t('web.profile.overview.lead')}</p>
+                  <SettingsInfoTip
+                    testId="tip-profile-overview"
+                    label={t('web.profile.overview.title')}
+                    text={t('web.profile.overview.lead')}
+                  />
                 ) : null}
               </div>
               <button
@@ -3151,17 +3237,48 @@ export function App(): React.JSX.Element {
               **下降**，新造一族（哪怕只包一层）是要被拒的。
             */}
             <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-profile'} id="settings-group-profile" aria-labelledby="settings-group-profile-title">
-              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-profile-title">
-                {t('web.settings.nav.profile')}
-              </h2>
+              <SettingsSectionHead
+                id="settings-group-profile-title"
+                title={t('web.settings.nav.profile')}
+                lead={t('web.settings.lead.profile')}
+              />
               <div id="settings-profile" data-testid="profile-section-anchor">
-                <ProfilePanel active={activeSettingsSection === 'settings-group-profile'} />
+                <ProfilePanel
+                  active={activeSettingsSection === 'settings-group-profile'}
+                  /*
+                   * 「去解锁」落到**同步与隐私**那一节，并且用与其它入口同一个锚点
+                   * （`SETTINGS_ANCHORS.sync`）。🔴 不在这里手写 `setSettingsSection`
+                   * 的理由：锚点表是"从别处点一下，要落在哪一节、焦点给谁"的唯一
+                   * 事实源，绕开它就等于第二份实现 —— 而第二份总会漏掉焦点。
+                   */
+                  onRequestUnlock={() => {
+                    setSettingsFocus(undefined);
+                    setSettingsAnchor('sync');
+                  }}
+                />
               </div>
             </section>
+            {/*
+              🔴 「订阅」是**独立一节**（2026-10-24）。页内三段：状态 → 选一档 → 关于收费。
+              它不再挂在「账号与安全」下面：那一节管的是"谁能登录这台账号"，
+              而这一节管的是"我们替你运维的那台服务器还要不要续" —— 两件不同的事。
+              ⚠️ 支付渠道与入口由 `check:payment-entry` 钉成同一件事：没配渠道时
+              界面如实说"这台实例没有配置收款通道"，不假装能买。
+            */}
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-subscription'} id="settings-group-subscription" aria-labelledby="settings-group-subscription-title">
+              <SettingsSectionHead
+                id="settings-group-subscription-title"
+                title={t('web.settings.nav.subscription')}
+                lead={t('web.settings.lead.subscription')}
+              />
+              <SubscriptionPanel active={activeSettingsSection === 'settings-group-subscription'} />
+            </section>
             <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-appearance'} id="settings-group-appearance" aria-labelledby="settings-group-appearance-title">
-              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-appearance-title">
-                {t('web.settings.nav.appearance')}
-              </h2>
+              <SettingsSectionHead
+                id="settings-group-appearance-title"
+                title={t('web.settings.nav.appearance')}
+                lead={t('web.settings.lead.appearance')}
+              />
             {/*
               🔴 **显示偏好**（2026-09-30 从任务页头搬进来）：「日期 | 倒计时」
               两个词悬在页头上，用户不知道它是什么、影响什么 —— 它其实是
@@ -3169,7 +3286,7 @@ export function App(): React.JSX.Element {
               设备本地持久化（`due-display-pref.ts`），不进 op-log。
             */}
             <section className="ht-settings" data-testid="display-pref-panel">
-              <h2 className="ht-settings__title ht-type-section-title">{t('web.settings.display.title')}</h2>
+              {/* 页标题是「任务与显示」；这里再写一个「显示」就是同一屏两行近义标题。 */}
               <div className="ht-settings__preference-row">
               <h3 className="ht-settings__h3 ht-type-headline">{t('web.shell.dueMode.aria')}</h3>
               <div
@@ -3199,8 +3316,14 @@ export function App(): React.JSX.Element {
               {/* 窄窗会自动收起辅助栏；说明只解释这一项非直觉的行为。 */}
               <div className="ht-settings__preference-row">
                 <div className="ht-settings__preference-label">
-              <h3 className="ht-settings__h3 ht-type-headline">{t('web.settings.display.detail.title')}</h3>
-              <p className="ht-settings__hint">{t('web.settings.display.detailNote')}</p>
+              <h3 className="ht-settings__h3 ht-type-headline">
+                {t('web.settings.display.detail.title')}
+                <SettingsInfoTip
+                  testId="tip-detail-pane"
+                  label={t('web.settings.display.detail.title')}
+                  text={t('web.settings.display.detailNote')}
+                />
+              </h3>
                 </div>
               <div
                 role="radiogroup"
@@ -3281,9 +3404,11 @@ export function App(): React.JSX.Element {
               <WidgetPushPanel active={activeSettingsSection === 'settings-group-appearance'} />
             </section>
             <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-sync'} id="settings-group-sync" aria-labelledby="settings-group-sync-title">
-              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-sync-title">
-                {t('web.settings.nav.syncPrivacy')}
-              </h2>
+              <SettingsSectionHead
+                id="settings-group-sync-title"
+                title={t('web.settings.nav.syncPrivacy')}
+                lead={t('web.settings.lead.syncPrivacy')}
+              />
               {/*
                 🔴 **同步**（工单 H9 第 3 刀，2026-10-06）：地址 / 令牌 / 口令 / 密钥库
                 这一组原来是一个**同级浮层**（rail 那颗齿轮点开它）。产品负责人第 2 条
@@ -3316,9 +3441,11 @@ export function App(): React.JSX.Element {
               <PrivacyPanel active={activeSettingsSection === 'settings-group-sync'} />
             </section>
             <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-ai'} id="settings-group-ai" aria-labelledby="settings-group-ai-title">
-              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-ai-title">
-                {t('web.settings.nav.aiIntegrations')}
-              </h2>
+              <SettingsSectionHead
+                id="settings-group-ai-title"
+                title={t('web.settings.nav.aiIntegrations')}
+                lead={t('web.settings.lead.ai')}
+              />
               <AiSettings
                 active={activeSettingsSection === 'settings-group-ai'}
                 initial={aiSettings}
@@ -3356,15 +3483,19 @@ export function App(): React.JSX.Element {
               />
             </section>
             <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-data'} id="settings-group-data" aria-labelledby="settings-group-data-title">
-              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-data-title">
-                {t('web.settings.nav.data')}
-              </h2>
+              <SettingsSectionHead
+                id="settings-group-data-title"
+                title={t('web.settings.nav.data')}
+                lead={t('web.settings.lead.data')}
+              />
               <DataSettingsPanel active={activeSettingsSection === 'settings-group-data'} />
             </section>
             <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-account'} id="settings-group-account" aria-labelledby="settings-group-account-title">
-              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-account-title">
-                {t('web.settings.nav.account')}
-              </h2>
+              <SettingsSectionHead
+                id="settings-group-account-title"
+                title={t('web.settings.nav.account')}
+                lead={t('web.settings.lead.account')}
+              />
               {accountNeedsSignIn ? (
                 <SettingsAccountGate
                   messageKey="web.settings.accountSignIn"
@@ -3372,14 +3503,6 @@ export function App(): React.JSX.Element {
                 />
               ) : (
                 <>
-              {/*
-                托管同步续费（临时方案：再下一单 = 在当前到期日之后叠 30 天）。
-                它排在"数据进出"之后、"账号安全"之前：这一档买的是**服务**，
-                不是登录方式 —— 与下面三块（通行密钥 / 密码 / 注销）不是一类东西。
-                🔴 入口与支付渠道由 `check:payment-entry` 钉成同一件事：
-                渠道没配时这里的请求会拿到 503，界面如实说"这台实例没配收款通道"。
-              */}
-              <RenewPanel />
               {/* 账号安全：管理自己的通行密钥（列 / 删）。见 PasskeyPanel 文件头。 */}
               <PasskeyPanel active={activeSettingsSection === 'settings-group-account'} />
               {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
@@ -3402,9 +3525,11 @@ export function App(): React.JSX.Element {
               )}
             </section>
             <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-help'} id="settings-group-help" aria-labelledby="settings-group-help-title">
-              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-help-title">
-                {t('web.settings.nav.help')}
-              </h2>
+              <SettingsSectionHead
+                id="settings-group-help-title"
+                title={t('web.settings.nav.help')}
+                lead={t('web.settings.lead.help')}
+              />
               {/*
                 🔴 「帮助与关于」是**产品孤岛的另一半**：在此之前，应用里
                 没有任何一处能到达站点的帮助 / 价格 / 更新动态。

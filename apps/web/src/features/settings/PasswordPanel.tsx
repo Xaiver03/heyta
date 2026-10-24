@@ -63,6 +63,7 @@
  */
 
 import { useRef, useState } from 'react';
+import { SettingsInfoTip } from './SettingsInfoTip.js';
 
 import { useI18n, type MessageKey, type MessageVars } from '@heyta/i18n';
 import { AUTH_PASSWORD_MIN_CODE_POINTS } from '@heyta/shared-schema';
@@ -168,6 +169,8 @@ function PasswordField(props: {
   testId: string;
   revealTestId: string;
   label: string;
+  /** 这一格旁边那枚 `?`（2026-10-24：说明只许走问号）。 */
+  tip?: { readonly text: string; readonly testId: string };
   autoComplete: 'current-password' | 'new-password';
   invalid: boolean;
   value: string;
@@ -180,6 +183,9 @@ function PasswordField(props: {
     <div className="ht-settings__field">
       <label className="ht-settings__item-label" htmlFor={props.id}>
         {props.label}
+        {props.tip === undefined ? null : (
+          <SettingsInfoTip testId={props.tip.testId} label={props.label} text={props.tip.text} />
+        )}
       </label>
       <div className="ht-settings__actions">
         <input
@@ -364,11 +370,15 @@ export function PasswordPanel(): React.JSX.Element {
 
   return (
     <div className="ht-settings" data-testid="password-panel">
-      <h2 className="ht-settings__title ht-type-section-title">{t('web.settings.password.title')}</h2>
-      {/* 🔴 两张表的 lead 不是同一句：改密是"这里改的只是…"，设密是"多一条路"。 */}
-      <p className="ht-settings__hint">
-        {mode === 'change' ? t('web.settings.password.lead') : t('web.settings.password.setLead')}
-      </p>
+      <h2 className="ht-settings__title ht-type-section-title">
+        {t('web.settings.password.title')}
+        {/* 🔴 两张表的 lead 不是同一句：改密是"这里改的只是…"，设密是"多一条路"。 */}
+        <SettingsInfoTip
+          testId="tip-password"
+          label={t('web.settings.password.title')}
+          text={mode === 'change' ? t('web.settings.password.lead') : t('web.settings.password.setLead')}
+        />
+      </h2>
 
       {!signedIn ? (
         <SettingsAccountGate
@@ -395,10 +405,10 @@ export function PasswordPanel(): React.JSX.Element {
             }}
             inputRef={setRef}
           />
-          <p className="ht-settings__hint" data-testid="password-set-hint">
-            {t('web.settings.password.minLength', { min: AUTH_PASSWORD_MIN_CODE_POINTS })}{' '}
-            {t('common.auth.form.passwordHint')}
-          </p>
+          {/*
+            设密那张表的长度规则也挂在它的格子旁（`tip` 走 `PasswordField`），
+            所以这里不再单起一行。
+          */}
 
           <div className="ht-settings__actions">
             <button
@@ -436,9 +446,11 @@ export function PasswordPanel(): React.JSX.Element {
             🔴 这句与改密那张的 `otherDevices` 是**相反**的后果，且必须在点之前看得见：
             加一个认证器不把任何人踢下线（这条不 bump `tokenVersion`）。
           */}
-          <p className="ht-settings__hint" data-testid="password-set-consequence">
-            {t('web.settings.password.setConsequence')}
-          </p>
+          <SettingsInfoTip
+            testId="tip-password-set-consequence"
+            label={t('web.settings.password.setConsequence')}
+            text={t('web.settings.password.setConsequence')}
+          />
 
           <div aria-live="polite" data-testid="password-set-live">
             {localError !== undefined && (
@@ -493,11 +505,11 @@ export function PasswordPanel(): React.JSX.Element {
               if (localError === 'new') setLocalError(undefined);
             }}
             inputRef={nextRef}
+          tip={{
+            testId: 'tip-password-hint',
+            text: `${t('web.settings.password.minLength', { min: AUTH_PASSWORD_MIN_CODE_POINTS })} ${t('common.auth.form.passwordHint')}`,
+          }}
           />
-          <p className="ht-settings__hint" data-testid="password-hint">
-            {t('web.settings.password.minLength', { min: AUTH_PASSWORD_MIN_CODE_POINTS })}{' '}
-            {t('common.auth.form.passwordHint')}
-          </p>
 
           <div className="ht-settings__actions">
             <button
@@ -541,18 +553,20 @@ export function PasswordPanel(): React.JSX.Element {
             有没有口令（服务端也不许界面猜），所以这句话只能报邮箱、不保证送达。
           */}
           {email === undefined ? null : (
-            <p className="ht-settings__hint" data-testid="password-reset-to">
+            <p className="ht-settings__hint" role="status" data-testid="password-reset-to">
               {t('web.settings.password.resetTo', { email })}
             </p>
           )}
 
           {/*
-            🔴 这句在**点之前**就得看得见：
-            "其余设备全部要重新登录"是改密的后果，不是失败信息。
+            🔴 这句在**点之前**就得能看到 —— 但"看到"不等于"占一整行"
+            （2026-10-24 禁令）：它是按钮旁的 `?`，点开就是后果说明。
           */}
-          <p className="ht-settings__hint" data-testid="password-consequence">
-            {t('web.settings.password.otherDevices')}
-          </p>
+          <SettingsInfoTip
+            testId="tip-password-consequence"
+            label={t('web.settings.password.otherDevices')}
+            text={t('web.settings.password.otherDevices')}
+          />
 
           {/*
             「从来没设过？」是**主动**出口：不必先撞一次墙才找得到另一张表。

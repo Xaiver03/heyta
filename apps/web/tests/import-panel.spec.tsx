@@ -151,7 +151,8 @@ describe('ImportPanel', () => {
   it('英文界面下词条真的翻了，且不露中文', () => {
     const el = render('en');
     const text = el.textContent ?? '';
-    expect(text).toContain('Import / restore');
+    /* 面板 h2 已删（2026-10-24 禁令），改判"还原动作真的在"。 */
+    expect(text).toContain('Read and restore');
     expect(text).toContain('Read and restore');
     expect(text).not.toMatch(CJK);
   });

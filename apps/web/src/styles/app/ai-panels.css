@@ -1282,3 +1282,25 @@ input[type="radio"] {
     padding: var(--ht-space-3);
   }
 }
+
+/* ── 开关那一行（2026-10-24：说明搬进 `?` 之后的两列）───────────────
+ *
+ * 结构变成：`<div class="ht-settings__toggle">` 里放 `<label>` + 一枚 `?`。
+ * `?` **必须**在 label 外面：`<button>` 落在 label 里时 Safari 点它会连带
+ * 切换那个 checkbox（"只想看说明，结果把 AI 打开了"）。
+ * 所以这里要补两件事：外层是一行（label 吃满、`?` 靠右），label 自己仍是
+ * "方框 + 文字"的横排 —— 少了 `__toggle-hit` 那一条，方框会单独占一行。 */
+.ht-settings__toggle {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+}
+
+.ht-settings__toggle-hit {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+  min-inline-size: 0;
+  cursor: pointer;
+}

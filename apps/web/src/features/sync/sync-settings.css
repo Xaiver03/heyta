@@ -35,29 +35,12 @@
   font-size: var(--ht-font-size-sm);
 }
 
-.sync-settings__field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-1);
-  color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-sm);
-}
-
-.sync-settings__input {
-  min-block-size: var(--ht-touch-target-min);
-  padding-inline: var(--ht-space-2);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-background);
-  color: var(--ht-color-foreground);
-  font-family: var(--ht-font-sans);
-  font-size: var(--ht-font-size-base);
-}
-
-.sync-settings__input:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
+/* 🔴 2026-10-24：`.sync-settings__field` / `.sync-settings__input` 已删 —— 这三格
+   改走共享 `FormField`（`apps/web/src/lib/form/FormField.tsx`）。
+   删掉的不只是"又一套解剖"，还有**两条从来不会生效的声明**：
+   这里的 `border: 1px solid` 与 `:focus-visible { outline: … }` 都被
+   `borderless-controls.css` 的 `!important` 抹掉了 —— 也就是说它们一直只是**死代码**，
+   而"这个输入框有边框"这件事从来没有真的发生过。 */
 
 .sync-settings__fit-button {
   align-self: flex-start;

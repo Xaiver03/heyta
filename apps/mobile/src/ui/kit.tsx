@@ -40,7 +40,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { TextStyleName } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
-import { StateIllustration, type StateIllustrationVariant } from '@heyta/ui';
+import {
+  StateIllustration,
+  resolveFieldChrome,
+  type StateIllustrationVariant,
+} from '@heyta/ui';
 import { useText, useTheme, useTokens } from '../theme';
 import { Icon, type IconName } from './icons';
 
@@ -83,6 +87,18 @@ export interface TextProps {
   tone?: TextTone;
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
+  /**
+   * 原生 id。**只给 `aria-describedby` 这类关联用**（RN 的 `nativeID` 就是那个 id）。
+   * 加它是因为字段的"说明/错误"要能被输入框按 id 指到 —— 那正是
+   * `@heyta/ui#fieldDescribedById` 算出来的东西。
+   */
+  nativeID?: string;
+  /**
+   * 读屏播报策略。`'polite'` = 等当前朗读结束后再念出来 ——
+   * 就地错误必须带它，否则读屏用户**永远不知道**那次提交失败了
+   * （视觉上有红字，无声世界什么都没有）。
+   */
+  accessibilityLiveRegion?: 'none' | 'polite' | 'assertive';
   /** 允许长按选中 —— 给错误详情这类"用户要复制去反馈"的文字用。 */
   selectable?: boolean;
   /**
@@ -109,6 +125,8 @@ export function Text({
   selectable,
   grow = false,
   testID,
+  nativeID,
+  accessibilityLiveRegion,
 }: TextProps): React.JSX.Element {
   const t = useTokens();
   const text = useText();
@@ -117,6 +135,8 @@ export function Text({
   return (
     <RNText
       testID={testID}
+      nativeID={nativeID}
+      accessibilityLiveRegion={accessibilityLiveRegion}
       numberOfLines={numberOfLines}
       selectable={selectable}
       style={[
@@ -943,9 +963,21 @@ export interface TextFieldProps {
   keyboard?: 'default' | 'url' | 'email-address';
   autoCapitalize?: 'none' | 'sentences';
   editable?: boolean;
-  /** 字段下方的说明或错误。传了就会占位，所以只在真有时才传。 */
+  /** 字段下方的说明。传了就会占位，所以只在真有时才传。 */
   hint?: string;
   hintTone?: 'subtle' | 'danger';
+  /**
+   * 就地错误（2026-10-24 加）。
+   *
+   * 🔴 与 `hint` 的区别是**语义**不是颜色：错误出现时说明**让位**
+   * （同一行只说一句话），并且它会带 `accessibilityLiveRegion="polite"`，
+   * 读屏会念出来。判断来自共享层 `@heyta/ui#resolveFieldChrome` ——
+   * 与 web 的 `FormField` 同一个函数，所以"错误优先"在两端不可能各说一套。
+   *
+   * ⚠️ 以前移动端的做法是把 `hint` 的色调改成 danger，那是**外观**层面的模拟：
+   * 读屏不会播报，而且"说明"和"错误"会同时占两行。
+   */
+  error?: string;
   /**
    * 单行字段的**提交**通道：给了就在键盘上出现「完成」并回调一次。
    *
@@ -989,6 +1021,7 @@ export function TextField({
   editable = true,
   hint,
   hintTone = 'subtle',
+  error,
   onSubmitEditing,
   testID,
   multiline = false,
@@ -996,6 +1029,9 @@ export function TextField({
 }: TextFieldProps): React.JSX.Element {
   const t = useTokens();
   const text = useText();
+  // 🔴 三件判断（错误优先 / 说明让位 / 必填星号）住在 `@heyta/ui#resolveFieldChrome`，
+  //    与 web 的 `FormField` 共用同一个函数。这里只负责把它摆到 RN 原语上。
+  const chrome = resolveFieldChrome({ hint, error }, 'stacked');
 
   return (
     <View style={{ gap: t['space.1'] }}>
@@ -1016,6 +1052,9 @@ export function TextField({
         // 只给多行时传：给单行传 numberOfLines 在 Android 上会把它变成多行。
         numberOfLines={multiline ? lines : undefined}
         accessibilityLabel={label}
+        // 显式 `false` 而不是缺省：读屏不会替你清掉上一次的 invalid 状态。
+        aria-invalid={chrome.invalid}
+        aria-describedby={hint === undefined && error === undefined ? undefined : `${testID ?? 'field'}-message`}
         testID={testID}
         onSubmitEditing={onSubmitEditing}
         // 只有声明了提交通道才改键盘形状（现有调用点保持 RN 默认）。
@@ -1046,8 +1085,22 @@ export function TextField({
           },
         ]}
       />
-      {hint !== undefined ? (
-        <Text variant="caption" tone={hintTone === 'danger' ? 'danger' : 'subtle'}>
+      {chrome.invalid ? (
+        <Text
+          variant="caption"
+          tone="danger"
+          nativeID={`${testID ?? 'field'}-message`}
+          accessibilityLiveRegion="polite"
+        >
+          {error}
+        </Text>
+      ) : null}
+      {chrome.showHint ? (
+        <Text
+          variant="caption"
+          tone={hintTone === 'danger' ? 'danger' : 'subtle'}
+          nativeID={`${testID ?? 'field'}-message`}
+        >
           {hint}
         </Text>
       ) : null}

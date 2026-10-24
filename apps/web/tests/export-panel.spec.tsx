@@ -81,7 +81,11 @@ describe('ExportPanel', () => {
     expect(el.querySelector('[data-testid="export-markdown"]')).not.toBeNull();
 
     const text = el.textContent ?? '';
-    expect(text).toContain('导出数据');
+    /*
+     * ⚠️ 2026-10-24：面板自己的 h2「导出数据」被删了（节标题「数据管理」旁那枚 `?`
+     * 已经说明这一页）。判据改成"动作与格式都在" —— 这条断言守的是**入口存在**，
+     * 不是"屏幕上必须有那四个字"。
+     */
     expect(text).toContain('下载 JSON');
     expect(text).toContain('下载任务清单');
 
@@ -96,7 +100,6 @@ describe('ExportPanel', () => {
   it('英文界面下词条真的翻了，且不露中文', () => {
     const el = render('en');
     const text = el.textContent ?? '';
-    expect(text).toContain('Export data');
     expect(text).toContain('Download JSON');
     expect(text).not.toMatch(CJK);
   });

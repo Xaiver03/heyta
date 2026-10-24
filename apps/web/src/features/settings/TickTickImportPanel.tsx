@@ -143,8 +143,10 @@ export function TickTickImportPanel(): React.JSX.Element {
 
   return (
     <div className="ht-settings" data-testid="ticktick-import-panel">
-      <h2 className="ht-settings__title ht-type-section-title">{t('web.ticktick.title')}</h2>
-      <p className="ht-settings__hint">{t('web.ticktick.intro')}</p>
+      {/*
+        没有 h2、没有 intro（2026-10-24 禁令）。这一屏要说明的两件事
+        （"从哪个应用迁移"、"CSV 从哪来"）挂在下面两个小标题的 `?` 上。
+      */}
 
       <section className="ht-settings__section" aria-labelledby="ticktick-file-title">
         <h3 id="ticktick-file-title" className="ht-settings__h3 ht-type-headline">
@@ -175,10 +177,17 @@ export function TickTickImportPanel(): React.JSX.Element {
       </section>
 
       {/* 诚实条款：只认滴答清单 —— Todoist 的解析在本仓库不存在。 */}
-      <SettingsNotice title={t('web.ticktick.ticktickOnly')} testId="ticktick-ticktick-only" />
+      <SettingsNotice
+        title={t('web.ticktick.ticktickOnly.title')}
+        testId="ticktick-ticktick-only"
+      >
+        {t('web.ticktick.ticktickOnly')}
+      </SettingsNotice>
 
       {/* 与"还原自己的导出"是两个不同的承诺，必须在界面上分开说。 */}
-      <SettingsNotice title={t('web.ticktick.coexist')} testId="ticktick-coexist" />
+      <SettingsNotice title={t('web.ticktick.coexist.title')} testId="ticktick-coexist">
+        {t('web.ticktick.coexist')}
+      </SettingsNotice>
 
       {busy && (
         <SettingsNotice title={t('web.ticktick.busy')} testId="ticktick-busy" live />
@@ -242,7 +251,7 @@ export function TickTickImportPanel(): React.JSX.Element {
               </div>
             </div>
           )}
-          <p className="ht-settings__hint" data-testid="ticktick-preview-rows">
+          <p className="ht-settings__hint" role="status" data-testid="ticktick-preview-rows">
             {t('web.ticktick.previewRows', {
               rows: stage.preview.report.dataRows,
               checklist: stage.preview.report.checklistItems,
@@ -253,7 +262,7 @@ export function TickTickImportPanel(): React.JSX.Element {
 
           {(Object.keys(skipped) as TickTickSkipReason[]).length > 0 && (
             <div data-testid="ticktick-skipped">
-              <p className="ht-settings__hint">{t('web.ticktick.skippedTitle')}</p>
+              <p className="ht-settings__h4">{t('web.ticktick.skippedTitle')}</p>
               <ul className="ht-settings__list">
                 {(Object.keys(skipped) as TickTickSkipReason[]).map((reason) => (
                   <li key={reason}>
@@ -266,7 +275,7 @@ export function TickTickImportPanel(): React.JSX.Element {
 
           {(Object.keys(unmapped) as TickTickUnmappedField[]).length > 0 && (
             <div data-testid="ticktick-unmapped">
-              <p className="ht-settings__hint">{t('web.ticktick.unmappedTitle')}</p>
+              <p className="ht-settings__h4">{t('web.ticktick.unmappedTitle')}</p>
               <ul className="ht-settings__list">
                 {(Object.keys(unmapped) as TickTickUnmappedField[]).map((field) => (
                   <li key={field}>

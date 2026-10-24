@@ -38,6 +38,7 @@ import { currentState, requireStore } from '../../lib/oplog.js';
 import { tasksMarkdownCopy } from './export-copy.js';
 import { downloadTextFile } from './export-download.js';
 import { SettingsNotice } from './SettingsNotice.js';
+import { SettingsInfoTip } from './SettingsInfoTip.js';
 
 export function ExportPanel({
   onlyJson = false,
@@ -89,14 +90,20 @@ export function ExportPanel({
 
   return (
     <div className="ht-settings" data-testid="export-panel">
-      <h2 className="ht-settings__title ht-type-section-title">{t('web.export.title')}</h2>
-      <p className="ht-settings__hint">{t('web.export.intro')}</p>
+      {/*
+        🔴 没有 h2 也没有 intro（2026-10-24 禁令）：节标题「数据管理」旁边那枚 `?`
+        已经说明这一页管什么；面板再写「导出」+ 一句"把数据带走"就是同一件事的第三遍。
+      */}
 
       <section className="ht-settings__section">
         <h3 className="ht-settings__h3 ht-type-headline">
           <FileJson size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.json.label')}
+          <SettingsInfoTip
+            testId="tip-export-json"
+            label={t('web.export.json.label')}
+            text={t('web.export.json.note')}
+          />
         </h3>
-        <p className="ht-settings__hint">{t('web.export.json.note')}</p>
         <div className="ht-settings__actions">
           <button
             type="button"
@@ -113,12 +120,21 @@ export function ExportPanel({
       {!onlyJson && <section className="ht-settings__section">
         <h3 className="ht-settings__h3 ht-type-headline">
           <FileText size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.markdown.label')}
+          <SettingsInfoTip
+            testId="tip-export-markdown"
+            label={t('web.export.markdown.label')}
+            text={t('web.export.markdown.note')}
+          />
         </h3>
-        <p className="ht-settings__hint">{t('web.export.markdown.note')}</p>
         <div className="ht-settings__actions">
+          {/*
+            🔴 这一枚是**次要**动作（2026-10-24）：同一屏上「下载 JSON」已经是主色实底，
+            而这一屏还有第二个主色实底 + 一个禁用的主色实底 —— 三个主按钮等于没有主按钮。
+            给人看的 Markdown 是旁支（它不能导回），所以降到 ghost。
+          */}
           <button
             type="button"
-            className="ht-btn ht-btn--primary"
+            className="ht-btn ht-btn--ghost"
             data-testid="export-markdown"
             disabled={busy}
             onClick={() => void run('markdown')}
@@ -129,7 +145,7 @@ export function ExportPanel({
       </section>}
 
       {counts !== undefined && (
-        <p className="ht-settings__hint" data-testid="export-counts">
+        <p className="ht-settings__hint" role="status" data-testid="export-counts">
           {t('web.export.counts', {
             entities: counts.totalEntities,
             deleted: counts.totalDeleted,

@@ -44,12 +44,15 @@
  * 把合法的候选取出来、把结果（或拒绝原因）交给用户。
  */
 
+import { ICON_SIZE } from '@heyta/design-system';
 import type { Task } from '@heyta/domain';
 import { canSetParent } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { rejectionReasonOf, subtaskRejectionMessageKey } from '@heyta/ui';
-import { CornerDownRight } from 'lucide-react';
+import { ChevronDown, CornerDownRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
+
+import { FormField } from '../../lib/form/FormField.js';
 
 import { useTaskStore } from './store.js';
 
@@ -98,41 +101,32 @@ export function SubtaskField({
 
   return (
     <>
-      <label
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--ht-space-1)',
-          fontSize: 'var(--ht-font-size-2xs)',
-          color: 'var(--ht-color-foreground-muted)',
-        }}
+      <FormField
+        id={`subtask-select-${task.id}`}
+        label={t('web.subtask.pick.label')}
       >
-        {t('web.subtask.pick.label')}
-        <select
-          data-testid={`subtask-select-${task.id}`}
-          aria-label={t('web.subtask.pick.aria', { title: task.title })}
-          value={task.parentId ?? ''}
-          onChange={(e) => {
-            onPick(e.target.value);
-          }}
-          style={{
-            minHeight: 'var(--ht-touch-target-min)',
-            padding: '0 var(--ht-space-2)',
-            borderRadius: 'var(--ht-radius-md)',
-            border: 'var(--ht-border-width-thin) solid var(--ht-color-border)',
-            background: 'var(--ht-color-background)',
-            color: 'var(--ht-color-foreground)',
-            fontSize: 'var(--ht-font-size-base)',
-          }}
-        >
-          <option value="">{t('web.subtask.option.topLevel')}</option>
-          {candidates.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.title}
-            </option>
-          ))}
-        </select>
-      </label>
+        {(field) => (
+          <div className="ht-input-field__select">
+            <select
+              {...field}
+              data-testid={`subtask-select-${task.id}`}
+              aria-label={t('web.subtask.pick.aria', { title: task.title })}
+              value={task.parentId ?? ''}
+              onChange={(e) => {
+                onPick(e.target.value);
+              }}
+            >
+              <option value="">{t('web.subtask.option.topLevel')}</option>
+              {candidates.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.title}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={ICON_SIZE.sm} aria-hidden="true" />
+          </div>
+        )}
+      </FormField>
 
       {errorKey === undefined ? null : (
         <span

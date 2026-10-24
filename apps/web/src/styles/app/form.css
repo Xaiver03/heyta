@@ -1,0 +1,155 @@
+/**
+ * 表单行（web）—— 与 `apps/web/src/lib/form/FormField.tsx` 成对。
+ *
+ * 🔴 类名是 `.ht-input-field*` 而**不是** `.ht-field*`：`check:row-single-source`
+ * 断言"`ht-*` 前缀族只减不增"，而"表单行"属于**输入控件**这一族（`.ht-input`），
+ * 不是新的一族。第一版就叫 `.ht-field`，被那道门禁当场拦下 ——
+ * 它拦得对：新前缀族是"又开了一套"的信号，而这里要的正是**收编**。
+ *
+ * 🔴 这一族类名是**唯一的表单解剖**。加新字段时用 `FormField`，
+ *    不要再在功能 CSS 里另写一套 `.xxx__field`（那正是"6 种解剖"的来历）。
+ *
+ * 两条不变量（在 `docs/agents/ux-principles.md` 里有出处与判据）：
+ *   1. 可键入控件**只有一档高度** = `--ht-size-field-height`，且用 `block-size` 给死
+ *      （`min-block-size` 挡不住原生 `<select>` 的 20px 外观）。
+ *   2. `inline` 解剖的标签列宽 = `--ht-layout-form-label-width`，
+ *      全仓同一条竖线；`stacked` 解剖标签在上，不占列。
+ */
+
+.ht-input-field {
+  display: grid;
+  min-inline-size: 0;
+}
+
+/* ── 表单页：标签在上 ─────────────────────────────────────────── */
+.ht-input-field--stacked {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--ht-space-1);
+}
+
+/* ── 设置/属性面板：标签在左 ──────────────────────────────────── */
+.ht-input-field--inline {
+  grid-template-columns: var(--ht-layout-form-label-width) minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--ht-space-4);
+  row-gap: var(--ht-space-1);
+}
+
+.ht-input-field__label {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+/* 必填星号：只给视觉，读屏靠 `aria-required`（那一个才是判据）。 */
+.ht-input-field__required {
+  margin-inline-start: var(--ht-space-1);
+  color: var(--ht-color-danger);
+}
+
+/* 控件那一侧可能是**多个**孩子（输入框 + 提示 / 一对并排框），竖向排。 */
+.ht-input-field__control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+.ht-input-field__hint {
+  margin: 0;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-input-field__error {
+  margin: 0;
+  color: var(--ht-color-danger);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+}
+
+/*
+ * 🔴 **唯一的控件高度**。任何字段里的 input / select / textarea 都吃这一条。
+ * ⚠️ 别改回 `min-block-size`：那只是下限，原生 `<select>` 会渲成 20px，
+ *    而所有静态检查都是绿的（实测过，`e2e/tests/habit-create-shape.spec.ts` 的 S2 会抓）。
+ * ⚠️ 也别加静止态描边：产品负责人 2026-10-07 的「无描边交互」，
+ *    边界由填充色 + `borderless-controls.css` 的键盘焦点环承担。
+ */
+.ht-input-field__control :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: var(--ht-size-field-height);
+  margin: 0;
+  padding-block: 0;
+  padding-inline: var(--ht-size-field-padding-x);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  appearance: none;
+}
+
+/* 一对并排框（数值 + 单位）：各自仍是同一条高度。 */
+.ht-input-field__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+}
+
+/* 一对并排框，但**左边那个更需要宽度**（日期 + 时间：`2026-10-24` 比 `08:00` 长）。
+   这是原语的第二个配比，不是第二种解剖 —— 行仍然是"标签 + 控件"。 */
+.ht-input-field__pair--wide-first {
+  grid-template-columns: minmax(0, 6fr) minmax(0, 4fr);
+}
+
+/* pair 里那些**不占整行**的控件：它们由父级网格定宽，不许自己 `inline-size: 100%`。
+   直接写在 `.ht-input-field__control` 之外，是因为那条规则只对字段的**直接**控件生效。 */
+.ht-input-field__pair > input {
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: var(--ht-size-field-height);
+  margin: 0;
+  padding-block: 0;
+  padding-inline: var(--ht-size-field-padding-x);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  appearance: none;
+}
+
+/* select 外面的那一层：控件 + 一枚不吃点击的 ⌄。 */
+.ht-input-field__select {
+  position: relative;
+  display: block;
+  min-inline-size: 0;
+}
+
+.ht-input-field__control .ht-input-field__select > :is(select) {
+  padding-inline-end: var(--ht-space-10);
+  cursor: pointer;
+}
+
+.ht-input-field__select > svg {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: var(--ht-space-3);
+  translate: 0 -50%;
+  color: var(--ht-color-foreground-muted);
+  pointer-events: none;
+}
+
+/* 窄屏：两种解剖都退回"标签在上"。两列在 36rem 以下会把控件压到不可读。 */
+@media (max-width: 36rem) {
+  .ht-input-field--inline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

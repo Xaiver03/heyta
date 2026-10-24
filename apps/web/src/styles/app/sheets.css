@@ -84,12 +84,96 @@
 
 .ht-settings__group[hidden] { display: none; }
 
+/* 面板 = 一张卡片。
+ *
+ * 🔴 2026-10-24 起给它一条**发丝线**（原先 `border: 0`）。理由不是"更好看"：
+ * 卡片底色 `surface` 与页面底色 `background` 只差一点点，八节里每一节都是一叠
+ * 白卡片 —— 不描边时"这里有 3 张卡"和"这里有 1 张大卡"在图上是同一件事
+ * （「AI 与集成」那一屏就是这么读成一整块的）。层次用边框表达、阴影只留给浮层，
+ * 是本仓一贯的约定（`docs/agents/design-system.md`）。
+ */
 .ht-settings__content > .ht-settings__group > .ht-settings,
 .ht-settings__content > .ht-settings__group > div > .ht-settings {
-  border: 0;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);
   background: var(--ht-color-surface);
   max-inline-size: none;
+}
+
+/* ── 面板内的「偏好行」（任务与显示 / 隐私 / AI 共用）──────────────
+ *
+ * 原来这些行只有 `justify-content: space-between`：一屏四行之间没有分隔，
+ * 读起来像四行散落的字；而「个人资料」那几行是有发丝线的 —— 同一套设置页里
+ * 两种行距。这里把**节奏**对齐（分隔与留白），布局仍是"标签左、控件右"。 */
+.ht-settings .ht-settings__preference-row {
+  align-items: center;
+  padding-block: var(--ht-space-3);
+}
+
+.ht-settings .ht-settings__preference-row + .ht-settings__preference-row {
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-settings .ht-settings__preference-row:first-of-type { padding-block-start: 0; }
+.ht-settings .ht-settings__preference-row:last-of-type { padding-block-end: 0; }
+
+/* ── 面板内的子块（AI / 同步 …）：一条线隔开"这一屏其实有四件事" ────
+ *
+ * 「AI 与集成」一屏装着：AI 开关 / 本机 API / 自动收集规则 / 记忆。
+ * 它们各有自己的 h3，但 h3 之间没有任何视觉边界，于是整屏读成一大段。
+ * 只给**非首个** h3 加一条上边线 —— 第一个 h3 紧接面板标题，加线就多余了。 */
+.ht-settings > .ht-settings__h3:not(:first-child) {
+  margin-block-start: var(--ht-space-4);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* 同步设置那一列用的是 `<fieldset>` 而不是 h3，同一条纪律。 */
+.sync-settings__fieldset + .sync-settings__fieldset {
+  margin-block-start: var(--ht-space-4);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* ── 设置里的"次要动作"要看得出来是按钮（2026-10-24）───────────────
+ *
+ * `.ht-btn--ghost` 是"透明底 + muted 字"。它在工具条里没问题，但在设置页里
+ * 它常常是**这一块唯一的动作**（「刷新列表」「忘记密码?」「准备收件密钥」），
+ * 于是看图时那几枚读成了说明文字 —— 用户找不到"下一步该点哪"。
+ *
+ * 🔴 **只能用底色，不能用描边**：产品负责人 2026-10-07 的裁决是"无描边交互 ——
+ * 按钮/菜单靠文字与底色表达"，`styles/app/borderless-controls.css` 里那条
+ * `border-color: transparent !important` 就是它，本文件**不跟它对抗**（拿 !important
+ * 去压 !important 只会把那条裁决静默改成"有时有描边"）。所以这里给的是凹陷底：
+ * 次要权重仍然是次要的（不是主色实底），但它长得像个能点的东西了。
+ * ⚠️ 行内动作（`…__inline-action`，例如头像那格的「去解锁」）不在此列 ——
+ * 它跟着一句话走，加底色会把句子切碎。 */
+.ht-settings .ht-btn--ghost:not(.ht-settings__inline-action) {
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-settings .ht-btn--ghost:not(.ht-settings__inline-action):hover {
+  background: var(--ht-color-hover);
+}
+
+/* ── 面板内的"子块卡片"之间也要有边界（AI 与集成那一屏）────────────
+ *
+ * AI 面板把四件事分别装进 `.ht-settings__section`（本机 API / 自动收集规则 / …）。
+ * 这些 section 与面板本身**同色**，于是"四块"在图上读成"一整块"，
+ * 而它们各自还有自己的 padding ⇒ 看起来只是行距突然变大。
+ * 一条发丝线把"这是另一件事"说出来。（`ProfilePanel` 用的是行式布局，不涉及这条。） */
+.ht-settings__section + .ht-settings__section,
+.ht-settings__subsection {
+  margin-block-start: var(--ht-space-4);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+/* 子块的第一块（紧接面板标题/第一行）不加线：那一条会与其上方的间距打架。 */
+.ht-settings__subsection:first-of-type {
+  margin-block-start: 0;
+  padding-block-start: 0;
+  border-block-start: 0;
 }
 
 .ht-settings__nav-link:focus-visible {
@@ -122,6 +206,194 @@
   margin: 0;
   padding-block-end: var(--ht-space-2);
   border-block-end: 0;
+}
+
+/* 行式面板：间距交给行自己（行内有 `padding-block`），面板只留内边距与背景。 */
+.ht-settings--rows {
+  gap: 0;
+}
+
+/* 换邮箱那一块与上面三行之间画一条线：它们是两件事，而白卡片上的空白
+   不是分隔（2026-10-24 实拍：两块白底贴在一起，读起来像同一段）。 */
+.ht-settings__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+/* ── 一行一件事（个人资料，2026-10-24）───────────────────────
+ *
+ * 产品负责人实拍「排版混乱」之后重排的形状：**左列标签、右列控件**，
+ * 行与行之间只隔一条发丝线。原来每一块都是自己一列纵向堆叠，标签、控件、
+ * 按钮各起一行，于是三行的面板看起来像七行，且每块的左边界都不一样。
+ *
+ * ⚠️ 缩窄到单列时（< 40rem）标签在上、控件在下 —— 不靠 media query 改结构，
+ * 只改网格列数，组件不用知道自己有多宽。 */
+.ht-settings__row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 8rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--ht-space-2) var(--ht-space-4);
+  padding-block: var(--ht-space-3);
+}
+
+.ht-settings__row + .ht-settings__row {
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.ht-settings__row:first-child { padding-block-start: 0; }
+.ht-settings__row:last-child { padding-block-end: 0; }
+
+.ht-settings__row-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-touch-target-min);
+}
+
+.ht-settings__row-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+  /* 控件那几行自己要有最小高度，否则单列下标签与控件会挤在一起。 */
+  padding-block-start: var(--ht-space-1);
+}
+
+.ht-settings__avatar-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ht-space-3);
+}
+
+/* 一句可执行的话 + 一个行内动作（「去解锁」）。
+   它不换行成一坨：句子与按钮同一行，窄屏才折行。 */
+.ht-settings__action-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+}
+
+/* 「去解锁」是一句话的行内动作，不是一块按钮：命中区仍是触控目标，
+   视觉上只占一个词的位置（`.ht-btn--ghost` 的内边距在这里太胖）。 */
+.ht-settings__inline-action {
+  padding-inline: var(--ht-space-2);
+  color: var(--ht-color-primary);
+}
+
+.ht-settings__value {
+  margin: 0;
+  color: var(--ht-color-foreground);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 40rem) {
+  .ht-settings__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ht-settings__row-label {
+    min-block-size: 0;
+  }
+
+  .ht-settings__row-body {
+    padding-block-start: 0;
+  }
+}
+
+/* ── 设置里的 `<fieldset>`（2026-10-24）───────────────────────
+ *
+ * 🔴 浏览器给 `fieldset` 的默认值是 `2px groove` 边框 + 内边距 + `min-inline-size:
+ * min-content`。设计系统的 reset（`controls.css`）只覆盖了 button/input/select，
+ * 没有 fieldset —— 于是「账号与安全 → 托管同步续费 → 买哪一档」那一组单选框
+ * 外面凭空长出一圈**黑框**，图例还把上边框切了一道口子（产品负责人实拍：
+ * 「为什么这个是黑色的框？」）。
+ *
+ * 三件都归零：边框、内边距、外边距。`min-inline-size` 一并放开 ——
+ * 它默认按内容撑宽，窄容器里会把卡片顶出可视区。 */
+.ht-settings__field {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.ht-settings__field > legend {
+  padding: 0;
+}
+
+/* ── 设置卡片里的输入框要看得出来是个框 ───────────────────────
+ *
+ * `.ht-input` 的背景是 `--ht-color-surface`，而设置卡片**也是** `surface`
+ * （`sheets.css` 里 `.ht-settings__content > … > .ht-settings`）—— 两者同色，
+ * 输入框只剩几行灰字，看图根本认不出那里能输入（昵称那一格就是这么丢的）。
+ * 卡片内改用凹陷面（页面底色）表达"这是一个可编辑的格子"。 */
+.ht-settings .ht-input {
+  background: var(--ht-color-background);
+}
+
+/* ── 「?」说明（SettingsInfoTip）───────────────────────────────
+ *
+ * 触发件按触控目标尺寸给命中区，视觉上仍是一枚小图标（图标本身 `icon-sm`）。
+ * 气泡是**浮层**：`z` 用 popover 那一档、阴影用 `shadow-md` —— 与
+ * `overlay-feedback.md` 的层次约定一致（tooltip 不进关闭策略表，见该组件头）。 */
+.ht-settings__tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ht-settings__tip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--ht-touch-target-min);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ht-radius-full);
+  background: transparent;
+  color: var(--ht-color-foreground-subtle);
+  cursor: pointer;
+}
+
+.ht-settings__tip-trigger:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-settings__tip-trigger:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-settings__tip-bubble {
+  position: absolute;
+  inset-block-start: calc(100% + var(--ht-space-1));
+  inset-inline-start: 0;
+  z-index: var(--ht-z-popover);
+  display: block;
+  /* 20rem ≈ 320px：正文那一段最多 3 行，再宽就从"提示"变成"段落"。 */
+  max-inline-size: 20rem;
+  inline-size: max-content;
+  padding: var(--ht-space-3);
+  /* 发丝线不是装饰：气泡落在**白卡片**上，没有阴影很难看出它是一层浮起来的
+     东西（实拍里它读起来像卡片上的一段引用）。 */
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-md);
+  color: var(--ht-color-foreground-muted);
+  line-height: var(--ht-line-height-normal);
+  text-align: start;
+}
+
+.ht-settings__tip-bubble[data-hidden='true'] {
+  display: none;
 }
 
 @media (max-width: 64rem) {
@@ -402,6 +674,37 @@
   gap: var(--ht-space-3);
 }
 
+/* ── 续费档位：一行一档（2026-10-24）─────────────────────────
+ *
+ * 原来两档挤在一个带默认黑框的 `<fieldset>` 里，档位说明是 `<p>`（无效嵌套，
+ * 会把 `label` 提前闭合 ⇒ 点说明文字选不中那一档），而主按钮又贴在促销码右边。
+ * 现在：凹陷的容器包住两行、选中的那一档整行染色、提交按钮独占一行。
+ *
+ * ⚠️ 选择器按 `data-testid` 收窄，不动共享的 `.ht-settings__option` ——
+ * 那个类还管着"任务与显示"里的两档分段控件，那边的形状已经定过了。 */
+.ht-settings [data-testid='renew-tier'] {
+  gap: var(--ht-space-2);
+}
+
+[data-testid='renew-tier'] .ht-settings__options {
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+}
+
+[data-testid='renew-tier'] .ht-settings__option {
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-radius: var(--ht-radius-sm);
+}
+
+[data-testid='renew-tier'] .ht-settings__option-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
 /* 同一选择语言覆盖单选和功能开关：整个选项表达当前值。 */
 .ht-settings__option {
   min-block-size: var(--ht-touch-target-min);
@@ -441,4 +744,271 @@
     padding-inline-end: calc(var(--ht-space-6) + var(--ht-touch-target-min));
     scroll-padding-inline-end: calc(var(--ht-space-6) + var(--ht-touch-target-min));
   }
+}
+
+/* ── 每一节的开头（2026-10-24，「设置中心」统一版式）──────────────
+ *
+ * 产品负责人对设置页的两句原话是「排版混乱」与「需要有单独的订阅界面」。
+ * 逐屏看下来，"乱"的最大来源不是控件，而是**每节的开头都不一样**：
+ * 七节里只有两节有一句说明，而有些面板又自带一个和节标题近义的 `<h2>`
+ * （「设置 / 个人资料 / 个人信息」三行标题就是这么叠出来的）。
+ *
+ * 现在统一成：**一个标题 + 一句"这一页管什么"**。说明用 muted、限行宽 ——
+ * 它的作用是让人一眼确认自己来对了地方，不是用来读的。 */
+.ht-settings__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__head .ht-settings__lead {
+  max-inline-size: var(--ht-layout-prose-max);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 订阅页（2026-10-24 独立成节）────────────────────────────────
+ *
+ * 三段：① 状态 ② 选一档 ③ 关于收费。三段的版式**故意不同**，
+ * 因为它们是三种不同的东西：状态是读数、方案是选择、脚注是说明。
+ * 全用同一种卡片就会读成"三张差不多的卡"。 */
+
+/* ① 状态：一行读数 + 一枚刷新。状态点用颜色，但同时有文字 ——
+   不靠颜色单独传达信息（WCAG）。 */
+.ht-settings__sub-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  flex-wrap: wrap;
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-background);
+}
+
+.ht-settings__sub-status-main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+  min-inline-size: 0;
+}
+
+.ht-settings__sub-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+.ht-settings__sub-status-title {
+  margin: 0;
+  color: var(--ht-color-foreground);
+}
+
+.ht-settings__sub-dot {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  margin-block-start: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-foreground-subtle);
+  flex: none;
+}
+
+.ht-settings__sub-status--ok .ht-settings__sub-dot { background: var(--ht-color-success); }
+.ht-settings__sub-status--warn .ht-settings__sub-dot { background: var(--ht-color-warning-strong); }
+.ht-settings__sub-status--unknown .ht-settings__sub-dot { background: var(--ht-color-border-strong); }
+
+.ht-settings__sub-refresh {
+  flex: none;
+  gap: var(--ht-space-1);
+}
+
+/* ② 方案卡：**两列**，选中那一列整卡染色 + 主色描边。
+   ⚠️ 不用阴影表达选中（本仓的层次约定是"浮层才用阴影"）。 */
+.ht-settings__sub-block-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__sub-plans {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.ht-settings__sub-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  cursor: pointer;
+}
+
+.ht-settings__sub-plan:hover {
+  border-color: var(--ht-color-border-strong);
+}
+
+.ht-settings__sub-plan[data-checked='true'] {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+}
+
+.ht-settings__sub-plan-top {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+}
+
+.ht-settings__sub-plan-name {
+  font-weight: var(--ht-font-weight-semibold);
+  color: var(--ht-color-foreground);
+}
+
+/* 标价靠右：两档并排时价格对齐成一列，扫一眼就能比。 */
+.ht-settings__sub-plan-price {
+  margin-inline-start: auto;
+  color: var(--ht-color-foreground);
+  white-space: nowrap;
+}
+
+.ht-settings__sub-plan-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin: 0;
+  padding-inline-start: var(--ht-space-4);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-settings__sub-coupon {
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  padding: var(--ht-space-2) var(--ht-space-3);
+}
+
+.ht-settings__sub-coupon > summary {
+  cursor: pointer;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-settings__sub-coupon[open] > summary {
+  margin-block-end: var(--ht-space-2);
+}
+
+.ht-settings__sub-cta {
+  justify-content: flex-start;
+}
+
+/* ③ 订单结果卡：与方案卡同一个圆角档位，但用描边 + 淡底表示"这是结果，不是选项"。 */
+.ht-settings__sub-order {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-settings__sub-order-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1) var(--ht-space-4);
+  margin: 0;
+}
+
+.ht-settings__sub-order-summary p {
+  margin: 0;
+  color: var(--ht-color-foreground);
+}
+
+/* ③ 关于收费：不是卡片，是一段带小标题的说明 —— 它不含任何可点的东西（除了价格页链接），
+   做成卡片会让人以为那里还有选项。 */
+.ht-settings__sub-about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+@media (max-width: 40rem) {
+  .ht-settings__sub-plans {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── 卡片式面板：`.ht-settings--cards`（第一处是「AI 与集成」）────────
+ *
+ * 2026-10-24：那一屏原来是一整块白卡里装着四件互不相干的事，读成"一大段"。
+ * 现在面板根**自己不是卡片**，它是一列卡片：每张卡承担自己的边界，
+ * 卡与卡之间靠间距分段（`gap`），不再用分隔线 —— 一条线和一张卡在说同一句话，
+ * 两个一起说就是噪音。
+ *
+ * 🔴 那几级的优先级是刻意的：面板根的透明化要压过
+ * `.ht-settings__content > .ht-settings__group > .ht-settings` 那条卡片规则
+ * （同特异性、靠后写赢），而卡片内部的 section 又要压过上面那条"子块分隔线"。 */
+.ht-settings__content > .ht-settings__group > .ht-settings--cards {
+  gap: var(--ht-space-3);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.ht-settings--cards > .ht-settings__section,
+.ht-settings--cards > .ht-settings__subsection,
+.ht-settings--cards > .ht-ai-card {
+  padding: var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+}
+
+/* 卡片容器的内部节奏：跟 `.ht-settings` 一样是"一列，有间距"。 */
+.ht-settings--cards > .ht-ai-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+/* 卡片**之间**：不用分隔线（卡片的边就是分隔），也不用上边距（`gap` 管了）。 */
+.ht-settings--cards > .ht-settings__section + .ht-settings__section,
+.ht-settings--cards > .ht-settings__subsection {
+  margin-block-start: 0;
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+/* 卡片**内部**的 `.ht-settings__section` 降级成子块：一层卡片已经够了，
+ * 卡片里再套卡片只会在视觉上多出一圈没人需要的框。 */
+.ht-settings--cards .ht-ai-card .ht-settings__section {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.ht-settings--cards .ht-ai-card .ht-settings__section + .ht-settings__section {
+  margin-block-start: var(--ht-space-4);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* 报告里的小分组标题（导入结果"跳过 / 未映射"那两个）——
+ * 它是一组条目的名字，不是说明文字：所以既不是 `__hint`（禁止）也不是 `__h3`
+ * （那会把报告抬到与"文件"同级）。字号与字重走 body-strong 那一档。 */
+.ht-settings__h4 {
+  margin: 0;
+  font-weight: var(--ht-font-weight-semibold);
+  color: var(--ht-color-foreground);
 }

@@ -33,6 +33,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { SettingsInfoTip } from './SettingsInfoTip.js';
 
 import { AlertTriangle, CheckCircle2, Loader2, Mail, XCircle } from 'lucide-react';
 
@@ -194,14 +195,20 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
 
   return (
     <div className="ht-settings__section" data-testid="email-change-panel">
-      <h3 className="ht-settings__h3 ht-type-headline">{t('common.emailChange.title')}</h3>
-      <p className="ht-settings__hint">{t('common.emailChange.intro')}</p>
+      <h3 className="ht-settings__h3 ht-type-headline">
+        {t('common.emailChange.title')}
+        <SettingsInfoTip
+          testId="tip-email-change"
+          label={t('common.emailChange.title')}
+          text={t('common.emailChange.intro')}
+        />
+      </h3>
 
       {/* 当前邮箱：值来自本机存的凭据（不是我们猜的）。没读到就**不编一个**。 */}
       {email === undefined ? null : (
         <div className="ht-settings__field" data-testid="email-change-current-row">
           <div className="ht-settings__item-label">{t('common.emailChange.currentLabel')}</div>
-          <p className="ht-settings__hint" data-testid="email-change-current">
+          <p className="ht-settings__hint" role="status" data-testid="email-change-current">
             {email}
           </p>
         </div>

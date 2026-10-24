@@ -37,6 +37,8 @@ import { EyeOff, RotateCcw, X } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n';
 
+import { SettingsInfoTip } from './SettingsInfoTip.js';
+
 import { preferenceEvidenceCopy, preferenceLabelText, withheldCopy } from './preference-copy.js';
 
 import {
@@ -113,7 +115,7 @@ function PreferenceRow({
         <span className="ht-settings__toggle-label">{preferenceLabelText(id, t)}</span>
         {/* 🔴 显示**依据原文**（含样本量），不是只给结论。
             用户要能判断"这说得对不对"，才谈得上纠正。 */}
-        <span className="ht-settings__hint" data-testid={`memory-evidence-${id}`}>
+        <span className="ht-settings__hint" role="status" data-testid={`memory-evidence-${id}`}>
           {t(evidence.key, evidence.params)}
         </span>
       </span>
@@ -146,7 +148,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
 
   if (!memoryEnabled) {
     return (
-      <p className="ht-settings__hint" data-testid="memory-off-note">
+      <p className="ht-settings__hint" role="status" data-testid="memory-off-note">
         {t('web.memory.off')}
       </p>
     );
@@ -195,7 +197,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
       </h3>
 
       {known.length === 0 ? (
-        <p className="ht-settings__hint" data-testid="memory-nothing-known">
+        <p className="ht-settings__hint" role="status" data-testid="memory-nothing-known">
           {t('web.memory.known.empty')}
         </p>
       ) : (
@@ -222,7 +224,9 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
                       {preferenceLabelText(w.id, t)}
                     </span>
                     {/* 如实说明还缺什么，而不是编一个"平均用户"顶上 */}
-                    <span className="ht-settings__hint">{t(copy.key, copy.params)}</span>
+                    <span className="ht-settings__hint" role="status">
+                  {t(copy.key, copy.params)}
+                </span>
                   </span>
                 </li>
               );
@@ -239,17 +243,23 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
       */}
       {focusGaps !== undefined && (
         <>
-          <h3 className="ht-settings__subtitle">{t('web.memory.gap.title')}</h3>
-          <p className="ht-settings__hint">{t('web.memory.gap.note')}</p>
+          <h3 className="ht-settings__subtitle">
+            {t('web.memory.gap.title')}
+            <SettingsInfoTip
+              testId="tip-memory-gap"
+              label={t('web.memory.gap.title')}
+              text={t('web.memory.gap.note')}
+            />
+          </h3>
 
           {focusGaps === null ? (
             /* 读不到事件流时的**诚实降级**：推迟次数算不出来，说"0 次"就是编造。 */
-            <p className="ht-settings__hint" data-testid="memory-gap-unavailable">
+            <p className="ht-settings__hint" role="status" data-testid="memory-gap-unavailable">
               {t('web.memory.gap.unavailable')}
             </p>
           ) : focusGaps.length === 0 ? (
             /* 空状态必须诚实：没有落差就明说，**不要**留一个空白区块。 */
-            <p className="ht-settings__hint" data-testid="memory-gap-empty">
+            <p className="ht-settings__hint" role="status" data-testid="memory-gap-empty">
               {t('web.memory.gap.empty')}
             </p>
           ) : (
@@ -267,10 +277,10 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
                       🔴 每条至少给三件事：声明了什么、实际投入多少、以及"为什么"
                       （推迟次数 / 逾期天数）。全部由结构化字段 + 词条现拼。
                     */}
-                    <span className="ht-settings__hint tabular-nums">
+                    <span className="ht-settings__hint tabular-nums" role="status">
                       {t('web.memory.gap.declared', { declared: gap.declared })}
                     </span>
-                    <span className="ht-settings__hint tabular-nums">
+                    <span className="ht-settings__hint tabular-nums" role="status">
                       {t('web.memory.gap.focusMinutes', {
                         minutes: Math.round(gap.focusMinutes),
                       })}
@@ -278,6 +288,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
                     {gap.postponements > 0 && (
                       <span
                         className="ht-settings__hint tabular-nums"
+                        role="status"
                         data-testid={`memory-gap-postponed-${gap.taskId}`}
                       >
                         {/* 英文按数量分支到单数兄弟（词条表刻意不支持 ICU）。 */}
@@ -292,6 +303,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
                     {gap.overdueDays !== null && (
                       <span
                         className="ht-settings__hint tabular-nums"
+                        role="status"
                         data-testid={`memory-gap-overdue-${gap.taskId}`}
                       >
                         {t(
@@ -322,7 +334,11 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
                   <span className="ht-settings__toggle-label">
                     {preferenceLabelText(f.id, t)}
                   </span>
-                  <span className="ht-settings__hint">{t('web.memory.forgotten.note')}</span>
+                  <SettingsInfoTip
+                    testId={`tip-memory-forgotten-${f.id}`}
+                    label={preferenceLabelText(f.id, t)}
+                    text={t('web.memory.forgotten.note')}
+                  />
                 </span>
                 <button
                   type="button"
@@ -342,9 +358,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
         </>
       )}
 
-      <p className="ht-settings__hint">
-        <X size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.memory.footer')}
-      </p>
+      {/* 页脚那句同理：它是说明，不是状态。挂到"记忆"这个标题的问题号上（见上）。 */}
     </div>
   );
 }

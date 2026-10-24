@@ -343,7 +343,17 @@ test('🔴 头像：口令缺失 → 真上传 → 刷新之后仍说"要先填�
   await page.screenshot({ path: SHOT('r15b-4-after-reload'), fullPage: false });
 
   // 🔴 应用只调了我登记过的那几条路由（凭空多出来的调用 = 桩在给一个不存在的 API 回 200）。
-  expect(unexpected, `假服务端收到了没登记过的调用：${unexpected.join(' | ')}`).toEqual([]);
+  //
+  // ⚠️ 一处**登记过的例外**：`GET /api/auth/central/config` 是开机时的中心认证探测
+  // （ADR-0066，`resumeCentralSession` / `AuthPanel` 各一发），与头像无关。
+  // 刻意**不伪造**它的应答：`central-auth.ts` 会逐字段校验，填一份真的 `oidc`
+  // 配置等于用夹具把被测界面改成另一种登录模式 —— 那是"为了变绿改环境"。
+  // 同一处置与同一条理由在 `renew-panel.spec.ts` 的 `UNSTUBBED_BUT_HANDLED`。
+  const KNOWN_UNSTUBBED = ['/api/auth/central/config'] as const;
+  const unexpectedBeyondKnown = unexpected.filter(
+    (call) => !KNOWN_UNSTUBBED.some((known) => call.endsWith(known)),
+  );
+  expect(unexpectedBeyondKnown, `假服务端收到了没登记过的调用：${unexpectedBeyondKnown.join(' | ')}`).toEqual([]);
   // 控制台：这一条的范围刻意**只圈资料链**，因为同步传输层对着假服务端必然有噪声
   //（`/api/sync/ops` 的应答形状不是本用例的主题，上面已经给了合法的空应答）。
   const profileErrors = errors.filter((e) => /account|avatar|profile/iu.test(e));

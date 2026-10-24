@@ -91,8 +91,7 @@ export function ImportPanel(): React.JSX.Element {
 
   return (
     <div className="ht-settings" data-testid="import-panel">
-      <h2 className="ht-settings__title ht-type-section-title">{t('web.import.title')}</h2>
-      <p className="ht-settings__hint">{t('web.import.intro')}</p>
+      {/* 没有 h2、没有 intro（2026-10-24 禁令）：节标题旁那枚 `?` 已经说明这一页。 */}
 
       <section className="ht-settings__section" aria-labelledby="import-file-title">
         <h3 id="import-file-title" className="ht-settings__h3 ht-type-headline">

@@ -10,6 +10,8 @@ import { ArrowRight, LockKeyhole, Settings2, UserRoundPen } from 'lucide-react';
 
 import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
+
+import { SettingsInfoTip } from './SettingsInfoTip.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useSyncStore } from '../sync/store.js';
 import { useAccountIdentity } from './useAccountIdentity.js';
@@ -77,11 +79,19 @@ export function ProfileOverview({
               </button>
             </div>
           ) : null}
-          <p className="ht-settings__profile-note">{t('web.profile.overview.localOnly')}</p>
+          <SettingsInfoTip
+            testId="tip-profile-local-only"
+            label={t('web.profile.overview.title')}
+            text={t('web.profile.overview.localOnly')}
+          />
           {identity.avatarState === 'needs-password' ? (
-            <p className="ht-settings__profile-note">{t('common.profile.avatar.needPassword')}</p>
+            <p className="ht-settings__profile-note" role="status">
+              {t('common.profile.avatar.needPassword')}
+            </p>
           ) : identity.avatarState === 'undecryptable' || identity.avatarState === 'unreadable' ? (
-            <p className="ht-settings__profile-note">{t('common.profile.avatar.unreadable')}</p>
+            <p className="ht-settings__profile-note" role="status">
+              {t('common.profile.avatar.unreadable')}
+            </p>
           ) : null}
         </div>
         {signedIn ? (
@@ -120,8 +130,12 @@ export function ProfileOverview({
             <div>
               <h2 className="ht-type-section-title" id="profile-center-achievements-title">
                 {t('web.profile.overview.achievements')}
+                <SettingsInfoTip
+                  testId="tip-profile-achievements"
+                  label={t('web.profile.overview.achievements')}
+                  text={t('web.profile.overview.achievementsHint')}
+                />
               </h2>
-              <p className="ht-settings__profile-note">{t('web.profile.overview.achievementsHint')}</p>
             </div>
             <button
               type="button"
@@ -147,7 +161,7 @@ export function ProfileOverview({
                       gap: Math.max(0, nextMilestone.threshold - nextMilestone.value),
                     })}
               </span>
-              <span className="ht-settings__profile-note">
+              <span className="ht-settings__profile-note" role="status">
                 {nextMilestone === undefined
                   ? t('web.profile.overview.achievements')
                   : labels.milestones.kindName(nextMilestone.kind)}

@@ -70,7 +70,7 @@ export function resolveInstallPlatform(platform: string | null | undefined): Ins
 }
 
 /** 壳注册给页面的 `WKScriptMessageHandler` 名字；新增一个要同时在这里登记。 */
-export const SHELL_MESSAGE_HANDLER_NAMES = ['heytaStorage', 'heytaWidget'] as const;
+export const SHELL_MESSAGE_HANDLER_NAMES = ['heytaStorage', 'heytaWidget', 'heytaReminder'] as const;
 
 /** 页侧能观察到的宿主信号，全部来自壳**实际注入的东西**，不做 UA 猜测。 */
 export interface ShellHostSignals {
