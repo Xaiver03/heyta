@@ -341,8 +341,20 @@ export function AuthPanel({
     busy && (status.action === 'passkey-register' || status.action === 'passkey-login');
 
   const centralMode = isOfficialService && centralConfig?.mode === 'oidc' && centralConfig.documentVersion !== null;
-  const centralLoading = isOfficialService && centralConfig === undefined;
-  const centralBlocked = isOfficialService && centralConfig !== undefined && !centralMode;
+  /**
+   * 🔴 服务端**明确**说自己是本地模式 ⇒ 官方站也走自有注册/登录表单。
+   *
+   * 2026-10-24 紧急回退：中央登录页整改期间（产品口径：只用中央的*认证*、
+   * 不用中央的 *UI*），官方站先退回自有账号体系，否则登录直接不可用。
+   * 模式是**服务端**说了算的事（config.ts 里 official+local 会拒绝启动），
+   * web 不该在服务端明确放行本地时再自己发明一条 fail-closed 把它盖掉。
+   *
+   * 保留的 fail-closed 只剩两格，都是"服务端没把话说清楚"：
+   *   ① 读不到配置（网络/5xx）⇒ 不猜；② mode 是 oidc 但条款版本缺失 ⇒ 配置残。
+   */
+  const centralExplicitLocal = isOfficialService && centralConfig?.mode === 'local';
+  const centralLoading = isOfficialService && !centralExplicitLocal && centralConfig === undefined;
+  const centralBlocked = isOfficialService && !centralExplicitLocal && centralConfig !== undefined && !centralMode;
   /**
    * 壳内官方站 ⇒ 中央登录改走 device handoff（P5.4）。
    *
@@ -606,7 +618,6 @@ export function AuthPanel({
               {centralClose}
               <p className="ht-auth-central__eyebrow ht-type-caption">{t('web.auth.central.kicker')}</p>
               <h2 id="central-auth-title" className="ht-type-section-title">{t('web.auth.central.title')}</h2>
-              <p className="ht-auth-central__body">{t('web.auth.central.body')}</p>
               {deviceWaiting !== undefined ? (
                 <div className="ht-auth-central__device" data-testid="central-device-waiting">
                   <p className="ht-auth-central__body">{t('web.auth.central.device.waitingBody')}</p>
@@ -669,7 +680,7 @@ export function AuthPanel({
               >
                 {busy ? t('web.auth.central.busy') : t('web.auth.central.button')}
               </button>
-              <p className="ht-auth-central__note">{t('web.auth.central.note')}</p>
+              {centralDeviceHandoff ? <p className="ht-auth-central__note">{t('web.auth.central.note')}</p> : null}
                 </>
               )}
               {allowAdvanced ? (

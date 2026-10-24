@@ -221,8 +221,9 @@ test('凭据页与 API 与站点同域（同源是 passkey 的前提）', async 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'probe@example.com' }),
     });
-    const passkeyBody = (await passkey.json().catch(() => ({}))) as { code?: string };
-    // central 时代的同源判据本体：中央配置接口从**本站页面内**可取、且是 oidc。
+    const passkeyBody = (await passkey.json().catch(() => ({}))) as { code?: string; rpId?: string };
+    // 同源判据本体：中央配置接口从**本站页面内**可取。它的 `mode` 决定下面走哪一支 ——
+    // 服务端是权威（`config.ts` 里 official+local 会拒绝启动），判据不该自己假设模式。
     const central = (await fetch(`${origin}/api/auth/central/config`).then((r) => r.json())) as { mode?: string };
     return {
       healthStatus: health.status,
@@ -232,6 +233,7 @@ test('凭据页与 API 与站点同域（同源是 passkey 的前提）', async 
       verifyIsLandingHtml: verifyText.includes('id="root"'),
       passkeyStatus: passkey.status,
       passkeyCode: passkeyBody.code,
+      passkeyRpId: passkeyBody.rpId,
       centralMode: central.mode,
     };
   }, ORIGIN);
@@ -241,11 +243,23 @@ test('凭据页与 API 与站点同域（同源是 passkey 的前提）', async 
   expect(probe.healthStatus, '/health 没代理到同步服务端').toBe('ok');
   expect(probe.verifyIsLandingHtml, '/verify-email 被落地页 SPA 兜底吞了').toBe(false);
   expect(probe.verifyStatus, '/verify-email 应当是服务端的诚实失败').not.toBe(200);
-  expect(probe.passkeyStatus, '官方站旧 passkey 入口应按设计 409 关闭').toBe(409);
-  expect(probe.passkeyCode, '409 的 body 必须是机器可读的 central_authentication_required').toBe(
-    'central_authentication_required',
-  );
-  expect(probe.centralMode, '中央登录链路不可用，或不是 oidc 模式').toBe('oidc');
+  expect(probe.centralMode, '中央配置接口取不到 mode（整站登录形状未知）').toBeTruthy();
+
+  if (probe.centralMode === 'oidc') {
+    // official 模式：旧本机凭据入口按设计在副作用前 409。
+    expect(probe.passkeyStatus, '官方站旧 passkey 入口应按设计 409 关闭').toBe(409);
+    expect(probe.passkeyCode, '409 的 body 必须是机器可读的 central_authentication_required').toBe(
+      'central_authentication_required',
+    );
+  } else {
+    // 本地（自有账号）模式：passkey 入口活着，且 RP ID 必须等于当前域名 ——
+    // 这正是"同源是 passkey 前提"这条判据的本体。
+    expect(probe.passkeyStatus, '本地模式 passkey 入口应当可用（不是 409/404）').not.toBe(409);
+    expect(probe.centralMode, '回退期间服务端应明确报 local').toBe('local');
+    if (probe.passkeyStatus === 200) {
+      expect(probe.passkeyRpId, 'WebAuthn RP ID 没跟着域名一起换').toBe(new URL(ORIGIN).host);
+    }
+  }
 
   const hard = hardErrors(logs);
   expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
@@ -469,10 +483,23 @@ test('官方站旧魔法登录入口按设计关闭（409），中央链路同�
   }, ORIGIN);
 
   console.log(`PROBE: ${JSON.stringify({ ...probe, magicCode: probe.magicCode.slice(0, 80) })}`);
+  expect(probe.centralMode, '中央配置接口取不到 mode（整站登录形状未知）').toBeTruthy();
 
-  expect(probe.magicStatus, '官方站旧魔法登录入口应按设计 409 关闭').toBe(409);
-  expect(probe.magicCode).toContain('central_authentication_required');
-  expect(probe.centralMode, '中央登录链路不可用，或不是 oidc 模式').toBe('oidc');
+  if (probe.centralMode === 'oidc') {
+    // official 模式：旧入口按设计关闭（409 + 机器可读 code，不是假页面、不是旧表单）。
+    expect(probe.magicStatus, '官方站旧魔法登录入口应按设计 409 关闭').toBe(409);
+    expect(probe.magicCode).toContain('central_authentication_required');
+  } else {
+    // 本地（自有账号）模式：这页必须**真的渲染出来**，而且按钮点了有反应 ——
+    // 原判据的三个对象在这一支里都存在，就按原判据验，别退化成只验状态码。
+    await page.goto(`${ORIGIN}/magic-login?token=definitely-invalid-token`, { waitUntil: 'domcontentloaded' });
+    expect(
+      await page.evaluate(() => document.body?.dataset.token !== undefined),
+      'body.dataset.token 取不到 —— 脚本多半又在 <body> 之前就跑了',
+    ).toBe(true);
+    await page.locator('#login-btn').click();
+    await expect(page.locator('#error')).toBeVisible({ timeout: 20_000 });
+  }
 
   // ③ 全程不许有未捕获异常（原报障判据，仍然有效）
   const hard = logs.filter((l) => l.startsWith('[pageerror]'));
