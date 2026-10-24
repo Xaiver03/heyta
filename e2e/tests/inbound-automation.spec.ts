@@ -1,7 +1,7 @@
 /** Real browser/UI with HTTP fixtures; database authorization is tested separately. */
 import { test, expect } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openApp, openSettingsSheet, selectSettingsSection, stubLegalRecheck, stubPublicFacts } from './helpers';
+import { assertFormRhythm, openApp, openSettingsSheet, selectSettingsSection, stubLegalRecheck, stubPublicFacts } from './helpers';
 const server = 'http://sync.inbound.e2e.test';
 const evidence = '../apps/web/evidence/inbound-recovery';
 for (const width of [1280, 390]) {
@@ -126,9 +126,15 @@ for (const width of [1280, 390]) {
       const form = page.getByTestId('inbound-automation-settings').locator('.ht-inbound__group').first();
       await form.scrollIntoViewIfNeeded();
       // No horizontal overflow alone does not catch text squeezed vertically.
-      for (const input of await form.locator('.ht-settings__input').all()) {
+      // 🔴 2026-10-24：选择器从 `.ht-settings__input` 改成**共享原语**那一族。
+      //    那个类**全仓没有定义**（九个字段因此渲成 UA 默认的 ≈22px），
+      //    而按它取的循环在迁移之后会迭代 **0 次** —— 一条永远通过的判据。
+      //    现在改用量几何的 helper：既量宽度，也量"只有一档高度、且 ≥44"。
+      const inputs = form.locator('input:not([type="checkbox"]):not([type="radio"]), textarea');
+      for (const input of await inputs.all()) {
         expect((await input.boundingBox())!.width).toBeGreaterThan(200);
       }
+      await assertFormRhythm(form);
       for (const label of await form.locator('.ht-inbound__check').all()) {
         const geometry = await label.boundingBox();
         expect(geometry!.width).toBeGreaterThan(45);

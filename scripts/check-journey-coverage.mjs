@@ -160,12 +160,17 @@ const ENDPOINTS = [
       //    press success ≠ 控件收到事件），所以这里是两个条目而不是一个。
       'scripts/verify-mobile-ai.sh', // Android：闸门/披露/授权/提案四判据族（真模拟器 + 确定性假端点）
       'scripts/verify-mobile-ios-ai.sh', // iOS 同一判据族（AXUniqueId 通道；中文走 AXSetValue —— HID 键码表没有非 ASCII）
+      // 🔴 协作共享清单那一族今天只有 web 那台浏览器有设备腿（§9.11/§9.12 的读数都在
+      //    `verify:collab-journey` 里）。移动端那两屏（`ShareSpaceScreen` / `JoinShareScreen`）
+      //    源码级接线入库后**从未在设备上画出来过** —— "源码级绿 ≠ 界面向"这条线踩过一次，
+      //    所以这里登记的是 iOS 旅程装置本体：加入 → 下行可见 → 上行带签名 → 信号驱动。
+      'scripts/verify-mobile-collab-ios.sh', // 共享清单在手机上的整条旅程（真模拟器 + 真服务端，零 mock）
     ],
     shellSpecs: [],
     covers:
       'J1–J7 全覆盖（真模拟器 + 真服务端，零 mock）：身份注册/登录 → 凭据管理 → 写入并跨设备读回同一条 → ' +
       '冲突解决 → 零点击自动同步 → 备份还原 → 回收站四类跨设备 → 注销后本机明文库销毁 → 六个视图 → ' +
-      '专注/重复/提醒投递，Android 与 iOS 两端',
+      '专注/重复/提醒投递 → 共享清单（加入·双向·带签名·信号驱动，iOS 腿），Android 与 iOS 两端',
   },
   {
     end: 'macos',

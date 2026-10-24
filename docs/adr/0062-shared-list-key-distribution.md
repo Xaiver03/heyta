@@ -49,3 +49,31 @@
 ## 验证
 
 尚无实现（本 ADR 立于实施前）。判据与变异臂按计划 §4 的 `verify:collab-*` 矩阵执行；密文类判据沿用 ADR-0050 的形状（重建实例续传、journal 不含密钥材料、幂等重加密）。
+
+---
+
+## 实施记录（2026-10-24 追加；只登记与本文措辞的差，不改上面任何一条裁决）
+
+**「验证」那一节那句「尚无实现」已经不成立** —— 从 M1 到 M6 六批落地，逐批读数在
+[计划 §9.7–§9.13](../plans/collaboration-shared-lists.md)。这里只登记**三处会被本文措辞误导人的差**：
+
+1. **决策 4 里那句「与滴答的任务提醒四档（个人设置）一致」** —— 四档**没有实现，也不会实现**：
+   它判的是 `Task.assigneeUserId`，那个字段全仓零写点（现量
+   `grep -rn "assigneeUserId" packages apps server --include='*.ts*' | grep -v tests`）。
+   2026-10-24 连同谓词与界面档位一起撤下（`bc20e679a`）。
+   🔴 这一条动的是**决策 7 那句括号里的偏好清单**：三档今天只剩**活动那一族**一档。
+   裁决本身（"偏好存本地、服务端零知识"）一个字没改 —— 改的是"哪几档有输入"这个事实。
+   钉子：`packages/ui/tests/notification-model.spec.ts` 那句「默认偏好里只有 activities 一个键」；
+   反向臂（界面上不许再摆那两档）在 `scripts/verify-mobile-collab-ios.sh` 第 10 步。
+2. **决策 7 那句「服务端只按 shareId 广播『有新 op』信号」** —— 今天有两类信号，
+   另一类是成员名册变化（`share_roster_changed`，[ADR-0070](0070-share-roster-changed-signal-replaces-polling.md)），
+   它替代的是面板那两枚 3s 轮询。"服务端零知识"这条边界没动：两类信号都不带内容。
+3. **「成员眼里仍是一条空清单」这个结论（头部那段 ⚠️）已经不成立** ——
+   多写者路由（`TASK`/`NOTE`）在 M2 接上（决策 4 要求它住在 `packages/app-host`，实测就住在
+   `share-routing.ts`，壳里没有第二份判断），移动端在 M6 接上。
+   判"成员眼里到底看得见什么"的那把尺现在有两枚：web 那台真浏览器
+   （`pnpm verify:collab-journey`）与 iOS 那台真模拟器（`pnpm verify:mobile-collab:ios`）。
+
+**仍然没有做到的（别把上面读成"全做完了"）**：库里存量 op 不追签（ADR-0069 裁决二/三）；
+旧密文在 rekey 后不重加密（追加模型的代价，边界写在 `share-rekey.ts` 文件头）；
+Android 那一侧的界面腿读数本批没开（出包与设备腿按负责人的长期令一律走 `ssh windows-pc`）。
