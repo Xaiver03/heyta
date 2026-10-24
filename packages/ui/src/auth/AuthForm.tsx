@@ -92,6 +92,8 @@ export interface AuthFormLabels {
   /** 表单区的无障碍名。界面上**不出现**这行字（标题另有 `titleText`）。 */
   readonly title: string;
   readonly titleText: string;
+  /** 标题下的一行说明（2026-10-24 排版改造：大标题 + 副标题的层级）。可选。 */
+  readonly subtitle?: string;
   readonly close: string;
   readonly email: string;
   readonly emailPlaceholder: string;
@@ -675,9 +677,14 @@ export function AuthForm({
       style={styles.root}
     >
       <View style={styles.head}>
-        <Text style={[text['section-title'], styles.title]} accessibilityRole="header">
-          {labels.titleText}
-        </Text>
+        <View style={styles.headText}>
+          <Text style={[text['section-title'], styles.title]} accessibilityRole="header">
+            {labels.titleText}
+          </Text>
+          {labels.subtitle !== undefined ? (
+            <Text style={[text['row-meta'], styles.subtitle]}>{labels.subtitle}</Text>
+          ) : null}
+        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={labels.close}
@@ -914,7 +921,23 @@ export function AuthForm({
             <Text style={[text['caption'], styles.danger]}>{labels.localErrors.email}</Text>
           ) : null}
 
-          <Text style={[text['caption'], styles.muted]}>{labels.password}</Text>
+          {/*
+            密码标签行：sign-in 档把「忘记密码？」放在**标签行的右侧**（最佳实践：
+            它属于"密码"这个字段，而不是表单尾部一个孤零零的链接）。
+          */}
+          <View style={styles.labelRow}>
+            <Text style={[text['caption'], styles.muted]}>{labels.password}</Text>
+            {mode === 'sign-in' ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={guard(() => onForgotPassword(email))}
+                style={({ pressed }) => [styles.labelLink, pressed ? styles.pressed : null]}
+                testID={`${testID}-forgot`}
+              >
+                <Text style={[text['caption'], styles.linkText]}>{labels.forgotPassword}</Text>
+              </Pressable>
+            ) : null}
+          </View>
           <View style={styles.passwordRow}>
             <TextInput
               ref={passwordInput}
@@ -1184,6 +1207,10 @@ export function AuthForm({
             </Text>
           </Pressable>
 
+          {/*
+            模式切换（登录 ↔ 注册）：放在主按钮**正下方、居中**——它是这一屏的
+            次级出口，不是另一个待填字段。
+          */}
           <Pressable
             accessibilityRole="button"
             onPress={() => {
@@ -1192,24 +1219,13 @@ export function AuthForm({
               setConfirmPassword('');
               setLocalField(undefined);
             }}
-            style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
+            style={({ pressed }) => [styles.textAction, styles.textActionCenter, pressed ? styles.pressed : null]}
             testID={`${testID}-switch-mode`}
           >
             <Text style={[text['row-meta'], styles.linkText]}>
               {mode === 'sign-in' ? labels.switchToRegister : labels.switchToSignIn}
             </Text>
           </Pressable>
-
-          {mode === 'sign-in' ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={guard(() => onForgotPassword(email))}
-              style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
-              testID={`${testID}-forgot`}
-            >
-              <Text style={[text['row-meta'], styles.linkText]}>{labels.forgotPassword}</Text>
-            </Pressable>
-          ) : null}
         </View>
       )}
 
@@ -1223,18 +1239,24 @@ export function AuthForm({
       {stage === 'credential' ? (
         <View style={styles.secondary}>
           {labels.otherWaysToggle === undefined ? (
-            <Text style={[text['caption'], styles.muted]}>{labels.otherWays}</Text>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={[text['caption'], styles.muted]}>{labels.otherWays}</Text>
+              <View style={styles.dividerLine} />
+            </View>
           ) : (
             <Pressable
               accessibilityRole="button"
               aria-expanded={otherWaysOpen}
               onPress={() => setOtherWaysOpen((open) => !open)}
-              style={({ pressed }) => [styles.disclosure, pressed ? styles.pressed : null]}
+              style={styles.dividerRow}
               testID={`${testID}-other-ways-toggle`}
             >
-              <Text style={[text['row-meta'], styles.disclosureText]}>
+              <View style={styles.dividerLine} />
+              <Text style={[text['row-meta'], styles.muted]}>
                 {otherWaysOpen ? labels.otherWaysToggle.close : labels.otherWaysToggle.open}
               </Text>
+              <View style={styles.dividerLine} />
             </Pressable>
           )}
           {labels.otherWaysToggle !== undefined && !otherWaysOpen ? null : (
@@ -1325,12 +1347,14 @@ export function AuthForm({
           accessibilityRole="button"
           onPress={() => setAdvancedOpen((v) => !v)}
           aria-expanded={advancedShown}
-          style={({ pressed }) => [styles.disclosure, pressed ? styles.pressed : null]}
+          style={styles.dividerRow}
           testID={`${testID}-advanced-toggle`}
         >
-          <Text style={[text['row-meta'], styles.disclosureText]}>
+          <View style={styles.dividerLine} />
+          <Text style={[text['row-meta'], styles.muted]}>
             {advancedShown ? labels.advancedToggle.close : labels.advancedToggle.open}
           </Text>
+          <View style={styles.dividerLine} />
         </Pressable>
       ) : null}
 
@@ -1432,8 +1456,14 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       gap: tokens['space.2'],
     },
-    title: {
+    headText: {
       flex: 1,
+      gap: tokens['space.1'],
+    },
+    subtitle: {
+      color: tokens['color.foreground-muted'],
+    },
+    title: {
       color: tokens['color.foreground'],
     },
     close: {
@@ -1500,9 +1530,21 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flex: 1,
       color: tokens['color.foreground'],
     },
+    labelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    labelLink: {
+      minHeight: tokens['touch-target.min'],
+      justifyContent: 'center',
+      paddingHorizontal: tokens['space.1'],
+    },
     primary: {
       flexDirection: 'row',
-      alignSelf: 'flex-start',
+      // 🔴 2026-10-24 排版改造：主按钮**全宽**（此前 `flex-start` 让"登录"缩在左边，
+      //    与输入框宽度不对齐 —— 用户反馈"排版太乱"的那张截图里最扎眼的一条）。
+      alignSelf: 'stretch',
       alignItems: 'center',
       justifyContent: 'center',
       gap: tokens['space.1'],
@@ -1547,19 +1589,27 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingVertical: tokens['space.1'],
     },
-    linkText: {
-      color: tokens['color.primary'],
+    // 模式切换这类"次级出口"要**居中**（主按钮正下方），与左对齐的文字链区分。
+    textActionCenter: {
+      alignSelf: 'center',
     },
-    disclosure: {
+    // 「其他登录方式」从整宽灰条改成**分隔线 + 居中文字**（千问式排版）：
+    // 它是一个分组标题，不是一个待点的按钮。
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: tokens['space.2'],
       alignSelf: 'stretch',
       minHeight: tokens['touch-target.min'],
-      justifyContent: 'center',
-      paddingHorizontal: tokens['space.3'],
-      borderRadius: tokens['radius.md'],
-      backgroundColor: tokens['color.surface-sunken'],
+      paddingVertical: tokens['space.1'],
     },
-    disclosureText: {
-      color: tokens['color.foreground'],
+    dividerLine: {
+      flex: 1,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: tokens['color.border'],
+    },
+    linkText: {
+      color: tokens['color.primary'],
     },
     secondary: {
       gap: tokens['space.1'],

@@ -934,6 +934,7 @@ export const zhCN = {
   // 手填令牌，而没人告诉他令牌从哪来。这一组就是那个缺失的入口。
   // ⚠️ 电子邮件地址的**格式校验在服务端**（唯一事实源），这里的占位符只示范形状。
   'web.auth.title': '登录 / 注册',
+  'web.auth.subtitle': '使用你的邮箱和登录密码继续',
   'web.auth.close': '关闭',
   'web.auth.open': '登录 / 注册',
   'web.auth.central.kicker': 'heyta 官方服务',
@@ -4862,6 +4863,11 @@ export const zhCN = {
   'common.share.notif.sectionTitle': '共享通知',
   'common.share.activity.added': '有人在你参与的共享清单里写了新内容',
   'common.share.activity.deleted': '有人在你参与的共享清单里删掉了内容',
+  // ADR-0071：正文允许带**清单名**（元数据级），条目内容不许（数据级）。
+  // 名字从本机那条清单行取，取不到就回落到上面那两句不带名字的措辞。
+  'common.share.activityNamed.added': '有人在你参与的共享清单「{name}」里写了新内容',
+  'common.share.activityNamed.deleted': '有人在你参与的共享清单「{name}」里删掉了内容',
+  'common.share.activityNamed.completed': '你参与的共享清单「{name}」里有任务被完成或取消完成',
   'common.share.notif.activitiesTitle': '活动通知',
   'common.share.notif.activityCompleted': '完成/取消完成了任务',
   'common.share.notif.activityAdded': '添加了任务/笔记',
@@ -5611,6 +5617,24 @@ export const zhCN = {
   // M6-2（移动端协作）：「我的」页第二层的共享入口行。**只追加在表尾**（同 W8 那两条的理由）。
   'mobile.share.entry': '共享清单',
   'mobile.share.entry.hint': '和别人共用一份清单，双方的改动都看得见',
+  // M6-3a（移动端协作·界面腿）：两张共享屏 + 通知中心「共享动态」那一档的新词。
+  // 屏内其余文案一律复用同源词（`web.share.*` / `common.share.*`，先例是
+  // `lib/countdown-display.ts` 复用 `web.countdown.*`），这里只登记真正的新句子。
+  'mobile.inbox.tab.share': '共享动态',
+  'mobile.inbox.share.empty': '还没有共享动态',
+  'mobile.inbox.share.note': '共享动态只保存在本机，重启后清空；内容本身在共享日志里，进清单就能看到。',
+  'mobile.share.space.sharedTitle': '已共享的清单',
+  'mobile.share.space.shareableTitle': '可共享的清单',
+  'mobile.share.space.noneYet': '还没有共享出去的清单',
+  'mobile.share.space.shareableEmpty': '没有可共享的清单',
+  'mobile.share.space.commentsTitle': '评论区',
+  'mobile.share.space.noTasks': '这条共享清单里还没有任务',
+  'mobile.share.space.pickTask': '选一条任务看它的评论',
+  'mobile.share.space.leaveConfirm': '确认离开这条共享清单？',
+  'mobile.share.invite.handOff': '把邀请交给对方',
+  'mobile.share.invite.revoke': '撤销这张邀请',
+  'mobile.share.prefs.saveFailed': '共享通知偏好没有保存成功（本机存储写入失败），开关下次开机可能回到默认。',
+  'mobile.share.consent.saveFailed': '「不再提示」没有落盘，下次共享还会再问一次。',
 } as const;
 
 /**
