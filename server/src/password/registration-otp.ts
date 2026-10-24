@@ -13,6 +13,7 @@ import {
   EMAIL_PASSWORD_REGISTRATION_RESEND_COOLDOWN_MS,
 } from '@heyta/shared-schema';
 import { prisma } from '../db';
+import { Logger } from '../logger';
 import { getDefaultStorageQuotaBytes } from '../sync/services/storage-quota.service';
 import { attachInviteOnRegister, settleReferralActivation } from '../activity/invite';
 import { authCache } from '../auth-cache';
@@ -376,6 +377,17 @@ export const verifyRegistrationCode = async (
   try {
     if (challenge.userId === null) throw invalidChallenge();
     const activatedUserId = challenge.userId;
+    // 🔴 分段计时（2026-10-24 线上报障"填对了码却等 5 秒"加的抓证手段）。
+    //    平时一声不吭：只有整段超过 500ms 才打一条 warn，把每一段的耗时列出来。
+    //    这样下一次再慢，我们看的是**哪一段慢**，而不是"好像是数据库"。
+    const verifyStarted = Date.now();
+    const marks: string[] = [];
+    let markFrom = verifyStarted;
+    const mark = (name: string): void => {
+      const now2 = Date.now();
+      marks.push(`${name}=${now2 - markFrom}ms`);
+      markFrom = now2;
+    };
     // 🔴 显式给时间上限（Prisma 交互式事务默认 5 秒）。
     //
     // 2026-10-24 线上实测：同一段事务在生产库上复刻只要 **168ms**（FOR UPDATE 7ms、
@@ -392,6 +404,7 @@ export const verifyRegistrationCode = async (
       const lockedUser = await tx.$queryRaw<
         Array<{ id: number; email: string; is_verified: number; password_hash: string | null }>
       >`SELECT id, email, is_verified, password_hash FROM users WHERE id = ${activatedUserId} FOR UPDATE`;
+      mark('lock-user');
       const currentUser = lockedUser[0];
       if (
         currentUser === undefined ||
@@ -412,6 +425,7 @@ export const verifyRegistrationCode = async (
         },
         data: { consumedAt: BigInt(now) },
       });
+      mark('claim-challenge');
       if (claim.count !== 1) throw invalidChallenge();
 
       const activated = await tx.user.updateMany({
@@ -429,6 +443,7 @@ export const verifyRegistrationCode = async (
           verificationResendCount: 0,
         },
       });
+      mark('activate-user');
       if (activated.count !== 1) throw invalidChallenge();
 
       // Do not consume invite capacity until the email proof succeeds. The challenge
@@ -442,6 +457,7 @@ export const verifyRegistrationCode = async (
         });
       }
 
+      mark('invite');
       const referral = await settleReferralActivation(tx, activatedUserId, now);
       if (!referral.settled && referral.reason !== 'ALREADY_SETTLED') {
         // No referral is normal; the helper's result is intentionally ignored.
@@ -450,12 +466,18 @@ export const verifyRegistrationCode = async (
         where: { id: activatedUserId },
         select: { id: true, email: true, locale: true, tokenVersion: true },
       });
+      mark('referral');
       if (user === null) throw invalidChallenge();
       return {
         token: await issueSession(user, meta),
         user: { id: user.id, email: user.email, locale: user.locale },
       };
     }, { timeout: REGISTRATION_TX_TIMEOUT_MS, maxWait: REGISTRATION_TX_MAX_WAIT_MS });
+    mark('issue-session');
+    const verifyTotal = Date.now() - verifyStarted;
+    if (verifyTotal > 500) {
+      Logger.warn(`Registration verify slow: total=${verifyTotal}ms ${marks.join(' ')} (userId=${activatedUserId})`);
+    }
     authCache.invalidate(activatedUserId);
     return result;
   } catch (error) {
