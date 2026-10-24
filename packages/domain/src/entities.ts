@@ -406,11 +406,29 @@ export interface Note extends EntityBase {
 // 习惯
 // ─────────────────────────────────────────────────────────────
 
-/** 习惯的重复周期。 */
+/**
+ * 习惯的重复周期。
+ *
+ * `spaced`（间隔复习，2026-10-24 由产品负责人拍板新增）是第四档，**不是**
+ * "每隔几天"的变体：它的间隔不等距（第 1/2/4/7/15/30 天），`everyNDays` 表达不了。
+ * 判定与词表在 `habit-review.ts`；三档旧的语义一字未动。
+ */
 export type HabitFrequency =
   | { type: 'daily' }
   | { type: 'weekly'; /** 1=周一 … 7=周日 */ daysOfWeek: number[] }
-  | { type: 'interval'; everyNDays: number };
+  | { type: 'interval'; everyNDays: number }
+  | {
+      type: 'spaced';
+      /**
+       * 从 `anchor` 算起的第几天要出现，**升序、去重、均 ≥ 1**。
+       *
+       * 🔴 存"第几天"而不是日期：日期会随起点漂移，而这份数组是**规则本身**
+       *    （与 `daysOfWeek` / `everyNDays` 同构 —— 规则存规则，实例不落库）。
+       */
+      offsets: number[];
+      /** 起算日（本地日期，通常是创建那天）。重锚点等于重排整张计划。 */
+      anchor: LocalDate;
+    };
 
 export type HabitGoalType = 'atLeast' | 'atMost' | 'exactly';
 

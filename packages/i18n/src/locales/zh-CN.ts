@@ -31,6 +31,8 @@ export const zhCN = {
   'common.sync.signIn': '登录以同步',
   'common.sync.hosted.title': 'heyta 云同步',
   'common.sync.hosted.hint': '登录后，你的任务会在设备间自动同步。无需填写服务器地址。',
+  // 设置页里每一枚「?」的无障碍名字。给读屏器一句"这是什么"，不是"点我"。
+  'common.tip.label': '更多说明',
   'common.sync.advanced': '高级：自托管与手动连接',
   'common.sync.account.connected': '已登录',
   'common.brand': 'heyta',
@@ -337,7 +339,7 @@ export const zhCN = {
   'landing.pricing.hosted.feature1': '除云端 AI 外的全部功能，与自建一致',
   'landing.pricing.hosted.feature2': '多设备之间自动同步',
   'landing.pricing.hosted.feature3': '服务端记录完整保留，到期也不删',
-  'landing.pricing.hosted.cta': '即将开放',
+  'landing.pricing.hosted.cta': '立即订阅',
   'landing.pricing.hostedAi.name': '官方托管 + 云端 AI',
   'landing.pricing.hostedAi.priceCny': '¥12 / 月',
   'landing.pricing.hostedAi.priceUsd': '$12 / 月',
@@ -347,8 +349,27 @@ export const zhCN = {
   'landing.pricing.hostedAi.feature1': '上面这一档的全部',
   'landing.pricing.hostedAi.feature2': '云端 AI，每月 300 次',
   'landing.pricing.hostedAi.feature3': '自带端点的 AI 不受影响，仍然免费、不限次',
-  'landing.pricing.hostedAi.cta': '即将开放',
-  'landing.pricing.statusNote': '收银台已经接通，但大陆与海外的支付通道都还在等支付商资质 —— 现在还不能下单。',
+  'landing.pricing.hostedAi.cta': '立即订阅',
+  /*
+   * 「没配应用地址」那一态的那行字（`PaidCard` 只在 `subscriptionHref() === null` 时用它）。
+   * 🔴 它**不是**"这一档不能买"，而是"这个构建里没有应用入口" —— 两者不能共用一句话：
+   *   前者会让配好的站点也在说谎，后者只是一个还没部署的构建该说的话。
+   */
+  'landing.pricing.pending': '应用入口尚未配置，暂时无法下单',
+  /*
+   * 🔴 口径按**地区**分开说，因为两边的真实状态不同（2026-10-24）：
+   * 人民币两档走支付中心、可以下单；美元档没有通道，点下去会拿到 409
+   * （`PROVIDER_CURRENCY_UNSUPPORTED`，见 launch-blockers §3「海外 $5/$12」那一行）。
+   * 写成"现在还不能下单"把已经能买的那一半也否掉了 —— 那是另一种假话。
+   */
+  /*
+   * 🔴 2026-10-24 第二版：第一版写的是"人民币两档现在可以下单"，而部署现量是
+   * **¥5 能卖、¥12 卖不了**（生产实例没配 `MANAGED_AI_*`，②′ 会拒单）。
+   * 一句"两档都能买"在那种实例上就是假话 —— 所以改成**对任何一台实例都成立**的说法：
+   * 能买的是"这一档在这台实例上配好了交付能力"的那些，配不好的会被如实拒绝并说明缺什么。
+   * 这样部署侧补齐上游时**不需要再改文案**，而说出去的每句话都是真的。
+   */
+  'landing.pricing.statusNote': '人民币两档已经开放订阅：进入应用后在「设置 → 订阅」里选档支付。某一档若在你连的这台实例上还没配好对应的交付能力，下单会被如实拒绝并说明缺什么，不会扣款。海外（美元）定价还在等支付通道，暂时不能下单。',
 
   // ── 落地页 · 收尾 CTA ─────────────────────────────────────
   'landing.cta.title': '你的清单，不该是别人的资产',
@@ -600,12 +621,27 @@ export const zhCN = {
   // 浮层的**标准出口**是"看得见的关闭 + Esc"，缺一个都会让人以为要按浏览器后退。
   'web.shell.settings.close': '关闭设置',
   'web.settings.nav.profile': '个人资料',
+  // 「订阅」是**独立一节**（2026-10-24 产品负责人："需要有单独的订阅界面"）。
+  // 它原先是「账号与安全」里的第一张卡 —— 那让"付钱"躲在"安全"底下，
+  // 而且在那一节里它和通行密钥、密码、注销账号挤在一起看，像同一类事。
+  'web.settings.nav.subscription': '订阅',
   'web.settings.nav.appearance': '任务与显示',
   'web.settings.nav.syncPrivacy': '同步与隐私',
   'web.settings.nav.aiIntegrations': 'AI 与集成',
   'web.settings.nav.data': '数据管理',
   'web.settings.nav.account': '账号与安全',
   'web.settings.nav.help': '关于与帮助',
+  // ── 每一节开头的一句话（2026-10-24）───────────────────────────────
+  // 🔴 设置页的毛病从来不是"控件不对"，而是**不知道这一页在管什么**：
+  //    七节里只有两节有一句说明。这句只回答"这一页管哪几件事"，不重复标题。
+  'web.settings.lead.profile': '昵称、头像与登录邮箱。只给自己看，不会公开。',
+  'web.settings.lead.subscription': '官方托管同步的订阅状态与续费。软件本体自托管永久免费。',
+  'web.settings.lead.appearance': '任务怎么显示、日期怎么写、详情栏收不收。',
+  'web.settings.lead.syncPrivacy': '数据出门去哪个服务器，以及出门前那几道闸。',
+  'web.settings.lead.ai': '云端 AI、自带端点与记忆偏好。',
+  'web.settings.lead.data': '备份、还原、从别的应用迁移。',
+  'web.settings.lead.account': '登录方式、已登录的设备、注销账号。',
+  'web.settings.lead.help': '帮助入口、价格与版本信息。',
   'web.settings.dataUx.backupTitle': '备份与还原',
   'web.settings.dataUx.backupLead': '保留一份完整的本地备份，也可以将它还原到一台空设备。',
   'web.settings.dataUx.migrationTitle': '从其他应用迁移',
@@ -638,9 +674,15 @@ export const zhCN = {
   // 规格（32 个码点 / 图片格式与原图上限）的唯一来源是
   // `packages/shared-schema/src/account-profile-contract.ts`，措辞在这里。
   'common.profile.title': '个人信息',
+  // 🔴 「解释」不住在行里（2026-10-24）。原先昵称那格挂着一整句
+  //    「最多 32 个字。昵称只是显示名，不是你的真实姓名；登录标识始终是邮箱。」
+  //    —— 两件事挤在一行说明里，把只有三行的面板读成了一份说明书。
+  //    现在行里只留一眼要用的那个数，解释搬进标签旁边的 `?`（`…nickname.why`）。
   'common.profile.nickname.label': '昵称',
   'common.profile.nickname.placeholder': '留空则显示邮箱',
-  'common.profile.nickname.hint': '最多 {max} 个字。昵称只是显示名，不是你的真实姓名；登录标识始终是邮箱。',
+  'common.profile.nickname.hint': '最多 {max} 个字。',
+  'common.profile.nickname.whyLabel': '昵称会显示在哪里',
+  'common.profile.nickname.why': '昵称只是显示名，不是你的真实姓名；登录标识始终是邮箱。留空时用邮箱的前几位代替它。',
   'common.profile.nickname.toolong': '昵称最多 {max} 个字，现在有 {count} 个。',
   'common.profile.nickname.save': '保存昵称',
   'common.profile.nickname.saved': '昵称已保存',
@@ -653,9 +695,23 @@ export const zhCN = {
   'common.profile.avatar.remove': '移除头像',
   'common.profile.avatar.removed': '头像已移除',
   'common.profile.avatar.uploading': '正在上传…',
-  // 🔴 这条不是错误提示，是**产品事实**：口令从不落盘（`credential-storage.ts`），
+  // 🔴 这条不是错误提示，是**产品事实**：钥匙从不落盘（`credential-storage.ts`），
   // 所以刷新之后内存里没有它，而头像是用它加密的。没有它谁也解不开，包括我们自己。
-  'common.profile.avatar.needPassword': '头像是用你的端到端加密口令保护的，本机没有保存这个口令 —— 请先在「同步设置」里填写一次，再更换或查看头像。',
+  //
+  // 🔴 2026-10-24 改短（原来是三行长句 + 指向「同步设置」，而登录态账号在那一节
+  //    里**看不到**口令输入框 —— `SyncSettingsPanel` 的 `!vaultMode` 分支）。
+  //    现在行里只说"现在缺什么 + 按哪个按钮"，为什么、钥匙去哪了，搬进标签旁的 `?`
+  //    （`…avatar.why`）。短句仍含「端到端加密口令」这几个字，因为读侧的
+  //    `undecryptable` 那句指的也是它，两处必须能对上。
+  'common.profile.avatar.needPassword': '端到端加密口令不在这台设备上 —— 解锁一次之后就能换头像。',
+  // `?` 里的那一段。**这不是装饰性 help text**：它要回答用户唯一真正会问的问题
+  // （"我就换个头像，凭什么要口令"），而且答案必须与实现一致：
+  // 头像在本机加密后上传，服务端只有密文；钥匙就是口令本身，且它不落盘。
+  'common.profile.avatar.whyLabel': '头像为什么要加密',
+  // ⚠️ 长度是**设计约束**：这枚气泡最宽 20rem，四行以内才像"提示"。
+  //    写满七行就是把刚才那句长解释从行里搬到气泡里，问题一点没解决。
+  'common.profile.avatar.why': '头像在你本机加密后才上传，服务端只存密文。钥匙就是你的口令，它从不落盘 —— 刷新或重开之后要重新解锁一次。',
+  'common.profile.avatar.unlock': '去解锁',
   'common.profile.avatar.badType': '只支持 {types} 格式的图片。',
   'common.profile.avatar.tooBig': '图片压缩后仍超过 {max}，换一张小一点的。',
   'common.profile.avatar.failed': '头像没有传上去，请稍后再试。',
@@ -670,7 +726,7 @@ export const zhCN = {
   'common.profile.email.label': '邮箱',
   // 🔴 这句原本写的是"不能在这里修改"。换绑流程落地之后它就是一句谎 ——
   // 留着一句假指引，比留着空白更糟（用户会去别处找那个"不能"的理由）。
-  'common.profile.email.hint': '邮箱是登录标识，也是找回账号的唯一凭据。要换成别的地址，请用下面的「更换登录邮箱」。',
+  'common.profile.email.hint': '登录标识，也是找回账号的唯一凭据 —— 换地址用下面的「更换登录邮箱」。',
   // ── 换绑登录邮箱（ADR-0063）。两个壳共用这一组。──
   // 🔴 措辞必须把"两边各点一次"说出来：只写"已发送确认邮件"，用户点了自己那封
   // 就会以为已经改成了，于是另一边永远不会去点，那张请求在库里静静过期。
@@ -1489,6 +1545,9 @@ export const zhCN = {
   'web.habits.goal.unit': '单位',
   'web.habits.goal.unitPlaceholder': '杯 / 页 / 分钟',
   'web.habits.goal.atLeast': '至少',
+  // 口径那一行的**标签**。此前它复用 `goal.atLeast`（"至少"）⇒
+  // 标签与下拉框里的值逐字相同，读起来像"这一行没有名字"。
+  'web.habits.goal.mode': '达成方式',
   'web.habits.goal.atMost': '最多',
   'web.habits.goal.exactly': '恰好',
   'web.habits.goal.defaultUnit': '次',
@@ -1627,6 +1686,14 @@ export const zhCN = {
   'web.habits.freq.invalid': '「每隔几天」的天数要是一个 1 或更大的整数',
   'web.habits.freq.intervalHint': '按日历固定隔 {n} 天排一次，起点不随建立习惯那天挪。',
   'web.habits.freq.default': '回到每天',
+  // ── 间隔复习（2026-10-24）────────────────────────────────
+  // 🔴 文案是**事实口径**：只描述"第几天复习"，不做任何"科学有效/符合遗忘曲线"
+  //    的形状背书 —— 红线与出处写在 `packages/domain/src/habit-review.ts` 的文件头。
+  'web.habits.freq.spaced': '间隔复习',
+  'web.habits.freq.summary.spaced': '间隔复习',
+  'web.habits.freq.spacedDay': '创建后第 {n} 天复习',
+  'web.habits.freq.spacedDayShort': '第{n}天',
+  'web.habits.freq.spacedRequired': '间隔复习至少要选一个日子。',
 
   // ── 习惯月历 + 补打卡（工单 H4）───────────────────────────
   // 🔴 六档一句：档位词表是 `@heyta/domain#HabitDayState`，界面只负责把它念出来。
@@ -2596,11 +2663,41 @@ export const zhCN = {
   // ── 托管同步续费入口（临时方案：再次下单 = 在当前到期日之后叠加 30 天）────
   // 🔴 措辞里不许出现"自动续费"：全仓库没有任何签约/代扣（ADR-0017 的通道选型
   // 与 `wechat.adapter.ts` 都只有单次 Native 支付）。承诺了就是假话。
+  // ── 订阅页（2026-10-24 独立成节）───────────────────────────────────
+  // 🔴 这一页回答三个问题、按顺序：**我现在是什么状态** → **有哪些档** →
+  //    **怎么买**。金额不出现在客户端（报价来自服务端），但**标价**用的是落地页
+  //    那几条已被 `check:pricing` 钉住的词条 —— 同一个事实一个来源，不在这里抄。
+  'web.subscription.page.title': '订阅',
+  'web.subscription.status.title': '当前状态',
+  'web.subscription.status.none': '还没有订阅官方托管',
+  'web.subscription.status.noneHint': '软件本体免费。订阅只买"我们替你运维那台同步服务器"这件事。',
+  'web.subscription.status.entitled': '官方托管同步已开通',
+  'web.subscription.status.entitledHint': '任务数据仍然是密文，我们打不开。',
+  'web.subscription.status.until': '有效期到 {time}',
+  'web.subscription.status.expired': '订阅已于 {time} 到期',
+  'web.subscription.status.refused': '服务端没有放行这台设备的托管同步',
+  'web.subscription.status.unavailable': '暂时读不到订阅状态',
+  'web.subscription.status.unavailableHint': '读不到不影响下面的购买入口 —— 下单那一步会重新问服务端。',
+  'web.subscription.status.checking': '正在读取…',
+  'web.subscription.status.refresh': '刷新',
+  'web.subscription.status.localData': '到期不会删任何数据：任务、清单和设置始终在这台设备上。',
+  'web.subscription.plans.title': '选一档',
+  'web.subscription.plans.hint': '一次性购买 30 天，叠加在当前到期日之后；不会自动扣款。',
+  'web.subscription.coupon.toggle': '有促销码？',
+  'web.subscription.footnote.title': '关于收费',
+  'web.subscription.footnote.selfHost': '自托管永久免费：同一套客户端，配上你自己的服务器就行，不限设备、不校验时长。',
+  'web.subscription.footnote.pricing': '完整的价目与对比在价格页上，界面里的数字不另写一份。',
+  'web.subscription.footnote.pricingLink': '打开价格页',
   'web.subscription.renew.title': '托管同步续费',
   'web.subscription.renew.intro': '一次性购买 30 天，直接叠加在你当前的到期日之后；不会自动扣款，到期了数据也一个字都不动。',
   'web.subscription.renew.tierTitle': '买哪一档',
   'web.subscription.renew.couponPlaceholder': '促销码（可选）',
-  'web.subscription.renew.action': '下单续费',
+  // 行里的标签与输入框的占位文字**不能是同一句**：两行一模一样的字看起来像
+  // 把标签写了两遍，而占位文字这一格是空的（2026-10-24 实拍）。
+  'web.subscription.renew.couponInput': '有促销码就填在这里',
+  'web.subscription.renew.action': '续费 30 天',
+  // 还没订阅过时按钮说的是「订阅」——「续费」对着一个从没买过的人是一句错话。
+  'web.subscription.renew.subscribe': '订阅这一档',
   'web.subscription.renew.busy': '正在下单…',
   'web.subscription.renew.amount': '应付金额 {amount}',
   'web.subscription.renew.validUntil': '这一单在 {time} 之前有效',
@@ -2613,9 +2710,22 @@ export const zhCN = {
   'web.subscription.renew.fail.unauthorized': '先登录你的 heyta 账号，才能下单。',
   'web.subscription.renew.fail.unconfigured': '还没有填写同步服务器地址，先在同步设置里配好。',
   'web.subscription.renew.fail.sellable': '这一档现在还不能卖，服务端拒绝了这笔下单。',
+  // 🔴 比错误码更细的那一层：`PRICE_NOT_SELLABLE` 同时盖着"这一档要的能力本机没有"
+  //    与"这一档全局还没开卖"。前者有一个用户能做的动作，所以必须单独说，
+  //    并且**说清另一档还能买**（服务端判据：同一台没配上游的实例 ¥5 照卖）。
+  'web.subscription.renew.fail.managedAi': '这一档要交付我们的云端 AI，而这台实例没有开通托管 AI 上游 —— 只买官方托管的那一档仍然可以买。',
+  'web.subscription.renew.switchTier': '改买「官方托管」',
   'web.subscription.renew.fail.downgrade': '这一档不包含你当前这一档的全部能力，服务端没有下单 —— 先让当前这一档到期，或者继续按它续费。',
   'web.subscription.renew.fail.network': '连不上服务端，这一单没有下成。',
   'web.subscription.renew.fail.unknown': '下单失败（{code}）。',
+  // ── 订阅页（移动端，2026-10-24 独立成节）──────────────────────────
+  // 与 Web 的「订阅」一节同构（状态 → 选档 → 下单 → 脚注），只是形态是原生卡片。
+  'mobile.settings.section.subscription': '订阅',
+  'mobile.subscription.lead': '官方托管同步：当前状态、选档与下单。软件本体自托管永久免费。',
+  'mobile.subscription.plans.hint': '一次性购买 30 天，叠加在当前到期日之后；不会自动扣款。',
+  'mobile.subscription.footnote': '订阅只买"我们替你运维那台同步服务器"这件事；到期不会删任何数据，任务、清单和设置始终在这台设备上。',
+  'mobile.subscription.renew.subscribe': '订阅这一档',
+  'mobile.subscription.entry.hint': '官方托管同步的订阅与续费',
   'mobile.entitlement.renew.action': '下单续费',
   'mobile.entitlement.renew.tierTitle': '买哪一档',
   'mobile.entitlement.renew.busy': '正在下单…',
@@ -2628,6 +2738,7 @@ export const zhCN = {
   'mobile.entitlement.renew.fail.unauthorized': '先登录你的 heyta 账号，才能下单。',
   'mobile.entitlement.renew.fail.network': '连不上服务端，这一单没有下成。',
   'mobile.entitlement.renew.fail.sellable': '这一档现在还不能卖，服务端拒绝了这笔下单。',
+  'mobile.entitlement.renew.fail.managedAi': '这一档要交付我们的云端 AI，而这台实例没有开通托管 AI 上游 —— 只买官方托管的那一档仍然可以买。',
   'mobile.entitlement.renew.fail.downgrade': '这一档不包含你当前这一档的全部能力，服务端没有下单 —— 先让当前这一档到期，或者继续按它续费。',
   'mobile.entitlement.renew.fail.unknown': '下单失败（{code}）。',
   // ── AI 面板的失败态（第 18 轮）───────────────────────────────
@@ -2842,6 +2953,8 @@ export const zhCN = {
   'web.ticktick.intro': '选一份滴答清单导出的 CSV 备份。先看预览，确认后才写入 —— 预览里的数字与真的写进去的是同一次解析。',
   'web.ticktick.fileLabel': '滴答清单 CSV 备份',
   'web.ticktick.picked': '已选择：{name}',
+  'web.ticktick.ticktickOnly.title': '只认滴答清单导出的 CSV',
+  'web.ticktick.coexist.title': '导入与现有数据共存',
   'web.ticktick.ticktickOnly': '请选择从滴答清单导出的 CSV 文件。暂不支持其他应用的备份格式。',
   'web.ticktick.coexist': '导入走普通操作，可以与现有数据共存；同一份文件导第二次不会重复（按稳定 id 判定）。',
   'web.ticktick.busy': '处理中…',
@@ -5018,8 +5131,10 @@ export const zhCN = {
   'reminder.phase.snoozed': '已推迟',
   'reminder.phase.due': '已到点',
   'reminder.delivery.uncertain': '无法确认本机是否已提醒。可点“稍后提醒”重新安排。',
-  'reminder.delivery.blockedNotification': '系统通知还没授权，这条提醒到点不会响。提醒本身仍保留在应用里。',
-  'reminder.delivery.blockedExactAlarm': '系统还没允许准点唤醒，这条提醒可能迟到几分钟。',
+  // ⚠️ 这两句的主语刻意是**整个提醒面**，不是"这一条"：降级状态卡的是系统闸门，
+  // 一台设备上所有提醒共用同一个读数，逐行复读同一句"这条提醒…"才是假话。
+  'reminder.delivery.blockedNotification': '系统通知还没授权，提醒到点不会响。提醒本身仍保留在应用里。',
+  'reminder.delivery.blockedExactAlarm': '系统还没允许准点唤醒，提醒可能迟到几分钟。',
   'reminder.delivery.openSettings': '去系统设置',
   // 设置页的「提醒送达」：三把系统闸门的状态 + 一条回到系统的路。
   'reminder.settings.section': '提醒送达',
@@ -5355,9 +5470,9 @@ export const zhCN = {
   "site.legal.third-parties.seo.title": "第三方与共享清单 —— heyta",
   "site.legal.third-parties.seo.description": "数据离开 heyta 的全部去向：由我们服务器发出的四类对外请求与承载它们的云基础设施，由你的设备直接发出的四条，以及逐项列明为「否」的未接入清单 —— 按目的地写，不按服务商名单写。",
   "site.legal.ai-and-transfer.title": "AI 功能与数据流向",
-  "site.legal.ai-and-transfer.lede": "AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要、目的地由你自己填且 heyta 服务器不中转；由我们提供的云端 AI 当前不可用。",
+  "site.legal.ai-and-transfer.lede": "AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权，且不含对话式助手。",
   "site.legal.ai-and-transfer.seo.title": "AI 功能与数据流向 —— heyta",
-  "site.legal.ai-and-transfer.seo.description": "AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要、目的地由你自己填且 heyta 服务器不中转；由我们提供的云端 AI 当前不可用。",
+  "site.legal.ai-and-transfer.seo.description": "AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权，且不含对话式助手。",
   "site.legal.algorithm-disclosure.title": "算法机制机理公示",
   "site.legal.algorithm-disclosure.lede": "heyta 的 AI 辅助功能用了什么算法、能做什么、不能做什么，以及你手上有哪些控制。",
   "site.legal.algorithm-disclosure.seo.title": "算法机制机理公示 —— heyta",
