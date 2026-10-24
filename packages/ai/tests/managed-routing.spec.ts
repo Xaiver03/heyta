@@ -5,8 +5,11 @@
  * 1. 非托管档**逐字不受影响**（同一个引用 —— 顺手改到自备档是最容易犯的错）；
  * 2. 拿不到服务器地址时**不合成**（⇒ `no-route`，而不是编一个端点出来）；
  * 3. 合成出来的端点**真的能过白名单并推出 `heyta-cloud`**（否则披露是假的）；
- * 4. 🔴 **`tool-calling` 必须被排除** —— 服务端不转发 `tools`，
- *    托管端点声明 `tool_calling` 就是一句假话，放过去就是静默降级。
+ * 4. 🔴 **`tool-calling` 在托管档上也要能解析出候选** —— 2026-10-25 起托管端点声明
+ *    `tool_calling`，依据是逐跳实测（上游真的回 `tool_calls`，
+ *    见 x-c 仓 `tools/ai-control/verify-tool-calling.mjs`）。这条用例原先断言的是
+ *    "必须被排除"，理由（"服务端不转发 tools"、"没做过端到端验证"）先后都过期了。
+ *    留着它的**反向**形态，是为了钉住"别哪天又悄悄把这一格摘掉"。
  */
 import { describe, expect, it } from 'vitest';
 
@@ -91,16 +94,18 @@ describe('withManagedEndpoint', () => {
     expect(candidates.map((c) => c.endpointConfig.id)).toEqual([MANAGED_ENDPOINT_ID]);
   });
 
-  it('🔴 `tool-calling` 在托管档上**被排除**（托管不声明 `tool_calling`，服务端不转发 `tools`）', () => {
+  it('🔴 `tool-calling` 在托管档上**能解析出候选**（托管端点声明 `tool_calling`，且服务端转发 `tools`）', () => {
     const out = withManagedEndpoint(managed(), `https://${SELF_HOST}`);
 
     const { candidates, excluded } = resolveRoute(out, 'tool-calling', { now: 0 });
 
-    expect(candidates).toHaveLength(0);
-    expect(excluded.map((e) => e.reason)).toContain('capability-missing');
+    // 声明了就必须真的能被选中：能力表与路由是同一条链上的两格，
+    // "声明了但仍被排除"和"没声明却放过去"一样是假话。
+    expect(candidates.map((c) => c.endpointConfig.id)).toEqual([MANAGED_ENDPOINT_ID]);
+    expect(excluded.map((e) => e.reason)).not.toContain('capability-missing');
   });
 
-  it('⚠️ 其余五个功能都能拿到候选（别把"排除 tool-calling"变成"什么都跑不了"）', () => {
+  it('⚠️ 其余五个功能也都能拿到候选（别为了 tool-calling 把别的功能挤掉）', () => {
     const out = withManagedEndpoint(managed(), `https://${SELF_HOST}`);
 
     for (const feature of [
