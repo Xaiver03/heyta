@@ -191,6 +191,8 @@ pnpm 用符号链接 + 嵌套 `node_modules`，打包器复制过去的是一堆
 - ❌ **签名 / 公证**：产物是未签名的，macOS 上首次打开会被 Gatekeeper 拦。
 - ❌ **安装器**：没有 `.dmg` / `.exe`(NSIS) / `.AppImage`，只有应用包本身。
 - ❌ **自动更新**。
+  🔴 **以上三行的主语是 Electron 壳的产物**，不是桌面端整体 —— macOS 原生壳那侧的
+  签名 / 公证 / `.dmg` 已实现，自动更新的发布侧工具已备（详见文末 2026-10-24 更正块与 §6）。
 - ⚠️ **Windows 产物**：✅ 已实测**能启动并建出 op-log schema**（[§5.6](#56-打包产物在-windows-上真的跑起来了2026-09-28-实测-)）；
   ⏳ 它的**可见窗口**截图仍缺（无头 SSH 会话里截不到）。
 - ⚠️ **Linux 产物**：❌ 仍未在 Linux 上运行过。
@@ -203,6 +205,13 @@ pnpm 用符号链接 + 嵌套 `node_modules`，打包器复制过去的是一堆
 签名 / 公证 / 安装器 / 自动更新这四项都要等证书到位，届时的工具大概率是
 `electron-builder`（它做安装器与签名）。
 **在那之前不要写"三平台已验证可运行"。**
+
+> 🔴 **2026-10-24 现量更正（这张表写的是 Electron 壳那条路）**：上一段"没有证书"
+> 的理由**只适用于 Electron 壳**，且已被本机实测推翻 —— 证书与 ASC key 齐备（见 §6
+> 那一行）。**macOS 原生壳**这一侧签名 / 公证 / `.dmg` 全部已实现并跑过
+> （`apps/desktop-macos/scripts/package-app.sh`）；自动更新的发布侧工具也已备
+> （`scripts/appcast/sparkle-appcast.mjs`）。⇒ 读这一节时不要把"Electron 欠的活"
+> 当成"桌面端欠的活"。
 
 ### 4.4 🔴 "Electron 总是意外退出" —— 先把退出**是谁触发的**分清 ✅实测
 
@@ -445,9 +454,9 @@ SQLite 3.x, version-valid-for 13, written using SQLite 3.53.4
 | 三平台**应用包** | ✅ **已产出**（`@electron/packager`，见 [§4.3](#43-打包m2-4)）· **Windows 打包件已在真 Windows 上启动并建库**（见 [§5.6](#56-打包产物在-windows-上真的跑起来了2026-09-28-实测-)） |
 | ⚠️ 仍未做：**Windows 打包件的「可见窗口」截图** | 打包进程能起来并建库（§5.6），但无头 SSH 会话里截不到**它**的窗口；§5.5 那张图来自同一份渲染产物在 Windows 上的构建。要补这一条需要在**有桌面的会话**里跑一次 |
 | ⚠️ 仍未做：**Linux 产物在 Linux 上运行** | **不是因为没有机器**（`ubuntu-jcli` / `sanjiaozhou` 实测 SSH 可达，见 [本地验证手册](local-server-verification.md) §0），是还没去做。三平台包此前都只在 macOS 上产出过 |
-| 三平台**安装器**（dmg / nsis / AppImage） | 未做 |
-| 代码签名 / 公证 | 未做 |
-| 自动更新 | 未做 |
+| 三平台**安装器**（dmg / nsis / AppImage） | ⚠️ **只 macOS 原生壳有**：`apps/desktop-macos/scripts/package-app.sh` 产出已签名的 `.dmg`；nsis / AppImage 未做 |
+| 代码签名 / 公证 | 🔴 **2026-10-24 改口：不再是"等证书"**。本机实测两样都齐 —— `Developer ID Application: Xiaoli Creativity … (V5S2LT9YV8)`（+ `Apple Distribution`）在登录钥匙串，ASC API key `AuthKey_T2H876K8MJ.p8` 在 `~/Library/Private/AppStoreConnect/` ⇒ **macOS 原生壳的签名 + 公证 + 票据装订已由 `package-app.sh` 第 ③⑥ 步实现并可跑**。⚠️ 上面 §4.3 那种"没有证书所以做不了"的说法指的是 **Electron 壳**那条路，对原生壳不成立 |
+| 自动更新 | 🟡 **2026-10-24：发布侧已备、app 侧未集成**。发布侧工具 `scripts/appcast/sparkle-appcast.mjs`（ed25519 密钥 / 签名 / appcast.xml / 验签，`--self-test` 含**负例臂**：改一字节必须验不过）已跑通端到端；生产密钥已生成于 `~/.heyta/sparkle-ed25519.key`（0600，不进仓库），公钥 `SUPublicEDKey=2elBDy0RhX88BEyIGfTMxBhXECMsyzAun+7/gfwZ+Hg=`。⚠️ **还没完**：app 侧要把 Sparkle 链进 `apps/desktop-macos`（SPM 依赖 + `SUFeedURL` + `SUPublicEDKey`）才会真的更新 —— 只发 appcast 而 app 里没 Sparkle，等于铺了路没造车 |
 | 真实服务端同步 | 未在本层做 —— 复用 `@heyta/node-host` 的 `sync()`，见 [`multi-platform-build.md`](multi-platform-build.md) |
 
 ## 7. 设计门禁的覆盖范围 ✅实测
