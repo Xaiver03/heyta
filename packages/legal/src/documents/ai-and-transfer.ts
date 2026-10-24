@@ -14,13 +14,16 @@
  *
  * 1. **禁止写"我们会先脱敏、匿名化或摘要后再发送"。** 代码里不存在任何这类环节：
  *    任务备注是整段正文照发，任务列表是 JSON 原文。这条路径有五个可查的调用点，一查就穿。
- * 2. **禁止写"heyta 云端 AI / 我们替你调用模型 / 我们可能使用自有 AI 服务"。**
- *    `managed` 供给在生产出境路径上仍然不可达：`AiRoutingConfig` 里没有"模式"字段，
- *    目的地只能由端点地址推导，所以那条链路推不出 `heyta-cloud`（服务端那条代理路由要真的
- *    工作还得运营方配上境内上游）。⚠️ 2026-10-05 换过一次理由：那句"因为保留策略未定所以
- *    挡住"已经过期 —— ADR-0054 把保留期定案了，`assertEnableable` 里那条有意的检查
- *    从此不再触发。**禁令本身一条没松**，只是它现在只靠结构那条腿撑着；写了那句就是在
- *    描述一个用户打不开的功能。
+ * 2. 🔴 **2026-10-24 更正：这条禁令原来写的是"禁止写 heyta 云端 AI"，理由是
+ *    `managed` 供给在生产出境路径上**不可达**（`AiRoutingConfig` 没有"模式"字段、
+ *    目的地只能由端点推导）。那个理由**已经不成立** —— `AiRoutingConfig.mode` 是生产面，
+ *    设置页有 `own / managed` 两个选项，服务端代理路由也已就位（ADR-0054 §10.1）。
+ *    **所以禁令换了内容，而不是被取消**：现在禁止的是把这档写成**无条件可用**。它必须同时
+ *    是三件事都成立才说得通 —— ① 运营方在这台**实例**上配好了境内上游；② 你在设置里选了托管；
+ *    ③ 你对**每个功能**单独授权。缺任何一条，正确写法是"这条路径在这台实例上不可用 /
+ *    这个功能被拒绝"，不是"我们的 AI 会帮你做"。
+ *    🔴 而且**不许把对话式助手写进这一档**：托管端点不声明工具调用能力，
+ *    带工具的请求在发出之前就被拒（`no-route`，零请求）—— 助手只属于自备端点。
  * 3. **禁止把云端 AI 与端到端加密写在同一句话里。** 模型必须读到明文才能工作 ——
  *    这是定义外的例外，不是可调和的细节。
  *
@@ -150,11 +153,19 @@ const zh = [
   },
   {
     id: 's5',
-    title: '由我们提供并计费的云端 AI：保留策略已定案，但这一档仍打不开',
+    title: '由我们提供并计费的云端 AI：保留策略已定案，这一档现在可以订阅',
     blocks: [
       {
         kind: 'p',
-        text: 'heyta 里存在一条**由我们统一提供、统一计费、由我们挑选模型**的云端 AI 的路。这条路的**数据保留策略已于 2026-10-05 定案**（ADR-0054，"托管 AI 的数据保留策略与可售卖的前置顺序"），下面第二段写的就是定案内容 —— 它不再是"还没想清楚数据留多久，所以不许打开"。但它**今天仍然不是一个用户打得开的功能**，理由是一条可核对的结构事实：内置 AI 真正走的那份出境路由配置里没有"服务模式"这个字段，目的地只能从端点地址推导，因此那条链路推不出"heyta 云端"；而服务端那条代理路径要真的工作，还需要运营方先把境内上游配上 —— 没配的时候它一律回"未配置"，一个字节都不转发。',
+        text: 'heyta 里存在一条**由我们统一提供、统一计费、由我们挑选模型**的云端 AI 的路（第二段是它的数据保留定案）。**这一档现在可以订阅**：设置里的供给方式可以选"由 heyta 托管"，对应 ¥12/月 那一档。🔴 但它**有前提，而且只覆盖一部分功能**，这三件事必须一起读：',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '**运营方要先在这台实例上配好境内上游**。没配的实例会在**下单**与**调用**两处各自如实拒绝（下单被拒并说明"要交付的能力本机没有"，调用回"未配置"），不会出现"收了钱却打不开"。',
+          '**你在设置里选了托管**才算把目的地指向我们。选它之前，你的内容只去你自己填的那个端点。',
+          '**每个 AI 功能仍然要你单独授权**，而且随时可以逐项撤销 —— 订阅**不**等于同意出境（第四段那句话是这一条的正面写法）。',
+        ],
       },
       {
         kind: 'p',
@@ -166,11 +177,11 @@ const zh = [
       },
       {
         kind: 'callout',
-        text: '**这项服务现在没有提供，而且它不是一个"暂时关着"的选项** —— 今天的客户端里没有任何一个开关能把它打开，本文件也不会写"我们可能使用自有 AI 服务"来预留空间。你今天能在 heyta 里用到的 AI 功能，只有你自己配了端点、逐项授权过的那几个。',
+        text: '**这一档现在提供，但它不随订阅生效** —— 订阅买的是"我们替你运维那台同步服务器，加上我们的云端 AI 额度"，**不是**一份"把内容发出去"的同意。你要用的是每个功能各自的那枚开关，开一次算一次，关掉即停。**并且这一档不含对话式助手**：托管端点在路由上不声明工具调用能力，带工具的请求在**发出之前**就被拒绝（用户看到"没有可用的路由"），一个字节都不转发。要助手，请用你自己填的端点 —— 那条路免费、不限次，本文件第四节写的全是它。',
       },
       {
         kind: 'p',
-        text: '为什么这条界限必须写死：任何由平台侧提供、由平台挑选模型的 AI 服务，定义上必须能看到明文；它**永远不能**被描述成端到端加密。把两句话拼成"我们全程加密，还用 AI 帮你整理"是一种会在监管与用户两侧同时翻车的写法。这一节的改写**不等于**这条路已经开放：保留期那一件有了答案，另两件没有 —— 它面向用户时必须是**逐项、可撤销的单独同意**（不能随订阅默认生效），而第 8 节那一格关于境外端点的定性仍然**不下结论**。它真正开放的那一天，这一节还是得整段重写，而"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。',
+        text: '为什么这条界限必须写死：任何由平台侧提供、由平台挑选模型的 AI 服务，定义上必须能看到明文；它**永远不能**被描述成端到端加密。把两句话拼成"我们全程加密，还用 AI 帮你整理"是一种会在监管与用户两侧同时翻车的写法。这一档开放**不等于**那两句可以合写：面向用户时它必须是**逐项、可撤销的单独同意**（不能随订阅默认生效），而第 8 节那一格关于境外端点的定性仍然**不下结论**。任何时候，"端到端加密"与"云端 AI"都必须写成两个功能面，不得并成一句。',
       },
     ],
   },
@@ -389,6 +400,11 @@ const zh = [
             '第三节那张表的**拆解任务 / 优先级建议 / 估时**三行各加了 `today`，工具选择那行也补上 `today`：这三条链路此前不知道"今天是哪天"，用户说"下周三""14 号"时模型只能自己编（实测编错过四个半月），而唯一的修法是往提示词里注入这一行。它看起来不像用户数据，实际上是**这台设备的本地日期**，所以按"新增任何一个出境字段都要先扩表再上线"那条纪律，先改这张表。工具选择那行的 `today` 不是新增出境面，是**补一句漏写**：内置助手早就带这一项，而这张表把它漏掉了。',
           ],
           [
+            '1.6',
+            '2026-10-24',
+            '**第五节整段重写，因为这一档从"打不开"变成了"可以订阅"** —— 而这正是本文件开头那条禁令原来挡住的说法。改的原因是**代码变了**（不是措辞）：设置页有了 `own / managed` 两个供给选项、服务端托管代理路由已就位、保留策略早在 1.5 就定案了。新写法把三件事写成并列条件（运营方配好境内上游 / 你在设置里选托管 / 每个功能单独授权），并**明确排除对话式助手**（托管端点不声明工具调用，带工具的请求发出之前就被拒，零请求）。同时撤掉了三句已不成立的话："这一档仍打不开"、"这项服务现在没有提供"、"今天的客户端里没有任何一个开关能把它打开"。保留策略那两段（四列表 / 内容只活在一次调用里 / 45 天元数据 / "到期就删"没落地）**一字未改** —— 定案没变，变的是可用性。⚠️ 本文件整体仍是草案，未经法务复核。',
+          ],
+          [
             '1.5',
             '2026-10-05',
             '第五节按 ADR-0054 改写：这类服务的**数据保留策略已经定案**，所以本节不再把"保留期还没决定"当成它不可用的理由（那道为此而写的有意的检查，在定案之后不再触发）。定案本身写在第五节第二段，逐条落到可核对的东西上：一张只装计数的表（证据是列集合，不是措辞）、请求与返回体只存在于一次代理调用的内存里、保留下来的运维元数据是一份封闭字段清单加一个有出处的期限，以及托管档的目的地由**境内白名单**推导而不是由客户端声明。两处刻意没写成更满的话：那一个期限**没有**配"到期会自动删除"（清理作业本轮未落地，它落地时本节要改），而第 8 节关于你自己配置的境外端点那一格**仍然不下结论** —— 本次定案不涉及它，本文件也不替它定性。第九节的触发清单同步改掉保留期这一件。开放与购买按 ADR-0054 §6 的顺序走，走到那一步本节还要整段重写。本行不复述那个数字与那份字段清单：它们只住在第五节，抄一份就是多一个会漂的副本。',
@@ -516,11 +532,19 @@ const en = [
   },
   {
     id: 's5',
-    title: 'Cloud AI operated and billed by us: the retention policy is settled, the tier is still not switchable on',
+    title: 'Cloud AI operated and billed by us: the retention policy is settled, and this tier can now be subscribed to',
     blocks: [
       {
         kind: 'p',
-        text: 'There is a path in heyta for cloud AI **provided and billed by us, with the model chosen by us**. The **data retention policy for that path was settled on 2026-10-05** (ADR-0054, the decision on managed-AI retention and the preconditions for selling it); the second paragraph below is what was settled, so the reason is no longer "we have not worked out how long data stays, so nobody may turn it on". It is **still not a feature a user can switch on**, and that rests on a checkable structural fact: the egress routing configuration the built-in AI actually uses has no "service mode" field at all, destinations are derived solely from endpoint addresses, and so "heyta cloud" can never be derived on that path. For the server-side proxy route to do anything at all, the operator must first point it at a domestic upstream; while that is unset it answers "not configured" and forwards nothing.',
+        text: 'There is a path in heyta for cloud AI **provided and billed by us, with the model chosen by us** (the second paragraph is the settled retention policy for it). **This tier can now be subscribed to**: the supply choice in Settings offers "hosted by heyta", and it corresponds to the ¥12 / month tier. 🔴 But it **has preconditions and covers only part of the features**, so these three belong together:',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '**The operator must first point this instance at a domestic upstream.** On an instance where that is unset, both the **order** and the **call** are refused honestly and separately (the order is rejected as "the capability this tier delivers is not present here"; the call answers "not configured"), so there is no state where money is taken for something that cannot run.',
+          '**You have to choose hosted** in Settings before the destination becomes us. Until you do, your content only goes to the endpoint you typed yourself.',
+          '**Every AI feature still needs its own consent from you**, revocable feature by feature at any time — a subscription is **not** consent to send anything out (the fourth paragraph states this positively).',
+        ],
       },
       {
         kind: 'p',
@@ -528,15 +552,15 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'One settled point about "who receives it" belongs here too, because it is **not the same thing** as the endpoint you configure yourself (section four): on the managed tier the destination is not declared by the client, it is derived from an endpoint address matching a **whitelist of domestic providers** — host names registered one by one, anything off the list unavailable, checked twice (when the configuration is saved and again immediately before a request is actually sent), and an unqualified endpoint is refused loudly rather than silently downgraded. The sentence in section four, "we maintain no allowlist of providers and do not determine which country an endpoint sits in", is about **your** endpoint — you choose that address, we have no standing to judge it for you and no ability to audit it.',
+        text: 'One settled point about "who receives it" belongs here too, because it is **not the same thing** as the endpoint you configure yourself (section four): on the hosted tier the destination is not declared by the client, it is derived from an endpoint address matching a **whitelist of domestic providers** — host names registered one by one, anything off the list unavailable, checked twice (when the configuration is saved and again immediately before a request is actually sent), and an unqualified endpoint is refused loudly rather than silently downgraded. The sentence in section four, "we maintain no allowlist of providers and do not determine which country an endpoint sits in", is about **your** endpoint — you choose that address, we have no standing to judge it for you and no ability to audit it.',
       },
       {
         kind: 'callout',
-        text: '**This service is not offered today, and it is not an option that happens to be switched off** — no switch anywhere in the shipped clients can turn it on, and this document will not say "we may use our own AI service" to leave room. The only AI you can use in heyta today is what you configured yourself, endpoint by endpoint and feature by feature.',
+        text: '**This tier is offered now, but it does not follow from a subscription** — what you buy is "we run that sync server for you, plus an allowance of our cloud AI", **not** a consent to send content out. What you use is each feature\'s own switch, one grant at a time, and it stops when you switch it off. **And this tier does not include the conversational assistant**: on the routing table the hosted endpoint does not declare tool-calling capability, so a request carrying tools is refused **before it leaves** ("no available route" is what the user sees) and not one byte is forwarded. For the assistant, use an endpoint you configure yourself — that path is free, unlimited, and is what section four describes in full.',
       },
       {
         kind: 'p',
-        text: 'Why this line must be held hard: any AI service provided by the platform, with models picked by the platform, must see plaintext by definition, and can **never** be described as end-to-end encrypted. Stitching the two into "we encrypt everything and also let AI tidy your notes" is the kind of sentence that fails both a regulator and a user. Rewriting this section is **not** the same as opening the path: one of the three preconditions now has an answer, two do not — when this tier faces a user it must be a **per-feature, revocable, separate consent** (never something a subscription grants by default), and the characterisation in section 8 about an endpoint abroad still **stays open**. On the day it really does open, this section gets rewritten end to end again, and "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions that are never merged into one sentence.',
+        text: 'Why this line must be held hard: any AI service provided by the platform, with models picked by the platform, must see plaintext by definition, and can **never** be described as end-to-end encrypted. Stitching the two into "we encrypt everything and also let AI tidy your notes" is the kind of sentence that fails both a regulator and a user. This tier being open is **not** permission to merge those two sentences: when it faces a user it must be a **per-feature, revocable, separate consent** (never something a subscription grants by default), and the characterisation in section 8 about an endpoint abroad still **stays open**. "End-to-end encryption" and "cloud AI" must remain two separate feature descriptions that are never merged into one sentence.',
       },
     ],
   },
@@ -753,6 +777,11 @@ const en = [
             'The **Task breakdown / Prioritisation / Duration estimate** rows of the table in section three each gained `today`, and the Tool selection row gained it too. Those three chains did not know which day it was, so when you wrote "next Wednesday" or "the 14th" the model had to invent a date (measured: it was once off by four and a half months); the only fix is to inject that line into the prompt. It does not look like user data, but it is **this device\'s local date**, so the rule "any new egress field extends this table before it ships" applies. For Tool selection the `today` is not new egress - it is a **missing line being added back**: the built-in assistant already sent it while this table omitted it.',
           ],
           [
+            '1.6',
+            '2026-10-24',
+            '**Section five is rewritten end to end, because this tier went from "cannot be switched on" to "can be subscribed to"** - which is exactly the claim the prohibition at the top of this document used to block. The cause is a change in the code, not in wording: Settings now offers an `own / managed` supply choice, the server-side hosted proxy route is in place, and the retention policy was settled back in 1.5. The new wording puts three conditions side by side (the operator configured a domestic upstream / you chose hosted in Settings / you granted each feature separately) and **explicitly excludes the conversational assistant** (the hosted endpoint declares no tool-calling, so a request carrying tools is refused before it leaves - zero requests). Three sentences that had become false are withdrawn: "the tier is still not switchable on", "this service is not offered today", and "no switch anywhere in the shipped clients can turn it on". The two retention paragraphs (four-column table / content lives only inside one call / 45-day metadata / "delete on expiry" not implemented) are **untouched** - the settled policy did not change, only availability did. The document as a whole remains a draft that has not been through legal review.',
+          ],
+          [
             '1.5',
             '2026-10-05',
             'Section five is rewritten against ADR-0054: the **data retention policy for this kind of service has been settled**, so the section no longer gives "the retention period is undecided" as the reason the tier is unavailable (the deliberate check written for that purpose no longer fires once the period is decided). What was settled is stated in the second paragraph of section five, item by item against things that can be checked: a table that can only hold counts (its column set is the evidence, not our wording), request and response bodies that exist only in the memory of one proxied call, the operational metadata as a closed field list plus one dated period with a stated derivation, and the managed destination being derived from a **domestic allowlist** rather than declared by the client. Two places deliberately say less than they could: that period carries **no** "it is deleted automatically when it expires" (the sweep is not implemented in this round, and section five changes again when it is), and the cell in section 8 about an endpoint you configure abroad **still reaches no conclusion** - this decision does not touch it and this document will not settle it. The trigger list in section nine drops the retention item with this change. Opening the tier and selling it follow the order in ADR-0054 §6; when that step arrives this section is rewritten end to end again. This row does not restate that number or that field list: they live in section five only, and a second copy is a second thing that can drift.',
@@ -783,18 +812,22 @@ export const aiAndTransfer: LegalDocument = {
   // 目的地由境内白名单推导），不是措辞。而且这一版**撤掉了一句真话的旧版本**：
   // "因为保留策略未定所以这一档打不开"在 2026-10-05 之后不再成立。同意留痕要能回答
   // "他同意的那一版里，这一节写的是哪一套理由"，所以必须换版本号。
-  version: '1.5',
+  // 🔴 1.5 → 1.6（2026-10-24）：第五节从"打不开"改成"可以订阅"。这一次换号的理由是
+  // **可用性变了**（设置页有了 own/managed、服务端代理就位），而不是发现写错了 ——
+  // 但同样的纪律照样触发：同意要能回答"他同意的那一版里，这一档到底能不能用"。
+  // 同时撤掉三句已不成立的话（"仍打不开"/"现在没有提供"/"没有任何开关能打开"）。
+  version: '1.6',
   status: 'draft',
-  updatedDate: '2026-10-05',
+  updatedDate: '2026-10-24',
   title: {
     'zh-CN': 'AI 功能与数据流向',
     en: 'AI Features and Where Your Data Goes',
   },
   summary: {
     'zh-CN':
-      'AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要、目的地由你自己填且 heyta 服务器不中转；由我们提供的云端 AI 当前不可用。',
+      'AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权，且不含对话式助手。',
     en:
-      'AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us is currently unavailable.',
+      'AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, only per feature with your own consent, and it does not include the conversational assistant.',
   },
   sections: { 'zh-CN': zh, en },
 };
