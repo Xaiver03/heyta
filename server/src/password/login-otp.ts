@@ -26,7 +26,8 @@ import {
 } from '@heyta/shared-schema';
 import { prisma } from '../db';
 import { getJwtSecret, issueSession } from '../auth';
-import type { SessionMeta } from '../account/access-sessions';
+import { newJti, type SessionMeta } from '../account/access-sessions';
+import { SESSION_MAX_AGE_MS } from '../central-auth/session-policy';
 import { sendLoginCodeEmail } from '../email';
 import { normalizeEmail } from '../account/email-normalize';
 import type { ServerLocale } from '../copy.generated.js';
@@ -284,8 +285,17 @@ export const verifyLoginCode = async (input: {
       select: { id: true, email: true, locale: true, tokenVersion: true, isVerified: true },
     });
     if (user === null || user.isVerified !== 1) throw invalidChallenge();
+    // 🔴 会话用 `tx` 落库，不许在事务里另抓一条池连接。
+    //    与注册那条同一个缺陷类（完整取证见 `registration-otp.ts` 里 `issueSession`
+    //    上方那张表）：一条请求占两条连接，除了在持有 `users` 行强锁时**自锁**，
+    //    并发下还会把连接池抽干（n 条事务各要第二条连接 ⇒ 互相等到 maxWait）。
+    //    这条今天**还没**自锁（本事务只读 users、不握强锁），但形状是同一个。
     return {
-      token: await issueSession(user, meta),
+      token: await issueSession(user, meta, {
+        tx,
+        jti: newJti(),
+        expiresAt: Date.now() + SESSION_MAX_AGE_MS,
+      }),
       user: { id: user.id, email: user.email, locale: user.locale },
     };
   });
