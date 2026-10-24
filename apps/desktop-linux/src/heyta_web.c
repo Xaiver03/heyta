@@ -2,6 +2,7 @@
 
 #include "heyta_web.h"
 #include "heyta_host.h" /* heyta_js_string_literal —— 转义只有这一份 */
+#include "heyta_notify.h" /* 页侧提醒腿的那三条 C 入口（判定只有一份） */
 
 #include <webkit/webkit.h> /* GTK4 原生那一档（6.0）；`webkit2gtk-4.1` 的头按 GTK3 编，会撞 */
 
@@ -13,6 +14,11 @@
 #define SCHEME "heyta-local"
 #define URI_BASE SCHEME "://app/"
 #define HANDLER_NAME "heytaStorage"
+/* 🔴 与页侧 `SHELL_REMINDER_HANDLER_NAME`、macOS 的 `addScriptMessageHandler(name:)`、
+ * Windows 的 `ReminderHandlerName` **逐字相同**。这个名字在 TS 侧靠"存在与否"来判
+ * "我是不是装在壳里"，拼错的症状不是报错，而是**悄悄退回浏览器那根管道** ——
+ * 于是"装在壳里的应用"弹的是 WebView 的通知而不是系统通知，没人会说破。 */
+#define REMINDER_HANDLER_NAME "heytaReminder"
 
 struct HeytaWeb {
     GtkWidget *widget;
@@ -583,6 +589,100 @@ static void snapshot_done(GObject *source, GAsyncResult *result, gpointer user_d
     if (texture != NULL) g_object_unref(texture);
 }
 
+/* ── 页侧提醒腿（`heytaReminder` 那根管道）─────────────────────────────
+ *
+ * 🔴 这一层没有一行在判"哪条提醒该弹"：到点判据、去重、`firedAt` 回执全在页侧
+ * （`apps/web/src/features/reminders/notify.ts` + `shell-reminder-center.ts`）。
+ * 这里只做管道：认出这条消息、把四件事转给 `heyta_notify.c` 那同一族实现、
+ * 把得到的那个值**原样**送回页面（AGENTS §3.5）。
+ *
+ * ⚠️ 回法是 ack，不是返回值：WebKit 的 script message 是**单向**的
+ * （`script-message-received` 的信号里没有把值交回页侧的形状），
+ * 所以回执靠执行 `window.__heytaReminderAck(requestId, 值)`。页侧那一等就是它，
+ * **没等到就按"没投出去"算** —— 这条不对称是本切片全部判据的地基：
+ * 反过来（丢回执却当成投了）会把没响过的提醒写成 `firedAt`，用户从此永远等不到它。
+ */
+
+/* 值只允许两种形状：`true`/`false` 两个字面，或一枚**转义过的字符串**。
+ * 手拼引号会被标题里的引号咬 —— 症状是"提醒永远等不到回执"（脚本语法坏了）。 */
+static void ack_reminder(WebKitWebView *view, const char *request_id, const char *value_js) {
+    char *literal = heyta_js_string_literal(request_id);
+    char *script = g_strdup_printf("window.__heytaReminderAck && window.__heytaReminderAck(%s, %s);",
+                                   literal != NULL ? literal : "\"\"", value_js);
+    run_evaluate(script, view);
+    g_free(script);
+    g_free(literal);
+}
+
+/* 消息里的一个字段读成 C 字符串。页侧发的是**对象**（不是字符串），
+ * 而 `args` 是数组 —— JS 数组的下标本身就是属性，所以 "0"/"1"/"2" 这样取，
+ * 不在 C 里手写任何 JSON 解析（那条纪律与 `heyta_notify.c` 同一族：借引擎读）。 */
+static char *reminder_field(JSCValue *object, const char *name) {
+    if (object == NULL || !jsc_value_is_object(object)) return NULL;
+    JSCValue *value = jsc_value_object_get_property(object, name);
+    if (value == NULL) return NULL;
+    char *text = jsc_value_is_string(value) ? jsc_value_to_string(value) : NULL;
+    g_object_unref(value);
+    return text;
+}
+
+static void on_reminder_message(WebKitUserContentManager *manager,
+                                JSCValue *message,
+                                gpointer user_data) {
+    (void)manager;
+    HeytaWeb *web = user_data;
+    WebKitWebView *view = web != NULL ? WEBKIT_WEB_VIEW(web->widget) : NULL;
+    if (view == NULL || message == NULL || !jsc_value_is_object(message)) {
+        printf("REMINDER_PAGE_FAIL=not-an-object\n");
+        fflush(stdout);
+        return;
+    }
+
+    char *request_id = reminder_field(message, "requestId");
+    char *method = reminder_field(message, "method");
+    if (request_id == NULL || method == NULL) {
+        /* 没有 requestId 就回不了话：这一条只能丢，但**必须留痕**，
+         * 否则页侧那 5 秒超时的症状与"壳根本没接上"长得一模一样。 */
+        printf("REMINDER_PAGE_FAIL=missing-field(hasId=%d hasMethod=%d)\n",
+               request_id != NULL, method != NULL);
+        fflush(stdout);
+        g_free(request_id);
+        g_free(method);
+        return;
+    }
+
+    JSCValue *args = jsc_value_object_get_property(message, "args");
+    if (strcmp(method, "permission") == 0 || strcmp(method, "request") == 0) {
+        /* freedesktop 没有"再问一次会不一样"的询问：探测幂等，两个方法同答。 */
+        const char *permission = heyta_notify_permission();
+        char *literal = heyta_js_string_literal(permission);
+        ack_reminder(view, request_id, literal != NULL ? literal : "\"unsupported\"");
+        printf("REMINDER_PAGE.permission=%s\n", permission);
+        g_free(literal);
+    } else if (strcmp(method, "openSettings") == 0) {
+        bool opened = heyta_notify_open_settings();
+        ack_reminder(view, request_id, opened ? "true" : "false");
+    } else if (strcmp(method, "show") == 0) {
+        char *body = reminder_field(args, "2");
+        char *title = reminder_field(args, "1");
+        bool delivered = heyta_notify_show(title, body);
+        /* 每一次投递都留一行：证据里"壳弹了没有"要能与"页侧以为弹了没有"对上账。 */
+        printf("REMINDER_PAGE_SHOW=permission=%s delivered=%d\n",
+               heyta_notify_permission(), delivered);
+        ack_reminder(view, request_id, delivered ? "true" : "false");
+        g_free(title);
+        g_free(body);
+    } else {
+        /* 认不出的方法**也要回执**（false = 没投出去），否则页侧白等一次超时。 */
+        printf("REMINDER_PAGE_FAIL=unknown-method method=%s\n", method);
+        ack_reminder(view, request_id, "false");
+    }
+    fflush(stdout);
+    if (args != NULL) g_object_unref(args);
+    g_free(request_id);
+    g_free(method);
+}
+
 /* ── 组装 ─────────────────────────────────────────────────────────────── */
 
 HeytaWeb *heyta_web_new(const char *root, GtkWidget **widget, char *errbuf, size_t errlen) {
@@ -626,6 +726,17 @@ HeytaWeb *heyta_web_new(const char *root, GtkWidget **widget, char *errbuf, size
         return NULL;
     }
 
+    /* 页侧提醒腿的第二根管道。注册失败**不许把整壳带崩**：没有它，页面退回
+     * 浏览器 `Notification`（WebView 自己的通知），应用照常能用 —— 所以这里
+     * 留一行读数而不 return NULL。反过来说，静默不注册才是真问题：
+     * "装在壳里却弹成网页通知"没有任何一处会说破。 */
+    if (!webkit_user_content_manager_register_script_message_handler(manager,
+                                                                     REMINDER_HANDLER_NAME,
+                                                                     NULL)) {
+        printf("REMINDER_HANDLER_REGISTER_FAIL=%s\n", REMINDER_HANDLER_NAME);
+        fflush(stdout);
+    }
+
     /* 🔴 必须在**文档创建时**注入：页侧在启动那刻就定了用哪份存储。
      * 只注主框架 —— 与 macOS 那份的 `forMainFrameOnly: true` 对齐。 */
     WebKitUserScript *shim = webkit_user_script_new(
@@ -653,6 +764,8 @@ HeytaWeb *heyta_web_new(const char *root, GtkWidget **widget, char *errbuf, size
      * 但信号连的是 manager 本身 —— 连晚了那个 handler 就挂在别人的生命周期上。 */
     g_signal_connect(manager, "script-message-received::" HANDLER_NAME,
                      G_CALLBACK(on_storage_message), web);
+    g_signal_connect(manager, "script-message-received::" REMINDER_HANDLER_NAME,
+                     G_CALLBACK(on_reminder_message), web);
 
     /* 6.0 没有 `..._new_with_user_content_manager` 这一族构造器（实测只有
      * `webkit_web_view_new`），走 GObject 构造属性。显式带上 context ——

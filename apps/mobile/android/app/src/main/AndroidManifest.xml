@@ -3,6 +3,26 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!--
+      W9 提醒这一族的两个补能力（精确闹钟的授权变化 / 开机后重新排程）。
+
+      RECEIVE_BOOT_COMPLETED —— 闹钟**不跨重启存活**（系统开机时会清掉所有排程），
+      所以开机后必须有一条"重新排一遍"的入口；这里只用来接收系统自己发的那条广播。
+
+      REQUEST_IGNORE_BATTERY_OPTIMIZATIONS —— normal 级、装即授予，它是**发起
+      ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 那个 intent 的入场券**，不声明时
+      点了设置页里的入口会被系统拒掉（ReminderModule.openBatteryOptimizationSettings
+      会据此退到应用详情页）。
+      🔴 声明它**不等于**索取豁免：豁免只在用户于**设置页里主动点**那一下时才跳系统页面，
+      启动流程一律不调（《App 违法违规收集使用个人信息行为认定方法》把"提前索要"
+      "一揽子同意"单独列为违规形态）。
+
+      ⚠️ 这两条都要进 `scripts/check-legal-permissions.mjs` 的名单与
+      `packages/legal/src/documents/permissions.ts` 的逐字清单（那份文档的写法是
+      "逐字抄 manifest，不概括、不补"），否则 `pnpm check:legal-permissions` 会红。
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
       android:name=".MainApplication"
@@ -30,6 +50,64 @@
         android:exported="false">
         <intent-filter>
           <action android:name="com.heyta.action.REMINDER" />
+        </intent-filter>
+      </receiver>
+
+      <!--
+        ==========================================================================
+        三个"叫醒 JS 重新排程"的 receiver（精确闹钟授权变化 / 开机 / 应用被更新）
+        ==========================================================================
+
+        🔴 **它们为什么必须是 `exported="true"`** —— 这两条广播的发送者是**系统**
+        （另一个 UID），而 `exported="false"` 的组件不参与跨 UID 的隐式广播解析，
+        写 false 的结果是"静默收不到"，跟没注册一样。（对照下面四个小组件 receiver：
+        它们必须 exported="false"，因为那条广播是**给用户点**的 PendingIntent 发的，
+        而且它们会真的改动用户任务 —— 那两者是不同风险等级，不是一个风格的两种写法。）
+
+        ⚠️ `android:permission="android.permission.RECEIVE_BOOT_COMPLETED"` 要求
+        **发送方**持有这条权限，系统持有，所以开机广播照常送达。它是"把可触发者缩一圈"
+        的闸门，不是唯一的防线 —— RECEIVE_BOOT_COMPLETED 是 normal 级，任何应用都能声明，
+        所以这条防线单看是软的。
+
+        🔴 **真正让 exported="true" 站得住的是这两个组件没有任何权限**：
+        实现见 `ReminderWakeupReceiver` —— 它们不读数据、不排闹钟、不取消闹钟、
+        不写任何内容，只做一件事：把 `heyta.reminders` 这份 prefs 里的
+        "我已经排过这些"缓存清掉（`invalidateArmedCache`）。最坏情况（某个 ROM/某个
+        第三方把这条广播发了一遍）的**全部后果**是：heyta 下一次回前台时多做一次
+        它本来每次回前台都会做的 reconcile。伪造者拿不到任何能力，也改不了任何用户数据。
+        反过来，一旦哪天有人往这两个 receiver 里加了"直接改排程/写状态"的逻辑，
+        上面那段论证立刻失效 —— 那时候的正确做法不是改 exported，是把它踢回 JS。
+
+        ⚠️ 第三条那一发（`MY_PACKAGE_REPLACED`）在应用**升级/覆盖安装**后送达：那条路
+        同样会清掉全部已排闹钟，而 prefs 里的"已经排过了"缓存是活的 —— 不抹它，
+        `schedule()` 会以为不用重排，症状与开机那一条一模一样（从此不响）。
+        它只发给**被更新的那个包自己**（不是全局广播），所以风险面比开机那一发更小。
+
+        ⚠️ 精确闹钟那条 action 是 API 31 才有的（低版本系统不会发，注册着无害）；
+        部分文档把它描述为"只发给运行期注册的 receiver"，本地未取证 —— 即便某些 OEM
+        真的不发给静态注册的组件，退路仍然存在：用户在系统页授予权限后回到 heyta，
+        `apps/mobile/src/App.tsx` 里那个 AppState 'active' 的 reconcile 会补齐。
+      -->
+      <receiver
+        android:name=".reminder.ExactAlarmPermissionReceiver"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+        </intent-filter>
+      </receiver>
+      <receiver
+        android:name=".reminder.ReminderReplacedReceiver"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        </intent-filter>
+      </receiver>
+      <receiver
+        android:name=".reminder.ReminderBootReceiver"
+        android:exported="true"
+        android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
+        <intent-filter>
+          <action android:name="android.intent.action.BOOT_COMPLETED" />
         </intent-filter>
       </receiver>
 
@@ -63,26 +141,6 @@
         （而且 Android 5.0 之后系统本身就移除了锁屏组件）。详见各 `widget_*_info.xml`。
       -->
 
-        ## 🔴 `android:exported="false"` 是**安全要求**，不是随手写的
-
-        这个 receiver 会处理"把某个任务标记为完成"的广播。若它 `exported="true"`，
-        **任何**装在同一台设备上的应用都能发一条伪造的 `ACTION_TOGGLE` 广播，
-        等用户下次打开 Heyta 时就把用户的任务改掉了 —— 而用户完全不会知道是谁改的。
-        （Android 12 之后 `android:exported` 变成必须显式声明，就是因为
-          这类"组件被外部触发"的历史漏洞。）
-
-        ⚠️ 那"启动器怎么还能点得动组件？" —— 因为点击是通过
-        **PendingIntent** 发出去的：PendingIntent 的授权来自**创建它的应用**（我们），
-        与 receiver 是否 exported 无关。这正是 PendingIntent 存在的意义。
-        再加上建 PendingIntent 时用了 `FLAG_IMMUTABLE`（见 `TodayWidgetViews.toggle`），
-        拿到它的第三方**不能改写里面的 extras**。两处缺一都不够。
-
-        ## `widgetCategory` 里没有 `keyguard`
-
-        这就是 D6 的"首版不做锁屏组件"。注意计划文档里写的 "not_keyguard"
-        是 **iOS** 的词；Android 的对应做法是**不声明** `keyguard`
-        （而且 Android 5.0 之后系统本身就移除了锁屏组件）。详见 `widget_today_info.xml`。
-      -->
       <receiver
         android:name=".widget.TodayWidgetProvider"
         android:exported="false"

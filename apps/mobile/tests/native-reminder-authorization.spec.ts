@@ -18,7 +18,7 @@ vi.mock('../src/lib/reminder-native', () => ({
   cancelStaleNativeReminders: async () => true,
   peekNativeUncertainReminders: async () => [],
 }));
-import { authorizeNativeReminders, reconcileNativeReminders, subscribeNativeReminderWrites } from '../src/lib/native-reminder-scheduler';
+import { authorizeNativeReminders, reconcileNativeReminders, subscribeNativeReminderWrites, subscribeReminderDelivery } from '../src/lib/native-reminder-scheduler';
 import { emitLocalWrite } from '../src/sync/write-signal';
 
 let adapter: SqliteAdapter;
@@ -92,5 +92,22 @@ describe('native authorization completion', () => {
     await createReminder();
     await reconcileNativeReminders();
     expect(native.schedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('🔴 答完系统弹窗要把结果交回去、并通知界面重读 —— 那个弹窗不把应用退到后台', async () => {
+    native.request.mockImplementation(async () => { native.permission = 'granted'; return 'granted'; });
+    await authorizeNativeReminders();
+    const seen = vi.fn();
+    const unsubscribe = subscribeReminderDelivery(seen);
+    try {
+      native.request.mockImplementation(async () => { native.permission = 'denied'; return 'denied'; });
+      expect(await authorizeNativeReminders()).toBe('denied');
+      // 读数变了 ⇒ 必须重读一次：少这一声，提醒面那句"到点不会响"会一直挂到用户
+      // 自己把应用切出去再切回来（而 `AppState` 在答弹窗那一刻根本不变）。
+      expect(seen).toHaveBeenCalledTimes(1);
+      // 读数没变 ⇒ 不许再吵（每次添加提醒都会走这条路，重复重读是白烧四次原生调用）。
+      await authorizeNativeReminders();
+      expect(seen).toHaveBeenCalledTimes(1);
+    } finally { unsubscribe(); }
   });
 });

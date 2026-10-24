@@ -19,6 +19,11 @@ import JavaScriptCore
 public final class ScriptHost {
     private let context: JSContext
     private let driver: SqliteBridge
+    /// macOS 通知中心那一侧。注入成 `globalThis.__heytaReminderPort`，
+    /// 由 `native-bridge.ts` 的 `deliverReminders()` 消费（见 `ReminderPort.swift`）。
+    public let reminderPort: ReminderPort
+    /// 🔴 全壳唯一的提醒循环（见 `ReminderLoop.swift`）。store 打开后才启动。
+    private var reminderLoop: ReminderLoop?
 
     public init(bundlePath: String, dbPath: String) throws {
         let source = try String(contentsOfFile: bundlePath, encoding: .utf8)
@@ -27,6 +32,7 @@ public final class ScriptHost {
         }
         self.context = context
         self.driver = try SqliteBridge(path: dbPath)
+        self.reminderPort = ReminderPort()
 
         // ⚠️ 这里**不**设 `exceptionHandler` 去兜驱动错误：驱动改成返回**信封**了
         //    （见 SqliteBridge.swift 头部）。JSC 的 native 方法抛 NSException
@@ -38,10 +44,45 @@ public final class ScriptHost {
         context.setObject(driver, forKeyedSubscript: "__heytaDriver" as NSString)
         context.evaluateScript("globalThis.__heytaDriverFactory = () => globalThis.__heytaDriver;")
 
+        // 提醒端口：契约要求它是个**对象**（`native-bridge.ts` 的 `InjectedReminderPort`），
+        // 不像驱动那样要包成工厂 —— 直接挂上去就行。
+        context.setObject(reminderPort, forKeyedSubscript: "__heytaReminderPort" as NSString)
+
         context.evaluateScript(source, withSourceURL: URL(fileURLWithPath: bundlePath))
         if context.objectForKeyedSubscript("HeytaApp")?.isUndefined != false {
             throw ScriptHostError.bundleMissingGlobal
         }
+        self.reminderLoop = ReminderLoop(host: self)
+    }
+
+    /// store 打开之后由 `AppApi` 调。幂等；**主线程**。
+    public func startReminderLoop() {
+        reminderLoop?.start()
+    }
+
+    /// 页侧落了一批 op 之后重算"下一次什么时候醒"。未启动时是 no-op。
+    public func rearmReminderLoop() {
+        reminderLoop?.rearm()
+    }
+
+    /// 同步问 JS："下一条提醒还要多久到点"（ms）。`null` / 出错 ⇒ `nil`（不排）。
+    /// 🔴 "睡多久"是 JS 算的，这里只是把那个数读出来 —— 反向就会把业务判定漏进壳里。
+    func nextReminderWakeDelayMs() -> Int64? {
+        guard let app = context.objectForKeyedSubscript("HeytaApp"),
+              let fn = app.objectForKeyedSubscript("nextReminderWakeDelay"),
+              let value = fn.call(withArguments: []),
+              context.exception == nil else {
+            context.exception = nil  // store 没开等：按"不知道"处理，不炸、也不猜
+            return nil
+        }
+        guard let delay = value.forProperty("delayMs"),
+              !delay.isUndefined, !delay.isNull,
+              let number = delay.toNumber() else {
+            return nil
+        }
+        // ⚠️ 不用 `toInt64()`：那是 macOS 15+ 才有的（本包下限 14）。
+        // `delayMs` 已被 JS 封顶 6h（21,600,000 ms），Int64(truncating:) 无损。
+        return Int64(truncating: number)
     }
 
     /// 调 `HeytaApp.<fn>(JSON.parse(argJson))`，返回结果的 JSON 文本。
@@ -88,6 +129,9 @@ public final class ScriptHost {
     }
 
     public func shutdown() {
+        // 先停循环：关掉之后再来一拍 `deliverReminders` 会撞在已销毁的 store 上。
+        reminderLoop?.stop()
+        reminderLoop = nil
         context.evaluateScript("try { HeytaApp.close(); } catch (e) {}")
     }
 

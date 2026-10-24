@@ -62,11 +62,11 @@ function reminder(id: string, taskId: string, triggerAt = 1000): Reminder {
 const LABELS = { title: 'heyta', body: (t: string) => `该做「${t}」了` };
 
 describe('notificationsSupported', () => {
-  it('没有 Notification（jsdom 默认）时是 false —— 不抛', () => {
+  it('没有 Notification（jsdom 默认）时是 false —— 不抛', async () => {
     expect(notificationsSupported(undefined)).toBe(false);
   });
 
-  it('有构造器但 `permission` 不是字符串时也当不支持', () => {
+  it('有构造器但 `permission` 不是字符串时也当不支持', async () => {
     // ⚠️ 非安全上下文（http:// 自托管）下 `new Notification()` 会直接抛。
     // 只判 `typeof === 'function'` 会把它误判成"可用"。
     const weird = function (): unknown {
@@ -75,17 +75,17 @@ describe('notificationsSupported', () => {
     expect(notificationsSupported(weird)).toBe(false);
   });
 
-  it('正常的构造器是 true', () => {
+  it('正常的构造器是 true', async () => {
     expect(notificationsSupported(fakeCtor().ctor)).toBe(true);
   });
 });
 
 describe('notificationPermission', () => {
-  it('不支持时返回独立状态，界面才能给出正确说明', () => {
+  it('不支持时返回独立状态，界面才能给出正确说明', async () => {
     expect(notificationPermission(undefined)).toBe('unsupported');
   });
 
-  it('透传真实权限', () => {
+  it('透传真实权限', async () => {
     expect(notificationPermission(fakeCtor('default').ctor)).toBe('default');
     expect(notificationPermission(fakeCtor('granted').ctor)).toBe('granted');
   });
@@ -109,9 +109,9 @@ describe('requestNotificationPermission', () => {
 });
 
 describe('deliverDueReminders', () => {
-  it('🔴 到点的那一条**真的投出去了**，且正文是任务标题', () => {
+  it('🔴 到点的那一条**真的投出去了**，且正文是任务标题', async () => {
     const { ctor, calls } = fakeCtor('granted');
-    const outcome = deliverDueReminders(
+    const outcome = await deliverDueReminders(
       [reminder('r1', 't1')],
       { t1: task('t1', '交周报') },
       new Set(),
@@ -127,14 +127,14 @@ describe('deliverDueReminders', () => {
     expect(calls[0]?.options?.body).toBe('该做「交周报」了');
   });
 
-  it('🔴 同一条提醒**只投一次**（否则每次 op 都会重投，通知栏被刷屏）', () => {
+  it('🔴 同一条提醒**只投一次**（否则每次 op 都会重投，通知栏被刷屏）', async () => {
     const { ctor, calls } = fakeCtor('granted');
     const shown = new Set<string>();
     const due = [reminder('r1', 't1')];
     const tasks = { t1: task('t1', '交周报') };
 
-    deliverDueReminders(due, tasks, shown, LABELS, ctor);
-    const second = deliverDueReminders(due, tasks, shown, LABELS, ctor);
+    await deliverDueReminders(due, tasks, shown, LABELS, ctor);
+    const second = await deliverDueReminders(due, tasks, shown, LABELS, ctor);
 
     expect(calls, '第二次不该再投').toHaveLength(1);
     // 第二次没有新投的 —— 但**不是** permission 问题，所以 reason 不该是那个。
@@ -142,9 +142,9 @@ describe('deliverDueReminders', () => {
     expect(second.delivered).toBe(0);
   });
 
-  it('权限不是 `granted` 时**一条都不投**，且 reason 说清是权限', () => {
+  it('权限不是 `granted` 时**一条都不投**，且 reason 说清是权限', async () => {
     const { ctor, calls } = fakeCtor('default');
-    const outcome = deliverDueReminders(
+    const outcome = await deliverDueReminders(
       [reminder('r1', 't1')],
       { t1: task('t1', '交周报') },
       new Set(),
@@ -155,8 +155,8 @@ describe('deliverDueReminders', () => {
     expect(outcome).toEqual({ delivered: 0, deliveredIds: [], reason: 'permission' });
   });
 
-  it('浏览器不支持时 reason 是 `unsupported`（与"权限被拒"区分开）', () => {
-    const outcome = deliverDueReminders(
+  it('浏览器不支持时 reason 是 `unsupported`（与"权限被拒"区分开）', async () => {
+    const outcome = await deliverDueReminders(
       [reminder('r1', 't1')],
       { t1: task('t1', '交周报') },
       new Set(),
@@ -166,14 +166,14 @@ describe('deliverDueReminders', () => {
     expect(outcome).toEqual({ delivered: 0, deliveredIds: [], reason: 'unsupported' });
   });
 
-  it('没有到点的提醒时 reason 是 `empty`，**不去碰权限**', () => {
-    const outcome = deliverDueReminders([], {}, new Set(), LABELS, undefined);
+  it('没有到点的提醒时 reason 是 `empty`，**不去碰权限**', async () => {
+    const outcome = await deliverDueReminders([], {}, new Set(), LABELS, undefined);
     expect(outcome).toEqual({ delivered: 0, deliveredIds: [], reason: 'empty' });
   });
 
-  it('任务已被删掉时跳过它，但不影响其余几条', () => {
+  it('任务已被删掉时跳过它，但不影响其余几条', async () => {
     const { ctor, calls } = fakeCtor('granted');
-    const outcome = deliverDueReminders(
+    const outcome = await deliverDueReminders(
       [reminder('r-gone', 'missing'), reminder('r2', 't2')],
       { t2: task('t2', '还在的任务') },
       new Set(),
@@ -192,10 +192,10 @@ describe('deliverDueReminders', () => {
    * 注释却写着"这种情况不投"。所以这一组必须喂一张**含墓碑的表** ——
    * 那正是动作层 `due()` 之外、调用方可能递进来的真实形状。
    */
-  it('🔴 任务在表里但带 deletedAt（回收站）时不投，其余几条照投', () => {
+  it('🔴 任务在表里但带 deletedAt（回收站）时不投，其余几条照投', async () => {
     const { ctor, calls } = fakeCtor('granted');
     const trashed = { id: 't-gone', title: '已删除的任务', createdAt: 0, updatedAt: 0, deletedAt: 999 } as Task;
-    const outcome = deliverDueReminders(
+    const outcome = await deliverDueReminders(
       [reminder('r-gone', 't-gone'), reminder('r2', 't2')],
       { 't-gone': trashed, t2: task('t2', '还在的任务') },
       new Set(),
@@ -206,7 +206,7 @@ describe('deliverDueReminders', () => {
     expect(calls.map((c) => c.options?.body)).toEqual(['该做「还在的任务」了']);
   });
 
-  it('🔴 已彻底删除（purgedAt）的任务同样不投', () => {
+  it('🔴 已彻底删除（purgedAt）的任务同样不投', async () => {
     const { ctor, calls } = fakeCtor('granted');
     const purged = {
       id: 't-purged',
@@ -216,7 +216,7 @@ describe('deliverDueReminders', () => {
       deletedAt: 999,
       purgedAt: 1000,
     } as Task;
-    const outcome = deliverDueReminders([reminder('r-p', 't-purged')], { 't-purged': purged }, new Set(), LABELS, ctor);
+    const outcome = await deliverDueReminders([reminder('r-p', 't-purged')], { 't-purged': purged }, new Set(), LABELS, ctor);
     expect(outcome.delivered).toBe(0);
     expect(calls).toHaveLength(0);
   });
@@ -228,10 +228,10 @@ describe('deliverDueReminders', () => {
    * "刷新一次就再弹一遍"的根因：内存 `shown` 集合跨不了页面加载，
    * 落库靠的是 id。
    */
-  it('deliveredIds 精确等于真投出去的那几条 id（顺序同输入）', () => {
+  it('deliveredIds 精确等于真投出去的那几条 id（顺序同输入）', async () => {
     const { ctor } = fakeCtor('granted');
     const shown = new Set(['skip-me']);
-    const outcome = deliverDueReminders(
+    const outcome = await deliverDueReminders(
       [reminder('skip-me', 't1'), reminder('a', 't1'), reminder('b', 't1')],
       { t1: task('t1', '交周报') },
       shown,
@@ -242,12 +242,12 @@ describe('deliverDueReminders', () => {
     expect(outcome.delivered).toBe(outcome.deliveredIds.length);
   });
 
-  it('一条都没投出去时 deliveredIds 是空数组（而不是 undefined）', () => {
-    const outcome = deliverDueReminders([], {}, new Set(), LABELS, fakeCtor('granted').ctor);
+  it('一条都没投出去时 deliveredIds 是空数组（而不是 undefined）', async () => {
+    const outcome = await deliverDueReminders([], {}, new Set(), LABELS, fakeCtor('granted').ctor);
     expect(outcome.deliveredIds).toEqual([]);
   });
 
-  it('构造抛错时**不中断**其余几条，也不把那条记成已投', () => {
+  it('构造抛错时**不中断**其余几条，也不把那条记成已投', async () => {
     const calls: string[] = [];
     const ctor = function (this: unknown, title: string, options?: { body?: string }): unknown {
       const body = options?.body ?? '';
@@ -257,7 +257,7 @@ describe('deliverDueReminders', () => {
     } as unknown as NotificationCtor;
     (ctor as { permission: NotificationPermission }).permission = 'granted';
 
-    const outcome = deliverDueReminders(
+    const outcome = await deliverDueReminders(
       [reminder('bad', 'tbad'), reminder('good', 'tgood')],
       { tbad: task('tbad', '坏掉的那条'), tgood: task('tgood', '正常的那条') },
       new Set(),
@@ -268,9 +268,9 @@ describe('deliverDueReminders', () => {
     expect(calls).toEqual(['该做「正常的那条」了']);
   });
 
-  it('`tag` 用提醒 id —— 同一条的重复投递在通知中心会合并而不是堆叠', () => {
+  it('`tag` 用提醒 id —— 同一条的重复投递在通知中心会合并而不是堆叠', async () => {
     const { ctor, calls } = fakeCtor('granted');
-    deliverDueReminders(
+    await deliverDueReminders(
       [reminder('r-xyz', 't1')],
       { t1: task('t1', '交周报') },
       new Set(),

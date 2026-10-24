@@ -47,6 +47,7 @@ import {
   exportDocumentFromHost,
   materializedState,
   openAppHost,
+  startForegroundReminderLoop,
   startInboundWorkerLoop,
   type NewAssistantTurn,
   type RestoreDocument,
@@ -56,7 +57,9 @@ import {
   type InboundAutomationCycleResult,
   type InboundAutomationHostOptions,
   type InboundRecipientKeyScope,
+  type ForegroundReminderLoopOptions,
   type InboundRecipientRegistration,
+  type ReminderForegroundPort,
   type NewTaskFields,
   type RestoreExportResult,
 } from '@heyta/app-host';
@@ -89,6 +92,25 @@ export interface NodeHost {
   readonly dbPath: string;
   readonly clientId: string;
   readonly engine: AppHost['engine'];
+
+  /**
+   * 挂上"到点自己醒"的前台提醒投递循环，返回取消函数。
+   *
+   * 🔴 为什么这条要住在宿主里，而不是让每个壳自己去调 `@heyta/app-host`：
+   * seam 的第一个参数是 `AppHost`，而 `AppHost` 由 `openAppHost()` 在这里创建，
+   * 壳**拿不到**（`NodeHost` 只透出 `engine` 与 `dispatch`）。如果让壳自己去
+   * 拼一个"看起来像 AppHost"的对象，它就得 import `@heyta/app-host` 并自己
+   * 断言形状 —— 那正是 `apps/desktop/tests/reuse.spec.ts` 钉住的那道门
+   * （桌面壳的业务入口只有 `@heyta/node-host` 一个）。
+   * 所以这里只做**一行透传**：把已经存在的 `app` 递给共享实现。
+   *
+   * ⚠️ 本方法**不判断任何事**：哪条算到点、去重、写 `firedAt` 回执，
+   * 全在 `packages/app-host/src/reminder-foreground.ts`（AGENTS.md §3.5）。
+   * 平台那一侧（怎么弹、系统让不让弹）由调用方实现的 `ReminderForegroundPort` 负责。
+   *
+   * 返回取消函数；`close()` 会一并取消 —— 与 `startInboundWorker` 同一个生命周期。
+   */
+  startForegroundReminders(port: ReminderForegroundPort, options: ForegroundReminderLoopOptions): () => void;
 
   /**
    * 创建任务。返回新任务的实体 id。
@@ -340,6 +362,9 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
 
   const actions = createTaskActions(app);
   const inboundLoops = new Set<() => void>();
+  /* 提醒循环与它同命：`close()` 之后还挂着一枚 `setTimeout` 的话，
+   * 下一发投递会打在已销毁的宿主上（症状是进程退出时抛一句看不懂的栈）。 */
+  const reminderLoops = new Set<() => void>();
   let closed = false;
   const projectActions = createProjectActions(app);
   const noteActions = createNoteActions(app);
@@ -440,11 +465,23 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
       inboundLoops.add(stop);
       return stop;
     },
+    startForegroundReminders: (port, options) => {
+      /* 一行透传：判定与回执全在共享实现里，这里只负责把 `app` 递过去，
+       * 并把取消函数收进与 `startInboundWorker` 同一枚生命周期集合。 */
+      if (closed) throw new Error('Host is closed');
+      const stop = startForegroundReminderLoop(app, port, options);
+      reminderLoops.add(stop);
+      return () => {
+        reminderLoops.delete(stop);
+        stop();
+      };
+    },
     exportDocument: () => exportDocumentFromHost(app, { exportedAt: Date.now(), host: 'node' }),
     restoreExport: (document) => restoreIntoEmptyTarget(app, document),
     close: () => {
       closed = true;
       for (const stop of inboundLoops) stop();
+      for (const stop of reminderLoops) stop();
       app.close();
     },
   };
@@ -452,4 +489,19 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
 
 /** 当前物化状态（诊断用）。 */
 export { materializedState };
+
+/**
+ * 提醒投递那几个类型必须**从这里**递给桌面壳：壳的 import 白名单
+ * （`apps/desktop/tests/reuse.spec.ts`）只放 `electron` / `node:` / `@heyta/node-host`，
+ * 而"这台机器的通知中心怎么弹"那个端口的形状正是这几个类型。
+ * 不转出的话，壳要么 import `@heyta/app-host`（撞那道门），要么自己抄一份形状
+ * （抄本一定会漂）。
+ */
+export type {
+  ForegroundDeliveryResult,
+  ForegroundReminderLabels,
+  ForegroundReminderLoopOptions,
+  ReminderAuthorization,
+  ReminderForegroundPort,
+} from '@heyta/app-host';
 export type { EntityType };

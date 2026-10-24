@@ -23,6 +23,18 @@ public sealed partial class MainWindow : Window
 {
     private readonly ObservableCollection<TaskItem> _tasks = new();
     private AppApi? _api;
+
+    /// <summary>
+    /// 页侧提醒腿的**系统通知中心**（四端里 Windows 这一份实现）。
+    ///
+    /// 🔴 它是"管道"不是"决策"：哪条到点、弹过没有、`firedAt` 怎么记，全在页侧
+    /// （`apps/web/src/features/reminders/*` + `packages/app-host`），这里只回答
+    /// "这台机器上能不能弹"和"怎么弹"（AGENTS §3.5）。
+    /// </summary>
+    private readonly ReminderPort _pageReminderPort = new();
+
+    /// <summary>最后一次提醒消息的读数，进证据文件（"壳弹了没有"要能与"页侧以为弹了没有"对账）。</summary>
+    private string _reminderNote = string.Empty;
     private string _dbPath = string.Empty;
     private WindowsDataPaths? _dataPaths;
 
@@ -438,6 +450,11 @@ public sealed partial class MainWindow : Window
                         args.Source,
                         rawMessage)) return;
                 if (TryHandleWindowChromeMessage(rawMessage)) return;
+                // 🔴 提醒消息必须在 op-log 转发**之前**分流：共用的那根管道
+                // （`window.chrome.webview.postMessage`）没有 per-name 处理器，
+                // 一切消息都会先落到这里；反过来讲，认不出来的必须原路放行，
+                // 否则应用会卡在启动（这一族的症状在仓里记过案）。
+                if (TryHandleReminderMessage(args.Source, rawMessage)) return;
 
                 /**
                  * 🔴 **存储宿主接管时，页侧所有消息都是 op-log 请求或交握** ——
@@ -847,6 +864,132 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>页侧与壳共用的那枚分流依据（与页侧 `SHELL_REMINDER_HANDLER_NAME` 逐字相同）。</summary>
+    private const string ReminderHandlerName = "heytaReminder";
+
+    /// <summary>
+    /// 页侧提醒腿的消息 → 系统通知中心 → 回执。
+    ///
+    /// 🔴 这一层没有一行在判"哪条提醒该弹"：到点判据、去重、`firedAt` 全在页侧
+    /// （`apps/web/src/features/reminders/notify.ts` + `shell-reminder-center.ts`）。
+    /// 这里只做管道：认出 `handler:'heytaReminder'`、把四个方法转给 <see cref="ReminderPort"/>、
+    /// 把端口给的那个值**原样**送回页面（AGENTS §3.5）。
+    ///
+    /// ⚠️ 回法是 ack，不是返回值：`chrome.webview.postMessage` 是**单向**的，
+    /// 所以回执靠执行 `window.__heytaReminderAck(requestId, 值)`。页侧那一等就是它，
+    /// 且**没等到就按"没投出去"算** —— 反过来讲：这里如果回执丢了，最坏的后果是
+    /// 提醒下一轮再试一次，而不是被记成已投。这条不对称是本切片全部判据的地基。
+    /// </summary>
+    private bool TryHandleReminderMessage(string source, string raw)
+    {
+        // 🔴 与 widgets 那枚桥同一个 origin 判据：只有壳自己的页面能使这根管道。
+        if (!IsInternalShellUri(source)) return false;
+
+        string? requestId = null;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            if (root.ValueKind != System.Text.Json.JsonValueKind.Object) return false;
+            if (!root.TryGetProperty("handler", out var handlerElement)
+                || handlerElement.GetString() != ReminderHandlerName) return false;
+            requestId = root.TryGetProperty("requestId", out var id) ? id.GetString() : null;
+            var method = root.TryGetProperty("method", out var m) ? m.GetString() ?? "" : "";
+            // args 在 doc.Dispose 之后就不能再读了 ⇒ 先把要用的三个值拷成托管字符串。
+            var first = "";
+            var second = "";
+            var third = "";
+            if (root.TryGetProperty("args", out var supplied)
+                && supplied.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                var index = 0;
+                foreach (var item in supplied.EnumerateArray())
+                {
+                    var text = item.ValueKind == System.Text.Json.JsonValueKind.String
+                        ? item.GetString() ?? ""
+                        : item.GetRawText();
+                    if (index == 0) first = text;
+                    else if (index == 1) second = text;
+                    else if (index == 2) third = text;
+                    index++;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(requestId))
+            {
+                _reminderNote = $"REMINDER_PAGE_BAD=missing-requestId method={method}";
+                return true;
+            }
+
+            object? result = method switch
+            {
+                "permission" => _pageReminderPort.authorizationStatus(),
+                // Windows 没有应用内授权弹窗：这一问只回当前状态，绝不为变成 granted 而说谎。
+                "request" => _pageReminderPort.requestAuthorization(),
+                "openSettings" => _pageReminderPort.openSettings(),
+                "show" => _pageReminderPort.show(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    occurrenceId = first,
+                    title = second,
+                    body = third,
+                })),
+                _ => null,
+            };
+            if (result is null && method != "permission")
+            {
+                _reminderNote = $"REMINDER_PAGE_BAD=unknown-method method={method}";
+                AckReminder(requestId, false);
+                return true;
+            }
+            // 每次投递都留一行：证据里"壳弹了没有"必须能与"页侧以为弹了没有"对上账。
+            if (method == "show")
+            {
+                _reminderNote = $"REMINDER_PAGE_SHOW=delivered={result} " +
+                                $"permission={_pageReminderPort.authorizationStatus()} " +
+                                $"channel={_pageReminderPort.Channel}";
+            }
+            AckReminder(requestId, result);
+            return true;
+        }
+        catch (Exception error)
+        {
+            // 坏消息不属于这条腿时**不能吞掉**（否则 op-log 消息会被这里吃掉 ⇒ 应用永久卡在启动）。
+            // 但已经被认出是提醒消息的（handler 命中、requestId 也取到了）必须回执，否则页侧白等 5s。
+            _reminderNote = $"REMINDER_PAGE_ERROR={error.Message.Replace(Environment.NewLine, " ")}";
+            if (!string.IsNullOrWhiteSpace(requestId)) AckReminder(requestId!, false);
+            return requestId is not null;
+        }
+    }
+
+    /// <summary>
+    /// 把结果送回页面。**失败必须说出来**：静默的丢回执 = 页侧白等一次超时。
+    ///
+    /// ⚠️ 值一律走 `JsonSerializer`，不手写引号 —— requestId 与标题正文都可能带引号/换行，
+    /// 手拼会拼出一句语法坏掉的脚本，而那副症状是"提醒永远等不到回执"。
+    /// </summary>
+    private void AckReminder(string requestId, object? value)
+    {
+        var script =
+            "window.__heytaReminderAck && window.__heytaReminderAck(" +
+            $"{System.Text.Json.JsonSerializer.Serialize(requestId)}, " +
+            $"{System.Text.Json.JsonSerializer.Serialize(value)});";
+        _ = SafeAckAsync(script);
+    }
+
+    private async Task SafeAckAsync(string script)
+    {
+        try
+        {
+            await SharedUi.CoreWebView2.ExecuteScriptAsync(script);
+        }
+        catch (Exception error)
+        {
+            // 回执发不出去（页面正在导航、webview 已销毁）也要留一行，不许静默。
+            _reminderNote = $"REMINDER_ACK_FAILED={error.Message.Replace(Environment.NewLine, " ")}";
+        }
+    }
+
+
     /// <summary>M2-A 的宿主结论（供截图/证据读取）。</summary>
     private string SharedUiHostNote { get; set; } = string.Empty;
 
@@ -940,7 +1083,10 @@ public sealed partial class MainWindow : Window
                 $"WRITE_HANDLED={WriteHandled}{Environment.NewLine}" +
                 $"DB_DONE={dbDone}{Environment.NewLine}" +
                 $"DB_TOTAL={dbTotal}{Environment.NewLine}" +
-                $"WRITE_NOTE={SharedUiHostNote}{Environment.NewLine}");
+                $"WRITE_NOTE={SharedUiHostNote}{Environment.NewLine}" +
+                // 提醒腿的最后一发读数（`REMINDER_PAGE_SHOW=… delivered=True/False`）。
+                // 没有它，"页侧以为弹了"与"系统真的弹了"在两处各说一套而没人能对账。
+                $"REMINDER_NOTE={_reminderNote}{Environment.NewLine}");
         }
         catch (Exception error)
         {

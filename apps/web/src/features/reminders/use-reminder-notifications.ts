@@ -34,6 +34,7 @@ import { useI18n } from '@heyta/i18n';
 
 import { useReminderStore } from './store.js';
 import { deliverDueReminders, type DeliveryOutcome } from './notify.js';
+import { resolveReminderCenter } from './shell-reminder-center.js';
 import { useReminderWakeTimer } from './use-reminder-wake.js';
 import { useTaskStore } from '../tasks/store.js';
 
@@ -62,30 +63,36 @@ export function useReminderNotifications(): { last: DeliveryOutcome | undefined 
   const last = useRef<DeliveryOutcome | undefined>(undefined);
 
   useEffect(() => {
-    const outcome = deliverDueReminders(due, tasks, shown.current, {
+    /**
+     * 🔴 后端**每次现取**：壳那条腿（`heytaReminder` 消息通道）由壳在文档创建时注入，
+     * 而注入之前这一格是 `null` ⇒ 退到浏览器的 `Notification`。
+     * 把它 `useMemo` 一次就定死，症状是"装进壳里的应用永远以为自己在浏览器里"。
+     */
+    void deliverDueReminders(due, tasks, shown.current, {
       // 通知的标题就是产品名 —— 它出现在系统通知里，所以必须走词条
       //（硬编码会被 `check:ui-language` 拦，而它正是为这一类存在的）。
       title: t('common.brand'),
       // 正文是**任务标题本身**：这是"有显示路径"与"只弹一句泛泛的话"的分界。
       // 泛泛的"你有新提醒"等于没有告诉用户任何事。
       body: (taskTitle: string) => t('web.reminder.notify.body', { title: taskTitle }),
-    });
-    last.current = outcome;
+    }, resolveReminderCenter()).then((outcome) => {
+      last.current = outcome;
 
-    /**
-     * 🔴 投出去就要**落库**（写 `firedAt` op），否则"投过"只活在这一次页面加载里。
-     *
-     * `shown.current` 是 `useRef(new Set())`：刷新即忘、另一台设备完全不知道。
-     * 领域层判 `fired` **优先于** `due`，所以把 `firedAt` 写成 op 之后，
-     * 这条提醒在任何一端重放同一份状态时都不会再进 `due()`。
-     * （此前 `markReminderFired` 全仓库只有它自己的单测在调 —— 见计划 D14。）
-     *
-     * ⚠️ 不 `await`：effect 里等一条写 op 会把"弹通知"变成"等同步"，
-     * 而失败已经由 store 落进 `error` 并在面板上渲染（`attempt` 的既有纪律）。
-     */
-    if (outcome.deliveredIds.length > 0) {
-      void useReminderStore.getState().markDelivered(outcome.deliveredIds);
-    }
+      /**
+       * 🔴 投出去就要**落库**（写 `firedAt` op），否则"投过"只活在这一次页面加载里。
+       *
+       * `shown.current` 是 `useRef(new Set())`：刷新即忘、另一台设备完全不知道。
+       * 领域层判 `fired` **优先于** `due`，所以把 `firedAt` 写成 op 之后，
+       * 这条提醒在任何一端重放同一份状态时都不会再进 `due()`。
+       * （此前 `markReminderFired` 全仓库只有它自己的单测在调 —— 见计划 D14。）
+       *
+       * ⚠️ 这里不 `await` 那条写 op：effect 里等一次同步会把"弹通知"变成"等存储"，
+       * 而失败已经由 store 落进 `error` 并在面板上渲染（`attempt` 的既有纪律）。
+       */
+      if (outcome.deliveredIds.length > 0) {
+        void useReminderStore.getState().markDelivered(outcome.deliveredIds);
+      }
+    });
   }, [due, tasks, t]);
 
   return { last: last.current };

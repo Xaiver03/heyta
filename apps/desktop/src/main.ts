@@ -16,7 +16,19 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 
 import type { NodeHost } from '@heyta/node-host';
 import { openDesktopHost } from './host.js';
-import { DESKTOP_CHANNELS, handleDesktopRequest, type DesktopRequest } from './ipc-contract.js';
+import {
+  DESKTOP_CHANNELS,
+  handleDesktopRequest,
+  type DesktopReminderAccess,
+  type DesktopRequest,
+} from './ipc-contract.js';
+import {
+  REMINDER_NOTIFICATION_LABELS,
+  createDeliveryLedger,
+  createReminderForegroundPort,
+  readReminderStatus,
+} from './reminder-notify.js';
+import { createElectronNotificationSurface } from './reminder-notify-electron.js';
 
 /** 进程级单例。开第二个库连接会让 SQLite 文件被两个 writer 打开。 */
 let host: NodeHost | null = null;
@@ -26,6 +38,36 @@ let quitting = false;
  * 当前主窗口。只在 `second-instance` 里用来把已有窗口拉回前台。
  */
 let mainWindow: BrowserWindow | null = null;
+
+/**
+ * 前台提醒这一族在主进程里的三个件：端口（怎么弹）、账本（最近一轮实况）、
+ * 循环的取消函数（`before-quit` 撤掉）。
+ *
+ * 🔴 循环只在**宿主真的起来了**之后挂一次：`bootHost()` 是幂等单例，所以这里
+ * 用同一个判据（`stopReminderLoop !== null`）而不看时间 —— 挂两枚循环等于同一轮
+ * 到点投两次，而记账只有一份。
+ */
+let reminderAccess: DesktopReminderAccess | null = null;
+let stopReminderLoop: (() => void) | null = null;
+
+function armReminders(host: NodeHost): void {
+  if (stopReminderLoop !== null) return;
+  const port = createReminderForegroundPort(createElectronNotificationSurface());
+  const ledger = createDeliveryLedger();
+  stopReminderLoop = host.startForegroundReminders(port, {
+    labels: REMINDER_NOTIFICATION_LABELS,
+    // seam 每一轮的结论只从 onDelivery 出来，而渲染进程拿不到主进程的回调 ——
+    // 中间必须有人把"最近一次实况"存下来，界面那一行才有真话可说。
+    onDelivery: (result) => ledger.note(result),
+    onError: (error: unknown) => console.error('前台提醒投递失败：', error),
+  });
+  reminderAccess = {
+    status: () => readReminderStatus(port, ledger),
+    // 端口没给 openSettings（Linux 没有标准入口）⇒ 这里回 false，
+    // 界面据此**不画**那个点了没反应的按钮，而不是画一个骗人的。
+    openSettings: () => (port.openSettings === undefined ? Promise.resolve(false) : port.openSettings()),
+  };
+}
 
 async function bootHost(): Promise<NodeHost> {
   host ??= await openDesktopHost({ userDataDir: app.getPath('userData') });
@@ -165,7 +207,8 @@ if (!app.requestSingleInstanceLock()) {
     () => {
       ipcMain.handle(DESKTOP_CHANNELS.request, async (_event, request: DesktopRequest) => {
         const opened = await bootHost();
-        return handleDesktopRequest(opened, request);
+        armReminders(opened);
+        return handleDesktopRequest(opened, request, reminderAccess ?? undefined);
       });
 
       createWindow();
@@ -191,6 +234,11 @@ app.on('before-quit', () => {
   // 只关一次：`before-quit` 可能被触发多次。
   if (quitting) return;
   quitting = true;
+  /* 先撤提醒循环再关宿主：`setTimeout` 在宿主关掉之后还会打过来，
+   * 那一发投在已销毁的宿主上，症状是退出时一句看不懂的栈。 */
+  if (stopReminderLoop !== null) stopReminderLoop();
+  stopReminderLoop = null;
+  reminderAccess = null;
   host?.close();
   host = null;
 });

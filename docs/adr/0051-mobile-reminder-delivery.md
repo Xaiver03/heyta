@@ -380,3 +380,196 @@ Composer 建任务和真实 SQLite `TASK CRT` 均通过；随后在任务详情�
 读成空树。现已让共享入口与 shim 使用同一 `HOST:PORT`/Unix 判别；同一目标 UDID 的 TCP
 `11005` 只读对照得到 `AX_LABELS=11` 与合法 JSON。今后 transport 变更必须同时覆盖 shim、
 共享 helper、重启分支和只读 AX 对照，不能只验证一个调用点。
+
+### 2026-10-24：桌面四端接上系统通知 + 移动端把"拒绝"说到明处（本轮）
+
+**这一轮补的是"最后一公里"的另一半。** 2026-09-29 那条记录说的是"算得出 `due` 却没人读"；
+这一轮的症状是**移动与桌面两套形状的投递路径各自缺不同的东西**：移动端拿到了授权结果
+却不告诉用户"到点不会响"，桌面四端则压根没有通往系统通知中心的腿。
+
+#### 定下来的形状（有一条是新的，写清楚）
+
+🔴 **桌面端的投递住在页侧，不住在壳侧。** 理由是实测出来的：桌面三壳（macOS / Windows /
+Linux）跑的是**存储宿主**模式 —— 页面自己持有 `OpLogEngine`，壳只调 `openOpLog()`，
+所以壳侧那一份 `HeytaApp.deliverReminders()` **必然**抛"应用宿主还没打开"。
+于是：
+
+```
+页面（apps/web/src/features/reminders/notify.ts + shell-reminder-center.ts）
+   │  判哪条到点、弹过没有、写 firedAt —— 全部业务语义（AGENTS §3.5 的那一侧）
+   ▼
+一条消息通道 {requestId, method: permission|request|openSettings|show, args}
+   ▼
+壳（只回答"这台机器能不能弹 / 怎么弹"）
+```
+
+两种**回法**按平台形状分工，页侧同一份代码兼容：
+① macOS 的 `WKScriptMessageHandlerWithReply` ⇒ `postMessage` 直接回 Promise；
+② Windows WebView2 / Linux WebKitGTK 的管道是**单向**的 ⇒ 壳执行
+`window.__heytaReminderAck(requestId, 值)`。5 秒等不到回执**按"没投出去"算**。
+这条不对称是整个设计的承重处：`true` 会写 `firedAt`，而"没投出去却记成已投"
+= 用户的那条提醒永久消失；反过来（回执丢了、下一轮再试一次）只是晚一点。
+
+⚠️ **`openOpLog()` 里刻意不挂前台提醒循环。** 一条永远投不出去的循环比没有循环更糟 ——
+它把"这一端没接通知"读成"接了"。循环只在引擎模式（`open()`）里挂：
+macOS 的 `ScriptHost.startReminderLoop()`、Linux 的 `heyta_api_arm_reminders()`（M1 回退屏）、
+Electron 的 `NodeHost.startForegroundReminders()`（主进程持库，页面拿不到宿主）。
+Electron 因此是唯一走"主进程投递"的桌面端，另三壳走页侧 —— 差别来自**谁持有宿主**，
+不是风格。
+
+#### 三处判据补强（都是"原来那臂会空转"）
+
+`scripts/check-legal-permissions.mjs` 新增/改了三臂，每一臂都做了变异验证
+（造失→必须红→还原），基线绿：
+
+1. **合并产物 ⇄ 源清单**：条款说的是装上机的那份清单，而装配工会把第三方库的 manifest
+   合进来（RN 的 debug manifest 就往里塞 `SYSTEM_ALERT_WINDOW`）。只判源文件看不见这层。
+   产物在就判，不在就在读数里写"未判" —— 不许把"本机没构建过"读成绿。
+2. **iOS 通知臂改判代码面**：本地通知的申请是 `requestAuthorization(options:)` 那一次调用，
+   plist 里一个键都不必出现，所以只判 plist 的那一臂**永远不会因为真申请而红**。
+   现在两处都读，并加反向一臂：调用撤了而目的串还留着 ⇒ 红（清单里挂一句系统读不到的承诺）。
+3. **日历/提醒的 iOS 键名补齐**：iOS 18 起日历与提醒各有"限范围/全访问"两枚键，
+   登记表只写一枚的话，另一枚出现时红在"陌生词"分支上，指向错误的条款句子。
+   `RECEIVE_BOOT_COMPLETED` / `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 同时进非隐私集合
+   （normal 级、不读个人信息），`permissions.ts` 中英各加一行，版本 `1.2 → 1.3`。
+
+`apps/web/tests/shell-reminder-center.spec.ts` 另加一组**跨语言钉**：三壳注册的通道名、
+ack 全局名、分流必须在 op-log 转发**之前**，都按源码逐字比 —— 这类名字错了不会报错，
+只会静默退回"网页通知"，而那一档没有任何一层会说破。
+
+#### 实测到哪一步
+
+| 端 | 现量 |
+|---|---|
+| Linux 壳 | 在载体上 `-Werror` 全编译 + 链接两枚产物；`HEYTA_LINUX_SMOKE=OK 15/15`，其中新增两条提醒端口断言；通道读数 `NOTIFY_CHANNEL=granted`，投递 `NOTIFY_SHOW=ok id=3` —— 服务端是 **GNOME Shell 46**（`GetServerInformation` 现量），按 freedesktop 规范 id≠0 就是收下并归它渲染。证据：`apps/desktop-linux/evidence/reminder-port-2026-10-24/smoke.log` |
+| macOS 壳 | `swift build` 绿 + `heyta-smoke` 第十二节绿（端口跨 JSC 边界的读数：`unsupported` / `show()==false` / `containsDelivered("smoke\|1")==false`，无 `.app` 时的诚实降级） |
+| Electron | `pnpm --filter @heyta/node-host build` 后 `apps/desktop` **37/37** 通过，含"投不出去绝不回 true"与 IPC 白名单那两条 |
+| 移动端 | `apps/mobile` **1094/1094** 通过（含设置页三行、省电落点三句话、`permissions.ts` 与开关名同字） |
+| iOS 通知目的串 | 同一台模拟器、同一枚二进制、同一份 plist，**两种渲染形态都取到过**：一轮弹窗正文逐字＝本轮注入的暗号，另一轮是系统自带那句。装置自证三条（注入串 == 设备容器现读 == 截图正文）与逐轮对照见上面边界 3 和 `apps/mobile/evidence/ios-notification-purpose-20261024/README.md`；装置本身踩到的坑与否证掉的归因登记在 §7 #547、#548 |
+| 门禁 | `check:legal-permissions` / `legal-copy` / `legal-closure-truth` / `mobile-settings` / `crosslang-contract` / `ios-native-bridges` / `docs` / `i18n-vars` / `ui-language` / `native-bare` 全 rc=0；`apps/web` **2486/2499**（13 skip）、`packages/app-host` **2061/2061** |
+
+一条**如实登记的不绿**：`check:shell-surfaces` 红在桌面三端的**倒数日产物**那几格
+（包内 `index.html` 的 sha 与本工作树 `apps/web/dist` 不符 —— 那是别的会话/别的构建的包）。
+它与本轮无关，关闭判据是 `pnpm build:linux local` 等重打包，见 §5.9 那节。
+`pnpm typecheck` 另有 4 条错在 `apps/web/src/features/settings/AiSettings.tsx` 与
+`apps/web/tests/admin-console-route.spec.tsx` —— 两个文件在本工作树**未被修改**（`git status` 干净），
+是 AI 设置那条线的既有红，不在本轮里代改。
+
+#### 没关掉的边界（逐条写关闭判据，不写成缺陷也不写成完成）
+
+1. **macOS 真横幅**：装置已经能把页侧 → 壳 → `UNUserNotificationCenter` 整条跑通并把
+   系统那侧的 delivered 列表读回来，缺的是**一次人点"允许"** —— 探针 199 次轮询 600 秒，
+   `reminderStatus` 恒 `default`，那台机器上那个系统弹窗没人应答。
+   关闭判据：打包态 `.app` 里点一次允许，`REMINDER_PROBE` 的 `delivered=true` 且
+   `REMINDER_DELIVERED=in-list=yes`，并留一张截图（AGENTS §6.2 规定一）。
+2. **Windows C# / Android Kotlin 的编译证据**：本轮两处代码是按契约写的，
+   而打包机 `C:\src\heyta` 那枚检出停在别的提交、且有一大片未提交改动
+   （别的会话的在飞工作）—— 不在别人的树上做覆盖。
+   ⚠️ **"有人在飞"是瞬时读数**，接手前先现量，别照抄上面那句：
+   `ssh windows-pc "git -C C:/src/heyta rev-parse --short HEAD & git -C C:/src/heyta status --porcelain | find /c /v \"\""`
+   （2026-10-24 21:16 那一读是 `fc608b7` / 2298 行，且比同日 16:5x 那一读的 2247 在涨）。
+   🔴 还要注意：Windows 那一腿的同步目标路径**写死在 `C:\src\heyta`**
+   （`scripts/lib/sync-windows-sources.sh`），所以"隔离检出"隔离的是**本机这一侧**，
+   远端那一侧没有第二个落点 —— 要走这条路，得先拿到那台机器上那份工作的处置。
+   关闭判据：按"四端重装在隔离检出里跑"那条约定，在 windows-pc 上开一份只含本轮改动的
+   检出，跑 `dotnet build`（HeytaWindows）与 `:app:compileDebugKotlin`。
+3. **iOS 通知目的串是否被系统读取**（交付项 4）：**不是可靠的展示通道 —— 同一台模拟器、
+   同一枚二进制、同一份 plist，实测出现过两种形态**。装置
+   `apps/mobile/probe/ios-notification-purpose/` 把那枚键设成每轮新生成的暗号：
+   20:38 那一轮弹窗正文**逐字就是暗号**（`HEYTA-PURPOSE-1792845370-18531`，
+   与设备容器里现读的那份 plist 一致，读数 `PROBE_STATUS_BEFORE=0`）；
+   21:02 那一轮（注入 `…1792846917-26489`，同样三条一致）正文却是系统自带那句
+   「通知可能包括提醒、声音和图标标记…」。
+   两种形态之间**没找到能判别的读数** —— 先猜"冷重启后才回落"，被 21:02 那一轮否证
+   （那轮没重启、设备已温）。
+   证据与逐轮对照：`apps/mobile/evidence/ios-notification-purpose-20261024/README.md`；
+   装置踩到的坑与否证掉的归因登记在 §7 #547、#548。
+   ⇒ 三条落地：**① 键保留**（某些状态下它确实是正文，删掉只会让那一状态下的用户
+   什么说明都看不到）；**② 对外不许写"iOS 会显示 heyta 的目的说明"**，
+   `packages/legal` 里那一行的口径停在"由系统显示通知授权弹窗"，两种形态下都真；
+   **③ 要让用户一定看到理由，只能靠应用内那一行**（交付项 1 的降级状态行）。
+   关闭判据（把"什么时候读"这一格关掉需要）：真机 + 出厂未申请过通知的设备跑一次，
+   或 Apple 侧明文说明该键在通知授权弹窗里的角色 —— 模拟器上 usernoted/SpringBoard
+   的状态机不是产品运行环境。
+   ⚠️ 顺带量到的一条既有缺口（不在本轮修）：iOS 原生 `Info.plist` 的文案**全仓没有本地化**
+   （`find` 现量：0 个 `.lproj` / `InfoPlist.strings`），英文装机用户在**会被读的那一态**
+   看到的是中文目的串 —— 日历/提醒事项那几枚键同此，属同一件独立工作。
+4. **桌面横幅的那一帧截图**：Linux 侧抓不到（载体上没有可用的显示会话给 ssh，
+   截图工具也不在 PATH），macOS 侧被第 1 条挡住。日志读数已经能证"系统收下了"，
+   但"用户看得见"这一格仍然空着 —— 这一格必须由人或者由带显示环境的构建来关。
+5. **移动端"拒绝态"在当前包上的真机一帧**：本轮的降级行与再授权入口只有
+   `apps/mobile` 的渲染级断言（1094 条里那三行），**没有**当前构建在设备上的截图 ——
+   模拟器/真机上装着的是本轮之前的 RN 包，而 Android 出包按约定在 windows-pc、
+   iOS 包要过 `pnpm reinstall:all` 那条隔离检出流程。
+   关闭判据：当前产物装到任一移动设备后，在**关掉系统通知授权**的状态下截一张提醒面，
+   屏上要看得见"未授权、到点不会响"那一行与跳系统设置的入口（AGENTS §6.2 规定一）。
+
+### 2026-10-25：提醒面那一行补上了（交付项 1 的另一半）
+
+上一节写"移动端把拒绝说到明处"时，**只说了设置页那一半**。现量的另一半：
+
+```
+grep -rn blockedNotification .        # 命中只有词条表自己（零消费者）
+```
+
+`reminder.delivery.blockedNotification` / `.blockedExactAlarm` / `.openSettings` 三句
+是全仓唯一写"到点不会响"的界面文案，而**没有任何一处 `t()` 读它们**；
+`authorizeNativeReminders()` 也仍然回 `Promise<void>`。任务清单上那一格写着"已完成"。
+成因与逐条教训登记在 §7 #551（含一枚**恒绿的源码级判据**被变异穿过去的那次实测）。
+
+#### 定下来的形状
+
+```
+原生闸门读数 ──► lib/use-reminder-delivery.ts   （唯一持有者：什么时候重读只有一份）
+                     │  readings: 通知授权 / 通知总开关 / 精确闹钟 / 省电豁免
+                     ▼
+        lib/reminder-delivery-display.ts        （纯函数，可断言）
+           deliveryRows()      → 设置页那三行
+           reminderFaceNotice()→ 提醒面那一句（哪一句、能不能跳）
+           landingCopy()       → 那一跳落到哪儿该说什么
+                     ▼
+   共享 ReminderList 的 `deliveryBlocked` prop（packages/ui，web 与移动同一份实现）
+```
+
+三条刻意的形状，都会被下一个人顺手改回去，所以写清楚理由：
+
+1. **`deliveryBlocked` 是 `{ text, settings? }` 而不是三个平铺字段。** 这一行唯一危险的
+   失败形状是"话说一半"：只给文字，用户读完只知道"不会响"却没有回头路（通知授权被系统
+   拒掉后应用**自己再也问不出第二个弹窗**）；只给入口，没人知道为什么点它。文字做成必填，
+   漏一半就是类型错误。
+2. **`'default'`（系统还没问过）在提醒面一句都不说。** 那一刻系统弹窗正盖在界面上，
+   先写"到点不会响"是替用户做一个他还没做的决定。设置页那一节有它自己的第三句
+   （"还没问过你"），两处问的不是同一个问句。
+3. **答完弹窗要主动通知界面重读**（`authorizeNativeReminders` 回结果 + 一声 listener）。
+   iOS/Android 的授权弹窗**不把应用退到后台**，`AppState` 在用户答完那一刻根本不变；
+   少了这一声，那一行会一直挂着"还没问过"的旧读数，直到用户自己切出去再切回来。
+
+顺手补的一格真缺陷：Android 上"授权还在、通知总开关被关掉"
+（`areNotificationsEnabled()==false`）同样一条都不会响，而旧判据只看授权读数 ⇒ 那种情况下
+界面会保持沉默。现在两处任一被拒都说那一句。
+
+#### 判据
+
+* `apps/mobile/tests/reminder-delivery-settings.spec.ts` 新增一组 `reminderFaceNotice`
+  （哪一句 / 优先级 / `'default'` 与 `'unsupported'` 各自不说 / 没有待投递提醒时不报警 /
+  文案主语是整个提醒面 / 中英两表都在）与一组接线钉（共享组件画出那句与那一跳、
+  详情面板真的把判定结果接上、重读时机只有一份）。
+* `apps/mobile/tests/native-reminder-authorization.spec.ts` 新增一条：结果要交回调用方，
+  且读数变了才通知（读数没变不许反复吵）。
+* 六发变异逐条实测过红：拿掉那条订阅 / 让"零条待投递提醒"也报警 / `authorize` 又吞掉结果 /
+  硬回一个假读数 / 共享组件只说不给入口（**这一发第一次没红**，把判据从"标识符出现过"
+  改成钉守卫本身与位置关系后才红）/ 详情面板漏接 `deliveryBlocked`。
+* 现量命令（别抄数）：`pnpm --filter @heyta/mobile test`、`pnpm --filter @heyta/ui test`、
+  `pnpm --filter @heyta/web test`，以及 `pnpm check:mobile-settings`、
+  `check:i18n-vars`、`check:ui-language`、`check:native-bare`、`check:layering`、
+  `check:design`、`check:l4`、`check:theme`、`check:ui-provider`、`check:verify-script-copy`、
+  `check:shell-surfaces`、`check:docs`。
+
+#### 设备腿踩到的两枚夹具坑（都不是产品红）
+
+1. **上一轮取证探针留下的那道系统弹窗会挡住整条旅程**，而 `simctl uninstall` 撤不掉它 ——
+   只有重启设备才行。白烧一枚 Release 构建。细节与复量命令在 §7 #552。
+2. **`deny_notification_permission()` 原本只查一次 AX 树就判"没找到拒绝按钮"**：
+   模拟器刚重启过的那一轮里，弹窗由 usernoted 排队呈现，可以晚到几十秒（同一族延迟
+   在 §7 #266 量过）。现在改成有界轮询（默认上限 90 秒，`HEYTA_IOS_DENY_WAIT_SECONDS`），
+   并把"第几秒出现"打进读数 —— 判红时能立刻分清是夹具没等到、还是产品真没说那句话。
