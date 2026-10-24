@@ -244,6 +244,31 @@ describe('email password registration OTP', () => {
     });
   });
 
+  it('issues the session on the verification transaction, never on a second connection', async () => {
+    // 🔴 这条钉的是一个**只能在真库上看见**的缺陷（2026-10-24 线上取证见
+    //    `registration-otp.ts` 里 `issueSession` 上方那张表）：会话如果走全局
+    //    `prisma`，它会另抓一条池连接，而 `access_sessions.user_id` 的外键要对
+    //    `users` 那一行取 `FOR KEY SHARE` —— 本事务已经用 `FOR UPDATE` 握着那一行，
+    //    于是同一个请求的两条连接互相等，直到事务上限把整笔掐掉（耗时永远等于上限）。
+    //    单元测试里 `$transaction` 直接把 `db` 当 tx 交进来，"两条连接"在 mock 里
+    //    不存在，所以能钉的只有**它必须拿到 tx 这个事实**。
+    const result = await requestRegistrationCode({ email, password: 'a password' });
+    const sentCode = spies.sendCode.mock.calls[0][1] as string;
+    await verifyRegistrationCode({ challengeId: result.challengeId, code: sentCode });
+
+    expect(spies.issueSession).toHaveBeenCalledTimes(1);
+    const [, , txOptions] = spies.issueSession.mock.calls[0] as [
+      unknown,
+      unknown,
+      { tx?: unknown; jti?: string; expiresAt?: number } | undefined,
+    ];
+    expect(txOptions?.tx).toBe(db);
+    expect(txOptions?.jti).toMatch(/^[a-f0-9]{32}$/);
+    const remaining = (txOptions?.expiresAt ?? 0) - Date.now();
+    expect(remaining).toBeGreaterThan(0);
+    expect(remaining).toBeLessThanOrEqual(365 * 24 * 60 * 60 * 1000);
+  });
+
   it('claims once under concurrent verification and returns the existing session shape', async () => {
     const result = await requestRegistrationCode({ email, password: 'a password' });
     const sentCode = spies.sendCode.mock.calls[0][1] as string;

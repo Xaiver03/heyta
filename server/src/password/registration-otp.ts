@@ -18,7 +18,8 @@ import { getDefaultStorageQuotaBytes } from '../sync/services/storage-quota.serv
 import { attachInviteOnRegister, settleReferralActivation } from '../activity/invite';
 import { authCache } from '../auth-cache';
 import { getJwtSecret, issueSession } from '../auth';
-import type { SessionMeta } from '../account/access-sessions';
+import { newJti, type SessionMeta } from '../account/access-sessions';
+import { SESSION_MAX_AGE_MS } from '../central-auth/session-policy';
 import { consentedLegalSetVersion } from '../legal-consent';
 import { isConsentRequired, loadConfigFromEnv } from '../config';
 import { sendEmailPasswordRegistrationCodeEmail } from '../email';
@@ -388,14 +389,11 @@ export const verifyRegistrationCode = async (
       marks.push(`${name}=${now2 - markFrom}ms`);
       markFrom = now2;
     };
-    // 🔴 显式给时间上限（Prisma 交互式事务默认 5 秒）。
-    //
-    // 2026-10-24 线上实测：同一段事务在生产库上复刻只要 **168ms**（FOR UPDATE 7ms、
-    // 领取 4ms、激活 2ms、会话落库 4ms、JWT 签名 78ms），但并发时它要**等行锁**
-    // （`SELECT … FOR UPDATE`）或等连接池 —— 默认 5 秒一到，Prisma 就把整笔作废，
-    // 而调用方当年把所有非领域错误一律平成 400「验证码无效或已过期」，
-    // 于是**用户填对了码却被界面告知"邮箱或令牌不对"**（一次真实报障）。
-    // 等锁不是用户填错，给它 20 秒；真超时再由调用方回 503 让客户端重试。
+    // 🔴 显式给时间上限（Prisma 交互式事务默认 5 秒）—— 但它**不是**原先那类故障的
+    //    解法，只是兜底。真正的原因 2026-10-24 抓到了，见下面 `issueSession` 那段：
+    //    这笔事务**自己把自己锁死**，所以耗时永远等于上限 —— 上限是 5 秒时表现为
+    //    "填对了码却说码不对"，调到 20 秒只把同一件事换成了"等 20 秒后说服务端不可用"。
+    //    上限保留：等锁/等连接不是用户填错，真超时由调用方回 503 + Retry-After。
     const result = await prisma.$transaction(async (tx) => {
       // Requests lock the account row before touching its challenge. Verify in
       // the same order so a request replacing a challenge cannot deadlock with
@@ -468,12 +466,39 @@ export const verifyRegistrationCode = async (
       });
       mark('referral');
       if (user === null) throw invalidChallenge();
+      /**
+       * 🔴 **会话必须用 `tx` 落库，不许让它自己再抓一条池连接。**
+       *
+       * 2026-10-24 线上现场取证（`pg_locks` + `pg_stat_activity`，同一笔请求的两条连接）：
+       *
+       * | pid | 在干什么 | 在等什么 |
+       * |---|---|---|
+       * | A（本事务）| `SELECT … FOR UPDATE` 之后 **idle in transaction** | 等 JS 下一步 |
+       * | B（同一请求，另抓的连接）| `INSERT INTO access_sessions …` | 等 **A 的 transactionid** |
+       *
+       * 机制很平常：`access_sessions.user_id` 上有外键，插入一行要对 `users` 那一行取
+       * `FOR KEY SHARE`，而本事务在上面那句 `FOR UPDATE` 里握着强锁（实测：A 持锁期间，
+       * 另一个会话的 `SELECT … FOR KEY SHARE` 会一直等下去）。于是**一个请求的两条连接
+       * 互相等**，而 Postgres 认不出这是死锁（A 在等客户端、不是在等锁），只能等 Prisma
+       * 的事务上限把它掐掉 ⇒ 耗时永远等于上限、**成功率 0**。
+       *
+       * 附带后果也是真的：B 那条 `INSERT` 不在事务里，它**自己提交了** —— 那次失败注册
+       * 在线上留下了两行孤儿会话，而外层事务全部回滚。
+       *
+       * ⇒ 传 `{ tx, jti, expiresAt }`：`issueSession` 用本事务的客户端落库，既不抢第二条
+       * 连接，也不可能出现"事务回滚了、会话却留下了"。
+       */
+      const token = await issueSession(user, meta, {
+        tx,
+        jti: newJti(),
+        expiresAt: Date.now() + SESSION_MAX_AGE_MS,
+      });
+      mark('issue-session');
       return {
-        token: await issueSession(user, meta),
+        token,
         user: { id: user.id, email: user.email, locale: user.locale },
       };
     }, { timeout: REGISTRATION_TX_TIMEOUT_MS, maxWait: REGISTRATION_TX_MAX_WAIT_MS });
-    mark('issue-session');
     const verifyTotal = Date.now() - verifyStarted;
     if (verifyTotal > 500) {
       Logger.warn(`Registration verify slow: total=${verifyTotal}ms ${marks.join(' ')} (userId=${activatedUserId})`);

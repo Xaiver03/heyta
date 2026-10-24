@@ -11211,3 +11211,33 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     （本批实测 `task-sort.spec.tsx` 那一趟 8109ms 红一枚，单独跑 1231ms 全过）⇒
     交付读数的"整趟绿"要**单独一趟**跑出来，别拿首趟凑。
 
+544. **事务里再抓一条池连接 = 一个请求自己把自己锁死，而 Postgres 永远不会报死锁**（2026-10-24，注册验证码「填对了码却失败」的真因）
+    症状两次换皮：先是**等 5 秒后说「验证码无效或已过期」**（400），把事务上限调到 20 秒后变成
+    **等 20 秒后说「服务端暂时不可用」**（503）。两次都有人去查慢 SQL / 行锁 / 连接池 —— 全查错了，
+    因为单条 SQL 都很快（同一段事务复刻 168ms）。
+    现场取证（生产 `pg_locks` + `pg_stat_activity`，同一个 HTTP 请求的两条连接）：
+
+    | pid | 在干什么 | 在等什么 |
+    |---|---|---|
+    | A（`prisma.$transaction` 那条）| 句 `SELECT … FOR UPDATE` 之后 **idle in transaction** | 等 JS 下一步 |
+    | B（同一请求，`prisma` 另抓的连接）| `INSERT INTO access_sessions …` | 等 **A 的 transactionid** |
+
+    B 卡住的原因很平常：`access_sessions.user_id` 有外键，插入一行要对 `users` 那一行取
+    `FOR KEY SHARE`，而 A 握着 `FOR UPDATE`（实测：A 持锁期间，另一个会话的
+    `SELECT … FOR KEY SHARE` 一直等下去）。于是**一个请求的两条连接互相等**，
+    而 A 在等客户端、不在等锁 ⇒ Postgres 的 deadlock detector 看不见它，只能等 Prisma 的
+    事务上限把整笔掐掉 ⇒ **耗时恒等于上限，成功率 0**，调大上限只是把失败拖长。
+    附带后果：B 那条 `INSERT` 不在事务里，**它自己提交** —— 失败注册会留下孤儿 `access_sessions` 行。
+    可复用规则三条：
+    ① **`$transaction` 回调里只许用 `tx`**；任何"内部还会自己连库"的 helper（本仓的
+       `issueSession` / `recordSession` 是最容易踩的两个）必须把 `tx` 传进去 ——
+       `issueSession(user, meta)` 与 `issueSession(user, meta, { tx, jti, expiresAt })` 是两条不同的路。
+    ② **"耗时恰好等于事务上限"就是自锁的指纹**，不是"数据库慢"：真慢的 SQL 会有方差，
+       自锁没有。别再靠调大上限解决。
+    ③ 单元测试抓不到它（mock 的 `$transaction` 把同一个对象当 tx，根本不存在第二条连接）；
+       能钉住的只有"helper 拿到了 `tx`"这个事实，加真库集成用例才看得到锁。
+    臂：`server/tests/registration-otp.spec.ts` 的
+    `issues the session on the verification transaction, never on a second connection`
+    （对着 `git show HEAD:server/src/password/registration-otp.ts` 跑必红）。
+    同类但**今天还没有自锁**的一处也一并改了：`password/login-otp.ts` 的 `verifyLoginCode`
+    （它的事务只读 `users`、不握强锁；但"一条请求两条连接"在并发下会把连接池抽干）。
