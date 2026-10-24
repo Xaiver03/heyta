@@ -440,6 +440,10 @@ describe('收银台 —— ②′ 这台实例到底交付不交付得了这一�
 
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe('PRICE_NOT_SELLABLE');
+    // 🔴 原因码是**机器码**，界面据此说自己的那句话（换一档就能买）。
+    //    它曾经是一句中文散文 —— 客户端只能原样印（英文界面漏中文）或者干脆不读
+    //    （= 两件不同的事被说成同一句"这一档现在还不能卖"）。
+    expect(res.json().reason).toBe('MANAGED_AI_NOT_CONFIGURED');
     const rows = await sql.query<{ n: unknown }>('SELECT count(*)::int AS n FROM checkout_orders');
     expect(Number(rows[0]?.n)).toBe(0);
   });
@@ -499,6 +503,8 @@ describe('收银台 —— ④′ 收了钱不许把已经付费的能力判小'
 
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe('PRICE_TIER_LOSES_GRANTS');
+    // 与 ②′ 同一条纪律：原因码是机器码，且**两个 409 的码不同** —— 界面才能分别说话。
+    expect(res.json().reason).toBe('TIER_LOSES_GRANTS');
     expect(res.json().lostGrants).toEqual(['ai', 'automation']);
     // 🔴 "拒在冻结之前"的证据是**库里没有这一单**，不是响应码。
     expect(await orderCount()).toBe(0);

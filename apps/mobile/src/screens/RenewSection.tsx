@@ -24,20 +24,22 @@
  * 要求那个文件里连注释都不许出现 web 前缀的词条调用 —— 本文件用的全是 `mobile.` 词条，
  * 但挂载点仍留在独立组件里，避免下一次再复用同一句话时踩到那两条。
  */
-import React, { useState } from 'react';
-import { Clipboard, Linking } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Clipboard, Linking, Pressable, StyleSheet, View } from 'react-native';
 import {
   CHECKOUT_TIER_PRICE_IDS,
   CHECKOUT_TIERS,
   DEFAULT_CHECKOUT_TIER_ID,
   startCheckout,
   type CheckoutFailureCode,
+  type CheckoutFailureReason,
   type CheckoutOutcome,
   type CheckoutTierId,
 } from '@heyta/app-host';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
-import { Button, Card, Text } from '../ui/kit';
+import { Button, Card, Stack, Text } from '../ui/kit';
+import { useTokens, useText } from '../theme';
 import { readSyncConfig } from '../sync/config';
 import { privacyConsent } from '../privacy/consent-gate';
 
@@ -56,18 +58,91 @@ const FAILURE_KEYS: Partial<Record<CheckoutFailureCode, MessageKey>> = {
 };
 
 /**
+ * 拒单原因码 → 词条（与 Web 侧同一张语义表，见 `checkout.ts` 的 `CheckoutFailureReason`）。
+ *
+ * 🔴 `PRICE_NOT_SELLABLE` 一句话盖着两件事：这一档要交付的能力本机没有（换一档就能买），
+ * 与这一档全局还没开卖。前者值得单独说 —— 用户有一条真的能走的路。
+ * ⚠️ 移动端这一屏**只换文案、不换档**：档位选择器与"改买官方托管"那颗按钮还没做，
+ * 这半条出路是 Web 先有的。不假装两端一样。
+ */
+const FAILURE_REASON_KEYS: Partial<Record<CheckoutFailureReason, MessageKey>> = {
+  MANAGED_AI_NOT_CONFIGURED: 'mobile.entitlement.renew.fail.managedAi',
+};
+
+/**
  * 档位 → 词条。**不写金额**，也**不另抄一份档位说明**：
  * 名字与"这一档给什么"复用落地页那两条已被 `check-pricing-consistency` 钉住的词条。
  * `landing.pricing.hostedAi.body` 自带那句"这一步会把内容发到我们的服务器，
  * 它不受端到端加密保护" —— 说在按下下单按钮之前，正是 ADR-0054 §7 要的位置。
  */
-const TIER_KEYS: Record<CheckoutTierId, { readonly name: MessageKey; readonly detail: MessageKey }> = {
-  hosted: { name: 'landing.pricing.hosted.name', detail: 'landing.pricing.hosted.body' },
-  hostedAi: { name: 'landing.pricing.hostedAi.name', detail: 'landing.pricing.hostedAi.body' },
+const TIER_KEYS: Record<
+  CheckoutTierId,
+  {
+    readonly name: MessageKey;
+    readonly detail: MessageKey;
+    /** 标价：与价格页**同一个词条**（`check:pricing` 钉着数值一致），不另写金额。 */
+    readonly price: MessageKey;
+    readonly features: readonly MessageKey[];
+  }
+> = {
+  hosted: {
+    name: 'landing.pricing.hosted.name',
+    detail: 'landing.pricing.hosted.body',
+    price: 'landing.pricing.hosted.priceCny',
+    features: [
+      'landing.pricing.hosted.feature1',
+      'landing.pricing.hosted.feature2',
+      'landing.pricing.hosted.feature3',
+    ],
+  },
+  hostedAi: {
+    name: 'landing.pricing.hostedAi.name',
+    detail: 'landing.pricing.hostedAi.body',
+    price: 'landing.pricing.hostedAi.priceCny',
+    features: [
+      'landing.pricing.hostedAi.feature1',
+      'landing.pricing.hostedAi.feature2',
+      'landing.pricing.hostedAi.feature3',
+    ],
+  },
 };
 
-export function RenewSection(): React.JSX.Element | null {
+export function RenewSection({
+  /**
+   * 这个账号现在是不是**已经**订阅着（由订阅页从权益投影里读出来）。
+   * 只影响主按钮那一个词（「订阅」/「续费」）—— 不影响任何请求：
+   * 能不能买、买哪一档、收多少钱，全由服务端判（`checkout.routes.ts` 的 ①②′④）。
+   */
+  entitled = false,
+}: {
+  entitled?: boolean;
+} = {}): React.JSX.Element | null {
   const { t } = useI18n();
+  const tokens = useTokens();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        plan: {
+          gap: tokens['space.2'],
+          padding: tokens['space.3'],
+          borderRadius: tokens['radius.md'],
+          borderWidth: tokens['border-width.thin'],
+          borderColor: tokens['color.border'],
+          backgroundColor: tokens['color.surface'],
+        },
+        planSelected: {
+          borderColor: tokens['color.primary'],
+          backgroundColor: tokens['color.primary-subtle'],
+        },
+        planHead: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: tokens['space.2'],
+        },
+      }),
+    [tokens],
+  );
   const [pending, setPending] = useState(false);
   const [tierId, setTierId] = useState<CheckoutTierId>(DEFAULT_CHECKOUT_TIER_ID);
   const [outcome, setOutcome] = useState<CheckoutOutcome | null>(null);
@@ -105,33 +180,62 @@ export function RenewSection(): React.JSX.Element | null {
   return (
     <Card>
       <Text variant="row-title">{t('mobile.entitlement.renew.tierTitle')}</Text>
-      {CHECKOUT_TIERS.map((id) => (
-        <Button
-          key={id}
-          label={t(TIER_KEYS[id].name)}
-          accessibilityLabel={t(TIER_KEYS[id].name)}
-          testID={`renew-tier-${id}`}
-          tone={tierId === id ? 'primary' : 'ghost'}
-          onPress={() => {
-            setTierId(id);
-            // 换档之后上一张单不能继续挂着：那张卡写的是**旧档**冻的金额。
-            setOutcome(null);
-          }}
-        />
-      ))}
       <Text variant="row-meta" tone="subtle">
-        {t(TIER_KEYS[tierId].detail)}
+        {t('mobile.subscription.plans.hint')}
       </Text>
+      {/*
+        🔴 两档是**两张可选的卡**（名字 + 标价 + 给什么 + 三条要点），不是两颗无标签按钮：
+        原来的形状只看得到档名，看不到价、也看不到买的是什么，与 Web 的订阅页也不一致。
+        可访问性上仍是单选语义（`accessibilityRole="radio"` + `selected`）。
+      */}
+      {CHECKOUT_TIERS.map((id) => {
+        const selected = tierId === id;
+        return (
+          <Pressable
+            key={id}
+            testID={`renew-tier-${id}`}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+            accessibilityLabel={`${t(TIER_KEYS[id].name)} ${t(TIER_KEYS[id].price)}`}
+            onPress={() => {
+              setTierId(id);
+              // 换档之后上一张单不能继续挂着：那张卡写的是**旧档**冻的金额。
+              setOutcome(null);
+            }}
+            style={[styles.plan, selected ? styles.planSelected : null]}
+          >
+            <View style={styles.planHead}>
+              <Text variant="row-title">{t(TIER_KEYS[id].name)}</Text>
+              <Text variant="row-meta">{t(TIER_KEYS[id].price)}</Text>
+            </View>
+            <Text variant="row-meta" tone="subtle">
+              {t(TIER_KEYS[id].detail)}
+            </Text>
+            {TIER_KEYS[id].features.map((feature) => (
+              <Text key={feature} variant="row-meta" tone="subtle">
+                {`• ${t(feature)}`}
+              </Text>
+            ))}
+          </Pressable>
+        );
+      })}
       <Button
-        label={t('mobile.entitlement.renew.action')}
-        accessibilityLabel={t('mobile.entitlement.renew.action')}
+        label={entitled ? t('mobile.entitlement.renew.action') : t('mobile.subscription.renew.subscribe')}
+        accessibilityLabel={
+          entitled ? t('mobile.entitlement.renew.action') : t('mobile.subscription.renew.subscribe')
+        }
         onPress={() => void onRenew()}
         loading={pending}
         tone="secondary"
       />
       {outcome?.kind === 'failed' ? (
         <Text variant="row-meta" tone="danger">
-          {t(FAILURE_KEYS[outcome.code] ?? 'mobile.entitlement.renew.fail.unknown', { code: outcome.code })}
+          {t(
+            (outcome.reason === undefined ? undefined : FAILURE_REASON_KEYS[outcome.reason])
+              ?? FAILURE_KEYS[outcome.code]
+              ?? 'mobile.entitlement.renew.fail.unknown',
+            { code: outcome.code },
+          )}
         </Text>
       ) : null}
       {payTarget !== null ? (

@@ -76,17 +76,39 @@ const DEFAULT_CURRENCY = 'CNY';
 const DEFAULT_REGION = 'CN';
 
 /**
- * ②′ 拒单时给**运营者**看的那句理由。
+ * 拒单时响应体里的 `reason`：**稳定机器码**，界面据此说自己的那句话。
  *
- * 客户端渲染的是 `PRICE_NOT_SELLABLE` 对应的那条词条（"这一档现在买不了"），
- * 不是这一句 —— 它不进界面，只进响应体与日志，回答的是"我该去配哪一枚旋钮"。
+ * 🔴 这里曾经是**一句中文散文**（"这台实例没有配置托管 AI 的上游…"）—— 它同时被当成
+ * 给运营者的说明和给客户端的分支依据用。后果两头都坏：
+ *
+ * · 客户端**没法**按它分支（散文是会改的，而且只有中文），于是真实发生的两件完全不同的事
+ *   （"这一档要交付的能力本机没有" vs "这一单会把已付费的能力判小"）被界面说成同一句
+ *   「这一档现在还不能卖」——产品负责人 2026-10-24 实拍问的第一句就是"为什么"；
+ * · 想把它印到界面上就会在英文界面漏中文（`CouponRejectionExplanation` 那一课）。
+ *
+ * 所以：**散文归日志，机器码归线协议**。界面只按码取自己的词条（`web.*` / `mobile.*`）。
  */
-const MANAGED_AI_NOT_DELIVERABLE_REASON =
+export const CHECKOUT_REJECTION_REASON = {
+  /** ②′：这一档授予 `ai`，而本实例没配托管 AI 上游（`MANAGED_AI_ENABLED` + 三项）。 */
+  managedAiNotConfigured: 'MANAGED_AI_NOT_CONFIGURED',
+  /** ④′：这一单会让该账号已付费那一行的能力变少（一次性支付整行替换）。 */
+  tierLosesGrants: 'TIER_LOSES_GRANTS',
+} as const;
+
+export type CheckoutRejectionReason =
+  (typeof CHECKOUT_REJECTION_REASON)[keyof typeof CHECKOUT_REJECTION_REASON];
+
+/**
+ * ②′ 给**运营者**看的那句解释。只进日志（`Logger.warn` 的 `detail`），**不进响应体**。
+ *
+ * 它回答的是"我该去配哪一枚旋钮"，而用户看到的永远是"这一档现在买不了 + 该换哪一档"。
+ */
+const MANAGED_AI_NOT_DELIVERABLE_DETAIL =
   '这台实例没有配置托管 AI 的上游（`MANAGED_AI_ENABLED` 与三项 `MANAGED_AI_UPSTREAM_*`），'
   + '而这一档买的就是它：现在卖出去，用户拿到的是每次请求一个 503。';
 
-/** ④′ 的理由，同上：给运营者看的，不进界面。 */
-const TIER_LOSSES_GRANTS_REASON =
+/** ④′ 的解释，同上：只进日志。 */
+const TIER_LOSSES_GRANTS_DETAIL =
   '这一档的能力集合不包含该账号当前已付费那一行的全部能力，而一次性支付是**整行替换** '
   + '`priceId` / `grants`（`apply-event.ts` 的 `applyOneTimeGrant`）：'
   + '收这一单会让用户付了钱却**少**拿到原来有的能力。';
@@ -256,12 +278,14 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
         Logger.warn('收银台：这一档授予云端 AI，但本实例未配置托管上游，已拒单', {
           priceId: body.priceId,
           userId,
+          reason: CHECKOUT_REJECTION_REASON.managedAiNotConfigured,
+          detail: MANAGED_AI_NOT_DELIVERABLE_DETAIL,
         });
         return reply.code(409).send({
           code: 'PRICE_NOT_SELLABLE',
           message: 'PRICE_NOT_SELLABLE',
           priceId: body.priceId,
-          reason: MANAGED_AI_NOT_DELIVERABLE_REASON,
+          reason: CHECKOUT_REJECTION_REASON.managedAiNotConfigured,
         });
       }
       // ── ③ 币种与区域只能来自词表 ──────────────────────────────────────
@@ -320,13 +344,15 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
           provider: adapter.provider,
           priceId: body.priceId,
           lostGrants,
+          reason: CHECKOUT_REJECTION_REASON.tierLosesGrants,
+          detail: TIER_LOSSES_GRANTS_DETAIL,
         });
         return reply.code(409).send({
           code: 'PRICE_TIER_LOSES_GRANTS',
           message: 'PRICE_TIER_LOSES_GRANTS',
           priceId: body.priceId,
           lostGrants,
-          reason: TIER_LOSSES_GRANTS_REASON,
+          reason: CHECKOUT_REJECTION_REASON.tierLosesGrants,
         });
       }
 

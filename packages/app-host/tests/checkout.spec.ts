@@ -272,3 +272,57 @@ describe('startCheckout', () => {
     });
   });
 });
+
+/**
+ * 拒单**原因码**的透传（2026-10-24）
+ *
+ * 由来：产品负责人实拍「托管同步续费」按下 ¥12 拿到「这一档现在还不能卖」，
+ * 而服务端其实给了 `reason: MANAGED_AI_NOT_CONFIGURED` —— 客户端把它丢了。
+ * 丢掉之后界面只剩一个含糊的错误码，用户既不知道为什么，也不知道**换一档就能买**。
+ */
+describe('拒单原因码（reason）', () => {
+  it('服务端给了词表内的原因码 ⇒ 原样带出来，界面才能按它分支', async () => {
+    const { impl } = recordingFetch(() => ({
+      status: 409,
+      body: {
+        code: 'PRICE_NOT_SELLABLE',
+        message: 'PRICE_NOT_SELLABLE',
+        reason: 'MANAGED_AI_NOT_CONFIGURED',
+      },
+    }));
+    expect(await startCheckout(base({ fetchImpl: impl }))).toEqual({
+      kind: 'failed',
+      code: 'PRICE_NOT_SELLABLE',
+      status: 409,
+      reason: 'MANAGED_AI_NOT_CONFIGURED',
+    });
+  });
+
+  it('🔴 词表外的原因码一律丢弃 —— 不把陌生串当语义用', async () => {
+    // 失败的形状有两种，都要盖住：
+    //   ① 服务端以后加的新码（本版不认识）；
+    //   ② 那枚字段上曾经放过**一句中文散文**（旧形状）。
+    // 两种都不许原样进对象：界面拿它取词条会取到 `undefined`，再退回 `code` 那句 ——
+    // 而"把陌生串拼进译文"正是本仓反复记过的假话形状。
+    for (const reason of ['SOME_FUTURE_CODE', '这台实例没有配置托管 AI 的上游']) {
+      const { impl } = recordingFetch(() => ({
+        status: 409,
+        body: { code: 'PRICE_NOT_SELLABLE', message: 'PRICE_NOT_SELLABLE', reason },
+      }));
+      expect(await startCheckout(base({ fetchImpl: impl }))).toEqual({
+        kind: 'failed',
+        code: 'PRICE_NOT_SELLABLE',
+        status: 409,
+      });
+    }
+  });
+
+  it('没有 reason 时对象里不出现这个键（既有判据用 toEqual 逐字段比较）', async () => {
+    const { impl } = recordingFetch(() => ({
+      status: 409,
+      body: { code: 'PRICE_NOT_SELLABLE', message: 'PRICE_NOT_SELLABLE' },
+    }));
+    const outcome = await startCheckout(base({ fetchImpl: impl }));
+    expect(outcome.kind === 'failed' && 'reason' in outcome).toBe(false);
+  });
+});

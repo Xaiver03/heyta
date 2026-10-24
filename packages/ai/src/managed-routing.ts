@@ -42,14 +42,20 @@ export const MANAGED_ENDPOINT_ID = 'heyta-managed';
 /**
  * 托管端点**能诚实声明**的能力。
  *
- * 🔴 **不含 `tool_calling`，这是有意的、也是准确的**：服务端
- * （`managed-proxy.routes.ts`）**不转发 `tools`** —— 发出去的上游请求体只有
- * `{ model, messages, stream? }`。所以托管档声明 `tool_calling` 就是一句假话。
+ * 🔴 **不含 `tool_calling`**，而且这是**有意的**。注意这条注释在 2026-10-24 更正过
+ * 一次：原文写的理由是"服务端不转发 `tools`"，那句**已经不成立了** ——
+ * `managed-proxy.routes.ts` 现在把 `tools` / `tool_choice` 照原样转发
+ * （`grep -n "tools" server/src/ai/managed-proxy.routes.ts` 有 5 处，含 schema 与透传点）。
  *
- * 后果是 `'tool-calling'` 这个功能在托管档上会在**解析候选**时以
+ * 所以现在的理由是**另一条**：这一格**还没有做过端到端的验证**（托管上游真的接受
+ * 我们转发的这套工具目录、并把 `tool_calls` 回给我们、客户端能把它接回助手循环）。
+ * 没验过就声明，等于把一个没跑过的链路写成能力 —— 与"服务端不转发"那种**事实错误**
+ * 不同，这次是**不敢声明**。
+ *
+ * 后果仍然是 `'tool-calling'` 这个功能在托管档上于**解析候选**时以
  * `capability-missing` 被排除（⇒ 用户看到 `no-route`），而**不是**发出去之后
- * 静默降级成一段纯文本回答。要真的支持助手，得先在服务端补 `tools` 透传 ——
- * 发现与要拍的板登记在 `docs/plans/launch-blockers.md` §3.2。
+ * 静默降级成一段纯文本回答。要真的支持助手，得先补一条端到端判据，
+ * 再把 `'tool_calling'` 加回本表 —— 登记在 `docs/plans/launch-blockers.md` §3.2。
  */
 const MANAGED_CAPABILITIES: readonly AiCapability[] = ['structured_output', 'long_context'];
 

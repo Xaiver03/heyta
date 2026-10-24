@@ -91,11 +91,37 @@ export type CheckoutFailureCode =
   | 'NETWORK_ERROR'
   | 'UNEXPECTED_RESPONSE';
 
+/**
+ * 收银台拒单的**稳定原因码**（线协议上的 `reason`，词表与
+ * `server/src/billing/checkout.routes.ts` 的 `CHECKOUT_REJECTION_REASON` 同源）。
+ *
+ * 🔴 为什么错误码之外还需要它：`PRICE_NOT_SELLABLE` 下面挂着**两件完全不同**的事 ——
+ * "这一档要交付的能力本机没有"（换一档就能买）与"这一单会把已付费的能力判小"
+ * （该做的就是别买）。同一个码说两句话，用户只能读到一个含糊的"这一档现在买不了"，
+ * 而这正是 2026-10-24 产品负责人实拍问的那句"为什么"。
+ *
+ * ⚠️ 服务端曾经把一句**中文散文**放在这个字段上。这里只认**词表内**的机器码：
+ * 读到别的值一律当没有（`undefined`）—— 把陌生串当语义用，就是替服务端编造意思。
+ */
+export type CheckoutFailureReason = 'MANAGED_AI_NOT_CONFIGURED' | 'TIER_LOSES_GRANTS';
+
+const FAILURE_REASONS: readonly CheckoutFailureReason[] = [
+  'MANAGED_AI_NOT_CONFIGURED',
+  'TIER_LOSES_GRANTS',
+];
+
 export interface CheckoutFailure {
   readonly kind: 'failed';
   readonly code: CheckoutFailureCode;
   /** HTTP 状态（网络层失败时为 `null`）。运维排查用，不面向用户。 */
   readonly status: number | null;
+  /**
+   * 服务端报回来的**原因码**（词表外的一律丢弃，所以这里不会出现陌生值）。
+   *
+   * 只在与 `code` 一起读得通时使用：界面按 `(code, reason)` 取词条，
+   * 不按 `reason` 猜 `code`。
+   */
+  readonly reason?: CheckoutFailureReason;
 }
 
 /** 服务端报回来的"这一张券为什么不能用"（字段名与 `quote.ts` 的 `RejectedCoupon` 同源）。 */
@@ -169,6 +195,8 @@ interface CheckoutResponseBody {
   readonly error?: unknown;
   /** 2026-10-10 全局错误信封的稳定机器码（`api-error-contract` 那批的另一半）。 */
   readonly code?: unknown;
+  /** 拒单原因码（见 `CheckoutFailureReason`）。词表外的一律不认。 */
+  readonly reason?: unknown;
   readonly outTradeNo?: unknown;
   readonly qrCode?: unknown;
   readonly redirectUrl?: unknown;
@@ -244,7 +272,14 @@ export async function startCheckout(options: StartCheckoutOptions): Promise<Chec
       reported !== undefined && (ERROR_CODES as readonly string[]).includes(reported)
         ? (reported as CheckoutFailureCode)
         : (FAILURE_BY_STATUS[response.status] ?? 'UNEXPECTED_RESPONSE');
-    return { kind: 'failed', code, status: response.status };
+    const reportedReason = typeof payload?.reason === 'string' ? payload.reason : undefined;
+    const reason =
+      reportedReason !== undefined && (FAILURE_REASONS as readonly string[]).includes(reportedReason)
+        ? (reportedReason as CheckoutFailureReason)
+        : undefined;
+    // ⚠️ `reason` 只在读到时才写进对象：既有判据用 `toEqual` 逐字段比较失败结果，
+    //    多一个恒为 `undefined` 的键会让它们因为"形状变了"而红，而那不是缺陷。
+    return { kind: 'failed', code, status: response.status, ...(reason === undefined ? {} : { reason }) };
   }
 
   const outTradeNo = typeof payload?.outTradeNo === 'string' ? payload.outTradeNo : '';

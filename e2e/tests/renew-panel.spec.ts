@@ -170,7 +170,8 @@ async function openSettings(page: Page, consent: 'accepted' | 'local-only' = 'ac
   await page.reload();
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
   await openSettingsView(page);
-  await selectSettingsSection(page, 'account');
+  // 「订阅」2026-10-24 起是**独立一节**（原先挂在「账号与安全」下面）。
+  await selectSettingsSection(page, 'subscription');
   await expect(page.getByTestId('renew-panel')).toBeVisible();
 }
 
@@ -395,5 +396,70 @@ test('服务端按 ①′ 拒卖（这台实例没配托管上游）：屏上是
   await page.screenshot({ path: 'test-results/renew-panel-not-sellable.png' });
 
   // 🔴 §6.2 规定一第 3 条：这一屏不许有任何"未登记的报错"（本用例自己造的那发非 2xx 已逐条登记）。
+  assertNoProblems(problems, ['/api/billing/checkout']);
+});
+
+/**
+ * 🔴 2026-10-24 补：**同一条 409、两种成因**在屏幕上的区别。
+ *
+ * 由来是产品负责人实拍那一屏，问的是"现在不应该接了中央支付吗？" —— 收款确实已经
+ * 走支付中心了，挡住那一单的是闸门 ②′（这一档要交付云端 AI，而这台实例没配上游）。
+ * 服务端为这件事给了 `reason: MANAGED_AI_NOT_CONFIGURED`；客户端此前把它**丢掉**，
+ * 于是两件完全不同的事被说成同一句「这一档现在还不能卖」。
+ *
+ * 这条钉两半：
+ *   · 有原因码 ⇒ 说得更具体，并且**给一条真的能走的路**（一键换成不含云端 AI 的那一档）；
+ *   · 换过去之后真的重发 ¥5 —— 不是只把文案改了。
+ */
+test('闸门 ②′ 带原因码：屏上说清"缺云端 AI"，并能一键换成能买的那一档', async ({ page }) => {
+  test.info().annotations.push({ type: '截图', description: 'test-results/renew-panel-managed-ai.png' });
+  const problems = captureProblems(page);
+  await openSettings(page);
+
+  const bodies: string[] = [];
+  await page.route(`${SERVER}/api/billing/checkout**`, async (route) => {
+    const body = String(route.request().postData());
+    bodies.push(body);
+    if (body.includes('hosted-ai-monthly')) {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 'PRICE_NOT_SELLABLE',
+          message: 'PRICE_NOT_SELLABLE',
+          reason: 'MANAGED_AI_NOT_CONFIGURED',
+        }),
+      });
+      return;
+    }
+    // 换成 ¥5 之后：一封正常报价（与 `下单成功` 那条同形状，金额从服务端来）。
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ORDER_BODY),
+    });
+  });
+
+  await page.getByTestId('renew-tier-hostedAi').click();
+  await page.getByTestId('renew-place-order').click();
+
+  const failure = page.getByTestId('renew-failure');
+  await expect(failure).toBeVisible();
+  await expect(failure).toContainText('这一档要交付我们的云端 AI');
+  // 🔴 反向：不许退回那句含糊的"这一档现在还不能卖" —— 它把两件事说成一件。
+  await expect(failure).not.toContainText('这一档现在还不能卖');
+  await expect(failure).not.toContainText('PRICE_NOT_SELLABLE');
+
+  await page.screenshot({ path: 'test-results/renew-panel-managed-ai.png' });
+
+  // 一键换档：真的换成 ¥5，并且真的能下单（不是只把文案改了）。
+  await page.getByTestId('renew-switch-tier').click();
+  await expect(page.getByTestId('renew-tier-hosted')).toBeChecked();
+  await page.getByTestId('renew-place-order').click();
+  await expect(page.getByTestId('renew-order')).toBeVisible();
+  expect(bodies.at(-1), `最后一次出站是：${bodies.at(-1) ?? '（没有）'}`).toContain('hosted-monthly');
+  expect(bodies.at(-1)).not.toContain('hosted-ai-monthly');
+
+  // §6.2 规定一第 3 条：本用例自己造了一发 409，已逐条登记。
   assertNoProblems(problems, ['/api/billing/checkout']);
 });

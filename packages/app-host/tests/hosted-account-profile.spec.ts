@@ -27,10 +27,12 @@ import {
   fetchAccountAvatar,
   getAccountProfile,
   resolveAccountAvatarImage,
+  resolveAvatarKey,
   updateAccountDisplayName,
   uploadAccountAvatar,
   type HostedAuthOptions,
 } from '../src/hosted-auth.js';
+import { createVaultPayloadCipher } from '@heyta/sync-client';
 
 interface RecordedCall {
   readonly url: string;
@@ -342,6 +344,86 @@ describe('头像读侧的六种状态（界面按它出句子）', () => {
       state: 'needs-password',
     });
     expect(f.calls, '没有口令还出站').toEqual([]);
+    vi.unstubAllGlobals();
+  });
+});
+
+/**
+ * 🔴 登录态账号（vault 模式）的头像钥匙（2026-10-24）
+ *
+ * 这一组的由来是一次**实拍缺陷**：ADR-0050 的 vault 落地之后，登录态账号的同步
+ * 走 vault 根钥匙，而 `sync` store 在 vault 模式下把 `getPassword` 固定返回
+ * `undefined` —— 头像却仍然只认口令。于是**每一个登录用户**打开「个人资料」
+ * 都看到「本机没有保存这个口令，请先在同步设置里填写一次」，而设置里那个
+ * 口令输入框在 vault 模式下根本不渲染（`SyncSettingsPanel` 的 `!vaultMode`）。
+ *
+ * 这一组钉两件事：
+ *   1. `resolveAvatarKey` 的取舍（vault 优先、口令兜底、都没有 ⇒ 没有钥匙）；
+ *   2. vault 信封**真的能往返**，而两种钥匙之间不会互相"看起来能解"。
+ *
+ * 用真 cipher（`createVaultPayloadCipher`），不 mock —— 理由与文件头同一条：
+ * mock 会凭空造 API，桩里写什么就永远对。
+ */
+describe('头像的 vault 钥匙（登录态账号）', () => {
+  const IMAGE = { contentType: 'image/png' as const, dataBase64: 'iVBORw0KGgoAAAANSUhEUg==' };
+  const rootKey = new Uint8Array(32).fill(7);
+  const cipher = createVaultPayloadCipher({ current: { keyVersion: 1, rootKey } });
+
+  it('resolveAvatarKey：vault 优先、口令兜底、都没有就是没有钥匙', () => {
+    expect(resolveAvatarKey({ vaultCipher: cipher, password: PASSWORD })).toEqual({ cipher });
+    expect(resolveAvatarKey({ password: PASSWORD })).toBe(PASSWORD);
+    expect(resolveAvatarKey({ password: '   ' })).toBeUndefined();
+    expect(resolveAvatarKey({})).toBeUndefined();
+  });
+
+  it('vault 往返：写进去的能被同一把 cipher 解开，而原图不在出站字节里', async () => {
+    const blob = await encodeAvatarCipher({ cipher }, IMAGE);
+    // vault 信封：魔数在第一段 —— 与口令密文长得不同，这正是 `isVaultOpEnvelope` 的依据。
+    expect(Buffer.from(blob, 'base64').subarray(0, 15).toString()).toBe('heyta-vault-op/');
+
+    const back = await decodeAvatarCipher({ cipher }, blob);
+    expect(back, 'vault 钥匙解不开自己写的密文').toEqual({ ok: true, image: IMAGE });
+    expect(Buffer.from(blob, 'base64').includes(Buffer.from('image/', 'utf8'))).toBe(false);
+  });
+
+  it('🔴 两种钥匙不互相冒充：口令解 vault 密文 = undecryptable，vault 解口令密文也 = undecryptable', async () => {
+    const vaultBlob = await encodeAvatarCipher({ cipher }, IMAGE);
+    const passwordBlob = await encodeAvatarCipher(PASSWORD, IMAGE);
+
+    // 拿口令解 vault 密文：**不是** no-password（这台设备有钥匙），也不是成功。
+    expect(await decodeAvatarCipher(PASSWORD, vaultBlob)).toEqual({
+      ok: false,
+      reason: 'undecryptable',
+    });
+    // 拿 vault 钥匙解口令密文：同理。合并成 no-password 会让界面说"去解锁"，
+    // 而用户刚解锁过 —— 那是最让人怀疑"这功能坏了"的一句。
+    expect(await decodeAvatarCipher({ cipher }, passwordBlob)).toEqual({
+      ok: false,
+      reason: 'undecryptable',
+    });
+  });
+
+  it('上传链：传 cipher 时出站的是 vault 信封（不是口令密文），且服务端只收到一个键', async () => {
+    const f = fetchReturning(200, { avatarHash: 'cafebabe' });
+    vi.stubGlobal('fetch', f.impl);
+    const out = await uploadAccountAvatar(opts(), TOKEN, { cipher }, IMAGE);
+    expect(out.ok).toBe(true);
+    const body = f.calls[0]?.body as Record<string, unknown>;
+    expect(Object.keys(body)).toEqual(['cipherBase64']);
+    const blob = body['cipherBase64'] as string;
+    expect(await decodeAvatarCipher({ cipher }, blob)).toEqual({ ok: true, image: IMAGE });
+    expect(await decodeAvatarCipher(PASSWORD, blob), '口令居然解得开 vault 密文').toMatchObject({
+      ok: false,
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it('没有钥匙时上传**不出站**（一次注定解不开的上传会覆盖服务端那份好图）', async () => {
+    const f = fetchReturning(200, { avatarHash: 'cafebabe' });
+    vi.stubGlobal('fetch', f.impl);
+    const out = await uploadAccountAvatar(opts(), TOKEN, undefined, IMAGE);
+    expect(out.ok).toBe(false);
+    expect(f.calls, '没有钥匙还出站').toEqual([]);
     vi.unstubAllGlobals();
   });
 });

@@ -20,6 +20,10 @@ import { describe, expect, it } from 'vitest';
 const SRC = join(__dirname, '..');
 const renew = () => readFileSync(join(SRC, 'src/screens/RenewSection.tsx'), 'utf8');
 const profile = () => readFileSync(join(SRC, 'src/screens/ProfileScreen.tsx'), 'utf8');
+/** 订阅页与设置目录（2026-10-24 起「我的」只留入口，真正的两块住在这两枚里）。 */
+const subscriptionSection = () =>
+  readFileSync(join(SRC, 'src/screens/SubscriptionSection.tsx'), 'utf8');
+const settingsScreen = () => readFileSync(join(SRC, 'src/screens/SettingsScreen.tsx'), 'utf8');
 
 /**
  * 去掉注释，只留代码。
@@ -74,7 +78,13 @@ describe('移动端续费入口', () => {
 
   it('失败的陌生码不许被翻译成一句假话：兜底里要带上原始码', () => {
     const src = renew();
-    expect(src).toMatch(/FAILURE_KEYS\[outcome\.code\]\s*\?\?\s*'mobile\.entitlement\.renew\.fail\.unknown'/);
+    // 查表顺序：**先原因码、再错误码、最后 unknown**（三档必须都在同一条式子里）。
+    // 🔴 这条形状在 2026-10-24 变过一次：只按错误码查时，`PRICE_NOT_SELLABLE`
+    //    盖住了"这一档要交付的能力本机没有"与"这一档全局没开卖"两件事 ——
+    //    两件不同的事被说成同一句，用户拿不到那条真能走的路。原因码那一档因此排在最前。
+    expect(src).toMatch(
+      /FAILURE_REASON_KEYS\[outcome\.reason\][\s\S]{0,80}FAILURE_KEYS\[outcome\.code\]\s*\?\?\s*'mobile\.entitlement\.renew\.fail\.unknown'/,
+    );
     expect(src).toMatch(/\{\s*code:\s*outcome\.code\s*\}/);
   });
 
@@ -108,9 +118,20 @@ describe('移动端续费入口', () => {
     expect(speaks, '按下「下单续费」在没配服务器时不产生任何界面反馈 = 静默空转').toBe(true);
   });
 
-  it('ProfileScreen 挂上了它，且那两条冻结判据仍然成立', () => {
+  /**
+   * 🔴 2026-10-24 改了挂载点：产品负责人要"单独的订阅界面，移动端和桌面端都要有"。
+   * `RenewSection` 从「我的」的滚动流搬进了设置里独立的一节（`SubscriptionSection`），
+   * 「我的」只留一个入口行。
+   *
+   * 判据仍然是"挂上了没挂"，只是现在**三处都得在**，缺一处没有别的门禁会红：
+   *   ① 订阅页真的渲染了它；②「我的」有一个入口行；③ 设置目录里真的有这一节。
+   */
+  it('订阅页挂上了它、「我的」有入口、设置目录有这一节', () => {
     const src = profile();
-    expect(src).toMatch(/<RenewSection \/>/);
+    expect(subscriptionSection()).toMatch(/<RenewSection \/>/);
+    expect(src).toContain("testID: 'profile-entry-subscription'");
+    expect(src).toContain("setSettingsSection('subscription')");
+    expect(settingsScreen()).toContain("case 'subscription'");
     // 挂载点没有把 `web.` 词条带进这一屏（`profile-nickname-entry.spec.ts:144` 的账）。
     expect(src.match(/t\(\s*'web\./gu) ?? [], 'ProfileScreen 里出现了 t(\'web.…\')').toHaveLength(0);
   });
