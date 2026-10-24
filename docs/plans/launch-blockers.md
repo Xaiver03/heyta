@@ -434,7 +434,7 @@ heyta 现在还不能对外发布。挡上线的只剩 4 件 —— 全都只差
 |---|---|---|
 | **¥0 自建** | ✅ **真能交付**（免费列完整、不限设备、自带端点 AI 永久免费且不计量） | 已成立 |
 | **¥5 `hosted-monthly`** | 🟢 **2026-10-24：入口从 2 处变 3 处** —— 新增落地页付费档的「立即订阅」（`apps/landing/src/components/Pricing.tsx`，只在 `VITE_APP_URL` 配了时渲染，指向 `…/app?settings=settings-group-subscription`）。应用里仍是两处活入口（[`RenewPanel.tsx`](../../apps/web/src/features/subscription/RenewPanel.tsx) / [`RenewSection.tsx`](../../apps/mobile/src/screens/RenewSection.tsx)），**两处都只买 ¥5 续费**（`RENEWAL_PRICE_ID` 写死 `hosted-monthly`）；实例未配通道 ⇒ 点下去**如实报 503**（不是死按钮），配了就能收也能交付 | 卡 **A7/A8**（通道），**不再是"买不到"** |
-| **¥12 `hosted-ai-monthly`** | ✅ **2026-10-16 更正：客户端那一半已经闭合，原文是过期的** | 原文写「**买到也打不开**（`AiSupplyMode` 零生产引用、`/api/ai/managed/chat` 在 `apps/` 下零调用点、`peekManagedAiUsage` **零调用方** ⇒ 法务 §5.3 承诺的「本周期已用 X / 300」没有界面）」—— 🔴 **四条当日重核全部不成立**：① `AiSupplyMode` 在 `packages/ai/src/routing.ts` **多处生产使用**；② **生产链路在**（`routing.ts:1018` / `provider.ts:416` 调 `managedChatUrl()`）；③ 用量读数**两端都接了**（`apps/web/src/features/settings/AiSettings.tsx:497`、`apps/mobile/src/ai/AiSettingsSection.tsx:136` 调 `fetchManagedAiUsage`）；④ 两个服务端稳定码的**客户端文案也在**（`apps/mobile/src/ai/copy.ts:182-183`）。⚠️ 探针错在**找错了名字**（与 §4.2 那条同款）。<br>✅ **仍然成立的那一半**：**服务端会卖**（`NOT_YET_DELIVERABLE_SKUS = {}`、下单返 200 + 1200 分、有测试钉住），而**落地页 `Pricing.tsx` 仍是 0 个 `<button>`** ⇒ **客户端买不到**。⇒ 所以这一行 2026-10-16 的形状是「**能交付、但买不到**」。<br>🟢 **2026-10-24 更正后半句**：**落地页不再是 0 个 `<button>`** —— 付费两档各有一枚「立即订阅」（`VITE_APP_URL` 配了才渲染；真浏览器实测会跳到 `?settings=settings-group-subscription`，证据 `apps/landing/evidence/pricing-cta-20261024/`）。⇒ 这一行现在的形状是「**能交付、也买得到**」，只剩**通道**（§7.1 的 A7/B8）与**法务正文那句"没提供"**（ADR-0054 §11.3）。⚠️ 助手仍**不在**托管档的承诺里（`MANAGED_CAPABILITIES` 不含 `tool_calling`，ADR-0054 §11.1） |
+| **¥12 `hosted-ai-monthly`** | ✅ **2026-10-16 更正：客户端那一半已经闭合，原文是过期的** | 原文写「**买到也打不开**（`AiSupplyMode` 零生产引用、`/api/ai/managed/chat` 在 `apps/` 下零调用点、`peekManagedAiUsage` **零调用方** ⇒ 法务 §5.3 承诺的「本周期已用 X / 300」没有界面）」—— 🔴 **四条当日重核全部不成立**：① `AiSupplyMode` 在 `packages/ai/src/routing.ts` **多处生产使用**；② **生产链路在**（`routing.ts:1018` / `provider.ts:416` 调 `managedChatUrl()`）；③ 用量读数**两端都接了**（`apps/web/src/features/settings/AiSettings.tsx:497`、`apps/mobile/src/ai/AiSettingsSection.tsx:136` 调 `fetchManagedAiUsage`）；④ 两个服务端稳定码的**客户端文案也在**（`apps/mobile/src/ai/copy.ts:182-183`）。⚠️ 探针错在**找错了名字**（与 §4.2 那条同款）。<br>✅ **仍然成立的那一半**：**服务端会卖**（`NOT_YET_DELIVERABLE_SKUS = {}`、下单返 200 + 1200 分、有测试钉住），而**落地页 `Pricing.tsx` 仍是 0 个 `<button>`** ⇒ **客户端买不到**。⇒ 所以这一行 2026-10-16 的形状是「**能交付、但买不到**」。<br>🟢 **2026-10-24 更正后半句**：**落地页不再是 0 个 `<button>`** —— 付费两档各有一枚「立即订阅」（`VITE_APP_URL` 配了才渲染；真浏览器实测会跳到 `?settings=settings-group-subscription`，证据 `apps/landing/evidence/pricing-cta-20261024/`）。⇒ 这一行现在的形状是「**能交付、也买得到**」，只剩**通道**（§7.1 的 A7/B8）与**法务正文那句"没提供"**（ADR-0054 §11.3）。⚠️ **2026-10-25 更正**：助手**技术上已经能走托管档**（`MANAGED_CAPABILITIES` 现在含 `tool_calling`，中央侧三跳实测过 `tool_calls`，见 §3.2 尾），所以"不在承诺里"这句现在的依据**只剩法务文本**（`ai-and-transfer` 1.6 写着「这一档不含对话式助手」）。对外口径仍按法务写，改那一句需要人签（ADR-0054 §11.1） |
 | **海外 $5/$12** | 落地页**还印着价格**，点了拿 `409 PROVIDER_CURRENCY_UNSUPPORTED`（无 USD 通道）。产品负责人已决定整条延后，**对外措辞未定** | 一个措辞决定 |
 | **退款** | 后台第八 tab「退款」真实存在，但"批准 → 发通道"必然 `BILLING_PROVIDER_NOT_CONFIGURED`；界面如实报"没发出去"（不伪装成功）。**运营点了没用** | 卡 A7 |
 
@@ -491,10 +491,15 @@ heyta 现在还不能对外发布。挡上线的只剩 4 件 —— 全都只差
    ✅ **2026-10-16 托管端点也从同步服务器派生了**：
    [`withManagedEndpoint`](../../packages/ai/src/managed-routing.ts) —— `mode === 'managed'` 时
    在**构造路由配置那一刻**把当前同步服务器合成成端点（**不落盘**：用户会换服务器，
-   写死进设置的表现是"AI 忽然全失败"且没人能定位）。8 条判据，**变异验证过**
-   （把 `tool_calling` 加进托管端点声明的能力 ⇒ `expected [...] to have a length of +0 but got 1` 红）。
-   🔴 它只声明 `structured_output` + `long_context`，**不声明 `tool_calling`** ——
-   服务端不转发 `tools`，声明了就是假话，放过去就是把助手静默降级（见 §3.2）。
+   写死进设置的表现是"AI 忽然全失败"且没人能定位）。8 条判据。
+   ⚠️ **2026-10-25 更正**：原文这里写着"只声明 `structured_output` + `long_context`，
+   **不声明 `tool_calling`**，因为服务端不转发 `tools`"—— 那条理由和结论**都已过期**。
+   服务端自 2026-10-22 起转发 `tools`（见 §3.2），中央侧分配自 2026-10-25 起声明
+   `tool_calling` 并**逐跳实测**过（MiraclePlus `/v1` · OpenCode Go · DeepSeek 官方
+   三跳各自回 `tool_calls`），所以托管端点现在**声明 `tool_calling`**。
+   那条"变异验证"（把 `tool_calling` 加进去 ⇒ 变红）随之反转成
+   "声明了就必须真的能被选中"（`managed-routing.spec.ts`）。
+   🔴 **但对外仍是"这一档不含对话式助手"** —— 卡点从技术换成了法务文本（见 §3.2 尾）。
    ✅ **2026-10-16 web 的"开关"已落地**：`AiSettings` 里新增
    `data-testid="ai-supply-mode"` 的二选一（**我自己的端点 / heyta 托管**），
    落在"允许远程"之后、"端点列表"之前 —— 它是"请求发给谁"的第一层选择。
@@ -578,6 +583,36 @@ heyta 现在还不能对外发布。挡上线的只剩 4 件 —— 全都只差
 **对外口径可以更新的那句**：¥12 档"托管"下的**对话式助手不再退化为纯文本**。
 剩下不能说的仍然在 ADR-0054 §8 / §9：助手在托管档的**多步上界**、**流式与工具的相容性**
 （`stream:true` + `tools` 上游是否按 `delta.tool_calls` 回）、以及**长上下文**这一维。
+
+#### ✅ 2026-10-25 收尾：能力的最后一格也补上了（但对外口径仍卡在法务）
+
+上一段落地的只是"**转发**"；还差一格——链路终点的**能力声明**。当时中央侧
+（`services/ai-control`，x-c 仓）**没有任何一条分配声明过 `tool_calling`**，
+于是带 `tools` 的请求在**发出之前**就被 `capabilities.every(...)` 挡成
+`403 model_not_allocated`。症状极具误导性：看起来像"上游模型不支持工具"，
+其实是配置里没登记（模型一直是支持的，转发也一直是通的）。
+
+| 环节 | 2026-10-25 的读数 |
+|---|---|
+| 中央分配（`heyta` / `entrepreneurship` × 三环境 × `chat` × `chat-completions`，16 条） | ✅ 全部声明 `tool_calling`，回读链形状与优先级未变 |
+| 三跳各自单独打（MiraclePlus `/v1` · OpenCode Go · DeepSeek 官方） | ✅ 都回 `finish_reason=tool_calls`，`arguments` 可解析 |
+| 客户端托管端点能力表（`packages/ai/src/managed-routing.ts`） | ✅ 声明 `tool_calling`，`resolveRoute(..., 'tool-calling')` 拿到候选 |
+| 判据 | `packages/ai` 311 项 + `apps/web` 3 个 AI 面板 119 项通过 |
+
+证据脚本在 x-c 仓 `tools/ai-control/verify-tool-calling.mjs`（判据是**回包里有没有
+`tool_calls`**，不是状态码——200 但没有 `tool_calls` 就是"渠道把工具吃了"）。
+
+🔴 **新卡点，而且这次不是技术问题**：法务正文
+`packages/legal/src/documents/ai-and-transfer.ts`（版本 1.6，`status: draft`）
+仍写着「**这一档不含对话式助手**：托管端点在路由上不声明工具调用能力」。
+那句话的**技术理由与结论现在都不成立**，而它是**给用户看的文本**。
+按本仓的规矩（代码与法务打架时以法务为对外口径、改法务要人签），
+**在它被改并复核之前，对外一律仍说"这一档不含对话式助手"**，
+`server/env.example` 的托管 AI 段也按这个口径写。
+
+改它需要：版本 1.6 → 1.7、中英同步、`gen-server-legal` + `gen-site-copy` 重生成、
+`check:server-legal` / `check:legal-copy` / `check:legal-tools` 家族全绿，
+并且**要一个真人点头**（这条是唯一一处"代码已开通、文本说没开通"的地方）。
 
 ---
 

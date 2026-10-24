@@ -42,22 +42,32 @@ export const MANAGED_ENDPOINT_ID = 'heyta-managed';
 /**
  * 托管端点**能诚实声明**的能力。
  *
- * 🔴 **不含 `tool_calling`**，而且这是**有意的**。注意这条注释在 2026-10-24 更正过
- * 一次：原文写的理由是"服务端不转发 `tools`"，那句**已经不成立了** ——
- * `managed-proxy.routes.ts` 现在把 `tools` / `tool_choice` 照原样转发
- * （`grep -n "tools" server/src/ai/managed-proxy.routes.ts` 有 5 处，含 schema 与透传点）。
+ * ⚠️ 这条注释改过两次，两次都是因为"理由过期"，值得留着当教训：
+ * 2026-10-24 之前写的理由是"服务端不转发 `tools`"，那句当时就不成立了
+ * （`managed-proxy.routes.ts` 早把 `tools` / `tool_choice` 照原样转发）；
+ * 改成"还没做过端到端验证"。现在那条验证也做完了，见下。
  *
- * 所以现在的理由是**另一条**：这一格**还没有做过端到端的验证**（托管上游真的接受
- * 我们转发的这套工具目录、并把 `tool_calls` 回给我们、客户端能把它接回助手循环）。
- * 没验过就声明，等于把一个没跑过的链路写成能力 —— 与"服务端不转发"那种**事实错误**
- * 不同，这次是**不敢声明**。
+ * **`tool_calling` 于 2026-10-25 加回本表，依据是逐跳实测，不是愿望**：
  *
- * 后果仍然是 `'tool-calling'` 这个功能在托管档上于**解析候选**时以
- * `capability-missing` 被排除（⇒ 用户看到 `no-route`），而**不是**发出去之后
- * 静默降级成一段纯文本回答。要真的支持助手，得先补一条端到端判据，
- * 再把 `'tool_calling'` 加回本表 —— 登记在 `docs/plans/launch-blockers.md` §3.2。
+ * | 判据 | 读数 |
+ * |---|---|
+ * | 中央侧这条链的分配声明了 `tool_calling` | ✅ `heyta.chat` 三环境全跳 |
+ * | 上游真的回 `tool_calls` | ✅ 三跳各自单打：MiraclePlus `/v1`、OpenCode Go、DeepSeek 官方 |
+ * | 回包参数可解析 | ✅ `finish_reason=tool_calls`，`arguments={"city":"北京"}` |
+ *
+ * 验证脚本在 x-c 仓：`tools/ai-control/verify-tool-calling.mjs`（判据是回包里有没有
+ * `tool_calls`，不是状态码 —— 200 但没有 `tool_calls` 就是"渠道把工具吃了"）。
+ *
+ * 🔴 仍然要守的边界：这条表声明的是**能力**，不是**质量**。托管档的助手循环
+ * （多步工具调用 + 本地执行）在上游侧现在有据可依，但产品侧仍必须能响亮地失败：
+ * 一旦中央把 `tool_calling` 从分配上撤掉，这里要跟着撤，否则症状会变成
+ * 发出去之后拿回一段"假装调用过工具"的纯文本 —— 那正是当初不肯声明的理由。
  */
-const MANAGED_CAPABILITIES: readonly AiCapability[] = ['structured_output', 'long_context'];
+const MANAGED_CAPABILITIES: readonly AiCapability[] = [
+  'structured_output',
+  'long_context',
+  'tool_calling',
+];
 
 /** 全部功能 —— 从能力表派生，**不手抄一份**（手抄的那份一定会漂）。 */
 const ALL_FEATURES = Object.keys(DEFAULT_FEATURE_CAPABILITIES) as readonly AiFeature[];

@@ -268,7 +268,7 @@ ADR-0005 那条在托管档一字不改：**托管 AI 与端到端加密在定�
 | §9.4 的两句 | 2026-10-24 现量 |
 |---|---|
 | 「`managed-proxy.routes.ts` 里 `grep -n "tools\|tool_choice"` **零命中**」 | 🔴 **已变**：同一命令回 **5** 处 —— `WireToolSchema` 的入参 schema（最多 64 枚）、`tool_choice: z.literal('auto')`、以及真正的透传点。文件头原话：「`tools` 与 `tool_choice` **照原样转发**给上游（launch-blockers §3.2 (a) 方案）」 |
-| 「助手在托管档上会**静默降级**成纯文本回答」 | ✅ **仍然不会**：`packages/ai/src/managed-routing.ts` 的 `MANAGED_CAPABILITIES` **不含 `'tool_calling'`** ⇒ 带工具的功能在**解析候选**阶段就以 `capability-missing` 被排除（`no-route`，零请求） |
+| 「助手在托管档上会**静默降级**成纯文本回答」 | ⚠️ **2026-10-25：这一行描述的拦截方式已变，但"不会静默降级"这个结论仍成立**。`MANAGED_CAPABILITIES` 现在**含** `'tool_calling'`（中央侧三跳逐跳实测过 `tool_calls`，见 x-c 仓 `tools/ai-control/verify-tool-calling.mjs`）⇒ 助手在托管档**能拿到候选**，不再以 `capability-missing` 被排除。所以"响亮地拒绝"这个保护**已经不在这一层**了：它只剩两处——① **部署层**（`MANAGED_AI_*` 未配 ⇒ `503 MANAGED_AI_NOT_CONFIGURED`）；② **法务文本**（`ai-and-transfer` 1.6 仍写「这一档不含对话式助手」）。🔴 在法务那句被改并复核之前，对外口径仍是"不含助手"；代码与文本的这处不一致已登记在 launch-blockers §3.2 尾。 |
 
 ⇒ 所以 §9.4 的**结论照旧**（托管档上的对话式助手仍被响亮拒绝），但它**给的理由**是错的：
 "服务端不转发"今天不成立，真实理由是"**这条链路没有端到端验证过**——托管上游是否接受我们
