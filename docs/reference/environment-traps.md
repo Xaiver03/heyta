@@ -11265,3 +11265,40 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       工作区（`heyta-carriers/` 这类），宽松通配会连别人的在途工作一起删。判据是"名字落在同族
       精确形状里"，不是"看起来像 heyta 的" —— 这条代价与收益完全不对称：漏删一个目录只是少省
       几百 MB，误删一个工作区是毁掉别人一轮的现场。
+
+546. **`~/heyta-carriers` 是一次性搬运树，不是第二份工作树**（2026-10-24，它长到 11 GB，三份完整副本各自带着全套依赖）
+    症状不会喊：`pnpm` 慢、`du` 报警、Spotlight 索引一堆东西，但没有任何一步失败。实测
+    `du -sh ~/heyta-carriers` 回 **11 GB** —— 里面是**三份**搬运工作副本（`collab-m6-ios`、
+    `heyta-wt-collab-m5`、`head-r128`），没有一份是 git 仓库、没有一份是事实源。
+    逐项构成与"能不能重建"：
+
+    | 内容 | 体积 | 可重建？ |
+    |---|---|---|
+    | `collab-m6-ios/DerivedData`（Xcode 中间产物 + 模拟器产物） | 5.3 GB | ✅ |
+    | 两份 `node_modules` | 1.1 GB × 2 | ✅ |
+    | `e2e/test-results`（Playwright 每次跑都落这里） | 430 MB | ✅ |
+    | `apps/desktop-macos/.build`（SwiftPM 产物 ×2） | 323 MB + 147 MB | ✅ |
+    | `apps/mobile/ios/Pods`（CocoaPods 依赖 ×2） | 166 MB × 2 | ✅ |
+    | 重复的 `apps/*/evidence`（主仓库已有同一份） | 1.3 GB | ✅ 是副本，不是取证 |
+    | 旧打包 `heyta-f97013de.tgz` + 几个 `tmp-*` | 138 MB | ✅ |
+    | `ios-tf-artifacts` 里的 TestFlight `.xcarchive` | 154 MB | 🔴 不可重建 ⇒ 留 |
+    | 要引用的构建日志 | 16 MB | 🔴 不可重建 ⇒ 留 |
+
+    为什么会长到 11 GB：**每份副本自带 `node_modules`/`Pods`/`DerivedData`**（搬一次 = 复制
+    一遍依赖），而 `DerivedData` 与 `test-results` 是"每跑一次就多一份"的落点；更要紧的是
+    **没有任何规则说这些是可删的** —— 手工清到 675 MB 只解决了这一次，下一次必然长回去。
+    - **判据（先量再修）**：`du -sh ~/heyta-carriers/*` 找大项，再
+      `bash scripts/clean-carriers.sh`（**默认干跑**，逐条打印"体积 + 路径"与末尾"可释放 X"）。
+      两个读数要一起看：只看总量分不清"源码树"与"可重建余料"。
+    - 修法：`bash scripts/clean-carriers.sh --apply`。名单**只认精确目录名**
+      （`node_modules`/`Pods`/`DerivedData`/`.build`/`dist`/`dist-types`/`test-results`/`.gradle`/
+      `heyta-ios-release`/`heyta-macos-dist`、`tmp-*`、`*.tgz`、`*.dmg`），白名单
+      （`ios-tf-artifacts`、`*.xcarchive`、`*.ipa`、`*.dSYM`、`.git`）**优先于黑名单**，
+      `evidence` 要显式 `--include-evidence` 才动。约定见
+      [`multi-end-build.md`](../agents/multi-end-build.md) §6.1.2。
+    - 🔴 **别把主仓库的 `apps/*/evidence` 再拷一份进去**：那 1.3 GB 就是这么来的，而它是
+      **同名副本**，误删的代价和删掉取证一样高 —— 这也是 `evidence` 默认不动的唯一原因。
+    - 🔴 **别把它和轮次目录混在一起清**：`$HOME/heyta-r<NN>-tmp` 那一族归
+      `scripts/reinstall-all.sh` 的保留策略（`HEYTA_KEEP_ROUNDS`），carrier 归本脚本。
+      两族的共同禁忌是同一个：**不要 `rm -rf ~/heyta-*`** —— 那个父目录里同时躺着别人的
+      在途工作区。

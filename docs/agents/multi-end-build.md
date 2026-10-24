@@ -100,3 +100,77 @@ pnpm reinstall:mobile           # 只 android + ios
   🔴 该脚本**必须保持纯 ASCII** —— PS 5.1 把无 BOM UTF-8 当 ANSI 读，中文会破坏解析。
 
 **提交前至少跑**：`pnpm -r typecheck && pnpm -r test`。
+
+### 6.1.2 carrier 目录：用完即弃
+
+**定义**：carrier（载体）= 为了让**别的机器 / 别的 lane** 跑一次构建（或一次验收），把工作树
+**搬过去**的那个目录。判据三条，缺一条就不是 carrier：
+
+- **不是 git 仓库**（或者只是 `rsync`/`tar` 出来的树，`.git` 只是个指针文件）；
+- **不是事实源** —— 事实源永远是主仓库，carrier 里的源码是**某一次搬过去的快照**；
+- **一次性**：它的用途在那一趟跑完就结束了。
+
+命名约定：`$HOME/heyta-carriers/<lane>-<用途>`（例：`$HOME/heyta-carriers/head-r128`、
+`collab-m6-ios`）。🔴 **不要**在 `$HOME` 直接铺 `heyta-r<NN>-tmp` 那种**轮次目录** ——
+那是 `reinstall-all.sh` 的轮次目录，归 §6.1.1 的保留策略管（`HEYTA_KEEP_ROUNDS`，默认留 2 轮
++ 收尾删本轮 `.app`/`.dmg`）。两者别混：轮次目录由**脚本自己**开、自己收；
+carrier 由**人**开、**人**收（`scripts/clean-carriers.sh`）。
+
+#### 三条纪律
+
+1. **搬完就跑、跑完就清**。收尾动作是 `bash scripts/clean-carriers.sh --apply`
+   （默认干跑，只列"会删什么 + 能释放多少"）。不要把它留着当"第二份工作树"——
+   留着的结果就是下面那张表：11 GB，而且没有任何一层会来清。
+2. **里面只允许长期留下不可重建的东西**：TestFlight 的 `.xcarchive` / `.ipa`、签名产物、
+   以及你**要引用**的构建日志。其余（`node_modules` / `Pods` / `DerivedData` / `.build` /
+   `test-results` / `dist` / `dist-types` / `.gradle` / `heyta-ios-release` /
+   `heyta-macos-dist` / `tmp-*` / `*.tgz` / `*.dmg`）全部**可重建**，用完即删。
+   工具侧的依据：这些名字在 `clean-carriers.sh` 的黑名单里，而
+   `ios-tf-artifacts` / `*.xcarchive` / `*.ipa` / `*.dSYM` / `.git` 在白名单里 ——
+   **白名单优先于黑名单**，所以 `ios-tf-artifacts/node_modules` 永远不会被删。
+3. **别把主仓库的 `apps/*/evidence` 再拷一份进去**。主仓库已经有同一份，而它是**取证**
+   （§6.2 规定一：界面验收必须真跑 + 真看截图）。重复拷贝进去的那 1.3 GB 既不是证据
+   （它是副本）、又和证据同名 —— 误删代价最高，所以 `evidence` 在工具里单列一个开关
+   `--include-evidence`，**默认不动**。
+
+#### 反例：今天的读数（11 GB → 675 MB）
+
+2026-10-24 实测 `~/heyta-carriers` 长到 **11 GB**：**三份**完整的搬运工作副本，每份都自带
+一整套依赖与产物。逐项拆开看，"能不能重建"一栏全是 ✅ —— 也就是说这 11 GB 里有
+**10.3 GB 是纯粹的重建余料**：
+
+| 内容 | 体积 | 可重建？ |
+|---|---|---|
+| `collab-m6-ios/DerivedData`（Xcode 中间产物 + 模拟器产物） | 5.3 GB | ✅ 重跑构建就长回来 |
+| `heyta-wt-collab-m5/node_modules`、`head-r128/node_modules` | 1.1 GB × 2 | ✅ `pnpm install` |
+| `e2e/test-results`（Playwright 每跑一次都往这儿落） | 430 MB | ✅ 下一次跑 |
+| `apps/desktop-macos/.build`（SwiftPM 产物 ×2） | 323 MB + 147 MB | ✅ `swift build` |
+| `apps/mobile/ios/Pods`（CocoaPods 依赖 ×2） | 166 MB × 2 | ✅ `pod install` |
+| 重复的 `apps/*/evidence` 截图归档（**主仓库已有同一份**） | 1.3 GB | ✅ 副本，不是证据 |
+| 旧打包 `heyta-f97013de.tgz` + 几个 `tmp-*` | 138 MB | ✅ |
+| `ios-tf-artifacts` 里那份 TestFlight `.xcarchive` | 154 MB | 🔴 **不可重建** ⇒ 保留 |
+| 构建日志（要引用的那几份） | 16 MB | 🔴 不可重建 ⇒ 保留 |
+| 源码树（carrier 本体，不是产物） | 478 MB | 保留 |
+
+清完留下 **675 MB**。为什么会长到 11 GB：① 每份副本都自带 `node_modules`/`Pods`/
+`DerivedData`（搬一次 = 复制一遍依赖）；② `e2e/test-results` 与 `DerivedData` 是**每跑一次
+就多一份**的落点；③ **没有任何规则说"这些是可删的"** —— 手工清完只解决了这一次，
+所以这条规则必须落在工具 + 本文件 + [`environment-traps.md`](../reference/environment-traps.md)
+（#546）三处。
+
+#### 工具
+
+```bash
+bash scripts/clean-carriers.sh                     # 干跑：逐条 体积 + 路径，末尾"可释放 X"
+bash scripts/clean-carriers.sh --apply             # 真删
+bash scripts/clean-carriers.sh --include-evidence  # 连 evidence 一起（默认不动）
+bash scripts/clean-carriers.sh --keep my-vendor    # 追加白名单（可重复）
+bash scripts/clean-carriers.sh --json              # 只往 stdout 吐 JSON（给后续脚本用）
+```
+
+- 根目录 `$HEYTA_CARRIERS_ROOT`，默认 `$HOME/heyta-carriers`；**根不存在 / 解析后是 `/`、
+  `$HOME`、仓库根或其祖先 ⇒ `exit 4`**，一个字节都不动（`rm -rf` 的形状判据，
+  同族写法见 `apps/desktop-macos/scripts/package-app.sh` 的 `OUT_DIR`）。
+- 可删名单**只认精确目录名**（`tmp-*` 与扩展名是仅有的通配族），不认模糊 glob：
+  `dist-esm` 是产物、`distribution-notes.md` 是文档、`node_modules.bak` 可能是别人正在救的现场。
+- 删除失败只 warn、继续，最后用 `exit 1` 报"有 N 项没删掉"。

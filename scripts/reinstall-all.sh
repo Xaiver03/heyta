@@ -119,7 +119,7 @@ fi
 # 症状不是"重复安装"，是**Spotlight 里搜出一长串同名 .app**。成因链很短：
 #   ① 每轮重装都由操作者手写一个新的 `HEYTA_REINSTALL_TMP_DIR`（`~/heyta-r99-tmp`、
 #      `~/heyta-r108-tmp`、`~/heyta-r139-mac-tmp` …）；
-#   ② 本脚本此前**没有任何保留策略、也没有收尾删除**，退场时把这些目录整个留给 $HOME；
+#   ② 本脚本此前**没有任何保留策略、也没有收尾删除**，退场时把这些目录整个留在家目录；
 #   ③ 每轮 mac 段的 `$MAC_OUT` 里各躺一份 `Heyta.app` + `.dmg`（约 430 MB/轮）。
 # Spotlight 索引**任意位置**的 `.app`，于是按 `heyta` 搜出来的是 r146/r148/r155/… 一长串
 # 同名的 App，而真正安装、真正在跑的**永远只有一份** `/Applications/Heyta.app`
