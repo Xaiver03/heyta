@@ -178,7 +178,10 @@ export const sendEmailPasswordRegistrationCodeEmail = async (
       // The template requires a button. It is only a convenience link back to the
       // app; the code remains the sole credential for this challenge.
       buttonLabel: t(locale, 'server.email.login.button'),
-      url: `${config.publicUrl}/app/`,
+      // 🔴 2026-10-24：这条链接以前是裸的 `/app/`，点开只看到应用首页，不知道
+      //    下一步干嘛（报障原话："为什么收到的是一个通用地址"）。带上 `signin=1`
+      //    ⇒ 打开就落在登录界面；语言参数与其余邮件保持一致。
+      url: withLocale(`${config.publicUrl}/app/?signin=1`, locale),
       note: `${t(locale, 'server.email.registerCode.expiry')}\n${t(
         locale,
         'server.email.registerCode.ignore',
@@ -212,7 +215,10 @@ export const sendLoginCodeEmail = async (
       heading: t(locale, 'server.email.loginCode.title'),
       body,
       buttonLabel: t(locale, 'server.email.login.button'),
-      url: `${config.publicUrl}/app/`,
+      // 🔴 2026-10-24：这条链接以前是裸的 `/app/`，点开只看到应用首页，不知道
+      //    下一步干嘛（报障原话："为什么收到的是一个通用地址"）。带上 `signin=1`
+      //    ⇒ 打开就落在登录界面；语言参数与其余邮件保持一致。
+      url: withLocale(`${config.publicUrl}/app/?signin=1`, locale),
       note: `${t(locale, 'server.email.loginCode.expiry')}\n${t(locale, 'server.email.loginCode.ignore')}`,
     },
   });
