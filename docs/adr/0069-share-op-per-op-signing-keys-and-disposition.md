@@ -222,3 +222,24 @@ ADR-0067 裁决四的原话是「逐 op 签名要加 `signature` 字段（写侧
 `node scripts/verify-collab-sync.mjs` ⇒ 末行 `RESULT=OK steps=13`；
 `node scripts/verify-collab-revoke.mjs` / `-conflict.mjs` ⇒ `steps=8` / `steps=6`；
 `node research/tools/mutation-rigs/mutate-collab-upload-gate.mjs` ⇒ `ARMS=pass (4/4)`。
+
+---
+
+## 补记（2026-10-24，M6 移动端接入之后）
+
+上面那份实施记录写的时候，计划 §9.12 末尾还挂着一句「**移动端零接入** —— 它今天**写不出**带签名的 op」。
+那条腿现在接上了，形状是：
+
+- **签名件没有被复制第二份**。移动端用的还是 `packages/app-host/src/share-client.ts` 的 `signShareOpWire`
+  与同一套四态词表（裁决一/三对"签哪些字节"的定义只有一处），壳只注入两个端口：
+  私钥从**原生安全存储**取（`apps/mobile/src/share/share-session.ts`），名册走
+  `GET /shares/:shareId/signing-keys`（裁决五那条 🔴 修订要求含已移除成员，移动端同样吃这条）。
+- **判"手机写出的每一条到底可不可验"的那把尺不在单测里**，在界面腿上：
+  `scripts/verify-mobile-collab-ios.sh` 第 8 步 —— owner 侧下载手机写的那条 op，
+  用**名册里的公钥**重验，词表里必须是 `verified`。
+  🔴 刻意**不是**"服务端返回 200"：裁决四说的那件事只有拿钥重验才量得到，
+  而服务端收下 ≠ 另一台成员验得过。复量：`pnpm verify:mobile-collab:ios`。
+- ⚠️ **Android 那一侧今天没有设备读数**（出包与设备腿按负责人的长期令一律走 `ssh windows-pc`，本批没开那条窗口）。
+  iOS 与 Android 共用同一份 `@heyta/app-host` 装配，但**"共用源码"不等于"两端都验过"** ——
+  这条纪律本线踩过（注销销毁那一格就是因为有两份 `removeDatabase` 实现，必须各量一发）。
+  登记在册，别把上面那条绿读成"移动端全绿"。

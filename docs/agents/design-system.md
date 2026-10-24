@@ -79,3 +79,74 @@ React Native 的 `View` 默认 `flex: 0 0 auto`（与 CSS 的 `0 1 auto` **不�
 - ❌ **数字不加 `.tabular-nums`** —— 番茄钟计时与统计数字的宽度会跳动。
 
 ---
+
+## 🔴 设置界面里**禁止**写说明文字（2026-10-24，产品负责人下的禁令）
+
+原话（第二次说的时候已经很生气，所以这条是**禁令**，不是建议）：
+
+> 「严禁说明文字出现，严禁说明文字直接写进去。只允许用那种"一个圈里面一个问号"的，
+>   hover 上去有。把这种东西写成严格的代码禁令……彻底禁止！」
+
+**规则**：设置界面的每一个控件旁边，只许出现**控件本身**（标签、开关、输入框、按钮）。
+任何"这个是什么 / 为什么这样 / 会怎样"的句子，一律进 `?`：
+
+| 端 | 合法载体 |
+|---|---|
+| web | `SettingsInfoTip`（`apps/web/src/features/settings/SettingsInfoTip.tsx`），渲染成 `?`，悬停**或**聚焦展开，`Esc` 收起，正文常驻 DOM 由 `aria-describedby` 指向 |
+| mobile | 同名组件的移动版（`InfoTip`，点击展开）—— ⚠️ 尚未建，移动端的存量在账本里 |
+
+三条例外（**写清楚才好反驳**）：
+
+1. **反馈**：失败 / 成功 / 进行中 / 空态 / 读数。`role="alert"`、`aria-live`、
+   `ht-settings__danger`、testid 里带 failure/error/status 的那些 —— 把"这一单没下成"
+   塞进气泡是另一种错：用户得先点一下才知道出了什么事。
+2. **披露**：ADR-0054 §7 要求"对话之前就看得到"的出境披露（助手那一块）。
+   藏进悬停气泡就不再是披露。用 `data-settings-disclosure="true"` 显式登记。
+3. 页面标题的副句（`web.profile.overview.lead`）—— 它是"我在哪一屏"的确认，
+   不是某个控件的解释。**只有这一处**，也记在账本里。
+
+**判据**：`pnpm check:settings-prose`（`scripts/check-settings-no-prose.mjs`）。
+
+它是**账本制**（与 `check:overlay` 同一条纪律）：
+
+- 账本外新增 ⇒ 🔴 红（新写的说明文字一天都进不来）；
+- 账内读数涨了 ⇒ 🔴 红；
+- 账内读数掉了却没改账本 ⇒ 🔴 红（这一条是"它真的在缩"的唯一读数）。
+
+账本：`scripts/settings-prose-ledger.json`。清理时**只许改小**：
+`node scripts/check-settings-no-prose.mjs --update`。
+
+⚠️ 为什么不是一次清完：存量横跨两端、十九个文件；一次改完会把"删说明"与
+"重写控件"混成几百行，而那种改动的判据只有"跑起来了"。账本让每一屏的收缩都可读。
+
+### 那道门有一道**已知的缝**，缝上补了两道判据
+
+`check:settings-prose` 扫的是**调用点**（`ht-settings__*hint*` 容器、行模型里的 `hint:` 字段），
+**不扫组件内部**（理由写在脚本头部）。于是有一种改法它看不见：
+
+```diff
+- {row.hint === undefined ? null : (<SettingsInfoTip text={row.hint} … />)}
++ {row.hint === undefined ? null : (<Text>{row.hint}</Text>)}
+```
+
+调用点一个字节没变 ⇒ 门禁照样绿，而屏幕上一整句说明又回来了。**2026-10-24 实测过**
+（当时是为了证明设备腿会红）：`check:settings-prose` ✅、设备腿 ❌。
+
+现在这条缝由两道互补的判据堵着：
+
+| 判据 | 成本 | 抓的是 |
+|---|---|---|
+| `packages/ui/tests/settings-hint-through-tip.spec.ts` | 毫秒 | **源码形状**：`Settings.tsx` 里每处 `row.hint` 必须交给 `SettingsInfoTip` 或存在性守卫 |
+| `pnpm verify:mobile-ios-subscription` | 一枚模拟器 + 一次构建 | **行为**：hint 默认不在 AX 树上、点 `?` 出现、再点收起 |
+
+两条分工是刻意的：**同一个判断不在两个地方长牙**，但"入口"必须有一道零成本的。
+
+### `?` 的贴合位置（2026-10-24 修）
+
+行首那一列是 `actionHead`。它原来是 `alignItems: 'center'`，于是 `?` 展开时那一列多出一行正文、
+居中对齐把**图标本身**也一起挪位（设备截图上看得见：展开后 `?` 比标题高出一截，点一下动一次）。
+改成 `'flex-start'`：图标只随标题首行定位，开合都在同一处。
+⚠️ 这条的证据是**两张图**，不是像素读数 —— 展开会重排列表，跨图比绝对 y 会被滚动锚点混淆
+（三种探针实测不稳）⇒ 只主张看得见的那件事。
+代价是与单行标题的视觉中心差约 3pt（**常量**，不动就不显眼）。
+判据仍是那条设备腿的两张图（`00-tip-collapsed.png` / `01-tip-expanded.png`）。

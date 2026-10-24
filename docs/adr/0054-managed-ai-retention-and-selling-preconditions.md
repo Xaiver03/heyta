@@ -256,3 +256,148 @@ ADR-0005 那条在托管档一字不改：**托管 AI 与端到端加密在定�
 
 也就是说：现在留着那句"打不开"是一句**偏保守的过期陈述**，改掉它才是在造一个
 没有依据的承诺。要动这一格，前提是先解掉 §9.4，或把"不含对话式助手"写进同一批文案。
+
+---
+
+## 11. 勘误（2026-10-24）：**服务端开始透传工具了** —— §9.4 的**前提**过期，**结论仍然成立**；落地页这一侧开始**卖**
+
+> 处置同 §9 / §10：**正文与前几节一字不改**，变化只写在这一节。
+
+### 11.1 §9.4 那条限制：**理由换了，结论没换**
+
+| §9.4 的两句 | 2026-10-24 现量 |
+|---|---|
+| 「`managed-proxy.routes.ts` 里 `grep -n "tools\|tool_choice"` **零命中**」 | 🔴 **已变**：同一命令回 **5** 处 —— `WireToolSchema` 的入参 schema（最多 64 枚）、`tool_choice: z.literal('auto')`、以及真正的透传点。文件头原话：「`tools` 与 `tool_choice` **照原样转发**给上游（launch-blockers §3.2 (a) 方案）」 |
+| 「助手在托管档上会**静默降级**成纯文本回答」 | ✅ **仍然不会**：`packages/ai/src/managed-routing.ts` 的 `MANAGED_CAPABILITIES` **不含 `'tool_calling'`** ⇒ 带工具的功能在**解析候选**阶段就以 `capability-missing` 被排除（`no-route`，零请求） |
+
+⇒ 所以 §9.4 的**结论照旧**（托管档上的对话式助手仍被响亮拒绝），但它**给的理由**是错的：
+"服务端不转发"今天不成立，真实理由是"**这条链路没有端到端验证过**——托管上游是否接受我们
+转发的这套工具目录、是否把 `tool_calls` 回给我们、客户端能不能接回助手循环，一条判据都没有"。
+那句注释已按此更正（行为零改动）。
+
+🔴 **这一格要真正打开，缺的是判据，不是代码**：先补一条端到端验证，再把 `'tool_calling'`
+加回 `MANAGED_CAPABILITIES`。在那之前，对外文案**仍然不许**把助手承诺进托管档。
+
+### 11.2 落地页：付费两档从"即将开放"改成**真入口**（产品负责人 2026-10-24 拍板）
+
+背景：产品负责人说「12 元和 5 元的都可以开始卖了」。落地页此前**刻意 0 个按钮**
+（`apps/landing/src/components/Pricing.tsx` 的旧注释：点了必然 503，"一个点了没反应的
+立即购买比没有按钮更坏"）。**那个理由今天仍然有效**，但它的结论取决于"应用在不在"，
+而那件事有现成判据 `VITE_APP_URL` ⇒ 现在是**两态**：
+
+| `VITE_APP_URL` | 渲染 | 实测 |
+|---|---|---|
+| 配了 | 两档各一枚 `立即订阅` → `…/app?lang=…&settings=settings-group-subscription` | 真浏览器点得到、真跳转；`rel=noopener noreferrer`；截图 `apps/landing/evidence/pricing-cta-20261024/01-pricing-configured.png` |
+| 没配 | 一行虚线说明「应用入口尚未配置，暂时无法下单」，**0 个按钮** | 同目录 `02-pricing-unconfigured.png`；单测「没有假的购买按钮」那条**仍然绿** |
+
+🔴 **落地页不自己收单**：它把人送进应用里**已经存在**的那一节
+（`SubscriptionPanel` → `RenewPanel` → `@heyta/app-host` 的 `startCheckout`）。
+收银台仍然**一份实现**（AGENTS §3.5）。为此新增了应用侧的深链
+`?settings=<节 id>`（`apps/web/src/lib/settings-deep-link.ts`），
+未配置 `VITE_APP_URL` 时**不渲染**按钮（一个猜出来的 href 点下去是 404）。
+
+口径也按地区拆开了（旧文案把已经能买的 RMB 两档一起否掉了）。⚠️ **只隔了一小时就改了第二版**：
+第一版写的是「人民币两档现在可以下单」，而**部署现量**是 **¥5 能卖、¥12 卖不了**（见 §11.4）——
+那句话在生产实例上就是假话。现在写的是「人民币两档已经开放订阅…某一档若在你连的这台实例上
+还没配好对应的交付能力，下单会被如实拒绝并说明缺什么，不会扣款」，**对任何一台实例都成立**，
+所以部署侧补齐上游时**不需要再改文案**。
+
+### 11.3 §10.3 第 1 条（法务正文）**仍然没做**，而且现在它与落地页**直接冲突**
+
+`packages/legal/src/documents/ai-and-transfer.ts` 的 s5 标题与正文仍写着
+「这一档仍打不开」「**这项服务现在没有提供**」「今天的客户端里没有任何一个开关能把它打开」。
+其中**最后一句已经与代码不符**（§10.1 那枚开关是落地的），而落地页现在**卖这一档** ⇒
+两侧口径相反。
+
+🔴 **本轮没有改它**，理由与 §10.3 相同、并且更强：那几份文档自己标着
+「状态：草案，尚未经法务复核、尚未生效」，改它是**一次法务动作**；而它现在不只是
+"偏保守的过期陈述"，而是**与对外售卖口径矛盾**。这一格需要**产品负责人点头**
+（或法务复核）之后，与 `LEGAL_SET_VERSION` / `server/src/legal.generated.ts` 的重生成同批做。
+
+📌 一句话交接：**代码侧已经能卖**（服务端两档都放行、落地页有真入口、应用里有收银台）；
+**对外法律文本还写着"没提供"** —— 这是剩下唯一一处自相矛盾，且它不归代码改。
+
+### 11.4 部署现量（2026-10-24，只读在生产机 `ubuntu-jcli` 上量的）
+
+> 这一段是**部署事实**，不是代码事实。之所以写进 ADR：它决定「两档可以开始卖了」这句话
+> 在生产上到底成立几条。
+
+| 读数 | 命令（只读） | 结果 |
+|---|---|---|
+| heyta 服务在跑 | `docker compose ps`（`/home/ubuntu/heyta/server`） | `supersync-server` Up 8h **(healthy)**、postgres Up 4d (healthy) |
+| 收款总闸 | `docker compose exec -T supersync printenv PAYCENTER_ENABLED` | **true** |
+| 收款凭证 | 同前，只列**键名** | `PAYCENTER_{ENABLED,BASE_URL,CLIENT_ID,CLIENT_SECRET,PAYMENT_TYPE,TIMEOUT_MS,WEBHOOK_PATH}` **七枚齐全** |
+| 支付中心登记 | 支付中心容器的 `PLATFORM_PAYMENT_CLIENTS_JSON`（只 grep 是否出现） | **有 `heyta`** ⇒ 中心侧确实给了 heyta 一个 client |
+| 订单表 | `select count(*) from checkout_orders` | 表在，**0 单**（还没人买过，所以"能收款"尚无真实成交证据） |
+| 托管 AI 上游 | `printenv | grep ^MANAGED_AI_`（容器）与 `.env` | **0 枚** —— `MANAGED_AI_*` 在宿主机 `.env`、容器环境里都不存在 |
+| 部署那份 compose | `grep -c MANAGED_AI_ docker-compose.yml` | **0** ⇒ 生产跑的是**更早的树**，即使 `.env` 填了那四枚也**不会**进容器 |
+
+⇒ **结论：¥5 通了（代码 + 凭据 + 中心登记 + 表都在），¥12 没通**（缺上游，且部署那份 compose
+还没带那四枚键的转发）。要让 ¥12 真能卖，需要三样，缺一不可：
+
+1. **一个境内上游的凭据** —— 白名单只认 `api.deepseek.com`（DeepSeek，ADR-0021 §1 第 3 条）
+   或自建在 `heyta.waytofuture.cn` 上的端点（`SERVER_MANAGED_MODEL_HOSTS`）。本机与生产机上
+   **都没有**现成的这类密钥（已按**键名**扫过全部运行中的容器，只有 `AI_MODEL` 这类名字，
+   没有 DEEPSEEK/OPENAI 的密钥变量）。
+2. **把工作树里已有的 `MANAGED_AI_*` 转发块部署上去**（部署那份 compose 是旧树）。
+3. **重建服务镜像**（顺带：现网镜像里连 `doctor:billing:dist` 这个脚本都没有 ⇒ 同样是旧树）。
+
+⚠️ 另有一条**待观察**：生产日志里有 `WEBHOOK_VERIFICATION_FAILED / reason: client-mismatch`
+（来源 IP 含 `172.25.0.1` 与一个公网地址）。当前 0 单，最可能是扫描器或旧客户端试探；
+但**如果**支付中心回调用的 client id 与 `PAYCENTER_CLIENT_ID` 不一致，真实付款会**永远不结算**。
+第一笔真实订单落地时要盯这条日志 —— 这是"能收钱"与"钱到账"之间唯一还没被真实流量验证的环节。
+
+### 11.5 2026-10-25：中央 AI 服务已接入，¥12 档在生产上真的可交付
+
+> §11.4 那张表是**接入前**的读数。这一节记接入后的现量，**不改 §11.4 的任何一行**。
+
+**做法（为什么必须绕一圈）**：heyta 的境内上游白名单是代码常量、只认
+`api.deepseek.com` 与 `heyta.waytofuture.cn`（逐字相等 + 必须 https）。中央 AI
+（`ai-control`，OpenAI 兼容网关）跑在 `127.0.0.1:4050`，与 heyta 容器**不在同一 docker
+网络**，主机名也不在白名单里 ⇒ 唯一合规路径是**把中央 AI 挂在白名单主机的一条路径下**：
+
+```
+heyta 服务端  →  https://heyta.waytofuture.cn/managed-ai/v1/chat/completions
+              →  Caddy handle_path（剥前缀）
+              →  http://127.0.0.1:4050/v1/chat/completions
+              →  中央 AI 按 heyta 的分配 → DeepSeek 官方（api.deepseek.com，境内）
+```
+
+**四条落地动作**（都在生产机上，逐条可回滚）：
+
+1. **收窄 heyta 的分配**：`heyta/production` 原本 priority 1=MiraclePlus 代理、
+   2=OpenCode Go、3=DeepSeek 官方 —— **前两条会出境**，与 §5 直接冲突。
+   已 `POST /admin/allocations/{id}/disable` 停用前两条（`version` 乐观锁），只留 DeepSeek 官方。
+   ⚠️ staging / development 的同两款**未动**（不是用户面，但别把 staging 的 key 当生产用）。
+2. **签一把专用 key**：`POST /admin/product-keys`（product=heyta, environment=production,
+   5000 次/月）。⚠️ `ai_product_keys_active_scope` 是 `UNIQUE (product, environment) WHERE active`
+   ⇒ **一个产品+环境只能有一把 active key**，所以先吊销了那把 2026-10-22 的（近两天零调用）。
+3. **Caddy 加一条路**：`sites.d/00-heyta.caddy` 里 `handle_path /managed-ai/* → 127.0.0.1:4050`，
+   排在 `/api/*` 与兜底 `handle` **之前**（Caddy 的 handle 顺序首个命中胜）。
+   鉴权不在边缘：ai-control 自己按 `ai_` key 校验，无 key 一律 401。
+   🔴 教训：这份站点当时**不是 nginx 在服务** —— 边缘是 `caddy-edge`，`nginx.service` 是 masked，
+   `sites-available/*` 是死配置。我先改错了地方（`nginx -t` 都过、`reload` 却报 masked），
+   测试 404 才发现。**改边缘配置前先 `ss -ltnp | grep :443` 看是谁在监听。**
+4. **heyta 侧**：部署 compose 补 `MANAGED_AI_*` 四枚转发（默认空 = 惰性），`.env` 填值，
+   `docker compose up -d supersync` 重建。
+
+**读数（全部当场）**：
+
+| 判据 | 结果 |
+|---|---|
+| 服务端解析出的 `managedAi` | `configured: true`、`baseUrl=https://heyta.waytofuture.cn/managed-ai/v1`、`modelId=heyta.chat`、key 存在（只回显 `ai_***`） |
+| `domesticUpstreamVerdict(baseUrl)` | `{ok:true, host:'heyta.waytofuture.cn'}` |
+| 阴性对照 | `opencode.ai/zen/go/v1` ⇒ `not-allowlisted`；`http://…` ⇒ `plaintext` |
+| 公网路径无 key | **401** `invalid_product_key`（不是落地页 404 ⇒ 路由真的命中） |
+| 公网路径带 key | **200**，`model:"deepseek-flash"` |
+| 那次调用落在哪家（`ai_usage`） | **DeepSeek 官方 / api.deepseek.com / 200** |
+| heyta 托管代理路由 | `POST /api/ai/managed/chat` 无鉴权 ⇒ **401**（路由已挂） |
+| 生产 active key 数 | **1** |
+
+**还没做的一件事**：带**真实登录会话**走一次 heyta 自己的 `/api/ai/managed/chat`
+（需要账号 + 订阅权益）。上面两条是独立证据（服务端配置 + 上游链路），但"用户视角点一下能用"
+这一格仍空着 —— 第一次真实使用时要盯。
+
+**密钥卫生**：轮换过一次。第一把 key 的明文**被我打印进了终端输出**（错在"只打印布尔"那条
+自制规则上），已当场吊销并重签，`.env` 与 `.managed-ai-key`（600）同步成新值、未再打印。
+`ai_` key 的价值在于"能用"，泄进日志就等于泄露 ⇒ 这类变量以后只允许回显 `prefix + ***`。

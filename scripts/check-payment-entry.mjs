@@ -64,6 +64,19 @@ const ENTRY_PATTERNS = [
   /\/api\/billing\/checkout/,
   /createCheckout\s*\(/,
   /startCheckout\s*\(/,
+  /*
+   * 落地页的购买入口（2026-10-24 加）：付费两档的 CTA 是
+   * `<a href={subscriptionHref(locale)}>` —— 它**不**自己下单（收银台只有
+   * `@heyta/app-host` 一份实现，AGENTS §3.5），只把人送进应用里
+   * 「设置 → 订阅」那一节。所以它调的不是 `startCheckout`，而这条门禁
+   * 按**字面量**找入口，原本完全看不见它 —— 于是"落地页上把按钮删了"不会红。
+   *
+   * 🔴 负向断言：**定义**那一行不算入口。`app-url.ts` 里
+   * `export function subscriptionHref(` 自己也会命中，留着它等于这条判据
+   * 永远绿（删掉调用点、留下定义 ⇒ 照样"有入口"）——
+   * 那正是本文件反复记过的"一条永远通过的判据比没有判据更糟"。
+   */
+  /(?<!function\s)subscriptionHref\s*\(/,
 ];
 
 /**
@@ -333,16 +346,29 @@ const ARMS = [
     '      - WECHAT_PAY_ENABLED=true\n' + PAYCENTER_FALSE, 'entry', 'wechat-retired'],
   ['F 给微信直连的凭证填字面值 ⇒ 红（填了也不多一条通道）',
     '      - WECHAT_MCH_ID=123\n' + PAYCENTER_FALSE, 'entry', 'wechat-creds'],
+  /*
+   * G/H 是 2026-10-24 加的那条落地页入口模式的**两条对照**：
+   *   G 落地页真的调了 `subscriptionHref(...)` ⇒ 算一处入口（绿）
+   *   H 只剩**定义**、没有调用点 ⇒ **不算**入口（红，且点名"没有任何付款入口"）
+   * 没有 H 的话，把 G 的模式写成 `/subscriptionHref/` 也能全绿 —— 而那种写法
+   * 在"删掉按钮、留下函数定义"时会假绿，正是这条判据要防的那件事。
+   */
+  ['G 落地页调用 subscriptionHref(...) ⇒ 算一处入口（绿）', PAYCENTER_FALSE, 'entry', 'ok',
+    ['apps/landing/src', 'Pricing.tsx', 'const buyHref = subscriptionHref(locale);\n']],
+  ['H 只剩 subscriptionHref 的定义、没有调用点 ⇒ 红（没有入口）', PAYCENTER_FALSE, 'noentry', 'no-entry',
+    ['apps/landing/src', 'app-url.ts', 'export function subscriptionHref(locale) { return null; }\n']],
 ];
 
-function fixtureRoot(envLines, withEntry) {
+function fixtureRoot(envLines, withEntry, entryFile) {
   const dir = mkdtempSync(join(tmpdir(), 'heyta-pay-'));
   mkdirSync(join(dir, 'server'), { recursive: true });
   writeFileSync(join(dir, 'server/docker-compose.yml'),
     `services:\n  app:\n    environment:\n${envLines}`);
   for (const d of CLIENT_DIRS) mkdirSync(join(dir, d), { recursive: true });
   if (withEntry) {
-    writeFileSync(join(dir, CLIENT_DIRS[0], 'x.ts'), 'await startCheckout({});\n');
+    // `entryFile` 默认是老形状（应用里调 startCheckout）；落地页那条臂用它自己那行。
+    const [relDir, name, body] = entryFile ?? [CLIENT_DIRS[0], 'x.ts', 'await startCheckout({});\n'];
+    writeFileSync(join(dir, relDir, name), body);
   }
   return dir;
 }
@@ -366,8 +392,8 @@ const EXPECT_TEXT = {
 
 function selfTest() {
   let failures = 0;
-  for (const [label, envLines, mode, expect] of ARMS) {
-    const dir = fixtureRoot(envLines, mode === 'entry');
+  for (const [label, envLines, mode, expect, entryFile] of ARMS) {
+    const dir = fixtureRoot(envLines, mode === 'entry', entryFile);
     let out;
     try {
       out = runGate(dir);

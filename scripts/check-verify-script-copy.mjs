@@ -112,9 +112,26 @@ const EXACT_FORMS = [
 ];
 const SUBSTR_FORMS = [
   /(?<![-\w])(?:grep|rg)\s+(['"])([^'"]+)\1/g,
-  /\b(has_sub|has_desc_sub|settle_for|idb_has|idb_wait_label)\s+"([^"$]+)"/g,
-  /\b(has_sub|has_desc_sub|settle_for|idb_has|idb_wait_label)\s+'([^'$]+)'/g,
+  /\b(has_sub|has_desc_sub|settle_for|idb_has|idb_wait_label|tree_has|field_count|ax_press|ax_press_until|remember_safe_tap|fill_field)\s+"([^"$]+)"/g,
+  /\b(has_sub|has_desc_sub|settle_for|idb_has|idb_wait_label|tree_has|field_count|ax_press|ax_press_until|remember_safe_tap|fill_field)\s+'([^'$]+)'/g,
 ];
+/**
+ * 🔴 上面那六枚（`tree_has` / `field_count` / `ax_press` / `ax_press_until` /
+ * `remember_safe_tap` / `fill_field`）是 iOS 装置那一族**自己**的查找件，2026-10-25 由
+ * `verify-mobile-collab-ios.sh` 这条腿带进来。**档位是读实现定的，不是类推的**：
+ *  · `tree_has`（该脚本内联 python）对 `AXLabel/AXValue/label/value/title` 做 **NFKC 子串**；
+ *  · `field_count` 对 `role==AXTextField` 节点的 `AXLabel` 做 **NFKC 子串**；
+ *  · `ax_press` / `ax_press_until` / `remember_safe_tap` / `fill_field` 都经
+ *    `scripts/tools/ios-ax-shim.py` 的 `find()`：`:282-287` 先取 `label_of(n) == label` 那批，
+ *    为空且没带 `--exact` 时**退化到** `label in label_of(n)` ⇒ 运行时接受子串，
+ *    所以按 SUBSTR 档判才等于按真语义判（判 EXACT 会把「邮箱」这种合法前缀报成缺失）。
+ * `shot` **刻意不进名单**：它的实参是证据文件名（「02c-没落在AuthScreen」这类装置自造的短语），
+ * 不是界面文案 —— 收进来会把几十条日志命名判成"缺失词条"，正是文件头判据 ① 要防的那件事。
+ * 扩面前后各跑一次 `pnpm check:verify-script-copy` 的读数（2026-10-25 那一趟）：
+ * `needle 377→469`、`靠substring 105→197`、**`缺失=0`**、`输入脚本=65` 两侧同数
+ * ⇒ 零红变化。牙的取证也在同一趟：把该脚本 `:591` 那枚 needle 改成「使用自建服务端歪掉的」，
+ * 本门 `rc=1` 并点名 `verify-mobile-collab-ios.sh:591 [substr]`，还原后（`.mut-bak` 逐字节）回到 `rc=0`。
+ */
 
 /**
  * 界面**不是 heyta 画的**、因此不该拿去对词条表的那些串，逐项登记理由。

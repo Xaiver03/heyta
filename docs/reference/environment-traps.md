@@ -11302,3 +11302,134 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       `scripts/reinstall-all.sh` 的保留策略（`HEYTA_KEEP_ROUNDS`），carrier 归本脚本。
       两族的共同禁忌是同一个：**不要 `rm -rf ~/heyta-*`** —— 那个父目录里同时躺着别人的
       在途工作区。
+
+547. **iOS 授权弹窗取证：截图上那一帧可能是"设备的状态"，不是"系统的行为"**（2026-10-24，交付项 4 的探针 `apps/mobile/probe/ios-notification-purpose/`）
+    要证的是一件很小的事：`NSUserNotificationsUsageDescription` 会不会被系统读进弹窗正文。
+    装置把答案压成一枚每轮新生成的暗号写进那枚键，截图里出现暗号＝读了。
+    四条实测把它逼到这个形状，缺任何一条都会**假绿或假结论**（结论本身还要再降级一档，见 #548）：
+
+    1. **上一轮没人点掉的弹窗会跨过 `uninstall` + `install` 留在屏上。** 实测两次：
+       截图正文是 `…1792837114`，而设备上那份 plist 已经是 `…1792837248`。
+       弹窗是 SpringBoard 画的，卸载应用不卸载它。
+       ⇒ 判据不许写成"截图里出现了 `HEYTA-PURPOSE-*`"，要写成
+       **"截图里的串逐字等于 `installed-marker.txt`（从设备容器里那份 plist 现读）"**；
+       本轮装置自己比这一步，对不上直接判废。
+    2. **没有 scene 生命周期的应用在 iOS 27 上起来就被判非活跃。** 症状是
+       `simctl launch` 回一个 pid、屏幕却停在桌面，`log show` 里
+       `UIKit:Application Deactivation reason added: 10` → 1024、随后 backboardd
+       `connection invalidated`。弹窗根本没机会渲染，而截图读起来像"系统不读那枚键"。
+       ⇒ 探针补 `UIApplicationSceneManifest` + `SceneDelegate`（真实应用本来就有，见
+       `apps/mobile/ios/Heyta/Info.plist`），这不是模板冗余。
+    3. **`bootstatus -b` 说的是"设备起来了"，不是"通知服务能答话"。** 冷重启后立刻装/起，
+       35 秒内 `getNotificationSettings` 不答、`requestAuthorization` 也不渲染；
+       同一枚包在设备温了以后 3～14 秒就答 —— "多久能答"没有稳定值，不许押时间点截图。
+       ⇒ 装置的 readiness 改成**读应用自己落在容器里的读数**（出现 `PROBE_STATUS_BEFORE`
+       才算可以截图）；答不上就重装重起、有界重试，始终答不上整轮判废。
+       （原先写的"`bootstatus -b` 之后 `sleep 90` + 取三帧"是押时间点的做法，已按实测换掉。）
+    4. **`simctl launch --stdout=… --stderr=… --terminate-running-process` 在装置里稳定报
+       `FBSOpenApplicationServiceErrorDomain code=3` "Process failed to launch"，
+       而同一枚包同样的参数在 shell 里手敲能起。** 归因未定论（不写成"因为 X"），
+       但这条通道已被证明不可靠。
+       ⇒ 读数改走应用自己的容器文件（`Documents/heyta-probe.txt`，`uninstall` 天然清空），
+       起进程那一步不再带任何重定向参数 —— **"读不到日志"和"应用没起来"必须是两个不同的失败形状**。
+
+    通用的一条：这类装置先问"我这一步的失法会被读成什么"。上面四条里有三条的坏读数
+    都长得像**结论**（"系统不读那枚键"），而不是像故障 —— 一枚会造结论的装置比没有装置更糟。
+
+548. **同一份 plist、同一枚二进制，弹窗正文两种形态都出现过 —— 装置能证"出现过"，证不了"什么时候"**（2026-10-24，接上一条的同一套探针）
+    20:38 那一轮：注入暗号 == 设备容器里现读的那份 plist == 弹窗正文（三条逐字一致）。
+    21:02 那一轮：同样三条一致，正文却是系统自带那句「通知可能包括提醒、声音和图标标记…」。
+    中间试过并**否证**的归因只有一个："冷重启后的第一发才回落" —— 21:02 那轮没重启、
+    设备已温（重启后 3 秒通知服务就答话了），照样是自带句式。
+    于是那条归因对应的装置改动（每轮 `shutdown + boot`）也撤了：它既不造成也不消除
+    这个现象，却要付"每轮多等 90 秒 + 打断别人在用的设备"。
+
+    对产品的那一条：**别把"iOS 会显示我们的目的说明"写成承诺**。这枚键在某些状态下确实是
+    正文，在另一些状态下被自带句式盖掉，而"哪一态"在模拟器上判不出来 ——
+    要让用户一定看到理由，只能靠应用内那一行（提醒面的降级状态）。
+    判据形状上留下的教训：**"出现过 X"和"总是 X"是两个断言**，取证装置跑一轮只配得上前者；
+    把一轮的读数写成"系统读这枚键"，下一轮反例出现时文档就成了错的那一方。
+
+549. **RN 的 void 型 TurboModule 方法抛异常时进程直接 abort，而 `.ips` 里查不到是哪一次调用**（2026-10-24，Heyta 模拟器五连崩，全部停在 `RCTTurboModule.mm:467`）
+    五份报告（17:28 / 20:25 / 20:33 / 20:37 / 20:58）签名逐字相同：触发线程在
+    `com.meta.react.turbomodulemanager.queue`，第 9 帧是
+    `invocation function for block in ObjCTurboModule::performVoidMethodInvocation`。
+    触发线程的**序号每次都不同**（13 / 6 / 8 …）—— 那是线程池调度，不是不同的故障。
+
+    🔴 **报告里没有异常原因，这不是日志等级问题。** 顶层键逐份核过：既无 `asi`
+    也无 `exceptionReason`。根因在源码：`RCTTurboModule.mm` 的同步路径（:395-406）
+    会把 `NSException` 转成 `JSError`，而 **void 异步路径**（:462-464）只做
+    `@throw exception` —— 异常逃出 dispatch block ⇒ `std::terminate` ⇒ `SIGABRT`，
+    而那两处**转换函数里已经拼好的 `moduleName.methodName + reason` 从来没有被写出去**。
+    于是"等复现去抓日志"是死路（它下次照样什么都不留），只能从**形状**上消除。
+
+    🔴 **主线程栈不是原因。** 五次的主线程栈顶各不相同
+    （`_SFAppPasswordSavingViewController` / `_platform_memmove` / `mach_msg2_trap` /
+    `madvise` / 又一次 `mach_msg2_trap`）—— 报告抓的是 abort 那一刻主线程**恰好**在哪。
+    它只说明"当时正在卸载并处理第一响应者"，顺着它去查键盘或 os_log 会跑偏。
+
+    抛在哪：全仓 RN 里**返回 `void`** 的原生方法只有两处 —— `ViewNativeComponent` 的
+    `focus`/`blur`/`hotspotUpdate`/`setPressed`，与 `ImageViewNativeComponent` 的
+    `setIsVisible_EXPERIMENTAL`。`RCTViewComponentView.mm` 上 `canBecomeFirstResponder`
+    恒 `YES`（:1652）、`handleCommand` 认 `focus`/`blur`（:1657）、`focus` 就是
+    `becomeFirstResponder`（:1670）。竞态形状：输入框在**条件渲染**里且带 `autoFocus`
+    （`{open && <Composer autoFocus/>}`）⇒ 抢第一响应者与 unmount 撞在同一帧。
+
+    修法（已落地并实测）：原生端**不透传 `autoFocus`**，改成延后一拍 `focus()`
+    + 卸载前先 `blur()`；web 保持透传（RNW 没有这条原生命令，不进 Fabric 那条路）。
+    判据：在同一台崩过的模拟器上连开/关 6 轮，pid 不变、`-newermt` 查新增报告数 0。
+
+    ⚠️ 盲区：只修了"新建任务"面板那条路径（实机点过）；行内新建清单那条改法相同、
+    类型与单测都过，但**没在实机上点过**。别把"同一套改法"读成"两条都验过"。
+
+550. **取证三件套的假读数：`log` 在沙箱里跑不了、`.ips` 会被 `Retired/` 收走、`idb` 的全局 flag 必须放在子命令前**（2026-10-24，查上面那次崩溃时逐个踩到）
+    · `log show … --predicate …` 在沙箱内直接回 `log: Cannot run while sandboxed` ——
+      它不是"查无结果"，是一条**被拒的命令**。要这条读数得让用户在自己的终端跑。
+    · `~/Library/Logs/DiagnosticReports/*.ips` 会被系统搬进同目录的 `Retired/`
+      （本轮 21:11 收走三份）。于是 `ls *.ips | wc -l` 从 3 变 0，读起来像"没崩过"。
+      ⇒ 数"有没有**新**崩溃"要连 `Retired/` 一起算，并用 `-newermt <修复时刻>`
+      而不是数总数 —— 否则"归档"会被读成"修好了"。
+    · `idb --companion-path <二进制> ui describe-all --udid <u>`：`--companion-path`
+      是**全局** flag，放到子命令后面报 `unrecognized arguments`。而 `IDB_COMPANION`
+      环境变量是 `--companion`（**socket 地址**）的形态，塞二进制路径进去会
+      `[Errno 38] Socket operation on non-socket`（`scripts/verify-mobile-ios.sh:143`
+      已记这条）。两个 flag 名字像、语义不同。
+    · `xcodebuild` 在本沙箱里因 SwiftPM 缓存被拒而失败：
+      `cannot open file '…/org.swift.swiftpm/manifests/…' for diagnostics emission
+      (Operation not permitted)`，换 `-clonedSourcePackagesDirPath` **也不解除**。
+      ⇒ 纯 JS 改动可用"重打 `main.jsbundle` 换进 `.app`"完成等价验证，
+      并用 grep 确认新标识符真的在产物里；别把"原生编不过"当成"改动没验过"。
+
+551. **"文案已入库"不等于"界面有这一行"：三句降级词条零消费者，而任务清单把它标成了已完成**（2026-10-25，补 goal 交付项 1 的另一半时现量）
+    · `packages/i18n` 里 `reminder.delivery.blockedNotification` / `.blockedExactAlarm` / `.openSettings`
+      三句是全仓唯一提及"到点不会响"的界面文案，而 `grep -rn blockedNotification` 的命中**只有词条表自己**
+      —— 没有一处 `t(...)` 读它。同期 `authorizeNativeReminders()` 仍然回 `Promise<void>`，
+      也就是系统那一跳的答复依旧被吞掉。任务清单上那一格写的是"已完成"。
+    · 为什么会这样：这一轮的**设置页那一节**先做完了（三行闸门、跳系统页、落点三句话，
+      还有一整份单测），交付项读起来像"拒绝态可见化已经落地"。但任务书要的是**提醒面**那一行，
+      它住在一个未跟踪文件里，被一次硬回滚抹掉后只重建了"已跟踪文件半边"。
+      ⇒ 判"某条承诺做到了"要按**句子有没有读者**查：`grep -rn "<key>"` 命中数＝1（只有定义）
+      就是没接完，与测试条数、任务状态无关。
+    · 🔴 顺带一枚恒绿的源码级判据：`expect(sharedSrc).toContain('deliveryBlocked.settings.onPress')`
+      在把守卫改成 `{false ? null : (…)}`（入口永不渲染）之后**仍然绿** —— 那句字符串还在文件里。
+      变异实测过。源码级 pin 要钉的是**守卫本身**（逐字 `… === undefined ? null : (`）
+      与**位置关系**（那一行落在"有提醒"那一支里，不在空态上方），不是"某个标识符出现过"。
+
+552. **取证探针留下的那道系统弹窗会挡住下一轮设备验收，而且卸掉探针也撤不走它**（2026-10-25，iOS 提醒面拒绝态取证白烧一枚 Release 构建之后现量）
+    · 症状：`scripts/verify-mobile-ios-reminder.sh` 在 permission-recovery 模式下第一步就整排判红
+      （`首启隐私/联网选择层未收起` / `任务页不可达` / `新建任务按钮未真正打开 Composer`），
+      而截图上盖在 heyta 首屏之上的是一句**别的 App 的**系统授权弹窗
+      ——「"heyta 通知探针" 想给你发送通知」（那是 `apps/mobile/probe/ios-notification-purpose/`
+      那枚取证件，bundle `cloud.finlaw.heyta.notifypurposeprobe`，显示名就是它）。
+    · 🔴 装置为什么抓不到它：那枚弹窗**不在应用的 AX 树里**
+      （`ios-ax-shim.py "不允许" … → found=False`），所以 `deny_notification_permission()`
+      找不到拒绝按钮，`has`/`press` 全部落空。这与「"保存密码？"属别的进程且把树压到 1 枚」
+      是同一族，只是这一次被压住的不是键盘而是整条旅程。
+    · 撤掉它的三条**失败**试法（逐条实测）：`xcrun simctl uninstall <探针>` 之后弹窗**照旧在**
+      （卸载不清 SpringBoard 已排队的授权窗）；`simctl spawn … killall SpringBoard` 在该 runtime 里
+      直接 `No such file or directory`；`launchctl kickstart -k gui/0/com.apple.SpringBoard`
+      也没能撤掉。**唯一清掉它的是 `simctl shutdown` + `simctl boot`。**
+    · ⇒ 规律：**取证装置用完要当场把设备交还成"干净可跑"的样子** —— 卸载探针之后必须再重启一次设备，
+      否则下一轮（可能是别人、可能是明天的自己）会用一枚几分钟的 Release 构建去换一次判红。
+      跑任何设备验收之前，先 `simctl io <u> screenshot` 看一眼屏幕归谁，并
+      `simctl listapps <u> | grep -c <探针 bundle id>` 数一遍这台设备上还留着几枚取证件。

@@ -106,3 +106,19 @@ HEAD 在动，照下面几条现量，别抄本节正文：
   `cd apps/web && npx vitest run tests/share-notification-content.spec.tsx` ⇒ 条数由脚本自己打印。
 
 落地后的实施记录与读数写回 `docs/plans/collaboration-shared-lists.md` 的 M5 那一节。
+
+---
+
+## 补记（2026-10-24，移动端接上投递面之后）
+
+上面「事实基线」里那句「读者只有 web 那一处接线」是**立文当时**的读数。今天有了第二个读者：
+`apps/mobile/src/share/share-activity-notify.ts`（系统投递）+ `apps/mobile/src/share/share-signals.ts`（信号→拉取），
+而**判断本体仍然只有一份**，住在 `@heyta/ui`（`selectShareActivitiesToNotify` 与正文构造件）——
+壳只投递，不重算口径，这正是裁决二"内容口径不许各壳自己写一遍"要的形状。
+
+界面腿上量得到的一件事：偏好面**只剩活动那一族**（另两档 2026-10-24 撤下，理由见
+[ADR-0062 的实施记录](0062-shared-list-key-distribution.md)）。反向臂（界面上不许再摆那两档）在
+`scripts/verify-mobile-collab-ios.sh` 第 10 步，复量 `pnpm verify:mobile-collab:ios`。
+
+⚠️ 裁决三那句"这台设备**同意过**"在移动端同样成立，而 §四 那格缺口（**通过链接加入的设备没有同意记录**）
+在移动端**没有**被顺手放宽：手机加入流程今天不写同意态 ⇒ 它拿到的是零打扰。补法仍归产品负责人拍。

@@ -71,6 +71,53 @@ pnpm verify:mobile-ios          # iOS 输入侧全链路：点 FAB → 输入 �
 pnpm verify:ios-lan-http        # iOS 连**私有 IP 字面量**（自建服务器）的明文 HTTP 可用性
                                 #   三个地址单变量对照：错端口 / 错 IP 都失败，真 LAN 地址成功
                                 #   ⚠️ 需要 Simulator 窗口在**当前 Space**（见 §7 第 37 条）
+pnpm verify:mobile-collab:ios   # 🔴 共享清单在**手机上**是不是真的能用（M6 那条旅程的验收载体）
+                                #   真 Release 包 + 真 iPhone 模拟器 + 真服务端（TEST_MODE，零 mock），
+                                #   "另一台设备"那侧是同仓的生产装配件（`scripts/lib/collab-owner-step.mjs`
+                                #   里的 `createShareOpDispatcher`），不是手搓 HTTP。六档判据：
+                                #   L1 手机走自己的界面加入（贴凭证→同意→界面自己说「加入成功」）；
+                                #   L2 owner 写的任务在手机上**不点同步**就出现；
+                                #   L3 手机发评论→这条评论回到界面上；
+                                #   L4 🔴 owner 把手机那行写回的 op 下载回来、用名册公钥重验 = `verified`
+                                #      （服务端"收下了"不算 —— ADR-0069 那句承诺要在移动端也成立）；
+                                #   L5 owner 再写一条→手机靠 `new_share_ops` 自己重画（全程没碰同步按钮）；
+                                #   L6 通知偏好面只有活动那三档（没有输入的档位不许画）。
+                                #   每档都留截图（失败也留）在 `apps/mobile/evidence/collab-ios-<戳>/`；
+                                #   Release 产物与 DerivedData 住临时目录，收尾删。
+                                #   凭据那一侧走的是**登录**那条规定路径（同族装置 `sign_in_with_password`）：
+                                #     自托管表单 →「注册 / 登录」→ AuthScreen 填地址/邮箱/登录密码 →
+                                #     「用邮箱和密码登录」→ 会话卡之后**才有**「加密口令」栏 →「保存并启用同步」。
+                                #   ⚠️ 全新设备上 AuthScreen 默认落在「统一身份登录」那一档（`centralMode`），
+                                #     那一代整段不渲染邮箱/地址两栏 ⇒ 装置先按「使用自建服务端」切档再填。
+                                #   ⚠️ 登录之后还有一步**必须做**：设置 → 账号安全 → 创建「加密数据钥匙」。
+                                #     同步读的密文来自 `readVaultSession()`（`host.ts:609`），**不是**
+                                #     `readSyncConfig().password` ⇒ 只在 AuthScreen 填口令，界面会一直停在
+                                #     「还没设置端到端加密口令」（2026-10-25 第 10/11 跑实测）。
+                                #   ⚠️ 它开头有一道**并行闸**：读到别的 `verify-mobile-*` 在跑就退 3，
+                                #     不跟别人抢同一台模拟器（两趟设备腿互相拆现场时红都归错人）。
+                                #   退出码：0 全绿 / 1 有判据红 / 3 **前提不成立**（装置问题，别照着改产品）。
+                                #   已登记进 `scripts/check-journey-coverage.mjs` 那张表（真设备 + 真服务端）。
+pnpm verify:mobile-ios-subscription
+                                # 移动端「订阅」独立一节 + `?` 气泡的**设备读数**（无头模拟器，零服务端）
+                                #   四条判据全读 AX 树：①设置目录里 `profile-entry-subscription` 到得了
+                                #   ②hint 默认**不在**树上 ③点 `?` 展开、再点收起（自校准 x 偏移，
+                                #   11 个候选逐个试，都不成才红）④订阅页有 lead/两档标价/CTA/脚注，
+                                #   未登录按下说「先登录你的 heyta 账号，才能下单。」
+                                #   证据图落 `apps/mobile/evidence/subscription-<日期>/`
+                                #   ⚠️ 它**不**证明"能买到"：真下单要真服务端 + 真账号
+                                #   （那两条各有自己的腿：renew-sellable / verify:mobile-ios）
+                                #   🔴 它存在的理由：`check:settings-prose` 只扫**调用点**，
+                                #   把 `SettingsRow` 里的 hint 改成 `<Text>` 直出时它照样绿 ——
+                                #   2026-10-24 实测过这条缝，只有这条设备腿抓到了。
+                                #   零成本的那一道是 `packages/ui/tests/settings-hint-through-tip.spec.ts`
+pnpm verify:android-subscription
+                                # 同一件事的 **Android 载具**（远端 `linux-dev` 上的 headless 模拟器）
+                                #   `uiautomator dump` 给每个节点 `resource-id` + `bounds` ⇒ `?` 是**独立节点**
+                                #   （`<row-testID>-tip`），点它中心即可，**不用猜坐标**（比 iOS 那版硬）
+                                #   ⚠️ 远端宿主与 SDK 路径走 `ANDROID_HOST` / `ANDROID_SDK_ON_HOST`
+                                #   ⚠️ 界面语言由**这个包**的 per-app locale 决定（本镜像系统 locale 是 en-US）：
+                                #      `adb shell cmd locale set-app-locales com.heyta --locales zh-CN`
+                                #   ⚠️ 同样**不**证明"能买到"
 
 # 鸿蒙验收：用 DevEco **自带**的工具链（cmake/ninja/ohpm/hvigorw 都不在 PATH 上）
 pnpm verify:harmony-toolchain   # 工具链 → 最小 ArkTS 工程 → 真 HAP（17 项）
@@ -100,11 +147,30 @@ pnpm check:checkout-tier-gates  # 收银台两道新闸门（②′ "这台实�
                                 #   没有一条用例会为"我少了一条判据"报错，只有一批 409 悄悄变成 200。
                                 #   臂数由脚本自己打印；红集合读 vitest 的 json reporter，不解析彩色输出。
                                 #   同族先例：`check:op-log-semantics`、`check:egress-wording`。
+pnpm doctor:billing             # 🔴 **这台实例到底能卖什么**（只读：不发请求、不碰库）。
+                                #   打印解析后的配置事实（支付中心 / 托管 AI 上游在不在）、
+                                #   真的注册成功的收款通道、以及每个 SKU 按闸门顺序先撞上哪一道。
+                                #   它**不**重新判断"能不能卖" —— 那是 `checkout.routes.ts` 的闸门，
+                                #   写第二份一定会漂；这里只把运营看不见的那几格事实摊开。
+                                #   在容器里看**实际生效**的那份：`docker compose exec server npm run doctor:billing:dist`
+                                #   （`doctor:billing` 会先 `tsc` —— `ts-node` 解析不了源码里 `./x.js` 那种后缀；
+                                #   而运行镜像按 `npm pkg delete devDependencies` 构建，容器里没有 ts-node）。
+                                #   `--strict` 时有档卖不了就退 1（部署前自检用）。
+                                #   由来：产品负责人 2026-10-24 按下 ¥12 拿到「这一档现在还不能卖」，
+                                #   问的是"现在不应该接了中央支付吗？" —— 收款确实已走支付中心，
+                                #   挡住那一单的是 ②′（这台实例没配托管 AI 上游）。
 pnpm check:mobile-renew-shape   # 移动壳续费那一屏的**形状判据**的变异验证（`apps/mobile/tests/renew-entry.spec.ts`
                                 #   全是源码正则，没有 render 载体 —— 这类断言最阴的坏法是被**注释**满足、
                                 #   或写成恒真，所以四条臂各注入一次真实坏法：删同意闸门 / 壳里抄 priceId /
                                 #   屏上写死 `¥` 金额 / 把 `web.*` 键读进移动壳）。
                                 #   与上一条的分工：那套管"服务端该不该卖"，这套管"壳有没有自己抄一份收银台"。
+pnpm check:settings-prose       # **设置界面禁止内联说明文字**（2026-10-24 产品负责人的禁令）。
+                                #   账本制：账本外新增 / 某文件读数涨了 / 掉了却没改账本，三种都红。
+                                #   账本 `scripts/settings-prose-ledger.json`；清理时
+                                #   `node scripts/check-settings-no-prose.mjs --update`（只许变小）。
+                                #   例外只有三种：反馈（alert/aria-live/danger）、
+                                #   ADR-0054 §7 的出境披露（`data-settings-disclosure`）、
+                                #   「个人资料」概览那一句副句。规则正文在 design-system.md。
 pnpm check:design               # 只跑设计变量硬编码检查
 pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:ui-language          # 界面文案必须全是中文（见 §5）
