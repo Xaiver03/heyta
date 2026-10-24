@@ -125,6 +125,28 @@ MIT 许可证的合规义务：**保留版权声明与许可声明**。本仓库
 
 原始许可全文由已安装包携带并由构建许可清单收录；以上版本、许可证和仓库更新时间均实际核查，不将上层近期发布冒充每个传递依赖的近期发布。
 
+### Sparkle 2（macOS 自动更新，2026-10-24）
+
+决策见 [ADR-0072](docs/adr/0072-desktop-auto-update-via-sparkle.md)（原编号 0071，因与同日并行线
+那份「共享清单通知正文边界」的 `0071-share-notification-content-boundary` 撞号而让号 ——
+那份此刻尚未 `git add`，故此处**只提文件名不加链接**，避免 `check:docs` 判死链）。这是本仓库**第一枚通过
+SwiftPM 引入的原生依赖**（其余原生侧只有随发行版走的系统库，走的是
+[ADR-0057](docs/adr/0057-native-system-library-linking.md) 那条登记线），所以两道门在此逐条记实。
+
+| 项 | 值 |
+|---|---|
+| 包 | `Sparkle`（sparkle-project/Sparkle） |
+| 引入方式 | SwiftPM，仅 `apps/desktop-macos` |
+| **License** | **MIT**（官网与仓库 `LICENSE` 一致；CocoaPods 页亦标 MIT）⇒ 白名单内自动通过 |
+| **可维护性** | ✅ 远超「2021 年后仍在更新」：仓库最后提交 **2026-10-19**，`Package.swift` 随 **2.10.0** 更新于 2026-09-13，CocoaPods 最新 **2.9.4（2026-07）**；9.7k★，未归档 |
+| 平台要求 | macOS 12+；壳的 `LSMinimumSystemVersion` 是 14.0 ⇒ 无冲突 |
+| 用途 | 桌面端自动更新的**客户端**（拉 appcast → 下载 → ed25519 验签 → 换包重启） |
+
+⚠️ **两笔要分清**：① 本条登记的是**依赖准入**，不等于"自动更新已做" —— ADR-0072 §五第 6 条
+写明完成判据是"一次从 app 里发起的真更新"，在那之前任何地方都只能写"未做"；
+② 发布侧签名用的是**本仓库自己的** `scripts/appcast/sparkle-appcast.mjs`（零依赖，纯 Node
+`crypto` 的 ed25519），**不引入** Sparkle 的 `sign_update` 二进制 —— 它只是**兼容**同一枚签名格式。
+
 ### 逐项清单
 
 📋 **[`research/licenses-inventory.generated.md`](research/licenses-inventory.generated.md)**

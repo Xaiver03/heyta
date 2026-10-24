@@ -2385,7 +2385,15 @@ export const apiRoutes = async (
           return reply.status(result.status).send(result.body);
         }
         Logger.error(`Email password registration code verification failed: ${error instanceof Error ? error.message : 'unknown'}`);
-        return reply.status(400).send({ code: 'invalid_registration_challenge', message: 'This registration code is invalid or has expired.' });
+        // 🔴 服务端自己的故障（事务超时 / 等行锁 / 连接池）**不许**说成"码不对"。
+        //    2026-10-24 线上真实报障：用户填对了 6 位码，只因那笔事务等锁超过
+        //    Prisma 默认的 5 秒，界面就说"邮箱地址或令牌看起来不对"，而服务端日志
+        //    记的是 Transaction already closed。把基础设施故障标成 400 invalid 等于
+        //    让用户去改一个本来就对的东西 —— 这里改成 503 + 可重试。
+        return reply.status(503).header('retry-after', '3').send({
+          code: 'registration_unavailable',
+          message: 'We could not verify that code just now. Please try again in a moment.',
+        });
       }
     },
   );
@@ -2477,7 +2485,12 @@ export const apiRoutes = async (
           return reply.status(result.status).send(result.body);
         }
         Logger.error(`Email login code verification failed: ${error instanceof Error ? error.message : 'unknown'}`);
-        return reply.status(400).send({ code: 'invalid_login_challenge', message: 'This login code is invalid or has expired.' });
+        // 与注册验证码同一条立场（见上面 `registerVerify` 那段注释）：服务端故障
+        // 不许说成"码不对"。
+        return reply.status(503).header('retry-after', '3').send({
+          code: 'login_unavailable',
+          message: 'We could not verify that code just now. Please try again in a moment.',
+        });
       }
     },
   );

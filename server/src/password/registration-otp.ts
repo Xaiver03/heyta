@@ -35,6 +35,13 @@ export const REGISTRATION_CODE_RESEND_COOLDOWN_MS =
 const REGISTRATION_CODE_PURPOSE = 'email-password-registration:v1';
 const INVALID_CHALLENGE_MESSAGE = 'This registration code is invalid or has expired.';
 const CODE_RATE_LIMITED_MESSAGE = 'Please wait before requesting another registration code.';
+/**
+ * 激活那笔事务的时间上限（Prisma 交互式事务默认 5 秒，见 `verifyRegistrationCode`
+ * 里那段注释：2026-10-24 实测默认上限把"等行锁"误报成了"验证码不对"）。
+ * 等锁/等连接不是用户填错 ⇒ 给足 20 秒，超了由调用方回 503 让客户端重试。
+ */
+export const REGISTRATION_TX_TIMEOUT_MS = 20_000;
+export const REGISTRATION_TX_MAX_WAIT_MS = 10_000;
 
 export type RegistrationOtpErrorCode =
   | 'invalid_registration_challenge'
@@ -369,6 +376,14 @@ export const verifyRegistrationCode = async (
   try {
     if (challenge.userId === null) throw invalidChallenge();
     const activatedUserId = challenge.userId;
+    // 🔴 显式给时间上限（Prisma 交互式事务默认 5 秒）。
+    //
+    // 2026-10-24 线上实测：同一段事务在生产库上复刻只要 **168ms**（FOR UPDATE 7ms、
+    // 领取 4ms、激活 2ms、会话落库 4ms、JWT 签名 78ms），但并发时它要**等行锁**
+    // （`SELECT … FOR UPDATE`）或等连接池 —— 默认 5 秒一到，Prisma 就把整笔作废，
+    // 而调用方当年把所有非领域错误一律平成 400「验证码无效或已过期」，
+    // 于是**用户填对了码却被界面告知"邮箱或令牌不对"**（一次真实报障）。
+    // 等锁不是用户填错，给它 20 秒；真超时再由调用方回 503 让客户端重试。
     const result = await prisma.$transaction(async (tx) => {
       // Requests lock the account row before touching its challenge. Verify in
       // the same order so a request replacing a challenge cannot deadlock with
@@ -440,7 +455,7 @@ export const verifyRegistrationCode = async (
         token: await issueSession(user, meta),
         user: { id: user.id, email: user.email, locale: user.locale },
       };
-    });
+    }, { timeout: REGISTRATION_TX_TIMEOUT_MS, maxWait: REGISTRATION_TX_MAX_WAIT_MS });
     authCache.invalidate(activatedUserId);
     return result;
   } catch (error) {
