@@ -142,9 +142,15 @@ describe('移动壳：分享块与权益行真的挂上了（挂不上没有别�
     expect(growth).toContain("t('web.growth.share.note')");
   });
 
-  it('「我的」真的挂了 EntitlementSection（与 NotesSection 同一条理由）', () => {
-    expect(profile).toContain('import { EntitlementSection }');
-    expect(profile).toContain('<EntitlementSection />');
+  /**
+   * 2026-10-24：状态行搬进了独立的订阅页（`SubscriptionSection`），「我的」只留入口 ——
+   * 判据跟着搬，但**没有变松**：仍然要求"真的渲染了"，而且入口链接的那一节真的存在。
+   */
+  it('订阅页真的挂了 EntitlementSection，且「我的」有通往它的入口', () => {
+    const subscription = src('../src/screens/SubscriptionSection.tsx');
+    expect(subscription).toContain('import { EntitlementSection }');
+    expect(subscription).toContain('<EntitlementSection />');
+    expect(profile).toContain("setSettingsSection('subscription')");
   });
 
   it('权益行的四条判断都在：闸门先于请求、只有 denied 分到期/其它、未知不猜过期', () => {

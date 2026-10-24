@@ -148,4 +148,27 @@ describe('路由：判据交 app-host，壳只装配', () => {
     expect(h.personal, '悄悄落个人 log = 界面动了、对面看不见').toHaveLength(0);
     h.cleanup();
   });
+
+  it('🔴 把路由套进路由（base.getState 绕回 `currentState`）⇒ 具名报错，不许爆栈', () => {
+    // 复现 2026-10-24 iOS 真机那一崩的形状：`db/open-host.ts` 的 `withWriteSignal()`
+    // 返回的包装宿主，它的 `getState` 就是本模块的 `currentState`。
+    // 把那样一件交成 base ⇒ 读侧无限互递归。闸门要把它变成**一句能读懂的报错**，
+    // 而不是 `RangeError: Maximum call stack size exceeded`（栈里只有两个名字交替，
+    // 看不出是装配问题，长得像 RN 的锅）。
+    const h = harness();
+    bindMobileOplogBase({
+      dispatch: async () => undefined,
+      dispatchChecked: async () => undefined,
+      getState: currentState,
+    });
+    expect(() => currentState()).toThrow(/递归/);
+    // 报错不能把闸门自己卡住：摘回原始 base 后必须照常读得到。
+    bindMobileOplogBase({
+      dispatch: async () => undefined,
+      dispatchChecked: async () => undefined,
+      getState: () => h.state,
+    });
+    expect(currentState()).toBe(h.state);
+    h.cleanup();
+  });
 });

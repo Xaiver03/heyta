@@ -220,6 +220,24 @@ describe('装配的反向判据（源码那半，先剥注释）', () => {
     expect(code).toContain('shareAwareState');
   });
 
+  it('🔴 `bindMobileOplogBase` 的调用点全壳**只许一处**（第二处必然拿到包装宿主 ⇒ 递归）', () => {
+    // 2026-10-24 iOS 设备腿实测：`share/share-signals.ts` 当时也绑了一次，交的是
+    // `openTaskHost()` 那份**包装后**的宿主（它的 `getState` 就是 `wiring.currentState`），
+    // 于是 `currentState → base.getState → currentState` 逐帧互递归 ——
+    // 用户在设置页存完凭据（那一次会 `startRealtime()`），下一帧整个 App 死在
+    // `RangeError: Maximum call stack size exceeded`。
+    // 这一条只数调用点（声明那行剔掉），不看"文件里出现过那个词"：把绑定挪回第二处必红。
+    const callSites = ['apps/mobile/src/db/open-host.ts'];
+    const found = mobileSources().filter((file) => {
+      const code = stripComments(read(file))
+        .split('\n')
+        .filter((line) => !/^\s*(export )?function bindMobileOplogBase\b/.test(line))
+        .join('\n');
+      return code.includes('bindMobileOplogBase(');
+    });
+    expect(found, `出现第二处绑定入口：${found.join(', ')}`).toEqual(callSites);
+  });
+
   it('判据 C 数的构造点：移动端壳里真的调用 `createCommentActions(`', () => {
     expect(stripComments(read('apps/mobile/src/share/comment-actions.ts'))).toContain('createCommentActions(');
   });

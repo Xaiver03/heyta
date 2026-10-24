@@ -67,6 +67,9 @@ function requireBase(): MobileOplogBase {
 /**
  * `openTaskHost()` 打开后把**未包装**的引擎入口交进来；数据库换代时摘掉。
  * 🔴 交的一定是原始宿主的方法 —— 交包装后的会把路由套进路由（递归）。
+ * 🔴 **生产里唯一的绑定点是 `db/open-host.ts` 的 `withWriteSignal()`**：别人再绑一次
+ *    拿到的必然是包装后的那份（`openTaskHost()` 是单例，交出的就是包过的那件），
+ *    写读两侧都会绕回自己。常驻判据见 `tests/share-routing-assembly.spec.ts`。
  */
 export function bindMobileOplogBase(next: MobileOplogBase | undefined): void {
   base = next;
@@ -96,8 +99,33 @@ export async function dispatchChecked<T>(build: CheckedDispatchBuilder<T>): Prom
   return await routed(build);
 }
 
+/**
+ * 🔴 一次合法的读最多走**这一趟**（`base.getState()` 是引擎自己的同步取值，
+ * `mergeView` 拿的是交进去的那份 personal，两者都不该再调回 `currentState`）。
+ * 再进来一次就是"路由套进路由"，**必须具名报错**。
+ *
+ * 为什么要有这道闸门（2026-10-24 iOS 设备腿实测）：`share-signals.ts` 当时把
+ * `openTaskHost()` 返回的**包装后**宿主又交了一次 `bindMobileOplogBase`，于是
+ * `currentState → base.getState → shareAwareState(=currentState) → …` 逐帧互递归。
+ * 真机症状是「在设置页存完凭据，下一帧渲染整个 App 死在
+ * `RangeError: Maximum call stack size exceeded`」—— 崩溃栈里只有那两个名字交替，
+ * 既不指出是谁交的，也看不出这是装配问题，长得像 RN 的锅。
+ */
+let readingMergeView = false;
+
 /** 合并视图：没装共享通道时个人状态就是全部状态。 */
 export function currentState(): MaterializedState {
-  const personal = requireBase().getState();
-  return wiring === undefined ? personal : wiring.mergeView(personal);
+  if (readingMergeView) {
+    throw new Error(
+      '共享读路由递归：交给 bindMobileOplogBase 的宿主，它的 getState 又绕回了 currentState()。' +
+        '这里只许交未包装的原始引擎入口（见 bindMobileOplogBase 的注释）。',
+    );
+  }
+  readingMergeView = true;
+  try {
+    const personal = requireBase().getState();
+    return wiring === undefined ? personal : wiring.mergeView(personal);
+  } finally {
+    readingMergeView = false;
+  }
 }

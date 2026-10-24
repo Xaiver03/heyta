@@ -209,7 +209,10 @@ export async function startRealtime(over: Partial<RealtimeDeps> = {}): Promise<v
     // 同一个理由在任务屏、日历屏都写着（AGENTS.md §7 第 9 条）。
     const host = await deps.openHost();
 
-    // 共享信号的闸门要读这台宿主的清单行绑定（"本机认不认得这份 share"是本地事实）。
+    // 共享信号的"自己不吵自己"与活动差集要认这台设备的 clientId；
+    // "本机认不认得这份 share"读的是合并视图，它的 base 已由 `openTaskHost()` 内部绑好。
+    // 🔴 这里**不再**往 `wiring` 绑第二次 —— 那份包装宿主的 `getState` 就是路由的读出口，
+    // 交进去会绕回自己（真机崩过，见 `share/wiring.ts` 里 `currentState` 的注释）。
     bindShareSignalHost(host);
 
     client = deps.makeClient({
