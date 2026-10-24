@@ -74,4 +74,70 @@ Android Vault 验收还必须把恢复码控件的滚动、输入和业务回读
   `HEYTA_NO_FOCUS=1`（macOS 壳已支持；Electron 用 `HEYTA_DESKTOP_NO_FOCUS=1`）。
   2026-09-29 当天壳级验收反复把用户从前台拽走，这条就是那天的产出。
 
+#### 规定三：证据目录只存证据
+
+**"留证"不等于"把那一轮碰过的东西全拷过去"。** 证据目录里只有**证据**，产物一律不许进。
+这条不是纪律，是门禁：`pnpm check:evidence-hygiene`（`scripts/check-evidence-hygiene.mjs`），
+只读、不动任何文件，红的时候逐条打印**路径 + 体积 + 命中的规则名**。
+
+**什么算证据**（都是人能直接看、体积有上限的东西）：
+
+| 算证据 | 例子 |
+|---|---|
+| 截图 | `.png` / `.jpg` / `.webp`（规定一那个"人必须看一眼"的载体） |
+| 纯文本日志 | `.txt` / `.log` |
+| 退出码 | `rc.txt` |
+| 补丁 | `.patch` / `.diff` |
+| 机器可读报告 | `.json`（manifest、测试汇总） |
+| 说明 | `.md` |
+
+**什么不算证据**（这是黑名单，认名字，不看内容）：
+
+- 构建/安装包产物：`.app`、`.dmg`、`.xcarchive`、`.dSYM`、`heyta-ios-release/`、`heyta-macos-dist/`；
+- 构建中间物与依赖树：`DerivedData/`、`node_modules/`、`Pods/`、`.build/`、`build/`、`xcodebuild/`；
+- 测试运行器自己的输出目录：`test-results/`（Playwright 的录像/trace 是运行产物，不是结论）；
+- **任何 > 25 MB 的单文件**（`--max-file-mb`，默认 25）—— 证据是截图与日志，到这个量级基本就是产物或整包。
+
+**产物该去哪**：`$TMPDIR`（用 `mktemp -d` 开一个本轮专属目录）或本轮 `RT` 目录下，
+**验收脚本收尾时删掉**。不要为了"留证"把产物拷进证据目录 ——
+`ditto Heyta.app …/evidence/` 这一步留下的不是证据，是一份没人会删的 431 MB。
+
+**量纲（唯一挡得住"9.5 GB"的判据）**：
+
+| root 位置 | 单个 root 预算 | 为什么是这个数 |
+|---|---|---|
+| 仓库外（`$HEYTA_EVIDENCE_ROOT`，默认 `$HOME/.heyta-evidence`） | **300 MB** | 事故就发生在这一档 |
+| 仓库内（`apps/*/evidence`、`packages/*/evidence`、`docs/**/evidence`、`research/**/evidence`） | **800 MB** | 本仓库约定截图证据入库，现量 `apps/mobile/evidence` 410 MB / `apps/web/evidence` 261 MB —— 拿 300 MB 卡它们只会得到假红 |
+| 单个文件 | **25 MB** | 逐文件查不出"罪恶在量"，这条挡的是"某一次把整包塞进来" |
+
+超了就是**产物混进来了**，不是"证据多"。`--max-root-mb` / `--max-file-mb` 可以覆盖，
+但覆盖是**当轮显式选择**，不是把默认值放宽。
+
+**当天读的反例**（2026-10-16 现量，别再犯一次）：
+
+| 内容 | 体积 |
+|---|---|
+| `~/.heyta-evidence` 总计（148 个目录） | **9.5 GB** |
+| 其中 `…/leg3-1020-1101/heyta-ios-release`（一个 iOS Release 构建） | 5.3 GB |
+| 其中 3 份 `heyta-macos-dist`（`.app` + `widget-build`） | 1.3 GB |
+| 其中**真正的证据**（png / build log / patch / `rc.txt`） | **几 MB** |
+
+98% 是产物。同一天 `~/heyta-carriers` 11 GB（三份搬运树各带 DerivedData / node_modules / Pods /
+SwiftPM `.build` / Playwright `test-results`）是同一个形状：**产物和证据住在同一个目录里、
+且没有收尾删除**。`~/` 下 29 GB 轮次构建目录让 Spotlight 搜出一长串同名 `Heyta.app`，那条由
+`scripts/reinstall-all.sh` 的保留策略 + 收尾删产物修掉（环境陷阱 §7 #545）；**本条规定的是另一半**：
+验收脚本自己不要去造那个形状。
+
+```bash
+pnpm check:evidence-hygiene                       # 仓库内 root + $HEYTA_EVIDENCE_ROOT
+pnpm check:evidence-hygiene --self-test           # 四红一绿：每条判据都验"删掉违规必须变绿"
+HEYTA_EVIDENCE_ROOT=$HOME/.heyta-evidence pnpm check:evidence-hygiene   # 本机显式点名
+node scripts/check-evidence-hygiene.mjs --json    # 机器可读（体积 / 规则名 / 跳过原因）
+```
+
+🔴 **CI 绿 ≠ 本机证据目录干净。** 这条门禁在 CI 上扫不到 `$HOME/.heyta-evidence`
+（它不在仓库里，CI 也从来没跑过验收），所以那边只会打印一行"跳过"。
+**本机要自己跑**：`HEYTA_EVIDENCE_ROOT=$HOME/.heyta-evidence pnpm check:evidence-hygiene`。
+跳过是**打印出来**的，不是安静地过 —— 静默跳过在读数上和"没扫到"完全一样。
+
 ---
