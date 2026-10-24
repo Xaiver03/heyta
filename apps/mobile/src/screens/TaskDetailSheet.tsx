@@ -31,8 +31,8 @@
  * 删除是软删还是硬删，全部来自 `@heyta/app-host` 的 `createTaskActions`。
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Keyboard, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Keyboard, Platform, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -71,9 +71,11 @@ import {
 import { formatStamp } from '../lib/date';
 import { PRIORITY_ORDER, priorityLabel } from '../lib/priority';
 import { describeRecurrenceText } from '../lib/recurrence-display';
+import { reminderFaceNotice } from '../lib/reminder-delivery-display';
 import { reminderListLabels } from '../lib/reminders-display';
 import { timelineLabels } from '../lib/timeline-labels';
 import { useTaskReminders } from '../lib/reminders';
+import { useReminderDelivery } from '../lib/use-reminder-delivery';
 import { useText, useTheme, useTokens } from '../theme';
 // 🔴 DatePicker 已上提到共享层（批一，多端入口覆盖 goal §2）：
 // web 补 due 编辑时两端要同一只选择器。本地的 `ui/DatePicker.tsx` 已删 ——
@@ -181,6 +183,25 @@ export function TaskDetailSheet({
   } = useTaskReminders(taskId);
 
   const reminderLabels = useMemo(() => reminderListLabels(t), [t]);
+
+  /**
+   * 送达被系统闸门挡住时那一行降级状态（"到点不会响" / "可能迟到几分钟"）。
+   *
+   * 🔴 这一行的**全部意义**是"拒了之后看得见、并且有回头路"：授权一旦被系统拒掉，
+   * 应用自己再也问不出第二个弹窗，所以这里必须同时给出跳系统设置的入口。
+   * 判定（哪一句、这一行在这台设备上存不存在、一条都没有时不许报警）在
+   * `lib/reminder-delivery-display.ts` 的纯函数里；本文件只做绑定（AGENTS §3.5）。
+   *
+   * ⚠️ 读数由 `useReminderDelivery()` 持有，与设置页那一节**同一份、同一套重读时机**，
+   * 包括"答完系统弹窗"那一声 —— 那个弹窗不把应用退到后台，光靠 AppState 是等不来的。
+   */
+  const delivery = useReminderDelivery();
+  const deliveryNotice = useMemo(
+    () => (delivery.readings === null
+      ? null
+      : reminderFaceNotice(delivery.readings, Platform.OS, reminders, now)),
+    [delivery.readings, reminders, now],
+  );
 
   /**
    * 清单排程预览（时间线重画 2026-10-01：板上不再画任务内部的清单甘特图，
@@ -550,7 +571,17 @@ export function TaskDetailSheet({
               {newListOpen && projectActions !== null && (
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: tokens['space.2'] }}>
                   <View style={{ flex: 1 }}>
-                    <TextInput
+                    {/*
+                      🔴 用 `NewListNameInput` 而不是裸 `<TextInput autoFocus>`：
+                      这一格在 `{newListOpen && …}` 里，于是"聚焦"与"卸载"会撞在
+                      同一帧，而 Fabric 的 `focus`/`blur` 是 **void 异步方法** ——
+                      那条路径上的异常不会被转成 JSError，只会 `abort`
+                      （四次 `Heyta-2026-10-24-*.ips` 都停在
+                      `RCTTurboModule.mm:467`，且报告里既没有 `asi` 也没有
+                      `exceptionReason`）。组件内部把这个竞态消掉了，
+                      见 `NewListNameInput` 的注释。
+                    */}
+                    <NewListNameInput
                       value={newListName}
                       onChangeText={setNewListName}
                       // 🔴 与段落标题「清单」**不同名**：同名会让无障碍树里
@@ -558,7 +589,6 @@ export function TaskDetailSheet({
                       accessibilityLabel={t('mobile.detail.project.newPlaceholder')}
                       placeholder={t('mobile.detail.project.newPlaceholder')}
                       placeholderTextColor={tokens['color.foreground-subtle']}
-                      autoFocus
                       style={[
                         text['row-title'],
                         {
@@ -897,6 +927,21 @@ export function TaskDetailSheet({
               onDismiss={dismiss}
               onRemove={removeReminder}
               labels={reminderLabels}
+              deliveryBlocked={
+                deliveryNotice === null
+                  ? undefined
+                  : {
+                      text: t(deliveryNotice.key),
+                      // 这台设备给不出那一页时**不画入口**（画一个点了没反应的按钮比没有更糟），
+                      // 但那句话照说 —— 通知被拒是事实，没有回头路也不能不说。
+                      settings: deliveryNotice.canOpen
+                        ? {
+                            label: t('reminder.delivery.openSettings'),
+                            onPress: () => { delivery.open(deliveryNotice.row); },
+                          }
+                        : undefined,
+                    }
+              }
               // 🔴 时刻格式化注入移动端唯一的实现：**不用 `Intl`**
               // （Hermes 上 Intl 是可选编译的，拿不到会抛）。见 `lib/date.ts`。
               formatWhen={formatStamp}
@@ -985,5 +1030,72 @@ export function TaskDetailSheet({
               />
             </View>
     </BottomSheet>
+  );
+}
+
+/**
+ * 「行内新建清单」的名字输入框 —— 只为**消掉一个真实崩溃**而存在。
+ * ==================================================================
+ *
+ * ## 为什么不能直接写 `<TextInput autoFocus />`
+ *
+ * 这一格渲染在 `{newListOpen && …}` 里。`autoFocus` 让 view 去抢第一响应者，
+ * 而收紧面板 / 建完清单都会让同一个子树 unmount —— **两件事可能落在同一帧**。
+ *
+ * Fabric 的视图命令（`focus` / `blur`，来自 `ViewNativeComponent` 的
+ * `codegenNativeCommands`）是**返回 void 的异步方法**，走
+ * `ObjCTurboModule::performVoidMethodInvocation`。那条路径的 `@catch` 只做
+ * `@throw exception`（`RCTTurboModule.mm:462-464`）—— **不**像同步路径那样
+ * 转成 `JSError`。异常于是逃出 dispatch block ⇒ `std::terminate` ⇒ `SIGABRT`。
+ *
+ * 🔴 **代价是"拿到报告也没用"**：正因为那一支不转换，`.ips` 里**既没有 `asi`
+ * 也没有 `exceptionReason`**（`Heyta-2026-10-24-*.ips` 三份都核过，顶层键里
+ * 根本没这两项）。所以正确的做法不是"等复现去抓"，而是**从形状上不让它发生**。
+ *
+ * ## 两条纪律（与 `@heyta/ui` 的 `CaptureComposer` 同一套）
+ *
+ *   1. **延后一拍再聚焦** —— 让父层的 modal / `KeyboardAvoidingView` 先完成
+ *      订阅与测量（本项目已经踩过一次"键盘先于父层出现"）；
+ *   2. **卸载前先 `blur()`** —— 把第一响应者交还掉，**再**让 view 被摘下。
+ *
+ * 只在原生端生效：`react-native-web` 的 `TextInput` 没有这条原生命令，
+ * 不走 Fabric 那条路，也就没有这个竞态。
+ */
+function NewListNameInput({
+  value,
+  onChangeText,
+  accessibilityLabel,
+  placeholder,
+  placeholderTextColor,
+  style,
+}: {
+  readonly value: string;
+  readonly onChangeText: (text: string) => void;
+  readonly accessibilityLabel: string;
+  readonly placeholder: string;
+  readonly placeholderTextColor: string;
+  readonly style: React.ComponentProps<typeof TextInput>['style'];
+}): React.JSX.Element {
+  const ref = useRef<TextInput>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => ref.current?.focus(), 0);
+    return () => {
+      clearTimeout(timer);
+      // 🔴 这一行是修复本身：卸载前先交还第一响应者。
+      ref.current?.blur();
+    };
+  }, []);
+
+  return (
+    <TextInput
+      ref={ref}
+      value={value}
+      onChangeText={onChangeText}
+      accessibilityLabel={accessibilityLabel}
+      placeholder={placeholder}
+      placeholderTextColor={placeholderTextColor}
+      style={style}
+    />
   );
 }

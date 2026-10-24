@@ -47,7 +47,7 @@ import {
   type ShareWriteChannel,
 } from '@heyta/app-host';
 
-import { bindMobileOplogBase, currentState } from './wiring';
+import { currentState } from './wiring';
 
 /* ── 投递垫片：两条传输通道（形状照 web 的 share-signal-sink） ───────────── */
 
@@ -178,17 +178,26 @@ export function subscribeShareActivity(listener: ShareActivityListener): () => v
 /* ── 装配：把两条信号接到 app-host 的两个 handler ────────────────────────── */
 
 /**
- * 实时通道建连时把宿主绑进来：
- * 1. 交进 `wiring.ts`（共享写路由的个人那条腿 + 合并视图的读法都从它来）；
- * 2. "本机认不认得这份 share"的闸门要读这台宿主的清单行绑定；
- * 3. `clientId` 是"自己不吵自己"与活动差集的依据 —— 没有它，内容信号宁可不处理
- *    （拿空串去滤等于"自己不吵自己"静默失效，与 web 的 `hasEngine()` 那一档同理由）。
- * ⚠️ 传 `openTaskHost()` 那份包装宿主即可 —— 路由在包装**之外**，不会递归。
+ * 实时通道建连时把宿主绑进来，这里**只取 `clientId`**：
+ *
+ * · `clientId` 是"自己不吵自己"与活动差集的依据 —— 没有它，内容信号宁可不处理
+ *   （拿空串去滤等于"自己不吵自己"静默失效，与 web 的 `hasEngine()` 那一档同理由）；
+ * · "本机认不认得这份 share"的闸门读 `currentState()`（合并视图），
+ *   而那份状态的个人那条腿由 `db/open-host.ts` 绑好 —— 走到这里必然已经绑过，
+ *   因为 `deps.openHost()` 就是那枚单例 `openTaskHost()`。
+ *
+ * 🔴 **这里不许再调 `bindMobileOplogBase`**（2026-10-24 真机炸过一次，别再写回去）：
+ * 传进来的永远是 `openTaskHost()` 那份**包装后**的宿主，它的 `getState` 就是
+ * `wiring.currentState`；把它当 base 交进去 ⇒ `currentState → base.getState → currentState`
+ * 无限互递归。上一版这句注释写的是"传包装宿主即可，路由在包装之外，不会递归"——
+ * **那句话是错的**：路由不在包装之外，包装件正是路由的读侧出口。
+ * 症状：用户在设置页存完凭据（那一次会 `startRealtime()`），下一帧渲染整个 App
+ * 死在 `RangeError: Maximum call stack size exceeded`。现在 `currentState()` 有闸门，
+ * 同样的错法会具名报错；常驻判据在 `tests/share-routing-assembly.spec.ts`。
  */
 let boundClientId = '';
 
 export function bindShareSignalHost(host: AppHost | undefined): void {
-  bindMobileOplogBase(host);
   boundClientId = host?.clientId ?? '';
 }
 

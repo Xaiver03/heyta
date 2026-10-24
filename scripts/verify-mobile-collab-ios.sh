@@ -1,0 +1,1001 @@
+#!/bin/bash
+
+# 🔴 HEYTA-SNAPSHOT-BOOTSTRAP v1：脚本运行期间工作树可能被另一轮任务编辑；
+#    先执行不可变快照，避免 bash 按字节读取时把后半段解析成别的文件。
+case "$(basename "$0")" in
+  .*.snap.*) ;;
+  *)
+    _snap_dir="$(cd "$(dirname "$0")" && pwd)" || exit 1
+    find "$_snap_dir" -maxdepth 1 -name ".$(basename "$0").snap.*" -mmin +240 -delete 2>/dev/null || true
+    _snap="${_snap_dir}/.$(basename "$0").snap.$$"
+    cat "$_snap_dir/$(basename "$0")" >"$_snap" || exit 1
+    exec bash "$_snap" "$@"
+    ;;
+esac
+trap 'rm -f -- "$0"' EXIT
+
+# iOS 协作共享清单旅程验收（真 Release 包 + 真 iOS 模拟器 + 真服务端，零 mock）
+# ==============================================================================
+#
+# 这条装置回答 M6 那一格：共享清单在**手机上**是不是真的能用。
+# web 那侧早有 `verify:collab-*` 几套，但它们量的是线协议与服务端边界，
+# **手机界面从来不在里面**。这里走同一条产品旅程，只是把"另一台设备"换成
+# 一台真 iPhone 模拟器，另一侧用生产装配件（`createShareOpDispatcher`）驱动的 node 进程：
+#
+#   L1 手机能加入：贴邀请凭证 → 同意 → 界面自己说「加入成功」
+#   L2 下行看得见：owner 写的那条任务，在手机上**不点同步**就出现
+#   L3 上行写得出去：手机在评论框打字 → 点发送 → 这条评论回到界面上
+#   L4 上行带签名：owner 把手机那一行写的 op 下载回来，用名册公钥重验 = `verified`
+#      （服务端"收下" ≠ verified；这一条才是 ADR-0069 在移动端成立）
+#   L5 信号驱动：owner 再写一条评论 → 手机靠 `new_share_ops` 自己重画，全程没碰同步按钮
+#   L6 界面不谎称能力：通知偏好面只剩三枚有输入的开关（M5-3 那一格）
+#
+# 🔴 每一档都留**截图**（AGENTS §6.2 规定一：必须肉眼看图），失败时也留。
+# 🔴 证据目录只存证据（规定三）：png / txt / json / md。Release 产物与 DerivedData
+#    一律在临时目录，收尾删掉。
+# 🔴 不抢前台：idb 经 companion 从设备内部驱动，不启动也不激活 Simulator.app。
+#
+# 退出码：`0` 全绿；`1` 产品判据红；`3` 环境/装置前提不成立（不判产品）。
+#
+# 用法：
+#   IOS_UDID=<udid> bash scripts/verify-mobile-collab-ios.sh
+#
+# 可覆盖：IOS_UDID / IOS_DEVICE_NAME / IOS_BID / HEYTA_IOS_DERIVED / HEYTA_IOS_BUILD_LOG
+#         PORT（默认 3177）/ HEYTA_E2E_DB（默认 heyta_collab_m6_ios）
+#         HEYTA_COLLAB_IOS_RUN（本轮私有目录；默认 mktemp -d）
+#         HEYTA_COLLAB_IOS_KEEP_ARTIFACTS=1（留着产物与临时目录以便调试）
+
+set -u
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SHIM="$ROOT/scripts/tools/ios-ax-shim.py"
+. "$(dirname "$0")/lib/mobile-e2e.sh"
+. "$(dirname "$0")/lib/mobile-e2e-fresh-account.sh"
+
+DEVICE_NAME=${IOS_DEVICE_NAME:-heyta-collab-m6}
+BID=${IOS_BID:-com.heyta}
+PORT=${PORT:-3177}
+E2E_DB=${HEYTA_E2E_DB:-heyta_collab_m6_ios}
+HOST_SERVER="http://127.0.0.1:${PORT}"
+DERIVED=${HEYTA_IOS_DERIVED:-/tmp/heyta-collab-m6-release}
+BUILD_LOG=${HEYTA_IOS_BUILD_LOG:-/tmp/heyta-collab-m6-build.log}
+IOS_DISPLAY=${HEYTA_IOS_DISPLAY:-primary}
+STAMP="$(date +%m%d%H%M)"
+# 🔴 不许写成 ${VAR:-$(mktemp -d ...)} 或 ${VAR:-"$ROOT/..."} 这种形状：macOS 自带 bash 3.2
+#    解析「参数展开默认值里嵌套引号」会漏配引号，症状是**离真凶很远的那一行**报
+#    unexpected EOF while looking for matching "（实测报在 line 115）。
+#    所以这两枚默认值一律用 if/else 求。
+if [ -z "${HEYTA_COLLAB_IOS_RUN:-}" ]; then
+  TMPROOT="${TMPDIR:-/tmp}"
+  RUN_DIR="$(mktemp -d "${TMPROOT%/}/heyta-collab-m6-XXXXXX")"
+else
+  RUN_DIR="$HEYTA_COLLAB_IOS_RUN"
+fi
+mkdir -p "$RUN_DIR"
+if [ -z "${HEYTA_COLLAB_IOS_EVIDENCE:-}" ]; then
+  EVIDENCE="$ROOT/apps/mobile/evidence/collab-ios-$STAMP"
+else
+  EVIDENCE="$HEYTA_COLLAB_IOS_EVIDENCE"
+fi
+mkdir -p "$EVIDENCE"
+OWNER_STATE="$RUN_DIR/owner-state.json"
+OWNER_TOKEN_FILE="$RUN_DIR/owner-token.txt"
+# 🔴 私有凭据文件：lib 的默认值（`/tmp/heyta_mobile_*.txt`）是跨轮共享的，
+#    与别的移动端验收并行时会互相把对方的账号读进来（"写者可换、读者不可换"那次事故）。
+export HEYTA_E2E_TOKEN_FILE="$RUN_DIR/member-token.txt"
+export HEYTA_E2E_EMAIL_FILE="$RUN_DIR/member-email.txt"
+export HEYTA_E2E_E2EE_FILE="$RUN_DIR/member-e2ee.txt"
+export HEYTA_E2E_PIDFILE="$RUN_DIR/server.pid"
+export HEYTA_E2E_LOGFILE="$RUN_DIR/server.log"
+# 🔴 dump 必须换成**本趟私有**路径：lib 的默认值是固定路径，两趟并行时后写的会**覆盖前一趟的证据**；
+#    而这条旅程会把访问令牌抄进 dump，共享路径等于在 /tmp 留一份本机明文。
+export IDB_DUMP_FILE="$RUN_DIR/ax-dump.json"
+
+SERVER_STARTED=0
+OWNER_LOOP_PID=""
+SHARE_ID=''
+OWNER_MEMBER=''
+PHONE_MEMBER=''
+
+PASS=0
+FAIL=0
+ok() { echo "   ✅ $1"; PASS=$((PASS + 1)); }
+bad() { echo "   ❌ $1"; FAIL=$((FAIL + 1)); }
+step() { echo; echo "════ $1 ════"; }
+note() { echo "   · $1"; }
+
+summary() {
+  {
+    echo "iOS 协作旅程：${PASS} 通过 / ${FAIL} 失败"
+    echo "share=${SHARE_ID:-未建} ownerMember=${OWNER_MEMBER:-未建} phoneMember=${PHONE_MEMBER:-未入群}"
+    echo "服务端=${HOST_SERVER} 设备=${UDID:-?} bundle=$(cat "$EVIDENCE/bundle-sha256.txt" 2>/dev/null)"
+  } > "$EVIDENCE/rc.txt"
+  echo
+  echo "════════ iOS 协作旅程：${PASS} 通过 / ${FAIL} 失败 ════"
+  echo "证据目录：$EVIDENCE"
+  [ "$FAIL" -eq 0 ]
+}
+
+env_bail() {  # <说明> —— 装置/环境前提不成立：不判产品
+  echo "   ❌ $1"
+  echo "      这是环境/装置条件，不是产品失败 ⇒ exit 3"
+  cleanup
+  exit 3
+}
+
+# ── 设备侧原语：全部沿用同族 iOS 装置已经踩过的那套读法 ─────────────────────
+ax() { python3 "$SHIM" "$@" --udid "$UDID" --idb "$IDB_BIN" --companion "$IDB_COMPANION" --json; }
+jget() { printf '%s' "$1" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$2',''))" 2>/dev/null; }
+# 🔴 任何跳页动作先 `forget_safe_tap`：那对坐标属于**上一页**，
+#    在新界面上按坐标点就是随机一击。
+ax_press() { forget_safe_tap; ax "$1" --pressable --scroll-into-view >/dev/null 2>&1; ax "$1" --pressable --press --json >/dev/null 2>&1; }
+dismiss_keyboard() { ax --dismiss-keyboard --json >/dev/null 2>&1 || true; }
+
+# 🔴 键盘立着的时候**整个 App 的子树都不在 AX 树上**（只剩键盘那 44 个节点），
+#    于是"读不到那个框"会被读成"产品没那个框"。所以要一条**带复测**的收法，
+#    退不掉就返回非 0 —— 调用方**必须**据此报红/退 3，不许在"树里只有键盘"的
+#    状态下做任何"某某不见了"的断言（那是一条恒真的判据）。
+#
+# 🔴 收法**只许点一枚事先量过的静态文本**（`SAFE_TAP_*` 那对坐标），两条禁令都有实测：
+#    ① 不许按 return 收 —— `ios-ax-shim.py:1054-1057` 写得明白，RN 输入框把 return 当
+#      `onSubmitEditing`，"收个键盘"会把表单提交掉；
+#    ② 不许按屏幕比例点"看着像空白"的坐标 —— 2026-10-24 第二跑实测：点 (50%,34%)
+#      落在设置面「同步」那一节的表头上（`{{40,282},{346,23}}`），自托管表单当场收起，
+#      后三次就报"框不在树上了"（装置自己造的假红）。
+#    坐标必须**趁树还看得见**记下来（`remember_safe_tap`）：键盘起来之后再查标签查不到。
+#    任何跳页动作（`ax_press` / `ax_press_until` / 返回列表）先 `forget_safe_tap` ——
+#    旧坐标点到新界面上就是随机一击。
+SAFE_TAP_X=''
+SAFE_TAP_Y=''
+remember_safe_tap() {  # <静态文本标签>
+  local n
+  n=$(ax "$1" --role AXStaticText --list --json 2>/dev/null)
+  [ "$(jget "$n" found)" = "True" ] || return 1
+  SAFE_TAP_X=$(jget "$n" x)
+  SAFE_TAP_Y=$(jget "$n" y)
+}
+forget_safe_tap() { SAFE_TAP_X=''; SAFE_TAP_Y=''; }
+
+dismiss_keyboard_hard() {
+  local i
+  [ "$(jget "$(ax --keyboard --json)" present)" = "True" ] || return 0
+  [ -n "$SAFE_TAP_X" ] || return 1
+  for i in 1 2 3; do
+    ax --tap "$SAFE_TAP_X" "$SAFE_TAP_Y" --json >/dev/null 2>&1
+    sleep 1.2
+    [ "$(jget "$(ax --keyboard --json)" present)" = "False" ] && return 0
+  done
+  return 1
+}
+cpcount() { python3 -c 'import sys;print(len(sys.argv[1]))' "$1"; }
+
+# 数**这一棵树**里标签含某个词的输入框有几枚（同族装置实测：两枚框同一个 label 时
+# 不先数就会填错那一格；本装置「加密口令」也是「端到端加密口令」的子串，同一类失法）。
+field_count() {
+  python3 - "$IDB_DUMP_FILE" "$1" <<'PYCOUNT'
+import json, sys, unicodedata
+try:
+    nodes = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print(-1); sys.exit(0)
+needle = unicodedata.normalize("NFKC", sys.argv[2])
+def walk(n):
+    yield n
+    for c in (n.get("children") or n.get("nodes") or []):
+        yield from walk(c)
+count = 0
+for top in (nodes if isinstance(nodes, list) else [nodes]):
+    for n in walk(top):
+        if not isinstance(n, dict):
+            continue
+        if str(n.get("role") or "") != "AXTextField":
+            continue
+        label = unicodedata.normalize("NFKC", str(n.get("AXLabel") or ""))
+        if needle and needle in label:
+            count += 1
+print(count)
+PYCOUNT
+}
+
+# 界面文本读数：NFKC 归一化 + 子串。
+# 🔴 不用"精确标签"：RN 在 iOS 上把按钮可及名拼成组合句，而 iOS 还会把 ASCII 规范化成
+#    **全角**（`ios-erase-1` → `ｉｏｓ－ｅｒａｓｅ－１`）。精确比对对这两件事恒不命中，
+#    症状是"界面上明明有的东西读不到"。
+# 等某枚按钮从 disabled 翻成 enabled（RN 那一侧的读数）。翻面返回 0，等不到返回 1。
+wait_enabled() {  # <按钮标签>
+  local want="$1" i out
+  for i in 1 2 3 4 5 6; do
+    out=$(ax "$want" --pressable --list --json 2>/dev/null)
+    if [ "$(jget "$out" found)" = "True" ] && [ "$(jget "$out" enabled)" = "True" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+tree_has() {
+  python3 - "${2:-$IDB_DUMP_FILE}" "$1" <<'PY'
+import json, sys, unicodedata
+try:
+    nodes = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    sys.exit(2)
+needle = unicodedata.normalize("NFKC", sys.argv[2])
+def walk(n):
+    yield n
+    for c in (n.get("children") or n.get("nodes") or []):
+        yield from walk(c)
+for top in (nodes if isinstance(nodes, list) else [nodes]):
+    for n in walk(top):
+        for k in ("AXLabel", "AXValue", "label", "value", "title"):
+            v = n.get(k)
+            if isinstance(v, str) and needle in unicodedata.normalize("NFKC", v):
+                sys.exit(0)
+sys.exit(1)
+PY
+}
+
+wait_tree() {  # <needle> [超时秒]
+  local want="$1" timeout="${2:-90}" i=0
+  while [ "$i" -lt "$timeout" ]; do
+    idb_dump
+    tree_has "$want" && return 0
+    sleep 3
+    i=$((i + 3))
+  done
+  return 1
+}
+
+shot() {  # <文件名>：截图要"能用"才算留下 —— 全黑 PNG 不是证据
+  local path="$EVIDENCE/$1.png"
+  rm -f -- "$path"
+  idb_ui screenshot "$path" >/dev/null 2>&1 || true
+  if ! png_usable "$path"; then
+    xcrun simctl io "$UDID" screenshot --display "$IOS_DISPLAY" "$path" >/dev/null 2>&1 || true
+  fi
+  if png_usable "$path"; then echo "   🖼 $path"; else echo "   ⚠️ 截图不可用（全黑或没落盘）：$path"; fi
+}
+png_usable() {
+  local path="$1"
+  [ -s "$path" ] || return 1
+  HEYTA_PNG_STATS="$ROOT/scripts/screenshots/png-stats.mjs" node --input-type=module - "$path" <<'NODE' >/dev/null 2>&1
+const { inspectPng, looksBlank } = await import(process.env.HEYTA_PNG_STATS);
+const stats = inspectPng(process.argv[2]);
+if (looksBlank(stats)) process.exit(1);
+NODE
+}
+
+# iOS「保存密码？」是**别的进程**的弹窗：它立着的时候底部两个标签都不在树上。
+# 判"这是弹窗态"用这条读数，点完必须回读"树回来了没有"（按下 ≠ 生效）。
+dismiss_ios_save_password() {
+  dismiss_keyboard
+  local t m _fr _aw _ah _sx _sy
+  t=$(jget "$(ax "任务" --list --json)" found)
+  m=$(jget "$(ax "我的" --list --json)" found)
+  if [ "$t" != "True" ] && [ "$m" != "True" ]; then
+    echo "     底部两个标签都不在树上 ⇒ 按 iOS 系统弹窗态处理，按坐标点「以后」"
+    _fr=$(ax - --list --json 2>/dev/null)
+    _aw=$(jget "$_fr" width)
+    _ah=$(jget "$_fr" height)
+    case "$_aw" in '' | *[!0-9]*) _aw=402; note "取不到 app frame 宽，退回 402" ;; esac
+    case "$_ah" in '' | *[!0-9]*) _ah=874; note "取不到 app frame 高，退回 874" ;; esac
+    _sx=$(python3 -c "print(int(${_aw}*0.31))")
+    _sy=$(python3 -c "print(int(${_ah}*0.615))")
+    ax --tap "$_sx" "$_sy" --json >/dev/null 2>&1 || true
+    sleep 2
+    t=$(jget "$(ax "任务" --list --json)" found)
+    m=$(jget "$(ax "我的" --list --json)" found)
+    if [ "$t" = "True" ] || [ "$m" = "True" ]; then
+      ok "已关掉 iOS「保存密码？」系统弹窗（回读：任务=${t} 我的=${m}）"
+      return 0
+    fi
+    echo "     [dismiss] 点完仍读不到底部标签（任务=${t} 我的=${m}）"
+  fi
+  return 1
+}
+
+# 点一个入口，用**到达判据**回读，不按按压的返回值判成功。
+#
+# 🔴 为什么预算是 5 次：同族 iOS 装置实测这台机上 RN 的按压**时灵时不灵**
+#    （3 次全落空过，也第一次即中过），3 次的预算分不出"夹具抖"与"产品坏了"。
+#    到达判据必须是**下一屏才有的东西** —— 只看 `press` 回 `success` 是
+#    "按下 ≠ 生效"那一族（AGENTS §7 陷阱账里本线踩过多次）。
+ax_press_until() {  # <要点标签> <到达后树上必须有的标签> [exact]
+  # 🔴 第三枚 `exact` 是给"同一个词是别的元素的子串"准备的：本页上「共享清单」
+  #    既是入口标签、又出现在按钮「加入共享清单」里，退化匹配会按错那一个。
+  local want=$1 arrive=$2 exact=${3:-} try=1 out flags=''
+  [ -n "$exact" ] && flags='--exact'
+  while [ "$try" -le 5 ]; do
+    forget_safe_tap
+    # 导航场合收键盘用同族装置那档 `dismiss_keyboard`（按 return）：这里没有正在填的
+    # 表单，return 的 onSubmitEditing 没有可提交的对象；`_hard` 那档要求**上一页量过**
+    # 的坐标，在本函数里拿不到，宁可不收（收不掉就由到达判据那一层报出来）。
+    dismiss_keyboard
+    # shellcheck disable=SC2086
+    out=$(ax "$want" --pressable --scroll-into-view $flags --json)
+    # 🔴 能不能按，判 `found` 不判 `visible`：底部标签栏那几枚在 shim 的几何判定下
+    #    回的是 found=True / visible=False（第 2 跑实测：五试全落空、一次都没按下去），
+    #    而**按它确实有效**。拿 visible 当门 = 把"装置不会按"报成"产品没入口"。
+    #    真正的判据是**到达判据**（下一屏才有的那个标签），不是按压前的几何读数。
+    if [ "$(jget "$out" found)" = "True" ]; then
+      # shellcheck disable=SC2086
+      ax "$want" --pressable --press $flags --json >/dev/null 2>&1
+      sleep 2
+      idb_dump
+      tree_has "$arrive" && return 0
+    fi
+    echo "     [press] 「${want}」第 ${try} 次没到「${arrive}」（found=$(jget "$out" found) visible=$(jget "$out" visible)）"
+    try=$((try + 1))
+    sleep 1
+  done
+  return 1
+}
+
+# 填输入框：普通框走 `--set`（替换），secure 框走 `--type-text`（键入 + 掩码码点回读）。
+# 🔴 三条实测换来的纪律：
+#    ① 普通框不许用键入：地址框被产品默认值**预填**过，键入是追加 ⇒ 回读永远不等。
+#    ② 不许信 rc：`set-value` 返回 0 而值没动过是实测过的形状 ⇒ **判据是回读逐字相同**。
+#    ③ 写之前先 `--scroll-into-view` 并确认 `visible=True`：折叠线以下的框**在树上但点不到**，
+#       而"定位不到"在全新装机语境下**不是**"已经设好了"，是页面状态不对 ⇒ 报红，不容错跳过。
+# fill_field <标签> <值> [secure] [enabled-probe <按钮标签>]
+#   第四/五枚实参：secure 框**没有可读回**（值不进 AX），所以"打字有没有进 RN 状态"
+#   在这一层是判不了的。给一枚**依赖这个状态的按钮**（它的 disabled 直接写着
+#   `passphrase.length === 0`），填完去读它的 `enabled` —— 那是 RN 那一侧的读数，
+#   不是 UIKit 的。两档都不在树上/不翻面 ⇒ 响亮报"没进去"，不拿掩码码点当成功。
+fill_field() {  # <标签> <值> [secure] [probe <按钮标签>]
+  local lbl="$1" val="$2" kind="${3:-}" probe="${5:-}" pre out back attempt=1 vl bl note=''
+  # 🔴 趁树还看得见，把这一行标题的静态文本坐标记成安全落点：填完之后键盘会把
+  #    整棵 App 子树藏掉，那时再查标签就查不到了（`dismiss_keyboard_hard` 依赖这对坐标）。
+  #    以前这里是无条件 `dismiss_keyboard_hard`（内含按 return + 按比例点空白）：
+  #    第二跑就是被那两下弄红的 —— return 可能把表单提交掉，比例点落在表头上把
+  #    自托管面板收起，于是"框不在了"被读成"产品没有这个框"。
+  remember_safe_tap "$lbl"
+  while [ "$attempt" -le 5 ]; do
+    dismiss_keyboard_hard
+    pre=$(ax "$lbl" --role AXTextField --scroll-into-view --json)
+    if [ "$(jget "$pre" visible)" != "True" ]; then
+      echo "     [fill] 「${lbl}」第 ${attempt} 次滚不进可见区：found=$(jget "$pre" found) visible=$(jget "$pre" visible) scrollRc=$(jget "$pre" scrollRc)"
+      # 框不在树上时先试**一次**重新展开自托管表单（装置自己可能把它点了收起），
+      # 展开了下一轮再试；不猜"它就是没了"。
+      if [ "$(jget "$pre" found)" != "True" ]; then
+        ax_press "使用自托管服务器"
+        sleep 1
+      fi
+      attempt=$((attempt + 1))
+      sleep 1.5
+      continue
+    fi
+    if [ "$kind" = "secure" ]; then
+      out=$(ax "$lbl" --role AXTextField --type-text "$val")
+      back=$(jget "$out" detail)
+      vl=$(cpcount "$val")
+      bl=$(cpcount "$back")
+      if [ "$(jget "$out" typedRc)" = "0" ] && [ "$bl" = "$vl" ] && [ -n "$back" ]; then
+        # 🔴 掩码码点只证 UIKit 里有字，**不证 RN 收得到**（`ios-ax-shim.py:737-741` 那一族）。
+        #    有 probe 就等它翻面；没翻面 = 这一发没进表单状态，按失败重试而不是按成功返回。
+        if [ -n "$probe" ]; then
+          if wait_enabled "$probe"; then
+            ok "已填「${lbl}」（secure：掩码码点 ${bl} = 原文码点 ${vl}）并且「${probe}」已经可点 ⇒ 值真进了 RN 状态"
+            return 0
+          fi
+          note="掩码码点=${bl} 但「${probe}」仍是 disabled ⇒ 打字没进 RN 表单状态（不是 UIKit 没收到）"
+        else
+          ok "已填「${lbl}」（secure：掩码码点 ${bl} = 原文码点 ${vl}；值本身不进 AX，这一屏没有可翻面的探针）"
+          return 0
+        fi
+      else
+        note="typedRc=$(jget "$out" typedRc) 掩码码点=${bl}（期望 ${vl}）"
+      fi
+    else
+      out=$(ax "$lbl" --role AXTextField --set "$val")
+      back=$(jget "$out" detail)
+      if [ "$back" = "$val" ]; then
+        ok "已填「${lbl}」（set-value 替换，回读逐字相同）"
+        return 0
+      fi
+      note="setRc=$(jget "$out" setRc) 回读长度=${#back}（期望 ${#val}）setErr=$(jget "$out" setErr)"
+    fi
+    echo "     [fill] 「${lbl}」第 ${attempt} 次没成：${note}"
+    attempt=$((attempt + 1))
+    sleep 0.8
+  done
+  # 🔴 失败也留图（AGENTS §6.2 规定一）：上一跑红在这里却没留任何截图，
+  #    等于"装置说界面坏了，但没人看得见界面当时是什么"。
+  shot "填不进-${lbl}"
+  bad "「${lbl}」五次都没能写进去（${kind:-text}）：${note}"
+  return 1
+}
+
+# 走到"手填凭据"那三个输入框。**2026-10-24 设备腿第一跑实测的界面形状**：
+#   我的 → 设置（分区枢纽：订阅/常规/同步与隐私/AI 与集成/数据管理/账号安全）
+#       → 同步与隐私 → 「使用自托管服务器」
+# 地址/令牌/口令三框在那一层**任何状态下都在树上**（不是旧「我的」页那种"设好就收起"）。
+# 🔴 旧写法"我的 → 设置 → 直接等服务器地址"量的是一版已经不存在的界面 ——
+#    第一跑就是这么红的（12 秒读不到框，截图证明停在分区枢纽上）。
+open_settings_sheet() {
+  ax_press_until "我的" "设置" || { note "「我的」页没打开（底部标签按 5 次没到设置枢纽）"; return 1; }
+  ax_press_until "设置" "同步与隐私" || { note "设置枢纽里没进得去「同步与隐私」"; return 1; }
+  ax_press_until "同步与隐私" "使用自托管服务器" || { note "同步与隐私那屏没有「使用自托管服务器」入口"; return 1; }
+  ax_press_until "使用自托管服务器" "服务器地址" || { note "展开自托管表单后读不到「服务器地址」"; return 1; }
+  local i
+  for i in 1 2 3; do
+    [ "$(jget "$(ax "服务器地址" --role AXTextField --scroll-into-view --json)" visible)" = "True" ] && return 0
+    sleep 1
+  done
+  note "「服务器地址」框在树上但滚不进可见区"
+  return 1
+}
+
+# 从任意子屏退回**底部标签那一层**（设置面是全屏幕，不退干净下一步按「我的」必然落空）。
+back_to_tabs() {
+  local i
+  for i in 1 2 3; do
+    idb_dump
+    [ "$(jget "$(ax "我的" --pressable --list --json)" found)" = "True" ] && return 0
+    ax_press "关闭"
+    sleep 2
+  done
+  return 1
+}
+
+cleanup() {
+  if [ -n "$OWNER_LOOP_PID" ] && kill -0 "$OWNER_LOOP_PID" >/dev/null 2>&1; then
+    kill "$OWNER_LOOP_PID" >/dev/null 2>&1 || true
+  fi
+  if [ "$SERVER_STARTED" = "1" ]; then
+    bash "$ROOT/scripts/mobile-e2e-down.sh" >/dev/null 2>&1 || true
+    note "已停本趟起的服务端栈"
+  fi
+  # 产物按「用完即弃」：DerivedData 与本轮临时目录不进证据目录，收尾删掉。
+  if [ "${HEYTA_COLLAB_IOS_KEEP_ARTIFACTS:-0}" != "1" ]; then
+    [ -d "$DERIVED" ] && rm -rf -- "$DERIVED"
+    case "$RUN_DIR" in
+      /tmp/heyta-collab-m6-* | /var/folders/* | /private/var/folders/*) rm -rf -- "$RUN_DIR" ;;
+    esac
+  fi
+}
+trap cleanup EXIT
+
+# ── 0. 现场：设备、AX 工具接口 ──────────────────────────────────────────────
+step "0. 现场与归属（设备 / AX 工具接口）"
+UDID=${IOS_UDID:-}
+if [ -z "$UDID" ]; then
+  UDID=$(xcrun simctl list devices booted -j 2>/dev/null | python3 -c '
+import json, sys
+want = sys.argv[1]
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(0)
+same = []
+for _rt, devs in (data.get("devices") or {}).items():
+    for d in devs:
+        if d.get("state") == "Booted" and (d.get("name") or "").startswith(want):
+            same.append(d.get("udid") or "")
+if len(same) == 1:
+    print(same[0])
+' "$DEVICE_NAME" 2>/dev/null)
+fi
+[ -n "$UDID" ] || env_bail "认不出该验收哪台模拟器（名字前缀「${DEVICE_NAME}」的已启动设备不唯一或不存在）—— 不猜设备。显式指定：IOS_UDID=<udid> bash $0"
+IDB_UDID="$UDID"
+export IDB_UDID
+note "设备 $UDID（本机已启动模拟器 $(xcrun simctl list devices booted 2>/dev/null | grep -c Booted) 台）"
+
+OTHER=$(another_mobile_e2e_running)
+if [ -n "$OTHER" ]; then
+  echo "   ❌ 有别的移动端验收正在跑（并行 = 互相拆现场 / 抢同一台设备）："
+  printf '%s\n' "$OTHER" | sed 's/^/      /'
+  env_bail "本趟不判产品"
+fi
+
+resolve_idb >/dev/null 2>&1 || env_bail "找不到 idb/idb_companion（装法见 scripts/lib/mobile-e2e.sh 文件头）"
+for _flag in --dismiss-keyboard --type-text --scroll-into-view; do
+  python3 "$SHIM" --help 2>&1 | grep -q -- "$_flag" \
+    || env_bail "ios-ax-shim 不再接受 $_flag ⇒ 装置与共享 iOS 工具的接口漂了，本趟不判产品"
+done
+ok "iOS AX 工具接口在位"
+
+# ── 1. 服务端栈（私有端口 + 私有库 + 私有 pidfile） ─────────────────────────
+step "1. 起本趟专属服务端栈（TEST_MODE，零 mock）"
+PATH="/opt/homebrew/bin:$PATH"
+pg_isready >/dev/null 2>&1 || env_bail "本机 Postgres 没在跑（pg_isready 不通）—— 这条旅程零 mock，起不了服务端就不成立"
+if ! psql -lqt 2>/dev/null | cut -d'|' -f1 | grep -qw "$E2E_DB"; then
+  note "库 $E2E_DB 不存在 —— 建库并只走 migrate-deploy.sh（不许直接 prisma migrate deploy）"
+  createdb "$E2E_DB" || env_bail "createdb $E2E_DB 失败"
+  (cd "$ROOT/server" && DATABASE_URL="postgresql://${USER}@127.0.0.1:5432/${E2E_DB}" sh scripts/migrate-deploy.sh) \
+    > "$RUN_DIR/migrate.log" 2>&1 || env_bail "迁移失败，读数在 $RUN_DIR/migrate.log"
+  ok "库就位并已迁移"
+else
+  ok "库已在（复用本线的私有库；每轮仍换新账号）"
+fi
+PORT="$PORT" HEYTA_E2E_DB="$E2E_DB" bash "$ROOT/scripts/mobile-e2e-up.sh" > "$RUN_DIR/up.log" 2>&1 \
+  || env_bail "起栈失败：$(tail -3 "$RUN_DIR/up.log" | tr '\n' ' ')"
+SERVER_STARTED=1
+ok "服务端在 $HOST_SERVER（pid $(cat "$HEYTA_E2E_PIDFILE")）"
+curl -sf --noproxy '*' -m 4 "$HOST_SERVER/health" >/dev/null 2>&1 || env_bail "健康检查不通：$HOST_SERVER/health"
+
+# ── 2. 当前源码 Release 构建、安装、新鲜度对账 ──────────────────────────────
+step "2. 当前源码 Release 构建 + 安装（产物住临时目录，不进证据目录）"
+rm -f -- "$DERIVED/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle"
+xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" -scheme Heyta \
+  -configuration Release -sdk iphonesimulator -destination "id=$UDID" \
+  -derivedDataPath "$DERIVED" build > "$BUILD_LOG" 2>&1 \
+  || { tail -25 "$BUILD_LOG" >&2; env_bail "Release 构建失败（$BUILD_LOG）"; }
+APP="$DERIVED/Build/Products/Release-iphonesimulator/Heyta.app"
+[ -d "$APP" ] || env_bail "找不到 Release 产物：$APP"
+xcrun simctl uninstall "$UDID" "$BID" >/dev/null 2>&1 || true
+xcrun simctl install "$UDID" "$APP" || env_bail "simctl install 失败（$APP @ $UDID）"
+ok "已装当前 Release 包（先卸再装 = 全新态）"
+INSTALLED="$(xcrun simctl get_app_container "$UDID" "$BID" app 2>/dev/null)"
+BUILT_SHA="$(shasum -a 256 "$APP/main.jsbundle" 2>/dev/null | awk '{print $1}')"
+INST_SHA="$(shasum -a 256 "$INSTALLED/main.jsbundle" 2>/dev/null | awk '{print $1}')"
+{ [ -n "$BUILT_SHA" ] && [ "$BUILT_SHA" = "$INST_SHA" ]; } \
+  || env_bail "已安装的 main.jsbundle 与本轮构建产物 hash 不一致（built=${BUILT_SHA:0:12} installed=${INST_SHA:0:12}）"
+printf '%s\n' "$BUILT_SHA" > "$EVIDENCE/bundle-sha256.txt"
+ok "安装的 bundle 与本轮构建逐字节相同（hash 对账，不看 mtime）"
+
+# ── 3. 两个账号 ─────────────────────────────────────────────────────────────
+step "3. owner（服务端那台设备）+ 手机用的 member —— 每轮换号"
+note "MAX_VECTOR_CLOCK_SIZE=20：复用老号会让每条 op 判 CONFLICT_CONCURRENT"
+OWNER_EMAIL="collab-owner-${STAMP}@example.test"
+OWNER_RESP=$(curl -s --noproxy '*' -X POST "$HOST_SERVER/api/test/create-user" \
+  -H 'content-type: application/json' \
+  -d "{\"email\":\"${OWNER_EMAIL}\",\"password\":\"collab-verify-password\"}")
+OWNER_TOKEN=$(printf '%s' "$OWNER_RESP" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("token",""))' 2>/dev/null)
+[ -n "$OWNER_TOKEN" ] || env_bail "owner 建号失败：$(printf '%s' "$OWNER_RESP" | head -c 160)"
+printf '%s' "$OWNER_TOKEN" > "$OWNER_TOKEN_FILE"
+ok "owner 就位：$OWNER_EMAIL"
+# 🔴 覆盖 `HEYTA_E2E_SERVER` 而不是 `SERVER`：helper 里那句默认值在 **source 时**就展开定死了。
+HEYTA_E2E_SERVER="$HOST_SERVER" heyta_e2e_fresh_account \
+  || env_bail "member 建号失败（服务端 TEST_MODE？端口对到了吗？）"
+MEMBER_EMAIL="$(cat "$HEYTA_E2E_EMAIL_FILE")"
+E2EE_PASS="$(cat "$HEYTA_E2E_E2EE_FILE")"
+# 🔴 登录密码**从唯一事实源现读**，不在本文件里抄一份字面量：
+#    `scripts/lib/mobile-e2e-fresh-account.sh` 里那枚 `password="…"` 常量。
+MEMBER_LOGIN_PASSWORD=$(sed -n 's/^[[:space:]]*password="\([^"]*\)".*/\1/p' "$ROOT/scripts/lib/mobile-e2e-fresh-account.sh" | head -1)
+[ -n "$MEMBER_LOGIN_PASSWORD" ] || env_bail "从 lib 里读不到那枚登录密码常量 ⇒ 不猜密码，本趟作废"
+ok "手机账号就位：$MEMBER_EMAIL"
+
+# ── 4. 起 App、处置首启、把凭据填进设置面 ───────────────────────────────────
+step "4. 起 App → 处置首启屏 → 登录并启用同步（手机成为已登录、口令在内存里的设备）"
+ensure_idb_companion || env_bail "idb companion 起不来"
+xcrun simctl launch "$UDID" "$BID" --terminate-running-process >/dev/null 2>&1 \
+  || xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1 \
+  || env_bail "App 起不来（$BID @ $UDID）"
+sleep 8
+for _screen in "同意并联网" "先离线使用"; do
+  idb_dump
+  if tree_has "$_screen"; then
+    ax_press "$_screen"
+    sleep 3
+    note "已处置首启屏「${_screen}」"
+  else
+    note "首启没有「${_screen}」这一屏"
+  fi
+done
+dismiss_ios_save_password || true
+if ! wait_tree "任务" 30; then
+  shot "00-没到主屏"
+  env_bail "处置完首启屏仍读不到底部「任务」标签 —— 界面没到主屏，后面的填写都不可信"
+fi
+ok "已到主界面"
+shot "01-主界面"
+
+# 🔴 这台手机要成为**已登录**的设备，走的是同族装置（`verify-mobile-ios-account-email-sessions.sh`
+#    的 `sign_in_with_password`）实测出来的那条规定路径，不是"往设置面手抄令牌"：
+#    自托管表单里那颗账号按钮（`SettingsScreen.tsx:570` 的 `openAuth(true)`）→ AuthScreen
+#    （只有它带「服务器地址」那一栏）→ 地址 + 邮箱 + 登录密码 →「用邮箱和密码登录」
+#    → 会话卡「已登录」**之后**才有「加密口令」那一栏 → 填口令 →「保存并启用同步」。
+#    2026-10-24 设备腿实测：在**没有登录态**的自托管表单里把口令填进去（框里画出 20 个掩码点、
+#    `--type-text` 回 rc=0），应用自己那句「还没设置端到端加密口令，同步已停止」纹丝不动
+#    ⇒ 那条路拿不到能解开共享信封的口令，L2/L5 全都不成立。
+if open_settings_sheet; then
+  ok "自托管表单已打开（「服务器地址」输入框可见）"
+else
+  shot "02-自托管表单没开"
+  env_bail "走不到「同步与隐私 → 使用自托管服务器」那张表单 ⇒ 登录入口没有载体"
+fi
+
+# 进 AuthScreen：那颗按钮按 `form.configured` 换文案（未配置=「注册 / 登录」，已有凭据=「切换账号」），
+# 两代都够得着；两枚都不在树上就退 3，**不猜入口**。
+if tree_has "注册 / 登录"; then
+  ax_press "注册 / 登录"
+elif tree_has "切换账号"; then
+  ax_press "切换账号"
+else
+  shot "02b-没有登录入口"
+  env_bail "自托管表单上既没有「注册 / 登录」也没有「切换账号」⇒ 进不去带服务器地址栏的 AuthScreen"
+fi
+sleep 3
+idb_dump
+# 🔴 全新设备上 AuthScreen 默认**不**在邮箱/密码那张表上：`AuthScreen.tsx:226` 的
+#    `centralMode = isOfficialCentralAuthEndpoint(serverUrl)` 为真时，`:751` 那个 `!centralMode`
+#    整段（含「邮箱」「服务器地址」两栏）根本不渲染。2026-10-25 第 8 跑截图现量到的是这一档的
+#    三件：条款勾选框 +「使用统一身份登录」+「使用自建服务端」，而标题「注册 / 登录」照旧在树上
+#    ⇒ 拿"有没有标题"当"落在哪一屏"会读成假成功，拿"有没有邮箱框"当"没落在 AuthScreen"会读成假归因。
+#    这一趟要连自建服务端 ⇒ 按 `:1058` 那颗切换（`allowServerSelection && session === undefined`
+#    才渲染，正是从自托管表单进来的那一代）：它把 serverUrl 打回空串 ⇒ centralMode 转假 ⇒ 表单出现。
+if [ "$(field_count "邮箱")" != "1" ]; then
+  if tree_has "使用自建服务端"; then
+    note "落在「统一身份登录」那一档 ⇒ 按「使用自建服务端」切到自建表单那一代"
+    ax_press "使用自建服务端" || { shot "02c2-切不到自建档"; env_bail "「使用自建服务端」在树上却按不动（装置问题）"; }
+    sleep 2.5
+    idb_dump
+  fi
+fi
+if [ "$(field_count "邮箱")" != "1" ]; then
+  shot "02c-没落在AuthScreen"
+  env_bail "按完入口（含切档那一发）之后「邮箱」输入框不是恰好 1 枚（实读 $(field_count "邮箱")，-1=树读不出）⇒ 不在能填自建凭据的那张表上，后面的填写都不作数"
+fi
+# 注册那张表与登录那张表共用邮箱/密码两栏，**填错那张 = 拿本轮账号去注册**（服务端会回具名错误，
+# 但这一腿要的是登录态）。判据是注册独有的两件，存在性读；命中就按模式切换那一行，切完回读。
+if tree_has "再次输入密码" || tree_has "发送验证码"; then
+  note "数到注册那张表的独有件 ⇒ 按「已经有账号了？直接登录」切到登录那一代"
+  ax_press "已经有账号了？直接登录" || { shot "02c3-切不到登录代"; env_bail "模式切换那一行在树上却按不动（装置问题）"; }
+  sleep 2
+  idb_dump
+  if tree_has "再次输入密码"; then
+    shot "02c4-仍是注册那张表"
+    env_bail "按了模式切换之后「再次输入密码」还在 ⇒ 代没切过去，不拿注册那张表填密码"
+  fi
+fi
+if ! tree_has "服务器地址"; then
+  shot "02d-没有服务器地址栏"
+  env_bail "AuthScreen 上没有「服务器地址」那一栏（`allowServerSelection` 为假）⇒ 这一趟没法把登录指向本轮服务端"
+fi
+if ! tree_has "用邮箱和密码登录"; then
+  shot "02d2-数不到登录那颗按钮"
+  env_bail "树上数不到「用邮箱和密码登录」⇒ 不能确认落在**登录**那一代，不往下填"
+fi
+ok "已到 AuthScreen 的登录那一代（「邮箱」「服务器地址」两栏 +「用邮箱和密码登录」都在）"
+
+fill_field "服务器地址" "$HOST_SERVER" || env_bail "AuthScreen 的服务器地址写不进去（装置问题）"
+fill_field "邮箱" "$MEMBER_EMAIL" || env_bail "邮箱写不进去（装置问题）"
+# 登录密码那一栏是明文档还是遮住档**量出来的**（移动端默认揭示），两档各有填法；
+# 两枚显隐开关都不在树上 ⇒ 判不了该走哪条腿，退 3，不猜。
+if tree_has "隐藏密码"; then
+  note "显隐开关此刻写「隐藏密码」⇒ 登录密码是明文档，按普通框填（回读逐字相同）"
+  fill_field "登录密码" "$MEMBER_LOGIN_PASSWORD" || env_bail "登录密码写不进去（装置问题）"
+elif tree_has "显示密码"; then
+  note "显隐开关此刻写「显示密码」⇒ 登录密码是遮住档，按 secure 框填（掩码码点回读）"
+  fill_field "登录密码" "$MEMBER_LOGIN_PASSWORD" secure || env_bail "登录密码写不进去（装置问题）"
+else
+  shot "02e-判不了密码档"
+  env_bail "两枚显隐开关都不在树上 ⇒ 判不了「登录密码」该走哪一条填写腿，不猜"
+fi
+dismiss_ios_save_password || true
+ax_press "用邮箱和密码登录"
+signed=0
+for _i in $(seq 1 30); do
+  sleep 2
+  idb_dump
+  if tree_has "已登录"; then signed=1; break; fi
+  # 「保存密码？」是**提交之后**才弹的，它会盖住整屏 ⇒ 每 5 次采样摘一遍再读。
+  if [ "$((_i % 5))" = 0 ]; then
+    dismiss_ios_save_password || true
+    idb_dump
+    if tree_has "已登录"; then signed=1; break; fi
+  fi
+done
+if [ "$signed" != "1" ]; then
+  shot "02f-登录没成"
+  env_bail "30×2s 内没出现会话卡「已登录」⇒ 登录这一发没成，后面的口令那一栏根本不存在"
+fi
+ok "登录成功（会话卡「已登录」在）"
+
+# ── 加密口令 + 保存并启用同步（🔴 登录之后这一栏才存在）─────────────────────
+idb_dump
+_fc=$(field_count "加密口令")
+if [ "$_fc" != "1" ]; then
+  shot "02f2-加密口令栏数不对"
+  env_bail "树上标签含「加密口令」的输入框数到 ${_fc} 枚（期望恰好 1，-1=树读不出）⇒ 不猜往哪一格写"
+fi
+fill_field "加密口令" "$E2EE_PASS" secure || env_bail "加密口令写不进去（装置问题）"
+dismiss_ios_save_password || true
+dismiss_keyboard
+ax_press "保存并启用同步"
+left=0
+for _i in $(seq 1 20); do
+  sleep 2
+  idb_dump
+  # 🔴 `tree_has` 的第三档（rc=2 = 这一棵树根本读不出）**不许**被读成「按钮已经没了」：
+  #    那一档下"减法断言"是恒真的（§7 元规则一）。同族装置 `needle_state` 三分档同理。
+  tree_has "保存并启用同步" >/dev/null 2>&1; _rc=$?
+  if [ "$_rc" = "1" ]; then left=1; break; fi
+  [ "$_rc" = "2" ] && echo "     [save] 第 ${_i} 次树读不出（不拿它当「这一栏已经没了」）"
+done
+if [ "$left" != "1" ]; then
+  shot "02g-同步没启用"
+  env_bail "40×2s 之后「保存并启用同步」还在（或树一直读不出）⇒ AuthScreen 没退出，这次登录没落成活配置"
+fi
+ok "「保存并启用同步」按掉且这一栏已从树上消失（AuthScreen 已退出）"
+shot "02-已登录并启用同步"
+
+dismiss_ios_save_password || true
+back_to_tabs || { shot "03b-退不到主标签层"; env_bail "填完凭据退不回底部标签那一层（装置问题）"; }
+# 口令这一档的**判据**在 L1/L2（加入共享要把清单密钥解出来）。这里只取一句界面读数当**归因证据**，
+# 为什么不拿它判红：见下面 `BANNER_AT_LOGIN` 那一段（同一条码覆盖两种坏，读源码定的）。
+idb_dump
+tree_has "还没设置端到端加密口令" >/dev/null 2>&1; _rc=$?
+# 🔴 这一句**不当终判，只留证**。两条理由，都是读源码定的：
+#    ① 它不是配置谓词，是**上一次同步的错误读数**：`common.sync.error.noPassword` 由
+#      `packages/ui/src/sync/model.ts:262` 从同步码 `no-encryption-password` 映射来。
+#    ② 那个码**两种坏同形**：`packages/sync-client/src/client.ts:800` 的 catch（安全存储／
+#      口令包校验抛错）与 `:802` 的 `payloadCipher === undefined`（真的没口令）打的是同一个码。
+#    ⇒ 拿它判红会把两种不同的坏说成同一件，而这一趟真正要证的"口令可用"由 L1/L2 判：
+#      加入共享要把清单密钥解出来，口令不在状态里那一步必然过不去。
+#    2026-10-25 第 10/11 跑实测：登录成功、口令栏填入 20 掩码码点、AuthScreen 已退出，
+#    这句仍在；手动点「立即同步」再等 60s 也仍在 —— 但那仍然分不清①②，故降级为诊断。
+BANNER_AT_LOGIN=''
+case "$_rc" in
+  0) BANNER_AT_LOGIN=present
+     shot "03c-登录后仍报未设置口令"
+     note "登录后那句红字在册 ⇒ 留作 L1/L2 失败时的归因证据（它本身不判红，理由见上面那段）" ;;
+  1) BANNER_AT_LOGIN=absent
+     ok "登录后界面没有报「还没设置端到端加密口令」" ;;
+  *) shot "03c2-树读不出"
+     env_bail "登录后这一棵树读不出（rc=2）⇒ 连那句在不在都判不了，先修探针再谈产品" ;;
+esac
+
+# ── 4b. 创建「加密数据钥匙」——同步那侧真正要读的钥匙 ─────────────────────────
+# 🔴 这一步是读源码定出来的，不是猜的：
+#    `host.ts:609` 的 `getPayloadCipher` 走的是 `readVaultSession()`，
+#    **不是** `readSyncConfig().password`；而 vault 会话由 `SettingsScreen.tsx:724`
+#    挂的 `VaultSettingsSection` 那一屏创建/解锁（`beginCreation(passphrase)` →
+#    「确认并发布」→ 已解锁）。⇒ 只在 AuthScreen 填口令**不会**让同步拿到可用密文。
+#    2026-10-25 第 10/11 跑实测正是这个形状：登录成功、AuthScreen 正常退出、
+#    口令栏 20 掩码码点，但「还没设置端到端加密口令」在手动「立即同步」之后仍在。
+step "4b. 创建加密数据钥匙（设置 → 账号安全 → 创建钥匙 → 确认并发布）"
+dismiss_ios_save_password || true
+ax_press_until "设置" "账号安全" || { shot "04-进不去账号安全"; env_bail "设置枢纽里到不了「账号安全」⇒ 走不到「加密数据钥匙」那一屏（装置问题）"; }
+ax_press_until "账号安全" "加密数据钥匙" || { shot "04b-没有保险库那一屏"; env_bail "「账号安全」那一屏读不到「加密数据钥匙」⇒ 这一代界面把它挪走了，装置跟着挪，不猜"; }
+idb_dump
+if tree_has "创建加密数据钥匙"; then
+  note "落在「创建加密数据钥匙」那一态（这台设备还没有 keyPackage）⇒ 建一把"
+  _fc=$(field_count "加密口令")
+  [ "$_fc" = "1" ] || { shot "04c-口令栏数不对"; env_bail "保险库那一屏标签含「加密口令」的输入框数到 ${_fc} 枚（期望恰好 1，-1=树读不出）⇒ 不猜往哪一格写"; }
+  fill_field "加密口令" "$E2EE_PASS" secure probe "创建钥匙" || env_bail "保险库的加密口令写不进去（含「创建钥匙」一直 disabled = 打字没进 RN 状态）"
+  dismiss_ios_save_password || true
+  dismiss_keyboard
+  ax_press "创建钥匙"
+  sleep 5
+  idb_dump
+  if tree_has "确认并发布"; then
+    note "到了待发布那一态（beginCreation 成了）⇒ 按「确认并发布」"
+    ax_press "确认并发布"
+    sleep 5
+    idb_dump
+  fi
+  tree_has "这台设备上的加密数据已经解锁" >/dev/null 2>&1; _rc=$?
+  if [ "$_rc" != "0" ]; then
+    shot "04d-没到已解锁那一态"
+    bad "创建钥匙之后没读到「这台设备上的加密数据已经解锁。」（rc=${_rc}，2=树读不出）⇒ 同步拿不到可用密文；「创建钥匙」在口令没进 RN 状态时是 disabled 的，这一发红的大概就是那件事"
+    summary
+    exit 1
+  fi
+  ok "加密数据钥匙已建好并且这台设备上是解锁态 ⇒ 同步与共享信封有可用密文"
+  shot "04e-保险库已解锁"
+elif tree_has "这台设备上的加密数据已经解锁"; then
+  bad "全新安装的设备上保险库已经是解锁态 ⇒ 现场没清干净，这一趟的归属不可信（先查是不是复用了别人的容器）"
+  summary
+  exit 1
+else
+  shot "04f-保险库那一屏两态都不是"
+  env_bail "「加密数据钥匙」那一屏既没有「创建加密数据钥匙」也没有「已经解锁」⇒ 这一代还有第三种态，装置不猜"
+fi
+
+# ── 5. owner 建共享 + 发邀请 + 种一条任务 ───────────────────────────────────
+step "5. owner 侧：建共享、发邀请、写一条任务（下行要有东西可看）"
+TASK_TITLE="owner取证任务${STAMP}"
+node "$ROOT/scripts/lib/collab-owner-step.mjs" init \
+  --base-url "$HOST_SERVER" --owner-token "$OWNER_TOKEN" \
+  --invited-email "$MEMBER_EMAIL" --state "$OWNER_STATE" > "$RUN_DIR/init.json" 2> "$RUN_DIR/init.err" \
+  || { sed 's/^/      /' "$RUN_DIR/init.err" >&2; env_bail "owner init 失败"; }
+SHARE_ID=$(python3 -c 'import json;print(json.load(open("'"$RUN_DIR"'/init.json"))["shareId"])')
+OWNER_MEMBER=$(python3 -c 'import json;print(json.load(open("'"$RUN_DIR"'/init.json"))["ownerMemberId"])')
+INVITE_TOKEN=$(python3 -c 'import json;print(json.load(open("'"$RUN_DIR"'/init.json"))["invitationToken"])')
+ok "share=$SHARE_ID；邀请凭证已签发（只在这一次响应里）；owner 签名公钥已在册"
+node "$ROOT/scripts/lib/collab-owner-step.mjs" add-task --state "$OWNER_STATE" --title "$TASK_TITLE" \
+  > "$RUN_DIR/task.json" 2> "$RUN_DIR/task.err" \
+  || { sed 's/^/      /' "$RUN_DIR/task.err" >&2; env_bail "owner 写任务失败"; }
+ok "owner 写了一条任务：$TASK_TITLE"
+
+# ── 6. 手机加入：贴凭证 → 同意 → 等界面自己说成功 ────────────────────────────
+step "6. 加入判据（L1）：手机走自己的界面加入这份共享"
+dismiss_ios_save_password || true
+if ! ax_press_until "我的" "共享清单" exact; then
+  shot "06-我的页没有共享入口"
+  # 实测过的两种失法：① iOS「保存密码？」那枚系统弹窗压住整棵 App 树（读什么都不是）；
+  # ② 入口的渲染条件 `syncConfigured` 没成立（凭据没被认下）。P-1 翻案之后**没有**
+  # 实验开关这一档了（`check:share-entry-visible` 反过来钉"不许再藏"），别再往那猜。
+  bad "「我的」页上读不到共享清单入口（要么系统弹窗压着树，要么 syncConfigured 没成立）；口令那句读数=$BANNER_AT_LOGIN"
+  summary
+  exit 1
+fi
+if ! ax_press_until "共享清单" "加入共享清单" exact; then
+  shot "06b-共享首页没有加入入口"
+  bad "共享面上没有「加入共享清单」入口"
+  summary
+  exit 1
+fi
+shot "06c-共享清单首页"
+if ! ax_press_until "加入共享清单" "邀请凭证或链接" exact; then
+  shot "06b2-加入面板没开"
+  bad "按不进「加入共享清单」那面板（按了 5 次也没读到凭证输入框）"
+  summary
+  exit 1
+fi
+fill_field "邀请凭证或链接" "$INVITE_TOKEN" || { shot "06d-凭证填不进"; env_bail "邀请凭证填不进输入框（装置问题）"; }
+shot "06e-已贴凭证"
+ax_press "加入"
+sleep 3
+idb_dump
+if tree_has "确认共享"; then
+  ax_press "确认共享"
+  note "已处置同意面板（首次才会弹）"
+  sleep 2
+fi
+# owner 侧在后台等成员行出现并把清单密钥封给它 —— 手机界面会停在
+# 「已入群。正在等待所有者分发密钥」直到这一步真的发生。
+(
+  node "$ROOT/scripts/lib/collab-owner-step.mjs" wait-member --state "$OWNER_STATE" --timeout 150 \
+    > "$RUN_DIR/member.json" 2> "$RUN_DIR/member.err" \
+    && node "$ROOT/scripts/lib/collab-owner-step.mjs" deliver --state "$OWNER_STATE" \
+      > "$RUN_DIR/deliver.json" 2> "$RUN_DIR/deliver.err"
+) &
+OWNER_LOOP_PID=$!
+if ! wait_tree "加入成功，清单已出现在侧栏。" 240; then
+  idb_dump
+  shot "06f-加入没走到成功态"
+  for probe in "已入群。正在等待所有者分发密钥" "邀请凭证无效或已被使用。" "共享密钥已加密保存，解锁保险库后即可继续。"; do
+    tree_has "$probe" && note "界面停在：$probe"
+  done
+  bad "手机上没有走到「加入成功」那一句；口令那句读数=$BANNER_AT_LOGIN（present=同步那侧报过取不到可用口令）"
+  summary
+  exit 1
+fi
+ok "手机自己说了「加入成功」"
+shot "06g-加入成功"
+wait "$OWNER_LOOP_PID" 2>/dev/null || {
+  sed 's/^/      /' "$RUN_DIR/member.err" "$RUN_DIR/deliver.err" >&2 2>/dev/null
+  env_bail "owner 侧等成员行/封信封失败"
+}
+OWNER_LOOP_PID=''
+[ -s "$RUN_DIR/member.err" ] && sed 's/^/      /' "$RUN_DIR/member.err"
+PHONE_MEMBER=$(python3 -c 'import json;print(json.load(open("'"$RUN_DIR"'/member.json"))["memberId"])' 2>/dev/null)
+[ -n "$PHONE_MEMBER" ] || env_bail "读不到手机那一行成员 id"
+ok "服务端看到手机那一行成员 $PHONE_MEMBER，清单密钥已封给它"
+
+# ── 7. 下行：owner 写的那条任务，手机不点同步就要看得见 ─────────────────────
+step "7. 下行判据（L2）：手机界面出现 owner 写的那条任务"
+back_to_tabs || { shot "07-退不到主标签层"; env_bail "退不回底部标签那一层（装置问题）"; }
+ax_press_until "我的" "共享清单" exact \
+  || { shot "07b-进不去共享面"; bad "按不进「共享清单」入口"; summary; exit 1; }
+# 空间屏的到达判据：那一节要么列出任务（「选一条任务看它的评论」），要么明说没有
+# （「这条共享清单里还没有任务」）。两种都算"进到了这份共享的空间"。
+_space_open=0
+for _i in 1 2 3 4 5 6; do
+  idb_dump
+  if tree_has "选一条任务看它的评论" || tree_has "这条共享清单里还没有任务" || tree_has "$TASK_TITLE"; then
+    _space_open=1
+    break
+  fi
+  sleep 3
+done
+if [ "$_space_open" != "1" ]; then
+  shot "07c-共享空间没渲染"
+  bad "进了共享清单却没看到任务那一节（空间屏没渲染 / 没选中这份共享）"
+  summary
+  exit 1
+fi
+if ! wait_tree "$TASK_TITLE" 180; then
+  idb_dump
+  shot "07-看不到owner的任务"
+  bad "手机界面里没有 owner 写的那条任务「$TASK_TITLE」；口令那句读数=$BANNER_AT_LOGIN（present 时优先怀疑口令没进状态，见上面那段两种坏同形）"
+  summary
+  exit 1
+fi
+ok "手机上看见了 owner 写的任务（没点过一次同步）"
+shot "08-下行任务可见"
+
+# ── 8. 上行：手机发一条评论，owner 侧下载回来必须是 verified ─────────────────
+step "8. 上行判据（L3/L4）：手机发评论 → owner 侧重验签 = verified"
+ax_press_until "$TASK_TITLE" "写下你的评论" \
+  || { shot "09b-任务点不开"; bad "点不开 owner 那条任务（评论输入框没出现）"; summary; exit 1; }
+idb_dump
+tree_has "评论区" || note "没读到「评论区」标题（可能在屏幕下方，继续试输入）"
+PHONE_COMMENT="手机取证评论${STAMP}"
+fill_field "写下你的评论" "$PHONE_COMMENT" || { shot "09-评论框进不去"; bad "评论输入框写不进去"; summary; exit 1; }
+# 收键盘用的是 `fill_field` 记下的那行标题坐标；收不掉只记一句、**不因此宣布产品坏了**
+#（下面 L3 那两条断言才是判据：点「发送」→ 评论回到界面）。
+dismiss_keyboard_hard || note "软键盘没收掉（「写下你的评论」那行标题当量过落点的坐标不可得）—— 继续按发送"
+shot "10-评论已输入"
+ax_press "发送"
+sleep 3
+if ! wait_tree "$PHONE_COMMENT" 90; then
+  shot "11-评论没出现在界面上"
+  bad "手机发出去的评论没有回到界面上（本地物化那一半没成立）"
+  summary
+  exit 1
+fi
+ok "手机发出的评论回到了界面上"
+shot "11-手机评论可见"
+
+node "$ROOT/scripts/lib/collab-owner-step.mjs" verify-phone-op --state "$OWNER_STATE" \
+  --expect-body "$PHONE_COMMENT" > "$EVIDENCE/phone-op-signature.json" 2> "$EVIDENCE/phone-op-signature.err"
+if [ "$?" -ne 0 ]; then
+  shot "12-上行验签没过"
+  bad "owner 侧下载手机写的那条 op，重验没有通过（读数见 phone-op-signature.err）"
+  summary
+  exit 1
+fi
+ok "手机写出的 op 在 owner 侧重验 = verified（ADR-0069 在移动端成立）"
+
+# ── 9. 信号驱动：owner 再写一条评论，手机不点同步自己重画 ───────────────────
+step "9. 信号判据（L5）：owner 写第二条评论 → 手机靠 new_share_ops 自己出现"
+OWNER_COMMENT="owner第二条评论${STAMP}"
+node "$ROOT/scripts/lib/collab-owner-step.mjs" add-comment --state "$OWNER_STATE" --body "$OWNER_COMMENT" \
+  > "$RUN_DIR/owner-comment.json" 2> "$RUN_DIR/owner-comment.err" \
+  || { sed 's/^/      /' "$RUN_DIR/owner-comment.err" >&2; env_bail "owner 写评论失败"; }
+note "owner 已写「$OWNER_COMMENT」；这一步**不许碰同步按钮**，手机只能靠信号"
+if ! wait_tree "$OWNER_COMMENT" 180; then
+  shot "13-信号没把评论送到手机"
+  bad "owner 那条评论没有出现在手机界面上（信号→拉取那条腿在移动端没成立，或手机没有活连接）"
+  summary
+  exit 1
+fi
+ok "owner 的评论靠信号出现在手机上（全程没点同步）"
+shot "14-信号驱动到的评论"
+
+# ── 10. 界面不谎称能力：通知偏好面只剩三枚有输入的开关 ──────────────────────
+step "10. 偏好面判据（L6）：只有活动那三档，没有「任务提醒」/「自动接受」"
+idb_dump
+if ! tree_has "活动通知" && ! tree_has "完成/取消完成了任务"; then
+  ax_press "通知偏好" || note "这一屏上没读到偏好面标题，按现场继续"
+  sleep 2
+  idb_dump
+fi
+if tree_has "活动通知" || tree_has "完成/取消完成了任务"; then
+  ok "通知偏好面在活动那一档"
+  shot "16-通知偏好面"
+else
+  shot "15-偏好面读不到活动档"
+  bad "通知偏好面没在活动档上（面板没渲染或文案漂了）"
+  summary
+  exit 1
+fi
+for ghost in "任务提醒" "指派给他人的除外" "自动接受已知合作者的共享邀请"; do
+  # 🔴 这一档是**减法**判据（"界面上不许再摆着没有输入的开关"），所以 rc=2 那一档
+  #    单独走：树读不出时"没数到"和"确实没有"逐字同形，把它算成 ✅ 就是一条恒真判据。
+  tree_has "$ghost" >/dev/null 2>&1; _rc=$?
+  if [ "$_rc" = "0" ]; then
+    bad "界面上还摆着没有输入的开关：「$ghost」（M5-3 那一格没成立）"
+  elif [ "$_rc" = "2" ]; then
+    bad "判不了「$ghost」在不在这一棵树上（树读不出）⇒ 不拿「没读到」当「已经撤掉」"
+  else
+    ok "界面上没有「$ghost」（没有输入的档位已撤干净）"
+  fi
+done
+
+# ── 11. 证据收尾 ────────────────────────────────────────────────────────────
+step "11. 证据目录（只存读数，不存产物）"
+node "$ROOT/scripts/lib/collab-owner-step.mjs" dump --state "$OWNER_STATE" > "$EVIDENCE/server-side.json" 2> /dev/null \
+  || note "dump 读数没落成（不影响上面的判据）"
+{
+  echo "# iOS 协作旅程证据（$(date -Iseconds)）"
+  echo
+  echo "- 设备：$UDID（名字前缀 $DEVICE_NAME）"
+  echo "- 服务端：$HOST_SERVER（库 $E2E_DB，TEST_MODE，零 mock）"
+  echo "- 安装包 main.jsbundle sha256：$(cat "$EVIDENCE/bundle-sha256.txt" 2>/dev/null)"
+  echo "- share：$SHARE_ID"
+  echo "- owner 成员行：$OWNER_MEMBER"
+  echo "- 手机成员行：$PHONE_MEMBER"
+  echo "- 判据读数：$PASS 通过 / $FAIL 失败"
+  echo
+  echo "截图逐张对应上面每一步；上行验签的机器读数在 phone-op-signature.json，"
+  echo "服务端侧的成员/日志形状在 server-side.json。"
+} > "$EVIDENCE/README.md"
+note "截图 $(ls -1 "$EVIDENCE" | grep -c 'png$') 张，证据目录 $EVIDENCE"
+
+summary

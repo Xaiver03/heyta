@@ -57,6 +57,26 @@ export interface VaultSyncKey {
 }
 
 /**
+ * 这串载荷**是不是 vault 信封**（`heyta-vault-op/` 魔数）。
+ *
+ * 🔴 存在理由是**一个只有调用方知道的问题**：同一块密文可能由两种钥匙之一写下
+ * （旧的同步口令，或 vault 的根钥匙），而密文里除了这个魔数没有任何东西能区分它们。
+ * 「先试口令、失败再试根钥匙」是错的 —— 那会为一次判断付两次 Argon2id，
+ * 还把"钥匙不对"和"信封不是这一种"混成同一个失败。
+ *
+ * 它**只回答形状**，不回答"这把钥匙对不对"：魔数对但版本/标签不认的，仍然要在
+ * `decrypt` 里失败（`createPasswordPayloadCipher` 就是这么做的）。
+ * base64 读不出来一律当"不是 vault 信封"，不抛 —— 调用方要的是判断，不是异常。
+ */
+export function isVaultOpEnvelope(payload: string): boolean {
+  try {
+    return hasVaultMarker(new Uint8Array(decodeBase64(payload)));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * New-format-only writes with explicit legacy reads for migration. The caller
  * must obtain/publish the wrapped package before using this codec. This does
  * not migrate historical operations or persist any plaintext key.

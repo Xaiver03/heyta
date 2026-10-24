@@ -34,6 +34,7 @@ import {
   subscribeShareRepaint,
   type ShareSignalDeps,
 } from '../src/share/share-signals';
+import { bindMobileOplogBase } from '../src/share/wiring';
 
 function stateWith(shareIds: string[]): MaterializedState {
   const projects: Record<string, unknown> = {};
@@ -50,6 +51,18 @@ function fakeHost(shareIds: string[]): AppHost {
     dispatchChecked: vi.fn(async () => undefined),
     getState: () => stateWith(shareIds),
   } as unknown as AppHost;
+}
+
+/**
+ * 把"这台设备认得这几份 share"摆出来 —— 和生产的形状一致：
+ * 合并视图那条腿（base）由 `db/open-host.ts` 绑，`clientId` 由实时通道建连时绑。
+ * 🔴 2026-10-24 之前这里只调 `bindShareSignalHost` 一枚就够，因为它顺手把 base 也绑了；
+ * 那一处多绑交的是**包装后**的宿主 ⇒ 读侧递归、真机崩在栈溢出。拆开后测试跟着拆。
+ */
+function bindDevice(shareIds: string[]): void {
+  const host = fakeHost(shareIds);
+  bindMobileOplogBase(host);
+  bindShareSignalHost(host);
 }
 
 function fakeStorage(ops: { value: unknown[] } = { value: [] }) {
@@ -94,11 +107,14 @@ async function settled(): Promise<void> {
 
 afterEach(() => {
   __resetMobileShareSignalsForTests();
+  // base 现在不由 `bindShareSignalHost` 管（那是生产里 `db/open-host.ts` 一件事），
+  // 所以复位也得自己摘 —— 不摘会把这台假设备漏给下一个用例。
+  bindMobileOplogBase(undefined);
 });
 
 describe('移动端共享信号装配', () => {
   it('🔴 `new_share_ops`：本机认得（清单行绑定在册）⇒ 真的拉了那一份', async () => {
-    bindShareSignalHost(fakeHost(['s1']));
+    bindDevice(['s1']);
     const storage = fakeStorage();
     const { session, pullShareOps } = fakeSession(storage);
     install({ ensureSession: async () => session, ensureStorage: async () => storage as never });
@@ -111,7 +127,7 @@ describe('移动端共享信号装配', () => {
   });
 
   it('本机不认得的 shareId ⇒ 零拉取（信号按账号扇出，本地事实本地判）', async () => {
-    bindShareSignalHost(fakeHost(['s1']));
+    bindDevice(['s1']);
     const storage = fakeStorage();
     const { session, pullShareOps } = fakeSession(storage);
     install({ ensureSession: async () => session, ensureStorage: async () => storage as never });
@@ -123,7 +139,7 @@ describe('移动端共享信号装配', () => {
   });
 
   it('拉到新内容 ⇒ 敲"重画"（界面从盘上重放，不做第二次下载）', async () => {
-    bindShareSignalHost(fakeHost(['s1']));
+    bindDevice(['s1']);
     const storage = fakeStorage();
     const { session } = fakeSession(storage);
     install({ ensureSession: async () => session, ensureStorage: async () => storage as never });
@@ -140,7 +156,7 @@ describe('移动端共享信号装配', () => {
   });
 
   it('别人新增的评论 ⇒ 活动转发给界面监听器（自己不吵自己按 clientId 滤）', async () => {
-    bindShareSignalHost(fakeHost(['s1']));
+    bindDevice(['s1']);
     const storage = fakeStorage();
     const { session } = fakeSession(storage);
     install({ ensureSession: async () => session, ensureStorage: async () => storage as never });
@@ -159,7 +175,7 @@ describe('移动端共享信号装配', () => {
   it('🔴 刚入群、清单行还没绑定：登记中的 target 也算认得（owner 补发信封的信号不许丢）', async () => {
     // 这台设备刚点完「接受邀请」：`getState()` 里还没有任何 shareId 绑定
     //（那一行要等 finalize 成功才写），但入群对话框已经把自己的重取登记上了。
-    bindShareSignalHost(fakeHost([]));
+    bindDevice([]);
     const refresh = vi.fn(async () => undefined);
     const unregister = registerShareRosterTarget('s-just-joined', refresh);
     expect(shareRosterTargetCount('s-just-joined')).toBe(1);
@@ -173,7 +189,7 @@ describe('移动端共享信号装配', () => {
   });
 
   it('成员面信号：本机不认得、也没登记的 shareId ⇒ 一条重取都不跑', async () => {
-    bindShareSignalHost(fakeHost(['s1']));
+    bindDevice(['s1']);
     const refresh = vi.fn(async () => undefined);
     registerShareRosterTarget('s1', refresh);
     install();
@@ -185,7 +201,7 @@ describe('移动端共享信号装配', () => {
   });
 
   it('两类信号不串线：成员面信号**不拉内容**', async () => {
-    bindShareSignalHost(fakeHost(['s1']));
+    bindDevice(['s1']);
     const storage = fakeStorage();
     const { session, pullShareOps } = fakeSession(storage);
     const refresh = vi.fn(async () => undefined);
