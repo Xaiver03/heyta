@@ -1,0 +1,745 @@
+/**
+ * 演示外壳样式
+ * ============
+ *
+ * ⚠️ 这里**只管演示的排版**（舞台、翻页、卡片、文案层级），
+ * **不碰产品界面** —— 界面由 `src/mockup/mockup.css` 负责，两边各管各的。
+ * 颜色一律取 `--ht-*` 令牌，不在这里另造一套色值。
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #060b18;
+  font-family: var(--ht-font-sans, system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif);
+  overflow: hidden;
+}
+
+.pd-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pd-viewport {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.pd-stage {
+  position: relative;
+  transform-origin: center center;
+  flex: none;
+}
+
+/* 总览：15 页缩到一屏，不缩放、换成网格 */
+.pd-stage--grid {
+  position: static;
+  width: 100% !important;
+  height: 100% !important;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  overflow: auto;
+}
+
+/* ── 单页 ─────────────────────────────────────────────── */
+
+.pd-slide {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: size;
+}
+
+.pd-slide--light {
+  background:
+    radial-gradient(1200px 900px at 78% -12%, var(--ht-blue-100, #dbeafe) 0%, transparent 62%),
+    linear-gradient(155deg, #f8fafc 0%, #eef4ff 100%);
+  color: var(--ht-color-foreground, #0f172a);
+}
+
+.pd-slide--dark {
+  background:
+    radial-gradient(1100px 900px at 80% -10%, rgba(37, 99, 235, 0.45) 0%, transparent 60%),
+    linear-gradient(150deg, #04091f 0%, #0d1f4c 100%);
+  color: #fff;
+}
+
+/* ── 通用排版 ─────────────────────────────────────────── */
+
+/* 内容块垂直居中：贴顶会让下半页留一大片空白，看起来像没画完。 */
+.pd-body {
+  position: absolute;
+  inset: 0;
+  padding: 96px 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 44px;
+}
+
+/* 内容多的页（总览）压一压留白并贴顶 ——
+   两行缩略图本来就吃满高度，居中会让首行被裁掉。 */
+.pd-body--tight {
+  padding: 68px 80px;
+  gap: 26px;
+  justify-content: flex-start;
+}
+
+.pd-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  padding: 96px 160px;
+  text-align: center;
+}
+
+.pd-eyebrow {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ht-color-primary, #2563eb);
+}
+
+.pd-slide--dark .pd-eyebrow {
+  color: var(--ht-blue-300, #93c5fd);
+}
+
+.pd-h2 {
+  margin: 0;
+  font-size: 68px;
+  line-height: 1.28;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  max-width: 1500px;
+}
+
+/* 界面页的标题：左栏只有 560px，52px 会把「待办」拆成两行 —— 降到 46px
+   并在 JSX 里手动断行，保证断点在语义停顿处而不是随缘。 */
+.pd-h2--sm {
+  font-size: 46px;
+  line-height: 1.4;
+}
+
+/* 只在左右分栏里限宽 —— 限在通用类上会连总览页的标题一起挤窄，
+   表现是末端单独掉一个字（「…另一套数 / 据」）。 */
+.pd-split .pd-h2--sm {
+  max-width: 560px;
+}
+
+.pd-h2--onDark {
+  color: #fff;
+}
+
+.pd-fine {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.6;
+  color: var(--ht-color-foreground-subtle, #64748b);
+}
+
+.pd-slide--dark .pd-fine {
+  color: var(--ht-slate-400, #94a3b8);
+}
+
+.pd-note {
+  margin: 0;
+  padding: 26px 34px;
+  border-radius: 16px;
+  background: var(--ht-color-primary-subtle, #eff6ff);
+  color: var(--ht-color-primary-active, #1d4ed8);
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.pd-note--plain {
+  background: transparent;
+  padding: 0;
+  color: var(--ht-color-foreground-muted, #475569);
+  font-weight: 400;
+}
+
+/* ── 封面 ─────────────────────────────────────────────── */
+
+.pd-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  text-align: center;
+}
+
+.pd-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pd-brand__mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--ht-color-primary, #2563eb);
+  box-shadow: 0 14px 34px rgba(37, 99, 235, 0.32);
+}
+
+.pd-brand__name {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ht-color-foreground, #0f172a);
+}
+
+.pd-cover__title {
+  margin: 0;
+  font-size: 96px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  max-width: 1500px;
+}
+
+.pd-cover__title--sm {
+  font-size: 76px;
+  color: #fff;
+}
+
+.pd-cover__sub {
+  margin: 0;
+  font-size: 38px;
+  line-height: 1.5;
+  color: var(--ht-color-foreground-muted, #475569);
+}
+
+.pd-cover__sub--sm {
+  font-size: 32px;
+  max-width: 1280px;
+  color: var(--ht-slate-300, #cbd5e1);
+}
+
+.pd-cover__meta {
+  margin: 0;
+  font-size: 26px;
+  color: var(--ht-color-foreground-subtle, #64748b);
+}
+
+/* ── 标签 ─────────────────────────────────────────────── */
+
+.pd-chips {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pd-chip {
+  padding: 14px 30px;
+  border-radius: 999px;
+  background: var(--ht-color-surface, #fff);
+  border: 2px solid var(--ht-blue-200, #bfdbfe);
+  color: var(--ht-color-primary-active, #1d4ed8);
+  font-size: 28px;
+  font-weight: 500;
+}
+
+.pd-slide--dark .pd-chip {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.pd-rule {
+  width: 200px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--ht-color-primary, #2563eb);
+}
+
+/* ── 一句话主张 ───────────────────────────────────────── */
+
+.pd-statement {
+  margin: 0;
+  font-size: 58px;
+  line-height: 1.5;
+  font-weight: 700;
+  max-width: 1480px;
+  color: var(--ht-color-foreground, #0f172a);
+}
+
+/* ── 卡片网格 ─────────────────────────────────────────── */
+
+.pd-grid3,
+.pd-grid4,
+.pd-grid2 {
+  display: grid;
+  gap: 32px;
+}
+
+.pd-grid3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.pd-grid4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.pd-grid2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.pd-card {
+  padding: 46px 44px;
+  border-radius: 26px;
+  background: var(--ht-color-surface, #fff);
+  border: 1px solid var(--ht-color-border, #e2e8f0);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pd-slide--dark .pd-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(2px);
+}
+
+.pd-card__n {
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ht-blue-500, #3b82f6);
+}
+
+.pd-slide--dark .pd-card__n {
+  color: var(--ht-blue-400, #60a5fa);
+}
+
+.pd-card__t {
+  margin: 0;
+  font-size: 38px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.pd-slide--dark .pd-card__t {
+  color: #fff;
+}
+
+.pd-card__d {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.6;
+  color: var(--ht-color-foreground-muted, #475569);
+}
+
+.pd-slide--dark .pd-card__d {
+  color: var(--ht-slate-300, #cbd5e1);
+}
+
+.pd-card--row {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 26px;
+}
+
+.pd-card__icon {
+  flex: none;
+  line-height: 0;
+}
+
+/* ── 要点 ─────────────────────────────────────────────── */
+
+.pd-bullets {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.pd-bullet {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  font-size: 30px;
+  line-height: 1.5;
+  color: var(--ht-color-foreground-muted, #475569);
+}
+
+.pd-bullet__dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 12px;
+  border-radius: 7px;
+  background: var(--ht-color-primary, #2563eb);
+}
+
+/* ── 界面页：左文右窗 ─────────────────────────────────── */
+
+/* 左文右窗。列宽是写死的 560px，**窗口列用 1fr 自适应** ——
+   窗口再写死一个大于列宽的宽度就会溢出到页外（第一版正是这么错的：
+   `.pd-window{width:1020px}` 落在 640px 的列里，右边被裁掉一大块）。 */
+.pd-split {
+  position: absolute;
+  inset: 0;
+  padding: 64px 80px;
+  display: grid;
+  grid-template-columns: 560px 1fr;
+  align-items: center;
+  gap: 56px;
+}
+
+/* 镜像：窗口在左、文案在右。窗口落在 1fr 那一列，宽度照样由列决定。 */
+.pd-split--flip {
+  grid-template-columns: 1fr 560px;
+}
+
+.pd-split__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* 窗口框：真实复现件在这里，`AppWindow` 按框宽算 stage 缩放 */
+.pd-window {
+  width: 100%;
+  max-width: 1180px;
+  justify-self: center;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 40px 90px rgba(15, 23, 42, 0.22);
+  border: 1px solid var(--ht-color-border, #e2e8f0);
+}
+
+/* ── 五视图总览 ───────────────────────────────────────── */
+
+/* 三列而不是五列：五个窗口在五列里每个只有 320px 宽，
+   界面缩成一个色块、看不出是哪个视图 —— 那还不如不放。
+   列宽写死 440：两行 × (440×0.625 + 标题) 刚好装进 1080 高，
+   用 1fr 时每格会被撑到 568 宽、第二行溢出页外。 */
+.pd-grid5 {
+  display: grid;
+  grid-template-columns: repeat(3, 440px);
+  justify-content: space-between;
+  gap: 22px 24px;
+  align-items: start;
+}
+
+.pd-overview__note {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 36px;
+  border-radius: 22px;
+  background: var(--ht-color-primary-subtle, #eff6ff);
+  border: 1px dashed var(--ht-blue-300, #93c5fd);
+}
+
+.pd-overview__note strong {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--ht-color-primary-active, #1d4ed8);
+}
+
+.pd-overview__note span {
+  font-size: 26px;
+  line-height: 1.6;
+  color: var(--ht-color-foreground-muted, #475569);
+}
+
+.pd-thumb {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pd-thumb__win {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ht-color-border, #e2e8f0);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+  background: var(--ht-color-surface, #fff);
+}
+
+.pd-thumb__cap {
+  font-size: 26px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ht-color-foreground, #0f172a);
+}
+
+/* ── 多端 ─────────────────────────────────────────────── */
+
+.pd-platforms {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 22px;
+}
+
+.pd-platform {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 34px 18px;
+  border-radius: 24px;
+  background: var(--ht-color-surface, #fff);
+  border: 1px solid var(--ht-color-border, #e2e8f0);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+}
+
+.pd-platform svg {
+  width: 62px;
+  height: 62px;
+}
+
+.pd-platform span {
+  font-size: 28px;
+  font-weight: 600;
+}
+
+/* ── 定价 ─────────────────────────────────────────────── */
+
+.pd-plans {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
+.pd-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 46px 42px;
+  border-radius: 26px;
+  background: var(--ht-color-surface, #fff);
+  border: 1px solid var(--ht-color-border, #e2e8f0);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+}
+
+.pd-plan--hot {
+  border: 2px solid var(--ht-color-primary, #2563eb);
+  box-shadow: 0 18px 48px rgba(37, 99, 235, 0.2);
+}
+
+.pd-plan__name {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--ht-color-foreground-muted, #475569);
+}
+
+.pd-plan__price {
+  font-size: 70px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--ht-color-primary, #2563eb);
+}
+
+.pd-plan__period {
+  font-size: 26px;
+  color: var(--ht-color-foreground-subtle, #64748b);
+}
+
+.pd-plan__items {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pd-plan__items li {
+  font-size: 27px;
+  line-height: 1.55;
+  color: var(--ht-slate-700, #334155);
+  padding-left: 30px;
+  position: relative;
+}
+
+.pd-plan__items li::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 14px;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--ht-color-primary, #2563eb);
+  opacity: 0.45;
+}
+
+/* ── 路线图 ───────────────────────────────────────────── */
+
+.pd-phases {
+  display: flex;
+  gap: 22px;
+}
+
+.pd-phase {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 30px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.pd-phase--active {
+  border-color: var(--ht-blue-400, #60a5fa);
+  border-width: 2px;
+}
+
+.pd-phase__mark {
+  font-size: 26px;
+  color: var(--ht-emerald-400, #34d399);
+}
+
+.pd-phase--active .pd-phase__mark {
+  color: var(--ht-blue-300, #93c5fd);
+}
+
+.pd-phase__name {
+  font-size: 30px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.pd-phase__state {
+  font-size: 26px;
+  color: var(--ht-emerald-300, #6ee7b7);
+}
+
+.pd-phase--active .pd-phase__state {
+  color: var(--ht-blue-300, #93c5fd);
+}
+
+.pd-ctas {
+  display: flex;
+  gap: 20px;
+}
+
+.pd-cta {
+  padding: 22px 44px;
+  border-radius: 16px;
+  font-size: 32px;
+  font-weight: 600;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.pd-cta--solid {
+  background: var(--ht-color-primary, #2563eb);
+  border-color: transparent;
+  box-shadow: 0 14px 34px rgba(37, 99, 235, 0.4);
+}
+
+/* ── 底部进度条 ───────────────────────────────────────── */
+
+.pd-bar {
+  flex: none;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 28px;
+  background: #060b18;
+  color: var(--ht-slate-400, #94a3b8);
+  font-size: 18px;
+}
+
+.pd-bar__track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.pd-bar__fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ht-color-primary, #2563eb);
+  transition: width 0.28s ease;
+}
+
+.pd-bar__n {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* ── 总览缩略 ─────────────────────────────────────────── */
+
+.pd-slide--thumb {
+  position: relative;
+  inset: auto;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  padding: 0;
+  border: 2px solid transparent;
+  overflow: hidden;
+  cursor: pointer;
+  transform: scale(1);
+}
+
+.pd-slide--thumb.pd-slide--current {
+  border-color: var(--ht-color-primary, #2563eb);
+}
+
+.pd-thumbInner {
+  position: absolute;
+  inset: 0;
+  transform: scale(0.28);
+  transform-origin: top left;
+  width: 1920px;
+  height: 1080px;
+  pointer-events: none;
+}
+
+.pd-thumbIndex {
+  position: absolute;
+  z-index: 2;
+  right: 8px;
+  bottom: 8px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+}

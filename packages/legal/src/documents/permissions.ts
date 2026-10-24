@@ -29,7 +29,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: 'heyta 不申请位置、通讯录、通话记录、短信、照片、麦克风、相机、健康、日历读写权限，也不读取其他应用的存储数据。',
+        text: 'heyta 不申请位置、通讯录、通话记录、短信、照片、麦克风、相机、健康、日历读写权限、提醒事项，也不读取其他应用的存储数据。',
       },
       {
         kind: 'callout',
@@ -69,6 +69,20 @@ const zh = [
             '尽量按设定时刻投递本地提醒，不读取其他个人信息',
             '清单声明此能力；是否允许由系统特殊访问设置决定，应用不会在启动时跳转索取授权',
             '未获授权时使用系统非精确排程，通知可能延迟；任务和应用内提醒照常可用',
+          ],
+          [
+            'Android',
+            '开机后重算排程（RECEIVE_BOOT_COMPLETED）',
+            '设备重启会让系统清掉全部已排闹钟。这一项让 heyta 在开机时被系统叫醒一次，把本机那份"这些闹钟我已经排过了"的缓存忘掉',
+            '安装时由系统授予，不会弹窗；它在开机时**不启动界面、不读任何个人信息、不上传任何东西**，只清本机那一份排程缓存',
+            '🔴 系统不提供拒绝这一项的入口（normal 级）。⚠️ 真实边界：因为数据是端到端加密的，**只有应用被打开、数据解密之后才排得出闹钟**，所以重启后的提醒会在你下次打开 heyta 时补齐，而不是在关屏状态下自己响',
+          ],
+          [
+            'Android',
+            '忽略电池优化（REQUEST_IGNORE_BATTERY_OPTIMIZATIONS）',
+            '让系统在长时间休眠时不要冻结本应用，从而让提醒按点送达',
+            '🔴 **只在你于设置页里主动点下"提醒不受省电限制"那一条之后**才跳转系统页面索取；启动时、创建提醒时都不索取。部分机型没有那个系统页面，此时改为打开 heyta 的应用信息页，我们不会把它说成"已向你要过授权"',
+            '拒绝后提醒仍会排程并保留在应用内，只是可能被系统省电推迟几分钟到几小时；heyta 不会因此不让你用应用',
           ],
           [
             'iOS / iPadOS',
@@ -202,7 +216,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'heyta does not request location, contacts, call log, SMS, photos, microphone, camera, health, or calendar write access, and does not read other apps\' storage.',
+        text: 'heyta does not request location, contacts, call log, SMS, photos, microphone, camera, health, calendar write access, or reminders, and does not read other apps\' storage.',
       },
       {
         kind: 'callout',
@@ -242,6 +256,20 @@ const en = [
             'Deliver local reminders at the configured time; no access to other personal information',
             'Declared in the manifest and controlled by system special-access settings; the app does not open that setting on startup',
             'Without access, the app uses inexact scheduling and notifications may be delayed; tasks and in-app reminders remain available',
+          ],
+          [
+            'Android',
+            'Recompute schedules after boot (RECEIVE_BOOT_COMPLETED)',
+            'A reboot wipes every alarm the system held for us. This lets heyta be woken once at boot to drop its local "these alarms are already armed" cache',
+            'Granted at install, no prompt. At boot it **starts no screen, reads no personal information and sends nothing** — it clears one local cache entry',
+            '🔴 The OS offers no way to decline this one (normal level). ⚠️ The real boundary: because data is end-to-end encrypted, **an alarm can only be scheduled once the app is open and the data decrypted**, so reminders missed across a reboot are re-armed the next time you open heyta rather than ringing with the screen off'
+          ],
+          [
+            'Android',
+            'Ignore battery optimisation (REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)',
+            'Stop the system from freezing the app during long sleep, so reminders arrive on time',
+            '🔴 Asked **only after you tap the battery-saving row in settings ("提醒不受省电限制")**; never on startup or when creating a reminder. Some devices have no such system page — there we open the app info page for heyta instead, and we do not describe that as "we asked you for the exemption"',
+            'If you decline, reminders are still scheduled and stay in the app; the system may delay them by minutes to hours. heyta does not withhold the app for this'
           ],
           [
             'iOS / iPadOS',
@@ -366,9 +394,9 @@ const en = [
 
 export const permissions: LegalDocument = {
   id: 'permissions',
-  version: '1.2',
+  version: '1.3',
   status: 'draft',
-  updatedDate: '2026-10-04',
+  updatedDate: '2026-10-24',
   title: {
     'zh-CN': '应用权限清单',
     en: 'App Permissions Inventory',
