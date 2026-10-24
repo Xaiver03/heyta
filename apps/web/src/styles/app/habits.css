@@ -103,6 +103,26 @@
   outline: none;
 }
 
+/*
+ * 添加习惯（对齐滴答清单的形状，2026-10-24）
+ * ==========================================
+ *
+ * 这个对话框此前是"每个字段一个 <label> 竖排 + 两列栅格 + 40 枚图标常驻"，
+ * 症状是控件高度不一、字段互相挤压、主线下推到第三屏。改法不是调间距，
+ * 而是把它换成滴答那一套**行解剖**：
+ *
+ *   1. 一条**两列网格**：左列是标签（第一格是头像），右列是控件。
+ *      所有行共用 `--ht-layout-form-label-width`，于是"文字从哪开始、
+ *      控件从哪开始"在整张表单里是同一条竖线。
+ *   2. **可交互控件只有一档高度** = `--ht-size-field-height`。
+ *      🔴 这条是本文件最容易再破的规矩：`min-block-size` 只是下限，
+ *      `<input type=number>` 的 spinner、`<select>` 的原生外观、
+ *      以及 `font: inherit` 没写时的回落，都会让内容高度越过下限 ——
+ *      所以这里**给死 `block-size`** 并让三个标签页共用同一个类。
+ *   3. 图标**收起**，点头像才展开（滴答的形状）。常驻 40 枚图标是
+ *      "把配置的可见性当成主任务"。
+ *   4. 动作区贴底、固定不随内容滚动（长表单里"确定"不该在滚动区外面消失）。
+ */
 .ht-habit-create-dialog {
   position: fixed;
   /* The mobile rail is a contained bottom navigation.  Its labels are part of
@@ -118,9 +138,14 @@
 }
 
 .ht-habit-create-dialog__dialog {
-  inline-size: min(100%, 38rem);
+  display: flex;
+  flex-direction: column;
+  /* 34rem = 544px。此前是 38rem（608）—— 那个宽度是为**两列栅格**留的，
+     换成"左标签 / 右控件"之后不需要那么宽（滴答那张是 449，
+     我们还要放"数值 + 单位"并排，所以留到 544）。 */
+  inline-size: min(100%, 34rem);
   max-block-size: min(90dvh, 48rem);
-  overflow: auto;
+  overflow: hidden;
   border: 0;
   border-radius: var(--ht-radius-xl);
   background: var(--ht-color-surface-raised);
@@ -153,63 +178,161 @@
   outline: none;
 }
 
+/* 🔴 表单 = **两段**：可滚动的正文 + 常驻的动作区。
+   此前动作区在滚动容器**里面**，实测 754 高的视口下「取消 / 添加习惯」
+   一个像素都没渲染出来（截图 y 688..716 除滚动条外全白），
+   而 `toBeVisible()` 对它返回 true —— 那是本仓已经栽过一次的坑
+   （H3 的 I6：`toBeVisible()` 不验"在不在视口里"）。 */
 .ht-habit-create-dialog__form {
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-4);
-  padding: var(--ht-space-3) var(--ht-space-6) var(--ht-space-6);
+  min-block-size: 0;
 }
 
-.ht-habit-create-dialog__field {
+.ht-habit-create-dialog__body {
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-1);
-  min-inline-size: 0;
-  color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-sm);
+  /* 字段间距 8px：行高 44（触控下限）+ 8 = 52 的节奏。
+     滴答是 32 + 8 = 40 —— 它的控件比我们的可访问下限矮 12px，
+     所以"看起来一样松"的那个间距对我们是 space-2，不是 space-3。 */
+  gap: var(--ht-space-2);
+  overflow: auto;
+  padding: var(--ht-space-3) var(--ht-space-6) var(--ht-space-4);
 }
 
-.ht-habit-create-dialog__field > input,
-.ht-habit-create-dialog__field > select {
-  min-block-size: var(--ht-touch-target-min);
-  inline-size: 100%;
-  padding-inline: var(--ht-space-3);
+/* 字段解剖（行、标签列、控件高度）**已搬到 `form.css`**（`FormField` 一族，2026-10-24）。
+   🔴 这里不许再定义 `.ht-field*` 或第二种字段形状 —— 那正是"6 种解剖"的来历。 */
+
+/* ── 头像：它就是标签那一列 ───────────────────────────────────── */
+.ht-habit-create-dialog__avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-size-field-height);
+  block-size: var(--ht-size-field-height);
+  justify-self: start;
+  padding: 0;
   border: 0;
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  cursor: pointer;
+}
+
+/* 右下角那颗铅笔徽标：它是"这里可以点"的唯一提示 ——
+   头像本身长得像装饰，不给徽标就没人会去点它。 */
+.ht-habit-create-dialog__avatar-pencil {
+  position: absolute;
+  inset-block-end: calc(-1 * var(--ht-space-1));
+  inset-inline-end: calc(-1 * var(--ht-space-1));
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-space-5);
+  block-size: var(--ht-space-5);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-habit-create-dialog__avatar:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+/* ── 图标面板（收起态默认关闭）────────────────────────────────── */
+.ht-habit-create-dialog__icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--ht-touch-target-min), 1fr));
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-2);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-habit-create-dialog__icon {
+  display: grid;
+  place-items: center;
+  block-size: var(--ht-touch-target-min);
+  padding: 0;
+  border: var(--ht-border-width-thick) solid transparent;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  cursor: pointer;
+}
+
+.ht-habit-create-dialog__icon:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-habit-create-dialog__icon[aria-pressed='true'] {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+}
+
+.ht-habit-create-dialog__icon--default {
+  grid-column: span 2;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 星期 / 复习日：同一种小方块，避免出现第三套"选择格子" ────── */
+.ht-habit-create-dialog__tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+.ht-habit-create-dialog__tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border: var(--ht-border-width-thick) solid transparent;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-background);
   color: var(--ht-color-foreground);
-  font: inherit;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  cursor: pointer;
 }
 
-.ht-habit-create-dialog__field > input:focus-visible,
-.ht-habit-create-dialog__field > select:focus-visible {
-  outline: none;
-  background: var(--ht-color-hover);
-  box-shadow: var(--ht-shadow-focus);
+.ht-habit-create-dialog__tile[aria-pressed='true'] {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
 }
 
-.ht-habit-create-dialog__field small {
-  color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-xs);
+.ht-habit-create-dialog__tile:focus-visible,
+.ht-habit-create-dialog__icon:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
 }
 
-.ht-habit-create-dialog__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ht-space-3);
+/* ── 分组分隔线 ──────────────────────────────────────────────────
+   "线数 = 组数 − 1"。这张表单分两组：**必填的主体**（名称/频次/目标/达成）
+   与**补救策略**（补打卡）。不画线时它们在视觉上是同一件事，
+   而"这行是不是必须填"正是用户在这一屏最需要一眼分辨的东西。 */
+.ht-habit-create-dialog__divider {
+  block-size: 0;
+  margin-block: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }
 
+/* ── 动作区 ──────────────────────────────────────────────────── */
 .ht-habit-create-dialog__actions {
   display: flex;
+  flex: 0 0 auto;
   justify-content: flex-end;
   gap: var(--ht-space-2);
-  padding-block-start: var(--ht-space-2);
-}
-
-@container (max-width: 30rem) {
-  .ht-habit-create-dialog__grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  padding: var(--ht-space-4) var(--ht-space-6);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  background: var(--ht-color-surface-raised);
 }
 
 @media (max-width: 36rem) {

@@ -30,6 +30,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useState } from 'react';
+import { FormField } from '../../lib/form/FormField.js';
 import { cssVar } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import type { Habit, HabitGoalType } from '@heyta/domain';
@@ -171,46 +172,43 @@ export function HabitGoalEditor({ habit, onSetGoal }: HabitGoalEditorProps): Rea
             if (e.key === 'Escape') setOpen(false);
           }}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', fontSize: cssVar('font-size.xs') }}>
-            {t('web.habits.goal.target' as never)}
-            <input
-              type="number"
-              min={0}
-              value={draftTarget}
-              data-testid={`habit-goal-target-${habit.id}`}
-              onChange={(e) => setDraftTarget(e.target.value)}
-              style={{
-                width: '5rem',
-                minHeight: cssVar('touch-target.min'),
-                padding: `0 ${cssVar('space.2')}`,
-                borderRadius: cssVar('radius.md'),
-                border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-                background: cssVar('color.background'),
-                color: cssVar('color.foreground'),
-                fontSize: cssVar('font-size.base'),
-              }}
-            />
-          </label>
+          {/* 两格**各占一行**（`stacked`），不是并排。
+              🔴 这是看图改回来的：并排（原语的 `pair`）在这个
+              ~180px 宽的浮动面板里会把「杯 / 页 / 分钟」的占位符裁掉 ——
+              而给这一行加宽度下限（`--ht-layout-input-min`）会让它**溢出面板右边框**，
+              因为面板的宽是"最宽的孩子"决定的（两者互相依赖）。
+              并排只在"面板本来就有足够宽度"时成立（见 `habit-create-dialog` 那一对）。
+              宁可多 44px 高度，也不让用户看不见自己单位怎么填。 */}
+          <FormField
+            id={`habit-goal-target-${habit.id}`}
+            label={t('web.habits.goal.target' as never)}
+          >
+            {(field) => (
+              <input
+                {...field}
+                type="number"
+                min={0}
+                value={draftTarget}
+                data-testid={`habit-goal-target-${habit.id}`}
+                onChange={(e) => setDraftTarget(e.target.value)}
+              />
+            )}
+          </FormField>
 
-          <label style={{ display: 'flex', flexDirection: 'column', fontSize: cssVar('font-size.xs') }}>
-            {t('web.habits.goal.unit' as never)}
-            <input
-              value={draftUnit}
-              placeholder={t('web.habits.goal.unitPlaceholder' as never)}
-              data-testid={`habit-goal-unit-${habit.id}`}
-              onChange={(e) => setDraftUnit(e.target.value)}
-              style={{
-                width: '7rem',
-                minHeight: cssVar('touch-target.min'),
-                padding: `0 ${cssVar('space.2')}`,
-                borderRadius: cssVar('radius.md'),
-                border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-                background: cssVar('color.background'),
-                color: cssVar('color.foreground'),
-                fontSize: cssVar('font-size.base'),
-              }}
-            />
-          </label>
+          <FormField
+            id={`habit-goal-unit-${habit.id}`}
+            label={t('web.habits.goal.unit' as never)}
+          >
+            {(field) => (
+              <input
+                {...field}
+                value={draftUnit}
+                placeholder={t('web.habits.goal.unitPlaceholder' as never)}
+                data-testid={`habit-goal-unit-${habit.id}`}
+                onChange={(e) => setDraftUnit(e.target.value)}
+              />
+            )}
+          </FormField>
 
           <div style={{ display: 'flex', gap: cssVar('space.1') }}>
             {typeButton('atLeast', 'web.habits.goal.atLeast')}

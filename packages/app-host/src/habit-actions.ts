@@ -36,6 +36,7 @@ import {
   byCreatedAtOrder,
   habitLogValue,
   isLive,
+  normalizeReviewOffsets,
   parseCategorySlot,
   parseHabitIcon,
   toLocalDate,
@@ -119,6 +120,16 @@ export function normalizeHabitFrequency(input: HabitFrequency): HabitFrequency {
       throw new Error(`"每 N 天"的 N 必须是 ≥1 的整数，收到 ${JSON.stringify(n)}`);
     }
     return n === 1 ? { type: 'daily' } : { type: 'interval', everyNDays: n };
+  }
+
+  if (input.type === 'spaced') {
+    // 校验与归一**只有 `normalizeReviewOffsets` 一份**（去重、升序、≥1、非空）。
+    // 空表与非法值都在那里抛 —— 这里不再判一遍。
+    const offsets = normalizeReviewOffsets(input.offsets);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.anchor)) {
+      throw new Error(`复习计划的起点必须是 YYYY-MM-DD 的本地日期，收到「${String(input.anchor)}」`);
+    }
+    return { type: 'spaced', offsets, anchor: input.anchor };
   }
 
   const days = [...new Set(input.daysOfWeek)];

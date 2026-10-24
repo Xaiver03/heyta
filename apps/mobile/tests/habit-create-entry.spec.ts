@@ -196,10 +196,20 @@ describe('移动端新建习惯的接线（源码级；本壳没有组件测试�
     );
     // 接住之后必须落到错误状态：吞掉错误的 catch 与没有 catch 对用户是同一件事
     //（都是"点了没反应"），但它会让上面那条 `.catch(` 判据永远绿。
+    //
+    // 🔴 2026-10-24：落到的是 `setCreateError` —— **字段级**的错误。
+    //    改之前它写 `setError`，而那一个会把**整屏**换成错误页：
+    //    一次建不成，连已经建好的习惯都看不见了。判据从"名字必须是 setError"
+    //    改成"必须落进某个错误状态"，并**新增一条**更强的：那枚状态要真的接到字段上
+    //    （否则它只是存起来，屏幕上什么都没有 —— 与吞掉错误等价）。
     expect(
       after.slice(catchAt, catchAt + 220),
-      '.catch 里没有 setError —— 失败被静默吞掉',
-    ).toMatch(/setError\(/);
+      '.catch 里没有落到错误状态 —— 失败被静默吞掉',
+    ).toMatch(/set(?:Create)?Error\(/);
+    expect(
+      src,
+      '创建失败的错误没有接到字段上（TextField 的 error）—— 存进 state 却不显示',
+    ).toMatch(/error=\{createError/);
   });
 
   it('J4 写成功要 refresh（否则列表不动，用户以为没建成）', () => {

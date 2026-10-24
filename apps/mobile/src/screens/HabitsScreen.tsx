@@ -113,6 +113,12 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
 
   const [host, setHost] = useState<AppHost | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * 🔴 「新建失败」曾经写进上面那个 `error` —— 于是**一次建不成会把整屏换成错误页**，
+   * 连已经建好的习惯列都看不见了。它属于**字段**：说清楚"这一次没建成"就够了。
+   * 上面那个 `error` 现在只留给**加载**失败（那一次确实什么都没有）。
+   */
+  const [createError, setCreateError] = useState<string | null>(null);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [draft, setDraft] = useState('');
@@ -521,8 +527,15 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         <TextField
           label={t('web.habits.addLabel')}
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={(next) => {
+            setDraft(next);
+            // 用户一开始改就清掉上一次的失败 —— 让错误跟着输入走，
+            // 而不是挂在那里直到下一次提交。
+            if (createError !== null) setCreateError(null);
+          }}
           placeholder={t('web.habits.addPlaceholder')}
+          error={createError ?? undefined}
+          testID="habit-create-name"
         />
         <Button
           label={t('web.habits.add')}
@@ -537,11 +550,13 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
             void actions
               .createHabit(name)
               .then(() => {
-                setError(null);
+                setCreateError(null);
                 refresh();
               })
               .catch((e: unknown) => {
-                setError(e instanceof Error ? e.message : String(e));
+                // 就地报在字段下方（`TextField` 的 `error`）。不加一句"失败了"的
+                // 前缀：动作层抛出来的话本身就是原因，再包一层只会把它推远。
+                setCreateError(e instanceof Error ? e.message : String(e));
               });
           }}
         />

@@ -65,6 +65,7 @@ import { createPortal } from 'react-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ICON_SIZE } from '@heyta/design-system';
 import {
+  DEFAULT_REVIEW_OFFSETS,
   HABIT_ICONS,
   toLocalDate,
   isoWeekday,
@@ -73,7 +74,7 @@ import {
   type HabitIcon,
 } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { Download, MoreHorizontal, Plus, X } from 'lucide-react';
+import { ChevronDown, Download, MoreHorizontal, Pencil, Plus, Smile, X } from 'lucide-react';
 import { buildHabitExportRows, renderHabitCsv } from '@heyta/app-host';
 import {
   EmptyState,
@@ -83,6 +84,7 @@ import {
   HeytaUiProvider,
 } from '@heyta/ui';
 
+import { FormField } from '../../lib/form/FormField.js';
 import { selection, useSelected } from '../../lib/selection.js';
 import { downloadTextFile } from '../settings/export-download.js';
 import { HabitDetailCard } from './HabitDetailCard.js';
@@ -99,11 +101,27 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
   const [draftTarget, setDraftTarget] = useState('1');
   const [draftUnit, setDraftUnit] = useState('');
   const [draftGoalType, setDraftGoalType] = useState<HabitGoalType>('atLeast');
-  const [draftFrequency, setDraftFrequency] = useState<'daily' | 'weekly' | 'interval'>('daily');
+  const [draftFrequency, setDraftFrequency] = useState<'daily' | 'weekly' | 'interval' | 'spaced'>('daily');
   const [draftInterval, setDraftInterval] = useState('2');
   const [draftWeeklyDays, setDraftWeeklyDays] = useState<number[]>([isoWeekday(toLocalDate(now))]);
+  /**
+   * 间隔复习的那几个"第几天"（可改的那一版）。
+   *
+   * 🔴 草稿状态默认取 `DEFAULT_REVIEW_OFFSETS`（第 1/2/4/7/15/30 天），
+   * 而那个常量住在 `@heyta/domain`：**四端必须同一张默认表**，
+   * 在各宿主里各写一份会让"新建出来的复习计划"按端不同。
+   */
+  const [draftReview, setDraftReview] = useState<number[]>([...DEFAULT_REVIEW_OFFSETS]);
   const [draftBackfillDays, setDraftBackfillDays] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  /**
+   * 图标面板默认**收起**（滴答的形状：点头像才展开）。
+   *
+   * 🔴 这不只是省地方：40 枚图标常驻会把"名称 → 频率 → 目标"这条主线下推三屏，
+   *    而挑图标是**少数时候才做的事**。收起之后，这一屏的第一眼只回答一个问题：
+   *    "我在建一个什么习惯"。
+   */
+  const [draftIconOpen, setDraftIconOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [addError, setAddError] = useState<string | undefined>();
   const [adding, setAdding] = useState(false);
@@ -147,13 +165,23 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
       setAddError(t('web.habits.freq.weeklyRequired'));
       return;
     }
+    if (draftFrequency === 'spaced' && draftReview.length === 0) {
+      // 空表 = 没有一天该复习（判定侧连续天数恒 0）。动作层也会抛，
+      // 但在这里就拦下才说得清"点了几格"。
+      setAddError(t('web.habits.freq.spacedRequired'));
+      return;
+    }
     setAddError(undefined);
     const frequency: HabitFrequency | undefined =
       draftFrequency === 'daily'
         ? undefined
         : draftFrequency === 'weekly'
           ? { type: 'weekly', daysOfWeek: draftWeeklyDays }
-          : { type: 'interval', everyNDays: interval };
+          : draftFrequency === 'spaced'
+            ? // 🔴 起点 = **创建这一刻的本地日期**，不是"下一次打开对话框时的今天"。
+              //    锚点会随这条 op 一起落盘，之后再不漂移（理由见 `habit-review.ts`）。
+              { type: 'spaced', offsets: draftReview, anchor: toLocalDate(readNow()) }
+            : { type: 'interval', everyNDays: interval };
     setAdding(true);
     try {
       await store.addHabit(draft, {
@@ -178,6 +206,8 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
     setDraftFrequency('daily');
     setDraftInterval('2');
     setDraftWeeklyDays([isoWeekday(toLocalDate(readNow()))]);
+    setDraftReview([...DEFAULT_REVIEW_OFFSETS]);
+    setDraftIconOpen(false);
     setDraftBackfillDays('');
     setCreateOpen(false);
   }
@@ -322,31 +352,294 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
                 void add();
               }}
             >
-              <label className="ht-habit-create-dialog__field">
-                <span>{t('web.habits.addLabel')}</span>
-                <input ref={nameInputRef} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={t('web.habits.addPlaceholder')} required disabled={adding} />
-              </label>
-              <div className="ht-habit-create-dialog__field">
-                <span>{t('web.habits.icon.toggle')}</span>
-                <div className="ht-habit__add-icons" role="group" aria-label={t('web.habits.icon.group')}>
-                  {HABIT_ICONS.map((icon) => (
-                    <button key={icon} type="button" className="ht-habit__add-icon" aria-label={t(HABIT_ICON_LABEL_KEYS[icon])} aria-pressed={draftIcon === icon} onClick={() => setDraftIcon((current) => (current === icon ? undefined : icon))} disabled={adding}>
-                      <HabitArtwork icon={icon} size={ICON_SIZE.lg} />
+              <div className="ht-habit-create-dialog__body">
+                {/* ── 名称 + 头像 ──────────────────────────────────────────
+                    `FormField` 的 `inline` 解剖：标签列里放的是**头像**，
+                    名字输入框在右列。没有"新习惯名称"这行字 —— 占位符 + `aria-label`。
+                    点头像展开图标面板（收起态的理由见 `draftIconOpen` 的注释）。 */}
+                <FormField
+                  id="ht-habit-create-name"
+                  label={t('web.habits.addLabel')}
+                  layout="inline"
+                  required
+                  leading={
+                    <button
+                      type="button"
+                      className="ht-habit-create-dialog__avatar"
+                      aria-label={t('web.habits.icon.toggle')}
+                      aria-expanded={draftIconOpen}
+                      aria-controls="ht-habit-create-icons"
+                      data-testid="habit-create-icon-toggle"
+                      onClick={() => setDraftIconOpen((was) => !was)}
+                      disabled={adding}
+                    >
+                      {draftIcon === undefined ? (
+                        <Smile size={ICON_SIZE.lg} aria-hidden="true" />
+                      ) : (
+                        <HabitArtwork icon={draftIcon} size={ICON_SIZE.lg} />
+                      )}
+                      <span className="ht-habit-create-dialog__avatar-pencil" aria-hidden="true">
+                        <Pencil size={ICON_SIZE.xs} />
+                      </span>
                     </button>
-                  ))}
-                </div>
+                  }
+                >
+                  {(field) => (
+                    <input
+                      {...field}
+                      aria-label={t('web.habits.addLabel')}
+                      ref={nameInputRef}
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      placeholder={t('web.habits.addPlaceholder')}
+                      disabled={adding}
+                    />
+                  )}
+                </FormField>
+
+                {draftIconOpen ? (
+                  <div
+                    id="ht-habit-create-icons"
+                    className="ht-habit-create-dialog__icons"
+                    role="group"
+                    aria-label={t('web.habits.icon.group')}
+                  >
+                    {HABIT_ICONS.map((icon) => (
+                      <button
+                        key={icon}
+                        type="button"
+                        className="ht-habit-create-dialog__icon"
+                        aria-label={t(HABIT_ICON_LABEL_KEYS[icon])}
+                        aria-pressed={draftIcon === icon}
+                        onClick={() => setDraftIcon(icon)}
+                        disabled={adding}
+                      >
+                        <HabitArtwork icon={icon} size={ICON_SIZE.lg} />
+                      </button>
+                    ))}
+                    {/* "默认"在这里的意思是"不指定"——落盘后由 id 派生，
+                        与详情面板 `HabitIconPicker` 里那格同一语义。 */}
+                    <button
+                      type="button"
+                      className="ht-habit-create-dialog__icon ht-habit-create-dialog__icon--default"
+                      aria-pressed={draftIcon === undefined}
+                      onClick={() => setDraftIcon(undefined)}
+                      disabled={adding}
+                    >
+                      {t('web.habits.icon.default')}
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* ── 频次（含它自己的条件行）─────────────────────────── */}
+                <FormField
+                  id="ht-habit-create-freq"
+                  label={t('web.habits.freq.toggle')}
+                  layout="inline"
+                >
+                  {(field) => (
+                    <>
+                      <div className="ht-field__select">
+                        <select
+                          {...field}
+                              value={draftFrequency}
+                          onChange={(event) => {
+                            const next = event.target.value as typeof draftFrequency;
+                            setDraftFrequency(next);
+                            if (next === 'weekly' && draftWeeklyDays.length === 0) {
+                              setDraftWeeklyDays([isoWeekday(toLocalDate(now))]);
+                            }
+                          }}
+                          disabled={adding}
+                        >
+                          <option value="daily">{t('web.habits.freq.daily')}</option>
+                          <option value="weekly">{t('web.habits.freq.weekly')}</option>
+                          <option value="interval">{t('web.habits.freq.interval')}</option>
+                          <option value="spaced">{t('web.habits.freq.spaced')}</option>
+                        </select>
+                        <ChevronDown size={ICON_SIZE.sm} aria-hidden="true" />
+                      </div>
+
+                      {draftFrequency === 'weekly' ? (
+                        <div
+                          className="ht-habit-create-dialog__tiles"
+                          role="group"
+                          aria-label={t('web.habits.freq.weekly')}
+                        >
+                          {HABIT_WEEKDAY_MESSAGE_KEYS.map((key, index) => {
+                            const day = index + 1;
+                            const selected = draftWeeklyDays.includes(day);
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                className="ht-habit-create-dialog__tile"
+                                aria-pressed={selected}
+                                onClick={() =>
+                                  setDraftWeeklyDays((days) =>
+                                    selected ? days.filter((value) => value !== day) : [...days, day].sort(),
+                                  )
+                                }
+                                disabled={adding}
+                              >
+                                {t(key as never)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+
+                      {draftFrequency === 'interval' ? (
+                        <input
+                              aria-label={t('web.habits.freq.nDays')}
+                          type="number"
+                          min={1}
+                          step={1}
+                          required
+                          value={draftInterval}
+                          onChange={(event) => setDraftInterval(event.target.value)}
+                          disabled={adding}
+                        />
+                      ) : null}
+
+                      {draftFrequency === 'spaced' ? (
+                        /* 复习日**可以改**：默认那六档只是默认，不是唯一正确答案。
+                           文案是事实口径（第几天），不做任何"科学有效"的背书 ——
+                           红线写在 `packages/domain/src/habit-review.ts` 的文件头。 */
+                        <div
+                          className="ht-habit-create-dialog__tiles"
+                          role="group"
+                          aria-label={t('web.habits.freq.spaced')}
+                        >
+                          {DEFAULT_REVIEW_OFFSETS.map((offset) => {
+                            const selected = draftReview.includes(offset);
+                            return (
+                              <button
+                                key={offset}
+                                type="button"
+                                className="ht-habit-create-dialog__tile"
+                                aria-pressed={selected}
+                                aria-label={t('web.habits.freq.spacedDay', { n: String(offset) })}
+                                onClick={() =>
+                                  setDraftReview((days) =>
+                                    selected
+                                      ? days.filter((value) => value !== offset)
+                                      : [...days, offset].sort((a, b) => a - b),
+                                  )
+                                }
+                                disabled={adding}
+                              >
+                                {t('web.habits.freq.spacedDayShort', { n: String(offset) })}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </FormField>
+
+                {/* ── 目标：数值 + 单位在同一行 ─────────────────────────── */}
+                <FormField
+                  id="ht-habit-create-target"
+                  label={t('web.habits.goal.target')}
+                  layout="inline"
+                >
+                  {() => (
+                    <div className="ht-field__pair">
+                      <input
+                          aria-label={t('web.habits.goal.target')}
+                        type="number"
+                        min={0}
+                        step="any"
+                        required
+                        value={draftTarget}
+                        onChange={(event) => setDraftTarget(event.target.value)}
+                        disabled={adding}
+                      />
+                      <input
+                          aria-label={t('web.habits.goal.unit')}
+                        value={draftUnit}
+                        placeholder={t('web.habits.goal.unitPlaceholder')}
+                        onChange={(event) => setDraftUnit(event.target.value)}
+                        disabled={adding}
+                      />
+                    </div>
+                  )}
+                </FormField>
+
+                {/* ── 达成口径 ─────────────────────────────────────────── */}
+                <FormField
+                  id="ht-habit-create-goal"
+                  label={t('web.habits.goal.mode')}
+                  layout="inline"
+                >
+                  {(field) => (
+                    <div className="ht-field__select">
+                      <select
+                        {...field}
+                          value={draftGoalType}
+                        onChange={(event) => setDraftGoalType(event.target.value as HabitGoalType)}
+                        disabled={adding}
+                      >
+                        <option value="atLeast">{t('web.habits.goal.atLeast')}</option>
+                        <option value="atMost">{t('web.habits.goal.atMost')}</option>
+                        <option value="exactly">{t('web.habits.goal.exactly')}</option>
+                      </select>
+                      <ChevronDown size={ICON_SIZE.sm} aria-hidden="true" />
+                    </div>
+                  )}
+                </FormField>
+
+                {/* 唯一一条分隔线：上面是"这条习惯是什么"（必填），
+                    下面是"漏了怎么补"（可选）。线 = 组数 − 1。 */}
+                <div className="ht-habit-create-dialog__divider" role="presentation" />
+
+                {/* ── 补打卡 ───────────────────────────────────────────── */}
+                <FormField
+                  id="ht-habit-create-backfill"
+                  label={t('web.habits.backfill.label')}
+                  layout="inline"
+                  hint={t('web.habits.backfill.default')}
+                >
+                  {(field) => (
+                    <input
+                      {...field}
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={draftBackfillDays}
+                      placeholder={t('web.habits.backfill.placeholder')}
+                      onChange={(event) => setDraftBackfillDays(event.target.value)}
+                      disabled={adding}
+                    />
+                  )}
+                </FormField>
               </div>
-              <div className="ht-habit-create-dialog__grid">
-                <label className="ht-habit-create-dialog__field"><span>{t('web.habits.goal.target')}</span><input type="number" min={0} step="any" required value={draftTarget} onChange={(event) => setDraftTarget(event.target.value)} disabled={adding} /></label>
-                <label className="ht-habit-create-dialog__field"><span>{t('web.habits.goal.unit')}</span><input value={draftUnit} placeholder={t('web.habits.goal.unitPlaceholder')} onChange={(event) => setDraftUnit(event.target.value)} disabled={adding} /></label>
-                <label className="ht-habit-create-dialog__field"><span>{t('web.habits.goal.atLeast')}</span><select value={draftGoalType} onChange={(event) => setDraftGoalType(event.target.value as HabitGoalType)} disabled={adding}><option value="atLeast">{t('web.habits.goal.atLeast')}</option><option value="atMost">{t('web.habits.goal.atMost')}</option><option value="exactly">{t('web.habits.goal.exactly')}</option></select></label>
-                <label className="ht-habit-create-dialog__field"><span>{t('web.habits.freq.toggle')}</span><select value={draftFrequency} onChange={(event) => { const next = event.target.value as typeof draftFrequency; setDraftFrequency(next); if (next === 'weekly' && draftWeeklyDays.length === 0) setDraftWeeklyDays([isoWeekday(toLocalDate(now))]); }} disabled={adding}><option value="daily">{t('web.habits.freq.daily')}</option><option value="weekly">{t('web.habits.freq.weekly')}</option><option value="interval">{t('web.habits.freq.interval')}</option></select></label>
-              </div>
-              {draftFrequency === 'weekly' ? <div className="ht-habit-create-dialog__field"><span>{t('web.habits.freq.weekly')}</span><div className="ht-habit__add-weekdays" role="group" aria-label={t('web.habits.freq.weekly')}>{HABIT_WEEKDAY_MESSAGE_KEYS.map((key, index) => { const day = index + 1; const selected = draftWeeklyDays.includes(day); return <button key={key} type="button" className="ht-habit__add-weekday" aria-pressed={selected} onClick={() => setDraftWeeklyDays((days) => selected ? days.filter((value) => value !== day) : [...days, day].sort())} disabled={adding}>{t(key as never)}</button>; })}</div></div> : null}
-              {draftFrequency === 'interval' ? <label className="ht-habit-create-dialog__field"><span>{t('web.habits.freq.nDays')}</span><input type="number" min={1} step={1} required value={draftInterval} onChange={(event) => setDraftInterval(event.target.value)} disabled={adding} /></label> : null}
-              <label className="ht-habit-create-dialog__field"><span>{t('web.habits.backfill.label')}</span><input type="number" min={1} step={1} value={draftBackfillDays} placeholder={t('web.habits.backfill.placeholder')} onChange={(event) => setDraftBackfillDays(event.target.value)} disabled={adding} /><small>{t('web.habits.backfill.default')}</small></label>
-              {addError ? <p className="ht-habit__add-error" role="alert">{addError}</p> : null}
-              <footer className="ht-habit-create-dialog__actions"><button type="button" className="ht-btn ht-btn--ghost" onClick={() => setCreateOpen(false)} disabled={adding}>{t('web.habits.create.cancel')}</button><button type="submit" className="ht-btn ht-btn--primary" disabled={adding || draft.trim() === ''}>{t('web.habits.create.submit')}</button></footer>
+
+              {addError ? (
+                <p className="ht-habit__add-error" role="alert">
+                  {addError}
+                </p>
+              ) : null}
+
+              <footer className="ht-habit-create-dialog__actions">
+                <button
+                  type="button"
+                  className="ht-btn ht-btn--ghost"
+                  onClick={() => setCreateOpen(false)}
+                  disabled={adding}
+                >
+                  {t('web.habits.create.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="ht-btn ht-btn--primary"
+                  disabled={adding || draft.trim() === ''}
+                >
+                  {t('web.habits.create.submit')}
+                </button>
+              </footer>
             </form>
           </div>
         </div>,

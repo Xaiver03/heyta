@@ -38,8 +38,10 @@
 import { useState } from 'react';
 
 import { CalendarDays, Repeat } from 'lucide-react';
+import { FormField } from '../../lib/form/FormField.js';
 import { ICON_SIZE } from '@heyta/design-system';
 import { isoWeekday, type Habit, type HabitFrequency, type LocalDate } from '@heyta/domain';
+import { DEFAULT_REVIEW_OFFSETS } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   HABIT_WEEKDAY_MESSAGE_KEYS,
@@ -75,6 +77,7 @@ export function HabitFrequencyEditor({
   const isDaily = frequency === undefined || frequency.type === 'daily';
   const isWeekly = frequency?.type === 'weekly';
   const isInterval = frequency?.type === 'interval';
+  const isSpaced = frequency?.type === 'spaced';
 
   const summaryKey: HabitFrequencySummaryKey = habitFrequencySummaryKey(frequency);
   const summary =
@@ -180,6 +183,21 @@ export function HabitFrequencyEditor({
             >
               {t('web.habits.freq.interval' as never)}
             </button>
+            {/* 间隔复习那一档：与上面三档同一形状 —— 已是它时 chip 亮着，
+                再点一次**一条 op 都不发**（与 daily 那条同一个理由）。 */}
+            <button
+              type="button"
+              className="ht-habit__freq-chip"
+              aria-pressed={isSpaced}
+              data-testid={`habit-freq-spaced-${habit.id}`}
+              onClick={() => {
+                if (isSpaced) return;
+                // 换档 = 用**默认那张表**重排，锚点取今天（旧起点已无意义）。
+                submit({ type: 'spaced', offsets: [...DEFAULT_REVIEW_OFFSETS], anchor: today });
+              }}
+            >
+              {t('web.habits.freq.spaced' as never)}
+            </button>
           </div>
 
           {isWeekly ? (
@@ -217,21 +235,25 @@ export function HabitFrequencyEditor({
               7 条 e2e 断言当时全绿：它们验的是"该有的在不在"，没验"不该来的别来"。 */}
           {isInterval ? (
             <>
-              <label className="ht-habit__freq-n">
-                <CalendarDays aria-hidden="true" />
-                {t('web.habits.freq.nDays' as never)}
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={draftN}
-                  onChange={(event) => {
-                    setDraftN(event.target.value);
-                  }}
-                  aria-label={t('web.habits.freq.nDays' as never)}
-                  data-testid={`habit-freq-n-${habit.id}`}
-                />
-              </label>
+              <FormField
+                id={`habit-freq-n-${habit.id}`}
+                label={t('web.habits.freq.nDays' as never)}
+              >
+                {(field) => (
+                  <input
+                    {...field}
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={draftN}
+                    onChange={(event) => {
+                      setDraftN(event.target.value);
+                    }}
+                    aria-label={t('web.habits.freq.nDays' as never)}
+                    data-testid={`habit-freq-n-${habit.id}`}
+                  />
+                )}
+              </FormField>
 
               {/* 这条不是装饰：`interval` 的锚点是**固定日历格**（`isScheduledOn` 拿
                   `1970-01-01` 取模），不是"从建立习惯那天起每 N 天"。不写出来，
