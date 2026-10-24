@@ -4621,12 +4621,6 @@ export const en = {
   'common.share.notif.activityCompleted': 'Task completed/uncompleted',
   'common.share.notif.activityAdded': 'Task/note added',
   'common.share.notif.activityDeleted': 'Task/note deleted or moved',
-  'common.share.notif.taskScopeTitle': 'Task reminders',
-  'common.share.notif.taskScope.all': 'All tasks',
-  'common.share.notif.taskScope.allExceptAssignedToOthers': 'All tasks (except those assigned to others)',
-  'common.share.notif.taskScope.assignedToMe': 'Assigned to me',
-  'common.share.notif.taskScope.none': 'No reminders',
-  'common.share.notif.autoAcceptTitle': 'Auto-accept shared-list invites from known collaborators',
   // Shared-list panel (W4 wiring). Panel title lives in common.share so a
   // future mobile mount reuses it verbatim.
   'common.share.panel.membersTitle': 'Members',

@@ -7,13 +7,13 @@
  * （判定全部在模型里，组件只是把 `prefs` 传进去拿布尔结果）。
  *
  * 文案由宿主 `t()` 解析后传入（labels）；本包不 import `@heyta/i18n`
- * （AuthForm / ShareConsentModal 同一条纪律）。无障碍：三类开关与
- * 「不再提示」同款真 `Pressable` + 平铺 `aria-checked`；四档用
- * `radiogroup` + 平铺 `aria-checked`。
+ * （AuthForm / ShareConsentModal 同一条纪律）。无障碍：三类活动开关是
+ * 真 `Pressable` + 平铺 `aria-checked`。
  *
- * 🔴 「自动接受已知合作者」的开关与三类活动开关**视觉分层**：前者改变
- * 的是"要不要不经确认就入群"（安全相关），后三类只改变"响不响"。
- * 分层是为了让审阅者一眼看出哪一个是安全决策。
+ * 🔴 面板只渲染**有输入**的偏好。曾有「任务提醒范围」四档（radiogroup）与
+ * 「自动接受已知合作者」开关，2026-10-24 连同判据一起删 —— 理由写在
+ * `notification-model.ts`：摆一枚点得动、行为却恒等于「不响」的开关，
+ * 等于对用户谎称有能力。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 文字层级（2026-10-16 补齐，同 `ShareConsentModal` 那一次的理由）
@@ -26,8 +26,8 @@
  * 所以这里按**角色**接语义文字样式（`useHeytaText()`），而不是给每个 `<Text>` 补一枚色值：
  *
  * - 面板标题 = `section-title`（区块标题；设置面里"一屏一个"的那一级）
- * - 三个分组标签（活动 / 任务范围 / 自动接受）= `group-label`
- * - 可点的行（三个活动开关、四档范围、自动接受）= `row-title`
+ * - 分组标签（活动）= `group-label`
+ * - 可点的行（三个活动开关）= `row-title`
  *
  * ⚠️ 语义样式**自带默认前景色**，所以这一层不再需要任何 `color:` 覆盖；
  * 需要别的色在消费点用样式数组覆盖（后面的胜出）。
@@ -40,7 +40,6 @@ import {
   isActivityEnabled,
   type ShareActivityKind,
   type ShareNotificationPrefs,
-  type TaskReminderScope,
 } from './notification-model';
 
 export interface NotificationPrefsLabels {
@@ -49,12 +48,6 @@ export interface NotificationPrefsLabels {
   activityCompleted: string;
   activityAdded: string;
   activityDeleted: string;
-  taskScopeTitle: string;
-  taskScopeAll: string;
-  taskScopeAllExceptAssignedToOthers: string;
-  taskScopeAssignedToMe: string;
-  taskScopeNone: string;
-  autoAcceptTitle: string;
 }
 
 export interface NotificationPrefsPanelProps {
@@ -63,13 +56,6 @@ export interface NotificationPrefsPanelProps {
   /** 用户改偏好 → 宿主落盘（本地），下一轮 props.prefs 带新值进来。 */
   onChange: (prefs: ShareNotificationPrefs) => void;
 }
-
-const TASK_SCOPES: ReadonlyArray<{ scope: TaskReminderScope; key: keyof NotificationPrefsLabels }> = [
-  { scope: 'all', key: 'taskScopeAll' },
-  { scope: 'allExceptAssignedToOthers', key: 'taskScopeAllExceptAssignedToOthers' },
-  { scope: 'assignedToMe', key: 'taskScopeAssignedToMe' },
-  { scope: 'none', key: 'taskScopeNone' },
-];
 
 const ACTIVITIES: ReadonlyArray<{ kind: ShareActivityKind; key: keyof NotificationPrefsLabels }> = [
   { kind: 'completed', key: 'activityCompleted' },
@@ -97,6 +83,7 @@ export function NotificationPrefsPanel(props: NotificationPrefsPanelProps) {
       <Text style={text['section-title']}>{labels.sectionTitle}</Text>
 
       <Text style={text['group-label']}>{labels.activitiesTitle}</Text>
+
       {ACTIVITIES.map(({ kind, key }) => (
         <Pressable
           key={kind}
@@ -108,33 +95,6 @@ export function NotificationPrefsPanel(props: NotificationPrefsPanelProps) {
           <Text style={text['row-title']}>{labels[key]}</Text>
         </Pressable>
       ))}
-
-      <Text style={text['group-label']}>{labels.taskScopeTitle}</Text>
-      <View accessibilityRole="radiogroup" testID="share-notif-task-scope">
-        {TASK_SCOPES.map(({ scope, key }) => (
-          <Pressable
-            key={scope}
-            onPress={() => onChange({ ...prefs, taskScope: scope })}
-            accessibilityRole="radio"
-            aria-checked={prefs.taskScope === scope}
-            testID={`share-notif-scope-${scope}`}
-          >
-            <Text style={text['row-title']}>
-              {prefs.taskScope === scope ? '◉ ' : '○ '}{labels[key]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <Text style={text['group-label']}>{labels.autoAcceptTitle}</Text>
-      <Pressable
-        onPress={() => onChange({ ...prefs, autoAcceptKnownCollaborators: !prefs.autoAcceptKnownCollaborators })}
-        accessibilityRole="checkbox"
-        aria-checked={prefs.autoAcceptKnownCollaborators}
-        testID="share-notif-auto-accept"
-      >
-        <Text style={text['row-title']}>{labels.autoAcceptTitle}</Text>
-      </Pressable>
     </View>
   );
 }

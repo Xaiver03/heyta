@@ -52,12 +52,6 @@ export function ShareNotificationSettings(): React.JSX.Element {
             activityCompleted: t('common.share.notif.activityCompleted'),
             activityAdded: t('common.share.notif.activityAdded'),
             activityDeleted: t('common.share.notif.activityDeleted'),
-            taskScopeTitle: t('common.share.notif.taskScopeTitle'),
-            taskScopeAll: t('common.share.notif.taskScope.all'),
-            taskScopeAllExceptAssignedToOthers: t('common.share.notif.taskScope.allExceptAssignedToOthers'),
-            taskScopeAssignedToMe: t('common.share.notif.taskScope.assignedToMe'),
-            taskScopeNone: t('common.share.notif.taskScope.none'),
-            autoAcceptTitle: t('common.share.notif.autoAcceptTitle'),
           }}
           onChange={onChange}
         />

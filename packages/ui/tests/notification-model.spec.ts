@@ -2,10 +2,23 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_NOTIFICATION_PREFS,
-  shouldAutoAcceptInvitation,
   shouldNotifyActivity,
-  shouldNotifyTaskReminder,
 } from '../src/sync/notification-model';
+
+describe('偏好形状：只登记有消费者的那一档', () => {
+  // 🔴 这一档是"界面不许谎称有能力"的钉子。曾经的 `taskScope`（四档）与
+  //    `autoAcceptKnownCollaborators` 被删，不是因为设计变了，是因为**它们没有输入**：
+  //    前者判 `Task.assigneeUserId`（全仓零写点），后者要一份还不存在的合作者名单。
+  //    往这个形状里加一档而不带消费者，这里就该红。
+  it('默认偏好里只有 activities 一个键', () => {
+    expect(Object.keys(DEFAULT_NOTIFICATION_PREFS)).toEqual(['activities']);
+    expect(Object.keys(DEFAULT_NOTIFICATION_PREFS.activities).sort()).toEqual([
+      'onAdded',
+      'onCompleted',
+      'onDeleted',
+    ]);
+  });
+});
 
 describe('活动通知三类（默认全关）', () => {
   it('默认偏好：三类都不响', () => {
@@ -22,49 +35,5 @@ describe('活动通知三类（默认全关）', () => {
     expect(shouldNotifyActivity(prefs, 'completed')).toBe(true);
     expect(shouldNotifyActivity(prefs, 'added')).toBe(false);
     expect(shouldNotifyActivity(prefs, 'deleted')).toBe(false);
-  });
-});
-
-describe('任务提醒四档', () => {
-  const myTask = { taskId: 't1', assigneeUserId: '42', actorUserId: 2 };
-  const otherTask = { taskId: 't2', assigneeUserId: '99', actorUserId: 2 };
-  const unassigned = { taskId: 't3', actorUserId: 2 };
-
-  it('assignedToMe：指派给我的响，未指派/别人的不响', () => {
-    const prefs = { ...DEFAULT_NOTIFICATION_PREFS, taskScope: 'assignedToMe' as const };
-    expect(shouldNotifyTaskReminder(prefs, myTask, 42)).toBe(true);
-    expect(shouldNotifyTaskReminder(prefs, otherTask, 42)).toBe(false);
-    expect(shouldNotifyTaskReminder(prefs, unassigned, 42)).toBe(false);
-  });
-
-  it('自己改自己的任务：任何档位都不响（自我操作零打扰）', () => {
-    const prefs = { ...DEFAULT_NOTIFICATION_PREFS, taskScope: 'all' as const };
-    expect(shouldNotifyTaskReminder(prefs, { ...myTask, actorUserId: 42 }, 42)).toBe(false);
-  });
-
-  it('all 档：未指派也响；none 档：全静默', () => {
-    const all = { ...DEFAULT_NOTIFICATION_PREFS, taskScope: 'all' as const };
-    expect(shouldNotifyTaskReminder(all, unassigned, 42)).toBe(true);
-    const none = { ...DEFAULT_NOTIFICATION_PREFS, taskScope: 'none' as const };
-    expect(shouldNotifyTaskReminder(none, myTask, 42)).toBe(false);
-  });
-
-  it('allExceptAssignedToOthers：未指派与指派给我的响，指派给他人的不响', () => {
-    const prefs = { ...DEFAULT_NOTIFICATION_PREFS, taskScope: 'allExceptAssignedToOthers' as const };
-    expect(shouldNotifyTaskReminder(prefs, unassigned, 42)).toBe(true);
-    expect(shouldNotifyTaskReminder(prefs, myTask, 42)).toBe(true);
-    expect(shouldNotifyTaskReminder(prefs, otherTask, 42)).toBe(false);
-  });
-});
-
-describe('自动接受已知合作者', () => {
-  it('默认关：名单命中也不自动接受', () => {
-    expect(shouldAutoAcceptInvitation(DEFAULT_NOTIFICATION_PREFS, 7, [7, 8])).toBe(false);
-  });
-
-  it('开了：名单内的邀请人自动接受，名单外的拒绝', () => {
-    const prefs = { ...DEFAULT_NOTIFICATION_PREFS, autoAcceptKnownCollaborators: true };
-    expect(shouldAutoAcceptInvitation(prefs, 7, [7, 8])).toBe(true);
-    expect(shouldAutoAcceptInvitation(prefs, 99, [7, 8])).toBe(false);
   });
 });
