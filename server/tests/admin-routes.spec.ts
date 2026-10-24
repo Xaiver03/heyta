@@ -130,6 +130,14 @@ const ALL_ROUTES: readonly (readonly [string, string])[] = [
   ['GET', '/api/admin/orders'],
   ['GET', '/api/admin/coupons'],
   ['GET', '/api/admin/invites'],
+  // 营收看板（只读聚合；判据细节在 `admin-revenue.spec.ts`，
+  // 这里只管一件事：**它进不了闸门就没有任何别的地方在守**）。
+  ['GET', '/api/admin/revenue'],
+  // ADR-0075 运营公告那三条（判据细节在 `announcements-admin-routes.spec.ts`，
+  // 这里只管一件事：**它们进不了闸门就没有任何别的地方在守**）。
+  ['GET', '/api/admin/announcements'],
+  ['POST', '/api/admin/announcements'],
+  ['DELETE', '/api/admin/announcements/1'],
   // W4b 调休/补班录入面（三条新路由；判据细节在 `holiday-admin-routes.spec.ts`，
   // 这里只管一件事：**它们进不了闸门就没有任何别的地方在守**）。
   ['GET', '/api/admin/holiday-adjustments'],

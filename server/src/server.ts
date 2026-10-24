@@ -47,6 +47,7 @@ import { shareRoutes } from './shares/share.routes';
 import { accountSecurityRoutes } from './account/account-security.routes';
 import { accountProfileRoutes } from './account/account-profile.routes';
 import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
+import { announcementRoutes } from './announcements/announcement.routes';
 import { adminRoutes } from './admin/admin.routes';
 import { managedAiProxyRoutes } from './ai/managed-proxy.routes';
 import { inboundAutomationRoutes } from './automation/inbound.routes';
@@ -614,6 +615,12 @@ export const createServer = (
       //    一个**少了标注**的日历，而那不是"降级"，那是**界面在悄悄说谎**。
       //    同理它也**不需要** `requireTermsConsent`：读公共事实不产生任何账号级写入。
       await fastifyServer.register(holidayAdjustmentRoutes, { prefix: '/api' });
+
+      // 运营公告的读面（ADR-0075）。它与调休那条**同为"部署方下发的内容"**，
+      // 但**要 token**：读者是登录进来的用户，不是搜索引擎（理由见那文件的注释）。
+      // ⚠️ 同样**不受计费闸门影响**：一条"今晚要维护"的公告把付费用户挡在外面，
+      //    比少一个标注严重得多 —— 那是这条通道存在的唯一理由。
+      await fastifyServer.register(announcementRoutes, { prefix: '/api' });
 
       // 运营管理后台（ADR-0038）。**默认没有人是管理员**（`users.is_admin` 默认
       // false），所以这个前缀对所有人都是 403，直到有人跑过

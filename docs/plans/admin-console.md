@@ -276,3 +276,88 @@ PROGRESS.md                                       ⚠️ 共享：只入 2 个 h
 3. 改完 `packages/i18n` 必须 `pnpm --filter @heyta/i18n build`（AGENTS §7 第 79 条）。
 4. 别把 `store.ts` 里 `loadUsers` 的 `offset`/`query` 省成默认值 —— 那会把用户翻页翻回第一页。
 5. 遇到 e2e 随机红，**先查 trace 里有没有 `[vite] hot updated`**（§7.4），再怀疑产品代码。
+
+---
+
+## 8. 追加（2026-10-24）：一个能敲的地址、营收看板、运营公告
+
+产品负责人这一轮的原始问题有三个：后台做好了没、能不能像 SSOS 那样有一个后台、
+以及**能不能用域名访问到**。前两个的答复是"已经做好了"（§1–§7 那一轮），
+第三个是真缺口：`/admin` 当时**测得 404**，后台只存在于设置浮层里的一格里 ——
+运营者必须先登录、再开设置、再滚到最底下，才看得到自己那面板。
+
+取向定了两条（2026-10-24 拍板）：**独立后台壳 + `/admin` 地址**，功能范围**加营收看板与运营公告**。
+
+### 8.1 入口：一个地址，不是第二个应用
+
+- `apps/web/src/features/admin/route.ts` 是**唯一**那枚路径判定，`App.tsx` 在
+  所有 hook 跑完之后整棵换成 `<AdminConsolePage />`。
+  🔴 判定是**整段相等**（`/admin`、`/app/admin`，容忍尾斜杠），**不是** `endsWith`：
+  后者会让自托管者自己的 `…/team/admin` 之类路径被后台壳劫走。
+- nginx 那一条 `location = /admin { alias /var/www/heyta-app/index.html; }`
+  **不是访问控制**，它只是"这个地址有人接"。真的那道闸是服务端插件里的 `requireAdmin`。
+  资源仍走 `location /app/assets/`，所以**不需要第二份产物**、不需要新子域名、不动证书。
+- 侧栏那一份清单在 `features/admin/nav.ts`，设置页的 tab 条与 `/admin` 的侧栏
+  **共用它**。加一格只改一处；漏改的表现是"后台里有一格点不到"，
+  判据是 `admin-panel.spec.tsx` 里那份逐格点名的清单。
+
+### 8.2 营收看板：净收入是**读**来的，不是界面减出来的
+
+`GET /api/admin/revenue?days=&offsetMinutes=`（`server/src/admin/admin.routes.ts`）。
+三条立场，每条都带一把会红的尺：
+
+| 立场 | 为什么不能反着做 | 判据 |
+|---|---|---|
+| 逐日分桶按**运营者所在时区**裁（`offsetMinutes`） | 用 UTC 裁 ⇒ 北京时间早上 8 点前的进账落到**昨天** | `server/tests/admin-revenue.spec.ts` 那对"同一笔钱两种偏移落在两个桶 / 一个桶"的对照臂 |
+| 币种**只分开、不相加** | 混币求和是一个没有意义的数，而它会出现在"今日营收"那一格 | 同上，逐币种分组 |
+| `totalNetMinor` 由服务端算 | 界面自己 `paid − refunded` 就是第二套标准（哪些退款算数是业务判定） | `admin-revenue.spec.tsx` 用 `1200 − 500 ≠ 400` 的响应体钉住；e2e 同一形状再钉一次 |
+
+### 8.3 运营公告：一条内容通道，不是一种通知
+
+决策在 [`ADR-0075`](../adr/0075-announcements-are-a-content-channel.md)。
+要点只复述三句，其余以那份为准：
+
+- 🔴 **"有效"只有服务端那一次查询是裁决者**。后台列表那一格显示的
+  `pending / active / expired` 是服务端算好发回来的（连同它算的时候那一枚 `now`），
+  界面**不许**再拿 `Date.now()` 比 `publishedAt` / `expiresAt`。
+  两处都判的症状不是"数字不对"，是**「运营以为已经下架了，用户还看得见」**。
+- 忽略记在**这台设备**上。服务端记"谁读过哪条公告"= 新增一次账号级个人信息处理，
+  换来的只是少点一次关闭，与本地优先 + 端到端加密这个前提方向相反。
+- 标题与正文是**运营写的自由文本**（数据），`level` 才是闭词表（`info` / `warning`）。
+  所以文案门禁不套它，但那一格顶部常驻一句**明文下发**的警告，
+  且它**不随列表为空而消失**（`admin-announcements.spec.tsx` 钉的就是这一条）。
+
+### 8.4 真浏览器查出来、jsdom 查不出的两条缺陷
+
+两条同一族：**挂载那一次就去拉，而那一刻闸门还没开**。
+
+1. `/admin` 在全新浏览器里停在「连不上服务器，请检查网络后重试」，
+   真话是"你还没同意联网"。修：这一页也挂 `PrivacyConsentSheet`，
+   内容区由 `useNetworkAllowed()` 决定挂不挂。
+2. 应用顶部那一横条公告**永远不会出现** —— 同意之前那一发被
+   `installConsentGatedFetch()` 挡下，失败被读成"没有公告"（那是对的处理），
+   而答完同意之后**没人再拉一次**。修：`AnnouncementBanner` 的 effect 由
+   `networkAllowed` + `baseUrl` + `token` 驱动，判定本身仍在闸门与服务端里。
+
+🔴 第 2 条值得留在台账里，因为它给的是一个**通用的错法形状**：
+"读不到就不画"这一侧的宽容，会让"什么时候问一次"这个生命周期错误**静默**。
+jsdom 那一套里同意早已答好、凭据是 `setState` 直接塞的，所以它测得一片绿。
+以后加任何"顶部一条外部内容"的读面，先问这一句：**闸门开之前拉的那一次，之后还有人补拉吗？**
+
+### 8.5 这一轮的落点与现量命令
+
+- 判据：`apps/web/tests/admin-console-route.spec.tsx`、`admin-revenue.spec.tsx`、
+  `admin-announcements.spec.tsx`、`announcement-banner.spec.tsx`、
+  `server/tests/admin-revenue.spec.ts`、`announcements-admin-routes.spec.ts`、
+  `packages/app-host/tests/announcement-client.spec.ts`；
+  真浏览器：`e2e/tests/admin-console-route.spec.ts`、`e2e/tests/announcement-banner.spec.ts`，
+  图在 `apps/web/evidence/admin-console/`。条数自己数，别抄这里：
+  `ls apps/web/tests/admin-*.spec.tsx apps/web/tests/announcement-*.spec.tsx | wc -l`。
+- 迁移：`server/prisma/migrations/20261024000000_add_announcements/`。
+  🔴 只走 `cd server && sh scripts/migrate-deploy.sh`。
+  这一张表**故意没有外键**（`created_by` 指向 `users`，但删号不许连带删掉公告历史，
+  也不许因为约束挡住回收流程），理由写在迁移头部。
+- 上线顺序（**不能倒**）：先跑迁移 ⇒ 再部署服务端并重启 ⇒ 再 `pnpm --filter @heyta/web build`
+  + `rsync` 产物 ⇒ 最后 `server/scripts/nginx-sync.sh --apply`。
+  先 apply nginx 的话，`/admin` 会把**旧产物**交出去，那一屏上没有后台壳，
+  读起来像"这个地址坏了"。

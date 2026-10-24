@@ -1193,6 +1193,57 @@ model Refund {
 }
 
 // ---------------------------------------------------------------------------
+// 运营公告（ADR-0075）—— 部署方下发的一段内容，不是用户的数据
+// ---------------------------------------------------------------------------
+
+/// 一条运营公告。
+///
+/// 🔴 **它不是通知。** `account_notifications` 里的一行是"一次发生过的事"，
+/// 形状因此必须是「语义 `kind` + 参数」，文案由 `packages/i18n` 在客户端渲染；
+/// 而一条公告是**现在挂着的一段内容**，它没有"发生"过，换语言也不该变。
+/// 把它塞进通知表就是 ADR-0038 §2 第四条拦的那件事。判据：
+/// `NOTIFICATION_KINDS` 的成员数与本表无关。
+///
+/// 🔴 **它也不是同步数据。** 不进 op-log、不参与端到端加密 —— 与
+/// [ADR-0052](../../docs/adr/0052-public-facts-are-deployer-supplied.md) 那条
+/// （调休/补班由部署方下发）同型。后果要认下来：**公告是明文**，
+/// 所以这里**不许**放只有部分人该看到的东西（口令、个人数据）。
+model Announcement {
+  id Int @id @default(autoincrement())
+
+  /// 运营者写的原文，界面**原样呈现**。
+  ///
+  /// ⚠️ 这不是"界面里的文案" —— 应用自己的文案仍然全部住在 `packages/i18n`。
+  /// 这一格与"用户自己写的任务标题"同一类：它是数据。
+  title String
+  body  String
+
+  /// `'info' | 'warning'`。封闭词表，界面按它画形状。
+  ///
+  /// 🔴 存的是**语义**，不是颜色名（设计系统那条"用语义名不用外观名"）。
+  /// 词表在 `src/announcements/announcement-store.ts`，写入时在词表外直接抛 ——
+  /// 与下单/退款那两处同一套做法（库不设 CHECK，因为 CHECK 的报错到不了界面）。
+  level String @default("info")
+
+  /// 生效时刻（epoch 毫秒）。`published_at > now` = 还没挂出来。
+  publishedAt BigInt @map("published_at")
+  /// `null` = 不过期。"现在这条算不算挂着"由服务端那条查询裁决（ADR-0075 §3.4），
+  /// 界面不许自己比时间戳 —— 两处的差会表现为"运营以为已经下了，用户还看得见"。
+  expiresAt BigInt? @map("expires_at")
+
+  /// 谁发的。**没有外键**：账号注销不该把已发出的公告一起带走，
+  /// 也不该因为挂着公告而删不掉账号（同 `refunds.requested_by`）。
+  createdBy Int? @map("created_by")
+
+  createdAt BigInt @default(0) @map("created_at")
+  updatedAt BigInt @default(0) @map("updated_at")
+
+  /// 读面的唯一形状：取当前有效的几条，按发布时刻倒序。
+  @@index([publishedAt(sort: Desc)])
+  @@map("announcements")
+}
+
+// ---------------------------------------------------------------------------
 // Windows PWA 小组件的 Web Push 订阅（见 docs/plans/multi-platform-widgets.md 的 U12）
 // ---------------------------------------------------------------------------
 

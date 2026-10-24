@@ -338,3 +338,66 @@
 }
 
 .ht-content__calendar-capture-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--ht-space-3); margin-block-end: var(--ht-space-2); }
+
+/* ── 运营公告那一横条（ADR-0075）────────────────────────────
+ * 类名挂在既有的 `.ht-main` 族下，**不开 `.ht-announcements` 族** ——
+ * `check:row-single-source` 的断言 B 钉着顶层 `ht-*` 前缀族只减不增（基线 28）。
+ * 它是主区顶部的第一格，与 `SignOutNotice` 同一个位置、同一条理由。
+ */
+.ht-main__announcement {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  background: var(--ht-color-info-subtle);
+  color: var(--ht-color-foreground);
+}
+
+/* `level` 是**语义**档位，界面按它换背景与边线；这里不出现任何颜色字面量。 */
+.ht-main__announcement--warning {
+  background: var(--ht-color-warning-subtle);
+  border-block-end-color: var(--ht-color-border-strong);
+}
+
+.ht-main__announcementBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  /* 长句必须能折行，否则 flex 项默认 `min-inline-size: auto` 会把整条撑破。 */
+  min-inline-size: 0;
+}
+
+.ht-main__announcementText {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  overflow-wrap: anywhere;
+}
+
+.ht-main__announcementDismiss {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border: 0;
+  border-radius: var(--ht-radius-full);
+  background: none;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-main__announcementDismiss:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+/* 🔴 焦点环不许抹掉（AGENTS §5「容易犯的几个错」）。 */
+.ht-main__announcementDismiss:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}

@@ -32,21 +32,26 @@ import {
   adminApproveRefund,
   adminCreateRefundRequest,
   adminForceUserLogout,
+  adminPublishAnnouncement,
   adminRejectRefund,
   adminSetUserQuota,
   adminUnlockUser,
+  adminWithdrawAnnouncement,
   adminDeleteHolidayYear,
   adminPutHolidayYear,
+  fetchAdminAnnouncements,
   fetchAdminCoupons,
   fetchAdminHolidayYears,
   fetchAdminInvites,
   fetchAdminOrders,
   fetchAdminOverview,
   fetchAdminRefunds,
+  fetchAdminRevenue,
   fetchAdminSubscriptions,
   fetchAdminUser,
   fetchAdminUsers,
   type AdminClientOptions,
+  type AdminAnnouncementRow,
   type AdminCouponRow,
   type AdminFailureReason,
   type AdminHolidayYears,
@@ -56,6 +61,7 @@ import {
   type AdminPage,
   type AdminRefundRow,
   type AdminResult,
+  type AdminRevenue,
   type AdminSubscriptionRow,
   type AdminUserDetail,
   type AdminUserRow,
@@ -73,6 +79,8 @@ export type AdminTab =
   | 'orders'
   | 'coupons'
   | 'invites'
+  | 'revenue'
+  | 'announcements'
   | 'holidays'
   | 'refunds';
 
@@ -90,6 +98,31 @@ export const ADMIN_REASON_KEY: Record<AdminFailureReason, string> = {
   invalid: 'web.admin.error.invalid',
   conflict: 'web.admin.error.conflict',
   server: 'web.admin.error.server',
+};
+
+/**
+ * 公告表单**收集到的原始输入**（未修剪、未换算前的文本框内容）。
+ *
+ * 🔴 与 `HolidayYearInput` 同一条纪律：这一片界面**不判合法性**。
+ * 长度、词表、"过期要晚于生效"全部住在服务端那一次 `safeParse`。
+ */
+export interface AnnouncementFormInput {
+  readonly titleText: string;
+  readonly bodyText: string;
+  readonly level: 'info' | 'warning';
+  /** `datetime-local` 的原值（`YYYY-MM-DDTHH:mm`），空串 = 现在。 */
+  readonly publishesAtText: string;
+  /** 空串 = 不过期。 */
+  readonly expiresAtText: string;
+}
+
+/** 发公告表单的初值。全空 —— 不给默认标题，也不默认"一小时后过期"。 */
+export const EMPTY_ANNOUNCEMENT_FORM: AnnouncementFormInput = {
+  titleText: '',
+  bodyText: '',
+  level: 'info',
+  publishesAtText: '',
+  expiresAtText: '',
 };
 
 /**
@@ -242,6 +275,24 @@ export interface AdminStoreState {
   orders: AdminPage<AdminOrderRow> | null;
   coupons: AdminPage<AdminCouponRow> | null;
   invites: AdminInvites | null;
+  /**
+   * 营收看板（`GET /api/admin/revenue` 的响应原样搬回来）。
+   *
+   * `null` = 还没拉过。它与"窗口里一单都没有"**不是**同一件事 ——
+   * 后者是 `series: []`，界面要能说"这段时间没有进账"，
+   * 而前者只能说"还没问"。混起来的表现是：刚切到这一格时闪一句
+   * "没有营收"，一秒后又冒出数字。
+   */
+  revenue: AdminRevenue | null;
+  /** 当前窗口天数。界面那三个按钮改的就是它，也是下一次 `loadRevenue` 的参数。 */
+  revenueDays: number;
+  /**
+   * 公告全量（含未生效与已过期 —— 后台要看的就是现状）。
+   * `null` = 还没拉过，与"一条都没有"是两件事。
+   */
+  announcements: AdminAnnouncementRow[] | null;
+  /** 上一次发公告的结果（`null` = 这次会话还没发过）。 */
+  announcementNotice: 'done' | 'failed' | null;
   detail: AdminUserDetail | null;
   /** 已录入的调休年度（含 `papers`，面板要把它们渲染成链接）。 */
   holidayYears: AdminHolidayYears | null;
@@ -271,6 +322,14 @@ export interface AdminStoreState {
 
   /** 用户搜索词（服务端按邮箱 `contains`）。 */
   query: string;
+  /**
+   * 当前所在的后台分区。
+   *
+   * 🔴 为什么在 store 而不是面板的 `useState`：现在**两个壳**消费它 ——
+   * 设置页里那一排横向 tab，和 `/admin` 那个独立后台页的侧栏。
+   * 各自持一份的话，"侧栏点了但内容区跟着另一份状态走"是编译期抓不到的错。
+   */
+  activeTab: AdminTab;
   /** 动作完成后的提示（成功/失败），界面显示一次即可。 */
   actionNotice: 'done' | 'failed' | null;
 
@@ -281,6 +340,26 @@ export interface AdminStoreState {
   loadOrders: (offset?: number) => Promise<void>;
   loadCoupons: (offset?: number) => Promise<void>;
   loadInvites: (offset?: number) => Promise<void>;
+  /**
+   * 拉营收看板。`days` 不给就沿用界面上那一档。
+   *
+   * 🔴 时区偏移由**这一侧**算并传过去：这台浏览器知道运营者在哪个日子边界上
+   * 看这张图，服务端不知道。`getTimezoneOffset()` 返回的是"本地→UTC 要加多少分钟"
+   * （东八区给 -480），所以取反才是服务端那个 `offsetMinutes`。
+   */
+  loadRevenue: (days?: number) => Promise<void>;
+  loadAnnouncements: () => Promise<void>;
+  /**
+   * 发一条公告。表单给的是**原始字符串**（含两个 `datetime-local` 的值）。
+   *
+   * 🔴 这里只把"墙上时钟"换算成 epoch 毫秒（那是设备本地事实，只有这台机器知道），
+   * 除此之外**一个判断都不做**：长度、词表、"过期时刻不能早于生效时刻"
+   * 全部由服务端那一次 `safeParse` 裁决（ADR-0075）。
+   * 在这里多判一次就是第二套标准，而漂移表现为"界面收了、服务端拒了"。
+   */
+  publishAnnouncement: (input: AnnouncementFormInput) => Promise<boolean>;
+  withdrawAnnouncement: (id: number) => Promise<void>;
+  clearAnnouncementNotice: () => void;
   loadHolidayYears: () => Promise<void>;
   /** 整年替换（一个用户意图 = 一次 PUT；不接受"半套数据"由服务端事务保证）。 */
   saveHolidayYear: (input: HolidayYearInput) => Promise<boolean>;
@@ -297,6 +376,14 @@ export interface AdminStoreState {
   clearRefundNotice: () => void;
   openUser: (id: number) => Promise<void>;
   closeUser: () => void;
+  /**
+   * 切分区，并把三个**一次性提示**清掉。
+   *
+   * 为什么清提示是这里的事而不是每个壳的 onClick：两条入口（设置页 tab 条 /
+   * `/admin` 侧栏）都要同一个行为。漏一处的表现是"切走了，上一格的『已完成。』
+   * 还挂在新一格下面"—— 一句关于**另一个分区**的话，比没有话更坏。
+   */
+  setActiveTab: (tab: AdminTab) => void;
   unlockUser: (id: number) => Promise<void>;
   setUserQuota: (id: number, quotaBytes: number) => Promise<void>;
   forceLogout: (id: number) => Promise<void>;
@@ -384,6 +471,10 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   orders: null,
   coupons: null,
   invites: null,
+  revenue: null,
+  revenueDays: 90,
+  announcements: null,
+  announcementNotice: null,
   detail: null,
   holidayYears: null,
   holidayNotice: null,
@@ -396,6 +487,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   refundEcho: null,
 
   query: '',
+  activeTab: 'overview',
   actionNotice: null,
 
   probe: async () => {
@@ -472,6 +564,70 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     const result = await fetchAdminInvites(clientOptions(), { limit: ADMIN_PAGE_SIZE, offset });
     if (!result.ok) return applyFailure(result, set);
     set({ invites: result.data, errorKey: null, loading: false });
+  },
+
+  loadRevenue: async (days) => {
+    const wanted = days ?? get().revenueDays;
+    set({ loading: true, revenue: null, revenueDays: wanted });
+    const result = await fetchAdminRevenue(clientOptions(), {
+      days: wanted,
+      offsetMinutes: -new Date().getTimezoneOffset(),
+    });
+    if (!result.ok) return applyFailure(result, set);
+    set({ revenue: result.data, errorKey: null, loading: false });
+  },
+
+  loadAnnouncements: async () => {
+    set({ loading: true });
+    const result = await fetchAdminAnnouncements(clientOptions());
+    if (!result.ok) return applyFailure(result, set);
+    set({ announcements: result.data.announcements, errorKey: null, loading: false });
+  },
+
+  publishAnnouncement: async (input) => {
+    // 空文本框 ⇒ `Date.parse('')` 是 NaN，而 NaN 进 JSON 会变成 `null` ——
+    // 服务端那一条 `int().positive()` 会把它判成 400，界面于是报一个
+    // "参数不合法"却不说哪一格。所以**空 = 现在**在这里落地（它是一个缺省值，
+    // 不是一条合法性判断，与"界面不判合法性"那条纪律不冲突）。
+    const publishedAtMs =
+      input.publishesAtText.trim() === '' ? Date.now() : Date.parse(input.publishesAtText.trim());
+    const expiresRaw = input.expiresAtText.trim();
+    const expiresAtMs = expiresRaw === '' ? undefined : Date.parse(expiresRaw);
+
+    set({ loading: true, announcementNotice: null });
+    const result = await adminPublishAnnouncement(clientOptions(), {
+      title: input.titleText,
+      body: input.bodyText,
+      level: input.level,
+      publishedAtMs: Number.isFinite(publishedAtMs) ? publishedAtMs : Date.now(),
+      ...(expiresAtMs === undefined || Number.isNaN(expiresAtMs) ? {} : { expiresAtMs }),
+    });
+    if (!result.ok) {
+      applyFailure(result, set);
+      set({ announcementNotice: 'failed' });
+      return false;
+    }
+    // 🔴 发完**重新拉列表**，而不是把返回的那一行本地插进去：
+    // 界面要显示的是服务端存下来的样子（含它算的 `createdAt` 与它裁过的长度）。
+    await get().loadAnnouncements();
+    set({ announcementNotice: 'done' });
+    return true;
+  },
+
+  withdrawAnnouncement: async (id) => {
+    set({ loading: true, announcementNotice: null });
+    const result = await adminWithdrawAnnouncement(clientOptions(), id);
+    if (!result.ok) {
+      applyFailure(result, set);
+      set({ announcementNotice: 'failed' });
+      return;
+    }
+    await get().loadAnnouncements();
+    set({ announcementNotice: 'done' });
+  },
+
+  clearAnnouncementNotice: () => {
+    set({ announcementNotice: null });
   },
 
   loadHolidayYears: async () => {
@@ -676,6 +832,18 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   clearNotice: () => {
     set({ actionNotice: null });
   },
+
+  setActiveTab: (tab) => {
+    set({ activeTab: tab });
+    // 🔴 复用那三个 clear\*，不在这里手写它们清空的字段。
+    // 手写会清**少**：`clearHolidayNotice` 除了 `holidayNotice` 还要清 `holidayEcho`，
+    // `clearRefundNotice` 还要清 `refundCode` 与 `refundEcho` —— 那三格是界面
+    // 要念出来的**服务端回显坐标**，留着就是在下一格里复述上一格的事实。
+    get().clearNotice();
+    get().clearHolidayNotice();
+    get().clearRefundNotice();
+    get().clearAnnouncementNotice();
+  },
 }));
 
 /** 测试用：把 store 归零（与其它 feature store 同名同形）。 */
@@ -690,6 +858,10 @@ export function __resetAdminForTests(): void {
     orders: null,
     coupons: null,
     invites: null,
+    revenue: null,
+    revenueDays: 90,
+    announcements: null,
+    announcementNotice: null,
     detail: null,
     holidayYears: null,
     holidayNotice: null,
@@ -700,6 +872,7 @@ export function __resetAdminForTests(): void {
     refundCode: null,
     refundEcho: null,
     query: '',
+    activeTab: 'overview',
     actionNotice: null,
   });
 }
