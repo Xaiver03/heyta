@@ -196,6 +196,7 @@ enum HeytaTokens {
     static let layoutTwoColumnMin: Double = 768  // px
     static let layoutInputMin: Double = 224  // px
     static let layoutModalMax: Double = 640  // px
+    static let layoutFormLabelWidth: Double = 96  // px
     static let borderWidthThin: Double = 1  // px
     static let borderWidthThick: Double = 2  // px
     static let navTabBarHeight: Double = 64  // px

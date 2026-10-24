@@ -193,6 +193,7 @@ export const HEYTA_LAYOUT_SPLASH_MARK: number = 96;  // px
 export const HEYTA_LAYOUT_TWO_COLUMN_MIN: number = 768;  // px
 export const HEYTA_LAYOUT_INPUT_MIN: number = 224;  // px
 export const HEYTA_LAYOUT_MODAL_MAX: number = 640;  // px
+export const HEYTA_LAYOUT_FORM_LABEL_WIDTH: number = 96;  // px
 export const HEYTA_BORDER_WIDTH_THIN: number = 1;  // px
 export const HEYTA_BORDER_WIDTH_THICK: number = 2;  // px
 export const HEYTA_NAV_TAB_BAR_HEIGHT: number = 64;  // px
