@@ -7,6 +7,8 @@ import { useI18n } from '@heyta/i18n';
 
 import { categorySlotColor } from '../../lib/category-colors.js';
 
+import { FormField } from '../../lib/form/FormField.js';
+
 import './category-create-dialog.css';
 
 export type CategoryCreateKind = 'project' | 'tag';
@@ -171,23 +173,35 @@ export function CategoryCreateDialog({
             void submit();
           }}
         >
-          <label className="ht-category-create-dialog__label" htmlFor="ht-category-create-name">
-            {inputLabel}
-          </label>
-          <input
-            ref={inputRef}
+          {/* 🔴 2026-10-24：改用共享 `FormField`（`stacked` 解剖 = 标签在上）。
+              `label` 在上是**表单页**的正确解剖（一次录入一组新数据，见 GOV.UK 的
+              question pages 与 `packages/ui` 那份约定的出处），而"设置/属性面板"
+              才用 `inline`。两档之外没有第三档。
+              ⚠️ 错误文案由本组件自己接住（它有 `role="alert"` 与既有的
+              `ht-category-create-error`），所以这里**不**传 `error`：
+              传了就有两个元素抢同一个 `aria-describedby`。 */}
+          <FormField
             id="ht-category-create-name"
-            className="ht-category-create-dialog__input"
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value);
-              if (error !== '') setError('');
-            }}
-            placeholder={t('web.categories.create.namePlaceholder')}
-            aria-invalid={error === '' ? undefined : true}
-            aria-describedby={error === '' ? undefined : 'ht-category-create-error'}
-            disabled={busy}
-          />
+            label={inputLabel}
+            layout="stacked"
+            required
+          >
+            {(field) => (
+              <input
+                {...field}
+                ref={inputRef}
+                value={name}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  if (error !== '') setError('');
+                }}
+                placeholder={t('web.categories.create.namePlaceholder')}
+                aria-invalid={error === '' ? undefined : true}
+                aria-describedby={error === '' ? undefined : 'ht-category-create-error'}
+                disabled={busy}
+              />
+            )}
+          </FormField>
 
           {supportsColor ? (
             <fieldset className="ht-category-create-dialog__colors">

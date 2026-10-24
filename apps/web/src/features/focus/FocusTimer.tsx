@@ -16,7 +16,9 @@
  */
 
 import { useEffect, useState } from 'react';
-import { cssVar } from '@heyta/design-system';
+import { FormField } from '../../lib/form/FormField.js';
+import { cssVar, ICON_SIZE } from '@heyta/design-system';
+import { ChevronDown } from 'lucide-react';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { FocusPanel, focusLogFailureMessageKey } from '@heyta/ui';
 
@@ -114,53 +116,37 @@ function DurationSettings() {
         const bounds = FOCUS_CONFIG_BOUNDS[f.key];
         const label = t(f.labelKey);
         return (
-          <label
+          <FormField
             key={f.key}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: cssVar('space.2'),
-              fontSize: cssVar('font-size.sm'),
-              color: cssVar('color.foreground'),
-            }}
+            id={`focus-config-${f.key}`}
+            label={label}
+            layout="inline"
           >
-            {label}
-            <input
-              type="number"
-              // `inputMode` 让移动端弹数字键盘；`min`/`max` 是**给浏览器与
-              // 读屏软件的提示**，不是防线 —— 真正的防线是 store 前的夹取。
-              inputMode="numeric"
-              min={bounds.min}
-              max={bounds.max}
-              step={1}
-              value={draft[f.key] ?? String(current[f.key])}
-              aria-label={
-                f.unit === 'minutes'
-                  ? t('web.focus.config.a11y.minutes', { label })
-                  : t('web.focus.config.a11y.sessions', { label })
-              }
-              onChange={(e) => {
-                setDraft((d) => ({ ...d, [f.key]: e.target.value }));
-              }}
-              onBlur={(e) => {
-                commit(f.key, e.target.value);
-              }}
-              style={{
-                width: cssVar('layout.sidebar-min-width'),
-                minHeight: cssVar('touch-target.min'),
-                padding: `0 ${cssVar('space.2')}`,
-                borderRadius: cssVar('radius.md'),
-                border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-                background: cssVar('color.surface'),
-                color: cssVar('color.foreground'),
-                fontSize: cssVar('font-size.base'),
-                fontFamily: cssVar('font.sans'),
-                // 数字列对齐，且改变时不抖
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            />
-          </label>
+            {(field) => (
+              <input
+                {...field}
+                type="number"
+                // `inputMode` 让移动端弹数字键盘；`min`/`max` 是**给浏览器与
+                // 读屏软件的提示**，不是防线 —— 真正的防线是 store 前的夹取。
+                inputMode="numeric"
+                min={bounds.min}
+                max={bounds.max}
+                step={1}
+                value={draft[f.key] ?? String(current[f.key])}
+                aria-label={
+                  f.unit === 'minutes'
+                    ? t('web.focus.config.a11y.minutes', { label })
+                    : t('web.focus.config.a11y.sessions', { label })
+                }
+                onChange={(e) => {
+                  setDraft((d) => ({ ...d, [f.key]: e.target.value }));
+                }}
+                onBlur={(e) => {
+                  commit(f.key, e.target.value);
+                }}
+              />
+            )}
+          </FormField>
         );
       })}
 
@@ -290,51 +276,40 @@ export function FocusTimer() {
           void focus.abort();
         }}
       >
-        <label
-          className="ht-app__focus-task"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: cssVar('space.1'),
-            fontSize: cssVar('font-size.2xs'),
-            color: cssVar('color.foreground-muted'),
-            width: '100%',
-            maxWidth: cssVar('layout.sidebar-width'),
-          }}
+        <FormField
+          id="focus-linked-task"
+          label={t('web.focus.task.label')}
+          layout="stacked"
         >
-          {t('web.focus.task.label')}
-          <select
-            /* idle 时显示"下一轮要关联哪条"（共享选中）；跑起来之后显示**这一轮的**
-               归属（领域状态），那一轮开始时就冻结了。 */
-            value={(focus.state.phase === 'idle' ? selectedTaskId : focus.state.taskId) ?? ''}
-            disabled={focus.state.phase !== 'idle'}
-            onChange={(e) => {
-              const next = e.target.value === '' ? null : e.target.value;
-              selection.select('task', next);
-              /* 「不关联」必须真的解除：领域层的 `start()` 是 `taskId ?? state.taskId`
-                 （保留上一轮的归属），只传 undefined 清不掉它 —— 不在这里调
-                 `clearLinkedTask()`，下拉说"没关联"而落盘仍记在旧任务上，就是界面在说谎。 */
-              if (next === null) focus.clearLinkedTask();
-            }}
-            style={{
-              minHeight: cssVar('touch-target.min'),
-              padding: `0 ${cssVar('space.2')}`,
-              borderRadius: cssVar('radius.md'),
-              border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-              background: cssVar('color.surface'),
-              color: cssVar('color.foreground'),
-              fontSize: cssVar('font-size.base'),
-              fontFamily: cssVar('font.sans'),
-            }}
-          >
-            <option value="">{t('web.focus.task.none')}</option>
-            {aliveTasks.map((task) => (
-              <option key={task.id} value={task.id}>
-                {task.title}
-              </option>
-            ))}
-          </select>
-        </label>
+          {(field) => (
+            <div className="ht-input-field__select">
+              <select
+                {...field}
+                data-testid="focus-linked-task"
+                /* idle 时显示"下一轮要关联哪条"（共享选中）；跑起来之后显示**这一轮的**
+                   归属（领域状态），那一轮开始时就冻结了。 */
+                value={(focus.state.phase === 'idle' ? selectedTaskId : focus.state.taskId) ?? ''}
+                disabled={focus.state.phase !== 'idle'}
+                onChange={(e) => {
+                  const next = e.target.value === '' ? null : e.target.value;
+                  selection.select('task', next);
+                  /* 「不关联」必须真的解除：领域层的 `start()` 是 `taskId ?? state.taskId`
+                     （保留上一轮的归属），只传 undefined 清不掉它 —— 不在这里调
+                     `clearLinkedTask()`，下拉说"没关联"而落盘仍记在旧任务上，就是界面在说谎。 */
+                  if (next === null) focus.clearLinkedTask();
+                }}
+              >
+                <option value="">{t('web.focus.task.none')}</option>
+                {aliveTasks.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.title}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={ICON_SIZE.sm} aria-hidden="true" />
+            </div>
+          )}
+        </FormField>
 
         <DurationSettings />
       </FocusPanel>

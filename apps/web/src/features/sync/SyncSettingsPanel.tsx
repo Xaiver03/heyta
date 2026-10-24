@@ -41,6 +41,7 @@ import { CircleHelp } from 'lucide-react';
 import { HELP_SYNC_ANCHOR, siteLink } from '../../lib/site-url.js';
 import { SettingsNotice } from '../settings/SettingsNotice.js';
 import { describeSyncStatus } from './status-copy.js';
+import { FormField } from '../../lib/form/FormField.js';
 import { useSyncStore } from './store.js';
 import { SettingsAccountGate } from '../settings/SettingsAccountGate.js';
 import { VaultSettingsPanel } from './VaultSettingsPanel.js';
@@ -161,16 +162,17 @@ export function SyncSettingsPanel({
           <p className="sync-settings__section-hint">{t('web.settings.syncUx.encryptionHint')}</p>
           {!vaultMode ? (
             <>
-              <label className="sync-settings__field">
-                {t('web.sync.password.label')}
-                <input
-                  className="sync-settings__input"
-                  type="password"
-                  value={draft.password}
-                  onChange={(e) => setDraft({ password: e.target.value })}
-                  autoComplete="new-password"
-                />
-              </label>
+              <FormField id="sync-password" label={t('web.sync.password.label')}>
+                {(field) => (
+                  <input
+                    {...field}
+                    type="password"
+                    value={draft.password}
+                    onChange={(e) => setDraft({ password: e.target.value })}
+                    autoComplete="new-password"
+                  />
+                )}
+              </FormField>
               <p className="sync-settings__field-hint">
                 {t('web.sync.password.lead')}
                 <strong>{t('web.sync.password.strong')}</strong>
@@ -192,27 +194,29 @@ export function SyncSettingsPanel({
         <fieldset className="sync-settings__fieldset" aria-labelledby="sync-account-title">
           <legend id="sync-account-title" className="sync-settings__legend">{t('web.settings.syncUx.accountTitle')}</legend>
           <p className="sync-settings__section-hint">{t('web.settings.syncUx.accountHint')}</p>
-          <label className="sync-settings__field">
-            {t('web.sync.serverUrl.label')}
-            <input
-              className="sync-settings__input"
-              value={draft.baseUrl}
-              onChange={(e) => setDraft({ baseUrl: e.target.value })}
-              placeholder={SERVER_URL_EXAMPLE}
-              // 「从订阅提示跳到这一节」时焦点落在它身上（见 `shell/settings-anchors.ts`）。
-              data-testid="sync-server-url"
-            />
-          </label>
-          <label className="sync-settings__field">
-            {t('web.sync.token.label')}
-            <input
-              className="sync-settings__input"
-              type="password"
-              value={draft.token}
-              onChange={(e) => setDraft({ token: e.target.value })}
-              autoComplete="off"
-            />
-          </label>
+          <FormField id="sync-server-url" label={t('web.sync.serverUrl.label')}>
+            {(field) => (
+              <input
+                {...field}
+                value={draft.baseUrl}
+                onChange={(e) => setDraft({ baseUrl: e.target.value })}
+                placeholder={SERVER_URL_EXAMPLE}
+                // 「从订阅提示跳到这一节」时焦点落在它身上（见 `shell/settings-anchors.ts`）。
+                data-testid="sync-server-url"
+              />
+            )}
+          </FormField>
+          <FormField id="sync-token" label={t('web.sync.token.label')}>
+            {(field) => (
+              <input
+                {...field}
+                type="password"
+                value={draft.token}
+                onChange={(e) => setDraft({ token: e.target.value })}
+                autoComplete="off"
+              />
+            )}
+          </FormField>
           <p className="sync-settings__field-hint">{t('web.auth.tokenHint')}</p>
           <button type="button" className="ht-btn ht-btn--ghost sync-settings__fit-button" onClick={() => sync.openSignIn()}>
             {t('web.auth.open')}

@@ -129,7 +129,11 @@ describe('设置浮层的落位与焦点', () => {
 
     const sheet = el.querySelector('[data-testid="settings-sheet"]')!;
     const nav = sheet.querySelector('nav.ht-settings__nav')!;
-    expect(nav.querySelectorAll('button')).toHaveLength(7);
+    // 目录条数跟着信息架构走：2026-10-24 把「订阅」独立成节 ⇒ 7 → 8。
+    // 🔴 这条数的是"目录里每一项都长成了按钮"，不是"必须是 7" —— 加节时改这个数字，
+    //    但**不许**为了让它绿而删掉任何一节（`SETTINGS_NAV_ITEMS` 是唯一事实源）。
+    expect(nav.querySelectorAll('button')).toHaveLength(8);
+    expect(nav.querySelector('[aria-controls="settings-group-subscription"]')).not.toBeNull();
     expect(nav.querySelector('[aria-controls="settings-group-sync"]')?.getAttribute('aria-current')).toBe('page');
     expect(sheet.querySelector('#settings-group-sync')?.hasAttribute('hidden')).toBe(false);
     expect(sheet.querySelector('#settings-group-profile')?.hasAttribute('hidden')).toBe(true);

@@ -86,9 +86,7 @@ import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { CountdownScreen } from './CountdownScreen';
 import { EmailChangeSection } from './EmailChangeSection';
-import { EntitlementSection } from './EntitlementSection';
 // 托管同步的续费入口（与 web 的 RenewPanel 共用 @heyta/app-host 那一份接线）。
-import { RenewSection } from './RenewSection';
 import { ExportScreen } from './ExportScreen';
 import { GrowthScreen } from './GrowthScreen';
 import { ProfileProgressSummary } from './ProfileProgressSummary';
@@ -1378,15 +1376,28 @@ export function ProfileScreen(): React.JSX.Element {
       </View>
 
       {/*
-        托管同步权益（「已开启」/「已到期」/「暂不可用」）。独立成组件有两个理由：
-        ① 它要发一次出境探测，得跟着 `privacyConsent` 闸门走，不该混进这屏的
-        凭据/头像状态机；② 本文件的冻结判据（`profile-nickname-entry.spec.ts:144`）
-        要求这里**一个 web 前缀的词条调用都没有**，而那三条说明是 web 已有的真词条
-        —— 复用它们、不复制第二份，所以引用只能落在这个独立文件里。
-        没有权益可说时它自己返回 null（不占位）。
+        订阅（2026-10-24）：这里是**一个入口**，不再是两块内联内容。
+        产品负责人要"单独的订阅界面"——状态与收银台原来直接摊在本屏的滚动流里，
+        想付钱的人得先滚过半个屏幕，而且那一屏没有"我在买什么"。
+        现在它们住在设置里独立的一节（`SubscriptionSection`），这一行只负责去那儿。
+        🔴 只留一个入口：两处指向同一个动作时，其中一处必然先过期。
       */}
-      <EntitlementSection />
-      <RenewSection />
+      <SectionHeader icon="action.more" title={t('mobile.settings.section.subscription')} />
+      <Card>
+        <SettingsRow
+          row={{
+            kind: 'action',
+            testID: 'profile-entry-subscription',
+            label: t('mobile.settings.section.subscription'),
+            hint: t('mobile.subscription.entry.hint'),
+            leading: <Icon name="action.more" size="sm" color={tokens['color.foreground-muted']} />,
+            onPress: () => {
+              setSettingsSection('subscription');
+              navigation.push('settings');
+            },
+          }}
+        />
+      </Card>
 
       {/* 清单 / 标签 / 便签管理。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}

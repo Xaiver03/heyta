@@ -22,5 +22,5 @@
 }
 .ht-settings__help-icon { color: var(--ht-color-primary); display: flex; flex-shrink: 0; }
 .ht-settings__help-copy { display: flex; flex-direction: column; gap: var(--ht-space-1); flex: 1; min-inline-size: 0; }
-.ht-settings__help-copy > :last-child, .ht-settings__help-note { color: var(--ht-color-foreground-muted); }
-.ht-settings__help-note { margin-block: var(--ht-space-4) 0; }
+.ht-settings__help-copy > :last-child, .ht-settings__help-line { color: var(--ht-color-foreground-muted); }
+.ht-settings__help-line { margin-block: var(--ht-space-4) 0; }

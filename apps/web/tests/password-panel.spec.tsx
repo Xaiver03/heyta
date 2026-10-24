@@ -213,7 +213,8 @@ describe('1. 未登录时不摆表单（也没有可点的死按钮）', () => {
   it('🔴 两个秘密每次出现都划界：标题点名"登录密码"，lead 点名"加密口令"不在这里', () => {
     render();
     expect(text('password-panel')).toContain('登录密码');
-    const lead = container?.querySelector('.ht-settings__hint')?.textContent ?? '';
+    /* 2026-10-24：lead 不再是常驻段落，而是标题旁那枚 `?` 的正文。 */
+    const lead = container?.querySelector('[data-testid="tip-password"]')?.textContent ?? '';
     expect(lead).toContain('加密口令');
   });
 });
@@ -221,8 +222,9 @@ describe('1. 未登录时不摆表单（也没有可点的死按钮）', () => {
 describe('2. 🔴 后果在点之前就看得见', () => {
   it('"其它设备上的登录都会失效"在初次渲染的 DOM 里，而成功提示还没有出现', () => {
     render();
-    expect(q('password-consequence')).not.toBeNull();
-    expect(text('password-consequence')).toContain('其它设备');
+    /* 后果必须**在点之前**拿得到；载体从常驻段落换成问号气泡（正文常驻 DOM）。 */
+    expect(q('tip-password-consequence')).not.toBeNull();
+    expect(text('tip-password-consequence')).toContain('其它设备');
     // 还没点过 ⇒ 没有任何结果区内容。
     expect(q('password-changed')).toBeNull();
     expect(q('password-failed')).toBeNull();
@@ -231,7 +233,8 @@ describe('2. 🔴 后果在点之前就看得见', () => {
 
   it('长度提示念的是 shared-schema 里的那个数，不是写死的 8', () => {
     render();
-    expect(text('password-hint')).toContain(String(AUTH_PASSWORD_MIN_CODE_POINTS));
+    /* 载体换成问号气泡（2026-10-24），要求不变：那个数必须来自 shared-schema。 */
+    expect(text('tip-password-hint')).toContain(String(AUTH_PASSWORD_MIN_CODE_POINTS));
   });
 });
 
@@ -528,13 +531,13 @@ describe('9. 「设第一个密码」那张表', () => {
   it('🔴 后果那句与改密**相反**，而且必须在点之前就看得见', async () => {
     stubPath(AUTH_PASSWORD_PATHS.set, { status: 200, body: { message: 'Password set' } });
     render();
-    const changeSentence = text('password-consequence');
+    const changeSentence = text('tip-password-consequence');
     expect(changeSentence).toContain('其它设备');
 
     await click('password-switch-to-set');
     // 换表后这句不许还是那句"其余设备都要重新登录"。
-    expect(q('password-consequence')).toBeNull();
-    const setSentence = text('password-set-consequence');
+    expect(q('tip-password-consequence')).toBeNull();
+    const setSentence = text('tip-password-set-consequence');
     expect(setSentence).toContain('不会把任何地方踢下线');
     // 两张表的句子必须不同（同一条文案摆两张表 = 对一半人说错话）。
     expect(setSentence).not.toBe(changeSentence);
@@ -709,8 +712,8 @@ describe('9. 「设第一个密码」那张表', () => {
       switchBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
 
-    expect(q('password-set-consequence')).not.toBeNull();
-    expect(text('password-set-consequence')).toContain('不会把任何地方踢下线');
+    expect(q('tip-password-set-consequence')).not.toBeNull();
+    expect(text('tip-password-set-consequence')).toContain('不会把任何地方踢下线');
     // 还没点过 ⇒ 没有任何结果。
     expect(q('password-set-done')).toBeNull();
     expect(q('password-set-failed')).toBeNull();

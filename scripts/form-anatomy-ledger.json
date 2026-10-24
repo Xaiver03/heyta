@@ -1,0 +1,4 @@
+{
+  "note": "手写 <label> 的既存债务（2026-10-24 基线）。只许减少：新写的字段必须走 apps/web/src/lib/form/FormField.tsx。用 node scripts/check-form-anatomy.mjs --update 把读数改小（不许改大）。",
+  "labels": {}
+}

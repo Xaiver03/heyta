@@ -98,7 +98,7 @@
  * （第四刀补登记那一次的根因与后果写在那个脚本的注释里。）
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -106,7 +106,7 @@ import {
   View,
   type TextProps,
 } from 'react-native';
-import { Check } from 'lucide';
+import { Check, CircleHelp } from 'lucide';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
@@ -121,6 +121,58 @@ import {
   type SettingsToggleRow,
   type SettingsValueRow,
 } from './model.js';
+
+/**
+ * 「?」——说明文字的**唯一**载体（2026-10-24 产品负责人的禁令）
+ * ==========================================================
+ *
+ * > 「严禁说明文字出现，严禁说明文字直接写进去。只允许用那种"一个圈里面一个问号"的，
+ * >   hover 上去有。……彻底禁止！」
+ *
+ * 共享层这一份给**两端**用：web 上它渲染成 RN-web 的按钮（点一下/聚焦即展开），
+ * 原生端点一下展开。展开前正文**不在视觉树里**，所以一屏读下来是
+ * 「图标 + 名字 + 一圈问号」，而不是「图标 + 名字 + 一句解释」。
+ *
+ * 🔴 与 web 那个 `SettingsInfoTip` 的差别只有开合方式（那边还支持 hover）：
+ * 原生没有 hover，所以这里只认点击；两份的**语义**是同一条（`accessibilityState` /
+ * `aria-expanded` 都表达"展开/收起"，读屏器念得到正文）。
+ *
+ * ⚠️ 判据：`pnpm check:settings-prose`。它扫的是**调用点**里有没有 `hint` 直出、
+ * 而不是这个组件内部 —— 因为从这里出去的每一个字都必须先经过"点一下"。
+ */
+export function SettingsInfoTip({
+  text,
+  label,
+  testID,
+}: {
+  /** 解释正文。 */
+  text: string;
+  /** 无障碍名字（"这一行是什么"），读屏器念它而不是念整个正文。 */
+  label: string;
+  testID?: string;
+}): React.JSX.Element {
+  const tokens = useHeytaTokens();
+  const textStyles = useHeytaText();
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ gap: tokens['space.1'] }}>
+      <Pressable
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ expanded: open }}
+        aria-expanded={open}
+        hitSlop={tokens['space.2']}
+        onPress={() => setOpen((previous) => !previous)}
+      >
+        <HeytaIcon data={CircleHelp} size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />
+      </Pressable>
+      {open ? (
+        <Text style={[textStyles.caption, { color: tokens['color.foreground-muted'] }]}>{text}</Text>
+      ) : null}
+    </View>
+  );
+}
 
 /* ========================================================================
  * 样式
@@ -185,10 +237,19 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       justifyContent: 'center',
     },
-    /** 标签那一行：记号 + 文字，水平排列。 */
+    /**
+     * 标签那一行：记号 + 文字，水平排列。
+     *
+     * 🔴 `alignItems: 'flex-start'` 而不是 `'center'`：`?` 气泡展开时那一列会多出一行正文，
+     *    居中对齐把**图标本身**也一起挪位（2026-10-24 设备截图看得见：展开后 `?` 比标题高出一截，
+     *    点一下动一次）。顶端对齐之后图标只随标题首行定位，开合都在同一处。
+     *    ⚠️ **没有做像素级定量**：展开会让列表重排，两版截图之间比绝对 y 会被滚动锚点混淆；
+     *    证据是同一脚本拍的两张图（`apps/mobile/evidence/subscription-20261024/00/01-*.png`），
+     *    以及居中版那张同位置截图 —— 肉眼可判，机器读数在这一屏上不可靠。
+     */
     actionHead: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       gap: tokens['space.2'],
     },
     /** 说明句那一行：记号 + 文字。 */
@@ -442,12 +503,11 @@ function ToggleLine({
             <Text style={[text['row-title'], styles.dynamic, { color: tokens['color.foreground'] }]}>
               {row.label}
             </Text>
+            {/* 说明**只**走 `?`（2026-10-24 禁令）。 */}
+            {row.hint === undefined ? null : (
+              <SettingsInfoTip text={row.hint} label={row.label} testID={`${row.testID ?? 'row'}-tip`} />
+            )}
           </View>
-          {row.hint === undefined ? null : (
-            <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
-              {row.hint}
-            </Text>
-          )}
         </View>
         {/*
           状态标记：一个方框 + 选中时的对钩。
@@ -510,12 +570,10 @@ function ActionLine({
         >
           {row.label}
         </Text>
+        {row.hint === undefined ? null : (
+          <SettingsInfoTip text={row.hint} label={row.label} testID={`${row.testID ?? 'row'}-tip`} />
+        )}
       </View>
-      {row.hint === undefined ? null : (
-        <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
-          {row.hint}
-        </Text>
-      )}
     </View>
   );
 

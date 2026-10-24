@@ -27,7 +27,7 @@ export function SettingsAccountGate(props: {
         </span>
         <div>
           <p className="ht-settings__account-gate-title">{t('common.auth.form.signIn')}</p>
-          <p className="ht-settings__hint" data-testid={props.testId}>
+          <p className="ht-settings__hint" role="status" data-testid={props.testId}>
             {t(props.messageKey)}
           </p>
         </div>

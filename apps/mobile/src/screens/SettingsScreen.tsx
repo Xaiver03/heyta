@@ -65,6 +65,10 @@ import { useMobileNavigation } from '../nav/navigation';
 import type { SyncCredentialForm } from '../sync/credential-form';
 import { DEFAULT_SERVER_URL, readSyncConfig } from '../sync/config';
 import { VaultSettingsSection } from './VaultSettingsSection';
+import { SubscriptionSection } from './SubscriptionSection';
+// 提醒送达那一节：拒绝授权之后**唯一**的再授权入口（用户得先知道它被拒了，
+// 而入口必须和那句话在同一屏上 —— 挂在详情面板里等于要用户再找第二条路）。
+import { ReminderDeliverySection } from './ReminderDeliverySection';
 import { AiSettingsSection } from '../ai/AiSettingsSection';
 import {
   privacyConsent,
@@ -134,7 +138,21 @@ function makeStyles(tokens: HeytaNativeTokens) {
 }
 
 /** 一级目录的稳定语义 key。父屏可以用它把“从哪一组进入”传回设置面。 */
-export type SettingsSectionKey = 'profile' | 'general' | 'sync' | 'ai' | 'data' | 'security';
+/**
+ * 设置目录的分节。
+ *
+ * 🔴 `subscription` 是 2026-10-24 新加的一节（产品负责人："需要有单独的订阅界面"）。
+ * 它与 Web 的设置 IA 对齐（Web 有「订阅」一节）；移动端此前把状态与收银台塞在
+ * 「我的」的滚动流里，用户要滚过"清单/标签/便签"才看得到。
+ */
+export type SettingsSectionKey =
+  | 'profile'
+  | 'subscription'
+  | 'general'
+  | 'sync'
+  | 'ai'
+  | 'data'
+  | 'security';
 
 export function SettingsScreen({
   visible,
@@ -409,6 +427,7 @@ export function SettingsScreen({
 
   const sectionLabels: Record<SettingsSectionKey, string> = {
     profile: t('mobile.settings.section.profile'),
+    subscription: t('mobile.settings.section.subscription'),
     general: t('mobile.settings.section.general'),
     sync: t('mobile.settings.section.sync'),
     ai: t('mobile.settings.section.ai'),
@@ -418,6 +437,7 @@ export function SettingsScreen({
 
   const sectionIcons: Record<SettingsSectionKey, React.ComponentProps<typeof Icon>['name']> = {
     profile: 'tab.profile',
+    subscription: 'action.more',
     general: 'action.settings',
     sync: 'action.sync',
     ai: 'action.more',
@@ -603,6 +623,10 @@ export function SettingsScreen({
 
   const renderGeneral = (): React.JSX.Element => (
     <>
+      {/* 🔴 放在这一节**最上面**：这一屏的其他内容都跟"提醒为什么不响"无关，
+          而被拒之后能做的只有这一件事。它自己会在"三道门都读不到"时返回 null，
+          所以不存在"多出一张空卡"的那一种。 */}
+      <ReminderDeliverySection />
       {shouldShowWidgetJourney(widgetBridgeAvailable) ? (
         <SettingsSection
           variant="card"
@@ -747,6 +771,8 @@ export function SettingsScreen({
     switch (section) {
       case 'profile':
         return <>{profileEditor}</>;
+      case 'subscription':
+        return <SubscriptionSection />;
       case 'general':
         return renderGeneral();
       case 'sync':

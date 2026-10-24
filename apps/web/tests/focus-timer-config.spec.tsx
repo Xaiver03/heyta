@@ -108,7 +108,10 @@ function blur(el: HTMLInputElement): void {
 }
 
 function chooseTask(el: HTMLElement, taskId: string): HTMLSelectElement {
-  const select = el.querySelector<HTMLSelectElement>('.ht-app__focus-task select');
+  // 🔴 2026-10-24：选择器从样式类 `.ht-app__focus-task select` 换成 `data-testid`。
+  //    那一行改走共享 `FormField` 之后，类名不再存在（它本来只是**样式**挂钩）；
+  //    而"关联任务选择框"是**行为契约**，该用 testID 钉，不是用样式类钉。
+  const select = el.querySelector<HTMLSelectElement>('[data-testid="focus-linked-task"]');
   expect(select, '没找到关联任务选择框').not.toBeNull();
   act(() => {
     select!.value = taskId;
@@ -233,7 +236,7 @@ describe('番茄钟关联任务交互', () => {
       el.querySelector<HTMLElement>('[data-testid="focus-primary"]')?.click();
     });
 
-    const select = el.querySelector<HTMLSelectElement>('.ht-app__focus-task select');
+    const select = el.querySelector<HTMLSelectElement>('[data-testid="focus-linked-task"]');
     expect(select?.matches(':disabled')).toBe(true);
     act(() => {
       select!.value = '';

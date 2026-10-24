@@ -35,6 +35,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { SettingsInfoTip } from './SettingsInfoTip.js';
 
 import { AlertTriangle, CheckCircle2, Loader2, LogOut, RefreshCw } from 'lucide-react';
 
@@ -121,8 +122,14 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
 
   return (
     <div className="ht-settings" data-testid="sessions-panel">
-      <h2 className="ht-settings__title ht-type-section-title">{t('common.sessions.title')}</h2>
-      <p className="ht-settings__hint">{t('common.sessions.intro')}</p>
+      <h2 className="ht-settings__title ht-type-section-title">
+        {t('common.sessions.title')}
+        <SettingsInfoTip
+          testId="tip-sessions"
+          label={t('common.sessions.title')}
+          text={t('common.sessions.intro')}
+        />
+      </h2>
 
       {!signedIn ? (
         <SettingsAccountGate
@@ -205,7 +212,7 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
             "看起来谁都没登录"的那一刻。
           */}
           {sessions !== undefined && (
-            <p className="ht-settings__hint" data-testid="sessions-legacy-hint">
+            <p className="ht-settings__hint" role="status" data-testid="sessions-legacy-hint">
               {t('common.sessions.legacyHint')}
             </p>
           )}
@@ -240,7 +247,7 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
                   </p>
                   {/* 🔴 这台就是正在用的设备 ⇒ 撤销它的出口不在这里（文件头第 2 条）。 */}
                   {session.current && (
-                    <p className="ht-settings__hint" data-testid={`session-hint-${session.sessionId}`}>
+                    <p className="ht-settings__hint" role="status" data-testid={`session-hint-${session.sessionId}`}>
                       {t('common.sessions.currentHint')}
                     </p>
                   )}

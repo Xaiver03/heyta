@@ -274,12 +274,14 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 }
 
 /* device handoff 的 12 位配对码：抄写是这条链路唯一的人工步骤，
-   大号等宽 + 分组间距，别让用户对着小字数错位。 */
+   大号等宽 + 分组间距，别让用户对着小字数错位。
+   🔴 字号/字重**不写在这里**：它们来自 JSX 与 `.ht-type-numeric-summary` 成对的语义档位
+   （2026-10-24 修 —— 这条规则原先自拼 `xl+semibold`，让 `check:design` 在**干净检出上**
+   永久变红，而"一直红着的门禁等于没有门禁"）。等宽与 0.12em 分组字距是这个元素自己的事，
+   留着；tabular 数字由那个档位一并给出，正好服务"对着数"这个动作。 */
 .ht-auth-central__pairing {
   margin: 0;
   font-family: var(--ht-font-mono);
-  font-size: var(--ht-font-size-xl);
-  font-weight: var(--ht-font-weight-semibold);
   letter-spacing: 0.12em;
   color: var(--ht-color-foreground);
 }

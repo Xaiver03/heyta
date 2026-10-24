@@ -126,6 +126,8 @@ import {
 } from './aiStore.js';
 import './ai-settings.css';
 import { InboundAutomationSettings } from './InboundAutomationSettings.js';
+import { FormField } from '../../lib/form/FormField.js';
+import { SettingsInfoTip } from './SettingsInfoTip.js';
 
 /**
  * 某个功能在**当前路由里**缺哪些能力。
@@ -685,14 +687,37 @@ export function AiSettings({
   const assistantPlan = planAssistantEgress(settings.assistantTier);
 
   return (
-    <div className="ht-settings ht-ai-settings" data-testid="ai-settings">
-      <h2 className="ht-settings__title ht-type-section-title">{t('web.ai.settings.title')}</h2>
+    <div
+      className="ht-settings ht-ai-settings ht-settings--cards"
+      data-testid="ai-settings"
+    >
+      {/*
+        🔴 这里**没有** h2：页标题由设置壳的 `SettingsSectionHead` 给（「AI 与集成」）。
+        面板自己再写一个「AI 设置」= 同一屏两行近义标题，而那正是 2026-10-24
+        产品负责人指着说"排版混乱"的那一处形状。下面各小节的 h3 保留。
+      */}
+
+      {/*
+        卡片分组（2026-10-24）：这一屏原来**一整块白卡**里装着四件互不相干的事
+        （AI 开关与出境 / 本机 API / 入站自动化 / 重置），看图时读成"一大段"。
+        现在按"这是几件事"切卡：
+
+          ① `ai-card-gates`  开关、出境闸门、供给模式、端点、能力、助手 —— 同一段披露故事
+          ② 本机 API         （自己的 `<section>`）
+          ③ 入站自动化       （`InboundAutomationSettings`，`.ht-settings__subsection`）
+          ④ 重置             （破坏性动作，§8.2 第 11 条要求与常规项分开）
+
+        🔴 ① 里那几个 `.ht-settings__section` 在卡片内部**降级成子块**（无底色、无边框、
+        之间一条发丝线）：卡片里的卡片是层次噪音，不是层次。
+        ⚠️ 卡数不是"越多越好"：①②③ 是三个话题，④ 是危险动作，四张就到齐了。
+      */}
+      <div className="ht-ai-card" data-testid="ai-card-gates">
 
       {/* ── 闸 1：总开关 ─────────────────────────────────────────── */}
       <Toggle
         id="ai-enabled"
         label={t('web.ai.settings.enabled.label')}
-        note={t('web.ai.settings.enabled.note')}
+        tip={t('web.ai.settings.enabled.note')}
         checked={routing.enabled}
         onChange={(v) => updateRouting({ ...routing, enabled: v })}
       />
@@ -706,7 +731,7 @@ export function AiSettings({
       <Toggle
         id="ai-memory-enabled"
         label={t('web.ai.settings.memory.label')}
-        note={t('web.ai.settings.memory.note')}
+        tip={t('web.ai.settings.memory.note')}
         checked={settings.memoryEnabled}
         onChange={(v) => update({ ...settings, memoryEnabled: v })}
       />
@@ -725,7 +750,7 @@ export function AiSettings({
             <Toggle
               id="ai-allow-remote"
               label={t('web.ai.settings.allowRemote.label')}
-              note={t('web.ai.settings.allowRemote.note')}
+              tip={t('web.ai.settings.allowRemote.note')}
               checked={routing.allowRemote}
               onChange={(v) => updateRouting({ ...routing, allowRemote: v })}
             />
@@ -754,26 +779,39 @@ export function AiSettings({
             data-testid="ai-supply-mode"
             style={{ border: 0, padding: 0, margin: 0 }}
           >
+            {/*
+              🔴 顺序与默认值（2026-10-24，产品负责人的纠正）：
+              「我们现在主要是卖中央托管的」—— 托管在前、且未选过时默认托管。
+              原来的顺序是"我自己配的端点"在前并作为默认，等于把**我们卖的那一档**
+              写成第二选项，而"自己接一个端点"成了主叙事。那是自托管产品的叙事，
+              不是这个产品的。
+              ⚠️ 安全侧没变：发不发出去仍由**「允许远程端点」那道闸**裁决
+              （关着就一个请求都不发），所以改默认值不会让谁的内容悄悄出门。
+            */}
             <legend className="ht-settings__h3 ht-type-headline">
               {t('web.ai.settings.supply.title')}
+              <SettingsInfoTip
+                testId="tip-ai-supply"
+                label={t('web.ai.settings.supply.title')}
+                text={t('web.ai.settings.supply.note')}
+              />
             </legend>
             {(
               [
-                { key: 'own' as const, labelKey: 'web.ai.settings.supply.own' },
                 { key: 'managed' as const, labelKey: 'web.ai.settings.supply.managed' },
+                { key: 'own' as const, labelKey: 'web.ai.settings.supply.own' },
               ] as const
             ).map((option) => (
               <label key={option.key} className="ht-settings__option">
                 <input
                   type="radio"
                   name="ai-supply-mode"
-                  checked={(routing.mode ?? 'own') === option.key}
+                  checked={(routing.mode ?? 'managed') === option.key}
                   onChange={() => updateRouting({ ...routing, mode: option.key })}
                 />
                 <span>{t(option.labelKey)}</span>
               </label>
             ))}
-            <p className="ht-settings__hint">{t('web.ai.settings.supply.note')}</p>
             {routing.mode === 'managed' && !managedServerReady && (
               /* 选了托管但**没有可打的服务器** —— 与其让用户按下 AI 再拿一句
                  "AI 不可用"，不如在这里就说清下一步该去哪（「同步」）。 */
@@ -795,6 +833,7 @@ export function AiSettings({
             {usage !== undefined && usage.kind !== 'unconfigured' && (
               <p
                 className="ht-settings__hint"
+                role="status"
                 data-testid="ai-managed-usage"
                 data-usage-state={
                   usage.kind === 'unavailable'
@@ -820,7 +859,29 @@ export function AiSettings({
             data-testid="ai-endpoints-section"
             data-focused={focused === 'endpoints' ? 'true' : undefined}
           >
-            <h3 className="ht-settings__h3 ht-type-headline">{t('web.ai.settings.endpoints.title')}</h3>
+            <h3 className="ht-settings__h3 ht-type-headline">
+              {t('web.ai.settings.endpoints.title')}
+              {/*
+                这一段原先是**贴在标题下面的一整坨**（"heyta 会提供统一云端 AI…这一步会把内容
+                发到我们的服务器…"）。它是这一屏最该被读到的一句，也是最该**别杵在那儿**的一句：
+                现在它住进 `?`（2026-10-24 禁令）。内容一个字没删（词条仍是原来那几条），
+                只是从"每次进设置都要读"变成"想知道时点一下"。
+              */}
+              <SettingsInfoTip
+                testId="tip-managed-ai"
+                label={t('common.tip.label')}
+                text={
+                  <>
+                    {t('common.brand')} <strong>{t('web.ai.settings.managed.offer')}</strong>
+                    {t('web.ai.settings.managed.rest')}
+                    <strong>{t('web.ai.settings.managed.strongPlain')}</strong>
+                    {t('web.ai.settings.managed.mid')}
+                    <strong>{t('web.ai.settings.managed.strongNot')}</strong>
+                    {t('web.ai.settings.managed.tail')}
+                  </>
+                }
+              />
+            </h3>
 
             {/* 🔴🔴 **这一段的话术改过两次，两次都是因为"把做没做完说反了"。**
                 ① 曾经写"我们没有提供托管 AI" —— 那是错的：产品负责人已明确
@@ -833,14 +894,10 @@ export function AiSettings({
 
                 不变的那半句：用托管 AI 时内容会明文到 heyta 服务器，
                 所以它**不是**端到端加密（ADR-0005 / ADR-0006）。 */}
-            <p className="ht-settings__hint" data-testid="managed-ai-note">
-              {t('common.brand')} <strong>{t('web.ai.settings.managed.offer')}</strong>{t('web.ai.settings.managed.rest')}
-              <strong>{t('web.ai.settings.managed.strongPlain')}</strong>{t('web.ai.settings.managed.mid')}
-              <strong>{t('web.ai.settings.managed.strongNot')}</strong>{t('web.ai.settings.managed.tail')}
-            </p>
+
 
             {routing.endpoints.length === 0 && (
-              <p className="ht-settings__hint">
+              <p className="ht-settings__hint" role="status">
                 {t('web.ai.settings.endpoints.empty')}
               </p>
             )}
@@ -877,33 +934,51 @@ export function AiSettings({
                       {/* 🔴 可编辑：预设一键加进来只是起点，用户必须能改。
                           没有编辑能力的话"添加自定义端点"会加进一个 `https://`
                           然后**用户没有任何办法把它改对** —— 那是死路。 */}
-                      <label className="ht-settings__inline">
-                        <span className="ht-settings__inline-label">{t('web.ai.settings.field.name')}</span>
-                        <input
-                          type="text"
-                          aria-label={t('web.ai.settings.nameAria', { name: endpoint.label })}
-                          value={endpoint.label}
-                          onChange={(e) => editEndpoint(endpoint.id, { label: e.target.value })}
-                        />
-                      </label>
-                      <label className="ht-settings__inline">
-                        <span className="ht-settings__inline-label">{t('web.ai.settings.field.url')}</span>
-                        <input
-                          type="text"
-                          aria-label={t('web.ai.settings.urlAria', { name: endpoint.label })}
-                          value={endpoint.endpoint}
-                          onChange={(e) => editEndpoint(endpoint.id, { endpoint: e.target.value })}
-                        />
-                      </label>
-                      <label className="ht-settings__inline">
-                        <span className="ht-settings__inline-label">{t('web.ai.settings.field.model')}</span>
-                        <input
-                          type="text"
-                          aria-label={t('web.ai.settings.modelAria', { name: endpoint.label })}
-                          value={endpoint.model}
-                          onChange={(e) => editEndpoint(endpoint.id, { model: e.target.value })}
-                        />
-                      </label>
+                      <FormField
+                        id={`ai-endpoint-${endpoint.id}-name`}
+                        label={t('web.ai.settings.field.name')}
+                        layout="inline"
+                      >
+                        {(fieldProps) => (
+                          <input
+                            {...fieldProps}
+                            type="text"
+                            aria-label={t('web.ai.settings.nameAria', { name: endpoint.label })}
+                            value={endpoint.label}
+                            onChange={(e) => editEndpoint(endpoint.id, { label: e.target.value })}
+                          />
+                        )}
+                      </FormField>
+                      <FormField
+                        id={`ai-endpoint-${endpoint.id}-url`}
+                        label={t('web.ai.settings.field.url')}
+                        layout="inline"
+                      >
+                        {(fieldProps) => (
+                          <input
+                            {...fieldProps}
+                            type="text"
+                            aria-label={t('web.ai.settings.urlAria', { name: endpoint.label })}
+                            value={endpoint.endpoint}
+                            onChange={(e) => editEndpoint(endpoint.id, { endpoint: e.target.value })}
+                          />
+                        )}
+                      </FormField>
+                      <FormField
+                        id={`ai-endpoint-${endpoint.id}-model`}
+                        label={t('web.ai.settings.field.model')}
+                        layout="inline"
+                      >
+                        {(fieldProps) => (
+                          <input
+                            {...fieldProps}
+                            type="text"
+                            aria-label={t('web.ai.settings.modelAria', { name: endpoint.label })}
+                            value={endpoint.model}
+                            onChange={(e) => editEndpoint(endpoint.id, { model: e.target.value })}
+                          />
+                        )}
+                      </FormField>
 
                       {/* 🔴 停用开关 —— `AiEndpointConfig.disabled` 的**唯一生产者**。
                           这个字段一直只有"读"：`resolveRoute` 真的会跳过停用端点，
@@ -930,6 +1005,7 @@ export function AiSettings({
                       {endpoint.disabled === true && (
                         <p
                           className="ht-settings__hint"
+                          role="status"
                           data-testid={`endpoint-${endpoint.id}-disabled-note`}
                         >
                           <strong>{t('web.ai.settings.endpointDisabled.tag')}</strong>
@@ -961,7 +1037,7 @@ export function AiSettings({
                               />
                               <span>{capabilityLabel[capability]}</span>
                               {neededBy !== '' && (
-                                <span className="ht-settings__cap-hint">{`${PAIRED_PARENS[locale][0]}${neededBy}${PAIRED_PARENS[locale][1]}`}</span>
+                                <span className="ht-settings__cap-hint" role="status">{`${PAIRED_PARENS[locale][0]}${neededBy}${PAIRED_PARENS[locale][1]}`}</span>
                               )}
                             </label>
                           );
@@ -1081,10 +1157,20 @@ export function AiSettings({
               focused === 'capability' || focused === 'consent' ? 'true' : undefined
             }
           >
-            <h3 className="ht-settings__h3 ht-type-headline">{t('web.ai.settings.features.title')}</h3>
-            <p className="ht-settings__hint">
-              {t('web.ai.settings.features.hintLead')}<strong>{t('web.ai.settings.features.hintStrong')}</strong>{t('web.ai.settings.features.hintTail')}
-            </p>
+            <h3 className="ht-settings__h3 ht-type-headline">
+              {t('web.ai.settings.features.title')}
+              <SettingsInfoTip
+                testId="tip-ai-features"
+                label={t('web.ai.settings.features.title')}
+                text={
+                  <>
+                    {t('web.ai.settings.features.hintLead')}
+                    <strong>{t('web.ai.settings.features.hintStrong')}</strong>
+                    {t('web.ai.settings.features.hintTail')}
+                  </>
+                }
+              />
+            </h3>
 
             {FEATURE_ORDER.map((feature) => {
               const enabled = (routing.routes[feature] ?? []).length > 0;
@@ -1111,7 +1197,9 @@ export function AiSettings({
                       );
                     })}
                     {routing.endpoints.length === 0 && (
-                      <span className="ht-settings__hint">{t('web.ai.settings.features.empty')}</span>
+                      <span className="ht-settings__hint" role="status">
+                {t('web.ai.settings.features.empty')}
+              </span>
                     )}
                   </div>
 
@@ -1182,8 +1270,14 @@ export function AiSettings({
               "一次性并集披露"：多步循环中途不再逐步征求同意（那会变成用户
               无脑点下去的疲劳闸门），所以这里说的必须是**这一次最多会送出的全部**。 */}
           <section className="ht-settings__section" data-testid="ai-assistant-section">
-            <h3 className="ht-settings__h3 ht-type-headline">{t('web.ai.assistant.title')}</h3>
-            <p className="ht-settings__hint">{t('web.ai.assistant.hint')}</p>
+            <h3 className="ht-settings__h3 ht-type-headline">
+              {t('web.ai.assistant.title')}
+              <SettingsInfoTip
+                testId="tip-ai-assistant"
+                label={t('web.ai.assistant.title')}
+                text={t('web.ai.assistant.hint')}
+              />
+            </h3>
 
             <div
               className="ht-settings__options"
@@ -1201,7 +1295,10 @@ export function AiSettings({
                   />
                   <span>
                     {tierLabel[tier]}
-                    <span className="ht-settings__hint"> {tierNote[tier]}</span>
+                    <span className="ht-settings__hint" role="status">
+                  {' '}
+                  {tierNote[tier]}
+                </span>
                   </span>
                 </label>
               ))}
@@ -1210,34 +1307,35 @@ export function AiSettings({
             {/* 🔴 披露的字段名**来自目录的 `egressFields`**，不是这里手写一份名单 ——
                 手写的就是抄件，而抄件一定漂（本仓库为这件事付过几次学费）。
                 档位换了，这份集合跟着变：`read-only` 档里写工具根本不进来。 */}
-            <p className="ht-settings__hint" data-testid="assistant-egress-title">
+            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-egress-title">
               {t('web.ai.assistant.egressTitle')}
             </p>
-            <p className="ht-settings__hint" data-testid="assistant-egress-fields">
+            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-egress-fields">
               {assistantPlan.fields.join(LIST_SEPARATOR[locale])}
             </p>
             {/* 档位之间**真正**的差别在这一行：写工具只在高一级进模型上下文。
                 （出境字段两档相同 —— 写工具只产出提案、结果不回送模型，
                 所以它们不贡献字段。这句话不写出来，用户会以为"换了档就没送正文"。） */}
-            <p className="ht-settings__hint" data-testid="assistant-tools-title">
+            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-tools-title">
               {t('web.ai.assistant.toolsTitle')}
             </p>
-            <p className="ht-settings__hint" data-testid="assistant-tools">
+            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-tools">
               {assistantPlan.tools.join(LIST_SEPARATOR[locale])}
             </p>
-            <p className="ht-settings__hint" data-testid="assistant-limits">
+            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-limits">
               {t('web.ai.assistant.maxRequests', { n: assistantPlan.maxRequests })}
               {LIST_SEPARATOR[locale]}
               {t('web.ai.assistant.maxMessages', { n: assistantPlan.maxMessages })}
               {LIST_SEPARATOR[locale]}
               {t('web.ai.assistant.maxBytes', { n: assistantPlan.maxBytesPerRequest })}
             </p>
-            <p className="ht-settings__hint" data-testid="assistant-mcp-split">
+            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-mcp-split">
               {t('web.ai.assistant.mcpSplit')}
             </p>
           </section>
         </>
       )}
+      </div>
 
       {/* ── 闸 3（入站）：本机 API ───────────────────────────────── */}
       <section className="ht-settings__section" aria-labelledby="local-api-heading">
@@ -1245,10 +1343,17 @@ export function AiSettings({
           <div>
             <h3 className="ht-settings__h3 ht-type-headline" id="local-api-heading">
               {t('web.ai.settings.localApi.title')}
+              <SettingsInfoTip
+                testId="tip-local-api"
+                label={t('web.ai.settings.localApi.title')}
+                text={
+                  <>
+                    {t('web.ai.settings.localApi.hintLead')}
+                    <strong>{t('web.ai.settings.localApi.hintStrong')}</strong>
+                  </>
+                }
+              />
             </h3>
-            <p className="ht-settings__hint">
-              {t('web.ai.settings.localApi.hintLead')}<strong>{t('web.ai.settings.localApi.hintStrong')}</strong>
-            </p>
           </div>
           <span className="ht-ai-settings__scope-badge">
             <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" />
@@ -1263,12 +1368,14 @@ export function AiSettings({
             </span>
             <div>
               <strong>{t('web.ai.settings.localApi.source.title')}</strong>
-              <p className="ht-settings__hint">{t('web.ai.settings.localApi.source.summary')}</p>
+              <p className="ht-settings__hint" data-settings-disclosure="true">
+                {t('web.ai.settings.localApi.source.summary')}
+              </p>
             </div>
           </div>
           <details className="ht-ai-settings__technical">
             <summary>{t('web.ai.settings.localApi.source.details')}</summary>
-            <p className="ht-settings__hint">
+            <p className="ht-settings__hint" data-settings-disclosure="true">
               {t('web.ai.settings.localApi.source.part1')}
               <strong>{t('web.ai.settings.localApi.source.browser')}</strong>
               {t('web.ai.settings.localApi.source.part2')}
@@ -1283,7 +1390,7 @@ export function AiSettings({
         <Toggle
           id="local-api-enabled"
           label={t('web.ai.settings.localApi.enabled.label')}
-          note={t('web.ai.settings.localApi.enabled.note', { address: localApi.bindAddress })}
+          tip={t('web.ai.settings.localApi.enabled.note', { address: localApi.bindAddress })}
           checked={localApi.enabled}
           onChange={(v) => update({ ...settings, localApi: { ...localApi, enabled: v } })}
         />
@@ -1296,8 +1403,12 @@ export function AiSettings({
                   <label className="ht-ai-settings__field-label" htmlFor="local-api-token">
                     <Lock size={ICON_SIZE.xs} aria-hidden="true" />
                     {t('web.ai.settings.localApi.token.label')}
+                    <SettingsInfoTip
+                      testId="tip-local-api-token"
+                      label={t('web.ai.settings.localApi.token.label')}
+                      text={t('web.ai.settings.localApi.token.hint')}
+                    />
                   </label>
-                  <p className="ht-settings__hint">{t('web.ai.settings.localApi.token.hint')}</p>
                 </div>
                 <span className="ht-ai-settings__token-state">
                   {localApi.token !== undefined && localApi.token !== ''
@@ -1483,33 +1594,49 @@ export function AiSettings({
   );
 }
 
-/** 一个开关。**用 checkbox 而不是自定义 div**，键盘与读屏器直接可用。 */
+/**
+ * 一个开关。**用 checkbox 而不是自定义 div**，键盘与读屏器直接可用。
+ *
+ * 🔴 `note` → `tip`（2026-10-24 产品负责人的禁令）：
+ *
+ * > 「严禁说明文字出现，严禁说明文字直接写进去。只允许用那种"一个圈里面一个问号"的，
+ * >   hover 上去有。……彻底禁止！」
+ *
+ * 原来这一句说明是**写在开关下面的一行小字**，一屏六个开关就是六行解释文字，
+ * 于是"设置"读起来像一份说明书。现在它只剩一个 `?`：悬停/聚焦才展开，
+ * 读屏器通过 `aria-describedby` 照样拿得到（不是把信息删掉，是**换载体**）。
+ *
+ * ⚠️ `?` 刻意放在 `<label>` **外面**：`<button>` 落在 label 里时，Safari 点它
+ * 会连带切换那个 checkbox（"我只想看说明，结果把 AI 打开了"）。
+ */
 function Toggle({
   id,
   label,
-  note,
+  tip,
   checked,
   onChange,
 }: {
   id: string;
   label: string;
-  note: string;
+  tip: string;
   checked: boolean;
   onChange: (value: boolean) => void;
 }) {
   return (
-    <label className="ht-settings__toggle" htmlFor={id}>
-      <input
-        id={id}
-        type="checkbox"
-        role="switch"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span className="ht-settings__toggle-body">
-        <span className="ht-settings__toggle-label">{label}</span>
-        <span className="ht-settings__hint">{note}</span>
-      </span>
-    </label>
+    <div className="ht-settings__toggle">
+      <label className="ht-settings__toggle-hit" htmlFor={id}>
+        <input
+          id={id}
+          type="checkbox"
+          role="switch"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span className="ht-settings__toggle-body">
+          <span className="ht-settings__toggle-label">{label}</span>
+        </span>
+      </label>
+      <SettingsInfoTip label={label} text={tip} testId={`tip-${id}`} />
+    </div>
   );
 }

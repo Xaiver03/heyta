@@ -18,6 +18,7 @@ import {
   decidePrivacyConsent,
   enableAllModules,
   openSettingsSheet,
+  selectSettingsSection,
   stubLegalRecheck,
   stubPublicFacts,
   switchTheme,
@@ -165,6 +166,10 @@ async function openSyncSection(page: Page): Promise<Locator> {
   // 「页头标题真的是『设置』」，而**这一份套件跑的是英文界面**（`/?lang=en`，见上面）——
   // 用它就会红在夹具的中文前提上（2026-10-06 实测：Received "Settings"）。
   await openSettingsSheet(page);
+  // 🔴 2026-10-24：设置面板改成**分区切换**（侧栏一栏 + 内容区一节）之后，
+  // "打开浮层就能看到同步那一节"不再成立 —— 必须先选中它。
+  // 这一行补的是**夹具跟着 IA 走**，不是放宽判据：下面那条 `toBeVisible` 一个字没动。
+  await selectSettingsSection(page, 'sync');
   const section = page.getByTestId('sync-settings-panel');
   await expect(section, '设置浮层里没有「同步」那一节').toBeVisible();
   await section.scrollIntoViewIfNeeded();

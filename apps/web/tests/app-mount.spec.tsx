@@ -845,9 +845,18 @@ describe('应用 → 站点：孤岛的另一半', () => {
     await openSettings();
     const panel = container!.querySelector('[data-testid="about-panel"]');
     expect(panel).not.toBeNull();
-    // 一个点了不会生效的按钮比没有按钮更坏（同 `Pricing.tsx` 不放"立即购买"）。
-    const buttons = [...(panel?.querySelectorAll('button') ?? [])];
-    expect(buttons.map((b) => b.textContent?.trim())).toEqual([]);
+    /*
+     * 一个点了不会生效的按钮比没有按钮更坏（同 `Pricing.tsx` 不放"立即购买"）。
+     *
+     * ⚠️ 2026-10-24：这一条只看**有文字的**按钮。设置里现在每句说明都挂一枚
+     * 「?」（`SettingsInfoTip`），它本身是一个 `<button>` 但**没有文字**
+     * （图标 + `aria-label`）。这不是"假按钮"—— 它点了真的会展开。
+     * 原来那条 `toEqual([])` 会把"说明只能走问号"这条禁令判成违规。
+     */
+    const labelled = [...(panel?.querySelectorAll('button') ?? [])]
+      .map((b) => b.textContent?.trim() ?? '')
+      .filter((text) => text !== '');
+    expect(labelled).toEqual([]);
   });
 
   /**

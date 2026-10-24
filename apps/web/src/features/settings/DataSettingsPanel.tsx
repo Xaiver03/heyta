@@ -16,6 +16,8 @@ import './data-settings.css';
  * remains a fourth, permission-gated card; AdminPanel owns its own title and
  * renders nothing until the server confirms administrator access.
  */
+import { SettingsInfoTip } from './SettingsInfoTip.js';
+
 export function DataSettingsPanel({ active = true }: { active?: boolean }): React.JSX.Element {
   const { t } = useI18n();
 
@@ -27,10 +29,14 @@ export function DataSettingsPanel({ active = true }: { active?: boolean }): Reac
             <h3 className="ht-settings__data-card-title ht-type-headline">
               <Database size={ICON_SIZE.sm} aria-hidden="true" />
               {t('web.settings.dataUx.backupTitle')}
+              {/* 说明进 `?`（2026-10-24 禁令）。 */}
+              <SettingsInfoTip
+                testId="tip-data-backup"
+                label={t('web.settings.dataUx.backupTitle')}
+                text={t('web.settings.dataUx.backupLead')}
+              />
             </h3>
-            <p className="ht-settings__data-card-lead">
-              {t('web.settings.dataUx.backupLead')}
-            </p>
+
           </div>
         </header>
         <ExportPanel />
@@ -43,10 +49,13 @@ export function DataSettingsPanel({ active = true }: { active?: boolean }): Reac
             <h3 className="ht-settings__data-card-title ht-type-headline">
               <ArchiveRestore size={ICON_SIZE.sm} aria-hidden="true" />
               {t('web.settings.dataUx.migrationTitle')}
+              <SettingsInfoTip
+                testId="tip-data-migration"
+                label={t('web.settings.dataUx.migrationTitle')}
+                text={t('web.settings.dataUx.migrationLead')}
+              />
             </h3>
-            <p className="ht-settings__data-card-lead">
-              {t('web.settings.dataUx.migrationLead')}
-            </p>
+
           </div>
         </header>
         <TickTickImportPanel />

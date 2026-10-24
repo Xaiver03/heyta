@@ -21,6 +21,9 @@
 @import './app/profile.css';
 @import './app/material.css';
 @import './app/controls.css';
+/* 表单行（FormField）—— 2026-10-24。放在 controls 之后、功能 CSS 之前：
+   它给的是**解剖**，功能 CSS 只该改配色/宽度，不该重新定义字段形状。 */
+@import './app/form.css';
 @import './app/rail.css';
 @import './app/inbox.css';
 @import './app/ai-panels.css';

@@ -766,7 +766,14 @@ describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
     const id = await addTask('整理乙');
     selection.select('task', id);
     mount();
-    expect(countText(pane(), 'span', '清单'), '「清单」区块头在栏里不是恰好一处').toBe(1);
+    // 🔴 2026-10-24：视图从 `<span>` 换成 `FormField` 之后，区块头变成了
+    // **真正的 `<label>`**（它点一下就该聚焦到那枚下拉 —— 那才是 `<label>` 的语义，
+    // `<span>` 从来没有这个能力）。判据跟着**收紧**：不再只数一种标签，
+    // 而是数「清单」这个词在 span / label / h3 里一共几处 —— 恰好 1 处。
+    const headerCount = (word: string): number =>
+      countText(pane(), 'span', word) + countText(pane(), 'label', word) + countText(pane(), 'h3', word);
+    expect(headerCount('清单'), '「清单」区块头在栏里不是恰好一处').toBe(1);
+    expect(countText(pane(), 'label', '清单'), '「清单」现在必须是真正的 <label>（点它要能聚焦下拉）').toBe(1);
     expect(countText(pane(), 'legend', '标签'), '「标签」区块头在栏里不是恰好一处').toBe(1);
     expect(
       countText(pane(), 'h3', '清单') + countText(pane(), 'h3', '标签'),

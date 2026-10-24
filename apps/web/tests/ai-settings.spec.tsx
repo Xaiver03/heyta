@@ -1023,9 +1023,16 @@ describe('🔴🔴 必须说清"我们只提供两种供给方式中的哪一种
     return { ...base, routing: { ...base.routing, enabled: true } };
   }
 
+  /*
+   * ⚠️ 2026-10-24 晚：这一段从**常驻段落**搬进了「端点」标题旁边那枚问号
+   * （产品负责人：「严禁说明文字出现……只允许一个圈里一个问号」）。
+   * 判据跟着搬 —— 断言从 `managed-ai-note` 改读气泡正文 `tip-managed-ai`，
+   * 要求的东西一条没少：说过什么、不许说什么、有没有粗体。
+   * 🔴 气泡正文**常驻 DOM**（`aria-describedby` 指向隐藏内容），所以"没打开"也能测到。
+   */
   it('🔴🔴 说清托管 AI **会来、但这一版界面点不动**（曾经写"我们不做"，后写"仍在开发中"）', () => {
     const el = render({ initial: enabled(), secrets: createSessionSecretStore() });
-    const note = el.querySelector('[data-testid="managed-ai-note"]');
+    const note = el.querySelector('[data-testid="tip-managed-ai"]');
     expect(note).toBeTruthy();
     expect(note?.textContent).toContain('暂不在这里开放');
     // 🔴 第二条才是这一版的重点：ADR-0054 之后服务端那一半已经落地，
@@ -1036,7 +1043,7 @@ describe('🔴🔴 必须说清"我们只提供两种供给方式中的哪一种
 
   it('🔴🔴 明说托管模式**不是端到端加密**（ADR-0006 的核心结论）', () => {
     const el = render({ initial: enabled(), secrets: createSessionSecretStore() });
-    const text = el.querySelector('[data-testid="managed-ai-note"]')?.textContent ?? '';
+    const text = el.querySelector('[data-testid="tip-managed-ai"]')?.textContent ?? '';
     // 这句不能省：托管 AI 是这个 E2EE 产品里唯一"必须解开才能用"的口子
     expect(text).toContain('明文到达');
     expect(text).toContain('不是');
@@ -1045,21 +1052,22 @@ describe('🔴🔴 必须说清"我们只提供两种供给方式中的哪一种
 
   it('🔴 不能再说"我们没有提供托管 AI"（那会变成对用户的错误承诺）', () => {
     const el = render({ initial: enabled(), secrets: createSessionSecretStore() });
-    const text = el.querySelector('[data-testid="managed-ai-note"]')?.textContent ?? '';
+    const text = el.querySelector('[data-testid="tip-managed-ai"]')?.textContent ?? '';
     expect(text).not.toContain('没有');
   });
 
   it('🔴🔴 不能出现字面量星号（JSX 里 ** 不会变粗体）', () => {
     const el = render({ initial: enabled(), secrets: createSessionSecretStore() });
-    const text = el.querySelector('[data-testid="managed-ai-note"]')?.textContent ?? '';
+    const text = el.querySelector('[data-testid="tip-managed-ai"]')?.textContent ?? '';
     expect(text).not.toContain('**');
-    // 而且确实用了 <strong>
-    expect(el.querySelector('[data-testid="managed-ai-note"] strong')).toBeTruthy();
+    // 而且确实用了 <strong>（搬进气泡时类型从 string 放宽到 ReactNode，就是为了保住这个）
+    expect(el.querySelector('[data-testid="tip-managed-ai"] strong')).toBeTruthy();
   });
 
   it('🔴 AI 总开关关着时不显示（那是"还没启用"，不是"缺功能"）', () => {
+    // 「端点」那一节在 AI 关着时整节不渲染 ⇒ 那枚问号也不存在。
     const el = render({ initial: defaultAiSettings(), secrets: createSessionSecretStore() });
-    expect(el.querySelector('[data-testid="managed-ai-note"]')).toBeNull();
+    expect(el.querySelector('[data-testid="tip-managed-ai"]')).toBeNull();
   });
 });
 
@@ -1081,19 +1089,31 @@ describe('AI 供给模式开关（我自己的端点 / heyta 托管）', () => {
     };
   };
 
-  it('默认（没写过 mode）⇒「我自己的端点」选中', () => {
+  /**
+   * 🔴 2026-10-24 改的**产品默认值**：没写过 `mode` 时默认「heyta 托管」。
+   *
+   * 产品负责人的原话：「我们现在主要是卖中央托管的……怎么搞成自托管是主叙事了呀？」
+   * 原来默认是「我自己配置的端点」—— 那等于把我们卖的那一档写成第二选项。
+   * 安全侧不变：发不发出去仍由「允许远程端点」那道闸裁决（关着就不发）。
+   */
+  it('默认（没写过 mode）⇒「heyta 托管」选中，且它排在第一位', () => {
     const c = render({ initial: enabledSettings(), secrets: createSessionSecretStore() });
 
     const group = c.querySelector('[data-testid="ai-supply-mode"]');
     expect(group).not.toBeNull();
     const checked = group!.querySelector('input[type="radio"]:checked');
-    expect(checked?.closest('label')?.textContent).toContain('我自己配置的端点');
+    expect(checked?.closest('label')?.textContent).toContain('heyta 托管');
+    // 顺序也是产品结论：托管在前。反过来就等于把自托管当主叙事。
+    const first = group!.querySelector('input[type="radio"]')?.closest('label')?.textContent ?? '';
+    expect(first).toContain('heyta 托管');
   });
 
   it('🔴 选「heyta 托管」⇒ 回传 `routing.mode = managed`（否则选了不生效）', () => {
     const seen: (string | undefined)[] = [];
+    // 从「我自己的端点」起步 —— 托管现在**已是默认值**，从默认值点它不会再触发 onChange
+    // （那个"点了没反应"是正确行为，但也让这条断言什么都没测到）。
     const c = render({
-      initial: enabledSettings(),
+      initial: enabledSettings('own'),
       secrets: createSessionSecretStore(),
       managedServerReady: true,
       onChange: (next) => seen.push(next.routing.mode),

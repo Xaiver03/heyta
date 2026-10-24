@@ -54,10 +54,12 @@
  * 这里只做两件事：把用户想要的那一组算出来，然后交给 store。
  */
 
-import { cssVar } from '@heyta/design-system';
+import { cssVar, ICON_SIZE } from '@heyta/design-system';
+
+import { FormField } from '../../lib/form/FormField.js';
 import { useI18n } from '@heyta/i18n';
 import type { Task } from '@heyta/domain';
-import { SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
+import { ChevronDown, SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
 
 import { selectChildProjects, selectTopLevelProjects, useProjectStore } from '../projects/store.js';
 import { moveBlockedForTask } from '../share/share-move-guards.js';
@@ -167,49 +169,61 @@ export function OrganizerField({
 
   return (
     <>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.1') }}>
-        <span style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}>
-          {t('web.organize.projectLabel')}
-        </span>
-        <select
-          // 与视觉标签**同名会撞**（读屏与验收都靠这个定位），
-          // 所以 aria-label 带上任务标题做区分。
-          aria-label={t('web.organize.projectSelect', { title: task.title })}
-          data-testid="organize-project-select"
-          disabled={moveUnavailable}
-          value={task.projectId ?? ''}
-          onChange={(event) => {
-            const next = event.target.value;
-            // 空字符串 = 「收集箱」。传 `undefined` 而不是 `''` ——
-            // app-host 会把它写成 `null`（清除该字段）。
-            onMoveToProject(next === '' ? undefined : next);
-          }}
-        >
-          <option value="" disabled={inboxBlocked}>
-            {t('web.organize.inbox')}
-          </option>
-          {options.map((option) => (
-            <option
-              key={option.id}
-              value={option.id}
-              disabled={option.blocked}
-              title={option.blocked ? t('web.organize.moveBlockedShared') : undefined}
+      <FormField
+        id="organize-project-select"
+        label={t('web.organize.projectLabel')}
+      >
+        {(field) => (
+          <>
+          <div className="ht-input-field__select">
+            <select
+              {...field}
+              // 与视觉标签**同名会撞**（读屏与验收都靠这个定位），
+              // 所以 aria-label 带上任务标题做区分。
+              aria-label={t('web.organize.projectSelect', { title: task.title })}
+              data-testid="organize-project-select"
+              disabled={moveUnavailable}
+              value={task.projectId ?? ''}
+              onChange={(event) => {
+                const next = event.target.value;
+                // 空字符串 = 「收集箱」。传 `undefined` 而不是 `''` ——
+                // app-host 会把它写成 `null`（清除该字段）。
+                onMoveToProject(next === '' ? undefined : next);
+              }}
             >
-              {option.label}
-            </option>
-          ))}
-        </select>
-        {moveUnavailable ? (
-          <p
-            className="ht-type-caption ht-settings__hint"
-            role="status"
-            data-testid="organize-move-blocked"
-            style={{ margin: 0 }}
-          >
-            {t('web.organize.moveBlockedShared')}
-          </p>
-        ) : null}
-      </label>
+              <option value="" disabled={inboxBlocked}>
+                {t('web.organize.inbox')}
+              </option>
+              {options.map((option) => (
+                <option
+                  key={option.id}
+                  value={option.id}
+                  disabled={option.blocked}
+                  title={option.blocked ? t('web.organize.moveBlockedShared') : undefined}
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={ICON_SIZE.sm} aria-hidden="true" />
+          </div>
+          {/* 🔴 灰掉必须配一句人读得懂的话。
+              这一句**原先是 `<label>` 里的最后一个孩子**，我重写那一块时把它丢了 ——
+              `share-move-affordance.spec.tsx` 当场红（"灰掉必须配一句人读得懂的话"）。
+              它属于**控件那一侧**，所以现在挂在 `FormField` 的控件槽里，
+              与 `hint` 同一个位置语义（但它是 `role="status"`，会被读屏播报）。 */}
+          {moveUnavailable ? (
+            <p
+              className="ht-input-field__hint"
+              role="status"
+              data-testid="organize-move-blocked"
+            >
+              {t('web.organize.moveBlockedShared')}
+            </p>
+          ) : null}
+          </>
+        )}
+      </FormField>
 
       {projectState.tags.length === 0 ? (
         // 一个标签都没有时**说明去哪建**。留一片空白会让人以为这功能坏了。

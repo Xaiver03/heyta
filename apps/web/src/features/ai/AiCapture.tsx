@@ -1,4 +1,5 @@
 import { AssistantIcon } from './AssistantIcon.js';
+import { FormField } from '../../lib/form/FormField.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 一句话捕获 —— 面向用户的入口
@@ -548,52 +549,61 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
           </p>
         )}
 
-        <label className="ht-ai__row">
-          <span>{t('web.ai.capture.field.title')}</span>
-          <input
-            className="ht-input"
-            type="text"
-            data-testid="capture-title"
-            aria-label={t('web.ai.capture.field.titleAria')}
-            maxLength={MAX_CAPTURE_TITLE_LENGTH}
-            value={draftTitle}
-            onChange={(e) => {
-              setDraftTitle(e.target.value);
-            }}
-          />
-        </label>
+        <FormField id="capture-title" label={t('web.ai.capture.field.title')}>
+          {(field) => (
+            <input
+              {...field}
+              type="text"
+              data-testid="capture-title"
+              aria-label={t('web.ai.capture.field.titleAria')}
+              maxLength={MAX_CAPTURE_TITLE_LENGTH}
+              value={draftTitle}
+              onChange={(e) => {
+                setDraftTitle(e.target.value);
+              }}
+            />
+          )}
+        </FormField>
 
         {/* 🔴 日期与时间**分开两个控件**，而不是一个"日期时间"输入框。
             理由是"不许猜"：模型只给了日期时，替它补一个 00:00 是把
             "那一天" 悄悄变成 "那一天零点"。分开之后，没给时间就是没给。 */}
-        <label className="ht-ai__row">
-          <span>{t('web.ai.capture.field.dueDate')}</span>
-          <input
-            className="ht-input"
-            type="date"
-            data-testid="capture-due-date"
-            aria-label={t('web.ai.capture.field.dueDate')}
-            value={draftDate}
-            onChange={(e) => {
-              setDraftDate(e.target.value);
-            }}
-          />
-          <input
-            className="ht-input"
-            type="time"
-            data-testid="capture-due-time"
-            aria-label={t('web.ai.capture.field.dueTime')}
-            value={draftTime}
-            onChange={(e) => {
-              setDraftTime(e.target.value);
-            }}
-          />
-        </label>
+        <FormField id="capture-due-date" label={t('web.ai.capture.field.dueDate')}>
+          {(field) => (
+            /* 🔴 日期与时间**分开两个控件**，而不是一个"日期时间"输入框。
+               理由是"不许猜"：模型只给了日期时，替它补一个 00:00 是把
+               "那一天" 悄悄变成 "那一天零点"。分开之后，没给时间就是没给。
+               ⇒ 这一行的第二个控件（时间）不是"额外配置"，是与日期并列的一个输入，
+                  所以它们共用一个 `label`（`aria-label` 各自给），并排用原语的 pair。 */
+            <div className="ht-input-field__pair ht-input-field__pair--wide-first">
+              <input
+                {...field}
+                type="date"
+                data-testid="capture-due-date"
+                aria-label={t('web.ai.capture.field.dueDate')}
+                value={draftDate}
+                onChange={(e) => {
+                  setDraftDate(e.target.value);
+                }}
+              />
+              <input
+                type="time"
+                className="ht-input-field__trailing"
+                data-testid="capture-due-time"
+                aria-label={t('web.ai.capture.field.dueTime')}
+                value={draftTime}
+                onChange={(e) => {
+                  setDraftTime(e.target.value);
+                }}
+              />
+            </div>
+          )}
+        </FormField>
 
-        <label className="ht-ai__row">
-          <span>{t('web.ai.capture.field.priority')}</span>
+        <FormField id="capture-priority" label={t('web.ai.capture.field.priority')}>
+          {(field) => (
           <select
-            className="ht-input"
+            {...field}
             data-testid="capture-priority"
             aria-label={t('web.ai.capture.field.priority')}
             value={draftPriority}
@@ -609,7 +619,8 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
             <option value="medium">{t('web.ai.capture.priority.medium')}</option>
             <option value="high">{t('web.ai.capture.priority.high')}</option>
           </select>
-        </label>
+          )}
+        </FormField>
 
         {/* 标识在候选字段**下方**（备案材料原话）—— 字段是 AI 预填的，
             而它们是可编辑的：标识说的是"这些值的来源"，不是"这个表单不能改"。 */}

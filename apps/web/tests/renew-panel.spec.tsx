@@ -147,7 +147,7 @@ describe('下单成功', () => {
       });
     };
 
-    it('两档都渲染出来、默认选中 ¥5，并且**界面里不写金额**', async () => {
+    it('两档都渲染出来、默认选中 ¥5；标价与价格页同源，**成交金额只来自服务端**', async () => {
       stubCheckout(() => ({ status: 200, body: ORDER_OK }));
       const el = await renderPanel();
       const before = el.textContent ?? '';
@@ -155,9 +155,22 @@ describe('下单成功', () => {
       expect(el.querySelector('[data-testid="renew-tier-hosted"]')).toBeTruthy();
       expect(el.querySelector('[data-testid="renew-tier-hostedAi"]')).toBeTruthy();
       expect((el.querySelector<HTMLInputElement>('[data-testid="renew-tier-hosted"]'))?.checked).toBe(true);
-      // 🔴 档位名字来自**落地页那两条已被定价门禁钉住的词条**，所以这一屏不该出现任何
-      // 价格字符串 —— 金额只在服务端报价之后才出现（`ORDER_OK.amountMinor` = 400）。
-      expect(before).not.toMatch(/¥|\$|12\.00|5\.00/);
+
+      /*
+       * 🔴 这条判据在 2026-10-24 改过口径（原文是"这一屏不许出现任何价格字符串"）。
+       *
+       * 那一天产品负责人要"单独的订阅界面"，方案卡上必须能看见价 —— 一屏让人选档
+       * 却不给价，等于让人猜。所以现在的规则是**两条**，比原来更细而不是更松：
+       *   ① 卡上的**标价**只许来自落地页那几条被 `check:pricing` 钉住的词条
+       *      （`landing.pricing.*.priceCny`）—— 不许在这里另写金额字面量；
+       *   ② **这一单收多少**仍然只许来自服务端报价（下单前屏上没有任何成交金额）。
+       *
+       * 原来那条一刀切在改版之后会误报成"界面写死金额"，而真正要拦的是 ②。
+       */
+      expect(before).toContain(translate('zh-CN', 'landing.pricing.hosted.priceCny'));
+      expect(before).toContain(translate('zh-CN', 'landing.pricing.hostedAi.priceCny'));
+      // ② 下单**之前**没有任何成交金额（`amountMinor` 是 400，服务端才给）。
+      expect(before).not.toContain('4.00');
 
       await act(async () => {
         await clickPlace(el);
@@ -195,6 +208,73 @@ describe('下单成功', () => {
       const text = el.textContent ?? '';
       expect(text).toContain(translate('zh-CN', 'web.subscription.renew.fail.downgrade'));
       expect(text).not.toContain(translate('zh-CN', 'web.subscription.renew.fail.unknown'));
+    });
+
+    /**
+     * 🔴 这一条是产品负责人 2026-10-24 实拍那块屏的回归判据。
+     *
+     * 现场：选了「官方托管 + 云端 AI」按下单，拿到一句「这一档现在还不能卖，服务端拒绝了
+     * 这笔下单」，然后问"现在不应该接了中央支付吗？" —— 支付条款其实是好的，
+     * 拒单的是另一道闸：这一档要交付**我们的云端 AI**，而这台实例没配托管上游
+     * （服务端 `PRICE_NOT_SELLABLE` + `reason: MANAGED_AI_NOT_CONFIGURED`）。
+     *
+     * 而且同一台实例上 **¥5 那一档照卖**（服务端有对照判据）。所以界面的责任不止"说清原因"，
+     * 还要**给一条真的能走的路**：一键换成不含云端 AI 的那一档。
+     */
+    it('🔴 云端 AI 那一档被拒 ⇒ 说清成因，并给一个真的能换过去的下单出口', async () => {
+      stubCheckout(() => ({
+        status: 409,
+        body: {
+          code: 'PRICE_NOT_SELLABLE',
+          message: 'PRICE_NOT_SELLABLE',
+          reason: 'MANAGED_AI_NOT_CONFIGURED',
+        },
+      }));
+      const el = await renderPanel();
+      await pickTier(el, 'hostedAi');
+      await clickPlace(el);
+
+      const text = el.textContent ?? '';
+      expect(text, '成因没说出来').toContain(
+        translate('zh-CN', 'web.subscription.renew.fail.managedAi'),
+      );
+      // 🔴 反向：不能退回那句含糊的"这一档现在还不能卖" —— 它盖住了两件事。
+      expect(text).not.toContain(translate('zh-CN', 'web.subscription.renew.fail.sellable'));
+
+      const switchButton = el.querySelector<HTMLButtonElement>(
+        'button[data-testid="renew-switch-tier"]',
+      );
+      expect(switchButton, '说了原因却没有任何出路').not.toBeNull();
+      await act(async () => {
+        switchButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      // 换档之后：¥5 被选中，且旧的那条失败提示不能继续挂着（它讲的是另一档）。
+      expect(el.querySelector<HTMLInputElement>('[data-testid="renew-tier-hosted"]')?.checked).toBe(
+        true,
+      );
+      expect(el.querySelector('[data-testid="renew-switch-tier"]')).toBeNull();
+
+      // 真的能下单：请求体是 ¥5 那一档，而不是原样再打一次 ¥12。
+      stubCheckout(() => ({ status: 200, body: ORDER_OK }));
+      await clickPlace(el);
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      expect(JSON.parse(String(init.body))).toEqual({ priceId: 'hosted-monthly' });
+    });
+
+    it('同一句含糊拒绝（没有原因码）时，界面不说"缺云端 AI" —— 不许替服务端猜', async () => {
+      stubCheckout(() => ({
+        status: 409,
+        body: { code: 'PRICE_NOT_SELLABLE', message: 'PRICE_NOT_SELLABLE' },
+      }));
+      const el = await renderPanel();
+      await pickTier(el, 'hostedAi');
+      await clickPlace(el);
+
+      const text = el.textContent ?? '';
+      expect(text).toContain(translate('zh-CN', 'web.subscription.renew.fail.sellable'));
+      expect(text).not.toContain(translate('zh-CN', 'web.subscription.renew.fail.managedAi'));
+      // 没有原因码就没有"换一档"按钮：我们不知道换成哪一档是对的。
+      expect(el.querySelector('[data-testid="renew-switch-tier"]')).toBeNull();
     });
 
     it('英文界面里档位说明不漏中文（词条两侧都有）', async () => {
@@ -317,7 +397,11 @@ describe('两种语言', () => {
     const el = await renderPanel(locale);
     await clickPlace(el);
     const text = el.textContent ?? '';
-    expect(text).toContain(translate(locale, 'web.subscription.renew.title'));
+    // 页标题（「托管同步续费」）已经没有了自己的 h2 —— 它现在住在「订阅」这一节里
+    // （2026-10-24 独立成节），标题由设置壳的 `SettingsSectionHead` 给。
+    // 这里改为断言**这一屏自己的**那些词条：档位名与那句计费说明。
+    expect(text).toContain(translate(locale, 'landing.pricing.hosted.name'));
+    expect(text).toContain(translate(locale, 'web.subscription.plans.hint'));
     if (locale === 'en') expect(CJK.test(text)).toBe(false);
     else expect(CJK.test(text)).toBe(true);
   });

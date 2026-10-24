@@ -207,10 +207,13 @@ describe('C. 设置里那一项（恢复路径②）', () => {
   it('🔴 说明句与当前显示策略一致，并给出页头恢复入口', async () => {
     const el = await mountApp();
     await openSettingsViaAvatar(el);
+    /*
+     * ⚠️ 2026-10-24：那句说明从**常驻段落**搬进了标题旁的 `?`
+     * （`tip-detail-pane`）。判据改读气泡正文 —— 要求没变：必须说清"窄窗会收起"
+     * 与"从页头能恢复"。
+     */
     const note = el
-      .querySelector('[data-testid="detail-pane-pref"]')!
-      .previousElementSibling!
-      .querySelector('.ht-settings__hint')!
+      .querySelector('[data-testid="tip-detail-pane"]')!
       .textContent!
       .trim();
     expect(note).toBe(translate('zh-CN', 'web.settings.display.detailNote'));

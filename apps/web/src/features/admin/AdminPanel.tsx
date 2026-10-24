@@ -49,6 +49,8 @@ import {
 
 import type { AdminAnnouncementRow } from '@heyta/app-host';
 
+import { FormField } from '../../lib/form/FormField.js';
+
 import { ADMIN_TABS } from './nav.js';
 
 /** 录入表单的初值。全空 —— **不给默认年份**：默认值会让人提交自己没看过的数字。 */
@@ -445,29 +447,36 @@ export function AdminPanel({
                 >
                   {t('web.admin.action.logout')}
                 </button>
-                <label className="ht-settings__admin-quota">
-                  <span className="ht-settings__hint">{t('web.admin.quota.label')}</span>
-                  <input
-                    className="ht-settings__admin-input ht-settings__admin-input--narrow"
-                    type="number"
-                    min={1}
-                    value={quotaMiB}
-                    onChange={(event) => {
-                      setQuotaMiB(event.target.value);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="ht-settings__admin-btn"
-                    onClick={() => {
-                      const mib = Number(quotaMiB);
-                      if (!Number.isFinite(mib) || mib < 1) return;
-                      void store.setUserQuota(detail.user.id, Math.round(mib * 1024 * 1024));
-                    }}
-                  >
-                    {t('web.admin.quota.submit')}
-                  </button>
-                </label>
+        <FormField id="admin-quota-mib" label={t('web.admin.quota.label')}>
+          {(fieldProps) => (
+            <div className="ht-settings__admin-inline">
+              <input
+                {...fieldProps}
+                className="ht-settings__admin-input"
+                type="number"
+                min={1}
+                value={quotaMiB}
+                onChange={(event) => {
+                  setQuotaMiB(event.target.value);
+                }}
+              />
+              {/* 提交按钮**不在** `FormField` 里：它是这一行旁边的动作，不是字段的一部分。
+                  上一版它嵌在 `<label>` 里 —— 点按钮也会把焦点送进输入框，
+                  而且读屏会把按钮念成标签的一部分。 */}
+              <button
+                type="button"
+                className="ht-settings__admin-btn"
+                onClick={() => {
+                  const mib = Number(quotaMiB);
+                  if (!Number.isFinite(mib) || mib < 1) return;
+                  void store.setUserQuota(detail.user.id, Math.round(mib * 1024 * 1024));
+                }}
+              >
+                {t('web.admin.quota.submit')}
+              </button>
+            </div>
+          )}
+        </FormField>
                 <button
                   type="button"
                   className="ht-settings__admin-btn"
@@ -878,31 +887,35 @@ function RefundPanel(props: { store: AdminStoreState }): React.JSX.Element {
           });
         }}
       >
-        <label className="ht-settings__admin-quota">
-          <span className="ht-settings__hint">{t('web.admin.refund.form.orderId')}</span>
-          <input
-            className="ht-settings__admin-input ht-settings__admin-input--narrow"
-            type="number"
-            inputMode="numeric"
-            data-testid="admin-refund-order-input"
-            value={form.orderIdText}
-            onChange={(event) => {
-              setForm((previous) => ({ ...previous, orderIdText: event.target.value }));
-            }}
-          />
-        </label>
-        <label className="ht-settings__admin-quota">
-          <span className="ht-settings__hint">{t('web.admin.refund.form.note')}</span>
-          <textarea
-            className="ht-settings__admin-input"
-            rows={2}
-            data-testid="admin-refund-request-note"
-            value={form.noteText}
-            onChange={(event) => {
-              setForm((previous) => ({ ...previous, noteText: event.target.value }));
-            }}
-          />
-        </label>
+                <FormField id="admin-refund-order-input" label={t('web.admin.refund.form.orderId')}>
+          {(fieldProps) => (
+  <input
+    {...fieldProps}
+              className="ht-settings__admin-input"
+              type="number"
+              inputMode="numeric"
+              data-testid="admin-refund-order-input"
+              value={form.orderIdText}
+              onChange={(event) => {
+                setForm((previous) => ({ ...previous, orderIdText: event.target.value }));
+              }}
+            />
+          )}
+        </FormField>
+                <FormField id="admin-refund-request-note" label={t('web.admin.refund.form.note')}>
+          {(fieldProps) => (
+  <textarea
+    {...fieldProps}
+              className="ht-settings__admin-input"
+              rows={2}
+              data-testid="admin-refund-request-note"
+              value={form.noteText}
+              onChange={(event) => {
+                setForm((previous) => ({ ...previous, noteText: event.target.value }));
+              }}
+            />
+          )}
+        </FormField>
         <label className="ht-settings__admin-quota">
           <span className="ht-settings__hint">{t('web.admin.refund.form.exception')}</span>
           <input
@@ -1102,56 +1115,66 @@ function HolidayPanel(props: { store: AdminStoreState }): React.JSX.Element {
           });
         }}
       >
-        <label className="ht-settings__admin-quota">
-          <span className="ht-settings__hint">{t('web.admin.holiday.form.year')}</span>
-          <input
-            className="ht-settings__admin-input ht-settings__admin-input--narrow"
-            type="number"
-            inputMode="numeric"
-            data-testid="admin-holiday-year-input"
-            value={form.yearText}
-            onChange={field('yearText')}
-          />
-        </label>
-        <label className="ht-settings__admin-quota">
-          <span className="ht-settings__hint">{t('web.admin.holiday.form.papers')}</span>
-          <textarea
-            className="ht-settings__admin-input"
-            rows={2}
-            data-testid="admin-holiday-papers-input"
-            value={form.papersText}
-            onChange={field('papersText')}
-          />
-        </label>
-        <label className="ht-settings__admin-quota">
-          <span className="ht-settings__hint">{t('web.admin.holiday.form.offDays')}</span>
-          <textarea
-            className="ht-settings__admin-input"
-            rows={4}
-            data-testid="admin-holiday-off-input"
-            value={form.offDaysText}
-            onChange={field('offDaysText')}
-          />
-        </label>
-        <label className="ht-settings__admin-quota">
-          <span className="ht-settings__hint">{t('web.admin.holiday.form.workDays')}</span>
-          <textarea
-            className="ht-settings__admin-input"
-            rows={4}
-            data-testid="admin-holiday-work-input"
-            value={form.workDaysText}
-            onChange={field('workDaysText')}
-          />
-        </label>
-        <label className="ht-settings__admin-quota">
-          <span className="ht-settings__hint">{t('web.admin.holiday.form.note')}</span>
-          <input
-            className="ht-settings__admin-input"
-            data-testid="admin-holiday-note-input"
-            value={form.noteText}
-            onChange={field('noteText')}
-          />
-        </label>
+                <FormField id="admin-holiday-year-input" label={t('web.admin.holiday.form.year')}>
+          {(fieldProps) => (
+  <input
+    {...fieldProps}
+              className="ht-settings__admin-input"
+              type="number"
+              inputMode="numeric"
+              data-testid="admin-holiday-year-input"
+              value={form.yearText}
+              onChange={field('yearText')}
+            />
+          )}
+        </FormField>
+                <FormField id="admin-holiday-papers-input" label={t('web.admin.holiday.form.papers')}>
+          {(fieldProps) => (
+  <textarea
+    {...fieldProps}
+              className="ht-settings__admin-input"
+              rows={2}
+              data-testid="admin-holiday-papers-input"
+              value={form.papersText}
+              onChange={field('papersText')}
+            />
+          )}
+        </FormField>
+                <FormField id="admin-holiday-off-input" label={t('web.admin.holiday.form.offDays')}>
+          {(fieldProps) => (
+  <textarea
+    {...fieldProps}
+              className="ht-settings__admin-input"
+              rows={4}
+              data-testid="admin-holiday-off-input"
+              value={form.offDaysText}
+              onChange={field('offDaysText')}
+            />
+          )}
+        </FormField>
+                <FormField id="admin-holiday-work-input" label={t('web.admin.holiday.form.workDays')}>
+          {(fieldProps) => (
+  <textarea
+    {...fieldProps}
+              className="ht-settings__admin-input"
+              rows={4}
+              data-testid="admin-holiday-work-input"
+              value={form.workDaysText}
+              onChange={field('workDaysText')}
+            />
+          )}
+        </FormField>
+                <FormField id="admin-holiday-note-input" label={t('web.admin.holiday.form.note')}>
+          {(fieldProps) => (
+  <input
+    {...fieldProps}
+              className="ht-settings__admin-input"
+              data-testid="admin-holiday-note-input"
+              value={form.noteText}
+              onChange={field('noteText')}
+            />
+          )}
+        </FormField>
         <div className="ht-settings__admin-actions">
           <button type="submit" className="ht-settings__admin-btn" data-testid="admin-holiday-save">
             {t('web.admin.holiday.save')}
@@ -1439,25 +1462,29 @@ function AnnouncementPanel({
           ))}
         </div>
         <div className="ht-settings__admin-badges">
-          <label className="ht-settings__admin-quota">
-            {t('web.admin.announcements.publishesAt')}
-            {/* `datetime-local` 给的是**本地墙上时钟**，换算发生在 store。 */}
-            <input
-              className="ht-settings__admin-input ht-settings__admin-input--narrow"
-              type="datetime-local"
-              value={form.publishesAtText}
-              onChange={(event) => setForm({ ...form, publishesAtText: event.target.value })}
-            />
-          </label>
-          <label className="ht-settings__admin-quota">
-            {t('web.admin.announcements.expiresAt')}
-            <input
-              className="ht-settings__admin-input ht-settings__admin-input--narrow"
-              type="datetime-local"
-              value={form.expiresAtText}
-              onChange={(event) => setForm({ ...form, expiresAtText: event.target.value })}
-            />
-          </label>
+          <FormField id="admin-publishes-at" label={t('web.admin.announcements.publishesAt')}>
+            {(fieldProps) => (
+              /* `datetime-local` 给的是**本地墙上时钟**，换算发生在 store。 */
+              <input
+                {...fieldProps}
+                className="ht-settings__admin-input"
+                type="datetime-local"
+                value={form.publishesAtText}
+                onChange={(event) => setForm({ ...form, publishesAtText: event.target.value })}
+              />
+            )}
+          </FormField>
+          <FormField id="admin-expires-at" label={t('web.admin.announcements.expiresAt')}>
+            {(fieldProps) => (
+              <input
+                {...fieldProps}
+                className="ht-settings__admin-input"
+                type="datetime-local"
+                value={form.expiresAtText}
+                onChange={(event) => setForm({ ...form, expiresAtText: event.target.value })}
+              />
+            )}
+          </FormField>
         </div>
         <div className="ht-settings__admin-actions">
           <button type="submit" className="ht-settings__admin-btn">

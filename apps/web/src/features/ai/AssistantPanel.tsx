@@ -1,4 +1,5 @@
 import { AssistantIcon } from './AssistantIcon.js';
+import { FormField } from '../../lib/form/FormField.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 对话式助手 —— 面向用户的入口（W12 / ADR-0045）
@@ -49,7 +50,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Maximize2, Minimize2, Send, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Maximize2, Minimize2, Send, X } from 'lucide-react';
 
 import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
 import {
@@ -660,23 +661,32 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
               >
                 {historyOpen ? t('web.ai.chat.history.close') : t('web.ai.chat.history.open')}
               </button>
-              <label className="ht-ai__tier" data-testid="ai-assistant-tier">
-                <span className="ht-ai__tier-label">{t('web.ai.chat.tierLabel')}</span>
-                <select
-                  className="ht-input ht-ai__tier-select"
-                  aria-label={t('web.ai.chat.tierLabel')}
-                  value={selectedTier}
-                  onChange={(event) => {
-                    const next = event.target.value as AssistantTier;
-                    setSelectedTier(next);
-                    props.onTierChange?.(next);
-                  }}
-                  data-testid="ai-assistant-tier-select"
-                >
-                  <option value={ASSISTANT_TIER_READ_ONLY}>{t('web.ai.chat.tier.readOnly')}</option>
-                  <option value={ASSISTANT_TIER_EXECUTE}>{t('web.ai.chat.tier.readAndPropose')}</option>
-                </select>
-              </label>
+              <FormField
+                id="ai-assistant-tier"
+                label={t('web.ai.chat.tierLabel')}
+                layout="inline"
+                testID="ai-assistant-tier"
+              >
+                {(field) => (
+                  <div className="ht-input-field__select">
+                    <select
+                      {...field}
+                      aria-label={t('web.ai.chat.tierLabel')}
+                      value={selectedTier}
+                      onChange={(event) => {
+                        const next = event.target.value as AssistantTier;
+                        setSelectedTier(next);
+                        props.onTierChange?.(next);
+                      }}
+                      data-testid="ai-assistant-tier-select"
+                    >
+                      <option value={ASSISTANT_TIER_READ_ONLY}>{t('web.ai.chat.tier.readOnly')}</option>
+                      <option value={ASSISTANT_TIER_EXECUTE}>{t('web.ai.chat.tier.readAndPropose')}</option>
+                    </select>
+                    <ChevronDown size={ICON_SIZE.sm} aria-hidden="true" />
+                  </div>
+                )}
+              </FormField>
               {props.onToggleExpanded !== undefined && (
                 <button
                   type="button"

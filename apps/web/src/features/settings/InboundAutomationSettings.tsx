@@ -15,6 +15,8 @@ import {
 import type { AiRoutingConfig, EgressConsent, SecretStore } from '@heyta/ai';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { EmptyState, HeytaUiProvider } from '@heyta/ui';
+
+import { FormField } from '../../lib/form/FormField.js';
 import { useSyncStore } from '../sync/store.js';
 import { consentFetch } from '../privacy/consent-gate.js';
 import { ensureWebInboundRecipientKey, hasWebInboundWorker, processWebInboundOnce, registerWebInboundWorker, rotateWebInboundRecipientKey, webInboundDraftReviewer } from './inbound-runtime.js';
@@ -373,10 +375,11 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                 {workerRegistered ? t('web.ai.inbound.workerReady') : t('web.ai.inbound.workerSetup')}
               </button>
             </div>
-            <label className="ht-settings__field">
-              {t('web.ai.inbound.keyId')}
-              <input className="ht-settings__input" value={keyId} onChange={(event) => setKeyId(event.target.value)} maxLength={32} disabled={editingRuleId !== undefined} />
-            </label>
+            <FormField id="inbound-key-id" label={t('web.ai.inbound.keyId')}>
+              {(field) => (
+                <input {...field} value={keyId} onChange={(event) => setKeyId(event.target.value)} maxLength={32} disabled={editingRuleId !== undefined} />
+              )}
+            </FormField>
             <fieldset className="ht-inbound__fields">
               <legend className="ht-settings__legend">{t('web.ai.inbound.fields')}</legend>
               {FIELD_ORDER.map((field) => <label key={field} className="ht-inbound__check">
@@ -384,18 +387,21 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                 {fieldLabel(field, t)}
               </label>)}
             </fieldset>
-            <label className="ht-settings__field">
-              {t('web.ai.inbound.target')}
-              <input className="ht-settings__input" value={targetProjectId} onChange={(event) => setTargetProjectId(event.target.value)} />
-            </label>
-            <label className="ht-settings__field">
-              {t('web.ai.inbound.timezone')}
-              <input className="ht-settings__input" value={timezone} onChange={(event) => setTimezone(event.target.value)} placeholder={t('web.ai.inbound.timezonePlaceholder')} />
-            </label>
-            <label className="ht-settings__field">
-              {t('web.ai.inbound.maxItems')}
-              <input className="ht-settings__input" type="number" min={1} max={50} value={maxItems} onChange={(event) => setMaxItems(event.target.value)} />
-            </label>
+            <FormField id="inbound-target" label={t('web.ai.inbound.target')}>
+              {(field) => (
+                <input {...field} value={targetProjectId} onChange={(event) => setTargetProjectId(event.target.value)} />
+              )}
+            </FormField>
+            <FormField id="inbound-timezone" label={t('web.ai.inbound.timezone')}>
+              {(field) => (
+                <input {...field} value={timezone} onChange={(event) => setTimezone(event.target.value)} placeholder={t('web.ai.inbound.timezonePlaceholder')} />
+              )}
+            </FormField>
+            <FormField id="inbound-max-items" label={t('web.ai.inbound.maxItems')}>
+              {(field) => (
+                <input {...field} type="number" min={1} max={50} value={maxItems} onChange={(event) => setMaxItems(event.target.value)} />
+              )}
+            </FormField>
             <button type="button" className="ht-btn ht-btn--primary" onClick={() => void (editingRuleId === undefined ? createRule() : saveEdit())} disabled={busy !== undefined || keyId.trim() === ''}>
               {editingRuleId === undefined ? t('web.ai.inbound.create') : t('web.ai.inbound.saveEdit')}
             </button>
@@ -490,13 +496,27 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                       <p className="ht-settings__hint">{t('web.ai.inbound.draft.disclosure', { timezone: draft.review.timezone })}</p>
                       {draft.tasks.map((task, index) => <fieldset key={task.id} className="ht-inbound__draft-task">
                         <legend className="ht-settings__legend">{t('web.ai.inbound.draft.item', { index: index + 1 })}</legend>
-                        <label className="ht-settings__field">{t('web.ai.inbound.field.title')}<input className="ht-settings__input" value={task.title} onChange={(e) => editDraftTask(index, { title: e.target.value })} /></label>
-                        <label className="ht-settings__field">{t('web.ai.inbound.field.note')}<textarea className="ht-settings__input" value={task.note ?? ''} onChange={(e) => editDraftTask(index, { note: e.target.value })} /></label>
-                        <label className="ht-settings__field">{t('web.ai.inbound.field.priority')}<select className="ht-settings__input" value={task.priority} onChange={(e) => editDraftTask(index, { priority: Number(e.target.value) as InboundDraftTask['priority'] })}>
-                          {[0, 1, 2, 3].map((value) => <option key={value} value={value}>{t(`web.ai.inbound.draft.priority.${value}` as any)}</option>)}
-                        </select></label>
-                        {(['dueDate', 'startDate'] as const).map((field) => <label key={field} className="ht-settings__field">{t(`web.ai.inbound.field.${field}` as any)}<input className="ht-settings__input" value={task[field] ?? ''} onChange={(e) => editDraftTask(index, { [field]: e.target.value === '' ? undefined : e.target.value })} /></label>)}
-                        <label className="ht-settings__field">{t('web.ai.inbound.field.durationMinutes')}<input className="ht-settings__input" type="number" value={task.durationMinutes ?? ''} onChange={(e) => editDraftTask(index, { durationMinutes: e.target.value === '' ? undefined : Number(e.target.value) })} /></label>
+                        <FormField id={`inbound-draft-${task.id}-title`} label={t('web.ai.inbound.field.title')}>
+                          {(field) => <input {...field} value={task.title} onChange={(e) => editDraftTask(index, { title: e.target.value })} />}
+                        </FormField>
+                        <FormField id={`inbound-draft-${task.id}-note`} label={t('web.ai.inbound.field.note')}>
+                          {(field) => <textarea {...field} value={task.note ?? ''} onChange={(e) => editDraftTask(index, { note: e.target.value })} />}
+                        </FormField>
+                        <FormField id={`inbound-draft-${task.id}-priority`} label={t('web.ai.inbound.field.priority')}>
+                          {(field) => (
+                            <select {...field} value={task.priority} onChange={(e) => editDraftTask(index, { priority: Number(e.target.value) as InboundDraftTask['priority'] })}>
+                              {[0, 1, 2, 3].map((value) => <option key={value} value={value}>{t(`web.ai.inbound.draft.priority.${value}` as any)}</option>)}
+                            </select>
+                          )}
+                        </FormField>
+                        {(['dueDate', 'startDate'] as const).map((dateField) => (
+                          <FormField key={dateField} id={`inbound-draft-${task.id}-${dateField}`} label={t(`web.ai.inbound.field.${dateField}` as any)}>
+                            {(field) => <input {...field} value={task[dateField] ?? ''} onChange={(e) => editDraftTask(index, { [dateField]: e.target.value === '' ? undefined : e.target.value })} />}
+                          </FormField>
+                        ))}
+                        <FormField id={`inbound-draft-${task.id}-duration`} label={t('web.ai.inbound.field.durationMinutes')}>
+                          {(field) => <input {...field} type="number" value={task.durationMinutes ?? ''} onChange={(e) => editDraftTask(index, { durationMinutes: e.target.value === '' ? undefined : Number(e.target.value) })} />}
+                        </FormField>
                       </fieldset>)}
                       <div className="ht-settings__actions">
                         <button type="button" className="ht-btn ht-btn--primary" disabled={busy !== undefined} onClick={() => void confirmDraft()}>{t('web.ai.inbound.draft.confirm')}</button>

@@ -39,6 +39,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '@heyta/i18n';
 import { HOSTED_AUTH_PATHS, decodeAvatarCipher } from '@heyta/app-host';
+import { createVaultPayloadCipher } from '@heyta/sync-client';
 
 // 🔴 路径**必须**用 app-host 那枚常量（它自带 `/api` 前缀）。本文件第一版按
 // `ACCOUNT_PROFILE_PATHS` 手拼出 `/account/profile` ⇒ 桩一路 404，
@@ -58,6 +59,22 @@ vi.mock('../src/features/settings/avatar-encode.js', () => ({
     encoder.fail === null
       ? { ok: true, image: { contentType: 'image/png', dataBase64: 'iVBORw0KGgo=' } }
       : { ok: false, error: encoder.fail },
+}));
+
+/**
+ * vault 会话（登录态账号的钥匙来源）。
+ *
+ * 🔴 真跑 IndexedDB 是不可能的（jsdom 没有），但**不能因此把这段接线测成"没有"**：
+ * 「登录态账号的头像用 vault 钥匙」正是那个实拍缺陷的修法，而它在没有账号
+ * （`accountId` 为空）的用例里**一次都不会被走到** —— 覆盖率为零。
+ * 所以这里换掉的是"从哪拿到 cipher"（平台能力），保留的是"拿到之后走哪条路"
+ * （`resolveAvatarKey` + `encodeAvatarCipher`，那两条在 app-host 有自己的判据）。
+ */
+const vault = vi.hoisted(() => ({ cipher: undefined as undefined | object }));
+vi.mock('../src/lib/vault-session.js', () => ({
+  getWebVaultSession: async () => ({
+    getPayloadCipher: async () => vault.cipher,
+  }),
 }));
 
 import { ProfilePanel } from '../src/features/settings/ProfilePanel.js';
@@ -231,6 +248,7 @@ beforeEach(() => {
     }),
   );
 
+  vault.cipher = undefined;
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -449,6 +467,52 @@ describe('个人信息面板（R10）', () => {
       calls.some((c) => c.method === 'GET' && c.path === AVATAR),
       '没有口令还去拉密文：拉回来也解不开，白跑一趟还会显示成错误'
     ).toBe(false);
+  });
+
+  /**
+   * 🔴 登录态账号（vault 模式）的头像钥匙 —— 2026-10-24 那条实拍缺陷的回归判据。
+   *
+   * 缺陷的形状：`accountId` 有值时 `sync` store 的 `password` **永远**是
+   * `undefined`（同步走 vault 根钥匙，`getPassword` 固定返回 undefined），
+   * 而头像只认口令 ⇒ 界面永远说「本机没有保存这个口令」，设置里那一格还不渲染。
+   * 每一个登录用户都换不了头像，而所有既有判据都是**没有 accountId** 的。
+   *
+   * 这条钉两半：
+   *   · 拿到 vault cipher 之后，界面**不再**说"缺口令"，`换一张` 可用；
+   *   · 传上去的是 **vault 信封**（`heyta-vault-op/` 开头），不是口令密文。
+   */
+  it('登录态账号：有 vault 钥匙就不说缺口令，上传走的是 vault 信封', async () => {
+    useSyncStore.setState({ accountId: 'acct-1', password: undefined });
+    vault.cipher = createVaultPayloadCipher({
+      current: { keyVersion: 1, rootKey: new Uint8Array(32).fill(3) },
+    });
+    await mount();
+    await waitUntil('头像那一行的状态落定', () => find<HTMLElement>('profile-avatar-change') !== null);
+    expect(
+      text('profile-avatar-need-password'),
+      '有 vault 钥匙时界面还在说缺口令',
+    ).toBe('');
+    expect(find<HTMLButtonElement>('profile-avatar-change')?.disabled).toBe(false);
+
+    const fileInput = find<HTMLInputElement>('profile-avatar-file')!;
+    await act(async () => {
+      Object.defineProperty(fileInput, 'files', {
+        value: [new File([new Uint8Array([137, 80, 78, 71])], 'a.png', { type: 'image/png' })],
+        configurable: true,
+      });
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitUntil('头像 PUT 出站', () =>
+      calls.some((c) => c.method === 'PUT' && c.path === AVATAR),
+    );
+    const put = calls.find((c) => c.method === 'PUT' && c.path === AVATAR);
+    const sent = (put?.body as { cipherBase64: string }).cipherBase64;
+    expect(
+      Buffer.from(sent, 'base64').subarray(0, 15).toString(),
+      '登录态账号传出去的居然是口令密文（不是 vault 信封）',
+    ).toBe('heyta-vault-op/');
+    // 反向对照：**口令**解不开它 —— 否则上面那条"是 vault 信封"只是形状对。
+    expect((await decodeAvatarCipher(PASSWORD, sent)).ok).toBe(false);
   });
 
   it('点「换一张」把系统文件框弹出来（隐藏的原生 input 必须仍在 DOM 里）', async () => {

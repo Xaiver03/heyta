@@ -28,6 +28,26 @@ a[href], a[href]:hover, a[href]:focus-visible {
   outline: 0 !important;
   box-shadow: none !important;
 }
+/*
+ * 🔴 2026-10-24 修复：**文本输入的焦点环必须画出来**。
+ *
+ * 上面那条 `:focus { outline: 0 !important }` 是为了"无描边"的观感，
+ * 但它把**键盘焦点**一起抹掉了 —— 于是全仓所有输入框在键盘操作下**没有任何可见焦点**。
+ * 这不是审美取舍，是两条 AA 级判据：
+ *   · WCAG 2.4.7 Focus Visible：键盘焦点必须**可见**；
+ *   · WCAG 1.4.11 的 Boundaries 一节明写：*"Even when a control does not need to have a
+ *     visual boundary indicating its hit area, it will still need to have a sufficiently
+ *     contrasting focus indication."*
+ *     （<https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html>）
+ * ⇒ **静止态的描边仍然不画**（产品负责人 2026-10-07 的"无描边交互"一字未动），
+ *   只有**键盘焦点**这一种状态画环，且用主色（白底 5.17:1，远超 3:1）。
+ *   ⚠️ 用 `:focus-visible` 而不是 `:focus`：鼠标点进来时不画环，
+ *      否则每一次点击都会闪一圈，那就把"无描边"的意图抵消掉了。
+ */
+:is(input:not([type='checkbox']):not([type='radio']), textarea, [contenteditable='true']):focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring) !important;
+  outline-offset: var(--ht-border-width-thin) !important;
+}
 :is(button, [role='button'], [role='tab'], [role='menuitem'], select, summary, a[href], [role='separator']):focus-visible {
   outline: 0 !important;
   background-color: var(--ht-color-primary-subtle) !important;

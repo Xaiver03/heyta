@@ -46,6 +46,8 @@ import { useState } from 'react';
 
 import { REPEAT_PRESET_IDS, repeatPresetRule, type RepeatPresetId } from '@heyta/app-host';
 import { cssVar } from '@heyta/design-system';
+
+import { FormField } from '../../lib/form/FormField.js';
 import { isValidRecurrenceRule, toLocalDate, type Task } from '@heyta/domain';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { Repeat } from 'lucide-react';
@@ -281,31 +283,32 @@ export function RepeatField({
       <details data-testid="task-repeat-advanced">
         <summary style={advancedSummaryStyle}>{t('web.tasks.detail.advanced')}</summary>
         <div style={advancedBodyStyle}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.1') }}>
-            <span
-              style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}
-            >
-              {t('web.repeat.customLabel')}
-            </span>
-            <input
-              type="text"
-              value={draft}
-              placeholder={t('web.repeat.customPlaceholder')}
-              aria-label={t('web.repeat.customAria', { title: task.title })}
-              data-testid="task-repeat-custom-input"
-              onChange={(event) => {
-                setDraft(event.target.value);
-                // 用户一开始改输入就把上一次的报错清掉 —— 让错误信息跟着输入走。
-                setError(undefined);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  applyCustom();
-                }
-              }}
-            />
-          </label>
+          <FormField
+            id="task-repeat-custom-input"
+            label={t('web.repeat.customLabel')}
+          >
+            {(field) => (
+              <input
+                {...field}
+                type="text"
+                value={draft}
+                placeholder={t('web.repeat.customPlaceholder')}
+                aria-label={t('web.repeat.customAria', { title: task.title })}
+                data-testid="task-repeat-custom-input"
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  // 用户一开始改输入就把上一次的报错清掉 —— 让错误信息跟着输入走。
+                  setError(undefined);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    applyCustom();
+                  }
+                }}
+              />
+            )}
+          </FormField>
           <div style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.2') }}>
             <button type="button" data-testid="task-repeat-custom-apply" onClick={applyCustom}>
               {t('web.repeat.apply')}

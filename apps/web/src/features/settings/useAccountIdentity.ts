@@ -23,6 +23,7 @@ import {
   privacyConsent,
   subscribePrivacyConsent,
 } from '../privacy/consent-gate.js';
+import { useAvatarKey } from '../sync/avatar-key.js';
 import { useSyncStore } from '../sync/store.js';
 
 export type AccountIdentityStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -70,8 +71,13 @@ function accountScope(baseUrl: string, token: string | undefined): string {
 export function useAccountIdentity(): AccountIdentity {
   const baseUrl = useSyncStore((state) => state.baseUrl);
   const token = useSyncStore((state) => state.token);
-  const password = useSyncStore((state) => state.password);
   const email = useSyncStore((state) => state.email);
+  /**
+   * 🔴 钥匙**不再**直接读 `password`：登录态账号（vault 模式）里它是永久的
+   * `undefined`，用它判"能不能解开头像"会让每个登录用户都拿到 `needs-password`。
+   * 口径只有一处：`useAvatarKey`。
+   */
+  const { key: avatarKey } = useAvatarKey();
   const [consentRevision, setConsentRevision] = useState(0);
   const [profileRevision, setProfileRevision] = useState(0);
   const scope = accountScope(baseUrl, token);
@@ -143,7 +149,7 @@ export function useAccountIdentity(): AccountIdentity {
       const reading = await resolveAccountAvatarImage(
         options,
         token,
-        password,
+        avatarKey,
         profile.avatarHash,
       );
       if (!current) return;
@@ -162,7 +168,7 @@ export function useAccountIdentity(): AccountIdentity {
       current = false;
       controller.abort();
     };
-  }, [baseUrl, consentRevision, password, profileRevision, scope, token]);
+  }, [avatarKey, baseUrl, consentRevision, profileRevision, scope, token]);
 
   // Effects run after render. Scope the returned snapshot as well so a new
   // account can never see one frame of the previous account's nickname.
