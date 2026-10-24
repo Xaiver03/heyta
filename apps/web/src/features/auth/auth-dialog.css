@@ -24,7 +24,11 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 
 .ht-sheet__auth-dialog {
   display: grid;
-  grid-template-columns: minmax(15rem, 0.72fr) minmax(0, 1fr);
+  /* 🔴 左六右四（2026-10-24 产品口径，参照千问登录页的分栏比例）。
+     此前是 `minmax(15rem, 0.72fr) minmax(0, 1fr)` —— 实测左 41.9% / 右 58.1%，
+     品牌视觉那一栏太窄、撑不住画面，读起来像"表单旁边贴了条色块"。
+     表单栏给 `minmax(18rem, 4fr)`：窄容器里先保住表单能用的宽度，再谈比例。 */
+  grid-template-columns: minmax(0, 6fr) minmax(18rem, 4fr);
   inline-size: min(100%, calc(var(--ht-layout-modal-max) + var(--ht-layout-detail-width) + var(--ht-space-8)));
   max-block-size: calc(100dvh - var(--ht-space-8));
   overflow-y: auto;
