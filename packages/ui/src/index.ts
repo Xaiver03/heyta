@@ -1347,3 +1347,20 @@ export {
   type BottomSheetLabels,
   type BottomSheetProps,
 } from './overlay/BottomSheet.js';
+
+/* ── 表单行（2026-10-24）────────────────────────────────────────────
+   `anatomy.ts` 是**判断**，两端各有自己的渲染器并且都消费它：
+     · web   → `apps/web/src/lib/form/FormField.tsx`（HTML + `form.css`）
+     · mobile → `apps/mobile/src/ui/kit.tsx#TextField`（RN 原语）
+   🔴 这里**不再**放第三个 RN 渲染器：第一版我写了一个 `form/Field.tsx`，
+      结果它零消费者，而移动端本来就有 `kit.TextField` ——
+      那正是"同一件事的第三份实现"。渲染器归各端的 kit，判断才归共享层。
+   🔴 本文件只许**末尾追加**。 */
+export {
+  FIELD_LAYOUTS,
+  fieldDescribedById,
+  resolveFieldChrome,
+  type FieldChrome,
+  type FieldChromeInput,
+  type FieldLayout,
+} from './form/anatomy.js';

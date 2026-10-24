@@ -21,6 +21,7 @@ export const en = {
   'common.sync.signIn': 'Sign in to sync',
   'common.sync.hosted.title': 'heyta cloud sync',
   'common.sync.hosted.hint': 'Sign in to sync tasks automatically across devices. No server address needed.',
+  'common.tip.label': 'More about this',
   'common.sync.advanced': 'Advanced: self-hosting and manual connection',
   'common.sync.account.connected': 'Signed in',
   'common.brand': 'heyta',
@@ -299,7 +300,7 @@ export const en = {
   'landing.pricing.hosted.feature1': 'Every feature except cloud AI, same as self-hosting',
   'landing.pricing.hosted.feature2': 'Sync across your devices',
   'landing.pricing.hosted.feature3': 'Server records are kept in full, not deleted when a period ends',
-  'landing.pricing.hosted.cta': 'Opening soon',
+  'landing.pricing.hosted.cta': 'Subscribe now',
   'landing.pricing.hostedAi.name': 'Managed hosting + cloud AI',
   'landing.pricing.hostedAi.priceCny': 'CNY 12 / month',
   'landing.pricing.hostedAi.priceUsd': '$12 / month',
@@ -309,8 +310,9 @@ export const en = {
   'landing.pricing.hostedAi.feature1': 'Everything in the tier above',
   'landing.pricing.hostedAi.feature2': 'Cloud AI, 300 actions a month',
   'landing.pricing.hostedAi.feature3': 'AI on your own endpoint is unaffected -- still free and unlimited',
-  'landing.pricing.hostedAi.cta': 'Opening soon',
-  'landing.pricing.statusNote': 'Checkout is wired up, but the payment channels for both mainland China and international are still waiting on merchant approval — orders cannot be placed today.',
+  'landing.pricing.hostedAi.cta': 'Subscribe now',
+  'landing.pricing.pending': 'No app entry point in this build yet, so ordering is not available here',
+  'landing.pricing.statusNote': 'Subscription is open for both RMB tiers — open the app and go to Settings → Subscription to pick a plan and pay. If a tier has no delivery capability configured on the instance you are connected to, the order is refused honestly and tells you what is missing; nothing is charged. The USD pricing is still waiting on a payment channel, so international orders are not available yet.',
 
   // ── Landing · final CTA ───────────────────────────────────
   'landing.cta.title': 'Your task list should never become an asset someone else owns',
@@ -538,12 +540,21 @@ export const en = {
   'web.shell.profile.close': 'Close profile',
   'web.shell.settings.close': 'Close settings',
   'web.settings.nav.profile': 'Profile',
+  'web.settings.nav.subscription': 'Subscription',
   'web.settings.nav.appearance': 'Tasks and display',
   'web.settings.nav.syncPrivacy': 'Sync and privacy',
   'web.settings.nav.aiIntegrations': 'AI and integrations',
   'web.settings.nav.data': 'Data management',
   'web.settings.nav.account': 'Account and security',
   'web.settings.nav.help': 'About and help',
+  'web.settings.lead.profile': 'Nickname, avatar and sign-in email. Yours only, never public.',
+  'web.settings.lead.subscription': 'Hosted sync status and renewal. Self-hosting the app itself stays free.',
+  'web.settings.lead.appearance': 'How tasks and dates are shown, and whether the detail pane stays open.',
+  'web.settings.lead.syncPrivacy': 'Which server your data travels to, and the gates it passes first.',
+  'web.settings.lead.ai': 'Cloud AI, your own endpoint, and memory preferences.',
+  'web.settings.lead.data': 'Backups, restores, and migrating from another app.',
+  'web.settings.lead.account': 'Sign-in methods, the devices still signed in, and closing the account.',
+  'web.settings.lead.help': 'Where to get help, pricing, and version information.',
   'web.settings.dataUx.backupTitle': 'Backup and restore',
   'web.settings.dataUx.backupLead': 'Keep a full local backup, or restore one onto an empty device.',
   'web.settings.dataUx.migrationTitle': 'Move from another app',
@@ -577,7 +588,11 @@ export const en = {
   'common.profile.title': 'Profile',
   'common.profile.nickname.label': 'Nickname',
   'common.profile.nickname.placeholder': 'Leave empty to show your email',
-  'common.profile.nickname.hint': 'Up to {max} characters. A nickname is a display name, not your legal name; your sign-in identifier stays the email address.',
+  // The explanation moved next to the label (the `?`), and the row keeps only the
+  // one number someone needs while typing. Same reason as the zh string above.
+  'common.profile.nickname.hint': 'Up to {max} characters.',
+  'common.profile.nickname.whyLabel': 'Where the nickname shows up',
+  'common.profile.nickname.why': 'A nickname is a display name, not your legal name; your sign-in identifier stays the email address. When it is empty, the first part of your email stands in for it.',
   'common.profile.nickname.toolong': 'The nickname allows at most {max} characters, this has {count}.',
   'common.profile.nickname.save': 'Save nickname',
   'common.profile.nickname.saved': 'Nickname saved',
@@ -588,9 +603,15 @@ export const en = {
   'common.profile.avatar.remove': 'Remove avatar',
   'common.profile.avatar.removed': 'Avatar removed',
   'common.profile.avatar.uploading': 'Uploading…',
-  // 🔴 Not an error message but a product fact: the passphrase is never written
-  // to disk, so after a refresh the device cannot open the avatar — neither can we.
-  'common.profile.avatar.needPassword': 'Your avatar is protected by your end-to-end encryption passphrase, which this device does not keep. Enter it once under Sync settings to change or preview your avatar.',
+  // 🔴 Not an error message but a product fact: the key is never written to disk,
+  // so after a refresh the device cannot open the avatar — neither can we.
+  // The sentence used to point at "Sync settings", where a signed-in (vault mode)
+  // account does not even see a passphrase field. Now the row only says what is
+  // missing and which button to press; the "why" lives behind the `?`.
+  'common.profile.avatar.needPassword': 'The end-to-end encryption passphrase is not on this device — unlock once and you can change the avatar.',
+  'common.profile.avatar.whyLabel': 'Why the avatar is encrypted',
+  'common.profile.avatar.why': 'The avatar is encrypted on your device before upload; the server only stores ciphertext. The key is your passphrase, which never touches disk — so each session has to unlock once again.',
+  'common.profile.avatar.unlock': 'Unlock',
   'common.profile.avatar.badType': 'Only these image formats are supported: {types}.',
   'common.profile.avatar.tooBig': 'Even after compression the image exceeds {max}. Please pick a smaller one.',
   'common.profile.avatar.failed': 'The avatar could not be uploaded. Please try again.',
@@ -602,7 +623,7 @@ export const en = {
   'common.profile.email.label': 'Email',
   // This used to say the address "can't be changed here". After rebinding landed
   // that sentence became false, and a false pointer is worse than an empty one.
-  'common.profile.email.hint': 'Your email is both your sign-in identity and the only way to recover this account. To move it to another address, use "Change sign-in email" below.',
+  'common.profile.email.hint': 'Your sign-in identity and the only way to recover this account — use "Change sign-in email" below to move it.',
   // ── Rebinding the sign-in email (ADR-0063). Shared by all shells. ──
   // The wording has to say "one click in each inbox": "a confirmation email was sent"
   // makes someone who clicked their own side believe it is already done.
@@ -1391,6 +1412,9 @@ export const en = {
   'web.habits.goal.unit': 'Unit',
   'web.habits.goal.unitPlaceholder': 'cups / pages / minutes',
   'web.habits.goal.atLeast': 'At least',
+  // Label for the goal-type row. It used to reuse `goal.atLeast`, so the label and the
+  // selected option read as the same words — the row looked like it had no name.
+  'web.habits.goal.mode': 'Counts as done',
   'web.habits.goal.atMost': 'At most',
   'web.habits.goal.exactly': 'Exactly',
   'web.habits.goal.defaultUnit': 'times',
@@ -1524,6 +1548,15 @@ export const en = {
   'web.habits.freq.invalid': '“Days between each time” must be a whole number of 1 or more',
   'web.habits.freq.intervalHint': 'Lands every {n} calendar days on a fixed grid — it does not shift to the day this habit was created.',
   'web.habits.freq.default': 'Back to every day',
+  // ── Spaced review (2026-10-24) ────────────────────────────
+  // 🔴 Factual wording only: it says which days recur, and makes no claim that the
+  // schedule is scientifically validated. The red line and its source live in the
+  // header of `packages/domain/src/habit-review.ts`.
+  'web.habits.freq.spaced': 'Spaced review',
+  'web.habits.freq.summary.spaced': 'Spaced review',
+  'web.habits.freq.spacedDay': 'Review on day {n} after creation',
+  'web.habits.freq.spacedDayShort': 'Day {n}',
+  'web.habits.freq.spacedRequired': 'Pick at least one review day.',
 
   // ── Habit month calendar + backfill (ticket H4) ────────────
   'web.habits.month.grid': 'Check-in calendar for {name} — {month}',
@@ -2447,11 +2480,34 @@ export const en = {
   // Hosted sync renewal entry (interim scheme: placing another order stacks 30 days
   // after the current expiry). Wording must never promise auto-renewal — there is no
   // signing / recurring charge anywhere in this repo.
+  'web.subscription.page.title': 'Subscription',
+  'web.subscription.status.title': 'Current status',
+  'web.subscription.status.none': 'No hosted sync subscription yet',
+  'web.subscription.status.noneHint': 'The app itself is free. A subscription only pays for us running the sync server.',
+  'web.subscription.status.entitled': 'Hosted sync is active',
+  'web.subscription.status.entitledHint': 'Your task data is still ciphertext. We cannot read it.',
+  'web.subscription.status.until': 'Valid until {time}',
+  'web.subscription.status.expired': 'Expired on {time}',
+  'web.subscription.status.refused': 'This device is not allowed to use hosted sync',
+  'web.subscription.status.unavailable': 'Subscription status is unavailable right now',
+  'web.subscription.status.unavailableHint': 'That does not block buying below: the order step asks the server again.',
+  'web.subscription.status.checking': 'Reading…',
+  'web.subscription.status.refresh': 'Refresh',
+  'web.subscription.status.localData': 'Expiring deletes nothing: your tasks, lists and settings stay on this device.',
+  'web.subscription.plans.title': 'Pick a plan',
+  'web.subscription.plans.hint': 'One-time purchase of 30 days, stacked after your current end date. No automatic charging.',
+  'web.subscription.coupon.toggle': 'Have a promo code?',
+  'web.subscription.footnote.title': 'About pricing',
+  'web.subscription.footnote.selfHost': 'Self-hosting is free forever: same client, your own server, unlimited devices, no time checks.',
+  'web.subscription.footnote.pricing': 'The full price list and comparison live on the pricing page; this screen does not keep a second copy.',
+  'web.subscription.footnote.pricingLink': 'Open the pricing page',
   'web.subscription.renew.title': 'Renew hosted sync',
   'web.subscription.renew.intro': 'A one-off 30-day purchase, stacked on top of your current expiry date. No automatic charges, and your data stays untouched when a period ends.',
   'web.subscription.renew.tierTitle': 'Which plan',
   'web.subscription.renew.couponPlaceholder': 'Promo code (optional)',
-  'web.subscription.renew.action': 'Place renewal order',
+  'web.subscription.renew.couponInput': 'Paste the code here',
+  'web.subscription.renew.action': 'Renew 30 days',
+  'web.subscription.renew.subscribe': 'Subscribe to this plan',
   'web.subscription.renew.busy': 'Creating the order…',
   'web.subscription.renew.amount': 'Amount due {amount}',
   'web.subscription.renew.validUntil': 'This order is valid until {time}',
@@ -2464,9 +2520,17 @@ export const en = {
   'web.subscription.renew.fail.unauthorized': 'Sign in to your heyta account before placing an order.',
   'web.subscription.renew.fail.unconfigured': 'No sync server address yet — set one up in the sync settings first.',
   'web.subscription.renew.fail.sellable': 'This plan cannot be sold right now; the server refused the order.',
+  'web.subscription.renew.fail.managedAi': 'This plan delivers our cloud AI, and this instance has no managed AI upstream configured — the hosting-only plan is still available.',
+  'web.subscription.renew.switchTier': 'Buy hosting only instead',
   'web.subscription.renew.fail.downgrade': 'This plan does not include everything your current plan covers, so no order was created — keep renewing your current plan, or let it expire first.',
   'web.subscription.renew.fail.network': 'Could not reach the server; the order was not created.',
   'web.subscription.renew.fail.unknown': 'Order failed ({code}).',
+  'mobile.settings.section.subscription': 'Subscription',
+  'mobile.subscription.lead': 'Hosted sync: current status, plan choice and checkout. Self-hosting the app itself stays free.',
+  'mobile.subscription.plans.hint': 'One-time purchase of 30 days, stacked after your current end date. No automatic charging.',
+  'mobile.subscription.footnote': 'A subscription only pays for us running the sync server. Expiring deletes nothing: tasks, lists and settings stay on this device.',
+  'mobile.subscription.renew.subscribe': 'Subscribe to this plan',
+  'mobile.subscription.entry.hint': 'Subscription and renewal for hosted sync',
   'mobile.entitlement.renew.action': 'Place renewal order',
   'mobile.entitlement.renew.tierTitle': 'Which plan',
   'mobile.entitlement.renew.busy': 'Creating the order…',
@@ -2479,6 +2543,7 @@ export const en = {
   'mobile.entitlement.renew.fail.unauthorized': 'Sign in to your heyta account before placing an order.',
   'mobile.entitlement.renew.fail.network': 'Could not reach the server; the order was not created.',
   'mobile.entitlement.renew.fail.sellable': 'This plan cannot be sold right now; the server refused the order.',
+  'mobile.entitlement.renew.fail.managedAi': 'This plan delivers our cloud AI, and this instance has no managed AI upstream configured — the hosting-only plan is still available.',
   'mobile.entitlement.renew.fail.downgrade': 'This plan does not include everything your current plan covers, so no order was created — keep renewing your current plan, or let it expire first.',
   'mobile.entitlement.renew.fail.unknown': 'Order failed ({code}).',
   // AI panel failure states - see the zh file for why these moved out of app-host.
@@ -2675,6 +2740,8 @@ export const en = {
   'web.ticktick.intro': 'Pick a CSV backup exported by TickTick. You see a preview first; nothing is written until you confirm — the numbers in the preview and what actually gets written come from the same parse.',
   'web.ticktick.fileLabel': 'TickTick CSV backup',
   'web.ticktick.picked': 'Selected: {name}',
+  'web.ticktick.ticktickOnly.title': 'Only CSVs exported by TickTick',
+  'web.ticktick.coexist.title': 'Imports coexist with your data',
   'web.ticktick.ticktickOnly': 'Choose a CSV file exported from TickTick. Backup formats from other apps are not supported yet.',
   'web.ticktick.coexist': 'Importing uses ordinary operations and can coexist with existing data; importing the same file twice creates no duplicates (judged by stable ids).',
   'web.ticktick.busy': 'Working…',
@@ -4755,8 +4822,10 @@ export const en = {
   'reminder.phase.snoozed': 'Snoozed',
   'reminder.phase.due': 'Due now',
   'reminder.delivery.uncertain': 'Delivery on this device is unconfirmed. Choose Snooze to schedule again.',
-  'reminder.delivery.blockedNotification': 'Notifications are not allowed yet, so this reminder will not ring. The reminder itself stays in the app.',
-  'reminder.delivery.blockedExactAlarm': 'Exact alarms are not allowed yet, so this reminder may arrive a few minutes late.',
+  // Subject is the whole reminders face, not "this reminder": one device, one
+  // system gate, so repeating "this reminder" on every row would be the lie.
+  'reminder.delivery.blockedNotification': 'Notifications are not allowed yet, so reminders will not ring. The reminders themselves stay in the app.',
+  'reminder.delivery.blockedExactAlarm': 'Exact alarms are not allowed yet, so reminders may arrive a few minutes late.',
   'reminder.delivery.openSettings': 'Open system settings',
   'reminder.settings.section': 'Reminder delivery',
   'reminder.settings.notification': 'Notification access',
@@ -5090,9 +5159,9 @@ export const en = {
   "site.legal.third-parties.seo.title": "Third Parties and Data Sharing Inventory — heyta",
   "site.legal.third-parties.seo.description": "Every destination your data can reach: the four classes of request sent from our servers and the infrastructure that hosts them, the four flows sent straight from your device, and an item-by-item list of what is not integrated — organised by destination, not by vendor name.",
   "site.legal.ai-and-transfer.title": "AI Features and Where Your Data Goes",
-  "site.legal.ai-and-transfer.lede": "AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us is currently unavailable.",
+  "site.legal.ai-and-transfer.lede": "AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, only per feature with your own consent, and it does not include the conversational assistant.",
   "site.legal.ai-and-transfer.seo.title": "AI Features and Where Your Data Goes — heyta",
-  "site.legal.ai-and-transfer.seo.description": "AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us is currently unavailable.",
+  "site.legal.ai-and-transfer.seo.description": "AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, only per feature with your own consent, and it does not include the conversational assistant.",
   "site.legal.algorithm-disclosure.title": "Algorithm Mechanism Disclosure",
   "site.legal.algorithm-disclosure.lede": "What algorithm powers heyta’s AI assistance, what it can and cannot do, and which controls are yours.",
   "site.legal.algorithm-disclosure.seo.title": "Algorithm Mechanism Disclosure — heyta",
