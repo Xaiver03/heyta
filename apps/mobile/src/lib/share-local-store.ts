@@ -215,10 +215,6 @@ export function loadMobileShareNotificationPrefs(
         onAdded: parsed.activities?.onAdded ?? DEFAULT_NOTIFICATION_PREFS.activities.onAdded,
         onDeleted: parsed.activities?.onDeleted ?? DEFAULT_NOTIFICATION_PREFS.activities.onDeleted,
       },
-      taskScope: parsed.taskScope ?? DEFAULT_NOTIFICATION_PREFS.taskScope,
-      autoAcceptKnownCollaborators:
-        parsed.autoAcceptKnownCollaborators ??
-        DEFAULT_NOTIFICATION_PREFS.autoAcceptKnownCollaborators,
     };
   } catch {
     return DEFAULT_NOTIFICATION_PREFS;

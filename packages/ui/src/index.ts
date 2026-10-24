@@ -263,7 +263,6 @@ export {
   type ShareActivityBodyCopy,
   type ShareActivityKind,
   type ShareNotificationPrefs,
-  type TaskReminderScope,
 } from './sync/notification-model.js';
 export { buildShareJoinLink, parseShareJoinLink } from './sync/share-link.js';
 export { CommentThread, type CommentThreadLabels, type CommentThreadProps } from './sync/CommentThread.js';

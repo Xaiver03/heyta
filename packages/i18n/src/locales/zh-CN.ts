@@ -4872,12 +4872,6 @@ export const zhCN = {
   'common.share.notif.activityCompleted': '完成/取消完成了任务',
   'common.share.notif.activityAdded': '添加了任务/笔记',
   'common.share.notif.activityDeleted': '删除/移走了任务/笔记',
-  'common.share.notif.taskScopeTitle': '任务提醒',
-  'common.share.notif.taskScope.all': '所有任务',
-  'common.share.notif.taskScope.allExceptAssignedToOthers': '所有任务（指派给他人的除外）',
-  'common.share.notif.taskScope.assignedToMe': '指派给我的',
-  'common.share.notif.taskScope.none': '不提醒',
-  'common.share.notif.autoAcceptTitle': '自动接受已知合作者的共享邀请',
   // 共享清单面板（W4 接线）。成员管理面板的标题也走 common.share 域 ——
   // 移动端将来挂同一个面板时直接复用。
   'common.share.panel.membersTitle': '成员',

@@ -80,14 +80,10 @@ export {
   selectShareActivitiesToNotify,
   shareActivityNotificationBody,
   shouldNotifyActivity,
-  shouldNotifyTaskReminder,
-  shouldAutoAcceptInvitation,
   type ShareActivityBodyCopy,
   type ShareActivityKind,
   type ShareActivityPrefs,
   type ShareNotificationPrefs,
-  type ShareTaskLike,
-  type TaskReminderScope,
 } from './sync/notification-model.js';
 export {
   SHARE_CONSENT_SCOPE_KEYS,

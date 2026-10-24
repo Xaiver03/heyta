@@ -25,8 +25,7 @@
  *     `SharePullResult.added` 猜的：折叠会把重复吃掉，同一条 op 被信号推两次
  *     （服务端不去抖，见 `websocket-connection.service.ts` 那段注释）时
  *     第二次差集为空 ⇒ 不响。按 `added` 数响就会把同一条评论吵两遍。
- *  3. **自己不吵自己。** 按 `clientId` 滤掉本设备写的 op（与 `shouldNotifyTaskReminder`
- *     里"自己动手的事不需要通知自己"同一条理由）。
+ *  3. **自己不吵自己。** 按 `clientId` 滤掉本设备写的 op —— 自己动手的事不需要通知自己。
  *
  * 拉取失败**不抛穿**：这条回调是从 WebSocket 的消息处理里进来的，而那一层对宿主回调的
  * 契约是"你不能掀掉连接"（`realtime.ts` 里 `onNewOps` 那段 try/catch）。

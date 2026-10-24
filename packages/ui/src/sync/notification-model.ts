@@ -29,22 +29,12 @@ export interface ShareActivityPrefs {
   onDeleted: boolean;
 }
 
-export type TaskReminderScope =
-  | 'all'
-  | 'allExceptAssignedToOthers'
-  | 'assignedToMe'
-  | 'none';
-
 export interface ShareNotificationPrefs {
   activities: ShareActivityPrefs;
-  taskScope: TaskReminderScope;
-  autoAcceptKnownCollaborators: boolean;
 }
 
 export const DEFAULT_NOTIFICATION_PREFS: ShareNotificationPrefs = {
   activities: { onCompleted: false, onAdded: false, onDeleted: false },
-  taskScope: 'assignedToMe',
-  autoAcceptKnownCollaborators: false,
 };
 
 const ACTIVITY_MATCHERS: Record<ShareActivityKind, (p: ShareNotificationPrefs) => boolean> = {
@@ -128,48 +118,13 @@ export const shareActivityNotificationBody = (
   return name === '' ? copy.anonymous(kind) : copy.named(name, kind);
 };
 
-export interface ShareTaskLike {
-  taskId: string;
-  /** 加密 payload 里的指派人；undefined = 未指派。 */
-  assigneeUserId?: string;
-  /** 服务端（明文）操作者的账号 id——「指派给他人的除外」用它判。 */
-  actorUserId: number;
-}
-
-/**
- * 任务提醒判定（四档）。`myUserId` = 当前账号 id；
- * `actorUserId` 是做出这次变更的账号——「指派给他人的除外」挡的是
- * *"别人改了指派给他的任务也吵我"*，而**自己改自己的任务永远不响**
- * （这与 scope 无关：自己动手的事不需要通知自己）。
+/*
+ * 🔴 这里曾有另外两档偏好（任务提醒范围 `taskScope` 四档、`autoAcceptKnownCollaborators`）
+ *    和它们的两个谓词，2026-10-24 整条删掉。删的理由不是"没写完"，是**它们没有输入**：
+ *    · `taskScope` 判的是 `Task.assigneeUserId`，而这个字段**全仓零写点**（现量：
+ *      `grep -rn "assigneeUserId" packages apps server --include='*.ts*' | grep -v tests` 只剩实体声明与本文件）
+ *      ⇒ 四档选择摆在一起时行为逐字相同，面板等于在撒谎；
+ *    · 自动接受需要一份"合作者名单"，那一档产品面还不存在（谁算已知合作者是个真问题）。
+ *    界面上一律不再渲染它们。**判据不许靠夹具点亮**：等指派或合作者名单落地时，
+ *    连同它的输入来源一起重来（见计划 §9.10 那格与交接书）。
  */
-export const shouldNotifyTaskReminder = (
-  prefs: ShareNotificationPrefs,
-  task: ShareTaskLike,
-  myUserId: number,
-): boolean => {
-  if (task.actorUserId === myUserId) return false;
-  const assignedToMe = task.assigneeUserId !== undefined && task.assigneeUserId === String(myUserId);
-  const assignedToSomeoneElse = task.assigneeUserId !== undefined && !assignedToMe;
-  switch (prefs.taskScope) {
-    case 'all':
-      return true;
-    case 'allExceptAssignedToOthers':
-      return !assignedToSomeoneElse;
-    case 'assignedToMe':
-      return assignedToMe;
-    case 'none':
-      return false;
-  }
-};
-
-/**
- * 「自动接受已知合作者」：邀请人的账号 id 出现在合作者名单里才自动接受。
- * 🔴 名单匹配是**精确 id 相等**——不存在模糊的「认识」（那是社交产品的
- * 话术；隐私产品只认显式名单）。默认关：每次邀请都走手动确认。
- */
-export const shouldAutoAcceptInvitation = (
-  prefs: ShareNotificationPrefs,
-  inviterUserId: number,
-  knownCollaboratorIds: readonly number[],
-): boolean =>
-  prefs.autoAcceptKnownCollaborators && knownCollaboratorIds.includes(inviterUserId);
