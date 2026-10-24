@@ -87,12 +87,28 @@ async function settleLanding(page: Page): Promise<void> {
   await page.waitForTimeout(1200);
 }
 
+/**
+ * 官方站**现在**是哪种登录模式 —— 从服务端读，不在测试里假设。
+ *
+ * 2026-10-24：中央登录页整改期间，服务端回退到自有账号模式（`mode: "local"`），
+ * 官方站 accept 隐私后渲染的就不是中央面板而是自有表单。判据的两支都成立，
+ * 但它们验的对象不同，所以**先问服务端是哪一支**，不要靠"我以为线上是什么"。
+ */
+async function readCentralMode(page: Page): Promise<string> {
+  return page.evaluate(async (origin: string) => {
+    const config = (await fetch(`${origin}/api/auth/central/config`).then((r) => r.json())) as { mode?: string };
+    return config.mode ?? 'unknown';
+  }, ORIGIN);
+}
+
 test('线上「登录」：点一次就到登录界面，中途不落在那段说明上', async ({ page }) => {
   const logs = attachLogs(page);
   await page.setViewportSize({ width: 1280, height: 900 });
 
   await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded' });
   await settleLanding(page);
+  const mode = await readCentralMode(page);
+  console.log(`服务端登录模式 = ${mode}`);
 
   // ① 导航那个「登录」的落点：应用 + 那个参数。
   const signin = page.locator('a.lp-nav__signin').first();
@@ -131,6 +147,20 @@ test('线上「登录」：点一次就到登录界面，中途不落在那段�
   // central 模式（2026-10-23 起，见文件头修订记录）：它是 central-auth-panel，
   // 本地邮箱表单在官方站按设计不再出现。
   await page.locator('[data-testid="privacy-consent-accept"]').first().click();
+
+  // 自有账号模式（2026-10-24 回退期间）：登录界面就是本地邮箱表单，
+  // 这是**原判据**的形状 —— 中央面板这一支不存在时别硬等它。
+  if (mode !== 'oidc') {
+    await expect(page.locator('[data-testid="auth-form-email"]')).toBeVisible({ timeout: 30_000 });
+    await page.screenshot({ path: `${SHOT_DIR}/live-2b-local-form.png` });
+    expect(new URL(page.url()).searchParams.has('signin')).toBe(true);
+
+    logs.stop();
+    const noisy = logs.lines.filter((line) => line.startsWith('[console.error]') || line.startsWith('[pageerror]'));
+    expect(noisy, `控制台有错误：\n${noisy.join('\n')}`).toEqual([]);
+    return;
+  }
+
   const panel = page.locator('[data-testid="central-auth-panel"]').first();
   await expect(panel).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('[data-testid="auth-form-email"]')).toHaveCount(0);
@@ -168,6 +198,7 @@ test('线上英文页同一条路（语言参数不能把 signin 挤掉）', asy
 
   await page.goto(`${ORIGIN}/en/`, { waitUntil: 'domcontentloaded' });
   await settleLanding(page);
+  const mode = await readCentralMode(page);
 
   const signin = page.locator('a.lp-nav__signin').first();
   const href = await signin.getAttribute('href');
@@ -184,11 +215,22 @@ test('线上英文页同一条路（语言参数不能把 signin 挤掉）', asy
     timeout: 60_000,
   });
   await page.locator('[data-testid="privacy-consent-accept"]').first().click();
+  // 界面确实跟着切到英文 —— 否则"参数带上了但语言丢了"这条判据就没牙。
+  await expect(page.locator('html')).toHaveAttribute('lang', /^en/);
+
+  if (mode !== 'oidc') {
+    await expect(page.locator('[data-testid="auth-form-email"]')).toBeVisible({ timeout: 30_000 });
+    await page.screenshot({ path: `${SHOT_DIR}/live-3-local-form-en.png` });
+
+    logs.stop();
+    const noisy = logs.lines.filter((line) => line.startsWith('[console.error]') || line.startsWith('[pageerror]'));
+    expect(noisy, `控制台有错误：\n${noisy.join('\n')}`).toEqual([]);
+    return;
+  }
+
   // central 模式：英文页同样落在中央登录面板（见中文那条的修订记录）。
   const panel = page.locator('[data-testid="central-auth-panel"]').first();
   await expect(panel).toBeVisible({ timeout: 30_000 });
-  // 界面确实跟着切到英文 —— 否则"参数带上了但语言丢了"这条判据就没牙。
-  await expect(page.locator('html')).toHaveAttribute('lang', /^en/);
   // 条款同意未勾选时发起按钮禁用（与中文页同一条判据）。
   const centralConsent = page.locator('[data-testid="central-auth-consent"]').first();
   await expect(centralConsent).not.toBeChecked();

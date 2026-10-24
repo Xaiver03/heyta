@@ -50,6 +50,25 @@ for (const width of [390, 1440]) {
     // 落到中央登录面板 —— 条款同意勾选器就在那上面。
     await page.goto('/app/?signin=1&lang=zh-CN');
     await page.getByTestId('privacy-consent-accept').click();
+
+    // 服务端现在到底哪一支登录？问服务端，不靠"我以为线上是什么"
+    // （2026-10-24：中央 UI 整改期间回退到自有账号模式）。
+    const mode = await page.evaluate(async () => {
+      const config = (await fetch('/api/auth/central/config').then((r) => r.json())) as { mode?: string };
+      return config.mode ?? 'unknown';
+    });
+    console.log(`服务端登录模式 = ${mode}`);
+
+    if (mode !== 'oidc') {
+      // 自有账号模式：central 面板与它的条款按钮都不在树上 —— 判据退到
+      // "登录界面真的出现 + 读条款期间零 POST /auth/ + 零 pageerror"，
+      // 阅读器本身的文本/渲染由 `apps/web/tests/` 的单元判据钉住（本机可验）。
+      await expect(page.getByTestId('auth-form-email')).toBeVisible({ timeout: 30_000 });
+      expect(errors).toEqual([]);
+      expect(authRequests).toEqual([]);
+      return;
+    }
+
     const panel = page.getByTestId('central-auth-panel');
     await expect(panel).toBeVisible({ timeout: 30_000 });
     const consentBox = page.getByTestId('central-auth-consent');

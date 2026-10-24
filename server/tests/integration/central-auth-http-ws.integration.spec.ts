@@ -155,6 +155,25 @@ describe('central HTTP and established WS', () => {
     expect((await claim(verifier)).status).toBe(410);
     expect((await fetch(`${network}/private`, { headers: { authorization: `Bearer ${session.token}` } })).status).toBe(200);
   });
+  it('accepts device handoff signed by desktop shell origins, still rejects foreign browser origins', async () => {
+    const start = (challenge: string, headers: Record<string, string>) => fetch(`${network}/api/auth/oidc/device/start`, {
+      method: 'POST', headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify({ deviceChallenge: challenge, termsAccepted: true, documentVersion: LEGAL_SET_VERSION }) });
+    // 两枚壳 origin 都能发起（WebView 是真浏览器，带 Origin + Sec-Fetch-Site 也必须放行）
+    for (const shellOrigin of ['heyta-local://app', 'https://heyta.local']) {
+      const response = await start(digest(randomSecret()),
+        { origin: shellOrigin, 'sec-fetch-site': 'cross-site' });
+      expect(response.status, `${shellOrigin}: ${await response.clone().text()}`).toBe(200);
+    }
+    // 陌生网页 origin（浏览器形态）仍然 403 —— 守卫挡第三方页面驱动的本意不变
+    const evil = await fetch(`${network}/api/auth/oidc/device/start`, { method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'https://evil.example' }, body: '{}' });
+    expect(evil.status).toBe(403);
+    // 官方站网页 origin 也仍按浏览器处理：跨站 fetch 一律 403
+    const official = await start(digest(randomSecret()),
+      { origin, 'sec-fetch-site': 'cross-site' });
+    expect(official.status).toBe(403);
+  });
   it('completes a real callback with host-only cookie, verified consent and CSRF-protected API; rejects local mint', async () => {
     const browser = new Browser(), response = await browser.login();
     const cookies = response.headers.getSetCookie();

@@ -14,6 +14,23 @@ import { CentralPersistenceError } from './repository';
 const DEVICE_SECRET = /^[A-Za-z0-9_-]{43}$/;
 const DEVICE_CHALLENGE = /^[a-f0-9]{64}$/;
 const DEVICE_ID = /^[0-9a-f-]{36}$/;
+/**
+ * 桌面壳 WebView 的 origin（P5.4 device handoff 的合法发起方）。
+ *
+ * device/start、device/claim 的守卫本意是「只许非浏览器客户端裸调用」：
+ * 浏览器里的 fetch 一定带 Origin / Sec-Fetch-Site，一律 403 —— 这挡住了
+ * 官方站网页被第三方页面驱动着静默发起 device handoff 的可能。
+ * 但桌面壳的 WebView **是真浏览器**（macOS `heyta-local://app`、
+ * Windows `https://heyta.local`），fetch 同样带这些头 —— 2026-10-24 线上实测
+ * （nginx 日志：OPTIONS 204 → POST 403 forbidden）它被自己的守卫挡死了。
+ *
+ * 放行这两枚 origin 不破坏上面的安全性质：任意网页**伪造不了**这个 Origin 值
+ * （自定义 scheme 的 origin 由 WebView 宿主决定；https://heyta.local 也不是
+ * 公网可达的名字），能带着它发请求的只有我们签名的壳。device handoff 的
+ * 领取端仍然要 verifier（知识证明），浏览器腿要配对码 —— 守卫挡的从来不是
+ * 唯一一道门。
+ */
+const DEVICE_SHELL_ORIGINS: ReadonlySet<string> = new Set(['heyta-local://app', 'https://heyta.local']);
 function strictBody(value: unknown, keys: readonly string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
       Object.keys(value).some((key) => !keys.includes(key))) throw new CentralHttpError(400, 'invalid_request');
@@ -85,13 +102,16 @@ export async function centralAuthRoutes(server: FastifyInstance, runtime: Centra
   });
   server.post(CENTRAL_AUTH_PATHS.deviceStart, { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (req, reply) => {
     reply.header('Cache-Control', 'no-store');
-    if (!runtime || !origin) return unavailable(reply);
-    try {
-      if (req.headers.authorization !== undefined || req.headers.cookie !== undefined ||
-          (req.headers.origin !== undefined && req.headers.origin !== origin) ||
-          (req.headers['sec-fetch-site'] !== undefined && req.headers['sec-fetch-site'] !== 'same-origin'))
-        throw new CentralHttpError(403, 'forbidden');
-      const body = strictBody(req.body, ['deviceChallenge', 'termsAccepted', 'documentVersion']);
+      if (!runtime || !origin) return unavailable(reply);
+      try {
+        // 壳 origin（DEVICE_SHELL_ORIGINS）是合法发起方，跳过浏览器形态检查；
+        // 其余带 Origin / Sec-Fetch-Site 的请求仍视为浏览器，一律 403。
+        const fromShell = req.headers.origin !== undefined && DEVICE_SHELL_ORIGINS.has(req.headers.origin);
+        if (req.headers.authorization !== undefined || req.headers.cookie !== undefined ||
+            (req.headers.origin !== undefined && !fromShell && req.headers.origin !== origin) ||
+            (!fromShell && req.headers['sec-fetch-site'] !== undefined && req.headers['sec-fetch-site'] !== 'same-origin'))
+          throw new CentralHttpError(403, 'forbidden');
+        const body = strictBody(req.body, ['deviceChallenge', 'termsAccepted', 'documentVersion']);
       if (typeof body.deviceChallenge !== 'string' || !DEVICE_CHALLENGE.test(body.deviceChallenge))
         throw new CentralHttpError(400, 'invalid_request');
       if ((body.termsAccepted !== undefined && body.termsAccepted !== true) ||
@@ -143,9 +163,10 @@ export async function centralAuthRoutes(server: FastifyInstance, runtime: Centra
     reply.header('Cache-Control', 'no-store');
     if (!runtime || !origin) return unavailable(reply);
     try {
+      const fromShell = req.headers.origin !== undefined && DEVICE_SHELL_ORIGINS.has(req.headers.origin);
       if (req.headers.authorization !== undefined || req.headers.cookie !== undefined ||
-          (req.headers.origin !== undefined && req.headers.origin !== origin) ||
-          (req.headers['sec-fetch-site'] !== undefined && req.headers['sec-fetch-site'] !== 'same-origin'))
+          (req.headers.origin !== undefined && !fromShell && req.headers.origin !== origin) ||
+          (!fromShell && req.headers['sec-fetch-site'] !== undefined && req.headers['sec-fetch-site'] !== 'same-origin'))
         throw new CentralHttpError(403, 'forbidden');
       const body = strictBody(req.body, ['handoffId', 'verifier']);
       if (typeof body.handoffId !== 'string' || !DEVICE_ID.test(body.handoffId) ||
