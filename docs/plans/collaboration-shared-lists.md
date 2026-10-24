@@ -518,7 +518,17 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
   所以撤掉它会把"邀请被对面接受后面板自己更新"退化成"刷新页面才更新"——**这不是漏撤，是要另立一条**：
   服务端在成员/信封写路径上也发一条信号，或让面板从本机已知事件重取。归 M4 之后的活，不进 M5 的读数。
 
-- **通知正文只有"有人新增/删除了一条评论"，不含清单名与内容**。端到端加密下本机当然解得开，但把明文写进系统通知中心等于交给操作系统（及其同步）去保管。要带名字得先定一条口径："通知里允许出现什么"—— 这一格归产品负责人拍，不由工程顺手放宽。
+- ✅ **通知正文的口径已经拍了并落进 web（2026-10-24，`docs/adr/0071-share-notification-content-boundary.md`）**：
+  正文允许「这份共享清单的名字 + 活动种类」，条目内容（任务标题、评论正文、便签内容）一律不进 ——
+  理由是"把明文写进系统通知中心等于交给操作系统及其同步链路去保管，而那些保管者不是本产品的信任边界"。
+  两个条件：这台设备**同意过**（裁决三，闸门仍是 `selectNotifiedActivities` 那一枚，外面多包一道同意）
+  **且**该类活动在偏好里开着。名字只从现成本地状态那条清单行取，取不到就回落到不带名字的现有措辞，
+  🔴 不为此发一次请求。判据：`cd packages/ui && npx vitest run tests/notification-content-boundary.spec.ts`、
+  `cd apps/web && npx vitest run tests/share-notification-content.spec.tsx`（条数由脚本自己打印），
+  能红的证据 `node research/tools/mutation-rigs/mutate-collab-notif-content.mjs` ⇒ `ARMS=pass (4/4)`。
+  ⚠️ **这一格还留着一个要拍的口子**：同意态今天只有设备级一条记录，写点在 owner 的「共享此清单」确认，
+  **通过链接加入的那台设备没有同意记录** ⇒ 按裁决三它拿到的是零打扰。补法（加入流程也走一次确认 /
+  同意改成每份清单一行）归产品负责人，见 ADR-0071 §四与文末；本批**没有**顺手放宽成"加入即视为同意"。
 - **`shouldNotifyTaskReminder` 与 `shouldAutoAcceptInvitation` 仍没有数据面**：前者要 `TASK` 的 op 进 share log（M2 的路由），后者要移动端的邀请接受面（§9.4 那六段）。这不是"接了没测"，是**没有输入** —— 给它造一条假输入去点亮判据，量的是夹具不是产品。
 - **`app-mount.spec.tsx` 里的 `act(...)` 警告是预存的**：同一枚文件在 HEAD 上跑就有 28 条（`An update to SubscriptionNotice inside a test was not wrapped in act`），本批那一臂挂上完整 `<App />` 后整文件涨到 45 条。现量：`cd apps/web && npx vitest run tests/app-mount.spec.tsx 2>&1 | grep -c "not wrapped in act"`。这条不是本批的缺陷，也没有被当成判据。
 - **移动端与三枚桌面壳今天接不到这条信号**：`new_share_ops` 的解析在 `@heyta/sync-client`（共享包）里，判断在 `@heyta/app-host`，而投递面（Notification）与"注册消费者"那一行只在 web 壳里。移动端要等它自己的通知面（§9.4）。

@@ -76,7 +76,7 @@ import {
 
 import { Button, Card, Divider, HStack, Screen, SectionHeader, Stack, Text, TextField } from '../ui/kit';
 import { Icon, type IconName } from '../ui/icons';
-import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
+import { MOBILE_PROFILE_ENTRIES, type MobileProfileEntryKey } from '../nav/feature-entries';
 import { AssistantScreen } from '../ai/AssistantScreen';
 import { AiToolboxScreen } from '../ai/AiToolboxScreen';
 import { AvatarBadge } from '../ui/avatar';
@@ -93,6 +93,8 @@ import { ExportScreen } from './ExportScreen';
 import { GrowthScreen } from './GrowthScreen';
 import { ProfileProgressSummary } from './ProfileProgressSummary';
 import { HabitsScreen } from './HabitsScreen';
+// M6：共享屏是**默认导出**（第三枚并行代理交付，契约名固定）。
+import ShareSpaceScreen from './ShareSpaceScreen';
 import { ListsSection } from './ListsSection';
 import { NotesSection } from './NotesSection';
 import { NotificationsScreen } from './NotificationsScreen';
@@ -803,7 +805,7 @@ export function ProfileScreen(): React.JSX.Element {
    * 🔴 这里不许再出现一份手写的 `{ key: 'habits', label: t('…') }`：
    * 同一件事写两遍，迟早只改一遍（AGENTS §3.5 的那条教训）。
    */
-  const featureRows: readonly SettingsRowModel[] = MOBILE_FEATURE_ENTRIES.map(
+  const featureRows: readonly SettingsRowModel[] = MOBILE_PROFILE_ENTRIES.map(
     (entry): SettingsRowModel => ({
       kind: 'action',
       testID: entry.testID,
@@ -1439,14 +1441,14 @@ export function ProfileScreen(): React.JSX.Element {
 
 const FEATURE_ROUTE_PREFIX = 'feature:';
 
-function featureRouteKey(key: MobileFeatureEntryKey): string {
+function featureRouteKey(key: MobileProfileEntryKey): string {
   return `${FEATURE_ROUTE_PREFIX}${key}`;
 }
 
-function featureKeyFromRoute(routeKey: string | undefined): MobileFeatureEntryKey | null {
+function featureKeyFromRoute(routeKey: string | undefined): MobileProfileEntryKey | null {
   if (routeKey === undefined || !routeKey.startsWith(FEATURE_ROUTE_PREFIX)) return null;
   const candidate = routeKey.slice(FEATURE_ROUTE_PREFIX.length);
-  for (const entry of MOBILE_FEATURE_ENTRIES) {
+  for (const entry of MOBILE_PROFILE_ENTRIES) {
     if (entry.key === candidate) return entry.key;
   }
   return null;
@@ -1464,13 +1466,14 @@ function featureKeyFromRoute(routeKey: string | undefined): MobileFeatureEntryKe
  * "行在、点了没反应"，而它**不报错、界面也不难看**（AGENTS §7 那类）。
  * 让它在编译期就站不住，比给它写一条运行时判据更便宜。
  */
-const FEATURE_ENTRY_ICONS: Record<MobileFeatureEntryKey, IconName> = {
+const FEATURE_ENTRY_ICONS: Record<MobileProfileEntryKey, IconName> = {
   growth: 'growth.week',
   habits: 'focus.streak',
   countdown: 'task.due',
+  share: 'action.share',
 };
 
-function featureScreen(key: MobileFeatureEntryKey, onBack: () => void, onOpenHabits: () => void): React.JSX.Element {
+function featureScreen(key: MobileProfileEntryKey, onBack: () => void, onOpenHabits: () => void): React.JSX.Element {
   switch (key) {
     case 'growth':
       return <GrowthScreen onBack={onBack} onOpenHabits={onOpenHabits} />;
@@ -1481,6 +1484,9 @@ function featureScreen(key: MobileFeatureEntryKey, onBack: () => void, onOpenHab
     //    编译期版本（`nav/feature-entries.ts` 文件头第 2 条说的就是这件事）。
     case 'countdown':
       return <CountdownScreen onBack={onBack} />;
+    // M6：共享那一行同理 —— 注册了 `share` 而不接屏，编译期就站不住。
+    case 'share':
+      return <ShareSpaceScreen onBack={onBack} />;
   }
 }
 

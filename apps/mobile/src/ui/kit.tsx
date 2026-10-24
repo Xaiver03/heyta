@@ -93,6 +93,11 @@ export interface TextProps {
    * 却要每处开一条内联样式（`check:l4` 的棘轮数它）。
    */
   grow?: boolean;
+  /**
+   * 设备级验收的锚点 id（真模拟器 AX 探针按它找控件；`Button`/`Chip` 同一通道）。
+   * 🔴 不参与样式或逻辑，纯透传给 `RNText`（M6-3a 的共享屏需要把状态句钉给载体）。
+   */
+  testID?: string;
 }
 
 export function Text({
@@ -103,6 +108,7 @@ export function Text({
   numberOfLines,
   selectable,
   grow = false,
+  testID,
 }: TextProps): React.JSX.Element {
   const t = useTokens();
   const text = useText();
@@ -110,6 +116,7 @@ export function Text({
 
   return (
     <RNText
+      testID={testID}
       numberOfLines={numberOfLines}
       selectable={selectable}
       style={[

@@ -14,7 +14,12 @@
  *   默认「指派给我的」；
  * - **自动接受已知合作者的共享邀请**：默认关（与滴答相反——隐私产品
  *   宁可多一次确认）。
+ *
+ * ADR-0071 在这一层又加了两件事，都**不是**新的闸门：**同意**决定这条通知能不能出现，
+ * **内容口径**决定响的时候说什么（清单名 + 活动种类，条目内容一律不进正文）。
  */
+
+import type { ShareConsentStore } from './share-consent-model.js';
 
 export type ShareActivityKind = 'completed' | 'added' | 'deleted';
 
@@ -78,6 +83,49 @@ export const selectNotifiedActivities = (
     if (shouldNotifyActivity(prefs, kind)) enabled.push(kind);
   }
   return enabled;
+};
+
+/**
+ * ADR-0071 裁决三：这台设备**有没有对共享同意过**，决定这条通知能不能出现。
+ * 同意缺席 = 从没同意过 ⇒ fail-closed（与 `shouldShowConsent` 同向）。
+ * ⚠️ 现量的同意态是**设备级一条记录**（写点在「共享此清单」那一步），不是每份清单一条。
+ */
+export const hasShareConsent = (consent: ShareConsentStore | undefined): boolean =>
+  consent?.consentAcceptedAt !== undefined;
+
+/**
+ * 内容口径的入口：**先过同意，再过偏好**。
+ * 🔴 偏好那道闸门仍是 `selectNotifiedActivities` 这一枚，这里不重写它 ——
+ *    同意只是在它前面多出来的一道：没同意过 ⇒ 空数组，一条都不许响。
+ */
+export const selectShareActivitiesToNotify = (
+  prefs: ShareNotificationPrefs,
+  kinds: readonly ShareActivityKind[],
+  consent: ShareConsentStore | undefined,
+): ShareActivityKind[] =>
+  hasShareConsent(consent) ? selectNotifiedActivities(prefs, kinds) : [];
+
+/**
+ * 通知正文的两句现成措辞（措辞本身归 i18n，由壳注入；这里只决定**该说哪一句**）。
+ * `named` 只拿得到清单名与活动种类 —— 没有第三个口子，也就塞不进条目内容。
+ */
+export interface ShareActivityBodyCopy {
+  readonly anonymous: (kind: ShareActivityKind) => string;
+  readonly named: (listName: string, kind: ShareActivityKind) => string;
+}
+
+/**
+ * ADR-0071 裁决一 / 二 / 四：正文 = **清单名（可缺）+ 活动种类**，别的不许出现。
+ * 名字拿不到（本机没有那条清单行绑定）就回落不带名字那句 ——
+ * 🔴 不许为了拼这一句话去发一次请求，通知路径必须能在离线时如实说话。
+ */
+export const shareActivityNotificationBody = (
+  copy: ShareActivityBodyCopy,
+  listName: string | undefined,
+  kind: ShareActivityKind,
+): string => {
+  const name = listName?.trim() ?? '';
+  return name === '' ? copy.anonymous(kind) : copy.named(name, kind);
 };
 
 export interface ShareTaskLike {

@@ -257,6 +257,10 @@ export {
 export {
   DEFAULT_NOTIFICATION_PREFS,
   selectNotifiedActivities,
+  selectShareActivitiesToNotify,
+  hasShareConsent,
+  shareActivityNotificationBody,
+  type ShareActivityBodyCopy,
   type ShareActivityKind,
   type ShareNotificationPrefs,
   type TaskReminderScope,

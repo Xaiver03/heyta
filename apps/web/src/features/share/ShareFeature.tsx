@@ -51,6 +51,7 @@ import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { text } from '../../lib/text.js';
 import { forgetShareLocally, publishShareSigningKey, shareTransferFailure, type ShareTransferFailure } from '@heyta/app-host';
 import { clearStorageShareLog } from './comment-actions.js';
+import { loadShareConsent, saveShareConsent } from './share-consent-store.js';
 import { registerShareRosterTarget } from '../../lib/share-signal-sink.js';
 import { resetWebShareSession } from './share-session.js';
 import { createWebShareKeyRotation } from './share-rotation.js';
@@ -147,8 +148,6 @@ const styles = {
   dangerText: { color: cssVar('color.danger') },
 } as const;
 
-const CONSENT_STORAGE_KEY = 'heyta.share-consent.v1';
-
 const toBase64 = (bytes: Uint8Array): string => {
   let binary = '';
   for (const b of bytes) binary += String.fromCharCode(b);
@@ -162,12 +161,7 @@ const fromBase64 = (b64: string): Uint8Array => {
 };
 
 function loadConsent(): ShareConsentStore {
-  try {
-    const raw = localStorage.getItem(CONSENT_STORAGE_KEY);
-    return raw === null ? {} : (JSON.parse(raw) as ShareConsentStore);
-  } catch {
-    return {};
-  }
+  return loadShareConsent(localStorage);
 }
 
 export interface ShareFeatureProps {
@@ -542,7 +536,7 @@ export function ShareFeature(props: ShareFeatureProps) {
                 titleHidden
                 onConsent={(next) => {
                   setConsentStore(next);
-                  localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(next));
+                  saveShareConsent(localStorage, next);
                 }}
                 onProceed={() => { void createShare(); }}
                 onCancel={onClose}

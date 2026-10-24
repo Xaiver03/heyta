@@ -6,7 +6,9 @@
  *
  * 三段各归各位，这里只做装配（AGENTS §3.5：壳里不许有业务判断）：
  *   · 该不该拉、拉到什么活动 —— `@heyta/app-host` 的 `createShareOpsSignalHandler`
- *   · 这些活动里哪些该吵人 —— `@heyta/ui` 的 `selectNotifiedActivities`（本机偏好）
+ *   · 这些活动里哪些该吵人 —— `@heyta/ui` 的 `selectShareActivitiesToNotify`（同意 + 本机偏好；
+ *     偏好那道闸门仍是 `selectNotifiedActivities`，这里不重写它）
+ *   · 响的时候说什么 —— `@heyta/ui` 的 `shareActivityNotificationBody`（ADR-0071 的内容口径）
  *   · 怎么投递 —— `share-activity-notify.ts`（唯一不纯的那一下）
  *
  * 🔴 这一片是**唯一的**信号消费者（垫片里那个单槽 sink）。评论区不自己接 WS：
@@ -16,8 +18,12 @@
 
 import { useEffect, useMemo } from 'react';
 
-import { createShareOpsSignalHandler, shareIdsOnDevice } from '@heyta/app-host';
-import { selectNotifiedActivities } from '@heyta/ui';
+import { createShareOpsSignalHandler, localRowIdForShare, shareIdsOnDevice } from '@heyta/app-host';
+import {
+  selectShareActivitiesToNotify,
+  shareActivityNotificationBody,
+  type ShareActivityBodyCopy,
+} from '@heyta/ui';
 import { useI18n } from '@heyta/i18n';
 
 import { useSyncStore } from '../sync/store.js';
@@ -25,6 +31,7 @@ import { currentState, hasEngine, requireEngine } from '../../lib/oplog.js';
 import { emitShareRepaint, setShareSignalSink } from '../../lib/share-signal-sink.js';
 import { createStorageShareLog } from './comment-actions.js';
 import { ensureWebShareSession } from './share-session.js';
+import { loadShareConsent } from './share-consent-store.js';
 import { loadShareNotificationPrefs } from './share-notif-prefs.js';
 import { deliverShareActivityNotifications } from './share-activity-notify.js';
 
@@ -34,10 +41,12 @@ export function useShareActivitySignal(): void {
   const token = useSyncStore((s) => s.token);
   const accountId = useSyncStore((s) => s.accountId);
 
-  const labels = useMemo(
+  const title = t('common.brand');
+
+  /** 两句现成措辞（ADR-0071）：带名字的只能拼清单名，另一句不带任何名字。 */
+  const copy = useMemo<ShareActivityBodyCopy>(
     () => ({
-      title: t('common.brand'),
-      body: (kind: 'added' | 'deleted' | 'completed'): string =>
+      anonymous: (kind): string =>
         kind === 'added'
           ? t('common.share.activity.added')
           : kind === 'deleted'
@@ -46,6 +55,12 @@ export function useShareActivitySignal(): void {
               // 缺的是**档位映射与措辞**（`ShareSignalActivity` 只到 added/deleted，见 app-host 那段）。
               // 留一条兜底文案而不是留白 —— 真接上那一档时它会被判据抓到并要求写清楚。
               t('common.share.notif.activityCompleted'),
+      named: (name, kind): string =>
+        kind === 'added'
+          ? t('common.share.activityNamed.added', { name })
+          : kind === 'deleted'
+            ? t('common.share.activityNamed.deleted', { name })
+            : t('common.share.activityNamed.completed', { name }),
     }),
     [t],
   );
@@ -82,15 +97,25 @@ export function useShareActivitySignal(): void {
       // 盘上的日志刚被这批新内容写过 —— 正在显示这份共享的那一节得重放一次。
       // 它**不能**自己去拉：游标已经推进，拉回来是 `fetched = 0`（见垫片那段）。
       if (reading.pulled && reading.added > 0) emitShareRepaint();
-      const toSurface = selectNotifiedActivities(
+      // 🔴 清单名只从**现成本地状态**里那条清单行取（ADR-0071 裁决四）：这一趟已经读过它，
+      //    取不到就回落到不带名字那句 —— 通知路径不许为了拼一句话多发一次请求，
+      //    它必须能在离线时如实说话。
+      const personal = currentState();
+      const rowId = localRowIdForShare(personal, shareId);
+      const listName = rowId === undefined ? undefined : personal.projects[rowId]?.name;
+      const toSurface = selectShareActivitiesToNotify(
         loadShareNotificationPrefs(window.localStorage),
         reading.activities,
+        loadShareConsent(window.localStorage),
       );
-      deliverShareActivityNotifications(toSurface, shareId, latestSeq, labels);
+      deliverShareActivityNotifications(toSurface, shareId, latestSeq, {
+        title,
+        body: (kind) => shareActivityNotificationBody(copy, listName, kind),
+      });
     };
     setShareSignalSink((shareId, latestSeq) => {
       void sink(shareId, latestSeq);
     });
     return () => setShareSignalSink(undefined);
-  }, [accountId, baseUrl, labels, token]);
+  }, [accountId, baseUrl, copy, title, token]);
 }

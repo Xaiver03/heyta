@@ -160,9 +160,10 @@ describe('共享活动投递 · tag 与失败形状', () => {
     });
   });
 
-  it('正文不含清单名与内容：labels 只给标题 + 一句活动描述', () => {
-    // 端到端加密下本机当然解得开正文，但把明文写进系统通知中心等于交给操作系统保管。
-    // 这条臂钉的是"投递件只拿得到标题与活动类别"这个**接口形状**（不是运行时扫描）。
+  it('正文是上游组装好的那一句：投递件只拿得到标题 + 一句活动描述', () => {
+    // ADR-0071：正文里**允许**有清单名，条目内容不许 —— 那句话由 `shareActivityNotificationBody`
+    // 组装（判据在 `share-notification-content.spec.tsx`）。这一枚钉的是投递件这一层的
+    // **接口形状**：它只拿得到标题、body、tag，没有第二个口子能塞进内容（不是运行时扫描）。
     const { ctor, calls } = fakeCtor();
     deliverShareActivityNotifications(['added'], SHARE, SEQ, LABELS, ctor);
     const options = calls[0]?.options ?? {};
