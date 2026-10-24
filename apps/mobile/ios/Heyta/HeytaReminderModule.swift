@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import UserNotifications
 import React
 
@@ -165,6 +166,21 @@ final class HeytaReminderModule: NSObject {
     center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
       if let error { reject("E_REMINDER_AUTH", error.localizedDescription, error) }
       else { resolve(granted ? "granted" : "denied") }
+    }
+  }
+
+  /// 跳本应用的系统设置页 —— 用户在这里自己关过通知之后，`requestAuthorization`
+  /// 不会再弹任何东西（Apple 的授权弹窗每台设备只问一次），这一跳是**唯一的**再授权入口。
+  ///
+  /// ⚠️ iOS 没有"直达通知那一栏"的公开 URL：`app-settings:` 只到应用那一页，
+  /// 用户得自己再点一次「通知」。所以界面不许写"已为你打开通知设置"，只许写"打开设置"。
+  /// 🔴 只在用户手势里调（设置页那一行的按钮），绝不在启动时顺手调 —— 启动时跳设置
+  /// 等于把用户从应用里踢出去，而《认定方法》把"频繁 solicitation"列为违规形态。
+  @objc(openNotificationSettings:reject:)
+  func openNotificationSettings(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    guard let url = URL(string: UIApplication.openSettingsURLString) else { resolve(false); return }
+    DispatchQueue.main.async {
+      UIApplication.shared.open(url) { opened in resolve(opened) }
     }
   }
 

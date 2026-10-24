@@ -10,6 +10,8 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.BaseJavaModule
 import com.facebook.react.bridge.Promise
@@ -45,6 +47,118 @@ class ReminderModule(private val context: ReactApplicationContext) : BaseJavaMod
             }
         }
     }
+
+    /**
+     * `AlarmManager.canScheduleExactAlarms()` 那一档。
+     *
+     * Android 12（API 31）之前**没有这道门**：精确闹钟是装即有的能力，所以回 `granted`
+     * 而不是 `unsupported` —— 回 `unsupported` 会让界面把"系统压根不管"读成"读不到"，
+     * 而那是两句话（界面要分清"这里没有可拨的开关"与"这里可能坏了"）。
+     */
+    @ReactMethod
+    fun exactAlarmStatus(promise: Promise) {
+        if (Build.VERSION.SDK_INT < 31) {
+            promise.resolve("granted")
+            return
+        }
+        val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        promise.resolve(if (alarm.canScheduleExactAlarms()) "granted" else "denied")
+    }
+
+    /**
+     * 拉「创建精确闹钟」那一页（`ACTION_REQUEST_SCHEDULE_EXACT_ALARM`）。
+     *
+     * ⚠️ 只由设置页那一行**在用户手势里**触发；启动流程一律不调。
+     * 那一页是设置页，**不给应用回调**，所以本方法只回答"页面起来了吗"。
+     * API 31 以下回 `false`：那一页在这个系统版本上不存在。
+     */
+    @ReactMethod
+    fun requestExactAlarmPermission(promise: Promise) {
+        if (Build.VERSION.SDK_INT < 31) {
+            promise.resolve(false)
+            return
+        }
+        promise.resolve(launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+            .setData(Uri.fromParts("package", context.packageName, null))))
+    }
+
+    /** 系统「通知」总开关那一档（授权之外还有它：关掉时 toast 一律不显示）。 */
+    @ReactMethod
+    fun notificationSettingsStatus(promise: Promise) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        promise.resolve(if (manager.areNotificationsEnabled()) "granted" else "denied")
+    }
+
+    /** 跳系统的应用通知设置页。API 26 以下没有那个 action，退到应用信息页。 */
+    @ReactMethod
+    fun openNotificationSettings(promise: Promise) {
+        if (Build.VERSION.SDK_INT >= 26) {
+            promise.resolve(launch(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)))
+            return
+        }
+        promise.resolve(openPackagePage())
+    }
+
+    /**
+     * 「忽略电池优化」那一档。
+     *
+     * Android 6（API 23）之前没有电池优化这套机制 ⇒ 同 `exactAlarmStatus` 的理由回
+     * `granted`（"系统不限制"），而不是"读不到"。
+     */
+    @ReactMethod
+    fun batteryOptimizationStatus(promise: Promise) {
+        if (Build.VERSION.SDK_INT < 23) {
+            promise.resolve("granted")
+            return
+        }
+        val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        promise.resolve(if (power.isIgnoringBatteryOptimizations(context.packageName)) "granted" else "denied")
+    }
+
+    /**
+     * 跳电池优化白名单页，把**落点**回给 JS：`'requested' | 'appSettings' | 'unavailable'`。
+     *
+     * 🔴 部分国产 ROM 把 `IgnoreBatteryOptimizationSettings` 那个组件摘掉了
+     * （`resolveActivity` 找得到但启动即抛，或压根找不到）。那种机器上退到**应用信息页**
+     * 是诚实的落点，那一页上通常能翻到省电策略；但界面**不许**把这一跳说成
+     * "已经向系统要过豁免" —— 用户在那里看到的不是一个叫"忽略电池优化"的开关。
+     * ⚠️ 这条 intent 需要清单里的 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`（normal 级）；
+     * 没有它系统会 SecurityException 拒掉 —— 那正是"声明它"的唯一用途。
+     */
+    @ReactMethod
+    fun openBatteryOptimizationSettings(promise: Promise) {
+        if (Build.VERSION.SDK_INT < 23) {
+            promise.resolve("unavailable")
+            return
+        }
+        val requested = launch(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+            .setData(Uri.fromParts("package", context.packageName, null)))
+        promise.resolve(when {
+            requested -> "requested"
+            openPackagePage() -> "appSettings"
+            else -> "unavailable"
+        })
+    }
+
+    /** 从非 Activity 上下文起系统设置页：带 NEW_TASK，起不来如实回 false。 */
+    private fun launch(intent: Intent): Boolean = try {
+        val activity = context.currentActivity
+        if (activity != null) {
+            activity.startActivity(intent)
+        } else {
+            context.applicationContext.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+        true
+    } catch (error: Exception) {
+        android.util.Log.i(NAME, "reminder settings page unavailable: ${error.javaClass.simpleName}")
+        false
+    }
+
+    private fun openPackagePage(): Boolean = launch(
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(Uri.fromParts("package", context.packageName, null))
+    )
 
     @ReactMethod
     fun schedule(id: String, atMs: Double, title: String, body: String, promise: Promise) {
@@ -144,6 +258,9 @@ class ReminderModule(private val context: ReactApplicationContext) : BaseJavaMod
         const val EXTRA_ID = "id"
         const val EXTRA_TITLE = "title"
         const val EXTRA_BODY = "body"
+        /** API 31 起才有；低版本系统不会发，注册着无害。 */
+        const val ACTION_EXACT_ALARM_PERMISSION_CHANGED =
+            "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"
         private const val REQUEST_CODE = 19041
         private const val FLAGS = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val STATE_LOCK = Any()
@@ -169,6 +286,28 @@ class ReminderModule(private val context: ReactApplicationContext) : BaseJavaMod
             if (!manager.areNotificationsEnabled()) return "denied"
             if (Build.VERSION.SDK_INT >= 26 && manager.getNotificationChannel(CHANNEL)?.importance == NotificationManager.IMPORTANCE_NONE) return "denied"
             return "granted"
+        }
+
+        /**
+         * 系统把我们排过的闹钟清了（开机），或者"能不能排精确闹钟"这道门变了
+         * （用户在系统页里拨了一下开关）⇒ 忘掉"我已经排过了"这份缓存。
+         *
+         * 🔴 只清 `scheduled`。`delivered` 是**还没写成 op 的投递回执**，清掉它等于
+         * 把已经弹给用户的那一条删账 —— 它会再弹一遍而 `firedAt` 永远补不上。
+         * `posted` 留着：它挡的是"同一次到点在 JS 回前台之前重复投递"，而重启后系统
+         * 横幅本来就已经没了；这里的风险对比是"少弹一次"对"这条提醒从此再也不响"，
+         * 后者才是开机重排要修的那个洞。
+         *
+         * ⚠️ 为什么不在这里直接重排：排哪几条、什么时候排、已 fired 算不算 ——
+         * 全是业务语义（AGENTS §3.5），事实源在 `packages/app-host` 的
+         * `planNativeReminders`。这个缓存一清，JS 下一次回前台的 reconcile 就会
+         * 把它重新排一遍，而那一趟用的是同一份领域判定。
+         */
+        fun invalidateArmedCache(context: Context) {
+            synchronized(STATE_LOCK) {
+                val prefs = preferences(context)
+                persist(prefs.edit().putStringSet(KEY_SCHEDULED, emptySet()))
+            }
         }
 
         fun ensureChannel(context: Context, title: String) {
@@ -217,8 +356,18 @@ class ReminderReceiver : android.content.BroadcastReceiver() {
             ReminderModule.ensureChannel(context, title)
             if (ReminderModule.authorization(context) != "granted") return
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            /* 点横幅只做一件**已经兑现**的事：把应用带到前台。
+             *
+             * 🔴 这里原先挂着一枚 `heyta://reminder-open/<id>` 的 data URI，而全仓
+             *    没有任何一处读它（既没有 intent-filter 认领这个 scheme，也没有
+             *    `Linking` 的订阅方）—— 那是"能力被写进声明却不存在"的形状：
+             *    读代码的人会以为点通知会直达那条任务。要让它成立，缺的是两件，
+             *    少一件都不算：① 清单里 `heyta` scheme 的 intent-filter（Android 侧
+             *    RN 才会把 URL 递给 JS）；② JS 侧一个把 taskId 变成"打开那一格详情"
+             *    的订阅方。两者都属于"通知直达"这一项独立工作，不在投递路径上打洞。
+             * ⚠️ 到点提醒在应用打开之后仍然会走到用户面前：`App.tsx` 那个
+             *    AppState 'active' 的 reconcile 会把已过点没投递的补齐。 */
             val launch = Intent(context, com.heytamobile.MainActivity::class.java)
-                .setData(Uri.Builder().scheme("heyta").authority("reminder-open").appendPath(id).build())
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             val click = PendingIntent.getActivity(context, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val builder = if (Build.VERSION.SDK_INT >= 26) android.app.Notification.Builder(context, ReminderModule.CHANNEL)
@@ -236,3 +385,41 @@ class ReminderReceiver : android.content.BroadcastReceiver() {
         }
     }
 }
+
+/**
+ * 「系统那边的前提变了」这一类广播的共同实现（授权变化 / 开机 / 应用被更新）。
+ *
+ * 🔴 两个子类都**只清一份缓存**：不读任务数据、不排闹钟、不取消闹钟、不写任何内容。
+ * 这一点是 `exported="true"` 站得住的全部依据（清单里那段注释讲的就是它）——
+ * 伪造这条广播的后果最多是"下一次回前台多做一次它本来每次都会做的 reconcile"。
+ * 哪天有人往这里加了"直接改排程"的逻辑，那段论证立刻失效：正确做法是把它踢回 JS，
+ * 不是把 exported 改掉（改掉就再也收不到系统广播，等于这条腿白做）。
+ */
+abstract class ReminderWakeupReceiver(private val expectedAction: String) : android.content.BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != expectedAction) return
+        ReminderModule.invalidateArmedCache(context)
+    }
+}
+
+/** 用户在系统页里拨了「创建精确闹钟」这道门 ⇒ 之前按老能力排的那批要重排。 */
+class ExactAlarmPermissionReceiver : ReminderWakeupReceiver(ReminderModule.ACTION_EXACT_ALARM_PERMISSION_CHANGED)
+
+/**
+ * 开机。Android 会清掉所有排程，而这份 prefs 是活的 —— 不抹缓存的话，
+ * `schedule()` 会以为"这条已经排过了"而永远不再排（真丢提醒，不是晚一点）。
+ *
+ * ⚠️ 用 `BOOT_COMPLETED` 而不是 `LOCKED_BOOT_COMPLETED`：设备未解锁时
+ * SharedPreferences 根本读不到，在那里跑只会拿到一份假的空缓存。
+ */
+class ReminderBootReceiver : ReminderWakeupReceiver(Intent.ACTION_BOOT_COMPLETED)
+
+/**
+ * 应用升级/覆盖安装。这条路同样会清掉系统替我们排的全部闹钟。
+ *
+ * ⚠️ 只登记 `MY_PACKAGE_REPLACED`，不登记 `PACKAGE_REPLACED` —— 后者是**全局**广播
+ * （任何一次包替换都会发），需要 `android.permission.STATUS_BAR_SERVICE` 级别的
+ * 系统权限或运行期注册，而对本应用的更新来说 `MY_PACKAGE_REPLACED` 就是那一条
+ * 定向给自己的（也是 Android 官方在 24 之后推荐的那条）。
+ */
+class ReminderReplacedReceiver : ReminderWakeupReceiver(Intent.ACTION_MY_PACKAGE_REPLACED)

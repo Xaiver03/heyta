@@ -284,6 +284,10 @@ static void build_fallback_ui(Shell *shell, const char *db, const char *create_e
         snprintf(footer, sizeof footer, "库：%s　设备：%s", db, client_id);
         gtk_label_set_text(GTK_LABEL(shell->footer), footer);
         refresh(shell);
+        /* 走到这里就是**引擎模式**（壳自己持有宿主）：提醒腿归壳。
+         * M2 那条路（默认）不经过这里 —— 页面持有宿主，通知走 `heyta_web.c`
+         * 的 `heytaReminder` 管道，两边共用 `heyta_notify.c` 同一族实现。 */
+        heyta_api_arm_reminders(shell->api);
     }
 }
 

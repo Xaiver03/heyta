@@ -12,6 +12,10 @@ RCT_EXTERN_METHOD(authorizationStatus:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(requestAuthorization:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+// 再授权入口：iOS 的授权弹窗每台设备只问一次，被拒之后这一跳是唯一的路。
+RCT_EXTERN_METHOD(openNotificationSettings:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(schedule:(NSString *)identifier
                   atMs:(double)atMs
                   title:(NSString *)title

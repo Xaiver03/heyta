@@ -1,0 +1,10 @@
+{"t":"  0.00s","bundlePath":"\/tmp\/heyta-macos-reminder-probe\/HeytaReminderProbe.app","wall":"2026-10-23T17:57:43Z","pathExtension":"app","bundleId":"cloud.finlaw.heyta.macosprobe","event":"identity"}
+{"bridge":"\/tmp\/heyta-macos-reminder-probe\/HeytaReminderProbe.app\/Contents\/Resources\/native-bridge.js","t":"  0.04s","event":"pre-open","wall":"2026-10-23T17:57:43Z","db":"\/tmp\/heyta-reminder-probe-store\/probe.sqlite"}
+{"value":"default","event":"authorizationStatus.beforeOpen","t":"  0.04s","wall":"2026-10-23T17:57:43Z"}
+{"t":"  0.04s","wall":"2026-10-23T17:57:43Z","error":"HeytaApp.deliverReminders 失败：应用宿主还没打开 —— 先调 open({ dbPath })\nrequireHost@file:\/\/\/tmp\/heyta-macos-reminder-probe\/HeytaReminderProbe.app\/Contents\/Resources\/native-bridge.js:42110:22\ndeliverReminders@file:\/\/\/tmp\/heyta-macos-reminder-probe\/HeytaReminderProbe.app\/Contents\/Resources\/native-bridge.js:42295:51\n@\nglobal code@","event":"deliverReminders.beforeOpen.error"}
+{"note":"open() 内部会起跑 ReminderLoop 并跑第一轮 deliverReminders","wall":"2026-10-23T17:57:43Z","event":"open.begin","t":"  0.04s"}
+{"event":"open.done","t":"  0.05s","wall":"2026-10-23T17:57:43Z","clientId":"6c430c1f-38ef-4768-808a-d8571abd5496"}
+{"event":"deliverReminders.afterOpen","t":"  2.05s","wall":"2026-10-23T17:57:45Z","receipt":"{\"delivered\":[],\"reason\":\"permission\"}"}
+{"event":"authorizationStatus","t":"  5.06s","wall":"2026-10-23T17:57:48Z","poll":"1","value":"default"}
+{"event":"final.reminderStatus","t":"600.08s","wall":"2026-10-23T18:07:43Z","value":"default"}
+{"event":"exit","t":"600.08s","wall":"2026-10-23T18:07:43Z","polls":"199"}

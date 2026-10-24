@@ -22,6 +22,8 @@ private struct TaskListEnvelope: Codable { let tasks: [TaskView] }
 private struct ClientIdEnvelope: Codable { let clientId: String }
 private struct IdEnvelope: Codable { let id: String }
 private struct OutboundEnvelope: Codable { let outboundJson: [String] }
+private struct ReminderPermissionEnvelope: Codable { let permission: String }
+private struct ReminderOpenedEnvelope: Codable { let opened: Bool }
 
 public final class AppApi {
     private let host: ScriptHost
@@ -31,7 +33,11 @@ public final class AppApi {
     }
 
     public func open(_ dbPath: String) throws -> String {
-        try decode(ClientIdEnvelope.self, from: host.call("open", json(["dbPath": dbPath]))).clientId
+        let clientId = try decode(ClientIdEnvelope.self, from: host.call("open", json(["dbPath": dbPath]))).clientId
+        // 引擎模式：这份 JSC 就是唯一的引擎 ⇒ store 一开，提醒循环就起跑
+        //（先补投一轮离线期间到点的，再按 JS 给的时长排下一次）。见 ReminderLoop.swift。
+        host.startReminderLoop()
+        return clientId
     }
 
     public func listTasks() throws -> [TaskView] {
@@ -57,7 +63,39 @@ public final class AppApi {
     /// （向量时钟与 appliedOpIds 漂移），所以壳在 `app` 模式下只调这一个。
     /// 与 Windows 的 `AppApi.OpenOpLog` 逐字同构。
     public func openOpLog() throws -> String {
-        try decode(ClientIdEnvelope.self, from: host.call("openOpLog", json(["dbPath": ""]))).clientId
+        let clientId = try decode(ClientIdEnvelope.self, from: host.call("openOpLog", json(["dbPath": ""]))).clientId
+        /**
+         * 🔴 这里**不**起 `ReminderLoop` —— 起了也永远不会投出去。
+         *
+         * `app` 模式下这份 JSC 里**没有引擎**（引擎归页侧的真应用），所以壳侧循环调的
+         * `HeytaApp.deliverReminders()` 走 `requireHost()` 必然失败，而循环把失败吞成 `"{}"`
+         * ⇒ 它每醒一拍都做一件**不可能成功**的事，日志里一个字都不报。
+         * 一条永远不会响的循环比没有循环更糟：它会让人以为"投递已经接上了"。
+         *
+         * 那条腿现在长在页侧：应用的 `useReminderNotifications()` 自己算到点、自己记账，
+         * 要弹系统通知时经 `heytaReminder` 消息通道问壳要一次
+         *（`apps/desktop-macos/Sources/HeytaMac/ShellReminderBridge.swift`）。
+         * 与 Windows 的 `AppApi.OpenOpLog`、Linux 的 `heyta_api_open_store` 同一归属决定。
+         */
+        return clientId
+    }
+
+    // ── 提醒投递（窄门面；判定全在 TS 的 `reminder-foreground.ts`）────────────
+    //    macOS 壳的 `__heytaReminderPort` 由 `ScriptHost` 注入，见 `ReminderPort.swift`。
+
+    /// 跑一轮到点投递，原样带回 JS 的收据 JSON（`{delivered, reason?}`）。
+    public func deliverReminders() throws -> String {
+        try host.call("deliverReminders")
+    }
+
+    /// `'granted' | 'denied' | 'default' | 'unsupported'` —— 界面那一行画不画读的是它。
+    public func reminderStatus() throws -> String {
+        try decode(ReminderPermissionEnvelope.self, from: host.call("reminderStatus")).permission
+    }
+
+    /// 引导用户去系统设置放行通知。`true` 只代表 LaunchServices 接下了这个 URL。
+    public func openReminderSettings() throws -> Bool {
+        try decode(ReminderOpenedEnvelope.self, from: host.call("openReminderSettings")).opened
     }
 
     /// 把页侧发来的**一条消息**转给 TS，拿回**要发回去的那些消息**。
@@ -68,7 +106,12 @@ public final class AppApi {
     /// 于是它**不必认识任何协议字段**（与 Windows 的 `AppApi.HandleHostMessage` 同构）。
     public func handleHostMessage(_ messageJson: String) throws -> [String] {
         let raw = try host.call("handleHostMessage", json(["messageJson": messageJson]))
-        return try decode(OutboundEnvelope.self, from: raw).outboundJson
+        let out = try decode(OutboundEnvelope.self, from: raw).outboundJson
+        // 页侧刚落了 op（可能新建/改期了提醒）⇒ 让循环重算"下一次什么时候醒"。
+        // 排程输入是 JS 的 `nextReminderWakeDelay()`，这里不判业务（见 ReminderLoop.swift）。
+        // ⚠️ `app` 模式下循环根本没起跑 ⇒ 这一句是 no-op，不是第二条投递路径。
+        host.rearmReminderLoop()
+        return out
     }
 
     public func shutdown() { host.shutdown() }

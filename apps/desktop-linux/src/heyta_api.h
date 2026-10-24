@@ -59,6 +59,15 @@ bool heyta_api_handle_host_message(HeytaApi *api, const char *message_json,
                                    char *errbuf, size_t errlen);
 
 void heyta_task_list_free(HeytaTaskList *list);
+/* 引擎模式（M1 回退屏）下把提醒腿接上：给宿主引擎注入 `__heytaReminderPort`，
+ * 再挂上那枚全进程唯一的掐表。
+ *
+ * 🔴 **存储宿主模式不许调它**：那一趟页侧才是宿主，壳的 `HeytaApp.deliverReminders`
+ *    当场抛"应用宿主还没打开"—— 一条**永远不会响**的循环比没有循环更糟，
+ *    因为它把"这一端没接通知"读成"接了"。页面那一路走 `heyta_web.c` 的
+ *    `heytaReminder` 消息管道（两种到达方式，投递只有一份实现）。 */
+void heyta_api_arm_reminders(HeytaApi *api);
+
 void heyta_api_destroy(HeytaApi *api);
 
 #endif /* HEYTA_API_H */

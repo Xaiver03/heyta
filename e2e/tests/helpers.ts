@@ -417,7 +417,7 @@ export async function closeSettingsSheet(page: Page): Promise<void> {
  */
 export async function selectSettingsSection(
   page: Page,
-  section: 'profile' | 'appearance' | 'sync' | 'ai' | 'data' | 'account' | 'help',
+  section: 'profile' | 'subscription' | 'appearance' | 'sync' | 'ai' | 'data' | 'account' | 'help',
 ): Promise<void> {
   const button = page.locator(`button[aria-controls="settings-group-${section}"]`);
   await expect(button, `设置分类 ${section} 必须存在`).toHaveCount(1);
@@ -850,4 +850,40 @@ export async function boxOf(page: Page, locator: Locator, what: string) {
 export async function selectHabit(page: Page, name: string): Promise<void> {
   await page.locator('[data-testid^="habit-row-"]').filter({ hasText: name }).first().click();
   await expect(page.getByTestId('habit-pane')).toHaveAttribute('aria-label', new RegExp(name));
+}
+
+/**
+ * 量一张表单的**行节奏**：可键入控件只许有一档高度，且不低于 44。
+ *
+ * 出处与理由：`docs/agents/ux-principles.md` §2（Apple HIG 44pt / `--ht-size-field-height`）。
+ * 🔴 为什么是"去重集合大小 == 1"而不是"每个都 ≥44"：后者会把**两档都合规**
+ *    （44 与 20 并存）也算过 —— 而"两档并存"正是「添加习惯」那次的症状。
+ *
+ * ⚠️ 量的是 `getBoundingClientRect().height`，不是 `offsetHeight`：
+ *    后者在 transform 缩放下会四舍五入到整数，而 43.6 与 44 的差别正是这条判据要看的东西。
+ * ⚠️ 排除 checkbox / radio：它们的盒子是"图形"不是"字段"，高度按内容走。
+ */
+export async function assertFormRhythm(
+  scope: Locator,
+  options: { minHeight?: number; allowHeights?: number } = {},
+): Promise<void> {
+  const minHeight = options.minHeight ?? 43;
+  const allowHeights = options.allowHeights ?? 1;
+  const heights = await scope.evaluate((root) => {
+    const controls = root.querySelectorAll<HTMLElement>(
+      'input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea',
+    );
+    return [...controls].map((el) => el.getBoundingClientRect().height);
+  });
+  expect(heights.length, '量到 0 个可键入控件 —— 这条判据没在测东西').toBeGreaterThan(0);
+  const distinct = [...new Set(heights.map((value) => Math.round(value * 10) / 10))];
+  expect(
+    distinct.length,
+    `表单里出现了 ${distinct.length} 档控件高度：${distinct.join(' / ')}`,
+  ).toBeLessThanOrEqual(allowHeights);
+  for (const height of distinct) {
+    expect(height, `控件高度 ${height}px 低于可访问下限 ${minHeight}px`).toBeGreaterThanOrEqual(
+      minHeight,
+    );
+  }
 }

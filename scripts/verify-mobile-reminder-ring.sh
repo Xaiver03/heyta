@@ -176,7 +176,19 @@ $ADB shell pm clear $PKG >/dev/null 2>&1
 # Android 13+ 通知是运行时权限：真用户会在首启授，脚本直接授（等价于点了允许）。
 $ADB shell pm grant $PKG android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 \
   && echo "   已授 POST_NOTIFICATIONS（等价于真用户点允许）" || echo "   （该系统无需运行时通知权限）"
-$ADB shell appops set "$PKG" SCHEDULE_EXACT_ALARM allow || exit 1
+# 精确闹钟这道门：**设得成就设，设不成不是本轮的失败**。
+#
+# 🔴 原来这里是 `|| exit 1` —— 而那一发在**部分系统上必然失败**：这道门在
+#    Android 12/13 上是一枚 appop，到 14 被拆成 `SCHEDULE_EXACT_ALARM` /
+#    `USE_EXACT_ALARM` 两档，OEM ROM 还可能把它整个摘掉。把"脚本没法替你拨这道门"
+#    写成整轮验收失败，症状是"永远拿不到投递证据"，而那恰恰是最该被证伪的一句话。
+# ⚠️ 真用户在设置页里**可以拒绝**它，应用那条路是通的：投递退到系统非精确排程，
+#    提醒仍然响（晚一点）。所以这里只把**实际读数**记进证据，不判红也不判绿。
+$ADB shell appops set "$PKG" SCHEDULE_EXACT_ALARM allow >/dev/null 2>&1 \
+  && echo "   已把精确闹钟门拨到 allow（等价于用户在特殊访问里允许）" \
+  || echo "   （这台系统拨不动那道门 —— 应用会退到非精确排程，照常投递）"
+EXACT_ALARM_OP=$($ADB shell appops get "$PKG" SCHEDULE_EXACT_ALARM 2>&1 | tr -d '\r')
+echo "   EXACT_ALARM_OP=${EXACT_ALARM_OP:-（读不到）}"
 $ADB shell am force-stop $PKG; sleep 1
 launch_app || exit 1; sleep 6
 dismiss_consent_if_present

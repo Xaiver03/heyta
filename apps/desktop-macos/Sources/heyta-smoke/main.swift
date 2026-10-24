@@ -442,6 +442,48 @@ do {
     }
 }
 
+// ── 12. 提醒投递端口的**接缝形状**（无头 = 非 .app 进程）──────────────────
+//
+// ⚠️ 如实标注这一节能证什么、不能证什么：
+//   · 能证：`__heytaReminderPort` 真的跨过了 JSContext（`reminderStatus()` 拿不到端口会当场 throw，
+//     信封那条路走不通）；无能力时**每个出口都朝"没投出去"的方向降级**。
+//   · 不能证：真弹出一条系统通知 —— `UNUserNotificationCenter` 只在真的 .app 包 +
+//     图形会话里可用（裸可执行文件里 `current()` 直接抛 NSException），
+//     那一格由打包后的 .app 单独取证（`apps/desktop-macos/probe/`），不冒充在这里。
+//
+// 🔴 用 `open()`（引擎模式）而不是 `openOpLog()`：`native-bridge.ts` 的
+//   `deliverReminders()` 走 `requireHost()`，而 **`openOpLog` 刻意不建 AppHost**
+//   （引擎归页侧）。⇒ 顺带说清一条边界：产品态（存储宿主）里投递归页侧，
+//   壳这一侧的门面在那种模式下**必然**失败 —— 见 `AppApi.openOpLog` 那段注释。
+do {
+    let remindDb = workDir.appendingPathComponent("remind.sqlite").path
+    let rApi = try AppApi(bundlePath: bundlePath, dbPath: remindDb)
+    _ = try rApi.open(remindDb)  // store 打开 ⇒ 提醒循环起跑；无头下必须**无事发生且不崩**
+
+    let permission = try rApi.reminderStatus()
+    check(permission == "unsupported",
+          "无头（非 .app）进程里 reminderStatus ⇒ 诚实报 unsupported（绝不假报 granted）（实测：\(permission)）")
+
+    let receipt = try rApi.deliverReminders()
+    check(receipt.contains("\"delivered\""),
+          "deliverReminders 经端口跑完一轮并回 JS 的收据形状（实测：\(receipt.prefix(120))）")
+
+    // 🔴 假成功判据：没有投递能力时 show() 必须回 false。
+    // 回 true 的代价是"提醒被 JS 记成已投、用户永远没看到"—— 这条断言防的就是它。
+    let shown = ReminderPort().show("{\"occurrenceId\":\"smoke|1\",\"title\":\"heyta\",\"body\":\"smoke\"}")
+    check(!shown, "无投递能力时 show() 返回 false（不许把没弹出来的提醒记账）")
+
+    // 同一方向的第二格：读系统的账也必须是"没有"，而不是"有但看不见"。
+    check(!ReminderPort().containsDelivered("smoke|1"),
+          "无头进程里 containsDelivered 回 false（读不到系统的账就说读不到）")
+
+    let opened = ReminderPort().openSettings()
+    check(opened == true || opened == false,
+          "openSettings() 有一个布尔答案（true 只代表系统接下了那个 URL，判据写在这里）")
+
+    rApi.shutdown()
+}
+
 try? FileManager.default.removeItem(at: workDir)
 
 print("")

@@ -57,6 +57,14 @@ import type { Operation } from '@heyta/sync-core';
 
 import { createTaskActions } from './actions.js';
 import { openAppHost, openOpLogStore, type AppHost } from './host.js';
+import {
+  deliverForegroundReminders,
+  MAX_WAKE_SLEEP_MS,
+  type ForegroundReminderLabels,
+  type ReminderForegroundPort,
+} from './reminder-foreground.js';
+import type { ReminderAuthorization } from './reminder-delivery.js';
+import { planNativeReminders } from './reminder-scheduler.js';
 
 /** 原生列表真正需要的字段。**故意很小**。 */
 export interface TaskView {
@@ -461,6 +469,111 @@ export async function handleHostMessage(input: {
   }
   const response = await handleOpLogWorkerRequest(store, decoded as OpLogWorkerRequest);
   return { outboundJson: [JSON.stringify(encodeOpLogWire(response))] };
+}
+
+/**
+ * 原生壳注入的通知中心端口。
+ *
+ * 🔴 契约（与 `__heytaDriverFactory` 同一套约定）：方法**同步**、入参与返回都是
+ * 可 JSON 化的标量。之所以不是异步 —— 三枚壳的宿主引擎（JSC / Jint / QuickJS）
+ * 都是在宿主线程上同步调 JSExport 的，跨边界 await 会直接吊死宿主。
+ * `ReminderForegroundPort` 那一层是异步的，异步只发生在本文件这一层的包装里。
+ */
+export interface InjectedReminderPort {
+  /** `'granted' | 'denied' | 'default' | 'unsupported'`。 */
+  authorizationStatus(): string;
+  /**
+   * 可选：**只在 `authorizationStatus()` 报 `default` 时被要**。
+   * macOS 能真弹系统询问；Windows/Linux 没有应用内询问，实现方**只回当前状态**，
+   * 不许为了让状态变绿而撒谎（`ReminderPort.swift` / `heyta_notify.h` 各自写明了这一点）。
+   */
+  requestAuthorization?(): string;
+  /** 入参 = `JSON.stringify({occurrenceId,title,body})`；投不出去必须回 `false`。 */
+  show(requestJson: string): boolean;
+  /** 跳系统通知设置。不支持的端不给这个键。 */
+  openSettings?(): boolean;
+}
+
+const reminderLabels: ForegroundReminderLabels = {
+  // 通知标题就是产品名。本层不引 i18n（bundle 里没有 locale），
+  // 而这一格与 Web 那边 `t('common.brand')` 是同一个词 —— 改动要两边一起。
+  title: 'heyta',
+  // 正文是**任务标题本身**：泛泛的"你有新提醒"等于没告诉用户任何事。
+  body: (taskTitle: string) => taskTitle,
+};
+
+/**
+ * 同一次运行内的去重。
+ *
+ * ⚠️ 只在内存里：跨重启与跨设备的去重靠 `firedAt`（`deliverForegroundReminders`
+ * 内部就写了那条 op），不是靠这个 Set。
+ */
+const shownThisRun = new Set<string>();
+
+const requireReminderPort = (): InjectedReminderPort => {
+  const port = (globalThis as { __heytaReminderPort?: InjectedReminderPort }).__heytaReminderPort;
+  if (port === undefined) {
+    throw new Error('宿主没有注入 __heytaReminderPort —— 原生壳要同时挂定时器与通知中心');
+  }
+  return port;
+};
+
+/** 引擎归属：壳那份 JSC 里的 host（只有 `open()` 之后存在，`openOpLog()` 刻意不建）。 */
+function reminderHost(): AppHost {
+  return requireHost();
+}
+
+/**
+ * 跑一轮"到点就投"。返回 JS 的收据 `{delivered, reason}`；
+ * 🔴 `reason:'permission'` 是"有待投但系统不给弹"，界面据此说话。
+ */
+export async function deliverReminders(): Promise<Awaited<ReturnType<typeof deliverForegroundReminders>>> {
+  const port = requireReminderPort();
+  return deliverForegroundReminders(
+    reminderHost(),
+    {
+      authorizationStatus: async () => port.authorizationStatus() as ReminderAuthorization,
+      show: async (request) => port.show(JSON.stringify(request)),
+      // 🔴 壳里没提供就**连这个键都不给**：`deliverForegroundReminders` 用
+      // `port.requestAuthorization?.()` 判"能不能问系统"，给了一个值为 `undefined` 的
+      // 键不会改变那个判断，但会让读代码的人以为这条壳有索要入口。
+      ...(port.requestAuthorization === undefined
+        ? {}
+        : {
+            requestAuthorization: async () =>
+              port.requestAuthorization!() as ReminderAuthorization,
+          }),
+    } satisfies ReminderForegroundPort,
+    { labels: reminderLabels, shown: shownThisRun },
+  );
+}
+
+/** `'granted' | 'denied' | 'default' | 'unsupported'` —— 界面那一行画不画读的是它。 */
+export async function reminderStatus(): Promise<{ permission: ReminderAuthorization }> {
+  return { permission: requireReminderPort().authorizationStatus() as ReminderAuthorization };
+}
+
+/** 引导用户去系统设置放行通知。`opened:false` = 这台机器上没这个入口，界面要如实说。 */
+export async function openReminderSettings(): Promise<{ opened: boolean }> {
+  const port = requireReminderPort();
+  return { opened: port.openSettings?.() === true };
+}
+
+/**
+ * "下一条提醒还要多久到点"（ms）。`null` = 没有将来待排的 ⇒ 壳**不排**定时器。
+ *
+ * 🔴 这一格是判据唯一性的落点：四端各自只睡"这里说的这么久"，
+ * 醒来都调 `deliverReminders()`。壳里再算一遍"什么算到点"就会与这份漂移，
+ * 症状是"面板显示已到点、通知却不响"。
+ */
+export function nextReminderWakeDelay(): { delayMs: number | null } {
+  const at = Date.now();
+  const state = reminderHost().getState();
+  const reminders = Object.values(state.reminders);
+  const next = planNativeReminders(reminders, state.tasks, at)
+    .map((plan) => Number(plan.occurrenceId.slice(plan.occurrenceId.lastIndexOf('|') + 1)))
+    .find((effectiveAt) => effectiveAt > at);
+  return { delayMs: next === undefined ? null : Math.min(next - at, MAX_WAKE_SLEEP_MS) };
 }
 
 /** 关闭 SQLite 连接。之后不可再用。 */

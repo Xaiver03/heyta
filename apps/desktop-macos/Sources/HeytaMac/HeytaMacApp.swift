@@ -468,6 +468,16 @@ struct SharedWebView: NSViewRepresentable {
         config.userContentController.addUserScript(WKUserScript(
             source: ShellWidgetBridge.shim, injectionTime: .atDocumentStart, forMainFrameOnly: true
         ))
+        /**
+         * 🔴 提醒投递的壳侧那一米：页侧（`shell-reminder-center.ts`）直接
+         * `window.webkit.messageHandlers.heytaReminder.postMessage({requestId, method, args})`
+         * 并 await 回来的 Promise ⇒ **不需要 shim**（widget 那枚要 shim 是因为它还有
+         * 一个原生侧主动回推的事件）。`contentWorld: .page` 也是契约的一部分 ——
+         * 页侧探测读的是页面自己那个 world 里的 `window.webkit.messageHandlers`。
+         */
+        config.userContentController.addScriptMessageHandler(
+            context.coordinator.reminderBridge, contentWorld: .page, name: "heytaReminder"
+        )
         let webView = WKWebView(frame: .zero, configuration: config)
         context.coordinator.widgetBridge.webView = webView
         webView.navigationDelegate = context.coordinator
@@ -491,6 +501,8 @@ struct SharedWebView: NSViewRepresentable {
         let onStorageFact: (String) -> Void
         /// 存储宿主（`nil` = 不当宿主）。见 `ShellStorageHost.decide()`。
         let widgetBridge = ShellWidgetBridge()
+        /// 页侧提醒投递腿（`heytaReminder` 消息通道，见 `ShellReminderBridge.swift`）。
+        let reminderBridge = ShellReminderBridge()
         var storageHost: ShellStorageHost?
         /// 🔴 **weak**：见 `makeNSView` 里的说明（强引用会成环）。
         weak var webView: WKWebView?
@@ -509,6 +521,8 @@ struct SharedWebView: NSViewRepresentable {
         private var ranEraseJourney = false
         /// 小组件环境识别 / 外链交接那条诊断链只跑一次（它会**真的点**帮助外链）。
         private var ranWidgetJourney = false
+        /// 页侧提醒腿的往返取证只跑一次（它会在系统通知中心里**真留一条**通知）。
+        private var ranReminderProbe = false
         /// 🔴 诊断链期间**壳实际收到并判给系统浏览器的外链**（逐条留着，供证据自述）。
         /// 正常路径不填它 —— 只有 `HEYTA_WIDGET_HELP_PROBE` 在环境里时才记，
         /// 因为那一趟故意**不**叫起浏览器（见 `openExternalURLIfAllowed`）。
@@ -778,6 +792,7 @@ struct SharedWebView: NSViewRepresentable {
               ' webview2=' + !!(window.chrome && window.chrome.webview) +
               ' heytaStorage=' + (typeof handlers.heytaStorage !== 'undefined') +
               ' heytaWidget=' + (typeof handlers.heytaWidget !== 'undefined') +
+              ' heytaReminder=' + (typeof handlers.heytaReminder !== 'undefined') +
               ' widgetBridgeSeal=' + typeof (window.__heytaNativeWidgetBridge || {}).sealWidgetSnapshot
           });
         })()
@@ -824,6 +839,9 @@ struct SharedWebView: NSViewRepresentable {
         init(onProbe: @escaping (String) -> Void, onStorageFact: @escaping (String) -> Void) {
             self.onProbe = onProbe
             self.onStorageFact = onStorageFact
+            // 投递回执落进**同一份**证据流（`REMINDER_SHOW=…`），
+            // 这样"壳真的弹了"与"页侧以为弹了"能在一个文件里对账。
+            reminderBridge.onFact = onStorageFact
         }
 
         /**
@@ -886,6 +904,26 @@ struct SharedWebView: NSViewRepresentable {
                 "document.documentElement.classList.add('heyta-shell')"
             )
             probe(webView)
+            /**
+             🔬 **页侧提醒腿的往返取证**（`HEYTA_REMINDER_PROBE=1` 才跑；产品路径不碰这一段）。
+
+             它验的是这一轮补上的那条一米：页侧 → `heytaReminder` 消息通道 → 壳的
+             `UNUserNotificationCenter`。**不需要登录、不需要真到点的提醒** ——
+             通道在文档创建时就注入好了，而"能不能弹"只取决于系统与授权。
+
+             🔴 故意**不**调 `openSettings`：那会把「系统设置」叫到前台，
+             而 AGENTS §6.2 规定二写明任何会开窗口的验收都不得抢走输入焦点。
+             那一格由 `REMINDER_SETTINGS_UNTESTED=openSettings` 如实登记，不混进这次的读数里。
+
+             判据落在**系统的账**上（`REMINDER_DELIVERED=in-list=yes`），
+             不是 `show()` 的回值 —— 后者只证明"系统接下了请求"。
+             */
+            if ProcessInfo.processInfo.environment["HEYTA_REMINDER_PROBE"] == "1" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self, weak webView] in
+                    guard let self, let webView else { return }
+                    self.runReminderChannelProbe(webView)
+                }
+            }
         }
 
         /// Help, pricing and changelog belong to the public site. Opening them in
@@ -1285,6 +1323,73 @@ struct SharedWebView: NSViewRepresentable {
          ⚠️ 边界（不包装成完成）：`WIDGET_EXTERNAL_LAUNCH=suppressed` 说明这一趟**没有**
          真的叫起浏览器，"浏览器里渲染出那一页"那一格仍归前台 AX 装置。
          */
+        /**
+         页侧 → 壳 → 系统通知中心那一趟往返（`HEYTA_REMINDER_PROBE=1`）。
+
+         ⚠️ 结果**不从 `evaluateJavaScript` 的返回值拿**：那一段是 async 的，
+         而 WebKit 在这一档上会不会替你 await 掉 Promise 取决于版本 ——
+         所以脚本把结论写进 `window.__heytaReminderProbe`，壳隔一拍再读回来。
+         读回 `state=running` 时再说一次，而不是当成"没投出去"（那是假红的形状）。
+         */
+        static let reminderChannelKick = """
+        (() => {
+          window.__heytaReminderProbe = { state: 'running' };
+          const handlers = (window.webkit && window.webkit.messageHandlers) || {};
+          const port = handlers.heytaReminder;
+          if (!port || typeof port.postMessage !== 'function') {
+            window.__heytaReminderProbe = { state: 'done', handler: 'absent' };
+            return 'absent';
+          }
+          const occurrence = 'heyta-evidence|' + Date.now();
+          const call = (tag, method, args) =>
+            port.postMessage({ requestId: occurrence + '|' + tag, method, args: args || [] });
+          (async () => {
+            const permission = await call('p', 'permission');
+            // 只在"从没问过"时才升级成系统询问 —— 与产品纪律同一条：不在启动时问。
+            const requested = permission === 'default' ? await call('r', 'request') : null;
+            const delivered = await call('s', 'show',
+              [occurrence, 'heyta 提醒取证', '这条应当进系统通知中心']);
+            window.__heytaReminderProbe = {
+              state: 'done', handler: 'present', occurrence, permission, requested, delivered,
+            };
+          })().catch((error) => {
+            window.__heytaReminderProbe = { state: 'error', message: String(error) };
+          });
+          return 'kicked';
+        })()
+        """
+
+        static let reminderChannelRead = "JSON.stringify(window.__heytaReminderProbe || { state: 'missing' })"
+
+        func runReminderChannelProbe(_ webView: WKWebView) {
+            if ranReminderProbe { return }
+            ranReminderProbe = true
+            onStorageFact("REMINDER_SETTINGS_UNTESTED=openSettings(不让系统设置抢前台，见 §6.2 规定二)")
+            webView.evaluateJavaScript(Self.reminderChannelKick) { _, error in
+                if let error {
+                    self.onStorageFact("REMINDER_PROBE=kick-failed \(error.localizedDescription)")
+                    return
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    webView.evaluateJavaScript(Self.reminderChannelRead) { result, _ in
+                        let text = (result as? String) ?? "{}"
+                        self.onStorageFact("REMINDER_PROBE=\(text)")
+                        guard let data = text.data(using: .utf8),
+                              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                              let occurrence = obj["occurrence"] as? String else {
+                            self.onStorageFact("REMINDER_DELIVERED=in-list=unknown(没有 occurrence 可查)")
+                            return
+                        }
+                        // 🔴 读的是系统的账：`show()` 回 true 只证明"接下了请求"，
+                        // 而验收要的是"用户的通知中心里真的有这一条"。
+                        let inList = self.reminderBridge.evidenceDeliveredContains(occurrence)
+                        self.onStorageFact(
+                            "REMINDER_DELIVERED=in-list=\(inList ? "yes" : "no") id=\(occurrence)")
+                    }
+                }
+            }
+        }
+
         func runWidgetJourneyChain(_ webView: WKWebView) {
             ranWidgetJourney = true
             webView.evaluateJavaScript(Self.settingsNavClickProbe("settings-group-appearance")) { res, _ in

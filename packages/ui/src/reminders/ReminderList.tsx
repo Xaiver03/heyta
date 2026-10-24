@@ -164,6 +164,23 @@ export interface ReminderListProps {
   readonly onRemove: (entityId: string) => void;
   readonly labels: ReminderListLabels;
   /**
+   * 本机被系统闸门挡住时那一行降级说明（"到点不会响 / 可能迟到几分钟"）。
+   *
+   * 🔴 形状是 `{ text, settings? }` 而不是三个平铺字段：**话说一半**是这个入口
+   * 唯一危险的失败形状 —— 只给文字，用户读完只知道"不会响"却没有回头路（通知授权
+   * 被系统拒掉后应用自己再也问不出弹窗，只能送去系统页面）；只给入口，没人知道
+   * 为什么要点它。把文字做成必填、入口挂在它下面，是为了让"漏接一半"变成类型错误。
+   *
+   * ⚠️ 不传 = **不渲染**。这台设备上根本没有那道闸门（iOS 没有精确闹钟那一档）时，
+   * 由宿主判定层返回"没有这一行"，而不是渲染一句"你没允许准点唤醒"。
+   * 哪一句、什么时候出现是**语义判断**，全在宿主（`apps/mobile` 的
+   * `reminder-delivery-display.ts` / `apps/web` 的通知面板），本组件只照字段摆。
+   */
+  readonly deliveryBlocked?: {
+    readonly text: string;
+    readonly settings?: { readonly label: string; readonly onPress: () => void };
+  };
+  /**
    * 把触发时刻渲染成人读的字符串。
    *
    * ⚠️ **必须由宿主注入**：相对/绝对口径、"多久算今天"依赖本地化，
@@ -250,6 +267,16 @@ function makeStyles(tokens: HeytaNativeTokens) {
     actionText: {
       color: tokens['color.foreground'],
     },
+    /**
+     * 降级说明那一行：文字 + （能给就给的）跳系统设置入口。
+     * 与 `list` 同宽，靠 `flexWrap` 让长文案自己换行，入口不被挤掉。
+     */
+    notice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: tokens['space.2'],
+    },
     /** "添加提醒"一排：可换行，预设多时不会把容器撑破。 */
     addRow: {
       flexDirection: 'row',
@@ -284,6 +311,7 @@ export function ReminderList({
   onDismiss,
   onRemove,
   labels,
+  deliveryBlocked,
   formatWhen,
   testID,
 }: ReminderListProps): React.JSX.Element {
@@ -405,6 +433,33 @@ export function ReminderList({
               </View>
             </View>
           ))}
+
+          {/*
+            系统闸门挡住送达时的降级说明（"到点不会响 / 可能迟到几分钟"）。
+            它跟着**提醒列表**这一支走：`rows.length === 0` 时上面那个分支已经
+            返回空态，此时没有任何东西会被挡住，说这句就成了凭空报警。
+          */}
+          {deliveryBlocked === undefined ? null : (
+            <View style={styles.notice} testID="reminder-delivery-blocked">
+              <Text
+                style={[text.caption, { color: tokens['color.warning-strong'] }]}
+                testID="reminder-delivery-blocked-text"
+              >
+                {deliveryBlocked.text}
+              </Text>
+              {deliveryBlocked.settings === undefined ? null : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={deliveryBlocked.settings.label}
+                  onPress={deliveryBlocked.settings.onPress}
+                  style={styles.actionButton}
+                  testID="reminder-delivery-open-settings"
+                >
+                  <Text style={[text.caption, styles.actionText]}>{deliveryBlocked.settings.label}</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
         </View>
       )}
 

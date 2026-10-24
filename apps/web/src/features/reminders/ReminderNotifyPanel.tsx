@@ -24,27 +24,42 @@ import { useEffect, useState } from 'react';
 
 import { useI18n } from '@heyta/i18n';
 
-import {
-  notificationPermission,
-  requestNotificationPermission,
-  type NotificationRequestResult,
-} from './notify.js';
+import type { NotificationRequestResult } from './notify.js';
+import { resolveReminderCenter } from './shell-reminder-center.js';
 import { SettingsNotice } from '../settings/SettingsNotice.js';
 
 export function ReminderNotifyPanel(): React.JSX.Element {
   const { t } = useI18n();
-  const [permission, setPermission] = useState<NotificationRequestResult>(() =>
-    notificationPermission(),
-  );
+  /**
+   * 初值是 `default`（"还不知道"）而不是同步读一次：壳那条腿
+   *（`heytaReminder` 消息通道）一问一答是**异步**的，渲染期拿不到同步答案。
+   * 第一拍交给下面那个 effect —— 它本来就是干这件事的。
+   */
+  const [permission, setPermission] = useState<NotificationRequestResult>('default');
 
-  // 权限可能在浏览器设置页里被改掉；用户切回 heyta 时要读一次真实状态。
+  // 权限可能在系统设置里被改掉；用户切回 heyta 时要读一次真实状态。
   useEffect(() => {
     const refresh = (): void => {
-      if (document.visibilityState === 'visible') setPermission(notificationPermission());
+      if (document.visibilityState !== 'visible') return;
+      void Promise.resolve(resolveReminderCenter().permission()).then(setPermission);
     };
+    refresh();
     document.addEventListener('visibilitychange', refresh);
     return () => document.removeEventListener('visibilitychange', refresh);
   }, []);
+
+  /**
+   * 🔴 只能在**用户手势里**调 —— 这两个按钮存在的全部理由。
+   *
+   * ⚠️ 浏览器那条腿在没有 `requestPermission` 时退回"再读一次"，而不是给一个
+   * 点了没反应的按钮；壳那条腿的 `request` 由壳决定它到底能不能问
+   *（macOS 能弹系统询问；Windows/Linux 没有应用内询问，只回当前状态 —— 不许为了变绿说谎）。
+   */
+  const ask = (): void => {
+    const center = resolveReminderCenter();
+    const pending = center.request ? center.request() : Promise.resolve(center.permission());
+    void Promise.resolve(pending).then(setPermission);
+  };
 
   return (
     <section className="ht-settings" data-testid="reminder-notify-panel">
@@ -78,9 +93,7 @@ export function ReminderNotifyPanel(): React.JSX.Element {
               type="button"
               className="ht-btn ht-btn--primary"
               data-testid="reminder-notify-request"
-              onClick={() => {
-                void requestNotificationPermission().then(setPermission);
-              }}
+              onClick={ask}
             >
               {t('web.reminder.notify.request')}
             </button>
@@ -94,10 +107,7 @@ export function ReminderNotifyPanel(): React.JSX.Element {
               type="button"
               className="ht-btn ht-btn--primary"
               data-testid="reminder-notify-request"
-              onClick={() => {
-                // 🔴 只能在**用户手势里**调 —— 这是这个按钮存在的全部理由。
-                void requestNotificationPermission().then(setPermission);
-              }}
+              onClick={ask}
             >
               {t('web.reminder.notify.request')}
             </button>

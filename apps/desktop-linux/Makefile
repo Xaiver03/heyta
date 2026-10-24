@@ -29,7 +29,7 @@ PKGS   := gtk4 javascriptcoregtk-4.1 sqlite3 webkitgtk-6.0
 CFLAGS := -std=c11 -O2 -Wall -Wextra -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags $(PKGS))
 LDLIBS := $(shell pkg-config --libs $(PKGS)) -lm
 
-CORE := src/heyta_driver.c src/heyta_host.c src/heyta_api.c
+CORE := src/heyta_driver.c src/heyta_host.c src/heyta_api.c src/heyta_notify.c
 
 # bundle 由 `packages/app-host/scripts/build-native-bridge.mjs` 生成，
 # 与 Windows / macOS 两个壳加载的是**同一个文件**。
@@ -45,7 +45,7 @@ all: heyta-linux heyta-smoke
 
 # M2 的那一半（WebView）只进**窗口**这一枚：无头冒烟不链 WebKitGTK，
 # 这样"跨语言那一层"在没有任何显示环境的 CI 上照样跑得动。
-heyta-linux: $(CORE) src/main.c src/heyta_web.c src/heyta_web.h $(GTK_TOKENS) | check-bundle check-tokens
+heyta-linux: $(CORE) src/main.c src/heyta_web.c src/heyta_web.h src/heyta_notify.h $(GTK_TOKENS) | check-bundle check-tokens
 	$(CC) $(CFLAGS) -I../../packages/design-system/generated -o $@ $(CORE) src/main.c src/heyta_web.c $(LDLIBS)
 
 heyta-smoke: $(CORE) src/smoke.c | check-bundle

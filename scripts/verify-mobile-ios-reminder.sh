@@ -65,7 +65,10 @@ PROBE_PATH=""
 # keep the occurrence comfortably in the future while retaining a short default
 # for the ordinary full journey. The value is test-only timing, never reminder
 # semantics or a relaxed success condition.
-TRIGGER_OFFSET_MINUTES=${HEYTA_IOS_TRIGGER_OFFSET_MINUTES:-3}
+# ⚠️ 这一档要盖住**拒绝态那一整段**的耗时：答弹窗（有界等待）→ 那一行滚进可见区并复测
+# → 只读探针（冷启后 usernoted 的 XPC 可能要几分钟，见 §7 #266）。
+# 6 分钟那一档在 2026-10-25 实测被吃到"trigger 已过期"，判红的是夹具不是产品。
+TRIGGER_OFFSET_MINUTES=${HEYTA_IOS_TRIGGER_OFFSET_MINUTES:-8}
 COMPANION_PID=""
 APP_CONSOLE_PID=""
 APP_CONSOLE_LOG="/tmp/heyta-ios-reminder-console.$$"
@@ -470,16 +473,26 @@ sqlite_fired_count() {
   sqlite3 "$PHONE_DB" "SELECT COUNT(*) FROM ops WHERE json_extract(data,'\$.op.entityType')='REMINDER' AND json_extract(data,'\$.op.entityId')='${REMINDER_ENTITY_ID}' AND json_extract(data,'\$.op.payload.firedAt') IS NOT NULL AND json_extract(data,'\$.op.payload.firedForTriggerAt')=${REMINDER_TRIGGER_MS};" 2>/dev/null | tr -d ' '
 }
 deny_notification_permission() {
-  local label
+  local label _i
   # The first authorization request is the only supported way to create a
   # denied state in the simulator. Do not use TCC database writes or simctl
   # privacy shortcuts: those are not available on current iOS runtimes.
-  for label in "不允许" "不允许通知" "Don't Allow" "Don’t Allow"; do
-    if has "$label"; then
-      press "$label" >/dev/null 2>&1 || return 1
-      sleep 2
-      return 0
-    fi
+  #
+  # 🔴 必须**有界地等**那枚弹窗：`requestAuthorization` 的弹窗由 usernoted 排队呈现，
+  # 模拟器刚重启过的那一轮里它可以晚到几十秒（§7 #266 量过同一族延迟）。
+  # 2026-10-25 就是按"按一下就该在"跑法的：`has` 只查一次就判"没找到拒绝按钮"，
+  # 于是权限停在 `default`，后面那一行降级状态与 OS 快照三条一起判红 ——
+  # 那是**夹具**的红，不是产品的红（截图上根本没有弹窗）。
+  for _i in $(seq 1 "${HEYTA_IOS_DENY_WAIT_SECONDS:-90}"); do
+    for label in "不允许" "不允许通知" "Don't Allow" "Don’t Allow"; do
+      if has "$label"; then
+        press "$label" >/dev/null 2>&1 || return 1
+        echo "   弹窗在第 ${_i} 秒出现（等待上限 ${HEYTA_IOS_DENY_WAIT_SECONDS:-90}s）"
+        sleep 2
+        return 0
+      fi
+    done
+    sleep 1
   done
   return 1
 }
@@ -1063,6 +1076,80 @@ fi
 
 if [ "$IOS_MODE" = permission-recovery ] || [ "$IOS_MODE" = restart-recovery ]; then
   step "2. ${IOS_MODE}：跨过 trigger 后只用真实 OS 状态判定恢复"
+  if [ "$IOS_MODE" = permission-recovery ]; then
+    # 🔴 目标 1 的界面那一半：**拒绝之后必须当场看得见**，而且当场给得出回头路。
+    # 读的是设备真实 AX 树（不是 JS 返回值、也不是本地库里那条 op —— 那两样都证不了
+    # 屏幕上有一行字）。必须在 `run_probe` 之前跑：那一发按设计会终止 RN 进程。
+    step "2a. permission-recovery：拒绝态在提醒面上看得见，且给得出再授权入口"
+    # 🔴 "在 AX 树上"不等于"看得见"（AGENTS §6.2 规定一）。RN 把整个 ScrollView 的
+    # 内容都留在树上，所以只查 found 会抓到一屏之外的节点 —— 上一轮就是这样：
+    # 三条命中全绿，而截图停在面板顶部，那一行根本不在屏上。
+    # 这里要的是 shim **复测过几何**的那个 `visible=True`（中心 y 在可视区内），
+    # 而且截图必须紧跟在复测之后，中间不再做任何可能把滚动位置弄回去的动作。
+    notice_frame() {  # $1=needle $2=pressable(1/0)；成功时把 frame 打到 stdout
+      local needle="$1" kind="${2:-0}" _i out
+      for _i in $(seq 1 "${3:-25}"); do
+        if [ "$kind" = 1 ]; then
+          out="$(ax "$needle" --pressable --scroll-into-view --json 2>/dev/null || true)"
+        else
+          out="$(ax "$needle" --scroll-into-view --json 2>/dev/null || true)"
+        fi
+        [ "$(jget "$out" found)" = "True" ] && [ "$(jget "$out" visible)" = "True" ] \
+          && { printf '%s %s %s %s\n' "$(jget "$out" x)" "$(jget "$out" y)" "$(jget "$out" width)" "$(jget "$out" height)"; return 0; }
+        sleep 1
+      done
+      return 1
+    }
+    CAPTION=""
+    CAPTION_FRAME=""
+    for _copy in "到点不会响" "will not ring"; do
+      if CAPTION_FRAME="$(notice_frame "$_copy" 0)"; then CAPTION="$_copy"; break; fi
+    done
+    if [ -n "$CAPTION" ]; then
+      ok "降级说明在提醒面上**看得见**（「${CAPTION}」，frame=${CAPTION_FRAME}）"
+    else
+      bad "拒绝通知后提醒面上看不见那句降级说明（found 但不在可视区也算没看见）"
+      ax "到点不会响" --json 2>/dev/null | head -c 400
+    fi
+    ENTRY=""
+    ENTRY_FRAME=""
+    for _entry in "去系统设置" "Open system settings"; do
+      if ENTRY_FRAME="$(notice_frame "$_entry" 1 8)"; then ENTRY="$_entry"; break; fi
+    done
+    if [ -n "$ENTRY" ]; then
+      ok "拒绝态当场给得出跳系统设置的再授权入口（「${ENTRY}」可点且可见，frame=${ENTRY_FRAME}）"
+    else
+      bad "拒绝态没有可见的跳系统设置入口 —— 只说\"不会响\"而不给回头路"
+    fi
+    # 那一行与那一跳必须**是同一条**：入口的 y 落在说明文字那一行的带内。
+    # 只各自"在屏上"不够 —— 屏上别处也可能有一枚同名按钮。
+    if [ -n "$CAPTION_FRAME" ] && [ -n "$ENTRY_FRAME" ]; then
+      caption_y="$(printf '%s' "$CAPTION_FRAME" | cut -d' ' -f2)"
+      entry_y="$(printf '%s' "$ENTRY_FRAME" | cut -d' ' -f2)"
+      dy=$((caption_y > entry_y ? caption_y - entry_y : entry_y - caption_y))
+      if [ "$dy" -le 80 ]; then
+        ok "入口与那句说明在同一行带内（纵向相差 ${dy}pt ≤ 80）—— 这一行确实是"那句话 + 那个回头路""
+      else
+        bad "入口与那句说明不在同一行带内（${dy}pt）—— 不能算那一行给得出回头路"
+      fi
+    fi
+    # 锚点（testID 通道）是第三把尺：它证明那一行确实挂在共享提醒列表内部。
+    # 🔴 但这棵树上可能整批没有 `AXUniqueId`（Release 包的 RN 版本相关）——
+    # 那是**通道不可用**，要如实登记成未判定，不许判成产品失败，也不许顺手改成绿。
+    ANCHOR_JSON="$(ax "id:reminder-delivery-blocked-text" --scroll-into-view --json 2>/dev/null || true)"
+    if [ "$(jget "$ANCHOR_JSON" found)" = "True" ]; then
+      ok "那一行的锚点在本轮树里（id:reminder-delivery-blocked-text，共享提醒列表内部）"
+    elif [ "$(jget "$ANCHOR_JSON" detail)" = "tree-has-no-AXUniqueId" ]; then
+      echo "   ⚠️ 锚点通道本轮不可用（这棵树上没有任何 AXUniqueId）⇒ 那一行的归属只由上面两条几何判据 + 截图承担"
+    else
+      bad "锚点通道可用而这一枚取不到 —— 那一行不是共享提醒列表打出来的"
+    fi
+    if snapshot "$ROOT/apps/mobile/evidence/ios-reminder-denied-visible.png"; then
+      ok "拒绝态截图已落盘：apps/mobile/evidence/ios-reminder-denied-visible.png"
+    else
+      bad "拒绝态截图为空白或不可解析"
+    fi
+  fi
   if [ "$IOS_MODE" = permission-recovery ]; then
     PRE_TRIGGER_JSON="$(run_probe 500 || true)"
     if [ -n "$PRE_TRIGGER_JSON" ] && [ "$(probe_field authorization "$PRE_TRIGGER_JSON")" = denied ]; then

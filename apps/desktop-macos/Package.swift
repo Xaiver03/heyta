@@ -22,6 +22,9 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("JavaScriptCore"),
                 .linkedLibrary("sqlite3"),
+                // 提醒投递（见 ReminderPort.swift）：系统自带的框架，不引任何新依赖。
+                .linkedFramework("UserNotifications"),
+                .linkedFramework("AppKit"),
             ]
         ),
         .executableTarget(

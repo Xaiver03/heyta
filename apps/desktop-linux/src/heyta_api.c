@@ -1,6 +1,7 @@
 #include "heyta_api.h"
 
 #include "heyta_host.h"
+#include "heyta_notify.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -249,8 +250,19 @@ void heyta_task_list_free(HeytaTaskList *list) {
     list->count = 0;
 }
 
+void heyta_api_arm_reminders(HeytaApi *api) {
+    if (api == NULL || api->host == NULL) return;
+    /* 端口挂在宿主引擎的 global 上，bundle 反向不认识任何平台 API（与
+     * `__heytaDriverFactory` 同一个约定）。 */
+    heyta_notify_install_port(heyta_host_context(api->host));
+    /* 幂等：全进程只有一枚这一族的定时器，挂上后先跑一轮投递。 */
+    heyta_notify_arm(api->host);
+}
+
 void heyta_api_destroy(HeytaApi *api) {
     if (api == NULL) return;
+    /* 先拆表再毁宿主：宿主没了而定时器还挂着 = 悬垂指针。 */
+    heyta_notify_disarm();
     heyta_host_destroy(api->host);
     free(api);
 }

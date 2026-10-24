@@ -1,0 +1,3 @@
+这一轮（20:38 本地）当时三条一致：注入 MARKER == 设备容器现读 installed-marker == 截图正文，逐字都是
+HEYTA-PURPOSE-1792845370-18531。`marker.txt` / `installed-marker.txt` 两个文件后来被 21:02 那一轮覆盖，
+所以这里只留**当时终端回显的转录**（`round-2038-readout.txt`）与图本身；串值另见 ADR-0051 边界 3。

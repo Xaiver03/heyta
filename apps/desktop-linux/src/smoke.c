@@ -20,6 +20,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "heyta_notify.h"
+
 static int failures = 0;
 static int total_checks = 0;
 
@@ -188,6 +190,28 @@ int main(void) {
         sqlite3_close_v2(probe);
     } else {
         check(false, "驱动出错时拿得到错误消息（而不是静默）");
+    }
+
+    /* ── 提醒那一族：通知中心那半边界的**契约形状**（无头也能判的那部分）──
+     *
+     * 🔴 这里刻意**不**断言"这台机器能不能弹"：freedesktop 的通知服务器在不在是
+     * 环境事实，无头机器上必然没有，把那件事写成断言只会得到一条永远红或永远绿的
+     * 判据（AGENTS §7 元规则 2）。断言的是两条**跨环境都成立**的纪律：
+     *   1. 权限读数只可能是 'granted' / 'unsupported' —— freedesktop 没有 per-app
+     *      开关，所以它永不说 'denied'（说"被拒"就是把没测过的东西当事实）；
+     *   2. `show()` 回 true 的那一发必须建立在 'granted' 上 —— 反过来（没通道却回
+     *      true）会让 JS 把这条提醒记成已投（`firedAt`），用户从此等不到它。
+     * ⚠️ **不调 `openSettings`**：那一发在真桌面上会把设置程序真的起来，
+     * 无头冒烟不该带这种副作用（AGENTS §6.2 规定二那条同一个方向）。 */
+    {
+        const char *permission = heyta_notify_permission();
+        printf("\n── 提醒端口（%s）──\n", permission);
+        check(strcmp(permission, "granted") == 0 || strcmp(permission, "unsupported") == 0,
+              "提醒权限读数只可能是 granted / unsupported");
+        bool delivered = heyta_notify_show("heyta 冒烟", "这一发只验端口形状，不验本机有没有通知服务器");
+        check(!delivered || strcmp(permission, "granted") == 0,
+              "show() 回 true 时通道必须是 granted");
+        printf("  ℹ️ 本次 show()=%d（真桌面上应当看得见一条横幅）\n", delivered);
     }
 
     char cleanup[600];
