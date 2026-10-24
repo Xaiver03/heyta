@@ -49,6 +49,13 @@ export function isScheduledOn(frequency: HabitFrequency | undefined, date: Local
       const days = diffDays('1970-01-01', date);
       return ((days % every) + every) % every === 0;
     }
+    case 'spaced': {
+      // 间隔复习：只数 `anchor + offsets` 那几天（规则见 `habit-review.ts`）。
+      // 🔴 起点之前一律不是计划日 —— 否则"创建之前的那几天"会突然变成该复习的日子，
+      //    而那是判定侧凭空多出来的历史。
+      const offset = diffDays(frequency.anchor, date);
+      return offset >= 0 && frequency.offsets.includes(offset);
+    }
   }
 }
 

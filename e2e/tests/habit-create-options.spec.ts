@@ -13,12 +13,20 @@ test('页头加号打开新增面板，配置创建后刷新仍可读回', async
   await page.getByTestId('habits-add-open').click();
   const dialog = page.getByTestId('habit-create-dialog');
   await expect(dialog).toBeVisible();
+  // 🔴 图标是**收起**的（滴答的形状）：先点头像才出现那一排。
+  //    这一行此前写的是「爱心」立即 `toHaveCount(1)` —— 那等于把
+  //    "24 枚图标常驻在表单中间"这个毛病钉成了不变量，谁折叠谁红。
+  //    现在断言的是**顺序**：收起 → 点开 → 出现。
+  await expect(dialog.getByRole('button', { name: '爱心', exact: true })).toHaveCount(0);
+  await dialog.getByTestId('habit-create-icon-toggle').click();
   await expect(dialog.getByRole('button', { name: '爱心', exact: true })).toHaveCount(1);
   await dialog.getByRole('button', { name: '爱心', exact: true }).click();
   await dialog.getByLabel('数值', { exact: true }).fill('8');
   await dialog.getByLabel('单位', { exact: true }).fill('杯');
-  await dialog.locator('select').nth(0).selectOption('exactly');
-  await dialog.locator('select').nth(1).selectOption('weekly');
+  // 按**可访问名**选，不按 `select` 的下标：下标那种写法把"第几个"当成了契约，
+  // 而这排字段的先后正是本次要动的东西。
+  await dialog.getByLabel('达成方式', { exact: true }).selectOption('exactly');
+  await dialog.getByLabel('频次', { exact: true }).selectOption('weekly');
   const weekdays = dialog.getByRole('group', { name: '每周挑几天', exact: true });
   for (const day of ['一', '二', '三', '四', '五', '六', '日']) {
     const button = weekdays.getByRole('button', { name: day, exact: true });
@@ -61,7 +69,7 @@ test('atMost 目标为 0 仍可通过新增面板创建', async ({ page }) => {
   const dialog = page.getByTestId('habit-create-dialog');
   await dialog.getByLabel('新习惯名称', { exact: true }).fill(name);
   await dialog.getByLabel('数值', { exact: true }).fill('0');
-  await dialog.locator('select').nth(0).selectOption('atMost');
+  await dialog.getByLabel('达成方式', { exact: true }).selectOption('atMost');
   await dialog.getByRole('button', { name: '添加习惯', exact: true }).click();
   await expect(page.locator('[data-testid^="habit-row-"]').filter({ hasText: name })).toBeVisible();
 });

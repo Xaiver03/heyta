@@ -521,7 +521,8 @@ export type HabitFrequencySummaryKey =
   | 'web.habits.freq.summary.daily'
   | 'web.habits.freq.summary.weekly'
   | 'web.habits.freq.summary.interval'
-  | 'web.habits.freq.summary.intervalOne';
+  | 'web.habits.freq.summary.intervalOne'
+  | 'web.habits.freq.summary.spaced';
 
 /**
  * 频次 → 摘要词条 key。
@@ -543,6 +544,7 @@ export function habitFrequencySummaryKey(
     return 'web.habits.freq.summary.daily';
   }
   if (frequency.type === 'weekly') return 'web.habits.freq.summary.weekly';
+  if (frequency.type === 'spaced') return 'web.habits.freq.summary.spaced';
   return frequency.everyNDays === 1
     ? 'web.habits.freq.summary.intervalOne'
     : 'web.habits.freq.summary.interval';
