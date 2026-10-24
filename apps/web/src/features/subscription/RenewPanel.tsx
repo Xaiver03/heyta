@@ -31,11 +31,13 @@ import {
   DEFAULT_CHECKOUT_TIER_ID,
   startCheckout,
   type CheckoutFailureCode,
+  type CheckoutFailureReason,
   type CheckoutOutcome,
   type CheckoutTierId,
 } from '@heyta/app-host';
 
 import { useSyncStore } from '../sync/store.js';
+import { SettingsInfoTip } from '../settings/SettingsInfoTip.js';
 import { privacyConsent } from '../privacy/consent-gate.js';
 import { SettingsAccountGate } from '../settings/SettingsAccountGate.js';
 
@@ -49,9 +51,36 @@ import { SettingsAccountGate } from '../settings/SettingsAccountGate.js';
  * 而 `landing.pricing.hostedAi.body` 自带那句"这一步会把内容发到我们的服务器，
  * 它不受端到端加密保护" —— 收钱的那一屏正该说这句话（ADR-0054 §7）。
  */
-const TIER_KEYS: Record<CheckoutTierId, { readonly name: MessageKey; readonly detail: MessageKey }> = {
-  hosted: { name: 'landing.pricing.hosted.name', detail: 'landing.pricing.hosted.body' },
-  hostedAi: { name: 'landing.pricing.hostedAi.name', detail: 'landing.pricing.hostedAi.body' },
+const TIER_KEYS: Record<
+  CheckoutTierId,
+  {
+    readonly name: MessageKey;
+    readonly detail: MessageKey;
+    /** 标价：与价格页**同一个词条**（`check:pricing` 钉着数值一致）。 */
+    readonly price: MessageKey;
+    readonly features: readonly MessageKey[];
+  }
+> = {
+  hosted: {
+    name: 'landing.pricing.hosted.name',
+    detail: 'landing.pricing.hosted.body',
+    price: 'landing.pricing.hosted.priceCny',
+    features: [
+      'landing.pricing.hosted.feature1',
+      'landing.pricing.hosted.feature2',
+      'landing.pricing.hosted.feature3',
+    ],
+  },
+  hostedAi: {
+    name: 'landing.pricing.hostedAi.name',
+    detail: 'landing.pricing.hostedAi.body',
+    price: 'landing.pricing.hostedAi.priceCny',
+    features: [
+      'landing.pricing.hostedAi.feature1',
+      'landing.pricing.hostedAi.feature2',
+      'landing.pricing.hostedAi.feature3',
+    ],
+  },
 };
 
 /**
@@ -68,6 +97,24 @@ const FAILURE_KEYS: Partial<Record<CheckoutFailureCode, MessageKey>> = {
   PRICE_NOT_SELLABLE: 'web.subscription.renew.fail.sellable',
   PRICE_TIER_LOSES_GRANTS: 'web.subscription.renew.fail.downgrade',
   NETWORK_ERROR: 'web.subscription.renew.fail.network',
+};
+
+/**
+ * 拒单原因码 → 词条。**比错误码更细的那一层**：同一个 `PRICE_NOT_SELLABLE`
+ * 下面挂着一件"换一档就能买"的事与一件"别买"的事。
+ *
+ * 🔴 只有 `MANAGED_AI_NOT_CONFIGURED` 值得单独说：它有一个**用户能做**的动作 ——
+ * 换成不含云端 AI 的那一档（那一档判据在服务端，`billing-checkout.routes.spec.ts`
+ * 的「同一台没配上游的实例，¥5 那一档照卖」钉着）。别的原因码没有这种出口，
+ * 说了也只会变成又一句"买不了"。
+ */
+const FAILURE_REASON_KEYS: Partial<Record<CheckoutFailureReason, MessageKey>> = {
+  MANAGED_AI_NOT_CONFIGURED: 'web.subscription.renew.fail.managedAi',
+};
+
+/** 这条原因码对应的"那一档还能买"的换档动作（`undefined` = 没有可换的档）。 */
+const REASON_SWITCH_TIER: Partial<Record<CheckoutFailureReason, CheckoutTierId>> = {
+  MANAGED_AI_NOT_CONFIGURED: 'hosted',
 };
 
 const amountLabel = (amountMinor: number, currency: string): string =>
@@ -90,7 +137,18 @@ const expiryLabel = (expiresAt: number, locale: Locale): string =>
     minute: '2-digit',
   });
 
-export function RenewPanel(): React.JSX.Element {
+export function RenewPanel({
+  /**
+   * 这个账号现在是不是**已经**订阅着（由 `SubscriptionPanel` 从权益投影里读出来）。
+   *
+   * 只影响主按钮那一个词（「订阅」/「续费」）—— **不影响**任何请求：
+   * 能不能买、买哪一档、收多少钱，全由服务端判（`checkout.routes.ts` 的 ①②′④）。
+   * 也就是说这个 prop 写错了只会说错一个词，不会下错一单。
+   */
+  entitled = false,
+}: {
+  entitled?: boolean;
+} = {}): React.JSX.Element {
   const { t, locale } = useI18n();
   const [couponCode, setCouponCode] = useState('');
   const [tierId, setTierId] = useState<CheckoutTierId>(DEFAULT_CHECKOUT_TIER_ID);
@@ -129,6 +187,12 @@ export function RenewPanel(): React.JSX.Element {
     setPending(false);
   };
 
+  /** 这一条拒单原因有没有"换一档就能买"的出口（见 `REASON_SWITCH_TIER`）。 */
+  const switchTarget =
+    outcome?.kind === 'failed' && outcome.reason !== undefined
+      ? REASON_SWITCH_TIER[outcome.reason]
+      : undefined;
+
   const payTarget =
     outcome?.kind === 'qr'
       ? outcome.codeUrl
@@ -147,10 +211,7 @@ export function RenewPanel(): React.JSX.Element {
   };
 
   return (
-    <div className="ht-settings" data-testid="renew-panel">
-      <h2 className="ht-settings__title ht-type-section-title">{t('web.subscription.renew.title')}</h2>
-      <p className="ht-settings__hint">{t('web.subscription.renew.intro')}</p>
-
+    <div className="ht-settings ht-settings__sub-buy" data-testid="renew-panel">
       {!signedIn ? (
         <SettingsAccountGate
           messageKey="web.subscription.renew.fail.unauthorized"
@@ -158,60 +219,102 @@ export function RenewPanel(): React.JSX.Element {
         />
       ) : (
         <>
-          <fieldset className="ht-settings__field" data-testid="renew-tier">
-            <legend className="ht-settings__item-label">{t('web.subscription.renew.tierTitle')}</legend>
+          {/*
+            🔴 这一块**没有自己的 h2**：它现在住在「订阅」这一节里，页标题已经有了。
+            块头只有一句"选一档"+一句"怎么计费"，然后就是两档卡片。
+          */}
+          <div className="ht-settings__sub-block-head">
+            <p className="ht-settings__h3">
+              {t('web.subscription.plans.title')}
+              {/* 计费规则（一次性 30 天 / 不自动扣款）是"这怎么算"，不是状态 —— 进 `?`。 */}
+              <SettingsInfoTip
+                testId="tip-subscription-plans"
+                label={t('web.subscription.plans.title')}
+                text={t('web.subscription.plans.hint')}
+              />
+            </p>
+          </div>
+
+          <fieldset className="ht-settings__sub-plans" data-testid="renew-tier">
+            {/* legend 只给读屏：两档卡片已经各写了自己的名字。 */}
+            <legend className="sr-only">{t('web.subscription.plans.title')}</legend>
             {CHECKOUT_TIERS.map((id) => (
-              <label key={id} className="ht-settings__option">
-                <input
-                  type="radio"
-                  name="renew-tier"
-                  data-testid={`renew-tier-${id}`}
-                  checked={tierId === id}
-                  onChange={() => {
-                    setTierId(id);
-                    // 换档之后上一张单不能继续挂着：那张卡写的是**旧档**冻的金额，
-                    // 挂着就会读成"这一单是这么多钱"。
-                    setOutcome(null);
-                    setCopied(false);
-                  }}
-                />
-                <span>
-                  <strong>{t(TIER_KEYS[id].name)}</strong>
-                  <p className="ht-settings__hint">{t(TIER_KEYS[id].detail)}</p>
+              <label key={id} className="ht-settings__sub-plan" data-checked={tierId === id ? 'true' : undefined}>
+                <span className="ht-settings__sub-plan-top">
+                  <input
+                    type="radio"
+                    name="renew-tier"
+                    data-testid={`renew-tier-${id}`}
+                    checked={tierId === id}
+                    onChange={() => {
+                      setTierId(id);
+                      // 换档之后上一张单不能继续挂着：那张卡写的是**旧档**冻的金额，
+                      // 挂着就会读成"这一单是这么多钱"。
+                      setOutcome(null);
+                      setCopied(false);
+                    }}
+                  />
+                  <span className="ht-settings__sub-plan-name">
+                    {t(TIER_KEYS[id].name)}
+                    {/* 这一档给什么 → `?`（2026-10-24 禁令）。 */}
+                    <SettingsInfoTip
+                      testId={`tip-plan-${id}`}
+                      label={t(TIER_KEYS[id].name)}
+                      text={t(TIER_KEYS[id].detail)}
+                    />
+                  </span>
+                  <span className="ht-settings__sub-plan-price">{t(TIER_KEYS[id].price)}</span>
                 </span>
+                <ul className="ht-settings__sub-plan-features">
+                  {TIER_KEYS[id].features.map((feature) => (
+                    <li key={feature}>{t(feature)}</li>
+                  ))}
+                </ul>
               </label>
             ))}
           </fieldset>
-          <div className="ht-settings__field">
+
+          {/*
+            促销码默认**收起来**：绝大多数人没有码，摊在面上等于每次购买都先问一个
+            多半用不上的问题（渐进披露）。`<details>` 原生可键盘操作、无需 JS。
+          */}
+          <details className="ht-settings__sub-coupon">
+            <summary>{t('web.subscription.coupon.toggle')}</summary>
             <label className="ht-settings__item-label" htmlFor="renew-coupon">
               {t('web.subscription.renew.couponPlaceholder')}
             </label>
-            <div className="ht-settings__actions">
-              <input
-                id="renew-coupon"
-                type="text"
-                className="ht-input"
-                value={couponCode}
-                placeholder={t('web.subscription.renew.couponPlaceholder')}
-                onChange={(event) => setCouponCode(event.target.value)}
-              />
-              <button
-                type="button"
-                className="ht-btn ht-btn--primary"
-                data-testid="renew-place-order"
-                disabled={pending}
-                onClick={() => void onPlaceOrder()}
-              >
-                {pending ? t('web.subscription.renew.busy') : t('web.subscription.renew.action')}
-              </button>
-            </div>
+            <input
+              id="renew-coupon"
+              type="text"
+              className="ht-input"
+              value={couponCode}
+              placeholder={t('web.subscription.renew.couponInput')}
+              onChange={(event) => setCouponCode(event.target.value)}
+            />
+          </details>
+
+          {/* 主按钮**独占一行**：它是这一屏唯一的提交动作。 */}
+          <div className="ht-settings__actions ht-settings__sub-cta">
+            <button
+              type="button"
+              className="ht-btn ht-btn--primary"
+              data-testid="renew-place-order"
+              disabled={pending}
+              onClick={() => void onPlaceOrder()}
+            >
+              {pending
+                ? t('web.subscription.renew.busy')
+                : entitled
+                  ? t('web.subscription.renew.action')
+                  : t('web.subscription.renew.subscribe')}
+            </button>
           </div>
         </>
       )}
 
       {outcome?.kind === 'qr' || outcome?.kind === 'redirect' ? (
-        <section className="ht-settings__order-card" data-testid="renew-order">
-          <div className="ht-settings__order-summary" aria-live="polite">
+        <section className="ht-settings__sub-order" data-testid="renew-order">
+          <div className="ht-settings__sub-order-summary" aria-live="polite">
             <p>{t('web.subscription.renew.amount', { amount: amountLabel(outcome.amountMinor, outcome.currency) })}</p>
             <p>{t('web.subscription.renew.validUntil', { time: expiryLabel(outcome.expiresAt, locale) })}</p>
           </div>
@@ -228,7 +331,9 @@ export function RenewPanel(): React.JSX.Element {
           {/* 🔴 只读输入框而不是"已支付"的确认：到账只有 webhook 知道，
               客户端在这里**没有**任何可以声称成功的信息（见 checkout.ts 文件头）。 */}
           <input id="renew-pay-url" className="ht-input" readOnly value={payTarget ?? ''} />
-          <p className="ht-settings__hint">{t('web.subscription.renew.payHint')}</p>
+          <p className="ht-settings__hint" role="status">
+            {t('web.subscription.renew.payHint')}
+          </p>
           <div className="ht-settings__actions">
             <button type="button" className="ht-btn ht-btn--ghost" data-testid="renew-copy" onClick={onCopy}>
               {copied ? t('web.subscription.renew.copied') : t('web.subscription.renew.copy')}
@@ -238,15 +343,44 @@ export function RenewPanel(): React.JSX.Element {
       ) : null}
 
       {consentBlocked ? (
-        <p data-testid="renew-consent" role="alert">
+        <p className="ht-settings__danger" data-testid="renew-consent" role="alert">
           {t('common.privacy.consent.whyRequiredForAction')}
         </p>
       ) : null}
 
       {outcome?.kind === 'failed' ? (
-        <p data-testid="renew-failure" role="alert">
-          {t(FAILURE_KEYS[outcome.code] ?? 'web.subscription.renew.fail.unknown', { code: outcome.code })}
-        </p>
+        <div className="ht-settings__renew-failure" data-testid="renew-failure" role="alert">
+          {/*
+            🔴 先按**原因码**说，再退回错误码：`PRICE_NOT_SELLABLE` 一句话盖住了两件事，
+            而其中一件（这一档要交付云端 AI、本实例没开）有明确的出路。
+            词表外的码仍然原样带出来（`{code}`），不替服务端编造语义。
+          */}
+          <p>
+            {t(
+              (outcome.reason === undefined ? undefined : FAILURE_REASON_KEYS[outcome.reason])
+                ?? FAILURE_KEYS[outcome.code]
+                ?? 'web.subscription.renew.fail.unknown',
+              { code: outcome.code },
+            )}
+          </p>
+          {switchTarget === undefined ? null : (
+            <div className="ht-settings__actions">
+              <button
+                type="button"
+                className="ht-btn ht-btn--ghost"
+                data-testid="renew-switch-tier"
+                onClick={() => {
+                  setTierId(switchTarget);
+                  // 换档与"旧单不能继续挂着"同一条纪律：上一张单写的是旧档冻的金额。
+                  setOutcome(null);
+                  setCopied(false);
+                }}
+              >
+                {t('web.subscription.renew.switchTier')}
+              </button>
+            </div>
+          )}
+        </div>
       ) : null}
     </div>
   );

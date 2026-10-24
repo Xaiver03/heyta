@@ -68,10 +68,19 @@ import {
   type AccountProfileResponse,
   type AvatarPayload,
 } from '@heyta/shared-schema';
-// 头像的加解密**就是**同步通道那把口令与那两个函数 —— 不是"另写一套加密"。
+// 头像的加解密**就是**同步通道那把钥匙与那几个函数 —— 不是"另写一套加密"。
 // 见 docs/plans/ui-review-fill-zh-timeline.md §8.6：这样它不新增任何前提
-//（`sync-client` 早写明没有口令根本同步不了）。
+//（`sync-client` 早写明没有钥匙根本同步不了）。
+//
+// 🔴 但"那把钥匙"有两种形状：手填凭据的实例是**口令**，登录态账号是 **vault 根钥匙**
+//    （ADR-0050）。本行原来只 import 了口令那一支，于是登录态账号的头像永远解不开 ——
+//    详见 `AvatarKey` 的注释。
 import { decrypt, encrypt } from '@heyta/sync-core';
+import {
+  isVaultOpEnvelope,
+  type SyncPayloadCipher,
+  type SyncPayloadIdentity,
+} from '@heyta/sync-client';
 import { joinEndpointUrl } from './endpoint-url.js';
 import { PrivacyConsentBlockedError } from './privacy-consent.js';
 import { CENTRAL_COOKIE_SESSION_MARKER } from './central-auth.js';
@@ -1077,7 +1086,7 @@ export async function requestPasskeyRecovery(
  */
 
 /**
- * 头像的加密载荷：`{ contentType, dataBase64 }` 打包成 JSON，再走同步口令加密。
+ * 头像的加密载荷：`{ contentType, dataBase64 }` 打包成 JSON，再走**当前的钥匙**加密。
  *
  * 🔴 为什么**连图片格式都进密文**：服务端解不开，所以它不该知道这张图是 JPEG 还是 PNG。
  * 把 `content_type` 做成明文列（本文件的第一版就是这么设计的，后来改掉），
@@ -1089,9 +1098,74 @@ export async function requestPasskeyRecovery(
  * 512 KB 的原图 → 约 920 KB 密文，仍远小于 2 MiB 的密文上限。
  */
 export const encodeAvatarCipher = (
-  password: string,
+  key: AvatarKey,
   image: { contentType: AccountAvatarContentType; dataBase64: string },
-): Promise<string> => encrypt(JSON.stringify(image), password);
+): Promise<string> =>
+  typeof key === 'string'
+    ? encrypt(JSON.stringify(image), key)
+    : key.cipher.encrypt(JSON.stringify(image), AVATAR_SYNC_IDENTITY);
+
+/**
+ * 一把能加解密头像的钥匙。
+ *
+ * ## 🔴 为什么是**两种形状**，而不是"把口令换成钥匙"
+ *
+ * 头像的密文可能由两种东西之一写下，而这两种东西在同一个账号上**不是永远都有的**：
+ *
+ * | 形状 | 什么时候是它 | 钥匙从哪来 |
+ * |---|---|---|
+ * | `string`（口令） | 手填 `baseUrl + token + 口令` 的实例（自建、旧凭据） | 用户在这次会话里填过 |
+ * | `{ cipher }` | 用邮箱/通行密钥登录的账号（`accountId` 有值 ⇒ vault 模式） | vault 会话解出来之后 |
+ *
+ * 这里曾经只有口令一种。ADR-0050 的 vault 落地之后，登录态账号的同步走的是
+ * **vault 根钥匙**，而 `sync` store 在 vault 模式下把 `getPassword` 固定返回
+ * `undefined`（`apps/web/src/features/sync/store.ts`）—— 于是"头像是用同步那把口令
+ * 加密的"这个前提对**每一个登录态账号**都不成立了：界面永远说"本机没有口令"，
+ * 而设置里那个口令输入框在 vault 模式下根本不渲染。用户看到的是一句无解的指引
+ * （2026-10-24 产品负责人实拍）。
+ *
+ * 形状写成联合而不是"统一成 cipher"，是因为口令那条路**还在用**：没登录的
+ * 自建实例只有口令，把它也塞进一个假 cipher 会让"有没有钥匙"变成一次猜。
+ *
+ * ## `AVATAR_SYNC_IDENTITY` 是**冻住的**
+ *
+ * vault 信封的 AAD 参与认证：这七个数改任何一个，已经传上去的头像就再也解不开
+ * （不是报错，是"这台设备解不开"）。所以它们**不是**可以顺手改的示例值。
+ */
+export type AvatarKey = string | { readonly cipher: SyncPayloadCipher };
+
+/**
+ * 头像在 vault 信封里的身份。
+ *
+ * ⚠️ 冻住：见 `AvatarKey` 的注释。`timestamp` 用 0 是刻意的 —— 头像不是 op，
+ * 没有"什么时候发生的"这件事要认证。
+ */
+const AVATAR_SYNC_IDENTITY: SyncPayloadIdentity = {
+  id: 'account-avatar',
+  clientId: 'account-profile',
+  actionType: 'account.avatar',
+  opType: 'set',
+  entityType: 'account',
+  timestamp: 0,
+  schemaVersion: 1,
+};
+
+/**
+ * 这台设备现在有哪把钥匙 —— **唯一的裁决**（两个壳都调它，不各判一遍）。
+ *
+ * 优先 vault：拿到 cipher 就说明会话已解锁，那把钥匙与同步数据是同一把。
+ * 退回去看口令：手填凭据的实例没有 vault，口令就是唯一的钥匙。
+ * 两个都没有 ⇒ `undefined`（界面据此说"先解锁"，而不是"你没有头像"）。
+ */
+export function resolveAvatarKey(input: {
+  readonly password?: string | undefined;
+  readonly vaultCipher?: SyncPayloadCipher | undefined;
+}): AvatarKey | undefined {
+  if (input.vaultCipher !== undefined) return { cipher: input.vaultCipher };
+  const password = input.password;
+  if (password === undefined || password.trim() === '') return undefined;
+  return password;
+}
 
 /**
  * 解回来的结果。**判别式**：界面据此决定"显示图"还是说那句话。
@@ -1107,8 +1181,10 @@ export type AvatarDecodeResult =
       /**
        * 🔴 五种失败**不能合并**，因为用户动作不同：
        * - `no-token`：这台设备没登录。去做登录。
-       * - `no-password`：登录了但本机没有口令（口令从不落盘）。去同步设置里填一次。
-       * - `undecryptable`：口令填了但**不对**。也是去填口令，但提示不该是"你还没设口令"。
+       * - `no-password`：登录了但本机**没有钥匙**（口令不落盘 / vault 还锁着）。
+       *   去解锁一次。⚠️ 这个名字是口令时代的遗留：它现在的含义是"没有钥匙"，
+       *   两种钥匙都算。改名的代价是两个壳的 switch 一起改，本轮不做。
+       * - `undecryptable`：有钥匙但**解不开**（钥匙不对、或密文是另一种钥匙写的）。
        * - `bad-shape`：解出来不是 `{contentType,dataBase64}`。这是服务端/数据坏了，
        *   跟用户没关系，界面该说的是"暂时取不到"，不是催他改口令。
        * - `network`：一次往返没成，可重试。
@@ -1122,19 +1198,35 @@ export type AvatarDecodeResult =
  *
  * 🔴 解出来之后**必须过 zod**：那是从远端拿回来的字节，即使已解密也不能当可信对象用。
  * 不校验的后果不是崩溃而是"界面把 `undefined` 拼进 `data:` URL"，症状是一张坏图。
+ *
+ * 🔴 **先看信封，再选钥匙**（`isVaultOpEnvelope`）。两种钥匙的密文长得完全不同，
+ * 拿错钥匙只会得到一次"解不开"，而用户会被告知钥匙不对 —— 但真正的问题是
+ * 这台设备只有另一种钥匙。"先试这个、失败再试那个"要多付一次 Argon2id。
  */
 export const decodeAvatarCipher = async (
-  password: string | undefined,
+  key: AvatarKey | undefined,
   cipherBase64: string,
 ): Promise<AvatarDecodeResult> => {
-  if (password === undefined || password.trim() === '') return { ok: false, reason: 'no-password' };
+  if (key === undefined) return { ok: false, reason: 'no-password' };
   let plain: string;
-  try {
-    plain = await decrypt(cipherBase64, password);
-  } catch {
-    // 口令不对 / 密文被截断，在这里长得一模一样 —— 都归 undecryptable，
-    // 由界面统一说"这台设备解不开头像"，不去猜哪一种。
-    return { ok: false, reason: 'undecryptable' };
+  if (typeof key === 'string') {
+    if (key.trim() === '') return { ok: false, reason: 'no-password' };
+    try {
+      plain = await decrypt(cipherBase64, key);
+    } catch {
+      // 口令不对 / 密文被截断 / 这份密文其实是 vault 信封写的，在这里长得一模一样
+      // —— 都归 undecryptable，由界面统一说"这台设备解不开头像"，不去猜哪一种。
+      return { ok: false, reason: 'undecryptable' };
+    }
+  } else {
+    // 没有 vault 信封 ⇒ 这份头像由口令写下，而这台设备只有 vault 钥匙。
+    // 归 `undecryptable` 而不是 `no-password`：钥匙是有的，只是不对。
+    if (!isVaultOpEnvelope(cipherBase64)) return { ok: false, reason: 'undecryptable' };
+    try {
+      plain = await key.cipher.decrypt(cipherBase64, AVATAR_SYNC_IDENTITY);
+    } catch {
+      return { ok: false, reason: 'undecryptable' };
+    }
   }
   const image = parseAvatarPayload(plain);
   if (image === null) return { ok: false, reason: 'bad-shape' };
@@ -1234,13 +1326,16 @@ export function planDisplayNameWrite(input: {
 export async function uploadAccountAvatar(
   options: HostedAuthOptions,
   token: string,
-  password: string,
+  key: AvatarKey | undefined,
   image: { contentType: AccountAvatarContentType; dataBase64: string },
 ): Promise<HostedAuthOutcome<{ avatarHash: string }>> {
   const trimmed = token.trim();
   if (trimmed === '') return failure('invalid-input');
-  if (password.trim() === '') return failure('invalid-input');
-  const cipherBase64 = await encodeAvatarCipher(password, image);
+  // 没有钥匙就**不发请求**：一次注定解不开的上传会把服务端那份好图覆盖掉。
+  if (key === undefined || (typeof key === 'string' && key.trim() === '')) {
+    return failure('invalid-input');
+  }
+  const cipherBase64 = await encodeAvatarCipher(key, image);
   const result = await sendJson(
     options,
     'PUT',
@@ -1275,7 +1370,7 @@ export async function uploadAccountAvatar(
 export async function fetchAccountAvatar(
   options: HostedAuthOptions,
   token: string,
-  password: string | undefined,
+  key: AvatarKey | undefined,
 ): Promise<AvatarDecodeResult> {
   // 🔴 两道闸门都必须在 `sendJson` **之前**，这里是实测抓出来的：
   // 第一版只有口令那道闸门，而它长在 `decodeAvatarCipher` 里 —— 于是"没有口令"
@@ -1284,7 +1379,7 @@ export async function fetchAccountAvatar(
   // （界面层当时确实挡住了，所以这个缺陷在 web 上看不见 —— 这是它活到今天的原因。）
   const trimmed = token.trim();
   if (trimmed === '') return { ok: false, reason: 'no-token' };
-  if (password === undefined || password.trim() === '') {
+  if (key === undefined || (typeof key === 'string' && key.trim() === '')) {
     return { ok: false, reason: 'no-password' };
   }
   const result = await sendJson(options, 'GET', HOSTED_AUTH_PATHS.accountAvatar, undefined, trimmed);
@@ -1293,7 +1388,7 @@ export async function fetchAccountAvatar(
   if (body === null || typeof body.cipherBase64 !== 'string') {
     return { ok: false, reason: 'bad-shape' };
   }
-  return decodeAvatarCipher(password, body.cipherBase64);
+  return decodeAvatarCipher(key, body.cipherBase64);
 }
 
 /**
@@ -1335,11 +1430,11 @@ export type AccountAvatarImage =
 export async function resolveAccountAvatarImage(
   options: HostedAuthOptions,
   token: string,
-  password: string | undefined,
+  key: AvatarKey | undefined,
   avatarHash: string | null,
 ): Promise<AccountAvatarImage> {
   if (avatarHash === null) return { state: 'absent' };
-  const decoded = await fetchAccountAvatar(options, token, password);
+  const decoded = await fetchAccountAvatar(options, token, key);
   if (decoded.ok) return { state: 'ready', dataUri: avatarDataUri(decoded.image) };
   if (decoded.reason === 'no-password') return { state: 'needs-password' };
   if (decoded.reason === 'undecryptable') return { state: 'undecryptable' };

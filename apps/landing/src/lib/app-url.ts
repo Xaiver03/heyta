@@ -163,3 +163,36 @@ export function startCta(locale: Locale): StartCta {
     ? { href: '#selfhost', labelKey: 'landing.cta.selfHost', external: false }
     : { href: withLocale(url, locale), labelKey: 'landing.cta.useApp', external: true };
 }
+
+/**
+ * 「订阅 / 购买」这个意图：带 `?settings=` 进应用，让应用把设置**直接开在订阅那一节**。
+ *
+ * 🔴 2026-10-24：产品负责人说两档「可以开始卖了」，于是落地页的付费两档有了真入口。
+ * 它**不**在落地页里拉一份收银台 —— 落地页是营销站，收银台的唯一实现在
+ * `@heyta/app-host` 的 `startCheckout`（`apps/web` 的 `RenewPanel` 与 `apps/mobile` 的
+ * `RenewSection` 都用它）。抄第二份的代价是两份金额/失败归类的漂移，AGENTS §3.5 也禁止。
+ * 所以这里的动作是"把人送进应用里那一节"。
+ *
+ * ⚠️ 两个**必须逐字相同**的字面量（跨包，没有类型能钉住它们）：
+ *   · 参数名 `settings` ↔ `apps/web/src/lib/settings-deep-link.ts` 的 `SETTINGS_QUERY_PARAM`；
+ *   · `settings-group-subscription` ↔ 那个文件的 `SUBSCRIPTION_SETTINGS_SECTION`
+ *     （也就是 `apps/web/src/App.tsx` 的 `SETTINGS_NAV_ITEMS` 里那一条的 id）。
+ * 钉这条相等的是 `apps/landing/tests/render.spec.tsx`（它读回那两个文件比对）。
+ *
+ * @returns 绝对地址；**未配置应用地址时返回 `null`** —— 调用点据此**不渲染**按钮、
+ *   退回"即将开放"那行说明。与 `appPathHref()` 同一取舍：一个猜出来的地址点下去是 404，
+ *   比没有这个入口更坏。
+ */
+const SETTINGS_PARAM = 'settings';
+
+/** 「订阅」那一节的 id —— 见上面那条注释（跨包抄件，判据钉着相等）。 */
+export const SUBSCRIPTION_SETTINGS_SECTION = 'settings-group-subscription';
+
+export function subscriptionHref(locale: Locale): string | null {
+  const url = appUrl();
+  if (url === null) return null;
+  const parsed = new URL(withLocale(url, locale));
+  parsed.searchParams.set(SETTINGS_PARAM, SUBSCRIPTION_SETTINGS_SECTION);
+  return parsed.toString();
+}
+

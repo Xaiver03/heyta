@@ -40,7 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { signInHref } from '../src/lib/app-url.js';
+import { signInHref, SUBSCRIPTION_SETTINGS_SECTION, subscriptionHref } from '../src/lib/app-url.js';
 import { pageFromPath } from '../src/site/paths.js';
 import { SITE_PAGES } from '../src/site/pages.js';
 import {
@@ -358,8 +358,21 @@ describe('首页（原有断言，一个都不放松）', () => {
     const ctas = appAnchors.filter(({ url }) => !url.searchParams.has('signin'));
     const signins = appAnchors.filter(({ url }) => url.searchParams.has('signin'));
 
-    // 两处：导航一条 + 收尾 CTA 一条。
-    expect(ctas.length).toBe(2);
+    // 🟢 2026-10-24：付费两档也有入口了 ⇒ 从 2 变 4。
+    //    为什么这不是"数字往上改一下"：那两档的入口**只有一个形状**才说得通 ——
+    //    它们必须指向**订阅那一节**（`?settings=…`），而不是首页。所以下面按
+    //    "有没有 settings 参数"把它们从 ctas 里分出来，各自数、各自断。
+    //    只把 2 改成 4 会让"付费入口其实指向首页"这种错也绿。
+    const buys = ctas.filter(({ url }) => url.searchParams.has('settings'));
+    const plainCtas = ctas.filter(({ url }) => !url.searchParams.has('settings'));
+
+    // 两个意图：导航一条 + 收尾 CTA 一条（都不带 settings）。
+    expect(plainCtas.length).toBe(2);
+    // 付费两档：托管 + 托管含 AI，各一条，都必须精确落在订阅那一节。
+    expect(buys.length).toBe(2);
+    for (const { url } of buys) {
+      expect(url.searchParams.get('settings')).toBe('settings-group-subscription');
+    }
     expect(signins.length).toBe(2);
     for (const { a: anchor, url } of appAnchors) {
       expect(anchor.getAttribute('rel')).toBe('noopener noreferrer');
@@ -367,8 +380,11 @@ describe('首页（原有断言，一个都不放松）', () => {
       // 点中文落地页会被静默换成英文界面（`0aa6cb0e` 给应用解析链加了系统语言那一层）。
       expect(url.searchParams.get('lang')).toBe('zh-CN');
     }
-    for (const { a: anchor } of ctas) {
+    for (const { a: anchor } of plainCtas) {
       expect(anchor.textContent).toContain('立即使用');
+    }
+    for (const { a: anchor } of buys) {
+      expect(anchor.textContent).toContain('立即订阅');
     }
   });
 
@@ -550,6 +566,73 @@ describe('子页面的正文真的挂上了', () => {
       throw new Error('配了 VITE_APP_URL 而 signInHref() 返回 null —— 这一侧坏了，比对无从做起');
     }
     expect(new URL(href).searchParams.get(paramName)).toBe('1');
+  });
+
+  /**
+   * 🔴 付费两档的「立即订阅」：**未配置应用地址时一个按钮都不许有**。
+   *
+   * 这条与上面那条「没有假的购买按钮」是**同一件事的另一半**：那一半断的是
+   * "未配置时不渲染"（它今天仍然绿），这一条断的是"配置了才渲染、且落点在订阅节"。
+   * 两条都要在 —— 只有一条的话，"配没配都一个样"也能让它绿。
+   */
+  it('未配置应用地址时，付费两档没有「立即订阅」按钮，只有那行说明', () => {
+    const view = renderPage('home');
+    const pricing = view.querySelector('#pricing');
+    expect(pricing).not.toBeNull();
+    // 付费卡里不许出现任何 `<a>`；全页也不许出现「立即订阅」这四个字。
+    expect([...(pricing?.querySelectorAll('a[href]') ?? [])].map((a) => a.getAttribute('href'))).toEqual(['#selfhost']);
+    expect(view.textContent ?? '').not.toContain('立即订阅');
+  });
+
+  /**
+   * 🔴 配置了应用地址时，付费两档**各有一条**入口，且都精确落在订阅那一节。
+   *
+   * 「落在订阅节」是这条判据的要害：只断"多了一条应用链接"的话，
+   * 一个指向应用**首页**的按钮也能绿 —— 而那不是购买按钮，是"去找找看"。
+   */
+  it('配置了应用地址时，付费两档的入口都落在应用的订阅那一节', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://app.example.com/app/');
+    const view = renderPage('home');
+    const pricing = view.querySelector('#pricing');
+    const buys = [...(pricing?.querySelectorAll<HTMLAnchorElement>('a[href]') ?? [])].filter(
+      (a) => (a.getAttribute('href') ?? '').startsWith('https://app.example.com'),
+    );
+    expect(buys.length).toBe(2);
+    for (const anchor of buys) {
+      expect(anchor.textContent).toContain('立即订阅');
+      expect(anchor.getAttribute('rel')).toBe('noopener noreferrer');
+      const url = new URL(anchor.getAttribute('href') ?? '');
+      expect(url.searchParams.get('settings')).toBe('settings-group-subscription');
+      // 语言也要带（理由同 `?signin` 那条：不带会让英文浏览器访客被静默换语言）。
+      expect(url.searchParams.get('lang')).toBe('zh-CN');
+    }
+  });
+
+  /**
+   * 🔴 两个包各抄了一份 `settings` 参数名与订阅节 id：
+   * `apps/landing/src/lib/app-url.ts` 写，`apps/web/src/lib/settings-deep-link.ts` 读。
+   * 与 `?signin` 那条同族：任何一边改名都会红，而不是等用户点了没反应才发现。
+   */
+  it('落地页写的 settings 参数名与订阅节 id，就是应用那一侧读的那两个值', () => {
+    const webSource = readFileSync(join(REPO, 'apps/web/src/lib/settings-deep-link.ts'), 'utf8');
+    const paramName = /SETTINGS_QUERY_PARAM\s*=\s*'([^']+)'/.exec(webSource)?.[1];
+    const sectionId = /SUBSCRIPTION_SETTINGS_SECTION\s*=\s*'([^']+)'/.exec(webSource)?.[1];
+    if (paramName === undefined || sectionId === undefined) {
+      throw new Error(
+        'apps/web/src/lib/settings-deep-link.ts 里没有 SETTINGS_QUERY_PARAM / ' +
+          'SUBSCRIPTION_SETTINGS_SECTION 的定义 —— 那一侧改名或删了常量，这条判据要跟着改，不能空转。',
+      );
+    }
+
+    // 落地页抄的那两个值必须逐字相同（否则这里先红）。
+    expect(SUBSCRIPTION_SETTINGS_SECTION).toBe(sectionId);
+
+    vi.stubEnv('VITE_APP_URL', 'https://heyta.finlaw.cloud/app/');
+    const href = subscriptionHref('zh-CN');
+    if (href === null) {
+      throw new Error('配了 VITE_APP_URL 而 subscriptionHref() 返回 null —— 这一侧坏了，比对无从做起');
+    }
+    expect(new URL(href).searchParams.get(paramName)).toBe(sectionId);
   });
 
   /**

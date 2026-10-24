@@ -20,21 +20,35 @@ import { ICON_SIZE } from '@heyta/design-system';
  *   必须一致 —— `scripts/check-pricing-consistency.mjs` 会红。
  *   改价时先读 `docs/reference/pricing-and-entitlements.md`。
  *
- * ⚠️ 两个付费档**现在都买不到** —— 但原因**不是"没接线"**：服务端收银台路由
- *   （`POST /api/billing/checkout`）已经接通，且会走到 `adapter.createCheckout`；
- *   真正缺的是**通道本身** —— 实例里只有 `noop` adapter，所以必然回 `503`；
- *   海外则是 KYC 没过。所以这里**刻意不放按钮**：一个点了没反应的"立即购买"比没有按钮更坏。
- *   状态由各自的 `*.cta` + `landing.pricing.statusNote` 如实说明。
+ * ## 付费两档的 CTA（2026-10-24 改了）
+ *
+ * 这里原先**刻意没有按钮**，理由写在前一版注释里："通道里只有 noop，点了必然 503，
+ * 一个点了没反应的『立即购买』比没有按钮更坏"。那个理由今天仍然有效 ——
+ * 但它的**结论**取决于"应用在不在"，而那件事有现成的判据：`VITE_APP_URL`。
+ *
+ * 所以现在的形状是**两态**，与 `startCta()` 完全同构：
+ *   · **配了应用地址** ⇒ 真入口：`<a>` 指向应用里**设置 → 订阅**那一节
+ *     （`subscriptionHref()`，带 `?settings=settings-group-subscription`）。
+ *     收银台仍然只有**一份**实现（`@heyta/app-host` 的 `startCheckout`，
+ *     由应用里的 `RenewPanel` 调），落地页**不**自己拉单 —— AGENTS §3.5。
+ *   · **没配** ⇒ 逐字退回今天的行为：一行"即将开放"的说明，**没有按钮**。
+ *     一个猜出来的 href 点下去是 404，比没有入口更坏。
+ *
+ * 🔴 这个两态不是"为了过测试"：`apps/landing/tests/render.spec.tsx` 里那条
+ *   「没有假的购买按钮」断的就是**未配置**那一态（它现在仍然绿），而新增那条断的是
+ *   **配置了**那一态真的多出按钮、且 href 落在订阅节上。两条都要在 —— 只有一条的话，
+ *   "配没配都一个样"也能让它绿。
  */
 
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Check, Cloud, Hourglass, Server } from 'lucide-react';
 
-import { useI18n } from '@heyta/i18n/provider';
+import { useI18n, useLocale } from '@heyta/i18n/provider';
 
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
 import { useSelfHostHref } from '../site/cta.js';
+import { subscriptionHref } from '../lib/app-url.js';
 /**
  * 两个付费档的形状完全一样，只有词条前缀不同。
  *
@@ -46,10 +60,16 @@ function PaidCard({
   keyPrefix,
   icon,
   preset,
+  buyHref,
 }: {
   keyPrefix: 'landing.pricing.hosted' | 'landing.pricing.hostedAi';
   icon: React.ReactNode;
   preset: ReturnType<typeof useMotionPreset>;
+  /**
+   * 应用里「设置 → 订阅」的绝对地址；**未配置应用地址时为 `null`**。
+   * `null` 时这一档**不渲染按钮**，只渲染那行"即将开放"（见文件头"两态"）。
+   */
+  buyHref: string | null;
 }): React.JSX.Element {
   const { t } = useI18n();
   // 🔴 `as const` 不是装饰：`t()` 的入参是 `MessageKey` 联合类型。
@@ -96,11 +116,26 @@ function PaidCard({
         ))}
       </ul>
 
-      {/* 没有按钮，只有一个状态说明 —— 见文件头 */}
-      <p className="lp-pricing__pending">
-        <Hourglass size={ICON_SIZE.sm} aria-hidden="true" />
-        {t(`${keyPrefix}.cta`)}
-      </p>
+      {/*
+        两态（见文件头）：
+          · 配了应用地址 ⇒ 真入口，指向应用里「设置 → 订阅」那一节；
+          · 没配 ⇒ 一行"即将开放"，**没有按钮**（猜出来的 href 点下去是 404）。
+        外链必须带 `rel="noopener noreferrer"`（同页那条 GitHub 外链的判据）。
+      */}
+      {buyHref === null ? (
+        <p className="lp-pricing__pending">
+          <Hourglass size={ICON_SIZE.sm} aria-hidden="true" />
+          {t('landing.pricing.pending')}
+        </p>
+      ) : (
+        <a
+          className="lp-btn lp-btn--secondary lp-pricing__cta"
+          href={buyHref}
+          rel="noopener noreferrer"
+        >
+          {t(`${keyPrefix}.cta`)}
+        </a>
+      )}
     </motion.article>
   );
 }
@@ -108,7 +143,11 @@ function PaidCard({
 export function Pricing(): React.JSX.Element {
   const preset = useMotionPreset();
   const { t } = useI18n();
+  const locale = useLocale();
   const selfHostHref = useSelfHostHref();
+  // 🔴 语言必须显式取：`subscriptionHref()` 会把 `?lang=` 带进应用（理由见 `app-url.ts`
+  //    的 `withLocale`）。这里取**当前页**的语言，与实际渲染用的 `t()` 同源。
+  const buyHref = subscriptionHref(locale);
 
   // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
   const free = useMemo(
@@ -184,6 +223,7 @@ export function Pricing(): React.JSX.Element {
             keyPrefix="landing.pricing.hosted"
             icon={<Cloud size={ICON_SIZE.md} aria-hidden="true" />}
             preset={preset}
+            buyHref={buyHref}
           />
 
           {/* ── 托管 + 云端 AI：唯一一个我们卡得住的能力 ──────────────── */}
@@ -191,6 +231,7 @@ export function Pricing(): React.JSX.Element {
             keyPrefix="landing.pricing.hostedAi"
             icon={<AssistantIcon size={ICON_SIZE.md} aria-hidden="true" />}
             preset={preset}
+            buyHref={buyHref}
           />
         </motion.div>
 

@@ -38,6 +38,8 @@
     "migrate-payload-bytes:dev": "ts-node scripts/migrate-payload-bytes.ts",
     "dry-run-old-ops-sweep": "node dist/scripts/dry-run-old-ops-sweep.js",
     "dry-run-old-ops-sweep:dev": "tsx scripts/dry-run-old-ops-sweep.ts",
+    "doctor:billing": "tsc && node dist/scripts/billing-doctor.js",
+    "doctor:billing:dist": "node dist/scripts/billing-doctor.js",
     "pricing": "node dist/scripts/pricing.js",
     "pricing:dev": "tsx scripts/pricing.ts",
     "gen:server-copy": "ts-node --transpile-only scripts/gen-server-copy.ts",
