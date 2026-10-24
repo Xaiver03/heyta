@@ -16,7 +16,43 @@ case "$(basename "$0")" in
     exec bash "$_snap" "$@"
     ;;
 esac
-trap 'rm -f -- "$0"' EXIT
+trap 'rm -f -- "$0"; heyta_cleanup_round_dist' EXIT
+# 这条 handler 现在收两件事（bash 的 EXIT trap 只有一份，后注册的会顶掉前一份，所以必须挂在一起，
+# 不能另起一条 `trap`）：① 删脚本快照（bootstrap 的既有职责）；② 删**本轮**打包产物里会被
+# Spotlight 索引的 `.app` / `*.dmg`（来龙去脉见下面 `prune_round_dirs` 那一段）。
+# ⚠️ 形状不能改：`check:script-snapshot` 认的就是"**顶格**的 `trap '…rm -f -- "$0"…' EXIT`"，
+#    换成 `trap heyta_cleanup_round_dist EXIT` 会让那道门禁当场变哑（traps #110/#113）。
+heyta_cleanup_round_dist() {
+  # 只收「这一趟真的进过 mac 段」的产物：没进 mac 段时 `MAC_OUT` 还是空的，这时按默认值去算
+  # 会顺手删掉**上一轮**留在同一个目录里的东西 —— 那不是本轮的产物，不该记在本轮账上。
+  [ "${ROUND_DIST_ARMED:-0}" = 1 ] || return 0
+  if [ "${HEYTA_KEEP_DIST:-0}" = 1 ]; then
+    echo "⏭ 保留本轮打包产物（HEYTA_KEEP_DIST=1）：${MAC_OUT:-}"
+    return 0
+  fi
+  [ -n "${MAC_OUT:-}" ] && [ -d "${MAC_OUT}" ] || return 0
+  # 🔴 只删 `.app` 与 `*.dmg`，**不整目录 rm -rf**：打包自检的截图（`packaged-first-run.png`
+  #    及其 `.webview.png`）、`entitlements.plist`、公证日志都躺在同一个目录里，那是这一轮的
+  #    取证；而 `.app`/`.dmg` 除了被 Spotlight 再索引一遍没有别的用处（真正在跑的那一份是
+  #    `/Applications/Heyta.app`，不是这里这一份）。
+  local item size n=0
+  for item in "$MAC_OUT"/*.app "$MAC_OUT"/*.dmg; do
+    [ -e "$item" ] || continue
+    size="$(du -sh "$item" 2>/dev/null | awk '{print $1}')"
+    if rm -rf -- "$item"; then
+      echo "  🗑 收尾删产物 ${size:-?}  ${item}"
+      n=$((n + 1))
+    else
+      # rm 失败不许把整轮重装的结论弄红：装好的那份已经在 /Applications，产物没删只是留了个
+      # Spotlight 索引源，与"这一轮装没装上当前产物"无关。
+      echo "  ⚠️ 收尾删不掉（不影响本轮结论）：${item}" >&2
+    fi
+  done
+  if [ "$n" -gt 0 ]; then
+    echo "🧹 收尾：本轮 ${MAC_OUT} 里的 .app/.dmg 已删（截图/日志/取证原地保留）—— 产物留着只会被 Spotlight 再索引一遍"
+  fi
+  return 0
+}
 #
 # 固定收尾流程：**清旧包 → 重打 → 四端重装**，每端给出响亮判据。
 # =====================================================================
@@ -77,6 +113,159 @@ esac
 if [ ! -d "$RT" ]; then
   echo "🔴 HEYTA_REINSTALL_TMP_DIR 指向的目录不存在：${RT}（先 mkdir -p，别让日志重定向以 No such file 收尾）" >&2
   exit 4
+fi
+
+# ── 轮次目录保留策略（🔴 2026-10-24 实测事故：$HOME 下堆了 ~29 GB）─────────────
+# 症状不是"重复安装"，是**Spotlight 里搜出一长串同名 .app**。成因链很短：
+#   ① 每轮重装都由操作者手写一个新的 `HEYTA_REINSTALL_TMP_DIR`（`~/heyta-r99-tmp`、
+#      `~/heyta-r108-tmp`、`~/heyta-r139-mac-tmp` …）；
+#   ② 本脚本此前**没有任何保留策略、也没有收尾删除**，退场时把这些目录整个留给 $HOME；
+#   ③ 每轮 mac 段的 `$MAC_OUT` 里各躺一份 `Heyta.app` + `.dmg`（约 430 MB/轮）。
+# Spotlight 索引**任意位置**的 `.app`，于是按 `heyta` 搜出来的是 r146/r148/r155/… 一长串
+# 同名的 App，而真正安装、真正在跑的**永远只有一份** `/Applications/Heyta.app`
+# —— 安装那一步本来就是覆盖。所以问题全在轮次工作目录，不在安装。
+# 修法是两条（缺一条就会再堆起来）：
+#   ① 开跑前清掉**同族**旧轮次（本函数）；
+#   ② 收尾删掉本轮 `$MAC_OUT` 里的 `.app`/`.dmg`（`heyta_cleanup_round_dist`，挂在 EXIT trap 上）。
+#
+# 🔴 只认**精确形状**：`heyta-r<数字>-{tmp,reinstall,mac-tmp,android-tmp}` 与
+#    `heyta-macos-dist-r<数字>`。**不要**用宽松的 `heyta-*` —— 同一个父目录里还有别的活
+#    （并行 lane 会在 $HOME 下建 `heyta-carriers/` 这类工作区），一把梭等于毁掉别人的在途工作。
+#
+# 旋钮：
+#   HEYTA_KEEP_ROUNDS=2   保留最近 2 轮（含当前这一轮）。必须是 ≥1 的整数，非法就停。
+#   HEYTA_PRUNE_ROUNDS=1  1 = 启用（默认），0 = 关闭（关闭时会打印一行，别让"关了"和"没跑到"混同）。
+#   HEYTA_KEEP_DIST=1     收尾不删本轮的 .app/.dmg（要留证据/要拿去验包时用）。
+#   HEYTA_PRUNE_ONLY=1    只跑清理就退出（自检/手工清场用：不打包、不装任何端）。
+HEYTA_KEEP_ROUNDS="${HEYTA_KEEP_ROUNDS:-2}"
+HEYTA_PRUNE_ROUNDS="${HEYTA_PRUNE_ROUNDS:-1}"
+# 非法输入**当场停**而不是退回默认值：一个悄悄被纠正的"保留 0 轮"就是一次全删。
+case "$HEYTA_KEEP_ROUNDS" in
+  ''|*[!0-9]*)
+    echo "🔴 HEYTA_KEEP_ROUNDS 必须是 ≥1 的整数（读到：${HEYTA_KEEP_ROUNDS}）" >&2
+    exit 4
+    ;;
+esac
+if [ "$HEYTA_KEEP_ROUNDS" -lt 1 ]; then
+  echo "🔴 HEYTA_KEEP_ROUNDS 必须 ≥1（读到：${HEYTA_KEEP_ROUNDS}）—— 0 会让「保留」变成「全删」" >&2
+  exit 4
+fi
+case "$HEYTA_PRUNE_ROUNDS" in
+  0|1) ;;
+  *)
+    echo "🔴 HEYTA_PRUNE_ROUNDS 只接受 0（关闭）或 1（默认开启）（读到：${HEYTA_PRUNE_ROUNDS}）" >&2
+    exit 4
+    ;;
+esac
+
+# 人读的体积（KB 进、`12 MB` 出）。macOS 的 `du` 没有 `-h` 的稳定列宽，自己算更好对齐。
+heyta_human_kb() {
+  awk -v kb="${1:-0}" 'BEGIN {
+    if (kb >= 1048576) printf "%.1f GB", kb / 1048576;
+    else if (kb >= 1024) printf "%.1f MB", kb / 1024;
+    else printf "%d KB", kb;
+  }'
+}
+
+prune_round_dirs() {
+  if [ "$HEYTA_PRUNE_ROUNDS" = 0 ]; then
+    echo "⏭ 轮次目录保留策略被关掉了（HEYTA_PRUNE_ROUNDS=0）：旧轮次目录这一趟一个都不会清"
+    return 0
+  fi
+  local parent rt_real
+  parent="$(dirname "$RT")"
+  if [ ! -d "$parent" ]; then
+    echo "🧹 轮次目录：父目录 ${parent} 不存在 ⇒ 无旧轮次可清"
+    return 0
+  fi
+  # 用 `pwd -P` 而不是 `realpath`：macOS 自带的 bash 3.2 环境里 `realpath` 不一定在，
+  # 而"当前这一轮按 realpath 比"这条判据不能因为少一个工具就静默失效。
+  rt_real="$(cd "$RT" 2>/dev/null && pwd -P)" || rt_real="$RT"
+  echo "🧹 轮次目录：扫描 ${parent}（保留最近 ${HEYTA_KEEP_ROUNDS} 轮；旋钮 HEYTA_KEEP_ROUNDS / HEYTA_PRUNE_ROUNDS）"
+
+  local list="" path name round real
+  for path in "$parent"/heyta-r*-tmp "$parent"/heyta-r*-reinstall \
+              "$parent"/heyta-r*-mac-tmp "$parent"/heyta-r*-android-tmp \
+              "$parent"/heyta-macos-dist-r*; do
+    [ -d "$path" ] || continue
+    name="$(basename "$path")"
+    # ⚠️ 必须锚定 `^…$`：`heyta-r[0-9]*-tmp` 这种 glob 顺手就能匹配到
+    #    `heyta-r1-whatever-tmp`，而这一族的名字是**约定**，不是模式。
+    if [[ "$name" =~ ^heyta-r[0-9]+-(tmp|reinstall|mac-tmp|android-tmp)$ ]]; then
+      round="${name#heyta-r}"; round="${round%%-*}"
+    elif [[ "$name" =~ ^heyta-macos-dist-r[0-9]+$ ]]; then
+      round="${name##*-r}"
+    else
+      continue
+    fi
+    list="${list}${round}|${path}"$'\n'
+  done
+
+  if [ -z "$list" ]; then
+    echo "🧹 无旧轮次可清（${parent} 里没有同族轮次目录）"
+    return 0
+  fi
+
+  local idx=0 seen_round="" kept="" freed_kb=0 deleted=0 size_kb
+  # 按轮次号**从大到小**排（"最近"= 号码最大）；同一轮有多个目录（如 r2-reinstall 与
+  # macos-dist-r2）算**同一轮**，要留一起留、要删一起删 —— 否则留下的那半截会被误读成"这一轮的现场"。
+  while IFS='|' read -r round path; do
+    [ -n "$round" ] || continue
+    if [ "$round" != "$seen_round" ]; then
+      seen_round="$round"
+      idx=$((idx + 1))
+    fi
+    real="$(cd "$path" 2>/dev/null && pwd -P)" || real="$path"
+    # 正在用的这一轮（$RT 自身）永远不删 —— 即便它落在保留窗口之外。
+    if [ "$real" = "$rt_real" ]; then
+      echo "  🛡 当前这一轮永不删：${path}"
+      continue
+    fi
+    # 反向保护：候选目录若**包含**当前轮（有人把轮次目录做成指向上层的软链），删它就是连本轮
+    # 现场一起删。这条路只跳过，不猜。
+    case "$rt_real" in
+      "$real"/*)
+        echo "  ⚠️ 跳过 ${path}：解析后是 ${real}，是当前轮次的祖先目录" >&2
+        continue
+        ;;
+    esac
+    if [ "$idx" -le "$HEYTA_KEEP_ROUNDS" ]; then
+      kept="${kept} r${round}"
+      continue
+    fi
+    size_kb="$(du -sk "$path" 2>/dev/null | awk '{print $1}')"; size_kb="${size_kb:-0}"
+    if rm -rf -- "$path" 2>/dev/null; then
+      freed_kb=$((freed_kb + size_kb))
+      deleted=$((deleted + 1))
+      echo "  🗑 删掉 $(heyta_human_kb "$size_kb")  ${path}"
+    else
+      # rm 失败不许让整轮重装失败：留下一个旧轮次目录是"下次还会被搜到"，不是"这一轮没装好"。
+      echo "  ⚠️ 删不掉（不影响本轮重装结论）：${path}" >&2
+    fi
+  done <<EOF
+$(printf '%s' "$list" | sort -t'|' -k1,1nr -k2,2)
+EOF
+
+  # 写成 if/fi 而不是 `[ … ] && echo`：后者在"没有保留窗口"时返回 1，今天无害
+  # （本脚本是 `set -uo pipefail`，没有 -e），但将来谁给这份脚本加个 `-e`，它就会变成
+  # "清完场直接中止整轮重装"的假故障 —— 这种靠运气活着的写法不值得留。
+  if [ -n "$kept" ]; then
+    echo "  🛡 保留窗口内：${kept}（当前这一轮另算，永不删）"
+  fi
+  if [ "$deleted" -eq 0 ]; then
+    echo "🧹 无旧轮次可清（${parent} 里没有超出保留窗口的同族轮次目录）"
+  else
+    echo "🧹 清理汇总：释放 $(heyta_human_kb "$freed_kb")（删掉 ${deleted} 个轮次目录，保留最近 ${HEYTA_KEEP_ROUNDS} 轮）"
+  fi
+  return 0
+}
+
+# 在**写任何产物之前**跑：本脚本下面第一件事就是往 $RT 里重定向构建日志。
+prune_round_dirs
+# 只清场就退出的干跑口（自检用）。放在这里是因为它必须在 resolve_pnpm 与任何打包之前生效。
+if [ "${HEYTA_PRUNE_ONLY:-0}" = 1 ] || [ "${1:-}" = "--prune-only" ]; then
+  echo "⏭ HEYTA_PRUNE_ONLY=1 ⇒ 只跑了轮次清理，然后退出（没打包、没装任何端、没写日志）"
+  exit 0
 fi
 
 # 🔴 封装运行时里 PATH 最前面的 `pnpm` 可能是不能独立 spawn 的私有垫片
@@ -259,6 +448,10 @@ if printf '%s' "$WANT" | grep -q "mac"; then
   #    而"我记得先改名"不是判据（AGENTS §8 第 9 条：共享资源要先定所有者与运行窗口）。
   #    旋钮的默认值逐字不变，所以不带 env 的行为与今天完全一致。
   MAC_OUT="${HEYTA_MACOS_DIST_DIR:-$RT/heyta-macos-dist}"
+  # 从这里起，EXIT trap 里的 `heyta_cleanup_round_dist` 才允许动产物：本轮确实打过 mac 包，
+  # 目录里的 `.app`/`.dmg` 才是"这一轮留下的"。没进 mac 段时不武装 ⇒ 不会顺手删掉别人
+  # （或上一轮）留在同一目录里的东西。
+  ROUND_DIST_ARMED=1
   INSTALLED_APP="/Applications/Heyta.app"
   RESULT_mac=FAIL
   # 🔴 删之前把"删的是哪个目录、里面有什么"打进日志：这一句的失败模式是**安静**，

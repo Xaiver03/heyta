@@ -11241,3 +11241,27 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     （对着 `git show HEAD:server/src/password/registration-otp.ts` 跑必红）。
     同类但**今天还没有自锁**的一处也一并改了：`password/login-otp.ts` 的 `verifyLoginCode`
     （它的事务只读 `users`、不握强锁；但"一条请求两条连接"在并发下会把连接池抽干）。
+
+545. **Spotlight 里搜出一长串同名 `.app` = `$HOME` 下的轮次构建目录，不是重复安装**（2026-10-24，`pnpm reinstall:all` 的轮次目录堆到约 29 GB）
+    症状：按 `heyta` 搜，Spotlight 列出 r146 / r148 / r155 / r139-tmp… 一长串**同名 App**，
+    报障原话是"为什么我能搜索到那么多这个应用？这不应该自动清理吗？每次装新的都覆盖旧的安装包和应用"。
+    第一反应容易去查"是不是每轮装了一份" —— **不是**，装的那一步从来是覆盖。
+    - **安装只有一份**：`/Applications/Heyta.app`。`scripts/reinstall-all.sh` 的 mac 段就是
+      `rm -rf /Applications/Heyta.app` → `cp -R` ⇒ 覆盖是既有行为，不会并排留两份。
+    - **被索引的是构建产物**：`$RT/heyta-macos-dist` 里每轮一份 `.app` + `.dmg`（约 430 MB/轮）。
+      而 `$RT`（`HEYTA_REINSTALL_TMP_DIR`）是**操作者每轮手写的新父目录**
+      （`~/heyta-r99-tmp`、`~/heyta-r108-tmp`、`~/heyta-r139-mac-tmp` …），脚本此前**没有任何
+      保留策略、也没有收尾删除** ⇒ 每轮在 `$HOME` 下多留一份可被 Spotlight 索引的 `.app`。
+    - **判据（先量再修）**：`mdfind -name "heyta.app"` —— 条数 ≈ 轮次目录数，路径几乎全在
+      `$HOME/heyta-r*-*/heyta-macos-dist/` 下，只有一条是 `/Applications/Heyta.app`。
+      只报"能搜到 App"不算判据，要连**路径**一起看，才分得清"重复安装"与"轮次残留"。
+    - **修法两条，缺一条还会再堆**：① 脚本开跑前按**精确同族形状**
+      （`heyta-r<数字>-{tmp,reinstall,mac-tmp,android-tmp}`、`heyta-macos-dist-r<数字>`）
+      保留最近 `HEYTA_KEEP_ROUNDS` 轮（默认 2，当前这一轮按 realpath 比、永不删），其余删掉并
+      逐条打印体积、末尾一行释放汇总；② 收尾（含失败路径）删掉本轮 `$MAC_OUT` 里的
+      `.app` / `*.dmg` —— **打包/安装自检的截图与日志保留**，那是证据。
+      `HEYTA_PRUNE_ROUNDS=0` 可关，`HEYTA_PRUNE_ONLY=1` 可只清场不打包。
+    - 🔴 **别用 `rm -rf ~/heyta-*` 一把梭**：那个父目录通常就是 `$HOME`，里面还有并行 lane 的
+      工作区（`heyta-carriers/` 这类），宽松通配会连别人的在途工作一起删。判据是"名字落在同族
+      精确形状里"，不是"看起来像 heyta 的" —— 这条代价与收益完全不对称：漏删一个目录只是少省
+      几百 MB，误删一个工作区是毁掉别人一轮的现场。

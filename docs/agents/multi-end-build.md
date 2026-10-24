@@ -74,6 +74,21 @@ pnpm reinstall:mobile           # 只 android + ios
   iOS 新鲜度判据沿用 `verify-mobile-ios.sh` 那次事故的产物（main.jsbundle mtime ≥ 源码 mtime）。
 - 打包脚本自己会做的事（签名/公证/远端 schtasks 安装）**不在本脚本里重写** ——
   它只编排；改打包行为去改各端的 package 脚本。
+- 🔴 **轮次工作目录有保留策略**（2026-10-24 实测：`$HOME` 下堆了约 29 GB 的同名 `.app`）。
+  脚本**开跑前**（在写任何产物之前）扫 `dirname "$RT"` 里**同族**的旧轮次目录
+  （`heyta-r<数字>-{tmp,reinstall,mac-tmp,android-tmp}`、`heyta-macos-dist-r<数字>`，
+  只认这个精确形状），**保留最近 2 轮**（`HEYTA_KEEP_ROUNDS`，必须是 ≥1 的整数，非法就停；
+  **当前这一轮按 realpath 比、永远不删**），其余 `rm -rf` 并逐条打印「体积 + 路径」，
+  末尾一行释放汇总；一个都没删时也会打印「无旧轮次可清」（"跑了但没活干"必须与"根本没跑到"分得开）。
+  `HEYTA_PRUNE_ROUNDS=0` 关闭（关闭时会打印一行说明）。
+  收尾（含失败路径）若 `HEYTA_KEEP_DIST` 未设为 1，删掉本轮 `$MAC_OUT` 里的 `Heyta.app`
+  与 `*.dmg` —— 装好的那份在 `/Applications`，产物留着只会被 Spotlight 再索引一遍；
+  **打包/安装自检的截图与日志不删**，那是证据。`HEYTA_PRUNE_ONLY=1` 只清场不打包（自检用）。
+- 🔴 **别再每轮手写一个新的 `HEYTA_REINSTALL_TMP_DIR`。** 那正是上面那 29 GB 的成因：
+  每轮一个 `~/heyta-r<NNN>-tmp`，而脚本此前没有保留策略也没有收尾删除 ⇒ 每轮留下约
+  430 MB 的 `.app` + `.dmg`，Spotlight 又索引**任意位置**的 `.app`。要隔离就把轮次号交给
+  脚本、或**复用同一个父目录**（让保留策略有东西可清）；别用 `rm -rf ~/heyta-*` 一把梭 ——
+  那个父目录里还有并行 lane 的工作区（`heyta-carriers/` 这类），删了等于毁掉在途工作。
 
 - **事实源（环境 / 版本 / 产物 / 状态）**：[`docs/reference/build-matrix.md`](../../docs/reference/build-matrix.md)
 - **操作步骤（怎么打、怎么验、坑）**：[`docs/runbooks/multi-platform-build.md`](../../docs/runbooks/multi-platform-build.md)
