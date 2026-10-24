@@ -394,6 +394,7 @@ export function AuthPanel({
   } = {
     title: t('web.auth.title'),
     titleText: t('web.auth.title'),
+    subtitle: t('web.auth.subtitle'),
     close: t('web.auth.close'),
     email: t('web.auth.email.label'),
     emailPlaceholder: t('web.auth.email.placeholder'),

@@ -863,6 +863,7 @@ export const en = {
   // The email format check lives on the server (single source of truth); the
   // placeholder only shows the shape.
   'web.auth.title': 'Sign in or register',
+  'web.auth.subtitle': 'Continue with your email and password',
   'web.auth.close': 'Close',
   'web.auth.open': 'Sign in or register',
   'web.auth.central.kicker': 'heyta official service',
@@ -4610,6 +4611,12 @@ export const en = {
   'common.share.notif.sectionTitle': 'Shared-list notifications',
   'common.share.activity.added': 'Someone added something to a shared list you joined',
   'common.share.activity.deleted': 'Someone removed something from a shared list you joined',
+  // ADR-0071: the body may carry the shared list's **name** (metadata level) but never
+  // entry content (data level). The name comes from this device's own list row; when it
+  // is unavailable, fall back to the two name-free sentences above.
+  'common.share.activityNamed.added': 'Someone added something to the shared list "{name}" you joined',
+  'common.share.activityNamed.deleted': 'Someone removed something from the shared list "{name}" you joined',
+  'common.share.activityNamed.completed': 'A task was completed or reopened in the shared list "{name}" you joined',
   'common.share.notif.activitiesTitle': 'Activity notifications',
   'common.share.notif.activityCompleted': 'Task completed/uncompleted',
   'common.share.notif.activityAdded': 'Task/note added',
@@ -5338,4 +5345,22 @@ export const en = {
   // M6-2 (mobile collaboration): the share row in the second layer of the profile tab. Paired with zh-CN.
   'mobile.share.entry': 'Shared lists',
   'mobile.share.entry.hint': 'One list, several people - everyone sees each other',
+  // M6-3a (mobile collaboration, UI leg): the two share screens and the "Shared activity"
+  // tab in the notification centre. Everything else reuses the same-source keys
+  // (`web.share.*` / `common.share.*`); these are the genuinely new sentences.
+  'mobile.inbox.tab.share': 'Shared activity',
+  'mobile.inbox.share.empty': 'No shared activity yet',
+  'mobile.inbox.share.note': 'Shared activity is kept on this device only and clears on restart; the content itself lives in the share log and is visible inside the list.',
+  'mobile.share.space.sharedTitle': 'Shared lists',
+  'mobile.share.space.shareableTitle': 'Lists you can share',
+  'mobile.share.space.noneYet': 'Nothing has been shared from this device yet',
+  'mobile.share.space.shareableEmpty': 'No lists available to share',
+  'mobile.share.space.commentsTitle': 'Comments',
+  'mobile.share.space.noTasks': 'No tasks in this shared list yet',
+  'mobile.share.space.pickTask': 'Pick a task to view its comments',
+  'mobile.share.space.leaveConfirm': 'Leave this shared list?',
+  'mobile.share.invite.handOff': 'Send the invitation',
+  'mobile.share.invite.revoke': 'Revoke this invitation',
+  'mobile.share.prefs.saveFailed': 'Share notification preferences were not saved (local storage write failed); the switches may revert on next launch.',
+  'mobile.share.consent.saveFailed': '“Don’t ask again” was not saved; you will be asked again before the next share.',
 } satisfies Record<MessageKey, string>;
