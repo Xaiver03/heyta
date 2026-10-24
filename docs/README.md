@@ -93,6 +93,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 
 | 编号 | 决策 | 状态 |
 |---|---|---|
+| [0075](adr/0075-announcements-are-a-content-channel.md) | 运营公告是**一条内容通道**，不是一种通知：明文下发、服务端独占"有效"的裁决权、忽略只记在本机（不做账号级阅读史）、下架即删除 | ✅ **已接受**（工程裁决 2026-10-24）；实施见 [后台计划](plans/admin-console.md) §8.3 |
 | [0066](adr/0066-official-central-identity-and-self-hosted-auth.md) | 官方中央身份、自托管认证与 E2EE 边界 | 已接受；[实施状态](plans/unified-central-auth.md) |
 | [0067](adr/0067-shared-list-write-routing-and-merge.md) | 共享清单的写路径路由与多写者合并语义（承接 0062；线协议一次定，M2 做路由+因果时钟+并发可见，M4 做签名） | 已接受（工程裁决 2026-10-22）；实施见 [协作计划](plans/collaboration-shared-lists.md) §9.3 的 M2/M4 |
 | [0068](adr/0068-share-member-identity-and-content-publication.md) | 共享清单的成员侧身份（收窄 0067 裁决一的 PROJECT 那一支）、读侧按 shareId 归并、存量内容发布快照 | 已接受（工程裁决 2026-10-22）；M2 的读侧合并与发布那两片的判据来源 |

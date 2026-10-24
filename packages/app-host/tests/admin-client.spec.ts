@@ -27,9 +27,13 @@ import {
   adminDeleteHolidayYear,
   adminPutHolidayYear,
   adminUnlockUser,
+  adminPublishAnnouncement,
+  adminWithdrawAnnouncement,
+  fetchAdminAnnouncements,
   fetchAdminHolidayYears,
   fetchAdminOverview,
   fetchAdminRefunds,
+  fetchAdminRevenue,
   fetchAdminUsers,
   type AdminClientOptions,
 } from '../src/admin-client.js';
@@ -400,6 +404,135 @@ describe('退款四条端点的传输形状', () => {
     });
     expect(await adminApproveRefund(options, 12, '批准')).toEqual({ ok: false, reason: 'no-token' });
     expect(await adminRejectRefund(options, 12, '驳回')).toEqual({ ok: false, reason: 'no-token' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * 营收看板（GET /revenue）与运营公告（GET/POST/DELETE /announcements）。
+ *
+ * 这一组钉的还是**传输**：
+ *   · 时区偏移必须由**调用方**给（这台设备的墙上时钟只有浏览器知道），
+ *     但它只是分桶参数，不是"这里算净收入"的许可；
+ *   · 🔴 公告的 `state` 由服务端算，客户端不许自己比时钟 —— 所以这一层
+ *     **没有任何 Date.now()**，测试用假时钟也拿不到别的结果；
+ *   · 下架用的是 DELETE，404 的形状必须是 `not-found`（界面要说"它已经不在了"，
+ *     而不是"出错了"）。
+ * ──────────────────────────────────────────────────────────────────────── */
+describe('营收与公告的传输形状', () => {
+  it('GET /revenue 把 days 与 offsetMinutes 拼进查询串，响应体原样交出', async () => {
+    const payload = {
+      window: { days: 90, offsetMinutes: 480, fromMs: 0, toMs: 1 },
+      series: [{ currency: 'CNY', totalPaidMinor: 900, totalRefundedMinor: 500, totalNetMinor: 400, totalPaidOrders: 3, totalRefundedOrders: 2, points: [] }],
+    };
+    const fetchImpl = stubResponse(200, payload);
+
+    const result = await fetchAdminRevenue(withFetch(fetchImpl), { days: 90, offsetMinutes: 480 });
+
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/revenue?days=90&offsetMinutes=480`);
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+    expect(result).toEqual({ ok: true, data: payload });
+  });
+
+  it('🔴 负偏移（UTC 以西）原样传出去，不取绝对值', async () => {
+    const fetchImpl = stubResponse(200, { window: {}, series: [] });
+
+    await fetchAdminRevenue(withFetch(fetchImpl), { days: 30, offsetMinutes: -300 });
+
+    const [url] = fetchImpl.mock.calls[0] as [string];
+    expect(url).toContain('offsetMinutes=-300');
+  });
+
+  it('不传参数时查询串是空的（服务端自己有默认 90 天 / 0 偏移）', async () => {
+    const fetchImpl = stubResponse(200, { window: {}, series: [] });
+
+    await fetchAdminRevenue(withFetch(fetchImpl));
+
+    const [url] = fetchImpl.mock.calls[0] as [string];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/revenue`);
+  });
+
+  it('公告读面是 GET 全量（含未生效与已过期），带 now', async () => {
+    const payload = { now: 1234, announcements: [] };
+    const fetchImpl = stubResponse(200, payload);
+
+    const result = await fetchAdminAnnouncements(withFetch(fetchImpl));
+
+    const [url] = fetchImpl.mock.calls[0] as [string];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/announcements`);
+    // 🔴 `now` 必须到得了调用方：界面那句"这条还没到发布时间"用的就是它，
+    // 自己 new Date() 就是第二个裁决者。
+    expect(result).toEqual({ ok: true, data: payload });
+  });
+
+  it('公告写面的载荷只有服务端认识的那五个键', async () => {
+    const fetchImpl = stubResponse(201, { ok: true, announcement: { id: 1 } });
+
+    await adminPublishAnnouncement(withFetch(fetchImpl), {
+      title: '系统维护',
+      body: '今晚 22:00 起同步暂停约 20 分钟。',
+      level: 'warning',
+      publishedAtMs: 1000,
+      expiresAtMs: 2000,
+    });
+
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/announcements`);
+    expect(init.method).toBe('POST');
+    // 🔴 这里不许多出 `author`、`color`、`targetUserIds` 之类的键：
+    // 谁发的由服务端从会话里取（`createdBy = request.user.id`），
+    // 一旦客户端能填，就能把一条话伪造成别人发的。
+    expect(JSON.parse(String(init.body))).toEqual({
+      title: '系统维护',
+      body: '今晚 22:00 起同步暂停约 20 分钟。',
+      level: 'warning',
+      publishedAtMs: 1000,
+      expiresAtMs: 2000,
+    });
+  });
+
+  it('不过期时不发送 expiresAtMs 这个键（而不是发 null 混过校验）', async () => {
+    const fetchImpl = stubResponse(201, { ok: true, announcement: { id: 1 } });
+
+    await adminPublishAnnouncement(withFetch(fetchImpl), {
+      title: 'a',
+      body: 'b',
+      level: 'info',
+      publishedAtMs: 1000,
+    });
+
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('expiresAtMs');
+  });
+
+  it('下架是 DELETE /announcements/:id；404 报成 not-found', async () => {
+    const ok = stubResponse(200, { ok: true, withdrawn: true });
+    const result = await adminWithdrawAnnouncement(withFetch(ok), 12);
+    const [url, init] = ok.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/announcements/12`);
+    expect(init.method).toBe('DELETE');
+    expect(result).toEqual({ ok: true, data: { ok: true, withdrawn: true } });
+
+    const gone = stubResponse(404, { error: 'announcement_not_found' });
+    expect(await adminWithdrawAnnouncement(withFetch(gone), 12)).toEqual({
+      ok: false,
+      reason: 'not-found',
+      status: 404,
+    });
+  });
+
+  it('🔴 未登录时这一组端点一个请求都不发', async () => {
+    const fetchImpl = stubResponse(200, {});
+    const options = withFetch(fetchImpl, { getToken: async () => undefined });
+
+    expect(await fetchAdminRevenue(options, { days: 30 })).toEqual({ ok: false, reason: 'no-token' });
+    expect(await fetchAdminAnnouncements(options)).toEqual({ ok: false, reason: 'no-token' });
+    expect(
+      await adminPublishAnnouncement(options, { title: 'a', body: 'b', level: 'info', publishedAtMs: 1 }),
+    ).toEqual({ ok: false, reason: 'no-token' });
+    expect(await adminWithdrawAnnouncement(options, 1)).toEqual({ ok: false, reason: 'no-token' });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

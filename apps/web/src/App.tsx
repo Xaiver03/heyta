@@ -229,9 +229,19 @@ import { NavButton } from './features/shell/NavButton.js';
 import { EmptyState, isActive } from './features/shell/EmptyState.js';
 import { SETTINGS_ANCHORS, type SettingsAnchor } from './features/shell/settings-anchors.js';
 import { SyncSettingsPanel } from './features/sync/SyncSettingsPanel.js';
+import { AdminConsolePage } from './features/admin/AdminConsolePage.js';
+import { AnnouncementBanner } from './features/announcements/AnnouncementBanner.js';
+import { isAdminConsoleLocation } from './features/admin/route.js';
 
 const SETTINGS_NAV_ITEMS = [
   { id: 'settings-group-profile', labelKey: 'web.settings.nav.profile' },
+  /*
+   * 「订阅」独立成节（2026-10-24 产品负责人："需要有单独的订阅界面"）。
+   * 它排在**个人资料之后、任务与显示之前**：身份 → 付钱 → 用起来，
+   * 与"我"相关的两件事在前，偏好类在后。原来它在「账号与安全」里，
+   * 而那让"付钱"躲在"安全"底下，还和通行密钥、注销账号挤在同一列。
+   */
+  { id: 'settings-group-subscription', labelKey: 'web.settings.nav.subscription' },
   { id: 'settings-group-appearance', labelKey: 'web.settings.nav.appearance' },
   { id: 'settings-group-sync', labelKey: 'web.settings.nav.syncPrivacy' },
   { id: 'settings-group-ai', labelKey: 'web.settings.nav.aiIntegrations' },
@@ -2126,6 +2136,22 @@ export function App(): React.JSX.Element {
   );
 
 
+  /*
+   * `/admin` 这个地址：整棵树换成后台壳，不画应用本体。
+   *
+   * 🔴 位置是刻意的 —— 必须在**所有 hook 之后**。往上挪一行，`/admin` 就会在
+   * 第一个条件分支处违反 rules-of-hooks，症状是"只有这一个地址打不开、
+   * 别处全好"，而报错只在那一个 URL 上出现。
+   *
+   * 地址只在挂载这一次读：后台壳里点分区改的是 `store.activeTab`，**不改地址**，
+   * 所以这里不监听 popstate，也不需要路由库（ADR-0038 §3.3）。
+   *
+   * ⚠️ 这里判的是"该画哪个壳"，不是权限。权限只有服务端 `requireAdmin` 那一个
+   * 裁决者（§4.3）：手工把地址敲成 `/admin` 的人拿到的是一个说明原因的页面，
+   * 不是一条数据。
+   */
+  if (isAdminConsoleLocation()) return <AdminConsolePage />;
+
   return (
     /*
       🔴 共享层的主题在**这里**交出去（唯一的 `value`）。
@@ -2351,6 +2377,12 @@ export function App(): React.JSX.Element {
           而这两句话讲的是**这一次点击的结果** —— 结果要出现在用户做出动作的那个位置。
         */}
         <SignOutNotice />
+        {/*
+          运营公告那一横条（ADR-0075）。挂在主区顶部：它讲的不是某一个视图的事，
+          而是"这个部署现在要告诉所有用户一句话"。
+          一次只画最新的一条，忽略记在本机 —— 见 `features/announcements/store.ts`。
+        */}
+        <AnnouncementBanner />
         <header className="ht-header">
           {view === 'tasks' ? (
             <button type="button" className="ht-btn ht-btn--ghost ht-scope-trigger"

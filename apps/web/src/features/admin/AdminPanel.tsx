@@ -37,25 +37,19 @@ import {
   ADMIN_PAGE_SIZE,
   ADMIN_REFUND_CODE_KEY,
   ADMIN_REFUND_NOTICE_KEY,
+  EMPTY_ANNOUNCEMENT_FORM,
   useAdminStore,
   type AdminHolidayNotice,
   type AdminRefundNotice,
   type AdminStoreState,
-  type AdminTab,
+  type AnnouncementFormInput,
   type HolidayYearInput,
   type RefundRequestInput,
 } from './store.js';
 
-const TABS: readonly { key: AdminTab; labelKey: MessageKey }[] = [
-  { key: 'overview', labelKey: 'web.admin.tab.overview' },
-  { key: 'users', labelKey: 'web.admin.tab.users' },
-  { key: 'subscriptions', labelKey: 'web.admin.tab.subscriptions' },
-  { key: 'orders', labelKey: 'web.admin.tab.orders' },
-  { key: 'coupons', labelKey: 'web.admin.tab.coupons' },
-  { key: 'invites', labelKey: 'web.admin.tab.invites' },
-  { key: 'holidays', labelKey: 'web.admin.tab.holidays' },
-  { key: 'refunds', labelKey: 'web.admin.tab.refunds' },
-];
+import type { AdminAnnouncementRow } from '@heyta/app-host';
+
+import { ADMIN_TABS } from './nav.js';
 
 /** 录入表单的初值。全空 —— **不给默认年份**：默认值会让人提交自己没看过的数字。 */
 const EMPTY_HOLIDAY_FORM: HolidayYearInput = {
@@ -136,10 +130,27 @@ function Stat(props: { labelKey: MessageKey; value: string | number }): React.JS
   );
 }
 
-export function AdminPanel({ active = true }: { active?: boolean }): React.JSX.Element | null {
+/**
+ * 后台的**内容区**，两种壳共用。
+ *
+ * - `chrome="settings"`（默认）：设置页里那一格，自带小标题与一排横向 tab。
+ *   对非管理员**什么都不渲染**（见文件头）。
+ * - `chrome="console"`：`/admin` 那个独立后台页里的内容区。标题、侧栏、
+ *   「返回应用」都在 `AdminConsolePage`，这里只留表格与动作。
+ *
+ * 🔴 两种壳共用**同一份**内容：分区状态在 store（`activeTab`），导航清单在
+ * `nav.ts`。分开写两份的表现不是"样式不一致"，是**其中一份会漏掉后来加的那一格**。
+ */
+export function AdminPanel({
+  active = true,
+  chrome = 'settings',
+}: {
+  active?: boolean;
+  chrome?: 'settings' | 'console';
+}): React.JSX.Element | null {
   const { t } = useI18n();
   const store = useAdminStore();
-  const [tab, setTab] = useState<AdminTab>('overview');
+  const tab = store.activeTab;
   const [search, setSearch] = useState('');
   const [quotaMiB, setQuotaMiB] = useState('');
 
@@ -170,6 +181,15 @@ export function AdminPanel({ active = true }: { active?: boolean }): React.JSX.E
         break;
       case 'invites':
         if (store.invites === null) void store.loadInvites();
+        break;
+      case 'revenue':
+        // 聚合窗口不分页（一次把整段日界发回来），所以这一格没有 Pager ——
+        // 与调休/退款那两格同一理由：造一个翻页按钮会点出一个假动作。
+        if (store.revenue === null) void store.loadRevenue();
+        break;
+      case 'announcements':
+        // 全量、不分页（一次最多 100 条，运营要看的就是现状）。
+        if (store.announcements === null) void store.loadAnnouncements();
         break;
       case 'holidays':
         // 服务端那三条端点里只有列表是 GET，年度**不分页**（一年一次录入，
@@ -204,46 +224,50 @@ export function AdminPanel({ active = true }: { active?: boolean }): React.JSX.E
   const overview = store.overview;
   const users = store.users;
   const detail = store.detail;
+  // 独立后台页的标题与导航在 `AdminConsolePage` 那一侧，这里只留内容。
+  const bareChrome = chrome === 'console';
 
   return (
-    <div className="ht-settings__section" data-testid="admin-panel">
-      <h3 className="ht-settings__h3 ht-type-headline">
-        <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.admin.title')}
-      </h3>
-      <p className="ht-settings__hint">{t('web.admin.lead')}</p>
+    <div
+      className={bareChrome ? 'ht-settings__console-body' : 'ht-settings__section'}
+      data-testid="admin-panel"
+    >
+      {!bareChrome && (
+        <>
+          <h3 className="ht-settings__h3 ht-type-headline">
+            <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.admin.title')}
+          </h3>
+          <p className="ht-settings__hint">{t('web.admin.lead')}</p>
 
-      <div className="ht-settings__admin-tabs" role="tablist">
-        {TABS.map((entry) => (
-          <button
-            key={entry.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === entry.key}
-            className={`ht-settings__admin-tab${tab === entry.key ? ' ht-settings__admin-tab--active' : ''}`}
-            onClick={() => {
-              setTab(entry.key);
-              store.clearNotice();
-              store.clearHolidayNotice();
-              store.clearRefundNotice();
-            }}
-          >
-            {t(entry.labelKey)}
-          </button>
-        ))}
-        <button
-          type="button"
-          className="ht-settings__admin-tab ht-settings__admin-tab--icon"
-          title={t('web.admin.retry')}
-          aria-label={t('web.admin.retry')}
-          onClick={() => {
-            if (!active) return;
-            void store.probe();
-            void store.loadUsers({ offset: 0 });
-          }}
-        >
-          <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
-        </button>
-      </div>
+          <div className="ht-settings__admin-tabs" role="tablist">
+            {ADMIN_TABS.map((entry) => (
+              <button
+                key={entry.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === entry.key}
+                className={`ht-settings__admin-tab${tab === entry.key ? ' ht-settings__admin-tab--active' : ''}`}
+                onClick={() => store.setActiveTab(entry.key)}
+              >
+                {t(entry.labelKey)}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="ht-settings__admin-tab ht-settings__admin-tab--icon"
+              title={t('web.admin.retry')}
+              aria-label={t('web.admin.retry')}
+              onClick={() => {
+                if (!active) return;
+                void store.probe();
+                void store.loadUsers({ offset: 0 });
+              }}
+            >
+              <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
+            </button>
+          </div>
+        </>
+      )}
 
       {store.errorKey !== null && (
         <p className="ht-settings__danger" data-testid="admin-error">
@@ -641,6 +665,12 @@ export function AdminPanel({ active = true }: { active?: boolean }): React.JSX.E
           />
         </>
       )}
+
+      {/* ── 营收看板（只读聚合）────────────────────────────────── */}
+      {tab === 'revenue' && <RevenuePanel store={store} />}
+
+      {/* ── 运营公告（ADR-0075 的内容通道写面）────────────────── */}
+      {tab === 'announcements' && <AnnouncementPanel store={store} />}
 
       {/* ── 调休 / 补班（公共事实的唯一录入面）──────────────────── */}
       {tab === 'holidays' && <HolidayPanel store={store} />}
@@ -1158,6 +1188,349 @@ function Pager(props: {
       >
         {t('web.admin.next')} <ChevronRight size={ICON_SIZE.xs} aria-hidden="true" />
       </button>
+    </div>
+  );
+}
+
+/** `formatTime` 的前十个字符 = 本地日 `YYYY-MM-DD`。 */
+function formatDay(ms: number): string {
+  return formatTime(ms).slice(0, 10);
+}
+
+/** 分钟偏移 → `UTC+8` / `UTC-5` / `UTC+0`。界面要说的是"哪一天算一天"，不是符号学。 */
+function utcOffsetLabel(offsetMinutes: number): string {
+  const sign = offsetMinutes < 0 ? '-' : '+';
+  return `UTC${sign}${String(Math.abs(offsetMinutes) / 60)}`;
+}
+
+/** 可选的聚合窗口。三档是刻意的窄集：再多一档就没人点了。 */
+const REVENUE_WINDOWS: readonly number[] = [30, 90, 365];
+
+/** 明细表最多列这么多天（有活动的那些）。 */
+const REVENUE_DETAIL_ROWS = 14;
+
+/**
+ * 营收看板。
+ *
+ * 🔴 这里**一个数都不算**。逐日分桶、日界按哪个时区裁、净收入怎么折、
+ * 币种能不能相加 —— 全部来自 `/api/admin/revenue` 的响应体
+ * （`server/src/admin/admin.routes.ts`）。本组件只做两件事：把服务端给的
+ * 数字画出来，以及把"窗口"这个参数发回去。
+ *
+ * ⚠️ **没有跨币种合计**，因为那不是一个合法的数（混币求和是"错得很像真的"
+ * 那一类）。界面因此按币种各一段，而不是给一个大总数。
+ */
+function RevenuePanel({ store }: { store: AdminStoreState }): React.JSX.Element {
+  const { t } = useI18n();
+  const revenue = store.revenue;
+
+  // `null` 是"还没问"，不是"没有营收" —— 这一格只可能出现在切过来的那一瞬。
+  if (revenue === null) return <p className="ht-settings__hint">{t('web.admin.loading')}</p>;
+
+  if (revenue.series.length === 0) {
+    return <AdminEmpty titleKey="web.admin.revenue.noneFound" />;
+  }
+
+  return (
+    <div data-testid="admin-revenue">
+      <div className="ht-settings__admin-tabs" role="group" aria-label={t('web.admin.revenue.window')}>
+        {REVENUE_WINDOWS.map((days) => (
+          <button
+            key={days}
+            type="button"
+            className={`ht-settings__admin-tab${store.revenueDays === days ? ' ht-settings__admin-tab--active' : ''}`}
+            aria-pressed={store.revenueDays === days}
+            onClick={() => void store.loadRevenue(days)}
+          >
+            {t('web.admin.revenue.days', { count: days })}
+          </button>
+        ))}
+      </div>
+
+      {/* 日界是按这台设备的时区裁的 —— 这句话必须写在图上，
+          否则读图的人会默认它是服务器那个时区，而两者差几个小时。 */}
+      <p className="ht-settings__hint">
+        {t('web.admin.revenue.tzNote', { offset: utcOffsetLabel(revenue.window.offsetMinutes) })}
+      </p>
+
+      {revenue.series.map((series) => {
+        const peak = Math.max(
+          1,
+          ...series.points.map((point) => Math.max(point.paidMinor, point.refundedMinor)),
+        );
+        const activeDays = series.points
+          .filter((point) => point.paidMinor > 0 || point.refundedMinor > 0)
+          .slice(-REVENUE_DETAIL_ROWS)
+          .reverse();
+        const barHeight = (value: number): number => (value / peak) * 100;
+
+        return (
+          <section
+            key={series.currency}
+            className="ht-settings__admin-revenueGroup"
+            data-testid={`admin-revenue-${series.currency}`}
+          >
+            <h4 className="ht-settings__admin-h">{series.currency}</h4>
+
+            <div className="ht-settings__admin-stats">
+              <Stat
+                labelKey="web.admin.revenue.paid"
+                value={formatMoney(series.totalPaidMinor, series.currency)}
+              />
+              <Stat
+                labelKey="web.admin.revenue.refunded"
+                value={formatMoney(series.totalRefundedMinor, series.currency)}
+              />
+              <Stat
+                labelKey="web.admin.revenue.net"
+                value={formatMoney(series.totalNetMinor, series.currency)}
+              />
+              <Stat labelKey="web.admin.revenue.paidOrders" value={series.totalPaidOrders} />
+              <Stat
+                labelKey="web.admin.revenue.refundedOrders"
+                value={series.totalRefundedOrders}
+              />
+            </div>
+
+            <svg
+              className="ht-settings__admin-revenueChart"
+              viewBox={`0 0 ${String(series.points.length)} 100`}
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={t('web.admin.revenue.chartLabel', {
+                currency: series.currency,
+                days: String(revenue.window.days),
+              })}
+            >
+              {series.points.map((point, index) => (
+                // 一根柱子两窄条：左进账、右退款。不叠在一起 —— 叠加会把
+                // "退了 30%"读成"收了 130%"，而这两件事的差才是净收入。
+                <g key={point.dayMs}>
+                  <rect
+                    className="ht-settings__admin-revenueBarPaid"
+                    x={index + 0.12}
+                    y={100 - barHeight(point.paidMinor)}
+                    width={0.36}
+                    height={barHeight(point.paidMinor)}
+                  >
+                    <title>
+                      {t('web.admin.revenue.day', {
+                        day: formatDay(point.dayMs),
+                        paid: formatMoney(point.paidMinor, series.currency),
+                        refunded: formatMoney(point.refundedMinor, series.currency),
+                      })}
+                    </title>
+                  </rect>
+                  <rect
+                    className="ht-settings__admin-revenueBarRefunded"
+                    x={index + 0.52}
+                    y={100 - barHeight(point.refundedMinor)}
+                    width={0.36}
+                    height={barHeight(point.refundedMinor)}
+                  />
+                </g>
+              ))}
+            </svg>
+
+            {activeDays.length === 0 ? (
+              <p className="ht-settings__hint">{t('web.admin.revenue.noneFound')}</p>
+            ) : (
+              <div className="ht-settings__admin-list" data-testid={`admin-revenue-rows-${series.currency}`}>
+                {activeDays.map((point) => (
+                  <div key={point.dayMs} className="ht-settings__admin-row">
+                    <span className="ht-settings__admin-rowMain">{formatDay(point.dayMs)}</span>
+                    <span className="ht-settings__admin-static">
+                      {t('web.admin.revenue.rowPaid', {
+                        paid: formatMoney(point.paidMinor, series.currency),
+                        orders: String(point.paidOrders),
+                      })}
+                    </span>
+                    <span className="ht-settings__admin-static">
+                      {t('web.admin.revenue.rowRefunded', {
+                        refunded: formatMoney(point.refundedMinor, series.currency),
+                        orders: String(point.refundedOrders),
+                      })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 公告那一格的状态词 → 词条 key。**穷举**，漏一个编译期就红。 */
+const ANNOUNCEMENT_STATE_KEY: Record<AdminAnnouncementRow['state'], MessageKey> = {
+  pending: 'web.admin.announcements.state.pending',
+  active: 'web.admin.announcements.state.active',
+  expired: 'web.admin.announcements.state.expired',
+};
+
+/**
+ * 运营公告的写面（ADR-0075）。
+ *
+ * 🔴 这一片界面**不判**任何一件事该不该发：长度、`level` 词表、
+ * "失效要晚于生效"全部由服务端那一次 `safeParse` 裁决。
+ * 表单里那两个时刻控件给的是**运营者墙上时钟**，换算成 epoch 毫秒发生在 store
+ * （那是设备本地事实，只有这台机器知道）。
+ *
+ * 🔴 第一句必须是"这是明文"。ADR-0075 §5.1 写的正是：这条通道对**所有用户**
+ * 可见且不走端到端加密，而"别把口令写进去"这条约束如果只躺在一份没人读的
+ * 决策记录里，它就等于不存在。
+ */
+function AnnouncementPanel({
+  store,
+}: {
+  store: AdminStoreState;
+}): React.JSX.Element {
+  const { t } = useI18n();
+  const [form, setForm] = useState<AnnouncementFormInput>(EMPTY_ANNOUNCEMENT_FORM);
+  // 下架是**两步**：第一次点只出确认、一个请求都不发（与退款批准同一模式）。
+  const [pendingWithdrawId, setPendingWithdrawId] = useState<number | null>(null);
+
+  const rows = store.announcements;
+
+  return (
+    <div data-testid="admin-announcements">
+      <p className="ht-settings__admin-notice" data-testid="admin-announcements-plaintext">
+        {t('web.admin.announcements.plaintextWarning')}
+      </p>
+
+      <form
+        className="ht-settings__admin-detail"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void (async () => {
+            const ok = await store.publishAnnouncement(form);
+            if (ok) setForm(EMPTY_ANNOUNCEMENT_FORM);
+          })();
+        }}
+      >
+        <h4 className="ht-settings__admin-h">{t('web.admin.announcements.compose')}</h4>
+        <input
+          className="ht-settings__admin-input"
+          value={form.titleText}
+          placeholder={t('web.admin.announcements.title')}
+          aria-label={t('web.admin.announcements.title')}
+          onChange={(event) => setForm({ ...form, titleText: event.target.value })}
+        />
+        <textarea
+          className="ht-settings__admin-input"
+          rows={3}
+          value={form.bodyText}
+          placeholder={t('web.admin.announcements.body')}
+          aria-label={t('web.admin.announcements.body')}
+          onChange={(event) => setForm({ ...form, bodyText: event.target.value })}
+        />
+        <div className="ht-settings__admin-badges">
+          {(['info', 'warning'] as const).map((level) => (
+            <label key={level} className="ht-settings__admin-quota">
+              <input
+                type="radio"
+                name="announcement-level"
+                checked={form.level === level}
+                onChange={() => setForm({ ...form, level })}
+              />
+              {t(level === 'info' ? 'web.admin.announcements.levelInfo' : 'web.admin.announcements.levelWarning')}
+            </label>
+          ))}
+        </div>
+        <div className="ht-settings__admin-badges">
+          <label className="ht-settings__admin-quota">
+            {t('web.admin.announcements.publishesAt')}
+            {/* `datetime-local` 给的是**本地墙上时钟**，换算发生在 store。 */}
+            <input
+              className="ht-settings__admin-input ht-settings__admin-input--narrow"
+              type="datetime-local"
+              value={form.publishesAtText}
+              onChange={(event) => setForm({ ...form, publishesAtText: event.target.value })}
+            />
+          </label>
+          <label className="ht-settings__admin-quota">
+            {t('web.admin.announcements.expiresAt')}
+            <input
+              className="ht-settings__admin-input ht-settings__admin-input--narrow"
+              type="datetime-local"
+              value={form.expiresAtText}
+              onChange={(event) => setForm({ ...form, expiresAtText: event.target.value })}
+            />
+          </label>
+        </div>
+        <div className="ht-settings__admin-actions">
+          <button type="submit" className="ht-settings__admin-btn">
+            {t('web.admin.announcements.publish')}
+          </button>
+        </div>
+        {store.announcementNotice !== null && (
+          <p
+            className={store.announcementNotice === 'done' ? 'ht-settings__hint' : 'ht-settings__danger'}
+            data-testid="admin-announcements-notice"
+          >
+            {t(store.announcementNotice === 'done' ? 'web.admin.action.done' : 'web.admin.action.failed')}
+          </p>
+        )}
+      </form>
+
+      <h4 className="ht-settings__admin-h">{t('web.admin.announcements.list')}</h4>
+      {rows === null ? (
+        <p className="ht-settings__hint">{t('web.admin.loading')}</p>
+      ) : rows.length === 0 ? (
+        <AdminEmpty titleKey="web.admin.announcements.noneFound" />
+      ) : (
+        <div className="ht-settings__admin-list">
+          {rows.map((row) => (
+            <div key={row.id} className="ht-settings__admin-row">
+              <span className="ht-settings__admin-rowMain">{row.title}</span>
+              <span className="ht-settings__admin-badges">
+                <span
+                  className={`ht-settings__admin-badge${
+                    row.state === 'active' ? '' : ' ht-settings__admin-badge--danger'
+                  }`}
+                >
+                  {t(ANNOUNCEMENT_STATE_KEY[row.state])}
+                </span>
+              </span>
+              <span className="ht-settings__admin-rowMeta">
+                {formatTime(row.publishedAt)}
+                {' → '}
+                {row.expiresAt === null ? t('web.admin.announcements.neverExpires') : formatTime(row.expiresAt)}
+              </span>
+              {pendingWithdrawId === row.id ? (
+                <span className="ht-settings__admin-actions">
+                  <button
+                    type="button"
+                    className="ht-settings__admin-btn ht-settings__admin-btn--danger"
+                    onClick={() => {
+                      setPendingWithdrawId(null);
+                      void store.withdrawAnnouncement(row.id);
+                    }}
+                  >
+                    {t('web.admin.announcements.withdrawConfirm')}
+                  </button>
+                  <button
+                    type="button"
+                    className="ht-settings__admin-btn"
+                    onClick={() => setPendingWithdrawId(null)}
+                  >
+                    {t('web.admin.close')}
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="ht-settings__admin-btn"
+                  onClick={() => setPendingWithdrawId(row.id)}
+                >
+                  {t('web.admin.announcements.withdraw')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

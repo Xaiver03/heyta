@@ -19,6 +19,10 @@ import { centralRuntime } from '../central-auth/runtime';
  * | GET  | `/orders`                | 订单列表 |
  * | GET  | `/coupons`               | 优惠码 + 核销数 |
  * | GET  | `/invites`               | 邀请码 + 推荐关系 |
+ * | GET  | `/revenue`               | 营收看板：逐日 × 逐币种的进账与退款（只读聚合，日界由调用方时区裁） |
+ * | GET  | `/announcements`         | 运营公告全量（含未生效与已过期；后台要看现状）—— ADR-0075 |
+ * | POST | `/announcements`         | 发一条公告（`level` 词表 + 有效期由服务端判） |
+ * | DELETE | `/announcements/:id`     | 下架 = 删掉那一行（0 行 ⇒ 404，不折成"已完成"） |
  * | GET  | `/holiday-adjustments`   | 调休/补班已录入的年度（含 `papers` 出处回显） |
  * | PUT  | `/holiday-adjustments/years` | **整年替换**某一年（公共事实的唯一写入口，判据③的载体） |
  * | DELETE | `/holiday-adjustments/years?year=` | 撤销某一年（退回随包表，不是"下发空的一年"） |
@@ -71,6 +75,13 @@ import {
   submitRefundToChannel,
 } from '../billing/refund-store';
 import { createPrismaSqlExecutor } from '../billing/pricing-store';
+import {
+  ANNOUNCEMENT_LEVELS,
+  announcementStateAt,
+  listAllAnnouncements,
+  publishAnnouncement,
+  withdrawAnnouncement,
+} from '../announcements/announcement-store';
 import { prisma } from '../db';
 
 /** epoch 毫秒。`null` 原样返回（"未知"与 0 是两件事）。 */
@@ -1074,5 +1085,233 @@ export const adminRoutes = async (
     // 拒绝**不碰钱也不碰权益** —— 它是这条流程里唯一"什么都不发生"的出口，
     // 所以响应里如实只带状态，不带任何金额或到期日字段。
     return reply.send({ ok: true, ...decided });
+  });
+
+  /* ── 营收看板（只读聚合）───────────────────────────────────────
+   *
+   * 这是后台里**唯一一处把订单行折成数字**的地方，所以它服务的领域就是
+   * "这台部署上收了多少、退了多少"。它**不新造任何事实**：
+   *
+   *   · 进账 = `checkout_orders.paid_at` 非空的那些行，金额取 `final_amount_minor`
+   *     （实付，不是标价 —— 用券的那一单按标价计会让看板与对账差一张券）；
+   *   · 退款 = `refunds.refunded_at` 非空的那些行。
+   *
+   * 🔴 退款那一格用的谓词是 `refunded_at IS NOT NULL`，**不是** `status='success'`。
+   *   schema 上那条双向 CHECK 让两者此刻等价，但"钱真的出去了"这个事实的载体
+   *   是那一列（见 `billing/refund-store.ts` 文件头对 `refunds_success_needs_refunded_at`
+   *   的说明）。按状态取，是在读一个**关于**事实的字段，而不是事实本身。
+   *
+   * 🔴 混币求和是一个"错得很像真的"数字，所以**逐币种各算各的**，
+   *   响应里没有任何一个"总计金额"。要跨币种只能比数量，不能比钱。
+   *
+   * ⚠️ 日界由调用方给的 `offsetMinutes` 裁。这台服务器跑 UTC，而"今天收了多少"
+   *   是运营者本地那个日子的问题：不裁的话，北京时间凌晨 0–8 点的进账会算到昨天。
+   *   默认 0（UTC）而不是猜一个 —— 界面把自己那个时区的偏移传进来。
+   */
+  const DAY_MS = 86_400_000;
+
+  const RevenueQuerySchema = z.object({
+    days: z.coerce.number().int().min(7).max(365).default(90),
+    offsetMinutes: z.coerce.number().int().min(-14 * 60).max(14 * 60).default(0),
+  });
+
+  fastify.get('/revenue', async (req, reply) => {
+    const query = RevenueQuerySchema.safeParse(req.query);
+    if (!query.success) {
+      return reply.status(400).send({ code: 'bad_request', message: 'Invalid revenue query.' });
+    }
+    const { days, offsetMinutes } = query.data;
+    const offsetMs = offsetMinutes * 60_000;
+
+    // 先在"运营者的本地时间轴"上取整日边界，再减回偏移换成本机 epoch 毫秒。
+    // 反过来做（先裁 UTC 再挪）会在负偏移上取错格子。
+    const localNow = Date.now() + offsetMs;
+    const localTodayStart = Math.floor(localNow / DAY_MS) * DAY_MS;
+    const localWindowStart = localTodayStart - (days - 1) * DAY_MS;
+    const fromMs = localWindowStart - offsetMs;
+    // 右开边界 = 本地"明天零点"，于是今天这一格是完整的一天（含此刻之后的进账）。
+    const toMs = localTodayStart + DAY_MS - offsetMs;
+
+    const [paidRows, refundRows] = await Promise.all([
+      prisma.checkoutOrder.findMany({
+        where: { paidAt: { not: null, gte: BigInt(fromMs), lt: BigInt(toMs) } },
+        select: { paidAt: true, currency: true, finalAmountMinor: true },
+      }),
+      prisma.refund.findMany({
+        where: { refundedAt: { not: null, gte: BigInt(fromMs), lt: BigInt(toMs) } },
+        select: { refundedAt: true, currency: true, amountMinor: true },
+      }),
+    ]);
+
+    /** 一条 epoch 毫秒 → 它所在那个**本地日**的 dayMs（值仍是本机 epoch 毫秒）。 */
+    const dayBucket = (valueMs: number): number =>
+      Math.floor((valueMs + offsetMs) / DAY_MS) * DAY_MS - offsetMs;
+
+    interface Cell {
+      dayMs: number;
+      currency: string;
+      paidMinor: number;
+      refundedMinor: number;
+      paidOrders: number;
+      refundedOrders: number;
+    }
+    const cells = new Map<string, Cell>();
+    const cellAt = (dayMs: number, currency: string): Cell => {
+      const key = `${String(dayMs)}|${currency}`;
+      const existing = cells.get(key);
+      if (existing !== undefined) return existing;
+      const created: Cell = {
+        dayMs,
+        currency,
+        paidMinor: 0,
+        refundedMinor: 0,
+        paidOrders: 0,
+        refundedOrders: 0,
+      };
+      cells.set(key, created);
+      return created;
+    };
+
+    for (const row of paidRows) {
+      if (row.paidAt === null) continue; // `where` 已经排除，这一格是给类型的那个 null。
+      const cell = cellAt(dayBucket(Number(row.paidAt)), row.currency);
+      cell.paidMinor += row.finalAmountMinor;
+      cell.paidOrders += 1;
+    }
+    for (const row of refundRows) {
+      if (row.refundedAt === null) continue;
+      const cell = cellAt(dayBucket(Number(row.refundedAt)), row.currency);
+      cell.refundedMinor += row.amountMinor;
+      cell.refundedOrders += 1;
+    }
+
+    // 出现过的币种（按字母序，响应要可重放）。
+    // ⚠️ `[...cells.values()].map(...)` 而不是 `cells.values().map(...)`：后者是
+    //    **迭代器助手**（Node 22 运行时支持），但本仓 server 的 `tsc` 目标/lib 不含它
+    //    ⇒ `pnpm -r build` 在 `Property 'map' does not exist on type 'MapIterator<Cell>'`
+    //    上停住，连带挡住 `reinstall:all` 的第 0 步（2026-10-24 实测）。展开成数组语义等价。
+    const currencies = [...new Set([...cells.values()].map((cell) => cell.currency))].sort();
+
+    // 🔴 **每一天都发一个点**，包括零。只发非零日的话，界面上"3 月 5 日"和
+    // "3 月 6 日"之间那根没画出来的柱子会被读成"那天没人付钱"，而它其实
+    // 只是**没被列出来** —— 零与缺席在两处界面上长得一样，含义完全不同。
+    const series = currencies.map((currency) => {
+      const points: { dayMs: number; paidMinor: number; refundedMinor: number; paidOrders: number; refundedOrders: number }[] = [];
+      for (let i = 0; i < days; i += 1) {
+        const dayMs = localWindowStart + i * DAY_MS - offsetMs;
+        const cell = cells.get(`${String(dayMs)}|${currency}`);
+        points.push({
+          dayMs,
+          paidMinor: cell?.paidMinor ?? 0,
+          refundedMinor: cell?.refundedMinor ?? 0,
+          paidOrders: cell?.paidOrders ?? 0,
+          refundedOrders: cell?.refundedOrders ?? 0,
+        });
+      }
+      return {
+        currency,
+        totalPaidMinor: points.reduce((sum, point) => sum + point.paidMinor, 0),
+        totalRefundedMinor: points.reduce((sum, point) => sum + point.refundedMinor, 0),
+        // 🔴 净收入在**这里**折，不在界面折。"哪些退款算进这一格"是一个业务判定
+        // （只有 `refunded_at` 非空的算），让界面自己减一次就是第二套标准 ——
+        // 两处的差会表现为"看板与对账差一笔"，而没人知道是哪一侧错了。
+        totalNetMinor: points.reduce(
+          (sum, point) => sum + point.paidMinor - point.refundedMinor,
+          0,
+        ),
+        totalPaidOrders: points.reduce((sum, point) => sum + point.paidOrders, 0),
+        totalRefundedOrders: points.reduce((sum, point) => sum + point.refundedOrders, 0),
+        points,
+      };
+    });
+
+    return reply.send({
+      window: { days, offsetMinutes, fromMs, toMs },
+      series,
+    });
+  });
+
+  /* ── 运营公告（写面）──────────────────────────────────────────
+   *
+   * 定性见 [`docs/adr/0075`](../../../docs/adr/0075-announcements-are-a-content-channel.md)。
+   * 三条路由都**不写 `preHandler`** —— 它们继承上面那个插件级 `requireAdmin`
+   * （那一条结构性保证：新增路由忘了鉴权是不可能的）。
+   *
+   * 🔴 时刻是**浏览器算好的 epoch 毫秒**，不是服务端解析的日期串。
+   *   `datetime-local` 那个控件给的是"运营者墙上时钟的 10:00"，而这台服务器在 UTC。
+   *   服务端 `Date.parse` 一个不带时区的串会按服务器时区解释 ⇒ 差几个小时，
+   *   表现是"我说今晚 10 点挂出来，结果 2 点才出现"。换算属于设备本地事实，
+   *   所以它住在客户端；这里只收一个数。
+   *
+   * ⚠️ 这里**不判**"这条该不该发"。有效期、词表、长度都在下面那一道 `safeParse`
+   *   与 store 里；界面那一侧多判一次就是第二套标准。
+   */
+  const AnnouncementPublishSchema = z.object({
+    title: z.string().trim().min(1).max(120),
+    body: z.string().trim().min(1).max(2_000),
+    level: z.enum(ANNOUNCEMENT_LEVELS),
+    publishedAtMs: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    // 不给 = 不过期。给的话必须晚于生效时刻（一条"已经结束了"的公告是一个操作失误，
+    // 而不是一个合法状态 —— 那种情况该做的是不发）。
+    expiresAtMs: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+  });
+
+  fastify.get('/announcements', async (_req, reply) => {
+    const now = Date.now();
+    const announcements = await listAllAnnouncements();
+    // 后台这一侧**多给一格 `createdBy`**：运营要知道是谁发的。
+    // 用户侧那条读面故意不给（见 `announcements/announcement.routes.ts` 的投影注释）。
+    //
+    // 🔴 `state` 是**服务端算的**（`announcementStateAt`），界面不许自己比时间戳 ——
+    // 那会造出第二个裁决者，而它的症状是"运营以为已经下架了，用户还看得见"。
+    return reply.send({
+      now,
+      announcements: announcements.map((item) => ({
+        ...item,
+        state: announcementStateAt(item, now),
+      })),
+    });
+  });
+
+  fastify.post('/announcements', async (req, reply) => {
+    const body = AnnouncementPublishSchema.safeParse(req.body);
+    if (!body.success) {
+      return reply.status(400).send({ code: 'bad_request', message: 'Invalid announcement payload.' });
+    }
+    const publishedAt = body.data.publishedAtMs;
+    const expiresAt = body.data.expiresAtMs;
+    if (expiresAt !== undefined && expiresAt <= publishedAt) {
+      return reply.status(400).send({
+        code: 'bad_request',
+        message: 'Invalid announcement payload.',
+        reason: 'EXPIRES_BEFORE_PUBLISH',
+      });
+    }
+    const created = await publishAnnouncement(
+      {
+        title: body.data.title,
+        body: body.data.body,
+        level: body.data.level,
+        publishedAt,
+        expiresAt: expiresAt ?? null,
+      },
+      getAuthUser(req).userId,
+      Date.now(),
+    );
+    return reply.send({ ok: true, announcement: created });
+  });
+
+  const AnnouncementIdParam = z.object({ id: z.coerce.number().int().positive() });
+
+  fastify.delete('/announcements/:id', async (req, reply) => {
+    const id = AnnouncementIdParam.safeParse(req.params);
+    if (!id.success) return reply.status(400).send({ code: 'bad_request', message: 'Invalid announcement id.' });
+    const withdrawn = await withdrawAnnouncement(id.data.id);
+    if (!withdrawn) {
+      // 与退款那几条同一立场：**"它已经不在了"不是一句"已完成"**。
+      // 把 0 行折成成功，界面就会对一个没发生过的动作点头。
+      return reply.status(404).send({ code: 'announcement_not_found', message: 'Announcement not found.' });
+    }
+    return reply.send({ ok: true, withdrawn: true });
   });
 };

@@ -332,19 +332,26 @@ export {
   adminCreateRefundRequest,
   adminForceUserLogout,
   adminRejectRefund,
+  adminPublishAnnouncement,
   adminSetUserQuota,
+  adminWithdrawAnnouncement,
   adminUnlockUser,
   adminDeleteHolidayYear,
   adminPutHolidayYear,
+  fetchAdminAnnouncements,
   fetchAdminCoupons,
   fetchAdminHolidayYears,
   fetchAdminInvites,
   fetchAdminOrders,
   fetchAdminOverview,
   fetchAdminRefunds,
+  fetchAdminRevenue,
   fetchAdminSubscriptions,
   fetchAdminUser,
   fetchAdminUsers,
+  type AdminAnnouncementList,
+  type AdminAnnouncementPublishInput,
+  type AdminAnnouncementRow,
   type AdminClientOptions,
   type AdminCouponRow,
   type AdminFailureReason,
@@ -358,6 +365,9 @@ export {
   type AdminPage,
   type AdminRefundRow,
   type AdminResult,
+  type AdminRevenue,
+  type AdminRevenuePoint,
+  type AdminRevenueSeries,
   type AdminSubscriptionRow,
   type AdminUserDetail,
   type AdminUserRow,
@@ -1070,3 +1080,12 @@ export * from './share-signals.js';
 export * from './share-roster-signals.js';
 export * from './share-signing-key.js';
 export * from './share-key-store.js';
+
+// 运营公告的用户侧读面（ADR-0075）。与 admin-client 同一条短路纪律，
+// 但是**另一个客户端**：它没有权限维度，拉不到就不画那一横条。
+export {
+  fetchActiveAnnouncements,
+  type ActiveAnnouncement,
+  type AnnouncementClientOptions,
+  type AnnouncementsResult,
+} from './announcement-client.js';

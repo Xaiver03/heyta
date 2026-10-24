@@ -534,6 +534,59 @@ export const fetchAdminInvites = (
   );
 
 // ─────────────────────────────────────────────────────────────────────
+// 营收看板（只读聚合）。
+//
+// 🔴 与那三条支持动作同一立场：**这里一个数都不算**。逐日分桶、日界按谁裁、
+// 净收入怎么折、混币能不能加 —— 全部住在
+// `server/src/admin/admin.routes.ts` 的 `/revenue`。本文件只把响应搬过来。
+// 在这里"顺手"把两个币种相加，界面就会显示一个服务端从没说过、也不成立的总数。
+// ─────────────────────────────────────────────────────────────────────
+
+/** 窗口里的一天 × 一个币种。零与缺席是两件事：服务端把每一天都发出来。 */
+export interface AdminRevenuePoint {
+  readonly dayMs: number;
+  readonly paidMinor: number;
+  readonly refundedMinor: number;
+  readonly paidOrders: number;
+  readonly refundedOrders: number;
+}
+
+/**
+ * 一个币种一条序列。`total*` 是服务端算好的窗口合计。
+ *
+ * 🔴 连"净收入"都是服务端给的。哪些退款算进这一格是一个业务判定
+ * （只有 `refunded_at` 非空的算），界面自己减一次就是第二套标准。
+ */
+export interface AdminRevenueSeries {
+  readonly currency: string;
+  readonly totalPaidMinor: number;
+  readonly totalRefundedMinor: number;
+  readonly totalNetMinor: number;
+  readonly totalPaidOrders: number;
+  readonly totalRefundedOrders: number;
+  readonly points: readonly AdminRevenuePoint[];
+}
+
+export interface AdminRevenue {
+  readonly window: {
+    readonly days: number;
+    readonly offsetMinutes: number;
+    readonly fromMs: number;
+    readonly toMs: number;
+  };
+  readonly series: readonly AdminRevenueSeries[];
+}
+
+export const fetchAdminRevenue = (
+  options: AdminClientOptions,
+  params: { days?: number; offsetMinutes?: number } = {},
+): Promise<AdminResult<AdminRevenue>> =>
+  adminRequest<AdminRevenue>(
+    options,
+    `${ADMIN_API_PREFIX}/revenue${query({ days: params.days, offsetMinutes: params.offsetMinutes })}`,
+  );
+
+// ─────────────────────────────────────────────────────────────────────
 // 退款（申请 / 批准 / 驳回）—— 与 `server/src/admin/admin.routes.ts` 那四条端点一一对应。
 //
 // 决策依据在 [`docs/adr/0053-refunds-only-for-countable-segments.md`]
@@ -649,3 +702,79 @@ export const adminRejectRefund = (
     method: 'POST',
     body: { note },
   });
+
+// ─────────────────────────────────────────────────────────────────────
+// 运营公告（ADR-0075）—— 与 `server/src/admin/admin.routes.ts` 那三条一一对应。
+//
+// 🔴 **这里不判"该不该发"，也不判"现在挂着没有"。**
+// 有效期、`level` 词表、长度上限全部住在服务端
+// （`server/src/announcements/announcement-store.ts` 是唯一裁决者）。
+// 尤其**不许**在这一侧比 `publishedAt` / `expiresAt` 的 timestamp：
+// 两处的差会表现为"运营以为已经下架了，用户还看得见"。
+//
+// ⚠️ 时刻是**浏览器算好的 epoch 毫秒**（`datetime-local` 那个控件给的是运营者
+// 墙上时钟，而这台服务器在 UTC）。换算属于设备本地事实，所以它住在客户端。
+// ─────────────────────────────────────────────────────────────────────
+
+/** 一条公告行。`level` 是**语义**档位，不是颜色名。 */
+export interface AdminAnnouncementRow {
+  readonly id: number;
+  readonly title: string;
+  readonly body: string;
+  readonly level: 'info' | 'warning';
+  readonly publishedAt: number;
+  /** `null` = 不过期。 */
+  readonly expiresAt: number | null;
+  /** 谁发的。**只有后台这一侧看得到**，用户侧那条读面故意不给。 */
+  readonly createdBy: number | null;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+  /**
+   * 🔴 **服务端算的**状态（`announcementStateAt`）。
+   * 界面不许拿 `Date.now()` 自己比 `publishedAt` / `expiresAt` ——
+   * 那会造出第二个裁决者，症状是"运营以为已经下架了，用户还看得见"。
+   */
+  readonly state: 'pending' | 'active' | 'expired';
+}
+
+export interface AdminAnnouncementList {
+  /** 服务端算 `state` 用的那一刻，随响应一起给（界面不自己取时钟）。 */
+  readonly now: number;
+  readonly announcements: AdminAnnouncementRow[];
+}
+
+export interface AdminAnnouncementPublishInput {
+  readonly title: string;
+  readonly body: string;
+  readonly level: 'info' | 'warning';
+  readonly publishedAtMs: number;
+  readonly expiresAtMs?: number;
+}
+
+/** `GET /api/admin/announcements` —— 全量（含未生效与已过期，后台要看的就是现状）。 */
+export const fetchAdminAnnouncements = (
+  options: AdminClientOptions,
+): Promise<AdminResult<AdminAnnouncementList>> =>
+  adminRequest<AdminAnnouncementList>(options, `${ADMIN_API_PREFIX}/announcements`);
+
+/** `POST /api/admin/announcements` —— 发一条。 */
+export const adminPublishAnnouncement = (
+  options: AdminClientOptions,
+  input: AdminAnnouncementPublishInput,
+): Promise<AdminResult<{ ok: true; announcement: AdminAnnouncementRow }>> =>
+  adminRequest<{ ok: true; announcement: AdminAnnouncementRow }>(
+    options,
+    `${ADMIN_API_PREFIX}/announcements`,
+    { method: 'POST', body: input },
+  );
+
+/** `DELETE /api/admin/announcements/:id` —— 下架。404 = 它已经不在了（界面要这么说）。 */
+export const adminWithdrawAnnouncement = (
+  options: AdminClientOptions,
+  id: number,
+): Promise<AdminResult<{ ok: true; withdrawn: true }>> =>
+  adminRequest<{ ok: true; withdrawn: true }>(
+    options,
+    `${ADMIN_API_PREFIX}/announcements/${String(id)}`,
+    { method: 'DELETE', body: {} },
+  );

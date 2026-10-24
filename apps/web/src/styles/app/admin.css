@@ -336,3 +336,215 @@
   display: flex;
   gap: var(--ht-space-2);
 }
+
+/* ── 独立后台页（`/admin`）的壳 ─────────────────────────────
+ * 顶栏 + 侧栏导航 + 内容区；**内容区是同一个 `AdminPanel`**
+ * （`chrome="console"`），所以这里一格表格都不画。
+ *
+ * 🔴 类名继续挂 `.ht-settings` 族下，**不开 `.ht-console` 族** ——
+ * 本文件头部写着：`check:row-single-source` 的断言 B 钉着顶层 `ht-*` 前缀族
+ * 只减不增（基线 28），第一版开 `.ht-admin` 族就是在这里被拦下的。
+ *
+ * ⚠️ 取值全部来自 token（AGENTS §5）；`100dvh` 沿用 `base.css` 已有的写法。
+ */
+.ht-settings__console {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100dvh;
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+}
+
+.ht-settings__console-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  min-block-size: var(--ht-layout-header-height);
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-5);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface-raised);
+}
+
+.ht-settings__console-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  margin: 0;
+  color: var(--ht-color-foreground);
+}
+
+.ht-settings__console-barActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  margin-inline-start: auto;
+}
+
+/* 顶栏里那两枚（重试 / 返回应用）与设置页里那排 tab 同形：同一套 token、
+   同一个圆角档，不另开一档按钮样式。 */
+.ht-settings__console-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  text-decoration: none;
+}
+
+.ht-settings__console-action:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+/* 🔴 焦点环不许抹掉（AGENTS §5「容易犯的几个错」）。 */
+.ht-settings__console-action:focus-visible,
+.ht-settings__console-navItem:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-settings__console-main {
+  display: flex;
+  flex: 1 1 auto;
+  /* 内容区的表格会比这一格窄屏时更宽，没有 min-inline-size: 0 它会**撑破**壳
+     （flex 项默认 `min-inline-size: auto` = 内容宽度）。 */
+  min-inline-size: 0;
+}
+
+.ht-settings__console-nav {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  inline-size: var(--ht-layout-sidebar-width);
+  padding: var(--ht-space-4);
+  border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-settings__console-navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: none;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  text-align: start;
+}
+
+.ht-settings__console-navItem:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-settings__console-navItem--current {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-settings__console-content {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  padding: var(--ht-space-5);
+}
+
+/* 非管理员在这一页上看到的是**一句原因**，不是一片空白。见 AdminConsolePage 文件头。 */
+.ht-settings__console-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-4);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+}
+
+/* 窄屏（与 `controls.css` 同一档 40rem）：侧栏从"左列"折成"顶部横条"。
+   后台是给运营者用的，运营者多半在宽屏，但地址是公开的 ——
+   手机上敲 /admin 也该读得下去，而不是把一格导航压成竖排一个字。 */
+@media (max-width: 40rem) {
+  .ht-settings__console-main {
+    flex-direction: column;
+  }
+
+  .ht-settings__console-nav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    inline-size: auto;
+    padding: var(--ht-space-2);
+    border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+    border-inline-end: 0;
+  }
+
+  .ht-settings__console-navItem {
+    flex: 0 0 auto;
+  }
+
+  .ht-settings__console-content {
+    padding: var(--ht-space-3);
+  }
+}
+
+/* ── 营收看板 ───────────────────────────────────────────────
+ * 柱图是 SVG，几何量（x/y/width/height）由**数据**驱动、写在属性上，
+ * 颜色只从这里来 —— `check:l4` 明令 `features/**` 不许出现 `style={{…}}`，
+ * 而"属性表里没有的那些数字"（width/height/opacity）是允许由内容驱动的。
+ * 所以这张图不需要内联样式，也不需要新依赖。
+ */
+.ht-settings__admin-revenueGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-5);
+}
+
+.ht-settings__admin-revenueChart {
+  display: block;
+  inline-size: 100%;
+  block-size: 6rem;
+  /* 图本身没有边框，靠两侧留白与背景分开；暗色下 `surface-subtle` 仍然读得出。 */
+  background: var(--ht-color-surface-subtle);
+  border-radius: var(--ht-radius-sm);
+  /* 🔴 基线必须有：柱子高度为 0 的那一天，与"这一天根本不在窗口里"，
+     在没有基线的图上是**同一个样子** —— 而这两件事在营收上不是同一件事。
+     有了这条线，"零"至少有一个可指的位置。 */
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.ht-settings__admin-revenueBarPaid {
+  fill: var(--ht-color-primary);
+}
+
+.ht-settings__admin-revenueBarRefunded {
+  fill: var(--ht-color-danger);
+}
+
+/* 后台公告那一格顶上的"这是明文"提示。
+   它用 `danger-subtle` 而不是普通说明色：这条约束一旦违反是**对外泄密**，
+   不是一句可以略过的操作提示（ADR-0075 §5.1 要求它必须写在界面上）。 */
+.ht-settings__admin-notice {
+  margin: 0;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-danger-subtle);
+  color: var(--ht-color-danger-strong);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
