@@ -47,6 +47,20 @@ HOST_PROFILE="$(python3 "$HERE/find-signing-profile.py" "$BUNDLE_ID" "$WIDGET_TE
 APP="$OUT_DIR/Heyta.app"
 DMG="$OUT_DIR/Heyta-$VERSION.dmg"
 
+# 🔴 「产物目录里已经有旧 .app / .dmg」这件事本脚本**本来就已经处理**：下面两行是
+#    `rm -rf "$OUT_DIR"` 再 `mkdir -p`，整目录先清空 ⇒ 同一目录重复打包不会留下两份并排的
+#    `Heyta.app` / `Heyta-1.0.0.dmg`。（为什么这件事值得写下来：Spotlight 索引任意位置的
+#    `.app`，两份同名 App 并排会让人以为"装了两遍"，而实际只覆盖了 `/Applications` 那一份
+#    —— 与 `scripts/reinstall-all.sh` 那轮 29 GB 同源。）
+# ⚠️ 代价是这句 `rm -rf` 打的是**调用方传进来的路径**，所以先钉一条形状判据：
+#    `/`、`$HOME` 这种"删了就不可逆"的目录当场拒，不让一个手滑的参数把整台机器带走。
+case "$OUT_DIR" in
+  /|"$HOME"|"$HOME"/)
+    echo "🔴 OUT_DIR 不能是 ${OUT_DIR} —— 本脚本第一件事就是 rm -rf 它" >&2
+    exit 4
+    ;;
+esac
+
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
