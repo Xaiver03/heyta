@@ -12036,3 +12036,23 @@ B227 的第一版就是被这一枚误读数带偏的（把"串行同样红"读�
 ② 贴底时**朝上弹**（`flip`）：代价是多一份定位逻辑，且"朝哪边弹"又要一份判据。
 
 同族欠账：`TaskRepeat.tsx` 里那枚同形状的浮层（spec 文件头已登记）——三处一起做才是收尾。
+
+### B229 追记（探针读数，本机 12 条任务 / 1440×900）
+
+    openRowTail 之后：scrollHeight 1109、clientHeight 660（max 449）、scrollTop 348
+    点开整理浮层之后：scrollHeight 1150（**只长了 41px**）、max 490、scrollTop 353
+    浮层本体 rect：top 761、bottom 906（高 ≈ 145）
+    ⇒ 即使滚到 max(490)，浮层底边仍在 906−(490−353)=769 > 700（可视区底）**差 69px**
+
+**冒烟点在这里**：浮层是 `position: relative`（在流内）没错，但它挂在一个
+`block-size: 0` 的 `.ht-material__row-slot` 里，而那一格的父链是
+`details(46px) → span(46px) → .ht-compose-actions__items(131px) → .ht-compose-actions__panel(155px)`
+—— 也就是说行尾那条折叠面板**自己**也有高度，浮层溢出它之后只被算进 41px。
+所以"走 row-slot 就等于够得着"这个推论**不成立**：row-slot 只保证"相对那一行定位"，
+不保证"溢出祖先的部分计入 scrollHeight"。
+
+下一轮的三条候选（按代价排）：
+① 让行尾折叠面板（`.ht-compose-actions__panel`）在浮层展开时**不夹高度**（它现在 155px）；
+② 浮层贴底时朝上弹（flip）；
+③ 把整理浮层**移出**行尾折叠面板（回到行那一层）——视觉改动最大，但结构最干净。
+⚠️ 三个浮层（整理 / 重复 / 提醒截止）要一起改，只修一个会留下两种行为。
