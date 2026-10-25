@@ -50,6 +50,8 @@ import {
   type ShareConsentModalProps,
 } from '@heyta/ui';
 
+import { declared, norm } from './helpers/rnw-styles.js';
+
 const LABELS = {
   title: translate('zh-CN', 'common.share.consent.title' as MessageKey),
   body: translate('zh-CN', 'common.share.consent.body' as MessageKey),
@@ -65,14 +67,6 @@ const LABELS = {
 
 const DARK = resolveHeytaUiTheme({ scheme: 'dark' });
 const LIGHT = resolveHeytaUiTheme({ scheme: 'light' });
-
-/** `#rrggbb` → `rgb(r, g, b)`，与注入表里的写法对齐；不是十六进制的原样返回。 */
-function norm(color: string): string {
-  const hex = color.trim().replace('#', '');
-  if (hex.length !== 6) return color.trim();
-  const n = (i: number) => Number.parseInt(hex.slice(i, i + 2), 16);
-  return `rgb(${n(0)}, ${n(2)}, ${n(4)})`;
-}
 
 /** 取宿主那张表里的颜色值（token 名写错当场炸，不会静默比到 `undefined`）。 */
 function tokenValue(theme: typeof DARK, name: string): string {
@@ -112,39 +106,10 @@ function render(props: Partial<ShareConsentModalProps> = {}, theme = DARK): HTML
   return container as HTMLDivElement;
 }
 
-/**
- * 从 RNW 注入的那张原子表里读声明本身（见文件头"为什么不用 `getComputedStyle`"）。
- * 节点不存在 ⇒ 报错；该属性一个声明都没有 ⇒ 返回 `'<none>'`。
- * 🔴 `'<none>'` 是**读数**不是探针失败：对"取消不许有底色"这一条，它正是判据要的值。
- */
-function declared(el: HTMLElement, selector: string, prop: string): string {
-  const node = el.querySelector<HTMLElement>(selector);
-  if (node === null) throw new Error(`DOM 里没有 ${selector}`);
-  // 🔴 只认**原子类**（`r-backgroundColor-…`）。RNW 还给每个节点挂了基底类 `css-view-*` /
-  // `css-text-*`，那里面就写着 `background-color: rgba(0, 0, 0, 0)` 之类的复位声明 ——
-  // 第一版按 classList 顺序扫，永远先撞上基底，读到的全是复位值（本轮实测六条全红）。
-  const atomic = Array.from(node.classList).filter((cls) => cls.startsWith('r-'));
-  if (atomic.length === 0) return '<none>';
-  let found = '<none>';
-  for (const sheet of Array.from(document.styleSheets)) {
-    let rules: CSSRuleList | null = null;
-    try {
-      rules = sheet.cssRules;
-    } catch {
-      continue; // 读不到的表（跨源）与本判据无关
-    }
-    for (const rule of Array.from(rules)) {
-      const styleRule = rule as CSSStyleRule;
-      if (styleRule.style === undefined) continue;
-      const cls = atomic.find((name) => styleRule.selectorText === `.${name}`);
-      if (cls === undefined) continue;
-      const value = styleRule.style.getPropertyValue(prop);
-      // 后写的规则覆盖先写的，所以取**最后一个**命中，而不是第一个。
-      if (value !== '') found = norm(value);
-    }
-  }
-  return found;
-}
+// 读声明本身的实现搬到了 `./helpers/rnw-styles.ts`（第二条用到它的判据是
+// `share-notif-prefs-affordance.spec.tsx`）；两条禁令（不许按 classList 顺序扫、
+// 不许用 `getComputedStyle`）的理由写在那份文件的文件头。
+// ⚠️ `'<none>'` 是**读数**不是探针失败：对"取消不许有底色"这一条，它正是判据要的值。
 
 afterEach(() => {
   act(() => {
