@@ -1035,8 +1035,21 @@ if [ "$PRESS_HIT" = "确认共享" ]; then
   fi
   note "入群同意闸按过 ⇒ 这台设备有了同意记录（通知路径读的就是它）"
 fi
+# 🔴 从这一行起，屏幕上画着**当趟那枚一次性邀请凭证**（明文就在输入框里）⇒ 与恢复码同一档：
+#    帧只落私有 RUN_DIR，不进证据目录。代价是实测出来的：这一帧曾以 `06e-已贴凭证.png`
+#    进了证据目录，被并行会话按目录扫证据时顺手提交并推到公开远端
+#    （`git log --oneline -- apps/mobile/evidence/collab-ios-*/06e-*.png` 现量）。
+#    而"凭证进了框"这条判据本来不需要像素 —— 读界面值命中即可，值不落日志。
+SECRET_FRAMES=1
 fill_field "邀请凭证或链接" "$INVITE_TOKEN" || { shot "06d-凭证填不进"; env_bail "邀请凭证填不进输入框（装置问题）"; }
+if tree_has "$INVITE_TOKEN" >/dev/null 2>&1; then
+  ok "凭证已进输入框（按界面值命中，长度 ${#INVITE_TOKEN}；值不落日志、这一帧不进证据目录）"
+else
+  shot "06e-凭证没进框"
+  env_bail "fill 说成功但树里读不到那一串 ⇒ 装置判不了，不拿它当产品坏了"
+fi
 shot "06e-已贴凭证"
+SECRET_FRAMES=0
 ax_press "加入"
 sleep 3
 idb_dump
