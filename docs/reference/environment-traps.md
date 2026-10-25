@@ -11553,3 +11553,64 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     修法：原生模块另开一对变长通道（`loadBlob`/`saveBlob`，上限 64 KiB，Swift/Kotlin 对偶），
     **root-key 那对一字未动** —— `apps/mobile/evidence/ios-keychain-probe-invalid.json`
     那枚探针依赖的就是"非法长度必拒"这个行为。
+
+560. **iOS 装置按"标签"找入口时，RN 的合成标签会让精确匹配恒取空，退化匹配会按错行**
+    （2026-10-25 协作移动旅程装置第 22 跑，`apps/mobile/evidence/collab-ios-10251233/02-自托管表单没开.png`：
+    截图上是「AI 与集成」那一屏，而装置报的是"走不到同步与隐私那张表单"）。
+    设备上现量的形状：「我的」页那一行 `设置` 的 AXLabel 逐字是 **`设置, 设置`**（`AXUniqueId`
+    = `profile-entry-settings`），而共享 shim 的 `--exact` 是**整串相等**才算命中
+    ⇒ 精确按压永远 `found=False`；旧装置于是退到"预检用子串命中的那枚节点中心"去点。
+    子串命中在短词上必然撞车：同一屏里 `设置` 抓到「AI 设置」一带、`我的` 抓到
+    「让 AI 记住**我的**偏好」。再叠第二条实测：**屏外坐标按下去是空操作且不报错**
+    —— 那一发量到的中心其实是 `y=-403`（列表带着滚动残留，行在屏外），点下去落到
+    当时占着 `y=365` 的那一行 ⇒ 走进了错误的设置分屏。
+    第三条：到达判据本身也会假命中 —— 拿「设置」当"已到设置枢纽"的判据，
+    在**源屏**「我的」页上就成立了（那一行的标签逐字包含它），于是"没跳页"被读成"跳好了"。
+    四条纪律：
+    ① 按压目标只认**逐字相等**或**按 `,` 切分后的整段相等**，子串一律不算命中；
+       命中多枚 ⇒ 响亮报"同名多枚"，不"取第一枚"。本线把它做成一枚可红的工具：
+       `python3 scripts/tools/ios-collab-anchor.py --selftest`（7 条，含一条对照臂：
+       把命中规则换成子串，自检必须红）。
+    ② 优先用 `id:<testID>` 锚点（RN 的 `testID` 在 iOS 落进 `AXUniqueId`，Android 落进
+       `resource-id`，两端同一约定）。短词标签只当**读数**用，别当按压目标。
+    ③ 屏外不许按：先滚进可见区、**重取一次快照**、重新解析，再决定按不按；
+       滚完还在屏外就报出来，不拿旧坐标点。
+    ④ 到达判据必须**只在目标屏出现**。判"到哪一屏"用那一屏自己的 `AXUniqueId`
+       （枢纽是 `settings-section-sync`），不要用两屏都有的词。
+561. **打包机的镜像源里可能整包缺一个已锁定的版本；新开远端落点的第一趟必然红在依赖前置**
+    （2026-10-25 15:0x 边界 2 那趟，`C:\src\heyta-permwake`，`pnpm install --frozen-lockfile`）：
+    `[ERR_PNPM_FETCH_404] GET https://registry.npmmirror.com/@op-engineering/op-sqlite/-/op-sqlite-18.2.5.tgz: Not Found`
+    —— **重跑两次同字红**，所以不是抖动。三层现量把它定性成"镜像没有这个包"，不是"URL 写错"：
+    ① 索引层 `GET https://registry.npmmirror.com/@op-engineering%2Fop-sqlite/18.2.5`
+    回 `{"error":"[NOT_FOUND] … not found"}`（**整个版本都不在索引里**）；
+    ② 重定向层 `HEAD` 那枚 tarball 回 **302**，跟着走才看到终点
+    `https://cdn.npmmirror.com/packages/%40op-engineering/op-sqlite/18.2.5/…tgz` 回 **404**
+    ⇒ 🔴 **只读第一跳的状态码会把这条读成"能下"**（本条第一次就是这么误判的，于是白重跑了一趟）；
+    ③ 字节层：从打包机 `fetch` 官方源能拿到响应头（`status=200`、`content-length=115527544`），
+    但**读完整 body 会断**（pnpm 报 `error (23)`，重试两次同样断）⇒ 头通≠体通，
+    判"这台机器能不能用某个源"必须**把 body 读完**再看状态码。
+    可用的那条：`https://mirrors.cloud.tencent.com/npm/` 同一枚 tarball `200` 且 `arrayBuffer()`
+    读到 `115527544` 字节，逐字等于官方源的 `content-length`。
+    两条纪律：
+    ① **换落点 ⇒ 顺序只有同步 → 装依赖 → 跑构建**（`node_modules` 被 gitignore，同步永不送；
+       `run-gradle` 步骤 1 按 `apps/mobile/package.json` 的声明面逐包探测远端，新落点必然 `apps/mobile=False`）。
+       反序不成立：没有 `package.json` 装不了依赖，而 `package.json` 要靠同步送过去。
+    ② 改源只动**出问题那一枚 scope**，写在**那份隔离落点自己的 `.npmrc`** 里
+       （`@op-engineering:registry=…`），不动仓库、不动那台机器的全局 pnpm 配置。
+       选源的依据不是"哪个源快"，是**锁文件钉的 sha512 对不对得上**：
+       本例腾讯源 metadata 的 `dist.integrity` 与 `pnpm-lock.yaml` 的
+       `sha512-OLmcM0SQLapP1p5Q6Ck5P+V3N6RsAhBozIG07PbQr+8wgB0gYoFgFjuWZK0JvNBY+…` 逐字相同，
+       装完 pnpm 还会再验一次 —— 完整性自己会拒绝不对的字节，所以这条路不需要额外信任。
+562. **同步装置"推送认变量、对账写死路径"，换落点时解包到 A 而比的是 B —— 会假红，也会假绿**
+    （2026-10-25 15:26 同一趟，`scripts/lib/sync-windows-sources.sh` 的 `sync_windows_sources`）：
+    前一句 ✅ `远端收到的是这一包（tar sha256=eec8f45c… 逐字相同）`，后一句就 🔴
+    `远端源码不新鲜：apps/web/dist/index.html 哈希对不上 local=1582bbd9… remote=39db373e…`。
+    现量归因（只读三条命令，不重推）：把**同一枚**本地文件与**两棵远端树**各比一次 ⇒
+    隔离落点 `C:\src\heyta-permwake` = `1582BBD9…`（与本地逐字相同，解包其实成功了），
+    而主检出 `C:\src\heyta` = `39DB373E…`（正是那句"对不上"读到的值）
+    —— 因为三枚锚点的远端路径**硬编码** `C:\src\heyta`，而推送/解包用的是 `$HEYTA_WINDOWS_REPO_ROOT`。
+    🔴 双向错：落点不同 ⇒ 明明新鲜却报不新鲜（假红，本例）；两棵树恰好同字节 ⇒
+    构建吃的树从未被对账过（**假绿**，比红更糟，且它是 2026-09-30 那次"装上旧产物"的同一族）。
+    修法是把锚点也接同一个变量（本仓 2026-10-25 已改，默认值逐字不变 ⇒ 主检出行为不动）；
+    通用纪律：**同一份装置里"改哪棵树"与"验哪棵树"必须读同一个变量**，写完新判据要拿
+    **另一棵不该通过的树**量一次它确实会红（本例那棵树就在同一个 `ssh` 里，顺手就能对账）。

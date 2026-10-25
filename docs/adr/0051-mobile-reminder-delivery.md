@@ -444,6 +444,7 @@ ack 全局名、分流必须在 op-log 转发**之前**，都按源码逐字比 
 | Linux 壳 | 在载体上 `-Werror` 全编译 + 链接两枚产物；`HEYTA_LINUX_SMOKE=OK 15/15`，其中新增两条提醒端口断言；通道读数 `NOTIFY_CHANNEL=granted`，投递 `NOTIFY_SHOW=ok id=3` —— 服务端是 **GNOME Shell 46**（`GetServerInformation` 现量），按 freedesktop 规范 id≠0 就是收下并归它渲染。证据：`apps/desktop-linux/evidence/reminder-port-2026-10-24/smoke.log` |
 | macOS 壳 | `swift build` 绿 + `heyta-smoke` 第十二节绿（端口跨 JSC 边界的读数：`unsupported` / `show()==false` / `containsDelivered("smoke\|1")==false`，无 `.app` 时的诚实降级） |
 | Electron | `pnpm --filter @heyta/node-host build` 后 `apps/desktop` **37/37** 通过，含"投不出去绝不回 true"与 IPC 白名单那两条 |
+| Windows 壳 | `dotnet build HeytaWindows -c Release -p:Platform=x64` ⇒ `已成功生成 / 0 个警告 / 0 个错误`（2026-10-25 15:31，隔离落点 `C:\src\heyta-permwake`，三枚新鲜度锚点与本地字节逐字相同 —— 见上面边界 2）。🔴 这条只证**编译过**：源码里那条"未打包 ⇒ 报 `unsupported`"的降级分支在 [`apps/desktop-windows/HeytaWindows/ReminderPort.cs:54`](../../apps/desktop-windows/HeytaWindows/ReminderPort.cs#L54)（那是**代码写的分支**，不是这趟跑出的读数 —— 这趟没装包、也就没跑过 toast），所以"真弹出一条 toast"不在这一格里，它归边界 4 |
 | 移动端 | `apps/mobile` **1094/1094** 通过（含设置页三行、省电落点三句话、`permissions.ts` 与开关名同字） |
 | iOS 通知目的串 | 同一台模拟器、同一枚二进制、同一份 plist，**两种渲染形态都取到过**：一轮弹窗正文逐字＝本轮注入的暗号，另一轮是系统自带那句。装置自证三条（注入串 == 设备容器现读 == 截图正文）与逐轮对照见上面边界 3 和 `apps/mobile/evidence/ios-notification-purpose-20261024/README.md`；装置本身踩到的坑与否证掉的归因登记在 §7 #547、#548 |
 | 门禁 | `check:legal-permissions` / `legal-copy` / `legal-closure-truth` / `mobile-settings` / `crosslang-contract` / `ios-native-bridges` / `docs` / `i18n-vars` / `ui-language` / `native-bare` 全 rc=0；`apps/web` **2486/2499**（13 skip）、`packages/app-host` **2061/2061** |
@@ -462,15 +463,46 @@ ack 全局名、分流必须在 op-log 转发**之前**，都按源码逐字比 
    `reminderStatus` 恒 `default`，那台机器上那个系统弹窗没人应答。
    关闭判据：打包态 `.app` 里点一次允许，`REMINDER_PROBE` 的 `delivered=true` 且
    `REMINDER_DELIVERED=in-list=yes`，并留一张截图（AGENTS §6.2 规定一）。
-2. **Windows C# / Android Kotlin 的编译证据**：本轮两处代码是按契约写的，
+2. **Windows C# / Android Kotlin 的编译证据**：🟢 **本条已关**（按关闭判据取到，2026-10-25 15:31 那一趟，
+   隔离落点 `C:\src\heyta-permwake`）：`:app:compileDebugKotlin` `BUILD SUCCESSFUL in 28s`，
+   `dotnet build HeytaWindows -c Release -p:Platform=x64` `已成功生成 / 0 个警告 / 0 个错误`。
+   "构建吃的确实是本轮这一棵树"由四个来源互相指认，而不是同一个变量打印两次：
+   编译器自己回显的路径（`file:///C:/src/heyta-permwake/apps/mobile/android/app/src/main/…`、
+   `…HeytaWindows\bin\x64\Release\net10.0-windows10.0.19041.0\HeytaWindows.dll`）、本机打印的远端根、
+   同步回执的 tar sha256，加 MSIX 那条腿的三枚新鲜度锚点逐字等于本机字节
+   （`index.html=1582bbd9…`、`native-bridge.js=792a8102…`、`assets/*.js` 本地与远端同为 7 枚）。
+   **这一趟真编译抓出来的东西**（这正是"按契约写"与"编译过"之间的距离）：
+   `apps/mobile/android/app/src/main/java/com/heytamobile/vault/VaultSecureStorageModule.kt:140`
+   调的是 `CharsetDecoder.onUnmappableInput(...)` —— Java/Android 上那枚方法**叫 `onUnmappableCharacter`**，
+   `onUnmappableInput` 不存在 ⇒ `e: … Unresolved reference 'onUnmappableInput'`，
+   而 `:app:compileDebugKotlin` 是一个编译单元：**安全存储那一行的错名把整枚 app 模块（含本轮的提醒 Kotlin）一起挡在门外**。
+   它来自今天那笔 `a6c099462f`（安全存储线），改法是一枚标识符、意图由它上面那句注释写明
+   （坏字节必须响亮失败）、一条命令可回退 ⇒ 当场改对，重跑即绿。
+   提醒那几行在同一趟里**没有第二条错**（`ReminderModule.kt` 的 `canScheduleExactAlarms`、
+   `ReminderBootReceiver` / `ExactAlarmPermissionReceiver` 一起过了编译）。
+   下面三段留的是**这一格是怎么被打开的**，接手时不必再走一遍：
+   旧记录：本轮两处代码是按契约写的，
    而打包机 `C:\src\heyta` 那枚检出停在别的提交、且有一大片未提交改动
    （别的会话的在飞工作）—— 不在别人的树上做覆盖。
    ⚠️ **"有人在飞"是瞬时读数**，接手前先现量，别照抄上面那句：
    `ssh windows-pc "git -C C:/src/heyta rev-parse --short HEAD & git -C C:/src/heyta status --porcelain | find /c /v \"\""`
    （2026-10-24 21:16 那一读是 `fc608b7` / 2298 行，且比同日 16:5x 那一读的 2247 在涨）。
-   🔴 还要注意：Windows 那一腿的同步目标路径**写死在 `C:\src\heyta`**
-   （`scripts/lib/sync-windows-sources.sh`），所以"隔离检出"隔离的是**本机这一侧**，
-   远端那一侧没有第二个落点 —— 要走这条路，得先拿到那台机器上那份工作的处置。
+   🔴 **这一格的前提已经变了，别再照上面那句读**：Windows 那一腿的同步落点**不是**写死的 ——
+   `scripts/lib/sync-windows-sources.sh` 里 `sync_windows_sources_for_android <host> <远端仓库根>`
+   的第二枚实参就是落点，环境变量 `HEYTA_WINDOWS_REPO_ROOT`（同步侧）与
+   `HEYTA_ANDROID_REMOTE_ROOT`（run-gradle 侧）**成对**覆盖它的默认值。
+   ⇒ 所以"隔离检出"隔离得掉远端：可以在 windows-pc 上另开一份只含本轮改动的检出，
+   不碰 `C:\src\heyta` 那一片别人的在飞工作。
+   ⚠️ 两枚变量必须**同一个值**：只移一枚就变成"同步解包到 A、gradle 在 B 里构建"
+   （这正是那个函数正文里点名要防的形状，与 §7 #82 同族）。
+   ⚠️ 新开落点第一次跑必然红在 run-gradle 步骤 1：同步**永不送 node_modules**（它被 gitignore），
+   而步骤 1 按 `apps/mobile/package.json` 的声明面逐包探测远端 —— 修它只有一条命令：
+   先在远端 `pnpm install --frozen-lockfile`（顺序不能反：没有 package.json 装不了依赖，
+   而 package.json 要靠同步送过去）。
+   ⚠️ 这一趟在这条路上又现量到两件，正文都在 §7（这里只留指针，不复述读数）：
+   打包机那个镜像源**整包索引里没有** `@op-engineering/op-sqlite@18.2.5`（§7 #561），
+   以及"同步推送认 `$HEYTA_WINDOWS_REPO_ROOT`、三枚新鲜度锚点却写死 `C:\src\heyta`"
+   —— 换落点时它会**解包到 A、对账比 B**，既可能假红也可能假绿（§7 #562，已修）。
    关闭判据：按"四端重装在隔离检出里跑"那条约定，在 windows-pc 上开一份只含本轮改动的
    检出，跑 `dotnet build`（HeytaWindows）与 `:app:compileDebugKotlin`。
 3. **iOS 通知目的串是否被系统读取**（交付项 4）：**不是可靠的展示通道 —— 同一台模拟器、
@@ -494,9 +526,22 @@ ack 全局名、分流必须在 op-log 转发**之前**，都按源码逐字比 
    ⚠️ 顺带量到的一条既有缺口（不在本轮修）：iOS 原生 `Info.plist` 的文案**全仓没有本地化**
    （`find` 现量：0 个 `.lproj` / `InfoPlist.strings`），英文装机用户在**会被读的那一态**
    看到的是中文目的串 —— 日历/提醒事项那几枚键同此，属同一件独立工作。
-4. **桌面横幅的那一帧截图**：Linux 侧抓不到（载体上没有可用的显示会话给 ssh，
-   截图工具也不在 PATH），macOS 侧被第 1 条挡住。日志读数已经能证"系统收下了"，
-   但"用户看得见"这一格仍然空着 —— 这一格必须由人或者由带显示环境的构建来关。
+4. **桌面横幅的那一帧截图**：Linux 侧的墙现在**量到具体那一格了**（2026-10-25 15:42 现量，
+   载体 `linux-dev-lan`）：图形会话确实在（`loginctl` 读出 session 2 = `Type=wayland Active=yes`）、
+   会话总线可达、通知服务就是 gnome-shell（`GetServerInformation` 回 `GNOME 46.0`），
+   缺的只有"把屏幕抓下来"这一件事，而三条通道都试过：
+   ① 截图命令行工具不在 PATH（`grim`/`import` 现量都没有）；
+   ② `org.gnome.Shell.Screenshot` 接口在（`busctl --user introspect` 数到方法），
+      但按正确签名 `(bbs)` 调回 **`Access denied`** —— 我这发进程在
+      `user-1000.slice/session-*.scope`（ssh 那枚），不是图形会话那一枚；
+   ③ 换进图形会话的 slice 再调（`systemd-run --user --slice=session-2.slice …`）仍然 `Access denied`
+      （对照臂：两发都必须红，否则这条读数没有信息）。
+   macOS 侧被第 1 条挡住（要点一次"允许"）。日志读数已经能证"系统收下了"，
+   但"用户看得见"这一格仍然空着 —— 打开它只有三条路，每条都归人：
+   在载体上按一次 PrtSc / 在那台机器上装一个截图工具 / 在 Mac 上点一次"允许"后本地 `screencapture`。
+   接手前先现量这堵墙还在不在：
+   `ssh linux-dev-lan 'export XDG_RUNTIME_DIR=/run/user/$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus; busctl --user call org.gnome.Shell.Screenshot /org/gnome/Shell/Screenshot org.gnome.Shell.Screenshot Screenshot bbs false false /tmp/x.png'`
+   （回 `Access denied` ⇒ 墙还在；写出文件 ⇒ 这条路开了，可以直接补上装置）。
 5. **移动端"拒绝态"在当前包上的真机一帧**：🟢 **iOS 侧按关闭判据取得**（第十二趟：
    那句降级说明与「去系统设置」入口同屏可见、入口锚点在树里、只读 OS 快照确认 `denied`、
    截图人工看过；逐条读数与"当前产物"这句话的两个口径都在下面「设备腿」那一节）。

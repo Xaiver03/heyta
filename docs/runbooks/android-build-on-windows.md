@@ -379,6 +379,34 @@ curl -sS -o - https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx
 现量方式：`ssh windows-pc "dir /b C:\Users\41478\.gradle\init.d"` 要看到 `heyta-cn-mirror.gradle`，
 `dir /b C:\Users\41478\.gradle` 要同时看到 `gradle.properties` 与 `gradle.properties.pre-cn-mirror`。
 
+### 7.5 2026-10-25 15:0x–15:3x：在**新开的隔离落点**上跑一次只编译不出包（`C:\src\heyta-permwake`）
+
+目的不是打 APK，是拿 `:app:compileDebugKotlin` 的编译证据（ADR-0051 边界 2）。这一趟把"新开一份落点"
+这条路真正踩通了，三件事是**这条路上必经的**，写下来免得下一个人重新撞：
+
+| 步 | 现量到的事 | 处置 |
+|---|---|---|
+| 新开落点第一趟 | `run-gradle` 步骤 1 必然红：`远端 node_modules 不在位（apps/mobile=False，根 .pnpm=…）`。同步按设计不送 `node_modules`（gitignore），而步骤 1 按 `apps/mobile/package.json` 的声明面逐包探测远端 | 顺序只能是**同步 → 远端 `pnpm install --frozen-lockfile` → 再跑 `run-gradle`**（反序不成立：没有 `package.json` 装不了依赖，而 `package.json` 要靠同步送过去）。两枚根旋钮 `HEYTA_ANDROID_REMOTE_ROOT` / `HEYTA_WINDOWS_REPO_ROOT` **必须同值**，否则解包到 A、构建在 B |
+| 远端装依赖 | `ERR_PNPM_FETCH_404 … @op-engineering/op-sqlite@18.2.5`，**重跑两次同字红**：打包机用的 `registry.npmmirror.com` 索引里整版本都没有这枚包（`GET …/18.2.5` 回 `[NOT_FOUND]`），那枚 tarball 的第一跳是 302、跟到 `cdn.npmmirror.com` 才是 404 —— 只看第一跳会读成"能下" | 只把**出问题那一枚 scope** 指到有字节的源，且写在**那份隔离落点自己的 `.npmrc`** 里（`@op-engineering:registry=…`）：不动仓库、不动那台机器的全局配置。默认那枚 `C:\src\heyta` 落点里已经装好的树不受影响，也不用去动它。选源的依据是**锁文件钉的 sha512 逐字相同**（本例腾讯镜像 metadata 的 `dist.integrity` == `pnpm-lock.yaml` 那一行），装完 pnpm 还会自己再验 |
+| 真编译本身 | `e: …VaultSecureStorageModule.kt:140:14 Unresolved reference 'onUnmappableInput'` —— `CharsetDecoder` 上那枚方法叫 `onUnmappableCharacter`，`onUnmappableInput` 不存在 | 当场改对后 `BUILD SUCCESSFUL in 28s`。**这一条是本节存在的理由**：桥 TS、op-log、UI 全绿了一整轮，`kotlinc` 才是唯一看得见它的门 |
+
+判"构建吃的是本轮这一棵树"用**四个来源互相指认**，不是同一个变量打印两次：
+编译器自己回显的路径（`file:///C:/src/heyta-permwake/apps/mobile/android/app/src/main/…`）、
+本机打印的 `远端仓库根`、同步回执的 tar sha256，加 MSIX 那条腿的三枚新鲜度锚点
+（`index.html`、`native-bridge.js`、`assets/*.js` 枚数）。⚠️ 那三枚锚点在 2026-10-25 之前是**写死 `C:\src\heyta`** 的，
+换落点时会"解包到 A、对账比 B"（假红，且两棵树同字节时假绿）——已修；
+正文在 [`docs/reference/environment-traps.md`](../reference/environment-traps.md) 的 #561、#562
+（本节里的「§7 #N」都指那份文件，不是本 runbook 的第七节）。
+
+现量方式（只读，一条命令，两侧都要看 —— 它判的是形状，不是本节的读数）：
+
+```bash
+grep -cE "Get-FileHash .C:|Get-ChildItem C:" scripts/lib/sync-windows-sources.sh
+```
+
+🔴 这条**必须是 0**：它数的是"锚点里还写死着远端根"的行数。2026-10-25 实测改前 = 3、改后 = 0
+（对照臂就是 `git show HEAD:… | grep -c …` 那一条，别只看现在绿）。
+
 ## 八、第二枚门禁：`check:android-build-host`（规则的另一半）
 
 规则原话里有**两个**被禁的东西："不要再在 Mac 起新的 Gradle 构建**或模拟器**"。

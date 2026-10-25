@@ -673,4 +673,35 @@ ADR-0050 那句「RN port 只传递 base64 root key」加了**限定范围**的�
 `share-key-store.ts` 文件头原来那句"注销/撤销路径按同样后缀**即可**一并清掉"**过强** ⇒ 已改成如实口径
 （能清，但今天 `clearMobileVaultSession` 只删 root key；这一格转成下面的待拍板项，见「这一批还剩什么」）。
 
+**但本节标题不能覆盖第 22 跑那一步**：那一跑红在 `走不到「同步与隐私 → 使用自托管服务器」那张表单`，
+取证之后定性是**装置缺陷**（截图 `apps/mobile/evidence/collab-ios-10251233/02-自托管表单没开.png`
+画的是「AI 与集成」那一屏，而第 2 步的 bundle 逐字节对账是过的 ⇒ 本批 Swift 改动确实编进装了机的产物）。
+根因链三条，都在装置这一侧：① RN 的行把标签合成成 `设置, 设置`，shim 的 `--exact` 是整串相等 ⇒ 精确按压
+**恒取空**；② 装置于是退到"按预检那发子串命中节点的 frame 中心"，而那一发量到的中心实际是 `y=-403`
+（列表带着滚动残留，行在屏外），**屏外坐标按下去是空操作且不报错** ⇒ 落到当时占着 `y=365` 的另一行；
+③ 到达判据本身在两屏都成立（「我的」页那一行的标签逐字含「设置」）⇒ "没跳页"被读成"跳好了"。
+修法与判据（环境陷阱 #560）：本线新增一枚锚点解析器 `scripts/tools/ios-collab-anchor.py` ——
+命中条件只认**逐字相等**或**按 `,` 切分后的整段相等**，同名多枚回 `ambig`（不取第一枚），
+屏外回 `offscreen`（先滚进可见区、重取快照、重解析，还不行就报出来，不按）；
+按压通道的四处同类探针（`ax_press` / `ax_press_until` / `wait_enabled` / `wait_state` 的忙态采样 /
+`back_to_tabs` 的"到底部标签层"）全部改走这一把尺，跳页的到达判据改用**只在目标屏存在**的
+`AXUniqueId`（`profile-entry-settings` / `settings-section-sync` / `profile-entry-share`，
+三枚都是设备上现量的，见 §9.13 这一段的第 22/23 跑）。判据自己能不能红：
+`python3 scripts/tools/ios-collab-anchor.py --selftest`（条数由它自己打印，现量：其中一条是对照臂 ——
+把命中规则换成子串，自检必须红）。装置侧还补了一条步骤 0 的门禁：自检不绿就不开设备，
+免得下一读的人再花一趟 Release 构建去猜"是不是产品没入口"。
+
+**Android 那一侧本批欠的两格，2026-10-25 补了一格、如实留了一格**：
+编译腿已过 —— 在册通道 `node scripts/run-gradle.mjs :app:assembleDebug`（打包机 `windows-pc`，
+四条判据：工作树 tar sha256 对账 / 远端旧产物已清除 / 产物 mtime ≥ 构建起点 / 拉回后逐字节相同）。
+这一趟顺带抓到一处**已经推到 origin 的缺陷**：上一批写的 blob 严格解码那行用的是
+`onUnmappableInput`，而 `javap java.nio.charset.CharsetDecoder` 现量只有 `onUnmappableCharacter`
+⇒ Kotlin 未解析引用，Android 一编译就断（Swift 那侧编过，所以 iOS 腿看不出来）。
+改判名的那笔用现量命令取：`git log -1 --format=%h -- apps/mobile/android/app/src/main/java/com/heytamobile/vault/VaultSecureStorageModule.kt`。
+🔴 **设备腿仍然没跑**：共享密钥走 blob 这条路在 Android 真机/模拟器上没有读数
+（`scripts/verify-android-vault-storage.sh` 要独占一枚 emulator，而本机规则禁止在 Mac 起模拟器）。
+所以"Android 的 M6 已验"这句话现在不成立，成立的只有"编译过 + JS 侧形状钉住"。
+另记一条装置事实：远端源码包名 `C:\src\heyta-src-android.tar.gz` 是**跨会话共享**的，
+两条会话同时送包会互相覆盖 —— 第一趟就是这么红的（对账门按设计拒了混合树，重试即过，不是构建坏了）。
+
 
