@@ -107,3 +107,32 @@ awk '/^#### 没关掉的边界/,0' docs/adr/0051-mobile-reminder-delivery.md \
 要让用户一定看到理由只能靠应用内那一行降级状态。取证与逐轮对照见
 `apps/mobile/evidence/ios-notification-purpose-20261024/`，判据是"截图正文＝设备容器里现读的那份 plist"）。
 装置踩到的坑与否证掉的归因登记在 [`environment-traps.md`](../reference/environment-traps.md) §7 #547、#548。
+
+### 并行轨道：表单 / 对话框的「解剖」（✅ 代码层收口 2026-10-24；还欠两枚别线的红）
+
+**一句话**：把"每个填表界面各画一套"收敛成**一套判断 + 两个渲染器**，并让"结构"这一层能被判红。
+
+| 事 | 读数 |
+|---|---|
+| 原则文档 | [`ux-principles.md`](ux-principles.md) —— 九节，每条带**可判红的判据**与出处（GOV.UK / Apple HIG / WCAG / ui-ux-pro-max） |
+| 一份判断 | `packages/ui/src/form/anatomy.ts`（`resolveFieldChrome` / `fieldDescribedById`）—— web 的 `FormField` 与移动端 `kit.TextField` **各消费同一个函数** |
+| web 收敛 | 手写字段标签 **72 → 0**（账本 `scripts/form-anatomy-ledger.json` 现量 0 处 / 0 文件） |
+| 移动端收敛 | 文本 / 数字 / 多行备注全走 `kit.TextField`；裸 `<TextInput>` 只剩 **3 处非字段**（搜索框 / 聊天输入条 / Fabric focus 竞态那一格），由 `mobile-text-field.spec.ts` **M5** 记账 |
+| 结构门禁 | `check:form-anatomy`（R1 账本只减不增 + R2 解剖定义处唯一）+ e2e `assertFormRhythm`（一档控件高度、≥43px）；**5 次注入验证过能红** |
+| 看图 | `apps/web/evidence/habit-create-alignment/`、`…/settings-form-alignment/`、`…/form-alignment-sweep/`、`…/admin-holiday/admin-holiday-form.png` |
+
+**这一批最贵的三条教训**（都记在 ux-principles §8 的未闭合格里，因为下一位迁移时一定还会踩）：
+
+1. **看图才看得见形状**：习惯目标编辑器"数值 + 单位并排"在**宽度由内容决定**的面板里会裁掉占位符；
+   加宽度下限又会**溢出右边框**（面板宽 = 最宽的孩子，循环依赖）。几何判据当时全绿。
+2. **原语必须自己顶住宿主的遗留样式**：后台「年份」那一格被老的 `.ht-settings__admin-input { flex: 1 }`
+   压成 **17px** —— 纵向 flex 里 `flex-basis: 0%` 压过 `block-size`。原语现在带 `flex: none`，
+   判据加在 `admin-console.spec.ts`（注入：去掉 `flex: none` ⇒ 红在「17 / 42 / 84 三档」）。
+3. **别写第三份实现**：第一版我在 `packages/ui` 写了个 RN 渲染器 `Field.tsx`，零消费者 ——
+   而移动端本来就有 `kit.TextField`。**判断归共享层，渲染器归各端 kit。**
+
+**还欠的（不是本线的活）**：`pnpm check` 全链此刻仍被别线的存量红挡着
+（`check:selection-single-source` 的 `ShareSpaceScreen.selfMemberId` 是**门禁词表缺一档**：
+它既不是"当前看哪一条"也不是 5 类瞬态，而是从钥匙口取回来的"我是哪一行"；
+另有 `check:empty-state` / `check:mobile-renew-shape` / `check:text-color` / `check:rn-aria`
+与平台类红）。本线自己的闸门逐道绿。
