@@ -48,6 +48,130 @@ import { execFileSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 
 const ROOT = process.cwd();
+
+/**
+ * 第二臂：**按文案长度判**（2026-10-24 晚加，因为第一臂漏了一整片）。
+ *
+ * 第一臂只认 `ht-settings__*hint*` 那族类名 —— 而「AI 与集成 → 自动收集规则」那一块
+ * 用的是 `ht-inbound__*` 自己的类名，于是它的四段说明在账本上是 **0**，
+ * 用户第三次截图来问"怎么还有那么多说明性文字"。
+ *
+ * 教训：**按元素类名认"说明文字"，等于按房间灯的颜色认火**。文案才是它是什么。
+ * 所以这一臂直接看**词条的值**：设置界面里凡是引用了一条 zh 长度 ≥ {@link PROSE_MIN_CHARS}
+ * 的文案、又没有落在合法载体（问号 / 通知 / 反馈 / 披露）里，就算违规。
+ *
+ * 阈值 40：设置里合法的**标签、按钮、值**没有一条到这个长度（最长的选项文案 29 字），
+ * 而一段说明几乎必然超过它。它不完美（短说明会漏），但它是**按内容**判的，不会因为
+ * 换了类名就整片消失。
+ */
+const PROSE_MIN_CHARS = 40;
+
+/** 合法的"这段文案不在明面上"的载体标记（见上面的三条例外）。 */
+const CARRIER_MARKERS = [
+  'SettingsInfoTip',
+  // 传给「问号」的 props：`<Toggle tip={t(…)}>` / `note=` / `hint=` 都会渲染成 `?`。
+  'tip={',
+  'tip=',
+  'note={',
+  'SettingsNotice',
+  'role="alert"',
+  'role="status"',
+  'aria-live',
+  'data-settings-disclosure',
+];
+
+function loadZhLocale() {
+  const text = readFileSync(join(ROOT, 'packages/i18n/src/locales/zh-CN.ts'), 'utf8');
+  const pairs = text.matchAll(/^\s*'([^']+)':\s*'((?:[^'\\]|\\.)*)',?\s*$/gmu);
+  const map = new Map();
+  for (const [, key, value] of pairs) map.set(key, value);
+  return map;
+}
+
+/**
+ * 这一行所在的**那个元素的开始标签**（多行标签也算）。
+ *
+ * 🔴 为什么不用"前后 N 行窗口"：相邻的 `role="status"` 会把整屏都豁免掉 ——
+ * 「自动收集规则」那四段就是这么连续两轮从账本里消失的（用户每次都能看见，
+ * 而门禁说 0）。判据必须落在**同一个元素**上。
+ */
+function enclosingTag(lines, index) {
+  for (let i = index; i >= 0 && i >= index - 12; i -= 1) {
+    const line = lines[i];
+    if (!/<[A-Za-z]/.test(line)) continue;
+    let tag = '';
+    for (let j = i; j < Math.min(lines.length, i + 8); j += 1) {
+      tag += `\n${lines[j]}`;
+      if (lines[j].includes('>')) break;
+    }
+    return tag;
+  }
+  return '';
+}
+
+/**
+ * 这一行的载体标记：**本元素**的开标签 + 紧邻的**祖先**开标签（最多 4 行）。
+ *
+ * 为什么要带祖先：`<aside role="status"><p class="hint">…</p></aside>` 里那句
+ * 是正经反馈（一次性密钥、测试发送结果）。只看 `<p>` 会把它判成说明。
+ * 4 行是刻意的上限 —— 再放宽就退回"整屏豁免"，而那个坑这一轮已经踩过三次。
+ */
+function carrierContext(lines, index) {
+  const own = enclosingTag(lines, index);
+  const ancestors = lines.slice(Math.max(0, index - 4), index).join('\n');
+  /*
+   * 松一层：20 行内出现过 `<SettingsInfoTip` 而它**还没闭合**（没有 `/>`）——
+   * 说明这一行是那枚问号的正文（正文是多行 JSX 时很常见）。
+   * 只对"未闭合"成立，所以不会把"上一枚已经关掉的问号"算进来。
+   */
+  const above = lines.slice(Math.max(0, index - 20), index).join('\n');
+  const openTip = above.lastIndexOf('<SettingsInfoTip');
+  const unclosed = openTip !== -1 && !above.slice(openTip).includes('/>');
+  return `${own}\n${ancestors}${unclosed ? '\nSettingsInfoTip' : ''}`;
+}
+
+/**
+ * 这一行是不是**错误 / 状态文案的构造点**（`…Error()` / `const xMessage =` 之类）。
+ *
+ * 判据不是"名字里带 error 就放过"这么随意：这类函数返回的句子只会被渲染进
+ * `role="alert"` / 状态位（`AiSettings` 的 `describeEndpointError` 就是这样），
+ * 把它塞进问号反而会让用户点一下才知道哪里错了。
+ */
+function isFeedbackCopySite(lines, index, rawLine, rawPrev) {
+  // 40 行：错误文案的构造函数常常在 switch 前面十几行，且中间隔着分支。
+  const above = lines.slice(Math.max(0, index - 40), index + 1).join('\n');
+  if (/function\s+\w*(rror|otice|essage|tatus)\w*\s*\(|const\s+\w*(rror|otice|essage|tatus)\w*\s*=/iu.test(above)) {
+    return true;
+  }
+  /*
+   * 显式豁免：`settings-prose-ok: <理由>` 写在**这一行**上。
+   *
+   * 它不是"放宽判据"，而是把少数**构造点被复用**的句子（例如一个 notice 的标题
+   * 由纯函数拼出来，渲染处才是合法的载体）摊到台面上：每一条都带着理由，
+   * 而且会被打印出来，不会像静默豁免那样越用越多。
+   */
+  /* 标记可以写在**这一行**，也可以写在**上一行**（注释单独占一行更好读）。 */
+  return /settings-prose-ok:/u.test(rawLine ?? '') || /settings-prose-ok:/u.test(rawPrev ?? '');
+}
+
+/** 第二臂：长文案的引用点，且所在元素不是合法载体。 */
+function findLongCopy(text, zh) {
+  const raw = text.split('\n');
+  const lines = stripComments(text).split('\n');
+  const hits = [];
+  lines.forEach((line, index) => {
+    for (const match of line.matchAll(/\bt\(\s*'([^']+)'/gu)) {
+      const key = match[1];
+      const value = zh.get(key);
+      if (value === undefined || value.length < PROSE_MIN_CHARS) continue;
+      const tag = carrierContext(lines, index);
+      if (CARRIER_MARKERS.some((marker) => tag.includes(marker))) continue;
+      if (isFeedbackCopySite(lines, index, raw[index], raw[index - 1])) continue;
+      hits.push({ line: index + 1, text: `${key} (${value.length} 字)`, kind: 'long-copy' });
+    }
+  });
+  return hits;
+}
 const LEDGER = join(ROOT, 'scripts/settings-prose-ledger.json');
 
 /**
@@ -79,18 +203,17 @@ const DISCLOSURE_MARKER = 'data-settings-disclosure';
 const FEEDBACK_MARKERS = [
   'role="alert"',
   "role='alert'",
+  'role="status"',
   'aria-live',
   'ht-settings__danger',
-  'ht-settings__status',
-  'ht-settings__sub-status',
-  'data-testid="renew-failure"',
-  'failure',
-  'error',
-  'notice',
-  'warn',
-  'status',
-  'pending',
-  'busy',
+  'data-settings-disclosure',
+  /*
+   * 🔴 这里只放**结构标记**，不放裸词（`'status'` / `'error'` / `'failure'` 曾经在里面）——
+   * 一个裸词会让"同一段里恰好出现了 status 这个词"的整屏说明全部豁免：
+   * 「自动收集规则」那四段就是这么从第一版账本里漏掉的（用户第三次截图来问）。
+   * 要豁免的，把 `role="status"` / `role="alert"` / `data-settings-disclosure`
+   * 写在那个元素上，或者 `data-testid` 里带上 failure/status 并在下面显式匹配。
+   */
 ];
 
 /** 设置壳（App.tsx 里那一节的开头说明也算"说明文字"）。 */
@@ -129,6 +252,7 @@ function stripComments(text) {
 
 /** 找一处违规：容器类名或移动端 `hint:`，且窗口里没有反馈标记。 */
 function findViolations(text) {
+  const raw = text.split('\n');
   const lines = stripComments(text).split('\n');
   const hits = [];
   const isMobileRowHint = (line) => /^\s*hint:\s*/u.test(line);
@@ -138,10 +262,11 @@ function findViolations(text) {
     const mobileHint = false;
     if (banned === undefined && !mobileHint) return;
 
-    // 反馈标记：这一行前后 6 行里任意一个 —— JSX 的属性常写在上一行。
-    const windowText = lines.slice(Math.max(0, index - 6), index + 7).join('\n');
+    // 反馈/披露标记：看**这一行的元素**，不看邻居（见 `enclosingTag` 的注释）。
+    const windowText = carrierContext(lines, index);
     const isFeedback = FEEDBACK_MARKERS.some((marker) => windowText.includes(marker));
     if (isFeedback) return;
+    if (isFeedbackCopySite(lines, index, raw[index], raw[index - 1])) return;
     // 披露：ADR-0054 §7 要求"对话之前就看得到"，藏进问号气泡就不再是披露。
     if (windowText.includes(DISCLOSURE_MARKER)) return;
 
@@ -157,11 +282,23 @@ function findViolations(text) {
 }
 
 const files = listFiles();
+const zh = loadZhLocale();
 const counts = {};
 const details = [];
 for (const file of files) {
   const text = readFileSync(join(ROOT, file), 'utf8');
-  const hits = findViolations(text);
+  /*
+   * 第二臂（按文案长度）**只跑 Web 的设置面**。
+   * 移动端那些长句分散在 20 多个 screen 里（对话确认、同意闸门、法务重申…），
+   * 其中大半是**反馈或法务文本**，不是"设置项旁边的说明"；一刀切进去会把
+   * "这一单没下成"也判成违规。移动端这一半按屏幕逐个迁，进度记在 `.handoff/`
+   * 的那份交接里，不在本门的读数里假装已经清了。
+   */
+  const copyArmApplies = file.startsWith('apps/web/src/features/settings')
+    || file.startsWith('apps/web/src/features/subscription')
+    || file.startsWith('apps/web/src/features/sync')
+    || file === 'apps/web/src/App.tsx';
+  const hits = [...findViolations(text), ...(copyArmApplies ? findLongCopy(text, zh) : [])];
   if (hits.length > 0) {
     counts[file] = hits.length;
     details.push({ file, hits });

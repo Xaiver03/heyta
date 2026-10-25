@@ -265,10 +265,12 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
     >
       <h3 id="vault-settings-title" className="ht-settings__h3 ht-type-headline">
         {t('web.sync.vault.title')}
+        <SettingsInfoTip
+          testId="tip-vault"
+          label={t('web.sync.vault.title')}
+          text={t('web.sync.vault.description')}
+        />
       </h3>
-      <p className="ht-settings__hint">
-        {t('web.sync.vault.description')}
-      </p>
 
       {loading ? <p data-testid="vault-loading">{t('web.sync.vault.busy')}</p> : null}
       {sync.accountId === undefined || sync.accountId === '' ? (
@@ -410,9 +412,9 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
           {pending.recoveryCode !== '' ? (
             <code data-testid="vault-recovery-display" className="ht-settings__vault-code">{pending.recoveryCode}</code>
           ) : (
-            <p data-testid="vault-recovery-resume" className="ht-settings__hint">{t('web.sync.vault.recoveryResume')}</p>
+            <p data-testid="vault-recovery-resume" className="ht-settings__hint" role="status">{t('web.sync.vault.recoveryResume')}</p>
           )}
-          <p className="ht-settings__hint">{t('web.sync.vault.recoveryHint')}</p>
+          <p className="ht-settings__hint" role="status">{t('web.sync.vault.recoveryHint')}</p>
           <FormField id="vault-recovery-confirm" label={t('web.sync.vault.recoveryConfirm')}>
             {(field) => (
               <input {...field} data-testid="vault-recovery-confirm" type="text" autoComplete="off" value={pendingCode} onChange={(event) => setPendingCode(event.target.value)} />
@@ -463,10 +465,12 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
               {t('web.sync.vault.cancel')}
             </button>
           </div>
-          {pendingAction === 'change' ? <p className="ht-settings__hint">{t('web.sync.vault.changeTitle')}</p> : null}
+          {pendingAction === 'change' ? (
+            <p className="ht-settings__hint" role="status">{t('web.sync.vault.changeTitle')}</p>
+          ) : null}
           {pendingAction === 'rotate' ? (
             <>
-              <p className="ht-settings__hint">{t('web.sync.vault.rootRotationHint')}</p>
+              <p className="ht-settings__hint" role="status">{t('web.sync.vault.rootRotationHint')}</p>
               <FormField id="vault-legacy-passphrase" label={t('web.sync.vault.legacyPassphrase')}>
                 {(field) => (
                   <input
@@ -486,13 +490,15 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
               />
             </>
           ) : null}
-          {migrationProgress !== undefined ? <p className="ht-settings__hint" data-testid="vault-migration-progress">{t('web.sync.vault.rootRotationProgress', migrationProgress)}</p> : null}
+          {migrationProgress !== undefined ? (
+            <p className="ht-settings__hint" role="status" data-testid="vault-migration-progress">{t('web.sync.vault.rootRotationProgress', migrationProgress)}</p>
+          ) : null}
         </div>
       ) : null}
 
       {!loading && session !== undefined && unlocked && pending === undefined ? (
         <div data-testid="vault-unlocked" className="ht-settings__section">
-          <p className="ht-settings__hint" data-testid={session.requiresRecoveryRotation ? 'vault-recovery-rotation' : 'vault-ready'}>
+          <p className="ht-settings__hint" role="status" data-testid={session.requiresRecoveryRotation ? 'vault-recovery-rotation' : 'vault-ready'}>
             {session.requiresRecoveryRotation ? t('web.sync.vault.recoveryRotationRequired') : t('web.sync.vault.ready')}
           </p>
           <div className="ht-settings__actions">

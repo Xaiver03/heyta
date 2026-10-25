@@ -247,13 +247,13 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
           {status.pendingEmail === undefined ? null : (
             <div className="ht-settings__field">
               <div className="ht-settings__item-label">{t('common.emailChange.pendingLabel')}</div>
-              <p className="ht-settings__hint" data-testid="email-change-pending-email">
+              <p className="ht-settings__hint" role="status" data-testid="email-change-pending-email">
                 {status.pendingEmail}
               </p>
             </div>
           )}
           {cooldownSecondsLeft === undefined ? null : (
-            <p className="ht-settings__hint" data-testid="email-change-cooldown">
+            <p className="ht-settings__hint" role="status" data-testid="email-change-cooldown">
               {t('common.emailChange.cooldown', { seconds: cooldownSecondsLeft })}
             </p>
           )}

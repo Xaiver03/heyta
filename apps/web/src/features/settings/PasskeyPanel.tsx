@@ -289,7 +289,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
           )}
 
           {status.kind === 'loaded' && status.passkeys.length === 0 && (
-            <p className="ht-settings__hint" data-testid="passkeys-empty">
+            <p className="ht-settings__hint" role="status" data-testid="passkeys-empty">
               {t('web.passkeys.empty')}
             </p>
           )}

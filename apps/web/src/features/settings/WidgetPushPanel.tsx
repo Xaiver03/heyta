@@ -1,4 +1,5 @@
 import { ICON_SIZE } from '@heyta/design-system';
+import { SettingsInfoTip } from './SettingsInfoTip.js';
 /**
  * Windows 小组件的后台刷新开关（设置页）。
  * ==========================================
@@ -263,16 +264,23 @@ export function WidgetPushPanel({ active = true }: { active?: boolean } = {}): R
           },
         ] as const)
       : []),
-    // 载荷里没有任务内容 —— 用户没有别的途径知道这件事。见文件头。
-    { kind: 'note', text: t('web.widgetPush.note.privacy'), divider: true },
-    { kind: 'note', text: t('web.widgetPush.note.windowsOnly') },
+    // 载荷里没有任务内容 —— 这两句进标题旁的 `?`（见下面的 `SettingsInfoTip`）。
   ];
 
   return (
     <HeytaUiProvider>
       <SettingsSection
         testID="widget-push-panel"
-        title={t('web.widgetPush.title')}
+        title={
+          <>
+            {t('web.widgetPush.title')}
+            <SettingsInfoTip
+              testId="tip-widget-push"
+              label={t('web.widgetPush.title')}
+              text={t('web.widgetPush.note.privacy') + ' ' + t('web.widgetPush.note.windowsOnly')}
+            />
+          </>
+        }
         note={t('web.widgetPush.description')}
         leading={<BellRing aria-hidden="true" size={ICON_SIZE.md} />}
         rows={rows}

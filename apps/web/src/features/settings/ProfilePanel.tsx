@@ -448,7 +448,7 @@ export function ProfilePanel({
             上传成功后紧跟着一次读取失败，界面就把两件不同的事说成同一句。
           */}
           {avatarReadMessage === null ? null : (
-            <p className="ht-settings__hint" data-testid="profile-avatar-read-notice">
+            <p className="ht-settings__hint" role="status" data-testid="profile-avatar-read-notice">
               {avatarReadMessage}
             </p>
           )}
@@ -492,12 +492,7 @@ export function ProfilePanel({
               {t('common.profile.nickname.save')}
             </button>
           </div>
-          {/* 行里只留一眼要用的那个数；"昵称不是什么"在 `?` 里。 */}
-          <p className="ht-settings__hint">
-            {t('common.profile.nickname.hint', {
-              max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
-            })}
-          </p>
+          {/* 输入框下面那句"最多 32 字"也是说明 → 挪进上面那枚 `?` 的正文。 */}
           {tooLong ? (
             <p className="ht-settings__danger" data-testid="profile-nickname-toolong">
               {t('common.profile.nickname.toolong', {

@@ -33,6 +33,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { SettingsInfoTip } from './SettingsInfoTip.js';
 
 import { closeAccountAndEraseLocal } from '@heyta/app-host';
 import { ICON_SIZE } from '@heyta/design-system';
@@ -127,11 +128,24 @@ export function CloseAccountPanel(): React.JSX.Element | null {
         />
       ) : (
         <div className="ht-settings__danger-card">
-          <p className="ht-settings__hint">{t('common.accountClosure.lead')}</p>
-          <p className="ht-settings__hint">{t('common.accountClosure.exportHint')}</p>
+          {/*
+            这两句原来是注销卡片顶上的两行小字（2026-10-24 禁令后进 `?`）。
+            它们说的是"会发生什么"，而卡片自己的标题已经点明这件事。
+          */}
+          <SettingsInfoTip
+            testId="tip-close-account"
+            label={t('common.accountClosure.lead')}
+            text={
+              <>
+                {t('common.accountClosure.lead')}
+                {' '}
+                {t('common.accountClosure.exportHint')}
+              </>
+            }
+          />
 
           {pending !== undefined && pending > 0 ? (
-            <p className="ht-settings__danger" data-testid="close-account-pending">
+            <p className="ht-settings__danger" role="status" data-testid="close-account-pending">
               <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
               {t('common.accountClosure.pending', { count: pending })}
             </p>

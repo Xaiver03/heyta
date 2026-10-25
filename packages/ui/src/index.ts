@@ -389,6 +389,7 @@ export {
  * 唯一值得信的是 `PROVIDER_DEPENDENT` 本身。
  */
 export {
+  SettingsInfoTip,
   SettingsRow,
   SettingsSection,
   type SettingsRowProps,
