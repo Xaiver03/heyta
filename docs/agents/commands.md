@@ -221,6 +221,22 @@ bash scripts/clean-build-tmp.sh --self-test        # 分类器 + **端到端**�
                                 #   ⚠️ 见 §7 第 434 条：macOS 上 `find` 有两个会**安静**出错的地方
 ```
 
+## 6.6 边缘配置：改站点之前先跑这一条
+
+```sh
+server/scripts/caddy-sync.sh --check    # 线上 /etc/caddy/sites.d 与仓库镜像有无漂移（有漂移退出 1）
+```
+
+🔴 **这一域名现在由 `caddy-edge` 服务，不是 nginx**（现量：`ssh finlaw 'ss -ltnp | grep :443'`；
+`nginx.service` 是 masked）。所以 `server/scripts/nginx-sync.sh` 与 `server/deploy/nginx/`
+那一份镜像对 `heyta.waytofuture.cn` 是**死配置** —— 它写得进去、`nginx -t` 也过、
+reload 报 masked，而"改了边缘"这件事是假的（2026-10-25 实测踩过，ADR-0054 §落地动作 3 早记过同一课）。
+
+三档与理由在 [`server/deploy/caddy/README.md`](../../server/deploy/caddy/README.md)：
+`--check`（默认，只比对）/ `--pull`（线上是对的，抓回来并提交）/
+`--apply`（仓库是对的：逐片备份 → 整份 `caddy-edge validate` → 过了才 reload，任一环失败**全部还原**）。
+射程只含 `*heyta*.caddy` —— `sites.d/` 是多产品共用目录，整目录覆盖会打掉别人的站。
+
 ---
 
 ## 6.1 腾讯云账号与凭据（**多个账号，别假设是同一个**）

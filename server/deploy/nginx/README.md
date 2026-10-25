@@ -1,5 +1,13 @@
 # `server/deploy/nginx/` —— 生产 nginx 站点的**版本化镜像**
 
+> 🔴 **对 `heyta.waytofuture.cn` 这一枚域名，这一份与 `server/scripts/nginx-sync.sh` 都是死配置。**
+> 2026-10-24 起边缘是 `caddy-edge`（现量：`ssh finlaw 'ss -ltnp | grep :443'`），
+> `nginx.service` 是 masked —— 写进来没有任何东西会读它。
+> 真源与三档同步在 [`../caddy/`](../caddy/README.md) 与 `server/scripts/caddy-sync.sh`。
+> 2026-10-25 上线 `/admin` 时照旧计划跑了一次 `nginx-sync.sh --apply`：
+> 文件写进去了、`nginx -t` 也过了、reload 报 masked —— 于是"改了边缘"这件事是假的。
+> 下面这一整套理由仍然成立，只是换了个在服务的边缘。
+
 ## 这是什么，以及它**不是**什么
 
 这里放的是**线上那台机器上真实生效的** nginx 站点文件的一份**逐字节副本**。

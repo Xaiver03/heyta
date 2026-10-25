@@ -1,0 +1,15 @@
+apiheyta.waytofuture.cn {
+	handle /api/* {
+		reverse_proxy 127.0.0.1:1900
+	}
+	@serverPages path_regexp serverPages ^/(health|live)$
+	handle @serverPages {
+		reverse_proxy 127.0.0.1:1900
+	}
+	handle / {
+		respond `{"service":"heyta-api","message":"heyta API. Use /api/* endpoints."}` 200
+	}
+	handle {
+		respond 404
+	}
+}
