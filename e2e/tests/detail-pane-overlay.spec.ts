@@ -28,7 +28,7 @@
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openApp, openSettingsView, parkCursor, showDetailColumnContent } from './helpers';
+import { closeSettingsSheet, openApp, openSettingsView, parkCursor, showDetailColumnContent } from './helpers';
 
 const SHOT = (name: string) =>
   fileURLToPath(new URL(`../../apps/web/evidence/detail-pane-overlay/${name}.png`, import.meta.url));
@@ -120,26 +120,49 @@ test.describe('浮层与详情列', () => {
     const sheet = page.getByTestId('settings-sheet');
     await expect(sheet, '设置浮层没出现').toBeVisible();
     const sheetBox = await settledBox(sheet);
-    const detail = await detailBox(page);
 
     // 正向对照：它必须**真的盖住**中间那一列，否则下面那条"不相交"是恒真。
     expect(
       overlaps(sheetBox, await mainBox(page)),
-      `设置浮层连中间列都没盖住（sheet ${String(sheetBox.x)}+${String(sheetBox.width)}）—— "不盖详情列"这条就成了空判据`,
+      `设置浮层连中间列都没盖住（sheet ${String(sheetBox.x)}+${String(sheetBox.width)}）—— 这条就成了空判据`,
     ).toBe(true);
 
-    // 决定本体：第四列不在浮层的覆盖范围内。
+    /*
+     * 🔴 2026-10-25 改判据：**设置浮层开着的时候，详情列是被有意收起的**
+     * （`3fd905ec8` 那一刀的产品裁决：「设置遮蔽详情列」）。实测读数（本机 1280×720，
+     * 选中一条任务后打开设置）：
+     *     `.ht-app__detail` display=none、`grid-template-columns: 64px 1216px 0px`、
+     *     `data-detail="open"`（偏好没变，只是这一档不排版）
+     * 所以原来那三句（"浮层不盖详情列 / 浮层开着列宽仍是 token"）量的是一个**已经不存在的形态**：
+     * `detailBox()` 直接报"界面上没有详情列"。
+     *
+     * 这一条要守的事实没变 —— **设置浮层不会把那一栏弄坏**。改成三段量：
+     *   ① 浮层开着 ⇒ 第四列轨道是 0（被有意收起，不是被挤成 3px 的残条）；
+     *   ② 浮层关掉 ⇒ 那一栏回来，宽度**仍然等于 token**（这才是"没被挤掉"的真凭据）；
+     *   ③ 浮层盖住的是中间那一列（上面那条正向对照）。
+     */
+    const collapsedTrack = await page.locator('.ht-app').evaluate((el) => {
+      const tracks = getComputedStyle(el).gridTemplateColumns.split(' ');
+      const detail = document.querySelector<HTMLElement>('.ht-app__detail');
+      return { tracks, display: detail === null ? 'missing' : getComputedStyle(detail).display };
+    });
     expect(
-      overlaps(sheetBox, detail),
-      `设置浮层盖到了详情列上（sheet 右边缘 ${String(sheetBox.x + sheetBox.width)} vs 详情列左边缘 ${String(detail.x)}）`,
-    ).toBe(false);
+      collapsedTrack.display === 'none' || Number.parseFloat(collapsedTrack.tracks.at(-1) ?? '1') < 1,
+      `设置浮层开着时第四列既不是 display:none 也不是 0 轨道（读到 ${JSON.stringify(collapsedTrack)}）` +
+        ' ⇒ 那一栏被挤成了一条残缝，而不是被有意收起',
+    ).toBe(true);
 
-    // 浮层打开**不是**重排的理由：列宽仍等于 token。
+    await closeSettingsSheet(page);
+    const restored = await detailBox(page);
     const want = await pxOfCssVar(page, '--ht-layout-detail-width');
-    expect(detail.width, `浮层打开后详情列宽 ${String(detail.width)} 不再是 token 的 ${String(want)}`).toBeCloseTo(
-      want,
-      0,
-    );
+    expect(
+      restored.width,
+      `关掉设置之后详情列宽 ${String(restored.width)} 不再是 token 的 ${String(want)} ⇒ 那一栏被挤坏了`,
+    ).toBeCloseTo(want, 0);
+
+    // 收获：浮层关掉之后它也不该再盖住那一列（这一条在旧形态里是量浮层与本体的相交）。
+    await openSettingsView(page);
+    await expect(page.getByTestId('settings-sheet')).toBeVisible();
 
     await parkCursor(page);
     await page.screenshot({ path: SHOT('settings-sheet') });
