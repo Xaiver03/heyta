@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp } from './helpers';
+import { openApp, switchView } from './helpers';
 
 /**
  * 塌缩态（≤768px）的**逐页**扫描（goal-layout-audit.md 页 4 / 收尾）
@@ -33,7 +33,12 @@ for (const [tab, file] of [
   test(`塌缩态扫描：${tab}`, async ({ page }) => {
     await page.setViewportSize(NARROW);
     await openApp(page);
-    await page.getByRole('tab', { name: tab }).click();
+    // 🔴 切视图必须走 `switchView`（helpers 里那一处收口），不能自己 `getByRole('tab')`：
+    // 塌缩档（≤768px）渲染的是 `nav.ht-compact-rail` 下的**普通 button**，rail 上根本没有
+    // `role="tab"`；而常驻段只有「任务」「日历」两枚，其余住在「更多」面板里。
+    // 2026-10-25 之前这里写的是 tab 角色 ⇒ 一整条 spec 全部超时，而报错是
+    // "waiting for getByRole('tab', { name: '日历' })"（看着像视图打不开）。
+    await switchView(page, tab);
     // 🔴 每个视图的页头标题都必须等于它自己的名字。
     //
     // 这里**曾经**写着"日历跳过标题断言"，理由是「`VIEW_TITLED_BY_TAB` 不含
@@ -48,7 +53,9 @@ for (const [tab, file] of [
     }
 
     // 🔴 塌缩形态的锚：底部导航必须还在视口里（塌塌就没导航 = 半成品）。
-    const nav = page.locator('.ht-rail__tabs');
+    // 塌缩档的锚是 `nav.ht-compact-rail`（W1 之后 rail 收成常驻段 + 更多面板，
+    // `.ht-rail__tabs` 只存在于宽档）。判据本身不变：导航仍在视口里且贴底。
+    const nav = page.locator('nav.ht-compact-rail');
     await expect(nav).toBeVisible();
     const navBox = await nav.boundingBox();
     expect(navBox, '底部导航有几何').not.toBeNull();
@@ -68,7 +75,7 @@ test('塌缩态扫描：搜索浮层', async ({ page }) => {
   const composer = page.locator('input[placeholder^="添加任务"]');
   await composer.fill('塌缩态的锚点任务');
   await composer.press('Enter');
-  await page.getByRole('tab', { name: '搜索' }).click();
+  await switchView(page, '搜索');
 
   const surface = page.getByTestId('search-overlay-surface');
   await expect(surface).toBeVisible();
