@@ -160,7 +160,9 @@ export function SettingsInfoTip({
         testID={testID}
         accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityState={{ expanded: open }}
+        /* 🔴 平铺写法（2026-10-25）：对象形态的 `accessibilityState` 在 web 上会被
+           react-native-web **整个丢掉** —— 同一个组件在 web 上失去"已展开"状态，
+           而原生两端照常，且没有任何测试会红。`aria-expanded` 保留是给 DOM 那一侧。 */
         aria-expanded={open}
         hitSlop={tokens['space.2']}
         onPress={() => setOpen((previous) => !previous)}

@@ -55,14 +55,20 @@ const ARMS = [
     name: 'R3 屏上写死金额（价格是服务端报价之后才落屏的那条线被破）',
     // ⚠️ 锚点带上第二行：`<Text variant="row-meta" tone="subtle">` 在本文件出现 2 次，
     //    单拿它当锚会被脚本自己的"恰好 1 次"检查挡下（那是好事：注入点含糊 = 臂讲的不是这件事）。
-    from: '      <Text variant="row-meta" tone="subtle">\n        {t(TIER_KEYS[tierId].detail)}',
-    to: "      <Text variant=\"row-meta\" tone=\"subtle\">{'¥12 '}\n        {t(TIER_KEYS[tierId].detail)}",
+    // ⚠️ 2026-10-25：锚点跟着 `RenewSection` 的版面走了一次 —— 档位详情从
+    //    "单个 `tierId`" 变成 "`plans.map` 里的 `id`"（多档并排）。**臂讲的事没变**：
+    //    往价格那一行塞一枚写死的金额，判据（`/¥\s?\d/` 一处都不许有）必须红。
+    from: '              <Text variant="row-meta">{t(TIER_KEYS[id].price)}</Text>',
+    to: "              <Text variant=\"row-meta\">{'¥12 '}{t(TIER_KEYS[id].price)}</Text>",
     expect: ['档位只从'],
   },
   {
     name: 'R4 把 `web.*` 词条读进移动壳（命名空间说的是壳，不是事；那本"既存 179 处"的账又长大）',
-    from: "        label={t('mobile.entitlement.renew.action')}",
-    to: "        label={t('web.entitlement.renew.action')}",
+    // ⚠️ 2026-10-25：锚点跟着版面走了一次 —— 按钮文案现在是**三元**（已购/未购
+    //    两档），单行的 `label={t(...)}` 不再存在。臂讲的事没变：把 `web.*` 词条
+    //    读进移动壳，判据（"键都不读"）必须红。
+    from: "        label={entitled ? t('mobile.entitlement.renew.action') : t('mobile.subscription.renew.subscribe')}",
+    to: "        label={entitled ? t('web.entitlement.renew.action') : t('mobile.subscription.renew.subscribe')}",
     expect: ['键都不读'],
   },
   {

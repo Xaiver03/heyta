@@ -78,7 +78,10 @@ export function AiGeneratedLabel({
 
   return (
     <View style={style.frame} testID={testID ?? 'ai-generated-label'}>
-      <Text style={style.label}>{label}</Text>
+      {/* 🔴 `style.label` 只带字号/字重，**不带颜色** —— 而 `<Text>` 没有颜色时会画成
+          纯黑，暗色主题下等于看不见。语义文字样式自带默认前景色，再把 label 那层
+          贴上去做微调（顺序不能反：反过来语义色就盖掉了）。 */}
+      <Text style={[text['row-meta'], style.label]}>{label}</Text>
     </View>
   );
 }

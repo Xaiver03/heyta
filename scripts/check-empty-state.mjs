@@ -258,6 +258,14 @@ const NOT_AN_EMPTY_STATE = new Map([
    */
   ['mobile.conflict.payload.empty', '冲突载荷预览里的「（空）」占位符，不是页面空态'],
   ['web.export.markdown.empty', '导出到 Markdown 文件里的「（没有任务）」标签，不在页面上'],
+  /**
+   * 2026-10-25：`ShareSpaceScreen` 把这一条**交给共享评论面板**当标签
+   * （`labels.errorEmpty`），空态的骨架与留白由 `packages/ui` 那个共享组件画，
+   * 本屏不渲染任何空态结构。⇒ 站点在共享层，不在这里。
+   * ⚠️ 判据没松：本屏若自己写一句 `{t('…empty')}` 渲染出来，仍然按新站点红
+   * （同一文件里"两者都有"按出现位置判，不按文件判）。
+   */
+  ['common.share.comment.empty', '交给共享评论面板的"空"标签，骨架由共享组件渲染'],
 ]);
 
 /**
