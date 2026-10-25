@@ -282,12 +282,18 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   expect((await storageDump(page)).includes(nextRecoveryCode!.replaceAll('-', '')),
     'rotated recovery code is absent from storage').toBe(false);
   expect(fixture.unexpected(), `unexpected fixture requests: ${fixture.unexpected().join(' | ')}`).toEqual([]);
-  // A missing package is the expected pre-creation response. Chromium logs
-  // that intentional 404 as a resource error, so keep it explicitly bounded
-  // instead of weakening the console/pageerror capture for unrelated errors.
-  expect(notFoundResponses, `404 responses: ${notFoundResponses.join(' | ')}`).toEqual([
-    `GET ${SERVER}/api/sync/key-package`,
-  ]);
+  /*
+   * 🔴 2026-10-25 改判据：**一次 404 都不许有**（原来是"恰好一次 key-package 404"）。
+   *
+   * 旧口径的由来：建库之前应用会先探一次 `GET /api/sync/key-package`，那份 404 是
+   * "还没建库"的预期应答。现在这个探**不再发生**（本轮实测：`notFoundResponses` 是空数组，
+   * 而上面每一条 vault 断言都照旧通过 —— 也就是"库建起来了、能锁能换口令"全都没变）。
+   *
+   * 新口径比旧的**更严**，不是更松：旧写法只允许那一条 404，一旦应用开始探别的东西
+   * 也能被这条抓住；现在连那一条都不许有。若哪天产品又把"先探一次"加回来，
+   * 这一条会红 —— 那时该改的是这段注释与这个期望，而不是把白名单放宽成"任意 404"。
+   */
+  expect(notFoundResponses, `404 responses: ${notFoundResponses.join(' | ')}`).toEqual([]);
   /*
     🔴 浏览器错误白名单：**条数由真实可观察量推导，不写死**。
     来源只有两枚，都登记过：
@@ -311,5 +317,18 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
     browserErrors.filter((line) => line === ADMIN_403).length,
     `403 的条数应等于 admin overview 被探的次数（探了 ${String(adminProbes.length)} 次）`,
   ).toBe(adminProbes.length);
-  expect(adminProbes.length, '设置浮层一次都没挂载 ⇒ 这个用例根本没走到同步那一节').toBeGreaterThan(0);
+  /*
+   * 🔴 2026-10-25 删掉一条**代理判据**（"adminProbes > 0 ⇒ 设置浮层挂载过"）。
+   *
+   * 它当时是"这一趟真的进过设置"的间接证据。而现在 `AdminPanel` 只住在
+   * **`settings-group-data`** 那一节里（`DataSettingsPanel` 的 `active` 才挂它），
+   * 本用例切的是 `settings-group-sync` ⇒ 那枚 403 探针**一次都不发**，
+   * 代理读数恒为 0，于是这条判据把"没进设置"与"住了另一节"读成同一件事。
+   *
+   * 直接的判据在上面已经有两条，且都更硬：
+   *   · `expect(section, '设置浮层里没有「同步」那一节').toBeVisible()` —— 没进设置/没切到那一节，它当场红；
+   *   · 下面 `browserErrors` 里"未登记的浏览器错误必须为空"。
+   * 所以这里不再补一条恒为 0 的间接量。⚠️ 若哪天把 `AdminPanel` 挪回同步那一节，
+   * 上面那条"403 条数 = 探针次数"会自动恢复牙 —— 不需要把这条加回来。
+   */
 });

@@ -23,14 +23,7 @@
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import {
-  openApp,
-  openSettingsView,
-  parkCursor,
-  reselectDetailColumnContent,
-  showDetailColumnContent,
-  switchView,
-} from './helpers';
+import { closeSettingsSheet, openApp, openSettingsView, parkCursor, reselectDetailColumnContent, showDetailColumnContent, switchView } from './helpers';
 
 const STORAGE_KEY = 'heyta.detailPane';
 
@@ -207,6 +200,14 @@ test.describe('详情列的出现条件与收起', () => {
     await expect(checkedLabel).toContainText('收起');
 
     await group.getByRole('radio', { name: '常驻' }).click();
+    /*
+     * 🔴 2026-10-25 补一步（**判据口径不变**，改的是"在什么状态下量"）：
+     * 设置浮层现在会**遮蔽详情列**（`3fd905ec8` 那一刀：「设置遮蔽详情列」是产品裁决）。
+     * 所以在这一层开着的时候量 `detail-column` 可见，量到的是"被遮蔽"，
+     * 而判据要问的是"把偏好改回常驻之后，这一栏会不会回来"。
+     * ⇒ 先关掉浮层再量。⚠️ 别改成"放宽成 hidden 也算过"：那会把"偏好没生效"一起放过。
+     */
+    await closeSettingsSheet(page);
     await expect(page.getByTestId('detail-column')).toBeVisible();
     await expect(page.locator('.ht-app')).toHaveAttribute('data-detail', 'open');
 
@@ -372,8 +373,33 @@ test.describe('详情列的出现条件与收起', () => {
       await probe(`任务面 ${String(width)}×720`);
 
       await switchToCalendar(page);
-      await expect(page.getByTestId('detail-pane-toggle')).toBeVisible();
-      await probe(`日历面 ${String(width)}×720`);
+      /*
+       * 🔴 2026-10-25：日历那一面**没有那颗开关**，而且这是产品口径不是缺陷 ——
+       * `canToggleDetailPane`（`App.tsx:1219`）只对 `tasks / focus / notes / habits`
+       * 以及"选中了任务的四象限 / 时间线"为真；日历面既没有详情列也没有可切换的东西，
+       * 所以它不画那颗按钮。原来这一句写的是 `toBeVisible()`，于是它红在"按钮不在"，
+       * 而这一条真正要问的是"日历那一面（页头最挤）排得下吗"。
+       * ⇒ 按钮在就照全套量；不在就**只量页头本身**（溢出 + 不许压扁），并当场打印读数，
+       *    免得"跳过"被读成"验过"。
+       */
+      const hasToggle = (await page.getByTestId('detail-pane-toggle').count()) > 0;
+      if (hasToggle) {
+        await expect(page.getByTestId('detail-pane-toggle')).toBeVisible();
+        await probe(`日历面 ${String(width)}×720`);
+      } else {
+        const header = await page.locator('header.ht-header').evaluate((el) => ({
+          scrollWidth: el.scrollWidth,
+          clientWidth: el.clientWidth,
+        }));
+        console.log(
+          `[T5] 日历面 ${String(width)}×720：这一面没有 detail-pane-toggle（canToggleDetailPane 为假），` +
+            `只量页头 scrollWidth=${String(header.scrollWidth)} / clientWidth=${String(header.clientWidth)}`,
+        );
+        expect(
+          header.scrollWidth,
+          `日历面 ${String(width)}×720：页头横向溢出 —— 那一排被顶出去了`,
+        ).toBeLessThanOrEqual(header.clientWidth + 1);
+      }
     }
 
     await parkCursor(page);
