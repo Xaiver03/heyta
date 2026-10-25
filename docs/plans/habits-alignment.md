@@ -290,15 +290,28 @@ H6 HabitLog.note ── 一条决定，不阻塞别人
 | **S5** 间隔复习建得出、刷新后仍在、摘要说得出是哪一档 | 同上 | — |
 | **R1–R8** 判定 / 校验 / 派生 | `packages/domain/tests/habit-review.spec.ts` | 去掉起点守卫并改用 `Math.abs` ⇒ **恰 R3 红** |
 
-### 10.4 尚未闭合
+### 10.4 尚未闭合（2026-10-24 收口重写）
 
-- **web 有了共享 `FormField`**（`apps/web/src/lib/form/FormField.tsx` + `styles/app/form.css`，
-  2026-10-24 同日补建），已迁移「添加习惯」与「新建清单」两处；
-  🔴 **其余 25 处仍在账本里**（`scripts/form-anatomy-ledger.json`，72 处手写 `<label>`），
-  门禁只保证"不再增加"。同日在 `packages/ui` 建了 RN 侧的 `Field` + 共用的
-  `anatomy.ts`（判断一份、渲染器两个），**但还没有任何 screen 接它** ⇒ 移动端的
-  水位是"原语就绪、迁移未开始"，不是"已对齐"。
-- 移动端的新建习惯仍是"TextField + 主按钮"，**没有**跟这一批对齐；
-  图标选择器两端形状也不一致（web 展开 / mobile 展开，但入口位置不同）。
-- `check:design` 在**干净检出上就是红的**（`auth-dialog.css:278` 的 `xl+semibold` 自拼档位），
-  与本批无关，但会让"这次没红"不携带信息 —— 需要单独一单清账。
+**这一格在 2026-10-24 当天被改写三次**（原话保留在下面"划掉的那几条"里，别删：
+它们记录的是**当时的读数**，而读数是会变的）。现在的状态：
+
+| # | 事 | 状态 |
+|---|---|---|
+| 1 | web 手写字段标签 | ✅ **0 处 / 0 文件**（账本 `scripts/form-anatomy-ledger.json` 现量 0） |
+| 2 | 移动端字段接共享判断 | ✅ `kit.TextField` 消费 `@heyta/ui#resolveFieldChrome`；裸 `<TextInput>` 只剩 3 处非字段（搜索框 / 聊天输入条 / Fabric 竞态那一格），由 `mobile-text-field.spec.ts` **M5** 记账 |
+| 3 | `check:design` 在干净检出上就红 | ✅ 已修（`auth-dialog.css` 那处 `xl+semibold` 自拼档位改成 `ht-type-numeric-summary`）—— 这条红没了之后，"这次没红"才重新携带信息 |
+| 4 | 移动端"新建习惯"与 web 形状不一致 | ✅ **按定义关闭**：`docs/agents/ux-principles.md` §9 把"一致"切成三层 —— **判断**与**字段解剖**必须一致（已一致），**版面**不必一致（对话框 vs 全屏卡片本来就该不同）。字段层同源：`kit.TextField` ↔ `FormField` 都消费 `resolveFieldChrome` |
+| 5 | 图标选择器两端入口位置不同 | ✅ 同第 4 条：那是**版面**差异。但按 §9 的尾巴，它还差一句"为什么这个容器要这样" —— 记在下面待办里，不是欠账 |
+| 6 | `admin-console.spec.ts` 的「没登录」那一条 | 🔴 **仍红**：未登录时会请求**生产地址** `/api/auth/central/config`，桩接不到。属那条线的 fixture 面，未动 |
+| 7 | `vault-settings.spec.ts` | 🔴 **仍红**：3 个别的线新增接口没登记进它的桩白名单 |
+
+**划掉的那几条（当时读数，留作对照）**：
+
+- ~~"其余 25 处仍在账本里（72 处手写 `<label>`）"~~ ⇒ 当天收敛到 **0**。
+  中途还把指标修对过一次：R1 原先连复选框/单选框的标签一起数（72 里混着选项），
+  收窄成"包着非 choice 控件"的标签后重设基线 35，再降到 0。
+- ~~"`packages/ui` 里建了 RN 渲染器 `Field`，但没有任何 screen 接它"~~ ⇒ 那个渲染器
+  **已删**：移动端本来就有 `kit.TextField`，再写一个 RN 渲染器是**第三份实现**。
+  现在的分工是"判断归共享层（`anatomy.ts`），渲染器归各端 kit"。
+- ~~"移动端的新建习惯仍是 TextField + 主按钮，没有跟这一批对齐"~~ ⇒ 字段层已对齐
+  （见上表第 2 条）；版面差异另算（第 4 条）。

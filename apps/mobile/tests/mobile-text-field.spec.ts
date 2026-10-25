@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { read } from './source-reading';
+import { mobileSources, read, stripComments } from './source-reading';
 
 describe('移动端 TextField 与共享判断', () => {
   const src = read('apps/mobile/src/ui/kit.tsx');
@@ -53,5 +53,33 @@ describe('移动端 TextField 与共享判断', () => {
     // 第一版我在 `packages/ui/src/form/` 写了一个 `Field.tsx`，零消费者 ——
     // 而移动端本来就有 `kit.TextField`。那条被删掉了：渲染器归各端 kit，判断才归共享层。
     expect(src).toMatch(/export function TextField/);
+  });
+
+  it('M5 除了登记过的那几处，**没有屏自己手写 `<TextInput>`**（字段必须走 TextField）', () => {
+    /**
+     * 允许保留裸 `<TextInput>` 的地方 —— 每条都要写清楚"为什么它不是字段"。
+     * ⚠️ 与 web 的 `NOT_A_FIELD_ALLOW` 同一条纪律：**写理由**，而且能删。
+     */
+    const ALLOWED: Record<string, string> = {
+      'apps/mobile/src/screens/TasksScreen.tsx': '搜索框（工具栏控件，不是录入字段）',
+      'apps/mobile/src/ai/chat-composer.tsx': '聊天输入条（会随键盘高度变形的多行编辑区）',
+      'apps/mobile/src/screens/TaskDetailSheet.tsx':
+        '「行内新建清单」那一格：为了消掉 Fabric 的 focus/unmount 竞态崩溃才手写（见该文件 996 行起的说明）',
+    };
+    const offenders: string[] = [];
+    for (const rel of mobileSources()) {
+      if (rel.endsWith('ui/kit.tsx')) continue; // 渲染器本体
+      const code = stripComments(read(rel));
+      if (!/<TextInput\b/.test(code)) continue;
+      if (ALLOWED[rel] !== undefined) continue;
+      offenders.push(rel);
+    }
+    expect(offenders, `这些文件手写了 <TextInput>，字段请用 kit 的 TextField：${offenders.join('、')}`).toEqual([]);
+    // 登记表本身也要能收紧：每一条今天必须还命中，否则删掉它。
+    for (const rel of Object.keys(ALLOWED)) {
+      expect(stripComments(read(rel)), `ALLOWED 里登记的 ${rel} 今天已经没有 <TextInput> 了，删掉这一条`).toMatch(
+        /<TextInput\b/,
+      );
+    }
   });
 });

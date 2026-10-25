@@ -892,6 +892,7 @@ export function EmptyState({
   hint,
   detail,
   detailTone = 'danger',
+  testID,
 }: {
   icon?: IconName;
   illustration?: StateIllustrationVariant;
@@ -905,10 +906,16 @@ export function EmptyState({
    * **说明性**文字染成红色会读成"出错了" —— 颜色在表达一个不存在的问题。
    */
   detailTone?: 'danger' | 'subtle';
+  /**
+   * 根节点的 `testID`。加它是因为"不是成员"这一类终态**需要被判据点到**
+   * （`share-not-member` 就是 web 与移动端同名的那一枚）。
+   */
+  testID?: string;
 }): React.JSX.Element {
   const t = useTokens();
   return (
     <View
+      testID={testID}
       style={{
         alignItems: 'center',
         justifyContent: 'center',
@@ -960,7 +967,15 @@ export interface TextFieldProps {
    * 收到的那封信就落在别人的地址里，而那张换绑请求两边都不生效）。
    * 这一档是纯追加：现有调用点一个都不改行为。
    */
-  keyboard?: 'default' | 'url' | 'email-address';
+  /**
+   * 键盘类型。
+   *
+   * `number-pad` 是 2026-10-24 加的：数字字段（习惯目标、番茄钟时长）此前
+   * **各屏手写 `<TextInput keyboardType="number-pad">`** —— 于是它们绕过了字段解剖
+   * （没有标签、没有错误位、没有 `accessibilityLabel` 的统一写法）。
+   * 把键盘类型收进这里之后，"数字字段"也是同一个 `TextField`。
+   */
+  keyboard?: 'default' | 'url' | 'email-address' | 'number-pad';
   autoCapitalize?: 'none' | 'sentences';
   editable?: boolean;
   /** 字段下方的说明。传了就会占位，所以只在真有时才传。 */
@@ -985,6 +1000,11 @@ export interface TextFieldProps {
    * 一个都不许因为这次加参数而改变键盘形状。
    */
   onSubmitEditing?: () => void;
+  /**
+   * 失焦回调。**给"离开即提交"的字段用**（任务标题、备注都是这个模型：
+   * 不打确认键，点别处就存）。
+   */
+  onBlur?: () => void;
   /** 这一格的可发现性标识（自动化取证用）。默认不出现。 */
   testID?: string;
   /**
@@ -1023,6 +1043,7 @@ export function TextField({
   hintTone = 'subtle',
   error,
   onSubmitEditing,
+  onBlur,
   testID,
   multiline = false,
   lines = 6,
@@ -1057,6 +1078,7 @@ export function TextField({
         aria-describedby={hint === undefined && error === undefined ? undefined : `${testID ?? 'field'}-message`}
         testID={testID}
         onSubmitEditing={onSubmitEditing}
+        onBlur={onBlur}
         // 只有声明了提交通道才改键盘形状（现有调用点保持 RN 默认）。
         returnKeyType={onSubmitEditing === undefined ? undefined : 'done'}
         // cursorColor 是 TextInput 的 **prop**，不是 style —— 放进 style 会被静默忽略。

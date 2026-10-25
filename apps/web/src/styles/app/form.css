@@ -79,6 +79,13 @@
 .ht-input-field__control :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
   inline-size: 100%;
   min-inline-size: 0;
+  /* 🔴 `flex: none` 是防线，不是装饰。
+     控件的槽是一个**纵向 flex 容器**，而外面那些"老的单行样式"里常有 `flex: 1`
+     （`.ht-settings__admin-input` 就是）。在纵向容器里 `flex: 1` 把 `flex-basis`
+     设成 `0%`，而 **flex-basis 压过 `block-size`** —— 症状是那个框被压成一条线
+     （2026-10-24 后台「年份」那一格实测：44px 变成 ~18px，其余 textarea 正常）。
+     这个坑只在"宿主有遗留样式"时出现，所以判据必须钉在原语上，而不是钉在宿主上。 */
+  flex: none;
   block-size: var(--ht-size-field-height);
   margin: 0;
   padding-block: 0;
@@ -112,6 +119,7 @@
 .ht-input-field__pair > input {
   inline-size: 100%;
   min-inline-size: 0;
+  flex: none;
   block-size: var(--ht-size-field-height);
   margin: 0;
   padding-block: 0;
