@@ -130,6 +130,17 @@ test(`设置中心：一屏只有一种行（${section}）`, async ({ page }) =>
         return 'row';
       }))],
       pitchSamples: pitches.length,
+      skeleton: rows.length > 0 ? null : (() => {
+        const pane = root.querySelector('#' + PANE_ID);
+        if (!pane) return 'no-pane';
+        const walk = (el: Element, d: number): string => {
+          if (d > 3) return '';
+          const cls = [...el.classList].filter((c) => c.startsWith('ht-')).join('.');
+          return `\n${'  '.repeat(d)}<${el.tagName.toLowerCase()}${cls ? ' .' + cls : ''}>` +
+            [...el.children].slice(0, 6).map((c) => walk(c, d + 1)).join('');
+        };
+        return walk(pane, 0).slice(0, 900);
+      })(),
       rowParents: [...new Set(rows.map((row) => {
         const p2 = row.parentElement as HTMLElement | null;
         if (!p2) return 'none';
