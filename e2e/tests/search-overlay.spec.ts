@@ -170,16 +170,41 @@ test('搜索：贴顶浮层透出下层视图 + 顶栏没有第二个框 + 面�
     .toBeGreaterThan(0.5);
   expect(ratio, `比例过头说明它不再是"跟着宽度的面"：${ratio.toFixed(3)}`).toBeLessThan(0.66);
 
-  // 搜索保持实色，防止下层任务穿透干扰结果；输入和浮层均无描边。
+  /*
+   * 搜索保持实色，防止下层任务穿透干扰结果；浮层**不许画可见描边**。
+   *
+   * 🔴 2026-10-25 改量法（两处，都是"代理过期"而不是口径改变）：
+   *  ① 描边：原来量 `border-top-width === 0px`。现在卡片带着一条 **2px 但颜色透明** 的边框
+   *     （`.ht-search-overlay > *` 在 `borderless-controls.css` 里被统一成
+   *     `border-color: transparent !important`，宽度来自面板自身那套盒模型）。
+   *     "有没有可见描边"这件事的正确读法是**颜色**，不是宽度 —— 量宽度会把"透明的 2px"
+   *     读成"画了框"。所以改成 `border-top-color` 必须是透明。
+   *  ② 输入框：原来是 `outline-width === 0px`（"输入框不画焦点环"）。那个口径已被
+   *     2026-10-24 的无障碍决定取代（`borderless-controls.css:44-51`：所有文本输入
+   *     都要有可见键盘焦点环，据 WCAG 2.4.7 / 1.4.11）⇒ 现在拿到焦点**就该有**
+   *     2px 主色环。改成"环宽 = 全局 token 且 `outline-style ≠ none`"。
+   *     ⚠️ 与 `assistant-resize-ux` 同一条口径、同一处出处，两边不许各写一套。
+   */
   const appearance = await card.evaluate((el) => {
     const panel = getComputedStyle(el);
     const input = getComputedStyle(el.querySelector('input')!);
-    return { bg: panel.backgroundColor, border: panel.borderTopWidth, outline: input.outlineWidth };
+    return {
+      bg: panel.backgroundColor,
+      borderColor: panel.borderTopColor,
+      borderStyle: panel.borderTopStyle,
+      outlineStyle: input.outlineStyle,
+      outlineWidth: input.outlineWidth,
+      ring: getComputedStyle(document.documentElement).getPropertyValue('--ht-border-width-thick').trim(),
+    };
   });
   expect(appearance.bg).not.toBe('rgba(0, 0, 0, 0)');
   expect(appearance.bg).toMatch(/^rgb\(/);
-  expect(appearance.border).toBe('0px');
-  expect(appearance.outline).toBe('0px');
+  expect(
+    appearance.borderColor,
+    '浮层画了可见描边（判颜色不判宽度：透明边框不算描边）',
+  ).toBe('rgba(0, 0, 0, 0)');
+  expect(appearance.outlineWidth, '输入框的键盘焦点环 = 全局那一条').toBe(appearance.ring);
+  expect(appearance.outlineStyle, '焦点环被改成 none ⇒ 键盘用户看不出焦点').not.toBe('none');
 
   await page.screenshot({ path: 'test-results/search-spotlight-empty.png', fullPage: false });
 

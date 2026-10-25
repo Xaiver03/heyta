@@ -50,6 +50,25 @@ async function boxOf(page: Page, locator: ReturnType<Page['locator']>, what: str
   return box as { x: number; y: number; width: number; height: number };
 }
 
+/**
+ * 给这一页塞一份**已登录**的同步凭据。
+ *
+ * 🔴 2026-10-25：`SyncSettingsPanel` 里那枚共享状态条是 `signedIn ? … : "登录后…"` 的
+ * 一支（`SyncSettingsPanel.tsx:133-140`）—— 未登录时它**根本不渲染**
+ * （实测：`document.querySelectorAll('[data-testid="sync-status-bar"]').length === 0`）。
+ * 而 S3 要钉的正是"那一节 مصرف 了共享状态条"，所以前提得先成立：塞凭据。
+ * ⚠️ 这不是"为了让判据变绿造环境"：未登录那一支的文案另有判据（S1/S2 与设置里的入口），
+ * 这里要的是"登录之后状态条在不在那一节里"。
+ */
+async function seedSignedIn(page: Page): Promise<void> {
+  await page.addInitScript((server: string) => {
+    localStorage.setItem(
+      'heyta.sync.credentials',
+      JSON.stringify({ baseUrl: server, token: 'e2e-shell-sync-token', email: 'sync-rail@example.test' }),
+    );
+  }, 'http://sync.rail.e2e.test');
+}
+
 test.describe('同步入口在 rail 底部（H9，web 端）', () => {
   test('S1 🔴 页头那一排不许再出现同步的任何一枚', async ({ page }) => {
     await openApp(page, APP_ZH);
@@ -164,6 +183,7 @@ test.describe('同步入口在 rail 底部（H9，web 端）', () => {
   });
 
   test('S3 设置里那一节带着共享状态条，并且三个字段都在', async ({ page }) => {
+    await seedSignedIn(page);
     await openApp(page, APP_ZH);
     await openSettingsView(page);
     // 🔴 2026-10-25：设置中心重做之后是**分节**的（`settings-group-*`），
@@ -208,10 +228,24 @@ test.describe('同步入口在 rail 底部（H9，web 端）', () => {
       '「同步设置」那一节里没有状态条 ⇒ 搬家的收尾是把旧的删了',
     ).toBeVisible();
 
-    // 字段这一半：地址与令牌必须在（口令在未登录时也在）。
-    for (const label of ['服务端地址', '访问令牌']) {
+    /*
+     * 字段这一半：地址与令牌必须在（口令在未登录时也在）。
+     *
+     * 🔴 2026-10-25 改定位方式：`getByLabel('服务端地址')` 会命中**两枚** ——
+     * `sync-server-url` 那枚 input，**以及**包着它的 `<fieldset>`（它的 `<legend>`
+     * 就是「服务端地址」；Playwright 的 `getByLabel` 把 legend 也算作该分组的标签）。
+     * 实测读数：`[{"tag":"fieldset","cls":"sync-settings__fieldset"},{"tag":"input","id":"sync-server-url"}]`。
+     * 所以"地址输入框不止一处"这条报错是**探针自己的**，不是产品有两份。
+     * ⇒ 按角色收窄到 `textbox`（fieldset 不是 textbox），条数才等于"输入框的份数"。
+     */
+    for (const [label, id] of [['服务端地址', '#sync-server-url'], ['访问令牌', '#sync-token']] as const) {
+      // ⚠️ 用**元素的 id**，不用 `getByLabel` 也不用 `getByRole(name)`：
+      //    · `getByLabel` 会把包着它的 `<fieldset>`（legend = 服务端地址）一起算进来 ⇒ 数成 2；
+      //    · `getByRole('textbox', { name })` 在这块表里数到 0（无障碍名不是从可见 label 算出来的），
+      //      于是"地址输入框不止一处"变成"一个都没有" —— 两种探针都会说谎，id 不会。
+      const field = panel.locator(id);
       await expect(
-        panel.getByLabel(label),
+        field,
         `那一节里没有「${label}」的输入框 ⇒ 表单只搬了一半`,
       ).toHaveCount(1);
     }
@@ -236,7 +270,7 @@ test.describe('同步入口在 rail 底部（H9，web 端）', () => {
     ).toHaveCount(0);
     // 未打开设置时，屏幕上不该有同步表单（它不是常驻的同级浮层了）。
     await expect(
-      page.getByLabel('服务端地址'),
+      page.locator('#sync-server-url'),
       '没进设置就能读到服务端地址输入框 ⇒ 那一节其实是常驻浮层',
     ).toHaveCount(0);
 
@@ -246,7 +280,9 @@ test.describe('同步入口在 rail 底部（H9，web 端）', () => {
     // ⚠️ 计数用的是 DOM 里的节点（section 即使 `hidden` 也还在），所以这一条在
     // "只有一节"这件事上仍然成立；而"可见"由上面那句 `selectSettingsSection` 负责。
     await expect(page.getByTestId('sync-settings-panel'), '同步设置不止一处').toHaveCount(1);
-    await expect(page.getByLabel('服务端地址'), '地址输入框不止一处').toHaveCount(1);
+    // 同 S3 的理由与同一个读法：按元素 id 数（`getByLabel` 会把 fieldset 的 legend 算进来，
+    // `getByRole(name)` 在这块表里又数到 0 —— 两种探针都会说谎）。
+    await expect(page.locator('#sync-server-url'), '地址输入框不止一处').toHaveCount(1);
 
     await closeSettingsSheet(page);
     await expect(
