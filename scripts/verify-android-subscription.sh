@@ -243,7 +243,7 @@ PY2
   x=$(echo "$f"|awk '{print $1}'); y=$(echo "$f"|awk '{print $2}'); w=$(echo "$f"|awk '{print $3}'); h=$(echo "$f"|awk '{print $4}')
   tap_center "$x" "$y" "$w" "$h"; sleep 1
   needle_state "$HINT"; rc=$?
-  [ "$rc" != 0 ] && { bad "点了「?」正文没出现（rc=$rc；2=树读不出）"; exit 1; }
+  [ "$rc" != 0 ] && { bad "点了「?」正文没出现（rc=${rc}；2=树读不出）"; exit 1; }
   ok "点「?」展开成功（点的是 tip 节点中心 $((x+w/2)),$((y+h/2))）"
   shot "01-tip-expanded.png"
 

@@ -99,7 +99,16 @@ interface InviteTicket {
   readonly token: string;
 }
 
-type PanelDetail = { ownerId: number; keyEpoch: number; yourRole: string };
+/**
+ * 这一次拉取回来的清单详情。
+ *
+ * 🔴 `ownMemberId` 在 2026-10-25 之前是一个**独立的** `useState<…Id>`。
+ * `check:selection-single-source` 断言 G 把它记成"没有语义登记的本地 id" ——
+ * 而它既不是"当前看的是哪一条"，也不是 5 类瞬态之一：它是**同一次拉取里的数据**
+ * （与 ownerId / keyEpoch / yourRole 同一个 `Promise.all` 回来）。
+ * ⇒ 正确的修法不是给它加一条豁免，是把它并回它本来就属于的那个对象。
+ */
+type PanelDetail = { ownerId: number; keyEpoch: number; yourRole: string; ownMemberId?: string };
 type MemberRow = Awaited<ReturnType<MobileShareAdmin['api']['listMembers']>>['members'][number];
 
 export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
@@ -123,7 +132,6 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
   // ── 面板态（对齐 web `ShareFeature` 的同名格子）──────────────────────────
   const [detail, setDetail] = useState<PanelDetail | undefined>();
   const [members, setMembers] = useState<readonly MemberRow[]>([]);
-  const [selfMemberId, setSelfMemberId] = useState<string | undefined>();
   const [notMember, setNotMember] = useState(false);
   const [panelError, setPanelError] = useState<string | undefined>();
   const [transferFailure, setTransferFailure] = useState<{ kind: ShareTransferFailure; detail: string } | undefined>();
@@ -215,11 +223,15 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
       if (admin === undefined) return;
       try {
         const [d, m] = await Promise.all([admin.api.shareDetail(shareId), admin.api.listMembers(shareId)]);
-        setDetail({ ownerId: d.ownerId, keyEpoch: d.keyEpoch, yourRole: d.yourRole });
+        const entry = await getShareKeyEntryPortable(admin.keyPort, shareId);
+        setDetail({
+          ownerId: d.ownerId,
+          keyEpoch: d.keyEpoch,
+          yourRole: d.yourRole,
+          ownMemberId: entry?.ownMemberId,
+        });
         setMembers(m.members);
         setNotMember(false);
-        const entry = await getShareKeyEntryPortable(admin.keyPort, shareId);
-        setSelfMemberId(entry?.ownMemberId);
         setStorageError(mobileShareLogWriteError());
       } catch (err) {
         if (err instanceof ShareApiError && (err.status === 403 || err.status === 404)) {
@@ -779,9 +791,15 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
           </Card>
         </>
       ) : notMember ? (
-        <Text variant="row-title" tone="default" testID="share-not-member">
-          {t('web.share.notMember')}
-        </Text>
+        /* 🔴 2026-10-25：这一格原先是裸 `<Text>`（`check:empty-state` 断言 B 记的"新
+           手写空态站点"就是它）。它是**终态**，不是"这一块暂时没内容" —— 用共享
+           `EmptyState` 才拿得到同一套留白与排版；`testID` 与 web 那枚同名。 */
+        <EmptyState
+          illustration="search"
+          title={t('web.share.notMember')}
+          hint={t('web.share.notMemberHint')}
+          testID="share-not-member"
+        />
       ) : detail === undefined ? (
         <EmptyState icon="action.sync" title={t('mobile.tasks.loading.title')} hint={t('mobile.tasks.loading.hint')} />
       ) : (
@@ -874,7 +892,7 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
                   hasEnvelope: m.hasEnvelope,
                   memberKeyEpoch: m.memberKeyEpoch,
                 })),
-                selfMemberId,
+                selfMemberId: detail.ownMemberId,
               }}
               labels={panelLabels}
               callbacks={{

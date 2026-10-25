@@ -197,6 +197,64 @@ print(count)
 PYCOUNT
 }
 
+# app 自己那棵树里有几枚节点。用来判「iOS 系统弹窗立着没有」——
+# 弹窗在的时候 app 树会塌成一两枚（同族装置实测），而不是"底部标签找不到"。
+tree_node_count() {
+  python3 - "$IDB_DUMP_FILE" <<'PYNODES'
+import json, sys
+try:
+    nodes = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print(0); sys.exit(0)
+def walk(n):
+    yield n
+    for c in (n.get("children") or n.get("nodes") or []):
+        yield from walk(c)
+print(sum(1 for top in (nodes if isinstance(nodes, list) else [nodes])
+          for n in walk(top) if isinstance(n, dict)))
+PYNODES
+}
+
+# 从这一棵树里读出「待发布」那一屏画出来的恢复码。
+#
+# 🔴 为什么按**形状**读、不按标签读：那串码是 `<Text selectable>{pending.recoveryCode}</Text>`
+#    （`VaultSettingsSection.tsx:463`），它是一行正文，没有标签可挂。而形状是钉死的：
+#    `packages/sync-core/src/key-lifecycle.ts:29-31` ⇒ 24 字节 → 32 字母表
+#    `0123456789ABCDEFGHJKMNPQRSTVWXYZ`、`normalizeRecoveryCode` 之后定长 40、不带分隔符。
+#    所以"恰好一枚 40 位该字母表的串"就是它；数出 0 枚或 >1 枚都当场响亮报，**不猜码**。
+#    读数只走 stdout 给装置用，一律不落日志、不进证据目录（见 SECRET_FRAMES）。
+recovery_code_from_tree() {
+  python3 - "$IDB_DUMP_FILE" <<'PYRC'
+import json, re, sys, unicodedata
+try:
+    nodes = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("__unreadable__"); sys.exit(0)
+pat = re.compile(r"[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{40}")
+def walk(n):
+    yield n
+    for c in (n.get("children") or n.get("nodes") or []):
+        yield from walk(c)
+hits = set()
+for top in (nodes if isinstance(nodes, list) else [nodes]):
+    for n in walk(top):
+        if not isinstance(n, dict):
+            continue
+        for k in ("AXValue", "AXLabel", "value", "label", "title"):
+            v = n.get(k)
+            if isinstance(v, str):
+                v = unicodedata.normalize("NFKC", v)
+                for ch in ("\n", "\r", " ", "-"):
+                    v = v.replace(ch, "")
+                if pat.fullmatch(v):
+                    hits.add(v)
+                    break
+if len(hits) != 1:
+    print(f"__count:{len(hits)}__"); sys.exit(0)
+print(next(iter(hits)))
+PYRC
+}
+
 # 界面文本读数：NFKC 归一化 + 子串。
 # 🔴 不用"精确标签"：RN 在 iOS 上把按钮可及名拼成组合句，而 iOS 还会把 ASCII 规范化成
 #    **全角**（`ios-erase-1` → `ｉｏｓ－ｅｒａｓｅ－１`）。精确比对对这两件事恒不命中，
@@ -211,6 +269,46 @@ wait_enabled() {  # <按钮标签>
     fi
     sleep 1
   done
+  return 1
+}
+
+# 按下某枚按钮之后**有界等待**界面进入终态，同时采样那枚按钮自己的 enabled。
+#
+# 🔴 为什么要采样，而不是只看结果：这一族有三种坏，修法各不相同 ——
+#   · 从头到尾没变灰 = `onPress` 根本没落上（RN 按压抖动 = 装置问题）；
+#   · 变过灰、又亮回来却没到终态 = 落上了但那次调用抛错（产品/现场问题）；
+#   · 一直灰到超时 = 还在算（是装置的预算给小了）。
+# ⚠️ "变灰"只证**按钮当时不可点**，不证原因是 `busy`：RN 那侧 disabled 常有两个来源
+#    （忙 / 输入还没填够，例如「确认并发布」的条件是 `busy || pendingCode.length === 0`）。
+#    所以这一档读数只用来把"从没点着过"与"点着过但没走完"分开，别拿它当"还在算"的证明。
+# 最后一种在移动端不是假设而是**已登记的实测**：`beginCreation` 走纯 JS Argon2id
+# （`packages/sync-core/src/encryption/argon2.ts` 原文："Hermes 没有 JIT ⇒ 手机上数十秒
+# 量级"，并且明写"真机耗时必须实测，不能估算"）。⇒ 拿固定 `sleep` 判成败一定会把
+# "还在算"读成"没成"。2026-10-25 第 14 跑就是这个形状：口令 20 掩码点、按钮已变灰
+# （`kit.tsx:803` 的 disabled-opacity ⇒ `busy=true` ⇒ 按压确实落上了），5 秒时还没有「确认并发布」。
+# 读数写进全局：WAIT_HIT（命中的终态标签）、WAIT_SAW_BUSY（1=观察到过 disabled）、
+# WAIT_LAST_RC（最后一次 tree_has 的 rc，2=树读不出）、WAITED（实际等了多少秒）。
+wait_state() {  # <探针按钮标签> <超时秒> <终态标签> [终态标签...]
+  local want="$1" budget="$2"; shift 2
+  local i=0 out lbl rc saw_busy=0
+  WAIT_HIT=''; WAIT_SAW_BUSY=0; WAIT_LAST_RC=1; WAITED=0
+  while [ "$i" -lt "$budget" ]; do
+    sleep 2
+    i=$((i + 2))
+    idb_dump
+    for lbl in "$@"; do
+      tree_has "$lbl" >/dev/null 2>&1; rc=$?
+      WAIT_LAST_RC=$rc
+      if [ "$rc" = "0" ]; then
+        WAIT_HIT="$lbl"; WAIT_SAW_BUSY=$saw_busy; WAITED=$i; return 0
+      fi
+    done
+    out=$(ax "$want" --pressable --list --json 2>/dev/null)
+    if [ "$(jget "$out" found)" = "True" ] && [ "$(jget "$out" enabled)" = "False" ]; then
+      saw_busy=1
+    fi
+  done
+  WAIT_SAW_BUSY=$saw_busy; WAITED=$i
   return 1
 }
 
@@ -247,8 +345,14 @@ wait_tree() {  # <needle> [超时秒]
   return 1
 }
 
-shot() {  # <文件名>：截图要"能用"才算留下 —— 全黑 PNG 不是证据
-  local path="$EVIDENCE/$1.png"
+# SECRET_FRAMES=1 ⇒ 屏幕上正画着当趟那枚一次性恢复码 ⇒ 这一帧**不许进证据目录**
+#（证据目录是要提交进 git 的）。改落私有 RUN_DIR：默认随目录删掉，即便
+# HEYTA_COLLAB_IOS_KEEP_ARTIFACTS=1 也只留在本机 /tmp，不会被下一次提交带出去。
+SECRET_FRAMES=0
+shot() { _shot_to "$EVIDENCE" "$1"; }
+_shot_to() {  # <目录> <文件名>：截图要"能用"才算留下 —— 全黑 PNG 不是证据
+  local path
+  if [ "$SECRET_FRAMES" = "1" ]; then path="$RUN_DIR/$2.png"; else path="$1/$2.png"; fi
   rm -f -- "$path"
   idb_ui screenshot "$path" >/dev/null 2>&1 || true
   if ! png_usable "$path"; then
@@ -274,7 +378,16 @@ dismiss_ios_save_password() {
   t=$(jget "$(ax "任务" --list --json)" found)
   m=$(jget "$(ax "我的" --list --json)" found)
   if [ "$t" != "True" ] && [ "$m" != "True" ]; then
-    echo "     底部两个标签都不在树上 ⇒ 按 iOS 系统弹窗态处理，按坐标点「以后」"
+    # 🔴 底部标签找不到**不等于**弹窗立着：在设置/保险库这类屏上本来就没有底部标签
+    #    （第 14 跑实测：这里连点两次都读不回底部标签，说明那两发坐标点是白点的）。
+    #    真弹窗的特征是 app 树整体塌掉。所以先量节点数，树是完整的就**不做盲点坐标**。
+    idb_dump
+    _n=$(tree_node_count)
+    if [ "${_n:-0}" -gt 15 ]; then
+      echo "     [dismiss] app 树完整（${_n} 枚节点）⇒ 不是「保存密码？」弹窗态，不做盲点坐标"
+      return 1
+    fi
+    echo "     底部两个标签都不在树上、app 树只剩 ${_n} 枚 ⇒ 按 iOS 系统弹窗态处理，按坐标点「以后」"
     _fr=$(ax - --list --json 2>/dev/null)
     _aw=$(jget "$_fr" width)
     _ah=$(jget "$_fr" height)
@@ -301,11 +414,18 @@ dismiss_ios_save_password() {
 #    （3 次全落空过，也第一次即中过），3 次的预算分不出"夹具抖"与"产品坏了"。
 #    到达判据必须是**下一屏才有的东西** —— 只看 `press` 回 `success` 是
 #    "按下 ≠ 生效"那一族（AGENTS §7 陷阱账里本线踩过多次）。
-ax_press_until() {  # <要点标签> <到达后树上必须有的标签> [exact]
+PRESS_HIT=''
+ax_press_until() {  # <要点标签> <到达后树上必须有的标签> [exact] [另一个可接受的到达标签…]
   # 🔴 第三枚 `exact` 是给"同一个词是别的元素的子串"准备的：本页上「共享清单」
   #    既是入口标签、又出现在按钮「加入共享清单」里，退化匹配会按错那一个。
-  local want=$1 arrive=$2 exact=${3:-} try=1 out flags=''
-  [ -n "$exact" ] && flags='--exact'
+  # ⚠️ 第四枚起 = **同一屏的其它可接受落点**，命中哪一档写进 `$PRESS_HIT` 让调用方分档处置。
+  #    入群那一屏有两档（这台设备没确认过 ⇒ 先落 PIPL 同意面；确认过 ⇒ 直接落凭证框），
+  #    拿单一落点当到达判据就会把"同意闸正常工作"报成"入口按不动"。
+  local want=$1 arrive=$2 try=1 out flags=''
+  PRESS_HIT=''
+  shift 2
+  [ "${1:-}" = "exact" ] && flags='--exact' && shift
+  local -a arrives=("$arrive" "$@")
   while [ "$try" -le 5 ]; do
     forget_safe_tap
     # 导航场合收键盘用同族装置那档 `dismiss_keyboard`（按 return）：这里没有正在填的
@@ -320,12 +440,28 @@ ax_press_until() {  # <要点标签> <到达后树上必须有的标签> [exact]
     #    真正的判据是**到达判据**（下一屏才有的那个标签），不是按压前的几何读数。
     if [ "$(jget "$out" found)" = "True" ]; then
       # shellcheck disable=SC2086
-      ax "$want" --pressable --press $flags --json >/dev/null 2>&1
+      pr=$(ax "$want" --pressable --press $flags --json)
+      if [ "$(jget "$pr" found)" != "True" ]; then
+        # 🔴 预检与按压原本是**两套解析**：shim 的 `scroll_into_view` 内部把 `exact_only`
+        #    传成 `False`（`ios-ax-shim.py:623`），所以带 `--exact` 时会分成"预检按子串
+        #    命中 ⇒ found=True"与"真按压按精确取空 ⇒ 什么都没按"。
+        #    2026-10-25 第 17 跑实测就落在这条缝里：「我的」页那一行的 AXLabel 是 RN
+        #    合成名「共享清单, 共享清单」，`--pressable --exact` 单独取回 found=False，
+        #    而 `--pressable --exact --scroll-into-view` 取回 found=True（同一枚 frame）。
+        #    症状是"五试全空转，日志却读着像按到了"。⇒ 不再换一套匹配重找一次，
+        #    改按**刚才那一发量到的 frame 中心**（同一次解析、同一枚节点）。
+        cx=$(( $(jget "$out" x) + $(jget "$out" width) / 2 ))
+        cy=$(( $(jget "$out" y) + $(jget "$out" height) / 2 ))
+        echo "     [press] 「${want}」精确按压取空（预检却是子串命中）⇒ 改按量到的中心 ${cx},${cy}"
+        ax --tap "$cx" "$cy" --json >/dev/null 2>&1
+      fi
       sleep 2
       idb_dump
-      tree_has "$arrive" && return 0
+      for _a in "${arrives[@]}"; do
+        if tree_has "$_a" >/dev/null 2>&1; then PRESS_HIT="$_a"; return 0; fi
+      done
     fi
-    echo "     [press] 「${want}」第 ${try} 次没到「${arrive}」（found=$(jget "$out" found) visible=$(jget "$out" visible)）"
+    echo "     [press] 「${want}」第 ${try} 次没到「${arrives[*]}」（found=$(jget "$out" found) visible=$(jget "$out" visible)）"
     try=$((try + 1))
     sleep 1
   done
@@ -351,9 +487,18 @@ fill_field() {  # <标签> <值> [secure] [probe <按钮标签>]
   #    第二跑就是被那两下弄红的 —— return 可能把表单提交掉，比例点落在表头上把
   #    自托管面板收起，于是"框不在了"被读成"产品没有这个框"。
   remember_safe_tap "$lbl"
+  # 🔴 框不止 `AXTextField` 这一种角色：`multiline` 的 RN TextInput 在 iOS 上落成为
+  #    **`AXTextArea`**（2026-10-25 第 19 跑实测 dump：入群凭证框 `share-join-token` 与
+  #    评论框 `comment-composer-input` 两枚都是 multiline、role=AXTextArea）。
+  #    原来这里写死 AXTextField，于是 multiline 框永远 `found=False`，装置报出来的是
+  #    "这一屏没有这个框"——那是装置瞎，不是产品缺框。两档各探一次，探不到才按原样报错。
+  local role='AXTextField' _r
+  for _r in AXTextField AXTextArea; do
+    if [ "$(jget "$(ax "$lbl" --role "$_r" --json)" found)" = "True" ]; then role="$_r"; break; fi
+  done
   while [ "$attempt" -le 5 ]; do
     dismiss_keyboard_hard
-    pre=$(ax "$lbl" --role AXTextField --scroll-into-view --json)
+    pre=$(ax "$lbl" --role "$role" --scroll-into-view --json)
     if [ "$(jget "$pre" visible)" != "True" ]; then
       echo "     [fill] 「${lbl}」第 ${attempt} 次滚不进可见区：found=$(jget "$pre" found) visible=$(jget "$pre" visible) scrollRc=$(jget "$pre" scrollRc)"
       # 框不在树上时先试**一次**重新展开自托管表单（装置自己可能把它点了收起），
@@ -367,7 +512,7 @@ fill_field() {  # <标签> <值> [secure] [probe <按钮标签>]
       continue
     fi
     if [ "$kind" = "secure" ]; then
-      out=$(ax "$lbl" --role AXTextField --type-text "$val")
+      out=$(ax "$lbl" --role "$role" --type-text "$val")
       back=$(jget "$out" detail)
       vl=$(cpcount "$val")
       bl=$(cpcount "$back")
@@ -388,7 +533,7 @@ fill_field() {  # <标签> <值> [secure] [probe <按钮标签>]
         note="typedRc=$(jget "$out" typedRc) 掩码码点=${bl}（期望 ${vl}）"
       fi
     else
-      out=$(ax "$lbl" --role AXTextField --set "$val")
+      out=$(ax "$lbl" --role "$role" --set "$val")
       back=$(jget "$out" detail)
       if [ "$back" = "$val" ]; then
         ok "已填「${lbl}」（set-value 替换，回读逐字相同）"
@@ -455,7 +600,10 @@ cleanup() {
     esac
   fi
 }
-trap cleanup EXIT
+# 🔴 不是裸 `trap cleanup EXIT`：那会**整条替换**掉 lib 在 source 时挂上的
+# EXIT handler（里面带着 `rm -f -- "$0"` 的自快照清理），症状是"该删的没删"——
+# `check:shell-exit-chain` 判的就是这个。`heyta_chain_exit` 把两条串起来（新的先跑）。
+heyta_chain_exit cleanup
 
 # ── 0. 现场：设备、AX 工具接口 ──────────────────────────────────────────────
 step "0. 现场与归属（设备 / AX 工具接口）"
@@ -480,7 +628,7 @@ fi
 [ -n "$UDID" ] || env_bail "认不出该验收哪台模拟器（名字前缀「${DEVICE_NAME}」的已启动设备不唯一或不存在）—— 不猜设备。显式指定：IOS_UDID=<udid> bash $0"
 IDB_UDID="$UDID"
 export IDB_UDID
-note "设备 $UDID（本机已启动模拟器 $(xcrun simctl list devices booted 2>/dev/null | grep -c Booted) 台）"
+note "设备 ${UDID}（本机已启动模拟器 $(xcrun simctl list devices booted 2>/dev/null | grep -c Booted) 台）"
 
 OTHER=$(another_mobile_e2e_running)
 if [ -n "$OTHER" ]; then
@@ -512,7 +660,7 @@ fi
 PORT="$PORT" HEYTA_E2E_DB="$E2E_DB" bash "$ROOT/scripts/mobile-e2e-up.sh" > "$RUN_DIR/up.log" 2>&1 \
   || env_bail "起栈失败：$(tail -3 "$RUN_DIR/up.log" | tr '\n' ' ')"
 SERVER_STARTED=1
-ok "服务端在 $HOST_SERVER（pid $(cat "$HEYTA_E2E_PIDFILE")）"
+ok "服务端在 ${HOST_SERVER}（pid $(cat "$HEYTA_E2E_PIDFILE")）"
 curl -sf --noproxy '*' -m 4 "$HOST_SERVER/health" >/dev/null 2>&1 || env_bail "健康检查不通：$HOST_SERVER/health"
 
 # ── 2. 当前源码 Release 构建、安装、新鲜度对账 ──────────────────────────────
@@ -521,11 +669,11 @@ rm -f -- "$DERIVED/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundl
 xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" -scheme Heyta \
   -configuration Release -sdk iphonesimulator -destination "id=$UDID" \
   -derivedDataPath "$DERIVED" build > "$BUILD_LOG" 2>&1 \
-  || { tail -25 "$BUILD_LOG" >&2; env_bail "Release 构建失败（$BUILD_LOG）"; }
+  || { tail -25 "$BUILD_LOG" >&2; env_bail "Release 构建失败（${BUILD_LOG}）"; }
 APP="$DERIVED/Build/Products/Release-iphonesimulator/Heyta.app"
 [ -d "$APP" ] || env_bail "找不到 Release 产物：$APP"
 xcrun simctl uninstall "$UDID" "$BID" >/dev/null 2>&1 || true
-xcrun simctl install "$UDID" "$APP" || env_bail "simctl install 失败（$APP @ $UDID）"
+xcrun simctl install "$UDID" "$APP" || env_bail "simctl install 失败（${APP} @ ${UDID}）"
 ok "已装当前 Release 包（先卸再装 = 全新态）"
 INSTALLED="$(xcrun simctl get_app_container "$UDID" "$BID" app 2>/dev/null)"
 BUILT_SHA="$(shasum -a 256 "$APP/main.jsbundle" 2>/dev/null | awk '{print $1}')"
@@ -759,18 +907,61 @@ if tree_has "创建加密数据钥匙"; then
   dismiss_ios_save_password || true
   dismiss_keyboard
   ax_press "创建钥匙"
-  sleep 5
-  idb_dump
-  if tree_has "确认并发布"; then
-    note "到了待发布那一态（beginCreation 成了）⇒ 按「确认并发布」"
-    ax_press "确认并发布"
-    sleep 5
-    idb_dump
+  # 预算 300s 不是拍脑袋：这一发要的就是"真机耗时实测"那个数（读数落在 WAITED 里，
+  # 会原样打进日志）。跑这台机同时挂着 6 台模拟器，所以更要量出来而不是估。
+  if ! wait_state "创建钥匙" 300 "确认并发布" "这台设备上的加密数据已经解锁"; then
+    shot "04d-按创建钥匙后没到终态"
+    if [ "$WAIT_LAST_RC" = "2" ]; then
+      env_bail "按「创建钥匙」后 ${WAITED}s 里最后一棵树读不出（rc=2）⇒ 装置判不了，不拿它当产品坏了"
+    elif [ "$WAIT_SAW_BUSY" = "1" ]; then
+      bad "按下了（按钮变灰过 = busy=true = onPress 落上了）但 ${WAITED}s 内既没到「确认并发布」也没到「已解锁」⇒ beginCreation 抛错，或 Argon2 慢过 ${WAITED}s 预算"
+      summary
+      exit 1
+    else
+      env_bail "${WAITED}s 内「创建钥匙」从没变灰过 ⇒ onPress 没落上（RN 按压抖动 = 装置问题，不是产品问题）"
+    fi
   fi
-  tree_has "这台设备上的加密数据已经解锁" >/dev/null 2>&1; _rc=$?
-  if [ "$_rc" != "0" ]; then
-    shot "04d-没到已解锁那一态"
-    bad "创建钥匙之后没读到「这台设备上的加密数据已经解锁。」（rc=${_rc}，2=树读不出）⇒ 同步拿不到可用密文；「创建钥匙」在口令没进 RN 状态时是 disabled 的，这一发红的大概就是那件事"
+  ok "按「创建钥匙」后 ${WAITED}s 到终态「${WAIT_HIT}」（按钮变灰过=${WAIT_SAW_BUSY}）⇒ 这一发的 Argon2 实测耗时=${WAITED}s"
+  if tree_has "确认并发布"; then
+    # 🔴 待发布那一屏**不是**按一下就过：它把恢复码画出来，要求**照着输一遍**才放行
+    #    （`VaultSettingsSection.tsx:463-470` 那枚 `mobile.vault.recoveryConfirm` 输入框，
+    #    按钮条件是 `busy || pendingCode.length === 0`）。2026-10-25 第 15 跑实测：
+    #    空着按 ⇒ 按不动，等 180 秒也不会到已解锁。⇒ 先读码、再填、再按。
+    note "到了待发布那一态（beginCreation 成了）⇒ 这一屏要照着把恢复码输回去"
+    SECRET_FRAMES=1
+    RC=$(recovery_code_from_tree)
+    case "$RC" in
+      __unreadable__)
+        shot "04g-恢复码那棵树读不出"
+        env_bail "待发布那一屏的树读不出 ⇒ 拿不到恢复码，走不下去（装置不猜码）" ;;
+      __count:0__)
+        shot "04h-数不到恢复码"
+        env_bail "待发布那一屏没读到 40 位恢复码（字母表与长度钉在 key-lifecycle.ts:29-31）⇒ 界面换了形状，装置跟着改，不猜" ;;
+      __count:*)
+        shot "04i-恢复码数出多枚"
+        env_bail "待发布那一屏数出 ${RC#__count:} 枚候选码 ⇒ 不知道抄哪一枚，不猜" ;;
+      *)
+        ok "从界面上读出这一趟的恢复码（${#RC} 位；值不落日志、不进证据目录）" ;;
+    esac
+    _fc=$(field_count "输入恢复码以确认")
+    [ "$_fc" = "1" ] || { shot "04j-恢复码确认栏数不对"; env_bail "确认栏数到 ${_fc} 枚（期望恰好 1，-1=树读不出）⇒ 不猜往哪一格写"; }
+    fill_field "输入恢复码以确认" "$RC" || { SECRET_FRAMES=0; env_bail "恢复码写不进确认栏"; }
+    dismiss_keyboard
+    ax_press "确认并发布"
+    if ! wait_state "确认并发布" 240 "这台设备上的加密数据已经解锁"; then
+      shot "04d3-确认并发布后没解锁"
+      SECRET_FRAMES=0
+      bad "「确认并发布」按下去 ${WAITED}s 后仍没到已解锁态（按钮变灰过=${WAIT_SAW_BUSY}，最后一次树读数 rc=${WAIT_LAST_RC}）⇒ 同步拿不到可用密文"
+      summary
+      exit 1
+    fi
+    SECRET_FRAMES=0
+    ok "恢复码已照抄、待发布已确认（这一步又用了 ${WAITED}s）"
+  fi
+  # 再扫一遍终态：既是兜底复判，也把这条文案留在 check:verify-script-copy 的扫描面上
+  if ! tree_has "这台设备上的加密数据已经解锁"; then
+    shot "04d4-复扫没读到已解锁"
+    bad "等待过程中读到过终态，复扫却没有「这台设备上的加密数据已经解锁。」⇒ 界面自己退回了，这一趟的读数不可信"
     summary
     exit 1
   fi
@@ -804,6 +995,10 @@ ok "owner 写了一条任务：$TASK_TITLE"
 # ── 6. 手机加入：贴凭证 → 同意 → 等界面自己说成功 ────────────────────────────
 step "6. 加入判据（L1）：手机走自己的界面加入这份共享"
 dismiss_ios_save_password || true
+# 🔴 先退回主标签层再按「我的」：4b 结束时人还停在「账号安全」那一屏
+#    （`SettingsScreen.tsx:724` 把 `VaultSettingsSection` 挂在全屏 section 里），
+#    底部标签根本不在树上 —— 第 7 步早就有这一发，第 6 步是漏的。
+back_to_tabs || { shot "06a-退不到主标签层"; env_bail "创建完钥匙后退不回底部标签那一层（装置问题，不判产品）"; }
 if ! ax_press_until "我的" "共享清单" exact; then
   shot "06-我的页没有共享入口"
   # 实测过的两种失法：① iOS「保存密码？」那枚系统弹窗压住整棵 App 树（读什么都不是）；
@@ -820,22 +1015,31 @@ if ! ax_press_until "共享清单" "加入共享清单" exact; then
   exit 1
 fi
 shot "06c-共享清单首页"
-if ! ax_press_until "加入共享清单" "邀请凭证或链接" exact; then
+# 🔴 落点判据不许用「邀请凭证或链接」：那一屏的**副标题**写着「粘贴邀请凭证或链接。…」，
+#    两档相位都画它 ⇒ 拿它当到达判据会在同意面上就假命中（2026-10-25 第 18 跑实测：
+#    到达判据过了、`fill` 却五次 found=False）。用只有输入相位才画的清单名那一行。
+if ! ax_press_until "加入共享清单" "确认共享" exact "清单名称（仅本机显示）"; then
   shot "06b2-加入面板没开"
-  bad "按不进「加入共享清单」那面板（按了 5 次也没读到凭证输入框）"
+  bad "按不进「加入共享清单」那面板（按了 5 次也没读到同意面或凭证输入）"
   summary
   exit 1
+fi
+if [ "$PRESS_HIT" = "确认共享" ]; then
+  # 这台设备从没确认过 PIPL 同意 ⇒ `JoinShareScreen` 的初始 phase 停在同意面（fail-closed，
+  # 判断在 `@heyta/ui` 的 `shouldShowConsent`）。这一档**不是**装置绕路，是产品要求的那道闸：
+  # 本趟每一轮都先 `simctl uninstall`，同意态跟着沙盒一起清掉 ⇒ 同意面每轮都会在场。
+  shot "06b3-入群同意面"
+  if ! ax_press_until "确认共享" "清单名称（仅本机显示）" exact; then
+    shot "06b4-按同意后没到凭证框"
+    env_bail "按了「确认共享」却没走到凭证输入（装置问题，不判产品）"
+  fi
+  note "入群同意闸按过 ⇒ 这台设备有了同意记录（通知路径读的就是它）"
 fi
 fill_field "邀请凭证或链接" "$INVITE_TOKEN" || { shot "06d-凭证填不进"; env_bail "邀请凭证填不进输入框（装置问题）"; }
 shot "06e-已贴凭证"
 ax_press "加入"
 sleep 3
 idb_dump
-if tree_has "确认共享"; then
-  ax_press "确认共享"
-  note "已处置同意面板（首次才会弹）"
-  sleep 2
-fi
 # owner 侧在后台等成员行出现并把清单密钥封给它 —— 手机界面会停在
 # 「已入群。正在等待所有者分发密钥」直到这一步真的发生。
 (
@@ -872,6 +1076,15 @@ step "7. 下行判据（L2）：手机界面出现 owner 写的那条任务"
 back_to_tabs || { shot "07-退不到主标签层"; env_bail "退不回底部标签那一层（装置问题）"; }
 ax_press_until "我的" "共享清单" exact \
   || { shot "07b-进不去共享面"; bad "按不进「共享清单」入口"; summary; exit 1; }
+# 🔴 共享清单入口屏只是**一份共享一行**，任务/评论那一节挂在选中之后（`ShareSpaceScreen`
+#    的 `selected === undefined` 分支只画列表与偏好面）。旧写法按完入口就直接断言任务那一节
+#    ⇒ 少一步选中，判据量的是没打开过的那一屏。走 `testID`（`AXUniqueId`），不靠行名子串。
+if ! ax_press_until "id:share-space-row-$SHARE_ID" "评论区"; then
+  shot "07c-选不中那份共享"
+  bad "共享列表里点不开这一行（shareId=$SHARE_ID）⇒ 后面 L2/L3 都无从谈起"
+  summary
+  exit 1
+fi
 # 空间屏的到达判据：那一节要么列出任务（「选一条任务看它的评论」），要么明说没有
 # （「这条共享清单里还没有任务」）。两种都算"进到了这份共享的空间"。
 _space_open=0
@@ -950,18 +1163,28 @@ shot "14-信号驱动到的评论"
 
 # ── 10. 界面不谎称能力：通知偏好面只剩三枚有输入的开关 ──────────────────────
 step "10. 偏好面判据（L6）：只有活动那三档，没有「任务提醒」/「自动接受」"
+# 🔴 偏好面挂在**共享空间那一屏**（`apps/mobile/src/screens/ShareSpaceScreen.tsx:773` 挂
+#    `NotificationPrefsPanel`，节标题取 `common.share.notif.sectionTitle` =「共享通知」），
+#    而上一步停在**任务详情**里。旧写法这里按的是一颗界面上根本不存在的「通知偏好」按钮
+#    （那是装置自己编的词，不是产品文案），于是要么在不合适的屏上断言、要么恒过。
 idb_dump
-if ! tree_has "活动通知" && ! tree_has "完成/取消完成了任务"; then
-  ax_press "通知偏好" || note "这一屏上没读到偏好面标题，按现场继续"
+if ! tree_has "活动通知"; then
+  note "当前屏上没有「活动通知」⇒ 按「返回」退回共享空间那一屏再找"
+  ax_press "返回" || note "按「返回」没落上，仍继续找偏好面"
   sleep 2
   idb_dump
 fi
+if ! tree_has "活动通知"; then
+  ax "活动通知" --scroll-into-view --json >/dev/null 2>&1 || true
+  sleep 1
+  idb_dump
+fi
 if tree_has "活动通知" || tree_has "完成/取消完成了任务"; then
-  ok "通知偏好面在活动那一档"
+  ok "通知偏好面在活动那一档（共享空间屏上读到的）"
   shot "16-通知偏好面"
 else
   shot "15-偏好面读不到活动档"
-  bad "通知偏好面没在活动档上（面板没渲染或文案漂了）"
+  bad "退回共享空间屏、滚过「活动通知」之后仍没读到活动那一档（面板没渲染 / 文案漂了 / 没退到那一屏）"
   summary
   exit 1
 fi

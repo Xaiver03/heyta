@@ -289,6 +289,18 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
 
   await bobPage.getByTestId('share-join-entry').click();
   await expect(bobPage.getByTestId('share-join-dialog')).toBeVisible();
+  // 🔴 入群这一侧的同意闸（ADR-0071 裁决三；与 owner 那一屏、与手机端同一道）。
+  // 这台浏览器从没确认过 ⇒ fail-closed 必须先弹。少这一步，通知路径读的那份本地同意
+  // 就永远是空的 ⇒ 入群的人一条共享活动都收不到（2026-10-25 实测：只有 ShareFeature 写它）。
+  await expect(bobPage.getByTestId('share-consent-modal')).toBeVisible();
+  await evidenceShot(bobPage, '05a-bob-join-consent.png');
+  await bobPage.getByTestId('share-consent-dont-ask').click();
+  await bobPage.getByTestId('share-consent-accept').click();
+  // 点了同意不够，要看它**落盘**：键名真源在 `apps/web/src/features/share/share-consent-store.ts`。
+  expect(
+    JSON.parse(await bobPage.evaluate(() => localStorage.getItem('heyta.share-consent.v1') ?? '{}')),
+    '入群同意没有落盘 ⇒ 这台设备的通知闸门会一直关着',
+  ).toEqual({ consentAcceptedAt: expect.any(Number), dontAskAgain: true });
   await evidenceShot(bobPage, '05-bob-join-dialog.png');
   await bobPage.getByTestId('share-join-token').fill(inviteToken);
   await bobPage.getByTestId('share-join-name').fill('家庭装修（合伙）');

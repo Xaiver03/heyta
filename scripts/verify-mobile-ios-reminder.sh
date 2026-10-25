@@ -65,10 +65,10 @@ PROBE_PATH=""
 # keep the occurrence comfortably in the future while retaining a short default
 # for the ordinary full journey. The value is test-only timing, never reminder
 # semantics or a relaxed success condition.
-# ⚠️ 这一档要盖住**拒绝态那一整段**的耗时：答弹窗（有界等待）→ 那一行滚进可见区并复测
-# → 只读探针（冷启后 usernoted 的 XPC 可能要几分钟，见 §7 #266）。
-# 6 分钟那一档在 2026-10-25 实测被吃到"trigger 已过期"，判红的是夹具不是产品。
-TRIGGER_OFFSET_MINUTES=${HEYTA_IOS_TRIGGER_OFFSET_MINUTES:-8}
+# ⚠️ 这一档要盖住**拒绝态那一整段**的耗时：答弹窗（墙钟有界等待，实测最晚一次比请求晚了
+# 十几分钟）→ 那一行滚进可见区并复测 → 只读探针（冷启后 usernoted 的 XPC 可能要几分钟，见 §7 #266）。
+# 实测被吃到"trigger 已过期"两次：6 分钟与 8 分钟各一次（2026-10-25，两次的真因都在弹窗那侧）。
+TRIGGER_OFFSET_MINUTES=${HEYTA_IOS_TRIGGER_OFFSET_MINUTES:-45}
 COMPANION_PID=""
 APP_CONSOLE_PID=""
 APP_CONSOLE_LOG="/tmp/heyta-ios-reminder-console.$$"
@@ -155,13 +155,18 @@ wait_has() {
   return 1
 }
 wait_gone() {
-  local label="$1" limit="${2:-15}" _i out
-  for _i in $(seq 1 "$limit"); do
-    out=$(ax "$label" --pressable --list --exact --json)
-    [ "$(jget "$out" found)" != "True" ] && return 0
+  local label="$1" limit="${2:-15}" _end
+  # 🔴 有界等待一律按**墙钟**算，不按轮数算：2026-10-25 这台机器上同时挂着五枚模拟器，
+  # 一枚 `ax` 往返要 8~10 秒，"90 轮"实测是十几分钟 —— 既会把夹具自己拖到吃掉 trigger，
+  # 又让日志上"第 N 秒"那句失真。
+  _end=$(( $(date +%s) + limit ))
+  while :; do
+    if [ "$(jget "$(ax "$label" --pressable --list --exact --json 2>/dev/null || true)" found)" != "True" ]; then
+      return 0
+    fi
+    [ "$(date +%s)" -ge "$_end" ] && return 1
     sleep 1
   done
-  return 1
 }
 scroll_has() {
   local label="$1" out
@@ -473,7 +478,7 @@ sqlite_fired_count() {
   sqlite3 "$PHONE_DB" "SELECT COUNT(*) FROM ops WHERE json_extract(data,'\$.op.entityType')='REMINDER' AND json_extract(data,'\$.op.entityId')='${REMINDER_ENTITY_ID}' AND json_extract(data,'\$.op.payload.firedAt') IS NOT NULL AND json_extract(data,'\$.op.payload.firedForTriggerAt')=${REMINDER_TRIGGER_MS};" 2>/dev/null | tr -d ' '
 }
 deny_notification_permission() {
-  local label _i
+  local label hit out _round _start _wait
   # The first authorization request is the only supported way to create a
   # denied state in the simulator. Do not use TCC database writes or simctl
   # privacy shortcuts: those are not available on current iOS runtimes.
@@ -483,57 +488,133 @@ deny_notification_permission() {
   # 2026-10-25 就是按"按一下就该在"跑法的：`has` 只查一次就判"没找到拒绝按钮"，
   # 于是权限停在 `default`，后面那一行降级状态与 OS 快照三条一起判红 ——
   # 那是**夹具**的红，不是产品的红（截图上根本没有弹窗）。
-  for _i in $(seq 1 "${HEYTA_IOS_DENY_WAIT_SECONDS:-90}"); do
-    for label in "不允许" "不允许通知" "Don't Allow" "Don’t Allow"; do
-      if has "$label"; then
-        press "$label" >/dev/null 2>&1 || return 1
-        echo "   弹窗在第 ${_i} 秒出现（等待上限 ${HEYTA_IOS_DENY_WAIT_SECONDS:-90}s）"
-        sleep 2
-        return 0
-      fi
+  #
+  # 🔴 反过来也红过一次，成因不同：同一天 01:49 那一趟 `press` 报了成功、函数当场 return 0，
+  # 而 2a 的截图上弹窗还压着任务详情（`ios-reminder-denied-visible.png`）—— 于是三条几何判据
+  # 全 `found=False`、整棵树上没有一枚 `AXUniqueId`（读的是弹窗那层窗口，不是 RN 树），
+  # OS 快照也停在 `default`。**"按下过"不等于"弹窗没了"**，所以这里以弹窗消失为收口判据，
+  # 没消失就换一枚 transport 重按（系统控件走 axbridge 在本脚本里已被 restore_* 验证过）。
+  #
+  # ⚠️ 还有第三种失法（09:16 那一趟）：弹窗**整趟压根没出现** —— 通知授权状态是系统侧的，
+  # 不随 `simctl uninstall` 复位，`requestAuthorization` 直接回了已决状态。
+  # 所以调用面把这条当**首选**而不是**唯一**：它失败就回落到真 Settings 开关（§7 #554）。
+  for _round in 1 2 3; do
+    hit=""
+    # 只有第一轮值得等满（弹窗本来就晚到）；后面几轮是"按了没动"的重试，等 6s 就够。
+    _wait="${HEYTA_IOS_DENY_WAIT_SECONDS:-1200}"
+    [ "$_round" = 1 ] || _wait=6
+    _start="$(date +%s)"
+    while [ "$(date +%s)" -lt $(( _start + _wait )) ]; do
+      for label in "不允许" "不允许通知" "Don't Allow" "Don’t Allow"; do
+        if has "$label"; then hit="$label"; break; fi
+      done
+      [ -n "$hit" ] && break
+      sleep 1
     done
+    if [ -z "$hit" ]; then
+      [ "$_round" = 1 ] && return 1
+      echo "   弹窗已不再出现（第 ${_round} 轮等待 ${_wait}s 超时）—— 上一发的按下已生效" >&2
+      return 0
+    fi
+    echo "   弹窗在第 $(( $(date +%s) - _start )) 秒出现（等待上限 ${_wait}s），第 ${_round} 次按下" >&2
+    press "$hit" >/dev/null 2>&1 || true
+    wait_gone "$hit" 20 && return 0
+    out="$(idb_current ui tap "$hit" --api axbridge --udid "$UDID" 2>/dev/null || true)"
+    wait_gone "$hit" 20 && { echo "   第一枚 transport 没按动，改走 axbridge 后弹窗已消失" >&2; return 0; }
+    echo "   ⚠️ 第 ${_round} 次按下后弹窗仍在（$(printf '%s' "$out" | head -c 80)）" >&2
+  done
+  return 1
+}
+settings_press() {  # $1=label —— 设置页里的行
+  # 🔴 iOS 27 的设置页**不吃 HID 坐标点**：`press_scroll` 那套（shim 的 `--press` 走坐标）
+  # 在这里返回 found=True、几何也对，而页面根本不动 —— 2026-10-25 09:40 手走时现量到
+  # （点 "App" 那行：`{"found":"True","visible":"True"}` 之后树里还是侧栏原样）。
+  # 换成"精确框中心 + `--api axbridge`"同一枚行就进去了；而 marker 直点会把 "App"
+  # 匹配到「主屏幕与App资源库」，所以坐标必须由 shim 按精确标签算出来再交给 axbridge。
+  local label="$1" out cx cy _i
+  for _i in 1 2 3 4 5; do
+    # 🔴 取框与按下必须是**同一次精确解析**（§7 #555）：shim 的 `--scroll-into-view`
+    # 内部把 `exact_only` 硬写成 False，"App" 会命中「主屏幕与App资源库」那行。
+    # 所以这里只用 `--list --exact` 拿框，不在同一发里请求滚动；框不在屏上就先滚一发改**精确**重取。
+    out="$(ax "$label" --pressable --list --exact --json 2>/dev/null || true)"
+    if [ "$(jget "$out" found)" = "True" ]; then
+      cx=$(( $(jget "$out" x) + $(jget "$out" width) / 2 ))
+      cy=$(( $(jget "$out" y) + $(jget "$out" height) / 2 ))
+      idb_current ui tap "$cx" "$cy" --api axbridge --udid "$UDID" >/dev/null 2>&1 || true
+      sleep 2
+      return 0
+    fi
+    idb_current ui scroll down --udid "$UDID" >/dev/null 2>&1 || true
     sleep 1
   done
   return 1
 }
-restore_notification_permission() {
-  local label out detail
+open_heyta_notification_settings() {
+  local label out
   # Navigate the real Settings hierarchy. App-Prefs deep links are not stable
   # on iOS 27 and may leave the root page visible while returning success.
   xcrun simctl launch "$UDID" com.apple.Preferences >/dev/null 2>&1 || return 1
   sleep 2
   # iOS 27 presents the Settings sidebar at its previous scroll offset. The
   # Apps row is below the first viewport and may not be discoverable by an AX
-  # query until the sidebar has received a real downward gesture. Use the same
-  # companion transport as the rest of this journey, then let press_scroll
-  # re-read bounds before tapping.
+  # query until the sidebar has received a real downward gesture.
   for _i in 1 2 3 4 5 6 7 8; do
     idb_current ui scroll down --udid "$UDID" >/dev/null 2>&1 || true
   done
   for label in "App" "heyta"; do
-    if ! press_scroll "$label"; then return 1; fi
+    if ! settings_press "$label"; then return 1; fi
     sleep 2
   done
   # The iOS 27 Settings row is width-truncated in the AX tree on some
   # simulator sizes (`通知、关`), while older runtimes expose the full label.
   # Both labels are the same real notification settings row; accept only an
   # exact match to one of these observed labels.
-  if ! press_scroll "通知、横幅、声音、标记" && ! press_scroll "通知、关"; then
+  if ! settings_press "通知、横幅、声音、标记" && ! settings_press "通知、关"; then
     return 1
   fi
   sleep 2
   out="$(ax "允许通知" --pressable --list --exact --json 2>/dev/null || true)"
-  [ "$(jget "$out" found)" = "True" ] || return 1
-  detail="$(jget "$out" detail)"
-  if [ "$detail" != 1 ]; then
+  [ "$(jget "$out" found)" = "True" ]
+}
+set_notification_switch() {  # $1 = 目标读数：1 开 / 0 关
+  local want="$1" out _i
+  open_heyta_notification_settings || return 1
+  for _i in 1 2 3; do
+    out="$(ax "允许通知" --pressable --list --exact --json 2>/dev/null || true)"
+    [ "$(jget "$out" detail)" = "$want" ] && return 0
     # The Settings switch is a system AXCheckBox. HID coordinate taps return
     # rc=0 on iOS 27 but do not toggle it; use the companion's AX bridge for
     # this system control and read its value back before proceeding.
     idb_current ui tap "允许通知" --api axbridge --udid "$UDID" >/dev/null 2>&1 || return 1
     sleep 2
-  fi
+  done
   out="$(ax "允许通知" --pressable --list --exact --json 2>/dev/null || true)"
-  [ "$(jget "$out" detail)" = 1 ]
+  [ "$(jget "$out" detail)" = "$want" ]
+}
+restore_notification_permission() {
+  set_notification_switch 1
+}
+ensure_notification_denied_via_settings() {
+  # 🔴 这一条**不能**从"从没问过"造出 denied：2026-10-25 09:44 现量 —— 应用已经发过请求、
+  # 而弹窗还没被答（状态仍是 `notDetermined`）时，设置里的 heyta 页只有
+  # Siri / 搜索 / 蜂窝数据三行，**「通知」那一组根本不挂出来**（`ui describe-all` 7 枚节点，
+  # 与截图逐条对过）。所以它的适用面是"状态已决而本轮拿不到弹窗"
+  # （最常见：上一趟按了「允许」，系统从此不再弹，本轮请求直接回 `granted`）。
+  # 造拒绝态的正路仍然是那一次弹窗。
+  #
+  # 🔴 为什么原来想用它：那枚弹窗由 usernoted 排队呈现，实测最晚一次比请求晚了十几分钟
+  # （§7 #554），而 2a 要证的从来是「系统当前不允许通知时，那一行在不在屏上」这个**状态**，
+  # 不是「用户刚刚点了不允许」这个**动作**。全程走真设置界面，没有任何可伪造的 shell 旁路，
+  # 最后仍由只读 OS 快照那一发（`authorization=denied` 那条判据）验它确实落成了 denied。
+  #
+  # ⚠️ 为什么先开再关而不是"看着是关就不动"：`notDetermined`（从没问过）与 `denied`
+  # 在 Settings 那一枚开关上**长得一模一样**，都是关。先开（若系统肯直接放行就会变 1）
+  # 再关，才能把"没决定过"变成"确实拒绝过"。开不动（读数回不来 1）就整条判失败，
+  # 由调用面回落到弹窗那条路 —— 回落是**降级**，日志里会说清走的哪条。
+  if set_notification_switch 1 && set_notification_switch 0; then
+    return 0
+  fi
+  return 1
 }
 assert_probe_state() {
   local json="$1" auth="$2" pending="$3" delivered="$4"
@@ -591,7 +672,17 @@ terminate_before_trigger() {
   if [ "$remaining_ms" -le 0 ]; then
     return 1
   fi
-  xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || return 1
+  # 🔴 "已经没什么可终止"不是失败，但也不能读成"我们终止了它"。
+  # 只读探针那一发按设计读完快照就 terminate（否则下一发 RN 启动会复用它、留下黑屏），
+  # 所以走到这里进程常常已经不在 —— 要证的从来只是**跨过 trigger 那一刻进程不在**。
+  # 分三种情况各说一句：主动终止成功 / 已不在跑（说明是谁让它停的）/ 进程还在而终止失败（真失败）。
+  if xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1; then
+    echo "   已主动终止 App"
+  elif [ "$(xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -c "$BID")" = "0" ]; then
+    echo "   App 在本轮更早处就已不在跑（只读探针按设计终止过它）⇒ 仍满足「跨 trigger 时进程不在」"
+  else
+    return 1
+  fi
   TERMINATED_AT_MS="$(python3 -c 'import time; print(int(time.time() * 1000))')"
   if [ -n "$APP_CONSOLE_PID" ] && ! assert_app_console_exited; then
     return 1
@@ -825,6 +916,28 @@ PY
   fi
 fi
 
+step "0.6. 屏幕归属预检：本轮开始前设备上不许有滞留的系统授权弹窗"
+# 🔴 §7 #552 那一族的**提前判决点**：上一趟没被按掉的授权弹窗会跨 uninstall 留在这台设备上，
+# 而它压在第一层之上 —— 2026-10-25 02:47 那一趟步骤 1 的六条红（首启层未收起 → 任务页不可达
+# → 搜索框 → 键盘 → Composer → 任务行）真因只有这一句，而当时要等六条全红再看截图才发现。
+# 判红要早、要带 cure：uninstall / killall / launchctl kickstart 都撤不掉它，只有重启设备。
+STALE_ALERT=""
+for _label in "不允许" "不允许通知" "Don't Allow" "Don’t Allow"; do
+  if has "$_label"; then STALE_ALERT="$_label"; break; fi
+done
+if [ -n "$STALE_ALERT" ]; then
+  bad "本轮开始前设备上滞留着一枚系统授权弹窗（命中「${STALE_ALERT}」）—— 它会吃掉后面每一次 tap"
+  echo "   cure：xcrun simctl shutdown $UDID && xcrun simctl boot $UDID" >&2
+  summary
+  exit 1
+fi
+ok "屏幕归本轮所有（没有滞留的系统授权弹窗）"
+
+# ⚠️ 这里**没有**"先用真 Settings 开关把拒绝态钉住"这一步 —— 2026-10-25 09:42 实测否证：
+# 全新安装的包在**第一次真正发出请求之前**，设置里的 heyta 页只有 Siri / 搜索 / 蜂窝数据三行，
+# **根本没有「通知」那一组**（`ui describe-all` 现量 7 枚节点，逐条对过截图）。
+# 所以开关那条路只能在"应用已经问过"之后走（就是下面拒绝那一格里的回落），不能提前。
+
 step "1. 冷启动、离线入口与任务创建（真实 RN UI）"
 if launch_app; then :; else bad "App console 会话未能建立，无法证明进程终止"; summary; exit 1; fi
 sleep 6
@@ -1030,15 +1143,38 @@ if [ "$(jget "$TIME_RESULT" found)" = "True" ]; then
 else
   bad "任务详情 UI 的截止时刻输入框不可达"
 fi
-if press_scroll "截止时"; then ok "通过提醒 UI 创建未来 occurrence"; else bad "提醒 UI 的「截止时」不可达"; fi
+if press_scroll "截止时"; then
+  ok "通过提醒 UI 创建未来 occurrence"
+else
+  bad "提醒 UI 的「截止时」不可达"
+  # 判红时先分清两种失法：**树上根本没有这枚按钮**（产品/接线问题）与
+  # **有，但滚不进可视区**（夹具/几何问题）。不打印这一行，下一位只能重跑一遍再猜。
+  ax "截止时" --pressable --list --json 2>/dev/null | head -c 300
+  echo
+fi
 
 # 首次排程会弹系统通知权限。系统弹窗可能不在应用 AX 树中，先轮询 idb AX；
 # 若宿主系统不给无障碍节点，就保留失败证据，绝不把排程 accepted 当授权成功。
 if [ "$IOS_MODE" = permission-recovery ]; then
+  # 首选真用户那条路（答掉那枚一次性弹窗）。它一天里失过三种法（§7 #552、#554）：
+  # 晚到几十秒、按下不消失、以及**晚了十几分钟**才出现在屏上（09:16 请求、09:32 才见）。
+  # 所以等待按墙钟给足；等不到才回落到真 Settings 开关 —— 回落点放在这里而不是旅程之前，
+  # 是因为全新安装的包在应用第一次真正发出请求之前，设置里连「通知」那一组都没有
+  # （2026-10-25 09:42 现量：heyta 页只有 Siri / 搜索 / 蜂窝数据）。
+  # 两条路**都不许静默**：日志必须说清这一轮的 denied 是谁给的，
+  # 因为下面那条只读 OS 快照判据只认状态、不认路线。
   if deny_notification_permission; then
+    DENIED_ROUTE="alert"
     ok "permission-recovery 首次授权弹窗选择拒绝"
   else
-    bad "permission-recovery 未找到首次授权弹窗的拒绝按钮"
+    echo "   弹窗这一轮等不到（或按不动），回落到真 Settings 的「允许通知」开关" >&2
+    if ensure_notification_denied_via_settings; then
+      DENIED_ROUTE="settings"
+      ok "拒绝态由真 Settings 的「允许通知」开关钉住（先开再关，两次都回读过读数）"
+    else
+      DENIED_ROUTE=""
+      bad "permission-recovery 拿不到拒绝态：弹窗没答成，Settings 回落也没把开关拨到关"
+    fi
   fi
 else
   for _label in "允许" "允许通知" "Allow" "Allow Notifications"; do
@@ -1081,12 +1217,17 @@ if [ "$IOS_MODE" = permission-recovery ] || [ "$IOS_MODE" = restart-recovery ]; 
     # 读的是设备真实 AX 树（不是 JS 返回值、也不是本地库里那条 op —— 那两样都证不了
     # 屏幕上有一行字）。必须在 `run_probe` 之前跑：那一发按设计会终止 RN 进程。
     step "2a. permission-recovery：拒绝态在提醒面上看得见，且给得出再授权入口"
+    # 遮挡归因：那一枚弹窗自己就是一层窗口，它在场时下面三条几何判据必然 `found=False`
+    # 且整棵树没有一枚 `AXUniqueId`（§7 #554）—— 不写这一句，读日志的人会去改产品代码。
+    if has "不允许"; then
+      echo "   🔴 屏幕上正压着系统授权弹窗 ⇒ 下面几条读的是弹窗那层窗口，不是 RN 树" >&2
+    fi
     # 🔴 "在 AX 树上"不等于"看得见"（AGENTS §6.2 规定一）。RN 把整个 ScrollView 的
     # 内容都留在树上，所以只查 found 会抓到一屏之外的节点 —— 上一轮就是这样：
     # 三条命中全绿，而截图停在面板顶部，那一行根本不在屏上。
     # 这里要的是 shim **复测过几何**的那个 `visible=True`（中心 y 在可视区内），
     # 而且截图必须紧跟在复测之后，中间不再做任何可能把滚动位置弄回去的动作。
-    notice_frame() {  # $1=needle $2=pressable(1/0)；成功时把 frame 打到 stdout
+    notice_probe() {  # $1=needle $2=pressable(1/0) $3=tries；stdout="x y w h swipes"
       local needle="$1" kind="${2:-0}" _i out
       for _i in $(seq 1 "${3:-25}"); do
         if [ "$kind" = 1 ]; then
@@ -1095,7 +1236,7 @@ if [ "$IOS_MODE" = permission-recovery ] || [ "$IOS_MODE" = restart-recovery ]; 
           out="$(ax "$needle" --scroll-into-view --json 2>/dev/null || true)"
         fi
         [ "$(jget "$out" found)" = "True" ] && [ "$(jget "$out" visible)" = "True" ] \
-          && { printf '%s %s %s %s\n' "$(jget "$out" x)" "$(jget "$out" y)" "$(jget "$out" width)" "$(jget "$out" height)"; return 0; }
+          && { printf '%s %s %s %s %s\n' "$(jget "$out" x)" "$(jget "$out" y)" "$(jget "$out" width)" "$(jget "$out" height)" "$(jget "$out" swipes)"; return 0; }
         sleep 1
       done
       return 1
@@ -1103,7 +1244,7 @@ if [ "$IOS_MODE" = permission-recovery ] || [ "$IOS_MODE" = restart-recovery ]; 
     CAPTION=""
     CAPTION_FRAME=""
     for _copy in "到点不会响" "will not ring"; do
-      if CAPTION_FRAME="$(notice_frame "$_copy" 0)"; then CAPTION="$_copy"; break; fi
+      if CAPTION_FRAME="$(notice_probe "$_copy" 0)"; then CAPTION="$_copy"; break; fi
     done
     if [ -n "$CAPTION" ]; then
       ok "降级说明在提醒面上**看得见**（「${CAPTION}」，frame=${CAPTION_FRAME}）"
@@ -1114,7 +1255,7 @@ if [ "$IOS_MODE" = permission-recovery ] || [ "$IOS_MODE" = restart-recovery ]; 
     ENTRY=""
     ENTRY_FRAME=""
     for _entry in "去系统设置" "Open system settings"; do
-      if ENTRY_FRAME="$(notice_frame "$_entry" 1 8)"; then ENTRY="$_entry"; break; fi
+      if ENTRY_FRAME="$(notice_probe "$_entry" 1 8)"; then ENTRY="$_entry"; break; fi
     done
     if [ -n "$ENTRY" ]; then
       ok "拒绝态当场给得出跳系统设置的再授权入口（「${ENTRY}」可点且可见，frame=${ENTRY_FRAME}）"
@@ -1124,25 +1265,44 @@ if [ "$IOS_MODE" = permission-recovery ] || [ "$IOS_MODE" = restart-recovery ]; 
     # 那一行与那一跳必须**是同一条**：入口的 y 落在说明文字那一行的带内。
     # 只各自"在屏上"不够 —— 屏上别处也可能有一枚同名按钮。
     if [ -n "$CAPTION_FRAME" ] && [ -n "$ENTRY_FRAME" ]; then
+      # 🔴 两个 y 只有在**同一份滚动位置**上取到才可比。`--scroll-into-view` 会自己滚，
+      # 2026-10-25 09:50 实测：说明行读到 y=718、入口读到 y=574（差 144pt 判红），
+      # 而同一时刻的截图上两者只差约 30pt —— 那 144pt 是第二发读数自己滚出来的，
+      # 量的是"两次滚动的差"而不是布局。shim 会把这一发真的划了几次 `swipes` 报回来，
+      # 所以判据改成：**后一发没有再滚动（swipes=0）时才允许比 y**；还在动就重取一对读数。
+      pair_settled=""
+      for _settle in 1 2 3; do
+        [ "$(printf '%s' "$ENTRY_FRAME" | cut -d' ' -f5)" = "0" ] && { pair_settled=1; break; }
+        CAPTION_FRAME="$(notice_probe "$CAPTION" 0 || true)"
+        ENTRY_FRAME="$(notice_probe "$ENTRY" 1 8 || true)"
+        [ -n "$CAPTION_FRAME" ] && [ -n "$ENTRY_FRAME" ] || break
+      done
+      if [ -z "$pair_settled" ]; then
+        bad "两次读数之间列表一直在滚 ⇒ 这两个 y 不可比，判不了那一行的归属（读数问题，不是布局问题）"
+      else
       caption_y="$(printf '%s' "$CAPTION_FRAME" | cut -d' ' -f2)"
       entry_y="$(printf '%s' "$ENTRY_FRAME" | cut -d' ' -f2)"
       dy=$((caption_y > entry_y ? caption_y - entry_y : entry_y - caption_y))
       if [ "$dy" -le 80 ]; then
-        ok "入口与那句说明在同一行带内（纵向相差 ${dy}pt ≤ 80）—— 这一行确实是"那句话 + 那个回头路""
+        ok "入口与那句说明在同一行带内（纵向相差 ${dy}pt ≤ 80，两次读数之间列表未再滚动）—— 这一行确实是"那句话 + 那个回头路""
       else
         bad "入口与那句说明不在同一行带内（${dy}pt）—— 不能算那一行给得出回头路"
       fi
+      fi
     fi
-    # 锚点（testID 通道）是第三把尺：它证明那一行确实挂在共享提醒列表内部。
-    # 🔴 但这棵树上可能整批没有 `AXUniqueId`（Release 包的 RN 版本相关）——
-    # 那是**通道不可用**，要如实登记成未判定，不许判成产品失败，也不许顺手改成绿。
-    ANCHOR_JSON="$(ax "id:reminder-delivery-blocked-text" --scroll-into-view --json 2>/dev/null || true)"
+    # 锚点（testID 通道）是第三把尺：它证明屏幕上那一枚"去系统设置"确实是共享
+    # `ReminderList` 打出来的，而不是别处同名按钮。
+    # 🔴 锚点必须挂在**可点元素**上：2026-10-25 实测，同一棵树上 `AXUniqueId` 通道是通的
+    # （shim 没有报 `tree-has-no-AXUniqueId`），而 `reminder-delivery-blocked-text`
+    # 那枚挂在 `Text` 上的 testID 取不到 —— RN 的 Text 不进这棵树。
+    # 那句话的可见性由上面那条几何判据 + 截图承担，不靠这一枚。
+    ANCHOR_JSON="$(ax "id:reminder-delivery-open-settings" --pressable --scroll-into-view --json 2>/dev/null || true)"
     if [ "$(jget "$ANCHOR_JSON" found)" = "True" ]; then
-      ok "那一行的锚点在本轮树里（id:reminder-delivery-blocked-text，共享提醒列表内部）"
+      ok "那一跳的锚点在本轮树里（id:reminder-delivery-open-settings，共享提醒列表内部）"
     elif [ "$(jget "$ANCHOR_JSON" detail)" = "tree-has-no-AXUniqueId" ]; then
       echo "   ⚠️ 锚点通道本轮不可用（这棵树上没有任何 AXUniqueId）⇒ 那一行的归属只由上面两条几何判据 + 截图承担"
     else
-      bad "锚点通道可用而这一枚取不到 —— 那一行不是共享提醒列表打出来的"
+      bad "锚点通道可用而这一枚取不到 —— 那一枚入口不是共享提醒列表打出来的"
     fi
     if snapshot "$ROOT/apps/mobile/evidence/ios-reminder-denied-visible.png"; then
       ok "拒绝态截图已落盘：apps/mobile/evidence/ios-reminder-denied-visible.png"

@@ -308,9 +308,10 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 · 实时：`new_share_ops` → 闸门 → 拉一次 → 重画，全程无轮询。
 
 🔴 仍然到不了的，别写成"做完了"：
-· **移动端零接入**（M6 那六段，现量见 §9.4）；
+· **移动端**：share 通道那六段已接上（逐段落点与复量命令在 §9.4 那张表），设备腿那一趟的读数在 §9.13；
 · **逐 op 签名**已落地（M4，2026-10-23，读数见 §9.12）：写侧签、服务端验、验不过就不落库也不物化。
-  但它今天只覆盖**新写入**的 op（存量不追签，ADR-0069 裁决二/三），且**移动端一条都签不出来**（M6 没接）；
+  但它今天只覆盖**新写入**的 op（存量不追签，ADR-0069 裁决二/三）。移动端签的是**同一枚** `signShareOpWire`（没有第二份签名件），
+  那一跳在真机上的读数在 §9.13；
 · **跨清单搬迁**仍按补二具名拒绝 —— 界面上那三处"换清单"目的地现在**灰掉并说一句为什么**
   （2026-10-23 补：以前是把注定失败的动作摆出来，报错文案还是"你的改动还在本地，可以重试"，那句是假的）；
 · **库里旧密文不重加密**（追加模型，M3 就登记过）；
@@ -368,15 +369,20 @@ M2/M4 碰不可逆层，放同一份 ADR 一起做，避免两次线协议变更
 
 ### 9.4 移动端那六段缺什么（逐条命令，别按本节推断"现在还没有"）
 
+> 🔴 **这六段在 2026-10-25 已全部接上**，逐格落点与复量命令就在下面那张表里；
+> 设备腿那一趟的读数在 §9.13。本节保留"当时缺什么"那一列，是因为 M6 的顺序就是照它排的。
+
 组件本身可移植（`packages/ui/src/sync/` 那四枚只用 RN 原语 + `useHeytaText/useHeytaTokens`，
 mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿主侧：
 
-1. 入口与路由：`apps/mobile/src/nav/feature-entries.ts` 里没有任何共享项。
-2. `setProjectShareId` 的调用点：现在只有 `apps/web/src/features/projects/store.ts` 调它。
-3. share 密钥落盘：`apps/web/src/features/share/share-key-store.ts` 的签名吃 Web `Storage` 与 `btoa/atob`，移动端只有 device-prefs（sqlite）与原生安全存储两个**不同形状**的端口。
-4. vault → `SyncPayloadCipher`：移动端拿得到 session，但 `payloadCipher` 在 `apps/mobile/src` 出现 0 次。
-5. 传输与凭据：`ShareApiClient` 是纯 fetch、宿主无关，包依赖已具备；但移动端凭据只在内存、冷启动重填，面板的轮询/复封依赖它。
-6. `apps/web/.../ShareFeature.tsx` 这一层不可移植（`window.setInterval` / `document.getElementById` / `navigator.clipboard` / `window.location`）——**它是唯一需要重写的一层**，其余是接线。
+| 当时缺的那一格（2026-10-21 的读数） | 现在接在哪 | 现量命令 |
+|---|---|---|
+| ① 入口与路由：`feature-entries.ts` 里没有任何共享项 | 同文件的 `key: 'share'` 那一项 | `grep -n "key: 'share'" apps/mobile/src/nav/feature-entries.ts` |
+| ② `setProjectShareId` 只有 web 那一处在调 | `apps/mobile/src/share/project-share.ts`（文件头写明它是移动端**唯一**调用点，出现第二处即红） | `grep -rn setProjectShareId apps/mobile/src` |
+| ③ 密钥落盘端口形状不合（web 那枚吃 `Storage` + `btoa/atob`，移动端只有 device-prefs 与原生安全存储） | 宿主无关的那组 `*Portable` 住在 `packages/app-host/src/share-key-store.ts`；移动端只注入 kv 端口 `apps/mobile/src/lib/share-local-store.ts` | `grep -rln wrapAndStoreShareKeyPortable apps/mobile/src packages/app-host/src` |
+| ④ `payloadCipher` 在 `apps/mobile/src` 出现 0 次 | 装配点在 `apps/mobile/src/share/share-admin.ts`（条数不写在这里，用右边那条命令现量） | `grep -rn PayloadCipher apps/mobile/src \| wc -l` |
+| ⑤ 传输与凭据：`ShareApiClient` 宿主无关，但移动端凭据只在内存、冷启动重填 | 传输件原样复用（`apps/mobile/src/share/{share-admin,comment-actions}.ts`）。凭据那条**没变也不需变**：共享这条腿读的是保险库 session 的 `payloadCipher`（`packages/app-host/src/host.ts` 的 `getPayloadCipher`），不读口令框那个值 | `grep -rln ShareApiClient apps/mobile/src` |
+| ⑥ `ShareFeature.tsx` 那一层不可移植，是唯一需要重写的一层 | 重写成两屏：`ShareSpaceScreen.tsx`（面板 / 成员 / 邀请 / 评论 / 偏好）+ `JoinShareScreen.tsx`（入群） | `ls apps/mobile/src/screens/*Share*.tsx` |
 
 ### 9.5 文档体检队列 —— 2026-10-21 这一批把七格做完了，剩下两格是**门禁作用域**问题，不是文案问题
 
@@ -537,7 +543,12 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
   钉子与重新开工的条件在 `packages/ui/src/sync/notification-model.ts` 文件头与 `packages/ui/tests/notification-model.spec.ts`；
   🔴 别给它们造假输入点亮判据（那是量夹具不是量产品）。
 - **`app-mount.spec.tsx` 里的 `act(...)` 警告是预存的**：同一枚文件在 HEAD 上跑就有 28 条（`An update to SubscriptionNotice inside a test was not wrapped in act`），本批那一臂挂上完整 `<App />` 后整文件涨到 45 条。现量：`cd apps/web && npx vitest run tests/app-mount.spec.tsx 2>&1 | grep -c "not wrapped in act"`。这条不是本批的缺陷，也没有被当成判据。
-- **移动端与三枚桌面壳今天接不到这条信号**：`new_share_ops` 的解析在 `@heyta/sync-client`（共享包）里，判断在 `@heyta/app-host`，而投递面（Notification）与"注册消费者"那一行只在 web 壳里。移动端要等它自己的通知面（§9.4）。
+- **这条信号的读者今天有两枚壳**（2026-10-25 改口；原句"移动端要等它自己的通知面"已不成立）：
+  web 那侧是 `apps/web/src/features/share/use-share-activity-signal.ts`，移动端那侧是
+  `apps/mobile/src/share/share-signals.ts`（信号→拉取）+ `share-activity-notify.ts`（系统投递），
+  M6-3 接上，设备腿读数在 §9.13。**桌面那几枚壳仍没接** —— 解析在 `@heyta/sync-client`、判断在
+  `@heyta/app-host`（都是共享包，壳只差投递面与注册那一行），但这一格不在 M6 的授权范围内。
+  现量：`grep -rln new_share_ops apps/*/src`（列出来的壳才是接到过的）。
 - **上面那四处变异当时是一次性手工跑的**（M3 那批有 `mutate-collab-rekey.mjs`，M5 这批没有）。✅ **2026-10-23 那笔欠项已按它自己写的分法还掉**：秒级那两枚进了常驻装置 —— 宿主侧闸门两臂 `research/tools/mutation-rigs/mutate-collab-signal-known-share.mjs`（`ARMS=pass (2/2)`）、接线/界面侧两臂 `mutate-collab-journey-visible.mjs`（`ARMS=pass (2/2)`，它每跑一臂要重打一次 `@heyta/app-host`）；而**真 WS 那一枚（第 11 步）仍按当时的判断不做成秒级装置** —— 它由 `verify:collab-suite` 的周期跑承担。登记在册，不留"下次再说"。
 
 ### 9.11 M2 收尾（2026-10-23 第五批）—— 任务族进共享日志、两台真浏览器互见、P-1 翻案的读数
@@ -606,7 +617,8 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 教训（为什么"整趟绿"要单独一趟重跑而不是拿首趟读数凑）追加进环境陷阱，编号见文末。
 
 **这一批还剩什么**（不包装成"签名做完了"）：
-- **移动端零接入**（M6 那六段，现量见 §9.4）：移动端还没接 share 通道，所以它今天**写不出**带签名的 op —— 不是"签得不对"，是那条腿根本还没接。
+- **移动端**（这一批当时的第一号欠项）：2026-10-25 那条腿接上了，签名件**没有被复制第二份**（还是 `packages/app-host/src/share-client.ts` 的 `signShareOpWire`），
+  手机写出的 op 在 owner 侧重验的读数见 §9.13 那一行 L3/L4。
 - 名册取不到时只有宿主层那个异常名（`ShareSignatureRosterUnavailableError`），**没有界面措辞** ⇒ 用户看到的是"没更新"，不是一句为什么。
 - 服务端可以把 `signature` 与 `signer_member_id` **一起**抹掉 ⇒ 读侧回落到"存量未签"那一形。这一格 ADR-0069 实施记录里如实写着没做到，翻案条件也在那一节。
 - 库里存量 op **不追签**（裁决二/三定的），所以"每一条都可验"只对**新写入**成立；判它的断言在 ADR 里，别在本节推断。
