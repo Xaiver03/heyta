@@ -197,7 +197,17 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await sidebar.getByRole('button', { name: '创建标签' }).click();
     await expect(sidebar.getByText(TAG, { exact: true })).toBeVisible();
 
+    /*
+     * 🔴 2026-10-25（还原前提，不是改判据）：**建标签也会把当前范围切到那个新标签上**
+     * （与建清单同一件事）。而这条任务还在收集箱、身上没有那个标签 ⇒ 它压根不在当前列表里，
+     * `rowFor()` 数到 **0**（实测读数：`STEP row-visible=0`），于是后面 `openRowTail` 抛
+     * "这一行没有行尾动作区触发器"，整个用例拖到 60 秒超时。
+     * 切回「任务」是真实用户回到任务列表的那一步。
+     */
+    await switchView(page, '任务');
+
     const row = rowFor(page, title);
+    await expect(row, '建完标签之后那一行不在当前范围里 ⇒ 这一条后面全是空判据').toBeVisible();
     // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
     await openRowTail(page, row);
     await row.getByTestId('task-organize-summary').click();
@@ -245,7 +255,18 @@ test.describe('任务整理：清单归属 + 标签', () => {
 
     await page.reload();
     await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+    /*
+     * 🔴 2026-10-25：刷新之后**先把范围切回「任务」**，再谈那一条。
+     *
+     * 刷新会连侧栏选中一起恢复：这时当前范围还是刚被摘掉的那个**标签**，
+     * 而这条任务已经没有那个标签了 ⇒ 它压根不在当前列表里。
+     * 于是下面两句（"tag chip 为 0"）**恒真**、而 `task-organize-summary` 的定位
+     * 永远解析不到（报出来是 60 秒超时的 "waiting for locator"，看着像触发器坏了）。
+     * 这既是修复也是**加强**：先断言那一行真的在，那两句"没有 chip"才有意义。
+     */
+    await switchView(page, '任务');
     const afterReload = rowFor(page, title);
+    await expect(afterReload, '刷新后那一行不在当前范围里 ⇒ 下面两句"没有 chip"会变成空判据').toBeVisible();
     await expect(afterReload.getByTestId('task-chip-tag')).toHaveCount(0);
     /*
       🔴 计数位跟着**消失**（`OrganizerList` 的那条"只画非零"）。
