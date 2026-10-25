@@ -30,6 +30,25 @@ import { useSyncStore } from '../sync/store.js';
  *   ② **已存的值不在枚举里**（旧规则可能存了别名或手写过的值）⇒ 必须把它补回去，
  *      否则 `<select>` 找不到匹配项会显示空白，而保存时那张表单会把这个值**悄悄改掉**。
  */
+/**
+ * 时区的**人话标签**：`中国标准时间（Asia/Shanghai）`。
+ *
+ * 🔴 为什么不能只显示 IANA id：产品负责人 2026-10-25 指着这一格说
+ * 「规则时区怎么全都是英文」—— `Asia/Shanghai` 对引擎是标识，对用户不是名字。
+ * `Intl.DateTimeFormat` 按当前语言给出长名（中文环境是"中国标准时间"），
+ * 拿不到时退回 IANA id（**不编造**）。
+ */
+export function formatTimezoneLabel(zone: string, locale: string): string {
+  try {
+    const name = new Intl.DateTimeFormat(locale, { timeZone: zone, timeZoneName: 'long' })
+      .formatToParts(new Date())
+      .find((part) => part.type === 'timeZoneName')?.value;
+    return name !== undefined && name !== '' && name !== zone ? `${name}（${zone}）` : zone;
+  } catch {
+    return zone;
+  }
+}
+
 export function timezoneOptions(current: string): string[] {
   const probe = (Intl as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf;
   const zones = typeof probe === 'function' ? probe.call(Intl, 'timeZone') : [];
@@ -444,7 +463,8 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                   >
                     <option value="">{t('web.ai.inbound.timezoneFollowDevice')}</option>
                     {timezoneOptions(timezone).map((zone) => (
-                      <option key={zone} value={zone}>{zone}</option>
+                      // 值仍是 IANA id（存储契约不变），显示的是本地化名字。
+                      <option key={zone} value={zone}>{formatTimezoneLabel(zone, locale)}</option>
                     ))}
                   </select>
                 </div>
@@ -460,6 +480,11 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
             </button>
           </div>
           {loading ? <p className="ht-settings__hint" role="status">{t('web.ai.inbound.loading')}</p> : null}
+          {/*
+            🔴 读取失败时**不许**再说"还没有自动收集规则"（2026-10-25 截图里的样子）：
+            那句是"我问到了，答案是没有"，而失败是"我没问到"。两条同时出现，
+            用户不知道到底是没有、还是没连上 —— 空态只在**真的读成功且为空**时出现。
+          */}
           {error ? <p className="ht-settings__danger" role="alert">{error}</p> : null}
           <div className="ht-inbound__stack" aria-live="polite">
             {rules.map((rule) => <article className="ht-inbound__group" key={rule.id} data-testid={`inbound-rule-${rule.id}`}>

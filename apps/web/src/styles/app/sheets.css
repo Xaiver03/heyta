@@ -1027,3 +1027,83 @@
   font-weight: var(--ht-font-weight-semibold);
   color: var(--ht-color-foreground);
 }
+
+/* ── 独立设置窗口（`?settings=…&standalone=1`，2026-10-25）────────────────
+ *
+ * 桌面端把设置做成**单独的窗口**（macOS `Settings` 场景 / WinUI 新窗 / Electron
+ * 第二个 BrowserWindow），窗口里只载一份 `web-dist` 的 URL。若那个 URL 仍渲染
+ * "rail + 任务区 + 详情列"，窗口里就是"整个应用 + 一层模态挡在上面"——
+ * 不是设置窗口。所以这一档把壳收起、让设置自己铺满。
+ *
+ * ⚠️ 用 `display:none` 收起而不是"不渲染"：不渲染会让设置面板在窗口里重挂载，
+ *    而它带着未决的订阅/授权状态（理由与 `App.tsx` 里那段 Provider 注释同源）。
+ * ⚠️ 只在这一档生效 —— 寻常的 `?settings=`（落地页把人送进应用）必须**保留**壳，
+ *    那份判据是 `settings-deep-link.spec.tsx` 的另一组用例。
+ */
+.ht-app[data-settings-standalone] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 🔴 **不能连 `<main>` 一起藏** —— 设置面板就住在 `<main>` 里。
+   2026-10-25 实测：把 main 也 `display:none` 之后，独立窗口里是**一整片空白**
+   （`evidence/settings-redesign/macos-settings-window.png` 第一版就是那张图）。
+   要藏的是"壳的另外两根柱子"：左侧 rail 与右侧详情列。 */
+.ht-app[data-settings-standalone] > nav.ht-rail,
+.ht-app[data-settings-standalone] > .ht-app__detail {
+  display: none;
+}
+
+/* 设置这一层在窗口里**就是整个窗口**：铺满、去掉模态那套居中/最大宽/圆角/阴影。
+   🔴 必须是 `fixed; inset: 0` 而不是 `static` —— 第一版写成 `static` 时，
+   独立窗口里能看到应用壳从设置面板四周透出来（任务输入框、账号菜单都在），
+   那仍然是"应用 + 弹窗"，不是设置窗口。 */
+.ht-app[data-settings-standalone] .ht-sheet {
+  position: fixed;
+  inset: 0;
+  max-inline-size: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--ht-color-background);
+  z-index: var(--ht-z-modal);
+}
+
+/* 设置导航项：图标 + 文字（2026-10-25 产品负责人要求每个菜单带 Icon）。
+   独立窗口里这一列是**唯一导航**，纯文字要逐条读才能定位；图标把它变成形状识别。
+   图标与文字的间距用 `--ht-space-2`，图标颜色走 muted —— 选中态由 `aria-current` 那一档
+   统一提亮，不在这里另开一套颜色。 */
+.ht-settings__nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__nav-link > svg {
+  flex: none;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-settings__nav-link[aria-current='page'] > svg {
+  color: inherit;
+}
+
+/* 独立窗口里**保留左侧分类栏**，即使窗口比应用窄档断点还窄。
+   理由：那个窗口里没有别的内容，分类栏就是唯一导航；横排一档是为"窄屏应用"
+   设计的（rail 还在、空间被抢），而窗口化之后不存在那个约束。
+   选择器权重（两个类 + 属性）压过文件末尾 `@media (max-width: 48rem)` 那条。 */
+.ht-app[data-settings-standalone] .ht-settings__layout {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+}
+
+.ht-app[data-settings-standalone] .ht-settings__nav {
+  flex-direction: column;
+}
+
+/* 独立设置窗口里**没有头像可点**，账号菜单不该出现。
+   现状（2026-10-25 实测截图）：它会展开并盖住分类栏前三项，看起来像"设置坏了"。
+   窗口里唯一的账号入口是「账号与安全」那一节本身。 */
+.ht-app[data-settings-standalone] .ht-accountmenu__panel {
+  display: none;
+}

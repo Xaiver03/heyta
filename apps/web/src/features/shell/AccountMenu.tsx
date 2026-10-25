@@ -1,3 +1,4 @@
+import { isSettingsStandaloneSurface } from '../../lib/settings-deep-link.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 账号菜单（左侧导航顶部）
@@ -137,6 +138,14 @@ export function AccountMenu({
   onSignOut: () => void;
   testID?: string;
 }): React.JSX.Element {
+  /**
+   * 🔴 独立设置窗口（`?settings=…&standalone=1`）里**没有头像可点**，这个菜单
+   * 不该存在。它渲染在 `.ht-app` 之外（portal），CSS 那条 `display:none` 够不到它
+   * —— 必须在渲染层就返回 null（2026-10-25 实测：窗口里它展开着，盖住分类栏前三项）。
+   * 窗口里唯一的账号入口是「账号与安全」那一节本身。
+   */
+  if (isSettingsStandaloneSurface()) return null as unknown as React.JSX.Element;
+
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);

@@ -156,3 +156,42 @@ describe('🔴 带 `?settings=<节 id>` 冷启动 = 设置直接开在那一节'
     expect(sectionVisible(view, SUBSCRIPTION_SETTINGS_SECTION)).toBe(true);
   });
 });
+
+describe('🔴 `standalone=1`：这一页只画设置（桌面端独立窗口的载荷）', () => {
+  it('带 standalone：设置开在指定节，且根元素标明"收起壳"', async () => {
+    const view = await mountApp(`/app?settings=${SUBSCRIPTION_SETTINGS_SECTION}&standalone=1`);
+    expect(sectionVisible(view, SUBSCRIPTION_SETTINGS_SECTION)).toBe(true);
+    // 判据是**根元素上的属性**：CSS 按它收起 rail / 主区 / 详情列。
+    const root = view.querySelector('.ht-app');
+    expect(root?.hasAttribute('data-settings-standalone')).toBe(true);
+  });
+
+  it('不带 standalone：壳必须在（落地页送人进来的那种用法）', async () => {
+    // ⚠️ 这条是上一条的反面对照。少了它，"顺手把 standalone 设成默认"这种改动
+    //    会让落地页的购买入口把整个应用壳吞掉，而没有任何判据会红。
+    const view = await mountApp(`/app?settings=${SUBSCRIPTION_SETTINGS_SECTION}`);
+    expect(sectionVisible(view, SUBSCRIPTION_SETTINGS_SECTION)).toBe(true);
+    const root = view.querySelector('.ht-app');
+    expect(root?.hasAttribute('data-settings-standalone')).toBe(false);
+  });
+
+  it('没有 settings 时 standalone 不生效（不猜"只画设置"这种上下文）', async () => {
+    const view = await mountApp('/app?standalone=1');
+    const root = view.querySelector('.ht-app');
+    expect(root?.hasAttribute('data-settings-standalone')).toBe(false);
+  });
+});
+
+describe('设置导航：每个菜单都要有图标（独立窗口里那一列是唯一导航）', () => {
+  it('8 个分类逐项都有 svg，且文字仍在（图标不替代可访问名）', async () => {
+    const view = await mountApp(`/app?settings=${SUBSCRIPTION_SETTINGS_SECTION}`);
+    const links = [...view.querySelectorAll<HTMLElement>('.ht-settings__nav-link')];
+    expect(links.length, '分类数量').toBeGreaterThanOrEqual(8);
+    for (const link of links) {
+      expect(link.querySelector('svg'), `「${link.textContent ?? ''}」缺图标`).not.toBeNull();
+      // 🔴 图标 aria-hidden，可访问名必须仍是文字 —— 少这条，读屏用户听到的是"按钮"。
+      expect(link.textContent?.trim().length ?? 0, '图标不能替代文字').toBeGreaterThan(0);
+      expect(link.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    }
+  });
+});
