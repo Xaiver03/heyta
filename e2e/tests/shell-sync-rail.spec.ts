@@ -30,7 +30,13 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { closeSettingsSheet, openApp, openSettingsView, parkCursor } from './helpers';
+import {
+  closeSettingsSheet,
+  openApp,
+  openSettingsView,
+  parkCursor,
+  selectSettingsSection,
+} from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
 
@@ -160,6 +166,9 @@ test.describe('同步入口在 rail 底部（H9，web 端）', () => {
   test('S3 设置里那一节带着共享状态条，并且三个字段都在', async ({ page }) => {
     await openApp(page, APP_ZH);
     await openSettingsView(page);
+    // 🔴 2026-10-25：设置中心重做之后是**分节**的（`settings-group-*`），
+    // 「同步」那一节默认 `hidden` —— 不先切到那一节，`sync-settings-panel` 永远不可见。
+    await selectSettingsSection(page, 'sync');
 
     const panel = page.getByTestId('sync-settings-panel');
     await expect(panel, '设置浮层里没有「同步」那一节').toBeVisible();
@@ -232,7 +241,10 @@ test.describe('同步入口在 rail 底部（H9，web 端）', () => {
     ).toHaveCount(0);
 
     await openSettingsView(page);
+    await selectSettingsSection(page, 'sync');
     // 「有且只有一处」：多处会红，缺一处也会红。
+    // ⚠️ 计数用的是 DOM 里的节点（section 即使 `hidden` 也还在），所以这一条在
+    // "只有一节"这件事上仍然成立；而"可见"由上面那句 `selectSettingsSection` 负责。
     await expect(page.getByTestId('sync-settings-panel'), '同步设置不止一处').toHaveCount(1);
     await expect(page.getByLabel('服务端地址'), '地址输入框不止一处').toHaveCount(1);
 

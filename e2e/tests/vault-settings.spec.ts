@@ -111,6 +111,22 @@ async function installHttpFixture(page: Page): Promise<{
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ passkeys: [] }) }));
   await page.route(`${SERVER}/api/admin/overview`, (route) =>
     route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'Forbidden' }) }));
+  // 🔴 2026-10-25：应用新加了三条**开机就会发**的读请求，而这个 fixture 是
+  // **故意严格**的（catch-all 把没登记的一律记成 `unexpected`）⇒ 不给它们装桩，
+  // 红起来读成"密钥面坏了"。三条都是与本主题无关的惰性空态：
+  //   · `/api/auth/central/config` —— 中心认证入口探测（`{}` = 没有这项能力）
+  //   · `/api/announcements/active` —— 运营公告（`{ announcements: [] }`）
+  //   · `/api/automation/**` —— 入站自动化那两块面板（`{ rules: [] }` / `{ events: [] }`）
+  await page.route(`${SERVER}/api/auth/central/config`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  await page.route(`${SERVER}/api/announcements/active`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ announcements: [] }) }));
+  await page.route(`${SERVER}/api/automation/**`, (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = path.endsWith('/events') ? { events: [] } : { rules: [] };
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+
   await stubLegalRecheck(page, SERVER);
   // 🔴 W4b 的开机拉取不在这个主题里，但它确实会发：不登记就被 catch-all 计入
   // `unexpected`，而这条判据红起来读起来像"密钥面坏了"。

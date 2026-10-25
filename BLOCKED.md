@@ -11922,3 +11922,56 @@ B216 那一行进库之后，本线在新隔离载具 `.worktrees/inb-t10`（`gi
 
 处置：`timeout-minutes: 40 → 100`，并在 workflow 注释里写明这是**为了取得一次完整读数的临时值**，
 真正该做的是分片/拆套件（以及 B227 正文那三条路）。⚠️ 加预算只是让它跑得完，不是让它变绿。
+
+## B228（2026-10-25 深夜，本会话 · 修红门禁第二趟）：**还有 9 组红没修完**，每一组都带着"根因已定位 / 需要谁拍板"
+
+### 已经修掉的（本轮，逐条有读数）
+
+| 组 | 读数 |
+|---|---|
+| `narrow-sweep`(10) + `pages-sweep`(8) | 18 passed（判据改走 `switchView`；塌缩档 rail 没有 `role=tab`） |
+| `renew-panel`(6) | 7 passed（补 `/api/announcements/active` 桩） |
+| `reminder-permission-final`(5) | 5 passed（从默认配置摘出 + 接成 `check:reminder-permission` 真门禁） |
+| `inbox`(3) | 3 passed（补两条开机请求桩） |
+| `motivation`(3) | 7 passed（排除 `rail-assistant`；习惯锚点换成视图根） |
+| `p0-remediation`(4) | 6 passed（`ai-drawer` 已不存在 → 量 `ai-agent-surface`；375 档收起态跳过并记账） |
+| `rail-trash-anchor`(1) | 1 passed —— **真 a11y 回归**：工具段是 `role=tab` 却在 tablist 外面，已补容器 + CSS + 词条 |
+| `account-email-change-and-sessions`(7)、`ai-row-layout`(2)、`task-organize`(2) | 三轮里修掉（见 77772c77f / eb50fca49） |
+
+### 还没修的 9 组（按"谁能拍板"分）
+
+**A. 需要产品裁决（我按"不发明需求"停在这里）**
+
+1. `search-overlay`(1)：卡片 `border-top-width` 是 **2px**，而这条判据写的是"输入与浮层均无描边"。
+   `borderless-controls.css` 的"无描边"只覆盖**交互控件**（button/input/…），不覆盖面板容器 ⇒
+   两边都有一半道理。要么给面板去边框，要么把这条判据改成"允许 1–2px 容器描边"。
+2. `shell-sync-rail`(2)：①设置「同步」那一节里 **没有** `sync-status-bar`（它现在只在 rail 底部）；
+   ②`getByLabel('服务端地址')` 现在是 **2** 个（同一节里两处输入框）。
+   两者都是"搬家收尾"的口径问题：状态条该不该在节内？地址该不该只有一个可编辑副本？
+3. `auth-login-code`(3) + `auth-registration-otp`(2)：登录/注册面板的入口与表单结构变了
+   （`openAuthPanel` 拿得到 dialog，但 `auth-form-remember-password` 不在里面；注册旅程点不到）。
+   需要先定"默认走验证码还是密码"这件事，再改判据。
+
+**B. 根因已定位、改法明确（下一轮可继续，单组 10–20 分钟）**
+
+4. `detail-pane-task`(6) + `shell-no-document-scroll`(1) + `shell-sidebar-height`(1)：
+   共用一件事 —— **行内编辑器（重复/截止/整理/备注）的交互变了**：判据直接 `fill`
+   一个在 DOM 里但不可见的 `task-repeat-custom-input`，而现在要点开行尾 chip / 栏里那一格
+   才出现。要么判据先点开（真用户路径），要么组件补"直接聚焦即可编辑"。
+5. `detail-pane-collapse`(2)：页头"详情栏"按钮与恢复路径②（设置里那一项）的可见性/位置变了。
+6. `sidebar-resize`(2) + `shell-sidebar-height`(1)：`.ht-sidebar__resizer` 的命中带被祖先裁掉
+   （spec 自己的报错原话："把手中心点命中的不是把手 ⇒ 它的命中带被祖先裁掉了"）——
+   这是**几何回归**，不是判据过期；`sidebar.css` 头部就写着"命中带有 4px 骑在右边缘之外"。
+7. `vault-settings`(1)：`account-menu-settings` 这枚 menuitem 点击被拦截（element resolves 但
+   click 超时）—— 与 B227 里 admin-console 那枚 `<nav class="ht-sidebar"> intercepts pointer events`
+   可能是同一个层叠问题。
+
+**C. 还没测过（下一轮第一件事）**
+
+8. `assistant-navigation-acceptance`(5)、`assistant-resize-ux`(2)、`ai-assistant-atomic-tools`(2)。
+
+### 一条方法上的教训（写给自己）
+
+这一轮我又一次用 `grep '✘'` 数 Playwright 的失败行，而 line reporter 在两种模式下形状不同 ——
+**读数要么从 `N failed` 汇总行取，要么从 `test-results/*/error-context.md` 逐枚读**。
+B227 的第一版就是被这一枚误读数带偏的（把"串行同样红"读成"串行全绿"）。
