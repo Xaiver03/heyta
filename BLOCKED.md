@@ -12150,3 +12150,25 @@ B229 修掉，这两条会一起绿。
 
 ⚠️ **纪律**：这 11 条里凡是"读数口径过期"，都必须像 `search-overlay` 那样**改读数、不改口径**，
 并在注释里写清是哪一次产品/无障碍决定取代了旧口径 —— 不许为了变绿把断言放宽。
+
+### B230 追记（第 5 轮）：13 → **6** 条
+
+本轮转绿（各自有读数）：
+
+| 用例 | 真因 | 读数 |
+|---|---|---|
+| `focus-detail-pane` F1 | rail 的选中态已改成**只由图标颜色表达**（`inbox.css:580-589`：「Selection is carried by the icon alone」），旧读法"背景非透明"恒读出 `[]` | 6 passed |
+| `detail-pane-overlay` | 设置浮层开着时详情列**被有意收起**（`3fd905ec8`）⇒ 改成"浮层开着=0 轨道/display:none；关掉后回来且宽度仍=token" | 2 passed |
+| `detail-column-slot` T2 | 「习惯」面现在整列不排版 ⇒ 换「四象限」（也是两轨，选中任务后画出面单） | 3 passed |
+| `calendar-capture` | `gotoCalendar` 直点 `role=tab`，窄档 rail 是普通 button ⇒ 改走 `switchView` | 3 passed |
+
+还剩 6 条：
+
+| 用例 | 读数 / 现状 | 下一步 |
+|---|---|---|
+| `detail-pane-habit` H7 | `paintedBox(pane .ht-habit__pane-tools)` 拿到 null（元素"可见"却无盒子） | 先查它是零面积还是 `content-visibility` 藏在别的子树 |
+| `habit-heatmap-labels` HL2 | 「8月」左边缘 1008 vs 那一周 990（差 **18px**） | 真几何漂移，需读标签定位规则 |
+| `keyboard-cursor` K14 | 刷新后「勾选甲」又回来了（Space 只改了本地态） | 确定性复现；查 Space→op 的派发与落盘之间有没有竞态 |
+| `rail-roving` | `expect(...).toBe(true)` | 未查（dnd-kit Space 传感器与 roving tabindex） |
+| `task-organize` 第二条 | 刷新后 `task-organize-summary` 定位不到 | 未查完 |
+| `desktop-window` | **`Process failed to launch!`** | 环境：要真桌面窗口，这台机器上不该算红（要么给它写 skip 理由、要么在 CI 之外跑） |
