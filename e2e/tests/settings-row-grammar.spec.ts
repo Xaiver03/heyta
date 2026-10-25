@@ -43,7 +43,7 @@ test(`设置中心：一屏只有一种行（${section}）`, async ({ page }) =>
      *   3. `.ht-settings__row`（更早的行原语）
      */
     const rows = [...root.querySelectorAll(
-      '.ht-settings__preference-row, .ht-settings__toggle, .ht-settings__row',
+      '.ht-settings__preference-row, .ht-settings__toggle, .ht-settings__row, .ht-input-field--inline',
     )].filter((r) => r.getBoundingClientRect().height > 0);
     const pick = (row: Element) => {
       // 行的形状是"左标签 + 右控件"，控件是最后一个有尺寸的子元素（radio 组 / 文字按钮 / 开关都算）。
@@ -63,11 +63,28 @@ test(`设置中心：一屏只有一种行（${section}）`, async ({ page }) =>
       };
     };
     const data = rows.map(pick);
+    /**
+     * 行距只在**同一容器内的相邻行**之间算。
+     * 🔴 2026-10-25 被自己的判据骗过第二次：AI 那节两行之间隔着一个提示块，
+     * 跨块算出的"行距"是 319px —— 那不是行距，是两块之间的距离。
+     * 间距是**列表内部**的属性，不是页面上的绝对坐标差。
+     */
+    const pitchByParent = new Map<Element | null, number[]>();
+    rows.forEach((row, index) => {
+      if (index === 0) return;
+      const parent = row.parentElement;
+      if (parent === null || rows[index - 1]!.parentElement !== parent) return;
+      const delta = Math.round(row.getBoundingClientRect().top - rows[index - 1]!.getBoundingClientRect().top);
+      if (delta <= 0) return;
+      const list = pitchByParent.get(parent) ?? [];
+      list.push(delta);
+      pitchByParent.set(parent, list);
+    });
     const nav = root.querySelector('.ht-settings__nav')?.getBoundingClientRect();
     const pane = root.querySelector('#' + PANE_ID)?.getBoundingClientRect();
     const box = root.getBoundingClientRect();
     const uniq = (xs: Array<number | null>) => [...new Set(xs.filter((v): v is number => v != null))];
-    const pitches = data.map((d, i) => (i > 0 ? d.rowTop - data[i - 1]!.rowTop : 0)).filter((v) => v > 0);
+    const pitches = [...pitchByParent.values()].flat();
     const median = pitches.length ? [...pitches].sort((a, b) => a - b)[Math.floor(pitches.length / 2)]! : null;
     return {
       rows: data.length,
@@ -105,6 +122,20 @@ test(`设置中心：一屏只有一种行（${section}）`, async ({ page }) =>
       // 「一种行」还包括：同一节里不许并存两种列表语法（行 + 2 列复选卡网格）。
       cardsGrids: root.querySelectorAll('.ht-settings__cards').length,
       preferenceRows: rows.length,
+      // 同一节里用了几种行原语（1 = 合规；>1 = 混用，正是"看着乱"的来源之一）。
+      primitives: [...new Set(rows.map((row) => {
+        if (row.classList.contains('ht-settings__preference-row')) return 'preference-row';
+        if (row.classList.contains('ht-settings__toggle')) return 'toggle';
+        if (row.classList.contains('ht-input-field--inline')) return 'form-field-inline';
+        return 'row';
+      }))],
+      pitchSamples: pitches.length,
+      rowParents: [...new Set(rows.map((row) => {
+        const p2 = row.parentElement as HTMLElement | null;
+        if (!p2) return 'none';
+        const cs2 = getComputedStyle(p2);
+        return `${p2.className}|gap=${cs2.rowGap}|mt=${getComputedStyle(row as HTMLElement).marginTop}`;
+      }))],
     };
   }, section);
   console.log(`SETTINGS_SHAPE ${section} ${JSON.stringify(m)}`);
@@ -141,7 +172,21 @@ test(`设置中心：一屏只有一种行（${section}）`, async ({ page }) =>
   // 我第一版写成了"左缘唯一"，那会逼着人把控件改成左对齐 —— 错判据比没有判据更糟。
   expect(m.rights, '同行控件右缘必须唯一').toHaveLength(1);
   expect(m.heights.length, '控件高度档位 ≤ 2').toBeLessThanOrEqual(2);
-  expect(m.medianPitch!, '行距中位数 44–56').toBeGreaterThanOrEqual(44);
-  expect(m.medianPitch!).toBeLessThanOrEqual(56);
+  // 没有任何"同容器相邻行"的节（每块只有一行）不判行距，但要出声。
+  if (m.pitchSamples === 0) {
+    console.log(`SETTINGS_PITCH_SKIP ${section}（同容器内没有相邻行）`);
+  } else {
+    expect(m.medianPitch!, '行距中位数 44–56').toBeGreaterThanOrEqual(44);
+    expect(m.medianPitch!).toBeLessThanOrEqual(56);
+  }
+  /**
+   * 🔴 口径：`preference-row` / `toggle` / `row` / `form-field-inline` 在**视觉上**
+   * 是同一套语法（标签在左、控件在右、同一高度档），差异只是 DOM 血缘
+   * （原生行 / AI 旧行 / 更早的行原语 / 表单字段的 inline 形态）。
+   * 所以判据不要求血缘唯一 —— 那会逼着人去重写四个面板 —— 而是要求
+   * **量出来的形状一致**：高度档 ≤2、右缘唯一、行距在区间内。这三条已经覆盖
+   * "看着乱"的真实来源。血缘只打印出来供人核对。
+   */
+  console.log(`SETTINGS_PRIMITIVES ${section} ${JSON.stringify(m.primitives)}`);
 });
 }
