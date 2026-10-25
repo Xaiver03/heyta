@@ -12077,3 +12077,35 @@ B227 的第一版就是被这一枚误读数带偏的（把"串行同样红"读�
 
 ⇒ **需要产品裁决的 3 组**（auth / search-overlay / sync 节）我停在这里没动，理由写在上面每一行。
 其余 5 组都是"根因已定位、改法明确"的活。
+
+### B228 第四次追记：认证那 5 条**机制已查清**（不需要产品裁决，需要按下面这条路改夹具）
+
+原来的猜测（"需要先定默认走验证码还是密码"）**不成立** —— 我把 `AuthPanel` 的分支读完了，
+真实机制是这样两条门槛：
+
+```ts
+// AuthPanel.tsx:264
+const effectiveBaseUrl = addressDraft.trim() === ''
+  ? (allowAdvanced && showSelfHostedForm ? '' : authBaseUrl(baseUrl))
+  : addressDraft.trim();
+// AuthPanel.tsx:280
+const isOfficialService = legalLinks?.terms.startsWith(`${OFFICIAL_SITE_ORIGIN}/`) === true;
+// AuthPanel.tsx:317 —— 非官方实例**根本不探**中心认证
+if (!isOfficialService) { setCentralConfig(null); return; }
+```
+
+实测读数（本机，`openAuthPanel` 之后 dump 面板里的 testid）：
+
+| 夹具状态 | 面板里的 testid | 结论 |
+|---|---|---|
+| 什么都不塞（`baseUrl` 为空 ⇒ 落官方实例） | `auth-plan-scene` / `central-auth-loading` / `central-auth-close` | 走**中心认证**那一支，本地表单不是它 |
+| 塞一份「指向本机 + token」的凭据 | 面板打不开了（`sync-signin-entry` 不在菜单里） | 已登录 ⇒ 身份入口不是"登录/注册" |
+| 什么都不塞 + `central/config` 回 `{}` | `central-auth-unavailable` / `central-auth-close` | `{}` 被 `central-auth.ts:60-64` 判成 malformed ⇒ 画"不可用"，**不回落**本地表单 |
+
+⇒ 正确做法：**在面板里填自建地址**（那个 `addressDraft` 输入就是干这个的）——
+它一非空、host 不是官方，`isOfficialService` 就为假 ⇒ 面板直接走本地表单，
+中心认证一次都不探。下一轮按这条改 5 条夹具（`auth-login-code` 3 + `auth-registration-otp` 2）。
+
+⚠️ 两次试错的读数都留在上表里，免得下一个人再摸一遍：
+· 塞 token（想"只配置地址不登录"）会把用例变成"已登录"，身份入口消失；
+· 把 `central/config` 塞成 `{}` 不会回落本地表单，只会换一句"不可用"。
