@@ -492,6 +492,7 @@ if (INSTALLED_TREE && existsSync(SNAPSHOT)) {
   } catch { /* 读不到快照就用现量树自己判 —— 下面仍会响亮地报缺项 */ }
 }
 const rot = [];
+const redundant = [];
 // 🔴 一条登记"只在哪种载体上会出现"必须写明 —— 这是这次加第二载体时唯一站得住的过期规则。
 //  预测快照钉死一个 `TARGET`（linux/x64/musl）且把版本钉在它自己那次解析上，
 //  所以"真树有而快照没有"（arm64 变体、npm 取到比 pnpm 锁更新的版本）与反过来
@@ -510,8 +511,26 @@ for (const id of Object.keys(IMAGE_ONLY_PACKAGES)) {
   if (rec.carrier !== undefined && rec.carrier !== currentCarrier) continue;
   if (!snapshotIds.has(id)) {
     rot.push(`${id} 已经不在${INSTALLED_TREE ? '真树' : '快照'}里了（登记该删，或给它写 carrier）`);
-  } else if (scanned.has(id)) rot.push(`${id} 现在**已经**在门禁扫描集里 ⇒ 豁免不再成立，删掉这条登记`);
+  } else if (scanned.has(id)) {
+    /*
+     * 🔴 **本平台看得见它**，不等于这条登记腐坏了（2026-10-25 的 CI 红在这里）。
+     *
+     * 这张表里最典型的三条是**平台专属原生变体**：`@node-rs/argon2-linux-x64-gnu` 之类。
+     * macOS/arm64 的 pnpm store 里根本没有 linux 变体 ⇒ 必须登记；而在 linux runner 上
+     * 它**就在扫描集里** ⇒ 豁免多余。
+     *
+     * 把"多余"判成"腐坏"，等于要求一份**跨平台**账本在每个平台上都刚刚好 —— 那是做不到的，
+     * 而它的表现是"本机绿、CI 红"，最容易被读成环境问题。
+     * ⇒ 正确处理：登记项仍在快照里就够了（上面那一支）；这一支只记一条 ℹ️，
+     *    说明本平台上它已被门禁直接覆盖。
+     */
+    redundant.push(`${id}（本平台的扫描集里已有它 ⇒ 这条豁免在本平台多余，但另一平台上仍需要）`);
+  }
 
+}
+if (redundant.length > 0) {
+  console.log(`ℹ️  IMAGE_ONLY_PACKAGES 里有 ${redundant.length} 条在本平台已被门禁直接覆盖（不是腐坏）：`);
+  for (const line of redundant) console.log(`   · ${line}`);
 }
 if (rot.length > 0) report(`IMAGE_ONLY_PACKAGES 里有 ${rot.length} 条已经不成立`, rot);
 
