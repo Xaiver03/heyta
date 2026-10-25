@@ -38,14 +38,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import {
-  addHabit,
-  addTask,
-  openApp,
-  rowFor,
-  showDetailColumnContent,
-  switchView,
-} from './helpers';
+import { addHabit, addTask, openApp, openRowTail, rowFor, showDetailColumnContent, switchView } from './helpers';
 
 const SHOT = (name: string) =>
   fileURLToPath(
@@ -302,6 +295,10 @@ test.describe('滚到底之后，行尾整理编辑器仍够得着（B95 那一�
       '内容列滚不动 ⇒ W1 那条"它是滚动宿主"已经不成立，这一条的量法失去前提',
     ).toBeGreaterThan(0);
 
+    // 🔴 2026-10-25：行尾那几个 chip 住在 `<details class="ht-compose-actions">` 的
+    // 折叠面板里（`opacity: 0` ⇒ 不在命中栈里，点了等于点空气）。先展开它，
+    // 与 `detail-pane-task` 共用 `helpers.openRowTail` 那一处收口。
+    await openRowTail(page, rowFor(page, target));
     const trigger = rowFor(page, target).getByTestId('task-organize-summary');
     const tBox = await trigger.boundingBox();
     expect(tBox, '量不到行尾整理触发器 ⇒ 这一条点的是空气').not.toBeNull();

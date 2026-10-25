@@ -497,6 +497,30 @@ async function dismissFullBleedOverlay(page: Page): Promise<void> {
   }
 }
 
+/**
+ * 把某一行行尾那条「折叠的动作区」展开（`<details class="ht-compose-actions">`）。
+ *
+ * 🔴 2026-10-25：**这一步是真实用户路径，不是绕过**。行尾的 chip（备注 / 重复 / 截止 /
+ * 整理）现在住在 `.ht-compose-actions__panel` 里，而那一层**收起时 `opacity: 0`**：
+ * 节点有盒子、`summary` 的 `pointer-events` 也是 `auto`，但它不在命中栈里 ——
+ * 于是 `locator.click` 会一直重试到 60 秒超时，而报错长得像"这个 chip 有问题"。
+ * 取证（`document.elementsFromPoint`）：chip 中心那一点的命中栈里只有
+ * `div.ht-content / main.ht-main / …`，chip 那一层**根本不在里面**。
+ *
+ * ⚠️ 别改成 `click({ force: true })`：那会把"用户点不到"这件事一并测掉。
+ */
+export async function openRowTail(page: Page, rowLocator: Locator): Promise<void> {
+  const trigger = rowLocator.locator('.ht-compose-actions__trigger').first();
+  if ((await trigger.count()) === 0) return;
+  const open = await rowLocator
+    .locator('.ht-compose-actions')
+    .first()
+    .evaluate((el) => (el as HTMLDetailsElement).open)
+    .catch(() => false);
+  if (!open) await trigger.click();
+  await expect(rowLocator.locator('.ht-compose-actions__panel').first()).toHaveCSS('opacity', '1');
+}
+
 export async function switchView(
   page: Page,
   /**

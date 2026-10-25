@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { revealRowActionsBy } from './ai-entry.js';
-import { addTask, openApp, parkCursor, switchView } from './helpers';
+import { addTask, openApp, openRowTail, parkCursor, switchView } from './helpers';
 
 const SHOT = (name: string) =>
   fileURLToPath(new URL(`../../apps/web/evidence/detail-pane-task/${name}.png`, import.meta.url));
@@ -42,29 +42,6 @@ const paneEverywhere = (page: Page): Locator => page.getByTestId('task-pane');
 const paneInColumn = (page: Page): Locator => page.getByTestId('detail-column').getByTestId('task-pane');
 
 /** 元素**真实画得出来**吗（`toBeVisible` 的等价量，顺带把尺寸拿回来做几何判据）。 */
-/**
- * 把某一行行尾那条「折叠的动作区」展开（`<details class="ht-compose-actions">`）。
- *
- * 🔴 2026-10-25：**这一步是真实用户路径，不是绕过**。行尾的 chip（备注 / 重复 / 截止 /
- * 整理）现在住在 `.ht-compose-actions__panel` 里，而那一层**收起时 `opacity: 0`**：
- * 节点有盒子、`summary` 的 `pointer-events` 也是 `auto`，但它不在命中栈里 ——
- * 于是 `locator.click` 会一直重试到 60 秒超时，而报错长得像"这个 chip 有问题"。
- * 取证（`document.elementsFromPoint`，1024 宽的排查脚本，已删）：chip 中心那一点的命中栈
- * 只有 `div.ht-content / main.ht-main / …`，chip 那一层**根本不在里面**；
- * 而它的祖先 `div.ht-compose-actions__panel` 现量 `opacity: 0`。
- */
-async function openRowTail(page: Page, rowLocator: Locator): Promise<void> {
-  const trigger = rowLocator.locator('.ht-compose-actions__trigger').first();
-  if ((await trigger.count()) === 0) return;
-  const open = await rowLocator
-    .locator('.ht-compose-actions')
-    .first()
-    .evaluate((el) => (el as HTMLDetailsElement).open)
-    .catch(() => false);
-  if (!open) await trigger.click();
-  await expect(rowLocator.locator('.ht-compose-actions__panel').first()).toHaveCSS('opacity', '1');
-}
-
 async function paintedBox(page: Page, locator: Locator) {
   await expect(locator, '界面上找不到这个元素').toBeVisible();
   const box = await locator.boundingBox();
