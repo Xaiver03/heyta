@@ -59,7 +59,29 @@ test('设置中心：一屏只有一种行', async ({ page }) => {
       navWidth: nav ? Math.round(nav.width) : null,
       sheetWidth: Math.round(box.width),
       contentWidth: pane ? Math.round(pane.width) : null,
-      fill: pane && box.width ? Number((pane.width / box.width).toFixed(2)) : null,
+      // 右侧死区：面板右缘减内容右缘。比"占比"更贴近那句抱怨（"右边空一半"）。
+      // 🔴 死区要扣掉**内边距**：把 padding 当成空区会逼着人去删该有的留白。
+      // 现量：layout 右内边距 44px、面板 24px —— 那 68px 是设计，不是乱。
+      rightGap: (() => {
+        const layout = root.querySelector('.ht-settings__layout');
+        const content = root.querySelector('.ht-settings__content');
+        if (!layout || !content) return null;
+        const lr = layout.getBoundingClientRect();
+        const padR = Number.parseFloat(getComputedStyle(layout as HTMLElement).paddingRight) || 0;
+        return Math.round(lr.right - padR - content.getBoundingClientRect().right);
+      })(),
+      boxes: (() => {
+        const pick = (sel: string) => {
+          const el = root.querySelector(sel);
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const cs = getComputedStyle(el as HTMLElement);
+          return { left: Math.round(r.left), right: Math.round(r.right), w: Math.round(r.width),
+            padR: cs.paddingRight, padL: cs.paddingLeft, maxW: cs.maxWidth };
+        };
+        return { sheet: pick('.ht-settings'), layout: pick('.ht-settings__layout'),
+          content: pick('.ht-settings__content'), nav: pick('.ht-settings__nav') };
+      })(),
       sample: data.slice(0, 6),
       // 「一种行」还包括：同一节里不许并存两种列表语法（行 + 2 列复选卡网格）。
       cardsGrids: root.querySelectorAll('.ht-settings__cards').length,
@@ -77,6 +99,6 @@ test('设置中心：一屏只有一种行', async ({ page }) => {
   expect(m.medianPitch!).toBeLessThanOrEqual(56);
   expect(m.navWidth!, '侧栏 200–260（macOS 参考区间）').toBeGreaterThanOrEqual(200);
   expect(m.navWidth!).toBeLessThanOrEqual(260);
-  expect(m.fill!, '内容区 ≥ 80% 宽').toBeGreaterThanOrEqual(0.8);
+  expect(m.rightGap!, '面板右侧死区 ≤ 48px').toBeLessThanOrEqual(48);
   expect(m.cardsGrids, '同一节不许并存两种列表语法（行 + 复选卡网格）').toBe(0);
 });
