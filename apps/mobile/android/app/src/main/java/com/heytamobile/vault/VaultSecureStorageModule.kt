@@ -9,6 +9,9 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import org.json.JSONObject
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.security.MessageDigest
@@ -123,11 +126,23 @@ internal object VaultSecureStorage {
         return Base64.encodeToString(plain, Base64.NO_WRAP)
     }
 
-    /** The variable-length twin of [load]: same envelope, no root-key length check. */
+    /**
+     * The variable-length twin of [load]: same envelope, no root-key length check.
+     * A bad byte sequence must fail loudly (iOS does the same) — decoding it to
+     * U+FFFD would hand back a malformed JSON that the slot parser reads as an
+     * empty store and the next `set` overwrites, which is a silent key loss.
+     */
     fun loadBlob(preferences: android.content.SharedPreferences, serverOrigin: String, accountId: String): String? {
         val scope = Scope.of(serverOrigin, accountId)
         val plain = readPlain(preferences, scope) ?: return null
-        return String(plain, Charsets.UTF_8)
+        val decoder = Charsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableInput(CodingErrorAction.REPORT)
+        try {
+            return decoder.decode(ByteBuffer.wrap(plain)).toString()
+        } catch (error: CharacterCodingException) {
+            throw IllegalArgumentException("安全存储中的密钥料不是合法 UTF-8", error)
+        }
     }
 
     fun save(

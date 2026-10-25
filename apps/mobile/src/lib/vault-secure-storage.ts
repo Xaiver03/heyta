@@ -16,6 +16,8 @@
 import { readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
 const MODULE_NAME = 'HeytaVaultSecureStorage';
+/// 与 Swift/Kotlin 的 64 KiB blob 上限同源（那里数的是 UTF-8 字节，这里挡的是码元数）。
+const MAX_BLOB_CHARS = 64 * 1024;
 const REMEMBERED_UNLOCK_DISABLED_PREFIX = 'vault.rememberedUnlockDisabled:';
 const rememberedUnlockEpochs = new Map<string, number>();
 const rememberedUnlockDisabled = new Set<string>();
@@ -168,6 +170,12 @@ function requireNativeBlob(native: VaultSecureStorageNative | undefined): VaultS
 function requireBlobValue(value: string): string {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new TypeError('密钥料不能为空');
+  }
+  // JS 这半边按 UTF-16 码元数**先**挡一道：真实料是 base64+JSON（一码元一字节），
+  // 所以这就是原生那侧 UTF-8 字节上限的下界。原生仍然自己数一遍 —— 非 ASCII 时
+  // 字节数会更大，那道才是最终判决，这里只是不必让超限的字符串走一趟桥。
+  if (value.length > MAX_BLOB_CHARS) {
+    throw new TypeError(`密钥料超过 ${MAX_BLOB_CHARS} 上限`);
   }
   return value;
 }

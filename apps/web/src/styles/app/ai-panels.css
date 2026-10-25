@@ -1296,7 +1296,9 @@ input[type="radio"] {
  * 所以这里要补两件事：外层是一行（label 吃满、`?` 靠右），label 自己仍是
  * "方框 + 文字"的横排 —— 少了 `__toggle-hit` 那一条，方框会单独占一行。 */
 .ht-settings__toggle {
-  align-items: flex-start;
+  /* 行内顺序：`.ht-settings__toggle-hit`（标签 + 开关）→ `?`。
+     开关在 hit 的尾部（见下一条），所以视觉上仍然是"标签 …… ☐ ?"。 */
+  align-items: center;
   justify-content: space-between;
   gap: var(--ht-space-3);
 }
@@ -1304,7 +1306,15 @@ input[type="radio"] {
 .ht-settings__toggle-hit {
   display: flex;
   flex: 1;
-  align-items: flex-start;
+  /* 🔴 与其他设置行**同一套语法**：标签在左、控件在右。
+     2026-10-25 产品负责人对着「AI 与集成」说"排版混乱"—— 那一屏的每一行都是
+     "☐ 标签"，复选框抢在文字前面，而「任务与显示」那一屏是"标签 …… 控件"。
+     一屏两套语法，眼睛每翻一节就要重新学一次。
+     `row-reverse` 把 checkbox 挪到文字后面，`justify-content: space-between`
+     再把它推到行尾 —— 与 `preference-row` 的尾缘对齐。 */
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--ht-space-3);
   min-inline-size: 0;
   cursor: pointer;

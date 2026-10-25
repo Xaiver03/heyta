@@ -52,6 +52,18 @@ native save/load/remove 必须跨 wrapper 实例串行，登出同步推进 epoc
 隔离副本移除 native 队列后，“登出完成不残留原生 root”断言失败（1 failed / 11 skipped），
 不是测试初始化失败。生产源码未做临时变异，不干扰并行原生构建。
 
+> **2026-10-25 追加（只限定上面那句的适用范围，本文任何裁决未变）**：
+> 「RN port 只传递 base64 root key 到原生桥」这句今天只适用于 **root-key 那一对**（`load`/`save`，
+> 两端都校验"恰好 32 字节"，那句校验本身没动）。同一座原生桥 `HeytaVaultSecureStorage` 今天还有一条
+> **变长通道** `loadBlob`/`saveBlob`，装的是共享清单的密钥料（`heyta.share-keys.v1`，一份 vault 信封包裹的
+> 变长 JSON）—— 理由、判据与实测见 [ADR-0062 实施记录第 4 条](0062-shared-list-key-distribution.md)
+> 与[环境陷阱 #559](../reference/environment-traps.md)。
+> 两点连带口径：① 本节说的**跨 wrapper 实例串行**与 remembered-unlock fence 只覆盖 root-key 那一对，
+> blob 端口不经过那条队列（不同的 scope 格，且料本身已由 root key 派生的信封包裹）；
+> ② 那条"不写 SQLite、不写普通文件"的边界**照旧成立** —— blob 落的是 Keychain/Keystore，
+> 判据在 `apps/mobile/tests/share-key-store.spec.ts` 的"密钥料不落 device-prefs"那一条（去注释的源码文本尺）。
+> 该 spec 的条数别抄在这里，现量：`cd apps/mobile && npx vitest run tests/vault-secure-storage.spec.ts tests/share-key-store.spec.ts`。
+
 ## 拒绝的方案
 
 - 不在服务端保存可解密所有数据的托管恢复密钥；这会直接破坏 E2EE 的信任边界。
