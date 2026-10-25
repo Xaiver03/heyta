@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { addTask, openApp, rowFor } from './helpers';
+import { addTask, openApp, rowFor, switchView } from './helpers';
 
 const SHOT = (name: string) =>
   fileURLToPath(new URL(`../../apps/web/evidence/shell-sidebar-height/${name}.png`, import.meta.url));
@@ -117,10 +117,25 @@ test.describe('侧栏不许把主区顶得跳起来（H9 第二刀）', () => {
     await expect(sidebar, '侧栏没画出来 ⇒ 连清单都建不了，这一条没有基准').toBeVisible();
     // 创建表单是独立对话框：每次提交后对话框关闭，下一条从同一个侧栏入口打开。
     for (let i = 0; i < LIST_COUNT; i++) {
-      await sidebar.getByLabel('新建清单').click();
+      // 🔴 2026-10-25：`getByLabel('新建清单')` 现在会命中**两个**元素（严格模式报
+      // "resolved to 2 elements"）：侧栏那枚 `aria-label="新建清单"` 的按钮，**以及**
+      // 它打开的那个 `category-create-dialog`（对话框的 `aria-labelledby` 也解析成同一句）。
+      // 这不是产品缺陷，是这枚无障碍名在"触发器"与"对话框"上同形 —— 判据要的是触发器，
+      // 所以按角色收窄到 `button`。
+      await sidebar.getByRole('button', { name: '新建清单' }).click();
       await sidebar.locator('#ht-category-create-name').fill(`侧栏高度乙清单${String(i)}`);
       await sidebar.getByRole('button', { name: '创建清单' }).click();
     }
+
+    /*
+     * 🔴 2026-10-25 补一步（**还原前提**，不是改判据）：`新建清单`那个对话框建完之后
+     * 侧栏把当前范围切到**刚建的那条清单**上，而接下来 `addTask` 造的任务落的是**收集箱**
+     * ⇒ 它们不在当前范围里，`rowFor()` 一条都找不到（报的是"任务没渲染出来"）。
+     * 真浏览器实测：同一条任务在切回「任务」全量视图后就在。
+     * 这一句把范围重置回默认，与 `detail-pane-task` T15 里那句 `switchView(page,'任务')`
+     * 是同一个前提、同一句理由（那边注释写着"`seedListAndTag` 会新建一个清单……被筛到那个空清单上"）。
+     */
+    await switchView(page, '任务');
 
     const titles: string[] = [];
     for (let i = 0; i < TASK_COUNT; i++) {

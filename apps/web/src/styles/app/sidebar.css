@@ -34,6 +34,16 @@
   position: sticky;
   inset-block-start: 0;
   max-block-size: 100dvh;
+  /*
+   * 🔴 2026-10-25：**这一列必须自己参与层叠**，否则把手白给 z-index。
+   * `position: sticky` 会**建一个层叠上下文** ⇒ 把手身上的 `z-index` 只在这一列**内部**
+   * 有效；而这一列自己是 `z-index: auto`，在父层里按 DOM 顺序排在 `.ht-content` **之前**，
+   * 于是骑出去那半永远被内容盖住（实测 `elementsFromPoint(把手中心点)` 的栈里
+   * `div.ht-content` 在 `div.ht-sidebar__resizer` 上面）。
+   * 取 `--ht-z-sticky`（100）：高于内容，低于 dropdown/overlay/modal（200+）。
+   * 这一列有自己的网格列，抬高层级不会盖住别人的内容区。
+   */
+  z-index: var(--ht-z-sticky);
 }
 
 /* 这一列里真正滚的那一层。`min-block-size: 0` 是必须的：
@@ -61,6 +71,20 @@
 .ht-sidebar__resizer {
   position: absolute;
   inset-block: 0;
+  /*
+   * 🔴 2026-10-25（`sidebar-resize` / `shell-sidebar-height` X2 三枚红）：**必须参与层叠**。
+   *
+   * 这枚把手骑在列边界上（左右各 4px），而右半边落在 `.ht-content` 的地盘里。
+   * `.ht-sidebar` 是 `position: sticky`、`z-index: auto` ⇒ **不建层叠上下文**，
+   * 于是 DOM 里排在后面的 `.ht-content`（`position: relative`）把骑出去那半盖住：
+   * 实测 `elementFromPoint(把手中心点)` 命中的是 `div.ht-content`，`locator.click`
+   * 的日志写着"… intercepts pointer events"重试到 60 秒超时 —— 症状是"把手在那儿、拖不动"。
+   * 取证脚本读数（本机）：`handle box x=300..308`、`sidebar 宽 300`，中心点 304 命中 content。
+   *
+   * 用 `--ht-z-sticky`（100）而不是 popover（500）：它要比内容高一档、又要**低于**
+   * 菜单/浮层/弹层，否则拖拽时会盖住菜单的命中区。
+   */
+  z-index: var(--ht-z-sticky);
   /* 骑在边框上：左右各让一半，拖的时候不需要"精确压住那条 1px"。 */
   inline-size: var(--ht-space-2);
   inset-inline-end: calc(var(--ht-space-2) * -0.5);
