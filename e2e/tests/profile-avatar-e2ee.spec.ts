@@ -99,6 +99,18 @@ async function fakeServer(
     return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
   });
 
+  /*
+   * 🔴 2026-10-25：补两条**开机就会打**的读请求（这个 fixture 是**故意严格**的：
+   * catch-all 把没登记的一律记进 `unexpected`）。都是与本主题无关的惰性空态：
+   *   · `/api/announcements/active` —— 运营公告（`{ announcements: [] }` 是契约里的合法空态）
+   *   · `/api/auth/central/config` —— 中心认证入口探测（`{}` = 没有这项能力时的合法形状）
+   * 不补的话红起来读成"头像上传坏了"，实际是别人的接口进了 `unexpected`。
+   */
+  await page.route(`${SERVER}/api/announcements/active`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ announcements: [] }) }));
+  await page.route(`${SERVER}/api/auth/central/config`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+
   await page.route(`${SERVER}/api/account/profile**`, async (route) => {
     const method = route.request().method();
     if (method === 'GET') {
@@ -271,7 +283,13 @@ test('🔴 头像：口令缺失 → 真上传 → 刷新之后仍说"要先填�
   await selectSettingsSection(page, 'sync');
   const syncSection = page.getByTestId('sync-settings-panel');
   await syncSection.scrollIntoViewIfNeeded();
-  await syncSection.getByLabel(await zhValue('web.sync.password.label')).fill(PASSWORD);
+  /*
+   * 🔴 2026-10-25：按**元素 id** 定位，不用 `getByLabel`。`web.sync.password.label`
+   * 是「端到端加密口令」，而包着这枚 input 的 `<fieldset>` 的 `<legend>` 也是同一句话
+   * （`sync-encryption-title`）⇒ `getByLabel` 会同时命中 fieldset 与 input，
+   * 严格模式下报 `resolved to 2 elements`（读数与 `shell-sync-rail` S3 那次同一枚坑）。
+   */
+  await syncSection.locator('#sync-password').fill(PASSWORD);
   await syncSection.getByRole('button', { name: await zhValue('web.sync.saveAndSync') }).click();
   // 「保存并同步」不再关浮层（它本来就在浮层里）⇒ 回到顶部看头像那一节改口了没有。
   await selectSettingsSection(page, 'profile');

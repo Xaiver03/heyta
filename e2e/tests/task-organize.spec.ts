@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { addTask, metaFor, openApp, rowFor } from './helpers.js';
+import { addTask, metaFor, openApp, openRowTail, rowFor, switchView } from './helpers.js';
 
 /**
  * 任务整理：清单归属 + 标签（真浏览器，零 mock）
@@ -80,6 +80,14 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await sidebar.getByRole('button', { name: '创建标签' }).click();
     await expect(sidebar.getByText(TAG, { exact: true })).toBeVisible();
 
+    /*
+     * 🔴 2026-10-25（还原前提，不是改判据）：建清单/建标签之后侧栏会把当前范围切到
+     * **刚建的那一条**，而这条任务在收集箱里 ⇒ 它不在当前范围里，`rowFor()` 一条都找不到
+     * （红起来读成"任务没渲染出来"）。切回「任务」是真实用户回到任务列表的那一步，
+     * 与 `detail-pane-task` T15 / `shell-sidebar-height` X1 里那一句是同一个前提。
+     */
+    await switchView(page, '任务');
+
     // ── 挂到任务上 ────────────────────────────────────────────────────
     const row = rowFor(page, TITLE);
     await expect(row).toBeVisible();
@@ -93,6 +101,8 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await expect(metaFor(page, TITLE)).not.toContainText(LIST);
     await expect(row.getByTestId('task-chip-tag')).toHaveCount(0);
 
+    // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
+    await openRowTail(page, row);
     await row.getByTestId('task-organize-summary').click();
 
     await row.getByLabel(`任务「${TITLE}」所属清单`).selectOption({ label: LIST });
@@ -158,6 +168,8 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await expect(organizerRow(page, TAG).locator('[data-testid$="-count"]')).toHaveText('1');
 
     // 展开面板里控件的**状态**也要跟着回来（不只是那几个 chip 好看）。
+    // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
+    await openRowTail(page, afterReload);
     await afterReload.getByTestId('task-organize-summary').click();
     // 直接断言**被选中的那个 option 的文字** —— 比拿 value（清单 id）去比对
     // 更贴近"用户看到的是对的"，也少一次 await。
@@ -186,6 +198,8 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await expect(sidebar.getByText(TAG, { exact: true })).toBeVisible();
 
     const row = rowFor(page, title);
+    // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
+    await openRowTail(page, row);
     await row.getByTestId('task-organize-summary').click();
     const checkbox = row.getByRole('checkbox', {
       name: `给任务「${title}」加上或去掉标签「${TAG}」`,
@@ -219,6 +233,8 @@ test.describe('任务整理：清单归属 + 标签', () => {
     // 写 `[]` 的话 chip 也会消失，但下一次**加**标签的合并结果会不一样
     // （`[]` 是个真值，会在 reducer 的字段合并里继续占位）。
     const row2 = rowFor(page, title);
+    // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
+    await openRowTail(page, row2);
     await row2.getByTestId('task-organize-summary').click();
     await row2
       .getByRole('checkbox', {
@@ -241,6 +257,8 @@ test.describe('任务整理：清单归属 + 标签', () => {
       任务摘干净就没有了。
     */
     await expect(organizerRow(page, TAG).locator('[data-testid$="-count"]')).toHaveCount(0);
+    // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
+    await openRowTail(page, afterReload);
     await afterReload.getByTestId('task-organize-summary').click();
     await expect(
       afterReload.getByRole('checkbox', {
