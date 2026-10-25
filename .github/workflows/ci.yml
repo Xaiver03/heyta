@@ -49,6 +49,15 @@ jobs:
     steps:
       - name: 检出
         uses: actions/checkout@v7
+        with:
+          # 🔴 **必须全历史**（2026-10-25 的 CI 4 020 162 6180 红在这里）。
+          # `check:doc-citations` 把文档里的每个提交锚（`git show <sha>:` / 裸 SHA 引用）
+          # 当成判据，逐枚要求它**是本仓的提交对象**。而 checkout 默认 `fetch-depth: 1`
+          # ⇒ 只有最新一笔可见，一串老锚当场变成 "不是本仓的提交对象"，
+          # 报出来的是一枚**看着像文档写错**的红（`docs/research/performance-hotpaths-audit.md:1142`
+          # 的 f6478fad 在本机 `git cat-file -t` 是 commit，在浅克隆里根本不存在）。
+          # 仓库现在 10.3 MiB（见 docs/runbooks/ci-and-runner.md §9），全历史不痛。
+          fetch-depth: 0
 
       # 🔴 顺序不能反：pnpm 必须在 setup-node **之前**装好，
       # 否则 setup-node 的 `cache: pnpm` 找不到 pnpm，缓存直接失效。
