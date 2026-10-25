@@ -137,3 +137,30 @@ awk '/^#### 没关掉的边界/,0' docs/adr/0051-mobile-reminder-delivery.md \
 它既不是"当前看哪一条"也不是 5 类瞬态，而是从钥匙口取回来的"我是哪一行"；
 另有 `check:empty-state` / `check:mobile-renew-shape` / `check:text-color` / `check:rn-aria`
 与平台类红）。本线自己的闸门逐道绿。
+
+### 仓库体积与远端（2026-10-25 收口，**不需要人工操作**）
+
+**现状**：`gitee` 这个远端已经**拒绝一切推送**，原因不是这次的改动，是仓库本身超了它的配额：
+
+```
+remote: Repo size: 1209.512MB, exceeds quota 1024MB
+remote: Push rejected for repository [size exceeds limit]
+```
+
+实测过：连一个**指向已存在提交**的空分支都被同样拒绝（`probe-*` → `probe-test`），
+所以这不是"某一次 push 太大"，是仓库级的死锁。
+
+**体积构成**（`git rev-list --objects --all` 的现量，按 blob 大小排）：
+排在最前的是历史上被误提交的 `.pnpm-store/**`、`research/standalone/.npm-cache/**`
+（单个 10–39 MB，几十枚），其次是证据目录里的构建日志与 Playwright `trace.zip`。
+这些路径**今天都已在 `.gitignore` 里**，但历史里还在。
+
+**当前的处理（不需要人工）**：
+
+- `remote.pushDefault = origin`（GitHub）。⇒ 平时 `git push` 直接走 GitHub，
+  不会再去撞 Gitee 的那面墙；
+- `gitee` 远端**保留**（`git fetch gitee` 仍然可用），只是不再作为推送目标；
+- 要恢复 Gitee 镜像，只有一条路：**在 Gitee 侧把仓库 GC 一次**（或让历史瘦身到 1 GB 以内
+  后 force-push）。前者是对方的运维动作，后者要重写全部历史 —— 都不是 agent 能替它做的。
+
+⚠️ 别把"push 成功"读成"两边同步了"：**GitHub 是唯一在推进的远端**。
