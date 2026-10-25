@@ -56,11 +56,8 @@ type JoinPhase =
 
 export default function JoinShareScreen({
   onBack,
-  onJoined,
 }: {
   onBack: () => void;
-  /** 收口回调（宿主用它回共享主屏；web 的 `onJoined(projectId)` 在移动端的对偶）。 */
-  onJoined?: () => void;
 }): React.JSX.Element {
   const { t } = useI18n();
 
@@ -129,8 +126,13 @@ export default function JoinShareScreen({
       } finally {
         creatingRef.current.delete(shareId);
       }
+      // 🔴 到这一步就**停在成功面**，不许在同一拍里把这一屏换掉。
+      //    原来这里紧跟一句 `onJoined?.()`，宿主立刻 `setView('space')` ⇒ 那块写了
+      //    「加入成功，清单已出现在侧栏。」+「关闭」的 `done` 相位**一帧都没画过**
+      //    （2026-10-25 设备腿实测：旅程走到这里屏幕直接回到共享主屏，装置等那句等满 240s）。
+      //    回执是这一屏的最后一件事，由用户按「关闭」离开 —— 与 web 那侧同一个形状
+      //    （`JoinSharedListDialog` 的 `done` 相位也是"消息 + 关闭按钮"）。
       setPhase({ kind: 'done' });
-      onJoined?.();
     } catch (err) {
       if (err instanceof ShareApiError && (err.status === 403 || err.status === 404)) {
         setPhase({ kind: 'error', message: t('web.share.join.notMember') });
@@ -138,7 +140,7 @@ export default function JoinShareScreen({
       // 其余失败（比如信封还没落全）**不改相位**：留在等待态由下一条信号再试，
       // 这与 web 那一侧同一形状——它也不把"这一次没成"折成"出错了"。
     }
-  }, [listName, onJoined, t]);
+  }, [listName, t]);
 
   /**
    * 🔴 等待态一确立：**先登记 target，再等信封**（文件头那条自锁事故的正面写法）。
