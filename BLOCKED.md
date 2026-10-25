@@ -12172,3 +12172,20 @@ B229 修掉，这两条会一起绿。
 | `rail-roving` | `expect(...).toBe(true)` | 未查（dnd-kit Space 传感器与 roving tabindex） |
 | `task-organize` 第二条 | 刷新后 `task-organize-summary` 定位不到 | 未查完 |
 | `desktop-window` | **`Process failed to launch!`** | 环境：要真桌面窗口，这台机器上不该算红（要么给它写 skip 理由、要么在 CI 之外跑） |
+
+### B230 追记 2：`habit-heatmap-labels` HL2 的机制线索（下一轮从这里起手）
+
+读数：`「8月」左边缘 1008 不在它那一周 990 上`（差 **18px**）。
+标签那一枚在 `packages/ui/src/motivation/ActivityHeatmap.tsx:282-296`，它的 `marginLeft` 是一个
+**滚到最右时才生效的负边距**：
+
+    marginLeft: Math.min(0, (weeks.length - index) * (icon.xs + space.1) - space.1 - space.8)
+
+也就是"**离右边还剩多少格**"决定标签往左缩多少（防止最后一枚月份标签被裁）。
+⇒ 下一位要查两件事，别猜：
+① 量到的 +18 是不是"`space.8` 的宽度与某一周列宽不一致"（标签固定 `width: space.8`，
+   而格子列宽是 `icon.xs`/`space.1` 那一族算出来的）；
+② `panel` 里那两条读数（`labelBox` / `weekBox`）是不是取自**同一个滚动容器坐标系** ——
+   一个在 `styles.months`、一个在 `styles.grid`，两层都横向滚动，但它们的
+   `scrollLeft` 若有一帧不同步，读数就会差出一个格距的量级。
+⚠️ 这条是**真几何**：别用"允许 ±20px"这种放宽来收它（那就是把判据变成装饰）。
