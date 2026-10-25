@@ -819,6 +819,22 @@ async function expectRowIdentityNotClipped(list: Locator): Promise<void> {
 }
 
 test.describe('运营管理后台（真浏览器）', () => {
+  /*
+    🔴 中央身份配置：应用一启动就问一次（与后台无关）。
+    不桩它 ⇒ 请求会打到**生产域名** —— 没网时挂到超时、有网时真的出门，
+    而两种都不是本套件要验的事（`没登录` 那条更是直接读控制台报错）。
+
+    放在 `beforeEach` 而不是 `seed()` 里：`没登录` 那条**刻意不调 seed**，
+    它要演的正是"什么都没有"。桩必须与"有没有登录态"无关。
+  */
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/auth/central/config', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ mode: 'local', loginPath: '/api/auth/oidc/start', documentVersion: null }),
+    }));
+  });
+
   test('概览渲染出真实数字与金额（截图为证）', async ({ page }) => {
     const problems = captureProblems(page);
     await seed({ page });
