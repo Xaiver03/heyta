@@ -12002,3 +12002,18 @@ B227 的第一版就是被这一枚误读数带偏的（把"串行同样红"读�
 
 ⇒ 结论：**CI 的这条红与本会话的所有改动无关**，它每次 push 都会在同一环停住；
 在它落地之前，本线推任何东西拿到的都是同一条红。
+
+### B228 追记 2：`detail-pane-task` T4 的点击被吞（下一轮第一件事）
+
+失败形状不是"找不到"，是**点了没落到**：
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    - waiting for locator('.ht-note > summary').first()
+      - locator resolved to <summary class="ht-chip">…</summary>
+      - attempting click action          ← 停在这里
+
+`.ht-chip` 与 `.ht-note` 的 CSS 里都没有 `pointer-events: none`，所以不是"元素不可点"，
+而是**有东西盖在它上面**（900×600 下最可能是范围抽屉/详情列残影/行尾浮层）。
+下一轮取证方式：`page.evaluate` 拿 `document.elementFromPoint(中心点)` 打出真正接住点击的那个元素，
+再决定是判据该先 hover/收浮层，还是产品真有一层挡在前面。
+⚠️ 别用 `click({ force: true })` 绕过 —— 那会把"用户点不到"这件事一并测掉。
