@@ -162,10 +162,20 @@ export function OrganizerField({
    * 所以只看"有没有灰的"会永远算不出"没地方可去"，那一枚下拉就会一直亮着、
    * 而里面除了当前值什么都没有 —— 用户点开它看到的是一个只有一项的下拉框。
    */
+  /*
+   * 🔴 2026-10-25 修：判据写成"**除了它现在待的那一格以外**，还有没有能去的地方"。
+   *
+   * 上一版是 `inboxBlocked === false ? task.projectId === undefined : …`，也就是说
+   * **收集箱里的任务一律被灰掉** —— 而那恰好是"整理"这个动作最常见的主体
+   * （新任务先落收集箱，再归到清单里）。两条 e2e 就是这么红的：
+   * `detail-pane-task` 的 T14/T15 造了一条在收集箱的任务，然后 `selectOption` 一直等
+   * "visible and enabled"，报出来像"下拉坏了"，实际是它被这条判据关掉了。
+   * 单元判据当时**没有覆盖收集箱那一档**（只有共享任务与"个人任务在清单里"两档），
+   * 所以这个洞一路绿着过去了 —— 这一笔同时补上那一档。
+   */
   const moveUnavailable =
-    inboxBlocked === false
-      ? task.projectId === undefined
-      : options.every((option) => option.blocked || option.id === task.projectId);
+    options.every((option) => option.blocked || option.id === task.projectId) &&
+    (inboxBlocked || task.projectId === undefined);
 
   return (
     <>

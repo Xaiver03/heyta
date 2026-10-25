@@ -42,6 +42,29 @@ const paneEverywhere = (page: Page): Locator => page.getByTestId('task-pane');
 const paneInColumn = (page: Page): Locator => page.getByTestId('detail-column').getByTestId('task-pane');
 
 /** 元素**真实画得出来**吗（`toBeVisible` 的等价量，顺带把尺寸拿回来做几何判据）。 */
+/**
+ * 把某一行行尾那条「折叠的动作区」展开（`<details class="ht-compose-actions">`）。
+ *
+ * 🔴 2026-10-25：**这一步是真实用户路径，不是绕过**。行尾的 chip（备注 / 重复 / 截止 /
+ * 整理）现在住在 `.ht-compose-actions__panel` 里，而那一层**收起时 `opacity: 0`**：
+ * 节点有盒子、`summary` 的 `pointer-events` 也是 `auto`，但它不在命中栈里 ——
+ * 于是 `locator.click` 会一直重试到 60 秒超时，而报错长得像"这个 chip 有问题"。
+ * 取证（`document.elementsFromPoint`，1024 宽的排查脚本，已删）：chip 中心那一点的命中栈
+ * 只有 `div.ht-content / main.ht-main / …`，chip 那一层**根本不在里面**；
+ * 而它的祖先 `div.ht-compose-actions__panel` 现量 `opacity: 0`。
+ */
+async function openRowTail(page: Page, rowLocator: Locator): Promise<void> {
+  const trigger = rowLocator.locator('.ht-compose-actions__trigger').first();
+  if ((await trigger.count()) === 0) return;
+  const open = await rowLocator
+    .locator('.ht-compose-actions')
+    .first()
+    .evaluate((el) => (el as HTMLDetailsElement).open)
+    .catch(() => false);
+  if (!open) await trigger.click();
+  await expect(rowLocator.locator('.ht-compose-actions__panel').first()).toHaveCSS('opacity', '1');
+}
+
 async function paintedBox(page: Page, locator: Locator) {
   await expect(locator, '界面上找不到这个元素').toBeVisible();
   const box = await locator.boundingBox();
@@ -258,6 +281,7 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     /* 🔴 那颗 chip 是一个 `<details>`：**收起时框在 DOM 里但画不出来**（第一趟就是把这条
        判成"hidden"红的，红的是探针不是产品 —— 判"能写"必须走到用户真会走的那一步）。
        点开它，框才必须真画得出来。 */
+    await openRowTail(page, page.locator('[data-testid^="task-item-"]').first());
     await page.locator('.ht-note > summary').first().click();
     await paintedBox(page, fieldEverywhere(page));
     await fieldEverywhere(page).fill('窄档也写得进去');
@@ -367,6 +391,8 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     await expect(paneEverywhere(page), '窄档不该画面单').toHaveCount(0);
     const trigger = page.getByTestId('task-repeat-summary');
     await expect(trigger, '窄档下行尾没有重复入口 ⇒ "设不了重复"').toHaveCount(1);
+    // 行尾动作区收起时 `opacity: 0`、不在命中栈里（见 `openRowTail` 的理由）。
+    await openRowTail(page, page.locator('[data-testid^="task-item-"]').first());
     await trigger.first().click();
 
     // ⚠️ `<details>` 收起时面板在 DOM 里但不画得出来（§8.138 T4 同一件事）：
@@ -779,6 +805,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     /* 🔴 定位走**行内**那颗 summary（它带 `aria-label` = 「设置任务「…」的截止日期」），
        与 T9/T11 同一条理由：尾部动作是行体的兄弟节点，而 Portal 出去的面板会把
        **别的**日子写进 DOM。 */
+    await openRowTail(page, page.locator('[data-testid^="task-item-"]').first());
     const summary = page.getByLabel('设置任务「窄档截止乙」的截止日期');
     await expect(summary, '窄档下行尾没有截止入口 ⇒ "改不了截止"').toHaveCount(1);
     const box = await paintedBox(page, summary.first());
@@ -963,6 +990,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     // 🔴 窄档要量的东西**全在行尾**（触发器、`<details>` 里的下拉与复选框、chip），
     //    所以这一档从头到尾用整行 `task-item-*`（见上面 `rowItemOf` 的注释）。
     const row = rowItemOf(page, '整理窄档乙');
+    await openRowTail(page, row);
     const summary = row.getByTestId('task-organize-summary');
     await expect(summary, '窄档行尾没有整理入口 ⇒ 回落丢了，这一档根本归不了类').toHaveCount(1);
     /* 🔴 阈值从**触发器自己画的那枚图标**推导，不是我挑的字面量。
