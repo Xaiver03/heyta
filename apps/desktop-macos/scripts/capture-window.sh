@@ -37,7 +37,14 @@ rm -f "$OUT" "$OUT.txt"
 
 echo "=== 构建 ==="
 cd "$SHELL_DIR"
-swift build 2>&1 | grep -E "error:|Build complete" | awk '{print "  " $0}'
+# 2026-10-25：`sandbox-exec` 在**已有沙箱**里套不上（`sandbox_apply: EPERM`），
+# 而 SwiftPM 编译清单必须经它 ⇒ 会报成 `error: Invalid manifest`（看着像清单坏了）。
+# 探针只在这一处实现，见 `scripts/swift-sandbox-flag.sh` 的文件头。
+SWIFT_SANDBOX_FLAG="$(bash "$SHELL_DIR/scripts/swift-sandbox-flag.sh")"
+if [ -n "$SWIFT_SANDBOX_FLAG" ]; then
+  echo "  ⚠️ 本环境套不上限制性 sandbox profile ⇒ 本趟 swift build 带 --disable-sandbox"
+fi
+swift build $SWIFT_SANDBOX_FLAG 2>&1 | grep -E "error:|Build complete" | awk '{print "  " $0}'
 
 echo ""
 # 🔴 **桥的默认值**（2026-09-30 补）：取证跑的通常是**裸 SwiftPM 可执行文件**，

@@ -94,7 +94,36 @@ if (used.length < 5) {
 console.log(`✅ macOS 壳消费设计系统生成物：命中 ${used.length}/${TOKEN_USAGES.length} 个断言项。`);
 
 // ③ 无头冒烟。**继承 stdio**，让每条断言直接出现在门禁输出里。
-const smoke = spawnSync('swift', ['run', 'heyta-smoke'], {
+//
+// 🔴 为什么冒烟要带 `--disable-sandbox`（2026-10-25）：SwiftPM 编译 `Package.swift`
+//    时必须经 `sandbox-exec` 套一层限制性 profile，而**已经在沙箱里**再套会
+//    `sandbox_apply: Operation not permitted` ⇒ 报成 `error: 'desktop-macos': Invalid manifest`。
+//    症状指向"清单写坏了"，实际是环境；本门禁曾经因此在这一层红，而代码一个字没错。
+//    探针只在 `apps/desktop-macos/scripts/swift-sandbox-flag.sh` 里实现一处
+//    （`package-app.sh` / `capture-window.sh` / 本文件三个消费者共用）。
+//    探得过就一个参数都不加；探不过才加 —— 不在能用的机器上放宽任何东西。
+const sandboxProbe = spawnSync(
+  'bash',
+  [join(PACKAGE_DIR, 'scripts/swift-sandbox-flag.sh')],
+  { encoding: 'utf8' },
+);
+const sandboxFlag = (sandboxProbe.stdout ?? '').trim();
+if (sandboxProbe.status !== 0) {
+  console.error(`❌ sandbox 探针本身跑不了（exit ${sandboxProbe.status}）：${sandboxProbe.stderr ?? ''}`);
+  process.exit(1);
+}
+if (sandboxFlag) {
+  console.log(`⚠️ 本环境套不上限制性 sandbox profile（sandbox_apply EPERM，多为继承来的沙箱）⇒ 本趟 swift run 带 ${sandboxFlag}`);
+}
+
+// ⚠️ 开关必须紧跟在 `run` 后面，**不能放在可执行名之后** —— 那样 SwiftPM 会把它
+//    当成传给被跑程序的 argv（`swift run heyta-smoke --disable-sandbox` 静默无效，
+//    清单编译照旧被 sandbox_apply EPERM 打死）。2026-10-25 实测踩过这一下。
+const smokeArgs = ['run'];
+if (sandboxFlag) smokeArgs.push(sandboxFlag);
+smokeArgs.push('heyta-smoke');
+
+const smoke = spawnSync('swift', smokeArgs, {
   stdio: 'inherit',
   cwd: PACKAGE_DIR,
   env: { ...process.env, HEYTA_BRIDGE_BUNDLE: BUNDLE },

@@ -86,9 +86,12 @@ bash "$SHELL_DIR/scripts/sync-tokens.sh" || { echo "🔴 同步设计系统生�
 #    不加这个开关，这条路 100% 走不下去，而没有任何环境变量救得回来。
 # ⚠️ bash 3.2 下 `set -u` 与空数组的 `"${arr[@]}"` 同现即 unbound variable
 #    （本仓库一律按 bash 3.2 写）⇒ 用标量 + 非引用展开，空串会被词分割吃掉。
-SWIFT_SANDBOX_FLAG=""
-if ! sandbox-exec -p '(version 1)(deny default)(allow file-read*)' /bin/echo >/dev/null 2>&1; then
-  SWIFT_SANDBOX_FLAG="--disable-sandbox"
+#
+# 2026-10-25：探针搬进 `scripts/swift-sandbox-flag.sh`。原来这里是**第二份实现** ——
+#   `capture-window.sh` 与 `check-macos-shell.mjs` 各自没沾上，于是同一个环境里
+#   "能打包、两条门禁都红"。同一条规则三个消费者，只有一处拿到开关＝必然漂移。
+SWIFT_SANDBOX_FLAG="$(bash "$SHELL_DIR/scripts/swift-sandbox-flag.sh")"
+if [ -n "$SWIFT_SANDBOX_FLAG" ]; then
   echo "  ⚠️ 本环境套不上限制性 sandbox profile（sandbox_apply EPERM，多为继承来的沙箱）⇒ 本趟 swift build 带 --disable-sandbox"
 fi
 swift build -c release --product HeytaMac $SWIFT_SANDBOX_FLAG 2>&1 | grep -E "error:|warning:|Build complete" | awk '{print "  " $0}'
