@@ -2442,6 +2442,7 @@ export const en = {
   'web.memory.evidence.feedbackKeepRatioTrimmed': 'Based on {adopted} accepted suggestions, you usually keep only {percent}% - the AI gives you too much',
   'web.memory.evidence.feedbackKeepRatioPartial': 'Based on {adopted} accepted suggestions, you usually keep about {percent}% of the items',
 
+  'web.memory.offShort': 'Memory is off',
   'web.memory.off': 'Memory is off - heyta does not infer your preferences, and AI receives nothing about who you are. AI features still work as usual.',
   'web.memory.known.title': 'What I have learned about you',
   'web.memory.known.empty': 'I do not know you well yet. After a while, habits I summarise from your own data will show up here.',

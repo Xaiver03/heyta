@@ -78,6 +78,14 @@ const CARRIER_MARKERS = [
   'role="status"',
   'aria-live',
   'data-settings-disclosure',
+  /*
+   * `data-settings-readout`：**读数**（数字/计数/设备状态那种"这一行是数据"）。
+   * 它与"说明"的区别不是长短，而是**有没有可被读出的信息**：
+   * "共 1,234 条实体 / 56 条已删除"是数据（再短再长都该在），
+   * "记忆已关闭 —— heytа 不会推断你的偏好……"是解释（再短也只是把句子缩短）。
+   * 标了它就等于声明"这是数据"，判据不再按长度猜。
+   */
+  'data-settings-readout',
 ];
 
 function loadZhLocale() {
@@ -165,7 +173,14 @@ function findLongCopy(text, zh) {
       const value = zh.get(key);
       if (value === undefined || value.length < PROSE_MIN_CHARS) continue;
       const tag = carrierContext(lines, index);
-      if (CARRIER_MARKERS.some((marker) => tag.includes(marker))) continue;
+      /*
+       * 第二臂的例外**比第一臂窄**：`role="status"` 在这里不算载体。
+       * 理由：一句 63 字的"记忆已关闭 —— heytа 不会推断你的偏好……"写在
+       * `role="status"` 里仍然是那句话，用户看到的还是四行小字。
+       * 状态位只允许**短的**（≤ 阈值）或**动态的**（`{变量}`，不是 `t('键')`）。
+       */
+      const copyCarriers = CARRIER_MARKERS.filter((marker) => marker !== 'role="status"');
+      if (copyCarriers.some((marker) => tag.includes(marker))) continue;
       if (isFeedbackCopySite(lines, index, raw[index], raw[index - 1])) continue;
       hits.push({ line: index + 1, text: `${key} (${value.length} 字)`, kind: 'long-copy' });
     }

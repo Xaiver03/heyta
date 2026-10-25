@@ -791,7 +791,7 @@ export function AiSettings({
               ⚠️ 安全侧没变：发不发出去仍由**「允许远程端点」那道闸**裁决
               （关着就一个请求都不发），所以改默认值不会让谁的内容悄悄出门。
             */}
-            <legend className="ht-settings__h3 ht-type-headline">
+            <legend className="ht-settings__h3 ht-type-row-title">
               {t('web.ai.settings.supply.title')}
               <SettingsInfoTip
                 testId="tip-ai-supply"
@@ -862,7 +862,7 @@ export function AiSettings({
             data-testid="ai-endpoints-section"
             data-focused={focused === 'endpoints' ? 'true' : undefined}
           >
-            <h3 className="ht-settings__h3 ht-type-headline">
+            <h3 className="ht-settings__h3 ht-type-row-title">
               {t('web.ai.settings.endpoints.title')}
               {/*
                 这一段原先是**贴在标题下面的一整坨**（"heyta 会提供统一云端 AI…这一步会把内容
@@ -1160,7 +1160,7 @@ export function AiSettings({
               focused === 'capability' || focused === 'consent' ? 'true' : undefined
             }
           >
-            <h3 className="ht-settings__h3 ht-type-headline">
+            <h3 className="ht-settings__h3 ht-type-row-title">
               {t('web.ai.settings.features.title')}
               <SettingsInfoTip
                 testId="tip-ai-features"
@@ -1273,7 +1273,7 @@ export function AiSettings({
               "一次性并集披露"：多步循环中途不再逐步征求同意（那会变成用户
               无脑点下去的疲劳闸门），所以这里说的必须是**这一次最多会送出的全部**。 */}
           <section className="ht-settings__section" data-testid="ai-assistant-section">
-            <h3 className="ht-settings__h3 ht-type-headline">
+            <h3 className="ht-settings__h3 ht-type-row-title">
               {t('web.ai.assistant.title')}
               <SettingsInfoTip
                 testId="tip-ai-assistant"
@@ -1344,7 +1344,7 @@ export function AiSettings({
       <section className="ht-settings__section" aria-labelledby="local-api-heading">
         <div className="ht-ai-settings__section-head">
           <div>
-            <h3 className="ht-settings__h3 ht-type-headline" id="local-api-heading">
+            <h3 className="ht-settings__h3 ht-type-row-title" id="local-api-heading">
               {t('web.ai.settings.localApi.title')}
               <SettingsInfoTip
                 testId="tip-local-api"
@@ -1528,7 +1528,11 @@ export function AiSettings({
 
       <p className="ht-settings__notice" role="status" data-testid="key-notice">
         <Lock size={ICON_SIZE.xs} aria-hidden="true" />
-        {t('web.ai.settings.keyNotice')}
+        <SettingsInfoTip
+          testId="tip-ai-key-notice"
+          label={t('web.ai.settings.keyNotice')}
+          text={t('web.ai.settings.keyNotice')}
+        />
       </p>
 
       {/*

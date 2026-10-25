@@ -256,7 +256,7 @@ export function AdminPanel({
     >
       {!bareChrome && (
         <>
-          <h3 className="ht-settings__h3 ht-type-headline">
+          <h3 className="ht-settings__h3 ht-type-row-title">
             <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.admin.title')}
           </h3>
           <p className="ht-settings__hint">{t('web.admin.lead')}</p>

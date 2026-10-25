@@ -94,7 +94,7 @@ export function ImportPanel(): React.JSX.Element {
       {/* 没有 h2、没有 intro（2026-10-24 禁令）：节标题旁那枚 `?` 已经说明这一页。 */}
 
       <section className="ht-settings__section" aria-labelledby="import-file-title">
-        <h3 id="import-file-title" className="ht-settings__h3 ht-type-headline">
+        <h3 id="import-file-title" className="ht-settings__h3 ht-type-row-title">
           <Upload size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.import.fileLabel')}
         </h3>
         <div className="ht-settings__actions">

@@ -191,7 +191,8 @@ main() {
     scp -q "$APK" "$HOST:/tmp/heyta-sub.apk" || { bad "传不上去"; exit 1; }
     rsh "adb uninstall $PKG" >/dev/null 2>&1
     rsh "adb install -r -d /tmp/heyta-sub.apk" 2>&1 | tail -1
-    ok "已从当前产物重装（$(basename "$APK")，$(stat -f%z "$APK") 字节）"
+    # 同一条理由：stat 的 BSD 形状 `-f` 在 Linux 上取到空串而不是报错。
+    ok "已从当前产物重装（$(basename "$APK")，$(wc -c < "$APK" | tr -d ' ') 字节）"
   fi
 
   rsh "adb shell am force-stop $PKG" >/dev/null 2>&1

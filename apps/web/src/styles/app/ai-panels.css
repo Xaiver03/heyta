@@ -989,7 +989,7 @@ input[type="radio"] {
      "这个也没有会话栏的分界线"。参考（DeepSeek / macOS 分栏）里，栏与栏之间
      一定有一条 1px 的弱线：它回答的是"哪一列属于谁"，不是装饰。
      用 `--ht-color-border-subtle`：分栏线要能看见，但不该抢过标题。 */
-  border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border);
 }
 
 .ht-ai__history-head {

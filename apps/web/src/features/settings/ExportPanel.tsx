@@ -96,7 +96,7 @@ export function ExportPanel({
       */}
 
       <section className="ht-settings__section">
-        <h3 className="ht-settings__h3 ht-type-headline">
+        <h3 className="ht-settings__h3 ht-type-row-title">
           <FileJson size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.json.label')}
           <SettingsInfoTip
             testId="tip-export-json"
@@ -118,7 +118,7 @@ export function ExportPanel({
       </section>
 
       {!onlyJson && <section className="ht-settings__section">
-        <h3 className="ht-settings__h3 ht-type-headline">
+        <h3 className="ht-settings__h3 ht-type-row-title">
           <FileText size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.markdown.label')}
           <SettingsInfoTip
             testId="tip-export-markdown"
@@ -145,7 +145,7 @@ export function ExportPanel({
       </section>}
 
       {counts !== undefined && (
-        <p className="ht-settings__hint" role="status" data-testid="export-counts">
+        <p className="ht-settings__hint" role="status" data-settings-readout="true" data-testid="export-counts">
           {t('web.export.counts', {
             entities: counts.totalEntities,
             deleted: counts.totalDeleted,

@@ -58,7 +58,11 @@
 
 判据：`ht-settings__*hint* / *note* / *lead*` 任何容器 = 违规。三条例外（必须显式标注）：
 **反馈**（`role="alert"` / `aria-live` / `danger` / testid 带 failure\|status）、
-**ADR-0054 §7 的出境披露**（`data-settings-disclosure`）、**报告分组标题**（`ht-settings__h4`）。
+**ADR-0054 §7 的出境披露**（`data-settings-disclosure`）、**读数**（`data-settings-readout`，
+"共 1234 条实体"这种是数据、不是解释）、**报告分组标题**（`ht-settings__h4`）。
+⚠️ 第二臂**不认** `role="status"` 当载体：一句 58 字的"记忆已关闭 —— …"放进状态位仍然是那四行小字。
+另有两条显式逃逸口，都要求写明理由：`// settings-prose-ok: <理由>`（写在那一行或上一行）与
+`data-settings-readout`。
 
 ⚠️ 两个坑：容器**名字**带这三个词就中招（纯容器要改名，本轮把 `…__sub-footnote` → `…__sub-about`、
 `…__help-note` → `…__help-line`、`…__hint-line` → `…__action-line`）；账本只许变小，
@@ -66,13 +70,13 @@
 
 ---
 
-## 三、现在的读数（2026-10-24 收尾真跑过）
+## 三、现在的读数（2026-10-24 收尾真跑过；第二轮清完「说明文字」之后又跑了一遍）
 
 | 判据 | 命令 | 读数 |
 | --- | --- | --- |
-| 设置界面禁内联说明 | `pnpm check:settings-prose` | **0 处**（账本 0） |
-| Web 单测 | `cd apps/web && ./node_modules/.bin/vitest run` | **2491 passed / 0 failed**（198 文件） |
-| 移动端单测 | `cd apps/mobile && ./node_modules/.bin/vitest run` | **1094 passed / 0 failed** |
+| 设置界面禁内联说明 | `pnpm check:settings-prose` | **0 处**（账本 0，两臂都跑） |
+| Web 单测 | `cd apps/web && ./node_modules/.bin/vitest run` | **2542 passed / 2 failed** —— 两条都长在并行线的 `admin-console-route` / `admin-panel`，与本轮无关 |
+| 移动端单测 | `cd apps/mobile && ./node_modules/.bin/vitest run` | **1119 passed / 0 failed** |
 | 真浏览器（设置面） | `cd e2e && playwright test tests/renew-panel.spec.ts tests/ai-panel-layout.spec.ts tests/profile-avatar-e2ee.spec.ts` | **10 passed** |
 | 设置面整族走查 | `HEYTA_RESPONSIVE_LEGS=groups pnpm verify:web-ui-sweep` | `rig_rc=0`、25 张证据图 |
 | 桌面包里有订阅 | `grep -c settings.nav.subscription /Applications/Heyta.app/Contents/Resources/web-dist/assets/index-*.js` | **2** |
@@ -88,10 +92,22 @@
 
 ## 四、还没做完（按顺序）
 
-1. **移动端真机/模拟器读数**（唯一真正的缺口）：`pnpm verify:mobile-*`（`docs/agents/commands.md`）。
+0. **移动端的说明文字还只清了一半**：本门第二臂**只跑 Web**（`apps/web/src/features/{settings,subscription,sync}` + `App.tsx`）。
+   移动端那些 40 字以上的静态句子还在 20 多个 screen 里（`ProfileScreen` / `SecurityScreen` / `SessionsSection` /
+   `ReminderDeliverySection` / `PrivacyConsentSheet` …），其中一半是**反馈或法务文本**，要按屏逐块判。
+   把第二臂开到 `apps/mobile/src/screens/**` 会一次冒出约 40 处，读数见
+   `node scripts/check-settings-no-prose.mjs --json`（改 `copyArmApplies` 即可试）。
+1.5 **头像要口令 → 产品负责人已拍「A. 钥匙进系统钥匙串」**（2026-10-24，回答"为什么换个头像都要口令？？？"时选的）。
+   现状：头像在服务端只有密文（ADR-0073，法务表 E「没有任何生物特征模板离开你的设备」靠这条）；
+   解它的钥匙是**本次会话**的 vault 钥匙，而 ADR-0040 §7.2 规定 Web 端口令不落盘 ⇒ 每开一次应用都是锁的，
+   于是「换头像」和「同步」都会先要口令。A 的落法（ADR-0040 §3.2 D2 本来就留的那条路）：
+   钥匙串里按 `service=cloud.finlaw.heyta.<shell>` / `account=<accountId>` 存一把包装后的根钥匙，
+   启动时静默 adopt；Web 浏览器没有可信存储，行为不变（仍每次要口令）。
+   要新写一份 ADR（**不能改 ADR-0073 的结论**），并在 `packages/app-host` 落一个可测的 `KeyStore` 契约。
+2. **移动端真机/模拟器读数**（唯一真正的缺口）：`pnpm verify:mobile-*`（`docs/agents/commands.md`）。
    「订阅」一节与 `SettingsInfoTip` 目前只有**源码形状 + 单测**判据
    （`apps/mobile/tests/subscription-section.spec.ts` 5 条，其中 2 条是变异臂），**没有设备读数**。
-2. **公证**：这一趟是 `HEYTA_SKIP_NOTARIZE=1` ⇒ **不许**声称"已公证"。
+3. **公证**：这一趟是 `HEYTA_SKIP_NOTARIZE=1` ⇒ **不许**声称"已公证"。
    要公证：不带那个变量再跑一次 `package-app.sh`（无上界的等待要自己看着）。
 3. **四端重装 / 其它壳**：`docs/agents/multi-end-build.md` 的固定收尾。
 4. **可售的最后一步在部署侧**：`server/.env` 缺 `PAYCENTER_*` 与 `MANAGED_AI_*`（¥12 要后者）。
