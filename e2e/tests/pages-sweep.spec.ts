@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp } from './helpers';
+import { openApp, switchView } from './helpers';
 
 /**
  * 页 8 逐页排版扫描（goal-layout-audit.md 页 8）
@@ -16,8 +16,15 @@ import { openApp } from './helpers';
  * 现在走共享层那一份（6 个全开 = 它的超集）—— 抄件一定会漂。
  */
 
-async function open(page: import('@playwright/test').Page, tabName: string): Promise<void> {
-  await page.getByRole('tab', { name: tabName }).click();
+/**
+ * 🔴 切视图走 `switchView`（helpers 里那一处收口），不要自己 `getByRole('tab')`：
+ * W1（2026-10-06）把 rail 收成「主段 ≤4 + 更多」之后，低频目的地（时间线 / 番茄钟 /
+ * 成长 / 便签）**不在 tablist 里** —— 它们在「更多」菜单（宽档 `role="menuitem"`、
+ * 塌缩档 `#compact-rail-destinations` 面板）里。这一组 4 条就是这么红的：
+ * `waiting for getByRole('tab', { name: '便签' })`，看着像"视图打不开"。
+ */
+async function open(page: import('@playwright/test').Page, tabName: Parameters<typeof switchView>[1]): Promise<void> {
+  await switchView(page, tabName);
 }
 
 // ⚠️ rail 上那个 tab 的措辞是「番茄钟」（`web.shell.views.focus`），不是「专注」。
