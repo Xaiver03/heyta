@@ -1,10 +1,13 @@
 /**
  * 移动端 share 密钥落盘端口的验收（两半式，本壳惯例）：
  *
- * 1. **值导入**：`createShareKeyStoragePort` 喂假 `VaultSecureStorage`（Map 实现），
+ * 1. **值导入**：`createShareKeyStoragePort` 喂假 `VaultSecureBlobStorage`（Map 实现），
  *    钉住"落在哪一格、槽内形状、坏槽降级、remove 清槽"这些真行为 —— 测试不碰原生模块。
  * 2. **去注释的源码文本**：钉住反向判据（不许把密钥料写进 device-prefs、
- *    不许在外壳里长出第二份判定本体/键名字面量）。不先剥注释，`not.toMatch` 会假绿。
+ *    不许在外壳里长出第二份判定本体/键名字面量、**不许走 root key 那对恰好 32 字节的接口**）。
+ *    最后那条是 2026-10-25 iOS 旅程实测换来的：夹具喂假 vault，那条契约只有真机撞得出来，
+ *    这一半能钉的只有"走的是哪一对接口"这个形状。
+ *    不先剥注释，`not.toMatch` 会假绿。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,17 +22,17 @@ import {
   shareKeyStoreScope,
 } from '../src/lib/share-key-store';
 import { SHARE_KEY_STORAGE_PORTABLE_KEY } from '@heyta/app-host';
-import type { VaultSecureStorage, VaultSecureStorageScope } from '../src/lib/vault-secure-storage';
+import type { VaultSecureBlobStorage, VaultSecureStorageScope } from '../src/lib/vault-secure-storage';
 
 import { read, stripComments } from './source-reading';
 
 const SCOPE: VaultSecureStorageScope = { serverOrigin: 'https://sync.example.test', accountId: 'account-1' };
 
-/** 假原生：每个 (serverOrigin, accountId) 一格 —— 与 `VaultSecureStorage` 同契约。 */
+/** 假原生：每个 (serverOrigin, accountId) 一格 —— 与 `VaultSecureBlobStorage` 同契约。 */
 const makeVault = () => {
   const slots = new Map<string, string | undefined>();
   const slotKey = (scope: VaultSecureStorageScope) => `${scope.serverOrigin}\u0000${scope.accountId}`;
-  const vault: VaultSecureStorage = {
+  const vault: VaultSecureBlobStorage = {
     async load(scope) { return slots.get(slotKey(scope)); },
     async save(scope, value) { slots.set(slotKey(scope), value); },
     async remove(scope) { slots.delete(slotKey(scope)); },
@@ -105,5 +108,10 @@ describe('mobile share-key 端口 · 源码文本那半', () => {
   it('端口实现确实吃 vault-secure-storage 的既有 scope 惯例', () => {
     expect(src()).toMatch(/vault-secure-storage/);
     expect(src()).toMatch(/ShareKeyStoragePort/);
+  });
+
+  it('🔴 密钥料走 blob 通道，不走 root key 那对恰好 32 字节的接口', () => {
+    expect(src()).toMatch(/getVaultSecureBlobStorage/);
+    expect(src()).not.toMatch(/getVaultSecureStorage\b/);
   });
 });
