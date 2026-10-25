@@ -11774,3 +11774,64 @@ B216 那一行进库之后，本线在新隔离载具 `.worktrees/inb-t10`（`gi
 ⑤ ⚠️ **一格读数别读错**：本批的 `pnpm --filter @heyta/mobile typecheck` 是 **rc=2**，9 条错**全在别线的两枚未跟踪文件**（`src/lib/reminder-delivery-display.ts` 2 条、`src/screens/ReminderDeliverySection.tsx` 7 条；它们缺的导出在别线的 stash 里），**本线文件零错**。⇒ 本线这一批的"绿"是**逐包单测 + 本线文件零错**那个形状，**不是**"整包 typecheck rc=0"；在别线把那两枚未跟踪件处理掉之前，谁跑整包都会撞同一枚假红。复量：`pnpm --filter @heyta/mobile typecheck 2>&1 | grep -E "error TS" | sed -E 's/\(.*//' | sort | uniq -c`。
 ⑥ **一条与本条同形的旧账又被命中**：共享检出上"脏/干净"读数必须带 `pwd` 现取、别抄上一戳 —— 这条早已在长期记忆的「共享检出、git 与并发」族里；本条只是它**第 N 次**发作，而且这次连"谁动了我的树"都查不到常规证据。要防的是**行为**（共享检出上不用裸 stash / 不用 `-a` 扫别人改动），**判据口径不在本线自取**（要装成门禁得负责人拍）。
 ⑦ 本条只动 `BLOCKED.md` 一枚（纯追加：现量 `git diff --numstat -- BLOCKED.md` 删列 **0**）；同笔另入 `docs/plans/collaboration-shared-lists-handoff.md`（交接书，本线新文件）与 `docs/plans/README.md`（只加一行指针，状态不复述）。git config 零处、历史零重写、零 force push、`stash@{0}` 零改动、判卷口径零处新增、AC 已勾数现量 **0**。
+
+## B226（2026-10-25，本会话 · 修红门禁那一趟）：**单步工具面板早就被并进助手面了，而四条 spec 还指着它** —— 三条退役、两条改判据对象
+
+### 症状（不是环境）
+
+`pnpm check` 的 `check:ai-e2e` 那一段里，`ai-tool-run.spec.ts`（3 条）与
+`ai-row-layout.spec.ts`（2 条）红在 `getByTestId('ai-tool-run')` / `ai-tool-run-button` 找不到。
+第一反应容易读成"载体没起来"（同批确实还有一次 `ECONNREFUSED` 把整轮判作废），
+但单独跑同一份 spec 时失败信息是 **`element(s) not found`**，不是连接错。
+
+### 根因（一句话：被测物不在了，判据还在）
+
+2026-10-10 的外壳重写 `63e61f237`（"产品体验线 + 全局响应式"）把 `App.tsx` 的
+`aiPanels` 从「单步工具 + 对话助手」改成**只有助手**。这不是漏删，是**有意的产品裁决**，
+理由逐字写在 `apps/web/src/styles/app/ai-panels.css:799-802`：
+
+> AI Agent 是一个连续的聊天面。工具执行属于对话中的过程状态，
+> 不再与聊天并列成两个需要用户选择的入口。
+
+那次重写同笔改了 `apps/web/src/App.tsx`，所以 `git log -S"AiToolRun" -- apps/web/src/App.tsx`
+能直接指到它。而 `e2e/tests/ai-tool-run.spec.ts` 等四条**没有跟着改** —— 从那以后它们一直红。
+
+### 为什么可以退役（能力没丢）
+
+三条判据在**现存面**上都有对应守卫：
+
+| 退役的判据 | 现存载体 |
+|---|---|
+| 规则命中 ⇒ 一个字节都不发 | `e2e/tests/ai-assistant.spec.ts:69`「披露前零出境 → 多步读循环」 |
+| 模型那条先披露后出境 | 同上 |
+| 写工具只出提案：确认前不落库、确认后不再出境 | `e2e/tests/ai-assistant-atomic-tools.spec.ts:112`「助手高风险写工具：提案与 op 原子性」 |
+
+⇒ 所以这不是"删掉三条守不住的门"，是"把守卫挪到被测物还在的地方"。⚠️ 但**句法不同**：
+上面那两枚是助手面上的断言，不是单步面的逐条复制；谁要更强的等价，得自己再补。
+
+### 处置（本轮实际做了什么）
+
+1. `e2e/tests/ai-row-layout.spec.ts`：判据对象从 `ai-tool-run` 换成 `ai-agent-surface`，
+   **保留**两条还成立的几何判据（不与采集条相交 / 宽窗在右栏内、窄窗退回中间列），
+   并把退役的那一条（「运行」按钮 height < 56，防竖折）**显式写进文件头说明它为什么没了** ——
+   不换一条代理判据假装还在守。
+2. `e2e/tests/ai-tool-run.spec.ts`：文件保留 + 文件头写清退役理由与两条出路，
+   在 `e2e/playwright.config.ts` 的 `testIgnore` 里退役（与 `privacy-consent-zero-egress` /
+   `auth-simple-ux` / `collab-journey` 同一处置方式）。
+3. 本条目：登记"退役 ≠ 删除"。
+
+### 两条出路（下一个人二选一，别拖着）
+
+① **接回来**：`App.tsx` 的 `aiPanels` 里加回 `<AiToolRun routing={aiRouting} consents={…}
+   grants={aiSettings.localApi.grants} secrets={aiSecrets} healthSnapshot={…} onHealth={…} />`，
+   然后删掉 `playwright.config.ts` 那一行 `testIgnore`。
+   ⚠️ 本轮试过这一条并**回滚了**：面板在 `.ht-ai-agent-surface` 里与助手并列时，
+   窄窗（≤1023px）量到 `hidden`（`.ht-ai-panel` 的 `block-size:100%` 在双面板网格里被挤成 0），
+   而那要与上面那条 CSS 裁决对着干 —— 等于用一个布局补丁推翻一个产品决定。所以没做。
+② **正式迁移**：把三种行为在助手面上各写一条对策（不是复制断言，是按助手的形状重写），
+   然后把 `ai-tool-run.spec.ts` 移出仓库。
+
+### 判据（这一条怎么算关闭）
+
+`pnpm check:ai-e2e` 里 `ai-row-layout` 2 passed、`ai-tool-run` 不在运行集里（`--list` 可验），
+且上面那张表里两条助手 spec 仍是绿的。任何一条破了，说明"能力没丢"这句就成了假话。

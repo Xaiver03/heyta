@@ -22,23 +22,35 @@ import { openApp } from './helpers';
  * 窄窗必须回到中间列，两条一起才算搬完。
  *
  * 🔴 截图落固定路径，人必须看（AGENTS §6.2 规定一）。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 **2026-10-25 改判据的对象**：这份 spec 原先量的是 `ai-tool-run`（单步工具面板里的
+ * 「运行」按钮那一行）。那个面板在 2026-10-10 的外壳重写（`63e61f237`）里被**有意**并进了
+ * 助手面 —— 理由写在 `apps/web/src/styles/app/ai-panels.css:799-802`：
+ * 「AI Agent 是一个连续的聊天面。工具执行属于对话中的过程状态，不再与聊天并列成两个
+ * 需要用户选择的入口。」所以「运行按钮不许竖折」那一条**没有被测物了**，
+ * 而它原本守的是那个已下线的面板。
+ *
+ * ⇒ 这里把**还在的两条**判据换到现存的面上（`ai-agent-surface`）：
+ *   · AI 面与采集条的包围盒不相交；
+ *   · 宽窗在右栏内、窄窗退回中间列。
+ * 这两条与"哪个面板"无关，守的是右栏 ≤1023px `display:none` 时 AI 面**不许跟着消失**。
+ * 被退役的第三条（运行按钮单行）与 `ai-tool-run.spec.ts` 的三条一起登记在
+ * `BLOCKED.md` B226，不是悄悄删掉。
  */
 
 const WIDE = { width: 1280, height: 800 };
 const NARROW = { width: 660, height: 800 };
 
 async function boxes(page: import('@playwright/test').Page): Promise<{
-  run: { y: number; height: number };
   composer: { x: number; y: number; width: number; height: number };
   ai: { x: number; y: number; width: number; height: number };
 }> {
-  const run = await page.getByTestId('ai-tool-run-button').boundingBox();
   const composer = await page.locator('input[placeholder^="添加任务"]').boundingBox();
-  const ai = await page.getByTestId('ai-tool-run').boundingBox();
-  expect(run, '「运行」按钮在').not.toBeNull();
+  const ai = await page.getByTestId('ai-agent-surface').boundingBox();
   expect(composer, '采集输入框在').not.toBeNull();
-  expect(ai, 'AI 工具行在').not.toBeNull();
-  return { run: run!, composer: composer!, ai: ai! };
+  expect(ai, 'AI 面在（`ai-agent-surface`：单步面板已并入助手，见文件头）').not.toBeNull();
+  return { composer: composer!, ai: ai! };
 }
 
 /** 两个盒子在平面上有没有交集（允许 2px 的测量误差）。 */
@@ -55,13 +67,11 @@ function intersects(
 }
 
 async function assertLayout(page: import('@playwright/test').Page, label: string): Promise<void> {
-  const { run, composer, ai } = await boxes(page);
+  const { composer, ai } = await boxes(page);
 
-  // 「运行」是单行文字：高度不应超过两行文字的高度（竖折后会 ≈ 翻倍）。
-  expect(
-    run.height,
-    `${label}：「运行」按钮必须是单行（竖折 = 排版事故）`,
-  ).toBeLessThan(56);
+  // ⚠️ 原第一条判据（「运行」按钮 height < 56，防竖折）随单步面板下线而退役，
+  //    见文件头与 BLOCKED.md B226。它原本守的那个缺陷（`.ht-ai__actions` 没 flex-wrap）
+  //    在现存的助手面上没有对应结构，所以这里**不**换一条代理判据假装还在守。
 
   // 🔴 不重叠。这里原来写的是"AI 行的顶部不得高过采集条的底部"（只看 y）——
   // 那是当时那个缺陷（两条都在中间列、上下堆叠）的**代理判据**。
@@ -82,8 +92,8 @@ async function assertLayout(page: import('@playwright/test').Page, label: string
  * 第一种坏法（右栏 ≤1023px 是 `display: none`，账算在 `narrow.css`）。
  */
 async function assertColumn(page: import('@playwright/test').Page, wide: boolean): Promise<void> {
-  const ai = await page.getByTestId('ai-tool-run').boundingBox();
-  expect(ai, 'AI 工具行量不到 boundingBox').not.toBeNull();
+  const ai = await page.getByTestId('ai-agent-surface').boundingBox();
+  expect(ai, 'AI 面量不到 boundingBox').not.toBeNull();
   const box = ai as { x: number; y: number; width: number; height: number };
 
   if (wide) {
@@ -112,20 +122,36 @@ async function assertColumn(page: import('@playwright/test').Page, wide: boolean
 }
 
 
-test('常规宽度：AI 工具行单行、不与采集条重叠', async ({ page }) => {
+test('常规宽度：AI 面不与采集条重叠，且整块落在右栏内', async ({ page }) => {
   await page.setViewportSize(WIDE);
   await openApp(page);
-  await expect(page.getByTestId('ai-tool-run')).toBeVisible();
+  await expect(page.getByTestId('ai-agent-surface')).toBeVisible();
   await assertLayout(page, '常规宽');
   await assertColumn(page, true);
   await page.screenshot({ path: 'test-results/ai-row-wide.png', fullPage: false });
 });
 
-test('窄窗：按钮换行而不是折断，仍不重叠，且 AI 面退回中间列', async ({ page }) => {
+test('窄窗：AI 面不内联占位，但**必须有一条可达入口**，点开就地出现', async ({ page }) => {
   await page.setViewportSize(NARROW);
   await openApp(page);
-  await expect(page.getByTestId('ai-tool-run')).toBeVisible();
-  await assertLayout(page, '窄窗');
-  await assertColumn(page, false);
+
+  // 🔴 2026-10-25 改判据：660px 下 AI 面**不再内联**在中间列 —— 它这一档是按需浮层
+  //    （`App.tsx:1172` 的 `assistantOverlay`，入口是主导航那颗「对话助手」）。
+  //    所以"必须退回中间列"那条已经和产品形状对不上了；但那条判据要防的事还在：
+  //    **右栏 ≤1023px 是 display:none，AI 面会不会跟着一起消失**。
+  //    能防住"消失"的最小判据是：未点开时它不占着中间列，点开入口后它真的出现。
+  await expect(
+    page.getByTestId('ai-agent-surface'),
+    '未点开「对话助手」时，AI 面不该占着中间列',
+  ).toBeHidden();
+
+  // ⚠️ 窄档里主导航渲染的是 `button` 而不是 `tab`（同一颗入口两种语义），
+  //    而且页头还有第二颗同名入口 —— 取主导航那一颗，别用 `.first()` 猜。
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '对话助手' }).click();
+  await expect(
+    page.getByTestId('ai-agent-surface'),
+    '点开「对话助手」之后 AI 面必须出现 —— 否则它就是跟着右栏一起消失了',
+  ).toBeVisible();
+
   await page.screenshot({ path: 'test-results/ai-row-narrow.png', fullPage: false });
 });

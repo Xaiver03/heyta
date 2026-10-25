@@ -243,6 +243,19 @@ async function stubUnrelatedStartupCalls(page: Page): Promise<void> {
   await page.route(`${SERVER}/api/automation/events**`, async (route) => {
     await json(route, { events: [] });
   });
+  // 2026-10-25 补两条**开机就会打**的请求。它们与账号面无关，但没装夹具就回非 2xx，
+  // 而 `assertNoProblems` 会把它们算成"不该有的失败" ⇒ 整套 7 条用例红在一个别人的接口上。
+  //   · `/api/auth/central/config` —— 中央认证入口的可用性探测（`announcement-banner` 里同一个形状）；
+  //   · `/api/announcements/active` —— 运营公告（`{ announcements: [] }` 是客户端契约里的合法空集，
+  //     见 `packages/app-host/src/announcement-client.ts:76-80`）。
+  // ⚠️ 别改成往 `KNOWN_MISSING` 里塞：那条会替**所有**用例消掉这两格，
+  //    以后它们真坏了也不会有任何一条用例说话。
+  await page.route(`${SERVER}/api/auth/central/config**`, async (route) => {
+    await json(route, {});
+  });
+  await page.route(`${SERVER}/api/announcements/active**`, async (route) => {
+    await json(route, { announcements: [] });
+  });
   await page.routeWebSocket(WS_GLOB, () => {
     // 保持连接打开即可：本用例不验实时同步。
   });
@@ -334,9 +347,21 @@ test('换绑邮箱：后果写在点之前、发起后状态区说"还等哪一�
   await expect(panel, '登录着的人必须能看到「更换登录邮箱」这一块').toBeVisible();
   await expect(panel.getByText(COPY.emailChangeTitle)).toBeVisible();
 
-  // 🔴 判据是**存在性**：那句"两边都点才生效"必须在点之前就在界面上。
-  // 只断言"点了以后出现什么"抓不到"少了一整段说明"这一类缺陷。
-  await expect(panel.getByText(COPY.emailChangeIntro)).toBeVisible();
+  // 🔴 判据还是**存在性**，但载体变了（2026-10-25 改判）：
+  //    产品负责人 2026-10-24 的禁令是"设置界面禁止内联说明文字，只允许『?』气泡"
+  //    （`scripts/check-settings-no-prose.mjs` 是它的执行者）。所以那句后果说明现在在
+  //    标题旁那枚「?」里，而不是占一整行。
+  //    ⇒ 三条一起判，缺一条都不算：
+  //      ① 那枚「?」在（不是被删掉）；
+  //      ② 它的文案逐字等于那条后果句（不是被改写成"更客气"的一句）；
+  //      ③ 聚焦就能展开 —— 只挂悬停的话键盘用户拿不到，而这是点下去之前唯一一次说明。
+  const emailConsequence = panel.getByTestId('tip-email-change');
+  await expect(
+    emailConsequence,
+    '后果说明必须有合法载体（标题旁的问号），而不是被删掉',
+  ).toHaveText(COPY.emailChangeIntro);
+  await panel.getByTestId('tip-email-change-trigger').focus();
+  await expect(emailConsequence, '键盘聚焦必须能展开它').toBeVisible();
 
   await shot(page, panel, '01-before-request');
   await expect(page.getByTestId('email-change-form')).toBeVisible();
@@ -468,15 +493,21 @@ test('🔴 改登录密码：后果句在点之前、成功后那句、两个框
   // 截图先落盘（§6.2 规定一第 1 条：失败时也要有图）。
   await shot(page, panel, '08-password-before-submit');
 
-  // 🔴 标题按 heading 角色精确匹配，不用 `getByText`：面板里「从来没设过登录密码？
-  // 在这里设一个。」那颗按钮的文本含住「登录密码」，子串匹配会命中两个节点。
-  await expect(
-    panel.getByRole('heading', { name: COPY.passwordTitle, exact: true }),
-  ).toBeVisible();
+  // 🔴 标题按**那个 h2 容器**判，不用 `getByRole('heading', {exact})`：
+  // 2026-10-24 起标题里嵌了一枚「?」按钮（禁令要求说明进气泡），标题的可及名字因此
+  // 从"登录密码"变成"登录密码 + 那枚按钮的名字"，精确匹配会抓空 —— 而抓空的原因
+  // 与"标题没了"长得一样。用容器 + `toContainText` 把这两件事分开。
+  await expect(panel.locator('h2.ht-settings__title')).toContainText(COPY.passwordTitle);
 
-  // 🔴 存在性判据：那句"其它设备上的登录都会失效"必须在**点之前**就在界面上。
-  // 只断"点了以后出现什么"抓不到"少了一整段后果说明"—— 而这一句正是让人决定要不要点的东西。
-  await expect(panel.getByText(COPY.passwordOtherDevices)).toBeVisible();
+  // 🔴 后果句的判据同换绑那条：载体是按钮旁的「?」（`tip-password-consequence`），
+  // 所以判"文案逐字在 + 聚焦能展开"，而不是"占一整行"。这条句子是让人决定要不要点的东西，
+  // 只断言"点了以后出现什么"抓不到"少了一整段后果说明"。
+  const consequence = panel.getByTestId('tip-password-consequence');
+  await expect(consequence, '后果句必须有合法载体，而不是被删掉').toHaveText(
+    COPY.passwordOtherDevices,
+  );
+  await panel.getByTestId('tip-password-consequence-trigger').focus();
+  await expect(consequence, '键盘聚焦必须能展开它').toBeVisible();
 
   await page.getByTestId('password-current').fill(OLD_PASSWORD);
   await page.getByTestId('password-new').fill(NEW_PASSWORD);
@@ -507,7 +538,13 @@ test('🔴 改登录密码：后果句在点之前、成功后那句、两个框
   // 它不属于账号面，也不影响本节任何一条判据，所以按"已登记的无关路由"处理，
   // 而不是把它塞进 `KNOWN_MISSING`（那条会替**所有**用例消掉这一格，
   // 别的用例里它出现就是真信号）。
-  assertNoProblems(problems, ['/api/automation/recipient-key']);
+  //
+  // 🔴 2026-10-25 加第二格 `/api/sync/key-package`：改密换发令牌之后，同步层会用新令牌
+  // 重取一次密钥包，而这个套件的假服务端没有这一路 ⇒ 404。
+  // 这一格**不是**"缺失"而是**合法空态**：`packages/app-host/src/vault-session.ts:240`
+  // 明确把 404 读成"还没有密钥包"（`if (response.status === 404) return undefined;`）。
+  // 所以它也不进 `KNOWN_MISSING` —— 别处真出现非 404 的失败时，那条判据还得能响。
+  assertNoProblems(problems, ['/api/automation/recipient-key', '/api/sync/key-package']);
 });
 
 test('🔴 当前密码打错：不许冒一句"已修改"，焦点落回当前密码那个框', async ({ page }) => {

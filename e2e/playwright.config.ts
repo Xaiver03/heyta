@@ -58,6 +58,16 @@ export default defineConfig({
   //    所以这一支的覆盖在链上是空的 —— 摘出本配置只是让**本套件的读数不再说谎**。
   testIgnore: [
     /privacy-consent-zero-egress\.spec\.ts/,
+    // 🔴 2026-10-25 加：`ai-tool-run.spec.ts`（三条）测的是**单步工具面板**，
+    //    而那个面板在 2026-10-10 的外壳重写里被**有意**并进了助手面
+    //    （理由逐字在 `apps/web/src/styles/app/ai-panels.css:799-802`：「工具执行属于对话中的
+    //    过程状态，不再与聊天并列成两个需要用户选择的入口」）。⇒ 那三条**没有被测物**，
+    //    在本配置下必然红，而"一直红"最容易被读成环境问题。
+    //    能力没有丢：零出境 / 披露后出境 / 写工具只提案这三条在现存面上由
+    //    `ai-assistant.spec.ts` 与 `ai-assistant-atomic-tools.spec.ts` 守着。
+    //    ⚠️ 这是**退役**不是删除：文件与它的判据都留着，登记在 `BLOCKED.md` B226 ——
+    //    要么哪天把单步入口接回来（改这一行即可），要么把那三条的能力断言正式迁进助手那条链。
+    /ai-tool-run\.spec\.ts/,
     /auth-simple-ux\.spec\.ts/,
     /collab-journey\.spec\.ts/,
   ],

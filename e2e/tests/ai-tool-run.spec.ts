@@ -27,7 +27,22 @@
  *   - 走模型那句**必须一条规则都不命中**。`ai-tool-selection.ts:120` 那条
  *     `(已完成|做完|完成了)…` 会把"这周还剩几件事没做完"吃掉 —— 第一版就红在这里：
  *     界面显示「本机规则命中」，而用例断言「由模型选择」。
- */
+ 
+ * 🔴 **2026-10-25：这份 spec 已从默认配置退役（`playwright.config.ts` 的 `testIgnore`）。**
+ *    被测对象「单步工具面板」在 2026-10-10 的外壳重写（`63e61f237`）里被**有意**并进了助手面
+ *    —— 理由逐字写在 `apps/web/src/styles/app/ai-panels.css:799-802`。
+ *    三条判据本身没错，错在它们指着一个已经不存在的面：在本配置下必然红，
+ *    而"一直红"最容易被读成环境问题（§7 元规则一）。
+ *
+ *    能力没有丢：零出境 / 披露后出境 / 写工具只出提案，在现存面上由
+ *    `ai-assistant.spec.ts`（披露前零出境 → 多步读循环）与
+ *    `ai-assistant-atomic-tools.spec.ts`（高风险写工具的提案与 op 原子性）守着。
+ *
+ *    ⚠️ 退役 ≠ 删除：文件与判据都留着。两条出路任选其一，登记在 `BLOCKED.md` B226：
+ *      ① 把单步入口接回来（`App.tsx` 的 `aiPanels` 里加回 `<AiToolRun>`），然后删掉
+ *         `playwright.config.ts` 里那一行 `testIgnore`；
+ *      ② 把这三种行为在**助手面**上各写一条对策，然后把本文件移出仓库。
+*/
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
