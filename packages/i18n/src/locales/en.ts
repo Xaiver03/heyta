@@ -2385,6 +2385,7 @@ export const en = {
   // Moved here from `WEB_KEY_STORAGE_NOTICE` in `aiStore.ts`. It must sit next
   // to the key inputs: otherwise "I have to type it again" looks like a bug.
   'web.ai.settings.keyNotice': 'There is no system keychain in the browser, so keys are kept only in the memory of this tab. You will need to enter them again after closing or refreshing the page. Desktop keeps keys in the system keychain.',
+  'web.ai.settings.keyNoticeShort': 'The key lives only in this session',
   'web.ai.settings.reset': 'Reset to defaults (everything off)',
   // "Reset to defaults" is destructive (endpoints / routing / per-feature export
   // consents / keys held on this device / memory switches), so it gets its own

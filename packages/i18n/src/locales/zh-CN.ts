@@ -2554,6 +2554,7 @@ export const zhCN = {
   // 从 `features/settings/aiStore.ts` 的 `WEB_KEY_STORAGE_NOTICE` 搬来。
   // 🔴 它必须显示在密钥输入框旁边：不说明的话，"下次打开要重输"会被当成 bug。
   'web.ai.settings.keyNotice': '浏览器里没有系统钥匙串，密钥只保存在这个标签页的内存中。关掉或刷新页面后需要重新输入。桌面端会把密钥存进系统钥匙串。',
+  'web.ai.settings.keyNoticeShort': '密钥只保存在这次会话里',
   'web.ai.settings.reset': '恢复默认（全部关闭）',
   // 「恢复默认」是破坏性动作（清端点/路由/出境授权/本机密钥/记忆开关），
   // 所以它单独一区、第一下只把代价列出来。逐条对着 `defaultAiSettings()`
