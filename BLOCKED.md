@@ -11836,7 +11836,7 @@ B216 那一行进库之后，本线在新隔离载具 `.worktrees/inb-t10`（`gi
 `pnpm check:ai-e2e` 里 `ai-row-layout` 2 passed、`ai-tool-run` 不在运行集里（`--list` 可验），
 且上面那张表里两条助手 spec 仍是绿的。任何一条破了，说明"能力没丢"这句就成了假话。
 
-## B227（2026-10-25，本会话 · 修红门禁那一趟）：**`check:ai-e2e` 的 73 枚红是并跑互相污染，不是产品红** —— 而"权威读数"这一轮没跑完，所以它的状态是「未定」，不许写成绿
+## B227（2026-10-25，本会话 · 修红门禁那一趟）：**`check:ai-e2e` 的 73 枚红里没有一枚是"并跑污染"** —— 是三件能指到代码的事 + 一组待查；「权威读数」这一轮没跑完，所以它的状态是「未定」，不许写成绿
 
 ### 读数（两趟，都是本机当场跑）
 
@@ -11845,7 +11845,23 @@ B216 那一行进库之后，本线在新隔离载具 `.worktrees/inb-t10`（`gi
 | `playwright test`（默认并行，`--workers=2 --retries=0`） | **353 passed / 73 failed / 1 skipped**（34.3m），73 枚摊在 **25 个 spec 文件**上（narrow-sweep 9、renew-panel 6、detail-pane-task 6、reminder-permission-final 5…） |
 | 串行复跑那 4 个最红的文件（`--workers=1 --retries=0`） | 跑到 **32/35 时 0 failed**，被我自己的 900s 超时掐断（剩 3 条没跑到） |
 
-25 个文件同时坏、而串行一跑就全绿 —— 这不是 25 个独立 bug，这是**同一台载体被两个 worker 抢**。
+🔴 **2026-10-25 晚更正：这一条的第一版把根因判错了。串行复跑同样红。**
+`narrow-sweep` 单独串行是 **9 failed / 1 passed**、`pages-sweep` **4 failed / 4 passed**、
+`renew-panel` 6 failed、`detail-pane-task` 6 failed —— 都不是并跑制造的。
+第一版之所以读成"串行 0 failed"，是我 **grep 了 line reporter 的 `✘`**，而两种模式下失败行的形状不同
+（与 #524 同一枚旧账：分子分母要用同一条构造式；这一枚我自己又踩了一次）。
+
+真实成因逐条都能指到代码：
+
+| 组 | 真因 | 处置（本轮） |
+|---|---|---|
+| `narrow-sweep` 10 + `pages-sweep` 8 | 判据在找 `getByRole('tab')`：塌缩档 rail 是 `nav.ht-compact-rail` 下的**普通 button**（`CompactRailNavigation.tsx:67`），宽档 W1 之后低频目的地住进「更多」菜单 | 改走 `helpers.ts` 的 `switchView`（四条真路径已收口）+ 底部导航锚换成 `nav.ht-compact-rail` ⇒ **18 passed** |
+| `renew-panel` 6 | 新增 `/api/announcements/active` 开机请求没装桩 ⇒ 非 2xx 淹掉判据（与账号面那一批同一形状） | 补惰性空集桩 ⇒ **7 passed** |
+| `reminder-permission-final` 5 | 它有**自己的配置**（Web 固定 4355 + CDP 改站点权限），却在默认配置里被跑 ⇒ `ERR_CONNECTION_REFUSED 127.0.0.1:4355` | 从默认配置摘出，并**接成真门禁** `pnpm check:reminder-permission`（5 passed / 27.7s），进 `pnpm check` 链 |
+| `detail-pane-task` 6 | 待查（本轮只剩它） | —— |
+
+⇒ 于是"同一台载体被抢"这句话现在**没有证据**，也不再是本条的结论；`workers` 与 CI 预算那三段推论
+依然成立（CI 那次取消是真的），但它们回答的是"跑不完"，不是"为什么红"。
 
 ### 根因（结构问题，不是代码 bug）
 
