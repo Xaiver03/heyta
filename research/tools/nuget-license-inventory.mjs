@@ -121,7 +121,17 @@ function listPackages(projectPath) {
   const raw = execFileSync(
     'dotnet',
     ['list', projectPath, 'package', '--include-transitive', '--format', 'json'],
-    { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+    {
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
+      /**
+       * 🔴 NU1900 = "拿不到漏洞数据"，不是"发现了漏洞"。受限环境（无网络 / NuGet http-cache
+       * 不可写）里它必然出现，而 `Heyta.Windows.Core` 打开了 `TreatWarningsAsErrors` ⇒
+       * 隐式还原当场失败、整条许可证门禁报 "Restore failed" —— 看着像依赖坏了，其实是
+       * 一个与许可证无关的审计噪音。审计本身照旧开着（拉得到就会打印），只是不再当错误。
+       */
+      env: { ...process.env, WarningsNotAsErrors: process.env.WarningsNotAsErrors ?? 'NU1900' },
+    },
   );
   // `dotnet list` 有时会在 JSON 前面打印警告行，所以从第一个 `{` 开始截。
   const start = raw.indexOf('{');

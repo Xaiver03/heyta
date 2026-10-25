@@ -20,8 +20,9 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -53,6 +54,15 @@ if (!hasDotnet()) {
 process.env.DOTNET_CLI_TELEMETRY_OPTOUT ??= '1';
 process.env.DOTNET_NOLOGO ??= '1';
 process.env.HEYTA_BRIDGE_BUNDLE ??= BUNDLE;
+/**
+ * 🔴 NU1900 = "**拿不到**漏洞数据"，不是"发现了漏洞"。
+ *
+ * 受限环境（无网络 / NuGet 的 http-cache 目录不可写）里它必然出现，而
+ * `Heyta.Windows.Core` 与 `Smoke` 都打开了 `TreatWarningsAsErrors` ⇒ 整条门禁会因为
+ * "审计数据拉不到"而红，看起来像依赖坏了。依赖治理另有 `check:licenses:nuget`；
+ * 这里只把 NU1900 排除在"当错误"之外，**审计本身照旧开着**（拉得到就会打印）。
+ */
+process.env.WarningsNotAsErrors ??= 'NU1900';
 
 // ① 打包门面
 const bundled = spawnSync(process.execPath, [BUNDLE_SCRIPT], { stdio: 'inherit', cwd: ROOT });
@@ -77,8 +87,17 @@ if (smoke.error) {
 }
 if (smoke.status !== 0) process.exit(smoke.status ?? 1);
 
+/*
+ * 🔴 冒烟**不许**往开发者真实的用户目录里写：小组件那条会建一个随机 family 的目录再删，
+ * 而在只读 HOME 的环境（容器 / 代理沙箱 / CI 的只读用户目录）里那第一步就 EPERM，
+ * 整条门禁会红在"写不进真实 profile"上 —— 与它要验的语言映射毫无关系。
+ * 所以给它一个临时根（Core 里的 `HEYTA_WIDGET_STATE_ROOT`，生产路径不设）。
+ */
+const widgetStateRoot = mkdtempSync(join(tmpdir(), 'heyta-widget-smoke-'));
 const widgetSmoke = spawnSync('dotnet', ['run', '-c', 'Release', '--project', WIDGET_SMOKE_PROJECT], {
-  stdio: 'inherit', cwd: ROOT,
+  stdio: 'inherit',
+  cwd: ROOT,
+  env: { ...process.env, HEYTA_WIDGET_STATE_ROOT: widgetStateRoot },
 });
 if (widgetSmoke.error) console.error(`❌ Windows 小组件语言冒烟没能启动：${widgetSmoke.error.message}`);
 process.exit(widgetSmoke.status ?? 1);
