@@ -11433,3 +11433,98 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       否则下一轮（可能是别人、可能是明天的自己）会用一枚几分钟的 Release 构建去换一次判红。
       跑任何设备验收之前，先 `simctl io <u> screenshot` 看一眼屏幕归谁，并
       `simctl listapps <u> | grep -c <探针 bundle id>` 数一遍这台设备上还留着几枚取证件。
+
+553. **iOS 设备腿上"在 AX 树上"与"看得见"是两件事，而 `Text` 的 testID 根本不进树**（2026-10-25，提醒面拒绝态取证）
+    · 🔴 **`found=True` 不等于在屏上**：RN 把整个 `ScrollView` 的内容都留在无障碍树上，
+      所以"那一行在不在"用 `ax <文案> --list` 查会得到**永远为真**的答案 ——
+      同一次运行里三条判据全绿，而截图停在面板顶部、那一行根本不在屏上。
+      要的是 shim **复测过几何**的那个 `visible=True`（`--scroll-into-view` 会真的滚过去，
+      并按"元素中心 y 在可视区内"复测），而且截图必须紧跟其后、中间不再做任何可能把
+      滚动位置弄回去的动作。
+    · 🔴 **取证锚点必须挂在可点元素上**：同一棵树上 `AXUniqueId` 通道是通的
+      （shim 不报 `tree-has-no-AXUniqueId`，`id:reminder-delivery-open-settings` 取得到），
+      而挂在 `Text` 上的那枚 `reminder-delivery-blocked-text` **取不到** ——
+      RN 的 `Text` 不把这枚标识带进 iOS 无障碍树。所以"那一行确实存在"这句话，
+      在设备腿上只能由**文案 + 几何**说，不能由 Text 的 testID 说。
+    · ⚠️ **只读探针那一发会把 RN 进程终止掉**（`run_probe` 读完快照就 terminate，
+      否则下一次启动会复用它的黑屏）。于是后面那句
+      `xcrun simctl terminate` 返回 **rc=3 / "found nothing to terminate"** ——
+      既不许把它读成产品失败，也不许读成"我们终止了它"：要证的只是
+      **跨过 trigger 那一刻进程不在**，所以三条分支各说一句
+      （主动终止成功 / 已不在跑并说明是谁让它停的 / 进程还在而终止失败才算红）。
+
+554. **系统弹窗：「按下返回成功」不等于「弹窗消失了」，而"整棵树没有一枚 `AXUniqueId`"就是它还在的证据**（2026-10-25，同一枚拒绝授权弹窗连着红两趟）
+    · 🔴 上一趟按了一次 `不允许`，shim 报了成功、夹具当场 `return 0` 并打绿；而 2a 的截图
+      （`apps/mobile/evidence/ios-reminder-denied-visible.png`，时间戳 01:49）上那枚弹窗还压着任务详情。
+      于是三条几何判据全 `found=False`、OS 快照停在 `default`、trigger 被判过期 —— **四条红共用一个成因**，
+      而日志上唯一说真话的是那句"✅ 首次授权弹窗选择拒绝"。
+      ⇒ 规律：**对系统弹窗的收口判据只能是"它从 AX 树上消失"**，不是命令返回值。
+      没消失就换一枚 transport 重按（系统控件走 `--api axbridge` 在本脚本里已被 `restore_notification_permission` 验证过），
+      重按后仍要以"消失"为准。
+    · 🔴 **`found=False` × N + `detail=tree-has-no-AXUniqueId` 这一组读数不是"产品没渲染那一行"**：
+      RN 的树里一定有 `AXUniqueId`（testID 通道），一棵"什么都没有"的树是**系统弹窗自己那层窗口**。
+      看到这一组，第一反应是 `simctl io <u> screenshot` 看一眼屏幕归谁，而不是去改产品代码。
+    · ⚠️ 同一枚滞留弹窗还会**跨 uninstall 活到下一趟**（#552 说的那族），把下一趟步骤 1 的每一次 tap
+      吃掉，红成"首启层未收起 → 任务页不可达 → 搜索框 → 键盘 → Composer → 任务行"六连锁。
+      2026-10-25 02:47 那一趟烧了一枚 60 分钟的 Release 构建才读到这个成因。
+      ⇒ 夹具侧的修法：脚本开头加**屏幕归属预检**（命中拒绝按钮就直接判红并印出 cure），
+      别让它往下走成六条连锁红。
+555. **`--scroll-into-view` 会把 `--exact` 静默吃掉 ⇒ 预检"命中"、按压"取空"，五试全空转
+    而日志读着像按到了**（2026-10-25 协作移动旅程第 17 跑）。
+    形状：`ax_press_until` 先用 `--pressable --exact --scroll-into-view` 量一次（回
+    `found=True`），再用 `--pressable --press --exact` 按一次（回 `found=False`，什么都没按）。
+    成因在装置本体：`scripts/tools/ios-ax-shim.py` 的 `scroll_into_view()` 内部调
+    `find(..., False, ...)`（现量第 623 行），把 `exact_only` 硬写成 `False` ——
+    带不带 `--exact` 进那条路径，出来的是**两套不同的命中集**。
+    为什么会踩到：RN 在 iOS 上把行可及名**合成**成 `"共享清单, 共享清单"`，
+    所以精确匹配本来就取空；而 `--exact` 存在的理由（"同一个词是别的元素的子串"）
+    在这条路径上等于没写。症状是"界面明明有那个入口，装置按了五次说没有"。
+    ⇒ 两条纪律：① **预检与按压必须是同一次解析**（本线装置的修法是按压改按刚量到的
+    那枚 frame 的中心，不再换一套匹配重找一次）；② 导航按压优先走 **`id:<testID>` 通道**
+    （`AXUniqueId` 相等，与 Android 的 `resource-id` 同一约定，两条路径都 honors）。
+    反查：`grep -n "return find(ns, label" scripts/tools/ios-ax-shim.py`。
+    ⚠️ shim 是**多枚 iOS 装置共用件**，`verify-mobile-ios.sh` 与 reminder 那几枚也在用
+    `--scroll-into-view --exact`；本条只登记不改它（改它会让别的装置的精确取空当场变红，
+    那是别人的判据口径）。
+
+556. **到达判据挑了一句"两档相位都画"的文案 ⇒ 同意面被读成"已经到输入页"**
+    （2026-10-25 协作移动旅程装置第 18 跑）。
+    形状：`ax_press_until "加入共享清单" "邀请凭证或链接"` 第一次就判"到达"，紧接着
+    `fill_field "邀请凭证或链接"` 五次全 `found=False` ⇒ 装置报"凭证填不进"（exit 3），
+    而屏幕上立着的其实是 PIPL 同意面（截图 `06d-凭证填不进.png` 看得见）。
+    成因：`tree_has` 在整棵树的 `AXLabel/AXValue/label/value/title` 上做**子串**匹配，
+    而入群屏的副标题写着「粘贴邀请凭证或链接。接受后清单会出现在侧栏…」——这句**两档
+    相位都画**；输入框的 label 只在输入相位画。同一串字既是"这一屏的说明"又是"那个框的名字"
+    ⇒ 到达判据恒真，也就是那条"永远通过的判据"。
+    两条纪律：① 到达判据要挑**只有目标相位才画**的那一行（这里换成清单名那句 label），
+    或挑 `testID`（`id:` 走 `AXUniqueId`，与 Android `resource-id` 同约定）；
+    ② 每写一条到达判据先问一句"上一档相位里有没有同一串字"——有，这条判据就没有牙。
+
+557. **iOS 设置页三件实测事实：HID 坐标点不动它、marker 直点会跳错页、`notDetermined` 时「通知」那一组根本不存在**（2026-10-25，想用真设置开关造拒绝态时逐条撞出来）
+    · 🔴 **设置页不吃 HID 坐标 tap**：`press_scroll` 那套（shim `--press` 走坐标）在设置里
+      返回 `{"found":"True","visible":"True"}` 而**页面纹丝不动**（点 "App" 那一行后
+      `ui describe-all` 仍是侧栏原样）。同一枚行改用「精确框中心 + `idb ui tap x y --api axbridge`」
+      就进去了。⇒ 凡是驱动系统设置的验收，按下原语必须显式选 axbridge，不能沿用应用内那套。
+    · 🔴 **marker 直点会跳错页**：`idb ui tap "App" --api axbridge` 命中的是
+      「主屏幕与App资源库」（标签里含 "App" 的**第一个**节点），不是 "App" 分组行。
+      ⇒ 坐标要由**按精确标签取框**的那一层算出来再交给 axbridge，别让 idb 自己找节点。
+      （同一族错配在 shim 侧还有一条更深的成因：`--scroll-into-view` 会把 `--exact` 吃掉，见 #555
+      —— 所以"取框"那一发必须只用 `--list --exact`，不能顺手要滚动。）
+    · 🔴 **`notDetermined` 状态下没有可拨的开关**：全新安装、应用已经 `requestAuthorization`
+      但弹窗还没被答时，设置里的应用页只有 Siri / 搜索 / 蜂窝数据三行，**「通知」那一组不挂出来**
+      （现量 7 枚 AX 节点，与截图逐条对过）。
+      ⇒ "用真设置开关造拒绝态"只在**状态已决**时成立（例如上一趟按了「允许」，
+      本轮系统不再弹、请求直接回 `granted`）。从没问过的设备，正路仍然只有那一次弹窗。
+    · ⚠️ 顺带一条读数纪律：`ui describe-all` 在页面刚切换时会只回**一枚 Application 节点**
+      （空树），先给前台应用来一发真 scroll 再读，否则会把"还没渲染"读成"没有这一行"。
+
+558. **`fill_field` 只认 `AXTextField` ⇒ `multiline` 的框被报成"这一屏没有这个框"**
+    （2026-10-25 协作移动旅程装置第 19 跑）。
+    形状：那一屏**看得见**（同一次 dump 里 `清单名称（仅本机显示）` 与 `加入` 按钮都在），
+    装置却五次 `found=False / scrollRc=element-left-tree`，最后报"邀请凭证填不进输入框"。
+    成因：RN 的 `<TextInput multiline>` 在 iOS 落成为 **`AXTextArea`**，不是 `AXTextField`，
+    而装置里 scroll / type / set 三处查询都写死了 `--role AXTextField`。
+    两条纪律：① 在说"界面上没有这个框"之前，先把同一次 dump 里那一枚节点的 `role` 与
+    `AXUniqueId`（= testID）读出来 —— 一行 `python3` 走一遍树就够，别凭屏幕猜；
+    ② **一类不是一个**：同一处写死的角色会同时打中所有 multiline 框（这一趟是入群凭证框
+    `share-join-token` 与评论框 `comment-composer-input` 两枚），只修第一处 = 下一跑红在第二步。
