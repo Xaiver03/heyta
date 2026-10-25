@@ -15,7 +15,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { openApp, switchTheme } from './helpers';
+import { openApp, switchTheme, switchView } from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
 const BOARD = '[data-testid="calendar-board"]';
@@ -30,7 +30,11 @@ const MONTH_CARD = '[data-testid="calendar-board-month-card"]';
 const SHOT = (name: string): string => `../apps/web/evidence/calendar-capture/${name}.png`;
 
 async function gotoCalendar(page: Page): Promise<void> {
-  await page.getByRole('tab', { name: '日历' }).click();
+  // 🔴 2026-10-25：改走 `switchView`（helpers 里那一处收口）。窄档（≤768px）的 rail 是
+  // `nav.ht-compact-rail` 下的**普通 button**，那里没有 `role="tab"` ⇒ 直接点 tab 会在
+  // 窄屏那一刻死等到 60 秒超时（"日期底部与窄屏"这条就是这么红的）。
+  // 这一处收口已经把四条真路径都写好了：宽档 tab / 宽档「更多」/ 塌缩档常驻 button / 塌缩档面板。
+  await switchView(page, '日历');
   await expect(page.locator(BOARD)).toBeVisible();
   await expect(page.locator(MONTH_CARD)).toBeVisible();
 }
