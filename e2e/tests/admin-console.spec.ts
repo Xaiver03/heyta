@@ -1,5 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openApp, openSettingsView, selectSettingsSection, stubLegalRecheck, stubPublicFacts } from './helpers';
+import {
+  assertFormRhythm,
+  openApp,
+  openSettingsView,
+  selectSettingsSection,
+  stubLegalRecheck,
+  stubPublicFacts,
+} from './helpers';
 import { STUB_ORIGIN, STUB_PORT } from '../ports';
 
 /**
@@ -746,7 +753,23 @@ function captureProblems(page: Page): PageProblems {
 }
 
 /** 本仓库从来没有 favicon（同 `inbox.spec.ts` 与 `motivation.spec.ts` 的登记）。 */
-const KNOWN_MISSING = ['/favicon.ico'] as const;
+/**
+ * 已登记缺失的请求（不是"允许失败"，是"这份桩里本来就没有它"）。
+ *
+ * 🔴 2026-10-24 加 `/api/announcements/active`：运营公告是当天新加的特性，
+ *    本 spec 的桩没有这一路 ⇒ 它回非 2xx，于是**整个后台套件**因为一个
+ *    与后台无关的接口全红。登记在这里说明"这是缺失，不是回归"；
+ *    等公告那一单把它的桩补进来，这一条就该删掉（与 `UNTRACKED_LINK_OK` 同一条纪律：
+ *    每条都要能被删掉，否则它会变成永久的免死金牌）。
+ */
+const KNOWN_MISSING = [
+  '/favicon.ico',
+  // 同上：运营公告（2026-10-24 新特性），本 spec 的桩里没有这一路。
+  '/api/announcements/active',
+  // 中央账号配置（带凭据的探测）。它的**CORS** 那一层已在 `stub-provider.mjs` 修好
+  // （默认模式回显来源 + `allow-credentials`），这里只剩"桩里没有这条路由"。
+  '/api/auth/central/config',
+] as const;
 
 function assertNoProblems(problems: PageProblems, expectedBad: readonly string[] = []): void {
   const unexpected = problems.badResponses.filter(
@@ -1134,6 +1157,22 @@ test.describe('运营管理后台（真浏览器）', () => {
     const years = page.getByTestId('admin-holiday-years');
     await expect(years, '调休/补班那一页没渲染出年度列表').toBeVisible();
     await shoot(page, years, 'admin-holiday-papers.png', '../apps/web/evidence/admin-holiday');
+    /*
+      🔴 2026-10-24 补的一条判据 + 一张图：这几个字段改走共享 `FormField` 之后，
+      「年份」那一格被压成 **~18px**（其余 textarea 正常）。
+      根因不在原语里：老的单行样式 `.ht-settings__admin-input` 带 `flex: 1`，
+      而这一格在**纵向 flex 容器**里 ⇒ `flex-basis: 0%` 压过 `block-size: 44px`。
+      `assertFormRhythm` 正是抓这个的判据（它断言控件只有一档高度且不低于 43px），
+      但此前**没有任何一条判据量过这一页** —— 所以只有看图才发现。
+
+      ⚠️ 断言的是 `<form>` 里的**控件**（不含按钮与说明文字），否则"一档高度"会被
+      说明段落的高度稀释成永远通过。
+    */
+    const form = page.getByTestId('admin-holiday-year-input').locator('xpath=ancestor::form[1]');
+    await expect(form).toBeVisible();
+    await assertFormRhythm(form);
+    await page.getByTestId('admin-holiday-year-input').scrollIntoViewIfNeeded();
+    await shoot(page, form, 'admin-holiday-form.png', '../apps/web/evidence/admin-holiday');
 
     await expect(years.locator('li')).toHaveCount(1);
     // 按需拉取：这个端点恰好一次（与其余六个 Tab 同一条纪律）。

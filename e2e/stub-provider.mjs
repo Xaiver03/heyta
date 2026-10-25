@@ -211,9 +211,32 @@ const ORIGIN_ALLOWLIST = (process.env['STUB_ORIGIN_ALLOWLIST'] ?? '')
   .map((s) => s.trim())
   .filter((s) => s !== '');
 
-/** 放行时该回哪些 CORS 头。白名单模式下回显来源，而不是 `*`。 */
+/**
+ * 放行时该回哪些 CORS 头。
+ *
+ * 🔴 2026-10-24 修：默认模式**也**回显来源并带 `allow-credentials`。
+ *
+ * 原来默认模式无条件回 `ACAO: *`。而带凭据的请求（`fetch(…, { credentials: 'include' })`）
+ * 在浏览器里**不接受** `*` —— 症状是 CORS 拒绝 + 控制台一条
+ * `The value of the 'Access-Control-Allow-Origin' header in the response must not be
+ * the wildcard '*' when the request's credentials mode is 'include'`。
+ * 本仓 2026-10-24 就吃了一次：`/api/auth/central/config` 是带凭据的，
+ * 于是**整个后台套件 9 条**因为一个与后台无关的接口全红。
+ *
+ * 回显 `Origin` 是 CORS 规范里"给凭据放行"的正确写法，它**不放松任何判据**：
+ * 来源白名单模式（`STUB_ORIGIN_ALLOWLIST`）的分支一个字没动。
+ * ⚠️ 没有 `Origin` 头（非浏览器调用，例如测试自己 curl）时仍回 `*`。
+ */
 function corsFor(origin) {
-  if (ORIGIN_ALLOWLIST.length === 0) return CORS_HEADERS;
+  if (ORIGIN_ALLOWLIST.length === 0) {
+    if (origin === undefined) return CORS_HEADERS;
+    return {
+      ...CORS_HEADERS,
+      'access-control-allow-origin': origin,
+      'access-control-allow-credentials': 'true',
+      vary: 'Origin',
+    };
+  }
   if (origin === undefined || !ORIGIN_ALLOWLIST.includes(origin)) return undefined;
   return {
     'access-control-allow-origin': origin,

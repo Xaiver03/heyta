@@ -531,6 +531,14 @@ const ROW_ID_EXEMPT = [
   // 并开一个面板，第二下（在面板里选象限）才真的发 op，面板那枚取消只清它。
   // ⇒ 与确认框同形（两步式），**不是拖拽**：这一屏没有拖拽实现，`activeId` 那种才是 dragging。
   ['apps/mobile/src/screens/TasksScreen.tsx', 'quadrantMoveTaskId', 'confirm-gate'],
+  // ── 2026-10-24 补登 3 处（都是 G 报的"没有语义登记"，逐处读代码归类）──────────
+  // 运营公告的「撤回」是**两步式**：第一下记下"待撤回的是哪一条"，行内原地换成
+  // 「确认撤回 / 取消」两枚按钮，第二下才发请求、取消只清它 —— 与 `pendingApproveId` 同形。
+  ['apps/web/src/features/admin/AdminPanel.tsx', 'pendingWithdrawId', 'confirm-gate'],
+  // 订阅页两个端的**套餐选择**：它是结账表单的草稿字段（`DEFAULT_CHECKOUT_TIER_ID` 初值、
+  // 提交时读它决定买哪一档），不是"当前看的是哪一条"。
+  ['apps/web/src/features/subscription/RenewPanel.tsx', 'tierId', 'form-draft'],
+  ['apps/mobile/src/screens/RenewSection.tsx', 'tierId', 'form-draft'],
 ];
 
 /** 只看**单数** `…Id`：复数 `…Ids` 是筛选范围（"当前看哪几条"），不是"当前看的是哪一条"。 */
