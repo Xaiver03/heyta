@@ -271,20 +271,22 @@ export function WidgetPushPanel({ active = true }: { active?: boolean } = {}): R
     <HeytaUiProvider>
       <SettingsSection
         testID="widget-push-panel"
-        title={
-          <>
-            {t('web.widgetPush.title')}
-            <SettingsInfoTip
-              testId="tip-widget-push"
-              label={t('web.widgetPush.title')}
-              text={t('web.widgetPush.note.privacy') + ' ' + t('web.widgetPush.note.windowsOnly')}
-            />
-          </>
-        }
+        /*
+          这两句原来是列表里的两条 `note` 行（说明文字）。现在只剩标题旁那枚 `?` ——
+          `SettingsSection.title` 只收 string，所以它挂在 children 里、紧跟标题那一行。
+        */
+        title={t('web.widgetPush.title')}
         note={t('web.widgetPush.description')}
         leading={<BellRing aria-hidden="true" size={ICON_SIZE.md} />}
         rows={rows}
-      />
+      >
+        {/* 「载荷里没有任务内容」「只在 Windows 上有」两句话的唯一载体。 */}
+        <SettingsInfoTip
+          testId="tip-widget-push"
+          label={t('web.widgetPush.title')}
+          text={t('web.widgetPush.note.privacy') + ' ' + t('web.widgetPush.note.windowsOnly')}
+        />
+      </SettingsSection>
     </HeytaUiProvider>
   );
 }
