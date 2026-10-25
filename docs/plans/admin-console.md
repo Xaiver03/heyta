@@ -450,15 +450,24 @@ Caddy 内置 mime 表里，而 nginx 时代靠 `/etc/nginx/mime.types` 那一条
 `unrecognized directive: rate_limit` 而假红（本轮实测：假红那一次自动回滚了，真镜像没动）。
 
 **还欠的（登记，不在本轮做）**：
-- 仓库里没有 `/etc/caddy/sites.d/*.caddy` 的副本与 `--check/--pull/--apply` 那三档，
-  所以"线上有哪些 location"对 caddy 又不可 diff 了。要补的是 `nginx-sync.sh` 的同款，
-  不是再写一份散文。
-- 🔴 未登录打开 `/admin` 时，`admin-console-reason` 那句是
-  "没有配置服务器地址，所以管理后台不可用"（英文态实测同句）。**真实原因是没有会话**，
-  而 `clientOptions()` 在未登录时 `baseUrl` 为空，于是 `probe()` 走的是 `no_base_url` 那一支。
-  判它的断言：未登录时那句必须命中"要先登录"那一族文案，且 `no_base_url` 只许在
-  **有会话但地址没配**时出现。今天不修的理由：它要动的是认证态与 `baseUrl` 的语义
-  （`store.ts:514` 那一处是同步面共用的），不是后台自己的一格。
+- ✅ ~~仓库里没有 `/etc/caddy/sites.d/*.caddy` 的副本与 `--check/--pull/--apply` 那三档~~
+  —— 2026-10-25 当天补上：镜像在 `server/deploy/caddy/sites.d/`（heyta 那三片，逐字节），
+  三档在 `server/scripts/caddy-sync.sh`。四臂现量：`--check` 对线上 3 片一致退出 0；
+  故意改一片 ⇒ 退出 1 并点名；远端目录打错 ⇒ **拒绝**"无漂移"（空清单不判绿）；
+  `--apply` 打到沙箱目录 + 假服务名 ⇒ 校验过、reload 失败 ⇒ 退出 1 并印回滚命令。
+  校验用的是 `caddy-edge` 那枚二进制，理由写在 `server/deploy/caddy/README.md`。
+- ✅ ~~未登录打开 `/admin` 时那句"没有配置服务器地址"其实是"没会话"~~ —— 当天就修了：
+  `adminRequest` 原来先判 `baseUrl` 再判令牌，而未登录时 `baseUrl` **必然**也是空
+  （官方构建的地址是账号态填进来的），于是两格都为空时先判的那个赢了。
+  现在先判令牌（`packages/app-host/src/admin-client.ts` 那一处，注释写着为什么反过来不成立：
+  有会话而地址为空是自托管真配错，那时 `unconfigured` 才对）。
+  三处判据：传输层那条（两格都空 ⇒ `no-token`，变异验证 = 把顺序挪回去只杀它一条）、
+  界面层那条（未登录那一屏不许出现"服务器地址"四个字）、
+  线上那条（`live-admin-entry.spec.ts` 按 `not.toMatch(/服务器地址|server address/iu)` 判，
+  不钉中文字面 —— 这一页跟着界面语言走）。
+  修完的线上那一屏：`apps/web/evidence/admin-console/live-admin-logged-out.png`
+  （现量文案 "You are not signed in, so the admin console is unavailable."，
+  修前同一格是 "No server address is configured, …"）。
 - 后台的运营账号今天**是 0 个**（取证那枚已删）。要给自己开：
   `pnpm --filter @heyta/server admin:grant <你的邮箱>`（线上在容器里跑
   `docker exec -w /app supersync-server node dist/scripts/admin.js grant <邮箱>`）。
