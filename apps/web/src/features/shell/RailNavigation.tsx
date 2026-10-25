@@ -506,7 +506,18 @@ function DesktopRailNavigation({
           </div> : null}
         </DragOverlay>, document.body)}
       </DndContext>
-      {visibleToolTabs.map((tab, index) => <button key={tab.key} type="button" role="tab" aria-selected={!assistantActive && view === tab.key} tabIndex={railRovingKey === tab.key ? 0 : -1} data-testid={`rail-view-${tab.key}`} className={`ht-rail__tab ht-rail__tab--tool${index === 0 ? ' ht-rail__tab--tool-start' : ''}${!assistantActive && view === tab.key ? ' ht-rail__tab--active' : ''}`} onClick={() => onNavigate(tab.key)}><tab.Icon size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t(tab.labelKey)}</span></button>)}
+      {/*
+        🔴 工具段必须**自己是一个 `role="tablist"`**（2026-10-25）：
+        这些按钮是 `role="tab"`，而它们原来直接挂在 `<nav>` 下 ⇒ **tab 在 tablist 外面**，
+        那是无效的 ARIA 结构（`e2e/tests/rail-trash-anchor.spec.ts` 的 ① 就是钉这一条的，
+        它的注释里写着"为了贴着帮助把它挪出去"是这条判据要挡的改法）。
+        包一层 tablist 既保住结构，又保住"贴底"（`margin-top: auto` 挪到容器上）。
+      */}
+      {visibleToolTabs.length > 0 ? (
+        <div role="tablist" aria-label={t('web.shell.views.groupTools')} className="ht-rail__tools">
+          {visibleToolTabs.map((tab, index) => <button key={tab.key} type="button" role="tab" aria-selected={!assistantActive && view === tab.key} tabIndex={railRovingKey === tab.key ? 0 : -1} data-testid={`rail-view-${tab.key}`} className={`ht-rail__tab ht-rail__tab--tool${index === 0 ? ' ht-rail__tab--tool-start' : ''}${!assistantActive && view === tab.key ? ' ht-rail__tab--active' : ''}`} onClick={() => onNavigate(tab.key)}><tab.Icon size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t(tab.labelKey)}</span></button>)}
+        </div>
+      ) : null}
       <InboxBell />
       <button type="button" data-testid="rail-help" className="ht-rail__tab ht-rail__tab--tool" onClick={onOpenHelp}><CircleHelp size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t('web.shell.nav.help')}</span></button>
       <SyncBar />
