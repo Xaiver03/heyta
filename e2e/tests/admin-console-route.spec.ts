@@ -132,6 +132,57 @@ const ANNOUNCEMENTS = {
 };
 
 /**
+ * 后台的档位投影。
+ *
+ * 🔴 两处形状是这条判据的载体：
+ *  · `grantDaysMax: 1234` 是一个人在界面上**写不出来**的数 —— 提示那一格如果
+ *    不是读这个数（而是自己抄了一份 3650），下面那条判据就会红。
+ *  · `hosted-ai-monthly` 是 `sellable: false`，而它**必须仍然出现在下拉里**：
+ *    "现在发不了"与"这一档不存在"是两件事（ADR-0076 §1.3.4）。
+ */
+const GRANT_SKUS = {
+  skus: [
+    { priceId: 'hosted-monthly', grants: ['hosting'], sellable: true },
+    { priceId: 'hosted-ai-monthly', grants: ['hosting', 'ai', 'automation'], sellable: false },
+  ],
+  grantDaysMax: 1234,
+};
+
+const GRANT_LOG = {
+  items: [
+    {
+      id: 3,
+      userId: 5,
+      actorUserId: 1,
+      action: 'grant',
+      sku: 'hosted-monthly',
+      days: 30,
+      grants: ['hosting'],
+      beforePeriodEnd: null,
+      afterPeriodEnd: Date.now() + DAY_MS * 30,
+      reason: '内测授权',
+      createdAt: Date.now() - DAY_MS,
+    },
+    {
+      id: 2,
+      userId: 7,
+      actorUserId: 1,
+      action: 'revoke',
+      sku: null,
+      days: null,
+      grants: [],
+      beforePeriodEnd: Date.now() + DAY_MS * 3,
+      afterPeriodEnd: Date.now(),
+      reason: '内测结束',
+      createdAt: Date.now() - 2 * DAY_MS,
+    },
+  ],
+  total: 2,
+  limit: 50,
+  offset: 0,
+};
+
+/**
  * 装一个只认后台那几个端点的假服务端，并把浏览器停在 `/admin`。
  *
  * @param overviewStatus 200 = 这个账号是管理员；403 = 不是。
@@ -176,6 +227,34 @@ async function openConsole(page: Page, overviewStatus: number): Promise<void> {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(REVENUE),
+      });
+      return;
+    }
+    if (path === '/skus') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(GRANT_SKUS),
+      });
+      return;
+    }
+    if (path === '/subscriptions/grants') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(GRANT_LOG),
+      });
+      return;
+    }
+    if (
+      path === '/subscriptions/grant' ||
+      path === '/subscriptions/upgrade' ||
+      path === '/subscriptions/revoke'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, subscription: {}, audit: {} }),
       });
       return;
     }
@@ -242,6 +321,7 @@ test.describe('/admin 这个地址（真浏览器）', () => {
       '概览',
       '用户',
       '订阅',
+      '发放',
       '订单',
       '优惠码',
       '邀请',
@@ -346,7 +426,92 @@ test.describe('/admin 这个地址（真浏览器）', () => {
     await expect.poll(() => deletes).toEqual(['/api/admin/announcements/3']);
   });
 
-  test('🔴 暗色主题下这一页仍然读得下去（AGENTS §5：不测暗色就交付是明令的错法）', async ({ page }) => {
+  test('🔴 发放那一格：不可交付的档留在列表里、上界念服务端的数、收回要按两次', async ({ page }) => {
+    const posts: { url: string; body: string | null }[] = [];
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url().startsWith(ADMIN)) {
+        posts.push({ url: new URL(request.url()).pathname, body: request.postData() });
+      }
+    });
+
+    await openConsole(page, 200);
+    await page.getByRole('button', { name: '发放', exact: true }).click();
+
+    const panel = page.getByTestId('admin-grants');
+    await panel.waitFor();
+
+    // 🔴 交付不了的那一档**不许从下拉里消失**：它今天是"现在发不了"，不是"不存在"，
+    // 而后一种说法会让运营去翻价目表找一个并不存在的漏洞。
+    const options = await panel.locator('select option').allTextContents();
+    const ai = options.find((text) => text.includes('hosted-ai-monthly'));
+    expect(ai).toBeDefined();
+    expect(ai).toContain('现在发不了');
+    expect(options.find((text) => text.startsWith('hosted-monthly'))).not.toContain('现在发不了');
+
+    // 🔴 天数上界是**随响应给的那个数**（这里故意是 1234）。
+    // 界面上写死一份的话，下一次抬上界就是两处不同步 —— 而它不会报错。
+    await expect(page.getByTestId('admin-grants-daysHint')).toContainText('1234');
+    await expect(page.getByTestId('admin-grants-daysHint')).not.toContainText('3650');
+
+    // 发放记录念的是**动作史**：理由与操作者少一个，它就退化成一条状态流水。
+    const rows = page.getByTestId('admin-grants-rows').locator('.ht-settings__admin-row');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toContainText('内测授权');
+    await expect(rows.first()).toContainText('操作者 #1');
+    // 收回那一行不带档位：那一档是什么由它自己那条 grant 记录说。
+    await expect(rows.nth(1)).toContainText('不带档位');
+
+    await page.screenshot({ path: `${EVIDENCE}/admin-route-grants-light.png`, fullPage: true });
+
+    // 收回第一步：只出确认，一个 POST 都不发。
+    await page.getByLabel('账号编号').fill('5');
+    await page.getByLabel('理由（会进发放记录）').fill('内测结束');
+    await page.getByRole('button', { name: '收回发放', exact: true }).click();
+    await expect(
+      page.getByRole('button', {
+        name: '收回会让这个账号立刻失去赠送那一份能力（已经付费的不动）。确认吗？',
+        exact: true,
+      }),
+    ).toBeVisible();
+    expect(posts).toHaveLength(0);
+
+    // 第二步才真的发。
+    await page.getByRole('button', { name: '收回会让这个账号立刻失去', exact: false }).click();
+    await expect.poll(() => posts.map((post) => post.url)).toEqual([
+      '/api/admin/subscriptions/revoke',
+    ]);
+  });
+
+  test('🔴「免费升级」打的是 /upgrade，而且载荷里没有 days（"一天都不加"在界面上的唯一证明）', async ({ page }) => {
+    const posts: { url: string; body: string | null }[] = [];
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url().startsWith(ADMIN)) {
+        posts.push({ url: new URL(request.url()).pathname, body: request.postData() });
+      }
+    });
+
+    await openConsole(page, 200);
+    await page.getByRole('button', { name: '发放', exact: true }).click();
+    await page.getByTestId('admin-grants').waitFor();
+
+    await page.getByLabel('账号编号').fill('5');
+    await page.getByLabel('档位').selectOption('hosted-ai-monthly');
+    // 天数那一格**故意填着**：不许界面替服务端把它抹掉（那等于界面在裁决），
+    // 但它也**不许被发出去** —— 载荷里没有 days 才是这条判据。
+    await page.getByLabel('天数（只有「赠送」用得到）').fill('30');
+    await page.getByLabel('理由（会进发放记录）').fill('内测授权');
+
+    await page.getByRole('button', { name: '免费升级', exact: true }).click();
+
+    await expect.poll(() => posts.map((post) => post.url)).toEqual([
+      '/api/admin/subscriptions/upgrade',
+    ]);
+    const body = JSON.parse(posts[0]!.body ?? '{}') as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['reason', 'sku', 'userId']);
+    expect(body).toEqual({ userId: 5, sku: 'hosted-ai-monthly', reason: '内测授权' });
+  });
+
+    test('🔴 暗色主题下这一页仍然读得下去（AGENTS §5：不测暗色就交付是明令的错法）', async ({ page }) => {
     // 走**生产读路径**：`lib/theme.ts` 的 `resolveInitialTheme()` 读的就是这一枚 key，
     // 优先级是"用户已选 > 系统偏好"，所以这里种的是"用户选过 dark"，
     // 而不是 `emulateMedia` —— 后者会被那一条优先级盖掉（theme.ts 的注释

@@ -29,7 +29,12 @@ import {
   adminUnlockUser,
   adminPublishAnnouncement,
   adminWithdrawAnnouncement,
+  adminGrantSubscription,
+  adminUpgradeSubscription,
+  adminRevokeSubscriptionGrant,
   fetchAdminAnnouncements,
+  fetchAdminGrantSkus,
+  fetchAdminSubscriptionGrants,
   fetchAdminHolidayYears,
   fetchAdminOverview,
   fetchAdminRefunds,
@@ -533,6 +538,133 @@ describe('营收与公告的传输形状', () => {
       await adminPublishAnnouncement(options, { title: 'a', body: 'b', level: 'info', publishedAtMs: 1 }),
     ).toEqual({ ok: false, reason: 'no-token' });
     expect(await adminWithdrawAnnouncement(options, 1)).toEqual({ ok: false, reason: 'no-token' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// 订阅发放（ADR-0076）那五条端点的传输形状。
+//
+// 🔴 这一组只断"发出去了什么"，不断"该不该发" —— 后者住在服务端
+// （`server/src/admin/subscription-grant-store.ts` 的三道闸门）。
+// 这里唯一值得钉的是**载荷的形状**：界面能给旋钮的东西就是攻击面能给的东西，
+// 所以"没有 `grants` 这个键"必须是一条能红的断言，而不是一句注释。
+//
+// 变异验证（三臂）：给 `AdminGrantInput` 加一个 `grants` 并透传 ⇒ 第 1 条红；
+// 把 `revoke` 的 URL 拼成 `/subscriptions/revoke/{userId}` ⇒ 第 2 条红；
+// 把 `fetchAdminSubscriptionGrants` 的 `userId` 塞进 body ⇒ 第 3 条红。
+// ─────────────────────────────────────────────────────────────────────
+
+describe('订阅发放五条端点的传输形状', () => {
+  it('🔴 grant 的载荷只有服务端认识的那四个键（没有 `grants`、没有 `priceId`）', async () => {
+    const fetchImpl = stubResponse(200, { ok: true, subscription: {}, audit: {} });
+
+    await adminGrantSubscription(withFetch(fetchImpl), {
+      userId: 7,
+      sku: 'hosted-ai-monthly',
+      days: 30,
+      reason: '内测授权',
+    });
+
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/subscriptions/grant`);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({
+      userId: 7,
+      sku: 'hosted-ai-monthly',
+      days: 30,
+      reason: '内测授权',
+    });
+  });
+
+  it('upgrade 不带 `days`（它的定义就是"一天都不加"），revoke 只带 userId + reason', async () => {
+    const upgrade = stubResponse(200, { ok: true });
+    await adminUpgradeSubscription(withFetch(upgrade), {
+      userId: 7,
+      sku: 'hosted-ai-monthly',
+      reason: '内测授权',
+    });
+    const [upgradeUrl, upgradeInit] = upgrade.mock.calls[0] as [string, RequestInit];
+    expect(upgradeUrl).toBe(`${BASE}${ADMIN_API_PREFIX}/subscriptions/upgrade`);
+    const upgradeBody = JSON.parse(String(upgradeInit.body)) as Record<string, unknown>;
+    expect(Object.keys(upgradeBody).sort()).toEqual(['reason', 'sku', 'userId']);
+
+    const revoke = stubResponse(200, { ok: true });
+    await adminRevokeSubscriptionGrant(withFetch(revoke), { userId: 7, reason: '内测结束' });
+    const [revokeUrl, revokeInit] = revoke.mock.calls[0] as [string, RequestInit];
+    expect(revokeUrl).toBe(`${BASE}${ADMIN_API_PREFIX}/subscriptions/revoke`);
+    expect(JSON.parse(String(revokeInit.body))).toEqual({ userId: 7, reason: '内测结束' });
+  });
+
+  it('发放记录的 `userId` 走**查询串**，不进 body（GET 不带体）', async () => {
+    const fetchImpl = stubResponse(200, { items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchAdminSubscriptionGrants(withFetch(fetchImpl), { userId: 7, limit: 20, offset: 0 });
+
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/subscriptions/grants?userId=7&limit=20&offset=0`);
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
+  it('不筛选时查询串是空的（服务端自己有默认分页）', async () => {
+    const fetchImpl = stubResponse(200, { items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchAdminSubscriptionGrants(withFetch(fetchImpl));
+
+    const [url] = fetchImpl.mock.calls[0] as [string];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/subscriptions/grants`);
+  });
+
+  it('档位投影原样交出，**不**在这一侧过滤掉不可交付的档', async () => {
+    const skus = [
+      { priceId: 'hosted-ai-monthly', grants: ['hosting', 'ai', 'automation'], sellable: false },
+      { priceId: 'hosted-monthly', grants: ['hosting'], sellable: true },
+    ];
+    const fetchImpl = stubResponse(200, { skus, grantDaysMax: 3650 });
+
+    const result = await fetchAdminGrantSkus(withFetch(fetchImpl));
+
+    // 🔴 客户端**不许**提前裁这张表：那一格 `sellable` 是这一刻的实例状态
+    //（两道开关都能在重启后变），提前过滤会把它变成一个缓存的假答案。
+    // 界面要显示的是"全档位 + 哪个现在不能发"，拒绝由写入那一次裁决。
+    expect(result).toEqual({ ok: true, data: { skus, grantDaysMax: 3650 } });
+  });
+
+  it('🔴 409 的原因码交出、散文不交出（`reason` 只认服务端给的那一格）', async () => {
+    const fetchImpl = stubResponse(409, {
+      code: 'sku_not_deliverable',
+      message: 'This sku is not deliverable right now.',
+      reason: 'SKU_NOT_DELIVERABLE',
+      sku: 'hosted-ai-monthly',
+    });
+
+    const result = await adminGrantSubscription(withFetch(fetchImpl), {
+      userId: 7,
+      sku: 'hosted-ai-monthly',
+      days: 30,
+      reason: '内测授权',
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'conflict', status: 409, serverReason: 'SKU_NOT_DELIVERABLE' });
+  });
+
+  it('🔴 未登录时这一组端点一个请求都不发', async () => {
+    const fetchImpl = stubResponse(200, {});
+    const options = withFetch(fetchImpl, { getToken: async () => undefined });
+
+    expect(await fetchAdminGrantSkus(options)).toEqual({ ok: false, reason: 'no-token' });
+    expect(await fetchAdminSubscriptionGrants(options)).toEqual({ ok: false, reason: 'no-token' });
+    expect(
+      await adminGrantSubscription(options, { userId: 1, sku: 'hosted-monthly', days: 1, reason: 'x' }),
+    ).toEqual({ ok: false, reason: 'no-token' });
+    expect(await adminUpgradeSubscription(options, { userId: 1, sku: 'hosted-monthly', reason: 'x' })).toEqual(
+      { ok: false, reason: 'no-token' },
+    );
+    expect(await adminRevokeSubscriptionGrant(options, { userId: 1, reason: 'x' })).toEqual({
+      ok: false,
+      reason: 'no-token',
+    });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

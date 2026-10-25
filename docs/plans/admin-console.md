@@ -361,3 +361,40 @@ jsdom 那一套里同意早已答好、凭据是 `setState` 直接塞的，所�
   + `rsync` 产物 ⇒ 最后 `server/scripts/nginx-sync.sh --apply`。
   先 apply nginx 的话，`/admin` 会把**旧产物**交出去，那一屏上没有后台壳，
   读起来像"这个地址坏了"。
+
+---
+
+## 9. 追加（2026-10-25）：后台的三种订阅发放
+
+裁决在 [ADR-0076](../adr/0076-admin-subscription-grants.md)。这一节只写**落地清单与读数**，
+不复述理由。
+
+### 9.1 交付清单
+
+| # | 件 | 落点 |
+|---|---|---|
+| 1 | `subscription_grants` 表 + 迁移 | `server/prisma/schema.prisma`、`server/prisma/migrations/20261025000000_add_subscription_grants/` |
+| 2 | 发放存储层（三动作 + 审计同事务） | `server/src/admin/subscription-grant-store.ts` |
+| 3 | 五条路由 | `server/src/admin/admin.routes.ts`：`GET /skus`、`GET /subscriptions/grants`、`POST /subscriptions/{grant,upgrade,revoke}` |
+| 4 | app-host 客户端 | `packages/app-host/src/admin-client.ts` |
+| 5 | 后台「发放」tab + store 动作 | `apps/web/src/features/admin/{AdminPanel,store}.ts`、`apps/web/src/styles/app/admin.css` |
+| 6 | 中英词条 | `packages/i18n/src/locales/{en-US,zh-CN}.ts` |
+
+### 9.2 判据（每条都要能红，写完做变异验证）
+
+| 判据 | 钉住的东西 | 变异（改坏哪一行 ⇒ 必须红） |
+|---|---|---|
+| 发放后 `checkout_orders` 行数不变 + `/revenue` 读数逐字段相同 | ADR-0076 §4.2「发放不进营收」 | 让 grant 建一条订单行 |
+| 付费行的 5 个字段在"发放→收回"全程不变 | §2 二"只写 `admin-grant` 行" | 让 revoke 把 `where` 放宽到全部 provider |
+| 未知 SKU ⇒ 400 且**无审计行、无订阅行** | §2 三第 1 道闸门 | 把 `grantsForSku(...) === null` 折成 `?? []` |
+| `notSellableReason` 非 null ⇒ 拒绝发放 | §1.3.4（收银台挡住的东西后台也挡） | 删掉那次 `notSellableReason` 调用 |
+| `days` 越界/NaN/小数 ⇒ 400 | §2 三第 3 道闸门 | 把 `max` 去掉 |
+| 请求体多一个 `grants` 键 ⇒ 400 | §3.3（客户端发不出能力） | 把 `strictObject` 换成 `object` |
+| 审计行与订阅行在同一事务里 | §2 四末尾 | 把审计写挪到事务外、写在 await 之后 |
+| `upgrade` 不改 `currentPeriodEnd`；`grant` 不改别人的行 | §2 一那张表的"语义"列 | 让 upgrade 也调 `extendSubscriptionPeriod` |
+| 收回没有发放行 ⇒ 404，不折成 ok | 界面不许谎称成功 | 把 `count === 0` 那一路折进成功分支 |
+
+### 9.3 上线顺序
+
+沿用 §8.5 那一条，**不能倒**：迁移（`cd server && sh scripts/migrate-deploy.sh`）
+⇒ 服务端镜像重建换容器 ⇒ web 产物 build + rsync ⇒ `server/scripts/nginx-sync.sh --apply`。
