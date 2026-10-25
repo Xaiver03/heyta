@@ -1,0 +1,3 @@
+iOS 协作旅程：24 通过 / 1 失败
+share=5d2a284c-a437-457a-a26e-1f4c3edd5803 ownerMember=fb723c15-f8d9-42fc-aeb0-433ea9d68370 phoneMember=未入群
+服务端=http://127.0.0.1:3177 设备=60D29F47-F188-4C7A-8C81-D3FA5CBF3281 bundle=acc8d8ab1cafa67867463c72cd12d89d62a58679e6f8f320278fcc5cdc017a21
