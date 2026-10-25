@@ -30,7 +30,22 @@ public static class WindowsWidgetStore
         if (string.IsNullOrWhiteSpace(packageFamilyName))
             throw new ArgumentException("package family name is required", nameof(packageFamilyName));
 
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        /*
+         * `HEYTA_WIDGET_STATE_ROOT` 是**冒烟与 QA 的根**，不是产品开关：
+         * 生产路径上没人设它，走的就是 `<LocalApplicationData>/Packages/<family>/LocalState/heyta-widgets`
+         * （Windows 上那是 MSIX 给这一族的 LocalState）。
+         *
+         * 🔴 为什么必须有这条缝（2026-10-25 实测）：`check:windows-shell` 的小组件冒烟会
+         * 建一个随机 family 的目录再删掉 —— 它在**只读 HOME** 的环境里（容器、代理沙箱、
+         * CI 的只读用户目录）第一步就 `UnauthorizedAccessException`，于是整条门禁红在
+         * "写不进真实用户目录"上，而它要验的是语言映射。一个冒烟**不该**往开发者的真实
+         * profile 里写东西。
+         */
+        var root = Environment.GetEnvironmentVariable("HEYTA_WIDGET_STATE_ROOT");
+        var localAppData = string.IsNullOrWhiteSpace(root)
+            ? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+            : root!;
+
         _stateDirectory = Path.Combine(localAppData, "Packages", packageFamilyName, "LocalState", "heyta-widgets");
         Directory.CreateDirectory(_stateDirectory);
     }
