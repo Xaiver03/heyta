@@ -102,7 +102,7 @@ import { CentralAccountConflictPanel } from './CentralAccountConflictPanel.js';
 import { readRememberedCredentials, rememberCredentials } from './remembered-credentials.js';
 import { useAuthStore, type AuthBusyAction } from './store.js';
 import { authBaseUrl, isUnconfigured } from '../../lib/auth-endpoint.js';
-import { consentFetch } from '../privacy/consent-gate.js';
+import { consentFetch, privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate.js';
 import { useSyncStore } from '../sync/store.js';
 import { useModalDismiss } from '../../lib/use-modal-dismiss.js';
 import './auth-dialog.css';
@@ -283,19 +283,59 @@ export function AuthPanel({
   const [centralConfig, setCentralConfig] = useState<CentralAuthConfig | null | undefined>(undefined);
   const [centralProbe, setCentralProbe] = useState(0);
   const [centralTermsAccepted, setCentralTermsAccepted] = useState(false);
+  /**
+   * 同意状态的代数。
+   *
+   * 🔴 2026-10-25 修：**用户刚点了「同意联网」，配置却不会重新探**。
+   * 这个 effect 的依赖里只有 `effectiveBaseUrl / isOfficialService / centralProbe`，
+   * 而同意之前 `consentFetch` 会拦下那次探测 ⇒ `centralConfig` 落到 `null` ⇒
+   * 面板显示「登录暂时不可用……本页不会改用其他登录方式」。
+   * 用户明明刚同意了，画面却还是那句话，只能自己再去点一次「重新检查」——
+   * 而屏幕上根本没有提示要这么做。
+   *
+   * 订阅同意变化、把代数进依赖：同意那一刻自动重探，面板自己变成可用。
+   * （不是把 `privacyConsent` 塞进依赖 —— 它是个对象，引用不变，永远不会触发。）
+   */
+  const [consentRevision, setConsentRevision] = useState(0);
+  /**
+   * 是否正在探配置。
+   *
+   * 🔴 有它才能回答"**现在**该画表单还是该画不可用"：`centralConfig` 只记**结论**，
+   * 分不出"还没问"和"问过、说不行"。少了这一档，用户点完「同意联网」的下一帧
+   * 就会看到「登录暂时不可用」（旧结论 `null` 还在），表单被卸载 ——
+   * 用户刚打的口令跟着本地 state 一起没。
+   */
+  const [centralProbing, setCentralProbing] = useState(false);
+  /**
+   * 上一次结论是在**哪一代同意状态**下拿到的。
+   * `-1` = 还没有结论。`configRev !== consentRevision` ⇒ 结论**过期**，
+   * 而"过期"必须与"说不行"区分开：过期时保留表单，别让用户刚打的内容被卸载。
+   */
+  const [configRev, setConfigRev] = useState(-1);
+  useEffect(() => subscribePrivacyConsent(() => setConsentRevision((value) => value + 1)), []);
   useEffect(() => {
     if (!isOfficialService) {
       setCentralConfig(null);
       return;
     }
     let active = true;
-    setCentralConfig(undefined);
+    setCentralProbing(true);
+    /*
+      🔴 **重探时不许先清成 `undefined`**（2026-10-25 修）。
+      `undefined` 会让面板进入"配置加载中"那一支，于是**表单被卸载**——
+      用户刚打完的邮箱/口令跟着本地 state 一起没了。实测：点「同意联网」之后再回去，
+      口令框是空的（`toHaveValue` 收到 `""`），而那并不是"不自动重发"该有的副作用。
+      初值本来就是 `undefined`，所以这里不清也不会漏掉"第一次"的加载态；
+      重探期间保留上一次的结论，等新结果回来再换。
+    */
     void getCentralAuthConfig({ baseUrl: effectiveBaseUrl, fetchImpl: consentFetch }).then((result) => {
       if (!active) return;
       setCentralConfig(result.ok ? result.value : null);
+      setConfigRev(consentRevision);
+      setCentralProbing(false);
     });
     return () => { active = false; };
-  }, [effectiveBaseUrl, isOfficialService, centralProbe]);
+  }, [effectiveBaseUrl, isOfficialService, centralProbe, consentRevision]);
 
   // 每次渲染都重新探测。缓存成模块级常量会把**第一次**的结果永久钉住，
   // 而它在 jsdom 与真实浏览器里不同，用户中途接上安全密钥时也会变。
@@ -353,8 +393,32 @@ export function AuthPanel({
    *   ① 读不到配置（网络/5xx）⇒ 不猜；② mode 是 oidc 但条款版本缺失 ⇒ 配置残。
    */
   const centralExplicitLocal = isOfficialService && centralConfig?.mode === 'local';
-  const centralLoading = isOfficialService && !centralExplicitLocal && centralConfig === undefined;
-  const centralBlocked = isOfficialService && !centralExplicitLocal && centralConfig !== undefined && !centralMode;
+  /**
+   * 🔴 **还没同意联网时，不许把面板画成"登录不可用"**（2026-10-25 修）。
+   *
+   * 未同意时 `consentFetch` 会拦下配置探测 ⇒ `centralConfig === null` ⇒
+   * `centralBlocked` 为真 ⇒ 面板只剩「登录暂时不可用……本页不会改用其他登录方式」。
+   * 而那里**没有任何按钮能让用户同意**：同意弹窗只在用户点「提交」之后才出现，
+   * 可表单根本没画出来。⇒ 死路：用户既不能同意，也不能登录。
+   *
+   * 正确的落点是**本地表单**：它一个字节都不出进程（提交时由闸门弹同意），
+   * 正是"只用本机"该看到的东西。读不到配置只在**已经同意**时才该判"不可用"
+   * （那时确实该说"服务端没给配置"）。
+   */
+  const centralConfigStale = configRev !== consentRevision;
+  const centralUnreadableBeforeConsent =
+    isOfficialService
+    && centralConfig === null
+    && (centralConfigStale || !privacyConsent.networkAllowed());
+  const centralLoading =
+    isOfficialService && !centralExplicitLocal && centralConfig === undefined && centralProbing;
+  const centralBlocked =
+    isOfficialService
+    && !centralExplicitLocal
+    && !centralUnreadableBeforeConsent
+    && !centralProbing
+    && centralConfig !== undefined
+    && !centralMode;
   /**
    * 壳内官方站 ⇒ 中央登录改走 device handoff（P5.4）。
    *

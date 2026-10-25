@@ -29,6 +29,26 @@ async function interceptAuth(page: Page): Promise<{
     contentType: 'application/json',
     body: '{}',
   }));
+  /*
+    🔴 中央身份**配置**必须给一个**能用的**形状，否则面板根本长不出表单。
+    2026-10-25 之前这里是 `{}`（兜底那一支的产物）—— 而应用现在的行为是：
+    拿到畸形/缺失的配置就画「登录暂时不可用」，**并且明确不退回本地表单**
+    （`AuthPanel` 的 `centralBlocked` 分支，那是产品决定，不是缺陷）。
+    于是这四条用例红在"等一个永远不会出现的输入框"。
+
+    这里回 `mode:'local'`：它说的正是"这套部署用本地表单登录"，
+    与这组用例要验的东西（隐私闸门 → 勾选 → 表单 → 验证码）一致。
+    ⚠️ 不要改成 `{}` 或删掉这一支 —— 那会让四条用例变回"等 60 秒超时"。
+  */
+  await page.route('**/api/auth/central/config', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      mode: 'local',
+      loginPath: '/api/auth/oidc/start',
+      documentVersion: null,
+    }),
+  }));
   await page.route('**/api/register/email-password/request', async (route) => {
     registrations.push(route.request().postDataJSON() as RegistrationRequest);
     await route.fulfill({
