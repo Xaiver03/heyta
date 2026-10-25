@@ -846,3 +846,59 @@ heyta 服务端 → https://heyta.waytofuture.cn/managed-ai/v1/chat/completions
 
 门禁全绿：`settings-row-grammar`（6 节）· `settings-category-ux`（1440/375 × 深浅）·
 `page-layout-grammar` · `check:design` · `check:ui-language` · `check:settings-prose`。
+
+---
+
+## 十四、Windows 独立设置窗口（2026-10-25）
+
+### 14.1 分层：可跨平台的那一半进 Core
+
+| 文件 | 位置 | 本机可验 |
+|---|---|---|
+| `SettingsSurface.cs`（载荷：分节白名单 + 默认退回 + URL 组装） | `Heyta.Windows.Core`（`net10.0`） | ✅ `dotnet build` + 一次性探针 16 条 |
+| `WindowsWebRoot.cs`（web-dist 解析：环境变量优先，否则 exe 旁） | 同上 | ✅ 同上 |
+| `SettingsWindow.xaml` / `.xaml.cs`（建窗口 + 虚拟主机映射 + 导航） | `HeytaWindows`（`net10.0-windows`） | ❌ 本机编不了 |
+| `App.xaml.cs` 的 `ShowSettings()` + `HEYTA_OPEN_SETTINGS=1` | 同上 | ❌ |
+| `MainWindow.xaml` 的 `Ctrl+,` 加速器 + 处理器 | 同上 | ❌ |
+
+**为什么载荷不放 XAML 后面**：macOS 壳把 `?settings=…&standalone=1` 写在 Swift 里（那时只有一个壳）；
+到 Windows 这第二个壳再抄一遍，就有两份会漂的载荷（路径、参数名、默认节、合法节清单）。
+所以"长什么样"只有一份实现，放在能在 macOS/Linux 上构建与测试的库里。
+
+### 14.2 本机真跑到的读数
+
+```
+dotnet build Heyta.Windows.Core            Build succeeded（0 warning / 0 error）
+一次性探针（/tmp，不进仓库）                RESULT=OK，16 条
+  · 默认节 / 指定节（含首尾空格）/ 非法节退回默认 / 空串退回默认
+  · settings 与 standalone 两个参数名逐字比对
+  · 8 个合法节逐个能生成
+  · HEYTA_WEB_ROOT 优先 / 缺省落在 exe 旁 web-dist
+pnpm check:windows-shell                   RC=0（38 项 ✅ + WIDGET_LOCALE_SMOKE=OK 35/35）
+XAML 两条                                   XML 良构（ElementTree 解析通过）
+```
+
+⚠️ **诚实标注**：`HeytaWindows` 那半个工程（WinUI 3）**没有在本机构建过**（macOS 上没有
+`net10.0-windows` 目标与 WinUI 工具链）。`check:windows-shell` 在本机跑的是**跨语言那一层**
+（Core + 桥 + SQLite + 小组件本地化），它不编 XAML。所以在 Windows 上要补跑：
+
+```powershell
+# 在 Windows 机器上（仓库根）
+dotnet build apps/desktop-windows/HeytaWindows/HeytaWindows.csproj -c Debug
+pnpm check:windows-shell
+# 取证：启动即开设置窗口
+$env:HEYTA_OPEN_SETTINGS=1; $env:HEYTA_SETTINGS_STANDALONE="settings-group-ai"
+.\apps\desktop-windows\HeytaWindows\bin\Debug\net10.0-windows10.0.19041.0\win-x64\HeytaWindows.exe
+```
+
+### 14.3 Electron：**没有做**，理由写在代码事实里
+
+目标的剩余项里还有 Electron 独立窗口。查过之后决定不做：
+
+`apps/desktop/renderer/main.tsx` 是**最小 M2 切片**（只挂 `@heyta/ui` 的 `TaskList`），
+**不载 `apps/web`**。所以 `?settings=…&standalone=1` 在那个壳里没有任何含义 ——
+要做就得先把整个 web UI 搬进 Electron 渲染进程。而 repo-map 对这个壳的定位是
+**「过渡壳 + 唯一自动化桌面 GUI 门禁」，退役时点已定**
+（`docs/plans/multi-end-unified-strategy.md` §6.3-T3：等三个原生壳的壳级门禁替换它的断言）。
+
+给一个待退役的壳新写一套宿主，收益是负的。这一项按"不发明需求"处理，并在这一节留痕。

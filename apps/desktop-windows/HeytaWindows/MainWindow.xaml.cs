@@ -25,6 +25,19 @@ public sealed partial class MainWindow : Window
     private AppApi? _api;
 
     /// <summary>
+    /// Ctrl+, ⇒ 打开独立设置窗口。
+    /// </summary>
+    /// <remarks>
+    /// 壳这一层**没有**任何"设置长什么样"的决定：窗口自己载共享 UI 的
+    /// `?settings=…&standalone=1`。这里只转发一次用户意图。
+    /// </remarks>
+    private void OnOpenSettingsInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        App.ShowSettings();
+    }
+
+    /// <summary>
     /// 页侧提醒腿的**系统通知中心**（四端里 Windows 这一份实现）。
     ///
     /// 🔴 它是"管道"不是"决策"：哪条到点、弹过没有、`firedAt` 怎么记，全在页侧

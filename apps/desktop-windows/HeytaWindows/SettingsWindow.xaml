@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  独立设置窗口（2026-10-25）。
+
+  🔴 它**只有一控件**：一个填满窗口的 WebView2。设置长什么样、有哪些节、
+     行怎么排，全部在共享 UI 那一侧（`apps/web/dist` + `?standalone=1`）。
+     这个文件里刻意没有一行"设置界面"的布局 —— 有的话就是第二份实现，
+     而 macOS 壳已经证明这条路只需要一个 URL。
+-->
+<Window
+    x:Class="Heyta.Shell.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="设置">
+
+    <Grid x:Name="WindowRoot" Background="{ThemeResource HeytaColorBackground}">
+        <WebView2 x:Name="Web" />
+    </Grid>
+</Window>
