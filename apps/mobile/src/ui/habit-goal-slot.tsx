@@ -17,13 +17,13 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import type { Habit, HabitGoalType } from '@heyta/domain';
 import { habitGoalSummaryKey } from '@heyta/ui';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
-import { Chip, Text } from './kit';
+import { Chip, Text, TextField } from './kit';
 import { useTokens } from '../theme';
 
 export function HabitGoalSlot({
@@ -101,39 +101,24 @@ export function HabitGoalSlot({
 
       {open ? (
         <View style={{ gap: tokens['space.2'] }}>
-          <View style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
-            <TextInput
-              value={draftTarget}
-              onChangeText={setDraftTarget}
-              keyboardType="number-pad"
-              accessibilityLabel={t('web.habits.goal.target')}
-              placeholder={t('web.habits.goal.target')}
-              placeholderTextColor={tokens['color.foreground-subtle']}
-              style={{
-                width: tokens['space.8'],
-                minHeight: tokens['touch-target.min'],
-                paddingHorizontal: tokens['space.2'],
-                borderRadius: tokens['radius.md'],
-                backgroundColor: tokens['color.surface'],
-                color: tokens['color.foreground'],
-              }}
-            />
-            <TextInput
-              value={draftUnit}
-              onChangeText={setDraftUnit}
-              accessibilityLabel={t('web.habits.goal.unit')}
-              placeholder={t('web.habits.goal.unitPlaceholder')}
-              placeholderTextColor={tokens['color.foreground-subtle']}
-              style={{
-                flex: 1,
-                minHeight: tokens['touch-target.min'],
-                paddingHorizontal: tokens['space.2'],
-                borderRadius: tokens['radius.md'],
-                backgroundColor: tokens['color.surface'],
-                color: tokens['color.foreground'],
-              }}
-            />
-          </View>
+          {/* 🔴 两格改成共享 `TextField`（2026-10-24）：此前是裸 `<TextInput>`，
+              于是它们没有标签、没有错误位、也没有统一的 `accessibilityLabel` 写法 ——
+              而 web 的同一处（`HabitGoalEditor`）早就是"标签 + 控件"了。 */}
+          <TextField
+            label={t('web.habits.goal.target')}
+            value={draftTarget}
+            onChangeText={setDraftTarget}
+            keyboard="number-pad"
+            placeholder={t('web.habits.goal.target')}
+            testID={`habit-goal-target-${habit.id}`}
+          />
+          <TextField
+            label={t('web.habits.goal.unit')}
+            value={draftUnit}
+            onChangeText={setDraftUnit}
+            placeholder={t('web.habits.goal.unitPlaceholder')}
+            testID={`habit-goal-unit-${habit.id}`}
+          />
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
             {typeChip('atLeast', 'web.habits.goal.atLeast')}

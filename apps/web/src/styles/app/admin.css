@@ -332,6 +332,15 @@
   gap: var(--ht-space-1);
 }
 
+/* 配额那一行：输入框 + 提交按钮并排（2026-10-24 从 `<label>` 里拆出来的 ——
+   按钮嵌在 label 里会让"点按钮"也把焦点送进输入框）。 */
+.ht-settings__admin-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+}
+
 .ht-settings__admin-pager {
   display: flex;
   gap: var(--ht-space-2);

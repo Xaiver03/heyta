@@ -455,72 +455,31 @@ export function TaskDetailSheet({
       bottomInset={insets.bottom}
       testID="task-detail-sheet"
     >
-            <View style={{ gap: tokens['space.1'] }}>
-              <Text variant="row-meta" tone="muted">
-                {t('mobile.detail.field.title')}
-              </Text>
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                onBlur={commitTitle}
-                onSubmitEditing={commitTitle}
-                returnKeyType="done"
-                accessibilityLabel={t('mobile.detail.field.title')}
-                placeholder={t('mobile.tasks.composer.placeholder')}
-                placeholderTextColor={tokens['color.foreground-subtle']}
-                style={[
-                  text['row-title'],
-                  {
-                    minHeight: tokens['touch-target.min'],
-                    paddingHorizontal: tokens['space.3'],
-                    borderRadius: tokens['radius.md'],
-                    backgroundColor: tokens['color.surface-sunken'],
-                    color: tokens['color.foreground'],
-                    // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条
-                    // CSS 字体栈交给 RN，字体解析失败且**不报错**（已实测）。
-                    fontFamily: native.fontSans,
-                  },
-                ]}
-              />
-            </View>
+            {/* 🔴 2026-10-24：标题/备注改走共享 `TextField`。
+                此前是"手写 label + 裸 `<TextInput>` + 一整套 inline style" ——
+                那正是 web 侧被清掉 27 处的那种形状，只是换了个端。
+                `onBlur` 提交的语义一字未动（`TextField` 现在收 `onBlur`）。 */}
+            <TextField
+              label={t('mobile.detail.field.title')}
+              value={title}
+              onChangeText={setTitle}
+              onBlur={commitTitle}
+              onSubmitEditing={commitTitle}
+              placeholder={t('mobile.tasks.composer.placeholder')}
+              testID="task-detail-title"
+            />
 
-            <View style={{ gap: tokens['space.1'] }}>
-              <Text variant="row-meta" tone="muted">
-                {t('mobile.detail.field.note')}
-              </Text>
-              <TextInput
-                value={note}
-                onChangeText={setNote}
-                onBlur={commitNote}
-                multiline
-                // 备注是长文本，不该被"完成"键打断 —— 收起键盘靠点别处或关闭面板。
-                // 面板本身是 ScrollView，键盘弹起时有 KeyboardAvoidingView 兜着。
-                numberOfLines={4}
-                textAlignVertical="top"
-                accessibilityLabel={t('mobile.detail.field.note')}
-                placeholder={t('mobile.detail.note.placeholder')}
-                placeholderTextColor={tokens['color.foreground-subtle']}
-                style={[
-                  text['row-meta'],
-                  {
-                    minHeight: tokens['touch-target.min'],
-                    paddingHorizontal: tokens['space.3'],
-                    paddingVertical: tokens['space.2'],
-                    borderRadius: tokens['radius.md'],
-                    backgroundColor: tokens['color.surface-sunken'],
-                    color: tokens['color.foreground'],
-                    // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条
-                    // CSS 字体栈交给 RN，字体解析失败且**不报错**（已实测）。
-                    fontFamily: native.fontSans,
-                  },
-                ]}
-              />
-              {/* 如实说明"什么时候存" —— 失焦才提交是刻意的，
-                  但用户看不见这条规则时会以为它已经在同步了。 */}
-              <Text variant="row-meta" tone="muted">
-                {t('mobile.detail.note.hint')}
-              </Text>
-            </View>
+            {/* 备注是长文本，不该被"完成"键打断 —— 收起键盘靠点别处或关闭面板。
+                面板本身是 ScrollView，键盘弹起时有 KeyboardAvoidingView 兜着。 */}
+            <TextField
+              label={t('mobile.detail.field.note')}
+              value={note}
+              onChangeText={setNote}
+              onBlur={commitNote}
+              multiline
+              lines={4}
+              testID="task-detail-note"
+            />
 
             {/* 清单排程预览：备注里写了清单（或 AI 拆解过）时才有内容可排。
                 它是任务内部坐标系，与时间线板的关系由预览自己的说明文字标明。 */}
