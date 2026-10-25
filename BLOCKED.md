@@ -12017,3 +12017,22 @@ B227 的第一版就是被这一枚误读数带偏的（把"串行同样红"读�
 下一轮取证方式：`page.evaluate` 拿 `document.elementFromPoint(中心点)` 打出真正接住点击的那个元素，
 再决定是判据该先 hover/收浮层，还是产品真有一层挡在前面。
 ⚠️ 别用 `click({ force: true })` 绕过 —— 那会把"用户点不到"这件事一并测掉。
+
+## B229（2026-10-25 深夜）：**整理浮层掉在可视区外，滚到底也够不着** —— 「绝对定位的后代不进滚动宿主的 scrollable overflow」这条旧账在整理那一枚上还在
+
+读数（`shell-no-document-scroll` W2，真浏览器，本机当场）：
+
+    整理编辑器 top=604 bottom=749，可视区 top=60 bottom=700
+    内容列 scrollTop=510（已滚到 max）scrollHeight=1150 clientHeight=640，触发器 top=558
+
+⇒ 面板下半截（749−700 = 49px）在折叠线以下，而**已经滚到底**了 —— 不是"没滚够"。
+
+同一份 spec 的文件头记着 B95 那一档的修法：`material.css` 的 `.ht-material__row-slot`
+（零高度槽 + 流内本体）。而现在整理那一枚是**绝对定位**的（`.ht-material__row-pop`），
+绝对定位的后代**不**计入滚动宿主的 `scrollable overflow` ⇒ `scrollHeight` 里没有它。
+
+两条修法（产品/样式裁决，我倾向 ①）：
+① 让整理浮层也走 `.ht-material__row-slot`（与 B95 那次同一条路，一处收口）；
+② 贴底时**朝上弹**（`flip`）：代价是多一份定位逻辑，且"朝哪边弹"又要一份判据。
+
+同族欠账：`TaskRepeat.tsx` 里那枚同形状的浮层（spec 文件头已登记）——三处一起做才是收尾。
