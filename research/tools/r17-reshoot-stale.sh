@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# 跨平台 md5（macOS `md5 -q` / Linux `md5sum`）。实现只有一处，见 lib/md5q.sh。
+# 跨平台 md5：实现只有一处（lib/md5q.sh），这里只调 md5q / md5q_stdin。
+# ⚠️ 注释里**别**写那两条平台专属命令的字面 —— `check:shell-portability` 按文本扫站点，连注释一起算。
 . "$(cd "$(dirname "$0")" && pwd)/lib/md5q.sh"
+
 # 把 `r17-evidence-md5-check.sh --all` 报成「形状主张已过期」（UISTALE）的证据目录**重拍**一遍。
 #
 # 为什么要有这么个脚本（2026-10-04 14:2x）：本线现在有 4 份 README / 14 枚截图的 UIPIN 判为过期，
