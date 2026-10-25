@@ -173,6 +173,13 @@ const EXPECTED = [
   '03-owner-panel-created.png',
   '04-owner-invite-ticket.png',
   '05-bob-join-dialog.png',
+  // 🔴 入群那一侧的同意闸（ADR-0071 裁决三）自己有一张图：这台浏览器从没确认过 ⇒
+  //    fail-closed 必须先弹，弹出来的东西要有人看过。少登记这一张，这条腿从
+  //    那一闸落地那天起就是必红的（"拍了 12 张，在册 11 张"），而红的原因不是产品坏 ——
+  //    是收口清单没跟着长。补登记的前提是本批**逐张看过**这张图（2026-10-25）。
+  //    ⚠️ 同一张图上照出的另一件事（入群面用的是 owner 语）登记在计划 §9.14 末那一格，
+  //    归产品负责人拍，本批不代改文案。
+  '05a-bob-join-consent.png',
   '06-bob-joined.png',
   '07-owner-sees-bob.png',
   '08-owner-panel-error-visible.png',

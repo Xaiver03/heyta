@@ -75,7 +75,7 @@ import {
   subscribeShareActivityFeed,
 } from '../src/share/share-activity-notify';
 
-import { read, stripComments } from './source-reading';
+import { mobileSources, read, stripComments } from './source-reading';
 
 const SCREENS = ['apps/mobile/src/screens/ShareSpaceScreen.tsx', 'apps/mobile/src/screens/JoinShareScreen.tsx'];
 
@@ -235,5 +235,80 @@ describe('⑤ 无订阅偏好 ⇒ 零打扰（闸门只有 `@heyta/ui` 那一枚
     expect(code).toContain('installMobileShareActivityDelivery(');
     expect(code, '不 bind 依赖垫片，投递装配默认会抛"共享投递依赖未装配"').toContain('bindShareDeliveryDeps(');
     expect(code, '登出必须清共享动态（换归属）').toContain('clearShareActivityFeed');
+  });
+});
+
+describe('⑥ 手机上不许画"只在 web 那一格"（第八批逐张肉眼复核抓到的一族）', () => {
+  /**
+   * 存在的理由：第 26 跑的入群成功那一屏（`06g-加入成功.png`）画的是
+   * 「加入成功，清单已出现在侧栏。」—— 手机上**没有侧栏**，加入之后能看见那份清单的地方
+   * 叫「已共享的清单」。这条错一条判据都没红：设备腿判的是"有没有走到成功相位"，
+   * 文案对账门（`check:verify-script-copy`）判的是"脚本里的句子在不在词表里"，
+   * 两句都成立而这句话在手机上仍是谎称界面能力。**只有肉眼看得见它。**
+   * 🔴 所以这里判的是**一类**而不是那一枚键：任何被 `apps/mobile/src` 用到的词条，
+   *    中/英两档值都不许点名一个只存在于另一壳的界面格子。
+   */
+  /** 词条表：`键 → 值`。解析形状与 `check:verify-script-copy` 对词表的那把尺同源。 */
+  const loadTable = (rel: string): Map<string, string> => {
+    const map = new Map<string, string>();
+    for (const m of read(rel).matchAll(/^\s*'([a-z0-9][\w.]*)':\s*'((?:[^'\\]|\\.)*)',\s*$/gm)) {
+      map.set(m[1], m[2]);
+    }
+    return map;
+  };
+  const ZH_REL = 'packages/i18n/src/locales/zh-CN.ts';
+  const EN_REL = 'packages/i18n/src/locales/en.ts';
+  const ZH = loadTable(ZH_REL);
+  const EN = loadTable(EN_REL);
+  /** 每一档语言配一枚"只在 web 存在的格子"的名字 —— 两档都要判，判一档留一半洞。 */
+  const TABLES: Array<[rel: string, region: RegExp, table: Map<string, string>]> = [
+    [ZH_REL, /侧栏/, ZH],
+    [EN_REL, /sidebar/i, EN],
+  ];
+
+  /**
+   * ⚠️ 存量例外，**不是**把判据放轻：这三枚删除/归档回执点名的落点也是「侧栏」，
+   *    与 `web.share.join.*` 同一族错。改它们的话术归回收站/归档那条线（那两句被它自己的
+   *    用例钉着），本线不代改、更不代判"这样也可以"。逐格登记见计划 §9.14。
+   *    🔴 这张表只许变短：任何**新**出现的这一族错都会让下面那条判据红；
+   *    而它们被那条线修掉之后，这里留着空名目同样会红（同一条判据的第二句管这件事）。
+   */
+  const OTHER_LINE_DEBT = [
+    'common.organizer.confirm.impactChildren',
+    'common.organizer.confirm.impactChildrenArchive',
+    'common.trash.confirm.strandChildren',
+  ];
+
+  it('对照臂：两档词表都读得到（读不到 ⇒ 反向判据恒真，那是探针坏了）', () => {
+    expect(ZH.get('web.share.join.done'), 'zh 探针读不出这一枚键').toContain('侧栏');
+    expect(EN.get('web.share.join.done'), 'en 探针读不出这一枚键').toMatch(/sidebar/i);
+  });
+
+  it('🔴 移动端源码用到的每一枚词条，两档值都不许含"只在 web 存在的格子"（例外只剩在册那三枚）', () => {
+    for (const [rel, region, table] of TABLES) {
+      const offenders = new Set<string>();
+      for (const src of mobileSources()) {
+        for (const m of stripComments(read(src)).matchAll(/\bt\(\s*'([a-z0-9][\w.]*)'/g)) {
+          if (region.test(table.get(m[1]) ?? '')) offenders.add(m[1]);
+        }
+      }
+      expect([...offenders].filter((k) => !OTHER_LINE_DEBT.includes(k)), `${rel} 里新长出这一族错`).toEqual([]);
+      expect(OTHER_LINE_DEBT.filter((k) => !offenders.has(k)), `${rel}：这几枚已经不含了 ⇒ 把名目从债表里删掉，别留一张会骗人的表`).toEqual([]);
+    }
+  });
+
+  it('入群那一屏的两句话用的是手机自己的落点，不是 web 那两枚', () => {
+    const code = stripComments(read('apps/mobile/src/screens/JoinShareScreen.tsx'));
+    expect(code).toContain("t('mobile.share.join.subtitle')");
+    expect(code).toContain("t('mobile.share.join.done')");
+    expect(code).not.toContain("t('web.share.join.subtitle')");
+    expect(code).not.toContain("t('web.share.join.done')");
+    // 手机那两条点名的格子，必须就是这一屏之上真存在的那一节（同名同源，不各写一份）。
+    for (const table of [ZH, EN]) {
+      const region = table.get('mobile.share.space.sharedTitle');
+      expect(region, '手机上那一节的标题读不出来 ⇒ 下面两条是恒真').toBeTruthy();
+      expect(table.get('mobile.share.join.done'), '成功回执点名的格子要和真存在的那一节同名').toContain(region as string);
+      expect(table.get('mobile.share.join.subtitle'), '副标题点名的格子同理').toContain(region as string);
+    }
   });
 });

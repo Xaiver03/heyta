@@ -301,8 +301,12 @@ export default function JoinShareScreen({
     }
     return (
       <Stack>
+        {/* 这一句与文件末尾那枚 `share-join-subtitle` 走 `mobile.share.join.*` 而**不是**
+            `web.share.join.*` 的同句复用：web 那两枚说的落点是「侧栏」，手机上没有那一格
+            （看得见它的地方叫「已共享的清单」）。
+            别为了"去重"把它们并回去 —— 那是向用户谎称界面能力。 */}
         <Text variant="row-title" tone="default" testID="share-join-done">
-          {t('web.share.join.done')}
+          {t('mobile.share.join.done')}
         </Text>
         <Button label={t('web.share.dialog.close')} onPress={onBack} testID="share-join-close-final" />
       </Stack>
@@ -315,7 +319,7 @@ export default function JoinShareScreen({
       actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack }]}
     >
       <Text variant="row-meta" tone="muted" testID="share-join-subtitle">
-        {t('web.share.join.subtitle')}
+        {t('mobile.share.join.subtitle')}
       </Text>
       {body()}
     </Screen>

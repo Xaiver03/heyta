@@ -1,0 +1,63 @@
+{
+  "shareId": "6ac32acd-7388-434b-bfd4-5151243c62e4",
+  "ownerMemberId": "85432a8c-7d2f-41f2-8ca8-e53c6c0fbcb2",
+  "phone": {
+    "memberId": "63cb243d-b0b0-4bf2-b171-c94b3225c639",
+    "identityPublicKey": "W/VpkTM8XxMN6IB+SQFfOSfHzEtXes2wQxb85vSd4jk=",
+    "role": "editor"
+  },
+  "members": [
+    {
+      "memberId": "85432a8c-7d2f-41f2-8ca8-e53c6c0fbcb2",
+      "userId": 86,
+      "role": "owner",
+      "addedAt": 1792944451791,
+      "hasEnvelope": false,
+      "memberKeyEpoch": 1,
+      "identityPublicKey": null,
+      "signingPublicKey": "Ttqww3wC1eyeBUm6LvitW5UlSd+lcYWZdD/qo8QXEjg=",
+      "keyEnvelope": null
+    },
+    {
+      "memberId": "63cb243d-b0b0-4bf2-b171-c94b3225c639",
+      "userId": 87,
+      "role": "editor",
+      "addedAt": 1792944476102,
+      "hasEnvelope": true,
+      "memberKeyEpoch": 1,
+      "identityPublicKey": "W/VpkTM8XxMN6IB+SQFfOSfHzEtXes2wQxb85vSd4jk=",
+      "signingPublicKey": "y0G9KYtAmcHQab7p5jG/Aa/hE1FBR5mfdfO0PrNqhYQ=",
+      "keyEnvelope": {
+        "iv": "5X+tU7/Y9Wg4RGD6",
+        "shareId": "6ac32acd-7388-434b-bfd4-5151243c62e4",
+        "keyEpoch": 1,
+        "ciphertext": "NtP7Y6Fg+QqlX0tQ6towfULfzfjrR2dDnCkGjJIDCpgtieaU7JuYB4dzxyRr11H4",
+        "formatVersion": 1,
+        "ephemeralPublicKey": "ttafCaenmQLlTvwUfbUu9mTlp3hzVXSyQNxEKgbCjTY=",
+        "ephemeralFingerprint": "1fde1051a3484fc881aab65a9431ba1f5233abbeb3adddd995c3a77a5bc8f464",
+        "recipientFingerprint": "8987c7ce5d59da8c63b428936a35a57eac9e01c7e37baf2fe9de8a94a8ba120f"
+      }
+    }
+  ],
+  "opCount": 3,
+  "opAuthors": [
+    {
+      "id": "owner-op-1792944451777-1",
+      "entityType": "TASK",
+      "signerMemberId": "85432a8c-7d2f-41f2-8ca8-e53c6c0fbcb2",
+      "serverSeq": 1
+    },
+    {
+      "id": "share-op-1-1792944506107",
+      "entityType": "COMMENT",
+      "signerMemberId": "63cb243d-b0b0-4bf2-b171-c94b3225c639",
+      "serverSeq": 2
+    },
+    {
+      "id": "owner-op-1792944451777-2",
+      "entityType": "COMMENT",
+      "signerMemberId": "85432a8c-7d2f-41f2-8ca8-e53c6c0fbcb2",
+      "serverSeq": 3
+    }
+  ]
+}
