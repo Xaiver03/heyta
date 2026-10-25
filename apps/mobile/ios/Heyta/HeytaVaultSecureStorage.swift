@@ -10,11 +10,21 @@ import Security
  * `WhenUnlockedThisDeviceOnly`, so it is unavailable before first unlock and
  * is not migrated to another device. The app never writes the root key to a
  * file, UserDefaults, or the widget's keychain service.
+ *
+ * The root-key methods keep their exact 32-byte contract: that is what makes a
+ * truncated or corrupted item fail loudly instead of unlocking to garbage.
+ * `loadBlob` / `saveBlob` are the twin channel for the *other* secret this app
+ * holds in Keychain — the share-key document, which is a variable-length,
+ * already vault-envelope-encrypted JSON. Routing it through `save` was rejected
+ * by the device (2026-10-25 iOS journey: `vault root key 必须是 32 字节 Base64`).
  */
 @objc(HeytaVaultSecureStorage)
 final class HeytaVaultSecureStorage: NSObject {
   private static let service = "com.heyta.vault.secure-storage.v1"
   private static let rootKeyBytes = 32
+  /// Upper bound for a blob item. The share-key document is a few KiB; a cap
+  /// keeps a corrupted or hostile writer from growing Keychain unboundedly.
+  private static let maxBlobBytes = 64 * 1024
 
   @objc static func moduleName() -> String! { "HeytaVaultSecureStorage" }
   @objc static func requiresMainQueueSetup() -> Bool { false }
@@ -28,23 +38,37 @@ final class HeytaVaultSecureStorage: NSObject {
   ) {
     do {
       let scope = try Self.scope(serverOrigin: serverOrigin, accountId: accountId)
-      var query = Self.baseQuery(account: scope.account)
-      query[kSecReturnData as String] = true
-      query[kSecMatchLimit as String] = kSecMatchLimitOne
-      var result: CFTypeRef?
-      let status = SecItemCopyMatching(query as CFDictionary, &result)
-      if status == errSecItemNotFound {
+      guard let data = try Self.readItem(account: scope.account) else {
         resolve(nil)
         return
       }
-      guard status == errSecSuccess else {
-        throw Self.keychainError(status, operation: "读取")
-      }
-      guard let data = result as? Data, data.count == Self.rootKeyBytes else {
+      guard data.count == Self.rootKeyBytes else {
         throw NSError(domain: "HeytaVaultSecureStorage", code: 3,
                       userInfo: [NSLocalizedDescriptionKey: "Keychain 中的 vault root key 长度无效"])
       }
       resolve(data.base64EncodedString())
+    } catch {
+      reject("E_VAULT_SECURE_LOAD", error.localizedDescription, error)
+    }
+  }
+
+  @objc(loadBlob:accountId:resolve:reject:)
+  func loadBlob(
+    _ serverOrigin: String,
+    accountId: String,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    do {
+      let scope = try Self.scope(serverOrigin: serverOrigin, accountId: accountId)
+      guard let data = try Self.readItem(account: scope.account) else {
+        resolve(nil)
+        return
+      }
+      guard let value = String(data: data, encoding: .utf8) else {
+        throw Self.blobError("安全存储中的密钥料不是合法 UTF-8")
+      }
+      resolve(value)
     } catch {
       reject("E_VAULT_SECURE_LOAD", error.localizedDescription, error)
     }
@@ -64,20 +88,31 @@ final class HeytaVaultSecureStorage: NSObject {
         throw NSError(domain: "HeytaVaultSecureStorage", code: 4,
                       userInfo: [NSLocalizedDescriptionKey: "vault root key 必须是 32 字节 Base64"])
       }
+      // Update only the value. A failed update leaves the old item intact;
+      // this path never deletes first and never runs on sync failure.
+      try Self.writeItem(account: scope.account, data: data)
+      resolve(true)
+    } catch {
+      reject("E_VAULT_SECURE_SAVE", error.localizedDescription, error)
+    }
+  }
 
-      var item = Self.baseQuery(account: scope.account)
-      item[kSecValueData as String] = data
-      item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-      var status = SecItemAdd(item as CFDictionary, nil)
-      if status == errSecDuplicateItem {
-        // Update only the value. A failed update leaves the old item intact;
-        // this path never deletes first and never runs on sync failure.
-        let query = Self.baseQuery(account: scope.account)
-        status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+  @objc(saveBlob:accountId:value:resolve:reject:)
+  func saveBlob(
+    _ serverOrigin: String,
+    accountId: String,
+    value: String,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    do {
+      let scope = try Self.scope(serverOrigin: serverOrigin, accountId: accountId)
+      let data = Data(value.utf8)
+      guard !data.isEmpty else { throw Self.blobError("密钥料不能为空") }
+      guard data.count <= Self.maxBlobBytes else {
+        throw Self.blobError("密钥料超过 \(Self.maxBlobBytes) 字节上限")
       }
-      guard status == errSecSuccess else {
-        throw Self.keychainError(status, operation: "写入")
-      }
+      try Self.writeItem(account: scope.account, data: data)
       resolve(true)
     } catch {
       reject("E_VAULT_SECURE_SAVE", error.localizedDescription, error)
@@ -129,6 +164,40 @@ final class HeytaVaultSecureStorage: NSObject {
       kSecAttrService as String: service,
       kSecAttrAccount as String: account,
     ]
+  }
+
+  /// The one read path shared by the root-key and blob channels: the two differ
+  /// only in what they accept *after* the bytes come back.
+  private static func readItem(account: String) throws -> Data? {
+    var query = baseQuery(account: account)
+    query[kSecReturnData as String] = true
+    query[kSecMatchLimit as String] = kSecMatchLimitOne
+    var result: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &result)
+    if status == errSecItemNotFound { return nil }
+    guard status == errSecSuccess else { throw keychainError(status, operation: "读取") }
+    guard let data = result as? Data else {
+      throw keychainError(status, operation: "读取（返回的不是数据）")
+    }
+    return data
+  }
+
+  /// Add, or update only the value of an existing item. A failed update leaves
+  /// the previous item intact; no caller deletes first.
+  private static func writeItem(account: String, data: Data) throws {
+    var item = baseQuery(account: account)
+    item[kSecValueData as String] = data
+    item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+    var status = SecItemAdd(item as CFDictionary, nil)
+    if status == errSecDuplicateItem {
+      status = SecItemUpdate(baseQuery(account: account) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+    }
+    guard status == errSecSuccess else { throw keychainError(status, operation: "写入") }
+  }
+
+  private static func blobError(_ message: String) -> NSError {
+    NSError(domain: "HeytaVaultSecureStorage", code: 5,
+            userInfo: [NSLocalizedDescriptionKey: message])
   }
 
   private static func invalidScope(_ message: String) -> NSError {

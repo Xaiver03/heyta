@@ -7,6 +7,7 @@ vi.mock('../src/prefs/device-prefs', () => ({
 
 import {
   createRememberedUnlockVaultStorage,
+  createVaultSecureBlobStorage,
   createVaultSecureStorage,
   isVaultRootAutoUnlockDisabled,
   normalizeVaultSecureStorageScope,
@@ -26,6 +27,8 @@ function nativeFixture(): VaultSecureStorageNative {
   return {
     load: vi.fn(async () => null),
     save: vi.fn(async () => true),
+    loadBlob: vi.fn(async () => null),
+    saveBlob: vi.fn(async () => true),
     remove: vi.fn(async () => true),
   };
 }
@@ -142,6 +145,8 @@ describe('vault secure storage port', () => {
     const events: string[] = [];
     const native: VaultSecureStorageNative = {
       load: async () => item,
+      loadBlob: async () => null,
+      saveBlob: async () => true,
       save: async (_origin, _account, root) => {
         started();
         await finish;
@@ -214,5 +219,52 @@ describe('vault secure storage port', () => {
     await expect(storage.load(account)).resolves.toBeUndefined();
     await storage.save(account, key);
     await expect(storage.load(account)).resolves.toBe(key);
+  });
+});
+
+/**
+ * 密钥料（blob）通道。
+ *
+ * 🔴 这组用例的存在理由来自 2026-10-25 的 iOS 旅程实测：share 密钥环那份变长 JSON
+ * 当时走的是 root key 那对接口，原生按契约拒了（`vault root key 必须是 32 字节 Base64`），
+ * 手机入群因此永远走不到成功态。夹具喂的是假 vault，那对契约只有真机能撞出来 ——
+ * 这里能钉住的是"密钥料不许再走 root key 那对"这一条形状纪律。
+ */
+describe('vault blob（密钥料）通道', () => {
+  it('load/save 走 blob，绝不碰 root key 那对接口', async () => {
+    const native = nativeFixture();
+    const blob = 'NOT-32-BYTES-AT-ALL';
+    await expect(createVaultSecureBlobStorage(native).load(scope)).resolves.toBeUndefined();
+    await createVaultSecureBlobStorage(native).save(scope, blob);
+    expect(native.loadBlob).toHaveBeenCalledWith('https://sync.example.test/', 'account-1');
+    expect(native.saveBlob).toHaveBeenCalledWith('https://sync.example.test/', 'account-1', blob);
+    expect(native.load).not.toHaveBeenCalled();
+    expect(native.save).not.toHaveBeenCalled();
+  });
+
+  it('原生返回的字符串原样交出，null 如实是「没有」', async () => {
+    const native = nativeFixture();
+    native.loadBlob = vi.fn(async () => '{"version":1,"entries":[]}');
+    await expect(createVaultSecureBlobStorage(native).load(scope)).resolves.toBe('{"version":1,"entries":[]}');
+  });
+
+  it('空值在打原生桥之前就拒（不许把空槽写进钥匙串冒充密钥）', async () => {
+    const native = nativeFixture();
+    await expect(createVaultSecureBlobStorage(native).save(scope, '  ')).rejects.toThrow('密钥料不能为空');
+    expect(native.saveBlob).not.toHaveBeenCalled();
+  });
+
+  it('native 报 false ⇒ 抛，且不会顺手删掉旧值', async () => {
+    const native = nativeFixture();
+    native.saveBlob = vi.fn(async () => false);
+    const storage = createVaultSecureBlobStorage(native);
+    await expect(storage.save(scope, 'X')).rejects.toThrow('密钥料未能写入安全存储');
+    expect(native.remove).not.toHaveBeenCalled();
+  });
+
+  it('缺 blob 通道的旧原生：blob 端口具名失败，root key 端口不受影响', () => {
+    const legacy = { load: async () => null, save: async () => true, remove: async () => true } as unknown as VaultSecureStorageNative;
+    expect(() => createVaultSecureBlobStorage(legacy)).toThrow('缺少密钥料（blob）通道');
+    expect(() => createVaultSecureStorage(legacy)).not.toThrow();
   });
 });

@@ -63,12 +63,34 @@ export interface VaultSecureStorageScope {
 export interface VaultSecureStorageNative {
   load(serverOrigin: string, accountId: string): Promise<string | null>;
   save(serverOrigin: string, accountId: string, rootKeyBase64: string): Promise<boolean>;
+  /**
+   * Variable-length secret channel. The root-key pair above validates
+   * "exactly 32 bytes" on **both** directions — that contract is what makes a
+   * truncated root key fail instead of unlocking to garbage, so the share-key
+   * document (a variable-length, already vault-envelope-encrypted JSON) must
+   * not be pushed through it.
+   */
+  loadBlob(serverOrigin: string, accountId: string): Promise<string | null>;
+  saveBlob(serverOrigin: string, accountId: string, value: string): Promise<boolean>;
   remove(serverOrigin: string, accountId: string): Promise<boolean>;
 }
 
 export interface VaultSecureStorage {
   load(scope: VaultSecureStorageScope): Promise<string | undefined>;
   save(scope: VaultSecureStorageScope, rootKeyBase64: string): Promise<void>;
+  remove(scope: VaultSecureStorageScope): Promise<void>;
+}
+
+/**
+ * The same Keychain/Keystore item, reached through the blob channel.
+ *
+ * `remove` is deliberately the root-key module's own deletion: the item is
+ * addressed by `(serverOrigin, accountId)`, so a scope used by the blob port
+ * deletes exactly that blob and nothing else.
+ */
+export interface VaultSecureBlobStorage {
+  load(scope: VaultSecureStorageScope): Promise<string | undefined>;
+  save(scope: VaultSecureStorageScope, value: string): Promise<void>;
   remove(scope: VaultSecureStorageScope): Promise<void>;
 }
 
@@ -131,6 +153,25 @@ function requireNative(native: VaultSecureStorageNative | undefined): VaultSecur
   return native;
 }
 
+/**
+ * The blob channel is checked separately so a native build that predates it
+ * fails on the share-key path only — never on remembered unlock.
+ */
+function requireNativeBlob(native: VaultSecureStorageNative | undefined): VaultSecureStorageNative {
+  const bridge = requireNative(native);
+  if (typeof bridge.loadBlob !== 'function' || typeof bridge.saveBlob !== 'function') {
+    throw new Error(`${MODULE_NAME} 原生模块缺少密钥料（blob）通道`);
+  }
+  return bridge;
+}
+
+function requireBlobValue(value: string): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new TypeError('密钥料不能为空');
+  }
+  return value;
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -154,6 +195,35 @@ export function createVaultSecureStorage(native: VaultSecureStorageNative): Vaul
       const normalized = normalizeVaultSecureStorageScope(scope);
       const removed = await bridge.remove(normalized.serverOrigin, normalized.accountId);
       if (removed !== true) throw new Error('vault root key 未能从安全存储清除');
+    },
+  };
+}
+
+/**
+ * The blob twin of {@link createVaultSecureStorage} for one scope's
+ * variable-length secret. There is no remembered-unlock fence here on purpose:
+ * the fence protects the *root key*, and this channel holds data that is
+ * already wrapped by it — after logout the root key is gone, so a leftover
+ * blob item is unreadable rather than dangerous, and `remove` still deletes it.
+ */
+export function createVaultSecureBlobStorage(native: VaultSecureStorageNative): VaultSecureBlobStorage {
+  const bridge = requireNativeBlob(native);
+  return {
+    async load(scope) {
+      const normalized = normalizeVaultSecureStorageScope(scope);
+      const value = await bridge.loadBlob(normalized.serverOrigin, normalized.accountId);
+      return value === null ? undefined : value;
+    },
+    async save(scope, value) {
+      const normalized = normalizeVaultSecureStorageScope(scope);
+      const blob = requireBlobValue(value);
+      const saved = await bridge.saveBlob(normalized.serverOrigin, normalized.accountId, blob);
+      if (saved !== true) throw new Error('密钥料未能写入安全存储');
+    },
+    async remove(scope) {
+      const normalized = normalizeVaultSecureStorageScope(scope);
+      const removed = await bridge.remove(normalized.serverOrigin, normalized.accountId);
+      if (removed !== true) throw new Error('密钥料未能从安全存储清除');
     },
   };
 }
@@ -206,6 +276,11 @@ export function createRememberedUnlockVaultStorage(
 /** Resolve the real native port lazily; importing this file never touches RN. */
 export function getVaultSecureStorage(): VaultSecureStorage {
   return createVaultSecureStorage(requireNative(nativeModule()));
+}
+
+/** Resolve the blob channel of the same native module; lazy, like the port above. */
+export function getVaultSecureBlobStorage(): VaultSecureBlobStorage {
+  return createVaultSecureBlobStorage(requireNativeBlob(nativeModule()));
 }
 
 /** Explicit logout operation. This is the only convenience alias for `remove`. */

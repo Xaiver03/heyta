@@ -4,10 +4,19 @@
  *
  * 🔴 判定本体（信封封装/解开、多世代环、盘上键名与 JSON 形状）只在
  * `@heyta/app-host` 的 `share-key-store.ts` 一份（AGENTS §3.5）。本文件是
- * **端口适配器**：`ShareKeyStoragePort`（异步 get/set/remove）→ `VaultSecureStorage`
+ * **端口适配器**：`ShareKeyStoragePort`（异步 get/set/remove）→ `VaultSecureBlobStorage`
  * （iOS Keychain / Android Keystore）。密钥料整块进安全存储，不落 device-prefs
  * （sqlite）——整份存储本就是 vault 包裹的信封，拆开分放只会多出"两半不同步"
  * 的坏形状，而那正是这条通道最丢不起的东西（丢钥 = 共享清单不可用）。
+ *
+ * ## 为什么走 blob 通道而不是 root key 那一对
+ *
+ * 🔴 2026-10-25 iOS 旅程实测（第 21 跑，证据 `apps/mobile/evidence/collab-ios-10251033/06f-加入没走到成功态.png`）：
+ * 按 root key 那对接口写这份 JSON，原生直接拒 —— `vault root key 必须是 32 字节 Base64`。
+ * 那句**不是缺陷，是那条接口的契约**：`save`/`load` 两端都校验"恰好 32 字节"，
+ * 因为一把被截断的 root key 必须失败，而不是解出一堆垃圾。而这一格是一份
+ * **变长** JSON。所以原生模块另开了一对变长通道（`loadBlob`/`saveBlob`，上限见 Swift/Kotlin），
+ * root key 那对一字未动 —— 少开这一对，共享清单在手机上就永远加入不了。
  *
  * ## 为什么是"同账号的兄弟槽位"
  *
@@ -27,9 +36,9 @@
 import type { ShareKeyStoragePort } from '@heyta/app-host';
 
 import {
-  getVaultSecureStorage,
+  getVaultSecureBlobStorage,
   normalizeVaultSecureStorageScope,
-  type VaultSecureStorage,
+  type VaultSecureBlobStorage,
   type VaultSecureStorageScope,
 } from './vault-secure-storage';
 
@@ -59,7 +68,7 @@ const parseSlot = (raw: string): SlotMap => {
 
 /** 可注入端口的构造（判据用假实现，测试不碰原生模块）。 */
 export function createShareKeyStoragePort(
-  vault: VaultSecureStorage,
+  vault: VaultSecureBlobStorage,
   scope: VaultSecureStorageScope,
 ): ShareKeyStoragePort {
   const shareScope = shareKeyStoreScope(scope);
@@ -87,7 +96,7 @@ export function createShareKeyStoragePort(
   };
 }
 
-/** 生产入口：真正的原生端口 + 账号 scope。导入本文件不触碰 RN（`getVaultSecureStorage` 自己就是惰性的）。 */
+/** 生产入口：真正的原生端口 + 账号 scope。导入本文件不触碰 RN（`getVaultSecureBlobStorage` 自己就是惰性的）。 */
 export function getShareKeyStoragePort(scope: VaultSecureStorageScope): ShareKeyStoragePort {
-  return createShareKeyStoragePort(getVaultSecureStorage(), scope);
+  return createShareKeyStoragePort(getVaultSecureBlobStorage(), scope);
 }

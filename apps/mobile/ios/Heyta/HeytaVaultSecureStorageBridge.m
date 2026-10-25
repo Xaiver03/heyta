@@ -18,6 +18,17 @@ RCT_EXTERN_METHOD(save:(NSString *)serverOrigin
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(loadBlob:(NSString *)serverOrigin
+                  accountId:(NSString *)accountId
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(saveBlob:(NSString *)serverOrigin
+                  accountId:(NSString *)accountId
+                  value:(NSString *)value
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(remove:(NSString *)serverOrigin
                   accountId:(NSString *)accountId
                   resolve:(RCTPromiseResolveBlock)resolve

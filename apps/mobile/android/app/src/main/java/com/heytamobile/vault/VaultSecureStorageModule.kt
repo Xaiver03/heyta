@@ -26,6 +26,12 @@ import javax.crypto.spec.GCMParameterSpec
  * widget key. The plaintext root key exists only for the duration of this
  * bridge call (and, on the JS side, the caller's unlocked session).
  *
+ * `load`/`save` keep the exact 32-byte root-key contract in both directions.
+ * `loadBlob`/`saveBlob` are the twin channel for the other secret held here —
+ * the share-key document, a variable-length, already vault-envelope-encrypted
+ * JSON. Pushing it through `save` is rejected by the contract, not by a bug
+ * (same reason on iOS, 2026-10-25 journey evidence `collab-ios-10251033`).
+ *
  * This module has no implicit write path. Saving is an explicit user choice;
  * sync failures never call [remove].
  */
@@ -49,12 +55,31 @@ class VaultSecureStorageModule(
     }
 
     @ReactMethod
+    fun loadBlob(serverOrigin: String, accountId: String, promise: Promise) {
+        try {
+            promise.resolve(VaultSecureStorage.loadBlob(preferences, serverOrigin, accountId))
+        } catch (error: Throwable) {
+            promise.reject(ERR_LOAD, error.message ?: "读取安全存储失败", error)
+        }
+    }
+
+    @ReactMethod
     fun save(serverOrigin: String, accountId: String, rootKeyBase64: String, promise: Promise) {
         try {
             VaultSecureStorage.save(preferences, serverOrigin, accountId, rootKeyBase64)
             promise.resolve(true)
         } catch (error: Throwable) {
             // Do not remove or overwrite the previous envelope on failure.
+            promise.reject(ERR_SAVE, error.message ?: "写入安全存储失败", error)
+        }
+    }
+
+    @ReactMethod
+    fun saveBlob(serverOrigin: String, accountId: String, value: String, promise: Promise) {
+        try {
+            VaultSecureStorage.saveBlob(preferences, serverOrigin, accountId, value)
+            promise.resolve(true)
+        } catch (error: Throwable) {
             promise.reject(ERR_SAVE, error.message ?: "写入安全存储失败", error)
         }
     }
@@ -81,23 +106,28 @@ class VaultSecureStorageModule(
 /** Android implementation kept separate from the RN module so its invariants are testable. */
 internal object VaultSecureStorage {
     private const val KEYSTORE = "AndroidKeyStore"
-    /** Never reuse the widget alias: this key wraps vault root keys only. */
+    /** Never reuse the widget alias: this key wraps the vault root key and the share-key document. */
     private const val WRAP_KEY_ALIAS = "heyta_vault_root_wrap_key_v1"
     private const val KEY_PREFIX = "scope_"
     private const val ENVELOPE_VERSION = 1
     private const val GCM_TAG_BITS = 128
     private const val GCM_NONCE_BYTES = 12
     private const val ROOT_KEY_BYTES = 32
+    private const val MAX_BLOB_BYTES = 64 * 1024
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
 
     fun load(preferences: android.content.SharedPreferences, serverOrigin: String, accountId: String): String? {
         val scope = Scope.of(serverOrigin, accountId)
-        val raw = preferences.getString(preferenceKey(scope), null) ?: return null
-        val envelope = parseEnvelope(raw, scope)
-        val plain = cipher(Cipher.DECRYPT_MODE, wrappingKey(), envelope.nonce, scope.aad)
-            .doFinal(envelope.ciphertext)
+        val plain = readPlain(preferences, scope) ?: return null
         require(plain.size == ROOT_KEY_BYTES) { "存储的 vault root key 长度无效" }
         return Base64.encodeToString(plain, Base64.NO_WRAP)
+    }
+
+    /** The variable-length twin of [load]: same envelope, no root-key length check. */
+    fun loadBlob(preferences: android.content.SharedPreferences, serverOrigin: String, accountId: String): String? {
+        val scope = Scope.of(serverOrigin, accountId)
+        val plain = readPlain(preferences, scope) ?: return null
+        return String(plain, Charsets.UTF_8)
     }
 
     fun save(
@@ -107,9 +137,49 @@ internal object VaultSecureStorage {
         rootKeyBase64: String,
     ) {
         val scope = Scope.of(serverOrigin, accountId)
-        val root = decodeRootKey(rootKeyBase64)
+        writeEnvelope(preferences, scope, decodeRootKey(rootKeyBase64))
+    }
+
+    /**
+     * The variable-length twin of [save]. The share-key document is a JSON of
+     * a few hundred bytes, so it cannot satisfy the root-key pair's "exactly 32
+     * bytes" contract — that check is what makes a truncated root key fail
+     * instead of unlocking to garbage, so the blob goes around it, not through it.
+     */
+    fun saveBlob(
+        preferences: android.content.SharedPreferences,
+        serverOrigin: String,
+        accountId: String,
+        value: String,
+    ) {
+        val scope = Scope.of(serverOrigin, accountId)
+        val plain = value.toByteArray(Charsets.UTF_8)
+        require(plain.isNotEmpty()) { "密钥料不能为空" }
+        require(plain.size <= MAX_BLOB_BYTES) { "密钥料超过 $MAX_BLOB_BYTES 字节上限" }
+        writeEnvelope(preferences, scope, plain)
+    }
+
+    fun remove(preferences: android.content.SharedPreferences, serverOrigin: String, accountId: String) {
+        val scope = Scope.of(serverOrigin, accountId)
+        check(preferences.edit().remove(preferenceKey(scope)).commit()) {
+            "安全存储清除未能同步落盘"
+        }
+    }
+
+    private fun readPlain(preferences: android.content.SharedPreferences, scope: Scope): ByteArray? {
+        val raw = preferences.getString(preferenceKey(scope), null) ?: return null
+        val envelope = parseEnvelope(raw, scope)
+        return cipher(Cipher.DECRYPT_MODE, wrappingKey(), envelope.nonce, scope.aad)
+            .doFinal(envelope.ciphertext)
+    }
+
+    private fun writeEnvelope(
+        preferences: android.content.SharedPreferences,
+        scope: Scope,
+        plain: ByteArray,
+    ) {
         val nonce = ByteArray(GCM_NONCE_BYTES).also { SecureRandom().nextBytes(it) }
-        val encrypted = cipher(Cipher.ENCRYPT_MODE, wrappingKey(), nonce, scope.aad).doFinal(root)
+        val encrypted = cipher(Cipher.ENCRYPT_MODE, wrappingKey(), nonce, scope.aad).doFinal(plain)
         val envelope = JSONObject()
             .put("v", ENVELOPE_VERSION)
             .put("scope", scope.digestHex)
@@ -122,13 +192,6 @@ internal object VaultSecureStorage {
         // failed commit cannot turn a sync error into deletion of the old value.
         check(preferences.edit().putString(preferenceKey(scope), envelope).commit()) {
             "安全存储未能同步落盘"
-        }
-    }
-
-    fun remove(preferences: android.content.SharedPreferences, serverOrigin: String, accountId: String) {
-        val scope = Scope.of(serverOrigin, accountId)
-        check(preferences.edit().remove(preferenceKey(scope)).commit()) {
-            "安全存储清除未能同步落盘"
         }
     }
 

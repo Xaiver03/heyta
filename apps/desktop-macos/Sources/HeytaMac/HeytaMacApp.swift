@@ -43,6 +43,144 @@ struct HeytaMacApp: App {
         //    现取 **1120×720**：在 1440×900 的笔记本屏上留出菜单栏与 Dock 后
         //    仍有余量，内容区（竖排 rail + 主区）在这个宽度下不挤。
         .defaultSize(width: 1120, height: 720)
+
+        /**
+         🔴 **设置是一个独立窗口**（2026-10-25 产品负责人：「设置界面弄成单独的弹窗吧，
+         网页端可以内嵌」）。
+
+         用 SwiftUI 的 `Settings` 场景而不是自己 `NSWindow`：它会自动把
+         「heyta → 设置…」放进应用菜单、自动绑 ⌘,、自动带标题栏 —— 这几件事
+         手搓一遍就是三处会和系统不一致的地方（而它们正是"像不像 macOS 应用"的来源）。
+
+         载荷是**同一个 `web-dist` 的另一个 URL**：`?settings=…&standalone=1`。
+         `standalone=1` 让页侧收起应用壳（rail / 任务区 / 详情列），
+         所以窗口里画的就是设置本身，而不是"整个应用 + 一层模态"。
+         */
+        /**
+         🔴 **设置是一个独立窗口**（2026-10-25 产品负责人：「设置界面弄成单独的弹窗吧，
+         网页端可以内嵌」）。
+
+         ⚠️ 这里**不用** SwiftUI 的 `Settings` 场景：实测在"裸二进制直接跑"的形态下，
+         `NSApp.sendAction(showSettingsWindow:)` 没有把窗口唤起来（`window-id.swift`
+         只列到主窗口），而 `Settings` 场景的内容又要等窗口被打开才实例化 ——
+         取证链于是没有入口。改成**显式 `NSWindow` + 一条 ⌘, 菜单命令**：
+         确定性强，且它就是"第二个窗口"本身。
+
+         载荷是**同一个 `web-dist` 的另一个 URL**：`?settings=…&standalone=1`。
+         `standalone=1` 让页侧收起应用壳（rail / 任务区 / 详情列），
+         所以窗口里画的就是设置本身，而不是"整个应用 + 一层模态"。
+         */
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("设置…") { SettingsWindow.open() }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
+        }
+    }
+}
+
+/// 独立设置窗口的宿主（**唯一**创建它的地方）。
+///
+/// 为什么不用 `Settings` 场景：那条路依赖 `showSettingsWindow:` 这个私有 selector，
+/// 在"裸二进制直接跑"的形态下没反应（实测只列到主窗口），而取证链需要的正是
+/// "能确定地打开它"。显式 `NSWindow` 没有这个不确定性。
+@MainActor
+enum SettingsWindow {
+    private static var window: NSWindow?
+
+    static func open() {
+        if let existing = window {
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+        let hosting = NSHostingView(rootView: SettingsWindowView())
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 640),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "设置"
+        window.contentView = hosting
+        window.center()
+        // 关掉不释放：⌘, 再开回到同一个实例（设置是有状态的界面，重建会丢滚动位置）。
+        window.isReleasedWhenClosed = false
+        Self.window = window
+        window.makeKeyAndOrderFront(nil)
+        FileHandle.standardError.write("SETTINGS_WINDOW=opened\n".data(using: .utf8)!)
+        // 自报状态：窗口号/可见性/几何 全是取证读数（`window-id.swift` 只列**屏上**窗口，
+        // 取证时本窗口可能还没被窗口服务器登记，所以这里自己说清楚）。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            let wv = SelfCapture.webView
+            let url = wv?.url?.absoluteString ?? "nil"
+            FileHandle.standardError.write(
+                "SETTINGS_WINDOW_STATE=visible:\(window.isVisible) number:\(window.windowNumber) onScreen:\(window.isOnActiveSpace)\n"
+                    .data(using: .utf8)!)
+            FileHandle.standardError.write("SETTINGS_WEBVIEW_URL=\(url)\n".data(using: .utf8)!)
+            // 取证时把首启的联网同意框按掉（只用本机）—— 否则它盖住整屏，测不到设置本身。
+            wv?.evaluateJavaScript("""
+            (() => {
+              const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === '只用本机');
+              if (b) b.click();
+              // ⚠️ **不要按 Esc**：设置自己响应 Esc（`settings-exit` 那组判据），
+              //    一按就把面板关掉、露出应用本体 —— 2026-10-25 实测踩过这一次。
+              return 'ok';
+            })()
+            """) { _, _ in }
+            wv?.evaluateJavaScript("document.body ? document.body.innerText.slice(0,300) : '<no body>'") { value, error in
+                FileHandle.standardError.write(
+                    "SETTINGS_PAGE_TEXT=\(value ?? "nil") err=\(error?.localizedDescription ?? "none")\n"
+                        .data(using: .utf8)!)
+            }
+        }
+        // 🔴 取证时不许抢焦点（`AGENTS.md §6.2` 规定二）。
+        if ProcessInfo.processInfo.environment["HEYTA_NO_FOCUS"] != "1" {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+}
+
+/// 独立设置窗口：一个 WKWebView 载 `?settings=…&standalone=1`。
+///
+/// 默认落在「任务与显示」那一节（产品负责人最先看的就是它）；
+/// 想指定别节时用环境变量 `HEYTA_SETTINGS_STANDALONE=<section>`，
+/// 与壳里其它取证开关同一形状（默认值就是产品行为，开关只为取证）。
+struct SettingsWindowView: View {
+    private static let defaultSection = "settings-group-appearance"
+
+    /// 与主窗口同一套解析（`decide()` 幂等：确认桥在、建好库目录）。
+    private let storage = ShellStorageHost.decide()
+
+    private var payload: String {
+        let env = ProcessInfo.processInfo.environment["HEYTA_SETTINGS_STANDALONE"]
+        let section = (env?.isEmpty == false ? env! : Self.defaultSection)
+        return "settings=\(section)&standalone=1"
+    }
+
+    var body: some View {
+        Group {
+            if let root = SharedWebRoot.resolve() {
+                SharedWebView(
+                    root: root,
+                    query: payload,
+                    /**
+                     🔴 **必须和主窗口用同一套存储宿主决策**，不能传 `nil`。
+                     2026-10-25 实测：传 `nil` 之后页侧退回自己的存储，而
+                     `heyta-local://` 这个自定义 origin 下拿不到 IndexedDB，
+                     页面直接画成「无法初始化本地存储」—— 独立窗口一片空白。
+                     判据就是窗口里那句话（`SETTINGS_PAGE_TEXT=`）。
+                     */
+                    storageHost: storage.host,
+                    onProbe: { _ in },
+                    onStorageFact: { _ in }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Text("找不到共享 UI 产物（web-dist）。")
+                    .padding()
+            }
+        }
+        .frame(minWidth: 760, minHeight: 560)
     }
 }
 
@@ -57,6 +195,15 @@ struct HeytaMacApp: App {
 final class ActivationDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        /**
+         🔴 取证开关 `HEYTA_OPEN_SETTINGS=1`：启动即打开设置窗口。
+         必须在**这里**触发，不能写在 `Settings { }` 的内容里 ——
+         那个内容要等窗口被打开才会被实例化，`.onAppear` 就成了先有鸡还是先有蛋。
+         */
+        if ProcessInfo.processInfo.environment["HEYTA_OPEN_SETTINGS"] == "1" {
+            FileHandle.standardError.write("HEYTA_OPEN_SETTINGS=1\n".data(using: .utf8)!)
+            DispatchQueue.main.async { SettingsWindow.open() }
+        }
         if ProcessInfo.processInfo.environment["HEYTA_NO_FOCUS"] == "1" {
             // 窗口照常创建、照常能被 ScreenCaptureKit 截到，但不落焦点。
         } else {
@@ -387,6 +534,15 @@ final class HeytaSchemeHandler: NSObject, WKURLSchemeHandler {
 /// SwiftUI 里的共享 UI 宿主。
 struct SharedWebView: NSViewRepresentable {
     let root: URL
+
+    /**
+     载入时附带的查询串（`nil` = 原样载 `index.html`）。
+
+     为什么需要：桌面端把设置做成**独立窗口**时，那个窗口要的是
+     `index.html?settings=<节>&standalone=1` —— 同一个 `web-dist`，不同的意图。
+     默认值 `nil` 保证既有调用点一个字节都不变。
+     */
+    var query: String? = nil
     /// 存储宿主；`nil` = 这一轮不当宿主（页侧用自己那份存储）。见 `ShellStorageHost.decide()`。
     let storageHost: ShellStorageHost?
     /// 加载并探测完成后的结论（回传给 SwiftUI 显示 + 写证据）。
@@ -490,7 +646,9 @@ struct SharedWebView: NSViewRepresentable {
 
         // 🔴 探测取**组件自己打的 testID**，不取"界面上有字"。
         //    与 Windows 侧逐字相同的那条判据：登录入口（前置）+ 采集框（应用壳画出来了）。
-        webView.load(URLRequest(url: URL(string: "heyta-local://app/index.html")!))
+        var components = URLComponents(string: "heyta-local://app/index.html")!
+        if let query, !query.isEmpty { components.query = query }
+        webView.load(URLRequest(url: components.url!))
         return webView
     }
 
@@ -1839,6 +1997,27 @@ func writeWebEvidence(_ note: String, storageFacts: [String]) {
 /// 只有**原生才拿得到的东西**：窗口、菜单、托盘、通知、URL scheme、钥匙串、
 /// 文件关联。这个文件里现在体现为 `WKURLSchemeHandler`（把本地产物用**正常 origin**
 /// 提供给 WebView）—— 见它的注释里那条"为什么不用 `file://`"。
+/// 共享 UI 产物目录（`web-dist`）的解析：**只有这一处**。
+///
+/// 主窗口与独立设置窗口都载同一份产物 —— 两处各写一遍"先看环境变量、再找
+/// `Contents/Resources/web-dist`"就是一份会漂的抄件（本仓对这类抄件的纪律）。
+enum SharedWebRoot {
+    static func resolve() -> URL? {
+        if let env = ProcessInfo.processInfo.environment["HEYTA_WEB_ROOT"], !env.isEmpty {
+            return URL(fileURLWithPath: env)
+        }
+        // 🔴 必须在 **Contents/Resources**（`Bundle.main.resourceURL`），
+        //    不能放 bundle 根：code signing 只封 `Contents/`，根下的散目录让
+        //    `codesign` 报 "unsealed contents present in the bundle root"
+        //    （2026-09-30 实测）。这条理由原来写在 ShellView 那格注里，搬家时保留。
+        let inResources = Bundle.main.resourceURL?.appendingPathComponent("web-dist")
+        if let dir = inResources, FileManager.default.fileExists(atPath: dir.path) {
+            return dir
+        }
+        return nil
+    }
+}
+
 struct ShellView: View {
     /// M2：共享 UI 的加载结论（前置登录入口是否可达、设置里的导入入口在不在）。
     @State private var webNote = ""
@@ -1856,16 +2035,7 @@ struct ShellView: View {
     ///    不能放 bundle 根（`Heyta.app/web-dist`）：code signing 只封 `Contents/`，
     ///    根下的散目录让 `codesign` 直接报 "unsealed contents present in the
     ///    bundle root"，打不出有效签名（2026-09-30 实测）。
-    @State private var webRoot: URL? = {
-        if let env = ProcessInfo.processInfo.environment["HEYTA_WEB_ROOT"], !env.isEmpty {
-            return URL(fileURLWithPath: env)
-        }
-        let inResources = Bundle.main.resourceURL?.appendingPathComponent("web-dist")
-        if let dir = inResources, FileManager.default.fileExists(atPath: dir.path) {
-            return dir
-        }
-        return nil
-    }()
+    @State private var webRoot: URL? = SharedWebRoot.resolve()
 
     /// 把"这一轮当不当宿主"拼在最前面 —— 证据里必须能看出**为什么**没走宿主那条路。
     private func factsWithHostLine() -> [String] {
