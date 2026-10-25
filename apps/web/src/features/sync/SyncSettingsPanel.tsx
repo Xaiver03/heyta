@@ -33,6 +33,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { SettingsInfoTip } from '../settings/SettingsInfoTip.js';
 import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import { HeytaUiProvider, SyncStatusBar, syncStatusAffordances } from '@heyta/ui';
@@ -114,8 +115,14 @@ export function SyncSettingsPanel({
       data-testid="sync-settings-panel"
       aria-label={t('web.sync.settings.title')}
     >
-      <h2 className="ht-settings__title ht-type-section-title">{t('web.sync.settings.title')}</h2>
-      <p className="ht-settings__hint">{t('web.settings.sync.note')}</p>
+      <h2 className="ht-settings__title ht-type-section-title">
+        {t('web.sync.settings.title')}
+        <SettingsInfoTip
+          testId="tip-sync"
+          label={t('web.sync.settings.title')}
+          text={t('web.settings.sync.note')}
+        />
+      </h2>
 
       <div className="sync-settings__stack">
         {signedIn ? <fieldset className="sync-settings__fieldset" aria-labelledby="sync-status-title">
@@ -158,8 +165,14 @@ export function SyncSettingsPanel({
 
         {signedIn ? (
         <fieldset className="sync-settings__fieldset" aria-labelledby="sync-encryption-title">
-          <legend id="sync-encryption-title" className="sync-settings__legend">{t('web.settings.syncUx.encryptionTitle')}</legend>
-          <p className="sync-settings__section-hint">{t('web.settings.syncUx.encryptionHint')}</p>
+          <legend id="sync-encryption-title" className="sync-settings__legend">
+            {t('web.settings.syncUx.encryptionTitle')}
+            <SettingsInfoTip
+              testId="tip-sync-encryption"
+              label={t('web.settings.syncUx.encryptionTitle')}
+              text={t('web.settings.syncUx.encryptionHint')}
+            />
+          </legend>
           {!vaultMode ? (
             <>
               <FormField id="sync-password" label={t('web.sync.password.label')}>
@@ -173,11 +186,17 @@ export function SyncSettingsPanel({
                   />
                 )}
               </FormField>
-              <p className="sync-settings__field-hint">
-                {t('web.sync.password.lead')}
-                <strong>{t('web.sync.password.strong')}</strong>
-                {t('web.sync.password.tail')}
-              </p>
+              <SettingsInfoTip
+                testId="tip-sync-password"
+                label={t('web.sync.password.label')}
+                text={
+                  <>
+                    {t('web.sync.password.lead')}
+                    <strong>{t('web.sync.password.strong')}</strong>
+                    {t('web.sync.password.tail')}
+                  </>
+                }
+              />
             </>
           ) : null}
           {!vaultMode ? <button type="button" className="ht-btn ht-btn--primary" data-testid="sync-unlock-and-sync"
@@ -192,8 +211,14 @@ export function SyncSettingsPanel({
         <details className="sync-settings__advanced" data-testid="sync-advanced">
           <summary className="sync-settings__advanced-summary">{t('common.sync.advanced')}</summary>
         <fieldset className="sync-settings__fieldset" aria-labelledby="sync-account-title">
-          <legend id="sync-account-title" className="sync-settings__legend">{t('web.settings.syncUx.accountTitle')}</legend>
-          <p className="sync-settings__section-hint">{t('web.settings.syncUx.accountHint')}</p>
+          <legend id="sync-account-title" className="sync-settings__legend">
+            {t('web.settings.syncUx.accountTitle')}
+            <SettingsInfoTip
+              testId="tip-sync-account"
+              label={t('web.settings.syncUx.accountTitle')}
+              text={t('web.settings.syncUx.accountHint')}
+            />
+          </legend>
           <FormField id="sync-server-url" label={t('web.sync.serverUrl.label')}>
             {(field) => (
               <input
@@ -217,7 +242,11 @@ export function SyncSettingsPanel({
               />
             )}
           </FormField>
-          <p className="sync-settings__field-hint">{t('web.auth.tokenHint')}</p>
+          <SettingsInfoTip
+            testId="tip-sync-token"
+            label={t('web.sync.token.label')}
+            text={t('web.auth.tokenHint')}
+          />
           <button type="button" className="ht-btn ht-btn--ghost sync-settings__fit-button" onClick={() => sync.openSignIn()}>
             {t('web.auth.open')}
           </button>

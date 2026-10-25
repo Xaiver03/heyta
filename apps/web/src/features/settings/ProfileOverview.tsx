@@ -56,7 +56,7 @@ export function ProfileOverview({
             {identity.displayName ?? identity.email ?? t('web.profile.overview.local')}
           </h2>
           {identity.displayName && identity.email ? (
-            <p className="ht-settings__profile-note">{identity.email}</p>
+            <p className="ht-settings__profile-note" role="status">{identity.email}</p>
           ) : null}
           <p className="ht-settings__profile-status">
             <LockKeyhole size={ICON_SIZE.xs} aria-hidden="true" />

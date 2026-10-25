@@ -247,6 +247,7 @@ function endpointRejectionText(
     case 'credentials-in-url':
       return t('web.ai.settings.endpointError.credentialsInUrl');
     case 'plaintext-remote':
+      // settings-prose-ok: 这一句只渲染进 endpointError 的那枚 `role="alert"` 位
       return t('web.ai.settings.endpointError.plaintextRemote');
   }
 }
@@ -319,11 +320,13 @@ function presetText(
     case 'ollama':
       return {
         label: t('web.ai.settings.preset.ollama.label'),
+        // settings-prose-ok: 这一句是预设卡上那条 notice 的**标题**（渲染成 title），不是说明
         prerequisite: t('web.ai.settings.preset.ollama.prerequisite'),
       };
     case 'lm-studio':
       return {
         label: t('web.ai.settings.preset.lmStudio.label'),
+        // settings-prose-ok: 同上，是 notice 标题
         prerequisite: t('web.ai.settings.preset.lmStudio.prerequisite'),
       };
     default:
@@ -1523,7 +1526,7 @@ export function AiSettings({
 
       <InboundAutomationSettings active={active} routing={settings.routing} consents={settings.consents} secretStore={secrets} />
 
-      <p className="ht-settings__notice" data-testid="key-notice">
+      <p className="ht-settings__notice" role="status" data-testid="key-notice">
         <Lock size={ICON_SIZE.xs} aria-hidden="true" />
         {t('web.ai.settings.keyNotice')}
       </p>

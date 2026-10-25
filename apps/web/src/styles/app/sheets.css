@@ -107,7 +107,12 @@
  * 两种行距。这里把**节奏**对齐（分隔与留白），布局仍是"标签左、控件右"。 */
 .ht-settings .ht-settings__preference-row {
   align-items: center;
-  padding-block: var(--ht-space-3);
+  /* 行高 = 控件那一档（44 触控 / 52 行内），不再叠加 `--ht-space-3` 的上下留白。
+     2026-10-25 现量：改前行距中位数 **85px**（44 控件 + 16×2 留白 + 1 边框），
+     macOS 设置的区间是 **44–56** —— 所以留白降到 `--ht-space-1`，
+     行本身给一个 44 的下限，超出部分由控件自己决定。 */
+  min-block-size: var(--ht-touch-target-min);
+  padding-block: var(--ht-space-1);
 }
 
 .ht-settings .ht-settings__preference-row + .ht-settings__preference-row {
@@ -190,7 +195,10 @@
 
 .ht-settings__content {
   min-inline-size: 0;
-  max-inline-size: var(--ht-layout-prose-max);
+  /* 🔴 设置**不是散文**。`--ht-layout-prose-max` 是给正文阅读用的行宽（≈65ch），
+     套在设置上就是"右侧空掉 45%"的直接原因 —— 那一屏的判据是
+     "控件右缘必须对齐，且不许在面板右侧留超过 48px 的死区"，不是"一行读几个字"。 */
+  max-inline-size: none;
 }
 
 .ht-settings__group {
