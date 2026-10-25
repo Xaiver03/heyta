@@ -750,9 +750,19 @@ reminder_json() {
   sqlite3 "$PHONE_DB" "SELECT data FROM ops WHERE json_extract(data,'\$.op.entityType')='REMINDER' ORDER BY pk0 DESC LIMIT 1;" 2>/dev/null
 }
 
+# 🔴 不用 BSD 独有的 stat 那个 `-f` 形状：GNU 上它读的是**另一件事**、取到空串而不报错，
+#    于是"源码比包新"那条判据会变成恒真（§7 第 364/370 条）。
+#    node 两边都有，语义同一：拿 mtime 的秒。
 newest_src() {
-  find "$ROOT/apps/mobile/src" "$ROOT/packages"/*/src -type f \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
-    | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1
+  node -e '
+    const {readdirSync,statSync}=require("fs");const {join}=require("path");
+    const roots=process.argv.slice(1);let max=0;
+    const walk=(d)=>{for(const n of readdirSync(d,{withFileTypes:true})){const f=join(d,n.name);
+      if(n.isDirectory()){walk(f);continue;}
+      if(!/\.tsx?$/.test(n.name))continue;
+      const m=statSync(f).mtimeMs/1000;if(m>max)max=m;}};
+    for(const r of roots){try{walk(r);}catch{}}
+    console.log(Math.floor(max));' "$ROOT/apps/mobile/src" "$ROOT"/packages/*/src 2>/dev/null || echo 0
 }
 
 step "0. 当前源码 Release 构建、安装与新鲜度"
@@ -824,7 +834,7 @@ else
 fi
 INSTALLED="$(xcrun simctl get_app_container "$UDID" "$BID" app 2>/dev/null)"
 SRC_MTIME="$(newest_src)"
-BUNDLE_MTIME="$(stat -f '%m' "$INSTALLED/main.jsbundle" 2>/dev/null || echo 0)"
+BUNDLE_MTIME="$(node -e 'try{process.stdout.write(String(Math.floor(require("fs").statSync(process.argv[1]).mtimeMs/1000)))}catch{process.stdout.write("0")}' "$INSTALLED/main.jsbundle" 2>/dev/null || echo 0)"
 BUILT_BUNDLE_SHA="$(shasum -a 256 "$APP/main.jsbundle" 2>/dev/null | awk '{print $1}')"
 INSTALLED_BUNDLE_SHA="$(shasum -a 256 "$INSTALLED/main.jsbundle" 2>/dev/null | awk '{print $1}')"
 if [ "$BUILD_STARTED" -gt 0 ] && [ -n "$BUILT_BUNDLE_SHA" ] && [ "$BUILT_BUNDLE_SHA" = "$INSTALLED_BUNDLE_SHA" ]; then
@@ -852,7 +862,7 @@ for _f in packages/ui/src/reminders/ReminderList.tsx \
           packages/i18n/src/locales/en.ts; do
   [ -f "$ROOT/$_f" ] && FEATURE_SRC+=("$ROOT/$_f")
 done
-FEATURE_NEWEST="$(printf '%s\0' "${FEATURE_SRC[@]}" | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1)"
+FEATURE_NEWEST="$(node -e 'let max=0;for(const f of process.argv.slice(1)){try{const m=require("fs").statSync(f).mtimeMs/1000;if(m>max)max=m;}catch{}}process.stdout.write(String(Math.floor(max)))' "${FEATURE_SRC[@]}" 2>/dev/null || echo 0)"
 if [ "${#FEATURE_SRC[@]}" -eq 0 ]; then
   bad "本轮口径的源码清单为空 —— 判不了装机包含不含这一行，别把这条读成通过"
 elif [ -n "$FEATURE_NEWEST" ] && [ "${BUNDLE_MTIME:-0}" -ge "$FEATURE_NEWEST" ]; then
