@@ -371,6 +371,18 @@ export async function openApp(
   await enableAllModules(page);
   await pinChineseUi(page);
   await installMissingProducerShims(page);
+  /*
+    🔴 **测试不许打到生产**（2026-10-25）。
+    应用在没有配置同步地址时会去问**官方**那台 `/api/auth/central/config`。
+    以前 CI/沙箱没有网络，这个请求当场失败、测看起来"离线"；一旦有网络，
+    它就会真发出去并**挂在那儿等超时**（实测：认证那批 spec 每条都卡满 1 分钟），
+    于是红的原因从"产品行为"变成"外网慢不慢"。
+
+    这里统一把生产域名**在浏览器侧切断**：任何走 `heyta.waytofuture.cn` 的请求
+    直接 abort。要验"联网"的 spec 自己 `page.route` 覆盖（比 `openApp` 里先装的
+    规则优先），所以这层不是"禁止联网"，是"不许打到我们自己的生产环境"。
+  */
+  await page.route('**://heyta.waytofuture.cn/**', (route) => route.abort());
   await page.goto(path);
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
   await decidePrivacyConsent(page, consent);
