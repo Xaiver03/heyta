@@ -139,7 +139,10 @@ test.describe('激励体系：真浏览器契约', () => {
     // 🔴 不变的承诺是：**全部目的地仍然可达、每个文案逐字一致** —— 改的是
     // "在哪一级"，不是"有哪些"。
     const primary = page.locator(
-      '.ht-rail__tabs button[role="tab"]:not(.ht-rail__tab--tool)',
+      // 🔴 排除助手那一枚：`rail-assistant` 同样是 `role="tab"`（`RailNavigation.tsx:452`），
+      // 却没有 `--tool` 修饰类，于是「主段四枚」会数成 5。它不是视图目的地，
+      // 而是「打开 AI 面」的开关 —— 这条判据量的是视图目的地，两者不是一个分母。
+      '.ht-rail__tabs button[role="tab"]:not(.ht-rail__tab--tool):not([data-testid="rail-assistant"])',
     );
     await expect(primary).toHaveCount(4);
     const primaryLabels = (await primary.allTextContents()).map((t) => t.trim());
@@ -191,7 +194,13 @@ test.describe('激励体系：真浏览器契约', () => {
     await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
     await decidePrivacyConsent(page);
 
-    const labels = (await page.getByRole('tab').allTextContents()).map((t) => t.trim());
+    // 🔴 排除助手那一枚（`rail-assistant`）：它是 `role="tab"` 但没有 `--tool` 修饰类，
+    // 也不是视图目的地 —— 这条判据量的是「视图目的地 + 工具段」这一组。
+    const labels = (
+      await page
+        .locator('button[role="tab"]:not([data-testid="rail-assistant"])')
+        .allTextContents()
+    ).map((t) => t.trim());
     // 主段 = `splitRailTabs` 钉住的四枚；四象限/时间线在「更多」里；回收站是工具 tab。
     // ⚠️ 「设置」在头像菜单里、「帮助」是动作（不在 tablist）—— 两个都不是 tab。
     expect(labels, '默认 = 主段四枚 + 回收站（工具段）').toEqual([
@@ -335,7 +344,10 @@ test.describe('激励体系：真浏览器契约', () => {
     任务: 'task-list',
     日历: 'calendar-board',
     四象限: 'quadrant-board',
-    习惯: 'habit-board',
+    习惯: 'habits-view',
+    // ⚠️ 原来这里锚的是 `habit-board`：那是**面单**（`HabitDetailCard`），只有选中一条
+    // 习惯时才渲染。白屏检测要的是「这个视图自己画出来了」，所以锚视图根（`habits-view`）。
+    // 板子本身的判据在 `apps/web/tests/habits-board.spec.tsx` 与 detail-pane 那一组里。
     时间线: 'timeline-view',
     番茄钟: 'focus-ring',
     成长: 'growth-board',

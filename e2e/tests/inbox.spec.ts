@@ -113,6 +113,20 @@ async function seedServerAndStubRoutes(page: import('@playwright/test').Page): P
   // `/v1/chat/completions` ⇒ 不登记它，`assertNoProblems` 会把这条 404 算成通知面的缺陷。
   await stubPublicFacts(page, SERVER);
 
+  // 🔴 2026-10-25 补两条**开机就会打**的请求（与 `account-email-change-and-sessions`
+  // 那套桩同一个形状）。它们与通知这个主题无关，但没装夹具就回非 2xx，
+  // 而 `assertNoProblems` 会把它们算成通知面的缺陷 ⇒ 三条用例红在一个别人的接口上。
+  //   · `/api/auth/central/config` —— 中央认证入口的可用性探测（`{}` 是"没有这项能力"的合法形状）；
+  //   · `/api/announcements/active` —— 运营公告（`{ announcements: [] }` 是客户端契约里的合法空态，
+  //     见 `packages/app-host/src/announcement-client.ts:76-80`）。
+  // ⚠️ 别塞进 `KNOWN_MISSING`：那条会替所有用例消掉这两格，以后它们真坏了没人说话。
+  await page.route(`${SERVER}/api/auth/central/config**`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+  });
+  await page.route(`${SERVER}/api/announcements/active**`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ announcements: [] }) });
+  });
+
   await page.route(`${SERVER}/api/notifications**`, async (route) => {
     if (route.request().method() === 'POST') {
       await route.fulfill({
@@ -322,6 +336,13 @@ test.describe('通知中心 + 活动', () => {
     await stubLegalRecheck(page, SERVER);
     // 🔴 同上：W4b 的开机拉取不在这条用例的主题里，但它确实会发。
     await stubPublicFacts(page, SERVER);
+    // 🔴 2026-10-25：中央认证探测与运营公告也是开机就会发的两发（同上一条用例的理由）。
+    await page.route(`${SERVER}/api/auth/central/config**`, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+    await page.route(`${SERVER}/api/announcements/active**`, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ announcements: [] }) });
+    });
 
     // 通知与活动都空。
     await page.route(`${SERVER}/api/notifications**`, async (route) => {
@@ -383,6 +404,15 @@ test.describe('通知中心 + 活动', () => {
     //
     // 所以这一条的判据形态要求"允许出门"与"没有地址"**同时成立**：
     // `local-only` 下两者都成立的是空态，不是这条要钉的那句话。
+    //
+    // 🔴 2026-10-25：这一条**没有**凭据，但中央认证探测仍会发（它问的是"这台实例有没有
+    // 中心认证入口"，不是"我登录了没"）⇒ 不装桩就会把一句与本用例无关的 404 算进来。
+    await page.route('**/api/auth/central/config**', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+    await page.route('**/api/announcements/active**', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ announcements: [] }) });
+    });
     await openApp(page, '/', 'accepted');
 
     await page.getByTestId('inbox-trigger').click();

@@ -401,8 +401,24 @@
  * 上段列表的尾巴上，与下段之间裂着一整块空白。
  * 所以 `App.tsx` 给工具段的第一项另打一个类，这里按类贴底。
  */
-.ht-rail__tab--tool-start {
+/*
+ * 🔴 2026-10-25：贴底这件事**从按钮挪到了工具段的容器**上。
+ * 工具段现在是一个 `role="tablist"` 容器（tab 必须在 tablist 里，见
+ * `rail-trash-anchor.spec.ts` 的 ①），所以"第一枚贴底"改成"这一组贴底"。
+ * 组件内部的排布与 rail 同一套（列 + 同间距），视觉不变。
+ */
+.ht-rail__tools {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-3);
+}
+
+.ht-rail__tab--tool-start {
+  /* 贴底已经由容器承担；这里刻意留空，不再给单枚按钮加 `margin-top: auto` —— */
+  /* 那会在"工具段有多枚"时把第一枚顶开，组内间距就乱了。 */
+  margin-top: 0;
 }
 
 .ht-rail {
