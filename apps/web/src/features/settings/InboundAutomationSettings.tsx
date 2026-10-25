@@ -84,7 +84,7 @@ export const PROCESS_COPY: Partial<Record<InboundAutomationCycleState | 'failed'
 
 /** Settings-only CRUD surface for the server-side automatic-capture rules. */
 export function InboundAutomationSettings({ active = true, routing, consents, secretStore }: { active?: boolean; secretStore?: SecretStore; routing: AiRoutingConfig; consents: readonly EgressConsent[] }): React.JSX.Element {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const baseUrl = useSyncStore((s) => s.baseUrl);
   const token = useSyncStore((s) => s.token);
   const accountId = useSyncStore((s) => s.accountId);
@@ -537,7 +537,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
               所以没有可转交给 `testID` 的定位钩子；刻意也不新造一个 ——
               断言 B 用 `*empty*` 的 testid 字面形态识别手写站点。
             */}
-            {!loading && rules.length === 0 ? (
+            {!loading && error === undefined && rules.length === 0 ? (
               <HeytaUiProvider>
                 <EmptyState title={t('web.ai.inbound.empty')} size="line" />
               </HeytaUiProvider>
