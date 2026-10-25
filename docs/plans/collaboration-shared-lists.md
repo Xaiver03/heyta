@@ -369,8 +369,10 @@ M2/M4 碰不可逆层，放同一份 ADR 一起做，避免两次线协议变更
 
 ### 9.4 移动端那六段缺什么（逐条命令，别按本节推断"现在还没有"）
 
-> 🔴 **这六段在 2026-10-25 已全部接上**，逐格落点与复量命令就在下面那张表里；
-> 设备腿那一趟的读数在 §9.13。本节保留"当时缺什么"那一列，是因为 M6 的顺序就是照它排的。
+> 🔴 **这六段在 2026-10-25 是"源码级接上"** —— 逐格落点与复量命令就在下面那张表里。
+> ⚠️ 但**设备腿那一趟当时是红的**：走到 L1（手机自己入群）时报
+> 「vault root key 必须是 32 字节 Base64」，成因与修法见[环境陷阱 #559](../reference/environment-traps.md)，
+> 修好之后设备腿的逐格读数在 §9.13。本节保留"当时缺什么"那一列，是因为 M6 的顺序就是照它排的。
 
 组件本身可移植（`packages/ui/src/sync/` 那四枚只用 RN 原语 + `useHeytaText/useHeytaTokens`，
 mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿主侧：
@@ -379,7 +381,7 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 |---|---|---|
 | ① 入口与路由：`feature-entries.ts` 里没有任何共享项 | 同文件的 `key: 'share'` 那一项 | `grep -n "key: 'share'" apps/mobile/src/nav/feature-entries.ts` |
 | ② `setProjectShareId` 只有 web 那一处在调 | `apps/mobile/src/share/project-share.ts`（文件头写明它是移动端**唯一**调用点，出现第二处即红） | `grep -rn setProjectShareId apps/mobile/src` |
-| ③ 密钥落盘端口形状不合（web 那枚吃 `Storage` + `btoa/atob`，移动端只有 device-prefs 与原生安全存储） | 宿主无关的那组 `*Portable` 住在 `packages/app-host/src/share-key-store.ts`；移动端只注入 kv 端口 `apps/mobile/src/lib/share-local-store.ts` | `grep -rln wrapAndStoreShareKeyPortable apps/mobile/src packages/app-host/src` |
+| ③ 密钥落盘端口形状不合（web 那枚吃 `Storage` + `btoa/atob`，移动端只有 device-prefs 与原生安全存储） | 宿主无关的那组 `*Portable` 住在 `packages/app-host/src/share-key-store.ts`；移动端注入的端口是 `apps/mobile/src/lib/share-key-store.ts`，它把 KV 接到原生模块的**变长通道** `getVaultSecureBlobStorage`（`loadBlob`/`saveBlob`，见陷阱 #559）。非秘密那三样（日志/同意/偏好）才住 `lib/share-local-store.ts` | `grep -rln wrapAndStoreShareKeyPortable apps/mobile/src packages/app-host/src`；走的是哪一对接口：`grep -c getVaultSecureBlobStorage apps/mobile/src/lib/share-key-store.ts` |
 | ④ `payloadCipher` 在 `apps/mobile/src` 出现 0 次 | 装配点在 `apps/mobile/src/share/share-admin.ts`（条数不写在这里，用右边那条命令现量） | `grep -rn PayloadCipher apps/mobile/src \| wc -l` |
 | ⑤ 传输与凭据：`ShareApiClient` 宿主无关，但移动端凭据只在内存、冷启动重填 | 传输件原样复用（`apps/mobile/src/share/{share-admin,comment-actions}.ts`）。凭据那条**没变也不需变**：共享这条腿读的是保险库 session 的 `payloadCipher`（`packages/app-host/src/host.ts` 的 `getPayloadCipher`），不读口令框那个值 | `grep -rln ShareApiClient apps/mobile/src` |
 | ⑥ `ShareFeature.tsx` 那一层不可移植，是唯一需要重写的一层 | 重写成两屏：`ShareSpaceScreen.tsx`（面板 / 成员 / 邀请 / 评论 / 偏好）+ `JoinShareScreen.tsx`（入群） | `ls apps/mobile/src/screens/*Share*.tsx` |
@@ -622,5 +624,53 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 - 名册取不到时只有宿主层那个异常名（`ShareSignatureRosterUnavailableError`），**没有界面措辞** ⇒ 用户看到的是"没更新"，不是一句为什么。
 - 服务端可以把 `signature` 与 `signer_member_id` **一起**抹掉 ⇒ 读侧回落到"存量未签"那一形。这一格 ADR-0069 实施记录里如实写着没做到，翻案条件也在那一节。
 - 库里存量 op **不追签**（裁决二/三定的），所以"每一条都可验"只对**新写入**成立；判它的断言在 ADR 里，别在本节推断。
+
+
+### 9.13 M6 移动端设备腿（2026-10-25 第七批）—— 设备腿抓到的是**产品缺陷**，不是装置问题
+
+**起因**：§9.4 那句"六段已接上"是**源码级**读数。把同一条旅程搬到 iOS 真机（第 21 跑）时，
+前半程一路绿（同意闸 → 填凭证 → 提交），界面随后出现一行红字：
+
+> `vault root key 必须是 32 字节 Base64`
+
+肉眼看过的那一帧：`apps/mobile/evidence/collab-ios-10251033/06f-加入没走到成功态.png`。
+
+**根因链**（逐层读出来的，不是猜的）：那句来自原生模块，不是 JS 层的密钥环逻辑 ——
+`grep -n "32 字节" apps/mobile/ios/Heyta/HeytaVaultSecureStorage.swift` 直接命中写入那一步的校验。
+移动端 `apps/mobile/src/lib/share-key-store.ts` 把 app-host 那份 `ShareKeyStoragePort`（异步 KV）
+接到了原生 `VaultSecureStorage` 的 **root-key 那对接口**（`load`/`save`）上，而那对接口
+**在 Swift 与 Kotlin 两端都校验"恰好 32 字节"**，读写双向都校。
+这不是那条接口的缺陷，是它的契约：一把被截断的 vault root key 必须**失败**，
+而不是解出一堆垃圾 —— 所以不能靠放宽它来解决问题。
+而 `heyta.share-keys.v1` 是一份**变长** JSON（`serializeShareKeyStore` 的产物）。
+结论：移动端共享通道从一开始就**存不进密钥**，因此 L1 不可能过，L2–L6 全部无从谈起。
+
+**修法（为什么是这个形状）**：原生模块另开一对**变长通道** `loadBlob`/`saveBlob`
+（Swift + ObjC 桥声明 + Kotlin 对偶 + TS 桥面 `VaultSecureBlobStorage`），share 密钥端口改走这一对；
+**root-key 那对一字未动** —— `apps/mobile/evidence/ios-keychain-probe-invalid.json`
+那枚探针依赖的正是"非法长度必拒"。上限 64 KiB（JS/两端各挡一道，原生数的是 UTF-8 字节，是最终判决）；
+解出一段坏 UTF-8 时两端都**响亮地失败**（Kotlin 用 `CodingErrorAction.REPORT`，
+因为 `String(bytes, UTF_8)` 会把坏字节变成 U+FFFD ⇒ 坏 JSON ⇒ 本层把槽当空 ⇒ 下一次 `set` 覆盖 = **无声丢钥**）。
+"密钥料不落 sqlite"这条既有理由留住：落的是 Keychain/Keystore，判据是
+`apps/mobile/tests/share-key-store.spec.ts` 里"不落 device-prefs"那一条（去注释的源码文本尺）。
+
+**为什么单元侧全绿却拦不住这件事**：那一层的夹具是一枚假 vault（Map），
+它证明的是"我这层映射的形状"，不是"原生那一格吃不吃得下" —— 量的是夹具，不是产品。
+JS 这半边现在能钉的只有**走的是哪一对接口**：
+`grep -c getVaultSecureBlobStorage apps/mobile/src/lib/share-key-store.ts`（非 0 才算走对），
+钉它的用例是 `share-key-store.spec.ts` 的「密钥料走 blob 通道，不走 root key 那对恰好 32 字节的接口」。
+🔴 **这条判据能红，实测过**：把那三个符号临时换回 `getVaultSecureStorage` ⇒ 该用例红（1 failed），
+还原只从 `share-key-store.ts.mut-bak` 取并核 md5。契约本身**只有真机能量**，那台机器就是第 21/22 跑。
+
+**连带改口的文档**（同一结论的几种句子形状，逐格现量而非抄旧句）：
+本节 §9.4 行③ 原来把密钥端口指到 `share-local-store.ts`（那是非秘密三样那格）⇒ 已改；
+「六段已全部接上」降到「源码级接上，设备腿当时红」；
+ADR-0062 实施记录加了第 4 条（原生格子的形状，裁决未动）；
+ADR-0050 那句「RN port 只传递 base64 root key」加了**限定范围**的追加段（它今天只适用于 root-key 那对）；
+`feature-matrix.md` 6.1 那句"仍欠 M4 与 M6 移动端"改口；
+`docs/agents/progress-log.md` 那句"M6 移动端零接入"改口；
+环境陷阱新条目见现量：`grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md`（本批写的是 #559）。
+`share-key-store.ts` 文件头原来那句"注销/撤销路径按同样后缀**即可**一并清掉"**过强** ⇒ 已改成如实口径
+（能清，但今天 `clearMobileVaultSession` 只删 root key；这一格转成下面的待拍板项，见「这一批还剩什么」）。
 
 
