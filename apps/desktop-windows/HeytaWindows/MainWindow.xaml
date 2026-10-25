@@ -7,6 +7,14 @@
     Title="heyta">
 
     <Grid x:Name="WindowRoot" Background="{ThemeResource HeytaColorBackground}">
+        <!--
+          Ctrl+, 打开独立设置窗口 —— Windows 上"应用设置"的既定快捷键。
+          🔴 不在这里写任何"设置界面"的逻辑：窗口自己载共享 UI 的
+          `?settings=…&standalone=1`（载荷由 SettingsSurface 生成）。
+        -->
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="," Modifiers="Control" Invoked="OnOpenSettingsInvoked" />
+        </Grid.KeyboardAccelerators>
         <!-- The shared Web UI owns the entire client canvas, including modal
              backdrops beneath the native caption controls. AppWindow drag
              rectangles perform hit testing without an opaque XAML overlay. -->
