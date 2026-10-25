@@ -149,6 +149,13 @@ const ALL_ROUTES: readonly (readonly [string, string])[] = [
   ['POST', '/api/admin/refunds'],
   ['POST', '/api/admin/refunds/1/approve'],
   ['POST', '/api/admin/refunds/1/reject'],
+  // 2026-10-25 订阅赠予那一批（判据细节在 `admin-subscription-grant.spec.ts`，
+  // 这里只管一件事：**它们进不了闸门就没有任何别的地方在守**）。
+  ['GET', '/api/admin/skus'],
+  ['GET', '/api/admin/subscriptions/grants'],
+  ['POST', '/api/admin/subscriptions/grant'],
+  ['POST', '/api/admin/subscriptions/upgrade'],
+  ['POST', '/api/admin/subscriptions/revoke'],
 ];
 
 /**
