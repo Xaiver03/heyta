@@ -984,7 +984,12 @@ input[type="radio"] {
   min-inline-size: 0;
   min-block-size: 0;
   padding-inline-end: var(--ht-space-4);
-  border-inline-end: 0;
+  /* 🔴 2026-10-25：这一行原本是 `border-inline-end: 0` —— 会话栏与内容区之间
+     **一条线都没有**，两列靠 20px 的 gap 撑着。产品负责人指着截图说
+     "这个也没有会话栏的分界线"。参考（DeepSeek / macOS 分栏）里，栏与栏之间
+     一定有一条 1px 的弱线：它回答的是"哪一列属于谁"，不是装饰。
+     用 `--ht-color-border-subtle`：分栏线要能看见，但不该抢过标题。 */
+  border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }
 
 .ht-ai__history-head {
