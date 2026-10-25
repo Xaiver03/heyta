@@ -369,3 +369,37 @@
 .ht-compose-actions__panel:has([role='dialog']) {
   background: var(--ht-color-surface);
 }
+
+/*
+ * 🔴 2026-10-25（B229）：行尾动作区打开时，**那一行必须跟着长高**。
+ *
+ * 机制（本机实测）：行尾的 `<details class="ht-compose-actions">` 展开后自己是 207px，
+ * 但它的祖先 `span`（行尾插槽）与行体停在 46 / 65px —— 因为插槽是 flex 行里
+ * `align-items: center` 的一项，**子项溢出不改变 flex 行的交叉尺寸**。
+ * 于是面板溢出那一行，而溢出部分只有 41px 被算进 `.ht-content` 的 `scrollHeight`
+ * （1109 → 1150），面板本体 145px ⇒ 滚到 max，面板底边仍在可视区下 **69px**，
+ * "打开了却够不着"（`shell-no-document-scroll` W2 / `shell-sidebar-height` X1 就是这么红的）。
+ *
+ * 这一条让"打开着的那一行"按内容长高 ⇒ 溢出变成布局 ⇒ 整块进 `scrollHeight`。
+ * ⚠️ `block-size: auto` 要 `!important`：行高由 RN-web 的内联样式给的。
+ */
+[data-testid^='task-item-']:has(.ht-compose-actions[open]) {
+  block-size: auto !important;
+  min-block-size: var(--ht-touch-target-min);
+}
+
+[data-testid^='task-item-']:has(.ht-compose-actions[open]) span:has(> .ht-compose-actions[open]) {
+  align-self: stretch;
+  block-size: auto !important;
+}
+
+/*
+ * 🔴 2026-10-25（B229 第二刀）：`.ht-material__row-slot` 是**零高度锚点**，
+ * 它里面那枚 `.ht-material__row-pop` 是流内本体 —— 本体高于 0 就溢出那个槽。
+ * 溢出**只有一部分**被算进滚动宿主的 `scrollHeight`（实测 145px 的浮层只加 41px），
+ * 于是"打开了却滚不到"。
+ * 现在：槽里真的有本体时，槽自己按内容长高 ⇒ 溢出变成布局 ⇒ 整块进 `scrollHeight`。
+ */
+.ht-material__row-slot:has(> .ht-material__row-pop) {
+  block-size: auto;
+}

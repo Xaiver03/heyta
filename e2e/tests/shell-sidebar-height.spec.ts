@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { addTask, openApp, rowFor, switchView } from './helpers';
+import { addTask, openApp, openRowTail, rowFor, switchView } from './helpers';
 
 const SHOT = (name: string) =>
   fileURLToPath(new URL(`../../apps/web/evidence/shell-sidebar-height/${name}.png`, import.meta.url));
@@ -145,6 +145,14 @@ test.describe('侧栏不许把主区顶得跳起来（H9 第二刀）', () => {
     }
     const target = await bottomRowTitle(page, titles);
 
+    /*
+     * 🔴 2026-10-25：先把行尾那条折叠动作区展开（`openRowTail`）。
+     * 行尾的整理触发器住在 `<details class="ht-compose-actions">` 的折叠面板里 ——
+     * 收起时面板 `opacity: 0`、不在命中栈里，"第一下点击"点到的从来不是它，
+     * 而是那一层空气（这一条之前红在"触发器底边 615px > 视口 600px"这种读数上，
+     * 看起来像"它被顶出屏幕"，实际是"它还没被展开"）。展开是真实用户的第一步。
+     */
+    await openRowTail(page, rowOf(page, target));
     const trigger = rowOf(page, target).getByTestId('task-organize-summary');
 
     // 🔴 滚到**最大滚动量**（不是 `scrollIntoViewIfNeeded`：那一行本来就看得见时它一下都不滚，
