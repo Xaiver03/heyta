@@ -124,6 +124,26 @@ const electronBinary = existsSync(ELECTRON_PATH_TXT)
  * 跳过理由。**要说清"是什么没了"和"怎么补上"** ——
  * 只说 "electron not available" 会让人去查半天。
  */
+/**
+ * 这一份 spec 要一只**真的窗口**：`_electron.launch` 需要一个窗口服务器
+ *（macOS 的 WindowServer / Linux 的 X）。二进制在 ≠ 起得来 ——
+ * 实测（2026-10-25，沙箱内的 macOS 会话）：`Electron --version` 能打印 `v24.21.0`、
+ * `dist/main.cjs` 也在，而 `_electron.launch` 直接 `Process failed to launch!`。
+ * 那一刻红的是**环境**（拿不到窗口服务器），不是桌面壳坏了；可读数是红的，
+ * 于是"桌面端有没有被验过"这件事被一条环境红糊住了。
+ *
+ * ⇒ 显式前置：`HEYTA_DESKTOP_WINDOW=1` 才跑，否则**响亮跳过**（带上跑法与理由）。
+ * 这一条不降低 CI 覆盖 —— CI（ubuntu）上二进制本来就没装，一直是跳过的那一档；
+ * 它只把"本机碰巧装了二进制"与"这台机器能起窗口"这两件事分开。
+ * 详见 `docs/reference/environment-traps.md` #580。
+ */
+const WINDOW_SERVER_ENABLED = process.env['HEYTA_DESKTOP_WINDOW'] === '1';
+const WINDOW_SERVER_MISSING =
+  '需要窗口服务器：本机（或 CI）没有可用的 WindowServer/X。' +
+  '在有 GUI 的会话里置 `HEYTA_DESKTOP_WINDOW=1` 再跑，' +
+  '见 docs/runbooks/desktop.md §4 与 docs/reference/environment-traps.md #580。' +
+  '⚠️ 这条**跳过不等于"桌面端被验过"** —— 只是这台机器判不了它。';
+
 const ELECTRON_MISSING =
   `Electron 二进制没装（${ELECTRON_PATH_TXT} 不存在）。` +
   '本机补装：`node apps/desktop/node_modules/electron/install.js`' +
@@ -292,6 +312,7 @@ test('桌面端（开发构建）：真窗口打开，且共享 UI 真的画出�
   // 🔴 二进制不在时**响亮跳过**，理由见文件头的「绝对不能在模块顶层直接 require 它」。
   //    静默跳过会让"桌面端从没被验过"看起来像"桌面端没事"。
   test.skip(electronBinary === '', ELECTRON_MISSING);
+  test.skip(!WINDOW_SERVER_ENABLED, WINDOW_SERVER_MISSING);
   await verifyWindow(DEV_TARGET);
 });
 
