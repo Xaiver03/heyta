@@ -15,6 +15,13 @@
  * `notification-model.ts`：摆一枚点得动、行为却恒等于「不响」的开关，
  * 等于对用户谎称有能力。
  *
+ * 🔴 **反过来也一样：真能改的偏好必须看得出来能改**（2026-10-25 补）。
+ * 三行活动开关此前只有 `<Text>` —— 点得动、`aria-checked` 也在，但屏幕上没有任
+ * 何控件形状，也读不出当前是开还是关。截图是这一格唯一能看见它的地方
+ * （移动装置证据 `apps/mobile/evidence/collab-ios-<批次号>/06c-*.png` 里那三行就是三段裸文字）。
+ * 现在每行右侧带一枚与 `Settings.ToggleLine` / `ShareConsentModal` **同一形状**的状态标记：
+ * 方框（未选）→ 实心主色 + 对钩（已选）。状态不只靠颜色，字形与 `aria-checked` 同时携带。
+ *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 文字层级（2026-10-16 补齐，同 `ShareConsentModal` 那一次的理由）
  * ─────────────────────────────────────────────────────────────────────────
@@ -33,9 +40,12 @@
  * 需要别的色在消费点用样式数组覆盖（后面的胜出）。
  */
 
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useHeytaText } from '../theme.js';
+import { Check } from 'lucide';
+
+import { HeytaIcon } from '../icon/Icon.js';
+import { useHeytaText, useHeytaTokens } from '../theme.js';
 import {
   isActivityEnabled,
   type ShareActivityKind,
@@ -65,7 +75,9 @@ const ACTIVITIES: ReadonlyArray<{ kind: ShareActivityKind; key: keyof Notificati
 
 export function NotificationPrefsPanel(props: NotificationPrefsPanelProps) {
   const { prefs, labels, onChange } = props;
+  const tokens = useHeytaTokens();
   const text = useHeytaText();
+  const styles = makeStyles(tokens);
 
   const toggleActivity = (kind: ShareActivityKind) => {
     onChange({
@@ -84,17 +96,61 @@ export function NotificationPrefsPanel(props: NotificationPrefsPanelProps) {
 
       <Text style={text['group-label']}>{labels.activitiesTitle}</Text>
 
-      {ACTIVITIES.map(({ kind, key }) => (
-        <Pressable
-          key={kind}
-          onPress={() => toggleActivity(kind)}
-          accessibilityRole="checkbox"
-          aria-checked={isActivityEnabled(prefs, kind)}
-          testID={`share-notif-activity-${kind}`}
-        >
-          <Text style={text['row-title']}>{labels[key]}</Text>
-        </Pressable>
-      ))}
+      {ACTIVITIES.map(({ kind, key }) => {
+        const checked = isActivityEnabled(prefs, kind);
+        return (
+          <Pressable
+            key={kind}
+            onPress={() => toggleActivity(kind)}
+            accessibilityRole="checkbox"
+            aria-checked={checked}
+            testID={`share-notif-activity-${kind}`}
+            style={styles.row}
+          >
+            <Text style={[text['row-title'], styles.rowText]}>{labels[key]}</Text>
+            {/* 状态标记：与 `Settings.ToggleLine` 同一形状。开/关不只靠颜色 ——
+                方框 vs 实心 + 对钩，加上行本身的 `aria-checked`，三个通道同时携带。 */}
+            <View
+              testID={`share-notif-activity-${kind}-marker`}
+              style={[styles.marker, checked ? styles.markerOn : null]}
+            >
+              {checked ? (
+                <HeytaIcon data={Check} size={tokens['icon.xs']} color={tokens['color.on-primary']} />
+              ) : null}
+            </View>
+          </Pressable>
+        );
+      })}
     </View>
   );
+}
+
+/** 取一份 token 表建出这套样式。**一个裸值都没有**（`check:design` 会拦）。 */
+function makeStyles(tokens: ReturnType<typeof useHeytaTokens>) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: tokens['space.2'],
+      // 整行可点 ⇒ 触控区跟着整行走，不留一枚 20pt 的小方框给人瞄。
+      minHeight: tokens['touch-target.min'],
+    },
+    rowText: {
+      // 文字吃掉剩余宽度，状态标记才落在行的右端（与 `Settings.ToggleLine` 同一读法）。
+      flex: 1,
+    },
+    marker: {
+      width: tokens['size.checkbox'],
+      height: tokens['size.checkbox'],
+      borderRadius: tokens['radius.sm'],
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    markerOn: {
+      backgroundColor: tokens['color.primary'],
+      borderColor: tokens['color.primary'],
+    },
+  });
 }
