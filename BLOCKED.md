@@ -11835,3 +11835,56 @@ B216 那一行进库之后，本线在新隔离载具 `.worktrees/inb-t10`（`gi
 
 `pnpm check:ai-e2e` 里 `ai-row-layout` 2 passed、`ai-tool-run` 不在运行集里（`--list` 可验），
 且上面那张表里两条助手 spec 仍是绿的。任何一条破了，说明"能力没丢"这句就成了假话。
+
+## B227（2026-10-25，本会话 · 修红门禁那一趟）：**`check:ai-e2e` 的 73 枚红是并跑互相污染，不是产品红** —— 而"权威读数"这一轮没跑完，所以它的状态是「未定」，不许写成绿
+
+### 读数（两趟，都是本机当场跑）
+
+| 跑法 | 结果 |
+|---|---|
+| `playwright test`（默认并行，`--workers=2 --retries=0`） | **353 passed / 73 failed / 1 skipped**（34.3m），73 枚摊在 **25 个 spec 文件**上（narrow-sweep 9、renew-panel 6、detail-pane-task 6、reminder-permission-final 5…） |
+| 串行复跑那 4 个最红的文件（`--workers=1 --retries=0`） | 跑到 **32/35 时 0 failed**，被我自己的 900s 超时掐断（剩 3 条没跑到） |
+
+25 个文件同时坏、而串行一跑就全绿 —— 这不是 25 个独立 bug，这是**同一台载体被两个 worker 抢**。
+
+### 根因（结构问题，不是代码 bug）
+
+1. **只有一台假端点**（`e2e/stub-provider.mjs`，4319）。它的 `/__requests` 计数是**全局**的，
+   而多条用例的判据就是那个计数（"一次都不许发出去"、"只许发一次"）。
+   两个 worker 同时跑 ⇒ `resetStub` 把别人的计数清零 / 别人把条数加进来。
+2. **只有一台 vite dev**（4318），证据目录（`apps/web/evidence/**`）与 `test-results/` 也是共享的
+   —— 同一份 PNG 会被两个 worker 轮流覆盖。
+3. 用例并没有声明"我要独占载体"：`test.describe.configure({ mode: 'serial' })` 只在少数文件里出现。
+
+### 🔴 三条仪器教训（都是这一趟自己踩的）
+
+- **`--workers=2` 跑出来的红没有归因信息**。我看过的那批"助手跨账号历史串了""auth-login-code 3 红"
+  在串行复跑里一条都没复现。把它们当产品缺陷去改，就是照着一枚假尺修产品。
+- **同一个检出里同时跑两套 e2e**（我在 4318/4319 之外另开了 4418/4419 想并行）**仍然互相污染**：
+  证据目录、`test-results/`、`apps/web/dist` 是同一份。第一趟那 10 枚
+  `assistant-navigation-acceptance` 我怀疑就是被这一条制造的（第二趟干净并跑时它 0 红）。
+- **读 Playwright 的 line reporter 不能用 `grep '✘'` 数红**：并行模式下的失败行是
+  `[n/427] … ─────` 那个形状，我的第一版 grep 数出 0，差点把 73 枚红读成"全绿"
+  （与 #524 同族：分母分子要用同一条构造式）。
+
+### 为什么这一轮没有把它修绿（诚实交代）
+
+- 权威读数是 `--workers=1 --retries=0` 一整趟，实测 **>34 分钟**（并行那趟就 34.3m；
+  串行 35 条用掉 15 分钟 ⇒ 427 条约 50 分钟）。
+- 而 CI 的 `verify` job `timeout-minutes: 40`，`pnpm check` 里这一段是**默认并行**跑的
+  ⇒ **这条门禁在 CI 里本来就不可能靠"跑得完"变绿**。它是结构问题，要在
+  「每 worker 一台载体 / 串行 + 加预算 / 拆套件」三者里选一个，而那是 CI 预算决定，不是我能自己拍的。
+- 本轮**没有**改 `workers` 也没改 CI 预算：把并行偷偷改成串行会让 CI 每次超时，
+  那是把红变成"跑不完"，比红更坏。
+
+### 本轮在这一块真正修掉的（有读数，见 `77772c77f`）
+
+- `account-email-change-and-sessions.spec.ts`：7 passed（补两条开机请求的桩 + 后果句的载体改判据）。
+- `ai-row-layout.spec.ts`：2 passed（判据对象换成 `ai-agent-surface`；窄档改成"必须有一条可达入口"）。
+- `ai-tool-run.spec.ts`：退役（被测面板已并入助手面），登记在本文件 B226。
+
+### 判据（这一条怎么算关闭）
+
+`pnpm --dir e2e exec playwright test --workers=1 --retries=0` 一整趟 **0 failed**，
+且该趟的墙钟被写进 CI 预算（要么加 timeout，要么给每 worker 一台载体）。
+在那之前：**`check:ai-e2e` 的状态是"未定"**，谁写"绿"谁就是在拿 #524/#536 那两枚旧账重犯一遍。
