@@ -2614,6 +2614,7 @@ export const zhCN = {
   'web.memory.evidence.feedbackKeepRatioPartial': '基于 {adopted} 次采纳，你通常留下约 {percent}% 的拆解项',
 
   'web.memory.off': '记忆已关闭 —— heyta 不会推断你的偏好，AI 也收不到任何与「你是谁」有关的信息。 AI 功能本身照常可用。',
+  'web.memory.offShort': '记忆已关闭',
   'web.memory.known.title': '我了解到的你',
   'web.memory.known.empty': '我还不太了解你。用一段时间之后，这里会出现我从你自己数据里总结出的习惯。',
   'web.memory.withheld.title': '还不了解',

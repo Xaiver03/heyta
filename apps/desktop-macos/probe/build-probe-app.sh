@@ -34,7 +34,9 @@ BRIDGE="$REPO/packages/app-host/bridge-bundle/native-bridge.js"
 
 echo "=== ① 桥产物（与两个壳同一份）==="
 [ -f "$BRIDGE" ] || node "$REPO/packages/app-host/scripts/build-native-bridge.mjs"
-echo "  $(stat -f '%z bytes  mtime %Sm' "$BRIDGE")"
+# 🔴 不用 stat 的 BSD 形状 `-f`：BSD 与 GNU 用它读的是**两件不同的事**（§7 第 364 条），
+#    在 Linux 上取到空串而**不报错** —— "前后一致"那类断言会变成恒真。
+echo "  $(wc -c < "$BRIDGE" | tr -d ' ') bytes  mtime $(node -p 'require("fs").statSync(process.argv[1]).mtime.toISOString()' "$BRIDGE")"
 
 echo "=== ② 构建 HeytaShellCore（发货源码）==="
 cd "$SHELL_DIR"

@@ -145,7 +145,7 @@ export function CloseAccountPanel(): React.JSX.Element | null {
           />
 
           {pending !== undefined && pending > 0 ? (
-            <p className="ht-settings__danger" role="status" data-testid="close-account-pending">
+            <p className="ht-settings__danger" role="alert" data-testid="close-account-pending">
               <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
               {t('common.accountClosure.pending', { count: pending })}
             </p>

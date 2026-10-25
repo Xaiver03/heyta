@@ -3288,7 +3288,7 @@ export function App(): React.JSX.Element {
             <section className="ht-settings" data-testid="display-pref-panel">
               {/* 页标题是「任务与显示」；这里再写一个「显示」就是同一屏两行近义标题。 */}
               <div className="ht-settings__preference-row">
-              <h3 className="ht-settings__h3 ht-type-headline">{t('web.shell.dueMode.aria')}</h3>
+              <h3 className="ht-settings__h3 ht-type-row-title">{t('web.shell.dueMode.aria')}</h3>
               <div
                 role="radiogroup"
                 aria-label={t('web.shell.dueMode.aria')}
@@ -3316,7 +3316,7 @@ export function App(): React.JSX.Element {
               {/* 窄窗会自动收起辅助栏；说明只解释这一项非直觉的行为。 */}
               <div className="ht-settings__preference-row">
                 <div className="ht-settings__preference-label">
-              <h3 className="ht-settings__h3 ht-type-headline">
+              <h3 className="ht-settings__h3 ht-type-row-title">
                 {t('web.settings.display.detail.title')}
                 <SettingsInfoTip
                   testId="tip-detail-pane"
@@ -3353,11 +3353,11 @@ export function App(): React.JSX.Element {
               </div>
               </div>
               <div className="ht-settings__preference-row">
-                <h3 className="ht-settings__h3 ht-type-headline">{t('web.shell.lang.label')}</h3>
+                <h3 className="ht-settings__h3 ht-type-row-title">{t('web.shell.lang.label')}</h3>
                 <LanguageSwitcher />
               </div>
               <div className="ht-settings__preference-row">
-                <h3 className="ht-settings__h3 ht-type-headline">{t('web.settings.display.themeTitle')}</h3>
+                <h3 className="ht-settings__h3 ht-type-row-title">{t('web.settings.display.themeTitle')}</h3>
               <button
                 type="button"
                 className="ht-settings__theme-toggle ht-type-row-title"

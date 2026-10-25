@@ -141,6 +141,13 @@ export function TrashBoard({
                   ]}
                 />
               ) : null}
+              {/* 🔴 2026-10-25：原本标题、时间、动作是**三个平级块竖着排**，
+                  于是「还原 / 彻底删除」贴着各自那一行的文字起点、每行 x 都不同，
+                  右边留一大片空 —— 产品负责人指着回收站说"页面内布局都挺乱的"。
+                  现在收成两列：左列（标题 + 删除时间）吃满，动作是尾列，
+                  所有行的按钮共享同一条右缘。 */}
+              <View style={styles.row}>
+              <View style={styles.main}>
               <View style={styles.headline} testID={`${testID}-row-${item.id}`}>
                 {/*
                   种类徽标：回收站现在装两种东西，而它们的**恢复后果不一样**
@@ -164,7 +171,7 @@ export function TrashBoard({
               <Text style={[text['row-meta'], { color: tokens['color.foreground-subtle'] }]}>
                 {labels.deletedAt(item)}
               </Text>
-
+              </View>
               <View style={[styles.actions, { gap: tokens['space.3'] }]}>
                 <Pressable
                   accessibilityRole="button"
@@ -221,6 +228,7 @@ export function TrashBoard({
                   </Text>
                 </Pressable>
               </View>
+              </View>
             </View>
           ))}
         </View>
@@ -234,6 +242,9 @@ function makeStyles(tokens: HeytaNativeTokens) {
     root: { gap: tokens['space.4'] },
     list: { gap: tokens['space.2'] },
     item: { gap: tokens['space.2'] },
+    /** 一行两列：左列吃满、动作尾列固定宽 —— 所有按钮共享同一条右缘。 */
+    row: { flexDirection: 'row', alignItems: 'center', gap: tokens['space.4'] },
+    main: { flex: 1, minWidth: 0, gap: tokens['space.1'] },
     headline: { flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] },
     title: { flexShrink: 1 },
     kindBadge: {

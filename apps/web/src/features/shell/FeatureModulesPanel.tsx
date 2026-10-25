@@ -66,7 +66,7 @@ export function FeatureModulesPanel({
         {SHELL_MODULES.map((m) => (
           <div key={m.key} className="ht-settings__preference-row">
             <div className="ht-settings__preference-label">
-              <h3 className="ht-settings__h3 ht-type-headline">{t(m.labelKey)}</h3>
+              <h3 className="ht-settings__h3 ht-type-row-title">{t(m.labelKey)}</h3>
               <span className="ht-settings__cardNote">{t(m.noteKey)}</span>
             </div>
             {/* 尾格：让"开关"成为一个 44px 的单元格，而不是一枚 13px 的原生方框 ——

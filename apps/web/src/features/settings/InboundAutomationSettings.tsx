@@ -380,7 +380,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
 
   return (
     <section className="ht-settings__subsection" data-testid="inbound-automation-settings">
-      <h3 className="ht-settings__h3 ht-type-headline">
+      <h3 className="ht-settings__h3 ht-type-row-title">
         {t('web.ai.inbound.title')}
         {/*
           🔴 这一块原来有四段说明（做什么 / 规则冻结什么 / 等密钥 / 还没有密钥），

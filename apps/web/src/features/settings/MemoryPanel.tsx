@@ -149,7 +149,12 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
   if (!memoryEnabled) {
     return (
       <p className="ht-settings__hint" role="status" data-testid="memory-off-note">
-        {t('web.memory.off')}
+        {t('web.memory.offShort')}
+        <SettingsInfoTip
+          testId="tip-memory-off"
+          label={t('web.memory.offShort')}
+          text={t('web.memory.off')}
+        />
       </p>
     );
   }

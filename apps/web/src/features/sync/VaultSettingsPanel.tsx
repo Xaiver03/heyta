@@ -263,7 +263,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
       data-testid="vault-settings"
       className="ht-settings ht-settings__vault"
     >
-      <h3 id="vault-settings-title" className="ht-settings__h3 ht-type-headline">
+      <h3 id="vault-settings-title" className="ht-settings__h3 ht-type-row-title">
         {t('web.sync.vault.title')}
         <SettingsInfoTip
           testId="tip-vault"
@@ -300,7 +300,11 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
       {sync.accountId !== undefined && sync.accountId !== '' && sync.baseUrl !== '' && sync.token !== undefined ? (
         <div data-testid="vault-devices" className="ht-settings__section">
           <strong>{t('web.sync.devices.title')}</strong>
-          <p className="ht-settings__hint" role="status">{t('web.sync.devices.description')}</p>
+          <SettingsInfoTip
+        testId="tip-vault-devices"
+        label={t('web.sync.devices.title')}
+        text={t('web.sync.devices.description')}
+      />
           {devicesLoading ? <p className="ht-settings__hint" role="status">{t('web.sync.devices.loading')}</p> : null}
           {deviceError !== undefined ? <SettingsNotice title={t(deviceError as never)} tone="danger" live /> : null}
           {!devicesLoading && deviceError === undefined && devices.length === 0 ? (
@@ -414,7 +418,11 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
           ) : (
             <p data-testid="vault-recovery-resume" className="ht-settings__hint" role="status">{t('web.sync.vault.recoveryResume')}</p>
           )}
-          <p className="ht-settings__hint" role="status">{t('web.sync.vault.recoveryHint')}</p>
+          <SettingsInfoTip
+            testId="tip-vault-recovery"
+            label={t('web.sync.vault.recoveryCode')}
+            text={t('web.sync.vault.recoveryHint')}
+          />
           <FormField id="vault-recovery-confirm" label={t('web.sync.vault.recoveryConfirm')}>
             {(field) => (
               <input {...field} data-testid="vault-recovery-confirm" type="text" autoComplete="off" value={pendingCode} onChange={(event) => setPendingCode(event.target.value)} />

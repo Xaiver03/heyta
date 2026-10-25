@@ -149,7 +149,7 @@ export function TickTickImportPanel(): React.JSX.Element {
       */}
 
       <section className="ht-settings__section" aria-labelledby="ticktick-file-title">
-        <h3 id="ticktick-file-title" className="ht-settings__h3 ht-type-headline">
+        <h3 id="ticktick-file-title" className="ht-settings__h3 ht-type-row-title">
           <Upload size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.fileLabel')}
         </h3>
         <div className="ht-settings__actions">
@@ -212,7 +212,7 @@ export function TickTickImportPanel(): React.JSX.Element {
 
       {stage.kind === 'ready' && (
         <section className="ht-settings__section" data-testid="ticktick-preview">
-          <h3 className="ht-settings__h3 ht-type-headline">{t('web.ticktick.previewTitle')}</h3>
+          <h3 className="ht-settings__h3 ht-type-row-title">{t('web.ticktick.previewTitle')}</h3>
           {stage.preview.batch.entries.length === 0 ? (
             <SettingsNotice title={t('web.ticktick.previewNoop')} testId="ticktick-preview-counts" />
           ) : (
@@ -251,7 +251,7 @@ export function TickTickImportPanel(): React.JSX.Element {
               </div>
             </div>
           )}
-          <p className="ht-settings__hint" role="status" data-testid="ticktick-preview-rows">
+          <p className="ht-settings__hint" role="status" data-settings-readout="true" data-testid="ticktick-preview-rows">
             {t('web.ticktick.previewRows', {
               rows: stage.preview.report.dataRows,
               checklist: stage.preview.report.checklistItems,

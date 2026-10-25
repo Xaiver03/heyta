@@ -229,7 +229,8 @@ main() {
     xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1
     xcrun simctl uninstall "$UDID" "$BUNDLE" >/dev/null 2>&1
     xcrun simctl install "$UDID" "$APP" || { bad "装不上 $APP"; exit 1; }
-    ok "已从当前产物重装（$(basename "$APP")，main.jsbundle $(stat -f%Sm -t '%H:%M:%S' "$APP/main.jsbundle" 2>/dev/null)）"
+    # 同一条理由（§7 第 364 条）：换成 node 读 mtime，跨平台同一件事。
+    ok "已从当前产物重装（$(basename "$APP")，main.jsbundle $(node -p 'try{require("fs").statSync(process.argv[1]).mtime.toISOString().slice(11,19)}catch{""}' "$APP/main.jsbundle")）"
   fi
 
   xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1

@@ -184,7 +184,7 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
   if (!signedIn) {
     return (
       <div className="ht-settings__section" data-testid="email-change-panel">
-        <h3 className="ht-settings__h3 ht-type-headline">{t('common.emailChange.title')}</h3>
+        <h3 className="ht-settings__h3 ht-type-row-title">{t('common.emailChange.title')}</h3>
         <SettingsAccountGate
           messageKey="common.emailChange.intro"
           testId="email-change-needs-sign-in"
@@ -195,7 +195,7 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
 
   return (
     <div className="ht-settings__section" data-testid="email-change-panel">
-      <h3 className="ht-settings__h3 ht-type-headline">
+      <h3 className="ht-settings__h3 ht-type-row-title">
         {t('common.emailChange.title')}
         <SettingsInfoTip
           testId="tip-email-change"
