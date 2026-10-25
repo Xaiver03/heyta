@@ -966,10 +966,24 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
     await page.reload();
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
+    /*
+     * 🔴 2026-10-25：差分**不能**用 `filter({ hasText })` 认那一行 —— 用它当尺子会必红。
+     *
+     * 行尾那条折叠面板里有一枚「父任务」下拉（`TaskOrganizer` 的父任务选择器），
+     * 它的 `<option>` 是**全部任务的标题**，包括已经完成的「勾选甲」。Playwright 的
+     * `hasText` 比的是 `textContent`（**含隐藏子树**），而 `innerText` 不含 —— 实测：
+     * 行里 `innerText` 是「勾选乙|收集箱|更多」、`containing` 为空，但 `optionTexts` 里
+     * 明明白白有「勾选甲」。于是"行数 1"与"含勾选甲的行数 1"同时成立，判据永远红。
+     * ⇒ 用**行自己的身份**（那颗复选框的无障碍名）认行，与 `helpers.rowFor()` 同一把尺。
+     */
+    const rowOfTitle = (title: string) =>
+      page.locator(ROWS).filter({
+        has: page.getByRole('checkbox', { name: new RegExp(`^(?:完成|取消完成)：${title}$`, 'u') }),
+      });
     await expect(
-      page.locator(ROWS).filter({ hasText: '勾选甲' }),
+      rowOfTitle('勾选甲'),
       '刷新后「勾选甲」又回来了 ⇒ 那一下 Space 只改了本地态，没走 op',
     ).toHaveCount(0);
-    await expect(page.locator(ROWS).filter({ hasText: '勾选乙' })).toHaveCount(1);
+    await expect(rowOfTitle('勾选乙')).toHaveCount(1);
   });
 });
