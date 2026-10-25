@@ -32,21 +32,26 @@ import {
   adminApproveRefund,
   adminCreateRefundRequest,
   adminForceUserLogout,
+  adminGrantSubscription,
   adminPublishAnnouncement,
   adminRejectRefund,
+  adminRevokeSubscriptionGrant,
   adminSetUserQuota,
   adminUnlockUser,
+  adminUpgradeSubscription,
   adminWithdrawAnnouncement,
   adminDeleteHolidayYear,
   adminPutHolidayYear,
   fetchAdminAnnouncements,
   fetchAdminCoupons,
+  fetchAdminGrantSkus,
   fetchAdminHolidayYears,
   fetchAdminInvites,
   fetchAdminOrders,
   fetchAdminOverview,
   fetchAdminRefunds,
   fetchAdminRevenue,
+  fetchAdminSubscriptionGrants,
   fetchAdminSubscriptions,
   fetchAdminUser,
   fetchAdminUsers,
@@ -54,6 +59,8 @@ import {
   type AdminAnnouncementRow,
   type AdminCouponRow,
   type AdminFailureReason,
+  type AdminGrantRow,
+  type AdminGrantSku,
   type AdminHolidayYears,
   type AdminInvites,
   type AdminOrderRow,
@@ -67,6 +74,8 @@ import {
   type AdminUserRow,
 } from '@heyta/app-host';
 
+import type { MessageKey } from '@heyta/i18n';
+
 import { useSyncStore } from '../sync/store.js';
 
 /** 面板的访问状态。见文件头：这是**探测结果**，不是权限本身。 */
@@ -76,6 +85,7 @@ export type AdminTab =
   | 'overview'
   | 'users'
   | 'subscriptions'
+  | 'grants'
   | 'orders'
   | 'coupons'
   | 'invites'
@@ -98,6 +108,23 @@ export const ADMIN_REASON_KEY: Record<AdminFailureReason, string> = {
   invalid: 'web.admin.error.invalid',
   conflict: 'web.admin.error.conflict',
   server: 'web.admin.error.server',
+};
+
+/**
+ * 发放被拒时服务端给的那个**机器码** → 词条键。
+ *
+ * 🔴 只按码取文案，**不许**读那句散文 —— `admin.routes.ts` 的 `reason` 带的是码，
+ * 而 ADR-0074 §三.1 定的就是这条（散文进日志、不进线协议）。词表外的码 ⇒ `null` ⇒
+ * 界面落到 `web.admin.error.conflict` 那一格，**不**替服务端编一个原因。
+ *
+ * ⚠️ 这里的穷举是**单向**的：加一枚码而没登记，症状是"界面对那次拒绝只说'状态冲突'"，
+ * 而不是编译报错。真正逼着两处对齐的是 `server/tests/admin-subscription-grant.spec.ts`
+ * 那条"`reason` 只许是码"的判据 —— 它保证码的形状稳定，本表才敢按码查词。
+ */
+export const ADMIN_GRANT_CODE_KEY: Record<string, MessageKey> = {
+  SKU_NOT_DELIVERABLE: 'web.admin.grant.code.notDeliverable',
+  NO_ACTIVE_GRANT: 'web.admin.grant.code.noActiveGrant',
+  UNKNOWN_SKU: 'web.admin.grant.code.unknownSku',
 };
 
 /**
@@ -124,6 +151,59 @@ export const EMPTY_ANNOUNCEMENT_FORM: AnnouncementFormInput = {
   publishesAtText: '',
   expiresAtText: '',
 };
+
+/**
+ * 「订阅发放」表单**收集到的原始输入**（三个动作共用一张表）。
+ *
+ * 🔴 与 `HolidayYearInput` 同一条纪律：全是字符串，**一片判定都没有**。
+ * "账号编号必须是正整数""天数在不在界内""这一档今天能不能发"全部由服务端
+ * 那一次 `safeParse` + `subscription-grant-store.ts` 的三道闸门裁决
+ *（ADR-0076 §2 三）。在这里多判一次就是第二套标准，而漂移的表现是
+ * "界面收了、服务端拒了"或反过来 —— 后者更坏，因为它会让运营以为已经发出去了。
+ *
+ * ⚠️ 这里**没有** `grants` 那一格，也不是忘了：能力只能由 SKU 派生，
+ * 而服务端那一侧是 `strictObject`（多一个键就 400），所以界面**发不出**它。
+ */
+export interface GrantFormInput {
+  readonly userIdText: string;
+  readonly sku: string;
+  /** 空串 ⇒ `Number('')` 是 `0`，服务端按"天数不合法"拒 —— 这里不替它兜成一个默认天数。 */
+  readonly daysText: string;
+  readonly reasonText: string;
+}
+
+/**
+ * 发放表单的初值：档位空着 —— 不替运营预选一档，预选会让他没看就读到"能发"。
+ */
+export const EMPTY_GRANT_FORM: GrantFormInput = {
+  userIdText: '',
+  sku: '',
+  daysText: '',
+  reasonText: '',
+};
+
+/**
+ * 一次发放动作的六种可读出结果。**穷举**，漏一种编译期就红。
+ *
+ * 🔴 `denied` 与 `conflict` 是两句不同的话，这条不是措辞洁癖：
+ * `denied` 带服务端给的码（"这一档现在交付不了""他本来就没有发放行"），
+ * 运营看得懂就**不会**去改参数重试；`conflict` 是没给码，界面只能承认
+ * "这是一次状态冲突，但服务端没说为什么"。把后者写成前者就是替服务端编原因
+ * （同一件事在退款那一条上是 ADR-0053 §5 第 11 条点名的缺陷）。
+ */
+export type AdminGrantNotice = 'granted' | 'upgraded' | 'revoked' | 'denied' | 'conflict';
+
+export const ADMIN_GRANT_NOTICE_KEY: Record<AdminGrantNotice, MessageKey> = {
+  granted: 'web.admin.grant.notice.granted',
+  upgraded: 'web.admin.grant.notice.upgraded',
+  revoked: 'web.admin.grant.notice.revoked',
+  denied: 'web.admin.grant.notice.denied',
+  conflict: 'web.admin.error.conflict',
+};
+
+/** 服务端码 → 词条。**词表外的码 ⇒ `null`** ⇒ 界面落回 `conflict` 那一格。 */
+export const grantCodeKey = (code: string | null): MessageKey | null =>
+  code === null ? null : (ADMIN_GRANT_CODE_KEY[code] ?? null);
 
 /**
  * 「调休 / 补班」表单**收集到的原始输入**（未拆分、未修剪前的文本框内容）。
@@ -293,6 +373,29 @@ export interface AdminStoreState {
   announcements: AdminAnnouncementRow[] | null;
   /** 上一次发公告的结果（`null` = 这次会话还没发过）。 */
   announcementNotice: 'done' | 'failed' | null;
+
+  /**
+   * 档位下拉 + 天数上界。**同一次读**拿回来（`GET /api/admin/skus` 一起给）。
+   *
+   * 🔴 `daysMax` 是**服务端给的数**，不是界面抄的：那两个数一旦各写一份，
+   * 下一次抬上界时改一处留一处的症状是"界面说能发 5000 天、服务端说不能"。
+   */
+  grantBoard: { skus: AdminGrantSku[]; daysMax: number } | null;
+  /**
+   * 发放记录（动作史）。`null` = 还没拉过，与"一条都没有"是两件事。
+   *
+   * ⚠️ 它是**动作史**，不是当前权益：当前权益在「订阅」那一格。分两格是因为
+   * 读者问的问题不同（"他现在能用什么" vs "谁在什么时候给他动过什么"）。
+   */
+  grantHistory: AdminGrantRow[] | null;
+  /**
+   * 上一次发放动作的结果。**说了是哪一件事** —— 三种动作的回执不是一句话：
+   * 「已给这个人延长 30 天」「已把他升到另一档、一天没加」「已收回发放」
+   * 是三件不同的事，合成"操作成功"会让运营不确定自己刚才点的是哪一个。
+   */
+  grantNotice: AdminGrantNotice | null;
+  /** 409 时服务端给的那个**机器码**（`undefined` 时界面只说"状态冲突"，不编原因）。 */
+  grantCode: string | null;
   detail: AdminUserDetail | null;
   /** 已录入的调休年度（含 `papers`，面板要把它们渲染成链接）。 */
   holidayYears: AdminHolidayYears | null;
@@ -360,6 +463,23 @@ export interface AdminStoreState {
   publishAnnouncement: (input: AnnouncementFormInput) => Promise<boolean>;
   withdrawAnnouncement: (id: number) => Promise<void>;
   clearAnnouncementNotice: () => void;
+
+  /** 档位下拉 + 发放记录（同一次进格子里拉齐，两样都是"这一屏要读的"）。 */
+  loadGrantBoard: () => Promise<void>;
+  /**
+   * 赠送订阅：发放行延长 N 天 + 设档位。
+   *
+   * 🔴 这里只做**字符串 → 数**的转换（`Number(...)`），一条合法性判断都没有：
+   * `"abc"` 变成 `NaN`、`JSON.stringify` 把它写成 `null`、服务端按"天数不合法"拒 ——
+   * 那条 400 就是这一格该有的答案，界面不许替它先拦一次（拦了就是第二套标准）。
+   */
+  grantSubscription: (input: GrantFormInput) => Promise<boolean>;
+  /** 免费升级：只换档位，**一天都不加**（服务端那一条判据钉的就是它不写 `currentPeriodEnd`）。 */
+  upgradeGrant: (input: GrantFormInput) => Promise<boolean>;
+  /** 收回发放：只作用在发放行上。付费行一格不动 —— 停掉付费订阅是退款的职责（ADR-0053）。 */
+  revokeGrant: (input: GrantFormInput) => Promise<boolean>;
+  clearGrantNotice: () => void;
+
   loadHolidayYears: () => Promise<void>;
   /** 整年替换（一个用户意图 = 一次 PUT；不接受"半套数据"由服务端事务保证）。 */
   saveHolidayYear: (input: HolidayYearInput) => Promise<boolean>;
@@ -441,6 +561,32 @@ function applyRefundFailure(
 }
 
 /**
+ * 发放动作的失败：先走 `applyFailure`，再补这一层特有的一句 ——
+ * **409 时把服务端给的码带进界面**。
+ *
+ * 🔴 与 `applyRefundFailure` 同一形状，不是复制粘贴的巧合：这两类动作都会
+ * "参数完全正确、但当前状态不允许"。运营对着这样一句"操作失败"唯一能做的事
+ * 就是把同一个请求再点一遍，而"这一档现在交付不了"不会因为他重试就变成能交付。
+ *
+ * ⚠️ 非 409（400 / 404 / 断网）**不留** `grantNotice`：那几种情况下
+ * `errorKey` 那一行已经说清了是哪一类问题，再补一句"发放被拒"就是同一件事说两遍。
+ */
+function applyGrantFailure(
+  result: Extract<AdminResult<unknown>, { ok: false }>,
+  set: (partial: Partial<AdminStoreState>) => void,
+): void {
+  applyFailure(result, set);
+  if (result.reason !== 'conflict') {
+    set({ grantNotice: null, grantCode: null });
+    return;
+  }
+  set({
+    grantNotice: result.serverReason === undefined ? 'conflict' : 'denied',
+    grantCode: result.serverReason ?? null,
+  });
+}
+
+/**
  * 动作成功后重新读回服务端状态：**详情和列表都要**。
  *
  * 🔴 只重拉详情会留下一张说谎的界面。用户列表那一行有自己的「已锁定」徽标，
@@ -475,6 +621,10 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   revenueDays: 90,
   announcements: null,
   announcementNotice: null,
+  grantBoard: null,
+  grantHistory: null,
+  grantNotice: null,
+  grantCode: null,
   detail: null,
   holidayYears: null,
   holidayNotice: null,
@@ -628,6 +778,78 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   clearAnnouncementNotice: () => {
     set({ announcementNotice: null });
+  },
+
+  loadGrantBoard: async () => {
+    set({ loading: true });
+    // 两把读并发：档位是"能选什么"，历史是"已经动过什么"，同一屏都要显示，
+    // 串行会让这一屏多等一个 RTT 而没有任何一侧依赖另一侧。
+    const [skus, history] = await Promise.all([
+      fetchAdminGrantSkus(clientOptions()),
+      fetchAdminSubscriptionGrants(clientOptions(), { limit: ADMIN_PAGE_SIZE }),
+    ]);
+    if (!skus.ok) return applyFailure(skus, set);
+    if (!history.ok) return applyFailure(history, set);
+    set({
+      grantBoard: { skus: skus.data.skus, daysMax: skus.data.grantDaysMax },
+      grantHistory: history.data.items,
+      errorKey: null,
+      loading: false,
+    });
+  },
+
+  grantSubscription: async (input) => {
+    set({ loading: true, grantNotice: null, grantCode: null });
+    const result = await adminGrantSubscription(clientOptions(), {
+      userId: Number(input.userIdText),
+      sku: input.sku,
+      days: Number(input.daysText),
+      reason: input.reasonText,
+    });
+    if (!result.ok) {
+      applyGrantFailure(result, set);
+      return false;
+    }
+    // 🔴 动完**重新读**，而不是把返回的那一行本地拼进列表：
+    // 与发公告那一条同一纪律 —— 界面要显示的是服务端存下来的样子。
+    await get().loadGrantBoard();
+    set({ grantNotice: 'granted', loading: false });
+    return true;
+  },
+
+  upgradeGrant: async (input) => {
+    set({ loading: true, grantNotice: null, grantCode: null });
+    const result = await adminUpgradeSubscription(clientOptions(), {
+      userId: Number(input.userIdText),
+      sku: input.sku,
+      reason: input.reasonText,
+    });
+    if (!result.ok) {
+      applyGrantFailure(result, set);
+      return false;
+    }
+    await get().loadGrantBoard();
+    set({ grantNotice: 'upgraded', loading: false });
+    return true;
+  },
+
+  revokeGrant: async (input) => {
+    set({ loading: true, grantNotice: null, grantCode: null });
+    const result = await adminRevokeSubscriptionGrant(clientOptions(), {
+      userId: Number(input.userIdText),
+      reason: input.reasonText,
+    });
+    if (!result.ok) {
+      applyGrantFailure(result, set);
+      return false;
+    }
+    await get().loadGrantBoard();
+    set({ grantNotice: 'revoked', loading: false });
+    return true;
+  },
+
+  clearGrantNotice: () => {
+    set({ grantNotice: null, grantCode: null });
   },
 
   loadHolidayYears: async () => {
@@ -843,6 +1065,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     get().clearHolidayNotice();
     get().clearRefundNotice();
     get().clearAnnouncementNotice();
+    get().clearGrantNotice();
   },
 }));
 
@@ -862,6 +1085,10 @@ export function __resetAdminForTests(): void {
     revenueDays: 90,
     announcements: null,
     announcementNotice: null,
+    grantBoard: null,
+    grantHistory: null,
+    grantNotice: null,
+    grantCode: null,
     detail: null,
     holidayYears: null,
     holidayNotice: null,

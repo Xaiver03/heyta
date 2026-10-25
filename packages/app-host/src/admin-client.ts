@@ -778,3 +778,138 @@ export const adminWithdrawAnnouncement = (
     `${ADMIN_API_PREFIX}/announcements/${String(id)}`,
     { method: 'DELETE', body: {} },
   );
+
+// ─────────────────────────────────────────────────────────────────────
+// 订阅发放（ADR-0076）—— 与 `server/src/admin/admin.routes.ts` 那五条一一对应。
+//
+// 🔴 **这一层不知道"能发几天""这一档给什么能力"。**
+// 天数上下界、SKU → 能力的派生、"交付不了就不许发"全部住在
+// `server/src/admin/subscription-grant-store.ts`；界面把数字填进那一格只是**收集输入**。
+// 所以这里的入参**没有 `grants`**，而那也不是靠纪律：服务端那一侧是 `strictObject`，
+// 多一个键就 400（判据在 `server/tests/admin-subscription-grant.spec.ts`）。
+//
+// ⚠️ 发放与钱无关：这三条不建 `checkout_orders` 行，因此**不会**出现在营收看板里。
+// 界面不许把发放读数当成营收的一部分去解释（ADR-0076 §4.2）。
+// ─────────────────────────────────────────────────────────────────────────
+
+/** 档位下拉的一项。**没有价格、没有那句"为什么发不了"** —— 见 store 里那段 ADR-0074 的理由。 */
+export interface AdminGrantSku {
+  readonly priceId: string;
+  readonly grants: readonly string[];
+  readonly sellable: boolean;
+}
+
+export interface AdminGrantSkuList {
+  readonly skus: AdminGrantSku[];
+  /** 服务端那一侧的上界，随响应给：界面拿它做输入提示，**不**自己抄一个数。 */
+  readonly grantDaysMax: number;
+}
+
+/** 发放行的当前状态（动作成功后回给界面的那一格）。 */
+export interface AdminGrantSubscription {
+  readonly subscriptionId: number;
+  readonly userId: number;
+  readonly priceId: string | null;
+  readonly grants: readonly string[];
+  readonly status: string;
+  readonly currentPeriodEnd: number;
+}
+
+/** 一笔发放记录（动作史）。 */
+export interface AdminGrantRow {
+  readonly id: number;
+  readonly userId: number;
+  readonly actorUserId: number;
+  readonly action: 'grant' | 'upgrade' | 'revoke';
+  readonly sku: string | null;
+  readonly days: number | null;
+  readonly grants: readonly string[];
+  readonly beforePeriodEnd: number | null;
+  readonly afterPeriodEnd: number | null;
+  readonly reason: string;
+  readonly createdAt: number;
+}
+
+export interface AdminGrantList {
+  readonly items: AdminGrantRow[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
+}
+
+/** 三个动作的返回信封。 */
+export interface AdminGrantOutcome {
+  readonly ok: true;
+  readonly subscription: AdminGrantSubscription;
+  readonly audit: AdminGrantRow;
+}
+
+export interface AdminGrantInput {
+  readonly userId: number;
+  readonly sku: string;
+  readonly days: number;
+  readonly reason: string;
+}
+
+export interface AdminUpgradeInput {
+  readonly userId: number;
+  readonly sku: string;
+  readonly reason: string;
+}
+
+export interface AdminRevokeInput {
+  readonly userId: number;
+  readonly reason: string;
+}
+
+/** `GET /api/admin/skus` —— 档位投影。 */
+export const fetchAdminGrantSkus = (
+  options: AdminClientOptions,
+): Promise<AdminResult<AdminGrantSkuList>> =>
+  adminRequest<AdminGrantSkuList>(options, `${ADMIN_API_PREFIX}/skus`);
+
+/** `GET /api/admin/subscriptions/grants` —— 发放记录（可按账号过滤）。 */
+export const fetchAdminSubscriptionGrants = (
+  options: AdminClientOptions,
+  query?: { readonly userId?: number; readonly limit?: number; readonly offset?: number },
+): Promise<AdminResult<AdminGrantList>> => {
+  const search = new URLSearchParams();
+  if (query?.userId !== undefined) search.set('userId', String(query.userId));
+  if (query?.limit !== undefined) search.set('limit', String(query.limit));
+  if (query?.offset !== undefined) search.set('offset', String(query.offset));
+  const qs = search.toString();
+  return adminRequest<AdminGrantList>(
+    options,
+    `${ADMIN_API_PREFIX}/subscriptions/grants${qs === '' ? '' : `?${qs}`}`,
+  );
+};
+
+/** `POST /api/admin/subscriptions/grant` —— 赠送订阅（延长 N 天 + 设档位）。 */
+export const adminGrantSubscription = (
+  options: AdminClientOptions,
+  input: AdminGrantInput,
+): Promise<AdminResult<AdminGrantOutcome>> =>
+  adminRequest<AdminGrantOutcome>(options, `${ADMIN_API_PREFIX}/subscriptions/grant`, {
+    method: 'POST',
+    body: input,
+  });
+
+/** `POST /api/admin/subscriptions/upgrade` —— 免费升级（只换档位，一天都不加）。 */
+export const adminUpgradeSubscription = (
+  options: AdminClientOptions,
+  input: AdminUpgradeInput,
+): Promise<AdminResult<AdminGrantOutcome>> =>
+  adminRequest<AdminGrantOutcome>(options, `${ADMIN_API_PREFIX}/subscriptions/upgrade`, {
+    method: 'POST',
+    body: input,
+  });
+
+/** `POST /api/admin/subscriptions/revoke` —— 收回发放（只作用在发放行上）。 */
+export const adminRevokeSubscriptionGrant = (
+  options: AdminClientOptions,
+  input: AdminRevokeInput,
+): Promise<AdminResult<AdminGrantOutcome>> =>
+  adminRequest<AdminGrantOutcome>(options, `${ADMIN_API_PREFIX}/subscriptions/revoke`, {
+    method: 'POST',
+    body: input,
+  });

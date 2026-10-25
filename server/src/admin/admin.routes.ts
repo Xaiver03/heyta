@@ -5,7 +5,7 @@ import { centralRuntime } from '../central-auth/runtime';
  *
  * 依据：[`docs/adr/0038-admin-console-scope.md`](../../../docs/adr/0038-admin-console-scope.md)。
  *
- * ## 只读为主 + 三个不碰钱的动作
+ * ## 只读为主 + 会动数据的那几条
  *
  * | 方法 | 路径 | 用途 |
  * |---|---|---|
@@ -16,10 +16,19 @@ import { centralRuntime } from '../central-auth/runtime';
  * | POST | `/users/:id/quota`       | 调整存储配额 |
  * | POST | `/users/:id/logout`      | 强制登出（`tokenVersion++`，撤销该账号全部令牌） |
  * | GET  | `/subscriptions`         | 订阅列表 |
+ * | GET  | `/skus`                  | 后台的档位下拉（`SKU_GRANTS` 的投影，界面上不许硬编码档位）—— ADR-0076 |
+ * | GET  | `/subscriptions/grants`  | 发放记录（动作史，可只看某个账号）—— ADR-0076 |
+ * | POST | `/subscriptions/grant`   | **赠送订阅**：发放行延长 N 天 + 设档位（不建订单行 ⇒ 不进营收） |
+ * | POST | `/subscriptions/upgrade` | **免费升级**：只换发放行的档位，一天都不加 |
+ * | POST | `/subscriptions/revoke`  | **收回发放**：把发放行判死，行留着（付费行一格不动） |
  * | GET  | `/orders`                | 订单列表 |
  * | GET  | `/coupons`               | 优惠码 + 核销数 |
  * | GET  | `/invites`               | 邀请码 + 推荐关系 |
  * | GET  | `/revenue`               | 营收看板：逐日 × 逐币种的进账与退款（只读聚合，日界由调用方时区裁） |
+ * | GET  | `/refunds`               | 退款列表 |
+ * | POST | `/refunds`               | 发起退款申请（只对收银台下过、`checkout_orders` 里有自己那一行的单）—— ADR-0053 |
+ * | POST | `/refunds/:id/approve`   | 批准并送通道（通道确认到账后才回收权益） |
+ * | POST | `/refunds/:id/reject`    | 拒绝（必须带口径码） |
  * | GET  | `/announcements`         | 运营公告全量（含未生效与已过期；后台要看现状）—— ADR-0075 |
  * | POST | `/announcements`         | 发一条公告（`level` 词表 + 有效期由服务端判） |
  * | DELETE | `/announcements/:id`     | 下架 = 删掉那一行（0 行 ⇒ 404，不折成"已完成"） |
@@ -27,9 +36,22 @@ import { centralRuntime } from '../central-auth/runtime';
  * | PUT  | `/holiday-adjustments/years` | **整年替换**某一年（公共事实的唯一写入口，判据③的载体） |
  * | DELETE | `/holiday-adjustments/years?year=` | 撤销某一年（退回随包表，不是"下发空的一年"） |
  *
- * **不做**：改订阅、退款、发券、群发通知。理由见 ADR-0038 §2 三 / §3.4 ——
- * 前三个动到钱与权益，各自需要幂等键、审计与回滚；群发自由文本会破坏
- * "通知只存语义 + 参数、文案归 i18n"这条既有立场（`activity/notifications.ts` 文件头）。
+ * ## 那三条发放路由为什么可以出现在这张表里
+ *
+ * ADR-0038 §2 三当时写的是「**不做**：改订阅、退款、发券、群发通知」。
+ * 那句话现在被两份 ADR 分别开了口子，而**一行已知为假的注释留在文件头，
+ * 就会有人照它做决定**（比如"这里没有写面，那我新加一个也不破坏任何东西"）：
+ *
+ * | 那一项 | 现在的状态 | 谁动的 |
+ * |---|---|---|
+ * | 退款 | 四条路由，唯一**真的动钱**的一组；闸门 = 单级 `isAdmin` + 批准必须带非空理由 | ADR-0053 |
+ * | 改订阅 | 三条发放路由。但**仍然不改写已存在的行**：只写 `provider='admin-grant'` 那一行 | ADR-0076 §2 二 |
+ * | 发券 / 群发通知 | **仍然不做** —— 没有 `Coupon` 写面，没有新增通知 `kind` | — |
+ *
+ * 🔴 「不碰钱」这一句仍然是真的，但它的含义变成了一件需要写清的事：
+ * 发放**不建 `checkout_orders` 行**，因此结构上进不了营收看板与对账口径 ——
+ * 它动的是**权益**，不是**账**。那条性质由 `server/tests/admin-subscription-grant.spec.ts`
+ * 钉住（发放后订单行数不变 + `/revenue` 读数逐字段相同），不是靠这句注释。
  *
  * ## 🔴 响应一律走**白名单投影**
  *
@@ -82,6 +104,21 @@ import {
   publishAnnouncement,
   withdrawAnnouncement,
 } from '../announcements/announcement-store';
+import {
+  GRANT_DAYS_MAX,
+  GRANT_DAYS_MIN,
+  GrantUserNotFoundError,
+  InvalidGrantDaysError,
+  MissingGrantReasonError,
+  NoActiveGrantError,
+  SkuNotDeliverableError,
+  UnknownGrantSkuError,
+  grantSubscription,
+  listGrantSkuOptions,
+  listSubscriptionGrants,
+  revokeSubscriptionGrant,
+  upgradeSubscriptionGrant,
+} from './subscription-grant-store';
 import { prisma } from '../db';
 
 /** epoch 毫秒。`null` 原样返回（"未知"与 0 是两件事）。 */
@@ -121,6 +158,11 @@ const QuotaBodySchema = z.object({
 });
 
 const IdParamSchema = z.object({ id: z.coerce.number().int().positive() });
+
+/** 发放记录那一页：可以只看某一个账号的（`userId` 是可选过滤，不是必填）。 */
+const GrantListQuerySchema = PageQuerySchema.extend({
+  userId: z.coerce.number().int().positive().optional(),
+});
 
 /** 分页信封。统一形状 ⇒ 前端一个表格组件能吃所有列表。 */
 interface Page<T> {
@@ -1313,5 +1355,187 @@ export const adminRoutes = async (
       return reply.status(404).send({ code: 'announcement_not_found', message: 'Announcement not found.' });
     }
     return reply.send({ ok: true, withdrawn: true });
+  });
+
+  // ── 订阅发放（ADR-0076）────────────────────────────────────────────
+  /**
+   * 后台的三种发放动作。
+   *
+   * 🔴 载荷是 `strictObject`：多一个键就 400。这条形状**就是**"客户端发不出 `grants`"
+   * 这件事的实现 —— 能力只能从 `price-book.ts` 的 `grantsForSku` 派生（ADR-0076 §3.3）。
+   * 把它写成普通 `z.object` 也照样能跑，但那扇门就只是"暂时没人走进来"。
+   */
+  const GrantSkuSchema = z.string().trim().min(1).max(100);
+  const GrantReasonSchema = z.string().trim().min(1).max(500);
+  const GrantUserIdSchema = z.coerce.number().int().positive();
+
+  const GrantBodySchema = z.strictObject({
+    userId: GrantUserIdSchema,
+    sku: GrantSkuSchema,
+    // 上下界在 store 里**也**判了一遍（`assertGrantDays`）：这里是给人看的 400，
+    // 那里是给"绕过路由直接调 store"的人准备的。两处数字同一个来源。
+    days: z.coerce.number().int().min(GRANT_DAYS_MIN).max(GRANT_DAYS_MAX),
+    reason: GrantReasonSchema,
+  });
+
+  const UpgradeBodySchema = z.strictObject({
+    userId: GrantUserIdSchema,
+    sku: GrantSkuSchema,
+    reason: GrantReasonSchema,
+  });
+
+  const RevokeBodySchema = z.strictObject({
+    userId: GrantUserIdSchema,
+    reason: GrantReasonSchema,
+  });
+
+  /**
+   * 三个动作的失败**共用一张码表**。
+   *
+   * 为什么不让每条路由各写一遍 if-else：那样三处会漂移，而漂移的方向永远是
+   * "某一条把 409 报成了 500" —— 界面只能显示"服务端出错了"，运营会以为是自己网不好。
+   *
+   * 🔴 `reason` 带的是**码**，不是句子（与退款那四条同一约定，见 ADR-0053 §5 第 11 条；
+   * 而"码 vs 散文"这条规矩本身在 [ADR-0074](../../../docs/adr/0074-checkout-rejection-reason-is-a-token.md) §三.1）。
+   * 传输层只搬 `reason` 那一格（`admin-client.ts` 的 `readServerReason`），所以这里如果
+   * 放一句人话，那句话会**绕过 i18n** 直接出现在界面上 —— 而它是服务端写的中文，
+   * 切了英文也不会变。句子该由词条表负责；这一层只负责说"是哪一种拒绝"。
+   */
+  const grantFailure = (reply: import('fastify').FastifyReply, err: unknown) => {
+    if (err instanceof UnknownGrantSkuError) {
+      return reply
+        .status(400)
+        .send({ code: 'unknown_sku', message: 'Invalid sku.', reason: 'UNKNOWN_SKU', sku: err.sku });
+    }
+    if (err instanceof SkuNotDeliverableError) {
+      return reply.status(409).send({
+        code: 'sku_not_deliverable',
+        message: 'This sku is not deliverable right now.',
+        reason: 'SKU_NOT_DELIVERABLE',
+        sku: err.sku,
+      });
+    }
+    if (err instanceof InvalidGrantDaysError) {
+      return reply.status(400).send({ code: 'invalid_days', message: 'Invalid days.' });
+    }
+    if (err instanceof MissingGrantReasonError) {
+      return reply.status(400).send({ code: 'reason_required', message: 'Reason is required.' });
+    }
+    if (err instanceof GrantUserNotFoundError) {
+      // 这里**可以**说"账号不存在"：它不是一种权限状态，没有可泄漏的东西 ——
+      // 后台的 `/users` 本来就能列出全部账号（与 `/users/:id/unlock` 那条 404 同形）。
+      return reply.status(404).send({ code: 'user_not_found', message: 'User not found.' });
+    }
+    if (err instanceof NoActiveGrantError) {
+      // 与公告下架那条同一立场：**"没有可动的东西"不是一句"已完成"**。
+      return reply
+        .status(409)
+        .send({ code: 'no_active_grant', message: 'No active grant.', reason: 'NO_ACTIVE_GRANT' });
+    }
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    Logger.error(`Admin subscription grant error: ${message}`);
+    return reply.status(500).send({ code: 'grant_failed', message: 'Failed to mutate grant.' });
+  };
+
+  fastify.get('/skus', async (_req, reply) =>
+    reply.send({ skus: listGrantSkuOptions(), grantDaysMax: GRANT_DAYS_MAX })
+  );
+
+  fastify.get('/subscriptions/grants', async (req, reply) => {
+    const parsed = GrantListQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ code: 'invalid_query_parameters', message: 'Invalid query parameters.' });
+    }
+    const { take, skip } = pageParams(parsed.data);
+    try {
+      const { items, total } = await listSubscriptionGrants({
+        take,
+        skip,
+        ...(parsed.data.userId === undefined ? {} : { userId: parsed.data.userId }),
+      });
+      // 🔴 这一页**不回显邮箱**：动作史是"谁被发过什么"，`userId` 足够定位；
+      // 把邮箱带进一个可以翻页的列表，等于给每一次翻表附赠一份可识别信息（同 `/unlock` 那条纪律）。
+      return reply.send({ items, total, limit: take, offset: skip });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin grant list error: ${message}`);
+      return reply.status(500).send({ code: 'failed_to_load_grants', message: 'Failed to load grants.' });
+    }
+  });
+
+  fastify.post('/subscriptions/grant', async (req, reply) => {
+    const body = GrantBodySchema.safeParse(req.body);
+    if (!body.success) {
+      return reply.status(400).send({
+        code: 'invalid_grant',
+        message: 'Invalid grant payload.',
+        details: body.error.issues.map((issue) => issue.message),
+      });
+    }
+    try {
+      const outcome = await grantSubscription(
+        {
+          userId: body.data.userId,
+          sku: body.data.sku,
+          days: body.data.days,
+          reason: body.data.reason,
+          actorUserId: getAuthUser(req).userId,
+          now: Date.now(),
+        },
+      );
+      Logger.info(
+        `Admin granted user #${String(body.data.userId)} ${body.data.sku} +${String(body.data.days)}d`,
+      );
+      return reply.send({ ok: true, ...outcome });
+    } catch (err) {
+      return grantFailure(reply, err);
+    }
+  });
+
+  fastify.post('/subscriptions/upgrade', async (req, reply) => {
+    const body = UpgradeBodySchema.safeParse(req.body);
+    if (!body.success) {
+      return reply.status(400).send({
+        code: 'invalid_grant',
+        message: 'Invalid upgrade payload.',
+        details: body.error.issues.map((issue) => issue.message),
+      });
+    }
+    try {
+      const outcome = await upgradeSubscriptionGrant({
+        userId: body.data.userId,
+        sku: body.data.sku,
+        reason: body.data.reason,
+        actorUserId: getAuthUser(req).userId,
+        now: Date.now(),
+      });
+      Logger.info(`Admin upgraded user #${String(body.data.userId)} to ${body.data.sku}`);
+      return reply.send({ ok: true, ...outcome });
+    } catch (err) {
+      return grantFailure(reply, err);
+    }
+  });
+
+  fastify.post('/subscriptions/revoke', async (req, reply) => {
+    const body = RevokeBodySchema.safeParse(req.body);
+    if (!body.success) {
+      return reply.status(400).send({
+        code: 'invalid_grant',
+        message: 'Invalid revoke payload.',
+        details: body.error.issues.map((issue) => issue.message),
+      });
+    }
+    try {
+      const outcome = await revokeSubscriptionGrant({
+        userId: body.data.userId,
+        reason: body.data.reason,
+        actorUserId: getAuthUser(req).userId,
+        now: Date.now(),
+      });
+      Logger.info(`Admin revoked the grant of user #${String(body.data.userId)}`);
+      return reply.send({ ok: true, ...outcome });
+    } catch (err) {
+      return grantFailure(reply, err);
+    }
   });
 };

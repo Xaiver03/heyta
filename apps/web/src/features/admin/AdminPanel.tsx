@@ -19,10 +19,19 @@ import { ICON_SIZE } from '@heyta/design-system';
  * ⚠️ 这**不是**安全措施 —— 藏一个入口挡不住手工构造的请求。
  * 安全由服务端 `requireAdmin` 承担（ADR-0038 §4.3）。
  *
- * ## 只读 + 三个动作
+ * ## 只读为主，外加会动数据的那几格
  *
- * 首版只读，外加三个**不碰钱**的支持动作（解锁 / 配额 / 强制登出）。
- * "改订阅 / 退款 / 发券"要幂等键、审计与回滚，是独立的工作单元（ADR-0038 §3.4）。
+ * | 那一格 | 动的是什么 | 依据 |
+ * |---|---|---|
+ * | 用户详情：解锁 / 配额 / 强制登出 | 账号状态，**不碰钱也不碰权益** | ADR-0038 §2 三 |
+ * | 调休 / 补班 | 一份下发给全体的公共事实 | ADR-0052 |
+ * | 公告 | 一条内容通道（明文，不进端到端加密） | ADR-0075 |
+ * | 退款 | 🔴 **唯一真的动钱**的一组；批准要非空理由 | ADR-0053 |
+ * | 发放 | 三种订阅发放（赠送 / 免费升级 / 收回）。只写 `provider='admin-grant'` 那一行，**不建订单行 ⇒ 不进营收** | ADR-0076 |
+ *
+ * ⚠️ 这一张表现在是活的：加一格就登记一格。它原先写的是"首版只读，外加三个动作，
+ * 改订阅/退款/发券是独立的工作单元" —— 那句到 2026-10 已经三处为假，而它留在文件头
+ * 的作用是让下一个人在这里再开一格时以为自己在破坏什么（其实那条线早就被 ADR 挪过了）。
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -33,21 +42,26 @@ import { EmptyState, HeytaUiProvider } from '@heyta/ui';
 import { ChevronLeft, ChevronRight, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 
 import {
+  ADMIN_GRANT_NOTICE_KEY,
   ADMIN_HOLIDAY_NOTICE_KEY,
   ADMIN_PAGE_SIZE,
   ADMIN_REFUND_CODE_KEY,
   ADMIN_REFUND_NOTICE_KEY,
   EMPTY_ANNOUNCEMENT_FORM,
+  EMPTY_GRANT_FORM,
+  grantCodeKey,
   useAdminStore,
   type AdminHolidayNotice,
+  type AdminGrantNotice,
   type AdminRefundNotice,
   type AdminStoreState,
   type AnnouncementFormInput,
+  type GrantFormInput,
   type HolidayYearInput,
   type RefundRequestInput,
 } from './store.js';
 
-import type { AdminAnnouncementRow } from '@heyta/app-host';
+import type { AdminAnnouncementRow, AdminGrantRow } from '@heyta/app-host';
 
 import { FormField } from '../../lib/form/FormField.js';
 
@@ -174,6 +188,12 @@ export function AdminPanel({
         break;
       case 'subscriptions':
         if (store.subscriptions === null) void store.loadSubscriptions();
+        break;
+      case 'grants':
+        // 档位下拉与发放记录是**同一次读**（`loadGrantBoard` 里两把 GET 并发），
+        // 所以这里只有一个"还没拉过"的判据。判 `grantHistory` 而不是 `grantBoard`：
+        // 空档位列表是配置坏了的一种形状，而空历史是正常的初始状态 —— 前者不该重拉。
+        if (store.grantHistory === null) void store.loadGrantBoard();
         break;
       case 'orders':
         if (store.orders === null) void store.loadOrders();
@@ -560,7 +580,10 @@ export function AdminPanel({
       )}
 
       {/* ── 订单 ─────────────────────────────────────────────────── */}
-      {tab === 'orders' && store.orders !== null && (
+      {/* ── 订阅发放（ADR-0076：三种动作 + 动作史）──────────────── */}
+      {tab === 'grants' && <GrantPanel store={store} />}
+
+            {tab === 'orders' && store.orders !== null && (
         <>
           <ul className="ht-settings__admin-list" data-testid="admin-orders">
             {store.orders.items.map((order) => (
@@ -1554,6 +1577,255 @@ function AnnouncementPanel({
                   {t('web.admin.announcements.withdraw')}
                 </button>
               )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 发放记录的 `action` 词 → 词条 key。**穷举**，漏一个编译期就红。
+ *
+ * 🔴 词表住服务端（`subscription-grant-store.ts` 的 `SUBSCRIPTION_GRANT_ACTIONS`），
+ * 这里那份是**手抄的键表**：客户端类型 `AdminGrantRow['action']` 只有三个成员，
+ * 服务端加第四个词时这一处会红在类型上，而**不是**运行时显示一个空白格 ——
+ * 这是这一族"客户端手抄服务端词表"里少数能被编译期抓住的一处。
+ */
+const ADMIN_GRANT_ACTION_KEY: Record<AdminGrantRow['action'], MessageKey> = {
+  grant: 'web.admin.grant.action.grant',
+  upgrade: 'web.admin.grant.action.upgrade',
+  revoke: 'web.admin.grant.action.revoke',
+};
+
+/**
+ * 「发放」面板 —— 三种订阅发放（ADR-0076）。
+ * ============================================================================
+ *
+ * 🔴 **这里一片判定都没有。** 能不能发这一档、他有没有发放行、这次动作动没动时间，
+ * 全部住在 `server/src/admin/subscription-grant-store.ts` 那三道闸门里。
+ * 本面板只做四件机械的事：收集字符串 → 交给 store → 等一次读回 → 把读回的那几行念出来。
+ *
+ * ## 三个动作共用**一张**表单，因为它们是同一句话的三种时态
+ *
+ * 「送给这个人 30 天」「把他升到那一档」「收回这次发放」作用在**同一行**上。
+ * 分三张表单会让运营在三处各填一次账号编号，而填错一次就发给错的人。
+ *
+ * ## 🔴 档位下拉里**不裁掉**交付不了的那一档
+ *
+ * 服务端那一格 `sellable` 是**这一刻**的实例状态（两道开关都能在重启后变），
+ * 提前把它从下拉里抹掉的症状是"这一档根本不存在"，而真实情况是"现在发不了"。
+ * 所以它留在列表里、带一个说明，选了也照样能点 —— 那一次 409 会带着
+ * `SKU_NOT_DELIVERABLE` 回来，界面说出为什么。**看不见不是禁用，说得出才是。**
+ *
+ * ## 收回是**两步**
+ *
+ * 它会让一个人立刻失去一项他现在能用的能力。第一次点只出确认、一个请求都不发
+ * （与公告下架、退款批准同一模式，`docs/agents/overlay-feedback.md` 危险那四档里的
+ * 第三档：可逆但会打扰别人）。
+ *
+ * ⚠️ 这一格**不显示营收**。发放不建 `checkout_orders` 行，所以它结构上进不了
+ * 营收看板（ADR-0076 §4.2）；把这两件事摆在同一屏会让人把赠送读成收入。
+ */
+function GrantPanel({ store }: { store: AdminStoreState }): React.JSX.Element {
+  const { t } = useI18n();
+  const [form, setForm] = useState<GrantFormInput>(EMPTY_GRANT_FORM);
+  // 收回是两步：第一次点只出确认，一个请求都不发。
+  const [pendingRevoke, setPendingRevoke] = useState(false);
+
+  const board = store.grantBoard;
+  const history = store.grantHistory;
+  const notice = store.grantNotice;
+  const codeKey = store.grantCode === null ? null : grantCodeKey(store.grantCode);
+
+  const submit = (action: 'grant' | 'upgrade' | 'revoke'): void => {
+    void (async () => {
+      const run =
+        action === 'grant'
+          ? store.grantSubscription(form)
+          : action === 'upgrade'
+            ? store.upgradeGrant(form)
+            : store.revokeGrant(form);
+      const ok = await run;
+      // 只有**真的成了**才清表单；被拒时留着，运营改一格再点的应该是他刚填的那几格。
+      if (ok) {
+        setForm(EMPTY_GRANT_FORM);
+        setPendingRevoke(false);
+      }
+    })();
+  };
+
+  return (
+    <div data-testid="admin-grants">
+      <p className="ht-settings__admin-notice" data-testid="admin-grants-lead">
+        {t('web.admin.grant.lead')}
+      </p>
+
+      <form
+        className="ht-settings__admin-detail"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit('grant');
+        }}
+      >
+        <h4 className="ht-settings__admin-h">{t('web.admin.grant.compose')}</h4>
+
+        <FormField id="admin-grant-user" label={t('web.admin.grant.user')}>
+          {(fieldProps) => (
+            <input
+              {...fieldProps}
+              className="ht-settings__admin-input"
+              type="text"
+              inputMode="numeric"
+              value={form.userIdText}
+              onChange={(event) => setForm({ ...form, userIdText: event.target.value })}
+            />
+          )}
+        </FormField>
+
+        {board === null ? (
+          <p className="ht-settings__hint">{t('web.admin.loading')}</p>
+        ) : (
+          <FormField id="admin-grant-sku" label={t('web.admin.grant.sku')}>
+            {(fieldProps) => (
+              <select
+                {...fieldProps}
+                className="ht-settings__admin-input"
+                value={form.sku}
+                onChange={(event) => setForm({ ...form, sku: event.target.value })}
+              >
+                <option value="">{t('web.admin.grant.skuPick')}</option>
+                {board.skus.map((sku) => (
+                  <option key={sku.priceId} value={sku.priceId}>
+                    {sku.priceId}
+                    {' · '}
+                    {sku.grants.join(' / ')}
+                    {/* 🔴 交付不了的那一档**留在列表里**，只多一个后缀（见文件头）。 */}
+                    {sku.sellable ? '' : ` · ${t('web.admin.grant.skuUnsellable')}`}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormField>
+        )}
+
+        <FormField id="admin-grant-days" label={t('web.admin.grant.days')}>
+          {(fieldProps) => (
+            <input
+              {...fieldProps}
+              className="ht-settings__admin-input"
+              type="text"
+              inputMode="numeric"
+              value={form.daysText}
+              onChange={(event) => setForm({ ...form, daysText: event.target.value })}
+            />
+          )}
+        </FormField>
+        {/* 上界是**服务端随响应给的数**，不是这里抄的一份 —— 抄一份就是给下一次
+            改上界时只改一处留一处留的位置。它只用于**说明**，不用于拦截。 */}
+        {board !== null && (
+          <p className="ht-settings__hint" data-testid="admin-grants-daysHint">
+            {t('web.admin.grant.daysHint', { max: String(board.daysMax) })}
+          </p>
+        )}
+
+        <FormField id="admin-grant-reason" label={t('web.admin.grant.reason')}>
+          {(fieldProps) => (
+            <input
+              {...fieldProps}
+              className="ht-settings__admin-input"
+              type="text"
+              value={form.reasonText}
+              onChange={(event) => setForm({ ...form, reasonText: event.target.value })}
+            />
+          )}
+        </FormField>
+
+        <div className="ht-settings__admin-actions">
+          {/* 唯一的那枚 submit：Enter 走的是"赠送订阅"，它是这一格的主动词。 */}
+          <button type="submit" className="ht-settings__admin-btn">
+            {t('web.admin.grant.publish')}
+          </button>
+          <button
+            type="button"
+            className="ht-settings__admin-btn"
+            onClick={() => submit('upgrade')}
+          >
+            {t('web.admin.grant.upgrade')}
+          </button>
+          {pendingRevoke ? (
+            <>
+              <button
+                type="button"
+                className="ht-settings__admin-btn ht-settings__admin-btn--danger"
+                onClick={() => submit('revoke')}
+              >
+                {t('web.admin.grant.revokeConfirm')}
+              </button>
+              <button
+                type="button"
+                className="ht-settings__admin-btn"
+                onClick={() => setPendingRevoke(false)}
+              >
+                {t('web.admin.close')}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="ht-settings__admin-btn"
+              onClick={() => setPendingRevoke(true)}
+            >
+              {t('web.admin.grant.revoke')}
+            </button>
+          )}
+        </div>
+
+        {notice !== null && (
+          <p
+            className={notice === 'denied' || notice === 'conflict' ? 'ht-settings__danger' : 'ht-settings__hint'}
+            data-testid="admin-grants-notice"
+          >
+            {t(ADMIN_GRANT_NOTICE_KEY[notice])}
+            {codeKey !== null ? ` ${t(codeKey)}` : ''}
+          </p>
+        )}
+      </form>
+
+      <h4 className="ht-settings__admin-h">{t('web.admin.grant.history')}</h4>
+      {history === null ? (
+        <p className="ht-settings__hint">{t('web.admin.loading')}</p>
+      ) : history.length === 0 ? (
+        <AdminEmpty titleKey="web.admin.grant.noneFound" />
+      ) : (
+        <div className="ht-settings__admin-list" data-testid="admin-grants-rows">
+          {history.map((row) => (
+            <div key={row.id} className="ht-settings__admin-row">
+              <span className="ht-settings__admin-rowMain">
+                {t(ADMIN_GRANT_ACTION_KEY[row.action])}
+              </span>
+              <span className="ht-settings__admin-static">
+                {t('web.admin.grant.rowUser', { userId: String(row.userId) })}
+              </span>
+              <span className="ht-settings__admin-static">
+                {row.sku === null
+                  ? t('web.admin.grant.rowNoSku')
+                  : `${row.sku}${row.days === null ? '' : ` · ${t('web.admin.grant.rowDays', { days: String(row.days) })}`}`}
+              </span>
+              <span className="ht-settings__admin-rowMeta">
+                {formatTime(row.createdAt)}
+                {' → '}
+                {row.afterPeriodEnd === null
+                  ? '—'
+                  : t('web.admin.grant.rowUntil', { time: formatTime(row.afterPeriodEnd) })}
+              </span>
+              {/* 理由与操作者：这一格存在的意义就是"谁在什么时候为什么动过"，
+                  少了这两样它就退化成一条状态流水。 */}
+              <span className="ht-settings__admin-static">{row.reason}</span>
+              <span className="ht-settings__admin-static">
+                {t('web.admin.grant.rowActor', { actor: String(row.actorUserId) })}
+              </span>
             </div>
           ))}
         </div>

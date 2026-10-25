@@ -1243,6 +1243,60 @@ model Announcement {
   @@map("announcements")
 }
 
+/// 后台**发放订阅**的三个动作各留一行 —— 依据
+/// [ADR-0076](../../docs/adr/0076-admin-subscription-grants.md) §2 四。
+///
+/// ## 这是一张**动作表**，不是一份权益状态
+///
+/// 权益状态在 `subscriptions` 的那个 `provider='admin-grant'` 行上；这里记的是
+/// "谁在什么时候把谁的到期日动到了哪天"。所以收回一次发放**不许**删掉这里的历史行
+/// —— 删了就等于"那次动作没发生过"，而这张表存在的全部理由就是让它发生过。
+///
+/// ## 为什么每列都是**写入时快照**
+///
+/// `sku` / `days` / `grants` 之后都可能被运营改价目表改掉。与 `refunds.period_days`
+/// 同一条理由：把当时的事实冻在动作行上，追溯才是可重放的读，而不是对当前配置的猜测。
+model SubscriptionGrant {
+  id Int @id @default(autoincrement())
+
+  /// 发放作用在哪个账号。**没有外键**（同 `refunds.requested_by`、`announcements.created_by`）：
+  /// 注销账号不该把"曾经给他发过什么"一起带走，也不该因为挂着审计而删不掉账号。
+  userId Int @map("user_id")
+
+  /// 谁点的。**同样没有外键**，且它可以等于 `userId` ——
+  /// 测试期给自己发是主要用法（ADR-0076 §4.3.1），本版不拦，只让它**可见**。
+  actorUserId Int @map("actor_user_id")
+
+  /// `'grant' | 'upgrade' | 'revoke'`。封闭词表（在 `admin/subscription-grant-store.ts`，
+  /// 词表外直接抛）。🔴 存**语义**不存中文，展示名归 i18n —— 同 ADR-0038 那条通知立场。
+  action String
+
+  /// 发放的那一档。`null` 只出现在 `revoke` 行上（收回不重新声明档位）。
+  /// ⚠️ **不建外键**：价目表的键是代码里的 SKU 常量（`price-book.ts` 的 `SKU_GRANTS`），
+  /// 不是一行可引用的表记录 —— 想引用它只能引用 `price_versions`，
+  /// 而那一引用会在"档位下架"时**挡住审计行的写入**，等于让追溯能力服从于配置状态。
+  sku  String?
+  days Int?
+
+  /// 当时那一档授予的能力（从 `grantsForSku` 派生，客户端永远发不出来）。
+  grants String[] @default([])
+
+  /// 动作前后的到期日（epoch 毫秒）。`before` 为 `null` = 这次之前他没有发放行。
+  beforePeriodEnd BigInt? @map("before_period_end")
+  afterPeriodEnd  BigInt? @map("after_period_end")
+
+  /// 🔴 强制非空。沿用 ADR-0053 给退款批准立的那条规矩：
+  /// 一个会静默改变别人能用什么的动作，必须留下一句人话。
+  reason String
+
+  createdAt BigInt @default(0) @map("created_at")
+
+  /// 读面的两个形状：按账号翻他的发放史、按时间翻全站（后台列表默认后者）。
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("subscription_grants")
+}
+
 // ---------------------------------------------------------------------------
 // Windows PWA 小组件的 Web Push 订阅（见 docs/plans/multi-platform-widgets.md 的 U12）
 // ---------------------------------------------------------------------------
