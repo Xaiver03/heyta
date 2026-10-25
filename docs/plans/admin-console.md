@@ -358,9 +358,11 @@ jsdom 那一套里同意早已答好、凭据是 `setState` 直接塞的，所�
   这一张表**故意没有外键**（`created_by` 指向 `users`，但删号不许连带删掉公告历史，
   也不许因为约束挡住回收流程），理由写在迁移头部。
 - 上线顺序（**不能倒**）：先跑迁移 ⇒ 再部署服务端并重启 ⇒ 再 `pnpm --filter @heyta/web build`
-  + `rsync` 产物 ⇒ 最后 `server/scripts/nginx-sync.sh --apply`。
-  先 apply nginx 的话，`/admin` 会把**旧产物**交出去，那一屏上没有后台壳，
+  + `rsync` 产物 ⇒ 最后动边缘那一条 location。
+  先动边缘的话，`/admin` 会把**旧产物**交出去，那一屏上没有后台壳，
   读起来像"这个地址坏了"。
+  ⚠️ 这一条当时写的是"最后 `server/scripts/nginx-sync.sh --apply`"——**那句对本域名是错的**
+  （边缘是 caddy-edge，那份 nginx 文件没人读），2026-10-25 上线时踩到，改法与读数在 §9.3/§9.4。
 
 ---
 
@@ -384,7 +386,7 @@ jsdom 那一套里同意早已答好、凭据是 `setState` 直接塞的，所�
 
 | 判据 | 钉住的东西 | 变异（改坏哪一行 ⇒ 必须红） |
 |---|---|---|
-| 发放后 `checkout_orders` 行数不变 + `/revenue` 读数逐字段相同 | ADR-0076 §4.2「发放不进营收」 | 让 grant 建一条订单行 |
+| 发放用的那个事务客户端**只暴露三枚 model**（`subscription` / `subscriptionGrant` / `user`） | ADR-0076 §4.2「发放不进营收」——营收只读 `checkout_orders`，所以"发一条订单"在代码里**写不出来**，不是"记得别写" | 往 `GrantTx` 上加第四枚 model |
 | 付费行的 5 个字段在"发放→收回"全程不变 | §2 二"只写 `admin-grant` 行" | 让 revoke 把 `where` 放宽到全部 provider |
 | 未知 SKU ⇒ 400 且**无审计行、无订阅行** | §2 三第 1 道闸门 | 把 `grantsForSku(...) === null` 折成 `?? []` |
 | `notSellableReason` 非 null ⇒ 拒绝发放 | §1.3.4（收银台挡住的东西后台也挡） | 删掉那次 `notSellableReason` 调用 |
@@ -396,5 +398,67 @@ jsdom 那一套里同意早已答好、凭据是 `setState` 直接塞的，所�
 
 ### 9.3 上线顺序
 
-沿用 §8.5 那一条，**不能倒**：迁移（`cd server && sh scripts/migrate-deploy.sh`）
-⇒ 服务端镜像重建换容器 ⇒ web 产物 build + rsync ⇒ `server/scripts/nginx-sync.sh --apply`。
+迁移 ⇒ 服务端镜像重建换容器 ⇒ web 产物 build + rsync ⇒ **边缘那一条 location**。
+默认走 `node scripts/deploy-ssh.mjs`（沙箱是默认，真发生产要 `--apply --yes-production`），
+它把"送源码 / 建镜像 / 空库跑迁移 / 打 `/health` / 换容器"串成一条带 sha256 对账的链。
+
+🔴 **最后那一步不是 `server/scripts/nginx-sync.sh --apply`** —— 本域名 2026-10-24 起由
+`caddy-edge` 服务（`ssh finlaw 'ss -ltnp | grep :443'` 现量），`nginx.service` 是 masked，
+`/etc/nginx/sites-available/*` 与仓库里那份 `server/deploy/nginx/heyta.waytofuture.cn.conf`
+**都是死配置**。那一课 ADR-0054 §落地动作 3 记过一次，本轮又踩了一遍 ——
+差别是这次**计划里写着它**，所以那句话已按上面的形状改掉。
+线上真正在跑的站点片段：`/etc/caddy/sites.d/00-heyta.caddy`（改法见 §9.4）。
+
+⚠️ 仓库里**没有**那份 caddy 片段的副本，也没有对应的 `--check/--pull/--apply`。
+于是"线上有哪些 location"这件事对 caddy 又变回不可 diff 的了 ——
+这正是 `nginx-sync.sh` 文件头写的那条理由。补这一格的动作记在 §9.4「还欠的」。
+
+### 9.4 上线（2026-10-25，一次做完的读数）
+
+| 步 | 读数 |
+|---|---|
+| 沙箱 | 镜像可建；OCI revision 标签 == 送出去的 commit；**含 `20261025000000_add_subscription_grants` 的整条迁移链在空库跑通**；`/health=200`；只删自己创建的三枚对象 |
+| 生产 | `ROLLBACK_TAG=supersync:rollback-20261025T043018` → `MIGRATE_RC=0` → `SWAPPED` → `HEALTH=200` |
+| 产物 | `HEYTA_WEB_BASE=/app/` 构建 → `check:web-artifact:app` 绿 → rsync 前后各 9 个 asset 同名；发布前远端整目录备份在 `~/heyta-app.bak-20261025-admin` |
+| 边缘 | `/admin` 200 + `cache-control: no-cache` + 与 `/app/` **逐字节同一份 HTML**；`/admin/` 301 → `/admin`；`/app/`、`/`、`/health` 无回归，未知路径仍真 404 |
+| 判据 | `e2e/live-site/live-admin-entry.spec.ts` 两条（这一格地址本身）+ `live-manifest` 三条，全绿；条数自己数：`ls e2e/live-site/live-*.spec.ts \| wc -l` |
+
+**三个动作在真线上各点了一遍**（一次性管理员账号，做完即删）：
+图证在 `apps/web/evidence/admin-console/live-admin-grants-{before,after,revoked}.png`
+与 `live-admin-revenue.png`（这四张打的是**公网域名 + 真库**，与
+`admin-route-grants-*.png` 那两张假端点的本机图不是一回事）。
+`grant 30 天` 的周期差 == 2,592,000,000 ms（恰好 30 天）；`upgrade` 的
+`currentPeriodEnd` **逐字不变**（"一天都不加"在真库上成立）；`revoke` 把那一行折到 `now`。
+发放记录五条，倒序，每条带理由与操作者；`checkout_orders` 全程 **0 行**，
+营收那一格显示的是共享空态"这个窗口里没有进账，也没有退款" ——
+ADR-0076 §4.2「发放不进营收」这条立场第一次有了线上读数（此前只有那条
+"事务里只有三枚 model，`tx.checkoutOrder` 写不出来"的结构性判据）。
+
+收尾读数（现量命令：`ssh finlaw 'sudo -n docker exec supersync-postgres sh -c '"'"'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select (select count(*) from users), (select count(*) from users where is_admin), (select count(*) from subscriptions where provider=$$admin-grant$$), (select count(*) from subscription_grants)"'"'"''`）：
+用户回到 11、管理员 0、`admin-grant` 订阅行 0、**发放审计行留 5 条**。
+最后那一格是**故意的**：`subscription_grants` 按设计没有外键（ADR-0076 §2 二），
+删号不许连带抹掉"谁在什么时候为什么发过什么"。
+
+**顺手修掉的一条线上缺陷（不在本轮范围里，但它是红的）**：
+`/app/manifest.webmanifest` 的 `content-type` 是 `text/plain` —— `.webmanifest` 不在
+Caddy 内置 mime 表里，而 nginx 时代靠 `/etc/nginx/mime.types` 那一条。
+**2026-10-24 迁到 caddy 那天起就红**，只是没人再跑线上验收；本轮 `live-manifest` 两条判红抓到的。
+修法：站点片段里 `@appManifest` + `header Content-Type "application/manifest+json; charset=utf-8"`，
+必须排在 `handle /app*` **之前**（Caddy 的 handle 是顺序首个命中胜）。
+⚠️ 校验这枚文件必须用 **`/usr/local/bin/caddy-edge validate`**，不是 PATH 上那枚 `caddy`：
+后者没编进 `rate_limit` 模块，会在**别人那片** `21-originxspace.caddy` 上报
+`unrecognized directive: rate_limit` 而假红（本轮实测：假红那一次自动回滚了，真镜像没动）。
+
+**还欠的（登记，不在本轮做）**：
+- 仓库里没有 `/etc/caddy/sites.d/*.caddy` 的副本与 `--check/--pull/--apply` 那三档，
+  所以"线上有哪些 location"对 caddy 又不可 diff 了。要补的是 `nginx-sync.sh` 的同款，
+  不是再写一份散文。
+- 🔴 未登录打开 `/admin` 时，`admin-console-reason` 那句是
+  "没有配置服务器地址，所以管理后台不可用"（英文态实测同句）。**真实原因是没有会话**，
+  而 `clientOptions()` 在未登录时 `baseUrl` 为空，于是 `probe()` 走的是 `no_base_url` 那一支。
+  判它的断言：未登录时那句必须命中"要先登录"那一族文案，且 `no_base_url` 只许在
+  **有会话但地址没配**时出现。今天不修的理由：它要动的是认证态与 `baseUrl` 的语义
+  （`store.ts:514` 那一处是同步面共用的），不是后台自己的一格。
+- 后台的运营账号今天**是 0 个**（取证那枚已删）。要给自己开：
+  `pnpm --filter @heyta/server admin:grant <你的邮箱>`（线上在容器里跑
+  `docker exec -w /app supersync-server node dist/scripts/admin.js grant <邮箱>`）。
