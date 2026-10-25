@@ -62,6 +62,22 @@ async function labelBox(page: Page, index: number) {
       const text = el.querySelector('div,span') ?? el;
       const cs = getComputedStyle(text);
       const lh = cs.lineHeight === 'normal' ? Number.parseFloat(cs.fontSize) * 1.5 : Number.parseFloat(cs.lineHeight);
+      /*
+       * 🔴 2026-10-25：除了**格子**的盒子，还要**那行字自己的**盒子。
+       * 格子的宽有"两列下界"（`heatMonthLabelWidths` 的 floor，防止「10月」折行），
+       * 所以格子**可能比字宽**；而"标签互相压字"这句话说的是**字**，不是格子。
+       * 拿格子判重叠会在"两枚月份相邻"那一档误报（实测：格子 32 宽、字 ~14 宽、
+       * 下一枚在 18px 外 ⇒ 格子相交、字并不相交）。
+       */
+      /*
+       * ⚠️ 不能用 `text.getBoundingClientRect()`：那枚 `<Text>` 在 RNW 里是块级、
+       * 宽度**撑满格子**，量出来等于格子本身（实测 `textRight === right`），
+       * 于是"格子宽 = 32"仍然会算成重叠。要量的是**字形的盒子** ⇒ 用 `Range` 选内容。
+       */
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const raw = range.getBoundingClientRect();
+      const textBox = raw.width > 0 ? raw : text.getBoundingClientRect();
       return {
         testid: el.getAttribute('data-testid') ?? '',
         left: Math.round(box.left),
@@ -70,6 +86,8 @@ async function labelBox(page: Page, index: number) {
         height: Math.round(box.height),
         lineHeight: Math.round(lh),
         content: (el.textContent ?? '').trim(),
+        textLeft: Math.round(textBox.left),
+        textRight: Math.round(textBox.right),
       };
     });
 }
@@ -147,8 +165,9 @@ test.describe('热力图月份标签（H8，web 端）', () => {
         `「${box.content}」左边缘 ${String(box.left)} 不在它那一周 ${String(first.left)} 上 ⇒ 标签与格子错列`,
       ).toBeLessThanOrEqual(1);
     }
+    // 重叠量的是**字**（`textRight` / `textLeft`），不是格子 —— 理由见 `labelBox`。
     const overlap = boxes.filter((a, idx) =>
-      boxes.some((b, jdx) => jdx === idx + 1 && a.right > b.left + 1),
+      boxes.some((b, jdx) => jdx === idx + 1 && a.textRight > b.textLeft + 1),
     );
     expect(
       overlap.length,
