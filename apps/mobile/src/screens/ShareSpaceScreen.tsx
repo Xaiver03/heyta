@@ -89,7 +89,7 @@ import { useMobileSync } from '../sync/store';
 import { Button, Card, Chip, Divider, EmptyState, Screen, Stack, Text, TextField } from '../ui/kit';
 import { ensureMobileShareSession, mobileShareSession, resetMobileShareSession } from '../share/share-session';
 import { prepareMobileShareAdmin, type MobileShareAdmin } from '../share/share-admin';
-import { registerShareRosterTarget, subscribeShareRepaint } from '../share/share-signals';
+import { pullSharedContentsOnOpen, registerShareRosterTarget, subscribeShareRepaint } from '../share/share-signals';
 import { bindProjectShare } from '../share/project-share';
 import JoinShareScreen from './JoinShareScreen';
 
@@ -547,6 +547,20 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
       alive = false;
     };
   }, [sessionComments, commentTask]);
+
+  /**
+   * 🔴 **打开这份共享 ⇒ 拉一次既有下行**。判据本体在 `@heyta/app-host` 的
+   *    `pullSharedListOnOpen`（为什么每次打开都拉、为什么不抛穿，写在那份文件头）。
+   *    这一格是 2026-10-25 iOS 设备腿 L2 抓出来的：成员名册已经下来、清单行也绑好了，
+   *    评论区却写「这条共享清单里还没有任务」—— 因为 `new_share_ops` 只在**有人新写**时
+   *    响，"加入之前就在清单里的东西"此前**没有任何一条路径**会带来（两壳同形）。
+   *    只按 `selected` 触发，不许挂 `tick`：拉成功会敲重画、重画会顶 `tick`，
+   *    挂上去就变成"拉到 ⇒ 再拉"的自循环。
+   */
+  useEffect(() => {
+    if (selected === undefined) return;
+    void pullSharedContentsOnOpen(selected).catch(() => undefined);
+  }, [selected]);
 
   /**
    * 🔴 重画通道订阅：信号消费侧落盘后敲这一下，本节的动作是**重读那一份缓存**

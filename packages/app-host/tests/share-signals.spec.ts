@@ -12,6 +12,7 @@ import { OpType } from '@heyta/sync-core';
 
 import {
   createShareOpsSignalHandler,
+  pullSharedListOnOpen,
   shareActivitiesFromOps,
   type ShareSignalReading,
 } from '../src/share-signals.js';
@@ -229,5 +230,59 @@ describe('share 信号 · 什么算一条活动', () => {
     // 要给任务族加档位，改的是这一臂 + `ShareSignalActivity` 那个联合 + 通知偏好那一节，
     // 不是让 `completed` 那一档悄悄长出一个没人判过的输入。
     expect(shareActivitiesFromOps([op({ id: 't-1', entityType: 'TASK' })], ME)).toEqual([]);
+  });
+});
+
+describe('打开一份共享清单 ⇒ 拉一次既有下行（M6 设备腿 L2 那一格）', () => {
+  // 这一族判据的存在理由：`new_share_ops` 只在**有人新写**时响，所以"加入之前就在清单里的
+  // 东西"没有任何一条路径会带来。2026-10-25 iOS 设备腿实测到（成员名册已下来、清单行已绑好，
+  // 评论区那一节写「这条共享清单里还没有任务」）。pull 数得出次数，"每次都拉/不抛穿"才叫判据。
+  const pulled = (added = 0): SharePullResult => ({
+    fetched: added,
+    added,
+    cursor: 7,
+    pages: 1,
+  });
+
+  it('打开 ⇒ 真的发一次拉取，且带的是这一份 shareId', async () => {
+    const calls: string[] = [];
+    const reading = await pullSharedListOnOpen(
+      {
+        pull: async (shareId) => {
+          calls.push(shareId);
+          return pulled(3);
+        },
+      },
+      'share-a',
+    );
+    expect(calls).toEqual(['share-a']);
+    expect(reading).toMatchObject({ shareId: 'share-a', pulled: true, added: 3 });
+  });
+
+  it('拉取抛错 ⇒ 不抛穿，读数里 pulled=true 且 error 在册（锁着的保险库不许变成错误弹窗）', async () => {
+    const boom = new Error('vault locked');
+    await expect(
+      pullSharedListOnOpen({ pull: async () => { throw boom; } }, 'share-b'),
+    ).resolves.toMatchObject({ shareId: 'share-b', pulled: true, added: 0, error: boom });
+  });
+
+  it('对照臂：追平那一趟（added=0）照样算"拉过" ⇒ 判据不是"有新内容才算"，撤掉拉取会红', async () => {
+    const reading = await pullSharedListOnOpen({ pull: async () => pulled(0) }, 'share-c');
+    expect(reading.pulled).toBe(true);
+    expect(reading.added).toBe(0);
+    expect(reading.error).toBeUndefined();
+  });
+
+  it('没有 shareId（空串/全空格）⇒ 零请求，不拿一个不存在的清单去撞 404', async () => {
+    let calls = 0;
+    const ports = {
+      pull: async () => {
+        calls += 1;
+        return pulled(0);
+      },
+    };
+    await expect(pullSharedListOnOpen(ports, '')).resolves.toMatchObject({ pulled: false });
+    await pullSharedListOnOpen(ports, '   ');
+    expect(calls).toBe(0);
   });
 });

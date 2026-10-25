@@ -166,3 +166,48 @@ export function createShareOpsSignalHandler(
     },
   };
 }
+
+/** `pullSharedListOnOpen` 的端口：只需要"拉"这一件事，与信号那一路共用同一个 `pullShareOps`。 */
+export interface ShareOpenPullPorts {
+  readonly pull: (shareId: string) => Promise<SharePullResult>;
+}
+
+export interface ShareOpenPullReading {
+  readonly shareId: string;
+  /** 这一趟真的发了拉取（装配缺席时为 `false`）。 */
+  readonly pulled: boolean;
+  readonly added: number;
+  readonly error?: unknown;
+}
+
+/**
+ * **打开一份共享清单 ⇒ 把既有下行拉一次**（M6 设备腿 L2 抓出来的洞，两壳同形）。
+ *
+ * 为什么要有这一枚：`new_share_ops` 只在**有人新写**的时候响，而"这份清单里本来就有
+ * 的东西"没有任何一条路径会带来。加入那台设备拿到信封、建好本地清单行之后，
+ * 屏幕上就是空的 —— 而且它**一直**空到有人在对面新写一条为止（信号才会把它叫醒）。
+ * 2026-10-25 iOS 设备腿第一次把这一格量出来（`07-看不到owner的任务.png`：成员名册已经
+ * 下来了，评论区那一节写「这条共享清单里还没有任务」）。web 那侧同一个洞，只是
+ * `verify:collab-journey` 从来只测"加入之后写的东西互见"，测不到"加入之前就有的东西"。
+ *
+ * 三条口径：
+ *  · **每次打开都拉**，不判"这台设备以前拉过没有"。游标在 `pullShareOps` 里，
+ *    追平时那一趟只是取回零条 —— 与 ADR-0070 对成员信号"人按一次按钮的量级，不去抖"
+ *    同一条判断；而"离线一段时间再打开"这一形只有无条件拉才盖得住。
+ *  · **不抛穿**。调用点是界面挂载的那一趟，抛出去会变成"打开清单弹错误"，
+ *    而这条路径上失败是常态（保险库锁着 ⇒ 解不开）。失败如实留在 `error` 里。
+ *  · **这一枚只决定"要不要拉、拉了算不算成"**（业务语义，AGENTS §3.5 不许进壳）；
+ *    "什么时候算打开"由各壳自己说，两壳各只有一处调用点。
+ */
+export async function pullSharedListOnOpen(
+  ports: ShareOpenPullPorts,
+  shareId: string,
+): Promise<ShareOpenPullReading> {
+  if (shareId.trim() === '') return { shareId, pulled: false, added: 0 };
+  try {
+    const result = await ports.pull(shareId);
+    return { shareId, pulled: true, added: result.added };
+  } catch (error: unknown) {
+    return { shareId, pulled: true, added: 0, error };
+  }
+}

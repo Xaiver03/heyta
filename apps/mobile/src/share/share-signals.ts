@@ -39,9 +39,11 @@
 import {
   createShareOpsSignalHandler,
   createShareRosterSignalHandler,
+  pullSharedListOnOpen,
   shareIdsOnDevice,
   type AppHost,
   type ShareLogStorage,
+  type ShareOpenPullReading,
   type SharePullResult,
   type ShareSignalActivity,
   type ShareWriteChannel,
@@ -324,4 +326,25 @@ export function handleShareOpsSignal(shareId: string, latestSeq: number): void {
 export function handleShareRosterSignal(shareId: string): void {
   installMobileShareSignals();
   dispatchShareRosterSignal(shareId);
+}
+
+/**
+ * **打开一份共享清单 ⇒ 拉一次既有下行**（判据本体在 `@heyta/app-host` 的
+ * `pullSharedListOnOpen`，理由与三条口径写在那份文件头）。
+ *
+ * 这一枚只做两件事：取那**一份**会话（拉回来的东西必须落进合并视图读的那份缓存）、
+ * 拉过之后敲一次重画。为什么必须敲：被验签拒掉的那条根本没落盘，`added` 会是 0 ——
+ * 只看"有没有新内容"的话，症状恰好是这条线要防的静默（与上面信号那一路同一条 🔴）。
+ */
+export async function pullSharedContentsOnOpen(
+  shareId: string,
+  deps: ShareSignalDeps = defaultDeps,
+): Promise<ShareOpenPullReading> {
+  const session = await deps.ensureSession();
+  if (session === undefined) return { shareId, pulled: false, added: 0 };
+  const reading = await pullSharedListOnOpen({ pull: session.pullShareOps }, shareId);
+  if (reading.pulled && (reading.added > 0 || session.signatureRejections().length > 0)) {
+    emitShareRepaint();
+  }
+  return reading;
 }
