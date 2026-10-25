@@ -68,6 +68,14 @@ export default defineConfig({
     //    ⚠️ 这是**退役**不是删除：文件与它的判据都留着，登记在 `BLOCKED.md` B226 ——
     //    要么哪天把单步入口接回来（改这一行即可），要么把那三条的能力断言正式迁进助手那条链。
     /ai-tool-run\.spec\.ts/,
+    // 🔴 2026-10-25 加：`reminder-permission-final.spec.ts` 有**自己的配置**
+    //    （`playwright.reminder-permission.config.ts`：Web 固定在 4355，且要用 CDP 改
+    //    站点权限）。在本配置下它必然红 —— 4318 上没有任何东西在 4355 听，报出来的是
+    //    `page.goto: net::ERR_CONNECTION_REFUSED http://127.0.0.1:4355/`，
+    //    看着像"应用起不来"。
+    //    ⇒ 它现在有**自己的门禁**：`pnpm check:reminder-permission`（已进 `pnpm check` 链）。
+    //    本条目只是把它从"会被这一套跑、且必红"的集合里摘出去。
+    /reminder-permission-final\.spec\.ts/,
     /auth-simple-ux\.spec\.ts/,
     /collab-journey\.spec\.ts/,
   ],

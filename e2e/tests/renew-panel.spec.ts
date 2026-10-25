@@ -77,6 +77,15 @@ async function seedCredentialsAndProbe(page: Page): Promise<void> {
   await page.route(`${SERVER}/api/automation/events**`, async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ events: [] }) });
   });
+  // 🔴 运营公告（2026-10-24 新特性）开机就会拉一次。本套件不伪造业务事实，所以装一个
+  // **惰性空集**（`{ announcements: [] }` 是客户端契约里的合法空态，见
+  // `packages/app-host/src/announcement-client.ts:76-80`）：界面一块都不渲染，
+  // 而"除已登记缺失外不许有非 2xx"那条判据保住了牙。
+  // ⚠️ 别改成往 `UNSTUBBED_BUT_HANDLED` 里塞：那条会替**所有**用例消掉这一格，
+  //    以后公告真坏了也不会有任何一条用例说话。
+  await page.route(`${SERVER}/api/announcements/active**`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ announcements: [] }) });
+  });
   // 「账号与安全」那一组里的 `SessionsPanel` 一挂载就列会话（本套件现在**会**选中那一组）。
   await page.route(`${SERVER}/api/auth/sessions**`, async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
