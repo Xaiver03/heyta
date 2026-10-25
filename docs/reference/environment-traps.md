@@ -11633,3 +11633,82 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     （写成 `dir-<批次>/file.png` 或去掉那个星），因为词法层不会替你区分"这是给人看的路径"；
     ② 拿到一枚"看着像误报"的门禁红，先用**独立的一把尺**（掩码探针／真解析器）复判同一对象，
     再决定改门禁还是改文件 —— 反过来做就是把真坏件放行。
+564. **iOS 装置里"树里有没有那一串"读的是**上一次快照**：填完之后的断言量到的是填之前那棵树**
+    症状（2026-10-25 第 24 跑，`scripts/verify-mobile-collab-ios.sh` 第 6 步）：
+    `fill_field` 先报 ✅「set-value 替换，回读逐字相同」，紧跟一句
+    `tree_has "$INVITE_TOKEN"` 却报「树里读不到那一串」⇒ 装置 `exit 3`。
+    根因不在产品：`tree_has` 只解析 `$IDB_DUMP_FILE`，而那枚文件**只有 `idb_dump` 会写**；
+    `fill_field` 走的是 shim 自己的定向快照（它回读的那一枚节点确实是新值），
+    所以"填进去"与"再断言一次"量的不是同一棵树。当场手工 `idb ui describe-all` 反证：
+    `AXTextArea`（`AXUniqueId=share-join-token`）的 `AXValue` 就是那一串 ⇒ 值在树上，红在探针。
+    🔴 同一形反过来更糟：**减法判据**（"这一行已经没了"）量到旧快照会**恒过**，
+    那是比没有判据更坏的一条（§7 元规则二）。
+    修法：把快照的所有权交给读者 —— `tree_has` / `tree_has_id` 自己先 `idb_dump` 再解析，
+    调用方漏写 `idb_dump` 从此不是一种失法（`wait_tree` 里那行重复快照顺手删掉）。
+    还补了一条失败分支的形状读数：只印那一枚输入框的 `role` 与 `AXValue` **码点数**，
+    把"框是空的"与"探针没读到"分开，而**值本身不落日志**（当趟凭证是明文）。
+    ⚠️ 顺带一条取证纪律：失败帧若因含凭证只能落私有 `RUN_DIR`，那它随目录一起被清走
+    （第 24 跑的 `06e-凭证没进框.png` 就是这么丢的）⇒ 这种红必须靠**读数**自证，
+    不能靠"回头看图"。
+565. **变异臂打在 `packages/*/src` 上，宿主测试跑的却是 `dist`：变异不生效＝假绿；把组件改崩＝一片假红**
+    2026-10-25 给 `NotificationPrefsPanel` 补可见状态标记时实测到的两头：
+    ① 把标记整块删回去，`apps/web` 那侧新写的用例**七条全绿** —— 因为
+    `apps/web/vite.config.ts` 文件头写明 `@heyta/ui` 解析到 `packages/ui/dist/`，
+    而 `dist` 是上一次构建的字节（`grep -c 'activity-.*-marker' packages/ui/dist/index.js`
+    现量：源码删了、`dist` 里还在）。**改完 workspace 包的源码，必须先
+    `pnpm --filter <pkg> build` 再拿宿主侧用例判它红**，否则"能红"这件事根本没被证明过。
+    ② 另一头反着错：给 `useState<JoinPhase>(() => 三元)` 打变异时写成
+    `() => { kind: 'consent' },` ⇒ 箭头体被当成语句块、返回 `undefined`，组件当场崩，
+    五条用例一起红（`TypeError: Cannot read properties of undefined`）。
+    那一片红**不是牙**，是把被测物改没了。
+    🔴 判据：一条合格的变异臂要能指出**只有目标那一条**红 —— 补上括号
+    （`({ kind: 'consent' } as const)`）之后，"同意面写死成长期路障"这一发只红"下一次进来直接到表单"
+    那一条，其余三条照绿；而"整块摘掉闸"那一发红的是另外四条。两发各打中各的坏法，才算有牙。
+    还原照旧只从 `.mut-bak` 取并核 md5（本批两枚文件逐字回到变异前读数）。
+566. **隔离 shell 里带着 `ELECTRON_RUN_AS_NODE=1`：门禁的失败长得像"被测代码起不来"，其实是 Electron 退化成了 Node**
+    2026-10-25 跑 `e2e/tests/desktop-window.spec.ts`（桌面 GUI 门禁）时实测：
+    `electron.launch: Process failed to launch` + `bad option: --remote-debugging-port=0`。
+    根因不在被测代码：`ELECTRON_RUN_AS_NODE=1` 让 Electron **退化成普通 Node**，
+    于是它认不出任何 Chromium/调试参数 —— 而我们传给它的第一枚参数就是
+    `--remote-debugging-port=0`（Playwright 起 Electron 的固定形状）。
+    🔴 判据：先 `echo "$ELECTRON_RUN_AS_NODE"`，不是先读 spec。
+    修法：`env -u ELECTRON_RUN_AS_NODE …`（本仓的取证命令一律这么写）。
+    同族：**环境变量把被测进程换成了另一个程序**这一类，报错文案永远指向参数，不指向那个变量
+    （§7 元规则一"先怀疑探针"的又一枚实例）。
+567. **内存闸门 shim 的"排队"不会自己前进：挂着零输出不是慢，是排在一堆更重的套件后面**
+    2026-10-25 实测：`~/.tfa-shield/bin/{npx,pnpm}` 那个 shim 在两条重型套件
+    （live-site / staging）后面排了 **15 分钟**也没轮到一条 7 秒的 spec。
+    症状是"命令不返回、无输出"，与"测试很慢"在终端上长得一模一样。
+    🔴 判据不是"再等一会儿"，而是：①拿钟点（已经开始多久）；②看有没有子进程在动；
+    ③看那条 spec 单独跑需要多久（已知 7 秒）。
+    绕过方式（本机取证用）：`node ./node_modules/@playwright/test/cli.js test <spec> --workers=1`
+    —— 单 spec、单 worker，实测 7.4 秒跑完。
+    ⚠️ 绕过的代价要认：**这条读数没有经过闸门**。它不是"闸门跑了"，要如实标注成"直接跑的单 spec"。
+568. **`sandbox_apply: Operation not permitted` 会被 SwiftPM 报成 `error: '…': Invalid manifest`；而 `--disable-sandbox` 放错位置会静默无效**
+    2026-10-25 两条 macOS 门禁（`check:macos-shell` / `check:macos-window`）同时红，
+    报错是 `error: 'desktop-macos': Invalid manifest (compiled with: […swiftc…])`，
+    紧跟一行 `sandbox-exec: sandbox_apply: Operation not permitted`。
+    ⇒ 文案指向"清单写坏了"，实际是环境：SwiftPM 编译 `Package.swift` 必须经
+    `sandbox-exec` 套一层限制性 profile，而**已经在沙箱里**再套就是 EPERM
+    （macOS 的 Seatbelt **继承给子孙进程**，所以任何受沙箱约束的运行时里都必然中招，
+    与工具链版本无关）。
+    🔴 第二半更容易漏：`swift run heyta-smoke --disable-sandbox` **静默无效** ——
+    开关会被当成传给**被跑程序**的 argv。必须放在可执行名之前：
+    `swift run --disable-sandbox heyta-smoke`。第一次改完仍然红，就是这个原因。
+    🔴 第三半是本仓反复记的形状：同一条规则**三个消费者**（`package-app.sh` /
+    `capture-window.sh` / `check-macos-shell.mjs`），2026-09-30 只修了第一个 ⇒
+    同一个环境里"能打包、两条门禁红"。现已收成**一处实现**：
+    `apps/desktop-macos/scripts/swift-sandbox-flag.sh`，判据是**探针本身跑不跑得通**
+    （`sandbox-exec -p '…' /bin/echo`），不是去 grep 报错文案 —— 文案会随工具链版本变。
+569. **为了让探针"干净"而收紧 PATH，会把环境差异做成一枚假红**
+    2026-10-25 我给「逐段重跑 `pnpm check`」写了个 runner，为了绕开内存闸门 shim 把
+    PATH 写死成 `nvm/bin:/usr/bin:/bin`。结果 `server` 的
+    `tests/backup-script.spec.ts` 红在
+    `expected 'LibreSSL 3.3.6' to contain 'OpenSSL'`。
+    真相有两个，缺一不可：①这台机器的 `/usr/bin/openssl` 是 **LibreSSL**，而
+    PATH 里那份 miniconda `openssl` 是 3.5.6 —— 产品没坏；②那条断言本身拿**厂商文案**
+    当能力判据，而 `backup.sh` 真正依赖的是 `enc -aes-256-cbc -salt -pbkdf2 -iter`。
+    ⇒ 逐段重跑必须逐段记录"这一段的 PATH/环境与 `pnpm check` 是否一致"；不一致的段
+    **不给那条线定性**（与 #536 同一条纪律：一枚判决臂只能否证它自己那一枚的解释）。
+    ⚠️ 顺带记一条判据设计：`openssl version` 的 vendor 字符串不是能力判据，
+    要判就判那条命令**跑不跑得通**（`openssl enc -aes-256-cbc -pbkdf2 -help` 之类）。

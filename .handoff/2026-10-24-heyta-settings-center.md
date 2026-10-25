@@ -1000,10 +1000,13 @@ RESULT=OK
 
 #### 还剩下的边界（诚实）
 
-- **XAML 的 XML 语义**（控件树合法性、样式键解析）仍只有 Windows 能 100% 确认；
-  属性名与枚举成员已用元数据验过，`Key=","` 这个已知雷已拆。
+> 2026-10-25 追加：这一节的两条**已经收掉一半**，见 §14.8 —— 那三个 bug 的判据现在
+> 是仓库里能重跑的门禁（`pnpm check:windows-xaml`），不再是 `/tmp` 里的一次性探针。
+
+- **XAML 的 XML 语义**（控件树合法性、样式键解析优先级、模板合法性、`x:Bind` 的类型转换）
+  仍只有 Windows 上的 XamlCompiler 能 100% 确认。
 - `check:windows-shell` 在本机跑的仍是跨语言那一层（Core + 桥 + SQLite + 小组件），
-  它**不编 XAML** —— 这条不变。
+  它**不编 XAML** —— 这条不变（§14.8 新增的是**另一条**门禁，不是改它）。
 
 ### 14.7 桌面 GUI 门禁补跑（含一条环境坑）
 
@@ -1024,3 +1027,100 @@ RESULT=OK
    （live-site、staging）后面排了 15 分钟也没轮到本作业。最后直接用
    `node ./node_modules/@playwright/test/cli.js` **绕过 shim** 才跑起来（单 spec、单 worker，
    7.4 秒结束）。这不是"再等一会儿"的问题，是排队在这种并发下不会前进。
+
+### 14.8 把 `/tmp` 那一趟变成仓库门禁：`check:windows-xaml`（2026-10-25）
+
+§14.6 记录的是「能在 macOS 上把 WinUI 那半个工程编过」，**但那一趟有两个毛病**：
+
+- 探针在 `/tmp/winui-probe`：换个会话就没了，"验过"这件事没留下任何可重跑的东西；
+- 替身字段是**手抄的**（11 个 `x:Name` 一条条对着 XML 写）。漏一个字段的表现是
+  **探针绿、Windows 红** —— 最坏的方向，而且没人会发现。
+
+现在它在仓库里：`apps/desktop-windows/xaml-probe/`（说明见该目录 `README.md`），
+入口 `pnpm check:windows-xaml`（已进 `pnpm check` 链，位置在 `check:windows-shell` 之前）。
+
+#### 三层
+
+| 层 | 做什么 | 判什么 |
+|---|---|---|
+| `tool emit-stubs` | 从真实 `.xaml` **机械生成** `x:Name` 字段 + `InitializeComponent()` | `x:Name` 与 code-behind 手写字段重名、标签在元数据里找不到类型、类没写 `partial`、自己又写了一遍 `InitializeComponent` |
+| `compile/` | 把仓库里的**真实 .cs** 编进 `net10.0-windows` + `UseWinUI` 工程 | 命名空间被 `using` 抢走、类型不在你以为的命名空间、控件没有那个成员、缺 import |
+| `tool validate` | 用 WinUI 自己的元数据核对 XAML 里的名字 | 元素类型 / 属性 / 事件 / 附加属性 / 枚举成员 / `x:Bind` 根成员 / `{ThemeResource}` 键 / code-behind 处理器 / `x:Name` 唯一 / 基类与根元素一致 |
+
+元数据**不写死路径**：`compile/WinUiCompileProbe.csproj` 有一条 MSBuild target 把
+`@(ReferencePath)`（编译器真的看到的那些 DLL）落进 `obj/probe-refs.txt`，`tool` 只读它。
+按版本猜包路径会随升级静默指向旧包 —— 而"指向旧包"的表现是"属性都在、Windows 上没有"。
+
+读元数据用 .NET 自带的 `System.Reflection.Metadata`（`PEReader` + 自己写的签名 provider），
+**零 `PackageReference`**。第一版想用 `MetadataLoadContext`，那要一个 NuGet 包；
+而本仓库的规矩是"引入第三方组件先过可维护性 + 许可证两道门"，读 DLL 不值得为此加一条会漂的依赖。
+
+#### 读数（本机当场跑）
+
+```
+pnpm check:windows-xaml
+  build tool（net10.0）                        Build succeeded 0/0
+  ResolveAssemblyReferences                    203 条引用落盘
+  emit-stubs                                   3 个 .xaml → 14 个 x:Name 字段
+  build compile（真实 C#，UseWinUI）            Build succeeded 0 warning 0 error
+  validate                                     核对项 129 ｜ 未做值检查 23 处 ｜ 问题 0 处 → RESULT=OK
+```
+
+⚠️ 那 23 处"未做值检查"是**显式记账**，不是漏网：`GridLength` / `Thickness` / `FontWeight` /
+`Uri` / 字符串这些由 TypeConverter 解释，本层不猜 —— 每次跑都会逐类打出来。
+
+#### 它真的会红（7 条变异臂）
+
+每条臂只改工作树的一份临时副本，跑同一套 `validate`：
+
+| 臂 | 注入 | 红在哪一句 |
+|---|---|---|
+| A | `<KeyboardAccelerator Key="," />` | `Key="," 里读不出任何 Windows.System.VirtualKey 的成员名` |
+| B | `SelectionMode` → `SelectionModeX` | `上没有属性/事件 SelectionModeX` |
+| C | `HeytaColorForegroundMuted` → `…MutedX` | `既不在 tokens 生成物里，也不在内建白名单里` |
+| D | `{x:Bind Title}` → `{x:Bind Titel}` | `TextBlock 上没有成员 Titel` |
+| E | `Click="OnDelete"` → `Click="OnDeleteX"` | `code-behind 里没有同名方法` |
+| F | `x:Name="StatusText"` → `x:Name="AddButton"`（重复） | `在同一份 XAML 里重复` |
+| G | `<WebView2` → `<WebView3` | `在元数据里找不到对应的 CLR 类型` |
+
+#### 🔴 变异臂当场打出**两个假绿**（这是这一节最值钱的部分）
+
+1. **`Key=","` 第一版被放行。** 判据是"按 `,`/`|` 切开，逐段比枚举成员" ——
+   而 `,` 切完之后**一个成员名都不剩**，循环体一次不跑，于是"全部合法"。
+   这正是本仓 §7 元规则二的教科书形状：**判据的输入被它自己的分隔符吃掉了**。
+   修法：空集显式判红（`parts.Length == 0 ⇒ fail`），并把话说明白（"读不出任何成员名"）。
+   ⇒ 如果我当时只做"读一遍代码觉得对"，这个门禁会**恒绿**，而它守的正是那个已知 bug。
+2. **第一版的 XAML 命名空间候选表写死了 5 个**（Controls / 根 / Documents / Media / Shapes），
+   于是**正确的** `<KeyboardAccelerator Key="Enter"/>` 也会被判红 —— 它在
+   `Microsoft.UI.Xaml.Input`。一个会把正确写法判红的判据，最后一定会被人关掉。
+   修法：候选**从元数据来**（把所有 `Microsoft.UI.Xaml*` 下的类型按短名索引，Controls 优先）。
+
+#### 边界（这条门禁不替谁签名）
+
+- **不编 XAML**：控件树合法性、样式键解析优先级、模板合法性、隐式样式、`x:Bind` 的
+  类型转换与 `Mode` 语义 —— 仍只有 Windows 上的 XamlCompiler 能答。
+- **不跑界面**：窗口能不能起、WebView2 能不能加载共享 UI、设置窗口真的画出来没有，
+  仍要一次真启动（§14.2 的取证开关）。
+- `x:Bind` 只判**根成员存在**，不判类型兼容。
+
+⇒ 在 Windows 上仍应跑一遍 `dotnet build apps/desktop-windows/HeytaWindows/HeytaWindows.csproj`。
+**绿在这里的含义是"名字与成员层面不可能写错，剩下的是 XAML 语义"，不是"壳能用"。**
+
+#### 顺带修掉的一条环境坑（同一个形状：三处实现只有一处拿到开关）
+
+`check:macos-shell` / `check:macos-window` 在这台机器上**红了**，而红的原因是环境：
+
+```
+error: 'desktop-macos': Invalid manifest (compiled with: …)
+sandbox-exec: sandbox_apply: Operation not permitted
+```
+
+SwiftPM 编译 `Package.swift` 必须经 `sandbox-exec` 套一层限制性 profile，而**已在沙箱里**再套
+会 EPERM。2026-09-30 只在 `package-app.sh` 里修过（加 `--disable-sandbox`），
+于是同一个环境里"能打包、两条门禁红"。本轮把它收成**一处实现**：
+`apps/desktop-macos/scripts/swift-sandbox-flag.sh`（探针能过就一个参数都不加），
+三个消费者共用（`package-app.sh` / `capture-window.sh` / `check-macos-shell.mjs`）。
+
+⚠️ 顺手踩到一个坑并当天修掉：`swift run heyta-smoke --disable-sandbox` **静默无效** ——
+开关必须放在可执行名**之前**（`swift run --disable-sandbox heyta-smoke`），
+放后面会被当成传给被跑程序的 argv。第一次改完仍然红，就是这个原因。
