@@ -144,3 +144,22 @@ web 上不被问。反查一条：
 （手机与 web 都是）现在也把这一句画给一个"没有把任何清单设为共享"的人。判据在
 `packages/i18n/src/locales/zh-CN.ts` 的 `common.share.consent.body` / `.accept` 那两行；
 截图见移动装置证据目录的 `06b3-入群同意面.png`。改不改、怎么改归权利人拍。
+
+---
+
+## 补记二（2026-10-25 第八批，移动设备腿）—— 两格都在"界面不许谎称能力"这一侧
+
+1. **偏好面那三档活动开关在手机上画成了三段裸文字。** 行是 `Pressable`、`aria-checked` 也在、点了确实翻转，
+   屏幕上却没有方框也没有对钩 ⇒ 用户看不出那是开关、更看不出当前是开还是关。**既有判据一条都不红**：
+   设备侧那一条判的是"这三行文字在不在"，减法那一条（见上面补记末段）判的是"没有输入的开关不许摆着"——
+   两枚都不看"看得看得出来吗"。修在 `packages/ui/src/sync/NotificationPrefsPanel.tsx`：补一枚与
+   `Settings.ToggleLine` 同形状的标记（未选中=描边空框，选中=实心主蓝），两壳共用同一份判断与同一份 token。
+   钉子两枚：`apps/web/tests/share-notif-prefs-affordance.spec.tsx`（亮/暗两档各判"未选中不许有实心底"与
+   "选中必须是**这一档表里**那枚主蓝"，并断言两档主蓝确实不同 ⇒ 不是随便一枚蓝）+ 移动装置第 10 步的
+   三枚 `share-notif-activity-*` `testID` 存在性判据。分工要写清：设备上只能证"是有 testID 的交互元素"
+   （裸 `<Text>` 不进 AX 树），**颜色两态由 web 那枚用例判，像素由 `16-通知偏好面.png` 肉眼复核**。
+2. **web 那侧的同意闸只有"弹 + 落盘"两格有常驻判据**（上面补记指的那条 e2e）。三档失法——按取消、
+   不勾「不再提示」、键名漂了——没人守。补 `apps/web/tests/share-join-consent-gate.spec.tsx`，
+   含一条"apps/web 里出现该键字面量的文件只有 `features/share/share-consent-store.ts`"的尺。
+   裁决三与"单一存储键"那句都没动，动的是**它有没有人守着**。
+

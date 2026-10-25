@@ -64,20 +64,41 @@ M6 的判据本身（真跑 + 真看截图）。
 
 ## 2. 下一步按顺序做什么
 
-1. 🔴 **M6-4 设备腿（这一批唯一真正的缺口）**：与 web 同一条旅程在 iOS 模拟器上**真跑 + 真看截图**（AGENTS §6.2 那两条硬性规定：必须真跑、必须肉眼看图、不许抢前台）。
-   载体：`scripts/lib/mobile-e2e.sh`（adb/uiautomator）、`scripts/tools/ios-ax-shim.py`（idb AX）、判定 `scripts/tools/png-stats.mjs`（非空白 + 主蓝≥20 + 内容占比≥0.05）。
-   旅程要在 `scripts/check-journey-coverage.mjs` 的 `journeySpecs` 里登记，并给根 `package.json` 加 `verify:*` 别名（那把尺两样都查）。
+1. ✅ **M6-4 设备腿：iOS 那一侧已经全绿过一趟**（2026-10-25 第 31 跑，逐格读数与逐张看过的截图指针在 §9.14 那张表之后）。
+   **下一位要做的不是"再跑一次看它绿不绿"**，而是 §9.14 末那张表里还开着的三格：
+   ① 第 28 跑那一发崩溃（未判定，要的是**可重复复现**，三趟没复现不等于修好）；
+   ② 看图抓到的两枚新候选（评论发成功后行内报错没清 / 两条评论署名两形不一）—— 判它们的断言已各写一句；
+   ③ Android 的界面腿（**载体不存在**，两半的现量命令与归属都在那张表里）。
+   载体早就在册 —— `scripts/verify-mobile-collab-ios.sh`
+   （根 `package.json` 的 `verify:mobile-collab:ios`）、`scripts/lib/mobile-e2e.sh`、`scripts/tools/ios-ax-shim.py`、
+   `scripts/tools/ios-collab-anchor.py`、判定 `scripts/tools/png-stats.mjs`（非空白 + 主蓝≥20 + 内容占比≥0.05），
+   旅程也已登记进 `scripts/check-journey-coverage.mjs` 的 `journeySpecs`（那把尺两样都查，缺一样直接红）。
+   **现量只看两处**：`pnpm verify:mobile-collab:ios` 的退出码（`0` 全绿 / `1` 产品判据红 / `3` 环境前提不成立，不判产品）
+   与计划 §9.14 那张跑次归因表。AGENTS §6.2 那三条硬性规定照旧：必须真跑、必须**肉眼看图**、不许抢前台。
    Android 一律 `ssh windows-pc`，**不在 Mac 起 Gradle 或模拟器**（负责人 2026-10-23 的长期令）。
-   预期它会红：两屏从未渲染过。红了先分「壳的接线缺陷」与「RN 组件在移动端的键盘/滚动/暗色缺陷」——后者在本仓陷阱账里有一整族（`docs/agents/` 与环境陷阱的 iOS 设备腿那几条）。
+   红了先分「壳的接线缺陷」与「RN 组件在移动端的键盘/滚动/暗色缺陷」——后者在本仓陷阱账里有一整族
+   （`docs/agents/` 与环境陷阱的 iOS 设备腿那几条，以及 #571–#575 这一族**装置自己会造红/造绿**的）。
 2. **四把尺串行现量**：`pnpm -r typecheck` → `pnpm -r test` → `pnpm -r build` → `pnpm verify:collab-suite`（含 `verify:collab-journey`）→ `pnpm check`。
    已知非本线的存量：链上两枚别线存量红、`check:docs` 有一枚只在本机存在的 `.workbuddy/memory/MEMORY.md` 红（已登记，别去改别人的目录）。
-3. **文档写回**（任务 #55）：计划新增 §9.13 放这一批的读数；§9.10 那三格改口（面板轮询已撤、通知口径已由 ADR-0071 立、剩下那格见下条 4）；
-   ADR-0062 / 0069 / 0070 文末「实施记录」补口径；`docs/agents/progress-log.md`；`docs/research/feature-matrix.md`；`docs/plans/launch-blockers.md`。
-   ⚠️ §9.10 倒数第二条那句「**移动端与三枚桌面壳今天接不到这条信号**」是**文档抄件错**：桌面两枚壳早就是消费者，移动端本批接上（源码级），
-   真正缺的是**系统投递面**——按现量改口，别整句删（那会丢掉"为什么曾经这么写"）。
-4. **M5-3 那两枚谓词的数据面**：`shouldNotifyTaskReminder` / `shouldAutoAcceptInvitation` 已从 `@heyta/ui/node` 露出（本批入库），
-   现量看谁在调：`grep -rn "shouldAutoAcceptInvitation\|shouldNotifyTaskReminder" apps packages --include='*.ts' --include='*.tsx'`。
-   🔴 别给它们造假输入点亮判据（那是量夹具不是量产品）——移动端 `JoinShareScreen` 现在存在了，`shouldAutoAcceptInvitation` 可能第一次有了真输入。
+3. **文档写回**（任务 #55）：§9.13 是上一批（源码级接线），**这一批的读数在 §9.14**（跑次归因表 + 逐格读数 + 还剩什么）。
+   §9.10 那三格 2026-10-25 已全部改口完毕：面板 3s 轮询那格按"已撤 + 名册信号在册"结案（保留当初"不许撤"的理由，
+   那是 ADR-0070 的来由）、通知口径那格由 ADR-0071 立着、谓词那格见下条 4。
+   ⚠️ 曾经挂在这里的「移动端与三枚桌面壳今天接不到这条信号」已按现量改成「读者有两枚壳，桌面那几枚仍没接」——
+   **别整句删**（那会丢掉"为什么曾经这么写"），也别把它当成还没做：**桌面那三枚不在 M6 的授权范围内**。
+   本批已写回的：ADR-0062 实施记录**第 5 条**（那句"决策 7 只写了信号，不足以让新成员看见存量"）、
+   ADR-0069 **追记（2026-10-26）**（第 8 步那把"手机写的能不能被另一台验过"的尺第一次有真机读数）、
+   `docs/agents/progress-log.md` 那条并行轨道行、`docs/research/feature-matrix.md` 的 6.1 与 6.4。
+   ⚠️ ADR-0070（名册信号）本批**没动**：那三条裁决的措辞这一批没有撞上新的差，硬加一节就是造一份会漂的抄件。
+   还欠的写回只剩 `docs/plans/launch-blockers.md`（要不要登、登哪几格，按 push 之后的现量判）。
+4. ~~**M5-3 那两枚谓词的数据面**~~ —— 🔴 **这一格别再"接上"，它 2026-10-24 已按「撤下」结案**（计划 §9.10 那条 ✅）：
+   `shouldNotifyTaskReminder` / `shouldAutoAcceptInvitation` 连同两档偏好整条删掉（`bc20e679a`），理由是**它们没有输入**，
+   不是"没写完"。本批按现量重核过这两句理由还成不成立：
+   `assigneeUserId` 在 `packages` 只剩实体声明与注释、在 `apps` 与 `server` **零命中**；"已知合作者名单"那一档产品面仍不存在。
+   ⇒ 摆着开关而行为恒等于"不响"就是界面在谎称有能力。**钉子**：`packages/ui/tests/notification-model.spec.ts`
+   断言默认偏好只有 `activities` 一个键 —— 往那个形状里加一档而不带消费者，它就该红。
+   重新开工的条件与理由写在 `packages/ui/src/sync/notification-model.ts` 文件头。
+   ⚠️ 交接书此前那句「`JoinShareScreen` 现在存在了，`shouldAutoAcceptInvitation` 可能第一次有了真输入」是**错的**：
+   移动端邀请面存在 ≠ 有"谁算已知合作者"这份名单，前者每次都要人当场确认（入群同意闸就是它）。
 5. **一格仍未判定**（§9.11 那条截图读数：owner 面板里 bob 显示「等待所有者授权」而他手里其实有钥）：断言已写在 §9.11 那格末尾，
    但轮询撤了之后那句"等 ≥ 一个轮询周期"要改成"等 roster 信号那一趟落回"。判据本身还没进旅程。
 6. **push**：先 `git log --oneline -1 origin/main` 取现量再 `git push origin main`。负责人对本线有长期授权（"你来替他们 commit 并且 push"）；
