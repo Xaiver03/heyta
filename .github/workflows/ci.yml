@@ -140,4 +140,8 @@ jobs:
             echo "  在 CI 里会**跳过** —— 它需要一份本地的 \`provider.json\`。"
             echo "  想让它真跑，用 \`pnpm verify:ai-live\` 系列脚本在本地执行。"
             echo "- 测试汇总里的 skipped 数量即来自此处。"
+            echo "- \`check:windows-xaml\`（WinUI 的 C# 编译 + XAML 名字的元数据核对）在 ubuntu runner 上"
+            echo "  **跳过** —— 它要 \`dotnet\`，本 workflow 装的是 Node/pnpm。也就是说："
+            echo "  这条门禁只在**装了 dotnet 的开发机**（macOS/Windows）上真的跑。"
+            echo "  它绿的含义是\"名字与成员层面写不出那三个 Windows 编译 bug\"，不是\"壳能用\"。"
           } >> "$GITHUB_STEP_SUMMARY"
