@@ -95,8 +95,21 @@ case "$mode" in
 
     # 校验不过就**不** reload：宁可线上保持旧配置，也不要半生效的站点文件。
     if ssh "${SSH_OPTS[@]}" "$SSH_HOST" 'sudo -n nginx -t'; then
-      ssh "${SSH_OPTS[@]}" "$SSH_HOST" 'sudo -n systemctl reload nginx'
-      echo "✅ 已 reload。线上现在就是仓库副本。"
+      # ⚠️ 这一支原来**已经**会非零退出（`set -eu` 让 reload 的失败直接终止脚本 ——
+      # 2026-10-25 拿改前那份复量过：`OLD_APPLY_RC=1`，且没有打印"✅ 已 reload"）。
+      # 这里补的不是退出码，是**下一步**：reload 失败最常见的原因不是 ssh 断了，
+      # 而是这个域名根本不由 nginx 服务（本域名 2026-10-25 实测：443 在 `caddy-edge`
+      # 手里、`nginx.service` 是 masked，于是"文件写进去了、没生效、也没人告诉你为什么"）。
+      # 同一课 ADR-0054 §落地动作 3 已经记过一次，隔一天又踩 —— 所以把"先问谁在监听"
+      # 印在失败那一行里，而不是等人去翻 ADR。
+      if ssh "${SSH_OPTS[@]}" "$SSH_HOST" 'sudo -n systemctl reload nginx'; then
+        echo "✅ 已 reload。线上现在就是仓库副本。"
+      else
+        die "reload 失败 —— 文件写进去了但**没生效**。先确认是谁在服务 443：
+  ssh ${SSH_HOST} 'ss -ltnp | grep :443'
+（本域名 2026-10-25 实测是 caddy-edge，nginx.service masked ⇒ 这一份仓库副本对它是死配置。）
+  回滚：ssh ${SSH_HOST} sudo -n cp '$REMOTE_PATH.bak-$ts' '$REMOTE_PATH'"
+      fi
     else
       die "nginx -t 不通过 —— **没有** reload，线上仍是旧配置（备份也还在，可回滚）"
     fi
