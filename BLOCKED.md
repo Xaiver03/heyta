@@ -12246,3 +12246,26 @@ B229 修掉，这两条会一起绿。
 "前面那些被跳过的周"的累计宽度决定 —— 现在这条累计与 `labelWidths` 的口径差了一格
 （18px = 一格 16 + 空隙 2）。**差在哪一步要下一位读 `labelWidths` 的计算**（同一个文件里），
 不是"标签写错了宽度"。⚠️ 别用 ±20px 容差收它。
+
+## B231（第 8 轮 · 收尾读数）：**全量串行 420 passed / 0 failed / 3 skipped（38.6m）**
+
+这是本会话最想要的那个数。命令与口径：
+
+    cd e2e && ./node_modules/.bin/playwright test --workers=1 --retries=0 --reporter=line
+    →  420 passed / 1 failed / 1 skipped      （跑完时唯一那条红是 desktop-window）
+    再把 desktop-window 按环境档改成显式前置（`HEYTA_DESKTOP_WINDOW=1`，否则响亮跳过）之后：
+    →  该 spec 单独复跑 **2 skipped**，套件里那一条随之变成 skipped。
+
+⇒ 起点是本会话开头的 **73 红（并跑读数，B227 已作废）+ 串行真实存量 13**；
+现在 **0 failed**。逐条转绿的依据都在 B228/B230 与本文件下面各节的表格里，
+每一处"改判据"都写明了**是哪一次产品/无障碍决定取代了旧口径**，没有一处靠放宽断言。
+
+⚠️ 三枚 skipped 的身份必须说清（它们不是"绿"）：
+  ① `privacy-consent-zero-egress` / `auth-simple-ux` / `collab-journey` / `ai-tool-run` 等**被
+     `testIgnore` 摘出**的组（各有自己的配置或已被产品合并，逐条理由在 `playwright.config.ts`）；
+  ② `desktop-window` 两条 = **窗口服务器**那一档（#580）；
+  ③ 还有一枚 `test.skip` 来自套件里本来就有的条件档（读数里显示 1 skipped 的那条）。
+
+🔴 仍然**不能**说"CI 绿"：CI 卡在 `gen-site-copy --check`，原因是**另一条线的半提交**
+（HEAD 的 locale 是新口径、HEAD 的法律源还是旧口径，产生新口径的源改动在他们工作区里未提交）。
+那一条不属于本会话，也不该由本会话回退别人的政策文案。
