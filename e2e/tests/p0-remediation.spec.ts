@@ -62,16 +62,34 @@ test.describe('P0 整改视觉基线', () => {
     // 截图在断言前落盘（规定一第 1 条：失败也要有图）。
     await page.screenshot({ path: `${SHOTS}/w1w3-tasks-1440-light.png`, fullPage: false });
 
-    const primaryTabs = page.locator('.ht-rail__tabs button[role="tab"]:not(.ht-rail__tab--tool)');
+    // 🔴 排除助手那一枚（`rail-assistant`）：它同样是 `role="tab"`、但没有 `--tool` 类，
+    // 也不是视图目的地（它打开 AI 面）。不排除就会把「主段 ≤4」数成 5。
+    const primaryTabs = page.locator(
+      '.ht-rail__tabs button[role="tab"]:not(.ht-rail__tab--tool):not([data-testid="rail-assistant"])',
+    );
     await expect(
       primaryTabs,
       '主段目的地必须 ≤4（W1：不平铺全部启用模块）',
     ).toHaveCount(4);
     await expect(page.locator('.ht-rail__more button')).toBeVisible();
-    const drawer = page.locator('[data-testid="ai-drawer"]');
-    await expect(drawer).toHaveCount(1);
-    await expect(drawer, 'W3：AI 抽屉默认收起').not.toHaveAttribute('open');
-    await expect(page.locator('[data-testid="ai-tool-input"]')).toBeHidden();
+    /*
+     * 🔴 2026-10-25 改判据：`ai-drawer` 这个 testid **已经不存在** —— AI 面不再是"抽屉"，
+     * 它现在是右栏里的一块连续面（`ai-agent-surface`；`ai-panels.css:799-802` 记着那次改动的理由：
+     * 「工具执行属于对话中的过程状态，不再与聊天并列成两个需要用户选择的入口」）。
+     *
+     * W3 那条判据要防的事（"AI 不许默认铺开、抢走任务视图的首屏"）仍然成立，只是载体变了：
+     * 它现在的守点是 **右栏**是否在、AI 面是否落在右栏里（`ai-row-layout.spec.ts` 的
+     * `assertColumn` 逐档量几何）。这里只留一条最小读数：AI 面**在**，而且不是整屏。
+     */
+    const aiSurface = page.locator('[data-testid="ai-agent-surface"]');
+    await expect(aiSurface).toHaveCount(1);
+    const aiBox = await aiSurface.boundingBox();
+    const viewport = page.viewportSize()!;
+    expect(aiBox, 'AI 面有几何').not.toBeNull();
+    expect(
+      aiBox!.width,
+      'W3：AI 面不许铺成整屏（那会抢走任务视图的首屏）—— 它应当落在右栏里',
+    ).toBeLessThan(viewport.width * 0.6);
   });
 
   test('W1：「更多」菜单展开（亮 + 暗两张），键盘路径可用', async ({ page }) => {
@@ -170,21 +188,36 @@ test.describe('P0 整改视觉基线', () => {
     const labels = page.locator('.ht-rail__label');
     const count = await labels.count();
     expect(count, '底栏标签数量应为正').toBeGreaterThan(0);
+    let hidden = 0;
+    let measured = 0;
     for (let i = 0; i < count; i += 1) {
       const box = await labels.nth(i).boundingBox();
-      expect(box, `第 ${i} 枚标签有布局盒`).not.toBeNull();
+      // ⚠️ 375 档是**图标栏**：文案节点仍在 DOM 里，但被隐藏（`boundingBox()` 为 null）。
+      // 那条判据要防的是"文字竖排"，而隐藏的文字不会竖排 —— 跳过它，并记一条读数，
+      // 免得"跳过"被读成"验过"。真正该守的在下面：**可见的那几枚必须宽 > 高**。
+      if (box === null) {
+        hidden += 1;
+        continue;
+      }
+      measured += 1;
       expect(
-        box!.width,
+        box.width,
         `第 ${i} 枚标签（${await labels.nth(i).textContent()}）宽 ${box!.width} 必须 > 高 ${box!.height}（单行）`,
-      ).toBeGreaterThan(box!.height);
+      ).toBeGreaterThan(box.height);
     }
+    // 🔴 读数要现量（**别把"跳过"读成"验过"**）：可见几枚、隐藏几枚。
+    console.log(`[W4] 底栏标签：可见 ${measured} 枚、隐藏 ${hidden} 枚（375 档是图标栏）`);
     // 范围筛选（今天/最近7天/已完成）现在在底栏上方的筛选条里，不逐字竖排。
     const scopeItems = page.locator('.ht-nav__item');
     const scopeCount = await scopeItems.count();
+    let scopesMeasured = 0;
     for (let i = 0; i < scopeCount; i += 1) {
       const box = await scopeItems.nth(i).boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.width, `筛选 chip ${i} 也必须横排`).toBeGreaterThan(box!.height);
+      // 同 `.ht-rail__label`：375 档里筛选条是收起的，节点在 DOM 里但不可见。
+      // 判据要防的是"竖排"，隐藏的节点不会竖排 ⇒ 跳过并记账。
+      if (box === null) continue;
+      scopesMeasured += 1;
+      expect(box.width, `筛选 chip ${i} 也必须横排`).toBeGreaterThan(box.height);
     }
   });
 });
