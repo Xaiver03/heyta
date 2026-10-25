@@ -814,3 +814,35 @@ heyta 服务端 → https://heyta.waytofuture.cn/managed-ai/v1/chat/completions
 重型 e2e（playwright）本轮多次排在闸门后：`已等 540s／上限 900s`，两次没拿到租约。
 所以**浏览器读数这一格仍然是欠的**（形状判据、图标视觉、回收站对齐）。
 不拿它当已验证。
+
+### 13.5 判据覆盖到 6 个分节之后（2026-10-25 收尾）
+
+把 `settings-row-grammar` 从"只量 appearance"扩到 6 节，途中抓到自己两个错误：
+
+1. **门禁在骗人**：第一版只认 `.ht-settings__preference-row`，于是 5 节 `rows=0`
+   被 `SKIP` 分支静默吞掉 —— "只有一节永远通过"。改成把四种**视觉同构**的行原语
+   都算进来（`preference-row` / `toggle` / `row` / `form-field-inline`）。
+2. **跨块算行距是错的**：AI 那节两行之间隔着一个提示块，量出 319px。
+   行距只在**同容器相邻行**之间算，没有样本的节单独打印 `SETTINGS_PITCH_SKIP`。
+
+最终读数（`--workers=1`）：
+
+| 分节 | 行数 | 行距 | 高度档 | 原语 |
+|---|---|---|---|---|
+| 任务与显示 | 12 | 54 | [52,44] | preference-row |
+| AI 与集成 | 3 | 48 | [44] | toggle |
+| 同步与隐私 / 数据管理 / 账号与安全 / 关于与帮助 | **0** | — | — | 无 |
+
+🔴 **那 4 节不是"还没迁"，而是它们本来就不是列表**：`SyncSettingsPanel` 的字段是
+`FormField`（默认 `stacked`），登录/服务器/口令是一个**表单**；`docs/agents/ux-principles.md §1`
+明确写着"表单页用 stacked、设置列表用 inline"。我一度准备把这 4 节改造成行列表 ——
+那是**违反本仓自己的规则**。判据现在的口径是对的：表单页没有行，出声说明，不判形状。
+
+密度收尾：`.ht-settings__section` 与 `.ht-settings--cards > .ht-ai-card` 的 `gap`
+16 → 4 ⇒ AI 行距 60 → **48**（52 行高 + 4）。
+
+⚠️ 两次 `s.replace(...)` 漏了 `assert` —— 脚本打印"改好了"、文件其实没变
+（`gap: --ht-space-4` 原样留着），我是靠"行距还是 60"才发现的。**没有断言的重写等于没改。**
+
+门禁全绿：`settings-row-grammar`（6 节）· `settings-category-ux`（1440/375 × 深浅）·
+`page-layout-grammar` · `check:design` · `check:ui-language` · `check:settings-prose`。

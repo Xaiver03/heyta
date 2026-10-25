@@ -152,4 +152,5 @@ if (problems.length > 0) {
 
 console.log('✅ 设置面在 SettingsScreen（RN Modal）里；入口在「我的」首屏；凭据表单 / 语言 / 小组件不在「我的」滚动流里；新词条中英齐。');
 console.log('ℹ️ 覆盖边界（如实说明）：这是**源码结构**判据，不证明运行时渲染 ——');
-console.log('   运行时行为由真机验收覆盖（当前被 iOS 夹具阻塞，见 handoff §5.1n，如实登记）。');
+console.log('   运行时行为由真机验收覆盖 —— 那一趟跑到哪、还欠哪几格，以');
+console.log('   `docs/adr/0051-mobile-reminder-delivery.md` 末尾「设备腿」那一节为准（状态不在这里复述，复述一定会漂）。');
