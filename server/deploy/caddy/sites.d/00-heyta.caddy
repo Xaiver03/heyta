@@ -1,0 +1,161 @@
+# heyta 落地页 + /app（共享 UI）+ /api（同步服务端 1900）
+#
+# 🔴 改这一片前先读这三条（都是 2026-10-24 统一迁移时踩出来的，线上判据钉着）：
+#   ① 落地页的未知路径必须**真 404**，不许兜底成 /index.html（软 404 会骗过 SEO 判据）；
+#      只有 /app/* 是 SPA，才兜 /index.html。
+#   ② 目录无尾斜杠要 301 补上（nginx 的 `$uri/` 会自动补，Caddy 不会）；
+#      否则 `/features` 变成"200 + 首页字节"，人眼看不出来。
+#   ③ 404 必须是**品牌页**且状态码仍是 404（G-25b），不能是服务器的裸默认页。
+#   ④ `/app`（无尾斜杠）必须 301 到 `/app/`；共享 UI 的产物在**独立目录**
+#      /var/www/heyta-app（nginx 时代是 alias），不在落地页目录下。
+heyta.waytofuture.cn {
+	root * /var/www/heyta-landing
+	encode zstd gzip
+
+	handle /app {
+		redir * /app/?{query} 301
+	}
+	handle /help* {
+		uri strip_prefix /help
+		redir * /docs{uri} 301
+	}
+	handle /en/help* {
+		uri strip_prefix /en/help
+		redir * /en/docs{uri} 301
+	}
+
+	# ── 托管 AI 上游（2026-10-25）────────────────────────────────────────────
+	# 中央 AI 网关（ai-control，127.0.0.1:4050）挂在这个**白名单主机**下：
+	# heyta 服务端的境内上游白名单是代码常量（逐字相等 + 必须 https），只认
+	# `api.deepseek.com` 与 `heyta.waytofuture.cn` ⇒ 中央 AI 只能以这条路径出现。
+	# 鉴权不在这里：客户端必须带 `Authorization: Bearer ai_…`，ai-control 自己校验
+	# （无 key 401）。`handle_path` 会先剥掉前缀，于是
+	# `/managed-ai/v1/chat/completions` → `127.0.0.1:4050/v1/chat/completions`。
+	# 🔴 必须排在下面的 `/api/*` 与兜底 `handle` **之前**：Caddy 的 handle 是
+	#    顺序首个命中胜，排在兜底后面就永远吃不到。
+	handle_path /managed-ai/* {
+		reverse_proxy 127.0.0.1:4050
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:1900
+	}
+	@serverPages path_regexp serverPages ^/(health|live)$
+	handle @serverPages {
+		reverse_proxy 127.0.0.1:1900
+	}
+	@legalHtml path_regexp legalHtml ^/(terms|privacy)\.html$
+	handle @legalHtml {
+		reverse_proxy 127.0.0.1:1900
+	}
+	@credPages path_regexp credPages ^/(verify-email|recover-passkey|magic-login)$
+	handle @credPages {
+		reverse_proxy 127.0.0.1:1900
+	}
+	@credJs path_regexp credJs ^/(recover-passkey|magic-login-confirm)\.js$
+	handle @credJs {
+		reverse_proxy 127.0.0.1:1900
+	}
+	handle /simplewebauthn-browser.min.js {
+		reverse_proxy 127.0.0.1:1900
+	}
+
+	# ── 运营后台入口：/admin（2026-10-25）──────────────────────────────────────
+	# 与 /app/ 是**同一份产物、同一个 index.html**：后台壳是应用自己按 pathname 切的
+	# （apps/web/src/features/admin/route.ts），这里只把那一份 HTML 交出去，
+	# 分片继续走下面的 /app/assets/ —— 所以不需要为它复制第二份构建。
+	# 🔴 必须排在兜底 `handle {` 之前：Caddy 的 handle 是顺序首个命中胜。
+	# 🔴 HTML 不许被启发式缓存（与 /app/ 同一条纪律）：发布时旧分片被清掉，
+	#    拿着旧 HTML 的人会去请求不存在的 JS，症状是白屏。
+	handle /admin {
+		root * /var/www/heyta-app
+		header Cache-Control "no-cache"
+		rewrite * /index.html
+		file_server
+	}
+	handle /admin/ {
+		redir * /admin?{query} 301
+	}
+
+	# 🔴 `.webmanifest` **不在** Caddy 内置的 mime 表里（nginx 时代靠 /etc/nginx/mime.types
+	#    里那一条），于是清单以 `text/plain` 出厂，浏览器不认它 —— PWA 安装元数据失效。
+	#    这一条不是本轮改出来的：2026-10-24 迁到 caddy-edge 那天起就红，只是没人再跑
+	#    线上验收；2026-10-25 那两条 `live-manifest.spec.ts` 判红抓到的就是它。
+	#    ⚠️ 必须排在下面的 `handle /app*` **之前**（Caddy 的 handle 顺序首个命中胜）。
+	@appManifest path /app/manifest.webmanifest
+	handle @appManifest {
+		root * /var/www/heyta-app
+		uri strip_prefix /app
+		header Content-Type "application/manifest+json; charset=utf-8"
+		file_server
+	}
+
+	handle /app* {
+		uri strip_prefix /app
+		root * /var/www/heyta-app
+		try_files {path} {path}/index.html /index.html
+		file_server
+	}
+
+	handle /legal/* {
+		@dirLegal {
+			not path_regexp endsSlash /$
+			file {
+				try_files {path}/index.html
+			}
+		}
+		redir @dirLegal https://{host}{path}/ 301
+		try_files {path} {path}/index.html
+		file_server
+	}
+	handle /en/legal/* {
+		@dirLegalEn {
+			not path_regexp endsSlashEn /$
+			file {
+				try_files {path}/index.html
+			}
+		}
+		redir @dirLegalEn https://{host}{path}/ 301
+		try_files {path} {path}/index.html
+		file_server
+	}
+	handle /en/assets/* {
+		respond 404
+	}
+	handle /assets/* {
+		file_server
+	}
+	handle /en/* {
+		@dirEn {
+			not path /en
+			not path_regexp endsSlashEn /$
+			file {
+				try_files {path}/index.html
+			}
+		}
+		redir @dirEn https://{host}{path}/ 301
+		try_files {path} {path}/index.html
+		file_server
+	}
+
+	handle {
+		@dir {
+			not path /
+			not path_regexp endsSlash /$
+			file {
+				try_files {path}/index.html
+			}
+		}
+		redir @dir https://{host}{path}/ 301
+		try_files {path} {path}/index.html
+		file_server
+	}
+
+	# 品牌 404（Caddy 的 handle_errors 保持原状态码 404，不会变成 200）
+	handle_errors {
+		@en404 path /en/*
+		rewrite @en404 /en/404.html
+		rewrite * /404.html
+		file_server
+	}
+}

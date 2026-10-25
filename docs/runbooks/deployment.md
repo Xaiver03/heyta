@@ -241,6 +241,15 @@
 
 ### 3.3 反向代理（宿主机 nginx）
 
+> 🔴 **本节 2026-10-24 起对 `heyta.waytofuture.cn` 不再是事实源。** 现量：
+> `ssh finlaw 'ss -ltnp | grep :443'` → `caddy-edge`；`systemctl is-enabled nginx` → `masked`。
+> 真源是 `/etc/caddy/Caddyfile` + `/etc/caddy/sites.d/*.caddy`（heyta 那三片的仓库镜像与
+> `--check/--pull/--apply` 三档在 `server/deploy/caddy/`、`server/scripts/caddy-sync.sh`，
+> 理由与踩过的坑写在 `server/deploy/caddy/README.md`）。
+> 本节下面这些 nginx location 表**留着当考古**：它们解释的是"为什么要有版本化镜像"，
+> 而那件事现在归 caddy 那份。改边缘配置前先 `ss -ltnp | grep :443` 这条纪律
+> 来自 ADR-0054 §落地动作 3，2026-10-25 上线 `/admin` 时又验证了一遍。
+
 **机器上有两个 heyta 站点**（✅ 实测）：
 
 | `/etc/nginx/nginx.conf` 行 | include | 角色 |

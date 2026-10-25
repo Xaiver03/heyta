@@ -1,0 +1,33 @@
+# 🔴 旧域整站 301 到新域（2026-10-23）：服务端安全边界按 PUBLIC_URL
+#    （heyta.waytofuture.cn）划线，旧域的 POST 一律 403。
+heyta.finlaw.cloud {
+	redir * https://heyta.waytofuture.cn{uri} 301
+}
+
+# 临时域（litopia 别名）：/app、/landing 回主站，其余给服务端
+heyta-tmp.litopia.space {
+	handle /app* {
+		redir * https://heyta.waytofuture.cn{uri} 301
+	}
+	handle /landing* {
+		redir * https://heyta.waytofuture.cn/ 301
+	}
+	handle {
+		reverse_proxy 127.0.0.1:1900
+	}
+}
+
+# 裸 IP 入口（2026-10-24）：Caddy 无法给裸 IP 签公网证书，若并进 HTTPS 站点
+# 会变成 308 → 打不开的 https，IP 直连彻底不可用（nginx 时代同样是坏路）。
+# 因此单独给 HTTP 站点，路由与临时域保持一致，不跳 https。
+http://124.223.13.226 {
+	handle /app* {
+		redir * https://heyta.waytofuture.cn{uri} 301
+	}
+	handle /landing* {
+		redir * https://heyta.waytofuture.cn/ 301
+	}
+	handle {
+		reverse_proxy 127.0.0.1:1900
+	}
+}
