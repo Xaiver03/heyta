@@ -157,6 +157,23 @@ function parsePositiveNumber(raw, flag) {
   return { value: n };
 }
 
+/**
+ * 🔴 规则 5（2026-10-25 加，事故驱动）：**证据文件名里不许出现"某个密钥正在屏幕上"**。
+ *
+ * 事故：`apps/mobile/evidence/collab-ios-10251033/06e-已贴凭证.png` —— 那一帧拍的是
+ * **一次性邀请凭证明文躺在输入框里**。截图是正常产物，但"把密钥拍进证据目录"不是：
+ * 证据目录会被并行会话按目录扫、被提交、被推到公开远端（这次就发生了）。
+ *
+ * 为什么按**文件名**判而不是按像素：像素判不了（这层不解析图像内容），
+ * 而"凭证进框"这件事本来就不需要像素证据 —— 读界面值命中即可，值不落日志。
+ * 所以约定是：这类帧**不进证据目录**（脚本里用 `SECRET_FRAMES=1` 切到私有目录）。
+ * 文件名就是那条约定唯一能机器判的痕迹。
+ *
+ * ⚠️ 词表刻意窄：只收"已经贴/填进去了"的形状。`03c-登录后仍报未设置口令` 那种
+ * **缺陷现场**（屏幕上没有口令）不在射程内 —— 判据误报一次就会被放宽一次。
+ */
+const SECRET_FRAME_NAME = /(已贴|已填|贴好|填好).*(凭证|恢复码|口令|token|secret)|凭证已(贴|填)/iu;
+
 function parseArgs(argv) {
   const opts = { roots: [], maxRootMB: null, maxFileMB: DEFAULT_MAX_FILE_MB, json: false, help: false };
   for (let i = 0; i < argv.length; i += 1) {
@@ -370,6 +387,10 @@ function scanRoot(rootAbs, budgetMB, maxFileMB, rootSet) {
       const fileRule = artifactRuleFor(e.name, 'file');
       if (fileRule) {
         violations.push({ rule: fileRule, path: abs, bytes: st.size, kind: 'file' });
+        continue;
+      }
+      if (SECRET_FRAME_NAME.test(e.name)) {
+        violations.push({ rule: 'secret-frame', path: abs, bytes: st.size, kind: 'file' });
         continue;
       }
       if (st.size > maxFileBytes) {
