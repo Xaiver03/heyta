@@ -55,7 +55,7 @@
 ## 实施记录（2026-10-24 追加；只登记与本文措辞的差，不改上面任何一条裁决）
 
 **「验证」那一节那句「尚无实现」已经不成立** —— 从 M1 到 M6 六批落地，逐批读数在
-[计划 §9.7–§9.13](../plans/collaboration-shared-lists.md)。这里只登记**三处会被本文措辞误导人的差**：
+[计划 §9.7–§9.13](../plans/collaboration-shared-lists.md)。这里只登记**下面这几处**会被本文措辞误导人的差：
 
 1. **决策 4 里那句「与滴答的任务提醒四档（个人设置）一致」** —— 四档**没有实现，也不会实现**：
    它判的是 `Task.assigneeUserId`，那个字段全仓零写点（现量
@@ -73,6 +73,15 @@
    `share-routing.ts`，壳里没有第二份判断），移动端在 M6 接上。
    判"成员眼里到底看得见什么"的那把尺现在有两枚：web 那台真浏览器
    （`pnpm verify:collab-journey`）与 iOS 那台真模拟器（`pnpm verify:mobile-collab:ios`）。
+4. **决策 3 那句「listKey 用 vault 的载荷信封加密后落盘」在移动端的落点，比本文写的更窄** ——
+   本文没规定"落哪一格"，M6 第一版把它接到了 `VaultSecureStorage` 的 root-key 那对接口上，
+   真机一按就拒：那对接口**两端都校验"恰好 32 字节"**（截断的 root key 必须失败，不许解出垃圾），
+   而 `heyta.share-keys.v1` 是变长 JSON。所以原生模块（iOS Keychain / Android Keystore 同一形状）
+   开了一对**变长通道** `loadBlob`/`saveBlob`，root-key 那对一字未动 ——
+   `apps/mobile/evidence/ios-keychain-probe-invalid.json` 那枚探针依赖的正是"非法长度必拒"。
+   裁决（vault 包裹、不发明第二条密钥生命周期、锁定向）没动；动的是"移动端的格子长什么样"。
+   钉子与实测读数：环境陷阱 #559、计划 §9.13、`apps/mobile/tests/vault-secure-storage.spec.ts`
+   那组 blob 用例（形状纪律）+ 移动旅程装置（契约本身只有真机量得到）。
 
 **仍然没有做到的（别把上面读成"全做完了"）**：库里存量 op 不追签（ADR-0069 裁决二/三）；
 旧密文在 rekey 后不重加密（追加模型的代价，边界写在 `share-rekey.ts` 文件头）；

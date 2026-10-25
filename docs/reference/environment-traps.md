@@ -11528,3 +11528,28 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     `AXUniqueId`（= testID）读出来 —— 一行 `python3` 走一遍树就够，别凭屏幕猜；
     ② **一类不是一个**：同一处写死的角色会同时打中所有 multiline 框（这一趟是入群凭证框
     `share-join-token` 与评论框 `comment-composer-input` 两枚），只修第一处 = 下一跑红在第二步。
+
+559. **端口适配器接进原生模块时，"这一格存得下这份料吗"只有真机能回答**
+    （2026-10-25 协作移动旅程装置第 21 跑，`apps/mobile/evidence/collab-ios-10251033/06f-加入没走到成功态.png`）。
+    形状：手机入群一路走到"填凭证 → 提交"，界面上出现红字行内错误
+    **「vault root key 必须是 32 字节 Base64」**，共享清单永远加不进来。
+    单元侧**全绿** —— `apps/mobile/tests/share-key-store.spec.ts` 喂的是假 vault（一枚 Map），
+    它证明的是"我这层映射的形状"，不是"原生那一格吃不吃得下"。
+    成因：`apps/mobile/src/lib/share-key-store.ts` 把 root-key 专用接口当通用 KV 用了，
+    而 Swift 的 `save` 与 `load` **两端都校验"恰好 32 字节"**（Kotlin 同规）——
+    那句拒绝**是契约不是缺陷**：一把被截断的 root key 必须失败，而不是解出一堆垃圾。
+    share 密钥环那份 `heyta.share-keys.v1` 是**变长 JSON**（app-host `serializeShareKeyStore`），天生存不进。
+    三条纪律：
+    ① 新端口适配器接原生模块，判据里必须有一条**跑在真原生实现上**（设备腿），
+       否则这条通道第一次真用就红；JS 这半边能钉的只有"走的是哪一对接口"这个形状
+       （`grep -c getVaultSecureBlobStorage apps/mobile/src/lib/share-key-store.ts`，非 0 才算走对）。
+    ② 界面那行红字是**原话**：先按原话回到写它的那一行
+       （`grep -n "32 字节" apps/mobile/ios/Heyta/HeytaVaultSecureStorage.swift`），
+       别先怀疑上层密钥环逻辑 —— 这一趟差点被读成"信封封装写错了"。
+    ③ 一类不是一个：改接口前先枚举全部调用点
+       （`grep -rn "vault-secure-storage" apps/mobile/src`）——
+       实测 root-key 那对今天只剩 `saveVaultRootKey`（32 字节，合法），blob 那对只有 share 密钥端口，
+       所以这一族**只有一个实例**，不必全仓改稿。
+    修法：原生模块另开一对变长通道（`loadBlob`/`saveBlob`，上限 64 KiB，Swift/Kotlin 对偶），
+    **root-key 那对一字未动** —— `apps/mobile/evidence/ios-keychain-probe-invalid.json`
+    那枚探针依赖的就是"非法长度必拒"这个行为。
