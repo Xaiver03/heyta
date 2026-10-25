@@ -23,6 +23,15 @@ import {
   Trash2,
   Users,
   X,
+  CircleHelp,
+  CreditCard,
+  Database,
+  Palette,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { searchNotes, searchTasks } from '@heyta/domain';
@@ -86,7 +95,7 @@ import {
   type TaskFilter,
 } from './features/tasks/store.js';
 import { wantsSignInOnLoad } from './lib/auth-deep-link.js';
-import { settingsSectionOnLoad } from './lib/settings-deep-link.js';
+import { settingsSectionOnLoad, settingsStandaloneOnLoad } from './lib/settings-deep-link.js';
 import { type DueDisplayMode } from './lib/due-display.js';
 import { TaskRowMeta } from './features/tasks/row-meta.js';
 import { loadDueDisplay, saveDueDisplay } from './features/tasks/due-display-pref.js';
@@ -236,22 +245,31 @@ import { AdminConsolePage } from './features/admin/AdminConsolePage.js';
 import { AnnouncementBanner } from './features/announcements/AnnouncementBanner.js';
 import { isAdminConsoleLocation } from './features/admin/route.js';
 
+/**
+ * 设置左侧那一列：**每一项都带图标**（2026-10-25 产品负责人：
+ * 「独立弹窗之后，可以给设置的每个菜单都加一个 Icon」）。
+ *
+ * 为什么图标不是装饰：这一列在独立窗口里是**唯一的导航**，而一列纯文字
+ * 在 12–14px 字号下要逐条读才能定位；macOS 系统设置、微信、QQ 的设置窗
+ * 都有图标，它们的作用是让"我想改外观"变成一次形状识别，而不是一次阅读。
+ * ⚠️ 图标**不替代文字**：`aria-hidden` 只加在 svg 上，可访问名仍是 label。
+ */
 const SETTINGS_NAV_ITEMS = [
-  { id: 'settings-group-profile', labelKey: 'web.settings.nav.profile' },
+  { id: 'settings-group-profile', labelKey: 'web.settings.nav.profile', icon: UserRound },
   /*
    * 「订阅」独立成节（2026-10-24 产品负责人："需要有单独的订阅界面"）。
    * 它排在**个人资料之后、任务与显示之前**：身份 → 付钱 → 用起来，
    * 与"我"相关的两件事在前，偏好类在后。原来它在「账号与安全」里，
    * 而那让"付钱"躲在"安全"底下，还和通行密钥、注销账号挤在同一列。
    */
-  { id: 'settings-group-subscription', labelKey: 'web.settings.nav.subscription' },
-  { id: 'settings-group-appearance', labelKey: 'web.settings.nav.appearance' },
-  { id: 'settings-group-sync', labelKey: 'web.settings.nav.syncPrivacy' },
-  { id: 'settings-group-ai', labelKey: 'web.settings.nav.aiIntegrations' },
-  { id: 'settings-group-data', labelKey: 'web.settings.nav.data' },
-  { id: 'settings-group-account', labelKey: 'web.settings.nav.account' },
-  { id: 'settings-group-help', labelKey: 'web.settings.nav.help' },
-] as const satisfies readonly { id: string; labelKey: MessageKey }[];
+  { id: 'settings-group-subscription', labelKey: 'web.settings.nav.subscription', icon: CreditCard },
+  { id: 'settings-group-appearance', labelKey: 'web.settings.nav.appearance', icon: Palette },
+  { id: 'settings-group-sync', labelKey: 'web.settings.nav.syncPrivacy', icon: RefreshCw },
+  { id: 'settings-group-ai', labelKey: 'web.settings.nav.aiIntegrations', icon: Sparkles },
+  { id: 'settings-group-data', labelKey: 'web.settings.nav.data', icon: Database },
+  { id: 'settings-group-account', labelKey: 'web.settings.nav.account', icon: ShieldCheck },
+  { id: 'settings-group-help', labelKey: 'web.settings.nav.help', icon: CircleHelp },
+] as const satisfies readonly { id: string; labelKey: MessageKey; icon: LucideIcon }[];
 
 type SettingsSectionId = (typeof SETTINGS_NAV_ITEMS)[number]['id'];
 
@@ -332,7 +350,9 @@ function SettingsSectionNav({ active, onSelect }: {
         <button key={item.id} type="button" className="ht-settings__nav-link"
           aria-current={active === item.id ? 'page' : undefined}
           aria-controls={item.id} onClick={() => onSelect(item.id)}>
-          {t(item.labelKey)}
+          {/* svg 对读屏隐藏：可访问名是 label 文字，图标只帮眼睛定位。 */}
+          <item.icon size={ICON_SIZE.sm} aria-hidden="true" />
+          <span>{t(item.labelKey)}</span>
         </button>
       ))}
     </nav>
@@ -935,6 +955,16 @@ export function App(): React.JSX.Element {
    *   2. **认不出的 id 不猜**：落到默认节，而不是把一整页 hidden 掉（见 `isSettingsSectionId`）。
    * 参数名的唯一事实源在 `lib/settings-deep-link.ts`（落地页抄了一份字面量，判据钉着相等）。
    */
+  /**
+   * 这一页是不是"独立设置窗口"的载荷（`?settings=…&standalone=1`）。
+   * 一次性读数，与上面那条 effect 同源：参数不是状态，跟着 URL 变重算没有意义。
+   * 判据（`settings-deep-link.spec.tsx`）钉的是**只有带 settings 时**才认它。
+   */
+  const settingsStandalone = useMemo(
+    () => settingsSectionOnLoad() !== null && settingsStandaloneOnLoad(),
+    [],
+  );
+
   useEffect(() => {
     const wanted = settingsSectionOnLoad();
     if (wanted === null || !isSettingsSectionId(wanted)) return;
@@ -2256,6 +2286,10 @@ export function App(): React.JSX.Element {
         // 🔴 详情列的**用户选择**（不是几何判断）落在这里，CSS 按它把轨道归零 +
         // 不渲染那一列（`styles/app/base.css`）。两条各管一件事，见上面那段注释。
         data-detail={detailPane}
+        // 🔴 独立设置窗口：壳（rail / 主区 / 详情列）由 CSS 收起，只留设置自己。
+        //    用属性而不是"条件渲染整棵壳" —— 后者会让设置面板在窗口里重挂载一次，
+        //    而它带着未决的订阅/授权状态（与上面那段 Provider 理由同源）。
+        data-settings-standalone={settingsStandalone ? '' : undefined}
         data-assistant-workspace={assistantWorkspace ? '' : undefined}
         data-detail-agent={contentView === 'tasks' && selectedTaskId === null ? '' : undefined}
         // 🔴 而这一条管的是"这一栏此刻有没有要画的东西"（与"用户收没收"是两回事，

@@ -1658,7 +1658,10 @@ function GrantPanel({ store }: { store: AdminStoreState }): React.JSX.Element {
 
   return (
     <div data-testid="admin-grants">
-      <p className="ht-settings__admin-notice" data-testid="admin-grants-lead">
+      {/* 🔴 这一句是**说明**，不是警告：用 `admin-notice` 那套红底会把它读成
+          "现在有一个问题"。公告那一格用红色是对的（它说的真是危险：往所有人界面写明文），
+          这一格说的只是"这三个动作各动什么"。同一套颜色在两格里必须是同一件事。 */}
+      <p className="ht-settings__hint" data-testid="admin-grants-lead">
         {t('web.admin.grant.lead')}
       </p>
 

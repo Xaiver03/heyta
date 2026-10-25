@@ -54,3 +54,33 @@ export function settingsSectionOnLoad(
   const value = new URLSearchParams(search).get(SETTINGS_QUERY_PARAM)?.trim() ?? '';
   return value === '' ? null : value;
 }
+
+/**
+ * `standalone=1`：这一页只画设置，不画应用壳。
+ *
+ * 为什么需要它：桌面端要把设置做成**独立窗口**（macOS `Settings` 场景 / WinUI 新窗 /
+ * Electron 第二个 BrowserWindow），窗口里只有一个 `web-dist` 的 URL。若那个 URL 仍然
+ * 渲染"侧栏 + 任务区"，窗口里就是"整个应用 + 一个模态挡在上面" —— 那不叫设置窗口。
+ *
+ * 与 `?settings=` 的关系：`standalone` **只在带 `settings` 时才有意义**（单开一个
+ * 只画设置的页面而没有指向哪一节，等于把用户丢进一个没有上下文的表单）。
+ */
+export const SETTINGS_STANDALONE_PARAM = 'standalone';
+
+/** 只认 `1` / `true`：写错的值不猜（与本文件其它参数同一条纪律）。 */
+export function settingsStandaloneOnLoad(search: string = window.location.search): boolean {
+  const value = new URLSearchParams(search).get(SETTINGS_STANDALONE_PARAM);
+  return value === '1' || value === 'true';
+}
+
+/**
+ * 这一页是不是"独立设置窗口"的载荷（`?settings=…&standalone=1`）。
+ *
+ * 之所以要单独一个函数：判断在**两个地方**都要用 —— `App` 决定收起壳，
+ * `AccountMenu` 决定**压根不渲染**自己。第二处是必须的：那个菜单渲染在 `.ht-app`
+ * **之外**（portal），CSS 选择器够不着它；2026-10-25 实测在窗口里它就是展开的、
+ * 盖住分类栏前三项，看起来像"设置坏了"。
+ */
+export function isSettingsStandaloneSurface(search: string = window.location.search): boolean {
+  return new URLSearchParams(search).get(SETTINGS_QUERY_PARAM) !== null && settingsStandaloneOnLoad(search);
+}

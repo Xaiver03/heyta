@@ -511,7 +511,7 @@ test.describe('/admin 这个地址（真浏览器）', () => {
     expect(body).toEqual({ userId: 5, sku: 'hosted-ai-monthly', reason: '内测授权' });
   });
 
-    test('🔴 暗色主题下这一页仍然读得下去（AGENTS §5：不测暗色就交付是明令的错法）', async ({ page }) => {
+  test('🔴 暗色主题下这一页仍然读得下去（AGENTS §5：不测暗色就交付是明令的错法）', async ({ page }) => {
     // 走**生产读路径**：`lib/theme.ts` 的 `resolveInitialTheme()` 读的就是这一枚 key，
     // 优先级是"用户已选 > 系统偏好"，所以这里种的是"用户选过 dark"，
     // 而不是 `emulateMedia` —— 后者会被那一条优先级盖掉（theme.ts 的注释
@@ -540,6 +540,31 @@ test.describe('/admin 这个地址（真浏览器）', () => {
     });
     expect(contrast).not.toBeNull();
     expect(contrast!.fg).not.toBe(contrast!.bg);
+
+    // 🔴 新加的那一格也要在暗色下**各量一发**：只拍营收那一屏的话，
+    // "暗色只剩一条腿量得到"就是这一仓记过的探针陷阱 —— 换色的是 token，
+    // 而新格子用的是 `ht-settings__hint`，它有没有暗色分支只有这里知道。
+    await page.getByRole('button', { name: '发放', exact: true }).click();
+    await expect(page.getByTestId('admin-grants')).toBeVisible();
+    // 等它**装完**再拍：停在加载态的暗色截图只证明了"加载那一行有暗色分支"，
+    // 而下拉与记录行才是这一格里唯一带自己颜色的两块。
+    await expect(
+      page.getByTestId('admin-grants-rows').locator('.ht-settings__admin-row'),
+    ).toHaveCount(2);
+    await page.screenshot({ path: `${EVIDENCE}/admin-route-grants-dark.png`, fullPage: true });
+
+    // 判据是"字还看得见"，不是"两个颜色不相等"（后者拿一个透明背景就能假过）。
+    // 暗色下说明文字的前景色相对亮度必须够高 —— 把 hint 写成深灰就会红在这里。
+    const ink = await page.evaluate(() => {
+      const lead = document.querySelector('[data-testid="admin-grants-lead"]');
+      if (lead === null) return null;
+      const match = /rgba?\((\d+)[^)]*?(\d+)[^)]*?(\d+)/u.exec(getComputedStyle(lead).color);
+      if (match === null) return null;
+      const [r, g, b] = [1, 2, 3].map((i) => Number(match[i]) / 255);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    });
+    expect(ink).not.toBeNull();
+    expect(ink!).toBeGreaterThan(0.35);
   });
 
   test('应用入口仍然完好：同一个 bundle 挂在 / 时照常是任务视图', async ({ page }) => {
