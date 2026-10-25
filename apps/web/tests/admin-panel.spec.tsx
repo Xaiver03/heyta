@@ -175,16 +175,17 @@ describe('是管理员：渲染面板与概览', () => {
     expect(overview!.textContent).toContain('123.00 CNY');
   });
 
-  it('面板上有十个标签页，默认停在概览', async () => {
+  it('面板上有十一个标签页，默认停在概览', async () => {
     stubFetch(200);
     const el = await renderPanel();
 
     const tabs = [...el.querySelectorAll('[role="tab"]')];
     // 第六个是 W4b 的「调休/补班」，第七个之前是「邀请」，第八个是那批的「退款」，
-    // 第九、第十是营收看板与运营公告（三处都是 `TABS` 与 `AdminTab` 同批加的）。
+    // 第九、第十是营收看板与运营公告，第十一个是 2026-10-25 的「发放」（订阅赠予）
+    // —— 四处都是 `TABS` 与 `AdminTab` 同批加的。
     // ⚠️ 这条判据的价值在"标签页数 = TABS 的长度"：
     // 只改数字不改 TABS（或反过来）都会让它红。
-    expect(tabs).toHaveLength(10);
+    expect(tabs).toHaveLength(11);
     expect(tabs[0]!.getAttribute('aria-selected')).toBe('true');
   });
 
