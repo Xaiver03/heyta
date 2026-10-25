@@ -244,6 +244,21 @@ clear_task_search() {
   done
   return 1
 }
+press_or_axbridge() {  # $1=label
+  # 🔴 HID 那一发**点了不等于界面收到**：2026-10-25 11:12 那一趟里，首启同意层完整渲染、
+  # 「只用本机」在屏上、`press` 也回了 found=True，而八轮下来页面纹丝不动（截图 11:31 还是那一层）。
+  # 同一族失法在设置页是常态（§7 #557），在 RN 侧是整机被五枚模拟器压住时的偶发。
+  # 所以这里在"按完还在"时补一发**精确框中心 + axbridge**，而不是把偶发读成产品失败。
+  local label="$1" out cx cy
+  press "$label" >/dev/null 2>&1 || true
+  has "$label" || return 0
+  out="$(ax "$label" --pressable --list --exact --json 2>/dev/null || true)"
+  [ "$(jget "$out" found)" = "True" ] || return 1
+  cx=$(( $(jget "$out" x) + $(jget "$out" width) / 2 ))
+  cy=$(( $(jget "$out" y) + $(jget "$out" height) / 2 ))
+  idb_current ui tap "$cx" "$cy" --api axbridge --udid "$UDID" >/dev/null 2>&1 || true
+  return 0
+}
 privacy_destination_visible() {
   # A fresh installation reaches Welcome before Tasks. Require an observable
   # destination and the absence of both consent actions in the settled tree.
@@ -258,7 +273,7 @@ dismiss_privacy_gate() {
   # longer present after the tap.
   for _i in 1 2 3 4 5 6 7 8; do
     if has "只用本机"; then
-      press "只用本机" >/dev/null 2>&1 || true
+      press_or_axbridge "只用本机" || true
       sleep 2
       # A transient empty AX tree can make the consent button look gone while
       # the modal is still on screen. Require the destination task page in the
@@ -267,13 +282,13 @@ dismiss_privacy_gate() {
       continue
     fi
     if has "同意并联网"; then
-      press "只用本机" >/dev/null 2>&1 || true
+      press_or_axbridge "只用本机" || true
       sleep 2
       privacy_destination_visible && return 0
       continue
     fi
     if has "以后再说"; then
-      press "以后再说" >/dev/null 2>&1 || true
+      press_or_axbridge "以后再说" || true
       sleep 2
       privacy_destination_visible && return 0
       continue
@@ -819,6 +834,31 @@ elif [ "$BUILD_STARTED" -eq 0 ] && [ -n "$INSTALLED" ] && [ "${SRC_MTIME:-0}" -g
   ok "已安装 main.jsbundle 不旧于当前源码"
 else
   bad "安装包新鲜度无法证明（src=${SRC_MTIME} bundle=${BUNDLE_MTIME} built=${BUILT_BUNDLE_SHA} installed=${INSTALLED_BUNDLE_SHA} app=${INSTALLED}）"
+fi
+
+# 🔴 上面那条是**全集**判据，而在一枚被人并行编辑的共享工作树上它赢不了赛跑 ——
+# 2026-10-25 现量：09:37 / 10:38 / 10:43 / 11:03 / 11:31 一路都有人在改
+# `packages/{app-host,ui,i18n,op-log}` 与 `apps/mobile`，构建窗口（这台机器上 2~60 分钟）
+# 里几乎必然落进别人的编辑。所以本线那一行真正依赖的口径要**单独判**：
+# 提醒面这一行所需的源码，是否全部早于装机包。别人在飞的改动不在这条判据的口径里。
+FEATURE_SRC=()
+for _f in packages/ui/src/reminders/ReminderList.tsx \
+          apps/mobile/src/screens/TaskDetailSheet.tsx \
+          apps/mobile/src/lib/reminder-delivery-display.ts \
+          apps/mobile/src/lib/use-reminder-delivery.ts \
+          apps/mobile/src/lib/native-reminder-scheduler.ts \
+          apps/mobile/src/lib/reminder-native.ts \
+          packages/i18n/src/locales/zh-CN.ts \
+          packages/i18n/src/locales/en.ts; do
+  [ -f "$ROOT/$_f" ] && FEATURE_SRC+=("$ROOT/$_f")
+done
+FEATURE_NEWEST="$(printf '%s\0' "${FEATURE_SRC[@]}" | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1)"
+if [ "${#FEATURE_SRC[@]}" -eq 0 ]; then
+  bad "本轮口径的源码清单为空 —— 判不了装机包含不含这一行，别把这条读成通过"
+elif [ -n "$FEATURE_NEWEST" ] && [ "${BUNDLE_MTIME:-0}" -ge "$FEATURE_NEWEST" ]; then
+  ok "提醒面这一行所需的 ${#FEATURE_SRC[@]} 枚源码全部早于装机包（最晚 $(date -r "$FEATURE_NEWEST" '+%H:%M:%S')，包 $(date -r "$BUNDLE_MTIME" '+%H:%M:%S')）"
+else
+  bad "装机包**不含**这一行的当前源码（最晚所需 $(date -r "${FEATURE_NEWEST:-0}" '+%H:%M:%S')，包 $(date -r "${BUNDLE_MTIME:-0}" '+%H:%M:%S')）—— 这一帧不能算当前产物的证据"
 fi
 
 step "0.5. iOS AX 夹具"
