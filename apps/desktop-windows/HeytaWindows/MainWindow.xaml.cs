@@ -31,9 +31,8 @@ public sealed partial class MainWindow : Window
     /// 壳这一层**没有**任何"设置长什么样"的决定：窗口自己载共享 UI 的
     /// `?settings=…&standalone=1`。这里只转发一次用户意图。
     /// </remarks>
-    private void OnOpenSettingsInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    private void OnOpenSettingsClicked(object sender, RoutedEventArgs args)
     {
-        args.Handled = true;
         App.ShowSettings();
     }
 

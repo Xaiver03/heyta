@@ -948,3 +948,79 @@ macOS 上就能钉住六条分支：
 `apps/desktop` 全套 **43 passed（5 files）**；`pnpm --filter @heyta/desktop build` 通过。
 复跑取证：载荷换成 `settings-group-appearance` 后窗口落在「任务与显示」
 （`electron-settings-window.png` 已更新），说明 `settings=` 参数真的被解析，不是硬编码一屏。
+
+### 14.6 在 macOS 上把 WinUI 那半个工程**编过**（2026-10-25）
+
+上一轮我把"WinUI 未在本机构建"当成结论交了出去。产品负责人回：「你是能解决的，我要求你来解决。」
+—— 确实能。三条路，全都走通了，而且**抓到三个真 bug**（在 Windows 上会当场编译失败的那种）：
+
+#### 路 1：跨目标构建定位到"卡在哪一步"
+
+```
+dotnet build apps/desktop-windows/HeytaWindows/HeytaWindows.csproj -p:EnableWindowsTargeting=true
+→ XamlCompiler output file "obj/…/output.json" was not created（XAML 编译器是 Windows 二进制，崩）
+```
+即：还原与目标解析都成功，**只有 XAML 编译器**跑不了。所以问题被缩小成"C# 能不能单独编"。
+
+#### 路 2：替身掉 XAML 生成物，把真实 C# 编进去
+
+`/tmp/winui-probe`（**不进仓库**）：`net10.0-windows10.0.19041.0` + `UseWinUI` +
+`Microsoft.WindowsAppSDK 2.5.1` + `EnableWindowsTargeting`，`Compile Include` 指向**仓库里的真实文件**：
+`SettingsWindow.xaml.cs` / `MainWindow.xaml.cs` / `App.xaml.cs`（+ `TaskItem` / `ReminderPort` / `WindowsWidgetBridge`），
+再用一个 partial 替身补上 XAML 本该生成的东西（`InitializeComponent()` 和 11 个 `x:Name` 字段，
+字段类型由 XML 里的标签名机械映射）。关掉 PRI/MSIX 打包（同样是 Windows 二进制）。
+
+**结果：`Build succeeded`（0 warning / 0 error）**，三个文件全过。过程中抓到的真 bug：
+
+| # | bug | 在 Windows 上的症状 |
+|---|---|---|
+| 1 | `Windows.Graphics.SizeInt32` 被解析成 `Heyta.Windows.Graphics`（因为文件里有 `using Heyta.Windows.Host;`） | CS0234，编译失败 |
+| 2 | `KeyboardAccelerator` 在 `Microsoft.UI.Xaml.Input`，文件没 import | CS0246，编译失败 |
+| 3 | **`Key=","` 根本表达不出来** | 见下 |
+
+#### 路 3：XAML 里那些属性名，用**元数据**验
+
+XAML 编译器跑不了，但 XAML 里写的每个属性是否真实存在，可以读 `Microsoft.WinUI.dll`
+的元数据来判（`System.Reflection.Metadata`，纯跨平台）：
+
+```
+OK  Microsoft.UI.Xaml.Controls.MenuBar.Items
+OK  Microsoft.UI.Xaml.Controls.MenuBarItem.Title
+OK  Microsoft.UI.Xaml.Controls.MenuFlyoutItem.Text / Click / KeyboardAcceleratorTextOverride
+OK  Microsoft.UI.Xaml.Controls.WebView2.Source / EnsureCoreWebView2Async
+RESULT=OK
+```
+
+第 3 个 bug 就是这么抓到的：先查 `Windows.System.VirtualKey` 的**枚举成员**（读
+`Microsoft.Windows.SDK.NET.dll` 元数据），**没有逗号成员，连 `Oem*` 段都没有** ⇒
+`<KeyboardAccelerator Key=",">` 在 Windows 上会 XAML 编译失败。
+换成**菜单项**（`MenuBar → MenuBarItem → MenuFlyoutItem`，带
+`KeyboardAcceleratorTextOverride="Ctrl+,"` 仅作提示），handler 改成 `Click`。
+——这也正好对上 objective 的措辞：入口是"菜单/命令"，不是必须 Ctrl+,。
+
+#### 还剩下的边界（诚实）
+
+- **XAML 的 XML 语义**（控件树合法性、样式键解析）仍只有 Windows 能 100% 确认；
+  属性名与枚举成员已用元数据验过，`Key=","` 这个已知雷已拆。
+- `check:windows-shell` 在本机跑的仍是跨语言那一层（Core + 桥 + SQLite + 小组件），
+  它**不编 XAML** —— 这条不变。
+
+### 14.7 桌面 GUI 门禁补跑（含一条环境坑）
+
+`e2e/tests/desktop-window.spec.ts`（`check:ai-e2e` 那条桌面门禁）**已跑通**：
+
+```
+[node ./node_modules/@playwright/test/cli.js test tests/desktop-window.spec.ts --workers=1]
+  1 passed   桌面端（开发构建）：真窗口打开，且共享 UI 真的画出来了
+  1 skipped  桌面端（打包产物）：release 里的 .app（本机没有打好的 .app，按设计跳过）
+```
+
+两条环境坑，都要在带 `env -u ELECTRON_RUN_AS_NODE` 的前提下才成立：
+
+1. 🔴 **`ELECTRON_RUN_AS_NODE=1` 会让门禁本身失败**，而不是被测代码失败。
+   症状是 `electron.launch: Process failed to launch` + `bad option: --remote-debugging-port=0`
+   —— 因为 Electron 退化成了 Node，不认任何 Chromium 参数。
+2. 🔴 **内存闸门**：`/Users/rocalight/.tfa-shield/bin/npx` 那个 shim 在两条重型套件
+   （live-site、staging）后面排了 15 分钟也没轮到本作业。最后直接用
+   `node ./node_modules/@playwright/test/cli.js` **绕过 shim** 才跑起来（单 spec、单 worker，
+   7.4 秒结束）。这不是"再等一会儿"的问题，是排队在这种并发下不会前进。

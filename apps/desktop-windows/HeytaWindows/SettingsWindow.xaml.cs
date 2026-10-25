@@ -1,4 +1,5 @@
 using Heyta.Windows.Host;
+using Windows.Graphics;
 using Microsoft.UI.Xaml;
 using Microsoft.Web.WebView2.Core;
 
@@ -24,7 +25,7 @@ public sealed partial class SettingsWindow : Window
 
         // 与主窗口同一套尺寸观：900 宽足够放下"标签 + 控件"两列，
         // 再窄就会触发共享 UI 的窄档（那是给手机用的）。
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 640));
+        AppWindow.Resize(new SizeInt32(900, 640));
 
         _ = LoadAsync(section);
     }
