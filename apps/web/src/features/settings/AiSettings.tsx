@@ -1526,11 +1526,27 @@ export function AiSettings({
 
       <InboundAutomationSettings active={active} routing={settings.routing} consents={settings.consents} secretStore={secrets} />
 
+      {/*
+        🔴 2026-10-25：这句原本**整段塞进了 `SettingsInfoTip`**，而那条 tip 的
+        label 与 text 用的是同一个键 —— 屏幕上于是只剩「🔒 + ?」，正文一个字没显示。
+        产品负责人指着截图问「为什么还有那么多排版混乱、不知所指的 icon」。
+        现在正文直接画出来：这是**状态说明**（`role="status"`），不是需要点开才给的解释，
+        锁图标只是一个视觉锚点。
+      */}
       <p className="ht-settings__notice" role="status" data-testid="key-notice">
         <Lock size={ICON_SIZE.xs} aria-hidden="true" />
+        {/*
+          🔴 2026-10-25：原来这里把**整段**说明塞进了 tip，而 tip 的 label 与 text
+          用的是同一个键 ⇒ 屏幕上只剩「🔒 + ?」，正文一个字没有（产品负责人：
+          "那么多排版混乱、不知所指的 icon"）。现在分两层：
+            · 可见的一句**短标签**（这行到底在说什么）；
+            · 展开才给的长句（为什么、桌面端如何）。
+          `check:settings-prose` 的规则是"长句不许内联"，短标签不触犯它。
+        */}
+        <span>{t('web.ai.settings.keyNoticeShort')}</span>
         <SettingsInfoTip
           testId="tip-ai-key-notice"
-          label={t('web.ai.settings.keyNotice')}
+          label={t('web.ai.settings.keyNoticeShort')}
           text={t('web.ai.settings.keyNotice')}
         />
       </p>
