@@ -159,6 +159,29 @@ export async function openAuthPanel(page: Page) {
   const dialog = page.locator('[role="dialog"][aria-label="登录 / 注册"]');
   if (await dialog.isVisible().catch(() => false)) return dialog;
 
+  /*
+   * 🔴 2026-10-25：面板一打开会先问一次 `/api/auth/central/config`，而**这一族用例要的是
+   * 本地表单那一支**（邮箱 + 口令 / 邮箱验证码）。三个事实必须先知道（都实测过）：
+   *
+   *   · `isOfficialService` 为真时（未配置服务器 ⇒ 落官方实例），官方实例**只画中心认证**；
+   *   · 探测结果不合法（回 `{}`）⇒ `centralConfig = null` ⇒ 画 `central-auth-unavailable`
+   *     （"登录暂时不可用" + 关闭/重新检查），**不回落**本地表单；
+   *   · 只有两种情况会画本地表单：非官方实例，或服务端**明确**回 `mode: 'local'`
+   *     （`AuthPanel.tsx:395` 的 `centralExplicitLocal`，2026-10-24 紧急回退那一条）。
+   *
+   * ⇒ 这里装的是后者：`mode:'local'`。`loginPath` 必须逐字等于
+   * `CENTRAL_AUTH_PATHS.start`（`central-auth.ts:60-64` 会校验），`documentVersion` 允许 null。
+   * ⚠️ 想让**中心认证**那一屏被测，用 `auth-simple-ux.spec.ts` 自己的路由（它回 `mode:'oidc'`），
+   *    别改这里；也别把它改成"塞一份已登录凭据"——那会让身份入口整个消失
+   *    （实测：`sync-signin-entry` 不在菜单里）。
+   */
+  await page.route('**/api/auth/central/config', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ mode: 'local', loginPath: '/api/auth/oidc/start', documentVersion: null }),
+    }));
+
   const entry = page.getByTestId('sync-signin-entry');
   if (!(await entry.isVisible().catch(() => false))) {
     await page.getByTestId('account-menu-avatar').click();
