@@ -19,9 +19,9 @@
       "stat_f_bsd": {
         "count": 3,
         "lines": [
-          97,
-          181,
-          317
+          100,
+          184,
+          320
         ]
       }
     },
@@ -86,32 +86,6 @@
         "lines": [
           18,
           155
-        ]
-      }
-    },
-    "research/tools/calendar-line-commit-only-arms.sh": {
-      "md5_bsd": {
-        "count": 19,
-        "lines": [
-          844,
-          846,
-          868,
-          872,
-          886,
-          888,
-          964,
-          967,
-          977,
-          979,
-          991,
-          994,
-          1015,
-          1045,
-          1047,
-          1106,
-          1108,
-          1135,
-          1138
         ]
       }
     },
@@ -221,34 +195,6 @@
         "count": 1,
         "lines": [
           27
-        ]
-      }
-    },
-    "research/tools/r17-evidence-md5-check.sh": {
-      "md5_bsd": {
-        "count": 10,
-        "lines": [
-          199,
-          277,
-          302,
-          360,
-          367,
-          455,
-          477,
-          526,
-          556,
-          576
-        ]
-      }
-    },
-    "research/tools/r17-reshoot-stale.sh": {
-      "md5_bsd": {
-        "count": 4,
-        "lines": [
-          134,
-          201,
-          238,
-          368
         ]
       }
     },
