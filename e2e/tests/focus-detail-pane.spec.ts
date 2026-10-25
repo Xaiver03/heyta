@@ -96,11 +96,30 @@ test.describe('专注详情面', () => {
     // 🔴 落位之后才轮到这一条：**视觉上高亮的那一格**必须就是当前视图。
     // 它和上面那些判据不重复 —— 上面量的是详情列，这一条量的是"外壳说的当前视图"
     // 与"眼睛看见的高亮"是否同一件事（F3 那张过渡帧的图正是这两者不一致的样子）。
-    const highlighted = await page.evaluate(() =>
-      Array.from(document.querySelectorAll<HTMLElement>('.ht-rail__tab'))
-        .filter((el) => getComputedStyle(el).backgroundColor !== 'rgba(0, 0, 0, 0)')
-        .map((el) => (el.textContent ?? '').trim().slice(0, 4)),
-    );
+    /*
+     * 🔴 2026-10-25 改读数口径（**不是放宽**）：这条原来用"背景色不是透明"认高亮的那一格。
+     * 而 `.ht-rail__tab--active` 现在是 `background: transparent` —— 选中态**只由图标颜色表达**
+     * （`inbox.css:580-589`，注释原话："Selection is carried by the icon alone. The hit box
+     * stays quiet so a rail with several destinations reads as one centered icon column."）。
+     * 于是旧读法在任何视图下都读成 `[]`，红起来像是"rail 没高亮"，其实是**探针过期**。
+     * 现在按同一份 CSS 的语义量：图标颜色等于主色 ⇒ 那一格是高亮的那一格。
+     */
+    const highlighted = await page.evaluate(() => {
+      const primary = getComputedStyle(document.documentElement).getPropertyValue('--ht-color-primary').trim();
+      const probe = document.createElement('span');
+      probe.style.color = primary;
+      document.body.appendChild(probe);
+      const primaryRgb = getComputedStyle(probe).color;
+      probe.remove();
+      return Array.from(document.querySelectorAll<HTMLElement>('.ht-rail__tab'))
+        .filter((el) => {
+          const icon = el.querySelector('svg');
+          if (icon === null) return false;
+          const color = getComputedStyle(icon).color;
+          return color === primaryRgb || color === primary;
+        })
+        .map((el) => (el.textContent ?? '').trim().slice(0, 4));
+    });
     expect(
       highlighted,
       `rail 上高亮的格子不是当前视图（读到 ${JSON.stringify(highlighted)}，应为「番茄钟」；` +

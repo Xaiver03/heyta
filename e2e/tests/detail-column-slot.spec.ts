@@ -18,7 +18,7 @@
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { openApp, parkCursor, showDetailColumnContent, switchView } from './helpers';
+import { addTask, openApp, parkCursor, showDetailColumnContent, switchView } from './helpers';
 
 /** 控制台错误收集：监听必须**在导航之前**挂上，否则加载期错误收不到
  *  （§6.2 规定一第 3 条：`控制台无内容` 是最误导人的结果）。 */
@@ -138,11 +138,21 @@ test.describe('详情列槽位', () => {
        把轨道改成字面量 `24rem` 只动两轨那一行 ⇒ 两条用例全绿（实测 2 passed）。
        "两条判据都绿"当时被读成"宽度判据有牙"，其实量的是同一行声明两遍。 */
     const shell = page.locator('.ht-app').first();
-    // 2026-10-06：从「四象限」改成「习惯」。改的**不是**这条判据要量的那一行声明
-    // （两轨、无范围列 —— 下面那条 `not.toMatch(/ht-app--with-sidebar/)` 仍在原地盯着），
-    // 而是"这一栏得先有东西可画"：详情列现在没内容就不占位（工单 H10 第一刀），
-    // 而习惯面单是**始终挂载**的那一枚（`App.tsx` 里那句"没选中时它仍然挂载"）。
-    await switchView(page, '习惯');
+    /*
+     * 🔴 2026-10-25 换视图（量的仍是**两轨那一行声明**，不是放宽）：从「习惯」换成「四象限」。
+     * 「习惯」这一面现在**整列都不排版**（实测 1280×720：`.ht-app__detail` `display: none`、
+     * 轨道 `64px 1216px 0px`）—— 也就是说那一面早就没有"详情列"这件事可量了，
+     * 这条用例在它上面红在"界面上没有 detail-column"，读起来像槽位坏了。
+     * 「四象限」也是两轨（`not.toMatch(/ht-app--with-sidebar/)` 原地盯着），
+     * 而它在**选中一条任务之后**会把面单放进那一栏（`taskPaneInColumn` 的宽档那一支）——
+     * 于是"这一栏贴边、宽度走 token"仍然量得到。
+     */
+    // ⚠️ 任务要在**任务视图**里建（四象限没有捕获条），建完再切过去。
+    await addTask(page, '两轨槽位甲');
+    await switchView(page, '四象限');
+    const quadrantCard = page.locator('[data-testid^="task-item-"]').first();
+    await expect(quadrantCard, '四象限里没有那一条任务 ⇒ 选中不了，详情列也就不会出现').toBeVisible();
+    await quadrantCard.click();
     // 切换与前提**同一件事**：这一面必须丢掉 `--with-sidebar`，
     // 否则量的又是四轨那行，这条用例等于把上一条复制一遍。
     await expect
