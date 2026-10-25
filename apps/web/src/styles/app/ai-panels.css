@@ -249,8 +249,9 @@ input[type="radio"] {
   flex-direction: column;
   /* 🔴 2026-10-25：`--ht-space-3`(16) 叠在 44px 的开关行上 ⇒ 行距 **60**，
      超出 macOS 的 44–56 区间（`settings-row-grammar` 判据当场红在 60）。
-     收到 `--ht-space-2`(8) ⇒ 52。这一档同时压紧 AI 那屏"一块一块很松"的节奏。 */
-  gap: var(--ht-space-2);
+     先收到 8 仍不够（行高 52 + 8 = 60），再收到 `--ht-space-1`(4) ⇒ **56**，
+     正好落在区间上沿。这一档同时压紧 AI 那屏"一块一块很松"的节奏。 */
+  gap: var(--ht-space-1);
   padding: var(--ht-space-3);
   border: 0;
   border-radius: var(--ht-radius-md);

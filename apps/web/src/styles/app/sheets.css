@@ -993,7 +993,9 @@
 .ht-settings--cards > .ht-ai-card {
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-4);
+  /* 行高 52（标签可能两行）+ gap 4 = 56，正好落在 macOS 的 44–56 上沿；
+     16 时是 60，判据红在 60（2026-10-25 实测）。 */
+  gap: var(--ht-space-1);
 }
 
 /* 卡片**之间**：不用分隔线（卡片的边就是分隔），也不用上边距（`gap` 管了）。 */
