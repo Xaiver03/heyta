@@ -91,7 +91,14 @@ test('线上 /admin 未登录：给的是"进不去"的一句话，而后台端�
   // 钉死中文会得到一条只在默认语言下才成立的假判据。
   await expect(page.getByTestId('admin-console')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('admin-panel')).toHaveCount(0);
-  await expect(page.getByTestId('admin-console-reason')).not.toHaveText('');
+  const reason = page.getByTestId('admin-console-reason');
+  await expect(reason).not.toHaveText('');
+  // 🔴 这一句是**线上量出来的**那条缺陷的形状（2026-10-25 第一次跑就是红的在这里）：
+  // 未登录时 `baseUrl` 也还是空，于是那一屏说的是"没有配置服务器地址"，
+  // 把一个人支去查一个没坏的配置。真实原因是没会话 —— 判它"不许指向服务器地址"，
+  // 而不是判它"必须含某句中文"：这一页跟着界面语言走，钉死字面会得到一条
+  // 只在默认语言下成立的假判据。
+  expect(await reason.innerText()).not.toMatch(/服务器地址|server address/iu);
   await page.screenshot({ path: `${SHOT_DIR}/live-admin-logged-out.png`, fullPage: true });
 
   expect(errors, `页面报错：\n${errors.join('\n')}`).toEqual([]);

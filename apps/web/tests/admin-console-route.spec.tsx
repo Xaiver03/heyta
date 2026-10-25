@@ -254,6 +254,20 @@ describe('🔴 非管理员 / 未登录在 /admin 上', () => {
     expect(seen.filter((url) => url.includes('/api/admin'))).toHaveLength(0);
     expect(el.textContent).toContain('尚未登录');
   });
+
+  it('🔴 未登录**且**地址也还没填（线上未登录那一屏的真实形状）⇒ 仍然只许说"尚未登录"', async () => {
+    // 2026-10-25 线上取证抓到的：官方构建里 `baseUrl` 是账号态填进来的，
+    // 所以没登录时它**必然**也是空 —— 而那一屏当时给的是
+    // "没有配置服务器地址，管理后台不可用"，把一个人支去查一个没坏的配置。
+    // 上面那条判据（地址在、令牌没）盖不住这一格：两格都为空时，
+    // 谁先判就是谁说了算，而先判的必须是令牌。
+    useSyncStore.setState({ baseUrl: '', token: undefined });
+    const { el, seen } = await render(200);
+
+    expect(seen.filter((url) => url.includes('/api/admin'))).toHaveLength(0);
+    expect(el.textContent).toContain('尚未登录');
+    expect(el.textContent).not.toContain('服务器地址');
+  });
 });
 
 /**

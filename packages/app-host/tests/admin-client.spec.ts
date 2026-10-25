@@ -82,6 +82,20 @@ describe('🔴 不发无谓的请求', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it('🔴 两格同时为空（未登录打开 `/admin` 的真实形状）⇒ 报"尚未登录"，不报"没配地址"', async () => {
+    // 官方构建里 `baseUrl` 是账号态填进来的：没登录时它**必然**还是空。
+    // 上面那条判据（有会话 + 空地址 ⇒ unconfigured）与这一条合起来才是完整的：
+    // 只留上面那条，"先登录"这件事会被说成"去查服务器地址"。
+    const fetchImpl = stubResponse(200, {});
+
+    const result = await fetchAdminOverview(
+      withFetch(fetchImpl, { baseUrl: '', getToken: async () => undefined }),
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'no-token' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('未登录（没有令牌）⇒ 不发请求，返回 no-token', async () => {
     const fetchImpl = stubResponse(200, {});
 

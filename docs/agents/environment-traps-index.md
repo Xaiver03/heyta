@@ -57,6 +57,8 @@
 
 | 566–569 | **环境变量把被测进程换成了另一个程序 · 内存闸门 shim 的队不会自己前进 · `sandbox_apply` 被 SwiftPM 报成 Invalid manifest · 收紧 PATH 造出假红**（2026-10-25 桌面 GUI 门禁 + WinUI 门禁 + 全链逐段重跑） | #566 `ELECTRON_RUN_AS_NODE=1` 让 Electron 退化成 Node ⇒ `bad option: --remote-debugging-port=0`，看起来像被测代码起不来；先 `echo` 那个变量，修法 `env -u` · #567 `~/.tfa-shield/bin` 的 shim 把重活串行化，一条 7 秒的 spec 排 15 分钟也没轮到；判据是钟点 + 子进程 + "单独跑要多久"，绕过用 `node ./node_modules/@playwright/test/cli.js test <spec> --workers=1`，但这条读数**没经过闸门**要如实标注 · #568 已在沙箱里再套一层 seatbelt ⇒ EPERM，SwiftPM 把它报成 `Invalid manifest`；且 `swift run <exe> --disable-sandbox` 静默无效（开关要在可执行名**之前**）；同一条规则三个消费者只修了一处 ⇒ 收成 `swift-sandbox-flag.sh` 一处实现，判据是探针跑不跑得通而不是 grep 文案 · #569 逐段 runner 收紧 PATH 后 `/usr/bin/openssl` 是 LibreSSL ⇒ `backup-script.spec.ts` 红在厂商文案；产品没坏、判据拿厂商名当能力判据也不对；不一致环境的段不给那条线定性 |
 
+| 570 | **改 `packages/*` 的 `src` 后，消费方 jsdom 测试读的还是 `dist` 那份旧编译产物**（2026-10-25 后台"未登录说成没配服务器地址"那一格） | #570 新判据第一次跑就红、且红在**修前那句文案**上 —— 不是判据写错，是 `apps/web` 解析 `@heyta/app-host` 走包构建产物；`pnpm --filter @heyta/app-host build` 一跑立刻绿。跨包改 src 后先构建被改的包再验消费方；"包内绿、跨包红"不是矛盾，是两条臂量的是两份字节（包内测试 `import '../src/...'`） |
+
 三条**元规则**（跨条目通用，先读这个再查号）：
 
 1. **先怀疑探针** —— "没观测到 X" ≠ "X 没发生"；探针坏、探针够不着、探针被顶掉，

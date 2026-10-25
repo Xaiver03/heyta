@@ -320,10 +320,14 @@ async function adminRequest<T>(
   path: string,
   init?: { method: AdminRequestMethod; body?: unknown },
 ): Promise<AdminResult<T>> {
-  if (options.baseUrl.trim() === '') return { ok: false, reason: 'unconfigured' };
-
+  // 🔴 先问**有没有会话**，再问有没有地址。两格同时为空的时候（未登录打开 `/admin`
+  // 就是这个形状：官方构建的 `baseUrl` 是账号态填进来的，没登录时它必然还是空）
+  // 报"没有配置服务器地址"会让人去查一个没坏的配置，而真正的前一步是登录。
+  // 反过来不成立：有会话而地址为空是自托管真配错了，那时 `unconfigured` 才是对的。
   const token = await options.getToken();
   if (token === undefined || token === '') return { ok: false, reason: 'no-token' };
+
+  if (options.baseUrl.trim() === '') return { ok: false, reason: 'unconfigured' };
 
   const fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
   const headers: Record<string, string> = { authorization: `Bearer ${token}` };
