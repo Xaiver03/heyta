@@ -1,5 +1,8 @@
-. "$(cd "$(dirname "$0")" && pwd)/lib/md5q.sh"
 #!/usr/bin/env bash
+
+# 跨平台 md5：实现只有一处（lib/md5q.sh），这里只调 md5q / md5q_stdin。
+# ⚠️ 注释里**别**写那两条平台专属命令的字面 —— `check:shell-portability` 按文本扫站点，连注释一起算。
+. "$(cd "$(dirname "$0")" && pwd)/lib/md5q.sh"
 # calendar-line-commit-plan.sh 的 `--confirm` 那一腿的装置验证。
 #    ⚠️ **臂数不写在这份说明里**（写过一次"八臂"，加第 九 臂那天就漂了）—— 现量取最后一行 `== 合计 pass=… fail=… ==`。
 #

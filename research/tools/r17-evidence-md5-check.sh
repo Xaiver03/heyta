@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# 跨平台 md5（macOS `md5 -q` / Linux `md5sum`）。实现只有一处，见 lib/md5q.sh。
+# 跨平台 md5：实现只有一处（lib/md5q.sh），这里只调 md5q / md5q_stdin。
+# ⚠️ 注释里**别**写那两条平台专属命令的字面 —— `check:shell-portability` 按文本扫站点，连注释一起算。
 . "$(cd "$(dirname "$0")" && pwd)/lib/md5q.sh"
+
 # 证据 README 里"记的 md5 == 盘上字节"的常驻对账。
 #
 # 为什么需要它（2026-10-04 05:3x / 05:4x 两轮实测）：
