@@ -902,3 +902,49 @@ $env:HEYTA_OPEN_SETTINGS=1; $env:HEYTA_SETTINGS_STANDALONE="settings-group-ai"
 （`docs/plans/multi-end-unified-strategy.md` §6.3-T3：等三个原生壳的壳级门禁替换它的断言）。
 
 给一个待退役的壳新写一套宿主，收益是负的。这一项按"不发明需求"处理，并在这一节留痕。
+
+### 14.4 Electron 独立设置窗口（同日补做）
+
+上一轮我判定「不做」，理由是 `apps/desktop/renderer` 只是最小 M2 切片、不载 `apps/web`。
+产品负责人要求"把剩下的也做了"之后重新看了一遍：**窗口那一半是可以做的** ——
+只要让设置窗口去载 `web/dist`，主窗口维持 M2 切片不动（那条有 GUI 门禁盯着）。
+
+`apps/desktop/src/main.ts` 新增：
+- `createSettingsWindow()`：900×640、无 parent（可拖到另一块屏）、`ready-to-show` 再显示、
+  关掉不销毁实例（⌘, 再按只是提到前面）、产物缺席时载一张**说明缺什么**的 data: 页而不是白窗。
+- 入口两条：`HEYTA_OPEN_SETTINGS=1`（与 macOS/Windows 同名同义）+ 主窗口的 ⌘, / Ctrl+,
+  （`before-input-event` 拦一个组合键；**不重建应用菜单** —— 重建就得把复制/粘贴那些 role 一条条补回来，漏一条就是"粘贴忽然不好使"）。
+- `resolveWebRoot()`：`HEYTA_WEB_ROOT` 优先，否则 `apps/web/dist` —— 与两个原生壳同一优先级顺序。
+
+🔴 **踩到的坑（值得单独记）**：第一版用 `loadFile()`（`file://`）载设置页，
+窗口里是**启动闪屏卡死**，不报错、不白屏、就是不动。
+根因：`file://` 是**不透明 origin**，页面拿不到 IndexedDB，而 App 启动第一步就是开本地库。
+修法：`protocol.registerSchemesAsPrivileged([{scheme:'heyta', privileges:{standard:true, secure:true, …}}])`
++ `protocol.handle('heyta', …)` 把 `heyta://app/index.html` 映射到产物目录（带目录逃逸防护）。
+登记成 `standard + secure` 之后它就是正常 origin，存储可用 —— 不需要为设置窗口再造一套宿主。
+
+**本机实测**：`pnpm --filter @heyta/desktop build` 通过；以
+`env -u ELECTRON_RUN_AS_NODE HEYTA_OPEN_SETTINGS=1 HEYTA_DESKTOP_NO_FOCUS=1 …` 启动后
+`window-id.swift` 列出两个窗口（主 1100×760、设置 **900×640**），
+截图 `apps/web/evidence/settings-redesign/electron-settings-window.png`
+显示的是真设置界面（左栏带图标 + AI 与集成），上面叠着首启的联网同意（新 profile 的正常行为）。
+
+⚠️ 顺带记一条环境坑：这台机器的 shell 里带着 `ELECTRON_RUN_AS_NODE=1`，
+直接跑 `electron dist/main.cjs` 会**退化成 Node**（报 `Cannot read properties of undefined (reading 'requestSingleInstanceLock')`）。
+取证时要 `env -u ELECTRON_RUN_AS_NODE`。
+
+### 14.5 快捷键判定抽成纯函数（可单测）
+
+`⌘,` 那条判断原来埋在 `before-input-event` 回调里，只有"真起窗口 + 真给焦点 + 真灌键盘事件"
+才走得到。抽成 `apps/desktop/src/settings-shortcut.ts#isSettingsShortcut(input, platform)` 之后，
+macOS 上就能钉住六条分支：
+
+```
+✓ macOS：⌘, 打开            ✓ macOS：Ctrl+, 不算（那边的约定是 ⌘）
+✓ Windows/Linux：Ctrl+, 开   ✓ 不带修饰键的逗号是输入，不是命令
+✓ keyUp 也带 `,`，不筛会触发两次  ✓ 别的键 + 修饰符不算
+```
+
+`apps/desktop` 全套 **43 passed（5 files）**；`pnpm --filter @heyta/desktop build` 通过。
+复跑取证：载荷换成 `settings-group-appearance` 后窗口落在「任务与显示」
+（`electron-settings-window.png` 已更新），说明 `settings=` 参数真的被解析，不是硬编码一屏。

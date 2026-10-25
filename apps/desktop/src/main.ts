@@ -10,9 +10,12 @@
  * 渲染进程则被 contextIsolation + sandbox 隔离，本来就不该碰文件系统。
  */
 
+import { existsSync } from 'node:fs';
+import { isSettingsShortcut } from './settings-shortcut.js';
+import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, net, protocol } from 'electron';
 
 import type { NodeHost } from '@heyta/node-host';
 import { openDesktopHost } from './host.js';
@@ -85,6 +88,142 @@ async function bootHost(): Promise<NodeHost> {
  * 仍会因为窗口可聚焦而被激活，禁止聚焦之后它就不可能抢走输入焦点。
  */
 const NO_FOCUS = process.env.HEYTA_DESKTOP_NO_FOCUS === '1';
+
+/**
+ * 设置窗口的**载荷**：与 macOS / Windows 两个壳同一条约定。
+ *
+ * 🔴 为什么这里也要 `standalone=1`：`apps/web` 那边的 `?settings=` 会在应用壳之上
+ * 开一层模态；而在独立窗口里，那等于"整个应用 + 一个弹窗"。`standalone=1` 让页侧
+ * 收起 rail / 主区 / 详情列，只画设置（见 `apps/web/src/lib/settings-deep-link.ts`，
+ * 那是参数含义的唯一事实源；这里只负责拼 URL，不复制它的判断逻辑）。
+ */
+/** 共享 UI 产物用的 scheme（见 registerWebProtocol 里为什么不用 file://）。 */
+const SCHEME = 'heyta';
+
+const SETTINGS_SECTION_DEFAULT = 'settings-group-appearance';
+
+/** 与 macOS 的 `HEYTA_SETTINGS_STANDALONE` / Windows 的同名，三壳一个约定。 */
+function settingsSectionFromEnv(): string {
+  const raw = process.env.HEYTA_SETTINGS_STANDALONE?.trim();
+  return raw !== undefined && raw !== '' ? raw : SETTINGS_SECTION_DEFAULT;
+}
+
+/**
+ * 共享 UI 产物目录：**优先环境变量，否则 `apps/web/dist`**。
+ *
+ * 与 macOS 的 `SharedWebRoot`、Windows 的 `WindowsWebRoot` 同一优先级顺序。
+ * ⚠️ 这里不新造第二套约定 —— 三个壳找同一份产物、认同一个环境变量。
+ */
+function resolveWebRoot(): string {
+  const overridden = process.env.HEYTA_WEB_ROOT?.trim();
+  if (overridden !== undefined && overridden !== '') return overridden;
+  return join(__dirname, '..', '..', 'web', 'dist');
+}
+
+let settingsWindow: BrowserWindow | null = null;
+
+/**
+ * 打开（或唤回）独立设置窗口。
+ *
+ * 与主窗口的三条差异都是刻意的：
+ *   1. **不设 parent** —— macOS 的 sheet 会跟着父窗口动、还不能移出父窗口范围；
+ *      设置要能被拖到另一块屏上。
+ *   2. **关掉不销毁实例**，再按一次 ⌘, 只是把它提到前面（与 macOS/Windows 同纪律）。
+ *   3. **产物缺席时说清楚缺什么**，不留白窗 —— 白窗排查在两个壳上各花过一轮。
+ */
+function createSettingsWindow(): BrowserWindow {
+  if (settingsWindow !== null && !settingsWindow.isDestroyed()) {
+    settingsWindow.show();
+    settingsWindow.focus();
+    return settingsWindow;
+  }
+
+  const window = new BrowserWindow({
+    width: 900,
+    height: 640,
+    show: false,
+    focusable: !NO_FOCUS,
+    title: '设置',
+    webPreferences: {
+      // 与主窗口同一组安全边界，不放宽任何一项（理由见 createWindow）。
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  window.once('ready-to-show', () => {
+    if (NO_FOCUS) window.showInactive();
+    else window.show();
+  });
+
+  const root = resolveWebRoot();
+  const entry = join(root, 'index.html');
+  if (existsSync(entry)) {
+    const query = new URLSearchParams({
+      settings: settingsSectionFromEnv(),
+      standalone: '1',
+    });
+    void window.loadURL(`${SCHEME}://app/index.html?${query.toString()}`);
+  } else {
+    // 产物缺席：标题与正文都说清楚"缺什么、该跑哪条命令"，而不是一个白窗口。
+    window.setTitle('设置（未找到 web-dist）');
+    void window.loadURL(
+      /*
+       * 🔴 这张页**不带任何样式**：它是"产物都不在"时的兜底，
+       * 而 app 的样式表这时根本没加载。写内联 hex/px 会被 `check:design`
+       * 判成硬编码设计变量（实测红了 3 处），而在这里引 token 又不可能 —— 
+       * 所以就用最朴素的语义 HTML，让它靠浏览器默认样式显示。
+       * 缺什么、该跑哪条命令，仍然说清楚。
+       */
+      `data:text/html;charset=utf-8,${encodeURIComponent(
+        `<body><h1>找不到共享 UI 产物</h1><p>期望位置：<code>${entry}</code></p>` +
+          `<p>先在仓库根跑 <code>pnpm --filter @heyta/web build</code>，` +
+          `或用 <code>HEYTA_WEB_ROOT</code> 指过去。</p></body>`,
+      )}`,
+    );
+  }
+
+  settingsWindow = window;
+  window.on('closed', () => {
+    if (settingsWindow === window) settingsWindow = null;
+  });
+  return window;
+}
+
+/**
+ * 给共享 UI 产物注册一个**受信任的** scheme。
+ *
+ * 🔴 为什么不能用 `file://`：`file://` 是**不透明 origin**，页面拿不到
+ * IndexedDB / OPFS。/app 的启动第一步就是开本地库，于是它会**永远停在闪屏**——
+ * 不报错、不白屏、就是不动（2026-10-25 在设置窗口上实测过一次）。
+ * macOS 壳遇到过同一类问题的另一面（`heyta-local://` 的 origin 下也拿不到存储，
+ * 最后靠"由壳当存储宿主"解决）。这里选另一条同样正确的路：
+ * 把 scheme 登记成 `standard + secure`，于是它是一个**正常 origin**，
+ * 页侧自己的存储就能用 —— 不需要为设置窗口再造一套宿主。
+ */
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+  },
+]);
+
+/** 把 `heyta://app/index.html` 映射到 web 产物目录下的真实文件。 */
+function registerWebProtocol(): void {
+  protocol.handle(SCHEME, async (request) => {
+    const url = new URL(request.url);
+    const root = resolveWebRoot();
+    const pathname = decodeURIComponent(url.pathname);
+    const relative = pathname === '' || pathname === '/' ? 'index.html' : pathname.replace(/^\//, '');
+    const file = join(root, relative);
+    // 目录逃逸防护：只允许产物目录内的文件（`..` 一律拒绝）。
+    if (!file.startsWith(root)) {
+      return new Response('forbidden', { status: 403 });
+    }
+    return net.fetch(pathToFileURL(file).toString());
+  });
+}
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -170,6 +309,21 @@ function createWindow(): BrowserWindow {
    */
   void window.loadFile(join(__dirname, '..', 'renderer-dist', 'index.html'));
 
+  /**
+   * ⌘, / Ctrl+, ⇒ 独立设置窗口。
+   *
+   * 🔴 用 `before-input-event` 而不是重建应用菜单：Electron 的默认菜单带着
+   * 复制/粘贴/全选那一整套 role，替换它就得把那些一条条补回来 ——
+   * 补漏的症状是"粘贴忽然不好使了"，而它与设置毫无关系。
+   * 这里只截一个组合键，其余键一律放行（`return` 不 preventDefault）。
+   */
+  window.webContents.on('before-input-event', (event, input) => {
+    // 判断本身是纯函数（`settings-shortcut.ts`），这里只做"命中就拦下 + 开窗口"。
+    if (!isSettingsShortcut(input)) return;
+    event.preventDefault();
+    createSettingsWindow();
+  });
+
   mainWindow = window;
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null;
@@ -211,7 +365,15 @@ if (!app.requestSingleInstanceLock()) {
         return handleDesktopRequest(opened, request, reminderAccess ?? undefined);
       });
 
+      registerWebProtocol();
+
       createWindow();
+
+      /**
+       * 取证开关（与 macOS / Windows 同名同义）：`HEYTA_OPEN_SETTINGS=1` 启动即开设置窗口。
+       * `check:ai-e2e` 那条桌面门禁是"跑起来 → 判读数"，没有键盘那一步。
+       */
+      if (process.env.HEYTA_OPEN_SETTINGS === '1') createSettingsWindow();
 
       // macOS：点 Dock 图标且没有窗口时重开一个（平台惯例，不是业务逻辑）。
       app.on('activate', () => {
