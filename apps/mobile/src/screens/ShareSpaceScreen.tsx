@@ -641,14 +641,9 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
 
   if (view === 'join') {
     // 入群屏自己是一块完整屏（标题 + 返回），嵌进来渲染，不套第二层 Screen。
-    return (
-      <JoinShareScreen
-        onBack={() => setView('space')}
-        onJoined={() => {
-          setView('space');
-        }}
-      />
-    );
+    // ⚠️ 这里**没有** `onJoined`：入群成功那一屏要留在原地给用户看一眼回执，
+    //    由用户按「关闭」回来（宿主两个回调本来就是同一件事）。
+    return <JoinShareScreen onBack={() => setView('space')} />;
   }
 
   const notices = (
