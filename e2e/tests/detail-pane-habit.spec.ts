@@ -75,6 +75,31 @@ async function paintedBox(page: Page, locator: Locator) {
 }
 
 /**
+ * 一行**`display: contents` 的容器**的可见盒子 —— 量它**孩子**的并集。
+ *
+ * 🔴 2026-10-25：`.ht-habit__pane-tools` 现在是 `display: contents`（它只是把几个按钮
+ * 交给外层的 grid 去排，自己不生成盒子）。Playwright 认为它"可见"（子元素画得出来），
+ * 但 `boundingBox()` 返回 **null** —— H7 就是这么红的：
+ * `元素"可见"却量不到 boundingBox`。
+ * 判据要的是"这一排工具落在头行里、且与它说的卡片之间没有一整段空白"，
+ * 所以量**它孩子的并集**才是这句话本身。孩子一个都没画出来时返回 null，
+ * 让调用点用一句人话红掉（而不是拿 0 盒子继续算）。
+ */
+async function paintedUnionOfChildren(locator: Locator) {
+  return locator.evaluate((el) => {
+    const boxes = Array.from(el.children)
+      .map((child) => child.getBoundingClientRect())
+      .filter((b) => b.width > 0 && b.height > 0);
+    if (boxes.length === 0) return null;
+    const left = Math.min(...boxes.map((b) => b.left));
+    const right = Math.max(...boxes.map((b) => b.right));
+    const top = Math.min(...boxes.map((b) => b.top));
+    const bottom = Math.max(...boxes.map((b) => b.bottom));
+    return { x: left, y: top, width: right - left, height: bottom - top };
+  });
+}
+
+/**
  * `.ht-habit` 这一趟**实际用了几根列轨道**（计算值，不是源码里那行声明）。
  *
  * 🔴 为什么不能只读源码：CSSOM 报的是** resolved 值**，`grid-template-columns`
@@ -451,7 +476,8 @@ test.describe('习惯面单落进详情列', () => {
 
     const pane = paneInColumn(page);
     const head = await paintedBox(page, pane.locator('.ht-habit__pane-head'));
-    const tools = await paintedBox(page, pane.locator('.ht-habit__pane-tools'));
+    const tools = await paintedUnionOfChildren(pane.locator('.ht-habit__pane-tools'));
+    expect(tools, '这一排工具一个孩子都没画出来 ⇒ 下面两条没有基准').not.toBeNull();
     expect(
       tools.y >= head.y - 1 && tools.y + tools.height <= head.y + head.height + 1,
       `工具跑出头行盒子（头行 ${String(head.y)}–${String(head.y + head.height)}，` +
