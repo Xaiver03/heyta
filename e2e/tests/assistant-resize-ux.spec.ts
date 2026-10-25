@@ -47,7 +47,51 @@ test('助手随侧栏连续拖动重排，输入区无嵌套焦点框', async ({
       }
       await page.mouse.up();
       await input.click();
-      await expect(input).toHaveCSS('outline-width', '0px');
+      /*
+       * 🔴 2026-10-25 改判据：这条原来断言输入框 `outline-width: 0px` + `border-top-width: 0px`，
+       * 也就是"输入区一点框都不画"。那个口径**已经被一次更晚的、有据可查的无障碍决定取代**：
+       * `borderless-controls.css:44-51`（2026-10-24）给**所有文本输入的键盘焦点**补回了
+       * 可见焦点环，理由是两条 AA：WCAG 2.4.7（Focus Visible）与 1.4.11 的 Boundaries 一节
+       * （"控件可以不画边界，但焦点指示必须够对比"）。那次改动的注释里写着它顶着"无描边"
+       * 观感 —— 所以现在输入框拿到焦点**就该有** 2px 的主色环。
+       *
+       * 这条判据要防的事没变，只是要量的东西变了：**不许嵌套两层焦点框**
+       * （输入框一层 + 外层 composer 再来一层）。所以现在量两件事：
+       *   ① 输入框自己的焦点环 = 全局那一条（`--ht-border-width-thick`，2px）；
+       *   ② 外层 `.ht-ai__composer` **没有** outline（层叠两层会在拐角处露双线）。
+       */
+      const ring = await page.evaluate(() => {
+        const inputEl = document.querySelector('[data-testid="ai-assistant-input"]');
+        const composer = inputEl?.closest('.ht-ai__composer') ?? null;
+        if (inputEl === null || composer === null) return null;
+        const inputStyle = getComputedStyle(inputEl);
+        const composerStyle = getComputedStyle(composer);
+        return {
+          inputOutlineWidth: inputStyle.outlineWidth,
+          inputOutlineStyle: inputStyle.outlineStyle,
+          // ⚠️ 别用 `outline-width` 判"有没有画框"：`outline-style` 为 none 时
+          //    Chrome 仍把 `outline-width` 报成初始值 `medium`（= 3px），
+          //    于是"没画"会被读成"画了一条 3px"（这一条我当场踩了）。
+          composerOutlineStyle: composerStyle.outlineStyle,
+          composerOutlineWidth: composerStyle.outlineWidth,
+          focused: document.activeElement === inputEl,
+          ringToken: getComputedStyle(document.documentElement).getPropertyValue('--ht-border-width-thick').trim(),
+        };
+      });
+      expect(ring, '量不到输入框或 composer ⇒ 这一条没有基准').not.toBeNull();
+      expect(ring!.focused, '输入框没拿到焦点 ⇒ 焦点环这一条无从谈起').toBe(true);
+      expect(
+        ring!.inputOutlineWidth,
+        '输入框的焦点环不见了 ⇒ 键盘用户看不出焦点在哪（WCAG 2.4.7）',
+      ).toBe(ring!.ringToken);
+      expect(
+        ring!.inputOutlineStyle,
+        '焦点环被改成 none ⇒ 等于没画',
+      ).not.toBe('none');
+      expect(
+        ring!.composerOutlineStyle,
+        '外层 composer 也画了 outline ⇒ 输入区出现嵌套双框（这条判据防的就是它）',
+      ).toBe('none');
       await expect(input).toHaveCSS('border-top-width', '0px');
       await page.screenshot({ path: `${evidence}/${theme}-${target}.png` });
     }
