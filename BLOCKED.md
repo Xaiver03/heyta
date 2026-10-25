@@ -12122,3 +12122,31 @@ if (!isOfficialService) { setCentralConfig(null); return; }
 
 ⇒ e2e 这一侧已经**没有"判据过期"型的红**了：剩下的两条都是同一个真实布局缺陷的两个观测面。
 B229 修掉，这两条会一起绿。
+
+## B230（2026-10-25 深夜 · 权威读数终于拿到了）：**串行全量 408 passed / 13 failed / 1 skipped（41.3 分钟）**
+
+这是 B227 一直缺的那个数（此前只有并跑读数）。命令与判定口径写死在这里：
+
+    cd e2e && ./node_modules/.bin/playwright test --workers=1 --retries=0 --reporter=line
+    →  13 failed / 408 passed / 1 skipped / 41.3m
+
+⇒ B227 里"73 枚红是并跑污染"那句**彻底作废**：串行下真实存量是 **13**，其中大半是本轮已经
+修掉的那些"判据过期/夹具过期"；剩下 13 条里有 2 条本轮已转绿（`task-organize` 第一条、
+`profile-avatar-e2ee`），**还剩 11**：
+
+| 用例 | 失败读数（本机当场） | 初判 |
+|---|---|---|
+| `borderless-ux` | `expect(...).toBe("0px")` | 与 `search-overlay`/`assistant-resize-ux` 同一族：把"透明边框 / 焦点环"判成描边 ⇒ 改读数口径 |
+| `calendar-capture` | `locator.click` 60s 超时 | 未查（多半也是行尾折叠面板那一族） |
+| `desktop-window` | **`Process failed to launch!`** | 环境：需要真桌面窗口（开发构建）；这台机器上不该算红 |
+| `detail-column-slot` T2 | 界面上没有 `detail-column` | 切到「习惯」后详情列不渲染 —— 要么列的出现条件变了，要么夹具缺"选中一条" |
+| `detail-pane-overlay` | 同上（设置浮层开着时） | `3fd905ec8`「设置遮蔽详情列」之后，这条"详情列在浮层外面且没被挤掉"的前提可能已经不成立（需裁决） |
+| `detail-pane-habit` H7 | 元素"可见"却量不到 `boundingBox` | 未查 |
+| `focus-detail-pane` F1 | rail 高亮读到 `[]`，应为「番茄钟」 | rail 的"当前视图"标记找不到（可能随工具段改成 tablist 变了） |
+| `habit-heatmap-labels` HL2 | 「8月」左边缘 1008 vs 那一周 990（差 18px） | 真几何漂移 |
+| `keyboard-cursor` K14 | 刷新后勾选又回来 ⇒ Space 只改本地态 | 真行为问题（或夹具没等 op 落盘） |
+| `rail-roving` | `expect(...).toBe(true)` | dnd-kit Space 传感器与 roving tabindex 的冲突，未查 |
+| `task-organize` 第二条 | 刷新后 `task-organize-summary` 定位不到 | 未查完（第一条已绿） |
+
+⚠️ **纪律**：这 11 条里凡是"读数口径过期"，都必须像 `search-overlay` 那样**改读数、不改口径**，
+并在注释里写清是哪一次产品/无障碍决定取代了旧口径 —— 不许为了变绿把断言放宽。
