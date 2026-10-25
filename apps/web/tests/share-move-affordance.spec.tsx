@@ -120,6 +120,27 @@ describe('「换清单」这个动作在共享边界上摆不摆出来', () => {
     expect(note!.textContent).toContain('共享清单里的任务暂时不能换清单');
   });
 
+  it('🔴 收集箱里的任务 ⇒ 下拉必须能用（这正是"整理"最常见的主体）', () => {
+    /*
+     * 2026-10-25 补这一档：原来的两档覆盖的是"共享任务"与"个人任务已经在清单里"，
+     * 恰好漏掉"任务还在收集箱"。而 `moveUnavailable` 上一版把收集箱任务整枚灰掉了
+     * （`inboxBlocked === false ? task.projectId === undefined : …`），
+     * 于是这个洞没有任何一条判据会红 —— 是 `detail-pane-task` 的 T14/T15 把它抓出来的
+     * （`selectOption` 一直等 "visible and enabled"）。
+     */
+    holder.state = viewState();
+    const state = holder.state as MaterializedState;
+    Object.assign(state.tasks as object, {
+      tInbox: { id: 'tInbox', title: '还没归类', createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000 },
+    });
+    seedProjectStore();
+    const el = renderField((state.tasks as Record<string, Task>).tInbox!);
+    const select = el.querySelector<HTMLSelectElement>('[data-testid="organize-project-select"]');
+    expect(select, '整理那一格里没有这枚下拉').not.toBeNull();
+    expect(select!.disabled, '收集箱里的任务被整枚灰掉 ⇒ 归不了类（这就是当初那个洞）').toBe(false);
+    expect(el.querySelector('[data-testid="organize-move-blocked"]'), '没撞门就不许出现那句话').toBeNull();
+  });
+
   it('反向臂：个人任务那枚下拉照旧能用，只有共享那条目的地是灰的', () => {
     holder.state = viewState();
     seedProjectStore();
