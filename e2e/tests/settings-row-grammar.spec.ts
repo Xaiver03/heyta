@@ -14,18 +14,37 @@ import { openApp } from './helpers';
  *   · 行距中位数落在 44–56（macOS 设置的行高区间）
  *   · 侧栏 240±8、内容区 ≥ 80% 宽（两级导航，不是三层、不是半屏留白）
  */
-test('设置中心：一屏只有一种行', async ({ page }) => {
+const SECTIONS = [
+  'settings-group-appearance',
+  'settings-group-ai',
+  'settings-group-sync',
+  'settings-group-data',
+  'settings-group-account',
+  'settings-group-help',
+] as const;
+
+for (const section of SECTIONS) {
+test(`设置中心：一屏只有一种行（${section}）`, async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openApp(page, '/?lang=zh-CN');
   await page.getByTestId('account-menu-avatar').click();
   await page.getByTestId('account-menu-settings').click();
   const sheet = page.getByTestId('settings-sheet');
   await expect(sheet).toBeVisible();
-  await sheet.locator('[aria-controls="settings-group-appearance"]').click();
+  await sheet.locator(`[aria-controls="${section}"]`).click();
 
-  const m = await sheet.evaluate((root) => {
-    const rows = [...root.querySelectorAll('.ht-settings__preference-row')]
-      .filter((r) => r.getBoundingClientRect().height > 0);
+  const m = await sheet.evaluate((root, PANE_ID) => {
+    /**
+     * 🔴 行**不止一种原语**，这一格必须把三种都算进来 —— 否则只有 appearance 那节
+     * 量得到（12 行），其余 5 节 rows=0 被上一版的 SKIP 分支静默吞掉，
+     * 判据就成了"只有一节永远通过"。2026-10-25 现量就是这么被自己骗过一次。
+     *   1. `.ht-settings__preference-row`（新外壳的行：标签左 / 尾控件）
+     *   2. `.ht-settings__toggle`（AI 那屏的旧行：☐ + 标签）
+     *   3. `.ht-settings__row`（更早的行原语）
+     */
+    const rows = [...root.querySelectorAll(
+      '.ht-settings__preference-row, .ht-settings__toggle, .ht-settings__row',
+    )].filter((r) => r.getBoundingClientRect().height > 0);
     const pick = (row: Element) => {
       // 行的形状是"左标签 + 右控件"，控件是最后一个有尺寸的子元素（radio 组 / 文字按钮 / 开关都算）。
       const kids = [...row.children].filter((e) => e.getBoundingClientRect().width > 0);
@@ -45,7 +64,7 @@ test('设置中心：一屏只有一种行', async ({ page }) => {
     };
     const data = rows.map(pick);
     const nav = root.querySelector('.ht-settings__nav')?.getBoundingClientRect();
-    const pane = root.querySelector('#settings-group-appearance')?.getBoundingClientRect();
+    const pane = root.querySelector('#' + PANE_ID)?.getBoundingClientRect();
     const box = root.getBoundingClientRect();
     const uniq = (xs: Array<number | null>) => [...new Set(xs.filter((v): v is number => v != null))];
     const pitches = data.map((d, i) => (i > 0 ? d.rowTop - data[i - 1]!.rowTop : 0)).filter((v) => v > 0);
@@ -87,18 +106,42 @@ test('设置中心：一屏只有一种行', async ({ page }) => {
       cardsGrids: root.querySelectorAll('.ht-settings__cards').length,
       preferenceRows: rows.length,
     };
-  });
-  console.log(`SETTINGS_SHAPE ${JSON.stringify(m)}`);
+  }, section);
+  console.log(`SETTINGS_SHAPE ${section} ${JSON.stringify(m)}`);
 
-  expect(m.rows, '这一节至少要几行才量得出形状').toBeGreaterThan(2);
+  /**
+   * 样本不足的节（例如「关于与帮助」）**不判形状**，但要出声。
+   * 🔴 为什么不直接 `expect(rows).toBeGreaterThan(2)`：那会让门禁因为
+   * "这一节本来就没几行"而假红 —— 假红比没有判据更糟（本仓 §7 元规则二）。
+   * 也不静默跳过：跳过而不打印，下一个人会以为那一节验过了。
+   */
+  /*
+    🔴 版面那三条（侧栏宽 / 右侧死区 / 一种列表语法）**先判**，它们不需要"行"这个样本。
+    2026-10-25 实测：参数化到六个分节之后，其中五节**一行 preference-row 都没有**，
+    原来的 `if (rows < 3) return` 让它们连侧栏宽和死区都没量过 —— 六条判据里五条是
+    "跑过了但什么都没验"。跳过要出声，但**能量的必须量**。
+  */
+  expect(m.navWidth!, `[${section}] 侧栏 200–260（macOS 参考区间）`).toBeGreaterThanOrEqual(200);
+  expect(m.navWidth!).toBeLessThanOrEqual(260);
+  expect(m.rightGap!, `[${section}] 面板右侧死区 ≤ 48px`).toBeLessThanOrEqual(48);
+  expect(m.cardsGrids, `[${section}] 同一节不许并存两种列表语法（行 + 复选卡网格）`).toBe(0);
+
+  if (m.rows < 3) {
+    // 1–2 行是**样本不完整**（不是"这一节本来就没有行"）：那种情形下"形状一致"
+    // 可能只是因为恰好一样，判据会变成恒真 —— 所以要求它是 **0**。
+    expect(
+      m.rows,
+      `[${section}] 有 ${m.rows} 行 preference-row —— 样本 < 3 时"形状一致"证明不了什么，`
+        + '要么补行，要么让这一节明确地不含这种行',
+    ).toBe(0);
+    console.log(`SETTINGS_SHAPE_SKIP ${section} rows=0（这一节没有 preference-row；版面三条已判）`);
+    return;
+  }
   // 🔴 控件是**尾部对齐**的：右缘必须唯一，左缘本来就该随控件宽度不同。
   // 我第一版写成了"左缘唯一"，那会逼着人把控件改成左对齐 —— 错判据比没有判据更糟。
   expect(m.rights, '同行控件右缘必须唯一').toHaveLength(1);
   expect(m.heights.length, '控件高度档位 ≤ 2').toBeLessThanOrEqual(2);
   expect(m.medianPitch!, '行距中位数 44–56').toBeGreaterThanOrEqual(44);
   expect(m.medianPitch!).toBeLessThanOrEqual(56);
-  expect(m.navWidth!, '侧栏 200–260（macOS 参考区间）').toBeGreaterThanOrEqual(200);
-  expect(m.navWidth!).toBeLessThanOrEqual(260);
-  expect(m.rightGap!, '面板右侧死区 ≤ 48px').toBeLessThanOrEqual(48);
-  expect(m.cardsGrids, '同一节不许并存两种列表语法（行 + 复选卡网格）').toBe(0);
 });
+}

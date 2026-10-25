@@ -751,3 +751,66 @@ heyta 服务端 → https://heyta.waytofuture.cn/managed-ai/v1/chat/completions
 
 带**真实登录会话**走一次 heyta 自己的 `/api/ai/managed/chat`（要账号 + 订阅权益）。
 配置侧与上游侧各有独立证据，但"用户点一下能用"没实测过 —— 第一次真实使用要盯。
+
+---
+
+## 十三、设置中心重做 + 独立窗口（2026-10-25）
+
+### 13.1 先把"乱"变成判据
+
+`e2e/tests/settings-row-grammar.spec.ts`：量「一屏只有一种行」。
+
+| 判据 | 改前 | 改后 |
+|---|---|---|
+| 行距中位数 | **85px** | **53–54px**（目标 44–56） |
+| 内容右边界死区 | 205px（被 `--ht-layout-prose-max` 锁住） | **0px** |
+| 同节列表语法 | 2 种（4 行 + 8 个两列复选卡） | **1 种**（12 行同构） |
+| 控件高度档位 | 3 档（含 13px 原生方框） | **2 档**（44/52） |
+| 控件右缘 | 2 个值 | **唯一 1267** |
+| 侧栏宽 | 224 | 224（本来就对；我先目测成 400，是错的） |
+
+🔴 **我自己写错过一次判据**：第一版量"控件**左**缘唯一"，而控件是尾部对齐的
+（左缘本来就该随宽度不同）。真按那条改会把一屏控件全拽成左对齐。
+正确口径是**右缘唯一**。
+
+三条根因（都是结构，不是配色）：
+1. `.ht-settings__content { max-inline-size: var(--ht-layout-prose-max) }` —— 设置套了**正文行宽**；
+2. 行内 `padding-block: --ht-space-3`（16×2）叠在 44px 控件上 ⇒ 85px；
+3. 「功能模块」8 个复选卡是**第二种列表语法**。
+
+### 13.2 三处"用户指出来的乱"与它们的根因
+
+| 现象 | 根因 | 修法 |
+|---|---|---|
+| 一张卡里只有 🔒 和一个 `?`，正文没有 | `key-notice` 把**整段说明塞进 `SettingsInfoTip`**，且 label 与 text 同一个键 | 可见短标签 + 长句进 tip。⚠️ 直接显示长句会被 `check:settings-prose` 判红（该门禁明确"`role="status"` 里仍然是那句话"） |
+| 「创建规则」按钮像默认出现、顺序怪 | 不是按钮：`error` 与空态**同时出现**（"读取失败"和"还没有规则"并排） | 空态加 `error === undefined` 条件 —— 失败时不许断言"空" |
+| 规则时区全是英文 | 选项直接渲染 IANA id | `formatTimezoneLabel(zone, locale)` → **中国标准时间（Asia/Shanghai）**；值仍是 IANA id |
+| 「AI 与集成」每行是 `☐ 标签` | `.ht-settings__toggle-hit` 的 checkbox 在文字前 | `flex-direction: row-reverse` + `space-between` ⇒ 与其它设置同一套"标签 / 尾控件"语法 |
+
+### 13.3 独立窗口（macOS）
+
+`apps/desktop-macos`：显式 `NSWindow`（900×640）+ `CommandGroup(replacing: .appSettings)` 的「设置…」⌘,，
+载荷 = 同一份 `web-dist` 的 `index.html?settings=…&standalone=1`。
+
+🔴 **四个坑，全部实测**：
+
+1. **SwiftUI `Settings` 场景在裸二进制下没有入口**：`NSApp.sendAction(showSettingsWindow:)` 没反应
+   （`window-id.swift` 只列到主窗口），而 `Settings` 的内容又要等窗口打开才实例化 ⇒ 取证链断。
+   改显式 `NSWindow`。
+2. **`packages/app-host` 的 `native-bridge.js` 从没构建过** ⇒ `ShellStorageHost.decide()` 返回
+   `.off` ⇒ 两个 webview 都用页侧存储 ⇒ 第二个拿不到锁，页面渲染「**无法初始化本地存储**」
+   ⇒ 窗口一片空白。`node packages/app-host/scripts/build-native-bridge.mjs` + `HEYTA_BRIDGE_BUNDLE`
+   之后正常。**这条不是产品 bug，是本机缺件**（打包 .app 会带上）。
+3. `standalone` 的 CSS 第一版把 `main` 也 `display:none` ⇒ 连设置一起藏了（白窗）；
+   改成只藏 `nav.ht-rail` 与 `.ht-app__detail`，并让 `.ht-sheet` `position: fixed; inset: 0`。
+4. **账号菜单渲染在 `.ht-app` 之外**（portal），CSS 够不到 ⇒ 必须在 `AccountMenu` 渲染层返回 null。
+   ⚠️ 我第一次把 guard 插进了**参数列表**里，把文件编译坏了（`TS1005`），已修。
+
+证据：`apps/web/evidence/settings-redesign/macos-settings-window.png`（任务与显示）、
+`macos-settings-ai.png`（AI 与集成）。
+
+### 13.4 环境：内存闸门
+
+重型 e2e（playwright）本轮多次排在闸门后：`已等 540s／上限 900s`，两次没拿到租约。
+所以**浏览器读数这一格仍然是欠的**（形状判据、图标视觉、回收站对齐）。
+不拿它当已验证。
