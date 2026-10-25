@@ -5786,6 +5786,13 @@ export const zhCN = {
   'mobile.share.invite.revoke': '撤销这张邀请',
   'mobile.share.prefs.saveFailed': '共享通知偏好没有保存成功（本机存储写入失败），开关下次开机可能回到默认。',
   'mobile.share.consent.saveFailed': '「不再提示」没有落盘，下次共享还会再问一次。',
+  // 第八批（移动设备腿·逐张肉眼复核那一屏）：入群那一屏的两句话**不许复用 web 那两枚**。
+  // `web.share.join.subtitle` / `.done` 指的落点是「侧栏」——那是 web 外壳那一格的名字，手机上
+  // 没有它：加入之后能看见这份清单的地方叫「已共享的清单」（`mobile.share.space.sharedTitle`）。
+  // 同一句话在两壳指向一个不存在的地方，就是向用户谎称界面能力，所以各写一条；不把 web 那条
+  // 改成平台中立的模糊说法 —— web 用户拿到的是更准的指引，不该为手机的形状降级。
+  'mobile.share.join.subtitle': '粘贴邀请凭证或链接。接受后这份清单会出现在「已共享的清单」里，内容对双方之外的人（包括服务器）始终加密。',
+  'mobile.share.join.done': '加入成功，这份清单已经在「已共享的清单」里了。',
   'web.admin.tab.grants': '发放',
   'web.admin.grant.lead': '给一个账号发订阅只有三种动作：赠送（延长 N 天）、免费升级（只换档位，一天都不加）、收回（只收回这次发放）。它们只动「赠送」那一行，不动已经付过钱的订阅，也不会出现在营收看板里。每一次都要写理由。',
   'web.admin.grant.compose': '给一个账号发放',

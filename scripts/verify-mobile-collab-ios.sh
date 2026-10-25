@@ -434,6 +434,23 @@ wait_tree() {  # <needle> [超时秒]
   return 1
 }
 
+# 同一件事，但锚在 `AXUniqueId`（= RN 的 `testID`）上而不是界面文字上。
+# 什么时候用这一枚：断言的是"走到了哪一个相位"，而那一相位有自己独占的节点 ——
+# 拿整句文案当判据会把**装置和产品文案绑在一起**（改一个字就要重跑一趟设备）。
+# 🔴 前提：那枚 `testID` 必须挂在**可交互节点**上（`Button`/`Pressable`/`TextInput`）。
+#    挂在 `Text` 或纯容器上时 RN 不会把它落成 `AXUniqueId`（那类节点在 `describe-all` 里
+#    只有 `AXLabel`、没有 `AXUniqueId`），于是这一枚**永远不会命中** ——
+#    产品绿、装置红，而且红得像产品坏了。第 29 跑实测，见 §7 #575。
+wait_tree_id() {  # <testID> [超时秒]
+  local want="$1" timeout="${2:-90}" i=0
+  while [ "$i" -lt "$timeout" ]; do
+    tree_has_id "$want" >/dev/null 2>&1 && return 0
+    sleep 3
+    i=$((i + 3))
+  done
+  return 1
+}
+
 # SECRET_FRAMES=1 ⇒ 屏幕上正画着当趟那枚一次性恢复码 ⇒ 这一帧**不许进证据目录**
 #（证据目录是要提交进 git 的）。改落私有 RUN_DIR：默认随目录删掉，即便
 # HEYTA_COLLAB_IOS_KEEP_ARTIFACTS=1 也只留在本机 /tmp，不会被下一次提交带出去。
@@ -693,10 +710,35 @@ back_to_tabs() {
     idb_dump
     # 🔴 逐字/整段命中才算"到底部标签那一层"：子串的「我的」会抓到「我的成长, 我的成长」
     #    那一行 ⇒ "退干净了"是假的，下一步按「我的」就会落到别的行上。
+    # ⚠️ 这一枚判据只证**底部标签在场**，不证"人在该档的根"：第二层 section 里底部标签
+    #    也在场（`App.tsx:285-293` 是 `display:none` 的面板，section 挂在面板内部），而按
+    #    同一档的标签是空操作。要落到某一档/某一层的根，用 `back_to_anchor`（第 26 跑实测）。
     read -r _b_st _bx _by _blb _ben <<<"$(resolve_anchor "我的")"
     if [ "$_b_st" = "hit" ] || [ "$_b_st" = "offscreen" ]; then return 0; fi
     ax_press "关闭"
     sleep 2
+  done
+  return 1
+}
+
+# ── 用顶栏「返回」逐层退回画着某一枚锚点的那一层 ─────────────────────────────
+# 🔴 出路只有顶栏那枚「返回」（`ShareSpaceScreen.tsx:631` 的 `backAction`，文案
+#    `mobile.growth.back`=「返回」）：底部标签此刻**在树上但按了不动** —— 人已经在
+#    「我的」这一档里，再按一次同一档不改 `tab`，而共享面的层级在 `ShareSpaceScreen`
+#    自己的 state 里（列表 → 选中那份 → 任务详情，`backAction` 逐层 `setSelected/setCommentTask`）。
+#    第 26 跑实测：沿用第 6 步的"按「我的」"5 次全空转、`where_am_i` 恒为「共享清单」。
+# <到达判据（id:... 或只在目标层出现的标签）>；先量后按 ⇒ 已经在那一层上不白按。
+back_to_anchor() {
+  local arrive=$1 try=1
+  while [ "$try" -le 4 ]; do
+    if [ "${arrive#id:}" != "$arrive" ]; then
+      tree_has_id "${arrive#id:}" >/dev/null 2>&1 && return 0
+    else
+      tree_has "$arrive" >/dev/null 2>&1 && return 0
+    fi
+    ax_press "返回" || echo "     [back] 第 ${try} 次没按到「返回」"
+    sleep 2
+    try=$((try + 1))
   done
   return 1
 }
@@ -746,6 +788,26 @@ fi
 IDB_UDID="$UDID"
 export IDB_UDID
 note "设备 ${UDID}（本机已启动模拟器 $(xcrun simctl list devices booted 2>/dev/null | grep -c Booted) 台）"
+# 🔴 显式给了 `IOS_UDID` 也要现量它此刻是不是 Booted。第 27 跑就是这么烧掉两分钟的：那台设备
+#    在上一趟之后被关机，装置一路走到第 2 步的 `simctl install` 才撞出
+#    `Unable to lookup in current state: Shutdown`（domain=com.apple.CoreSimulator.SimError 405）。
+#    本线两枚脚本都**不代起设备**（起哪台要人判闲忙，见计划 §9.13 那条装机纪律），
+#    所以这里只把失法说清并给出那一条命令，不替你 boot。
+UDID_STATE=$(xcrun simctl list devices -j 2>/dev/null | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+for _rt, devs in (data.get("devices") or {}).items():
+    for d in devs:
+        if (d.get("udid") or "") == sys.argv[1]:
+            print(d.get("state") or "")
+            raise SystemExit(0)
+raise SystemExit(1)
+' "$UDID" 2>/dev/null)
+[ "${UDID_STATE:-}" = "Booted" ] \
+  || env_bail "设备 $UDID 当前状态=${UDID_STATE:-读不出}（不是 Booted）⇒ 先起它：xcrun simctl boot $UDID。本趟不判产品"
 
 OTHER=$(another_mobile_e2e_running)
 if [ -n "$OTHER" ]; then
@@ -786,6 +848,42 @@ curl -sf --noproxy '*' -m 4 "$HOST_SERVER/health" >/dev/null 2>&1 || env_bail "�
 
 # ── 2. 当前源码 Release 构建、安装、新鲜度对账 ──────────────────────────────
 step "2. 当前源码 Release 构建 + 安装（产物住临时目录，不进证据目录）"
+# 🔴 装进 bundle 的是各 workspace 包的 **`dist`**，不是 `src`。现量（2026-10-25）：
+#    移动端 `dependencies` 里那 13 枚 `@heyta/*` 的 `main`/`exports["."]` 全部指向 `./dist/…`
+#    （`@heyta/i18n`、`@heyta/ui` 都在内），metro 照 `package.json` 解析 ⇒ **改了 src 不构建，
+#    装机的就是旧产物**。第 28 跑撞上的正是这一格：改了 `packages/i18n/src/locales/*.ts`
+#    直接构建，屏幕上还是旧句子 —— 而 L1 的到达判据锚在 `testID` 上，这一格**静默通过**。
+#    （同族另一头是环境陷阱 #565：`apps/web` 的 jsdom 用例也吃 `dist`。）
+STALE_PKGS=$(python3 - "$ROOT" <<'PY'
+import json, os, sys
+root = sys.argv[1]
+pkg = json.load(open(os.path.join(root, 'apps/mobile/package.json'), encoding='utf-8'))
+names = sorted({n for sec in ('dependencies', 'devDependencies')
+                for n in (pkg.get(sec) or {}) if n.startswith('@heyta/')})
+def newest(d):
+    best = 0.0
+    for base, dirs, files in os.walk(d):
+        dirs[:] = [x for x in dirs if x != 'node_modules']
+        for f in files:
+            try:
+                best = max(best, os.stat(os.path.join(base, f)).st_mtime)
+            except OSError:
+                pass
+    return best
+stale = []
+for n in names:
+    p = os.path.join(root, 'packages', n.split('/', 1)[1])
+    s, d = os.path.join(p, 'src'), os.path.join(p, 'dist')
+    if os.path.isdir(s) and os.path.isdir(d) and newest(s) > newest(d):
+        stale.append(n)
+print(' '.join(stale))
+PY
+)
+if [ -n "${STALE_PKGS:-}" ]; then
+  _filters=''
+  for _p in $STALE_PKGS; do _filters="$_filters --filter $_p"; done
+  env_bail "这些被移动端依赖的包 src 比 dist 新 ⇒ 装进 bundle 的会是旧产物（不是产品坏）：$STALE_PKGS。先跑：pnpm $_filters build"
+fi
 rm -f -- "$DERIVED/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle"
 xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" -scheme Heyta \
   -configuration Release -sdk iphonesimulator -destination "id=$UDID" \
@@ -1209,7 +1307,17 @@ idb_dump
       > "$RUN_DIR/deliver.json" 2> "$RUN_DIR/deliver.err"
 ) &
 OWNER_LOOP_PID=$!
-if ! wait_tree "加入成功，清单已出现在侧栏。" 240; then
+# 🔴 到达判据锚在 `share-join-close-final` 这枚 `testID`（= RN 的 `testID` → `AXUniqueId`）上，
+#    不锚在整句文案上：那一相位有独占节点，而句子是产品文案 —— 第八批肉眼复核时它按平台
+#    改过（「侧栏」是 web 外壳那一格的名字，手机上画的是「已共享的清单」）。拿整句当判据
+#    等于把装置和文案绑死：改一个字就要重烧一趟稀缺的设备窗口。
+# 🔴 **锚点必须挂在可交互节点上**（`Button`/`Pressable`/`TextInput`），不能挂在 `Text` 上。
+#    第 29 跑就是这么红的：那句成功文案由 `<Text testID="share-join-done">` 画，界面上明明
+#    写着「加入成功」（`06f-加入没走到成功态.png` 拍到了），而 `describe-all` 里那枚节点是
+#    `AXStaticText`、**没有 `AXUniqueId`** —— RN 只给可访问元素（按钮那类）落 `accessibilityIdentifier`。
+#    于是产品绿、装置红。这一相位的独占可访问节点就是同屏那枚「关闭」（`JoinShareScreen`
+#    只有走到 done 分支才画它），拿它当到达判据；那句文案留给肉眼复核截图。
+if ! wait_tree_id "share-join-close-final" 240; then
   idb_dump
   shot "06f-加入没走到成功态"
   for probe in "已入群。正在等待所有者分发密钥" "邀请凭证无效或已被使用。" "共享密钥已加密保存，解锁保险库后即可继续。"; do
@@ -1238,9 +1346,12 @@ ok "服务端看到手机那一行成员 $PHONE_MEMBER，清单密钥已封给�
 
 # ── 7. 下行：owner 写的那条任务，手机不点同步就要看得见 ─────────────────────
 step "7. 下行判据（L2）：手机界面出现 owner 写的那条任务"
-back_to_tabs || { shot "07-退不到主标签层"; env_bail "退不回底部标签那一层（装置问题）"; }
-ax_press_until "我的" "id:profile-entry-share" \
-  || { shot "07b-进不去共享面"; bad "按不进「共享清单」入口"; summary; exit 1; }
+# 🔴 第 6 步末尾按「关闭」回到的是**共享主屏**（入群回执不再顺手把整块 section 关掉，
+#    与 web 同形）⇒ 人在「我的」这一档的第二层里，按底部标签是空操作。
+back_to_anchor "id:profile-entry-share" \
+  || { shot "07-退不到主标签层"; bad "按顶栏「返回」也退不出共享面 ⇒ 用户被关在第二层里"; summary; exit 1; }
+ax_press_until "id:profile-entry-share" "加入共享清单" \
+  || { shot "07b-进不去共享面"; bad "按不动「共享清单」入口"; summary; exit 1; }
 # 🔴 共享清单入口屏只是**一份共享一行**，任务/评论那一节挂在选中之后（`ShareSpaceScreen`
 #    的 `selected === undefined` 分支只画列表与偏好面）。旧写法按完入口就直接断言任务那一节
 #    ⇒ 少一步选中，判据量的是没打开过的那一屏。走 `testID`（`AXUniqueId`），不靠行名子串。

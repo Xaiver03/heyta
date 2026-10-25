@@ -5468,6 +5468,14 @@ export const en = {
   'mobile.share.invite.revoke': 'Revoke this invitation',
   'mobile.share.prefs.saveFailed': 'Share notification preferences were not saved (local storage write failed); the switches may revert on next launch.',
   'mobile.share.consent.saveFailed': '“Don’t ask again” was not saved; you will be asked again before the next share.',
+  // Batch 8 (mobile device leg, every screenshot looked at): the two join-screen sentences must not
+  // reuse the web keys. `web.share.join.subtitle` / `.done` name the “sidebar”, a web shell region a
+  // phone does not have - on this platform the joined list shows up under “Shared lists”
+  // (`mobile.share.space.sharedTitle`). A sentence pointing at a place that is not there claims a UI
+  // capability the screen does not have, so each shell says its own true destination; the web copy
+  // stays precise for web users instead of being blurred to fit the phone.
+  'mobile.share.join.subtitle': 'Paste the invitation ticket or link. The list appears under “Shared lists” once accepted; its content stays encrypted from everyone else, including the server.',
+  'mobile.share.join.done': 'Joined — the list is now under “Shared lists”.',
   'web.admin.tab.grants': 'Grants',
   'web.admin.grant.lead': 'Issuing a subscription takes one of three actions: grant (extend by N days), free upgrade (change the tier only, not a single day added), revoke (take back the grant only). They never touch a paid subscription row and never appear in the revenue board. Every one of them requires a reason.',
   'web.admin.grant.compose': 'Grant to an account',
