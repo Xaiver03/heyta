@@ -107,6 +107,7 @@ import {
   habitHeatmap,
   hasCountableGoal,
   heatMonthLabelWidths,
+  heatMonthSpans,
   heatmapLevelToken,
   heatmapTotal,
   shouldOfferFreshStart,
@@ -408,8 +409,17 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: tokens['space.1'],
     },
     heatMonths: {
-      flexDirection: 'row',
-      gap: tokens['space.1'],
+      /*
+       * 🔴 2026-10-25：这一排改成**绝对定位的容器**。
+       * 每一枚月份标签的 `left = 列号 × (格宽 + 空隙)` —— 位置只由它标注的那一列决定，
+       * 与"前一枚标签有多宽"脱钩。原来靠 flex 串起来，而标签有**两列下界**
+       *（防止「10月」折行），于是某枚用了下界之后，后面每一枚都会右移那个差额
+       *（HL2 实测差 18px = 32 − 14）。
+       * ⚠️ 高度必须显式给：绝对定位的子元素不参与父容器的高度计算，
+       * 不给就会塌成 0 高、下面的格子顶上来到标签上。
+       */
+      position: 'relative',
+      height: Number(tokens['font-size.xs']) * 1.6,
     },
     /**
      * 月份标签那一格**不在这里写宽度**：宽度 = 它标注的那几周（下界两列），
@@ -510,7 +520,11 @@ export function HabitBoard({
         const heatmap = habitHeatmap(logs, row.habit.id, now, heatmapDays);
         const weeks = toHeatmapWeeks(heatmap);
         // 标签宽度 = 它跨过的那几列（下界两列），算法在 `heatMonthLabelWidths`（工单 H8）。
+        const heatCellPx = Number(tokens['icon.xs']);
+        const heatGapPx = Number(tokens['space.1']);
         const labelWidths = heatMonthLabelWidths(weeks, tokens['icon.xs'], tokens['space.1']);
+        // 每一枚标签**真正跨过**几列（`0` = 这一列不是标签起点）—— 与 `labelWidths` 同一份数据。
+        const spans = heatMonthSpans(weeks);
         const total = heatmapTotal(heatmap);
         const { less, more } = labels.heatmap;
 
@@ -906,11 +920,35 @@ export function HabitBoard({
                   const width = labelWidths[index] ?? 0;
                   const month = week.month;
                   if (width === 0 || month === undefined) return [];
+                  /*
+                   * 🔴 2026-10-25（HL2 的那 18px）：`labelWidths` 有**两列下界**
+                   *（`heatMonthLabelWidths` 的 `Math.max(floor, span*cell + (span-1)*gap)`，
+                   * 下界 = 2×格宽 + 空隙 = 32px，目的是让"10月"这种三枚字形不折行）。
+                   * 而月份行**只给"有月份"的周发格子**，被跳过的周不占位 ⇒ 一旦某一枚标签
+                   * 用了下界（比它真正跨过的那几列宽），后面**每一枚**标签都跟着右移那个差额。
+                   * 实测（本机 1280×720）：month-0 `left=972 w=32`（自然宽只有 14），
+                   * month-1 于是落在 `1008`，而它标注的那一周在 `990` —— 正好差 **18px**
+                   *（= 32 − 14）。判据 `habit-heatmap-labels` HL2 量到的就是这个数。
+                   *
+                   * 修法：把"多出来的那条宽度"用**负 margin** 还回去（`width − 自然宽`）。
+                   * 文字的宽度不变（所以"不折行"那条判据照旧成立），而下一枚标签的起点
+                   * 回到它自己那一周。⚠️ 别改成"把 width 调小"——那会让最宽的那枚标签折行，
+                   * 正是 HL1 挡着的那个缺陷。
+                   */
+                  const span = spans[index] ?? 1;
+                  void span;
+                  /*
+                   * 用**绝对定位**把标签钉在它自己那一列的左边缘上（`left = 列号 × (格宽+空隙)`），
+                   * 而不再靠"前一枚的宽度"把它们串起来 —— 后者一旦某枚用了两列下界，
+                   * 后面每一枚都会跟着右移（HL2 量到的 18px 就是这么来的）。
+                   * 标签自己的宽度仍取下界宽（不折行，HL1），但它**不参与**排布。
+                   */
+                  const left = index * (heatCellPx + heatGapPx);
                   return [
                     <View
                       key={`m-${String(index)}`}
                       testID={`${testID}-heat-month-${String(index)}`}
-                      style={[styles.heatMonthCell, { width }]}
+                      style={[styles.heatMonthCell, { width, left, position: 'absolute' }]}
                     >
                       <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
                         {labels.heatmap.month(month)}
