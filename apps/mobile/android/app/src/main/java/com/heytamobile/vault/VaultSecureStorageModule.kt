@@ -137,7 +137,7 @@ internal object VaultSecureStorage {
         val plain = readPlain(preferences, scope) ?: return null
         val decoder = Charsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
-            .onUnmappableInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
         try {
             return decoder.decode(ByteBuffer.wrap(plain)).toString()
         } catch (error: CharacterCodingException) {
