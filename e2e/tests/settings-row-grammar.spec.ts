@@ -141,12 +141,6 @@ test(`设置中心：一屏只有一种行（${section}）`, async ({ page }) =>
         };
         return walk(pane, 0).slice(0, 900);
       })(),
-      rowParents: [...new Set(rows.map((row) => {
-        const p2 = row.parentElement as HTMLElement | null;
-        if (!p2) return 'none';
-        const cs2 = getComputedStyle(p2);
-        return `${p2.className}|gap=${cs2.rowGap}|mt=${getComputedStyle(row as HTMLElement).marginTop}`;
-      }))],
     };
   }, section);
   console.log(`SETTINGS_SHAPE ${section} ${JSON.stringify(m)}`);
