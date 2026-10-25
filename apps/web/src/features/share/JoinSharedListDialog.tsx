@@ -3,9 +3,15 @@
  * ================================================================================
  *
  * 旅程（成员侧半程）：
+ *   同意闸（PIPL 23；判断与界面都在 `@heyta/ui`，本壳只落盘）→
  *   贴 token → `acceptInvitation`（带封装公钥）→ 身份种子 vault 落盘 →
  *   等 owner 下发信封（owner 端面板开着时自动补发）→ 解出 listKey 落盘 →
  *   本地建清单行（挂 `shareId`）→ 侧栏出现这条清单。
+ *
+ * 🔴 **入群这一侧也要过同意闸**：通知路径读的就是这份本地同意
+ *    （`use-share-activity-signal.ts`），而它过去只有 owner 那一屏会写 ⇒
+ *    一台只走过「贴链接入群」的浏览器永远没有同意记录，按 fail-closed 的口径
+ *    它就一条共享活动都收不到。移动端早就是这道闸在前，这里与它同形。
  *
  * 🔴 **等待 owner 是如实显示的**：接受邀请成功 ≠ 立刻有密钥——E2EE 下
  *    listKey 只能由 owner 封给你。对话框轮询成员表里自己的信封，拿到才收口；
@@ -25,7 +31,7 @@ import {
   type ShareMemberKeyEnvelope,
 } from '@heyta/sync-core';
 import { ShareApiClient, ShareApiError, type SyncPayloadCipher } from '@heyta/sync-client';
-import { parseShareJoinLink } from '@heyta/ui';
+import { parseShareJoinLink, ShareConsentModal, shouldShowConsent, type ShareConsentStore } from '@heyta/ui';
 
 import { useSyncStore } from '../sync/store.js';
 import { registerShareRosterTarget } from '../../lib/share-signal-sink.js';
@@ -38,6 +44,7 @@ import {
   storeShareIdentity,
   wrapAndStoreShareKey,
 } from './share-key-store.js';
+import { loadShareConsent, saveShareConsent } from './share-consent-store.js';
 
 /**
  * 本视图的样式：**模块级常量**，不再写成 `style={{…}}` 内联对象。
@@ -116,6 +123,7 @@ export interface JoinSharedListDialogProps {
 }
 
 type JoinPhase =
+  | { kind: 'consent' }
   | { kind: 'input' }
   | { kind: 'accepting' }
   | { kind: 'waiting-key'; shareId: string; memberId: string }
@@ -131,7 +139,11 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
   const authTransport = useSyncStore((s) => s.authTransport);
   const accountId = useSyncStore((s) => s.accountId);
 
-  const [phase, setPhase] = useState<JoinPhase>({ kind: 'input' });
+  // 同意闸 fail-closed：本机没确认过 ⇒ 先弹（判断在 `@heyta/ui`，与移动端入群屏同一份）。
+  const [phase, setPhase] = useState<JoinPhase>(() =>
+    shouldShowConsent(loadShareConsent(localStorage)).show ? { kind: 'consent' } : { kind: 'input' },
+  );
+  const [consentStore, setConsentStore] = useState<ShareConsentStore>(() => loadShareConsent(localStorage));
   const [inputValue, setInputValue] = useState(initialToken ?? '');
   const [listName, setListName] = useState('');
   const [needsUnlock, setNeedsUnlock] = useState(false);
@@ -147,6 +159,19 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
     const session = await getWebVaultSession(accountId, baseUrl, async () => token, authTransport);
     return session.getPayloadCipher();
   }, [accountId, authTransport, baseUrl, token]);
+
+  const consentLabels = useMemo(() => ({
+    title: t('common.share.consent.title'),
+    body: t('common.share.consent.body'),
+    scopes: [
+      t('common.share.consent.scope.content'),
+      t('common.share.consent.scope.metadata'),
+      t('common.share.consent.scope.notAffected'),
+    ],
+    dontAskAgain: t('common.share.consent.dontAskAgain'),
+    accept: t('common.share.consent.accept'),
+    cancel: t('common.share.consent.cancel'),
+  }), [t]);
 
   // 拿到信封 ⇒ 解钥 ⇒ 建本地清单行 ⇒ 收口。
   const finalize = useCallback(async (shareId: string, memberId: string) => {
@@ -274,9 +299,12 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
             <h2 id="ht-share-join-title" style={styles.dialogTitle}>
               {t('web.share.join.title')}
             </h2>
-            <p style={styles.dialogSubtitle}>
-              {t('web.share.join.subtitle')}
-            </p>
+            {/* 同意面画的时候这句话还没有对象可指（表单还没出场），先收起来。 */}
+            {phase.kind !== 'consent' ? (
+              <p style={styles.dialogSubtitle}>
+                {t('web.share.join.subtitle')}
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -293,6 +321,22 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
           <p role="status" data-testid="share-join-needs-unlock" style={styles.resetTitle}>
             {t('web.share.needUnlock')}
           </p>
+        ) : null}
+
+        {phase.kind === 'consent' ? (
+          <ShareConsentModal
+            labels={consentLabels}
+            store={consentStore}
+            // 顶部 `<h2>` 已经写着「加入共享清单」，同意面那句「共享清单」再画一遍
+            // 会在同一张卡里出现两个同族标题 —— 与 owner 侧那屏同一个处置。
+            titleHidden
+            onConsent={(next) => {
+              setConsentStore(next);
+              saveShareConsent(localStorage, next);
+            }}
+            onProceed={() => setPhase({ kind: 'input' })}
+            onCancel={onClose}
+          />
         ) : null}
 
         {phase.kind === 'input' || phase.kind === 'error' ? (

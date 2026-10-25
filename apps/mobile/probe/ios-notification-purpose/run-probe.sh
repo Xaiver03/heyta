@@ -83,7 +83,7 @@ for attempt in $(seq 1 6); do
     fi
   done
   if [ "$READY" = "1" ]; then
-    echo "READY_AFTER_LAUNCH=$attempt（第 ${attempt} 次起、$((tick * 3)) 秒后通知服务答话）"
+    echo "READY_AFTER_LAUNCH=${attempt}（第 ${attempt} 次起、$((tick * 3)) 秒后通知服务答话）"
     break
   fi
   echo "   第 ${attempt} 次：起了，但 $((tick * 3)) 秒内通知服务没答话"

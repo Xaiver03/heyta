@@ -120,5 +120,27 @@ HEAD 在动，照下面几条现量，别抄本节正文：
 [ADR-0062 的实施记录](0062-shared-list-key-distribution.md)）。反向臂（界面上不许再摆那两档）在
 `scripts/verify-mobile-collab-ios.sh` 第 10 步，复量 `pnpm verify:mobile-collab:ios`。
 
-⚠️ 裁决三那句"这台设备**同意过**"在移动端同样成立，而 §四 那格缺口（**通过链接加入的设备没有同意记录**）
-在移动端**没有**被顺手放宽：手机加入流程今天不写同意态 ⇒ 它拿到的是零打扰。补法仍归产品负责人拍。
+⚠️ **2026-10-25 逐壳复量后更正本补记末句** —— 原句「手机加入流程今天不写同意态 ⇒ 它拿到的是零打扰」
+到 M6-1 落地为止是真的，现在**方向反了**：写同意态的是手机，不写的成了 web。
+- **手机写**：`apps/mobile/src/screens/JoinShareScreen.tsx:67-70` 的初始 phase 走
+  `shouldShowConsent(loadMobileShareConsent())`（没确认过 ⇒ 先弹，fail-closed），确认之后
+  `:232-235` 的 `onConsent` 把它 `saveMobileShareConsent` 落盘。
+- **web 不写**：`apps/web/src/features/share/ShareFeature.tsx:199` 写的是
+  `initialShareId === undefined ? { kind: 'consent' } : { kind: 'panel', shareId: initialShareId }`
+  ⇒ **带着 shareId 从入群链接进来时，整段同意面被跳过**。
+
+⇒ §四 那格缺口曾经只剩 web 这一侧，而且是一处**壳间不一致**：同一个人点同一条链接，手机上被问一次，
+web 上不被问。反查一条：
+`grep -n "kind: 'consent'" apps/web/src/features/share/*.tsx`（两枚入群入口都在：web 的
+`JoinSharedListDialog.tsx` 与手机的 `JoinShareScreen.tsx`）。
+**2026-10-25 本批把 web 那一侧补上了**：`JoinSharedListDialog` 的初始 phase 同样走
+`shouldShowConsent(loadShareConsent(localStorage))`，用的是同一枚 `ShareConsentModal` 与同一批
+`common.share.consent.*` 词条（壳只落盘，不重算口径）。常驻判据在
+`e2e/tests/collab-journey.spec.ts` 入群那一段——它不止断言"同意面在场"，还回读
+`localStorage` 里那枚键，钉的是**它真落了盘**（通知路径读的就是这条）。裁决三本身一个字不改。
+
+⚠️ 一处**留给产品负责人的文案不一致**（本批按边界不擅自改，因为它属于对外法律表征）：同意面的正文与
+按钮是 owner 视角写的——「把清单设为共享前，请确认以下事项：」与按钮「确认共享」——而**入群**那一侧
+（手机与 web 都是）现在也把这一句画给一个"没有把任何清单设为共享"的人。判据在
+`packages/i18n/src/locales/zh-CN.ts` 的 `common.share.consent.body` / `.accept` 那两行；
+截图见移动装置证据目录的 `06b3-入群同意面.png`。改不改、怎么改归权利人拍。
