@@ -448,25 +448,11 @@ export function AdminPanel({
                 </p>
               )}
 
-              <div className="ht-settings__admin-actions">
-                <button
-                  type="button"
-                  className="ht-settings__admin-btn"
-                  onClick={() => {
-                    void store.unlockUser(detail.user.id);
-                  }}
-                >
-                  {t('web.admin.action.unlock')}
-                </button>
-                <button
-                  type="button"
-                  className="ht-settings__admin-btn ht-settings__admin-btn--danger"
-                  onClick={() => {
-                    void store.forceLogout(detail.user.id);
-                  }}
-                >
-                  {t('web.admin.action.logout')}
-                </button>
+              {/* 🔴 配额那一行是**一整行**，放在动作行**外面**。
+                  上一版它被生成在 `.ht-settings__admin-actions`（一行 flex）里面 ——
+                  于是 `FormField` 的网格控件列被压成一个窄格子，里面的「保存」
+                  溢出到后面那枚「关闭」底下（Playwright 实测：
+                  `关闭` intercepts pointer events，真人点也点不到保存）。 */}
         <FormField id="admin-quota-mib" label={t('web.admin.quota.label')}>
           {(fieldProps) => (
             <div className="ht-settings__admin-inline">
@@ -497,6 +483,26 @@ export function AdminPanel({
             </div>
           )}
         </FormField>
+
+              <div className="ht-settings__admin-actions">
+                <button
+                  type="button"
+                  className="ht-settings__admin-btn"
+                  onClick={() => {
+                    void store.unlockUser(detail.user.id);
+                  }}
+                >
+                  {t('web.admin.action.unlock')}
+                </button>
+                <button
+                  type="button"
+                  className="ht-settings__admin-btn ht-settings__admin-btn--danger"
+                  onClick={() => {
+                    void store.forceLogout(detail.user.id);
+                  }}
+                >
+                  {t('web.admin.action.logout')}
+                </button>
                 <button
                   type="button"
                   className="ht-settings__admin-btn"
