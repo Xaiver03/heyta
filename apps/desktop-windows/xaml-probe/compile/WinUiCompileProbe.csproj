@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    把**仓库里的真实 C#** 拉到任意 OS 上编一遍（WinUI 那半个工程）。
+
+    🔴 为什么可以这样：`dotnet build -p:EnableWindowsTargeting=true` 时还原与目标解析都成功，
+       卡住的**只有 XAML 编译器**（Windows 二进制，跑不了）。所以只要有东西替身掉
+       "XAML 编译器本该生成的那两样"（`x:Name` 字段 + `InitializeComponent()`），
+       剩下的每一行真实代码就能照常参与编译 —— 而 C# 与 WinUI API 面之间的错
+       （命名空间被 `using` 抢走、类型在别的命名空间、控件没有那个成员）全都会现形。
+
+    ⚠️ 那份替身**不再是手写的**：`xaml-probe/tool` 从真实 `.xaml` 逐元素生成（`emit-stubs`）。
+       手写时代它是一份会漂的抄件 —— 加了控件没人补字段，而"漏一个字段"的表现是
+       "探针绿、Windows 红"，正好是最坏的方向。
+
+    ⚠️ 它**不验** XAML 语义（样式键优先级、模板合法性、x:Bind 的类型转换）。
+       那些只有 Windows 上的 XamlCompiler 能回答；本工程的职责只有一个：
+       "这些 C# 在真实的 WinUI API 面上能不能编过"。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <UseWinUI>true</UseWinUI>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>WinUiCompileProbe</AssemblyName>
+    <RootNamespace>Heyta.Shell</RootNamespace>
+    <EnableDefaultXamlItems>false</EnableDefaultXamlItems>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <NoWarn>CS0067;CS8618</NoWarn>
+    <!-- 打包那一步（PRI / MSIX）用的也是 Windows 专用二进制；这里只要"编过" -->
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
+    <GenerateProjectPriFile>false</GenerateProjectPriFile>
+    <DisableMrtCorePriGen>true</DisableMrtCorePriGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 被验的真实源码：仓库里那一份，不是拷贝。 -->
+    <Compile Include="../../HeytaWindows/SettingsWindow.xaml.cs" />
+    <Compile Include="../../HeytaWindows/MainWindow.xaml.cs" />
+    <Compile Include="../../HeytaWindows/App.xaml.cs" />
+    <Compile Include="../../HeytaWindows/TaskItem.cs" />
+    <Compile Include="../../HeytaWindows/ReminderPort.cs" />
+    <Compile Include="../../HeytaWindows/WindowsWidgetBridge.cs" />
+    <!-- 生成物（emit-stubs 写在这里；obj 默认被排除，所以显式 Include） -->
+    <Compile Include="obj/generated/XamlStubs.g.cs" />
+    <!-- 载荷与产物目录解析走真实工程引用，不留一份旧 dll 在磁盘上当输入 -->
+    <ProjectReference Include="../../Heyta.Windows.Core/Heyta.Windows.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    🔴 把**编译器真的看到的**引用落盘，给元数据探针当输入。
+       路径写死或按版本猜都会在升级时静默指向旧包 —— 而"指向旧包"的表现是
+       "属性都在、Windows 上却没有"，正是这一层最该消灭的假绿。
+  -->
+  <Target Name="HeytaDumpProbeInputs" AfterTargets="ResolveAssemblyReferences">
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)/obj/probe-refs.txt"
+                      Lines="@(ReferencePath)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)/obj/probe-out.txt"
+                      Lines="$(TargetPath)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
+
+</Project>
