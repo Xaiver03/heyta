@@ -115,6 +115,13 @@
   padding-block: var(--ht-space-1);
 }
 
+.ht-settings__switch-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-block-size: var(--ht-touch-target-min);
+}
+
 .ht-settings .ht-settings__preference-row + .ht-settings__preference-row {
   border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }

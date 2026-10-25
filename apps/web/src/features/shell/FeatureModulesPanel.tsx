@@ -58,15 +58,23 @@ export function FeatureModulesPanel({
       <h2 className="ht-settings__title ht-type-section-title">{t('web.shell.modules.title')}</h2>
       <p className="ht-settings__hint">{t('web.shell.modules.intro')}</p>
 
-      <div className="ht-settings__cards" data-testid={`${testID}-cards`}>
+      {/* 🔴 2026-10-25：这一节原本是**两列复选框卡片**，与上面几节的"左标签 / 右控件"
+          不是同一种语法 —— 一屏里两种列表语法，眼睛每翻一节就得重新学一遍。
+          现在改成同一套 `preference-row`：标签+说明在左，开关在最右，
+          与「任务与显示」那几行**逐格同构**。行为一个字没改（仍是即时生效、仍只影响本设备）。 */}
+      <div className="ht-settings__rows" data-testid={`${testID}-cards`}>
         {SHELL_MODULES.map((m) => (
-          <label key={m.key} className="ht-settings__card">
-            <span className="ht-settings__cardText">
-              <span className="ht-settings__cardTitle">{t(m.labelKey)}</span>
+          <div key={m.key} className="ht-settings__preference-row">
+            <div className="ht-settings__preference-label">
+              <h3 className="ht-settings__h3 ht-type-headline">{t(m.labelKey)}</h3>
               <span className="ht-settings__cardNote">{t(m.noteKey)}</span>
-            </span>
+            </div>
+            {/* 尾格：让"开关"成为一个 44px 的单元格，而不是一枚 13px 的原生方框 ——
+                否则同一列里它比别的控件矮一档，右缘也会差几像素（量到过 1264 vs 1267）。 */}
+            <span className="ht-settings__switch-cell">
             <input
               type="checkbox"
+              role="switch"
               // 每个开关都要能单独定位 —— 名称进可访问名，别只靠位置。
               aria-label={t(m.labelKey)}
               data-testid={`${testID}-${m.key}`}
@@ -76,7 +84,8 @@ export function FeatureModulesPanel({
                 onToggle(m.key);
               }}
             />
-          </label>
+            </span>
+          </div>
         ))}
       </div>
 
