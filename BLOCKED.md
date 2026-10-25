@@ -12109,3 +12109,16 @@ if (!isOfficialService) { setCentralConfig(null); return; }
 ⚠️ 两次试错的读数都留在上表里，免得下一个人再摸一遍：
 · 塞 token（想"只配置地址不登录"）会把用例变成"已登录"，身份入口消失；
 · 把 `central/config` 塞成 `{}` 不会回落本地表单，只会换一句"不可用"。
+
+### B228 第五次盘账（第 3 轮结束）：**只剩 2 条红，且它们是同一个根因（B229）**
+
+本轮转绿：`vault-settings` 1、`detail-pane-collapse` 2（T3b + T5）、`search-overlay` 1、
+`shell-sync-rail` 2（S3 + S4）、`auth-login-code` 3、`auth-registration-otp` 2 ⇒ **11 条**。
+
+| 仍红 | 根因 | 状态 |
+|---|---|---|
+| `shell-no-document-scroll` W2 | B229：整理浮层滚到 max 仍差 69px | 需在 B229 那三条候选里选一条（样式/产品裁决） |
+| `shell-sidebar-height` X1 | **同一件事**：滚到底时行尾触发器底边 615 > 视口 600 —— 触发器就住在那块超出的面板里 | 同上 |
+
+⇒ e2e 这一侧已经**没有"判据过期"型的红**了：剩下的两条都是同一个真实布局缺陷的两个观测面。
+B229 修掉，这两条会一起绿。
