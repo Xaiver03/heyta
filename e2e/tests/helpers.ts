@@ -511,7 +511,19 @@ async function dismissFullBleedOverlay(page: Page): Promise<void> {
  */
 export async function openRowTail(page: Page, rowLocator: Locator): Promise<void> {
   const trigger = rowLocator.locator('.ht-compose-actions__trigger').first();
-  if ((await trigger.count()) === 0) return;
+  /*
+   * 🔴 2026-10-25：**不再静默 return**。原来那一版"这一行没有触发器就当作不用展开"，
+   * 于是一个点不到的 chip 会被读成"折叠面板没展开"，而真实原因是"这一行根本不是那一行"
+   * （例如刷新后侧栏把范围切到了刚被摘掉的标签上，行压根不在列表里）。
+   * 现在直接抛一句能指路的话，调用点不会被一句 60 秒超时糊住。
+   */
+  if ((await trigger.count()) === 0) {
+    const text = (await rowLocator.first().innerText().catch(() => '')).replace(/\n/g, ' ');
+    throw new Error(
+      `这一行没有行尾动作区触发器（\`.ht-compose-actions__trigger\`）—— 多半是"这一行不在当前范围里"` +
+        `或"这一行根本不是那条任务"。行文本：${text.slice(0, 60)}`,
+    );
+  }
   const open = await rowLocator
     .locator('.ht-compose-actions')
     .first()
