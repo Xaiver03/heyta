@@ -12210,3 +12210,18 @@ B229 修掉，这两条会一起绿。
 
 也试过用"IndexedDB 记录总数变化"当落盘 oracle：**不等这条 op**（状态仓的写入同样会动计数，
 等待提前返回、仍然红，三次全红）—— 别再往这个方向走。
+
+### 第 6 轮：门禁侧的**正面证据**（本轮没修 e2e，但把"其余门禁是绿的"这件事量了一遍）
+
+在本机逐条跑过并全绿（都是本会话改动会碰到的门禁）：
+
+    check:design            check:l4                 check:design-system（经 check:design）
+    check:i18n-vars         check:gate-wiring        check:evidence-hygiene
+    check:ui-provider       check:ui-language        check:empty-state
+    check:rn-aria           check:docs               check:md-tables
+    check:doc-citations     check:doc-command-claims check:docs-voice
+    check:detail-pane-evidence-refs
+
+⇒ 本会话对 `apps/web/src/styles/**`（两处 `block-size: auto` + 一处 `z-index`）、
+`packages/i18n`（新增一个词条）、`e2e/**` 的改动**没有**打破任何一条非 e2e 门禁。
+剩下 6 条红全部集中在 e2e，且 B230 里逐条记了读数与下一步。
