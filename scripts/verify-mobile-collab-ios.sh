@@ -1221,6 +1221,11 @@ if ! wait_tree "加入成功，清单已出现在侧栏。" 240; then
 fi
 ok "手机自己说了「加入成功」"
 shot "06g-加入成功"
+# 🔴 回执必须**按得掉**：这一屏只有「关闭」一枚出口（第 25 跑之前它根本不出现 ——
+#    入群成功的同一拍宿主就把屏幕换掉了，那句成功文案一帧都没画过，装置等满 240s 报红）。
+#    按完之后回到共享主屏，第 7 步从那里接着走。
+ax_press "关闭" || { shot "06h-成功回执退不出去"; bad "「加入成功」那一屏没有按得动的「关闭」⇒ 用户被卡在回执上"; summary; exit 1; }
+sleep 2
 wait "$OWNER_LOOP_PID" 2>/dev/null || {
   sed 's/^/      /' "$RUN_DIR/member.err" "$RUN_DIR/deliver.err" >&2 2>/dev/null
   env_bail "owner 侧等成员行/封信封失败"
