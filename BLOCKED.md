@@ -11888,3 +11888,21 @@ B216 那一行进库之后，本线在新隔离载具 `.worktrees/inb-t10`（`gi
 `pnpm --dir e2e exec playwright test --workers=1 --retries=0` 一整趟 **0 failed**，
 且该趟的墙钟被写进 CI 预算（要么加 timeout，要么给每 worker 一台载体）。
 在那之前：**`check:ai-e2e` 的状态是"未定"**，谁写"绿"谁就是在拿 #524/#536 那两枚旧账重犯一遍。
+
+### B227 追记（2026-10-25 15:3x）：CI 不是"红在某条门禁"，是**40 分钟预算装不下 `pnpm check`**
+
+五次 dispatch/push 的读数（全部本机 `gh run view` 取的，不是猜）：
+
+| run | 结论 | 停在哪 |
+|---|---|---|
+| `40200874209` | failure | `check:image-license`：`IMAGE_ONLY_PACKAGES` 里一条 linux 变体在 linux runner 上"已被扫描集覆盖"被判成腐坏 —— **已修**（"多余"不再等于"腐坏"） |
+| `40201626180` | failure | `check:doc-citations`：锚 `f6478fad` "不是本仓的提交对象" —— 浅克隆（`fetch-depth: 1`）**已修**（检出改全历史） |
+| `40203348358` | failure | `check:linux-shell` ⓪b：shell 可移植性账本 —— `md5` 在 Linux 上不存在 —— **已修**（`lib/md5q.sh` 零分支 + 基线改小 33/87 → 30/75） |
+| `40204423541` | **cancelled（40 分整）** | `门禁` 这一 step 没跑完；被掐时最后活着的进程是 `chrome-headless-shell` + `esbuild`，即 `check:ai-e2e` |
+
+⇒ 前三次是**真的平台差异**（都修了，每一处都写进了提交信息）。第四次不是哪条门禁坏，
+是**预算**：本机 `--workers=2 --retries=0` 实测 34.3 分钟 / 427 条，而 runner 是 2 核；
+40 分钟要装下 `check:ai-e2e` **加上**后面的 `pnpm test`。
+
+处置：`timeout-minutes: 40 → 100`，并在 workflow 注释里写明这是**为了取得一次完整读数的临时值**，
+真正该做的是分片/拆套件（以及 B227 正文那三条路）。⚠️ 加预算只是让它跑得完，不是让它变绿。
