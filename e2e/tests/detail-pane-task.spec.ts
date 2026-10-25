@@ -297,6 +297,24 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     await page.screenshot({ path: SHOT('t5-long-title-wraps') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
+/**
+ * 打开「重复」里的**高级**（原始 RRULE 输入框那一格）。
+ *
+ * 🔴 W6（审计 §4.6）把它收进了 `<details data-testid="task-repeat-advanced">`，
+ * **默认折叠** —— 节点在 DOM 里、但画不出来。所以"填得进去"这条判据必须先走
+ * 用户真会走的那一步（点开「高级」），不能直接 `fill`：
+ * 第一版没点，`fill` 一直在等 "visible, enabled and editable"，报出来的
+ * 是 60 秒超时（像"输入框坏了"，其实是"它还没展开"）。
+ */
+async function openRepeatAdvanced(page: import('@playwright/test').Page): Promise<void> {
+  const advanced = page.getByTestId('task-repeat-advanced').first();
+  const summary = advanced.locator('summary').first();
+  if (await summary.isVisible().catch(() => false)) {
+    const open = await advanced.evaluate((el) => (el as HTMLDetailsElement).open).catch(() => false);
+    if (!open) await summary.click();
+  }
+}
+
   test('T6 宽档：重复的编辑本体在栏里那一格，行尾只剩只读徽标（§8.141）', async ({ page }) => {
     const errors = watchErrors(page);
     await openApp(page, '/?lang=zh-CN');
@@ -317,6 +335,7 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     ).toHaveCount(0);
 
     // 打进去的串要真落成一条 op（jsdom 只看得到 onChange/onClick 被调过）。
+    await openRepeatAdvanced(page);
     await page.getByTestId('task-repeat-custom-input').fill('FREQ=WEEKLY;INTERVAL=2;BYDAY=TU');
     await page.getByTestId('task-repeat-custom-input').press('Enter');
     await page.reload();
@@ -352,6 +371,7 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
 
     // ⚠️ `<details>` 收起时面板在 DOM 里但不画得出来（§8.138 T4 同一件事）：
     // 判"写不写得进去"必须量真实渲染，不能只看 `toHaveCount`。
+    await openRepeatAdvanced(page);
     const field = page.getByTestId('task-repeat-custom-input');
     const box = await paintedBox(page, field.first());
     expect(box.width, '窄档那只在行尾的框被挤成 0 宽').toBeGreaterThan(40);
