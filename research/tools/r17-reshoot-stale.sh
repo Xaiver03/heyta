@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# 跨平台 md5（macOS `md5 -q` / Linux `md5sum`）。实现只有一处，见 lib/md5q.sh。
+. "$(cd "$(dirname "$0")" && pwd)/lib/md5q.sh"
 # 把 `r17-evidence-md5-check.sh --all` 报成「形状主张已过期」（UISTALE）的证据目录**重拍**一遍。
 #
 # 为什么要有这么个脚本（2026-10-04 14:2x）：本线现在有 4 份 README / 14 枚截图的 UIPIN 判为过期，
@@ -131,7 +134,7 @@ PINS
 # 差集就是"这一趟真正动过的图"。
 snap_tree() {
   find "$EVID_ROOT" -type f -name '*.png' 2>/dev/null | LC_ALL=C sort | while IFS= read -r p; do
-    printf '%s\t%s\n' "$p" "$(md5 -q "$p")"
+    printf '%s\t%s\n' "$p" "$(md5q "$p")"
   done
 }
 
@@ -198,7 +201,7 @@ settle_dir() {
         printf '      %s %s  改前 %s\n' "$kind" "$(basename "$p")" \
           "$(awk -F'\t' -v k="$p" '$1==k { print substr($2,1,8); exit }' "$ST_DIR/before")"
       else
-        printf '      %s %s  %s\n' "$kind" "$(basename "$p")" "$(md5 -q "$p" | cut -c1-8)"
+        printf '      %s %s  %s\n' "$kind" "$(basename "$p")" "$(md5q "$p" | cut -c1-8)"
       fi
     else
       SIB="$SIB $(basename "$(dirname "$p")")"
@@ -235,7 +238,7 @@ PATHS_BLOCK
     [ -f "$f" ] || continue
     b=$(basename "$f")
     [ -f "$d/$b" ] || continue
-    old=$(md5 -q "$d/$b"); new=$(md5 -q "$f")
+    old=$(md5q "$d/$b"); new=$(md5q "$f")
     cp "$f" "$d/$b"
     NCP=$((NCP + 1))
     printf '      拷回 %s  %s → %s%s\n' "$b" "${old:0:8}" "${new:0:8}" "$([ "$old" = "$new" ] && echo '（字节相同）')"
@@ -365,7 +368,7 @@ if [ "$SELFTEST" = "1" ]; then
   #    第一版这里 grep 的是 `sibling`，而 `fake-sibling.spec.ts` 里就带着这个词，
   #    于是那条臂在警告**根本没打印**的时候也照样过（假绿臂，靠下面这条 SIB_DONE 才照出来）。
   SIBOK=$(printf '%s' "$OUT" | grep -cF '取证目录：'); SIBOK=${SIBOK:-0}
-  SIBBYTE=$(md5 -q "$EVID_ROOT/sibling/s.png")
+  SIBBYTE=$(md5q "$EVID_ROOT/sibling/s.png")
   if [ "$RC" != "1" ] || [ "$SIBOK" != "1" ] || [ "$SIBBYTE" = "SIB0" ]; then
     echo "❌ 臂 e 坏了（rc=${RC} 警告行=${SIBOK} 兄弟图真改了=${SIBBYTE}）⇒ calendar-day.spec.ts 顺带改 calendar-day-time/ 那一类没有出处" >&2; bad=$((bad+1))
   fi

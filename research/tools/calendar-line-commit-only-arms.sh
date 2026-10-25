@@ -1,3 +1,4 @@
+. "$(cd "$(dirname "$0")" && pwd)/lib/md5q.sh"
 #!/usr/bin/env bash
 # calendar-line-commit-plan.sh 的 `--confirm` 那一腿的装置验证。
 #    ⚠️ **臂数不写在这份说明里**（写过一次"八臂"，加第 九 臂那天就漂了）—— 现量取最后一行 `== 合计 pass=… fail=… ==`。
@@ -841,9 +842,9 @@ FW=$(mktemp -d /tmp/clc-wire.XXXXXX)
 if [ -f "$WIRE" ]; then
   # --- 臂22：默认必须是 dry-run，且**逐字节不写**（哈希对账，不看它自己怎么说）---
   mk_pkg "$FW/base.json"; cp "$FW/base.json" "$FW/a22.json"
-  H0=$(md5 -q "$FW/a22.json")
+  H0=$(md5q "$FW/a22.json")
   O22=$(node "$WIRE" --pkg "$FW/a22.json" 2>&1); R22=$?
-  H1=$(md5 -q "$FW/a22.json")
+  H1=$(md5q "$FW/a22.json")
   if [ "$R22" = 0 ] && [ "$H0" = "$H1" ] && printf '%s' "$O22" | grep -q 'dry-run 结束（没写盘）'; then
     ok "臂22 默认 dry-run ⇒ rc=0、打印两处、文件 md5 逐字未变 ⇒ \"默认不动盘\"是被证明的，不是被声称的"
   else
@@ -865,11 +866,11 @@ if [ -f "$WIRE" ]; then
     #    夹具改坏了被测前提，读数就会退化成另一条不相干的码。
     printf '{\n  "scripts": {\n    "check:md-tables": "node scripts/check-md-table-rows.mjs",\n    "check:someones-work": "echo 别人正在加的门禁",\n    "check": "pnpm check:md-tables && pnpm check:pricing"\n  }\n}\n' > package.json
     echo "DIRTY=$(git status --porcelain -- package.json)"
-    echo "BEFORE=$(md5 -q package.json)"
+    echo "BEFORE=$(md5q package.json)"
     O=$(node "$WIRE_ABS" --pkg "$FR/package.json" --confirm 2>&1); echo "RC=$?"
     printf '%s\n' "$O" | sed 's/^/      OUT: /'
     printf '%s\n' "$O" | grep -q '别人未提交的字节' && echo REFUSED=yes || echo REFUSED=no
-    echo "AFTER=$(md5 -q package.json)"
+    echo "AFTER=$(md5q package.json)"
   ) > "${L}.arm23.out" 2>&1
   A23=$(cat "${L}.arm23.out")
   if [ "$(rd "$A23" RC)" = "3" ] && [ "$(rd "$A23" REFUSED)" = "yes" ] \
@@ -883,9 +884,9 @@ if [ -f "$WIRE" ]; then
   # --- 臂24：锚点数不对 ⇒ exit 4「不猜插入点」，一条字节都不许写 ---
   mk_pkg "$FW/a24.json"
   sed 's/pnpm check:md-tables \&\& pnpm check:pricing/pnpm check:md-tables \&\& pnpm check:tokens/' "$FW/a24.json" > "$FW/a24b.json"
-  B0=$(md5 -q "$FW/a24b.json")
+  B0=$(md5q "$FW/a24b.json")
   O24=$(node "$WIRE" --pkg "$FW/a24b.json" --confirm 2>&1); R24=$?
-  B1=$(md5 -q "$FW/a24b.json")
+  B1=$(md5q "$FW/a24b.json")
   if [ "$R24" = 4 ] && [ "$B0" = "$B1" ] && printf '%s' "$O24" | grep -q '不猜插入点'; then
     ok "臂24 链锚点数 0 ⇒ rc=4、大字\"不猜插入点\"、文件 md5 未变 ⇒ 改了形的链不会被它猜着插进别处"
   else
@@ -961,10 +962,10 @@ else
     git add -A >/dev/null 2>&1; git commit -qm base
     mk_traps 3 docs/reference/environment-traps.md          # 别人未提交的第 4 条
     echo "DIRTY=$(git status --porcelain -- docs/reference/environment-traps.md)"
-    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    echo "BEFORE=$(md5q docs/reference/environment-traps.md)"
     node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/dirty/docs/reference/environment-traps.md" --confirm \
       > /dev/null 2>&1; echo "RC=$?"
-    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+    echo "AFTER=$(md5q docs/reference/environment-traps.md)"
   ) > "${L}.arm29.out" 2>&1
   A29=$(cat "${L}.arm29.out")
   if [ "$(rd "$A29" RC)" = "3" ] && [ -n "$(rd "$A29" DIRTY)" ] && [ "$(rd "$A29" BEFORE)" = "$(rd "$A29" AFTER)" ]; then
@@ -974,9 +975,9 @@ else
   fi
 
   # --- 臂30：dry-run ⇒ rc=0、现量末号+1 被打印出来、文件逐字节不变 ---
-  mk_traps 5 "$FT/a30.md"; H0=$(md5 -q "$FT/a30.md")
+  mk_traps 5 "$FT/a30.md"; H0=$(md5q "$FT/a30.md")
   O30=$(node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/a30.md" 2>&1); R30=$?
-  H1=$(md5 -q "$FT/a30.md")
+  H1=$(md5q "$FT/a30.md")
   if [ "$R30" = 0 ] && [ "$H0" = "$H1" ] && printf '%s' "$O30" | grep -q '⇒ 这一枚取 6'; then
     ok "臂30 末号 5 的目标 dry-run ⇒ rc=0、打印\"取 6\"（编号是现量的，不是抄的）、文件 md5 未变"
   else
@@ -988,10 +989,10 @@ else
   mk_traps 5 "$FT/a31.md"
   node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/a31.md" --confirm > "${L}.arm31a.out" 2>&1; R31A=$?
   NAPP=$(grep -c '^6\. 🔴' "$FT/a31.md" || true)
-  B1=$(md5 -q "$FT/a31.md")
+  B1=$(md5q "$FT/a31.md")
   node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/a31.md" --confirm > "${L}.arm31b.out" 2>&1; R31B=$?
   IDP=$(grep -c '已在册（现量号 6）' "${L}.arm31b.out" || true)
-  B2=$(md5 -q "$FT/a31.md")
+  B2=$(md5q "$FT/a31.md")
   if [ "$R31A" = 0 ] && [ "$NAPP" = 1 ] && [ "$R31B" = 0 ] && [ "$IDP" = 1 ] && [ "$B1" = "$B2" ]; then
     ok "臂31 写一次得号 6、第二次报\"已在册（现量号 6）\"且 md5 不变 ⇒ 幂等判的是正文；按号判的那版会再追加一份同号不同条目的重复"
   else
@@ -1012,7 +1013,7 @@ else
     git commit -qam c2
     git update-ref refs/remotes/origin/main HEAD
     git reset -q --hard HEAD~1                    # 本地回到 1 条，工作树干净，但 origin/main 已经有第 2 条
-    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    echo "BEFORE=$(md5q docs/reference/environment-traps.md)"
     echo "LINES=$(node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem/docs/reference/environment-traps.md" 2>&1 | grep -cE '顺延|这一枚取 3')"
     node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem/docs/reference/environment-traps.md" --confirm \
       >/dev/null 2>&1; echo "RC=$?"
@@ -1042,9 +1043,9 @@ else
     T33=$(mktemp); sed 's/^2\. .*/2. 本地那一版/' docs/reference/environment-traps.md > "$T33" && mv "$T33" docs/reference/environment-traps.md
     git commit -qam c2                                       # 本检出 = #2 改写过；号集合与远端一致 ⇒ N=4 不撞
     echo "DIRTY=$(git status --porcelain | wc -l | tr -d ' ')"
-    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    echo "BEFORE=$(md5q docs/reference/environment-traps.md)"
     node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem33/docs/reference/environment-traps.md" --confirm; echo "RC=$?"
-    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+    echo "AFTER=$(md5q docs/reference/environment-traps.md)"
   ) > "${L}.arm33.out" 2>&1
   A33=$(cat "${L}.arm33.out")
   if [ "$(rd "$A33" RC)" = "3" ] && [ "$(rd "$A33" DIRTY)" = "0" ] && [ "$(rd "$A33" BEFORE)" = "$(rd "$A33" AFTER)" ] \
@@ -1103,9 +1104,9 @@ else
     git add -A >/dev/null 2>&1; git commit -qm c1
     git update-ref refs/remotes/origin/main HEAD                          # 远端 == 本检出
     echo "DIRTY=$(git status --porcelain | wc -l | tr -d ' ')"
-    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    echo "BEFORE=$(md5q docs/reference/environment-traps.md)"
     node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem35/docs/reference/environment-traps.md"; echo "RC=$?"
-    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+    echo "AFTER=$(md5q docs/reference/environment-traps.md)"
   ) > "${L}.arm35.out" 2>&1
   A35=$(cat "${L}.arm35.out")
   if [ "$(rd "$A35" RC)" = "0" ] && [ "$(rd "$A35" DIRTY)" = "0" ] && [ "$(rd "$A35" BEFORE)" = "$(rd "$A35" AFTER)" ] \
@@ -1132,10 +1133,10 @@ else
     echo "DIRTY0=$(git status --porcelain | wc -l | tr -d ' ')"
     echo "LNUMS=$(grep -oE '^[0-9]+\.' docs/reference/environment-traps.md | tr -d '.' | tr '\n' ',')"
     echo "RNUMS=$(git show origin/main:docs/reference/environment-traps.md | grep -oE '^[0-9]+\.' | tr -d '.' | tr '\n' ',')"
-    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    echo "BEFORE=$(md5q docs/reference/environment-traps.md)"
     O36=$(node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem36/docs/reference/environment-traps.md" 2>&1); echo "RC=$?"
     printf '%s\n' "$O36" | sed 's/^/OUT| /'
-    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+    echo "AFTER=$(md5q docs/reference/environment-traps.md)"
   ) > "${L}.arm36.out" 2>&1
   A36=$(cat "${L}.arm36.out")
   if [ "$(rd "$A36" LNUMS)" = "1,2," ] && [ "$(rd "$A36" RNUMS)" = "1,2,3," ] && [ "$(rd "$A36" DIRTY0)" = "0" ] \

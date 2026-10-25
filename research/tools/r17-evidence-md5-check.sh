@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# 跨平台 md5（macOS `md5 -q` / Linux `md5sum`）。实现只有一处，见 lib/md5q.sh。
+. "$(cd "$(dirname "$0")" && pwd)/lib/md5q.sh"
 # 证据 README 里"记的 md5 == 盘上字节"的常驻对账。
 #
 # 为什么需要它（2026-10-04 05:3x / 05:4x 两轮实测）：
@@ -196,7 +199,7 @@ check_one_dir() {
       bad=$((bad + 1))
       continue
     fi
-    got=$(md5 -q "$p")
+    got=$(md5q "$p")
     if [ "$got" != "$want" ]; then
       echo "MISMATCH ${name}：README=${want} 盘上=${got} —— 记的与被记的不是同一份字节"
       bad=$((bad + 1))
@@ -274,7 +277,7 @@ if [ "$SELFTEST" = "1" ]; then
   #    装置腿只用自己造的合成夹具；现场状态由 default/`--all` 那条路负责报。
   mkdir -p "$D/raw"
   printf 'HT-RAW-A' > "$D/raw/a.png"
-  printf '%s  a.png\n' "$(md5 -q "$D/raw/a.png")" > "$D/raw/README.md"
+  printf '%s  a.png\n' "$(md5q "$D/raw/a.png")" > "$D/raw/README.md"
   echo "== selftest 对照腿（合成夹具，未变异）=="
   check_one_dir "$D/raw" >"$D/ctrl.out" 2>&1
   CTRL_RC=$?
@@ -299,7 +302,7 @@ if [ "$SELFTEST" = "1" ]; then
   # 第三臂：表格形状也得解析得到（否则 --all 那一半是空的却看起来像"没有不一致"）
   T=$(mktemp -d /tmp/ht-r17-tbl.XXXXXX)
   mkdir -p "$T/apps/web/evidence/tableshape"
-  printf '| `a.png` | `%s` | 说明 |\n' "$(printf 'A' | md5 -q)" > "$T/apps/web/evidence/tableshape/README.md"
+  printf '| `a.png` | `%s` | 说明 |\n' "$(printf 'A' | md5q_stdin)" > "$T/apps/web/evidence/tableshape/README.md"
   printf 'A' > "$T/apps/web/evidence/tableshape/a.png"
   echo "== selftest 表格形状臂 =="
   check_one_dir "$T/apps/web/evidence/tableshape" >"$T/tbl.out" 2>&1
@@ -357,14 +360,14 @@ if [ "$SELFTEST" = "1" ]; then
   # 臂 6：**决定形状的源码又动了一笔** ⇒ 必须恰好 1 枚 UISTALE。
   #   这一臂同时是"为什么不用图片提交号当锚"的反证：这里 x.png 的字节**一个字都没变**，
   #   而主张已经过期 —— 只有源码锚点看得见这件事。
-  XMD5_BEFORE=$(md5 -q "$P/x.png")
+  XMD5_BEFORE=$(md5q "$P/x.png")
   printf 'a{color:blue}\n' > "$P/ui/a.css"
   $GITP add ui/a.css 2>/dev/null; $GITP commit -q -m ui-2 2>/dev/null
   echo "== selftest 臂6 UIPIN 源码动了（图字节没变）=="
   check_one_dir "$P" >"$P/p2.out" 2>&1
   P2=$?
   ST6=$(grep -c '^UISTALE ' "$P/p2.out")
-  SAME=no; [ "$XMD5_BEFORE" = "$(md5 -q "$P/x.png")" ] && SAME=yes
+  SAME=no; [ "$XMD5_BEFORE" = "$(md5q "$P/x.png")" ] && SAME=yes
   echo "   臂6 rc=${P2} UISTALE=${ST6}（x.png 字节与臂5 那趟相同=${SAME}）"
   sed 's/^/      /' "$P/p2.out"
   if [ "$P2" = "0" ] || [ "$ST6" != "1" ]; then
@@ -452,7 +455,7 @@ if [ "$SELFTEST" = "1" ]; then
     echo "❌ 臂9 坏了（点名=${NR1} 负对照=${NRS} 全集=${NRT}，期望 1/0/1）⇒ 「有图没 README」会被 --all 读成「没有不一致」" >&2
     rm -rf "$T"; exit 1
   fi
-  printf '%s  z.png\n' "$(md5 -q "$T/apps/web/evidence/noreadme/z.png")" > "$T/apps/web/evidence/noreadme/README.md"
+  printf '%s  z.png\n' "$(md5q "$T/apps/web/evidence/noreadme/z.png")" > "$T/apps/web/evidence/noreadme/README.md"
   NR2=$(noreadme_dirs "$T" | grep -c . || true); NR2=${NR2:-0}
   echo "   补上合法 README 之后再数：${NR2}（要 0）"
   if [ "$NR2" != "0" ]; then
@@ -474,7 +477,7 @@ if [ "$SELFTEST" = "1" ]; then
   printf 'A1' > "$U/apps/web/evidence/unpinned/a.png"; printf 'A2' > "$U/apps/web/evidence/unpinned/b.png"
   printf '这是取证说明，没有锚点行。\n' > "$U/apps/web/evidence/unpinned/README.md"
   printf 'C' > "$U/apps/web/evidence/anchored/c.png"
-  printf '%s  c.png\n' "$(md5 -q "$U/apps/web/evidence/anchored/c.png")" > "$U/apps/web/evidence/anchored/README.md"
+  printf '%s  c.png\n' "$(md5q "$U/apps/web/evidence/anchored/c.png")" > "$U/apps/web/evidence/anchored/README.md"
   printf 'run log\n' > "$U/apps/web/evidence/txtonly/run.log"
   printf '只有文字证据，也没有锚点。\n' > "$U/apps/web/evidence/txtonly/README.md"
   echo "== selftest 臂10 --all 层（合成夹具；棘轮设成现场枚数）=="
@@ -523,7 +526,7 @@ if [ "$SELFTEST" = "1" ]; then
   # PINBROKEN 腿：锚点解析到了但判不了（/tmp 夹具不在 git 树里 ⇒ 必然 PINUNKNOWN）⇒ 必须点名并红
   mkdir -p "$U/apps/web/evidence/brokenpin"
   printf 'B' > "$U/apps/web/evidence/brokenpin/b.png"
-  printf 'UIPIN b.png %s packages/ui/src/calendar/CalendarBoard.tsx\n' "$(printf 'x' | md5 -q)" \
+  printf 'UIPIN b.png %s packages/ui/src/calendar/CalendarBoard.tsx\n' "$(printf 'x' | md5q_stdin)" \
     > "$U/apps/web/evidence/brokenpin/README.md"
   NOREADME_MAX=1 UNPINNED_MAX=1 bash "$SELF_PATH" --all --root "$U" >"$U/a10_bp.out" 2>"$U/a10_bp.err"
   R3=$?
@@ -553,7 +556,7 @@ if [ "$SELFTEST" = "1" ]; then
   for n in d1 d2 d3; do
     mkdir -p "$W/apps/web/evidence/$n"
     printf 'IMG-%s' "$n" > "$W/apps/web/evidence/$n/p.png"
-    printf '%s  p.png\n' "$(md5 -q "$W/apps/web/evidence/$n/p.png")" > "$W/apps/web/evidence/$n/README.md"
+    printf '%s  p.png\n' "$(md5q "$W/apps/web/evidence/$n/p.png")" > "$W/apps/web/evidence/$n/README.md"
   done
   echo "== selftest 臂11 点名分支的作用域自述 =="
   bash "$SELF_PATH" --root "$W" --dir "$W/apps/web/evidence/d1" >"$W/o1" 2>&1
@@ -573,7 +576,7 @@ if [ "$SELFTEST" = "1" ]; then
   #   这一腿证明那两个数是现量数出来的：写成常量的实现过不了这里。
   mkdir -p "$W/apps/web/evidence/d4"
   printf 'IMG-d4' > "$W/apps/web/evidence/d4/p.png"
-  printf '%s  p.png\n' "$(md5 -q "$W/apps/web/evidence/d4/p.png")" > "$W/apps/web/evidence/d4/README.md"
+  printf '%s  p.png\n' "$(md5q "$W/apps/web/evidence/d4/p.png")" > "$W/apps/web/evidence/d4/README.md"
   bash "$SELF_PATH" --root "$W" --dir "$W/apps/web/evidence/d1" >"$W/o2" 2>&1
   S2=$?
   L2=$(sed -n '/^✅/p' "$W/o2")
