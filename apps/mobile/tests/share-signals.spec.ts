@@ -12,7 +12,10 @@
  *   · 🔴 `share_roster_changed` 的闸门 = 「清单行绑定 ∪ 登记中的 target」——
  *     **刚入群、清单行还没绑定**那一格在移动端也必须钉住：只认清单行绑定的话，
  *     owner 补发信封的信号会被丢掉、人永远停在等待页（§9.11 自锁同一形状）；
- *   · 成员面信号**不拉内容**（两类信号不串线）。
+ *   · 成员面信号**不拉内容**（两类信号不串线）；
+ *   · 🔴 **打开一份共享 ⇒ 拉一次既有下行**（`pullSharedContentsOnOpen`）——
+ *     实时信号只在"有人新写"时响，"加入之前就在清单里的东西"没有别的携带路径
+ *     （2026-10-25 iOS 设备腿 L2 实测：名册下来了、清单行绑好了，评论区仍写「还没有任务」）。
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -27,14 +30,17 @@ import {
   dispatchShareOpsSignal,
   dispatchShareRosterSignal,
   installMobileShareSignals,
+  pullSharedContentsOnOpen,
   registerShareRosterTarget,
   shareRepaintListenerCount,
   shareRosterTargetCount,
   subscribeShareActivity,
   subscribeShareRepaint,
   type ShareSignalDeps,
+  type ShareSignalSession,
 } from '../src/share/share-signals';
 import { bindMobileOplogBase } from '../src/share/wiring';
+import { mobileSources, read, stripComments } from './source-reading';
 
 function stateWith(shareIds: string[]): MaterializedState {
   const projects: Record<string, unknown> = {};
@@ -238,5 +244,116 @@ describe('移动端共享信号装配', () => {
       await runShareRosterTargets('s1');
     }).rejects.toThrow('share roster refresh failed');
     expect(ok).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ── 打开一份共享 ⇒ 拉一次既有下行（M6；iOS 设备腿 L2 那一格） ──────────────── */
+
+/**
+ * 「什么时候该拉」的判据本体在 `@heyta/app-host` 的 `pullSharedListOnOpen`
+ * （那里 14 枚，含空 shareId、抛错不抛穿、added = 0 也算拉过）。
+ * 这里只钉移动端把它**接对**了：
+ *
+ *   · 会话缺席 ⇒ 一条请求都不发（登录后由下一次打开补，不在这里空打）；
+ *   · 会话在位 ⇒ 把**这一份** shareId 交给那一份会话的 `pullShareOps`
+ *     （落进别的缓存 = 拉到了但合并视图看不见）；
+ *   · 🔴 重画的条件与信号那一路同一条：`added > 0` **或**有验签拒 —— 被拒那条根本没落盘，
+ *     只看 `added` 的话"验签被拒"恰好长成"什么都没有"的静默；
+ *   · 🔴 界面里这一枚**有调用点**且只按 `selected` 触发，全壳只许这一处。
+ *     装配存在但没有调用点正是"第 10 项幻觉"的形状（纯逻辑全绿、设备上前空清单）。
+ */
+describe('打开一份共享清单 ⇒ 拉一次既有下行（移动端装配）', () => {
+  function sessionFor(
+    pull: ShareSignalSession['pullShareOps'],
+    rejections: readonly unknown[] = []
+  ): ShareSignalSession {
+    return {
+      channel: { dispatch: vi.fn(async () => undefined), stateFor: () => emptyState() as MaterializedState },
+      pullShareOps: pull,
+      signatureRejections: () => rejections,
+    };
+  }
+
+  const depsWith = (session: ShareSignalSession | undefined): ShareSignalDeps => ({
+    ensureSession: async () => session,
+    ensureStorage: async () => undefined,
+  });
+
+  it('会话还没建出来（未登录/未解锁）⇒ 零请求，且返回"没拉过"', async () => {
+    const pull = vi.fn(async (shareId: string) => ({ fetched: 0, added: 0, cursor: 0, pages: 0 }));
+    const deps: ShareSignalDeps = {
+      ensureSession: async () => sessionFor(pull),
+      ensureStorage: async () => undefined,
+    };
+    // 会话缺席的那一支：把同一枚替身换一个"建不出来"的 ensureSession。
+    const reading = await pullSharedContentsOnOpen('s1', { ...deps, ensureSession: async () => undefined });
+    expect(reading).toEqual({ shareId: 's1', pulled: false, added: 0 });
+    expect(pull).not.toHaveBeenCalled();
+  });
+
+  it('会话在位 ⇒ 把这一份 shareId 交给**那一份**会话的下行出口', async () => {
+    const pull = vi.fn(async (shareId: string) => ({ fetched: 2, added: 2, cursor: 11, pages: 1 }));
+    const reading = await pullSharedContentsOnOpen('s-7', depsWith(sessionFor(pull)));
+    expect(pull, '打开共享没接上下行出口 —— 加入之前就在清单里的东西永远看不见').toHaveBeenCalledTimes(1);
+    expect(pull.mock.calls[0]?.[0]).toBe('s-7');
+    expect(reading).toMatchObject({ shareId: 's-7', pulled: true, added: 2 });
+  });
+
+  it('拉到新内容 ⇒ 敲重画（界面从盘上重读那一份缓存）', async () => {
+    const repaint = vi.fn();
+    subscribeShareRepaint(repaint);
+    await pullSharedContentsOnOpen(
+      's1',
+      depsWith(sessionFor(async () => ({ fetched: 1, added: 1, cursor: 4, pages: 1 })))
+    );
+    expect(repaint).toHaveBeenCalledTimes(1);
+  });
+
+  it('🔴 added = 0 但有验签拒 ⇒ 照样敲重画（被拒那条没落盘，只看 added 就是静默）', async () => {
+    const repaint = vi.fn();
+    subscribeShareRepaint(repaint);
+    const session = sessionFor(async () => ({ fetched: 1, added: 0, cursor: 4, pages: 1 }), [
+      { shareId: 's1', reason: 'bad signature' },
+    ]);
+    await pullSharedContentsOnOpen('s1', depsWith(session));
+    expect(repaint, '验签被拒在界面上不许长成"什么都没发生"').toHaveBeenCalledTimes(1);
+  });
+
+  it('对照臂：added = 0、也没有被拒 ⇒ 不敲重画（否则上一条永远绿）', async () => {
+    const repaint = vi.fn();
+    subscribeShareRepaint(repaint);
+    await pullSharedContentsOnOpen(
+      's1',
+      depsWith(sessionFor(async () => ({ fetched: 0, added: 0, cursor: 4, pages: 1 })))
+    );
+    expect(repaint).not.toHaveBeenCalled();
+  });
+
+  it('下行炸了不许抛穿界面：读数留下、这一趟不敲重画', async () => {
+    const repaint = vi.fn();
+    subscribeShareRepaint(repaint);
+    const session = sessionFor(async () => {
+      throw new Error('share pull failed');
+    });
+    const reading = await pullSharedContentsOnOpen('s1', depsWith(session));
+    expect(reading.pulled).toBe(true);
+    expect(reading.error, '拉不成也要有痕迹').toBeInstanceOf(Error);
+    expect(repaint).not.toHaveBeenCalled();
+  });
+
+  it('🔴 界面里有调用点，且全壳只此一处、只按 selected 触发', () => {
+    const callSites = mobileSources().filter((file) => {
+      if (file.endsWith('src/share/share-signals.ts')) return false; // 定义处自己不算调用点
+      return stripComments(read(file)).includes('pullSharedContentsOnOpen(');
+    });
+    expect(callSites, '判据装配了却没人调 = 设备上前空清单，纯逻辑照样全绿').toEqual([
+      'apps/mobile/src/screens/ShareSpaceScreen.tsx',
+    ]);
+
+    const source = stripComments(read('apps/mobile/src/screens/ShareSpaceScreen.tsx'));
+    const callAt = source.indexOf('pullSharedContentsOnOpen(');
+    const depsAt = source.indexOf('}, [', callAt);
+    const deps = source.slice(depsAt + 4, source.indexOf(']', depsAt)).trim();
+    expect(deps, "挂 tick 就变成「拉到 ⇒ 顶 tick ⇒ 再拉」的自循环；挂 dataRevision 会把它降级成切屏才拉").toBe('selected');
   });
 });

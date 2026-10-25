@@ -127,6 +127,7 @@ import { useNoteStore } from './features/notes/store.js';
 import { ReminderNotifyPanel } from './features/reminders/ReminderNotifyPanel.js';
 import { useReminderNotifications } from './features/reminders/use-reminder-notifications.js';
 import { useShareActivitySignal } from './features/share/use-share-activity-signal.js';
+import { useShareOpenPull } from './features/share/use-share-open-pull.js';
 import { useShareRosterSignal } from './features/share/use-share-roster-signal.js';
 import { RailNavigation } from './features/shell/RailNavigation.js';
 /**
@@ -1823,6 +1824,12 @@ export function App(): React.JSX.Element {
     if (view !== 'tasks' || f.kind !== 'project') return undefined;
     return projects.projects.find((p) => p.id === f.projectId);
   }, [store.filter, view, projects.projects]);
+  /**
+   * 🔴 停在某份**共享**清单上 ⇒ 拉一次那条下行的既有内容。
+   * 判据本体与理由在 `features/share/use-share-open-pull.ts`（同一枚洞在 iOS 设备腿
+   * L2 那一格实测抓到：实时信号只在"有人新写"时响，加入之前就在清单里的东西没人带）。
+   */
+  useShareOpenPull(currentProject?.shareId);
   const syncConfigured = useSyncStore(
     (s) => s.baseUrl.trim() !== '' && s.token !== undefined && s.token.trim() !== '',
   );
