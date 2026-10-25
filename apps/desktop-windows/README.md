@@ -52,7 +52,10 @@ Windows 端交付**真正的原生应用**：WinUI 3 / Windows App SDK，原生�
    —— 与 Web 宿主的 `dispatchIntent()` 同一条纪律（AGENTS.md §3.4）。
 3. **能进 CI 的部分不许留在 Windows 上。** 壳里最容易错的是**跨语言那一层**，
    而它一点 Windows API 都不需要 ⇒ 拆成 `net10.0` 的 Core，**在 Linux/macOS 上就能验**。
-   留在 Windows 上的只剩 XAML + 窗口生命周期，那部分靠人眼看。
+   留在 Windows 上的原本是 XAML + 窗口生命周期。2026-10-25 之后**只剩 XAML 语义 + 一次真启动**：
+   `pnpm check:windows-xaml`（[`xaml-probe/`](xaml-probe/README.md)）在 macOS/Linux 上把
+   真实 C# 编过、并用 WinUI 元数据核对 XAML 里每个元素/属性/事件/枚举成员/绑定路径/资源键。
+   ⚠️ 它**不编 XAML** —— 样式键解析、模板合法性、控件树运行时行为仍只有 Windows 能答。
 
 ## 2. 怎么构建、怎么跑
 
@@ -65,7 +68,11 @@ node packages/app-host/scripts/build-native-bridge.mjs
 HEYTA_BRIDGE_BUNDLE="$PWD/packages/app-host/bridge-bundle/native-bridge.js" \
   dotnet run -c Release --project apps/desktop-windows/smoke/Smoke.csproj
 
-# ③ 壳本体：**只在 Windows 上**
+# ③ WinUI 那一半：**任意 OS**（真实 C# 编译 + XAML 名字的元数据核对，约 10 秒）
+pnpm check:windows-xaml
+#    它编不过 = 在 Windows 上同样编不过（2026-10-25 用它抓到过三个真 bug）
+
+# ④ 壳本体整包（含 XAML 编译器 / PRI / MSIX）：**只在 Windows 上**
 dotnet build apps/desktop-windows/HeytaWindows/HeytaWindows.csproj -c Release -p:Platform=x64
 ```
 
@@ -182,21 +189,20 @@ HeytaApp.open 失败：'c' is an invalid start of a value. LineNumber: 0
 | **界面只有任务列表** | 象限 / 清单 / 标签 / 重复 / 备注编辑 / 设置都还没有门面 |
 | **编组开销** | 用 JSON 文本过边界，实测约 **4.9 µs/行**（[基准](../../research/spikes/sqlite-driver-csharp/README.md)）。这是**已知取舍**，换的是"类型映射只有一处" |
 | **Jint 约束不可捕获** | 引擎失控（死循环/内存暴涨）会**杀掉整个进程**。W1 要么做隔离，要么显式接受（已进计划风险登记） |
-| **不在任何门禁里** | `check:design` / `check:layering` 等扫描器都是 JS/TS 的，看不到 C#。计划 §6 已登记要补 |
+| ~~**不在任何门禁里**~~ | ✅ **已关闭一半（2026-10-25）**：`pnpm check:windows-xaml` 现在会①把仓库里的真实 C# 编进一个 `net10.0-windows` 工程、②用 WinUI 元数据核对 XAML 里的元素/属性/事件/附加属性/枚举成员/`x:Bind` 根成员/资源键。⚠️ 仍**不覆盖**：XAML 语义（样式键解析优先级、模板合法性）、窗口与 WebView2 的运行时行为 —— 那两格只有真启动能答。设计扫描器（`check:design` 等）仍只扫 JS/TS，C# 里的裸值没人管 |
 | 🔴 **「任务行单一来源」门禁看不见这里的 XAML** | `scripts/check-row-single-source.mjs` 只扫 JS/TS（`.tsx`），而 `MainWindow.xaml` 里的任务行模板**是第二份实现**。**这是刻意的例外，不是漏网**：原生 UI 不可能复用 React 组件 —— 这正是 [ADR-0034](../../docs/adr/0034-windows-native-winui3-not-rnw.md) §4 已经承认的「`packages/ui` 对 Windows 归零」。⚠️ 代价要认：**任务行的视觉/行为在 Windows 上会独立漂移**，门禁不会替你发现。要么接受，要么将来为它加一条"渲染同一份数据契约"的视觉回归 |
 
 ## 6. 下一步（按价值排序）
 
 1. ~~在真 Windows 上启动窗口并截图~~ ✅ 已完成，见 §7 与 [`evidence/`](evidence/)。
-2. 把无头冒烟接进门禁：🔴 **脚本有了，但还没接进 `pnpm check`** ——
-   `scripts/check-windows-shell.mjs` 存在，而全仓 `package.json` 里**没有**
-   `check:windows-shell` 这个 script，`pnpm check` 与 CI 也都没有引用它。
-   ⚠️ 这里原先写的是"✅ `check:windows-shell` 已接进 `pnpm check`"，
-   **2026-09-28 实测为假**（`grep check:windows-shell package.json` 零命中）。
-   已按实测改正：**假声明比没有声明更坏**，它让下一个人以为这块有人守着。
-   真正要做的两件事：加 `check:{macos,windows,linux}-shell` 三个 script，
-   并把能在当前主机上跑的那一个加进 `pnpm check` 的链里。
-   **还没做的**：让它在**真 Windows** 上跑（现在 macOS 也跑，但 Windows 上更接近真实）。
+2. ~~把无头冒烟接进门禁~~ ✅ **已完成（2026-10-25 现量）**：三个壳的冒烟都在
+   `package.json` 里、也都进了 `pnpm check` 链 ——
+   `node -e "const c=require('./package.json').scripts.check.split('&&').map(s=>s.trim());console.log(c.filter(x=>/check:(windows|macos|linux)-shell|check:windows-xaml/.test(x)))"`
+   应打出四行（`check:windows-xaml` + 三个壳）。
+   ⚠️ 仍然成立的那半句：这些只有在**对应主机**上才是真门禁 —— CI 的 ubuntu runner 上
+   `check:windows-shell` / `check:macos-shell` 按设计跳过（没有 `dotnet` / 没有 macOS），
+   所以"链里有它"不等于"CI 里验过它"。
+   **还没做的**：让 `check:windows-shell` 在**真 Windows** 上跑过一轮（macOS 上跑的是跨语言那一层）。
 3. 门禁覆盖 C#：`check:licenses:nuget` 已经会扫到本目录的 `*.csproj`（它按仓库遍历）。
    ⚠️ WinUI 工程只在 Windows 上评（macOS 上还原就失败，脚本会**显式跳过并印出来**）。
 4. 界面按需长：一个视图一个视图地加，**每加一个都要问"原生界面真的渲染它吗"**，

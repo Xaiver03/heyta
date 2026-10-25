@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    XAML 探针的**工具本体**（任意 OS 可构建）。
+
+    它是 `scripts/check-windows-xaml.mjs` 的执行者，做两件 XAML 编译器在 macOS/Linux
+    上做不到的事：
+
+      · `emit-stubs`：把每个 `.xaml` 里 `x:Name` 与 `InitializeComponent()` 的生成物
+        从**真实 XML** 机械地造出来（以前这份替身是手写的，11 个字段，多一个少一个都没人知道）；
+      · `validate`：拿 WinUI 自己的元数据（`Microsoft.WinUI.dll` / `Microsoft.Windows.SDK.NET.dll`）
+        逐条核对 XAML 里写的**元素类型、属性名、事件名、附加属性、枚举成员、资源键**。
+
+    🔴 元数据从哪来：不是写死路径，也不是按版本去猜 —— `compile/WinUiCompileProbe.csproj`
+       构建时会把自己**真的看到的** `@(ReferencePath)` 落到 `obj/probe-refs.txt`，
+       本工具只读那份。工具链/包版本一变，输入跟着变，不会静默指向旧包。
+
+    ⚠️ 边界：它**不是** XAML 编译器。控件树的样式键解析、模板合法性、`x:Bind` 的类型转换
+       仍只有 Windows 上的 XamlCompiler 能 100% 回答。这里做到的是"名字与成员层面不可能
+       写错"—— 2026-10-25 那三个真 bug（`Windows.Graphics.SizeInt32` 被解析成 `Heyta.Windows.Graphics`、
+       `KeyboardAccelerator` 缺 import、`Key=","` 表达不出来）里，后两个正是这一层能当场判红的。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Heyta.XamlProbe</AssemblyName>
+    <RootNamespace>Heyta.XamlProbe</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    🔴 **零 PackageReference**：读元数据用的是 .NET 自带的 `System.Reflection.Metadata`
+       （随运行时一起分发）。`MetadataLoadContext` 那条路要一个 NuGet 包，而本仓库的规矩是
+       "引入第三方组件先过可维护性 + 许可证两道门" —— 读 DLL 这件事不值得为此加一条会漂的依赖。
+  -->
+
+</Project>
