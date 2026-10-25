@@ -11975,3 +11975,30 @@ B216 那一行进库之后，本线在新隔离载具 `.worktrees/inb-t10`（`gi
 这一轮我又一次用 `grep '✘'` 数 Playwright 的失败行，而 line reporter 在两种模式下形状不同 ——
 **读数要么从 `N failed` 汇总行取，要么从 `test-results/*/error-context.md` 逐枚读**。
 B227 的第一版就是被这一枚误读数带偏的（把"串行同样红"读成"串行全绿"）。
+
+### B228 追记（2026-10-25 18:0x）：CI 现在红在**另一条线的半提交状态**上，不在本线的改动里
+
+`check` 链第 ~40 环 `node packages/legal/scripts/gen-site-copy.mjs --check` 在 CI 红：
+
+    🔴 packages/i18n/src/locales/zh-CN.ts 里的法律文本站点文案与 @heyta/legal 不一致
+    🔴 packages/i18n/src/locales/en.ts 里的法律文本站点文案与 @heyta/legal 不一致
+
+逐条取证（本机，把那份未提交的法律源还原成 HEAD 版本再跑，跑完原样还回去）：
+
+| 位置 | 现在写的是 |
+|---|---|
+| `HEAD` 的 `packages/i18n/src/locales/zh-CN.ts`（已提交） | 「…对话式助手**也在这一档里**，它一次会话会发多次请求…」（新口径） |
+| `HEAD` 的 `packages/legal/src/documents/ai-and-transfer.ts`（已提交） | 「…且**不含**对话式助手」（旧口径） |
+| **工作区**同一份法律源（未提交，另一条线正在改） | 新口径长文（多轮形态那一整段） |
+
+⇒ **HEAD 自己就是不自洽的**：词条已经按新口径提交了，而产生它的法律源改动还在别人的工作区里。
+这就是为什么我本地 `--check` 绿、CI 红 —— 我本地那份 `packages/legal/dist` 是从**他们未提交的源**构建的。
+
+🔴 **处置：这条不能由我修。** 两条路都属于那条线：
+① 把 `packages/legal/src/documents/ai-and-transfer.ts` 的改动提交（推荐，口径是他定的）；
+② 反过来把词条回退成旧口径。
+任何"我来回退词条"的动作都会把他们刚定的政策文本改回去 —— 所以本线**不动**这两个文件
+（我只在核对时临时换入 HEAD 版本，跑完 sha256 校验原样还原，见提交前的核验读数）。
+
+⇒ 结论：**CI 的这条红与本会话的所有改动无关**，它每次 push 都会在同一环停住；
+在它落地之前，本线推任何东西拿到的都是同一条红。
