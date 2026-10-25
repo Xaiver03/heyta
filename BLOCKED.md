@@ -12056,3 +12056,24 @@ B227 的第一版就是被这一枚误读数带偏的（把"串行同样红"读�
 ② 浮层贴底时朝上弹（flip）；
 ③ 把整理浮层**移出**行尾折叠面板（回到行那一层）——视觉改动最大，但结构最干净。
 ⚠️ 三个浮层（整理 / 重复 / 提醒截止）要一起改，只修一个会留下两种行为。
+
+### B228 第三次盘账（2026-10-25 深夜，第 2 轮）：e2e 还剩 8 组，逐组现状
+
+已转绿（本会话）：`narrow-sweep` 10 + `pages-sweep` 8 + `renew-panel` 6 + `reminder-permission-final` 5 +
+`inbox` 3 + `motivation` 3 + `p0-remediation` 4 + `rail-trash-anchor` 1 + `detail-pane-task` 15 +
+`assistant-resize-ux` 1 + `assistant-navigation-acceptance` 5 + `ai-assistant-atomic-tools` 2 +
+`sidebar-resize` 3 + `shell-sidebar-height` X2 + `task-organize` 2 + `account-email-change-and-sessions` 7。
+
+| 组 | 现状 | 根因 |
+|---|---|---|
+| `detail-pane-collapse` T3b | 红 | 设置里把「收起」点成「常驻」之后 `detail-column` 没回来（前置 `showDetailColumnContent` 已选任务） |
+| `detail-pane-collapse` T5 | 红 | `detail-pane-toggle` 在探针的那一档**不可见**（`canToggleDetailPane` 为真、元素在 DOM，但 `toBeVisible` 失败） |
+| `shell-no-document-scroll` W2 | 红 | **B229**（真布局缺陷：整理浮层滚到 max 仍差 69px） |
+| `shell-sidebar-height` X1 | 红 | 同一族：滚到底后触发器底边 614 > 视口 600（内容列没把那一行压进可视区） |
+| `auth-login-code` 3 / `auth-registration-otp` 2 | 红 | 登录/注册面板的入口与表单结构变了（`openAuthPanel` 拿得到 dialog，但 `auth-form-remember-password` 不在里面）——**需要先定"默认走验证码还是密码"** |
+| `search-overlay` 1 | 红 | 卡片 `border-top-width: 2px`，而判据写的是"输入与浮层均无描边"——**需要裁决** |
+| `shell-sync-rail` S3/S4 | 红 | ①设置「同步」节里没有 `sync-status-bar`（它只在 rail 底部）；②`服务端地址` 输入框有 2 个——**需要裁决** |
+| `vault-settings` 1 | 红 | `account-menu-settings` 这枚 menuitem 点击被拦截（element resolves、click 超时），可能与 B227 里 admin-console 那枚 `<nav class="ht-sidebar"> intercepts pointer events` 同源 |
+
+⇒ **需要产品裁决的 3 组**（auth / search-overlay / sync 节）我停在这里没动，理由写在上面每一行。
+其余 5 组都是"根因已定位、改法明确"的活。
