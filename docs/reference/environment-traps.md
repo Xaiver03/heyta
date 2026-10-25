@@ -11724,3 +11724,83 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     别急着改判据（这一族与 #536 相邻：一枚判决臂只能否证它自己那一枚的解释）；
     ③同一件事在 `packages/*` 自己的测试里不会遇到（它们 `import '../src/...'`），
     所以"包内绿、跨包红"不是矛盾，是**两条臂量的是两份字节**。
+571. **底部标签"在树上"不等于人在那一档的根：第二层屏里它也在场，再按同一档是空操作**
+    2026-10-25 移动协作旅程第 26 跑：入群成功后第 7 步沿用第 6 步的"按「我的」回到共享入口"，
+    连按 5 次全空转，`where_am_i` 恒为「共享清单」，装置报「按不进共享清单入口」。
+    真相不是入口坏了：`apps/mobile/src/App.tsx:285-293` 的五块面板是 `display:none` 常驻，
+    共享面挂在 `ProfileScreen` 内部（`ProfileScreen.tsx:1500`），所以**底部标签一直在 AX 树上**，
+    而人已经在「我的」这一档里 —— 再按同一档不改 `tab`，也就退不出那一层。
+    ⇒ 两条纪律：① "到底部标签层"这类判据证的是**控件在场**，不是**人在根**，弱判据会一路骗到下一步；
+    ② 第二层屏的出路是它自己顶栏那枚「返回」（`ShareSpaceScreen.tsx:631` 的 `backAction`，逐层
+    `setSelected/setCommentTask`），装置要**先量到达判据、不在才按「返回」**（`back_to_anchor`），
+    已经在目标层上不白按。同族的第三层（任务详情里的评论节）是同屏内联，不是新的一层 ⇒ 一发就够。
+572. **文案对账门与设备判据双双绿，那一句话却在对应用户面前谎称界面能力 —— 只有肉眼看得见**
+    2026-10-25 逐张复核第 26 跑截图：手机入群成功那一屏画的是「加入成功，清单已出现在侧栏。」，
+    而手机上**没有侧栏**（加入之后能看见那份清单的那一节叫「已共享的清单」）。
+    两条既有尺为什么都不红：设备腿判的是"有没有走到成功那一相位"（句子对不上它不管），
+    `check:verify-script-copy` 判的是"脚本里的句子在不在词条表里"（它在，因为那是**给 web 写的**句子）。
+    ⇒ ①一族的错要按**类**修：`apps/mobile/tests/share-ui-assembly.spec.ts` ⑥ 扫全部
+    `mobileSources()` 里被用到的词条，中文值点名"只在另一壳存在的格子"就红，配一枚对照臂
+    （探针必须读得到 `web.share.join.done` 里那枚「侧栏」，读不到就是探针坏了、反向判据恒真）；
+    同族存量三枚 `common.{organizer,trash}.*` 归回收站/归档那条线，登记在册而不代改 —— 那张债表
+    **只许变短**，被修掉却不删名目同样判红。②改文案时把设备判据从**整句**换成那一相位的独占
+    `testID`（`wait_tree_id "share-join-done"`）：拿句子当到达判据等于把装置和文案绑死，
+    改一个字就要重烧一趟稀缺的设备窗口。
+573. **显式指定了模拟器 UDID，装置却不验它此刻是不是 Booted：两分钟后才在 `simctl install` 撞出 SimError 405**
+    2026-10-25 第 27 跑：上一趟之后那台设备被关机（步骤 0 自己打印的"本机已启动模拟器 0 台"就是读数），
+    装置却一路走到第 2 步才失败 —— `Unable to lookup in current state: Shutdown`
+    （domain=`com.apple.CoreSimulator.SimError`, code=405），白烧一次构建与一趟窗口。
+    根因是**两条取设备的路不对称**：不给 `IOS_UDID` 时从 `simctl list devices booted` 里挑，天然只挑到开着的；
+    显式给了 UDID 就直接用，没人再看它的 state。修法：步骤 0 现量 `UDID_STATE`，不是 `Booted` 就
+    按环境档退出并把那一条命令写进话里（`xcrun simctl boot <udid>`）。
+    ⚠️ 装置**不代起设备**是这条线的既有纪律（起哪台要人判闲忙，见计划 §9.13 的装机读数），
+    所以这里只把失法说清、给命令，不替你 boot。
+574. **移动端 bundle 吃的是各 workspace 包的 `dist`，不是 `src`；配上锚在 `testID` 的到达判据，"文案没换过来"会静默通过**
+    2026-10-25 第 28 跑：为修"手机上谎称 web 格子"那格改了 `packages/i18n/src/locales/{zh-CN,en}.ts`
+    与 `JoinShareScreen.tsx`，直接跑装置 ⇒ 装机的 bundle 里两枚新键根本不存在
+    （现量：`grep -rl mobile.share.space.sharedTitle packages/i18n/dist --include='*.js'` 命中 2 个文件，
+    同一把尺量新键命中 **0** —— 老键命中这一半是**对照臂**，否则"0"会被读成"探针坏了"）。
+    根因不是 metro 配置：`apps/mobile` 依赖的 **13 枚 `@heyta/*` 的 `main`/`exports["."]` 全部指向 `./dist/…`**
+    （`@heyta/ui` 也在内 —— 别以为壳里跑的是源码），metro 照 `package.json` 解析。
+    🔴 危险的是它**恰好**撞在刚把 L1 到达判据从整句换成 `testID` 之后：节点在、句子旧 ⇒ 判据绿。
+    整句判据虽然烦人（改一个字重烧一趟设备），却是这一格**唯一**的读数。
+    ⇒ 两条一起才成立：①到达判据用 `testID`（相位与文案解耦）；②构建之前先量新鲜度 ——
+    装置第 2 步现在对"被移动端依赖且 `src` 比 `dist` 新"的包**直接按环境档退出**并打出那条
+    `pnpm --filter … build`（`verify-mobile-collab-ios.sh` 第 2 步）。
+    只留②会漏掉"改了 src 忘了构建还继续跑别的腿"，只留①就是现在这个形状。
+    ⚠️ ① 单独用会反过来咬一口，适用条件记在 #575：**`testID` 只有挂在可交互节点上才会进 AX 树**。
+
+575. **RN 的 `testID` 挂在 `Text` 上不会变成 `AXUniqueId` —— 拿它当到达判据 = 产品绿、装置红**
+    2026-10-25 第 29 跑：L1 的到达判据按 #574 的建议换成了 `wait_tree_id "share-join-done"`，
+    跑满 240s 报「手机上没有走到「加入成功」那一句」。而失败那张截图（`06f-加入没走到成功态.png`）
+    上**明明白白画着**「加入成功，这份清单已经在「已共享的清单」里了。」⇒ 红的是装置，不是产品。
+    现量（同一台设备、同一屏，`idb ui describe-all`）：那一屏 11 枚节点里只有 **1** 枚带 `AXUniqueId`
+    （`share-join-close-final`，role `AXButton`）；成功那句是 `AXStaticText`、`AXUniqueId=None`。
+    根因：RN 只给**可访问元素**（`Button`/`Pressable`/`TextInput` 那类）落 `accessibilityIdentifier`，
+    纯文字与容器节点即便写了 `testID` 也只带 `AXLabel` ⇒ `tree_has_id` 恒不命中，
+    而且**不会以任何方式告诉你它没命中**（它返回 1，与"产品没走到那一相位"同形）。
+    同一枚名字在 web 侧却是好的：`apps/web` 那侧是 `<p role="status" data-testid="share-join-done">`，
+    Playwright 的 `getByTestId` 吃 DOM 属性，不吃 AX ⇒ **别把"这枚锚点在 web 绿"当成它在设备上也可用**。
+    ⇒ 三条：①到达判据锚在**该相位独占的可交互节点**上（这里就是同屏那枚「关闭」，
+    它只在 done 分支才画）；②那句文案留给肉眼复核截图，不当判据；
+    ③装置里 `id:` 前缀的锚点每次新增都要回源码确认它挂在 `Button`/`Pressable`/`TextInput` 上
+    （`verify-mobile-collab-ios.sh` 的 `wait_tree_id` 文件头已把这条写成前提）。
+
+576. **变异还原的那一发 `cp` 会把 `src` 的 mtime 顶到 `dist` 之后 —— #574 那道新鲜度尺随后必红一次**
+    2026-10-25 第 31 跑（第一次点火）：修完 L2 那一格后按纪律从 `.mut-bak` 还原
+    `packages/app-host/src/share-signals.ts`，**内容逐字等于构建时那份**（现量：还原后
+    `md5 -q` 与变异前基线一致），但装置第 2 步直接 `exit 3`：
+    「这些被移动端依赖的包 src 比 dist 新 ⇒ 装进 bundle 的会是旧产物：@heyta/app-host」。
+    根因：那道尺比的是**mtime**（`newest(src) > newest(dist)`），而 `cp` 只认时间不认内容 ——
+    它不知道这次写入是把文件**还原**成了已经构建过的那一份。
+    ⚠️ 不要把这条读成"尺子坏了、该放宽成按内容比"：它按 mtime 判是故意的，内容比对要哈希整棵
+    `src` 树，代价比一趟 `pnpm build` 高；而且"mtime 新"里混着**真没构建**那一支（#574 的来由）。
+    同一把尺还会被**别线的脏工作树**触发：第 31 跑第二发红在 `@heyta/ai @heyta/i18n` 两枚 ——
+    那是并行会话正在改的 `src`，与本线无关，但同一台机器上 `dist` 是**共享**的，
+    照它给的命令 build 之后，那一趟 bundle 里就**含进了别人未提交的改动**。
+    ⇒ 三条：①跑设备/构建类验收前，若本批做过变异还原，先按装置打出的那条 `pnpm --filter … build`
+    补一次构建再点火（别把这一发的 `exit 3` 登记成"产品又坏了"）；
+    ②被别线的包挡住时，先 `git status --porcelain -- packages/<那枚>` 看清是不是别人的活，
+    是就在读数里写明"这一趟的 bundle 含别线未提交改动"（现量：`apps/mobile/evidence/<本趟>/bundle-sha256.txt`），
+    否则这轮的截图无法归到某一次改动上；③还原后**同时**核 md5 与 mtime —— 只核 md5 会漏掉
+    "下一趟装置必红"这一格，只核 mtime 会漏掉内容漂移。

@@ -518,13 +518,17 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 
 **M5 没做到的，写清楚是谁的**：
 
-- ⚠️ **本线还剩一枚轮询，但它不是 M5 撤掉的那一类**：`apps/web/src/features/share/ShareFeature.tsx` 里开着面板时每 3s
-  `reload` 一次（现量 `grep -n "setInterval" apps/web/src/features/share/ShareFeature.tsx`）。
-  它取的是**清单详情与成员**（邀请被接受、成员信封下发都发生在另一端），而 `grep -rn "notifyShareOps" server/src`
-  只回**两行**：一行是 `websocket-connection.service.ts` 里的定义，一行是 `share.routes.ts` 里 share log 追加路径上的调用 ⇒
-  **发信号的只有那一条路径**，成员/信封那一份状态**不在这条信号的覆盖面上**。
-  所以撤掉它会把"邀请被对面接受后面板自己更新"退化成"刷新页面才更新"——**这不是漏撤，是要另立一条**：
-  服务端在成员/信封写路径上也发一条信号，或让面板从本机已知事件重取。归 M4 之后的活，不进 M5 的读数。
+- ✅ **这一格 2026-10-25 结案：那枚 3s 轮询已撤，改由名册信号驱动**（M5-1，[ADR-0070](../adr/0070-share-roster-changed-signal-replaces-polling.md)）。
+  现量：`grep -n "setInterval" apps/web/src/features/share/ShareFeature.tsx` ⇒ **零命中**；
+  替代它的是服务端 `notifyShareRosterChanged`（`server/src/sync/services/websocket-connection.service.ts`，
+  与 `notifyShareOps` 同一条安全契约：只说"成员面动过"，不带名单/内容/序号），
+  写路径上的覆盖面现量：`grep -c "await notifyShareRoster(" server/src/shares/share.routes.ts`。
+  ⚠️ **下面这段是当时为什么"不许撤"的理由，留着才有判断依据**（2026-10-21 写的）：那会儿
+  `grep -rn "notifyShareOps" server/src` 只回两行 —— 定义 + share log 追加路径上唯一一发调用 ⇒
+  成员/信封那一份状态**确实不在信号覆盖面上**，撤掉轮询会把"邀请被对面接受后面板自己更新"退化成"刷新才更新"。
+  所以当时的结论是"这不是漏撤，是要另立一条" —— 那条另立的信号就是 ADR-0070，它现在在册。
+  🔴 它同时解释了为什么名册信号**故意不排除发起方**（`notifyShareOps` 那条 `excludeClientId` 在这里没有对应物）：
+  服务端只有 userId 维度的连接表，按 clientId 排除会把同账号的另一台一起排掉。
 
 - ✅ **通知正文的口径已经拍了并落进 web（2026-10-24，`docs/adr/0071-share-notification-content-boundary.md`）**：
   正文允许「这份共享清单的名字 + 活动种类」，条目内容（任务标题、评论正文、便签内容）一律不进 ——
@@ -580,10 +584,14 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 而 `GET /shares/:id/members` 把它回给 owner（`server/src/shares/share.routes.ts:464`）⇒
 `ShareFeature.tsx:328` 那行 `identityPublicKey === null ⇒ continue` 不会挡住 bob。
 剩下的两种都可能，且**现有任何尺子都量不到**：① 截图那一刻 `autoSeal` 的补封往返还没落地
-（面板 3s 轮询，旅程在那之后立刻拍图）⇒ 瞬态；② 补封真的没跑成 ⇒ owner 那台**永远**看不到
+（当时面板每 3s 轮询一次，旅程在那之后立刻拍图）⇒ 瞬态；② 补封真的没跑成 ⇒ owner 那台**永远**看不到
 "转让给 bob"（B-10 那道门按 `hasEnvelope` 判）。
-判它只要一条：在旅程第 7 段之后 `await expect(ownerPage.getByText('等待所有者授权')).toHaveCount(0)`
-（等 ≥ 一个轮询周期），要么它现在就绿（证明是瞬态、把这句留在册当回归钉），要么它红得有意义。
+判它只要一条：在旅程第 7 段之后 `await expect(ownerPage.getByText('等待所有者授权')).toHaveCount(0)`，
+要么它现在就绿（证明是瞬态、把这句留在册当回归钉），要么它红得有意义。
+⚠️ **等多久这一句 2026-10-25 要按现量改口径**：面板那枚 3s 轮询已经撤了（§9.10 那条 ✅ 结案，ADR-0070），
+所以"等 ≥ 一个轮询周期"不再是一个可执行的等待 —— 现在等的是**名册信号那一趟落回**
+（服务端 `notifyShareRosterChanged` → 宿主重取；现量 `grep -n "setInterval" apps/web/src/features/share/ShareFeature.tsx` 零命中）。
+写断言时别拿固定秒数当量，要等那一格自己变（`toHaveCount(0)` 带 timeout 就是这一形状）。
 🔴 这一格**不在本批判据内**，也没被用它改过任何代码 —— 写下它是为了别把它弄丢。
 
 ### 9.12 M4 落地（2026-10-23 第六批）—— 逐 op 签名的读数
@@ -671,7 +679,7 @@ ADR-0050 那句「RN port 只传递 base64 root key」加了**限定范围**的�
 `docs/agents/progress-log.md` 那句"M6 移动端零接入"改口；
 环境陷阱新条目见现量：`grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md`（本批写的是 #559）。
 `share-key-store.ts` 文件头原来那句"注销/撤销路径按同样后缀**即可**一并清掉"**过强** ⇒ 已改成如实口径
-（能清，但今天 `clearMobileVaultSession` 只删 root key；这一格转成下面的待拍板项，见「这一批还剩什么」）。
+（能清，但今天 `clearMobileVaultSession` 只删 root key；这一格转成下面的待拍板项，见 §9.14 末节「这一批还剩什么」）。
 
 **但本节标题不能覆盖第 22 跑那一步**：那一跑红在 `走不到「同步与隐私 → 使用自托管服务器」那张表单`，
 取证之后定性是**装置缺陷**（截图 `apps/mobile/evidence/collab-ios-10251233/02-自托管表单没开.png`
@@ -703,5 +711,139 @@ ADR-0050 那句「RN port 只传递 base64 root key」加了**限定范围**的�
 所以"Android 的 M6 已验"这句话现在不成立，成立的只有"编译过 + JS 侧形状钉住"。
 另记一条装置事实：远端源码包名 `C:\src\heyta-src-android.tar.gz` 是**跨会话共享**的，
 两条会话同时送包会互相覆盖 —— 第一趟就是这么红的（对账门按设计拒了混合树，重试即过，不是构建坏了）。
+
+---
+
+### 9.14 M6 移动端设备腿·第八批（2026-10-25 第 24–31 跑）—— L1 第一次真过、L2–L6 全绿，以及三处"两把尺都绿"的洞
+
+**这一段判的是哪句话**：§9.13 末尾那句"设备腿当时红"到本批为止的形状。
+逐格读数在下面这张表里，**每次现量**（`pnpm verify:mobile-collab:ios`），别抄本节文字。
+
+**跑次归因**（同一台模拟器 `heyta-collab-m6-oct24` / `60D29F47-…CBF3281`，每轮 `simctl uninstall` 起全新态）：
+
+| 跑 | 退 | 红在哪一格 | 归因（装置 / 产品 / 环境） |
+|---|---|---|---|
+| 24 | 3 | 第 6 步「凭证没进输入框」 | **装置** —— `tree_has` 解析的是上一次快照，而 `fill_field` 的回读走 shim 的定向快照 ⇒ 两句话量的不是同一棵树（#564）。手工 `describe-all` 证明 `AXValue` 逐字就是那一串 |
+| 25 | 1 | 第 6 步「没走到加入成功」 | **产品** —— `JoinShareScreen` 在成功那一拍同一帧调 `onJoined`，宿主立刻换屏 ⇒ 回执**一帧都没画过**，装置等满 240s |
+| 26 | 1 | 第 7 步「按不进共享清单入口」 | **装置** —— 底部标签此刻**在树上但按了不动**（人已经在「我的」这一档的第二层里，五块面板是 `display:none` 常驻），出路只有顶栏「返回」（#571） |
+| 27 | 3 | 第 2 步 `simctl install` | **环境** —— 那台模拟器在上一趟之后被关机；显式给了 `IOS_UDID` 的那条路不验 `Booted`，于是白烧一次构建（#573）。现在第 0 步就量状态并退出 |
+| 28 | 1 | 第 6 步 App 崩到桌面 | 见下面「第 28 跑那一发崩溃」；同一趟还第一次照出**移动端 bundle 吃的是各包的 `dist`**（#574） |
+| 29 | 1 | 第 6 步「没走到加入成功」 | **装置** —— 到达判据按 #574 的建议换成了 `testID`，但那枚挂在 `<Text>` 上：截图（`06f-加入没走到成功态.png`）里「加入成功，这份清单已经在「已共享的清单」里了。」**画着**，而 `describe-all` 那一屏 11 枚节点只有 1 枚带 `AXUniqueId`（那枚「关闭」按钮），文字节点是 `AXStaticText` + `AXUniqueId=None` ⇒ 判据恒不命中（#575）。**产品这一发是走通的**，且同一发按压**没有**复现第 28 跑的崩溃 |
+| 30 | 1 | 第 7 步 L2：手机界面里没有 owner 写的那条任务（29 通过 / 1 失败） | **产品** —— 到达判据换锚后 L1 第一次真过，随即照出**下一格**：名册下来了、清单行也绑好了，而"加入之前就在清单里的东西"没有任何一条路径会带来（`new_share_ops` 只在**有人新写**时响）。取证 `apps/mobile/evidence/collab-ios-10252154/07-看不到owner的任务.png`；修的那一格见下面「本批修掉的四处产品缺陷」第 4 条。**两壳同形** —— web 侧同一条洞另起一格 |
+| 31 | 0 | — | **39 通过 / 0 失败**（`run-rc=0`，逐格读数见下面那张表）。L2 那一格由本批第 4 条修法转绿。⚠️ 归因：这一趟的 bundle 里**含别线未提交的改动** —— `@heyta/ai` / `@heyta/i18n` 的 `src` 当时脏着，装置那道按 mtime 的新鲜度尺连挡两次（#576），照它打出的命令补构建后才放行 ⇒ 这轮截图的逐字节对账锚在 `apps/mobile/evidence/collab-ios-10260001/bundle-sha256.txt`（现量 `cut -c1-16`），**不锚在本节文字** |
+
+#### 第 31 跑逐格读数（同一台模拟器、`simctl uninstall` 起全新态、每格都配一张肉眼复核过的截图）
+
+| 格 | 判据（装置里那一句话） | 读数 | 截图（都在 `apps/mobile/evidence/collab-ios-10260001/`） |
+|---|---|---|---|
+| L1 到达 | 手机自己说出「加入成功」，且该相位独占的**可交互**节点 `share-join-close-final` 在树上 | ✅ | `06g-加入成功.png` —— 副标题写的是手机上真实的落点「已共享的清单」（不是 web 的「侧栏」），「关闭」在位 |
+| L2 下行 | owner 在成员加入**之前**写的那条任务出现在手机上，全程没点过一次同步 | ✅（第 30 跑红的正是这一格） | `08-下行任务可见.png` —— 评论区那一列里是「owner取证任务10260001」，成员两行（所有者 / 可编辑（我））也在 |
+| L3 上行 | 手机发出的评论回到自己的界面上 | ✅ | `10-评论已输入.png` → `11-手机评论可见.png` |
+| L4 签名 | 手机写出的那条 op 在 owner 侧重验 = `verified` | ✅ —— ADR-0069 那句承诺在移动端成立（读数在服务端侧，无设备截图） | — |
+| L5 信号 | owner 写第二条评论 ⇒ 手机靠 `new_share_ops` 自己出现，**不许碰同步按钮** | ✅ | `14-信号驱动到的评论.png` |
+| L6 偏好面 | 只有活动那三档；两枚没有输入的档位不在界面上 | ✅ 三格都在（活动三档在、`任务提醒` 不在、`自动接受…` 不在） | `16-通知偏好面.png` —— 三行各带一枚**方框标记** ⇒ 「开关要看得出来是开关」那一半有图证（判据那一半见 #65） |
+| 崩溃那一形 | 第 28 跑那发（点一颗立刻卸载的 `Pressable` ⇒ `SIGABRT`） | 第 29/30/31 三趟同一发按压**都没复现** ⇒ 仍按**未判定**登记（一次不崩不构成"修好了"，见末节那一格） | — |
+
+🔴 **看图抓到、但还没定性的两枚**（按本仓口径：截图只证外观，定性要回源码；这一格欠的是**回源码**，不是回人）：
+
+1. `14-信号驱动到的评论.png` 里「评论内容不能为空」这枚行内报错**在评论已经发出去之后仍挂在界面上** ——
+   判它的断言：提交成功那一拍要把这枚 error 清掉（回 `apps/mobile/src/screens/ShareSpaceScreen.tsx` 的评论提交分支看它什么时候置空）。
+2. 同一张图里两条评论的署名**形状不一**：自己那条「成员 87」、owner 那条「成员 85432a8c」（memberId 前缀）——
+   判它的断言：同一份名册里两个 memberId 该解析成同一种显示名，回落只该发生在**名册里没有**那一条。
+
+**本批修掉的四处产品缺陷**（前三处全部只在真机上看得见，源码级读数一条都抓不到；第四处是**两壳同形**，源码级读数同样抓不到 —— 它抓的是"有没有这一条路径"，而那条路径本来就不存在）：
+
+1. **入群成功回执永不出现**（第 25 跑）。`JoinShareScreen` 删掉 `onJoined` 回调，成功相位留在原地，由用户按「关闭」回共享主屏 ——
+   与 web 同形（`apps/web/src/features/projects/ProjectsPanel.tsx:477` 那句注释"只导航、不关对话框：成功屏要留到用户自己关"
+   说的就是同一件事，两壳此前各做一半）。装置侧配套补了一发按「关闭」与一条"回执退不出去"的判红。
+2. **通知偏好那三行看不出是开关**（第 26 跑的 `07b` 那张图）。行是 `Pressable`、`aria-checked` 也在、点了确实翻转，
+   屏幕上却没有方框也没有对钩 ⇒ 既看不出那是开关、也看不出当前开还是关。修在
+   `packages/ui/src/sync/NotificationPrefsPanel.tsx`（与 `Settings.ToggleLine` 同形状的标记，全部走 token）。
+   理由与两枚钉子记在 [ADR-0071 补记二](../adr/0071-share-notification-content-boundary.md)。
+3. **入群那一屏的两句话在手机上谎称 web 的格子**（第 26 跑的 `06g`：「加入成功，清单已出现在侧栏。」—— 手机上没有侧栏）。
+   新增 `mobile.share.join.{subtitle,done}`（zh-CN + en），两壳各说各的真落点；**不把 web 那条改成平台中立的模糊说法**，
+   那等于让 web 用户为手机的形状失去精度。类级尺：`apps/mobile/tests/share-ui-assembly.spec.ts` 的 ⑥ 组 ——
+   扫 `mobileSources()` 用到的每一枚词条，中/英两档值里出现"只在另一壳存在的格子"就红，
+   配一枚"探针必须读得到 `web.share.join.done` 里那枚「侧栏」"的对照臂（否则那个 0 会被读成探针坏了）。
+   ⚠️ 同一族错还有**三枚存量**（`common.organizer.confirm.impactChildren` / `.impactChildrenArchive` /
+   `common.trash.confirm.strandChildren`，手机上同样说「侧栏」）—— 那两句被回收站/归档那条线自己的用例钉着，
+   **本线不代改、也不代判"这样也可以"**，只把它们登记进那张"只许变短"的债表（`OTHER_LINE_DEBT`）。
+4. **打开一份共享清单时，"加入之前就在清单里的东西"没有任何一条路径会带来**（第 30 跑 L2）—— 两壳同形。
+   此前下行只有**两枚**触发点：实时信号 `new_share_ops`（只在**有人新写**时响）与评论区挂载时按任务拉那一条。
+   成员刚加入一份早就写了任务/便签/评论的清单时，名册下来了、清单行绑好了，界面上却是一条空清单 ——
+   而源码级读数抓不到这件事，因为它问的是"有没有这条路径"，**那条路径本来就不存在**。
+   🔴 判据本体写成共享层的一件事（AGENTS §3.5）：`packages/app-host/src/share-signals.ts` 的
+   `pullSharedListOnOpen`（三条口径：每次打开都拉 / 拉不成不许抛穿、但要留 `error` 读数 / 语义只住这里），
+   两壳各自只做投递：移动端 `apps/mobile/src/share/share-signals.ts` 的 `pullSharedContentsOnOpen`
+   （拉过之后按 `added > 0` **或** 有验签拒敲一次重画 —— 移动端的那层没有别的通知通道）由
+   `ShareSpaceScreen.tsx` 里**只按 `selected` 触发**的一枚 effect 调用；web 侧新增
+   `apps/web/src/features/share/use-share-open-pull.ts`，调用点是 `App.tsx` 的
+   `useShareOpenPull(currentProject?.shareId)`（"当前停在哪个清单行"就是设备上 `selected` 的对位），
+   它**不再补敲重画** —— web 那个唯一出口 `comment-actions.ts` 的 `pullShareOps` 自己就敲
+   （`added > 0` 敲引擎通知、有验签拒敲重画），这里再敲一遍等于同一次拉取重渲染两轮。
+   判据与本批现量读数（每条都能红，命令附在下面，别按本节文字推断）：
+   · 本体：`cd packages/app-host && npx vitest run tests/share-signals.spec.ts` ⇒ 14 passed；
+   · 移动端装配：`cd apps/mobile && npx vitest run tests/share-signals.spec.ts` ⇒ 16 passed
+   （新增那 7 枚钉的是：会话缺席零请求、shareId 交给**那一份**会话、`added > 0` 敲重画、
+   🔴 有验签拒也敲重画、对照臂不敲、拉不成不抛穿、调用点唯一 + 依赖数组恰为 `selected`）；
+   · web 装配：`cd apps/web && npx vitest run tests/share-open-pull.spec.tsx` ⇒ 7 passed
+   （同一组形状，另加"停在同一份反复重渲染只拉一次"与"非共享清单行零请求"）；
+   · 🔴 变异臂已收成**一副可复跑的装置**：`node research/tools/mutation-rigs/mutate-collab-open-pull.mjs`
+   ⇒ `ARMS=pass (5/5)`、三载具基线与复跑全绿（2026-10-25 现量）。五臂各注一枚真实会犯的病灶：
+   `no-pull` 红 3 / `throw-through` 只红「抛穿」那一枚 / `added-only-repaint` 只红「有验签拒」那一枚 /
+   `mobile-call-site-gone` 与 `web-call-site-gone` 各只红"调用点唯一"那一枚 ——
+   最后这两臂是这副装置最值钱的：**装配在、没人调，纯逻辑那 14 枚照样全绿**，而设备上前空清单。
+   ⚠️ 本批早先那两发**手工**变异（一发红 2、一发红 1）已被这副装置取代 —— 手工那发的编辑只活在本轮的一次性
+   scratch 目录里（会随清场消失，所以**不写进台账当锚点**）；`no-pull` 那一臂实测红 3，多出来那枚是**对照臂**
+   （它断言的就是 `pulled === true` 本身），逐条读后确认它该红 ⇒ 收紧的是预测，不是判据。账登记在 `research/tools/mutation-rigs/README.md`。
+   ⚠️ **没有放宽 L2 的判据**：它判的是"这台设备能不能看见别人写在这份清单里的东西"，
+   把判据改成"等一条新写入再来"就等于把缺陷读成通过。
+
+**第 28 跑那一发崩溃（未判定，如实记）**：按「加入共享清单」之后 App 直接回到 SpringBoard（取证帧
+`apps/mobile/evidence/collab-ios-10252123/06b2-加入面板没开.png` 画的是桌面 + Spotlight 键盘，不是应用内某一屏），
+崩溃报告 `Heyta-2026-10-25-213336.ips` 的签名是 `com.meta.react.turbomodulemanager.queue` +
+`ObjCTurboModule::performVoidMethodInvocation`（`RCTTurboModule.mm:467`）⇒ **与环境陷阱 #549 同一签名族**
+（void 型 TurboModule 抛异常 → `std::terminate` → `SIGABRT`），而 #549 记的那条"报告里没有 `asi`／
+`exceptionReason`／`lastExceptionBacktrace`"在这份上逐字成立（三格现量都是空）⇒ **拿不到是哪一次调用**。
+#549 的修法只堵了 `autoFocus` 那一族触发点；这一发的形状是**点一颗会随导航立刻卸载的 `Pressable`**
+（`setPressed` / `hotspotUpdate` 也是同一批 void 方法）。⚠️ 第 26 跑同一发按压没崩 ⇒ 这是**竞态**，
+一次绿不许读成"修好了"。本批不据此宣布缺陷已定位，登记为待判定项（判它的断言见末节）。
+
+**本批另外收掉的三格**：
+
+1. **web 侧同一枚「打开才拉」洞**（与上面第 4 条同一个病灶、同一个判据本体）。
+   接缝取"当前停在哪个清单行"（`apps/web/src/App.tsx` 的 `currentProject?.shareId`，它就是设备上 `selected` 的对位），
+   新增 `apps/web/src/features/share/use-share-open-pull.ts`；**没有**并进 `ShareFeature` 那个含 `reload` 的 effect
+   （`reload` 的身份随 token/baseUrl 变，那会把"换一次凭据"变成"多拉一次"）。
+   判据：`cd apps/web && npx vitest run tests/share-open-pull.spec.tsx` ⇒ 7 passed；
+   变异臂 `web-call-site-gone`（摘掉调用点）⇒ 只红"调用点全壳唯一"那一枚（见上面那副装置）。
+   真浏览器那条腿带着这枚改动复跑：`pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3`。
+2. **`verify:collab-journey` 这条腿从入群同意闸落地那天起就是必红的**，而红的原因不是产品坏：
+   那一闸自己拍了一张 `05a-bob-join-consent.png`，收口清单却没跟着长 ⇒ 第 3 步报
+   「拍了 12 张，在册 11 张（多出来的没人名 = 没人看过的图）」。
+   ⇒ 本批**逐张看过**那张图（看到的内容见下面第 3 条）再把名字补进在册清单，随后 `RESULT=OK`。
+   这条记在这里是因为它是"判据要有人跑"那一族的反面：**一道一直红、没人回头看读数的腿，等于没有腿**。
+3. **看图照出的两枚新候选（未定性，判它的断言写在上面「第 31 跑逐格读数」那张表之后）**：
+   评论发出去之后「评论内容不能为空」仍挂在界面上；两条评论的署名两形不一（`成员 87` vs `成员 85432a8c`）。
+   同一张 `05a` 还照出 **#64 那一格在 web 也有实例**：入群面（`JoinSharedListDialog.tsx`）的
+   title/body/accept 三行取的是 `common.share.consent.*` —— 与 owner 那一屏同一组键，
+   所以刚加入的人看到的句子是「把清单设为共享前，请确认以下事项」、按钮是「确认共享」，
+   而他并没有把任何清单设为共享。**这一格仍归产品负责人拍**（改文案属对外法律表征），本批只把它量清楚。
+
+---
+
+#### 这一批还剩什么（逐格：谁做 / 判它的断言 / 为什么不在本批做完）
+
+| 格 | 状态 | 判它的断言（能红的那把尺） | 归属 |
+|---|---|---|---|
+| **点立刻卸载的 `Pressable` 会把 App 崩掉**（第 28 跑那一发，#549 同签名） | 🔴 **未判定** —— 只有一发实测，同一发在第 26 跑没崩 | 断言必须是**可重复的**：同一台模拟器上连开/关共享面 N 轮（#549 用的是 6 轮 pid 不变 + `-newermt` 新增 `.ips` 数 0，含 `Retired/`）。拿不到调用名这件事本身已由 #549 证死 ⇒ 只能从形状消除（`Pressable` 的 `setPressed` 在 unmount 之后不许再派发）。**本批没做完是因为它需要先有一个稳定复现**，而一次崩溃不构成复现 | 本线（移动装置腿撞上的） |
+| **Android 的 M6 设备腿** | 🔴 **载体不存在**（2026-10-25 现量，不是"还没排期"） | 两格分开看：①**出包腿已过** —— `scripts/run-gradle.mjs` 在 `windows-pc` 上打，四条身份判据（工作树 tar 对账 / 旧产物清除 / mtime ≥ 构建起点 / 拉回后 sha256 逐字相同）当轮全过，读数见 §9.13；②**界面腿没有装置** —— 与协作旅程对应的那枚装置只有 iOS 一份（现量：`ls scripts/verify*collab*`），而现存的 Android 设备装置 `verify-android-vault-storage.sh` 用的是**本机** adb（`ANDROID_HOME` 默认 `/opt/homebrew/…`）+ `emulator-5554`（现量：`grep -n ADB_BIN scripts/verify-android-vault-storage.sh` 与同一文件里的 `SERIAL=` 两格各看一次）⇒ 它的形状与"Android 一律走 `ssh windows-pc`、不在 Mac 起模拟器"那条长期令**直接冲突** | 要么新写一枚驱动远端设备的 Android 旅程装置（含"服务端在另一台机器上、设备要够得着"那一格），要么按出包 + JS 侧形状读数结案 —— **归产品负责人拍**，本线不自行把"编译过"读成"Android 已验" |
+| **手机自己「开启共享」那一格** | 未测 | 装置现在只走"加入"那一侧；开共享那一侧的同意闸 + 建 share 需要在手机上补一段旅程 | 本线，登记为待办（不谎称已验） |
+| **同意面文案的视角**（owner 语 vs 入群语） | 待拍板 | 判据在 `packages/i18n/src/locales/zh-CN.ts` 的 `common.share.consent.body` / `.accept` 两行；理由与截图指针在 ADR-0071 补记末段 | **归产品负责人** —— 属于对外法律表征，本线不代改 |
+| **登出 / 撤销要不要连带清 share 那几格** | 待拍板 | 现量：`clearMobileVaultSession` 今天只删 root key（`grep -n "clearMobileVaultSession" apps/mobile/src/**/*.ts`） | **归产品负责人** —— 是"清掉用户资产"这种不可逆取向的取舍 |
+| **`04e-保险库已解锁.png` 里那枚圆圈** | 未判定 | 截图只证外观；要判的是"那一枚在该屏该不该在场"，得回账号安全线的那块界面自己说清 | 归账号安全线（本线不代定性） |
+| **别线存量三枚「侧栏」文案**（`common.organizer.confirm.impactChildren` / `.impactChildrenArchive` / `common.trash.confirm.strandChildren`） | 已登记在册，**不代改** | `apps/mobile/tests/share-ui-assembly.spec.ts` ⑥ 的债表 `OTHER_LINE_DEBT`：只许变短，修好了不删名目也判红 | 归回收站/归档那条线 |
+
+
 
 
