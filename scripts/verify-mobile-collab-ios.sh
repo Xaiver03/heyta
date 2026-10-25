@@ -49,6 +49,8 @@ set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SHIM="$ROOT/scripts/tools/ios-ax-shim.py"
+# 🔴 本线自带的锚点解析器（为什么不用 shim 的退化匹配：见该文件文件头第 22 跑那段）
+ANCHOR="$ROOT/scripts/tools/ios-collab-anchor.py"
 . "$(dirname "$0")/lib/mobile-e2e.sh"
 . "$(dirname "$0")/lib/mobile-e2e-fresh-account.sh"
 
@@ -126,9 +128,85 @@ env_bail() {  # <说明> —— 装置/环境前提不成立：不判产品
 # ── 设备侧原语：全部沿用同族 iOS 装置已经踩过的那套读法 ─────────────────────
 ax() { python3 "$SHIM" "$@" --udid "$UDID" --idb "$IDB_BIN" --companion "$IDB_COMPANION" --json; }
 jget() { printf '%s' "$1" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$2',''))" 2>/dev/null; }
+SCREEN_W=402
+SCREEN_H=874
+
+# ── 按压的唯一通道：先解析、后按，解析只认**逐字/合成精确**命中的那一枚节点 ──
+#
+# 🔴 为什么不再用 `ax … --pressable --press` 的退化匹配（2026-10-25 第 22 跑实测）：
+#    RN 的行把标签合成成「设置, 设置」⇒ `--exact` 恒取空，而不带 `--exact` 时
+#    子串退化会抓到别的行（那一跑抓到「AI 设置」一带，落进「AI 与集成」屏），
+#    日志读起来却像"按到了设置"。加上屏外节点（滚动残留的负 y）按下去是**空操作
+#    且不报错**，两条叠在一起 = 随机一击。⇒ 现在：
+#      · 命中条件 = 标签逐字等于 want，或 want 是标签按 `,` 切分后的整段；
+#      · 中心在屏外 ⇒ 先让 shim 滚进可见区、重 dump、重解析，还不在就不按；
+#      · 同名多枚 ⇒ 响亮报 ambig，让调用方改用 `id:` 锚点，绝不"取第一枚"。
+#    解析器自带 7 条自检（含一条对照臂），在步骤 0 里当门禁跑。
+resolve_anchor() {  # <want> ⇒ "state cx cy label"（state ∈ hit|offscreen|none|ambig|bad-tree）
+  python3 "$ANCHOR" "$IDB_DUMP_FILE" "$1" "$SCREEN_W" "$SCREEN_H" 2>/dev/null
+}
+# 量一次 app 画面尺寸：屏内/屏外的判定要有分母，不能拿 402x874 当常量。
+# 取不到就沿用初值并**说出来**（沿用常量 = 一条会随设备漂移的抄件，只当兜底）。
+read_screen_size() {
+  local _fr w h
+  _fr=$(ax - --list --json 2>/dev/null)
+  w=$(jget "$_fr" width); h=$(jget "$_fr" height)
+  case "$w" in '' | *[!0-9]*) note "取不到 app 画面宽，屏内判定沿用 ${SCREEN_W}"; return 1 ;; esac
+  case "$h" in '' | *[!0-9]*) note "取不到 app 画面高，屏内判定沿用 ${SCREEN_H}"; return 1 ;; esac
+  SCREEN_W=$w; SCREEN_H=$h
+}
+tree_has_id() {  # <testID> ⇒ **当下**那棵树上有没有这枚 AXUniqueId
+  # 与 `tree_has` 同一条纪律：先重拍再读（旧快照会把"刚出现的那枚"读成"没有"）。
+  idb_dump
+  [ -f "$IDB_DUMP_FILE" ] || return 1
+  python3 - "$IDB_DUMP_FILE" "$1" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    sys.exit(2)
+roots = data if isinstance(data, list) else [data]
+def walk(n):
+    yield n
+    for c in (n.get("children") or []):
+        yield from walk(c)
+for top in roots:
+    for n in walk(top):
+        if (n.get("AXUniqueId") or "") == sys.argv[2]:
+            sys.exit(0)
+sys.exit(1)
+PY
+}
+
+# 把 want 解析成"可以按"的一发：命中屏内就按，被滚走了就滚回来再按。
+# ⇒ 0 = 按下了；非 0 = 没按（原因已经打到日志里，绝不静默乱按）。
+press_anchor() {  # <want>
+  # 🔴 `id:` 前缀与标签走**同一条**解析路径（解析器认两种 want）。第 23 跑实测过反面：
+  #    这里原来另走一套 `--press` 并拿 `found` 判成功 —— 而 shim 的 press 回的是
+  #    `{"result": …}`，**没有 `found` 这个键** ⇒ 那一发明明按成了（截图停在设置枢纽六节），
+  #    装置却连报五次"这枚 AXUniqueId 不在当前树上"。成功只由**到达判据**判。
+  local want="$1" state cx cy label enabled
+  idb_dump
+  read -r state cx cy label enabled <<<"$(resolve_anchor "$want")"
+  if [ "$state" != "hit" ]; then
+    ax "$want" --pressable --scroll-into-view --json >/dev/null 2>&1
+    idb_dump
+    read -r state cx cy label enabled <<<"$(resolve_anchor "$want")"
+  fi
+  case "$state" in
+    hit) ax --tap "$cx" "$cy" --json >/dev/null 2>&1; return 0 ;;
+    offscreen) echo "     [press] 「${want}」滚完仍在屏外（${cx},${cy}）⇒ 屏外坐标按下去是空操作，不按"; return 1 ;;
+    ambig)  echo "     [press] 「${want}」在本屏有同名多枚（${label}）⇒ 必须改用 id: 锚点，不取第一枚"; return 3 ;;
+    none)   echo "     [press] 本屏没有逐字叫「${want}」的可点节点（子串命中的是别的行，不算命中）"; return 1 ;;
+    *)      echo "     [press] 读不出 AX 树（state=${state:-空}）⇒ 这一发没按"; return 1 ;;
+  esac
+}
+
 # 🔴 任何跳页动作先 `forget_safe_tap`：那对坐标属于**上一页**，
 #    在新界面上按坐标点就是随机一击。
-ax_press() { forget_safe_tap; ax "$1" --pressable --scroll-into-view >/dev/null 2>&1; ax "$1" --pressable --press --json >/dev/null 2>&1; }
+# 🔴 日志不吞：按不动的原因（ambig / 屏外 / 没有这一枚）必须看得见，
+#    否则"装置没按"又会读成"产品没反应"。
+ax_press() { forget_safe_tap; press_anchor "$1"; }
 dismiss_keyboard() { ax --dismiss-keyboard --json >/dev/null 2>&1 || true; }
 
 # 🔴 键盘立着的时候**整个 App 的子树都不在 AX 树上**（只剩键盘那 44 个节点），
@@ -261,10 +339,12 @@ PYRC
 #    症状是"界面上明明有的东西读不到"。
 # 等某枚按钮从 disabled 翻成 enabled（RN 那一侧的读数）。翻面返回 0，等不到返回 1。
 wait_enabled() {  # <按钮标签>
-  local want="$1" i out
+  # 🔴 与按压通道同一把尺（子串命中会读到别的控件的 enabled ⇒ "打字进了表单状态"会假绿）
+  local want="$1" i _st _x _y _lb en
   for i in 1 2 3 4 5 6; do
-    out=$(ax "$want" --pressable --list --json 2>/dev/null)
-    if [ "$(jget "$out" found)" = "True" ] && [ "$(jget "$out" enabled)" = "True" ]; then
+    idb_dump
+    read -r _st _x _y _lb en <<<"$(resolve_anchor "$want")"
+    if [ "$_st" != "none" ] && [ "$_st" != "ambig" ] && [ "$en" = "true" ]; then
       return 0
     fi
     sleep 1
@@ -290,7 +370,7 @@ wait_enabled() {  # <按钮标签>
 # WAIT_LAST_RC（最后一次 tree_has 的 rc，2=树读不出）、WAITED（实际等了多少秒）。
 wait_state() {  # <探针按钮标签> <超时秒> <终态标签> [终态标签...]
   local want="$1" budget="$2"; shift 2
-  local i=0 out lbl rc saw_busy=0
+  local i=0 lbl rc saw_busy=0 _st _x _y _lb _en
   WAIT_HIT=''; WAIT_SAW_BUSY=0; WAIT_LAST_RC=1; WAITED=0
   while [ "$i" -lt "$budget" ]; do
     sleep 2
@@ -303,8 +383,10 @@ wait_state() {  # <探针按钮标签> <超时秒> <终态标签> [终态标签.
         WAIT_HIT="$lbl"; WAIT_SAW_BUSY=$saw_busy; WAITED=$i; return 0
       fi
     done
-    out=$(ax "$want" --pressable --list --json 2>/dev/null)
-    if [ "$(jget "$out" found)" = "True" ] && [ "$(jget "$out" enabled)" = "False" ]; then
+    # 🔴 忙态探针与按压通道必须**同一把尺**：这里原本是"子串命中 + 取那枚的 enabled"，
+    #    而子串命中的可能是别的控件 ⇒ "变过灰"这个读数会假（第 22 跑同一类缺陷的第二处）。
+    read -r _st _x _y _lb _en <<<"$(resolve_anchor "$want")"
+    if [ "$_st" != "none" ] && [ "$_st" != "ambig" ] && [ "$_en" = "false" ]; then
       saw_busy=1
     fi
   done
@@ -313,6 +395,13 @@ wait_state() {  # <探针按钮标签> <超时秒> <终态标签> [终态标签.
 }
 
 tree_has() {
+  # 🔴 **读数之前先重拍**：dump 文件只由 `idb_dump` 写，而按/填这些动作各走各的通道
+  #    （shim 自己快照），于是"填完之后断言那一串在不在树上"量到的是**填之前**那棵树 ——
+  #    2026-10-25 第 24 跑实测：凭证已经逐字进了输入框（shim 回读相同），本函数却报
+  #    "树里读不到"，装置自己造红；当场手工 `describe-all` 证实 `AXTextArea` 的 `AXValue`
+  #    就是那一串。同一形反过来更糟：减法判据（"这行已经没了"）量到旧树会**恒过**。
+  #    ⇒ 快照归读者负责，调用方漏写 `idb_dump` 不再是失法。
+  idb_dump
   python3 - "${2:-$IDB_DUMP_FILE}" "$1" <<'PY'
 import json, sys, unicodedata
 try:
@@ -337,7 +426,7 @@ PY
 wait_tree() {  # <needle> [超时秒]
   local want="$1" timeout="${2:-90}" i=0
   while [ "$i" -lt "$timeout" ]; do
-    idb_dump
+    # `tree_has` 自己会重拍快照，这里不再另写一遍 `idb_dump`。
     tree_has "$want" && return 0
     sleep 3
     i=$((i + 3))
@@ -415,53 +504,70 @@ dismiss_ios_save_password() {
 #    到达判据必须是**下一屏才有的东西** —— 只看 `press` 回 `success` 是
 #    "按下 ≠ 生效"那一族（AGENTS §7 陷阱账里本线踩过多次）。
 PRESS_HIT=''
-ax_press_until() {  # <要点标签> <到达后树上必须有的标签> [exact] [另一个可接受的到达标签…]
-  # 🔴 第三枚 `exact` 是给"同一个词是别的元素的子串"准备的：本页上「共享清单」
-  #    既是入口标签、又出现在按钮「加入共享清单」里，退化匹配会按错那一个。
+# 落点回读失败时打印"现在到底在哪一屏"：取顶部那枚静态文字（导航标题）。
+# 没有这一行，下一读的人只能像第 22 跑那样去猜"是不是被滚走了"。
+where_am_i() {
+  python3 - "$IDB_DUMP_FILE" <<'PY' 2>/dev/null
+import json, sys, unicodedata
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("<读不出树>"); raise SystemExit
+roots = data if isinstance(data, list) else [data]
+nodes = []
+def walk(n):
+    if isinstance(n, dict):
+        nodes.append(n)
+        for c in (n.get("children") or []):
+            walk(c)
+for r in roots:
+    walk(r)
+tops = []
+for n in nodes:
+    lab = unicodedata.normalize("NFKC", (n.get("AXLabel") or "")).strip()
+    f = n.get("frame") or {}
+    if not lab or (n.get("type") or "") != "StaticText":
+        continue
+    y = int(f.get("y") or 0)
+    if 0 <= y < 140:
+        tops.append((y, lab))
+print(tops[0][1][:34] if tops else "<顶部没有静态文字>")
+PY
+}
+ax_press_until() {  # <要点标签或 id:锚点> <到达后树上必须有的标签> [exact] [另一个可接受的到达标签…]
+  # 🔴 第三枚 `exact` 是**旧调用位**：现在的解析本来就只认逐字/合成整段（见 `press_anchor`），
+  #    保留它是为了让既有调用一行不改也不会退化成子串。短标签靠子串命中正是第 22 跑红起来的根因。
   # ⚠️ 第四枚起 = **同一屏的其它可接受落点**，命中哪一档写进 `$PRESS_HIT` 让调用方分档处置。
   #    入群那一屏有两档（这台设备没确认过 ⇒ 先落 PIPL 同意面；确认过 ⇒ 直接落凭证框），
   #    拿单一落点当到达判据就会把"同意闸正常工作"报成"入口按不动"。
-  local want=$1 arrive=$2 try=1 out flags=''
+  # 🔴 到达判据必须**只在目标屏出现**：拿「设置」当"已到设置枢纽"的判据是假命中 ——
+  #    「我的」页那一行的 AXLabel 逐字就是「设置, 设置」（第 22 跑实测，枢纽上请用
+  #    `id:settings-section-sync` 这类只在目标屏存在的锚点）。
+  local want=$1 arrive=$2 try=1
   PRESS_HIT=''
   shift 2
-  [ "${1:-}" = "exact" ] && flags='--exact' && shift
+  [ "${1:-}" = "exact" ] && shift
   local -a arrives=("$arrive" "$@")
   while [ "$try" -le 5 ]; do
     forget_safe_tap
-    # 导航场合收键盘用同族装置那档 `dismiss_keyboard`（按 return）：这里没有正在填的
-    # 表单，return 的 onSubmitEditing 没有可提交的对象；`_hard` 那档要求**上一页量过**
-    # 的坐标，在本函数里拿不到，宁可不收（收不掉就由到达判据那一层报出来）。
+    # 导航场合收键盘只收软键盘：这里没有正在填的表单，不许按 return（它会提交表单），
+    # 也不许按比例点空白（第 2 跑实测它把自托管表单点收起过）。
     dismiss_keyboard
     # shellcheck disable=SC2086
-    out=$(ax "$want" --pressable --scroll-into-view $flags --json)
-    # 🔴 能不能按，判 `found` 不判 `visible`：底部标签栏那几枚在 shim 的几何判定下
-    #    回的是 found=True / visible=False（第 2 跑实测：五试全落空、一次都没按下去），
-    #    而**按它确实有效**。拿 visible 当门 = 把"装置不会按"报成"产品没入口"。
-    #    真正的判据是**到达判据**（下一屏才有的那个标签），不是按压前的几何读数。
-    if [ "$(jget "$out" found)" = "True" ]; then
-      # shellcheck disable=SC2086
-      pr=$(ax "$want" --pressable --press $flags --json)
-      if [ "$(jget "$pr" found)" != "True" ]; then
-        # 🔴 预检与按压原本是**两套解析**：shim 的 `scroll_into_view` 内部把 `exact_only`
-        #    传成 `False`（`ios-ax-shim.py:623`），所以带 `--exact` 时会分成"预检按子串
-        #    命中 ⇒ found=True"与"真按压按精确取空 ⇒ 什么都没按"。
-        #    2026-10-25 第 17 跑实测就落在这条缝里：「我的」页那一行的 AXLabel 是 RN
-        #    合成名「共享清单, 共享清单」，`--pressable --exact` 单独取回 found=False，
-        #    而 `--pressable --exact --scroll-into-view` 取回 found=True（同一枚 frame）。
-        #    症状是"五试全空转，日志却读着像按到了"。⇒ 不再换一套匹配重找一次，
-        #    改按**刚才那一发量到的 frame 中心**（同一次解析、同一枚节点）。
-        cx=$(( $(jget "$out" x) + $(jget "$out" width) / 2 ))
-        cy=$(( $(jget "$out" y) + $(jget "$out" height) / 2 ))
-        echo "     [press] 「${want}」精确按压取空（预检却是子串命中）⇒ 改按量到的中心 ${cx},${cy}"
-        ax --tap "$cx" "$cy" --json >/dev/null 2>&1
-      fi
-      sleep 2
-      idb_dump
-      for _a in "${arrives[@]}"; do
-        if tree_has "$_a" >/dev/null 2>&1; then PRESS_HIT="$_a"; return 0; fi
-      done
+    if ! press_anchor "$want"; then
+      echo "     [press] 「${want}」第 ${try} 次没按成（原因见上一行：不按不明落点）"
+      try=$((try + 1)); sleep 1; continue
     fi
-    echo "     [press] 「${want}」第 ${try} 次没到「${arrives[*]}」（found=$(jget "$out" found) visible=$(jget "$out" visible)）"
+    sleep 2
+    idb_dump
+    for _a in "${arrives[@]}"; do
+      if [ "${_a#id:}" != "$_a" ]; then
+        tree_has_id "${_a#id:}" >/dev/null 2>&1 && { PRESS_HIT="$_a"; return 0; }
+      elif tree_has "$_a" >/dev/null 2>&1; then
+        PRESS_HIT="$_a"; return 0
+      fi
+    done
+    echo "     [press] 「${want}」第 ${try} 次按下了，但树上没有落点「${arrives[*]}」；当前屏顶部文字=$(where_am_i)"
     try=$((try + 1))
     sleep 1
   done
@@ -559,10 +665,18 @@ fill_field() {  # <标签> <值> [secure] [probe <按钮标签>]
 # 🔴 旧写法"我的 → 设置 → 直接等服务器地址"量的是一版已经不存在的界面 ——
 #    第一跑就是这么红的（12 秒读不到框，截图证明停在分区枢纽上）。
 open_settings_sheet() {
-  ax_press_until "我的" "设置" || { note "「我的」页没打开（底部标签按 5 次没到设置枢纽）"; return 1; }
-  ax_press_until "设置" "同步与隐私" || { note "设置枢纽里没进得去「同步与隐私」"; return 1; }
-  ax_press_until "同步与隐私" "使用自托管服务器" || { note "同步与隐私那屏没有「使用自托管服务器」入口"; return 1; }
-  ax_press_until "使用自托管服务器" "服务器地址" || { note "展开自托管表单后读不到「服务器地址」"; return 1; }
+  read_screen_size || true
+  # 🔴 三跳的到达判据各用**只在目标屏出现**的锚点（AXUniqueId 那三枚是设备上现量的，
+  #    不是照抄文档）：「我的」页 → profile-entry-settings，枢纽 → settings-section-sync，
+  #    同步屏 → 「使用自托管服务器」那段文字。以前用「设置」当枢纽的判据是假命中。
+  ax_press_until "我的" "id:profile-entry-settings" \
+    || { note "「我的」页没打开（底部标签按 5 次，树上没有 profile-entry-settings）"; return 1; }
+  ax_press_until "id:profile-entry-settings" "id:settings-section-sync" \
+    || { note "设置枢纽没打开（那一行按下去了，树上没有 settings-section-sync）"; return 1; }
+  ax_press_until "id:settings-section-sync" "使用自托管服务器" \
+    || { note "同步与隐私那屏没有「使用自托管服务器」入口"; return 1; }
+  ax_press_until "使用自托管服务器" "服务器地址" \
+    || { note "展开自托管表单后读不到「服务器地址」"; return 1; }
   local i
   for i in 1 2 3; do
     [ "$(jget "$(ax "服务器地址" --role AXTextField --scroll-into-view --json)" visible)" = "True" ] && return 0
@@ -574,10 +688,13 @@ open_settings_sheet() {
 
 # 从任意子屏退回**底部标签那一层**（设置面是全屏幕，不退干净下一步按「我的」必然落空）。
 back_to_tabs() {
-  local i
+  local i _b_st _bx _by _blb _ben
   for i in 1 2 3; do
     idb_dump
-    [ "$(jget "$(ax "我的" --pressable --list --json)" found)" = "True" ] && return 0
+    # 🔴 逐字/整段命中才算"到底部标签那一层"：子串的「我的」会抓到「我的成长, 我的成长」
+    #    那一行 ⇒ "退干净了"是假的，下一步按「我的」就会落到别的行上。
+    read -r _b_st _bx _by _blb _ben <<<"$(resolve_anchor "我的")"
+    if [ "$_b_st" = "hit" ] || [ "$_b_st" = "offscreen" ]; then return 0; fi
     ax_press "关闭"
     sleep 2
   done
@@ -643,6 +760,10 @@ for _flag in --dismiss-keyboard --type-text --scroll-into-view; do
     || env_bail "ios-ax-shim 不再接受 $_flag ⇒ 装置与共享 iOS 工具的接口漂了，本趟不判产品"
 done
 ok "iOS AX 工具接口在位"
+[ -f "$ANCHOR" ] || env_bail "找不到锚点解析器 $ANCHOR ⇒ 按压通道不可信，本趟不判产品"
+python3 "$ANCHOR" --selftest >/dev/null 2>&1 \
+  || env_bail "锚点解析器的自检不绿（现量：python3 $ANCHOR --selftest）⇒ 每一发按压都不可信，本趟不判产品"
+ok "锚点解析器自检通过（12 条，含一条对照臂：把命中规则换成子串，自检必须红）"
 
 # ── 1. 服务端栈（私有端口 + 私有库 + 私有 pidfile） ─────────────────────────
 step "1. 起本趟专属服务端栈（TEST_MODE，零 mock）"
@@ -858,6 +979,11 @@ if [ "$left" != "1" ]; then
   env_bail "40×2s 之后「保存并启用同步」还在（或树一直读不出）⇒ AuthScreen 没退出，这次登录没落成活配置"
 fi
 ok "「保存并启用同步」按掉且这一栏已从树上消失（AuthScreen 已退出）"
+# 🔴 这张图的名字承诺的是"已登录并启用同步"，那就得拍到那一件事。iOS 的「保存密码？」
+#    是**提交之后**才弹的（上面那次收是收不到它的），第 24 跑肉眼复核这张图时它正盖着整屏
+#    —— 判据（AuthScreen 退出）是读 AX 读到的，图却画着另一件事，等于一张会误导人的证据。
+dismiss_ios_save_password || true
+sleep 1
 shot "02-已登录并启用同步"
 
 dismiss_ios_save_password || true
@@ -999,7 +1125,7 @@ dismiss_ios_save_password || true
 #    （`SettingsScreen.tsx:724` 把 `VaultSettingsSection` 挂在全屏 section 里），
 #    底部标签根本不在树上 —— 第 7 步早就有这一发，第 6 步是漏的。
 back_to_tabs || { shot "06a-退不到主标签层"; env_bail "创建完钥匙后退不回底部标签那一层（装置问题，不判产品）"; }
-if ! ax_press_until "我的" "共享清单" exact; then
+if ! ax_press_until "我的" "id:profile-entry-share"; then
   shot "06-我的页没有共享入口"
   # 实测过的两种失法：① iOS「保存密码？」那枚系统弹窗压住整棵 App 树（读什么都不是）；
   # ② 入口的渲染条件 `syncConfigured` 没成立（凭据没被认下）。P-1 翻案之后**没有**
@@ -1008,7 +1134,7 @@ if ! ax_press_until "我的" "共享清单" exact; then
   summary
   exit 1
 fi
-if ! ax_press_until "共享清单" "加入共享清单" exact; then
+if ! ax_press_until "id:profile-entry-share" "加入共享清单"; then
   shot "06b-共享首页没有加入入口"
   bad "共享面上没有「加入共享清单」入口"
   summary
@@ -1045,6 +1171,27 @@ fill_field "邀请凭证或链接" "$INVITE_TOKEN" || { shot "06d-凭证填不�
 if tree_has "$INVITE_TOKEN" >/dev/null 2>&1; then
   ok "凭证已进输入框（按界面值命中，长度 ${#INVITE_TOKEN}；值不落日志、这一帧不进证据目录）"
 else
+  # 这一发的**值本身**不许进日志，但它"有没有长度"可以说 ⇒ 打下那一枚输入框的码点数，
+  # 把"框是空的"与"探针没读到"分开（第 24 跑栽的就是后者，当时只留下一句"读不到"）。
+  idb_dump
+  python3 - "$IDB_DUMP_FILE" <<'PY' 2>/dev/null
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("     [fill] 快照读不出（rc=2 那一档，不拿它当「框是空的」）"); sys.exit(0)
+def walk(n):
+    yield n
+    for c in (n.get("children") or []):
+        yield from walk(c)
+for top in (data if isinstance(data, list) else [data]):
+    for n in walk(top):
+        if (n.get("AXUniqueId") or "") == "share-join-token":
+            v = n.get("AXValue")
+            print(f"     [fill] share-join-token：role={n.get('role')} AXValue 码点数={0 if v is None else len(str(v))}")
+            sys.exit(0)
+print("     [fill] 这棵树上没有 share-join-token 这枚节点 ⇒ 已经离开凭证那一屏")
+PY
   shot "06e-凭证没进框"
   env_bail "fill 说成功但树里读不到那一串 ⇒ 装置判不了，不拿它当产品坏了"
 fi
@@ -1087,7 +1234,7 @@ ok "服务端看到手机那一行成员 $PHONE_MEMBER，清单密钥已封给�
 # ── 7. 下行：owner 写的那条任务，手机不点同步就要看得见 ─────────────────────
 step "7. 下行判据（L2）：手机界面出现 owner 写的那条任务"
 back_to_tabs || { shot "07-退不到主标签层"; env_bail "退不回底部标签那一层（装置问题）"; }
-ax_press_until "我的" "共享清单" exact \
+ax_press_until "我的" "id:profile-entry-share" \
   || { shot "07b-进不去共享面"; bad "按不进「共享清单」入口"; summary; exit 1; }
 # 🔴 共享清单入口屏只是**一份共享一行**，任务/评论那一节挂在选中之后（`ShareSpaceScreen`
 #    的 `selected === undefined` 分支只画列表与偏好面）。旧写法按完入口就直接断言任务那一节
@@ -1195,6 +1342,23 @@ fi
 if tree_has "活动通知" || tree_has "完成/取消完成了任务"; then
   ok "通知偏好面在活动那一档（共享空间屏上读到的）"
   shot "16-通知偏好面"
+  # 🔴 三档活动必须是**树上的可寻址元素**，不是三段裸文字。2026-10-25 看这张截图时发现的：
+  #    行是 `Pressable`、`aria-checked` 也在、点了确实翻转，但屏幕上没有方框也没有对钩 ⇒
+  #    看不出是开关、更看不出当前是开还是关（既有判据一条都不红：这里判文字在不在，
+  #    减法那条判"没有输入的开关不许摆着"）。修在 `packages/ui/src/sync/NotificationPrefsPanel.tsx`
+  #    （与 `Settings.ToggleLine` 同形状的标记）。
+  #    ⚠️ 分工：设备上只能证"这三行是有 testID 的交互元素"（裸 `<Text>` 不会进 AX 树）；
+  #      标记的**颜色与两态**由 `apps/web/tests/share-notif-prefs-affordance.spec.tsx` 判，
+  #      像素由上面这张 16 号图肉眼复核（AGENTS §6.2 规定一）。
+  _missing=''
+  for _kind in completed added deleted; do
+    tree_has_id "share-notif-activity-$_kind" >/dev/null 2>&1 || _missing="$_missing $_kind"
+  done
+  if [ -n "$_missing" ]; then
+    bad "活动档里这些行不在 AX 树上（没有 testID 的裸文字不算开关）：${_missing# }"
+  else
+    ok "三档活动行都在 AX 树上（completed/added/deleted 各有 testID）"
+  fi
 else
   shot "15-偏好面读不到活动档"
   bad "退回共享空间屏、滚过「活动通知」之后仍没读到活动那一档（面板没渲染 / 文案漂了 / 没退到那一屏）"

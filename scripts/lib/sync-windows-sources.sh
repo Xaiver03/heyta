@@ -227,10 +227,13 @@ sync_windows_sources() {
   #   · `apps/web/dist/index.html` —— "装上的是不是当前 UI 产物"的锚点
   #   · `bridge-bundle/native-bridge.js` —— "壳里那份 TS 逻辑是不是当前源码"的锚点
   #     （2026-09-30 补：它不入库，早先同步不带 ⇒ 远端会静默用旧桥）
+  # 🔴 这三枚锚点的远端路径**必须跟着 `$HEYTA_WINDOWS_REPO_ROOT`**：2026-10-25 它们写死成
+  #    `C:\src\heyta`，于是换落点时"解包到 A、对账比 B"—— 隔离落点上明明解包成功
+  #    （tar sha256 逐字相同）却报"远端不新鲜"；反过来说，两棵树恰好同字节时它会**假绿**。
   local local_hash remote_hash local_bridge remote_bridge
   local_hash="$(shasum -a 256 apps/web/dist/index.html | awk '{print $1}')"
   remote_hash="$(ssh -o ConnectTimeout=10 "$host" \
-    "powershell -NoProfile -Command \"(Get-FileHash 'C:\\src\\heyta\\apps\\web\\dist\\index.html' -Algorithm SHA256).Hash\"" 2>/dev/null |
+    "powershell -NoProfile -Command \"(Get-FileHash '${HEYTA_WINDOWS_REPO_ROOT}\\apps\\web\\dist\\index.html' -Algorithm SHA256).Hash\"" 2>/dev/null |
     tr -d '\r' | grep -iE '^[0-9a-f]{64}$' | tail -1 | tr 'A-Z' 'a-z')"
   if [ "$local_hash" != "$remote_hash" ]; then
     echo "  🔴 远端源码**不新鲜**：apps/web/dist/index.html 哈希对不上"
@@ -241,7 +244,7 @@ sync_windows_sources() {
   fi
   local_bridge="$(shasum -a 256 packages/app-host/bridge-bundle/native-bridge.js | awk '{print $1}')"
   remote_bridge="$(ssh -o ConnectTimeout=10 "$host" \
-    "powershell -NoProfile -Command \"(Get-FileHash 'C:\\src\\heyta\\packages\\app-host\\bridge-bundle\\native-bridge.js' -Algorithm SHA256).Hash\"" 2>/dev/null |
+    "powershell -NoProfile -Command \"(Get-FileHash '${HEYTA_WINDOWS_REPO_ROOT}\\packages\\app-host\\bridge-bundle\\native-bridge.js' -Algorithm SHA256).Hash\"" 2>/dev/null |
     tr -d '\r' | grep -iE '^[0-9a-f]{64}$' | tail -1 | tr 'A-Z' 'a-z')"
   if [ "$local_bridge" != "$remote_bridge" ]; then
     echo "  🔴 远端**桥的 bundle 不新鲜**：native-bridge.js 哈希对不上"
@@ -256,7 +259,7 @@ sync_windows_sources() {
   local local_chunks remote_chunks
   local_chunks="$(ls apps/web/dist/assets/*.js 2>/dev/null | wc -l | tr -d ' ')"
   remote_chunks="$(ssh -o ConnectTimeout=10 "$host" \
-    'powershell -NoProfile -Command "(Get-ChildItem C:\src\heyta\apps\web\dist\assets -Filter *.js -ErrorAction SilentlyContinue | Measure-Object).Count"' 2>/dev/null |
+    "powershell -NoProfile -Command \"(Get-ChildItem ${HEYTA_WINDOWS_REPO_ROOT}\\apps\\web\\dist\\assets -Filter *.js -ErrorAction SilentlyContinue | Measure-Object).Count\"" 2>/dev/null |
     tr -d '\r' | grep -E '^[0-9]+$' | tail -1)"
   if [ -z "$remote_chunks" ]; then
     echo "  🔴 数不到远端 apps/web/dist/assets 的 chunk 数 —— 对账不成立，拒绝打包"
