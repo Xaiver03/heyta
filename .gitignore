@@ -257,3 +257,6 @@ apps/web/evidence/web-ui-sweep-latest/
 
 # 中央服务凭据（本地生成，不入库）
 .central/
+
+# 并行会话的有界等待/临时脚本（本机脚手架，不入库）
+.scratch-*/
