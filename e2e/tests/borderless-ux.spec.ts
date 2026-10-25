@@ -23,11 +23,29 @@ test('无描边搜索、键盘结果导航与连续月历在深浅和窄屏可�
       await expect(input).toBeFocused();
       await input.fill('复盘');
       await expect(page.getByTestId('search-panel-results')).toContainText('复盘项目');
+      /*
+       * 🔴 2026-10-25 改读数口径（**不是放宽**）：这一条原来断言焦点在搜索框里时
+       * `outline-width === 0px`，即"输入框不画焦点环"。那个口径已被 2026-10-24 的
+       * 无障碍决定取代 —— `borderless-controls.css:44-51` 给**所有文本输入的键盘焦点**
+       * 补回了可见焦点环（WCAG 2.4.7 Focus Visible / 1.4.11 Boundaries，注释里写明它顶着
+       * "无描边"观感）。所以现在焦点框**就该有** 2px 主色环，没有才是缺陷。
+       * 这条用例要守的仍是"无描边"：**面板/边框**不许画（下面两条照旧），
+       * 而焦点指示必须看得见（改成量"环 = 全局 token 且 style ≠ none"）。
+       */
       const appearance = await input.evaluate(el => {
         const s = getComputedStyle(el);
-        return { outline: s.outlineWidth, border: s.borderTopWidth, borderColor: s.borderTopColor, shadow: s.boxShadow, caret: s.caretColor };
+        return {
+          outline: s.outlineWidth,
+          outlineStyle: s.outlineStyle,
+          ring: getComputedStyle(document.documentElement).getPropertyValue('--ht-border-width-thick').trim(),
+          border: s.borderTopWidth,
+          borderColor: s.borderTopColor,
+          shadow: s.boxShadow,
+          caret: s.caretColor,
+        };
       });
-      expect(appearance.outline).toBe('0px');
+      expect(appearance.outlineStyle, '焦点环被改成 none ⇒ 键盘用户看不出焦点在哪').not.toBe('none');
+      expect(appearance.outline, '焦点环宽度必须等于全局那条 token').toBe(appearance.ring);
       expect(appearance.shadow).toBe('none');
       expect(appearance.border === '0px' || appearance.borderColor === 'rgba(0, 0, 0, 0)').toBe(true);
       await input.press('ArrowDown');
