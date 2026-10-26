@@ -60,7 +60,7 @@ import { expect, test } from '@playwright/test';
 
 import { openApp, openAuthPanel } from '../auth-journey/helpers.js';
 
-const SHOTS = ['test-results/auth-form-spacing-signin.png'] as const;
+const SHOTS = ['test-results/auth-form-spacing-1440.png', 'test-results/auth-form-spacing-375.png'] as const;
 const MIN_CONTROL_GAP = 12;
 const TOLERANCE = 0.5;
 
@@ -97,33 +97,47 @@ async function measure(dialog: import('@playwright/test').Locator, pairs: readon
   return readings;
 }
 
-test('登录档里每一对相邻独立控件的间距都在 12px 那一格上', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await openApp(page, '/', 'accepted');
-  const dialog = await openAuthPanel(page);
-  await dialog.getByTestId('auth-form').waitFor({ state: 'visible' });
-  // 等弹窗淡入走完：动画中途的矩形还在位移，量出来的是过渡态而不是设计值。
-  await page.waitForTimeout(600);
-  await page.screenshot({ path: SHOTS[0]!, fullPage: false });
+/**
+ * 两档宽度各量一次。⚠️ 为什么是这两档、为什么**没有**暗色：
+ *  - `auth-dialog.css:317` 有一条 `@media (max-width: 30rem)`（=480px）—— 窄屏那一档
+ *    这个浮层的布局**换了一套规则**，所以 12px 这件事必须在两档各证一次；
+ *  - 暗色**刻意不量**，而且这不是省事：`darkTokens` 只覆盖 `color.*`
+ *    （现量：`sed -n '473,540p' packages/design-system/src/generated/tokens.native.ts`
+ *    里非 color 的键为 0 枚），间距不参与主题 ⇒ 暗色那张图与亮色**逐字节相同**。
+ *    本仓库已经在 `habit-month.spec.ts` R7 上吃过一次那种假绿
+ *    （"名字比断言强"），所以这里不摆一枚不可能红的暗色臂。
+ */
+for (const [label, width, height, shot] of [
+  ['宽屏 1440', 1440, 900, SHOTS[0]],
+  ['窄屏 375', 375, 812, SHOTS[1]],
+] as const) {
+  test(`登录档里每一对相邻独立控件的间距都在 12px 那一格上（${label}）`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await openApp(page, '/', 'accepted');
+    const dialog = await openAuthPanel(page);
+    await dialog.getByTestId('auth-form').waitFor({ state: 'visible' });
+    // 等弹窗淡入走完：动画中途的矩形还在位移，量出来的是过渡态而不是设计值。
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: shot, fullPage: false });
 
-  const signIn = await measure(dialog, PAIRS['sign-in']);
-
-  console.log('登录档：');
-  for (const r of signIn) {
-    console.log(`  ${r.label.padEnd(24)} ${r.gap === null ? '🔴 量不到' : `${String(r.gap)}px`}`);
-  }
-
-  const failures: string[] = [];
-  for (const r of signIn) {
-    if (r.gap === null) {
-      failures.push(`② 「${r.label}」量不到矩形（${r.above} / ${r.below} 之一不在册）⇒ 探针失效，不是"没有缺陷"`);
-    } else if (r.gap < MIN_CONTROL_GAP - TOLERANCE) {
-      failures.push(
-        `① 「${r.label}」实测 ${String(r.gap)}px < ${String(MIN_CONTROL_GAP)}px（space.3）` +
-          ` ⇒ 这个控件被放进了"控件内部"的容器（field 的 gap 是 space.1=4px），` +
-          `修法照样式表里 primary 那条：挂 standaloneRow（4+8 落在 12 那一格）`,
-      );
+    const readings = await measure(dialog, PAIRS['sign-in']);
+    console.log(`${label}：`);
+    for (const r of readings) {
+      console.log(`  ${r.label.padEnd(24)} ${r.gap === null ? '🔴 量不到' : `${String(r.gap)}px`}`);
     }
-  }
-  expect(failures, failures.join('\n')).toEqual([]);
-});
+
+    const failures: string[] = [];
+    for (const r of readings) {
+      if (r.gap === null) {
+        failures.push(`② ${label}「${r.label}」量不到矩形（${r.above} / ${r.below} 之一不在册）⇒ 探针失效，不是"没有缺陷"`);
+      } else if (r.gap < MIN_CONTROL_GAP - TOLERANCE) {
+        failures.push(
+          `① ${label}「${r.label}」实测 ${String(r.gap)}px < ${String(MIN_CONTROL_GAP)}px（space.3）` +
+            ` ⇒ 这个控件被放进了"控件内部"的容器（field 的 gap 是 space.1=4px），` +
+            `修法照样式表里 primary 那条：挂 standaloneRow（4+8 落在 12 那一格）`,
+        );
+      }
+    }
+    expect(failures, failures.join('\n')).toEqual([]);
+  });
+}
