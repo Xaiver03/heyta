@@ -614,6 +614,42 @@ heyta 现在还不能对外发布。挡上线的只剩 4 件 —— 全都只差
 `check:server-legal` / `check:legal-copy` / `check:legal-tools` 家族全绿，
 并且**要一个真人点头**（这条是唯一一处"代码已开通、文本说没开通"的地方）。
 
+#### ✅ 2026-10-25 晚：文本已改（`ai-and-transfer@1.7`），**卡点只剩"没人签"**
+
+上面那段列的五步里，前四步**已经做完**（本条是为了让下一个人别再按"文本说反了"去修）：
+
+| 判据 | 现量 |
+|---|---|
+| 版本 | `ai-and-transfer@1.7`，`status: 'draft'`、`updatedDate: '2026-10-25'`（`LEGAL_SET_VERSION` 同步） |
+| 中英同步 | 结构测试 69 项通过（`packages/legal` 全套 **85 项**） |
+| 重生成 | `gen-site-copy`（zh/en 各 40 条）与 `gen-server-legal` 都跑过，两个 `--check` 回 **0** |
+| 门禁 | `check:legal-copy` / `check:legal-tools` / `check:legal-permissions` / `check:legal-host` / `check:legal-closure-truth` / `check:legal-gdpr` 全绿 |
+| 第五节现在怎么写 | 助手**在**这一档里，但仍要三条前提 + 工具选择那枚授权；并写明它是多轮、每轮各占一次额度计数 |
+
+🔴 **对外口径仍然是"以签核为准"**：这一版仍是草案，**没有真人签过**，所以能改的只是
+"文本与代码不再互相矛盾"，不是"可以对外宣传托管档带助手"。签之前按 1.6 那套说。
+
+✅ **另有一处与本节无关、但会决定这一档能不能成立的矛盾**（2026-10-25 晚发现，**当场已处理**）：
+`x-c` 仓 `docs/infrastructure/product-registry.md` 曾记着 `heyta` **production** 的 `chat` 链
+按 development / staging 的"逐字同形"补回了三跳（p1 MiraclePlus `/v1` → p2 OpenCode Go →
+p3 DeepSeek 官方）。而 ADR-0054 **§11.5 第 1 条**当初正是因为这前两跳**会出境**才停用它们、
+只留境内那一条；法务 §10 第 44–49 条那一格也据此写着"托管路径只接境内白名单、没有数据在我们
+这一侧被送往境外"。⇒ 那一版里**默认第一跳就会把那句话证伪**。
+
+**处理结果（走的是"生产链恢复成境内"，不是改法务）**：production 现在是两跳全境内 ——
+p1 `DeepSeek 官方 / deepseek-flash`、p2 `DeepSeek 官方 / deepseek-v4-pro`，两跳都声明
+`tool_calling`；境外那两跳已停用。为什么只有两跳：已注册的 chat 供应商里境内只有 DeepSeek
+官方一家，它的目录只服务这两个模型（`deepseek-v4.1-flash` 是那两个境外代理的别名）。
+证据：`generate-contract --check` 与生产库一致；数据面实测 `finish_reason=tool_calls`、
+服务方 `deepseek-flash`。回滚杆在 x-c 仓 `tools/ai-control/repoint-heyta-domestic.mjs`
+（`--to-domestic` / `--to-foreign` 两个方向，默认 dry-run）。
+
+⚠️ **留给下一棒的三件事**（都不是"再做一次"的活，是明账）：
+① **单供应商**：两跳都在 `api.deepseek.com`，等于失败转移只剩"模型级"，供应商级仍是单点；
+想要境内三跳得先找第二家境内 chat 供应商（火山方舟 / 阿里百炼等，需要 key）。
+② **备用跳更贵**：`deepseek-v4-pro` 价目 9/27 CNY 每百万 token（flash 是 2/8），只在主跳失败时用到。
+③ **对外仍以签核为准**：法务 `ai-and-transfer@1.7` 是草案，托管档先不宣传。
+
 ---
 
 ## 4. 档四：功能面的架构缺失（决定"要不要宣传这个功能"）
