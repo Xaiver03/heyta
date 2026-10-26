@@ -176,6 +176,27 @@ export interface AdminUserDetail {
     appVersion: string | null;
     lastSeenAt: number;
   }[];
+  /**
+   * 🔴 **并集能力读数**：这个人此刻实际能用什么，以及每一项是从哪几行来的。
+   *
+   * 它不是 `subscriptions` 那份逐行列表的另一种写法：那份要运营自己心里做并集，
+   * 而"自己做的并集"没有判据。这一份由服务端调用**守卫用的同一批函数**算出来
+   * （`admin.routes.ts::projectEntitlements`），所以后台说的与线上拦的是同一次裁决。
+   *
+   * `reason` 是**机器码**（ADR-0074 §三.1：能外分的只有码）。`sources` 可以为空
+   * 而 `allowed` 为真 —— 那是 `selfhost-online` 下的自动收集：它的判据是官方签发的
+   * 票据，本机订阅行根本不参与，于是"来源"这一格没有订阅行可念。
+   */
+  readonly entitlements: {
+    capability: string;
+    allowed: boolean;
+    reason: string | null;
+    sources: {
+      provider: string | null;
+      priceId: string | null;
+      currentPeriodEnd: number | null;
+    }[];
+  }[];
 }
 
 export interface AdminSubscriptionRow {

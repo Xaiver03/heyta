@@ -10,6 +10,12 @@ import {
 import { STUB_ORIGIN, STUB_PORT } from '../ports';
 
 /**
+ * 新落的判据把图留在**受版本控制**的那一份（`test-results/` 每趟被清，
+ * 一张只活在那里的图下一趟就没人打得开）。与 `admin-console-route.spec.ts` 同一落点。
+ */
+const EVIDENCE = '../apps/web/evidence/admin-console';
+
+/**
  * 运营管理后台：真浏览器契约（截图为判据）。
  * ============================================
  *
@@ -228,6 +234,21 @@ function detailBody(fake: FakeServerState) {
         createdAt: T0,
         updatedAt: T0,
       },
+    ],
+    // 🔴 并集读数：这份替身**照服务端那一份的形状给**（`server/tests/admin-entitlements.spec.ts`
+    // 钉的是判定本身，这里只让浏览器那一趟有东西可看、可截图）。
+    // `provider: 'apple'` 故意用一张词表外的码：界面对它念裸码，不编一个中文名。
+    entitlements: [
+      {
+        capability: 'hosting',
+        allowed: true,
+        reason: null,
+        sources: [
+          { provider: 'apple', priceId: 'litopia-yearly', currentPeriodEnd: T0 + 30 * DAY },
+        ],
+      },
+      { capability: 'ai', allowed: false, reason: 'GRANT_NOT_INCLUDED', sources: [] },
+      { capability: 'automation', allowed: false, reason: 'ENTITLEMENT_MODE_UNCONFIGURED', sources: [] },
     ],
     orders: [
       {
@@ -621,6 +642,44 @@ async function seed({
       return;
     }
 
+    // 🔴 发放那一格的两把读（档位投影 + 动作史）。这一趟以前不存在：本文件的假服务端
+    // 此前把 `/skus` 与 `/subscriptions/grants` 落到最后的 404 上，所以没有任何一条
+    // e2e 进得了那一格 —— 症状是"档位下拉永远不出现"，而不是"这一格坏了"。
+    // 形状与 `admin-console-route.spec.ts` 那份同源（`grantDaysMax: 1234` 那枚写不出的数）。
+    if (path === '/skus') {
+      await json({
+        skus: [
+          { priceId: 'hosted-monthly', grants: ['hosting'], sellable: true },
+          { priceId: 'hosted-ai-monthly', grants: ['hosting', 'ai', 'automation'], sellable: false },
+        ],
+        grantDaysMax: 1234,
+      });
+      return;
+    }
+    if (path === '/subscriptions/grants') {
+      await json({
+        items: [
+          {
+            id: 3,
+            userId: 7,
+            actorUserId: 1,
+            action: 'grant',
+            sku: 'hosted-monthly',
+            days: 30,
+            grants: ['hosting'],
+            beforePeriodEnd: null,
+            afterPeriodEnd: T0 + 30 * DAY,
+            reason: '内测授权',
+            createdAt: T0,
+          },
+        ],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      });
+      return;
+    }
+
     if (/^\/users\/\d+$/.test(path)) {
       await json(detailBody(fake));
       return;
@@ -1010,6 +1069,76 @@ test.describe('运营管理后台（真浏览器）', () => {
     await expect(page.getByTestId('admin-action-notice')).toHaveText('已完成。');
     expect(adminCalls).toContain('POST /users/7/logout');
     await shoot(page, detail, 'admin-user-actions.png');
+
+    assertNoProblems(problems);
+  });
+
+  /**
+   * 🔴 并集读数 + 搬运入口（这一格在真浏览器里的两条腿）。
+   *
+   * jsdom 那两组钉的是"界面念的是服务端判的那件事"与翻页本身；这一趟只补一件
+   * 它们量不到的事：**这个人真能一路点过去** —— 搜到人 → 打开 → 看见三档各一行 →
+   * 点「给他发一份」→ 落到发放格且编号已经带着。中间任何一步靠"抄下来再粘过去"
+   * 都会在这一趟红（那条路径本文件已经不许存在了）。
+   */
+  test('🔴 用户详情念并集读数，「给他发一份」把目标带进发放格子', async ({ page }) => {
+    const problems = captureProblems(page);
+    const fake = defaultFake();
+    const { adminCalls } = await seed({ page, fake });
+    await openPanel(page);
+    await adminTab(page, '用户').click();
+    await expect(page.getByTestId('admin-users')).toBeVisible();
+
+    await page
+      .getByTestId('admin-users')
+      .locator('button.ht-settings__admin-row')
+      .filter({ hasText: 'locked@example.test' })
+      .click();
+
+    const detail = page.getByTestId('admin-user-detail');
+    await expect(detail).toBeVisible();
+
+    // 三档各一行，勾叉来自服务端那份投影（替身的形状与真响应逐字一致）。
+    const hosting = page.getByTestId('admin-user-entitlement-hosting');
+    await expect(hosting).toContainText('官方托管同步 ✓');
+    // 词表外的 `provider: 'apple'` ⇒ 念裸码，不编中文名。
+    await expect(hosting).toContainText('apple · litopia-yearly');
+    await expect(page.getByTestId('admin-user-entitlement-ai')).toContainText('云端 AI ✕');
+    await expect(page.getByTestId('admin-user-entitlement-ai')).toContainText('他那一档不含这项');
+    await expect(page.getByTestId('admin-user-entitlement-automation')).toContainText(
+      '这台实例没配自动收集的权益来源',
+    );
+    // 🔴 逐行列表与并集读数**同时在**：一格答"哪一行的问题"，一格答"他能不能用"。
+    await expect(detail).toContainText('litopia-yearly');
+    await shoot(page, detail, 'admin-user-entitlements.png', EVIDENCE);
+
+    // 🔴 「保存」必须落在详情卡片**里面**。这一带有过前科：配额那一行原来嵌在动作行里，
+    // 于是保存溢出到「关闭」底下（Playwright 报 intercepts pointer events，真人也点不到），
+    // 修完的注释还在 `AdminPanel.tsx`。那种缺陷在截图上最容易被看成"排版有点松"，
+    // 所以判据按几何写，不按眼睛写。
+    const card = await detail.boundingBox();
+    const save = await detail.getByRole('button', { name: '保存' }).boundingBox();
+    expect(card).not.toBeNull();
+    expect(save).not.toBeNull();
+    expect(
+      save!.x + save!.width,
+      `保存的右边界 ${String(Math.round(save!.x + save!.width))} 出了卡片右边界 ${String(Math.round(card!.x + card!.width))}`,
+    ).toBeLessThanOrEqual(Math.round(card!.x + card!.width));
+
+    await detail.getByTestId('admin-grant-for-user').click();
+
+    // 落到发放格：编号已经带着（7 就是详情里那个人的 id），其余三格照旧空着。
+    // ⚠️ 这里走 `getByLabel` 不是 testid：那三个控件的 `id` 由 `FormField` 发下去，
+    // 界面上没有 `data-testid`，用 testid 会得到一个"永远等不到"的假红。
+    await expect(page.getByTestId('admin-grants')).toBeVisible();
+    await expect(page.getByLabel('账号编号')).toHaveValue('7');
+    await expect(page.getByLabel('档位')).toHaveValue('');
+    await expect(page.getByLabel('理由（会进发放记录）')).toHaveValue('');
+    // 切格子这一步走的还是那条按需加载（档位与记录各读一次）。
+    expect(adminCalls).toContain('GET /skus');
+    // 第一屏就读得到前置，不用撞一次 409 才知道顺序错了。
+    await expect(page.getByTestId('admin-grants-precondition')).toContainText('先赠送');
+    await shoot(page, page.getByTestId('admin-grants'), 'admin-grants-prefilled.png', EVIDENCE);
 
     assertNoProblems(problems);
   });

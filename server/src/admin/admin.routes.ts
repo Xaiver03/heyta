@@ -75,7 +75,16 @@ import {
   holidayAdjustmentAdminDeleteQuerySchema,
 } from '@heyta/shared-schema';
 
-import { DEFAULT_ENTITLEMENT_POLICY } from '../entitlement';
+import {
+  DEFAULT_ENTITLEMENT_POLICY,
+  ENTITLEMENT_CAPABILITIES,
+  evaluateAutomationEntitlementForUser,
+  evaluateCapability,
+  evaluateCapabilityAcross,
+  resolveAutomationEntitlementMode,
+  type AnyEntitlementDenialReason,
+  type EntitlementSubscription,
+} from '../entitlement';
 import { getAuthUser } from '../middleware';
 import { Logger } from '../logger';
 import { revokeAllTokens } from '../auth';
@@ -217,6 +226,77 @@ function projectUserListRow(row: UserListRow, now: number) {
     storageUsedBytes: toMinor(row.storageUsedBytes),
     storageQuotaBytes: toMinor(row.storageQuotaBytes),
   };
+}
+
+/**
+ * 判权益用的行形状：判定只看三列，念来源要再多两列。
+ *
+ * 🔴 `currentPeriodEnd` 在这里**收窄成 `number | null`**（判定本身接受 `bigint`）：
+ * 这一格出的是 HTTP 响应，`bigint` 序列化会直接抛 —— 不收窄的话
+ * "带着一枚 bigint 走进 JSON"这条老坑会在这条新路上重新长出来。
+ */
+type EntitlementRow = EntitlementSubscription & {
+  readonly provider: string | null;
+  readonly priceId: string | null;
+  readonly currentPeriodEnd: number | null;
+};
+
+/**
+ * 🔴 「这个人**此刻**实际能用什么」—— 后台那一格的读数。
+ *
+ * ## 为什么要有它，`/subscriptions` 那一格不是已经给了逐行吗
+ *
+ * 权益是**跨行的并集**（`entitlement.ts::evaluateCapabilityAcross` 的头注释：付费行 +
+ * 邀请行 + 赠送行各自授予自己的能力，"最新那一行说了算"会让已付时长静默消失）。
+ * 逐行给出去，等于让运营自己在心里做并集 —— 而"自己做的并集"没有判据：他会把
+ * 一条 `past_due` 读成有效，也会把一条过期赠送读成"这档根本没交付"。
+ *
+ * 所以这里**不做第二套判定**：放行那一判逐字调用守卫用的那几个函数
+ * （`hosting` / `ai` → `evaluateCapabilityAcross`；`automation` → `evaluateAutomationEntitlementForUser`）。
+ * 后台说的与线上拦的是同一次裁决，不是同一份抄件。
+ *
+ * ## 三档的来源不是同一个地方
+ *
+ * `automation` 的权益来源由**部署模式**二选一：`official` 才看本机订阅行，
+ * `selfhost-online` 只看官方签发的票据（在自己的库里给自己发货不算买到了）。
+ * 因此 `sources` 只在 `official` 下按订阅行填 —— 模式不是 official 还照订阅行念来源，
+ * 念出口的就是一句守卫根本没看的话。
+ */
+async function projectEntitlements(
+  userId: number,
+  rows: readonly EntitlementRow[],
+  now: number,
+): Promise<
+  {
+    capability: (typeof ENTITLEMENT_CAPABILITIES)[number];
+    allowed: boolean;
+    reason: AnyEntitlementDenialReason | null;
+    sources: { provider: string | null; priceId: string | null; currentPeriodEnd: number | null }[];
+  }[]
+> {
+  const mode = resolveAutomationEntitlementMode();
+  const automation = await evaluateAutomationEntitlementForUser({ userId, now, mode });
+
+  return ENTITLEMENT_CAPABILITIES.map((capability) => {
+    const decision =
+      capability === 'automation' ? automation : evaluateCapabilityAcross(rows, capability, now);
+    const fromRows = capability !== 'automation' || mode === 'official';
+    return {
+      capability,
+      allowed: decision.allowed,
+      // 拒绝时给的是**机器码**（ADR-0074 §三.1：能外分的只有码，散文留给日志）。
+      reason: decision.allowed ? null : decision.reason,
+      sources: fromRows
+        ? rows
+            .filter((row) => evaluateCapability(row, capability, now).allowed)
+            .map((row) => ({
+              provider: row.provider ?? null,
+              priceId: row.priceId ?? null,
+              currentPeriodEnd: row.currentPeriodEnd ?? null,
+            }))
+        : [],
+    };
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -450,6 +530,19 @@ export const adminRoutes = async (
 
       if (user === null) return reply.status(404).send({ code: 'user_not_found', message: 'User not found.' });
 
+      // 投影一次，两处用：响应里那一份逐行列表，和下面那份并集读数。
+      // 分成两份各算一次的话，两处对"同一个字段叫什么"会漂移，而漂移的读数最难查。
+      const subscriptionRows: EntitlementRow[] = user.subscriptions.map((s) => ({
+        status: s.status,
+        currentPeriodEnd: toMs(s.currentPeriodEnd),
+        grants: s.grants,
+        provider: s.provider,
+        priceId: s.priceId,
+        id: s.id,
+        createdAt: toMsRequired(s.createdAt),
+        updatedAt: toMsRequired(s.updatedAt),
+      }));
+
       return reply.send({
         user: {
           ...projectUserListRow(user, now),
@@ -465,16 +558,9 @@ export const adminRoutes = async (
           operations: user._count.operations,
           notifications: user._count.notifications,
         },
-        subscriptions: user.subscriptions.map((s) => ({
-          id: s.id,
-          provider: s.provider,
-          priceId: s.priceId,
-          status: s.status,
-          grants: s.grants,
-          currentPeriodEnd: toMs(s.currentPeriodEnd),
-          createdAt: toMsRequired(s.createdAt),
-          updatedAt: toMsRequired(s.updatedAt),
-        })),
+        subscriptions: subscriptionRows,
+        // 🔴 并集读数：与守卫同一次裁决，不是这里再判一遍（见 `projectEntitlements`）。
+        entitlements: await projectEntitlements(parsed.data.id, subscriptionRows, now),
         orders: user.checkoutOrders.map((o) => ({
           id: o.id,
           outTradeNo: o.outTradeNo,

@@ -341,6 +341,23 @@
   min-inline-size: 0;
 }
 
+/* 🔴 这一行里"控件 + 动作按钮"并排，所以控件不许吃 `form.css` 里那条给字段控件
+   定形状的规则的 `inline-size: 100%` —— 它撑满整个槽，旁边的「保存」就被顶到卡片外面
+   （真浏览器实测：保存右边界 1240 > 卡片右边界 1192；判据在
+   `e2e/tests/admin-console.spec.ts` 的几何那一段）。
+   ⚠️ 选择器的**权重必须与那条打平**（两枚 `:not([type=…])` 一枚都不能少），
+   靠的是 `app.css` 里 admin 排在 form **之后**这一层叠顺序；只写
+   `.ht-settings__admin-input` 是压不住的。
+   ⚠️ 也别把那条规则的类名写进这里的选择器**或注释** —— `check:form-anatomy`
+   是纯文本匹配的，注释里写出那个前缀就足以让它判"字段解剖有第二个定义处"。
+   `flex: 1` 在这里是对的（父级是**横向**槽），那条规则里的 `flex: none` 防的是纵向槽里
+   把高度压成一条线，两件事不冲突。 */
+.ht-settings__admin-inline :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  inline-size: auto;
+  flex: 1;
+  min-inline-size: 0;
+}
+
 .ht-settings__admin-pager {
   display: flex;
   gap: var(--ht-space-2);

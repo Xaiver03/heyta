@@ -163,8 +163,7 @@ async function clickTab(label: string): Promise<void> {
 }
 
 /** 按可见文字找一个按钮。 */
-function buttonBy(label: string): HTMLButtonElement | undefined {
-  const el = container;
+function buttonBy(label: string): HTMLButtonElement | undefined {  const el = container;
   if (el === undefined) throw new Error('先渲染');
   return [...el.querySelectorAll('button')].find(
     (node) => (node.textContent ?? '').trim() === label,
@@ -174,6 +173,25 @@ function buttonBy(label: string): HTMLButtonElement | undefined {
 async function clickButton(label: string): Promise<void> {
   const button = buttonBy(label);
   if (button === undefined) throw new Error(`没有这个按钮：${label}`);
+  await act(async () => {
+    button.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+/**
+ * 按**包含**找一个按钮并点它。
+ *
+ * 用户列表那一行的按钮文字除了邮箱还带着徽标与注册时间，`buttonBy` 那种逐字相等
+ * 的找法在它身上永远找不到 —— 而"永远找不到"在这里会被读成"这一行没有入口"。
+ */
+async function clickButtonContaining(needle: string): Promise<void> {
+  const el = container;
+  if (el === undefined) throw new Error('先渲染');
+  const button = [...el.querySelectorAll('button')].find(
+    (node) => (node.textContent ?? '').includes(needle),
+  ) as HTMLButtonElement | undefined;
+  if (button === undefined) throw new Error(`没有含这段文字的按钮：${needle}`);
   await act(async () => {
     button.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -208,6 +226,21 @@ async function setField(label: string, value: string): Promise<void> {
 }
 
 const posts = (calls: Call[]): Call[] => calls.filter((call) => call.method === 'POST');
+
+/** 按标签读回一个字段的当前值（与 `setField` 同一套找法）。 */
+function fieldValue(label: string): string {
+  const el = container;
+  if (el === undefined) throw new Error('先渲染');
+  const field = [...el.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select')].find(
+    (node) => {
+      const id = node.getAttribute('id');
+      if (id === null) return false;
+      return (el.querySelector(`label[for="${id}"]`)?.textContent ?? '').includes(label);
+    },
+  );
+  if (field === undefined) throw new Error(`没有这个字段：${label}`);
+  return field.value;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -325,7 +358,7 @@ describe('三个动作各打各的端点', () => {
     ).toBe(readsBefore + 1);
   });
 
-  it('成功之后表单清空，回执说的是**这一个**动作', async () => {
+  it('成功之后**这一笔**清空，而「是谁」留着（回执说的是这一个动作）', async () => {
     stubFetch(okAll);
     await renderPanel();
     await clickTab('发放');
@@ -339,7 +372,13 @@ describe('三个动作各打各的端点', () => {
     expect(
       (el.querySelector('[data-testid="admin-grants-notice"]')?.textContent ?? '').trim(),
     ).toBe('已发放：这个账号的赠送周期往后延了。');
-    expect([...el.querySelectorAll('input')].every((node) => node.value === '')).toBe(true);
+    // 🔴 「是谁」**故意不清**：一次给同一个人发两档是常态，而这一格还是从「用户」
+    //    那一格搬过来的（`openGrantForUser`）—— 发一次就洗掉，那个搬运入口只生效一次。
+    expect(fieldValue('账号编号')).toBe('5');
+    // 这一笔的三格必须清空。理由那一格留着最坏：下一笔会带上上一笔的审计理由。
+    expect(fieldValue('档位')).toBe('');
+    expect(fieldValue('天数（只有「赠送」用得到）')).toBe('');
+    expect(fieldValue('理由（会进发放记录）')).toBe('');
   });
 
   it('收回成功的回执不许念成"已发放"（三句话是三个人工动作）', async () => {
@@ -514,5 +553,171 @@ describe('发放记录那一页', () => {
     const el = container as HTMLDivElement;
     expect(el.textContent).toContain('服务端出错了');
     expect(calls.filter((call) => call.method === 'POST')).toHaveLength(0);
+  });
+});
+
+/**
+ * 🔴 发放记录**会长过一页**，而这一格是这一条线里唯一"看历史"的地方。
+ *
+ * 没有翻页的症状不是报错，是"看起来只有 50 条"：运营会以为一个人只被动过一次，
+ * 而他要查的恰恰是第 51 条那一次。页坐标一律用**服务端回显的那一份** ——
+ * 界面自己数 `items.length` 当总数的话，第二页永远点不动（这一条就是这么红的）。
+ */
+describe('🔴 发放记录的翻页', () => {
+  /** 一个"库里已经有 120 条"的响应形状，第一页只回 50 条里的两行。 */
+  const pageOf = (offset: number): unknown => ({
+    ...GRANT_ROWS_BODY,
+    total: 120,
+    offset,
+  });
+
+  it('下一页打的是 `offset=50`，而且只多打这一把 GET（档位不重读）', async () => {
+    GRANT_ROWS = pageOf(0);
+    const calls = stubFetch((call) => {
+      if (call.url.includes('/subscriptions/grants')) {
+        const offset = Number(new URL(call.url).searchParams.get('offset') ?? '0');
+        return { status: 200, body: pageOf(offset) };
+      }
+      return okAll(call);
+    });
+    await renderPanel();
+    await clickTab('发放');
+    const before = calls.length;
+
+    await clickButton('下一页');
+
+    const gets = calls.slice(before).filter((call) => call.method === 'GET');
+    expect(gets).toHaveLength(1);
+    expect(gets[0]?.url).toContain('offset=50');
+  });
+
+  it('翻页控件念的是**服务端给的 total**（不是这一页的行数）', async () => {
+    GRANT_ROWS = pageOf(0);
+    stubFetch((call) =>
+      call.url.includes('/subscriptions/grants') ? { status: 200, body: pageOf(0) } : okAll(call),
+    );
+    await renderPanel();
+    await clickTab('发放');
+
+    // 这一页只有 2 行。按行数算总数的话「下一页」会是 disabled，而库里还有 118 条。
+    const next = buttonBy('下一页');
+    expect(next).toBeDefined();
+    expect(next?.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('只有一页时「下一页」禁用，而不是消失', async () => {
+    GRANT_ROWS = GRANT_ROWS_BODY;
+    stubFetch(okAll);
+    await renderPanel();
+    await clickTab('发放');
+
+    expect(buttonBy('下一页')?.hasAttribute('disabled')).toBe(true);
+    expect(buttonBy('上一页')?.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('发放动作之后**停在服务端那一页**，不被弹回第一页', async () => {
+    GRANT_ROWS = pageOf(50);
+    const calls = stubFetch((call) => {
+      if (call.url.includes('/subscriptions/grants')) {
+        return { status: 200, body: pageOf(Number(new URL(call.url).searchParams.get('offset') ?? '0')) };
+      }
+      if (call.method !== 'GET') return { status: 200, body: { ok: true, subscription: {}, audit: {} } };
+      return okAll(call);
+    });
+    await renderPanel();
+    await clickTab('发放');
+    await clickButton('下一页');
+    const before = calls.length;
+
+    await setField('账号编号', '5');
+    await setField('档位', 'hosted-monthly');
+    await setField('天数（只有「赠送」用得到）', '7');
+    await setField('理由（会进发放记录）', '续一周');
+    await clickButton('赠送订阅');
+
+    const reread = calls.slice(before).filter((call) => call.url.includes('/subscriptions/grants'));
+    expect(reread.at(-1)?.url).toContain('offset=50');
+  });
+});
+
+/**
+ * 🔴 「用户」那一格搜到人之后，不该还要运营抄一遍账号编号。
+ *
+ * 搬运只搬「是谁」。档位/天数/理由留空 —— 把上一笔的理由带进这一笔，
+ * 那条审计记录说的就不是这一次动作为什么做了。
+ */
+describe('🔴 从「用户」那一格搬过来的目标账号', () => {
+  const USER_ROW = {
+    id: 5,
+    email: 'someone@example.test',
+    isVerified: true,
+    isAdmin: false,
+    locked: false,
+    lockedUntil: null,
+    createdAt: NOW,
+    storageUsedBytes: 1024,
+    storageQuotaBytes: 2048,
+  };
+
+  const userResponder = (call: Call): { status: number; body: unknown } => {
+    // 判序：`/users/5` 里也含 `/users`。
+    if (call.url.includes('/users/5')) {
+      return {
+        status: 200,
+        body: {
+          user: { ...USER_ROW, failedLoginAttempts: 0, tokenVersion: 1, termsAcceptedAt: null, termsDocumentVersion: null },
+          counts: { passkeys: 0, operations: 0, notifications: 0 },
+          subscriptions: [],
+          entitlements: [],
+          orders: [],
+          devices: [],
+        },
+      };
+    }
+    if (call.url.includes('/users')) {
+      return { status: 200, body: { items: [USER_ROW], total: 1, limit: 50, offset: 0 } };
+    }
+    return okAll(call);
+  };
+
+  it('点「给他发一份」⇒ 切到发放格，账号编号就是那个人的 id', async () => {
+    stubFetch(userResponder);
+    await renderPanel();
+    await clickTab('用户');
+    await clickButtonContaining('someone@example.test');
+    await clickButton('给他发一份');
+
+    expect(fieldValue('账号编号')).toBe('5');
+    // 切格子这件事本身要能看见：内容区已经是发放那一格，而且它的读档路径被走到了。
+    expect((container as HTMLDivElement).querySelector('[data-testid="admin-grants"]')).not.toBeNull();
+    expect((container as HTMLDivElement).querySelector('[data-testid="admin-users"]')).toBeNull();
+  });
+
+  it('搬过来的**只有**「是谁」：档位、天数、理由仍然空着', async () => {
+    stubFetch(userResponder);
+    await renderPanel();
+    await clickTab('用户');
+    await clickButtonContaining('someone@example.test');
+    await clickButton('给他发一份');
+
+    expect(fieldValue('档位')).toBe('');
+    expect(fieldValue('天数（只有「赠送」用得到）')).toBe('');
+    expect(fieldValue('理由（会进发放记录）')).toBe('');
+  });
+});
+
+describe('🔴 第一屏就读得到的前置', () => {
+  it('「升档要先有一条赠送」写在格子里，不用撞一次 409 才知道', async () => {
+    stubFetch(okAll);
+    await renderPanel();
+    await clickTab('发放');
+
+    const lead = (container as HTMLDivElement).querySelector('[data-testid="admin-grants-lead"]');
+    const pre = (container as HTMLDivElement).querySelector(
+      '[data-testid="admin-grants-precondition"]',
+    );
+    expect(pre?.textContent).toContain('先赠送');
+    // 前置不是定义的一部分：两格各说一件事（合成一长句，第二句会被读成修辞）。
+    expect(lead?.textContent).not.toContain('先赠送');
   });
 });

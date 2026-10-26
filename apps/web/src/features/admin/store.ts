@@ -165,7 +165,6 @@ export const EMPTY_ANNOUNCEMENT_FORM: AnnouncementFormInput = {
  * 而服务端那一侧是 `strictObject`（多一个键就 400），所以界面**发不出**它。
  */
 export interface GrantFormInput {
-  readonly userIdText: string;
   readonly sku: string;
   /** 空串 ⇒ `Number('')` 是 `0`，服务端按"天数不合法"拒 —— 这里不替它兜成一个默认天数。 */
   readonly daysText: string;
@@ -176,7 +175,6 @@ export interface GrantFormInput {
  * 发放表单的初值：档位空着 —— 不替运营预选一档，预选会让他没看就读到"能发"。
  */
 export const EMPTY_GRANT_FORM: GrantFormInput = {
-  userIdText: '',
   sku: '',
   daysText: '',
   reasonText: '',
@@ -204,6 +202,63 @@ export const ADMIN_GRANT_NOTICE_KEY: Record<AdminGrantNotice, MessageKey> = {
 /** 服务端码 → 词条。**词表外的码 ⇒ `null`** ⇒ 界面落回 `conflict` 那一格。 */
 export const grantCodeKey = (code: string | null): MessageKey | null =>
   code === null ? null : (ADMIN_GRANT_CODE_KEY[code] ?? null);
+
+/**
+ * 能力码 → 词条。
+ *
+ * 🔴 词表住在服务端（`entitlement.ts::ENTITLEMENT_CAPABILITIES`），这里只是**取词**。
+ * 服务端加一档而这张表没登记时，界面念的是那个码本身（`capabilityLabelKey` 的回落），
+ * 不编中文名 —— 一个没翻译的码是"这里要加词条"的响亮提示，编出来的名字是安静的错。
+ */
+export const ADMIN_CAPABILITY_KEY: Record<string, MessageKey> = {
+  hosting: 'web.admin.user.entitlement.hosting',
+  ai: 'web.admin.user.entitlement.ai',
+  automation: 'web.admin.user.entitlement.automation',
+};
+
+export const capabilityLabelKey = (capability: string): MessageKey | null =>
+  ADMIN_CAPABILITY_KEY[capability] ?? null;
+
+/**
+ * 订阅行的 `provider` 码 → 词条（并集读数里那一格要说"这一份能力是谁给的"）。
+ *
+ * ⚠️ 只给**运营看得懂的那几枚**配词。`server/src/admin/subscription-grant-store.ts`
+ * 的 `ADMIN_GRANT_PROVIDER` 是本表的第一个成员 —— 它换了名而这里没跟，
+ * `apps/web/tests/admin-entitlements.spec.tsx` 那条"赠送那一行要念成运营赠送"会红；
+ * 码表外的 provider（比如线上那枚 `apple`）界面对它**念裸码**，不编一个中文名。
+ */
+export const ADMIN_PROVIDER_KEY: Record<string, MessageKey> = {
+  'admin-grant': 'web.admin.provider.adminGrant',
+  invite: 'web.admin.provider.invite',
+  wechat: 'web.admin.provider.wechat',
+  paycenter: 'web.admin.provider.paycenter',
+};
+
+export const providerLabelKey = (provider: string | null): MessageKey | null =>
+  provider === null ? null : (ADMIN_PROVIDER_KEY[provider] ?? null);
+
+/**
+ * 权益拒绝码 → 词条。两张码表都可能出现在这里（`entitlement.ts` 的
+ * `EntitlementDenialReason` 与只属于自动收集那一路的 `AutomationEntitlementDenialReason`），
+ * 它们**刻意不相交**，所以这一格不许把它们当成一张表来猜。
+ *
+ * 码表外的码 ⇒ `null` ⇒ 界面只说"✕"，**不**替服务端编一个原因（同 `grantCodeKey`）。
+ */
+export const ADMIN_ENTITLEMENT_REASON_KEY: Record<string, MessageKey> = {
+  NO_SUBSCRIPTION: 'web.admin.entitlement.reason.NO_SUBSCRIPTION',
+  STATUS_NOT_ENTITLED: 'web.admin.entitlement.reason.STATUS_NOT_ENTITLED',
+  MISSING_PERIOD_END: 'web.admin.entitlement.reason.MISSING_PERIOD_END',
+  INVALID_PERIOD_END: 'web.admin.entitlement.reason.INVALID_PERIOD_END',
+  PERIOD_ENDED: 'web.admin.entitlement.reason.PERIOD_ENDED',
+  INVALID_NOW: 'web.admin.entitlement.reason.INVALID_NOW',
+  MISSING_GRANTS: 'web.admin.entitlement.reason.MISSING_GRANTS',
+  GRANT_NOT_INCLUDED: 'web.admin.entitlement.reason.GRANT_NOT_INCLUDED',
+  ENTITLEMENT_MODE_UNCONFIGURED: 'web.admin.entitlement.reason.ENTITLEMENT_MODE_UNCONFIGURED',
+  ISSUER_NOT_CONFIGURED: 'web.admin.entitlement.reason.ISSUER_NOT_CONFIGURED',
+};
+
+export const entitlementReasonKey = (reason: string | null): MessageKey | null =>
+  reason === null ? null : (ADMIN_ENTITLEMENT_REASON_KEY[reason] ?? null);
 
 /**
  * 「调休 / 补班」表单**收集到的原始输入**（未拆分、未修剪前的文本框内容）。
@@ -384,10 +439,32 @@ export interface AdminStoreState {
   /**
    * 发放记录（动作史）。`null` = 还没拉过，与"一条都没有"是两件事。
    *
-   * ⚠️ 它是**动作史**，不是当前权益：当前权益在「订阅」那一格。分两格是因为
-   * 读者问的问题不同（"他现在能用什么" vs "谁在什么时候给他动过什么"）。
+   * ⚠️ 它是**动作史**，不是当前权益：「谁在什么时候给他动过什么」在这里，
+   * 「他此刻实际能用什么」在用户详情那格的并集读数里（`detail.entitlements`，
+   * 与守卫同一次裁决）。这两格不许合成一格 —— 一份是流水，一份是当下的闸门状态。
    */
   grantHistory: AdminGrantRow[] | null;
+  /**
+   * 服务端回显的那一页坐标（`{ total, offset }`）。
+   *
+   * 🔴 两个数都取**响应里的那一份**，不在界面自己数 `items.length`、也不自己加偏移：
+   * 界面记的页码与服务端给的那一页不一致时，翻页控件会停在"还能点下一页"而列表已经空了。
+   * `null` 时是 0 —— 那一格翻页本来就不该出现。
+   */
+  grantHistoryTotal: number;
+  grantHistoryOffset: number;
+  /**
+   * 「给谁发」。**故意住在 store 而不是表单的 `useState`**：它是跨格子的搬运，
+   * 不是这一屏的输入 —— 路径是「用户」那一格搜到人 → 点「给他发一份」→ 切到「发放」。
+   * 目标若住在面板自己的 state 里，切格子就是卸载重挂，那个编号会**静默变回空**，
+   * 而他刚点的那一下看起来"什么都没发生"。
+   *
+   * ⚠️ 只搬"是谁"：档位、天数、理由仍然一次一填、成功就清空 ——
+   * 把理由也跨格子留着，下一笔会带上上一笔的审计理由。
+   *
+   * 空串 = 还没选到人，输入框照旧由运营自己填。
+   */
+  grantTarget: string;
   /**
    * 上一次发放动作的结果。**说了是哪一件事** —— 三种动作的回执不是一句话：
    * 「已给这个人延长 30 天」「已把他升到另一档、一天没加」「已收回发放」
@@ -464,8 +541,30 @@ export interface AdminStoreState {
   withdrawAnnouncement: (id: number) => Promise<void>;
   clearAnnouncementNotice: () => void;
 
-  /** 档位下拉 + 发放记录（同一次进格子里拉齐，两样都是"这一屏要读的"）。 */
+  /**
+   * 档位下拉 + 发放记录第一页（同一次进格子里拉齐，两样都是"这一屏要读的"）。
+   */
   loadGrantBoard: () => Promise<void>;
+  /**
+   * 只重读发放记录那一页（翻页走这一条）。
+   *
+   * `offset` 不给就沿用**服务端上一次回显的那一页** —— 发完一次之后再点翻页，
+   * 应该回到他刚才看着那一页，而不是被弹回第一页。
+   *
+   * 🔴 翻页不重读档位：档位是"能选什么"，它不因你看第几页而变。
+   * 一次翻页打两把 GET 的症状不是报错，是每次翻页都闪一次下拉重新加载。
+   */
+  loadGrantHistory: (offset?: number) => Promise<void>;
+  /** 运营在发放输入框里自己改目标账号。 */
+  setGrantTarget: (value: string) => void;
+  /**
+   * 🔴 从「用户」那一格的行直接搬进发放格子：填好账号编号 + 切格子。
+   *
+   * 为什么不是"把整张表单搬过去"：这一格只有「是谁」值得跨格子存活（一次给同一个人
+   * 发两档是常态），档位/天数/理由都是这一笔自己的，搬过去等于让上一笔的理由
+   * 变成这一笔的审计记录。
+   */
+  openGrantForUser: (userId: number) => void;
   /**
    * 赠送订阅：发放行延长 N 天 + 设档位。
    *
@@ -623,6 +722,9 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   announcementNotice: null,
   grantBoard: null,
   grantHistory: null,
+  grantHistoryTotal: 0,
+  grantHistoryOffset: 0,
+  grantTarget: '',
   grantNotice: null,
   grantCode: null,
   detail: null,
@@ -780,28 +882,55 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     set({ announcementNotice: null });
   },
 
-  loadGrantBoard: async () => {
+  loadGrantHistory: async (offset) => {
     set({ loading: true });
-    // 两把读并发：档位是"能选什么"，历史是"已经动过什么"，同一屏都要显示，
-    // 串行会让这一屏多等一个 RTT 而没有任何一侧依赖另一侧。
-    const [skus, history] = await Promise.all([
-      fetchAdminGrantSkus(clientOptions()),
-      fetchAdminSubscriptionGrants(clientOptions(), { limit: ADMIN_PAGE_SIZE }),
-    ]);
-    if (!skus.ok) return applyFailure(skus, set);
+    const skip = offset ?? get().grantHistoryOffset;
+    const history = await fetchAdminSubscriptionGrants(clientOptions(), {
+      limit: ADMIN_PAGE_SIZE,
+      offset: skip,
+    });
     if (!history.ok) return applyFailure(history, set);
     set({
-      grantBoard: { skus: skus.data.skus, daysMax: skus.data.grantDaysMax },
       grantHistory: history.data.items,
+      // 🔴 页坐标取**服务端回显的那一份**（`total` / `offset` 都在响应里）。
+      // 界面自己数 `items.length` 当总数，第二页就会永远点不动 —— 它数到的是这一页的条数。
+      grantHistoryTotal: history.data.total,
+      grantHistoryOffset: history.data.offset,
       errorKey: null,
       loading: false,
     });
   },
 
+  loadGrantBoard: async () => {
+    set({ loading: true });
+    // 两把读并发：档位是"能选什么"，历史是"已经动过什么"，同一屏都要显示，
+    // 串行会让这一屏多等一个 RTT 而没有任何一侧依赖另一侧。
+    const [skus] = await Promise.all([fetchAdminGrantSkus(clientOptions()), get().loadGrantHistory()]);
+    if (!skus.ok) return applyFailure(skus, set);
+    set({
+      grantBoard: { skus: skus.data.skus, daysMax: skus.data.grantDaysMax },
+      errorKey: null,
+      loading: false,
+    });
+  },
+
+  setGrantTarget: (value) => {
+    set({ grantTarget: value });
+  },
+
+  openGrantForUser: (userId) => {
+    // 「是谁」先落到 store，再走 `setActiveTab`，不是直接 `set({ activeTab })`：
+    // 那一趟负责把每一格的服务端回显清掉，而面板那个 `switch (tab)` 会在这时把档位
+    // 与记录读回来。自己在这里调 `loadGrantBoard` 等于开出第二条加载路径，
+    // 而它绕过那些 clear —— 症状是「发放」那一格里还挂着上一格刚清掉的那句回执。
+    set({ grantTarget: String(userId) });
+    get().setActiveTab('grants');
+  },
+
   grantSubscription: async (input) => {
     set({ loading: true, grantNotice: null, grantCode: null });
     const result = await adminGrantSubscription(clientOptions(), {
-      userId: Number(input.userIdText),
+      userId: Number(get().grantTarget),
       sku: input.sku,
       days: Number(input.daysText),
       reason: input.reasonText,
@@ -820,7 +949,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   upgradeGrant: async (input) => {
     set({ loading: true, grantNotice: null, grantCode: null });
     const result = await adminUpgradeSubscription(clientOptions(), {
-      userId: Number(input.userIdText),
+      userId: Number(get().grantTarget),
       sku: input.sku,
       reason: input.reasonText,
     });
@@ -836,7 +965,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   revokeGrant: async (input) => {
     set({ loading: true, grantNotice: null, grantCode: null });
     const result = await adminRevokeSubscriptionGrant(clientOptions(), {
-      userId: Number(input.userIdText),
+      userId: Number(get().grantTarget),
       reason: input.reasonText,
     });
     if (!result.ok) {
@@ -1087,6 +1216,9 @@ export function __resetAdminForTests(): void {
     announcementNotice: null,
     grantBoard: null,
     grantHistory: null,
+    grantHistoryTotal: 0,
+    grantHistoryOffset: 0,
+    grantTarget: '',
     grantNotice: null,
     grantCode: null,
     detail: null,
