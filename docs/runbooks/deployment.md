@@ -306,9 +306,13 @@
 - ✅ `location /api/` → `proxy_pass http://127.0.0.1:1900;`，带 `Upgrade` / `Connection: upgrade`
   （WebSocket，真实路径 `/api/sync/ws`）、`Host` / `X-Real-IP` / `X-Forwarded-For` /
   `X-Forwarded-Proto`，`proxy_read_timeout 90s` / `proxy_send_timeout 90s`。
-- ✅ `location ~ ^/(verify-email|recover-passkey|magic-login)$` → 同一个 `proxy_pass`。
-  🔴 这三张是**服务端渲染**的页面（`server/src/pages.ts`），不代理就会掉进落地页的 SPA 兜底，
-  用户看到的是落地页而不是「令牌无效 / 请重新注册」。
+- ✅ 凭据页的 `location` → 同一个 `proxy_pass`。
+  🔴 这些是**服务端渲染**的页面（`server/src/pages.ts` 里 `fastify.get` 注册的那一批），
+  不代理就会掉进落地页，用户看到的是「页面未找到」而不是「令牌无效 / 请重新注册」。
+  🔴 **枚数不在这里维护**：这一度是"三张"，`pages.ts` 长到五张时没人回来补，
+  于是 2026-10-26 用户点开重置密码邮件得到一张 404。现在它由 `pnpm check:credential-routes`
+  钉住（它从 `pages.ts` 读全集、跟边缘那片对账，双向差集都红）——
+  加一张凭据页只需要改 `pages.ts`，门禁会逼着人回来补边缘，而不是靠这份手册被读到。
 - 🔴 `location ~ ^/(recover-passkey|magic-login-confirm)\.js$` 与
   `location = /simplewebauthn-browser.min.js` → 同一个 `proxy_pass`。
   **只代页面不代脚本 = 页面画得出来、按钮是死的。** 2026-09-27 线上实测过这个形状：
@@ -326,7 +330,7 @@
   `SimpleWebAuthnBrowser === "object"`、点按钮 → `200 /api/recover/passkey/options`
   + `200 /api/recover/passkey/complete`、页面成功文案出现。
 
-  📌 **只列这三个**：它们是 `server/src/pages.ts` 里三张页面**真正引用**的脚本。
+  📌 **只列页面真正引用的那些脚本**（枚数同样由 `pnpm check:credential-routes` 对账，不在这里数）。
   `server/public/` 里另有 `app.js` / `style.css` / `eu-stars.svg`，但那是服务端**自带
   standalone 首页**（`templates/index.template.html`）的资源；本域名 `/` 服务的是真正的
   落地页（`/var/www/heyta-landing/`，它只用 `/assets/*` 与 `/favicon.svg`），
@@ -562,7 +566,7 @@ location ~ ^/(health|live)$ {
 | 公网地址 | 🔴 **当前（2026-09-30 起）：`https://heyta.waytofuture.cn/app/`** —— 见 §3.7.2。<br>2026-09-27 → 2026-09-30 期间是 `https://heyta.finlaw.cloud/app/`（见 §3.7.1） |
 | 静态根目录 | `/var/www/heyta-app/`（`ubuntu:ubuntu`）—— 两次迁移**都没动**这个目录，换的只是它挂在哪个域名下 |
 | 为什么放这个域名 | 与同步服务端**同源**：`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` / `CORS_ORIGINS` 都指向它，passkey 才能用（§3.7.1 解释了为什么不能再挂第二个域名） |
-| nginx 片段 | `/etc/nginx/sites-available/heyta.waytofuture.cn` —— 应用（`/app/`）、同步 API（`/api/`）与三张凭据页都在这里；`heyta.finlaw.cloud` 那份保留但**不是入口** |
+| nginx 片段 | `/etc/nginx/sites-available/heyta.waytofuture.cn` —— 应用（`/app/`）、同步 API（`/api/`）与凭据页都在这里；`heyta.finlaw.cloud` 那份保留但**不是入口** |
 | 旧地址 | `https://heyta-tmp.litopia.space/app/` 现在 **301 到旧域名**；而 `https://heyta.finlaw.cloud/app/` ⚠️ **2026-10-18 实测仍是 `200` —— 它还在服务**（原文写"不再提供服务"是错的）。两者都**不是**当前入口，且 **passkey 均不可用**（RP ID 只能有一个，见 §3.7.1） |
 
 #### 重新发布的三条命令
@@ -755,7 +759,7 @@ location /en/legal/ {
   只写 `try_files $uri =404` 会把好页一起 404 掉 —— 这是**把修坏的方向**。
   保留 `$uri/` 还顺带留住了 `/legal/terms` → 301 → `/legal/terms/` 的既有行为（与 canonical 一致）。
 - **必须是 prefix location，不是 regex**。nginx 先按 prefix 最长匹配、之后才按文件顺序判 regex；
-  加 regex 会改变**已有** regex（`/health|live`、`/terms|privacy\.html`、三张凭据页）的判定顺序。
+  加 regex 会改变**已有** regex（`/health|live`、`/terms|privacy\.html`、凭据页那两条 regex）的判定顺序。
   逐条核过：那几条 regex 都不匹配 `/legal/` 前缀，所以两条互不干扰。
 - **裸 `/legal/` 仍然是 403**，这是**对的**：那里没有 `index.html` 且目录列表关闭，
   403 是 nginx 的诚实回答。别为了"好看"把它兜成首页 —— 那正是本次要修的东西。
@@ -2194,7 +2198,7 @@ server/scripts/nginx-sync.sh --apply    # 仓库 → 线上（先备份、先 ng
 ### 7.1 `heyta-tmp.litopia.space` 已弃用（2026-09-27）
 
 **它不再是任何东西的入口。** ⚠️ 但它今天的 301 目标**仍写死旧域名**（实测 `→ https://heyta.finlaw.cloud/…`，见 §3.6）。当前入口是 `https://heyta.waytofuture.cn/`
-（落地页 + 应用 + 同步 API + 三张凭据页，§3.7.1）。旧域名现在的角色只有两个：
+（落地页 + 应用 + 同步 API + 凭据页，§3.7.1）。旧域名现在的角色只有两个：
 `/app*` 与 `/landing*` 做 **301** 跳过去；`/`、`/api/`、`/health` 仍直连同步服务端
 （刻意**不** 301 —— 301 会把 POST 改写成 GET，见 §3.3.2）。
 
