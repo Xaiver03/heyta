@@ -11918,3 +11918,13 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ② "零调用点"这类否定结论要连**分母**一起写（扫的是哪几棵目录），否则下一位没法判断读 0 是不是因为扫错了地方；
     ③ 台账引用一条命令时要当场复跑一次再说它读什么 ——
     本例就是复跑 `grep -rn … apps`（91 秒、12 MB）才露馅的，命令写得越像"可随时复跑"，这条越要紧（与 #583 同一族的"探针自己会撒谎"，只是这次撒谎的是文档里的命令而不是判据）。
+
+585. **改了 `packages/i18n` 的生成块却没重建该包的 `dist` ⇒ 站点发出去的是旧文案，而每一步的 rc 都是 0。**
+     2026-10-26 实测：`gen-site-copy.mjs` 写的是 `packages/i18n/src/locales/*.ts`，而 `apps/landing`
+     走的是 `@heyta/i18n` 的 **`dist`**。只跑 `gen-site-copy` + `landing build`，构建产物里仍是上一版
+     法律摘要（实测：`grep -c 新句 dist/assets/*.js` 一处都没有，旧句 1 处），而
+     `check:legal-copy`、`verify-landing-dist`、`rsync` 全部 rc=0 —— 因为校验的是**源**，
+     发出去的是**产物**。修法固定成两段：`pnpm --filter @heyta/i18n build` **再**
+     `pnpm --filter @heyta/landing build`，然后**在产物里 grep 那一句**（不是看构建日志）。
+     🔴 归族：这就是 #79「改完不 build 不算数」的 i18n 变体；判据要落在"产物里有没有那句话"，
+     而不是"gen 脚本跑没跑"。
