@@ -552,6 +552,12 @@ describe('⑦ 一条内容信号 ⇒ 动态里带清单名的那一句', () => {
     // 光"订阅了"不算数：画到屏幕上、念给读屏的那两处必须用的是相加后的数。
     expect(profile).toContain('count: inboxBadge');
     expect(profile).toContain('{inboxBadge}');
+    // 🔴 上面那两枚钉的是"引用换了吗"，钉不住"数本身换了吗"：本批真犯过把
+    // `inboxBadge` 定义成 `inboxUnread`（只数 inbox）而三处引用照旧 —— 两枚都绿、
+    // 徽标却永远不带上共享动态。所以把**相加这个形状**也钉住（#582）。
+    expect(profile, '徽标那枚数不是两格未读相加 ⇒ 共享动态来了入口也不动').toContain(
+      'inboxUnread + shareUnread',
+    );
 
     const app = stripComments(read('apps/mobile/src/App.tsx'));
     expect(app, '装配点没把当下的合并视图交给正文组装 ⇒ 名字永远是空的').toContain(

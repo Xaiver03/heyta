@@ -894,6 +894,127 @@ ADR-0050 那句「RN port 只传递 base64 root key」加了**限定范围**的�
 | **`04e-保险库已解锁.png` 里那枚圆圈** | 未判定 | 截图只证外观；要判的是"那一枚在该屏该不该在场"，得回账号安全线的那块界面自己说清 | 归账号安全线（本线不代定性） |
 | **别线存量三枚「侧栏」文案**（`common.organizer.confirm.impactChildren` / `.impactChildrenArchive` / `common.trash.confirm.strandChildren`） | 已登记在册，**不代改** | `apps/mobile/tests/share-ui-assembly.spec.ts` ⑥ 的债表 `OTHER_LINE_DEBT`：只许变短，修好了不删名目也判红 | 归回收站/归档那条线 |
 
+### 9.15 M6 移动端「按本机偏好打扰用户」那一半 + 便签那一族的设备腿（2026-10-26 第九批，第 36–39 跑）
 
+**这一段判的是哪句话**：产品定义里那句「收得到实时信号并**按本机偏好打扰用户**」——
+上一批把投递那一半做完了（闸门→活动差集→内存动态），这一格量的是**有没有人消费它**。
+现量起点（钉在本批那笔实现之前一个提交上，工作树在动不许拿它当锚）：
+`git grep -n subscribeShareActivityFeed 173f5110f^ -- apps/mobile/src | grep -v share/share-activity-notify.ts`
+⇒ **无输出**（零消费者；`mobile.inbox.tab.share` 等三枚词条在册无消费者）。
+同一枚查询换成 `HEAD` 再跑一遍读得到消费者（形状：两屏各一处 import + 一处订阅调用）——
+这条查询两头都可复跑，别把某一轮的条数抄进下一段散文里。
 
+#### 本批改的四件事（每件都带一枚能红的判据）
 
+1. **投递那一刻就把正文拼好**：`ShareActivityFeedEntry` 多一枚 `body`，
+   `labels.body` 的签名从 `(kind)` 改成 `(shareId, kind)` —— 不带 `shareId` 就查不到那一行清单，
+   动态只能永远说匿名那句。口径仍只在 `@heyta/ui` 的 `shareActivityNotificationBody`（ADR-0071）。
+2. **"挑哪句 / 插什么变量"从装配闭包里搬出来**：新增 `apps/mobile/src/lib/share-activity-copy.ts`。
+   留在 `App.tsx` 的闭包里就只能用源码文本判 —— 本批变异臂实测：把传名字那行换成 `undefined`，
+   **零条行为断言红**（只红一条文本断言）。教训记在环境陷阱 #581。
+3. **通知中心补第三档「共享动态」**（`NotificationsScreen.tsx`）：订阅动态、**打开这一档才清未读**、
+   逐条画 `entry.body` + 时间，底下那句「只存本机、重启后清空」如实说。
+4. **「我的」入口徽标 = inbox 未读 + 共享动态未读**（`ProfileScreen.tsx` 的 `inboxBadge`）。
+   系统横幅今天做不到（本机唯一那条原生通道被提醒链按 `categoryIdentifier` 全量回收，
+   新开 category 要重装两端 = 别线在飞资产），所以**这一枚徽标是当下唯一的打扰面** ——
+   它只数 inbox 就等于那一档没人会去点。本批真犯过"三处引用只改了两处"，判据当场抓住，
+   记在 #582；装置臂 `badge-not-summed` 现在钉着它。
+
+顺带修掉一处**注释与代码不一致**：`installMobileShareActivityDelivery` 原先"装过就直接 return"，
+注释却写"换的是标签与端口" ⇒ 语言切换后每一条新动态仍在说切换前的语言。现在先摘旧订阅再订新的。
+
+#### 判据与变异臂
+
+判据本体：`cd apps/mobile && npx vitest run tests/share-ui-assembly.spec.ts`（⑦ 组四枚 + ⑧ 组四枚，
+条数现量看它自己打印的 `Tests N passed`）。
+
+🔴 变异臂已从**手工那五发**收成一副可复跑装置：
+`node research/tools/mutation-rigs/mutate-collab-mobile-activity.mjs` ⇒ 读数 `ARMS=pass (4/4)`
+（本批 2026-10-26 现量：基线 24 passed、四臂红集精确匹配、复跑 RC=0、无 `.mut-bak` 残留）。
+四臂与各自红几枚：`name-never-read` 4 / `stale-labels` 1 / `body-empty` 4 / `badge-not-summed` 1。
+⚠️ 首跑两臂**红集漂移**（预测 2/3、实测 4/4）：多出来的那三枚逐条读过源码后确认**该红**
+（它们断言的就是"带名字的正文"与"插值变量只有 `name`"这两件事本身）⇒ 收紧的是预测，不是判据。
+⚠️ 本批早先那五枚**手工**变异（A 5 红 / B 2 红 / C 1 红 / D 1 红 / E 1 红）的编辑只活在一次性
+scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有上面那条命令（§9.14 那一族的老账，第二次犯）。
+
+#### 设备腿 L8 / L9（装置第 10a / 10c 步）跑次归因
+
+| 跑 | 退 | 红在哪一格 | 归因 |
+|---|---|---|---|
+| 36 | 3 | 第 10a 步「翻开关前那一步」 | **装置** —— L8 第一半结束时人停在「共享动态」那一档，而开关在共享首页的偏好面板里 ⇒ 补一段回偏好面的导航（`back_to_anchor` + `ax_press_until` 到 `share-notif-activity-added`）。不判产品。（那趟取证 `apps/mobile/evidence/collab-ios-10260907/` **只在本地、不入库**：它是退 3 的一趟，没有产品读数，台账要的是这一格归因而不是那批截图） |
+| 37 | 0 | — | **53 通过 / 0 失败**（取证 `apps/mobile/evidence/collab-ios-10260922/`）。L8 两半第一次都绿，但**读数不唯一**：那句正文里的名字是「共享清单」，而手机上那一行的名字也是「共享清单」（入群时名字框空着 ⇒ 走 `web.share.join.defaultName`）⇒ "名字是从本机行上来的"与"句子写死了一份"两半同形，这一格等于没判 |
+| 38 | 0 | — | **55 通过 / 0 失败**（取证 `apps/mobile/evidence/collab-ios-10260954/`）。入群时把名字框填成带当趟戳的 `本机清单<STAMP>` ⇒ 两半不再同形，正文读出来是「有人在你参与的共享清单「本机清单10260954」里写了新内容」；新增那枚对照（那一行的名字必须等于入群时填的）也在场。⚠️ 通过数 53→55 那两枚增量是"名字框那次 `fill_field` 的成功读数 + 这枚对照"，不是多出两条腿 —— 腿仍是 L1–L8 |
+| 39 | 0 | — | **56 通过 / 0 失败**（取证 `apps/mobile/evidence/collab-ios-10261842/`，20 张截图）。+1 那枚就是本批新加的 **L9（装置第 10c 步）第一次真机读数**：owner 侧用生产装配件写进那份共享清单的便签，出现在手机「我的 → 便签」那块板上，全程没点同步 ⇒ 走的仍是 `new_share_ops` 那条信号。⚠️ 这一趟**第一发在装包之前被新鲜度尺拦下**（`run-rc=3`：别线把 `@heyta/op-log` / `@heyta/sync-core` 的 `src` 提交了、`dist` 落后 ⇒ #576 那一族的第三次实测，照它打出的命令补 `pnpm --filter @heyta/op-log --filter @heyta/sync-core build` 后重发，没烧设备）。L8 两半、L7（手机自建清单→开共享→签发→撤销）、L2/L3/L4/L5/L6 在同一条链上一起复绿 |
+
+**L8 两半为什么必须相反**（判据本体，别只读一遍就放行）：
+
+| 半 | 前置 | 判据 | 控制读数 |
+|---|---|---|---|
+| 一 | 偏好全关（本装置每趟 `simctl uninstall` ⇒ 磁盘上必是默认全关） | owner 写一条评论 ⇒「共享动态」那一档**是空的** | 同一条评论**本身**在手机上出现（`wait_tree`）⇒ 静默只可能是闸门，不是"信号根本没到" |
+| 二 | 翻开『新增内容』那一档 | 同一种信号**再发一次** ⇒ 那一档里出现那句带清单名的话 | 第二条评论同样先在评论区等到 ⇒ 与第一半只差偏好那一格 |
+
+⚠️ 这一格判的**不是**「owner 改的清单名会不会同步过来」—— 入群时那个名字框写的是「仅本机显示」，
+本机行名只在本机生效；名字取不到时落匿名那句由 ⑧ 那两枚用例钉着，不归设备腿。
+
+#### M5 那三格本批没有重开（逐格现量，别照上一批的文字推断）
+
+| M5 那一格 | 本批现量 | 结论 |
+|---|---|---|
+| 面板 3s 轮询 ⇒ 信号驱动 | `grep -rn setInterval packages/ui/src/sync/` ⇒ 零命中（整族面板都没有兜底定时器，不只 SharePanel 那一枚）；名册信号在册（ADR-0070） | ✅ 上一批已结案，本批未动 |
+| 通知内容口径 | 口径唯一出口 `shareActivityNotificationBody`，本批把**移动端那一半接上消费者** | ✅ 由 ADR-0071 立着，本批是补消费面不是改口径 |
+| 两枚谓词的数据面 | 全仓 `grep shouldNotifyTaskReminder` 与 `shouldAutoAcceptInvitation` 只在**文档**里命中（三份计划/交接书），代码零命中；钉子 `packages/ui/tests/notification-model.spec.ts:14` 断言默认偏好只有 `activities` 一个键 | ✅ 按「撤下」结案（它们没有输入），本批按现量重核过那句理由仍成立 |
+
+#### 本批审计时补的一格：便签那一族（L9，装置第 10c 步）
+
+写完 L8 之后按产品定义那句逐族对账：「任务/便签/评论**三族**与另一台设备双向同步」——
+设备上被看见过的只有**任务**（L2）与**评论**（L3/L5），便签那一族从没在手机上量过。
+它在宿主层是通的（`verify:collab-sync` 把三族都收进共享日志），漏的是设备腿自己 ——
+与 §9.14 那一族"两把尺都绿、设备上那一格没量"同一个形状，只是这次漏的是装置。
+
+- **L9 判什么（下行）**：owner 用生产装配件往那份共享清单写一条便签 ⇒ 手机上「我的 → 便签」
+  那块板上必须出现这一条，全程不点同步（走的仍是 `new_share_ops` 那条信号 +
+  `NotesSection` 订阅的 `dataRevision`）。载荷三格逐字照 `packages/app-host/src/note-actions.ts`
+  那行真客户端写的（`content` / `projectId` / `isPinnedToToday`），装置不自创形状（#577 那一族）。
+- **到达锚为什么是 `notes-submit`**：`mobile-notes-board` 与 `note-row-*` 都是裸 `View`，
+  按 #575 那一族不进 AX 树 —— 拿它们当到达判据会恒不命中且不区分原因。
+- **失法分档**：判红之前先数板上读得到的静态文字条数并打进日志（`-1` = 树读不出 ⇒ `env_bail`，
+  不拿"没读到"当"没回流"），这样"那块面没渲染"与"有别行独缺这一条"不用重跑就能分。
+- **第 39 跑读数（2026-10-26，`run-rc=0`）**：owner 侧那条便签在手机上**肉眼复核过**——
+  `20-owner的共享便签到手机.png` 里那块板画出一行「owner写的共享便签10261842」，
+  带「钉到今天」「删除便签」两个动作（⇒ 不是只进了 AX 树的空节点，是走完整条渲染）。
+  同一趟 L8 两半也各自有图：`18-偏好全关时共享动态为空.png` 是那句空态「还没有共享动态」，
+  `19-共享动态里那句带清单名的话.png` 是「有人在你参与的共享清单「本机清单10261842」里写了新内容」
+  —— 两半只差偏好那一格，控制读数（评论本身先到手机）在同一条链上。
+- ⚠️ **这一格证到哪、没证到哪**：那块板画的是 `listNotes()` 的**未筛选全集**
+  （`apps/mobile/src/screens/NotesSection.tsx` 的 `read()`，切分组时递给回落的也是全集），
+  所以 L9 绿说的是「便签那一族的 op 在手机上解得开、物化得了、画得出来，而且没点同步」，
+  **不是**「这条便签归在那份共享清单名下」。归属那一格今天没有界面可判（就是下面那条上行缺口）——
+  别把 L9 的绿读成"便签按清单归好了"。
+
+🔴 **上行那一格今天做不到，而且不是判据缺口**：手机上没有"把一条便签归进某份清单"的入口 ——
+`setNoteProject` 这个宿主动作在 `apps/mobile/src` 与 `apps/web/src` 都是**零调用点**
+（现量 `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'` ⇒ 只剩接口声明与实现这两处、零调用点。⚠️ 别拿整个 `apps` 当分母：那里混着 `apps/web/dist` 的 bundle，读出来不是零）⇒ 两壳同缺一个界面入口。登记在下面那张"还剩什么"表里，
+归**要新界面**那一档，不当成本批能顺手补的判据。
+
+#### 四把尺现量（2026-10-26，串行一条链，逐枚带 rc）
+
+| 尺 | 命令 | rc | 读数与归因 |
+|---|---|---|---|
+| 1 typecheck | `pnpm -r typecheck` | 0 | 当趟（2026-10-26 11:19 那串链）全包过。要现量就重跑这条 —— 它不带状态，别的线提交了什么只影响它自己那几枚 |
+| 2 test | `pnpm -r test` | 0 | 当趟 21 枚 workspace 包的 `Test Files` 全是 `passed`、那一段里 `N failed` 零命中（⚠️ 逐包条数只在一次性日志里，台账不把它当现量锚 —— 按 #577 那条教训，指得动的只有上面这条命令） |
+| 3 本线 verify | `pnpm verify:collab-suite` | 0 | 当趟 `SUITE=OK legs=4 failed=0`（sync 14 步 / revoke 8 步 / conflict 6 步 / journey 3 步）。这条命令本身就是可复跑的载体，不依赖那次日志 |
+| 4 check | `pnpm check` | 1 | 红在 e2e 那一段：`8 failed / 412 passed / 2 skipped (42.5m)` —— `assistant-navigation-acceptance` 3 枚、`category-dialog-ux` 1 枚、`inbound-automation` 4 枚，**没有一枚是本线的**（本线那几套 `verify:collab-*` 与 `share-*` spec 全在这段里绿着）。**当场做了归因实验**：链停后单独复跑这三份 spec（`pnpm --dir e2e exec playwright test tests/category-dialog-ux.spec.ts tests/inbound-automation.spec.ts tests/assistant-navigation-acceptance.spec.ts --workers=1 --retries=0`）⇒ **`24 passed (1.4m)` 全绿**，而跑大链时工作树里带着别线**未提交**的 `apps/web/src/features/admin/*`、`packages/i18n/src/locales/*`、`packages/app-host/src/admin-client.ts`、`e2e/tests/admin-console.spec.ts` ⇒ 读成 #567/#576 那一族（负载 + 一台机器一份 `dist` 里混着别人的件），**不读成本线回归，也不替那三条线定性**（要它们自己在干净树上跑一遍才有判决）。⚠️ 顺手抓到一条**结构性的**：`pnpm check` 是 `&&` 链，而 `check:shell-unicode` 这些门**排在 e2e 之后** ⇒ e2e 一红它们整批没跑过。本批因此单跑了 14 把静态门补上（`gate-wiring / evidence-hygiene / script-snapshot / journey-coverage / collab-carrier / ios-ax-shim / locator-labels / verify-script-copy / shell-unicode / shell-exit-chain / docs / doc-citations / md-tables / doc-command-claims`）⇒ 13 绿，唯一那枚红是 `check:shell-unicode` 指本线装置脚本两处 `$VAR` 紧跟全角标点（2026-10-25 那批留下的，因为排在 e2e 之后从没被跑到过）——**本批已按它给的修法补成 `${UDID}` / `${STALE_PKGS}` 并复跑**；同一把门剩下的红在 `server/scripts/caddy-sync.sh`（别线资产，登记不代改） |
+
+#### 这一批还剩什么（逐格：判它的断言 / 为什么不并进本批）
+
+| 格 | 状态 | 判它的断言 | 归属 |
+|---|---|---|---|
+| **手机上的系统横幅（通知中心之外那一档）** | 🔴 **今天做不到，且不打算在本批做** —— 本机唯一那条原生通道被提醒链按 `categoryIdentifier == "heyta.reminder"` 全量回收；新开一枚 category 要改原生壳 + 重装两端，那是别线在飞的资产。（2026-10-26 按现量重核过这句还成立，分母是移动壳那几枚原生件：`git grep -n "categoryIdentifier\|heyta.reminder" -- apps/mobile` ⇒ iOS `AppDelegate.swift` 两处按 category 过滤 + `HeytaReminderModule.swift` 那枚 `static let category`，Android `ReminderModule.kt` 的 `CHANNEL`/`PREFS` 单通道；全壳只有这一族原生通知代码） | 没有断言 ⇒ 所以**不写成缺陷**，写成边界：`systemBanner` 端口留着可注入（`ShareActivityDeliveryPorts`），装配点不传它 | 归"通知通道归属"那一格（提醒线）；本批只把界面上能做的两档做完 |
+| **Android 的界面腿** | 🔴 载体不存在（§9.14 那格不变，本批没有新读数） | 出包腿在册（`ssh windows-pc`），界面腿没有 | 负责人长期令：一律 `ssh windows-pc` |
+| **手机把一条便签写进那份共享清单**（三族里的便签·上行） | 🔴 **界面上到不了** —— 不是没测：`setNoteProject` 在两壳零调用点（现量 `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'`），手机与 web 都没有"给便签选清单"那一枚入口 | 先有入口才谈得上判据；入口一落地，判据形状与 L9 对称（手机写 ⇒ owner 侧从共享日志读回并验签，复用 L4 那把尺） | 归**新界面**那一档（要定：入口放便签板还是放共享空间屏）⇒ 产品负责人拍，本批不代做 |
+| **手机把一条任务写进那份共享清单**（三族里的任务·上行） | 🔴 **界面上到不了，而且这一格不是共享特有的**：手机端**建任务只有两处调用点**（分母现量 `git grep -n "actions.create(" -- apps/mobile/src` ⇒ `screens/TasksScreen.tsx:1741` 与 `ai/AiToolboxScreen.tsx:194`），**两处都不交 `projectId`**（只交 `dueDate`/`priority`），而 `actions` 就是宿主那套 `createTaskActions(host)`、不会替界面补上"当前选中的清单"（`TasksScreen.tsx:629`）；共享那块添加面板也没有"选清单"的控件（现量 `grep -n "projectId" packages/ui/src/capture/CaptureComposer.tsx` ⇒ 无输出）；手机上唯一能改的归属是象限（`moveTaskToQuadrant`）。⇒ 手机新任务一律落收集箱 | 动作层是**通的**（`create(title, {projectId})` 支持显式归属，且 M6-2 的写侧分流会把它送进共享日志）⇒ 入口一落地，判据与 L3/L4 同形：手机建一条任务 → owner 侧从共享日志读回并验签。今天缺的只有那一枚控件 | 🔴 **这条影响产品定义那句"三族双向"**：今天手机上三族里只有评论那一族真双向。⚠️ 而且它不是"漏传一个参数"那么小 —— 手机端**连"按清单浏览/选中"这一档都没有**（分母现量 `git grep -c "activeProject" -- apps/mobile/src` ⇒ 退出码 1、一个都没有；「分类」那一档 `CategoriesScreen` 管的是标签，不建任务）⇒ 要新界面。**2026-10-26 按产品视角拍定形状**（负责人给的长期授权"按产品经理视角拍板"，这格不属于要他答的对外表征那类）：在移动端添加面板里加**一枚「清单」选择行**，默认仍是收集箱，选中某份清单才把 `projectId` 交给 `create`；便签板同形。**为什么不选"先做成按清单浏览的那一屏再添加"**：那要在手机上重建一份清单视图（web 靠侧栏选中，手机今天没有这一档），改动面从"一块面板"扩成"一屏导航 + 状态"，而产品定义要的只是"写进哪一份看得见、可选"这一件事。判据形状与 L3/L4 同形：装配层把选中的 `projectId` 交进去（不传 ⇒ 红，配变异臂），设备腿再判真机上那条任务确实落在共享那一行下。**本批不动它**：这批的验收量的是 L1–L9 那一份 bundle 的共享接线，中途加一块新控件会把读数归因搅浑。执行排在下一批 ⇒ 任务 #71 |
+| **桌面三枚壳接不接这条信号** | 不在 M6 授权范围（§9.14 已改口为"读者有两枚壳"） | 反查 `grep -rn "createHostRealtimeClient(" apps packages` | 归桌面那条线 |
+
+⚠️ **为什么不并进 `docs/plans/launch-blockers.md`**：那一格卡的是"打扰强度"，不卡发布 ——
+应用可以带着"只有应用内那一档"上线（ADR-0062 实施记录第 7 条就是这么写的）。
+把它登进收款/备案那本账会把一条产品边界读成一条发布阻塞，那本账的读者要的是后者。

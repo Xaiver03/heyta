@@ -2,10 +2,21 @@
 
 > 状态：**已接受（产品决策 2026-10-08）；实施进行中（2026-10-16 更正原来的「实施未开始」）**。
 > 已落地：服务端 shares 表与端点族 + role 硬门、listKey 与成员公钥信封、Web 宿主的创建共享 / 邀请 / 成员角色 / 所有权转让 / 入群链接落点。
-> 🔴 **未落地**：客户端 share op-log 引擎与多写者写路径路由**从未接线** —— `uploadOps`/`downloadOps` 零生产消费者、`listKey` 解出后不喂给任何解密引擎，所以**共享清单在成员眼里仍是一条空清单**（逐条证据见[进度](../agents/progress-log.md)的「协作与共享清单」一节）。
-> ⚠️ 上面那句里**只有"零生产消费者"这一小格过期了**（2026-10-22 现量）：评论那一族的 `uploadOps`/`downloadOps` 各有一个生产消费者（`packages/app-host/src/share-comments.ts`），
-> 但**「成员眼里仍是一条空清单」这个结论仍然成立** —— 多写者路由（`TASK/PROJECT`）照旧零，而评论区在 web 只挂在任务详情上
-> （现量：`grep -rn ShareCommentsSection apps` 只回 `TaskDetailCard.tsx` 一处）。逐层读数在本线计划 §9.1。本 ADR 的裁决一个字没动。
+> 🔴 **这一格曾长期是"未落地"**（2026-10-16 与 2026-10-22 两次现量分别写下：客户端 share op-log 引擎与多写者路由从未接线、
+> `uploadOps`/`downloadOps` 零生产消费者、`listKey` 解出后不喂给任何解密引擎 ⇒ **成员眼里仍是一条空清单**）。
+> ✅ **2026-10-26 起这句不再是现状，只作为历史保留**：那枚"这一行属于哪份共享"的接线点在两壳都在（现量
+> `git grep -n "setProjectShareId(" -- apps/mobile/src apps/web/src`），多写者路由已按族通到界面
+> （**下行**三族在手机上都有真机读数：任务 L2 / 评论 L3·L5 / 便签 L9，最后一枚 2026-10-26 第 39 跑取到；
+> 🔴 但**上行**只有评论那一族真双向 —— 手机建的任务与便签今天没有"归进某份清单"的界面入口，
+> 缺的是控件不是判据，逐格现量与拍定的形状在本线计划 §9.15 那张"还剩什么"表），
+> `listKey` 解出后确实喂进解密引擎（现量 `git grep -c "listKey" -- apps/mobile/src apps/web/src`），
+> 成员在**真机**上看得见别的设备写的内容（`pnpm verify:mobile-collab:ios` 的 L2/L5 两格，逐格读数在本线计划
+> [§9.14 与 §9.15](../plans/collaboration-shared-lists.md)）。逐条证据仍在[进度](../agents/progress-log.md)的「协作与共享清单」一节。
+> ⚠️ 那段历史里的两个细节留下来了，因为它们各自解释过"为什么当时不能算落地"：评论族的 `uploadOps`/`downloadOps`
+> 在 2026-10-22 各有一个生产消费者（`packages/app-host/src/share-comments.ts`）而多写者路由仍零；
+> 而"评论区在 web 只挂在任务详情上"那枚读数当时用的命令是 `grep -rn ShareCommentsSection apps` ——
+> **这条命令今天不要照抄**：整个 `apps` 的分母里混着 `apps/*/dist` 的打包产物，扫出来的命中与源码命中不是一回事，
+> 要看源码命中请用 `git grep -n <名字> -- apps/<壳>/src`。本 ADR 的裁决一个字没动。
 > 证据见[共享清单调研](../research/collaboration-shared-lists.md)，落地计划（W0–W6）见 [collaboration-shared-lists.md](../plans/collaboration-shared-lists.md)。本 ADR 只记裁决。
 
 ## 背景：两类「协作」必须拆开
@@ -55,7 +66,7 @@
 ## 实施记录（2026-10-24 追加；只登记与本文措辞的差，不改上面任何一条裁决）
 
 **「验证」那一节那句「尚无实现」已经不成立** —— 从 M1 到 M6 六批落地，逐批读数在
-[计划 §9.7–§9.14](../plans/collaboration-shared-lists.md)。这里只登记**下面这几处**会被本文措辞误导人的差：
+[计划 §9.7–§9.15](../plans/collaboration-shared-lists.md)。这里只登记**下面这几处**会被本文措辞误导人的差：
 
 1. **决策 4 里那句「与滴答的任务提醒四档（个人设置）一致」** —— 四档**没有实现，也不会实现**：
    它判的是 `Task.assigneeUserId`，那个字段全仓零写点（现量
@@ -107,6 +118,15 @@
    以及"这台账号名下一条自己的清单都没有"这件事此前被装置写成 `exit 3` —— 而产品定义里
    「手机用户能建清单」那一格正因如此从没被验过（#579）。钉子与逐格读数：计划 §9.14
    「第 35 跑新增的两格」。
+
+7. **决策 7 那句「按本机偏好决定要不要吵」此前在手机上只有生产者、没有消费者** ——
+   投递把活动写进内存动态，而全仓没有任何界面读它（`mobile.inbox.tab.share` 等三枚词条在册零消费者）。
+   2026-10-26 第九批补的是消费那一头：通知中心第三档「共享动态」+「我的」入口徽标
+   （inbox 未读 **+** 共享动态未读）。**判断仍只有一份**（`@heyta/ui` 的 `selectNotifiedActivities`），
+   壳里新增的只有"画哪一句"与"从本机那一行取清单名"（`apps/mobile/src/lib/share-activity-copy.ts`）。
+   ⚠️ 系统横幅那一档**仍然做不到**：本机唯一那条原生通道被提醒链按 `categoryIdentifier` 全量回收，
+   新开 category 要重装两端 = 别线在飞资产 ⇒ 今天"打扰用户"在手机上就是那一档 + 那枚徽标，
+   `systemBanner` 端口留着可注入。设备腿 L8（两半相反）的读数在计划 §9.15。
 
 **仍然没有做到的（别把上面读成"全做完了"）**：库里存量 op 不追签（ADR-0069 裁决二/三）；
 旧密文在 rekey 后不重加密（追加模型的代价，边界写在 `share-rekey.ts` 文件头）；

@@ -1,0 +1,75 @@
+{
+  "shareId": "8de1e50c-012d-4d34-bb63-a0cb062abf45",
+  "ownerMemberId": "59db1143-dba3-4907-a8a5-c1cb71fcdf59",
+  "phone": {
+    "memberId": "97758950-2ecb-456a-957e-454d90e38d3e",
+    "identityPublicKey": "U6Vi9VRsj2Pdy6ZSVy/5KidPVSmUNfYweyIMH9GI8EA=",
+    "role": "editor"
+  },
+  "members": [
+    {
+      "memberId": "59db1143-dba3-4907-a8a5-c1cb71fcdf59",
+      "userId": 103,
+      "role": "owner",
+      "addedAt": 1792978069772,
+      "hasEnvelope": false,
+      "memberKeyEpoch": 1,
+      "identityPublicKey": null,
+      "signingPublicKey": "XVr882txJGRtQlRc3ByQ88kvmPpSPBhI4RLseAUC3Z4=",
+      "keyEnvelope": null
+    },
+    {
+      "memberId": "97758950-2ecb-456a-957e-454d90e38d3e",
+      "userId": 104,
+      "role": "editor",
+      "addedAt": 1792978093322,
+      "hasEnvelope": true,
+      "memberKeyEpoch": 1,
+      "identityPublicKey": "U6Vi9VRsj2Pdy6ZSVy/5KidPVSmUNfYweyIMH9GI8EA=",
+      "signingPublicKey": "22k1n0NvtkKXBNewgprzPD3ocjVLbuaPlCo1IrH94Qg=",
+      "keyEnvelope": {
+        "iv": "bTBqOx+rKDyHFQVi",
+        "shareId": "8de1e50c-012d-4d34-bb63-a0cb062abf45",
+        "keyEpoch": 1,
+        "ciphertext": "ADEN7idJcPvuRAbnNi9mENmRAHuGAaKxP/SEd7DVlu3rfi0biOTS0xdgH7au9X+a",
+        "formatVersion": 1,
+        "ephemeralPublicKey": "5KPNaGopa3uCNQBz98e7/0alHtXp7K6iBZOPy58bHmY=",
+        "ephemeralFingerprint": "5fefef06114d905f898c33b4990783d94e9fe81c17305dcb6b91f4bcf528b49b",
+        "recipientFingerprint": "54c3f579a8631ae70933174cc21cfad06d303ec8e91b4516ab002f0448e2a0d0"
+      }
+    }
+  ],
+  "opCount": 5,
+  "opAuthors": [
+    {
+      "id": "owner-op-1792978069759-1",
+      "entityType": "TASK",
+      "signerMemberId": "59db1143-dba3-4907-a8a5-c1cb71fcdf59",
+      "serverSeq": 1
+    },
+    {
+      "id": "share-op-1-1792978122303",
+      "entityType": "COMMENT",
+      "signerMemberId": "97758950-2ecb-456a-957e-454d90e38d3e",
+      "serverSeq": 2
+    },
+    {
+      "id": "owner-op-1792978069759-2",
+      "entityType": "COMMENT",
+      "signerMemberId": "59db1143-dba3-4907-a8a5-c1cb71fcdf59",
+      "serverSeq": 3
+    },
+    {
+      "id": "owner-op-1792978069759-3",
+      "entityType": "COMMENT",
+      "signerMemberId": "59db1143-dba3-4907-a8a5-c1cb71fcdf59",
+      "serverSeq": 4
+    },
+    {
+      "id": "owner-op-1792978069759-4",
+      "entityType": "COMMENT",
+      "signerMemberId": "59db1143-dba3-4907-a8a5-c1cb71fcdf59",
+      "serverSeq": 5
+    }
+  ]
+}

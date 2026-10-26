@@ -300,6 +300,36 @@ const steps = {
     save(flags.state, state);
     process.stdout.write(JSON.stringify({ entityId, opId: out.opId, taskId }) + '\n');
   },
+  /**
+   * owner 写一条**便签**到那份共享清单里 —— 手机那一侧的「便签」面应当不点同步就看见它。
+   *
+   * 🔴 载荷三格与 `packages/app-host/src/note-actions.ts:191` 那行真客户端写的逐字同形
+   * （`content` / `projectId` / `isPinnedToToday`）。`projectId` 给**具体的那一行**而不是省略：
+   * reducer 对 `CRT` 是合并语义，省略一个键等于"不动它"，而新建时没有任何东西可保留 ——
+   * 那行注释说的就是这件事，装置照抄，不自创形状。
+   */
+  async 'add-note'() {
+    const [content] = required('content');
+    const { state } = load();
+    const { dispatcher } = ownerWriter(state);
+    const entityId = `note-owner-${String(state.runId)}-${String((state.ownerNoteSeq ?? 0) + 1)}`;
+    const out = await dispatcher.dispatch(state.shareId, {
+      entityType: 'NOTE',
+      entityId,
+      opType: 'CRT',
+      payload: {
+        content: content.trim(),
+        projectId: state.seededProjectId ?? 'project-owner',
+        isPinnedToToday: false,
+      },
+    });
+    if (out.skipped) die(1, 'dispatcher 判定未登录，一条请求都没发');
+    advanceClock(state);
+    state.ownerNoteSeq = (state.ownerNoteSeq ?? 0) + 1;
+    state.lastOwnerNote = { entityId, opId: out.opId, content };
+    save(flags.state, state);
+    process.stdout.write(JSON.stringify({ entityId, opId: out.opId }) + '\n');
+  },
 
   /**
    * 拉共享日志，取**手机写的那几条**，用名册公钥逐条重验签。

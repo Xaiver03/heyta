@@ -31,6 +31,8 @@ trap 'rm -f -- "$0"' EXIT
 #   L6 界面不谎称能力：通知偏好面只剩三枚有输入的开关（M5-3 那一格）
 #   L8 本机偏好真的决定响不响：默认全关 ⇒ 共享动态是空的；翻开『新增内容』 ⇒ 同一种信号
 #      在那里落成**那句带清单名的话**（两半相反才说明闸门在看偏好，单判一响是假绿）
+#   L9 便签那一族也回流：owner 写一条便签进那份共享清单 ⇒ 手机「便签」板上看得见（下行；
+#      上行那一格两壳今天都没有入口 —— `setNoteProject` 在 `apps/*` 零调用点，见第 10c 步那段）
 #   L7 手机自己开共享：**反向**那一半 —— 手机先从界面上建一条自己的清单（产品定义里
 #      「手机用户能建清单」那一格），再把它设为共享（同意闸 → 建 share → 签发邀请 → 撤销）。
 #      这一档里手机是**所有者**，node 那侧只读服务端形状，不替它建。
@@ -812,7 +814,7 @@ for _rt, devs in (data.get("devices") or {}).items():
 raise SystemExit(1)
 ' "$UDID" 2>/dev/null)
 [ "${UDID_STATE:-}" = "Booted" ] \
-  || env_bail "设备 $UDID 当前状态=${UDID_STATE:-读不出}（不是 Booted）⇒ 先起它：xcrun simctl boot $UDID。本趟不判产品"
+  || env_bail "设备 $UDID 当前状态=${UDID_STATE:-读不出}（不是 Booted）⇒ 先起它：xcrun simctl boot ${UDID}。本趟不判产品"
 
 OTHER=$(another_mobile_e2e_running)
 if [ -n "$OTHER" ]; then
@@ -887,7 +889,7 @@ PY
 if [ -n "${STALE_PKGS:-}" ]; then
   _filters=''
   for _p in $STALE_PKGS; do _filters="$_filters --filter $_p"; done
-  env_bail "这些被移动端依赖的包 src 比 dist 新 ⇒ 装进 bundle 的会是旧产物（不是产品坏）：$STALE_PKGS。先跑：pnpm $_filters build"
+  env_bail "这些被移动端依赖的包 src 比 dist 新 ⇒ 装进 bundle 的会是旧产物（不是产品坏）：${STALE_PKGS}。先跑：pnpm $_filters build"
 fi
 rm -f -- "$DERIVED/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle"
 xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" -scheme Heyta \
@@ -1300,6 +1302,13 @@ PY
 fi
 shot "06e-已贴凭证"
 SECRET_FRAMES=0
+# 🔴 清单名那一格**故意填一个带当趟戳的名字**，不留在空着时的默认值上：空着 ⇒ 本机那一行的名字
+#    就是词表默认值「共享清单」（`JoinShareScreen.tsx:121` 走 `web.share.join.defaultName`），
+#    而第 10a 步那句正文里插的也是同一串 ⇒ 两半同形，读不出"名字是从本机行上来的"还是
+#    "句子里写死了一份"（#581 那一族）。填了戳，第 10a 步才拿得出"行名 == 这里填的名"这道对照。
+JOIN_LIST_NAME="本机清单${STAMP}"
+fill_field "id:share-join-name" "$JOIN_LIST_NAME" \
+  || { shot "06f-清单名填不进"; env_bail "清单名输入框填不进（装置问题，不判产品）"; }
 ax_press "加入"
 sleep 3
 idb_dump
@@ -1567,7 +1576,12 @@ l8_goto_activity_tab() {
   ax_press "id:inbox-tab-share" || return 1
 }
 
-# 界面上那份共享叫什么，从**这一屏那一行自己的读数**里取（不猜：名字是同步下来的）。
+# 界面上那份共享叫什么，从**这一屏那一行自己的读数**里取（不猜），再拿它跟第 6 步填进去的
+# 那个名字对一次账。🔴 上一趟（第 36/37 跑）这里两半同形：装置那侧的 owner 只写过一条任务 op，
+# 从没写过"清单名"那一枚（`collab-owner-step.mjs` 的 `projectId: 'project-owner'` 是一份没有
+# PROJECT op 的虚拟清单），而手机入群时名字那一格也空着 ⇒ 行名与正文里的名字都是词表默认值
+# 「共享清单」，那句正文证明不了名字是从本机行上来的。现在填了带戳的名，这一格才有牙。
+# ⚠️ 它判的仍**不是**"owner 改的名会不会同步过来"（那是另一格，本机名只本机可见）。
 idb_dump
 SHARE_LIST_NAME=$(python3 - "$IDB_DUMP_FILE" "$SHARE_ID" <<'PY'
 import json, sys
@@ -1590,6 +1604,13 @@ if [ -z "$SHARE_LIST_NAME" ]; then
   shot "18a-读不到那份共享的名字"
   env_bail "共享列表里那一行（share-space-row-$SHARE_ID）读不出名字 ⇒ 正文该带哪个名字这一格判不了（装置问题，不判产品）"
 fi
+if [ "$SHARE_LIST_NAME" != "$JOIN_LIST_NAME" ]; then
+  shot "18a2-那一行的名字不是入群时填的"
+  bad "共享列表那一行显示=$SHARE_LIST_NAME，第 6 步填进「清单名称」的是 $JOIN_LIST_NAME ⇒ 本机行名没落到界面上（正文插的就是它，这一格先红在这里）"
+  summary
+  exit 1
+fi
+ok "那一行的名字就是入群时填的那个（下面的正文因此是在拿本机行名插句子，不是拿词表默认值）"
 note "界面上这份共享的名字=$SHARE_LIST_NAME"
 # 期望那句正文在这里就先拼出来：两半的判据、红时的归因话术都用它，不各写一份。
 # ⚠️ 它是模板代入之后的**渲染结果**（`common.share.activityNamed.added`），
@@ -1637,6 +1658,17 @@ ok "偏好全关 ⇒ 共享动态是空的（零打扰在设备上成立）"
 shot "18-偏好全关时共享动态为空"
 
 # 翻开『新增内容』那一档：这一按之后必须**换一副读数**。
+# 🔴 先回偏好面那一屏 —— 上一段结束人还在**通知中心的共享动态**那一档，那里根本没有开关。
+#    第 36 跑就是在这里 env_bail 的（`本屏没有逐字叫 id:share-notif-activity-added 的可点节点`）：
+#    那句话是装置的导航错，不是产品没有开关 —— 同一屏第 10 步刚数到过那三行。
+#    偏好面板挂在共享面**未选中**那一支（`ShareSpaceScreen.tsx:708` 的 `selected === undefined`），
+#    与"一份共享一行"同屏，所以从「我的」按那一行入口进去就在面板上。
+back_to_anchor "id:profile-entry-share" \
+  || { shot "18h0-翻开关前爬不到我的页"; env_bail "翻开关前按顶栏「返回」爬不到「我的」那一行（装置问题，不判产品）"; }
+if ! ax_press_until "id:profile-entry-share" "id:share-notif-activity-added"; then
+  shot "18h1-进不到偏好面"
+  env_bail "从「我的」那行入口进不到画着活动开关的那一屏（装置落点问题，不判产品）"
+fi
 ax_press "id:share-notif-activity-added" \
   || { shot "18h-按不到新增内容那一档"; env_bail "偏好面上按不到『新增内容』那一行（装置落点问题，不判产品）"; }
 sleep 2
@@ -1658,18 +1690,52 @@ if ! l8_goto_activity_tab; then
   shot "18k-第二次进不到共享动态"
   env_bail "第二次按不到通知中心那第三档（装置落点问题，不判产品）"
 fi
-if ! wait_tree "$L8_SENTENCE" 120; then
+# 到达判据钉的是"本机那一行的名字被带进了 `「…」`"：匿名那句里没有书名号 ⇒ 这一枚只可能
+# 在**有名**那一档出现（`common.share.activityNamed.added`），比整串匹配更抗词表微调。
+if ! wait_tree "「$SHARE_LIST_NAME」" 120; then
   idb_dump
   shot "18l-翻开偏好后动态里没那句"
   if tree_has "还没有共享动态" >/dev/null 2>&1; then
-    bad "翻开『新增内容』后信号也到了、动态却仍写着空态 ⇒ 偏好写盘或投递那一格在设备上没成立（期望正文：$L8_SENTENCE）"
+    bad "翻开『新增内容』后信号也到了、动态却仍写着空态 ⇒ 偏好写盘或投递那一格在设备上没成立（期望带上本机那一行的名字：$SHARE_LIST_NAME）"
   else
-    bad "共享动态里没有那句带清单名的正文（期望逐字：$L8_SENTENCE）"
+    bad "共享动态里那句正文没带上本机那一行的名字「$SHARE_LIST_NAME」 ⇒ 名字那一格没进正文（期望逐字：$L8_SENTENCE）"
   fi
   summary
   exit 1
 fi
-ok "翻开偏好 ⇒ 同一种信号在共享动态里落成那句带清单名的话"
+# 屏幕上那一句逐字取回来落进**证据目录**：台账要引用一份还在那里的文件，而不是一次性的
+# 控制台日志（#576/#529 那一族 —— 日志随清场消失，台账那句"现量命令"就指到不存在的地方）。
+idb_dump
+L8_ROW_TEXT=$(python3 - "$IDB_DUMP_FILE" "$SHARE_LIST_NAME" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+def walk(n):
+    yield n
+    for c in (n.get("children") or []):
+        yield from walk(c)
+needle = "\u300c" + sys.argv[2] + "\u300d"
+for top in (data if isinstance(data, list) else [data]):
+    for n in walk(top):
+        label = (n.get("AXLabel") or "").strip()
+        if needle in label:
+            print(label)
+            sys.exit(0)
+PY
+)
+if [ -z "$L8_ROW_TEXT" ]; then
+  shot "18l2-读不到那一行正文"
+  env_bail "名字命中了却读不出那一整行文字（装置读不出这棵树，不判产品）"
+fi
+printf '%s\n' "$L8_ROW_TEXT" > "$EVIDENCE/l8-sentence.txt"
+if ! printf '%s' "$L8_ROW_TEXT" | grep -qF '有人在你参与的共享清单'; then
+  bad "动态里那行文字不是那句活动正文（逐字读数在 evidence/l8-sentence.txt）：$L8_ROW_TEXT"
+  summary
+  exit 1
+fi
+ok "翻开偏好 ⇒ 同一种信号在共享动态里落成那句带清单名的话：$L8_ROW_TEXT"
 shot "19-共享动态里那句带清单名的话"
 
 # ── 10b. L7：手机自己开启共享（反向那一半）──────────────────────────────────
@@ -1850,6 +1916,67 @@ elif [ "$rc_row" = "2" ]; then
 else
   shot "17r-手机建的那份不在列表里"
   bad "手机自己建的共享没出现在界面上（服务端在册、界面上没有 ⇒ 名册/绑定那一格没回流）"
+  summary
+  exit 1
+fi
+
+# ── 10c. 便签那一族的设备腿（L9）────────────────────────────────────────────
+step "10c. 便签下行判据（L9）：owner 写一条便签进共享清单 ⇒ 手机『便签』板上看得见，全程不点同步"
+# 🔴 产品定义那句是「任务/便签/评论**三族**与另一台设备双向同步」，而设备上被看见过的只有
+#    任务与评论两族（L2/L3/L5）。便签那一族在宿主层是通的（`verify:collab-sync` 把三族都收进
+#    共享日志），但"手机界面上看得见"此前**没有任何一条判据量过** —— 漏的是设备腿自己。
+# ⚠️ 这一格只有**下行**：手机上没有"把一条便签归进某份清单"那一枚入口 ——
+#    `setNoteProject` 在 `apps/mobile/src` 与 `apps/web/src` 都是**零调用点**（现量
+#    `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'` ⇒ 只剩接口声明与实现两处；
+#    ⚠️ 别扫整个 `apps`：那里面 `apps/web/dist` 的打包产物会命中，读出来不是零），
+#    所以"手机写便签进共享清单"两壳今天都到不了，
+#    那是缺一个界面入口，不是缺一条判据。登记在计划 §9.15 末那张表里。
+L9_NOTE_BODY="owner写的共享便签${STAMP}"
+node "$ROOT/scripts/lib/collab-owner-step.mjs" add-note --state "$OWNER_STATE" --content "$L9_NOTE_BODY" \
+  > "$RUN_DIR/l9-note.json" 2> "$RUN_DIR/l9-note.err" \
+  || { sed 's/^/      /' "$RUN_DIR/l9-note.err" >&2 2>/dev/null; env_bail "owner 写那条取证便签失败（装置/服务端那一腿，不判产品）"; }
+if ! back_to_anchor "id:profile-entry-notes"; then
+  shot "20a-L9 爬不到便签入口"
+  env_bail "按顶栏「返回」爬不到「我的」页上便签那一行（装置问题，不判产品）"
+fi
+# 到达判据用 `notes-submit`（`Pressable` + `accessibilityRole="button"` ⇒ 进 AX 树），
+# 不用 `mobile-notes-board` / `note-row-*` —— 那两枚都是裸 `View`，按 #575 那一族恒不命中。
+if ! ax_press_until "id:profile-entry-notes" "id:notes-submit"; then
+  shot "20b-进不到便签板"
+  env_bail "按了便签那一行却没走到便签板（装置落点问题，不判产品）"
+fi
+if wait_tree "$L9_NOTE_BODY" 180; then
+  ok "owner 写进那份共享清单的便签出现在手机的便签板上（没点过同步 ⇒ 走的仍是那条信号）"
+  shot "20-owner的共享便签到手机"
+else
+  idb_dump
+  # 失法分档：板上一行都没有（那块面没渲染）与"有别行、独缺这一条"（便签那一族没回流）
+  # 不是同一件事，读屏的静态文字条数落进取证目录，下一位不用重跑就能分。
+  L9_STATIC_LINES=$(python3 - "$IDB_DUMP_FILE" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print(-1); sys.exit(0)
+def walk(n):
+    yield n
+    for c in (n.get("children") or []):
+        yield from walk(c)
+rows = 0
+for top in (data if isinstance(data, list) else [data]):
+    for n in walk(top):
+        if (n.get("role") or "") == "AXStaticText" and (n.get("AXLabel") or "").strip():
+            rows += 1
+print(rows)
+PY
+)
+  echo "   · 便签板那棵树上读得到的静态文字条数=$L9_STATIC_LINES（-1 = 树读不出，别拿它当空板）"
+  if [ "$L9_STATIC_LINES" = "-1" ]; then
+    shot "20c-便签板读不出树"
+    env_bail "便签板那棵树读不出（rc=2 那一档）⇒ 不拿「没读到」当「便签没回流」"
+  fi
+  shot "20d-便签板上没有那条共享便签"
+  bad "owner 写进共享清单的便签没出现在手机便签板上（板上静态文字 $L9_STATIC_LINES 条，独缺这一条）⇒ 产品定义里三族中的便签那一族在手机上没接上"
   summary
   exit 1
 fi
