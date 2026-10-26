@@ -522,3 +522,22 @@ cd e2e && HEYTA_E2E_APP_PORT=4418 HEYTA_E2E_STUB_PORT=4419 npx playwright test t
 `A1` 挑最新一行 ⇒ 2 红 / `A2` 来源不看模式 ⇒ 2 红 / `A3` 界面自己判 ⇒ 2 红 /
 `A4` 翻页写死第一页 ⇒ 2 红 / `A5` 搬运不带编号 ⇒ 1 红 / `A6` 总数按本页行数算 ⇒ 3 红。
 
+
+### 9.6 这一版发上线的读数（2026-10-26 晚）
+
+顺序照 §9.3 那一条不可倒的链：迁移 → 服务端镜像换容器 → web 构建 + rsync → 线上验收。
+边缘那一步本轮没动（`/admin` 那片 10-25 就在了）。
+
+| 那一步 | 现量 |
+|---|---|
+| `node scripts/deploy-ssh.mjs --apply --yes-production` | `MIGRATE_RC=0` / `SWAPPED` / `INSTALLED_IMAGE=OK` / `HEALTH=200`，回滚 tag `supersync:rollback-20261026T132839` |
+| `HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build` + `pnpm check:web-artifact:app` | 构建过；对账过（`/app/` 挂载一致、`index.html` 5 个本地引用、manifest 15 个文件全在） |
+| `rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/` | 线上入口 `assets/index-CRNboaOo.js` 里 `此刻能用` / `给他发一份` / `先赠送、再升档` **各 1 次** |
+| 容器里的服务端 | `dist/src/admin/admin.routes.js` 里 `projectEntitlements` 3 次（⇒ 那份并集投影真的在跑的那枚镜像里，不是只在源码里） |
+| 真打一次线上端点 | `GET /api/admin/users/23` → 200 且有 `entitlements`：`hosting`/`ai` = `NO_SUBSCRIPTION`、`automation` = `ENTITLEMENT_MODE_UNCONFIGURED`、`sources` 全 0；`GET /api/admin/subscriptions/grants?limit=50&offset=0` → 200 `total=5 offset=0 limit=50`（翻页那一格有真坐标可读） |
+| 线上判据族 | `live-admin-entry` 两条**都过**；同族另有 5 条红**全在落地页/法务页**，逐条归属见 `BLOCKED.md` 的 B231 追记 |
+
+运营账号那一格（§9.4 最后一条还欠的）本轮闭合：负责人给了邮箱，`admin.js grant` 之后
+`admin.js list` 现量「共 1 位管理员：#23 `al***@163.com` 已验证=是」。
+⚠️ 口令是**临时**的（负责人要求先设一个短的、进去再改）—— 这条不是后台的缺陷，
+但它意味着"这台现在只有一个能进后台的人，而他用的是一次性口令"，进去之后第一件事是改密。
