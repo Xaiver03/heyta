@@ -163,3 +163,29 @@ web 上不被问。反查一条：
    含一条"apps/web 里出现该键字面量的文件只有 `features/share/share-consent-store.ts`"的尺。
    裁决三与"单一存储键"那句都没动，动的是**它有没有人守着**。
 
+## 补记三（2026-10-26 第九批，移动端把"消费"那一半接上）
+
+裁决三那句「正文只许是清单名 + 活动种类」此前在手机上**只有生产者没有消费者**：投递把活动写进
+内存动态，而全仓没有任何界面读它（`mobile.inbox.tab.share` 等三枚词条在册零消费者）。本批补的是
+消费的那一头，**口径本身一条没动**：
+
+1. **正文在投递那一刻拼好**：动态条目多一枚 `body`，`labels.body` 的签名从 `(kind)` 改成
+   `(shareId, kind)` —— 不带 `shareId` 就查不到本机那一行清单，动态只能永远说匿名那句。
+   组装仍在 `shareActivityNotificationBody`（唯一出口），壳里不许再拼一遍：判据是
+   `App.tsx` 去注释后**不许出现** `shareActivityNotificationBody(`，只许出现
+   `mobileShareActivityBody(tr, currentState(), shareId, kind)`。
+2. **"挑哪句 / 插什么变量"搬进 `apps/mobile/src/lib/share-activity-copy.ts`**（可值导入的纯函数，
+   吃调用方传进的 `state`/`t`，不读单例）。理由见环境陷阱 #581：留在装配闭包里，
+   把"传名字那行"换成 `undefined` 时**零条行为断言会红**。
+3. **界面上的那一档**：通知中心第三档「共享动态」订阅动态、**打开这一档才清未读**、逐条画
+   `entry.body`；「我的」入口徽标 = inbox 未读 + 共享动态未读。系统横幅这一档今天做不到
+   （本机唯一那条原生通道被提醒链按 `categoryIdentifier` 全量回收），所以**这枚徽标是当下
+   唯一的打扰面** —— 它若只数 inbox，这一档就等于没接上（#582 那一档本批真犯过一次）。
+4. **设备上那句正文第一次被看见**：移动装置第 10a 步（腿清单里的 L8）两半相反 —— 默认全关 ⇒
+   那一档是空的；翻开『新增内容』⇒ 同一种信号落成那句带清单名的话。每半都先让 owner 那条
+   评论**本身**到达手机当控制读数，否则拿"静默"冒充"闸门生效"（#580 那一族）。
+   读数与逐张看过的截图指针在计划 §9.15。
+
+现量命令（别按本节文字推断）：判据 `cd apps/mobile && npx vitest run tests/share-ui-assembly.spec.ts`；
+四枚变异臂 `node research/tools/mutation-rigs/mutate-collab-mobile-activity.mjs` ⇒ `ARMS=pass (4/4)`；
+设备腿 `pnpm verify:mobile-collab:ios`（退出码 0 全绿 / 1 产品判据红 / 3 环境前提不成立）。
