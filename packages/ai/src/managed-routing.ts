@@ -40,33 +40,28 @@ import {
 export const MANAGED_ENDPOINT_ID = 'heyta-managed';
 
 /**
- * 托管端点**能诚实声明**的能力。
+ * 托管端点声明哪些能力。
  *
- * ⚠️ 这条注释改过两次，两次都是因为"理由过期"，值得留着当教训：
- * 2026-10-24 之前写的理由是"服务端不转发 `tools`"，那句当时就不成立了
- * （`managed-proxy.routes.ts` 早把 `tools` / `tool_choice` 照原样转发）；
- * 改成"还没做过端到端验证"。现在那条验证也做完了，见下。
+ * 🔴 **`tool_calling` 故意不在这张表里 —— 这是一条产品决定，不是"能力没验过"。**
+ * 2026-10-25 短暂加进来过（依据是逐跳实测：中央侧分配声明了 `tool_calling`、
+ * 三跳各自回 `finish_reason=tool_calls`、`arguments` 可解析），2026-10-26 按产品口径撤回：
+ * **托管档不提供对话式助手** —— 额度是按次数计的，而助手一轮要跑好几次模型调用；
+ * 口径与成本都不适合放进 ¥12 那一档。能力是真的，但它不属于这一档。
  *
- * **`tool_calling` 于 2026-10-25 加回本表，依据是逐跳实测，不是愿望**：
+ * 这张表是**开关**而不是**说明书**：声明了 `tool_calling`，`resolveRoute(..., 'tool-calling')`
+ * 就会把托管端点选成候选，带工具的请求就会真的发出去。所以"不声明"就是"不提供"的实现，
+ * 而失败形状是**响亮**的 —— 排除原因 `capability-missing`、一个字节都不发，
+ * 用户看到"没有可用的端点"，而不是"发出去拿回一段假装调用过工具的纯文本"。
  *
- * | 判据 | 读数 |
- * |---|---|
- * | 中央侧这条链的分配声明了 `tool_calling` | ✅ `heyta.chat` 三环境全跳 |
- * | 上游真的回 `tool_calls` | ✅ 三跳各自单打：MiraclePlus `/v1`、OpenCode Go、DeepSeek 官方 |
- * | 回包参数可解析 | ✅ `finish_reason=tool_calls`，`arguments={"city":"北京"}` |
+ * 反过来：**要开这一档，改这一行就够了，但必须同批改法务 `ai-and-transfer` §5**
+ * （那里写着这一档不含助手）。只改一处，就是"代码开了、对外还说没开"。
  *
- * 验证脚本在 x-c 仓：`tools/ai-control/verify-tool-calling.mjs`（判据是回包里有没有
- * `tool_calls`，不是状态码 —— 200 但没有 `tool_calls` 就是"渠道把工具吃了"）。
- *
- * 🔴 仍然要守的边界：这条表声明的是**能力**，不是**质量**。托管档的助手循环
- * （多步工具调用 + 本地执行）在上游侧现在有据可依，但产品侧仍必须能响亮地失败：
- * 一旦中央把 `tool_calling` 从分配上撤掉，这里要跟着撤，否则症状会变成
- * 发出去之后拿回一段"假装调用过工具"的纯文本 —— 那正是当初不肯声明的理由。
+ * ⚠️ 别再把"服务端不转发 `tools`"写成理由：`managed-proxy.routes.ts` 照原样转发
+ * `tools` / `tool_choice`，那句早就不是事实 —— 这条注释历史上已经因为"理由过期"改过三次。
  */
 const MANAGED_CAPABILITIES: readonly AiCapability[] = [
   'structured_output',
   'long_context',
-  'tool_calling',
 ];
 
 /** 全部功能 —— 从能力表派生，**不手抄一份**（手抄的那份一定会漂）。 */

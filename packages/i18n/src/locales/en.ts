@@ -4964,6 +4964,31 @@ export const en = {
   'web.admin.user.passkeys': 'Passkeys',
   'web.admin.user.operations': 'Operations',
   'web.admin.user.failedLogins': 'Failed logins',
+  // 🔴 Union entitlement reading: what this account can actually use right now, not
+  // which rows exist. The verdict lives server-side and calls the same functions the
+  // guards call (`admin.routes.ts::projectEntitlements`).
+  'web.admin.user.entitlements': 'Available right now',
+  'web.admin.user.entitlement.hosting': 'Hosted sync',
+  'web.admin.user.entitlement.ai': 'Managed AI',
+  'web.admin.user.entitlement.automation': 'Auto-collect',
+  'web.admin.user.entitlementSource': '{provider} · {priceId}, until {until}',
+  'web.admin.user.entitlementNoRowSource': 'Not from a local subscription row',
+  'web.admin.provider.adminGrant': 'operator grant',
+  'web.admin.provider.invite': 'referral reward',
+  'web.admin.provider.wechat': 'WeChat Pay',
+  'web.admin.provider.paycenter': 'checkout',
+  // Denial reasons: the server sends a machine code, this table looks copy up by code.
+  // Codes not listed here get no reason text at all — the console never invents one.
+  'web.admin.entitlement.reason.NO_SUBSCRIPTION': 'no tier was ever subscribed',
+  'web.admin.entitlement.reason.STATUS_NOT_ENTITLED': 'that row is not in an entitled status',
+  'web.admin.entitlement.reason.MISSING_PERIOD_END': 'that row has no period end',
+  'web.admin.entitlement.reason.INVALID_PERIOD_END': 'that row’s period end cannot be read',
+  'web.admin.entitlement.reason.PERIOD_ENDED': 'expired',
+  'web.admin.entitlement.reason.INVALID_NOW': 'the server has no usable clock right now',
+  'web.admin.entitlement.reason.MISSING_GRANTS': 'that row does not say which capabilities it grants',
+  'web.admin.entitlement.reason.GRANT_NOT_INCLUDED': 'his tier does not include this one',
+  'web.admin.entitlement.reason.ENTITLEMENT_MODE_UNCONFIGURED': 'this instance has no entitlement source configured for auto-collect',
+  'web.admin.entitlement.reason.ISSUER_NOT_CONFIGURED': 'this instance has no issuer keys configured',
   // Consent record: the published terms promise that we keep the version fingerprint of
   // the whole document set, so the console has to be able to say it out loud.
   'web.admin.user.consent': 'Consent record',
@@ -5163,9 +5188,9 @@ export const en = {
   "site.legal.third-parties.seo.title": "Third Parties and Data Sharing Inventory — heyta",
   "site.legal.third-parties.seo.description": "Every destination your data can reach: the four classes of request sent from our servers and the infrastructure that hosts them, the four flows sent straight from your device, and an item-by-item list of what is not integrated — organised by destination, not by vendor name.",
   "site.legal.ai-and-transfer.title": "AI Features and Where Your Data Goes",
-  "site.legal.ai-and-transfer.lede": "AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, and only per feature with your own consent; the conversational assistant is part of that tier too, taking several requests per session with each one counting against the allowance.",
+  "site.legal.ai-and-transfer.lede": "AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, and only per feature with your own consent, and it does not include the conversational assistant.",
   "site.legal.ai-and-transfer.seo.title": "AI Features and Where Your Data Goes — heyta",
-  "site.legal.ai-and-transfer.seo.description": "AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, and only per feature with your own consent; the conversational assistant is part of that tier too, taking several requests per session with each one counting against the allowance.",
+  "site.legal.ai-and-transfer.seo.description": "AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, and only per feature with your own consent, and it does not include the conversational assistant.",
   "site.legal.algorithm-disclosure.title": "Algorithm Mechanism Disclosure",
   "site.legal.algorithm-disclosure.lede": "What algorithm powers heyta’s AI assistance, what it can and cannot do, and which controls are yours.",
   "site.legal.algorithm-disclosure.seo.title": "Algorithm Mechanism Disclosure — heyta",
@@ -5508,4 +5533,10 @@ export const en = {
   'web.admin.grant.code.notDeliverable': 'this tier cannot be delivered right now, so it cannot be issued (pick another tier or wait until it is on sale).',
   'web.admin.grant.code.noActiveGrant': 'this account has no active grant row, so there is nothing to upgrade or revoke (run "grant" first).',
   'web.admin.grant.code.unknownSku': 'this tier is not in the capability table, so the server does not know what it should grant and refuses to issue it.',
+  // 🔴 This line states the **precondition**, not what the three actions do (that is `grant.lead`).
+  // Without it the first screen cannot be read as "upgrade needs an existing grant row", and the
+  // operator only learns the order was wrong after the 409.
+  'web.admin.grant.precondition': '“Free upgrade” and “revoke” both act on the grant row this account already has: press them without one and the server answers “there is nothing to upgrade or revoke”. So raising a paying account for free is two steps — grant first, then upgrade.',
+  // Handoff from the user rows: saves "copy the account id → switch tab → paste it".
+  'web.admin.users.grantFor': 'Issue a grant',
 } satisfies Record<MessageKey, string>;

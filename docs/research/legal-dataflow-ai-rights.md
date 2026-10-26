@@ -734,8 +734,8 @@ AGENTS.md 那条纪律"隐私开关关不掉当下的行为是不可接受的"�
 
 > 为什么补这一节：C20 那张逐功能表只有"工具选择"一行（`today` / `text` / `tools`），
 > 而助手还会把**工具返回的内容**回送给模型 —— 于是 §3 首段那句"下表是**全部**出境面"
-> 在 1.7 之前对助手是不完整的。1.7 把助手纳入托管档之后，这件事从"只发生在你自备的端点上"
-> 变成"也可能发生在我们的代理上"，所以先有本节的读数，再改正文
+> 在 1.7 之前对助手是不完整的。1.7 曾把助手纳入托管档（当天又按产品口径撤回，见 1.8），
+> 那次反复恰好说明这件事值得单独写清：它默认只发生在**你自备的端点**上，先有本节的读数，再改正文
 > （正文见 `packages/legal/src/documents/ai-and-transfer.ts` §3 新增段与 §5 callout）。
 
 ### 26.1 feature 与授权粒度
@@ -781,17 +781,18 @@ AGENTS.md 那条纪律"隐私开关关不掉当下的行为是不可接受的"�
 
 | 判据 | 读数 | 出处 |
 |---|---|---|
-| 托管端点声明工具能力 | `MANAGED_CAPABILITIES` 含 `tool_calling` | `packages/ai/src/managed-routing.ts:66` |
+| 托管端点**不**声明工具能力 | `MANAGED_CAPABILITIES` 只有 `structured_output` / `long_context` ⇒ `tool-calling` 在托管档以 `capability-missing` 被排除、零请求（2026-10-26 按产品口径撤回了 10-25 那次声明） | `packages/ai/src/managed-routing.ts:42-66`、`packages/ai/tests/managed-routing.spec.ts:97` |
 | 客户端组装托管请求体时**带** `tools` | 与 OpenAI 那条路共用同一个 `toWireTools` | `packages/ai/src/wire.ts:214-247` |
 | 服务端代理转发 `tools` / `tool_choice` | `ChatBodySchema` 收，出站体原样带 | `server/src/ai/managed-proxy.routes.ts:170-178,427-437` |
 | 中央侧这条链声明了 `tool_calling` | heyta 三环境的 `chat` 任务 `capabilities` 都含它 | `x-c` 仓 `services/ai-control/contract/products.json` 的 `products.heyta.environments.{development,staging,production}` |
 | 中央侧证据是**回包**而不是状态码 | 判据是 `finish_reason=tool_calls` + 可解析的 `arguments` | `x-c` 仓 `tools/ai-control/verify-tool-calling.mjs` |
 | 每一轮各占一次额度 | `consumeManagedAiRequest()` 每次代理调用 +1（同一条 SQL 里读占用、裁决、+1） | `server/src/ai/managed-proxy.routes.ts:442-448` |
 
-⚠️ **遗留一项，别读错结论**：`createProvider()` 的托管分支**仍然**在带 `tools` 时返回 `no-route`
-（`packages/ai/src/provider.ts:388-407`，测试钉在 `packages/ai/tests/managed-allowlist.spec.ts:449`）。
-那条路径**不在生产上**（`packages/ai/src/provider.ts:294` 的注释逐字写着
-"新增出境功能请接 `invokeRouted`，不要接这里"，而助手接的正是 `invokeRouted`）。
-⚠️ 2026-10-25 已把那段注释里"托管档今天不支持工具调用：服务端不转发 `tools`"这个**已不成立的机制**
-换成准确说法（行为没动：收掉拦截要连那条断言一起改，属产品决定）。法务正文按**生产路径**写；
-这条遗留的处置登记在 `docs/plans/launch-blockers.md` §3.2 尾。
+**两条路现在给出同一个失败形状**（2026-10-26 起）：
+- 生产路径（`invokeRouted`）：路由层就排除 —— 托管端点没有 `tool_calling` ⇒ `capability-missing` ⇒ `no-route`，**零请求**；
+- 历史路径（`createProvider()` 的托管分支）：自己那条守卫同样返回 `no-route`
+  （`packages/ai/src/provider.ts:388-407`，测试钉在 `packages/ai/tests/managed-allowlist.spec.ts:449`）。
+
+⚠️ 两处都**不是**因为"服务端不转发 `tools`"（`managed-proxy.routes.ts` 一直原样转发），
+而是因为**这一档不提供助手**（额度按次数计）。这条注释历史上三次都写成"理由过期"，第四次别再写错。
+法务口径见 `packages/legal/src/documents/ai-and-transfer.ts` §5。

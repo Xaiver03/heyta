@@ -5281,6 +5281,29 @@ export const zhCN = {
   'web.admin.user.passkeys': '通行密钥',
   'web.admin.user.operations': '操作数',
   'web.admin.user.failedLogins': '失败登录',
+  // 🔴 并集能力读数：念的是"他此刻实际能用什么"，不是"库里有哪些行"。
+  // 那一判住在服务端，用的就是守卫那批函数（`admin.routes.ts::projectEntitlements`）。
+  'web.admin.user.entitlements': '此刻能用',
+  'web.admin.user.entitlement.hosting': '官方托管同步',
+  'web.admin.user.entitlement.ai': '云端 AI',
+  'web.admin.user.entitlement.automation': '自动收集',
+  'web.admin.user.entitlementSource': '{provider} · {priceId}，到 {until}',
+  'web.admin.user.entitlementNoRowSource': '不来自本机订阅行',
+  'web.admin.provider.adminGrant': '运营赠送',
+  'web.admin.provider.invite': '邀请奖励',
+  'web.admin.provider.wechat': '微信支付',
+  'web.admin.provider.paycenter': '收银台',
+  // 拒绝原因（服务端给的是机器码，这里按码取词；码表外的一律不替它编原因）。
+  'web.admin.entitlement.reason.NO_SUBSCRIPTION': '没订过任何档',
+  'web.admin.entitlement.reason.STATUS_NOT_ENTITLED': '那一行不是生效状态',
+  'web.admin.entitlement.reason.MISSING_PERIOD_END': '那一行没有到期日',
+  'web.admin.entitlement.reason.INVALID_PERIOD_END': '那一行的到期日读不出来',
+  'web.admin.entitlement.reason.PERIOD_ENDED': '已到期',
+  'web.admin.entitlement.reason.INVALID_NOW': '服务器此刻报不出可用时钟',
+  'web.admin.entitlement.reason.MISSING_GRANTS': '那一行没写授予哪些能力',
+  'web.admin.entitlement.reason.GRANT_NOT_INCLUDED': '他那一档不含这项',
+  'web.admin.entitlement.reason.ENTITLEMENT_MODE_UNCONFIGURED': '这台实例没配自动收集的权益来源',
+  'web.admin.entitlement.reason.ISSUER_NOT_CONFIGURED': '这台实例没配签发方公钥',
   // 同意留痕：对外文本承诺"记下当时那一套的版本指纹"，后台必须能把这句话说实。
   'web.admin.user.consent': '同意留痕',
   'web.admin.user.consentNone': '没有同意记录',
@@ -5474,9 +5497,9 @@ export const zhCN = {
   "site.legal.third-parties.seo.title": "第三方与共享清单 —— heyta",
   "site.legal.third-parties.seo.description": "数据离开 heyta 的全部去向：由我们服务器发出的四类对外请求与承载它们的云基础设施，由你的设备直接发出的四条，以及逐项列明为「否」的未接入清单 —— 按目的地写，不按服务商名单写。",
   "site.legal.ai-and-transfer.title": "AI 功能与数据流向",
-  "site.legal.ai-and-transfer.lede": "AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权；对话式助手也在这一档里，它一次会话会发多次请求、每一轮各占一次额度。",
+  "site.legal.ai-and-transfer.lede": "AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权，且不含对话式助手。",
   "site.legal.ai-and-transfer.seo.title": "AI 功能与数据流向 —— heyta",
-  "site.legal.ai-and-transfer.seo.description": "AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权；对话式助手也在这一档里，它一次会话会发多次请求、每一轮各占一次额度。",
+  "site.legal.ai-and-transfer.seo.description": "AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权，且不含对话式助手。",
   "site.legal.algorithm-disclosure.title": "算法机制机理公示",
   "site.legal.algorithm-disclosure.lede": "heyta 的 AI 辅助功能用了什么算法、能做什么、不能做什么，以及你手上有哪些控制。",
   "site.legal.algorithm-disclosure.seo.title": "算法机制机理公示 —— heyta",
@@ -5825,6 +5848,11 @@ export const zhCN = {
   'web.admin.grant.code.notDeliverable': '这一档现在交付不了，所以不能发（换一个档或等它开卖）。',
   'web.admin.grant.code.noActiveGrant': '这个账号当前没有有效的发放行，所以没有可升、可收回的东西（要先走「赠送」）。',
   'web.admin.grant.code.unknownSku': '这一档不在能力表里，服务端不知道它该给什么，所以拒发。',
+  // 🔴 这一句写的是**前置**，不是三种动作的定义（定义在 `grant.lead`）。少了它，
+  // 第一屏读不出"升档要先有一条赠送"，运营要在 409 之后才知道自己走错了顺序。
+  'web.admin.grant.precondition': '「免费升级」与「收回」动的都是这个账号已有的那一条赠送行：没赠送过就点它们，服务端会回"没有可升、可收回的东西"。所以给付费用户免费升一档的顺序是先赠送、再升档。',
+  // 用户那一格的搬运入口：省掉"抄下账号编号 → 切格子 → 粘进去"这三步。
+  'web.admin.users.grantFor': '给他发一份',
 } as const;
 
 /**
