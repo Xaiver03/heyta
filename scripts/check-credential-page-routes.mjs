@@ -56,7 +56,11 @@ const rootFlag = argv.indexOf('--root');
 const ROOT = rootFlag >= 0 && argv[rootFlag + 1] ? resolve(argv[rootFlag + 1]) : process.cwd();
 
 const PAGES = 'server/src/pages.ts';
+const EMAIL = 'server/src/email.ts';
 const EDGE = 'server/deploy/caddy/sites.d/00-heyta.caddy';
+/** 邮件里允许出现的**非凭据页**目的地：应用本体（`/app/` 与它的 `?signin=1` 深链）。
+ *  它由边缘从磁盘服务，不经 1900，所以不能拿代理白名单去要求它。 */
+const APP_ROUTE = '/app/';
 /** 代理到 1900、但**不是**凭据页的服务端路径（健康检查与法务页，形状与凭据页无关）。 */
 const NON_CREDENTIAL_UPSTREAMS = new Set(['/health', '/live', '/terms.html', '/privacy.html']);
 
@@ -70,6 +74,23 @@ function readPages(src) {
     for (const s of m[1].matchAll(/'(\/[^']+\.js)'/g)) scripts.add(s[1]);
   }
   return { pages, scripts };
+}
+
+/**
+ * 从 `email.ts` 读**发出去的信里到底写了哪些地址**（去重后的 pathname）。
+ *
+ * 为什么分母要长在这里而不是写一份清单：本条要防的正是"信里写了个打不开的地址"。
+ * 抄的清单会在下一个发信功能上失效 —— 而那与本轮那两张 404 的页是同一件事。
+ * 形状：`` `${config.publicUrl}/verify-email?token=${token}` ``，
+ * 所以取 `publicUrl}` 之后、遇到下一个 `$` 或反引号之前的那一段。
+ */
+function readEmailLinks(src) {
+  const paths = new Set();
+  for (const m of stripTsComments(src).matchAll(/config\.publicUrl\}([^`$]*)/g)) {
+    const path = m[1].split('?')[0];
+    if (path.startsWith('/')) paths.add(path);
+  }
+  return paths;
 }
 
 /** 把一条 `path_regexp` 的形状展开成精确路径；展不开（前缀式/通配）就返回空。 */
@@ -122,13 +143,14 @@ function readEdge(src) {
 }
 
 /** 算出四条判据的读数；`violations` 为空即绿。`probe` 为真表示探针本身不成立。 */
-function evaluate({ pages, scripts, proxied }) {
+function evaluate({ pages, scripts, emailPaths, proxied }) {
   const violations = [];
   const probe = [];
   if (pages.size === 0) probe.push(`${PAGES} 里一张凭据页都没读到 —— 探针不成立，不是"全部合规"`);
   if (scripts.size === 0) probe.push(`${PAGES} 里一个 scripts: [...] 都没读到 —— 探针不成立`);
   if (proxied.size === 0) probe.push(`${EDGE} 里一条代理到 1900 的精确路径都没读到 —— 探针不成立`);
-  if (probe.length) return { violations, probe, pages, scripts, proxied };
+  if (emailPaths.size === 0) probe.push(`${EMAIL} 里一个 publicUrl 链接都没读到 —— 探针不成立`);
+  if (probe.length) return { violations, probe, pages, scripts, emailPaths, proxied };
 
   for (const p of [...pages].sort()) {
     if (!proxied.has(p)) {
@@ -140,18 +162,24 @@ function evaluate({ pages, scripts, proxied }) {
       violations.push(`② 凭据页脚本 ${s} 没有被边缘代理到 1900 ⇒ 页面画得出来、按钮是死的（一次请求都不发）`);
     }
   }
+  for (const p of [...emailPaths].sort()) {
+    if (p !== APP_ROUTE && !pages.has(p)) {
+      violations.push(`⑤ ${EMAIL} 往用户邮箱里发 ${p}，但 ${PAGES} 里没有这张页、也不是 ${APP_ROUTE} ⇒ 那封信点开必然打不开`);
+    }
+  }
   const known = new Set([...pages, ...scripts]);
   for (const p of [...proxied].sort()) {
     if (!known.has(p) && !NON_CREDENTIAL_UPSTREAMS.has(p)) {
       violations.push(`③ 边缘把 ${p} 代理到 1900，但 ${PAGES} 里没有这张页/脚本 ⇒ 孤儿代理，删掉它或把页加回来`);
     }
   }
-  return { violations, probe, pages, scripts, proxied };
+  return { violations, probe, pages, scripts, emailPaths, proxied };
 }
 
 function readBoth(root) {
   return {
     ...readPages(readFileSync(join(root, PAGES), 'utf8')),
+    emailPaths: readEmailLinks(readFileSync(join(root, EMAIL), 'utf8')),
     proxied: readEdge(readFileSync(join(root, EDGE), 'utf8')),
   };
 }
@@ -167,10 +195,12 @@ if (argv.includes('--self-test')) {
     mkdirSync(join(dir, 'scripts/lib'), { recursive: true });
     writeFileSync(join(dir, 'scripts/lib/strip-ts-comments.mjs'), 'export const stripTsComments = (s) => s;\n');
     const pagesPath = join(dir, PAGES);
+    const emailPath = join(dir, EMAIL);
     const edgePath = join(dir, EDGE);
+    writeFileSync(emailPath, readFileSync(join(ROOT, EMAIL), 'utf8'));
     writeFileSync(pagesPath, readFileSync(join(ROOT, PAGES), 'utf8'));
     writeFileSync(edgePath, readFileSync(join(ROOT, EDGE), 'utf8'));
-    mutate(pagesPath, edgePath);
+    mutate(pagesPath, edgePath, emailPath);
     const run = spawnSync(process.execPath, [resolve('scripts/check-credential-page-routes.mjs'), '--root', dir], { encoding: 'utf8' });
     arms.push({ name, code: run.status, out: `${run.stdout}${run.stderr}` });
   };
@@ -187,6 +217,19 @@ if (argv.includes('--self-test')) {
   plant('orphan-proxy', (_p, e) => {
     writeFileSync(e, readFileSync(e, 'utf8').replace('verify-email|', 'verify-email|gone-away|'));
   });
+  /*
+    ⑤ 的臂：把信里一枚目的地换成**没有对应页面**的地址（本轮那两张 404 的页就是这个形状）。
+    🔴 必须动 `email.ts` —— ⑤ 的分母读的是发信侧。第一版把这枚改动种进了 `pages.ts`，
+    而 `pages.ts` 里多一个**裸字符串**并不会注册出一张页（读页面靠的是 `fastify.get(...)` 的形状），
+    于是那一臂安静地退化成"什么都没发生"、退码 0，看起来像"⑤ 没有牙"。
+    它其实有牙，是臂种错了文件 —— 这种"臂不红"要先怀疑臂，再怀疑尺。
+  */
+  plant('email-to-nowhere', (_p, _e, em) => {
+    writeFileSync(em, readFileSync(em, 'utf8').replace(
+      'config.publicUrl}/verify-email',
+      'config.publicUrl}/no-such-mail-target',
+    ));
+  });
   plant('empty-edge', (_p, e) => {
     writeFileSync(e, readFileSync(e, 'utf8').replace(/127\.0\.0\.1:1900/g, '127.0.0.1:9999'));
   });
@@ -197,6 +240,7 @@ if (argv.includes('--self-test')) {
     'drop-a-page': { code: 1, mark: '① 凭据页 /verify-email' },
     'drop-a-script': { code: 1, mark: '② 凭据页脚本 /reset-password.js' },
     'orphan-proxy': { code: 1, mark: '③ 边缘把 /gone-away' },
+    'email-to-nowhere': { code: 1, mark: '⑤ server/src/email.ts 往用户邮箱里发 /no-such-mail-target' },
     'empty-edge': { code: 2, mark: '探针不成立' },
   };
   let bad = 0;
@@ -221,13 +265,18 @@ try {
   console.error(`❌ 读不到判据的输入：${err.message}`);
   process.exit(2);
 }
-const { violations, probe, pages, scripts, proxied } = evaluate(reading);
+const { violations, probe, pages, scripts, emailPaths, proxied } = evaluate(reading);
 
 // 🔴 `--json` 是**分母的唯一出口**：`e2e/live-site/live-credential-pages.spec.ts` 从这里取
 //    "该在线上量哪些路径"。线上判据若自己抄一份清单，加第 6 张页时它会像这一族的前五次一样
 //    静默漏掉 —— 清单必须长在代码那一侧。
 if (argv.includes('--json')) {
-  console.log(JSON.stringify({ pages: [...pages].sort(), scripts: [...scripts].sort(), proxied: [...proxied].sort() }));
+  console.log(JSON.stringify({
+    pages: [...pages].sort(),
+    scripts: [...scripts].sort(),
+    emailPaths: [...reading.emailPaths].sort(),
+    proxied: [...proxied].sort(),
+  }));
   process.exit(0);
 }
 
