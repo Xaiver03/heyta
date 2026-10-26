@@ -29,6 +29,14 @@
  *     一个选择器改名会让这条判据静默退化成"没东西可判 ⇒ 绿"。
  *  ③ **不判**标签 ↔ 输入框（那正是 4px 的正确形状）。判据的对象只有跨控件的那几段，
  *     否则这条尺会在合规的地方造红。
+ *  ④ 文字按钮那一列判**高度 ≥ 44px**（`MASTER.md` 的触控目标那条），不判它们的间距数：
+ *     它们住在 4px 容器里是**事实**，判掉的理由是点击区撑开了视觉距离 —— 那就把这个理由量住。
+ *     墨迹间距只报数不判，因为没有任何一条明文规则规定"两行文字之间要隔几 px"，
+ *     而现编一个阈值就是往仓库里放一枚没有出处的尺。
+ *     🔴 这一条的能红性是**量过**的（2026-10-27）：把 `textAction` 的 `minHeight` 从
+ *     `touch-target.min` 换成 `space.5` 重跑 ⇒ 两档各 4 条 ④ 红，盒子高实测 29px，
+ *     而**同一趟里墨迹间距从 27px 掉到 12px** —— "点击区一收，4px 盒子间距就真贴脸"
+ *     这句不是推断。还原后 2 passed（还原只从本轮自己写的 `.teeth-bak`，不从 git）。
  *
  * ## 同族扫描里被**判掉**的两处（登记结论，免得下一个人重新怀疑一遍）
  *
@@ -41,6 +49,22 @@
  *
  * 判据的分母因此**只有**"独立控件 ↔ 下一个独立控件"那几对：本文件里被产品负责人
  * 当面指出过的两例（`primary` 与 `termsRow`）都属于这一类，被上面两处都不属于。
+ *
+ * ## 2026-10-27 那次全仓扫描：分母与结论都记在这儿
+ *
+ * 扫了 `packages/ui/src/**` + `apps/web/src/**` 约 **120 处** 4px 及以下的间距站点
+ * （`gap: tokens['space.1']`，含裸值与 space.0），进入候选 **9 处**，判掉 **9 处**，
+ * 真阳性只有登录面板那一枚（已修）。九处逐个的宿主容器与判掉理由：
+ * `AuthForm` 验证码屏 2 处（登录档 / 注册档同形）、二级链那一列 1 处、注册档同意项 1 处
+ * （上面已记）、`TaskOrganizer` 标签多选组、`TaskRepeat` 单选组、`FolderPicker` 触发↔自己的菜单、
+ * `HabitGoalEditor` 触发↔自己的展开面板、`SubscriptionNotice` 里按钮的兄弟是说明文字不是控件。
+ * 另核对 `CloseAccountPanel`、`CentralAccountConflictPanel`、`AuthPanel` 的复选框：
+ * 宿主容器本来就是 space.3/space.4，没入网。
+ *
+ * 🔴 其中前三处（文字按钮那一族）判掉靠的是**同一句明文规则**：`MASTER.md` 的
+ * "触控目标 ≥ 44×44px" —— 4px 是**盒子**间距，而盒子里只有中间那行字。
+ * 这个理由本身由判据 ④ 量着（见 `SECONDARY_TEXT_ACTIONS`），不是"看着还行"。
+ * 剩下六处按 `field`/同一控件的形状判掉，不需要一把新尺。
  *
  * 能红性（2026-10-26 实测，不是推断）：修之前跑本条，第 ① 对读到 **4px**、第 ③ 对读到
  * **4px**，两条一起报红；补上 `standaloneRow` 与 `textActionCenter` 的 `marginTop` 后三对都是 12px。
@@ -60,7 +84,12 @@ import { expect, test } from '@playwright/test';
 
 import { openApp, openAuthPanel } from '../auth-journey/helpers.js';
 
-const SHOTS = ['test-results/auth-form-spacing-1440.png', 'test-results/auth-form-spacing-375.png'] as const;
+const SHOTS = [
+  'test-results/auth-form-spacing-1440.png',
+  'test-results/auth-form-spacing-375.png',
+  'test-results/auth-form-spacing-secondary-1440.png',
+  'test-results/auth-form-spacing-secondary-375.png',
+] as const;
 const MIN_CONTROL_GAP = 12;
 const TOLERANCE = 0.5;
 
@@ -77,6 +106,31 @@ const PAIRS = {
     ['auth-form-submit', 'auth-form-switch-mode', '登录按钮 → 切换去注册'],
   ],
 } as const;
+
+/**
+ * ## 同族扫描剩下的那一族为什么**不是**缺陷 —— 这一条判的是它的成立前提
+ *
+ * 扫描（≈120 处 `gap: space.1` 站点 → 9 处进入候选）里，判掉的多数长这样：
+ * `AuthForm` 二级链那一列（`-passkey` / `-magic-link` / `-recovery`）、验证码屏下面那两枚
+ * （`-login-code-resend` / `-login-code-change-email`）—— 它们**也**住在 4px 的容器里，
+ * 盒子间距实测就是 4px。判掉的理由不是"看着还行"，而是一条**写在设计系统里**的规则：
+ * `design-system/heyta/MASTER.md` §「触控目标 ≥ 44×44px」。文字按钮的 44px 是**点击区**，
+ * 墨迹只占中间那 ~18px 一行 ⇒ 盒子贴脸不等于眼睛看贴脸。
+ *
+ * 🔴 所以这一条不许判"间距 ≥12"（那会在合规的地方造红），而判**那个理由本身**：
+ *     每一枚的实测高度必须 ≥ 44px。它一旦变矮（比如谁把 padding 收掉），4px 盒子间距
+ *     就真的变成贴脸 —— 那正是需要有人被叫醒的那一刻，而这里会红。
+ *     墨迹间距只**报数**不判：没有一条明文规则给"两行文字之间要隔几 px"，
+ *     我不会为了多一枚尺现编一个阈值。
+ */
+const SECONDARY_TEXT_ACTIONS = [
+  'auth-form-passkey',
+  'auth-form-magic-link',
+  'auth-form-recovery',
+  'auth-form-switch-mode',
+] as const;
+const MIN_TOUCH_TARGET = 44;
+const MIN_TOUCH_TOLERANCE = 0.5;
 
 test.beforeAll(() => {
   for (const shot of SHOTS) if (existsSync(shot)) rmSync(shot);
@@ -107,9 +161,9 @@ async function measure(dialog: import('@playwright/test').Locator, pairs: readon
  *    本仓库已经在 `habit-month.spec.ts` R7 上吃过一次那种假绿
  *    （"名字比断言强"），所以这里不摆一枚不可能红的暗色臂。
  */
-for (const [label, width, height, shot] of [
-  ['宽屏 1440', 1440, 900, SHOTS[0]],
-  ['窄屏 375', 375, 812, SHOTS[1]],
+for (const [label, width, height, shot, shotSecondary] of [
+  ['宽屏 1440', 1440, 900, SHOTS[0], SHOTS[2]],
+  ['窄屏 375', 375, 812, SHOTS[1], SHOTS[3]],
 ] as const) {
   test(`登录档里每一对相邻独立控件的间距都在 12px 那一格上（${label}）`, async ({ page }) => {
     await page.setViewportSize({ width, height });
@@ -138,6 +192,49 @@ for (const [label, width, height, shot] of [
         );
       }
     }
+
+    // ── 二级链那一列：判的是"它凭什么叫不贴脸"那条规则本身（见文件头 SECONDARY 那段）──
+    // DOM 顺序：切换去注册 → 通行密钥 → 收登录链接 → 找回。后三枚住在 4px 的容器里。
+    // ⚠️ 这三枚默认**不在 DOM 里**：web 壳传了 `otherWaysToggle`，未展开时那一列整段不渲染
+    //    （实测：直接 `boundingBox()` 会等到 60 s 超时，红的不是间距而是探针没点开那层）。
+    const toggle = dialog.getByTestId('auth-form-other-ways-toggle');
+    if ((await toggle.count()) > 0) await toggle.click();
+    const COLUMN = ['auth-form-switch-mode', ...SECONDARY_TEXT_ACTIONS.filter((id) => id !== 'auth-form-switch-mode')];
+    const inks: { id: string; box: { y: number; height: number } | null; ink: { y: number; height: number } | null }[] = [];
+    for (const id of COLUMN) {
+      const handle = dialog.getByTestId(id);
+      const box = await handle.boundingBox();
+      // 墨迹 = 这枚按钮**最后一个子节点**（那行链接文字）的矩形；第一枚在 passkey 那行是图标。
+      const ink = await handle.locator('> *:last-child').boundingBox();
+      inks.push({ id, box, ink });
+    }
+    await page.screenshot({ path: shotSecondary, fullPage: false });
+    console.log('  二级链那一列（盒子间距是 4px，靠 44px 点击区撑开，所以判高度）：');
+    for (const r of inks) {
+      const h = r.box ? String(Number(r.box.height.toFixed(2))) : '🔴 量不到';
+      const inkH = r.ink ? String(Number(r.ink.height.toFixed(2))) : '量不到';
+      console.log(`    ${r.id.padEnd(28)} 盒子高 ${h.padStart(6)}px   墨迹高 ${inkH}px`);
+    }
+    for (let i = 1; i < inks.length; i += 1) {
+      const a = inks[i - 1].ink;
+      const b = inks[i].ink;
+      const inkGap = a && b ? Number((b.y - (a.y + a.height)).toFixed(2)) : null;
+      console.log(
+        `    墨迹间距 ${inks[i - 1].id} → ${inks[i].id}: ${inkGap === null ? '量不到（只报数，不判）' : `${String(inkGap)}px`}`,
+      );
+    }
+    for (const r of inks) {
+      if (r.box === null) {
+        failures.push(`② ${label}「${r.id}」量不到矩形 ⇒ 探针失效（这一列没渲染出来 ≠ 合规）`);
+      } else if (r.box.height < MIN_TOUCH_TARGET - MIN_TOUCH_TOLERANCE) {
+        failures.push(
+          `④ ${label}「${r.id}」实测高 ${String(Number(r.box.height.toFixed(2)))}px < ${String(MIN_TOUCH_TARGET)}px` +
+            ` ⇒ 触控目标那条规则（MASTER.md「≥ 44×44px」）破了，而它住在 gap=space.1 的容器里 ——` +
+            ` 这枚一旦变矮，4px 盒子间距就真的变成贴脸`,
+        );
+      }
+    }
+
     expect(failures, failures.join('\n')).toEqual([]);
   });
 }
