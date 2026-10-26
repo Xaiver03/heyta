@@ -1000,7 +1000,7 @@ export function AuthForm({
                 setRememberPassword(next);
                 onRememberPasswordChange?.(next);
               }}
-              style={styles.termsRow}
+              style={[styles.termsRow, styles.standaloneRow]}
               testID={`${testID}-remember-password`}
             >
               <View
@@ -1592,6 +1592,13 @@ function makeStyles(tokens: HeytaNativeTokens) {
     // 模式切换这类"次级出口"要**居中**（主按钮正下方），与左对齐的文字链区分。
     textActionCenter: {
       alignSelf: 'center',
+      /*
+        模式切换是主按钮的**下一个控件**，却和主按钮住在同一个 `field` 里 ⇒ 2026-10-26
+        真浏览器量到「登录按钮 → 切换去注册」只有 4px。同 `standaloneRow` 一个根因、
+        一个补法（这一枚只有 `auth-form-switch-mode` 在用，所以补在这里不会牵连别的文字链：
+        `textAction` 另有十处用法，绝不能补在那上面）。
+      */
+      marginTop: tokens['space.2'],
     },
     // 「其他登录方式」从整宽灰条改成**分隔线 + 居中文字**（千问式排版）：
     // 它是一个分组标题，不是一个待点的按钮。
@@ -1618,6 +1625,19 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: tokens['space.2'],
+    },
+    /*
+      「这一行被写进了 `field`」这件事的补偿，**只许挂在确实住在 `field` 里的那一行**。
+      2026-10-26 真浏览器逐对量过（判据在 `e2e/tests/auth-form-spacing.spec.ts`）：
+      登录档「密码框 → 记住密码」实测 **4px** —— `field` 的 `gap` 是 `space.1`，那是
+      "标签↔输入框↔错误提示"这一个控件**内部**的节奏，而记住密码不是输入框的零件，它是
+      表单里的下一个控件，该吃 `root` 的 `space.3`（12px）；同一次量到注册档「确认密码框 →
+      同意项」已经是 12px（那一行挂在 `root` 下，本来就对）。
+      ⇒ 所以这枚补偿**不能**并进 `termsRow` —— 那会把合规的那一行顶到 20px。
+      补法与理由的形状都照样式表里 `primary` 那条：容器给 4，这里补 8，落在 12 那一格。
+    */
+    standaloneRow: {
+      marginTop: tokens['space.2'],
     },
     checkbox: {
       width: tokens['size.checkbox'],
