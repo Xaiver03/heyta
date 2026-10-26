@@ -64,16 +64,26 @@ const APP_ROUTE = '/app/';
 /** 代理到 1900、但**不是**凭据页的服务端路径（健康检查与法务页，形状与凭据页无关）。 */
 const NON_CREDENTIAL_UPSTREAMS = new Set(['/health', '/live', '/terms.html', '/privacy.html']);
 
-/** 从 `pages.ts` 读"需要被边缘代理的路径"：每张凭据页 + 它引用的每个脚本。 */
+/** 从 `pages.ts` 读"需要被边缘代理的路径"：每张凭据页 + 它引用的每个脚本。
+ *  顺带产出**页→它自己那几支脚本**的映射：线上验收要拿它判"这张页服务的是不是它自己"
+ *  （只看"正文不等于落地页"判不出两张凭据页互换了）。按位置配对：一张页的 `scripts: [...]`
+ *  写在它自己那次 `fastify.get(...)` 之后、下一张页之前。 */
 function readPages(src) {
   const code = stripTsComments(src);
   const pages = new Set();
-  for (const m of code.matchAll(/fastify\s*\.\s*get\s*(?:<[^)]*>)?\s*\(\s*'(\/[a-z0-9-]+)'/g)) pages.add(m[1]);
+  const pageScripts = {};
   const scripts = new Set();
-  for (const m of code.matchAll(/scripts\s*:\s*\[([^\]]*)\]/g)) {
-    for (const s of m[1].matchAll(/'(\/[^']+\.js)'/g)) scripts.add(s[1]);
+  for (const m of code.matchAll(/fastify\s*\.\s*get\s*(?:<[^)]*>)?\s*\(\s*'(\/[a-z0-9-]+)'/g)) {
+    pages.add(m[1]);
+    const own = [];
+    const after = code.slice(m.index);
+    const next = after.slice(1).search(/fastify\s*\.\s*get\s*(?:<[^)]*>)?\s*\(\s*'/);
+    const block = next < 0 ? after : after.slice(0, next + 1);
+    const s = block.match(/scripts\s*:\s*\[([^\]]*)\]/);
+    if (s) for (const x of s[1].matchAll(/'(\/[^']+\.js)'/g)) { own.push(x[1]); scripts.add(x[1]); }
+    pageScripts[m[1]] = own;
   }
-  return { pages, scripts };
+  return { pages, scripts, pageScripts };
 }
 
 /**
@@ -276,6 +286,9 @@ if (argv.includes('--json')) {
     scripts: [...scripts].sort(),
     emailPaths: [...reading.emailPaths].sort(),
     proxied: [...proxied].sort(),
+    // 页→自己那几支脚本。线上验收用它判"这张页服务的是不是它自己"，
+    // 所以它必须和上面三枚出自**同一次读盘**，不能由那份 spec 自己再抄一遍。
+    pageScripts: Object.fromEntries(Object.entries(reading.pageScripts ?? {}).sort()),
   }));
   process.exit(0);
 }
