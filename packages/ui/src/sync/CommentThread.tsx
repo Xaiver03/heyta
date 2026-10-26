@@ -62,11 +62,24 @@ export function CommentThread(props: CommentThreadProps) {
   const tokens = useHeytaTokens();
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // 🔴 「空草稿」是**还没做**，不是**做错了**。草稿一为空就画报错，会在两条真路径上诉称失败
+  //    （2026-10-25 移动设备腿逐张看图抓到）：发送成功那一拍组件把草稿清空 ⇒ 回执与
+  //    「评论内容不能为空」同屏，用户读到的是"没发出去"；别人的评论同步进来、这一格重画时
+  //    那框本来就是空的。⇒ 空草稿只在用户**按过发送**之后才该说话。
+  //    非空而超限（`tooLong`）仍然实时说：那是用户正在做的事，不是他没做的事。
+  const [emptyComplained, setEmptyComplained] = useState(false);
   const thread = commentsForTask(props.comments, props.taskId);
   const draftError = validateCommentDraft(draft);
+  const showError = draftError !== undefined && (draft.trim() !== '' || emptyComplained);
 
   const submit = async () => {
-    if (draftError !== undefined || submitting) return;
+    if (submitting) return;
+    if (draftError !== undefined) {
+      // 按了发送而草稿是空的 ⇒ 这一发才需要说话（说话的对象是"你刚按的那一下"）。
+      if (draft.trim() === '') setEmptyComplained(true);
+      return;
+    }
+    setEmptyComplained(false);
     setSubmitting(true);
     try {
       await props.onSubmit(draft.trim());
@@ -96,7 +109,7 @@ export function CommentThread(props: CommentThreadProps) {
         multiline
         testID="comment-composer-input"
       />
-      {draftError !== undefined && (
+      {showError && (
         <Text
           accessibilityLiveRegion="polite"
           testID="comment-draft-error"

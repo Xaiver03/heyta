@@ -387,12 +387,15 @@ export function ListsSection(): React.JSX.Element {
         onChangeText={setName}
         placeholder={t('mobile.lists.newPlaceholder')}
         autoCapitalize="sentences"
+        testID="mobile-list-name"
       />
       <Button
         label={t('mobile.lists.add')}
         tone="secondary"
         icon="task.add"
         loading={busy}
+        // 设备级验收的锚点（`Button` 落在 `Pressable` 上才进 AX 树，前提见 traps #575）。
+        testID="mobile-list-add"
         // 空名字时**禁用**而不是点了没反应：禁用态本身就是"还差什么"的提示。
         disabled={name.trim() === ''}
         onPress={add}

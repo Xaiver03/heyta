@@ -1,0 +1,63 @@
+{
+  "shareId": "f53d49a7-6f8a-40ec-8a07-a6145a18a6dc",
+  "ownerMemberId": "afd6d5fa-33c6-4724-938c-c61a9b33732c",
+  "phone": {
+    "memberId": "28b33dd7-4e53-4987-b30e-8a51bc65c93a",
+    "identityPublicKey": "LdjjZcY8Y9PGj78YyDDMGqQH+uH/24D7LCn/p+CVPFo=",
+    "role": "editor"
+  },
+  "members": [
+    {
+      "memberId": "afd6d5fa-33c6-4724-938c-c61a9b33732c",
+      "userId": 97,
+      "role": "owner",
+      "addedAt": 1792954337887,
+      "hasEnvelope": false,
+      "memberKeyEpoch": 1,
+      "identityPublicKey": null,
+      "signingPublicKey": "F08rKFhrrQNoFMQucibjoxdMhLPrd0CWQSVEXnXcJV0=",
+      "keyEnvelope": null
+    },
+    {
+      "memberId": "28b33dd7-4e53-4987-b30e-8a51bc65c93a",
+      "userId": 98,
+      "role": "editor",
+      "addedAt": 1792954362353,
+      "hasEnvelope": true,
+      "memberKeyEpoch": 1,
+      "identityPublicKey": "LdjjZcY8Y9PGj78YyDDMGqQH+uH/24D7LCn/p+CVPFo=",
+      "signingPublicKey": "HYE3n+s6Q+2uVz/xJdiFo8NG+ZdflG/qLo4gV3ke8Wg=",
+      "keyEnvelope": {
+        "iv": "H6SiXrmfMFucoso9",
+        "shareId": "f53d49a7-6f8a-40ec-8a07-a6145a18a6dc",
+        "keyEpoch": 1,
+        "ciphertext": "guyhT+kEN+cK8neRR/8v2BhDKgr2Rrd3DQNVVj7E+qluoDYK1zDQ2+jb33wiXaZP",
+        "formatVersion": 1,
+        "ephemeralPublicKey": "7Pr7OLwChewIZwlD7zPtJjrJun7z017yYbEfTpOQmjg=",
+        "ephemeralFingerprint": "da78c771027ce438739d948d37c8600068e09b87a9e2ebb8a3d519cb0d0f9a89",
+        "recipientFingerprint": "8ded36de077b574920575b8e3e641fcad491b169ce5c6f14a779f9c05d8a0a32"
+      }
+    }
+  ],
+  "opCount": 3,
+  "opAuthors": [
+    {
+      "id": "owner-op-1792954337872-1",
+      "entityType": "TASK",
+      "signerMemberId": "afd6d5fa-33c6-4724-938c-c61a9b33732c",
+      "serverSeq": 1
+    },
+    {
+      "id": "share-op-1-1792954392072",
+      "entityType": "COMMENT",
+      "signerMemberId": "28b33dd7-4e53-4987-b30e-8a51bc65c93a",
+      "serverSeq": 2
+    },
+    {
+      "id": "owner-op-1792954337872-2",
+      "entityType": "COMMENT",
+      "signerMemberId": "afd6d5fa-33c6-4724-938c-c61a9b33732c",
+      "serverSeq": 3
+    }
+  ]
+}
