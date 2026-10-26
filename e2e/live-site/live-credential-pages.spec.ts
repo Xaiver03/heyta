@@ -1,5 +1,5 @@
 /**
- * 邮件里的每一张凭据页与每一个脚本，在**真线上**都要打得开（不启本地服务，直接打公网域名）
+ * 邮件里的每一枚目的地（凭据页 / 页内脚本 / 应用地址）在**真线上**都要打得开
  * ========================================================================
  *
  * ## 它补的是哪一格
@@ -36,6 +36,9 @@
  *     那正是本域名已经发生过五次的形状。比逐字而不是比长度：长度相等只是巧合的尺。
  *  ③ 每个脚本：200 且 `content-type` 含 `javascript`。
  *     只代页不代脚本 = 页面画得出来、按钮是死的，而 curl 只看状态码时它是"200、很正常"。
+ *  ⑤ 邮件里的**应用**目的地（`/app/` 与 `/app/?signin=1`）：200 且正文引 `/app/assets/`。
+ *     这一枚必须比"状态码不是 404"更严 —— `/app/` 走的是文件服务不是代理，
+ *     被落地页顶掉时状态码同样是 200，而那正是本域名踩过五次的那个形状。
  *  ④ **阳性对照**：一枚未注册路径必须仍是 404。
  *     没有它，① 就是恒真的 —— 边缘整站挂掉、所有路径都答 200 时，①③ 会一起变绿。
  *
@@ -55,6 +58,7 @@ interface Reading {
   ct: string;
   len: number;
   isLandingByteForByte: boolean;
+  servesApp: boolean;
 }
 
 const routes = JSON.parse(
@@ -62,7 +66,7 @@ const routes = JSON.parse(
     cwd: REPO_ROOT,
     encoding: 'utf8',
   }),
-) as { pages: string[]; scripts: string[] };
+) as { pages: string[]; scripts: string[]; emailPaths: string[] };
 
 /** 在**页面内**发请求：`--host-resolver-rules` 与 `--no-proxy-server` 只作用于浏览器网络栈，
  *  node 侧的 fetch 会走系统解析（本机是代理的 fake-ip），那就变成"验代理"而不是"验服务器"。 */
@@ -70,12 +74,18 @@ async function probe(page: import('@playwright/test').Page, path: string, landin
   const raw = await page.evaluate(async ({ origin, p, home }) => {
     const r = await fetch(`${origin}${p}`);
     const body = await r.text();
-    return { status: r.status, ct: r.headers.get('content-type') ?? '', len: body.length, same: body === home };
+    return {
+      status: r.status,
+      ct: r.headers.get('content-type') ?? '',
+      len: body.length,
+      same: body === home,
+      app: body.includes('/app/assets/'),
+    };
   }, { origin: ORIGIN, p: path, home: landing });
-  return { path, ...raw, isLandingByteForByte: raw.same };
+  return { path, ...raw, isLandingByteForByte: raw.same, servesApp: raw.app };
 }
 
-test('每一张凭据页与每一个凭据脚本在线上都可达，且不是落地页', async ({ page }) => {
+test('邮件里的每一枚目的地在线上都可达，且服务的是它自己那张页', async ({ page }) => {
   test.skip(routes.pages.length === 0, '分母为空：判据没被判，先修探针再谈结论');
 
   // 必须先落在**本站页面**上：about:blank 里发出的 fetch 是跨域的，会被 CORS 拦掉 ——
@@ -87,11 +97,21 @@ test('每一张凭据页与每一个凭据脚本在线上都可达，且不是�
   for (const p of routes.pages) pages.push(await probe(page, `${p}?token=definitely-invalid-token`, landing));
   const scripts: Reading[] = [];
   for (const s of routes.scripts) scripts.push(await probe(page, s, landing));
+  // 🔴 邮件里**不只有凭据页**：改密成功、换绑完成、新增验证器那几封信发的是 `/app/`，
+  //    登录验证码那两封发的是 `/app/?signin=1`（分母同样从 `email.ts` 取，不抄清单）。
+  //    它们落的是边缘的**文件服务**那一条，不是代理，所以判据也不同：必须服务出
+  //    **应用那份产物**（正文引 `/app/assets/…`），而不是被落地页顶掉 —— 后者状态码一样是 200。
+  const appPaths = routes.emailPaths.filter((p) => !routes.pages.includes(p));
+  const apps: Reading[] = [];
+  for (const p of appPaths) {
+    apps.push(await probe(page, `${p}?signin=1`, landing));
+    apps.push(await probe(page, p, landing));
+  }
   const control = await probe(page, '/this-route-does-not-exist-anywhere', landing);
 
-  console.log(`分母来自 pages.ts：页 ${String(routes.pages.length)} 张 / 脚本 ${String(routes.scripts.length)} 个`);
-  for (const r of [...pages, ...scripts, control]) {
-    console.log(`  ${r.path.padEnd(48)} ${String(r.status).padEnd(4)} ${r.ct.padEnd(42)} ${String(r.len)}B 逐字等于落地页=${r.isLandingByteForByte ? 'YES' : 'no'}`);
+  console.log(`分母来自 pages.ts + email.ts：页 ${String(routes.pages.length)} 张 / 脚本 ${String(routes.scripts.length)} 个 / 邮件目的地 ${String(routes.emailPaths.length)} 枚`);
+  for (const r of [...pages, ...scripts, ...apps, control]) {
+    console.log(`  ${r.path.padEnd(48)} ${String(r.status).padEnd(4)} ${r.ct.padEnd(42)} ${String(r.len)}B 逐字等于落地页=${r.isLandingByteForByte ? 'YES' : 'no'} 应用产物=${r.servesApp ? 'YES' : 'no'}`);
   }
 
   const failures: string[] = [];
@@ -102,6 +122,10 @@ test('每一张凭据页与每一个凭据脚本在线上都可达，且不是�
   for (const r of scripts) {
     if (r.status !== 200) failures.push(`③ 脚本 ${r.path} 不是 200（读到 ${String(r.status)}）⇒ 页面画得出来、按钮是死的`);
     else if (!r.ct.includes('javascript')) failures.push(`③ 脚本 ${r.path} 的 content-type 是「${r.ct}」而不是 javascript ⇒ 浏览器会报 Unexpected token '<'`);
+  }
+  for (const r of apps) {
+    if (r.status !== 200) failures.push(`⑤ 邮件里的应用地址 ${r.path} 读到 ${String(r.status)} ⇒ 那封信的按钮点不开`);
+    else if (!r.servesApp) failures.push(`⑤ 邮件里的应用地址 ${r.path} 是 200，但正文不引 /app/assets/ ⇒ 服务的是落地页，不是应用`);
   }
   if (control.status !== 404) {
     failures.push(`④ 阳性对照失效：未注册的 ${control.path} 读到 ${String(control.status)} 而不是 404 ⇒ 上面那批"不是 404"是恒真的，零信息`);
