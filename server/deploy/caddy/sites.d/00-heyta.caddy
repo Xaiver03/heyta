@@ -48,11 +48,18 @@ heyta.waytofuture.cn {
 	handle @legalHtml {
 		reverse_proxy 127.0.0.1:1900
 	}
-	@credPages path_regexp credPages ^/(verify-email|recover-passkey|magic-login)$
+	# 🔴 这两条枚举的**全集**由 `pnpm check:credential-routes` 钉住（它从
+	#    `server/src/pages.ts` 读页面与 `scripts: [...]`，跟这里对账）。
+	#    2026-10-26 之前这里只有三张页：`/reset-password` 与 `/change-email` 后加进
+	#    `pages.ts` 时没人回来补这一行，于是**重置密码邮件里的链接点开是 404**
+	#    （落地页的兜底是诚实 404，所以症状不是"打开官网"而是彻底打不开）。
+	#    加一张凭据页 = 这里必须同时多一枚，否则那条邮件永远送不到能用的地方。
+	@credPages path_regexp credPages ^/(verify-email|recover-passkey|magic-login|reset-password|change-email)$
 	handle @credPages {
 		reverse_proxy 127.0.0.1:1900
 	}
-	@credJs path_regexp credJs ^/(recover-passkey|magic-login-confirm)\.js$
+	# 只代页不代脚本 = 页面画得出来、按钮是死的（`/recover-passkey.js` 那次的原文形状）。
+	@credJs path_regexp credJs ^/(recover-passkey|magic-login-confirm|reset-password|change-email)\.js$
 	handle @credJs {
 		reverse_proxy 127.0.0.1:1900
 	}
