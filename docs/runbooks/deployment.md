@@ -2000,6 +2000,10 @@ ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js re
 | `docker exec … node dist/scripts/admin.js list` | 「当前没有任何管理员 —— 后台对所有人关闭。」（fail-closed 生效） |
 | `supersync-server` / `supersync-postgres` | 均 `Up (healthy)`；`/health` → `{"status":"ok","db":"connected"}` |
 
+⚠️ 上面那张表是 **2026-09-30 那一趟的读数**，其中"没有任何管理员"那一格**已经不是线上现状**
+（2026-10-26 给运营邮箱开了号，`list` 现量 1 位）。现量永远以那条命令自己的输出为准：
+`ssh finlaw 'sudo -n docker exec -w /app supersync-server node dist/scripts/admin.js list'`。
+
 ### 3.13 nginx 站点文件现在**进了仓库**，并且能查漂移
 
 **问题**：上面 §3.3.1、§3.11 记的这些修复，以及更早的 `/app/`、`/assets/` 迁移，
