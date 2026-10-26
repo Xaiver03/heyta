@@ -483,5 +483,16 @@ p1 `DeepSeek 官方 / deepseek-flash`、p2 `DeepSeek 官方 / deepseek-v4-pro`�
 回过 `tool_calls`（x-c 仓 `verify-tool-calling.mjs`）。能力是真的，**是产品决定不用它**。
 这也意味着：哪天要开，改一行 + 同批改法务 §5 即可，不需要再"验证"什么。
 
-副产品：1.8 生效后，服务端指纹随之变成 `ai-and-transfer@1.8`（镜像已按 main 重建，见 §11.7 的做法），
-站点文案同步（`gen-site-copy` 40 条 × 2 + 落地页 legal 入口重生成）。
+**部署（2026-10-26 21:2x，同一套做法见 §11.7）**：
+
+| 判据 | 读数 |
+|---|---|
+| 站点 | 已重发；线上 `main-*.js` 里 `且不含对话式助手` = 1、旧句 `对话式助手也在这一档里` = **0**、`1.8` 在册 |
+| 服务端镜像 | 从 main 的干净导出重建（`git archive 41f2ba1ea`）；运行中容器 `LEGAL_SET_VERSION` = `ai-and-transfer@1.8;…` |
+| 健康 | `/health` ok；`/`、`/app/`、`/legal/ai-and-transfer/` 全 200 |
+| 回滚 | 两次部署各留一枚：`supersync:pre-legal17-20261026T120129`、`supersync:pre-legal18-20261026T212719` |
+
+🔴 **踩到一个新坑，已登记为环境陷阱 #585**：`gen-site-copy` 写的是 `packages/i18n/src`，
+而落地页读的是该包的 **`dist`** —— 只跑"生成 + 构建落地页"会**发旧文案而所有 rc 都是 0**
+（实测：产物里新句 0 处、旧句 1 处，`check:legal-copy` 与 `verify-landing-dist` 全绿）。
+固定动作改成：`i18n build` → `landing build` → **在产物里 grep 那句话**。
