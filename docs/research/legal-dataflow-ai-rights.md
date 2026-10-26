@@ -1,4 +1,4 @@
-# AI 出境路径与数据主体权利 —— 代码考古（C19–C23 / D24–D25）
+# AI 出境路径与数据主体权利 —— 代码考古（C19–C23、C26 / D24–D25）
 
 > 元信息：**日期 2026-10-01**、**纯只读代码考古**（本轮未修改任何产品代码）。
 > 范围：`packages/ai/`、`packages/app-host/src/ai-*.ts`、`packages/local-api/`、
@@ -709,6 +709,12 @@ AGENTS.md 那条纪律"隐私开关关不掉当下的行为是不可接受的"�
 1. **禁止出现"脱敏/匿名化/摘要后发送"** —— 无任何代码支撑（C20）。
 2. **禁止出现"heyta 云端 AI / 托管模型 / 我们替你调用模型"** —— 目的地结构上到不了 `heyta-cloud`（C19.4），
    且请求是设备直发（`routing.ts:865-893`）。
+   🔴 **2026-10-25 更正：这条禁令的两个前提都已不成立** —— `AiRoutingConfig.mode` 是生产面、设置页有
+   `own / managed` 两档、服务端托管代理（`server/src/ai/managed-proxy.routes.ts`）就位且只按境内白名单转发，
+   所以"托管"这一档**可以写**（现正文见 `packages/legal/src/documents/ai-and-transfer.ts` §5，1.6 起）。
+   **禁令换内容，不是被取消**：现在禁止把它写成**无条件可用**（必须同时写"运营方配好境内上游 /
+   你在设置里选托管 / 逐功能授权"），并且**不许把对话式助手写成"问一句就答完"** ——
+   它是多轮循环，一次会话发多次请求、每一轮各占一次额度计数（C26）。
 3. **禁止把 `purgedAt` / 注销描述成"立即从服务器销毁"** —— 一个只是标记（D24.3），另一个是硬删但**用户够不着**（D24.4）。
 
 ### 四、本轮未穷尽、下轮要补的（政策发布前应关闭的缺口）
@@ -719,3 +725,73 @@ AGENTS.md 那条纪律"隐私开关关不掉当下的行为是不可接受的"�
 4. `REMINDER` 等**未物化实体**在删除权上的表现（它们只活在 `opLog` 里，`export-dump.ts:104-107`）。
 5. `shared-schema` 的 zod 线契约与 hydration 是否真的按 ADR-0014 声称的"纯可加、无需 bump `CURRENT_SCHEMA_VERSION`"（C23.3 的未核项）。
 6. 人工删除/注销渠道（support 邮箱、表单、SLA）—— 属运营事实，代码考古给不出答案，需产品/运营确认。
+
+---
+
+## C26 对话式助手的多轮出境（`tool-calling` 的多步形态）
+
+**结论：助手不是第六个 AI 功能，它是 `tool-calling` 的多步版本 —— 出境面是"那句话 + 工具目录 + 工具读回来的字段"，上界是三个常量，越界即停，而且在托管档上每一轮各占一次额度。**
+
+> 为什么补这一节：C20 那张逐功能表只有"工具选择"一行（`today` / `text` / `tools`），
+> 而助手还会把**工具返回的内容**回送给模型 —— 于是 §3 首段那句"下表是**全部**出境面"
+> 在 1.7 之前对助手是不完整的。1.7 把助手纳入托管档之后，这件事从"只发生在你自备的端点上"
+> 变成"也可能发生在我们的代理上"，所以先有本节的读数，再改正文
+> （正文见 `packages/legal/src/documents/ai-and-transfer.ts` §3 新增段与 §5 callout）。
+
+### 26.1 feature 与授权粒度
+
+| 判据 | 读数 | 出处 |
+|---|---|---|
+| 用的哪个 feature | `'tool-calling'`（不是新造的第六个） | `packages/app-host/src/ai-assistant.ts:816`，理由在同文件 `:36-45` |
+| 授权粒度 | 与其它功能同一套 `(feature, destination)`；**没有**单独的 "assistant" 授权 | 同上 `:36-45`；`packages/ai/src/egress.ts` 的 `AiFeature` 词表 |
+| 生产出境执行点 | `invokeRouted()`，不是 `createProvider()` | `ai-assistant.ts:839` |
+
+### 26.2 出境面（逐项）
+
+| 项 | 内容 | 出处 |
+|---|---|---|
+| 会话那句话 | `system` 与本轮 `text` **就是** `messages` 的第 0 条与最后一条（同变量递进去，不可能不一致） | `ai-assistant.ts:816-822` |
+| 工具目录 | 已授权工具的名字、描述、参数结构 | `ai-assistant.ts:141-149`；`packages/ai/src/wire.ts:216-236` |
+| 工具**读回来的内容** | `JSON.stringify(run.data)` 作为 `role: 'tool'` 消息回送 | `ai-assistant.ts:932-953` |
+| 失败本身 | 被拒 / 失败的原因也回送（让模型换一条路），且**计入上界** | `ai-assistant.ts:957-967` |
+| 用户看到的清单 | 字段并集 + 工具名 + 三个上界，**会话开始前**渲染 | `apps/web/src/features/ai/AssistantPanel.tsx:343,885-886`；`apps/web/src/features/settings/AiSettings.tsx:1329-1331` |
+
+字段并集 = `assistantEgressFields(tier)`：基础字段 + 每个已授权工具的 `egressFields`
+（`ai-assistant.ts:141-149`）。所以"助手能送出哪些字段"不是另写一张表，而是第六节那张逐工具表
+按档位求并集 —— 两张表因此不会互相漂移。
+
+### 26.3 三个上界（是常量，不是估计）
+
+| 常量 | 值 | 拦的失控形状 | 出处 |
+|---|---|---|---|
+| `MAX_ASSISTANT_TOOL_STEPS` | 6 | 模型反复"再查一个"不收尾 | `packages/ai/src/assistant-limits.ts:24` |
+| `MAX_ASSISTANT_MESSAGES` | 40 | 长会话把历史整个反复送出 | 同上 `:27` |
+| `MAX_ASSISTANT_EGRESS_BYTES` | 200000 | 一步读出太多再回送 | 同上 `:38` |
+
+触顶时**明说停在哪里**（三种 `AssistantLimit`，同文件 `:41`），不静默截断后接着发。
+
+### 26.4 🔴 披露复查：越界即停，一个字节都不发
+
+每一步回送之前，`observedFieldNames(run.data)` 里的每个名字都必须在 `declaredFieldNames(run.tool)`
+里**且**在会话开始前那份已披露集合里；否则返回 `egress-outside-disclosed-set` 并停下
+（`ai-assistant.ts:930-945`）。这条是"并集披露"能成立的技术前提 —— 没有它，
+"清单之外的字段不发"就只是一句措辞。
+
+### 26.5 托管档：转发链与额度
+
+| 判据 | 读数 | 出处 |
+|---|---|---|
+| 托管端点声明工具能力 | `MANAGED_CAPABILITIES` 含 `tool_calling` | `packages/ai/src/managed-routing.ts:66` |
+| 客户端组装托管请求体时**带** `tools` | 与 OpenAI 那条路共用同一个 `toWireTools` | `packages/ai/src/wire.ts:214-247` |
+| 服务端代理转发 `tools` / `tool_choice` | `ChatBodySchema` 收，出站体原样带 | `server/src/ai/managed-proxy.routes.ts:170-178,427-437` |
+| 中央侧这条链声明了 `tool_calling` | heyta 三环境的 `chat` 任务 `capabilities` 都含它 | `x-c` 仓 `services/ai-control/contract/products.json` 的 `products.heyta.environments.{development,staging,production}` |
+| 中央侧证据是**回包**而不是状态码 | 判据是 `finish_reason=tool_calls` + 可解析的 `arguments` | `x-c` 仓 `tools/ai-control/verify-tool-calling.mjs` |
+| 每一轮各占一次额度 | `consumeManagedAiRequest()` 每次代理调用 +1（同一条 SQL 里读占用、裁决、+1） | `server/src/ai/managed-proxy.routes.ts:442-448` |
+
+⚠️ **遗留一项，别读错结论**：`createProvider()` 的托管分支**仍然**在带 `tools` 时返回 `no-route`
+（`packages/ai/src/provider.ts:388-407`，测试钉在 `packages/ai/tests/managed-allowlist.spec.ts:449`）。
+那条路径**不在生产上**（`packages/ai/src/provider.ts:294` 的注释逐字写着
+"新增出境功能请接 `invokeRouted`，不要接这里"，而助手接的正是 `invokeRouted`）。
+⚠️ 2026-10-25 已把那段注释里"托管档今天不支持工具调用：服务端不转发 `tools`"这个**已不成立的机制**
+换成准确说法（行为没动：收掉拦截要连那条断言一起改，属产品决定）。法务正文按**生产路径**写；
+这条遗留的处置登记在 `docs/plans/launch-blockers.md` §3.2 尾。

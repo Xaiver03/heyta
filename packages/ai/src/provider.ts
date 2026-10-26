@@ -386,19 +386,22 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
       let requestBody: unknown;
 
       if (config.mode === 'managed') {
-        // 🔴 托管档**今天不支持工具调用**，而且不许静默降级：
-        // 服务端（`managed-proxy.routes.ts`）不转发 `tools`，发出去也只会得到一段
-        // 纯文本回答 —— 那正是本仓最忌讳的"看起来有、其实没有"。
-        // 发现与要拍的板登记在 `docs/plans/launch-blockers.md` §3.2。
-        // 用 `no-route`（"AI 开着，但这个功能没有路走"）而不是编一个新原因：
-        // 失败词表是封闭的，加一档要同时动 i18n 的穷尽映射。
+        // ⚠️ **这段拦截的理由已经过期，行为留着只因为这条路径不在生产上。**
+        // 注释原文写的是"托管档今天不支持工具调用：服务端不转发 `tools`" —— 那句在
+        // 2026-10-25 已经不成立：`managed-proxy.routes.ts` 原样转发 `tools` / `tool_choice`
+        // （`:170-178`、`:427-437`），`MANAGED_CAPABILITIES` 也声明了 `tool_calling`
+        // （`managed-routing.ts:66`），而生产上的助手走的是 `invokeRouted()` 的托管分支
+        // （`routing.ts:1046-1078`），**不经过这里**。
+        // 所以这里的 `no-route` 只是这条历史 / 测试路径的边界，不代表产品口径：
+        // 托管档到底含不含助手，对外以法务 `ai-and-transfer` §5 为准（1.7 起为"含"）。
+        // 收掉这条拦截要连 `tests/managed-allowlist.spec.ts:449` 那条断言一起改，
+        // 属产品决定，本轮不动；文案不再声称"服务端不转发工具"那个已不成立的机制。
         if (invocation.tools !== undefined && invocation.tools.length > 0) {
           return {
             ok: false,
             reason: 'no-route',
             message:
-              '托管 AI 暂不支持工具调用：我们的服务端不会把工具目录转发给模型，' +
-              '所以这次请求发出去也只会得到一段纯文本回答。' +
+              '这条通道不支持工具调用，请求没有发出去 —— 不是你的配置坏了。' +
               '要用工具，请在设置里改选"使用自己的 AI 端点"。',
           };
         }

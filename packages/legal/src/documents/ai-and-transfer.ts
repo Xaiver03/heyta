@@ -22,8 +22,15 @@
  *    是三件事都成立才说得通 —— ① 运营方在这台**实例**上配好了境内上游；② 你在设置里选了托管；
  *    ③ 你对**每个功能**单独授权。缺任何一条，正确写法是"这条路径在这台实例上不可用 /
  *    这个功能被拒绝"，不是"我们的 AI 会帮你做"。
- *    🔴 而且**不许把对话式助手写进这一档**：托管端点不声明工具调用能力，
- *    带工具的请求在发出之前就被拒（`no-route`，零请求）—— 助手只属于自备端点。
+ *    🔴 **2026-10-25 更正：这条原来写的是"不许把对话式助手写进这一档"，理由是托管端点
+ *    不声明工具调用能力、带工具的请求发出之前就被拒。那个理由和那个结论**都已经不成立**。**
+ *    中央侧这条链的分配声明了 `tool_calling`（`x-c` 仓 `services/ai-control/contract/products.json`，
+ *    heyta 三环境各登记、判据是回包里有 `tool_calls` 而不是状态码），本仓
+ *    `MANAGED_CAPABILITIES` 跟着声明，服务端代理把 `tools` / `tool_choice` 原样转发。
+ *    **禁令换内容，不是被取消**：现在禁止把它写成"问一句就答完、不吃额度" ——
+ *    助手是多步循环，一次会话发**多次**请求、把工具读回来的内容回送给模型、
+ *    每一轮各占一次额度计数。这三件事必须一起写，否则"问一句"和实际发生的
+ *    "问五次"是两笔账。
  * 3. **禁止把云端 AI 与端到端加密写在同一句话里。** 模型必须读到明文才能工作 ——
  *    这是定义外的例外，不是可调和的细节。
  *
@@ -114,6 +121,10 @@ const zh = [
       },
       {
         kind: 'p',
+        text: '**对话式助手是"工具选择"那一行的多轮形态，不是第六个功能。** 它一次会话会发**多次**请求：每一轮都把你要办的那句话、已授权工具的名字与参数结构，连同**这些工具在上一轮读回来的内容**一起回送给模型。读回来的字段就是第六节那张表里逐工具写明的那几列；任何一步要回送清单之外的字段都会被**拦下来不发**（界面上的原话是"某一步要送出你没有批准过出境的字段，助手已经停下，那一步一个字节都没发"）。所以别把它读成"问一句 = 一次出境"：一次会话最多几轮、单次请求多少条消息与多少字节，上界都写在会话开始前那份清单里，触顶时它明确说停在哪一步，不截断后接着发。',
+      },
+      {
+        kind: 'p',
         text: '同样重要的是**不出境**的清单：邮箱地址、账号标识、订阅与计费信息、设备指纹、口令、同步凭据、便签正文、整张习惯表、完整操作日志、任何整库导出 —— 这些都不在任何一条出境路径上。需要如实标注的一项：优先级建议会带上任务的标识符，它是你数据的一部分，但仍然是一个可关联的标识。',
       },
       {
@@ -157,7 +168,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: 'heyta 里存在一条**由我们统一提供、统一计费、由我们挑选模型**的云端 AI 的路（第二段是它的数据保留定案）。**这一档现在可以订阅**：设置里的供给方式可以选"由 heyta 托管"，对应 ¥12/月 那一档。🔴 但它**有前提，而且只覆盖一部分功能**，这三件事必须一起读：',
+        text: 'heyta 里存在一条**由我们统一提供、统一计费、由我们挑选模型**的云端 AI 的路（第二段是它的数据保留定案）。**这一档现在可以订阅**：设置里的供给方式可以选"由 heyta 托管"，对应 ¥12/月 那一档。🔴 但它**有前提**，这三件事必须一起读：',
       },
       {
         kind: 'ul',
@@ -177,7 +188,7 @@ const zh = [
       },
       {
         kind: 'callout',
-        text: '**这一档现在提供，但它不随订阅生效** —— 订阅买的是"我们替你运维那台同步服务器，加上我们的云端 AI 额度"，**不是**一份"把内容发出去"的同意。你要用的是每个功能各自的那枚开关，开一次算一次，关掉即停。**并且这一档不含对话式助手**：托管端点在路由上不声明工具调用能力，带工具的请求在**发出之前**就被拒绝（用户看到"没有可用的路由"），一个字节都不转发。要助手，请用你自己填的端点 —— 那条路免费、不限次，本文件第四节写的全是它。',
+        text: '**这一档现在提供，但它不随订阅生效** —— 订阅买的是"我们替你运维那台同步服务器，加上我们的云端 AI 额度"，**不是**一份"把内容发出去"的同意。你要用的是每个功能各自的那枚开关，开一次算一次，关掉即停。**对话式助手现在也在这条链上**：托管端点已声明工具调用能力，带工具的请求会被转发给上游，所以它在托管档上真的拿得到工具调用，而不是被拦在发出之前。它用的仍是**工具选择**那枚授权 —— 授权对象是 `tool-calling` 这个功能加托管这个目的地，不是"助手"这个名字；在这一档上它跑几轮就发几次请求，**每一轮各占一次额度计数**，某一步要带出清单之外的字段就停住不发（第三节写的就是这套）。自备端点那条路仍然免费、不限次，本文件第四节写的全是它。',
       },
       {
         kind: 'p',
@@ -370,7 +381,7 @@ const zh = [
         kind: 'ul',
         items: [
           '**加任何一个新的出境字段**：第三节那张表必须先扩、再上线 —— 出境面必须在数据被写进请求之前收窄，披露不能虚报，也不能少报。',
-          '**提供云端 AI**：第五节整段重写。它列的三件前置条件里，**保留期那一件已在 2026-10-05 定案并写进第五节**，另两件没有 —— 逐项可撤销的单独同意，以及第 8 节那一格仍然**不下结论**的定性；届时"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。',
+          '**提供云端 AI**：第五节整段重写。它列的三件前置条件里，**保留期那一件已在 2026-10-05 定案并写进第五节**，另两件没有 —— 逐项可撤销的单独同意，以及第 8 节那一格仍然**不下结论**的定性；届时"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。🔴 **2026-10-25：这一条已经触发过两次**（1.6 开放订阅、1.7 把对话式助手纳入这一档），所以上面"另两件没有"里的第一件已经不是"没写"，而是"写了、还差人签"。仍然不变的那一半是第 8 节那一格：托管这一档的定性不替你自己配置的境外端点作答。',
           '**把"受保护条目"做进产品**：第六节那条提示才允许从"警告"改成"承诺"。在此之前，任何"加密条目读不出来"的表述都不写。',
         ],
       },
@@ -400,14 +411,19 @@ const zh = [
             '第三节那张表的**拆解任务 / 优先级建议 / 估时**三行各加了 `today`，工具选择那行也补上 `today`：这三条链路此前不知道"今天是哪天"，用户说"下周三""14 号"时模型只能自己编（实测编错过四个半月），而唯一的修法是往提示词里注入这一行。它看起来不像用户数据，实际上是**这台设备的本地日期**，所以按"新增任何一个出境字段都要先扩表再上线"那条纪律，先改这张表。工具选择那行的 `today` 不是新增出境面，是**补一句漏写**：内置助手早就带这一项，而这张表把它漏掉了。',
           ],
           [
+            '1.5',
+            '2026-10-05',
+            '第五节按 ADR-0054 改写：这类服务的**数据保留策略已经定案**，所以本节不再把"保留期还没决定"当成它不可用的理由（那道为此而写的有意的检查，在定案之后不再触发）。定案本身写在第五节第二段，逐条落到可核对的东西上：一张只装计数的表（证据是列集合，不是措辞）、请求与返回体只存在于一次代理调用的内存里、保留下来的运维元数据是一份封闭字段清单加一个有出处的期限，以及托管档的目的地由**境内白名单**推导而不是由客户端声明。两处刻意没写成更满的话：那一个期限**没有**配"到期会自动删除"（清理作业本轮未落地，它落地时本节要改），而第 8 节关于你自己配置的境外端点那一格**仍然不下结论** —— 本次定案不涉及它，本文件也不替它定性。第九节的触发清单同步改掉保留期这一件。开放与购买按 ADR-0054 §6 的顺序走，走到那一步本节还要整段重写。本行不复述那个数字与那份字段清单：它们只住在第五节，抄一份就是多一个会漂的副本。',
+          ],
+          [
             '1.6',
             '2026-10-24',
             '**第五节整段重写，因为这一档从"打不开"变成了"可以订阅"** —— 而这正是本文件开头那条禁令原来挡住的说法。改的原因是**代码变了**（不是措辞）：设置页有了 `own / managed` 两个供给选项、服务端托管代理路由已就位、保留策略早在 1.5 就定案了。新写法把三件事写成并列条件（运营方配好境内上游 / 你在设置里选托管 / 每个功能单独授权），并**明确排除对话式助手**（托管端点不声明工具调用，带工具的请求发出之前就被拒，零请求）。同时撤掉了三句已不成立的话："这一档仍打不开"、"这项服务现在没有提供"、"今天的客户端里没有任何一个开关能把它打开"。保留策略那两段（四列表 / 内容只活在一次调用里 / 45 天元数据 / "到期就删"没落地）**一字未改** —— 定案没变，变的是可用性。⚠️ 本文件整体仍是草案，未经法务复核。',
           ],
           [
-            '1.5',
-            '2026-10-05',
-            '第五节按 ADR-0054 改写：这类服务的**数据保留策略已经定案**，所以本节不再把"保留期还没决定"当成它不可用的理由（那道为此而写的有意的检查，在定案之后不再触发）。定案本身写在第五节第二段，逐条落到可核对的东西上：一张只装计数的表（证据是列集合，不是措辞）、请求与返回体只存在于一次代理调用的内存里、保留下来的运维元数据是一份封闭字段清单加一个有出处的期限，以及托管档的目的地由**境内白名单**推导而不是由客户端声明。两处刻意没写成更满的话：那一个期限**没有**配"到期会自动删除"（清理作业本轮未落地，它落地时本节要改），而第 8 节关于你自己配置的境外端点那一格**仍然不下结论** —— 本次定案不涉及它，本文件也不替它定性。第九节的触发清单同步改掉保留期这一件。开放与购买按 ADR-0054 §6 的顺序走，走到那一步本节还要整段重写。本行不复述那个数字与那份字段清单：它们只住在第五节，抄一份就是多一个会漂的副本。',
+            '1.7',
+            '2026-10-25',
+            '**第五节里那句"这一档不含对话式助手"被撤掉，因为它的理由已经不再成立** —— 中央侧这条链的分配声明了 `tool_calling`（heyta 三个环境逐跳实测，判据是回包里的 `tool_calls` 而不是状态码），本仓托管端点跟着声明，服务端代理把 `tools` / `tool_choice` 原样转发。所以结论从"不含"改成"含"，**但换来的不是"订阅就送助手"**：它仍然是那三条前提加工具选择那枚授权，而且这一档上跑几轮就发几次请求、每一轮各占一次额度计数。同时补上第三节此前根本没写的一件事：助手是**多轮**形态，会把工具读回来的内容回送给模型 —— 这三句以前只能从界面上那句"最多 N 次模型调用"间接看出来，写进政策才叫披露。第五节第一段那个"只覆盖一部分功能"一并删掉（六条功能现在都有路）。⚠️ 本文件整体仍是草案，未经法务复核；**这一版的改动需要有人签**，签之前对外口径仍按 1.6 那套说。',
           ],
         ],
       },
@@ -493,6 +509,10 @@ const en = [
       },
       {
         kind: 'p',
+        text: '**The conversational assistant is the multi-step form of the "Tool selection" row, not a sixth feature.** One session sends **several** requests: each one carries the line you typed, the names and parameter structures of the authorised tools, and **whatever those tools read back on the previous step**, all returned to the model. The fields read back are exactly the per-tool columns written out in section six; any step that would carry a field outside that list is **stopped and not sent** (the interface says, in these words, that a step wanted to send a field you never approved, so the assistant stopped and that step sent not one byte). So do not read it as "one question, one egress": how many steps a session may take, and how many messages and bytes a single request may carry, are all written in the list shown before the session starts, and when a limit is hit it says which step it stopped at instead of truncating and carrying on.',
+      },
+      {
+        kind: 'p',
         text: 'The list of what does **not** leave matters just as much: your email address, account identifier, subscription and billing data, device fingerprints, your passphrase, sync credentials, note bodies as an entity type, the whole habits table, the complete operation log, and any bulk export. One item has to be flagged honestly: prioritisation includes task identifiers. They are part of your data, but they are still linkable identifiers.',
       },
       {
@@ -536,7 +556,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'There is a path in heyta for cloud AI **provided and billed by us, with the model chosen by us** (the second paragraph is the settled retention policy for it). **This tier can now be subscribed to**: the supply choice in Settings offers "hosted by heyta", and it corresponds to the ¥12 / month tier. 🔴 But it **has preconditions and covers only part of the features**, so these three belong together:',
+        text: 'There is a path in heyta for cloud AI **provided and billed by us, with the model chosen by us** (the second paragraph is the settled retention policy for it). **This tier can now be subscribed to**: the supply choice in Settings offers "hosted by heyta", and it corresponds to the ¥12 / month tier. 🔴 But it **has preconditions**, so these three belong together:',
       },
       {
         kind: 'ul',
@@ -556,7 +576,7 @@ const en = [
       },
       {
         kind: 'callout',
-        text: '**This tier is offered now, but it does not follow from a subscription** — what you buy is "we run that sync server for you, plus an allowance of our cloud AI", **not** a consent to send content out. What you use is each feature\'s own switch, one grant at a time, and it stops when you switch it off. **And this tier does not include the conversational assistant**: on the routing table the hosted endpoint does not declare tool-calling capability, so a request carrying tools is refused **before it leaves** ("no available route" is what the user sees) and not one byte is forwarded. For the assistant, use an endpoint you configure yourself — that path is free, unlimited, and is what section four describes in full.',
+        text: '**This tier is offered now, but it does not follow from a subscription** — what you buy is "we run that sync server for you, plus an allowance of our cloud AI", **not** a consent to send content out. What you use is each feature\'s own switch, one grant at a time, and it stops when you switch it off. **The conversational assistant sits on this path now too**: the hosted endpoint declares tool-calling capability and a request carrying tools is forwarded to the upstream, so on this tier the assistant genuinely gets tool calls rather than being stopped before it leaves. It still uses the **Tool selection** grant — what you authorise is the `tool-calling` feature plus the hosted destination, not the word "assistant"; on this tier it sends one request per step, **each step counting once against the allowance**, and if a step would carry a field outside the disclosed list it stops without sending (section three describes exactly this). An endpoint you configure yourself remains free and unlimited, and section four describes it in full.',
       },
       {
         kind: 'p',
@@ -747,7 +767,7 @@ const en = [
         kind: 'ul',
         items: [
           '**Any new egress field**: the table in section three must be widened before the feature ships. The outbound surface has to be narrowed before data is written into the request, and disclosure may neither overstate nor understate.',
-          '**Cloud AI being offered**: section five is rewritten end to end. Of the three preconditions it names, **the retention period was settled on 2026-10-05 and is written into section five**; the other two are not — a per-feature, revocable, separate consent, and the characterisation in section 8 which still **stays open**. At that point "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions and may never be merged into one sentence.',
+          '**Cloud AI being offered**: section five is rewritten end to end. Of the three preconditions it names, **the retention period was settled on 2026-10-05 and is written into section five**; the other two are not — a per-feature, revocable, separate consent, and the characterisation in section 8 which still **stays open**. At that point "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions and may never be merged into one sentence. 🔴 **2026-10-25: this trigger has now fired twice** (1.6 opened the subscription, 1.7 brought the conversational assistant onto this tier), so the first of those "other two" is no longer unwritten — it is written and awaiting a signature. What does not change is the cell in section 8: the characterisation of this tier says nothing about an endpoint you configure abroad.',
           '**"Protected entries" becoming a product concept**: only then may the callout in section six change from a warning into a promise. Until then, no sentence claiming "encrypted entries cannot be read" is written.',
         ],
       },
@@ -777,14 +797,19 @@ const en = [
             'The **Task breakdown / Prioritisation / Duration estimate** rows of the table in section three each gained `today`, and the Tool selection row gained it too. Those three chains did not know which day it was, so when you wrote "next Wednesday" or "the 14th" the model had to invent a date (measured: it was once off by four and a half months); the only fix is to inject that line into the prompt. It does not look like user data, but it is **this device\'s local date**, so the rule "any new egress field extends this table before it ships" applies. For Tool selection the `today` is not new egress - it is a **missing line being added back**: the built-in assistant already sent it while this table omitted it.',
           ],
           [
+            '1.5',
+            '2026-10-05',
+            'Section five is rewritten against ADR-0054: the **data retention policy for this kind of service has been settled**, so the section no longer gives "the retention period is undecided" as the reason the tier is unavailable (the deliberate check written for that purpose no longer fires once the period is decided). What was settled is stated in the second paragraph of section five, item by item against things that can be checked: a table that can only hold counts (its column set is the evidence, not our wording), request and response bodies that exist only in the memory of one proxied call, the operational metadata as a closed field list plus one dated period with a stated derivation, and the managed destination being derived from a **domestic allowlist** rather than declared by the client. Two places deliberately say less than they could: that period carries **no** "it is deleted automatically when it expires" (the sweep is not implemented in this round, and section five changes again when it is), and the cell in section 8 about an endpoint you configure abroad **still reaches no conclusion** - this decision does not touch it and this document will not settle it. The trigger list in section nine drops the retention item with this change. Opening the tier and selling it follow the order in ADR-0054 §6; when that step arrives this section is rewritten end to end again. This row does not restate that number or that field list: they live in section five only, and a second copy is a second thing that can drift.',
+          ],
+          [
             '1.6',
             '2026-10-24',
             '**Section five is rewritten end to end, because this tier went from "cannot be switched on" to "can be subscribed to"** - which is exactly the claim the prohibition at the top of this document used to block. The cause is a change in the code, not in wording: Settings now offers an `own / managed` supply choice, the server-side hosted proxy route is in place, and the retention policy was settled back in 1.5. The new wording puts three conditions side by side (the operator configured a domestic upstream / you chose hosted in Settings / you granted each feature separately) and **explicitly excludes the conversational assistant** (the hosted endpoint declares no tool-calling, so a request carrying tools is refused before it leaves - zero requests). Three sentences that had become false are withdrawn: "the tier is still not switchable on", "this service is not offered today", and "no switch anywhere in the shipped clients can turn it on". The two retention paragraphs (four-column table / content lives only inside one call / 45-day metadata / "delete on expiry" not implemented) are **untouched** - the settled policy did not change, only availability did. The document as a whole remains a draft that has not been through legal review.',
           ],
           [
-            '1.5',
-            '2026-10-05',
-            'Section five is rewritten against ADR-0054: the **data retention policy for this kind of service has been settled**, so the section no longer gives "the retention period is undecided" as the reason the tier is unavailable (the deliberate check written for that purpose no longer fires once the period is decided). What was settled is stated in the second paragraph of section five, item by item against things that can be checked: a table that can only hold counts (its column set is the evidence, not our wording), request and response bodies that exist only in the memory of one proxied call, the operational metadata as a closed field list plus one dated period with a stated derivation, and the managed destination being derived from a **domestic allowlist** rather than declared by the client. Two places deliberately say less than they could: that period carries **no** "it is deleted automatically when it expires" (the sweep is not implemented in this round, and section five changes again when it is), and the cell in section 8 about an endpoint you configure abroad **still reaches no conclusion** - this decision does not touch it and this document will not settle it. The trigger list in section nine drops the retention item with this change. Opening the tier and selling it follow the order in ADR-0054 §6; when that step arrives this section is rewritten end to end again. This row does not restate that number or that field list: they live in section five only, and a second copy is a second thing that can drift.',
+            '1.7',
+            '2026-10-25',
+            '**The sentence in section five saying this tier "does not include the conversational assistant" is withdrawn, because its premise no longer holds** - the allocation for this chain on the central side declares `tool_calling` (measured hop by hop across all three heyta environments, judged by `tool_calls` in the response body rather than by a status code), the hosted endpoint here declares it too, and the server proxy forwards `tools` / `tool_choice` verbatim. So the conclusion moves from "excluded" to "included", **which does not mean a subscription hands you the assistant**: the same three preconditions apply, plus the Tool selection grant, and on this tier it sends one request per step with each step counting once against the allowance. The change also adds something section three never said: the assistant is a **multi-step** form that returns what the tools read back to the model - until now only inferable from the "at most N model calls" line on screen, and written into the policy it becomes a disclosure. The "covers only part of the features" caveat in the first paragraph of section five is dropped as well (all six features now have a route). ⚠️ The document as a whole remains a draft that has not been reviewed by counsel; **this revision needs a signature**, and until it is signed the external line stays the one in 1.6.',
           ],
         ],
       },
@@ -816,18 +841,23 @@ export const aiAndTransfer: LegalDocument = {
   // **可用性变了**（设置页有了 own/managed、服务端代理就位），而不是发现写错了 ——
   // 但同样的纪律照样触发：同意要能回答"他同意的那一版里，这一档到底能不能用"。
   // 同时撤掉三句已不成立的话（"仍打不开"/"现在没有提供"/"没有任何开关能打开"）。
-  version: '1.6',
+  // 🔴 1.6 → 1.7（2026-10-25）：第五节那句"这一档不含对话式助手"被撤掉 —— 它的理由
+  // （托管端点不声明工具调用）在中央侧补上 `tool_calling` 之后不成立，结论也跟着反过来
+  // （含，但仍是三条前提 + 工具选择那一枚授权）。同一版补上第三节此前缺失的
+  // "助手是多轮、多请求、每一轮各占一次额度计数"，并删掉第五节的"只覆盖一部分功能"。
+  // 换号的理由与 1.3–1.6 同一条：同意留痕要能回答"他同意的那一版里有没有这一句"。
+  version: '1.7',
   status: 'draft',
-  updatedDate: '2026-10-24',
+  updatedDate: '2026-10-25',
   title: {
     'zh-CN': 'AI 功能与数据流向',
     en: 'AI Features and Where Your Data Goes',
   },
   summary: {
     'zh-CN':
-      'AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权，且不含对话式助手。',
+      'AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权；对话式助手也在这一档里，它一次会话会发多次请求、每一轮各占一次额度。',
     en:
-      'AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, only per feature with your own consent, and it does not include the conversational assistant.',
+      'AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, and only per feature with your own consent; the conversational assistant is part of that tier too, taking several requests per session with each one counting against the allowance.',
   },
   sections: { 'zh-CN': zh, en },
 };
