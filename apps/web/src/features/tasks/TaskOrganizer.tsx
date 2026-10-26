@@ -248,12 +248,21 @@ export function OrganizerField({
             border: 'none',
             display: 'flex',
             flexDirection: 'column',
-            gap: cssVar('space.1'),
+            // 🔴 一行标签 = 一枚**独立**的复选框（各自可勾），所以这一列用的是
+            //    "控件↔控件"的节奏，不是"控件内部"的 4px。2026-10-26 用户报登录面板
+            //    「记住密码」贴脸之后同族排查到这里：实测两行复选框之间只有 **4px**
+            //    （行高 24px、盒子紧贴墨迹）。仓内其余复选/单选组一律 space.2 起
+            //    （`.ht-settings__sub-plans`=space.2、`.ht-settings__caps`=space.3），
+            //    这两处是唯一的例外。
+            gap: cssVar('space.2'),
           }}
         >
           <legend
             style={{
               padding: 0,
+              // `legend` 在 flex 容器里**不是 flex item**，上面那个 gap 管不到它 ——
+              // 不写这一句，分组标题与第一行复选框实测 **0px**（贴在一起）。
+              marginBottom: cssVar('space.1'),
               fontSize: cssVar('font-size.xs'),
               color: cssVar('color.foreground-muted'),
             }}
