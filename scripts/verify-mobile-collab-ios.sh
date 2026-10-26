@@ -29,6 +29,9 @@ trap 'rm -f -- "$0"' EXIT
 #      （服务端"收下" ≠ verified；这一条才是 ADR-0069 在移动端成立）
 #   L5 信号驱动：owner 再写一条评论 → 手机靠 `new_share_ops` 自己重画，全程没碰同步按钮
 #   L6 界面不谎称能力：通知偏好面只剩三枚有输入的开关（M5-3 那一格）
+#   L7 手机自己开共享：**反向**那一半 —— 手机先从界面上建一条自己的清单（产品定义里
+#      「手机用户能建清单」那一格），再把它设为共享（同意闸 → 建 share → 签发邀请 → 撤销）。
+#      这一档里手机是**所有者**，node 那侧只读服务端形状，不替它建。
 #
 # 🔴 每一档都留**截图**（AGENTS §6.2 规定一：必须肉眼看图），失败时也留。
 # 🔴 证据目录只存证据（规定三）：png / txt / json / md。Release 产物与 DerivedData
@@ -1436,6 +1439,45 @@ if ! wait_tree "$OWNER_COMMENT" 180; then
 fi
 ok "owner 的评论靠信号出现在手机上（全程没点同步）"
 shot "14-信号驱动到的评论"
+# 🔴 两行兜底署名必须是**同一种形状**（第 31 跑看图登记的那枚候选，回源码定完性之后剩下的那一半）。
+#    组件那一行是「成员 + `authorUserId` 前 8 位」（`packages/ui/src/sync/comments-model.ts:76`），
+#    两壳同一份。同一屏里一行像账号 id、另一行像 uuid ⇒ 有一方把**成员行的 id** 当作者写进了 op。
+#    实测成因在装置这一侧（`collab-owner-step.mjs` 原先 `?? ownerMemberId` 兜下去了），不在 App 里；
+#    这一格把它钉住：读不出树不算通过、一枚都没数到也不算通过（永远为真的判据比没有判据更糟）。
+idb_dump
+AUTH_SHAPE=$(python3 - "$IDB_DUMP_FILE" <<'PY'
+import json, re, sys
+try:
+    raw = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+    json.loads(raw)  # 读不出这棵树就打印 unreadable，别让"没数到"冒充"形状一致"
+except Exception:
+    print("unreadable")
+    raise SystemExit(0)
+ids = re.findall(r"成员[\s,]*([0-9A-Za-z-]{2,12})", raw)
+digits = [i for i in ids if i.isdigit()]
+others = sorted(set(i for i in ids if not i.isdigit()))
+print(f"n={len(ids)} digits={len(digits)} offenders={','.join(others)}")
+PY
+)
+case "$AUTH_SHAPE" in
+  unreadable)
+    shot "14b-署名形状读不出树"
+    env_bail "评论那一屏的树读不出 ⇒ 不拿「没数到」当「形状一致」"
+    ;;
+esac
+if printf '%s' "$AUTH_SHAPE" | grep -q 'offenders=.'; then
+  shot "14b-署名两行形状不一"
+  bad "界面上出现了不像账号 id 的兜底署名（有一行把成员行 id 当作者写了）：$AUTH_SHAPE"
+  summary
+  exit 1
+fi
+if printf '%s' "$AUTH_SHAPE" | grep -q 'n=0'; then
+  shot "14b-读不到任何兜底署名"
+  bad "这一屏一枚「成员 …」都没数到 ⇒ 线程没渲染，这条判据不能靠『没数到』通过：$AUTH_SHAPE"
+  summary
+  exit 1
+fi
+ok "两行兜底署名同一种形状（都是账号 id 前缀）：$AUTH_SHAPE"
 
 # ── 10. 界面不谎称能力：通知偏好面只剩三枚有输入的开关 ──────────────────────
 step "10. 偏好面判据（L6）：只有活动那三档，没有「任务提醒」/「自动接受」"
@@ -1493,6 +1535,188 @@ for ghost in "任务提醒" "指派给他人的除外" "自动接受已知合作
     ok "界面上没有「$ghost」（没有输入的档位已撤干净）"
   fi
 done
+
+# ── 10b. L7：手机自己开启共享（反向那一半）──────────────────────────────────
+step "10b. 开共享判据（L7）：手机自己建一条清单、把它设为共享、签发邀请、再撤销"
+# 🔴 这一档此前**整条不在旅程里**：第 5 步用服务端把 owner 那一侧建好（`collab-owner-step.mjs init`），
+#    所以"手机上按『开启共享』⇒ 同意闸 ⇒ 建 share ⇒ 发邀请"这条路径从未在设备上走过一次。
+#    界面与生产装配都在（`ShareSpaceScreen.tsx:745` 那颗 `share-create-${projectId}` → `startShare`
+#    → `ShareConsentModal` → `createShare`：`api.createShare` + `sealListKeyForRecipient`
+#    + `putMemberEnvelope` + `putMemberSigningKey` + `bindProjectShare`），欠的只是有人真按一次。
+# 🔴 第 10 步结束时人停在**共享空间那一屏**（比共享首页还深一层）。这里不许按底部标签找路：
+#    共享面挂在「我的」这一档的第二层里，再按一次同一档不改 `tab`（本文件 725-729 行那条实测），
+#    第 32 跑就是在这里红的 —— 日志写「树上没有落点 id:profile-entry-share；当前屏顶部文字=共享清单」，
+#    读的是装置走错了路，不是产品没有入口。出路只有顶栏那枚「返回」⇒ 用 `back_to_anchor` 逐层爬。
+back_to_anchor "id:profile-entry-share" \
+  || { shot "17a-爬不到我的页那一行"; env_bail "按顶栏「返回」也爬不到「我的」页那一行（装置问题，不判产品）"; }
+# 🔴 先**从界面上建一条自己的清单**，再拿它去开共享。"可共享的清单"那一节读的是本机没挂
+#    shareId 的清单行（`ShareSpaceScreen.tsx:213` 那段减法），而这台账号是旅程里新注册的、
+#    此前只**加入**过别人那一份 ⇒ 名下一条自己的清单都没有。第 33 跑就是在这里 env_bail 的
+#    （截图 17d：那一节写着空态）。这里不绕过它 —— 产品定义里「手机用户能建清单」那一格
+#    此前从未在设备上走过，建不出来就是产品红，不是装置前提不成立。
+PHONE_LIST_NAME="手机自建清单${STAMP}"
+if ! ax_press_until "id:profile-entry-lists" "id:mobile-list-add"; then
+  shot "17b1-进不到清单管理"
+  env_bail "按「我的」页那行清单入口进不到清单管理面（装置读不到落点，不判产品）"
+fi
+if ! fill_field "id:mobile-list-name" "$PHONE_LIST_NAME"; then
+  shot "17b3-清单名填不进"
+  env_bail "清单名填不进输入框（装置问题，不判产品）"
+fi
+if ! ax_press_until "id:mobile-list-add" "$PHONE_LIST_NAME"; then
+  shot "17b4-手机上建不出清单"
+  bad "按了「新建清单」那一枚，界面上没有出现「$PHONE_LIST_NAME」⇒ 产品定义里「手机用户能建清单」那一格在设备上没成立"
+  summary
+  exit 1
+fi
+ok "手机自己建出一条清单（$PHONE_LIST_NAME）"
+shot "17b5-手机建出的清单"
+if ! back_to_anchor "id:profile-entry-share"; then
+  shot "17b6-建完清单爬不到我的页"
+  env_bail "建完清单后按顶栏「返回」爬不到「我的」页那一行（装置问题，不判产品）"
+fi
+if ! ax_press_until "id:profile-entry-share" "id:share-join-entry"; then
+  shot "17b-按不动共享入口"
+  bad "「我的」页那行共享入口按不动，进不到共享首页（L7 走不下去）；口令那句读数=$BANNER_AT_LOGIN"
+  summary
+  exit 1
+fi
+# 手机这一页上"可共享的清单"那一节的每一行是一颗 `share-create-<projectId>`（可交互 ⇒ 进 AX 树）。
+# 🔴 认哪一行**按刚建的那条清单的名字**认，不按"树上第一颗"认：第 33 跑之后这一页上会同时有
+#    上一趟留下的行（同一台模拟器复用沙盒时）与这一条新行，取第一颗会把别的行当成目标。
+#    有行但没有我们这条 ⇒ 判产品红（建出来的清单没进可共享那一节）；一行都没有 ⇒ 判装置/环境。
+idb_dump
+CREATE_READ=$(python3 - "$IDB_DUMP_FILE" "$PHONE_LIST_NAME" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+def walk(n):
+    yield n
+    for c in (n.get("children") or []):
+        yield from walk(c)
+name = sys.argv[2]
+rows = []
+for top in (data if isinstance(data, list) else [data]):
+    for n in walk(top):
+        u = n.get("AXUniqueId") or ""
+        if not u.startswith("share-create-"):
+            continue
+        label = " ".join(str(n.get(k) or "") for k in ("AXLabel", "AXValue", "label", "value", "title"))
+        rows.append(u if name in label else "")
+print(f"{next((r for r in rows if r), '')}|{len(rows)}")
+PY
+)
+CREATE_ANCHOR=${CREATE_READ%%|*}
+CREATE_ROWS=${CREATE_READ##*|}
+if [ -z "$CREATE_ROWS" ]; then
+  shot "17d2-共享首页读不到树"
+  env_bail "共享首页那棵树读不出 ⇒ 不拿「没读到」当「界面上没有可共享的清单」"
+elif [ "$CREATE_ROWS" = "0" ]; then
+  shot "17d-没有可共享的清单"
+  bad "手机上刚建出来的那条清单没有出现在『可共享的清单』那一节（界面上这一节一行都没有）"
+  summary
+  exit 1
+elif [ -z "$CREATE_ANCHOR" ]; then
+  shot "17d3-可共享那一节里没有这条"
+  bad "『可共享的清单』里有 $CREATE_ROWS 行，但没有一行是刚建出来的「$PHONE_LIST_NAME」⇒ 名册/减法那一格没对上"
+  summary
+  exit 1
+fi
+ok "手机上有一条自己的清单可以设成共享（$CREATE_ANCHOR）"
+if ! ax_press_until "id:${CREATE_ANCHOR}" "id:share-consent-accept" "id:share-invite-submit"; then
+  shot "17e-按不动开启共享"
+  bad "按「${CREATE_ANCHOR}」五次也没落到同意面或共享面板"
+  summary
+  exit 1
+fi
+if [ "$PRESS_HIT" = "id:share-consent-accept" ]; then
+  # 这道闸在设备上第一次为 **owner** 一侧出现（第 6 步那次是 member 一侧）：
+  # 判断在 `@heyta/ui` 的 `shouldShowConsent`，本轮每趟都 `simctl uninstall` ⇒ 沙盒里同意态是空的。
+  shot "17f-开共享同意面"
+  if ! ax_press_until "id:share-consent-accept" "id:share-invite-submit"; then
+    shot "17g-按了同意却没到共享面板"
+    env_bail "按了「确认共享」却没走到共享面板（装置读不到落点，不判产品）"
+  fi
+  ok "开共享这一侧的同意闸在设备上按过了（与入群那一侧同一道闸）"
+fi
+shot "17h-手机建好的共享面板"
+ok "手机自己把一条清单设成了共享：面板上有所有者才有的『生成邀请』那一格"
+fill_field "id:share-invite-email" "$OWNER_EMAIL" \
+  || { shot "17i-邮箱填不进"; env_bail "邀请邮箱填不进输入框（装置问题，不判产品）"; }
+# 🔴 从这一按起，屏幕上画出**当趟那张一次性邀请凭证**的明文（`ShareSpaceScreen.tsx:838` 那枚
+#    `share-invite-token`）⇒ 与第 6 步凭证框、与恢复码同一档：帧只落私有 RUN_DIR，不进证据目录。
+#    判"签发成功"不需要像素 —— 锚在只有 ticket 相位才画的两枚按钮上（`share-invite-handoff`）。
+SECRET_FRAMES=1
+ax_press "id:share-invite-submit" || true
+if ! wait_tree_id "share-invite-handoff" 120; then
+  idb_dump
+  shot "17j-没签发邀请"
+  tree_has "share-create-error" >/dev/null 2>&1 && note "面板上挂着 share-create-error（建 share 那一步就没成）"
+  bad "按了『生成邀请』，界面上没有出现『把邀请交给对方』那一格 ⇒ 手机没签发出一张可用邀请"
+  summary
+  exit 1
+fi
+ok "手机自己签发了一张邀请（『把邀请交给对方』那一格出现 = ticket 已在界面上）"
+# 服务端形状要在**撤销之前**读：撤销会把那张邀请打上 revokedAt，活邀请那一格就读不到了。
+node "$ROOT/scripts/lib/collab-owner-step.mjs" phone-owner \
+  --base-url "$HOST_SERVER" --token-file "$RUN_DIR/member-token.txt" --exclude-share "$SHARE_ID" \
+  > "$EVIDENCE/phone-owner.json" 2> "$RUN_DIR/phone-owner.err"
+rc_po=$?
+if [ "$rc_po" -ne 0 ]; then
+  sed 's/^/      /' "$RUN_DIR/phone-owner.err" >&2 2>/dev/null
+  SECRET_FRAMES=0
+  bad "服务端没把这台手机认成它自己那条共享的所有者（手机建的 share / 所有者成员行 / 活邀请三格里有格没成立，rc=$rc_po）"
+  summary
+  exit 1
+fi
+PHONE_SHARE=$(python3 -c 'import json;print(json.load(open("'"$EVIDENCE"'/phone-owner.json"))["shareId"])')
+PHONE_LIVE=$(python3 -c 'import json;print(json.load(open("'"$EVIDENCE"'/phone-owner.json"))["liveInvitationCount"])')
+ok "服务端读数：手机名下 role=owner 的共享 $PHONE_SHARE，所有者行带签名公钥，活邀请 $PHONE_LIVE 张"
+# 撤销那一发要真把明文从屏幕上摘掉 —— 这是"可逆状态"的判据，也是下一张图能进证据目录的前提。
+ax_press "id:share-invite-revoke" || true
+sleep 2
+tree_has_id "share-invite-handoff" >/dev/null 2>&1; rc_rev=$?
+if [ "$rc_rev" = "0" ]; then
+  SECRET_FRAMES=0
+  shot "17k-撤销后凭证还挂在屏上"
+  bad "按了「撤销这张邀请」，「把邀请交给对方」那一格还在 ⇒ 撤销没回到无邀请态（一次性凭证继续画在屏上）"
+  summary
+  exit 1
+elif [ "$rc_rev" = "2" ]; then
+  SECRET_FRAMES=0
+  shot "17k-撤销后读不到树"
+  env_bail "撤销之后那棵树读不出（rc=2）⇒ 不拿「没读到」当「撤销成功」"
+fi
+SECRET_FRAMES=0
+ok "撤销回到无邀请态（凭证那一格从界面上摘掉了）"
+shot "17l-撤销后无邀请态"
+# 这一趟多出来一份**手机自己建的**共享：回到共享首页，它必须与加入那一份并排在场 ——
+# 服务端在册而界面上没有，也是这一格会红的那一档。
+if ! back_to_anchor "id:profile-entry-share"; then
+  shot "17m-L7 收尾爬不到我的页"
+  env_bail "L7 收尾时按顶栏「返回」爬不到「我的」页那一行（装置问题，不判产品）"
+fi
+if ! ax_press_until "id:profile-entry-share" "id:share-join-entry"; then
+  shot "17o-收尾进不到共享首页"
+  bad "L7 收尾时从那行入口进不到共享首页"
+  summary
+  exit 1
+fi
+tree_has_id "share-space-row-$PHONE_SHARE" >/dev/null 2>&1; rc_row=$?
+if [ "$rc_row" = "0" ]; then
+  ok "共享首页上有了手机自己那一行（share-space-row-$PHONE_SHARE），与加入的那一份并排"
+  shot "17p-手机自己建的共享在列表里"
+elif [ "$rc_row" = "2" ]; then
+  shot "17q-收尾读不到共享首页那棵树"
+  env_bail "读不出共享首页的树（rc=2）⇒ 不拿「没读到」当「界面上没建出来」"
+else
+  shot "17r-手机建的那份不在列表里"
+  bad "手机自己建的共享没出现在界面上（服务端在册、界面上没有 ⇒ 名册/绑定那一格没回流）"
+  summary
+  exit 1
+fi
 
 # ── 11. 证据收尾 ────────────────────────────────────────────────────────────
 step "11. 证据目录（只存读数，不存产物）"

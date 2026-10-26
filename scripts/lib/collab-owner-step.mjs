@@ -170,6 +170,21 @@ const steps = {
       ed25519PublicKey: identity.ed25519PublicKey,
     });
     if (pub.status !== 200) die(1, `owner 自证签名公钥失败：HTTP ${String(pub.status)}`);
+    // 🔴 owner 那一行的 **userId** 要在这一刻取到手，且不许回落到 `memberId`：
+    //    评论的作者字段是 `authorUserId`（真客户端写的是账号 id），而界面那行兜底署名是
+    //    「成员 + 该字段前 8 位」。装置要是拿 memberId 冒充它，屏幕上两行评论就会一行像账号 id、
+    //    一行像成员 id —— 截图读起来是"产品把同一种名字渲染成两种形状"（2026-10-25 第 31 跑
+    //    `14-信号驱动到的评论.png` 就是这么被照出来的，实测成因在这台 node 装配里，不在 App 里）。
+    const membersView = await http('GET', `${baseUrl}/api/shares/${shareId}/members`, ownerToken);
+    const selfRow = (membersView.json?.members ?? []).find((m) => m.memberId === ownerMemberId);
+    if (membersView.status !== 200 || selfRow?.userId === undefined || selfRow?.userId === null) {
+      die(
+        1,
+        `读不到 owner 那一行的 userId（HTTP ${String(membersView.status)}）⇒ 不拿 memberId 冒充作者字段 ` +
+          '（那会造出屏幕上两种署名形状，见本文件头那条纪律）',
+      );
+    }
+    const ownerUserId = String(selfRow.userId);
     const invitation = await http('POST', `${baseUrl}/api/shares/${shareId}/invitations`, ownerToken, {
       invitedEmail,
     });
@@ -183,6 +198,7 @@ const steps = {
       invitedEmail,
       shareId,
       ownerMemberId,
+      ownerUserId,
       ownerSeedB64: b64(ownerSeed),
       listKeyB64: b64(listKey),
       keyEpoch,
@@ -192,7 +208,9 @@ const steps = {
       seededTaskIds: [],
     };
     save(flags.state, state);
-    process.stdout.write(JSON.stringify({ shareId, ownerMemberId, invitationToken: invitation.json.token }) + '\n');
+    process.stdout.write(
+      JSON.stringify({ shareId, ownerMemberId, ownerUserId, invitationToken: invitation.json.token }) + '\n',
+    );
   },
 
   /** 等手机把自己加成成员（接受邀请是**手机界面**做的，这里只轮询成员表）。 */
@@ -258,6 +276,12 @@ const steps = {
   async 'add-comment'() {
     const [body] = required('body');
     const { state } = load();
+    // 🔴 作者字段只许是 owner 的**账号 id**（`comment-actions.ts:238` 那行真客户端写的就是
+    //    `currentUserId()`）。这里不许 `?? memberId` 兜下去：兜下去屏幕上会多出一行形状不一样
+    //    的兜底署名，而那是装置自造的形状，不是产品坏（第 31 跑那张图最初就是这样登记的）。
+    if (state.ownerUserId === undefined || state.ownerUserId === '') {
+      die(2, '状态里没有 ownerUserId ⇒ 这一份 state 是旧版 init 写的，重跑 init（不许回落成 memberId）');
+    }
     const taskId = flags['task-id'] ?? state.seededTaskIds.at(-1)?.entityId;
     if (!taskId) die(2, '没有可评论的任务，先跑 add-task 或带 --task-id');
     const { dispatcher } = ownerWriter(state);
@@ -267,7 +291,7 @@ const steps = {
       entityId,
       opType: 'CRT',
       // 只有这三格（comment-actions.ts 文件头第 4 条）：createdAt 由 reducer 从 op 时间戳派生。
-      payload: { taskId, authorUserId: String(state.ownerUserId ?? state.ownerMemberId), body },
+      payload: { taskId, authorUserId: state.ownerUserId, body },
     });
     if (out.skipped) die(1, 'dispatcher 判定未登录，一条请求都没发');
     advanceClock(state);
@@ -370,6 +394,72 @@ const steps = {
       die(1, `手机写出的 op 里有未通过重验的：${JSON.stringify(unverified)}（应全部 verified）`);
     }
     process.stdout.write(JSON.stringify({ phoneOps: verdicts, matched: true }) + '\n');
+  },
+
+  /**
+   * 读数：**手机自己**当所有者那一份共享的形状。
+   *
+   * 为什么单独一枚而不复用 `dump`：`dump` 走的是 owner 那把令牌，证的是"服务端那台设备建的共享"；
+   * 这一枚拿**手机上那个账号的令牌**读，读得到 `role === 'owner'` 才算"开共享这一步真在设备上发生过"。
+   * 🔴 `GET /invitations` 只有所有者拿得到（服务端 `requireShareOwner`）⇒ 这一发 200 本身就是
+   * "服务端认它是所有者"的读数，不需要再写一句断言去解释它。
+   * 输出不含任何一次性凭证（那一列只回元数据：邀请邮箱、签发/撤销/接受时间）。
+   */
+  async 'phone-owner'() {
+    const [baseUrl, tokenFile] = required('base-url', 'token-file');
+    const exclude = flags['exclude-share'];
+    let token;
+    try {
+      token = readFileSync(tokenFile, 'utf8').trim();
+    } catch {
+      die(3, `读不到手机那一侧的令牌文件 ${tokenFile}`);
+    }
+    if (token === '') die(3, '手机那一侧的令牌文件是空的（装置前提不成立，不判产品）');
+    const list = await http('GET', `${baseUrl}/api/shares`, token);
+    if (list.status !== 200) die(1, `GET /shares 回 ${list.status} ⇒ 手机账号读不到自己的成员行`);
+    const rows = (list.json?.shares ?? []).filter((s) => s.role === 'owner' && s.shareId !== exclude);
+    if (rows.length === 0) {
+      die(
+        1,
+        `手机名下没有 role=owner 的共享（排除加入的那份 ${String(exclude)} 之后剩 ` +
+          `${JSON.stringify((list.json?.shares ?? []).map((s) => [s.shareId.slice(0, 8), s.role]))}）` +
+          '⇒ 界面上按了「开启共享」而服务端没建出来',
+      );
+    }
+    if (rows.length > 1) die(1, `手机名下有 ${rows.length} 份 role=owner 的共享，本判据只钉"这一趟新建的那一份"`);
+    const shareId = rows[0].shareId;
+    const members = await http('GET', `${baseUrl}/api/shares/${shareId}/members`, token);
+    if (members.status !== 200) die(1, `GET /members 回 ${members.status}`);
+    const self = (members.json?.members ?? []).find((m) => m.role === 'owner') ?? null;
+    if (self === null) die(1, `那份共享里没有 role=owner 的成员行（读回 ${JSON.stringify(members.json?.members ?? [])}）`);
+    if (!self.signingPublicKey) {
+      die(1, '手机作为所有者那一行没有签名公钥 ⇒ M4 那条承诺在 owner 侧没成立');
+    }
+    const invites = await http('GET', `${baseUrl}/api/shares/${shareId}/invitations`, token);
+    if (invites.status !== 200) {
+      die(1, `GET /invitations 回 ${invites.status} ⇒ 服务端没把这台设备当那份共享的所有者`);
+    }
+    const all = invites.json?.invitations ?? [];
+    const live = all.filter((i) => i.revokedAt === null && i.acceptedAt === null);
+    if (live.length < 1) {
+      die(1, `手机签发的那张邀请不在册（服务端看到 ${all.length} 张，活的 0 张）`);
+    }
+    process.stdout.write(
+      JSON.stringify(
+        {
+          shareId,
+          ownerMemberId: self.memberId,
+          signingPublicKey: self.signingPublicKey,
+          keyEpoch: rows[0].keyEpoch,
+          memberCount: (members.json?.members ?? []).length,
+          invitationCount: all.length,
+          liveInvitationCount: live.length,
+          invitedEmails: all.map((i) => i.invitedByEmail),
+        },
+        null,
+        2,
+      ) + '\n',
+    );
   },
 
   /** 读数：把当前状态里"服务端侧看到的事实"打一份，给证据目录留 json。 */
