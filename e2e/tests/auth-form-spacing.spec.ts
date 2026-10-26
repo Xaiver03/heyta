@@ -44,8 +44,10 @@
  *    但那枚按钮的 `onPress` 是 `onVerifyToken(token)` 并立刻清空**那一个**输入框 ——
  *    它是那根控件自己的动作，不是表单里的下一个控件 ⇒ 4px 是对的。
  *    ⚠️ 另外它在 `allowAdvanced = false`（默认）下根本不渲染，本条也量不到。
- *  - `apps/web/src/features/tasks/TaskRepeat.tsx` 的 `<fieldset>`：`gap: space.1` 分隔的是
- *    `<legend>`（分组标题）与它的第一行单选 —— 那是"标签 ↔ 控件"，同一个 4px 的正确形状。
+ *  - `apps/web/src/features/tasks/TaskRepeat.tsx` 的 `<fieldset>`：**这一处当初被我判成合规，
+ *    判错了**。实测 6 行单选之间 4px、`<legend>` 到第一行 **0px**（`legend` 在 flex 容器里
+ *    不是 flex item，容器那个 `gap` 管不到它）—— 与用户报的是同一个形状，已改。
+ *    它的复测判据在 `e2e/tests/checkbox-group-spacing.spec.ts`。
  *
  * 判据的分母因此**只有**"独立控件 ↔ 下一个独立控件"那几对：本文件里被产品负责人
  * 当面指出过的两例（`primary` 与 `termsRow`）都属于这一类，被上面两处都不属于。
@@ -53,11 +55,17 @@
  * ## 2026-10-27 那次全仓扫描：分母与结论都记在这儿
  *
  * 扫了 `packages/ui/src/**` + `apps/web/src/**` 约 **120 处** 4px 及以下的间距站点
- * （`gap: tokens['space.1']`，含裸值与 space.0），进入候选 **9 处**，判掉 **9 处**，
- * 真阳性只有登录面板那一枚（已修）。九处逐个的宿主容器与判掉理由：
+ * （`gap: tokens['space.1']`，含裸值与 space.0），进入候选 **9 处**。
+ * 🔴 结论**改过一次**，改的原因值得留着：第一版按读代码判成"9 处全部不是缺陷"，
+ * 而其中两处（`TaskOrganizer` 的标签多选、`TaskRepeat` 的重复单选）拿一次性探针**实测**
+ * 之后是 **4px 行距 + 分组标题到第一行 0px** —— 与你两次当面指出的形状同一个。
+ * 那两处已按同一句改掉，判据在 `e2e/tests/checkbox-group-spacing.spec.ts`（那里也写了
+ * 为什么 `TaskRepeat` 不进它的分母）。**教训：读代码判"贴脸不贴脸"不成立，这类必须量。**
+ *
+ * 剩下 7 处判掉，逐条理由：
  * `AuthForm` 验证码屏 2 处（登录档 / 注册档同形）、二级链那一列 1 处、注册档同意项 1 处
- * （上面已记）、`TaskOrganizer` 标签多选组、`TaskRepeat` 单选组、`FolderPicker` 触发↔自己的菜单、
- * `HabitGoalEditor` 触发↔自己的展开面板、`SubscriptionNotice` 里按钮的兄弟是说明文字不是控件。
+ * （上面已记）、`FolderPicker` 触发↔自己的菜单、`HabitGoalEditor` 触发↔自己的展开面板、
+ * `SubscriptionNotice` 里按钮的兄弟是说明文字不是控件。
  * 另核对 `CloseAccountPanel`、`CentralAccountConflictPanel`、`AuthPanel` 的复选框：
  * 宿主容器本来就是 space.3/space.4，没入网。
  *

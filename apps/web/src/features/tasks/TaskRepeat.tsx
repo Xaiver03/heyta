@@ -202,12 +202,16 @@ export function RepeatField({
           border: 'none',
           display: 'flex',
           flexDirection: 'column',
-          gap: cssVar('space.1'),
+          // 同 `TaskOrganizer` 那一族：一行 = 一枚**独立**的单选，用的是控件↔控件的节奏。
+          // 实测这一列 6 行之间原本只有 4px；仓内其余单选/复选组一律 space.2 起。
+          gap: cssVar('space.2'),
         }}
       >
         <legend
           style={{
             padding: 0,
+            // `legend` 不是 flex item，上面那个 gap 管不到它 ⇒ 不写就是 0px 贴住第一行。
+            marginBottom: cssVar('space.1'),
             fontSize: cssVar('font-size.xs'),
             color: cssVar('color.foreground-muted'),
           }}
