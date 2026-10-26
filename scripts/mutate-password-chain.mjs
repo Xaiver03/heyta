@@ -4,6 +4,7 @@
  * ==================================================
  *
  * 用法：`node scripts/mutate-password-chain.mjs`（**串行**跑，一轮约 15 分钟）
+ *       `node scripts/mutate-password-chain.mjs --only M5`（只跑那一臂，约 8 分钟）
  *
  * ## 为什么这条链特别需要它
  *
@@ -22,8 +23,16 @@
  *   M2 已验证账号的注册**覆盖** password_hash（A2 假成功变真覆盖）→ ⑩
  *   M3 登录不再检查邮箱验证（任何人用邮箱领走账号）              → ④
  *   M4 "这个账号没设口令"单独成一句（口令路成了枚举预言机）        → ⑦
+ *   M5 重置成功不再让别的设备失效（那封信对用户的承诺变成假话）    → ⑫
  *
- * ⚠️ 只碰这三个文件的字节，每条变异跑完立刻按原文写回并校验 sha256。
+ * ⚠️ M5 为什么要一次改两处：`verifyToken` 里"这枚令牌还能不能用"是**两道独立**的判断 ——
+ *    旧 JWT 的 `tokenVersion` 与库里那格对不上（`server/src/auth.ts:397`），
+ *    以及 `jti` 那行会话还在不在（`server/src/auth.ts:426`）。重置成功把两道**同时**做了
+ *    （`increment: 1` 与 `revokeAllDeviceSessions()`），所以只拆一道，另一道照样把人踢下线，
+ *    ⑫ 那格会绿 —— 而那根**只拆一道的变异针**恰恰会让人以为"⑫ 在守着 tokenVersion"。
+ *    一次拆掉两道才是那句承诺的反面，也才量得到 ⑫ 到底在不在。
+ *
+ * ⚠️ 只碰这几个文件的字节，每条变异跑完立刻按原文写回并校验 sha256。
  *    写回**之前**会再读一次：如果这期间有别的进程改过它，就停下报错，
  *    而不是拿我这一轮的副本覆盖掉别人的编辑（共享工作树）。
  */
@@ -38,6 +47,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SERVER_AUTH = join(ROOT, 'server/src/auth.ts');
 const PASSWORD_SERVICE = join(ROOT, 'server/src/password/service.ts');
 const CLI_AUTH = join(ROOT, 'apps/node-host/src/cli-auth.ts');
+const RECOVERY = join(ROOT, 'server/src/password/recovery.ts');
 
 const MUTATIONS = [
   {
@@ -86,9 +96,46 @@ const MUTATIONS = [
       '  }',
     expect: ['⑦'],
   },
+  {
+    name: 'M5 重置成功不再让别的设备失效（信里那句承诺变成假话）',
+    file: RECOVERY,
+    // 🔴 两道独立机制要**一起**拆，理由在文件头（`auth.ts` 里版本比对与会话行存在性是
+    //    两条各管得住一次的判断；只拆一道，另一道照样把人踢下线 ⇒ ⑫ 会假绿）。
+    edits: [
+      {
+        from:
+          '      resetPasswordToken: null,\n' +
+          '      resetPasswordTokenExpiresAt: null,\n' +
+          '      // 🔴 全设备登出（J13）：旧 JWT 里的 `tokenVersion` 当场对不上。\n' +
+          '      tokenVersion: { increment: 1 },',
+        to:
+          '      resetPasswordToken: null,\n' +
+          '      resetPasswordTokenExpiresAt: null,\n' +
+          '      // 🔴 全设备登出（J13）：旧 JWT 里的 `tokenVersion` 当场对不上。\n' +
+          '      tokenVersion: { increment: 0 },',
+      },
+      {
+        from:
+          '  // 但这一批行是**当场已知死掉**的，没理由再留一年）。\n' +
+          '  await revokeAllDeviceSessions(user.id);',
+        to: '  // 但这一批行是**当场已知死掉**的，没理由再留一年）。',
+      },
+    ],
+    expect: ['⑫'],
+  },
 ];
 
 const digest = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
+
+/**
+ * 🔴 链脚本收尾会往这枚**要提交进仓库的产品证据**写 `RESULT=PASS|FAIL`。
+ *    变异轮的最后一趟是**故意坏掉**的那一趟 ⇒ 它会把基线那趟的绿色读数盖成 FAIL，
+ *    于是仓库里留下一条"产品坏了"的假陈述（实测：2026-10-27 一轮跑完它确实写着
+ *    `RESULT=FAIL`，而同一时刻四个源文件字节级还原、五条判据全绿）。
+ *    所以基线之后先把它的字节取一次，每一臂跑完连同源码一起还原 ——
+ *    留在仓库里的永远是**未变异那一趟**的读数。
+ */
+const EVIDENCE = join(ROOT, 'apps/web/evidence/password-chain/password-chain-run.txt');
 
 /** 跑一轮真链路：返回退出码与该轮**变红的那几格**。 */
 function runChain() {
@@ -98,12 +145,15 @@ function runChain() {
     timeout: 900_000,
   });
   const out = `${r.stdout ?? ''}${r.stderr ?? ''}`;
-  const reds = [...out.matchAll(/^\s*❌\s+([⓪①②③④⑤⑥⑦⑧⑨⑩⑪])/gm)].map((m) => m[1]);
+  // 🔴 范围而不是枚举：这一串原来写死 `[⓪…⑪]`，加第 ⑫ 格时忘了动它 ——
+  //    于是 ⑫ 变红**在这份读数里根本不存在**，变异会被判"漏了"，而真正坏的是这把尺。
+  //    ①-⑳ 是 Unicode  enclosed alphanumerics 的连续段，新加判据不用再动这里。
+  const reds = [...out.matchAll(/^\s*❌\s+([⓪①-⑳])/gm)].map((m) => m[1]);
   const bailed = /^\s*❌\s+(服务端没起来|没拿到 Ethereal|⑥ 没拿到令牌|CLI 根本没起来)/m.test(out);
   return { code: r.status ?? 1, reds: [...new Set(reds)], bailed, out };
 }
 
-const files = [SERVER_AUTH, PASSWORD_SERVICE, CLI_AUTH];
+const files = [SERVER_AUTH, PASSWORD_SERVICE, CLI_AUTH, RECOVERY];
 const originals = new Map(files.map((p) => [p, readFileSync(p, 'utf8')]));
 const hashes = new Map(files.map((p) => [p, digest(p)]));
 
@@ -129,21 +179,45 @@ if (baseline.code !== 0 || baseline.reds.length > 0) {
 }
 console.log('✅ 基线全绿。\n');
 
+// 基线那一趟是本轮**唯一**没被变异污染的读数：证据文件锚在这里。
+const evidenceClean = readFileSync(EVIDENCE, 'utf8');
+const evidenceDigest = digest(EVIDENCE);
+
+// `--only M5` 只跑名字以它开头的那一臂（基线照跑 —— 它是对照，不是开销）。
+// 加这一枚是因为"某一臂的机制到底生不生效"这种问题，等一整轮 20 分钟不划算。
+const onlyFlag = process.argv.indexOf('--only');
+const ONLY = onlyFlag >= 0 ? process.argv[onlyFlag + 1] : null;
+
 let allCaught = true;
+let ran = 0;
 for (const mutation of MUTATIONS) {
+  if (ONLY !== null && !mutation.name.startsWith(ONLY)) continue;
+  ran += 1;
+  // 一条变异 = 一个**语义**上的反面，而这个反面可能需要同时拆掉两处代码才成立（见文件头 M5）。
+  const edits = mutation.edits ?? [{ from: mutation.from, to: mutation.to }];
   const src = originals.get(mutation.file);
-  const hits = src.split(mutation.from).length - 1;
-  if (hits !== 1) {
-    console.log(`⚠️  ${mutation.name}：锚点命中 ${String(hits)} 次 —— 变异没打上`);
+  let mutated = src;
+  let anchorFailed = false;
+  for (const { from, to } of edits) {
+    const hits = mutated.split(from).length - 1;
+    if (hits !== 1) {
+      console.log(`⚠️  ${mutation.name}：一处锚点命中 ${String(hits)} 次 —— 变异没打上`);
+      anchorFailed = true;
+      break;
+    }
+    mutated = mutated.replace(from, to);
+  }
+  if (anchorFailed) {
     allCaught = false;
     continue;
   }
-  const mutated = src.replace(mutation.from, mutation.to);
   writeFileSync(mutation.file, mutated);
   const mutatedDigest = digest(mutation.file);
   console.log(`· ${mutation.name}：跑一轮…`);
   const result = runChain();
   restore(mutation.file, src, mutatedDigest);
+  // 这一臂的那趟链把产品证据写成 FAIL 了 —— 把它按回基线那一趟的字节（见 `EVIDENCE` 上面那段）。
+  restore(EVIDENCE, evidenceClean, digest(EVIDENCE));
 
   const missing = mutation.expect.filter((mark) => !result.reds.includes(mark));
   const caught = result.code !== 0 && missing.length === 0;
@@ -163,6 +237,14 @@ for (const [path, expected] of hashes) {
     process.exit(1);
   }
 }
-console.log(`\n✅ ${String(files.length)} 个文件字节级还原。`);
-console.log(allCaught ? '✅ 四条变异都被**对应那一格**抓到。' : '❌ 有变异没被对应判据抓到。');
+if (digest(EVIDENCE) !== evidenceDigest) {
+  console.log(`❌ 产品证据文件没还原成基线那一趟的字节：${EVIDENCE}`);
+  process.exit(1);
+}
+console.log(`\n✅ ${String(files.length)} 个文件字节级还原，产品证据文件留在**基线那一趟**的读数。`);
+console.log(
+  allCaught
+    ? `✅ ${String(ran)} 条变异都被**对应那一格**抓到${ONLY ? `（--only ${ONLY}，本轮只跑了这些）` : ''}。`
+    : '❌ 有变异没被对应判据抓到。',
+);
 process.exit(allCaught ? 0 : 1);
