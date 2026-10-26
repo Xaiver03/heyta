@@ -49,7 +49,10 @@ import {
   ADMIN_REFUND_NOTICE_KEY,
   EMPTY_ANNOUNCEMENT_FORM,
   EMPTY_GRANT_FORM,
+  capabilityLabelKey,
+  entitlementReasonKey,
   grantCodeKey,
+  providerLabelKey,
   useAdminStore,
   type AdminHolidayNotice,
   type AdminGrantNotice,
@@ -420,6 +423,46 @@ export function AdminPanel({
                 {t('web.admin.user.operations')}: {detail.counts.operations} ·{' '}
                 {t('web.admin.user.devices')}: {detail.devices.length}
               </p>
+              {/* 🔴 并集读数：回答的是"他**此刻**实际能用什么"，不是"库里有哪些行"。
+                  判定不住在界面 —— 服务端那一格（`admin.routes.ts::projectEntitlements`）
+                  调的就是守卫那批函数，所以后台念的与线上拦的是同一次裁决。
+                  这一格存在的理由正是运营自己数不出并集：两条行都合法、都 active，
+                  挑错一条就把已付时长读没了（`evaluateCapabilityAcross` 头注释里那条事故）。
+                  下面「订阅」那一节仍然保留逐行 —— 它答的是"哪一行的问题"，两格不互相替代。 */}
+              <p className="ht-settings__hint" data-testid="admin-user-entitlements">
+                {t('web.admin.user.entitlements')}
+              </p>
+              {detail.entitlements.map((item) => {
+                const labelKey = capabilityLabelKey(item.capability);
+                const reasonKey = entitlementReasonKey(item.reason);
+                const sources = item.sources.map((source) => {
+                  const providerKey = providerLabelKey(source.provider);
+                  return t('web.admin.user.entitlementSource', {
+                    provider: providerKey === null ? (source.provider ?? '—') : t(providerKey),
+                    priceId: source.priceId ?? '—',
+                    until: formatTime(source.currentPeriodEnd),
+                  });
+                });
+                const tail = item.allowed
+                  ? sources.length === 0
+                    ? ` ${t('web.admin.user.entitlementNoRowSource')}`
+                    : ` ${sources.join(' · ')}`
+                  : reasonKey === null
+                    ? ''
+                    : ` ${t(reasonKey)}`;
+                return (
+                  <p
+                    key={item.capability}
+                    className="ht-settings__hint"
+                    data-testid={`admin-user-entitlement-${item.capability}`}
+                  >
+                    {labelKey === null ? item.capability : t(labelKey)}
+                    {' '}
+                    {item.allowed ? '✓' : '✕'}
+                    {tail}
+                  </p>
+                );
+              })}
               {/* 同意留痕：对外文本已经承诺"记下当时那一套的版本指纹"，
                   所以后台必须能一眼答出"什么时候、哪一版"，并把"证明不了版本"
                   与"根本没同意"分成两种显示 —— 混在一起就是让运营者替数据库说谎。 */}
@@ -485,6 +528,19 @@ export function AdminPanel({
         </FormField>
 
               <div className="ht-settings__admin-actions">
+                {/* 🔴 搬运入口放在**这一格**而不是搜索结果的那一行：运营刚看完"他此刻
+                    能用 ✕"，下一个动作就是给他发一份 —— 中间不许有"把编号抄下来"这一步。
+                    它只搬「是谁」：档位、天数、理由留给这一笔自己填（见 store 的 `grantTarget`）。 */}
+                <button
+                  type="button"
+                  className="ht-settings__admin-btn"
+                  data-testid="admin-grant-for-user"
+                  onClick={() => {
+                    store.openGrantForUser(detail.user.id);
+                  }}
+                >
+                  {t('web.admin.users.grantFor')}
+                </button>
                 <button
                   type="button"
                   className="ht-settings__admin-btn"
@@ -1670,6 +1726,12 @@ function GrantPanel({ store }: { store: AdminStoreState }): React.JSX.Element {
       <p className="ht-settings__hint" data-testid="admin-grants-lead">
         {t('web.admin.grant.lead')}
       </p>
+      {/* 🔴 前置与定义分开两格：上一格说"三种动作各动什么"，这一格说"哪一格得先有东西"。
+          合成一长句的话，第二句会被读成修辞 —— 而它是 409 的唯一成因，
+          运营要是在第一屏读不到它，就只能撞一次报错才知道顺序错了。 */}
+      <p className="ht-settings__hint" data-testid="admin-grants-precondition">
+        {t('web.admin.grant.precondition')}
+      </p>
 
       <form
         className="ht-settings__admin-detail"
@@ -1687,8 +1749,10 @@ function GrantPanel({ store }: { store: AdminStoreState }): React.JSX.Element {
               className="ht-settings__admin-input"
               type="text"
               inputMode="numeric"
-              value={form.userIdText}
-              onChange={(event) => setForm({ ...form, userIdText: event.target.value })}
+              value={store.grantTarget}
+              onChange={(event) => {
+                store.setGrantTarget(event.target.value);
+              }}
             />
           )}
         </FormField>
@@ -1838,6 +1902,21 @@ function GrantPanel({ store }: { store: AdminStoreState }): React.JSX.Element {
             </div>
           ))}
         </div>
+      )}
+      {/* 🔴 动作史是这一格里**唯一会长过一页**的列表（其余几格都是配置项，几十行封顶）。
+          没有翻页时它的症状不是报错，是"看起来只有 50 条" —— 运营会以为一个人
+          只被动过一次，而第 51 条正是他要查的那一次。页坐标用服务端回显的那一份。 */}
+      {history !== null && (
+        <Pager
+          total={store.grantHistoryTotal}
+          offset={store.grantHistoryOffset}
+          onPrev={() => {
+            void store.loadGrantHistory(Math.max(0, store.grantHistoryOffset - ADMIN_PAGE_SIZE));
+          }}
+          onNext={() => {
+            void store.loadGrantHistory(store.grantHistoryOffset + ADMIN_PAGE_SIZE);
+          }}
+        />
       )}
     </div>
   );

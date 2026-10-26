@@ -34,6 +34,23 @@ let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 let fetchMock: ReturnType<typeof vi.fn>;
 
+/**
+ * 用户详情里那份并集读数的替身，三档各给一种**不同形状**：
+ * 付费行给的能力、能力不在那一档里（有行但没这项）、这台实例没配权益来源。
+ */
+const USER_DETAIL_ENTITLEMENTS = [
+  {
+    capability: 'hosting',
+    allowed: true,
+    reason: null,
+    sources: [
+      { provider: 'wechat', priceId: 'hosted-monthly', currentPeriodEnd: Date.parse('2026-12-01T00:00:00Z') },
+    ],
+  },
+  { capability: 'ai', allowed: false, reason: 'GRANT_NOT_INCLUDED', sources: [] },
+  { capability: 'automation', allowed: false, reason: 'ENTITLEMENT_MODE_UNCONFIGURED', sources: [] },
+];
+
 /** 概览的最小合法响应。 */
 const OVERVIEW = {
   users: { total: 42, verified: 40, admins: 1, locked: 2 },
@@ -270,6 +287,9 @@ function stubAdminServer(
           },
           counts: { passkeys: 2, operations: 41, notifications: 3 },
           subscriptions: [],
+          // 详情那一格的并集读数（判据本体在 `admin-entitlements.spec.tsx`，
+          // 这一组只要求它渲染得出来）。
+          entitlements: USER_DETAIL_ENTITLEMENTS,
           orders: [],
           devices: [],
         }),
