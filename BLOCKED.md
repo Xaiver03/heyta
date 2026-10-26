@@ -12331,3 +12331,36 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 修法是把 HEAD 那份 landing 重新发一次（`deployment.md` §3.7 那条流程），
 而**发落地页会把那条线此刻在制品的其它部分一起推上生产** —— 那是别人的在飞工作，
 我不代发布。复量命令就是上面那两行，发完之后 `live-signin-entry` 三条应全过。
+
+### B233（2026-10-27 · 我这轮跑全量 `pnpm check` 时撞上的）：**整条链现在红两枚，两枚都不归我这几笔**
+
+我为了给自己这轮的改动做整合验收，跑了完整的一条链：
+
+    pnpm check
+    → 停在 check:selection-single-source（CHECK_RC=1），它后面的门禁
+      （含 pnpm -r test、screenshot:verify、check:docs 之后的那些）这一趟**根本没跑到**。
+
+**红一 —— 选中态所有者不唯一。** 它点名 `packages/ui/src/capture/model.ts`：
+
+    ✗ 断言 F：有 1 个文件接了选中 id（activeTaskId/activeNoteId/selectedId 之一）却没在 F 的任何一张表里
+
+现量它是**谁**带进来的：那三行（`readonly selectedId: string | null;` 与它的两处使用）在
+`git diff` 里全是 `+`，而 `git show HEAD:packages/ui/src/capture/model.ts | grep -c 'selectedId'` = **0**。
+同一条线还有 `CaptureComposer.tsx`、`packages/ui/src/index.ts` 三枚文件在工作树里未提交。
+⇒ 归 capture/selection 那条线，修法它自己那张表知道（进 `FACES` 还是进 `RELAYS`）。**我没动它，也没把我的提交凑上去。**
+
+**红二 —— markdown 表格错位。** `check:md-tables` 点名
+`docs/plans/collaboration-shared-lists.md:1073`、`:1075`（列数 3，本表表头是 4）。
+现量：HEAD 那一份是 **1031 行**，工作树这一份是 **1083 行** ⇒ 那两行只存在于**未提交**的编辑里。
+⇒ 归协作/设备那条线（那张表正是它逐跑记的 L10/L11 读数）。
+
+**我这几笔相关的门禁，在同一棵带红的工作树里逐条量过是绿的**（所以不是被我遮住的）：
+`check:credential-routes`、`check:layering`、`check:claims`、`check:doc-command-claims`、
+`check:journey-coverage`、`check:locator-labels`、`check:e2e-helper-exports`、`check:tokens`、
+`check:rn-aria`、`check:theme`、`check:ui-language`、`check:design`、`check:form-anatomy`、
+`check:evidence-hygiene`、`check:gate-wiring`、`check:docs`，外加链头的 `pnpm build` 与 `pnpm typecheck`。
+
+🔴 **一般规律（这条值得入档）**：共享工作树里 `pnpm check` 的退出码**不是 HEAD 的读数**，
+而是"HEAD + 此刻别人在飞的编辑"的合成态。所以拿它当"我这轮改坏了没有"的证据之前，
+必须先 `git diff` 看它点名的那枚文件在不在别人的未提交清单里 ——
+不在我名下就登记、不顺手修（改法归那条线的判据口径）。
