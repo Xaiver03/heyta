@@ -201,6 +201,22 @@ grep -n '\*\*不做\*\*：改订阅' server/src/admin/admin.routes.ts           
 3. **没有额度/上限**（每人最多被发多少天）。当前只有一个运营者、发放对象是内测账号。
    **触发条件**：外部的人能申请发放，或发放变成常规客服动作。
 
+### 4.4 发放之后"他此刻能用什么"由谁回答（2026-10-26 补）
+
+§2 二把权益定成**跨行并集**，那么后台必须有一处按同一判据说出结论 ——
+否则运营只能在「订阅」那一格里自己数行，而"自己数"没有判据：他会挑中到期更早的那一条
+（`evaluateCapabilityAcross` 头注释里那起事故正是这个形状），也会把"卖出去的那档不含这一项"
+念成"这人过期了"。
+
+- **后台不新写判定**。用户详情那份读数由 `admin.routes.ts::projectEntitlements` 产出，
+  它调的就是守卫那批函数（`evaluateCapabilityAcross` / `evaluateCapability` /
+  `evaluateAutomationEntitlementForUser`）。后台念的与线上拦的是**同一次裁决**，不是同一份抄件。
+- **`automation` 的"来源"跟着部署模式走**（本 ADR §1 那张表只写了订阅那一路，自动收集那一路的
+  来源由 `AUTOMATION_ENTITLEMENT_MODE` 二选一）。未配模式或 `selfhost-online` 时守卫不看订阅行，
+  于是那份读数的 `sources` 必须为空 —— 把守卫没看的行念成来源，就是后台替守卫说一句它没说过的话。
+- 这条立场的判据：`server/tests/admin-entitlements.spec.ts`（判定本体）与
+  `apps/web/tests/admin-entitlements.spec.tsx`（界面只念不判）。两侧各有一条反向臂实测过红。
+
 ## 5. 未核实项
 
 - ⚠️ 微信/Stripe 的**webhook 回调**会不会把发放行覆盖掉：回调按

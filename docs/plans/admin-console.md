@@ -105,9 +105,11 @@ pnpm --filter @heyta/server admin:revoke someone@example.com   # 拒绝撤销最
 ## 5. 已知边界（不是缺陷）
 
 1. `is_admin` 是账号级的**全有全无**。见 §3 的升级触发条件。
-2. 三个写动作**没有审计表**，记录方式是 `Logger`。要做合规级审计
-   （谁在什么时候改了谁），需要一张 `admin_audit_log` —— 那时**新发一个 ADR**，
-   不要悄悄加一张表。
+2. 解锁 / 改配额 / 强制登这**三个支持动作没有审计表**，记录方式是 `Logger`。
+   （后台另外那三条发放动作**有**表 —— `subscription_grants` 逐笔落理由与操作者，
+   ADR-0076 §2 二；两类不是一回事，别照着这句去查发放记录。）
+   要给支持动作做合规级审计（谁在什么时候改了谁），需要一张 `admin_audit_log` ——
+   那时**新发一个 ADR**，不要悄悄加一张表。
 3. 后台代码进了主应用 bundle。首版靠"入口只对已授权用户渲染"隔离，
    但**前端从来不是保密手段** —— 保密由服务端 `requireAdmin` 承担。
 4. 计数与列表是**即时查询**，没有缓存。用户量到十万级时要重新看这一块
@@ -468,6 +470,55 @@ Caddy 内置 mime 表里，而 nginx 时代靠 `/etc/nginx/mime.types` 那一条
   修完的线上那一屏：`apps/web/evidence/admin-console/live-admin-logged-out.png`
   （现量文案 "You are not signed in, so the admin console is unavailable."，
   修前同一格是 "No server address is configured, …"）。
-- 后台的运营账号今天**是 0 个**（取证那枚已删）。要给自己开：
-  `pnpm --filter @heyta/server admin:grant <你的邮箱>`（线上在容器里跑
+- ✅ ~~后台的运营账号今天**是 0 个**（取证那枚已删）~~ —— 2026-10-26 负责人给出运营邮箱，
+  已授予：`admin.js grant` 退出 0，`admin.js list` 现量「共 1 位管理员：#23 `al***@163.com`
+  已验证=是」。开号前那一步是**先确认这个账号已经在册**（那条 CLI 拒给不存在的邮箱）：
+  `users` 里 11 行、`#23` 那条 `is_verified=1` 且有口令，所以登录进得来。
+  要再开一个：`pnpm --filter @heyta/server admin:grant <你的邮箱>`（线上在容器里跑
   `docker exec -w /app supersync-server node dist/scripts/admin.js grant <邮箱>`）。
+
+---
+
+## 9.5 追加（2026-10-26）：产品意义上还欠的四格，一次做完
+
+上一节把"能不能用"收口了，这一节收的是"运营一个人用得住不住"。四格都来自
+2026-10-25 那次「管理后台从产品意义上完成了吗」的读数表，逐格都有能红的判据。
+
+| 格 | 之前的形状 | 现在 | 判据落在哪 |
+|---|---|---|---|
+| 目标账号要手抄 | 搜到人 → 抄 `#id` → 切格子 → 粘进去 | 详情动作区第一枚「给他发一份」：带着编号落到发放格 | `admin-grants.spec.tsx`（搬过去**只有**「是谁」）+ `admin-console.spec.ts` 真浏览器那一趟 |
+| 发放记录只有第一页 50 条 | `fetchAdminSubscriptionGrants({limit})`，无 Pager | 接上 `<Pager>`，页坐标用**服务端回显**的 `total` / `offset` | `admin-grants.spec.tsx`「翻页」四条（A4/A6 两臂实测红） |
+| 看不见"这个人此刻能用什么" | 详情注释明写"不碰钱也不碰权益"，只给逐行 | 详情新增并集读数三行（✓/✕ + 来源 + 到期 / 拒绝码那句） | `server/tests/admin-entitlements.spec.ts` 判定本体 + `admin-entitlements.spec.tsx` 界面只念不判 |
+| 升档的前置不在第一屏 | 只有撞了 409 才知道要先赠送 | lead 下面单独一句 `grant.precondition` | `admin-grants.spec.tsx`「第一屏就读得到的前置」（并判 lead 里**没有**这句 —— 两格各说一件事） |
+
+### 并集读数这一格的立场（下一轮别改坏）
+
+- 🔴 **判定不在界面**。`admin.routes.ts::projectEntitlements` 调的就是守卫那批函数
+  （`evaluateCapabilityAcross` / `evaluateAutomationEntitlementForUser` / `evaluateCapability`）。
+  界面自己数一遍行 = 第二套标准，漂移的表现是运营说"他还有"而闸门说"他没有"。
+  这条不是措辞：A3 臂把界面上的勾改成 `sources.length > 0`，两条判据当场红。
+- 🔴 **`automation` 的"来源"跟着部署模式走**。未配模式 / `selfhost-online` 时守卫不看订阅行，
+  所以那一格的 `sources` 必须是空 —— 把没被看的行念成来源，就是一句守卫没说过的话（A2 臂）。
+  界面侧对应一条：`allowed: true` 而来源为空 ⇒ 念"不来自本机订阅行"。
+- ⚠️ 线上那台的读数现在是 **自动化 ✕（这台实例没配自动收集的权益来源）**：
+  容器里没有 `AUTOMATION_ENTITLEMENT_MODE`（现量：
+  `ssh finlaw 'sudo -n docker exec supersync-server sh -c "env | cut -d= -f1 | sort"' | grep -ci AUTOMATION` ⇒ `0`）。
+  这不是本轮的缺陷也不是本轮的裁决 —— 自动收集那条线自己写着"公网接收与售卖继续关闭"，
+  而三条候选修法登记在 `docs/plans/inbound-automation.md` 的 **B109**。
+  本轮做的只是**让它看得见**：价目表里 `hosted-ai-monthly` 的 grants 含 `automation`，
+  而 `NOT_YET_DELIVERABLE_SKUS` 是空的，"卖得出去、这台发不了"这一对必须有人在屏幕上看得见。
+
+### 现量命令
+
+```bash
+# 判定本体 + 界面只念不判 + 翻页/搬运/前置
+cd server && npx vitest run tests/admin-entitlements.spec.ts tests/admin-routes.spec.ts
+cd apps/web && npx vitest run tests/admin-entitlements.spec.tsx tests/admin-grants.spec.tsx tests/admin-panel.spec.tsx
+# 真浏览器那一趟（端口挪开：4318/4319 会被兄弟检出占着）
+cd e2e && HEYTA_E2E_APP_PORT=4418 HEYTA_E2E_STUB_PORT=4419 npx playwright test tests/admin-console.spec.ts
+```
+
+变异六臂（锚点唯一性由脚本自己判，不唯一就响亮失败；还原只从 `.mut-bak`）：
+`A1` 挑最新一行 ⇒ 2 红 / `A2` 来源不看模式 ⇒ 2 红 / `A3` 界面自己判 ⇒ 2 红 /
+`A4` 翻页写死第一页 ⇒ 2 红 / `A5` 搬运不带编号 ⇒ 1 红 / `A6` 总数按本页行数算 ⇒ 3 红。
+
