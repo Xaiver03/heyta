@@ -47,6 +47,21 @@
  *     （`invalid_reset_link` / `invalid_change_link` / `invalid_or_expired_link` /
  *     `invalid_recovery_token` / `validation_failed`）。
  *  ④ **阳性对照**：一枚未注册路径必须仍是 404。
+ *  ⑦ 每张页**服务的是不是它自己那张页**：它线上引的凭据脚本必须落在 `pages.ts` 给它声明的
+ *     那一组里（缺自己的 ⇒ 红；引到别人独占的 ⇒ 红），并且五张页的正文两两不许逐字相同。
+ *     ② 只判"不等于落地页"，**两张凭据页互换**（边缘把 `/reset-password` 接到 `/change-email`
+ *     那张页上）在 ② 下是绿的，而用户看到的是"点重置密码，打开是换邮箱"。
+ *     标记不抄清单：`pageScripts` 由 `check-credential-page-routes.mjs --json` 从 `pages.ts`
+ *     现读，与上面几枚出自同一次读盘。
+ *     🔴 为什么"正文两两不同"这一半不可省：`/verify-email` 与 `/magic-login` 在 `pages.ts` 里
+ *     **共用** `/magic-login-confirm.js`，那两张页互换时前半条判据看不出来。
+ *     它的能红性有一枚现成的负对照：同一把尺若打在 `/app/` 与 `/app/?signin=1` 上**会红**
+ *     （2026-10-27 实测：两枚都是 5919B、FNV 哈希**同为** 3082806998 —— 它们本该相同，
+ *     是同一个应用的两枚深链），所以这条只施于五张凭据页。
+ *     五张凭据页这一趟的读数互不相同：4580/4307/4494/5391/4353 B。
+ *     这不是"设计出来大概能红"，是量过的。
+ *     ⚠️ 哈希**只用来判等**，所以它必须是真 FNV-1a：第一版写成 `h * 16777619`，
+ *        乘积超出 2^53 会丢精度（照样确定性，但均匀性变差、更容易撞）。已改 `Math.imul`。
  *     没有它，① 就是恒真的 —— 边缘整站挂掉、所有路径都答 200 时，①③ 会一起变绿。
  *
  * 🔴 分母从 `scripts/check-credential-page-routes.mjs --json` 取（也就是从 `pages.ts` 取），
@@ -67,6 +82,8 @@ interface Reading {
   isLandingByteForByte: boolean;
   servesApp: boolean;
   fetchTargets: string[];
+  scriptRefs: string[];
+  hash: number;
 }
 
 const routes = JSON.parse(
@@ -74,7 +91,7 @@ const routes = JSON.parse(
     cwd: REPO_ROOT,
     encoding: 'utf8',
   }),
-) as { pages: string[]; scripts: string[]; emailPaths: string[] };
+) as { pages: string[]; scripts: string[]; emailPaths: string[]; pageScripts: Record<string, string[]> };
 
 /** 在**页面内**发请求：`--host-resolver-rules` 与 `--no-proxy-server` 只作用于浏览器网络栈，
  *  node 侧的 fetch 会走系统解析（本机是代理的 fake-ip），那就变成"验代理"而不是"验服务器"。 */
@@ -91,9 +108,21 @@ async function probe(page: import('@playwright/test').Page, path: string, landin
       // 脚本**自己**在往哪些端点发请求 —— 从线上那份脚本文本里读，不从本地文件读：
       // 要防的是"跑着的那份脚本发向一个跑着的服务器没有的路由"。
       targets: [...new Set([...body.matchAll(/fetch\(\s*['"`](\/api\/[^'"`?]+)/g)].map((x) => x[1]))],
+      // 这张页引了哪些脚本（⑦ 用它判"服务的是不是它自己那张页"）
+      refs: [...new Set([...body.matchAll(/<script[^>]+src=["']([^"']+)["']/g)].map((x) => x[1]))],
+      // FNV-1a：只用来判"两张页的正文彼此不同"，不当校验和用。
+      hash: [...body].reduce((h, c) => (Math.imul(h, 16777619) ^ c.charCodeAt(0)) >>> 0, 2166136261),
     };
   }, { origin: ORIGIN, p: path, home: landing });
-  return { path, ...raw, isLandingByteForByte: raw.same, servesApp: raw.app, fetchTargets: raw.targets };
+  return {
+    path,
+    ...raw,
+    isLandingByteForByte: raw.same,
+    servesApp: raw.app,
+    fetchTargets: raw.targets,
+    scriptRefs: raw.refs,
+    hash: raw.hash,
+  };
 }
 
 test('邮件里的每一枚目的地在线上都可达，且服务的是它自己那张页', async ({ page }) => {
@@ -120,15 +149,65 @@ test('邮件里的每一枚目的地在线上都可达，且服务的是它自�
   }
   const control = await probe(page, '/this-route-does-not-exist-anywhere', landing);
 
+  const CRED_SCRIPTS = new Set(routes.scripts);
+  const refPathsOf = (r: Reading) =>
+    r.scriptRefs.map((s) => { try { return new URL(s, ORIGIN).pathname; } catch { return s; } })
+      .filter((p) => CRED_SCRIPTS.has(p));
+
   console.log(`分母来自 pages.ts + email.ts：页 ${String(routes.pages.length)} 张 / 脚本 ${String(routes.scripts.length)} 个 / 邮件目的地 ${String(routes.emailPaths.length)} 枚`);
   for (const r of [...pages, ...scripts, ...apps, control]) {
-    console.log(`  ${r.path.padEnd(48)} ${String(r.status).padEnd(4)} ${r.ct.padEnd(42)} ${String(r.len)}B 逐字等于落地页=${r.isLandingByteForByte ? 'YES' : 'no'} 应用产物=${r.servesApp ? 'YES' : 'no'}`);
+    console.log(`  ${r.path.padEnd(48)} ${String(r.status).padEnd(4)} ${r.ct.padEnd(42)} ${String(r.len)}B 正文哈希=${String(r.hash).padStart(10)} 逐字等于落地页=${r.isLandingByteForByte ? 'YES' : 'no'} 应用产物=${r.servesApp ? 'YES' : 'no'}`);
+  }
+  // ⑦ 的读数单独打一行：页 → 它线上实际引的凭据脚本。
+  for (const r of pages) {
+    console.log(`  ⑦ ${r.path.split('?')[0].padEnd(20)} 线上引 ${refPathsOf(r).join(',') || '(无)'} ｜ pages.ts 声明 ${(routes.pageScripts[r.path.split('?')[0]] ?? []).join(',') || '(无)'}`);
   }
 
   const failures: string[] = [];
   for (const r of pages) {
     if (r.status === 404) failures.push(`① ${r.path} 在线上 404 ⇒ 发到用户邮箱里的这枚链接点开是"页面未找到"`);
     if (r.isLandingByteForByte) failures.push(`② ${r.path} 的正文与落地页逐字相同 ⇒ "HTTP 200 但内容是另一张页"那一族又回来了`);
+  }
+  /*
+    ⑦ **这张页服务的是不是它自己那张页**。② 只判"正文不等于落地页"——
+    两张凭据页**互换**（边缘把 `/reset-password` 指到 `/change-email` 那张页上）
+    在 ② 下是绿的，而用户看到的就是"点重置密码，打开是换邮箱"。
+    标记从 `pages.ts` 的 `scripts: [...]` 现读（经门禁的 `--json`，与上面同一份分母）：
+      · 一张页**必须**引到自己声明的那几支凭据脚本之一；
+      · 它**不许**引到别的页独占的凭据脚本；
+      · 五张页的正文两两**不许逐字相同**（`/verify-email` 与 `/magic-login` 共用一支脚本，
+        单靠前两条分不开，这一条分得开）。
+  */
+  if (pages.length > 0 && pages.every((r) => r.scriptRefs.length === 0)) {
+    failures.push('⑦ 探针不成立：五张线上页面里一枚 `<script src>` 都没读到 ⇒ 下面那三条等于没判');
+  }
+  for (const r of pages) {
+    const path = r.path.split('?')[0];
+    const own = new Set(routes.pageScripts[path] ?? []);
+    const refs = refPathsOf(r);
+    if (own.size === 0) {
+      if (refs.length > 0) {
+        failures.push(`⑦ ${path} 在 pages.ts 里没声明脚本，线上却引了 ${refs.join(',')} ⇒ 服务的大概率是别人的页`);
+      }
+      continue;
+    }
+    if (!refs.some((p) => own.has(p))) {
+      failures.push(
+        `⑦ ${path} 线上引的是 ${refs.join(',') || '（一枚凭据脚本都没有）'}，` +
+          `而 pages.ts 给它声明的是 ${[...own].join(',')} ⇒ 这张页不是它自己那张`,
+      );
+    }
+    const foreign = refs.filter((p) => !own.has(p));
+    if (foreign.length > 0) {
+      failures.push(`⑦ ${path} 引了不属于它的凭据脚本 ${foreign.join(',')} ⇒ 边缘把两张页接串了`);
+    }
+  }
+  for (let i = 0; i < pages.length; i += 1) {
+    for (let j = i + 1; j < pages.length; j += 1) {
+      if (pages[i].hash === pages[j].hash && pages[i].len === pages[j].len) {
+        failures.push(`⑦ ${pages[i].path} 与 ${pages[j].path} 的正文逐字相同 ⇒ 其中至少一张不是它自己那张页`);
+      }
+    }
   }
   for (const r of scripts) {
     if (r.status !== 200) failures.push(`③ 脚本 ${r.path} 不是 200（读到 ${String(r.status)}）⇒ 页面画得出来、按钮是死的`);
