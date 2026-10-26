@@ -69,6 +69,14 @@
  * 另核对 `CloseAccountPanel`、`CentralAccountConflictPanel`、`AuthPanel` 的复选框：
  * 宿主容器本来就是 space.3/space.4，没入网。
  *
+ * ⚠️ **验证码屏那两处的读数取不到，这一格是未判定的**（2026-10-27 试过）：
+ *   那一屏要 `onLoginCode` 真发出挑战才渲染，而 e2e 装置里没有真服务端 ⇒ 点「使用验证码登录」
+ *   之后 `auth-form-login-code-stage` 不在 DOM 里（实测 `isVisible()=false`）。
+ *   所以那两处的判掉**靠的是同一批样式对象的实测值**：`primary` 的 `marginTop` 补偿与
+ *   `textAction` 的 44px 点击区都在凭据档量过（上面那两组读数），而验证码屏用的就是这两个
+ *   样式与同一个 `field` 容器。这是**代理读数，不是那一屏自己的读数** —— 谁把 `primary`
+ *   或 `textAction` 在某一档单独改掉，这条推理就断了，届时要么接一个真挑战的装置，要么量到它。
+ *
  * 🔴 其中前三处（文字按钮那一族）判掉靠的是**同一句明文规则**：`MASTER.md` 的
  * "触控目标 ≥ 44×44px" —— 4px 是**盒子**间距，而盒子里只有中间那行字。
  * 这个理由本身由判据 ④ 量着（见 `SECONDARY_TEXT_ACTIONS`），不是"看着还行"。
