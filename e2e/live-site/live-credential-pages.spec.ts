@@ -17,6 +17,8 @@
  *
  * ## 每枚判据的能红性（不是设计出来的，是量出来的）
  *
+ *  - ⑥：把 `token` 换成一枚有效值也只会换掉 `code`，退码仍非 404；它真正的能红形状是
+ *    "部署的那份镜像里没有这条路由"，那种时候 Fastify 答 404 且是 HTML —— 三条断言一起红。
  *  - ① 与 ③：2026-10-26 修**前**跑同一枚探针，`/reset-password` 读到 404、
  *    `/reset-password.js` 同样落进落地页 ⇒ 这两枚当时就是红的。这是真实世界的变异臂。
  *  - ④：把 `ORIGIN` 指到一台"所有路径都答 200"的服务器时它会红 —— 它存在的意义就是
@@ -39,6 +41,11 @@
  *  ⑤ 邮件里的**应用**目的地（`/app/` 与 `/app/?signin=1`）：200 且正文引 `/app/assets/`。
  *     这一枚必须比"状态码不是 404"更严 —— `/app/` 走的是文件服务不是代理，
  *     被落地页顶掉时状态码同样是 200，而那正是本域名踩过五次的那个形状。
+ *  ⑥ 脚本自己发请求的那些 `/api/...` 端点在线上要"答得像服务端"：非 404、JSON、
+ *     且带一枚机器可读的 `code`。这一枚补的是"页与脚本都在、镜像里少那条路由"的形状 ——
+ *     按钮活着、转一下、报一句用户看不懂的话。本轮实测五枚端点全在
+ *     （`invalid_reset_link` / `invalid_change_link` / `invalid_or_expired_link` /
+ *     `invalid_recovery_token` / `validation_failed`）。
  *  ④ **阳性对照**：一枚未注册路径必须仍是 404。
  *     没有它，① 就是恒真的 —— 边缘整站挂掉、所有路径都答 200 时，①③ 会一起变绿。
  *
@@ -59,6 +66,7 @@ interface Reading {
   len: number;
   isLandingByteForByte: boolean;
   servesApp: boolean;
+  fetchTargets: string[];
 }
 
 const routes = JSON.parse(
@@ -80,9 +88,12 @@ async function probe(page: import('@playwright/test').Page, path: string, landin
       len: body.length,
       same: body === home,
       app: body.includes('/app/assets/'),
+      // 脚本**自己**在往哪些端点发请求 —— 从线上那份脚本文本里读，不从本地文件读：
+      // 要防的是"跑着的那份脚本发向一个跑着的服务器没有的路由"。
+      targets: [...new Set([...body.matchAll(/fetch\(\s*['"`](\/api\/[^'"`?]+)/g)].map((x) => x[1]))],
     };
   }, { origin: ORIGIN, p: path, home: landing });
-  return { path, ...raw, isLandingByteForByte: raw.same, servesApp: raw.app };
+  return { path, ...raw, isLandingByteForByte: raw.same, servesApp: raw.app, fetchTargets: raw.targets };
 }
 
 test('邮件里的每一枚目的地在线上都可达，且服务的是它自己那张页', async ({ page }) => {
@@ -127,6 +138,41 @@ test('邮件里的每一枚目的地在线上都可达，且服务的是它自�
     if (r.status !== 200) failures.push(`⑤ 邮件里的应用地址 ${r.path} 读到 ${String(r.status)} ⇒ 那封信的按钮点不开`);
     else if (!r.servesApp) failures.push(`⑤ 邮件里的应用地址 ${r.path} 是 200，但正文不引 /app/assets/ ⇒ 服务的是落地页，不是应用`);
   }
+  /*
+    ⑥ 脚本发请求的那些 `/api/...` 端点，在线上必须是"服务端在答"，不是 404。
+    只代页不代脚本会让按钮死掉（本仓库为此写过一整条注释），而**镜像里少一条路由**
+    会让按钮活着、转一下、然后报一个用户看不懂的错 —— 同一族的下一种形状。
+    打的是**故意无效的令牌**：解析不出账号，所以不改任何数据、不发任何信。
+    判"不是 404"而不是判某个具体码：具体码随策略顺序变（本轮实测先撞口令策略再撞令牌），
+    钉死它会造出与缺陷无关的红。
+  */
+  const endpoints = [...new Set(scripts.flatMap((r) => r.fetchTargets))].sort();
+  const api: { path: string; status: number; ct: string; code: string }[] = [];
+  for (const e of endpoints) {
+    api.push(await page.evaluate(async ({ origin, p }) => {
+      const r = await fetch(`${origin}${p}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token: 'definitely-invalid', password: 'Q7#mVm2mB!sP9dLxR4tYw6x3' }),
+      });
+      const text = await r.text();
+      return {
+        path: p,
+        status: r.status,
+        ct: r.headers.get('content-type') ?? '',
+        // 服务端错误形状是全仓统一的（`pnpm check:server-error-shape` 钉着），
+        // 所以"带一枚机器可读的 code"就是"打到 API 面了"的证据 —— 比只看 content-type 强。
+        code: /"code":"([^"]+)"/.exec(text)?.[1] ?? '',
+      };
+    }, { origin: ORIGIN, p: e }));
+  }
+  for (const a of api) console.log(`  POST ${a.path.padEnd(44)} ${String(a.status).padEnd(4)} code=${a.code || '(无)'}`);
+  for (const a of api) {
+    if (a.status === 404) failures.push(`⑥ 脚本要发的 ${a.path} 在线上 404 ⇒ 页面画得出来、按钮点了没结果`);
+    else if (!a.ct.includes('json')) failures.push(`⑥ ${a.path} 答的不是 JSON（${a.ct}）⇒ 那一发多半没打到 API 面`);
+    else if (a.code === '') failures.push(`⑥ ${a.path} 是 JSON 但没有机器可读的 code ⇒ 不是服务端那条错误形状，读不出它到底答了谁`);
+  }
+  if (endpoints.length === 0) failures.push('⑥ 探针不成立：五份线上脚本里一枚 /api/ 端点都没读到，这一条等于没判');
   if (control.status !== 404) {
     failures.push(`④ 阳性对照失效：未注册的 ${control.path} 读到 ${String(control.status)} 而不是 404 ⇒ 上面那批"不是 404"是恒真的，零信息`);
   }
