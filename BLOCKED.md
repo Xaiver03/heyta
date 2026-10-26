@@ -12364,3 +12364,16 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 而是"HEAD + 此刻别人在飞的编辑"的合成态。所以拿它当"我这轮改坏了没有"的证据之前，
 必须先 `git diff` 看它点名的那枚文件在不在别人的未提交清单里 ——
 不在我名下就登记、不顺手修（改法归那条线的判据口径）。
+**同一枚根因还有第三个消费者（2026-10-27 现量）**：因为链被红一截断，我另跑了一趟
+`pnpm -r test`，`UNIT_RC=1` 里**只有 2 条**失败，两条都在
+`server/tests/inbound-lane-rigs-consumers.spec.ts`，而它报的正文就是红二那两行：
+
+    ✖ markdown 表格行错位 2 处：
+      docs/plans/collaboration-shared-lists.md:1073 列数 3（本表表头是 4）
+      docs/plans/collaboration-shared-lists.md:1075 列数 3（本表表头是 4）
+
+那枚装置自己就把归因写在输出里（"属于本线四份的才是本线的；其余是登记表里别人的文档"），
+而它点名的不是它自己的四份。⇒ **修那两行表格，一次清掉三个消费者**（`check:md-tables`、
+这条 server 测试、以及它 --self-test 那一臂）。其余各包全过：`packages/ui` 51/51、
+`apps/web` 209 passed + 2 skipped、`server` 174/175 文件、`apps/mobile` 90/90、
+`packages/app-host` 121/121 —— 所以我这几笔（含 `AuthForm` 与两处组间距的改动）没有打破单测。
