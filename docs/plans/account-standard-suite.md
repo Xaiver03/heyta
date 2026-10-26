@@ -4379,3 +4379,40 @@ goal 的交付标准写着「门禁全绿」，而本线此前只按文件跑过
 （iPhone 17 Pro / iOS 27.0，402×874、`insets.top = 62`）。换它的原因与量到的读数在 **B155** 与环境陷阱 **#404** ——
 旧载体 `heyta-ios-isolated` 是 iPhone-Duo，顶栏最右那一格坐在挖孔摄像头下面、`insets.top` 报 0，
 HID 点击回 `success` 而控件收不到（**探针说成功，不等于界面收到了**）。
+
+### 6.89 重置密码邮件点开是 404：四种可能各自怎么被排掉，与那两处边缘白名单（10-26 夜 现量）
+
+用户报的是一枚打不开的信：`https://heyta.waytofuture.cn/reset-password?token=…` ⇒ **404**。
+"路由没写"、"代码里有但线上没部署"、"域名指错"、"静态托管缺 fallback"这四种都可能长成那样，
+所以逐种给一条排掉它的读数，而不是挑一种最像的解释：
+
+| 假设 | 排掉它的读数（都是当夜现量） |
+|---|---|
+| 代码里没这张路由 | `node scripts/check-credential-page-routes.mjs --json` 从 `server/src/pages.ts` 读到**五张**页在册，含 `/reset-password` 与 `/change-email` |
+| 有代码但线上没部署 | **同一个域名**上被放行的三条（`/verify-email`、`/magic-login`、`/recover-passkey`）回的是 **400**（缺 `?token=`），且响应头带 Fastify 的安全头与限流头 ⇒ 服务端活着、路由在；而那两条 404 的 `content-type` 与落地页一致 ⇒ 请求**根本没到服务端** |
+| 域名指错 | 出事的与没出事的那几条**同一个 host**；链式验收 ⑫ 还额外断言信里的链接指向**本次**这台服务端（`scripts/verify-email-password-chain.mjs`） |
+| 静态托管缺 fallback | 方向正好相反：落地页 `location /` 那条兜底**就是**把这两条压成 404 的东西。凭据页必须走代理，靠 SPA fallback 只会拿到落地页（那族本域名历史上踩过五次"200 + 落地页字节"） |
+
+**真因一句话**：`server/deploy/caddy/sites.d/00-heyta.caddy` 里那两条**手写枚举**
+（`@credPages` / `@credJs`）停在"三张页"，后加的 `/reset-password`、`/change-email` 没被抄进去。
+要覆盖的集合长在代码里，白名单是手抄的 —— 这两处之间隔着一个仓库边界，**没有任何一步会失败**。
+
+**改了什么**：`@credPages` 扩到五张、`@credJs` 扩到四支（少脚本的那两支是"页面画得出来、
+按钮是死的"那种半死形状，同一次补齐），`server/scripts/caddy-sync.sh --apply` 上线
+（先备份 `00-heyta.caddy.bak-<UTC>`、整份 `Caddyfile` 验过 "Valid configuration" 才 reload）。
+
+**防复发三件**（各带能红性）：
+1. 常驻门禁 `pnpm check:credential-routes`（已进 `check` 链）：双向对账 —— 少一页红、
+   少一脚本红、多一条孤儿代理红、两侧读空报"探针不成立"退 2 而不是报合规；
+   `--self-test` 六臂逐条证自己那条判据（干净/抽页/抽脚本/造孤儿/信里指向不存在的页/边缘读空）。
+2. 线上判据 `e2e/live-site/live-credential-pages.spec.ts`：分母从 `--json` 现读，
+   逐枚量状态码、正文不等于落地页、脚本 content-type、邮件里的 `/app/` 两枚深链、
+   脚本自己发的 `/api/…` 端点答得像服务端，外加 ⑦「这张页服务的是不是它自己那张页」
+   与一枚未注册路径的阳性对照。
+3. 手册里"三张凭据页"那种**枚数抄件**删掉，改成指向这把尺（`docs/runbooks/deployment.md`）。
+
+**边界，别读多**：`server/deploy/nginx/*.conf` 那两份是**死镜像**（本域名由 `caddy-edge` 服务、
+`nginx.service` masked），里面那句"三张凭据页"没去动它，理由写在门禁文件头
+（往没人读的文件里补规则只会制造一次假漂移）；真收件箱那一腿仍缺（缺口 G1，这里读的是
+Ethereal preview）；线上落地页导航「登录」缺 `signin`、线上产物比 HEAD 旧那一处**不归本线**，
+记在 **B232**。
