@@ -517,6 +517,90 @@ const globalFlags = (db, token) => ['--db', db, '--server', BASE, '--token', tok
   check(/链接|通行密钥|别的/.test(human.out), '⑪ 并且给出**换路**出口（锁的是口令这个认证器，不是账号）');
 }
 
+// ── ⑫ 重置口令这一整条路：那封信 → 点开 → 设新口令 → 旧口令失效 → 别的设备被踢 ──
+/*
+ * 🔴 这一格在本仓**从来没有被证过**。判据一直停在两头：
+ *   - `server/tests/password-reset-page.spec.ts` 那 24 条量的是**这张页自己**（缺令牌怎么答、
+ *     属性转义、脚本挂载位置、GET 不许消费令牌）；
+ *   - 线上那套量的是**可达性**（`e2e/live-site/live-credential-pages.spec.ts`）。
+ *   中间那段「拿一枚**真**令牌，真的把口令改掉，并且把别的设备踢下线」没人跑过 ——
+ *   而 2026-10-26 用户报的正是这条路（重置密码邮件点开是 404）。
+ *   可达性与表单契约都绿，不等于口令真的改得动。
+ *
+ * 三条只有在这里才量得到、也最容易做错的，逐条钉住：
+ *   ① GET 那页**不许**烧掉令牌（邮件客户端会在人点之前预取一次，烧了就是"我明明刚收到的信"）；
+ *   ② 一枚令牌只许用一次；
+ *   ③ 改成功之后，**重置之前**发出去的那枚会话必须失效 ——
+ *      那封信对用户承诺的是「设置成功后，其他设备上的登录都会失效」。
+ */
+{
+  const previewsBefore = (log.match(/Preview URL: /g) ?? []).length;
+  const forgot = await fetch(`${BASE}/api/password/forgot`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: EMAIL }),
+  });
+  check(forgot.status === 200, `⑫ 申请重置 ⇒ ${String(forgot.status)}（已存在的账号被受理，且这句与"不存在"同形）`);
+
+  let resetLink = '';
+  for (let i = 0; i < 60 && resetLink === ''; i += 1) {
+    await sleep(500);
+    // 🔴 取**最新**那一封，不是第一封：上面 ③ 已经抓过一封验证信，
+    //    而 `/Preview URL/.exec(log)` 会一直返回同一枚 ⇒ 取到的是验证链接，
+    //    于是这一臂会拿错令牌、在下一行就红，而红的不是被测物。
+    const all = [...log.matchAll(/Preview URL: (\S+)/g)].map((m) => m[1]);
+    if (all.length <= previewsBefore) continue;
+    const rawMail = await (await fetch(all[all.length - 1])).text();
+    const mail = rawMail.replace(/\\u002f/gi, '/').replace(/\\\//g, '/').replace(/&amp;/g, '&');
+    resetLink = /(https?:\/\/[^"'\s]*\/reset-password\?token=[0-9a-f]+)/.exec(mail)?.[1] ?? '';
+  }
+  check(resetLink.startsWith(BASE), '⑫ 那封信带着指向**本次**服务端的 /reset-password 链接');
+  const resetToken = /token=([0-9a-f]+)/.exec(resetLink)?.[1] ?? '';
+
+  const page = await fetch(resetLink);
+  const pageHtml = await page.text();
+  check(
+    page.status === 200 && pageHtml.includes('id="reset-form"'),
+    `⑫ 点开那枚链接 ⇒ ${String(page.status)}，且「设置新密码」那张表单真在页上（用户报的就是这一格）`,
+  );
+
+  const NEW_PASSWORD = 'harbor lantern puzzle 8412';
+  const doReset = async (token) => {
+    const r = await fetch(`${BASE}/api/password/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token, password: NEW_PASSWORD }),
+    });
+    return { status: r.status, body: await r.text() };
+  };
+  const first = await doReset(resetToken);
+  check(
+    first.status === 200,
+    `⑫ 上面那次 GET **没有**烧掉令牌：拿同一枚去设新口令 ⇒ ${String(first.status)} ${first.body.slice(0, 60)}`,
+  );
+
+  const reused = await doReset(resetToken);
+  check(
+    reused.status >= 400 && reused.body.includes('invalid_reset_link'),
+    `⑫ 同一枚令牌用第二次 ⇒ ${String(reused.status)} + invalid_reset_link（一次性这条是真的，不是文案）`,
+  );
+
+  const oldLogin = cli(['auth', 'login', '--server', BASE, '--email', EMAIL, '--json'], { input: LOGIN_PASSWORD });
+  check(oldLogin.code !== 0, `⑫ **旧**口令登不进去了（exit=${String(oldLogin.code)}）`);
+  const newLogin = cli(['auth', 'login', '--server', BASE, '--email', EMAIL, '--json'], { input: NEW_PASSWORD });
+  check(
+    newLogin.code === 0 && typeof newLogin.json?.token === 'string',
+    '⑫ **新**口令能登录并拿到令牌',
+  );
+
+  const evicted = cli([...globalFlags(DEV1, loginToken), '--json', '--password', E2EE_PASSWORD, 'sync']);
+  check(
+    evicted.code !== 0,
+    `⑫ 重置**之前**发出去的那枚会话现在同步不进去（exit=${String(evicted.code)}）` +
+      ' —— 那封信对用户承诺的是「设置成功后，其他设备上的登录都会失效」',
+  );
+}
+
 // ── 证据落盘 ──────────────────────────────────────────────────────────────
 mkdirSync(EVIDENCE, { recursive: true });
 writeFileSync(
@@ -533,7 +617,7 @@ writeFileSync(
     `EVIDENCE_FILES=${[DEV1, DEV2, DEV3].map((p) => relative(ROOT, p)).join(',')}`,
     `RESULT=${failed ? 'FAIL' : 'PASS'}`,
     '',
-    '# 判据 ⓪-⑪ 的语义写在 scripts/verify-email-password-chain.mjs 文件头。',
+    '# 判据 ⓪-⑫ 的语义写在 scripts/verify-email-password-chain.mjs 文件头。',
     '',
   ].join('\n'),
 );
