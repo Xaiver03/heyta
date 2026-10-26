@@ -2,7 +2,7 @@
  * M6-3a 界面腿的装配判据（两半式，本壳惯例：值导入 + 去注释源码文本）
  * =====================================================================
  *
- * 五形各钉一格，每一条都**能红**（写的时候按"删掉对应代码它会红"逐条对过）：
+ * 每一形各钉一格，每一条都**能红**（写的时候按"删掉对应代码它会红"逐条对过）：
  *
  * ① 根入口带真实端口调 `arm`：`makeMobileSharePorts()` 的值半 —— 没登录 ⇒ `undefined`；
  *    登录后 ⇒ 交出**三件真端口**，且 `shareLog`/`keyPort` 是记忆化单例（第二份存储
@@ -19,8 +19,13 @@
  *
  * ⚠️ 系统横幅那一格今天是**登记在册的做不到**（原因见 `share/share-activity-notify.ts`
  * 文件头），所以这里钉的是"端口可注入 + 缺省不投"，而不是钉它会投。
+ *
+ * 后两组是 M6-10 补的（产品定义里"按本机偏好打扰用户"那一半在手机上今天得真成立）：
+ *
+ * ⑦ 一条真信号走到动态里那一句（闸门 ⇒ 正文 ⇒ 内存动态 ⇒ 界面有消费者）。
+ * ⑧ 正文挑哪一句（`lib/share-activity-copy.ts` 的三档种类 × 有名/无名两档回落）。
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /** 内存版设备偏好（闭包延迟取值 ⇒ 与 `fakeConfig` 同一 TDZ 安全的写法）。 */
 const prefStore = new Map<string, string>();
@@ -61,19 +66,36 @@ vi.mock('../src/sync/config', () => ({
 }));
 
 import { DEFAULT_NOTIFICATION_PREFS, type ShareNotificationPrefs } from '@heyta/ui/node';
+import type { MessageKey, MessageVars } from '@heyta/i18n';
+import type { ShareActivityKind } from '@heyta/ui';
+import { localRowIdForShare, type AppHost } from '@heyta/app-host';
+import { emptyState, type MaterializedState } from '@heyta/op-log';
+import { OpType } from '@heyta/sync-core';
 
+import { mobileShareActivityBody } from '../src/lib/share-activity-copy';
 import { makeMobileSharePorts } from '../src/share/share-ports';
 import {
+  __resetShareActivityDeliveryForTests,
   __resetShareActivityFeedForTests,
   appendShareActivityFeed,
+  bindShareDeliveryDeps,
   clearShareActivityFeed,
   deliverShareActivities,
+  installMobileShareActivityDelivery,
   markShareActivityRead,
   SHARE_ACTIVITY_FEED_LIMIT,
   shareActivityFeed,
   shareActivityUnreadCount,
   subscribeShareActivityFeed,
 } from '../src/share/share-activity-notify';
+import {
+  bindShareSignalHost,
+  __resetMobileShareSignalsForTests,
+  dispatchShareOpsSignal,
+  installMobileShareSignals,
+  type ShareSignalSession,
+} from '../src/share/share-signals';
+import { bindMobileOplogBase, currentState } from '../src/share/wiring';
 
 import { mobileSources, read, stripComments } from './source-reading';
 
@@ -173,7 +195,8 @@ describe('④ 入群等待态真的登记了 roster target', () => {
 });
 
 describe('⑤ 无订阅偏好 ⇒ 零打扰（闸门只有 `@heyta/ui` 那一枚）', () => {
-  const labels = { title: 'heyta', body: () => '有人动了共享清单' };
+  /** 正文按 `(shareId, kind)` 组装：名字要按 share 查本机那一行，签名不带它就没法查。 */
+  const labels = { title: 'heyta', body: (shareId: string, kind: string) => `${shareId}:${kind}` };
 
   it('默认偏好（三类全关）⇒ delivered = 0、reason = prefs-off，一个回调都不发起', () => {
     const inApp = vi.fn();
@@ -203,7 +226,14 @@ describe('⑤ 无订阅偏好 ⇒ 零打扰（闸门只有 `@heyta/ui` 那一枚
     });
     expect(reading.delivered).toBe(1);
     expect(inApp).toHaveBeenCalledTimes(1);
-    expect(inApp.mock.calls[0]![0]).toMatchObject({ kind: 'added', shareId: 'share-1', seq: 9, projectId: 'p1' });
+    expect(inApp.mock.calls[0]![0]).toMatchObject({
+      kind: 'added',
+      shareId: 'share-1',
+      seq: 9,
+      projectId: 'p1',
+      // 🔴 投递那一刻正文就已经拼好了：界面画的是这条读数，不再自己拼句子。
+      body: 'share-1:added',
+    });
   });
 
   it('🔴 壳里不许长出第二份"响不响"：投递文件去注释后不含逐类开关的直读', () => {
@@ -214,7 +244,14 @@ describe('⑤ 无订阅偏好 ⇒ 零打扰（闸门只有 `@heyta/ui` 那一枚
 
   it('应用内那一格：feed 有上限、未读只有一处真相、登出清空', () => {
     for (let i = 0; i < SHARE_ACTIVITY_FEED_LIMIT + 5; i += 1) {
-      appendShareActivityFeed({ shareId: 's', kind: 'added', seq: i, at: 1000 + i, projectId: 'p' });
+      appendShareActivityFeed({
+        shareId: 's',
+        kind: 'added',
+        seq: i,
+        at: 1000 + i,
+        projectId: 'p',
+        body: '有人动了共享清单',
+      });
     }
     expect(shareActivityFeed()).toHaveLength(SHARE_ACTIVITY_FEED_LIMIT);
     expect(shareActivityUnreadCount()).toBe(SHARE_ACTIVITY_FEED_LIMIT + 5);
@@ -310,5 +347,270 @@ describe('⑥ 手机上不许画"只在 web 那一格"（第八批逐张肉眼�
       expect(table.get('mobile.share.join.done'), '成功回执点名的格子要和真存在的那一节同名').toContain(region as string);
       expect(table.get('mobile.share.join.subtitle'), '副标题点名的格子同理').toContain(region as string);
     }
+  });
+});
+
+/**
+ * 词表替身：把"挑了哪一句、往里插了什么"变成可断言的字符串。
+ * `vars` 只有 `name` 一枚（ADR-0071 的正文口径），别的键一旦出现这里就看得见。
+ */
+const fakeT =
+  (prefix: string) =>
+  (key: MessageKey, vars?: MessageVars): string =>
+    vars === undefined ? `${prefix}:${key}` : `${prefix}:${key}:${String(vars.name)}`;
+
+/** 一台假设备的清单行（`name` 缺省 = 那一行还没有名字，回落那一档要的就是这个形状）。 */
+type DeviceRow = { readonly shareId: string; readonly name?: string };
+
+/** 把清单行摆成合并视图里那个形状（⑦ 用它绑设备，⑧ 只拿这份状态、不碰单例）。 */
+function stateOf(rows: readonly DeviceRow[]): MaterializedState {
+  const projects: Record<string, unknown> = {};
+  rows.forEach((row, index) => {
+    projects[`p${String(index)}`] = {
+      id: `p${String(index)}`,
+      deletedAt: undefined,
+      shareId: row.shareId,
+      ...(row.name === undefined ? {} : { name: row.name }),
+    };
+  });
+  return { ...emptyState(), projects } as unknown as MaterializedState;
+}
+
+/**
+ * 这台假设备照 `share-signals.spec.ts` 的形状：清单行绑定 + `clientId` 各就各位。
+ * 🔴 不绑这两件，内容信号在闸门那一关就被丢掉，⑦ 那几条判据会**永远绿** ——
+ *    一条永远通过的判据比没有判据更糟。
+ */
+function bindDevice(rows: readonly DeviceRow[]): void {
+  const host = {
+    clientId: 'dev-me',
+    dispatch: vi.fn(async () => undefined),
+    dispatchChecked: vi.fn(async () => undefined),
+    getState: () => stateOf(rows),
+  } as unknown as AppHost;
+  bindMobileOplogBase(host);
+  bindShareSignalHost(host);
+}
+
+/**
+ * ⑦ 从**一条真信号**走到**动态里那一句**（M6-10）。
+ *
+ * 前面几格各钉一段，这一段把整条腿走一遍：内容信号 ⇒ 拉取 ⇒ 活动差集 ⇒ 偏好闸门 ⇒
+ * 按 `(shareId, kind)` 组装正文 ⇒ 落进那份内存动态。之所以要在 node 里跑这一趟：
+ * 设备腿量得到"界面上有没有那句话"，量不到"投出去的正文带不带清单名"。
+ */
+describe('⑦ 一条内容信号 ⇒ 动态里带清单名的那一句', () => {
+  function fakeStorage() {
+    const ops: { value: unknown[] } = { value: [] };
+    return {
+      load: () => (ops.value.length === 0 ? undefined : { ops: ops.value, clock: {} }),
+      save: vi.fn(),
+      list: () => [] as readonly string[],
+      cursor: () => 0,
+      setCursor: vi.fn(),
+      ops,
+    };
+  }
+
+  /** 拉到一条**别人写的**评论 op ⇒ 活动差集数得出 `added`。 */
+  function fakeSession(storage: ReturnType<typeof fakeStorage>) {
+    return {
+      channel: {
+        dispatch: vi.fn(async () => undefined),
+        stateFor: () => emptyState() as MaterializedState,
+      },
+      pullShareOps: vi.fn(async () => {
+        storage.ops.value = [
+          {
+            id: 'op-remote-1',
+            clientId: 'dev-other',
+            entityType: 'COMMENT',
+            opType: OpType.Create,
+            timestamp: 1,
+            vectorClock: {},
+          },
+        ];
+        return { fetched: 1, added: 1, cursor: 3, pages: 1, rejections: [] };
+      }),
+      signatureRejections: () => [] as const,
+    };
+  }
+
+  const prefsOn: ShareNotificationPrefs = {
+    ...DEFAULT_NOTIFICATION_PREFS,
+    activities: { onCompleted: false, onAdded: true, onDeleted: true },
+  };
+
+  /** 把投递装配的垫片换成"用这台假设备真跑信号链"的那一份（不绑 ⇒ 装配那一格会抛）。 */
+  function bindShim(session: ReturnType<typeof fakeSession>, storage: ReturnType<typeof fakeStorage>): void {
+    bindShareDeliveryDeps({
+      installMobileShareSignals: () =>
+        installMobileShareSignals({
+          ensureSession: async () => session as unknown as ShareSignalSession,
+          ensureStorage: async () => storage as never,
+        }),
+    });
+  }
+
+  /** 与 `App.tsx` 那一格同一份装配代码（只把词表换成可断言的替身）。 */
+  const ports = {
+    readPrefs: () => prefsOn,
+    projectIdFor: (shareId: string) => localRowIdForShare(currentState(), shareId) ?? '',
+    inApp: appendShareActivityFeed,
+  };
+  const bodyLabels = (prefix: string) => ({
+    title: prefix,
+    body: (shareId: string, kind: ShareActivityKind) =>
+      mobileShareActivityBody(fakeT(prefix), currentState(), shareId, kind),
+  });
+
+  /** 等 sink 里那发 `void (async …)()` 走完（不等是假阴性）。 */
+  const settled = async (): Promise<void> => {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  };
+
+  afterEach(() => {
+    __resetShareActivityDeliveryForTests();
+    __resetMobileShareSignalsForTests();
+    // base 不由 `bindShareSignalHost` 管（生产里那是 `db/open-host.ts` 一件事），复位也得自己摘。
+    bindMobileOplogBase(undefined);
+    bindShareSignalHost(undefined);
+  });
+
+  it('信号 ⇒ 动态多一条**带清单名**的正文，未读数随之 +1（全程零请求）', async () => {
+    bindDevice([{ shareId: 's1', name: '家庭采购' }]);
+    const storage = fakeStorage();
+    const session = fakeSession(storage);
+    bindShim(session, storage);
+    installMobileShareActivityDelivery({ labels: bodyLabels('中'), ports });
+
+    dispatchShareOpsSignal('s1', 9);
+    await settled();
+
+    const rows = shareActivityFeed();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      shareId: 's1',
+      kind: 'added',
+      seq: 9,
+      projectId: 'p0',
+      body: '中:common.share.activityNamed.added:家庭采购',
+    });
+    expect(shareActivityUnreadCount()).toBe(1);
+  });
+
+  it('那一行还没有名字 ⇒ 正文如实说匿名那句，不编名字、不为拼句子发一次请求', async () => {
+    bindDevice([{ shareId: 's1' }]);
+    const storage = fakeStorage();
+    const session = fakeSession(storage);
+    bindShim(session, storage);
+    installMobileShareActivityDelivery({
+      labels: bodyLabels('中'),
+      ports,
+    });
+
+    dispatchShareOpsSignal('s1', 9);
+    await settled();
+
+    expect(shareActivityFeed()[0]).toMatchObject({
+      projectId: 'p0',
+      body: '中:common.share.activity.added',
+    });
+  });
+
+  it('🔴 重复装配换的是标签与端口，通道上仍**只有一个**消费者（切语言后的新动态说新语言）', async () => {
+    bindDevice([{ shareId: 's1', name: '家庭采购' }]);
+    const storage = fakeStorage();
+    const session = fakeSession(storage);
+    bindShim(session, storage);
+    installMobileShareActivityDelivery({ labels: bodyLabels('旧'), ports });
+    installMobileShareActivityDelivery({ labels: bodyLabels('新'), ports });
+
+    dispatchShareOpsSignal('s1', 9);
+    await settled();
+
+    // 两道都订着 ⇒ 这里会是两条（同一次信号响两遍）；留着旧闭包 ⇒ 那一句还是「旧」。
+    expect(shareActivityFeed()).toHaveLength(1);
+    expect(shareActivityFeed()[0]?.body).toBe('新:common.share.activityNamed.added:家庭采购');
+  });
+
+  it('🔴 那一档真有消费者：通知中心订阅动态 + 打开即已读，入口徽标把未读算进去', () => {
+    const screen = stripComments(read('apps/mobile/src/screens/NotificationsScreen.tsx'));
+    expect(screen).toContain('subscribeShareActivityFeed(');
+    expect(screen).toContain('markShareActivityRead()');
+    for (const key of ['mobile.inbox.tab.share', 'mobile.inbox.share.empty', 'mobile.inbox.share.note']) {
+      expect(screen, `那一档少了 t('${key}') 这句文案（在册零消费者就是这一格的形状）`).toContain(
+        `t('${key}')`,
+      );
+    }
+    expect(screen, '界面画的是投递那一刻组装好的那句，不许在自己这里再拼一遍').toContain('entry.body');
+
+    const profile = stripComments(read('apps/mobile/src/screens/ProfileScreen.tsx'));
+    expect(profile, '入口徽标不带上共享动态的未读 ⇒ 那一档没人会去点').toContain('shareActivityUnreadCount');
+    // 光"订阅了"不算数：画到屏幕上、念给读屏的那两处必须用的是相加后的数。
+    expect(profile).toContain('count: inboxBadge');
+    expect(profile).toContain('{inboxBadge}');
+
+    const app = stripComments(read('apps/mobile/src/App.tsx'));
+    expect(app, '装配点没把当下的合并视图交给正文组装 ⇒ 名字永远是空的').toContain(
+      'mobileShareActivityBody(tr, currentState(), shareId, kind)',
+    );
+    expect(app, '句子不许在装配点手写（口径归 ui + `lib/share-activity-copy.ts`）').not.toContain(
+      'shareActivityNotificationBody(',
+    );
+  });
+});
+
+/*
+ * ⑧ 正文挑哪一句（`lib/share-activity-copy.ts` 那一格的行为）。
+ * 这一组不需要设备：`state` 由调用方交进来，所以"那一行还没有名字""本机认不出这份
+ * share"这两档能在 node 里逐格跑到 —— 留在 `App.tsx` 的闭包里就只能靠源码文本判，
+ * "永远不带清单名"那种改法量不到（本批变异臂实测抓出）。
+ */
+describe('⑧ 正文挑哪一句（ADR-0071 那一档口径在壳里的落地形状）', () => {
+  it('本机有那一行且有名字 ⇒ 三档种类各挑 `activityNamed.*` 那三句，插的就是那个名字', () => {
+    const state = stateOf([{ shareId: 's1', name: '家庭采购' }]);
+    for (const [kind, key] of [
+      ['added', 'common.share.activityNamed.added'],
+      ['deleted', 'common.share.activityNamed.deleted'],
+      ['completed', 'common.share.activityNamed.completed'],
+    ] as const) {
+      expect(mobileShareActivityBody(fakeT('中'), state, 's1', kind), `种类 ${kind} 挑错句`).toBe(
+        `中:${key}:家庭采购`,
+      );
+    }
+  });
+
+  it('本机认不出这份 share ⇒ 落 `activity.*` 那句，不编一个名字出来', () => {
+    const state = stateOf([{ shareId: 's1', name: '家庭采购' }]);
+    expect(mobileShareActivityBody(fakeT('中'), state, 's-没绑定', 'added')).toBe(
+      '中:common.share.activity.added',
+    );
+  });
+
+  it('那一行存在但还没有名字 ⇒ 同样落匿名那句（名字取不到是常态，不是错误）', () => {
+    const state = stateOf([{ shareId: 's1' }]);
+    expect(mobileShareActivityBody(fakeT('中'), state, 's1', 'deleted')).toBe(
+      '中:common.share.activity.deleted',
+    );
+  });
+
+  it('🔴 正文里只许出现清单名：三句带进来的插值变量**只有** `name`', () => {
+    const state = stateOf([{ shareId: 's1', name: '家庭采购' }]);
+    const varKeys: string[] = [];
+    const spy = (key: MessageKey, vars?: MessageVars): string => {
+      // 对照臂：变量一格都不许漏记（漏记了这条就恒真）。
+      varKeys.push(...(vars === undefined ? [] : Object.keys(vars)));
+      return key;
+    };
+    for (const kind of ['added', 'deleted', 'completed'] as const) {
+      mobileShareActivityBody(spy, state, 's1', kind);
+    }
+    expect(varKeys, '有名那三句各该带一次插值').toHaveLength(3);
+    expect([...new Set(varKeys)].sort(), '正文里塞进了清单名之外的东西（条目内容不许进通知）').toEqual([
+      'name',
+    ]);
   });
 });

@@ -29,6 +29,8 @@ trap 'rm -f -- "$0"' EXIT
 #      （服务端"收下" ≠ verified；这一条才是 ADR-0069 在移动端成立）
 #   L5 信号驱动：owner 再写一条评论 → 手机靠 `new_share_ops` 自己重画，全程没碰同步按钮
 #   L6 界面不谎称能力：通知偏好面只剩三枚有输入的开关（M5-3 那一格）
+#   L8 本机偏好真的决定响不响：默认全关 ⇒ 共享动态是空的；翻开『新增内容』 ⇒ 同一种信号
+#      在那里落成**那句带清单名的话**（两半相反才说明闸门在看偏好，单判一响是假绿）
 #   L7 手机自己开共享：**反向**那一半 —— 手机先从界面上建一条自己的清单（产品定义里
 #      「手机用户能建清单」那一格），再把它设为共享（同意闸 → 建 share → 签发邀请 → 撤销）。
 #      这一档里手机是**所有者**，node 那侧只读服务端形状，不替它建。
@@ -1539,6 +1541,137 @@ for ghost in "任务提醒" "指派给他人的除外" "自动接受已知合作
   fi
 done
 
+# ── 10a. L8：本机偏好决定响不响，响的那一句带着清单名 ────────────────────────
+step "10a. 投递判据（L8）：默认全关⇒零打扰；翻开『新增内容』⇒共享动态里那句带清单名的话"
+# 🔴 这一档判的是产品定义里"收得到实时信号并**按本机偏好打扰用户**"那一半的后半。
+#    node 那边把闸门、正文、消费者都钉住了（`apps/mobile/tests/share-ui-assembly.spec.ts`
+#    ⑤⑦⑧ 三组），但设备上此前**没有任何一条判据看见过这句投递正文**：移动端的系统横幅
+#    做不到（原因登记在 `apps/mobile/src/share/share-activity-notify.ts` 文件头），
+#    "打扰"落在界面上的唯一一处就是通知中心那第三档。投了而没人看得见 = 这一半不成立。
+# ⚠️ 为什么可以放心把起始读数当"全关"：本趟开头就 `simctl uninstall`（上面那一发），
+#    偏好那份磁盘（设备级一枚键 `heyta.share-notif-prefs.v1`）跟着沙盒一起清掉。
+#    这里不靠"应当是关的"，靠**第一趟不响、翻完第二趟必响**这一对相反读数 ——
+#    单判一响分不清是闸门放行的还是本来就一直开着的。
+# 🔴 每一趟都先让那条评论出现在**评论区**再去看动态：少了这道控制，"动态里静默"和
+#    "信号根本没到手机"逐字同形，拿静默冒充闸门生效就是假绿（#580 那一族）。
+
+# 从共享列表那一层进 owner 那条任务的评论区（两按：选这份共享 → 选这条任务）。
+l8_goto_comments() {
+  ax_press_until "id:share-space-row-$SHARE_ID" "$TASK_TITLE" || return 1
+  ax_press "$TASK_TITLE" || return 1
+}
+# 从任一共享层退回「我的」，进通知中心并打开「共享动态」那一档。
+l8_goto_activity_tab() {
+  back_to_anchor "id:profile-entry-notifications" || return 1
+  ax_press_until "id:profile-entry-notifications" "id:inbox-tab-share" || return 1
+  ax_press "id:inbox-tab-share" || return 1
+}
+
+# 界面上那份共享叫什么，从**这一屏那一行自己的读数**里取（不猜：名字是同步下来的）。
+idb_dump
+SHARE_LIST_NAME=$(python3 - "$IDB_DUMP_FILE" "$SHARE_ID" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+def walk(n):
+    yield n
+    for c in (n.get("children") or []):
+        yield from walk(c)
+for top in (data if isinstance(data, list) else [data]):
+    for n in walk(top):
+        if (n.get("AXUniqueId") or "") == "share-space-row-" + sys.argv[2]:
+            print((n.get("AXLabel") or "").strip())
+            sys.exit(0)
+PY
+)
+if [ -z "$SHARE_LIST_NAME" ]; then
+  shot "18a-读不到那份共享的名字"
+  env_bail "共享列表里那一行（share-space-row-$SHARE_ID）读不出名字 ⇒ 正文该带哪个名字这一格判不了（装置问题，不判产品）"
+fi
+note "界面上这份共享的名字=$SHARE_LIST_NAME"
+# 期望那句正文在这里就先拼出来：两半的判据、红时的归因话术都用它，不各写一份。
+# ⚠️ 它是模板代入之后的**渲染结果**（`common.share.activityNamed.added`），
+#    词表对账门（`check:verify-script-copy`）认这一形；写成裸子串那档会被报成缺失。
+L8_SENTENCE="有人在你参与的共享清单「$SHARE_LIST_NAME」里写了新内容"
+
+L8_COMMENT_OFF="偏好全关时的owner评论${STAMP}"
+node "$ROOT/scripts/lib/collab-owner-step.mjs" add-comment --state "$OWNER_STATE" --body "$L8_COMMENT_OFF" \
+  > "$RUN_DIR/l8-comment-off.json" 2> "$RUN_DIR/l8-comment-off.err" \
+  || { sed 's/^/      /' "$RUN_DIR/l8-comment-off.err" >&2; env_bail "owner 写第一条取证评论失败"; }
+if ! l8_goto_comments; then
+  shot "18b-进不到评论区"
+  env_bail "从共享列表进不到 owner 那条任务的评论区（装置落点问题，不判产品）"
+fi
+if ! wait_tree "$L8_COMMENT_OFF" 180; then
+  shot "18c-取证评论没到手机"
+  bad "偏好全关时 owner 那条评论本身也没靠信号到手机 ⇒ 内容那一腿是断的，L8 不能拿『动态里静默』当闸门生效"
+  summary
+  exit 1
+fi
+ok "控制读数在场：评论靠信号到了手机（下面的静默因此只可能是偏好那一格）"
+if ! l8_goto_activity_tab; then
+  shot "18d-进不到共享动态那一档"
+  env_bail "按不到「我的」→通知中心→共享动态这一路（装置落点问题，不判产品）"
+fi
+tree_has "还没有共享动态" >/dev/null 2>&1; rc_empty=$?
+if [ "$rc_empty" = "2" ]; then
+  shot "18e-共享动态读不出树"
+  env_bail "共享动态那一档的树读不出（rc=2）⇒ 不拿「没读到」当「偏好全关所以没响」"
+fi
+if [ "$rc_empty" != "0" ]; then
+  idb_dump
+  if tree_has "$L8_SENTENCE" >/dev/null 2>&1; then
+    shot "18f-偏好全关却响了"
+    bad "通知偏好一处都没开，共享动态里却出现了投递正文 ⇒ 闸门没生效（ADR-0062 决策 7 那一格在设备上翻了）"
+    summary
+    exit 1
+  fi
+  shot "18g-共享动态既没空态也没句子"
+  bad "共享动态那一档既读不到空态句、也读不到投递正文 ⇒ 这一档根本没渲染出来"
+  summary
+  exit 1
+fi
+ok "偏好全关 ⇒ 共享动态是空的（零打扰在设备上成立）"
+shot "18-偏好全关时共享动态为空"
+
+# 翻开『新增内容』那一档：这一按之后必须**换一副读数**。
+ax_press "id:share-notif-activity-added" \
+  || { shot "18h-按不到新增内容那一档"; env_bail "偏好面上按不到『新增内容』那一行（装置落点问题，不判产品）"; }
+sleep 2
+L8_COMMENT_ON="偏好翻开后的owner评论${STAMP}"
+node "$ROOT/scripts/lib/collab-owner-step.mjs" add-comment --state "$OWNER_STATE" --body "$L8_COMMENT_ON" \
+  > "$RUN_DIR/l8-comment-on.json" 2> "$RUN_DIR/l8-comment-on.err" \
+  || { sed 's/^/      /' "$RUN_DIR/l8-comment-on.err" >&2; env_bail "owner 写第二条评论失败"; }
+if ! l8_goto_comments; then
+  shot "18i-第二次进不到评论区"
+  env_bail "第二次从共享列表进不到评论区（装置落点问题，不判产品）"
+fi
+if ! wait_tree "$L8_COMMENT_ON" 180; then
+  shot "18j-第二条评论没到手机"
+  bad "翻开偏好后 owner 那条评论没能靠信号到手机 ⇒ 内容那一腿断了，动态那一格判不了"
+  summary
+  exit 1
+fi
+if ! l8_goto_activity_tab; then
+  shot "18k-第二次进不到共享动态"
+  env_bail "第二次按不到通知中心那第三档（装置落点问题，不判产品）"
+fi
+if ! wait_tree "$L8_SENTENCE" 120; then
+  idb_dump
+  shot "18l-翻开偏好后动态里没那句"
+  if tree_has "还没有共享动态" >/dev/null 2>&1; then
+    bad "翻开『新增内容』后信号也到了、动态却仍写着空态 ⇒ 偏好写盘或投递那一格在设备上没成立（期望正文：$L8_SENTENCE）"
+  else
+    bad "共享动态里没有那句带清单名的正文（期望逐字：$L8_SENTENCE）"
+  fi
+  summary
+  exit 1
+fi
+ok "翻开偏好 ⇒ 同一种信号在共享动态里落成那句带清单名的话"
+shot "19-共享动态里那句带清单名的话"
+
 # ── 10b. L7：手机自己开启共享（反向那一半）──────────────────────────────────
 step "10b. 开共享判据（L7）：手机自己建一条清单、把它设为共享、签发邀请、再撤销"
 # 🔴 这一档此前**整条不在旅程里**：第 5 步用服务端把 owner 那一侧建好（`collab-owner-step.mjs init`），
@@ -1546,7 +1679,7 @@ step "10b. 开共享判据（L7）：手机自己建一条清单、把它设为�
 #    界面与生产装配都在（`ShareSpaceScreen.tsx:745` 那颗 `share-create-${projectId}` → `startShare`
 #    → `ShareConsentModal` → `createShare`：`api.createShare` + `sealListKeyForRecipient`
 #    + `putMemberEnvelope` + `putMemberSigningKey` + `bindProjectShare`），欠的只是有人真按一次。
-# 🔴 第 10 步结束时人停在**共享空间那一屏**（比共享首页还深一层）。这里不许按底部标签找路：
+# 🔴 第 10a 步结束时人停在**通知中心那第三档**（「我的」这一档的第二层里）。这里不许按底部标签找路：
 #    共享面挂在「我的」这一档的第二层里，再按一次同一档不改 `tab`（本文件 725-729 行那条实测），
 #    第 32 跑就是在这里红的 —— 日志写「树上没有落点 id:profile-entry-share；当前屏顶部文字=共享清单」，
 #    读的是装置走错了路，不是产品没有入口。出路只有顶栏那枚「返回」⇒ 用 `back_to_anchor` 逐层爬。

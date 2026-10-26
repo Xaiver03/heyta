@@ -69,6 +69,7 @@ import * as shareDeliveryDeps from './share/share-delivery-deps';
 import { installMobileShareActivityDelivery, appendShareActivityFeed, clearShareActivityFeed, bindShareDeliveryDeps } from './share/share-activity-notify';
 import { loadMobileShareNotificationPrefs } from './lib/share-local-store';
 import { localRowIdForShare } from '@heyta/app-host';
+import { mobileShareActivityBody } from './lib/share-activity-copy';
 import { currentState } from './share/wiring';
 
 /**
@@ -152,14 +153,10 @@ function Shell(): React.JSX.Element {
     installMobileShareActivityDelivery({
       labels: {
         title: tr('common.brand'),
-        body: (kind) =>
-          kind === 'added'
-            ? tr('common.share.activity.added')
-            : kind === 'deleted'
-              ? tr('common.share.activity.deleted')
-              : // 「完成」那一档今天还不会有输入（词表只到 added/deleted，见
-                // `use-share-activity-signal.ts` 同一格的兜底理由）。留兜底句不留白。
-                tr('common.share.notif.activityCompleted'),
+        // 🔴 正文 = **清单名（可缺）+ 活动种类**（ADR-0071）。查名字与挑句子都在
+        // `lib/share-activity-copy.ts`（那是行为，判据在 node 里跑），这里只把当下的
+        // 合并视图交进去 —— 通知路径不发请求，离线也如实说话。
+        body: (shareId, kind) => mobileShareActivityBody(tr, currentState(), shareId, kind),
       },
       ports: {
         // 偏好读本机磁盘（ADR-0062 决策 7：零请求）；清单行绑定读合并视图。
