@@ -624,7 +624,7 @@ heyta 现在还不能对外发布。挡上线的只剩 4 件 —— 全都只差
 | 中英同步 | 结构测试 69 项通过（`packages/legal` 全套 **85 项**） |
 | 重生成 | `gen-site-copy`（zh/en 各 40 条）与 `gen-server-legal` 都跑过，两个 `--check` 回 **0** |
 | 门禁 | `check:legal-copy` / `check:legal-tools` / `check:legal-permissions` / `check:legal-host` / `check:legal-closure-truth` / `check:legal-gdpr` 全绿 |
-| 第五节现在怎么写 | 助手**在**这一档里，但仍要三条前提 + 工具选择那枚授权；并写明它是多轮、每轮各占一次额度计数 |
+| 第五节现在怎么写 | 🔴 **助手不在这一档里**（1.8，2026-10-26 按产品口径撤回 1.7 的那次"纳入"）：额度按次数计、助手一轮要跑好几次调用。代码侧同批把 `tool_calling` 从 `MANAGED_CAPABILITIES` 摘掉 —— 那才是"不提供"的实现 |
 
 🔴 **对外口径仍然是"以签核为准"**：这一版仍是草案，**没有真人签过**，所以能改的只是
 "文本与代码不再互相矛盾"，不是"可以对外宣传托管档带助手"。签之前按 1.6 那套说。

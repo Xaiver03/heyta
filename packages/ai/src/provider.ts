@@ -386,22 +386,22 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
       let requestBody: unknown;
 
       if (config.mode === 'managed') {
-        // ⚠️ **这段拦截的理由已经过期，行为留着只因为这条路径不在生产上。**
-        // 注释原文写的是"托管档今天不支持工具调用：服务端不转发 `tools`" —— 那句在
-        // 2026-10-25 已经不成立：`managed-proxy.routes.ts` 原样转发 `tools` / `tool_choice`
-        // （`:170-178`、`:427-437`），`MANAGED_CAPABILITIES` 也声明了 `tool_calling`
-        // （`managed-routing.ts:66`），而生产上的助手走的是 `invokeRouted()` 的托管分支
-        // （`routing.ts:1046-1078`），**不经过这里**。
-        // 所以这里的 `no-route` 只是这条历史 / 测试路径的边界，不代表产品口径：
-        // 托管档到底含不含助手，对外以法务 `ai-and-transfer` §5 为准（1.7 起为"含"）。
-        // 收掉这条拦截要连 `tests/managed-allowlist.spec.ts:449` 那条断言一起改，
-        // 属产品决定，本轮不动；文案不再声称"服务端不转发工具"那个已不成立的机制。
+        // 托管档**不提供工具调用** —— 这是产品口径（¥12 那档不含对话式助手），
+        // 与 `MANAGED_CAPABILITIES` 不声明 `tool_calling`、以及法务 `ai-and-transfer` §5
+        // 三处说同一件事。
+        //
+        // ⚠️ 机制别写错：真正让带工具的请求发不出去的**不是**"服务端不转发 `tools`"
+        // （`managed-proxy.routes.ts:170-178`、`:427-437` 照原样转发，那句早就不是事实），
+        // 而是**路由层**把托管端点以 `capability-missing` 排除掉（`managed-routing.ts`），
+        // 所以生产路径（`invokeRouted`）在发请求之前就停在 `no-route`。
+        // 这一段是那条历史 / 测试路径上的同一判断，保留它是为了让两条路给出同样的失败形状 ——
+        // 而不是让其中一条悄悄把 `tools` 丢掉、拿回一段"假装调用过工具"的纯文本。
         if (invocation.tools !== undefined && invocation.tools.length > 0) {
           return {
             ok: false,
             reason: 'no-route',
             message:
-              '这条通道不支持工具调用，请求没有发出去 —— 不是你的配置坏了。' +
+              '托管这一档不带工具调用，请求没有发出去 —— 不是你的配置坏了。' +
               '要用工具，请在设置里改选"使用自己的 AI 端点"。',
           };
         }

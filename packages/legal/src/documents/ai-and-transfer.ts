@@ -22,15 +22,12 @@
  *    是三件事都成立才说得通 —— ① 运营方在这台**实例**上配好了境内上游；② 你在设置里选了托管；
  *    ③ 你对**每个功能**单独授权。缺任何一条，正确写法是"这条路径在这台实例上不可用 /
  *    这个功能被拒绝"，不是"我们的 AI 会帮你做"。
- *    🔴 **2026-10-25 更正：这条原来写的是"不许把对话式助手写进这一档"，理由是托管端点
- *    不声明工具调用能力、带工具的请求发出之前就被拒。那个理由和那个结论**都已经不成立**。**
- *    中央侧这条链的分配声明了 `tool_calling`（`x-c` 仓 `services/ai-control/contract/products.json`，
- *    heyta 三环境各登记、判据是回包里有 `tool_calls` 而不是状态码），本仓
- *    `MANAGED_CAPABILITIES` 跟着声明，服务端代理把 `tools` / `tool_choice` 原样转发。
- *    **禁令换内容，不是被取消**：现在禁止把它写成"问一句就答完、不吃额度" ——
- *    助手是多步循环，一次会话发**多次**请求、把工具读回来的内容回送给模型、
- *    每一轮各占一次额度计数。这三件事必须一起写，否则"问一句"和实际发生的
- *    "问五次"是两笔账。
+ *    🔴 **不许把对话式助手写进这一档。** 这条禁令 2026-10-25 一度被撤（当时中央侧刚补上
+ *    `tool_calling`、三跳都验过 `tool_calls`），2026-10-26 按产品口径恢复：
+ *    **这一档的额度按次数计，而助手一轮要跑好几次模型调用** —— 口径与成本都不适合放进
+ *    ¥12 那一档。所以两个方向都要防：① 代码侧 `MANAGED_CAPABILITIES` **不声明**
+ *    `tool_calling`（声明了它就真能跑）；② 文本侧不许写成"含助手"。两边必须同批改。
+ *    ⚠️ **别用"能力没验过"当理由** —— 能力是验过的，是产品决定不用。
  * 3. **禁止把云端 AI 与端到端加密写在同一句话里。** 模型必须读到明文才能工作 ——
  *    这是定义外的例外，不是可调和的细节。
  *
@@ -168,7 +165,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: 'heyta 里存在一条**由我们统一提供、统一计费、由我们挑选模型**的云端 AI 的路（第二段是它的数据保留定案）。**这一档现在可以订阅**：设置里的供给方式可以选"由 heyta 托管"，对应 ¥12/月 那一档。🔴 但它**有前提**，这三件事必须一起读：',
+        text: 'heyta 里存在一条**由我们统一提供、统一计费、由我们挑选模型**的云端 AI 的路（第二段是它的数据保留定案）。**这一档现在可以订阅**：设置里的供给方式可以选"由 heyta 托管"，对应 ¥12/月 那一档。🔴 但它**有前提，而且只覆盖一部分功能**，这三件事必须一起读：',
       },
       {
         kind: 'ul',
@@ -188,7 +185,7 @@ const zh = [
       },
       {
         kind: 'callout',
-        text: '**这一档现在提供，但它不随订阅生效** —— 订阅买的是"我们替你运维那台同步服务器，加上我们的云端 AI 额度"，**不是**一份"把内容发出去"的同意。你要用的是每个功能各自的那枚开关，开一次算一次，关掉即停。**对话式助手现在也在这条链上**：托管端点已声明工具调用能力，带工具的请求会被转发给上游，所以它在托管档上真的拿得到工具调用，而不是被拦在发出之前。它用的仍是**工具选择**那枚授权 —— 授权对象是 `tool-calling` 这个功能加托管这个目的地，不是"助手"这个名字；在这一档上它跑几轮就发几次请求，**每一轮各占一次额度计数**，某一步要带出清单之外的字段就停住不发（第三节写的就是这套）。自备端点那条路仍然免费、不限次，本文件第四节写的全是它。',
+        text: '**这一档现在提供，但它不随订阅生效** —— 订阅买的是"我们替你运维那台同步服务器，加上我们的云端 AI 额度"，**不是**一份"把内容发出去"的同意。你要用的是每个功能各自的那枚开关，开一次算一次，关掉即停。**并且这一档不含对话式助手**：托管端点在路由上不声明工具调用能力，带工具的请求在**发出之前**就被排除（用户看到"没有可用的端点"，一个字节都不转发）。⚠️ 这**不是**"能力做不到"—— 那些模型本身能调工具，是我们**刻意不把这一档做成那样**：这一档的额度按次数计，助手一轮要跑好几次调用，口径与成本都不适合放进 ¥12。要助手，请用你自己填的端点 —— 那条路免费、不限次，本文件第四节写的全是它。',
       },
       {
         kind: 'p',
@@ -381,7 +378,7 @@ const zh = [
         kind: 'ul',
         items: [
           '**加任何一个新的出境字段**：第三节那张表必须先扩、再上线 —— 出境面必须在数据被写进请求之前收窄，披露不能虚报，也不能少报。',
-          '**提供云端 AI**：第五节整段重写。它列的三件前置条件里，**保留期那一件已在 2026-10-05 定案并写进第五节**，另两件没有 —— 逐项可撤销的单独同意，以及第 8 节那一格仍然**不下结论**的定性；届时"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。🔴 **2026-10-25：这一条已经触发过两次**（1.6 开放订阅、1.7 把对话式助手纳入这一档），所以上面"另两件没有"里的第一件已经不是"没写"，而是"写了、还差人签"。仍然不变的那一半是第 8 节那一格：托管这一档的定性不替你自己配置的境外端点作答。',
+          '**提供云端 AI**：第五节整段重写。它列的三件前置条件里，**保留期那一件已在 2026-10-05 定案并写进第五节**，另两件没有 —— 逐项可撤销的单独同意，以及第 8 节那一格仍然**不下结论**的定性；届时"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。🔴 **2026-10-25/26：这一条触发过两次、又撤回一次** —— 1.6 开放订阅、1.7 把对话式助手纳入这一档，1.8 按产品口径把它撤回（额度按次数计，助手一轮要跑好几次调用）。所以助手那一格的真源现在只有一个：`MANAGED_CAPABILITIES` **不声明** `tool_calling`。仍然不变的那一半是第 8 节那一格：托管这一档的定性不替你自己配置的境外端点作答。',
           '**把"受保护条目"做进产品**：第六节那条提示才允许从"警告"改成"承诺"。在此之前，任何"加密条目读不出来"的表述都不写。',
         ],
       },
@@ -424,6 +421,11 @@ const zh = [
             '1.7',
             '2026-10-25',
             '**第五节里那句"这一档不含对话式助手"被撤掉，因为它的理由已经不再成立** —— 中央侧这条链的分配声明了 `tool_calling`（heyta 三个环境逐跳实测，判据是回包里的 `tool_calls` 而不是状态码），本仓托管端点跟着声明，服务端代理把 `tools` / `tool_choice` 原样转发。所以结论从"不含"改成"含"，**但换来的不是"订阅就送助手"**：它仍然是那三条前提加工具选择那枚授权，而且这一档上跑几轮就发几次请求、每一轮各占一次额度计数。同时补上第三节此前根本没写的一件事：助手是**多轮**形态，会把工具读回来的内容回送给模型 —— 这三句以前只能从界面上那句"最多 N 次模型调用"间接看出来，写进政策才叫披露。第五节第一段那个"只覆盖一部分功能"一并删掉（六条功能现在都有路）。⚠️ 本文件整体仍是草案，未经法务复核；**这一版的改动需要有人签**，签之前对外口径仍按 1.6 那套说。',
+          ],
+          [
+            '1.8',
+            '2026-10-26',
+            '**1.7 那句"助手在这一档里"撤回成"不含"** —— 1.7 是当天按"能力已验过"写进去的，1.8 按产品口径改回：这一档的额度**按次数计**，助手一轮要跑好几次模型调用，口径与成本都不适合放进 ¥12。改的是**产品决定**，不是发现写错了，所以两个方向同批落：代码侧 `MANAGED_CAPABILITIES` 不声明 `tool_calling`（声明了它就真能跑；不声明则带工具的请求在路由层就被 `capability-missing` 排除），文本侧这里写"不含"。**§3 那段关于"助手是多轮出境"的说明保留** —— 它在你自己填的端点上仍然成立。⚠️ 这一版起 `status: effective`（产品负责人 2026-10-26 明确不再走签核流程、代码与文本一致即可对外）—— 本文件第一次不是草案。',
           ],
         ],
       },
@@ -576,7 +578,7 @@ const en = [
       },
       {
         kind: 'callout',
-        text: '**This tier is offered now, but it does not follow from a subscription** — what you buy is "we run that sync server for you, plus an allowance of our cloud AI", **not** a consent to send content out. What you use is each feature\'s own switch, one grant at a time, and it stops when you switch it off. **The conversational assistant sits on this path now too**: the hosted endpoint declares tool-calling capability and a request carrying tools is forwarded to the upstream, so on this tier the assistant genuinely gets tool calls rather than being stopped before it leaves. It still uses the **Tool selection** grant — what you authorise is the `tool-calling` feature plus the hosted destination, not the word "assistant"; on this tier it sends one request per step, **each step counting once against the allowance**, and if a step would carry a field outside the disclosed list it stops without sending (section three describes exactly this). An endpoint you configure yourself remains free and unlimited, and section four describes it in full.',
+        text: '**This tier is offered now, but it does not follow from a subscription** — what you buy is "we run that sync server for you, plus an allowance of our cloud AI", **not** a consent to send content out. What you use is each feature\'s own switch, one grant at a time, and it stops when you switch it off. **And this tier does not include the conversational assistant**: on the routing table the hosted endpoint declares no tool-calling capability, so a request carrying tools is ruled out **before it leaves** ("no available endpoint" is what the user sees, and not one byte is forwarded). ⚠️ This is **not** "the capability is missing" — those models can call tools; we deliberately do **not** build the tier that way, because the allowance here is counted in requests and one assistant turn takes several calls, so neither the promise nor the cost belongs in ¥12. For the assistant, use an endpoint you configure yourself — that path is free, unlimited, and is what section four describes in full.',
       },
       {
         kind: 'p',
@@ -767,7 +769,7 @@ const en = [
         kind: 'ul',
         items: [
           '**Any new egress field**: the table in section three must be widened before the feature ships. The outbound surface has to be narrowed before data is written into the request, and disclosure may neither overstate nor understate.',
-          '**Cloud AI being offered**: section five is rewritten end to end. Of the three preconditions it names, **the retention period was settled on 2026-10-05 and is written into section five**; the other two are not — a per-feature, revocable, separate consent, and the characterisation in section 8 which still **stays open**. At that point "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions and may never be merged into one sentence. 🔴 **2026-10-25: this trigger has now fired twice** (1.6 opened the subscription, 1.7 brought the conversational assistant onto this tier), so the first of those "other two" is no longer unwritten — it is written and awaiting a signature. What does not change is the cell in section 8: the characterisation of this tier says nothing about an endpoint you configure abroad.',
+          '**Cloud AI being offered**: section five is rewritten end to end. Of the three preconditions it names, **the retention period was settled on 2026-10-05 and is written into section five**; the other two are not — a per-feature, revocable, separate consent, and the characterisation in section 8 which still **stays open**. At that point "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions and may never be merged into one sentence. 🔴 **2026-10-25/26: this trigger fired twice and was then rolled back once** — 1.6 opened the subscription, 1.7 brought the conversational assistant onto this tier, and 1.8 withdrew it again on the product rule (the allowance is counted in requests, and one assistant turn takes several calls). So there is now exactly one source of truth for that cell: `MANAGED_CAPABILITIES` does **not** declare `tool_calling`. What does not change is the cell in section 8: the characterisation of this tier says nothing about an endpoint you configure abroad.',
           '**"Protected entries" becoming a product concept**: only then may the callout in section six change from a warning into a promise. Until then, no sentence claiming "encrypted entries cannot be read" is written.',
         ],
       },
@@ -811,6 +813,11 @@ const en = [
             '2026-10-25',
             '**The sentence in section five saying this tier "does not include the conversational assistant" is withdrawn, because its premise no longer holds** - the allocation for this chain on the central side declares `tool_calling` (measured hop by hop across all three heyta environments, judged by `tool_calls` in the response body rather than by a status code), the hosted endpoint here declares it too, and the server proxy forwards `tools` / `tool_choice` verbatim. So the conclusion moves from "excluded" to "included", **which does not mean a subscription hands you the assistant**: the same three preconditions apply, plus the Tool selection grant, and on this tier it sends one request per step with each step counting once against the allowance. The change also adds something section three never said: the assistant is a **multi-step** form that returns what the tools read back to the model - until now only inferable from the "at most N model calls" line on screen, and written into the policy it becomes a disclosure. The "covers only part of the features" caveat in the first paragraph of section five is dropped as well (all six features now have a route). ⚠️ The document as a whole remains a draft that has not been reviewed by counsel; **this revision needs a signature**, and until it is signed the external line stays the one in 1.6.',
           ],
+          [
+            '1.8',
+            '2026-10-26',
+            '**1.7 said the assistant sits on this tier; 1.8 puts it back to "not included"** - 1.7 wrote it that same day on the grounds that the capability had been verified; 1.8 reverts on the product rule: the allowance here is **counted in requests**, and one assistant turn takes several model calls, so neither the promise nor the cost belongs in ¥12. This is a **product decision, not the correction of a mistake**, so both directions move together: the code stops declaring `tool_calling` in `MANAGED_CAPABILITIES` (declaring it is what makes it run; undeclared, a request carrying tools is excluded at the routing table as `capability-missing`), and this text says "not included". **The paragraph in section three about the assistant being multi-step stays** - it still holds on an endpoint you configure yourself. ⚠️ From this revision the document is `status: effective` (on 2026-10-26 the product owner said the sign-off round is not needed and consistency between code and text is what counts) - the first time this document has not been a draft.',
+          ],
         ],
       },
     ],
@@ -846,18 +853,24 @@ export const aiAndTransfer: LegalDocument = {
   // （含，但仍是三条前提 + 工具选择那一枚授权）。同一版补上第三节此前缺失的
   // "助手是多轮、多请求、每一轮各占一次额度计数"，并删掉第五节的"只覆盖一部分功能"。
   // 换号的理由与 1.3–1.6 同一条：同意留痕要能回答"他同意的那一版里有没有这一句"。
-  version: '1.7',
-  status: 'draft',
-  updatedDate: '2026-10-25',
+  // 🔴 1.7 → 1.8（2026-10-26）：把 1.7 的"含助手"撤回成"不含" —— 但**理由换成了产品决定**
+  // （这一档的额度按次数计，助手一轮要跑好几次调用），不是"能力没验过"。同批把
+  // `MANAGED_CAPABILITIES` 里的 `tool_calling` 摘掉：那才是"不提供"的实现，只改文本不改它
+  // 就是"对外说不含、代码里还能跑"。同时本文件转为生效（产品负责人 2026-10-26 明确
+  // 不需要签核流程，代码与文本一致即可对外）—— 它在此之前一直是草案。
+  version: '1.8',
+  status: 'effective',
+  updatedDate: '2026-10-26',
+  effectiveDate: '2026-10-26',
   title: {
     'zh-CN': 'AI 功能与数据流向',
     en: 'AI Features and Where Your Data Goes',
   },
   summary: {
     'zh-CN':
-      'AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权；对话式助手也在这一档里，它一次会话会发多次请求、每一轮各占一次额度。',
+      'AI 功能默认全部关闭；每个功能出境哪些字段、发出去的是原文而不是摘要；目的地默认是你自己填的端点、heyta 服务器不中转。由我们提供的云端 AI 现在可以订阅，但它只在运营方配好上游的实例上可用、要你在设置里选托管、并对每个功能单独授权，且不含对话式助手。',
     en:
-      'AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, and only per feature with your own consent; the conversational assistant is part of that tier too, taking several requests per session with each one counting against the allowance.',
+      'AI features ship switched off; what each feature sends out field by field, as your original text rather than a redacted summary; by default the destination is the address you type, and heyta servers are not a relay. The cloud AI operated by us can now be subscribed to, but it only works on an instance where the operator configured an upstream, only after you choose hosted in Settings, and only per feature with your own consent, and it does not include the conversational assistant.',
   },
   sections: { 'zh-CN': zh, en },
 };
