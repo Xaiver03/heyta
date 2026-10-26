@@ -25,7 +25,8 @@
  *
  * ## 今天投得出去的那一格：应用内
  *
- * 「未读计数」+「共享动态」条目（通知中心与共享屏都读这一份）。
+ * 「未读计数」+「共享动态」条目 —— **消费的就是通知中心那一档**
+ * （`screens/NotificationsScreen.tsx` 第三个 tab 订阅动态、入口读未读数）。
  * ⚠️ 这份清单**只活在本机内存**：web 那端的投递对象是操作系统通知中心，
  * 而移动端的这一格今天只有应用内 —— 冷启动后动态清零是**已知边界**，不是丢数据
  * （内容本身在 share 日志里，重进评论区就看得见）。
@@ -50,11 +51,22 @@ export interface ShareActivityFeedEntry {
   readonly at: number;
   /** 这份共享在本机对应哪条清单行（`''` = 还没绑定，例如刚入群那台设备）。 */
   readonly projectId: string;
+  /**
+   * 投递那一刻**已经组装好**的那句话（ADR-0071：清单名（可缺）+ 活动种类，条目内容不进）。
+   * 界面只画它、不再拼句子 —— 拼句子这一步归 `@heyta/ui` 的 `shareActivityNotificationBody`，
+   * 由宿主把词表喂进去（与 web 的 `use-share-activity-signal` 同一分层）。
+   */
+  readonly body: string;
 }
 
 export interface ShareActivityNotifyLabels {
   readonly title: string;
-  readonly body: (kind: ShareActivityKind) => string;
+  /**
+   * 正文：给**这一份共享**（`shareId`）与这一类活动组装那句话。
+   * 🔴 签名带 `shareId` 是因为清单名要按 share 查本机那一行 —— 不带它，宿主拿不到名字，
+   *    动态就只能永远说"有人动了共享清单"，那是 ADR-0071 里回落那一档被误当成默认档。
+   */
+  readonly body: (shareId: string, kind: ShareActivityKind) => string;
 }
 
 /**
@@ -169,6 +181,7 @@ export function deliverShareActivities(
       seq: args.latestSeq,
       at: now,
       projectId: args.ports.projectIdFor(args.shareId),
+      body: args.labels.body(args.shareId, kind),
     };
     if (args.ports.inApp !== undefined) {
       args.ports.inApp(entry);
@@ -182,9 +195,8 @@ export function deliverShareActivities(
   return { delivered };
 }
 
-/* ── 消费者装配（入口调一次；幂等） ─────────────────────────────────────── */
+/* ── 消费者装配（入口调；重复调用只换标签与端口，通道上仍只有一个消费者） ─── */
 
-let installed = false;
 let unsubscribe: (() => void) | undefined;
 
 /**
@@ -206,11 +218,11 @@ export function installMobileShareActivityDelivery(
   void shareRosterTargetShareIds;
   const { installMobileShareSignals } = requireModule();
   installMobileShareSignals();
-  if (installed) {
-    // 已经装过（严格模式 effect 跑两次 / 重新挂载）：换的是标签与端口，订的仍是同一条通道。
-    return;
-  }
-  installed = true;
+  // 🔴 **每次装配都换一份标签与端口**：先摘旧订阅再订新的，所以通道上永远只有一个消费者，
+  // 而闭包里的 `args` 就是当下那一份。早先这里是"装过就直接 return"，注释却写着
+  // "换的是标签与端口" —— 代码没兑现：语言切换后 `tr` 换了人，effect 重跑却被那道
+  // 早退丢掉，之后的每一条动态仍在说**切换前**的语言。
+  unsubscribe?.();
   unsubscribe = subscribeShareActivity((shareId, latestSeq, activities) => {
     deliverShareActivities({
       shareId,
@@ -225,7 +237,6 @@ export function installMobileShareActivityDelivery(
 export function uninstallMobileShareActivityDelivery(): void {
   unsubscribe?.();
   unsubscribe = undefined;
-  installed = false;
 }
 
 /** 只给判据：回到"没装过"。 */

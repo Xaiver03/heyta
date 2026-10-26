@@ -7,7 +7,13 @@
  * —— 邀请得会员是已上线的运营功能，移动端登录用户完全看不见。
  * 本屏与 web 的 `InboxBell` 消费**同一批函数、同一个封闭词表**
  * （`@heyta/domain` 的 `parseNotificationPayload`，见 `lib/inbox-display.ts`），
- * 形态按移动壳惯例：第二层屏（顶栏返回）+ 页内两 tab（chips）。
+ * 形态按移动壳惯例：第二层屏（顶栏返回）+ 页内三 tab（chips）。
+ *
+ * 第三档「共享动态」的**数据源不是服务端**：它读的是本机那份内存动态
+ * （`share/share-activity-notify.ts`，实时信号 + 本机偏好闸门投进来的）。
+ * 🔴 这一格的存在理由是产品定义里那句"收得到实时信号并**按本机偏好打扰用户**"：
+ * 投递面早就在写动态，而移动端的系统横幅今天做不到（原因登记在那个文件的文件头），
+ * 所以**没有这一档 = 投了没人看**，那一半承诺不成立。它零请求、离线也照样说话。
  *
  * 三条与 web 同源的纪律（那边实测换来的，别"简化"掉）：
  *
@@ -45,6 +51,12 @@ import { Button, Card, Chip, HStack, Screen, Stack, Text } from '../ui/kit';
 import { toRenderableNotifications } from '../lib/inbox-display';
 import { privacyConsent } from '../privacy/consent-gate';
 import { readSyncConfig } from '../sync/config';
+import {
+  markShareActivityRead,
+  shareActivityFeed,
+  subscribeShareActivityFeed,
+  type ShareActivityFeedEntry,
+} from '../share/share-activity-notify';
 import { useTokens } from '../theme';
 
 type LoadState = 'ready' | 'unconfigured' | 'unavailable' | null;
@@ -66,7 +78,7 @@ export function NotificationsScreen({
   const baseUrl = config?.serverUrl ?? '';
   const getToken = useCallback(async () => config?.token, [config]);
 
-  const [tab, setTab] = useState<'notifications' | 'activity'>('notifications');
+  const [tab, setTab] = useState<'notifications' | 'activity' | 'share'>('notifications');
 
   const [notifications, setNotifications] = useState<readonly AccountNotificationItem[]>([]);
   const [notificationsState, setNotificationsState] = useState<LoadState>(null);
@@ -81,6 +93,14 @@ export function NotificationsScreen({
   const [loadingActivity, setLoadingActivity] = useState(false);
 
   const [shareFailed, setShareFailed] = useState(false);
+
+  /**
+   * 「共享动态」那一档的数据：本机内存里那份投递清单（**零请求**）。
+   * 初始值用惰性初始化读当下那一份；之后的每一次投递都由订阅推进重画。
+   */
+  const [shareEntries, setShareEntries] = useState<readonly ShareActivityFeedEntry[]>(
+    shareActivityFeed,
+  );
 
   const loadNotifications = useCallback(
     async (allowMarkRead: boolean): Promise<void> => {
@@ -143,6 +163,24 @@ export function NotificationsScreen({
   useEffect(() => {
     if (tab === 'activity' && campaigns === null) void loadActivity();
   }, [tab, campaigns, loadActivity]);
+
+  // 动态是"投递那一刻写进本机内存"的，不是本屏拉来的：订阅它，投一条画一条。
+  useEffect(
+    () =>
+      subscribeShareActivityFeed(() => {
+        setShareEntries(shareActivityFeed());
+      }),
+    [],
+  );
+
+  /**
+   * 打开「共享动态」那一档即已读 —— 与文件头纪律 3（通知列表"打开即已读"）同一形状。
+   * 🔴 只在这一档**真被打开**时清：没看见就把入口徽标按下去，等于替用户认定他读过了。
+   * `markShareActivityRead()` 在计数已经是 0 时自己返回，所以这里不会来回触发。
+   */
+  useEffect(() => {
+    if (tab === 'share') markShareActivityRead();
+  }, [tab]);
 
   const renderable = toRenderableNotifications(notifications);
   const invite = campaigns?.find((c) => c.kind === 'invite' && c.invite !== undefined)?.invite;
@@ -359,14 +397,54 @@ export function NotificationsScreen({
     );
   };
 
+  /**
+   * 「共享动态」那一档：本机那份投递清单，逐条画**投递那一刻组装好的那句**
+   * （ADR-0071：清单名（可缺）+ 活动种类）。这里不拼句子、不查名字、不发请求 ——
+   * 界面只做一件事：把已经过了闸门的读数如实画出来。
+   */
+  const shareBody = (): React.JSX.Element => {
+    const note = (
+      <Text variant="caption" tone="subtle" testID="inbox-share-note">
+        {t('mobile.inbox.share.note')}
+      </Text>
+    );
+    if (shareEntries.length === 0) {
+      return (
+        <Stack>
+          <EmptyState title={t('mobile.inbox.share.empty')} testID="inbox-share-empty" />
+          {note}
+        </Stack>
+      );
+    }
+    return (
+      <Stack testID="inbox-share-list">
+        {shareEntries.map((entry) => (
+          <Card key={`${entry.at}:${entry.shareId}:${entry.kind}`}>
+            <HStack align="center">
+              <Text variant="row-meta" tone="default" style={{ flex: 1 }}>
+                {entry.body}
+              </Text>
+              <Text variant="caption" tone="subtle">
+                {formatCompactDate(entry.at, Date.now())}
+              </Text>
+            </HStack>
+          </Card>
+        ))}
+        {note}
+      </Stack>
+    );
+  };
+
   return (
     // 返回是顶栏动作 —— 本屏是「我的」下面的第二层，没有第 6 个 tab。
     <Screen
       title={t('mobile.inbox.title')}
       actions={[{ icon: 'action.back', label: t('mobile.inbox.back'), onPress: onBack }]}
     >
-      <HStack>
+      {/* 三枚 chip 在窄屏（英文 375pt）会放不下 —— 允许换行，不许挤成一枚看不见的。 */}
+      <HStack style={{ flexWrap: 'wrap' }}>
         <Chip
+          testID="inbox-tab-notifications"
           label={t('mobile.inbox.tab.notifications')}
           selected={tab === 'notifications'}
           onPress={() => {
@@ -374,14 +452,27 @@ export function NotificationsScreen({
           }}
         />
         <Chip
+          testID="inbox-tab-activity"
           label={t('mobile.inbox.tab.activity')}
           selected={tab === 'activity'}
           onPress={() => {
             setTab('activity');
           }}
         />
+        <Chip
+          testID="inbox-tab-share"
+          label={t('mobile.inbox.tab.share')}
+          selected={tab === 'share'}
+          onPress={() => {
+            setTab('share');
+          }}
+        />
       </HStack>
-      {tab === 'notifications' ? notificationsBody() : activityBody()}
+      {tab === 'share'
+        ? shareBody()
+        : tab === 'notifications'
+          ? notificationsBody()
+          : activityBody()}
     </Screen>
   );
 }

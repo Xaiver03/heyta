@@ -96,6 +96,10 @@ import ShareSpaceScreen from './ShareSpaceScreen';
 import { ListsSection } from './ListsSection';
 import { NotesSection } from './NotesSection';
 import { NotificationsScreen } from './NotificationsScreen';
+import {
+  shareActivityUnreadCount,
+  subscribeShareActivityFeed,
+} from '../share/share-activity-notify';
 import { SecurityScreen } from './SecurityScreen';
 import { SettingsScreen, type SettingsSectionKey } from './SettingsScreen';
 import { TagsSection } from './TagsSection';
@@ -433,9 +437,10 @@ export function ProfileScreen(): React.JSX.Element {
   /**
    * 「通知」入口行的未读徽标（批二，多端覆盖审计 P0-2）。
    *
-   * 数据源只有 inbox 的 `GET /api/notification`（未配置/未同意时**连请求都不发**
+   * 这一格只取 inbox 的 `GET /api/notification`（未配置/未同意时**连请求都不发**
    * —— 出口闸的语义），读取时机三处：本屏挂载、从通知中心返回、同意状态变化
    * （首启点了同意之后徽标才可能出现 —— 不订阅就会记下"点了同意但没反应"）。
+   * ⚠️ 画在入口上的是它**加上**下面那格（共享动态的未读数）之后的数，见 `inboxBadge`。
    */
   const [inboxUnread, setInboxUnread] = useState(0);
   const fetchInboxUnread = useCallback((): Promise<void> => {
@@ -455,6 +460,25 @@ export function ProfileScreen(): React.JSX.Element {
       void fetchInboxUnread();
     });
   }, [fetchInboxUnread]);
+
+  /**
+   * 共享动态的未读数（本机内存那一份，零请求）—— 和上面那格**相加**成同一枚徽标。
+   *
+   * 这一格存在的理由不是"多个数字好看"：移动端的系统横幅今天做不到（原因登记在
+   * `share/share-activity-notify.ts` 文件头），所以产品定义里"按本机偏好打扰用户"
+   * 落到界面上的**唯一**一处回执就是这个数。少了它，投递面写进动态的每一条都得用户
+   * 自己想到去点开通知中心第三档才看得见 —— 那是"投了没人看"，不是"打扰"。
+   * 🔴 初始值用惰性初始化读当下那一份：动态可能在本屏挂载之前就已经攒上了。
+   */
+  const [shareUnread, setShareUnread] = useState(shareActivityUnreadCount);
+  useEffect(
+    () =>
+      subscribeShareActivityFeed(() => {
+        setShareUnread(shareActivityUnreadCount());
+      }),
+    [],
+  );
+  const inboxBadge = inboxUnread + shareUnread;
 
   /**
    * 昵称：服务端 `User` 上的**一列明文**，不是 op、不进 op-log。
@@ -844,9 +868,9 @@ export function ProfileScreen(): React.JSX.Element {
       leading: (
         <HStack gap="tight" align="center">
           <Icon name="task.reminder" size="sm" color={tokens['color.foreground-muted']} />
-          {inboxUnread > 0 ? (
+          {inboxBadge > 0 ? (
             <View
-              accessibilityLabel={t('mobile.inbox.badge.aria', { count: inboxUnread })}
+              accessibilityLabel={t('mobile.inbox.badge.aria', { count: inboxBadge })}
               style={{
                 minWidth: tokens['space.6'],
                 paddingHorizontal: tokens['space.2'],
@@ -857,7 +881,7 @@ export function ProfileScreen(): React.JSX.Element {
               }}
             >
               <Text variant="caption" style={{ color: tokens['color.on-primary'] }}>
-                {inboxUnread}
+                {inboxBadge}
               </Text>
             </View>
           ) : null}
