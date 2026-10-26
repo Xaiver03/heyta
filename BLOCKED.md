@@ -12269,3 +12269,28 @@ B229 修掉，这两条会一起绿。
 🔴 仍然**不能**说"CI 绿"：CI 卡在 `gen-site-copy --check`，原因是**另一条线的半提交**
 （HEAD 的 locale 是新口径、HEAD 的法律源还是旧口径，产生新口径的源改动在他们工作区里未提交）。
 那一条不属于本会话，也不该由本会话回退别人的政策文案。
+
+### B231 追记（2026-10-26 晚 · 后台那一格发完之后跑的线上验收）：**同一批半提交在 `live-site` 那一族的读数**
+
+后台四格发上线后，按 `docs/runbooks/deployment.md` §3.7 第 4 条跑了整族线上判据：
+
+    cd e2e && npx playwright test --config playwright.live-site.config.ts --reporter=line
+    →  46 passed / **5 failed**（2.3 分钟）
+
+五条红**全在落地页 / 法务页那一族**，与上面那段"CI 卡在 `gen-site-copy --check` 的半提交"是同一个根：
+
+| 红的那条 | 它要的 | 线上现量 |
+|---|---|---|
+| `live-domain.spec.ts:105` / `:168` | 落地页入口全程新域名、无旧域名残留 | `toHaveAttribute` 那一步 `element(s) not found` |
+| `live-signin-entry.spec.ts:104` / `:195` | 导航「登录」的 href 带 `?signin` | 拿到的 href **一个查询参数都没有**（`Received array: []`）；`/var/www/heyta-landing/index.html` 里 `signin` 出现 **0** 次（那份文件今天 21:21 被重发过） |
+| `live-legal.spec.ts:175` | `/legal/ai-and-transfer/` 要有"尚未生效"横幅 | 线上那份没有 —— 而工作区里 `apps/landing/{,en/}legal/ai-and-transfer/index.html` 两处**还是未提交的改动** |
+
+⚠️ 归属：这三件都是**落地页 / 法务文案那条线**的（本会话一行没碰 `apps/landing`），
+修法也不是回退政策文案，而是把那半提交补完再发一次落地页。
+
+✅ 本会话那一格的正面证据（同一趟里）：`live-admin-entry.spec.ts` 两条**都过**
+（`:47` 与 `/app/` 同一份 HTML + 不缓存 + 带斜杠 301；`:69` 未登录那句是"进不去"而不是"没配地址"，
+且三个后台端点在服务端 401）。另外单独取过：
+`GET /api/admin/users/23` → 200 且响应里**有** `entitlements` 那一格
+（`hosting`/`ai` = `NO_SUBSCRIPTION`，`automation` = `ENTITLEMENT_MODE_UNCONFIGURED`，`sources` 全 0），
+`GET /api/admin/subscriptions/grants?limit=50&offset=0` → 200 `total=5 offset=0 limit=50`。
