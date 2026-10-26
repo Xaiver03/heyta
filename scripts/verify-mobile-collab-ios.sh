@@ -1465,6 +1465,9 @@ case "$AUTH_SHAPE" in
     env_bail "评论那一屏的树读不出 ⇒ 不拿「没数到」当「形状一致」"
     ;;
 esac
+# 🔴 这条读数要落在**取证目录**里，不许只活在一次性的控制台日志上：日志随清场消失，
+#    而台账里那句"现量命令"就会指到一个不存在的地方（#529 那一族的近亲）。
+printf '%s\n' "$AUTH_SHAPE" > "$EVIDENCE/auth-shape.txt"
 if printf '%s' "$AUTH_SHAPE" | grep -q 'offenders=.'; then
   shot "14b-署名两行形状不一"
   bad "界面上出现了不像账号 id 的兜底署名（有一行把成员行 id 当作者写了）：$AUTH_SHAPE"

@@ -782,8 +782,11 @@ ADR-0050 那句「RN port 只传递 base64 root key」加了**限定范围**的�
    `userId`，于是同一屏两形。修法两条：`init` 从**成员视图那一行**读回 `userId` 并硬要求
    （读不到就按判据退出，不许兜），`add-comment` 缺 `ownerUserId` 直接 `die`。
    常驻尺：装置第 9 步新增署名形状判据（`AUTH_SHAPE`，只比形状不比值：几行、前缀各几位、
-   有没有非同类的一行），第 33 跑读数 `$ROOT/apps/mobile/evidence/<最新一趟>/` 里那句
-   `两行兜底署名同一种形状`（现量：`grep -h AUTH_SHAPE\|署名同一种形状 .scratch-collab-m6/run3*-console.log | tail -1`）。
+   有没有非同类的一行），读数**逐趟落在取证目录**：`apps/mobile/evidence/<趟>/auth-shape.txt`
+   （现量：`cat apps/mobile/evidence/$(ls -1 apps/mobile/evidence | tail -1)/auth-shape.txt`）。
+   ⚠️ 这枚落盘是从第 35 跑**之后**那版装置开始有的，所以 33/35 两趟的读数只在这节的台账文字里：
+   第 35 跑 `n=4 digits=4 offenders=`（空 = 无一枚是别的形状）。把读数只留在一次性控制台日志上
+   这件事本身也一并修了 —— 那是 #529 那一族（锚点指向会被清掉的载体）。
    完整教训（"装置替别的设备写业务字段时不许 `??` 兜一个替代品"）记在环境陷阱 #577。
 
 **本批修掉的四处产品缺陷**（前三处全部只在真机上看得见，源码级读数一条都抓不到；第四处是**两壳同形**，源码级读数同样抓不到 —— 它抓的是"有没有这一条路径"，而那条路径本来就不存在）：
