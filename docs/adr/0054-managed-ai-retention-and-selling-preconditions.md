@@ -434,3 +434,30 @@ p1 `DeepSeek 官方 / deepseek-flash`、p2 `DeepSeek 官方 / deepseek-v4-pro`�
 模型。⚠️ 因此**供应商级仍是单点**，且备用跳（v4-pro）价目是 flash 的 4.5×/3.4×，只在主跳失败时用到。
 回滚杆：x-c 仓 `tools/ai-control/repoint-heyta-domestic.mjs`（双向、默认 dry-run）。详见
 `docs/plans/launch-blockers.md` §3.2 尾。**在它被签核之前，托管档不要对外宣传。**
+
+### 11.7 2026-10-26：服务端镜像重建了 —— 指纹到 1.7，**45 天清理作业也因此有了在跑的读数**
+
+> §11.6 只做到"法务文本改了、站点发了"。这一节补部署那一半，并顺手关掉 §8 那条
+> "清理作业线上还没在跑"的观察项（那是本节之前唯一的未闭合项）。
+
+| 判据 | 读数（2026-10-26 12:0x CST，`ubuntu-jcli`） |
+|---|---|
+| 镜像 | 从 **main 的干净导出**（`git archive d90db1440`）构建，不拿生产那份拷贝树 —— 后者是 23 小时前的，`packages/ui` 等输入已落后 `main` |
+| 运行中容器里的指纹 | `grep ai-and-transfer@ /app/dist/src/legal.generated.js` ⇒ **`ai-and-transfer@1.7`**（不再需要"站点 1.7 / 服务端 1.6"这句限定） |
+| 健康 | `/health` ⇒ `{"status":"ok","db":"connected"}`；`/`、`/app/`、`/legal/ai-and-transfer/` 全 200 |
+| 回滚 | 旧镜像留成 `supersync:pre-legal17-20261026T120129`；回退 = 重新 tag 成 `supersync:local` + `docker compose up -d supersync` |
+| 迁移 | **没跑**（这次只改一个生成常量，无 schema 变化）；不是"忘了"，见下 |
+
+⚠️ **这次没走 `server/scripts/deploy.sh`**：那个脚本的口径是"拉代码 → 迁移 → 换容器"，
+而生产 `~/heyta` 不是 git 仓库（`git pull` 只会打警告），且本次零迁移。所以做的是
+`docker build` + `compose up -d supersync`；构建上下文是 main 的导出，不是那棵拷贝树。
+
+🔴 **顺带关闭一条观察项**（§8 第 2 段那句"⚠️ 但线上还没在跑 —— 生效要等服务端镜像重建"）：
+容器启动日志里有 `Cleanup [ai-usage-counters]: removed 0 row(s)` —— 那条每日清理任务里的
+`purgeExpiredAiUsageCounters`（`server/src/ai/metering.ts`，两个条件是与：`updated_at < now-45d`
+**且** `period_anchor < now`）**确实在跑**。"removed 0" 是"没有过期行可删"，不是"没执行"。
+
+⚠️ **但这一条不能顺推成"法务可以写自动删除了"**：法务 §5 那句"『到期就删』本轮没有落地"
+说的是**运行日志那条通道**（运维元数据走日志，日志没有轮转与到期删除机制），
+而 45 天清理删的是**计数表**那一行 —— 两件事，不要互相顶替。要让法务写满，
+缺的是"一条真的过期行被删掉"的读数，以及日志侧那条轮转作业。
