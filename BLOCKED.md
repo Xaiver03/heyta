@@ -12294,3 +12294,40 @@ B229 修掉，这两条会一起绿。
 `GET /api/admin/users/23` → 200 且响应里**有** `entitlements` 那一格
 （`hosting`/`ai` = `NO_SUBSCRIPTION`，`automation` = `ENTITLEMENT_MODE_UNCONFIGURED`，`sources` 全 0），
 `GET /api/admin/subscriptions/grants?limit=50&offset=0` → 200 `total=5 offset=0 limit=50`。
+
+### B232（2026-10-27 · 重置密码那一族的同族排查顺手量到的）：**线上落地页的「登录」入口现在是坏的，而且线上跑的是比 HEAD 旧的一份构建**
+
+排查"还有哪些从邮件/外部链接跳进站点的入口是异常的"（B231 那族的第一条判据）时，
+用真浏览器复量了 `live-signin-entry.spec.ts`：
+
+    cd e2e && npx playwright test --config playwright.live-site.config.ts live-signin-entry
+    →  1 passed / **2 failed**（`:104` 中文导航、`:195` 英文导航）
+
+两条红比 B231 记的那次更具体：断言读的是**水合之后**的 href，
+`expect([...target.searchParams.keys()])` 里**没有 `signin`** ——
+也就是访客点导航上的「登录」，进得去应用，但认证面板不会自己打开，
+他得在应用里再找一次入口。这正是 2026-10-03 那次改动要消灭的形状。
+
+**线上那份产物比 HEAD 旧**（这一条是现量出来的，不是推测）：
+
+| 读法 | 结果 |
+|---|---|
+| 线上首页引用的 JS | `/assets/main-d1EwLveP.js`（908,600 B，内含 `signin`，**不含** `/app/`） |
+| 干净 HEAD 上 `pnpm --filter @heyta/landing build` 产出 | `assets/main-k7HohaCf.js` |
+
+⇒ 至少有一部分是"发了旧包"，不一定是源码坏了。`apps/landing` 此刻**工作树干净**，
+B231 里那两处"还是未提交的改动"已被那条线自己收掉。
+
+⚠️ **我取证的路上错了两次，都记下来，因为它们都是同一族"探针读 0"**：
+1. 先拿 `curl` 读首页 HTML 找 app 链接 → 0 命中。那**不证明**链接没了：
+   导航是水合后渲染的，静态 HTML 里本来就没有。
+2. 再拿重建后的产物做静态 grep 找 `/app/…signin` → 也是 0 命中。那同样不证明：
+   这枚 href 是**运行期拼**出来的（`app-url.ts` 的 `SIGNIN_PARAM` 与 base 拼接），
+   压缩后的分片里不会留下这个字面量。
+   ⇒ 判"产物里有没有这段逻辑"要读**它自己那份 JS 的 token**（第 1 步行），
+   或者直接跑真浏览器那条判据（第 0 步），别拿静态 grep 的 0 说事。
+
+**归属与为什么我没直接修**：这是落地页 / 文案那条线的产物发布，不是登录这一族；
+修法是把 HEAD 那份 landing 重新发一次（`deployment.md` §3.7 那条流程），
+而**发落地页会把那条线此刻在制品的其它部分一起推上生产** —— 那是别人的在飞工作，
+我不代发布。复量命令就是上面那两行，发完之后 `live-signin-entry` 三条应全过。
