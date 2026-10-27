@@ -5,8 +5,8 @@
   "gotoError": "",
   "finalUrl": "https://heyta.waytofuture.cn/docs/",
   "h1": "帮助中心",
-  "bodyTextLength": 2367,
-  "anchorLinkCount": 50,
+  "bodyTextLength": 2372,
+  "anchorLinkCount": 51,
   "otherDocsRoutes": [
     "/docs/start/",
     "/docs/first-run/",
@@ -31,7 +31,7 @@
   ],
   "navCount": 1,
   "png": {
-    "contentRatio": 0.046718243074619414,
+    "contentRatio": 0.047616670826054405,
     "colorSpan": 228,
     "width": 1280,
     "height": 720
