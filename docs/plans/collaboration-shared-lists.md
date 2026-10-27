@@ -1483,7 +1483,7 @@ git diff --name-only 0cdaf8fdf <你此刻的 HEAD> -- apps/mobile/src apps/mobil
 
 ⚠️ **上面那句"打包输入面干净"在第三批里被我自己刚跑的那一趟打破了**，成因不是别线落笔，而是**门禁会写文件**：
 `check` 里的 `check:ai-e2e` 跑的是**整个 e2e 套**，spec 里的 `shot(...)` 直接覆写别人名下**已入库**的取证截图
-（枚数由现量命令给，不在此写死：`git status --porcelain -- apps/web/evidence | wc -l` —— 当趟跑到 `check:ai-e2e` 之后读回的是几十枚 ` M`，mtime 全落在那一格的窗口里，且**那一格没跑完它还在长**）。
+（枚数由现量命令给，不在此写死：`git status --porcelain -- apps/web/evidence | wc -l` —— 当趟跑到 `check:ai-e2e` 断点为止**最终读回 181 枚 ` M`**（中途三次量：5 枚 → 几十枚 → 181 枚，全落在那一格的窗口里））。
 ⇒ 教训入册 **§7 #602**（含三条处置：跑前存快照／"输入面干净"要明写 `evidence/` 那一维由门禁自己会动／提交只列文件）。
 ⚠️ 同一段里 `check` 那一趟的 HEAD **也不是一个值**：起建 `691b3f0bf`，跑到 `check:ai-e2e` 期间自动收集线又落了笔
 （区间与枚数现量：`git log --oneline 691b3f0bf..HEAD | wc -l`），所以那一趟 `CHECK_RC` 判的是**一段历史区间**上的工作树，
