@@ -70,7 +70,13 @@
  * 🔴 应用侧那两枚目的地（`/app/`、`/app/?signin=1`）同样**不是手写的清单**，它是现量出来的：
  *    全站 outbound mail 只有一个发送点（`server/src/email.ts:102` 那一句 `sendMail`），
  *    而它拼出的目的地只有六枚 —— 现量命令：
- *    `grep -oE '\$\{config\.publicUrl\}/[^`",]*' server/src/email.ts | sed 's/?.*//' | sort -u`
+ *    `grep -oE '\$\{config\.publicUrl\}/[^`",]*' server/src/email.ts | cut -d'?' -f1 | sort -u`
+ *    ⚠️ 这条命令在这里**必须写成 `cut -d'?' -f1`，不许换回按问号截断的那支 `sed`**：
+ *    它的替换体以"星号紧跟斜杠"这两个字符收尾，而那正是**块注释的终止符** ⇒ 注释被提前关掉，
+ *    剩下的内容当成代码，整个文件编译不过。
+ *    本文件今天就是因为这段说明里写了那支 `sed` 而坏过一整趟（而且**没有任何一道门跑得动
+ *    `e2e/live-site/` 这个目录**，它会一路坏到发布前才被撞见），号段见
+ *    `docs/reference/environment-traps.md`；常驻防线是 `scripts/check-e2e-specs-parse.mjs`。
  *    ⇒ `app/`、`change-email`、`magic-login`、`recover-passkey`、`reset-password`、`verify-email`。
  *    前五枚由 `pages.ts` 那把尺覆盖，`app/` 两枚由 ⑤ 覆盖。⇒ **本条的分母 = 邮件真能送出的全部**。
  *    将来若加了邀请/提醒类邮件，先在那条现量命令里出现，再往这条腿补判据。
