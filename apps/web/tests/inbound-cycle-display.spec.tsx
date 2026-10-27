@@ -143,3 +143,16 @@ it('有词条可接的两个状态（submitted / failed）各自回成自己的�
     broken.container.remove();
   }
 });
+
+it('那句"哪台设备才处理"在界面上渲出来，而且只从词条取（与移动壳同一条由对账尺钉）', async () => {
+  const panel = await openPanel();
+  try {
+    const node = panel.container.querySelector('[data-testid="inbound-boundary"]');
+    expect(node, '边界那句没渲出来 ⇒ 用户还是只能猜"到底什么时候会处理"').not.toBeNull();
+    expect(node?.textContent).toBe(zhCN['web.ai.inbound.boundary.foregroundOnly']);
+    expect(en['web.ai.inbound.boundary.foregroundOnly'], '英文档不许缺这一句').toBeTypeOf('string');
+  } finally {
+    await act(async () => { panel.root.unmount(); });
+    panel.container.remove();
+  }
+});

@@ -5421,6 +5421,8 @@ export const en = {
   'web.ai.inbound.status.worker': 'Waiting for this unlocked device to be registered as a processing device.',
   'web.ai.inbound.status.routing': 'Waiting for the automatic-capture AI route and egress consent; no model call is made silently.',
   'web.ai.inbound.status.ready': 'Processing device ready; a foreground page checks for one event periodically.',
+  'web.ai.inbound.status.noKeyOnThisDevice': 'This device has no recipient key yet, so it will not process anything. Create the key once on an unlocked device (for example, the web app).',
+  'web.ai.inbound.boundary.foregroundOnly': 'Automatic capture only runs while heyta is open on this device: nothing is claimed after the app goes to the background or the page closes. For always-on capture, run the processing device on a machine you keep running.',
   'web.ai.inbound.signIn': 'Sign in to the sync service before managing automatic capture rules.',
   'web.ai.inbound.formHint': 'Rules can only create new tasks. The field allowlist, target list, timezone and item limit are frozen with each rule version.',
   'web.ai.inbound.keyId': 'Webhook key id',

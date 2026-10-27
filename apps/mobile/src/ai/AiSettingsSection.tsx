@@ -57,8 +57,8 @@ import { useMobileSync } from '../sync/store';
 import { useTokens } from '../theme';
 import { AI_FEATURE_LABEL_KEY, healthCopy, managedUsageCopy } from './copy';
 import { aiSecrets, saveAiSettings, useAiSettings } from './settings-store';
-import { INBOUND_CYCLE_COPY_KEY } from '../inbound/copy';
-import { useInboundCycle } from '../inbound/status';
+import { INBOUND_BOUNDARY_COPY_KEY, INBOUND_CYCLE_COPY_KEY, INBOUND_READINESS_COPY_KEY } from '../inbound/copy';
+import { useInboundCycle, useInboundReadiness } from '../inbound/status';
 import { readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
 /** 五个功能在设置里的渲染顺序 —— 与助手面的顺序同一份，不重排。 */
@@ -263,6 +263,9 @@ export function AiSettingsSection(): React.JSX.Element {
   // 这一台设备最近一趟自动收集的终态。没跑过就一行都不渲（不是"当前没有待处理事件"——
   // 那句是 worker 真的走了一趟之后 `empty` 的意思，两者对用户是不同的事）。
   const inboundCycle = useInboundCycle();
+  // 而这台设备**能不能**开始接收。它和上面那格是两件事：没建过收件密钥的设备不会跑那一趟，
+  // 以前这里只是安静着，用户分不清"还没准备好"与"准备好了但没内容"。
+  const inboundReadiness = useInboundReadiness();
 
   return (
     <Stack gap="loose" testID="ai-settings-section">
@@ -276,11 +279,20 @@ export function AiSettingsSection(): React.JSX.Element {
 
       {/* 自动收集这一趟做完了什么 —— 手机上此前没有任何一面说得出这句话，
           队列空与"根本没在跑"在界面上长得一样。 */}
+      {inboundReadiness !== undefined && inboundReadiness !== 'ready' ? (
+        <Text variant="row-meta" tone="warning" testID="inbound-readiness">
+          {t(INBOUND_READINESS_COPY_KEY[inboundReadiness])}
+        </Text>
+      ) : null}
       {inboundCycle === undefined ? null : (
         <Text variant="row-meta" testID="inbound-cycle-state">
           {t(INBOUND_CYCLE_COPY_KEY[inboundCycle.state])}
         </Text>
       )}
+      {/* 那句边界两壳共用同一颗 key：哪台设备才处理、要常年接收该把 worker 放哪。 */}
+      <Text variant="row-meta" testID="inbound-boundary">
+        {t(INBOUND_BOUNDARY_COPY_KEY)}
+      </Text>
 
       {/* ── 闸 1：总开关 ─────────────────────────────────────────────── */}
       <Card gap="loose">
