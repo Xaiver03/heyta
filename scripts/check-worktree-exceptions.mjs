@@ -69,8 +69,31 @@ export const OWNER_RULES = [
       'e2e/tests/dirty-form-guard.spec.ts',
       'packages/ui/tests/overlay-dirty-popover.spec.ts',
       'scripts/check-focus-single-source.mjs',
+      'scripts/check-dirty-form-policy.mjs',
+      'docs/agents/overlay-feedback.md',
+      'apps/web/evidence/dirty-form-guard/',
+      'apps/web/src/features/categories/CategoryCreateDialog.tsx',
+      'apps/web/src/features/habits/HabitsView.tsx',
       'package.json',
     ],
+  },
+  {
+    line: '自动收集（inbound）线',
+    why:
+      '这条线的代码自己指名 ADR-0077 与托管抽取那一档；10-28 00:5x 现量：`inbound.routes.ts` 与那份 integration spec 正在改，' +
+      '而 §6.101 那四格待拍板（同意继承、reasonCode 落库、词表校验分叉）全落在这一层 —— 代提交 = 替别人把未定的口径落仓',
+    prefixes: [
+      'packages/inbound-core/',
+      'server/src/automation/',
+      'server/src/ai/managed-completion.ts',
+      'server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts',
+      'docs/adr/0077-inbound-hosted-extraction-at-ingest.md',
+    ],
+  },
+  {
+    line: '各线共用的环境陷阱正文',
+    why: '编号只增不改、谁踩坑谁追加：这一枚文件在脏集里只说明"某一行的正文还没入库"，作者随时在补；代提交 = 把别人未定稿的正文按我的名义落仓',
+    prefixes: ['docs/reference/environment-traps.md'],
   },
   {
     line: '日历/详情面线',
