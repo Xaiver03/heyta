@@ -1885,6 +1885,9 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 🔴 **两壳形态不同是有意的，必须写进注释与判据**（否则下一位会"统一"成悬停那一形，手机上就成了一条拿不到的信息）：
 触屏没有 hover，所以手机侧那枚 ⓘ 只能是**点击展开**；网页侧用悬停。判据要**各端各钉一发**，
 不许用一条"两边都有 tooltip"的合取糊过去 —— 那正是 #598 那一族（一句理由只读了两端）。
+⚠️ **这一格里"网页侧用悬停"与"只分叉标题/正文"两处假设已被 §9.39 按真浏览器实测更正**（悬停在这枚
+居中的、自带滚动容器的对话框里拿不到不跳的形状；确认按钮那颗也得跟着分叉）。照本节施工会撞墙，
+施工前直接读 §9.39。
 
 **射程清单（动这些，别多动）**：`ShareConsentModal.tsx` 的布局与 `labels` 形状、`share-consent-model.ts` 的键表、
 `packages/i18n/src/locales/{zh-CN,en}.ts` 的新旧词条（`consent.*` 家族，两语各一枚都不能少，`check:i18n-vars` 会抓）、
@@ -1896,3 +1899,48 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 剩下的不是装机而是**新写一枚装置**：APK 仍按长期令在 `windows-pc` 出 → 拉到 `linux-dev` → `adb install` 进那枚 AVD → 驱动与 iOS 同一条协作旅程。
 ⚠️ 服务端必须让远端设备访问得到（`127.0.0.1` 在跨机那一趟不成立，这枚坑 #590 那一族已经记过），
 装置结构可参照 `scripts/verify-mobile-collab-ios.sh`，但按压与取证要换成 `adb` / `uiautomator` 那一套。
+
+### 9.39 同意面按 §9.38 落地（2026-10-28 00:1x）——三格按语境分叉、条款进 ⓘ，并翻掉 §9.38 自己的两处假设
+
+代码腿：`a887ec89c`（13 枚文件，逐枚数用 `git show --name-only a887ec89c`）。
+
+**落成的形状**（与 §9.38 那张表逐格对，两格照不动原办）
+
+| 那一格 | 落成的样子 |
+|---|---|
+| 标题 | `consent.title.share`「分享清单」／`consent.title.join`「加入清单」两颗键；旧的 `consent.title` 已删（两侧不再共用一句） |
+| 正文 | `consent.body.share`／`consent.body.join` 各一句短话；旧的 `consent.body` 已删 |
+| 确认按钮 | 🔴 **§9.38 的表里没有这一格**：看 `05a-bob-join-consent.png` 看出入群侧那颗写的是「确认共享」——入群的人没在任何东西上"确认共享"。跟着分叉成 `consent.accept.share`／`consent.accept.join`，旧的 `consent.accept` 已删 |
+| 细节 | `SHARE_CONSENT_SCOPE_KEYS` 从 3 行拆成 4 行（原 `scope.metadata` 一句里塞的两件事拆成 `scope.server` + `scope.e2ee`），搬进 ⓘ。四行两侧共用，措辞按「清单成员」写——换成任一侧的视角，另一侧就是谎话 |
+| ⓘ 的位置 | 排在「取消/确认」**下面**（理由见下面第 1 条的读数） |
+| 宿主标题 | web 两枚对话框的 `<h2>` 在同意相位换成语境键那句；`titleHidden` 的理由从"外层写着同一句"变成"外层换写的就是这一句"。owner 侧那句长副标题 `web.share.dialog.subtitle` 在同意相位收起——它讲的正是搬进 ⓘ 的那两件事，与入群侧同一处置 |
+
+**🔴 两处对 §9.38 的更正，都带读数**
+
+1. **"网页＝悬停 ⓘ 气泡"作废；两壳同一形：只有按压。** 两种悬停形状都在真浏览器里量过坏法：
+   - 悬停 + 行内展开 ⇒ 展开把卡片撑高约 140px，而对话框是**垂直居中**的 ⇒ 上面两颗按钮往上跳、ⓘ 自己往下跳出指针 ⇒ 收起 ⇒ 又跳回来，开了收收了开地振荡。读数：点「确认共享」`waiting for element to be visible, enabled and stable` **333 次**直到测试结束，`share-panel` 那一格 30s 等不到（同意面上"看见的那一格"与"按下去的那一格"不是同一格）。
+   - 悬停 + 浮层（`position:absolute`）⇒ 那一叠压在「不再提示」与两颗按钮上、还溢出对话框下沿（第 1 版 `02b-owner-consent-details.png` 看图看出来的）；而 web 的对话框写着 `overflowY:'auto'`（`ShareFeature.tsx` 的 `styles.dialog`）⇒ 溢出不是"探出去"，是被它自己的滚动容器裁掉。
+   - ⇒ 摘掉 hover 不是省事：在这枚**居中且自带滚动容器**的对话框里，hover 拿不到一个"控件不在指针底下跳"的形状。§9.38 那句"两壳形态不同是有意的"方向反了——现在是**两壳同形，且每一壳都拿得到**。
+2. **iOS 装置入群那一腿的 needle 跟着改**（「确认共享」→「确认加入」，`scripts/verify-mobile-collab-ios.sh` 里那一腿的三处）；owner 那一腿走 `id:share-consent-accept`，不受影响。⚠️ 下一趟 iOS 腿若读成"同意面按不动"，先回这一格。
+
+**验收读数**（本批现量）
+
+- 三套单测本批全绿（枚数由各自运行打印，别在这里抄）：`cd packages/ui && pnpm vitest run`、`cd apps/web && pnpm vitest run`、`cd apps/mobile && pnpm vitest run`。
+- `node scripts/verify-collab-journey.mjs` → `RESULT=OK steps=3`，证据图逐张在册（脚本自己比对 `EXPECTED` 并打印张数）：本批新增 `02b-owner-consent-details.png`（展开态）并补进那份在册清单，且逐张看过 02 / 02b / 05a 三张同意面。
+- 门禁 rc=0：`check:i18n-vars`、`check:docs`、`check:design`、`check:rn-aria`、`check:overlay`、`check:text-color`、`check:share-entry-visible`、`check:journey-coverage`、`check:e2e-specs-parse`、`check:verify-script-copy`、`check:shell-unicode`、`check:shell-exit-chain`、`check:egress-wording`。
+
+**三格红不是本批**（归因取法一并留，别去改别人的判据）
+
+| 红 | 归谁 | 现量取法 |
+|---|---|---|
+| `check:ui-language` 4 处 | 日历线未提交的 `apps/web/src/App.tsx`（calendar 侧栏那一档） | `git status --porcelain -- apps/web/src/App.tsx` 非空；`git grep -c "web.calendar.sidebar.hide" HEAD -- apps/web/src/App.tsx` 无命中 ⇒ 那两枚键根本不在 HEAD |
+| `check:settings-prose` 2 处 | 自动收集线 staged 的 `apps/web/src/features/settings/InboundAutomationSettings.tsx` | `git status --porcelain -- <它>` 读 `MM`（索引里是别人暂存的） |
+| web `typecheck` 2 枚错 | 一笔已入库的自动收集提交里那枚 spec + 一枚**未跟踪**的 `apps/web/src/lib/form/useDirtyDismissGuard.tsx`（UX 线在飞，引用的 `web.overlay.discard.*` 还没进词条表） | `git grep -c "web.overlay.discard" HEAD -- packages/i18n` 为 0 ⇒ 红在他们的键没落；`git status --porcelain -- <那枚 guard>` 读 `??` |
+
+**牙**：`research/tools/mutation-rigs/mutate-collab-consent-gate.mjs` 从 4 臂扩到 **10 臂**，`ARMS=pass (10/10)`，每臂红集精确匹配。第 1 跑有三臂"存活"，**两个原因都在装置侧**——这条比读数值钱，写给下一位也写给别的臂：
+
+1. web 那枚判据 import 的是 `@heyta/ui` 的 **dist** ⇒ 病灶打在 `packages/ui/src` 必须连着重构建，否则臂必然存活，读出来是"判据没牙"，实际是装置没把病灶送到位。装置因此新增 `rebuild` 字段：注入后与还原后各刷一次产物。
+2. 移动端那枚"ⓘ 有按压通道"的判据第一版写成"从文件里第一枚 `Pressable` 起到 trigger 的 testID"——非贪婪起手落在**「不再提示」的勾选框**上，于是它永远读得到一句 `onPress` ⇒ **一枚永远绿的判据**。改成切"它自己那枚开标签"（`lastIndexOf('<Pressable', at)`）之后 `press-channel-gone-mobile` 才真的红。
+3. 第 11 枚判据（那一叠必须排在按钮下面）单点替换注入不了，用一次性整块交换臂量：把那块挪回按钮上面 ⇒ 恰好 `1 failed / 13 passed`，`git checkout --` 还原后 14 全绿。
+
+**还欠的**：同意面在**设备腿**上那一档——iOS 那枚装置要带着上面第 2 条的 needle 改动重跑一次才算；Android 那枚按 §9.37 末仍是新工作量。本批只量了 web 真浏览器 + 两壳的常驻判据。

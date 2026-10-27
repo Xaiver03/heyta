@@ -257,10 +257,15 @@ describe('⑨ 入群与开启共享两屏各自真的问一次同意闸（摘掉
 
   it('🔴 手机上那枚 ⓘ 靠**按压**打开（触屏没有 hover，只留悬停等于把条款藏起来）', () => {
     const modal = stripComments(read('packages/ui/src/sync/ShareConsentModal.tsx'));
-    // ⓘ 是本文件里的第一枚 `Pressable`，所以从它起手的这段开标签就是那枚触发件。
-    const trigger = modal.match(/<Pressable[\s\S]*?testID="share-consent-details-trigger"/);
-    expect(trigger, '找不到 ⓘ 那枚触发件（testID 变了要连着改这一发）').toBeTruthy();
-    expect(trigger![0], '同意面的条款在手机上拿不到了 = 触发件不再有按压通道').toContain('onPress');
+    // 🔴 只能切"它自己那枚开标签"。第一版写成 `/<Pressable[\s\S]*?testID="…trigger"/`，
+    //    而非贪婪从文件里**第一枚** `Pressable`（那是「不再提示」的勾选框）起手，
+    //    于是摘掉触发件的 `onPress` 它照样命中勾选框那一句 ⇒ 一枚永远绿的判据。
+    //    病灶实测见 `research/tools/mutation-rigs/mutate-collab-consent-gate.mjs` 的
+    //    `press-channel-gone-mobile` 臂。
+    const at = modal.indexOf('testID="share-consent-details-trigger"');
+    expect(at, '找不到 ⓘ 那枚触发件（testID 变了要连着改这一发）').toBeGreaterThan(-1);
+    const opener = modal.slice(modal.lastIndexOf('<Pressable', at), modal.indexOf('>', at));
+    expect(opener, '同意面的条款在手机上拿不到了 = 触发件不再有按压通道').toContain('onPress');
   });
 });
 
