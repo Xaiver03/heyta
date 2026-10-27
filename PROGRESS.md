@@ -7546,3 +7546,30 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       所以**本条不是纯追加**：`git diff -U0 -- PROGRESS.md | grep '^-'` 只出一行，而那唯一一枚删除
       就是这一行自己（上一戳我刚改完它，这一戳又在它下面续写 ⇒ 插入数会随下一句话变，
       因此这里只写形状不写枚数——与本仓"正文别存会漂的值"同一条）。
+210. **自动收集线 · 把自己写进三处的那句"缺列＝读成 `NULL`＝归设备"现量否证，并把第 4 件的门在 HEAD 上重量一遍**（写前先跑 `date`，本机 2026-10-28 01:3x）。
+    ① **成因先说清**：那句不是实测，是我从"这一列可空"顺嘴推的。探针打在**接收路由真发的那一发**上：
+      私有 `initdb` 一次性库 + 空闲端口 + `createdb heyta_unapplied_probe`（会话时区钉 UTC），逐枚 apply
+      **除** `20261027000000_add_hosted_inbound_extraction` **之外**的全部迁移，再用 `createRequire` 从 `server/package.json`
+      取**真** `@prisma/client` 打四种形状，最后补上那一枚、同一支探针重跑一遍。
+      跑法 `python3 ~/.heyta-evidence/inbound-hosted-extraction-20261027/probe-unapplied-migration.py`，读数同目录 `unapplied-migration-probe.out`。
+    ② **读数**：没 apply 那档 ⇒ `automationRule.findUnique` / `findFirst` 当场 **`P2022`**，`create` 带与不带那一列都 **`P2022`**
+      ⇒ 代码先上而迁移没上的形状是**公网接收路由 500**，不是"这条腿没开、照旧归设备"；
+      apply 之后那档 ⇒ 裸 SQL 插一行不写那一列，读回来是 `null`、`=== true` 为 `false` ⇒ 归设备（这句本来就对，错的是它挂的前提）。
+    ③ 🔴 **同一次探针里 `automationRule.count()` 照样回 `0`** —— 它不选那一列。
+      ⇒ 这类探针的规矩：**要打在被测路径真发的那一发上**；拿 `count()` 或"连得上库吗"当探针，读出来是"没事"，真相是那条腿一上线就 500。
+      这一形登记成**待入 traps**（那本账此刻正被并行会话写着 `#606`/`#607`，按纯追加账的纪律不单独往里落，正文在本条 ③ 与工单 §7 末）。
+    ④ **多出一条部署顺序**：这一档不许"先换容器再补迁移"；`docs/runbooks/deployment.md` 里那道
+      "先跑迁移、`MIGRATE_RC=0` 才换容器"的闸（现量 `grep -n "先跑迁移" docs/runbooks/deployment.md`）就是它不炸的前提 —— 本线不改那道闸，只指名它。
+      🔴 **同一句假话在仓里有三处抄件**（工单 §4 第 1 格、`ADR-0077` §6 第 1 条、本账上一条 ④），三处同批改完；
+      改完复量 `grep -rn "读成 .NULL" docs PROGRESS.md` 只剩"这句是假的"那类更正句，没有活的假句。
+    ⑤ **目标第 4 件那五道门在当前 HEAD 上重量**：`check:docs`／`verify-inbound-doc-tables`／`check-docs-voice`／
+      `pnpm --dir packages/i18n test`（对称那把尺是 `catalog.spec.ts` 里 `expect(enKeys).toEqual(zhKeys)`）
+      ／`apps/web` 五枚 inbound spec／`apps/mobile` 那枚 ⇒ **全部 rc=0**；逐条命令与读数在工单 §8 那张表。
+    ⑥ **唯一一枚红不归本线**：`pnpm check:ui-language` rc=1，4 处命中全在 `apps/web/src/App.tsx:2532-2533`。
+      三条读数各指一遍：`git show HEAD:apps/web/src/App.tsx | grep -c web.calendar.sidebar` 回 **0**（那两行根本不在 HEAD 里）、
+      `git diff -U0 -- apps/web/src/App.tsx` 回 `@@ -2524,0 +2525,17 @@`（2532/2533 落在别线那枚未提交的 17 行插入块内）、
+      两个键两张词条表都在 ⇒ 红的形状是 `t(条件 ? 'a' : 'b')` 这种三元当参数，而那把门自己的注释就写着这个形状是它的边界
+      （现量 `grep -n "三元表达式" scripts/check-ui-language.mjs`）。**不改那枚文件、也不放宽自己的判据**，交回日历那条线。
+    ⑦ 落点：`docs/adr/0077-inbound-hosted-extraction-at-ingest.md` §6 第 1 条与 §7 H-2、`docs/plans/inbound-automation.md` §4 第 1 格 + 新增 §7/§8、本账。
+      没 push、没 apply 迁移、没改对外文案、AC 一格没勾；门与 spec 的读数都取自同一戳 —— HEAD 为 `5440f019a`，
+      被测物是**它之上的工作树**（含别线未提交的 `App.tsx`，⑥ 那枚红正是这么来的，`check:docs` 那几道本线文件里的门不受它影响）。

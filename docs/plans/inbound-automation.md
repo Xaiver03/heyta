@@ -5059,3 +5059,26 @@ cd server && npx vitest run                          # server 全套
 免得别人整文件 `git add` 时把我的那条冲掉）：
 > 判"库里缺这一列会怎样"要打在**被测路径真发的那一发查询**上：Prisma 的读面按列名点选 ⇒ 缺列回 `P2022`；
 > 而 `count()` 不选列 ⇒ 照样 `0`。拿 `count()` 或"能不能连上库"当探针，读出来的是"没事"，真相是那条腿一上线就 500。
+
+### 8. 01:3x 追：第 4 件那五道门与两侧 spec 在当前 HEAD 上重量一遍
+
+`check:ui-language` 那一格先前登记过一句"红在别线"，这次按本仓固定的两条命令把它**证成读数**而不是推断，
+顺带把目标第 4 件列的门一次跑齐（同一戳、同一 HEAD `5440f019a`，逐条现量、别抄数）：
+
+| 那一格 | 命令 | 读数 |
+|---|---|---|
+| 文档 | `pnpm check:docs` | rc=0，无死链、无失效章节引用、无失效锚点 |
+| 文档表形状 | `python3 research/tools/verify-inbound-doc-tables.py` | rc=0 |
+| 文档口音 | `node scripts/check-docs-voice.mjs` | rc=0，禁词表零命中 |
+| 🔴 界面语言 | `pnpm check:ui-language` | **rc=1，4 处命中全在 `apps/web/src/App.tsx:2532-2533`** —— 见下面那段归因 |
+| i18n 中英对称 | `pnpm --dir packages/i18n test` | rc=0，`Test Files 4 passed (4)` / `Tests 30 passed (30)`；对称那把尺是 `packages/i18n/tests/catalog.spec.ts` 里 `expect(enKeys).toEqual(zhKeys)` 那一枚，另有 `satisfies Record<MessageKey, string>` 在类型层兜住 |
+| apps/web 相关 spec | `pnpm --dir apps/web exec vitest run --maxWorkers=1 tests/inbound-hosted-extraction-ui.spec.tsx tests/inbound-cycle-display.spec.tsx tests/inbound-panel-layout.spec.tsx tests/inbound-draft-review.spec.tsx tests/inbound-worker-lifecycle.spec.tsx` | rc=0，`Test Files 5 passed (5)` / `Tests 26 passed (26)` |
+| apps/mobile 相关 spec | `pnpm --dir apps/mobile exec vitest run --maxWorkers=1 tests/inbound-cycle-display.spec.ts` | rc=0，`Test Files 1 passed (1)` / `Tests 15 passed (15)` |
+
+**`check:ui-language` 那 4 处不属于本批，三条读数各指一遍**（判"工作树红 ≠ `HEAD` 红"的固定两把尺）：
+`git show HEAD:apps/web/src/App.tsx | grep -c web.calendar.sidebar` 回 **0** ⇒ 被点名的那两行**根本不在 HEAD 里**；
+`git diff -U0 -- apps/web/src/App.tsx | grep '^@@'` 回 `@@ -2524,0 +2525,17 @@` ⇒ 2532/2533 落在**别线那枚未提交的 17 行插入块**内；
+键本身两张表都在（`grep -o web.calendar.sidebar.[a-z]* packages/i18n/src/locales/{zh-CN,en}.ts` 各回 `hide`/`show`）
+⇒ 红的形状是 `t(条件 ? 'a' : 'b')` 这种**三元当参数**的写法，而那把门自己的注释里就写着这个形状（`scripts/check-ui-language.mjs` 现量
+`grep -n "三元表达式" scripts/check-ui-language.mjs`）。**处置**：不改那枚文件、也不放宽自己的判据（本批的门全绿）；
+交给日历那条线，形状上是 `条件 ? t('a') : t('b')` —— 一句话都不是本线能替他们拍的。
