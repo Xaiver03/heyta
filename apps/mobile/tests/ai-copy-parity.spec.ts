@@ -23,12 +23,16 @@
  * 一条抓不到任何东西的正则会让两边都得到空集、于是永远绿 ——
  * 能不能失败只靠这种反证回答（AGENTS §8 第 3 条）。
  *
- * ## 一处**登记过的**不同，不是漂移
+ * ## 两处**登记过的**不同，不是漂移
  *
  * `web.ai.failure.cause.networkOriginRejected`（"端点在你机器上但拒绝了你的来源"）
  * 只有 web 有：判据需要一个宿主 Origin，而 RN 没有 Origin 概念、原生 `fetch`
  * 也不发 `Origin` 头 —— 那一档在本端**到不了**，硬做等于编一条诊断。
- * 这条例外被**逐字钉住**（只许多这一条、且不许手机多任何一条），
+ *
+ * `web.ai.inbound.process.failed` 只有 web 有：`InboundAutomationCycleState` 只有四档终态，
+ * `failed` 是 web 那块面板自己加的"这一趟没成"那一档，而 worker 的返回值里根本没有它。
+ *
+ * 两条例外都被**逐字钉住**（只许多这些条、且不许手机多任何一条），
  * 所以下一次真的漂移仍然会红。
  */
 
@@ -43,6 +47,7 @@ const read = (rel: string): string => readFileSync(resolve(HERE, rel), 'utf8');
 
 const MOBILE_COPY = '../src/ai/copy.ts';
 const MOBILE_INTENT = '../src/ai/intent-copy.ts';
+const MOBILE_INBOUND = '../src/inbound/copy.ts';
 const WEB_DISCLOSURE = '../../../apps/web/src/features/ai/disclosure-copy.ts';
 const WEB_DISCLOSURE_HOST = '../../../apps/web/src/features/ai/AiDisclosureHost.tsx';
 const WEB_FAILURE = '../../../apps/web/src/features/ai/ai-failure-copy.ts';
@@ -50,6 +55,7 @@ const WEB_ROUTE = '../../../apps/web/src/features/ai/route-explanation.ts';
 const WEB_TOOL_RUN = '../../../apps/web/src/features/ai/AiToolRun.tsx';
 const WEB_HEALTH = '../../../apps/web/src/features/settings/health-copy.ts';
 const WEB_AI_SETTINGS = '../../../apps/web/src/features/settings/AiSettings.tsx';
+const WEB_INBOUND_SETTINGS = '../../../apps/web/src/features/settings/InboundAutomationSettings.tsx';
 
 /**
  * 按前缀取源码里出现过的词条 key（去重、排序 —— 顺序不同不是"key 不同"）。
@@ -208,6 +214,39 @@ describe('移动端 ↔ web 的 AI 文案表对账', () => {
     );
   });
 
+  it('🔴 自动收集周期的终态回显（inbound.process.*）两端同 key —— 登记的差集只有 web 自己那档 failed', () => {
+    // `failed` 不在 `InboundAutomationCycleState` 里：web 面板把"这一趟没成"渲成它自己的一档，
+    // 而 worker 的返回值只有四档终态。所以它是**逐字登记的例外**，不是漂移 ——
+    // 写进例外清单就等于下一次真的漂移照样会红。
+    expectSameFamily(
+      'inbound.process.*',
+      read(MOBILE_INBOUND),
+      read(WEB_INBOUND_SETTINGS),
+      /'(web\.ai\.inbound\.process\.[a-zA-Z0-9-]+)'/g,
+      { webOnly: ['web.ai.inbound.process.failed'] },
+    );
+  });
+
+  it('🔴 反证：手机单方面改掉终态那一族的 key ⇒ 红，且红因是"漂移"而不是"读不到"', () => {
+    const webSrc = read(WEB_INBOUND_SETTINGS);
+    // 先证明喂进去的真是源码内容（本文件第一版在这里喂过路径 —— 那种臂等于没有臂）。
+    expect(keysWith(webSrc, /'(web\.ai\.inbound\.process\.[a-zA-Z0-9-]+)'/g).length).toBeGreaterThan(0);
+    const tampered = read(MOBILE_INBOUND).replace(
+      "'web.ai.inbound.process.waiting-entitlement'",
+      "'web.ai.inbound.process.waitingRenamed'",
+    );
+    expect(tampered, '变异没落到预期那一行，这臂等于没测').not.toBe(read(MOBILE_INBOUND));
+    const msg = runFamily(
+      'inbound.process.*',
+      tampered,
+      [webSrc],
+      /'(web\.ai\.inbound\.process\.[a-zA-Z0-9-]+)'/g,
+      { webOnly: ['web.ai.inbound.process.failed'] },
+    );
+    expect(msg, '改掉终态那一族的 key 而对账没红 ⇒ 它挡不住任何漂移').not.toBeNull();
+    expect(msg).toContain('移动端多出这些 key');
+    expect(msg).not.toContain('一份都没读到');
+  });
   it('🔴 反证：手机单方面改掉一族的 key ⇒ 红，而且红得是"漂移"这条理由', () => {
     const web = [read(WEB_DISCLOSURE_HOST), read(WEB_DISCLOSURE)];
     // 先证明喂进去的东西真的是源码内容（本文件第一版在这里喂了路径，
