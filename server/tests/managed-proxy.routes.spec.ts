@@ -39,7 +39,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { FastifyInstance } from 'fastify';
 import Fastify from 'fastify';
 
-import { managedAiProxyRoutes, MANAGED_AI_ERROR_CODES } from '../src/ai/managed-proxy.routes';
+import { managedAiProxyRoutes } from '../src/ai/managed-proxy.routes';
+// 稳定码表 2026-10-27 搬到 `managed-completion.ts`：两条腿（这条路由与服务端抽取腿）共用同一套码，
+// 测试跟着真源走，不在路由文件里留一枚转出别名。
+import { MANAGED_AI_ERROR_CODES } from '../src/ai/managed-completion';
 import { SERVER_MANAGED_MODEL_HOSTS, type ServerManagedModelHost } from '../src/ai/managed-upstream';
 import type { SqlExecutor, SqlRunner } from '../src/billing/pricing-store';
 import { MINIMAL_USERS_DDL } from './pricing-ddl.helper';
