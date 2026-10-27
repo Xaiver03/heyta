@@ -102,6 +102,10 @@ M6 的判据本身（真跑 + 真看截图）。
    （取法现量：`grep -n 'git diff --name-only 0cdaf8fdf' docs/plans/collaboration-shared-lists.md`）；
    差集非空也不等于读数作废 —— 逐枚看它动没动到 L1–L11 的观察面：动到了才重跑，没动到也要如实写「打包字节变了、
    观察对象没变」那一格。**任何写成"当前"的设备读数都在几分钟内会变假**，这不是勤奋问题，是这类声称的形式本身不对。
+   ✅ 这一格今天已经有人照上面那把尺量过了（2026-10-27 19:28，起建 `762cedc54`）：§9.27 那三把尺**在当前 HEAD 上重取到绿**
+   （typecheck rc=0、`SUITE=OK legs=4 failed=0`、`verify:collab-keys` 与 `check:collab-carrier` rc=0、`pnpm -r test` rc=0），
+   而 `691b3f0bf..762cedc54` 剔掉 `apps/web/evidence/` 只剩 13 枚文件、动源码面的只有 1 枚别线 spec ——
+   逐臂读数、那把差集命令，以及**"iOS 设备腿对这一棵仍属未重跑"那一格**都在计划 **§9.30**。整链 `check` 这趟没重跑，理由写在同一节。
    🔴 还有一条给下一位的**装置纪律**（#579）：这个载体以后每次打 `env_bail`（退 3）之前，先问那句前提
    是不是产品定义里"用户能做 X"的某一格本身 —— 是就得补成判据，不是才允许退 3。
    载体早就在册 —— `scripts/verify-mobile-collab-ios.sh`
