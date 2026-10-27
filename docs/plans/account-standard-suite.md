@@ -4618,3 +4618,39 @@ git worktree remove /tmp/heyta-head-selfcheck        # 只删自己造的这枚
 
 顺手把这条问完了：**"链里引用了不存在的脚本"这一向有没有人管** —— 有，`scripts/check-gate-wiring.mjs:347` 那句注释就是它（"拼错或定义被摘掉 ⇒ 后面整串都不跑"），所以**不开新尺**。
 
+
+### 6.97（2026-10-27 23:5x · 落地页那半边第一次做到字节级，顺手量出一枚"从未接上的目的地"）
+
+`pnpm verify:live-web-freshness` 只看应用那盘 SPA。落地页（`heyta.waytofuture.cn` 根）那半边以前要人肉 `curl` + `diff`，
+今晚把它并成同一枚尺的第二种模式：
+
+```sh
+node scripts/live-web-freshness.mjs --landing            # 分母 = HEAD 里已入库的每份落地页 HTML
+node scripts/live-web-freshness.mjs --landing --strict;  # 不齐或线上没这页 ⇒ rc=1（本轮现实读数就是 1）
+```
+
+**归一化只许剔两类行**：仓库那份写着源文件（`main.tsx`），线上那份写着构建后的哈希产物（`/assets/main-…` 的 js 与同名 css）。
+这两类之外的一行差异都算不齐。这条界限是判据的全部价值所在 —— 多剔一行就会把"线上真的旧了"吞掉，
+少剔一行就会把**管线的阶段差**读成**版本差**：第一趟手搓就中了这一枪，每页恰好差 96 字节，
+diff 打开只有那两行，与"旧"无关。
+
+读到的事实（每次重跑，别抄数）：
+
+| 格 | 读数 | 复取 |
+|---|---|---|
+| 落地页与 HEAD 齐不齐 | 不齐 **0** 枚；线上没这页 **1** 枚（`/pitch/`） | `node scripts/live-web-freshness.mjs --landing` |
+| 这把尺在现实面前会红 | `--strict` rc=**1**（不是靠改判据变绿的） | `node scripts/live-web-freshness.mjs --landing --strict; echo $?` |
+| 自检 | 臂数由脚本打印、不符 0 | `node scripts/live-web-freshness.mjs --self-test` |
+
+**`/pitch/` 这一枚**：`apps/landing/pitch/` 是完整的 5 件套（`index.html`、`main.tsx`、`PitchDeck.tsx`、`pitch.css`、自己的 `vite.config.ts`），
+但不在 `SITE_PAGES` 注册表里（注册表条数由右栏打印），线上回 **HTTP 404**。仓内引用面按**整词**读回来逐行分类，
+没有一行是在接这枚页面。所以它不是"线上旧"，是**目的地存在过但从未接上**——产品视角里和"同一个目的地两个入口"相反的那一型。
+归落地页/文档站那线拍板（接进去并给入口，还是整目录删），本线只让它可复量。
+
+⚠️ 一枚**射程**结论，顺手量清了：`pnpm --filter @heyta/landing check:entries` 的分母是**注册表**，
+所以"产物堆里躺着一枚没注册的 HTML"落在它射程外 —— 它今天绿（"入口文件与注册表一致"），而 `/pitch/` 就在树上。
+有反向孤儿判据的是图片那侧（`gen-help-figures.mjs` 会点名"映射里没有的复制品"），HTML 这侧没有。
+
+**第二次中"先怀疑探针"这一枪**：断言"仓内没有任何引用"那趟用的是带 `\b` 的正则；本机 BSD grep 的 `-E` 对 `\b` 的支持不是可以赌的东西，
+所以换成 `grep -w` 并把分母逐行读完才敢写进台账（两种写法这次读数恰好一致，但"恰好一致"不是判据）。
+
