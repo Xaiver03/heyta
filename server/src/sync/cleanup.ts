@@ -7,7 +7,7 @@ import { MIN_CHECKPOINT_SAFE_APP_VERSION } from './checkpoint-gate';
 import { vaultKeyMigrationService } from './services/vault-key-migration.service';
 import { purgeExpiredAutomationEvents } from '../automation/rules';
 import { sweepExpiredAccountCredentials } from '../account/credential-sweep';
-import { purgeExpiredAutomationEntitlementTicketUses } from '../automation/entitlement-ticket';
+import { purgeExpiredAutomationEntitlementTicketUses, purgeRetiredAutomationEntitlementClocks } from '../automation/entitlement-ticket';
 
 let cleanupTimer: NodeJS.Timeout | null = null;
 let initialCleanupTimer: NodeJS.Timeout | null = null;
@@ -186,6 +186,15 @@ const runDailyCleanup = async (): Promise<void> => {
     Logger.info(`Cleanup [automation-entitlement-tickets]: removed ${deleted} replay nonce row(s)`);
   } catch (error) {
     Logger.error(`Cleanup [automation-entitlement-tickets] failed: ${error}`);
+  }
+
+  // 时钟高水位：**必须排在 nonce 之后** —— 一台 installation 只要还有票据消费行就还不算退役，
+  // 而上一趟刚把过期的 nonce 摘掉，这一趟才看得见那些"最后一引用已消失"的时钟行。
+  try {
+    const deleted = await purgeRetiredAutomationEntitlementClocks(new Date());
+    Logger.info(`Cleanup [automation-entitlement-clocks]: removed ${deleted} retired installation clock row(s)`);
+  } catch (error) {
+    Logger.error(`Cleanup [automation-entitlement-clocks] failed: ${error}`);
   }
 
   // 9. 过期的**账号凭据列**、过期/无人在等的换绑请求行、过了 JWT 生命周期的会话行，
