@@ -60,6 +60,8 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
 但**客户端有几条腿是"库写完了、生产里一个调用者都没有"**，那是代码缺口，不是证据缺口。逐条：
 
 ### A1 权益票据与 session 心跳：三条腿零生产消费者
+
+> ✅ **本单 §7 第 6 步按第二支落**（2026-10-27）：这一档本版本不支持，**代码一行没改**。现量 `grep -rn "selfhost-online" apps packages --include='*.ts' --include='*.tsx'` 去掉 dist 与测试只命中`packages/app-host/src/admin-client.ts` 一句注释 ⇒ 本节的"零生产消费者"仍成立，而"界面别露出"那一半本来就已成立；缺的那半（对运维说清配了也不会通）写进了 `docs/runbooks/self-host.md` §2.5 那张表。
 - `createAutomationTicketSource`（取动作票）：`grep -rn createAutomationTicketSource --include='*.ts' packages apps server | grep -v /dist/`
   ⇒ 只命中定义、`index.ts` 的 re-export、`packages/app-host/tests/`。**没有宿主用它。**
 - `startAutomationSessionKeepalive`（计划里那句"各宿主每 30 秒续票据"）：同样只被自己的 spec 引用。
@@ -70,6 +72,8 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
   且有一枚反向臂（摘掉票供给 ⇒ 那用例红）。**别只补代码不补臂**。
 
 ### A2 各宿主的 worker 生命周期：只有两端真的在跑，而且都是"前台才跑"
+
+> ✅ **表里"只有两端"这句按当前树要读成三端**：`apps/node-host` 的 `worker run` 那条启动腿已闭合（回执第 4 项）。iOS / Android 那行的两件事**依旧成立**——后台无腿、且不建收件密钥。
 | 端 | 现状（现量） | 缺什么 |
 |---|---|---|
 | 浏览器 `apps/web` | `grep -rn startInboundWorkerLoop apps` ⇒ 唯一生产调用点 `apps/web/src/features/settings/InboundAutomationSettings.tsx`（挂在设置节组件的 `useEffect` 上，`isRunnable` 读 `document.visibilityState`） | **离开设置视图即停、标签页不可见即停**；没有 ServiceWorker 那条腿（`grep -rn "inbound\|automation" apps/web/src/pwa` 回空，`e2e/playwright.inbound.config.ts` 还显式 `serviceWorkers: 'block'`） |
@@ -82,6 +86,8 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
 两者选一，不许两头都不做。
 
 ### A3 `waiting-entitlement` 到界面是一条**空白文案**
+
+> ✅ **整格闭合**：中英两档词条、web 的映射与那枚加严到钉句子的用例，以及下面那条"mobile 更彻底"的缺口（设置面里新增一行终态，testID 是 `inbound-cycle-state`）。本节引用的 `InboundAutomationSettings.tsx`现在住在 `apps/web/src/features/settings/`。
 - 库层有这个状态（`packages/app-host/src/inbound-process.ts` 的 `InboundAutomationCycleState`）；
 - 界面渲染处 `InboundAutomationSettings.tsx` 的 `PROCESS_COPY` 不含这一态 ⇒ 正文为空；
 - 词条确实缺：`grep -n "process.waiting" packages/i18n/src/locales/zh-CN.ts` 回空。
@@ -90,6 +96,8 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
 - 🔴 改文案走 `packages/i18n` 唯一事实源，中英两档都要，界面里不许硬编码。
 
 ### A4 托管 AI 额度**疑似一次扣两下**（本文最该先证伪/证实的一格）
+
+> 🔴 **"疑似"已升成"确证"**（真 PGlite + 真代理路由，逐字读数在回执第 2 项）：一次 managed 周期 `ai_usage_counters.requests` = **+2**，而上游只命中 1 次。摘哪一个扣点动的是计费口径 ⇒ 仍归 §6 第 3 格，本节原文一字未改。
 - 预留那一次：`server/src/automation/ai-metering.ts` 里 `billingSource==='managed'` 时调 `consumeManagedAiRequest`；
 - 真调用又一次：worker 走 `invokeRouted` ⇒ `packages/ai/src/wire.ts` 的 `managedChatUrl()` ⇒ `POST /api/ai/managed/chat` ⇒
   `server/src/ai/managed-proxy.routes.ts` 里再调一次 `consumeManagedAiRequest`；
@@ -99,6 +107,8 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
   ⚠️ 这动的是计费口径，属**判据口径**那一格 ⇒ **改法要报负责人拍，别代拍**（见 §6 第 3 格）。
 
 ### A5 实例退役清扫没接进每日任务
+
+> ✅ **已接**进 `server/src/sync/cleanup.ts`，并配了会红的判据（`server/tests/cleanup-automation-sweeps.spec.ts`）。本节末那条"搁置令要不要问负责人"**当场判掉了**：它约束的是 2026-10-12 那场会话自己的地界 ⇒ §6 第 4 格不再是待拍的事。
 - 函数有：`purgeRetiredAutomationEntitlementClocks`（`server/src/automation/entitlement-ticket.ts`）；
 - 调用者：`grep -rn purgeRetiredAutomationEntitlementClocks server/src` ⇒ **只有定义那一行**；
   `server/tests/automation-clock-retirement.pglite.spec.ts` 测的是函数本身，不测它被不被调。
@@ -108,11 +118,15 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
   他没解就说，别自己扩地界。
 
 ### A6 "正文保留 7 天"这句话没有一把对账尺
+
+> ✅ 尺已加进 `scripts/check-retention-window-parity.mjs`：`--self-test` 的臂数由脚本自己打印、两种不等分开报错，并已挂在 `pnpm check` 链里。加尺前按本仓规矩 grep 过，**没有明文否掉它**。
 - `scripts/check-retention-window-parity.mjs` 现在只对齐两枚 45 天窗口，不含 inbound 那枚 7 天常量
   （现量：`grep -n "inbound\|automation\|7" scripts/check-retention-window-parity.mjs`）。
 - 承诺写在 `docs/reference/inbound-automation-protocol.md`。**加尺前先 grep 仓内有没有明文否掉它**（本仓规矩）。
 
 ### A7 env 表面缺口：八枚里只登记了两枚
+
+> ✅ `server/env.example` 现在**八枚全在**（现量 `grep -c "^AUTOMATION" server/env.example`），运维件 `docs/runbooks/deployment.md` §3.5.1 与 `self-host.md` 各增一节。**helm 那一格没做**，理由在回执末段。
 - 读取点：`grep -rn "process.env.AUTOMATION" server/src`（模式/钥匙环/签发三件套/HMAC keyring/发送 KEK/提交回执 keyring 等）；
 - `server/env.example` 里只有 `AUTOMATION_COMMIT_KEYS` 与 `AUTOMATION_WEBHOOK_KEYS`（现量 `grep -n AUTOMATION server/env.example`）；
 - `server/helm/`、`server/deploy/`、`docs/runbooks/deployment.md` 对 `AUTOMATION` **零提及**（现量 `grep -rl AUTOMATION server/helm server/deploy docs/runbooks`）。
@@ -120,6 +134,8 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
   判据要不要改成启动即红（与 `ENTITLEMENT_GATE_ENABLED` 同形）属**判据口径**，要拍；先把它如实写进 §5 的运维件。
 
 ### A8 一份类型定义住两处
+
+> ✅ 已收到一处：定义只在 `packages/app-host/src/inbound-host-options.ts`，`host.ts` 只剩一行 `import type`。
 `InboundAutomationHostOptions` 在 `packages/app-host/src/inbound-host-options.ts` 与 `host.ts` 里各有一份逐字副本
 （`index.ts` 只导出前一份）。纯清理，改完 `pnpm --dir packages/app-host typecheck` 即判据。
 
@@ -221,8 +237,8 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
 
 ## 9. 执行回执（2026-10-27 · 负责人授权"按本单做完这些东西"之后由执行 AI 填）
 
-读数与逐格边界写在 [`inbound-automation.md`](inbound-automation.md) 文末 2026-10-27 那一节。这里只登记
-**与本单原文不一致的那三件**，因为下一位读这份文件时会照本单的说法去动手：
+读数与逐格边界写在 [`inbound-automation.md`](inbound-automation.md) 文末 2026-10-27 那一节。这里登记
+**与本单原文不一致的那些件**（§3 每格头上另有一枚 ✅/🔴 标记；两处说法不一致时，以标记加本单正文里那几条现量命令为准），因为下一位读这份文件时会照本单的说法去动手：
 
 1. **§7 第 2 步（node 宿主那条腿）不是"缺一行调用"**。`startInboundWorker` 的入参要 `routing` 与
    `consents`，而这台宿主**两个来源都没有**（现量：`grep -rn "consent\|routing" apps/node-host/src/*.ts`
@@ -235,8 +251,12 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
    [`inbound-automation.md`](inbound-automation.md) 文末 15:0x–15:3x 那一戳）。
 2. **§3 A4 从"疑似"升成"确证"**，载体与逐字读数见那一节第 1 项。修法仍归 §6 第 3 格，本单一句话没改：
    新用例现在**绿**着钉住现状（一次 managed 周期 = `requests` +2），拍定修法后那行改 `1`。
-3. **§3 A2 表里 mobile 那一格的"把周期结果露出来"没做**：移动壳里没有任何自动收集界面，
-   "露出来"要先把那面造出来，属产品取向；web 那一半（词条 + 映射 + 把用例加严到钉句子）已闭合，B110 随之闭合。
+3. **§3 A2 表里 mobile 那一格的"把周期结果露出来"已做完**，而这一项此前在本单里写下过**两句假话**，都留在这儿挡住下一位重犯：
+   ① "移动壳里没有任何自动收集界面，要先把那面造出来，属产品取向"——**错**：`apps/mobile/src/ai/AiSettingsSection.tsx`
+   早就承载 `inbound-automation` 那枚特性，缺的只是把周期结果渲成一行，是一格四处置的小代码；
+   ② 更早那句"这台机器上取不到真库"也已被否证（同一枚 Postgres 一直活着，缺的只是没人导出那枚键）。
+   落地的四处与判据见 §3 A3 头上那枚 ✅；过程账（含我自己那枚判据被"两处同改"的施变臂骗过一次）在计划文末 17:5x 那一节。
+   web 那一半（词条 + 映射 + 把用例加严到钉句子）与 B110 同格闭合。
 
 4. **§3 A2 表里 node 宿主那一格已闭合**（本单那句"性价比最高的一格"收窄成的那一难，由命令行上的操作者答）：
    `worker run` 现在把那枚循环真的打开，出境授权取 `--approve-egress`，而**该填哪一个不由本壳判** ——
