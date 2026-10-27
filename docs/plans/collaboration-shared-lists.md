@@ -1200,3 +1200,12 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 ⚠️ 归因要写清这棵树：那一趟链 13:5x 起跑，`apps/web test` 那一刻（14:37）工作树里已经有本节的 ⑨ 组判据（14:2x 落盘、14:38 才提交），
 所以它是"HEAD + 我在飞的编辑"的合成态 —— 对本线而言有用的两枚读数是三个载具的基线（6 / 5 / 26 全绿，那是臂跑完后的现量），
 而不是链的 rc。链本体环节数每次现量：`node -e "console.log(require('./package.json').scripts.check.split('&&').length)"`。
+
+#### 本批的四把尺（串行，逐枚带 rc）
+
+| 尺 | 读数 | 归因 |
+|---|---|---|
+| `pnpm -r typecheck` | **rc=0** | 本批新增的 TS 代码只有 ⑨ 组那两枚断言（在 `apps/mobile/tests/`） |
+| 本线全量单测（`cd apps/mobile && npx vitest run`） | **rc=0、`Test Files 90 passed (90)`、`Tests 1158 passed (1158)`** | ⑨ 组并入后移动壳套件零红；⚠️ 经 `npx` 直跑，**没过内存闸门**（那枚 shim 只挂在 `pnpm` 上） |
+| `pnpm verify:collab-suite` | **rc=0、`SUITE=OK legs=4 failed=0`**（journey／sync／revoke／conflict 四腿各 `RESULT=OK`，步数由脚本自己打印） | 🔴 本批**零产品源码改动**（现量：`git diff --name-only b0ac12042..HEAD -- packages apps server` 只回一枚 `apps/mobile/tests/share-ui-assembly.spec.ts`）⇒ 上一批第 51 跑那趟设备腿读数（63 通过 / 0 失败）**仍对应当前产物**，本批不重开 iOS 那一趟 |
+| `pnpm check` | 整链第三趟 **rc=1**，唯一那枚红见上面那段；本批那四枚文档门（`check:docs`、`check:doc-citations`、`check:md-tables`、`check:doc-command-claims`）在提交前各跑一次，**全 rc=0**；`check:gate-wiring` 同日 rc=0 | 链的 rc 归 `apps/web` 那条线，本线的文件上一枚红都没有；本批没动 `package.json` 的脚本面，所以 `gate-wiring` 无需重开 |
