@@ -411,7 +411,11 @@ export function renderPage(locale: ServerLocale, content: PageContent): string {
    *   这一条不是防御性冗余：#goLogin 用的就是 .btn，没有它整个隐藏机制是假的。
    */
   [hidden] { display: none !important; }
-  .status + .btn { margin-top: ${EMAIL_SIZE['space.4']}; }
+  /* 「.hint」那一支不是冗余：重置页的提示行（"至少 8 个字符…"）紧贴提交按钮，
+   * 2026-10-27 在真浏览器里量到 1440 与 375 两档**间隙都是 0px**（文字压着按钮上沿）。
+   * 只写「.status + .btn」的话，凡是把提示放在按钮前面的那张页都吃不到这条间距。
+   * ⚠️ 这段注释里不许出现反引号 —— 整块 CSS 在一个模板字符串里，反引号会把它截断。 */
+  .status + .btn, .hint + .btn { margin-top: ${EMAIL_SIZE['space.4']}; }
   form { margin: 0; }
   .status { margin: ${EMAIL_SIZE['space.4']} 0 0 0; font-size: ${EMAIL_SIZE['font-size.sm']}; }
   .status--ok { color: ${EMAIL_COLOR['color.success']}; }
