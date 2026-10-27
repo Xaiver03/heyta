@@ -237,11 +237,22 @@ describe('门槛：这条腿不许长出第二套实现，也不许碰任务写�
     return /\.ts$/u.test(entry) ? [full] : [];
   });
 
+  // 剥注释那一步在这里**不是讲究**：本仓的规矩是"源码读只能读代码，不能读散文"，
+  // 而 managed-completion.ts 的表头就把这枚端点名当判据引用了一遍。不剥 ⇒ 改名后
+  // 散文还在 ⇒ 尺绿 —— 我第一版就是这么写的，变异臂 A6 实测把它抓成了恒绿。
+  const stripComments = (text: string) => text
+    .replace(/\/\*[\S\s]*?\*\//gu, '')
+    .replace(/(^|[^:])\/\/[^\n]*/gu, '$1');
+  const codeOccurrences = (needle: string) => sourceTree('src')
+    .map((file) => [file, stripComments(read(file)).split(needle).length - 1] as const)
+    .filter(([, count]) => count > 0);
+
   it('`/chat/completions` 的拼接点在整个 server/src 里恰好一枚（第二套发送腿的门槛）', () => {
-    const sites = sourceTree('src').filter((file) => read(file).includes('/chat/completions'));
-    // 分母自己站在判据里：扫到 0 枚也是红（改名或换写法不等于重复没了）。
-    expect(sites, `扫到的拼接点：${sites.join(' , ') || '一处都没有'}`).toHaveLength(1);
-    expect(sites[0]!.endsWith('managed-completion.ts')).toBe(true);
+    const sites = codeOccurrences('/chat/completions');
+    // 分母自己站在判据里：**0 枚也红** —— 改名或换写法不等于重复没了，
+    // 而这枚端点是供应商契约的一部分，它消失就是一次真回归（A6 那一臂钉的正是这支）。
+    expect(sites, `代码里扫到的拼接点：${sites.map(([f, c]) => `${f}×${String(c)}`).join(' , ') || '一处都没有'}`).toHaveLength(1);
+    expect(sites[0]![0].endsWith('managed-completion.ts')).toBe(true);
   });
 
   it('服务端这条腿不写 commit permit、不碰 op 写入，也没有第二份正文出口', () => {

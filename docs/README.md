@@ -93,6 +93,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 
 | 编号 | 决策 | 状态 |
 |---|---|---|
+| [0077](adr/0077-inbound-hosted-extraction-at-ingest.md) | 托管档的「接收即抽取」：服务端只在**接收那一次请求的内存里**读明文（HPKE 封好之后谁也打不开），抽完把源正文从行上抹掉、结果重新封给同一枚收件人公钥；任务写回仍是设备的，服务端不持根密钥、不写 op、不建许可 | ✅ **已接受**（工程裁决 2026-10-27）；**未上线、未对外披露**，迁移未 apply，披露清单归负责人 |
 | [0076](adr/0076-admin-subscription-grants.md) | 后台的三种订阅发放（赠送 / 免费升级 / 收回）：只写 `provider='admin-grant'` 那一行、能力一律从 SKU 派生、发放不进营收，并兑现 ADR-0038 §4.2 那张审计表 | ✅ **已接受**（工程裁决 2026-10-25）；部分解除 [ADR-0038](adr/0038-admin-console-scope.md) §2 三的"不做改订阅"，实施见 [后台计划](plans/admin-console.md) §9 |
 | [0075](adr/0075-announcements-are-a-content-channel.md) | 运营公告是**一条内容通道**，不是一种通知：明文下发、服务端独占"有效"的裁决权、忽略只记在本机（不做账号级阅读史）、下架即删除 | ✅ **已接受**（工程裁决 2026-10-24）；实施见 [后台计划](plans/admin-console.md) §8.3 |
 | [0066](adr/0066-official-central-identity-and-self-hosted-auth.md) | 官方中央身份、自托管认证与 E2EE 边界 | 已接受；[实施状态](plans/unified-central-auth.md) |
