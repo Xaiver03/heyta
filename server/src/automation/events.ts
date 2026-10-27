@@ -3,6 +3,7 @@ import { inboundEnvelopeSchema, inboundDraftEventIdSchema, inboundDraftSnapshotS
 import { authorizeAutomationOperation, authorizeAutomationWrite } from '../entitlement';
 import { INBOUND_AUTOMATION_FIELDS, type InboundAutomationField } from '@heyta/inbound-core';
 import { prisma } from '../db';
+import { HOSTED_EXTRACTION_LEASE_OWNER } from './hosted-extraction';
 
 const LEASE_MS = 60_000;
 const EVENT_ID = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/;
@@ -210,6 +211,17 @@ export async function claimAutomationEvent(
       return undefined;
     }
     if (current.status === 'leased') {
+      // 「服务端那条腿」的租约（ADR-0077）走的是同一套行状态，但它**不写**
+      // `automation_ai_attempts` 那本台账（额度只在补全那一处扣一次）。所以这里
+      // 认不出台账时还得认持有者：租约过期而我们读不到它的结果 = 那次物理调用
+      // 到底发出去没有是**未知**的。未知就转待确认、要用户显式重试，
+      // 不许设备静默再抽一遍 —— 宁可用户多点一次按钮，不可同一份内容烧两次额度。
+      if (current.lease_worker_id === HOSTED_EXTRACTION_LEASE_OWNER) {
+        await tx.automationEvent.update({ where: { userId_ruleId_eventId: { userId, ruleId: current.rule_id, eventId: current.event_id } }, data: {
+          status: 'needs-confirmation', reasonCode: 'model-result-uncertain', leaseWorkerId: null, leaseExpiresAt: null,
+        } });
+        return undefined;
+      }
       const attempt = await tx.automationAiAttempt.findFirst({ where: {
         userId, ruleId: current.rule_id, eventId: current.event_id,
         state: { in: ['reserved', 'sent', 'consumed', 'unknown'] },

@@ -165,11 +165,21 @@ export type ManagedAiTransport = (
   request: ManagedAiUpstreamRequest,
 ) => Promise<ManagedAiUpstreamResponse>;
 
-export const managedAiFetchTransport: ManagedAiTransport = async (request) => {
+/**
+ * 默认的传输层。
+ *
+ * `timeoutMs` **只有服务端自己那条抽取腿会传**：设备走代理时，超时归客户端的
+ * 路由策略（`packages/ai` 的 `DEFAULT_ROUTING_POLICY.timeoutMs`），代理这边再套一层
+ * 就成了两层谁都不负责的超时。而接收这一趟是**同步等**的公网请求，
+ * 发送方等不到就会重投 —— 所以这一层必须由服务端限时，见 `hosted-extraction.ts`
+ * 里那枚 `HOSTED_EXTRACTION_TIMEOUT_MS` 的推导。
+ */
+export const managedAiFetchTransport = (timeoutMs?: number): ManagedAiTransport => async (request) => {
   const response = await fetch(request.url, {
     method: 'POST',
     headers: request.headers,
     body: request.body,
+    ...(timeoutMs === undefined ? {} : { signal: AbortSignal.timeout(timeoutMs) }),
   });
   const contentType = response.headers.get('content-type') ?? 'application/json';
   return {
