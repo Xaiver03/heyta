@@ -1290,3 +1290,35 @@ web 那侧 `grep -nE 'STEP [0-9] OK' scripts/verify-collab-journey.mjs` ⇒ 三�
 **两条首跑红，两条都是我自己造成的**（先记账再改，别把装置的红读成产品的红）：① 我拿"这个函数读了几次台账"当尺子，预测 3、现量 **5** —— 同一本台账在本函数里被读好几遍，那是个猜的数而不是不变量；改成钉"**读哪几本**"。② 我拿一把尺把"讲当前理由"的那四格与"记录历史错误"的那一格一起禁，而计划那份是本线的台账、它照抄旧口径正是 §9.21 的用途 —— 会让"记录错误"与"重复错误"长得一样的判据，逼下一位把历史删掉。
 
 **读数**：`cd apps/mobile && npx vitest run tests/share-ui-assembly.spec.ts` ⇒ `Tests 30 passed (30)`（此前 26，本组 +4）；整包 `cd apps/mobile && npx vitest run` ⇒ `Test Files 90 passed (90)`、`Tests 1162 passed (1162)`（此前 1158）；`pnpm -s --filter ./apps/mobile typecheck` ⇒ rc=0；四枚文档门（`check:docs`／`check:doc-citations`／`check:md-tables`／`check:doc-command-claims`）与 `check:gate-wiring` 逐枚 rc=0。⚠️ 那两枚 vitest 读数经 `npx` 直跑、**没经过内存闸门**（shim 只挂在 `pnpm` 上）。⚠️ 移动壳那份 `tsconfig` 的 `include` 只有 `src` 与根级 js，`tests/` 不在 `typecheck` 射程内（既有事实，不是本批引入）⇒ 这四枚的判决以运行器自己的读数为准。
+
+### 9.23 那趟设备读数还代不代表当前这棵树（2026-10-27 收口后的输入面差集）
+
+触发这一节的不是新代码，是本仓自己那条元规则（AGENTS §5 元规则三："测试全绿 ≠ 这是当前产物"）：
+设备腿 L1–L11 的判决来自第 51 跑，那一趟的 bundle 编译于 08:17，而它测的那棵树在 10:05 才落成一笔提交
+（`504d8b8aa`）。从那一刻到 HEAD 又落了五笔提交，其中两笔是我的。⇒ 要回答的不是"我改了什么"，
+而是**移动壳那台设备上跑着的那份产物，输入面变了没有**。
+
+粗 pathspec 会系统性高估（`-- apps packages` 把 `apps/*/evidence/**`、测试与文档全算进来），
+所以分母只取打包输入，逐枚现量：
+
+```
+git diff --name-only 504d8b8aa HEAD -- apps/mobile/src packages/ui/src packages/app-host/src packages/i18n/src
+git diff -U0 504d8b8aa HEAD -- <那一枚文件> | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' \
+  | grep -vE '^[+-][[:space:]]*(//|\*|/\*)' | wc -l
+```
+
+| 输入 | 自那一跑以来的改动 | 动不动得到 L1–L11 的观察 |
+|---|---|---|
+| `share/share-activity-notify.ts`、`screens/ShareSpaceScreen.tsx`（我这两枚） | 非注释改动 **0 行**（上一节那两处就是纯注释更正） | 不能 |
+| `packages/app-host/src/host.ts` | 17 行全部是那枚 `export interface InboundAutomationHostOptions` 的删除连同它的注释，换成从 `inbound-host-options.ts` 的 `import type` —— 类型空间，编译期抹掉 | 不能 |
+| `packages/app-host/src/inbound-runner.ts` | 一处：那句 `throw new Error(...)` 尾巴多了括号里的原因 | 那一档只有自动收集的失败路径会走到，旅程那十七段一次都不触发。⚠️ 但它**确实在移动壳的 import 图里**（`apps/mobile/src/inbound/lifecycle.ts` 从 `@heyta/app-host` 取 `startInboundWorkerLoop`）⇒ bundle 的字节会变 |
+| `packages/i18n/src/locales/zh-CN.ts` 与 `en.ts` | 各 1 行：新增一枚键 `web.ai.inbound.process.waiting-entitlement` | 只有 `apps/web` 的设置面板读它（现量 `git grep -n waiting-entitlement -- apps packages` ⇒ 命中的落点全在 web 那侧），移动壳没有任何 needle 叫这个名字 |
+
+**判决（照它自己的口径写，不许拔高）**：L1–L11 的观察对象没变，但这是**逐文件推理 + 现量差集**，不是一趟新跑。
+要字节级保证只有一条路——`pnpm verify:mobile-collab:ios` 再跑一趟（它自己会新建一枚带当趟戳的证据目录）。
+这一格就此登记成**未重跑**，不写成"已复验"；谁要把它读成"当前产物的读数"，先执行上面那两条现量命令自己看差集。
+
+⚠️ 这条复账里我当场犯了一次本线早已登记过的错：一条 grep 后面**无条件**跟着我自己写的结论串
+（`echo "(空=移动壳不 import 它)"`），而那枚 grep 其实有命中 ⇒ 读的人（那正是我自己）会把"有 import"读成"没有"。
+差点据此把上面第三行写成"根本不在移动壳的图里"。规矩：**结论串不许跟在可能非空的读数后面**；
+要写结论就写成自打印的形状（`printf '命中 %s 条\n' "$(grep -c …)"`），让它随世界一起变。
