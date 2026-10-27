@@ -53,6 +53,16 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - AUTOMATION_COMMIT_KEYS=${AUTOMATION_COMMIT_KEYS:-}
       - AUTOMATION_WEBHOOK_KEYS=${AUTOMATION_WEBHOOK_KEYS:-}
+      # 自动收集的权益模式与凭据面。空值等价于"没配"（每一枚读取点都是 `if (!raw)` 先行），
+      # 所以这里带 `:-` 默认值不改变现状；配了就必须是下面 env.example 写的形状。
+      # 🔴 `AUTOMATION_ENTITLEMENT_MODE` 写了非法值不在启动时报错，是**请求期抛 ⇒ 用户看到 500**。
+      - AUTOMATION_ENTITLEMENT_MODE=${AUTOMATION_ENTITLEMENT_MODE:-}
+      - AUTOMATION_OFFICIAL_KEYS=${AUTOMATION_OFFICIAL_KEYS:-}
+      - AUTOMATION_SENDER_KEK=${AUTOMATION_SENDER_KEK:-}
+      # 签发侧三件套，只有官方实例需要；三缺一 ⇒ 那六条签发路由全 403。
+      - AUTOMATION_OFFICIAL_PRIVATE_KEY=${AUTOMATION_OFFICIAL_PRIVATE_KEY:-}
+      - AUTOMATION_OFFICIAL_ISSUER=${AUTOMATION_OFFICIAL_ISSUER:-}
+      - AUTOMATION_OFFICIAL_KEY_ID=${AUTOMATION_OFFICIAL_KEY_ID:-}
       # Password hashing pepper. REQUIRED — the server verifies it and the Argon2id backend
       # at boot and refuses to start without it. 🔴 Rotating it makes every stored password
       # fail to verify (passkeys and email links still work). Without this line the container
