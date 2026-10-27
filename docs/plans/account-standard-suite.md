@@ -4432,3 +4432,44 @@ HID 点击回 `success` 而控件收不到（**探针说成功，不等于界面
 （往没人读的文件里补规则只会制造一次假漂移）；真收件箱那一腿仍缺（缺口 G1，这里读的是
 Ethereal preview）；线上落地页导航「登录」缺 `signin`、线上产物比 HEAD 旧那一处**不归本线**，
 记在 **B232**。
+
+### 6.90 间距扫描最后一格（验证码屏）改判成现量，与整条 `pnpm check` 的收尾读数（10-27 现量）
+
+上一节的同族扫描剩最后一格没落：`AuthForm` 验证码屏那两处（登录档 / 注册档同形）当时登记成
+**未判定**，写的理由是"这一屏要 `onLoginCode` 真发出挑战才渲染，而 e2e 装置里没有真服务端"。
+**那句理由是错的，错的是一次探针失误**：触发器要先填邮箱才出现、而且住在「其他登录方式」那层折叠里，
+我两次都没做这两步就去点它，读到 `isVisible()=false` 便把它当成了装置的限制。
+现量：那一屏的同目录两条用例一直在用 `page.route()` fulfill 假挑战把它渲染出来 ——
+`grep -n "page.route(" e2e/tests/auth-login-code.spec.ts e2e/tests/auth-registration-otp.spec.ts`。
+坑本身登记成环境陷阱（号从 `grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md` 取）。
+
+补法不是"这次手动量一下记个数"，而是把那一格变成**常驻的四条臂**
+（`e2e/tests/auth-form-spacing.spec.ts` 末尾，登录档 / 注册档 × 1440 / 375 各一条），
+判据沿用本单已有那两条，不新造阈值：① 独立控件之间合成视觉距离 ≥ 12px；
+④ 住在 `gap=space.1` 容器里的文字链按「触控目标 ≥ 44×44px」那条明文规则判**它自己成立**（高度 ≥ 44）。
+读数（2026-10-27 真 Chromium，四档全同）：
+
+| 量的是哪一格 | 读数 | 判的尺 |
+|---|---|---|
+| 验证码框 → 验证按钮（登录档 1440 / 375） | 12px | ①（吃 `primary` 自带的 `marginTop: space.2` 补偿） |
+| 验证码框 → 验证按钮（注册档 1440 / 375） | 12px | 同上 |
+| `-submit` / `-resend` / `-change-email` 盒子高 | 44px（墨迹 20-21px） | ④ |
+| 两枚文字链的墨迹间距 | 27px | 只报数不判：仓内没有一条明文规则规定两行文字之间隔几 px |
+
+⇒ 那两处的"不是缺陷"从此**不再靠代理读数**。移动壳那一格仍登记为未判定，理由与判它的断言写在尺的文件头。
+
+**整条 `pnpm check` 的收尾读数**（10-27 一趟跑完，43.0 分钟）：`423 passed / 1 flaky / 2 skipped`。
+那枚 flaky 是 `e2e/tests/rail-roving.spec.ts:300`（键盘拖拽与 dnd-kit `KeyboardSensor` 共存，
+断言的是"进入拖拽后 `.ht-rail__item--dragging` 归零"），retry 即过，与本线的间距改动无关。
+唯一的**硬红在链条最后一道**，而且是自己那枚：`node scripts/check-shell-unicode-vars.mjs` 指着
+`server/scripts/caddy-sync.sh` 的第 78、187 行 —— 那是我 2026-10-25 那笔 `7f7349cda` 留下的
+`$name（…）` / `$CADDY_BIN）`。本机（bash 3.2.57）同一句只换写法的现量对照：
+
+```
+LC_ALL=en_US.UTF-8  修前> 尾 / 校验通过（          ← 变量值整个被吞掉，只剩替换符
+LC_ALL=en_US.UTF-8  修后> caddyfile（尾 / 校验通过（caddy）
+LC_ALL=C            两种写法都对 —— 所以这枚坑只在正常终端环境下现形，而那正是人盯着看证据的地方
+```
+
+症状与门禁写的那句一致：**脚本照常退 0，只是打印出来的实测证据是乱码** —— 对一份"以实测输出为证据"
+的部署脚本比崩溃更糟。改法照门禁给的修法（`$var` → `${var}`），复量 `node scripts/check-shell-unicode-vars.mjs` 退 0（分母：210 枚被跟踪的 `.sh`）。
