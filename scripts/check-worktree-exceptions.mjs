@@ -11,6 +11,14 @@
  * 这枚尺把分类本身钉下来：每一枚未提交的路径必须命中一条**带理由**的登记规则，
  * 命不中就是"没登记过的例外" —— 那才是本仓真正想拦的东西。
  *
+ * ## 第二判：跨线依赖（归属表看不出来的那一类）
+ *
+ * 按路径归属会把一条线切成几堆，但**提交是按堆提的，import 是按文件解析的**。
+ * 2026-10-28 实测到的形状：一枚已跟踪、已改动的界面文件 import 了一枚**还没进仓库**的新模块，
+ * 而那枚新模块按路径归在**另一条线**的堆里 —— 于是"每一枚都登记了"这句完全成立，
+ * 单独提交日历那一堆照样把 HEAD 提成半棵树（下一位拿到的是"代码引用一个仓库里没有的模块"）。
+ * 所以除了归属，还须逐枚问：它引用的东西在 HEAD 里有没有？
+ *
  * ## 为什么默认不红
  *
  * 它读的是**工作树状态**，不是仓库内容：干净检出上工作树必然为空，硬把它塞进 `check` 链
@@ -19,14 +27,15 @@
  *
  * ## 用法
  *
- *   node scripts/check-worktree-exceptions.mjs           # 逐条归属 + 点名未登记的
- *   node scripts/check-worktree-exceptions.mjs --strict  # 有未登记 ⇒ exit 1
+ *   node scripts/check-worktree-exceptions.mjs           # 逐条归属 + 点名未登记的 + 点名跨线依赖
+ *   node scripts/check-worktree-exceptions.mjs --strict  # 有未登记**或**有跨线依赖 ⇒ exit 1
  *   node scripts/check-worktree-exceptions.mjs --self-test
  *
  * 规则表住在脚本里，登记正文（每一行为什么不归本线）在 `BLOCKED.md` 的 B238 那一节。
  */
 
 import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -65,7 +74,10 @@ export const OWNER_RULES = [
   },
   {
     line: '日历/详情面线',
-    why: '壳里那一支、工具栏新引的图标、spec 里新的 testid 连成一条还没接完的线；提两枚留一枚 = 用例引用一个界面里不存在的控件',
+    why:
+      '壳里那一支、工具栏新引的图标、spec 里新的 testid 连成一条还没接完的线；提两枚留一枚 = 用例引用一个界面里不存在的控件。' +
+      '🔴 2026-10-28 现量还多一条硬前提：`CalendarCapturePopover.tsx`（已跟踪）import 的 `apps/web/src/lib/form/useDirtyDismissGuard.tsx` **没入库**，' +
+      '而那枚 hook 按路径归在 UX 线那一堆 —— 本组单独入库必然留下"代码引用仓库里没有的模块"（第二判会点名它）',
     prefixes: ['apps/web/src/App.tsx', 'apps/web/src/features/calendar/', 'e2e/tests/calendar-cells.spec.ts'],
   },
   {
@@ -92,6 +104,14 @@ export const OWNER_RULES = [
     line: '别线的变异台架（research/tools/mutation-rigs/）',
     why: '台架改的是它自己的判据臂，作者正在按读数调臂；这类文件的"对不对"只有那条线能判',
     prefixes: ['research/tools/mutation-rigs/'],
+  },
+  {
+    line: '本线（注册登录标准套件线）在飞的这一笔',
+    why:
+      '这枚尺和它配套的台账正文，写它的那一刻必然在脏集里 —— 登记它不是"我的改动不用入库"，' +
+      '是让"没登记过的例外"那一栏只报真正没人认领的路径（收口后本行应读 0 枚）。' +
+      '`BLOCKED.md` **故意不进来**：它是几条线共用的取证账本，登记成"我的"会把别人没提交的那行一起洗掉',
+    prefixes: ['scripts/check-worktree-exceptions.mjs', 'docs/plans/account-standard-suite.md', 'scripts/live-web-freshness.mjs'],
   },
 ];
 
@@ -140,6 +160,61 @@ export function classify(entries, rules) {
   };
 }
 
+/**
+ * 只认相对说明符：`from './x'` 与副作用式 `import './x'`。
+ * 裸包名（`react`）不在射程里 —— 它由 `check:layering` 与 lockfile 管，这枚尺只盯"仓库内的落点"。
+ */
+const RELATIVE_SPEC_RE = /(?:\bfrom|\bimport)\s*['"](\.[^'"]+)['"]/g;
+
+const SCANNED_EXT = new Set(['.ts', '.tsx', '.mts']);
+
+/** 一条相对说明符在本仓约定下可能的磁盘落点（`.js` 实际指向 `.ts`/`.tsx` 是本项目写法）。 */
+export function candidateTargets(importer, spec) {
+  const base = path.posix.normalize(path.posix.join(path.posix.dirname(importer), spec));
+  const out = [base];
+  const ext = path.posix.extname(base);
+  if (ext === '.js' || ext === '.mjs') {
+    out.push(base.slice(0, -ext.length) + '.ts', base.slice(0, -ext.length) + '.tsx');
+  }
+  // 无扩展名的写法（`from './helpers'`）在本仓同样合法：不补这一档，别线的 spec 会整批假红
+  //（2026-10-28 第一发就是这么错的：`e2e/tests/helpers.ts` 明明已入库，尺判它"落点上根本没有"）
+  if (ext === '') out.push(`${base}.ts`, `${base}.tsx`, `${base}.js`, `${base}/index.ts`, `${base}/index.tsx`);
+  return out;
+}
+
+/**
+ * 第二判：已跟踪、已改动的源码 import 了一枚没在 HEAD 里的模块。
+ * `untracked` = 文件在这棵树上但没入库（同一趟提交里带上它才自洽）；
+ * `dangling` = 磁盘上根本没有这个落点（比未跟踪更硬：谁都跑不动）。
+ * 未跟踪的 importer 不扫 —— 它自己还没进仓库，和它的 target 同一笔提交就自洽。
+ */
+export function crossLineImports(entries, { read, isTracked, exists }) {
+  const found = [];
+  const seen = new Set();
+  for (const e of entries) {
+    if (e.xy.includes('?')) continue;
+    if (!SCANNED_EXT.has(path.posix.extname(e.file))) continue;
+    if (e.file.endsWith('.d.ts')) continue;
+    let text;
+    try {
+      text = read(e.file);
+    } catch {
+      continue; // 读不到就跳过这枚，但**不**把它读成"没有跨线依赖"
+    }
+    for (const [, spec] of [...text.matchAll(RELATIVE_SPEC_RE)]) {
+      const cands = candidateTargets(e.file, spec);
+      if (cands.some((c) => isTracked(c))) continue;
+      const onDisk = cands.find((c) => exists(c));
+      const target = onDisk ?? cands[0];
+      const key = `${e.file} ${target}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      found.push({ importer: e.file, target, kind: onDisk ? 'untracked' : 'dangling' });
+    }
+  }
+  return found;
+}
+
 const SELF_TEST_ARMS = () => {
   const arms = [];
   const push = (name, got, want) => arms.push({ name, ok: JSON.stringify(got) === JSON.stringify(want), got, want });
@@ -178,6 +253,45 @@ const SELF_TEST_ARMS = () => {
     { xy: ' M', file: 'a/b.ts' },
     { xy: 'R ', file: 'new.ts' },
   ]);
+
+  // 第二判的四臂：形状取自 2026-10-28 真实量到的那一枚（已跟踪的界面文件 import 一枚未入库的 hook）
+  const IMP = 'apps/web/src/features/calendar/CalendarCapturePopover.tsx';
+  const HOOK = 'apps/web/src/lib/form/useDirtyDismissGuard.tsx';
+  const TXT = "import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';\nexport const X = 1;\n";
+  const readMap = (m) => (f) => {
+    if (m[f] === undefined) throw new Error('no such file');
+    return m[f];
+  };
+  const mk = (tracked, onDisk) => ({
+    read: readMap({ [IMP]: TXT }),
+    isTracked: (f) => tracked.includes(f),
+    exists: (f) => onDisk.includes(f),
+  });
+  const one = (xy) => [{ xy, file: IMP }];
+  push(
+    '⑩ 已跟踪代码 import 一枚未入库、但在树上的模块 ⇒ 必须点名（这正是"单独提一组=半棵树"）',
+    crossLineImports(one(' M'), mk([], [HOOK])),
+    [{ importer: IMP, target: HOOK, kind: 'untracked' }],
+  );
+  push('⑪ 同一枚 import 的 target 已经入库 ⇒ 不许点名（别线的模块进仓库了就不是例外）', crossLineImports(one(' M'), mk([HOOK], [HOOK])), []);
+  push(
+    '⑫ target 既不入库也不在树上 ⇒ 判 dangling，不许读成"没问题"',
+    crossLineImports(one(' M'), mk([], [])).map((r) => r.kind),
+    ['dangling'],
+  );
+  push('⑬ 未跟踪的 importer 自己不扫（它和 target 同一笔提交就自洽）', crossLineImports(one('??'), mk([], [HOOK])), []);
+  push(
+    '⑭ 无扩展名写法要解析到 .ts —— 别线的 spec 全用这种写法，解析不到就是一整批假红',
+    crossLineImports(
+      [{ xy: ' M', file: 'e2e/tests/rail-roving.spec.ts' }],
+      {
+        read: () => "import { openApp } from './helpers';\n",
+        isTracked: (f) => f === 'e2e/tests/helpers.ts',
+        exists: () => false,
+      }
+    ),
+    [],
+  );
   return arms;
 };
 
@@ -217,7 +331,23 @@ const main = () => {
   } else {
     console.log('   ⇒ 每一枚都归到某条已登记的理由；正文见 BLOCKED.md 的 B238 那一节。');
   }
-  process.exit(opts.strict && v.unattributed.length > 0 ? 1 : 0);
+  const trackedSet = new Set(
+    execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n')
+      .filter((l) => l.trim() !== '')
+  );
+  const cross = crossLineImports(entries, {
+    read: (f) => readFileSync(path.join(ROOT, f), 'utf8'),
+    isTracked: (f) => trackedSet.has(f),
+    exists: (f) => existsSync(path.join(ROOT, f)),
+  });
+  if (cross.length > 0) {
+    console.log(`🔴 跨线依赖 ${cross.length} 处：已跟踪的代码 import 了没在 HEAD 里的模块 ⇒ **单独提交 importer 那一组，HEAD 就是半棵树**`);
+    for (const c of cross.slice(0, 20)) console.log(`   ${c.importer}\n      → ${c.target}（${c.kind === 'untracked' ? '在这棵树上，但没入库' : '落点上根本没有这枚文件'}）`);
+    if (cross.length > 20) console.log(`   …另 ${cross.length - 20} 处`);
+    console.log('   ⇒ 归属表按路径分堆，看不出这一类：两堆各自登记齐了，按堆提交照样红。');
+  }
+  process.exit(opts.strict && v.unattributed.length + cross.length > 0 ? 1 : 0);
 };
 
 main();
