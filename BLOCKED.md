@@ -12555,7 +12555,7 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 | 格 | 为什么不归我 | 现量 |
 |---|---|---|
 | R-legal：`live-legal.spec.ts` 那句一刀切 `hasDraftBanner` | 判据口径归法务文案那条线；改成"按 `status` 分档期望"要动他们的断言 | `grep -n hasDraftBanner e2e/live-site/live-legal.spec.ts` |
-| `main` 的上游还指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动。推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref main@upstream`；落后枚数 `git rev-list --count main@upstream..main` |
+| `main` 的上游还指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动。推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref 'main@{upstream}'`（🔴 裸写 `main@upstream` 读不出：`fatal: ambiguous argument` —— 这行以前就是坏的，照着跑会得到"没有上游"这个假事实）；落后枚数 `git rev-list --count 'main@{upstream}..main'`；真正要复验的那一枚用远端事实 `gh api repos/Xaiver03/heyta/git/ref/heads/main --jq .object.sha` 比 `git rev-parse HEAD` |
 | `apps/web/evidence/**` 与两枚台账此刻脏着 | 别的会话**正在写**（mtime 与本轮同一分钟内），代提交=替他们半份落仓；证据片那一族他们自己已登记"永久剔出输入面分母" | `git status --porcelain -uall`；`stat -f "%Sm %N" docs/plans/collaboration-shared-lists.md` |
 
 ### B238（2026-10-27 22:1x · 注册登录线：线上那枚「验证码登录」现在就是死的 —— 三发实测 + 我第一发探针是假绿）
@@ -12596,7 +12596,7 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 | 注册 resend 同一形状（`server/src/api.ts:2422`） | 同族第二枚；它今天不露出来只因为那张表没坏，改上一格就得一起改 | 同一份 catch 块：`grep -n "invalid_registration_challenge" server/src/api.ts` |
 | `login_unavailable` 没进客户端白名单 ⇒ 503 落到 `server-error`（"我们不知道发生了什么"），丢掉了服务端明说的"稍后再试" | 要不要为它加一档 reason 是文案与四端词条的取舍（`hosted-auth.ts:671` 那句"避免为一个子流程迫使所有壳加词条"就是它的反方） | `grep -n "login_unavailable" packages/app-host/src/hosted-auth.ts`（无命中即现状） |
 | 尺的 `KNOWN_GAPS` 两枚：`automation_sender_credentials_user_id_rule_id_key_id_idx`（库里只有同列的**部分唯一** + 一条 (user_id,rule_id,revoked_at) 普通索引 ⇒ 查已撤销凭据那条路没索引）、`automation_commit_permits_op_id_key`（迁移 20261018080000 有意撤掉单列唯一换成 (user_id,op_id)，schema 的 `opId @unique` 没跟着改 ⇒ 不变量收窄） | 两格都归自动收集线判：补迁移或改声明都是他们的口径，本尺先登记不代改 | `grep -n "KNOWN_GAPS" -A 20 scripts/check-schema-migration-drift.mjs` |
-| `main` 的上游仍指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动；本轮推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref main@upstream`；落后枚数 `git rev-list --count main@upstream..main` |
+| `main` 的上游仍指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动；本轮推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref 'main@{upstream}'`（🔴 裸写 `main@upstream` 读不出：`fatal: ambiguous argument` —— 这行以前就是坏的，照着跑会得到"没有上游"这个假事实）；落后枚数 `git rev-list --count 'main@{upstream}..main'`；真正要复验的那一枚用远端事实 `gh api repos/Xaiver03/heyta/git/ref/heads/main --jq .object.sha` 比 `git rev-parse HEAD` |
 | 本线之外那批正在被别人改的文件（枚数现量见右栏，别抄这里的数） | 两条会话**正在写**（`stat -f "%Sm %N"` 读回 mtime 落在最近十几分钟内），代提交 = 替他们把半份落仓 | `git status --porcelain=v1 \| wc -l`；`stat -f "%Sm %N" apps/web/src/App.tsx` |
 
 **发布已落地（2026-10-27 22:35–22:56 +08:00 · 负责人授权原话：「直接换线上容器」）**
