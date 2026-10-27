@@ -116,7 +116,10 @@
  *     自带的 `marginTop: space.2` 补偿），`-submit` / `-resend` / `-change-email` 三枚
  *     **盒子高都是 44px**（墨迹 20-21px），两枚文字链的**墨迹间距 27px**（只报数，不判）。
  *   ⇒ 那两处的判掉**不再靠代理读数**；谁把 `primary` 的补偿或 `textAction` 的 `minHeight`
- *     改掉，这四条会红（能红性见文件末尾那条注释与本单的变异轮）。
+ *     改掉，这四条会红。能红性 2026-10-27 现量证过：把 `textAction` 的
+ *     `minHeight` 从 `touch-target.min` 单独改成 `space.4`（16px）重建 `@heyta/ui` 再跑这四项
+ *     ⇒ **4 项全红**，报的就是 `④ …「-resend」「-change-email」实测高 29px < 44px`；
+ *     从 `.mut-bak` 还原后整条尺复跑 **6 passed**（变异只动产品，没动过任何一条断言）。
  *   坑本身记在 `docs/reference/environment-traps.md`（"把探针失误登记成装置的限制"那一条）。
  *
  * 🔴 其中前三处（文字按钮那一族）判掉靠的是**同一句明文规则**：`MASTER.md` 的

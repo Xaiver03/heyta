@@ -4473,3 +4473,10 @@ LC_ALL=C            两种写法都对 —— 所以这枚坑只在正常终端�
 
 症状与门禁写的那句一致：**脚本照常退 0，只是打印出来的实测证据是乱码** —— 对一份"以实测输出为证据"
 的部署脚本比崩溃更糟。改法照门禁给的修法（`$var` → `${var}`），复量 `node scripts/check-shell-unicode-vars.mjs` 退 0（分母：210 枚被跟踪的 `.sh`）。
+
+**这四条新臂的能红性（10-27 现量，变异只动产品、没动过任何一条断言）**：把 `textAction` 的
+`minHeight` 从 `touch-target.min` 单独改成 `space.4`（16px）、重建 `@heyta/ui` 再跑这四项 ⇒
+**4 项全红**，报的是 `④ …「-resend」「-change-email」实测高 29px < 44px`（16 是声明值，29 是它
+被内容 + `paddingVertical` 撑到之后的实际高度——两数都低于 44 那一档，所以这条抓的是"点击区变矮"
+而不是"数值等于几"）。从自己那份 `.mut-bak` 还原、再重建一次，整条尺复跑 **6 passed（24.1s）**，
+`git status` 对 `packages/ui/src/auth/AuthForm.tsx` 退空 ⇒ 产品源回到原样。
