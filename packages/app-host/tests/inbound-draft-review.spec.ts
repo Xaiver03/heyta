@@ -24,7 +24,7 @@ async function fixture(input: { ticket?: (request: AutomationTicketRequest) => P
     if (path.endsWith('/draft')) return Response.json(snapshot);
     if (path.endsWith('/rules')) return Response.json({ rules: [{ id: scope.ruleId, version: 1, enabled: true, keyId: 'hook',
       createdAt: '2026-01-01T00:00:00Z', deletedAt: null, allowedFields: ['title', 'dueDate'], targetProjectId: 'project',
-      timezone: 'Asia/Shanghai', parseVersion: 1, authorizationVersion: 1, maxItems: 2 }] });
+      timezone: 'Asia/Shanghai', parseVersion: 1, authorizationVersion: 1, maxItems: 2, hostedExtraction: false }] });
     if (path.endsWith('/recipient-key')) return Response.json({ keyEpoch: 2, packageVersion: 2,
       publicKey: current.publicKey.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') });
     if (path.endsWith('/decision')) {

@@ -5422,7 +5422,13 @@ export const en = {
   'web.ai.inbound.status.routing': 'Waiting for the automatic-capture AI route and egress consent; no model call is made silently.',
   'web.ai.inbound.status.ready': 'Processing device ready; a foreground page checks for one event periodically.',
   'web.ai.inbound.status.noKeyOnThisDevice': 'This device has no recipient key yet, so it will not process anything. Create the key once on an unlocked device (for example, the web app).',
-  'web.ai.inbound.boundary.foregroundOnly': 'Automatic capture only runs while heyta is open on this device: nothing is claimed after the app goes to the background or the page closes. For always-on capture, run the processing device on a machine you keep running.',
+  // Same two-lane wording as the zh entry: a rule may opt into extraction on our server
+  // (ADR-0077), so "only while the device is open" is no longer the whole truth.
+  'web.ai.inbound.boundary.foregroundOnly': 'Each rule decides who processes it: a rule without "extract on our server when content arrives" is processed only while heyta is open on this device — nothing is claimed after the app goes to the background or the page closes.',
+  'web.ai.inbound.hosted.label': 'Extract on our server when content arrives',
+  'web.ai.inbound.hosted.notice': 'When this is on, content is read by the AI we run the moment it arrives, and the title, dates and other fields are extracted. After that we keep only the encrypted task result and discard the original. When it is off, only the device you keep heyta open on reads it.',
+  'web.ai.inbound.hosted.stateHosted': 'Extraction: our server (as content arrives)',
+  'web.ai.inbound.hosted.stateDevice': 'Extraction: this device (heyta must be open)',
   'web.ai.inbound.signIn': 'Sign in to the sync service before managing automatic capture rules.',
   'web.ai.inbound.formHint': 'Rules can only create new tasks. The field allowlist, target list, timezone and item limit are frozen with each rule version.',
   'web.ai.inbound.keyId': 'Webhook key id',

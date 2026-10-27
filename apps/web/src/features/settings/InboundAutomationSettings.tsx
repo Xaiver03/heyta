@@ -112,6 +112,9 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
   const [targetProjectId, setTargetProjectId] = useState('');
   const [timezone, setTimezone] = useState('');
   const [maxItems, setMaxItems] = useState('50');
+  // 抽取归谁（ADR-0077）。默认**归设备**：这一格没被显式打开之前，
+  // 我们这台服务器不读正文 —— 与库里那一列"可空 = 从没被问过"是同一件事。
+  const [hostedExtraction, setHostedExtraction] = useState(false);
 
   const remote = useMemo(() => signedIn && token !== undefined
     ? createInboundRulesRemote({ baseUrl, getToken: async () => token, fetchImpl: consentFetch })
@@ -226,6 +229,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
         targetProjectId: targetProjectId.trim() === '' ? null : targetProjectId.trim(),
         timezone: timezone.trim() === '' ? null : timezone.trim(),
         maxItems: Math.max(1, Math.min(50, Number.parseInt(maxItems, 10) || 50)),
+        hostedExtraction,
       });
       await refresh();
     } catch { setError(t('web.ai.inbound.error.save')); }
@@ -239,6 +243,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
     setTargetProjectId(rule.targetProjectId ?? '');
     setTimezone(rule.timezone ?? '');
     setMaxItems(String(rule.maxItems));
+    setHostedExtraction(rule.hostedExtraction);
     setError(undefined);
   };
 
@@ -251,6 +256,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
         targetProjectId: targetProjectId.trim() === '' ? null : targetProjectId.trim(),
         timezone: timezone.trim() === '' ? null : timezone.trim(),
         maxItems: Math.max(1, Math.min(50, Number.parseInt(maxItems, 10) || 50)),
+        hostedExtraction,
       });
       setEditingRuleId(undefined);
       await refresh();
@@ -409,6 +415,13 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                 {fieldLabel(field, t)}
               </label>)}
             </fieldset>
+            <label className="ht-inbound__check" data-testid="inbound-hosted-extraction">
+              <input type="checkbox" checked={hostedExtraction} onChange={() => setHostedExtraction((value) => !value)} />
+              {t('web.ai.inbound.hosted.label')}
+            </label>
+            {/* 🔴 这一格是把"我们这一次确实读了明文"说给用户听的那一句，不许写成审计话术，
+                也不许在开了这一档之后再宣称"服务端看不到内容"。 */}
+            <p className="ht-settings__hint" data-testid="inbound-hosted-notice">{t('web.ai.inbound.hosted.notice')}</p>
             <FormField id="inbound-target" label={t('web.ai.inbound.target')}>
               {(field) => (
                 <input {...field} value={targetProjectId} onChange={(event) => setTargetProjectId(event.target.value)} />
@@ -457,6 +470,9 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
               <strong className="tabular-nums">{rule.keyId}</strong>
               <p className="ht-settings__hint tabular-nums" role="status">{rule.deletedAt !== null ? t('web.ai.inbound.deleted') : rule.enabled ? t('web.ai.inbound.enabled') : t('web.ai.inbound.disabled')} · {t('web.ai.inbound.version', { version: rule.version })}</p>
               <p className="ht-settings__hint" role="status">{rule.allowedFields.map((field) => fieldLabel(field, t)).join('、')}</p>
+              <p className="ht-settings__hint" role="status" data-testid={`inbound-hosted-state-${rule.id}`}>
+                {t(rule.hostedExtraction ? 'web.ai.inbound.hosted.stateHosted' : 'web.ai.inbound.hosted.stateDevice')}
+              </p>
               {rule.deletedAt === null ? <div className="ht-inbound__credential" data-testid={`inbound-credential-${rule.id}`}>
                 <SettingsInfoTip
                   testId={`tip-inbound-credential-${rule.id}`}
