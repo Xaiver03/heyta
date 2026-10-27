@@ -12156,3 +12156,9 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
    ⇒ 规矩三条：① 判**列名/索引名存在性**的只读探针必须在 `WHERE` 或 `SELECT` 里**点名那一列**，并挑一个匹配不到任何行的值（`-1`、一枚不存在的 id）——这样 Postgres 仍要在解析期判它存在与否，返回 0 行也照样报 `42703`/`P2022`；② `take: 0`、只按主键过滤、`count()` 这类"看着最省最安全"的写法**不算这一格的证据**（本条只实测了 `take: 0` 那一发与两发点名写法；`count()` 我没跑过，别把它写成结论）；③ 零副作用与"能证伪"不冲突：点名 + 不存在的值，既不发邮件也不写行，在生产上就这么取。
    复量：`cat <探针文件> | ssh finlaw 'sudo -n docker exec -i supersync-server node --input-type=module'` ⇒ 输出必须含 `code=P2022`；读不回 `P2022` 也不读回 `SELECT_FAILED` 就是探针没成形（先怀疑探针）。
    归族：#603（空读数长得像否证——这次连 ssh 那层都没坏，是本地 ORM 的写法）、#597（打空的探针既没否认也没确认）、#601（三个信号全绿而证据是空的）、§5 元规则一（先怀疑探针：这一次被否证的确实是探针，不是假设）。
+605. 🔴 **命令行尺用 `argv.includes('--self-test')` 读参数 ⇒ 多余的/拼错的旗标被静默吞掉，它照常判**默认那两份**并打一句绿**（2026-10-27 注册登录线自查自己新写的尺时撞上，同一晚补上）：
+   形状：`node scripts/check-schema-migration-drift.mjs --schema /tmp/other.prisma` 与 `… --migrations-dir server/prisma/NOPE` 两发都 `rc=0`，读数与不带旗标时逐字相同。尺本身不认这两个旗标 —— 它只 `includes('--self-test')`/`includes('--dump-indexes')`，其余一律看不见，于是"**我判的是我指的这棵树**"这句意图根本没生效。写脚本的人（我）与读日志的人（下一个我）都会把它读成"这条尺对坏路径免疫"。
+   坏在哪：这是 #601/#603 那条"打空仍然 rc=0"的 **CLI 版**，而且比它们更隐蔽——那两族至少有一条空输出可见，这一族**输出是满的**：句子里的枚数、✅ 全都在，只是讲的是另一棵树。判据越"看起来在认真汇报"，越容易被当成证据。
+   ⇒ 规矩：脚本自己消费的参数一律先做**未知旗标拒绝**（`argv.slice(2).filter(a => a.startsWith('-') && !ALLOWED.includes(a))` 非空即 `rc=1` 并点名只认哪几枚），再做工；同时"输入不在场"必须是红而不是空（路径不存在、迁移目录里没有一枚带时间戳前缀的目录，两种都要点名）。两条各自配臂，臂用**恒真空返回**那种变异来证明它能失败（改 `unknownFlags`/`missingInputs` ⇒ 对应臂红、`rc=1`）。
+   复量：`for a in "--schema /tmp/other.prisma" "--migrations-dir server/prisma/NOPE" "--self-test --bogus"; do node scripts/check-schema-migration-drift.mjs $a >/dev/null 2>&1; echo "$a rc=$?"; done` ⇒ 三行必须全是 `rc=1`（今天这一把尺全是 1；任何一枚回到 0 就是这格又漏了）。
+   归族：#601、#603、#604（同一族"没有信号就是通过"的四种载体：shell 引号、远程 PowerShell、ORM 探针、**CLI 参数**）、§5 元规则二（一条永远通过的判据比没有判据更糟——这里"rc=0"就是那条）。

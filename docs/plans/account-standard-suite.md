@@ -4506,7 +4506,9 @@ LC_ALL=C            两种写法都对 —— 所以这枚坑只在正常终端�
 
 **已入库（两笔，都在 `origin/main` 上）**：
 1. `fix(注册登录/schema)` —— `email_login_challenges` 的 `userId` 补 `@map`、`@@index` 补 `map:`；顺带把 `automation_events` 那枚租约索引按迁移 20261018050000 的裸 SQL 名字登记 `map:`（不登记，`migrate diff` 会对着线上提 `DROP INDEX`，而租约续期那条读路径正靠它）。
-2. `feat(门禁/尺)` —— `scripts/check-schema-migration-drift.mjs`：A) 迁移建了而 schema 认不出的索引名 / B) 迁移建了列而没有任何字段映射到它 / C) schema 声明了而按迁移重放出来的库里没有（名字与形状两条路，唯一性单独成一维），带 WHERE/USING/函数列/`_ops`/COLLATE 的按形状豁免并计数，`KNOWN_GAPS` 两枚各带归属与理由、命中数变了就红。复量 `pnpm check:schema-migration-drift`；11 臂自检含"删声明必须红""注释里的索引名不许当 DDL""同语句先 DROP 再 CREATE 不许红"。变异实测：抹 `@map("user_id")` ⇒ B 红，抹租约 `map:` ⇒ A 红，还原复绿（`.mut-bak` 还原）。
+2. `feat(门禁/尺)` —— `scripts/check-schema-migration-drift.mjs`：A) 迁移建了而 schema 认不出的索引名 / B) 迁移建了列而没有任何字段映射到它 / C) schema 声明了而按迁移重放出来的库里没有（名字与形状两条路，唯一性单独成一维），带 WHERE/USING/函数列/`_ops`/COLLATE 的按形状豁免并计数，`KNOWN_GAPS` 两枚各带归属与理由、命中数变了就红。复量 `pnpm check:schema-migration-drift`；自检臂数由脚本自己打印（`node scripts/check-schema-migration-drift.mjs --self-test | tail -1`），含"删声明必须红""注释里的索引名不许当 DDL""同语句先 DROP 再 CREATE 不许红""未知旗标必须被拒""尺的输入不在场必须点名红""迁移目录空着必须红"。变异实测：抹 `@map("user_id")` ⇒ B 红，抹租约 `map:` ⇒ A 红，把 `unknownFlags` 改成恒空 ⇒ 只有"未知旗标"那一臂红、`rc=1`，把 `missingInputs` 改成恒空 ⇒ 两臂同时红、`rc=1`，还原复绿（`.mut-bak` 还原）。
+
+**这笔尺自己挨的一记（22:2x 自查，同一晚补上）**：写完第一版只 `process.argv.includes('--self-test')`，**不认的旗标被静默忽略** —— 我用 `--schema <别的路径>` / `--migrations-dir <别的路径>` 去试"路径指错会不会红"，两发都 `rc=0` 并打出仓库这一份的绿。那一刻读起来像"尺对坏路径免疫"，其实是**整发命令没成形**：它压根没读我指的路径。同族形状就是环境陷阱 #601/#603/#604（打空仍然 rc=0）。处置：未知旗标一律拒 + `missingInputs()` 点名 schema 与迁移目录两格（含"目录在但一枚带时间戳前缀的迁移都没有"那种空重放），各配臂与变异实测（上句）。耗时那一维顺手量了：真树单次 `real 0.05s`，`--self-test` 同量级 —— 它进链不构成成本。
 
 **线上读数与取法**：逐格表（库里列名/索引名、容器里那几行 schema、两发点名探针、`/api/login/email-code/verify` 503 对 `/api/register/email-password/verify` 400 的对照、resend 400、诱饵 201）记在 [`BLOCKED.md` B238](../../BLOCKED.md)。**日志里 `P2022` 取 0 次不等于没人碰**——那台容器 `Up 23 hours` 而 `docker logs --since 720h` 回来的总行数比一次正常启动还短，取不到更久历史（两格都带现量命令，B238 里）。
 
