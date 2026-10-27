@@ -97,6 +97,45 @@ cp env.example .env
 ⚠️ `AUTOMATION_ENTITLEMENT_MODE` 写成别的值**不会让容器起不来**：它是在请求处理时抛 ⇒
 界面与探针看到的是 **500**。别按"启动红"去找它。
 
+## 2.6 让这台机器真的把事件做成待办：那条 CLI 的 `worker run`
+
+上面那两种模式讲的都是服务端。**事件收进队列之后，是设备侧那枚循环把它领走、解密、交模型抽字段、
+落成待办、再回执** —— 而"永远在线"的那台无头宿主（`apps/node-host`）此前**没有任何东西替它把循环打开**：
+`startInboundWorker` 在全仓唯一的调用者是一枚测试。现在它的启动者是一条命令：
+
+```bash
+node apps/node-host/dist/cli.js --db /var/lib/heyta/node.sqlite \
+  --server https://heyta.example.com --token <jwt> --account-id <id> \
+  worker run --ai-managed --approve-egress heyta-cloud
+```
+
+（先 `pnpm --filter @heyta/node-host build` 产出那枚 `dist/cli.js` —— 仓库里**没有**叫 `heyta-node` 的可执行文件，
+别按那个名字找。在 `apps/node-host/` 里 `pnpm host <参数>` 是同一条命令的别名，两形现在都实测过：
+缺参数时退出码 **1** 并把那句缺什么打在 stderr 上，不会静默。）
+
+口令走环境变量 `HEYTA_PASSWORD`，**不要写在命令行上**（命令行会进 `ps` 与 shell 历史）。
+`--token` 同样可以由 `HEYTA_TOKEN` 提供；拿令牌那条命令是 `auth login`。
+
+四件事按**这台壳上没有界面**这一前提设计，运维需要知道：
+
+| 情形 | 命令上的形状 | 不做会怎样 |
+|---|---|---|
+| 要不要把明文正文发出去 | `--approve-egress <heyta-cloud\|user-endpoint>`，且**目的地由 `@heyta/ai` 按端点地址算**，不由本壳判 | 算出来要出境而这个词没写 ⇒ **拒绝启动，一个请求都不发**；写了但与算出来的那个不一致 ⇒ 同样拒绝 |
+| 端点根本不出境（本机 `http://localhost:11434/v1` 这类回环） | 这时**不许**写 `--approve-egress` | 挂一句用不上的"授权"只会让那份同意记录变成装饰，所以也拒绝启动 |
+| 自带端点的密钥 | `ai key set <端点 id>`（从 stdin 读，落系统钥匙串），命令行只给 `--ai-key-id <端点 id>` 指认它住在哪儿 | 密钥出现在 argv 里就等于进了 shell 历史与进程表 |
+| 这个账号在服务端没有启用中的规则 | 直接拒绝，不空跑常驻 | 注册一台永远领不到活的 worker，而界面上还显示"设备已注册" |
+
+常驻到 `Ctrl-C`（`SIGINT`/`SIGTERM` 都会停干净并打印一份 JSON 报告：跑了几趟、建了几条、最后一趟的终态）；
+`--once` 只处理一趟，给验收与 cron 用；`--interval-ms` 改两趟之间的间隔（缺省 30000）。
+🔴 解析范围（`allowedFields` / `maxItems` / `parseVersion`）**不是这台壳的入参** —— 它们在服务端建规则时定，
+领取时随快照下发；界面上那面设置页才是唯一能改它们的地方。
+
+顺带一条与库有关的既往症状（现已修，判据常驻）：这枚 worker 以前在 **`TimeZone` 不是 UTC 的
+Postgres**（自托管装完默认跟着 OS，`Asia/Shanghai` 最常见）上会**每一趟都失败**，报的是
+"Automation AI attempt reservation failed"，看着像网络坏了。根因在服务端判租约那几句裸列比较，
+与环境陷阱 [#599] 同条；现在 `server/tests/integration/automation-lease-session-timezone.integration.spec.ts`
+把一枚 `+08` 会话钉死的连接直接交给产品的预留函数，所以这一格不再随装机时区漂。
+
 ## 3. 构建镜像
 
 ```bash
