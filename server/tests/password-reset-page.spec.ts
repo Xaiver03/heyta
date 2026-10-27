@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { pageRoutes } from '../src/pages';
 import { SERVER_COPY, type ServerCopyKey } from '../src/copy.generated';
-import { EMAIL_COLOR } from '../src/design.generated';
+import { EMAIL_COLOR, EMAIL_SIZE } from '../src/design.generated';
 import { MIN_PASSWORD_CODE_POINTS, MAX_PASSWORD_CODE_POINTS } from '../src/password/policy';
 
 /**
@@ -280,6 +280,29 @@ describe('这一页仍然是那套蓝白（不是第二套样式系统）', () =
     expect(at).toBeGreaterThan(-1);
     const block = style.slice(style.indexOf('{', at), style.indexOf('}', at));
     expect(block).toMatch(/display:\s*none\s*!important/);
+  });
+
+  /**
+   * 🔴 提示行与提交按钮**不许贴脸** —— 这一条是量出来的，不是读样式读出来的。
+   *
+   * 2026-10-27 在真 Chromium 里量这一张页（本地 inject 出的那份标记，1440 与 375 两档）：
+   * 「至少 8 个字符…」那行 `.hint` 的底到「保存新密码」按钮的顶**间隙 0px**，
+   * 文字压在按钮上沿（截图看过）。同一张样式表里 `.status + .btn` 早就有 `space.4`，
+   * 漏的是 `.hint` 这一支 —— 而重置页恰好把提示放在按钮前面。
+   * 摘掉 `.hint + .btn` 半条再量，间隙回到 0 ⇒ 这条判据能红。
+   */
+  it('提示行与按钮之间那条间距规则在，且值出自 token', async () => {
+    const style = styleOf((await get('/reset-password?token=abc123')).body);
+    const at = style.indexOf('.hint + .btn');
+    expect(at, '样式表里没有「.hint + .btn」这条 ⇒ 提示行又会贴住提交按钮').toBeGreaterThan(-1);
+    // 选择器列表从上一条规则的右括号之后起算（`.status + .btn, .hint + .btn { … }` 是一整条）。
+    const selector = style.slice(style.lastIndexOf('}', at) + 1, style.indexOf('{', at)).trim();
+    const block = style.slice(style.indexOf('{', at), style.indexOf('}', at));
+    const declared = block.match(/margin-top:\s*([^;]+);/u)?.[1]?.trim();
+    expect(declared, '这条规则没写 margin-top').toBe(EMAIL_SIZE['space.4']);
+    // 阳性对照：同一条规则必须同时管着 `.status + .btn`，否则两张页各修各的。
+    expect(selector).toContain('.status + .btn');
+    expect(declared).not.toBe('0');
   });
 });
 
