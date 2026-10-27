@@ -999,10 +999,12 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 - ⚠️ **这一格证到哪、没证到哪**：那块板画的是 `listNotes()` 的**未筛选全集**
   （`apps/mobile/src/screens/NotesSection.tsx` 的 `read()`，切分组时递给回落的也是全集），
   所以 L9 绿说的是「便签那一族的 op 在手机上解得开、物化得了、画得出来，而且没点同步」，
-  **不是**「这条便签归在那份共享清单名下」。归属那一格今天没有界面可判（就是下面那条上行缺口）——
+  **不是**「这条便签归在那份共享清单名下」。归属那一格到 2026-10-27 才有界面（第十批那枚落点选择器，见 §9.16），
+  而 L9 这一格量的是"解得开、物化得了、画得出来"——两件事各自有各自的判据，别互相顶。
   别把 L9 的绿读成"便签按清单归好了"。
 
-🔴 **上行那一格今天做不到，而且不是判据缺口**：手机上没有"把一条便签归进某份清单"的入口 ——
+🔴 **那一格到 2026-10-27 已经补上**（第十批）：新建时的归属控件落地 —— 共享层 `CaptureSubmitPlan.projectId` + `CaptureComposer` 的 `projectPicker` + 便签板复用同一份形状，设备腿 **L10**（任务）/**L11**（便签）各有真机读数与一条到达判据 ⇒ 逐格见 §9.16。
+**边界挪了一格、没有全清**：把一条**已有**便签改归属（`setNoteProject`）在两壳依旧零调用点（现量 `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'` ⇒ 只剩接口声明与实现这两处。⚠️ 别拿整个 `apps` 当分母：那里混着 `apps/web/dist` 的 bundle，读出来不是零）—— 本批改的是"新建时落进哪一份"，不是"事后改归属"。
 `setNoteProject` 这个宿主动作在 `apps/mobile/src` 与 `apps/web/src` 都是**零调用点**
 （现量 `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'` ⇒ 只剩接口声明与实现这两处、零调用点。⚠️ 别拿整个 `apps` 当分母：那里混着 `apps/web/dist` 的 bundle，读出来不是零）⇒ 两壳同缺一个界面入口。登记在下面那张"还剩什么"表里，
 归**要新界面**那一档，不当成本批能顺手补的判据。
@@ -1022,10 +1024,80 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 |---|---|---|---|
 | **手机上的系统横幅（通知中心之外那一档）** | 🔴 **今天做不到，且不打算在本批做** —— 本机唯一那条原生通道被提醒链按 `categoryIdentifier == "heyta.reminder"` 全量回收；新开一枚 category 要改原生壳 + 重装两端，那是别线在飞的资产。（2026-10-26 按现量重核过这句还成立，分母是移动壳那几枚原生件：`git grep -n "categoryIdentifier\|heyta.reminder" -- apps/mobile` ⇒ iOS `AppDelegate.swift` 两处按 category 过滤 + `HeytaReminderModule.swift` 那枚 `static let category`，Android `ReminderModule.kt` 的 `CHANNEL`/`PREFS` 单通道；全壳只有这一族原生通知代码） | 没有断言 ⇒ 所以**不写成缺陷**，写成边界：`systemBanner` 端口留着可注入（`ShareActivityDeliveryPorts`），装配点不传它 | 归"通知通道归属"那一格（提醒线）；本批只把界面上能做的两档做完 |
 | **Android 的界面腿** | 🔴 载体不存在（§9.14 那格不变，本批没有新读数） | 出包腿在册（`ssh windows-pc`），界面腿没有 | 负责人长期令：一律 `ssh windows-pc` |
-| **手机把一条便签写进那份共享清单**（三族里的便签·上行） | 🔴 **界面上到不了** —— 不是没测：`setNoteProject` 在两壳零调用点（现量 `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'`），手机与 web 都没有"给便签选清单"那一枚入口 | 先有入口才谈得上判据；入口一落地，判据形状与 L9 对称（手机写 ⇒ owner 侧从共享日志读回并验签，复用 L4 那把尺） | 归**新界面**那一档（要定：入口放便签板还是放共享空间屏）⇒ 产品负责人拍，本批不代做 |
-| **手机把一条任务写进那份共享清单**（三族里的任务·上行） | 🔴 **界面上到不了，而且这一格不是共享特有的**：手机端**建任务只有两处调用点**（分母现量 `git grep -n "actions.create(" -- apps/mobile/src` ⇒ `screens/TasksScreen.tsx:1741` 与 `ai/AiToolboxScreen.tsx:194`），**两处都不交 `projectId`**（只交 `dueDate`/`priority`），而 `actions` 就是宿主那套 `createTaskActions(host)`、不会替界面补上"当前选中的清单"（`TasksScreen.tsx:629`）；共享那块添加面板也没有"选清单"的控件（现量 `grep -n "projectId" packages/ui/src/capture/CaptureComposer.tsx` ⇒ 无输出）；手机上唯一能改的归属是象限（`moveTaskToQuadrant`）。⇒ 手机新任务一律落收集箱 | 动作层是**通的**（`create(title, {projectId})` 支持显式归属，且 M6-2 的写侧分流会把它送进共享日志）⇒ 入口一落地，判据与 L3/L4 同形：手机建一条任务 → owner 侧从共享日志读回并验签。今天缺的只有那一枚控件 | 🔴 **这条影响产品定义那句"三族双向"**：今天手机上三族里只有评论那一族真双向。⚠️ 而且它不是"漏传一个参数"那么小 —— 手机端**连"按清单浏览/选中"这一档都没有**（分母现量 `git grep -c "activeProject" -- apps/mobile/src` ⇒ 退出码 1、一个都没有；「分类」那一档 `CategoriesScreen` 管的是标签，不建任务）⇒ 要新界面。**2026-10-26 按产品视角拍定形状**（负责人给的长期授权"按产品经理视角拍板"，这格不属于要他答的对外表征那类）：在移动端添加面板里加**一枚「清单」选择行**，默认仍是收集箱，选中某份清单才把 `projectId` 交给 `create`；便签板同形。**为什么不选"先做成按清单浏览的那一屏再添加"**：那要在手机上重建一份清单视图（web 靠侧栏选中，手机今天没有这一档），改动面从"一块面板"扩成"一屏导航 + 状态"，而产品定义要的只是"写进哪一份看得见、可选"这一件事。判据形状与 L3/L4 同形：装配层把选中的 `projectId` 交进去（不传 ⇒ 红，配变异臂），设备腿再判真机上那条任务确实落在共享那一行下。**本批不动它**：这批的验收量的是 L1–L9 那一份 bundle 的共享接线，中途加一块新控件会把读数归因搅浑。执行排在下一批 ⇒ 任务 #71 |
+| **手机把一条便签写进那份共享清单**（三族里的便签·上行） | ✅ **2026-10-27 第十批做完**：便签板挂了 `CaptureProjectPickerRow`，`createNote(content, { projectId })` 交得出选中的那一行；设备腿 **L11**（装置第 10e 步）判到 owner 侧读回并验签 ⇒ 读数在 §9.16 | 装置第 10e 步那四格（入口在场 ⇒ 按得动 ⇒ 标题改口 ⇒ owner 侧 verified） | —（**事后改归属**那一格仍缺，见上面那段） |
+| **手机把一条任务写进那份共享清单**（三族里的任务·上行） | ✅ **2026-10-27 第十批做完**：形状就是本行原本拍定的那一枚（在移动端添加面板里加「清单」选择行，默认收集箱，选中才交 `projectId`；便签板同形）。落地细节、为什么不靠颜色说话、以及装配判据在 **§9.16**；设备腿 **L10** 判到 owner 侧读回并验签 | 装置第 10d 步那四格 + `capture-project-assembly.spec.ts` 四组 + `capture-model.spec.ts` G/H 两组（条数各自现量，别在正文抄数） | — |
 | **桌面三枚壳接不接这条信号** | 不在 M6 授权范围（§9.14 已改口为"读者有两枚壳"） | 反查 `grep -rn "createHostRealtimeClient(" apps packages` | 归桌面那条线 |
 
 ⚠️ **为什么不并进 `docs/plans/launch-blockers.md`**：那一格卡的是"打扰强度"，不卡发布 ——
 应用可以带着"只有应用内那一档"上线（ADR-0062 实施记录第 7 条就是这么写的）。
 把它登进收款/备案那本账会把一条产品边界读成一条发布阻塞，那本账的读者要的是后者。
+
+### 9.16 M6 移动端「这条新建落进哪一份清单」那枚控件 + 任务/便签两族的上行设备腿（2026-10-27 第十批，第 41–51 跑）
+
+#### 这一批补的是产品定义里最后那半句
+
+产品定义写的是「任务/便签/评论**三族**与另一台设备**双向**同步」。第九批结束时：三族的**下行**在设备上都有读数（任务 L2 / 评论 L3·L5 / 便签 L9），**上行**只有评论那一族真走过。缺的不是判据，是界面上那枚控件 —— 手机上建任务与建便签的两处调用点都不交 `projectId`，新条目一律落收集箱，于是"手机把一条东西写进那份共享清单"这件事在任务与便签两族上**根本做不到**（§9.15 末那张表登记的就是这一格）。
+
+#### 落地的形状（为什么是这个形状）
+
+- **共享层**（`packages/ui/src/capture/model.ts`）：`CaptureSubmitPlan` 多一个可选 `projectId`（省略 = 收集箱）；`withCaptureProject` 把 `null` / `undefined` / 空串一律写成**不带这个键**，与 `toCaptureSubmitPlan` 对 `dueDate` 的约定同一条；`captureSelectedProject(picker)` 是**唯一**那枚"此刻生效的落点"查询 —— 提交与那一行的标题共用它，所以选中那一枚已不在册（面板开着时另一台设备把清单删了）时两处一起回退成收集箱，不会出现"界面念着落进 X、东西却建进收集箱"。
+- **组件**（`CaptureComposer`）：新增**可选** prop `projectPicker`（受控：状态住宿主，组件只画与回传）。🔴 两条提交路（规则解析的 `submit` 与 AI 的 `apply`）**都**过 `withCaptureProject` —— 只接一条会得到"手打的能选清单、AI 建的不能"。宿主没给 picker 就一行都不画（web 因此零变化）。
+- **选中态不只靠颜色**：那一行的标题念此刻的落点（未选「新建落进收集箱」/ 选后「新建落进「X」」），芯片的实心底色只是冗余的一层。无障碍名是**整句**词条（`落点选为「{name}」`），不拿前缀拼裸名。
+- **两壳接线**：`TasksScreen` 的新建面板（关掉即重置落点）、`NotesSection` 的便签板（清单列表订阅 `dataRevision`，共享内容回流不重挂也看得见）。🔴 宿主**不许**拿"当前选中的那一行"替用户补落点 —— 手机上没有侧栏选中态，那等于悄悄改变一条任务的归属。
+- **web 为什么没接**：不是漏 —— `apps/web/src/features/capture/CaptureComposer.tsx` 里那句「**打开某个清单时新建的任务必须留在清单里**」（现量 `grep -n "必须留在清单里" apps/web/src/features/capture/CaptureComposer.tsx`）写明 web 的落点由侧栏选中那一行给；手机上没有那一行，才需要一枚显式选择器。两壳是两种形状，不是两端一有一缺。
+- 词条 6 枚 × 两份 locale（`mobile.capture.project.*`）。
+
+#### 判据（每格都先证明能红）
+
+| 判据 | 钉的是哪一格 | 位置 |
+|---|---|---|
+| `capture-model.spec.ts` G 组 3 条 | 带值 / 三种空值都不带这个键 / 不改入参 | `packages/ui/tests/` |
+| `capture-model.spec.ts` H 组 3 条 | 没选 / 选了在册 / 选中的已不在册 ⇒ 都回退成收集箱；宿主没给 picker 不炸 | 同上 |
+| `capture-project-assembly.spec.ts` 四组装配判据（条数现量：`cd apps/mobile && npx vitest run tests/capture-project-assembly.spec.ts`） | 两条提交路都过、任务面板交得出 `projectId`、便签板交得出、两屏都真渲染那一行且标题念的是此刻落点 | `apps/mobile/tests/` |
+| 设备腿 **L10**（装置第 10d 步） | 真机上：入口芯片在场且默认念收集箱 ⇒ 按得动、标题改口成那份共享 ⇒ 提交后 **owner 侧从共享日志读回并验签 = verified** | `scripts/verify-mobile-collab-ios.sh` |
+| 设备腿 **L11**（装置第 10e 步） | 便签那一族的同一串（与 L10 逐格对称） | 同上 |
+
+#### 这一批改的是一行源码，红的是别人钉住这行的判据（涟漪，已按"各管各的不变量"收）
+
+`NotesSection.tsx` 里那句 `return runAdd(actions.createNote(content));` 被**两枚**判据按字面钉住：提醒线的接线判据（`reminders-notes-display.spec.ts`，它要钉的不变量是"onAdd 的失败必须走 `runAdd` 交回共享层，不许 `run` 吞 reject、不许静默 return"）与本线的装配判据（`capture-project-assembly.spec.ts` ③，它要钉的是"落点交得出去 / 没选时交 `{}`"）。给 `createNote` 加第二枚实参（+ prettier 换行）⇒ `pnpm -r test` 当场红在**别人**那一枚上，红字把"实参表变了"解释成"回调没接上"。修法**不是**把两处都换成新字面（下一次改实参表还要再踩一次，而那个不变量根本没动），而是把提醒线那枚的针脚收窄到它自己那格：`/return runAdd\(\s*actions\.createNote\(/`（不吃实参表），落点那一格只由本线那枚钉。⚠️ 这不是放宽 —— 三枚坏形（`run(...)`／静默 return／不 return）在新针脚下逐条实测为 `false`，改完该文件 19 passed。教训入仓内环境陷阱 **#588**（含动手前的"一行几主"现量命令）。
+
+⚠️ 同一趟还量到一件**要如实记下来的事**：那两行少收尾 `|` 的红是在 `pnpm -r test` 里露出来的（消费者是自动收集线的 `research/tools/verify-inbound-doc-tables.py`，它打印"登记表 29 份 + 本线追加 4 份 = 33 份"，本计划在登记表里）。但**本线自己那枚 `check:md-tables` 同样抓得到这一枚失法** —— 现量对照（本批当场做的：临时去掉第 48 行的收尾 `|` ⇒ `pnpm check:md-tables` rc=1、报 `docs/plans/collaboration-shared-lists.md:<行> 列数 3（本表表头是 4）`；还原后 rc=0，改前改后 md5 逐字相同）。⇒ 上一会话那句"第 46 行写完后 `check:md-tables` rc=0"是**取数早于落笔**的读数（那一行当时就漏了收尾竖线）。教训：台账里"我跑过 X 且绿"这类句子只对取数那一刻的文件状态成立，改过文件要重取（与 #529 同族 —— 那条讲的是句子变旧，这条讲的是**读数比句子更早**）。
+
+#### 装置那一腿先红了一次（不是产品红）
+
+第 41 跑 L10 报「界面上有那枚芯片却按不动」，五发全报"没有逐字叫…的可点节点"。**截图现场相反**：任务已经建进收集箱、面板已关 —— `ax_press_until` 每一发之前先 `dismiss_keyboard`，而 shim 的收法是按键盘的 **return 键**，RN 输入框把 return 当 `onSubmitEditing` ⇒ 第一发就把这条任务提交了。同一条禁令本来就写在同一份装置文件头，却被 `ax_press_until` 里那一发绕过（**注释不是守卫**）。修法：有表单的屏只许用新增的 `press_in_form`（不碰键盘，直接按解析出的坐标）。⚠️ 那一步还有第二条独立失法：它的到达判据用的是输入框里那串标题，而那串字在按之前就在场 ⇒ 恒真。本批把到达判据换成**只有按下之后才出现**的那句（那一行的落点标题）。两条都进仓内环境陷阱 **#586**。
+
+#### 一枚共享层字段的名字撞进别线的词表（改名，不动他们的表）
+
+并行会话跑全量 `pnpm check` 时把这枚红登记在 `BLOCKED.md` 的 B233（2026-10-27 那一枚，不是 10-18 同号那枚）：`check:selection-single-source` **断言 F** 点名 `packages/ui/src/capture/model.ts`——"接了选中 id 却没在 F 的任何一张表里"。现量成因是那枚门**按名字**认声明者（`SELECTION_ID_PROPS = ['activeTaskId','activeNoteId','selectedId']`，凡文件里出现 `readonly <那一枚>:` 就算），而我这格的语义是**新建表单的落点**，不是"列表里当前选中的那一行"。
+
+三条出路里选了改名：① 进 `FACES` 不成立——`model.ts` 不渲染，那条要求文件里出现 `aria-…={谓词}`；② 进 `RELAYS` 也不成立——那张表要求文件真的用 JSX 把某个选中 id `p={…}` 往下递，而 `model.ts` 是一枚**契约类型**，既不"算"也不"递"；③ ✅ 字段改名 `destinationId`（7 处、5 枚文件），并把"为什么不叫 `selectedId`"写进 `model.ts` 的注释，防下一位顺手统一命名。🔴 全程没动他们的 `FACES`/`RELAYS` 与判据口径（那是别线资产）。"不许只靠颜色说选中"这一格改由**本线自己钉**：装配判据多一条 `it`，钉 `const on = picker.destinationId === id` 与 `aria-selected={on}`（摘掉那条属性、或把值换成常量，都红）。
+
+**断言 G** 随后红在我自己新加的两枚状态（`TasksScreen` 的 `projectId`、`NotesSection` 的 `newNoteProjectId`）——那一格**自带登记扩展点**（"是 5 类瞬态之一 ⇒ 在 `ROW_ID_EXEMPT` 里登记一行并写明是哪一类"），收款线那两枚 `tierId` 就是这么登记的 ⇒ 按它规定的类 `form-draft` 登记自己那两枚，是用它的扩展点，不是改它的判据。
+
+读数：`pnpm check:selection-single-source` rc=0；改名后重打 `@heyta/ui` 的 dist、`pnpm --filter @heyta/ui --filter @heyta/mobile typecheck` rc=0、装配判据 13 条全过（12→13 就是多出的那一条）。
+
+#### 设备腿跑次归因（第 41–51 跑）
+
+| 跑 | 退 | 红在哪一格 | 归因 |
+|---|---|---|---|
+| 41 | 1 | 第 10d 步 L10 | **装置自造红**（上面那一节：`dismiss_keyboard` 的 return 把表单提交了）⇒ 修 `press_in_form` + 换到达判据，不判产品 |
+| 42 | 0 | — | **60 通过 / 0 失败**（取证 `apps/mobile/evidence/collab-ios-10270106/`，21 张截图）。L10 第一次真绿：`l10-task-signature.json` 里手机名下两行 = COMMENT + **TASK**，两行 `classify` 都是 `verified`，`matched=true` ⇒ 任务那一族在设备上真双向 |
+| 43 | 1 | 第 10d 步 L10 | 🔬 **变异臂那一趟，红是预期**（不是回归）：把 `withCaptureProject` 退化成"原样返回、丢掉落点" ⇒ 设备上**只有 L10 红**（59 通过 / 1 失败），报的是「手机那一行名下解不出期望正文（名下行数 1；实体类型 COMMENT）」—— 任务落回个人日志，正是这一格要拦的失法。同一枚臂在单测层也**只有 2 枚**红（G 组那两条带值的）。还原：`cp` 回 `.mut-bak`，md5 `829a1fd5…` 与臂前逐字相同、`grep -c 'MUT:'` = 0、备份已删、`capture-model.spec.ts` 复跑 42 passed |
+| 44 | 3 | 第 10e 步 L11 第一发 | **装置来路写错**（不是产品红，也不是环境缺前提）：L11 照抄 L9 用 `back_to_anchor`，可 L10 结束时人停在**任务那一档的根**上，那里根本没有顶栏「返回」⇒ 连报四次"本屏没有逐字叫「返回」的可点节点"后按 `env_bail` 退 3。同趟 L10 复绿，而落点那一行的排版改动（标题独占一行、芯片成组换行）在 `21-选好落点待提交.png` 里肉眼确认：选中那枚是蓝描边 + 蓝字、未选是灰描边，标题在它上面一行。修法：这一格改按底部「我的」标签过去（`id:tab-profile`），与 L9 的来路各自写清 ⇒ 第 45 跑 |
+| 45 | 3 | 第 10e 步 L11 第二发 | **又是装置，但成因不同一枚**（仓内 #587）：`ax_press_until "id:tab-profile" "id:profile-entry-notes"` 五发都"按下了但树上没有落点"，而日志打出的当前屏顶部文字逐字就是「便签」—— L9 把「我的」那一档停在它自己的**内层屏**上，切回那一档**不等于**回到那一档的根（#571 的对偶形）。⇒ 改成"先量到达判据 `notes-submit`，不在才按那一行"，第 46 跑 |
+| 46 | 0 | — | **63 通过 / 0 失败**（取证 `apps/mobile/evidence/collab-ios-10270202/`）。L11 第一次真绿：便签板上按同一枚落点芯片 ⇒ 那一行改口 ⇒ 提交 ⇒ `l11-note-signature.json` 里手机名下三行 （COMMENT + TASK + NOTE）`classify` 全是 `verified`、`matched=true` ⇒ **产品定义那句"三族双向"在设备上第一次逐族成立** |
+| 47 | 1 | 第 10e 步 L11 | 🔬 **变异臂那一趟，红是预期**（不是回归）：把 `apps/mobile/src/screens/NotesSection.tsx:208` 那一行退化成永远交 `{}`（丢掉便签的落点）⇒ 设备上**只有 L11 红**（62 通过 / 1 失败），报的是「手机那一行名下解不出期望正文（名下行数 2；实体类型 COMMENT,TASK）」—— 便签落回个人日志，正是这一格要拦的失法；同趟 L1–L10 全绿 ⇒ 这一枚臂只切便签那一族，没有连带。同一枚臂在装配判据层恰好红 1 条（12 条里 11 通过）。还原：`cp` 回 `.mut-bak`，md5 `d3a3231c…` 与臂前逐字相同、`grep -c 'MUT:'` = 0、备份已删、`capture-project-assembly.spec.ts` 复跑 12 passed |
+| 48 | 0 | — | **63 通过 / 0 失败**（取证 `apps/mobile/evidence/collab-ios-10270243/`，22 张截图）：**还原后的树**在设备腿上复跑，L10+L11 双绿 ⇒ 上一趟的还原是真的回到原物，不是"看起来对"。同一趟补上便签那一族的**绿路径图证** `22-便签选好落点待提交.png`（AGENTS §6.2 要真看截图）：标题独占一行念「新建落进「本机清单10270243」」、选中那枚是蓝描边蓝字、下面才是输入框与「添加便签」，owner 那条共享便签同屏在场（L9 的下行读数） |
+| 49 | 3 | 第 2 步（构建前） | **环境档，不是产品红**：装置那枚新鲜度自闸拦下这一趟 —— `@heyta/op-log`／`@heyta/sync-core` 的 `src` 比 `dist` 新（两枚包对 HEAD 干净 ⇒ 是别会话提交了 src 而本机 `dist`（不入库）没跟着重打），装进 bundle 的会是旧产物。按它自己打印的命令 `pnpm --filter @heyta/op-log --filter @heyta/sync-core build` 补打后重跑 ⇒ 第 50 跑。⚠️ 这一形是本线改名（`selectedId`→`destinationId`）之后引出来的第一趟，所以那一趟**没有**读到改名后的界面 |
+| 50 | — | **无判决**（不是红也不是绿） | 日志停在第 4 步、没有收尾那行 `RC=` ⇒ 这一趟被外力掐掉（当时同一台机器上有另两个仓的 vitest 套件在跑）。**不读成产品红，也不读成装置坏**；它留下一个空的取证目录（已删）与一枚相隔 1 秒的重复目录。判"跑完没"的尺是**收尾那行**，不是文件 mtime。重起的姿势与一个静默失手（macOS 没有 `setsid` ⇒ `nohup setsid … & disown` 整条空枪、脚本一次都没跑）入仓内 **#589** |
+| 51 | 0 | — | **改名后的树第一次完整判决**：**63 通过 / 0 失败**（取证 `apps/mobile/evidence/collab-ios-10270817/`，22 张截图）。L10 与 L11 双绿 ⇒ `selectedId`→`destinationId` 那枚改名没把落点改坏（第 49 跑被新鲜度自闸拦、第 50 跑无判决，所以改名后的界面到这一趟才有设备读数）。肉眼复核 `22-便签选好落点待提交.png`：标题独占一行念「新建落进「本机清单10270817」」、选中那枚是蓝描边蓝字、未选那两枚是灰描边、owner 那条共享便签同屏在场（L9 的下行读数）。⚠️ 归因要写清：这一趟的 bundle 编译于本批最后那处**纯注释位移**之前 —— 那处只把样式表里"选中与否不能只靠颜色"那段 JSDoc 从 `projectWrap` 挪到它真正描述的 `projectChipOn` 头上，不动任何样式值、不动 JSX |
+
+⚠️ **上面那张表里点名的取证目录只在本地、不入库**（同 §9.15 那条 ⚠️ 的口径）：每趟 20 余张 PNG、约 4.4 MB，而仓库另一侧的推送配额已经吃紧（[`progress-log.md`](../agents/progress-log.md) 那条「`gitee` 拒绝一切推送」）。⇒ 表格里的**逐格读数与结论**是入库的，截图与 `l10/l11-*.json` 是**本机产物**；下一位要复现就重跑 `pnpm verify:mobile-collab:ios`（它自己会新建一个带当趟戳的目录），别去仓库里找这些路径。
+
+#### 这一批的边界（挪了一格，没有全清）
+| 格 | 现状 | 现量命令 | 归属 |
+|---|---|---|---|
+| 把一条**已有**条目挪进别的清单 | 🔴 仍零调用点。便签侧 `setNoteProject` 在两壳都没人调；任务侧手机上唯一能改的归属是象限 | `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'`（⇒ 只剩接口声明与实现两处）＋ `git grep -n "setTaskProject\|moveTaskTo" -- 'apps/mobile/src/**'`（⇒ 只有 `moveTaskToQuadrant`）。⚠️ 别拿整个 `apps` 当分母，那里混着 `apps/*/dist` 的 bundle | 归"改归属"那一档新界面，**不是**本批那枚"新建时选落点"——别拿 §9.16 的绿读成它做完 |
+| web 侧要不要也画这枚选择器 | 不画。web 的落点由侧栏选中那一行给（上面那条「必须留在清单里」的注释），手机上没有那一行 | `grep -n "projectPicker" apps/web/src/features/capture/CaptureComposer.tsx` ⇒ 无输出（宿主没给 ⇒ 组件一行都不画，这是装配判据 ① 第三格钉住的） | 两壳两种形状，刻意如此 |
+| L11 的变异臂 | ✅ **两族上行各有各的臂**：任务那一族走共享层 `withCaptureProject`（第 43 跑那枚臂），便签那一族走宿主 `createNote(content, { projectId })` ⇒ 臂打在那一句上（现量 `grep -n 'actions.createNote(' apps/mobile/src/screens/NotesSection.tsx`） | 第 47 跑：那一行退化成永远交 `{}` ⇒ 整链**只有 L11 红**（62 通过 / 1 失败）、装配判据恰好红 1 条；第 48 跑还原后复绿（63 通过 / 0 失败） | 已闭合 —— 便签那一族不再是"看着接上了" |

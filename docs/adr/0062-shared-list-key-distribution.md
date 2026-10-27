@@ -8,8 +8,13 @@
 > `git grep -n "setProjectShareId(" -- apps/mobile/src apps/web/src`），多写者路由已按族通到界面
 > （**下行**三族在手机上都有真机读数：任务 L2 / 评论 L3·L5 / 便签 L9，最后一枚 2026-10-26 第 39 跑取到，
 > 并配了变异臂 —— 注回「物化时丢掉便签那一族」后整链只有 L9 红，第 40 跑）；
-> 🔴 但**上行**只有评论那一族真双向 —— 手机建的任务与便签今天没有"归进某份清单"的界面入口，
-> 缺的是控件不是判据，逐格现量与拍定的形状在本线计划 §9.15 那张"还剩什么"表），
+> ✅ **上行也不再只有评论那一族**（2026-10-27 第十批）：新建时的落点控件接在任务面板与便签板上
+> （`CaptureComposer` 的 `projectPicker` + 共享层 `CaptureSubmitPlan.projectId`），设备腿 **L10**（任务）
+> 与 **L11**（便签）各判到 owner 侧从共享日志读回并验签，两族各配一枚变异臂（任务那一族把共享层
+> `withCaptureProject` 退化成"丢掉落点"⇒ 整链只有 L10 红，第 43 跑；便签那一族把宿主
+> `createNote(content, { projectId })` 那行退化成永远交 `{}` ⇒ 整链只有 L11 红，第 47 跑）
+> ⇒ 逐格读数与形状在本线计划 §9.16。
+> 🔴 **仍缺的那半是"事后改归属"**：`setNoteProject`（把一条**已有**便签挪进别的清单）在两壳仍零调用点，
 > `listKey` 解出后确实喂进解密引擎（现量 `git grep -c "listKey" -- apps/mobile/src apps/web/src`），
 > 成员在**真机**上看得见别的设备写的内容（`pnpm verify:mobile-collab:ios` 的 L2/L5 两格，逐格读数在本线计划
 > [§9.14 与 §9.15](../plans/collaboration-shared-lists.md)）。逐条证据仍在[进度](../agents/progress-log.md)的「协作与共享清单」一节。
