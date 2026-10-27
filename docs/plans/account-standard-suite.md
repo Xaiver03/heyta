@@ -4895,3 +4895,75 @@ node scripts/check-worktree-exceptions.mjs | sed -n '/没登记过/,$p'
 
 
 
+### 6.107（2026-10-28 01:2x · 门禁与尺那一层审完：抓到 gate-wiring 自己吞旗标并补 9 臂，顺手记下"臂没人跑"那张债表）
+
+§6.101–§6.105 审的是产品与实现层（35 枚源文件）。**唯一没开码的一层是这轮落进 HEAD 的门禁与尺**。分母现量：
+
+```sh
+git diff --name-only b55e98807..HEAD -- scripts/ package.json
+```
+
+#### 成立并已修的 1 格：`scripts/check-gate-wiring.mjs` 把不认的旗标**静默走过去**
+
+它的 argv 循环原先只处理 `--pkg` / `--root`，落到 `else` 的分支根本不存在。后果不是"少个功能"，是**一枚假读数**：
+我这趟照本仓惯例敲 `node scripts/check-gate-wiring.mjs --self-test`，拿到 **rc=0 + 一行普通判决**，
+读起来完全像"自检过了"——而它当时**压根没有自检**。这枚尺的职责恰恰是"检查别的门禁有没有被接上"，
+它自己吞旗标，等于把"没人验过它"伪装成"验过了"（AGENTS §7 元规则 2 的正面案）。
+
+补的东西（`scripts/check-gate-wiring.mjs:62-91` 参数闸门、`:505` 起 `runSelfTest()`）：
+
+| 臂 | 钉住的那条形状 | 现量 |
+|---|---|---|
+| Ⓐ | 阳性对照：注入树与链原样时必须**绿** | ✅ 红条数 0、rc=0 |
+| Ⓑ | 定义在、链段被摘 ⇒ 判据 1 红 | ✅ 独红 1 条 |
+| Ⓒ | 链段在、定义被摘 ⇒ 判据 3 红 | ✅（同趟还捎带点亮孤儿判据，见下） |
+| Ⓓ | 链段与定义**一起**消失 ⇒ 只有锚点看得见（10-04 那次整文件覆盖 rc=0 那一形） | ✅ 独红"链里少了锚点" |
+| Ⓔ | 载体里那行改成**仍含命令文本的散文** ⇒ 必须红 | ✅ 独红 1 条 |
+| Ⓕ | 那行整行删掉 ⇒ 必须红 | ✅ 独红 1 条 |
+| Ⓖ | 树上实现还在、定义与链段都没了 ⇒ 孤儿判据点名它 | ✅ 独红 1 条 |
+| Ⓗ/Ⓘ | 不认的旗标 / `--pkg` 不带值 ⇒ 拒 | ✅ rc=1 且文案点名 |
+
+**Ⓔ 是这一节真正想买的东西**：它复现的正是本文件头部记载的那次事故（runbook 里多了一句"这里少了 …"而门禁绿）。
+我把注入下沉成一枚仓内台架（`research/tools/mutate-gate-wiring-arms.mjs`：载体清单从尺自己的表里取，不写死文件名），
+逐枚读回**红条数**而不只是 rc —— 只判 rc 挡不住"红是因为另一条判据"那一形：
+
+```sh
+node research/tools/mutate-gate-wiring-arms.mjs   # Ⓐ 红条数必须 0；Ⓑ–Ⓖ 每臂点名它是哪条判据红的
+```
+
+`Ⓒ` 那次是 **2 条**：删 `check:gate-ssh` 的定义既让判据 3 红，又顺手把 `scripts/check-gate-ssh.mjs` 变成孤儿。
+两条都该红，但**这一臂不是单判据**，登记成单判据就是我在替读数夸大精度。
+
+**臂从此有人跑**：定义改成 `node scripts/check-gate-wiring.mjs --self-test && node scripts/check-gate-wiring.mjs`
+（现量 `pnpm -s check:gate-wiring` ⇒ rc=0，9 臂 + 普通判决；自检一趟 0.33s，链上成本可忽略）。
+
+#### 我自己在这节里造的三枚假读数（都要留在原处，不许悄悄改掉）
+
+1. **第一版债表探针是瞎的**：`research/tools/audit-gate-selftest-consumers.mjs` 我按 `"--self-test"`（双引号）匹配，
+   而脚本里一律写 `argv.includes('--self-test')` ⇒ **总数 0、rc=0**。它与我同一趟刚拿到的"链上二十多枚定义带
+   `--self-test`"直接冲突，才被抓住。修法是把谓词换成单/双引号都收（反引号仍不算：散文里的 `--self-test` 是叙述不是分支），
+   并加一条**视力臂**——已知在场的 `check-scripts-parse.mjs` 必须既"有臂"又"被定义跑着"，否则整张表拒答、退 2
+   （rc=2 = "我没干活"，与 rc=1 = "判了且不合格"分档）。
+2. **`grep -c` 报 0 就退 1，把我 `&&` 串后面的 `pnpm check:gate-wiring` 挡掉了**：那次输出的 `rc=1`
+   不是门禁的读数，是我的探针没跑。同一趟第二次犯（§6.103 那节刚写过一条同族）。
+3. **plumbing 用 `.trim()` 取母本，吃掉了 `package.json` 的行尾换行**：`9087f8e9e` 的 numstat 因此是 `2/2`
+   而不是 `1/1`，多出来的那一行就是 `-}` / `+}`（`\ No newline at end of file`）。
+   已用 `28b9806aa` 单独补回（**不 amend**，按本仓规矩新写一笔）。
+   通用形状：plumbing 里凡是"取 blob 原文再改一处"的，**不许过任何去空白的手**（`.trim()`、`String.prototype.replace` 前的模板字符串都算）。
+
+#### 跨线的一格：43 枚尺里 23 枚有臂但没人跑臂（**不归我修，进待拍板表**）
+
+`node research/tools/audit-gate-selftest-consumers.mjs` 现量：有臂 43 枚、定义里跑臂 19 枚、有定义不跑臂 23 枚、
+无定义 1 枚（`check-imports-resolve.mjs`，它已在 `ALLOWED_UNREFERENCED_IMPL` 里登记并有载体，本探针不重复判）。
+
+臂不跑不等于臂没用，**等于臂会烂**：判据改了、夹具没跟着改，没有任何东西会红。
+我没有一次性把 23 枚的臂都接进定义，理由是**成本与归属都不在我这格**：`pnpm check` 的分母正被并行会话计数
+（同一形见 `check:android-build-host` 那枚不进链的理由），且每一枚要不要跑臂是那条线的口径决定。
+探针因此**不因"有人没跑臂"退非零**，只出一张债表；翻案条件：任何一条线把自己的臂接进定义后，
+重跑该探针的"有定义不跑臂"那一行应当少一枚。
+
+```sh
+node research/tools/audit-gate-selftest-consumers.mjs        # 债表（视力臂不成立则 rc=2）
+node scripts/check-gate-wiring.mjs --self-test               # 本线那 9 臂
+git show --numstat --format= 28b9806aa                      # 行尾换行那一笔的实形
+```
