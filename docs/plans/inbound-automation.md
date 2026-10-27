@@ -4725,3 +4725,43 @@ vitest 报 `No test files found, exiting with code 1`，五臂齐刷刷 `rc=1`�
 处置是**有限的**：本笔提交之后在合并态上把那九腿重取一次，逐枚 rc 与 tip 落在
 `~/.heyta-evidence/inb-ac-battery-1027-1810/docs9-<tip>.txt`，**不再往本节追加第五十九行**——
 再加一行就又旧一笔，那是个死循环；台账里这一句负责把下一位领到那份原件，而不是替它担保新鲜。
+
+## 2026-10-27 18:17 · 完成审计在当前 tip 上把三枚红量成"载具的两处前置没铺"，不是仓库坏（自动收集线）
+
+审计做法：把目标七步逐条写成"能在盘上点的证据"，静态一律对 `HEAD` 现取（不引用本文件更早那几节的读数），
+动态在隔离载具 `.worktrees/inb-t10`（`92a6cc763`，dirty 0）上跑。**这一趟的价值全在跑红的那三次**：
+
+**第一次红：② 集成腿 `JWT_SECRET environment variable is required`。**
+成因现量：主检出有一枚**未入库、被 gitignore 的 `server/.env`**（`git status --porcelain --ignored=matching -- server/.env` 回 `!! server/.env`，
+`grep -c "^JWT_SECRET" server/.env` 回 1 —— 这里只登键名与形状，值不落任何地方），载具里没有那枚文件。
+⇒ **载具跑集成腿要显式导出 `JWT_SECRET`**（本趟用 `node -e 'randomBytes(32).toString("hex")'` 现造一枚合成值，只走 env、不上 argv、不入库、不进日志）。
+补上之后 ② 的两档共 **6 枚用例 rc=0**（真库真 HTTP 真子进程那条仍在内）。
+
+**第二次红：③ 移动壳 19 枚 / web 3 枚，症状全是"词条不存在"。**
+逐条点名后归因唯一：`Error: [@heyta/i18n] 词条不存在：zh-CN / web.ai.inbound.timezoneHint`、
+`每一把键在中英两档都翻得出非空` 红、`reminder-delivery-settings` / `share-ui-assembly` / `subscription-section` / `feature-entries` 同族红。
+载具里 `packages/*/dist` 是 **10-20 那批留下的旧产物**（未被 git 跟踪，快进 tip 不会带上它们），
+而 `@heyta/i18n` 的产物里还没有 10-27 补进去的那批键。
+⇒ **`git merge --ff-only` 只前进源码，不前进 workspace 的构建产物**；载具跑之前要
+`pnpm -s --filter @heyta/i18n --filter @heyta/app-host --filter @heyta/domain --filter @heyta/ui --filter @heyta/shared-schema build`（本趟 `rc=0`）。
+重建后：**`apps/mobile` 91 files / 1173 tests 全绿**、`apps/web` 那枚渲染用例 **3 passed**、② 的 6 枚绿，
+跑完载具 `git status --porcelain | wc -l` 仍回 **0**（这些腿不写盘）。
+
+🔴 **这两枚红都值得下一位防，因为它们长得像"仓库坏了"**：
+一种会被人读成"谁把生产件忘了提交"（其实缺的是未入库的 env 与未跟踪的产物），
+一种会被读成"干净检出红"（其实主检出同一枚 tip 全绿，差别只在 `node_modules`/`dist` 的年龄）。
+**判法固定两句**：红的文件名是不是我这批的路径；错误正文是不是"取不到模块/词条/环境变量"这一类前置。
+两条都不指向被测物 ⇒ 先修探针的前置，别去动代码，也别据此宣称回归。
+
+**七步逐条的当前证据（都取自本趟，不引用更早读数）**：
+① `server/tests/automation-managed-double-charge.pglite.spec.ts` 在册且 5 枚绿；两个扣点原样在
+（`grep -c consumeManagedAiRequest` 在 `ai-metering.ts`=2、`managed-proxy.routes.ts`=3），本批 8 笔的路径清单里没有这两枚文件 ⇒ **没代改计费**。
+② `apps/node-host` 的 `worker` 分支在册（`grep -c "case 'worker'" cli.ts`=1、`inbound-worker.ts`=1），真库用例已进点名列表（`server/package.json`=1）。
+③ 词条 zh/en 各 1；web `PROCESS_COPY` 与那枚加严用例绿 3；移动壳 `testID="inbound-cycle-state"`=1、本线判据 7 枚绿、两端文案对账门 15 枚绿。
+④ `server/env.example` 八枚全在；`deployment.md §3.5.1`=1、`self-host.md §2.5/§2.6`=2；
+   A8：定义只在 `inbound-host-options.ts`=1，`host.ts`=0。
+⑤ `cleanup.ts` 真调用=1、`cleanup-automation-sweeps.spec.ts` 3 枚绿。
+⑥ 七天尺在 `check` 链里（`grep -c check:retention-window-parity package.json`=2）、`--self-test` **臂数 9、失败 0**、脚本内读 `RETENTION_MS`=6 处。
+⑦ 界面对 `selfhost-online` 零露出（去 dist/测试后唯一命中是 `packages/app-host/src/admin-client.ts:187` 的一句注释），
+   `self-host.md` 明写"本版本在自托管实例上不可用"=1。
+边界：AC 已勾 **0**（`grep -c '^- \[x\] \*\*AC-'`=0，另由 `AC8-ac-ticks` 同戳自印）；未 push；helm 那一格按"没做＋理由"登记在 §3 A7 头上那枚 ✅ 标记与回执末段。
