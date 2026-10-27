@@ -1781,6 +1781,14 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
    而它上次两趟都**被墙钟掐掉**（第 50 跑那种"无判决"趟不记红也不记绿）。
    ⇒ 解除条件：在**隔离检出**里跑（那样写图落在自己的副本），且点火前现量三条 —— `git status --porcelain=v1 -- packages apps server` 对本线干净、
    `pgrep -fl 'vitest\|playwright'` 回 0、`lsof -nP -iTCP:4318 -iTCP:4319 -sTCP:LISTEN` 空（那两枚端口被占 ⇒ 下一趟直接起不来，读数无效）。
+
+   🔴 **22:1x 按这三条现量过，前两半够了、我仍没点火，因为量出第四条拦路的**：`pgrep -fl 'vitest|playwright'` 回 **0**、4318/4319 监听 **0** 行、`git worktree list` 只有主检出（没有现成隔离载体，得起一枚）——
+   但 `sysctl -n vm.loadavg` 读 **19.63／30.45／23.17**，而本仓给重跑的负载门**不是硬数、是「核数 × 3/4」**（现量出处 `research/tools/b-reinstall-readiness.sh:81` 那行 `LOAD_LIMIT=`；另一道等落回的门在 `scripts/lib/wait-for-quiet-host.sh`，旋钮 `HEYTA_LOAD_GATE_MAX`）。这台机 `sysctl -n hw.ncpu` = 16 ⇒ 阈值 12，而 1-min 与 5-min 两窗都在它上面。
+   **一分钟后再采一次，1-min 读到了 81.80** ⇒ 这台机此刻离"安静"很远，而且**同一条命令两次的读数差到 4 倍**（又一次说明负载是瞬时读数，只能现量、不能沿用）。
+   吃 CPU 的前几名逐枚读过：`mds_stores`（Spotlight 索引，已跑 9 小时那枚 92.6%）、`ApplicationsStorageExtension`、一枚 **`tar` + `zstd` 成对**（38 分钟）。
+   ⇒ **没有一枚是测试套件 ⇒ 这不是"等谁交活"，是等不来的机器底噪**，我不 poll 它、也不在它上面压一条 60–90 分钟的整链（那条链里 `check:ai-e2e` 会起浏览器与 webServer，负载叠加后既跑不完又会产出一趟**归因不了**的读数 —— 正是第 50 跑那种"无判决"趟）。
+   ⇒ 所以这一格的准确状态是**"前置三条已量过并满足、第四条（负载 ≤ 核数 × 3/4）不满足 ⇒ 没点火"**，不是"没试"。第四条件与那三条一起构成点火门：
+   `sysctl -n vm.loadavg` 的第一数 ≤ `$(( $(sysctl -n hw.ncpu) * 3 / 4 ))` **且** `pgrep -fl 'vitest|playwright'` 回 0 **且** 4318／4319 空 **且** `git status --porcelain=v1 -- packages apps server` 对本线干净；满足后先 `git worktree add` 一枚隔离载体再跑。
 2. **Android 那一侧没有界面腿读数**（成功定义那句"和 web 一样真的能用"在安卓上今天只能靠推定）。
    ⇒ 解除条件三选一，归负责人：补两枚 SDK 组件后做 §9.29 那条 `-no-accel` 起判断言（加法、不要管理员）／插一台真机（判据 `adb devices` 非空）／按"iOS 验过 + Android 只出包"结案并把它写进边界表。
 
