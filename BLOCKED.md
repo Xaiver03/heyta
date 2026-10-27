@@ -12617,6 +12617,19 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 |---|---|---|
 | 公网 `/app/` 那盘 SPA 与 HEAD 不齐：它服务的是宿主机 `/var/www/heyta-app`（不是镜像里的 `/app/web-dist`），mtime 早于 22:21 那两笔自动收集提交 ⇒ 新加的两句文案在盘里搜不到 | `scripts/deploy-ssh.mjs` 这条链**只换服务端容器**，网页应用是 `docs/runbooks/deployment.md` 里另一条 rsync；重新发布会把**自动收集线**的产品改动一起推上线 —— 对外动作 + 不是本线范围 ⇒ 停在这里。要收这格，先决定"要不要现在把自动收集那两笔推上线" | `ssh finlaw 'for n in noKeyOnThisDevice foregroundOnly email-code; do printf "%-20s " $n; sudo -n grep -rl "$n" /var/www/heyta-app/assets/ \| wc -l; done'`（前两枚 0、第三枚 1 —— 第三枚是控制臂，证明搜法本身有效，不是"grep 没扫到"） |
 | `/pitch/` 这枚落地页在仓库里有 5 件套（`apps/landing/pitch/`：`index.html`、`main.tsx`、`PitchDeck.tsx`、`pitch.css`、自己的 `vite.config.ts`），但**不在 `SITE_PAGES` 注册表里、仓内没有任何地方在接它（引用面逐行读过，见右栏）、线上回 HTTP 404** | 归落地页/文档站那线判：要么把它接进注册表并给入口，要么整目录删；本线只把它量成一条可复跑的读数。⚠️ 这不是"线上旧"，是**目的地存在过但从未接上**（`check:entries` 的分母是注册表，所以"产物堆里躺着一枚没注册的页"在它射程外） | `node scripts/live-web-freshness.mjs --landing`（末行点名 `/pitch/`）；注册表对账 `grep -c "id: " apps/landing/src/site/pages.ts`；引用面 `grep -rniw -e pitch -e PitchDeck --exclude-dir=node_modules --exclude-dir=dist apps/landing package.json scripts docs e2e` —— 整词写法，读回来逐行分类：命中的都是无关（4 行是 `docs/operations/cac-algorithm-filing/scripts/audit_completeness.py` 那族的版式行距变量 `pitch`，2 行是本线今晚那把尺自己的测试夹具），**没有一行是在接这枚页面**（**整条不带竖线**：竖线一进表格单元就得转义，转义了复制到终端就是一条永不命中的死探针 —— 见本节末那条纪律） |
+| 🔴 新建规则后不重置：同屏造第二条规则会**静默沿用**上一轮的"同意服务端读明文"（`hostedExtraction` 停在 `true`）；编辑那条路反倒逐字段回填 | 自动收集线的同意语义（ADR-0077 的"默认归设备"那条）。代改违反本仓纪律：改了会让用户可见的同意状态变，不满足"运行时形状逐字段等于改前" | 台账 §6.101 代码块第一行（读 `createRule` 的收尾，看它有没有任何 `set…(默认值)`） |
+| 🔴 同意面那句"服务器看不到任务明文"是无条件句，而同批上线了一档"勾了就是我们这一次读明文" | 这是对外承诺 + `packages/i18n` 唯一真源 + 四端词条一起动的取舍，归自动收集线与文案口径的负责人拍板；本线只把它钉成一条可读的并存证据 | `grep -n "看不到任务明文" packages/i18n/src/locales/zh-CN.ts`；档位那一笔：`git log --oneline b55e98807..HEAD -- packages/i18n/src/locales/zh-CN.ts` |
+| 🟠 托管抽取失败那一支把 `reasonCode` 写成 `null`（它自己上面的注释说这一行从这里取），八枚封闭词表只活在 `Logger.warn` 那一行里 ⇒ 行上与响应里都没有机读原因 | 落不落库、落哪一枚码是自动收集线的口径（碰库里那一列的语义与 `ADR-0077`），不是可代改的小毛病 | `sed -n '268,273p' server/src/automation/hosted-extraction.ts`；词表本体 `sed -n '106,114p' server/src/automation/hosted-extraction.ts`（⚠️ 真写法带 `model-` 前缀，按下划线搜会读回假的"零引用"） |
+| 🟠 `allowedFields` 的词表校验三份、只有托管那条腿不查（`inbound.routes.ts` 只判 `Array.isArray` 就整份塞进抽取） | 同一份脏 config 在两腿上表现不同 —— 改哪一份都是校验口径的取舍，且会改服务端对外的拒绝行为 | `grep -rn "INBOUND_AUTOMATION_FIELDS as readonly" server/src/automation`（三份在册 + 托管那一格不在） |
+
+```sh
+# 【上面四格的复量，整条可复制】逐条独立可读，不依赖表格
+sed -n '223,237p' apps/web/src/features/settings/InboundAutomationSettings.tsx
+grep -n "看不到任务明文" packages/i18n/src/locales/zh-CN.ts
+sed -n '268,273p' server/src/automation/hosted-extraction.ts
+sed -n '106,114p' server/src/automation/hosted-extraction.ts
+grep -rn "INBOUND_AUTOMATION_FIELDS as readonly" server/src/automation
+```
 
 
 **上面"本线之外那批正在被别人改的文件"那一格的逐枚归属表**（把"只剩登记过的例外"从一句话变成能一条一条打勾的东西）

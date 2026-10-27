@@ -4730,4 +4730,45 @@ git ls-files --error-unmatch apps/web/src/lib/form/useDirtyDismissGuard.tsx  # �
 ```
 那时第二判读 0 处，日历那组自成一组（词条与 prop 的依赖面已在 HEAD，见上③），我按 pathspec 代提；`pnpm check:worktree-exceptions` 的未登记栏届时应只剩 `tmp-discard-probe.spec.ts` 一枚 —— 那一枚要 UX 线的作者自己收（见 §6.99）。
 
+### 6.101（2026-10-28 00:4x · 自线上那笔以来 35 枚的质量审阅：逐条开码复核，两处口径是我自己搜错的）
+
+范围现量（别抄数）：
+
+```sh
+git rev-list --count b55e98807..HEAD                      # 自那次发布落进 HEAD 的提交
+git diff --name-only b55e98807..HEAD -- server/ packages/app-host packages/ui apps/web/src apps/mobile | wc -l
+```
+
+两腿并行审阅（服务端一腿、客户端与宿主层一腿）回来后，**每条我都自己开了码**才写在这里。判"已复核"的标准：判决那一行在 HEAD 的文件里当场读得到，不是我转抄的。
+
+**确认成立的（严重度排序，全部归自动收集线 / 协作线，见下面"为什么不代改"）**
+
+| # | 判决 | 位置 |
+|---|---|---|
+| 🔴 高·产品 | 新建规则成功后表单不重置：`createRule` 只 `setBusy/setError`，`hostedExtraction` 从初始 `false` 一旦被勾成 `true` 就**留在那格**，同屏再造第二条规则 = 静默沿用"同意服务端读明文"；编辑那条路（`beginEdit`）反倒逐字段回填 | `apps/web/src/features/settings/InboundAutomationSettings.tsx:223`（createRule 收尾）、`:117`（初值）、`:246`（beginEdit 回填）、`:419`（那枚 checkbox） |
+| 🔴 高·承诺 | 同意面的无条件句"服务器看不到任务明文"与同批上线的"这一次读明文"档位并存：句子是同意面的常驻回执，档位是规则级 opt-in，两处不是同一次改动写的 | 承诺在 `packages/i18n/src/locales/zh-CN.ts:150`（键 `common.privacy.consent.acceptedGuarantee`）；档位来自 `67c533212`（`git log --oneline b55e98807..HEAD -- packages/i18n/src/locales/zh-CN.ts` 现量两笔） |
+| 🟠 中·错误处理 | 抽取失败那一支把行退回 `queued` 时写 `reasonCode: null` —— 而它自己上面那行注释（`:103`）明写"这一行的 `reason_code` 与审计里的 `outcome` 都从这里取"。八枚封闭词表的失败原因最后只活在 `inbound.routes.ts:228` 那行 warn 里，行上与响应里都没有 ⇒ 设备与后台都无法机读"为什么这次退回" | `server/src/automation/hosted-extraction.ts:268`（`if (outcome.state === 'failed')`）与 `:272`（`reasonCode: null`） |
+| 🟠 中·重复实现（守卫分叉） | `allowedFields` 的词表校验三份：`rules.ts:61` 与 `:96`、`events.ts:180` 都逐值查 `INBOUND_AUTOMATION_FIELDS`，只有托管那条腿 `inbound.routes.ts:215` 只判 `Array.isArray` 然后整份塞进 `HostedExtractionRule` ⇒ 同一份脏 config，设备腿抛/降，托管腿原样带进抽取 | 复量：`grep -rn "INBOUND_AUTOMATION_FIELDS as readonly" server/src/automation` |
+| 🟡 低·回执 | `outcome.state === 'failed'` 时回执硬写 `'queued'`（`:229`），成功/待确认才回真实状态（`:231`）。库里那一行确实是退回 `queued`（`:272` 同批），所以**这一格我判"与库一致"**，不判成缺陷 —— subagent 报的是"库里状态是 leased/prepared"，那一句我没在读到的代码里核实，按未判定处理 | `server/src/automation/inbound.routes.ts:227` |
+
+**我自己复核时搜错的两发（记下来是因为它们本来会变成假发现）**
+
+- 我先按下划线写法 `grep -w model_not_configured …` 读回 0，据此差点写"六枚码全仓零引用"。真写法是**连字符且带 `model-` 前缀**（`model-upstream-rejected`、`model-entitlement-required`，见 `hosted-extraction.ts:106-114` 的类型体）。按真写法逐枚数：八枚里有 `server/src` 一份（就是它自己的定义文件）+ 测试侧仅 `result-conflict`、`model-result-unreadable` 各一枚 —— 所以成立的判决是"**词表被产出、但没落进行、也没被任何消费者读**"，不是"词表不存在/零引用"。
+- 上一节那枚 `zh.ts` 同型：文件真名 `zh-CN.ts`。两次都是**搜法看不见**，不是对象不在。
+
+**为什么不代改**：这五条全在自动收集线 / 协作线的**产品语义**上（同意继承、承诺文案、`reason_code` 落库、托管腿的校验口径）。按本仓那条纪律 —— 代改别线代码要"一子可删 + 运行时形状逐字段等于改前 + 一条命令可回退"三条齐 —— 这五条**没有一条**满足：改哪一条都会让用户可见的语义或库里的值变。所以它们进待拍板表（`BLOCKED.md` B238 末"新落到的一格待拍板"那张），**不进"已修"**。
+
+**本线当场做的两件能做的**：① 把每条判决钉到 HEAD 的行（上表）；② 把复量命令写成表外代码块（表格单元里的竖线会毁命令，§6.95 那条同一坑）。
+
+```sh
+# 逐条复量（每条独立可读，不依赖上面的表）
+sed -n '223,237p' apps/web/src/features/settings/InboundAutomationSettings.tsx   # createRule 收尾：没有任何 set…(默认值)
+grep -n "看不到任务明文" packages/i18n/src/locales/zh-CN.ts                        # 那句无条件承诺
+sed -n '268,273p' server/src/automation/hosted-extraction.ts                      # 失败支的 reasonCode: null
+grep -rn "INBOUND_AUTOMATION_FIELDS as readonly" server/src/automation            # 三份校验、一份漏查词表
+```
+
+**这枚例外尺今天已知的射程边界（写清，别让下一位以为它全覆盖）**：第二判只扫未提交里已跟踪的 `.ts/.tsx/.mts`，且只认 `from '…'` / `import '…'` 两种写法 —— 动态 `import('./x')`、`package.json` 里 `node scripts/x.mjs` 那种**命令行式引用**、以及 `.mjs/.js` 的 importer 都不在射程内。判它的断言：把一枚未入库模块改成动态 import 形式，第二判读 0 处 ⇒ 那正是射程外，不是"没问题"。
+
+
 
