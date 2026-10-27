@@ -4867,6 +4867,28 @@ sed -n '254,258p' e2e/tests/collab-journey.spec.ts
 
 **这一节为什么值得单开**：审阅的两腿交回 12 条，我最后写进清单的是 **8 条**（§6.101 五格 + §6.104 三格新成立），另有 **2 条判成不是缺陷**、**1 条拒收（措辞与实物不符）**、**1 条保持未判定**。这个"逐条定性并把排除项也写出来"的动作才是审阅的全部交付 —— 只报成立的那几条，等于拿别人的射程当我的结论。
 
+### 6.106（2026-10-28 01:1x · 把"推不推那一拍"的输入量齐：落地页那半边已对齐，SPA 那半边的可见变化只有一族文案）
+
+发布是对外动作，所以我先把**决策输入**取全（全程只读，没动线上任何一件文件）：
+
+| 那一半 | 现量 | 读数含义 |
+|---|---|---|
+| 落地页 / 帮助页 | `node scripts/live-web-freshness.mjs --landing` ⇒ 分母是 HEAD 里全部已入库 HTML，**不齐 0**（另有 1 枚线上 404 的 `/pitch/`，那是 §6.97 登记过的"从未接上的目的地"，不是"线上旧"） | 目标第 4 件里"线上落地页与 HEAD 逐字节对得上"这一半**今天是成立的** |
+| 网页应用那盘 SPA | `node scripts/live-web-freshness.mjs` ⇒ 不在场的都是**中文文案针脚**，逐枚点名：同意面那四行条款（`common.share.consent.scope.*`）与"抽取归谁"那一档五句（`web.ai.inbound.hosted.*` / `…boundary.foregroundOnly`） | 重新发布带来的**全部可见变化就是这两族文案**：登录与凭据面不受影响（同一条尺里它们都在场），没有夹带别的界面改动 |
+
+**这条判据为什么敢说"只有一族文案"**：那把尺的分母是 HEAD 里全部被界面读取的中文针脚（`collectNeedles`），它逐枚报"在不在场"，而不是我挑几句去搜。要出现"夹带的别的改动"，必须先在这份清单里点名。
+
+**顺带把 UX 线那批 P2 文件的依赖面量清了**（这决定我能不能说"他们那一堆是自洽的"）：
+`purgeDanger.ts` 从 `@heyta/domain` 取的 `resolveDangerTier` / `requiresModalCommitment` **HEAD 里已有**（`packages/domain/src/danger-tier.ts`），所以那一堆缺的只有自己那枚新 hook `apps/web/src/lib/dialog/useModalFocusIsolation.ts`。归属按它们**自己头注释里写的那句**「2026-10-27，全局 UX 整改 P2」登记进例外尺，不是我按目录猜的 —— 登记后未登记栏只剩 `e2e/tests/habit-create-options.spec.ts` 一枚（它没有任何自名，我不替它编归属）。
+
+```sh
+node scripts/live-web-freshness.mjs --landing            # 落地页逐字节对账
+node scripts/live-web-freshness.mjs                      # 线上那盘 SPA 相对 HEAD 缺哪些针脚
+git ls-tree -r --name-only HEAD | grep -i danger-tier     # 那条域层依赖确实在 HEAD
+node scripts/check-worktree-exceptions.mjs | sed -n '/没登记过/,$p'
+```
+
+
 
 
 
