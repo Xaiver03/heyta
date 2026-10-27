@@ -17,12 +17,18 @@
  * 这正是本仓反复登记过的形状：`mutate-collab-open-pull.mjs` 里最值钱的臂是
  * **摘调用点**那两枚，不是本体那两枚。
  *
- * 三臂、三个载具：
+ * 臂与载具（E–J 是 2026-10-28 补的，对应计划 §9.38/§9.39 同意面重做的新形状）：
  *
  *  A `fail-open`                   模型：没记录也返回"不弹" ⇒ 红 fail-closed 那几条
  *  B `web-call-site-gone`          web 入群对话框的闸整行摘掉 ⇒ 红 web 那几条"必须弹"
  *  C `mobile-call-site-gone`       移动端入群屏的闸整行摘掉
  *  D `mobile-owner-call-site-gone` 移动端「开启共享」那一侧的闸整行摘掉
+ *  E `web-owner-label-join-key`    owner 侧接到加入那颗语境键 ⇒ 红"宿主接线"那一发
+ *  F `web-joiner-label-owner-key`  反向：入群侧接到分享键 ⇒ 同一发
+ *  G `mobile-join-accept-owner-wording` 入群侧的确认按钮写成 owner 语 ⇒ 红移动端语境那一发
+ *  H `press-channel-gone`          ⓘ 的按压通道摘掉 ⇒ 红 web 的"点一下展开"
+ *  I `press-channel-gone-mobile`   同一处病灶，打的是移动端那一发（手机上唯一通道）
+ *  J `details-resident`            收起态不再收起（条款回到常驻）⇒ 红"默认收起"与"常驻判据"两发
  *
  * 🔴 C 与 D 的牙不是白来的：写这副臂时现量 `grep -rn shouldShowConsent apps/mobile/tests/` ⇒ **零命中**
  * —— 那一壳的调用点在当时**没有任何常驻判据指着它**，C/D 两臂会直接"存活（判据没牙）"。
@@ -53,6 +59,8 @@ const CARRIERS = {
   model: { dir: 'packages/ui', spec: 'tests/share-consent-model.spec.ts' },
   web: { dir: 'apps/web', spec: 'tests/share-join-consent-gate.spec.tsx' },
   mobile: { dir: 'apps/mobile', spec: 'tests/share-ui-assembly.spec.ts' },
+  // 同意面重做（§9.38/§9.39）那几枚判据住在 web 的常驻判据里（亮暗两档同一棵树那一份）。
+  webTheme: { dir: 'apps/web', spec: 'tests/share-consent-modal-theme.spec.tsx' },
 };
 
 const NEEDLE_MODEL = `  return {
@@ -63,6 +71,12 @@ const NEEDLE_MODEL = `  return {
 const NEEDLE_WEB = "    shouldShowConsent(loadShareConsent(localStorage)).show ? { kind: 'consent' } : { kind: 'input' },\n";
 const NEEDLE_MOBILE = '    const decision = shouldShowConsent(loadMobileShareConsent());\n';
 const NEEDLE_MOBILE_OWNER = '      const decision = shouldShowConsent(consentStore);\n';
+// E–J 的锚（同意面重做，2026-10-28）。逐枚都要求**恰好命中一次**，守卫会量。
+const NEEDLE_WEB_OWNER_TITLE = "    title: t('common.share.consent.title.share'),\n";
+const NEEDLE_WEB_JOINER_TITLE = "    title: t('common.share.consent.title.join'),\n";
+const NEEDLE_MOBILE_JOIN_ACCEPT = "      accept: t('common.share.consent.accept.join'),\n";
+const NEEDLE_TRIGGER_ONPRESS = '        onPress={() => setDetailsOpen((v) => !v)}\n';
+const NEEDLE_DETAILS_HIDDEN = "    detailsHidden: {\n      display: 'none',\n    },\n";
 
 const ARMS = [
   {
@@ -108,6 +122,71 @@ const ARMS = [
     rep: `      const decision = { show: false, reason: 'opted-out' } as const; // ${MARK}\n`,
     mustInclude: ['开启共享前先问'],
     expect: 1,
+  },
+  /* ── E–J：同意面重做（计划 §9.38/§9.39）的新形状各自能不能红 ───────────── */
+  {
+    id: 'web-owner-label-join-key',
+    carrier: 'webTheme',
+    target: 'apps/web/src/features/share/ShareFeature.tsx',
+    needle: NEEDLE_WEB_OWNER_TITLE,
+    why: 'owner 侧的同意面接到加入那颗语境键 ⇒ 分享的面写着「加入清单」（语境键接反）',
+    rep: `    title: t('common.share.consent.title.join'), // ${MARK}\n`,
+    mustInclude: ['两枚 web 宿主各自接对自己那一侧的语境键'],
+    expect: 1,
+  },
+  {
+    id: 'web-joiner-label-owner-key',
+    carrier: 'webTheme',
+    target: 'apps/web/src/features/share/JoinSharedListDialog.tsx',
+    needle: NEEDLE_WEB_JOINER_TITLE,
+    why: '反向：入群侧接到分享键 ⇒ 加入的面写着「分享清单」',
+    rep: `    title: t('common.share.consent.title.share'), // ${MARK}\n`,
+    mustInclude: ['两枚 web 宿主各自接对自己那一侧的语境键'],
+    expect: 1,
+  },
+  {
+    id: 'mobile-join-accept-owner-wording',
+    carrier: 'mobile',
+    target: 'apps/mobile/src/screens/JoinShareScreen.tsx',
+    needle: NEEDLE_MOBILE_JOIN_ACCEPT,
+    why: '入群侧那颗确认按钮写成 owner 语「确认共享」⇒ 替用户说一件他没做的事',
+    rep: `      accept: t('common.share.consent.accept.share'), // ${MARK}\n`,
+    mustInclude: ['同意面的标题与正文按语境取键'],
+    expect: 1,
+  },
+  {
+    id: 'press-channel-gone',
+    carrier: 'webTheme',
+    target: 'packages/ui/src/sync/ShareConsentModal.tsx',
+    rebuild: '@heyta/ui',
+    needle: NEEDLE_TRIGGER_ONPRESS,
+    why: 'ⓘ 的按压通道摘掉 ⇒ web 上点不开那一叠条款',
+    rep: `        // ${MARK}\n`,
+    // 两枚而不是"看着像一枚"：凹陷披露面那一枚要先 `openDetails()` 按得开才量得到底色，
+    // 按压通道没了它跟着红——这是**对**的连带，不是噪音（第 1 跑按 expect=1 报"红集漂移"）。
+    mustInclude: ['触屏：点一下', '一块凹陷披露面'],
+    expect: 2,
+  },
+  {
+    id: 'press-channel-gone-mobile',
+    carrier: 'mobile',
+    target: 'packages/ui/src/sync/ShareConsentModal.tsx',
+    needle: NEEDLE_TRIGGER_ONPRESS,
+    why: '同一处病灶打在移动端那一发上：手机上按压是**唯一**通道，摘掉条款就彻底拿不到',
+    rep: `        // ${MARK}\n`,
+    mustInclude: ['手机上那枚 ⓘ 靠'],
+    expect: 1,
+  },
+  {
+    id: 'details-resident',
+    carrier: 'webTheme',
+    target: 'packages/ui/src/sync/ShareConsentModal.tsx',
+    rebuild: '@heyta/ui',
+    needle: NEEDLE_DETAILS_HIDDEN,
+    why: '收起态不再真的收起（条款回到常驻）⇒ "细节收进提示"这条令只剩一句空话',
+    rep: `    detailsHidden: {}, // ${MARK}\n`,
+    mustInclude: ['触屏：点一下', '收起态下条款内容仍在树里'],
+    expect: 2,
   },
 ];
 
@@ -201,6 +280,17 @@ for (const a of ARMS) {
   const carrier = CARRIERS[a.carrier];
   const abs = join(ROOT, a.target);
   writeFileSync(abs, originals.get(a.target).replace(a.needle, a.rep), 'utf8');
+  // 🔴 病灶打在 `packages/ui/src` 而 web 那枚判据 import 的是 `@heyta/ui` 的 **dist** ——
+  //    不重构建的话臂必然"存活"，读出来的是"判据没牙"，实际是装置自己没把病灶送到位。
+  //    （本轮实测：H/I/J 三臂第一次跑全存活，两个原因都在装置侧，见 §9.39。）
+  if (a.rebuild !== undefined) {
+    const built = sh('.', `pnpm --filter ${a.rebuild} build`);
+    if (built.status !== 0) {
+      say(`ARMS=ABORT reason=rebuild-failed arm=${a.id}\n${String(built.stderr ?? '').slice(-1500)}`);
+      restoreAll();
+      process.exit(2);
+    }
+  }
   const run = sh(carrier.dir, `npx vitest run ${carrier.spec}`);
   const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
   const p = parseVitest(out);
@@ -224,6 +314,14 @@ for (const a of ARMS) {
   if (missing.length > 0) say(`      🔴 预期红的用例缺席: ${missing.join(' | ')}`);
   if (extra.length > 0) say(`      ⚠️ 额外红的用例: ${extra.map((t) => t.slice(0, 46)).join(' | ')}`);
   restoreAll();
+  // 还原之后要把产物刷回真身，否则后面那几臂与 RECHECK 读的都是带病灶的 dist。
+  if (a.rebuild !== undefined) {
+    const rebuilt = sh('.', `pnpm --filter ${a.rebuild} build`);
+    if (rebuilt.status !== 0) {
+      say(`ARMS=FAIL reason=rebuild-after-restore-failed arm=${a.id}（🔴 产物可能仍是带病灶那一份，手工重跑 pnpm --filter ${a.rebuild} build）`);
+      failures += 1;
+    }
+  }
   if (!match) failures += 1;
 }
 
