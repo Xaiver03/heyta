@@ -53,7 +53,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DEFINITION_REL = 'packages/app-host/src/inbound-system-prompt.ts';
+const DEFINITION_REL = 'packages/inbound-core/src/system-prompt.ts';
 const CONSTANT_NAME = 'INBOUND_AUTOMATION_SYSTEM_PROMPT';
 
 /**

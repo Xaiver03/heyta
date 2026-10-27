@@ -7,6 +7,7 @@ export {
   type InboundContentType, type WebhookSignatureInput,
 } from './webhook.js';
 export { buildInboundModelInput, freezeInboundTaskBatch, prepareInboundAutomationResult, inboundTaskDigest, INBOUND_AUTOMATION_FIELDS, type InboundAutomationField } from './parser.js';
+export { INBOUND_AUTOMATION_SYSTEM_PROMPT } from './system-prompt.js';
 export { inboundPublicKey } from './envelope.js';
 export {
   AUTOMATION_ENTITLEMENT_ACTIONS, AUTOMATION_ENTITLEMENT_SCOPES, AUTOMATION_ACTION_TICKET_ACTIONS,
