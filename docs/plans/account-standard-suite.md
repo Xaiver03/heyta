@@ -4739,6 +4739,13 @@ git rev-list --count b55e98807..HEAD                      # 自那次发布落�
 git diff --name-only b55e98807..HEAD -- server/ packages/app-host packages/ui apps/web/src apps/mobile | wc -l
 ```
 
+⚠️ **这一节的标题里那个"35 枚"不可复现**（2026-10-28 01:5x 现量：把上面两条命令逐个跑过，
+窄口径给 26、把 `packages/` 换成全量再连 `e2e/ scripts/` 给 49，两个口径在任何一枚历史提交上都没给过 35）。
+所以"35"当时读的是**审阅条目数**（两腿交回的判决条数），不是文件数，而我把它写成了文件数的样子。
+留在原处不删，是因为 §6.104/§6.105 那两节是按"35 里抽出 12 条"的口径续写的——
+真要改口径得连着那两节一起改，而改成一个命令给不出的数就是造假。
+**正确的范围陈述**：以 `b55e98807..HEAD` 的净差为分母；本线逐枚开码审过的判决见 §6.101–§6.105、§6.107、§6.110。
+
 两腿并行审阅（服务端一腿、客户端与宿主层一腿）回来后，**每条我都自己开了码**才写在这里。判"已复核"的标准：判决那一行在 HEAD 的文件里当场读得到，不是我转抄的。
 
 **确认成立的（严重度排序，全部归自动收集线 / 协作线，见下面"为什么不代改"）**
@@ -4897,7 +4904,7 @@ node scripts/check-worktree-exceptions.mjs | sed -n '/没登记过/,$p'
 
 ### 6.107（2026-10-28 01:2x · 门禁与尺那一层审完：抓到 gate-wiring 自己吞旗标并补 9 臂，顺手记下"臂没人跑"那张债表）
 
-§6.101–§6.105 审的是产品与实现层（35 枚源文件）。**唯一没开码的一层是这轮落进 HEAD 的门禁与尺**。分母现量：
+§6.101–§6.105 审的是产品与实现层（分母见 §6.101 那节末尾的更正——那里"35"是判决条数不是文件数）。**唯一没开码的一层是这轮落进 HEAD 的门禁与尺**。分母现量：
 
 ```sh
 git diff --name-only b55e98807..HEAD -- scripts/ package.json
@@ -5037,3 +5044,66 @@ node scripts/check-worktree-exceptions.mjs --self-test
 要读数就跑 `node scripts/check-worktree-exceptions.mjs`，三档各自的含义就是上面那些 ——
 未登记栏只报真没人认领的路径、索引旧内容那档自己打印正解、跨线依赖逐枚点名 importer 与被引的没入库模块。
 臂数由 `--self-test` 那行打印。
+### 6.110（2026-10-28 01:5x · 把审阅分母的洞补掉：同意面 12 条逐条开码复核，服务端那 8 枚我自己读）
+
+触发是上一节那条命令给不出它自己标题里的数。重算之后：窄口径 26 枚里**有 17 枚从未在任何一节被点过名**，
+其中同意面/共享那一族是产品语义最重的，所以补审。
+
+**派出去的一条腿两次没跑起来**（服务端 8 枚，模型服务连续拒绝，不是我没派）。所以我自己开码读它，只报我读到的：
+
+- **库形状（③）**：这轮唯一的新迁移是 `server/prisma/migrations/20261027000000_add_hosted_inbound_extraction/migration.sql`，
+  体是 `ALTER TABLE "automation_rules" ADD COLUMN IF NOT EXISTS "hosted_extraction" BOOLEAN;` ——
+  可空、无 DEFAULT、无索引、无 `CREATE INDEX`，所以不涉及 CONCURRENTLY 与锁表那两道纪律。
+  它注释里那句"没有任何查询以它为谓词"**是真的**：现量 0 处。
+- **端到端加密的承诺（⑤）**：自动化路径里搜不到把正文/主题写进日志的形状；
+  抽取成功那一支反过来把 `payload_ciphertext` 抹成 `NULL`（`hosted-extraction.ts:19` 那张表与 `:239` 的守卫注释）。
+  全仓唯一出现 `Logger.info({ body })` 这个形状的地方是 `server/src/ai/managed-proxy.routes.ts:50`，
+  而它是一句**警告注释**（讲那道拦不住这种写法），不是代码。
+
+**同意面那条腿交回 12 条，我逐条开码复核。成立的：**
+
+🔴 **成立·最重的一条（本来就在那儿，不是这轮引入）**：**web 的 owner 侧同意闸从未接线。**
+`apps/web/src/features/share/ShareFeature.tsx:199-201` 的初始相位是
+`initialShareId === undefined ? { kind: 'consent' } : …` —— **无条件**进同意相位；
+`shouldShowConsent` 与 `applyShareConsent` 在这个文件里只出现在 import 名单（`:41`、`:42`），零次调用。
+对照：移动 owner 侧 `apps/mobile/src/screens/ShareSpaceScreen.tsx:519` 读它，web 入群侧
+`JoinSharedListDialog.tsx:145` 也读它。模态自己会写记录（`ShareConsentModal.tsx:111` 的 `decide` 走
+`applyShareConsent`），所以**勾了「不再提示」会被存下来，但那一屏永远不读它** ⇒ 那个复选框在 web owner 路径上是装饰，
+而 `packages/ui/src/sync/share-consent-model.ts:9-11` 明写的红线正是"否则它就是装饰"。
+**并且没有任何用例钉着这一侧**：`apps/web/tests/share-join-consent-gate.spec.tsx` 从名字到渲染体只覆盖 join 侧（`:7`、`:41`、`:62`）
+⇒ 我要是把这条做成门禁，它**生下来就是红的**（AGENTS §7 元规则 2），所以只登记判决 + 那条该写的断言，不装门。
+
+复核（四条都能直接跑）：
+
+```sh
+grep -cw shouldShowConsent apps/web/src/features/share/ShareFeature.tsx      # 读 1 = 只有 import 那一行
+grep -n shouldShowConsent apps/mobile/src/screens/ShareSpaceScreen.tsx       # 对照：真调用在 519
+git show b55e98807:apps/web/src/features/share/ShareFeature.tsx | grep -n 'useState<Phase>' -A2
+grep -rln shouldShowConsent apps/web/tests e2e/tests apps/mobile/tests packages/ui/tests
+```
+
+🟠 **条款清单的"唯一真源"现在管不住宿主**：常量 `SHARE_CONSENT_SCOPE_KEYS` 在，`ShareConsentModal` 正确用它，
+但手抄同一串 key 的地方是 **4 枚宿主 + 本轮新增的 1 枚移动测试里的字面量数组**，宿主侧唯一引常量的是一枚 theme 测试。
+**结构通道**（现在不红、将来必静默）：modal 按**下标**取宿主的 `labels.details[index]`，取不到就 `return null`
+（`ShareConsentModal.tsx:194-196`）⇒ 往常量加第 5 条条款时，新条款在四个屏上**同时静默消失**，
+而两壳的测试各自只比它自己那份手抄 ⇒ 没有一把尺会红。条款内容**目前没有分叉**（同一笔提交把常量与四份手抄一起从 3 键改 4 键）。
+
+🟠 同一块约 14 行的 `consentLabels` 构造在四枚宿主**逐字写了四遍**（AGENTS §3.5 那档：这段在决定"展示哪些条款"，属业务语义）。
+🟠 web 同意**落盘失败没有回执**：`saveShareConsent` 签名是 `void`、调用点无 try（`JoinSharedListDialog.tsx:352-355`、
+`ShareFeature.tsx:557-560`），移动同场景有具名回执（`ShareSpaceScreen.tsx:777-778`）⇒ 同意面两壳不对称。
+🟠 移动共享面板：每发同步把 `dataRevision` +1 都重建 admin ⇒ 那条链（两个 GET + Keychain 读 + 重封 + 签名补发）整条重跑
+（`ShareSpaceScreen.tsx:174-193`，文件头自己写着"现取现用"；本轮该文件的 diff 只有 12 行标签，这形状是原有的）。
+
+🟡 记下来但判低的四条：`finalize` 的 catch 只认 403/404、其余畸形信封与"对方还没发"在用户眼里是同一句话；
+一条坏规则把列表整张报成 `transport`（契约错说成网络错）；保存失败把 402/契约/传输折成同一句；
+`ShareFeature.tsx:487` 在渲染体内读 localStorage、`:443` 的 2000ms 定时器不随卸载清。
+
+**我自己这轮又造了一次假读数（第三次，形状不同）**：为了核"有没有查询把这枚新列当谓词"，我写了
+`grep -rn 'hostedExtraction' server/src | grep -iE 'where|findMany|findFirst'`，**在此之前**那一发我写的是
+`grep -E 'where|filter|:'` —— 那个 `:` 匹配了**每一行**（每条 `file:line:` 都带冒号）⇒ 它是一枚恒真的过滤器，
+"11"是它数出来的噪声，不是命中数。重下谓词后真数是 0。
+通用形状：**复核命令里凡是"或"列，每一项都要能单独把整条读数判红**；混进一项恒真的，整条读数就只是长度。
+
+**为什么不代改**：`git status --porcelain -- apps/web/src/features/share/` 现量两枚 `M`（协作线正在写这两只壳），
+且这条 🔴 改的是**同意语义**（哪一屏免弹），不满足"一子可删 + 运行时形状逐字段等于改前 + 一条命令可回退"三条齐。
+⇒ 全部进 `BLOCKED.md` 的待拍板表，不进"已修"。
