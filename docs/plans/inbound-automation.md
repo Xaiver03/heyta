@@ -4853,3 +4853,12 @@ Chromium `kMinPeriodicSyncEventsInterval = base::Hours(12)`，实际间隔再乘
 §5.1 那句成稿要等上线那天由负责人取用；`apps/landing` 与 `docs/runbooks/deployment.md` 本轮未动；
 A2 表里 Electron 与三枚原生壳那两行**仍是零接线**（不影响这句边界的真实性，归"这台设备开着 heyta 时"那一档）；
 A4 计费口径、`AUTOMATION_ENTITLEMENT_MODE` 写错 ⇒ 500、B194 那批入库图处置仍在他手上。
+
+⚠️ **本批文档那一笔的入库形态要说准**（否则下一位按 `docs(自动收集)` 去 `git log` 找会找不到）：
+本节与工单 §5.1、`email-to-task-brief.md` 三份是**随协作线那笔 `1335fc1b8` 一起入库的**
+（我把它们 `git add` 之后，协作线在 22:39:48 提交时把索引里已 staged 的内容一并带走）。
+内容逐枚完好：`git show --stat 1335fc1b8` 回 `email-to-task-brief.md +71`、
+`inbound-automation-work-brief.md +49/-1`、`inbound-automation.md +81` —— 与我 `git diff --cached --numstat`
+那三个数逐字相同。两枚**代码腿仍是本线自己的提交**（`afe07423e`、`b55e98807`）。
+本线没有改写历史（共享 `main` 上那一步的代价比这条消息名目大得多）。
+
