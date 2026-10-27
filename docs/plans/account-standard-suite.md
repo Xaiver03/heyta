@@ -4590,3 +4590,31 @@ done                                               # 判据：空输出；非空
 
 一句话形状：**登记一条命令和登记一条结论是同一种责任 —— 它必须能失败。** 探针自己坏掉时，它给出的"干净"是最贵的一种假绿，因为读的人正照着它决定不做什么。
 
+
+### 6.96（2026-10-27 23:3x · 按路径限定提交之后，"HEAD 自己是不是半棵树"只能拿干净检出量）
+
+工作树里有别人未提交的件，所以**在工作树上跑绿，证明不了 HEAD 绿**。这轮造了一枚只读检出把这件事量掉：
+
+```sh
+git worktree add --detach /tmp/heyta-head-selfcheck HEAD
+cd /tmp/heyta-head-selfcheck
+for s in check-gate-wiring check-scripts-parse check-doc-command-claims live-web-freshness; do
+  node scripts/$s.mjs --self-test > /dev/null 2>&1; a=$?
+  node scripts/$s.mjs > /dev/null 2>&1; b=$?
+  printf '%-28s 自检 rc=%d ｜ 现跑 rc=%d\n' "$s" "$a" "$b"
+done
+git worktree remove /tmp/heyta-head-selfcheck        # 只删自己造的这枚
+```
+
+读数：**四把全 rc=0**（含本线今晚新加的两把）——`check:scripts-parse` 的定义与链入、`verify:live-web-freshness` 都没把半棵树留在 HEAD 上。
+链的自洽另量一次（引用步数、每步有没有定义、定义指向的文件在不在树上）用同一段 python，读数是"定义缺失 无 / 文件缺失 无"。
+
+**两条我自己的假发现，如实记（它们比那条真结论更值得防）**
+
+| 我量到了什么 | 实际是什么 | 为什么会错 |
+|---|---|---|
+| "链里引用了两枚不存在的定义 `--filter`、`-r`" | 探针错。链里那两步真身是 `pnpm --filter @heyta/landing check:entries` 与 `pnpm -r test`，我的正则把**旗标**当成了命令名 | 把"pnpm 后面那个词"当成键名，没排掉以 `-` 开头的 token |
+| "HEAD 里三枚 `check-*.mjs` 没有任何定义引用 = 孤儿尺"（`check-imports-resolve`、`check-ratchet-ceilings`、`check-module-boundaries`） | 尺错。三枚都在 `scripts/check-gate-wiring.mjs` 的**在册消费者表**里（见同文件 `:174`、`:190`、`:206` 的 needle），它们的调用方不在 package.json 里 | 我只在 `package.json` 这一个面上找引用 —— 正是"一把尺在某处读 0，只说明它扫的那套写法里没有" |
+
+顺手把这条问完了：**"链里引用了不存在的脚本"这一向有没有人管** —— 有，`scripts/check-gate-wiring.mjs:347` 那句注释就是它（"拼错或定义被摘掉 ⇒ 后面整串都不跑"），所以**不开新尺**。
+
