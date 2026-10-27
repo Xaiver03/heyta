@@ -1542,7 +1542,7 @@ git diff --name-only 0cdaf8fdf <你此刻的 HEAD> -- apps/mobile/src apps/mobil
 | ④「事后改归属」 | 把**已有**便签挪进别的清单（`setNoteProject`）在两壳仍零调用点（现量 `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'` ⇒ 只剩接口声明与实现两处；⚠️ 别扫整个 `apps`，会命中 `apps/web/dist` 的产物） | **推荐排下期**：它不在本次成功定义里，本次不扩范围 |
 | ⑤ 系统横幅那一档 | 两端回收形状不同形已逐端改准并有常驻判据钉着（#598、§9.21–§9.22） | **推荐不承诺系统横幅**，保持"通知中心那一档 + 入口徽标"。要 Android 侧上横幅需另立 ADR |
 | ⑥ 那枚别线的 e2e 红要不要我递 | `rail-roving` 那枚断点红**归属线自己早就在册**：现量 `grep -n 'rail-roving' BLOCKED.md` 两处，两处都写「未查（dnd-kit Space 传感器与 roving tabindex）」 | **本线不再重复登记**（重复条目只会让下一个读数的人以为有两只不同的红）。要做的是改那条线自己的排期，不在我射程内。<br>⚠️ 同一趟顺手否证了 §9.19 那句「整链只剩 `apps/web` 的 `task-sort` 那一枚红」：现量 `cd apps/web && npx vitest run tests/task-sort.spec.tsx tests/task-selection.spec.tsx` ⇒ 2 passed / rc=0。那句是**截断链只暴露第一个红**的读数被抄成红集全集（元规则：截断的读数不是全集），已在 progress-log 与 feature-matrix 两处入口改口 |
-| ⑦ 这个 goal 什么时候关 | 执行序 0–5 全部有读数（§9.24／§9.25／§9.26／§9.27），四把尺已串行现量，`origin/main` 与本地现量 `0 0` | **等 ①②③ 的答复**。硬边界写着不得自标 complete，所以我不动它 |
+| ⑦ 这个 goal 什么时候关 | 执行序 0–5 全部有读数（§9.24／§9.25／§9.26／§9.27），四把尺已串行现量；🔴 同日 19:28 又在**当前 HEAD `762cedc54`** 上把其中三把重取到绿（typecheck / 本线 verify 全套 / 全仓 test），第四把整链 `check` 没重跑的理由与那把差集命令都在 §9.30 | **等 ①②③ 的答复**。硬边界写着不得自标 complete，所以我不动它 |
 
 ⚠️ 一件必须传给下一位的**现场事实**（不在任务书里，但会咬每一次"输入面干净"的判断）：本批那趟整链 `check`
 把别人名下**已入库的取证截图**改掉了一整片（枚数现量 `git status --porcelain -- apps/web/evidence | wc -l`，
@@ -1633,4 +1633,32 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 ⇒ 所以"补那两枚组件"不是本线一家的偏好：它同时是那条线 Android 端读数的解锁动作；
 而**重启那一档影响的是两条线当天挂在 `windows-pc` 上的所有构建腿**，这也是为什么本线不自取。
 ⚠️ 本线**不去改那份交接书**（别线资产），这句话记在这里就够 —— 两边各自的原文独立成立，反而说明读数可信。
+
+### 9.30 上午那串读数在**当前 HEAD** 上重取了一遍（2026-10-27 19:28，起建 `762cedc54`）
+
+为什么要这一节：§9.27 那三把尺钉的是 `691b3f0bf`，而 #600 说的就是这个 —— **带时态的声称写进一份不会自己更新的账本就会过期**。
+负责人要判"能不能收口"，需要一串**对当前这棵树**的读数，而不是沿用上午那串。
+
+串行单跑（不并发、不与他人抢载），每臂把真实退出码落进同一份日志（`bash` 里 `echo "exit_x=$?"`，不让管道尾巴吃掉 rc）：
+
+| 臂 | 读数 | 它量到成功定义里的哪一句 |
+|---|---|---|
+| `pnpm -r typecheck` | **rc=0** | 四枚壳 + 全部共享层的类型面 |
+| `pnpm verify:collab-suite` | `SUITE=OK legs=4 failed=0`；逐腿 RESULT：sync `steps=14`、revoke `steps=8`、conflict `steps=6`、journey `steps=3` | web 那条常驻界面腿（四腿套件含 journey 那一腿） |
+| `pnpm verify:collab-keys` | **rc=0** | M4 逐 op 签名那族（四态词表 + 名册含已移除成员） |
+| `pnpm check:collab-carrier` | **rc=0** | 本线验收载体本身还在（装置没被静默改名或删掉） |
+| `pnpm -r test` | **rc=0**；最大几包 app-host 121、server 177、ui 51、domain 46、web 209 passed + 2 skipped（全为 passed，`grep -E "[1-9][0-9]* failed"` 只命中 `legs=4 failed=0` 那一行） | 三族双向、同意闸调用点、两枚谓词的双向常驻判据、移动壳装配形状 |
+
+⇒ **四把尺里的三把在当前 HEAD 上重取到绿**。第四把 `pnpm check`（132 段整链）这一趟**没重跑**，理由不是懒：它会把整片
+`apps/web/evidence` 的取证截图按当前产物改写（#602），而这棵树上此刻仍有别的线在动那一面。上午那串断点读数
+（第 102 段 `check:ai-e2e`、红在别线 `rail-roving`）**仍然有效**，但别把它读成"整链绿"。
+
+🔴 这一戳最值钱的**不是读数，是那把差集**：`git diff --name-only 691b3f0bf..762cedc54` 剔掉 `apps/web/evidence/` 之后只剩 **13 枚文件**，
+其中**动到源码面的只有 1 枚** —— `apps/mobile/tests/ai-copy-parity.spec.ts`（别线的 AI 词条对账 spec，动的是 `-r test` 的分母，不是行为面），
+其余 12 枚是文档、`BLOCKED.md` 与本线那枚发布工具。定向现量（只列 L1–L11 与四腿的观察面）：
+`git diff --name-only 691b3f0bf..762cedc54 -- scripts/verify-mobile-collab-ios.sh scripts/verify-collab-journey.mjs apps/mobile packages/app-host packages/sync-client packages/ui packages/domain packages/shared-schema` ⇒ 也只回那一枚 spec。
+⇒ 上午那串与这串**量的是几乎同一个源码面**，所以 §9.27 的结论不需要重写。
+⚠️ 但**这不等于设备腿也重跑过**：第 52 跑（起建 `0cdaf8fdf`）对 `762cedc54` 仍属**未重跑** —— 那一跑要装 Release 产物进模拟器、
+单跑十几分钟且会占住设备，而这一列差集里**没有任何一行落在 L1–L11 观察到的产品源码上**（唯一那枚是别线的 spec）。
+这条按"未重跑 + 判它的断言"登记，**不写成"应该也还行"**；重跑命令是 `pnpm verify:mobile-collab:ios`。
 
