@@ -5107,3 +5107,95 @@ grep -rln shouldShowConsent apps/web/tests e2e/tests apps/mobile/tests packages/
 **为什么不代改**：`git status --porcelain -- apps/web/src/features/share/` 现量两枚 `M`（协作线正在写这两只壳），
 且这条 🔴 改的是**同意语义**（哪一屏免弹），不满足"一子可删 + 运行时形状逐字段等于改前 + 一条命令可回退"三条齐。
 ⇒ 全部进 `BLOCKED.md` 的待拍板表，不进"已修"。
+
+### 6.111（2026-10-28 04:1x–04:4x · 「第三版索引」这一类雷是**我自己那套 plumbing 造的**：三枚全拆、尺补一栏、台架六种注入全咬住）
+
+**起因不是找雷，是收「未登记的例外」。** 例外归属尺当时报 `⚠️ 索引旧内容 1 枚 ｜ MM scripts/check-gate-wiring.mjs`。
+那枚文件的工作树**对 HEAD 是干净的**，脏的只有索引那一格，而且索引那版跟 HEAD、工作树**都不相同**：
+
+```sh
+# 🔴 这三枚雷当晚就被我拆了，所以现在照跑会读回"三版一致"（索引 == HEAD == 工作树）——
+# 留在这里的是**取法**，不是当时的数值；当时那三枚的哈希只在本节正文里。
+git rev-parse :scripts/check-gate-wiring.mjs HEAD:scripts/check-gate-wiring.mjs
+git hash-object scripts/check-gate-wiring.mjs
+git log --all --format='%h %s' --find-object=8047483d3c36edd85845ca646756047b4e9852a7
+```
+
+`--find-object` 读回来两笔：`2ab9efb45` 引入、`9087f8e9e` 替换掉。也就是说**索引停在「我提交之前那一版」**，
+而那一版里 `--self-test` 出现 0 次、HEAD 那版出现 6 次。
+
+**机制（这才是重点，不是某枚文件的事故）**：plumbing 提交那条路 ——
+`hash-object -w --stdin` → 私有 `GIT_INDEX_FILE` → `read-tree` → `update-index --cacheinfo` → `write-tree` →
+`commit-tree` → `update-ref <new> <OLD>` —— **从头到尾不写共享索引**。所以每用一次它提一枚文件，
+共享索引里那一格就留在提交前的内容，变成一个「既不是 HEAD、也不是工作树」的**第三版**。
+不带 pathspec 的 `git commit` 走的正是索引 ⇒ 谁随手提一次，就把那一格写回历史。今晚实际造出三枚。
+
+**最狠的一枚是 `package.json:208`。** 三版逐行对出来只有这一行差：
+
+```sh
+git cat-file -p :package.json > /tmp/pkg.idx; git show HEAD:package.json > /tmp/pkg.head; diff /tmp/pkg.head /tmp/pkg.idx
+```
+
+索引那版是 `"check:gate-wiring": "node scripts/check-gate-wiring.mjs",` —— **不带 `--self-test`**。
+谁不带 pathspec 提一次 `package.json`，我这格自检就静默消失，而 build / typecheck / 单测都不会告诉你
+（这条和 §6.107 那句「门禁定义了≠门禁跑了」是同一族，只是这次的偷法在索引里）。
+
+**§6.109 那一档为什么没拦住它 —— 不是翻案，是补。** 那一档的判据是「工作树对 HEAD 干净」，
+而 `package.json` 的工作树对 HEAD **也脏**（UX 线往里加了两行 `check:undo-receipt`）⇒ 它不进那一档，
+只在未登记栏露了一下就被归属表吃掉。所以判据从「路径 + 一种形状」换成**三版之间的关系**：
+
+    索引 ≠ HEAD 且（工作树里没这枚文件 或 索引 ≠ 工作树） ⇒ 命中
+
+`MM` / `AM` / `AD` 三种失法各配一枚臂（㉑–㉗），另加两枚解析器臂（㉘㉙）与一枚配对器臂（㉚）——
+解析器一坏分母就空、**空就等于假绿**，所以分母本身也得有牙；main 里还有一枚视力臂：
+有脏件却取到 0 条索引 ⇒ `rc=2`（"我今天没干活"），不许它说"没有雷"。
+
+```sh
+node scripts/check-worktree-exceptions.mjs --self-test        # 臂数与不符数由尺自己打印
+node research/tools/mutate-worktree-third-version.mjs          # 六种注入形状，打空数必须 0
+```
+
+**三种拆法与各自的前后读数**（都只动那一格，不碰别人的暂存）：
+
+| 那一格 | 索引那版是什么 | 拆法 | 为什么是这个方向 |
+|---|---|---|---|
+| `scripts/check-gate-wiring.mjs` | 我提交前的旧版 | `git update-index --cacheinfo 100644,<HEAD blob>,<路径>` | 工作树 == HEAD，索引归位到 HEAD 就是三版一致 |
+| `BLOCKED.md` | 我上一笔 plumbing 前的版本 | 同上（设成 HEAD 版） | 🔴 **不能设成工作树版**：工作树那版含别的会话 79 行未提交内容，设过去等于替他们 stage |
+| `package.json` | 同上 | 同上 | 工作树那版含 UX 线未提交的两行，同理 |
+
+**新落的纪律（下次不再造雷）**：**单归属文件优先 `git commit -o -F <消息文件> -- <路径>`**。
+pathspec 提交自己会把索引那一格刷成新提交的内容 —— 今晚 `0ac67ffda`、`4e1555cd6` 两笔之后
+`git -c core.quotepath=off status --porcelain -- <路径>` 都读回空。
+plumbing 只在「这枚文件里含别人的行」时才有理由用，且**用完必须立刻刷那一格**（就是上面那三种拆法）。
+
+**顺手记两条我自己的假读数**（都是「先怀疑探针」的现量样本）：
+
+1. 我先用 `grep -c 'check:gate-wiring.mjs --self-test'` 探 HEAD，读回 **0**，差点写成「我那行没进 HEAD」。
+   链里的**定义名**是冒号（`check:gate-wiring`），**脚本路径**是连字符（`check-gate-wiring.mjs`），
+   我把两种写法拼成一枚不存在于任何文本里的串 ⇒ 恒不命中。重下谓词 `grep -c 'gate-wiring\.mjs --self-test'`
+   读回 HEAD=1、工作树=1、索引=0 —— 这才和上面的机制对上。
+2. `git rev-list --left-right --count origin/main...HEAD` 报 `0 14`，看着像"有 14 笔没推"。
+   而 `git ls-remote origin refs/heads/main` 与本地 HEAD 逐字符相同。原因：`main` 的**上游是 `gitee/main`**，
+   我用显式 refspec 推 GitHub ⇒ 本地那枚 `refs/remotes/origin/main` 不会自己跟着动。
+   复验只认 `ls-remote`；把追踪 ref 刷成真相是一条：
+   `git fetch origin refs/heads/main:refs/remotes/origin/main`（刷完 `0 0`）。
+
+**归属表这一轮把 UX 线 P3「撤销回执」那一批按原文登记了进去**（未登记栏 15 → 0）。
+证据分三种独立来源，不是我猜的：① `scripts/check-undo-receipt.mjs` 头注释第一行写「撤销回执门禁（全局 UX 线 P3）」、
+`packages/ui/src/feedback/receipt-timing.ts` 与 `packages/ui/src/index.ts` 的新增段写「2026-10-28，全局 UX 线 P3」；
+② `e2e/tests/quadrant-move-ux.spec.ts` 自己写「那一枚撤销按钮现在住在共享的 `UndoReceipt` 里」；
+③ 四枚界面文件（`HabitDetailCard` / `NotesView` / `ProjectsPanel` / `QuadrantBoard`）头注释里**没有**日期（现量：
+`head -20 <文件> | grep -cE '2026-10-2[0-9]'` 各读 0），但本尺第二判的跨线依赖那一格报出它们各 import 一枚
+未入库的 `apps/web/src/lib/feedback/UndoReceipt.tsx` ⇒ 同一族。`?? apps/web/evidence/undo-receipt/` 是两次读数之间
+新冒出来的，同一族的取证目录。
+
+**目标第 1 件「全量入库」到这一拍的判决**：本线的改动已**全部**进 HEAD；剩下的都归别人，且**不能代提**，
+硬前提是现量不是推测 —— 上面那次 `--self-test` 之后的真跑读数是「跨线依赖 18 处」，
+即 18 条**已跟踪代码 import 了没在 HEAD 里的模块**，未入库的新模块三族（`lib/form/useDirtyDismissGuard.tsx`、
+`lib/dialog/DangerConfirmDialog.tsx` + 两枚 `*Danger.ts`、`lib/feedback/*`），外加那把新尺已经接进他们工作树的
+`package.json` 链但定义没入库。按堆代提的结果就是 HEAD 变半棵树，红的是下一位。取数：
+
+```sh
+node scripts/check-worktree-exceptions.mjs          # 分档 + 未登记栏 + 跨线依赖，全部现量打印
+git ls-files --error-unmatch apps/web/src/lib/form/useDirtyDismissGuard.tsx   # 读回 error = 仍未入库
+```
