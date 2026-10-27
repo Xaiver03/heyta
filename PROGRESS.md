@@ -7457,3 +7457,44 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ② **收口这一戳把外部前提那几格各取了一次现量，全部照旧**：`grep -c "tools\|tool_choice" server/src/ai/managed-proxy.routes.ts` 回 **0**（§9.4 那条限制仍成立 ⇒ 不许对外宣传对话式助手）；`grep -rl "这一档仍打不开" packages/legal/src/documents` 回 **1 枚文件**（法务那句仍没动，本轮红线）；真实小额下单仍欠运营填 `MANAGED_AI_*` ＋重建镜像那两步（45 天清理作业那格也卡在同一个部署态上）。
     ③ 本条只动 `PROGRESS.md`（纯追加：删列 **0**）· `docs/plans/subscription-handoff.md`（§10.2 加第 17 戳＝纯追加）。AC 已勾数现量 **0**（`grep -rn "^- \[x\] \*\*AC-" docs/plans/*.md | wc -l`），本线不勾格；四道文档门各 rc=0——⚠️ 按第 206 条 ⑧ 那句限定，这句话是"整仓绿"，四道里真读得到这两枚文件的只有 `check:docs`。
     ④ ⚠️ **落第 17 戳时自己差点删掉别人的正文**（本会话内就这一件，如实写清是靠什么抓到的）：给交接书 §10.2 追加那一行时，我把 Edit 的锚点写在上一行的**尾部片段**上，替换串里少带了我本要保留的那半句（"㈠ **射程**…"）——⇒ **那一行会整截变短**。抓到它的是**读自己那次调用的 old/new 两段串**（替换完的新文本当场比锚点短），不是靠事后尺；还原后跑 `git diff --numstat -- 那枚文件` 回**空**才确认与 HEAD 逐字一致，再改用**唯一的行尾串**重做，落成为 **1 插入／0 删除**。⇒ 与记忆「改索引或台账的一行别拿尾巴当锚点」同形，差别是**这次是 markdown 表格行**：表格一行的可读前缀/尾巴都很短，拿它当锚等于赌唯一性。⚠️ **numstat 的删列是"事后对账"用的，不是"当场拦截"用的**——它只在改完之后告诉你有没有删东西，所以纯追加件必须**每次改完立刻量**，别攒到提交前。
+208. 🔴 **自动收集线：负责人那句"数据对我们必须可读"落成 ADR-0077「接收即抽取」，同一趟抓到我自己写的两把恒绿的尺**（写前先跑 `date`，本机 2026-10-28 00:2x）。
+    ① **判的是"能做的那一半"，不是那句原话的全部**：入站那一刻明文确实在服务端手上（可证），
+      而"落库之后还能读"不成立（HPKE 只封到收件人公钥，服务端自己打不开）。所以那条档的形状是
+      **窗口只有一次**：当场抽字段 → 结果重新封给同一枚收件人公钥 → 把源正文从那一行上抹掉，
+      任务写回仍归设备（不持根密钥、不写 op、不建许可）。设计、三个候选的取舍与红线在
+      `docs/adr/0077-inbound-hosted-extraction-at-ingest.md`；实现读数在 `docs/plans/inbound-automation.md` 文末那一节。
+    ② **服务端怎么调模型：既不是自调 HTTP，也不是另起一套直连**。自调 `/api/ai/managed/chat` 要服务端替用户持一张 JWT（比"读一次明文"更坏），
+      另写一套 fetch 会让闸门顺序长出抄件（会漂）。落的是把路由里 ②'–⑦ 整段提出来成
+      `server/src/ai/managed-completion.ts::invokeManagedAiCompletion`，两条腿共用；
+      证据形状是 `managed-proxy.routes.spec.ts` **一字未改**仍全绿（那句"行为没变"靠它，不靠我的形容词）。
+      额度只在第 ⑤ 那一道消耗一次；这条腿**不写** `automation_ai_attempts`（那是设备腿的账本），
+      "结果不确定"改由租约持有者判定。A4 双重计费照旧归负责人，本线没动。
+    ③ 🔴 **本轮最该被读到的是两件我自己的错，两个都只有跑变异臂才暴露**：
+      (a) 台架从 ANSI 包裹的 `×` 字形里数失败条数 ⇒ **八臂全打印"绿，失败 0 条"**，而同一份日志正文写着 `3 failed`；
+      (b) 那把"`/chat/completions` 只许一枚"的门槛按**文件**计数，被 `managed-completion.ts` 自己的表头注释喂饱 ⇒ 端点改名后照样绿，
+        而我写在它旁边的注释"扫到 0 枚也是红"**在那一刻就是假的**。
+      ⇒ 修法与预防：判决只认框架那行 `Tests N failed`（先剥 ANSI）；门槛改成剥注释后数**出现次数**并要求恰好 1，
+      再补两臂把 0 枚与 2 枚两头钉住；跑法加**对照臂**（一棵没动的树必须绿，否则"全红"只是这台机器跑不动这套用例）。
+      现量：`python3 ~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.py`，臂数
+      `grep -cE "^\s+\('A[0-9]" ~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.py`，逐臂 `还原_ok` 与红了哪几条用例在同目录 `mutation-arms.md`。
+    ④ **这一档今天在任何环境都不生效**：`server/prisma/migrations/20261027000000_add_hosted_inbound_extraction`
+      只进了仓库、**没 apply**（本机那套 Postgres 被并行会话共用，apply 的时机归负责人），缺列＝读成 `NULL`＝归设备；
+      开关语义只认显式 `true`。生产 env／helm／push 一步没动。
+    ⑤ **对外六格披露是草稿、一处未发**（隐私政策／数据流转／第三方／帮助中心／价格页 + 那条"不许说成什么"），
+      清单在 `docs/plans/inbound-automation-work-brief.md` §5.2。同节登记一条现量危险：
+      `automation-metadata` 那段正文手抄在三枚法务文件里而**没有一把尺**看着它们一致
+      （现量 `grep -rn "automation-metadata" packages/legal/tests` 回空）。
+    ⑥ `docs/plans/email-to-task-brief.md` 已重指向这条窄档（新增 §0a 与 §3 的 P0.5）：
+      邮件那条入口**复用**抽取这条腿，**不复用**归属那一步——一封信凭什么算这个账号的没答案之前不许接。
+      ⚠️ 那句"设备开着才处理"的范围也因此改小过一次：i18n 那颗键没换，句子按两条腿重述（工单 §5.1 有现值）。
+    ⑦ 门禁读数（本条落笔前各跑一次，串行）：`pnpm check:docs` rc=0；`pnpm check:i18n-vars` rc=0；i18n 套 30 passed；
+      `apps/mobile` 两壳对账 16 passed；`apps/web` 那族 inbound spec 33 passed；`server` 那两枚 spec 31 passed；`server` 的 `tsc --noEmit` rc=0。
+      ⚠️ `pnpm check:ui-language` rc=1，4 处命中全在 `apps/web/src/App.tsx:2532-2533`（`web.calendar.sidebar.*`），
+      且 `git show HEAD:apps/web/src/App.tsx | grep -c "web.calendar.sidebar.show"` 回 **0** ⇒ 是别线**未入库**的在飞件，不是本线红。
+      ⚠️ 按第 206 条 ⑧ 的限定语：上面"文档门 rc=0"里真读得到 `PROGRESS.md` 的只有 `check:docs` 这一道。
+    ⑧ AC 已勾数现量 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md`），本线一格不代勾、不自标完成；
+      本条纯追加（现量 `git diff --numstat -- PROGRESS.md` 删列回 **0**）。
+      ⚠️ 共享工作树形状一条：本线这 6 枚文档/测试文件走的是**私有索引 + `commit-tree`/`update-ref` CAS**，
+      原因是共享索引里此刻挂着别线一枚**已 `git add` 的新文件**（`docs/plans/global-ux-system-remediation.md`），
+      普通 `git commit -- <pathspec>` 之前先 `git add` 新文件就会把那枚一起带走。配方与事后刷新见项目层记忆
+      `project-shared-worktree-sessions.md`。
