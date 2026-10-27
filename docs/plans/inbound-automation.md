@@ -4765,3 +4765,10 @@ vitest 报 `No test files found, exiting with code 1`，五臂齐刷刷 `rc=1`�
 ⑦ 界面对 `selfhost-online` 零露出（去 dist/测试后唯一命中是 `packages/app-host/src/admin-client.ts:187` 的一句注释），
    `self-host.md` 明写"本版本在自托管实例上不可用"=1。
 边界：AC 已勾 **0**（`grep -c '^- \[x\] \*\*AC-'`=0，另由 `AC8-ac-ticks` 同戳自印）；未 push；helm 那一格按"没做＋理由"登记在 §3 A7 头上那枚 ✅ 标记与回执末段。
+
+**18:19 就地更正上一节末句"未 push"**：那句在本节落库的那一刻就不准了。现量：
+`git branch -r --contains 2fff2c477` 与 `…--contains 9bc45a29a` **各回两行**（`origin/main` 与 `origin/HEAD`），
+而 `git ls-remote origin refs/heads/main` 回 `691b3f0bf` —— 那是**协作线的一笔**，它推 `main` 时把已经坐在 `main` 上的这两枚本线提交一起带上了远端。
+准确的句子是：**本线全程没有执行过 `git push`**（这九笔里前七笔我自己一次都没推），
+但共享 `main` 上"绝不 push"这条纪律**不由本线单方守得住**；此刻 `git rev-list --left-right --count origin/main...HEAD` 回 **`0 6`**
+⇒ 本批余下六笔（`f1f1c3cec` 起）仍在本地。⚠️ 这句同样是戳读数，引用前重跑那两条命令。
