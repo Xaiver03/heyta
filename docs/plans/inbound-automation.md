@@ -4633,3 +4633,15 @@ vitest 报 `No test files found, exiting with code 1`，五臂齐刷刷 `rc=1`�
 ② 界面这一行的**对外措辞取向**（"上次结果"要不要写成"仅在应用打开时处理"）仍归负责人，本批按现状渲，不加一句解释性文案。
 ③ `waiting-entitlement` 那把词条是**上一批**补的，本节只复用，没动 `packages/i18n`。
 ④ AC-1～AC-8 一格未勾（`research/tools/verify-inbound-ac-ticks.py` 的口径不变）。
+
+**6. 复跑真库腿时，本文件 15:2x 那节写的"入口就这两行"是不够的两行**（本轮按它复跑，6 枚用例整批红，
+其中 3 枚是 15:2x 当场绿过的）。缺的那步是**建表**：`createdb` 出来的新库有 0 张表，
+用例第一步 `user.create()` 就炸（`PrismaClientKnownRequestError`），
+而症状长得像"产品坏了"，实际是前置没铺。两种正确做法，本轮用的是第一种：
+① 复用那枚已经带上 59 张表的 `heyta_node_worker_cli`（同一条 `DATABASE_URL`，`psql -c "select count(*) from pg_tables…"` 现量到 59）；
+② 新库就先按仓规把迁移铺上去（`cd server && sh scripts/migrate-deploy.sh`，别裸 `prisma migrate deploy`）。
+复跑读数（当前 HEAD `2fff2c477`+`fecf59932`，`--maxWorkers=1`）：
+`inbound-node-worker-cli` 3 臂 **7257ms 全绿** + `automation-lease-session-timezone` 3 臂全绿，
+`Test Files 2 passed (2) / Tests 6 passed (6)`，`rc=0`；跑前 `pnpm --filter @heyta/node-host build`（`rc=0`），
+因为正臂 spawn 的是 `dist/cli.js`，不重 build 就是在测上一版产物。
+顺手把本轮自己造的那枚空库 `heyta_a3_recheck_1027` 删掉（`dropdb`），不留给下一位当"库是坏的"的现场。
