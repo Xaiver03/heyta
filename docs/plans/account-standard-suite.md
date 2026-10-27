@@ -5004,3 +5004,36 @@ git diff --cached --numstat
 而**最坏的是它顶回去之后不会有任何东西红**：旧版正好把 `--self-test` 当不认的旗标走过去。
 我不替他 unstage（只对自己创建的对象动手），这格登记给那一号线：
 **提交前重新 `git add scripts/check-gate-wiring.mjs package.json` 一次，或改用 `git commit -- <路径>`。**
+### 6.109（2026-10-28 01:3x · 例外归属尺补上"索引旧内容"那一档：它原先把 `MM` 当成未登记的例外，那是假例外）
+
+§6.108 记下那枚索引 hazard 之后，归属尺的未登记栏从 1 枚涨到 7 枚。逐枚读了它们自己的 diff，两种成因要分开：
+
+- **6 枚是并行 UX 线新写的在飞件**：`deviceRevocationDanger.ts` 文件头第一行就写「2026-10-27，全局 UX 整改 P2 第二格」，
+  被 `VaultSettingsPanel.tsx:3` 引、`app.css:33` 把 `./app/danger-confirm.css` 带进来、
+  `e2e/tests/vault-settings.spec.ts` 与 `apps/web/evidence/danger-confirm/` 是同批的界面腿取证。
+  ⇒ 归属有原文，加进那一行的成员表（不是我猜的）。
+- **1 枚根本不是"未提交的改动"**：`scripts/check-gate-wiring.mjs` 显示 `MM`，而
+  `git diff HEAD --numstat -- scripts/check-gate-wiring.mjs` 是**空**的 —— 工作树对 HEAD 干净，
+  脏的只是索引里那一枚旧 blob（§6.108 那格）。
+
+第二枚不该靠"再登记一条路径规则"洗掉（那正是本尺最反对的：按名字补黑名单永远补不完），
+所以改的是**机制**：`classify()` 现在多收一枚"工作树相对 HEAD 真改了哪些路径"的集合
+（`git diff HEAD --name-only -z`，NUL 分隔 ⇒ 路径里的空格与中文都不会被引号骗），
+不在其中且非 `??` 的路径一律进 `indexOnly` 一档，**不进未登记栏**、`--strict` 也不为它红。
+
+三枚新臂钉住这一档不许变成洗白口：
+
+```sh
+node scripts/check-worktree-exceptions.mjs --self-test
+```
+
+| 臂 | 判的形状 |
+|---|---|
+| ⑳ | `MM` 且工作树干净 ⇒ 未登记栏必须读 0（这才叫"分类"而不是"报错"） |
+| ⑳b | 同一枚路径若工作树**确实**改了 ⇒ 仍回到未登记栏（这一档不许顺手洗白真改动） |
+| ⑳c | `??` 不在 `diff HEAD` 里是常态 ⇒ 未跟踪件一律不许被这一档吃掉 |
+
+这一节的**枚数不写在这里**（脏集在并行检出上是分钟级在换的东西，写下来当天就漂）：
+要读数就跑 `node scripts/check-worktree-exceptions.mjs`，三档各自的含义就是上面那些 ——
+未登记栏只报真没人认领的路径、索引旧内容那档自己打印正解、跨线依赖逐枚点名 importer 与被引的没入库模块。
+臂数由 `--self-test` 那行打印。
