@@ -1787,8 +1787,16 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
    **一分钟后再采一次，1-min 读到了 81.80** ⇒ 这台机此刻离"安静"很远，而且**同一条命令两次的读数差到 4 倍**（又一次说明负载是瞬时读数，只能现量、不能沿用）。
    吃 CPU 的前几名逐枚读过：`mds_stores`（Spotlight 索引，已跑 9 小时那枚 92.6%）、`ApplicationsStorageExtension`、一枚 **`tar` + `zstd` 成对**（38 分钟）。
    ⇒ **没有一枚是测试套件 ⇒ 这不是"等谁交活"，是等不来的机器底噪**，我不 poll 它、也不在它上面压一条 60–90 分钟的整链（那条链里 `check:ai-e2e` 会起浏览器与 webServer，负载叠加后既跑不完又会产出一趟**归因不了**的读数 —— 正是第 50 跑那种"无判决"趟）。
-   ⇒ 所以这一格的准确状态是**"前置三条已量过并满足、第四条（负载 ≤ 核数 × 3/4）不满足 ⇒ 没点火"**，不是"没试"。第四条件与那三条一起构成点火门：
-   `sysctl -n vm.loadavg` 的第一数 ≤ `$(( $(sysctl -n hw.ncpu) * 3 / 4 ))` **且** `pgrep -fl 'vitest|playwright'` 回 0 **且** 4318／4319 空 **且** `git status --porcelain=v1 -- packages apps server` 对本线干净；满足后先 `git worktree add` 一枚隔离载体再跑。
+   ⇒ 所以这一格的准确状态是**"前置三条已量过并满足、第四条（负载 ≤ 核数 × 3/4）不满足 ⇒ 没点火"**，不是"没试"。
+   🔴 **而我上面写的那条负载判据本身用的是禁忌写法**（`sysctl -n vm.loadavg | tr -d '{} '` ⇒ 三个值被粘成一串，比较恒假），
+   正是 traps **#168** 点名别再犯那处 —— 三个读数（19.63 → 81.80 → 54.50）各自是真的（取的是每行第一个数），坏的是我那条 `[ … -le … ]` 自己报错返回 2。
+   ⇒ 点火门里负载那一条**不要手写**，改用本仓那道现成的门（**下面这条我当趟真跑过**，不是抄的形制）：
+   `HEYTA_LOAD_GATE_WAIT=0 bash -c 'source scripts/lib/wait-for-quiet-host.sh; host_load_gate; echo "READING=$HOST_LOAD_READING LIMIT=$HOST_LOAD_LIMIT"'`
+   ⇒ 当趟打印 `GATE=FAIL READING=load1=33（原始 33.05） LIMIT=12` —— 它读 `uptime`、把非整数读数判**不过**并点名探针故障（手写 `[ … -le … ]` 那一支恰好是"读不出来＝放行"那一形）。
+   函数在册位置：`host_load_gate()` 与 `host_memory_gate()` 同文件（现量 `grep -nE "^(host_load_gate|host_memory_gate)\(\)" scripts/lib/wait-for-quiet-host.sh`）。
+   其余三条仍是 `pgrep -fl 'vitest|playwright'` 回 0 **且** 4318／4319 空 **且** `git status --porcelain=v1 -- packages apps server` 对本线干净。
+   载体那一步仓内已有约定：`.gitignore` 第 2 行那条注释写的就是**linked worktree 里 `e2e/node_modules` 做成指向主检出的软链**（为了不重复装第二份 playwright），
+   下一位按这条形制起载体，别新造一套。
 2. **Android 那一侧没有界面腿读数**（成功定义那句"和 web 一样真的能用"在安卓上今天只能靠推定）。
    ⇒ 解除条件三选一，归负责人：补两枚 SDK 组件后做 §9.29 那条 `-no-accel` 起判断言（加法、不要管理员）／插一台真机（判据 `adb devices` 非空）／按"iOS 验过 + Android 只出包"结案并把它写进边界表。
 
