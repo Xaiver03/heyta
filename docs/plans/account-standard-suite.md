@@ -4654,3 +4654,24 @@ diff 打开只有那两行，与"旧"无关。
 **第二次中"先怀疑探针"这一枪**：断言"仓内没有任何引用"那趟用的是带 `\b` 的正则；本机 BSD grep 的 `-E` 对 `\b` 的支持不是可以赌的东西，
 所以换成 `grep -w` 并把分母逐行读完才敢写进台账（两种写法这次读数恰好一致，但"恰好一致"不是判据）。
 
+
+### 6.98（2026-10-27 23:5x · "只剩登记过的例外"下沉成一枚尺，并顺手量到别人正在修的一枚永远绿的判据）
+
+归属表是散文，脏集成员几分钟换一次人 —— 所以把分类本身钉进脚本：`scripts/check-worktree-exceptions.mjs`。
+`git status --porcelain` 的每一枚必须命中一条**带理由**的规则，命不中的那一枚才是真正危险的那批
+（"谁都可能顺手替别人提交掉"）。默认不红、`--strict` 才红；自检 9 臂里有两枚是牙：坏规则被拒、未登记被点名。
+
+| 格 | 现量 | 复取 |
+|---|---|---|
+| 定义/链的冲突 | 加完定义后 `check:gate-wiring` **当场红**："定义还在但不在这次的链里 ⇒ 它不会再被跑，而链子照样绿" | `pnpm check:gate-wiring` |
+| 出路（不是我想加的，是仓库自带的） | 链外**允许表**：逐条要写"为什么不进链"+ 一条**会执行它**的消费方；消费方落在 `docs/agents/commands.md` 的命令块 | `node scripts/check-gate-wiring.mjs --self-test && node scripts/check-gate-wiring.mjs` |
+| 为什么不进链（这枚尺自己的理由） | 干净检出上它必然报"未提交 0 枚"⇒ 进链就是恒绿；并行会话正写着时它必然红 ⇒ 进链就是每天替别人红一次。两头都不对的门禁不该装在链上，载体是**人** | `git worktree add --detach /tmp/x HEAD && cd /tmp/x && node scripts/check-worktree-exceptions.mjs; git worktree remove /tmp/x` |
+| 它第一次跑就点到的两枚 | ① 一枚 `*.mut-bak` 残渣（有人此刻正在对 `server/src/ai/managed-completion.ts` 施变）—— 这种**不该登记成例外**，它该在下一分钟自己消失；② `apps/mobile/tests/share-ui-assembly.spec.ts` | `pnpm check:worktree-exceptions` |
+| 第②枚归谁（协作线自己正在修） | 它的加行写着：那枚 `/<Pressable[\s\S]*?testID="…"/` 从**文件里第一枚** `Pressable`（"不再提示"的勾选框）起手 ⇒ 摘掉真触发件的 `onPress` 它照样绿 = **一枚永远绿的判据**；他们配了 `press-channel-gone-mobile` 那发变异臂在修（`6e05f077c`） | `git show 6e05f077c --stat \| tail -4`；`grep -n 'press-channel-gone-mobile' research/tools/mutation-rigs/mutate-collab-consent-gate.mjs` |
+
+**这轮我自己的一次手法，值得留一句**：`check-` 前缀的脚本必须在 package.json 里有定义（就是这枚尺的判据之一），
+而 `package.json` 正被别的会话改着 ⇒ 只能用临时索引提"HEAD + 我这一行"。
+提完必须**把同一行也插回工作树**：工作树少了这一行，任何一次整文件提交都会把我的定义抹掉，
+而那时红的是下一位的 `check:gate-wiring`。判据：`git diff -- package.json \| grep -c worktree-exceptions` 要读 **0**
+（我这行不在"未提交差异"里），同时 `grep -c focus-single-source` 要仍读 **2**（别人的行没被我动）。
+
