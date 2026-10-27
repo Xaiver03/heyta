@@ -40,11 +40,14 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { translate, type MessageKey } from '@heyta/i18n';
 import {
   HeytaUiProvider,
+  SHARE_CONSENT_SCOPE_KEYS,
   ShareConsentModal,
   resolveHeytaUiTheme,
   type ShareConsentModalProps,
@@ -53,15 +56,25 @@ import {
 import { declared, norm } from './helpers/rnw-styles.js';
 
 const LABELS = {
-  title: translate('zh-CN', 'common.share.consent.title' as MessageKey),
-  body: translate('zh-CN', 'common.share.consent.body' as MessageKey),
-  scopes: [
-    translate('zh-CN', 'common.share.consent.scope.content' as MessageKey),
-    translate('zh-CN', 'common.share.consent.scope.metadata' as MessageKey),
-    translate('zh-CN', 'common.share.consent.scope.notAffected' as MessageKey),
-  ],
+  // 语境键：这两套各代表一侧（分享／加入）。`describe('标题按语境分叉')` 拿它们互相断言，
+  // 所以调用点把两颗键接反当场就红。那颗确认按钮同样按语境 —— 入群的人没在"确认共享"。
+  share: {
+    title: translate('zh-CN', 'common.share.consent.title.share' as MessageKey),
+    body: translate('zh-CN', 'common.share.consent.body.share' as MessageKey),
+    accept: translate('zh-CN', 'common.share.consent.accept.share' as MessageKey),
+  },
+  join: {
+    title: translate('zh-CN', 'common.share.consent.title.join' as MessageKey),
+    body: translate('zh-CN', 'common.share.consent.body.join' as MessageKey),
+    accept: translate('zh-CN', 'common.share.consent.accept.join' as MessageKey),
+  },
+};
+
+const SHARE_LABELS: ShareConsentModalProps['labels'] = {
+  ...LABELS.share,
+  detailsLabel: translate('zh-CN', 'common.share.consent.details.label' as MessageKey),
+  details: SHARE_CONSENT_SCOPE_KEYS.map((key) => translate('zh-CN', key as MessageKey)),
   dontAskAgain: translate('zh-CN', 'common.share.consent.dontAskAgain' as MessageKey),
-  accept: translate('zh-CN', 'common.share.consent.accept' as MessageKey),
   cancel: translate('zh-CN', 'common.share.consent.cancel' as MessageKey),
 };
 
@@ -93,7 +106,7 @@ function render(props: Partial<ShareConsentModalProps> = {}, theme = DARK): HTML
     root?.render(
       <HeytaUiProvider value={theme}>
         <ShareConsentModal
-          labels={LABELS}
+          labels={SHARE_LABELS}
           store={{}}
           onConsent={() => undefined}
           onProceed={() => undefined}
@@ -110,6 +123,36 @@ function render(props: Partial<ShareConsentModalProps> = {}, theme = DARK): HTML
 // `share-notif-prefs-affordance.spec.tsx`）；两条禁令（不许按 classList 顺序扫、
 // 不许用 `getComputedStyle`）的理由写在那份文件的文件头。
 // ⚠️ `'<none>'` 是**读数**不是探针失败：对"取消不许有底色"这一条，它正是判据要的值。
+
+const TRIGGER = '[data-testid="share-consent-details-trigger"]';
+const PANEL = '[data-testid="share-consent-details"]';
+
+function node(el: ParentNode, selector: string): HTMLElement {
+  const found = el.querySelector<HTMLElement>(selector);
+  if (found === null) throw new Error(`DOM 里没有 ${selector}`);
+  return found;
+}
+
+/** 这一块在布局里**有没有**（收起 = `display:none`，内容仍然在树里）。 */
+function laidOut(el: ParentNode, selector: string): boolean {
+  return declared(el, selector, 'display') !== 'none';
+}
+
+/** 触屏那一下 —— 手机上唯一拿得到的通道，与 web 上的点击是同一条代码路径。 */
+function tapTrigger(el: ParentNode): ParentNode {
+  act(() => {
+    node(el, TRIGGER).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  return el;
+}
+
+const FIRST_DETAIL = SHARE_LABELS.details[0] ?? '';
+
+/** 先按开，再交回这棵树（披露面的底色只在展开态存在）。 */
+function openDetails(el: ParentNode): ParentNode {
+  tapTrigger(el);
+  return el;
+}
 
 afterEach(() => {
   act(() => {
@@ -146,10 +189,10 @@ describe('暗色档：确认与取消不等权（这一屏的 PIPL 层级）', (
     );
   });
 
-  it('三行同意范围是一块凹陷披露面（底色 = 暗色 surface-sunken，且与亮色不同）', () => {
+  it('展开后的条款是一块凹陷披露面（底色 = 暗色 surface-sunken，且与亮色不同）', () => {
     const sunken = tokenValue(DARK, 'color.surface-sunken');
     expect(sunken).not.toBe(tokenValue(LIGHT, 'color.surface-sunken'));
-    expect(declared(render(), '[data-testid="share-consent-scopes"]', 'background-color')).toBe(sunken);
+    expect(declared(openDetails(render()), '[data-testid="share-consent-details"]', 'background-color')).toBe(sunken);
   });
 
   it('勾选框：未勾选是描边空框，点一下变实心主蓝（状态不只靠颜色，还有 `aria-checked`）', () => {
@@ -185,16 +228,103 @@ describe('亮色档：同一棵树不能只在暗色里对', () => {
   });
 });
 
-describe('标题只出现一次（同屏两个同名标题是这次一并修掉的）', () => {
-  it('默认渲染这句标题', () => {
-    expect(render().textContent ?? '').toContain(LABELS.title);
+describe('标题、正文与那颗按钮按语境分叉（负责人令①「直接说『分享清单』『加入清单』」）', () => {
+  it('🔴 分享侧那棵树写「分享清单」，并且**读不到**「加入清单」——两颗键接反就红', () => {
+    const body = render().textContent ?? '';
+    expect(body).toContain(LABELS.share.title);
+    expect(body, '分享侧同意面写出了加入侧的标题 = 语境键接反').not.toContain(LABELS.join.title);
+    expect(body).toContain(LABELS.share.body);
+    expect(body, '分享侧同意面写出了加入侧那句正文 = 语境键接反').not.toContain(LABELS.join.body);
+    expect(body).toContain(LABELS.share.accept);
+    expect(body, '分享侧按钮写成加入那句').not.toContain(LABELS.join.accept);
   });
 
-  it('宿主已经写着同一句时（web 的对话框 `<h2>`）置 `titleHidden` ⇒ 这句不再出现，但三行范围仍在', () => {
-    const el = render({ titleHidden: true });
-    const body = el.textContent ?? '';
-    expect(body, '同屏不许出现两个同名标题').not.toContain(LABELS.title);
-    expect(body).toContain(LABELS.scopes[0] ?? '');
-    expect(body).toContain(LABELS.accept);
+  it('🔴 加入侧反过来：写「加入清单」，读不到「分享清单」，按钮也不是「确认共享」', () => {
+    const body = render({ labels: { ...SHARE_LABELS, ...LABELS.join } }).textContent ?? '';
+    expect(body).toContain(LABELS.join.title);
+    expect(body, '加入侧同意面写出了分享侧的标题 = 语境键接反').not.toContain(LABELS.share.title);
+    expect(body).toContain(LABELS.join.body);
+    expect(body, '加入侧同意面写出了分享侧那句正文 = 语境键接反').not.toContain(LABELS.share.body);
+    expect(body).toContain(LABELS.join.accept);
+    expect(body, '入群的人在替用户说"我确认共享"——那是他没做的事').not.toContain(LABELS.share.accept);
+  });
+
+  it('宿主已经写着同一句时（web 对话框的 `<h2>`）置 `titleHidden` ⇒ 这句不再出现，但短话与确认按钮仍在', () => {
+    const body = render({ titleHidden: true }).textContent ?? '';
+    expect(body, '同屏不许出现两个同名标题').not.toContain(LABELS.share.title);
+    expect(body).toContain(LABELS.share.body);
+    expect(body).toContain(SHARE_LABELS.accept);
+  });
+});
+
+/**
+ * 🔴 **三发各钉一件事，不许并成"有 tooltip"一句**。
+ *
+ * 为什么这里**没有**悬停那一发：§9.38 原本写"网页＝悬停 ⓘ 气泡"，两种形状都在真浏览器
+ * 里量过坏法（行内展开 ⇒ 居中的对话框被撑高 ⇒ ⓘ 跳出指针 ⇒ 开了收收了开地振荡，旅程里
+ * 点「确认共享」`waiting for … stable` 333 次；浮层 ⇒ 压在按钮上又被对话框的
+ * `overflowY:'auto'` 裁掉）。现在的形状是"只有按压，且那一叠排在动作区下面"，
+ * 于是三发各挡一种坏法：摘掉 `onPress`／把那一叠挪回按钮上面／把卸载当成收起。
+ * 合取的坑记在 `#598` 那一族。
+ *
+ * 展开是**行内展开**，不是自绘浮层：关闭策略表不覆盖 tooltip 一类，而行内展开也不给
+ * `check:overlay` R2 添新债。
+ */
+describe('提示层的开合：按压、键盘、位置、收起态', () => {
+  it('🔴 触屏：点一下 ⓘ 展开、再点一下收回（摘掉 `onPress` 这一发会红）', () => {
+    const el = render();
+    expect(laidOut(el, PANEL), '条款又变成常驻了').toBe(false);
+    tapTrigger(el);
+    expect(laidOut(el, PANEL)).toBe(true);
+    expect(node(el, TRIGGER).getAttribute('aria-expanded')).toBe('true');
+    tapTrigger(el);
+    expect(laidOut(el, PANEL), '点了两下还开着 = 按压态没有跟着切换').toBe(false);
+  });
+
+  it('🔴 ⓘ 是一枚真按钮：有 `role="button"`、可聚焦（读屏与键盘激活走的都是它的 `onPress`）', () => {
+    const trigger = node(render(), TRIGGER);
+    expect(trigger.getAttribute('role'), 'ⓘ 不是按钮 = 读屏里它根本不是一个可操作的东西').toBe('button');
+    expect(trigger.getAttribute('tabindex'), 'ⓘ 不可聚焦 = 键盘根本到不了它').not.toBeNull();
+    // ⚠️ 这一发刻意**不**去模拟"Enter 键把它打开"：RNW 的键盘激活要过它自己的 responder
+    //    系统（`PressResponder` 的 keydown 只 `start()`，完成在挂在 document 上的 keyup，
+    //    且要求 `_responderElement === event.target`），jsdom 里两发都发了仍然不落地——
+    //    那是探针打不通，不是产品坏。开合本身由上面那发（`onPress`）钉住，两壳同一条路。
+  });
+
+  it('🔴 两枚 web 宿主各自接对自己那一侧的语境键（接反＝分享的面写着「加入」，反之亦然）', () => {
+    // 上面几枚判的是组件拿到什么 labels；这一枚判的是**宿主**接没接对——
+    // 宿主接反时 labels 仍然是自洽的一套，组件那几枚一条都不会红。
+    const read = (rel: string): string =>
+      readFileSync(join(process.cwd(), '..', '..', rel), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^[ \t]*\/\/.*$/gm, '');
+    const owner = read('apps/web/src/features/share/ShareFeature.tsx');
+    const joiner = read('apps/web/src/features/share/JoinSharedListDialog.tsx');
+    expect(owner).toContain("consent.title.share'");
+    expect(owner, 'owner 侧接到加入键 = 分享的面写着「加入清单」').not.toContain("consent.title.join'");
+    expect(owner).toContain("consent.accept.share'");
+    expect(joiner).toContain("consent.title.join'");
+    expect(joiner, '入群侧接到分享键 = 加入的面写着「分享清单」').not.toContain("consent.title.share'");
+    expect(joiner).toContain("consent.accept.join'");
+    expect(joiner, '入群侧的确认按钮写成 owner 语').not.toContain("consent.accept.share'");
+  });
+
+  it('🔴 展开的那一叠排在两颗按钮**下面**：它长出来时不许有任何控件被推走', () => {
+    // 这条钉的是"位置"，不是"有没有展开"。把它挪到按钮上面，两发实测过的坏法都会回来：
+    // 行内展开 ⇒ 按钮在指针底下跳（旅程第 2 跑点空）；改浮层 ⇒ 压在按钮上并溢出对话框
+    // （`02b-owner-consent-details.png` 第 1 版）。判据 = 动作区在这块的**前面**。
+    const el = openDetails(render());
+    const panel = node(el, PANEL);
+    const accept = node(el, '[data-testid="share-consent-accept"]');
+    // `DOCUMENT_POSITION_FOLLOWING` ⇒ panel 排在 accept **之后**。
+    expect(accept.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('🔴 收起态下条款内容仍在树里（判据与读屏都不必先"打开"才读得到）', () => {
+    const el = render();
+    expect(laidOut(el, PANEL)).toBe(false);
+    expect(el.textContent ?? '', '条款被卸载了：读屏用户在没有 hover 的设备上一条都读不到')
+      .toContain(FIRST_DETAIL);
   });
 });

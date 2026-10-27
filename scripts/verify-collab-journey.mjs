@@ -177,8 +177,9 @@ const EXPECTED = [
   //    fail-closed 必须先弹，弹出来的东西要有人看过。少登记这一张，这条腿从
   //    那一闸落地那天起就是必红的（"拍了 12 张，在册 11 张"），而红的原因不是产品坏 ——
   //    是收口清单没跟着长。补登记的前提是本批**逐张看过**这张图（2026-10-25）。
-  //    ⚠️ 同一张图上照出的另一件事（入群面用的是 owner 语）登记在计划 §9.14 末那一格，
-  //    归产品负责人拍，本批不代改文案。
+  //    ⚠️ 同一张图上曾照出的另一件事（入群面那颗按钮写着 owner 语「确认共享」）**已于
+  //    2026-10-27 按负责人的令①改掉**：标题/正文/按钮三格都按语境分叉，加入侧读
+  //    「确认加入」。见计划 §9.38 与 §9.39。
   '05a-bob-join-consent.png',
   '06-bob-joined.png',
   '07-owner-sees-bob.png',
@@ -188,6 +189,9 @@ const EXPECTED = [
   '09-owner-wrote-shared-task.png',
   '10-bob-sees-owner-task.png',
   '11-owner-sees-bob-task.png',
+  // ⓘ 展开后的那一叠条款（按压通道，两壳同一形）。收起态那张是 02，两张合起来才是
+  // "细节收进提示"这件事的真浏览器证据——只看 02 会读成"条款被删了"。
+  '02b-owner-consent-details.png',
 ];
 const missing = EXPECTED.filter((name) => !shots.includes(name));
 if (missing.length > 0) fail(`证据图缺：${missing.join('、')}（拍了才算，路径固定）`);

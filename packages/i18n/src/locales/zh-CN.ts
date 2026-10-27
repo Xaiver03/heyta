@@ -1901,6 +1901,10 @@ export const zhCN = {
   // ⚠️ 与面板里的「新清单名称」「新标签名称」**刻意不同名**：同名会让无障碍树里
   //    出现多个同名节点，按名字取节点只能靠 role 去猜，而猜错就是静默设错元素。
   //    这几条都带上任务标题，读屏用户才知道正在给**哪一条**任务归类。
+  'web.overlay.discard.title': '放弃这次的修改？',
+  'web.overlay.discard.body': '还没保存的内容会丢掉，也恢复不了。',
+  'web.overlay.discard.keep': '继续编辑',
+  'web.overlay.discard.drop': '放弃修改',
   'web.organize.summary': '整理任务「{title}」',
   'web.organize.projectLabel': '清单',
   'web.organize.projectSelect': '任务「{title}」所属清单',
@@ -4974,12 +4978,21 @@ export const zhCN = {
   'common.share.comment.emptyThread': '还没有评论',
   'common.share.comment.composerPlaceholder': '写下你的评论…',
   'common.share.comment.send': '发送',
-  'common.share.consent.title': '共享清单',
-  'common.share.consent.body': '把清单设为共享前，请确认以下事项：',
-  'common.share.consent.scope.content': '任务标题、备注、日期与清单名对成员可见',
-  'common.share.consent.scope.metadata': '服务端会记录成员关系与角色（内容仍加密，服务端不可读）',
-  'common.share.consent.scope.notAffected': '你的其它清单不受影响',
-  'common.share.consent.accept': '确认共享',
+  // 同意面（负责人 2026-10-27 的两条令：标题按语境直接说「分享清单」「加入清单」，
+  // 细节收进提示不再平铺）。那颗确认按钮**也**按语境：入群的人没有在任何东西上
+  // "确认共享"，那样写是替用户说一件他没做的事。`scope.*` 这四行是**两侧共用**的一叠披露内容，
+  // 措辞按"成员"而不是"对方/你邀请的人"写 —— 换成任一侧的视角，另一侧就说谎了。
+  'common.share.consent.title.share': '分享清单',
+  'common.share.consent.title.join': '加入清单',
+  'common.share.consent.body.share': '共享后，这份清单会对你邀请的成员开放。',
+  'common.share.consent.body.join': '加入后，你能看到这份清单里的内容。',
+  'common.share.consent.details.label': '谁会看到什么',
+  'common.share.consent.scope.content': '任务标题、备注、日期与清单名对清单成员可见',
+  'common.share.consent.scope.server': '服务端记录成员关系与角色',
+  'common.share.consent.scope.e2ee': '清单内容端到端加密，服务端读不到明文',
+  'common.share.consent.scope.notAffected': '你的其它清单不受这份共享影响',
+  'common.share.consent.accept.share': '确认共享',
+  'common.share.consent.accept.join': '确认加入',
   'common.share.consent.cancel': '取消',
   'common.share.consent.dontAskAgain': '不再提示',
   'common.share.notif.sectionTitle': '共享通知',

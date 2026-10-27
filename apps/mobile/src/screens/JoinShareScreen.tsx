@@ -206,15 +206,17 @@ export default function JoinShareScreen({
 
   const consentLabels = useMemo(
     () => ({
-      title: t('common.share.consent.title'),
-      body: t('common.share.consent.body'),
-      scopes: [
+      title: t('common.share.consent.title.join'),
+      body: t('common.share.consent.body.join'),
+      detailsLabel: t('common.share.consent.details.label'),
+      details: [
         t('common.share.consent.scope.content'),
-        t('common.share.consent.scope.metadata'),
+        t('common.share.consent.scope.server'),
+        t('common.share.consent.scope.e2ee'),
         t('common.share.consent.scope.notAffected'),
       ],
       dontAskAgain: t('common.share.consent.dontAskAgain'),
-      accept: t('common.share.consent.accept'),
+      accept: t('common.share.consent.accept.join'),
       cancel: t('common.share.consent.cancel'),
     }),
     [t],
