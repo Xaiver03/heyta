@@ -1225,7 +1225,7 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 |---|---|---|
 | `pnpm -r typecheck` | **rc=0** | 本批新增的 TS 代码只有 ⑨ 组那两枚断言（在 `apps/mobile/tests/`） |
 | 本线全量单测（`cd apps/mobile && npx vitest run`） | **rc=0、`Test Files 90 passed (90)`、`Tests 1158 passed (1158)`** | ⑨ 组并入后移动壳套件零红；⚠️ 经 `npx` 直跑，**没过内存闸门**（那枚 shim 只挂在 `pnpm` 上） |
-| `pnpm verify:collab-suite` | **rc=0、`SUITE=OK legs=4 failed=0`**（journey／sync／revoke／conflict 四腿各 `RESULT=OK`，步数由脚本自己打印） | 🔴 本批**零产品源码改动**（现量：`git diff --name-only b0ac12042..HEAD -- packages apps server` 只回一枚 `apps/mobile/tests/share-ui-assembly.spec.ts`）⇒ 上一批第 51 跑那趟设备腿读数（63 通过 / 0 失败）**仍对应当前产物**，本批不重开 iOS 那一趟 |
+| `pnpm verify:collab-suite` | **rc=0、`SUITE=OK legs=4 failed=0`**（journey／sync／revoke／conflict 四腿各 `RESULT=OK`，步数由脚本自己打印） | 🔴 本批**零产品源码改动**（现量：`git diff --name-only b0ac12042..HEAD -- packages apps server` 只回一枚 `apps/mobile/tests/share-ui-assembly.spec.ts`）⇒ 上一批第 51 跑那趟设备腿读数（63 通过 / 0 失败）**仍对应当前产物**，本批不重开 iOS 那一趟。<br>⚠️ **这一格后半句当天就被 §9.23 否证**（差集其实非空，那趟只代表 `504d8b8aa`），并由 §9.24 那趟第 52 跑重新取到一枚带 `0cdaf8fdf` 戳的读数。保留原文是为了记下成因：**"仍对应当前产物"是一句带着"当前"这个时态的声称，写进一份不会自己更新的台账** —— 它落笔那一刻为真，之后每落一笔提交它都在悄悄变，而 `git diff` 读的是"这一批 vs 上一批"，不是"这一批 vs 现在"。规矩：**台账里的"仍对应/仍然成立"要么换成现量命令，要么换成"对哪一枚提交成立"**（本行现在两种都有了；而 §9.24 又把这把尺往前推了一格 —— 连"差集为 0"本身也只是那一刻的读数） |
 | `pnpm check` | 整链第三趟 **rc=1**，唯一那枚红见上面那段；本批那四枚文档门（`check:docs`、`check:doc-citations`、`check:md-tables`、`check:doc-command-claims`）在提交前各跑一次，**全 rc=0**；`check:gate-wiring` 同日 rc=0 | 链的 rc 归 `apps/web` 那条线，本线的文件上一枚红都没有；本批没动 `package.json` 的脚本面，所以 `gate-wiring` 无需重开 |
 ### 9.20 验收那句「与 web 同一条旅程」的逐步对照（2026-10-27 收口审计）
 
@@ -1317,8 +1317,103 @@ git diff -U0 504d8b8aa HEAD -- <那一枚文件> | grep -E '^[+-]' | grep -vE '^
 **判决（照它自己的口径写，不许拔高）**：L1–L11 的观察对象没变，但这是**逐文件推理 + 现量差集**，不是一趟新跑。
 要字节级保证只有一条路——`pnpm verify:mobile-collab:ios` 再跑一趟（它自己会新建一枚带当趟戳的证据目录）。
 这一格就此登记成**未重跑**，不写成"已复验"；谁要把它读成"当前产物的读数"，先执行上面那两条现量命令自己看差集。
+🔴 **上面这句"未重跑"到当天 16:42 已被一趟新跑换掉**（第 52 跑，读数在 §9.24）。这一节保留是因为它的
+**差集推理本身仍然成立** —— 它量的是第 51 跑，那趟确实只代表 `504d8b8aa` 那棵树；过期的是"现在也还没重跑"这个时态。
 
 ⚠️ 这条复账里我当场犯了一次本线早已登记过的错：一条 grep 后面**无条件**跟着我自己写的结论串
 （`echo "(空=移动壳不 import 它)"`），而那枚 grep 其实有命中 ⇒ 读的人（那正是我自己）会把"有 import"读成"没有"。
 差点据此把上面第三行写成"根本不在移动壳的图里"。规矩：**结论串不许跟在可能非空的读数后面**；
 要写结论就写成自打印的形状（`printf '命中 %s 条\n' "$(grep -c …)"`），让它随世界一起变。
+
+### 9.24 第 52 跑：那一格按它自己开的处方重跑了（2026-10-27 16:32–16:42）
+
+上一节把"要字节级保证只有一条路"写成了 `pnpm verify:mobile-collab:ios` 再跑一趟。这一节就是那一趟的读数 ——
+**跑完之后，"未重跑"那三个字的载体从判决变成了历史**。
+
+当趟读数（复量：`cat apps/mobile/evidence/collab-ios-10271632/rc.txt` —— **判决那两行落在取证目录里**，
+不指向一次性的控制台日志；起建点与收尾戳在 `README.md` 与 `bundle-sha256.txt`，逐枚机器读数同目录）：
+
+| 格 | 读数 |
+|---|---|
+| 起建点 | `HEAD=0cdaf8fdf`（日志头部自己打印的那一行，不是我补的；本机日志 `apps/mobile/evidence/rerun52.wrap.log` **不入库**，所以这一格以 `README.md` 里那枚 bundle 哈希为准） |
+| 判决 | **63 通过 / 0 失败**，`RC=0 收尾 10-27 16:42` |
+| 证据目录 | `apps/mobile/evidence/collab-ios-10271632`（22 张 PNG + README + 5 枚机器读数） |
+| 被测产物 | `main.jsbundle` sha256 `5751412e…a69c`（`bundle-sha256.txt` / `rc.txt` 两处同值） |
+| 栈 | 服务端 `http://127.0.0.1:3177`，库 `heyta_collab_m6_ios`，TEST_MODE，零 mock；设备 `60D29F47…`（名字前缀 `heyta-collab-m6`） |
+
+**三族上行都在这趟里被服务端验过签**（这是 objective 里"M4 那条承诺在移动端也成立"那一格的机器凭据，
+复量 `cat apps/mobile/evidence/collab-ios-10271632/l11-note-signature.json`）：
+`COMMENT` serverSeq 2、`TASK` serverSeq 7、`NOTE` serverSeq 8，三枚 `classify` 全为 `verified`、`matched: true`。
+三枚 JSON 是**同一份名单逐次长出来**的（l10 = 评论+任务，l11 = 再加便签），所以"三族齐"不是三次独立断言的拼接。
+评论区署名形状那格：`auth-shape.txt` 读回 `n=4 digits=4 offenders=`（4 枚 id 全数字、零异类）。
+
+**肉眼复核（AGENTS §6.2 要求真看，不是"跑过"）**：逐张看过 9 张关键帧，各自看到 ——
+`19` 通知中心第三档选中、条目正文那句带清单名的话；`18` 同一档在偏好全关时是「还没有共享动态」空态
+（L8 那两半相反的腿各自都有图证，不是拿"静默"冒充"闸门生效"）；`06g` 加入成功那句回执；
+`08` 共享清单首页画出成员两行 + owner 取证任务那一行；`14` 评论区两条都在（手机写的与 owner 后写的那条）；
+`17f` 手机端 PIPL 同意面三行 + 实心主按钮 + 描边空框勾选；`17p` 手机自建的共享已进「已共享的清单」两行、
+偏好面「添加了任务/笔记」那一档是勾上的；`20` owner 写的共享便签出现在手机便签屏、落点三枚 chip 齐；
+`22` 选中共享落点后输入框带待提交的那句、键盘在位。**没有一张图与台账登记的形状不符**，因此本趟不新增界面缺陷格。
+
+⚠️ **这格读数的限定语要一起抄，别只抄"63/0"**：它代表的是 `0cdaf8fdf` 那一棵树，**不写"当前产物"** ——
+理由不是猜的，是我写完上一段之后**四分钟内**当场撞上的：那一刻 HEAD 是 `c0249bf82`、差集现量为 0 枚，
+随后自动收集线落下两笔（`4306ff18e`、`815d84119`），差集变成 3 枚。复量的命令（**两端都钉成具体提交，不许出现裸 `HEAD`**）：
+
+```
+git diff --name-only 0cdaf8fdf <你此刻的 HEAD> -- apps/mobile/src apps/mobile/ios apps/mobile/android \
+  packages/ui/src packages/app-host/src packages/i18n/src
+```
+
+那 3 枚是什么、动不动得到 L1–L11 的观察（逐枚现读，不是从文件名推的）：
+
+| 输入 | 改动 | 观察面 |
+|---|---|---|
+| `packages/app-host/src/inbound-system-prompt.ts` | 新增 16 行：一枚 `INBOUND_AUTOMATION_SYSTEM_PROMPT` 常量（三壳各写一遍、移动壳已漂一个 `the` ⇒ 收到共享层） | 自动收集的 worker 提示词，共享旅程那十七段一次都不经过它 |
+| `packages/app-host/src/index.ts` | 加一行 `export` | 同上 |
+| `apps/mobile/src/inbound/lifecycle.ts` | 本地那枚 `const SYSTEM_PROMPT` 删掉，改从 `@heyta/app-host` 取 | 同上 |
+
+⇒ **行为观察对象没变，但 bundle 的字节确实变了**（移动壳的 import 图里多了一枚模块），所以"63/0"不能冠以"当前产物"。
+🔴 这一格的最终形状因此不是"重跑一次就齐了"，而是一条**记账规矩**：设备腿读数永远带一枚"对 `0cdaf8fdf` 成立"的戳 +
+一把两端钉死的差集命令；**任何写成"当前"的设备读数都在几分钟内会变假**，这不是勤奋问题，是这类声称的形式就不对（教训入 §7 **#600**，它登记的正是我这次改之前的那种写法）。
+
+### 9.25 那枚"戳"从本机日志搬进装置自己写的 README（2026-10-27，#600 的处置）
+
+上一节末句是"设备腿读数永远带一枚戳"。检查现量：**这枚戳此前根本不在装置里** ——
+`git show 0cdaf8fdf:scripts/verify-mobile-collab-ios.sh | grep -c 'rev-parse'` 读回 **0**（命令按 #600 钉在改之前那枚提交上；
+现在跑同一条不带 `git show` 的会读到 1，那正是本节的产物），
+`0cdaf8fdf` 那个数只存在于我手搭的 wrap log 第一行，而那枚日志**不入库**（既往 45 枚 `collab-ios-*` 目录都入库、
+`git ls-files 'apps/mobile/evidence/*.wrap.log'` 读回 0 枚）。⇒ 下一趟若没人再手搭 wrapper，
+"这趟测的是哪棵树"这一格**结构上无法回答**。修法两处，都在装置里（落地在 `09826a428`）：
+
+1. `ROOT=` 之后取 `START_HEAD`，取不到时**印出"读不到（git rev-parse 失败）"**而不是留空（留空会让 README 长成"起建点："，
+   读的人分不清"没取到"与"空树"—— #580 那一族的第三形）。
+2. 取证 `README.md` 的生成块里加一行 `- 起建点：$START_HEAD（…）`。
+
+🔴 排第二处时踩到一发**不报错的**坑：那一行的中文里我原本写了 `"你此刻的 HEAD"` —— **双引号嵌在双引号里**。
+拿最小复现量过（`/tmp` 三行脚本，跑完即删）：`bash -n` **rc=0**、真跑 **rc=0**、而那行照样打印出来，
+只是**那对引号被静默吃掉**（`不是你此刻的 HEAD；` 而非 `不是"你此刻的 HEAD"；`）。
+⇒ 这不是"语法坏了会挡我"那一类，是**只有看产物才会发现的**那一类。改成「」之后，把两行**摘进子 shell 真跑一遍**、
+看到 `- 起建点：4306ff18e（…）` 且匹配 `起建点：[0-9a-f]{9}（` ⇒ 才允许写"能打印"。
+（同族：#597 那句"打空的探针既没否认也没确认"；差别是这次连"没确认"都没有，它给了一句**看着对**的话。）
+
+常驻牙齿：装配判据新增 **⑪ 那一组**（`apps/mobile/tests/share-ui-assembly.spec.ts`，两枚 `it`）。
+它钉的不是"有没有那三个字"，是**三条结构**：取数排在 README 落盘**之前**（取晚了会把别人在这趟期间落下的提交当起建点）、
+生成块里真的引用 `$START_HEAD`（不是抄件）、失败分支写的是"读不到"而不是空。
+两枚施变臂各打一发并**先断言"变后≠变前"**：摘掉 echo ⇒ 块仍非空（464 字符）但不含那枚变量；
+撤掉失败分支 ⇒ 那一行只剩 `…2>/dev/null)`。中间量都单独打印过，防的是"块被摘空所以 `not.toContain` 恒真"那种假绿。
+
+读数（串行、逐枚带 rc）：`cd apps/mobile && npx vitest run` ⇒ `Test Files 91 passed (91)`、`Tests 1169 passed (1169)`；
+`pnpm --filter @heyta/mobile typecheck` ⇒ **rc=0**；受脚本改动牵动的五枚门
+（`check:verify-script-copy`、`check:script-snapshot`、`check:shell-erasure-parity`、`check:shell-exit-chain`、`check:gate-wiring`）
+**各 rc=0**；四枚文档门（`check:docs`、`check:doc-citations`、`check:md-tables`、`check:doc-command-claims`）**各 rc=0**。
+⚠️ 两条老规矩仍适用：`npx` 直跑**没过**本机那枚内存闸门 shim（它只挂在 `pnpm` 上）；
+`apps/mobile` 的 `tsconfig.json` 的 `include` **不含 `tests/`** ⇒ typecheck rc=0 不覆盖 ⑪ 那两枚，
+它的编译检查就是 vitest 那一趟本身。
+⚠️ 而且那 `91 files / 1169 tests` 是**共享树上带着自动收集线四枚在途脏件**取的数
+（现量 `git status --porcelain -- apps/mobile` ⇒ `AiSettingsSection.tsx`、`inbound/lifecycle.ts` 两枚 `M`
+加 `inbound/copy.ts`、`inbound/status.ts`、`tests/inbound-cycle-display.spec.ts` 三枚 `??`）
+⇒ 它是"这一刻这棵树上没红"，**不是**"HEAD 上有 1169 枚"。本线自己那片是 `share-ui-assembly.spec.ts` 的 32 枚。
+
+⚠️ **这一节改的是装置，不是产物**：下一趟（第 53 跑）才是第一次真印出那行 `- 起建点：…`。
+在那之前，本线**只有第 52 跑那一枚戳是手工补的**，其余 44 枚入库目录里的读数都没有戳 ——
+别拿"装置现在会盖章"读成"历史读数都有戳了"。
