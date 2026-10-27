@@ -915,8 +915,9 @@ ADR-0050 那句「RN port 只传递 base64 root key」加了**限定范围**的�
 3. **通知中心补第三档「共享动态」**（`NotificationsScreen.tsx`）：订阅动态、**打开这一档才清未读**、
    逐条画 `entry.body` + 时间，底下那句「只存本机、重启后清空」如实说。
 4. **「我的」入口徽标 = inbox 未读 + 共享动态未读**（`ProfileScreen.tsx` 的 `inboxBadge`）。
-   系统横幅今天做不到（本机唯一那条原生通道被提醒链按 `categoryIdentifier` 全量回收，
-   新开 category 要重装两端 = 别线在飞资产），所以**这一枚徽标是当下唯一的打扰面** ——
+   系统横幅今天做不到（本机唯一那条原生通道归提醒线，iOS 那端按 `categoryIdentifier` 整族认领回收、
+   安卓那端只有一条提醒通道可投；给活动通知一枚自己的身份要改原生壳 + 重装两端 = 提醒线的资产），
+   所以**这一枚徽标是当下唯一的打扰面** ——
    它只数 inbox 就等于那一档没人会去点。本批真犯过"三处引用只改了两处"，判据当场抓住，
    记在 #582；装置臂 `badge-not-summed` 现在钉着它。
 
@@ -1022,7 +1023,7 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 
 | 格 | 状态 | 判它的断言 | 归属 |
 |---|---|---|---|
-| **手机上的系统横幅（通知中心之外那一档）** | 🔴 **今天做不到，且不打算在本批做** —— 本机唯一那条原生通道被提醒链按 `categoryIdentifier == "heyta.reminder"` 全量回收；新开一枚 category 要改原生壳 + 重装两端，那是别线在飞的资产。（2026-10-26 按现量重核过这句还成立，分母是移动壳那几枚原生件：`git grep -n "categoryIdentifier\|heyta.reminder" -- apps/mobile` ⇒ iOS `AppDelegate.swift` 两处按 category 过滤 + `HeytaReminderModule.swift` 那枚 `static let category`，Android `ReminderModule.kt` 的 `CHANNEL`/`PREFS` 单通道；全壳只有这一族原生通知代码） | 没有断言 ⇒ 所以**不写成缺陷**，写成边界：`systemBanner` 端口留着可注入（`ShareActivityDeliveryPorts`），装配点不传它 | 归"通知通道归属"那一格（提醒线）；本批只把界面上能做的两档做完 |
+| **手机上的系统横幅（通知中心之外那一档）** | 🔴 **今天做不到，且不打算在本批做** —— 本机唯一那条原生通道归提醒线，而**两端拦住借道的机制不是同一枚**（2026-10-27 逐端重读；原先这句把 iOS 那一端的机制写成了两端的）：iOS 按 `categoryIdentifier` 整族认领回收（`HeytaReminderModule.swift` 的 `cancelStale` 把该 category 下的 pending 与 delivered 全收进本轮台账，不在排程清单里的那批 `removeDeliveredNotifications`，而唯一的投递入口又把 category 写死并把 id 记进 `state.scheduled`）；Android **不按 category 回收**（`cancelStale` 只动自己那三本 id 台账），约束换了形状：只有一条 `heyta.reminders` 通道、提醒投递路径之外没有第二个口子。给活动通知一枚自己的身份要改原生壳 + 重打重装两端。⚠️ 拦路的**不是**"别线在飞"：现量 `git status --porcelain -- apps/mobile/ios/Heyta apps/mobile/android/app/src/main/java/com/heytamobile/reminder` ⇒ 这一刻干净；是**提醒线的资产 + 要重装**。（2026-10-26 那次重核的分母仍然成立：全壳只有这一族原生通知代码） | 没有断言 ⇒ 所以**不写成缺陷**，写成边界：`systemBanner` 端口留着可注入（`ShareActivityDeliveryPorts`），装配点不传它 | 归"通知通道归属"那一格（提醒线，ADR-0051）；本批只把界面上能做的两档做完 |
 | **Android 的界面腿** | 🔴 仍跑不了 —— 载体的准确形状（`adb` 与一枚 AVD 在、缺 `Sdk\emulator` 主程序、无真机接入）与三条取法在 §9.14 那一格；2026-10-27 按现量把原先那句「载体不存在」改准了 | 出包腿在册（`ssh windows-pc`），界面腿没有 | 负责人长期令：一律 `ssh windows-pc` |
 | **手机把一条便签写进那份共享清单**（三族里的便签·上行） | ✅ **2026-10-27 第十批做完**：便签板挂了 `CaptureProjectPickerRow`，`createNote(content, { projectId })` 交得出选中的那一行；设备腿 **L11**（装置第 10e 步）判到 owner 侧读回并验签 ⇒ 读数在 §9.16 | 装置第 10e 步那四格（入口在场 ⇒ 按得动 ⇒ 标题改口 ⇒ owner 侧 verified） | —（**事后改归属**那一格仍缺，见上面那段） |
 | **手机把一条任务写进那份共享清单**（三族里的任务·上行） | ✅ **2026-10-27 第十批做完**：形状就是本行原本拍定的那一枚（在移动端添加面板里加「清单」选择行，默认收集箱，选中才交 `projectId`；便签板同形）。落地细节、为什么不靠颜色说话、以及装配判据在 **§9.16**；设备腿 **L10** 判到 owner 侧读回并验签 | 装置第 10d 步那四格 + `capture-project-assembly.spec.ts` 四组 + `capture-model.spec.ts` G/H 两组（条数各自现量，别在正文抄数） | — |
@@ -1252,3 +1253,21 @@ web 那侧 `grep -nE 'STEP [0-9] OK' scripts/verify-collab-journey.mjs` ⇒ 三�
 ⚠️ 两枚脚本**不同一套工具**：web 吃 Playwright + 真浏览器，手机吃 AX 驱动 + Release 构建装进模拟器。
 "同一条旅程"判的是**用户动作序列同一串**，不判实现工具相同 —— 这句写死，免得下一位拿工具差异当"没对齐"的证据。
 ⚠️ 反过来也别把这行读成"移动侧的读数覆盖 web 侧的判据"：`verify:collab-journey` 那三腿仍是 web 唯一的常驻界面腿（四腿套件 `SUITE=OK legs=4` 里的第一腿），两枚各管各的壳。
+
+### 9.21 那句「系统横幅做不到」的理由，此前只读了 iOS 那一端（2026-10-27 复账）
+
+收口审计时我打算"更正一处注释与代码不一致"，动手前把两端都读了一遍 ⇒ **错的是我那句理由，不是注释与代码对不上**。三处各自的形状：
+
+| 我当时写的 | 代码现量 | 形状 |
+|---|---|---|
+| 「本机唯一那条原生通道被提醒链按 `categoryIdentifier` **全量回收**」（这句被当成两端的） | 只有 **iOS** 按 category 整族认领：`HeytaReminderModule.swift` 的 `cancelStale` 先 `requests.filter`/`delivered.filter` 按该 category 收进 `known`，再 `stale = known.subtracting(keep)` ⇒ `removeDeliveredNotifications(stale)`。**Android 不按 category 回收**：`ReminderModule.kt` 的 `cancelStale` 只 `cancelLocked(all - keep)`，`all` 来自自己那三本 id 台账（scheduled/posted/delivered） | 🔴 **拿一端的机制套了另一端**。约束在两端都成立但**形状不同**：安卓那侧是"只有一条 `heyta.reminders` 通道、提醒投递路径之外没有第二个口子" |
+| 「那是**别线在飞**的资产」 | `git status --porcelain -- apps/mobile/ios/Heyta apps/mobile/android/app/src/main/java/com/heytamobile/reminder` ⇒ **无输出（这一刻干净）**，最近一笔碰它们的是 `486695c9d`（2026-10-25，提醒线） | 🔴 把**瞬时读数写成了常驻理由**。真正拦路的是"提醒线的资产（ADR-0051）+ 要重打重装两端"，与"在飞"无关 |
+| 「`cancelStale`（同文件 **234 行起**）」 | `grep -n 'func cancelStale' apps/mobile/ios/Heyta/HeytaReminderModule.swift` ⇒ **251** | 行号指针漂了（本文件早已登记过这条，我照样犯）。改法：注释里只写函数名，要位置给取法 |
+
+顺带把「唯一那条原生通道」这句的**分母**重取了一遍（此前只在 iOS 侧数过）：`grep` `UNUserNotificationCenter`/`UNNotificationRequest`/`NotificationManagerCompat`/`expo-notifications`/`notifee`/`@react-native-firebase/messaging` 整个 `apps/mobile` ⇒ 产品代码只有 `HeytaReminderModule.swift` 一处 `add`、Android 只有 `ReminderModule.kt` 一处 `notify`；命中的 `apps/mobile/probe/ios-notification-purpose/main.swift` 是独立探针台架、不进包，`package.json` 也没有任何第三方通知依赖 ⇒ **"唯一"这句成立**，改的是它后面的机制与理由。
+
+**落点（六格同一结论，逐格改准，"报修的缺陷是一类不是一个"）**：`apps/mobile/src/share/share-activity-notify.ts` 文件头（本体）、`apps/mobile/src/screens/ShareSpaceScreen.tsx` 文件头（抄件）、本节上面那张边界表那一格、[`ADR-0062`](../adr/0062-shared-list-key-distribution.md) 实施记录第 7 条、[`ADR-0071`](../adr/0071-share-notification-content-boundary.md) 那一节第 3 条、`docs/adr/0071` 与 `docs/plans` 里各一句短形复述。判决本身不变：**这一格仍做不到、仍不打算在本批做、`systemBanner` 端口仍留着可注入**。
+
+**读数**：`cd apps/mobile && npx vitest run tests/share-ui-assembly.spec.ts` ⇒ `Tests 26 passed (26)`（那两组源码断言先 `stripComments`，改注释不动判决；⚠️ 直跑 `npx` 未经内存闸门）；`check:docs`／`check:doc-citations`／`check:md-tables`／`check:doc-command-claims` 逐枚 **rc=0**。
+
+⚠️ 仓内早就写着这条纪律，只是写在法律文案那一格：[`packages/legal/src/documents/personal-info-list.ts`](../../packages/legal/src/documents/personal-info-list.ts) 有一句「必须**逐端说清**、不能拿一份最全的说法套所有端」。这次是同一枚错换到了技术理由那一族上 —— 一般规律入环境陷阱 **#598**。

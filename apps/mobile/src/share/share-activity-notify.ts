@@ -11,15 +11,23 @@
  *
  * ## 🔴 系统横幅这一格，移动端今天**做不到**（不是没做，是做不了）
  *
- * 本机唯一的原生通知通道是提醒链那套（`apps/mobile/ios/Heyta/HeytaReminderModule.swift`），
- * 而它按 **`categoryIdentifier == "heyta.reminder"` 认领**该 category 下的**全部**通知：
- * `cancelStale`（同文件 234 行起）每轮回收都会把"不在本轮排程清单里"的那些
- * `removeDeliveredNotifications` 掉。活动通知借这条 channel 投出去的结果是
- * **被提醒链当场抹掉** —— 用户看到它取决于他什么时候勾了提醒，那比不投更糟。
+ * 本机唯一的原生通知通道是提醒链那套（iOS `apps/mobile/ios/Heyta/HeytaReminderModule.swift`、
+ * 安卓 `apps/mobile/android/app/src/main/java/com/heytamobile/reminder/ReminderModule.kt`）。
+ * 🔴 **两端拦住"借道"的机制不一样**，别把一端的读数写成另一端的：
+ *   · **iOS 按 category 整族认领**：`cancelStale` 把该 category 下的 pending 与 delivered 全收进
+ *     本轮台账，不在排程清单里的那批直接 `removeDeliveredNotifications`；而唯一的投递入口又把
+ *     `content.categoryIdentifier` 写死成那一枚、并把 id 记进 `state.scheduled` ⇒ 借道投出去的
+ *     活动通知下一轮就被当成一条过期提醒摘掉。用户看到它取决于他什么时候勾了提醒，比不投更糟。
+ *   · **安卓不按 category 回收**：`cancelStale` 只动自己那三本 id 台账（scheduled/posted/delivered）。
+ *     约束换了形状而不是消失：唯一的通道是 `ReminderModule.CHANNEL = "heyta.reminders"`，
+ *     提醒那条投递路径之外没有第二个口子可投。
  *
- * 做到它需要的那一步（登记在册，本文件不抢）：给原生模块**新开一个 category**
- * （`HeytaReminderModule.swift` + 安卓那侧的 `ReminderModule.kt` 各一处）并**重装两端**，
- * 而那是别的会话正在飞的资产。所以这里的端口设计成**可注入**：
+ * 做到它需要的那一步（登记在册，本文件不抢）：给活动通知**一枚自己的身份** —— iOS 第二枚
+ * category + 一条不写提醒台账的投递入口，安卓第二条 channel —— 然后**重打并重装两端**。
+ * category 这个绑定点在 iOS 一侧不止一处（现量 `grep -rn 'HeytaReminderReceipts.category' apps/mobile/ios/Heyta/`），
+ * 逐处都要重读，不能只改投递那一行。那两枚原生件归**提醒线**（ADR-0051）；
+ * `git status --porcelain -- apps/mobile/ios/Heyta` 这一刻干净，所以拦路的不是"别人在飞"，
+ * 是"别人的资产 + 要重装两端"。所以这里的端口设计成**可注入**：
  * `ShareActivityDeliveryPorts.systemBanner` 留了口子，将来接原生只换端口实现，
  * 这一层的判据与界面一行都不用动。
  *
