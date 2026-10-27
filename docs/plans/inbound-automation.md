@@ -4821,9 +4821,10 @@ Chromium `kMinPeriodicSyncEventsInterval = base::Hours(12)`，实际间隔再乘
   `check:inbound-system-prompt` 由 **1 → 0**（web 分母从面板换成真正引常量的 `inbound-lifecycle.ts`，
   换文件的理由写在脚本注释里；`--self-test` 五臂仍 0 臂不符）。
 - 🔴 **两道红的归属要说准**：① `check:ui-language` **rc=1，4 处全在别人名下** ——
-  `apps/web/src/App.tsx:2532/2533` 的 `web.calendar.sidebar.hide|show` 是协作/日历线此刻在飞的 hunk
-  （现量：`git show HEAD:apps/web/src/App.tsx | grep -c web.calendar.sidebar` 回 **0**，
-  而我这枚提交在这条线上只动了 `@@ -219` 与 `@@ -1031` 两处）；本线没代改。
+  取法 `node scripts/check-ui-language.mjs | grep -B1 'web.calendar.sidebar'`；命中的是那枚 `web.calendar.sidebar.hide|show`
+  （协作/日历线此刻在飞的 `App.tsx` hunk，**行号会随他们继续编辑而漂，别引用行号**），
+  现量证明不是我抄的：`git show HEAD:apps/web/src/App.tsx | grep -c web.calendar.sidebar` 回 **0**，
+  而我那枚提交在这条线上只动了 `grep '^@@'` 里 `@@ -219` 与 `@@ -1031` 两处。本线没代改。
   ② `check:docs` 与 `node research/tools/docs-link-check.mjs` 各 **rc=1** 时点是同一件事：
   `email-to-task-brief.md` 刚写出来、还没 `git add`，那条链接在干净检出上是死链
   ⇒ 走脚本给的出路①（该入库）随本节一起入库，重跑取绿；**没有**放宽判据、没登记例外。
