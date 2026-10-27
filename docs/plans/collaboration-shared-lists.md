@@ -1841,3 +1841,27 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 掐时现量：已判 97 枚、非零 4 枚（两枚红的逐枚定性见上一节：`check:ui-language` ＝别线未提交的 `App.tsx` 两行，HEAD 命中 0；`check:macos-window` ＝ macOS 窗口那一线的环境形装置，本线不替它定性）。
 ⇒ **这一片的形状到此定格为"未跑完、无判决"**，不是绿、也不是红集。要续就在负载门内重跑整串（别沿用半串的数），命令与判读规则见本节上面那条恢复点；
 ⚠️ 一条自曝留档：我取原话时用了 `… | head -6`，那行 `rc_now=0` 是管道尾巴吃掉退出码的假象（仓内明记的坑），有效 rc 只认日志里的 `rc=1`。
+
+### 9.37 Android 界面腿的载体换了一台机（2026-10-27 22:3x，负责人指定「用 Linux 那台跑安卓」）——那条"未判定"实验当场判掉
+
+负责人这一拍的原文（记下来免得下一位猜）：**「你用 Linux Debug 去跑安卓会好一些」**，且「我都授权你去做了」。
+⇒ §9.28 ③ 与 §9.29 那两格的拦路结论**按现量作废**：那台 `windows-pc` 上"启用 `HypervisorPlatform` 要管理员 + 重启共享机"这一档**不再需要**，
+因为另一台在册载体 `linux-dev`（`Xaiver-linux`）**硬件加速本来就能用**。全程只读探测 + 只创建我自己的 AVD。
+
+| 量到的事实 | 当趟读数 |
+|---|---|
+| KVM 可用 | `/dev/kvm` 存在且 `getfacl` 里有 `user:xaiver:rw-` 这一行（组成员是 `root kvm`，靠 **ACL** 放行，不需要把人加进组、也就不需要 sudo 或重登） |
+| SDK 组件 | `emulator` **37.2.12 已装**、`system-images/android-36/google_apis/x86_64` **7.0.0 已装**（还有 android-32 那一档）；`adb`／`avdmanager`／`sdkmanager` 都在 `~/.local/opt/android-sdk` |
+| 我造的载体 | AVD `heyta_collab_api36`（`abi.type=x86_64`，镜像 android-36/google_apis/x86_64，机型模板 `pixel_5`） |
+| 🔬 **那条"未判定"实验的答案** | `-no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -accel on` 起，**25 秒**到 `sys.boot_completed=1`，`adb devices` 读到 `emulator-5554 device`（model `sdk_gphone64_x86_64`） |
+| 资源余量 | 12 核、起机时 `MemAvailable` 约 10.6 GiB ⇒ 单枚 AVD（emulator 自己把 RAM 抬到 2560 MB）不拦路 |
+| 收尾 | 按 PID 收掉，复验 `ps` 无残留、`adb devices` 读回空、`MemAvailable` 回到约 11.2 GiB；**AVD 目录保留**（下次直接起，不必重建） |
+
+⚠️ 两条这次现学到的形状，写给下一位也写给装置本身：
+1. **`pgrep -f "emulator -avd <名>"` 是假阴性** —— AVD 起来之后真实进程是 `…/emulator/qemu/linux-x86_64/qemu-system-x86_64-headless -avd <名> …`，
+   argv 里**没有** "emulator -avd" 这串连续字样。我第一发据此打了 `heyta_procs=[NONE]`，而 `adb devices` 同时读回一枚活设备——**两个读数打架就是证据**，
+   按整条 argv 匹配（`ps -eo pid,args` 里找 AVD 名）才看见 PID 439426 活得好好的。⇒ 判"我起的东西关了没"要**argv 里那枚独有名字**，别按启动器的可执行文件名。
+2. 又一次踩到**三层引号**（`ssh host "bash -lc '…' "` 里嵌单双引号 ⇒ `未预期的 EOF`），改回已验证的姿势：**脚本先落盘，`ssh host 'bash -s' < 脚本`**（#603 那一族的同一课，我这次是第二次犯在自己手上）。
+
+⇒ **下一段工作变清楚了**（不再是"等装机"）：Android 界面腿要新写一枚装置 —— **APK 在 `windows-pc` 出（那条长期令不变）→ 拉到 `linux-dev` → 装进这枚 AVD → 驱动它跑与 iOS 同一条协作旅程**，
+而服务端要能从 `linux-dev` 访问到（跨机地址，不是 `127.0.0.1`）。这一枚装置是新增工作量，iOS 那枚脚本的结构可以复用，但按压通道与取证得换成 `adb`/`uiautomator` 那一套。

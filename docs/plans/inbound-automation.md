@@ -4772,3 +4772,84 @@ vitest 报 `No test files found, exiting with code 1`，五臂齐刷刷 `rc=1`�
 准确的句子是：**本线全程没有执行过 `git push`**（这九笔里前七笔我自己一次都没推），
 但共享 `main` 上"绝不 push"这条纪律**不由本线单方守得住**；此刻 `git rev-list --left-right --count origin/main...HEAD` 回 **`0 6`**
 ⇒ 本批余下六笔（`f1f1c3cec` 起）仍在本地。⚠️ 这句同样是戳读数，引用前重跑那两条命令。
+
+---
+
+## 2026-10-27 22:0x–22:4x · 负责人把"后台腿 vs 明写边界"那格交回产品判断：判的是不补腿，代价是先把句子做成真话
+
+**这一节答的是开工单 §6 第 7 格**（原文：「A2 那两条边界——补 ServiceWorker/后台腿，还是对外明写
+"设备开着才处理"」，另附一句"两者选一，不许两头都不做"）。负责人当轮的原话是
+「你来从产品角度进行裁决……给出处理建议，然后给我审批」，审批选的是
+**「做两件小事再写文案」** 那一档。裁决与执行都在本批完成，逐格如下。
+
+**为什么判"不补后台腿"**（三条都在本仓量过，不是推测）：① `apps/web/src/pwa/sw.ts` 文件头逐字写着
+Chromium `kMinPeriodicSyncEventsInterval = base::Hours(12)`，实际间隔再乘互动度系数（12/24/36 小时或永不）；
+② 收件密钥与 Vault 解锁态在页面里，后台要么醒来解不开、要么得把解密钥常驻浏览器（自拆端到端加密这条卖点）；
+③ 手机侧要做后台唤醒得有推送库——现量 `grep -n "notifee\|firebase\|PushKit\|expo-" apps/mobile/package.json` 回 0，
+而 iOS 那枚 `HeytaReminderModule` 只能排本地提醒，跑不了"解密 → 落库 → 提交许可"整条链。
+常驻那件事的正确答案本来就是用户自己那台常年开着的机器（`apps/node-host` 的 `worker run`，本批 §7 第 2 步已闭合）。
+
+**两枚代码腿（让那句边界成为真话，先于文案）**：
+
+| 腿 | 入库前那句是真的吗 | 现在 | 提交 |
+|---|---|---|---|
+| web 那条循环挂在 `InboundAutomationSettings` 的 effect 上，离开设置视图即随组件卸载停 | ❌ 用户理解"开着就收"，实现是"守着那一屏" | 新增 `apps/web/src/features/settings/inbound-lifecycle.ts` 作应用级唯一拥有者，`App.tsx` 挂载；面板改读同一枚 store；收件包那枚只读事实收进 `getWebInboundRecipientKey`（两处共用一枚读法） | `afe07423e` |
+| 手机 `recipient === undefined` 时静默 return | ❌ 界面只是安静，"没建密钥"与"没有新内容"长得一样 | 新增一格 `InboundReadiness`（`signedOut`/`noRecipientKey`/`ready`），与那四档终态**分两格**存；`ready` 不占句子 | `b55e98807` |
+
+**文案**（`packages/i18n` 中英两档各两颗，界面零硬编码）：`web.ai.inbound.status.noKeyOnThisDevice`、
+`web.ai.inbound.boundary.foregroundOnly`；后者两壳渲染**同一颗 key**，并已登记进常驻对账尺
+`apps/mobile/tests/ai-copy-parity.spec.ts` 的新臂 `inbound.boundary.*` ⇒ 任何一端改措辞或加例外都会红。
+对外件的成稿（价格页与帮助中心那天要取的那句）写在工单 **§5.1**，`apps/landing` 源码本轮一字未动。
+
+**判据与逐字读数**（当日现量，别抄进别的句子）：
+
+- `cd apps/mobile && pnpm exec vitest run` ⇒ **Test Files 91 passed (91)**；`pnpm exec tsc --noEmit -p tsconfig.json` ⇒ **rc=0**。
+  本线那枚 `inbound-cycle-display.spec.ts` 从 7 条加到 **15 条**，`ai-copy-parity.spec.ts` 从 15 条加到 **16 条**。
+- `cd apps/web && pnpm exec vitest run` ⇒ **Tests 2597 passed | 13 skipped (2610)**；tsc ⇒ **rc=0**。
+  `inbound-worker-lifecycle.spec.tsx` 整枚重写为 **7 条**（含"摘掉挂载点就一趟不跑"的反向臂与
+  "挂载点必须真的写在 `App.tsx` 里"的源码臂）；`inbound-section-active.spec.tsx` 改成交出挂载点后仍钉
+  "`active` 只管列表、不管收集"。
+- 变异臂（台架与逐臂日志在 `~/.heyta-evidence/inbound-a2-webloop-20261027/`，还原只从 `.mut-bak`、三段哈希逐臂 `yes`）：
+  A1 摘 `App.tsx` 那两行 ⇒ 红 **1**（正是源码臂）；A2 放宽可见性闸 ⇒ 红 **4**；A3 摘路由闸 ⇒ 红 **1**；
+  M1 摘 `publishInboundReadiness('noRecipientKey')` ⇒ 红 **1**；
+  **M2 控制臂**：同一行只是**注释掉**而不是删掉 ⇒ 仍红 **1**（证明那把尺读的是代码、注释不算命中）；
+  M3 换 `testID` ⇒ 红 **1**；M4 单方面改 boundary key ⇒ 红 **2**（对账尺 + 渲染臂）；M5 web 删那行 ⇒ 红 **2**。
+- 门禁逐道：`check:layering`/`check:ai-coverage`/`check:egress-wording`/`check:claims`/`check:i18n-vars`/
+  `check:crosslang-contract`/`check:mobile-settings`/`check:mobile-ai-anchors`/`check:rn-aria`/
+  `check:empty-state`/`check:form-anatomy`/`check:doc-citations`/`check:docs-voice`/
+  `python3 research/tools/verify-inbound-doc-tables.py` ⇒ **各 rc=0**；
+  `check:inbound-system-prompt` 由 **1 → 0**（web 分母从面板换成真正引常量的 `inbound-lifecycle.ts`，
+  换文件的理由写在脚本注释里；`--self-test` 五臂仍 0 臂不符）。
+- 🔴 **两道红的归属要说准**：① `check:ui-language` **rc=1，4 处全在别人名下** ——
+  `apps/web/src/App.tsx:2532/2533` 的 `web.calendar.sidebar.hide|show` 是协作/日历线此刻在飞的 hunk
+  （现量：`git show HEAD:apps/web/src/App.tsx | grep -c web.calendar.sidebar` 回 **0**，
+  而我这枚提交在这条线上只动了 `@@ -219` 与 `@@ -1031` 两处）；本线没代改。
+  ② `check:docs` 与 `node research/tools/docs-link-check.mjs` 各 **rc=1** 时点是同一件事：
+  `email-to-task-brief.md` 刚写出来、还没 `git add`，那条链接在干净检出上是死链
+  ⇒ 走脚本给的出路①（该入库）随本节一起入库，重跑取绿；**没有**放宽判据、没登记例外。
+- 范围尺 `python3 research/tools/verify-inbound-commit-scope.py` ⇒ **rc=1，越界=114**（这句必须带归因读：
+  该尺在本次开工**之前就已经 rc=1**）。本批两笔点名的 OOB 逐枚是
+  `apps/web/src/features/settings/inbound-lifecycle.ts`、`packages/i18n/src/locales/{zh-CN,en}.ts`、
+  `scripts/check-inbound-system-prompt.mjs`（此前已在册）、`apps/mobile/src/ai/AiSettingsSection.tsx`、
+  `apps/mobile/tests/{ai-copy-parity,inbound-cycle-display}.spec.ts`（后三枚为 10-27 早批既有）
+  —— 前三枚是本轮首次出现，均在负责人批准的"两枚代码腿 + 文案"射程内；**要不要把它们收进 `WHITELIST` 是判卷口径，仍归 B205/B169**。
+- 邮件那格（§6 第 5 格）按批准的"另开一条线"落成
+  [`email-to-task-brief.md`](email-to-task-brief.md)：六个先决问题各带判据、P0 那一刀的边界、
+  以及"不许做成 `source=email` 一个枚举值"那条纪律。首版仍不含邮件，工单 §3 那句"不在首版"没动。
+
+**共享工作树纪律的两条实录**（本批都踩到了）：
+
+1. `apps/web/src/App.tsx` 同一时刻挂着别人的两枚 hunk（日历侧边栏 +2525/−2742）。整文件 pathspec 提交会把
+   别人的笔一起署名 ⇒ 本批改用"HEAD + 只属于我的两处"重放出 blob、`git update-index --cacheinfo` 只入自己那 13 行，
+   提交后立即验 `git show HEAD -- apps/web/src/App.tsx` 只含 `@@ -219`/`@@ -1031` 两处、别人的两枚仍留在工作树未入库。
+   重放器与读数在同名证据目录（`replay-my-hunks.mjs`）。
+2. 🔴 **origin/main 的戳读数**：`git rev-list --left-right --count origin/main...HEAD` 本节落笔时回 **`0 0`**，
+   `git log -1 --format=%h origin/main` 回 **`b55e98807`** ⇒ 本批两枚提交**已经在远端**了。
+   本线全程没执行过 `git push`（`git reflog show origin/main` 那三行都是 `update by push`，
+   由并行会话推 `main` 时顺带把已坐在 `main` 上的本线提交一起公开）。句子只能是"本线没推、但已公开"，
+   别写成"仍在本地"——那是 18:19 那一节我犯过的同一个错。
+
+**边界与遗留**：AC 已勾仍 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md`）；
+§5.1 那句成稿要等上线那天由负责人取用；`apps/landing` 与 `docs/runbooks/deployment.md` 本轮未动；
+A2 表里 Electron 与三枚原生壳那两行**仍是零接线**（不影响这句边界的真实性，归"这台设备开着 heyta 时"那一档）；
+A4 计费口径、`AUTOMATION_ENTITLEMENT_MODE` 写错 ⇒ 500、B194 那批入库图处置仍在他手上。
