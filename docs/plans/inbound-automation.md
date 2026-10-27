@@ -4672,3 +4672,56 @@ vitest 报 `No test files found, exiting with code 1`，五臂齐刷刷 `rc=1`�
 ③服务端在跑且有事件进队列 —— 三件都属于 B 组上线那一族（要生产 env 与负责人那头），本批一行没配。
 所以准确的句子是「**移动端现在有这一行、有门钉着它不许漂**」，
 不是「已在真机看过它显示成什么」；要补设备腿，按仓里 `verify:mobile-ai` 那族的装置标准走，别为凑读数起半套载体。
+
+## 2026-10-27 18:10–18:12 · 把 AC 电池刷到当前 tip：26 腿有读数、剔掉的两腿为什么不跑、以及一枚"差集为 0"的假免跑（自动收集线）
+
+写前先跑 `date`（本机 `2026-10-27 18:12`）。**动机不是"隔几天刷一遍"**：工单 §8 第 4 条要的是
+"AC 每格摆出命令 + 逐字输出 + 原件路径，由负责人自己勾"，而仓里那整串读数的最后一戳是 10-20 的 `dd91d1927`
+（文档维那九腿另有一戳 `33e814f4e`，它自己就写明"本笔之后旧一笔"）。A 组这批代码落地之后，那戳还代不代表当前这棵树，
+是要量的，不是要假设的。
+
+**1. 先差点被一把假尺免掉**。判"要不要重跑"用的是差集：`git diff --name-only dd91d1927 HEAD -- server/src packages apps scripts research/tools`
+回 **2413** 枚 ⇒ 显然要重跑。但我先试了"逐腿免跑"这条便宜路：`packages/inbound-core` 与 `packages/op-log` 的**包面差集都是 0**，
+看起来那两腿（`AC2-inbound-core`／`AC5-op-log`）的读数还能用。**这是假的**——两枚包都 `import @heyta/shared-schema`
+（现量 `grep -rho "@heyta/[a-z-]*" packages/inbound-core/src | sort -u`），而 shared-schema 到 HEAD 变了 2 枚
+（`central-auth-contract.ts`、`index.ts`）。⇒ **"一把尺在某处读 0"只说明它扫的那一套写法里没有**：
+传递依赖不在那枚 pathspec 里，包面差集为 0 不能免掉任何一条腿。
+
+**2. 载具身份**（跑在隔离检出里，共享检出零改动）：`.worktrees/inb-t10` 从 `500f7bf30`
+`git merge --ff-only 54348222e`（`rc=0`），起跑前后 `git status --porcelain | wc -l` 都回 **0**；
+`pnpm-lock.yaml` 的 sha256 与主检出**逐字相同**（`6e609a8bdb17…`）⇒ 按仓里那条配方直接复用 `node_modules`，不重装依赖。
+准入：`scripts/lib/wait-for-quiet-host.sh` 的 `host_load_gate` 退 0 才点火（取数时短窗 12.23）。
+
+**3. 跑法**：`NO_COLOR=1 python3 research/tools/verify-inbound-ac-battery.py --root . --ev ~/.heyta-evidence/inb-ac-battery-1027-1810 --quiet-gate --only <26 枚标签>`；
+标签集是从 `--list` 现取的（`awk '$1 ~ /^(AC|SCOPE)/'` 去掉表尾），**剔掉 `AC6-browser` 与 `AC6-web-specs` 两枚** ——
+理由不是省事：那两腿会按 spec 覆掉 `apps/web/evidence/inbound-recovery/*.png` 那批**待拍的入库图**（B194 那一格还没拍板），
+10-20 那趟同一处置过。冒烟臂 `--only AC8-ac-ticks` 先跑（`legs=1 rc0=1`，同时验腿名在册、不 rc=2）。
+
+**4. 结论行逐字 `legs=26 rc0=25 rc_nonzero=1`**（18:10:07→18:11:20，约 73 秒）。25 枚 rc=0 里有读数的关键几枚：
+`AC1-offline11 11 files／103 passed`、`AC1-entitlement3 3／56`、`AC1-quota-http 1／3`、`AC1-pglite 1／17`、
+`AC1-cjs-order 在册 .ts=138 有产物=138 无产物=0 命中=0`、`AC2-inbound-core 3／47`、
+`AC2-queue-teeth 臂数=6 不成立=0 末次 sha256=52c3fd707977a03e`（与开局那枚相等 ⇒ 变异臂还原对上）、
+`AC3-dual-host WINDOW=8 PASS 六档都有读数`、`AC3-sync-authz 1／6`、`AC4-app-host 15／112`、`AC4-egress-wire 1／4`、
+`AC5 三段 1／15、1／16、1／9`、`AC7 六道全 rc=0`、`AC8-matrix 行数=34 有尺行=27 无尺行=7 尺枚=67 窗=13/13`、
+`AC8-producer-seam 相对导入=269 模块在HEAD=269 新模块缝=0 尺瞎了=0`、**`AC8-ac-ticks 已勾=0 未勾=8`**。
+原件 28 个文件在 `~/.heyta-evidence/inb-ac-battery-1027-1810/`（`batt.txt` + `rc.txt` + 逐腿日志）。
+
+**5. 唯一那枚非 0 不是 AC 腿**：`SCOPE-commit-scope rc=1` ＝ **B205／B169 那一格的本体**（范围尺把别线借用
+「自动收集」标题的笔算进本线窗口）。同一戳首行 `窗口起 2026-10-09 16:52　本线笔数=372　仅正文提及=21　涉及路径=227　越界=111`
+（10-20 那戳是 96 ⇒ 涨的 15 枚是这两周别的笔）。🔴 **本批这 7 笔在 111 枚越界行里 0 命中**
+（逐枚 `grep -c "'<我那七笔的短号>'" SCOPE-commit-scope.log` 各回 0），第一条 OOB 是 `f9084821` 的
+`apps/mobile/evidence/ux-final-20261016/**`。这枚尺的 rc 口径归负责人拍，本线不动它、也不替它凑绿。
+
+**6. 顺带分清一件事（不是我这趟碰的）**：主检出在我跑的时候多出 5 枚脏图
+（`apps/web/evidence/account-suite/05-*,06-*`、`apps/web/evidence/admin-console/*`），mtime `18:09:53` 与 `18:10:20`。
+`18:09:53` 在我点火（`18:10:07`）**之前**，而我整趟只跑在载具里 —— 载具 `git status --porcelain -- apps/web/evidence` 回空、
+载具整体 dirty=0；而 `account-suite`／`admin-console` 那两枚目录分属注册登录线与后台线自己的浏览器腿。
+⇒ 归属别线，本线不还原、不提交、不代改。
+
+**7. 这一戳的射程**：26 腿在 `54348222e` 上各退 0（除那枚范围尺）；**`AC6-*` 两腿在当前 tip 上没有读数**，
+要补就得先拍 B194 那批入库图的处置。AC 一格没勾（`AC8-ac-ticks` 自己印的"已勾=0"），不对外发，不 push。
+🔴 **自我指涉那一格照本仓既有口径处理，不用"改一句就不算变"去断它**：本文件正是 `AC7-doc-*`／`AC8-matrix`／
+`AC8-ac-ticks`／`AC8-producer-seam` 这**九枚腿的输入**，所以"本条一落库，上面那串读数就旧一笔"成立。
+处置是**有限的**：本笔提交之后在合并态上把那九腿重取一次，逐枚 rc 与 tip 落在
+`~/.heyta-evidence/inb-ac-battery-1027-1810/docs9-<tip>.txt`，**不再往本节追加第五十九行**——
+再加一行就又旧一笔，那是个死循环；台账里这一句负责把下一位领到那份原件，而不是替它担保新鲜。
