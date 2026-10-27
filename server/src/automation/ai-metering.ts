@@ -93,7 +93,8 @@ export async function reserveAutomationAiAttempt(
         `SELECT 1 AS ok FROM automation_events e JOIN automation_rules r ON r.id = e.rule_id AND r.user_id = e.user_id
           WHERE e.user_id = $1 AND e.rule_id = $2 AND e.event_id = $3
           AND e.status = 'leased' AND e.lease_worker_id = $4 AND e.lease_generation = $5
-          AND e.lease_expires_at > clock_timestamp() AND e.expires_at > clock_timestamp()
+          -- 🔴 裸列与绝对时刻比之前，先把时钟锚回 UTC 挂钟（这一格在 +08 会话上曾读成「租约八小时前已过期」）：见环境陷阱 #599。
+          AND e.lease_expires_at > (clock_timestamp() AT TIME ZONE 'UTC') AND e.expires_at > (clock_timestamp() AT TIME ZONE 'UTC')
           AND e.attempt = $6 AND r.parse_version = $7 AND r.version = e.rule_version
           AND r.enabled = true AND r.deleted_at IS NULL FOR UPDATE OF e`,
         [key.userId, key.ruleId, key.eventId, workerId, auth.leaseGeneration, key.attempt, key.parseVersion],
@@ -171,8 +172,8 @@ export async function advanceAutomationAiAttempt(
         WHERE e.user_id = $1 AND e.rule_id = $2 AND e.event_id = $3
         AND e.status IN ('leased','prepared','needs-confirmation') AND e.lease_worker_id = $4 AND e.lease_generation = $5
         AND e.attempt = $6 AND r.parse_version = $7
-        AND ($8::boolean = false OR (e.status = 'leased' AND e.lease_expires_at > clock_timestamp()
-          AND e.expires_at > clock_timestamp() AND r.enabled = true AND r.deleted_at IS NULL AND r.version = e.rule_version))
+        AND ($8::boolean = false OR (e.status = 'leased' AND e.lease_expires_at > (clock_timestamp() AT TIME ZONE 'UTC')
+          AND e.expires_at > (clock_timestamp() AT TIME ZONE 'UTC') AND r.enabled = true AND r.deleted_at IS NULL AND r.version = e.rule_version))
         FOR UPDATE OF e`,
         [key.userId, key.ruleId, key.eventId, workerId, auth.leaseGeneration, key.attempt, key.parseVersion, to === 'sent']);
       if (leased.length !== 1) throw new Error('Automation lease is no longer valid');
