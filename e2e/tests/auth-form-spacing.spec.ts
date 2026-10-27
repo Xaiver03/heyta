@@ -73,6 +73,14 @@
  * 其余四张页各只有一个按钮、上方留白 55~110px，输入框高 44~46、按钮高 48（都过 44 那一档）。
  * 常驻守卫在 `server/tests/password-reset-page.spec.ts`（那里记了同一组读数）。
  *
+ * ⚠️ **第三套面本轮没量到：移动壳（`apps/mobile`，React Native）**。
+ *   登记成"未判定"而不是"合规"，因为按上面那条教训，没量的面不许写结论。
+ *   判它的断言就是本文件 ①③ 那两对（独立控件↔独立控件 ≥ `space.3`、触控目标 ≥ 44）
+ *   搬到 RN 的读数上：`AppRegistry` 起模拟器后取 `measureInRow` 或走 AX bounds，
+ *   装置与 `docs/agents/multi-end-build.md` 那四端重装共用（iOS 那端可在本机模拟器量，
+ *   Android 的构建与设备量要在打包机上跑，见 `docs/agents/multi-end-build.md` 的载体那一节）。
+ *   谁补这一格，请连**排除掉的那些**一起带读数，别只登记改掉的。
+ *
  * 剩下 7 处判掉，逐条理由：
  * `AuthForm` 验证码屏 2 处（登录档 / 注册档同形）、二级链那一列 1 处、注册档同意项 1 处
  * （上面已记）、`FolderPicker` 触发↔自己的菜单、`HabitGoalEditor` 触发↔自己的展开面板、
