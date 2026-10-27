@@ -175,7 +175,7 @@ model EmailPasswordRegistrationChallenge {
 model EmailLoginChallenge {
   id                String   @id
   email             String
-  userId            Int
+  userId            Int      @map("user_id")
   codeDigest        String   @map("code_digest")
   expiresAt         BigInt   @map("expires_at")
   lastSentAt        BigInt   @map("last_sent_at")
@@ -189,7 +189,9 @@ model EmailLoginChallenge {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([email])
-  @@index([userId])
+  // 列名是迁移建的 user_id；不写 @map 时 Prisma Client 会去 SELECT "userId"，
+  // 在任何按迁移建出来的库（生产、自托管装机）上当场 P2022。索引名同理。
+  @@index([userId], map: "email_login_challenges_user_id_idx")
   @@index([expiresAt])
   @@map("email_login_challenges")
 }
@@ -1856,6 +1858,9 @@ model AutomationEvent {
   @@index([userId, ruleId, status])
   @@unique([userId, eventId])
   @@index([expiresAt])
+  // map 是必须的：这一枚是迁移 20261018050000 用裸 SQL 建的，名字与 Prisma 的推导名不同，
+  // 不在这里登记就会让 migrate diff 对着线上提 DROP INDEX（租约续期那条读路径靠它）。
+  @@index([status, leaseExpiresAt], map: "automation_events_status_lease_idx")
   @@map("automation_events")
 }
 
