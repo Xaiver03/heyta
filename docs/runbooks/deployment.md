@@ -460,6 +460,44 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
 `No PRIVACY_* configuration set: /privacy.html and the registration consent notice are disabled`）。
 后果是注册接口**不要求**勾选任何同意项。要合规上线得先配这五个键 —— 与 §3.11 是同一件事。
 
+### 3.5.1 自动收集（inbound automation）那一族的键
+
+这一族**八枚**全部在**请求处理路径**上读，`server/src/config.ts` 的启动期校验一个都不碰。
+键名、形状、缺失与写错各自的症状都写在 [`server/env.example`](../../server/env.example)
+（那里是唯一事实源，本节只讲运维要关心的三件事）。
+
+1. **现状**：这台生产实例上 `AUTOMATION_*` 一枚都没配 ⇒ 公网接收端点回 401
+   `invalid_webhook_signature`（零写入），而设置页里那节「自动收集规则」用户看得见、点得动。
+   要在生产上真开这条功能，最小集是**三枚**（`official` 模式）：
+
+| 键 | 没配会怎样 | 形状 |
+|---|---|---|
+| `AUTOMATION_ENTITLEMENT_MODE=official` | 一切自动收集请求 402 + `reason=ENTITLEMENT_MODE_UNCONFIGURED` | 只接受 `official` / `selfhost-online` |
+| `AUTOMATION_SENDER_KEK` | 界面上签发发送方凭据 ⇒ 409；接收路径解密失败被吞成 401 | 64 位小写 hex（32 字节） |
+| `AUTOMATION_COMMIT_KEYS` | 第一次提交许可就抛 ⇒ 403，**任务永远落不了库** | JSON keyring |
+
+   `AUTOMATION_WEBHOOK_KEYS` 只在"用部署级 legacy 密钥"时才需要；走界面上签发那条
+   （托管凭据）就**不用配它**。`selfhost-online` 另需 `AUTOMATION_OFFICIAL_KEYS`；
+   官方签发端另需 `AUTOMATION_OFFICIAL_PRIVATE_KEY` + `AUTOMATION_OFFICIAL_ISSUER` +
+   `AUTOMATION_OFFICIAL_KEY_ID`（**三缺一** ⇒ 签发面那六条路由全 403 `AUTOMATION_ISSUER_NOT_CONFIGURED`）。
+
+2. 🔴 **一条会骗人的形状**：`AUTOMATION_ENTITLEMENT_MODE` 写成非法值**不会让容器起不来**，
+   它是在请求处理时抛裸 `Error` ⇒ 用户与探针看到的是 **500**，不是 402、也不是启动红。
+   排查这条时先看请求日志，别照 `ENTITLEMENT_GATE_ENABLED`（那枚才是启动期严格）的经验去找启动红。
+   要不要把它改成启动即红属判据口径，尚未拍（见 `docs/plans/inbound-automation-work-brief.md` §6 第 6 格）。
+
+3. **通路有尺，不用靠人记**：`pnpm check:server-env`
+   （`server/scripts/check-server-env-forwarding.mjs`）判的是"`env.example` 里文档化的每一枚键，
+   必须真的能到达它的使用者"。compose 的 `environment:` 是白名单，少写一行
+   `- KEY=${KEY}` 的后果是"照着文档拧了旋钮而它根本不生效，界面不报错、`/health` 200、
+   日志一个字都没有"。这一族八枚现在都在 `server/docker-compose.yml` 的 supersync 段里，
+   空值等价于没配（每枚读取点都先判 falsy），所以带默认值转发不改变现状。
+
+⚠️ **helm 那张图没接这一族**（`server/helm/supersync/templates/configmap.yaml` 逐枚枚举键，
+其中没有 `AUTOMATION_*`；`deployment.yaml` 的 `secretKeyRef` 同理）。本轮没顺手补的理由要写清：
+这台机器上**没有 `helm`**（现量：`which helm` 空），而改一张无法 `helm template` 验的图
+等于交一份没人核对过的 YAML —— 要么下次带 helm 一起补并跑一次模板渲染，要么就走 compose 这条路。
+
 ### 3.6 公网实测结果
 
 **旧域名 `heyta.finlaw.cloud`（下表是 2026-09-27 的实测；⚠️ 它今天仍在服务，见 §3.3.1）：**
