@@ -4770,5 +4770,22 @@ grep -rn "INBOUND_AUTOMATION_FIELDS as readonly" server/src/automation          
 
 **这枚例外尺今天已知的射程边界（写清，别让下一位以为它全覆盖）**：第二判只扫未提交里已跟踪的 `.ts/.tsx/.mts`，且只认 `from '…'` / `import '…'` 两种写法 —— 动态 `import('./x')`、`package.json` 里 `node scripts/x.mjs` 那种**命令行式引用**、以及 `.mjs/.js` 的 importer 都不在射程内。判它的断言：把一枚未入库模块改成动态 import 形式，第二判读 0 处 ⇒ 那正是射程外，不是"没问题"。
 
+### 6.102（2026-10-28 00:5x · 第二判上岗十分钟内就自己证明了一次：同一枚未入库的 hook 扩散到 5 枚）
+
+上一节写的"翻案条件"今天没到，但现实自己动了三格，都按现量记：
+
+| 格 | 读数 | 复取 |
+|---|---|---|
+| §6.99 那枚临时探针 | 🔴→闭合：**作者自己收掉了** —— 文件已不在树上，默认 e2e 配置的收集清单里也读不到它 | `ls e2e/tests/tmp-discard-probe.spec.ts`（No such file）；`cd e2e && npx playwright test --list > /tmp/l 2>&1` 后 `grep -c tmp-discard-probe /tmp/l`（读 0） |
+| 跨线依赖 | 从 1 处扩到 **5 处**，五枚 importer 全指向同一枚未入库的 `apps/web/src/lib/form/useDirtyDismissGuard.tsx`（新增的四枚：分类对话框、习惯视图、共享清单两张弹窗/特性页） | `pnpm check:worktree-exceptions`（末段逐枚点名） |
+| 未登记栏 | 51 枚未提交里 **0 枚没登记** —— 新落的两条规则各自带"那句指名在哪"当证据 | 同上，第一段逐行计数 |
+
+**这五处同目标说明的事**（不是我推测，是尺读回来的）：UX 线正在把一枚**还没进仓库**的守卫 hook 逐个接进已跟踪的界面文件。接得越多，"按堆提交"这件事越危险 —— 任何一堆先入库都会让 HEAD 引用一个仓库里没有的模块，而红的是下一位。所以这一格的去处不是"我替他们提"，是**让他们那一堆和 hook 同一笔进去**。
+
+**规则表新增两条（都带证据，不写"看着像他们改的"）**：① 自动收集（inbound）线 —— `server/src/automation/`、`packages/inbound-core/`、那份 dual-host-fault integration spec、ADR-0077；理由里点明 §6.101 那四格待拍板正落在这层。② 各线共用的环境陷阱正文 —— `docs/reference/environment-traps.md` 编号只增不改、谁踩坑谁追加，它在脏集里只说明"某一行的正文还没入库"。
+
+⚠️ 一条我没扩的口子：给 `apps/web/src/features/categories/`、`.../habits/` 这类**整目录**登记我没做 —— 目录前缀会把"以后任何人改这个目录"都自动归给 UX 线，那是假归属；所以只登记**现量在飞的那两枚文件**。归属表的价值在"每条都指得出名"，不在"未登记栏好看地读 0"。
+
+
 
 
