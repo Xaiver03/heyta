@@ -237,6 +237,7 @@
     "check:downloads": "node scripts/check-downloads.mjs",
     "check:release-version-guard": "node scripts/check-release-version-guard.mjs --self-test && node scripts/check-release-version-guard.mjs",
     "verify:downloads-live": "node apps/landing/scripts/gen-downloads.mjs --check",
+    "verify:live-web-freshness": "node scripts/live-web-freshness.mjs",
     "verify:downloads-servable": "node scripts/verify-downloads-servable.mjs --self-test && node scripts/verify-downloads-servable.mjs",
     "verify:artifact-facts": "node scripts/verify-artifact-facts.mjs --self-test && node scripts/verify-artifact-facts.mjs",
     "verify:android-signing-identity": "node scripts/verify-android-signing-identity.mjs --self-test && node scripts/verify-android-signing-identity.mjs",
