@@ -1038,6 +1038,7 @@ export {
   type ProcessInboundAutomationOptions,
 } from './inbound-process.js';
 export { startInboundWorkerLoop, type InboundWorkerLoopOptions, type InboundWorkerLoop } from './inbound-worker-loop.js';
+export { INBOUND_AUTOMATION_SYSTEM_PROMPT } from './inbound-system-prompt.js';
 export { verifyAutomationEntitlementTicket, AutomationEntitlementVerifyError, type AutomationEntitlementStatus } from './inbound-entitlement-remote.js';
 export {
   requestAutomationSessionTicket,
