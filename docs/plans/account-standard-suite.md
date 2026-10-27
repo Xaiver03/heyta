@@ -4675,3 +4675,19 @@ diff 打开只有那两行，与"旧"无关。
 而那时红的是下一位的 `check:gate-wiring`。判据：`git diff -- package.json | grep -c worktree-exceptions` 要读 **0**（这句在正文段落里，管道不该转义）
 （我这行不在"未提交差异"里），同时 `grep -c focus-single-source` 要仍读 **2**（别人的行没被我动）。
 
+
+### 6.99（2026-10-27 23:5x · 例外归属尺上岗第一天点出来的三枚，其中一枚是真的要修）
+
+`pnpm check:worktree-exceptions` 今天的读数：未提交 43 枚里 **40 枚归到 4 条已登记规则、3 枚没人登记**。
+逐枚定性（判据 = 它自己在仓里的形状，不是我猜的）：
+
+| 那枚 | 定性 | 复取 |
+|---|---|---|
+| `?? e2e/tests/tmp-discard-probe.spec.ts` | 🔴 **一次性探针住进了常驻射程**：它已经在默认 e2e 配置的收集清单里（用例名自己写着 `TEMP probe: what is in the DOM after Esc on a dirty capture`），所以每一次全量跑都会执行它 —— 今天它进的是 `check:ai-e2e` 与那趟四十几分钟的串行全量的分母。后果不是"多跑一条"，是**"全量绿"这句判据里混进一条不稳定的临时用例** | `cd e2e && npx playwright test --list > /tmp/l 2>&1; grep -c tmp-discard-probe /tmp/l`（读 **1** 就是在册） |
+| `?? docs/adr/0077-inbound-hosted-extraction-at-ingest.md` | 自动收集线正在写的 ADR（编号已定、正文未落）—— 他们 23:2x 已经把同批的 schema/迁移提交了，这份是同一件事的另一半 | `git log --oneline -3 -- server/prisma` |
+| `M server/tests/inbound-hosted-extraction.spec.ts` | 同上那批的测试腿，此刻还在写 | `stat -f "%Sm %N" server/tests/inbound-hosted-extraction.spec.ts`（分钟级） |
+
+**处置**：三枚都**不归本线代做** —— 前两枚的作者是自动收集线（他们在飞），第三枚是 UX 线的临时探针（作者随时要收）。
+本线只做两件自己能做的：① 让它可复量（这枚尺）；② 把"临时探针会进常驻射程"这句连同取数命令登记在这里。
+⚠️ 这不是"我删了它"：`e2e/tests/tmp-discard-probe.spec.ts` 不是我造的对象，共享检出上按名字删别人的在飞文件是本仓明令禁止的那一类。
+
