@@ -1095,6 +1095,15 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 
 ⚠️ **上面那张表里点名的取证目录只在本地、不入库**（同 §9.15 那条 ⚠️ 的口径）：每趟 20 余张 PNG、约 4.4 MB，而仓库另一侧的推送配额已经吃紧（[`progress-log.md`](../agents/progress-log.md) 那条「`gitee` 拒绝一切推送」）。⇒ 表格里的**逐格读数与结论**是入库的，截图与 `l10/l11-*.json` 是**本机产物**；下一位要复现就重跑 `pnpm verify:mobile-collab:ios`（它自己会新建一个带当趟戳的目录），别去仓库里找这些路径。
 
+#### 改名后这棵树的四把尺现量（串行，逐枚归因）
+
+| 尺 | 读数 | 归因 |
+|---|---|---|
+| `pnpm -r typecheck` | **rc=0** | 全仓过 |
+| `pnpm test`（= `-r build` + `-r test`） | **rc=1**，红在 `apps/web`：`Test Files 4 failed / 205 passed / 2 skipped`、`Tests 8 failed / 2582 passed` | 🔴 **不是本线**。那 8 条全在同一枚成因上：`Error: Test timed out in 5000ms`（`calendar-sidebar` 4 条、`nav-next7-days` 2 条、`reminder-wake` 1 条、`task-sort` 1 条），而当时这台机器上有一趟别会话的浏览器重活持着内存闸门的独占锁（`uptime` 五分钟负载 48.05）。本线名下的包逐枚有读数：`packages/ui 51/51`、`apps/mobile 90/90`、`packages/i18n 4/4`、`packages/app-host 121/121`。`server` 那几行 `❯ … 23 failed` 是**进度行不是判决** —— pnpm 在 `@heyta/web` 处中止（`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`），那一趟没跑完 ⇒ server 侧本批**未判定**，不归本线也不替别线定性 |
+| `pnpm verify:collab-suite` | 首趟 **rc=1**（`legs=4 failed=1（journey）`）⇒ 单跑那一腿 **rc=0 / `RESULT=OK steps=3`**；另三腿首趟即 `sync 14 / revoke 8 / conflict 6` 全 `RESULT=OK` | 🔴 那一枚红是**闸门空等**，不是产品判据：三条现量在仓内 **#590**（它说"上方是失败用例与断言"而上方什么都没有、证据图 mtime 还是上一趟的、`decisions.log` 里最后一条是 `refuse-heavy … waited=900`）。⇒ 本线那四腿合起来是绿的 |
+| `pnpm check` | **未判定**（截至本笔落笔仍在跑：链上已过的各枚门禁逐条 rc=0，含 `check:ui-provider`（本批新登记那枚组件走的就是它自己的登记协议）、`check:selection-single-source`、`check:md-tables`、`check:docs`、`check:verify-script-copy`、`check:design`、`check:layering`、`check:i18n-vars`、`check:rn-aria`，日志里零枚 `❌`；卡在 `screenshot:verify` 那一长串真浏览器用例上） | 判据本体是**收尾那行 `check rc=`**（与 #589/#590 同一条尺）。它排在 `pnpm -r test` 之前，所以本行不受上面那 8 条超时影响；取到之后另起一笔补数，**别拿本行读成"整枚 check 绿"** |
+
 #### 这一批的边界（挪了一格，没有全清）
 | 格 | 现状 | 现量命令 | 归属 |
 |---|---|---|---|
