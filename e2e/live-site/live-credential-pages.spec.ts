@@ -66,6 +66,13 @@
  *
  * 🔴 分母从 `scripts/check-credential-page-routes.mjs --json` 取（也就是从 `pages.ts` 取），
  *    **不在这里抄一份清单**：抄的那份会在加第 6 张页时静默漏掉，而那正是本条要防的事。
+ *
+ * ⚠️ **别拿 `curl` 量这枚域名**（2026-10-27 实测）：本机对同一批目的地发
+ *    `curl -m 20 --noproxy '*' --resolve heyta.waytofuture.cn:443:<IP>`，六个读数**全是 `000`**
+ *    （连 404 那枚对照也是），而**同一时刻**这条腿 3.0 秒内把同一批目的地全量到 200/404。
+ *    形状是 curl 那条 TLS 路径过不去，不是站坏了 —— 拿它下"线上不可达"的结论就是元规则 1
+ *    （先怀疑探针）的那一格。要复量请跑：
+ *    `cd e2e && npx playwright test --config playwright.live-site.config.ts live-credential-pages`
  */
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
