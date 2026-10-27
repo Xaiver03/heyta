@@ -24,6 +24,8 @@
  *
  * ⑦ 一条真信号走到动态里那一句（闸门 ⇒ 正文 ⇒ 内存动态 ⇒ 界面有消费者）。
  * ⑧ 正文挑哪一句（`lib/share-activity-copy.ts` 的三档种类 × 有名/无名两档回落）。
+ * ⑨ 同意闸在两屏各自的调用点（判断在 `@heyta/ui`，这里只钉"线接上了"；
+ *    摘掉调用点模型那 6 枚一条都不会红 —— 变异臂见 `mutate-collab-consent-gate.mjs`）。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -191,6 +193,30 @@ describe('④ 入群等待态真的登记了 roster target', () => {
     expect(match![0]).toContain('finalize');
     // 共享主屏那一侧同样要在面板打开时登记（成员面信号驱动的落点）。
     expect(stripComments(read('apps/mobile/src/screens/ShareSpaceScreen.tsx'))).toContain('registerShareRosterTarget(');
+  });
+});
+
+/**
+ * 同意闸的判断只在 `@heyta/ui` 一处，两壳各只有一个调用点 —— 所以模型那 6 枚全绿
+ * **不排斥**某一壳的那一行被整行摘掉：摘掉之后那一壳直接进表单/直接建共享，
+ * 而纯逻辑判据一条都不会红。这一组钉的是"线接上了"，不是"判断对了"（后者在 `packages/ui`）。
+ */
+describe('⑨ 入群与开启共享两屏各自真的问一次同意闸（摘掉调用点这一组就红）', () => {
+  it('🔴 入群屏先问 `shouldShowConsent(` 决定初始相位：没确认过 ⇒ consent 而不是 input', () => {
+    const code = stripComments(read('apps/mobile/src/screens/JoinShareScreen.tsx'));
+    const calls = code.match(/shouldShowConsent\(/g) ?? [];
+    expect(calls.length, '入群屏没有同意闸调用点 ⇒ 手机上没确认过也直接进凭证表单').toBe(1);
+    const phase = code.match(/decision\.show \? \{ kind: 'consent' \} : \{ kind: 'input' \}/);
+    expect(phase, '初始相位不再由那一刀决定：判据要按新形状重读').toBeTruthy();
+  });
+
+  it('🔴 开启共享前先问 `shouldShowConsent(`，没确认过只弹面不建共享', () => {
+    const code = stripComments(read('apps/mobile/src/screens/ShareSpaceScreen.tsx'));
+    const calls = code.match(/shouldShowConsent\(/g) ?? [];
+    expect(calls.length, '共享主屏没有同意闸调用点 ⇒ 手机上点一下就把它人清单变成共享').toBe(1);
+    const gate = code.match(/if \(decision\.show\)[\s\S]{0,120}/);
+    expect(gate, '闸门分支形状变了：判据要按新形状重读').toBeTruthy();
+    expect(gate![0], 'show=true 那一支没去弹同意面 = 闸形同虚设').toContain('setConsentFor');
   });
 });
 
