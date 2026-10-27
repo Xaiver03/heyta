@@ -1865,3 +1865,34 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 
 ⇒ **下一段工作变清楚了**（不再是"等装机"）：Android 界面腿要新写一枚装置 —— **APK 在 `windows-pc` 出（那条长期令不变）→ 拉到 `linux-dev` → 装进这枚 AVD → 驱动它跑与 iOS 同一条协作旅程**，
 而服务端要能从 `linux-dev` 访问到（跨机地址，不是 `127.0.0.1`）。这一枚装置是新增工作量，iOS 那枚脚本的结构可以复用，但按压通道与取证得换成 `adb`/`uiautomator` 那一套。
+
+### 9.38 同意面重做（负责人 2026-10-27 22:3x 的两条令）——先把形状与射程钉死，代码下一批落地
+
+负责人原话两条：① **「直接说『分享清单』『加入清单』就可以了，干嘛搞那么复杂呢」**；② **「各种东西应该放在一个 tool tip 里面，而不是放一大段说明文字」**。
+现量的起点（别照旧文档施工）：同一枚 `packages/ui/src/sync/ShareConsentModal.tsx` 被**四处**复用 ——
+`apps/mobile/src/screens/ShareSpaceScreen.tsx`（手机·分享侧）、`apps/mobile/src/screens/JoinShareScreen.tsx`（手机·加入侧）、
+`apps/web/src/features/share/ShareFeature.tsx`（网页·分享侧）、`apps/web/src/features/share/JoinSharedListDialog.tsx`（网页·加入侧）；
+文案走 `common.share.consent.*`（唯一事实源在 `packages/i18n`），条款清单在 `share-consent-model.ts` 的 `SHARE_CONSENT_SCOPE_KEYS`。
+
+**要改成什么（逐格，可判红）**
+
+| 那一格 | 现在 | 改成 |
+|---|---|---|
+| 标题 | 两侧共用一句「共享清单」（`consent.title`） | **按语境两颗键**：分享侧「分享清单」／加入侧「加入清单」 |
+| 正文 | 一句长说明 + 一块三行披露面 | **一行短话**（分享侧一句、加入侧一句），细节不再平铺 |
+| 细节（谁可见／服务端记什么／不影响别的清单／端到端加密） | 常驻在面板里 | **收进提示**：网页＝悬停 ⓘ 气泡；手机＝点 ⓘ 展开的浮层 |
+
+🔴 **两壳形态不同是有意的，必须写进注释与判据**（否则下一位会"统一"成悬停那一形，手机上就成了一条拿不到的信息）：
+触屏没有 hover，所以手机侧那枚 ⓘ 只能是**点击展开**；网页侧用悬停。判据要**各端各钉一发**，
+不许用一条"两边都有 tooltip"的合取糊过去 —— 那正是 #598 那一族（一句理由只读了两端）。
+
+**射程清单（动这些，别多动）**：`ShareConsentModal.tsx` 的布局与 `labels` 形状、`share-consent-model.ts` 的键表、
+`packages/i18n/src/locales/{zh-CN,en}.ts` 的新旧词条（`consent.*` 家族，两语各一枚都不能少，`check:i18n-vars` 会抓）、
+四处调用点传的 label 集、常驻判据 `apps/web/tests/share-consent-modal-theme.spec.tsx`（暗色那半必须一起改，别只改亮色）、
+`apps/mobile/tests/share-ui-assembly.spec.ts` 里钉同意面的那一组，以及 PIPL 那条**默认不勾 + 取消不是同意**的红线（这两条不许在重排时丢）。
+验收照 §6.2：`pnpm verify:collab-journey` 重跑后**逐张看截图**（同意面那张会变），并给新形状补一枚能红的判据（标题按语境分叉：拿分享侧的树去断言「加入清单」必须红）。
+
+**下一批的 Android 那格（同一条令的连带结果）**：载体已换成 `linux-dev`（§9.37，25 秒起到可用），
+剩下的不是装机而是**新写一枚装置**：APK 仍按长期令在 `windows-pc` 出 → 拉到 `linux-dev` → `adb install` 进那枚 AVD → 驱动与 iOS 同一条协作旅程。
+⚠️ 服务端必须让远端设备访问得到（`127.0.0.1` 在跨机那一趟不成立，这枚坑 #590 那一族已经记过），
+装置结构可参照 `scripts/verify-mobile-collab-ios.sh`，但按压与取证要换成 `adb` / `uiautomator` 那一套。
