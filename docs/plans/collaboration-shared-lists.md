@@ -1426,3 +1426,49 @@ git diff --name-only 0cdaf8fdf <你此刻的 HEAD> -- apps/mobile/src apps/mobil
 本线那把尺的最近一次读数仍是 §9.19 的 `SUITE=OK legs=4 failed=0`，**对 `fb0e7c107` 那一棵成立**
 （那一批的末笔，取法：`git --no-pager log --oneline -1 -S'9.19 ' -- docs/plans/collaboration-shared-lists.md`）。
 恢复条件与命令：设备面空 + 无外来套件 + `apps/mobile` 干净时跑 `pnpm verify:collab-suite`。
+
+### 9.26 执行序第 3 步那一格收口：「没有输入」从一句人记着的话变成一枚双向判据（2026-10-27 第十二批）
+
+任务书第 3 步第三句点名要接 `shouldNotifyTaskReminder` / `shouldAutoAcceptInvitation` 的数据面。
+**现量起点（别照文档施工）**：这两枚符号今天**在仓里不存在** ——
+`git grep -n 'shouldNotifyTaskReminder\|shouldAutoAcceptInvitation' -- packages apps server` 读回 **0 行**。
+它们连同两档偏好在 2026-10-24 被整条删掉（`packages/ui/src/sync/notification-model.ts` 那段注释记着理由），
+删的理由不是"没写完"，是**没有输入**：前者判 `Task.assigneeUserId`，后者要一份"合作者名单"。
+
+逐条复账到代码级（三条都是当趟现量，不是引用旧文）：
+
+| 前提 | 今天 | 所以这一格 |
+|---|---|---|
+| `assigneeUserId` 有写点吗 | **零**。全仓非测试命中 3 处，逐枚读正文：实体声明 1（`packages/domain/src/entities.ts`）、`dist` 抄件 1、那段注释自己 1 | 输入不存在 ⇒ 不能"接上"，接上就是一档永远同形的假开关 |
+| "合作者名单"存在吗 | **不存在**，且它一旦落地要**先过 ADR-0071 那面同意闸** —— 自动加入 = 绕过同意面 | 属**要先新立 ADR 的口径变更**，不是接线工作（硬边界那条：不动已接受 ADR 的结论） |
+
+于是这一格按"能不能被下一次提交悄悄推翻"来收：**给它一枚会自己红的闹钟**，而不是登记成"等有人做指派时记得回来加"。
+`packages/ui/tests/notification-model.spec.ts` 新增那一组（两枚 `it`）把原来单向的钉子做成双向 ——
+旧的那半判"**加档位没输入**会红"，缺的那半是"**输入出现了而档位没回来**"，
+后者今天结构上不可能红（指派 op 一旦落地，链上没有任何装置会发现偏好面还缺那一档）。
+
+判据形状三条（都是本线反复欠的那几形，逐条对上）：
+1. **规则只有一个所有者**：`assignmentWriteSites` / `assignmentGap` 是纯函数，生产断言与变异臂调的是同一枚，
+   臂里不另写一遍规则（仓内同纪律见 `research/tools/mutation-rigs/README.md` 与 §7 #598 那段"判据形状三条"）。
+2. **分母现取、不手写包名**：`packages/*`、`apps/*`、`server/src` 各自现读，枚数由装置自己打印
+   （当趟 `[assignment-gap 分母] 候选文件 1041 枚 · 含该字段的 2 枚 · 声明行 3 行`）。
+   写死六枚包名 = 下一个新包里落地写点时这把尺是瞎的。
+3. **三枚臂各证一环**：合成输入证**谓词**分得清"写点 / 可选字段声明 / 注释行 / `.d.ts`"；
+   条件那一支用两枚相反输入走到过（`assignmentGap(1, 现键集)=true`、`(1, 含 taskReminder)=false`），
+   否则"今天 0 写点"那支恒不进入＝条件臂是装饰；
+   第三枚把写点**接到一枚真被扫到的文件正文尾巴上**，证的是"遍历器 + 谓词"这一整条链会红 ——
+   前两枚都证不到这一条。**全程内存副本，工作树一字未动**（共享检出里原地注病灶会被并行构建编进产物）。
+
+两处当场修掉的自己的错：① 仓库根先用了 `new URL('../../..', import.meta.url).pathname` ⇒
+本仓路径里有空格，被 percent-encode 成 `All%20in%20one%20Data`，每一枚目录都 ENOENT ——
+**长得就像"目录不存在 ⇒ 没有写点"**，换成 `join(dirname(fileURLToPath(import.meta.url)), '../../..')` 才对；
+② 取 rc 时把 `tsc … | head` 串在一条管道里，`$?` 读的是 `head` 的 0 ——
+同一个会话里第二次踩"管道尾巴吃 rc"，改回**先重定向到文件、单独 printf `$?`**。
+
+读数（串行）：`cd packages/ui && npx vitest run tests/notification-model.spec.ts` ⇒ **5 passed**；
+整包 `npx vitest run` ⇒ `Test Files 51 passed (51)`、`Tests 737 passed (737)`；
+`pnpm --filter @heyta/ui typecheck` ⇒ **rc=0**（⚠️ 该包的 typecheck 走 `tsconfig.spec.json`，
+**含 `tests/`** ⇒ 这枚 rc=0 真覆盖新增那两枚 `it`，与移动壳那把不含 tests 的尺不同，别混着引用）。
+
+⇒ **执行序第 3 步三格到这一笔全部有归属**：轮询改信号驱动（已落地）、通知内容口径（ADR-0071 已落地）、
+这一格（**判为"今天不能接"+ 一枚双向常驻判据守着它哪天能被接**）。
