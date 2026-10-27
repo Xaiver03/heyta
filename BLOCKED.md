@@ -12505,3 +12505,55 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
    新门把它归在"拒跑但报数"（不并进红，否则第二天有人把整把尺放宽）。谁要清那台失效装置请先认领它。
 2. `e2e/playwright.multi-end.config.ts` 的 0 枚举是**按设计**的：它要 `HEYTA_MULTI_END_HANDLE` 由 shell 脚本注入，
    没传就抛错。本门特意把这一类与编译红分开判。
+
+### B237（2026-10-27 · 本会话：B232 那三格发完之后逐格复量）**线上落地页的「登录」入口已经好了，但同一趟里那枚"停在第 9 步"的失败文案是假的 —— 两件事都记，因为它们属于同一族"探针/文案读的是旧前提"**
+
+**先答 B232 那三格（现量，发布之后取的，不是发布前）**：
+
+| 那一格 | 复量读数 | 命令 |
+|---|---|---|
+| 导航「登录」的 href 带 `?signin`，点了真的开面板 | ✅ 中/英两档 + `/signin/` 退出页三条全过 | `cd e2e && npx playwright test --config playwright.live-site.config.ts live-signin-entry` |
+| 线上那份产物是不是当前的这一份 | ✅ 首页引用的 JS 不再是 B232 点名的旧文件名；线上产物与本机 HEAD 构建**逐枚 sha256 相同**（落地页与 web 壳各若干枚，枚数由 `index.html` 自己那一份引用清单现量，别在这里抄） | 见下"字节对账"那条 |
+| 五张凭据页与各自脚本在线上仍可达 | ✅ 每页 200 且它引的脚本 200，错误形状仍是机器可读的 code | `cd e2e && npx playwright test --config playwright.live-site.config.ts live-credential` |
+
+⚠️ B232 里那句"`/legal/ai-and-transfer/` 要有尚未生效横幅"这条**判据的前提已经不成立**了：那份文档在
+`packages/legal/src/documents/ai-and-transfer.ts` 里现在是 `status: 'effective'`（2026-10-26 那条线自己改的），
+而横幅只在 draft 时渲染（`apps/landing/src/pages/LegalDocumentPage.tsx` 那一格）。所以线上没横幅是**对的**，
+红的是 `e2e/live-site/live-legal.spec.ts` 那句一刀切的 `hasDraftBanner` 期望 —— 修法归法务文案那条线，
+本会话不代改判据口径（这条挂 R-legal，见下"还欠谁"那格）。
+
+**字节对账那格为什么值得单独写**：第一发探针是拿 `curl` 读首页、再拿正则找 `/assets/…`，读回来两枚"不匹配"，
+**都是探针自己的错**（zsh 按空白拆词把多行引用清单打散；第二发漏了带挂载前缀的 `/app/assets/…` 那一类写法）。
+⇒ 判"线上产物与仓库输入对不对得上"，分母要**从 `index.html` 自己引的那一份清单里读**，把挂载前缀剔掉之后
+再逐枚比 sha256；一把只扫某套写法的尺读出来的"缺"不是缺（同族：§7 那三条元规则里的"探针读 0 只说明它扫的那套写法里没有"）。
+
+### B237 追记：发布工具那句失败文案是一枚**会骗人回滚的常量**（当场修，配 P30–P33 四臂）
+
+这一趟九步链真的停在第 9 步（线上验收），而第 7、8 步两条 `rsync -az --delete` 当时**已经 exit 0 跑完** ——
+`research/tools/publish-public-sites.mjs` 照旧打印"后面的 rsync 一条都没执行"。读到那句的人会判成"线上没动过"，
+于是跳过回滚，而 `/var/www/heyta-landing` 与 `/var/www/heyta-app` 那一刻已经是这一份产物了。
+**回滚路径上的一句假话比没有这句话更糟**，所以它算缺陷不算措辞偏好。
+
+修完的形状：`failureNotice()` 按 `failedIndex` 现量 —— 一条 rsync 都没跑就说"不用回滚"，
+已经跑成就点名是哪几个目的地并给出现成的还原取法（`ssh <host> 'ls -t /tmp/heyta-public-backup-*.tgz | head -1'`）。
+
+🔴 **P33 第一版是我自己造的假红，记下来因为它和上面那格同族**：那条臂要钉的是"执行链上的 catch 不许被写回那句绝对话"，
+而我把它写成 `readFileSync(SELF)` **扫整份文件** —— 那句旧文案此刻合规地坐在两处散文里（函数头的事故说明、
+以及 dry-run 那句"上面每一步都没执行"），于是干净树上直接红。第二版从**第一枚** `} catch (e) {` 切起，
+本文件有 5 枚 catch（67、77、rig、链上那枚……），切片把注释与散文一起吞进来，照样红。
+第三版才切对：**最后一枚 catch 到它自己的 `process.exit(e.status`**，锚点找不到就直接判红（"扫不到也算红"）。
+⇒ 读自身源码的探针，取材面必须切到**它声称在判的那段执行面**，不能扫全文；
+这与本文件变异 rig 头部那条"锚点字符串坐在同一份文件里 ⇒ 命中 2 次"是同一族，只是这次needle 扫的是散文不是锚点。
+
+变异轮实测（`cp` 到 `.mut-bak`、改回旧常量、从 `.mut-bak` 还原，不从 git 还原）：
+`node research/tools/publish-public-sites.mjs --selftest` ⇒ **P30/P31/P32 全绿、只有 P33 红、rc=1**；
+还原后臂数与红数由脚本自己打印（本会话那一戳：27 · 红 0）。
+⇒ 只判函数本身的那三条臂盖不住"执行链被写回"这一格，P33 是它唯一的消费者。
+
+### 还欠谁（都不归本会话代做）
+
+| 格 | 为什么不归我 | 现量 |
+|---|---|---|
+| R-legal：`live-legal.spec.ts` 那句一刀切 `hasDraftBanner` | 判据口径归法务文案那条线；改成"按 `status` 分档期望"要动他们的断言 | `grep -n hasDraftBanner e2e/live-site/live-legal.spec.ts` |
+| `main` 的上游还指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动。推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref main@upstream`；落后枚数 `git rev-list --count main@upstream..main` |
+| `apps/web/evidence/**` 与两枚台账此刻脏着 | 别的会话**正在写**（mtime 与本轮同一分钟内），代提交=替他们半份落仓；证据片那一族他们自己已登记"永久剔出输入面分母" | `git status --porcelain -uall`；`stat -f "%Sm %N" docs/plans/collaboration-shared-lists.md` |
