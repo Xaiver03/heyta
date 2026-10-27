@@ -219,6 +219,7 @@ import {
   saveAiSettings,
   toHealthSnapshot,
 } from './features/settings/aiStore.js';
+import { configureWebInboundDeps, startWebInboundWorker } from './features/settings/inbound-lifecycle.js';
 import { FocusDetailPane } from './features/focus/FocusDetailPane.js';
 import { FocusTimer } from './features/focus/FocusTimer.js';
 import { TrashView } from './features/trash/TrashView.js';
@@ -1030,6 +1031,18 @@ export function App(): React.JSX.Element {
   );
   // 🔴 密钥只在内存里，只活在这个标签页（Web 没有系统钥匙串）
   const [aiSecrets] = useState(createSessionSecretStore);
+
+  /**
+   * 自动收集那条 worker 循环挂在**应用级**，不挂在设置面板上。
+   *
+   * 🔴 原来它挂在 `InboundAutomationSettings` 的 effect 里，于是"离开设置视图 = 停止收集"，
+   * 而用户理解的那句是"开着 heyta 就会收"。协议 §8 承诺的边界是前台执行 —— 前台指的是
+   * 这个应用可见，不是某一屏正显示着。闸门（可见性、路由、Vault、出境同意）仍在循环里逐趟现读。
+   */
+  useEffect(() => {
+    configureWebInboundDeps({ routing: aiSettings.routing, consents: aiSettings.consents, secretStore: aiSecrets });
+  }, [aiSecrets, aiSettings]);
+  useEffect(() => startWebInboundWorker(), []);
 
   /**
    * 右栏（`.ht-app__detail`）此刻**占不占位置**。

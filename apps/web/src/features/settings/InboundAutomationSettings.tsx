@@ -2,9 +2,6 @@ import './inbound-automation.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createInboundRulesRemote,
-  startInboundWorkerLoop,
-  INBOUND_AUTOMATION_SYSTEM_PROMPT,
-  type InboundWorkerLoop,
   type InboundAutomationField,
   type InboundAutomationRule,
   type InboundAutomationEventSummary,
@@ -58,7 +55,8 @@ export function timezoneOptions(current: string): string[] {
   return [trimmed, ...zones];
 }
 import { consentFetch } from '../privacy/consent-gate.js';
-import { ensureWebInboundRecipientKey, hasWebInboundWorker, processWebInboundOnce, registerWebInboundWorker, rotateWebInboundRecipientKey, webInboundDraftReviewer } from './inbound-runtime.js';
+import { ensureWebInboundRecipientKey, registerWebInboundWorker, rotateWebInboundRecipientKey, webInboundDraftReviewer } from './inbound-runtime.js';
+import { configureWebInboundDeps, refreshWebInboundReadiness, triggerWebInboundPass, useWebInboundWorker } from './inbound-lifecycle.js';
 
 const FIELD_ORDER: readonly InboundAutomationField[] = [
   'title', 'note', 'priority', 'projectId', 'dueDate', 'startDate', 'durationMinutes',
@@ -107,12 +105,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
-  const [recipient, setRecipient] = useState<{ keyEpoch: number; packageVersion: number } | undefined>();
-  const [workerRegistered, setWorkerRegistered] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const processingRef = useRef(false);
-  const workerLoop = useRef<InboundWorkerLoop | undefined>(undefined);
-  const [processState, setProcessState] = useState<'idle' | 'failed' | InboundAutomationCycleState>('idle');
+  const { keyEpoch, workerRegistered, processing, cycle: processState, failure } = useWebInboundWorker();
   const [editingRuleId, setEditingRuleId] = useState<string | undefined>();
   const [keyId, setKeyId] = useState('default');
   const [allowedFields, setAllowedFields] = useState<InboundAutomationField[]>(['title']);
@@ -141,20 +134,24 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
         const credentialResults = await Promise.allSettled(nextRules.filter((rule) => rule.deletedAt === null).map(async (rule) => [rule.id, await remote.listSenderCredentials(rule.id)] as const));
         setCredentials(Object.fromEntries(credentialResults.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])));
       } else setEvents([]);
-      if (accountId !== undefined && token !== undefined) {
-        const response = await consentFetch(new URL('/api/automation/recipient-key', baseUrl), { headers: { authorization: `Bearer ${token}` } });
-        if (response.ok) {
-          const body = await response.json() as { keyEpoch?: number; packageVersion?: number };
-          if (typeof body.keyEpoch === 'number' && typeof body.packageVersion === 'number') setRecipient({ keyEpoch: body.keyEpoch, packageVersion: body.packageVersion });
-        } else setRecipient(undefined);
-        setWorkerRegistered(await hasWebInboundWorker({ accountId, baseUrl, token }));
-      }
+      await refreshWebInboundReadiness();
     }
     catch { setError(t('web.ai.inbound.error.load')); }
     finally { setLoading(false); }
   }, [accountId, active, baseUrl, remote, t, token]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  /**
+   * 循环跑完一趟就重新拉一次接收记录：处理动作现在可能发生在面板看不见的地方，
+   * 而这条列表是用户判断"那条到底进没进来"的唯一依据 —— 让它等下一次手动刷新就是假绿。
+   */
+  const lastCycle = useRef(processState);
+  useEffect(() => {
+    if (lastCycle.current === processState) return;
+    lastCycle.current = processState;
+    void refresh();
+  }, [processState, refresh]);
 
   const closeDraft = useCallback((): void => {
     draftGeneration.current++;
@@ -320,7 +317,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
   const setupRecipient = async (): Promise<void> => {
     if (!accountId || !token) return;
     setBusy('recipient'); setError(undefined);
-    try { const value = await ensureWebInboundRecipientKey({ accountId, baseUrl, token }); setRecipient({ keyEpoch: value.keyEpoch, packageVersion: value.packageVersion }); }
+    try { await ensureWebInboundRecipientKey({ accountId, baseUrl, token }); await refreshWebInboundReadiness(); }
     catch { setError(t('web.ai.inbound.error.key')); }
     finally { setBusy(undefined); }
   };
@@ -328,7 +325,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
   const rotateRecipient = async (): Promise<void> => {
     if (!accountId || !token) return;
     setBusy('recipient'); setError(undefined);
-    try { const value = await rotateWebInboundRecipientKey({ accountId, baseUrl, token }); setRecipient({ keyEpoch: value.keyEpoch, packageVersion: value.packageVersion }); }
+    try { await rotateWebInboundRecipientKey({ accountId, baseUrl, token }); await refreshWebInboundReadiness(); }
     catch { setError(t('web.ai.inbound.error.key')); }
     finally { setBusy(undefined); }
   };
@@ -336,60 +333,23 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
   const setupWorker = async (): Promise<void> => {
     if (!accountId || !token) return;
     setBusy('worker'); setError(undefined);
-    try { await registerWebInboundWorker({ accountId, baseUrl, token }); setWorkerRegistered(true); }
+    try { await registerWebInboundWorker({ accountId, baseUrl, token }); await refreshWebInboundReadiness(); }
     catch { setError(t('web.ai.inbound.error.worker')); }
     finally { setBusy(undefined); }
   };
 
-  const processOne = useCallback(async (): Promise<void> => {
-    if (processingRef.current || !accountId || !token || recipient === undefined || !workerRegistered) return;
-    processingRef.current = true;
-    setProcessing(true); setProcessState('idle'); setError(undefined);
-    try {
-      const result = await processWebInboundOnce({ accountId, baseUrl, token, keyEpoch: recipient.keyEpoch,
-        assertCurrent: () => {
-          const live = useSyncStore.getState();
-          if (live.accountId !== accountId || live.baseUrl !== baseUrl || live.token !== token ||
-              liveWorker.current.processOne !== processOne || !liveWorker.current.runnable || document.visibilityState !== 'visible') {
-            throw new Error('Inbound processing session changed');
-          }
-        },
-        // The server claim snapshot is authoritative. These values are only
-        // compatibility fallbacks for old fixtures and never select a rule.
-        allowedFields: ['title'], maxItems: 50, parseVersion: 1,
-        routing, consents, secretStore, systemPrompt: INBOUND_AUTOMATION_SYSTEM_PROMPT, });
-      setProcessState(result.state);
-      await refresh();
-    } catch { setProcessState('failed'); setError(t('web.ai.inbound.error.process')); }
-    finally { processingRef.current = false; setProcessing(false); }
-  }, [accountId, baseUrl, consents, recipient, refresh, routing, secretStore, token, workerRegistered, t]);
-
-  const liveWorker = useRef({ processOne, runnable: false });
+  /**
+   * 面板把自己这三样闸门交给那枚应用级循环 —— 处理动作本身不在这里跑（原来在这里，
+   * 于是"离开设置视图 = 停止收集"）。这里只登记闸门：`routing`/`consents` 一变，
+   * 循环下一趟现读的就是新值。
+   */
   useEffect(() => {
-    // 🔴 这里刻意不吃 `active`：离开这一节只让列表停显示，不该让收集停摆（见 refresh 上面那段）。
-    liveWorker.current = { processOne, runnable: workerRegistered && recipient !== undefined && routing.enabled && rules.some((item) => item.enabled) };
-  }, [processOne, recipient, routing.enabled, rules, workerRegistered]);
-
-  useEffect(() => {
-    const stop = startInboundWorkerLoop({
-      processOnce: () => liveWorker.current.processOne(),
-      isRunnable: () => document.visibilityState === 'visible' && liveWorker.current.runnable,
-      onError: () => undefined,
-    });
-    workerLoop.current = stop;
-    const onFocus = (): void => { void stop.wake(); };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onFocus);
-    return () => {
-      liveWorker.current.runnable = false;
-      window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus);
-      stop(); workerLoop.current = undefined;
-    };
-  }, []);
+    configureWebInboundDeps({ routing, consents, secretStore });
+  }, [consents, routing, secretStore]);
 
   const readinessMessage = !signedIn
     ? t('web.ai.inbound.status.signIn')
-    : recipient === undefined
+    : keyEpoch === undefined
       ? t('web.ai.inbound.status.key')
       : !workerRegistered
         ? t('web.ai.inbound.status.worker')
@@ -398,6 +358,8 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
           : t('web.ai.inbound.status.ready');
 
   const processCopyKey = processState === 'idle' ? undefined : PROCESS_COPY[processState];
+  // 处理回执现在住在循环那一侧（面板不再是那趟处理的发起者），本地那条错误信息优先。
+  const shownError = error ?? (failure ? t('web.ai.inbound.error.process') : undefined);
 
   return (
     <section className="ht-settings__subsection" data-testid="inbound-automation-settings">
@@ -426,9 +388,9 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
         <>
           <div className="ht-inbound__group">
             <p className="ht-settings__hint" role="status">{readinessMessage}</p>
-            <p className="ht-settings__hint tabular-nums" role="status">{recipient === undefined ? t('web.ai.inbound.keyMissing') : t('web.ai.inbound.keyReady', { epoch: recipient.keyEpoch })}</p>
+            <p className="ht-settings__hint tabular-nums" role="status">{keyEpoch === undefined ? t('web.ai.inbound.keyMissing') : t('web.ai.inbound.keyReady', { epoch: keyEpoch })}</p>
             <div className="ht-settings__actions">
-              {recipient === undefined ? <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void setupRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keySetup')}</button> : <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void rotateRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keyRotate')}</button>}
+              {keyEpoch === undefined ? <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void setupRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keySetup')}</button> : <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void rotateRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keyRotate')}</button>}
               <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void setupWorker()} disabled={busy !== undefined}>
                 {workerRegistered ? t('web.ai.inbound.workerReady') : t('web.ai.inbound.workerSetup')}
               </button>
@@ -487,7 +449,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
             那句是"我问到了，答案是没有"，而失败是"我没问到"。两条同时出现，
             用户不知道到底是没有、还是没连上 —— 空态只在**真的读成功且为空**时出现。
           */}
-          {error ? <p className="ht-settings__danger" role="alert">{error}</p> : null}
+          {shownError ? <p className="ht-settings__danger" role="alert">{shownError}</p> : null}
           <div className="ht-inbound__stack" aria-live="polite">
             {rules.map((rule) => <article className="ht-inbound__group" key={rule.id} data-testid={`inbound-rule-${rule.id}`}>
               <strong className="tabular-nums">{rule.keyId}</strong>
@@ -513,7 +475,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
               </aside> : null}
               <div className="ht-settings__actions">
                 {rule.deletedAt === null ? <>
-                  {rule.enabled ? <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined || processing || !workerRegistered} onClick={() => void workerLoop.current?.wake()}>{t('web.ai.inbound.processOne')}</button> : null}
+                  {rule.enabled ? <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined || processing || !workerRegistered} onClick={triggerWebInboundPass}>{t('web.ai.inbound.processOne')}</button> : null}
                   <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => beginEdit(rule)}>{t('web.ai.inbound.edit')}</button>
                   <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void updateRule(rule, !rule.enabled)}>
                     {rule.enabled ? t('web.ai.inbound.pause') : t('web.ai.inbound.enable')}
@@ -539,7 +501,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
               所以没有可转交给 `testID` 的定位钩子；刻意也不新造一个 ——
               断言 B 用 `*empty*` 的 testid 字面形态识别手写站点。
             */}
-            {!loading && error === undefined && rules.length === 0 ? (
+            {!loading && shownError === undefined && rules.length === 0 ? (
               <HeytaUiProvider>
                 <EmptyState title={t('web.ai.inbound.empty')} size="line" />
               </HeytaUiProvider>

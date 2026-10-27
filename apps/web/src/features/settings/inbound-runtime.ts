@@ -160,6 +160,20 @@ export async function registerWebInboundWorker(input: { accountId: string; baseU
   } finally { root.root.fill(0); }
 }
 
+/**
+ * 收件包的**只读**事实（当前 `keyEpoch` 与包版本），没有登记或读不到都回 `undefined`。
+ *
+ * 🔴 为什么单独一枚函数：设置面板与那条常驻循环要问的是同一件事，而轮换密钥发生在
+ * 另一台设备上时，只有"每次开工前现问一次"才看得见（面板不在前台时没人替它刷新）。
+ * 两处各自 `consentFetch` 一次就是双事实源 —— 循环与面板必须走这同一枚读法。
+ */
+export async function getWebInboundRecipientKey(input: { accountId: string; baseUrl: string; token: string }): Promise<{ keyEpoch: number; packageVersion: number } | undefined> {
+  const response = await consentFetch(new URL('/api/automation/recipient-key', input.baseUrl), { headers: { authorization: `Bearer ${input.token}` } });
+  if (!response.ok) return undefined;
+  const body = await response.json() as { keyEpoch?: number; packageVersion?: number };
+  return typeof body.keyEpoch === 'number' && typeof body.packageVersion === 'number' ? { keyEpoch: body.keyEpoch, packageVersion: body.packageVersion } : undefined;
+}
+
 export async function hasWebInboundWorker(input: { accountId: string; baseUrl: string; token: string }): Promise<boolean> {
   const db = await adapter();
   const secrets = createVaultWrappedAutomationWorkerStore(db, async () => {

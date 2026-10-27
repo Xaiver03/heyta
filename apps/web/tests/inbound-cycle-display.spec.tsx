@@ -20,24 +20,32 @@ vi.mock('../src/features/sync/store.js', () => ({ useSyncStore: Object.assign(
 vi.mock('../src/features/privacy/consent-gate.js', () => ({ consentFetch: mocks.fetch }));
 vi.mock('../src/features/settings/inbound-runtime.js', () => ({
   hasWebInboundWorker: async () => true,
+  // 收件包那枚只读事实现在由那枚应用级循环与面板共用同一枚读法（`inbound-lifecycle.ts`），
+  // 面板不再自己 GET —— 这里不替它 mock 上，处理那一趟会因为拿不到 epoch 而根本不发。
+  getWebInboundRecipientKey: async () => ({ keyEpoch: 1, packageVersion: 1 }),
   processWebInboundOnce: mocks.process,
   ensureWebInboundRecipientKey: vi.fn(), registerWebInboundWorker: vi.fn(), rotateWebInboundRecipientKey: vi.fn(),
 }));
 
 import { InboundAutomationSettings, PROCESS_COPY } from '../src/features/settings/InboundAutomationSettings.js';
+import { startWebInboundWorker } from '../src/features/settings/inbound-lifecycle.js';
 
 const PREFIX = 'web.ai.inbound.process.';
 type Catalog = Record<string, string>;
 const processKeys = (catalog: Catalog): readonly string[] =>
   Object.keys(catalog).filter((key) => key.startsWith(PREFIX)).map((key) => key.slice(PREFIX.length));
 
-afterEach(() => { vi.clearAllMocks(); });
+let stopWorker: (() => void) | undefined;
+afterEach(() => { vi.clearAllMocks(); stopWorker?.(); stopWorker = undefined; });
 
 /** 面板挂起来，回到「处理一条待收件」可点、一次处理正悬在途的状态。 */
 async function openPanel(): Promise<{ container: HTMLElement; root: Root; settle: (value: { state: InboundAutomationCycleState }) => void; fail: (error: Error) => void }> {
   // 同一笔用例里会挂两次面板，而 spy 是模块级共享的：不先归零，"这一次点击发出了一次处理"
   // 就会读成两次（本用例第一次真跑就是这么红的，不是产品发了一遍）。
   mocks.process.mockClear();
+  // 🔴 处理动作现在归那枚应用级循环，所以这里必须先把挂载点交出去（生产里由 `App.tsx` 做）：
+  // 顺序要在这之前 —— 循环构造时发的那一趟唤醒落在"闸门还没登记"上，正好是惰性的。
+  stopWorker ??= startWebInboundWorker();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
