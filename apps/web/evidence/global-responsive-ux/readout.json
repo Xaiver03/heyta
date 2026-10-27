@@ -52,14 +52,35 @@
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 12,
+        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 0,
+        "scrollWidth": 14,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
         "clientWidth": 0,
         "scrollWidth": 12,
         "overflowX": "visible",
@@ -69,6 +90,27 @@
         "selector": "p.",
         "clientWidth": 0,
         "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -113,48 +155,6 @@
         "scrollWidth": 8,
         "overflowX": "visible",
         "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -169,6 +169,27 @@
         "selector": "main.ht-main",
         "clientWidth": 784,
         "scrollWidth": 788,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -619,6 +640,34 @@
         "scrollWidth": 68,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -634,6 +683,34 @@
         "clientWidth": 4,
         "scrollWidth": 68,
         "overflowX": "hidden",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
         "expectedScrollable": false
       }
     ],
@@ -2445,14 +2522,35 @@
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 12,
+        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 0,
+        "scrollWidth": 14,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
         "clientWidth": 0,
         "scrollWidth": 12,
         "overflowX": "visible",
@@ -2462,6 +2560,27 @@
         "selector": "p.",
         "clientWidth": 0,
         "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -2506,48 +2625,6 @@
         "scrollWidth": 8,
         "overflowX": "visible",
         "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -2562,6 +2639,27 @@
         "selector": "main.ht-main",
         "clientWidth": 413,
         "scrollWidth": 417,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -3012,6 +3110,34 @@
         "scrollWidth": 68,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -3027,6 +3153,34 @@
         "clientWidth": 4,
         "scrollWidth": 68,
         "overflowX": "hidden",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
         "expectedScrollable": false
       }
     ],
@@ -3989,6 +4143,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -4106,6 +4267,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -4223,6 +4391,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -4340,6 +4515,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1068,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -4457,6 +4639,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -4574,6 +4763,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -4691,6 +4887,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -4824,14 +5027,35 @@
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 12,
+        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 0,
+        "scrollWidth": 14,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
         "clientWidth": 0,
         "scrollWidth": 12,
         "overflowX": "visible",
@@ -4841,6 +5065,27 @@
         "selector": "p.",
         "clientWidth": 0,
         "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -4899,51 +5144,31 @@
         "scrollWidth": 8,
         "overflowX": "visible",
         "expectedScrollable": false
-      },
+      }
+    ],
+    "layoutOverflow": [
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 30,
-        "scrollWidth": 50,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       }
     ],
-    "layoutOverflow": [],
     "wraps": [],
     "offscreen": [],
     "rail": {
@@ -5256,6 +5481,34 @@
         "scrollWidth": 68,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -5264,6 +5517,34 @@
         "clientWidth": 4,
         "scrollWidth": 68,
         "overflowX": "hidden",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
         "expectedScrollable": false
       }
     ],
@@ -6006,7 +6287,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -6102,7 +6383,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -6198,7 +6479,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -6294,7 +6575,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 814,
+        "scrollWidth": 1068,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -6390,7 +6671,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -6486,7 +6767,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -6582,7 +6863,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -6697,14 +6978,35 @@
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 12,
+        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 0,
+        "scrollWidth": 14,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
         "clientWidth": 0,
         "scrollWidth": 12,
         "overflowX": "visible",
@@ -6714,6 +7016,27 @@
         "selector": "p.",
         "clientWidth": 0,
         "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -6765,51 +7088,31 @@
         "scrollWidth": 8,
         "overflowX": "visible",
         "expectedScrollable": false
-      },
+      }
+    ],
+    "layoutOverflow": [
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 30,
-        "scrollWidth": 50,
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       }
     ],
-    "layoutOverflow": [],
     "wraps": [],
     "offscreen": [],
     "rail": {
@@ -8069,7 +8372,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -8172,7 +8475,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -8275,7 +8578,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -8378,7 +8681,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 806,
+        "scrollWidth": 1060,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -8481,7 +8784,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -8584,7 +8887,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -8687,7 +8990,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -8802,14 +9105,35 @@
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 12,
+        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 0,
+        "scrollWidth": 14,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
         "clientWidth": 0,
         "scrollWidth": 12,
         "overflowX": "visible",
@@ -8819,6 +9143,27 @@
         "selector": "p.",
         "clientWidth": 0,
         "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -8870,48 +9215,6 @@
         "scrollWidth": 8,
         "overflowX": "visible",
         "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 30,
-        "scrollWidth": 50,
-        "overflowX": "visible",
-        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -8920,6 +9223,27 @@
         "clientWidth": 44,
         "scrollWidth": 48,
         "overflowX": "hidden",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
         "expectedScrollable": false
       }
     ],
@@ -9697,7 +10021,7 @@
         "expectedScrollable": false
       },
       {
-        "selector": "[data-testid=\"activity-cell-2026-07-25\"]",
+        "selector": "[data-testid=\"activity-cell-2026-08-01\"]",
         "clientWidth": 14,
         "scrollWidth": 67,
         "overflowX": "visible",
@@ -9713,7 +10037,7 @@
         "expectedScrollable": false
       },
       {
-        "selector": "[data-testid=\"activity-cell-2026-07-25\"]",
+        "selector": "[data-testid=\"activity-cell-2026-08-01\"]",
         "clientWidth": 14,
         "scrollWidth": 67,
         "overflowX": "visible",
@@ -10289,7 +10613,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -10400,7 +10724,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -10511,7 +10835,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -10622,7 +10946,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 806,
+        "scrollWidth": 1060,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -10733,7 +11057,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -10844,7 +11168,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -10955,7 +11279,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -11085,14 +11409,35 @@
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 12,
+        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 0,
+        "scrollWidth": 14,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
         "clientWidth": 0,
         "scrollWidth": 12,
         "overflowX": "visible",
@@ -11102,6 +11447,27 @@
         "selector": "p.",
         "clientWidth": 0,
         "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -11146,48 +11512,6 @@
         "scrollWidth": 8,
         "overflowX": "visible",
         "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -11202,6 +11526,27 @@
         "selector": "main.ht-main",
         "clientWidth": 784,
         "scrollWidth": 788,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -11652,6 +11997,34 @@
         "scrollWidth": 68,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -11667,6 +12040,34 @@
         "clientWidth": 4,
         "scrollWidth": 68,
         "overflowX": "hidden",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
         "expectedScrollable": false
       }
     ],
@@ -13478,14 +13879,35 @@
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 12,
+        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 0,
+        "scrollWidth": 14,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
         "clientWidth": 0,
         "scrollWidth": 12,
         "overflowX": "visible",
@@ -13495,6 +13917,27 @@
         "selector": "p.",
         "clientWidth": 0,
         "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -13539,48 +13982,6 @@
         "scrollWidth": 8,
         "overflowX": "visible",
         "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -13595,6 +13996,27 @@
         "selector": "main.ht-main",
         "clientWidth": 413,
         "scrollWidth": 417,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -14045,6 +14467,34 @@
         "scrollWidth": 68,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -14060,6 +14510,34 @@
         "clientWidth": 4,
         "scrollWidth": 68,
         "overflowX": "hidden",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
         "expectedScrollable": false
       }
     ],
@@ -15022,6 +15500,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -15139,6 +15624,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -15256,6 +15748,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -15373,6 +15872,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1068,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -15490,6 +15996,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -15607,6 +16120,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -15724,6 +16244,13 @@
         "scrollWidth": 80,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "nav.ht-settings__nav",
+        "clientWidth": 892,
+        "scrollWidth": 1067,
+        "overflowX": "auto",
+        "expectedScrollable": true
       }
     ],
     "layoutOverflow": [],
@@ -15857,14 +16384,35 @@
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 12,
+        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 0,
+        "scrollWidth": 14,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
         "clientWidth": 0,
         "scrollWidth": 12,
         "overflowX": "visible",
@@ -15874,6 +16422,27 @@
         "selector": "p.",
         "clientWidth": 0,
         "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -15932,51 +16501,31 @@
         "scrollWidth": 8,
         "overflowX": "visible",
         "expectedScrollable": false
-      },
+      }
+    ],
+    "layoutOverflow": [
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 30,
-        "scrollWidth": 50,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       }
     ],
-    "layoutOverflow": [],
     "wraps": [],
     "offscreen": [],
     "rail": {
@@ -16289,6 +16838,34 @@
         "scrollWidth": 68,
         "overflowX": "hidden",
         "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -16297,6 +16874,34 @@
         "clientWidth": 4,
         "scrollWidth": 68,
         "overflowX": "hidden",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-workMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 56,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-shortBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakMinutes",
+        "clientWidth": 40,
+        "scrollWidth": 54,
+        "overflowX": "clip",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "#focus-config-longBreakEvery",
+        "clientWidth": 40,
+        "scrollWidth": 48,
+        "overflowX": "clip",
         "expectedScrollable": false
       }
     ],
@@ -17039,7 +17644,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -17135,7 +17740,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -17231,7 +17836,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -17327,7 +17932,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 814,
+        "scrollWidth": 1068,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -17423,7 +18028,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -17519,7 +18124,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -17615,7 +18220,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 700,
-        "scrollWidth": 813,
+        "scrollWidth": 1067,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -17730,14 +18335,35 @@
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 12,
+        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 0,
+        "scrollWidth": 14,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
         "clientWidth": 0,
         "scrollWidth": 12,
         "overflowX": "visible",
@@ -17747,6 +18373,27 @@
         "selector": "p.",
         "clientWidth": 0,
         "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -17798,51 +18445,31 @@
         "scrollWidth": 8,
         "overflowX": "visible",
         "expectedScrollable": false
-      },
+      }
+    ],
+    "layoutOverflow": [
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 30,
-        "scrollWidth": 50,
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       }
     ],
-    "layoutOverflow": [],
     "wraps": [],
     "offscreen": [],
     "rail": {
@@ -19102,7 +19729,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -19205,7 +19832,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -19308,7 +19935,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -19411,7 +20038,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 806,
+        "scrollWidth": 1060,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -19514,7 +20141,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -19617,7 +20244,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -19720,7 +20347,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 330,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -19835,14 +20462,35 @@
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 12,
+        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 0,
+        "scrollWidth": 14,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
         "clientWidth": 0,
         "scrollWidth": 12,
         "overflowX": "visible",
@@ -19852,6 +20500,27 @@
         "selector": "p.",
         "clientWidth": 0,
         "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -19903,48 +20572,6 @@
         "scrollWidth": 8,
         "overflowX": "visible",
         "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 8,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 30,
-        "scrollWidth": 50,
-        "overflowX": "visible",
-        "expectedScrollable": false
       }
     ],
     "layoutOverflow": [
@@ -19953,6 +20580,27 @@
         "clientWidth": 44,
         "scrollWidth": 48,
         "overflowX": "hidden",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field.ht-input-field--stacked",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "label.ht-input-field__label",
+        "clientWidth": 45,
+        "scrollWidth": 58,
+        "overflowX": "visible",
         "expectedScrollable": false
       }
     ],
@@ -20730,7 +21378,7 @@
         "expectedScrollable": false
       },
       {
-        "selector": "[data-testid=\"activity-cell-2026-07-25\"]",
+        "selector": "[data-testid=\"activity-cell-2026-08-01\"]",
         "clientWidth": 14,
         "scrollWidth": 67,
         "overflowX": "visible",
@@ -20746,7 +21394,7 @@
         "expectedScrollable": false
       },
       {
-        "selector": "[data-testid=\"activity-cell-2026-07-25\"]",
+        "selector": "[data-testid=\"activity-cell-2026-08-01\"]",
         "clientWidth": 14,
         "scrollWidth": 67,
         "overflowX": "visible",
@@ -21322,7 +21970,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -21433,7 +22081,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -21544,7 +22192,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -21655,7 +22303,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 806,
+        "scrollWidth": 1060,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -21766,7 +22414,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -21877,7 +22525,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -21988,7 +22636,7 @@
       {
         "selector": "nav.ht-settings__nav",
         "clientWidth": 315,
-        "scrollWidth": 805,
+        "scrollWidth": 1059,
         "overflowX": "auto",
         "expectedScrollable": true
       }
@@ -22106,28 +22754,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -22191,27 +22860,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -22352,28 +23000,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -22451,27 +23120,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -22603,28 +23251,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -22709,27 +23378,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -22853,28 +23501,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -22959,27 +23628,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -23117,28 +23765,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -23202,27 +23871,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -23363,28 +24011,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -23462,27 +24131,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -23614,28 +24262,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -23720,27 +24389,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -23864,28 +24512,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -23970,27 +24639,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -24114,28 +24762,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -24220,27 +24889,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -24324,28 +24972,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -24430,27 +25099,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -24546,28 +25194,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -24652,27 +25321,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -24768,28 +25416,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -24874,27 +25543,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -25011,28 +25659,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -25096,27 +25765,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -25243,28 +25891,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -25328,27 +25997,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -25487,28 +26135,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -25572,27 +26241,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -25731,28 +26379,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -25816,27 +26485,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -25975,28 +26623,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -26060,27 +26729,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -26207,28 +26855,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -26292,27 +26961,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -26451,28 +27099,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -26536,27 +27205,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -26695,28 +27343,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -26780,27 +27449,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -26932,28 +27580,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -27017,27 +27686,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -27178,28 +27826,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -27277,27 +27946,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -27429,28 +28077,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -27535,27 +28204,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -27679,28 +28327,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -27785,27 +28454,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -27943,28 +28591,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -28028,27 +28697,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -28189,28 +28837,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -28288,27 +28957,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -28440,28 +29088,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -28546,27 +29215,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -28690,28 +29338,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -28796,27 +29465,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -28940,28 +29588,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -29046,27 +29715,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -29150,28 +29798,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -29256,27 +29925,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -29372,28 +30020,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -29478,27 +30147,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -29594,28 +30242,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -29700,27 +30369,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 12,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 29,
-        "scrollWidth": 49,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "button.css-view-g5y9jx.r-cursor-1loqt21",
-        "clientWidth": 4,
-        "scrollWidth": 24,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -29837,28 +30485,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -29922,27 +30591,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -30069,28 +30717,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -30154,27 +30823,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -30313,28 +30961,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -30398,27 +31067,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -30557,28 +31205,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -30642,27 +31311,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -30801,28 +31449,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -30886,27 +31555,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -31033,28 +31681,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -31118,27 +31787,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -31277,28 +31925,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -31362,27 +32031,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }
@@ -31521,28 +32169,49 @@
       {
         "selector": "div.ht-material__row-slot",
         "clientWidth": 17,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
         "selector": "div.ht-material.ht-material__row-pop",
         "clientWidth": 24,
-        "scrollWidth": 50,
+        "scrollWidth": 54,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "label.",
+        "selector": "div.ht-input-field.ht-input-field--stacked",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
       {
-        "selector": "span.",
+        "selector": "label.ht-input-field__label",
         "clientWidth": 0,
-        "scrollWidth": 20,
+        "scrollWidth": 23,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__control",
+        "clientWidth": 0,
+        "scrollWidth": 42,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "div.ht-input-field__select",
+        "clientWidth": 0,
+        "scrollWidth": 24,
+        "overflowX": "visible",
+        "expectedScrollable": false
+      },
+      {
+        "selector": "[data-testid=\"organize-move-blocked\"]",
+        "clientWidth": 0,
+        "scrollWidth": 42,
         "overflowX": "visible",
         "expectedScrollable": false
       },
@@ -31606,27 +32275,6 @@
         "selector": "div.css-view-g5y9jx",
         "clientWidth": 4,
         "scrollWidth": 15,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 13,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 10,
-        "overflowX": "visible",
-        "expectedScrollable": false
-      },
-      {
-        "selector": "div.css-view-g5y9jx",
-        "clientWidth": 4,
-        "scrollWidth": 12,
         "overflowX": "visible",
         "expectedScrollable": false
       }

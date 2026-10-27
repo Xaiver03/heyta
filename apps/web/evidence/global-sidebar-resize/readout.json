@@ -10,7 +10,7 @@
       {
         "selector": ".ht-sidebar__body",
         "visible": true,
-        "width": 208,
+        "width": 160,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -32,7 +32,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 848,
+        "width": 896,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -49,7 +49,7 @@
       {
         "selector": ".ht-sidebar__body",
         "visible": true,
-        "width": 208,
+        "width": 384,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -71,7 +71,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 656,
+        "width": 480,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -88,7 +88,7 @@
       {
         "selector": ".ht-sidebar__body",
         "visible": true,
-        "width": 208,
+        "width": 284,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -110,7 +110,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 756,
+        "width": 680,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -784,7 +784,7 @@
       {
         "selector": ".ht-sidebar__body",
         "visible": true,
-        "width": 284,
+        "width": 160,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -806,7 +806,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 772,
+        "width": 896,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -823,7 +823,7 @@
       {
         "selector": ".ht-sidebar__body",
         "visible": true,
-        "width": 284,
+        "width": 384,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -845,7 +845,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 580,
+        "width": 480,
         "horizontalOverflow": 0,
         "spill": []
       }
