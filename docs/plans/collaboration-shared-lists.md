@@ -1023,7 +1023,7 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 
 | 格 | 状态 | 判它的断言 | 归属 |
 |---|---|---|---|
-| **手机上的系统横幅（通知中心之外那一档）** | 🔴 **今天做不到，且不打算在本批做** —— 本机唯一那条原生通道归提醒线，而**两端拦住借道的机制不是同一枚**（2026-10-27 逐端重读；原先这句把 iOS 那一端的机制写成了两端的）：iOS 按 `categoryIdentifier` 整族认领回收（`HeytaReminderModule.swift` 的 `cancelStale` 把该 category 下的 pending 与 delivered 全收进本轮台账，不在排程清单里的那批 `removeDeliveredNotifications`，而唯一的投递入口又把 category 写死并把 id 记进 `state.scheduled`）；Android **不按 category 回收**（`cancelStale` 只动自己那三本 id 台账），约束换了形状：只有一条 `heyta.reminders` 通道、提醒投递路径之外没有第二个口子。给活动通知一枚自己的身份要改原生壳 + 重打重装两端。⚠️ 拦路的**不是**"别线在飞"：现量 `git status --porcelain -- apps/mobile/ios/Heyta apps/mobile/android/app/src/main/java/com/heytamobile/reminder` ⇒ 这一刻干净；是**提醒线的资产 + 要重装**。（2026-10-26 那次重核的分母仍然成立：全壳只有这一族原生通知代码） | 没有断言 ⇒ 所以**不写成缺陷**，写成边界：`systemBanner` 端口留着可注入（`ShareActivityDeliveryPorts`），装配点不传它 | 归"通知通道归属"那一格（提醒线，ADR-0051）；本批只把界面上能做的两档做完 |
+| **手机上的系统横幅（通知中心之外那一档）** | 🔴 **今天做不到，且不打算在本批做** —— 本机唯一那条原生通道归提醒线，而**两端拦住借道的机制不是同一枚**（2026-10-27 逐端重读；原先这句把 iOS 那一端的机制写成了两端的）：iOS 按 `categoryIdentifier` 整族认领回收（`HeytaReminderModule.swift` 的 `cancelStale` 把该 category 下的 pending 与 delivered 全收进本轮台账，不在排程清单里的那批 `removeDeliveredNotifications`，而唯一的投递入口又把 category 写死并把 id 记进 `state.scheduled`）；Android **不按 category 回收**（`cancelStale` 只动自己那三本 id 台账），约束换了形状：只有一条 `heyta.reminders` 通道、提醒投递路径之外没有第二个口子。给活动通知一枚自己的身份要改原生壳 + 重打重装两端。⚠️ 拦路的**不是**"别线在飞"：现量 `git status --porcelain -- apps/mobile/ios/Heyta apps/mobile/android/app/src/main/java/com/heytamobile/reminder` ⇒ 这一刻干净；是**提醒线的资产 + 要重装**。（2026-10-26 那次重核的分母仍然成立：全壳只有这一族原生通知代码） | 投递本身没有断言 ⇒ 所以**不写成缺陷**，写成边界：`systemBanner` 端口留着可注入（`ShareActivityDeliveryPorts`），装配点不传它。⚠️ 但**那句理由现在有常驻牙齿**：移动壳 `apps/mobile/tests/share-ui-assembly.spec.ts` 的 ⑩ 那一组逐端钉住两枚原生件的回收形状，任一端变了形状就红（读数与两条设计教训见 §9.22） | 归"通知通道归属"那一格（提醒线，ADR-0051）；本批只把界面上能做的两档做完 |
 | **Android 的界面腿** | 🔴 仍跑不了 —— 载体的准确形状（`adb` 与一枚 AVD 在、缺 `Sdk\emulator` 主程序、无真机接入）与三条取法在 §9.14 那一格；2026-10-27 按现量把原先那句「载体不存在」改准了 | 出包腿在册（`ssh windows-pc`），界面腿没有 | 负责人长期令：一律 `ssh windows-pc` |
 | **手机把一条便签写进那份共享清单**（三族里的便签·上行） | ✅ **2026-10-27 第十批做完**：便签板挂了 `CaptureProjectPickerRow`，`createNote(content, { projectId })` 交得出选中的那一行；设备腿 **L11**（装置第 10e 步）判到 owner 侧读回并验签 ⇒ 读数在 §9.16 | 装置第 10e 步那四格（入口在场 ⇒ 按得动 ⇒ 标题改口 ⇒ owner 侧 verified） | —（**事后改归属**那一格仍缺，见上面那段） |
 | **手机把一条任务写进那份共享清单**（三族里的任务·上行） | ✅ **2026-10-27 第十批做完**：形状就是本行原本拍定的那一枚（在移动端添加面板里加「清单」选择行，默认收集箱，选中才交 `projectId`；便签板同形）。落地细节、为什么不靠颜色说话、以及装配判据在 **§9.16**；设备腿 **L10** 判到 owner 侧读回并验签 | 装置第 10d 步那四格 + `capture-project-assembly.spec.ts` 四组 + `capture-model.spec.ts` G/H 两组（条数各自现量，别在正文抄数） | — |
@@ -1271,3 +1271,22 @@ web 那侧 `grep -nE 'STEP [0-9] OK' scripts/verify-collab-journey.mjs` ⇒ 三�
 **读数**：`cd apps/mobile && npx vitest run tests/share-ui-assembly.spec.ts` ⇒ `Tests 26 passed (26)`（那两组源码断言先 `stripComments`，改注释不动判决；⚠️ 直跑 `npx` 未经内存闸门）；`check:docs`／`check:doc-citations`／`check:md-tables`／`check:doc-command-claims` 逐枚 **rc=0**。
 
 ⚠️ 仓内早就写着这条纪律，只是写在法律文案那一格：[`packages/legal/src/documents/personal-info-list.ts`](../../packages/legal/src/documents/personal-info-list.ts) 有一句「必须**逐端说清**、不能拿一份最全的说法套所有端」。这次是同一枚错换到了技术理由那一族上 —— 一般规律入环境陷阱 **#598**。
+
+### 9.22 那句理由现在有了常驻牙齿：装配判据的 ⑩ 那一组（2026-10-27，收口后补）
+
+上面那节末尾我写下"这类更正只能靠人重读，别指望门禁"——那句话说完的同一趟我就不接受它：**没有门，下一次照样漂**。所以补了一组判据。它钉的不是注释文本（没有人该去比对两句话是否逐字相同），钉的是**那句理由所描述的机制此刻还成不成立**：任一端的回收形状变了，这一组就红，红文直接点名"去重读那五格载体"。
+
+| 判什么 | 此刻的读数 | 什么形状会红 |
+|---|---|---|
+| iOS 的 `cancelStale` 仍按那枚 category 认领 pending 与 delivered，并且会摘已投递 | 认领 2 处；`removeDeliveredNotifications` 在场 | 少一枚认领，或不再摘已投递 ⇒ 那句"借道会被当场抹掉"要重读 |
+| Android 的 `cancelStale` 只读那三本 id 台账、按"台账减 keep"摘、没长出按通道认领 | 台账集合恰为 `DELIVERED`／`POSTED`／`SCHEDULED` | 集合多出一本，或换了别的尺，或出现通道过滤 ⇒ 那句"两端不同形"作废 |
+| 五格载体都在场；其中"讲当前理由"那四格不许写回旧错形 | 五份文件各含 `categoryIdentifier` | 载体整格消失，或写回那句不带端限定的"全量回收" |
+| 施变臂：五枚病灶喂回同一组读法 | 每枚施变前都先断言"锚串确实命中" | 锚串没命中（形状换了）⇒ 那一枚当场红，不会静默 |
+
+**读法只许有一份**：那一组的正则收口进 `apps/mobile/tests/native-recycling-shape.ts`，判据与施变臂共用同一组函数。我第一版把同一组正则抄了两遍（判据一份、对照臂一份）——那是本仓明令禁止的形状（同一判断写两遍必漂一处），收口时改掉了。
+
+**为什么这一族故意不进 `mutation-rigs`**：目标物是 Swift/Kotlin。原地注病灶的代价不是"别人读到脏文件"，而是**同一台机器上一次并行的 Xcode/Gradle 会把病灶编译进产物**，于是下一趟设备读数整体成假的 —— 那比一次脏读严重得多。所以牙齿长在"读法"上：拿真文件的原文在**内存里的副本**上施变，工作树一动不动现量 `git status --porcelain -- apps/mobile/ios apps/mobile/android` ⇒ 空。
+
+**两条首跑红，两条都是我自己造成的**（先记账再改，别把装置的红读成产品的红）：① 我拿"这个函数读了几次台账"当尺子，预测 3、现量 **5** —— 同一本台账在本函数里被读好几遍，那是个猜的数而不是不变量；改成钉"**读哪几本**"。② 我拿一把尺把"讲当前理由"的那四格与"记录历史错误"的那一格一起禁，而计划那份是本线的台账、它照抄旧口径正是 §9.21 的用途 —— 会让"记录错误"与"重复错误"长得一样的判据，逼下一位把历史删掉。
+
+**读数**：`cd apps/mobile && npx vitest run tests/share-ui-assembly.spec.ts` ⇒ `Tests 30 passed (30)`（此前 26，本组 +4）；整包 `cd apps/mobile && npx vitest run` ⇒ `Test Files 90 passed (90)`、`Tests 1162 passed (1162)`（此前 1158）；`pnpm -s --filter ./apps/mobile typecheck` ⇒ rc=0；四枚文档门（`check:docs`／`check:doc-citations`／`check:md-tables`／`check:doc-command-claims`）与 `check:gate-wiring` 逐枚 rc=0。⚠️ 那两枚 vitest 读数经 `npx` 直跑、**没经过内存闸门**（shim 只挂在 `pnpm` 上）。⚠️ 移动壳那份 `tsconfig` 的 `include` 只有 `src` 与根级 js，`tests/` 不在 `typecheck` 射程内（既有事实，不是本批引入）⇒ 这四枚的判决以运行器自己的读数为准。

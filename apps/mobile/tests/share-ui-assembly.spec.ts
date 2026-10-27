@@ -100,8 +100,19 @@ import {
 import { bindMobileOplogBase, currentState } from '../src/share/wiring';
 
 import { mobileSources, read, stripComments } from './source-reading';
+import {
+  ANDROID_MODULE,
+  IOS_MODULE,
+  androidCancelsByLedgerDiff,
+  androidClaimsByChannel,
+  androidLedgers,
+  iosCategoryClaims,
+  iosRemovesDelivered,
+  nativeBody,
+} from './native-recycling-shape';
 
 const SCREENS = ['apps/mobile/src/screens/ShareSpaceScreen.tsx', 'apps/mobile/src/screens/JoinShareScreen.tsx'];
+
 
 beforeEach(() => {
   __resetShareActivityFeedForTests();
@@ -644,5 +655,99 @@ describe('⑧ 正文挑哪一句（ADR-0071 那一档口径在壳里的落地形
     expect([...new Set(varKeys)].sort(), '正文里塞进了清单名之外的东西（条目内容不许进通知）').toEqual([
       'name',
     ]);
+  });
+});
+
+/**
+ * ⑩ 「系统横幅做不到」那句理由，此前**没有任何门读过那两枚原生件** —— 所以我把只属于
+ * iOS 的机制写成了"两端的机制"，六格载体一起错了几天（#598）。
+ * 这一组不判产品对不对，判的是**那句理由描述的机制此刻还成不成立**：任一端的回收形状变了，
+ * 它就红，红文点名"去重读那六格载体"。读法收口在 `native-recycling-shape.ts`，
+ * 与下面那枚施变臂共用同一份实现（同一判断写两遍必漂一处）。
+ */
+describe('⑩ 两枚原生模块的回收形状（那句"做不到"的理由逐端钉住，#598）', () => {
+  const iosBody = () => stripComments(nativeBody(read(IOS_MODULE), 'func cancelStale'));
+  const androidBody = () => stripComments(nativeBody(read(ANDROID_MODULE), 'fun cancelStale'));
+
+  it('🔴 iOS：`cancelStale` 仍按那枚 category 认领 pending 与 delivered，并且会摘已投递的', () => {
+    const body = iosBody();
+    expect(body.length, '取不到 iOS 那侧的 `cancelStale` 函数体 ⇒ 理由要按新形状重读').toBeGreaterThan(0);
+    // 两枚认领：pending 的 requests 与 delivered 各一次（少一枚就是回收面变了）。
+    expect(
+      iosCategoryClaims(body),
+      'iOS 的回收不再按 category 认领 ⇒ 「系统横幅做不到」那句理由要重读（载体见 #598）',
+    ).toBe(2);
+    expect(iosRemovesDelivered(body), 'iOS 那侧不再摘已投递的通知 ⇒ 借道的风险变了，理由要重读').toBe(true);
+  });
+
+  it('🔴 Android：`cancelStale` 只读那三本 id 台账、按"台账减 keep"摘，且没有长出按通道认领', () => {
+    const body = androidBody();
+    expect(body.length, '取不到安卓那侧的 `cancelStale` 函数体 ⇒ 理由要按新形状重读').toBeGreaterThan(0);
+    // 钉的是**读哪几本台账**，不是"读了几次"（同一本在本函数里被读好几遍；首跑我就是把
+    // 次数当尺子，预测 3、现量 5 —— 那是个猜的数，不是不变量）。
+    expect(
+      androidLedgers(body),
+      '安卓的回收面不再恰好是那三本台账 ⇒ 它可能长成 iOS 那一形，那句"两端不同形"要重读（载体见 #598）',
+    ).toEqual(['DELIVERED', 'POSTED', 'SCHEDULED']);
+    expect(androidCancelsByLedgerDiff(body), '安卓不再用"台账减 keep"那把尺摘通知 ⇒ 理由要重读').toBe(true);
+    expect(
+      androidClaimsByChannel(body),
+      '安卓那侧新出了按通道认领 ⇒ 它变成 iOS 那一形，那句"两端不同形"作废',
+    ).toBe(false);
+  });
+
+  it('🔴 施变臂（只改内存里的副本，不动工作树）：五枚病灶喂回同一组读法，读数必须各自动', () => {
+    // 🔴 为什么不在原地施变：这两枚是 Swift/Kotlin，任何 JS 门都不读它们，可同一台机器上
+    // 只要有别的会话在编 Xcode/Gradle，注进去的病灶会被**编译进产物**，设备读数就成了假的。
+    // 所以牙齿长在"读法"上：拿真文件的原文施变，再喂回同一组函数。
+    expect(nativeBody('这一份里没有那枚函数', 'func cancelStale'), '取法自己要能失手').toBe('');
+    const ios = iosBody();
+    expect(ios.length, 'iOS 函数体取不到 ⇒ 下面那几枚施变全会打成空，先让这一枚红').toBeGreaterThan(0);
+    // 施变器也要能失手：锚串没命中就等于病灶没施上、读数照旧 ⇒ 下面那两枚该红。
+    const dropOneClaim = ios.replace(/let ownedDelivered = [^\n]*\n/, '');
+    expect(dropOneClaim, '锚串没命中：iOS 那一枚 delivered 认领换了形状').not.toBe(ios);
+    expect(iosCategoryClaims(dropOneClaim), '摘掉一枚认领后读数没动 ⇒ 那把尺是恒真的').toBe(1);
+    const noRemove = ios.replace(/removeDeliveredNotifications/g, 'noop');
+    expect(noRemove, '锚串没命中：iOS 那侧不摘已投递的形状换了').not.toBe(ios);
+    expect(iosRemovesDelivered(noRemove), '不再摘已投递后读数没动 ⇒ 那句"会被当场抹掉"没被钉住').toBe(false);
+    const android = androidBody();
+    expect(android.length, '安卓函数体取不到 ⇒ 同上').toBeGreaterThan(0);
+    const withChannel = `${android}\nif (manager.getNotificationChannel(CHANNEL) != null) return\n`;
+    expect(androidClaimsByChannel(withChannel), '长出按通道认领后读数没动 ⇒ 那句"两端不同形"没被钉住').toBe(true);
+    const noDiff = android.replace(/cancelLocked\(\s*context,\s*all\s*-\s*keep\s*\)/, 'noop()');
+    expect(noDiff, '锚串没命中：安卓那侧"台账减 keep"换了形状').not.toBe(android);
+    expect(androidCancelsByLedgerDiff(noDiff), '换成别的尺后读数没动 ⇒ 那把尺是恒真的').toBe(false);
+    const extraLedger = `${android}\nids(prefs, KEY_PENDING)\n`;
+    expect(androidLedgers(extraLedger), '多一本台账后台账集合没变 ⇒ 那把尺只数了非空').toEqual([
+      'DELIVERED',
+      'PENDING',
+      'POSTED',
+      'SCHEDULED',
+    ]);
+  });
+
+  it('🔴 那句理由的载体还在，且"讲当前理由"那几格不许写回"两端同一机制"那个错形', () => {
+    // 五格都在场 ⇒ 钉子不许漂；但只有**讲当前理由**的那四格禁旧错形 ——
+    // 计划那份是本线的台账，它照抄旧口径正是 §9.21 的用途，一把尺子把它也禁了
+    // 就是让"记录错误"和"重复错误"长得一样（首跑就是这么红的，红得对：尺子粗）。
+    const carriers = [
+      'apps/mobile/src/share/share-activity-notify.ts',
+      'apps/mobile/src/screens/ShareSpaceScreen.tsx',
+      'docs/plans/collaboration-shared-lists.md',
+      'docs/adr/0062-shared-list-key-distribution.md',
+      'docs/adr/0071-share-notification-content-boundary.md',
+    ];
+    const currentReason = [carriers[0], carriers[1], carriers[3], carriers[4]];
+    for (const rel of carriers) {
+      expect(read(rel), `${rel} 里那句"做不到"的理由整格消失了 ⇒ 载体数漂了，见 #598`).toContain(
+        'categoryIdentifier',
+      );
+    }
+    for (const rel of currentReason) {
+      expect(
+        /categoryIdentifier[^\n]{0,40}全量回收/.test(read(rel)),
+        `${rel} 写回了"按 categoryIdentifier 全量回收"那句不带端限定的旧理由（安卓那侧不认 category）`,
+      ).toBe(false);
+    }
   });
 });
