@@ -67,6 +67,14 @@
  * 🔴 分母从 `scripts/check-credential-page-routes.mjs --json` 取（也就是从 `pages.ts` 取），
  *    **不在这里抄一份清单**：抄的那份会在加第 6 张页时静默漏掉，而那正是本条要防的事。
  *
+ * 🔴 应用侧那两枚目的地（`/app/`、`/app/?signin=1`）同样**不是手写的清单**，它是现量出来的：
+ *    全站 outbound mail 只有一个发送点（`server/src/email.ts:102` 那一句 `sendMail`），
+ *    而它拼出的目的地只有六枚 —— 现量命令：
+ *    `grep -oE '\$\{config\.publicUrl\}/[^`",]*' server/src/email.ts | sed 's/?.*//' | sort -u`
+ *    ⇒ `app/`、`change-email`、`magic-login`、`recover-passkey`、`reset-password`、`verify-email`。
+ *    前五枚由 `pages.ts` 那把尺覆盖，`app/` 两枚由 ⑤ 覆盖。⇒ **本条的分母 = 邮件真能送出的全部**。
+ *    将来若加了邀请/提醒类邮件，先在那条现量命令里出现，再往这条腿补判据。
+ *
  * ⚠️ **别拿 `curl` 量这枚域名**（2026-10-27 实测）：本机对同一批目的地发
  *    `curl -m 20 --noproxy '*' --resolve heyta.waytofuture.cn:443:<IP>`，六个读数**全是 `000`**
  *    （连 404 那枚对照也是），而**同一时刻**这条腿 3.0 秒内把同一批目的地全量到 200/404。
