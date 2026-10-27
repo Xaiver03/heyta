@@ -1,0 +1,93 @@
+{
+  "shareId": "022bed44-8075-455d-9a2e-0521e3064f2f",
+  "ownerMemberId": "94cf12a5-f3fd-4d0e-a607-7a7b0515f5ee",
+  "phone": {
+    "memberId": "ebba8fa1-6670-40fd-8645-e58918983503",
+    "identityPublicKey": "DYcQkLgjKxUsZhaiG7FgHk3os2nGBFmuhZ/yt/ZJmlo=",
+    "role": "editor"
+  },
+  "members": [
+    {
+      "memberId": "94cf12a5-f3fd-4d0e-a607-7a7b0515f5ee",
+      "userId": 133,
+      "role": "owner",
+      "addedAt": 1793038089599,
+      "hasEnvelope": false,
+      "memberKeyEpoch": 1,
+      "identityPublicKey": null,
+      "signingPublicKey": "zH6vOMFW5yGNe9aE0HNxOaKDrz+kEQHLQzy/RBRpMEI=",
+      "keyEnvelope": null
+    },
+    {
+      "memberId": "ebba8fa1-6670-40fd-8645-e58918983503",
+      "userId": 134,
+      "role": "editor",
+      "addedAt": 1793038115747,
+      "hasEnvelope": true,
+      "memberKeyEpoch": 1,
+      "identityPublicKey": "DYcQkLgjKxUsZhaiG7FgHk3os2nGBFmuhZ/yt/ZJmlo=",
+      "signingPublicKey": "gUt/v/YenfrjTwawwopg7cqBCEqR3bcl6zGL7mjghF0=",
+      "keyEnvelope": {
+        "iv": "D/lENEd/ohvPUjl+",
+        "shareId": "022bed44-8075-455d-9a2e-0521e3064f2f",
+        "keyEpoch": 1,
+        "ciphertext": "FiZodUnaMQvBTbCgJUoVZ9hBrxONOJzxSSdApkUB0jMh8RnLyz+lzuAFKe5JpiOT",
+        "formatVersion": 1,
+        "ephemeralPublicKey": "ekcswWzs9ZdH7ygr5yYh/nTlln/9NF4GZqMUO+6j3zQ=",
+        "ephemeralFingerprint": "95ca9b61075888b18caddbe9a8894930ca9bbde54b3752ce8fdcb29b6fd8c09d",
+        "recipientFingerprint": "b38944b1e8e9331c5644673991ec3a463c73e5888fcd78b80f9546290050d057"
+      }
+    }
+  ],
+  "opCount": 8,
+  "opAuthors": [
+    {
+      "id": "owner-op-1793038089585-1",
+      "entityType": "TASK",
+      "signerMemberId": "94cf12a5-f3fd-4d0e-a607-7a7b0515f5ee",
+      "serverSeq": 1
+    },
+    {
+      "id": "share-op-1-1793038152886",
+      "entityType": "COMMENT",
+      "signerMemberId": "ebba8fa1-6670-40fd-8645-e58918983503",
+      "serverSeq": 2
+    },
+    {
+      "id": "owner-op-1793038089585-2",
+      "entityType": "COMMENT",
+      "signerMemberId": "94cf12a5-f3fd-4d0e-a607-7a7b0515f5ee",
+      "serverSeq": 3
+    },
+    {
+      "id": "owner-op-1793038089585-3",
+      "entityType": "COMMENT",
+      "signerMemberId": "94cf12a5-f3fd-4d0e-a607-7a7b0515f5ee",
+      "serverSeq": 4
+    },
+    {
+      "id": "owner-op-1793038089585-4",
+      "entityType": "COMMENT",
+      "signerMemberId": "94cf12a5-f3fd-4d0e-a607-7a7b0515f5ee",
+      "serverSeq": 5
+    },
+    {
+      "id": "owner-op-1793038089585-5",
+      "entityType": "NOTE",
+      "signerMemberId": "94cf12a5-f3fd-4d0e-a607-7a7b0515f5ee",
+      "serverSeq": 6
+    },
+    {
+      "id": "share-op-2-1793038298672",
+      "entityType": "TASK",
+      "signerMemberId": "ebba8fa1-6670-40fd-8645-e58918983503",
+      "serverSeq": 7
+    },
+    {
+      "id": "share-op-3-1793038334703",
+      "entityType": "NOTE",
+      "signerMemberId": "ebba8fa1-6670-40fd-8645-e58918983503",
+      "serverSeq": 8
+    }
+  ]
+}
