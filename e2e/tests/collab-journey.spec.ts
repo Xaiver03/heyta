@@ -243,6 +243,18 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
     consentEmphasis.primary,
   );
   await evidenceShot(ownerPage, '02-owner-consent-modal.png');
+  // ⓘ 那一叠条款在**网页侧**靠悬停打开（触屏侧只有按压那条通道，判据在
+  // `apps/mobile/tests/share-ui-assembly.spec.ts` 的 ⑨ 组）。这里要一张真浏览器的图：
+  // jsdom 那两枚判据说得出"展开/收起"，但"展开后读起来像不像一叠条款"只有看图才知道。
+  // ⓘ 那一叠条款：点一下展开（两壳同一形）。这里要一张真浏览器的图：jsdom 那几枚判据
+  // 读得出"展开/收起"，但"展开后压在谁身上、有没有溢出对话框"只有看图才知道 ——
+  // 第 1 版就是看图看出"浮层盖住按钮并溢出下沿"的。
+  // ⚠️ 刻意**不用 `hover()`**：居中的对话框一被撑高，ⓘ 自己会跳出指针 ⇒ 收起 ⇒ 又跳回来，
+  //    实测点「确认共享」`waiting for element to be … stable` 333 次直到测试结束。
+  await ownerPage.getByTestId('share-consent-details-trigger').click();
+  await expect(ownerPage.getByTestId('share-consent-details')).toBeVisible();
+  await evidenceShot(ownerPage, '02b-owner-consent-details.png');
+  await evidenceShot(ownerPage, '02b-owner-consent-details.png');
   // ⚠️ 这一屏的**暗色**证据不在这里（`apps/web/tests/share-consent-modal-theme.spec.tsx` 用
   // 暗色 token 表渲染同一棵树来判）。原因记在 `apps/web/src/lib/theme.ts` 的文件头：
   // 应用暗色只改 `<html data-theme>`，而共享层按钮的颜色来自**开机时解析的 token 表**，

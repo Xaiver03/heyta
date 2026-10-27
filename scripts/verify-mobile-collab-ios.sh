@@ -1270,20 +1270,22 @@ shot "06c-共享清单首页"
 # 🔴 落点判据不许用「邀请凭证或链接」：那一屏的**副标题**写着「粘贴邀请凭证或链接。…」，
 #    两档相位都画它 ⇒ 拿它当到达判据会在同意面上就假命中（2026-10-25 第 18 跑实测：
 #    到达判据过了、`fill` 却五次 found=False）。用只有输入相位才画的清单名那一行。
-if ! ax_press_until "加入共享清单" "确认共享" exact "清单名称（仅本机显示）"; then
+# ⚠️ 入群那一侧那颗按钮自 2026-10-27（计划 §9.38）起写「确认加入」而不是「确认共享」——
+#    语境键分叉了，needle 跟着分叉；owner 那一侧仍是「确认共享」，走 testID 不走文字。
+if ! ax_press_until "加入共享清单" "确认加入" exact "清单名称（仅本机显示）"; then
   shot "06b2-加入面板没开"
   bad "按不进「加入共享清单」那面板（按了 5 次也没读到同意面或凭证输入）"
   summary
   exit 1
 fi
-if [ "$PRESS_HIT" = "确认共享" ]; then
+if [ "$PRESS_HIT" = "确认加入" ]; then
   # 这台设备从没确认过 PIPL 同意 ⇒ `JoinShareScreen` 的初始 phase 停在同意面（fail-closed，
   # 判断在 `@heyta/ui` 的 `shouldShowConsent`）。这一档**不是**装置绕路，是产品要求的那道闸：
   # 本趟每一轮都先 `simctl uninstall`，同意态跟着沙盒一起清掉 ⇒ 同意面每轮都会在场。
   shot "06b3-入群同意面"
-  if ! ax_press_until "确认共享" "清单名称（仅本机显示）" exact; then
+  if ! ax_press_until "确认加入" "清单名称（仅本机显示）" exact; then
     shot "06b4-按同意后没到凭证框"
-    env_bail "按了「确认共享」却没走到凭证输入（装置问题，不判产品）"
+    env_bail "按了「确认加入」却没走到凭证输入（装置问题，不判产品）"
   fi
   note "入群同意闸按过 ⇒ 这台设备有了同意记录（通知路径读的就是它）"
 fi

@@ -26,6 +26,8 @@
  * ⑧ 正文挑哪一句（`lib/share-activity-copy.ts` 的三档种类 × 有名/无名两档回落）。
  * ⑨ 同意闸在两屏各自的调用点（判断在 `@heyta/ui`，这里只钉"线接上了"；
  *    摘掉调用点模型那 6 枚一条都不会红 —— 变异臂见 `mutate-collab-consent-gate.mjs`）。
+ *    2026-10-27 §9.38 起这一组还钉两件事：标题与正文按语境取键（两屏不许同一句、
+ *    不许互相接反），以及 ⓘ 的**按压**通道在（触屏没有 hover）。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -228,6 +230,37 @@ describe('⑨ 入群与开启共享两屏各自真的问一次同意闸（摘掉
     const gate = code.match(/if \(decision\.show\)[\s\S]{0,120}/);
     expect(gate, '闸门分支形状变了：判据要按新形状重读').toBeTruthy();
     expect(gate![0], 'show=true 那一支没去弹同意面 = 闸形同虚设').toContain('setConsentFor');
+  });
+
+  it('🔴 同意面的标题与正文按语境取键（分享侧与加入侧不许是同一句，也不许互相接反）', () => {
+    const share = stripComments(read('apps/mobile/src/screens/ShareSpaceScreen.tsx'));
+    const join = stripComments(read('apps/mobile/src/screens/JoinShareScreen.tsx'));
+    expect(share).toContain("consent.title.share'");
+    expect(share, '共享侧读到加入侧那颗键 = 语境接反').not.toContain("consent.title.join'");
+    expect(join).toContain("consent.title.join'");
+    expect(join, '加入侧读到分享侧那颗键 = 语境接反').not.toContain("consent.title.share'");
+    expect(share).toContain("consent.body.share'");
+    expect(join).toContain("consent.body.join'");
+    // 那颗确认按钮同理：入群的人没在"确认共享"，替他那么写是说了一件他没做的事。
+    expect(share).toContain("consent.accept.share'");
+    expect(share, '共享侧读到加入侧那颗按钮键 = 语境接反').not.toContain("consent.accept.join'");
+    expect(join).toContain("consent.accept.join'");
+    expect(join, '加入侧读到分享侧那颗按钮键 = 语境接反').not.toContain("consent.accept.share'");
+    // 提示层那四行条款两侧共用一组（措辞按「清单成员」写，换任一视角另一侧就是谎话）。
+    for (const [side, code] of [['分享', share], ['加入', join]] as const) {
+      expect(code, `${side}侧没给 ⓘ 那句标签`).toContain('consent.details.label\'');
+      for (const key of ['scope.content', 'scope.server', 'scope.e2ee', 'scope.notAffected']) {
+        expect(code, `${side}侧的提示层少了一行条款：${key}`).toContain(`consent.${key}'`);
+      }
+    }
+  });
+
+  it('🔴 手机上那枚 ⓘ 靠**按压**打开（触屏没有 hover，只留悬停等于把条款藏起来）', () => {
+    const modal = stripComments(read('packages/ui/src/sync/ShareConsentModal.tsx'));
+    // ⓘ 是本文件里的第一枚 `Pressable`，所以从它起手的这段开标签就是那枚触发件。
+    const trigger = modal.match(/<Pressable[\s\S]*?testID="share-consent-details-trigger"/);
+    expect(trigger, '找不到 ⓘ 那枚触发件（testID 变了要连着改这一发）').toBeTruthy();
+    expect(trigger![0], '同意面的条款在手机上拿不到了 = 触发件不再有按压通道').toContain('onPress');
   });
 });
 

@@ -757,15 +757,17 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
           {consentFor !== undefined ? (
             <ShareConsentModal
               labels={{
-                title: t('common.share.consent.title'),
-                body: t('common.share.consent.body'),
-                scopes: [
+                title: t('common.share.consent.title.share'),
+                body: t('common.share.consent.body.share'),
+                detailsLabel: t('common.share.consent.details.label'),
+                details: [
                   t('common.share.consent.scope.content'),
-                  t('common.share.consent.scope.metadata'),
+                  t('common.share.consent.scope.server'),
+                  t('common.share.consent.scope.e2ee'),
                   t('common.share.consent.scope.notAffected'),
                 ],
                 dontAskAgain: t('common.share.consent.dontAskAgain'),
-                accept: t('common.share.consent.accept'),
+                accept: t('common.share.consent.accept.share'),
                 cancel: t('common.share.consent.cancel'),
               }}
               store={consentStore}

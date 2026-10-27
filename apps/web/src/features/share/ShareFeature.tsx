@@ -462,15 +462,17 @@ export function ShareFeature(props: ShareFeatureProps) {
   }), [t]);
 
   const consentLabels = useMemo(() => ({
-    title: t('common.share.consent.title'),
-    body: t('common.share.consent.body'),
-    scopes: [
+    title: t('common.share.consent.title.share'),
+    body: t('common.share.consent.body.share'),
+    detailsLabel: t('common.share.consent.details.label'),
+    details: [
       t('common.share.consent.scope.content'),
-      t('common.share.consent.scope.metadata'),
+      t('common.share.consent.scope.server'),
+      t('common.share.consent.scope.e2ee'),
       t('common.share.consent.scope.notAffected'),
     ],
     dontAskAgain: t('common.share.consent.dontAskAgain'),
-    accept: t('common.share.consent.accept'),
+    accept: t('common.share.consent.accept.share'),
     cancel: t('common.share.consent.cancel'),
   }), [t]);
 
@@ -492,11 +494,21 @@ export function ShareFeature(props: ShareFeatureProps) {
         <div style={styles.headRow}>
           <div style={styles.headText}>
             <h2 id="ht-share-title" style={styles.dialogTitle}>
-              {t('web.share.dialog.title')}
+              {/* 同意相位换成语境键那句「分享清单」，面板相位才是「共享清单」——
+                  换掉的正是同意面自己那句标题（下面 `titleHidden` 的理由仍然成立：
+                  外层写的就是同一句），不是往同屏再叠一个近义标题。 */}
+              {phase.kind === 'consent'
+                ? t('common.share.consent.title.share')
+                : t('web.share.dialog.title')}
             </h2>
-            <p style={styles.dialogSubtitle}>
-              {t('web.share.dialog.subtitle')}
-            </p>
+            {/* 这句讲的正是端到端加密与服务端记录 —— 同意相位它已经搬进 ⓘ 里了，
+                再挂在标题下面等于让"细节不再平铺"这条令只在面板内部成立。
+                与入群那一侧 `JoinSharedListDialog` 同一处置。 */}
+            {phase.kind !== 'consent' ? (
+              <p style={styles.dialogSubtitle}>
+                {t('web.share.dialog.subtitle')}
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -530,9 +542,8 @@ export function ShareFeature(props: ShareFeatureProps) {
               <ShareConsentModal
                 labels={consentLabels}
                 store={consentStore}
-                // 这个对话框顶部 `<h2>` 写的就是同一句「共享清单」
-                // （`web.share.dialog.title` 与 `common.share.consent.title` 同文），
-                // 再画一遍会在同屏出现两个同名标题。
+                // 这个对话框顶部的 `<h2>` 在同意相位写的就是同一句「分享清单」
+                // （上面那颗语境键），再画一遍会在同屏出现两个同名标题。
                 titleHidden
                 onConsent={(next) => {
                   setConsentStore(next);

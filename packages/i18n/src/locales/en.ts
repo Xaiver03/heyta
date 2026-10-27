@@ -4676,12 +4676,23 @@ export const en = {
   'common.share.comment.emptyThread': 'No comments yet',
   'common.share.comment.composerPlaceholder': 'Write a comment…',
   'common.share.comment.send': 'Send',
-  'common.share.consent.title': 'Share list',
-  'common.share.consent.body': 'Before sharing a list, please confirm the following:',
-  'common.share.consent.scope.content': 'Task titles, notes, dates and the list name become visible to members',
-  'common.share.consent.scope.metadata': 'The server records membership and roles (content stays encrypted; the server cannot read it)',
-  'common.share.consent.scope.notAffected': 'Your other lists are not affected',
-  'common.share.consent.accept': 'Confirm sharing',
+  // Consent face (the two orders of 2026-10-27: say "Share list" / "Join list" in the
+  // title, and put the disclosure lines in the tip instead of a paragraph). The accept
+  // button forks the same way - a person joining never "confirms sharing", so labelling
+  // it that way would put words in their mouth. The four `scope.*` lines are shared by
+  // both sides, so they speak of "list members" rather than "the other person" - either
+  // viewpoint would make the other side untrue.
+  'common.share.consent.title.share': 'Share list',
+  'common.share.consent.title.join': 'Join list',
+  'common.share.consent.body.share': 'Sharing opens this list to the members you invite.',
+  'common.share.consent.body.join': 'Joining gives you access to what this list contains.',
+  'common.share.consent.details.label': 'Who sees what',
+  'common.share.consent.scope.content': 'Task titles, notes, dates and the list name are visible to list members',
+  'common.share.consent.scope.server': 'The server records membership and roles',
+  'common.share.consent.scope.e2ee': 'List content stays end-to-end encrypted, so the server cannot read it',
+  'common.share.consent.scope.notAffected': 'Your other lists are not affected by this share',
+  'common.share.consent.accept.share': 'Confirm sharing',
+  'common.share.consent.accept.join': 'Confirm joining',
   'common.share.consent.cancel': 'Cancel',
   'common.share.consent.dontAskAgain': 'Don\'t ask again',
   'common.share.notif.sectionTitle': 'Shared-list notifications',

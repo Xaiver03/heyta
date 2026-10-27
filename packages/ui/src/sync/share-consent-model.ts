@@ -63,9 +63,17 @@ export function applyShareConsent(
   };
 }
 
-/** 模态正文的结构化内容（文案归 i18n，这里是**要展示哪些条款**的清单）。 */
+/**
+ * 同意面要说清的**条款清单**（文案归 i18n，这里是"要展示哪些条款"）。
+ *
+ * 2026-10-27 起这四行住在 ⓘ 提示里而不是平铺在面板上（负责人：「各种东西应该放在一个
+ * tool tip 里面，而不是放一大段说明文字」）。顺序即展示顺序，两侧共用同一叠——
+ * 所以措辞一律按「清单成员」写，不写成「对方」或「你邀请的人」：任一视角都会让
+ * 另一侧那句话变成谎话。
+ */
 export const SHARE_CONSENT_SCOPE_KEYS = [
   'common.share.consent.scope.content',
-  'common.share.consent.scope.metadata',
+  'common.share.consent.scope.server',
+  'common.share.consent.scope.e2ee',
   'common.share.consent.scope.notAffected',
 ] as const;

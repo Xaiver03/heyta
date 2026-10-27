@@ -161,15 +161,17 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
   }, [accountId, authTransport, baseUrl, token]);
 
   const consentLabels = useMemo(() => ({
-    title: t('common.share.consent.title'),
-    body: t('common.share.consent.body'),
-    scopes: [
+    title: t('common.share.consent.title.join'),
+    body: t('common.share.consent.body.join'),
+    detailsLabel: t('common.share.consent.details.label'),
+    details: [
       t('common.share.consent.scope.content'),
-      t('common.share.consent.scope.metadata'),
+      t('common.share.consent.scope.server'),
+      t('common.share.consent.scope.e2ee'),
       t('common.share.consent.scope.notAffected'),
     ],
     dontAskAgain: t('common.share.consent.dontAskAgain'),
-    accept: t('common.share.consent.accept'),
+    accept: t('common.share.consent.accept.join'),
     cancel: t('common.share.consent.cancel'),
   }), [t]);
 
@@ -297,7 +299,11 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
         <div style={styles.headRow}>
           <div style={styles.headText}>
             <h2 id="ht-share-join-title" style={styles.dialogTitle}>
-              {t('web.share.join.title')}
+              {/* 同意相位换成语境键那句「加入清单」（下面 `titleHidden` 的同一句），
+                  入群相位才是「加入共享清单」。 */}
+              {phase.kind === 'consent'
+                ? t('common.share.consent.title.join')
+                : t('web.share.join.title')}
             </h2>
             {/* 同意面画的时候这句话还没有对象可指（表单还没出场），先收起来。 */}
             {phase.kind !== 'consent' ? (
@@ -327,8 +333,8 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
           <ShareConsentModal
             labels={consentLabels}
             store={consentStore}
-            // 顶部 `<h2>` 已经写着「加入共享清单」，同意面那句「共享清单」再画一遍
-            // 会在同一张卡里出现两个同族标题 —— 与 owner 侧那屏同一个处置。
+            // 顶部 `<h2>` 在同意相位写的就是同一句「加入清单」，再画一遍会在同一张卡里
+            // 出现两个同族标题 —— 与 owner 侧那屏同一个处置。
             titleHidden
             onConsent={(next) => {
               setConsentStore(next);
