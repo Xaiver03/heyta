@@ -167,6 +167,9 @@ const AutomationRuleConfigSchema = z.object({
   timezone: z.string().max(128).nullable().optional(),
   parseVersion: z.number().int().min(1).optional(),
   maxItems: z.number().int().min(1).max(50).optional(),
+  // 「接收即抽取」的开关（ADR-0077）。只有显式 true 才让服务端读正文；
+  // 缺省 = 设备抽，与这一列存在之前的规则同一读法。
+  hostedExtraction: z.boolean().optional(),
 }).strict();
 const AutomationRuleCreateSchema = z.object({ keyId: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/), ...AutomationRuleConfigSchema.shape }).strict();
 const AutomationRuleEnabledSchema = z.object({ enabled: z.boolean() }).strict();

@@ -2,6 +2,12 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import { generateInboundKeyPair, openInbound, signWebhook } from '@heyta/inbound-core';
 
+// 服务端那条抽取腿（ADR-0077）在这里必须是**可控的替身**：本文件判的是接收这一趟
+// 把不把活交给它、以及它没成时对发送方说什么，抽取本身由
+// `inbound-hosted-extraction.spec.ts` 逐条钉。
+const hosted = vi.hoisted(() => ({ runHostedExtractionAtIngest: vi.fn(), HOSTED_EXTRACTION_LEASE_OWNER: 'hosted-extraction' }));
+vi.mock('../src/automation/hosted-extraction', () => hosted);
+
 const mocks = vi.hoisted(() => {
   const state: { event: any | null; queue: { events: bigint; bytes: bigint } } = {
     event: null,
@@ -260,5 +266,62 @@ describe('public inbound automation receiver', () => {
     // create 只多了那两次**失败**的尝试；若生产代码在竞态后另建一封，这里就会变。
     expect(mocks.prisma.automationEvent.create.mock.calls.length).toBe(createAttempts + 2);
     expect(mocks.state.event).toBe(winner);
+  });
+
+  describe('「接收即抽取」那一档的接线（ADR-0077）', () => {
+    const openHosted = () => mocks.prisma.automationRule.findUnique.mockResolvedValue({
+      id: ruleId, userId: 7, version: 3, enabled: true, deletedAt: null, keyId: 'inbound-v1',
+      hostedExtraction: true, allowedFields: ['title'], targetProjectId: null, timezone: 'UTC',
+      parseVersion: 1, maxItems: 50,
+    });
+
+    it('规则开了那一档 ⇒ 把**同一把原始字节**交给这条腿，并把它的终态如实报给发送方', async () => {
+      openHosted();
+      hosted.runHostedExtractionAtIngest.mockResolvedValue({ state: 'prepared', resultCiphertext: '{}', resultDigest: 'a'.repeat(64), itemCount: 1 });
+      const body = Buffer.from(JSON.stringify({ title: '买牛奶' }), 'utf8');
+      const response = await request(body);
+      expect(response.statusCode).toBe(202);
+      expect(response.json()).toEqual({ eventId, state: 'prepared' });
+      const input = hosted.runHostedExtractionAtIngest.mock.calls[0]![0];
+      expect(Buffer.from(input.plaintext).equals(body)).toBe(true);
+      expect(input.rule.id).toBe(ruleId);
+      expect(input.keyEpoch).toBe(2);
+    });
+
+    it('规则没开那一档 ⇒ 这条腿一次都不被叫（设备那条老路一字未动）', async () => {
+      hosted.runHostedExtractionAtIngest.mockClear();
+      await request(Buffer.from(JSON.stringify({ title: '买牛奶' }), 'utf8'));
+      expect(hosted.runHostedExtractionAtIngest).not.toHaveBeenCalled();
+    });
+
+    it('🔴 只有显式 true 才开：`NULL`（这一列存在之前的规则）读成"归设备"，不是"归我们"', async () => {
+      mocks.prisma.automationRule.findUnique.mockResolvedValue({
+        id: ruleId, userId: 7, version: 3, enabled: true, deletedAt: null, keyId: 'inbound-v1',
+        hostedExtraction: null, allowedFields: ['title'], targetProjectId: null, timezone: 'UTC', parseVersion: 1, maxItems: 50,
+      });
+      await request(Buffer.from(JSON.stringify({ title: '买牛奶' }), 'utf8'));
+      expect(hosted.runHostedExtractionAtIngest).not.toHaveBeenCalled();
+    });
+
+    it('没有收件人公钥时仍然先 503 —— 这条腿不许在那里把自己降级成"我们代读"', async () => {
+      openHosted();
+      mocks.prisma.automationRecipientKey.findUnique.mockResolvedValue(null);
+      const response = await request(Buffer.from(JSON.stringify({ title: '买牛奶' }), 'utf8'));
+      expect(response.statusCode).toBe(503);
+      expect(response.json().code).toBe('recipient_key_is_not_available');
+      expect(hosted.runHostedExtractionAtIngest).not.toHaveBeenCalled();
+    });
+
+    it('这条腿没成 ⇒ 对发送方仍是 202 queued，而日志里只有那枚稳定原因码', async () => {
+      openHosted();
+      hosted.runHostedExtractionAtIngest.mockResolvedValue({ state: 'failed', reason: 'model-quota-exhausted' });
+      const body = Buffer.from(JSON.stringify({ title: '买牛奶' }), 'utf8');
+      const response = await request(body);
+      expect(response.statusCode).toBe(202);
+      expect(response.json()).toEqual({ eventId, state: 'queued' });
+      const warned = JSON.stringify((await import('../src/logger')).Logger.warn.mock.calls);
+      expect(warned).toContain('model-quota-exhausted');
+      expect(warned).not.toContain('买牛奶');
+    });
   });
 });

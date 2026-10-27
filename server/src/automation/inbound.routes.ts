@@ -12,6 +12,7 @@ import {
 import { prisma } from '../db';
 import { Logger } from '../logger';
 import { loadAutomationWebhookSecret } from './rules';
+import { runHostedExtractionAtIngest, type HostedExtractionRule } from './hosted-extraction';
 import { resolveSenderCredential } from './sender-credentials';
 import { evaluateAutomationEntitlementForUser, lockedAutomationEntitlementSource, ENTITLEMENT_ERROR_CODE } from '../entitlement';
 
@@ -201,6 +202,31 @@ export const inboundAutomationRoutes = async (
             return reply.status(409).send({ code: 'EVENT_CONTENT_CONFLICT', message: 'EVENT_CONTENT_CONFLICT' });
           }
           return reply.status(202).send(statusResponse(winner.eventId, winner.status));
+        }
+        // 「接收即抽取」那一档（ADR-0077）：只有规则**显式**开了这一档才走，
+        // 而这一档只可能让抽取更早，不可能让内容更少 —— 抽取没成时那一行退回
+        // `queued`、正文的密文仍在，设备那条老路照旧接管（未配置收件人公钥时
+        // 仍然先在上面那行 503 挡住，这条腿一个字都不改那件事）。
+        if (rule.hostedExtraction === true) {
+          const hostedRule: HostedExtractionRule = {
+            id: rule.id, userId: rule.userId, version: rule.version,
+            allowedFields: Array.isArray(rule.allowedFields) ? rule.allowedFields as HostedExtractionRule['allowedFields'] : ['title'],
+            targetProjectId: rule.targetProjectId, timezone: rule.timezone,
+            parseVersion: rule.parseVersion, maxItems: rule.maxItems,
+          };
+          const outcome = await runHostedExtractionAtIngest({
+            rule: hostedRule, eventId: row.eventId, contentType, plaintext: new Uint8Array(rawBody),
+            publicKey: canonicalPublicKey(recipient.publicKey), keyEpoch: recipient.keyEpoch,
+                        // 接收时刻用这一趟自己的时钟（与签名校验、保留期用的是同一枚 `now`）：
+            // 库里那一列 `createdAt` 是数据库默认值，把它读回来等于让一次网络往返
+            // 依赖一列"我们没写、由别人填"的时间。
+            accountId: `user-${rule.userId}`, serverOrigin: options.serverOrigin, receivedAt: now(),
+          });
+          if (outcome.state === 'failed') {
+            Logger.warn(`Inbound hosted extraction fell back to the device lane: ${outcome.reason}`);
+            return reply.status(202).send(statusResponse(row.eventId, 'queued'));
+          }
+          return reply.status(202).send(statusResponse(row.eventId, outcome.state));
         }
         return reply.status(202).send(statusResponse(row.eventId, row.status));
       } catch (error) {

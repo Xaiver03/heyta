@@ -40,6 +40,11 @@ export interface AutomationRuleSummary {
   parseVersion: number;
   authorizationVersion: number;
   maxItems: number;
+  /**
+   * 「接收即抽取」开没开（ADR-0077）。读面只认 `=== true`：这一列存在之前的规则
+   * 落的是 `NULL`，那是"从来没被问过"，不是"选了设备"。
+   */
+  hostedExtraction: boolean;
 }
 
 export interface AutomationRuleConfig {
@@ -48,6 +53,7 @@ export interface AutomationRuleConfig {
   timezone?: string | null;
   parseVersion?: number;
   maxItems?: number;
+  hostedExtraction?: boolean;
 }
 
 const normalizeConfig = (config: AutomationRuleConfig = {}) => {
@@ -67,7 +73,9 @@ const normalizeConfig = (config: AutomationRuleConfig = {}) => {
   }
   const targetProjectId = config.targetProjectId ?? null;
   if (targetProjectId !== null && (typeof targetProjectId !== 'string' || targetProjectId.length > 128)) throw new Error('Invalid automation target');
-  return { allowedFields: fields, targetProjectId, timezone, parseVersion, maxItems };
+  const hostedExtraction = config.hostedExtraction ?? false;
+  if (typeof hostedExtraction !== 'boolean') throw new Error('Invalid automation extraction policy');
+  return { allowedFields: fields, targetProjectId, timezone, parseVersion, maxItems, hostedExtraction };
 };
 
 /** Load one 32-byte webhook secret without ever exposing the keyring in logs. */
@@ -80,7 +88,7 @@ export const loadAutomationWebhookSecret = (keyId: string, userId?: number): Uin
 const toSummary = (row: {
   id: string; version: number; enabled: boolean; keyId: string; createdAt: Date; deletedAt: bigint | null;
   allowedFields: unknown; targetProjectId: string | null; timezone: string | null;
-  parseVersion: number; authorizationVersion: number; maxItems: number;
+  parseVersion: number; authorizationVersion: number; maxItems: number; hostedExtraction: boolean | null;
 }): AutomationRuleSummary => ({
   id: row.id, version: row.version, enabled: row.enabled, keyId: row.keyId,
   createdAt: row.createdAt.toISOString(), deletedAt: row.deletedAt === null ? null : row.deletedAt.toString(),
@@ -90,6 +98,7 @@ const toSummary = (row: {
   targetProjectId: row.targetProjectId ?? null, timezone: row.timezone ?? null,
   parseVersion: row.parseVersion ?? 1, authorizationVersion: row.authorizationVersion ?? 1,
   maxItems: row.maxItems ?? 50,
+  hostedExtraction: row.hostedExtraction === true,
 });
 
 export async function createAutomationRule(userId: number, keyId: string, config: AutomationRuleConfig = {}): Promise<AutomationRuleSummary> {
@@ -97,7 +106,8 @@ export async function createAutomationRule(userId: number, keyId: string, config
   const normalized = normalizeConfig(config);
   const row = await prisma.automationRule.create({ data: { id: randomUUID(), userId, keyId,
     allowedFields: normalized.allowedFields, targetProjectId: normalized.targetProjectId,
-    timezone: normalized.timezone, parseVersion: normalized.parseVersion, maxItems: normalized.maxItems } });
+    timezone: normalized.timezone, parseVersion: normalized.parseVersion, maxItems: normalized.maxItems,
+    hostedExtraction: normalized.hostedExtraction } });
   return toSummary(row);
 }
 
@@ -112,6 +122,7 @@ export async function updateAutomationRuleConfig(userId: number, ruleId: string,
       enabled: false, version: { increment: 1 }, authorizationVersion: { increment: 1 },
       allowedFields: normalized.allowedFields, targetProjectId: normalized.targetProjectId,
       timezone: normalized.timezone, parseVersion: normalized.parseVersion, maxItems: normalized.maxItems,
+      hostedExtraction: normalized.hostedExtraction,
     } });
     return toSummary(row);
   });

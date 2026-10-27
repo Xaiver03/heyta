@@ -163,7 +163,7 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
   const sql = options.sql ?? createPrismaSqlExecutor(prisma);
   const limit = options.limit ?? MANAGED_AI_REQUESTS_PER_PERIOD;
   const now = options.now ?? Date.now;
-  const transport = options.transport ?? managedAiFetchTransport;
+  const transport = options.transport ?? managedAiFetchTransport();
   const hosts = options.hosts ?? SERVER_MANAGED_MODEL_HOSTS;
   const plaintextHosts = options.plaintextHosts ?? [];
 
