@@ -21,6 +21,11 @@
  *      **中央登录面板真的可见**（central 模式：官方站的认证能力由中央 OIDC 提供，
  *      `server/docs/authentication.md`「任何故障不得降级本地认证」——
  *      所以 accept 之后不再是本地邮箱表单，而是 central-auth-panel）；
+ *   2a. **自有账号模式下**（2026-10-27 加）：展开「其他登录方式」后
+ *       `auth-form-login-code-trigger` 那枚入口真的可见 —— 钉的是"**线上那盘 SPA** 里
+ *       验证码登录这一档在不在"。网页应用与服务端是**两件产物、两条发布路径**
+ *       （`/var/www/heyta-app` 由 rsync 单独同步，`scripts/deploy-ssh.mjs` 不碰它），
+ *       所以服务端修好了、这一档却可能还停在旧构建上，而 `/health` 与五张凭据页全绿。
  *   3. 条款同意未勾选时，发起登录的按钮必须是**禁用**的（"没同意就发起"没有入口）；
  *   4. 勾选后点下去**真的离开 heyta、落在中央授权域**（POST start ⇒ 303 ⇒ 中央登录页）——
  *      这一条钉的是"按钮不是摆设"，也是线上链路端到端活的唯一证据；
@@ -154,6 +159,17 @@ test('线上「登录」：点一次就到登录界面，中途不落在那段�
     await expect(page.locator('[data-testid="auth-form-email"]')).toBeVisible({ timeout: 30_000 });
     await page.screenshot({ path: `${SHOT_DIR}/live-2b-local-form.png` });
     expect(new URL(page.url()).searchParams.has('signin')).toBe(true);
+
+    // 🔴 验证码登录那一档在**线上这盘 SPA 里**要真的存在（2026-10-27 加）。
+    //    服务端修好 P2022 只证了一半 —— 网页应用是另一件产物、另一条发布路径
+    //    （`/var/www/heyta-app`，由 rsync 单独同步，`scripts/deploy-ssh.mjs` 不碰它）。
+    //    那一盘比仓库旧时，这一条会红，而线上五张凭据页与 `/health` 全都还是绿的。
+    //    它默认收在「其他登录方式」那根折叠条后面，所以先展开再断言。
+    await page.locator('[data-testid="auth-form-other-ways-toggle"]').first().click();
+    await expect(page.locator('[data-testid="auth-form-login-code-trigger"]')).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.screenshot({ path: `${SHOT_DIR}/live-2c-code-entry.png` });
 
     logs.stop();
     const noisy = logs.lines.filter((line) => line.startsWith('[console.error]') || line.startsWith('[pageerror]'));
