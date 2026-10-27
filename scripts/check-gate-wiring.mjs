@@ -20,6 +20,7 @@
  *
  * ```sh
  * pnpm check:gate-wiring              # 正常跑
+ * node scripts/check-gate-wiring.mjs --self-test            # 9 臂：真的 spawn 自己，注入改坏的 pkg / 载体树
  * node scripts/check-gate-wiring.mjs --pkg <path>              # 拿一份候选 package.json 试（注入验证用，不动工作树）
  * node scripts/check-gate-wiring.mjs --root <dir>              # 把"链外门禁的消费方"指到临时树（同上，只用于注入验证）
  * ```
@@ -41,12 +42,15 @@
  * rsync 源路径根本不存在那个断点），以及本文件把"链外必须有可验消费方"变成判据。
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
+const SELF = fileURLToPath(import.meta.url);
 
 const argv = process.argv.slice(2);
 let pkgPath = join(ROOT, 'package.json');
@@ -56,16 +60,34 @@ let pkgPath = join(ROOT, 'package.json');
  * 而不用去动工作树（工作树里有别的会话在飞）。
  */
 let consumersRoot = ROOT;
+/**
+ * 🔴 未知旗标必须**收进来并拒绝**，不许让它走过去。
+ * 2026-10-27 现量的自身缺陷：原先这个循环只处理 `--pkg` / `--root`，其余旗标什么都不做就跳过 ——
+ * 于是 `node scripts/check-gate-wiring.mjs --self-test` 拿到的是 rc=0 加一行**普通判决**，
+ * 读起来像"自检过了"，而它当时压根没有自检。本仓每把尺都认 `--self-test`，
+ * 这枚尺恰恰是"检查别的尺有没有被接上"的那一枚：它自己吞旗标，等于把"没人验过它"
+ * 伪装成"验过了"（AGENTS §7 元规则 2：一条永远通过的判据比没有判据更糟）。
+ */
+let wantSelfTest = false;
+const badArgs = [];
 for (let i = 0; i < argv.length; i += 1) {
-  if (argv[i] === '--pkg') {
-    pkgPath = resolve(argv[i + 1] ?? '');
+  const a = argv[i];
+  if (a === '--self-test') {
+    wantSelfTest = true;
+    continue;
+  }
+  if (a === '--pkg' || a === '--root') {
+    const value = argv[i + 1];
+    if (typeof value !== 'string' || value.length === 0) {
+      badArgs.push(`${a} 后面要一个路径`);
+      continue;
+    }
+    if (a === '--pkg') pkgPath = resolve(value);
+    else consumersRoot = resolve(value);
     i += 1;
     continue;
   }
-  if (argv[i] === '--root') {
-    consumersRoot = resolve(argv[i + 1] ?? '');
-    i += 1;
-  }
+  badArgs.push(`不认的旗标 ${a}`);
 }
 
 /**
@@ -253,6 +275,14 @@ const REQUIRED_ANCHORS = [
   // 落地后谁拿自己那份 stale base 提交 `package.json`，它就会静默消失。
   'pnpm check:image-build-args',
 ];
+
+if (badArgs.length > 0) {
+  console.error(`🔴 参数不合：${badArgs.join(' ｜ ')}`);
+  console.error(`   这枚尺只认 --pkg <路径> / --root <目录> / --self-test。`);
+  process.exit(1);
+}
+// 自检臂在下面（函数声明提升，所以可以在这里先调用）。它自己 process.exit，不会落到下面的判决。
+if (wantSelfTest) runSelfTest();
 
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const chainRaw = pkg.scripts?.check;
@@ -502,3 +532,176 @@ if (failures.length > 0) {
 console.log(
   '✅ check 链与门禁定义对上了（链外逐条有理由+可验消费方、锚点在场、树上没有"写了没人引用"的门禁实现）',
 );
+
+/**
+ * ## 自检（2026-10-27 补，此前这枚尺**没有自检**）
+ *
+ * 每一臂都真的 `spawn` 一次本文件，注入一份改坏的 `package.json` 和/或一棵装着改坏载体文件的
+ * 临时树（走的就是 `--pkg` / `--root` 那两个注入口子，工作树一个字都不动），
+ * 然后判**退出码 + 报错文案**：只判 rc 不够 —— 一臂可能因为它判而红，不是因为它该判的那条判据红。
+ *
+ * Ⓐ 是阳性对照：链与载体都原样时必须绿。没有它，剩下每一臂都可能在测一把恒红的尺。
+ *
+ * 射程边界（如实登记，不当成已覆盖）：
+ *  - 允许表里「reason 不许空」「consumers 不许空」两格判的是脚本内那张静态表，注入改不到它 ——
+ *    它们由每次 `pnpm check` 本身判（表一旦写空立刻红），自检臂覆盖的是能注入的那几条。
+ *  - 判据 3b（链里每道门禁的实现文件要在树上）读的永远是真仓库的 `scripts/`，`--root` 不改它，
+ *    所以自检不造这一形；Ⓖ 覆盖的是它的姊妹判据（树上的实现没有任何定义引用）。
+ */
+function runSelfTest() {
+  const consumerFiles = [];
+  for (const entry of [...ALLOWED_OUTSIDE_CHAIN.values(), ...ALLOWED_UNREFERENCED_IMPL.values()]) {
+    for (const c of entry.consumers ?? []) if (!consumerFiles.includes(c.file)) consumerFiles.push(c.file);
+  }
+  // 载体探针从表里取，不写死文件名与 needle（写死 = 表一改臂就悄悄测的是旧形状）。
+  let probe = null;
+  for (const [name, entry] of ALLOWED_OUTSIDE_CHAIN) {
+    for (const c of entry.consumers ?? []) {
+      if (existsSync(join(ROOT, c.file))) {
+        probe = { name, file: c.file, needle: c.needle };
+        break;
+      }
+    }
+    if (probe) break;
+  }
+
+  const realPkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+
+  const build = ({ editPkg, editFile } = {}) => {
+    const dir = mkdtempSync(join(tmpdir(), 'heyta-gate-wiring-'));
+    for (const rel of consumerFiles) {
+      const src = join(ROOT, rel);
+      if (!existsSync(src)) continue;
+      const dest = join(dir, rel);
+      mkdirSync(dirname(dest), { recursive: true });
+      let text = readFileSync(src, 'utf8');
+      if (editFile && editFile.file === rel) text = editFile.apply(text);
+      writeFileSync(dest, text, 'utf8');
+    }
+    const pkg = structuredClone(realPkg);
+    if (editPkg) editPkg(pkg);
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+    return dir;
+  };
+  const dropFromChain = (pkg, seg) => {
+    pkg.scripts.check = pkg.scripts.check
+      .split('&&')
+      .map((s) => s.trim())
+      .filter((s) => s !== seg)
+      .join(' && ');
+  };
+  const dirs = [];
+  const arms = [];
+  const check = (label, { expectRed, mustContain, fixture, argv: extraArgs }) => {
+    let dir = null;
+    try {
+      let r;
+      if (extraArgs) {
+        r = spawnSync(process.execPath, [SELF, ...extraArgs], { encoding: 'utf8', cwd: ROOT });
+      } else {
+        dir = build(fixture);
+        dirs.push(dir);
+        r = spawnSync(process.execPath, [SELF, '--pkg', join(dir, 'package.json'), '--root', dir], { encoding: 'utf8', cwd: ROOT });
+      }
+      const text = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+      const red = r.status !== 0;
+      const ok = red === expectRed && (mustContain === undefined || text.includes(mustContain));
+      arms.push({ label, red, status: r.status, ok, detail: text.split('\n').find((l) => l.includes('🔴')) ?? text.slice(0, 160) });
+    } finally {
+      if (dir) rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  // Ⓐ 阳性对照
+  check('Ⓐ 阳性对照：链与载体原样 ⇒ 必须绿（这条不绿，下面每一臂都在测一把恒红的尺）', { expectRed: false });
+
+  // Ⓑ 判据 1：定义还在、链段被摘 —— 这正是本文件存在的全部理由（合并 package.json 时掉出去的那道门）。
+  check('Ⓑ 判据 1：定义在、链段摘掉 ⇒ 红', {
+    expectRed: true,
+    mustContain: '不在这次的 check 链里',
+    fixture: { editPkg: (pkg) => dropFromChain(pkg, 'pnpm check:gate-ssh') },
+  });
+
+  // Ⓒ 判据 3：链上引用了一枚没定义的脚本 ⇒ 那一整段之后的链根本不跑。
+  check('Ⓒ 判据 3：链段在、定义被摘 ⇒ 红', {
+    expectRed: true,
+    mustContain: '没有这个脚本定义',
+    fixture: { editPkg: (pkg) => { delete pkg.scripts['check:gate-ssh']; } },
+  });
+
+  // Ⓓ 锚点这条判据**独立**成立吗：链段与定义一起消失时，判据 1（要定义在场）与
+  // 判据 3（要链上引用在场）都看不见 —— 2026-10-04 现量过那一形（整文件覆盖 ⇒ rc=0）。
+  check('Ⓓ 锚点：链段与定义一起摘（1/3 条都失明）⇒ 只有锚点会红', {
+    expectRed: true,
+    mustContain: '链里少了锚点',
+    fixture: {
+      editPkg: (pkg) => {
+        dropFromChain(pkg, 'pnpm -r test');
+        delete pkg.scripts.test;
+      },
+    },
+  });
+
+  if (probe) {
+    // Ⓔ 行首锚定的牙：那一行改成**仍然含这段字**的散文。`includes` 在这一形是绿的 ——
+    // 这就是文件头记载的那次事故（runbook 里多了一句"这里少了 …"而门禁绿）。
+    check(`Ⓔ 判据 2b：载体里那行改成散文（含原命令文本，includes 会绿）⇒ 必须红`, {
+      expectRed: true,
+      mustContain: '没有任何一行',
+      fixture: {
+        editFile: {
+          file: probe.file,
+          apply: (text) =>
+            text
+              .split('\n')
+              .map((l) => (l.trimStart().startsWith(probe.needle) ? `> 补充说明：手工也可以 ${probe.needle}（本行是散文，不是命令块）` : l))
+              .join('\n'),
+        },
+      },
+    });
+    // Ⓕ 载体被整行删掉 ⇒ 同一判据必须抓到（否则 2b 只在"文件不在场"时有牙）。
+    check('Ⓕ 判据 2b：载体里那行整行删掉 ⇒ 红', {
+      expectRed: true,
+      mustContain: '没有任何一行',
+      fixture: {
+        editFile: {
+          file: probe.file,
+          apply: (text) => text.split('\n').filter((l) => !l.trimStart().startsWith(probe.needle)).join('\n'),
+        },
+      },
+    });
+  } else {
+    arms.push({ label: 'Ⓔ/Ⓕ 载体探针取不到（允许表里没有任何在场的 consumer 文件）', red: null, ok: false });
+  }
+
+  // Ⓖ 树上的实现还在、package.json 里连定义带链段都没了 ⇒ "写了没人引用"那条必须点名它。
+  check('Ⓖ 无定义实现：摘掉 check:scripts-parse 的定义与链段，实现文件仍在树上 ⇒ 红', {
+    expectRed: true,
+    mustContain: '没有任何 package.json 定义引用它',
+    fixture: {
+      editPkg: (pkg) => {
+        dropFromChain(pkg, 'pnpm check:scripts-parse');
+        delete pkg.scripts['check:scripts-parse'];
+      },
+    },
+  });
+
+  // Ⓗ/Ⓘ 旗标闸门：这枚尺原先把不认的旗标**走过去**（`--self-test` 因此读起来像过了）。
+  check('Ⓗ 不认的旗标必须被拒（原先它被静默吞掉）', {
+    expectRed: true,
+    mustContain: '不认的旗标',
+    argv: ['--bogus'],
+  });
+  check('Ⓘ --pkg 不带值必须被拒，不许静默退化成"读仓库根那份"', {
+    expectRed: true,
+    mustContain: '后面要一个路径',
+    argv: ['--pkg'],
+  });
+
+  const bad = arms.filter((a) => !a.ok);
+  for (const a of arms) {
+    console.log(`${a.ok ? '✅' : '🔴'} ${a.label}${a.ok ? '' : ` ｜ rc=${a.status ?? 'n/a'} ｜ ${String(a.detail).replace(/\n/gu, ' ').slice(0, 200)}`}`);
+  }
+  console.log(`臂数 ${arms.length} ｜ 不符 ${bad.length}`);
+  process.exit(bad.length === 0 ? 0 : 1);
+}

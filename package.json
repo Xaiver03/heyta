@@ -205,7 +205,7 @@
     "check:web-artifact": "node scripts/check-web-artifact.mjs --mount /",
     "check:web-artifact:app": "node scripts/check-web-artifact.mjs --mount /app/",
     "check:entries": "pnpm --filter @heyta/landing check:entries",
-    "check:gate-wiring": "node scripts/check-gate-wiring.mjs",
+    "check:gate-wiring": "node scripts/check-gate-wiring.mjs --self-test && node scripts/check-gate-wiring.mjs",
     "check:gate-ssh": "node scripts/check-gate-ssh.mjs",
     "check:e2e-helper-exports": "node scripts/check-e2e-helper-exports.mjs",
     "check:e2e-specs-parse": "node scripts/check-e2e-specs-parse.mjs --self-test && node scripts/check-e2e-specs-parse.mjs",
