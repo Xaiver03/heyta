@@ -4645,3 +4645,23 @@ vitest 报 `No test files found, exiting with code 1`，五臂齐刷刷 `rc=1`�
 `Test Files 2 passed (2) / Tests 6 passed (6)`，`rc=0`；跑前 `pnpm --filter @heyta/node-host build`（`rc=0`），
 因为正臂 spawn 的是 `dist/cli.js`，不重 build 就是在测上一版产物。
 顺手把本轮自己造的那枚空库 `heyta_a3_recheck_1027` 删掉（`dropdb`），不留给下一位当"库是坏的"的现场。
+
+**7. 落地之后自己回去补的那道缝**：这一格把「周期终态 → 词条」这张表**在两端各写了一份**
+（web 的 `PROCESS_COPY` 与移动端的 `INBOUND_CYCLE_COPY_KEY`），而仓里那把专门钉"同一件事不许两端各说一句"的常驻门
+`apps/mobile/tests/ai-copy-parity.spec.ts` **不含这一族** —— 它覆盖了披露块/健康三档/路由解释/功能名/预设/提案卡/四组失败原因，
+偏偏漏掉我刚新增的这一族。补进去时量到一处**必须逐字登记的差异**：web 那张表多一颗 `web.ai.inbound.process.failed`，
+而 `failed` 不在 `InboundAutomationCycleState` 里（那是 web 面板自己的"这一趟没成"那一档，worker 的返回值里没有）。
+所以这一族按既有那条例外（`failure.cause.networkOriginRejected`）同一条写法处理：写进 `webOnly` 逐字钉住，
+默认仍要求完全一致 ⇒ 下一次真的漂移照样红。另配一枚反证臂（把手机端 `waiting-entitlement` 改名 ⇒ 必须红在
+"移动端多出这些 key"，且不红在"一份都没读到"），先证明喂进臂里的是源码内容而不是路径。
+读数：那把门从 13 枚到 **15 枚全绿**；`apps/mobile` 全套 **91 files / 1173 tests**、`tsc --noEmit` `rc=0`。
+
+**8. 按 §6.1 的固定收尾把"能读到我这批文件的门"逐道跑齐**（此前只跑了移动壳那 7 道，本轮补 23 道，逐条 `pnpm <名>` 取退出码）：
+`check:l4` `check:design` `check:text-color` `check:settings-prose` `check:row-single-source` `check:empty-state`
+`check:ui-provider` `check:theme` `check:form-anatomy` `check:overlay` `check:native-bare`
+`check:inbound-system-prompt` `check:egress-wording` `check:retention-window-parity` `check:integration-coverage`
+`check:journey-coverage` `check:gate-wiring` `check:evidence-hygiene` `check:verify-script-copy`
+`check:mobile-first-run-gate` `check:mobile-renew-shape` `check:reachability` `check:shell-surfaces`
+⇒ **23 道 exit 全为 0**（连同前面的 7 道移动门与 6 道文档门）。
+⚠️ 这句的射程是"这些道在当前树上各退 0"，**不是**"整条 `pnpm check` 绿"——那条链 100 多道、
+红因落在别线地界（本线不代改），要整链读数得按仓里那台逐道不 bail 的装置跑一次。
