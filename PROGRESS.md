@@ -7478,7 +7478,13 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       现量：`python3 ~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.py`，臂数
       `grep -cE "^\s+\('A[0-9]" ~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.py`，逐臂 `还原_ok` 与红了哪几条用例在同目录 `mutation-arms.md`。
     ④ **这一档今天在任何环境都不生效**：`server/prisma/migrations/20261027000000_add_hosted_inbound_extraction`
-      只进了仓库、**没 apply**（本机那套 Postgres 被并行会话共用，apply 的时机归负责人），缺列＝读成 `NULL`＝归设备；
+      只进了仓库、**没 apply**（本机那套 Postgres 被并行会话共用，apply 的时机归负责人）。
+      🔴 但我原先写的"缺列＝读成 `NULL`＝归设备"**是假的**，2026-10-28 现量否证：拿真客户端打在一枚只应用了
+      其余全部迁移的一次性库上，接收 webhook 第一发就要读的 `automationRule.findUnique` 回 **`P2022`**、
+      写面 `create` 带与不带那一列都回 `P2022` ⇒ 代码先上而迁移没上的形状是**公网接收路由 500**，不是回到设备档；
+      同一次探针里 `count()` 照样回 `0`（它不选那一列）⇒ **拿 `count()` 当这类探针会读出假结论**。
+      "`NULL`＝归设备"这句成立的另一档是：列已存在、行是加列之前的旧行，实测读回 `null`、`=== true` 为 `false`。
+      复现 `python3 ~/.heyta-evidence/inbound-hosted-extraction-20261027/probe-unapplied-migration.py`。
       开关语义只认显式 `true`。生产 env／helm／push 一步没动。
     ⑤ **对外六格披露是草稿、一处未发**（隐私政策／数据流转／第三方／帮助中心／价格页 + 那条"不许说成什么"），
       清单在 `docs/plans/inbound-automation-work-brief.md` §5.2。同节登记一条现量危险：

@@ -4931,7 +4931,12 @@ node scripts/check-schema-migration-drift.mjs
 
 ### 4. 边界（这档现在**不生效**，别读成已上线）
 
-1. 🔴 **迁移没 apply**：那一列在任何环境的库里都还不存在 ⇒ 一律读成 `NULL` ⇒ 一律归设备。
+1. 🔴 **迁移没 apply**，而这一格原先那句"那一列不存在 ⇒ 一律读成 `NULL` ⇒ 一律归设备"**是假的**
+   （2026-10-28 现量否证，探针见文末"迁移没 apply 时那一发热读报什么"那一节）：
+   代码先上、迁移没上时，接收 webhook 第一发就要读的那枚 `automationRule.findUnique` 当场回 **`P2022`** ⇒ 症状是**公网接收路由 500**，
+   不是安静退回设备档。"`NULL` 读成归设备"这句只对**另一档**成立：那一列已经存在、行是加列之前落的旧行。
+   ⇒ 顺序上因此**不许**"先换容器再补迁移"；`docs/runbooks/deployment.md` 里"先跑迁移、`MIGRATE_RC=0` 才换容器"那道闸（现量
+   `grep -n "先跑迁移" docs/runbooks/deployment.md`）就是这一档不炸的前提。
    本机那套 Postgres 被并行会话共用，`cd server && sh scripts/migrate-deploy.sh` 的时机归负责人（§6 第 2 格）。
 2. **生产 env 没动、不 push、helm 不动**；`MANAGED_AI_*` 三项不齐时这条腿的分支根本不会配置成功。
 3. **对外披露一处未发**：六格草稿逐处写在工单 [§5.2](inbound-automation-work-brief.md)，
@@ -5018,3 +5023,39 @@ cd server && npx vitest run                          # server 全套
 ⚠️ 这一支补上之后仍然**没有**覆盖"抽取成功那一趟的对外响应"：真路由在测试载体里注定抽不成
 （白名单只认主机名、回环进不了那张表），所以那一趟的响应仍只在单元档里量着 ——
 落点见 ADR-0077 §6 第 7 条，不在这里假装闭合。
+
+### 7. 01:3x 追：迁移没 apply 时那一发热读报什么——我把自己 §4 第 1 格写错了
+
+上一节收完之后，把 §4 那张边界表逐格当"能不能被现量否证"过了一遍，第 1 格那句
+"那一列不存在 ⇒ 一律读成 `NULL` ⇒ 一律归设备"**不是实测**，是我从"可空列"的语义顺嘴推的。
+现量把它否证了。
+
+**跑法**（只属于本探针的一次性库，没动任何在册库）：
+`python3 ~/.heyta-evidence/inbound-hosted-extraction-20261027/probe-unapplied-migration.py`
+—— 私有 `initdb` + 空闲端口 + `createdb heyta_unapplied_probe`，会话时区钉 UTC（与正规尺同一形状），
+逐枚 apply **除** `20261027000000_add_hosted_inbound_extraction` **之外**的全部迁移，
+然后用**真**客户端（`createRequire` 从 `server/package.json` 取 `@prisma/client`，所以它就是生产那枚读面）打四种形状，
+再补上那一枚、同一个探针重跑一遍。读数在同目录 `unapplied-migration-probe.out`。
+
+- **没 apply 那一档**：`automationRule.findUnique` / `findFirst` ⇒ **`P2022`**；
+  `create` 带与不带那一列 ⇒ 都 **`P2022`**。而 `inbound.routes.ts` 的接收腿**第一发**就是那枚 `findUnique`
+  （现量 `grep -n "automationRule.findUnique" server/src/automation/inbound.routes.ts`）
+  ⇒ 代码先上、迁移没上时的形状是**公网 webhook 500**，不是"这条腿没开、照旧归设备"。
+- ⚠️ **同一次探针里 `count()` 照样回 `0`** —— 它不选那一列。
+  这一形比结论要紧：**这类探针若只打 `count()` 会当场读出一个假结论**（"库没这列也没事"）。
+  探针要打在**被测路径真正发的那一发**上，判据才是它自己的判据。
+- **apply 之后那一档**：`findFirst` 回 `null`、`create` 两种形状都成、
+  裸 SQL 插一行不写那一列 ⇒ 经读面回来 `hostedExtraction` 是 `null`、`=== true` 为 `false` ⇒ 归设备。
+  ⇒ "读成 `NULL` 归设备"这句话**没错**，错的是它挂的前提：那说的是"**列已存在、行是旧的**"，
+  不是"迁移没 apply"。
+
+由此多出一条顺序上的话（写进 §4 第 1 格）：这一档**不许**"先换容器再补迁移"，
+而 `docs/runbooks/deployment.md` 里那道"先跑迁移、`MIGRATE_RC=0` 才换容器"的闸就是它不炸的前提 ——
+本线不改那道闸，只是指名它。**同一条假话在仓里有三处抄件**（本 §4 第 1 格、`ADR-0077` §6 第 1 条、
+`PROGRESS.md` 第 209 条 ④），三处同批改完；这符合本仓那条"报修的缺陷是一类不是一个"：
+按**结论的几种句子形状**枚举，不按文件名打勾。
+
+登记一条**待入 traps**（工作树里那本账正被并行会话写着 `#606`/`#607`，按纪律不单独往纯追加账里落、
+免得别人整文件 `git add` 时把我的那条冲掉）：
+> 判"库里缺这一列会怎样"要打在**被测路径真发的那一发查询**上：Prisma 的读面按列名点选 ⇒ 缺列回 `P2022`；
+> 而 `count()` 不选列 ⇒ 照样 `0`。拿 `count()` 或"能不能连上库"当探针，读出来的是"没事"，真相是那条腿一上线就 500。
