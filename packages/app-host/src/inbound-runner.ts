@@ -97,7 +97,7 @@ export async function runInboundAutomationEvent(options: InboundAutomationRunOpt
   if (!routed.result.ok) {
     try { if (sent) await options.advance?.({ eventId: options.claimed.eventId, ruleId: options.claimed.ruleId, parseVersion: options.parseVersion,
       attempt: options.claimed.attempt, leaseGeneration: options.claimed.leaseGeneration, from: 'sent', to: 'unknown' }); } catch { /* preserve provider failure */ }
-    throw new Error(`Inbound automation model failed: ${routed.result.reason}`);
+    throw new Error(`Inbound automation model failed: ${routed.result.reason}（${routed.result.message}）`);
   }
   await options.advance?.({ eventId: options.claimed.eventId, ruleId: options.claimed.ruleId, parseVersion: options.parseVersion,
     attempt: options.claimed.attempt, leaseGeneration: options.claimed.leaseGeneration, from: 'sent', to: 'consumed' });

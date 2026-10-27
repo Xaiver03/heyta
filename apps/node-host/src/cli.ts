@@ -29,6 +29,8 @@ import { parseExportDocument, serializeExportDocument, type NewTaskFields } from
 import { openNodeHost } from './host.js';
 import { runAuthCommand } from './cli-auth.js';
 import { runAccountCommand } from './cli-account.js';
+import { planWorkerRun, runWorker } from './inbound-worker.js';
+import { createKeychainSecretStore } from './keychain-secret-store.js';
 import type { SyncStatus } from '@heyta/sync-client';
 
 /**
@@ -157,8 +159,13 @@ const VALUE_FLAGS = new Set([
   'text',
   'destination',
   'tool',
+  'approve-egress',
+  'ai-endpoint',
+  'ai-model',
+  'ai-key-id',
+  'interval-ms',
 ]);
-const BOOL_FLAGS = new Set(['json', 'all', 'help', 'confirm']);
+const BOOL_FLAGS = new Set(['json', 'all', 'help', 'confirm', 'once', 'ai-managed']);
 
 interface ParsedArgs {
   command: string | undefined;
@@ -365,6 +372,27 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   assistant clear --session <id>
                             清掉一段会话：**一条** DEL op（批量域，AGENTS §3.4），
                             墓碑保留内容 ⇒ 对端离线也不会把它复活回来
+  worker run                把这台的自动收集循环真的打开：领取 → 解密 → 交模型抽字段 →
+                            落待办 → 回执。这是 host.ts 里那枚 startInboundWorkerLoop
+                            在**生产路径上**唯一的启动者（此前只有测试调它）
+      --server/--token/--account-id/--password    四个都必填（或各自的环境变量）
+                            没有 --password 就没有 Vault 根密钥，收件私钥解不开
+      --ai-managed          用 heyta 托管端点解析（明文正文发往**我们自己的服务器**）
+      --ai-endpoint <url> --ai-model <id> --ai-key-id <端点 id>
+                            用自带端点解析。密钥**不在命令行上**：先 ai key set <端点 id>
+                            （密钥从 stdin 读）存进系统钥匙串，这里只指认它住在哪儿
+      --approve-egress <heyta-cloud|user-endpoint>
+                            🔴 要不要它、该填哪一个，都不由本壳判：目的地是 @heyta/ai 按
+                            端点地址算出来的（不在托管白名单上的 --server 不算 heyta-cloud，
+                            回环端点是 none = 明文不出这台设备）。
+                            · 算出来要出境 ⇒ 这个词必填、且必须与算出来的那个相同；缺它或填错
+                              都**拒绝启动**，一个请求都不发（web 壳靠设置界面、移动壳靠同意
+                              流程拿授权，这台无头壳只有命令行上这一处）
+                            · 算出来是 none（本机端点）⇒ 不许写它：挂一句用不上的"授权"
+                              只会让那份同意记录变成装饰
+      --interval-ms <毫秒>  常驻时两趟之间的间隔（缺省 30000）
+      --once                只处理一趟就退出（给验收与定时任务用）；不带它则常驻到 Ctrl-C
+                            这个账号在服务端没有**启用中**的规则时直接拒绝，不空跑常驻
   export --out <路径>       导出全部数据到 JSON 文件（含已删除记录与完整操作日志）
   import --in <路径>        从导出的 JSON 还原 —— **只支持还原到空库**；
                             本机已有数据时拒绝，且不会改动任何现有数据
@@ -828,6 +856,100 @@ async function main(): Promise<number> {
           out(JSON.stringify({ ok: true, command: 'sync', status }));
         } else {
           out(`已同步（${new Date(status.at).toISOString()}）`);
+        }
+        return 0;
+      }
+
+      case 'worker': {
+        const sub = positionals[0];
+        if (sub !== 'run') {
+          throw new Error(
+            `worker 只有 run 这一个子命令（收到「${sub ?? '（空）'}」）。\n\n${USAGE}`,
+          );
+        }
+        // 🔴 四枚参数在**发第一个请求之前**验齐，并把"缺它会坏在哪"写在句子里。
+        // 缺 `--password` 是最值得单独说的一格：Vault 打不开 ⇒ 收件私钥解不出来，
+        // 而底层抛出的那句"Vault is locked"看起来像是"用户没解锁"，不像"参数没给"。
+        if (serverUrl === undefined) {
+          throw new Error('worker run 需要 --server <url>（或 HEYTA_SERVER_URL）—— 领取事件与回执都要打给这台服务器');
+        }
+        if (token === undefined) {
+          throw new Error('worker run 需要 --token <jwt>（或 HEYTA_TOKEN）—— 没有的话先跑一条命令拿：auth login');
+        }
+        if (accountId === undefined) {
+          throw new Error(
+            'worker run 需要 --account-id <id>（或 HEYTA_ACCOUNT_ID）—— 收件私钥按「账号 + 服务器」存，' +
+              '没有它不知道取哪一把，也没有可注册的 worker',
+          );
+        }
+        if (password === undefined) {
+          throw new Error(
+            'worker run 需要 --password <端到端加密口令>（或 HEYTA_PASSWORD）—— ' +
+              '解不开 Vault 就解不开信封里的正文，一条事件也处理不了。' +
+              '🔴 这**不是**登录口令（那条在 `auth login` 的 stdin 里）',
+          );
+        }
+        const intervalRaw = stringFlag(flags, 'interval-ms');
+        let intervalMs: number | undefined;
+        if (intervalRaw !== undefined) {
+          // 只把字符串变成数字；"多久一趟"的下限由共享层判（它自己会拒非法值）。
+          const parsed = Number(intervalRaw);
+          if (!Number.isInteger(parsed) || parsed < 1) {
+            throw new Error(`--interval-ms 要是一个正整数毫秒数，收到「${intervalRaw}」`);
+          }
+          intervalMs = parsed;
+        }
+        const managed = flags['ai-managed'] === true;
+        const endpointUrl = stringFlag(flags, 'ai-endpoint');
+        const endpointModel = stringFlag(flags, 'ai-model');
+        const endpointKeyId = stringFlag(flags, 'ai-key-id');
+        if (managed && (endpointUrl !== undefined || endpointModel !== undefined || endpointKeyId !== undefined)) {
+          throw new Error(
+            '--ai-managed 与 --ai-endpoint/--ai-model/--ai-key-id 只能选一个：前者说"用我们的服务器解析"，' +
+              '后者说"用我自己的端点解析"。两个都给等于谁也没答这道题。',
+          );
+        }
+        if (!managed && endpointUrl === undefined && endpointModel === undefined && endpointKeyId === undefined) {
+          throw new Error(
+            'worker run 要选解析档位：--ai-managed（走 heyta 托管），' +
+              '或 --ai-endpoint <url> --ai-model <id> --ai-key-id <端点 id>（走自带端点）。\n' +
+              '这一格不许由本壳替你猜：它决定收件事件的明文正文发到哪儿。',
+          );
+        }
+        const keychainPath = process.env['HEYTA_KEYCHAIN_PATH'];
+        const plan = planWorkerRun({
+          serverUrl,
+          mode: managed ? 'managed' : 'endpoint',
+          ...(endpointUrl === undefined ? {} : { endpointUrl }),
+          ...(endpointModel === undefined ? {} : { endpointModel }),
+          ...(endpointKeyId === undefined ? {} : { endpointKeyId }),
+          ...(stringFlag(flags, 'approve-egress') === undefined
+            ? {}
+            : { approveEgress: stringFlag(flags, 'approve-egress') }),
+          ...(intervalMs === undefined ? {} : { intervalMs }),
+          once: flags['once'] === true,
+          // 与 `ai key set` 同源：同一枚环境变量决定去哪个钥匙串取，否则存进自定义
+          // 钥匙串的密钥在这里根本找不到（症状是"配好了却拒启"）。
+          ...(managed ? {} : { secretStore: createKeychainSecretStore(keychainPath === undefined ? {} : { keychainPath }) }),
+        });
+        // 🔴 `--json` 时过程行全部走 stderr，stdout 只剩最后一行那个对象 ——
+        // 否则"机器可读输出"要先把人读的行剔掉才能 parse，那就不叫机器可读。
+        const report = await runWorker(
+          host,
+          { userId: accountId, serverUrl, token },
+          plan,
+          (line) => {
+            if (json) err(line);
+            else out(line);
+          },
+        );
+        if (json) {
+          out(JSON.stringify({ ok: true, command: 'worker', ...report }));
+        } else {
+          out(
+            `worker 退出：跑了 ${String(report.cycles)} 趟，新建 ${String(report.createdItems)} 条` +
+              (report.lastState === undefined ? '' : `，最后一趟 ${report.lastState}`),
+          );
         }
         return 0;
       }
