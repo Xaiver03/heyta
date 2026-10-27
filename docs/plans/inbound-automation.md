@@ -4570,3 +4570,66 @@ node-host 全套 `Test Files 14 passed (14) / Tests 213 passed (213)`。
 + `scripts/check-inbound-system-prompt.mjs`，并把三端改成引用它。⚠️ 17:3x 时那一刻的接线状态（瞬时读数，引用前重跑）：
 `grep -n "inbound-system-prompt" package.json` **回空** ⇒ 注释里点名的 `pnpm check:inbound-system-prompt`
 那枚别名此刻还没进 `check` 链，脚本与常量都还是未跟踪/未提交。这件事归他们那一笔，我不代落、也不代勾。
+
+## 2026-10-27 17:5x · 上一节让路的那一格（移动壳把周期结果露出来）落地；判据按失法分臂各证一次，顺带复量 17:3x 那两条瞬时读数（自动收集线）
+
+**0. 让路的前提先复核**（"他们落地了没有"是瞬时读数，不沿用上一节的结论）：
+`git log --oneline -1 -- scripts/check-inbound-system-prompt.mjs` 回 `4306ff18e`，
+`git status --porcelain -- apps/mobile` 那一刻只剩 ` M apps/mobile/src/inbound/lifecycle.ts` 与
+` M apps/mobile/tests/share-ui-assembly.spec.ts`（后者归协作线，本批一行不碰）⇒ 我要写的
+`lifecycle.ts` 不再是混合文件，上一节那句"排在他们落地之后"的前置解除。
+
+**1. 落了四处 + 一枚用例**（都在 `apps/mobile`，全走 `packages/i18n` 取句子，界面里没有第二份字面量）：
+
+| 落点 | 干了什么 |
+|---|---|
+| `src/inbound/status.ts`（新） | 一枚模块级快照 store：`publishInboundCycle(result)` 只留 `state` 与 `itemCount`，同值不通知（前台每 20 秒一趟，稳态是 `empty`，不去重就是白重渲染设置面）；`useInboundCycle()` 走 `useSyncExternalStore`，与 `ai/settings-store.ts` 同形 |
+| `src/inbound/copy.ts`（新） | `INBOUND_CYCLE_COPY_KEY: Record<InboundAutomationCycleState, MessageKey>`，穷尽映射，复用 web 那五颗 `web.ai.inbound.process.*`（不新建词条 ⇒ 两壳同一句话） |
+| `src/inbound/lifecycle.ts` | 上一节点名的那一行：`publishInboundCycle(await host.processInboundAutomation(options));` |
+| `src/ai/AiSettingsSection.tsx` | 新增一行 `<Text variant="row-meta" testID="inbound-cycle-state">`，句子从那张表取；`inboundCycle === undefined` 时**整行不渲**（没有"上次结果"就不编一句"当前没有待处理事件"） |
+| `tests/inbound-cycle-display.spec.ts`（新） | 七枚 `it`：键集合等于显式分母、中英两档各档非空且互不相同、接线三档（接住 / 渲出 / 不许第二份字面量）、`eventId` 不外带、去重与退订 |
+
+**2. 现量判据**（全部本轮实跑，命令逐条可复现）：
+
+- `apps/mobile` 全套：`npx vitest run` → **91 files / 1171 tests passed**，`rc=0`。这两个数是**拆分之后**重跑的（拆分前那条读数是 1169，留着只为说明它是旧档，别当本批判据）；日志与施变输出都落在 `~/.heyta-evidence/inbound-a3-mobile-20261027/`（`logs/` 与 `runs/`），不指 `/tmp`——那里的东西第二天就没了，台账里写它等于写一条死链。
+- 类型检查：`npx tsc --noEmit -p tsconfig.json` → `rc=0`，零输出（`logs/tsc-after-split.log`，同为拆分后重跑）。
+- 门禁逐条 `pnpm <name>`，取退出码用 `cmd >log 2>&1; echo rc=$?`（管道尾巴会吃 rc）：
+  `check:mobile-settings` `check:mobile-ai-anchors` `check:rn-aria` `check:ui-language`
+  `check:i18n-vars` `check:ai-coverage` `check:layering` → **七条 exit 全为 0**。
+- 施变臂（装置 `~/.heyta-evidence/inbound-a3-mobile-20261027/{mutate-arms.sh,mutate.mjs,runs/}`，
+  不落 `/tmp`）：**每臂只改一处**，五臂读数与判定：
+
+  | 臂 | 改法 | 结果 | 判定 |
+  |---|---|---|---|
+  | A1-catch | 摘掉 `publishInboundCycle(...)` 那一手 | `× 接住：…` 1 红 | 有牙 |
+  | A2-render | 那一行的句子换成 `t('mobile.ai.saveFailed')` | `× 渲出：…` 1 红 | 有牙 |
+  | A3-testid | `testID` 去掉 `-state` 后缀 | `× 渲出：…` 1 红 | 有牙 |
+  | A4-literal | 真代码里写死 `const PROBE = '已提交任务';` | `× 界面里不许有第二份句子…` 1 红 | 有牙 |
+  | A5-comment | 同一句中文**只放注释里** | `rc=0 红=0` | 不误红 |
+
+  三段哈希每臂都过（`lifecycle.ts` 基线 `a2de36758c53…`、`AiSettingsSection.tsx` `03f0c8cd004c…`，
+  五臂还原后逐字节相同），`find … -name '*.mut-bak'` 回空。
+
+**3. 自己判据上的一处自曝（这条是本节的主要产出）**：上一版把这些断言**捆在一枚 `it` 里**，
+而我第一次施变是**两处同时改**（摘 publish + 换文案）⇒ 第一条断言先抛，**换文案那一半从未被证过**，
+读数却写着"1 failed"，看起来像整枚判据有牙。
+判据形状因此改成**一种失法一枚 `it`**，施变**一臂只改一处**；改完 A1/A2/A3/A4 各红在**自己那一枚**上。
+同轮的探针自曝第二味：装置把用例路径写成了仓库根相对，`cd apps/mobile` 之后再传 ⇒
+vitest 报 `No test files found, exiting with code 1`，五臂齐刷刷 `rc=1`、`红=0`。
+**用具的红与判据的红在 `rc` 这一列上长得一模一样**，所以这条臂现在自带两件事：
+先 grep `No test files found` 判"探针没找到用例 ⇒ 整批读数作废"，再按 `×` 的**枚数**下判定，
+`rc` 只作旁证。这条形状写在这里而不占 traps 编号（编号是竞态资源，见本仓既有登记）。
+
+**4. 复量 17:3x 那一节留给下一位的两条瞬时读数**（原句留在上面不删，因为那是当时的真实读数）：
+`grep -n "inbound-system-prompt" package.json` 现在回**两行** —— `179` 行的 `check` 链里有
+`pnpm check:inbound-system-prompt`，`211` 行是别名定义本体；
+`git ls-files --error-unmatch scripts/check-inbound-system-prompt.mjs packages/app-host/src/inbound-system-prompt.ts`
+`rc=0` ⇒ 上一节那句"⚠️ 别名还没进 `check` 链、脚本与常量都还是未跟踪"**已过期**，
+那件事由 `4306ff18e` 落完，归他们那一笔。
+
+**5. 这一格不等于哪些事**（别把它读成 A3 整格闭合之外的更大东西）：
+① 它**不解决** A2 那条边界（工单 §6 第 7 格：补后台腿，还是对外明写"设备开着才处理"）——
+移动壳依旧只在 `AppState === 'active'` 时跑，界面这一行只说"上一趟的终态"，不说"这壳能后台收"。
+② 界面这一行的**对外措辞取向**（"上次结果"要不要写成"仅在应用打开时处理"）仍归负责人，本批按现状渲，不加一句解释性文案。
+③ `waiting-entitlement` 那把词条是**上一批**补的，本节只复用，没动 `packages/i18n`。
+④ AC-1～AC-8 一格未勾（`research/tools/verify-inbound-ac-ticks.py` 的口径不变）。
