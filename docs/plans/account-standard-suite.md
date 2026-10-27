@@ -4411,6 +4411,22 @@ HID 点击回 `success` 而控件收不到（**探针说成功，不等于界面
    与一枚未注册路径的阳性对照。
 3. 手册里"三张凭据页"那种**枚数抄件**删掉，改成指向这把尺（`docs/runbooks/deployment.md`）。
 
+**同族逐枚读数（10-27 用真浏览器在线上复量，同一趟里取的；分母 = 信里真会写出的全部目的地）**：
+
+| 目的地 | 读数 | 结论 |
+|---|---|---|
+| `/reset-password?token=…` | 200 `text/html`，正文不等于落地页，引自己那支 `/reset-password.js` | 可达（**修前是 404**） |
+| `/change-email?token=…` | 200 `text/html`，正文不等于落地页，引 `/change-email.js` | 可达（**修前同样是 404**，与上面同一次补齐） |
+| `/verify-email?token=…` | 200 `text/html`，引 `/magic-login-confirm.js`（与 magic-login **共用**那支） | 可达，修前也通 |
+| `/magic-login?token=…` | 200 `text/html`，引 `/magic-login-confirm.js` | 可达，修前也通 |
+| `/recover-passkey?token=…` | 200 `text/html`，引 `simplewebauthn` + 自己那支 | 可达，修前也通 |
+| `/app/` 与 `/app/?signin=1` | 200，两份字节相同的应用外壳（正文引 `/app/assets/`） | 可达；但落地页导航上的「登录」不带 `signin` ⇒ 记 **B232**，不归本线 |
+| 未注册路径（阳性对照） | 404 | 边缘仍在区分"没这条路由"，不是整站放开 |
+| 脚本自己发的五枚 `/api/…` | 400 / 401，且各带机器可读 `code` | 服务端在答（不是边缘答的 404） |
+
+⇒ **"还有没有同样打不开的"这一问的答案是：只有那两张，一起修好了**；另外三张凭据页与应用侧本来就通。
+五张页的正文两两不同（判据 ⑦），所以不存在"两张页互换而看不出来"那种绿。
+
 **边界，别读多**：`server/deploy/nginx/*.conf` 那两份是**死镜像**（本域名由 `caddy-edge` 服务、
 `nginx.service` masked），里面那句"三张凭据页"没去动它，理由写在门禁文件头
 （往没人读的文件里补规则只会制造一次假漂移）；真收件箱那一腿仍缺（缺口 G1，这里读的是
