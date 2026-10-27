@@ -30,6 +30,7 @@
  *   node scripts/check-worktree-exceptions.mjs           # 逐条归属 + 点名未登记的 + 点名跨线依赖
  *   node scripts/check-worktree-exceptions.mjs --strict  # 有未登记**或**有跨线依赖 ⇒ exit 1
  *   node scripts/check-worktree-exceptions.mjs --self-test
+ *   node scripts/check-worktree-exceptions.mjs --head --range b55e98807  # 第三判：那一笔以来落进 HEAD 的改动，自己是不是半棵树（只读对象库）
  *
  * 规则表住在脚本里，登记正文（每一行为什么不归本线）在 `BLOCKED.md` 的 B238 那一节。
  */
@@ -40,7 +41,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const ALLOWED_FLAGS = ['--strict', '--self-test'];
+const ALLOWED_FLAGS = ['--strict', '--self-test', '--head', '--range <ref>'];
 
 /**
  * 每条规则 = 一行归属 + 它凭什么这么归。
@@ -87,6 +88,7 @@ export const OWNER_RULES = [
       'server/src/automation/',
       'server/src/ai/managed-completion.ts',
       'server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts',
+      'docs/plans/inbound-automation.md',
       'docs/adr/0077-inbound-hosted-extraction-at-ingest.md',
     ],
   },
@@ -104,9 +106,12 @@ export const OWNER_RULES = [
     prefixes: ['apps/web/src/App.tsx', 'apps/web/src/features/calendar/', 'e2e/tests/calendar-cells.spec.ts'],
   },
   {
-    line: '不是任何人的改动：门禁自己的产物回执',
-    why: '谁在这棵树上跑 `check:ai-e2e`，那批截图就被重写一次（traps #602）；代提交 = 把别人那一趟运行的产物按我的名义落仓',
-    prefixes: ['apps/web/evidence/reminder-permission-final/'],
+    line: '不是任何人的改动：已入库截图被门禁重写',
+    why: '谁在这棵树上跑截图类门禁，已入库的那批 PNG 就被重写一次（traps #602）；代提交 = 把别人那一趟运行的产物按我的名义落仓。' +
+      '🔴 这条**只吃已跟踪件的修改**（`skipUntracked`）：`apps/web/evidence/` 下新出现的文件是作者准备入库的真证据，' +
+      '必须留在"没登记过"那一栏被点名 —— 按机制登记和按目录穷举的分别是：前者不随跑门禁的次数漂',
+    prefixes: ['apps/web/evidence/'],
+    skipUntracked: true,
   },
   {
     line: '协作/同意面线',
@@ -139,12 +144,21 @@ export const OWNER_RULES = [
 ];
 
 export function parseArgs(argv) {
-  const out = { strict: false, selfTest: false };
+  const out = { strict: false, selfTest: false, head: false, range: undefined };
   const unknown = [];
-  for (const a of argv) {
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
     if (a === '--strict') out.strict = true;
     else if (a === '--self-test') out.selfTest = true;
-    else unknown.push(a);
+    else if (a === '--head') out.head = true;
+    else if (a === '--range') {
+      const v = argv[i + 1];
+      if (v === undefined || v.startsWith('--')) unknown.push('--range（少了 ref）');
+      else {
+        out.range = v;
+        i += 1;
+      }
+    } else unknown.push(a);
   }
   return { ...out, unknown };
 }
@@ -172,7 +186,9 @@ export function parsePorcelain(text) {
 export function classify(entries, rules) {
   const rows = [];
   for (const e of entries) {
-    const hit = rules.find((r) => r.prefixes.some((p) => (p.endsWith('/') ? e.file.startsWith(p) : e.file === p)));
+    const hit = rules.find(
+      (r) => (r.skipUntracked && e.xy.includes('?') ? false : r.prefixes.some((p) => (p.endsWith('/') ? e.file.startsWith(p) : e.file === p)))
+    );
     rows.push({ ...e, line: hit ? hit.line : null });
   }
   return {
@@ -184,24 +200,42 @@ export function classify(entries, rules) {
 }
 
 /**
- * 只认相对说明符：`from './x'` 与副作用式 `import './x'`。
- * 裸包名（`react`）不在射程里 —— 它由 `check:layering` 与 lockfile 管，这枚尺只盯"仓库内的落点"。
+ * 逐行抽出**真正的**相对引用语句：`import … from './x';` / `export … from './x';` / `import './x';`。
+ * 两头都锚死（行首是关键字、说明符后面到行尾只剩 `;`），注释行先丢 —— 否则散文与断言字符串会灌进读数：
+ * `--head` 第一发 381 处里，抽样三处全是这类（`pages.ts:59` 的注释、`theme.tsx:14` 的注释、
+ * `note-edit.spec.ts:163` 那句 `expect(...).toContain("import … from './NoteEditScreen';")`）。
  */
-const RELATIVE_SPEC_RE = /(?:\bfrom|\bimport)\s*['"](\.[^'"]+)['"]/g;
+export function extractRelativeSpecs(text) {
+  const specs = [];
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) continue;
+    const m = /^(?:import|export)\b(?:[\s\S]*?\bfrom)?\s*['"](\.[^'"]*)['"]\s*;?\s*(?:\/\/.*)?$/.exec(t);
+    if (m) specs.push(m[1]);
+  }
+  return specs;
+}
 
 const SCANNED_EXT = new Set(['.ts', '.tsx', '.mts']);
 
-/** 一条相对说明符在本仓约定下可能的磁盘落点（`.js` 实际指向 `.ts`/`.tsx` 是本项目写法）。 */
+/**
+ * 一条相对说明符在本仓约定下可能的磁盘落点。
+ * 🔴 不许用 `extname()` 判扩展名：本仓有一批**带点的文件名**（`account-profile.store.ts`、
+ * `websocket-connection.service.ts`），`extname` 会把 `.store` 当扩展名 ⇒ 候选一个都不补 ⇒
+ * 已入库的模块被报成"HEAD 里没有"。这里改成"结尾是不是已知模块扩展名"。
+ */
+const MODULE_EXT_RE = /\.(ts|tsx|mts|js|mjs|json|css|scss)\b/;
+const JS_LIKE_RE = /\.(js|mjs)$/;
+
 export function candidateTargets(importer, spec) {
   const base = path.posix.normalize(path.posix.join(path.posix.dirname(importer), spec));
   const out = [base];
-  const ext = path.posix.extname(base);
-  if (ext === '.js' || ext === '.mjs') {
-    out.push(base.slice(0, -ext.length) + '.ts', base.slice(0, -ext.length) + '.tsx');
+  if (JS_LIKE_RE.test(base)) {
+    const stem = base.replace(JS_LIKE_RE, '');
+    out.push(`${stem}.ts`, `${stem}.tsx`, `${stem}.mts`);
+  } else if (!MODULE_EXT_RE.test(base)) {
+    out.push(`${base}.ts`, `${base}.tsx`, `${base}.mts`, `${base}.js`, `${base}/index.ts`, `${base}/index.tsx`);
   }
-  // 无扩展名的写法（`from './helpers'`）在本仓同样合法：不补这一档，别线的 spec 会整批假红
-  //（2026-10-28 第一发就是这么错的：`e2e/tests/helpers.ts` 明明已入库，尺判它"落点上根本没有"）
-  if (ext === '') out.push(`${base}.ts`, `${base}.tsx`, `${base}.js`, `${base}/index.ts`, `${base}/index.tsx`);
   return out;
 }
 
@@ -224,7 +258,7 @@ export function crossLineImports(entries, { read, isTracked, exists }) {
     } catch {
       continue; // 读不到就跳过这枚，但**不**把它读成"没有跨线依赖"
     }
-    for (const [, spec] of [...text.matchAll(RELATIVE_SPEC_RE)]) {
+    for (const spec of extractRelativeSpecs(text)) {
       const cands = candidateTargets(e.file, spec);
       if (cands.some((c) => isTracked(c))) continue;
       const onDisk = cands.find((c) => exists(c));
@@ -236,6 +270,11 @@ export function crossLineImports(entries, { read, isTracked, exists }) {
     }
   }
   return found;
+}
+
+/** `git diff --name-only` 的输出 ⇒ 路径清单（空行丢掉；带引号的路径不去，本仓没有非 ASCII 路径的改名）。  */
+export function parseNameList(text) {
+  return text.split('\n').filter((l) => l.trim() !== '');
 }
 
 const SELF_TEST_ARMS = () => {
@@ -304,6 +343,18 @@ const SELF_TEST_ARMS = () => {
   );
   push('⑬ 未跟踪的 importer 自己不扫（它和 target 同一笔提交就自洽）', crossLineImports(one('??'), mk([], [HOOK])), []);
   push(
+    '⑱ 带点的文件名要解析得到（`account-profile.store` 这族，extname 会把 `.store` 当扩展名）',
+    crossLineImports(
+      [{ xy: ' M', file: 'server/src/api.ts' }],
+      {
+        read: () => "import { withAccountProfile } from './account/account-profile.store';\n",
+        isTracked: (f) => f === 'server/src/account/account-profile.store.ts',
+        exists: () => false,
+      }
+    ),
+    [],
+  );
+  push(
     '⑭ 无扩展名写法要解析到 .ts —— 别线的 spec 全用这种写法，解析不到就是一整批假红',
     crossLineImports(
       [{ xy: ' M', file: 'e2e/tests/rail-roving.spec.ts' }],
@@ -314,6 +365,41 @@ const SELF_TEST_ARMS = () => {
       }
     ),
     [],
+  );
+  push(
+    '⑮ 路径清单解析要丢空行；--range 少了 ref 必须被拒（不许把 --head 读成"扫整棵树"）',
+    [parseNameList('a/b.ts\n\nc/d.tsx\n'), parseArgs(['--head', '--range']).unknown, parseArgs(['--head', '--range', 'HEAD~5']).range],
+    [['a/b.ts', 'c/d.tsx'], ['--range（少了 ref）'], 'HEAD~5'],
+  );
+  push(
+    '⑯ 注释行与"断言里的 import 文本"都不许算引用（这就是 --head 第一发 381 处噪声的来源）',
+    extractRelativeSpecs(
+      [
+        "// import x from './commented-out';",
+        " * `import { VALUE } from './doc-text.js'` 不行。",
+        `    expect(section).toContain("import { NoteEditScreen } from './NoteEditScreen';");`,
+        "import { NoteEditScreen } from './NoteEditScreen';",
+        "import { trailing } from './with-comment'; // 行尾注释不许把它读成'不是引用'",
+        "import './side.css';",
+      ].join('\n')
+    ),
+    ['./NoteEditScreen', './with-comment', './side.css'],
+  );
+  push(
+    '⑰ `export … from` 那种再转发行也要吃到（锚死行尾不能把转发漏掉）',
+    extractRelativeSpecs("export { createFoo } from './factory.js';\nexport * from './re-export-all';\n"),
+    ['./factory.js', './re-export-all']
+  );
+  push(
+    '⑲ 按机制登记的那条只吃已跟踪件的修改：新加的取证文件必须仍被点名（skipUntracked 的牙）',
+    classify(
+      [
+        { xy: ' M', file: 'apps/web/evidence/whatever/old-shot.png' },
+        { xy: '??', file: 'apps/web/evidence/whatever/new-shot.png' },
+      ],
+      OWNER_RULES
+    ).unattributed.map((r) => r.file),
+    ['apps/web/evidence/whatever/new-shot.png'],
   );
   return arms;
 };
@@ -333,13 +419,43 @@ const main = () => {
     console.log(`臂数 ${arms.length} ｜ 不符 ${bad.length}`);
     process.exit(bad.length === 0 ? 0 : 1);
   }
+  if (opts.head) {
+    if (opts.range === undefined) {
+      console.error('🔴 --head 必须带 --range <ref>：它只读对象库，分母就是 "git diff --name-only <ref>..HEAD"。');
+      console.error('   整棵 HEAD 那一档我今天试过后撤掉了 —— 分母 1721 枚、286 处判不中，噪声两类（指向 `packages/*/dist/*` 这种构建产物、');
+      console.error('   以及非语句式的 import 写法）都要真正的解析器才分得清。留一枚天生红的尺比不留更糟。');
+      process.exit(1);
+    }
+    const names = execFileSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n')
+      .filter((l) => l.trim() !== '');
+    const headSet = new Set(names);
+    const changed = parseNameList(
+      execFileSync('git', ['diff', '--name-only', `${opts.range}..HEAD`, '--', '*.ts', '*.tsx', '*.mts'], { cwd: ROOT, encoding: 'utf8' })
+    ).filter((f) => headSet.has(f)); // 范围里被删掉的文件不在 HEAD 里，扫它们没有意义
+    const bad = crossLineImports(
+      changed.map((file) => ({ xy: ' M', file })),
+      {
+        read: (f) => execFileSync('git', ['show', `HEAD:${f}`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }),
+        isTracked: (f) => headSet.has(f),
+        exists: () => false,
+      }
+    );
+    console.log(`HEAD 自洽 ｜ 范围 ${opts.range}..HEAD ｜ 这批里已入库的源文件 ${changed.length} 枚（HEAD 共 ${names.length} 枚）｜ 引用不到 HEAD 落点的 ${bad.length} 处`);
+    for (const b of bad) console.log(`   ${b.importer}\n      → ${b.target}（HEAD 里没有这个落点）`);
+    process.exit(opts.strict && bad.length > 0 ? 1 : 0);
+  }
   const rulesBad = auditRules(OWNER_RULES);
   if (rulesBad.length > 0) {
     console.error('🔴 规则表自己不合格，这枚尺今天不许报"干净"：');
     for (const b of rulesBad) console.error(`   ${b}`);
     process.exit(1);
   }
-  const entries = parsePorcelain(execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }));
+  // 🔴 `core.quotepath=off`：默认写法会把非 ASCII 路径转义成 "view-\344\271\240…"，
+  // 那种字符串跟任何前缀都拼不上 ⇒ 中文名的证据件会整批读成"没登记过"（2026-10-28 实测到过）。
+  const entries = parsePorcelain(
+    execFileSync('git', ['-c', 'core.quotepath=off', 'status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' })
+  );
   const v = classify(entries, OWNER_RULES);
   if (v.checked === 0) {
     console.log('工作树干净：未提交 0 枚 ⇒ 没有例外需要登记。');
