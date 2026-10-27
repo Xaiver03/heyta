@@ -1795,6 +1795,11 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
    ⇒ 当趟打印 `GATE=FAIL READING=load1=33（原始 33.05） LIMIT=12` —— 它读 `uptime`、把非整数读数判**不过**并点名探针故障（手写 `[ … -le … ]` 那一支恰好是"读不出来＝放行"那一形）。
    函数在册位置：`host_load_gate()` 与 `host_memory_gate()` 同文件（现量 `grep -nE "^(host_load_gate|host_memory_gate)\(\)" scripts/lib/wait-for-quiet-host.sh`）。
    其余三条仍是 `pgrep -fl 'vitest|playwright'` 回 0 **且** 4318／4319 空 **且** `git status --porcelain=v1 -- packages apps server` 对本线干净。
+   ⚠️ **别拿"只挑便宜的段跑"充当这把尺**（下一位最容易走的捷径，我这里明确堵掉）：整链里那些**跑测试套件的段**在负载 33 上会假红 ——
+   `Test timed out in 5000ms` 那一形在册（**#590** 第二形：同一枚持锁者能把 jsdom 用例压成超时）。
+   在那种读数上报"别线红"是把机器底噪记成别人的缺陷，代价比"这一段还没读数"大得多。
+   ⇒ 所以本线此刻能给这把尺的形状只有两种：①**只读源码、不依赖时序**的静态门逐枚跑（今天已做，§9.34 那 15 枚）；
+   ②负载门过后在隔离载体里跑**整条**并逐枚归因。中间形态（部分重段）不算读数。
    载体那一步仓内已有约定：`.gitignore` 第 2 行那条注释写的就是**linked worktree 里 `e2e/node_modules` 做成指向主检出的软链**（为了不重复装第二份 playwright），
    下一位按这条形制起载体，别新造一套。
 2. **Android 那一侧没有界面腿读数**（成功定义那句"和 web 一样真的能用"在安卓上今天只能靠推定）。
