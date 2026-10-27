@@ -197,7 +197,10 @@ export async function claimAutomationEvent(
     if (!worker) throw new Error('Automation worker is not authorized');
     const candidates = requestedEventId
       ? await tx.$queryRaw<any[]>`SELECT * FROM automation_events WHERE event_id = ${requestedEventId} AND user_id = ${userId} FOR UPDATE`
-      : await tx.$queryRaw<any[]>`SELECT * FROM automation_events WHERE user_id = ${userId} AND payload_ciphertext IS NOT NULL AND (status IN ('queued','received') OR (status = 'leased' AND lease_expires_at <= ${now})) ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED`;
+      // 🔴 `(::timestamptz AT TIME ZONE 'UTC')` 不是装饰：${now} 绑进来是绝对时刻，而这一列是
+      // 按 UTC 挂钟存的裸 `timestamp`，Postgres 会按**会话时区**解释裸值 —— 不锚就会在 +08 会话上
+      // 把还活着的租约读成已过期（另一台设备因此能把它抢走）。理由与现量见环境陷阱 #599。
+      : await tx.$queryRaw<any[]>`SELECT * FROM automation_events WHERE user_id = ${userId} AND payload_ciphertext IS NOT NULL AND (status IN ('queued','received') OR (status = 'leased' AND lease_expires_at <= (${now}::timestamptz AT TIME ZONE 'UTC'))) ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED`;
     const current = candidates[0];
     if (!current || current.payload_ciphertext === null || (current.status !== 'queued' && current.status !== 'received' && !(current.status === 'leased' && current.lease_expires_at <= now))) return undefined;
     if (current.expires_at <= now) {
@@ -345,7 +348,7 @@ export async function readAutomationPreparedResult(
       LEFT JOIN automation_rules r ON r.id = e.rule_id AND r.user_id = e.user_id
       WHERE e.user_id = ${userId}
         AND (${eventId ?? null}::text IS NULL OR e.event_id = ${eventId ?? null})
-        AND e.expires_at > ${now}
+        AND e.expires_at > (${now}::timestamptz AT TIME ZONE 'UTC')
         AND e.result_ciphertext IS NOT NULL AND e.result_digest IS NOT NULL
         AND e.result_item_count IS NOT NULL AND e.parse_version IS NOT NULL
         AND (

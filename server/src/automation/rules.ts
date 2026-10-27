@@ -164,12 +164,13 @@ export async function deleteAutomationRule(userId: number, ruleId: string): Prom
 export async function purgeExpiredAutomationEvents(now = new Date()): Promise<number> {
   // One statement serializes with an upload's completion update. Erasing
   // ciphertext must never turn a completed/cancelled event into a failed one.
+  // 🔴 保留窗按 UTC 挂钟比：不锚时钟就把七天的窗读成七天减八小时。见环境陷阱 #599。
   return prisma.$executeRaw`
     UPDATE automation_events
     SET payload_ciphertext = NULL, result_ciphertext = NULL,
       status = CASE WHEN status IN ('queued', 'received', 'leased', 'prepared', 'needs-confirmation') THEN 'expired' ELSE status END,
       reason_code = CASE WHEN status IN ('queued', 'received', 'leased', 'prepared', 'needs-confirmation') THEN 'retention-expired' ELSE reason_code END,
       lease_worker_id = NULL, lease_expires_at = NULL
-    WHERE expires_at <= ${now} AND (payload_ciphertext IS NOT NULL OR result_ciphertext IS NOT NULL)
+    WHERE expires_at <= (${now}::timestamptz AT TIME ZONE 'UTC') AND (payload_ciphertext IS NOT NULL OR result_ciphertext IS NOT NULL)
   `;
 }
