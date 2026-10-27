@@ -896,4 +896,113 @@ describe.skipIf(!DATABASE_URL)('inbound fault windows across two independent rea
     expect(dayOf(actions.findTask(shanghai.tasks[0]!.id)!.dueDate!, 'Asia/Shanghai')).toBe('2027-01-01');
     report(13, `date-only 在 Asia/Shanghai 规则下锚回 2026-11-30（UTC 读成 11-29，证明跟规则不跟机器）；换 America/Los_Angeles 规则仍回 2026-11-30 且 epoch 不同；start-only 不产生 dueDate；编辑到 2027-01-01 往返不漂`);
   }, 150_000);
+
+  // 🔴 H1 **不占窗口号**：这一档的分母是计划里那张 AC-3 故障表，`verify-inbound-dual-host.py`
+  // 把"套件报了计划里没有的号"判红（R5），所以它只打自己的 `HOSTED_HANDOFF=` 那一行，不进对账。
+  // 它挂在这同一份夹具上跑，是因为要证的正是**设备那一腿**：`processInboundAutomationEvent`
+  // 的解码序列住在 `@heyta/app-host`，单元档里我自己再解一遍只证"我的解法与我的封法自洽"，
+  // **不证两档接得上**。这里让一枚真宿主经真 HTTP 把服务端冻好的那一行跑完整个周期。
+  it('H1 托管档冻好的结果被设备档接住：当场抽取→重封→正文清零，任务仍由设备写回', async () => {
+    if (only !== undefined && !only.has(-1)) {
+      process.stdout.write('HOSTED_HANDOFF=SKIP 不在 HEYTA_DUAL_HOST_ONLY 里（排障旋钮，不算验收）\n');
+      return;
+    }
+    const { runHostedExtractionAtIngest, HOSTED_EXTRACTION_TIMEOUT_MS } = await import('../../src/automation/hosted-extraction');
+    const { managedAiFetchTransport } = await import('../../src/ai/managed-completion');
+    const { MANAGED_AI_REQUESTS_PER_PERIOD, peekManagedAiUsage } = await import('../../src/ai/metering');
+    const { createPrismaSqlExecutor } = await import('../../src/billing/pricing-store');
+    const { canonicalPublicKey } = await import('../../src/automation/inbound.routes');
+    const s = await scenario({ tasks: [{ title: '买牛奶', priority: 2 }] });
+    const a = s.devices.get('a')!;
+
+    // 这一档由**真 API** 打开：界面上那枚开关写的就是那一列，读回来的也必须是它。
+    const hosted = await s.rules.create(KEY_V1, { allowedFields: ['title', 'priority'], timezone: null,
+      parseVersion: 1, maxItems: 50, hostedExtraction: true });
+    expect(hosted.hostedExtraction).toBe(true);
+    await s.rules.setEnabled(hosted.id, true);
+
+    // 第一趟走**真接收路由**。这台实例没配 `MANAGED_AI_*`，那条腿于是注定抽不成 ——
+    // 要量的是"没成之后内容一个字都没少"：行还停在 queued、正文密文还在、一次模型都没发、
+    // 一次额度都没扣。（抽取的失败原因不落这一行，所以这里不声称读到了哪个原因码。）
+    const eventId = randomUUID();
+    const body = JSON.stringify({ title: 'Inbox note', secret: 'must-not-leave' });
+    const delivered = await deliver(hosted.id, eventId, body);
+    expect(delivered.status).toBe(202);
+    expect(delivered.json).toMatchObject({ state: 'queued' });
+    expect((await eventRow(s.userId, eventId))?.payloadCiphertext).not.toBeNull();
+    expect(provider.sources.length).toBe(0);
+    expect((await peekManagedAiUsage({ userId: s.userId })).used).toBe(0);
+
+    // 第二趟是同一条腿，只把上游指到这档现成的回环桩上。与生产那一份 context 差的是三格
+    // （`upstream.baseUrl` / `hosts` / `plaintextHosts`），发送函数与闸门顺序用的都是**同一枚**
+    // `invokeManagedAiCompletion`；白名单表在测试里必然是合成的，`managed-proxy.routes.spec.ts`
+    // 拿同一形状的合成表钉的也是它。`canonicalPublicKey` 从路由那里**读同一枚归一化** ——
+    // 测试里再抄一份就是第二份事实源，两腿封的字节是否逐字相同这件事会从此量不到。
+    const recipient = await db.automationRecipientKey.findUniqueOrThrow({ where: { userId: s.userId } });
+    const ruleRow = await db.automationRule.findUniqueOrThrow({ where: { id: hosted.id } });
+    // 🔴 白名单与明文表比的是 `url.hostname`（`parseUpstreamUrl` 里那一句），**不带端口** ——
+    // 端口在 `baseUrl` 里，匹配键里没有。这里写成 `127.0.0.1:<端口>` 会被判 `not-allowlisted`，
+    // 而那一支长得很像"我的合成表没配对"，其实是把闸门的匹配口径猜错了。
+    const stubHost = '127.0.0.1';
+    const outcome = await runHostedExtractionAtIngest({
+      rule: { id: ruleRow.id, userId: s.userId, version: ruleRow.version,
+        allowedFields: ruleRow.allowedFields as InboundAutomationField[], targetProjectId: ruleRow.targetProjectId,
+        timezone: ruleRow.timezone, parseVersion: ruleRow.parseVersion, maxItems: ruleRow.maxItems },
+      eventId, contentType: 'application/json', plaintext: new TextEncoder().encode(body),
+      publicKey: canonicalPublicKey(recipient.publicKey), keyEpoch: recipient.keyEpoch,
+      accountId: `user-${s.userId}`, serverOrigin: base, receivedAt: Date.now(),
+    }, { context: {
+      upstream: { baseUrl: `http://${stubHost}:${providerPort}/v1`, apiKey: 'dual-host-loopback-stub-not-a-real-key', modelId: 'test' },
+      sql: createPrismaSqlExecutor(db), limit: MANAGED_AI_REQUESTS_PER_PERIOD, now: Date.now,
+      transport: managedAiFetchTransport(HOSTED_EXTRACTION_TIMEOUT_MS),
+      hosts: [{ host: stubHost, provider: '双宿主桩', jurisdiction: 'cn' as const, evidence: '仅测试内的回环桩' }],
+      plaintextHosts: [stubHost], startedAt: Date.now(),
+    } });
+    // 失败形状带上 outcome 那一枚**稳定原因码**：`HostedExtractionFailure` 是封闭词表，
+    // 里面没有正文，所以读它不违反零日志那条红线；没有它，一次红只写着 "'failed' ≠ 'prepared'"。
+    expect(outcome.state, `抽取 outcome=${JSON.stringify(outcome)}`).toBe('prepared');
+
+    // 服务端**确实读了**正文，但出境的只有 `allowedFields` 投影出来的那一格 ——
+    // "标记串没出境"在这里量，不写在注释里承诺。
+    expect(provider.sources.length).toBe(1);
+    expect(provider.sources[0]).toEqual({ title: 'Inbox note' });
+
+    const frozen = await eventRow(s.userId, eventId);
+    expect(frozen?.status).toBe('prepared');
+    expect(frozen?.payloadCiphertext).toBeNull();
+    expect(frozen?.leaseWorkerId).toBeNull();
+    expect(frozen?.resultItemCount).toBe(1);
+    expect(frozen?.resultDigest).not.toBeNull();
+    // 存储层的零明文：这个账号**每一行**事件的两列密文里都搜不到那枚标记串。
+    const ciphertexts = await db.automationEvent.findMany({ where: { userId: s.userId },
+      select: { payloadCiphertext: true, resultCiphertext: true } });
+    expect(JSON.stringify(ciphertexts)).not.toContain('must-not-leave');
+
+    // 额度只扣一次；这条腿不写 `automation_ai_attempts`、不发提交许可、不写任何 op。
+    expect((await peekManagedAiUsage({ userId: s.userId })).used).toBe(1);
+    expect(await db.automationAiAttempt.count({ where: { userId: s.userId } })).toBe(0);
+    expect(await db.automationCommitPermit.count({ where: { eventId } })).toBe(0);
+    expect(await serverOps(eventId)).toHaveLength(0);
+    // 上游重投同一发不许再烧一次额度：去重在路由那一层先命中，那条腿连领都不领。
+    expect((await deliver(hosted.id, eventId, body)).status).toBe(202);
+    expect((await peekManagedAiUsage({ userId: s.userId })).used).toBe(1);
+
+    // 设备那一腿先试 recover，拿到的是服务端冻好的那一行 ⇒ 自己**不再发一次模型**，
+    // 任务从解密出来的批次写回，op 由它产生。
+    expect((await cycle(s, 'a', { eventId })).state).toBe('submitted');
+    expect(provider.sources.length).toBe(1);
+    expect((await peekManagedAiUsage({ userId: s.userId })).used).toBe(1);
+    expect(await inboundOps(a)).toHaveLength(1);
+    const batch = await batchOf(a) as { tasks: { id: string; title: string; priority?: number }[] };
+    expect(batch.tasks[0]?.title).toBe('买牛奶');
+    expect(batch.tasks[0]?.priority).toBe(2);
+    // 库里那一枚 op 是**设备同步上来**的：跑到这里（同步之前）它还数不到。
+    expect(await serverOps(eventId)).toHaveLength(0);
+    await synced(a);
+    expect(await serverOps(eventId)).toHaveLength(1);
+    process.stdout.write(`HOSTED_HANDOFF=PASS 两档接上：真路由在没配上游那一趟回 queued 且正文密文仍在（模型 0 次、额度 0 次）；`
+      + `把上游指到回环桩后同一条腿抽成 prepared（出境的只有 {title:"Inbox note"}，标记串没出境、两列密文里也搜不到），`
+      + `额度 1 次、attempts 0 行、许可 0 行、服务端 op 0 枚；重投同一发额度仍 1 次；`
+      + `设备 recover 到冻结结果后 0 次模型调用就 submitted，任务 "买牛奶"/priority=2、本地 1 枚 op，同步后服务端才出现那 1 枚`);
+  }, 150_000);
 });

@@ -42,7 +42,9 @@ const rawBodyOf = (body: unknown): Buffer | undefined => {
 // The authenticated recipient-key API transports base64url without padding,
 // while the envelope contract intentionally uses canonical RFC 4648 base64.
 // Normalize at this boundary and let sealInbound perform the strict roundtrip.
-const canonicalPublicKey = (value: string): string => {
+// 🔴 导出只为让集成用例读**同一枚**归一化：服务端抽取那条腿封给谁的字节，
+// 必须与接收那一腿封的逐字相同，测试里再抄一份就是第二份事实源。
+export const canonicalPublicKey = (value: string): string => {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
   return normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
 };
