@@ -55,7 +55,7 @@ M6 的判据本身（真跑 + 真看截图）。
 | web 单测 | 47 passed（`share-key-store` 15 / `share-activity-notify` 10 / `share-roster-signal` 9 / `share-notification-content` 7 / `share-activity-signal` 6） | `cd apps/web && npx vitest run tests/share-key-store.spec.ts tests/share-activity-notify.spec.ts tests/share-roster-signal.spec.tsx tests/share-notification-content.spec.tsx tests/share-activity-signal.spec.tsx` |
 | **mobile 单测（本线那 8 份 spec）** | **分母别抄这一格**：2026-10-27 现量，右边那条命令（本线那 8 份）跑出 `Test Files 8 passed (8)`、`Tests 100 passed (100)`；整个移动壳另有 `90 files / 1158 tests`（两枚数**不同一 scope**，别混用）。原先这行写的"77 passed / 8 个文件全绿"加逐份枚数是**那一代副本的读数**，留着只为说明"枚数会随每次并入漂"——权威数只认命令自己打的那行 | `cd apps/mobile && npx vitest run tests/share-session.spec.ts tests/share-ui-assembly.spec.ts tests/share-routing.spec.ts tests/feature-entries.spec.ts tests/share-signals.spec.ts tests/share-key-store.spec.ts tests/share-realtime-wiring.spec.ts tests/share-routing-assembly.spec.ts` |
 | 变异装置（M5-2 那批） | `ARMS=pass (4/4)` —— **代理读数，我没复跑**（跑装置会临时改文件，别会话正在提交时不能跑） | `node research/tools/mutation-rigs/mutate-collab-notif-content.mjs` |
-| 四把尺全量（`-r typecheck` / `-r test` / `-r build` / `check` / `verify:collab-suite`） | **本批没跑** | 见 §2 第 2 条 |
+| 四把尺全量（`-r typecheck` / `-r test` / `-r build` / `check` / `verify:collab-suite`） | ✅ **第十三批起把这一格从"本批没跑"换成了带戳读数**——四把尺各自的 rc、分母对法与**各自钉的那枚起建提交**只在计划 **§9.27 那张表**里（本文**不复述**，复述就是下一份会漂的抄件）。⚠️ 原先那句「本批没跑」留着只为说明"没跑"曾经是唯一形状，**别把它抄回去** | 命令见 §2 第 2 条；逐把读数在计划 §9.27 |
 
 ⚠️ 这句**会漂，别照它施工**：`pnpm --filter @heyta/mobile typecheck` 曾在 2026-10-25 读到 rc=2（两枚别线未跟踪件），
 2026-10-26 现量已经是 rc=0。它当时刻意登记，是因为**本线的判据要能独立判定** —— 读到非 0 先分清是谁的件，
@@ -70,7 +70,10 @@ M6 的判据本身（真跑 + 真看截图）。
    **下一位要做的不是"再跑一次看它绿不绿"**，而是 §9.14 末那张表里还开着的三格：
    ① 第 28 跑那一发崩溃（未判定，要的是**可重复复现**，第 29/30/31/32/33/35 六趟没复现不等于修好）；
    ② ~~看图抓到的两枚新候选~~ **本批已各自回源码定性并修完**（一枚两壳真实产品缺陷：`packages/ui/src/sync/CommentThread.tsx` 的报错时机，6 枚判据 + 变异臂恰好红 2；一枚装置自造：`collab-owner-step.mjs` 把 owner 的作者字段兜成 memberId，已加常驻形状尺。教训在 #577/#579）；
-   ③ Android 的界面腿（**载体不存在**，两半的现量命令与归属都在那张表里）。
+   ③ Android 的界面腿（⚠️ **这句原先写的是"载体不存在"，2026-10-27 按现量改准：载体是"半装"** ——
+   `adb` 与一枚 AVD 在、缺 `Sdk\emulator` 主程序、无真机接入；三条取法与归属在计划 §9.14 那一格。
+   解锁它要在**两台设备**之间选一条（补 emulator 组件 / 插真机），那归产品负责人，本线不自取例外，
+   也**不在 Mac 起 Android 模拟器**（仓内拍板）。
    ④ 手机把一条**新**任务 / **新**便签写进那份共享清单 ⇒ ✅ **2026-10-27 第十批做完**：
    新建时的落点控件接在任务面板与便签板上（`CaptureComposer` 的 `projectPicker` + 共享层
    `CaptureSubmitPlan.projectId`，选中才交、默认仍是收集箱），设备腿 **L10**（任务，第 42 跑）与
@@ -82,6 +85,13 @@ M6 的判据本身（真跑 + 真看截图）。
    （现量 `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'` ⇒ 只剩接口声明与实现两处；
    ⚠️ 别扫整个 `apps`，那里会命中 `apps/web/dist` 的打包产物、读出来不是零）⇒ 那是"事后改归属"，
    与本批那枚"新建时选落点"是两格，别把 §9.16 的绿读成它做完。
+   🔴 **抄这一节那些读数的规矩**（#600，2026-10-27 我落笔后四分钟当场撞上的）：上面每个「N 通过 / 0 失败」
+   只代表**它那趟起建的那一棵树**（第 52 跑 = `0cdaf8fdf`），所以**别把它们写成"当前产物"** ——
+   这份交接书不会自己更新，而本线之外每天还在往 `apps/mobile` 与共享层落提交。
+   要判"这串数还代不代表你现在这棵树"，跑计划 §9.24 末尾那把**两端都钉成具体提交**的差集命令
+   （取法现量：`grep -n 'git diff --name-only 0cdaf8fdf' docs/plans/collaboration-shared-lists.md`）；
+   差集非空也不等于读数作废 —— 逐枚看它动没动到 L1–L11 的观察面：动到了才重跑，没动到也要如实写「打包字节变了、
+   观察对象没变」那一格。**任何写成"当前"的设备读数都在几分钟内会变假**，这不是勤奋问题，是这类声称的形式本身不对。
    🔴 还有一条给下一位的**装置纪律**（#579）：这个载体以后每次打 `env_bail`（退 3）之前，先问那句前提
    是不是产品定义里"用户能做 X"的某一格本身 —— 是就得补成判据，不是才允许退 3。
    载体早就在册 —— `scripts/verify-mobile-collab-ios.sh`
@@ -95,6 +105,10 @@ M6 的判据本身（真跑 + 真看截图）。
    （`docs/agents/` 与环境陷阱的 iOS 设备腿那几条，以及 #571–#575 这一族**装置自己会造红/造绿**的）。
 2. **四把尺串行现量**：`pnpm -r typecheck` → `pnpm -r test` → `pnpm -r build` → `pnpm verify:collab-suite`（含 `verify:collab-journey`）→ `pnpm check`。
    已知非本线的存量：链上两枚别线存量红、`check:docs` 有一枚只在本机存在的 `.workbuddy/memory/MEMORY.md` 红（已登记，别去改别人的目录）。
+   🔴 **跑 `pnpm check` 之前要知道的一件事**（环境陷阱 **#602**，2026-10-27 我这趟自己撞的）：那一串里的 `check:ai-e2e`
+   跑的是**整个 e2e 套**，spec 里的 `shot(...)` 会**直接覆写别人名下已入库的取证截图**（受害面是整片 `apps/web/evidence`，
+   枚数现量 `git status --porcelain -- apps/web/evidence | wc -l`）。所以"我这批输入面干净"这句**有效期不到一趟**；
+   跑前先存一份 `git status --porcelain` 快照、跑完逐枚归因，**提交永远列到文件、那一整片图一枚都不取**。
 3. **文档写回**（任务 #55）：§9.13 是上一批（源码级接线），**这一批的读数在 §9.14**（跑次归因表 + 逐格读数 + 还剩什么）；**第九批（M6-10 消费面 + 设备腿 L8）的读数在 §9.15**。
    §9.10 那三格 2026-10-25 已全部改口完毕：面板 3s 轮询那格按"已撤 + 名册信号在册"结案（保留当初"不许撤"的理由，
    那是 ADR-0070 的来由）、通知口径那格由 ADR-0071 立着、谓词那格见下条 4。

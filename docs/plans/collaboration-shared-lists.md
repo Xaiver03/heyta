@@ -887,7 +887,7 @@ ADR-0050 那句「RN port 只传递 base64 root key」加了**限定范围**的�
 | 格 | 状态 | 判它的断言（能红的那把尺） | 归属 |
 |---|---|---|---|
 | **点立刻卸载的 `Pressable` 会把 App 崩掉**（第 28 跑那一发，#549 同签名） | 🔴 **未判定** —— 只有一发实测，同一发在第 26 跑没崩 | 断言必须是**可重复的**：同一台模拟器上连开/关共享面 N 轮（#549 用的是 6 轮 pid 不变 + `-newermt` 新增 `.ips` 数 0，含 `Retired/`）。拿不到调用名这件事本身已由 #549 证死 ⇒ 只能从形状消除（`Pressable` 的 `setPressed` 在 unmount 之后不许再派发）。**本批没做完是因为它需要先有一个稳定复现**，而一次崩溃不构成复现 | 本线（移动装置腿撞上的） |
-| **Android 的 M6 设备腿** | 🔴 **载体半装，界面腿仍跑不了** —— 2026-10-27 现量把上一版那句"载体不存在"改准：`windows-pc` 上 `adb.exe` **在**（platform-tools 已装、daemon 起得来）、AVD **有一枚**（`%USERPROFILE%\.android\avd` 里 `opp-smoke.avd`），**缺的是 `Sdk\emulator` 那枚主程序** ⇒ 那枚 AVD 起不动，且 `adb devices` 空（没插真机）。三条取法都在 `ssh windows-pc` 上跑：`if exist "%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe"`（NO）、`dir /b "%USERPROFILE%\.android\avd"`（有）、`adb devices`（空表）。⚠️ 远端默认 shell 是 **cmd**，用 bash 语法探它会打出"系统找不到指定的路径"，那条不是否证（本轮先撞了一次）。⇒ 解锁差的是一段**装机动作**（补 Google 的 emulator 组件，或插一台真机），不是排期 | 两格分开看：①**出包腿已过** —— `scripts/run-gradle.mjs` 在 `windows-pc` 上打，四条身份判据（工作树 tar 对账 / 旧产物清除 / mtime ≥ 构建起点 / 拉回后 sha256 逐字相同）当轮全过，读数见 §9.13；②**界面腿没有装置** —— 与协作旅程对应的那枚装置只有 iOS 一份（现量：`ls scripts/verify*collab*`），而现存的 Android 设备装置 `verify-android-vault-storage.sh` 用的是**本机** adb（`ANDROID_HOME` 默认 `/opt/homebrew/…`）+ `emulator-5554`（现量：`grep -n ADB_BIN scripts/verify-android-vault-storage.sh` 与同一文件里的 `SERIAL=` 两格各看一次）⇒ 它的形状与"Android 一律走 `ssh windows-pc`、不在 Mac 起模拟器"那条长期令**直接冲突** | 要么新写一枚驱动远端设备的 Android 旅程装置（含"服务端在另一台机器上、设备要够得着"那一格），要么按出包 + JS 侧形状读数结案 —— **归产品负责人拍**，本线不自行把"编译过"读成"Android 已验" |
+| **Android 的 M6 设备腿** | 🔴 **载体半装，界面腿仍跑不了** —— 2026-10-27 现量把上一版那句"载体不存在"改准：`windows-pc` 上 `adb.exe` **在**（platform-tools 已装、daemon 起得来）、AVD **有一枚**（`%USERPROFILE%\.android\avd` 里 `opp-smoke.avd`），**缺的是 `Sdk\emulator` 那枚主程序** ⇒ 那枚 AVD 起不动，且 `adb devices` 空（没插真机）。三条取法都在 `ssh windows-pc` 上跑：`if exist "%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe"`（NO）、`dir /b "%USERPROFILE%\.android\avd"`（有）、`adb devices`（空表）。⚠️ 远端默认 shell 是 **cmd**，用 bash 语法探它会打出"系统找不到指定的路径"，那条不是否证（本轮先撞了一次）。⇒ 解锁差的是一段**装机动作**（补 Google 的 emulator 组件，或插一台真机），不是排期。<br>🔄 **2026-10-27 18:1x 复量三格，形状未变**：`EMULATOR=NO`、`%USERPROFILE%\.android\avd` 里 `opp-smoke.avd` + `opp-smoke.ini` 在、`adb devices` 空表。<br>⚠️ 复量那发踩到一枚**打空的远程探针**：把 `dir /b … 2>nul & adb devices` 合成一发 ssh 载荷时，**`dir` 那一格的输出整段消失而 `SSH_RC=0`**，<br>读起来像"AVD 目录空了"。拆成两条、并给 `dir` 那格加上 `[AVD-BEGIN] … [AVD-END rc=%errorlevel%]` 两枚标记才读得到那两行<br>（同族：#601「三个信号全绿而产物缺字」、以及那发 PowerShell 单引号被 shell 吃掉而 rc=0 的记录）。 | 两格分开看：①**出包腿已过** —— `scripts/run-gradle.mjs` 在 `windows-pc` 上打，四条身份判据（工作树 tar 对账 / 旧产物清除 / mtime ≥ 构建起点 / 拉回后 sha256 逐字相同）当轮全过，读数见 §9.13；②**界面腿没有装置** —— 与协作旅程对应的那枚装置只有 iOS 一份（现量：`ls scripts/verify*collab*`），而现存的 Android 设备装置 `verify-android-vault-storage.sh` 用的是**本机** adb（`ANDROID_HOME` 默认 `/opt/homebrew/…`）+ `emulator-5554`（现量：`grep -n ADB_BIN scripts/verify-android-vault-storage.sh` 与同一文件里的 `SERIAL=` 两格各看一次）⇒ 它的形状与"Android 一律走 `ssh windows-pc`、不在 Mac 起模拟器"那条长期令**直接冲突** | 要么新写一枚驱动远端设备的 Android 旅程装置（含"服务端在另一台机器上、设备要够得着"那一格），要么按出包 + JS 侧形状读数结案 —— **归产品负责人拍**，本线不自行把"编译过"读成"Android 已验" |
 | **手机自己「开启共享」那一格**（含「手机用户能建清单」） | ✅ **本批闭合**（2026-10-26 第 35 跑，`run-rc=0`） | 装置第 10b 步 L7：手机自己建清单 → 设为共享（owner 一侧同意闸）→ 签发邀请 → 服务端读形状（`node scripts/lib/collab-owner-step.mjs phone-owner`：`role=owner` + 所有者行带 `signingPublicKey` + 活邀请数）→ 撤销回到无邀请态 → 首页两份并排。逐格读数与四张截图在上面「第 35 跑新增的两格」那张表。⚠️ 第 33 跑那发 `exit 3` 的教训登记为环境陷阱 **#579**（装置的"前提不成立"可能就是产品定义里没走过的那一格） | 本线 |
 | **同意面文案的视角**（owner 语 vs 入群语） | 待拍板 | 判据在 `packages/i18n/src/locales/zh-CN.ts` 的 `common.share.consent.body` / `.accept` 两行；理由与截图指针在 ADR-0071 补记末段 | **归产品负责人** —— 属于对外法律表征，本线不代改 |
 | **登出 / 撤销要不要连带清 share 那几格** | 待拍板 | 现量：`clearMobileVaultSession` 今天只删 root key（`grep -n "clearMobileVaultSession" apps/mobile/src/**/*.ts`） | **归产品负责人** —— 是"清掉用户资产"这种不可逆取向的取舍 |
@@ -1472,3 +1472,56 @@ git diff --name-only 0cdaf8fdf <你此刻的 HEAD> -- apps/mobile/src apps/mobil
 
 ⇒ **执行序第 3 步三格到这一笔全部有归属**：轮询改信号驱动（已落地）、通知内容口径（ADR-0071 已落地）、
 这一格（**判为"今天不能接"+ 一枚双向常驻判据守着它哪天能被接**）。
+
+### 9.27 四把尺在当前 HEAD 上重取（2026-10-27 第十三批）
+
+§9.25 那格判"不重跑"的两条前置到这一批**都变了**，所以按它自己写的恢复条件重跑：
+现量 `git status --porcelain=v1`（剔 `evidence/`）只剩一枚别人的文档（`docs/plans/inbound-automation-work-brief.md`），
+**打包输入面干净**；那 9 枚外来 vitest/playwright 进程逐条看归属，全部在另一个仓
+（`pgrep -fl 'vitest|playwright' | grep -v heyta` 里能读出 `01_PROJECTS/ssos`）⇒ 不污染本仓归因。
+当趟 HEAD = `691b3f0bf`（与 `origin/main` 现量 `0 0`）。
+
+⚠️ **上面那句"打包输入面干净"在第三批里被我自己刚跑的那一趟打破了**，成因不是别线落笔，而是**门禁会写文件**：
+`check` 里的 `check:ai-e2e` 跑的是**整个 e2e 套**，spec 里的 `shot(...)` 直接覆写别人名下**已入库**的取证截图
+（枚数由现量命令给，不在此写死：`git status --porcelain -- apps/web/evidence | wc -l` —— 当趟跑到 `check:ai-e2e` 之后读回的是几十枚 ` M`，mtime 全落在那一格的窗口里，且**那一格没跑完它还在长**）。
+⇒ 教训入册 **§7 #602**（含三条处置：跑前存快照／"输入面干净"要明写 `evidence/` 那一维由门禁自己会动／提交只列文件）。
+⚠️ 同一段里 `check` 那一趟的 HEAD **也不是一个值**：起建 `691b3f0bf`，跑到 `check:ai-e2e` 期间自动收集线又落了笔
+（区间与枚数现量：`git log --oneline 691b3f0bf..HEAD | wc -l`），所以那一趟 `CHECK_RC` 判的是**一段历史区间**上的工作树，
+不像前三把尺那样钉在一枚提交上 —— 这一格按 #600 的写法如实登记成"区间"，不写成"当前"。
+⚠️ 前三把尺的起建戳 `691b3f0bf` 到本批落笔时，**打包输入面差集一枚**（现量：
+`git diff --name-only 691b3f0bf $(git rev-parse HEAD) -- packages apps server scripts`）＝ `apps/mobile/tests/ai-copy-parity.spec.ts`
+（归自动收集线 `08e27cd28`，一枚**测试**文件）。它不动 `typecheck` 与 `verify:collab-suite` 那两把的行为面，
+但**动的是 `pnpm -r test` 那一格的分母**（那串 `12023 passed` 是对 `691b3f0bf` 成立的数，不是对此刻的树），
+所以那一行读数连同限定语一起抄，别只抄数。
+⚠️ **本批末尾还要补跑四枚文档门**（`check:docs` / `check:doc-citations` / `check:md-tables` / `check:doc-command-claims`）：
+上面 §9.27 这一节与 §9.14 那格的增补是在**这四枚门跑完之后**才写的，所以整条链里那四段的绿**不覆盖本批新增的文字**。
+我自己造的一枚红就是证据：往 §9.14 那张表的一格里插读数时先按多行写了 ⇒ 表格行被拆成五行（`check:md-tables` 正是管这一形的门），
+已按同格 `<br>` 的既有写法合回一行（现量：`awk '/^\| \*\*Android 的 M6 设备腿\*\*/' docs/plans/collaboration-shared-lists.md | wc -l` 必须 1，
+且那一行之后紧跟的必须还是 `\|` 开头的那一行）。**四枚门的重跑读数记在下面这一节末尾**，别拿上面那张表里 `check` 那一格当"文档也过了"。
+✅ **重跑读数（本批末尾，串行逐枚、各取各的退出码，整链 `check` 已停之后才跑）**：
+`check:docs` **rc=0** ／ `check:doc-citations` **rc=0** ／ `check:md-tables` **rc=0** ／ `check:doc-command-claims` **rc=0** ／
+`check:verify-script-copy` **rc=0**（第 5 枚是因为 §9.25 那批改过移动旅程装置脚本，把它一起重取）。
+⇒ 上面那枚"我自己造的红"确实被 `check:md-tables` 这一族管得住：该脚本头部第**二**类写的就是
+「把一条长表格行折成多个物理行（GFM 的表行不能跨物理行）」，并注明它在 `ui-review-fill-zh-timeline.md` 里实测抓过 2 行 ——
+**这一族的牙有在册的先例，不是我这趟现搭的探针**。
+
+| 尺 | 当趟读数 | 分母怎么对的 |
+|---|---|---|
+| `pnpm -r typecheck` | **rc=0** | `: Done` 行 **20** 枚 == 有 `typecheck` 脚本的包 **20** 枚（分母由 `packages/*`、`apps/*`、`server` 的 `package.json` 现读，不是抄数）；`error TS` 0 行 |
+| `pnpm -r --filter '!@heyta/sync-server' test` | **rc=0**、总通过 **12023**、跳过 **28** | 打 `Tests N passed` 摘要行的包 **20** 枚 == `: Done` **20** 枚（两把独立数法对账） |
+| `pnpm verify:collab-suite` | **rc=0**、`SUITE=OK legs=4 failed=0` | 四腿各自的 `RESULT=OK` 由脚本自己打印步数：`sync steps=14`／`revoke steps=8`／`conflict steps=6`／`journey steps=3`。⚠️ `sync` 那腿从 §9.10 时代的 11 步长到 14 步，**步数归脚本自己说，本文不抄成常量** |
+| `pnpm check` | **rc=1，断在第 102／132 段 `check:ai-e2e`**（枚数现量：`node -e 'const s=JSON.parse(require("fs").readFileSync("package.json","utf8")).scripts.check;const g=s.split(/&& pnpm /);console.log(g.length)'`） | 红的是 `e2e/tests/rail-roving.spec.ts:300`「与 dnd-kit KeyboardSensor 共存：Space 进入拖拽后方向键不再挪焦点」⇒ `expect(received).toBe(true)` 拿到 `false`，`Timeout 15000ms exceeded while waiting on the predicate`（那枚 predicate 是 `document.querySelectorAll('.ht-rail__item--dragging').length === 0`）。**这是别线的在册存量红，不是本批引入的**：现量 `grep -n 'rail-roving' BLOCKED.md` 两处都在册，两处都写「未查（dnd-kit Space 传感器与 roving tabindex）」，那枚 spec 由 `7dea2de8b`（2026-10-12）落的；本线在整条链里只有两段（`verify:collab-keys`／`check:collab-carrier`＝第 73／74 段），**都在断点之前跑过并绿**，断点之后 30 段**没跑**（含 `pnpm -r test`、`screenshot:verify`、`check:verify-script-copy`）⇒ 这一趟既不记成"整链绿"，也不把没跑的那些段记成红 —— 只记"没跑" |
+
+⚠️ 这一批抓到一把**我自己搭的计数尺没有分辨力**：判"有没有红"我用的是 `grep -cE 'failed|FAIL'`，
+它数出 **1 行**。读原文那一行是 `✓ 有词条可接的两个状态（submitted / failed）各自回成自己的那一句 470ms`
+—— 一枚**通过**用例的名字里带着 `failed` 这个词。
+⇒ 这条针打中的是被测对象的**散文**不是它的**判决**：它既会在真红时红（`0 failed` 那种汇总行、`FAIL` 前缀），
+也会在一枚绿用例上红，等于**没有鉴别力**。改法不是把针放宽，是换成有结构的读法——
+判决只认退出码 + 框架自己的收尾行（`Tests N passed`），要数失败就钉 `failed [1-9]` 这个形状而不是单词 `failed`。
+（同族：§7 那条"字面匹配的门禁对执行语义无分辨力"；这次是**我自己现搭的读数尺**中招，不是仓里的门。）
+⇒ 顺手把这把坏针的**同类落点**穷举了一遍，免得下一个人以为仓里还散着几处：
+`git grep -c "failed|FAIL" -- scripts research/tools` 读回 **0 处**（现量）。
+上面那一屏 `grep "'FAIL'"` 命中的 40 多行全是各装置**自己打印的判决 token**（`ARMS=… : 'pass' : 'FAIL'`、
+`SUITE=…`、`RIG_RESULT=…`），那是正确用法——由计数派生的字符串，不是拿单词去文本里找红。
+**唯一需要修的读法就是本文这一处**，而它不入库（是一次性 shell 命令），所以本批**不新增门**，
+只把"判决只认退出码 + 框架自己的收尾行，要数失败就钉 `failed [1-9]` 这个形状"这句留在这一节。
