@@ -12609,12 +12609,14 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 | `POST /api/login/email-code/verify`（不存在的 challengeId） | 从 `503 login_unavailable` 变成 **`400 invalid_login_challenge`** ⇒ 服务端答的是业务语义，不再走兜底分支 | `curl -s -o /dev/null -w 'HTTP=%{http_code}\n' -X POST https://heyta.waytofuture.cn/api/login/email-code/verify -H 'content-type: application/json' -d '{"challengeId":"no-such-challenge","code":"123456"}`（⚠️ `heyta.finlaw.cloud` 会 301 到 `heyta.waytofuture.cn`，读数打在后者上） |
 | 真浏览器：落地页「登录」→ 面板 → 验证码那一档 | `live-signin-entry` + `live-credential-pages` 全绿；面板展开「其他登录方式」后 `auth-form-login-code-trigger` 可见（图与逐格读数在 `apps/web/evidence/login-code-live-after-deploy-1027/`） | `cd e2e && npx playwright test --config playwright.live-site.config.ts live-signin-entry live-credential-pages` |
 | 新加的那条常驻判据（判据 2a）能红 | 把断言里的 testid 改成 `…-MUTANT` ⇒ 该用例红（`rc=1`，15s 超时）；还原复绿。🔴 第一发变异**打空过**：`perl -0pi -e 's/…/…/'` 不带 `/g` 只替换文件里第一处，而第一处是我写在文件头注释里的同名串 ⇒ 用例照绿。判据要改的是**断言那一行的形状**（`[data-testid="…"]`），不是那个名字 | `cd e2e/live-site && perl -pi -e 's/\\[data-testid="auth-form-login-code-trigger"\\]/[data-testid="auth-form-login-code-trigger-MUTANT"]/' live-signin-entry.spec.ts`（跑完按行号还原，别拿 git 顶掉未提交的判据） |
+| 线上落地页与仓库输入**逐字节**对账（这半边以前只能手搓 curl+diff） | 分母 = HEAD 里已入库的落地页份数（尺自己打印，别抄数）；剔除构建期改写的那两类行之后**不齐 0 枚**、线上没这页 1 枚（见下面那张待拍板表）；尺在现实中会红：非严格 rc=0、`--strict` rc=1 （臂数与判决由脚本打印） | `node scripts/live-web-freshness.mjs --landing` ｜ 再 `--landing --strict; echo $?` |
 
 **新落到的一格待拍板（不许算进"已修"）**
 
 | 格 | 为什么不停在本线 | 现量 |
 |---|---|---|
 | 公网 `/app/` 那盘 SPA 与 HEAD 不齐：它服务的是宿主机 `/var/www/heyta-app`（不是镜像里的 `/app/web-dist`），mtime 早于 22:21 那两笔自动收集提交 ⇒ 新加的两句文案在盘里搜不到 | `scripts/deploy-ssh.mjs` 这条链**只换服务端容器**，网页应用是 `docs/runbooks/deployment.md` 里另一条 rsync；重新发布会把**自动收集线**的产品改动一起推上线 —— 对外动作 + 不是本线范围 ⇒ 停在这里。要收这格，先决定"要不要现在把自动收集那两笔推上线" | `ssh finlaw 'for n in noKeyOnThisDevice foregroundOnly email-code; do printf "%-20s " $n; sudo -n grep -rl "$n" /var/www/heyta-app/assets/ \| wc -l; done'`（前两枚 0、第三枚 1 —— 第三枚是控制臂，证明搜法本身有效，不是"grep 没扫到"） |
+| `/pitch/` 这枚落地页在仓库里有 5 件套（`apps/landing/pitch/`：`index.html`、`main.tsx`、`PitchDeck.tsx`、`pitch.css`、自己的 `vite.config.ts`），但**不在 `SITE_PAGES` 注册表里、仓内没有任何地方在接它（引用面逐行读过，见右栏）、线上回 HTTP 404** | 归落地页/文档站那线判：要么把它接进注册表并给入口，要么整目录删；本线只把它量成一条可复跑的读数。⚠️ 这不是"线上旧"，是**目的地存在过但从未接上**（`check:entries` 的分母是注册表，所以"产物堆里躺着一枚没注册的页"在它射程外） | `node scripts/live-web-freshness.mjs --landing`（末行点名 `/pitch/`）；注册表对账 `grep -c "id: " apps/landing/src/site/pages.ts`；引用面 `grep -rniw -e pitch -e PitchDeck --exclude-dir=node_modules --exclude-dir=dist apps/landing package.json scripts docs e2e` —— 整词写法，读回来逐行分类：命中的都是无关（4 行是 `docs/operations/cac-algorithm-filing/scripts/audit_completeness.py` 那族的版式行距变量 `pitch`，2 行是本线今晚那把尺自己的测试夹具），**没有一行是在接这枚页面**（**整条不带竖线**：竖线一进表格单元就得转义，转义了复制到终端就是一条永不命中的死探针 —— 见本节末那条纪律） |
 
 
 **上面"本线之外那批正在被别人改的文件"那一格的逐枚归属表**（把"只剩登记过的例外"从一句话变成能一条一条打勾的东西）
