@@ -44,7 +44,16 @@
  *   node scripts/live-web-freshness.mjs --strict        # 有针脚不在场 ⇒ exit 1
  *   node scripts/live-web-freshness.mjs --depth 12      # 多看几笔提交
  *   node scripts/live-web-freshness.mjs --origin https://staging.example
- *   node scripts/live-web-freshness.mjs --self-test     # 六臂自检（每臂都要能失败）
+ *   node scripts/live-web-freshness.mjs --self-test     # 自检（臂数由脚本自己打印，别在这里抄数）
+ *   node scripts/live-web-freshness.mjs --landing       # 换一侧：落地页每份已入库 HTML 对线上同路径
+ *
+ * ## --landing 是另一件事
+ *
+ * 上面那条判的是**应用那盘 SPA**（公网 `/app/`，它是 `apps/web` 构建出来的静态盘）。
+ * `--landing` 判的是**落地页本身**：仓里已入库的每一份 `apps/landing` 下的 `index.html`，
+ * 线上同一个路径回的是不是同一份字节。两侧唯一**该**不同的地方是构建期改写的那两行资源引用
+ * （仓库那份写着 `/src/main.tsx`，线上写着哈希名 `/assets/main-xxxx.js` + 同名 css），
+ * 所以归一化只许剔这两类行 —— 多剔一行就会把"线上真的旧了"吞掉。
  */
 
 import { execFileSync } from 'node:child_process';
@@ -55,15 +64,16 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const LOCALE_FILE = 'packages/i18n/src/locales/zh-CN.ts';
 const WEB_SRC_DIR = 'apps/web/src';
 const DEFAULT_ORIGIN = 'https://heyta.waytofuture.cn';
-const ALLOWED_FLAGS = ['--strict', '--self-test'];
+const ALLOWED_FLAGS = ['--strict', '--self-test', '--landing'];
 
 function parseArgs(argv) {
-  const out = { strict: false, selfTest: false, depth: 6, origin: DEFAULT_ORIGIN };
+  const out = { strict: false, selfTest: false, landing: false, depth: 6, origin: DEFAULT_ORIGIN };
   const unknown = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--strict') out.strict = true;
     else if (a === '--self-test') out.selfTest = true;
+    else if (a === '--landing') out.landing = true;
     else if (a === '--depth') out.depth = Number.parseInt(argv[++i], 10);
     else if (a === '--origin') out.origin = argv[++i];
     else if (a.startsWith('-')) unknown.push(a);
@@ -201,6 +211,75 @@ function report(needles, verdict, bundleInfo) {
   }
 }
 
+/** `apps/landing/pitch/index.html` → `/pitch/`；`apps/landing/index.html` → `/`。 */
+export function landingUrl(file) {
+  const rel = file.slice('apps/landing/'.length).replace(/index\.html$/, '');
+  return rel === '' ? '/' : `/${rel}`;
+}
+
+// 构建期改写的那两行：仓库写着源文件、线上写着哈希产物。除这两类以外的差异都算"不齐"。
+const BUILD_REWRITTEN = [/\/assets\/main-/, /main\.tsx/];
+
+export function normalizeLandingHtml(text) {
+  return text
+    .split('\n')
+    .filter((line) => !BUILD_REWRITTEN.some((re) => re.test(line)))
+    .join('\n');
+}
+
+/** 分母 = 仓库那一侧已入库的落地页，不是"线上有哪些 URL"。 */
+export function listLandingPages(ref = 'HEAD') {
+  const out = execFileSync('git', ['ls-tree', '-r', '--name-only', ref, 'apps/landing'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+  return out
+    .split('\n')
+    .filter((f) => f.endsWith('index.html'))
+    .map((f) => ({ file: f, url: landingUrl(f) }));
+}
+
+/**
+ * 纯函数：给定每页的两侧字节（或线上状态）算判决。
+ * bodies 的 value：`{ status, text }` —— status 非 200 记 missing（"线上没这页"），
+ * 空 text 记 fetch-error，**都不许**混进 stale（把抖动读成"线上旧了"是这族尺最贵的错）。
+ */
+export function classifyLanding(pages, bodies) {
+  const identical = [];
+  const stale = [];
+  const missing = [];
+  const errored = [];
+  for (const p of pages) {
+    const got = bodies.get(p.url);
+    if (!got || got.status !== 200) {
+      missing.push({ url: p.url, status: got?.status ?? null });
+      continue;
+    }
+    if (got.text.trim() === '') {
+      errored.push({ url: p.url, reason: '空响应体' });
+      continue;
+    }
+    const a = normalizeLandingHtml(got.text);
+    const b = normalizeLandingHtml(got.repo ?? '');
+    if (a === b) {
+      identical.push(p.url);
+      continue;
+    }
+    const la = a.split('\n');
+    const lb = b.split('\n');
+    const i = la.findIndex((l, k) => l !== lb[k]);
+    const at = i === -1 ? Math.min(la.length, lb.length) : i;
+    stale.push({
+      url: p.url,
+      atLine: at + 1,
+      live: (la[at] ?? '').trim().slice(0, 70),
+      repoBytes: (got.repo ?? '').length,
+      liveBytes: got.text.length,
+    });
+  }
+  return { identical, stale, missing, errored, checked: pages.length };
+}
+
 const SELF_TEST_ARMS = () => {
   const arms = [];
   const N = [
@@ -230,6 +309,56 @@ const SELF_TEST_ARMS = () => {
     ['index-AbC12345.js', 'chunk-Zz9_8675x.js', 'three-QwErTy12.js'],
   );
   push('⑧ 正文里没有 chunk 名 ⇒ 空清单（不是崩）', discoverChunkNames('var a=1;'), []);
+  // ── --landing 那半边 ──
+  push(
+    '⑨ 构建改写行要剔掉：同一页的两种管线阶段判成"齐"',
+    classifyLanding(
+      [{ file: 'apps/landing/x/index.html', url: '/x/' }],
+      new Map([
+        [
+          '/x/',
+          {
+            status: 200,
+            text: '<html>\n<body>ok</body>\n<script type="module" crossorigin src="/assets/main-CrRTTs6Q.js"></script>\n</html>',
+            repo: '<html>\n<body>ok</body>\n<script type="module" src="./main.tsx"></script>\n</html>',
+          },
+        ],
+      ]),
+    ).identical,
+    ['/x/'],
+  );
+  push(
+    '⑩ 真差异不许被归一化吞掉（少一句文案 ⇒ 判不齐，不是判齐）',
+    classifyLanding(
+      [{ file: 'apps/landing/x/index.html', url: '/x/' }],
+      new Map([['/x/', { status: 200, text: '<html><body>旧文案</body></html>', repo: '<html><body>新文案</body></html>' }]]),
+    ).stale.map((s) => s.url),
+    ['/x/'],
+  );
+  push(
+    '⑪ 线上 404 记 missing，不许混进 stale',
+    (() => {
+      const v = classifyLanding(
+        [{ file: 'apps/landing/pitch/index.html', url: '/pitch/' }],
+        new Map([['/pitch/', { status: 404, text: '页面没有', repo: '<html><body>x</body></html>' }]]),
+      );
+      return { missing: v.missing, stale: v.stale.length };
+    })(),
+    { missing: [{ url: '/pitch/', status: 404 }], stale: 0 },
+  );
+  push(
+    '⑫ 空响应记 fetch-error，不读成"线上旧了"',
+    (() => {
+      const v = classifyLanding(
+        [{ file: 'apps/landing/x/index.html', url: '/x/' }],
+        new Map([['/x/', { status: 200, text: '   ', repo: '<html>x</html>' }]]),
+      );
+      return { errored: v.errored.length, stale: v.stale.length, identical: v.identical.length };
+    })(),
+    { errored: 1, stale: 0, identical: 0 },
+  );
+  push('⑬ 路径映射：包根是 /，深层目录带尾斜杠', [landingUrl('apps/landing/index.html'), landingUrl('apps/landing/docs/account/index.html'), landingUrl('apps/landing/pitch/index.html')], ['/', '/docs/account/', '/pitch/']);
+  push('⑭ 未知旗标里 --landing 必须是认的', parseArgs(['--landing']).unknown, []);
   return arms;
 };
 
@@ -247,6 +376,38 @@ const main = async () => {
     }
     console.log(`臂数 ${arms.length} ｜ 不符 ${bad.length}`);
     process.exit(bad.length === 0 ? 0 : 1);
+  }
+  if (opts.landing) {
+    const pages = listLandingPages();
+    if (pages.length === 0) {
+      console.log('🔴 分母为空：HEAD 里没有 apps/landing 下的 index.html —— 零页不许读成"齐"');
+      process.exit(1);
+    }
+    const bodies = new Map();
+    for (const p of pages) {
+      const repo = execFileSync('git', ['show', `HEAD:${p.file}`], { cwd: ROOT, encoding: 'utf8' });
+      try {
+        const res = await fetch(opts.origin + p.url);
+        bodies.set(p.url, { status: res.status, text: await res.text(), repo });
+      } catch (err) {
+        bodies.set(p.url, { status: null, text: '', repo, reason: String(err.message ?? err).split('\n')[0] });
+      }
+    }
+    const v = classifyLanding(pages, bodies);
+    console.log(
+      `落地页逐字节对账 ｜ origin=${opts.origin} ｜ 分母 ${v.checked} 份已入库 HTML ｜ 齐 ${v.identical.length} ｜ 不齐 ${v.stale.length} ｜ 线上没这页 ${v.missing.length} ｜ 抓取失败 ${v.errored.length}`,
+    );
+    for (const s of v.stale.slice(0, 10)) {
+      console.log(`   🔴 ${s.url} 第 ${s.atLine} 行起不齐（线上 ${s.liveBytes}B / 仓库 ${s.repoBytes}B）：${s.live}`);
+    }
+    for (const m of v.missing.slice(0, 10)) {
+      console.log(`   ⚠️ ${m.url} 线上回 ${m.status ?? '抓取失败'} —— 仓库有这份 HTML，但这一页不在注册表里、也不会被发布`);
+    }
+    for (const e of v.errored.slice(0, 5)) {
+      console.log(`   ⚠️ ${e.url} ${e.reason} —— 记成抓取失败，不读成"线上旧了"`);
+    }
+    if (v.stale.length === 0 && v.missing.length === 0) console.log('   ⇒ 线上落地页与仓库输入逐字节对得上（构建改写行按定义排除）。');
+    process.exit(opts.strict && (v.stale.length > 0 || v.missing.length > 0) ? 1 : 0);
   }
   const needles = collectNeedles({ depth: opts.depth });
   let bundle;
