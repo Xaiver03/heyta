@@ -57,6 +57,8 @@ import { useMobileSync } from '../sync/store';
 import { useTokens } from '../theme';
 import { AI_FEATURE_LABEL_KEY, healthCopy, managedUsageCopy } from './copy';
 import { aiSecrets, saveAiSettings, useAiSettings } from './settings-store';
+import { INBOUND_CYCLE_COPY_KEY } from '../inbound/copy';
+import { useInboundCycle } from '../inbound/status';
 import { readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
 /** 五个功能在设置里的渲染顺序 —— 与助手面的顺序同一份，不重排。 */
@@ -258,6 +260,10 @@ export function AiSettingsSection(): React.JSX.Element {
     setSavedWithoutKey(!wrote);
   }
 
+  // 这一台设备最近一趟自动收集的终态。没跑过就一行都不渲（不是"当前没有待处理事件"——
+  // 那句是 worker 真的走了一趟之后 `empty` 的意思，两者对用户是不同的事）。
+  const inboundCycle = useInboundCycle();
+
   return (
     <Stack gap="loose" testID="ai-settings-section">
       <SectionHeader icon="action.more" title={t('web.ai.settings.title')} />
@@ -267,6 +273,14 @@ export function AiSettingsSection(): React.JSX.Element {
           {t('mobile.ai.saveFailed')}
         </Text>
       ) : null}
+
+      {/* 自动收集这一趟做完了什么 —— 手机上此前没有任何一面说得出这句话，
+          队列空与"根本没在跑"在界面上长得一样。 */}
+      {inboundCycle === undefined ? null : (
+        <Text variant="row-meta" testID="inbound-cycle-state">
+          {t(INBOUND_CYCLE_COPY_KEY[inboundCycle.state])}
+        </Text>
+      )}
 
       {/* ── 闸 1：总开关 ─────────────────────────────────────────────── */}
       <Card gap="loose">

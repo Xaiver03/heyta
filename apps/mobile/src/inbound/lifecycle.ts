@@ -8,6 +8,7 @@ import {
 import { readSyncConfig } from '../sync/config';
 import { openTaskHost } from '../db/open-host';
 import { getAiSettings, aiSecrets } from '../ai/settings-store';
+import { publishInboundCycle } from './status';
 
 /**
  * Foreground-only mobile worker. It deliberately does not create keys or
@@ -47,7 +48,7 @@ export function startMobileInboundWorker(): () => void {
         systemPrompt: INBOUND_AUTOMATION_SYSTEM_PROMPT,
         parseVersion: 1,
       };
-      await host.processInboundAutomation(options);
+      publishInboundCycle(await host.processInboundAutomation(options));
     } catch {
       // A failed foreground pass is recoverable: the server lease fences any
       // partial attempt and the next focus/tick retries the same event.
