@@ -42,11 +42,17 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Note } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { createNoteActions, type AppHost, type NoteActions } from '@heyta/app-host';
-import { NotesBoard } from '@heyta/ui';
+import {
+  createNoteActions,
+  createProjectActions,
+  type AppHost,
+  type NoteActions,
+} from '@heyta/app-host';
+import { CaptureProjectPickerRow, NotesBoard, type CaptureProjectOption } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
 import { notesBoardLabels } from '../lib/notes-display';
+import { useCaptureProjectLabels } from '../lib/capture-labels';
 import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import { NoteEditScreen } from './NoteEditScreen';
 import { useMobileSync } from '../sync/store';
@@ -66,6 +72,11 @@ export function NotesSection(): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([]);
   /** 见文件头决定 3：失败原因原样显示，不静默吞。 */
   const [error, setError] = useState<string | null>(null);
+  /**
+   * 这一趟新建便签落进哪一份清单；`null` = 未归属（收集箱那一档在便签板上没有意义，
+   * `NewNoteFields` 省略 `projectId` 就是"不归任何清单"）。
+   */
+  const [newNoteProjectId, setNewNoteProjectId] = useState<string | null>(null);
   /**
    * 正在编辑的那条便签 = **选中的那一条**（`null` = 编辑屏没开）。
    *
@@ -154,6 +165,17 @@ export function NotesSection(): React.JSX.Element {
   );
 
   const labels = useMemo(() => notesBoardLabels(t), [t]);
+  const projectLabels = useCaptureProjectLabels();
+  const projectOptions = useMemo<readonly CaptureProjectOption[]>(
+    () =>
+      host === null
+        ? []
+        : createProjectActions(host)
+            .listProjects()
+            .map((project) => ({ id: project.id, name: project.name })),
+    // 🔴 与 `notes` 同一把尺：共享内容回流走 `dataRevision`，不订阅它就连不上。
+    [host, dataRevision],
+  );
 
   return (
     <>
@@ -164,6 +186,14 @@ export function NotesSection(): React.JSX.Element {
           共享组件的 composer 只在 `trim()` 为空时**不提交** —— 那是交互挡板，
           不是内容规则（见 `NotesBoard` 文件头）。这里不重复判断一遍。
         */}
+        <CaptureProjectPickerRow
+          picker={{
+            options: projectOptions,
+            destinationId: newNoteProjectId,
+            onSelect: setNewNoteProjectId,
+            labels: projectLabels,
+          }}
+        />
         <NotesBoard
           notes={notes}
           labels={labels}
@@ -174,7 +204,9 @@ export function NotesSection(): React.JSX.Element {
             // 消失了（W8a 点名的边缘，接线判据钉在 labels 契约测试旁）。
             if (actions === null) throw new Error(t('notes.error.saveFailed'));
             // 🔴 走 runAdd 而不是 run：run 吞 reject，共享层就只看得到成功。
-            return runAdd(actions.createNote(content));
+            return runAdd(
+              actions.createNote(content, newNoteProjectId === null ? {} : { projectId: newNoteProjectId }),
+            );
           }}
           onRemove={(entityId) => {
             if (actions === null) return;

@@ -230,6 +230,80 @@ export interface CaptureSubmitPlan {
   readonly title: string;
   readonly dueDate?: number;
   readonly priority?: Priority;
+  /**
+   * 这条任务落进**哪一份清单**。省略 = 收集箱。
+   *
+   * 🔴 它是"用户选出来的数据"，不是宿主自己判断的业务结论：谁都没选的时候
+   * 这里就是空，宿主**不许**拿"当前侧栏选中的那一行"之类的界面状态替用户补上
+   * （那等于悄悄改变一条任务的落点）。选择器在 `CaptureComposer` 的 `projectPicker`。
+   */
+  readonly projectId?: string;
+}
+
+/**
+ * 把选中的清单并进一份已经算好的计划。
+ *
+ * `null` / `undefined` / 空串都写成**不带这个字段**，而不是带一个 `undefined` ——
+ * 与 `toCaptureSubmitPlan` 对 `dueDate` 的约定同一条（省略与显式空在动作层
+ * 是两种语义，见 `NewTaskFields`）。
+ */
+export function withCaptureProject(
+  plan: CaptureSubmitPlan,
+  projectId: string | null | undefined,
+): CaptureSubmitPlan {
+  return projectId === null || projectId === undefined || projectId === ''
+    ? plan
+    : { ...plan, projectId };
+}
+
+/** 选择器里的一行（`id` = 清单 id；收集箱由 `labels.inbox` 单独画，不是一条 option）。 */
+export interface CaptureProjectOption {
+  readonly id: string;
+  readonly name: string;
+}
+
+/**
+ * 「这条新建落进哪一份清单」那一行的**受控**形状。
+ *
+ * 🔴 选择状态住在宿主，共享层只画与回传：这样任务面板与便签板能用同一份行、
+ * 而"默认落点是什么"由宿主一次说清（`destinationId = null` 就是收集箱，
+ * 共享层不猜、也不替用户补上"当前选中的那一行"）。
+ * ⚠️ 这枚字段**刻意不叫 `selectedId`**：那个词在本仓指"列表里当前选中的那一行"，
+ * 由 `check:selection-single-source` 按名字登记成面/递送层；这一格是**表单里的落点**，
+ * 不是列表选中，借那个名字会被判成"多了一处没人要求它说话的选中面"。
+ */
+export interface CaptureProjectPicker {
+  readonly options: readonly CaptureProjectOption[];
+  readonly destinationId: string | null;
+  readonly onSelect: (id: string | null) => void;
+  readonly labels: {
+    /** 这一组控件的名字（例如「新建落进哪一份清单」）。 */
+    readonly title: string;
+    /** 收集箱那一枚的可见文案。 */
+    readonly inbox: string;
+    /** 此刻的落点是一句**整句**：选中了某份清单。 */
+    readonly current: (name: string) => string;
+    /** 此刻的落点是一句**整句**：没选 = 收集箱。 */
+    readonly currentInbox: string;
+    /** 一枚芯片的无障碍名（**一整句**，不用前缀拼裸名）。 */
+    readonly optionAria: (name: string) => string;
+    /** 收集箱那枚的无障碍名。 */
+    readonly inboxAria: string;
+  };
+}
+
+/**
+ * 此刻生效的那一枚落点（含名字）。`undefined` = 收集箱。
+ *
+ * 🔴 提交与那一行的标题**共用这一枚查询**：选中 id 已不在册时（面板开着的时候
+ * 另一台设备把那份清单删了）它一并回退成收集箱。两处各写一份判法，就会出现
+ * 界面念着"新建落进「X」"、东西却建进了收集箱。
+ */
+export function captureSelectedProject(
+  picker: CaptureProjectPicker | undefined,
+): CaptureProjectOption | undefined {
+  if (picker === undefined) return undefined;
+  return picker.options.find((option) => option.id === picker.destinationId);
 }
 
 /**

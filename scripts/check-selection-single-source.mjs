@@ -539,6 +539,13 @@ const ROW_ID_EXEMPT = [
   // 提交时读它决定买哪一档），不是"当前看的是哪一条"。
   ['apps/web/src/features/subscription/RenewPanel.tsx', 'tierId', 'form-draft'],
   ['apps/mobile/src/screens/RenewSection.tsx', 'tierId', 'form-draft'],
+  // ── 2026-10-27 补登 2 处（协作线那枚「新建落进哪一份清单」）──────────────────
+  // 它们是**新建表单的落点字段**，不是"当前看的是哪一条"：初值 null（= 收集箱），
+  // 点一枚芯片才写，面板关掉就清回 null（`TasksScreen` 里那句 `if (!visible) setProjectId(null)`）。
+  // 与上面 `targetProjectId`／`tierId` 同一类。🔴 共享层字段刻意叫 `destinationId` 而不叫
+  // `selectedId` —— 后者是本仓"列表里选中的那一行"的词，借它会被 F 判成多一处没人要求它说话的选中面。
+  ['apps/mobile/src/screens/TasksScreen.tsx', 'projectId', 'form-draft'],
+  ['apps/mobile/src/screens/NotesSection.tsx', 'newNoteProjectId', 'form-draft'],
 ];
 
 /** 只看**单数** `…Id`：复数 `…Ids` 是筛选范围（"当前看哪几条"），不是"当前看的是哪一条"。 */

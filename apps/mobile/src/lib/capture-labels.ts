@@ -33,6 +33,7 @@ import {
   captureChipTimeLabel,
   capturePriorityLabelKey,
   type CaptureComposerLabels,
+  type CaptureProjectPicker,
 } from '@heyta/ui';
 
 import type { Translate } from '../i18n/translate';
@@ -77,4 +78,27 @@ export function captureLabels(t: Translate): CaptureComposerLabels {
 export function useCaptureLabels(): CaptureComposerLabels {
   const { t } = useI18n();
   return useMemo(() => captureLabels(t), [t]);
+}
+
+/**
+ * 「新建落进哪一份清单」那一行的文案（任务面板与便签板共用）。
+ *
+ * 🔴 芯片上的字是裸清单名，无障碍名与那一行的标题各是**一整句** ——
+ * 不拿前缀拼名字（拼出来的句子在词表里查不到，换语言就散架）。
+ */
+export function captureProjectLabels(t: Translate): CaptureProjectPicker['labels'] {
+  return {
+    title: t('mobile.capture.project.title'),
+    inbox: t('mobile.capture.project.inbox'),
+    current: (name) => t('mobile.capture.project.current', { name }),
+    currentInbox: t('mobile.capture.project.currentInbox'),
+    inboxAria: t('mobile.capture.project.inboxAria'),
+    optionAria: (name) => t('mobile.capture.project.optionAria', { name }),
+  };
+}
+
+/** 组件里用。 */
+export function useCaptureProjectLabels(): CaptureProjectPicker['labels'] {
+  const { t } = useI18n();
+  return useMemo(() => captureProjectLabels(t), [t]);
 }

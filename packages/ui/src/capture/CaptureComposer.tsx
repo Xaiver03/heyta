@@ -85,14 +85,17 @@ import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import {
   captureCanSubmit,
+  captureSelectedProject,
   parseCaptureDraft,
   shouldResetCaptureIgnore,
   toAiCaptureSubmitPlan,
   toCaptureChips,
   toCaptureSubmitPlan,
   toggleCaptureIgnore,
+  withCaptureProject,
   type CaptureAiFields,
   type CaptureChip,
+  type CaptureProjectPicker,
   type CaptureSubmitPlan,
 } from './model.js';
 
@@ -201,6 +204,11 @@ export interface CaptureComposerProps {
    */
   readonly autoFocus?: boolean;
   readonly testID?: string;
+  /**
+   * 「落进哪一份清单」那一行。不传就不渲染（web 不传 —— 它靠侧栏选中，
+   * 传了会变成两处说同一件事）。
+   */
+  readonly projectPicker?: CaptureProjectPicker | undefined;
 }
 
 /** 取一份 token 表，建出这套样式。**一个裸尺度值都没有**（`check:design` 会拦）。 */
@@ -259,6 +267,39 @@ function makeStyles(tokens: HeytaNativeTokens) {
       paddingHorizontal: tokens['size.chip-padding-x'],
       borderRadius: tokens['radius.full'],
       backgroundColor: tokens['color.primary-subtle'],
+    },
+    /** 标题独占一行，芯片在它下面成组 —— 芯片是换行排的，标题混进去会像第一枚芯片。 */
+    projectWrap: {
+      gap: tokens['space.2'],
+    },
+    projectRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: tokens['space.2'],
+    },
+    projectTitle: {
+      color: tokens['color.foreground-subtle'],
+    },
+    projectChip: {
+      minHeight: tokens['size.chip-height'],
+      paddingHorizontal: tokens['size.chip-padding-x'],
+      borderRadius: tokens['radius.full'],
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
+      backgroundColor: 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    projectChipOn: {
+      borderColor: tokens['color.primary'],
+      backgroundColor: tokens['color.primary-subtle'],
+    },
+    projectChipText: {
+      color: tokens['color.foreground'],
+    },
+    projectChipTextOn: {
+      color: tokens['color.primary'],
     },
     /**
      * 未被采纳 / 已忽略：用**虚线边框 + 弱化色**。
@@ -322,6 +363,7 @@ export function CaptureComposer({
   now,
   autoFocus,
   testID,
+  projectPicker,
 }: CaptureComposerProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -360,7 +402,7 @@ export function CaptureComposer({
   function submit(): void {
     const plan = toCaptureSubmitPlan(parsed, anchorDate);
     if (plan === undefined) return;
-    void onSubmit(plan);
+    void onSubmit(withCaptureProject(plan, captureSelectedProject(projectPicker)?.id));
     setDraft('');
     setIgnored([]);
   }
@@ -384,11 +426,13 @@ export function CaptureComposer({
    */
   const apply = useCallback(
     async (fields: CaptureAiFields): Promise<void> => {
-      await onSubmit(toAiCaptureSubmitPlan(fields));
+      await onSubmit(
+        withCaptureProject(toAiCaptureSubmitPlan(fields), captureSelectedProject(projectPicker)?.id),
+      );
       setDraft('');
       setIgnored([]);
     },
-    [onSubmit],
+    [onSubmit, projectPicker],
   );
 
   return (
@@ -425,6 +469,10 @@ export function CaptureComposer({
           <Text style={[text['row-meta'], styles.addText]}>{labels.add}</Text>
         </Pressable>
       </View>
+
+      {projectPicker === undefined ? null : (
+        <CaptureProjectPickerRow picker={projectPicker} />
+      )}
 
       {chips.length > 0 ? (
         <View
@@ -511,6 +559,57 @@ export function CaptureComposer({
       ) : null}
 
       {renderAssistant === undefined ? null : renderAssistant({ draft, apply })}
+    </View>
+  );
+}
+
+/**
+ * 「落进哪一份清单」那一行，单独导出：任务面板的捕获器与便签板共用同一份形状。
+ *
+ * 🔴 选中态**不许只靠颜色**说话：这一行的标题念的是此刻真正的落点
+ * （「新建落进收集箱」/「新建落进「X」」），芯片的底色只是冗余的一层。
+ *
+ * 🔴 它是**受控**的：状态住在宿主，本组件只回传 `onSelect`。
+ */
+export function CaptureProjectPickerRow({
+  picker,
+}: {
+  readonly picker: CaptureProjectPicker;
+}): React.JSX.Element {
+  const tokens = useHeytaTokens();
+  const text = useHeytaText();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
+  const selected = captureSelectedProject(picker);
+  const chip = (id: string | null, name: string, aria: string, testId: string): React.JSX.Element => {
+    const on = picker.destinationId === id;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={aria}
+        aria-selected={on}
+        onPress={() => {
+          picker.onSelect(id);
+        }}
+        style={[styles.projectChip, on ? styles.projectChipOn : null]}
+        testID={testId}
+      >
+        <Text style={[text.caption, styles.projectChipText, on ? styles.projectChipTextOn : null]}>
+          {name}
+        </Text>
+      </Pressable>
+    );
+  };
+  return (
+    <View style={styles.projectWrap} accessibilityLabel={picker.labels.title} testID="capture-project-picker">
+      <Text style={[text.caption, styles.projectTitle]}>
+        {selected === undefined ? picker.labels.currentInbox : picker.labels.current(selected.name)}
+      </Text>
+      <View style={styles.projectRow}>
+        {chip(null, picker.labels.inbox, picker.labels.inboxAria, 'capture-project-inbox')}
+        {picker.options.map((option) =>
+          chip(option.id, option.name, picker.labels.optionAria(option.name), `capture-project-${option.id}`),
+        )}
+      </View>
     </View>
   );
 }
