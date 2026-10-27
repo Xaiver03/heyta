@@ -12616,3 +12616,26 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 |---|---|---|
 | 公网 `/app/` 那盘 SPA 与 HEAD 不齐：它服务的是宿主机 `/var/www/heyta-app`（不是镜像里的 `/app/web-dist`），mtime 早于 22:21 那两笔自动收集提交 ⇒ 新加的两句文案在盘里搜不到 | `scripts/deploy-ssh.mjs` 这条链**只换服务端容器**，网页应用是 `docs/runbooks/deployment.md` 里另一条 rsync；重新发布会把**自动收集线**的产品改动一起推上线 —— 对外动作 + 不是本线范围 ⇒ 停在这里。要收这格，先决定"要不要现在把自动收集那两笔推上线" | `ssh finlaw 'for n in noKeyOnThisDevice foregroundOnly email-code; do printf "%-20s " $n; sudo -n grep -rl "$n" /var/www/heyta-app/assets/ \| wc -l; done'`（前两枚 0、第三枚 1 —— 第三枚是控制臂，证明搜法本身有效，不是"grep 没扫到"） |
 
+
+**上面"本线之外那批正在被别人改的文件"那一格的逐枚归属表**（把"只剩登记过的例外"从一句话变成能一条一条打勾的东西）
+
+> 取数只有两条命令，别抄这里的行号与枚数：
+> `git status --porcelain`（列形 `XY 路径`；`A ` / `D ` 的标记在**第一列** = 已经在索引里，那是别人自己的落盘节奏，不是我能顺手带走的东西）＋
+> `git status --porcelain | sed 's/^...//' | while read p; do [ -e "$p" ] && echo "$(( ( $(date +%s) - $(stat -f %m "$p") ) / 60 ))分  $p"; done | sort -rn`（每枚距现在几分钟）。
+> 归属判据**不是"我最近动过这个项目"**，是"**这枚文件的加行指不指名我的工单 / 我的装置名**" —— 表里每一行都把那句指名指到位。
+
+| 归谁 | 具体哪几枚 | 为什么不由我代提交 | 那句"指名"在哪（现量） |
+|---|---|---|---|
+| 全局 UX 分层整改线（2026-10-27 当天立项） | `docs/plans/global-ux-system-remediation.md`（索引里 `A`）、`docs/agents/ux-principles.md`、`scripts/check-focus-single-source.mjs`（未跟踪）、`package.json`（它此刻唯一的未暂存改动就是这条尺的定义 + `check` 链里那一格）、`e2e/tests/focus-visible-matrix.spec.ts` 与 `apps/web/evidence/focus-visible-matrix/`（未跟踪）、`apps/web/src/styles/app/` 下那批 `.css`、`e2e/tests/rail-geometry.spec.ts`、`e2e/tests/rail-roving.spec.ts` | 计划自己写着"状态：进行中"，尺还是未跟踪件；`package.json` 那两行要和它的脚本同一笔才不自相矛盾 —— 先提定义 = 链里指着一枚仓库里不存在的脚本，`check:gate-wiring` 当场红。而 P0 那格判据当天刚翻过案 ⇒ 整组此刻是半成品 | `head -3 docs/plans/global-ux-system-remediation.md`（"全局 UX 系统整改… 状态：进行中"）；`head -6 scripts/check-focus-single-source.mjs`（"焦点实现单一来源门禁（2026-10-27，全局 UX 整改 P0）"）；`git diff -- package.json \| grep -c focus-single-source` |
+| 协作/共享清单线 | `packages/ui/src/sync/ShareConsentModal.tsx`、`packages/ui/src/sync/share-consent-model.ts`、`apps/web/src/features/share/JoinSharedListDialog.tsx`、`apps/web/src/features/share/ShareFeature.tsx`、`apps/mobile/src/screens/JoinShareScreen.tsx`、`apps/mobile/src/screens/ShareSpaceScreen.tsx`、`apps/web/tests/share-consent-modal-theme.spec.tsx`、`e2e/tests/collab-journey.spec.ts`、`scripts/verify-collab-journey.mjs`、`scripts/verify-mobile-collab-ios.sh`、`packages/i18n/src/locales/zh-CN.ts` 与 `en.ts` | 这批是同一件事（分享同意面），但**两份 locale 是多条线共用的一张密集 key 表** —— UX 线同时在往里写，整文件 `git add` 就是替别人提交他们的行；要提只能按 hunk 区间切，而那正是他们自己的活 | `git diff -- packages/ui/src/sync/share-consent-model.ts \| grep '^+' \| head -3`；共用表混写的现量：`git diff -U0 -- packages/i18n/src/locales/zh-CN.ts \| grep -c '^@@'` |
+| 自动收集（inbound）线 | `packages/app-host/src/inbound-system-prompt.ts`（索引里 `D`）+ `packages/inbound-core/src/system-prompt.ts`（未跟踪）+ `packages/app-host/src/index.ts` + `packages/inbound-core/src/index.ts` + `scripts/check-inbound-system-prompt.mjs`；同一组还带 `server/src/ai/managed-completion.ts`（未跟踪）、`server/src/ai/managed-proxy.routes.ts`、`server/tests/managed-proxy.routes.spec.ts` | 这是一次**跨文件重命名 + 发送腿提取**：那个 `D` 与新文件必须同一笔落地，只搬一半，干净检出上 `packages/app-host/src/index.ts` 就 import 一枚仓库里不存在的模块；`managed-completion.ts` 还没跟踪而 `managed-proxy.routes.ts` 已经不再自己写那条腿 ⇒ 分两笔交必留一枚半棵树 | `head -8 server/src/ai/managed-completion.ts`（"2026-10-27 从 managed-proxy.routes.ts 提出来… ADR-0077… 服务端抽取腿"）；`grep -n inbound-system-prompt packages/app-host/src/index.ts` |
+| 日历/详情面线 | `apps/web/src/App.tsx`、`apps/web/src/features/calendar/CalendarHeaderToolbar.tsx`、`e2e/tests/calendar-cells.spec.ts` | 三枚连成一条**还没接完的线**（壳里 `view === 'calendar'` 那一支、工具栏新引的图标、spec 里新的 testid）；提两枚留一枚 = 干净检出上那条用例引用一个界面里不存在的控件 | `git diff -- apps/web/src/features/calendar/CalendarHeaderToolbar.tsx \| grep '^+import'`；`git diff -U0 -- apps/web/src/App.tsx \| grep '^@@'` |
+| 不是任何人的改动：门禁自己的产物回执 | `apps/web/evidence/reminder-permission-final/05-denied-to-granted-return-refresh.png` | 谁在这棵树上跑 `check:ai-e2e`，它就被重写一次（已登记的探针陷阱 #602）；代提交 = 把别人那一趟运行的产物按我的名义落仓 | `git log --oneline -1 -- apps/web/evidence/reminder-permission-final/`；`grep -n '602\. ' docs/reference/environment-traps.md \| head -1` |
+
+**本线名下残渣为零**（这三格是自查，不是登记别人；每一格都要跑，因为"我以为我擦干净了"是这棵树上最常见的一种假绿）
+
+| 查什么 | 命令 | 判据 |
+|---|---|---|
+| 变异 / 台架还原后有没有留下备份件 | `find . -path ./node_modules -prune -o -name '*.mut-bak' -print -o -name '*.teeth-bak' -print -o -name '*.snap.bak' -print` | 空输出；非空就是本会话某轮变异没擦干净 |
+| 本线今晚写过的路径有没有再次变脏 | `git status --porcelain -- BLOCKED.md docs/plans/account-standard-suite.md scripts/live-web-freshness.mjs scripts/check-scripts-parse.mjs e2e/live-site/live-signin-entry.spec.ts apps/web/evidence/login-code-live-after-deploy-1027` | 空输出 |
+| 未跟踪件里有没有敏感件（密钥 / 证件 / 真收件箱数据） | `git status --porcelain \| sed 's/^...//' \| while read p; do [ -f "$p" ] && grep -lE 'BEGIN (RSA\|EC\|OPENSSH) PRIVATE KEY' "$p"; done`；再补一次目录级 `git status --porcelain \| grep -E '\.env\|id_rsa\|\.pem\|token'` | 无命中。⚠️ 退出码要在接管道**之前**取（`cmd > /tmp/o 2>&1; rc=$?` 之后再看），本会话在这条链上踩过一次把 `grep \| head` 的 rc 当成 grep 的 rc |
