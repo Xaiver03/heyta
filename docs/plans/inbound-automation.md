@@ -4863,3 +4863,86 @@ A4 计费口径、`AUTOMATION_ENTITLEMENT_MODE` 写错 ⇒ 500、B194 那批入�
 那三个数逐字相同。两枚**代码腿仍是本线自己的提交**（`afe07423e`、`b55e98807`）。
 本线没有改写历史（共享 `main` 上那一步的代价比这条消息名目大得多）。
 
+---
+
+## 2026-10-28 00:0x–00:2x · 负责人那句"数据本来对我们就是可读的"落成一条窄档：ADR-0077「接收即抽取」（自动收集线）
+
+### 0. 这一节只做一件事：把上一轮那句假话变成一条能红的尺
+
+上一节结束时我登记的结论是"常驻处理只能归用户自己那台机器"，而负责人回的是
+**"都已经用上 AI 了，数据本来对我们来说就是可以读的，必须得是可读的"**。
+这句话里有一半当场可证（**进数据那一刻**明文确实在服务端手上），另一半当场可否
+（**落库之后**服务端只有公钥，打不开自己刚封的那一行）。所以这一节写的不是"改口"，
+而是把那一句可证的部分单独做成一条档：**窗口只有一次，抽完就丢**。
+设计、否决项与红线在 [ADR-0077](../adr/0077-inbound-hosted-extraction-at-ingest.md)。
+
+### 1. 落地了什么（三枚本线提交 + 这一节文档）
+
+| 件 | 落点 | 判据在哪 |
+|---|---|---|
+| 发送腿被提出来共用（路由退成 HTTP 壳） | `server/src/ai/managed-completion.ts::invokeManagedAiCompletion` | `managed-proxy.routes.spec.ts` **一字未改**仍全绿 —— 那句"行为没变"靠的是它，不是我写的形容词 |
+| 服务端抽取那条腿 | `server/src/automation/hosted-extraction.ts`（领活 → 当场抽 → 落终态） | `server/tests/inbound-hosted-extraction.spec.ts`，枚数现量 `grep -cE "^\s+it\(" server/tests/inbound-hosted-extraction.spec.ts` |
+| 接线：入站路由在事务之后按开关分派 | `server/src/automation/inbound.routes.ts` | `server/tests/inbound-automation.routes.spec.ts` 那一组 5 条 |
+| 开关那一列 | `automation_rules.hosted_extraction`（可空布尔，迁移 `20261027000000_add_hosted_inbound_extraction`） | 只有显式 `true` 才开；`NULL` 读成"归设备" |
+| 界面与文案 | `apps/web` 那枚面板 + `packages/i18n` 的 `web.ai.inbound.hosted.*` | `apps/web/tests/inbound-hosted-extraction-ui.spec.tsx`（含反向 PUT 带 `false` 那枚） |
+| 系统提示词的唯一所有者搬家 | `packages/inbound-core/src/system-prompt.ts`（服务端不能依赖 app-host） | `scripts/check-inbound-system-prompt.mjs --self-test` 五臂 |
+
+**设备侧零改动**这条不是设计上的优雅，是现量捡到的：`processInboundAutomationEvent` 本来就会
+恢复"别人替我抽好的"结果（`readAutomationPreparedResult` → 摘要校验 → 领许可 → 写批）。
+
+### 2. 🔴 这一节最该被下一位读到的：我自己写的两把尺**当场是恒绿的**
+
+变异臂跑法见 `~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.md`（`mutate-arms.py` 可复现，
+含对照臂 0：**一棵没动的树必须先绿**，否则"全部臂都红"只是这台机器跑不动这套用例）。
+两轮跑下来抓到两处，形状不同、病根同一个（§7 那条元规则"一把永远通过的判据比没有判据更糟"）：
+
+1. **判决数错了字形**：第一版八臂全打印"绿，失败 0 条"，而 `logs/arm-1.log` 明明写着 3 条失败 ——
+   我从 ANSI 包裹的 `×` 字形里数失败条数，裸串永远匹配不到。改成只认框架自己写的
+   `Tests  N failed` 汇总行（先剥 ANSI），并把"没跑到汇总行"单列一种形状。
+2. **门槛被同文件的注释喂饱**：那条"`/chat/completions` 只许一枚"按**文件**计数，
+   而 `managed-completion.ts` 的表头注释把这枚端点名当判据引用了一遍 ⇒ 改名后那一枚文件仍命中 ⇒ 尺绿。
+   我写在它上面的那句注释"扫到 0 枚也是红"**在它写下的那一刻就是假的**。
+   改成剥注释后数**出现次数**、要求恰好 1，并补一枚 A9 把"2 枚也红"那一支钉住。
+
+现量（改完复跑）：11 臂全红、对照臂绿、逐臂 `还原_ok`；臂数
+`grep -cE "^\s+\('A[0-9]" ~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.py`。
+
+⚠️ 教训要说窄一点，别写成"grep 不可信"：**源码读门槛必须读代码、不读散文，且两端都要有臂**
+（0 枚与 ≥2 枚）。这条与本仓 `apps/mobile/tests/source-reading.ts` 早就写明的剥注释纪律是同一件事，
+我没在写新尺时把它捡起来。
+
+### 3. 读数（本节落笔前量的，别抄数）
+
+```bash
+cd server && npx vitest run                                # 全套
+cd apps/web && npx vitest run tests/inbound-*.spec.ts*     # 面板那一族
+pnpm check:i18n-vars
+node scripts/check-migrations.mjs
+node scripts/check-schema-migration-drift.mjs
+```
+
+| 尺 | 读数 |
+|---|---|
+| server 全套 | 全绿（`Tests` 汇总行的通过数由脚本自己打印） |
+| 两条新 spec | `inbound-hosted-extraction` + `inbound-automation.routes` 合跑 31 条通过 |
+| apps/web 那一枚新 spec | 5 条通过 |
+| i18n 中英对称与变量 | `check:i18n-vars` rc=0 |
+| 迁移与 schema 对账 | rc=0（本批新增一枚迁移目录，`schema.prisma` 加一列） |
+
+### 4. 边界（这档现在**不生效**，别读成已上线）
+
+1. 🔴 **迁移没 apply**：那一列在任何环境的库里都还不存在 ⇒ 一律读成 `NULL` ⇒ 一律归设备。
+   本机那套 Postgres 被并行会话共用，`cd server && sh scripts/migrate-deploy.sh` 的时机归负责人（§6 第 2 格）。
+2. **生产 env 没动、不 push、helm 不动**；`MANAGED_AI_*` 三项不齐时这条腿的分支根本不会配置成功。
+3. **对外披露一处未发**：六格草稿逐处写在工单 [§5.2](inbound-automation-work-brief.md)，
+   措辞与法律表征归负责人。同一节还登记了一条现量危险：那段
+   `automation-metadata` 正文手抄在三枚法务文件里而**没有一把尺**看着它们一致。
+4. **`HOSTED_EXTRACTION_TIMEOUT_MS = 30_000` 是推导不是实测**（公网发送方重试窗口 10–30s）；
+   真机上的模型耗时分布没量过。
+5. **AC-1～AC-8 仍一格没勾**（现量 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md`）。
+6. **A4 计费口径**照旧在他手上；本档只保证**新增**这条腿不多扣一次（额度只在第 ⑤ 道消耗，
+   这条腿不写 `automation_ai_attempts`，"结果不确定"改由租约持有者判定）。
+7. **mobile 没有规则编辑器** ⇒ 这一档的开关只在 web 上存在。这是登记，不是待办：
+   要么补一枚编辑器，要么界面别露出——现在它没露出。
+
+
