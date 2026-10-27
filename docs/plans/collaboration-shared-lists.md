@@ -1539,7 +1539,7 @@ git diff --name-only 0cdaf8fdf <你此刻的 HEAD> -- apps/mobile/src apps/mobil
 | ③ Android 界面腿解锁 | 今日复量三格照旧：`EMULATOR=NO`、`opp-smoke.avd` 在、`adb devices` 空（取法与那枚打空的远程探针教训都在 §9.14 那一格） | **推荐补 emulator 组件**（一次装机、不买设备）。补完还要新写一枚"驱动远端设备 + 服务端在另一台机器"的旅程装置，那是另一段工作量。**不在 Mac 起模拟器**（仓内长期令） |
 | ④「事后改归属」 | 把**已有**便签挪进别的清单（`setNoteProject`）在两壳仍零调用点（现量 `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'` ⇒ 只剩接口声明与实现两处；⚠️ 别扫整个 `apps`，会命中 `apps/web/dist` 的产物） | **推荐排下期**：它不在本次成功定义里，本次不扩范围 |
 | ⑤ 系统横幅那一档 | 两端回收形状不同形已逐端改准并有常驻判据钉着（#598、§9.21–§9.22） | **推荐不承诺系统横幅**，保持"通知中心那一档 + 入口徽标"。要 Android 侧上横幅需另立 ADR |
-| ⑥ 那枚别线的 e2e 红要不要我递 | `rail-roving` 那枚断点红**归属线自己早就在册**：现量 `grep -n 'rail-roving' BLOCKED.md` 两处，两处都写「未查（dnd-kit Space 传感器与 roving tabindex）」 | **本线不再重复登记**（重复条目只会让下一个读数的人以为有两只不同的红）。要做的是改那条线自己的排期，不在我射程内 |
+| ⑥ 那枚别线的 e2e 红要不要我递 | `rail-roving` 那枚断点红**归属线自己早就在册**：现量 `grep -n 'rail-roving' BLOCKED.md` 两处，两处都写「未查（dnd-kit Space 传感器与 roving tabindex）」 | **本线不再重复登记**（重复条目只会让下一个读数的人以为有两只不同的红）。要做的是改那条线自己的排期，不在我射程内。<br>⚠️ 同一趟顺手否证了 §9.19 那句「整链只剩 `apps/web` 的 `task-sort` 那一枚红」：现量 `cd apps/web && npx vitest run tests/task-sort.spec.tsx tests/task-selection.spec.tsx` ⇒ 2 passed / rc=0。那句是**截断链只暴露第一个红**的读数被抄成红集全集（元规则：截断的读数不是全集），已在 progress-log 与 feature-matrix 两处入口改口 |
 | ⑦ 这个 goal 什么时候关 | 执行序 0–5 全部有读数（§9.24／§9.25／§9.26／§9.27），四把尺已串行现量，`origin/main` 与本地现量 `0 0` | **等 ①②③ 的答复**。硬边界写着不得自标 complete，所以我不动它 |
 
 ⚠️ 一件必须传给下一位的**现场事实**（不在任务书里，但会咬每一次"输入面干净"的判断）：本批那趟整链 `check`
