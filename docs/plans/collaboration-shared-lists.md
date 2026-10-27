@@ -1150,7 +1150,7 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 
 - **登出/撤销后本机那份共享密钥料**：`clearMobileVaultSession` 删的是 root key，`#share-keys` 那一格**没跟着删**。现量：`grep -c removeVaultRootKey apps/mobile/src/lib/vault-session-cleanup.ts` ⇒ 2、`grep -c share-keys apps/mobile/src/lib/share-key-store.ts` ⇒ 2（那段 ⚠️ 就写在实现端口的同一份文件里，不是本轮新发现）。⇒ 这一格**不是明文泄露** —— 密钥料是 vault 信封包裹的，root key 一删就解不开；留下的形状是"离场的设备上还有一份解不开的密钥料"。要清它得动 vault 会话那一层的清理时序，**归产品负责人拍板**，本线不代改别人那枚函数的次序。
 - **同意面那句措辞用谁的口吻**（清单所有者语 vs 加入者语）：这句会被用户当成承诺读，属对外表征 ⇒ 归权利人；两屏各自现的那份文案在 §9.14、§9.15 的截图指针里能看到。
-- **Android 那一侧**只有出包读数、**没有界面腿**。载体不是「什么都没有」：`adb` 与一枚 AVD 在，缺 `Sdk\emulator` 那枚主程序，且没插真机 —— 三条取法与解锁所需那段装机动作都在 §9.14 那一格（2026-10-27 现量更正；原先写的是「载体不存在」）。
+- **Android 那一侧**只有出包读数、**没有界面腿**。载体不是「什么都没有」：`adb` 与一枚 AVD 在，缺 `Sdk\emulator` 那枚主程序，且没插真机 —— 三条取法与解锁所需那段装机动作都在 §9.14 那一格（2026-10-27 现量更正；原先写的是「载体不存在」）。⚠️ 同日 14:5x 又重测了一次，形状更重：**`system-images` 整目录也不在**，所以解锁至少是两枚组件 + 硬件加速确认 + 一枚还不存在的远端旅程装置 —— 逐条取法见 §9.19 那一节。
 - **「事后把一条已有条目挪进别的清单」**在两壳仍零调用点 —— 见上面那张边界表，它和本批那枚"新建时选落点"是两格。
 
 ### 9.19 同意闸那一格的调用点判据 + 四臂首跑（2026-10-27 第十一批）+ 整条 `pnpm check` 的第三趟读数
@@ -1200,6 +1200,22 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 ⚠️ 归因要写清这棵树：那一趟链 13:5x 起跑，`apps/web test` 那一刻（14:37）工作树里已经有本节的 ⑨ 组判据（14:2x 落盘、14:38 才提交），
 所以它是"HEAD + 我在飞的编辑"的合成态 —— 对本线而言有用的两枚读数是三个载具的基线（6 / 5 / 26 全绿，那是臂跑完后的现量），
 而不是链的 rc。链本体环节数每次现量：`node -e "console.log(require('./package.json').scripts.check.split('&&').length)"`。
+
+#### Android 那一格同日再量一次（2026-10-27 14:5x，同一台 `windows-pc`；"载体半装"这句是瞬时读数，重跑才算）
+
+远端默认 shell 是 **cmd**，所以下面三条都按 cmd 语法跑（bash 语法探它打出的"系统找不到指定的路径"不是否证）：
+
+- `dir /b "%LOCALAPPDATA%\Android\Sdk"` ⇒ `build-tools`、`cmake`、`cmdline-tools`（下有 `latest`，`sdkmanager.bat` 在）、`ndk`、`platform-tools`（还有一枚 `platform-tools-2`）、`platforms`、`licenses`、`.knownPackages`、`.sdk`、`.temp`
+- `if exist "%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe" (echo YES) else (echo NO)` ⇒ **NO**（`C:\Android\Sdk\...` 同一条也 NO）
+- `adb devices` ⇒ `List of devices attached` 下面**空**（daemon 起得来，没插真机）；`where adb` ⇒ 那份 platform-tools 里的 `adb.exe`
+
+⇒ 形状比 §9.14/§9.16 那几处写的"缺 `Sdk\emulator` 一枚"要**更具体也更重**：`system-images` 那枚目录**整目录不在**，
+而册里那枚 AVD（`%USERPROFILE%\.android\avd\opp-smoke.avd`）的 `config.ini` 写着 `abi.type = x86_64`
+——镜像按这个 ABI 就该落在 `system-images` 里。所以"补一枚 Google 组件"这条改判：**至少两枚（`emulator` + 一枚匹配的系统镜像）**，
+再加两格装置侧的前提：**那台机的硬件加速要确认**，以及**协作旅程装置今天只有 iOS 一份**
+（现量 `ls scripts/verify*collab*`），要跑 Android 界面腿得新写一枚驱动远端设备的装置，还要让那台模拟器够得着服务端。
+⇒ 这一格今天仍按"出包腿有读数、界面腿没有装置"结案，**不把"编译过"读成"Android 已验"**；解锁它的代价已经量到这一层，
+排不排归产品负责人。
 
 #### 本批的四把尺（串行，逐枚带 rc）
 
