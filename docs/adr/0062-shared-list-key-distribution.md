@@ -142,6 +142,18 @@
    逐层证明能红（2026-10-27 首跑 `ARMS=pass (4/4)`，四臂红集精确匹配，读数在计划 §9.19）。
    裁决没动（PIPL 单独同意、fail-closed 方向、「没勾不再提示 ⇒ 每次还弹」的勾选语义）；动的是"这一格的牙现在量得到"。
 
+8. **任务书里那两枚谓词（`shouldNotifyTaskReminder` / `shouldAutoAcceptInvitation`）按"撤下"结案，不是漏做** ——
+   这条写在这里是为了让下一位不必再翻计划 §9.10 才能知道代码里为什么没有它们：
+   `git grep -n "shouldNotifyTaskReminder\|shouldAutoAcceptInvitation" -- apps packages server scripts` 现量 = **零命中**。
+   两枚各自的原因不同：
+   ① 提醒那一枚**没有输入**——共享日志里没有"到期时间"这一族语义，替它编一个默认值就是让通知在吵；
+   现在偏好模型只有一个键 `activities`（三类种类：新增／删除／完成），数据面接的就是这一族（`packages/ui/src/sync/notification-model.ts`）。
+   ② 自动接受邀请那一枚**不该有**——加入一份共享在两个壳上都是用户按下"加入"那一下
+   （移动端调用点 `apps/mobile/src/screens/JoinShareScreen.tsx`），把它自动化等于替用户同意，
+   与决策 8 那道单独同意闸方向相反。
+   ⇒ 所以这一格的正确交付形状是"没有这两枚谓词 + 各自的替代口径在册"，而不是"接上它们"。
+   翻案条件：哪天共享条目带上真正的到期时间并决定要据此吵人，第 ① 条重新开；哪天产品决定接受邀请可以预先授权，第 ② 条重新开 —— 两条都要新写一份 ADR，不改本文这一条。
+
 **仍然没有做到的（别把上面读成"全做完了"）**：库里存量 op 不追签（ADR-0069 裁决二/三）；
 旧密文在 rekey 后不重加密（追加模型的代价，边界写在 `share-rekey.ts` 文件头）；
 Android 那一侧的界面腿读数本批没开（出包与设备腿按负责人的长期令一律走 `ssh windows-pc`）。
