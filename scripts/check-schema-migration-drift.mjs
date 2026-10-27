@@ -33,7 +33,27 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ALLOWED_FLAGS = ['--self-test', '--dump-indexes'];
 const SELF_TEST = process.argv.includes('--self-test');
+
+/**
+ * 未知旗标必须被拒，不许被静默忽略。
+ * 形状：`--schema <另一棵树>` 这类写法穿进来时，旧版实现只 `includes('--self-test')`，
+ * 于是它**照常读仓库里那两份**并打一句绿 —— 读的人以为判的是他指的那棵树。
+ * 打空仍然 rc=0 比没有判据更糟（AGENTS §8.2），所以这里宁可红。
+ */
+const unknownFlags = (argv) => argv.slice(2).filter((a) => a.startsWith('-') && !ALLOWED_FLAGS.includes(a));
+
+/** 尺的输入不在场时必须红，并且点名是哪一格 —— 少了这一格，路径挪走会读成"对得上"。 */
+const missingInputs = (repo) => {
+  const missing = [];
+  if (!existsSync(repo.schemaPath)) missing.push(`schema ${repo.schemaPath}`);
+  if (!existsSync(repo.migrationsDir)) missing.push(`迁移目录 ${repo.migrationsDir}`);
+  else if (readdirSync(repo.migrationsDir).filter((n) => /^\d{14}/u.test(n)).length === 0) {
+    missing.push(`迁移目录 ${repo.migrationsDir} 里一枚带时间戳前缀的迁移都没有`);
+  }
+  return missing;
+};
 
 /**
  * C 方向的在册缺口：schema 认得、迁移没建 ⇒ 按迁移建出来的库（含生产）没有这个对象。
@@ -520,6 +540,25 @@ const selfTest = () => {
     buildFixture(({ addMigration }) => addMigration('20260101000006_rebuild',
       'DROP INDEX CONCURRENTLY IF EXISTS "thing_user_id_idx";\nCREATE INDEX CONCURRENTLY "thing_user_id_idx" ON "thing"("user_id");\n')));
 
+  push('臂12 未知旗标必须被拒（`--schema 别的树` 那种写法打空仍然 rc=0，比没有尺更坏）', true,
+    { reds: unknownFlags(['node', 'x.mjs', '--schema', '/tmp/other.prisma']) });
+
+  push('臂13 两枚在册旗标不许被当成未知（误红的尺第二天就被人放宽）', false,
+    { reds: unknownFlags(['node', 'x.mjs', '--self-test', '--dump-indexes']) });
+
+  push('臂14 尺的输入路径不在场 ⇒ 必须点名红（指不到真源时那句"对得上"是假的）', true,
+    { reds: missingInputs({ schemaPath: join(ROOT, 'server/prisma/NOPE.prisma'), migrationsDir: join(ROOT, 'server/prisma/NOPE') }) });
+
+  const emptyDir = mkdtempSync(join(tmpdir(), 'heyta-drift-empty-'));
+  let arm15;
+  try {
+    arm15 = missingInputs({ schemaPath: REPO.schemaPath, migrationsDir: emptyDir });
+  } finally {
+    rmSync(emptyDir, { recursive: true, force: true });
+  }
+  push('臂15 迁移目录在、但一枚带时间戳前缀的迁移都没有 ⇒ 必须红（重放器一无所获，会读成"库里没有、schema 也没声明"那种假绿）', true,
+    { reds: arm15 });
+
   let bad = 0;
   for (const arm of arms) {
     console.log(`  ${arm.ok ? 'ok ' : 'RED'} ${arm.label} ｜ ${arm.detail}`);
@@ -529,9 +568,23 @@ const selfTest = () => {
   if (bad > 0) process.exit(1);
 };
 
+const STRAY_FLAGS = unknownFlags(process.argv);
+if (STRAY_FLAGS.length > 0) {
+  console.error(`🔴 未知旗标：${STRAY_FLAGS.join(' ')} ｜ 这把尺只认 ${ALLOWED_FLAGS.join(' / ')}。`);
+  console.error('   不认的旗标会被静默忽略 ⇒ "我判的是另一棵树/另一个目录"那句意图根本没生效，读数仍然是仓库这一份的绿。宁可红。');
+  process.exit(1);
+}
+
 if (SELF_TEST) {
   selfTest();
   process.exit(0);
+}
+
+const MISSING_INPUTS = missingInputs(REPO);
+if (MISSING_INPUTS.length > 0) {
+  for (const m of MISSING_INPUTS) console.error(`🔴 尺的输入不在场：${m}`);
+  console.error('   这句必须红：对不上"没有 schema 可读"和"schema 与迁移一致"是两个完全不同的结论。');
+  process.exit(1);
 }
 
 /**
