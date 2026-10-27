@@ -54,8 +54,13 @@ import {
 import { useI18n } from '@heyta/i18n';
 // 🔴 共享捕获件：与 web 用的是**同一份**（识别日期/优先级 + 芯片 + 预览）。
 // 在这一刀之前移动端只有一个纯标题输入框 —— 同一句话在两端建出不同的任务。
-import { CaptureComposer, priorityColorToken, type CaptureSubmitPlan } from '@heyta/ui';
-import { useCaptureLabels } from '../lib/capture-labels';
+import {
+  CaptureComposer,
+  priorityColorToken,
+  type CaptureProjectOption,
+  type CaptureSubmitPlan,
+} from '@heyta/ui';
+import { useCaptureLabels, useCaptureProjectLabels } from '../lib/capture-labels';
 import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import {
   createNoteActions,
@@ -151,16 +156,30 @@ function Composer({
   visible,
   onClose,
   onSubmit,
+  projects,
 }: {
   visible: boolean;
   onClose: () => void;
-  /** 🔴 收的是**共享层解析出来的计划**（title + 可选 dueDate / priority），
+  /** 🔴 收的是**共享层解析出来的计划**（title + 可选 dueDate / priority / projectId），
    *  不是一句裸标题 —— 这正是"移动端也有捕获能力"的落点。 */
   onSubmit: (plan: CaptureSubmitPlan) => Promise<void>;
+  /** 可落进的清单（含自己那份共享）。空数组也照样画收集箱那一枚。 */
+  projects: readonly CaptureProjectOption[];
 }): React.JSX.Element {
   const tokens = useTokens();
   const { t } = useI18n();
   const labels = useCaptureLabels();
+  const projectLabels = useCaptureProjectLabels();
+  /**
+   * 这一趟新建要落进哪一份清单；`null` = 收集箱。
+   *
+   * 🔴 它**住在面板里**而不是宿主：关闭即该回到默认落点（`presented` 那个 effect
+   * 一起重置），而宿主"当前选中的那一行"不是这里的语义 —— 手机上没有侧栏选中态。
+   */
+  const [projectId, setProjectId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!visible) setProjectId(null);
+  }, [visible]);
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
   const [presented, setPresented] = useState(false);
@@ -272,6 +291,12 @@ function Composer({
               onSubmit={submit}
               autoFocus
               testID="mobile-capture"
+              projectPicker={{
+                options: projects,
+                destinationId: projectId,
+                onSelect: setProjectId,
+                labels: projectLabels,
+              }}
             /> : null}
             {/* 取消留在这里：共享组件只管"添加"，关闭面板是 modal 的事。
 
@@ -1576,7 +1601,12 @@ export function TasksScreen({
       )}
 
       {bulkSelecting ? null : quadrantMoveUndo === null && quadrantMoveError === null ? (
-        <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
+        <Fab
+          icon="task.add"
+          label={t('mobile.tasks.new')}
+          testID="mobile-task-add"
+          onPress={() => setComposerOpen(true)}
+        />
       ) : (
         <View accessibilityLiveRegion="polite" style={{
           position: 'absolute', left: tokens['screen.gutter'], right: tokens['screen.gutter'],
@@ -1734,6 +1764,7 @@ export function TasksScreen({
       <Composer
         visible={composerOpen}
         onClose={() => setComposerOpen(false)}
+        projects={projects.map((project) => ({ id: project.id, name: project.name }))}
         onSubmit={async (plan) => {
           // 🔴 只把**解析出来的字段**交给动作层 —— "写哪些键"是
           // `NewTaskFields` 的事（AGENTS.md §3.5），这里不做第二次换算：
@@ -1741,6 +1772,8 @@ export function TasksScreen({
           await actions.create(plan.title, {
             ...(plan.dueDate === undefined ? {} : { dueDate: plan.dueDate }),
             ...(plan.priority === undefined ? {} : { priority: plan.priority }),
+            // 用户选了哪一份就交给哪一份；没选就**不交这个键**（= 收集箱）。
+            ...(plan.projectId === undefined ? {} : { projectId: plan.projectId }),
           });
           refresh();
         }}

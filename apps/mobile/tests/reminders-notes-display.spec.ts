@@ -282,7 +282,10 @@ describe('宿主接线：共享组件的必填回调真的传了（少传不会�
     // return 同罪（"没提交"被当成"存上了"）。两条接线判据钉在源码上
     // （本仓库对"少传/改错回调不报类型错"的既有守卫方式，见本 describe 文件头）。
     expect(screen).toContain("if (actions === null) throw new Error(t('notes.error.saveFailed'));");
-    expect(screen).toContain('return runAdd(actions.createNote(content));');
+    // 这一枚只管**走不走 `runAdd`、调的是不是 `createNote`**，所以针脚不吃实参表：
+    // `createNote` 现在多交一枚落点（`{ projectId }`，2026-10-27 第十批），把整行
+    // 字面钉住会让两族的判据互相踩脚。落点那一格由 `capture-project-assembly.spec.ts` ③ 钉。
+    expect(screen).toMatch(/return runAdd\(\s*actions\.createNote\(/);
     // 🔴 **这条断言是翻向的**（多端第二批，2026-10-03）。原文是
     // `expect(screen).not.toContain('onEdit=')`，理由「移动端没有便签编辑屏」。
     // 屏有了（`NoteEditScreen`），所以"不传"从正确变成缺陷：摘要那段会退回纯文本，

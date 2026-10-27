@@ -214,6 +214,23 @@ press_anchor() {  # <want>
 # 🔴 日志不吞：按不动的原因（ambig / 屏外 / 没有这一枚）必须看得见，
 #    否则"装置没按"又会读成"产品没反应"。
 ax_press() { forget_safe_tap; press_anchor "$1"; }
+
+# 🔴 屏上**有正在填的表单**时唯一可用的按法：不碰软键盘，直接按解析出来的坐标。
+#    `ax_press_until` 每一发之前都 `dismiss_keyboard`，而那一发是按键盘的 **return 键**
+#    （见 `ios-ax-shim.py` 的 `RETURN_KEY_LABELS`）—— RN 的输入框把 return 当
+#    `onSubmitEditing`，于是"收个键盘"= **把表单提交了**。
+#    第 41 跑实测：新建任务面板里按落点芯片，第一发就把任务提交进收集箱、面板随之关闭，
+#    后四发读到的"没有这一枚"是装置自己造成的现场，不是产品缺控件。
+press_in_form() {  # <want> [重试次数]
+  local want=$1 tries=${2:-5} i=1
+  while [ "$i" -le "$tries" ]; do
+    if press_anchor "$want"; then return 0; fi
+    i=$((i + 1))
+    sleep 1
+  done
+  return 1
+}
+
 dismiss_keyboard() { ax --dismiss-keyboard --json >/dev/null 2>&1 || true; }
 
 # 🔴 键盘立着的时候**整个 App 的子树都不在 AX 树上**（只剩键盘那 44 个节点），
@@ -1980,6 +1997,145 @@ PY
   summary
   exit 1
 fi
+
+# ── 10d. 任务那一族的上行（L10）：手机把一条新任务指进那份共享清单 ────────────
+#
+# 🔴 这一格补的是产品定义那句「三族与另一台设备**双向**同步」里最后缺的一族方向：
+# 此前手机上建任务只有两处调用点、都不交 `projectId`（⇒ 新任务一律落收集箱），
+# 本批把「落进哪一份清单」那一枚控件接上（`CaptureComposer` 的 `projectPicker`），
+# 于是这里判的是**真机上的整条上行**：按那枚芯片 ⇒ 提交 ⇒ owner 侧从共享日志读回并验签。
+step "10d. 上行判据（L10）：手机新建一条任务并指进那份共享清单 ⇒ owner 侧读回并验签"
+L10_TASK_TITLE="手机写进共享的任务${STAMP}"
+# 🔴 三枚针脚各管一格，且都是**整句**（不拿前缀拼清单名）：
+#    芯片的无障碍名 = 入口在不在场；那一行的标题 = 此刻的落点（默认收集箱 → 按完变成那份共享）。
+#    标题这一枚是**按压的到达判据**：它随选中而变，所以"按下了但没生效"红得出来。
+#    （第 41 跑用的到达判据是输入框里的标题 —— 它在按之前就在场，是一条恒真判据。）
+L10_CHIP_LABEL="落点选为「本机清单${STAMP}」"
+L10_DEFAULT_TARGET="新建落进收集箱"
+L10_PICKED_TARGET="新建落进「本机清单${STAMP}」"
+if ! ax_press "id:tab-tasks"; then
+  shot "21a-回不到任务标签"
+  env_bail "按不动底部「任务」标签（装置/AX 那一腿，不判产品）"
+fi
+if ! ax_press_until "id:mobile-task-add" "id:capture-input"; then
+  shot "21b-新建面板没开"
+  env_bail "按不开新建任务面板（捕获输入框没出现）"
+fi
+if ! fill_field "id:capture-input" "$L10_TASK_TITLE"; then
+  shot "21c-任务标题填不进"
+  env_bail "捕获输入框填不进字（set-value 那一腿）"
+fi
+# 落点那一行必须在场 —— 这一格是本批新加的控件，不在场就是产品红，不是"装置没点到"。
+if ! wait_tree "$L10_CHIP_LABEL" 30; then
+  idb_dump
+  shot "21d-面板上没有那份共享"
+  bad "新建面板里读不到「$L10_CHIP_LABEL」那一枚 ⇒ 手机上还是没有把新任务指进某份清单的入口"
+  summary
+  exit 1
+fi
+if ! tree_has "$L10_DEFAULT_TARGET"; then
+  shot "21d2-落点标题没念默认值"
+  bad "面板上那一行的标题没念「$L10_DEFAULT_TARGET」⇒ 未选时的默认落点说不清（选中态只靠颜色）"
+  summary
+  exit 1
+fi
+ok "面板上那份共享的落点芯片在场，且此刻的落点念的是收集箱"
+# 🔴 只按，不碰键盘（`ax_press_until` 会先按 return 收键盘 ⇒ 把这条任务提交掉）。
+if ! press_in_form "$L10_CHIP_LABEL"; then
+  shot "21e-落点芯片按不动"
+  bad "按不动那份共享那一枚落点芯片（界面上有它却按不下去）"
+  summary
+  exit 1
+fi
+if ! wait_tree "$L10_PICKED_TARGET" 20; then
+  shot "21e2-按了但落点没改口"
+  bad "按过那份共享的芯片后，那一行的标题仍没念「$L10_PICKED_TARGET」⇒ 选择没有真的生效"
+  summary
+  exit 1
+fi
+ok "按过芯片，那一行的标题改口成那份共享（选择真的生效，不是画了个样子）"
+shot "21-选好落点待提交"
+if ! ax_press "id:capture-submit"; then
+  shot "21f-提交按钮按不动"
+  env_bail "按不动捕获器的添加按钮（装置那一腿）"
+fi
+# owner 侧读回并验签（与 L3/L4 同一把尺，只是这次期望正文是一条 TASK）。
+node "$ROOT/scripts/lib/collab-owner-step.mjs" verify-phone-op --state "$OWNER_STATE" \
+  --expect-body "$L10_TASK_TITLE" > "$EVIDENCE/l10-task-signature.json" 2> "$EVIDENCE/l10-task-signature.err" \
+  || {
+    sed 's/^/      /' "$EVIDENCE/l10-task-signature.err" >&2 2>/dev/null
+    shot "21g-owner侧没读回那条任务"
+    bad "手机指进共享的那条任务在 owner 侧读不回或重验没过（读数见 l10-task-signature.err）⇒ 任务那一族的上行没接上"
+    summary
+    exit 1
+  }
+ok "手机把一条新任务写进了那份共享清单，owner 侧重验 = verified（三族里的任务那一族真双向）"
+
+# ── 10e. 便签那一族的上行（L11）：手机把一条新便签指进那份共享清单 ────────────
+#
+# 🔴 L10 的对偶。产品定义那句是「任务/便签/评论**三族**与另一台设备双向同步」：
+#    评论那一族早就双向（L3/L5），任务这一批补上（L10），便签此前只有下行（L9）。
+#    同一枚控件也接在便签板上（`NotesSection` 挂 `CaptureProjectPickerRow` +
+#    `createNote(content, { projectId })`），所以这里判的是**真机上的整条上行**，
+#    判据形状与 L10 逐格对称：入口在场 ⇒ 按下改口 ⇒ owner 侧读回并验签。
+step "10e. 上行判据（L11）：手机新建一条便签并指进那份共享清单 ⇒ owner 侧读回并验签"
+L11_NOTE_BODY="手机写进共享的便签${STAMP}"
+# 🔴 上一格（L10）结束时人在**任务**那一档的根上，那里**没有**顶栏「返回」可爬
+#    （第 44 跑实测：`back_to_anchor` 连报四次"本屏没有逐字叫「返回」的可点节点"）。
+#    所以走底部标签，与 L9 的来路不同 —— L9 是从共享那一屏往上爬，这一格是从另一档过去。
+if ! ax_press "id:tab-profile"; then
+  shot "22a-L11 按不动「我的」标签"
+  env_bail "按不动底部「我的」标签（装置/AX 那一腿，不判产品）"
+fi
+# 🔴 回到这一档之后人在**哪一层**不固定：这一档记得自己上次的内层屏（#571 那一族），
+#    而 L9 就是停在便签板上 ⇒ 第 45 跑实测：按完标签到达判据 `profile-entry-notes` 五发都不在，
+#    日志打出的当前屏顶部文字逐字就是「便签」—— 已经站在便签板上了，再按那一行反而会走深一层。
+#    ⇒ 与 `back_to_anchor` 同一条纪律、方向相反：**先量到达判据，不在才按**。
+if ! tree_has_id "notes-submit"; then
+  if ! ax_press_until "id:profile-entry-notes" "id:notes-submit"; then
+    shot "22b-进不到便签板"
+    env_bail "按了便签那一行却没走到便签板（装置落点问题，不判产品）"
+  fi
+fi
+if ! fill_field "id:notes-input" "$L11_NOTE_BODY"; then
+  shot "22c-便签内容填不进"
+  env_bail "便签板那条输入框填不进字（set-value 那一腿）"
+fi
+if ! tree_has "$L10_CHIP_LABEL"; then
+  shot "22d-便签板上没有那份共享"
+  bad "便签板上读不到「$L10_CHIP_LABEL」那一枚 ⇒ 便签那一族还是没有指进某份清单的入口"
+  summary
+  exit 1
+fi
+if ! press_in_form "$L10_CHIP_LABEL"; then
+  shot "22e-便签落点芯片按不动"
+  bad "按不动便签板上那份共享的落点芯片（界面上有它却按不下去）"
+  summary
+  exit 1
+fi
+if ! wait_tree "$L10_PICKED_TARGET" 20; then
+  shot "22f-按了但便签落点没改口"
+  bad "按过芯片后便签板那一行仍没念「$L10_PICKED_TARGET」⇒ 便签那一族的选择没有真的生效"
+  summary
+  exit 1
+fi
+ok "便签板上按过同一枚落点芯片，那一行也改口成那份共享（与任务那一屏共用一份形状）"
+# 图证：AGENTS §6.2 要"真看截图"，这一格此前只有日志断言、没有一张绿路径的图。
+shot "22-便签选好落点待提交"
+if ! ax_press "id:notes-submit"; then
+  shot "22g-便签添加按钮按不动"
+  env_bail "按不动便签板的添加按钮（装置那一腿）"
+fi
+node "$ROOT/scripts/lib/collab-owner-step.mjs" verify-phone-op --state "$OWNER_STATE" \
+  --expect-body "$L11_NOTE_BODY" > "$EVIDENCE/l11-note-signature.json" 2> "$EVIDENCE/l11-note-signature.err" \
+  || {
+    sed 's/^/      /' "$EVIDENCE/l11-note-signature.err" >&2 2>/dev/null
+    shot "22h-owner侧没读回那条便签"
+    bad "手机指进共享的那条便签在 owner 侧读不回或重验没过（读数见 l11-note-signature.err）⇒ 便签那一族的上行没接上"
+    summary
+    exit 1
+  }
+ok "手机把一条新便签写进了那份共享清单，owner 侧重验 = verified（三族里便签那一族也真双向）"
 
 # ── 11. 证据收尾 ────────────────────────────────────────────────────────────
 step "11. 证据目录（只存读数，不存产物）"

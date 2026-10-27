@@ -833,10 +833,13 @@ export function Fab({
   icon,
   label,
   onPress,
+  testID = 'fab',
 }: {
   icon: IconName;
   label: string;
   onPress: () => void;
+  /** 设备腿落点（同一个理由：`Pressable` 才进 AX 树）。 */
+  testID?: string;
 }): React.JSX.Element {
   const t = useTokens();
   const { native, reducedMotion } = useTheme();
@@ -848,6 +851,7 @@ export function Fab({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
+      testID={testID}
       style={({ pressed }) => [
         {
           position: 'absolute',

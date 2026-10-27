@@ -219,6 +219,11 @@ const PROVIDER_DEPENDENT = [
    */
   'CaptureComposer',
   /**
+   * 2026-10-27 协作线第十批：落点那一行单独导出，因为便签板**只**挂它（不挂整台捕获器）。
+   * 它自己调 `useHeytaTokens()` / `useHeytaText()` ⇒ 与 `CaptureComposer` 同一族缺口。
+   */
+  'CaptureProjectPickerRow',
+  /**
    * M3 第八刀（capture）关联项。
    * 🔴 **这是同一个缺口第七次出现**（sync → AI → settings → quadrant → habits → capture 的前身 → 本次）。
    * ⚠️ 特别之处：`packages/ui/src/index.ts:184-191` **早就写着**

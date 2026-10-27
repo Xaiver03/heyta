@@ -18,6 +18,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   captureCanSubmit,
+  captureSelectedProject,
+  withCaptureProject,
   captureChipAction,
   captureChipKey,
   captureChipRemainingDays,
@@ -30,6 +32,7 @@ import {
   toCaptureSubmitPlan,
   toggleCaptureIgnore,
   type CaptureChip,
+  type CaptureSubmitPlan,
 } from '../src/capture/model.js';
 
 /** 确定的"现在"：2026-09-28 12:00（本地）。**不读墙上时钟。** */
@@ -341,5 +344,69 @@ describe('F. 优先级 → 词条 key（只导出 key，不导出文案）', () 
 
   it('`undefined` 按 `None` 处理（与迁移前 `priorityLabel[m.priority ?? None]` 同口径）', () => {
     expect(capturePriorityLabelKey(undefined)).toBe(capturePriorityLabelKey(Priority.None));
+  });
+});
+
+describe('G. 落点：把选中的清单并进计划（`withCaptureProject`）', () => {
+  /** 一条不带任何可选键的计划，作为这组的起点。 */
+  const base: CaptureSubmitPlan = { title: '写周报' };
+
+  it('选了哪一份就带哪一份，且不动已有的键', () => {
+    expect(withCaptureProject({ ...base, priority: Priority.Low }, 'p-1')).toEqual({
+      title: '写周报',
+      priority: Priority.Low,
+      projectId: 'p-1',
+    });
+  });
+
+  it('`null` / `undefined` / 空串都写成**不带这个键**，而不是带一个 `undefined`', () => {
+    // 与 `toCaptureSubmitPlan` 对 `dueDate` 同一条约定：省略与显式空在动作层
+    // 是两种语义（`NewTaskFields.projectId` 省略 = 收集箱）。
+    for (const empty of [null, undefined, '']) {
+      const plan = withCaptureProject({ ...base }, empty);
+      expect(Object.prototype.hasOwnProperty.call(plan, 'projectId')).toBe(false);
+    }
+  });
+
+  it('不复制入参以外的一切：返回的是新对象，原计划不被改写', () => {
+    const frozen = { ...base };
+    const next = withCaptureProject(frozen, 'p-2');
+    expect(next).not.toBe(frozen);
+    expect(frozen.projectId).toBeUndefined();
+  });
+});
+
+describe('H. 落点：那一行此刻该念谁的名字（`captureSelectedProject`）', () => {
+  const options = [
+    { id: 'p-1', name: '本机清单' },
+    { id: 'p-2', name: '共享清单' },
+  ] as const;
+  const picker = (destinationId: string | null) => ({
+    options,
+    destinationId,
+    onSelect: () => {},
+    labels: {
+      title: '',
+      inbox: '',
+      current: (name: string) => name,
+      currentInbox: '',
+      optionAria: (name: string) => name,
+      inboxAria: '',
+    },
+  });
+
+  it('没选 ⇒ `undefined`（= 收集箱）；选了 ⇒ 在册那一枚', () => {
+    expect(captureSelectedProject(picker(null))).toBeUndefined();
+    expect(captureSelectedProject(picker('p-2'))?.name).toBe('共享清单');
+  });
+
+  it('选中的那一枚已经不在册 ⇒ 也回退成收集箱', () => {
+    // 面板开着的时候另一台设备把那份清单删了。提交与那一行的标题共用这一枚
+    // 查询，所以不会出现"界面念着落进 X、东西却建进收集箱"。
+    expect(captureSelectedProject(picker('p-gone'))).toBeUndefined();
+  });
+
+  it('宿主没给选择器（web 的内联捕获器）⇒ `undefined`，不炸', () => {
+    expect(captureSelectedProject(undefined)).toBeUndefined();
   });
 });

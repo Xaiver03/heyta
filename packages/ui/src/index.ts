@@ -568,6 +568,7 @@ export {
  */
 export {
   CaptureComposer,
+  CaptureProjectPickerRow,
   type CaptureAssistantContext,
   type CaptureComposerLabels,
   type CaptureComposerProps,
@@ -578,15 +579,19 @@ export {
   captureChipKey,
   captureChipRemainingDays,
   capturePriorityLabelKey,
+  captureSelectedProject,
   parseCaptureDraft,
   shouldResetCaptureIgnore,
   toAiCaptureSubmitPlan,
   toCaptureChips,
   toCaptureSubmitPlan,
   toggleCaptureIgnore,
+  withCaptureProject,
   type CaptureAiFields,
   type CaptureChip,
   type CaptureChipAction,
+  type CaptureProjectOption,
+  type CaptureProjectPicker,
   type CapturePriorityLabelKey,
   type CaptureSubmitPlan,
 } from './capture/model.js';

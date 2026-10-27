@@ -161,6 +161,9 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
           return (
             <Pressable
               key={tab.key}
+              // 设备腿按 `id:tab-<key>` 落点（#575 那一族：只有可访问节点会进 AX 树，
+              // 拿标签文字当唯一锚点会让"点哪一格"读成"屏幕上有没有这几个字"）。
+              testID={`tab-${tab.key}`}
               onPress={() => onChange(tab.key)}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
