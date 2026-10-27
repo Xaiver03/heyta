@@ -22,12 +22,22 @@ vi.mock('../src/features/sync/store.js', () => ({ useSyncStore: Object.assign(
 vi.mock('../src/features/privacy/consent-gate.js', () => ({ consentFetch: mocks.fetch }));
 vi.mock('../src/features/settings/inbound-runtime.js', () => ({
   hasWebInboundWorker: async () => true,
+  // 收件包那枚只读事实由循环与面板共用（`inbound-lifecycle.ts`）；不 mock 上，
+  // 循环会因为拿不到 epoch 而直接跳过这一趟 —— 那这条用例就变成恒绿。
+  getWebInboundRecipientKey: async () => ({ keyEpoch: 1, packageVersion: 1 }),
   processWebInboundOnce: mocks.process,
   ensureWebInboundRecipientKey: vi.fn(), registerWebInboundWorker: vi.fn(), rotateWebInboundRecipientKey: vi.fn(),
 }));
 import { InboundAutomationSettings } from '../src/features/settings/InboundAutomationSettings.js';
+import { configureWebInboundDeps, startWebInboundWorker } from '../src/features/settings/inbound-lifecycle.js';
 
-afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); mocks.requested.length = 0; });
+let stopWorker: (() => void) | undefined;
+afterEach(async () => {
+  vi.useRealTimers();
+  vi.clearAllMocks();
+  await act(async () => { stopWorker?.(); stopWorker = undefined; });
+  mocks.requested.length = 0;
+});
 
 const eventsCalls = (): number => mocks.requested.filter((url) => url.endsWith('/events')).length;
 
@@ -39,11 +49,14 @@ it('离开这一节只让事件列表停显示，不让后台收集停摆；切�
   const routing = { ...defaultAiSettings().routing, enabled: true };
   try {
     await act(async () => { root.render(<InboundAutomationSettings active={false} routing={routing} consents={[]} />); });
-    // 🔴 这一条是这枚用例的牙：页内那条循环是 web 端唯一的后台处理通道，
-    // 把 `active` 当成它的闸门就等于"打开设置·AI 节才收集"。改前 rules 被清空 ⇒ 这里 0 次。
-    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
-    expect(mocks.process).toHaveBeenCalledTimes(1);
-    expect(eventsCalls()).toBe(0);
+    // 🔴 这一条是这枚用例的牙：把 `active` 当成收集闸门就等于"打开设置·AI 节才收"。
+    // 循环现在由应用级挂载点起（生产里是 `App.tsx` 那两行），这里就照生产那样交出去。
+    await act(async () => {
+      configureWebInboundDeps({ routing, consents: [] });
+      stopWorker = startWebInboundWorker();
+    });
+    expect(mocks.process, '这一节没显示，但收集照跑 —— 页内那条循环不再由这一节起').toHaveBeenCalledTimes(1);
+    expect(eventsCalls(), '而事件列表确实没拉（它才是 `active` 唯一该管的东西）').toBe(0);
 
     await act(async () => { root.render(<InboundAutomationSettings active routing={routing} consents={[]} />); });
     expect(eventsCalls()).toBe(1);

@@ -56,9 +56,17 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DEFINITION_REL = 'packages/app-host/src/inbound-system-prompt.ts';
 const CONSTANT_NAME = 'INBOUND_AUTOMATION_SYSTEM_PROMPT';
 
-/** 宿主三枚 —— 少任何一枚的 import 都要红（C 组的分母）。 */
+/**
+ * 宿主三枚 —— 少任何一枚的 import 都要红（C 组的分母）。
+ *
+ * ⚠️ 2026-10-27 web 这一枚从 `InboundAutomationSettings.tsx` 换成
+ * `features/settings/inbound-lifecycle.ts`：那条 worker 循环（唯一用到这枚常量的地方）
+ * 从设置面板提到了应用级，所以常量现在住在那枚循环旁边，而**不在**面板里。
+ * 分母换文件不是放宽这条 —— web 这一端仍然必须引共享常量，
+ * 而 C 组在"这一端换了实现"的那一刻就响了（就是逼这次改动的登记，不是事后追认）。
+ */
 const SHELLS = [
-  'apps/web/src/features/settings/InboundAutomationSettings.tsx',
+  'apps/web/src/features/settings/inbound-lifecycle.ts',
   'apps/mobile/src/inbound/lifecycle.ts',
   'apps/node-host/src/inbound-worker.ts',
 ];
