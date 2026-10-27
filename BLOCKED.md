@@ -12465,3 +12465,11 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 （`c565b90cb`），当前 HEAD 上单跑 `pnpm -s check:shell-unicode` **rc=0** ⇒ 第一趟那枚红在 HEAD 上已经不存在，
 上面"HEAD 仍是旧写法"那句只对取数那一刻（10:5x）成立。第二趟那枚 `auth-form-spacing` 的红**还在工作树里**
 （现量 `git status --porcelain -- e2e/tests/auth-form-spacing.spec.ts` ⇒ ` M`），归 `界面/间距` 那一格，本线不代改。
+
+**✅ 再一笔（把"链尾没跑到"这半句收掉）**：断链之后那 10 枚静态门逐枚单跑**全部 rc=0**
+（`check:downloads`、`check:release-version-guard`、`check:app-version`、`check:version-declarations`、
+`check:checkpoint-cadence`、`check:retention-window-parity`、`check:windows-signing-posture`、`check:i18n-vars`、
+`check:e2e-carrier`、`check:mobile-ai-anchors`）⇒ **整枚 `check` 那个 rc=1 只由 `screenshot:verify` 这一格贡献**，
+链上其余各枚（含协作线名下那几枚）都有 rc=0 读数；`pnpm -r test` 那一腿另有本线计划 §9.16 那行的读数。
+⇒ 所以这一格的现状是：**别线那一枚间距用例仍在工作树上红**，其余各段有数；那一格补齐之前，
+`pnpm check` 在这台机器上取到的都只会是"HEAD + 别人在飞的编辑"的合成态。
