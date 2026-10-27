@@ -1737,3 +1737,21 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 不能说「支持任务指派」（那一格零写路径）、不能说「Android 已验收」（只有出包读数）、不能把锁屏推送写进卖点。
 ⚠️ 这一节数的是**调用点存在性**，不是"这条路上每个分支都被设备验过"——设备腿逐格验到哪一列在 §9.24 那张跑次表里，两维别混读。
 
+### 9.34 第四把尺（整链 `check`）里"本线那一片"，22:1x 在当前 HEAD 上逐枚补齐了（起建 `3a60a2b47`）
+
+为什么用这串读数而不是整链：§9.30 记下整链 `check` 没重跑的理由是 #602（它跑到 `check:ai-e2e` 那格会重写别人名下**已入库**的取证截图）。
+但"不跑整链"不能变成"第四把尺本线那一片也没读数"—— 于是把**本线在册、且只读源码不落图**的 15 枚门逐枚单跑（串行、每条 `>/dev/null` 后立刻取 `$?`，不让管道尾巴吃掉退出码）：
+
+| 门 | rc | 归属 |
+|---|---|---|
+| `check:layering`、`check:design`、`check:migrations`、`check:adr-numbering`、`check:share-entry-visible`、`check:verify-script-copy`、`check:locator-labels`、`check:i18n-vars`、`check:journey-coverage`、`check:checkpoint-cadence`、`check:gate-wiring`、`check:md-tables`、`check:docs`、`check:doc-command-claims` | **各 0**（14 枚） | 全绿 |
+| `check:ui-language` | 🔴 **1** | **不是 HEAD 级、也不是本线**：门点名 `apps/web/src/App.tsx:2532`–`2533` 那两行的 `web.calendar.sidebar.hide`／`show` 是硬编码文案。逐枚归因现量：工作树命中 2 / `git show HEAD:apps/web/src/App.tsx` 命中 **0** / `git diff` 的 `+` 行命中 2 ⇒ **该两行由别人那枚未提交的 `M apps/web/src/App.tsx` 引入**（自动收集线在途件）。本线不代改（别人的文件 + 措辞归他们），也只登记不替它定性 |
+
+复算姿势（逐枚）：`for g in check:layering …; do pnpm -s run "$g" >/dev/null 2>&1; echo "$g rc=$?"; done`；那一枚红的归因三条现量：
+`grep -c 'web.calendar.sidebar.hide' apps/web/src/App.tsx`、`git show HEAD:apps/web/src/App.tsx \| grep -c 'web.calendar.sidebar.hide'`、`git diff -- apps/web/src/App.tsx \| grep -c '^+.*web.calendar.sidebar'`。
+
+⇒ 这一串给第四把尺的**准确说法**是：**本线在册的 15 枚门在 `3a60a2b47` 上 14 绿 + 1 红，而那枚红逐枚归因后不在本线名下**；
+这不等于"整链绿"——整链其余那段（含 `check:ai-e2e`）今天仍然没跑，理由与区间读数在 §9.27／§9.30。
+✅ 顺手一条对照证据：这串门跑完后 `git status --porcelain=v1 -- apps/web/evidence | wc -l` 现量 **0** ⇒ **静态门这一片不改取证面**，
+所以"怕脏别人图"只挡整链里那格会写图的，不挡这串 —— 下一位别把这两类混成一条不跑的理由。
+
