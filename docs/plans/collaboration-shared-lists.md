@@ -1625,3 +1625,10 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 ⇒ 于是 ③ 那格此刻**只剩两件真人动作**：装两枚组件（约 2 GB，写进的是别线那棵 `%LOCALAPPDATA%\Android\Sdk` ⇒ 按硬边界我不自取），
 以及要不要为启用 `HypervisorPlatform` 重启这台共享装机。其余前置（Java、网络、磁盘、内存、AVD 本体）今天逐条量过，**都不拦路**。
 
+🔴 **这一台机上有第二枚读者 —— 拍一次板解两条线**（2026-10-27 顺手读到，不是本线写的）：自动收集（inbound）那条线的交接书
+`docs/plans/inbound-automation-handoff.md` 已独立写下同一件事 —— 逐字「本机 `adb devices` 回 0 台、打包机侧没有 emulator 本体与 system-images」，
+并把它的翻案条件写成"负责人起一枚属于本线的 AVD，或给一句当轮授权"。现量：`grep -n "打包机侧没有 emulator" docs/plans/inbound-automation-handoff.md`。
+⇒ 所以"补那两枚组件"不是本线一家的偏好：它同时是那条线 Android 端读数的解锁动作；
+而**重启那一档影响的是两条线当天挂在 `windows-pc` 上的所有构建腿**，这也是为什么本线不自取。
+⚠️ 本线**不去改那份交接书**（别线资产），这句话记在这里就够 —— 两边各自的原文独立成立，反而说明读数可信。
+
