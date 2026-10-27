@@ -751,3 +751,60 @@ describe('⑩ 两枚原生模块的回收形状（那句"做不到"的理由逐�
     }
   });
 });
+// ──  装置必须把"我这趟测的是哪一棵树"写进**入库的那份**取证 README ──────────────
+// 起因是环境陷阱 #600：§9.24 那格先写成"与当前 HEAD 差集为 0"，四分钟后别线落两笔就变了。
+// 结论是台账里不存在"当前产物的设备腿读数"这一档，只有**带戳的**读数 —— 而戳得由装置自己盖。
+// 此前那枚戳只活在本机的 wrap log 里（不入库），日志一清，"这趟代表哪棵树"就永久读不到了。
+describe('⑪ 移动旅程装置给当趟读数盖章（#600：戳不许只活在一次性日志里）', () => {
+  const RIG = 'scripts/verify-mobile-collab-ios.sh';
+  /** 取 `$EVIDENCE/README.md` 那个生成块（从 `{` 到 `} > "$EVIDENCE/README.md"`）。 */
+  const readmeBlock = (src: string): string => {
+    const end = src.indexOf('} > "$EVIDENCE/README.md"');
+    if (end < 0) return '';
+    const start = src.lastIndexOf('{', end);
+    return start < 0 ? '' : src.slice(start, end);
+  };
+
+  it('起建点在写 README 之前就已取到，且 README 块里真的引用了那枚变量', () => {
+    const src = read(RIG);
+    const capture = src.indexOf('START_HEAD=$(git');
+    const block = readmeBlock(src);
+    expect(capture, '装置里取不到"起建点"那一行 ⇒ 当趟读数没有戳').toBeGreaterThan(0);
+    expect(block.length, 'README 生成块整块消失 ⇒ 下面那两条结构判据没有输入').toBeGreaterThan(0);
+    // 顺序判据，不是存在判据：取晚了会把**别人这一趟期间落下的提交**当起建点，那枚戳就是假的。
+    expect(
+      capture < src.indexOf('} > "$EVIDENCE/README.md"'),
+      '起建点排在 README 落盘之后 ⇒ 盖上去的是别人的提交',
+    ).toBe(true);
+    expect(block, 'README 块里没有那枚变量 ⇒ "起建点"那行是一份抄件').toContain('$START_HEAD');
+    expect(
+      block,
+      'README 那行不含"起建点"三个字 ⇒ 台账里那句复量命令指不到东西',
+    ).toMatch(/起建点：\$\{?START_HEAD/);
+  });
+
+  it('取不到时要出声，且摘掉那一行会红（施变走内存副本，不碰工作树）', () => {
+    const src = read(RIG);
+    const captureLine = src
+      .split('\n')
+      .find((l) => l.startsWith('START_HEAD=$(git'));
+    expect(captureLine, '取数那一行换了形状 ⇒ 下面那半条"读不到要出声"没有输入').toBeDefined();
+    expect(
+      captureLine,
+      'git 失败时静默留空 ⇒ 下一份 README 会印成"起建点：（…）"，读的人分不清没取到与空树'
+    ).toMatch(/\|\|\s+START_HEAD="读不到/);
+
+    const withoutEcho = src.replace(/\n *echo "- 起建点：[^\n]*/, '');
+    expect(withoutEcho, '施变没落地（锚串漂了）⇒ 这一臂是恒真的').not.toBe(src);
+    expect(readmeBlock(withoutEcho), '摘掉 echo 后 README 块仍引用那枚变量 ⇒ 判据没牙').not.toContain(
+      '$START_HEAD',
+    );
+
+    const silent = src.replace(/\) \|\| START_HEAD="读不到（git rev-parse 失败）"/, ')');
+    expect(silent, '施变没落地（取数那行的尾巴换了写法）⇒ 这一臂是恒真的').not.toBe(src);
+    expect(
+      /\|\|\s+START_HEAD=/.test(silent.split('\n').find((l) => l.startsWith('START_HEAD=$(git')) ?? ''),
+      '撤掉失败分支后"读不到"那半句仍判绿 ⇒ 那半句是装饰',
+    ).toBe(false);
+  });
+});
