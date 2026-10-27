@@ -1133,7 +1133,7 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 
 #### §9.18 M6 那两段的变异臂补上了（2026-10-27 现量，首跑）
 
-上面那张表里「密钥落盘端口」与「载荷密钥接线」两格，此前只有**设备腿 L4 那一次结果**与两枚行为用例，**没有常驻变异臂**（本线臂册 15 副里没有覆盖它们的：`mutate-collab-share-routing` 管路由、`mutate-collab-open-pull` 管"打开才拉"、`mutate-collab-mobile-activity` 管投递）。⇒ 补一副 `research/tools/mutation-rigs/mutate-collab-mobile-keywiring.mjs`，四臂与首跑读数：
+上面那张表里「密钥落盘端口」与「载荷密钥接线」两格，此前只有**设备腿 L4 那一次结果**与两枚行为用例，**没有常驻变异臂**（本线臂册里没有覆盖它们的（**副数别抄**：现量 `ls research/tools/mutation-rigs/` 数 `mutate-collab-` 前缀那几枚）：`mutate-collab-share-routing` 管路由、`mutate-collab-open-pull` 管"打开才拉"、`mutate-collab-mobile-activity` 管投递）。⇒ 补一副 `research/tools/mutation-rigs/mutate-collab-mobile-keywiring.mjs`，四臂与首跑读数：
 
 | 臂 | 病灶 | 红集 | 读数 |
 |---|---|---|---|
@@ -1144,7 +1144,7 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 
 `ARMS=pass (4/4)`；基线两载具各 10 与 14 枚全过；跑完 `git status --porcelain -- apps/mobile/src` 为空，两枚目标文件与 `git show HEAD:` 逐字同 md5。⚠️ 读数经 `npx vitest` 直跑，**没经过内存闸门**（那枚 shim 只挂在 `pnpm` 上）。⚠️ 这副臂原地注病灶，跑前必须确认同一棵共享检出里没有别人的 `pnpm check` 正读到移动壳（本次是在邻会话那条链的真浏览器阶段跑的，链上读移动源码的是链尾 `-r test`）。
 
-**六段现在的臂覆盖图**（如实登记，不是"都有臂"）：入口路由 `mutate-collab-share-routing`；打开才拉 `mutate-collab-open-pull`（两壳各一臂）；实时投递与偏好 `mutate-collab-mobile-activity`、内容口径 `mutate-collab-notif-content`；密钥落盘端口与载荷接线 = 本副；**同意态存储那一格没有单开一副臂** —— 它的牙在 `packages/ui/tests/share-consent-model.spec.ts` 与两壳入群闸用例（`apps/web/tests/share-join-consent-gate.spec.tsx`）加上设备腿 L7 的同意面那一步，够用但没被单独变异验证过，下一位要补就补这一格。
+**六段现在的臂覆盖图**（如实登记，不是"都有臂"）：入口路由 `mutate-collab-share-routing`；打开才拉 `mutate-collab-open-pull`（两壳各一臂）；实时投递与偏好 `mutate-collab-mobile-activity`、内容口径 `mutate-collab-notif-content`；密钥落盘端口与载荷接线 = 本副；**同意态存储那一格在写这一句时只有行为用例、没单开一副臂** —— 它的牙当时在 `packages/ui/tests/share-consent-model.spec.ts` 与两壳入群闸用例（`apps/web/tests/share-join-consent-gate.spec.tsx`）加上设备腿 L7 的同意面那一步。⚠️ **这一句在它自己落笔那一刻成立，同一趟晚些已补上**：`mutate-collab-consent-gate.mjs` 四臂 + 移动端两壳调用点的常驻判据（`share-ui-assembly.spec.ts` ⑨ 组）⇒ **别按这一句施工**，看 §9.19。
 
 **这一批之后仍开着的格**（逐格带现量与归属，别把上面任何一枚绿读成这四格做完）：
 
@@ -1152,3 +1152,51 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 - **同意面那句措辞用谁的口吻**（清单所有者语 vs 加入者语）：这句会被用户当成承诺读，属对外表征 ⇒ 归权利人；两屏各自现的那份文案在 §9.14、§9.15 的截图指针里能看到。
 - **Android 那一侧**只有出包读数、**没有界面腿**。载体不是「什么都没有」：`adb` 与一枚 AVD 在，缺 `Sdk\emulator` 那枚主程序，且没插真机 —— 三条取法与解锁所需那段装机动作都在 §9.14 那一格（2026-10-27 现量更正；原先写的是「载体不存在」）。
 - **「事后把一条已有条目挪进别的清单」**在两壳仍零调用点 —— 见上面那张边界表，它和本批那枚"新建时选落点"是两格。
+
+### 9.19 同意闸那一格的调用点判据 + 四臂首跑（2026-10-27 第十一批）+ 整条 `pnpm check` 的第三趟读数
+
+§9.18 末尾登记的那一格欠账（"同意态存储那一格当时没有单开一副臂"）在这一批补上了。**顺序是这一节唯一值得学的地方**：
+先去量"臂打在哪儿"，才发现移动端那两枚调用点**当时没有任何常驻判据指着它** ——
+现量 `grep -rn shouldShowConsent apps/mobile/tests/` 在补之前是**零命中**。
+⇒ 先补判据（`apps/mobile/tests/share-ui-assembly.spec.ts` 新增 ⑨ 组两枚，提交 `b514b0f10`），再让臂打上去。
+反过来先跑臂，C/D 两臂只会以"存活（判据没牙）"收 —— 那是**装置的红**，而它特别容易被下一位抄成"这一格没牙"。
+
+#### 四臂首跑（`node research/tools/mutation-rigs/mutate-collab-consent-gate.mjs`，退出 0，`ARMS=pass (4/4)`）
+
+| 臂 | 病灶 | 载具与基线分母 | 红集 | 读数 |
+|---|---|---|---|---|
+| `fail-open` | 模型里没记录也返回"不弹" | `packages/ui` 那份 `share-consent-model` 6 枚 | 4 | 精确匹配 |
+| `web-call-site-gone` | web 入群对话框那一行摘掉 | `apps/web` 那份入群闸 5 枚 | 4 | 精确匹配 |
+| `mobile-call-site-gone` | 手机入群屏那一行摘掉 | `apps/mobile` 装配那份 26 枚 | 1 | 精确匹配 |
+| `mobile-owner-call-site-gone` | 手机「开启共享」那一侧摘掉 | 同上 26 枚 | 1 | 精确匹配 |
+
+两处预期是**跑之前对着源码改掉**的（不是跑完漂移再改）：模型那一臂原写 3，读 spec 见「取消不是同意」在同一个 `it` 里
+复查 `shouldShowConsent(result.store)` ⇒ 必然一起红；web 那一臂原写 3，见 `press()` 在 DOM 里找不到同意面的按钮**就抛**
+⇒「勾了不再提示 ⇒ 直接到表单」那一枚走不到自己的断言。⇒ 四臂首跑**零漂移**。
+基线三载具各 6 / 5 / 26 全过，跑完 `git status --porcelain -- packages/ui/src apps/web/src apps/mobile/src` 空读数、
+无 `.mut-bak` 残留、逐载具 RECHECK RC=0。⚠️ 读数经 `npx vitest` 直跑，**没经过内存闸门**（那枚 shim 只挂在 `pnpm` 上）。
+⚠️ 这副臂**碰 `apps/web/src`** ⇒ 点火前等同一棵共享检出里那趟 `pnpm check` 打出收尾行（它的真浏览器阶段与链尾 `-r test` 都会读那份源码）；
+这一趟是在 `CHAIN_RC=1` 落进日志之后才跑的。
+
+**六段的臂覆盖图到这一批为止是齐的**（副数与名单现量：`ls research/tools/mutation-rigs/`）：入口路由 / 打开才拉 /
+实时投递与偏好 / 内容口径 / 密钥落盘端口与载荷接线 / **同意闸三层 = 本副**。
+
+#### 顺带：整条 `pnpm check` 的第三趟读数（同日 14:3x，串行一条链，取证 `/tmp/full-check-final.log`）
+
+前两趟（§9.16 那一行）都断在 `screenshot:verify` 的「登录档相邻控件 12px / 验证码屏」那六枚上。这一趟**那一格过了**
+（`auth-form-spacing.spec.ts` 的真浏览器用例这次打勾，修法由 `界面/间距` 那条线自己入库），链一直走到链尾倒数第二档，
+**唯一一枚红落在 `pnpm -r test` 的 `apps/web`**：`tests/task-sort.spec.tsx` 的「批量选择入口只在任务列表里出现，完成后退出」
+⇒ `AssertionError: expected undefined to be defined`（该行读的是 `entities.tasks[task.id]?.completedAt`），
+判决 `Test Files 1 failed | 208 passed | 2 skipped`、`Tests 1 failed | 2589 passed | 13 skipped`。
+
+🔴 **仍不是本线**，且这次的形状与"别人在飞的编辑"无关 —— 那枚 spec 相对 HEAD 干净（现量
+`git status --porcelain -- apps/web/tests/task-sort.spec.tsx` ⇒ 空），它最近一笔改动是 2026-10-10 的 `feat(web)`。
+⚠️ **但本线不替它定性**：这一枚红只在整链里出现过这一趟，而同日 `apps/web` 那条线在自己的台账里补了单跑对照
+（`2590 passed / 0 failed`）并把它归成**时序**（现量：`git show --stat 0f136105b`）。两种读数不冲突 ——
+一枚"链里红、单跑不红"的用例，说它"稳定复现"是没有证据的，说它"是环境的"同样没有证据。
+⇒ 本线只登记到这一格：**`main` 到"整条 check 绿"之间现在只剩这一枚红，落在 `apps/web` 的 `task-sort` 批量选择那一档**；
+改法与定性都归那条线（本线不代改别人的判据口径）。
+
+⚠️ 归因要写清这棵树：那一趟链 13:5x 起跑，`apps/web test` 那一刻（14:37）工作树里已经有本节的 ⑨ 组判据（14:2x 落盘、14:38 才提交），
+所以它是"HEAD + 我在飞的编辑"的合成态 —— 对本线而言有用的两枚读数是三个载具的基线（6 / 5 / 26 全绿，那是臂跑完后的现量），
+而不是链的 rc。链本体环节数每次现量：`node -e "console.log(require('./package.json').scripts.check.split('&&').length)"`。
