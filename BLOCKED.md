@@ -12555,7 +12555,7 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 | 格 | 为什么不归我 | 现量 |
 |---|---|---|
 | R-legal：`live-legal.spec.ts` 那句一刀切 `hasDraftBanner` | 判据口径归法务文案那条线；改成"按 `status` 分档期望"要动他们的断言 | `grep -n hasDraftBanner e2e/live-site/live-legal.spec.ts` |
-| `main` 的上游还指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动。推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref 'main@{upstream}'`（🔴 裸写 `main@upstream` 读不出：`fatal: ambiguous argument` —— 这行以前就是坏的，照着跑会得到"没有上游"这个假事实）；落后枚数 `git rev-list --count 'main@{upstream}..main'`；真正要复验的那一枚用远端事实 `gh api repos/Xaiver03/heyta/git/ref/heads/main --jq .object.sha` 比 `git rev-parse HEAD` |
+| `main` 的上游还指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动。推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref 'main@{upstream}'`（🔴 裸写 `main@upstream` 读不出：`fatal: ambiguous argument` —— 这行以前就是坏的，照着跑会得到"没有上游"这个假事实）；`git rev-list --count 'main@{upstream}..main'` 读的是**上游那一侧还没收到多少枚**（上游是 gitee，所以这个数大是常态 —— 早先这里写作"落后枚数"会把方向读反）；真正要复验的那一枚用远端事实 `gh api repos/Xaiver03/heyta/git/ref/heads/main --jq .object.sha` 比 `git rev-parse HEAD` |
 | `apps/web/evidence/**` 与两枚台账此刻脏着 | 别的会话**正在写**（mtime 与本轮同一分钟内），代提交=替他们半份落仓；证据片那一族他们自己已登记"永久剔出输入面分母" | `git status --porcelain -uall`；`stat -f "%Sm %N" docs/plans/collaboration-shared-lists.md` |
 
 ### B238（2026-10-27 22:1x · 注册登录线：线上那枚「验证码登录」现在就是死的 —— 三发实测 + 我第一发探针是假绿）
@@ -12596,7 +12596,7 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 | 注册 resend 同一形状（`server/src/api.ts:2422`） | 同族第二枚；它今天不露出来只因为那张表没坏，改上一格就得一起改 | 同一份 catch 块：`grep -n "invalid_registration_challenge" server/src/api.ts` |
 | `login_unavailable` 没进客户端白名单 ⇒ 503 落到 `server-error`（"我们不知道发生了什么"），丢掉了服务端明说的"稍后再试" | 要不要为它加一档 reason 是文案与四端词条的取舍（`hosted-auth.ts:671` 那句"避免为一个子流程迫使所有壳加词条"就是它的反方） | `grep -n "login_unavailable" packages/app-host/src/hosted-auth.ts`（无命中即现状） |
 | 尺的 `KNOWN_GAPS` 两枚：`automation_sender_credentials_user_id_rule_id_key_id_idx`（库里只有同列的**部分唯一** + 一条 (user_id,rule_id,revoked_at) 普通索引 ⇒ 查已撤销凭据那条路没索引）、`automation_commit_permits_op_id_key`（迁移 20261018080000 有意撤掉单列唯一换成 (user_id,op_id)，schema 的 `opId @unique` 没跟着改 ⇒ 不变量收窄） | 两格都归自动收集线判：补迁移或改声明都是他们的口径，本尺先登记不代改 | `grep -n "KNOWN_GAPS" -A 20 scripts/check-schema-migration-drift.mjs` |
-| `main` 的上游仍指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动；本轮推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref 'main@{upstream}'`（🔴 裸写 `main@upstream` 读不出：`fatal: ambiguous argument` —— 这行以前就是坏的，照着跑会得到"没有上游"这个假事实）；落后枚数 `git rev-list --count 'main@{upstream}..main'`；真正要复验的那一枚用远端事实 `gh api repos/Xaiver03/heyta/git/ref/heads/main --jq .object.sha` 比 `git rev-parse HEAD` |
+| `main` 的上游仍指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动；本轮推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref 'main@{upstream}'`（🔴 裸写 `main@upstream` 读不出：`fatal: ambiguous argument` —— 这行以前就是坏的，照着跑会得到"没有上游"这个假事实）；`git rev-list --count 'main@{upstream}..main'` 读的是**上游那一侧还没收到多少枚**（上游是 gitee，所以这个数大是常态 —— 早先这里写作"落后枚数"会把方向读反）；真正要复验的那一枚用远端事实 `gh api repos/Xaiver03/heyta/git/ref/heads/main --jq .object.sha` 比 `git rev-parse HEAD` |
 | 本线之外那批正在被别人改的文件（枚数现量见右栏，别抄这里的数） | 两条会话**正在写**（`stat -f "%Sm %N"` 读回 mtime 落在最近十几分钟内），代提交 = 替他们把半份落仓 | `git status --porcelain=v1 \| wc -l`；`stat -f "%Sm %N" apps/web/src/App.tsx` |
 
 **发布已落地（2026-10-27 22:35–22:56 +08:00 · 负责人授权原话：「直接换线上容器」）**
@@ -12619,24 +12619,52 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 
 **上面"本线之外那批正在被别人改的文件"那一格的逐枚归属表**（把"只剩登记过的例外"从一句话变成能一条一条打勾的东西）
 
-> 取数只有两条命令，别抄这里的行号与枚数：
-> `git status --porcelain`（列形 `XY 路径`；`A ` / `D ` 的标记在**第一列** = 已经在索引里，那是别人自己的落盘节奏，不是我能顺手带走的东西）＋
-> `git status --porcelain | sed 's/^...//' | while read p; do [ -e "$p" ] && echo "$(( ( $(date +%s) - $(stat -f %m "$p") ) / 60 ))分  $p"; done | sort -rn`（每枚距现在几分钟）。
-> ⚠️ **这张表的"具体哪几枚"那一列会漂，写成那一刻的读数不是常驻事实**（实测：本表写成后 4 分钟内，自动收集线自己把那枚跨文件重命名提交了 —— `git log --oneline -1 -- packages/inbound-core/src/system-prompt.ts` 读得到那笔；同一分钟他们又开始写 `server/prisma/` 那一层）。所以打勾的顺序是**先跑上面两条取数命令拿当前脏集，再按"归谁"那一列判归属**，不是拿这张表当脏集。
-> 归属判据**不是"我最近动过这个项目"**，是"**这枚文件的加行指不指名我的工单 / 我的装置名**" —— 表里每一行都把那句指名指到位。
+> ⚠️ **"哪几枚"那一列会漂，写成那一刻的读数不是常驻事实**（实测：本表写成后 4 分钟内，自动收集线自己把那枚跨文件重命名提交了，
+> 同一分钟他们又开始写 `server/prisma/` 那一层）。打勾的顺序是**先跑下面那段【取数】命令拿当前脏集，再按"归谁"那一列判归属**，不是拿这张表当脏集。
+> 归属判据**不是"我最近动过这个项目"**，是"**这枚文件的加行指不指名别人的工单 / 别人的装置名**"。
+> 🔴 shell 命令一律写在**表外的代码块**里：表格单元里的竖线要转义成 `\|`，而复制去跑时 `grep -E 'a\|b'` 里的 `\|` 在 ERE 中是**字面竖线** ⇒
+> 这条判据从此永远不会命中任何东西，也不会红 —— 本表第一版就犯了这个（见【复取】段末的自证）。
 
-| 归谁 | 具体哪几枚 | 为什么不由我代提交 | 那句"指名"在哪（现量） |
-|---|---|---|---|
-| 全局 UX 分层整改线（2026-10-27 当天立项） | `docs/plans/global-ux-system-remediation.md`（索引里 `A`）、`docs/agents/ux-principles.md`、`scripts/check-focus-single-source.mjs`（未跟踪）、`package.json`（它此刻唯一的未暂存改动就是这条尺的定义 + `check` 链里那一格）、`e2e/tests/focus-visible-matrix.spec.ts` 与 `apps/web/evidence/focus-visible-matrix/`（未跟踪）、`apps/web/src/styles/app/` 下那批 `.css`、`e2e/tests/rail-geometry.spec.ts`、`e2e/tests/rail-roving.spec.ts` | 计划自己写着"状态：进行中"，尺还是未跟踪件；`package.json` 那两行要和它的脚本同一笔才不自相矛盾 —— 先提定义 = 链里指着一枚仓库里不存在的脚本，`check:gate-wiring` 当场红。而 P0 那格判据当天刚翻过案 ⇒ 整组此刻是半成品 | `head -3 docs/plans/global-ux-system-remediation.md`（"全局 UX 系统整改… 状态：进行中"）；`head -6 scripts/check-focus-single-source.mjs`（"焦点实现单一来源门禁（2026-10-27，全局 UX 整改 P0）"）；`git diff -- package.json \| grep -c focus-single-source` |
-| 协作/共享清单线 | `packages/ui/src/sync/ShareConsentModal.tsx`、`packages/ui/src/sync/share-consent-model.ts`、`apps/web/src/features/share/JoinSharedListDialog.tsx`、`apps/web/src/features/share/ShareFeature.tsx`、`apps/mobile/src/screens/JoinShareScreen.tsx`、`apps/mobile/src/screens/ShareSpaceScreen.tsx`、`apps/web/tests/share-consent-modal-theme.spec.tsx`、`e2e/tests/collab-journey.spec.ts`、`scripts/verify-collab-journey.mjs`、`scripts/verify-mobile-collab-ios.sh`、`packages/i18n/src/locales/zh-CN.ts` 与 `en.ts` | 这批是同一件事（分享同意面），但**两份 locale 是多条线共用的一张密集 key 表** —— UX 线同时在往里写，整文件 `git add` 就是替别人提交他们的行；要提只能按 hunk 区间切，而那正是他们自己的活 | `git diff -- packages/ui/src/sync/share-consent-model.ts \| grep '^+' \| head -3`；共用表混写的现量：`git diff -U0 -- packages/i18n/src/locales/zh-CN.ts \| grep -c '^@@'` |
-| 自动收集（inbound）线 | 这一组的**成员每分钟在换**，认的是判据不是路径：他们把 `packages/app-host/src/inbound-system-prompt.ts` 重命名进 `packages/inbound-core/src/system-prompt.ts`（那笔他们 23:23 自己提了），紧接着又写下 `server/prisma/schema.prisma`、未跟踪的 `server/prisma/migrations/…add_hosted_inbound_extraction/`、`server/src/api.ts`、`server/src/automation/rules.ts` | 🔴 **脏集里现在有不可逆层**（schema + 迁移）。这组的纪律是 `D` 与新文件、schema 与迁移目录**必须同一笔落地**，只搬一半，干净检出上要么 import 一枚不存在的模块、要么 `check:schema-migration-drift` 报名字对不上 —— 而迁移怎么写、叫什么名是他们的口径，本线连判据都不该替他们定，更不代提交 | `head -8 server/src/ai/managed-completion.ts`（"… 提出来… ADR-0077… 服务端抽取腿"，那枚已入库，是这线的署名样本）；`git status --porcelain -- server/prisma server/src/api.ts`；迁移枚数对账 `pnpm check:schema-migration-drift`
-| 日历/详情面线 | `apps/web/src/App.tsx`、`apps/web/src/features/calendar/CalendarHeaderToolbar.tsx`、`e2e/tests/calendar-cells.spec.ts` | 三枚连成一条**还没接完的线**（壳里 `view === 'calendar'` 那一支、工具栏新引的图标、spec 里新的 testid）；提两枚留一枚 = 干净检出上那条用例引用一个界面里不存在的控件 | `git diff -- apps/web/src/features/calendar/CalendarHeaderToolbar.tsx \| grep '^+import'`；`git diff -U0 -- apps/web/src/App.tsx \| grep '^@@'` |
-| 不是任何人的改动：门禁自己的产物回执 | `apps/web/evidence/reminder-permission-final/05-denied-to-granted-return-refresh.png` | 谁在这棵树上跑 `check:ai-e2e`，它就被重写一次（已登记的探针陷阱 #602）；代提交 = 把别人那一趟运行的产物按我的名义落仓 | `git log --oneline -1 -- apps/web/evidence/reminder-permission-final/`；`grep -n '602\. ' docs/reference/environment-traps.md \| head -1` |
-
-**本线名下残渣为零**（这三格是自查，不是登记别人；每一格都要跑，因为"我以为我擦干净了"是这棵树上最常见的一种假绿）
-
-| 查什么 | 命令 | 判据 |
+| 归谁 | 那批里的哪些（23:2x 读数，会漂） | 为什么不由我代提交 |
 |---|---|---|
-| 变异 / 台架还原后有没有留下备份件 | `find . -path ./node_modules -prune -o -name '*.mut-bak' -print -o -name '*.teeth-bak' -print -o -name '*.snap.bak' -print` | 空输出；非空就是本会话某轮变异没擦干净 |
-| 本线今晚写过的路径有没有再次变脏 | `git status --porcelain -- BLOCKED.md docs/plans/account-standard-suite.md scripts/live-web-freshness.mjs scripts/check-scripts-parse.mjs e2e/live-site/live-signin-entry.spec.ts apps/web/evidence/login-code-live-after-deploy-1027` | 空输出 |
-| 未跟踪件里有没有敏感件（密钥 / 证件 / 真收件箱数据） | `git status --porcelain \| sed 's/^...//' \| while read p; do [ -f "$p" ] && grep -lE 'BEGIN (RSA\|EC\|OPENSSH) PRIVATE KEY' "$p"; done`；再补一次目录级 `git status --porcelain \| grep -E '\.env\|id_rsa\|\.pem\|token'` | 无命中。⚠️ 退出码要在接管道**之前**取（`cmd > /tmp/o 2>&1; rc=$?` 之后再看），本会话在这条链上踩过一次把 `grep \| head` 的 rc 当成 grep 的 rc |
+| 全局 UX 分层整改线（2026-10-27 当天立项） | `docs/plans/global-ux-system-remediation.md`（已在索引里，标 `A`）、`docs/agents/ux-principles.md`、`scripts/check-focus-single-source.mjs` 与 `e2e/tests/focus-visible-matrix.spec.ts` 和 `apps/web/evidence/focus-visible-matrix/`（未跟踪）、`package.json`（它此刻唯一的未暂存改动就是这条尺的定义 + `check` 链里那一格）、`apps/web/src/styles/app/` 下那批 `.css`、`packages/design-system/src/tokens.css` 与 `tokens.ts` 及 `generated/`、`src/generated/` 那两枚产物、`e2e/tests/rail-geometry.spec.ts`、`e2e/tests/rail-roving.spec.ts` | 计划自己写着"状态：进行中"，尺还是未跟踪件；`package.json` 那两行要和它的脚本**同一笔**才不自相矛盾 —— 先提定义 = 链里指着一枚仓库里不存在的脚本，`check:gate-wiring` 当场红。`tokens.*` 那批是生成产物，由他们的 token 构建路径重写，手改产物一个字节必红。而 P0 那格判据当天刚翻过案 ⇒ 整组此刻是半成品 |
+| 协作/共享清单线 | `packages/ui/src/sync/ShareConsentModal.tsx`、`share-consent-model.ts`、`apps/web/src/features/share/JoinSharedListDialog.tsx`、`ShareFeature.tsx`、`apps/mobile/src/screens/JoinShareScreen.tsx`、`ShareSpaceScreen.tsx`、`apps/web/tests/share-consent-modal-theme.spec.tsx`、`apps/mobile/tests/share-ui-assembly.spec.ts`、`e2e/tests/collab-journey.spec.ts`、`scripts/verify-collab-journey.mjs`、`scripts/verify-mobile-collab-ios.sh`、`packages/i18n/src/locales/zh-CN.ts` 与 `en.ts` | 这批是同一件事（分享同意面），但**两份 locale 是多条线共用的一张密集 key 表** —— UX 线同时在往里写，整文件 `git add` 就是替别人提交他们的行；要提只能按 hunk 区间切，而那正是他们自己的活 |
+| 自动收集（inbound）线 | 认**判据**不认路径：他们把 `inbound-system-prompt` 那次跨文件重命名 23:23 自己提了（`packages/inbound-core/src/system-prompt.ts` 已在 HEAD 里），紧接着写下 `server/prisma/schema.prisma`、未跟踪的 `server/prisma/migrations/…add_hosted_inbound_extraction/`、`server/src/api.ts`、`server/src/automation/rules.ts` | 🔴 **脏集里有不可逆层**（schema + 迁移）。这组的纪律是 schema 与迁移目录必须同一笔落地，只搬一半，干净检出上 `check:schema-migration-drift` 就报"名字对不上"；而迁移怎么写、叫什么名、要不要 bump 是**他们的口径**，本线连判据都不该替他们定，更不代提交 |
+| 日历/详情面线 | `apps/web/src/App.tsx`、`apps/web/src/features/calendar/CalendarHeaderToolbar.tsx`、`e2e/tests/calendar-cells.spec.ts` | 三枚连成一条**还没接完的线**（壳里 `view === 'calendar'` 那一支、工具栏新引的图标、spec 里新的 testid）；提两枚留一枚 = 干净检出上那条用例引用一个界面里不存在的控件 |
+| 不是任何人的改动：门禁自己的产物回执 | `apps/web/evidence/reminder-permission-final/05-denied-to-granted-return-refresh.png` | 谁在这棵树上跑 `check:ai-e2e`，它就被重写一次（已登记的探针陷阱 #602）；代提交 = 把别人那一趟运行的产物按我的名义落仓 |
+
+```sh
+# 【取数】这两条才是当前脏集的真身，逐轮重取，别抄上面
+git status --porcelain                       # 列形 "XY 路径"；标记在第一列(A / D) = 已在索引里，是别人自己的落盘节奏
+git status --porcelain | sed 's/^...//' | while read p; do
+  [ -e "$p" ] && echo "$(( ( $(date +%s) - $(stat -f %m "$p") ) / 60 ))分  $p"
+done | sort -rn                              # 每枚距现在几分钟：落在个位数 = 作者此刻还在写
+
+# 【指名】每行的归属都指到别人自己写下的那句话，而不是靠"我猜这是谁的"
+head -3  docs/plans/global-ux-system-remediation.md     # "全局 UX 系统整改… 状态：进行中"
+head -6  scripts/check-focus-single-source.mjs          # "焦点实现单一来源门禁（2026-10-27，全局 UX 整改 P0）"
+head -8  server/src/ai/managed-completion.ts            # "…从 managed-proxy.routes.ts 提出来… ADR-0077… 服务端抽取腿"
+git log --oneline -1 -- packages/inbound-core/src/system-prompt.ts   # 他们自己那笔重命名
+git diff -- package.json | grep -c focus-single-source  # 那两行是不是 package.json 里唯一未暂存的东西
+git diff -- apps/web/src/features/calendar/CalendarHeaderToolbar.tsx | grep '^+import'
+git diff -U0 -- apps/web/src/App.tsx | grep '^@@'
+git log --oneline -1 -- apps/web/evidence/reminder-permission-final/
+grep -n '^602\. ' docs/reference/environment-traps.md   # 那条产物回执陷阱
+
+# 【自查】本线名下残渣为零 —— 三格都要跑，"我以为我擦干净了"是这棵树上最常见的一种假绿
+find . -path ./node_modules -prune -o -name '*.mut-bak' -print \
+     -o -name '*.teeth-bak' -print -o -name '*.snap.bak' -print       # 判据：空输出
+git status --porcelain -- BLOCKED.md docs/plans/account-standard-suite.md \
+  scripts/live-web-freshness.mjs scripts/check-scripts-parse.mjs \
+  e2e/live-site/live-signin-entry.spec.ts apps/web/evidence/login-code-live-after-deploy-1027   # 判据：提交后空输出
+git status --porcelain | sed 's/^...//' | while read p; do
+  [ -f "$p" ] && grep -lE 'BEGIN (RSA|EC|OPENSSH) PRIVATE KEY' "$p"
+done                                                          # 判据：空 = 未跟踪/脏件里没有私钥
+```
+
+🔴 **敏感件那格要按"形状"扫，不按文件名的子串扫**。本表第一版写着
+`git status --porcelain | grep -E '\.env|id_rsa|\.pem|token'`，两处坏：① 表格转义把 `|` 变成 `\|`，在 ERE 里读成字面竖线 ⇒
+这条判据**永远不会命中、也永远不会红**（实测 0 命中 / rc=1，而它自称在扫敏感件）；② 就算转义修好，裸子串 `token` 也会把
+`packages/design-system/src/tokens.css` 这类**设计变量件**报成敏感件（实测 4 行命中全是 tokens 家族）。
+所以敏感件判据落在**内容形状**上（私钥头），文件名只做二次线索、不做判决。
+
