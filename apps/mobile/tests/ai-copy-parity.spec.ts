@@ -227,6 +227,18 @@ describe('移动端 ↔ web 的 AI 文案表对账', () => {
     );
   });
 
+  it('🔴 那句"哪台设备才处理"（inbound.boundary.*）两端同一条 —— 边界话术不许一端一套', () => {
+    // 2026-10-27 移动壳与 web 各自把这条边界写进界面（工单 §6 第 7 格选的那一头：明写边界）。
+    // 两端讲的是**同一颗 key**，所以任何一端改措辞、加一档例外，这一条就红 ——
+    // 而不是等到用户在手机上读到"什么时候会处理"、在网页上读到另一句。
+    expectSameFamily(
+      'inbound.boundary.*',
+      read(MOBILE_INBOUND),
+      read(WEB_INBOUND_SETTINGS),
+      /'(web\.ai\.inbound\.boundary\.[a-zA-Z0-9]+)'/g,
+    );
+  });
+
   it('🔴 反证：手机单方面改掉终态那一族的 key ⇒ 红，且红因是"漂移"而不是"读不到"', () => {
     const webSrc = read(WEB_INBOUND_SETTINGS);
     // 先证明喂进去的真是源码内容（本文件第一版在这里喂过路径 —— 那种臂等于没有臂）。

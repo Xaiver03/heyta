@@ -43,3 +43,40 @@ export function subscribeInboundCycle(listener: () => void): () => void {
 export function useInboundCycle(): InboundCycleSnapshot | undefined {
   return useSyncExternalStore(subscribeInboundCycle, getInboundCycle);
 }
+
+/**
+ * 这台设备此刻**能不能**开始接收。
+ *
+ * 🔴 为什么不并进上面那枚快照：`state` 说的是"这一趟做了什么"，这一格说的是
+ * "这台设备根本没资格跑那一趟"。混成一格，界面就会把"这台还没建过收件密钥"
+ * 渲成"没有待处理的内容" —— 那正是本线要治的假绿：用户看到一句没毛病的话，
+ * 而它描述的是另一件事。
+ *
+ * ⚠️ `undefined` 是"还没量过"（冷启动、第一趟前台处理之前），不是"没问题"。
+ * 界面在那一刻什么都不写，也不许写"就绪"。
+ */
+export type InboundReadiness = 'signedOut' | 'noRecipientKey' | 'ready';
+
+let readiness: InboundReadiness | undefined;
+const readinessListeners = new Set<() => void>();
+
+export function publishInboundReadiness(next: InboundReadiness): void {
+  if (readiness === next) return;
+  readiness = next;
+  for (const listener of readinessListeners) listener();
+}
+
+export function getInboundReadiness(): InboundReadiness | undefined {
+  return readiness;
+}
+
+export function subscribeInboundReadiness(listener: () => void): () => void {
+  readinessListeners.add(listener);
+  return () => {
+    readinessListeners.delete(listener);
+  };
+}
+
+export function useInboundReadiness(): InboundReadiness | undefined {
+  return useSyncExternalStore(subscribeInboundReadiness, getInboundReadiness);
+}

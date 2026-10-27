@@ -388,6 +388,8 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
         <>
           <div className="ht-inbound__group">
             <p className="ht-settings__hint" role="status">{readinessMessage}</p>
+            {/* 那句边界现在是真的，所以可以写出来：循环由应用级挂载点起，前台指的是这个应用可见。 */}
+            <p className="ht-settings__hint" data-testid="inbound-boundary">{t('web.ai.inbound.boundary.foregroundOnly')}</p>
             <p className="ht-settings__hint tabular-nums" role="status">{keyEpoch === undefined ? t('web.ai.inbound.keyMissing') : t('web.ai.inbound.keyReady', { epoch: keyEpoch })}</p>
             <div className="ht-settings__actions">
               {keyEpoch === undefined ? <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void setupRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keySetup')}</button> : <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void rotateRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keyRotate')}</button>}

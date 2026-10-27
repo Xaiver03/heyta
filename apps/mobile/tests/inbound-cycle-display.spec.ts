@@ -21,8 +21,14 @@ import { describe, expect, it } from 'vitest';
 import { translate } from '@heyta/i18n';
 
 import { read, stripComments } from './source-reading';
-import { INBOUND_CYCLE_COPY_KEY } from '../src/inbound/copy';
-import { getInboundCycle, publishInboundCycle, subscribeInboundCycle } from '../src/inbound/status';
+import { INBOUND_BOUNDARY_COPY_KEY, INBOUND_CYCLE_COPY_KEY, INBOUND_READINESS_COPY_KEY } from '../src/inbound/copy';
+import {
+  getInboundCycle,
+  publishInboundCycle,
+  publishInboundReadiness,
+  subscribeInboundCycle,
+  subscribeInboundReadiness,
+} from '../src/inbound/status';
 
 /** 共享层那四档终态。**新增一档而这里没补 ⇒ 前两条一起红**（这就是分母自己站在判据里的写法）。 */
 const CYCLE_STATES = ['empty', 'submitted', 'needs-confirmation', 'waiting-entitlement'] as const;
@@ -82,5 +88,72 @@ describe('移动壳把自动收集的周期结果露出来（A3 的 mobile 半�
     off();
     publishInboundCycle({ state: 'submitted', itemCount: 1 });
     expect(calls, '取消订阅之后还在通知').toBe(1);
+  });
+});
+
+describe('移动壳把"这台设备还没准备好接收"说出来（A2 那两条边界的第一条）', () => {
+  /** 分母自己站在判据里：从 worker 源码里读它实际会交出的那几档原因，而不是照这张表数。 */
+  const publishedReasons = [...LIFECYCLE.matchAll(/publishInboundReadiness\('([a-zA-Z]+)'\)/g)].map((m) => m[1]!);
+
+  it('分母自检：worker 确实交出了原因，而且交出的每一档都在射程内', () => {
+    expect(publishedReasons.length, '一条 `publishInboundReadiness(...)` 都没扫到 ⇒ 下面几条会是空转').toBeGreaterThan(0);
+    for (const reason of publishedReasons) {
+      expect(['ready', 'signedOut', 'noRecipientKey'], `worker 交出了一档这张尺没登记的 ${reason}`).toContain(reason);
+    }
+  });
+
+  it('每一档"跑不了"的原因在中英两档都翻得出非空句子', () => {
+    const waiting = Object.keys(INBOUND_READINESS_COPY_KEY);
+    expect(waiting.length, '这张表是空的 ⇒ 下面那些断言都在空转').toBeGreaterThan(0);
+    const zh = waiting.map((reason) => translate('zh-CN', INBOUND_READINESS_COPY_KEY[reason as keyof typeof INBOUND_READINESS_COPY_KEY]).trim());
+    const en = waiting.map((reason) => translate('en', INBOUND_READINESS_COPY_KEY[reason as keyof typeof INBOUND_READINESS_COPY_KEY]).trim());
+    for (const [index, reason] of waiting.entries()) {
+      expect(zh[index], `${reason} 中文档翻出来是空的`).not.toBe('');
+      expect(en[index], `${reason} 英文档翻出来是空的`).not.toBe('');
+    }
+    // 原因句不许等于四档终态里的任何一句 —— 那两格混起来就是"没建密钥"被念成"没有待处理内容"。
+    const cycleSentences = new Set(CYCLE_STATES.map((state) => translate('zh-CN', INBOUND_CYCLE_COPY_KEY[state]).trim()));
+    for (const sentence of zh) expect(cycleSentences.has(sentence), `这句和某档终态撞了：${sentence}`).toBe(false);
+  });
+
+  it('worker 交出的每一档原因都有句子可接（加一档而不登记 ⇒ 红）', () => {
+    const covered = new Set(['ready', ...Object.keys(INBOUND_READINESS_COPY_KEY)]);
+    for (const reason of publishedReasons) expect(covered.has(reason), `${reason} 这一档没有句子可接`).toBe(true);
+  });
+
+  it('渲出：那一行有 testID，且经表取句子', () => {
+    expect(SECTION).toContain('INBOUND_READINESS_COPY_KEY[');
+    expect(SECTION).toContain('testID="inbound-readiness"');
+  });
+
+  it('那台设备没建密钥时不再静默 return（这是原来那条假绿的正文）', () => {
+    expect(LIFECYCLE).toContain("publishInboundReadiness('noRecipientKey')");
+  });
+
+  it('ready 不当句子播：这张表里不许有 ready', () => {
+    expect(Object.keys(INBOUND_READINESS_COPY_KEY)).not.toContain('ready');
+  });
+
+  it('重复播报同一档原因不通知，换档才通知', () => {
+    publishInboundReadiness('ready');
+    let calls = 0;
+    const off = subscribeInboundReadiness(() => { calls += 1; });
+    publishInboundReadiness('ready');
+    expect(calls, '去重没生效：同一档原因又通知了一次').toBe(0);
+    publishInboundReadiness('noRecipientKey');
+    expect(calls, '换了原因却没通知，界面会一直停在旧句子').toBe(1);
+    off();
+    publishInboundReadiness('signedOut');
+    expect(calls, '取消订阅之后还在通知').toBe(1);
+    publishInboundReadiness('ready');
+  });
+
+  it('那句"哪台设备才处理"在界面上渲出来，两壳同一条、界面里不许有第二份字面量', () => {
+    expect(SECTION).toContain('INBOUND_BOUNDARY_COPY_KEY');
+    expect(SECTION).toContain('testID="inbound-boundary"');
+    expect(translate('zh-CN', INBOUND_BOUNDARY_COPY_KEY)).not.toBe('');
+    expect(translate('en', INBOUND_BOUNDARY_COPY_KEY)).not.toBe('');
+    // 写死那句中文当字面量就是第二份句子（web 那端换了措辞而这里跟着抄，正是本仓反复登记的漂移源）。
+    expect(SECTION).not.toMatch(/开着 heyta 时处理|常年接收/);
   });
 });

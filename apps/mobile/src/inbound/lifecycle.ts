@@ -8,7 +8,7 @@ import {
 import { readSyncConfig } from '../sync/config';
 import { openTaskHost } from '../db/open-host';
 import { getAiSettings, aiSecrets } from '../ai/settings-store';
-import { publishInboundCycle } from './status';
+import { publishInboundCycle, publishInboundReadiness } from './status';
 
 /**
  * Foreground-only mobile worker. It deliberately does not create keys or
@@ -24,7 +24,10 @@ export function startMobileInboundWorker(): () => void {
   const processOnce = async (): Promise<void> => {
     if (stopped || AppState.currentState !== 'active') return;
     const config = readSyncConfig();
-    if (config === undefined || !config.accountId?.trim() || !config.serverUrl.trim() || !config.token) return;
+    if (config === undefined || !config.accountId?.trim() || !config.serverUrl.trim() || !config.token) {
+      publishInboundReadiness('signedOut');
+      return;
+    }
     try {
       host ??= await openTaskHost();
       const currentBinding = `${config.accountId}\u0000${config.serverUrl}\u0000${host.clientId}`;
@@ -36,7 +39,13 @@ export function startMobileInboundWorker(): () => void {
         await host.registerInboundWorker({ userId: config.accountId, databaseEpoch: `mobile-${host.clientId}` });
       }
       const recipient = await host.getInboundRecipientRegistration();
-      if (recipient === undefined) return;
+      // 🔴 没有密钥就什么都收不了，而这件事以前**没人说**：直接 return 的话，界面只是
+      // 安静着，用户分不清"这台还没准备好"和"准备好了但没有新内容"。现在把原因交出去。
+      if (recipient === undefined) {
+        publishInboundReadiness('noRecipientKey');
+        return;
+      }
+      publishInboundReadiness('ready');
       const ai = getAiSettings();
       options = {
         userId: config.accountId,
