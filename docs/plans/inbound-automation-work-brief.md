@@ -85,6 +85,12 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
 ⚠️ **"页面开着才处理"这句话现在还没对外说过**。要么补腿，要么在 §5 的对外件里明写这条边界——
 两者选一，不许两头都不做。
 
+> ✅ **2026-10-27 负责人拍了"明写边界"这一头，两枚代码腿已入库**：web 那条循环从设置面板提到
+> 应用级（离开设置视图不再停摆），移动壳那格"这台设备还没准备好接收"从静默 return 变成渲出原因。
+> 界面句子与对外成稿都在 §5.1；表里 Electron 与三枚原生壳那两行**仍是零接线**，
+> 而那不影响这句边界的真实性——它们本来就归"这台设备开着 heyta 时"那一档。
+> 🔴 为什么不补后台腿，三条实测理由写在 §5.1，别在本节重推导。
+
 ### A3 `waiting-entitlement` 到界面是一条**空白文案**
 
 > ✅ **整格闭合**：中英两档词条、web 的映射与那枚加严到钉句子的用例，以及下面那条"mobile 更彻底"的缺口（设置面里新增一行终态，testID 是 `inbound-cycle-state`）。本节引用的 `InboundAutomationSettings.tsx`现在住在 `apps/web/src/features/settings/`。
@@ -182,7 +188,7 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
 | 件 | 现在写的是什么 | 上线时要改成 |
 |---|---|---|
 | 帮助中心那篇（`apps/landing/src/site/docs.ts` 的 `site.docs.automation.*` 一组词条） | 「付费自动收集（规划中）」「此功能尚未上线，目前没有可用回调地址」「回调接入均待上线」 | 逐段换成真实端点、真实凭据流程、真实错误/重试指引；未做的那部分**继续留"不在首版"** |
-| 价格页（`landing.pricing.hostedAi.feature1..3`） | 三条卖点里**没有**自动收集 | 拍：要不要写进去；写就得同时写"哪台设备得开着"这条边界 |
+| 价格页（`landing.pricing.hostedAi.feature1..3`） | 三条卖点里**没有**自动收集 | 拍：要不要写进去；写就得同时写"哪台设备得开着"这条边界——**成稿见下面 §5.1**，别再手写第二份 |
 | `docs/reference/inbound-automation-protocol.md` | 已写 7 天保留、票据、密钥轮换 | 补 §3 A7 那条真实症状（模式写错 ⇒ 500），别写成"启动红" |
 | 部署面 | 三处零提及（见 A7 现量） | `server/env.example` 补齐键名与非敏感形状、发布手册加一节 |
 | 后台（`/admin` 用户详情） | 会打「自动收集 ✕ 这台实例没配自动收集的权益来源」——**这句是活的、对的** | 开完模式后自己会翻绿，不用改代码；别为了好看去改读数 |
@@ -190,6 +196,43 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
 🔴 **改完必过这几道**：`pnpm check:docs`、`pnpm check:ui-language`、i18n 两档对称、
 `python3 research/tools/verify-inbound-doc-endpoints.py`（端点少前缀/方法写错会红）、
 `python3 research/tools/verify-inbound-doc-tables.py`。
+
+### 5.1 那句边界已成真，这是成稿（上线那天直接取，别再手写第二份）
+
+**裁决（负责人 2026-10-27）**：不补手机/浏览器的后台腿，改由界面与对外件明写边界。
+理由三条，都是这仓里量出来的，不是推测：
+
+1. 浏览器那条腿补不圆。`apps/web/src/pwa/sw.ts` 文件头逐字写着 Chromium 周期同步下限
+   `kMinPeriodicSyncEventsInterval = base::Hours(12)`，实际间隔还要乘互动度系数（12/24/36 小时，或者永不）。
+2. 事件是端到端加密的：收件密钥与 Vault 解锁态都在页面里。后台要么醒来解不开，
+   要么得把解密钥常驻浏览器——那是自己拆"服务端看不到明文"这条卖点。
+3. 手机那条腿是一个新子系统：`apps/mobile/package.json` 里没有任何推送库（现量），
+   iOS 那枚 `HeytaReminderModule` 只能排本地提醒，跑不了"解密 → 落库 → 提交许可"整条链；
+   要做就得引 APNs/FCM：新第三方 + 一套对外基础设施 + 合规登记。
+
+**所以产品承诺改成这一句**（常驻处理归用户自己那台常年开着的机器，手机与浏览器开着时顺手补一趟）：
+
+- 中文（已进 `packages/i18n`，键 `web.ai.inbound.boundary.foregroundOnly`）：
+  「自动收集只在这台设备开着 heyta 时处理：应用退到后台、浏览器关掉页面都不领新内容。
+  要常年接收，把处理设备跑在你自己那台一直开着的机器上。」
+- 同键英文档：`Automatic capture only runs while heyta is open on this device: nothing is
+  claimed after the app goes to the background or the page closes. For always-on capture,
+  run the processing device on a machine you keep running.`
+- 两壳对账：这一族 key 已登记进常驻对账尺 `apps/mobile/tests/ai-copy-parity.spec.ts`
+  的 `inbound.boundary.*` 那一臂——**任何一端改措辞或加例外都会红**，所以价格页与帮助中心
+  要写的就是界面里那一句，不需要另行起草。
+
+**让这句成真而写的两枚代码腿**（本轮已入库）：
+
+| 腿 | 入库前那句是真的吗 | 现在 |
+|---|---|---|
+| web 那条循环挂在设置面板的 effect 上 | ❌ 离开设置视图就随组件卸载停掉，等于"得守着那一屏" | 提到应用级：`apps/web/src/features/settings/inbound-lifecycle.ts` 由 `App.tsx` 挂载，标签页可见即跑 |
+| 手机没建收件密钥时直接 return | ❌ 界面只是安静着，用户分不清"还没准备好"与"没新内容" | 新增一格 `InboundReadiness`，把那台设备的原因渲出来（键 `web.ai.inbound.status.noKeyOnThisDevice`） |
+
+⚠️ 帮助中心那篇（`site.docs.automation.*`）与价格页那三条卖点**本轮一字未改**——
+它们是对外发布件，改动落在源码里就会随下一次站点构建公开。上线那天按上面那句取用，
+发布那一步仍归负责人。
+
 
 ---
 
@@ -200,8 +243,13 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
 3. **A4 的修法**——动计费口径：摘 managed-proxy 那一次扣，还是让 attempt 账本成为唯一权威。
 4. **A5 的地界**——`server/src/sync/cleanup.ts` 那句"本线白名单之外"的搁置令还在不在。
 5. **"邮件转待办"要不要做**——用户口语里的"自动收集"九成指邮件；首版没有。这决定这条线做不做得成。
+   ✅ **2026-10-27 负责人拍了：另开一条线**，不塞进本八格。首版仍不含邮件，工单见
+   [`email-to-task-brief.md`](email-to-task-brief.md)；对外那篇帮助中心不许写成"什么来源都能自动收"。
 6. **`AUTOMATION_ENTITLEMENT_MODE` 写错 ⇒ 500 要不要改成启动即红**。
 7. **A2 那两条边界**——补 ServiceWorker/后台腿，还是对外明写"设备开着才处理"。
+   ✅ **2026-10-27 负责人拍了：不补后台腿，明写边界**，并要求先把这句做成真话再动文案。
+   两枚代码腿（web 循环提到应用级、手机那格渲出原因）已入库，成稿在 §5.1；
+   🔴 剩下的只有"上线那天把 §5.1 那句取用出去"，那一格仍归负责人（对外发布）。
 8. `BLOCKED.md` 里挂在别人名下的那几格（B109 签发端 URL、B205 范围尺口径、B239 等）——本单不动。
 
 ---
