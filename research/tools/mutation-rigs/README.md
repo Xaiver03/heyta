@@ -84,3 +84,13 @@ sh research/tools/mutation-rigs/wait-and-run.sh /tmp/mut.log 1200 \
 
 `gate-run.sh` 是被 `wait-and-run.sh` 取代的早期版本（它只认日志里的拒绝字样，
 而装置会吞掉内层输出 ⇒ "没跑到用例"在它眼里长得像"跑完了"）。留着是为了让人认得出这个形状。
+
+## ⚠️ 有一族"能不能红"故意不住在这里
+
+判据的对象是 **Swift/Kotlin 那两枚原生件**时，不许原地注病灶：任何 JS 门都不读它们，可同一台机器上
+只要有别的会话在编 Xcode/Gradle，注进去的病灶会被**编译进产物** —— 下一趟设备读数整体成假的，
+那比一次脏读严重。所以那一族的施臂留在判据文件里，走**内存里的副本**施变：
+`apps/mobile/tests/share-ui-assembly.spec.ts` 的 ⑩ 那一组（现量 `grep -c "^  it(" apps/mobile/tests/share-ui-assembly.spec.ts`
+会连它一起数），读法收口在同一份 `apps/mobile/tests/native-recycling-shape.ts`。
+它守的是协作线那句「系统横幅在手机上做不到」的理由（环境陷阱 **#598**）：任一端的通知回收形状变了，
+⑩ 就红，红文点名去重读那五格载体。
