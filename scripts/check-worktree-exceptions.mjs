@@ -50,7 +50,8 @@ const ALLOWED_FLAGS = ['--strict', '--self-test', '--head', '--range <ref>'];
 export const OWNER_RULES = [
   {
     line: '全局 UX 分层整改线',
-    why: '计划自写"状态：进行中"、尺还是未跟踪件、`package.json` 那两行要和它的脚本同一笔才不自相矛盾',
+    why: '计划自写"状态：进行中"、尺还是未跟踪件、`package.json` 那两行要和它的脚本同一笔才不自相矛盾；' +
+      '01:1x 又并进一批 P2 的（危险确认档位、`apps/web/src/lib/dialog/`）—— 那批文件的头注释自己写着「2026-10-27，全局 UX 整改 P2」，归属是指了名的，不是我猜的',
     prefixes: [
       'apps/web/src/styles/app/',
       'packages/design-system/generated/',
@@ -75,6 +76,12 @@ export const OWNER_RULES = [
       'apps/web/evidence/dirty-form-guard/',
       'apps/web/src/features/categories/CategoryCreateDialog.tsx',
       'apps/web/src/features/habits/HabitsView.tsx',
+      'apps/web/src/lib/dialog/',
+      'apps/web/src/features/trash/TrashView.tsx',
+      'apps/web/src/features/trash/purgeDanger.ts',
+      'apps/web/tests/trash-purge-danger-tier.spec.ts',
+      'e2e/tests/danger-confirm-trash.spec.ts',
+      'scripts/check-danger-confirm.mjs',
       'package.json',
     ],
   },
