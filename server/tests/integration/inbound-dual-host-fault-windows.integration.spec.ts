@@ -929,6 +929,10 @@ describe.skipIf(!DATABASE_URL)('inbound fault windows across two independent rea
     const delivered = await deliver(hosted.id, eventId, body);
     expect(delivered.status).toBe(202);
     expect(delivered.json).toMatchObject({ state: 'queued' });
+    // 🔴 对外那一格**只许说状态词**：发送方是自己把正文送上来的，所以"回显给它看"看起来无害，
+    // 但这条路径上的响应会进对方（第三方的）日志与我们的访问日志 —— 查询面不许出现明文
+    // 与存储面不许出现明文是**两条失法**，各一枚臂（A14/A15），别合成一条。
+    expect(JSON.stringify(delivered.json)).not.toContain('must-not-leave');
     expect((await eventRow(s.userId, eventId))?.payloadCiphertext).not.toBeNull();
     expect(provider.sources.length).toBe(0);
     expect((await peekManagedAiUsage({ userId: s.userId })).used).toBe(0);
@@ -984,7 +988,11 @@ describe.skipIf(!DATABASE_URL)('inbound fault windows across two independent rea
     expect(await db.automationCommitPermit.count({ where: { eventId } })).toBe(0);
     expect(await serverOps(eventId)).toHaveLength(0);
     // 上游重投同一发不许再烧一次额度：去重在路由那一层先命中，那条腿连领都不领。
-    expect((await deliver(hosted.id, eventId, body)).status).toBe(202);
+    // 而**去重那一支的响应同样只许说状态词**：它是这条路径上最容易被"顺手把上一次的内容带回来"
+    // 写坏的一支（发送方会拿这个响应做对账，内容一旦进去就落到别人的日志里）。
+    const retried = await deliver(hosted.id, eventId, body);
+    expect(retried.status).toBe(202);
+    expect(JSON.stringify(retried.json)).not.toContain('must-not-leave');
     expect((await peekManagedAiUsage({ userId: s.userId })).used).toBe(1);
 
     // 设备那一腿先试 recover，拿到的是服务端冻好的那一行 ⇒ 自己**不再发一次模型**，
@@ -1000,7 +1008,8 @@ describe.skipIf(!DATABASE_URL)('inbound fault windows across two independent rea
     expect(await serverOps(eventId)).toHaveLength(0);
     await synced(a);
     expect(await serverOps(eventId)).toHaveLength(1);
-    process.stdout.write(`HOSTED_HANDOFF=PASS 两档接上：真路由在没配上游那一趟回 queued 且正文密文仍在（模型 0 次、额度 0 次）；`
+    process.stdout.write(`HOSTED_HANDOFF=PASS 两档接上：真路由在没配上游那一趟回 queued 且正文密文仍在（模型 0 次、额度 0 次，`
+      + `两趟对外响应体里都搜不到标记串）；`
       + `把上游指到回环桩后同一条腿抽成 prepared（出境的只有 {title:"Inbox note"}，标记串没出境、两列密文里也搜不到），`
       + `额度 1 次、attempts 0 行、许可 0 行、服务端 op 0 枚；重投同一发额度仍 1 次；`
       + `设备 recover 到冻结结果后 0 次模型调用就 submitted，任务 "买牛奶"/priority=2、本地 1 枚 op，同步后服务端才出现那 1 枚`);

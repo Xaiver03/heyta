@@ -7527,4 +7527,15 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ⑥ 本条动 `PROGRESS.md`（纯追加）与 `docs/plans/inbound-automation.md`（文末 §5 纯追加）、
       `server/src/automation/inbound.routes.ts`、`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts`；
       迁移仍**没 apply**、env 没动、不 push、对外六格草稿仍未发（归属照旧见工单 §6/§5.2）。
-      本线这 4 枚仍走第 208 条 ⑧ 那套私有索引 CAS。
+      本线这 5 枚（`PROGRESS.md`、计划、ADR-0077、那枚集成 spec、`inbound.routes.ts`）仍走第 208 条 ⑧ 那套私有索引 CAS。
+    ⑦ **01:1x 完成审计查出判据第 3 条少量了半句，当场补口**（写前先跑 `date`，本机 01:14）：那条原话是
+      「存储层**与查询/错误路径**都不出现明文」，而上一戳的 H1 只断了状态码——查询面那半句一直只在
+      单元档用假传输量着。补法是两趟对外响应各加"体里搜不到标记串"，并**按失法分两枚臂**
+      （路由里 `202` 有两个出口：命中去重先返回、抽取没成退回 `queued`；合成一枚臂的话另一行被写坏时尺照样绿）。
+      现量：`--only 14,15` ⇒ 三面对照臂先绿、两臂各红 1 条且只红在 H1；补完断言后**用正规尺重跑全量** ⇒
+      rc=0、`Windows: 13/13`、`HOSTED_HANDOFF=PASS`、`Tests 15 passed`。
+      ⚠️ 仍未覆盖的是"**抽取成功那一趟**的对外响应"（真路由在测试载体里注定抽不成：白名单只认主机名、
+      回环进不了那张表）—— 登记在 ADR-0077 §6 第 7 条，不写成已闭合。
+      另：本条 ⑥ 那句"这 4 枚"是我数错了，实际入库 5 枚（漏了 ADR-0077）⇒ 已当场改那一行，
+      现量 `git diff --numstat -- PROGRESS.md` 回 **11 插入／1 删除**，而那唯一一枚删除就是这一行自己
+      （`git diff -U0 -- PROGRESS.md | grep '^-'` 只出一行）⇒ **本条不是纯追加**，按第 207 条 ④ 的口径写明。
