@@ -226,7 +226,21 @@ ADR-0054 §7 那句话照旧成立：托管不叫 E2EE。本档把"服务端读�
 1. **迁移没 apply**：`server/prisma/migrations/20261027000000_add_hosted_inbound_extraction` 只在仓库里，
    `prisma generate` 跑过，生产/本机库都**没动**（本机那套 Postgres 被并行会话共用，
    按纪律要 `cd server && sh scripts/migrate-deploy.sh` 且由负责人掌握时机）。
-   ⇒ **这一档在今天的任何环境上都不生效**：那一列不存在 ⇒ 读成 `NULL` ⇒ 一律归设备。
+   🔴 **这一格原先那句"那一列不存在 ⇒ 读成 `NULL` ⇒ 一律归设备"是假的**，2026-10-28 现量否证：
+   在一枚只属于探针的一次性库里逐枚应用**除这一枚之外**的全部迁移（枚数现量
+   `ls -d server/prisma/migrations/*/ | wc -l`），拿**真**客户端去打读面 ——
+   `automationRule.findUnique` / `findFirst`（接收 webhook 第一发就要读它）当场回 **`P2022`**，
+   写面 `create` 带与不带那一列都回 **`P2022`**。
+   ⇒ 代码先上、迁移没上时的症状是**公网接收路由 500**，不是安静退回设备档。
+   ⚠️ 同一次探针里 `automationRule.count()` 照样回 `0` —— 它不选那一列，
+   **所以拿 `count()` 当这类探针会读出假结论**（这一形比结论更要紧）。
+   而"`NULL` 读成归设备"这句成立的是**另一档**：那一列已经存在、行是加列之前落的旧行 ——
+   探针第二档实测裸 SQL 插一行不写那一列，经读面回来是 `null`，`=== true` 为 `false` ⇒ 归设备。
+   复现：`python3 ~/.heyta-evidence/inbound-hosted-extraction-20261027/probe-unapplied-migration.py`
+   （读数同目录 `unapplied-migration-probe.out`）。
+   ⇒ 由此得出一条**部署顺序**上的话：这一档**不许**"先换容器再补迁移"，而 `docs/runbooks/deployment.md`
+   里本来就有一道"先跑迁移、`MIGRATE_RC=0` 才换容器"的闸（现量 `grep -n "先跑迁移" docs/runbooks/deployment.md`）
+   —— 本档不改它，只是指名：**绕开那道闸**手工换容器时，红的形状是全量 500，不是"回到设备档"。
 2. **对外披露没发**：§7 那张清单是草稿，一处都没改进线上文案，也没发布。
 3. **没开生产 env**：`MANAGED_AI_*` 不动，helm 不动，不 push。
 4. **AC 表一格没勾**。
@@ -247,7 +261,7 @@ ADR-0054 §7 那句话照旧成立：托管不叫 E2EE。本档把"服务端读�
 | # | 那一格 | 为什么不在我这 |
 |---|---|---|
 | H-1 | 五处对外件的正文（隐私政策、AI 与数据流转、第三方名单、帮助中心自动收集那篇、价格页）逐句披露"数据进我们服务端时会被我们的 AI 当场读取并抽取，抽取窗口结束后立刻丢弃" | 对外法律表征；草稿在 `../plans/inbound-automation-work-brief.md` 的那张清单里，**一处未改、一处未发** |
-| H-2 | 迁移何时 apply（本机/生产）与生产 env 是否开这一档 | 上线动作 |
+| H-2 | 迁移何时 apply（本机/生产）与生产 env 是否开这一档；🔴 顺序**不许**"先换容器再补迁移"——绕开 `deployment.md` 那道"先迁移、`MIGRATE_RC=0` 才换容器"的闸时，红的形状是公网 webhook 全量 500 而不是"回到设备档"（现量见 §6 第 1 条） | 上线动作 |
 | H-3 | A4 计费口径的修法 | 已登记的口径问题 |
 | H-4 | `AUTOMATION_ENTITLEMENT_MODE` 写错 ⇒ 500 是否改成启动即红 | 判据口径 |
 | H-5 | 邮件转待办那条线能不能对外承诺 | 对外承诺 |
