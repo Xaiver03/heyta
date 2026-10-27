@@ -55,6 +55,10 @@ trap 'rm -f -- "$0"' EXIT
 set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# 🔴 起建点必须落进**入库的那份**取证 README，不许只活在一次性的控制台日志上：
+#    台账里"这趟读数代表哪一棵树"这一格，此前只能靠本机 wrap log 回答，而日志随清场消失
+#    （环境陷阱 #600 —— 带戳的读数才是可迁移的，"当前产物"那种声称写进台账就在过期）。
+START_HEAD=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null) || START_HEAD="读不到（git rev-parse 失败）"
 SHIM="$ROOT/scripts/tools/ios-ax-shim.py"
 # 🔴 本线自带的锚点解析器（为什么不用 shim 的退化匹配：见该文件文件头第 22 跑那段）
 ANCHOR="$ROOT/scripts/tools/ios-collab-anchor.py"
@@ -2151,6 +2155,7 @@ node "$ROOT/scripts/lib/collab-owner-step.mjs" dump --state "$OWNER_STATE" > "$E
   echo "- owner 成员行：$OWNER_MEMBER"
   echo "- 手机成员行：$PHONE_MEMBER"
   echo "- 判据读数：$PASS 通过 / $FAIL 失败"
+  echo "- 起建点：$START_HEAD（这趟读数代表的是**这一棵**树，不是「你此刻的 HEAD」；复算差集见计划 §9.24 末尾那把两端钉死的命令）"
   echo
   echo "截图逐张对应上面每一步；上行验签的机器读数在 phone-op-signature.json，"
   echo "服务端侧的成员/日志形状在 server-side.json。"
