@@ -4815,6 +4815,39 @@ node scripts/check-worktree-exceptions.mjs --self-test | tail -1     # 臂数 19
 node scripts/check-worktree-exceptions.mjs | sed -n '/没登记过/,$p'   # 逐枚点名
 ```
 
+### 6.104（2026-10-28 01:0x · 上一节没开码的断言逐条补验：六格成立，两格判成"不是缺陷"，一格拒收）
+
+§6.101 那五格是抽出来的，两腿审阅还留着一批我**没自己开码**的断言。留着不当结论是不够的，所以逐条重读：
+
+**成立（六格，都归自动收集线 / 协作线）**
+
+| # | 判决（现量） | 位置 |
+|---|---|---|
+| ① | 同一份规则 config 在 create 与 saveEdit 里**手抄两遍**，`Math.max(1, Math.min(50, …))` 那一行在两处逐字符相同 ⇒ 任何夹取规则改动都要记得改两次 | `apps/web/src/features/settings/InboundAutomationSettings.tsx:231` 与 `:258` |
+| ② | 两条保存路径的 catch **不绑 error**：`catch { setError(t('web.ai.inbound.error.save')) }` —— 服务端明写的 `code`（含 402 的付费门槛）在界面层被丢成同一句"没接受这次改动" | 同文件 `:235`、`:263` |
+| ③ | 那个 402 错误类**在任何壳层都没有消费者**：`AutomationEntitlementRequiredError` 逐枚数（剔 `dist` 产物）命中只在 `packages/app-host` 的 src 与 tests，`apps/**` 读 **0** ⇒ 抛得出来、没人分得清 | `grep -rn "AutomationEntitlementRequiredError" --include='*.ts' --include='*.tsx' apps packages`（剔产物后 apps 侧 0） |
+| ④ | 读面自己写的红线没被执行：`:55-58` 注释是"认不出这个字段就**不渲染这一格**，而不是当 false 猜"，而 `list()` 的写法是 `!body.rules.every(valid) ⇒ throw transport` —— 一条坏规则拖垮整张列表，且把契约不合报成"网络故障" | `packages/app-host/src/inbound-rules-remote.ts:181`（对照 `:55`） |
+| ⑤ | 队列上限只数**还没抽的**行（`AND payload_ciphertext IS NOT NULL`），而抽取成功那一刻就把该列置 NULL（`hosted-extraction.ts:280`）⇒ 这条腿越成功，被计入 1000 条 / 64MB 分母的行越少 | `server/src/automation/inbound.routes.ts:182` |
+| ⑥ | 结果体积上限只在一腿有：设备腿 `events.ts:295` 卡 `resultCiphertext.length > 1_000_000`，托管腿那一档 `hosted-extraction.ts` 里 `1_000_000` 读 **0** 次 ⇒ 托管写进 `result_ciphertext` 的东西没有同一道闸 | `grep -c "1_000_000" server/src/automation/hosted-extraction.ts` |
+
+**判成"不是缺陷"的一格（如实记，别混进清单）**：`inbound.routes.ts:229` 失败时回执硬写 `'queued'`。库里那一行同批确实被改回 `queued`（`hosted-extraction.ts:272`），**回执与库一致**；审阅那条说"真实状态是 leased/prepared"，那一句我在读到的代码里没核实 ⇒ 判未成立。
+
+**拒收的一格**：同意面"四行条款各写一遍"——我原话抄了审阅的措辞，开码后形状不是那样。现量：唯一真源 `SHARE_CONSENT_SCOPE_KEYS` 在 `packages/ui/src/sync/share-consent-model.ts:74`，共享原语 `ShareConsentModal.tsx` 引用它 4 次（正确用法）；但**四枚宿主文件各自手抄同一串 key、零次引用那枚常量**（`ShareSpaceScreen` / `JoinShareScreen` / `ShareFeature` / `JoinSharedListDialog`，逐枚 `grep -c "consent.scope.e2ee"` 读 1、`SHARE_CONSENT_SCOPE_KEYS` 读 0）。所以成立的判决是"**宿主绕过了唯一真源**"（AGENTS §3.5 那一档），不是"条款文案被抄了四遍"。
+
+**为什么这一格我没顺手加一把尺**：条款清单的顺序现在有四处在宿主层各写各的，此时把"宿主不许自己列 `consent.scope.*`"做成门禁 ⇒ **它生下来就是红的**，本仓那条元规则（一枚天生红的尺比没有尺更糟）直接否掉。正确顺序是先让那四处改走常量、再上尺；那是协作线的代码与口径，代改不满足"三条齐"。要做也可以非红地做：按**棘轮**登记现量 4 为上限、只许减（仓里已有 `check-ratchet-ceilings` 那一族机制），但那是**判据口径**，得他们或你点头。
+
+```sh
+# 上面六格 + 那一格拒收的复量（整条可复制，全都不带竖线）
+grep -n "Math.min(50" apps/web/src/features/settings/InboundAutomationSettings.tsx
+sed -n '232,236p;260,266p' apps/web/src/features/settings/InboundAutomationSettings.tsx
+grep -rn "AutomationEntitlementRequiredError" --include='*.ts' --include='*.tsx' apps packages
+sed -n '53,59p;176,184p' packages/app-host/src/inbound-rules-remote.ts
+grep -n "payload_ciphertext IS NOT NULL" server/src/automation/inbound.routes.ts
+grep -c "1_000_000" server/src/automation/hosted-extraction.ts
+grep -rn "SHARE_CONSENT_SCOPE_KEYS" --include='*.ts' --include='*.tsx' apps packages
+```
+
+
 
 
 
