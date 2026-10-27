@@ -1417,3 +1417,12 @@ git diff --name-only 0cdaf8fdf <你此刻的 HEAD> -- apps/mobile/src apps/mobil
 ⚠️ **这一节改的是装置，不是产物**：下一趟（第 53 跑）才是第一次真印出那行 `- 起建点：…`。
 在那之前，本线**只有第 52 跑那一枚戳是手工补的**，其余 44 枚入库目录里的读数都没有戳 ——
 别拿"装置现在会盖章"读成"历史读数都有戳了"。
+
+⚠️ **本批没重跑 `pnpm verify:collab-suite`，是量过之后决定的，不是漏了**（现量三条）：
+`pgrep -fl 'vitest|playwright'` 回 **5 枚**（另一仓 `ssos/services/api` 的套件正在跑）、
+`sysctl -n vm.loadavg` 回 **18.92**、`xcrun simctl list devices booted` 回 **1 台**（不是本线起的）；
+且主检出此刻挂着自动收集线**四枚 `apps/mobile` 脏件**（`git status --porcelain -- apps/mobile` 现量）
+⇒ 那一趟会把别人在途的代码编进读数，红了归不到我这片（AGENTS §8 第 9 条 + #536 那形）。
+本线那把尺的最近一次读数仍是 §9.19 的 `SUITE=OK legs=4 failed=0`，**对 `fb0e7c107` 那一棵成立**
+（那一批的末笔，取法：`git --no-pager log --oneline -1 -S'9.19 ' -- docs/plans/collaboration-shared-lists.md`）。
+恢复条件与命令：设备面空 + 无外来套件 + `apps/mobile` 干净时跑 `pnpm verify:collab-suite`。
