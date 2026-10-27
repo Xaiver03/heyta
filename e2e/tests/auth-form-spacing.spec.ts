@@ -74,6 +74,11 @@
  * 常驻守卫在 `server/tests/password-reset-page.spec.ts`（那里记了同一组读数）。
  *
  * ⚠️ **第三套面本轮没量到：移动壳（`apps/mobile`，React Native）**。
+ *   先说清一件不需要量就能定的事：移动登录屏**没有「记住密码」这一枚控件**
+ *   （`apps/mobile/src/screens/AuthScreen.tsx` 里既没有该文案，也不渲染共享 `<AuthForm>`，
+ *   只借它的类型 ⇒ 现量 `grep -n "<AuthForm\\|remember\\|记住" apps/mobile/src/screens/AuthScreen.tsx`
+ *   只回一行 `useState<AuthFormMode>`）。所以用户报的那个形状在移动上不成立；
+ *   未判定的是**别的** RN 表单的间距。
  *   登记成"未判定"而不是"合规"，因为按上面那条教训，没量的面不许写结论。
  *   判它的断言就是本文件 ①③ 那两对（独立控件↔独立控件 ≥ `space.3`、触控目标 ≥ 44）
  *   搬到 RN 的读数上：`AppRegistry` 起模拟器后取 `measureInRow` 或走 AX bounds，
