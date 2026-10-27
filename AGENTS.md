@@ -85,7 +85,7 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 | [`docs/agents/overlay-feedback.md`](docs/agents/overlay-feedback.md) | **浮层与反馈**：提需求的四要素 / 危险四档 / 关闭策略表 / 债务账本门禁 | 写任何浮层、确认框、操作回执 |
 | [`docs/agents/commands.md`](docs/agents/commands.md) | **常用命令**：install / build / typecheck / test / 各 `verify:*` / 各 `check:*` | 跑任何命令前 |
 | [`docs/agents/multi-end-build.md`](docs/agents/multi-end-build.md) | **多端构建与固定收尾**：`pnpm reinstall:all` 四端重装、各端判据 | 交付一轮之前 |
-| [`docs/agents/ui-acceptance.md`](docs/agents/ui-acceptance.md) | **界面验收两条硬性规定**：Playwright 必须真跑+真看截图 / 不许抢前台 | 写验收、跑 GUI 测试 |
+| [`docs/agents/ui-acceptance.md`](docs/agents/ui-acceptance.md) | **界面验收硬性规定**：Playwright 必须真跑+真看截图 / 不许抢前台 / "同类缺陷没有"这句要带现量读数 | 写验收、跑 GUI 测试 |
 | [`docs/agents/ux-principles.md`](docs/agents/ux-principles.md) | **界面结构原则（解剖）**：控件高度一档 / 一行一容器 / 动作区常驻 / 配置收起；每条带可判红的判据 | 写任何表单、对话框、设置页 |
 | [`docs/agents/environment-traps-index.md`](docs/agents/environment-traps-index.md) | **环境陷阱索引**：号段 → 主题；三条元规则 | 排查"本地过、容器不过" |
 | [`docs/agents/workflow-rules.md`](docs/agents/workflow-rules.md) | **工作流 25 条**：对账 / 安全判据 / 同步语义 / 提醒回执 / iOS 验收纪律 | 做任何实质改动 |
@@ -134,7 +134,7 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 | 6 | 常用命令 | [`commands.md`](docs/agents/commands.md) |
 | 6.1 | 多端构建 | [`multi-end-build.md`](docs/agents/multi-end-build.md) |
 | 6.1.1 | 固定收尾流程：清旧包 → 重打 → 四端重装 | [`multi-end-build.md`](docs/agents/multi-end-build.md) |
-| 6.2 | 界面验收：两条**硬性规定** | [`ui-acceptance.md`](docs/agents/ui-acceptance.md) |
+| 6.2 | 界面验收：**硬性规定** | [`ui-acceptance.md`](docs/agents/ui-acceptance.md) |
 | 7 | 环境陷阱（索引） | [`environment-traps-index.md`](docs/agents/environment-traps-index.md) |
 | 8 | 工作流 | [`workflow-rules.md`](docs/agents/workflow-rules.md) |
 | 9 | 当前进度 | [`progress-log.md`](docs/agents/progress-log.md) |
