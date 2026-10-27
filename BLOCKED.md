@@ -12377,3 +12377,11 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 这条 server 测试、以及它 --self-test 那一臂）。其余各包全过：`packages/ui` 51/51、
 `apps/web` 209 passed + 2 skipped、`server` 174/175 文件、`apps/mobile` 90/90、
 `packages/app-host` 121/121 —— 所以我这几笔（含 `AuthForm` 与两处组间距的改动）没有打破单测。
+
+**✅ 收（2026-10-27 现量，三个消费者各自量过，不是推断）**：
+`pnpm -s check:selection-single-source` **绿**、`pnpm -s check:md-tables` **绿**
+（输出："markdown 表格行：29 个文件，列数、断行…都一致"），
+`cd server && npx vitest run tests/inbound-lane-rigs-consumers.spec.ts` **16/16 过**。
+⇒ 那两条线的编辑已各自补齐，本条不再有拦路的红；**我没有代它们改任何东西**，
+从头到尾只登记归属。留这一节的用处是下面那条一般规律 —— 下次在共享工作树里看见
+`pnpm check` 红，先 `git diff` 点名那枚文件归谁，再决定是修还是登记。
