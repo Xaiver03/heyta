@@ -291,6 +291,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    /**
+     * 选中那一枚**不只靠底色**区分：暗色下 `primary-subtle` 与透明底差别很小，
+     * 所以同时换边框色与文字色（装配判据另钉 `aria-selected`，见 §9.16 那格）。
+     */
     projectChipOn: {
       borderColor: tokens['color.primary'],
       backgroundColor: tokens['color.primary-subtle'],
