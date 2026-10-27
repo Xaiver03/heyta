@@ -12142,3 +12142,8 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
    ⚠️ 顺带一条形状更正（我写这条时先只数到五枚，第二次量已是几十枚）：**受害面不是一个目录而是整片 `apps/web/evidence`** —— 按"我看到的那几枚"下结论会把处置写窄（只防 account-suite 那一族），实际要防的是 e2e 套里每一个 `shot(...)` 的落点。
    ⇒ 规矩三条：① 跑整条 `check` **前**先存一份 `git status --porcelain` 快照，**后**再逐枚归因（谁名下、哪枚 spec 写的图），不许把"跑之前干净"沿用成"跑之后干净"；② 写"输入面干净"要**明确剔掉 `evidence/` 并写下"这一维由门禁自己会动"**，否则那句话的有效期比一次运行还短；③ 提交永远列到**文件**、不列目录，别人那几枚图一枚都不取（要还原则 `git restore -- <那几枚路径>`，先确认它们不在我的作用域里）。
    归族：#600（带时态的声称——这次坏的是"输入面干净"这一句，它过期不是几分钟，是**一次运行**）、#601 同批、§5 元规则三（"测试全绿 ≠ 这是当前产物"更硬的一面：跑测试会把产物改掉）。
+603. 🔴 **ssh 进 Windows 再套一层 PowerShell：三层引号会把 `-Filter` 里的引号吃掉 ⇒ CIM 报「无效查询」而 `SSH_RC=0`，读起来像"这台机没有那个组件"**（2026-10-27 协作线现量 `windows-pc` 那枚"Android 硬件加速前置"时撞上，读数与取法记在计划 §9.29）：
+   形状：本地 zsh 一层、远端 cmd 一层、PowerShell 一层。写的是 `ssh windows-pc 'powershell -NoProfile -Command "Get-CimInstance Win32_OptionalFeature -Filter \"Name=''X''\" | Format-List …"'`，落到 PowerShell 那一刻引号已经没了，它收到的是 `Filter Name=X` —— 报 `Get-CimInstance : 无效查询`（`HRESULT 0x80041017`），**而这条 ssh 仍然以 0 退出**。
+   坏在哪：这种红**长得像否证**。错误信息还在 stderr 的 GBK 乱码里（只剩一枚 HRESULT 数字读得清），所以只看退出码的人会把"没有输出"记成"这台机上没有这个开关"，而那正是决定**要不要重启一台共享装机**的依据。同族两发都是同一形状：#601（三个信号全绿、产物缺字）与那条 `dir /b … 2>nul & adb devices` 合成一发时 `dir` 那格输出整段消失而 rc=0。
+   ⇒ 规矩三条：① 远端 PowerShell **一律**走 `powershell -NoProfile -EncodedCommand <base64>`，base64 在同一条本地命令里生成（`iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n'`），让引根本不进第二层 shell；② 脚本里每个可能为空的查询自带"空结果也打一行标记"的分支（本次写的 `DEVICEGUARD_QUERY_EMPTY`），把"没查到"与"没跑成"分成两种输出；③ 判一次远程探针可不可信，**不看退出码，看它有没有打出预期的那行标记**（§5 元规则二在这里的读法：`SSH_RC=0` 就是那条永远通过的判据）。
+   归族：#601、#597（打空的探针既没否认也没确认）、§5 元规则一（先怀疑探针）与二。

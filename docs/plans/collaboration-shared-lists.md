@@ -887,7 +887,7 @@ ADR-0050 那句「RN port 只传递 base64 root key」加了**限定范围**的�
 | 格 | 状态 | 判它的断言（能红的那把尺） | 归属 |
 |---|---|---|---|
 | **点立刻卸载的 `Pressable` 会把 App 崩掉**（第 28 跑那一发，#549 同签名） | 🔴 **未判定** —— 只有一发实测，同一发在第 26 跑没崩 | 断言必须是**可重复的**：同一台模拟器上连开/关共享面 N 轮（#549 用的是 6 轮 pid 不变 + `-newermt` 新增 `.ips` 数 0，含 `Retired/`）。拿不到调用名这件事本身已由 #549 证死 ⇒ 只能从形状消除（`Pressable` 的 `setPressed` 在 unmount 之后不许再派发）。**本批没做完是因为它需要先有一个稳定复现**，而一次崩溃不构成复现 | 本线（移动装置腿撞上的） |
-| **Android 的 M6 设备腿** | 🔴 **载体半装，界面腿仍跑不了** —— 2026-10-27 现量把上一版那句"载体不存在"改准：`windows-pc` 上 `adb.exe` **在**（platform-tools 已装、daemon 起得来）、AVD **有一枚**（`%USERPROFILE%\.android\avd` 里 `opp-smoke.avd`），**缺的是 `Sdk\emulator` 那枚主程序** ⇒ 那枚 AVD 起不动，且 `adb devices` 空（没插真机）。三条取法都在 `ssh windows-pc` 上跑：`if exist "%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe"`（NO）、`dir /b "%USERPROFILE%\.android\avd"`（有）、`adb devices`（空表）。⚠️ 远端默认 shell 是 **cmd**，用 bash 语法探它会打出"系统找不到指定的路径"，那条不是否证（本轮先撞了一次）。⇒ 解锁差的是一段**装机动作**（补 Google 的 emulator 组件，或插一台真机），不是排期。<br>🔴 **2026-10-27 19:0x 把那枚"缺 emulator 主程序"的分母枚举完，实际少的是两枚组件**：`ANDROID_HOME` 与 `ANDROID_SDK_ROOT` 现量指同一棵 `%LOCALAPPDATA%\Android\Sdk`（不是多处装机），把那棵根 `dir /b` 逐格读出来是 build-tools／cmake／cmdline-tools／licenses／ndk／platform-tools／platform-tools-2／platforms —— **既没有 `emulator`，也没有 `system-images`**。而那枚 AVD 的 `config.ini` 现量写着 `image.sysdir.1 = system-images\android-36\google_apis\x86_64`、`abi.type = x86_64`，`system-images\android-36` 那一格现量 NO ⇒ **光补 emulator 起不动它**。四条取法：`where adb`、`echo %ANDROID_HOME% %ANDROID_SDK_ROOT%`、`dir /b "%LOCALAPPDATA%\Android\Sdk"`、`findstr /i "sysdir abi" "%USERPROFILE%\.android\avd\opp-smoke.avd\config.ini"`<br>🔄 **2026-10-27 18:1x 复量三格，形状未变**：`EMULATOR=NO`、`%USERPROFILE%\.android\avd` 里 `opp-smoke.avd` + `opp-smoke.ini` 在、`adb devices` 空表。<br>⚠️ 复量那发踩到一枚**打空的远程探针**：把 `dir /b … 2>nul & adb devices` 合成一发 ssh 载荷时，**`dir` 那一格的输出整段消失而 `SSH_RC=0`**，<br>读起来像"AVD 目录空了"。拆成两条、并给 `dir` 那格加上 `[AVD-BEGIN] … [AVD-END rc=%errorlevel%]` 两枚标记才读得到那两行<br>（同族：#601「三个信号全绿而产物缺字」、以及那发 PowerShell 单引号被 shell 吃掉而 rc=0 的记录）。 | 两格分开看：①**出包腿已过** —— `scripts/run-gradle.mjs` 在 `windows-pc` 上打，四条身份判据（工作树 tar 对账 / 旧产物清除 / mtime ≥ 构建起点 / 拉回后 sha256 逐字相同）当轮全过，读数见 §9.13；②**界面腿没有装置** —— 与协作旅程对应的那枚装置只有 iOS 一份（现量：`ls scripts/verify*collab*`），而现存的 Android 设备装置 `verify-android-vault-storage.sh` 用的是**本机** adb（`ANDROID_HOME` 默认 `/opt/homebrew/…`）+ `emulator-5554`（现量：`grep -n ADB_BIN scripts/verify-android-vault-storage.sh` 与同一文件里的 `SERIAL=` 两格各看一次）⇒ 它的形状与"Android 一律走 `ssh windows-pc`、不在 Mac 起模拟器"那条长期令**直接冲突** | 要么新写一枚驱动远端设备的 Android 旅程装置（含"服务端在另一台机器上、设备要够得着"那一格），要么按出包 + JS 侧形状读数结案 —— **归产品负责人拍**，本线不自行把"编译过"读成"Android 已验" |
+| **Android 的 M6 设备腿** | 🔴 **载体半装，界面腿仍跑不了** —— 2026-10-27 现量把上一版那句"载体不存在"改准：`windows-pc` 上 `adb.exe` **在**（platform-tools 已装、daemon 起得来）、AVD **有一枚**（`%USERPROFILE%\.android\avd` 里 `opp-smoke.avd`），**缺的是 `Sdk\emulator` 那枚主程序** ⇒ 那枚 AVD 起不动，且 `adb devices` 空（没插真机）。三条取法都在 `ssh windows-pc` 上跑：`if exist "%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe"`（NO）、`dir /b "%USERPROFILE%\.android\avd"`（有）、`adb devices`（空表）。⚠️ 远端默认 shell 是 **cmd**，用 bash 语法探它会打出"系统找不到指定的路径"，那条不是否证（本轮先撞了一次）。⇒ 解锁差的是一段**装机动作**（补 Google 的 emulator 组件，或插一台真机），不是排期。<br>🔴 **2026-10-27 19:0x 把那枚"缺 emulator 主程序"的分母枚举完，实际少的是两枚组件**：`ANDROID_HOME` 与 `ANDROID_SDK_ROOT` 现量指同一棵 `%LOCALAPPDATA%\Android\Sdk`（不是多处装机），把那棵根 `dir /b` 逐格读出来是 build-tools／cmake／cmdline-tools／licenses／ndk／platform-tools／platform-tools-2／platforms —— **既没有 `emulator`，也没有 `system-images`**。而那枚 AVD 的 `config.ini` 现量写着 `image.sysdir.1 = system-images\android-36\google_apis\x86_64`、`abi.type = x86_64`，`system-images\android-36` 那一格现量 NO ⇒ **光补 emulator 起不动它**。四条取法：`where adb`、`echo %ANDROID_HOME% %ANDROID_SDK_ROOT%`、`dir /b "%LOCALAPPDATA%\Android\Sdk"`、`findstr /i "sysdir abi" "%USERPROFILE%\.android\avd\opp-smoke.avd\config.ini"`<br>🔄 **2026-10-27 18:1x 复量三格，形状未变**：`EMULATOR=NO`、`%USERPROFILE%\.android\avd` 里 `opp-smoke.avd` + `opp-smoke.ini` 在、`adb devices` 空表。<br>⚠️ 复量那发踩到一枚**打空的远程探针**：把 `dir /b … 2>nul & adb devices` 合成一发 ssh 载荷时，**`dir` 那一格的输出整段消失而 `SSH_RC=0`**，<br>读起来像"AVD 目录空了"。拆成两条、并给 `dir` 那格加上 `[AVD-BEGIN] … [AVD-END rc=%errorlevel%]` 两枚标记才读得到那两行<br>（同族：#601「三个信号全绿而产物缺字」、以及那发 PowerShell 单引号被 shell 吃掉而 rc=0 的记录）。<br>🔴 **2026-10-27 19:0x 连"x86_64 硬件加速在不在"这件前置也量了**（三枚虚拟化可选组件全未启用、VT-x 被 VBS 占住、磁盘与内存都不拦路）⇒ 这一格的解锁代价现在是**两枚 SDK 组件 + 一枚要管理员且要重启共享机的 Windows 可选组件 + 一枚还不存在的远端旅程装置**；逐格读数、取法命令、那条"未判定"实验的断言都在 §9.29。 | 两格分开看：①**出包腿已过** —— `scripts/run-gradle.mjs` 在 `windows-pc` 上打，四条身份判据（工作树 tar 对账 / 旧产物清除 / mtime ≥ 构建起点 / 拉回后 sha256 逐字相同）当轮全过，读数见 §9.13；②**界面腿没有装置** —— 与协作旅程对应的那枚装置只有 iOS 一份（现量：`ls scripts/verify*collab*`），而现存的 Android 设备装置 `verify-android-vault-storage.sh` 用的是**本机** adb（`ANDROID_HOME` 默认 `/opt/homebrew/…`）+ `emulator-5554`（现量：`grep -n ADB_BIN scripts/verify-android-vault-storage.sh` 与同一文件里的 `SERIAL=` 两格各看一次）⇒ 它的形状与"Android 一律走 `ssh windows-pc`、不在 Mac 起模拟器"那条长期令**直接冲突** | 要么新写一枚驱动远端设备的 Android 旅程装置（含"服务端在另一台机器上、设备要够得着"那一格），要么按出包 + JS 侧形状读数结案 —— **归产品负责人拍**，本线不自行把"编译过"读成"Android 已验" |
 | **手机自己「开启共享」那一格**（含「手机用户能建清单」） | ✅ **本批闭合**（2026-10-26 第 35 跑，`run-rc=0`） | 装置第 10b 步 L7：手机自己建清单 → 设为共享（owner 一侧同意闸）→ 签发邀请 → 服务端读形状（`node scripts/lib/collab-owner-step.mjs phone-owner`：`role=owner` + 所有者行带 `signingPublicKey` + 活邀请数）→ 撤销回到无邀请态 → 首页两份并排。逐格读数与四张截图在上面「第 35 跑新增的两格」那张表。⚠️ 第 33 跑那发 `exit 3` 的教训登记为环境陷阱 **#579**（装置的"前提不成立"可能就是产品定义里没走过的那一格） | 本线 |
 | **同意面文案的视角**（owner 语 vs 入群语） | 待拍板 | 判据在 `packages/i18n/src/locales/zh-CN.ts` 的 `common.share.consent.body` / `.accept` 两行；理由与截图指针在 ADR-0071 补记末段 | **归产品负责人** —— 属于对外法律表征，本线不代改 |
 | **登出 / 撤销要不要连带清 share 那几格** | 待拍板 | 现量：`clearMobileVaultSession` 今天只删 root key（`grep -n "clearMobileVaultSession" apps/mobile/src/**/*.ts`） | **归产品负责人** —— 是"清掉用户资产"这种不可逆取向的取舍 |
@@ -1536,7 +1536,7 @@ git diff --name-only 0cdaf8fdf <你此刻的 HEAD> -- apps/mobile/src apps/mobil
 |---|---|---|
 | ① 登出·撤销要不要连带清 `#share-keys` 那一格 | `clearMobileVaultSession` 只删 root key（现量 `grep -c removeVaultRootKey apps/mobile/src/lib/vault-session-cleanup.ts`），密钥料那格留着但**已解不开**（vault 信封包裹），不是明文泄露 | **推荐维持现状**：清它要改别线那枚 vault 会话清理时序。翻案条件：做"换设备迁移"工具时一并处理 |
 | ② 同意面文案的视角 | 现词逐字（`packages/i18n/src/locales/zh-CN.ts` 的 `common.share.consent.*`）：标题「共享清单」／正文「把清单设为共享前，请确认以下事项」／三格「任务标题、备注、日期与清单名对成员可见」＋「服务端会记录成员关系与角色（内容仍加密，服务端不可读）」＋「你的其它清单不受影响」／按钮「确认共享」。**owner 语与入群语共用同一批** | **推荐拆两格**，入群侧改成「加入后，这份清单里的任务、便签、评论会和对方互相同步，双方都能改」。这句是对外告知范围，**措辞我不代改** |
-| ③ Android 界面腿解锁 | 今日复量三格照旧：`EMULATOR=NO`、`opp-smoke.avd` 在、`adb devices` 空（取法与那枚打空的远程探针教训都在 §9.14 那一格） | **推荐补 emulator 组件**（一次装机、不买设备）。⚠️ 这句今天按现量改准代价：**要装两枚**，`emulator` **加** `system-images;android-36;google_apis;x86_64`（那枚 AVD 的 `config.ini` 指着 `system-images\android-36\google_apis\x86_64`，该格现量 NO），另有一件今天没量的前置是那台机 x86_64 硬件加速在不在。补完还要新写一枚"驱动远端设备 + 服务端在另一台机器"的旅程装置，那是另一段工作量。**不在 Mac 起模拟器**（仓内长期令） |
+| ③ Android 界面腿解锁 | 今日复量三格照旧：`EMULATOR=NO`、`opp-smoke.avd` 在、`adb devices` 空（取法与那枚打空的远程探针教训都在 §9.14 那一格） | **推荐先做 §9.29 那条断言**（补两枚组件只要加法、不要管理员，一趟就能问清"没加速到底能不能起到可用"）；要启用 `HypervisorPlatform` 那一档我不自取，因为要重启你正在用来构建的那台机。⚠️ 原话那句"推荐补 emulator 组件（一次装机、不买设备）"按现量改准代价：**要装两枚**，`emulator` **加** `system-images;android-36;google_apis;x86_64`（那枚 AVD 的 `config.ini` 指着 `system-images\android-36\google_apis\x86_64`，该格现量 NO），另有一件前置今天量了 —— 见下格与 §9.29（原先写的是"没量的前置"）。<br>🔴 **2026-10-27 19:0x 硬件加速那一档的读数**：三枚虚拟化可选组件（`HypervisorPlatform`／`VirtualMachinePlatform`／`Microsoft-Hyper-V-All`）的 `InstallState` 全为 2（在这台机上、**未启用**），`HypervisorPresent` 却是 True —— 先占住 VT-x 的是 VBS／内核隔离那一档 ⇒ 补两枚 SDK 组件是**加法、不要管理员**，而要启用 `HypervisorPlatform` 就是**管理员权限 + 重启这台共享装机**。<br>⚠️ 一句如实：**"没有加速时那枚 x86_64 镜像能不能起到可用"今天测不了**（那台机上根本没有 emulator 主程序），§9.29 把它登记成"未判定 + 判它的断言"，不是缺陷。补完还要新写一枚"驱动远端设备 + 服务端在另一台机器"的旅程装置，那是另一段工作量。**不在 Mac 起模拟器**（仓内长期令） |
 | ④「事后改归属」 | 把**已有**便签挪进别的清单（`setNoteProject`）在两壳仍零调用点（现量 `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'` ⇒ 只剩接口声明与实现两处；⚠️ 别扫整个 `apps`，会命中 `apps/web/dist` 的产物） | **推荐排下期**：它不在本次成功定义里，本次不扩范围 |
 | ⑤ 系统横幅那一档 | 两端回收形状不同形已逐端改准并有常驻判据钉着（#598、§9.21–§9.22） | **推荐不承诺系统横幅**，保持"通知中心那一档 + 入口徽标"。要 Android 侧上横幅需另立 ADR |
 | ⑥ 那枚别线的 e2e 红要不要我递 | `rail-roving` 那枚断点红**归属线自己早就在册**：现量 `grep -n 'rail-roving' BLOCKED.md` 两处，两处都写「未查（dnd-kit Space 传感器与 roving tabindex）」 | **本线不再重复登记**（重复条目只会让下一个读数的人以为有两只不同的红）。要做的是改那条线自己的排期，不在我射程内。<br>⚠️ 同一趟顺手否证了 §9.19 那句「整链只剩 `apps/web` 的 `task-sort` 那一枚红」：现量 `cd apps/web && npx vitest run tests/task-sort.spec.tsx tests/task-selection.spec.tsx` ⇒ 2 passed / rc=0。那句是**截断链只暴露第一个红**的读数被抄成红集全集（元规则：截断的读数不是全集），已在 progress-log 与 feature-matrix 两处入口改口 |
@@ -1547,7 +1547,65 @@ git diff --name-only 0cdaf8fdf <你此刻的 HEAD> -- apps/mobile/src apps/mobil
 断点处读回 181）。我**一张都没提交、也没替谁还原**。成因与三条处置入册环境陷阱 **#602**；
 本线今后判输入面**把 `apps/web/evidence` 整个剔出分母**。
 
+🔄 同日 19:1x 复量这一格（"181 枚脏着"是瞬时读数，不重测就不能接着说）：`git status --porcelain -- apps/web/evidence | wc -l`
+已不是 181 —— 别线的一笔 `8cd3e3e30`（10-27 18:59，182 枚文件里 161 枚落在 `apps/web/evidence`）把那批按当前产物**落仓了**，
+不是我提交的，我也没替谁还原；复量那一刻工作树里只剩 2 枚脏（`help-link-render-1013/` 的图与 `readout.json`），
+那是**又一趟别线运行正在改**，属瞬时读数，我没碰。**剩下的落点本线不逐枚追**（不是本线资产）。
+⇒ 结论与那句处置都不变：**这一片永久剔出输入面分母**，因为只要有人跑过 `check` 它就会脏。
+
 另记一件共享 `main` 的既成事实：本批 push 连带公开了别线当时未推的提交（枚数现量
 `git log --oneline 691b3f0bf..4488ebaca --grep '自动收集' | wc -l`）。那条线的会话已自己把这句写进台账
 （`fd74d3aba`：「共享 main 上这条纪律不由本线单方守得住」），所以这不是需要谁来守的边界，
 **下一位不必再把它升级成待决**。
+
+### 9.29 Android 界面腿那件"没量的前置"，今天量了（2026-10-27 19:0x，同一台 `windows-pc`，全程只读）
+
+为什么单开一节：§9.28 的 ③ 那格此前写的是「要装两枚组件，**另有一件没量的前置**是那台机 x86_64 硬件加速在不在」。
+"没量的前置"留给下一位，他要么重新摸索一遍，要么按"装两枚就好"去排期 —— 所以这一节把它的读数、取法命令、
+代价分档，以及那条**还没做的实验**（含判它的断言）一次写全。这台机上没装、没改、没重启任何东西。
+
+取法（三条都在 `ssh windows-pc` 上跑，形状见本节末那条探针教训）：
+
+```powershell
+# 1) 虚拟化可选组件处于什么状态、hypervisor 是不是已经在跑
+Get-CimInstance Win32_OptionalFeature | Where-Object { $_.Name -in 'HypervisorPlatform','VirtualMachinePlatform','Microsoft-Hyper-V-All' } | Format-List Name,InstallState
+Get-CimInstance Win32_ComputerSystem | Format-List HypervisorPresent,TotalPhysicalMemory
+Get-Service HvHost,vmms,vmcompute -ErrorAction SilentlyContinue | Format-List Name,Status,StartType
+# 2) 是谁先占住了 VT-x
+Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\Microsoft\Windows\DeviceGuard | Format-List VirtualizationBasedSecurityStatus,CodeIntegrityPolicyEnforcementStatus,SecurityServicesRunning
+# 3) 装两枚组件要的地儿够不够
+Get-PSDrive C | Format-List Used,Free
+```
+
+当趟读数（10-27 19:0x 那一戳）：
+
+| 那一格 | 读数 | 它说明什么 |
+|---|---|---|
+| `HypervisorPlatform`（WHPX —— Hyper-V 态下 Android 模拟器唯一能用的加速 API） | `InstallState=2` | 在这台机上、**没启用**；启用它要管理员权限，而且**要重启** |
+| `VirtualMachinePlatform` 与 `Microsoft-Hyper-V-All` | 同样 `InstallState=2` | 整机没开 Hyper-V 那一档 ⇒ `vmms`／`vmcompute` 两枚服务查不到，只有 `HvHost` 在跑（StartType=Manual） |
+| `HypervisorPresent` | `True` | VT-x **已经被一个 hypervisor 占着**，而占它的不是 Hyper-V 角色 —— 见下条 |
+| `VirtualizationBasedSecurityStatus` 与 `CodeIntegrityPolicyEnforcementStatus` | `2` 与 `2` | VBS 在跑、内核隔离（HVCI）在执行 ⇒ 这就是上面那对"没启用却已存在 hypervisor"的来源 |
+| `TotalPhysicalMemory` 与 C 盘 `Free` | 约 16 GiB 与约 65 GiB | **内存与磁盘都不拦路**（拦路的是那枚开关 + 重启那台机） |
+
+⇒ 三条结论，逐条可判红：
+
+1. **"补两枚 SDK 组件就能跑界面腿"这句今天不能算成立。** 那枚 AVD 指着 x86_64 google_apis 镜像，而加速 API 未启用。
+2. **代价分两档，归属不同。** 补 `emulator` + `system-images;android-36;google_apis;x86_64` 是**加法、不要管理员**
+   （`sdkmanager` 在 `cmdline-tools\latest\bin` 里，`licenses` 目录已在册）；启用 `HypervisorPlatform` 要**管理员 + 重启这台共享装机**
+   —— 那台机上随时挂着别线的构建／重装腿，所以这一档我不自取，归负责人。
+3. **还有一条更便宜的路没被排除**：插一台 Android 真机（判据是 `adb devices` 从空表变非空），那样两枚组件与那枚开关都不需要，
+   唯一还缺的仍是"驱动远端设备 + 服务端在另一台机器"的那枚旅程装置。
+
+🔴 **未判定的一格，与判它的断言**（不写成缺陷，因为这台机上根本没有 emulator 主程序，测不了）：
+「没有加速时那枚 x86_64 镜像能不能起到可用」。断言：补完两枚组件后在 `windows-pc` 上
+`emulator -avd opp-smoke -gpu swiftshader_indirect -no-window -no-accel`，并在 3 分钟内读到
+`adb shell getprop sys.boot_completed` = 1 ⇒ 读到 = 那枚开关不必动、界面腿只差装置；读不到 = 解锁必须含"启用 WHPX + 重启"那一档。
+这条实验**做在装完组件之后**，一趟就能把"要不要重启那台机"这个问题从取向题变成事实题。
+
+⚠️ **一枚探针形状**（入册环境陷阱 **#603**）：这三枚读数只能用 `powershell -NoProfile -EncodedCommand` 打
+（脚本先 `iconv -f UTF-8 -t UTF-16LE | base64`）。第一发我把 `-Filter "Name='HypervisorPlatform'"` 经
+ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShell 直接报 `Get-CimInstance : 无效查询`
+（`HRESULT 0x80041017`），**而 `SSH_RC` 仍是 0** —— 那条红只在 stderr 的中文乱码里，只看退出码就会把它读成"这台机没有这个组件"。
+同族：#601「三个信号全绿而产物缺字」、以及本节 §9.14 那发 `dir /b … 2>nul & adb devices` 打空而 rc=0 的远程探针。
+判法两条：远端 PowerShell 一律 `-EncodedCommand`；脚本里自带"空结果也要打一行标记"的分支（本次那条 `DEVICEGUARD_QUERY_EMPTY` 就是这么写的）。
+
