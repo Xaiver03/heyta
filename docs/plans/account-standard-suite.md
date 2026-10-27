@@ -4691,3 +4691,43 @@ diff 打开只有那两行，与"旧"无关。
 本线只做两件自己能做的：① 让它可复量（这枚尺）；② 把"临时探针会进常驻射程"这句连同取数命令登记在这里。
 ⚠️ 这不是"我删了它"：`e2e/tests/tmp-discard-probe.spec.ts` 不是我造的对象，共享检出上按名字删别人的在飞文件是本仓明令禁止的那一类。
 
+### 6.100（2026-10-28 00:3x · "含并行会话的也要入库"量到最后是一枚跨线 import，不是一堆能直接提的改动）
+
+目标那句是"所有未提交改动（含并行会话留下的）按逻辑分组入库"，收干净的口径给了两档：脏集为空，**或**只剩明确登记的例外并写清为什么。这一节就是那个"为什么"，并且把它从散文变成尺判得到的东西。
+
+**量到的形状（三条现量，逐条附命令）**
+
+| 读数 | 内容 |
+|---|---|
+| ① 硬前提 | 一枚**已跟踪、已改动**的界面文件 import 了一枚**没入库**的新模块：`apps/web/src/features/calendar/CalendarCapturePopover.tsx:9` → `../../lib/form/useDirtyDismissGuard.js`，而 HEAD 的 `apps/web/src/lib/form/` 里只有 `FormField.tsx` |
+| ② 它还在被写 | 那枚 hook 不是"写完忘了提交"：mtime 落在分钟级（同上一条命令里的 `stat`），作者此刻还在调 |
+| ③ 本组自身没缺口 | 日历那一组其余依赖全在 HEAD：两个 locale 文件里 `web.calendar.sidebar.*` 各就位；被删的两个 prop 在**源码**里引用面为 0 |
+
+第③条我第一发读错过，两格都值得记：
+
+- 我先 `git show HEAD:packages/i18n/src/locales/zh.ts` 读回 **0**，据此差点写成"词条不在 HEAD"。那个 0 的成因是 **`zh.ts` 这个文件在本仓不存在**（真名 `zh-CN.ts`，`git ls-tree` 现量）—— 对着不存在的文件 grep，空读数是搜法的属性，不是词条的属性。逐个真名重读：两份 locale 各有 2 枚，HEAD 里就在。
+- `sidebarOpen` / `onToggleSidebar` 的第一发引用面读回 7 行，全住在 `apps/web/dist-types/**`（上一次构建的产物，不是调用方）。限定到 `apps/web/src`、`packages`、`e2e` 并剔产物后读回 **0** —— "没有别的调用方"这句这才成立。
+
+**为什么这三条合起来就停在这里**：提那 4 枚 = 把 HEAD 写成"代码引用仓库里没有的模块"，红的是下一位的 `pnpm build` / `typecheck`，不是我这笔；把 hook 一起提 = 我以别人两分钟前写完的一半落仓。两档里前一档（登记例外）是目标允许、且不制造半棵树的那一档。
+
+**把登记变成尺**：`scripts/check-worktree-exceptions.mjs` 加第二判 `crossLineImports` —— 逐枚扫未提交里**已跟踪**的 `.ts/.tsx/.mts`，解析其相对说明符（含 `.js`→`.ts/.tsx` 与无扩展名两档），落点不在 `git ls-files` 里就点名，分 `untracked`（在树上没入库）与 `dangling`（落点上根本没有）两种判决。自检 **14 臂**（新增 ⑩⑪⑫⑬⑭），现实读数 1 处、`--strict` rc=1。
+
+```sh
+# 现量：第二判 + 臂数 + strict 的退出码
+node scripts/check-worktree-exceptions.mjs | sed -n '/跨线依赖/,$p'
+node scripts/check-worktree-exceptions.mjs --self-test | tail -1
+node scripts/check-worktree-exceptions.mjs --strict > /dev/null 2>&1; echo $?
+```
+
+**变异轮（证明第二判能红，还原只从 `.mut-bak`）**：把 `isTracked(c)` 那一格换成恒真 ⇒ 自检 ⑩⑫ 两臂 🔴、`臂数 14 ｜ 不符 2`、rc=1，同时现实里那枚真依赖被洗成"跨线依赖 0 处"（这就是假绿的长相）。`mv` 回原文件后：14 臂全绿、现实读数回到 1 处、`grep -c` 那句判据读回 1 行原始形状。
+
+**我自己这一趟又犯了一次同一类错**：第一发 `--strict` 之前，尺把三枚 `from './helpers'` 判成 `dangling`，而 `e2e/tests/helpers.ts` 明明已入库 —— 成因是我的候选解析只补了 `index.*`，没补无扩展名那一档，于是别线的 spec 整批假红。修解析并加 ⑭ 臂把它钉住（⑭ 的夹具让 `exists()` 恒假、只有 `isTracked` 认 `helpers.ts`，解析再漏一次就红）。同一天在复取命令上栽的是同一类：**报"没有"之前先问是不是搜法看不见**。
+
+**翻案条件（读数一变我就该代提）**：
+
+```sh
+git ls-files --error-unmatch apps/web/src/lib/form/useDirtyDismissGuard.tsx  # 退 0 = 作者已入库
+```
+那时第二判读 0 处，日历那组自成一组（词条与 prop 的依赖面已在 HEAD，见上③），我按 pathspec 代提；`pnpm check:worktree-exceptions` 的未登记栏届时应只剩 `tmp-discard-probe.spec.ts` 一枚 —— 那一枚要 UX 线的作者自己收（见 §6.99）。
+
+
