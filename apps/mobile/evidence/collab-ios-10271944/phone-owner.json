@@ -1,0 +1,12 @@
+{
+  "shareId": "721c5813-06d0-486d-bbed-d449a21aa968",
+  "ownerMemberId": "3b97ae83-88a6-4ebe-98e4-05c7bafdcb58",
+  "signingPublicKey": "wk6x8ku9b3jebysCh92pQI7E3//WRjQzXj4OPmpuxXY=",
+  "keyEpoch": 1,
+  "memberCount": 1,
+  "invitationCount": 1,
+  "liveInvitationCount": 1,
+  "invitedEmails": [
+    "collab-owner-10271944@example.test"
+  ]
+}
