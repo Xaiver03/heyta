@@ -4518,3 +4518,11 @@ LC_ALL=C            两种写法都对 —— 所以这枚坑只在正常终端�
 - **换线上容器那一步**：本修复不需要新迁移（库里的名字本来就对，改的是客户端的看法），要做的是"重建生产镜像 + 换容器"。`scripts/deploy-ssh.mjs` 三档：`--dry-run` 只打印计划 → 默认 `--sandbox`（一次性网络/库/容器）→ `--apply --yes-production`（覆盖在用镜像 tag、重启 `supersync-server`，两旗同时给才算人拍过）。按 `docs/runbooks/deployment.md` 6b：先打 `supersync:rollback-<日期>`、旧容器仍在服务时跑迁移、`MIGRATE_RC=0` 才 `up -d --wait`；换完重取 §3.8.1 五条线上判据。**没授权之前本线两档都不跑**。
 - **`resend` 那格把服务端故障说成"这验证码无效或已过期"**（`server/src/api.ts:2520`），而同一族紧邻的 verify 已明写"服务端故障不许说成码不对"（`server/src/api.ts:2488`）⇒ 一份立场两处写法。改成 503 是 **HTTP 线协议语义**（🔴 不可逆层），要连三端壳的 `FAILURE_REASON_BY_SERVER_CODE`（`packages/app-host/src/hosted-auth.ts:678`）与 i18n 词条一起判，所以登记不代改；同形状的第二枚在注册 resend（`server/src/api.ts:2422`），今天不露出来只因为那张表没坏。
 - **`login_unavailable` 没进客户端白名单** ⇒ 503 落到 `server-error`，丢掉服务端明说的"稍后再试"（`grep -n "login_unavailable" packages/app-host/src/hosted-auth.ts` 无命中即现状）；要不要为它加一档 reason 归文案与四端词条一起定，`hosted-auth.ts:671` 那句"别为一个子流程迫使所有壳加词条"就是它的反方。
+
+### 6.92（2026-10-27 22:35–22:56 · 负责人授权「直接换线上容器」后）发布落地与发布后读数
+
+上一节那条"没授权之前本线两档都不跑"在 22:3x 被解除：负责人选的是**直接换线上容器**那一档。执行的是 `scripts/deploy-ssh.mjs --apply --yes-production --ref b55e988078f8…`（`--ref` 显式钉死，不拿 `HEAD` 当参数 —— 那台机器上 `headSha` 与 `git archive` 是**两个时刻**读的）。判决行、逐格发布后读数与复取命令都在 [`BLOCKED.md` B238](../../BLOCKED.md) 那张"发布已落地"表里，本节只记三件**下一位会用得上、又不在读数里**的事：
+
+1. **修好的是服务端那一半，用户可达的那一半要靠另一件产物**。网页应用不在镜像里被服务：公网 `/app/` 打的是宿主机 `/var/www/heyta-app`（`index.html` 两端 sha256 相同可证），镜像里那份 `/app/web-dist` 是第二份拷贝。所以"换容器成功"与"用户能看到验证码登录"是**两件事**，`/health=200`、五张凭据页全绿、`HEALTH` 判据都覆盖不到后者。为此把线上尺 `e2e/live-site/live-signin-entry.spec.ts` 加了一条常驻判据（文件头判据 2a）：展开「其他登录方式」后 `auth-form-login-code-trigger` 必须可见 —— 它判的正是"那一盘 SPA 里这一档在不在"，而不是"服务端接不接"。
+2. **变异轮自己会打空，而且打空的样子和通过一模一样**。第一发我用 `perl -0pi -e 's/auth-form-login-code-trigger/…-MUTANT/'`，`-0` 把整份文件当一条记录、没有 `/g` ⇒ 只替换**第一处**，而第一处是我自己写在文件头注释里的那枚同名串；断言那行没动，用例照绿 `rc=0`。要改的目标必须带上只有代码里才有的形状（`[data-testid="…"]` 整串），并且**跑之前先 `grep -n` 确认命中的是断言那一行**。还原也不从 git 拿（判据此刻还没提交，`git checkout` 会把我这一整块抹掉），从同目录的快照 `cp` 回去。
+3. **`/var/www/heyta-app` 与 HEAD 不齐这一格停在待拍板**，不在本线代做：把它对齐要重新构建并 rsync，而 22:21 之后落进 `apps/web` 的那批输入全是自动收集线的产品改动 ⇒ 一次 rsync 会把**别人那两笔**一起推上线。判"盘里有没有这两句新文案"用的是 grep 命中数，配了一枚控制臂（同目录 grep `email-code` 命中 1 ⇒ 证明搜法本身有效，前两枚的 0 不是"尺没扫到"）。命令在 B238 那张新待拍板表的右栏。
