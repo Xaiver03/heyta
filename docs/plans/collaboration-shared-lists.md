@@ -1694,3 +1694,25 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 （本计划与交接书，全是文档），所以这串读数**没有**夹带任何源码差量。
 ⚠️ 边界照旧不改口：**Android 那一侧仍没有设备读数**（§9.29 那两件真人动作没做）—— iOS 这跑绿不等于两端绿。
 
+### 9.32 §9.28 里那几格"现状原话"，22:0x 又现量复取了一遍（Android 那格没被现场解掉；顺带抓到一把打空的尺）
+
+为什么要复取：③ 那格的拦路读数写于当日 19:0x，而**那台共享装机正被别线用来做 Android 出包** —— 他们完全可能顺手把缺的组件装上。
+台账里"仍拦路"这句不重测就不能接着说（#600）。观察对象 = `windows-pc` 上那棵 SDK 根与在线设备表，全程只读、不落任何写操作。
+起建 `8c3486db0`。
+
+| 读数 | 当趟取值 | 可信度归因 |
+|---|---|---|
+| SDK 根 | `C:\Users\41478\AppData\Local\Android\Sdk`（三枚候选路径里第一枚 `Test-Path` 命中） | 目录存在性，不依赖任何 CLI |
+| emulator 主程序 | `EMULATOR_MAIN=False` | 🔴 **这条才是"仍然没装"的依据**（`Test-Path <root>\emulator\emulator.exe`） |
+| system-images | `SYSTEM_IMAGES_DIR=False` | 同上，目录存在性 |
+| 已装清单那把尺 | `LIST_LINES=0` ⇒ 走 `INSTALLED_EMPTY` 分支、`HITS=0` | **这一趟它打空了，不能读成"两枚组件没装"**：`sdkmanager --list_installed` 在 `-EncodedCommand` 下回 0 行，而我把 stderr 用 `2>$null` 吞了 ⇒ 看不见原因；同一把尺 19:0x 那趟回 658 行。按 #603 的纪律，判探针可不可信**看标记行**，`LIST_LINES=0` 就是那枚标记 |
+| 在线设备 | `ADB_LINES=2`：一行是表头「List of devices attached」、一行是 daemon 冷启动那句 ⇒ **设备零台** | 分母行逐枚读过，没把表头当设备 |
+| ① 那格原话 | `grep -c removeVaultRootKey apps/mobile/src/lib/vault-session-cleanup.ts` 现量 2 ⇒「只删 root key、密钥料那格留着但已解不开」仍成立 | 本地现量 |
+
+⇒ **③ 那格递给负责人的三个选项（补两枚组件 / 插真机 / 按"iOS 验过 + Android 只出包"结案）没有一个被现场自动解决，照旧等他那一句。**
+我这趟仍不装任何东西：往那棵 SDK 根里写属别线资产（硬边界），启用 `HypervisorPlatform` 要重启这台机 —— 两条都不自取。
+
+⚠️ 一件要传给下一位的形状：**同一条只读探针，两趟可以一枚读数有效、另一枚打空**（这趟 CLI 清单 0 行 / 19:0x 那趟 658 行）。
+⇒ 那一格的"没装"要锚在**目录存在性**那两枚 `Test-Path` 上，**不锚在 CLI 清单**上；CLI 那把尺必须留"空结果也打一行"的分支，
+否则 0 行会被读成否证（#603 族里第二次命中）。取法逐字：`cat > /tmp/probe-android.ps1`（quoted heredoc）+ `iconv -f UTF-8 -t UTF-16LE … | base64 | tr -d '\n'` 喂 `-EncodedCommand`。
+
