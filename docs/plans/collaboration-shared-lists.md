@@ -1131,6 +1131,21 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 
 **四把尺里最后一格未判定的也补上了**：`server` 侧单测在同一天晚些单独跑，**rc=0**（判决与那趟的分母在 §9.16 那张四把尺表的 `pnpm test` 那一行，别在这里抄第二份）。⇒ 本批收口时，四把尺**每一枚都有判决**，两枚红（`check` 与首趟 `test`）逐条归到别线名下并带现量命令。
 
+#### §9.18 M6 那两段的变异臂补上了（2026-10-27 现量，首跑）
+
+上面那张表里「密钥落盘端口」与「载荷密钥接线」两格，此前只有**设备腿 L4 那一次结果**与两枚行为用例，**没有常驻变异臂**（本线臂册 15 副里没有覆盖它们的：`mutate-collab-share-routing` 管路由、`mutate-collab-open-pull` 管"打开才拉"、`mutate-collab-mobile-activity` 管投递）。⇒ 补一副 `research/tools/mutation-rigs/mutate-collab-mobile-keywiring.mjs`，四臂与首跑读数：
+
+| 臂 | 病灶 | 红集 | 读数 |
+|---|---|---|---|
+| `slot-suffix-gone` | accountId 不拼 `#share-keys` 后缀 ⇒ 密钥料与 vault root key 抢同一格 | 1（兄弟槽那一枚） | 精确匹配 |
+| `remove-noop` | `remove()` 里 `delete` 打空 ⇒ 摘掉的键还在盘上 | 2（往返 + 最后一枚整槽删） | 精确匹配 |
+| `null-as-empty` | 键不存在时回空串 | 4 | 精确匹配（首跑我预测 2，逐条读后确认四条都是同一口径的另一条入路 ⇒ **改预测不改判据**） |
+| `cipher-not-taken` | 不再调 `getPayloadCipher()`，恒交 `undefined` | 4（单例／换账号／登出摘掉／reset 重问） | 精确匹配（首跑我指望那枚**静态装配**断言红，它不红 —— 它数的是调用点存在性，本来就不该负责"取到没取到"；行为那一侧由这四枚咬住 ⇒ 判据原样留着） |
+
+`ARMS=pass (4/4)`；基线两载具各 10 与 14 枚全过；跑完 `git status --porcelain -- apps/mobile/src` 为空，两枚目标文件与 `git show HEAD:` 逐字同 md5。⚠️ 读数经 `npx vitest` 直跑，**没经过内存闸门**（那枚 shim 只挂在 `pnpm` 上）。⚠️ 这副臂原地注病灶，跑前必须确认同一棵共享检出里没有别人的 `pnpm check` 正读到移动壳（本次是在邻会话那条链的真浏览器阶段跑的，链上读移动源码的是链尾 `-r test`）。
+
+**六段现在的臂覆盖图**（如实登记，不是"都有臂"）：入口路由 `mutate-collab-share-routing`；打开才拉 `mutate-collab-open-pull`（两壳各一臂）；实时投递与偏好 `mutate-collab-mobile-activity`、内容口径 `mutate-collab-notif-content`；密钥落盘端口与载荷接线 = 本副；**同意态存储那一格没有单开一副臂** —— 它的牙在 `packages/ui/tests/share-consent-model.spec.ts` 与两壳入群闸用例（`apps/web/tests/share-join-consent-gate.spec.tsx`）加上设备腿 L7 的同意面那一步，够用但没被单独变异验证过，下一位要补就补这一格。
+
 **这一批之后仍开着的格**（逐格带现量与归属，别把上面任何一枚绿读成这四格做完）：
 
 - **登出/撤销后本机那份共享密钥料**：`clearMobileVaultSession` 删的是 root key，`#share-keys` 那一格**没跟着删**。现量：`grep -c removeVaultRootKey apps/mobile/src/lib/vault-session-cleanup.ts` ⇒ 2、`grep -c share-keys apps/mobile/src/lib/share-key-store.ts` ⇒ 2（那段 ⚠️ 就写在实现端口的同一份文件里，不是本轮新发现）。⇒ 这一格**不是明文泄露** —— 密钥料是 vault 信封包裹的，root key 一删就解不开；留下的形状是"离场的设备上还有一份解不开的密钥料"。要清它得动 vault 会话那一层的清理时序，**归产品负责人拍板**，本线不代改别人那枚函数的次序。
