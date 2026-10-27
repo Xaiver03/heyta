@@ -89,8 +89,37 @@ export const OWNER_RULES = [
       'apps/web/src/styles/app.css',
       'e2e/tests/vault-settings.spec.ts',
       'apps/web/evidence/danger-confirm/',
+      // 04:1x 这一批（撤销回执那一族）。归属同样有原文，三条各自独立：
+      //   · `scripts/check-undo-receipt.mjs` 头注释第一行写「撤销回执门禁（全局 UX 线 P3）」，
+      //     `packages/ui/src/feedback/receipt-timing.ts` 与 `packages/ui/src/index.ts` 新增段都写「2026-10-28，全局 UX 线 P3」；
+      //   · `e2e/tests/quadrant-move-ux.spec.ts` 自己写「🔴 2026-10-28（全局 UX 线 P3）：那一枚撤销按钮现在住在共享的 `UndoReceipt` 里」；
+      //   · 四枚界面文件（HabitDetailCard / NotesView / ProjectsPanel / QuadrantBoard）没写日期，
+      //     但**本尺第二判的跨线依赖那一格**报出它们 import 了未入库的 `apps/web/src/lib/feedback/UndoReceipt.tsx` ⇒ 同一族；
+      //     `TasksScreen.tsx` 由 `packages/ui/src/index.ts` 那段点名"移动端渲染归这一行"。
+      'apps/web/src/lib/feedback/',
+      'packages/ui/src/feedback/',
+      'apps/web/tests/undo-receipt.spec.tsx',
+      'packages/ui/tests/feedback-receipt-timing.spec.ts',
+      'scripts/check-undo-receipt.mjs',
+      'packages/ui/src/index.ts',
+      'scripts/check-overlay.mjs',
+      'e2e/tests/habit-create-options.spec.ts',
+      'e2e/tests/quadrant-move-ux.spec.ts',
+      'apps/mobile/src/screens/TasksScreen.tsx',
+      'apps/web/src/features/habits/HabitDetailCard.tsx',
+      'apps/web/src/features/notes/NotesView.tsx',
+      'apps/web/src/features/projects/ProjectsPanel.tsx',
+      'apps/web/src/features/quadrant/QuadrantBoard.tsx',
+      'apps/web/evidence/undo-receipt/',
       'package.json',
     ],
+  },
+  {
+    line: '各线共用的取证账本（BLOCKED.md）',
+    why: '它归所有人，不归任何一个人：2026-10-28 现量是"我编辑的那一分钟里它被别的会话加了 79 行"。' +
+      '我只用 plumbing 提我写的那几行，所以工作树那一版**必然**长期含别人没提交的内容 ⇒ 未提交不是漏归，是这本账的用法。' +
+      '反过来说：把它登记成"某条线的改动"才是错的——那等于替别人认领。',
+    prefixes: ['BLOCKED.md'],
   },
   {
     line: '自动收集（inbound）线',
@@ -223,6 +252,63 @@ export function classify(entries, rules, worktreeDirty = null) {
   };
 }
 
+/** `git ls-files -s -z` ⇒ Map(路径 → 索引那一格的 blob)。行形状 `<mode> <sha> <stage>\t<路径>`。 */
+export function parseLsFilesStage(text) {
+  const out = new Map();
+  for (const rec of text.split('\0')) {
+    if (rec === '') continue;
+    const tab = rec.indexOf('\t');
+    if (tab < 0) continue;
+    const meta = rec.slice(0, tab).split(' ');
+    if (meta.length < 3) continue;
+    if (meta[2] !== '0') continue; // 合并中的条目（stage 1/2/3）不在这一栏的射程里
+    out.set(rec.slice(tab + 1), meta[1]);
+  }
+  return out;
+}
+
+/** `git ls-tree -r -z <ref>` ⇒ Map(路径 → 那一版的 blob)。行形状 `<mode> blob <sha>\t<路径>`。 */
+export function parseLsTree(text) {
+  const out = new Map();
+  for (const rec of text.split('\0')) {
+    if (rec === '') continue;
+    const tab = rec.indexOf('\t');
+    if (tab < 0) continue;
+    const meta = rec.slice(0, tab).split(' ');
+    if (meta.length < 3) continue;
+    out.set(rec.slice(tab + 1), meta[2]);
+  }
+  return out;
+}
+
+/**
+ * 「索引里躺着一版谁都不在看的东西」⇒ 不带 pathspec 的 `git commit` 会把它直接写进历史。
+ * 判据是**三版之间的关系**，不是 `git status` 那两个字符，也不是路径名：
+ *
+ *     索引 ≠ HEAD 且（工作树已没这枚文件 或 索引 ≠ 工作树） ⇒ 命中
+ *
+ * 两种失法都得报出来（2026-10-28 各量到真实一枚）：
+ *   · 工作树对 HEAD 干净（`MM`）⇒ 把**已入库**的内容退回旧版。今天实测三枚，全是 plumbing 提交留下的：
+ *     私有索引 + `update-ref` CAS 这条路**天生不写共享索引**，所以提交后那一格还停在提交前的旧 blob。
+ *     其中一枚是 `package.json:208` —— 索引那版的 `check:gate-wiring` 不带 `--self-test`，
+ *     谁不带 pathspec 提一次，我这格接线就静默消失（build/typecheck/单测都不会告诉你）。
+ *   · 工作树对 HEAD 也脏（`AM`、双脏）⇒ 丢掉写的人**最新那一段**（今天量到 `docs/plans/global-ux-system-remediation.md`）。
+ *
+ * 🔴 反过来必须**不命中**：只 stage（索引==工作树）、只改工作树（索引==HEAD）、三版相同。
+ *   把这三种报出来就是假红；假红的代价是这一栏再也没人看。
+ * ⚠️ 这一栏**不进 `--strict` 的退出码**：能拆的雷只有"这格是谁留下的"才知道答案，
+ *   别人的索引条目我不替人改（见台账 §6.108 的归属纪律），所以它是读数不是判决。
+ */
+export function thirdVersionRows(indexSha, headSha, worktreeSha) {
+  const rows = [];
+  for (const [file, idx] of indexSha) {
+    const head = headSha.has(file) ? headSha.get(file) : null;
+    const wt = worktreeSha.has(file) ? worktreeSha.get(file) : null;
+    if (idx !== head && (wt === null || idx !== wt)) rows.push({ file, idx, head, wt });
+  }
+  return rows.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+}
+
 /**
  * 逐行抽出**真正的**相对引用语句：`import … from './x';` / `export … from './x';` / `import './x';`。
  * 两头都锚死（行首是关键字、说明符后面到行尾只剩 `;`），注释行先丢 —— 否则散文与断言字符串会灌进读数：
@@ -301,6 +387,18 @@ export function parseNameList(text) {
   return text.split('\n').filter((l) => l.trim() !== '');
 }
 
+/**
+ * 把 `git hash-object --stdin-paths` 的回执（一行一枚，**顺序即输入顺序**）与输入路径配对。
+ * 🔴 长度不等必须炸而不是静默截掉：`hash-object` 遇到读不到的路径会整发失败，
+ * 那种"少了几条"的回执如果配对着往下走，就会把没算到的路径当成"工作树里没有" ⇒ 第三版那一栏会假绿。
+ */
+export function zip(paths, shas) {
+  if (paths.length !== shas.length) {
+    throw new Error(`zip：路径 ${paths.length} 枚 vs 哈希 ${shas.length} 枚 ⇒ 顺序对不上，不配拿来配对`);
+  }
+  return paths.map((p, i) => [p, shas[i]]);
+}
+
 const SELF_TEST_ARMS = () => {
   const arms = [];
   const push = (name, got, want) => arms.push({ name, ok: JSON.stringify(got) === JSON.stringify(want), got, want });
@@ -337,6 +435,62 @@ const SELF_TEST_ARMS = () => {
     '⑳c 未跟踪件不许被这一档吃掉（`??` 不在 diff HEAD 里是常态，它确实是没入库的东西）',
     classify([{ xy: '??', file: 'server/src/new.ts' }], OWNER_RULES, new Set()).unattributed.map((r) => r.file),
     ['server/src/new.ts'],
+  );
+  // 「第三版」那一栏的九枚臂。形状全部取自 2026-10-28 真实量到的枚子，不是编的：
+  // ㉑ 就是 `package.json`、㉒ 就是 `scripts/check-gate-wiring.mjs`、㉕ 就是那份 UX 计划。
+  const V = (xs) => new Map(xs);
+  push(
+    '㉑ 三版各不同（`package.json` 真实形状：索引那版的 check:gate-wiring 不带 --self-test）⇒ 必须命中',
+    thirdVersionRows(V([['package.json', 'IDX']]), V([['package.json', 'HEAD']]), V([['package.json', 'WT']])),
+    [{ file: 'package.json', idx: 'IDX', head: 'HEAD', wt: 'WT' }],
+  );
+  push(
+    '㉒ 工作树对 HEAD 干净、只有索引旧（`MM`，我今天拆的第一枚雷）⇒ 必须命中',
+    thirdVersionRows(V([['a.ts', 'IDX']]), V([['a.ts', 'HEAD']]), V([['a.ts', 'HEAD']])),
+    [{ file: 'a.ts', idx: 'IDX', head: 'HEAD', wt: 'HEAD' }],
+  );
+  push(
+    '㉓ 只 stage 了（索引==工作树）⇒ 不许命中：那是正常暂存，报出来就是假红',
+    thirdVersionRows(V([['a.ts', 'S']]), V([['a.ts', 'H']]), V([['a.ts', 'S']])),
+    [],
+  );
+  push(
+    '㉔ 只改了工作树（索引==HEAD）⇒ 不许命中：这一格里没有"谁都不在看"的东西',
+    thirdVersionRows(V([['a.ts', 'H']]), V([['a.ts', 'H']]), V([['a.ts', 'W']])),
+    [],
+  );
+  push(
+    '㉕ 新增件 stage 之后又改（`AM`，HEAD 里根本没这枚）⇒ 必须命中，head 给 null',
+    thirdVersionRows(V([['n.ts', 'S']]), new Map(), V([['n.ts', 'W']])),
+    [{ file: 'n.ts', idx: 'S', head: null, wt: 'W' }],
+  );
+  push(
+    '㉖ 工作树里已经删掉、索引还留着（`AD`）⇒ 必须命中，wt 给 null',
+    thirdVersionRows(V([['d.ts', 'S']]), V([['d.ts', 'H']]), new Map()),
+    [{ file: 'd.ts', idx: 'S', head: 'H', wt: null }],
+  );
+  push('㉗ 三版相同 ⇒ 空（不许把干净的东西报成雷）', thirdVersionRows(V([['x.ts', 'S']]), V([['x.ts', 'S']]), V([['x.ts', 'S']])), []);
+  push(
+    '㉘ 索引行解析器：meta 三段 + TAB，带空格与中文的路径要原样还原，stage≠0 的合并条目必须剔掉（解析器一坏分母就空、空就假绿）',
+    [...parseLsFilesStage('100644 aaa 0\tpackage.json\u0000100644 bbb 0\tapps/web/evidence/x 中文.png\u0000100644 ccc 1\tconflict.ts\u0000')],
+    [['package.json', 'aaa'], ['apps/web/evidence/x 中文.png', 'bbb']],
+  );
+  push(
+    '㉙ HEAD 行解析器：meta 是 `mode blob sha`，取第三段（取错整栏失明）',
+    [...parseLsTree('100644 blob ddd\tsrc/a.ts\u0000100644 blob eee\tsrc/b 中文.ts\u0000')],
+    [['src/a.ts', 'ddd'], ['src/b 中文.ts', 'eee']],
+  );
+  push(
+    '㉚ 配对器：两列不等长必须炸（静默截掉就会把没算到的路径当成"工作树里没有"⇒ 第三版栏假绿）',
+    (() => {
+      try {
+        zip(['a.ts', 'b.ts'], ['aaa']);
+        return '没炸';
+      } catch (e) {
+        return String(e.message).startsWith('zip：路径 2 枚 vs 哈希 1 枚');
+      }
+    })(),
+    true,
   );
   push('④ 目录规则要按前缀吃下整棵子树', classify([E('e2e/tests/dirty-form-guard.spec.ts')], OWNER_RULES).rows[0].line, '全局 UX 分层整改线');
   push('⑤ 规则表自己必须干净（现在这份必须无违规）', auditRules(OWNER_RULES), []);
@@ -513,6 +667,48 @@ const main = () => {
     console.log(`   ⚠️ 索引旧内容 ${v.indexOnly.length} 枚（工作树对 HEAD 是**干净**的，脏的是索引那一格 ⇒ 不是"没登记的例外"）：`);
     for (const r of v.indexOnly) console.log(`      ${r.xy} ${r.file}`);
     console.log('      这格的正解是**那一趟提交前重新 `git add` 一次**（或改用 `git commit -- <路径>`），详见台账 §6.108');
+  }
+  // 「第三版」这一栏：机制判据，不看 `git status` 那两个字符。
+  // 分母只取"脏过"的路径（未跟踪件索引里本来就没有格子），三条 git 各一发批量取，不逐枚 spawn。
+  const dirtyTracked = entries.filter((e) => !e.xy.includes('?')).map((e) => e.file);
+  if (dirtyTracked.length > 0) {
+    const indexSha = parseLsFilesStage(
+      execFileSync('git', ['ls-files', '-s', '-z', '--', ...dirtyTracked], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 }),
+    );
+    if (indexSha.size === 0) {
+      console.error(`🔴 ${dirtyTracked.length} 枚已跟踪的脏件，` + '`git ls-files -s` 却回 0 条 ⇒ 探针坏了，这一栏今天没干活（不配说"没有雷"）');
+      process.exit(2);
+    }
+    const headSha = parseLsTree(
+      execFileSync('git', ['ls-tree', '-r', '-z', 'HEAD', '--', ...dirtyTracked], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 }),
+    );
+    const present = dirtyTracked.filter((f) => existsSync(path.join(ROOT, f)));
+    const worktreeSha = new Map(
+      zip(present, execFileSync('git', ['hash-object', '--stdin-paths'], { cwd: ROOT, encoding: 'utf8', input: present.join('\n') + '\n' }).split('\n').filter((s) => s !== '')),
+    );
+    if (worktreeSha.size !== present.length) {
+      console.error(`🔴 工作树哈希取回 ${worktreeSha.size} 条、分母是 ${present.length} 枚 ⇒ 对不上账，这一栏今天不许报"没有雷"`);
+      process.exit(2);
+    }
+    const third = thirdVersionRows(indexSha, headSha, worktreeSha);
+    if (third.length > 0) {
+      console.log(`   ⚠️ 索引里躺着一版谁都不在看的东西 ${third.length} 枚（不带 pathspec 的 \`git commit\` 会把**索引那一版**写进历史）：`);
+      for (const r of third) {
+        if (r.wt === r.head && r.head !== null) {
+          console.log(`      ${r.file} ← 索引 ≠ HEAD，工作树 == HEAD ⇒ 提交它等于把已入库的内容退回旧版`);
+          console.log(`         正解（只动这一格，不碰别人的暂存）：git update-index --cacheinfo 100644,${r.head},"${r.file}"`);
+        } else if (r.head === null) {
+          console.log(`      ${r.file} ← HEAD 里没有（新增件），索引那一版 ≠ 工作树最新那一段 ⇒ 提交它丢掉写的人最新的改动`);
+          console.log(`         正解由**写的人**定：要么 \`git add "${r.file}"\`（以工作树为准），要么 \`git restore --staged -- "${r.file}"\``);
+        } else if (r.wt === null) {
+          console.log(`      ${r.file} ← 工作树里已经删掉、索引还留着一版 ⇒ 提交它会把删掉的内容又写回去`);
+          console.log(`         正解：\`git rm --cached -- "${r.file}"\` 或按写的人的意思重删`);
+        } else {
+          console.log(`      ${r.file} ← 三版各不同（HEAD/索引/工作树互不相等）`);
+          console.log(`         正解先问这格是谁 stage 的；我不替别的会话改索引（台账 §6.108 的归属纪律）`);
+        }
+      }
+    }
   }
   if (v.unattributed.length > 0) {
     console.log(`🔴 没登记过的例外 ${v.unattributed.length} 枚（这些才是"谁都可能顺手提交掉"的那批）：`);
