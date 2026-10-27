@@ -85,6 +85,9 @@ import {
   processInboundAutomationEvent,
   type ProcessInboundAutomationOptions,
 } from './inbound-process.js';
+// 🔴 这枚契约的真源在 `inbound-host-options.ts`（`index.ts` 也从那里对外导出）。
+// `host.ts` 以前留过一份逐字重复的副本 —— 双事实源，改一处不会让另一处响。
+import type { InboundAutomationHostOptions } from './inbound-host-options.js';
 import {
   registerAutomationWorker,
   createInboundUploadAuthorization,
@@ -198,24 +201,6 @@ export interface AppHostOptions {
   onLocalDataErased?: () => void;
   /** Platform secret/journal bridge for inbound automation uploads. */
   getInboundUploadAuthorization?: SyncClientOptions['getInboundUploadAuthorization'];
-}
-
-/** Configuration for one host-owned inbound automation cycle. */
-export interface InboundAutomationHostOptions {
-  userId: string;
-  keyEpoch: number;
-  allowedFields: readonly InboundAutomationField[];
-  targetProjectId?: string;
-  maxItems?: number;
-  routing: AiRoutingConfig;
-  secretStore?: SecretStore;
-  consents: readonly EgressConsent[];
-  systemPrompt: string;
-  parseVersion: number;
-  timezone?: string;
-  eventId?: string;
-  /** A private key supplied by the host's secure-store bridge. */
-  privateKey?: Uint8Array;
 }
 
 export interface AppHost {
