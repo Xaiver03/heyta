@@ -90,6 +90,22 @@ for (let i = 0; i < argv.length; i += 1) {
  */
 const ALLOWED_OUTSIDE_CHAIN = new Map([
   [
+    'check:worktree-exceptions',
+    {
+      reason:
+        '它读的是**工作树状态**而不是仓库内容：干净检出上未提交必然为空 ⇒ 进链就是一枚恒绿的门；' +
+        '而在并行会话正写着的时候它必然红 ⇒ 进链等于每天替别人红一次、逼下一位放宽判据。' +
+        '两头都不对的门禁不该装在链上，载体是**人**：收口那一趟先跑它（`docs/agents/commands.md` 那条就是入口）。',
+      consumers: [
+        {
+          file: 'docs/agents/commands.md',
+          needle: 'pnpm check:worktree-exceptions',
+          role: '「常用命令」代码块里"动手/提交之前先看这一枚"那一条（含为什么不进链的理由）',
+        },
+      ],
+    },
+  ],
+  [
     'check:web-artifact:app',
     {
       reason:
