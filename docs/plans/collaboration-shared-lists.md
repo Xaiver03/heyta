@@ -1233,8 +1233,10 @@ scratch 目录里，随清场消失 ⇒ **不写进台账当锚点**，锚只有
 —— 两枚脚本完全可能各跑各的。这一节把两侧的步骤名逐一钉起来，取代之前那句凭印象的"同一条旅程"。
 
 现量取两侧步骤名（两枚脚本都还在动，别按本节文字推断"现在还没有"）：
-web 那侧 `grep -nE 'STEP [0-9] OK' scripts/verify-collab-journey.mjs` ⇒ 三段，收尾 `RESULT=OK steps=3`；
-手机那侧 `grep -nE '^step ' scripts/verify-mobile-collab-ios.sh` ⇒ 十七段。
+web 那侧 `grep -cE 'STEP [0-9]+ OK' scripts/verify-collab-journey.mjs` ⇒ 2026-10-27 复量 **3 段**，收尾 `RESULT=OK steps=3`；
+手机那侧 `grep -cE '^step ' scripts/verify-mobile-collab-ios.sh` ⇒ 同日复量 **18 段**。
+⚠️ 这两个数是**那一戳的读数**，不是常量：本节初稿写的是"十七段"，那是第 52 跑把证据目录那段（`11. 证据目录`）补进去**之前**的量
+—— 枚数每次都要跑上面两条命令现取，别照本节的字面推断装置长什么样（同一条时态病见 #600）。
 
 | web 那一趟断言的那一句 | 移动装置里对应的那一段 | 判定 |
 |---|---|---|
