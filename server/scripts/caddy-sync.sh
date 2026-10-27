@@ -75,7 +75,7 @@ trap 'rm -rf "$tmp"' EXIT
 for name in $all_names; do
   case "$name" in
     $PATTERN) ;;
-    *) die "射程外的文件名：$name（PATTERN=$PATTERN 之外一律不碰）" ;;
+    *) die "射程外的文件名：${name}（PATTERN=${PATTERN} 之外一律不碰）" ;;
   esac
   # 下面所有循环都按空白切词（`for name in $all_names`），带空格的名字会把一片
   # 切成两片 —— 与其在错误的路径上备份/写入，不如在这里拒绝。
@@ -184,7 +184,7 @@ case "$mode" in
       restore_all
       die "校验不通过 —— 已全部还原，线上仍是旧配置，且**没有** reload"
     fi
-    info "校验通过（$CADDY_BIN）"
+    info "校验通过（${CADDY_BIN}）"
 
     if ! ssh_r "sudo -n systemctl reload $CADDY_SERVICE"; then
       restore_all
