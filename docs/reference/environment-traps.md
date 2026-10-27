@@ -12096,3 +12096,7 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
      "No tests found"先怀疑自己过滤词的人是我）。
      顺手登记一件不是我的事：`e2e/playwright.probe.config.ts` 引的 `e2e/_probe/helpers` **在库里不存在**，
      那枚配置永远枚举 0 枚 —— 新门把它归到"拒跑但报数"，谁要清那台失效装置请先认领它。
+
+597. **`ssh windows-pc` 的默认 shell 是 cmd，用 bash 语法探它 ⇒ 那屏报错既没否认也没确认任何东西，而 `ssh` 的退出码照样 0**（2026-10-27 协作线收口 Android 载体那一格）：我发的是 `command -v adb || echo "NO-adb"` 与 `ls -d "$LOCALAPPDATA/Android/Sdk"`，远端回的是乱码的「'head' 不是内部或外部命令」「系统找不到指定的路径」——**这不是否证，是探针根本没被执行**。我差点据此复述台账里上一版那句「Android 载体不存在」。换成 cmd 语法、每问一条自己打印 YES/NO 之后，读数是**四个方向各不相同**：`adb.exe` **在**（platform-tools 装了，daemon 起得来）、AVD **有一枚**（`dir /b "%USERPROFILE%\.android\avd"` ⇒ `opp-smoke.avd`）、`Sdk\emulator` **确实没有**（`if exist …\emulator\emulator.exe` ⇒ NO）、`adb devices` **空表**（没插真机）。⇒ 那句「载体不存在」当初就是**一把打空的探针写下来的**；真实形状是"半装"，而缺的两条解锁路径（补 emulator 组件 / 插一台真机）对负责人是可决策的，被一句笼统的"不存在"盖住了。
+   **How to apply:** ① 跨机探针之前先问**远端默认 shell 是什么**（最便宜的一发：`ssh <那台> 'ver'` 或 `'echo %USERNAME%'` —— 能展开成用户名就是 cmd，`$0` 原样回显才是 POSIX）；② 判存在性一律用**分支自打印**的形状（cmd：`if exist <路径> (echo YES) else (echo NO)`），不要让"命令失败"顶替否证；③ 一条否证要配**同屏的正向对照**（本例 `adb.exe` 命中而 `emulator.exe` 未命中 ⇒ 探测确实在跑，只是那一枚真没有）；④ 台账里"某载体不存在"这类**阻塞句**落笔时把那条 YES/NO 命令一起写进去，别只留结论。
+   归族：§7 元规则一（先怀疑探针自己没做前置，#595 同日第二次撞上）、#594（管道吃 rc —— 这里连 `ssh` 的 rc 都不说话）、#584（分母/搜索面）。
