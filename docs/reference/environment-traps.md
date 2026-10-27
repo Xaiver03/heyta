@@ -11928,3 +11928,42 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
      `pnpm --filter @heyta/landing build`，然后**在产物里 grep 那一句**（不是看构建日志）。
      🔴 归族：这就是 #79「改完不 build 不算数」的 i18n 变体；判据要落在"产物里有没有那句话"，
      而不是"gen 脚本跑没跑"。
+
+590. **「同族缺陷扫过了、没有」这句话不许由读代码支撑，只能由现量读数支撑**（2026-10-27 实测，
+     本域名当天两次踩它）。用户报了一处「记住密码」贴住输入框（量出来 4px），并要求扫同族。
+     派出去的那一趟按**读代码**判成"9 处候选全部合规"，而拿一次性探针实测之后其中两处是坏的：
+     `TaskOrganizer` 标签组行距 **4px**、`<legend>` 到第一行 **0px**，`TaskRepeat` 同形状。
+     根因不是"忘写 gap"：容器上确实写着 `gap`，但 **`<legend>` 在 flex 容器里不算 flex item**，
+     容器那个 `gap` 按定义管不到它 —— 于是"样式里写了间距"与"界面上有间距"这两件事
+     可以逐字同形而一真一假。同一天在第二套面（服务端渲染的凭据页，样式是内联 `<style>`）
+     又是同一个形状：重置页提示行到提交按钮**间隙 0px**，而那张样式表里 `.status + .btn`
+     早有 16px —— 只读 CSS 会读到"有间距规则"。
+     修法固定成两句：**改掉的每一处要带读数，排除掉的每一处也要带读数**；
+     只登记改掉的，下一个人就分不清"量过才排除"与"没看就排除"。
+     常驻尺：`e2e/tests/auth-form-spacing.spec.ts`（间距 + 触控 ≥44）、
+     `e2e/tests/checkbox-group-spacing.spec.ts`（组行距 + legend 到第一行）、
+     `server/tests/password-reset-page.spec.ts`（提示行→按钮那条兄弟规则）。
+     🔴 归族：这是元规则 1「先怀疑探针」与 #585「源码改了不等于产物改了」的同一类 ——
+     声明层与渲染层之间那一步没人量过，就没人知道它成不成立。
+
+591. **本机 `curl` 量 `heyta.waytofuture.cn` 会得到"六个目的地全 `000`"，而同一时刻真浏览器
+     那条腿 3 秒全量到 200/404**（2026-10-27 实测）。命令形状是
+     `curl -m 20 --noproxy '*' --resolve heyta.waytofuture.cn:443:<IP> -w '%{http_code}' …`，
+     连"未注册路径必须是 404"那枚阳性对照也回 `000` ⇒ 拿它下结论会得到**整站不可达**，
+     而站是好的。同一条腿换成 Playwright 的 live-site 配置
+     （`cd e2e && npx playwright test --config playwright.live-site.config.ts live-credential-pages`，
+     它带 `--host-resolver-rules=MAP … <IP>` 与 `--no-proxy-server`）当场全绿。
+     ⚠️ 别把它写成"curl 到不了这个域名"：`e2e/live-site/live-seo.spec.ts` 文件头记着另一天
+     同一枚 origin 上 `curl` 回过 200 / 32 字节 / 逐字一致的键文件。所以真相是
+     **curl 在这枚域名上的读数不稳定**（同一天里 000，换一天 200），不稳定就等于不可用作判据。
+     可达性这一问**只许走 live-site 那把尺**；`pnpm check:credential-routes` 只管仓库内自洽。
+     🔴 归族：元规则 1（先怀疑探针）。探针自己过不去时，六个读数长得像"站坏了"。
+
+592. **往内联 CSS 的注释里写反引号会截断那段模板字符串，报错落在 CSS 里那一行，
+     看起来像选择器写坏了**（2026-10-27 实测）。`server/src/design-html.ts` 的整块页面样式
+     是一个 JS 模板字符串里的文本，注释也是它的一部分 —— 在里面写 `` `.hint + .btn` `` 这种
+     反引号，字符串就地断开，症状是 esbuild 报
+     `design-html.ts:416:23: ERROR: Unexpected "."`，指针落在**选择器那一行**而不是注释行。
+     修法：这类注释里要引用选择器/类名，用「」或裸文本，**不许出现反引号**；
+     文件里那条规则旁边已留了这句提醒。
+     🔴 归族：与 #590 同一族的"声明层与渲染层"—— 只不过这里坏的是声明层自己的语法。
