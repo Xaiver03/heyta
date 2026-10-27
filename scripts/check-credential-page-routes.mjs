@@ -300,8 +300,14 @@ if (probe.length) {
 if (violations.length) {
   console.error(`❌ 凭据页与边缘代理白名单对不上（页 ${pages.size} 张 / 脚本 ${scripts.size} 个 / 边缘精确路径 ${proxied.size} 条）：`);
   for (const v of violations) console.error(`  · ${v}`);
-  console.error(`\n  修法：在 ${EDGE} 的 @credPages / @credJs 里补上缺的那几枚，`);
-  console.error('  再跑 server/scripts/caddy-sync.sh --apply，最后用 curl 复验状态码不是 404。');
+  console.error(`\n  修法（三步，缺一不可 —— 本条绿只证明**仓库内自洽**，线上那份是另一件事）：`);
+  console.error(`  ① 在 ${EDGE} 的 @credPages / @credJs 里补上缺的那几枚；`);
+  console.error('  ② `server/scripts/caddy-sync.sh --check` 看差集，再 `--apply`（它校验整份 Caddyfile，不过就不 reload）；');
+  console.error(
+    '  ③ 复验走真线上那把尺：`cd e2e && npx playwright test --config playwright.live-site.config.ts live-credential-pages`。' +
+      '\n     ⚠️ 别用 curl 量这枚域名：2026-10-27 实测本机对同一批目的地六个读数全 `000`，' +
+      '而同一时刻上面那条腿 3 秒全量到 200/404 —— curl 的 000 是探针过不去，不是站坏了。'
+  );
   process.exit(1);
 }
 console.log(`✅ 凭据页对账通过：${pages.size} 张页 + ${scripts.size} 个脚本全部被边缘代理到 1900（边缘精确路径 ${proxied.size} 条，无孤儿）`);
