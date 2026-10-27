@@ -4847,6 +4847,27 @@ grep -c "1_000_000" server/src/automation/hosted-extraction.ts
 grep -rn "SHARE_CONSENT_SCOPE_KEYS" --include='*.ts' --include='*.tsx' apps packages
 ```
 
+### 6.105（2026-10-28 01:1x · 把"没复核就不作为结论"那几格也跑完：三格有读数、一格保持未判定）
+
+上一节末尾我留了一句"剩下的没自己开码，不当结论"。这一节把那一摞清空，逐格给现量：
+
+| 那格 | 复核读数 | 去处 |
+|---|---|---|
+| `data-testid="inbound-hosted-notice"` 零消费者 | 逐字面枚文件搜（`apps packages e2e server scripts`，剔 `dist`）命中 **1 处 = 它自己**（`InboundAutomationSettings.tsx:424`） | 低·待拍板：这枚锚点是留给将来的用例、还是白挂的，只有自动收集线能判；我不替他们删（别人资产） |
+| `ShareFeature.tsx` 那枚 2 秒 `setTimeout` 没配 `clearTimeout` | 现量在 `:443`，全文件 `clearTimeout` 读 0；**但 `git merge-base --is-ancestor` 判它来自 `a923f7fa2`（10-10），早于线上那笔** | 判"**非本批引入**"，不进这轮清单（不冒充成本轮改动的缺陷，也不顺手修别人历史里的一格） |
+| `collab-journey` 同一枚证据图连截两次 | `e2e/tests/collab-journey.spec.ts:256` 与 `:257` 传的是同一个文件名 ⇒ 后一次覆盖前一次，产物只有一枚 | 低·待拍板：归协作线（删哪一发、要不要留两帧是他们的取证口径）；我不动那枚 spec |
+| `ShareConsentModal` 的 `aria-controls`/`nativeID` 是否悬空引用 | **没验**：判它要一次真渲染（web 端读那个元素 id 是否等于触发件的 `aria-describedby` 值），不是一条 grep | 保持"未判定 + 判它的断言"，既不写进缺陷也不写进"没问题" |
+
+```sh
+grep -rn "inbound-hosted-notice" --include='*.ts' --include='*.tsx' --include='*.mjs' apps packages e2e server scripts
+grep -n "setTimeout\|clearTimeout" apps/web/src/features/share/ShareFeature.tsx
+git merge-base --is-ancestor a923f7fa2 b55e98807; echo $?   # 退 0 = 那枚早于线上那笔
+sed -n '254,258p' e2e/tests/collab-journey.spec.ts
+```
+
+**这一节为什么值得单开**：审阅的两腿交回 12 条，我最后写进清单的是 **8 条**（§6.101 五格 + §6.104 三格新成立），另有 **2 条判成不是缺陷**、**1 条拒收（措辞与实物不符）**、**1 条保持未判定**。这个"逐条定性并把排除项也写出来"的动作才是审阅的全部交付 —— 只报成立的那几条，等于拿别人的射程当我的结论。
+
+
 
 
 
