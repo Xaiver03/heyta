@@ -82,6 +82,13 @@ export const OWNER_RULES = [
       'apps/web/tests/trash-purge-danger-tier.spec.ts',
       'e2e/tests/danger-confirm-trash.spec.ts',
       'scripts/check-danger-confirm.mjs',
+      // 01:3x 这一批：撤销设备那一格（文件头自己写「2026-10-27，全局 UX 整改 P2 第二格」，
+      // 并被 VaultSettingsPanel 引、被 app.css 带进 danger-confirm.css —— 归属有原文，不是我猜的）
+      'apps/web/src/features/sync/deviceRevocationDanger.ts',
+      'apps/web/src/features/sync/VaultSettingsPanel.tsx',
+      'apps/web/src/styles/app.css',
+      'e2e/tests/vault-settings.spec.ts',
+      'apps/web/evidence/danger-confirm/',
       'package.json',
     ],
   },
@@ -190,17 +197,27 @@ export function parsePorcelain(text) {
     .map((l) => ({ xy: l.slice(0, 2), file: l.slice(3).split(' -> ').pop() }));
 }
 
-export function classify(entries, rules) {
+export function classify(entries, rules, worktreeDirty = null) {
   const rows = [];
   for (const e of entries) {
-    const hit = rules.find(
-      (r) => (r.skipUntracked && e.xy.includes('?') ? false : r.prefixes.some((p) => (p.endsWith('/') ? e.file.startsWith(p) : e.file === p)))
-    );
-    rows.push({ ...e, line: hit ? hit.line : null });
+    // 🔴 索引旧内容 ≠ 未提交的改动。并行会话在 t0 `git add` 了一枚文件、我在 t1 把它改进并入库之后，
+    // `git status` 会给这枚文件打 `MM` —— 而**工作树对 HEAD 是干净的**，脏的只是索引那一格。
+    // 把它算进"没登记过的例外"会造出一枚假例外（2026-10-28 现量：`scripts/check-gate-wiring.mjs` 就这么进了未登记栏）。
+    // 判据是机制而不是路径名：`git diff HEAD --name-only` 里有没有这枚路径。
+    const indexOnly = worktreeDirty !== null && !e.xy.includes('?') && !worktreeDirty.has(e.file);
+    const hit = indexOnly
+      ? null
+      : rules.find(
+          (r) =>
+            (r.skipUntracked && e.xy.includes('?') ? false : r.prefixes.some((p) => (p.endsWith('/') ? e.file.startsWith(p) : e.file === p))),
+        );
+    rows.push({ ...e, line: hit ? hit.line : null, indexOnly });
   }
+  const indexOnlyRows = rows.filter((r) => r.indexOnly);
   return {
     rows,
-    unattributed: rows.filter((r) => !r.line),
+    unattributed: rows.filter((r) => !r.line && !r.indexOnly),
+    indexOnly: indexOnlyRows,
     byLine: rules.map((r) => ({ line: r.line, n: rows.filter((x) => x.line === r.line).length })),
     checked: rows.length,
   };
@@ -302,9 +319,25 @@ const SELF_TEST_ARMS = () => {
   push('③ 空清单 ⇒ 判"干净"，不许判成"有例外"', classify([], OWNER_RULES), {
     rows: [],
     unattributed: [],
+    indexOnly: [],
     byLine: OWNER_RULES.map((r) => ({ line: r.line, n: 0 })),
     checked: 0,
   });
+  push(
+    '⑳ 索引旧内容不算"未登记的例外"：工作树对 HEAD 干净、只有索引脏 ⇒ 单独一档，未登记栏读 0',
+    classify([{ xy: 'MM', file: 'server/src/api.ts' }], OWNER_RULES, new Set()).unattributed.length,
+    0,
+  );
+  push(
+    '⑳b 同一枚路径若工作树也确实改了 ⇒ 仍回到未登记栏（这一档不许变成洗白口）',
+    classify([{ xy: 'MM', file: 'server/src/api.ts' }], OWNER_RULES, new Set(['server/src/api.ts'])).unattributed.map((r) => r.file),
+    ['server/src/api.ts'],
+  );
+  push(
+    '⑳c 未跟踪件不许被这一档吃掉（`??` 不在 diff HEAD 里是常态，它确实是没入库的东西）',
+    classify([{ xy: '??', file: 'server/src/new.ts' }], OWNER_RULES, new Set()).unattributed.map((r) => r.file),
+    ['server/src/new.ts'],
+  );
   push('④ 目录规则要按前缀吃下整棵子树', classify([E('e2e/tests/dirty-form-guard.spec.ts')], OWNER_RULES).rows[0].line, '全局 UX 分层整改线');
   push('⑤ 规则表自己必须干净（现在这份必须无违规）', auditRules(OWNER_RULES), []);
   push(
@@ -463,13 +496,24 @@ const main = () => {
   const entries = parsePorcelain(
     execFileSync('git', ['-c', 'core.quotepath=off', 'status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' })
   );
-  const v = classify(entries, OWNER_RULES);
+  // 工作树相对 HEAD 真改了哪些路径（NUL 分隔：路径里有空格与中文都不该被引号骗掉）
+  const worktreeDirty = new Set(
+    execFileSync('git', ['-c', 'core.quotepath=off', 'diff', 'HEAD', '--name-only', '-z'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\0')
+      .filter((s) => s !== '')
+  );
+  const v = classify(entries, OWNER_RULES, worktreeDirty);
   if (v.checked === 0) {
     console.log('工作树干净：未提交 0 枚 ⇒ 没有例外需要登记。');
     process.exit(0);
   }
   console.log(`工作树例外归属 ｜ 未提交 ${v.checked} 枚 ｜ 规则 ${OWNER_RULES.length} 行`);
   for (const b of v.byLine) if (b.n > 0) console.log(`   ${String(b.n).padStart(3)} 枚 ← ${b.line}`);
+  if (v.indexOnly.length > 0) {
+    console.log(`   ⚠️ 索引旧内容 ${v.indexOnly.length} 枚（工作树对 HEAD 是**干净**的，脏的是索引那一格 ⇒ 不是"没登记的例外"）：`);
+    for (const r of v.indexOnly) console.log(`      ${r.xy} ${r.file}`);
+    console.log('      这格的正解是**那一趟提交前重新 `git add` 一次**（或改用 `git commit -- <路径>`），详见台账 §6.108');
+  }
   if (v.unattributed.length > 0) {
     console.log(`🔴 没登记过的例外 ${v.unattributed.length} 枚（这些才是"谁都可能顺手提交掉"的那批）：`);
     for (const u of v.unattributed.slice(0, 20)) console.log(`   ${u.xy} ${u.file}`);
