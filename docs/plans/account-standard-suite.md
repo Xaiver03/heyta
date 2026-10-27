@@ -4967,3 +4967,40 @@ node research/tools/audit-gate-selftest-consumers.mjs        # 债表（视力�
 node scripts/check-gate-wiring.mjs --self-test               # 本线那 9 臂
 git show --numstat --format= 28b9806aa                      # 行尾换行那一笔的实形
 ```
+### 6.108（2026-10-28 01:3x · 顺手量"跑臂的定义是否真被脚本认"：假红一枚是我自己造的，外加一枚会顶掉我刚落的 209 行的索引 hazard）
+
+§6.107 修完 gate-wiring 之后，顺着同一条线问一句反向的问题：**定义里写了 `--self-test`，
+那枚脚本真的认这个旗标吗？**不认就是"声称验过而什么都没验"——与刚修掉的那格同一族。
+
+```sh
+node -e 'const fs=require("fs"),p=require("path");const pkg=JSON.parse(fs.readFileSync("package.json","utf8"));
+const A=/[\x27"]--self-test[\x27"]/u;let ok=0,bad=[];
+for(const [k,v] of Object.entries(pkg.scripts)){if(typeof v!=="string"||!v.includes("--self-test"))continue;
+for(const rel of new Set([...v.matchAll(/(?:^|[\s;&(])(?:node|bash|sh)\s+([\w.\/-]+\.(?:mjs|cjs|js|sh))(?=$|[\s;&)])/g)].map(m=>m[1].replace(/^.\//,"")))){
+if(!fs.existsSync(p.resolve(rel))){bad.push(k+" → "+rel+"（文件不在）");continue;}
+if(A.test(fs.readFileSync(rel,"utf8")))ok++;else bad.push(k+" → "+rel);}}
+console.log("认这个旗标 "+ok+" ｜ 不认或不在 "+bad.length);bad.forEach(b=>console.log("   "+b));'
+```
+
+读数：**26 认 + 1 枚被我误报**。那 1 枚是 `check:apk-freshness → scripts/lib/apk-freshness.sh`，
+现开码：它 `:477` 写的是 bash `case --self-test) …`，**不带引号** ⇒ 我的谓词按 JS 那一族的写法下，
+在 shell 的写法上结构性失明。真数是**全部 27 枚都认**。
+（这是本节第三次"尺自己瞎"，与前两次的形状各不相同：双引号漏单引号、`grep -c` 的退出码、
+这一枚是**跨栈的写法差异**。通用的一句：**按名字/写法搜代码之前，先问这个标识符在被测语言里怎么拼**。）
+
+⚠️ 因此也**没有**把"定义跑臂而脚本不认旗标"做成 gate-wiring 的新判据：一把需要同时覆盖
+JS 引号形与 shell `case` 形、且我只有 27 个样本的谓词，今天写出来就是一枚可能天生红或天生瞎的门禁
+（AGENTS §7 元规则 2）。要做得连着两栈的谓词与各自的臂一起做。
+
+**另一格更要紧，且不归我修**：这棵共享检出的**索引**里压着并行会话在 17:2x 之前 `git add` 的两枚**旧内容**：
+
+```sh
+git diff --cached --numstat
+```
+
+现量 `scripts/check-gate-wiring.mjs` 是 `6 增 / 209 删`、`package.json` 是 `1/1` ——
+也就是**索引里那份是 gate-wiring 被我改之前的版本**。他一旦跑一次不带 pathspec 的
+`git commit`，我刚落的 209 行自检与那枚 def 就在 HEAD 里被顶回去；
+而**最坏的是它顶回去之后不会有任何东西红**：旧版正好把 `--self-test` 当不认的旗标走过去。
+我不替他 unstage（只对自己创建的对象动手），这格登记给那一号线：
+**提交前重新 `git add scripts/check-gate-wiring.mjs package.json` 一次，或改用 `git commit -- <路径>`。**
