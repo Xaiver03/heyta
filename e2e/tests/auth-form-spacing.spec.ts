@@ -94,9 +94,19 @@
  *   未判定的是**别的** RN 表单的间距。
  *   登记成"未判定"而不是"合规"，因为按上面那条教训，没量的面不许写结论。
  *   判它的断言就是本文件 ①③ 那两对（独立控件↔独立控件 ≥ `space.3`、触控目标 ≥ 44）
- *   搬到 RN 的读数上：`AppRegistry` 起模拟器后取 `measureInRow` 或走 AX bounds，
- *   装置与 `docs/agents/multi-end-build.md` 那四端重装共用（iOS 那端可在本机模拟器量，
- *   Android 的构建与设备量要在打包机上跑，见 `docs/agents/multi-end-build.md` 的载体那一节）。
+ *   搬到 RN 的读数上。**取数路径不是"以后再找"，仓内已有现成先例**（10-27 现量）：
+ *   `apps/mobile/src/ai/AssistantScreen.tsx:289` 就在用
+ *   `onLayout={() => ref.current?.measureInWindow((_x, y) => …)}` 把布局变成数字
+ *   ⇒ 补这一格最便宜的一条腿是：对相邻两枚控件各取一次 `measureInWindow` 的 `y`/`height`，
+ *   差值就是本文件 ① 那把尺量的同一个量（**注意 RN 里没有 `measureInRow` 这个 API**，
+ *   我之前在这段里写错了名字，会让人白找一个函数；真的那两个是
+ *   `measureInWindow` 与 `measureLayout`）。
+ *   跑动装置与 `docs/agents/multi-end-build.md` 那四端重装共用（iOS 那端可在本机模拟器量；
+ *   Android 的构建与设备量要在打包机上跑，见那一节载体）。
+ *   ⚠️ 另外两条现量事实，省得下一个人重复摸：`apps/mobile/package.json` 的
+ *   `test = vitest run` —— **没有 Detox / Maestro 那类装置**，纯 JS 测试跑不出布局（Yoga 的
+ *   计算结果不在 vitest 里暴露成像素），所以这一格确实只能走设备腿；
+ *   `grep -rln 'detox\|maestro' apps/mobile/src` 现量为空。
  *   谁补这一格，请连**排除掉的那些**一起带读数，别只登记改掉的。
  *
  * 剩下 7 处判掉，逐条理由：
