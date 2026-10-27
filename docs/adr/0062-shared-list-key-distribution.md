@@ -134,6 +134,14 @@
    新开 category 要重装两端 = 别线在飞资产 ⇒ 今天"打扰用户"在手机上就是那一档 + 那枚徽标，
    `systemBanner` 端口留着可注入。设备腿 L8（两半相反）的读数在计划 §9.15。
 
+7. **决策 8 那道同意闸在界面上的落点，此前只有模型层的牙** —— 判断只在 `@heyta/ui` 一处，而调用点有四处（web 入群对话框、手机入群屏、手机「开启共享」那一侧、模型本体）；
+   "模型那 6 枚全绿"**不排斥**某一壳的那一行被整行摘掉 —— 摘掉之后那一壳直接进表单 / 直接建共享，纯逻辑判据一条都不会红。
+   ⇒ 补一条口径：**这一格要有牙，钉的是"调用点在不在"，不是"判断对不对"**（后者一直钉着）。
+   现在三层各有常驻判据（`packages/ui/tests/share-consent-model.spec.ts`、`apps/web/tests/share-join-consent-gate.spec.tsx`、
+   `apps/mobile/tests/share-ui-assembly.spec.ts` 的 ⑨ 组），并由 `research/tools/mutation-rigs/mutate-collab-consent-gate.mjs`
+   逐层证明能红（2026-10-27 首跑 `ARMS=pass (4/4)`，四臂红集精确匹配，读数在计划 §9.19）。
+   裁决没动（PIPL 单独同意、fail-closed 方向、「没勾不再提示 ⇒ 每次还弹」的勾选语义）；动的是"这一格的牙现在量得到"。
+
 **仍然没有做到的（别把上面读成"全做完了"）**：库里存量 op 不追签（ADR-0069 裁决二/三）；
 旧密文在 rekey 后不重加密（追加模型的代价，边界写在 `share-rekey.ts` 文件头）；
 Android 那一侧的界面腿读数本批没开（出包与设备腿按负责人的长期令一律走 `ssh windows-pc`）。
