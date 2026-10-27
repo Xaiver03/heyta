@@ -19,11 +19,11 @@
  * （`commentsForTask` 读的就是那一份缓存）。进入某一节的冷启动那一趟 `pullForTask`
  * 是 web `ShareCommentsSection` 的同一条纪律，不是轮询。
  *
- * 🔴 **系统横幅这一格今天做不到**（不是没做，是做不了；全文在
- * `share/share-activity-notify.ts` 文件头）：本机唯一原生通知通道被提醒链按
- * `categoryIdentifier` 整族认领回收（`ios/Heyta/HeytaReminderModule.swift` 的
- * `cancelStale`），借道投出去的活动通知会被当场抹掉。做到它需要给两枚原生模块
- * 新开 category 并重打两端 —— 而那是另一会话在飞的资产。所以投递端口保持**可注入**
+ * 🔴 **系统横幅这一格今天做不到**（不是没做，是做不了；全文与两端的机制差异在
+ * `share/share-activity-notify.ts` 文件头）：本机唯一那条原生通道归提醒链 —— iOS 那侧按
+ * `categoryIdentifier` 整族认领回收（`HeytaReminderModule.swift` 的 `cancelStale`），安卓那侧
+ * 只有一条 `heyta.reminders` 通道可投。做到它需要给活动通知一枚自己的身份并重打、重装两端 ——
+ * 而那是提醒线的资产。所以投递端口保持**可注入**
  * （`ShareActivityDeliveryPorts.systemBanner`），本屏只把**应用内**那一格画出来
  * （「共享动态」在通知中心，入口装配见 `App.tsx`）。
  *
