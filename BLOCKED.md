@@ -12557,3 +12557,43 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 | R-legal：`live-legal.spec.ts` 那句一刀切 `hasDraftBanner` | 判据口径归法务文案那条线；改成"按 `status` 分档期望"要动他们的断言 | `grep -n hasDraftBanner e2e/live-site/live-legal.spec.ts` |
 | `main` 的上游还指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动。推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref main@upstream`；落后枚数 `git rev-list --count main@upstream..main` |
 | `apps/web/evidence/**` 与两枚台账此刻脏着 | 别的会话**正在写**（mtime 与本轮同一分钟内），代提交=替他们半份落仓；证据片那一族他们自己已登记"永久剔出输入面分母" | `git status --porcelain -uall`；`stat -f "%Sm %N" docs/plans/collaboration-shared-lists.md` |
+
+### B238（2026-10-27 22:1x · 注册登录线：线上那枚「验证码登录」现在就是死的 —— 三发实测 + 我第一发探针是假绿）
+
+**一句结论**：生产容器里那份 `prisma/schema.prisma` 没给 `email_login_challenges.user_id` 写 `@map`，Prisma Client 于是去引用 `"userId"`；库里那一列**本来**叫 `user_id` ⇒ 这张表的每一次读写都 `P2022`。注册（`email_verifications`）那条不受影响，所以症状只是"验证码登录进不去"。
+
+**读数（每一格都带现量命令，都不在本文件里存数）**
+
+| 格 | 读数 | 命令 |
+|---|---|---|
+| 库里这列的真名 | `user_id`（全表 snake_case） | `cat <列名 SQL> \| ssh finlaw "sudo -n docker exec -i supersync-postgres sh -c 'psql -U \$POSTGRES_USER -d \$POSTGRES_DB -At'"`（SQL：`SELECT column_name FROM information_schema.columns WHERE table_name='email_login_challenges' ORDER BY ordinal_position`） |
+| 库里索引名 | `email_login_challenges_user_id_idx`、`…_one_live_per_user_idx`（部分唯一）、`…_email_idx`、`…_expires_at_idx`、pkey | 同上换成 `SELECT indexname, indexdef FROM pg_indexes WHERE tablename='email_login_challenges'` |
+| 线上库里那几行 schema | `userId Int` 后面**没有** `@map("user_id")` | `ssh finlaw 'sudo -n docker exec supersync-server sh -c "sed -n \"/model EmailLoginChallenge/,/@@map/p\" /app/prisma/schema.prisma"'` |
+| 点名探针（两发，都零副作用） | 两发都 `code=P2022 … column email_login_challenges.userId does not exist` | `findMany({where:{userId:-1},take:1})` / `findMany({where:{id:'probe-no-such-id'},select:{userId:true}})`，经 `docker exec -i supersync-server node --input-type=module` 喂进去 |
+| 线上 HTTP：`POST /api/login/email-code/verify`（带一枚不存在的 challengeId） | **`HTTP 503 {"code":"login_unavailable"}` + `retry-after: 3`** | `curl -sS -o /tmp/r.json -D /tmp/r.hdr -w '%{http_code}' -X POST https://heyta.waytofuture.cn/api/login/email-code/verify -H 'content-type: application/json' -d '{"challengeId":"probe-nonexistent-0000","code":"000000"}'` |
+| 对照：`POST /api/register/email-password/verify`（不同那张表，同形状请求） | `HTTP 400 invalid_registration_challenge` ⇒ 服务端活着、路由通，503 只可能来自那张坏表 | 同一条 curl 换路径 |
+| 线上 HTTP：`POST /api/login/email-code/resend` | **`HTTP 400 invalid_login_challenge`** —— 真因是服务端故障，话说成"这验证码无效或已过期"（见下表"待拍板"第一格） | 同一条 curl，body 只带 challengeId |
+| 容器日志里的 `P2022` 次数 | 0 次 —— ⚠️ **这句不是"没人碰过"**：`docker logs --since 720h` 回来的整份日志行数比一次正常启动还短（现量 `ssh finlaw 'sudo -n docker logs --since 720h supersync-server 2>&1 \| wc -l'`），容器 `Up 23 hours`，取不到更久的历史 | `… \| grep -cE "P2022"` |
+| 发验证码那一发（`/login/email-code/request`，一枚 `@example.test` 的不存在邮箱） | `HTTP 201` 带一个诱饵 `challengeId` ⇒ 走的是"账号不存在也给同形状"那条支路，**没建真挑战、没发信**，所以它没碰到坏列 | `curl … -d '{"email":"probe-nonexistent@example.test"}'` |
+
+**我第一发探针是假绿，已单独入册**：`findMany({ take: 0 })` 回过 `SELECT_OK rows_returned=0`，那一刻读起来像"否证了本条结论"。它什么都没判——`take: 0` 不生成列引用。规矩与两发点名写法记在 [环境陷阱 #604](docs/reference/environment-traps.md)。
+
+**已修（本线名下两笔，都已 push 到 `origin/main`）**
+
+| 笔 | 内容 | 复量 |
+|---|---|---|
+| `fix(注册登录/schema)` | `email_login_challenges` 的 `userId` 补 `@map("user_id")`、`@@index` 补 `map:`；`automation_events` 那枚租约索引按迁移 20261018050000 的裸 SQL 名字登记 `map:`（不登记就会让 `migrate diff` 对着线上提 `DROP INDEX`） | `node scripts/check-schema-migration-drift.mjs`（真树 rc=0，枚数与命中数由它自己打印） |
+| `feat(门禁/尺)` | 新尺 `scripts/check-schema-migration-drift.mjs`：静态对账 schema 与 `migrations/**`，A) 迁移有而 schema 认不出 / B) 迁移建的列没字段映射 / C) schema 声明而重放库里没有；带 WHERE/USING/函数列/`_ops`/COLLATE 的按形状豁免并计数，在册缺口逐枚写理由，命中数变了就红；`--self-test` 每臂都要能失败 | `pnpm check:schema-migration-drift`；变异实测：抹掉 `@map("user_id")` ⇒ B 红、抹掉租约 `map:` ⇒ A 红、还原复绿（`.mut-bak` 还原，不从 git） |
+
+**还欠的那一步（要人拍，本会话不代做）**：修复只改了客户端的看法，**不需要新迁移**（库里的名字本来就是对的），要做的动作是"重建生产镜像 + 换容器"。脚本 `scripts/deploy-ssh.mjs` 的三档现量在它的 usage 里：`--dry-run`（只打印计划、一个字节都不写）→ 默认 `--sandbox`（一次性网络/库/容器，不碰线上）→ `--apply --yes-production`（**会覆盖在用的镜像 tag、重启 `supersync-server`**，两个旗标同时给才算人拍过）。按 `docs/runbooks/deployment.md` 6b：先给现役镜像打 `supersync:rollback-<日期>`、旧容器仍在服务时跑迁移、只有 `MIGRATE_RC=0` 才 `up -d --wait supersync`；换完还要重取 §3.8.1 那五条线上判据。**在拿到明确授权之前，本会话不跑 `--apply`，也不跑 `--sandbox`**（那次 `--help` 试跑没留下任何 `ht-deploy-*` 网络/容器，现量 `ssh finlaw 'sudo -n docker ps -a --filter name=ht-deploy --format "{{.Names}}"; sudo -n docker network ls --filter name=ht-deploy --format "{{.Name}}'` 都回空）。
+
+**待拍板 / 跨线（都不许算进"已修"）**
+
+| 格 | 为什么不停在本线 | 现量 |
+|---|---|---|
+| 登录 resend 把服务端故障说成"码无效或已过期"（`server/src/api.ts:2520` 那格） | 改成 503 就是改 **HTTP 线协议语义**（🔴 不可逆层）；而且隔壁同一族的 verify 已经明写"服务端故障不许说成码不对"（`server/src/api.ts:2488`）⇒ 一份立场两处写法，动它要连 i18n 词条与三端壳的 `FAILURE_REASON_BY_SERVER_CODE`（`packages/app-host/src/hosted-auth.ts:678`）一起判 | `grep -n "Email login code resend failed" server/src/api.ts`；`grep -n "invalid_login_challenge" packages/app-host/src/hosted-auth.ts` |
+| 注册 resend 同一形状（`server/src/api.ts:2422`） | 同族第二枚；它今天不露出来只因为那张表没坏，改上一格就得一起改 | 同一份 catch 块：`grep -n "invalid_registration_challenge" server/src/api.ts` |
+| `login_unavailable` 没进客户端白名单 ⇒ 503 落到 `server-error`（"我们不知道发生了什么"），丢掉了服务端明说的"稍后再试" | 要不要为它加一档 reason 是文案与四端词条的取舍（`hosted-auth.ts:671` 那句"避免为一个子流程迫使所有壳加词条"就是它的反方） | `grep -n "login_unavailable" packages/app-host/src/hosted-auth.ts`（无命中即现状） |
+| 尺的 `KNOWN_GAPS` 两枚：`automation_sender_credentials_user_id_rule_id_key_id_idx`（库里只有同列的**部分唯一** + 一条 (user_id,rule_id,revoked_at) 普通索引 ⇒ 查已撤销凭据那条路没索引）、`automation_commit_permits_op_id_key`（迁移 20261018080000 有意撤掉单列唯一换成 (user_id,op_id)，schema 的 `opId @unique` 没跟着改 ⇒ 不变量收窄） | 两格都归自动收集线判：补迁移或改声明都是他们的口径，本尺先登记不代改 | `grep -n "KNOWN_GAPS" -A 20 scripts/check-schema-migration-drift.mjs` |
+| `main` 的上游仍指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动；本轮推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref main@upstream`；落后枚数 `git rev-list --count main@upstream..main` |
+| 本线之外那 13 枚脏（`apps/web/src/**`、`apps/web/tests/inbound-*.spec.tsx`、`docs/agents/ux-principles.md`、`e2e/tests/calendar-cells.spec.ts`） | 两条会话**正在写**（`stat -f "%Sm %N"` 读回 mtime 落在最近十几分钟内），代提交 = 替他们把半份落仓 | `git status --porcelain=v1 \| wc -l`；`stat -f "%Sm %N" apps/web/src/App.tsx` |

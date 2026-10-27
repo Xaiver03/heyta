@@ -4497,3 +4497,22 @@ LC_ALL=C            两种写法都对 —— 所以这枚坑只在正常终端�
 `tests/task-sort.spec.tsx:253`（断言 `entities.tasks[task.id]` 存在，读到 `undefined`）——
 不是本线的文件（它最后一次改动是 `63e61f237`，属产品体验线），而且**单独把 2603 枚全跑一遍是
 `2590 passed | 0 failed`** ⇒ 这枚红是 2603 枚同跑时的时序/隔离读数，登记为负载红，不由本线代改。
+
+### 6.91 线上「验证码登录」当场是死的：schema 没把列名 map 到迁移给的名字（10-27 22:1x 现量，本线名下已修）
+
+**缺陷定性**：生产容器 `/app/prisma/schema.prisma` 里 `EmailLoginChallenge.userId` 后面没有 `@map("user_id")`，而库里那一列**是**迁移建的 `user_id` ⇒ Prisma Client 引用 `"userId"` ⇒ 这张表每一次读写都 `P2022`。注册那条（`email_verifications`）不受影响，所以症状只有一个：验证码登录进不去。口令登录、重置密码、换绑都不在这张表上，所以此前四趟线上验收全绿也没撞上它。
+
+**为什么 build/typecheck/单测一个都不响**：`server/tests/registration-otp.spec.ts` 那一族不打真库（`npx vitest run` 8 passed 而文件里没有任何迁移/真库标记），而 schema 与 migrations 是同一现实的两种写法，没有任何一把尺逐枚对过名字 ⇒ 本线补了一把静态尺（下格）。
+
+**已入库（两笔，都在 `origin/main` 上）**：
+1. `fix(注册登录/schema)` —— `email_login_challenges` 的 `userId` 补 `@map`、`@@index` 补 `map:`；顺带把 `automation_events` 那枚租约索引按迁移 20261018050000 的裸 SQL 名字登记 `map:`（不登记，`migrate diff` 会对着线上提 `DROP INDEX`，而租约续期那条读路径正靠它）。
+2. `feat(门禁/尺)` —— `scripts/check-schema-migration-drift.mjs`：A) 迁移建了而 schema 认不出的索引名 / B) 迁移建了列而没有任何字段映射到它 / C) schema 声明了而按迁移重放出来的库里没有（名字与形状两条路，唯一性单独成一维），带 WHERE/USING/函数列/`_ops`/COLLATE 的按形状豁免并计数，`KNOWN_GAPS` 两枚各带归属与理由、命中数变了就红。复量 `pnpm check:schema-migration-drift`；11 臂自检含"删声明必须红""注释里的索引名不许当 DDL""同语句先 DROP 再 CREATE 不许红"。变异实测：抹 `@map("user_id")` ⇒ B 红，抹租约 `map:` ⇒ A 红，还原复绿（`.mut-bak` 还原）。
+
+**线上读数与取法**：逐格表（库里列名/索引名、容器里那几行 schema、两发点名探针、`/api/login/email-code/verify` 503 对 `/api/register/email-password/verify` 400 的对照、resend 400、诱饵 201）记在 [`BLOCKED.md` B238](../../BLOCKED.md)。**日志里 `P2022` 取 0 次不等于没人碰**——那台容器 `Up 23 hours` 而 `docker logs --since 720h` 回来的总行数比一次正常启动还短，取不到更久历史（两格都带现量命令，B238 里）。
+
+**我自己第一发探针是假绿**：`findMany({ take: 0 })` 回过 `SELECT_OK`，那一刻读起来像否证了本条结论；`take: 0` 不生成列引用，所以它什么都没判。规矩（判列名存在性必须 `WHERE`/`SELECT` 点名那一列 + 挑一个匹配不到任何行的值，零副作用与可证伪不冲突）入 [环境陷阱 #604](../reference/environment-traps.md)。
+
+**待拍板（不算已修）**：
+- **换线上容器那一步**：本修复不需要新迁移（库里的名字本来就对，改的是客户端的看法），要做的是"重建生产镜像 + 换容器"。`scripts/deploy-ssh.mjs` 三档：`--dry-run` 只打印计划 → 默认 `--sandbox`（一次性网络/库/容器）→ `--apply --yes-production`（覆盖在用镜像 tag、重启 `supersync-server`，两旗同时给才算人拍过）。按 `docs/runbooks/deployment.md` 6b：先打 `supersync:rollback-<日期>`、旧容器仍在服务时跑迁移、`MIGRATE_RC=0` 才 `up -d --wait`；换完重取 §3.8.1 五条线上判据。**没授权之前本线两档都不跑**。
+- **`resend` 那格把服务端故障说成"这验证码无效或已过期"**（`server/src/api.ts:2520`），而同一族紧邻的 verify 已明写"服务端故障不许说成码不对"（`server/src/api.ts:2488`）⇒ 一份立场两处写法。改成 503 是 **HTTP 线协议语义**（🔴 不可逆层），要连三端壳的 `FAILURE_REASON_BY_SERVER_CODE`（`packages/app-host/src/hosted-auth.ts:678`）与 i18n 词条一起判，所以登记不代改；同形状的第二枚在注册 resend（`server/src/api.ts:2422`），今天不露出来只因为那张表没坏。
+- **`login_unavailable` 没进客户端白名单** ⇒ 503 落到 `server-error`，丢掉服务端明说的"稍后再试"（`grep -n "login_unavailable" packages/app-host/src/hosted-auth.ts` 无命中即现状）；要不要为它加一档 reason 归文案与四端词条一起定，`hosted-auth.ts:671` 那句"别为一个子流程迫使所有壳加词条"就是它的反方。
