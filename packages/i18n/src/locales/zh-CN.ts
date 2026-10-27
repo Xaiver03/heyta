@@ -5738,7 +5738,13 @@ export const zhCN = {
   'web.ai.inbound.status.routing': '等待开启自动收集的 AI 路由和出境同意；不会静默调用模型。',
   'web.ai.inbound.status.ready': '处理设备已就绪；页面保持前台时会定期领取一条事件。',
   'web.ai.inbound.status.noKeyOnThisDevice': '这台设备还没有收件密钥，所以它不会处理任何内容；密钥要先在一台已解锁的设备上建一次（例如网页版）。',
-  'web.ai.inbound.boundary.foregroundOnly': '自动收集只在这台设备开着 heyta 时处理：应用退到后台、浏览器关掉页面都不领新内容。要常年接收，把处理设备跑在你自己那台一直开着的机器上。',
+  // 这一句现在是"两条腿"的说法：规则可以选由服务器在到达时抽取（ADR-0077），
+  // 于是"只在设备开着时处理"不再是全部事实 —— 两枚壳渲染同一句，措辞必须两边都真。
+  'web.ai.inbound.boundary.foregroundOnly': '每条规则自己决定由谁来处理：没有勾选"由我们的服务器在内容到达时抽取"的规则，只在这台设备开着 heyta 时处理 —— 应用退到后台、浏览器关掉页面都不领新内容。',
+  'web.ai.inbound.hosted.label': '由我们的服务器在内容到达时抽取',
+  'web.ai.inbound.hosted.notice': '勾选后，内容一到达就由我们启用的 AI 读取并抽出标题、日期等字段；抽取完成后我们只保存加密的任务结果，原始内容随即丢弃。不勾选时，只有你打开 heyta 的那台设备会读它。',
+  'web.ai.inbound.hosted.stateHosted': '抽取：我们这台服务器（内容到达即处理）',
+  'web.ai.inbound.hosted.stateDevice': '抽取：这台设备（需要开着 heyta）',
   'web.ai.inbound.signIn': '先登录同步服务，才能管理自动收集规则。',
   'web.ai.inbound.formHint': '规则只允许创建新任务。字段白名单、目标清单、时区和条数上限会随规则版本冻结。',
   'web.ai.inbound.keyId': '回调密钥编号',

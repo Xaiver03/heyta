@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   process: vi.fn(),
   fetch: vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(
     String(input).endsWith('/events') ? { events: [] } : String(input).endsWith('/recipient-key') ? { keyEpoch: 1, packageVersion: 1 } : {
-      rules: [{ id: 'rule', version: 1, keyId: 'hook', enabled: true, allowedFields: ['title'], maxItems: 50, createdAt: '2026-10-08T00:00:00Z', deletedAt: null, targetProjectId: null, timezone: null, parseVersion: 1, authorizationVersion: 1 }],
+      rules: [{ id: 'rule', version: 1, keyId: 'hook', enabled: true, allowedFields: ['title'], maxItems: 50, createdAt: '2026-10-08T00:00:00Z', deletedAt: null, targetProjectId: null, timezone: null, parseVersion: 1, authorizationVersion: 1, hostedExtraction: false }],
     },
   ))),
 }));

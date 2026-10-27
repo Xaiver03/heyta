@@ -18,7 +18,7 @@ const RULE_IDS = ['rule-a', 'rule-b'] as const;
 const ruleRow = (id: string) => ({
   id, version: 3, keyId: `hook-${id}`, enabled: true, allowedFields: ['title'], maxItems: 50,
   createdAt: '2026-10-08T00:00:00Z', deletedAt: null, targetProjectId: null, timezone: null,
-  parseVersion: 1, authorizationVersion: 1,
+  parseVersion: 1, authorizationVersion: 1, hostedExtraction: false,
 });
 
 const mocks = vi.hoisted(() => ({

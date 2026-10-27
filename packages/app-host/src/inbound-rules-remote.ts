@@ -10,10 +10,17 @@ export interface InboundAutomationRule {
   id: string; version: number; enabled: boolean; keyId: string; createdAt: string; deletedAt: string | null;
   allowedFields: readonly InboundAutomationField[]; targetProjectId: string | null; timezone: string | null;
   parseVersion: number; authorizationVersion: number; maxItems: number;
+  /**
+   * 「接收即抽取」（ADR-0077）：抽取归这台设备，还是归我们这台服务器。
+   * 🔴 只有服务端那一列**显式为 true** 才是后者。那一列存在之前落的规则，服务端读成
+   * `false` 再发出来 —— 界面于是永远有一个确定的值可渲染，不用猜"没读到是什么"。
+   */
+  hostedExtraction: boolean;
 }
 export interface InboundAutomationRuleConfig {
   allowedFields?: readonly InboundAutomationField[];
   targetProjectId?: string | null; timezone?: string | null; parseVersion?: number; maxItems?: number;
+  hostedExtraction?: boolean;
 }
 export interface InboundSenderCredential {
   credentialId: string; keyId: string; createdAt: string; revokedAt: string | null; rotatedAt: string | null;
@@ -45,7 +52,11 @@ const valid = (value: unknown): value is InboundAutomationRule => {
     Array.isArray(r.allowedFields) && r.allowedFields.length > 0 && r.allowedFields.every((f) => typeof f === 'string' && fields.has(f)) &&
     (r.targetProjectId === null || typeof r.targetProjectId === 'string') && (r.timezone === null || typeof r.timezone === 'string') &&
     typeof r.parseVersion === 'number' && Number.isInteger(r.parseVersion) && typeof r.authorizationVersion === 'number' && Number.isInteger(r.authorizationVersion) &&
-    typeof r.maxItems === 'number' && Number.isInteger(r.maxItems) && r.maxItems >= 1 && r.maxItems <= 50;
+    typeof r.maxItems === 'number' && Number.isInteger(r.maxItems) && r.maxItems >= 1 && r.maxItems <= 50 &&
+    // 这一条是**读面的红线**：认不出这个字段就不渲染这一格，而不是把它当 false 猜。
+    // 服务端与界面出自同一份产物，所以"老服务器不返回这一枚"在这里是一次真故障，
+    // 不是一种需要向下兼容的形状。
+    typeof r.hostedExtraction === 'boolean';
 };
 export class InboundRulesRemoteError extends Error {
   constructor(readonly code: 'authentication' | 'forbidden' | 'validation' | 'not-found' | 'conflict' | 'transport') { super(`Inbound rules request failed: ${code}`); }

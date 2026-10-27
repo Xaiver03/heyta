@@ -4,7 +4,7 @@ import { AutomationEntitlementRequiredError } from '../src/inbound-worker.js';
 import { AutomationTicketError, type AutomationTicketRequest } from '../src/inbound-entitlement-tickets.js';
 import { AUTOMATION_ENTITLEMENT_TICKET_HEADER } from '@heyta/inbound-core';
 
-const rule = { id: '11111111-1111-4111-8111-111111111111', version: 1, enabled: false, keyId: 'hook', createdAt: '2026-01-01T00:00:00.000Z', deletedAt: null, allowedFields: ['title'], targetProjectId: null, timezone: 'UTC', parseVersion: 1, authorizationVersion: 1, maxItems: 50 };
+const rule = { id: '11111111-1111-4111-8111-111111111111', version: 1, enabled: false, keyId: 'hook', createdAt: '2026-01-01T00:00:00.000Z', deletedAt: null, allowedFields: ['title'], targetProjectId: null, timezone: 'UTC', parseVersion: 1, authorizationVersion: 1, maxItems: 50, hostedExtraction: false };
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 describe('automation rule transport', () => {
