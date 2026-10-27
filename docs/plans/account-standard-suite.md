@@ -4667,11 +4667,11 @@ diff 打开只有那两行，与"旧"无关。
 | 出路（不是我想加的，是仓库自带的） | 链外**允许表**：逐条要写"为什么不进链"+ 一条**会执行它**的消费方；消费方落在 `docs/agents/commands.md` 的命令块 | `node scripts/check-gate-wiring.mjs --self-test && node scripts/check-gate-wiring.mjs` |
 | 为什么不进链（这枚尺自己的理由） | 干净检出上它必然报"未提交 0 枚"⇒ 进链就是恒绿；并行会话正写着时它必然红 ⇒ 进链就是每天替别人红一次。两头都不对的门禁不该装在链上，载体是**人** | `git worktree add --detach /tmp/x HEAD && cd /tmp/x && node scripts/check-worktree-exceptions.mjs; git worktree remove /tmp/x` |
 | 它第一次跑就点到的两枚 | ① 一枚 `*.mut-bak` 残渣（有人此刻正在对 `server/src/ai/managed-completion.ts` 施变）—— 这种**不该登记成例外**，它该在下一分钟自己消失；② `apps/mobile/tests/share-ui-assembly.spec.ts` | `pnpm check:worktree-exceptions` |
-| 第②枚归谁（协作线自己正在修） | 它的加行写着：那枚 `/<Pressable[\s\S]*?testID="…"/` 从**文件里第一枚** `Pressable`（"不再提示"的勾选框）起手 ⇒ 摘掉真触发件的 `onPress` 它照样绿 = **一枚永远绿的判据**；他们配了 `press-channel-gone-mobile` 那发变异臂在修（`6e05f077c`） | `git show 6e05f077c --stat \| tail -4`；`grep -n 'press-channel-gone-mobile' research/tools/mutation-rigs/mutate-collab-consent-gate.mjs` |
+| 第②枚归谁（协作线自己正在修） | 它的加行写着：那枚 `/<Pressable[\s\S]*?testID="…"/` 从**文件里第一枚** `Pressable`（"不再提示"的勾选框）起手 ⇒ 摘掉真触发件的 `onPress` 它照样绿 = **一枚永远绿的判据**；他们配了 `press-channel-gone-mobile` 那发变异臂在修（`6e05f077c`） | `git show --stat 6e05f077c`；`grep -n 'press-channel-gone-mobile' research/tools/mutation-rigs/mutate-collab-consent-gate.mjs` |
 
 **这轮我自己的一次手法，值得留一句**：`check-` 前缀的脚本必须在 package.json 里有定义（就是这枚尺的判据之一），
 而 `package.json` 正被别的会话改着 ⇒ 只能用临时索引提"HEAD + 我这一行"。
 提完必须**把同一行也插回工作树**：工作树少了这一行，任何一次整文件提交都会把我的定义抹掉，
-而那时红的是下一位的 `check:gate-wiring`。判据：`git diff -- package.json \| grep -c worktree-exceptions` 要读 **0**
+而那时红的是下一位的 `check:gate-wiring`。判据：`git diff -- package.json | grep -c worktree-exceptions` 要读 **0**（这句在正文段落里，管道不该转义）
 （我这行不在"未提交差异"里），同时 `grep -c focus-single-source` 要仍读 **2**（别人的行没被我动）。
 
