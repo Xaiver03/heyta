@@ -4468,9 +4468,10 @@ AC-8：`python3 research/tools/verify-inbound-ac8-matrix.py` rc=**0**（`读数�
 （移动那份 `apps/mobile/src/ai/settings-store.ts` 是 AsyncStorage 私有实现）。
 ⇒ "给 node 宿主一个启动者"缺的**不是那一行调用**，是"一台无头机器怎么被授权把用户内容发往某个端点"这件事的设计，
 而出境同意属对外法律表征那一档 ⇒ 不代拍，交回负责人（开工单 §6 第 7 格由此从"补腿 vs 明写边界"两难变成
-"先定无头宿主的同意来源"三难）。另有一条机械前置：判据要求的"真库真 HTTP"在这台机器上取不到 ——
-`env | grep -c DATABASE_URL` = **0**、`server/.env` 里也没有 `DATABASE_URL`，集成套件按
-`describe.skipIf(!DATABASE_URL)` 整段跳 ⇒ 就算写完也只能交"待有库那台机器上跑"的用例。
+"先定无头宿主的同意来源"三难）。另有一条机械前置，**当天下午被自己否证**：当时 `env | grep -c DATABASE_URL` = 0、`server/.env` 里也没有
+那枚键，我据此写了"判据要的『真库真 HTTP』在这台机器上取不到"。那句是**探针没做完前置就下的负结论** ——
+本机 `127.0.0.1:5432` 上那台 Postgres 一直活着（`nc -z 127.0.0.1 5432` 通），`DATABASE_URL` 只是**没人导出**，
+`createdb` 一枚独立库再把它导出就拿到了真库；判据后来就在真库 + 真 HTTP + 真 CLI 子进程上取到了（见 15:2x 那一戳）。
 
 **8. A1 按开工单第二支落**（本版本不支持 `selfhost-online`，不改代码）。现量：客户端没有任何一面把这档做成用户选项 ——
 `grep -rn "selfhost-online" apps packages --include='*.ts' --include='*.tsx'` 去掉 dist 与测试只命中
@@ -4485,3 +4486,60 @@ AC-8：`python3 research/tools/verify-inbound-ac8-matrix.py` rc=**0**（`读数�
 本文件与 `BLOCKED.md`（B110 / B175 各一条闭合行）。
 **判卷口径变更**：`check:retention-window-parity` 长了一条判据（9 臂）；`web.ai.inbound.process.*` 一族从 4 颗变 5 颗，
 双向对账用例的分母跟着长。**AC 已勾数零处**（现量 `python3 research/tools/verify-inbound-ac-ticks.py`）。
+
+## 2026-10-27 15:0x–15:3x · A2 闭合：那条 CLI 现在真的把循环打开了；顺带抓到一句只在非 UTC 会话上红的租约谓词（自动收集线）
+
+本戳对应开工单 §7 第 2 步（`apps/node-host` 那枚 worker 循环的真实启动者）。提交两笔：修复
+`af287a83d`（服务端租约谓词）、A2 本体（下一笔）。
+
+**1. 启动者落在 CLI 上**：`worker run`（`apps/node-host/src/inbound-worker.ts` 新 + `src/cli.ts` 的
+`case 'worker'`）。这台壳上没有设置界面也没有同意流程，所以出境授权只认**正在敲这条命令的人**在命令行上
+写下的那一个词；目的地**不由本壳判**，由 `@heyta/ai` 的 `classifyDestination` 按端点地址算（AGENTS §3.5 的
+宿主边界：CLI 只把操作者意图翻译成入参）。四支拒绝形状各有对应臂：算出来要出境而词缺失 / 词是自造的 /
+词与算出来的不一致 / 算出来是 `none`（回环）却挂了词 ⇒ 全部**拒绝启动、一个请求都不发**。同意记录里的
+`grantedAt` 取"操作者敲下这条命令的这一刻"，不从别处抄时间戳。🔴 那几句拒动与披露文案是**我起草的**，
+措辞（尤其"明文正文交给谁"那一句）要负责人复看一次再当对外口径用；本轮没代勾任何 AC。
+密钥不进 argv：自带端点走 `ai key set <端点 id>`（stdin → 系统钥匙串），命令行只给 `--ai-key-id` 指认位置。
+
+**2. 判据（真库 + 真 HTTP + 真 CLI 子进程）**：`server/tests/integration/inbound-node-worker-cli.integration.spec.ts`
+三臂 —— 正臂**不调任何宿主 API**，只有 `spawn(node, [dist/cli.js, …, 'worker', 'run'])`，之后公钥、注册、领取、
+解密、模型调用、落待办、回执全由那枚子进程自己做；读数：`Tests 3 passed (3)`（+08 会话那台库），另把正臂单独在
+UTC 会话（同一枚库、URL 尾巴 `?options=-c%20timezone%3DUTC`）复跑一次也绿。反向臂把公钥与 worker 都替它登记好、
+**只是没有启动者** ⇒ 队列原样 `queued`、提交许可 0、假上游命中 0（它挡的是"没注册所以领不了"那条捷径，并给正臂定归因）。
+出境闸臂量"挂一句用不上的授权"⇒ 非 0 退出 + 上游 0 次。**摘掉启动点的变异臂**（现量，不是推的）：把 `case 'worker'`
+改成不可达的标签、重打 `dist/cli.js`、只跑正臂 ⇒ `AssertionError: CLI 起来后服务端该有收件公钥：等待 30000ms 后读数为 0`、
+`Tests 1 failed`；还原后 `shasum -a 256` 前后逐字相同（`dfc3ce6f…` 同一枚），重打后两档合跑 `Tests 6 passed (6)`。
+单元侧的授权矩阵 `apps/node-host/tests/inbound-worker-plan.spec.ts` **10 臂**（托管白名单命中/不命中、回环 own 判 `none`、
+own 远端放行、缺词、自造词、错配、参数不全指回 `ai key set`、`--interval-ms`/`--once` 透传与缺省）。
+node-host 全套 `Test Files 14 passed (14) / Tests 213 passed (213)`。
+
+**3. 一台真库从哪来**（写清取法，因为它否证了本文件今天早些时候那句"这台机器取不到"）：本机 `127.0.0.1:5432`
+那台 Postgres 一直活着（`nc -z 127.0.0.1 5432` 通），缺的只是**没人导出 `DATABASE_URL`**；取法是
+`createdb heyta_node_worker_cli` 一枚独立库 + `DATABASE_URL="postgresql://$(whoami)@127.0.0.1:5432/heyta_node_worker_cli"`
+（trust 认证，链路里没有口令）。复跑入口就这两行，加 `pnpm --dir server exec vitest run --config vitest.integration.config.ts <那两档>`。
+
+**4. 撞出来的缺陷：租约谓词只在非 UTC 会话上对**（环境陷阱 **#599**，修复在 `af287a83d`）。A2 正臂第一次跑就红在
+`Automation AI attempt reservation failed`，服务端回 409、宿主把它归成 `network`，读起来像端点坏了。三段读数分开量：
+列是 `timestamp without time zone`；Prisma 客户端按 **UTC 挂钟**写它；`clock_timestamp()` 与绑进来的 `Date` 参数都是
+`timestamptz`；而 `SHOW timezone` 在这台库上是 **`Asia/Shanghai`** ⇒ 裸值被按 +08 解释，一把还有 60 秒的租约读成
+"八小时前已过期"。**现量到的既有受害面**：`inbound-dual-host-fault-windows` 的 **W0 基线**在这台 +08 库上红，
+把会话换成 UTC 立刻绿 ⇒ 那 41 枚用例此前只在容器那台 UTC 库上跑过，这条谓词从写下起没在非 UTC 会话被测过一次。
+修法把绝对时刻那一侧锚回 UTC 挂钟（`ai-metering.ts` 预留与推进、`events.ts` 领取与结果回收、`rules.ts` 七天密文清扫）。
+新档常驻判据 `server/tests/integration/automation-lease-session-timezone.integration.spec.ts`：把一枚
+`connection_limit=1` + `set_config('TimeZone','Asia/Shanghai',false)` 的连接（先自证 `current_setting('TimeZone')`，
+钉不住就当场红）直接交给产品的 `reserveAutomationAiAttempt`，**不复制那句 SQL**；修复前 `1 failed | 2 passed`、
+修复后 `3 passed`，另两枚对照臂（过期租约、过保留期）挡"判活改成恒真"。回归面：双宿主套件 **14/14**、
+`inbound-worker-identity` + `ai-metering-race` **49/49** 都在这台 +08 库上过。
+
+**5. 没做与不归本格的**：托管档（`--ai-managed`）在本地**量不到** —— `classifyDestination` 只认境内白名单，
+明文 http 回环算不出 `heyta-cloud`，共享层又正确地拒绝把明文发到非回环地址；要真跑得让测试上白名单 + https，
+那是发布那一格而不是这一档，所以 CLI 集成腿走自带端点，托管档的翻译与授权矩阵由那 10 臂钉住。
+`--interval-ms` 与 `--once` 之外没有加"选规则"的入参（`allowedFields`/`maxItems`/`parseVersion` 由服务端快照决定，
+写进 CLI 就是越界）。web/mobile/Electron 那几档的生命周期一格没动（A2 表里它们的边界仍归负责人：
+"设备开着才处理"这句要不要对外明写，属开工单 §6 第 7 格）。
+
+**判卷口径变更**：`test:integration:postgres` 点名从 41 枚变 **43 枚**（新两档；`node scripts/check-integration-coverage.mjs`
+现在 `盘上 43 个，全部被…点名` rc=0）；`docs/runbooks/self-host.md` 新增 **§2.6**（那条命令的四个必填、两种档位、
+`--approve-egress` 的三种形状，以及"仓库里没有叫 `heyta-node` 的可执行文件"这句——我写第一版时编过这个名字，
+现量 `apps/node-host/package.json` 无 `bin` 字段后改成实测过的 `node apps/node-host/dist/cli.js` 与 `pnpm host`，
+两形都跑过：缺参时 stderr 说话、退出码 1）。**AC 已勾数零处**（现量 `python3 research/tools/verify-inbound-ac-ticks.py`）。
