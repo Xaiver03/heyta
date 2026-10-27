@@ -4786,6 +4786,36 @@ grep -rn "INBOUND_AUTOMATION_FIELDS as readonly" server/src/automation          
 
 ⚠️ 一条我没扩的口子：给 `apps/web/src/features/categories/`、`.../habits/` 这类**整目录**登记我没做 —— 目录前缀会把"以后任何人改这个目录"都自动归给 UX 线，那是假归属；所以只登记**现量在飞的那两枚文件**。归属表的价值在"每条都指得出名"，不在"未登记栏好看地读 0"。
 
+### 6.103（2026-10-28 01:0x · 第三判"HEAD 自洽"上线，同时当场抓到并修掉我自己三枚 bug）
+
+**第三判**：`--head --range <ref>` 只读对象库（`git show HEAD:<file>`），分母 = `git diff --name-only <ref>..HEAD` 里那些**现在仍在 HEAD** 的源文件。今天的读数：那批 35 枚源文件，**引用不到 HEAD 落点的 0 处** ⇒ 自那次发布以来别人提交的每一笔都不是半棵树。
+
+```sh
+node scripts/check-worktree-exceptions.mjs --head --range b55e98807      # 读 0 处
+node scripts/check-worktree-exceptions.mjs --head --range HEAD~80        # 控制臂：换个更宽的分母，仍读 0
+node scripts/check-worktree-exceptions.mjs --head                        # 不带 range ⇒ rc=1 并说明为什么
+```
+
+**我试过后撤掉的那一档**：不带 range 扫整棵 HEAD。分母 1721 枚带相对引用的源文件，第一发判不中 381 处、修掉注释与断言字符串后仍 286 处。剩下两类噪声（指向 `packages/*/dist/*` 这种**构建产物**的引用、以及非语句式的 import 写法）要真正的解析器才分得清。本仓那条元规则就在这儿：**一枚天生红的尺比没有尺更糟**，所以这一档不进代码，只进报错文字。
+
+**三枚自家 bug（都属于"空读数先归因搜法"）**
+
+| bug | 症状 | 修法与那枚臂 |
+|---|---|---|
+| 扩展名判错 | `extname('server/src/account/account-profile.store')` 读回 `.store` ⇒ 候选一个都不补，**已入库的模块被报成"HEAD 里没有"**；第三判第一发那 5 处全是这一类假红 | 改成"结尾是不是已知模块扩展名"；⑱ 臂拿 `account-profile.store` 这类带点文件名钉住 |
+| 路径被转义 | `git status --porcelain` 默认把非 ASCII 路径写成 `"…\344\271\240…"`，那种字符串跟任何前缀都拼不上 ⇒ 中文名证据件**整批**读成"没登记过"（未登记一栏从 26 涨到 44 全是它） | 取数改 `-c core.quotepath=off`；判据：`git -c core.quotepath=off status --porcelain` 里不该再出现反斜杠转义 |
+| 按目录穷举 | 脏集几分钟从 51 涨到 98，其中 45 枚是**被截图类门禁重写的已入库 PNG** —— 逐目录登记永远在追 | 改成按机制登记：`apps/web/evidence/` 下的修改归"门禁产物回执"，但 `skipUntracked` ⇒ 新出现的取证文件仍被点名（⑲ 臂就是这一条的牙） |
+
+**抽引用那一档也收紧了**：只认语句式的 `import … from './x';` / `export … from './x';` / `import './x';`，注释行先丢、行尾注释仍要吃到（⑯⑰ 两臂）。这修的是"散文里的 import 字样被读成依赖"那一类假红。
+
+**今天的现实读数**（别抄，现量）：未提交 98 枚、未登记 **2** 枚。这两格我**没有**替它们编归属，因为拿不出"那句指名"：`e2e/tests/habit-create-options.spec.ts`（习惯线在飞的用例）、`?? e2e/tests/danger-confirm-trash.spec.ts`（新增的危险确认用例，作者还没落）。
+
+```sh
+node scripts/check-worktree-exceptions.mjs --self-test | tail -1     # 臂数 19
+node scripts/check-worktree-exceptions.mjs | sed -n '/没登记过/,$p'   # 逐枚点名
+```
+
+
 
 
 
