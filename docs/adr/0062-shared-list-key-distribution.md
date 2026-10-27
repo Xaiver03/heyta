@@ -150,6 +150,10 @@
    两枚各自的原因不同：
    ① 提醒那一枚**没有输入**——共享日志里没有"到期时间"这一族语义，替它编一个默认值就是让通知在吵；
    现在偏好模型只有一个键 `activities`（三类种类：新增／删除／完成），数据面接的就是这一族（`packages/ui/src/sync/notification-model.ts`）。
+   ⚠️ **"没有输入"这句不是靠人记着的** —— 它由常驻判据钉着：`packages/ui/tests/notification-model.spec.ts` 断言
+   `Object.keys(DEFAULT_NOTIFICATION_PREFS)` 恰好等于那一族、且那三类种类逐名列举（现量 `grep -n 'Object.keys(DEFAULT_NOTIFICATION_PREFS)' packages/ui/tests/notification-model.spec.ts`）。
+   哪天有人给偏好加第二族（比如按提醒吵人），红的是那枚断言，这条撤下裁决就被迫重读 —— 不必翻本条才知道前提变了。
+   2026-10-27 复确认（HEAD 在动，前提要重量）：两枚谓词仍零命中、偏好仍单族三类、`common.share.activity*` 词条仍 5 枚。
    ② 自动接受邀请那一枚**不该有**——加入一份共享在两个壳上都是用户按下"加入"那一下
    （移动端调用点 `apps/mobile/src/screens/JoinShareScreen.tsx`），把它自动化等于替用户同意，
    与决策 8 那道单独同意闸方向相反。
