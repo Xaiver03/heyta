@@ -4526,3 +4526,20 @@ LC_ALL=C            两种写法都对 —— 所以这枚坑只在正常终端�
 1. **修好的是服务端那一半，用户可达的那一半要靠另一件产物**。网页应用不在镜像里被服务：公网 `/app/` 打的是宿主机 `/var/www/heyta-app`（`index.html` 两端 sha256 相同可证），镜像里那份 `/app/web-dist` 是第二份拷贝。所以"换容器成功"与"用户能看到验证码登录"是**两件事**，`/health=200`、五张凭据页全绿、`HEALTH` 判据都覆盖不到后者。为此把线上尺 `e2e/live-site/live-signin-entry.spec.ts` 加了一条常驻判据（文件头判据 2a）：展开「其他登录方式」后 `auth-form-login-code-trigger` 必须可见 —— 它判的正是"那一盘 SPA 里这一档在不在"，而不是"服务端接不接"。
 2. **变异轮自己会打空，而且打空的样子和通过一模一样**。第一发我用 `perl -0pi -e 's/auth-form-login-code-trigger/…-MUTANT/'`，`-0` 把整份文件当一条记录、没有 `/g` ⇒ 只替换**第一处**，而第一处是我自己写在文件头注释里的那枚同名串；断言那行没动，用例照绿 `rc=0`。要改的目标必须带上只有代码里才有的形状（`[data-testid="…"]` 整串），并且**跑之前先 `grep -n` 确认命中的是断言那一行**。还原也不从 git 拿（判据此刻还没提交，`git checkout` 会把我这一整块抹掉），从同目录的快照 `cp` 回去。
 3. **`/var/www/heyta-app` 与 HEAD 不齐这一格停在待拍板**，不在本线代做：把它对齐要重新构建并 rsync，而 22:21 之后落进 `apps/web` 的那批输入全是自动收集线的产品改动 ⇒ 一次 rsync 会把**别人那两笔**一起推上线。判"盘里有没有这两句新文案"用的是 grep 命中数，配了一枚控制臂（同目录 grep `email-code` 命中 1 ⇒ 证明搜法本身有效，前两枚的 0 不是"尺没扫到"）。命令在 B238 那张新待拍板表的右栏。
+
+### 6.93（10-27 23:0x 现量）本轮编辑的质量复核：五格各自怎么量的
+
+范围只圈**本轮这几笔**（`server/prisma/schema.prisma`、`scripts/check-schema-migration-drift.mjs` + `package.json` 接线、`e2e/live-site/live-signin-entry.spec.ts` 判据 2a、两份证据件、台账）。每条都带一条**现在就能重跑**的命令，不写"看过了"。
+
+| 格 | 读数 | 命令 |
+|---|---|---|
+| ① 重复实现：新尺与仓内另一枚迁移尺重叠吗 | 不重叠。`check-migrations.mjs` 判的是 CONCURRENTLY/隐式事务形状，文件里 `indexname`/`@@index`/`map:` **命中 0**；碰过 `schema.prisma` 或 `migrations/` 的脚本共 4 枚，逐枚看过职责 | `grep -cE 'indexname\|@@index\|dbName\|map:' scripts/check-migrations.mjs`；`grep -rln 'schema\\.prisma\|prisma/migrations' scripts/*.mjs` |
+| ② 死代码：尺里每个声明都有调用点吗 | 30 枚顶层声明，**没有一枚只出现一次**（即没有"定义了没人叫"）。⚠️ 第一发我按 `^function` 数，返回空 —— 那把尺只扫一种写法；真实声明是 `function`/`const`/`async` 三种混着，重数才是 30 | `grep -oE '^(export )?(async )?(function\|const) [A-Za-z0-9_]+' scripts/check-schema-migration-drift.mjs \| awk '{print $NF}' \| sort \| while read f; do n=$(grep -c "\\b$f\\b" scripts/check-schema-migration-drift.mjs); [ "$n" -le 1 ] && echo "$f 只出现一次"; done` |
+| ②b 无自动消费者的出口 | `--dump-indexes` 只有文档引用它（人看的取数出口），没有门禁叫它。**判为不修**：删它等于删一条排障路径，而它 0.05s 就能跑完 | `grep -rl 'dump-indexes' --include='*.md' --include='*.mjs' . \| grep -v node_modules` |
+| ③ 性能 | 尺真树单次 `real 0.05s`（进链不构成成本）；本轮唯一碰到读路径的是那枚 `@@index([userId], map: …)` —— 它**登记的是库里已存在的索引**，不改库。没引入循环内 IO / N+1：尺是纯静态读两份文件 | `time node scripts/check-schema-migration-drift.mjs` |
+| ④ 错误处理是否真实存在 | 两处当场修完：a) 尺自己吞未知旗标 ⇒ 现在未知旗标拒、输入不在场点名红（臂数自打印，变异实测见 §6.91）；b) 线上那发 `verify` 的 503 兜底把 P2022 说成"服务不可用"，**形状是机器可读的**（带 `code` 与 `retry-after`），所以它不是吞异常，是**话说错了**——改它归线协议语义 ⇒ 进待拍板 | `node scripts/check-schema-migration-drift.mjs --self-test \| tail -1`；`curl -s -X POST https://heyta.waytofuture.cn/api/login/email-code/resend -H 'content-type: application/json' -d '{"challengeId":"no-such"}'` |
+| ⑤ 产品视角：本轮改动有没有做出"两个入口/没有回执" | 一格**新缺陷形状**（不是本轮引入，是本轮量出来的）：网页应用与服务端是两件产物两条发布路径，`deploy-ssh.mjs` 只换容器 ⇒ "改对了但没上线"仍可在整条 check 全绿时发生。已用常驻判据 2a 把"验证码那一档在线上那盘里在不在"钉住；**发布链本身要不要收第二件产物**归发布线判（见下） | `cd e2e && npx playwright test --config playwright.live-site.config.ts live-signin-entry`；`ssh finlaw 'sudo -n sha256sum /var/www/heyta-app/index.html'` 对 `curl -s https://heyta.waytofuture.cn/app/ \| shasum -a 256` |
+| ⑤b 可达性（不算缺陷，登记给人看） | 「使用验证码登录」收在「其他登录方式」那根折叠条后面（`aria-expanded=false`），而那条写作一行被横线穿过的字 ⇒ 第一眼读起来像**分隔线**而不是按钮。要不要默认展开是取向题，本线不代改 | `cd e2e && node -e`（探针留在 `~/.heyta-evidence/login-code-prod-deploy-1027/probe-panel-2.mjs`，打印 `toggle 展开前 expanded=false` 与展开后四枚 testid） |
+
+**本轮"已修"合计（都在 git 里，逐笔可对账）**：`git log --oneline --since="2026-10-27 20:00" --author-date-order -- server/prisma/schema.prisma scripts/check-schema-migration-drift.mjs package.json e2e/live-site/live-signin-entry.spec.ts apps/web/evidence/login-code-live-after-deploy-1027`。
+**仍停在待拍板的**：B238 那两张表（错误形状那三格 + `KNOWN_GAPS` 两枚 + `main` 上游指 gitee + 别人在飞的脏项 + 本轮新增的"`/var/www/heyta-app` 与 HEAD 不齐要不要现在对齐"）。
