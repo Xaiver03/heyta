@@ -12670,3 +12670,27 @@ done                                                          # 判据：空 = �
 `packages/design-system/src/tokens.css` 这类**设计变量件**报成敏感件（实测 4 行命中全是 tokens 家族）。
 所以敏感件判据落在**内容形状**上（私钥头），文件名只做二次线索、不做判决。
 
+
+**【B238 这几张表里所有复取命令的可复制版本】** 表格里带管道的命令是 markdown 转义形（单元格必须写斜杠竖线），
+**复制去终端就成了一条永不命中的死探针** —— 所以下面这份才是给人抄的：
+
+```sh
+# 库里这列的真名
+cat <列名 SQL> | ssh finlaw "sudo -n docker exec -i supersync-postgres sh -c 'psql -U postgres -d supersync -f -'"
+# 容器日志里 P2022 的次数，以及"这句不是没人碰过"的那次自校验
+ssh finlaw 'sudo -n docker logs --since 720h supersync-server 2>&1 | grep -c P2022; sudo -n docker logs --since 720h supersync-server | wc -l'
+# 未知旗标那格假绿的对照组：不给旗标 vs 给错旗标
+node scripts/check-schema-migration-drift.mjs; echo rc=$?
+node scripts/check-schema-migration-drift.mjs --schema /tmp/别的树/schema.prisma; echo rc=$?
+# 本线之外那批正在被别人改的文件：当前脏集 + 每枚几分钟
+git status --porcelain
+git status --porcelain | sed 's/^...//' | while read p; do [ -e "$p" ] && echo "$(( ( $(date +%s) - $(stat -f %m "$p") ) / 60 ))分  $p"; done | sort -rn
+# 换完容器后线上库里那几行 schema
+ssh finlaw 'sudo -n docker exec supersync-server sh -c "awk \"/model EmailLoginChallenge/,/^}/\" /app/prisma/schema.prisma | grep -nE \"userId|@@index\""'
+# 三发点名探针（零副作用，发布前后各跑一次）
+cd ~/.heyta-evidence/login-code-prod-deploy-1027 && cat probe-named-columns.mjs | ssh finlaw 'sudo -n docker exec -i supersync-server node --input-type=module'
+# 公网那盘 SPA 落后多远（needle 版）
+node scripts/live-web-freshness.mjs
+# 判据 2a 那枚变异（改的是断言那一行的形状，不是那个名字）
+cd e2e/live-site && perl -pi -e 's/\[data-testid="auth-form-login-code-trigger"\]/[data-testid="auth-form-login-code-trigger-MUTANT"]/' live-signin-entry.spec.ts
+```
