@@ -68,18 +68,19 @@ function fieldLabel(field: InboundAutomationField, t: (key: any, vars?: any) => 
 }
 
 /**
- * 一句状态回显只从这张表取词条。`waiting-entitlement` 刻意不在表里：它的句子是
- * 一颗还没有的词条（BLOCKED.md B110），挪用 `failed` 那句会把"这台实例还没买到资格"
- * 说成"处理失败"。B110 的词条进去时在这里补一行映射即可，节点已经带上了状态属性。
+ * 一句状态回显只从这张表取词条。`waiting-entitlement` 的句子是 2026-10-27 补进
+ * `packages/i18n` 的（BLOCKED.md B110 那一格）：挪用 `failed` 那句会把
+ * "这台实例还没买到资格"说成"处理失败"，而那正是原缺陷本体。
  * 🔴 这张表与词条表 `web.ai.inbound.process.*` 的双向对账钉在
  * `apps/web/tests/inbound-cycle-display.spec.tsx` —— 指一颗不存在的键会让 `translateIn` 抛，
- * 整块设置面板当场崩。
+ * 整块设置面板当场崩；词条表里多出一颗而这里没接，同一条用例反头会红。
  */
 export const PROCESS_COPY: Partial<Record<InboundAutomationCycleState | 'failed', MessageKey>> = {
   submitted: 'web.ai.inbound.process.submitted',
   empty: 'web.ai.inbound.process.empty',
   'needs-confirmation': 'web.ai.inbound.process.needs-confirmation',
   failed: 'web.ai.inbound.process.failed',
+  'waiting-entitlement': 'web.ai.inbound.process.waiting-entitlement',
 };
 
 /** Settings-only CRUD surface for the server-side automatic-capture rules. */

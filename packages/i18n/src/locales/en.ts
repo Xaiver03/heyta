@@ -5461,6 +5461,7 @@ export const en = {
   'web.ai.inbound.process.empty': 'There are no queued events to process.',
   'web.ai.inbound.process.needs-confirmation': 'The encrypted draft needs your review. No tasks were created.',
   'web.ai.inbound.process.failed': 'Processing failed; the event stays on the server for recovery.',
+  'web.ai.inbound.process.waiting-entitlement': 'Neither this instance nor your account has the service entitlement automatic capture needs. The event stays on the server; no tasks were created.',
   'web.ai.inbound.field.title': 'Title',
   'web.ai.inbound.field.note': 'Note',
   'web.ai.inbound.field.priority': 'Priority',

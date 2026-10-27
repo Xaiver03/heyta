@@ -5777,6 +5777,7 @@ export const zhCN = {
   'web.ai.inbound.process.empty': '当前没有待处理事件。',
   'web.ai.inbound.process.needs-confirmation': '加密草稿等待您确认，尚未创建任务。',
   'web.ai.inbound.process.failed': '处理失败，事件会保留在服务端等待恢复。',
+  'web.ai.inbound.process.waiting-entitlement': '这台实例或当前账号还没有自动收集所需的服务权益，事件保留在服务端，没有创建任务。',
   'web.ai.inbound.field.title': '标题',
   'web.ai.inbound.field.note': '备注',
   'web.ai.inbound.field.priority': '优先级',

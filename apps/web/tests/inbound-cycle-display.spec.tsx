@@ -76,7 +76,7 @@ it('状态回显表与词条表 web.ai.inbound.process.* 双向对账（指空�
   expect(mapped.map((key) => key.slice(PREFIX.length)).sort()).toEqual([...zh].sort());
 });
 
-it('权益等待（waiting-entitlement）不回成「处理失败」那句，面板也不崩', async () => {
+it('权益等待（waiting-entitlement）回成**它自己那一句**，不回成「处理失败」，面板也不崩', async () => {
   const panel = await openPanel();
   try {
     await act(async () => { panel.settle({ state: 'waiting-entitlement' }); });
@@ -84,15 +84,26 @@ it('权益等待（waiting-entitlement）不回成「处理失败」那句，面
     expect(node, '处理之后必须有一条带状态属性的回显').not.toBeNull();
     expect(node?.getAttribute('data-inbound-cycle-state')).toBe('waiting-entitlement');
 
+    const shown = node?.textContent ?? null;
+    // 🔴 这一行是 2026-10-27 加严的那一格。原先只钉"不崩、不回成处理失败"，
+    // 于是"正文为空"也能通过 —— 而空正文正是那条假绿本体：状态属性在、句子没有，
+    // 用户看到一块什么都不说的界面。现在钉的是**具体哪一句**，
+    // 词条被删、映射被摘、句子被挪去别处，三种坏法都会在这里红。
+    expect(shown).toBe(zhCN['web.ai.inbound.process.waiting-entitlement']);
+    expect(shown, '不许是一条空正文').not.toBe('');
+
     // 四句已存在的句子逐句比对：这一格不许等于其中任何一句。
-    // 尤其不许等于 `failed` 那句 —— 把"这台实例还没买到资格"说成"处理失败"就是缺陷本体。
+    // 尤其不许等于 `failed` 那句 —— 把"这台实例还没买到资格"说成"处理失败"就是原缺陷。
     // `satisfies readonly MessageKey[]` 让这四枚键本身在编译期就必须存在，不用 cast。
     const controlKeys = ['web.ai.inbound.process.submitted', 'web.ai.inbound.process.empty',
       'web.ai.inbound.process.needs-confirmation', 'web.ai.inbound.process.failed'] as const satisfies readonly MessageKey[];
     const sentences = controlKeys.map((key) => zhCN[key]);
     expect(new Set(sentences).size, '作对照的四句必须互不相同').toBe(controlKeys.length);
-    const shown = node?.textContent ?? null;
     for (const sentence of sentences) expect(shown).not.toBe(sentence);
+
+    // 英文档同一条腿：这一族词条是中英两档一起承诺的，只补中文就等于对英文用户留着空正文。
+    expect(en['web.ai.inbound.process.waiting-entitlement'], '英文档不许缺这一句').toBeTypeOf('string');
+    expect(en['web.ai.inbound.process.waiting-entitlement']).not.toBe(en['web.ai.inbound.process.failed']);
 
     // 面板整体还活着：`t()` 抛的话 React 会在上面那次 act 里就把错误顶出来。
     expect(panel.container.querySelector('[data-testid="inbound-automation-settings"]')).not.toBeNull();
