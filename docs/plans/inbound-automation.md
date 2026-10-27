@@ -4543,3 +4543,30 @@ node-host 全套 `Test Files 14 passed (14) / Tests 213 passed (213)`。
 `--approve-egress` 的三种形状，以及"仓库里没有叫 `heyta-node` 的可执行文件"这句——我写第一版时编过这个名字，
 现量 `apps/node-host/package.json` 无 `bin` 字段后改成实测过的 `node apps/node-host/dist/cli.js` 与 `pnpm host`，
 两形都跑过：缺参时 stderr 说话、退出码 1）。**AC 已勾数零处**（现量 `python3 research/tools/verify-inbound-ac-ticks.py`）。
+
+## 2026-10-27 17:3x · 复核自己写下的两句：移动壳那一格的理由错了一半，而我那条 CLI 的注释里有一句假话（自动收集线）
+
+收完 A2 之后回读自己今天写进台账与代码的句子，两句被现量打掉，都在这里更正 —— 因为下一位会照它们动手。
+
+**1. 「移动壳里没有任何自动收集界面（无规则 UI、无状态行）」这句写错了半步**（上面 15:0x–15:3x 那一戳第 6 项与开工单 §9 第 3 项都这么写着）。
+现量分母：`grep -n "inbound" apps/mobile/src/ai/AiSettingsSection.tsx` ⇒ 第 69–70 行就有一句
+`// Inbound automation is configured here, not exposed as a Chatbot mode.` 加特性名 `'inbound-automation'`，
+而这枚文件是**移动壳 AI 设置区**（`apps/mobile/src/ai/`，配套 `settings-store.ts` 与 `apps/mobile/tests/`）。
+⇒ 真实形状是：**有一个能承载它的现成面**（"状态行"确实还没有，但"要先把那面造出来"是我说重的）。
+所以 §3 A3 里 mobile 那一格**不是取向题，是一格 3–4 处的小代码**：`lifecycle.ts:50` 那句
+`await host.processInboundAutomation(options)` 把返回值丢掉 ⇒ 要让 `processOnce` 把
+`InboundAutomationCycleResult` 交出来、落进一枚可读的 store、在 `AiSettingsSection` 里渲一行、
+文案仍走 `packages/i18n` 那五颗 `web.ai.inbound.process.*`（本轮已补齐 `waiting-entitlement`）。
+🔴 **本轮没落地它的原因不是"归人"，是撞上一枚在飞的写者**：17:3x 现量 `git status --porcelain -- apps/mobile`
+= ` M apps/mobile/src/inbound/lifecycle.ts`（mtime 16:57，同一批还有 `apps/node-host`、`packages/app-host`、
+`apps/web`、`package.json`，而 `apps/node-host/src/inbound-worker.ts` 的 mtime 距我取数那一刻 28 秒）。
+我要改的那一行正住在别人此刻写的文件里；按仓规（混合文件不许拿 pathspec 替别人签收、我的新行不在他那份里 ⇒
+单独落会被他下一次整文件写静默冲掉）**这一格排在他们落地之后**，谁接手就照着上面那四处做。
+
+**2. 我写进 `apps/node-host/src/inbound-worker.ts` 的那句注释是假的**：原文「与 web / mobile 那两处逐字相同」。
+逐端现量（都从 HEAD 取，不读工作树）：web 与 node-host 两份是 `Treat the incoming content…`，
+**mobile 那份少一个 `the`**（`Treat incoming content…`）⇒ 三处里已经漂了一处，而**没有任何一把尺读过这句话**，
+所以漂不会红。这条此刻由并行会话在收：他们新写了 `packages/app-host/src/inbound-system-prompt.ts`（唯一一份常量）
++ `scripts/check-inbound-system-prompt.mjs`，并把三端改成引用它。⚠️ 17:3x 时那一刻的接线状态（瞬时读数，引用前重跑）：
+`grep -n "inbound-system-prompt" package.json` **回空** ⇒ 注释里点名的 `pnpm check:inbound-system-prompt`
+那枚别名此刻还没进 `check` 链，脚本与常量都还是未跟踪/未提交。这件事归他们那一笔，我不代落、也不代勾。
