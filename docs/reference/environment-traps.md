@@ -12146,4 +12146,7 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
    形状：本地 zsh 一层、远端 cmd 一层、PowerShell 一层。写的是 `ssh windows-pc 'powershell -NoProfile -Command "Get-CimInstance Win32_OptionalFeature -Filter \"Name=''X''\" | Format-List …"'`，落到 PowerShell 那一刻引号已经没了，它收到的是 `Filter Name=X` —— 报 `Get-CimInstance : 无效查询`（`HRESULT 0x80041017`），**而这条 ssh 仍然以 0 退出**。
    坏在哪：这种红**长得像否证**。错误信息还在 stderr 的 GBK 乱码里（只剩一枚 HRESULT 数字读得清），所以只看退出码的人会把"没有输出"记成"这台机上没有这个开关"，而那正是决定**要不要重启一台共享装机**的依据。同族两发都是同一形状：#601（三个信号全绿、产物缺字）与那条 `dir /b … 2>nul & adb devices` 合成一发时 `dir` 那格输出整段消失而 rc=0。
    ⇒ 规矩三条：① 远端 PowerShell **一律**走 `powershell -NoProfile -EncodedCommand <base64>`，base64 在同一条本地命令里生成（`iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n'`），让引根本不进第二层 shell；② 脚本里每个可能为空的查询自带"空结果也打一行标记"的分支（本次写的 `DEVICEGUARD_QUERY_EMPTY`），把"没查到"与"没跑成"分成两种输出；③ 判一次远程探针可不可信，**不看退出码，看它有没有打出预期的那行标记**（§5 元规则二在这里的读法：`SSH_RC=0` 就是那条永远通过的判据）。
+   ⚠️ 同一趟还撞出两枚同形状的读数，一并记在这条里（它们不是新坑，是同一个坑的第二、第三面）：
+   ① **同一条远程命令，两次跑给出完全不同的量**：`sdkmanager.bat --list` 第一跑 rc=1、只有 5 行，第二跑 rc=0、658 行 —— 第一跑那句"`emulator` 那两枚匹配 0 次"**差点被读成"这两枚装不到"**，而真因是那一发探针没跑成。判法：对"有没有"这类问题，**空读数要复跑并比总行数**（把 `LINES=` 这类"分母行"打出来是最省事的办法），别拿一次空读数下否证。
+   ② **引号这一层不只远端会塌，本地那一层就会**：我把 PowerShell 脚本放在 zsh 的单引号里，而脚本正文含单引号（`'HKCU:\Software\…\Internet Settings'`）⇒ 外层引号在拼那一刻被内层截断，zsh 报 `command not found` 且 **`SSH_RC=127`、远端一个字节都没执行**。这不是远程问题，是**整发命令没成形**。写法：脚本先落盘（heredoc 带引号定界符），再 `iconv … | base64` 生成 `-EncodedCommand`，别让脚本正文穿过任何一层的引号语法。
    归族：#601、#597（打空的探针既没否认也没确认）、§5 元规则一（先怀疑探针）与二。

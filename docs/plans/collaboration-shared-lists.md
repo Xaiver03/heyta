@@ -1536,7 +1536,7 @@ git diff --name-only 0cdaf8fdf <你此刻的 HEAD> -- apps/mobile/src apps/mobil
 |---|---|---|
 | ① 登出·撤销要不要连带清 `#share-keys` 那一格 | `clearMobileVaultSession` 只删 root key（现量 `grep -c removeVaultRootKey apps/mobile/src/lib/vault-session-cleanup.ts`），密钥料那格留着但**已解不开**（vault 信封包裹），不是明文泄露 | **推荐维持现状**：清它要改别线那枚 vault 会话清理时序。翻案条件：做"换设备迁移"工具时一并处理 |
 | ② 同意面文案的视角 | 现词逐字（`packages/i18n/src/locales/zh-CN.ts` 的 `common.share.consent.*`）：标题「共享清单」／正文「把清单设为共享前，请确认以下事项」／三格「任务标题、备注、日期与清单名对成员可见」＋「服务端会记录成员关系与角色（内容仍加密，服务端不可读）」＋「你的其它清单不受影响」／按钮「确认共享」。**owner 语与入群语共用同一批** | **推荐拆两格**，入群侧改成「加入后，这份清单里的任务、便签、评论会和对方互相同步，双方都能改」。这句是对外告知范围，**措辞我不代改** |
-| ③ Android 界面腿解锁 | 今日复量三格照旧：`EMULATOR=NO`、`opp-smoke.avd` 在、`adb devices` 空（取法与那枚打空的远程探针教训都在 §9.14 那一格） | **推荐先做 §9.29 那条断言**（补两枚组件只要加法、不要管理员，一趟就能问清"没加速到底能不能起到可用"）；要启用 `HypervisorPlatform` 那一档我不自取，因为要重启你正在用来构建的那台机。⚠️ 原话那句"推荐补 emulator 组件（一次装机、不买设备）"按现量改准代价：**要装两枚**，`emulator` **加** `system-images;android-36;google_apis;x86_64`（那枚 AVD 的 `config.ini` 指着 `system-images\android-36\google_apis\x86_64`，该格现量 NO），另有一件前置今天量了 —— 见下格与 §9.29（原先写的是"没量的前置"）。<br>🔴 **2026-10-27 19:0x 硬件加速那一档的读数**：三枚虚拟化可选组件（`HypervisorPlatform`／`VirtualMachinePlatform`／`Microsoft-Hyper-V-All`）的 `InstallState` 全为 2（在这台机上、**未启用**），`HypervisorPresent` 却是 True —— 先占住 VT-x 的是 VBS／内核隔离那一档 ⇒ 补两枚 SDK 组件是**加法、不要管理员**，而要启用 `HypervisorPlatform` 就是**管理员权限 + 重启这台共享装机**。<br>⚠️ 一句如实：**"没有加速时那枚 x86_64 镜像能不能起到可用"今天测不了**（那台机上根本没有 emulator 主程序），§9.29 把它登记成"未判定 + 判它的断言"，不是缺陷。补完还要新写一枚"驱动远端设备 + 服务端在另一台机器"的旅程装置，那是另一段工作量。**不在 Mac 起模拟器**（仓内长期令） |
+| ③ Android 界面腿解锁 | 今日复量三格照旧：`EMULATOR=NO`、`opp-smoke.avd` 在、`adb devices` 空（取法与那枚打空的远程探针教训都在 §9.14 那一格） | **推荐先做 §9.29 那条断言**（补两枚组件只要加法、不要管理员，一趟就能问清"没加速到底能不能起到可用"）；要启用 `HypervisorPlatform` 那一档我不自取，因为要重启你正在用来构建的那台机。⚠️ 原话那句"推荐补 emulator 组件（一次装机、不买设备）"按现量改准代价：**要装两枚**，`emulator` **加** `system-images/android-36/google_apis/x86_64`（这台机 `sdkmanager --list` 用的斜杠形制；带分号的经典 ID 在这份清单里出现 0 次，别照旧句抄）（那枚 AVD 的 `config.ini` 指着 `system-images\android-36\google_apis\x86_64`，该格现量 NO），另有一件前置今天量了 —— 见下格与 §9.29（原先写的是"没量的前置"）。<br>🔴 **2026-10-27 19:0x 硬件加速那一档的读数**：三枚虚拟化可选组件（`HypervisorPlatform`／`VirtualMachinePlatform`／`Microsoft-Hyper-V-All`）的 `InstallState` 全为 2（在这台机上、**未启用**），`HypervisorPresent` 却是 True —— 先占住 VT-x 的是 VBS／内核隔离那一档 ⇒ 补两枚 SDK 组件是**加法、不要管理员**，而要启用 `HypervisorPlatform` 就是**管理员权限 + 重启这台共享装机**。<br>⚠️ 一句如实：**"没有加速时那枚 x86_64 镜像能不能起到可用"今天测不了**（那台机上根本没有 emulator 主程序），§9.29 把它登记成"未判定 + 判它的断言"，不是缺陷。补完还要新写一枚"驱动远端设备 + 服务端在另一台机器"的旅程装置，那是另一段工作量。**不在 Mac 起模拟器**（仓内长期令） |
 | ④「事后改归属」 | 把**已有**便签挪进别的清单（`setNoteProject`）在两壳仍零调用点（现量 `git grep -n setNoteProject -- 'apps/**/src/**' 'packages/**/src/**'` ⇒ 只剩接口声明与实现两处；⚠️ 别扫整个 `apps`，会命中 `apps/web/dist` 的产物） | **推荐排下期**：它不在本次成功定义里，本次不扩范围 |
 | ⑤ 系统横幅那一档 | 两端回收形状不同形已逐端改准并有常驻判据钉着（#598、§9.21–§9.22） | **推荐不承诺系统横幅**，保持"通知中心那一档 + 入口徽标"。要 Android 侧上横幅需另立 ADR |
 | ⑥ 那枚别线的 e2e 红要不要我递 | `rail-roving` 那枚断点红**归属线自己早就在册**：现量 `grep -n 'rail-roving' BLOCKED.md` 两处，两处都写「未查（dnd-kit Space 传感器与 roving tabindex）」 | **本线不再重复登记**（重复条目只会让下一个读数的人以为有两只不同的红）。要做的是改那条线自己的排期，不在我射程内。<br>⚠️ 同一趟顺手否证了 §9.19 那句「整链只剩 `apps/web` 的 `task-sort` 那一枚红」：现量 `cd apps/web && npx vitest run tests/task-sort.spec.tsx tests/task-selection.spec.tsx` ⇒ 2 passed / rc=0。那句是**截断链只暴露第一个红**的读数被抄成红集全集（元规则：截断的读数不是全集），已在 progress-log 与 feature-matrix 两处入口改口 |
@@ -1590,7 +1590,8 @@ Get-PSDrive C | Format-List Used,Free
 ⇒ 三条结论，逐条可判红：
 
 1. **"补两枚 SDK 组件就能跑界面腿"这句今天不能算成立。** 那枚 AVD 指着 x86_64 google_apis 镜像，而加速 API 未启用。
-2. **代价分两档，归属不同。** 补 `emulator` + `system-images;android-36;google_apis;x86_64` 是**加法、不要管理员**
+2. **代价分两档，归属不同。** 补 `emulator` + `system-images/android-36/google_apis/x86_64`（这台机的清单打的是**斜杠形制**，
+   带分号的经典 ID 在这份清单里出现 0 次 —— 见本节末那条形制更正）是**加法、不要管理员**
    （`sdkmanager` 在 `cmdline-tools\latest\bin` 里，`licenses` 目录已在册）；启用 `HypervisorPlatform` 要**管理员 + 重启这台共享装机**
    —— 那台机上随时挂着别线的构建／重装腿，所以这一档我不自取，归负责人。
 3. **还有一条更便宜的路没被排除**：插一台 Android 真机（判据是 `adb devices` 从空表变非空），那样两枚组件与那枚开关都不需要，
@@ -1608,4 +1609,19 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 （`HRESULT 0x80041017`），**而 `SSH_RC` 仍是 0** —— 那条红只在 stderr 的中文乱码里，只看退出码就会把它读成"这台机没有这个组件"。
 同族：#601「三个信号全绿而产物缺字」、以及本节 §9.14 那发 `dir /b … 2>nul & adb devices` 打空而 rc=0 的远程探针。
 判法两条：远端 PowerShell 一律 `-EncodedCommand`；脚本里自带"空结果也要打一行标记"的分支（本次那条 `DEVICEGUARD_QUERY_EMPTY` 就是这么写的）。
+
+🔧 **补那两枚组件还差不差别的东西 —— 也量了（同戳，仍只读）**：`sdkmanager.bat --list` 复跑打回 rc=0、658 行，
+`emulator` 修订 37.2.12 与 `system-images/android-36/google_apis/x86_64` 修订 7.0.0 都在 Available 段（取法：整份清单落盘后
+`grep -n "system-images/android-36/google_apis/x86_64" <那份输出>`，行号随清单变，别抄）；`java` 在 PATH 里；
+这台机的 IE 代理（`127.0.0.1:7890`）处于**关闭**态而清单照样取回来了 ⇒ 网络也不拦。
+⚠️ 顺带更正**我自己写错的一条形制**：本节与 §9.28 ③ 那格原先把镜像 ID 写成带分号的经典形制（`system-images` 后跟分号那串），
+而这台机上的 cmdline-tools（`Android CLI 1.0.16500706`）整份清单用**斜杠形制**，带分号的写法出现 **0 次** ——
+一把尺在这个词表里读 0，只说明它扫的写法里没有，不等于这台机装不到；两处已按现量改口。
+（另一处带分号的旧形制在 `docs/plans/countdown-anniversary.md`，讲的是 **Mac 侧**另一枚 AVD，不是本线资产、也不被这句否证。）
+⚠️ 又一枚同族探针（并入 #603）：**同一条 `--list` 第一跑打回 rc=1、只有 5 行**，第二跑才 rc=0、658 行 ——
+第一跑那句 `MATCH_COUNT=0` 差一点被我读成"这两枚装不到"。判法：远程探针对"有没有"这类问题，
+**空读数必须先复跑并比总行数**（脚本里那行 `LINES=` 就是为这一格留的），别拿一次空读数下否证。
+
+⇒ 于是 ③ 那格此刻**只剩两件真人动作**：装两枚组件（约 2 GB，写进的是别线那棵 `%LOCALAPPDATA%\Android\Sdk` ⇒ 按硬边界我不自取），
+以及要不要为启用 `HypervisorPlatform` 重启这台共享装机。其余前置（Java、网络、磁盘、内存、AVD 本体）今天逐条量过，**都不拦路**。
 
