@@ -152,6 +152,31 @@ const isAppCheck = (s) => s.argv[1] === 'scripts/check-web-artifact.mjs';
 const isLandingCheck = (s) => s.argv[1] === 'research/tools/verify-landing-dist.mjs';
 const rsyncDest = (s) => s.argv.filter((a) => !a.startsWith('-') && a !== 'rsync')[1];
 
+/**
+ * 失败文案要按**停在第几步**现量出来，不许是一句常量。
+ *
+ * 为什么这算判据而不算措辞偏好：2026-10-27 那一趟真的停在 9/9（线上验收），
+ * 而 7/9 与 8/9 两条 rsync 当时**已经 exit 0 跑完** —— 旧文案照旧打印
+ * "后面的 rsync 一条都没执行"。读到那句的人会判成"线上没动过"，于是跳过回滚；
+ * 而 `/var/www/heyta-landing` 与 `/var/www/heyta-app` 那一刻已经是这一份产物了。
+ * 回滚路径上的一句假话比没有这句更糟，所以两头的形状都由臂钉住（P30 / P31）。
+ */
+export function failureNotice({ steps, failedIndex, host }) {
+  const shipped = steps.slice(0, failedIndex).filter(isRsync);
+  const pending = steps.slice(failedIndex).filter(isRsync);
+  const pendingLine = pending.length > 0
+    ? `       后面还有 ${String(pending.length)} 条 rsync 没执行（${pending.map((s) => rsyncDest(s) ?? '?').join(' , ')}）。`
+    : '       后面没有待发的 rsync 了 —— 这一步是链上最后一条。';
+  if (shipped.length === 0) {
+    return `    🔴 一条 rsync 都没执行 ⇒ **线上还是发之前那一份，不用回滚**（宁可不发，也不发一半）。\n` +
+      pendingLine;
+  }
+  return `    🔴 注意：${String(shipped.length)} 条 rsync **已经跑成**（${shipped.map((s) => rsyncDest(s) ?? '?').join(' , ')}）\n` +
+    `       ⇒ 上面那些目录此刻已经是这一份产物了，**别按"没发一半"处理**。\n` +
+    `       要还原：ssh ${host} 'ls -t /tmp/heyta-public-backup-*.tgz | head -1' 取最新那枚备份（第 6 步打的），再解回 /var/www。\n` +
+    pendingLine;
+}
+
 export function publishArms() {
   const arms = [];
   const push = (name, expect, got) => arms.push({ name, expect, got });
@@ -267,6 +292,45 @@ export function publishArms() {
     guardReadings(fakeGit({ head: 'aaaaaaaa', ref: 'aaaaaaaa', dirty: '?? e2e/live-site/new.spec.ts' }), ROOT).ok);
   push('P22 根 package.json 未提交 ⇒ 拒绝（workspace 定义与 scripts 键都在这份文件里）', false,
     guardReadings(fakeGit({ head: 'aaaaaaaa', ref: 'aaaaaaaa', dirty: ' M package.json' }), ROOT).ok);
+
+  /* 失败文案要**停在第几步**说，不许是一句常量。这两条臂是 2026-10-27 那一趟
+     （停在 9/9，而 7/9、8/9 两条 rsync 当时已经跑成）现量出来后补的：
+     旧文案那种情况下会说"一条 rsync 都没执行"，读到的人会跳过回滚。 */
+  const nine = planSteps({ ref: REF, host: HOST, domain: DOMAIN, appUrl: APP_URL });
+  const noticeRsyncIdxs = nine.map((s, i) => (isRsync(s) ? i : -1)).filter((i) => i >= 0);
+  push('P30 停在 rsync 之前 ⇒ 文案必须说"线上没动、不用回滚"，且不许谎称已发', true,
+    (() => {
+      const before = failureNotice({ steps: nine, failedIndex: noticeRsyncIdxs[0], host: HOST });
+      return /一条 rsync 都没执行/u.test(before) && /不用回滚/u.test(before) && !/已经跑成/u.test(before);
+    })());
+  push('P31 停在最后一步（验收）⇒ 文案必须点名"哪几条 rsync 已跑成"并给出现成的还原取法', true,
+    (() => {
+      const after = failureNotice({ steps: nine, failedIndex: nine.length - 1, host: HOST });
+      return rsyncIdxs.every((i) => nine[i] !== undefined) &&
+        /已经跑成/u.test(after) &&
+        after.includes(rsyncDest(nine[rsyncIdxs[0]])) &&
+        after.includes(rsyncDest(nine[noticeRsyncIdxs[noticeRsyncIdxs.length - 1]])) &&
+        after.includes('heyta-public-backup') &&
+        !/一条 rsync 都没执行/u.test(after);
+    })());
+  push('P32 两臂的取材面是真的：rsync 那几步确实在链上、且不在首尾（否则上面两条恒真）', true,
+    noticeRsyncIdxs.length === 2 && noticeRsyncIdxs[0] > 0 && noticeRsyncIdxs[1] < nine.length - 1);
+  /* P30/P31 只判函数本身；执行链上的 catch 要是被人写回那句绝对话，两臂照样绿。
+     所以这条读源码形状：catch 必须把失败文案交给 failureNotice 现算。
+     🔴 取材面只切**执行链那一个 catch**（最后一枚 catch 到它自己的退出），不扫整份文件：
+     本文件有 5 枚 catch（67、77、 rig、…），旧文案那句话还坐在注释与 dry-run 提示里，
+     扫全文或从第一枚 catch 切起的探针会把自己读的散文当成失败路径打红 —— 那正是本仓
+     "needle 扫到自己"那一族。锚点找不到 ⇒ 直接判红：形状变了这条守卫就失效，不许静默绿。 */
+  push('P33 执行链上的 catch 把失败文案交给 failureNotice 现算，段内没有绝对化的"都没执行"', true,
+    (() => {
+      const src = readFileSync(SELF, 'utf8');
+      const open = src.lastIndexOf('} catch (e) {');
+      const close = open < 0 ? -1 : src.indexOf('process.exit(e.status', open);
+      if (open < 0 || close <= open) return false;
+      const block = src.slice(open, close);
+      return /failureNotice\(\{ steps: planSteps\(\), failedIndex: i/u.test(block) &&
+        !/都没执行/u.test(block);
+    })());
   return arms;
 }
 
@@ -424,7 +488,7 @@ if (!g.ok) {
 console.log(`\n✅ 守卫成立：现在这棵树正好等于 ${REF}，且构建输入没有未提交改动。`);
 console.log(CONFIRM ? '\n--confirm：按下面顺序真的执行（对外动作已经由人明确授权）\n' : '\n默认 dry-run：只打印，不 build、不 ssh、不 rsync。\n');
 
-for (const s of planSteps()) {
+for (const [i, s] of planSteps().entries()) {
   const env = s.env ? Object.entries(s.env).map(([k, v]) => `${k}=${v}`).join(' ') + ' ' : '';
   console.log(`${s.label}\n    $ ${env}${s.argv.join(' ')}`);
   if (!CONFIRM) continue;
@@ -440,8 +504,7 @@ for (const s of planSteps()) {
   } catch (e) {
     const text = `${e.stdout ?? ''}${e.stderr ?? ''}${e.message ?? ''}`;
     console.log(`    ❌ 这一步没成（退 ${e.status ?? '?'}），**链到此为止**：\n${text.split('\n').slice(-8).join('\n')}`);
-    console.log(`    🔴 后面的 rsync 一条都没执行 —— 这正是要的顺序：宁可不发，也不发一半。\n` +
-      `       远端备份的路径在上面第 6 条的输出里；要回滚就拿它还原。`);
+    console.log(failureNotice({ steps: planSteps(), failedIndex: i, host: HOST }));
     process.exit(e.status ?? 1);
   }
 }
