@@ -4543,3 +4543,22 @@ LC_ALL=C            两种写法都对 —— 所以这枚坑只在正常终端�
 
 **本轮"已修"合计（都在 git 里，逐笔可对账）**：`git log --oneline --since="2026-10-27 20:00" --author-date-order -- server/prisma/schema.prisma scripts/check-schema-migration-drift.mjs package.json e2e/live-site/live-signin-entry.spec.ts apps/web/evidence/login-code-live-after-deploy-1027`。
 **仍停在待拍板的**：B238 那两张表（错误形状那三格 + `KNOWN_GAPS` 两枚 + `main` 上游指 gitee + 别人在飞的脏项 + 本轮新增的"`/var/www/heyta-app` 与 HEAD 不齐要不要现在对齐"）。
+
+### 6.94（10-27 23:1x 现量）两枚新尺：线上那盘新不新、门禁自己 parse 不 parse
+
+**① `scripts/live-web-freshness.mjs`（`pnpm verify:live-web-freshness`）** —— 把"公网 `/app/` 那盘 SPA 落后仓库多远"从我手搓 grep 变成一条命令。针脚 = 最近若干枚动过 `packages/i18n/src/locales/zh-CN.ts` 的提交里**新增**、且 key 被 `apps/web/src` 引用过、值够长的词条；顺着入口 JS 里的 chunk 名**再爬一层**（只抓入口会让住在懒加载 chunk 里的新文案假红）。默认**永远 exit 0**（承 `dist-freshness.mjs` 同一条纪律：并行会话刚落 i18n 而还没发布时，"落后"是正常态，一条天生红的门禁等于没有门禁），要为一个读数负责就显式 `--strict`。三种假绿各有一臂：分母为空判红、抓不到线上记 `fetch-error` 而不折算成"不在场"、未知旗标直接拒。
+现量读数（23:0x）：`臂数 8 ｜ 不符 0`；真跑抓回 8 枚产物，针脚 13 枚来自 3 笔提交，**1 枚不在场 ⇒ 线上那盘旧于 `b55e98807`**，`--strict` 退 1。这一发同时是它的**真实世界阳性对照**：同一件事我今天早上是手搓三条 `grep -rl` 加一枚控制臂才量出来的。
+🔴 一条诚实的限制：针脚只认"被 `apps/web/src` 引用"的 key，所以一枚只在 `packages/ui` 里用的词条不会成为针脚（读数里那行"没被 web 引用 9"就是它）—— 收窄分母是刻意的，宁可少判也不假红。
+
+**② `scripts/check-scripts-parse.mjs`（已接进 `pnpm check`）** —— 逐枚 `node --check` 扫 `scripts` 下全部 `.mjs`。它挡的是这一族：块注释里出现那对"星号斜杠"字符 ⇒ 注释被提前关掉 ⇒ **整枚文件 parse 不过**，而**没接进链的工具没有任何一层会告诉你**（唯一解析它的时刻就是有人手动去跑它）。本仓这一族咬过三次（e2e/live-site 那把线上尺坏过一整晚、hunk 删声明没删调用点、以及今天我自己写尺时又犯一次），按"同一手滑犯到第三次就下沉成会拒的命令"办。
+现量读数：`枚举 207 枚 ｜ 语法红 0 枚`，单次 `real 4.2s`；自检 `臂数 5 ｜ 不符 0`（含"坏的那枚必须被点名、好的不许被牵连"与"分母为空必须判红"两臂）。
+**它第一趟就红给了我自己看**：这枚尺自己的文件头写了 `` `scripts/**/*.mjs` `` —— 那对字符把注释关掉，`--self-test` 第一趟 `rc=1`。第四形、当场被自己造的尺抓住，这就是它该在链里的理由。
+
+**同一晚我自己造成的一次夹带与一次丢件（都当场发现、当场复原，记下来给下一位避坑）**：
+
+- **夹带**：`git add -- <我的路径>` 之后 `git commit` **不带 pathspec**，提交的是**整份索引** —— 于是别人**早已暂存**的一枚新文件被我一笔带走（第一发是 `docs/plans/global-ux-system-remediation.md`，第二发更糟：`package.json` 里别人未提交的 `check:focus-single-source` 定义与链上那一格被推进了 HEAD，而那枚脚本文件还没落仓 ⇒ 干净载体的 `pnpm check` 会**替他们红**）。复原都是 `git reset --soft HEAD~1` + `git restore --staged <那一格>`，别人的暂存原样留在索引里。
+- **丢件**：为了"只提交我那一行"，我把 `package.json` 按 **HEAD 的内容**重写了一遍 —— 那一步把别人**未暂存**的两格从工作树里抹掉了。亏在动手前先 `cp` 了快照（`~/.heyta-evidence/login-code-prod-deploy-1027/package.json.{final,mixed-worktree}`），从快照原子还原后逐格核对才没造成实际丢失。
+- **正确的做法（本轮最终用的就是这个）**：要提交"HEAD + 只我的改动"，**不要动工作树里那份共享文件** —— 用 `git hash-object -w` 造 blob、`GIT_INDEX_FILE=<临时索引> read-tree HEAD` + `update-index --cacheinfo`、`write-tree`、`commit-tree -p <OLD>`，最后 `update-ref refs/heads/main <新> <OLD>`（**带 OLD 做 CAS**，HEAD 被别人推过就会拒）。收尾记得 `git restore --staged <我那两格>` 把陈旧索引刷回 HEAD，否则 `git status` 会报出一枚"暂存的删除"看着像我把文件删了。
+- **判据**：每笔提交后除了 `git show --stat`，还要对**共享文件**做一次结构对账（`git show HEAD:<file>` 与工作树逐键比，确认"链里新增的格"只有我的）。本轮那两次红都是这么抓出来的，不是靠眼看 diff。
+
+**顺手登记一件我自己的手法缺陷**：改 `package.json` 用的是"截断式写"（`open(p,'w')` 再写），而这是**共享仓里被所有门禁读的文件**。改完那一分钟里 `pnpm check:gate-wiring` 报了一次 `rc=1`，随后连跑三趟全 `rc=0`，日志被覆盖所以无法归因到具体读法——**不写成结论**，只登记两条：① 改共享 JSON 要走"写临时文件 + rename"的原子替换；② 一次性的红要留日志再重跑，否则下一位只能听我转述。
