@@ -281,6 +281,7 @@ comm -3 ~/.heyta-evidence/inb-t7-1017-0902/legs-register.txt ~/.heyta-evidence/i
 | 要查什么 | 去哪 |
 |---|---|
 | 唯一实施计划 + 逐格台账（AC-1～AC-8 的命令与读数、T7 三条腿） | [`inbound-automation.md`](inbound-automation.md) 文末各节；八格的**逐字输出**在「2026-10-19 21:3x · 完成条件 1 里"贴出的输出"那一半，从家目录搬进仓里」那一节，按格复跑命令在本件 §4a |
+| **给"从零接手的执行 AI"的缺口开工单**（2026-10-27 按代码与生产现量重盘；它收窄了本件 §1 那句"代码层是齐的"） | [`inbound-automation-work-brief.md`](inbound-automation-work-brief.md) —— 只列缺口、顺序与归人格子；判据与读数仍以计划与本件为准 |
 | 台账（末节号现量 `grep -oE '^1[0-9]{2}\.' PROGRESS.md | tr -d '.' | sort -n | tail -1`；纯追加、旧文不删只加带日期的改口） | [`../../PROGRESS.md`](../../PROGRESS.md) |
 | 阻塞与待拍板（B207 那张待点头表、B223／B239／B241／B199／B205…） | [`../../BLOCKED.md`](../../BLOCKED.md) |
 | 环境陷阱（#490 假空、#493 计数器口径、#494 三层分母、#480 探针语言敏感） | [`../reference/environment-traps.md`](../reference/environment-traps.md) |
