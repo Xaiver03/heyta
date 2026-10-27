@@ -93,13 +93,18 @@
  * 另核对 `CloseAccountPanel`、`CentralAccountConflictPanel`、`AuthPanel` 的复选框：
  * 宿主容器本来就是 space.3/space.4，没入网。
  *
- * ⚠️ **验证码屏那两处的读数取不到，这一格是未判定的**（2026-10-27 试过）：
- *   那一屏要 `onLoginCode` 真发出挑战才渲染，而 e2e 装置里没有真服务端 ⇒ 点「使用验证码登录」
- *   之后 `auth-form-login-code-stage` 不在 DOM 里（实测 `isVisible()=false`）。
- *   所以那两处的判掉**靠的是同一批样式对象的实测值**：`primary` 的 `marginTop` 补偿与
- *   `textAction` 的 44px 点击区都在凭据档量过（上面那两组读数），而验证码屏用的就是这两个
- *   样式与同一个 `field` 容器。这是**代理读数，不是那一屏自己的读数** —— 谁把 `primary`
- *   或 `textAction` 在某一档单独改掉，这条推理就断了，届时要么接一个真挑战的装置，要么量到它。
+ * 🔴 **验证码屏那两处 2026-10-27 曾经登记成"未判定"，理由是"这一屏要真服务端发挑战才渲染，
+ *   e2e 装置里没有"—— 那句是错的**：错的是一次探针失误（没先填邮箱就点触发器，而触发器
+ *   本身还住在折叠层里），同目录 `auth-login-code.spec.ts` / `auth-registration-otp.spec.ts`
+ *   一直用 `page.route()` fulfill 一份假挑战让那一屏出现。现量：
+ *   `grep -n "page.route(" e2e/tests/auth-login-code.spec.ts e2e/tests/auth-registration-otp.spec.ts`。
+ *   那一格现在由本文件末尾那四条臂量着，读数（2026-10-27，真 Chromium、两档宽度各一次）：
+ *     登录档 / 注册档 验证码屏：**验证码框 → 验证按钮 实测 12px**（两档相同，吃的是 `primary`
+ *     自带的 `marginTop: space.2` 补偿），`-submit` / `-resend` / `-change-email` 三枚
+ *     **盒子高都是 44px**（墨迹 20-21px），两枚文字链的**墨迹间距 27px**（只报数，不判）。
+ *   ⇒ 那两处的判掉**不再靠代理读数**；谁把 `primary` 的补偿或 `textAction` 的 `minHeight`
+ *     改掉，这四条会红（能红性见文件末尾那条注释与本单的变异轮）。
+ *   坑本身记在 `docs/reference/environment-traps.md`（"把探针失误登记成装置的限制"那一条）。
  *
  * 🔴 其中前三处（文字按钮那一族）判掉靠的是**同一句明文规则**：`MASTER.md` 的
  * "触控目标 ≥ 44×44px" —— 4px 是**盒子**间距，而盒子里只有中间那行字。
@@ -120,7 +125,7 @@
  * 🔴 截图落固定路径、人必须打开看（§6.2）。`test-results/` 是运行产物，不是证据。
  */
 import { existsSync, rmSync } from 'node:fs';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { openApp, openAuthPanel } from '../auth-journey/helpers.js';
 
@@ -129,6 +134,10 @@ const SHOTS = [
   'test-results/auth-form-spacing-375.png',
   'test-results/auth-form-spacing-secondary-1440.png',
   'test-results/auth-form-spacing-secondary-375.png',
+  'test-results/auth-form-spacing-code-screen-login-1440.png',
+  'test-results/auth-form-spacing-code-screen-login-375.png',
+  'test-results/auth-form-spacing-code-screen-registration-1440.png',
+  'test-results/auth-form-spacing-code-screen-registration-375.png',
 ] as const;
 const MIN_CONTROL_GAP = 12;
 const TOLERANCE = 0.5;
@@ -275,6 +284,156 @@ for (const [label, width, height, shot, shotSecondary] of [
       }
     }
 
+    expect(failures, failures.join('\n')).toEqual([]);
+  });
+}
+
+/**
+ * ## 第三段：验证码屏 —— 把文件头那格「未判定」补成现量
+ *
+ * 文件头原先写过"这一屏要真服务端发挑战才渲染，e2e 装置里没有"，**那句是错的**：
+ * 现成的机关一直在同目录另外两条尺里 —— `auth-login-code.spec.ts` 与
+ * `auth-registration-otp.spec.ts` 用 `page.route` 把
+ * `/api/login/email-code/request`、`/api/register/email-password/request` 拦下、
+ * fulfill 一份带 `emailDelivered` 的挑战，那一屏就出来了。
+ * 我先前探的是**没填邮箱**就去点触发器，于是读到 `isVisible()=false`，
+ * 把一次探针操作失误登记成了装置的限制（教训记在 `docs/reference/environment-traps.md`）。
+ *
+ * 这一屏的控件全部住在同一个 `styles.field`（`gap: space.1` = 4px）里，
+ * 和用户报的是**同一个形状**，所以判据照上面那两条走，不新造阈值：
+ *  ① 验证码框 → 验证按钮：两枚**独立**控件 ⇒ 判合成视觉距离 ≥ 12px
+ *     （`primary` 自带 `marginTop: space.2` 的补偿：容器给 4，补 8，落在 12 那一格）；
+ *  ④ 「重新发送」「换邮箱」两枚文字链：盒子间距实测就是 4px，判掉靠的是
+ *     `design-system/heyta/MASTER.md`「触控目标 ≥ 44×44px」那条明文规则
+ *     ⇒ 这里判**那个理由本身**（实测高度 ≥ 44），墨迹间距只报数不判 ——
+ *     与 `SECONDARY_TEXT_ACTIONS` 那一段同一把尺。
+ *
+ * 两档宽度各量一次的理由同上（`auth-dialog.css` 那条 `@media (max-width: 30rem)`）。
+ */
+function futureChallenge(id: string) {
+  return {
+    challengeId: id,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    resendAvailableAt: Date.now() + 60_000,
+    emailDelivered: true,
+  };
+}
+
+async function installChallengeRoutes(page: Page): Promise<void> {
+  await page.route('**/api/login/email-code/request', async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify(futureChallenge('spacing-login-code')),
+    });
+  });
+  await page.route('**/api/register/email-password/request', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(futureChallenge('spacing-registration-code')),
+    });
+  });
+}
+
+async function reachLoginCodeStage(dialog: ReturnType<Page['getByTestId']>): Promise<void> {
+  await dialog.getByTestId('auth-form-email').fill('me@example.com');
+  const toggle = dialog.getByTestId('auth-form-other-ways-toggle');
+  if ((await toggle.count()) > 0) await toggle.click();
+  await dialog.getByTestId('auth-form-login-code-trigger').click();
+  await expect(dialog.getByTestId('auth-form-login-code-stage')).toBeVisible();
+}
+
+async function reachRegistrationCodeStage(dialog: ReturnType<Page['getByTestId']>): Promise<void> {
+  await dialog.getByTestId('auth-form-switch-mode').click();
+  await dialog.getByTestId('auth-form-email').fill('me@example.com');
+  await dialog.getByTestId('auth-form-password').fill('correct horse battery');
+  await dialog.getByTestId('auth-form-password-confirmation').fill('correct horse battery');
+  await dialog.getByTestId('auth-form-terms').click();
+  await dialog.getByTestId('auth-form-submit').click();
+  await expect(dialog.getByTestId('auth-form-registration-code-stage')).toBeVisible();
+}
+
+/**
+ * `kind` 就是那一屏的 testID 中缀（`login-code` / `registration-code`）：
+ * 输入框 `auth-form-<kind>`、按钮 `-submit`、两枚文字链 `-resend` / `-change-email`。
+ */
+async function measureCodeScreen(
+  dialog: ReturnType<Page['getByTestId']>,
+  kind: string,
+  screenLabel: string,
+): Promise<string[]> {
+  const input = await dialog.getByTestId(`auth-form-${kind}`).boundingBox();
+  const submit = await dialog.getByTestId(`auth-form-${kind}-submit`).boundingBox();
+  const failures: string[] = [];
+
+  if (input === null || submit === null) {
+    failures.push(`② ${screenLabel}：验证码框或提交按钮量不到矩形 ⇒ 探针失效，不是"没有缺陷"`);
+  } else {
+    const gap = Number((submit.y - (input.y + input.height)).toFixed(2));
+    console.log(`  ${screenLabel}：验证码框 → 验证按钮 实测 ${String(gap)}px`);
+    if (gap < MIN_CONTROL_GAP - TOLERANCE) {
+      failures.push(
+        `① ${screenLabel}「验证码框 → 验证按钮」实测 ${String(gap)}px < ${String(MIN_CONTROL_GAP)}px（space.3）` +
+          ` ⇒ 这一屏的提交按钮没吃到 \`primary\` 那条 marginTop 补偿`,
+      );
+    }
+  }
+
+  for (const id of [
+    `auth-form-${kind}-submit`,
+    `auth-form-${kind}-resend`,
+    `auth-form-${kind}-change-email`,
+  ]) {
+    const box = await dialog.getByTestId(id).boundingBox();
+    const ink = box === null ? null : await dialog.getByTestId(id).locator('> *:last-child').boundingBox();
+    console.log(
+      `    ${id.padEnd(40)} 盒子高 ${(box === null ? '🔴 量不到' : `${String(Number(box.height.toFixed(2)))}px`)}` +
+        `   墨迹高 ${ink === null ? '量不到' : `${String(Number(ink.height.toFixed(2)))}px`}`,
+    );
+    if (box === null) {
+      failures.push(`② ${screenLabel}「${id}」量不到矩形 ⇒ 探针失效（这一枚没渲染出来 ≠ 合规）`);
+    } else if (box.height < MIN_TOUCH_TARGET - MIN_TOUCH_TOLERANCE) {
+      failures.push(
+        `④ ${screenLabel}「${id}」实测高 ${String(Number(box.height.toFixed(2)))}px < ${String(MIN_TOUCH_TARGET)}px` +
+          ` ⇒ 触控目标那条规则（MASTER.md「≥ 44×44px」）破了，而它住在 gap=space.1 的容器里 ——` +
+          ` 这枚一旦变矮，4px 盒子间距就真的变成贴脸`,
+      );
+    }
+  }
+
+  // 墨迹间距只报数：没有一条明文规则规定两行文字之间要隔几 px。
+  const inkBoxes: (import('@playwright/test').BoundingBox | null)[] = [];
+  for (const id of [`auth-form-${kind}-resend`, `auth-form-${kind}-change-email`]) {
+    inkBoxes.push(await dialog.getByTestId(id).locator('> *:last-child').boundingBox());
+  }
+  const inkGap =
+    inkBoxes[0] && inkBoxes[1]
+      ? Number((inkBoxes[1].y - (inkBoxes[0].y + inkBoxes[0].height)).toFixed(2))
+      : null;
+  console.log(`    两枚文字链的墨迹间距：${inkGap === null ? '量不到（只报数，不判）' : `${String(inkGap)}px`}`);
+
+  return failures;
+}
+
+for (const [screenLabel, kind, width, height, shot, reach] of [
+  ['登录档验证码屏 · 宽屏 1440', 'login-code', 1440, 900, SHOTS[4], reachLoginCodeStage],
+  ['登录档验证码屏 · 窄屏 375', 'login-code', 375, 812, SHOTS[5], reachLoginCodeStage],
+  ['注册档验证码屏 · 宽屏 1440', 'registration-code', 1440, 900, SHOTS[6], reachRegistrationCodeStage],
+  ['注册档验证码屏 · 窄屏 375', 'registration-code', 375, 812, SHOTS[7], reachRegistrationCodeStage],
+] as const) {
+  test(`验证码屏这一格的间距有它自己的读数（${screenLabel}）`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await installChallengeRoutes(page);
+    await openApp(page, '/', 'accepted');
+    const dialog = await openAuthPanel(page);
+    await dialog.getByTestId('auth-form').waitFor({ state: 'visible' });
+    await reach(dialog);
+    // 等切换那一下的过渡走完，理由同上：中途的矩形是过渡态而不是设计值。
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: shot, fullPage: false });
+
+    const failures = await measureCodeScreen(dialog, kind, screenLabel);
     expect(failures, failures.join('\n')).toEqual([]);
   });
 }
