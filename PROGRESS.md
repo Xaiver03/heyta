@@ -7498,3 +7498,33 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       原因是共享索引里此刻挂着别线一枚**已 `git add` 的新文件**（`docs/plans/global-ux-system-remediation.md`），
       普通 `git commit -- <pathspec>` 之前先 `git add` 新文件就会把那枚一起带走。配方与事后刷新见项目层记忆
       `project-shared-worktree-sessions.md`。
+209. **自动收集线 · ADR-0077 那条腿补上"两档接得上"那一格证据（H1）**（写前先跑 `date`，本机 2026-10-28 00:59）。
+    ① **补的是什么洞**：第 208 条那张判据表里"任务写回仍归设备"这一句，当时靠的是**读代码**，
+      而单元那两枚 spec 的封与解都出自我自己写的 AAD（同一份抄件）——
+      把源码里的 `purpose` 改掉时它们跟着一起改，于是"服务端冻好的那一行能不能被真宿主的
+      `openInbound` 解开"从来没被测过。现在由真宿主跑完：设备 recover 到冻结结果 ⇒ 模型调用仍 1 次、
+      本地 1 枚 op、`sync()` **之前**服务端那枚 `inbound:<eventId>` op 数不到，之后恰好 1 枚。
+    ② **它不占窗口号，这是设计不是省事**：`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts`
+      的分母是计划里 AC-3 那张故障表，`research/tools/verify-inbound-dual-host.py` 把"套件报了计划里没有的号"
+      判红（R5）。所以这一格只打自己的 `HOSTED_HANDOFF=` 行、不进对账，排障旋钮用 `-1` 选它。
+      ⚠️ 别"顺手"给它编号——那会把 AC-3 的分母改成两张清单的并集。
+    ③ **读数（本戳现取，别抄进正文）**：`python3 research/tools/verify-inbound-dual-host.py` 回 rc=0、
+      `Windows: 13/13`、`HOSTED_HANDOFF=PASS`、`Tests 15 passed`（一次性 PG、逐枚 apply 79 枚迁移）；
+      `pnpm --dir server test` 回 rc=0、`Test Files 178 passed`、`Tests 3132 passed | 1 skipped`。
+      变异臂扩到 13 枚：新增 A12（把冻结那一步 AAD 的 `purpose` 写成 `input`）与 A13（集成面上正文密文不抹）
+      各红 1 条且**只红在 H1**；对照臂三面（server 两枚 spec / web 那枚 / 集成那一格）先绿。
+      臂数现量 `grep -cE "^\s+\('A[0-9]" ~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.py`。
+    ④ **动了一处生产代码，理由要说清**：`server/src/automation/inbound.routes.ts` 里 `canonicalPublicKey`
+      改成导出——测试要读**同一枚**归一化，抄一份就是第二份事实源，而"接收那腿与抽取那腿封的字节
+      是否逐字相同"这件事在抄件下永远量不到。函数体一字未动。
+    ⑤ 🔴 **这一趟三次读错，全是我自己的装置**：(a) 断言只打形状不打原因，第一趟只回
+      `expected 'failed' to be 'prepared'`，四种可能撞成同一行 ⇒ 改成消息里带那枚**稳定原因码**
+      （封闭词表、不含正文，所以不违反零日志那条）才读到 `model-upstream-rejected`；
+      (b) 白名单与明文表比的是 `url.hostname`（**不带端口**），我按 `127.0.0.1:<端口>` 写合成表；
+      (c) `vitest list` 在整个 describe 被 `skipIf` 掉时打印 0 条而 rc=0，我拿它当"谁编译这枚文件"的探针，
+      空读数差一点被读成"文件坏了"——同一条探针打另一枚没动过的文件也是 0，带上 `DATABASE_URL`
+      才枚举出 15 条。⇒ 又是"空读数先归因搜法，再归因对象"那一族。
+    ⑥ 本条动 `PROGRESS.md`（纯追加）与 `docs/plans/inbound-automation.md`（文末 §5 纯追加）、
+      `server/src/automation/inbound.routes.ts`、`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts`；
+      迁移仍**没 apply**、env 没动、不 push、对外六格草稿仍未发（归属照旧见工单 §6/§5.2）。
+      本线这 4 枚仍走第 208 条 ⑧ 那套私有索引 CAS。

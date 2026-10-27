@@ -4946,3 +4946,56 @@ node scripts/check-schema-migration-drift.mjs
    要么补一枚编辑器，要么界面别露出——现在它没露出。
 
 
+### 5. 00:5x 追：服务端冻好的那一行，让真宿主把整个周期跑完了（H1）
+
+**为什么还差这一格**：上面第 3 节那张表里"任务写回仍归设备"那一句，当时的依据是**读代码** ——
+`packages/app-host/src/inbound-process.ts` 先 `readAutomationPreparedResult`，拿到就
+`openInbound(purpose:'result')` 解。可单元那两枚 spec 的封与解**都出自我自己写的 AAD**（同一份抄件），
+于是"两档接不接得上"从来没有被宿主里那行真代码解过一次。这一格补的就是那一次。
+
+**加在哪、为什么不占窗口号**：`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts`
+末尾一枚 `H1`。这一档的分母是 AC-3 那张故障表，`research/tools/verify-inbound-dual-host.py`
+把"套件报了计划里没有的号"判红（R5），所以它只打自己那行 `HOSTED_HANDOFF=`，不进对账；
+排障旋钮用 `HEYTA_DUAL_HOST_ONLY=-1` 单独选它。
+
+**它真跑了什么**（一条链，中间不换手）：
+
+- 规则的 `hostedExtraction` 由**真 API** 打开（界面上那枚开关写的就是同一列，读回来的也必须是它）；
+- 第一趟走**真接收路由**：这台实例没配 `MANAGED_AI_*` ⇒ 抽取注定没成 ⇒ 回 `202 queued`、
+  正文密文仍在、模型 0 次、额度 0 次（"只可能更早，不可能更少"这句在真 HTTP 上的现量）；
+- 第二趟同一条腿，只把上游指到这档现成的回环桩上 ⇒ `prepared`；送出境的只有
+  `{title:"Inbox note"}`（`allowedFields` 投影之外那枚标记串没出境），那一行的 `payload_ciphertext`
+  被写成 NULL，且**这个账号每一行事件的两列密文里都搜不到那枚标记串**；
+- 额度 1 次、`automation_ai_attempts` 0 行、提交许可 0 行、`inbound:<eventId>` 的服务端 op **0 枚**；
+- 重投同一发 ⇒ 去重先命中，额度仍 1 次；
+- 设备那一腿 `cycle()` 先 recover 到冻结结果 ⇒ **模型调用仍是 1 次**（它没再抽一遍）、
+  本地 1 枚 op、任务标题与 `priority` 来自冻好的那一批；
+- 同步之前服务端库里那枚 op 数不到，`sync()` 之后恰好 1 枚 ⇒ 写 op 的那一方是设备，不是服务端。
+
+**现量（2026-10-28 00:5x）**：
+
+```bash
+python3 research/tools/verify-inbound-dual-host.py   # 一次性 PG、逐枚 apply 迁移、全 13 格 + H1
+cd server && npx vitest run                          # server 全套
+```
+
+| 尺 | 读数 |
+|---|---|
+| 双宿主全量 | rc=0，`Windows: 13/13`，`HOSTED_HANDOFF=PASS`，`Tests 15 passed`（迁移 79 枚逐枚 apply） |
+| server 全套 | rc=0，178 份文件 / 3132 通过、1 跳过（数由汇总行自己打） |
+| 变异臂 | 新增 A12/A13 两枚打在集成面，各红 1 条且只红在 H1；对照臂扩到三面先绿（`~/.heyta-evidence/inbound-hosted-extraction-20261027/mutation-arms.md`） |
+
+**顺带动了一处生产代码**：`server/src/automation/inbound.routes.ts` 里 `canonicalPublicKey` 改成导出。
+理由是接收那腿与抽取那腿**必须封到逐字相同的字节**，而测试里再抄一份归一化就是第二份事实源 ——
+抄的那份永远测不到"两腿不一致"这一失法。导出只为读同一枚，函数体一字未动。
+
+**这一趟我自己读错的三次**（都不是产品的错，是装置的）：
+
+1. 断言只打形状不打原因：第一趟只报 `expected 'failed' to be 'prepared'`，四种可能撞成同一行。
+   改成消息里带 `outcome` 那枚**稳定原因码**（封闭词表、不含正文，所以不违反零日志那条）才读到
+   `model-upstream-rejected`。
+2. 白名单与明文表比的是 `url.hostname`（`server/src/ai/managed-upstream.ts` 的 `parseUpstreamUrl`），
+   **不带端口**；我按 `127.0.0.1:<端口>` 写合成表 ⇒ 判 `not-allowlisted`。
+3. `vitest list` 在"整个 describe 被 `skipIf` 掉"时打印 0 条而 rc=0：我拿它当"谁编译这枚文件"的探针，
+   第一读数差一点被读成"文件坏了"。同一条探针打另一枚没动过的文件也是 0，带上 `DATABASE_URL`
+   才枚举出 15 条 ⇒ **空读数先归因搜法，再归因对象**。
