@@ -4408,3 +4408,80 @@ AC-8：`python3 research/tools/verify-inbound-ac8-matrix.py` rc=**0**（`读数�
 15. **push 实际推的是哪两枚 ref，以及第三枚为什么没推（这句要在负责人问起之前先写在纸上）**：本笔推到 **`origin`（github.com:Xaiver03/heyta.git）**：`refs/heads/main` ⇒ `9af02d3ba..dfeee27c4`（227 笔）与 `refs/heads/feat/paycenter-integration` ⇒ `4c220ac33..5f27a8705`（38 笔），两枚都 fast-forward（祖先判各 `git merge-base --is-ancestor <远端值> <本地 ref>` 回 0），仓里那枚 pre-push 闸逐笔扫过在册值（227 笔／87521 行与 38 笔／33872 行，各 0 命中）。⚠️ **`refs/heads/main` 的配置上游其实是 `gitee/main`**（现量 `git for-each-ref --format='%(refname:short) %(upstream:short) %(upstream:track)' refs/heads/main` ⇒ `main gitee/main [ahead 52]`，gitee 那侧停在 `606113e10`＝合并前的 main），而 `git push` 不带 refspec 会推到 gitee ⇒ **这一趟没推 gitee**，因为把含支付中心 adapter 的这批件同步到第二个远端属于**可见范围**这一格，按仓规那句"对外发布先说一声"留给负责人一句话决定，命令现成：`git push gitee refs/heads/main:refs/heads/main`。⚠️ 另有一处我自己踩的形状：`for pair in "sha ref"; do set -- $pair; done` 在这台机（`$0`＝`/bin/zsh`）**不做词分割** ⇒ 祖先判拿到的是整串，报「Not a valid object name」而脚本继续往下跑；改成两条显式命令才取到真读数（同 `#498` 那一族，本线第三次命中，正文不再新立条号）。
 
 本节动 `docs/plans/inbound-automation.md`、`PROGRESS.md`、`BLOCKED.md`、`docs/reference/environment-traps.md`、`docs/plans/inbound-automation-handoff.md`、`scripts/reinstall-all.sh`、`server/tests/inbound-lane-rigs-consumers.spec.ts`、`docs/agents/environment-traps-index.md`、`docs/plans/product-ux-optimization.md`、`docs/plans/product-ux-optimization-handoff.md`、`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md`。判卷口径零处、AC 已勾数零处（现量 `python3 research/tools/verify-inbound-ac-ticks.py`）。
+
+## 2026-10-27 · 按开工单执行 A 组（代码缺口）：五格闭合、A4 确证成缺陷、A2 撞出一件开工单没写的前置
+
+负责人那句"按照这个建议把东西做完"指的是 [`inbound-automation-work-brief.md`](inbound-automation-work-brief.md) §7 的顺序。
+本轮只动 A 组里**归执行 AI 的那几格**；§6 那八格一格没代拍（AC 的勾、上线那一步、计费口径、地界、邮件转待办、
+"`AUTOMATION_ENTITLEMENT_MODE` 写错 ⇒ 500 要不要改启动红"、A2 那两条边界、别人名下那几格）。
+
+**1. A4 确证：托管档一次物理调用扣两下**（不是"疑似"）。载体 `server/tests/automation-managed-double-charge.pglite.spec.ts`
+—— 真 PGlite + 真 Fastify 托管代理路由 + 进程内真 HTTP 假上游，DDL 从发布中的迁移文件读，不手抄。
+逐字读数（同一条用例里两条审计行 + 假上游自己数的命中）：
+
+```
+{"level":"AUDIT","event":"AI_METERING_CONSUMED",...,"used":1,...}   ← 预留那一次（automation/ai-metering.ts）
+{"level":"AUDIT","event":"AI_METERING_CONSUMED",...,"used":2,...}   ← 物理调用又扣一次（ai/managed-proxy.routes.ts）
+{"level":"AUDIT","event":"AI_PROXY_REQUEST","feature":"inbound-automation","outcome":"forwarded",...}
+上游命中 = 1 次（假上游自己数的，不是响应码推的）
+```
+
+两条反向臂把来源钉死：只发物理调用（摘掉预留）⇒ `requests` 恰好 1；`billingSource='direct'` 那档预留根本不碰计数器 ⇒ 0。
+对账读路径同戳：`chargedAttempts=1 / counterRequests=2 / unexplainedByAutomation=1`。
+⚠️ 那条断言钉的是**现状**（`toBe(2)`），不是承诺 —— 承诺是"一次物理调用 +1"。
+修法（摘 managed-proxy 那次扣，还是让 attempt 账本成为唯一权威）动的是计费口径 = §6 第 3 格，归负责人；
+两条路各自的读数已在用例里，拍完把那一行改成 `1` 并删掉用例头部的说明段即可。
+
+**2. A5 闭合**：`purgeRetiredAutomationEntitlementClocks` 按邻居形状接进 `server/src/sync/cleanup.ts`，
+且**排在 nonce 清扫之后**（一台 installation 只要还有票据消费行就还没退役，反过来写会让"最后一引用已消失"的
+时钟行多留一天）。新判据 `server/tests/cleanup-automation-sweeps.spec.ts` 三条：各调一次 / 顺序 / 前面那步抛错不带走后面。
+变异复跑（摘掉那处调用）⇒ **3 failed / rc=1**，还原后 `shasum` 前后逐字相同（PRE==POST=`3b60bfef3eb7`）。
+那句"`cleanup.ts` 在本线白名单之外"的搁置令现量**已无活职能**：它约束的是 2026-10-12 那场会话自己的地界，
+而开工单 §7 第 5 步把这格排了进来 ⇒ B175 闭合，没扩任何人的地界。
+
+**3. A6 闭合**：`scripts/check-retention-window-parity.mjs` 加第三判据（代码 `RETENTION_MS` 的 7 天 ↔
+协议文档"输入/冻结结果密文 7 天"），锚点缺失与取值不等**分开报**。自检从 5 臂长到 9 臂（新增 F/G/H/I 四臂 + 一条阳性对照），
+`--self-test` 与真跑双 rc=0。加尺前按仓规先 grep 有没有明文否掉它：
+`grep -rn "不并入奇偶校验|不做 7 天|不把 7 天|不纳入 7 天" docs BLOCKED.md` 回 **0 命中**。
+
+**4. A7 闭合**：`server/env.example` 补齐缺的六枚（模式 / 公钥环 / 发送 KEK / 签发三件套），每枚写清
+"没配是什么症状、配错是什么症状"；`server/docker-compose.yml` 的 supersync 段同步加六行转发（空值等价于没配，
+逐枚读过 `if (!raw)` 那一支，所以带 `:-` 不改变现状）；`docs/runbooks/deployment.md` 新增 §3.5.1，
+`docs/runbooks/self-host.md` 新增 §2.5。判据读数：`check:server-env` 从"文档化 84"变成
+**"文档化 90 = 进 supersync 69 + …（孤儿 0）"**，rc=0 —— 也就是这六枚不是"文档里写了而容器收不到"那种死旋钮。
+⚠️ **helm 那张图没接**，理由写在 §3.5.1 末尾：本机 `which helm` 为空，改一张连 `helm template` 都渲染不了的图
+等于交一份没人核对过的 YAML。这一格留给"下次带 helm 一起补并跑一次渲染"，不当已完成。
+
+**5. A8 闭合**：删掉 `packages/app-host/src/host.ts` 里那份逐字重复的 `InboundAutomationHostOptions`
+（真源在 `inbound-host-options.ts`，`index.ts` 也从那里对外导出）。判据：`pnpm --dir packages/app-host typecheck` **rc=0**。
+
+**6. A3 闭合（web 那一半）**：中英两档各补 `web.ai.inbound.process.waiting-entitlement`，
+`PROCESS_COPY` 接上映射，并把那条只钉"不崩、不回成处理失败"的渲染用例**加严成钉具体句子**
+（原先空正文也能过 —— 那正是假绿本体）。变异复跑（摘掉映射）⇒ 对账用例与句子用例**两条一起红**，还原逐字一致。
+⇒ B110 闭合。⚠️ mobile 那一半**没做**：移动壳里没有任何自动收集界面（无规则 UI、无状态行），
+"把周期结果露出来"要先把那面造出来，而手机上要不要露这条状态属产品取向，本轮不代拍。
+
+**7. A2 撞出一件开工单没写的前置**（这条最重要的要如实回报，因为工单把它写成"性价比最高的一格"）。
+`startInboundWorker` 的入参要 `routing` 与 `consents`，而这台宿主**一个来源都没有**：
+`grep -rn "consent|routing" apps/node-host/src/*.ts` 只命中 `cli-auth.ts:168` 一句错误文案与
+`keychain-secret-store.ts:5` 一行注释；`packages/ai` 里也没有跨壳共用的 settings store
+（移动那份 `apps/mobile/src/ai/settings-store.ts` 是 AsyncStorage 私有实现）。
+⇒ "给 node 宿主一个启动者"缺的**不是那一行调用**，是"一台无头机器怎么被授权把用户内容发往某个端点"这件事的设计，
+而出境同意属对外法律表征那一档 ⇒ 不代拍，交回负责人（开工单 §6 第 7 格由此从"补腿 vs 明写边界"两难变成
+"先定无头宿主的同意来源"三难）。另有一条机械前置：判据要求的"真库真 HTTP"在这台机器上取不到 ——
+`env | grep -c DATABASE_URL` = **0**、`server/.env` 里也没有 `DATABASE_URL`，集成套件按
+`describe.skipIf(!DATABASE_URL)` 整段跳 ⇒ 就算写完也只能交"待有库那台机器上跑"的用例。
+
+**8. A1 按开工单第二支落**（本版本不支持 `selfhost-online`，不改代码）。现量：客户端没有任何一面把这档做成用户选项 ——
+`grep -rn "selfhost-online" apps packages --include='*.ts' --include='*.tsx'` 去掉 dist 与测试只命中
+`packages/app-host/src/admin-client.ts:187` 的一句注释，管理后台读的是服务端模式而非用户选项
+⇒ "界面别露出"这半本来成立，缺的那半（对运维说清配了也不会通）已写进 `docs/runbooks/self-host.md` §2.5 那张表。
+
+本轮动 `server/tests/automation-managed-double-charge.pglite.spec.ts`（新）、`server/src/sync/cleanup.ts`、
+`server/tests/cleanup-automation-sweeps.spec.ts`（新）、`scripts/check-retention-window-parity.mjs`、
+`server/env.example`、`server/docker-compose.yml`、`docs/runbooks/deployment.md`、`docs/runbooks/self-host.md`、
+`packages/app-host/src/host.ts`、`packages/i18n/src/locales/{zh-CN,en}.ts`、
+`apps/web/src/features/settings/InboundAutomationSettings.tsx`、`apps/web/tests/inbound-cycle-display.spec.tsx`、
+本文件与 `BLOCKED.md`（B110 / B175 各一条闭合行）。
+**判卷口径变更**：`check:retention-window-parity` 长了一条判据（9 臂）；`web.ai.inbound.process.*` 一族从 4 颗变 5 颗，
+双向对账用例的分母跟着长。**AC 已勾数零处**（现量 `python3 research/tools/verify-inbound-ac-ticks.py`）。

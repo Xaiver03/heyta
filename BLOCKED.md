@@ -7097,6 +7097,11 @@ git show --numstat --format='' 6d06bae4   # 空输出
 
 ## B110 `waiting-entitlement` 的界面文案缺词条，而 `packages/i18n` 正被并行会话写着
 
+✅ **2026-10-27 闭合**（本线执行开工单 A3）：中英两档各补 `web.ai.inbound.process.waiting-entitlement`、
+`PROCESS_COPY` 接上映射，并把那条只钉"不崩"的渲染用例加严成**钉具体句子**；变异复跑（摘掉映射）⇒ 对账用例与句子用例两条一起红，
+还原逐字一致。当时的"i18n 正被别人写"这一前置今日现量已不在（`git status --porcelain -- packages/i18n` 动手前为空）。
+读数与边界见 `docs/plans/inbound-automation.md` 文末 2026-10-27 那一节第 6 项。
+
 **现量**：`packages/i18n/src/locales/zh-CN.ts:5261-5265` 只有 `submitted/empty/needs-confirmation/failed` 四条
 （`en.ts:4994-4998` 同），**没有** `web.ai.inbound.process.waiting-entitlement`；
 `git status --porcelain -- packages/i18n` 当前 **3 条脏**。任务书死规矩："不许动 `packages/i18n` 与任何别人在写的文件"。
@@ -9615,6 +9620,12 @@ grep -rln "startAutomationSessionKeepalive" apps/web/src apps/mobile/src apps/no
 `apps/web/src/features/settings/inbound-runtime.ts:39`、`:50`）。
 
 ## B175（2026-10-12 01:4x，本会话 · 做任务书 T2 最后一项时留下的那一行）：**时钟高水位的退役清扫已经写完并有真库判据，缺的只有每日任务里的那一次调用 —— 而 `server/src/sync/cleanup.ts` 不在本线地界内**
+
+✅ **2026-10-27 闭合**（本线执行开工单 A5）：那一次调用按邻居形状接进 `server/src/sync/cleanup.ts`，且刻意排在 nonce 清扫之后
+（还有票据消费行的 installation 不算退役，反过来写会让那些时钟行多留一天）。新判据
+`server/tests/cleanup-automation-sweeps.spec.ts` 三条（各调一次 / 顺序 / 前面那步抛错不带走后面），变异复跑（摘掉那处调用）⇒
+**3 failed / rc=1**，还原后 `shasum` 前后逐字相同。那句"白名单之外"约束的是当日那场会话自己的地界，开工单 §7 第 5 步
+已把这格排进执行范围 ⇒ 不是代别人扩地界。
 
 现量（这条格子闭合与否不看正文，看这三行）：
 
