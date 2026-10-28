@@ -5558,6 +5558,9 @@ node scripts/check-docs-voice.mjs                                   # rc=0（禁
    `git status --porcelain -- apps/web/src/App.tsx` 回 ` M`（别线在飞）；
    `git show HEAD:apps/web/src/App.tsx | grep -c 'web.calendar.sidebar.hide'` 回 **0** 而工作树那份回 **2**
    ⇒ 这枚红**只活在他们未提交的编辑里**，不在已入库态；本线界面件里这枚键命中 **0**。日历侧栏不是本线的面，措辞与词条归他们。
+   ⚠️ 上面这三行是 `674562704` 那一戳的读数；到 `2a8446fc1` 那两行**已随别线 `c249bb6f1` 进 HEAD**
+   （现量 `git show HEAD:apps/web/src/App.tsx | grep -c 'web.calendar.sidebar.hide'` 现在回 **2**、该文件 `git status --porcelain` 回空）
+   ⇒ 形状从"只在未提交编辑里"变成"已入库态的红"，归属不变、仍不归本线。详见 19:4x 那节第五段的对照表。
 2. `pnpm check:docs` ⇒ rc=**1**，三处全指同一枚未跟踪目标 `docs/runbooks/android-build-on-linux-dev.md`
    （归因与两条持久判据在上面 15:5x 那节第六段）。
 
@@ -5702,7 +5705,8 @@ column_before=0  create_p2022_before=2  p2022_before=3  column_after=1  p2022_af
 
 AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉了 ⇒ 没有任何东西跑过它。
 顺这条因果去现量电池清单，发现**移动端从来没有腿**：`AC1..AC8`+`SCOPE` 里没有一条跑 `apps/mobile` 的 inbound spec
-（现量 `git show HEAD:research/tools/verify-inbound-ac-battery.py | grep -c mobile` 回 **0** —— 那还是改前的清单；加完之后同一枚命令在工作树那份回 **2**）。
+（现量 `git show HEAD:research/tools/verify-inbound-ac-battery.py | grep -c mobile` 回 **0** —— 那是改前的清单；
+ 加完之后同一枚命令跑在工作树那份上回 **1**：`grep -c` 数的是行，新腿标签与它的工作目录写在同一行里）。
 于是加一条 `AC4-mobile-inbound`，命令写成 glob：
 
 ```bash
