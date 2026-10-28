@@ -5502,3 +5502,25 @@ A2 谓词那一支被删/改坏 ⇒ 红、A3 分母打空 ⇒ 红、A4 **抹掉�
 `research/tools/verify-inbound-ac-battery.py`（新腿）、`packages/app-host/tests/inbound-rules-remote.spec.ts`（注释标记）、
 `docs/plans/inbound-automation-handoff.md`（§4a 两格）、`docs/plans/inbound-automation.md`、`PROGRESS.md`。
 本线不 push、不自标完成。
+
+### 九、整串 29 腿在两笔入库之后又跑了一遍（16:1x，同一戳，不是拼表）
+
+```bash
+python3 research/tools/verify-inbound-ac-battery.py   # 原件 .run-logs/inb-ac-battery-1028-1610/（gitignore 内）
+```
+
+⇒ **`legs=29 rc0=27 rc_nonzero=2`**，载具自报 `CARRIER_HEAD=73930c813 dirty=187`。两枚非 0 都不是本线红：
+`SCOPE-commit-scope`（B205 那枚范围尺，口径见上面第七段）与 **`AC7-link`** —— 后者就是第六段那三处别线未跟踪 runbook 引用，
+现在被电池自己收在腿上，所以那格红**不必再靠我单独复跑才看得见**。关键逐腿读数：
+`AC6-rule-fixture-parity rc=0 sec=0 :: 读数: keys=13 denom=7 exempt=1 missing=0 ok=true`（新腿的正文第一次进了 `rc.txt`，
+不再只有 rc）、`AC6-browser rc=0 sec=19 :: 8 passed (19.0s)`、`AC3-dual-host rc=0 sec=11`（13 格 + H1 三趟都在里面）、
+`AC8-matrix rc=0`（`尺枚=67 有尺行=27 无尺行=7`）、`AC8-producer-seam rc=0`（`相对导入=285 模块在 HEAD=285 新模块缝=0`）。
+起跑负载现量 `sysctl -n vm.loadavg` 回 `{ 10.54 11.42 11.01 }`（安静门阈值 12 ⇒ 这趟没开 `--quiet-gate`，
+读数挂在共享检出上，别把它念成"深安静窗里的一戳"）。
+
+**这趟的副作用按上面第四节定下的新规矩清掉了**：`PNG_DIFF_LINES=18` 与 `EVIDENCE_DIRTY=18` 同值（这次没有名单外的），
+还原清单取自 `git -c core.quotePath=false status --porcelain -- <三枚派生证据目录>` 抽出的 18 条路径，
+落 `.run-logs/dirty-pngs-1612.txt` 后 `git restore --pathspec-from-file=<那枚文件>` ⇒ 三枚目录 `git status --porcelain` 回 **0**。
+⚠️ 第一发我是照 GNU 的习惯写 `xargs -d '\n'` 去喂的，BSD 的 `xargs` 没有 `-d` ⇒ 那一步 rc=1、18 枚一枚没还原；
+`--pathspec-from-file` **默认就按换行分隔**，不需要那个旗标（记这条是为了防下一位把"还原失败"读成"还原命令不管用"）。
+ok

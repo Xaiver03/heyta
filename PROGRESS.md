@@ -7685,3 +7685,12 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ⑨ **`pnpm check:docs` 这一格现在的读数从一处变三处，仍不归本线**：三处全指同一枚未跟踪目标 `docs/runbooks/android-build-on-linux-dev.md`（`multi-end-build.md:41`、`repo-map.md:28`、`android-build-on-windows.md:5`）。多出来的两处怎么排除本线——那两枚文件此刻都 ` M`（别线在飞），而**已入库那版根本没有这两条引用**（`git show HEAD:docs/agents/repo-map.md | grep -c 'android-build-on-linux-dev'` 与 `git show HEAD:docs/runbooks/android-build-on-windows.md | grep -c 'android-build-on-linux-dev'` 各回 **0**）。15:0x 那节"全文只有一处"是当时的读数，不作废；处置照旧：不改他们的文件、不替别人登记 `UNTRACKED_LINK_OK`。
     ⑩ **本笔提交给范围尺加了三行 OOB，白名单一个字没动**：`verify-inbound-commit-scope.py` 首行 `越界` 由 `120`（15:20 那戳）到 `122`，`bc983822` 被点名的 OOB = 3 枚（新脚本、`scripts/check-gate-wiring.mjs`、交接书）。**`WHITELIST` 里没有任何 `^scripts/` 形状、也没有交接书那枚路径**——同族前例现量：`scripts/check-inbound-system-prompt.mjs`（本线自己的尺，被 3 笔早期提交点名）、`scripts/check-worktree-exceptions.mjs`；交接书那行 `bc983822` 之前已排着 **9** 枚历史提交。⇒ 改判据（往白名单加形状）动的是"这条线允许碰哪些路径"这句话本身，挂 B169／B205 归负责人；本线只把数写清，那枚腿继续按 B205 保持红。
 
+    ⑪ **两笔入库之后把整串 29 腿在 `73930c813` 上重跑一遍**（`.run-logs/inb-ac-battery-1028-1610/`，起跑负载现量 `{ 10.54 11.42 11.01 }`、阈值 12 ⇒ 没开 `--quiet-gate`，别念成深安静窗那一戳）：
+      **`legs=29 rc0=27 rc_nonzero=2`**，两枚非 0 都不是本线红 —— `SCOPE-commit-scope`（B205）与 **`AC7-link`**
+      （现量 `grep -cE 'android-build-on-linux-dev' <AC7-link.log>` 回 **3**，就是 ⑨ 那三处别线未跟踪 runbook 引用；
+      这格红现在**由电池自己带着**，不必再靠单独复跑才看得见）。新腿的正文第一次进了 `rc.txt`：
+      `AC6-rule-fixture-parity rc=0 sec=0 :: 读数: keys=13 denom=7 exempt=1 missing=0 ok=true`；
+      `AC6-browser rc=0 :: 8 passed (19.0s)`、`AC3-dual-host rc=0`、`AC8-matrix rc=0`、`AC8-producer-seam rc=0`。
+      副作用这回放对了：`PNG_DIFF_LINES=18`=`EVIDENCE_DIRTY=18`，还原清单取自 `git status --porcelain -- <三枚派生目录>` 的 18 条路径，
+      `git restore --pathspec-from-file=<清单>` 后三枚目录回 **0**。⚠️ 第一发照 GNU 习惯写 `xargs -d '\n'` ⇒ BSD 没有 `-d`、rc=1、一枚没还原 ——
+      `--pathspec-from-file` 默认按换行分隔，不需要那个旗标。
