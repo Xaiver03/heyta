@@ -5664,3 +5664,28 @@ python3 research/tools/verify-inbound-ac-battery.py   # 原件 .run-logs/inb-ac-
 ⚠️ 顺手自曝一笔自己的手滑：`11b701ab6` 那笔的**标题**是从上一笔抄的（同一句"六项交付逐条绑上一条可重跑的现量命令…"），
 正文写的才是本节的补充。规矩不许 amend，所以不改写历史 —— 这里指名它，免得下一位按标题把两笔读成同一件事。
 本线实际落装置的那笔是 `41d1e1396`。
+
+### 七、ADR §6 那格部署顺序探针也搬进仓内（同一枚"只活在这台机器上"的病，第二例）
+
+`~/.heyta-evidence/inbound-hosted-extraction-20261027/probe-unapplied-{migration.py,client.cjs}` 两枚仓外件 ⇒ 合并成一枚被跟踪装置
+`research/tools/verify-inbound-unapplied-migration.py`（客户端内联成临时文件，仓库里不留第二枚件；
+`--root` 默认从装置自身位置推仓库根，不再写死某个人机器上的绝对路径）。搬的时候给它加了一道前身没有的东西：
+**形状闸内置**——档一必须"那一列不存在 + 两头发写面 create 各报一次 `P2022`"、档二必须"列在 + 旧行经读面回来是 `null`、
+`=== true` 为 false"，任一项不符 ⇒ rc=1 并点名是哪一项。前身只把读数**印出来**给人看，读的人不在场时"跑完了"就退化成"结论成立"。
+
+现量（本机 `31c2b88f1`，私有 initdb + 空闲端口 + 一次性库，跑完随临时目录销毁，在册那 27 枚别人的库一枚没碰）：
+
+```text
+column_before=0  create_p2022_before=2  p2022_before=3  column_after=1  p2022_after=0  legacy_line=True   rc=0
+```
+
+`p2022_before=3` 比 ADR 原来那句只说"两头发写面死"更响：**读面那发 `findFirst` 也一起报 `P2022`** ⇒ 每一发 webhook
+进来判走哪条腿时就在路由里死，公网形状是 500。这一条把 §6 那句断言从"我记得我测过"变成"仓内一条命令能重取"。
+常驻注册走 `DELIBERATELY_NOT_WIRED`（要起真 Postgres + apply 78 枚迁移，约 40 秒，挂进并发套件不合算；
+判决既然内置，留手跑不损失牙），`consumers` spec 复跑 `17 passed` rc=0。
+
+⚠️ 这一段欠两条自我记录，写给下一位也写给我自己：
+① 我第一版把回环地址写成 `127.0.1.1` ⇒ `OSError: Can't assign requested address`，探针根本没起 Postgres —— 那种 traceback
+   形状比"红"好，因为它不会伪装成结论；② 我初稿在装置说明里写过一枚**不存在的**常驻尺名（`inbound-unapplied-migration-shape.spec.ts`），
+   现量核对后删掉，换成真名 `inbound-automation.routes.spec.ts` 并写明"它用假 store、不碰真库 ⇒ 这一格没有常驻替代物"。
+   这类"把合理的东西当成存在的"是本仓那条老坑（去找一件不存在的东西），所以两处都在台账里留名，不只改文件。

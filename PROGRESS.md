@@ -7736,3 +7736,17 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       18 枚被重写的取证图按 ⑦/第四段规矩逐枚点名还原，还原后三枚派生目录回 0。
       ⚠️ 自曝一笔手滑：`11b701ab6` 的**标题**是从上一笔抄的（正文写的才是本节的补充），规矩不许 amend ⇒ 不改写历史，只在这里指名；
       本线真正落装置的那笔是 `41d1e1396`。
+
+215. **自动收集线 · ADR-0077 §6 那格部署顺序探针也搬进仓内，并给它加了前身没有的形状闸**（写前先跑 `date`，本机 2026-10-28 19:5x；tip `31c2b88f1`）
+    ① 两枚仓外件（`probe-unapplied-{migration.py,client.cjs}`）合并成一枚被跟踪装置 `research/tools/verify-inbound-unapplied-migration.py`：
+      客户端内联成临时文件（仓库里不留第二枚件）、`--root` 默认由装置自身位置推仓库根（不再写死个人绝对路径）。
+    ② **形状闸内置**（前身只印读数）：档一必须"列不存在 + 两头发写面 create 各报一次 `P2022`"、档二必须"列在 + 旧行读回 `null`、`=== true` 为 false"，
+      不符 ⇒ rc=1 点名哪一项。现量 rc=**0**：`column_before=0 create_p2022_before=2 p2022_before=3 column_after=1 p2022_after=0 legacy_line=True`。
+      `p2022_before=3` 比 §6 原句更响：**读面 `findFirst` 也一起 P2022** ⇒ 每发 webhook 判腿时就在路由里死（公网形状 500）。
+    ③ 一次性载体只属于本装置：私有 `initdb` + 空闲端口 + 随临时目录销毁，在册那 27 枚别人的库一枚没碰。
+      常驻注册进 `consumers` spec 的 `DELIBERATELY_NOT_WIRED`（约 40 秒、要真 Postgres，留手跑；判决内置所以不损失牙），该 spec 复跑 `17 passed` rc=0。
+    ④ 两条自我记录：(a) 我第一版把回环地址写成 `127.0.1.1` ⇒ `OSError: Can't assign requested address`，探针根本没起库（traceback 比"红"好，它不伪装成结论）；
+      (b) 初稿说明里我写过一枚**不存在的**常驻尺名 `inbound-unapplied-migration-shape.spec.ts`，现量核对后换成真名
+      `inbound-automation.routes.spec.ts` 并写明"它用假 store、不碰真库 ⇒ 这一格没有常驻替代物"。
+    ⑤ 本节动 5 枚（探针新／consumers spec 一段／ADR §6 复现入口／计划本节／本条）。判卷口径零处、AC 勾数 0；没动 `package.json`、没动链。本线不 push、不自标完成。
+
