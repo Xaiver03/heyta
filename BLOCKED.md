@@ -12592,6 +12592,7 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 
 | 格 | 为什么不停在本线 | 现量 |
 |---|---|---|
+| 🔴 账本里的 B 号有同号开两节的（枚数别抄这里，现量见右栏第二条） | 改号＝动引用面：这仓的 ADR、计划、本文件自己几个月来都按号互引；而且哪一节该让给谁只有原作者知道 ⇒ 不归我代改。我只做了本分的那一步：把**我自己按号写死的引用**换成按形状定位（例外归属尺那句「见 B238 那一节」原本还指错地方，那一号讲的是 macOS 窗口门）。⚠️ 影响面里包含用户目标正文引用的那一号（B232）——引用它之前要先读两节标题各说什么，别默认同一个意思 | `node research/tools/audit-blocked-number-collisions.mjs`（只认「B<数字>（」这种新开一节的形状，追记条不算；分母空退 2）；再 `node research/tools/audit-blocked-number-collisions.mjs --strict; echo $?`（1＝有撞号）|
 | 登录 resend 把服务端故障说成"码无效或已过期"（`server/src/api.ts:2520` 那格） | 改成 503 就是改 **HTTP 线协议语义**（🔴 不可逆层）；而且隔壁同一族的 verify 已经明写"服务端故障不许说成码不对"（`server/src/api.ts:2488`）⇒ 一份立场两处写法，动它要连 i18n 词条与三端壳的 `FAILURE_REASON_BY_SERVER_CODE`（`packages/app-host/src/hosted-auth.ts:678`）一起判 | `grep -n "Email login code resend failed" server/src/api.ts`；`grep -n "invalid_login_challenge" packages/app-host/src/hosted-auth.ts` |
 | 注册 resend 同一形状（`server/src/api.ts:2422`） | 同族第二枚；它今天不露出来只因为那张表没坏，改上一格就得一起改 | 同一份 catch 块：`grep -n "invalid_registration_challenge" server/src/api.ts` |
 | `login_unavailable` 没进客户端白名单 ⇒ 503 落到 `server-error`（"我们不知道发生了什么"），丢掉了服务端明说的"稍后再试" | 要不要为它加一档 reason 是文案与四端词条的取舍（`hosted-auth.ts:671` 那句"避免为一个子流程迫使所有壳加词条"就是它的反方） | `grep -n "login_unavailable" packages/app-host/src/hosted-auth.ts`（无命中即现状） |
