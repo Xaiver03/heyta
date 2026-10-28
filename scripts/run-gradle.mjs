@@ -77,6 +77,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, utimesSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -114,6 +115,18 @@ const SDK_ON_HOST = process.env.HEYTA_ANDROID_SDK_ON_HOST || '/home/xaiver/.loca
  */
 const GRADLE_HOME_ON_HOST = process.env.HEYTA_ANDROID_GRADLE_HOME_ON_HOST || '/home/xaiver/.heyta-android-gradle';
 const REMOTE_ANDROID = `${REMOTE_ROOT}/apps/mobile/android`;
+
+/**
+ * 载体机自己跑这批 pnpm 脚本时**必须**落在本机执行 —— 否则 `linux-dev` 上的一条任务会
+ * ssh 到它自己：把它的树打包送给它的树，再在"远端"起一次构建。旧设计里 `isWindows`
+ * 那一支挡的就是同一件事（那时载体是 Windows），换到 Linux 载体之后需要它的对应分支。
+ * 🔴 判据是**主机名逐字相等**，不是"ssh 失败了就改本机" —— 后者正是这条规则要挡的
+ *    静默降级形状（G5 钉的就是它）。主机名本身可覆盖，但覆盖不了"必须匹配才走"。
+ */
+const CARRIER_HOSTNAME = process.env.HEYTA_ANDROID_CARRIER_HOSTNAME || 'Xaiver-linux';
+const onCarrier = !isWindows && hostname() === CARRIER_HOSTNAME;
+/** 载体本机执行时要注入的东西，与远程分支步骤 4 那一串**逐项同形**（两处不一致就是两套构建）。 */
+const CARRIER_MIRROR_INIT = join(repoRoot, 'scripts', 'linux-dev', 'gradle-host', 'heyta-cn-mirror.init.gradle');
 
 // 🔴 这三枚旋钮的值会被拼进远端命令行，所以它们只许是**路径形状**：出现引号、`$`、
 //    反引号、分号、管道、重定向、换行、空格或反斜杠就直接红，不送过去。
@@ -249,16 +262,24 @@ function die(step, detail, extra) {
 
 /* ── 本机分支（Windows 常态 / POSIX 的显式例外）────────────────────────── */
 
-function runLocal(why) {
+function runLocal(why, opts = {}) {
+  const carrier = opts.carrier === true;
+  // 🔴 载体分支与远程分支必须**同形**：同一枚 `--no-build-cache`、同一份镜像 init 脚本、
+  //    同一个私有 GRADLE_USER_HOME、同一个 ANDROID_HOME。少一样，两条路就会打出不同的包，
+  //    而"这个 APK 是哪条路打的"重新变成猜的。
+  const localArgs = carrier ? ['--no-build-cache', `-I${CARRIER_MIRROR_INIT}`, ...gradleArgs] : gradleArgs;
   if (DRY) {
     console.log(`本机执行 gradle（${why}）—— 计划：`);
-    console.log(`   [dry-run] 将执行（**未执行**）：\n      ${command} ${gradleArgs.join(' ')}   （cwd=apps/mobile/android）`);
+    console.log(`   [dry-run] 将执行（**未执行**）：\n      ${command} ${localArgs.join(' ')}   （cwd=apps/mobile/android）`);
     return 0;
   }
-  const result = spawnSync(command, gradleArgs, {
+  const result = spawnSync(command, localArgs, {
     cwd: androidDir,
     stdio: 'inherit',
     shell: isWindows,
+    env: carrier
+      ? { ...process.env, ANDROID_HOME: SDK_ON_HOST, ANDROID_SDK_ROOT: SDK_ON_HOST, GRADLE_USER_HOME: GRADLE_HOME_ON_HOST }
+      : process.env,
   });
   if (result.error) {
     console.error(`run-gradle: 无法启动 ${command}: ${result.error.message}`);
@@ -809,6 +830,21 @@ if (invokedDirectly) {
     //    否则"远程构建"会在远端再发起一次"远程构建"（递归）。载体本身是 Linux（`linux-dev`），
     //    走的是下面那条远程支；这一支留着的理由与 2026-10-04 那批相同，只是对侧机器换了。
     process.exit(runLocal('Windows 本机 —— 远程模式的对侧，行为逐字不变'));
+  }
+  if (onCarrier) {
+    console.log(
+      [
+        '',
+        '╔═══════════════════════════════════════════════════════════════════',
+        '║ 本机就是 Android 载体 —— 直接在本机构建，不发 ssh。',
+        `║    判据：hostname() === '${CARRIER_HOSTNAME}'（不是"远程失败后的兜底"）`,
+        `║    与远程分支同形：--no-build-cache / -I heyta-cn-mirror.init.gradle /`,
+        `║    GRADLE_USER_HOME=${GRADLE_HOME_ON_HOST} / ANDROID_HOME=${SDK_ON_HOST}`,
+        '╚═══════════════════════════════════════════════════════════════════',
+        '',
+      ].join('\n'),
+    );
+    process.exit(runLocal(`本机就是 Android 载体（hostname=${hostname()}）`, { carrier: true }));
   }
   if (process.env.HEYTA_ANDROID_LOCAL_GRADLE === '1') {
     console.warn(
