@@ -24,7 +24,7 @@ for (const width of [1280, 390]) {
       let body: unknown = {}; let status = 200;
       if (path.endsWith('/automation/rules')) body = { rules: [{ id: ruleId, version: 1, enabled: true, keyId: 'hook',
         createdAt: '2026-10-08T00:00:00Z', deletedAt: null, allowedFields: ['title', 'dueDate'], targetProjectId: null,
-        timezone: 'Asia/Shanghai', parseVersion: 1, authorizationVersion: 1, maxItems: 2 }] };
+        timezone: 'Asia/Shanghai', parseVersion: 1, authorizationVersion: 1, maxItems: 2, hostedExtraction: false }] };
       else if (path.endsWith('/automation/events')) body = { events: snapshot ? [{ eventId, ruleId, ruleVersion: 1,
         status: state, reasonCode: state === 'needs-confirmation' ? 'needs-confirmation' : null, attempt: 1, receivedAt: 1_700_000_000_000 }] : [] };
       else if (path.endsWith(`/${eventId}/draft`)) body = snapshot;
@@ -180,7 +180,7 @@ for (const width of [1280, 390]) {
       let body: unknown = {}; let status = 200;
       if (path.endsWith('/automation/rules')) body = { rules: [{ id: ruleId, version: 7, enabled: true, keyId: 'hook-layout',
         createdAt: '2026-10-08T00:00:00Z', deletedAt: null, allowedFields: ['title', 'dueDate'], targetProjectId: null,
-        timezone: 'Asia/Shanghai', parseVersion: 1, authorizationVersion: 1, maxItems: 5 }] };
+        timezone: 'Asia/Shanghai', parseVersion: 1, authorizationVersion: 1, maxItems: 5, hostedExtraction: false }] };
       else if (path.endsWith('/automation/events')) body = { events: [{ eventId: 'event-queued', ruleId, ruleVersion: 7,
         status: 'queued', reasonCode: null, attempt: 1, receivedAt: 1_700_000_000_000 }] };
       else if (path.endsWith('/sender-credentials') && route.request().method() === 'POST') {
@@ -328,7 +328,7 @@ for (const zone of zoneList) {
         let body: unknown = {}; let status = 200;
         if (path.endsWith('/automation/rules')) body = { rules: [{ id: ruleId, version: 1, enabled: true, keyId: 'hook',
           createdAt: '2026-10-08T00:00:00Z', deletedAt: null, allowedFields: ['title', 'dueDate'], targetProjectId: null,
-          timezone: 'Asia/Shanghai', parseVersion: 1, authorizationVersion: 1, maxItems: 2 }] };
+          timezone: 'Asia/Shanghai', parseVersion: 1, authorizationVersion: 1, maxItems: 2, hostedExtraction: false }] };
         else if (path.endsWith('/automation/events')) body = { events: snapshot ? [{ eventId, ruleId, ruleVersion: 1,
           status: state, reasonCode: state === 'needs-confirmation' ? 'needs-confirmation' : null, attempt: 1,
           receivedAt: 1_700_000_000_000 }] : [] };
