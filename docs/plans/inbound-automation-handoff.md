@@ -38,7 +38,7 @@
 | "崩了不会留半批、不会重复建" | AC-3 两个独立真实宿主 + 独立数据库跑完全部故障窗口；AC-5 多字段多项只产生**一枚逻辑 op**、中断重启无半批 |
 | "同一封邮件在别的时区不会变成别的日期" | AC-4 同一事件跨时区／跨处理日归一化结果相同，DST 与非法日期有界 |
 | "用户在界面上能自己走通：启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理" | AC-6 的浏览器腿（`8 passed`，隔离载具读数）+ 界面挂载点已入库（B140 那三点，见 §3 表） |
-| "未上线的能力没有被写成上线" | AC-7 六枚文档尺 + `pnpm check:docs`、`check:public-facts`（匿名 GET 只有四枚，接收路径不在其中） |
+| "未上线的能力没有被写成上线" | AC-7 那族文档尺（枚数现量：电池 `--list` 里 `AC7-` 前缀那几行） + `pnpm check:docs`、`check:public-facts`（匿名 GET 只有四枚，接收路径不在其中） |
 
 **还不能说的**：不能说"四端当前产物齐"（**三端齐、android 那端 10-20 11:3x 仍复不出来**——它缺的不是机器，是 §7 第 7 格那条设备身份判据／当轮授权）、不能说"公网接收已在生产开通/未开通" 🟡 **19:5x 这一句的后半按负责人授权改口**（旧文留着，因为它那格还有活职能：三端齐这件事没变）：android 那端"复不出来"的原因**已经换了一次**——11:3x 那戳说的是「缺设备身份判据／当轮授权」，而 19:5x 那条判据**已落进脚本**（§7 第 7 格选甲并执行完），所以现在缺的**只剩一台身份可指认的模拟器**（本机 `adb devices` 回 0 台、打包机侧没有 emulator 本体与 system-images）。翻案条件：负责人起一枚属于本线的 AVD，或给乙一句当轮授权，那一端当场能出读数。
 （那是运营事实，本线没取过生产侧证据）、不能说"AC 已验收"（一格都没勾）。
@@ -114,7 +114,7 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 | AC-4 解析 | `AC4-local-date,AC4-app-host,AC4-egress-wire,AC4-mobile-inbound` | 同上；第四枚（10-28 添）是**移动端那格的第一个腿** —— 此前 `apps/mobile` 的 inbound spec 完全不在电池射程里，而 AC-6 那次缺陷藏一天正是因为一条腿被剔出整串：同一个盲区不能再留在移动端 |
 | AC-5 批创建与来源记录 | `AC5-shared-schema,AC5-op-log,AC5-batch-actions` | 同上 |
 | AC-6 规则界面 | `AC6-web-specs,AC6-browser,AC6-rule-fixture-parity` | 同上；⚠️ `AC6-browser` 会逐名覆写那批待拍的取证图 ⇒ 单跑它前先读 §7 第 4 格。第三枚是 10-28 新添的**不碰浏览器**的防再犯尺（判"线谓词收紧而规则 fixture 没跟上"那一族），它的读数不在"同上"那一戳，见计划文末 10-28 那节 |
-| AC-7 文档 | `AC7-doc-tables,AC7-doc-endpoints,AC7-migrations,AC7-license,AC7-docs-voice,AC7-link` | 同 05:09 那趟（六枚各 rc=0）；⚠️ **这一格就是"为什么必须重跑"的那一格**：AC7 六枚与 `AC8-matrix`／`AC8-ac-ticks` 读的输入里含本文件、`inbound-automation.md`、`PROGRESS.md` ⇒ 第 149 条那笔**只改文档**也构成判卷输入变化。这与"八枚构建输入 delta=0 所以 Linux 取证不必重跑"那把尺**射程不同**，两把尺不许互相顶替。更早那批「已入库态」读数在 `PROGRESS.md` 第 121 条（00:46 那戳的零脏起跑态凭证是同目录 `prefix.txt` 里 `dirty 0` 那一行） |
+| AC-7 文档 | `AC7-doc-tables,AC7-doc-endpoints,AC7-migrations,AC7-license,AC7-docs-voice,AC7-link,AC7-legal-copy-parity` | 同 05:09 那趟（六枚各 rc=0）；第 7 枚 `AC7-legal-copy-parity` 是 2026-10-28 20:3x 新加的（单跑 rc=0，读数与它抓出的那处已登记漂移见计划文末「20:2x–20:3x」那节）；⚠️ **这一格就是"为什么必须重跑"的那一格**：AC7 那一族与 `AC8-matrix`／`AC8-ac-ticks` 读的输入里含本文件、`inbound-automation.md`、`PROGRESS.md` ⇒ 第 149 条那笔**只改文档**也构成判卷输入变化。这与"八枚构建输入 delta=0 所以 Linux 取证不必重跑"那把尺**射程不同**，两把尺不许互相顶替。更早那批「已入库态」读数在 `PROGRESS.md` 第 121 条（00:46 那戳的零脏起跑态凭证是同目录 `prefix.txt` 里 `dirty 0` 那一行） |
 | AC-8 验收矩阵 | `AC8-matrix,AC8-producer-seam,AC8-ac-ticks` | 同上（05:09 那戳逐枚：`尺枚=67 有尺行=27 无尺行=7 窗=13/13 平台=10/10 权益=9/9 设备状态=9/9`、`相对导入=237 模块在HEAD=237 尺瞎了=0`、`已勾=0 未勾=8`） |
 | 范围尺（**不是 AC 格**） | `SCOPE-commit-scope` | 仍 rc=1，越界笔名归别线（B205）；05:09 同戳现量 `python3 research/tools/verify-inbound-commit-scope.py` 首行 `本线笔数=346　仅正文提及=16　涉及路径=203　越界=96` ⇒ 别把它算进 AC 结论 |
 
