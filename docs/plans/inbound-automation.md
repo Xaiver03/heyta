@@ -5925,6 +5925,14 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 **只归负责人的（本线不代拍，按硬约束）**：① push 与 ref；② 迁移 apply 与发版顺序；③ 生产 env/helm、`AUTOMATION_ENTITLEMENT_MODE` 写错⇒500 要不要改成启动即红；④ 六格对外发布与措辞（含新量出的一处英文漂移、"两类明文元数据"要不要补）；⑤ A4 双重计费口径修法；⑥ AC-1～AC-8 勾选（含"人真打开看过截图"）；⑦ 范围尺白名单口径（B205）。
 **另有一条仓级（不归本线顺手做）**：`server/tests` 不在任何 typecheck 门里，补门要付 225 条既有类型错。
 
+**⑤「A4 双重计费口径」这一格的现量证据（只交事实，修法归负责人）**：
+- 设备腿在**预留**那一步就扣：`server/src/automation/ai-metering.ts:121`，条件是 `billingSource === 'managed'`，与写 `automation_ai_attempts`（state=`reserved`）同一个事务；
+- 物理请求仍走托管代理 → `managed-completion.ts::invokeManagedAiCompletion` → **第 ⑤ 道再扣一次**（`consumeManagedAiRequest`，`managed-completion.ts:289`）；
+- 而 `consumeManagedAiRequest` 的入参是 `{ userId, now, limit, policy, sql }` —— **没有幂等键**（`ai/metering.ts:282`）⇒ 两次调用就是两次自增，同一发物理请求记两笔。
+- 失败那一侧不双扣：`reserved → released` 会把预留额度在同一个事务里退回去（`ai-metering.ts` 那段注释说的就是"别为用户没发生的那一次收费"）⇒ **双扣只发生在成功那一趟**。
+- 两条候选修法（都动计费口径，本线不代拍）：**A** 让设备腿的预留成为唯一扣费点，代理路由对"内部已预留"的请求跳过 ⑤（要新增一个只在进程内传递的标记）；**B** 设备腿不再预留、只靠代理 ⑤（换来的是"预留先于发送"这条保护会丢，ADR 里 P1-4 正是为它写的）。选哪条、以及历史账要不要回补，归负责人。
+
+
 **对账表的"当前产物"读数（2026-10-28 21:0x 整串重跑，除浏览器腿以外 30 腿全跑）**：`legs=30 rc0=29 rc_nonzero=1`
 （起跑时 `CARRIER_HEAD=9316f618a`；唯一非 0 仍是 `SCOPE-commit-scope`＝B205 那枚别线提交）。
 副作用自报：`PNG_DIFF_LINES=0`、`EVIDENCE_DIRTY=0` ⇒ 这一趟**没碰任何取证图**（浏览器腿被排除，它最近的读数是 20:1x 那趟补齐 `e2e` 的载具：8 passed）。
