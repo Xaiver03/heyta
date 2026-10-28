@@ -37,6 +37,8 @@
  * 发现。空白空态同理 —— 它必须**当场响**。
  */
 
+import type { ReactNode } from 'react';
+
 import type { HeytaIconData } from '../icon/Icon.js';
 import type { StateIllustrationLocale } from './artwork.js';
 import type { StateIllustrationMotion, StateIllustrationVariant } from './StateIllustration.js';
@@ -108,6 +110,22 @@ export interface EmptyStateSlots {
   readonly locale?: StateIllustrationLocale | undefined;
   /** 高频空态可关闭一次性入场动效，默认进入动效。 */
   readonly illustrationMotion?: StateIllustrationMotion | undefined;
+  /**
+   * 🔴 P7 那一格：**"下一步做什么"里的那个动作本身**。
+   *
+   * 原来这一族只有 `hint` —— 一句**描述**下一步的话，于是"这里还没有习惯"
+   * 配上"点右上角的加号可以建一个"，而那个人真正要做的事得**自己去别处找**。
+   * 现在宿主可以把动作交给空态，让它长在**它说的那块区域里**。
+   *
+   * ⚠️ 类型是 `ReactNode` 而不是 `() => void`：本包不 import i18n、也不许知道
+   * 各端的控件形状（Web 是一枚 `<button>`、原生是一枚 `Pressable`）——
+   * **判断共享、渲染分端**在这里就是"槽位收节点，按钮归宿主"。
+   *
+   * ⚠️ 它**没有默认值，也不许有**：省略就什么都不画。
+   * "纯无内容态不制造假动作"这条判据靠的就是这个默认方向
+   * （契约测里那枚对照臂断的是"不传 ⇒ 空态里零枚可点控件"）。
+   */
+  readonly action?: ReactNode | undefined;
 }
 
 /** `EmptyState.tsx` 要摆到屏幕上的全部内容。没有分支可判 —— 判断都在这里做完了。 */
@@ -132,6 +150,8 @@ export interface EmptyStateViewModel {
   readonly size: EmptyStateSize;
   readonly illustration: StateIllustrationVariant | undefined;
   readonly illustrationMotion: StateIllustrationMotion;
+  /** 归一后的动作槽（省略 = `undefined` ⇒ 组件一格都不画）。 */
+  readonly action: ReactNode | undefined;
   readonly locale: StateIllustrationLocale;
   /**
    * 根节点的无障碍 role。
@@ -208,6 +228,7 @@ export function toEmptyStateViewModel(slots: EmptyStateSlots): EmptyStateViewMod
     size,
     illustration,
     illustrationMotion: slots.illustrationMotion ?? 'enter',
+    action: slots.action,
     locale,
     // `detail` 不存在时 role 必须是 undefined —— 否则会在一个不渲染的节点上
     // 声明 alert（tone 的默认值不该"借"到这个不存在的节点上）。

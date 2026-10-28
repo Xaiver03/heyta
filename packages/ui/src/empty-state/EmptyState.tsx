@@ -118,6 +118,8 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
         title: { color: tokens['color.foreground-muted'] },
         hint: { color: tokens['color.foreground-subtle'] },
         detailSubtle: { color: tokens['color.foreground-subtle'] },
+        // 动作槽：宿主给的那一枚控件住在**这一块区域里**，所以跟着根节点居中。
+        action: { alignItems: 'center', gap: tokens['space.2'] }, 
         detailDanger: { color: tokens['color.danger'] },
         // 🔴 `section` 档：**不居中、不占页面高度**。它画的是"卡片里的一行占位"，
         //    所以根节点除了行间距什么都没有 —— 沿用页面档的 `paddingVertical: space.16`
@@ -193,6 +195,15 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
           {view.hint}
         </Text>
       )}
+
+      {/*
+        * 🔴 动作槽**没有默认值**：`view.action` 是 `undefined` 时这一格一格都不画 ——
+        * "纯无内容态不制造假动作"就是靠这个省略方向成立的（对照臂见
+        * `apps/web/tests/empty-state-action.spec.tsx`：不传 ⇒ 空态里零枚可点控件）。
+        * 节点本身由宿主给（Web 一枚 `<button>`、原生一枚 `Pressable`），
+        * 共享层不知道它的形状，所以也不会替它挑样式。
+        */}
+      {view.action === undefined ? null : <View style={styles.action}>{view.action}</View>}
 
       {view.detail === undefined ? null : (
         <Text
