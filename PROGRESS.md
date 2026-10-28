@@ -7620,3 +7620,19 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       **(b)** 注入**不许真调用解密** —— 真调用缺私钥缺字段 ⇒ 红的原因是崩溃不是判据（就是本条 ② 里 A16 那 5 条意外红的成因）。
       还有一枚**空读数**：`HOSTED_HANDOFF=PASS` 那行不打 stdout，它进这枚尺自己写的 results 文件；
       扫 `.out` 读出空、差一点判成"这趟没跑 H1"，是 `grep -in handoff <results>` 加上 mtime 同戳才归因回搜法（工单文末 §4 记全）。
+    ⑧ 🔴 **上一条汇报里我给自己交了一句错的判断，这趟按现量改口了**：我说"抽取成功那一趟的对外响应要闭合就得动生产 env
+      或放宽白名单"——那是**没读守卫实现就下的结论**。现量三支：`domesticUpstreamVerdict` 只拒四件事
+      （协议、非 https 又不进明文表、主机名不与表逐字相等、`jurisdiction !== 'cn'`），**没有**"回环/内网一律拒"那一支；
+      `loadConfigFromEnv` 在抽取腿里是**每次调用现读**（`grep -n loadConfigFromEnv server/src/automation/hosted-extraction.ts`）；
+      白名单表**没有 env 通道**但表上本来就有境内 https 的合法主机名。
+      ⇒ 正当通道是 `baseUrl` 指表上那枚真主机名（守卫照原样跑完）、**只桩住发送那一层 `globalThis.fetch`**：
+      一次外网都不发、判据一格没放宽，而路由里**第三行 `202` 出口**（成功那一支）第一次在真 HTTP 上被量到
+      —— `H1` 第三趟：`prepared`、对外响应体与出境提示词都搜不到标记串、那一行密文是 NULL、额度恰好 +1、
+      attempts 仍 0 行、op 差仍 0，`finally` 逐键还原 env 与 fetch。臂 **A22** 写坏第三行 ⇒ 集成面红 1 条；
+      13 格全量在新代码上复跑 rc=0、`Windows: 13/13`、`HOSTED_HANDOFF=PASS`（原件 `dual-host-full-1028b.out`）。
+      ⚠️ 两枚自己的形状：**(a)** 桩**必须按主机名分流** —— 第一版无差别替换 `globalThis.fetch`，
+      连测试自己发 webhook 那一发都被桩接住回了 200，红出来像"路由换了状态码"，其实被测物整个被换掉了；
+      这是索引那三条元规则里第一条「先怀疑探针」的又一枚现形（登记成待入 traps，**不写条号**：那本账正被并行会话往下写，
+      现量 `grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md`）。**(b)** `--only -1` 那趟 rc=1 且 `Windows: 0/13`
+      与 H1 绿**同时成立**（未选的格按设计判 SKIP 红）⇒ 挑单格时读的是 results 里那条用例，不是退出码。
+      ADR-0077 §6 第 7 条随之**整条重写**：现在没证的那一半只剩一句——**真上游供应商那一次物理调用**（归 H-2 部署前提）。

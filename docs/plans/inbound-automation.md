@@ -5204,3 +5204,42 @@ zsh 的管道状态数组叫 `$pipestatus` 且 **1-indexed**，`${PIPESTATUS[0]}
 而"服务端进程此刻到底有没有一把设备私钥"是部署与密钥管理的事，不在这一层能红的那一格。
 这句写在 §4.5 最后一条里，措辞是"这把尺证不了什么"。
 
+### 5. 14:5x 追：上一节那句"仍然没量过"被我按现量改口了——有一条正当通道，不用碰生产也不用放宽判据
+
+上面第 4 节交汇报时我写的是：「抽取成功那一趟的对外响应在真 HTTP 上没量过，要闭合得动生产 env 或放宽白名单」。
+**那句判断错了**，而且错在我没读守卫的实现就下了结论。现量三支：
+
+| 读的那一格 | 命令 | 读数 |
+|---|---|---|
+| 守卫到底拒什么 | 读 `server/src/ai/managed-upstream.ts` 里 `domesticUpstreamVerdict` 那一段 | 只有四支：协议、非 https 要进明文表、主机名与表**逐字相等**、`jurisdiction !== 'cn'` 也拒。**没有**"回环/内网一律拒"这一支 |
+| 配置什么时候读 | `grep -n "loadConfigFromEnv" server/src/automation/hosted-extraction.ts` | 每次调用现读 ⇒ 测试里设 env 就够，不需要重启容器 |
+| 表能不能用 env 撑 | `grep -n "table: readonly ServerManagedModelHost\[\] =" server/src/ai/managed-upstream.ts` | 默认值是那枚写死的表，**没有** env 通道 ⇒ 所以不能往表里塞回环；但表上本来就有境内 https 的合法主机名可用 |
+
+⇒ 正当通道是：**`baseUrl` 指表上那枚真境内主机名（守卫照原样跑完三支），只把发送那一层 `globalThis.fetch` 桩住**。
+一次真外网请求都不发，判据一格没放宽，而路由里**第三行 `202` 出口**（成功那一支）第一次在真 HTTP 上被量到。
+补在 `H1` 的第三趟：状态词是 `prepared`、对外响应体搜不到标记串、出境提示词搜不到标记串（顺带把"发送前投影"
+在真路由这一支也量到了）、那一行 `payloadCiphertext` 是 NULL、额度恰好再 +1、`automation_ai_attempts` 仍 0 行、
+按用户全量数的 op 差仍 0；`finally` 里逐键还原 env 与被桩的 `fetch`，并断言 `MANAGED_AI_ENABLED` 还原成未设。
+
+**两枚自己踩的形状**（都是本线那条老规矩的现形，只是新 dressed）：
+
+1. 🔴 **桩要按主机名分流**。第一版我无差别替换 `globalThis.fetch`，**测试自己发 webhook 那一发也被桩接住**、
+   回了 200 ⇒ 红出来是 `expected 200 to be 202`，看着像"路由换了状态码"，其实被测物整个被换掉了。
+   ⇒ 桩传输层时，**分母要写进谓词里**（不是上游主机的请求一律转给原 `fetch`），"命中了几次"不构成分母。
+   这就是 [`docs/agents/environment-traps-index.md`](../agents/environment-traps-index.md) 那三条元规则里第一条
+   「**先怀疑探针**」的又一枚现形（探针自己把被测物接走了，红读的是装置），值得进 traps 一条；
+   ⚠️ 我这里**不写具体条号**——那本账此刻在被并行会话往下写（现量 `grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md`），
+   写死号就是写一份会漂的抄件。
+2. **`--only` 那趟的 rc 不能当验收**：`verify-inbound-dual-host.py --only -1` 按设计把未选的 13 格判 SKIP 红（rc=1），
+   而 `Windows: 0/13` 与 H1 绿**同时成立**。⇒ 挑单格时读的是 results 文件里那条用例与 `HOSTED_HANDOFF`，不是退出码。
+   正式的读数在 14:5x 那趟全量：`python3 research/tools/verify-inbound-dual-host.py` ⇒ rc=0、`Windows: 13/13`、
+   `HOSTED_HANDOFF=PASS`（原件 `~/.heyta-evidence/inbound-hosted-extraction-20261027/dual-host-full-1028b.out`，
+   `HOSTED_HANDOFF` 那一行照旧住在尺自己写的 results 文件里，不在 stdout —— 上面第 4 节记过的那枚空读数同一形）。
+   臂 A22 写坏第三行出口 ⇒ 集成面红 1 条（红的正是那句响应体断言），三面对照臂先绿；臂数现量
+   `grep -cE "^\s+\('A[0-9]" ~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.py`。
+
+**改口的落点**：ADR-0077 §4.1 那段 ⚠️（两枚臂 → 三行出口三枚臂 A14/A15/A22）、§5 臂表加 A22 那一行、
+**§6 第 7 条整条重写**——原来那句"生产形状没跑过"里，"路由派发＋抽成功在同一趟 HTTP"这一半现在量到了，
+剩下的那一半收窄成一句：**真上游供应商的那一次物理调用仍未证**，它归 H-2（部署时配好 `MANAGED_AI_*` 真发一次）。
+
+
