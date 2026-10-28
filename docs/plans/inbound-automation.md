@@ -5936,6 +5936,13 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 ⇒ 当前 tip 上**没有锚点腐烂**；集成面那 5 枚（A12–A15、A18）要真库，未在这一趟的射程内（按库闸门拒跑规则本来就要 `HEYTA_INTEGRATION_DATABASE_URL`）。
 原件 `.run-logs/inb-hosted-arms-sweep-2104/`（24 份：21 臂 + 3 面控制，gitignore 内）。
 
+**集成面那 5 枚也跑完了（同日 21:0x 续，补上上面那句"未在射程内"）**：自己建一枚一次性库（唯一名 + 全 79 枚迁移 apply + 会话时区钉 UTC），
+把 `HEYTA_INTEGRATION_DATABASE_URL` 指过去 ⇒ 集成面**对照臂绿、A12/A13/A14/A15/A18 各红 1 条、逐枚 `还原_ok`**、
+`✓ 全部臂都按预期红：跑过 5 臂／在册 27`、rc=**0**；库与载具都由本线删除。
+⇒ **在册 26 枚臂（非集成 21 ＋ 集成 5）到当前 tip 全部实跑过一遍，没有锚点腐烂。**
+原件 `.run-logs/inb-hosted-arms-sweep-int-2106/`（6 份：5 臂 + 集成面对照，gitignore 内）。
+
+
 
 
 **③「`AUTOMATION_ENTITLEMENT_MODE` 写错⇒500 要不要改成启动即红」这一格的现量证据**（只交事实，决定归负责人）：

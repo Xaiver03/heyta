@@ -7867,6 +7867,13 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ③ 射程边界：集成面 5 枚（A12–A15、A18）要真库，未在射程内（库闸门本来就要求 `HEYTA_INTEGRATION_DATABASE_URL`）。
     ④ 原件 `.run-logs/inb-hosted-arms-sweep-2104/`（24 份），载具跑完由本线删除。
 
+226. **自动收集线 · 集成面那 5 枚臂也在真库上跑完（23 分钟前那句"未在射程内"就地补齐）**（写前先跑 `date`，本机 2026-10-28 21:0x）
+    ① 自己建一枚**一次性库**（唯一名 `heyta_arms_<时分>`、`createdb`、79 枚迁移逐枚 apply 全成、`ALTER DATABASE … SET timezone='UTC'`、URL 上再挂 `?options=-c%20timezone%3DUTC` 双保险），
+      没用、也没碰任何人命名的库；跑完 `dropdb`。
+    ② 读数：集成面对照臂绿、**A12/A13/A14/A15/A18 各红 1 条、逐枚 `还原_ok`**、`✓ 全部臂都按预期红：跑过 5 臂／在册 27`、rc=**0**。
+    ③ ⇒ **在册 26 枚臂（非集成 21 ＋ 集成 5）到当前 tip 全部实跑过**，没有锚点腐烂。原件 `.run-logs/inb-hosted-arms-sweep-int-2106/`（6 份）。
+
+
 
 
 
