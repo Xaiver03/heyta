@@ -131,15 +131,12 @@ test.describe('P4 控件档位：确认层里两枚的重量与逐态读数', ()
       await page.screenshot({ path: `${EVIDENCE}/purge-confirm-1440-${theme}.png` });
 
       /*
-       * ⚠️ 禁用档（`.ht-btn:disabled` 的 `opacity` 是否真的来自 `state.disabled-opacity`）
-       * 在**本趟没量到**，登记为未判定，不写成缺陷：
-       *   断言应是 `look(那枚按钮).opacity === String(Number(tokenValue('--ht-state-disabled-opacity')))`；
-       *   试过的两条真界面路径都不出现那枚按钮 ——
-       *     · `selectSettingsSection(page,'sync')` 下 `vault-unlock` 不存在（空白档还没建库，解锁表单不渲染）；
-       *     · 换成 `vault-create` 同样 not found（该格在未配置服务器前先画别的）。
-       *   下一步要量，先照 `e2e/tests/vault-settings.spec.ts:205→241` 那一段把服务器配好再进这一格。
-       *   源码那一侧此刻**有**尺：`check:control-semantics` 的 A1/A7 管配方与 token 存在性，
-       *   `check:design` 管不许出现裸 `opacity: 0.5`。缺的只是"浏览器算出来的那一次"。
+       * ✅ 禁用档那一格**已经量到了**，就在下面那条独立用例里
+       * （`禁用档：浏览器算出来的 opacity 就是 token 那个数`）。
+       * 这里曾登记过"两条路径都画不出那枚按钮"（`vault-unlock`/`vault-create` 都要先配好
+       * 服务器与库才出现）—— 那句判断本身没错，错的是**只在那一屏找**：
+       * 新建习惯那一格"名称为空 ⇒ 提交禁用"是默认态，零前置就读得到。
+       * 旧口径不留在这里当警示标签，指向新落点即可。
        */
     });
   }
@@ -150,5 +147,34 @@ test.describe('P4 控件档位：确认层里两枚的重量与逐态读数', ()
     const { submit } = await openPurgeConfirm(page);
     await expect(submit).toBeVisible();
     await page.screenshot({ path: `${EVIDENCE}/purge-confirm-390-light.png` });
+  });
+
+  /*
+   * 🔴 上面那格登记为"未判定"的禁用档，这一趟量到了 —— 换的是**落点**，不是断言。
+   *
+   * 原来试的两条路径（`vault-unlock` / `vault-create`）在未建库/未配服务器时根本不渲染
+   * 那枚按钮，所以量不到。新建习惯那一格里"名称为空 ⇒ 提交按钮 disabled"是**默认态**，
+   * 不需要任何前置：同一句 `opacity = var(--ht-state-disabled-opacity)` 在这里读得到。
+   * 对照臂钉的是"没禁用的那一枚不许也等于那个数"—— 否则这把尺分不清
+   * "禁用档读到了 token"与"整屏都被调成了 0.38"。
+   */
+  test('禁用档：浏览器算出来的 opacity 就是 token 那个数（含未禁用那一枚的对照臂）', async ({ page }) => {
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '习惯');
+    await page.getByTestId('habits-add-open').click();
+    const dialog = page.getByTestId('habit-create-dialog');
+    await expect(dialog).toBeVisible();
+    const disabled = dialog.locator('footer button[type="submit"]');
+    await expect(disabled, '名称为空时提交按钮就该是禁用的（这一格是默认态，不需要前置）').toBeDisabled();
+    const enabled = dialog.locator('footer button[type="button"]');
+    await expect(enabled, '同一排里那枚「取消」不该是禁用的').toBeEnabled();
+
+    const token = await tokenValue(page, '--ht-state-disabled-opacity', 'opacity');
+    const off = await look(disabled);
+    const on = await look(enabled);
+    expect(off.disabled, '读出来的那一枚其实没禁用').toBe(true);
+    expect(off.opacity, `禁用档算出来的 opacity 不等于 token（token=${token}）`).toBe(String(Number(token)));
+    expect(on.opacity, '对照臂：未禁用的那一枚也读成了禁用值 ⇒ 这把尺分不清两态').toBe('1');
+    await page.screenshot({ path: `${EVIDENCE}/disabled-opacity-habit-create.png` });
   });
 });
