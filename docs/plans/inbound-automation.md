@@ -5646,3 +5646,21 @@ CARRIER_HEAD=c249bb6f1 dirty=0（臂点名的 5 枚文件与整棵树都干净�
 本节动 5 枚：`research/tools/verify-inbound-hosted-arms.py`（新）、
 `server/tests/inbound-lane-rigs-consumers.spec.ts`（名单加一枚 + 常驻那腿的收尾行）、`docs/adr/0077-….md`（§5 跑法改指仓内装置）、本文件与 `PROGRESS.md`。判卷口径零处、AC 勾数 0；
 没动 `package.json`、没动 `pnpm check` 链。本线不 push、不自标完成。
+
+### 六、装置入库之后，整串电池在新 tip 上又跑了一遍（这是本节最后一枚读数）
+
+```bash
+python3 research/tools/verify-inbound-ac-battery.py   # 原件 .run-logs/inb-ac-battery-1028-1946/
+```
+
+⇒ **`legs=29 rc0=28 rc_nonzero=1`**，载具自报 `CARRIER_HEAD=41d1e1396 dirty=94`。
+唯一那枚非 0 仍是 `SCOPE-commit-scope`（B205／B169 的口径，别线借用「自动收集」标题那笔），
+**`AC7-link` 这一趟回 rc=0** —— 就是上面第五段说的那枚 runbook 被别线入库了。
+所以"本线的 AC 腿一片绿、只剩一枚已知范围尺红"这句话，现在有了 `41d1e1396` 这一戳的现量支撑
+（比 16:1x 那戳的 `27/29` 又少一枚红）。
+副作用照第五段的规矩清：`PNG_DIFF_LINES=18` = `EVIDENCE_DIRTY=18`，
+清单取自 `git -c core.quotePath=false status --porcelain -- <三枚派生目录>`，`git restore --pathspec-from-file=<清单>` 后回 **0**。
+
+⚠️ 顺手自曝一笔自己的手滑：`11b701ab6` 那笔的**标题**是从上一笔抄的（同一句"六项交付逐条绑上一条可重跑的现量命令…"），
+正文写的才是本节的补充。规矩不许 amend，所以不改写历史 —— 这里指名它，免得下一位按标题把两笔读成同一件事。
+本线实际落装置的那笔是 `41d1e1396`。

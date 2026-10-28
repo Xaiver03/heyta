@@ -7731,3 +7731,8 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       `git show HEAD:apps/web/src/App.tsx | grep -c 'web.calendar.sidebar.hide'` 现在回 **2** 且该文件工作树干净，
       ⇒ 它已从"只在别人未提交的编辑里"变成**已入库态的红**（随 `c249bb6f1` 进来的）。归属不变：日历侧栏不是本线的面，本线不代改。
       所以交付 4 现在只能说："本线新增/改动处全绿（七把尺 + 两面 spec + 两处 tsc），仓库全局仍剩一道红在别线已入库的代码里"。
+    ⑧ 装置入库后整串电池在新 tip 再跑一遍：**`legs=29 rc0=28 rc_nonzero=1`** @`41d1e1396`（原件 `.run-logs/inb-ac-battery-1028-1946/`），
+      唯一非 0 仍是 B205 那枚范围尺，`AC7-link` 这趟回 rc=0（⑦ 里那枚 runbook 已入库）⇒ 比 16:1x 的 `27/29` 又少一枚红。
+      18 枚被重写的取证图按 ⑦/第四段规矩逐枚点名还原，还原后三枚派生目录回 0。
+      ⚠️ 自曝一笔手滑：`11b701ab6` 的**标题**是从上一笔抄的（正文写的才是本节的补充），规矩不许 amend ⇒ 不改写历史，只在这里指名；
+      本线真正落装置的那笔是 `41d1e1396`。
