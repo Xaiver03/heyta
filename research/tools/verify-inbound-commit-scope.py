@@ -86,6 +86,7 @@ WHITELIST = [
     r'^apps/node-host/',                              # 无头宿主那一腿（4d377391）
     r'^apps/mobile/src/ai/AiSettingsSection\.tsx$',   # 移动壳的上传/处理位置文案（2fff2c47）
     r'^server/src/sync/cleanup\.ts$',                 # A5 退役时钟清扫（4b321c61）
+    r'^server/src/index\.ts$',                        # 交付 ③（负责人 2026-10-28 拍「3-B」）：启动闸门加在 boot() 里
     r'^apps/mobile/tests/(inbound-[a-z-]+|ai-copy-parity)\.spec\.ts$',  # 移动侧本线用例（b55e9880、08e27cd2）
     r'^apps/web/src/features/settings/inbound-lifecycle\.ts$',          # 本线自己的生命周期模块（afe07423）
     r'^apps/web/src/App\.tsx$',                       # ⚠️ 别线的壳：只为 B140 那处 `active` 接线被动过，

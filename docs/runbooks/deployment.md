@@ -481,10 +481,14 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
    官方签发端另需 `AUTOMATION_OFFICIAL_PRIVATE_KEY` + `AUTOMATION_OFFICIAL_ISSUER` +
    `AUTOMATION_OFFICIAL_KEY_ID`（**三缺一** ⇒ 签发面那六条路由全 403 `AUTOMATION_ISSUER_NOT_CONFIGURED`）。
 
-2. 🔴 **一条会骗人的形状**：`AUTOMATION_ENTITLEMENT_MODE` 写成非法值**不会让容器起不来**，
-   它是在请求处理时抛裸 `Error` ⇒ 用户与探针看到的是 **500**，不是 402、也不是启动红。
-   排查这条时先看请求日志，别照 `ENTITLEMENT_GATE_ENABLED`（那枚才是启动期严格）的经验去找启动红。
-   要不要把它改成启动即红属判据口径，尚未拍（见 `docs/plans/inbound-automation-work-brief.md` §6 第 6 格）。
+2. ✅ **2026-10-28 起这一枚改成启动即红**（负责人拍「3-B」）：`AUTOMATION_ENTITLEMENT_MODE` 写成非法值时，
+   进程在**绑定端口之前**就退出 —— 日志两行：`❌ AUTOMATION_ENTITLEMENT_MODE is invalid — refusing to start.`
+   与 `Invalid AUTOMATION_ENTITLEMENT_MODE: <值>. Use 'official' or 'selfhost-online'.`，`rc=1`。
+   现量三条：写错 `rc=1` 且端口没绑；**留空/未配照常起**（那是"响的拒绝"那一档，402 带 `reason=ENTITLEMENT_MODE_UNCONFIGURED`，不是崩）；
+   `official` 照常起并打 `🧭 AUTOMATION_ENTITLEMENT_MODE=official`。
+   守它的尺：`server/tests/automation-boot-gate.spec.ts`（四枚断言读 `server/src/index.ts` 的形状：调用恰一次、在 `start()` 之前、
+   拒绝时打名与 `process.exit(1)`、未配置那一支仍在）。
+   历史一句（别再照它排查）：改之前它是**请求处理时抛裸 `Error` ⇒ 500**，排查要看请求日志——现在不用了，起不来就是它。
 
 3. **通路有尺，不用靠人记**：`pnpm check:server-env`
    （`server/scripts/check-server-env-forwarding.mjs`）判的是"`env.example` 里文档化的每一枚键，

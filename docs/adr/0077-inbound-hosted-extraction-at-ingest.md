@@ -358,5 +358,5 @@ A16 第一趟红 5 条、门槛那条**一言不发**（标题比断言宽），
 | H-1 | 五处对外件的正文（隐私政策、AI 与数据流转、第三方名单、帮助中心自动收集那篇、价格页）逐句披露"数据进我们服务端时会被我们的 AI 当场读取并抽取，抽取窗口结束后立刻丢弃" | 对外法律表征；草稿在 `../plans/inbound-automation-work-brief.md` 的那张清单里，**一处未改、一处未发** |
 | H-2 | 迁移何时 apply（本机/生产）与生产 env 是否开这一档；🔴 顺序**不许**"先换容器再补迁移"——绕开 `deployment.md` 那道"先迁移、`MIGRATE_RC=0` 才换容器"的闸时，红的形状是公网 webhook 全量 500 而不是"回到设备档"（现量见 §6 第 1 条） | 上线动作 |
 | H-3 | A4 计费口径的修法 | 已登记的口径问题 |
-| H-4 | `AUTOMATION_ENTITLEMENT_MODE` 写错 ⇒ 500 是否改成启动即红 | 判据口径 |
+| H-4 | ✅ **已拍已落地**（2026-10-28「3-B」）：`AUTOMATION_ENTITLEMENT_MODE` 写非法值 ⇒ **端口绑定之前**就退出（`rc=1`，日志点名那枚键与两个合法值）；**未配置仍合法**，走 402 带 `reason=ENTITLEMENT_MODE_UNCONFIGURED` 那一档。守它的尺：`server/tests/automation-boot-gate.spec.ts`；三条现量（写错不退、留空照常起、`official` 照常起）记在 `../plans/inbound-automation.md` 文末 ③ 那一节 | 已闭合 |
 | H-5 | 邮件转待办那条线能不能对外承诺 | 对外承诺 |
