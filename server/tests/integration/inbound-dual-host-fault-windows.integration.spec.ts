@@ -1016,10 +1016,77 @@ describe.skipIf(!DATABASE_URL)('inbound fault windows across two independent rea
     expect(await serverOps(eventId)).toHaveLength(0);
     await synced(a);
     expect(await serverOps(eventId)).toHaveLength(1);
+
+    // 🔴 第三趟补的是判据第 3 条里**最后没被真 HTTP 量过的那半句**：抽取成功那一支的对外响应。
+    // 前两趟覆盖的是路由里另外两行 `202` 出口（去重先命中、抽取没成退回 `queued`），
+    // 而成功那一支是**第三行不同的代码**（`outcome.state` 直接进状态词），
+    // 按本线那条"按失法分臂、不按结论分臂"的规矩它得有自己的臂（A22）。
+    //
+    // 为什么这趟只把**发送那一层**桩住（`globalThis.fetch`）而不是把上游指到回环桩：
+    // 抽取腿把 `plaintextHosts` 钉成 `[]`（本套里那条"不开任何明文主机"的用例正盯着它），
+    // 所以 `http://127.0.0.1:端口` 会在守卫的 `plaintext` 那一支被拒；而白名单表**没有 env 通道**
+    // （`SERVER_MANAGED_MODEL_HOSTS` 是唯一默认，现量 `grep -n "table: readonly ServerManagedModelHost\[\] ="
+    // server/src/ai/managed-upstream.ts`）。⇒ 走 https + 表上真有的那枚境内主机名，
+    // 守卫**照原样跑完**，一次真外网请求都不发（fetch 被桩住在这一趟内）。
+    // 这与"为了让测试过而放宽判据"是两件事：没动白名单、没动明文表、没动地址类别那一维。
+    const envKeys = ['MANAGED_AI_ENABLED', 'MANAGED_AI_UPSTREAM_BASE_URL', 'MANAGED_AI_UPSTREAM_API_KEY',
+      'MANAGED_AI_UPSTREAM_MODEL_ID'] as const;
+    const envBefore = envKeys.map((key) => [key, process.env[key]] as const);
+    const fetchBefore = globalThis.fetch;
+    const upstreamHost = 'api.deepseek.com';
+    const sentBodies: string[] = [];
+    const eventId3 = randomUUID();
+    const opsBeforeThird = await db.operation.count({ where: { userId: s.userId } });
+    const usedBeforeThird = (await peekManagedAiUsage({ userId: s.userId })).used;
+    // 🔴 桩**只对那一枚上游主机生效**，其余一律转给真 fetch。第一版我无差别地替掉 `fetch`，
+    // 结果 `deliver()` 自己发的那发 webhook 也被这个桩接住、回了 200 —— 量的东西整个被换掉了，
+    // 而红出来的形状看着像"路由换了状态码"。 ⇒ 桩住传输层时，**分母要写进谓词里**，不能只看命中次数。
+    globalThis.fetch = (async (input: unknown, init?: { body?: unknown }) => {
+      if (!String(input).includes(upstreamHost)) return fetchBefore(input as never, init as never);
+      sentBodies.push(String(init?.body ?? ''));
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({ tasks: [{ title: 'Inbox note' }] }) } }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof globalThis.fetch;
+    try {
+      process.env.MANAGED_AI_ENABLED = 'true';
+      process.env.MANAGED_AI_UPSTREAM_BASE_URL = `https://${upstreamHost}/v1`;
+      process.env.MANAGED_AI_UPSTREAM_API_KEY = 'dual-host-stub-not-a-real-key';
+      process.env.MANAGED_AI_UPSTREAM_MODEL_ID = 'test-model';
+      const prepared = await deliver(hosted.id, eventId3, body);
+      expect(prepared.status).toBe(202);
+      expect(prepared.json, `成功那一支的响应=${JSON.stringify(prepared.json)}`).toMatchObject({ state: 'prepared' });
+      // 这一句就是整趟的目的：状态词之外不许带任何东西回来。
+      expect(JSON.stringify(prepared.json)).not.toContain('must-not-leave');
+      // 同一趟顺手量到：发送前的投影在**真路由**这一支也成立（提示词里没有那一格没授权的 secret）。
+      expect(sentBodies.length).toBe(1);
+      expect(sentBodies[0]).not.toContain('must-not-leave');
+      const third = await eventRow(s.userId, eventId3);
+      expect(third?.status).toBe('prepared');
+      expect(third?.payloadCiphertext).toBeNull();
+      // 计量归属照 §3.5：这一趟**只**扣一次额度、不写 attempts 那本台账、不写任何 op。
+      expect((await peekManagedAiUsage({ userId: s.userId })).used).toBe(usedBeforeThird + 1);
+      expect(await db.automationAiAttempt.count({ where: { userId: s.userId } })).toBe(0);
+      expect(await db.operation.count({ where: { userId: s.userId } }), '第三趟在服务端 op-log 里多写了行')
+        .toBe(opsBeforeThird);
+      // 桩住 fetch 不影响那枚真回环上游：设备那一腿已经跑完了，这里仍然只有第二趟那一次投影。
+      expect(provider.sources.length).toBe(1);
+    } finally {
+      // 环境与被桩的 fetch **必须**逐键还原：这一枚 spec 后面还有别的用例，
+      // 漏还原等于给它们留下一枚"看起来抽成了"的假上游。
+      for (const [key, value] of envBefore) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      globalThis.fetch = fetchBefore;
+      expect(process.env.MANAGED_AI_ENABLED).toBeUndefined();
+    }
     process.stdout.write(`HOSTED_HANDOFF=PASS 两档接上：真路由在没配上游那一趟回 queued 且正文密文仍在（模型 0 次、额度 0 次，`
       + `两趟对外响应体里都搜不到标记串）；`
       + `把上游指到回环桩后同一条腿抽成 prepared（出境的只有 {title:"Inbox note"}，标记串没出境、两列密文里也搜不到），`
       + `额度 1 次、attempts 0 行、许可 0 行、服务端 op 0 枚；重投同一发额度仍 1 次；`
-      + `设备 recover 到冻结结果后 0 次模型调用就 submitted，任务 "买牛奶"/priority=2、本地 1 枚 op，同步后服务端才出现那 1 枚`);
+      + `设备 recover 到冻结结果后 0 次模型调用就 submitted，任务 "买牛奶"/priority=2、本地 1 枚 op，同步后服务端才出现那 1 枚；`
+      + `第三趟走真路由的成功那一支（https + 表上的境内主机名、只在 fetch 那一层桩住）回 prepared，`
+      + `对外响应体与出境提示词里都搜不到标记串，额度再 +1、attempts 仍 0 行、op 差仍 0`);
   }, 150_000);
 });
