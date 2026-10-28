@@ -285,11 +285,6 @@
   border-color: var(--ht-color-primary);
 }
 
-.ht-slot-picker__option:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-slot-picker__swatch {
   width: var(--ht-space-3);
   height: var(--ht-space-3);

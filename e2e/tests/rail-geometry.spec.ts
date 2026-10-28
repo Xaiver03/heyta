@@ -120,8 +120,8 @@ test.describe('rail 视觉几何', () => {
     expect(menuBox?.width ?? Infinity, 'more menu should stay compact').toBeLessThan(280);
     const first = menu.locator('[role="menuitem"]').first();
     await expect(first).toBeFocused();
-    await expect.poll(() => first.evaluate((element) => getComputedStyle(element).outlineWidth)).toBe('0px');
-    await expect.poll(() => first.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+    await expect.poll(() => first.evaluate((element) => Number.parseFloat(getComputedStyle(element).outlineWidth))).toBeGreaterThanOrEqual(2);
+    await expect.poll(() => first.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   });
 });
 

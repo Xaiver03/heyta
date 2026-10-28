@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
+import { deviceRevocationUsesModalCommitment } from './deviceRevocationDanger.js';
 import { FormField } from '../../lib/form/FormField.js';
 import { SettingsInfoTip } from '../settings/SettingsInfoTip.js';
 import { useI18n } from '@heyta/i18n';
@@ -174,6 +176,18 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
     };
   }, [active, sync.accountId, sync.baseUrl, sync.token]);
 
+  /**
+   * 待确认的那一发撤销。
+   *
+   * 🔴 连**凭证快照**一起存：原实现是"问之前先 capture，答完就用那份"，
+   *    为的是用户在确认框开着的时候改了服务器/换了 token，那一发撤销不该拿新值去发
+   *    （`readCurrentAuth` 就是用来发现这件事的）。改成页内确认框之后这条纪律一个字不许丢，
+   *    所以快照进 state 而不是在点"确认"时重新取。
+   */
+  const [pendingRevoke, setPendingRevoke] = useState<
+    { clientId: string; auth: HostedSyncAuthSnapshot } | undefined
+  >(undefined);
+
   const revokeDevice = (clientId: string): void => {
     if (!activeRef.current || deviceBusy !== undefined) return;
     const currentBeforeConfirm = useSyncStore.getState();
@@ -187,7 +201,16 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
       baseUrl: currentBeforeConfirm.baseUrl,
       token: currentBeforeConfirm.token,
     };
-    if (!window.confirm(t('web.sync.devices.confirm'))) return;
+    // 原生 `window.confirm` 是 Web 侧最后一枚（`check:overlay` 的 R1 账本靠它清）。
+    // 它放不下后果说明、放不下具名动作、测不了焦点，而且在 Playwright 下被自动 dismiss
+    // ⇒ 这一发撤销在验收里永远"点了没反应"。
+    setPendingRevoke({ clientId, auth: capturedAuth });
+  };
+
+  const runRevoke = (): void => {
+    if (pendingRevoke === undefined) return;
+    const { clientId, auth: capturedAuth } = pendingRevoke;
+    setPendingRevoke(undefined);
     setDeviceBusy(clientId);
     setDeviceError(undefined);
     void runHostedDeviceRevocation({
@@ -297,6 +320,22 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
         />
       ) : null}
 
+      {pendingRevoke !== undefined ? (
+        <DangerConfirmDialog
+          testId="vault-revoke-confirm"
+          labelledBy="vault-revoke-confirm-title"
+          modalCommitment={deviceRevocationUsesModalCommitment()}
+          cancelLabel={t('web.sync.devices.revokeConfirm.cancel')}
+          // 🔴 主按钮复述动词与对象（「撤销这台设备」），不是原生框那句"确定继续吗？"。
+          confirmLabel={t('web.sync.devices.revokeConfirm.submit')}
+          onCancel={() => setPendingRevoke(undefined)}
+          onConfirm={runRevoke}
+        >
+          <h2 id="vault-revoke-confirm-title">{t('web.sync.devices.revokeConfirm.title')}</h2>
+          <p className="ht-settings__hint">{t('web.sync.devices.revokeConfirm.body')}</p>
+        </DangerConfirmDialog>
+      ) : null}
+
       {sync.accountId !== undefined && sync.accountId !== '' && sync.baseUrl !== '' && sync.token !== undefined ? (
         <div data-testid="vault-devices" className="ht-settings__section">
           <strong>{t('web.sync.devices.title')}</strong>
@@ -306,7 +345,10 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
         text={t('web.sync.devices.description')}
       />
           {devicesLoading ? <p className="ht-settings__hint" role="status">{t('web.sync.devices.loading')}</p> : null}
-          {deviceError !== undefined ? <SettingsNotice title={t(deviceError as never)} tone="danger" live /> : null}
+          {/* 🔴 失败回执必须有名有姓地**留在屏幕上**（`live` ⇒ `role="alert"`、无计时器）：
+              撤销失败意味着"这台设备可能还能同步"，回执一旦自己飘走，用户会以为已经撤了。
+              `testId` 是验收钉这一格用的（`e2e/tests/vault-settings.spec.ts`）。 */}
+          {deviceError !== undefined ? <SettingsNotice title={t(deviceError as never)} tone="danger" live testId="vault-device-error" /> : null}
           {!devicesLoading && deviceError === undefined && devices.length === 0 ? (
             <p className="ht-settings__hint" role="status">{t('web.sync.devices.empty')}</p>
           ) : null}

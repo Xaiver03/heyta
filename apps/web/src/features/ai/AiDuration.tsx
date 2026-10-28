@@ -432,7 +432,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             <div className="ht-ai__actions">
               <button
                 type="button"
-                className="ht-btn"
+                className="ht-btn ht-btn--secondary"
                 data-testid="duration-send"
                 onClick={() => void send()}
               >
@@ -501,7 +501,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
         <div className="ht-ai__actions">
           <button
             type="button"
-            className="ht-btn"
+            className="ht-btn ht-btn--secondary"
             data-testid="duration-apply"
             onClick={() => void apply()}
           >
@@ -569,7 +569,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
         {t('web.ai.duration.manualUnit')}
         <button
           type="button"
-          className="ht-btn"
+          className="ht-btn ht-btn--secondary"
           data-testid="duration-manual-apply"
           disabled={!manualOk}
           onClick={() => void applyManual()}

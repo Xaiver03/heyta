@@ -127,49 +127,42 @@ test('rail：Tab 只进来一次、方向键只挪焦点不切视图、焦点环
 
   // ⑤ 焦点**真的看得见**（渲染结果，不是样式源码）。
   //
-  // 🔴 这一格第一版写的是 `expect(outlineStyle).not.toBe('none')` —— **它测错了属性**，
-  //    在**正确实现上恒红**。本产品的焦点表达方式是产品负责人 2026-10-07 定的
-  //    **无描边交互**（`apps/web/src/styles/app/borderless-controls.css` 文件头）：
-  //    描边被显式 `outline: 0 !important` 抹掉，焦点改由**底色 + 字色**表达：
-  //
-  //    | 通道 | 未聚焦 | 聚焦（落定后） |
-  //    |---|---|---|
-  //    | outline | `none` / `0px` | `none` / `0px`（**故意**） |
-  //    | background-color | `rgba(0,0,0,0)` | `rgb(239,246,255)`（`--ht-color-primary-subtle`） |
-  //    | color | `rgb(71,85,105)` | `rgb(37,99,235)`（`--ht-color-primary`） |
-  //
-  //    正确的判据是「**三个通道里至少有一个真的变了**」——
-  //    它同时守住 AGENTS §5 那条"抹掉焦点环是最常见的可访问性回归"的**意图**
-  //    （焦点必须可见），而不去规定**用哪个通道**表达。
-  //
-  // 🔴 **必须等 transition 落定再采样 —— 这一条踩过。**
-  //    第一版量的时候我在聚焦后**立刻**读，读到 `rgba(239,246,255,0.118)`：
-  //    那是底色从透明过渡到 `#eff6ff` 的**中间帧**。我据此误判成"焦点完全不可见"，
-  //    还差点去改产品。`--ht-duration-fast` 之内不许下结论（§7「先怀疑探针」）。
+  // 2026-10-27 全局 UX 整改 P0 把焦点表达重新收为**独立焦点环**：
+  // 旧版用 `outline: 0 !important` + 底色/字色变化，会让已选中控件聚焦时画面
+  // 与未聚焦时几乎无法区分，并把 hover/selected/focus 三种状态压成同一种装饰。
+  // 现在只允许 outline 通道承担焦点；背景与文字前景必须保持基线。
   const RAIL_TAB_CHANNELS = (id: string) =>
     page.evaluate((testid) => {
       const el = document.querySelector(`[data-testid="${testid}"]`);
       if (el === null) return null;
       const c = getComputedStyle(el);
-      return { outline: Number.parseFloat(c.outlineWidth), bg: c.backgroundColor, color: c.color };
+      return {
+        outline: Number.parseFloat(c.outlineWidth),
+        outlineStyle: c.outlineStyle,
+        bg: c.backgroundColor,
+        color: c.color,
+      };
     }, id);
-  /** "至少在**一个**通道上看得出来"——这就是这一格要守的不变量。 */
-  const isVisible = (
-    base: { outline: number; bg: string; color: string } | null,
-    now: { outline: number; bg: string; color: string } | null,
-  ): boolean => now !== null && base !== null && (now.outline > 0 || now.bg !== base.bg || now.color !== base.color);
+  type RailFocusReading = Awaited<ReturnType<typeof RAIL_TAB_CHANNELS>>;
+  const hasIndependentRing = (now: RailFocusReading): boolean =>
+    now !== null && now.outlineStyle !== 'none' && now.outline >= 2;
+  const keepsPaint = (
+    base: NonNullable<RailFocusReading>,
+    now: RailFocusReading,
+  ): boolean => now !== null && now.bg === base.bg && now.color === base.color;
 
   // 基线必须在**全未聚焦**时取 —— 此刻还没按过 Tab。
   // 🔴 不能"先聚焦、再 blur 取基线、再 focus 回来"：程序化 `el.focus()` **不保证**触发
   //    `:focus-visible`（实测 `PROG_FOCUS` 那一档 `focusVisible === false`，
   //    而真按 Tab 那一档才是 `true`）。那样取到的"聚焦态"会是一份假的未聚焦读数。
   const baselineAll = await page.evaluate(() => {
-    const out: Record<string, { outline: number; bg: string; color: string }> = {};
+    const out: Record<string, { outline: number; outlineStyle: string; bg: string; color: string }> = {};
     document.querySelectorAll('nav.ht-rail [role="tab"]').forEach((el) => {
       const h = el as HTMLElement;
       const c = getComputedStyle(h);
       out[h.dataset.testid ?? h.className] = {
         outline: Number.parseFloat(c.outlineWidth),
+        outlineStyle: c.outlineStyle,
         bg: c.backgroundColor,
         color: c.color,
       };
@@ -193,66 +186,59 @@ test('rail：Tab 只进来一次、方向键只挪焦点不切视图、焦点环
     () => (document.activeElement as HTMLElement | null)?.dataset?.testid ?? null,
   );
   expect(focusedId, '取不到聚焦那一枚的 testid').not.toBeNull();
-  const baseline = baselineAll[focusedId!] ?? null;
+  const baseline = baselineAll[focusedId!];
   const focused = await RAIL_TAB_CHANNELS(focusedId!);
 
-  expect(baseline, `基线上没有 ${focusedId}`).not.toBeNull();
+  expect(baseline, `基线上没有 ${focusedId}`).toBeDefined();
   expect(
-    isVisible(baseline, focused),
-    `🔴 焦点必须至少在**一个**通道上看得出来（描边 / 底色 / 字色）。` +
-      `实测基线 ${JSON.stringify(baseline)} vs 聚焦 ${JSON.stringify(focused)}`,
+    hasIndependentRing(focused),
+    `🔴 键盘焦点必须有至少 2px 的独立焦点环。实测 ${JSON.stringify(focused)}`,
   ).toBe(true);
-  // 描边那一档单独留一条**否定**断言：本产品是刻意的无描边，
-  // 哪天有人把 `borderless-controls.css` 那条 `outline: 0 !important` 去掉，
-  // 这里会红 —— 那是产品决定的变更，该由改动者连判据一起改，不该悄悄发生。
   expect(
-    focused!.outline,
-    '本产品刻意无描边（borderless-controls.css 文件头，产品负责人 2026-10-07）；描边回来了说明那条决定被单方面改掉',
-  ).toBe(0);
+    keepsPaint(baseline, focused),
+    `🔴 焦点不得改背景或文字色。基线 ${JSON.stringify(baseline)} vs 聚焦 ${JSON.stringify(focused)}`,
+  ).toBe(true);
 
   // 截图必须在断言之**前**落盘（失败时也要有图，§6.2 第 1 条）。
   await page.screenshot({ path: `test-results/${SHOTS[0]}` });
 
-  // 🔴 两头对照：**把三个通道一起按回基线**，同一把尺必须读到"不可见"，撤掉又变回来。
+  // 🔴 对照臂：把焦点环抹掉，同一把尺必须读到"不可见"，撤掉又变回来。
   //    不注入就永远读不到"它本来能不能红"—— 一条在任何情况下都绿的判据比没有判据更糟。
-  //
-  // ⚠️ 注入的值必须**逐字取自基线**，不能写 `color: inherit` —— 第一版就是这么写的，
-  //    结果 `inherit` 从父元素继承来一个**新的**颜色（≠ 基线色），于是"抹掉"反而把
-  //    颜色通道**打开了**，两头对照读到"可见"而红。这是"变异没进被测判据"那一族的变体：
-  //    变异的意图是"关掉"，实际效果是"改成了另一个值"。
   const blind = await page.evaluate(
-    async ({ testid, bg, color }) => {
+    async ({ testid }) => {
       const el = document.querySelector(`[data-testid="${testid}"]`) as HTMLElement | null;
       if (el === null) return null;
       const style = document.createElement('style');
-      // ⚠️ 选择器必须带上 `[role='tab']` 与 `:focus-visible` —— 单写 `[data-testid=…]`
-      //    只有 (0,1,0)，而同为 `!important` 时**特异性高者赢**，被测的那条
-      //    `borderless-controls.css` 的 `:is(…):focus-visible` 是 (0,2,0) ⇒ 注入会被它压掉，
-      //    两头对照会读到"仍然可见"而假红。这是"变异没进产物"那一族的 CSS 版本。
-      //    写成 `[role='tab'][data-testid=…]:focus-visible` = (0,3,0)，稳压它。
+      // 选择器必须同时命中 `[role='tab']`、testID 与 `:focus-visible`，特异性要高于
+      // 被测全局规则，否则注入没有进入判据，会得到一次假绿。
       style.textContent =
         `[role='tab'][data-testid="${testid}"]:focus-visible {` +
-        ` outline: 0 !important; background-color: ${bg} !important; color: ${color} !important; }`;
+        ' outline: 0 !important; }';
       document.head.append(style);
       await new Promise((r) => setTimeout(r, 800));
       const c = getComputedStyle(el);
-      const reading = { outline: Number.parseFloat(c.outlineWidth), bg: c.backgroundColor, color: c.color };
+      const reading = {
+        outline: Number.parseFloat(c.outlineWidth),
+        outlineStyle: c.outlineStyle,
+        bg: c.backgroundColor,
+        color: c.color,
+      };
       style.remove();
       await new Promise((r) => setTimeout(r, 800));
       return reading;
     },
-    { testid: focusedId!, bg: baseline!.bg, color: baseline!.color },
+    { testid: focusedId! },
   );
-  expect(blind, '取不到"抹掉三通道"后的读数').not.toBeNull();
+  expect(blind, '取不到"抹掉焦点环"后的读数').not.toBeNull();
   expect(
-    isVisible(baseline, blind),
-    '🔴 把三个通道一起按回基线后，这把尺必须读到"不可见"（否则它是恒真的）',
+    hasIndependentRing(blind),
+    '🔴 把焦点环抹掉后，这把尺必须读到"不可见"（否则它是恒真的）',
   ).toBe(false);
   expect(blind!.outline, '连描边都该被注入抹成 0').toBe(0);
 
   const restored = await RAIL_TAB_CHANNELS(focusedId!);
   expect(
-    isVisible(baseline, restored),
+    hasIndependentRing(restored),
     '撤掉注入后必须回到"可见"（证明上面那次"不可见"是注入造成的，不是环境）',
   ).toBe(true);
 });

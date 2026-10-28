@@ -97,10 +97,8 @@
   font: inherit;
 }
 
-.ht-header__habits-menu button:hover,
-.ht-header__habits-menu button:focus-visible {
+.ht-header__habits-menu button:hover {
   background: var(--ht-color-hover);
-  outline: none;
 }
 
 /*
@@ -171,11 +169,9 @@
   color: var(--ht-color-foreground-muted);
 }
 
-.ht-habit-create-dialog__close:hover,
-.ht-habit-create-dialog__close:focus-visible {
+.ht-habit-create-dialog__close:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
-  outline: none;
 }
 
 /* 🔴 表单 = **两段**：可滚动的正文 + 常驻的动作区。
@@ -233,11 +229,6 @@
   background: var(--ht-color-surface-raised);
   box-shadow: var(--ht-shadow-sm);
   color: var(--ht-color-foreground-muted);
-}
-
-.ht-habit-create-dialog__avatar:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 /* ── 图标面板（收起态默认关闭）────────────────────────────────── */
@@ -306,12 +297,6 @@
   border-color: var(--ht-color-primary);
   background: var(--ht-color-primary-subtle);
   color: var(--ht-color-primary);
-}
-
-.ht-habit-create-dialog__tile:focus-visible,
-.ht-habit-create-dialog__icon:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 /* ── 分组分隔线 ──────────────────────────────────────────────────
@@ -415,12 +400,6 @@
   font-size: var(--ht-font-size-sm);
 }
 
-.ht-habit__add-field input:focus-visible,
-.ht-habit__add-field select:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-habit__add-field--icons,
 .ht-habit__add-field--weekdays {
   grid-column: 1 / -1;
@@ -457,15 +436,6 @@
   color: var(--ht-color-primary);
 }
 
-.ht-habit__add-icon:focus-visible,
-.ht-habit__add-weekday:focus-visible,
-.ht-habit__add-more:focus-visible,
-.ht-habit-create-dialog .ht-habit__add-icon:focus-visible,
-.ht-habit-create-dialog .ht-habit__add-weekday:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-habit__add-weekdays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -500,11 +470,6 @@
   font-family: var(--ht-font-sans);
 }
 
-.ht-habit__add input:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-habit__add button {
   display: grid;
   place-items: center;
@@ -514,11 +479,6 @@
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-primary);
   color: var(--ht-color-on-primary);
-}
-
-.ht-habit__add button:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 /*
@@ -592,11 +552,6 @@
 .ht-habit__row[aria-current='true'] {
   border-color: var(--ht-color-primary);
   background: var(--ht-color-primary-subtle);
-}
-
-.ht-habit__row:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 .ht-habit__head {
@@ -821,12 +776,6 @@
   color: var(--ht-color-primary);
 }
 
-.ht-habit__icon-toggle:focus-visible,
-.ht-habit__icon-option:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 /* 窄详情栏优先完整呈现习惯名，操作成组换行，不把名字挤成一两个字。 */
 @container habit-detail (max-width: 26rem) {
   .ht-habit__pane-head {
@@ -965,9 +914,3 @@
   color: var(--ht-color-danger);
 }
 
-.ht-habit__freq-toggle:focus-visible,
-.ht-habit__freq-chip:focus-visible,
-.ht-habit__freq-n input:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}

@@ -930,6 +930,7 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
                 <Button
                   label={t('mobile.share.space.leaveConfirm')}
                   tone="danger"
+                  emphasis="commit"
                   testID="share-leave-confirm"
                   onPress={() => {
                     void leaveShare();

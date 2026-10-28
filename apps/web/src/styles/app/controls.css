@@ -32,6 +32,79 @@
   background: var(--ht-color-primary-active);
 }
 
+/*
+ * 次要动作 —— **有填充、无描边**那一档。
+ *
+ * 🔴 这一档在本文件里**原本不存在**，而它是两端分歧最大的一格：
+ *   · Mobile 的 `Button` 默认那一档就叫 `secondary`（`apps/mobile/src/ui/kit.tsx`）；
+ *   · Web 没有 ⇒ 界面上只能要么写 `--ghost`（透明底 + muted 字），要么什么色调都不写。
+ * 两个后果都留在仓里：`className="ht-btn"` 这种不带色调的按钮 2026-10-28 立项时现量 18 处
+ * （AI 面板、隐私同意层、`DangerConfirmDialog` 的「取消」），它们没有底也没有 hover 底，
+ * 图上读起来就是说明文字；而设置页在 `sheets.css:150` 那段注释里写了同一件事
+ * —— "它在设置页里常常是这一块唯一的动作，于是看图时那几枚读成了说明文字" ——
+ * 然后在**那个文件里**现造了一个凹陷底。
+ * ⇒ 那一格今天已收编（全部显式写成 `ht-btn--secondary`）。复量（门禁 A8 也盯着它）：
+ *   `grep -rn 'className="ht-btn"' apps/web/src --include='*.tsx'` ⇒ 0 处。
+ * ⇒ "次要按钮长什么样"原本有三份答案（Web 没有 / sheets.css 局部造 / Mobile 有一份），
+ *    没有一份是别人参照的。这一档是它们共同的那一份，配方与
+ *    `packages/ui/src/control/states.ts` 的 `secondary` **逐格相同**
+ *    （门禁 `check:control-semantics` 按源码对账两边，多一格少一格都红）。
+ *
+ * ⚠️ 底选 `surface-sunken` 而不是 `surface`：次要按钮坐在 `color.surface` 的卡片上时
+ * 同色填充等于没画。⚠️ 前景恒为 `foreground`，不许降到 `subtle` ——
+ * `tokens.ts` 里明写着 subtle 在 sunken 上是 4.34:1、够不到 4.5 且从没登记过。
+ */
+.ht-btn--secondary {
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+}
+
+.ht-btn--secondary:hover {
+  background: var(--ht-color-hover);
+}
+
+/*
+ * 破坏性动作的按钮。**默认是行内档**（透明底 + 危险色文字）：
+ * 回收站每一行都有「彻底删除」，默认给实底会把整屏染红。
+ *
+ * 前景恒为 `--ht-color-danger`，hover 换 `danger-subtle` 底 + `danger-strong` 字 ——
+ * 配方与 `packages/ui/src/control/states.ts` 的 `danger` **行内档**逐格相同。
+ *
+ * 语义不靠颜色独扛：按钮文字自己复述动词（「放弃修改」），颜色只是冗余通道。 */
+.ht-btn--danger {
+  background: transparent;
+  color: var(--ht-color-danger);
+}
+
+.ht-btn--danger:hover {
+  background: var(--ht-color-danger-subtle);
+  color: var(--ht-color-danger-strong);
+}
+
+/*
+ * **重量档**：确认层里那枚唯一要按下去的危险按钮 —— 它必须比同一层里的「取消」更重，
+ * 否则危险确认只是两句并排的文字（`DangerConfirmDialog` 立项时两端各对一半：
+ * Web 这里恒为透明底红字，Mobile 的 `palette.danger` 恒为实底白字）。
+ *
+ * 🔴 前景必须是 `--ht-color-on-danger`，**不许**换成 `--ht-color-foreground-inverse`：
+ * 那一格今天恰好也是白/深，但它的语义是"反色前景"，`danger` 提亮时它会跟着变，
+ * 而实底危险按钮上的字不该跟着变。它与 `danger`/`danger-strong` 的两条配对都在
+ * `AA_PAIRS` 里登记着，暗色档实测 **7.29:1**（沿用白字只有 **2.77:1**，直接掉出 AA）——
+ * 两个数都由 `packages/design-system/tests/tokens.spec.ts` 现算，不是这里抄的。
+ *
+ * 这一档只有 `danger` 有：`primary` 的重量已经由色调本身表达，给它再建一条
+ * "和原来一样"的覆盖就是零消费者槽位（判据 `hasCommitOverride` 按键的存在性罚）。
+ */
+.ht-btn--danger.ht-btn--commit {
+  background: var(--ht-color-danger);
+  color: var(--ht-color-on-danger);
+}
+
+.ht-btn--danger.ht-btn--commit:hover {
+  background: var(--ht-color-danger-strong);
+  color: var(--ht-color-on-danger);
+}
+
 .ht-btn--ghost {
   background: transparent;
   color: var(--ht-color-foreground-muted);
@@ -42,8 +115,24 @@
   color: var(--ht-color-foreground);
 }
 
+.ht-btn--ghost[aria-pressed='true'] {
+  background: transparent;
+  color: var(--ht-color-primary);
+}
+
+.ht-btn--ghost[aria-pressed='true']:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-primary);
+}
+
+/*
+ * 🔴 原来是裸值 `opacity: 0.5`，而移动端读的是 token
+ * （`state.disabled-opacity` = **0.38**，Apple 惯例值）。同一个"点不动"在两端
+ * 是两个重量，而 0.5 还是 §5 禁的裸值。配方在
+ * `packages/ui/src/control/states.ts` 的 `CONTROL_STATE_TOKENS.disabledOpacity`。
+ */
 .ht-btn:disabled {
-  opacity: 0.5;
+  opacity: var(--ht-state-disabled-opacity);
 }
 
 /**
@@ -242,12 +331,6 @@
 
 .ht-input:hover {
   border-color: var(--ht-color-border-strong);
-}
-
-/* 焦点用主色边框 + 焦点环。
-   注意**没有** outline:none —— 那是可访问性回归。 */
-.ht-input:focus-visible {
-  border-color: var(--ht-color-primary);
 }
 
 /* ── 空状态 ─────────────────────────────────────────── */

@@ -57,6 +57,7 @@ import { useI18n } from '@heyta/i18n';
 import {
   CaptureComposer,
   priorityColorToken,
+  receiptTimingOf,
   type CaptureProjectOption,
   type CaptureSubmitPlan,
 } from '@heyta/ui';
@@ -726,20 +727,29 @@ export function TasksScreen({
     });
   }, [tasks]);
 
-  // 批量删除的撤销窗口是短时的，避免把旧动作误认为当前动作。
+  // 🔴 时长来自共享那张表（全局 UX 线 P3）。这里原来是两处各写一枚 `5000`：
+  //    数字本身是"没人核对过的窗口"，而它比 Web 那一档短、又比读一句
+  //    "撤销删除 3 个任务"再找到按钮所需的时长短。
+  //    查不到策略就**不自消**（不是兜一个默认时长 —— 那条路等于在表外新建一份裁决）：
+  //    回执留在屏幕上比被悄悄缩短更坏不到哪去，因为撤销本身是幂等的。
+  // ⚠️ 一格的**边界**（登记，不装作已做完）：移动端没有 hover，`pauseOnHover` 在这一端
+  //    没有对应通道；"按下时暂停"要做就得连 RN 的 press 事件一起设计，归 P4 的
+  //    共享控件语义层（那一期才谈 toggle/press 的状态形状）。两端的**结果**一致指的是
+  //    "用户拿到的是同一份窗口承诺"，不是"两端的暂停通道数相同"。
+  const undoWindowMs = receiptTimingOf('undo')?.durationMs;
   useEffect(() => {
-    if (bulkUndoIds === null) return;
-    const timer = setTimeout(() => setBulkUndoIds(null), 5000);
+    if (bulkUndoIds === null || undoWindowMs === undefined) return;
+    const timer = setTimeout(() => setBulkUndoIds(null), undoWindowMs);
     return () => clearTimeout(timer);
-  }, [bulkUndoIds]);
+  }, [bulkUndoIds, undoWindowMs]);
 
   // 四象限移动的撤销入口与批量删除使用同一条短时窗口，避免把旧动作
   // 留在屏幕上，让用户误以为它仍然可以回滚。
   useEffect(() => {
-    if (quadrantMoveUndo === null) return;
-    const timer = setTimeout(() => setQuadrantMoveUndo(null), 5000);
+    if (quadrantMoveUndo === null || undoWindowMs === undefined) return;
+    const timer = setTimeout(() => setQuadrantMoveUndo(null), undoWindowMs);
     return () => clearTimeout(timer);
-  }, [quadrantMoveUndo]);
+  }, [quadrantMoveUndo, undoWindowMs]);
 
   const clearBulkSelection = useCallback(() => {
     setBulkSelecting(false);

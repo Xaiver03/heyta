@@ -302,7 +302,7 @@ export function PrivacyConsentSheet(): React.JSX.Element | null {
             <button
               type="button"
               data-testid="privacy-consent-local-only"
-              className="ht-btn"
+              className="ht-btn ht-btn--secondary"
               onClick={chooseLocalOnly}
             >
               {t('common.privacy.consent.localOnly')}

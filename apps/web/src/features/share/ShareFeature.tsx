@@ -53,6 +53,7 @@ import { forgetShareLocally, publishShareSigningKey, shareTransferFailure, type 
 import { clearStorageShareLog } from './comment-actions.js';
 import { loadShareConsent, saveShareConsent } from './share-consent-store.js';
 import { registerShareRosterTarget } from '../../lib/share-signal-sink.js';
+import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';
 import { resetWebShareSession } from './share-session.js';
 import { createWebShareKeyRotation } from './share-rotation.js';
 import {
@@ -213,6 +214,13 @@ export function ShareFeature(props: ShareFeatureProps) {
   const [members, setMembers] = useState<Awaited<ReturnType<ShareApiClient['listMembers']>>['members']>([]);
   const [detail, setDetail] = useState<{ ownerId: number; keyEpoch: number; yourRole: string } | undefined>();
   const [inviteEmail, setInviteEmail] = useState('');
+  /* 🔴 邀请邮箱住在组件本地 state，关掉即丢 ⇒ 出口先问一句。
+     只在面板相位判脏：同意相位还没开始打，票据那一格也没有可丢的输入。 */
+  const { requestDismiss, guard: discardGuard } = useDirtyDismissGuard({
+    overlay: 'modal-dirty-form',
+    isDirty: () => phase.kind === 'panel' && inviteEmail.trim() !== '',
+    onDismiss: onClose,
+  });
   const [ticket, setTicket] = useState<InviteTicket | undefined>();
   const [inviteBusy, setInviteBusy] = useState(false);
   const [needsUnlock, setNeedsUnlock] = useState(false);
@@ -482,8 +490,9 @@ export function ShareFeature(props: ShareFeatureProps) {
     <div
       style={styles.overlay}
       data-testid="share-dialog-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) requestDismiss('scrim'); }}
     >
+      {discardGuard}
       <div
         role="dialog"
         aria-modal="true"
@@ -515,7 +524,7 @@ export function ShareFeature(props: ShareFeatureProps) {
             data-testid="share-dialog-close"
             aria-label={t('web.share.dialog.close')}
             className="ht-btn ht-btn--ghost"
-            onClick={onClose}
+            onClick={() => requestDismiss('escape')}
           >
             <X size={ICON_SIZE.sm} aria-hidden="true" />
           </button>

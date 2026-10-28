@@ -50,6 +50,29 @@ pnpm check:design     # 非零退出 = 有裸值
 > **这个测试已经抓到过真问题**：`quadrant-3` 原用 amber-600（`3.19:1`）不达正文标准，
 > 已改为 amber-700（`5.02:1`）。写在文档里的"4.5:1"是拦不住的。
 
+### 🔴 交互控件的档位只有一处定义（2026-10-28，全局 UX 线 P4）
+
+一枚按钮"长什么样"的答案**只许住在一个地方**：`packages/ui/src/control/states.ts` 的
+`CONTROL_PALETTE`（色调 `primary`/`secondary`/`ghost`/`danger` × 重量 `inline`/`commit`）。
+表里写的是 **token 名**，不是色值也不是类名 —— Web 把它翻成 `var(--ht-…)`，
+移动端把它翻成 `HeytaNativeTokens[name]`。**翻译可以两份，判断只许一份**（AGENTS §3.5）。
+
+三条会踩到的：
+
+1. **不许有不带色调的 `.ht-btn`**。立项现量 18 处（AI 面板、隐私同意层、危险确认的「取消」），
+   它们没有底也没有 hover 底，图上读起来就是说明文字。今天归零，`check:control-semantics` 的 A8 守住。
+2. **危险动作分两档，按位置选**：列表行/设置项里那枚是 `inline`（透明底 + 危险色字），
+   确认层里唯一要按下去的那枚是 `commit`（实底 + `color.on-danger`）。
+   两端原本各对一半（Web 恒为透明底、Mobile 恒为实底），缺的是"这一枚站在哪个位置"这一格判断。
+   ⚠️ 实底那枚的前景**不许**用 `foreground-inverse`：暗色的 `danger` 是提亮后的浅红，
+   白字压上去只有 2.77:1，`on-danger` 换深之后是 7.29:1 —— 这两个数由对比度套件现算。
+3. **功能 CSS 不许重声明控件外观**（`background`/`color`/`border`/`box-shadow`/`opacity`/`outline`），
+   布局（`flex`/`inline-size`/`padding`）归宿主、一律放过。
+
+门禁：`pnpm check:control-semantics`（14 枚 self-test 臂 + 两次真树变异取证）。
+它**看不到**的那一格诚实登记在脚本头部：选择器里不写控件族类名、只写宿主自己那枚 class 的
+外观覆盖 —— 那一格归"真实浏览器逐态读计算样式"（`e2e/tests/control-semantics.spec.ts`）。
+
 ### 🔴 行内动作条：每一枚动作都是 `.ht-chip`，不许裸 `<summary>`
 
 `.ht-compose-actions__items` 这一排（备注 / 子任务 / 截止 / 提醒 / AI …）里，

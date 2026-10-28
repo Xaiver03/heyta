@@ -516,6 +516,20 @@ export const zhCN = {
   'web.shell.bulk.move': '移动到清单',
   'web.shell.bulk.moveInbox': '收集箱',
   'web.shell.bulk.undo': '撤销本次批量操作',
+  // 🔴 全局 UX 线 P3（2026-10-28）：删除回执这一族。正文必须自带**对象名或数量**——
+  // 「撤销」两个字不足以让人判断撤销的是哪一次动作（`destructive-actions.md` §3.1
+  // 那条"标题写后果，不写动作名"用在回执上）。两地的占位符名必须一致。
+  'web.feedback.undo.busy': '撤销中…',
+  'web.feedback.undo.failed': '撤销失败：{reason}',
+  'web.feedback.undo.refused': '「{title}」已被彻底删除，捞不回来',
+  'web.feedback.undo.task': '撤销删除「{title}」',
+  'web.feedback.undo.tasks': '撤销删除 {count} 个任务',
+  'web.feedback.undo.note': '撤销删除便签「{title}」',
+  'web.feedback.undo.notes': '撤销删除 {count} 条便签',
+  'web.feedback.undo.list': '撤销删除清单「{title}」',
+  'web.feedback.undo.lists': '撤销删除 {count} 个清单',
+  'web.feedback.undo.habit': '撤销删除习惯「{title}」',
+  'web.feedback.undo.habits': '撤销删除 {count} 个习惯',
   'web.shell.bulk.error': '批量操作未完成：{message}',
   'web.shell.search.placeholder': '搜索任务',
   'web.shell.search.aria': '搜索任务（标题与备注）',
@@ -938,7 +952,14 @@ export const zhCN = {
   'web.sync.devices.lastSeen': '最近活动：{date}',
   'web.sync.devices.revoke': '撤销设备',
   'web.sync.devices.revoking': '正在撤销…',
-  'web.sync.devices.confirm': '撤销后所有设备都必须重新登录。离线设备上的本地数据不会被远程擦除。确定继续吗？',
+  // 🔴 原生 `window.confirm` 那一整句（旧键 `web.sync.devices.confirm`）**已删**：
+  //   它把"后果"和"确定继续吗？"塞在同一行里，而原生框放不下标题、放不下具名动作、
+  //   也没法测焦点。同一句话现在拆成下面四格 —— 旧键留着就是"同一句话存两栏"那个
+  //   本仓反复吃过漂移的形状。
+  'web.sync.devices.revokeConfirm.title': '撤销这台设备？所有设备都要重新登录',
+  'web.sync.devices.revokeConfirm.body': '离线设备上的本地数据不会被远程擦除。',
+  'web.sync.devices.revokeConfirm.cancel': '取消',
+  'web.sync.devices.revokeConfirm.submit': '撤销这台设备',
   'web.sync.devices.revoked': '设备已撤销，所有设备都必须重新登录。请在可信设备重新登录后轮换数据密钥并迁移保留的密文。',
   'web.sync.devices.revocationUncertain': '撤销请求的响应丢失了。本机已先退出登录；重新登录后请核对设备列表，再轮换数据密钥。',
   'web.sync.devices.unauthorized': '会话已失效，请重新登录后再管理设备。',

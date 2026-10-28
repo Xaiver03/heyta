@@ -78,6 +78,8 @@ import { extractShareToken, searchWithoutShareToken } from '../share/join-link.j
 import { useTaskStore, type TaskFilter } from '../tasks/store.js';
 import { useSyncStore } from '../sync/store.js';
 import { useProjectStore } from './store.js';
+import { UndoReceipt } from '../../lib/feedback/UndoReceipt.js';
+import { restoreOrRefuse, undoReceiptFor } from '../../lib/feedback/undo-receipt.js';
 
 export function ProjectsPanel({
   onFilterWith,
@@ -217,9 +219,24 @@ export function ProjectsPanel({
     return parseCategorySlot(projects.projects.find((p) => p.id === projectId)?.color);
   }
 
+  /**
+   * 删除清单之后那一条可撤销回执（全局 UX 线 P3）。
+   * 原来这一格是 `void projects.deleteProject(item.id)`：清单进的是回收站
+   * （ADR-0048 的 `deletedAt`），撤销真的可执行，而界面上一个字都没说。
+   */
+  const [undo, setUndo] = useState<{ readonly label: string; readonly run: () => Promise<void> } | undefined>(undefined);
+
   return (
     <HeytaUiProvider>
       <aside aria-label={t('web.projects.ariaLabel')} style={asideStyle}>
+        {undo === undefined ? null : (
+          <UndoReceipt
+            label={undo.label}
+            onUndo={undo.run}
+            data-testid="projects-undo"
+            onDismiss={() => { setUndo(undefined); }}
+          />
+        )}
         <section>
           <div className="ht-sidebar__organizer-heading">
             <h2 className="ht-nav__section ht-type-group-label">{t('web.projects.heading')}</h2>
@@ -332,7 +349,17 @@ export function ProjectsPanel({
               void projects.archiveProject(item.id, archived);
             }}
             onRemove={(item) => {
-              void projects.deleteProject(item.id);
+              const { id, name } = item;
+              void projects.deleteProject(id).then(() => {
+                if (!undoReceiptFor('list')) return;
+                setUndo({
+                  label: t('web.feedback.undo.list', { title: name }),
+                  run: () => restoreOrRefuse(
+                    () => projects.restoreProject(id),
+                    t('web.feedback.undo.refused', { title: name }),
+                  ),
+                });
+              });
             }}
             // 顶层画文件夹、子级不画 —— "层级"的一部分，与缩进一起。
             renderLeading={(_item, context) =>

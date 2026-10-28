@@ -383,11 +383,6 @@ html.heyta-windows-shell .ht-app__detail:not([hidden]) {
   content: '−';
 }
 
-.ht-app__focus-settings-toggle:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-app__focus-settings-summary {
   color: var(--ht-color-foreground-subtle);
   font-variant-numeric: tabular-nums;

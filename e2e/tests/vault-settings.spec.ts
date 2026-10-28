@@ -27,6 +27,7 @@ import { installMissingProducerShims } from './shims';
 
 const SERVER = 'http://sync.vault.e2e.test';
 const ACCOUNT_ID = 'vault-browser-account-1';
+const DEVICE_CLIENT_ID = 'e2e0000000000001';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const EVIDENCE = `${ROOT}apps/web/evidence/vault-panel`;
 
@@ -55,7 +56,14 @@ async function seedCredentials(page: Page): Promise<void> {
   }, { server: SERVER, accountId: ACCOUNT_ID });
 }
 
-async function installHttpFixture(page: Page): Promise<{
+async function installHttpFixture(
+  page: Page,
+  /**
+   * 装几台已登录设备。默认 `[]` —— 原有那一条用例看的是空态，
+   * 把设备数写死成非空会顺手改掉它的画面。
+   */
+  devices: readonly string[] = [],
+): Promise<{
   getCount: () => number;
   putCount: () => number;
   published: () => Record<string, unknown> | undefined;
@@ -98,7 +106,16 @@ async function installHttpFixture(page: Page): Promise<{
   await page.route(`${SERVER}/api/account/profile**`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ displayName: null, avatarHash: null }) }));
   await page.route(`${SERVER}/api/sync/devices`, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ devices: [] }) }));
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        // 🔴 `lastSeenAt` 是 **Unix 毫秒**（`SuperSyncDeviceSchema`：`z.number()`），
+        //    不是 ISO 串。第一版发的是字符串 ⇒ `safeParse` 失败 ⇒ 面板读成
+        //    "设备列表是空的"，而红话说的是"那一行没画出来" —— 假红指错了方向。
+        devices: devices.map((clientId) => ({ clientId, lastSeenAt: Date.now() })),
+      }),
+    }));
   await page.route(`${SERVER}/api/sync/status**`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ latestSeq: 0 }) }));
   await page.route(`${SERVER}/api/sync/ops**`, (route) =>
@@ -331,4 +348,125 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
    * 所以这里不再补一条恒为 0 的间接量。⚠️ 若哪天把 `AdminPanel` 挪回同步那一节，
    * 上面那条"403 条数 = 探针次数"会自动恢复牙 —— 不需要把这条加回来。
    */
+});
+
+/**
+ * 撤销设备这一格走危险确认（2026-10-27，全局 UX 整改 P2 第二格）
+ * ============================================================
+ *
+ * 判据与回收站那一格同源（`e2e/tests/danger-confirm-trash.spec.ts` 是全集），这里只钉
+ * **这一格特有的那件事**：它此前是 `window.confirm` —— 全仓 Web 侧**最后一枚**原生确认框。
+ *
+ * 🔴 为什么"仍然用原生框"这件事在本仓**不会报错、只会静默通过**：
+ * Playwright 默认**自动 dismiss** 掉 `window.confirm`，于是那一发撤销永远返回 false，
+ * 用例看到的是"点了没反应"，而产品那边是"用户根本读不到后果说明就被告知要重新登录"。
+ * 所以这里同时钉两件事：确认框必须是**页内那一层**，且原生框**一次都没出现**。
+ *
+ * ⚠️ 不点"撤销这台设备"那一步：真撤销要装 DELETE 桩，而这一条的命题是
+ *    "确认之前不发请求"与"这层的语义对不对"，用**取消**与 **Esc** 两条出口就够证。
+ *    真执行那一腿归 `check:journey-coverage` 的登录态旅程，不在本文件（登记见计划 §P2）。
+ */
+test('撤销设备：页内危险确认，取消与 Esc 都不发出写请求', async ({ page }) => {
+  // 前置照抄本文件那一条主用例的开局（英文界面 + 模块开关 + 隐私闸门 + 凭证）。
+  // ⚠️ 少一步就会红在"找不到头像"这种夹具问题上，而不是红在产品上 ——
+  //    第一版就是这么红的（`openSyncSection` 等 `account-menu-avatar` 60 秒超时），
+  //    那种红**不能**当成本格的能红证据。
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await enableAllModules(page);
+  await installMissingProducerShims(page);
+  await seedCredentials(page);
+  const fixture = await installHttpFixture(page, [DEVICE_CLIENT_ID]);
+  await page.goto('/?lang=en');
+  await expect(page.locator('input[placeholder^="Add a task"]')).toBeVisible();
+  await decidePrivacyConsent(page, 'accepted');
+
+  await openSyncSection(page);
+
+  let nativeDialogSeen = false;
+  page.on('dialog', async (dialog) => {
+    nativeDialogSeen = true;
+    await dialog.dismiss();
+  });
+
+  const revoke = page.getByTestId(`vault-device-revoke-${DEVICE_CLIENT_ID}`);
+  await expect(revoke, '设备列表没画出那一行 ⇒ 后面的读数全是废的').toBeVisible();
+  await revoke.click();
+
+  const dialog = page.getByTestId('vault-revoke-confirm');
+  await expect(
+    dialog,
+    '撤销设备仍走 window.confirm：原生框被自动 dismiss，页内那一层根本没出现',
+  ).toBeVisible();
+  expect(nativeDialogSeen, '还弹了原生确认框（Web 侧最后一枚 window.confirm 没清掉）').toBe(false);
+
+  /**
+   * 一目的地一控件：这一层**只有两枚按钮**（具名的安全侧 + 危险主按钮），
+   * 没有第三枚图标式的 × 出口。
+   *
+   * ⚠️ 按**数量**判而不是按"取消"这个名字判：本套件跑的是英文界面（`/?lang=en`），
+   *    第一版写死中文名字 ⇒ 它红在语言上（`Received: 0`），而不是红在产品上。
+   *    数按钮既与语言无关，又恰好是这一条命题本来的样子。
+   */
+  await expect(dialog.getByRole('button')).toHaveCount(2);
+  // 不可逆主按钮是 danger tone（读的是类，颜色那条在回收站那格里已经按计算值钉过）。
+  await expect(page.getByTestId('vault-revoke-confirm-submit')).toHaveClass(/ht-btn--danger/);
+  // 初始焦点在安全侧。
+  await expect(page.getByTestId('vault-revoke-confirm-cancel')).toBeFocused();
+
+  const writesBefore = fixture.unexpected().filter((line) => !line.startsWith('GET'));
+  await page.keyboard.press('Escape');
+  await expect(dialog, 'Esc 必须等价于取消（关掉）').toHaveCount(0);
+  expect(
+    fixture.unexpected().filter((line) => !line.startsWith('GET')),
+    `取消/Esc 之后出现了写请求：${writesBefore.join(' | ')}`,
+  ).toEqual([]);
+});
+
+/**
+ * 计划 §P2 判据里最后那一格：**失败回执持续可见**。
+ *
+ * 为什么单独一条：撤销**失败**不是"这件事没发生"，而是"这台设备可能还在能同步"。
+ * 回执一旦飘走，屏幕上就什么都不剩，用户读到的是"我已经撤了" —— 那是比不弹确认更坏的形状。
+ *
+ * 🔴 这条用例的**时长本身就是断言**：`waitForTimeout(5_500)` 比 toast 那一族的
+ * 4~5 秒自消窗口长。如果将来有人把这句失败文案改走 `showToast`，第一发
+ * `toHaveCount(1)` 仍然绿（toast 刚出现），红的是第二发 —— 这正是把它放在真实浏览器里
+ * 而不是放在 jsdom 里的理由：jsdom 不会替你把计时器走完还顺手删掉 DOM。
+ *
+ * 401 是**故意选的**：`revokeHostedSyncDeviceBound` 只对 `request-failed` / `invalid-response`
+ * 走"重试 + 判为 ambiguous"那条路（那两个码代表"响应丢了，不能证明服务端没删成"）；
+ * `unauthorized` 直接抛出 ⇒ 面板落进 `.catch` ⇒ 持久 danger 回执。
+ * 换成 404 测的是另一格（ambiguous ⇒ 会话被围栏清掉），不是这一格。
+ */
+test('撤销设备失败：回执是不自消的 alert，不是一条会飘走的 toast', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await enableAllModules(page);
+  await installMissingProducerShims(page);
+  await seedCredentials(page);
+  await installHttpFixture(page, [DEVICE_CLIENT_ID]);
+
+  let deleteCount = 0;
+  // 注册在 fixture 之后 ⇒ 这条优先命中；非 DELETE 一律 `fallback()` 交回原来的桩，
+  // 否则会把设备列表那发 GET 一起吃掉（那发读回来是空的，红话会指错方向）。
+  await page.route(`${SERVER}/api/sync/devices/**`, async (route) => {
+    if (route.request().method() !== 'DELETE') return route.fallback();
+    deleteCount += 1;
+    await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
+  });
+
+  await page.goto('/?lang=en');
+  await expect(page.locator('input[placeholder^="Add a task"]')).toBeVisible();
+  await decidePrivacyConsent(page, 'accepted');
+  await openSyncSection(page);
+
+  await page.getByTestId(`vault-device-revoke-${DEVICE_CLIENT_ID}`).click();
+  await page.getByTestId('vault-revoke-confirm-submit').click();
+
+  await expect(page.getByTestId('vault-revoke-confirm'), '确认之后这一层要关掉').toHaveCount(0);
+  expect(deleteCount, '点下「撤销这台设备」却没有发出 DELETE：主按钮没接上执行').toBe(1);
+
+  const notice = page.locator('[data-testid="vault-device-error"][role="alert"]');
+  await expect(notice, '撤销失败后屏幕上没有 role="alert" 的持久回执').toHaveCount(1);
+  await page.waitForTimeout(5_500);
+  await expect(notice, '失败回执自己消失了：它走的是会自消的 toast，不是就地常驻的 alert').toHaveCount(1);
 });

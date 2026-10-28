@@ -88,11 +88,6 @@
   color: var(--ht-color-foreground);
 }
 
-.ht-accountmenu__avatar:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 /* 🔴 2026-09-30 撤掉了「头像旁的登录 pill」。
    身份入口只能有一个（产品负责人："应该是点击头像出来注册、登录吧？"）——
    它现在是菜单里的第一项（`.ht-accountmenu__item--primary`），
@@ -169,12 +164,6 @@
 
 .ht-accountmenu__item:hover {
   background: var(--ht-color-surface-sunken);
-}
-
-.ht-accountmenu__item:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-  background: var(--ht-color-primary-subtle);
 }
 
 /* 退出登录是这一组里唯一**会清掉本机凭据**的动作 —— 颜色要说清这件事。

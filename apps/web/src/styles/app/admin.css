@@ -39,14 +39,6 @@
 }
 
 /* 🔴 焦点环不许抹掉（AGENTS §5「容易犯的几个错」）。 */
-.ht-settings__admin-tab:focus-visible,
-.ht-settings__admin-btn:focus-visible,
-.ht-settings__admin-row:focus-visible,
-.ht-settings__admin-input:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-settings__admin-tab--active {
   background: var(--ht-color-primary-subtle);
   border-color: var(--ht-color-primary);
@@ -430,13 +422,6 @@
 .ht-settings__console-action:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
-}
-
-/* 🔴 焦点环不许抹掉（AGENTS §5「容易犯的几个错」）。 */
-.ht-settings__console-action:focus-visible,
-.ht-settings__console-navItem:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 .ht-settings__console-main {

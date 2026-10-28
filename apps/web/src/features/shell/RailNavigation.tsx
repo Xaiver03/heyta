@@ -25,6 +25,7 @@ import { anchorRailLabelElement, splitRailTabs, type ViewKey, type ViewTab } fro
 import { onTabRovingKeyDown, rovingTabKey } from '../../lib/tab-roving.js';
 import { useNarrowLayout } from './useNarrowLayout.js';
 import { CompactRailNavigation } from './CompactRailNavigation.js';
+import { useMenuKeyboard } from '../../lib/menu/useMenuKeyboard.js';
 
 const REQUIRED_RAIL_KEYS = new Set<ViewKey>(['tasks', 'search']);
 const PRIMARY_ZONE = 'rail-zone-primary';
@@ -162,7 +163,7 @@ function SortableMoreItem({
   const style = { transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition };
   return (
     <div ref={sortable.setNodeRef} style={style} className={`ht-rail__more-row${sortable.isDragging ? ' ht-rail__more-row--dragging' : ''}`}>
-      <button ref={sortable.setActivatorNodeRef} type="button" role="menuitem" className="ht-rail__more-item" onClick={onActivate} {...sortableAttributes} {...sortable.listeners}>
+      <button ref={sortable.setActivatorNodeRef} type="button" role="menuitem" className="ht-rail__more-item" onClick={onActivate} {...sortableAttributes} {...sortable.listeners} tabIndex={-1}>
         <tab.Icon size={ICON_SIZE.sm} aria-hidden="true" />
         <span>{t(tab.labelKey)}</span>
       </button>
@@ -236,6 +237,25 @@ function DesktopRailNavigation({
   const [customize, setCustomize] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  /**
+   * More 菜单的键盘（P5）。
+   *
+   * 🔴 原来这一格只接了 `Escape` 一条键：从键盘进得去、出不来 —— 方向键在菜单里
+   * 没有落点，用户只能再按一次 Esc。现在与账号菜单共用同一份判断
+   * （`packages/ui/src/control/menu.ts`），环绕 / Home / End / 类型查找一起有。
+   * `focusTrigger` 传 `preventScroll` 是既有行为：面板 `createPortal` 到 `body`，
+   * 默认 `.focus()` 会把页面滚回锚点，"关个菜单页面跳一下"。
+   */
+  const onMoreMenuKeyDown = useMenuKeyboard({
+    open: moreOpen,
+    containerRef: moreMenuRef,
+    triggerRef: moreButtonRef,
+    onClose: () => {
+      setMoreOpen(false);
+      setCustomize(false);
+    },
+    focusTrigger: (trigger) => (trigger as HTMLButtonElement | null)?.focus({ preventScroll: true }),
+  });
   const activeRailTabRef = useRef<HTMLElement | null>(null);
   const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | undefined>(undefined);
   const sensors = useSensors(
@@ -460,14 +480,7 @@ function DesktopRailNavigation({
                 <span className="ht-rail__label ht-type-caption">{t('web.shell.views.groupMore')}</span>
               </button>
               {moreOpen ? createPortal(
-                <div ref={moreMenuRef} className={`ht-rail__more-menu${panelPosition === undefined ? ' ht-rail__more-menu--measuring' : ''}`} role="menu" aria-label={t('web.shell.views.groupMore')} style={panelPosition === undefined ? undefined : { top: panelPosition.top, left: panelPosition.left }} onKeyDown={(event) => {
-                  if (event.key !== 'Escape') return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setMoreOpen(false);
-                  setCustomize(false);
-                  moreButtonRef.current?.focus({ preventScroll: true });
-                }}>
+                <div ref={moreMenuRef} className={`ht-rail__more-menu${panelPosition === undefined ? ' ht-rail__more-menu--measuring' : ''}`} role="menu" aria-label={t('web.shell.views.groupMore')} style={panelPosition === undefined ? undefined : { top: panelPosition.top, left: panelPosition.left }} onKeyDown={onMoreMenuKeyDown}>
                   <div className="ht-rail__more-header">
                     <button
                       type="button"

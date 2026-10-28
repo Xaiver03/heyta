@@ -36,6 +36,7 @@
 @define-color ht_color_danger #dc2626;
 @define-color ht_color_danger_strong #b91c1c;
 @define-color ht_color_danger_subtle #fef2f2;
+@define-color ht_color_on_danger #ffffff;
 @define-color ht_color_info #0284c7;
 @define-color ht_color_info_strong #0369a1;
 @define-color ht_color_info_subtle #f0f9ff;

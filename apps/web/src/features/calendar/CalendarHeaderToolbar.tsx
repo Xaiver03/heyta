@@ -53,7 +53,7 @@ import { useTaskStore } from '../tasks/store.js';
 import { useProjectStore } from '../projects/store.js';
 import { useCalendarLabels } from './useCalendarLabels.js';
 import { useCalendarViewStore } from './store.js';
-import { PanelLeft, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 
 /*
  * 档位与它们的键名**不在这里**（R17）：这里曾经写着一张 `{kind, key}[]`，
@@ -73,16 +73,12 @@ const TIMELINE_VALUE = 'timeline';
 export interface CalendarHeaderToolbarProps {
   /** 功能模块「时间线」是否开着 —— 关掉时下拉里**不出现**这一档。 */
   timelineEnabled: boolean;
-  sidebarOpen?: boolean;
-  onToggleSidebar?: () => void;
   /** 切到时间线视图（与 rail 上那个 tab **同一条路**：`App` 的 `goToView('timeline')`）。 */
   onOpenTimeline: () => void;
 }
 
 export function CalendarHeaderToolbar({
   timelineEnabled,
-  sidebarOpen,
-  onToggleSidebar,
   onOpenTimeline,
 }: CalendarHeaderToolbarProps): React.JSX.Element {
   const view = useCalendarViewStore();
@@ -114,13 +110,6 @@ export function CalendarHeaderToolbar({
       : names.join(t('web.calendar.scope.separator'));
   }, [projects, tags, t, view.scope.projectIds, view.scope.tagIds]);
 
-  const sidebarVisible = sidebarOpen ?? view.calendarSidebarOpen;
-  const calendarSidebarLabel = t(
-    sidebarVisible
-      ? 'web.calendar.sidebar.hide'
-      : 'web.calendar.sidebar.show',
-  );
-
   return (
     <div className="ht-header__calendar-toolbar">
       <CalendarToolbar
@@ -135,20 +124,6 @@ export function CalendarHeaderToolbar({
         trailing={
         <>
           <div className="ht-header__calendar-tools">
-            <button
-              type="button"
-              className="ht-header__calendar-sidebar-toggle"
-              data-testid="calendar-sidebar-toggle"
-              aria-pressed={sidebarVisible}
-              aria-controls="calendar-sidebar"
-              aria-label={calendarSidebarLabel}
-              title={calendarSidebarLabel}
-              onClick={() => {
-                (onToggleSidebar ?? view.toggleCalendarSidebar)();
-              }}
-            >
-              <PanelLeft size={ICON_SIZE.sm} aria-hidden="true" />
-            </button>
             {hasScope ? (
               <div className="ht-header__calendar-scope" data-testid="calendar-scope-summary" role="status">
                 <span>{t('web.calendar.scope.active', { names: activeScopeNames })}</span>

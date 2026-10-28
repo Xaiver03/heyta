@@ -533,6 +533,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
             <Button
               label={t('mobile.restore.confirm')}
               tone="danger"
+              emphasis="commit"
               disabled={host === null || restoreBusy}
               loading={restoreBusy}
               onPress={confirmRestore}

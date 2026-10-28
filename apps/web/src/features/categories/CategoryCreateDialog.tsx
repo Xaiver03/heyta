@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';
+import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
 import { Check, Palette, X } from 'lucide-react';
 
 import { cssVar, ICON_SIZE } from '@heyta/design-system';
@@ -22,84 +24,56 @@ interface CategoryCreateDialogProps {
   onCreate: (input: { name: string; color?: CategorySlot }) => Promise<void>;
 }
 
-const focusableSelector =
-  'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
-
 /**
  * 清单 / 标签共用的新建对话框。
  *
  * 它只拥有交互状态：实体创建仍由宿主传入的 action 完成。颜色只在宿主
  * 明确声明 domain/action 支持时显示，避免给 Tag 画出一个实际无法保存的控件。
  */
-export function CategoryCreateDialog({
-  open,
+export function CategoryCreateDialog(props: CategoryCreateDialogProps): React.JSX.Element | null {
+  const { open, ...formProps } = props;
+  // 🔴 P6 现量抓出来的缺陷（不是测试竞态）：草稿 state 原本挂在**关掉后仍存活**的这一层，
+  //   重开的那一瞬间 DOM 里还是上一份草稿（实测 `value="诊断清单"`、色槽 1 `aria-pressed=true`），
+  //   清草稿的 effect 要等这次 commit 之后才跑。于是"刚点开就按 Esc / 点背景"会弹出
+  //   「放弃这次的修改？」去问用户**从没输入过**的内容。
+  //   根治不是"清得更早"，是**让草稿随开合重新挂载**：这一层只判开合，state 全在内层。
+  if (!open) return null;
+  return <CategoryDraftForm {...formProps} />;
+}
+
+interface CategoryDraftFormProps extends Omit<CategoryCreateDialogProps, 'open'> {}
+
+function CategoryDraftForm({
   kind,
   existingNames,
   supportsColor = false,
   onClose,
   onCreate,
-}: CategoryCreateDialogProps): React.JSX.Element | null {
+}: CategoryDraftFormProps): React.JSX.Element {
   const { t } = useI18n();
-  const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
-  const wasOpenRef = useRef(false);
   const busyRef = useRef(false);
-  const onCloseRef = useRef(onClose);
   const [name, setName] = useState('');
   const [color, setColor] = useState<CategorySlot | undefined>(undefined);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  /* 🔴 名称与颜色都住在本地 state，关掉即丢 ⇒ 三条通道先问一句。
+     这一格不在 2026-10-27 立项时点名的四格里 —— 它是 §P1 那枚门禁现量出来的第五格。 */
+  const { requestDismiss, guard: discardGuard } = useDirtyDismissGuard({
+    overlay: 'modal-dirty-form',
+    isDirty: () => name.trim() !== '' || color !== undefined,
+    onDismiss: onClose,
+  });
 
-  // The parent passes inline callbacks. Keep the keyboard handler stable while
-  // still calling the latest callback and reading the latest busy state.
-  onCloseRef.current = onClose;
+  // 提交中要挡住"再按一次"，这一格读的仍是最新值。
   busyRef.current = busy;
 
-  useEffect(() => {
-    if (!open) return;
-    if (!wasOpenRef.current) {
-      restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      wasOpenRef.current = true;
-    }
-    setName('');
-    setColor(undefined);
-    setError('');
-    const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        if (!busyRef.current) onCloseRef.current();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector);
-      if (focusable === undefined || focusable.length === 0) return;
-      const first = focusable[0]!;
-      const last = focusable[focusable.length - 1]!;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown, true);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener('keydown', onKeyDown, true);
-    };
-  }, [kind, open]);
-
-  useEffect(() => {
-    if (open || restoreFocusRef.current === null) return;
-    restoreFocusRef.current.focus();
-    restoreFocusRef.current = null;
-    wasOpenRef.current = false;
-  }, [open]);
-
-  if (!open) return null;
+  /*
+   * P6：焦点进入 / Tab 不外逃 / 关闭归还触发者 / Esc 与背景两条通道全在 `WebModalShell` 里，
+   * 本组件不再手写（原来是 44 行 + 一份 `focusableSelector` 的第二答案）。
+   * 原来这里还有一枚"每次打开把草稿清干净"的 effect —— **删了**：
+   * 草稿现在随开合挂载（见 `CategoryCreateDialog` 那一行），不需要事后清。
+   */
 
   const title = kind === 'project' ? t('web.categories.create.project.title') : t('web.categories.create.tag.title');
   const inputLabel = t('web.categories.create.name');
@@ -137,29 +111,27 @@ export function CategoryCreateDialog({
   };
 
   return (
-    <div
-      className="ht-category-create-dialog"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose();
-      }}
+    <WebModalShell
+      overlayClass="ht-category-create-dialog"
+      dialogClass="ht-category-create-dialog__dialog"
+      labelledBy="ht-category-create-title"
+      policy="modal-dirty-form"
+      testId="category-create-dialog"
+      busy={busy}
+      initialFocusRef={inputRef}
+      onCancel={onClose}
+      onDismissAttempt={(via) => requestDismiss(via)}
+      /* 确认框画在遮罩层内、面板之外：同一个层叠上下文里后来者在上，
+         不用跟宿主的 z-index 比数字（§7 第 607 条）。 */
+      overlayChildren={discardGuard}
     >
-      <div
-        ref={dialogRef}
-        className="ht-category-create-dialog__dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-busy={busy}
-        aria-labelledby="ht-category-create-title"
-        data-testid="category-create-dialog"
-      >
         <div className="ht-category-create-dialog__header">
           <h2 id="ht-category-create-title" className="ht-type-section-title">{title}</h2>
           <button
             type="button"
             className="ht-category-create-dialog__close"
             aria-label={t('web.categories.create.close')}
-            onClick={onClose}
+            onClick={() => requestDismiss('escape')}
             disabled={busy}
           >
             <X size={ICON_SIZE.sm} aria-hidden="true" />
@@ -247,7 +219,7 @@ export function CategoryCreateDialog({
           )}
 
           <div className="ht-category-create-dialog__actions">
-            <button type="button" className="ht-btn ht-btn--ghost" onClick={onClose} disabled={busy}>
+            <button type="button" className="ht-btn ht-btn--ghost" onClick={() => requestDismiss('escape')} disabled={busy}>
               {t('web.categories.create.cancel')}
             </button>
             <button type="submit" className="ht-btn ht-btn--primary" disabled={busy}>
@@ -256,7 +228,6 @@ export function CategoryCreateDialog({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </WebModalShell>
   );
 }

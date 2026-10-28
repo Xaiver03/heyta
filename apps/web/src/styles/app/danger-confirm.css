@@ -1,0 +1,47 @@
+/*
+ * 危险确认的共享外观（2026-10-27，全局 UX 整改 P2）
+ * ==============================================
+ *
+ * 为什么要有这一族，而不是每个功能页再抄一份：本仓的对话框外观此前是**逐功能各写一族**
+ * （`ht-trash__dialog`、`ht-habit-create-dialog__dialog`、`ht-category-create-dialog__dialog`），
+ * 而"确认框长什么样"在三处各写一次的结果就是三处会漂 —— 漂了没有任何东西会红，
+ * 症状只是"回收站的确认框比设置里的宽 200px"这种没人报的坏。
+ *
+ * ⚠️ 本批只有**新落点**（撤销设备）走这一族。回收站那一格仍指它自己那套类，
+ *    因为它这一批刚被逐张看过截图钉住（`apps/web/evidence/danger-confirm/`），
+ *    在同一次改动里既换语义又换外观，红了就说不清是哪一半。
+ *    归并这一族 = 计划 §P7（页头/间距/宽度）的活，判据已经写在那里。
+ *
+ * 全部取值走 token：裸 hex/px/ms/z-index 会被 `check:design` 与 `check:l4` 拦。
+ */
+
+.ht-danger-confirm__overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ht-space-4);
+  background: var(--ht-color-overlay);
+  z-index: var(--ht-z-modal);
+}
+
+.ht-danger-confirm__dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-5);
+  width: 100%;
+  max-width: var(--ht-layout-content-max);
+  padding: var(--ht-space-6);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-lg);
+  color: var(--ht-color-foreground);
+}
+
+.ht-danger-confirm__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ht-space-3);
+}

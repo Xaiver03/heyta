@@ -31,7 +31,7 @@
  * ## 关闭策略来自一张表，不在这里判
  *
  * `closePolicyOf(overlay)` 是唯一依据（同目录 `dismissal.ts`）。
- * `ask-discard` 的三类里少了 `onDismissAttempt` 就**不关** —— 安全侧默认：
+ * `ask-discard` 的那几类里少了 `onDismissAttempt` 就**不关** —— 安全侧默认：
  * 不关，用户再点一次还在；关了，填了一半的表单就没了。
  */
 

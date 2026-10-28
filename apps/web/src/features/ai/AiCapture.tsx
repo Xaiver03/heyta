@@ -493,7 +493,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
             <div className="ht-ai__actions">
               <button
                 type="button"
-                className="ht-btn"
+                className="ht-btn ht-btn--secondary"
                 data-testid="capture-send"
                 onClick={() => void send()}
               >
@@ -633,7 +633,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
         <div className="ht-ai__actions">
           <button
             type="button"
-            className="ht-btn"
+            className="ht-btn ht-btn--secondary"
             data-testid="capture-apply"
             disabled={draftTitle.trim() === ''}
             onClick={() => void apply()}
@@ -718,7 +718,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
 
             type="button"
 
-            className="ht-btn"
+            className="ht-btn ht-btn--secondary"
 
             data-testid="capture-retry"
 

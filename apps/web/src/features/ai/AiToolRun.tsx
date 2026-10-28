@@ -382,7 +382,7 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
         />
         <button
           type="button"
-          className="ht-btn"
+          className="ht-btn ht-btn--secondary"
           data-testid="ai-tool-run-button"
           onClick={run}
           disabled={text.trim() === '' || phase === 'running'}
@@ -427,7 +427,7 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
               <div className="ht-ai__actions">
                 <button
                   type="button"
-                  className="ht-btn"
+                  className="ht-btn ht-btn--secondary"
                   data-testid="ai-tool-send"
                   onClick={() => void execute()}
                 >
@@ -584,7 +584,7 @@ function RunResult(props: {
             <div className="ht-ai__actions">
               <button
                 type="button"
-                className="ht-btn"
+                className="ht-btn ht-btn--secondary"
                 aria-label={t('web.ai.tools.confirmAria')}
                 data-testid="ai-tool-confirm"
                 onClick={props.onConfirm}

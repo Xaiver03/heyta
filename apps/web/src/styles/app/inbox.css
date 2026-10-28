@@ -96,13 +96,6 @@
   border-color: var(--ht-color-border);
 }
 
-.ht-inbox__tab:focus-visible,
-.ht-inbox__action:focus-visible,
-.ht-inbox__copy:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-inbox__actions {
   display: flex;
   align-items: center;
@@ -643,20 +636,10 @@
 }
 
 .ht-rail__customize-action:hover,
-.ht-rail__customize-action:focus-visible,
 .ht-rail__customize-toggle:hover,
-.ht-rail__customize-toggle:focus-visible,
-.ht-rail__reset:hover,
-.ht-rail__reset:focus-visible {
+.ht-rail__reset:hover {
   background: var(--ht-color-surface-sunken);
   color: var(--ht-color-foreground);
-}
-
-.ht-rail__customize-action:focus-visible,
-.ht-rail__customize-toggle:focus-visible,
-.ht-rail__reset:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 .ht-rail__more-menu {
@@ -730,20 +713,8 @@
   column-gap: var(--ht-space-1);
 }
 
-.ht-rail__more-item:hover,
-.ht-rail__more-item:focus-visible {
+.ht-rail__more-item:hover {
   background: var(--ht-color-surface-sunken);
-}
-
-.ht-rail__more-item:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
-/* 焦点环必须可见 —— 抹掉它是最常见的可访问性回归 */
-.ht-rail__tab:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 /* 🔴 2026-10-16：`.ht-viewtab` / `--active` / `:hover` / `:focus-visible` 四条规则

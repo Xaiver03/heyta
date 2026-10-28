@@ -34,12 +34,14 @@
  * 仍然是这里的判据 —— 面板与入口要么一起有，要么一个都不留。
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useI18n, type I18nValue } from '@heyta/i18n';
 import { HeytaUiProvider, NotesBoard, type NotesBoardLabels } from '@heyta/ui';
 
 import { selection, useSelected } from '../../lib/selection.js';
 import { NoteEditorCard } from './NoteEditorCard.js';
+import { UndoReceipt } from '../../lib/feedback/UndoReceipt.js';
+import { restoreOrRefuse, undoReceiptFor } from '../../lib/feedback/undo-receipt.js';
 import { useNoteStore } from './store.js';
 
 /** 构造共享 `NotesBoard` 的全部文案。字段名与 `NotesBoardLabels` 逐项对应，漏了编译不过。 */
@@ -75,6 +77,9 @@ export function NotesView({ editorInColumn }: { editorInColumn: boolean }): Reac
   const notes = useNoteStore((s) => s.notes);
   const addNote = useNoteStore((s) => s.addNote);
   const removeNote = useNoteStore((s) => s.removeNote);
+  const restoreNote = useNoteStore((s) => s.restoreNote);
+  /** 删除之后那一条可撤销回执（P3）。时长与暂停归 `@heyta/ui`，这里只有一格内容。 */
+  const [undo, setUndo] = useState<{ readonly label: string; readonly run: () => Promise<void> } | undefined>(undefined);
   const togglePinned = useNoteStore((s) => s.togglePinned);
 
   /**
@@ -101,6 +106,14 @@ export function NotesView({ editorInColumn }: { editorInColumn: boolean }): Reac
 
   return (
     <HeytaUiProvider>
+      {undo === undefined ? null : (
+        <UndoReceipt
+          label={undo.label}
+          onUndo={undo.run}
+          data-testid="notes-undo"
+          onDismiss={() => { setUndo(undefined); }}
+        />
+      )}
       {editorInColumn ? null : <NoteEditorCard inset={false} />}
       <NotesBoard
         notes={notes}
@@ -111,7 +124,19 @@ export function NotesView({ editorInColumn }: { editorInColumn: boolean }): Reac
           return addNote(content);
         }}
         onRemove={(entityId) => {
-          void removeNote(entityId);
+          // 正文取**删之前**的那一条：回执要说出撤销的是哪张便签，而删完之后
+          // `notes` 里已经没有它了（回收站才算得回来，那是另一份数据）。
+          const excerpt = notes.find((note) => note.id === entityId)?.content.split('\n')[0]?.slice(0, 40) ?? '';
+          void removeNote(entityId).then(() => {
+            if (!undoReceiptFor('note')) return;
+            setUndo({
+              label: t('web.feedback.undo.note', { title: excerpt }),
+              run: () => restoreOrRefuse(
+                () => restoreNote(entityId),
+                t('web.feedback.undo.refused', { title: excerpt }),
+              ),
+            });
+          });
         }}
         onTogglePinned={(entityId, pinned) => {
           void togglePinned(entityId, pinned);

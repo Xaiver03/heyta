@@ -39,6 +39,7 @@ import { useProjectStore } from '../projects/store.js';
 import { getWebVaultSession } from '../../lib/vault-session.js';
 import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { text } from '../../lib/text.js';
+import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';
 import {
   unwrapShareIdentitySeed,
   storeShareIdentity,
@@ -147,6 +148,17 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
   const [inputValue, setInputValue] = useState(initialToken ?? '');
   const [listName, setListName] = useState('');
   const [needsUnlock, setNeedsUnlock] = useState(false);
+  /* 🔴 令牌 / 清单名住在组件本地 state，关掉即丢 ⇒ 三条通道先问一句。
+     判脏**分相位**：只有 `input` / `error` 这两格场上有可丢的东西；
+     `consent`（还没开始打）与 `done`（已经加进去了）都拦一道确认，
+     就是把成本摊给每一次正常操作。 */
+  const { requestDismiss, guard } = useDirtyDismissGuard({
+    overlay: 'modal-dirty-form',
+    isDirty: () =>
+      (phase.kind === 'input' || phase.kind === 'error')
+      && (inputValue.trim() !== '' || listName.trim() !== ''),
+    onDismiss: onClose,
+  });
   const creatingRef = useRef<Set<string>>(new Set());
 
   const api = useMemo(() => {
@@ -287,8 +299,9 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
     <div
       style={styles.overlay}
       data-testid="share-join-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) requestDismiss('scrim'); }}
     >
+      {guard}
       <div
         role="dialog"
         aria-modal="true"
@@ -317,7 +330,7 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
             data-testid="share-join-close"
             aria-label={t('web.share.dialog.close')}
             className="ht-btn ht-btn--ghost"
-            onClick={onClose}
+            onClick={() => requestDismiss('escape')}
           >
             <X size={ICON_SIZE.sm} aria-hidden="true" />
           </button>

@@ -46,6 +46,7 @@ export interface HeytaNativeTokens {
   readonly 'color.danger': string;
   readonly 'color.danger-strong': string;
   readonly 'color.danger-subtle': string;
+  readonly 'color.on-danger': string;
   readonly 'color.info': string;
   readonly 'color.info-strong': string;
   readonly 'color.info-subtle': string;
@@ -152,6 +153,7 @@ export interface HeytaNativeTokens {
   readonly 'z.overlay': number;
   readonly 'z.modal': number;
   readonly 'z.popover': number;
+  readonly 'z.modal-commitment': number;
   readonly 'z.toast': number;
   readonly 'z.tooltip': number;
   readonly 'z.splash': number;
@@ -162,6 +164,7 @@ export interface HeytaNativeTokens {
   readonly 'icon.xl': number;
   readonly 'touch-target.min': number;
   readonly 'focus-ring.width': number;
+  readonly 'focus-ring.offset': number;
   readonly 'layout.rail-width': number;
   readonly 'layout.sidebar-width': number;
   readonly 'layout.sidebar-min-width': number;
@@ -283,6 +286,7 @@ export const lightTokens: HeytaNativeTokens = {
   'color.danger': "#dc2626",
   'color.danger-strong': "#b91c1c",
   'color.danger-subtle': "#fef2f2",
+  'color.on-danger': "#ffffff",
   'color.info': "#0284c7",
   'color.info-strong': "#0369a1",
   'color.info-subtle': "#f0f9ff",
@@ -377,6 +381,7 @@ export const lightTokens: HeytaNativeTokens = {
   'z.overlay': 300,
   'z.modal': 400,
   'z.popover': 500,
+  'z.modal-commitment': 550,
   'z.toast': 600,
   'z.tooltip': 700,
   'z.splash': 900,
@@ -387,6 +392,7 @@ export const lightTokens: HeytaNativeTokens = {
   'icon.xl': 32,
   'touch-target.min': 44,
   'focus-ring.width': 2,
+  'focus-ring.offset': 1,
   'layout.rail-width': 64,
   'layout.sidebar-width': 240,
   'layout.sidebar-min-width': 192,
@@ -503,6 +509,7 @@ export const darkTokens: HeytaNativeTokens = {
   'color.danger': "#f87171",
   'color.danger-strong': "#fca5a5",
   'color.danger-subtle': "#dc262629",
+  'color.on-danger': "#020617",
   'color.info': "#38bdf8",
   'color.info-strong': "#7dd3fc",
   'color.info-subtle': "#0284c729",
@@ -597,6 +604,7 @@ export const darkTokens: HeytaNativeTokens = {
   'z.overlay': 300,
   'z.modal': 400,
   'z.popover': 500,
+  'z.modal-commitment': 550,
   'z.toast': 600,
   'z.tooltip': 700,
   'z.splash': 900,
@@ -607,6 +615,7 @@ export const darkTokens: HeytaNativeTokens = {
   'icon.xl': 32,
   'touch-target.min': 44,
   'focus-ring.width': 2,
+  'focus-ring.offset': 1,
   'layout.rail-width': 64,
   'layout.sidebar-width': 240,
   'layout.sidebar-min-width': 192,
