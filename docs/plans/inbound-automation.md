@@ -5912,7 +5912,7 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 | 2·计量归属 | 写明计量归属，A4 口径只登记不代拍 | ADR §3.5 三条 + §5 ⚠️「A4 不在本档里、归负责人」；H1 读到"额度恰好 +1、attempts 0 行、op 差 0"（spec 注释 :989/:998/:1067 那一族） | ✅ 登记 / 🔴 A4 修法归负责人 |
 | 3·a 存储+查询+错误路径 | 窗口后正文不可再读出，三面都要 | A1（存储）/ A26（查询 `select` 恰七列）/ A14·A15·A22（三行 202 回显）/ **A27（失败兜底只披露稳定码，上游原话不许带出来）** —— 后两枚本戳新增并在零脏载具上实跑 | ✅ |
 | 3·b 503 不变 | 未配置收件人公钥时行为与现在一致 | A10：没有公钥时仍然先 503，不许降级成"我们代读" | ✅ |
-| 3·c 设备侧仍是写任务那方 | 服务端不新增 op 写入口 | 设备侧两条：`packages/app-host/tests/inbound-worker.spec.ts:98`「recovers an encrypted prepared result without returning task plaintext」＋ H1 那条把整条腿走完的用例（A22 红灯描述就是"设备档接住冻结结果…任务仍在"）；服务端零写入由 A18（集成面 op 差 0）+ A17（不写 attempts 台账）钉。`inbound-process.spec.ts` 那 6 条是权益票据闸门，不承担这一格 | ✅ |
+| 3·c 设备侧仍是写任务那方 | 服务端不新增 op 写入口 | 设备侧两条：`packages/app-host/tests/inbound-worker.spec.ts:98`「recovers an encrypted prepared result without returning task plaintext」＋ H1 整腿用例；**计数断言逐行**（`inbound-dual-host-fault-windows.integration.spec.ts` 窗口 6）：设备提交后 `operation.count(inbound:*)` = **0**（:590，服务端没写 op）→ 设备带 receipt 补传后 = **1** 且 `opType` 是 `BATCH`（:601-602，写回的是设备）；同族计数：`automationCommitPermit.count` = 0（:537，服务端不签发提交许可）、`automationAiAttempt.count` = 1（:506/:521，那是设备腿自己的账本）。变异臂 A18/A16/A17 各打坏一处。`inbound-process.spec.ts` 那 6 条是权益票据闸门，不承担这一格 | ✅ |
 | 3·每尺有臂 | 每把尺都要有变异臂 | 臂架**在册枚数读 `--list` 末行**（别抄这里的数），A1–A27 逐枚各自跑红过；A23–A27 是本会话补的。**判据 → 臂**对照：存储 A1／查询 A26／响应 A14·A15·A22／失败兜底 A27／503 A10／零 op A17·A18／重试 A23–A25／零日志 A11 | ✅ |
 | 4·check:docs | 过 | `node research/tools/docs-link-check.mjs` rc=0 | ✅ |
 | 4·i18n 对称 + 单一事实源 | 过 | `cd packages/i18n && vitest run` ⇒ `Tests 30 passed (30)`；本会话改动没新增任何文案 | ✅ |
