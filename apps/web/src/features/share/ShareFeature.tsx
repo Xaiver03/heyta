@@ -54,6 +54,7 @@ import { clearStorageShareLog } from './comment-actions.js';
 import { loadShareConsent, saveShareConsent } from './share-consent-store.js';
 import { registerShareRosterTarget } from '../../lib/share-signal-sink.js';
 import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';
+import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
 import { resetWebShareSession } from './share-session.js';
 import { createWebShareKeyRotation } from './share-rotation.js';
 import {
@@ -486,20 +487,23 @@ export function ShareFeature(props: ShareFeatureProps) {
 
   const shareKeyEntry = phase.kind === 'panel' ? getShareKeyEntry(localStorage, phase.shareId) : undefined;
 
+  /*
+   * P6：遮罩 + 面板 + 三条关闭通道 + 焦点三件事收进 `WebModalShell`（判断仍查共享那张表）。
+   * 这一层原本画在组件自己的位置、`fixed` 覆盖整屏，所以**不需要** `portalToBody` ——
+   * 与入群那一侧（挂在 sticky 侧栏里）的区别就是那一行为什么只有它要搬。
+   */
   return (
-    <div
-      style={styles.overlay}
-      data-testid="share-dialog-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) requestDismiss('scrim'); }}
+    <WebModalShell
+      overlayStyle={styles.overlay}
+      dialogStyle={styles.dialog}
+      labelledBy="ht-share-title"
+      policy="modal-dirty-form"
+      testId="share-dialog"
+      busy={phase.kind === 'creating' || inviteBusy}
+      onCancel={onClose}
+      onDismissAttempt={(via) => requestDismiss(via)}
+      overlayChildren={discardGuard}
     >
-      {discardGuard}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ht-share-title"
-        data-testid="share-dialog"
-        style={styles.dialog}
-      >
         <div style={styles.headRow}>
           <div style={styles.headText}>
             <h2 id="ht-share-title" style={styles.dialogTitle}>
@@ -737,7 +741,6 @@ export function ShareFeature(props: ShareFeatureProps) {
             ) : null}
           </>
         ) : null}
-      </div>
-    </div>
+    </WebModalShell>
   );
 }

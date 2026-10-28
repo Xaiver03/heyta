@@ -62,9 +62,10 @@
  */
 
 import { createPortal } from 'react-dom';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useMenuKeyboard } from '../../lib/menu/useMenuKeyboard.js';
 import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';
+import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
 import { ICON_SIZE } from '@heyta/design-system';
 import {
   DEFAULT_REVIEW_OFFSETS,
@@ -143,21 +144,38 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
     || draftGoalType !== 'atLeast'
     || draftFrequency !== 'daily'
     || draftWeeklyDays.length !== 1;
+  /**
+   * 把十格草稿放回默认值。
+   *
+   * 🔴 P6 迁移时补的一格：原来只有"提交成功"这条路会清草稿，而**放弃**那条不会 ——
+   * 于是确认框说"这次的修改会丢掉"，重开时 DOM 里躺着的还是上一份草稿（实测与
+   * 机制见 §7 第 611 条，那一枚缺陷在 `CategoryCreateDialog` 上是靠"草稿随开合挂载"
+   * 根治的；这一屏的十格 state 与 `add()` 的校验共用，抽不出那个内层组件，
+   * 所以这里治的是同一个**行为**：离开这一层就一定不再持有草稿）。
+   */
+  const resetDraft = (): void => {
+    setDraft('');
+    setDraftIcon(undefined);
+    setDraftTarget('1');
+    setDraftUnit('');
+    setDraftGoalType('atLeast');
+    setDraftFrequency('daily');
+    setDraftInterval('2');
+    setDraftWeeklyDays([isoWeekday(toLocalDate(readNow()))]);
+    setDraftReview([...DEFAULT_REVIEW_OFFSETS]);
+    setDraftIconOpen(false);
+    setDraftBackfillDays('');
+  };
   const closeCreateForm = (): void => {
     setCreateOpen(false);
     setAddError(undefined);
+    resetDraft();
   };
-  const { requestDismiss, asking, guard } = useDirtyDismissGuard({
+  const { requestDismiss, guard } = useDirtyDismissGuard({
     overlay: 'modal-dirty-form',
     isDirty: isDraftDirty,
     onDismiss: closeCreateForm,
   });
-  // 下面那个一次性 keydown 监听读 ref 而不是 `asking`：进 deps 会让 effect 重跑，
-  // 而它开头那句 `requestAnimationFrame(() => nameInputRef.current?.focus())`
-  // 会把焦点从刚弹出的确认框手里抢回名称输入框。
-  const askingRef = useRef(false);
-  askingRef.current = asking;
-  const dialogRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   /**
    * 左列的数据：进度行 + 它自己的 7 天窗口。
@@ -230,51 +248,9 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
     } finally {
       setAdding(false);
     }
-    setDraft('');
-    setDraftIcon(undefined);
-    setDraftTarget('1');
-    setDraftUnit('');
-    setDraftGoalType('atLeast');
-    setDraftFrequency('daily');
-    setDraftInterval('2');
-    setDraftWeeklyDays([isoWeekday(toLocalDate(readNow()))]);
-    setDraftReview([...DEFAULT_REVIEW_OFFSETS]);
-    setDraftIconOpen(false);
-    setDraftBackfillDays('');
+    resetDraft();
     setCreateOpen(false);
   }
-
-  useEffect(() => {
-    if (!createOpen) return;
-    const frame = window.requestAnimationFrame(() => nameInputRef.current?.focus());
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && !adding) {
-        event.preventDefault();
-        // 确认框开着时 Esc 归它（= 安全侧的「继续编辑」），这一层不许抢。
-        if (askingRef.current) return;
-        requestDismiss('escape');
-      }
-      if (event.key !== 'Tab' || askingRef.current) return;
-      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled])',
-      );
-      if (focusable === undefined || focusable.length === 0) return;
-      const first = focusable[0]!;
-      const last = focusable[focusable.length - 1]!;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown, true);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener('keydown', onKeyDown, true);
-    };
-  }, [adding, createOpen]);
 
   /**
    * 菜单键盘（P5）。
@@ -367,26 +343,27 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
       )
     : null;
 
-  const createDialog = createOpen
-    ? createPortal(
-        <div
-          className="ht-habit-create-dialog"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !adding) requestDismiss('scrim');
-          }}
-        >
-          {/* 丢弃确认画在**这一层里面**（不是 body）：它拦的就是这一层，
-              同一个层叠上下文里后来者在上，才不用跟宿主的 z-index 比数字。 */}
-          {guard}
-          <div
-            ref={dialogRef}
-            className="ht-habit-create-dialog__dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="ht-habit-create-title"
-            data-testid="habit-create-dialog"
-          >
+  /*
+   * P6：遮罩 + 面板 + `role="dialog"`/`aria-modal`/`aria-labelledby`、三条关闭通道查表、
+   * 提交中不许关、焦点三件事（初始焦点 / Tab 不外逃 / 关闭归还触发者）全在 `WebModalShell` 里。
+   * 原来这里是 `createPortal(document.body)` + 一份手写的 Tab 焦点陷阱 + 一条 capture 阶段的
+   * `keydown`（本文件是第三枚这样写的壳，见 §7 第 607 条为什么不能 portal 到 body）。
+   */
+  const createDialog = createOpen ? (
+    <WebModalShell
+      overlayClass="ht-habit-create-dialog"
+      dialogClass="ht-habit-create-dialog__dialog"
+      labelledBy="ht-habit-create-title"
+      policy="modal-dirty-form"
+      testId="habit-create-dialog"
+      busy={adding}
+      initialFocusRef={nameInputRef}
+      onCancel={closeCreateForm}
+      onDismissAttempt={(via) => requestDismiss(via)}
+      /* 丢弃确认画在遮罩层内、面板之外：同一个层叠上下文里后来者在上，
+         不用跟宿主的 z-index 比数字。 */
+      overlayChildren={guard}
+    >
             <header className="ht-habit-create-dialog__header">
               <h2 id="ht-habit-create-title" className="ht-type-section-title">{t('web.habits.create.title')}</h2>
               <button type="button" className="ht-habit-create-dialog__close" aria-label={t('web.habits.create.close')} onClick={() => requestDismiss('escape')} disabled={adding}>
@@ -689,10 +666,8 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
                 </button>
               </footer>
             </form>
-          </div>
-        </div>,
-        document.body,
-      )
+    </WebModalShell>
+  )
     : null;
 
   return (

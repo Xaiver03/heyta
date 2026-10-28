@@ -154,14 +154,17 @@ const MODAL_LEDGER = {
   'apps/web/src/features/ai/AssistantPanel.tsx': { ariaModal: 0, dialogRole: 1 },
   'apps/web/src/features/auth/AuthPanel.tsx': { ariaModal: 1, dialogRole: 1 },
   'apps/web/src/features/calendar/CalendarCapturePopover.tsx': { ariaModal: 0, dialogRole: 1 },
-  'apps/web/src/features/habits/HabitsView.tsx': { ariaModal: 1, dialogRole: 1 },
   'apps/web/src/features/inbox/InboxBell.tsx': { ariaModal: 0, dialogRole: 1 },
   'apps/web/src/features/legal-recheck/LegalReconfirmSheet.tsx': { ariaModal: 1, dialogRole: 1 },
   'apps/web/src/features/privacy/PrivacyConsentSheet.tsx': { ariaModal: 1, dialogRole: 1 },
-  'apps/web/src/features/share/JoinSharedListDialog.tsx': { ariaModal: 1, dialogRole: 1 },
-  'apps/web/src/features/share/ShareFeature.tsx': { ariaModal: 1, dialogRole: 1 },
   'apps/web/src/features/shell/CompactRailNavigation.tsx': { ariaModal: 0, dialogRole: 1 },
-  'apps/web/src/features/sync/ConflictDialog.tsx': { ariaModal: 1, dialogRole: 1 },
+  /*
+   * 🔴 2026-10-28（P6 第二批）：这四行**跟着删**，不是放宽判据 ——
+   * `HabitsView` 的新建习惯、`ShareFeature` 的分享面板、`JoinSharedListDialog` 的入群、
+   * `ConflictDialog` 的冲突解决都改吃 `WebModalShell`，`role="dialog"`/`aria-modal`
+   * 那两枚标记现在只住在壳那一个文件里（每迁一枚，这张表就少一行；
+   * 判据的候选下限那一臂会在"迁完之后扫描器自己瞎了"时红，不会因为表变短而松）。
+   */
   /*
    * 2026-10-27（P2）：`TrashView` 自己那一层搬进了 `DangerConfirmDialog`，
    * 所以它不再被扫到 —— 这一行**跟着删**，不是放宽判据：落点一处没少，

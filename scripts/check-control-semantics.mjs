@@ -173,13 +173,29 @@ export function cssVarName(token) {
 }
 
 /**
- * A8 的谓词：**不带任何色调后缀**的 `className="ht-btn"`。
+ * A8 的谓词：**一整枚字符串就是 `ht-btn`**（没有色调后缀）。
  * 立项现量是 18 处（AI 面板、隐私同意层、危险确认的「取消」），它们没有底也没有
  * hover 底，图上读起来就是说明文字 —— 那一格今天归零，所以要有一把尺守住归零。
- * 这一枚只认 `className="ht-btn"` 这一种写法，别的形状（模板串、`clsx` 拼接）
- * 由 A4/A5 兜：它们要么引用一个不存在的档，要么根本不在类名集里。
+ *
+ * 🔴 原来这一枚只认 `className="ht-btn"` 那一种写法，并把"别的形状（模板串、三元）
+ * 由 A4/A5 兜"当成理由写在注释里 —— 那句话是**错的**：A4/A5 比的是"引用的档在不在 CSS 里"，
+ * 而 `ht-btn` 当然在，所以三元里写 `: 'ht-btn'` 的裸档**两边都不红**。
+ * 实测抓到的一处就是这一枚（`features/sync/ConflictDialog.tsx` 的
+ * `info.preferred ? 'ht-btn ht-btn--primary' : 'ht-btn'`），尺读 0、仓里躺着真裸档。
+ * 现在谓词按**字符串整枚等于**判：`"ht-btn"`、`'ht-btn'`、`` `ht-btn` `` 都算，
+ * 而 `"ht-btn ht-btn--primary"` 这种带后缀的不会误伤（它不是整枚等于）。
  */
-const BARE_CLASS_RE = /className="ht-btn"/g;
+const BARE_CLASS_RE = /["'`]ht-btn["'`]/g;
+
+/**
+ * A8 的判据本体（单独收成一枚函数，是为了让 self-test 能**直接喂两种写法**：
+ * `className="ht-btn"` 与三元里的 `: 'ht-btn'`。挂在真实文件上做这一臂，
+ * 今天只能证明"现在没有"，证明不了"这一种形状抓得到"。
+ */
+export function hasBareBtn(text) {
+  BARE_CLASS_RE.lastIndex = 0;
+  return BARE_CLASS_RE.test(text);
+}
 
 /** 取 `const NAME … = { … }` 的花括号配平体（表文件里只有这一处需要）。 */
 function objectLiteral(text, name) {
@@ -475,8 +491,7 @@ function scan() {
   for (const scope of USE_SCOPES) {
     for (const abs of sourceFiles(join(ROOT, scope))) {
       const text = stripComments(readFileSync(abs, 'utf8'));
-      if (BARE_CLASS_RE.test(text)) bare.push(relative(ROOT, abs));
-      BARE_CLASS_RE.lastIndex = 0;
+      if (hasBareBtn(text)) bare.push(relative(ROOT, abs));
       for (const m of text.matchAll(new RegExp(`${BASE_CLASS}--([a-z-]+)`, 'g'))) {
         variants.add(m[1]);
         const site = relative(ROOT, abs);
@@ -637,6 +652,21 @@ async function selftest(real) {
   bareArm.used = usedWith([], ['apps/web/src/features/x/Bare.tsx']);
   const bareRead = check(bareArm);
   push('⑭ 不带色调的 .ht-btn ⇒ A8 红（立项现量 18 处，今天归零要守得住）', bareRead.length === 1 && bareRead[0].startsWith('A8'), bareRead.join(' | '));
+
+  /*
+   * ⑰ A8 的**形状**那一维：裸档写成三元里的字符串也要抓得到。
+   * 这一臂存在的原因不是"想多一条臂"：原来那句注释写着"别的形状由 A4/A5 兜"，
+   * 而 A4/A5 比的是"引用的档在不在 CSS 里"——`ht-btn` 当然在，所以那种写法两边都不红，
+   * 仓里就躺着一枚真的（`ConflictDialog` 的 `: 'ht-btn'`）。尺读 0 ≠ 没有。
+   * 反向那一半同样要紧：带后缀的档不许被误伤，否则下一次归零会被"怕误伤"绕过去。
+   */
+  push(
+    '⑰ 裸档写成三元字符串 ⇒ A8 的谓词抓得到，且带后缀的档不误伤',
+    hasBareBtn(`className={info.preferred ? 'ht-btn ht-btn--primary' : 'ht-btn'}`)
+      && !hasBareBtn('className="ht-btn ht-btn--primary"')
+      && hasBareBtn('className="ht-btn"'),
+    '三元里的 \'ht-btn\' 必须算裸档；"ht-btn ht-btn--primary" 必须不算',
+  );
 
   let flagCode = 0;
   let flagErr = '';
