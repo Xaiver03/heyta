@@ -43,7 +43,7 @@ describe('automation rule transport', () => {
     const fetch = vi.fn().mockResolvedValue(response({ error: 'x' }, 403));
     const remote = createInboundRulesRemote({ baseUrl: 'https://example.test', getToken: async () => 'token', fetchImpl: fetch });
     await expect(remote.list()).rejects.toMatchObject({ code: 'forbidden' });
-    const malformed = createInboundRulesRemote({ baseUrl: 'https://example.test', getToken: async () => 'token', fetchImpl: vi.fn().mockResolvedValue(response({ rules: [{}] })) });
+    const malformed = createInboundRulesRemote({ baseUrl: 'https://example.test', getToken: async () => 'token', fetchImpl: vi.fn().mockResolvedValue(response({ rules: [{}] })) }); // fixture-parity: 故意不法样本（测 fail-closed：这一枚**就该**被读面拒掉）
     await expect(malformed.list()).rejects.toMatchObject({ code: 'transport' });
   });
   it('manages sender credentials without ever accepting a malformed secret response', async () => {
