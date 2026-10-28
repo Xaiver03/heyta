@@ -5884,6 +5884,8 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 **三、A26 臂，零脏载具实跑。** 往 `select` 里加回 `payloadCiphertext: true` ⇒ 对照臂（未注入）**绿**、A26 红 **1 条**并点名
 「列表接口的 select 只取元数据」、`还原_ok`；汇运 `✓ 全部臂都按预期红：跑过 1 臂／在册 26`、rc=**0**（载具 `.worktrees/inb-query-arm` @`c89f3eb6d`，起跑 `git status` 0 脏，跑完由本线删除）。
 
+**三之二、A27 臂单独补跑（2026-10-28 23:0x；收口审计发现下面那张汇总表把 A27 记成"已实跑"，而本节只有 A26 的读数、汇运写的是"在册 26"）。** 按"汇总表不能代替读数"的规矩补一次：载具 `.worktrees/inb-a27` @`ddb95a5e9`，起跑 `git status --porcelain` 回 **0** 脏。🔴 **载具里装完依赖必须先 `pnpm build`**：不构建时单元面报 `Failed to resolve entry for package "@heyta/inbound-core"`，对照臂会被读成**「红 -1 条」**（日志里没有任何 vitest 汇总行）——那是一枚会伪装成"臂红"的假红，别把它当成判据有牙的证据。构建 rc=0 之后同一条命令：对照臂（未注入）**绿**、A27 红 **1 条**并点名「上游给了词表外的新错误码 ⇒ 只披露稳定码，上游那句原话一个字都不带出来」、`还原_ok`；汇运 `✓ 全部臂都按预期红：跑过 1 臂／在册 27`、rc=**0**。
+
 **四、判据 3 三半 × 用例 × 臂，逐条对账**（这张表就是"每一半都红得起来"的账）：
 
 | 判据 3 的那一半 | 钉住它的用例 | 变异臂 | 读数 |
@@ -5913,7 +5915,7 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 | 3·a 存储+查询+错误路径 | 窗口后正文不可再读出，三面都要 | A1（存储）/ A26（查询 `select` 恰七列）/ A14·A15·A22（三行 202 回显）/ **A27（失败兜底只披露稳定码，上游原话不许带出来）** —— 后两枚本戳新增并在零脏载具上实跑 | ✅ |
 | 3·b 503 不变 | 未配置收件人公钥时行为与现在一致 | A10：没有公钥时仍然先 503，不许降级成"我们代读" | ✅ |
 | 3·c 设备侧仍是写任务那方 | 服务端不新增 op 写入口 | 设备侧两条：`packages/app-host/tests/inbound-worker.spec.ts:98`「recovers an encrypted prepared result without returning task plaintext」＋ H1 整腿用例；**计数断言逐行**（`inbound-dual-host-fault-windows.integration.spec.ts` 窗口 6）：设备提交后 `operation.count(inbound:*)` = **0**（:590，服务端没写 op）→ 设备带 receipt 补传后 = **1** 且 `opType` 是 `BATCH`（:601-602，写回的是设备）；同族计数：`automationCommitPermit.count` = 0（:537，服务端不签发提交许可）、`automationAiAttempt.count` = 1（:506/:521，那是设备腿自己的账本）。变异臂 A18/A16/A17 各打坏一处。`inbound-process.spec.ts` 那 6 条是权益票据闸门，不承担这一格 | ✅ |
-| 3·每尺有臂 | 每把尺都要有变异臂 | 臂架**在册枚数读 `--list` 末行**（别抄这里的数），A1–A27 逐枚各自跑红过；A23–A27 是本会话补的。**判据 → 臂**对照：存储 A1／查询 A26／响应 A14·A15·A22／失败兜底 A27／503 A10／零 op A17·A18／重试 A23–A25／零日志 A11 | ✅ |
+| 3·每尺有臂 | 每把尺都要有变异臂 | 臂架**在册枚数读 `--list` 末行**（别抄这里的数），A1–A27 逐枚各自跑红过（A27 的单独读数在「三之二」那一趟）；A23–A27 是本会话补的。**判据 → 臂**对照：存储 A1／查询 A26／响应 A14·A15·A22／失败兜底 A27／503 A10／零 op A17·A18／重试 A23–A25／零日志 A11 | ✅ |
 | 4·check:docs | 过 | `node research/tools/docs-link-check.mjs` rc=0 | ✅ |
 | 4·i18n 对称 + 单一事实源 | 过 | `cd packages/i18n && vitest run` ⇒ `Tests 30 passed (30)`；本会话改动没新增任何文案 | ✅ |
 | 4·web / mobile spec | 过 | 电池腿 `AC6-web-specs` `10 files / 33 tests`、`AC4-mobile-inbound` `1 / 15`、`AC4-app-host` `15 / 112`，全 rc=0；另：`pnpm --filter @heyta/web typecheck` 现量 rc=**0** —— B245 登记的那枚红（本线 `inbound-hosted-extraction-ui.spec.tsx` 的可变捕获收窄）已由 `8180d6295` 修掉，本轮复跑确认 | ✅ ；⚠️ 一条**产品边界**（别把它读成缺陷）：`grep -rn hostedExtraction apps/mobile/src` ⇒ **0 命中**，`apps/mobile/tests/inbound-*.spec.ts` 只有 `inbound-cycle-display.spec.ts`（15 条）⇒ **这一档的开关目前只在 web 上**，移动端没有它；交付 4 要的"apps/mobile 相关 spec"指的是那份 inbound 显示层用例，不是这一档的界面。 |
