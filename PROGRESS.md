@@ -7573,3 +7573,39 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ⑦ 落点：`docs/adr/0077-inbound-hosted-extraction-at-ingest.md` §6 第 1 条与 §7 H-2、`docs/plans/inbound-automation.md` §4 第 1 格 + 新增 §7/§8、本账。
       没 push、没 apply 迁移、没改对外文案、AC 一格没勾；门与 spec 的读数都取自同一戳 —— HEAD 为 `5440f019a`，
       被测物是**它之上的工作树**（含别线未提交的 `App.tsx`，⑥ 那枚红正是这么来的，`check:docs` 那几道本线文件里的门不受它影响）。
+
+211. **自动收集线 · 接替上一会话（它死在一道取不到退码的类型检查上），把它最后一批改动验实并入库**（写前先跑 `date`，本机 2026-10-28 13:0x-14:0x）。
+    ① **死点与那枚空读数的真因**：上一会话最后一条是 `cd server && pnpm exec tsc --noEmit 2>&1 | tail -15; echo "退码=${PIPESTATUS[0]}"`，
+      留下的读数是空的 `退码=`。**空不是"没跑成"**：本机外层 shell 是 `/bin/zsh`（现量 `echo $0`），zsh 的管道状态叫 `$pipestatus`
+      且 1-indexed ⇒ `${PIPESTATUS[0]}` 在 zsh **恒空**，那条命令即使干净退出也打不出数字。实测它其实是 **rc=0**。
+      ⇒ 登记一枚**待入 traps**（`docs/reference/environment-traps.md` 此刻仍被并行会话在写，按纯追加账纪律不落它，正文在本条 ① 与工单 §0）：
+      取退码要 `cmd > log 2>&1; rc=$?`，别在 zsh 会话里读 `${PIPESTATUS[0]}` —— 一个恒空又能读成两种意思的退码栏，比没有退码更坏。
+    ② **那批改的是什么**：判据第 3 条「服务端没有新增 op 写入口」原先只有两句散文撑着，而撑它们的断言比的是别的名字 ——
+      源码读门槛的 needle 里没有真正的 op-log 写入口（臂 A16 第一趟：门槛一言不发，红的是夹具缺键造成的 5 条**意外**）；
+      `H1` 那句"不写任何 op"底下比的是带 `inbound:` 前缀的那一枚（服务端写出一枚别的 id 的 op，前缀那把数不到）。
+      补成**三把各比一层**：needle 加 `operation\.create` 与 `automationAiAttempt`、事务替身记"这一趟真发生过哪些写"并断言清单为空、
+      `H1` 另按**用户全量**比这一趟前后 `operation.count` 之差。臂读数：A16/A17 各红 2 条、A18 红 1 条，三面对照臂各先绿。
+      ⚠️ 取证方法记一条：**臂的时刻按那份台架目录里 `logs/arm-*.log` 的 mtime 取**，别按证据文件的小节标题 ——
+      那两枚标题写着 01:4x／02:4x，而日志上的实际戳是 09:5x／10:4x（同一文件 10:5x 才落笔）。
+    ③ **我这趟补的验证**（上一会话没跑完的那一步）：`cd server && npx tsc --noEmit` **rc=0**（原件 0 字节 `logs/tsc-noemit-1028.log`）；
+      `npx vitest run tests/inbound-hosted-extraction.spec.ts tests/inbound-automation.routes.spec.ts` rc=0、`Tests 32 passed (32)`；
+      `find . -name '*.mut-bak'`（剔 `node_modules`）**空** ⇒ 那趟臂架是干净还原后停的；三道文档门各 rc=0。
+      `pnpm check:ui-language` 仍 rc=1、命中仍全在别线那枚未提交的 `apps/web/src/App.tsx` 插入块里
+      （`git show HEAD:apps/web/src/App.tsx | grep -c web.calendar.sidebar` 回 **0**）；⚠️ 被点名的行号在两小时内从 2532/2533 漂到 2560/2561
+      —— 又一枚"正文里别存行号"的现量，本条只写形状不写号。
+    ④ 🔴 **撞见一道门自己翻脸**：`verify-inbound-doc-tables.py` 在 13:07 那趟 rc=1、点名**别线**那枚 `docs/plans/collaboration-shared-lists.md`
+      并把"第四类基线"打成 **0 行**，而 12:5x 与 13:0x 两趟都打 **3 行**、rc=0；那三趟之间没落过任何一笔提交
+      （现量：`git rev-parse --short refs/heads/main` 两趟同为 `2799fbb2a`，`git log -3` 显示上一枚是 10:16 的 `d8aee1dad`），
+      且复跑时那枚文件与 HEAD 逐字节一致（`git status --porcelain -- docs/plans/collaboration-shared-lists.md` 空）
+      ⇒ 那一枚红是**别人正在写那枚文件的几十秒**，不是仓库坏。
+      规矩：**报这道门的读数要带戳与"读的是哪一棵树"**，只写 rc 会把一次瞬时事件写成长期状态（工单那张读数表已按这条补了 ⚠️ 段）。
+      ⚠️ 而同一道门随后**真的红在我自己头上**，形状值得单独记：我把一段说明散文插进了那张表的行中间，
+      剩下的那一行就成了"表头下面没有分隔行"的裸文字 ⇒ **列数判据对整个碎片失效**。
+      尺点名的那一行本身是准的，所以这条不是"尺指错地方"，是一条纯形状纪律：
+      **一张表中间插散文＝拆表，说明要写在整张表之后。**
+    ⑤ **入库的形状**（共享工作树）：这笔必须 `git commit --only -- <那三枚>` —— 暂存槽里此刻躺着**别人** `git add` 过的
+      `docs/plans/global-ux-system-remediation.md`（状态 `AM`：他们 staged 一版、工作树又改一版），裸 commit 会把他们那半静默带走。
+      复核两件：`git show --stat` 回**恰好三枚文件**；提交后 `git status --porcelain -- <他们那枚>` 仍回 `AM`（槽没被动）。
+    ⑥ **边界一件没因接管而变**：迁移没 apply、生产 env 没动、不 push、helm 不动 ⇒ 这一档在本机之外不生效；
+      对外披露六格草稿仍一处未发（工单 §5.2）；AC 一格没勾；A4 双重扣费的修法仍在负责人手上；`HOSTED_EXTRACTION_TIMEOUT_MS` 仍是推导不是实测；
+      mobile 仍没有规则编辑器。逐条现量命令在 `docs/plans/inbound-automation.md` 文末那一节的边界表里。

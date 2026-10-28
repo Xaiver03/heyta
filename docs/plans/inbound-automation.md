@@ -5082,3 +5082,85 @@ cd server && npx vitest run                          # server 全套
 ⇒ 红的形状是 `t(条件 ? 'a' : 'b')` 这种**三元当参数**的写法，而那把门自己的注释里就写着这个形状（`scripts/check-ui-language.mjs` 现量
 `grep -n "三元表达式" scripts/check-ui-language.mjs`）。**处置**：不改那枚文件、也不放宽自己的判据（本批的门全绿）；
 交给日历那条线，形状上是 `条件 ? t('a') : t('b')` —— 一句话都不是本线能替他们拍的。
+
+---
+
+## 2026-10-28 12:5x · 接管上一会话：它死在一道取不到退码的类型检查上，把它的最后一批改动验实并入库
+
+### 0. 接手的入口（谁、死在哪、剩什么）
+
+接替的是那份会话导出（`00_INBOX/会话导出/按照这个建议，你来启用目标模式，做完这些东西_2026-10-28_12-16.md`）里那枚
+目标「窄档·接收即抽取」的续跑，重启后为 `1793162906292-5069a2`。它的**死点**是这一条：
+
+```bash
+cd server && NO_COLOR=1 pnpm exec tsc --noEmit 2>&1 | tail -15; echo "退码=${PIPESTATUS[0]}"
+```
+
+会话留下的最后一行是 `退码=`（空），随后连接中断。
+
+🔴 **那个空读数不是"命令没跑成"的证据，是探针自己造的**：本机外层 shell 是 zsh（现量 `echo $0`），
+zsh 的管道状态数组叫 `$pipestatus` 且 **1-indexed**，`${PIPESTATUS[0]}` 在 zsh 里恒为空 ⇒
+**这条命令即使干净退出，那一行也打印不出数字**。一个既能读成"跑了、没事"又能读成"没跑到"的空栏，
+就是本仓那条元规则说的"打不到的守卫"。
+
+**待入 traps 一枚**（`docs/reference/environment-traps.md` 此刻正被并行会话写着，按上文 §7 那条纪律不单独落纯追加账，
+免得别人整文件 `git add` 把这条冲掉）：
+> 取命令退码要 `cmd > log 2>&1; rc=$?; echo $rc`，别在外层是 zsh 的会话里读 `${PIPESTATUS[0]}` —— 它在 zsh 恒空，
+> 而"恒空的退码栏"会让下一位把一次成功的运行读成一次失败的运行（本线那枚 `tsc --noEmit` 实际是 rc=0）。
+
+### 1. 那一批改的是什么（三把尺各比一层）＋我这趟的验证
+
+上一会话最后落在工作树、没入库的是三枚文件（`docs/adr/0077-inbound-hosted-extraction-at-ingest.md`、
+`server/tests/inbound-hosted-extraction.spec.ts`、`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts`），
+做的是判据第 3 条「服务端没有新增 op 写入口」那一半：**两句散文各自多承诺了一件事**，
+而撑它们的断言比的是别的名字（详 [ADR-0077](../adr/0077-inbound-hosted-extraction-at-ingest.md) §3.4 与 §5 第六处）。
+
+| 尺 | 钉的是哪一层 | 臂 |
+|---|---|---|
+| 源码读门槛的 needle 补上 `operation\.create` 与 `automationAiAttempt` | 这条腿里不许长出那两个**名字** | A16 / A17 各红 2 条（门槛 + 计数） |
+| 事务替身装上那两张表并记"这一趟真发生过哪些写"，断言清单为空 | 经由任何 helper 伸进来的**写入**都不许发生 | 同上那 2 条里的计数那枚 |
+| H1 里按**用户全量**比这一趟前后 `operation.count` 之差 | 与 op 的 id 长成什么形状无关 | A18 红 1 条（H1） |
+
+**臂的读数时刻由日志自己带，别抄这里的数**：
+`ls -laT ~/.heyta-evidence/inbound-hosted-extraction-20261027/logs | grep -E 'arm-(0-control|16|17|18)'`。
+⚠️ 校正一处：那份证据文件里这两节的**标题**写着 01:4x / 02:4x，而三枚臂与三面对照臂的实际运行戳是那几份日志上的时间
+—— 读那份文件时按日志对时刻，不按标题。
+
+我这趟在同一戳重跑的（不是替上一会话抄数，是它没跑完的那一步）：
+
+| 那一格 | 命令 | 读数 |
+|---|---|---|
+| 🔴 上一会话死掉的那道 | `cd server && npx tsc --noEmit` | **rc=0**（原件 `~/.heyta-evidence/inbound-hosted-extraction-20261027/logs/tsc-noemit-1028.log`，空文件） |
+| 单元两面 | `cd server && npx vitest run tests/inbound-hosted-extraction.spec.ts tests/inbound-automation.routes.spec.ts` | rc=0，`Tests 32 passed (32)`（数由汇总行自己打） |
+| 变异残留 | `find . -name '*.mut-bak'`（剔 `node_modules`） | 空 ⇒ 那趟臂架是干净还原后停的，工作树里没留变异体 |
+| 文档 / 表形状 / 口音 | `pnpm check:docs`；`python3 research/tools/verify-inbound-doc-tables.py`；`node scripts/check-docs-voice.mjs` | 三道各 rc=0 |
+| 界面语言 | `pnpm check:ui-language` | rc=1，命中仍全在 `apps/web/src/App.tsx` 那枚**别线未提交的插入块**里（`git show HEAD:apps/web/src/App.tsx \| grep -c web.calendar.sidebar` 回 **0**）。⚠️ 被点名的行号在两小时内漂过一次 —— 又一枚"正文别存行号"的现量，所以这里只写形状不写号 |
+
+⚠️ **那枚表形状尺读的是工作树，不是 HEAD —— 我这趟当场被它的瞬时读数骗了一次**：13:07 那一趟它点名
+**别线**那枚 `docs/plans/collaboration-shared-lists.md`（报的是"格内反引号配不成对"那一类，且把该类的基线打成 **0 行**），
+而 12:58 与 13:09 两趟都打 **3 行**、rc=0；那三趟之间没有任何新提交（现量：`git rev-parse --short refs/heads/main` 在 12:58 与 13:09 同为
+`2799fbb2a`，且 13:09 的 `git log -3` 显示上一枚是 10:16 的 `d8aee1dad` —— 中间那段没有落过任何一笔），
+且 13:09 时那枚文件与 HEAD 逐字节一致（`git status --porcelain -- docs/plans/collaboration-shared-lists.md` 空）。
+⇒ 那一枚红是**别人正在写那枚文件的几十秒**，不是仓库坏；报这道门的读数要带**戳**与"读的是哪一棵树"，
+只写 rc 会把一次瞬时事件写成长期状态。
+
+⚠️ 反过来说，同一道门随后**真的红在我自己头上**，而且形状值得记：我把上面那段 ⚠️ 插进了这张表的行中间，
+剩下那一行就被 GFM 当成"表头下面没有分隔行"的裸文字 —— 于是**列数判据对整个碎片失效**。
+尺点名的那一行本身是准的（它就是那张碎片的表头），所以这条不是"尺指错地方"，是一条纯形状纪律：
+**一张表中间插散文＝拆表，说明要写在整张表之后。**
+
+### 2. 入库这一笔的形状（共享工作树里为什么必须 `--only`）
+
+暂存槽里此刻躺着**别人** `git add` 过的 `docs/plans/global-ux-system-remediation.md`（状态 `AM`：他们 staged 一版、工作树又改一版）。
+不带 pathspec 的 `git commit` 会连他们那半一起带走，而他们下一次 `git diff` 那段再无差异 ⇒ 静默替他们提交。
+所以这一笔走 `git commit --only -- <那三枚>`：`git show --stat` 回**恰好三枚文件**，
+提交后复核 `git status --porcelain -- docs/plans/global-ux-system-remediation.md` 仍回 `AM`（他们的槽没被动）。
+
+### 3. 边界（一件没因接管而变，逐条给现量命令）
+
+1. **迁移没 apply**、生产 env 没动、不 push、helm 不动 ⇒ 这一档在本机之外**不生效**；顺序闸仍是
+   `docs/runbooks/deployment.md` 里"先跑迁移、`MIGRATE_RC=0` 才换容器"那一句（现量 `grep -n "先跑迁移" docs/runbooks/deployment.md`）。
+2. **AC 一格没勾**：`grep -cE '^- \[ \] \*\*AC-' docs/plans/inbound-automation.md` 与 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md`。
+3. **对外披露六格草稿一处未发**（工单 §5.2），措辞与法律表征归负责人。
+4. **A4 双重扣费的修法**仍在他手上；本档只保证新增这条腿不多扣一次。
+5. `HOSTED_EXTRACTION_TIMEOUT_MS` 仍是推导不是实测；mobile 仍没有规则编辑器 ⇒ 开关只在 web 上存在。
