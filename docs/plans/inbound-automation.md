@@ -5976,7 +5976,7 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
      ⇒ 正是"借标题"那一形（B205 描述的机制），但**不止一笔、不止一条路径**；
   2. **20 条无归属**（装置打不出笔号的那一档）；
   3. **约 15 条分散在若干小笔**，其中包含**本线自己合法该动、但那张死表里没有的路径**：
-     `docs/adr/0077-inbound-hosted-extraction-at-ingest.md`（★这枚 ADR 就是本任务要求写的）、`server/src/ai/**`、`packages/i18n/src/**`、
+     `docs/adr/0077-inbound-hosted-extraction-at-ingest.md`（★这枚 ADR 就是本任务要求写的）、**`docs/plans/email-to-task-brief.md`（★交付 6 要求重指向的那份，同样不在表里；它那笔 `35a6ec2d5` 就在 OOB 清单第 223 行）**、`server/src/ai/**`、`packages/i18n/src/**`、
      `apps/mobile/tests/**`、`apps/web/src/**`、`apps/node-host/**`、`docs/agents/**`、`docs/README.md`。
 - 为什么第 3 类会越界：`WHITELIST` 是**照 2026-10-09 任务书正文抄进来的死表**（装置 docstring 原话），
   而 10-27/10-28 才落地的 ADR-0077、`server/src/ai/managed-completion.ts`、相关 i18n 词条**当时都还不存在** ⇒ 表没跟上，**不是本线越界**。
