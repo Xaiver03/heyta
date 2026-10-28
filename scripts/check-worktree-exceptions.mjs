@@ -496,6 +496,15 @@ const SELF_TEST_ARMS = () => {
     })(),
     true,
   );
+  push(
+    '㉛ 折叠的那一栏不许把路径吞掉：classify 判为「索引旧内容」的每一枚，必须同时被「第三版」那一栏点名（真子集关系）',
+    (() => {
+      const c = classify([{ xy: 'MM', file: 'server/src/api.ts' }], OWNER_RULES, new Set());
+      const t = thirdVersionRows(V([['server/src/api.ts', 'IDX']]), V([['server/src/api.ts', 'HEAD']]), V([['server/src/api.ts', 'HEAD']]));
+      return [c.indexOnly.map((r) => r.file).sort(), t.map((r) => r.file).sort()];
+    })(),
+    [['server/src/api.ts'], ['server/src/api.ts']],
+  );
   push('④ 目录规则要按前缀吃下整棵子树', classify([E('e2e/tests/dirty-form-guard.spec.ts')], OWNER_RULES).rows[0].line, '全局 UX 分层整改线');
   push('⑤ 规则表自己必须干净（现在这份必须无违规）', auditRules(OWNER_RULES), []);
   push(
@@ -667,11 +676,11 @@ const main = () => {
   }
   console.log(`工作树例外归属 ｜ 未提交 ${v.checked} 枚 ｜ 规则 ${OWNER_RULES.length} 行`);
   for (const b of v.byLine) if (b.n > 0) console.log(`   ${String(b.n).padStart(3)} 枚 ← ${b.line}`);
-  if (v.indexOnly.length > 0) {
-    console.log(`   ⚠️ 索引旧内容 ${v.indexOnly.length} 枚（工作树对 HEAD 是**干净**的，脏的是索引那一格 ⇒ 不是"没登记的例外"）：`);
-    for (const r of v.indexOnly) console.log(`      ${r.xy} ${r.file}`);
-    console.log('      这格的正解是**那一趟提交前重新 `git add` 一次**（或改用 `git commit -- <路径>`），详见台账 §6.108');
-  }
+  // 🔴 「索引旧内容」那一档**不单独打印**了：它是下面「第三版」那一栏的真子集
+  //   （工作树==HEAD 且 索引≠HEAD ⇒ 索引既不等于 HEAD 也不等于工作树 ⇒ 必然命中），
+  //   两栏并排印同一批路径就是重复实现，而重复输出的代价是下一位不知道哪一栏是权威。
+  //   包含性由臂 ㉛ 钉住（classify 的 indexOnly 必须被第三版那一栏逐枚覆盖）；
+  //   这一档仍然参与**归属**（索引旧内容不是"没登记的例外"），所以 `v.indexOnly` 照常算，只是不再单独印。
   // 「第三版」这一栏：机制判据，不看 `git status` 那两个字符。
   // 分母只取"脏过"的路径（未跟踪件索引里本来就没有格子），三条 git 各一发批量取，不逐枚 spawn。
   const dirtyTracked = entries.filter((e) => !e.xy.includes('?')).map((e) => e.file);
@@ -687,11 +696,16 @@ const main = () => {
       execFileSync('git', ['ls-tree', '-r', '-z', 'HEAD', '--', ...dirtyTracked], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 }),
     );
     const present = dirtyTracked.filter((f) => existsSync(path.join(ROOT, f)));
-    const worktreeSha = new Map(
-      zip(present, execFileSync('git', ['hash-object', '--stdin-paths'], { cwd: ROOT, encoding: 'utf8', input: present.join('\n') + '\n' }).split('\n').filter((s) => s !== '')),
-    );
-    if (worktreeSha.size !== present.length) {
-      console.error(`🔴 工作树哈希取回 ${worktreeSha.size} 条、分母是 ${present.length} 枚 ⇒ 对不上账，这一栏今天不许报"没有雷"`);
+    let worktreeSha;
+    try {
+      worktreeSha = new Map(
+        zip(present, execFileSync('git', ['hash-object', '--stdin-paths'], { cwd: ROOT, encoding: 'utf8', input: present.join('\n') + '\n' }).split('\n').filter((s) => s !== '')),
+      );
+    } catch (e) {
+      // 🔴 这里曾经是"取完再比长度"的守卫 —— 那种写法**永远轮不到执行**：路径读不到时 `hash-object`
+      //   整发失败、`zip` 先抛，长度不等这一步提前在异常里发生了。守卫要包在真正会失败的那一步外面才算数
+      //   （台账 §6.111 第 ④ 维那条：写了但打不到的错误处理，等于没有错误处理）。
+      console.error(`🔴 工作树哈希这一发没取成 ⇒ 这一栏今天不许报"没有雷"：${String(e.message ?? e).split('\n')[0]}`);
       process.exit(2);
     }
     const third = thirdVersionRows(indexSha, headSha, worktreeSha);
@@ -699,7 +713,7 @@ const main = () => {
       console.log(`   ⚠️ 索引里躺着一版谁都不在看的东西 ${third.length} 枚（不带 pathspec 的 \`git commit\` 会把**索引那一版**写进历史）：`);
       for (const r of third) {
         if (r.wt === r.head && r.head !== null) {
-          console.log(`      ${r.file} ← 索引 ≠ HEAD，工作树 == HEAD ⇒ 提交它等于把已入库的内容退回旧版`);
+          console.log(`      ${r.file} ← 索引 ≠ HEAD，工作树 == HEAD ⇒ 提交它等于把已入库的内容退回旧版（旧版单独打印的那档「索引旧内容」就是这一种，正文见台账 §6.108）`);
           console.log(`         正解（只动这一格，不碰别人的暂存）：git update-index --cacheinfo 100644,${r.head},"${r.file}"`);
         } else if (r.head === null) {
           console.log(`      ${r.file} ← HEAD 里没有（新增件），索引那一版 ≠ 工作树最新那一段 ⇒ 提交它丢掉写的人最新的改动`);
