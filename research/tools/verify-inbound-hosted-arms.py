@@ -23,9 +23,12 @@
  1. **载具闸门**：任何一枚臂要点名的文件在工作树里是脏的 ⇒ 整趟拒跑（rc=3），一枚都不注入。
     理由是本仓的共享检出里同时有别线在飞的件（`docs/agents/workflow-rules.md` §8 那条"变异类验收不许在共享检出里开窗口"）。
     还原只从 `.mut-bak` 取、绝不借 `git checkout` —— 那会把别人同一枚文件里的在飞改动一起顶掉。
- 2. **库闸门**：集成面（H1 那五枚臂）的库**必须由调用方给** `HEYTA_INTEGRATION_DATABASE_URL`；
+ 2. **库闸门**：集成面（H1 那几枚臂）的库**必须由调用方给** `HEYTA_INTEGRATION_DATABASE_URL`；
     没给就拒跑，不再像台架的前身那样默认某个库名 —— 默认一个名字等于替别人占库，
     而集成档会写行。给法与建库三步在下面 `--only` 拒跑时打印。
+    ⚠️ 闸门的作用域**只到"这一趟点名的臂"**（`needs_integration`）：2026-10-28 第一版按整张表判，
+    `--only 23,24,25`（三枚单元面）也被拒 —— 范围写宽不等于更安全，它只是逼人建一枚不必要的库或不跑。
+    同理对照臂只跑这趟用到的规格（`controls_for`），不拿整张表的三个面当分母。
 """
 
 from __future__ import annotations
@@ -170,11 +173,26 @@ ARMS = [
      '    if (!rule) throw new Error(\'Automation event cannot be retried\');'),
 ]
 
-FACES = (('server 两枚 spec', 'server', 'server', SERVER_SPEC),
-         ('web 那枚 spec', 'web', 'apps/web', WEB_SPEC),
-         ('集成那一格（只 H1）', 'integration', 'server', INTEGRATION_SPEC))
-
 ARM_FILES = sorted({arm[1] for arm in ARMS})
+
+
+def needs_integration(arms: list[tuple]) -> bool:
+    """这一趟要点名的臂里有没有走集成面的 —— 库闸门的作用域**只到这枚答案**。
+
+    2026-10-28 实测的失法：第一版按**整张 ARMS 表**判，于是 `--only 23,24,25`（三枚单元面）
+    也被库闸门拒（rc=3）。理由站不住：库闸门防的是"集成档往别人库里写行"，单元面一枚都不写库。
+    范围写宽了不等于更安全 —— 它让"只想验三枚单元臂"的人要么去建一枚没必要的库，要么干脆不跑。
+    """
+    return any(arm[3].startswith(INTEGRATION_PREFIX) for arm in arms)
+
+
+def controls_for(arms: list[tuple]) -> list[tuple[str, str]]:
+    """这一趟真正要跑的规格（去重）⇒ 对照臂的面。**按点名到的规格取**，不拿整张表的三面当分母：
+    对照臂的作用是"注入之前这枚规格本来就绿"，跑一枚这趟用不到的规格只会多烧几分钟并把红引进来。"""
+    seen: dict[tuple[str, str], None] = {}
+    for arm in arms:
+        seen.setdefault((arm[2], arm[3]), None)
+    return list(seen)
 
 
 def sha(path: str) -> str:
@@ -327,13 +345,7 @@ def main() -> int:
         return 3
     print(f'2026 CARRIER_HEAD={head} dirty=0（臂点名的 {len(ARM_FILES)} 枚文件与整棵树都干净）')
 
-    integration_needed = any(arm[3].startswith(INTEGRATION_PREFIX) for arm in ARMS)
-    if integration_needed and not os.environ.get('HEYTA_INTEGRATION_DATABASE_URL'):
-        print(f'🔴 库闸门：{PROVISION_HINT}')
-        return 3
-
-    ev = Path(args[args.index('--ev') + 1]) if '--ev' in args else root / '.run-logs' / f'inb-hosted-arms-{time.strftime("%m%d-%H%M")}'
-    ev.mkdir(parents=True, exist_ok=True)
+    # `--only` 先解析：库闸门与对照臂的作用域都只到"这一趟要点名的臂"（见 needs_integration/controls_for 的注释）。
     only = None
     if '--only' in args:
         wanted = {int(v) for v in args[args.index('--only') + 1].split(',') if v.strip()}
@@ -342,27 +354,35 @@ def main() -> int:
             print(f'🔴 --only 里这些臂序号不在册：{sorted(unknown)}')
             return 2
         only = wanted
+    selected = [arm for index, arm in enumerate(ARMS, start=1) if only is None or index in only]
+
+    if needs_integration(selected) and not os.environ.get('HEYTA_INTEGRATION_DATABASE_URL'):
+        print(f'🔴 库闸门：{PROVISION_HINT}')
+        return 3
+
+    ev = Path(args[args.index('--ev') + 1]) if '--ev' in args else root / '.run-logs' / f'inb-hosted-arms-{time.strftime("%m%d-%H%M")}'
+    ev.mkdir(parents=True, exist_ok=True)
 
     baseline = {rel: sha(str(root / rel)) for rel in ARM_FILES}
     bad = []
     control_green = True
-    for title, name, cwd, spec in FACES:
-        log = ev / f'arm-0-control-{name}.log'
+    for face_index, (cwd, spec) in enumerate(controls_for(selected)):
+        log = ev / f'arm-0-control-{face_index}.log'
         env = dict(os.environ)
         command = face_command(spec, env)
         if isinstance(command, str):
-            print(f' 0 · 对照臂 {title} ⇒ 🔴 拒跑：\n{command}')
+            print(f' 0 · 对照臂 {spec} ⇒ 🔴 拒跑：\n{command}')
             control_green = False
             continue
         with open(log, 'w', encoding='utf-8') as handle:
             subprocess.run(command, cwd=str(root / cwd), env=env, stdout=handle, stderr=subprocess.STDOUT)
         count, _ = failures(str(log))
-        print(f' 0 · 对照臂 {title} ⇒ {"绿" if count == 0 else f"🔴 红 {count} 条"}')
+        print(f' 0 · 对照臂 {spec} ⇒ {"绿" if count == 0 else f"🔴 红 {count} 条"}')
         # 集成面那枚对照如果红，可能是载具库里没有 H1 的产物 —— 那照样是"这台机器跑不动这套用例"，
         # 与单元面同判：对照不绿，后面每一臂的红都不能算数。
         control_green = control_green and count == 0
     if not control_green:
-        print('🔴 对照臂不绿：22 臂的红不能算数，先修基线')
+        print(f'🔴 对照臂不绿：{len(selected)} 臂的红不能算数，先修基线')
         return 1
 
     for index, arm in enumerate(ARMS, start=1):
@@ -469,6 +489,15 @@ def self_test() -> int:
     check('⑧b 旗标缺值或值位上是另一枚旗标 ⇒ 拒（不许静默退化成默认载具）',
           validate_args(['--root']) != '' and validate_args(['--root', '--list']) != '', validate_args(['--root', '--list']))
     check('⑧c 真·未知旗标 ⇒ 拒', validate_args(['--carier']) != '', validate_args(['--carier']))
+    # ⑩ 库闸门与对照臂的作用域只到"这一趟点名的臂"。第一版按整张表判 ⇒ `--only 23,24,25`（三枚单元面）
+    # 也被拒（rc=3），逼着人要么建一枚不必要的库、要么干脆不跑。
+    unit_only = [ARMS[22], ARMS[23], ARMS[24]]
+    check('⑩a 只点名单元面的臂 ⇒ 不该要库', not needs_integration(unit_only), str([arm[0] for arm in unit_only]))
+    integration_only = [arm for arm in ARMS if arm[3].startswith(INTEGRATION_PREFIX)]
+    check('⑩b 点名到集成面的臂 ⇒ 必须要库', bool(integration_only) and needs_integration(integration_only),
+          f'集成面在册 {len(integration_only)} 枚')
+    check('⑩c 对照臂只取这趟用到的规格（去重）', controls_for(unit_only) == [('server', 'tests/automation-events.spec.ts')],
+          str(controls_for(unit_only)))
     # ⑨ 一枚臂都没判过的自检不算量过（防止"把 check 全删掉"留下 failed=0 的假绿）。
     check('⑨ 自检确实跑了臂', len(results) > 0, '一条臂都没跑')
     failed_arms = [name for name, ok, _ in results if not ok]
