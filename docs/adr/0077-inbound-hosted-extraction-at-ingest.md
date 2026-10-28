@@ -176,7 +176,7 @@ grep -n "payloadCiphertext\|resultCiphertext" server/src/automation/inbound.rout
 
 判据是**标记串**，不是"我们说没有"：`server/tests/inbound-hosted-extraction.spec.ts` 把一段带唯一标记串的
 正文喂进这条腿，然后断言那枚标记串**既不在写库参数里，也不在捕获到的全部日志输出里**；
-失败时对外只披露稳定码（`model-request-failed` 这类），错误路径不回显上游响应体、不回显端点字符串。
+失败时对外只披露稳定码（`model-request-failed` 这类），错误路径不回显上游响应体、不回显端点字符串。**兜底那一支也有用例**：词表外的错误码 ⇒ 兑现的 `reason` 恰好是 `model-request-failed`，且上游那句 `reason` 原话不出现在对外结构里（臂 A27 把它改成"透上游 reason" ⇒ 红）。
 这与 ADR-0054 对代理路由的约束同一条形状：**日志参数表就是保留清单**，没有接"内容"的位置。
 
 ⚠️ 上面那句原来只由单元档量着（假传输 + 捕获 logger），**真 HTTP 那一趟的对外响应体没量过**。
