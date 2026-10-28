@@ -735,6 +735,54 @@ function checkCarrierDefaults(baseRoot) {
   return out;
 }
 
+/* ── G12：载体机自己跑时的本机分支 —— 在位、窄、与远程同形 ─────────────────
+ * 2026-10-28 换载体之后新出现的一格：载体是 Linux，而"macOS/Linux ⇒ ssh 远端"这条分流
+ * 会让 `linux-dev` 上的一条任务 ssh 到**它自己**。Windows 那一支当初挡的就是这个形状，
+ * 只是换机器之后它够不着了。三条腿各钉一件事：
+ *   1. 分支在位，且判据是**主机名逐字相等**（不是"远程失败后改本机"——那是 G5 禁的静默降级）；
+ *   2. 走到这一支时**大声印出来**（"这个包是载体本机打的"必须能从输出里读出来）；
+ *   3. 与远程分支**同形**：同一枚 `--no-build-cache`、同一份镜像 init、同一套 env。
+ *      少了第 3 条，两条路会打出不同的 APK，而"产物来自哪条路"重新变成猜的。 */
+function checkCarrierLocalBranch(baseRoot) {
+  const out = [];
+  let router = '';
+  try {
+    router = readFileSync(join(baseRoot, 'scripts/run-gradle.mjs'), 'utf8');
+  } catch {
+    return ['G12 读不到 scripts/run-gradle.mjs —— 载体本机分支这条判据无法求值。'];
+  }
+  const BRANCH = /const onCarrier = !isWindows && hostname\(\) === CARRIER_HOSTNAME/;
+  const BANNER = /本机就是 Android 载体/;
+  const SAME_SHAPE = /\['--no-build-cache', `-I\$\{CARRIER_MIRROR_INIT\}`/;
+  const SAME_ENV = /ANDROID_HOME: SDK_ON_HOST, ANDROID_SDK_ROOT: SDK_ON_HOST, GRADLE_USER_HOME: GRADLE_HOME_ON_HOST/;
+  if (!BRANCH.test(router)) {
+    out.push(
+      'G12 载体本机分支没了或**变宽**了（要求 `hostname() === CARRIER_HOSTNAME` 这一形）—— ' +
+        '变宽等于"任何 Linux 都本机执行"，那台 Mac 之外的机器会静默绕开载体，' +
+        '而"远程失败就本机"正是 §6.1 要挡的形状。',
+    );
+  }
+  if (!BANNER.test(router)) {
+    out.push('G12 走到载体本机分支时不再大声印出来 —— 读输出的人无法区分"载体打的"与"远程打的"。');
+  }
+  if (!SAME_SHAPE.test(router)) {
+    out.push(
+      'G12 载体本机分支不再带 `--no-build-cache` 与 `-I <镜像 init>` —— 与远程分支不同形，' +
+        '两条路会打出不同的产物（新鲜度证明与 Maven 出口都跟着变）。',
+    );
+  }
+  if (!SAME_ENV.test(router)) {
+    out.push(
+      'G12 载体本机分支不再注入 ANDROID_HOME / ANDROID_SDK_ROOT / GRADLE_USER_HOME —— ' +
+        '`local.properties` 不入库，缺这三枚时载体会去读一个不存在或不属于它的 SDK 与缓存。',
+    );
+  }
+  if (BRANCH.test(router) && BANNER.test(router) && SAME_SHAPE.test(router) && SAME_ENV.test(router)) {
+    readings.push('G12 载体本机分支在位（按主机名匹配 ／ 大声标注 ／ 与远程同形同 env）');
+  }
+  return out;
+}
+
 /* ── 自检：逐臂证明每条判据都会红（臂 0 是阳性对照，臂 7/8 是豁免的正反两腿）── */
 
 /**
@@ -1138,6 +1186,31 @@ function selfTest() {
       }
     }
 
+/* 臂 16 / 16b / 16c / 16d：G12 的四条腿（每条只动一处 ⇒ 恰好 1 条红）。
+     * 16 是**最坏的那一种**：把主机名判据改成恒真，等于任何 Linux 都本机执行。 */
+    const g12Arms = [
+      { name: '16（主机名判据改成恒真）', from: 'const onCarrier = !isWindows && hostname() === CARRIER_HOSTNAME;', to: 'const onCarrier = !isWindows;' },
+      { name: '16b（摘掉本机分支的大声标注）', from: "'║ 本机就是 Android 载体 —— 直接在本机构建，不发 ssh。',", to: "'║',", },
+      { name: '16c（本机分支不再带 --no-build-cache 与 -I）', from: "const localArgs = carrier ? ['--no-build-cache', `-I${CARRIER_MIRROR_INIT}`, ...gradleArgs] : gradleArgs;", to: 'const localArgs = gradleArgs;' },
+      { name: '16d（本机分支不再注入 SDK 与私有 Gradle 目录）', from: '      env: carrier\n      ? { ...process.env, ANDROID_HOME: SDK_ON_HOST, ANDROID_SDK_ROOT: SDK_ON_HOST, GRADLE_USER_HOME: GRADLE_HOME_ON_HOST }\n      : process.env,', to: '' },
+    ];
+    for (const arm of g12Arms) {
+      seed();
+      const mutated = router.split(arm.from).join(arm.to);
+      if (mutated === router) {
+        console.log(`   🔴 臂 ${arm.name} 没施上：run-gradle.mjs 里读不到那一串 —— G12 的这条腿无从求值`);
+        fail = 1;
+        continue;
+      }
+      write('scripts/run-gradle.mjs', mutated);
+      msgs = checkCarrierLocalBranch(dir);
+      if (countRed(msgs, 'G12 ') === 1) console.log(`   ✅ 臂 ${arm.name} 转红：G12 抓到（恰好 1 条）`);
+      else {
+        console.log(`   🔴 臂 ${arm.name} 存活：G12 报了 ${countRed(msgs, 'G12 ')} 条（应当恰好 1）\n      ${msgs.join(' | ').slice(0, 200)}`);
+        fail = 1;
+      }
+    }
+
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -1166,6 +1239,7 @@ for (const f of [
   ...checkRouterInvariants(root),
   ...checkRemotePreflightPaths(root),
   ...checkCarrierDefaults(root),
+  ...checkCarrierLocalBranch(root),
 ]) {
   failures.push(f);
 }
