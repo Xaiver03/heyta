@@ -7805,5 +7805,19 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       接完后把改动打得着的 11 枚腿在同一 tip 重跑（`--only` 七枚 AC-7 + 三枚 AC-8 + 范围尺，不含会重写入库图的浏览器腿）⇒ `legs=11 rc0=10 rc_nonzero=1`，唯一非 0 仍是 B205。
     ⑦ 新增归负责人那一格：那句"两类明文元数据"要不要按代码现量补上权益签发那三张表、补哪几种语言、版本号与变更记录怎么同批 —— 本轮只交读数，不代拍、不发布。
 
+218. **自动收集线 · 「抽取成功后不能重抽」那行只有一枚宽松断言（202 也算过）；补四条能红的用例 + A23–A25 三枚臂，并把臂架闸门收窄到这一趟**（写前先跑 `date`，本机 2026-10-28 20:4x；tip `cc927bc4f`）
+    ① 缺口按作用面枚举：`grep -rn retryUncertainAutomationEvent server/tests` ⇒ **0 命中**（该函数无单测）；
+      集成面两处：`inbound-worker-identity.integration.spec.ts` 那条重试腿没覆盖"正文已丢/窗口已过"，
+      `inbound-dual-host-fault-windows.integration.spec.ts` 虽把 `payloadCiphertext` 置空，断言却是 `expect([202,409,410,503]).toContain(status)` —— **202 也算过**。
+    ② 新四条（`server/tests/automation-events.spec.ts`，沿用 mock-prisma 夹具）：一条绿头（重新入队 + 租约清空），三条该拒（正文已丢／窗口已过／已有许可），
+      且每条都断言 `update` 未被调用（不许"拒了还排队"）。现量 `Tests 12 passed (12)` rc=0。
+    ③ 三枚臂 A23/A24/A25 各摘一支守卫，**零脏载具**（`08de4063f` 起跑、装置提交 `ec2acb32f`、`git status --porcelain` 现量 0）实跑：
+      对照臂绿 ⇒ 三枚各红 **1 条**、各自点名对应用例、三枚 `还原_ok`，汇运 `✓ 全部臂都按预期红：跑过 3 臂／在册 25` rc=**0**；逐臂红了哪条写进 review 文末附录（A23–A25）。
+    ④ 臂架自修一枚**范围过宽**：库闸门与对照臂原按整张表判 ⇒ `--only 23,24,25`（纯单元面）也被 rc=3 拒。现在两者都只到"这一趟点名的臂"（`needs_integration` / `controls_for`），
+      自检加 ⑩a/⑩b/⑩c 三枚臂，现量 `self_test arms=18 failed=0`。**范围写宽不等于更安全**，它只是逼人建一枚不必要的库或干脆不跑。
+    ⑤ 文档不再写死枚数：ADR §5 那句"22 臂"、review 附录那两句"22 枚/跑过 22 臂"都改成"读装置 `--list` 末行"（那一趟的历史读数原样保留在原句里）。
+    ⑥ 边界：判卷口径零处动、**AC 勾数现量仍 0**、`packages/legal/**` 一个字节未动；载具 `.worktrees/inb-retry-arm` 由本线 `worktree remove` 删除。
+
+
 
 

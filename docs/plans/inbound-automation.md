@@ -5816,6 +5816,34 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 
 **六、归负责人那一格（新增，不代拍）**：那句"服务端预留两类明文元数据"要不要按代码现量补成"两类之外还有权益签发那三张表的标识与计数"，以及补哪几种语言、版本号与变更记录怎么同批 —— 都是对外法律表征，本轮只交上面这些读数。
 
+## 2026-10-28 20:4x · 「抽取成功后不能重抽」那行直到今天只有一枚**宽松**断言；补四条能红的用例 + 三枚变异臂，并把臂架的闸门收窄到这一趟（自动收集线）
+
+**一、缺口是怎么量出来的。** ADR-0077 §5 表里那行写着"显式重试只认结果不确定那一档，且要求源正文还在"，指向
+`server/src/automation/events.ts::retryUncertainAutomationEvent` 里三支守卫（正文缺席 / 留存窗口过期 / 已有提交许可）。
+现量按作用面枚举全部实例（不只盯一处）：
+- 单元面：`grep -rn retryUncertainAutomationEvent server/tests` ⇒ **0 命中**（这个函数一枚单测都没有）。
+- 集成面：`server/tests/integration/inbound-worker-identity.integration.spec.ts` 里那条重试腿覆盖了跨账号、attempt CAS、ruleVersion CAS、重复重试，
+  **没覆盖**"正文已丢"与"窗口已过"；`inbound-dual-host-fault-windows.integration.spec.ts` 里那条虽把 `payloadCiphertext` 置空，
+  但断言写的是 `expect([202,409,410,503]).toContain(status)` —— **202 也算过**，摘掉守卫照样绿。
+⇒ 这就是"尺在，但没有牙"那一形：句子在 ADR 里，红不了。
+
+**二、补的四条（`server/tests/automation-events.spec.ts`，沿用该文件的 mock-prisma 夹具）。**
+一条**绿头**：结果不确定 + 正文在 + 未过期 + CAS 对 + 无许可 ⇒ 确实重新入队、租约清空、`reasonCode` 清空；
+三条**该拒**：正文已丢（`payloadCiphertext: null`）/ 留存窗口已过 / 已有提交许可 ⇒ 抛 `Automation event cannot be retried`，**且一次重新入队都不许发生**（断言 `update` 未被调用）。
+绿头的意义是让后三条的红不可能来自"夹具坏了"。现量：`Tests 12 passed (12)`、rc=**0**。
+
+**三、三枚变异臂（A23/A24/A25）各摘一支守卫**，在**零脏载具**上实跑（`08de4063f` 起跑、装置提交 `ec2acb32f`，`git status --porcelain` 现量 0）：
+对照臂（`tests/automation-events.spec.ts` 未注入）**绿** ⇒ 三枚各红 **1 条**、各自点名对应那一行、三枚 `还原_ok`，
+汇运 `✓ 全部臂都按预期红：跑过 3 臂／在册 25`、rc=**0**。逐臂红了哪条写进 `docs/research/inbound-automation-review.md` 文末附录（A23–A25 三行）。
+
+**四、顺带修了臂架自己的一处**范围过宽**：库闸门与对照臂原先按**整张 ARMS 表**判，于是 `--only 23,24,25`（三枚单元面）也被 `rc=3` 拒
+（集成面的库跟它们一点关系都没有）。现在闸门与对照臂都只到"这一趟点名的臂"（`needs_integration` / `controls_for` 两枚纯函数），
+自检加了三枚臂（⑩a 单元子集不该要库／⑩b 点名到集成面必须拒／⑩c 对照只取用到的规格），现量 `self_test arms=18 failed=0`。
+⚠️ 这条登记要说清：范围写宽**不等于**更安全 —— 它只是逼人建一枚不必要的库，或者干脆不跑那三枚。
+
+**五、边界。** 判卷口径零处动，**AC-1～AC-8 勾数现量仍 0**；没动 `packages/legal/**` 一个字节；载具 `.worktrees/inb-retry-arm` 由本线删除。
+
+
 
 
 
