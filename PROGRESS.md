@@ -7609,3 +7609,14 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ⑥ **边界一件没因接管而变**：迁移没 apply、生产 env 没动、不 push、helm 不动 ⇒ 这一档在本机之外不生效；
       对外披露六格草稿仍一处未发（工单 §5.2）；AC 一格没勾；A4 双重扣费的修法仍在负责人手上；`HOSTED_EXTRACTION_TIMEOUT_MS` 仍是推导不是实测；
       mobile 仍没有规则编辑器。逐条现量命令在 `docs/plans/inbound-automation.md` 文末那一节的边界表里。
+    ⑦ **六件逐件回读时，查出第 1 件少写了一半**：目标要 ADR 写清「不持根密钥／不写 op-log」这条红线，
+      「不写 op」那一半有 §3.4 那三把尺，而「不持根密钥」那一半**只作为现状写在 §1 那张表里**（"服务端只有公钥"）。
+      现状不是约束：这条腿的七枚文件本来就 import `@heyta/inbound-core`（现量 `grep -rlF "from '@heyta/inbound-core'" server/src/automation | wc -l`），
+      下一位想在服务端解正文 **import 一行就够**，那句现状会变成假话而没一把尺拦他。
+      ⇒ 补成 ADR-0077 **§4.5**（红线）+ 新那枚源码读用例（扫 `src/automation` 整棵子树、先剥注释、**先断言文件数 > 0**）
+      + 三枚臂 A19（具名进口）／A20（**改名**的进口）／A21（抄原语）：三枚各红 1 条且红的正是这枚用例，三面对照臂先绿，未动的树单元面 16 条绿。
+      ⚠️ 两处踩过的形状一起记：**(a)** 针不能按"私钥"这个**词**下 —— 服务端合法持有 issuer 签名私钥
+      （`privateKeySeed`，现量 `grep -rn privateKeySeed server/src/automation | head -1`），那样当场假红；针只认能解开入站信封的那六个名字。
+      **(b)** 注入**不许真调用解密** —— 真调用缺私钥缺字段 ⇒ 红的原因是崩溃不是判据（就是本条 ② 里 A16 那 5 条意外红的成因）。
+      还有一枚**空读数**：`HOSTED_HANDOFF=PASS` 那行不打 stdout，它进这枚尺自己写的 results 文件；
+      扫 `.out` 读出空、差一点判成"这趟没跑 H1"，是 `grep -in handoff <results>` 加上 mtime 同戳才归因回搜法（工单文末 §4 记全）。

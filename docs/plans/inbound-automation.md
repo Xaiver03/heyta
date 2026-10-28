@@ -5164,3 +5164,43 @@ zsh 的管道状态数组叫 `$pipestatus` 且 **1-indexed**，`${PIPESTATUS[0]}
 3. **对外披露六格草稿一处未发**（工单 §5.2），措辞与法律表征归负责人。
 4. **A4 双重扣费的修法**仍在他手上；本档只保证新增这条腿不多扣一次。
 5. `HOSTED_EXTRACTION_TIMEOUT_MS` 仍是推导不是实测；mobile 仍没有规则编辑器 ⇒ 开关只在 web 上存在。
+
+### 4. 14:4x 追：完成审计查出「不持根密钥」那句以前只是**现状描述**，没写成**不许**
+
+按目标那六件逐件回读时，第 1 件要求 ADR 写清「服务端不持根密钥／不写 op-log 的红线」。
+「不写 op」那一半在 §3.4 已经有三把尺（上面第 1 节），但「不持根密钥」那一半**只在 §1 那张表里作为现状出现过一次**
+（"服务端只有公钥，`openInbound` 需要设备私钥"）。现状不是约束：这条腿的七枚文件本来就从 `@heyta/inbound-core` 拿东西
+（现量 `grep -rlF "from '@heyta/inbound-core'" server/src/automation | wc -l`），下一位想在服务端解正文，
+**import 一行就够**，而 §1 那句话会变成假话、且没有任何一把尺拦他。
+
+补的形状（三处一起，缺一处就是又一次"散文比断言宽"）：
+
+| 件 | 落点 |
+|---|---|
+| 红线本身 | [ADR-0077](../adr/0077-inbound-hosted-extraction-at-ingest.md) 新增 §4.5：具名的 `openInbound` 与它底下五枚原语（`x25519`／`getSharedSecret`／`envelopeKey`／`aesDecrypt`／`diffieHellman`）都不许进服务端 automation 面 |
+| 尺 | `server/tests/inbound-hosted-extraction.spec.ts` 里那枚新用例：扫 `src/automation` 整棵子树、先剥注释、**先断言扫到的文件数 > 0**（否则"哪都没命中"是零信息） |
+| 臂 | A19 具名进口、A20 **改名**的进口、A21 不进口而是抄原语 ⇒ 三枚各红 1 条，红的正是那枚新用例 |
+
+两条当场量到的事，都写进 §4.5 免得下一位重踩：
+
+1. **`privateKey` 这个词不能用当针** —— 服务端本来合法地持有 issuer 签名私钥
+   （现量 `grep -rn privateKeySeed server/src/automation | head -1` 命中 `entitlement-issuer.ts`）。
+   第一版我按"私钥"下针，那会当场假红。针只认**能解开入站信封**的那六个名字。
+2. **注入不许真去调用解密** —— 真调用就缺私钥、缺字段 ⇒ 红的原因是崩溃不是判据（A16 那 5 条意外红就是这个成因，
+   §1 第 1 节已经记过一回）。三枚臂都只把名字带进进口或代码形状里，不执行。
+
+新用例落地后同一趟的读数（`ls -laT ~/.heyta-evidence/inbound-hosted-extraction-20261027/logs | grep -E 'arm-(0-control|19|20|21)'` 取时刻）：
+三面对照臂先绿，A19/A20/A21 各红 1 条、`还原_ok`；未动的树单元面 16 条全绿（比补之前多 1 枚，就是这枚新用例）。
+集成面那一格**没有因这一笔重跑**：这一枚尺读的是源码，`H1` 的行为断言一字未动，而它在 14:4x 那趟 13 格全量里刚绿过。
+
+⚠️ 但取那趟读数时踩到一枚**空读数**形状，值得写下来：`HOSTED_HANDOFF=PASS` 那行**不打在 stdout**，
+它进的是这枚尺自己写的 results 文件（`Windows: 13/13` 才在 `.out` 里）。
+我按 `grep HOSTED_HANDOFF` 扫 `.out` 时读出**空**，第一反应是"这一趟没跑 H1"——
+现量两件事即可归因：`grep -in handoff <results 文件>` 回第 806 行那一枚 PASS，而它的 mtime 与 `.out` 同一戳
+（现量 `stat -f '%Sm' -t '%H:%M:%S' /private/tmp/heyta-inbound-dual-host.log`）。
+⇒ 与 §7 那条老规矩同一形：**空读数先归因搜法，再归因对象**；这枚"两行读数分住两个原件"的落点也记进上面那枚待入 traps。
+
+⚠️ 这条红线**仍然有一格量不到**，别读成已封死：源码读的尺管的是"能力面没被带进代码"，
+而"服务端进程此刻到底有没有一把设备私钥"是部署与密钥管理的事，不在这一层能红的那一格。
+这句写在 §4.5 最后一条里，措辞是"这把尺证不了什么"。
+
