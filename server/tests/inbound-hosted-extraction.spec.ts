@@ -295,4 +295,24 @@ describe('门槛：这条腿不许长出第二套实现，也不许碰任务写�
     expect(src).toMatch(/managedAiFetchTransport\(HOSTED_EXTRACTION_TIMEOUT_MS\)/u);
     expect(src).toMatch(/plaintextHosts: \[\]/u);
   });
+
+  it('服务端整个 automation 面不许长出"打开入站正文"的能力（不持收件私钥／Vault 根密钥那条红线的尺）', () => {
+    // 判的是**能力面**不是行为：`openInbound(value, privateKey, context)` 是收件私钥唯一的用法，
+    // 而下面四枚是它内部的原始件（x25519 协商、信封密钥、AES 解）。服务端今天七枚 automation 文件
+    // 都 import `@heyta/inbound-core`（那是 `sealInbound` 重封与摘要用的，方向只有加密），
+    // 但这六个词在整个 `server/src` 里现量各 0 枚 ⇒ 这一档不许把它们带进来。
+    // 🔴 两支针各自可红：具名进口（臂 A19）与被**改名**的进口（臂 A20 用 `as` 别名，
+    // 因为进口子句里原名必须出现，而调用点随你改名）；底层原语那一支钉的是"自己抄一份解密"（臂 A21）。
+    // 与 `privateKeySeed` 无关 —— 那是签发权益的 issuer 签名密钥，服务端本来就该持有（现量
+    // `grep -rn privateKeySeed server/src/automation | head -1`），把它当针会当场假红。
+    const files = sourceTree('src/automation');
+    // 分母自己站在判据里：扫到 0 枚文件时"哪都没命中"是零信息，所以先要求这一档真的有文件。
+    expect(files.length, '`src/automation` 下一枚 .ts 都没有 ⇒ 这把尺在空转').toBeGreaterThan(0);
+    const needles = ['openInbound', 'x25519', 'getSharedSecret', 'envelopeKey', 'aesDecrypt', 'diffieHellman'];
+    const hits = files.flatMap((file) => {
+      const code = stripComments(read(file));
+      return needles.filter((needle) => code.includes(needle)).map((needle) => `${needle}@${file}`);
+    });
+    expect(hits, `服务端长出解密面的地方：${hits.join(' , ') || '无'}`).toEqual([]);
+  });
 });
