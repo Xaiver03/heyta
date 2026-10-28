@@ -280,21 +280,74 @@ const NOT_AN_EMPTY_STATE = new Map([
  *   · `<Text>{t('x.empty')}</Text>`              → 仍然算（故障注入 E4/E5 实测）
  *   · 同一文件里两者都有                          → 仍然算（按出现位置判，不按文件判）
  *
- * ⚠️ 只认自闭合形状：共享实现的契约就是"props 进、骨架出"（它不收 children），
+ * ⚠️ 共享实现的契约是"props 进、骨架出"（它不收 children），
  *    写成 `<EmptyState>…</EmptyState>` 会被 React 忽略，不构成豁免面。
+ *
+ * 🔴 原来这一枚是按 `/<EmptyState[\s\S]*?\/>/` 找元素的 —— 那个形状在
+ *    **P7 给空态加动作槽之后就不成立了**：`action={<button … />}` 让元素内部
+ *    第一次出现"花括号里的 `/>`"，非贪婪匹配会在**宿主那枚按钮中间**收口，
+ *    于是这一格共享空态被读成"落点在共享元素之外"，
+ *    `HabitsView` 的 `data-testid="habits-empty-add"` 当场变成账外新空态（实测 rc=1）。
+ *
+ * ⚠️ 中途试过改用 `scripts/lib/jsx-tree.mjs` 的那棵共享树，**在这台仓库里不行**：
+ *    它自己的文件头就写着"不解析正则字面量与比较运算符里的 `<`"，而
+ *    `apps/mobile/src/screens/NotificationsScreen.tsx` 恰好有 —— 三处真共享空态
+ *    它只认出一处（实测：tree 给 1 个 range，旧正则给 3 个），换过去会把两格
+ *    合规站点读成违规。**判据的眼睛不能比它替掉的更瞎**，所以这里自己扫：
+ *    从 `<EmptyState` 起，按**花括号深度**走，字符串里的括号不算数，
+ *    深度 0 上遇到的第一个 `/>` 才是这一枚元素的结尾。
  */
 function sharedEmptyStateRanges(src) {
   const ranges = [];
-  for (const m of src.matchAll(/<EmptyState\b[\s\S]*?\/>/g)) {
-    ranges.push([m.index, m.index + m[0].length]);
+  const open = /<EmptyState\b/g;
+  for (const m of src.matchAll(open)) {
+    let depth = 0;
+    let quote = null;
+    let i = m.index + '<EmptyState'.length;
+    for (; i < src.length; i += 1) {
+      const ch = src[i];
+      if (quote !== null) {
+        if (ch === '\\') i += 1;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') {
+        quote = ch;
+        continue;
+      }
+      if (ch === '{') depth += 1;
+      else if (ch === '}') depth -= 1;
+      else if (depth === 0 && ch === '/' && src[i + 1] === '>') {
+        i += 1;
+        break;
+      } else if (depth === 0 && ch === '>') break;
+    }
+    ranges.push([m.index, i + 1]);
   }
   return ranges;
+}
+
+/** 这一处偏移是不是落在某一枚共享 `<EmptyState>` 元素**里面**（含它的 props）。 */
+function insideSharedEmptyState(ranges, offset) {
+  return ranges.some(([start, end]) => offset >= start && offset < end);
 }
 
 const SITE_MARKERS = [
   { kind: '骨架类', test: (src) => /ht-empty/.test(src) },
   { kind: '空槽位类', test: (src) => /__empty\b/.test(src) },
-  { kind: '空态 testid', test: (src) => /data-testid\s*=\s*["'][^"']*empty/.test(src) },
+  {
+    kind: '空态 testid',
+    // 🔴 逐处判，不按文件判：宿主**给共享空态传的那一枚动作按钮**也带 `*empty*` 的
+    //    testid（`habits-empty-add`），它是控件、不是第二份空态实现 —— 落在共享元素
+    //    范围内的一律不算站点（与下面"直接渲染空态词条"同一口径）。
+    test: (src) => {
+      const ranges = sharedEmptyStateRanges(src);
+      for (const m of src.matchAll(/data-testid\s*=\s*["'][^"']*empty/g)) {
+        if (!insideSharedEmptyState(ranges, m.index)) return true;
+      }
+      return false;
+    },
+  },
   {
     kind: '直接渲染空态词条',
     test: (src) => {

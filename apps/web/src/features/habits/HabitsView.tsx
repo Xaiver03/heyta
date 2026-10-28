@@ -688,6 +688,26 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
               title={t('web.habits.empty.title')}
               hint={t('web.habits.empty.hint')}
               testID="habits-empty"
+              /*
+               * 🔴 P7 的动作槽第一枚真消费者。这一屏原来只有 `hint` 那句
+               * "添加一个习惯，从今天开始记录" —— 它**描述**了下一步，
+               * 而能做那件事的控件是页头一枚**只有图标**的 `+`（`habits-add-open`），
+               * 站在空态对面的人得自己把那句话翻译成"哪个控件"。
+               * 现在动作长在它说的那块区域里，用的还是同一个既有词条（零新增文案）。
+               */
+              action={
+                <button
+                  type="button"
+                  className="ht-btn ht-btn--primary"
+                  data-testid="habits-empty-add"
+                  onClick={() => {
+                    setAddError(undefined);
+                    setCreateOpen(true);
+                  }}
+                >
+                  {t('web.habits.add')}
+                </button>
+              }
             />
           </HeytaUiProvider>
         ) : (

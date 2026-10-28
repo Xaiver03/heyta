@@ -16,6 +16,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { ReactNode } from 'react';
 
 import { nonBlank, toEmptyStateViewModel } from '../src/empty-state/model.js';
 
@@ -196,5 +197,22 @@ describe('toEmptyStateViewModel —— size 三档', () => {
       illustration: 'notes',
     });
     expect(v.illustration).toBeUndefined();
+  });
+});
+
+describe('动作槽（P7）—— 它只有"给/不给"两个方向，没有默认值', () => {
+  it('宿主给了动作 ⇒ 模型原样带过去，不替宿主判断该不该画', () => {
+    const action = { type: 'button' } as unknown as ReactNode;
+    expect(toEmptyStateViewModel({ title: '还没有习惯', action }).action).toBe(action);
+  });
+
+  it('🔴 对照臂：没给动作 ⇒ `undefined`，一格都不画（"纯无内容态不制造假动作"靠的就是这个省略方向）', () => {
+    expect(toEmptyStateViewModel({ title: '还没有习惯' }).action).toBeUndefined();
+  });
+
+  it('给了 `hint` 没给动作也**不许**凭空造一枚控件', () => {
+    const view = toEmptyStateViewModel({ title: '还没有习惯', hint: '添加一个习惯，从今天开始记录。' });
+    expect(view.hint).toBe('添加一个习惯，从今天开始记录。');
+    expect(view.action).toBeUndefined();
   });
 });

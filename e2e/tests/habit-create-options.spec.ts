@@ -141,3 +141,21 @@ test('习惯更多操作可导出真实打卡记录', async ({ page }) => {
   }
   expect(csv).toContain(name);
 });
+
+/**
+ * 🔴 P7 动作槽那一格的用户可见结果：空态里**就有**出口。
+ *
+ * 原来这一屏只有一句 hint（"添加一个习惯，从今天开始记录"），而能做那件事的控件是
+ * 页头一枚只有图标的 `+`。判据不测"有没有那句话"，测的是**点了空态里那枚按钮，
+ * 新建面板真的开了** —— 一句描述换成一个能按的东西，只有真点一次才算数。
+ */
+test('空态里的「添加习惯」直接开新建面板（动作长在它说的那块区域里）', async ({ page }) => {
+  await openApp(page, APP_ZH);
+  await switchView(page, '习惯');
+  const empty = page.getByTestId('habits-empty');
+  await expect(empty, '新账号的习惯视图本该是空态').toBeVisible();
+  await expect(empty.getByRole('button', { name: '添加习惯' })).toBeVisible();
+  await empty.getByRole('button', { name: '添加习惯' }).click();
+  await expect(page.getByTestId('habit-create-dialog')).toBeVisible();
+  await page.screenshot({ path: '../apps/web/evidence/empty-state-action/habits-empty-action.png' });
+});
