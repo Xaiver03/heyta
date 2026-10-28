@@ -7775,8 +7775,17 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       15 接线（拒时 `echo SHOULD_NOT_RUN` 不许出现在 log 且 rc 非 0）。现量 `--self-test` ⇒ **`arms=15 failed=0`** rc=0。
     ⑤ 两头都在**违规现场**取，不靠临时树自证：红头 `--root .worktrees/inb-clean --only AC6-browser` ⇒ `rc=78 前置拒绝，没开火`、
       `legs=1 rc0=0 rc_nonzero=1`，跑完载具非 png 脏条目 **0**（确实没执行）；绿头同一枚函数打在主检出回 **None**（那枚在、报 1.63.0）。
-    ⑥ 读数边界（别读宽）：载具上那 28 枚 rc=0 里现在**不含**浏览器腿（它按前置记 78）；"当前产物上浏览器 8 条全绿"的证据仍来自主检出 19:4x 那趟。
-      要一棵 30 腿全开火的载具，补 `cd e2e && pnpm install` 即可（只写载具自己那棵树）。副作用那三行同戳：`PNG_DIFF_LINES=18 EVIDENCE_DIRTY=18 CARRIER_DIRTY=18`，
-      18 枚全落在载具内，共享检出没被这趟碰。
+    ⑥ 读数边界（别读宽）：20:0x 那趟 30 腿里**不含**浏览器腿真开火（它按前置记 rc=78），那一趟"浏览器 8 条全绿"的证据仍来自主检出 19:4x 那格；
+      那趟副作用三行同戳 `PNG_DIFF_LINES=18 EVIDENCE_DIRTY=18 CARRIER_DIRTY=18`，18 枚全落在载具内，共享检出没被这趟碰。
+      ⇒ 30 腿全开火那一档由下面 ⑧ 补上了，别再沿用"载具量不到浏览器"这句。
     ⑦ 判卷口径零处未动：AC 勾数现量仍 **0**（`verify-inbound-ac-ticks.py` rc=0）；没动 `package.json`、没动链、没 push、没上线。本节动 2 枚（装置 + 计划文末那节）。
+    ⑧ **追记：把载具缺的那步装上后同树同 tip 又跑一整串 ⇒ 第 ② 条那枚红的归因从"推理+主检出背书"升级成同树对照**。
+      `cd e2e && pnpm install --prefer-offline` ⇒ `E2E_INSTALL_RC=0`（`+ @playwright/test 1.63.0`），补完那枚二进制报 1.63.0（等于在册钉 ⇒ 前置放行）；
+      同载具同 tip `76c7399d2` 整串 ⇒ **`legs=30 rc0=29 rc_nonzero=1`**，唯一非 0 仍是 `SCOPE-commit-scope`（B205 别线那枚提交）。
+      两趟只差那一步安装，于是 `AC7-license` rc=1（"已登记的 store 里有 1 条不在场 ⇒ 必然少算，不出数"）→ **rc=0**，
+      `AC6-browser` 从"全局 1.60.0 判的 `8 passed (20.1s)`"变成"在册 1.63.0 判的 `8 passed (20.5s)`"
+      ⇒ 交付 4 那一族（web `10/33`、mobile `1/15`、fixture parity `keys=13 missing=0`、AC-7 六道）到 `76c7399d2` 的完整读数在零脏**源码**载具上取全了。
+      ⚠️ 一句不扩写：这一趟起跑 `CARRIER_HEAD=76c7399d2 dirty=18`，那 18 枚全是上一趟浏览器腿在载具内重写的证据 png
+      （`EVIDENCE_DIRTY=18` 与 `CARRIER_DIRTY=18` 相等 ⇒ 非源码脏目 **0**，`PNG_DIFF_LINES=4`）——"起跑零脏"只属于 20:0x 那一趟。
+
 

@@ -5764,9 +5764,25 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
   现量 `python3 research/tools/verify-inbound-ac-battery.py --self-test` ⇒ **`self_test arms=15 failed=0`**，rc=**0**。
 
 **五、这一格读数的边界**（别把它读宽）：
-- 整串 `legs=30` 里那 28 枚 rc=0 是**载具**上的读数；`AC6-browser` 那一枚在载具上现在是 rc=78（前置拒），
-  它"当前产物上真跑过且 8 条全绿"的证据仍来自主检出那一趟（19:4x，`AC6-browser rc=0`）。
-  ⇒ 想要一棵 30 腿全开火的载具，补一步 `cd e2e && pnpm install` 就行（只往载具自己那棵树写）。
+- 20:0x 那趟 30 腿里 `AC6-browser` 那一枚装上前置后按 rc=78 拒了（它当时用的是全局那件），
+  "当前产物上浏览器 8 条全绿"的证据在那一趟仍只来自主检出 19:4x 那一格 —— 直到下面第六节那趟补了那一步安装，
+  载具自己就把这一格也判了。
 - 本线**没动**任何判卷口径：AC-1～AC-8 勾数现量仍 **0**（`python3 research/tools/verify-inbound-ac-ticks.py` rc=0）。
 - 本线没动 `package.json`、没动链、没 push、没上线。这节动 2 枚：装置 + 本节（外加 PROGRESS 同期那条）。
+
+**六、追记（20:1x）：把载具补齐那一步之后，同树同 tip 又跑了一整串 —— 第二节那枚红的归因从此是同树对照量出来的，不是推理**。
+补的是 `cd e2e && pnpm install --prefer-offline` ⇒ `E2E_INSTALL_RC=0`（`Done in 12.9s`、`+ @playwright/test 1.63.0`），
+补完 `e2e/node_modules/.bin/playwright --version` 回 **1.63.0**（等于在册钉的那个 ⇒ 前置放行）。
+同载具同 tip 整串重跑 ⇒ `legs=30 rc0=29 rc_nonzero=1`，唯一非 0 还是 `SCOPE-commit-scope`（B205，别线那枚提交）。
+这趟是一枚**受控对照**：两趟只差那一步安装，其余全同（同一棵树、`76c7399d2`、同一份装置），于是
+- `AC7-license`：rc=**1**（"已登记的 store 里有 1 条不在场 ⇒ 必然少算，不出数"）→ rc=**0**（`结论：全部依赖均为宽松许可…`）
+  ⇒ 第二节那句"载具条件，不是许可变了"不再靠主检出那一发背书，同树两头直接对上；
+- `AC6-browser`：全局 1.60.0 判的 `8 passed (20.1s)` → 在册 1.63.0 判的 `8 passed (20.5s)`
+  ⇒ 交付 4 里"apps/web 与 apps/mobile 的相关 spec"这一族到 `76c7399d2` 的完整读数从此在零脏源码载具上取全：
+  `AC6-web-specs 10 passed (10) / Tests 33 passed`、`AC4-mobile-inbound 1 passed / Tests 15 passed`、
+  `AC6-rule-fixture-parity 读数: keys=13 denom=7 exempt=1 missing=0 ok=true`、AC-7 那六道（doc-tables / doc-endpoints / migrations / license / docs-voice / link）全 rc=0。
+⚠️ 一句不扩写：这一趟起跑时载具 `dirty=18`，而那 18 枚全是 20:0x 那趟浏览器腿在**载具内**重写的证据 png
+（`EVIDENCE_DIRTY=18` 与 `CARRIER_DIRTY=18` 相等 ⇒ 非源码脏目 **0**；`PNG_DIFF_LINES=4`）。
+"起跑零脏"那句只属于 20:0x 那一趟，别把它安到这一趟头上。
+
 
