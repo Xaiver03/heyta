@@ -5524,3 +5524,45 @@ python3 research/tools/verify-inbound-ac-battery.py   # 原件 .run-logs/inb-ac-
 ⚠️ 第一发我是照 GNU 的习惯写 `xargs -d '\n'` 去喂的，BSD 的 `xargs` 没有 `-d` ⇒ 那一步 rc=1、18 枚一枚没还原；
 `--pathspec-from-file` **默认就按换行分隔**，不需要那个旗标（记这条是为了防下一位把"还原失败"读成"还原命令不管用"）。
 ok
+
+## 2026-10-28 16:3x · 收尾前的逐条对账：六项交付在当前 tip 各比什么、读到什么（自动收集线）
+
+写前先跑 `date`（本机 2026-10-28 16:34:38；tip 现量 `git rev-parse --short HEAD` 于同戳回 `674562704`）。
+这一节不复述结论，只把**每一格交付绑一条能重跑的现量命令**，读不到的那半明确写"归谁"。
+
+| 交付 | 判据（这格算不算做到） | 现量命令 | 读数 |
+|---|---|---|---|
+| 1 ADR-0077 | 四个主题都在文里：边界／窗口留存与零日志／不持根密钥·不写 op 的红线／与 0054 衔接 | `grep -cE '^## ' docs/adr/0077-….md`；`grep -c '### 4.5' …`；`grep -c 'ADR-0054' …`；`grep -cE '^\| A[0-9]+ ' …` | 小节 **8**、红线 §4.5 **1**、提 0054 **3** 处、臂表行 **22** |
+| 2 服务端这条链 | 托管档有独立抽取面，且模型腿**复用**那条唯一发送腿、出境白名单闸由它继承 | `ls server/src/automation \| grep -c hosted-extraction`；`grep -c hostedExtraction server/src/automation/inbound.routes.ts`；`grep -n 'invokeManagedAiCompletion' server/src/automation/hosted-extraction.ts`；`grep -rn domesticUpstreamVerdict server/src` | 抽取面 **1** 枚、路由派发命中 **1**、复用点 `hosted-extraction.ts:170`（默认 `complete = invokeManagedAiCompletion`）+ `:159` 把 `UPSTREAM_NOT_DOMESTIC` 折成 `model-upstream-rejected`；闸本体在 `managed-completion.ts:256` 与 `:307` 两处 |
+| 3 可红的判据 | 三半各有一条断言在场，且每把尺有变异臂 | `grep -c opsBeforeIngest server/tests/integration/….integration.spec.ts`；`grep -c openInbound server/tests/inbound-hosted-extraction.spec.ts`；`grep -c automationAiAttempt …`；`grep -c recipient_key_is_not_available server/tests/inbound-automation.routes.spec.ts` | op 差那半 **2** 处、禁"打开入站正文"的红线尺 **5** 处、attempts 零写 **3** 处、503 那格 **1** 处；臂的枚数由 ADR §5 那张表自己带（现量 22 行），跑法与逐臂记录在载具文件 |
+| 4 门禁与测试 | 交付点名的四道门 + 两个壳的 spec 逐道取 rc | 见下面那段"这一轮跑的七道" | 本线全绿；两枚红的红因逐条量到别线名下 |
+| 5 对外披露 | 清单成文**且**线上文案一处没发 | `grep -c '^## 7' docs/adr/0077-….md`；`grep -c '^\| H-1' …`；`grep -cE '隐私政策\|AI 与数据流转\|第三方名单\|帮助中心\|价格页' docs/plans/inbound-automation-work-brief.md`；再按下面两条 find/grep 数分母 | ADR §7 **1** 节 + H-1 **1** 行；工单 §5.2 里五处件名命中 **10** 行；`packages/legal` 扫 **18** 个源文件命中 **0**；`apps/landing` 扫 **167** 个源文件命中 **0**（排除 `node_modules` 与 `dist`，含 `.md/.mdx/.ts/.tsx/.astro`）⇒ **未发布为实** |
+| 6 邮件转待办重指向 | 那份 brief 指向这条窄档 | `grep -c inbound-automation docs/plans/email-to-task-brief.md` | **4** 处引用 |
+
+这一轮为交付 4 跑的七道（串行，一条命令一道，取 rc）：
+
+```bash
+node scripts/check-i18n-vars.mjs                                   # rc=0（"每个 {placeholder} 都有来源"）
+(cd packages/i18n && npx --no-install vitest run --maxWorkers=1)     # rc=0  4 files / 30 tests（中英对账那四份 spec）
+(cd apps/mobile && npx --no-install vitest run --maxWorkers=1 tests/inbound-cycle-display.spec.ts)   # rc=0  15 passed
+(cd packages/app-host && npx --no-install tsc --noEmit -p tsconfig.spec.json)                        # rc=0
+(cd server && npx --no-install tsc --noEmit -p tsconfig.json)                                        # rc=0（上一会话死的那道，两笔之后仍在 tip 上重取过）
+python3 research/tools/verify-inbound-doc-tables.py                 # rc=0（33 个文件的表行）
+node scripts/check-docs-voice.mjs                                   # rc=0（禁词表 30 项零命中）
+```
+
+**交付 4 里两道没在仓库全局绿，红因都是量出来的、不是我推测的：**
+
+1. `node scripts/check-ui-language.mjs` ⇒ rc=**1**，全文 **4** 处，逐条都在 `apps/web/src/App.tsx:2560-2561` 那两行的
+   `t((cond) ? 'web.calendar.sidebar.hide' : 'web.calendar.sidebar.show')` 形状里。三条现量把它排除本线：
+   `git status --porcelain -- apps/web/src/App.tsx` 回 ` M`（别线在飞）；
+   `git show HEAD:apps/web/src/App.tsx | grep -c 'web.calendar.sidebar.hide'` 回 **0** 而工作树那份回 **2**
+   ⇒ 这枚红**只活在他们未提交的编辑里**，不在已入库态；本线界面件里这枚键命中 **0**。日历侧栏不是本线的面，措辞与词条归他们。
+2. `pnpm check:docs` ⇒ rc=**1**，三处全指同一枚未跟踪目标 `docs/runbooks/android-build-on-linux-dev.md`
+   （归因与两条持久判据在上面 15:5x 那节第六段）。
+
+`AC-1～AC-8` 一格没代勾：现量 `python3 research/tools/verify-inbound-ac-ticks.py` 回 `已勾=0、未勾=8`（rc=**0**，尺在位）；
+`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。
+本节之后本线仍欠的只有两类：**归负责人的那八格动作**（push／迁移与上线顺序／生产 env／发布披露／A4 口径／500 是否改启动即红／AC 勾选／范围白名单口径），
+和**一枚被别线占着的输入**（根 `package.json` 一干净，我就把那把新尺的定义接进 `pnpm check` 并删掉临时登记——这条已写进登记表正文，不靠人记）。
+appended

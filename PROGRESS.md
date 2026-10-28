@@ -7694,3 +7694,12 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       副作用这回放对了：`PNG_DIFF_LINES=18`=`EVIDENCE_DIRTY=18`，还原清单取自 `git status --porcelain -- <三枚派生目录>` 的 18 条路径，
       `git restore --pathspec-from-file=<清单>` 后三枚目录回 **0**。⚠️ 第一发照 GNU 习惯写 `xargs -d '\n'` ⇒ BSD 没有 `-d`、rc=1、一枚没还原 ——
       `--pathspec-from-file` 默认按换行分隔，不需要那个旗标。
+
+213. **自动收集线 · 收尾前把六项交付逐条绑上一条可重跑的现量命令；交付 4 那两道没全局绿的门，红因量到别线名下**（写前先跑 `date`，本机 2026-10-28 16:34:38；tip 同戳 `674562704`）
+    ① **对账表在计划文末那一节**（六行，每行「判据／现量命令／读数」三列）——这一条不是复述结论，是把"这格算不算做到"换成能被下一位重跑的谓词。要点读数：ADR 小节 8／红线 §4.5 一枚／提 ADR-0054 三处／臂表 22 行；抽取面 1 枚、路由派发 1 处、默认腿复用 `invokeManagedAiCompletion`（`hosted-extraction.ts:170`），出境白名单闸本体在 `managed-completion.ts:256` 与 `:307` 两处；三半断言在场（op 差 2、禁打开入站正文 5、attempts 零写 3、503 那格 1）；工单 §5.2 五处件名 10 行；邮件转待办重指向 4 处。
+    ② **交付 5 的"没发布"这半第一次带上分母**：`packages/legal` 扫 **18** 个源文件、`apps/landing` 扫 **167** 个（含 `.md/.mdx/.ts/.tsx/.astro`，排除 `node_modules` 与 `dist`），两个词表（`接收即抽取`／`hostedExtraction`）命中各 **0**。⚠️ 第一发我没加排除，`grep -rl` 把两枚目录的 `node_modules` 一起吞进来，读出 42 与 719 —— 那种数**只能证明探针扫错了面**，不能当"发布了多少"的反证；改完的才是可用读数。
+    ③ **`check:ui-language` rc=1（4 处）不在本线**：4 条全指 `apps/web/src/App.tsx:2560-2561` 那两行 `t((cond) ? 'web.calendar.sidebar.hide' : 'web.calendar.sidebar.show')`。三条现量排除本线：`git status --porcelain -- apps/web/src/App.tsx` 回 ` M`；`git show HEAD:apps/web/src/App.tsx | grep -c 'web.calendar.sidebar.hide'` 回 **0** 而工作树那份回 **2** ⇒ **红只活在别线未提交的编辑里，不在已入库态**；本线界面件里这枚键命中 **0**。日历侧栏不是本线的面，措辞与词条归他们——**不代改**。
+    ④ **交付 4 本轮新取的五道**：`check-i18n-vars` rc=0；`packages/i18n` vitest rc=**0**（4 files／30 tests，中英对账）；`apps/mobile` 的 `tests/inbound-cycle-display.spec.ts` rc=**0**（15 passed）；`packages/app-host` 与 `server` 两处 `tsc --noEmit` 各 rc=**0**（上一会话正是死在后者）；`verify-inbound-doc-tables.py`／`check-docs-voice.mjs`／`verify-inbound-evidence-pointers.py` 各 rc=**0**。`pnpm check:docs` 仍 rc=1、三处全指别线那枚未跟踪 runbook（归因在 15:5x 那节第六段，本轮复跑还是 **3** 处）。
+    ⑤ **AC 一格没代勾**：`verify-inbound-ac-ticks.py` rc=0 且自报 `已勾=0、未勾=8`；`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。
+    ⑥ 本节动 2 枚（计划那一节 + 本条）；判据口径零处、白名单零处、`package.json` 零处。本线仍欠的只有两类：归负责人的那八格动作，和一枚被别线占着的输入（根 `package.json` 一干净就把新尺接进 `pnpm check` 并删临时登记——已写进登记表正文）。本线不 push、不自标完成。
+
