@@ -5943,6 +5943,22 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 - 顺序上的硬约束只有一条：**列必须先存在**。没 apply 之前，读面 `findFirst` 也会 P2022（探针量到 `p2022_before=3`，不是 2）⇒ 每一发 webhook 在路由里就死，公网形状 500。
   所以「先 apply 再放流量」，不能反过来。
 
+**⑦「范围尺白名单口径」这一格的现量 —— 🔴 并更正本线一直以来的说法**（只交事实，改表=改判卷口径，归负责人）：
+- 我此前反复写"唯一非 0 是 B205 那枚别线提交"。**这个说法不对**。现量：`python3 research/tools/verify-inbound-commit-scope.py`
+  首行 `本线笔数=444 涉及路径=253 **越界=123**`，rc=1 —— 是 **123 条越界路径**，来源至少三类：
+  1. **88/123 来自 `f9084821`**（2026-10-16，标题"docs(自动收集 r116 语言腿入库)"）—— 主题命中了本线关键字，而它实际带的是
+     `apps/mobile/evidence/ux-final-20261016/{android-widget-click-r115,android-widget-lang-r116,android-widget-data-r114}/**` 共 89 个文件
+     ⇒ 正是"借标题"那一形（B205 描述的机制），但**不止一笔、不止一条路径**；
+  2. **20 条无归属**（装置打不出笔号的那一档）；
+  3. **约 15 条分散在若干小笔**，其中包含**本线自己合法该动、但那张死表里没有的路径**：
+     `docs/adr/0077-inbound-hosted-extraction-at-ingest.md`（★这枚 ADR 就是本任务要求写的）、`server/src/ai/**`、`packages/i18n/src/**`、
+     `apps/mobile/tests/**`、`apps/web/src/**`、`apps/node-host/**`、`docs/agents/**`、`docs/README.md`。
+- 为什么第 3 类会越界：`WHITELIST` 是**照 2026-10-09 任务书正文抄进来的死表**（装置 docstring 原话），
+  而 10-27/10-28 才落地的 ADR-0077、`server/src/ai/managed-completion.ts`、相关 i18n 词条**当时都还不存在** ⇒ 表没跟上，**不是本线越界**。
+- 要决定的两件事（都属判卷口径）：**(a)** 把第 3 类那几条**补进白名单**（补的应当是可枚举的具体路径，不是按目录笼统放开）；
+  **(b)** 借标题那类（88 条）怎么算 —— 沿用 B169 那条待拍的口径，还是让装置要求"主题命中**且**至少带一枚本线独占路径"才算本线的笔。
+  改表/改谓词都归负责人；本线不动。
+
 **①「push 与 ref」这一格的现量（只交事实，推送动作归负责人）**：
 - 远端两枚，都是 **SSH 形状**（URL 里不含任何凭据）：`gitee git@gitee.com:dengxiadeng/heyta.git`、`origin git@github.com:Xaiver03/heyta.git`。
 - **`main` 跟踪的上游是 `gitee/main`**（`git status -sb` 首行 `## main...gitee/main [ahead 653]`）。
