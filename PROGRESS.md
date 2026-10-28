@@ -7636,3 +7636,18 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       现量 `grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md`）。**(b)** `--only -1` 那趟 rc=1 且 `Windows: 0/13`
       与 H1 绿**同时成立**（未选的格按设计判 SKIP 红）⇒ 挑单格时读的是 results 里那条用例，不是退出码。
       ADR-0077 §6 第 7 条随之**整条重写**：现在没证的那一半只剩一句——**真上游供应商那一次物理调用**（归 H-2 部署前提）。
+    ⑨ **AC 电池在当前 tip 上整张刷过一遍**（负责人问要不要交可勾清单；这趟只交证据，`AC8-ac-ticks` 自己打 **已勾=0 未勾=8**）：
+      汇总 **`legs=28 rc0=26 rc_nonzero=2`**。两枚红里 `SCOPE-commit-scope` 是已知那枚（口径在 B205／B169，本线没动白名单也没动窗口口径）；
+      🔴 **另一枚 `AC6-browser` 挂在本线名下**（`6 failed / 2 passed`，失败形状全是 `element(s) not found`，不是被遮挡）。
+      四条量过的排除：**不是文案改名**（`web.ai.inbound.draft.open` 在工作树与 `git show HEAD:` 两侧都还是"查看并编辑草稿"，
+      本线这天的 diff 没碰这枚键）、**不是 jsdom 层坏**（同格 `AC6-web-specs` 10 份文件 33 条全绿）、
+      **导航没断**（同一枚 spec 里那两腿过、红集中在 draft review／layout evidence／date-only 两支）、
+      **本线在那枚 `8 passed` 基线之后确实动过 web 面板**（`git log --since=2026-10-20 -- apps/web/src | grep 自动收集` 有命中），
+      而 10-27 那趟整串**主动剔掉了 `AC6-browser` 与 `AC6-web-specs` 两腿** ⇒ 这枚红可能已经挂几天没人看。
+      ⇒ 我**没有**替它下"是本线这笔改坏，还是 UX 线未提交的 `apps/web`／`packages/ui` 改坏"这个结论——那要在一枚**干净载具**上
+      单跑这条腿才证得了，共享工作树里证不了；也没为了让这张表好看把它记成"环境红"。
+      ⚠️ 顺手收的一件事：这条腿会**重写本线的取证 png**（已登记的探针陷阱同一族），这趟写了 8 枚、全在
+      `apps/web/evidence/inbound-recovery/`；腿既然是红的，我按 `rc.txt` 里那份 `PNG_CHANGED` 清单逐枚 `git restore`，
+      还原后该目录 `git status --porcelain` 读回空 —— **没有把一次失败运行的产物当"当前产物"提交**。
+      逐格读数在 `docs/plans/inbound-automation.md` 文末 15:0x 那一节那张表里。
+

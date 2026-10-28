@@ -5242,4 +5242,53 @@ zsh 的管道状态数组叫 `$pipestatus` 且 **1-indexed**，`${PIPESTATUS[0]}
 **§6 第 7 条整条重写**——原来那句"生产形状没跑过"里，"路由派发＋抽成功在同一趟 HTTP"这一半现在量到了，
 剩下的那一半收窄成一句：**真上游供应商的那一次物理调用仍未证**，它归 H-2（部署时配好 `MANAGED_AI_*` 真发一次）。
 
+---
+
+## 2026-10-28 15:0x–15:1x · AC 电池在当前 tip 上整张刷一遍：26 腿绿、两腿红，AC 一格没代勾（自动收集线）
+
+**为什么刷**：负责人问要不要把 AC 证据刷成当前 tip 的可勾清单。这趟是**交证据，不是判卷**——
+`AC-1～AC-8` 一格都不勾（现量 `python3 research/tools/verify-inbound-ac-ticks.py` 由尺自己打）。
+
+起跑态由尺自己记在 `.run-logs/inb-ac-battery-1028-1501/rc.txt` 头三行（`CARRIER_HEAD=`／`dirty=`／`PNG_BEFORE=`／`PNG_DENOM=`，
+枚数与派生的证据目录都由它现算，我不在这里抄数）。汇总行：**`legs=28 rc0=26 rc_nonzero=2`**。
+
+| 格子 | 本戳的腿 | 逐字摘要（每条腿的全文在 `.run-logs/inb-ac-battery-1028-1501/<腿名>.log`） |
+|---|---|---|
+| **AC-1 权益与授权** | `AC1-offline11,AC1-entitlement3,AC1-quota-http,AC1-pglite,AC1-worker-identity,AC1-cjs-order` | 六枚全 rc=0；`108 passed`／`56 passed`／`3 passed`／`17 passed`；`AC1-cjs-order` 打在"在册 .ts 与产物一一对上、无未编译" |
+| **AC-2 接收与队列** | `AC2-inbound-core,AC2-queue-teeth` | rc=0；`47 passed`；`臂数=6 不成立=0 末次 sha256=须等于开局那枚`（这条腿自己判"变异还原没漏"） |
+| **AC-3 领取与提交** | `AC3-dual-host,AC3-sync-authz` | rc=0；双宿主全量 **在这趟里也 13/13 绿**，且 `H1` 已含本线 14:5x 补的第三趟；`6 passed` |
+| **AC-4 解析** | `AC4-local-date,AC4-app-host,AC4-egress-wire` | rc=0；`1`／`112 passed`／`4 passed` |
+| **AC-5 批创建与来源记录** | `AC5-shared-schema,AC5-op-log,AC5-batch-actions` | rc=0；`15`／`16`／`9 passed` |
+| **AC-6 规则界面** | `AC6-web-specs,AC6-browser` | 🔴 `AC6-web-specs` rc=0（`Test Files 10 passed` / `Tests 33 passed`）；**`AC6-browser` rc=1 ⇒ `6 failed / 2 passed (4.7m)`** —— 见下面整段 |
+| **AC-7 文档** | `AC7-doc-tables,AC7-doc-endpoints,AC7-migrations,AC7-license,AC7-docs-voice,AC7-link` | 六枚全 rc=0；端点那枚打"每一枚端点都落在按挂载前缀算出的可达集合上（成立）"，许可那枚打"全部依赖均为宽松许可，清点输入集对得上 lockfile" |
+| **AC-8 验收矩阵** | `AC8-matrix,AC8-producer-seam,AC8-ac-ticks` | 三枚全 rc=0；矩阵那枚自己打 `窗=13/13 平台=10/10 权益=9/9`；tick 那枚打 **`AC 行=8 已勾=0 未勾=8`** |
+| 范围尺（**不是 AC 格**） | `SCOPE-commit-scope` | rc=1，已知：口径与逐笔归因在 `BLOCKED.md` 的 B205／B169 那两节，本线没动白名单也没动窗口口径 |
+
+### 🔴 AC-6 那枚红：这格挂在本线名下，我不推给别人
+
+失败原文只有一种形状：`expect(locator).toBeVisible() failed — element(s) not found`，
+以及 `locator.click: waiting for getByTestId('inbound-event-…').getByRole('button', { name: '查看并编辑草稿', exact: true })`。
+**是"元素不存在"，不是"元素被遮挡"**。四条已排除/已量到的：
+
+1. **不是文案改名**。`web.ai.inbound.draft.open` 在工作树与 `git show HEAD:` 两侧都是 `查看并编辑草稿`（各命中 1），
+   本线这天的 diff 没碰 `packages/i18n` 里这枚键 ⇒ spec 里那个 `name:` 仍然对得上。
+2. **不是 jsdom 层坏了**。同一格的 `AC6-web-specs` 全绿（10 份文件 33 条），面板与那枚按钮在单元渲染里都在。
+3. **同一个 spec 里两枚腿是过的**（`inbound explicit retry and themes` 1280／390），
+   所以 `openSettingsSheet` + `selectSettingsSection(page,'ai')` 这套导航本身没断，红集中在
+   draft review（`spec:8`）、panel layout evidence（`spec:167`）、date-only 两档（`spec:298`）。
+4. **本线在那枚基线之后确实动过 web 面板**（`git log --since=2026-10-20 -- apps/web/src | grep 自动收集` 命中数枚，
+   含"收集循环从设置那一屏提到应用级"那一笔）—— 上一张表里这条腿的读数是 `8 passed (15.8s)`，而 10-27 那趟整串
+   **主动剔掉了 `AC6-browser` 与 `AC6-web-specs` 两腿**（见本文 18:1x 那节），所以这枚红**可能已经挂了几天没人看**。
+
+**没做完的那一步，以及为什么这轮没做**：判"是我这笔改坏、还是这棵树上 UX 线未提交的 `apps/web`/`packages/ui` 改坏"
+要在一枚**干净载具**上单跑这条腿（HEAD 单独检出＋装依赖），不是在这棵共享树上能证的。
+我没有替它下结论，也没有为了让这张表好看把它记成"环境红"。
+
+**顺手收的一件事**：这条腿会**重写本线的取证 png**（已登记的探针陷阱同一族）。这趟它写了 8 枚
+（`PNG_CHANGED` 逐枚在 `rc.txt`，全在 `apps/web/evidence/inbound-recovery/`），
+而腿本身是红的 ⇒ 我 `git restore --pathspec-from-file` 逐枚还原、还原后
+`git status --porcelain -- apps/web/evidence/inbound-recovery` 读回空。
+**没有把这 8 枚按"当前产物"提交**——那等于把一次失败运行画成证据。
+
+
 
