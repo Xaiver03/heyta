@@ -7703,3 +7703,31 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ⑤ **AC 一格没代勾**：`verify-inbound-ac-ticks.py` rc=0 且自报 `已勾=0、未勾=8`；`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。
     ⑥ 本节动 2 枚（计划那一节 + 本条）；判据口径零处、白名单零处、`package.json` 零处。本线仍欠的只有两类：归负责人的那八格动作，和一枚被别线占着的输入（根 `package.json` 一干净就把新尺接进 `pnpm check` 并删临时登记——已写进登记表正文）。本线不 push、不自标完成。
 
+
+214. **自动收集线 · ADR-0077 那 22 枚变异臂的台架搬进仓库、在零脏载具上重跑一遍；搬运过程里被自己的臂抓出两处失法**（写前先跑 `date`，本机 2026-10-28 19:4x）
+    ① **为什么要搬**：§5 那张臂表的跑法原先指向 `~/.heyta-evidence/…/mutate-arms.py` —— 一枚这台机器上、仓库外的文件，
+      而 ADR 按"可复现"引它。同一缺陷本线 10-17 为 AC 电池修过一次，这次不再只登记。22 枚臂的锚点串与注入串**逐字照抄**，判据口径一字未动。
+    ② **新装置** `research/tools/verify-inbound-hosted-arms.py`，补三道会**拒跑**的闸（不是注释）：载具不零脏 ⇒ rc=3（注入期间那枚源文件是故意写坏的，共享检出里别人一发 `git commit -a` 就签进 main）；
+      集成面没给 `HEYTA_INTEGRATION_DATABASE_URL` ⇒ rc=3 并打印建库三步（前身默认写死一枚库名 = 替别人占库，本机那台 Postgres 里坐着 27 枚别人的库）；对照臂不绿 ⇒ rc=1 且一枚臂都不注入。
+      现量：`CARRIER_HEAD=c249bb6f1 dirty=0` → 三面对照臂全绿 → **22 臂逐臂红（失败 1～3 条）且逐臂 还原_ok** → `✓ 全部臂都按预期红`、rc=**0**；
+      装置自检 `self_test arms=15 failed=0`（rc=0），常驻由 `server/tests/inbound-lane-rigs-consumers.spec.ts` 消费（复跑 **17 passed**、rc=0）。
+      两道拒跑闸都在真环境量过：共享检出（`dirty=189`）上跑 ⇒ rc=3 并逐枚点名别人在飞的件；不给库变量 ⇒ rc=3。
+    ③ 🔴 **两处失法是被自己的臂抓的，不是审出来的**：(a) 旗标校验把 `--root` 的**值**判成未知旗标 ⇒ rc=2 整趟拒跑，最坑的是它外观像"闸门起作用了"；
+      补三臂（合法组合通过／旗标缺值要拒／真未知旗标要拒）。(b) 更要命的一形：载具缺 workspace 产物时 vitest 收摊写
+      `Test Files  2 failed (2)` + `Tests  no tests`（169ms），第一版取不到 `N failed` 就回 0 ⇒ **对照臂报绿**、22 臂全被读成"没有牙"。
+      改成"汇总行在但整行没数字 ⇒ 判没跑到（-1）"，补两臂钉这一形与"真全过才许读成 0"。
+    ④ **顺带量到一枚不归本线、且已被别线修掉的红**：旧 tip `71292e2ae` 上 `pnpm build` rc=1，红在 `packages/i18n`
+      —— `en.ts(5568,3) TS1360 … missing "web.overlay.discard.title/.body/.keep/.drop"`（`zh-CN.ts` 有、那枚 tip 的 `en.ts` 没有）。
+      归属现量：这四枚键在别线 `c249bb6f1 feat(全局UX/P0-P6)` 里补齐（`git show c249bb6f1:packages/i18n/src/locales/en.ts | grep -c 'web.overlay.discard.title'` 回 **1**），
+      载具换到该 tip 后 `pnpm build` 回 **rc=0**（66 个包）。⇒ 不代改别人文案；但这一形值得记住：**i18n 目录不齐会把所有需要 workspace 产物的验收一起变成假绿**，
+      它不属于"界面线的红所以没人看"那一档。
+    ⑤ 收尾只对自己创建的对象动手：载具 `.worktrees/inb-arms` 与两枚一次性库 `heyta_hosted_arms_1028`／`heyta_hosted_arms_1028b` 由本线删；别人那 27 枚库一枚不碰。
+      ⚠️ 本节**没搬**的仓外引用还剩一枚：ADR §6 那条部署顺序探针 `probe-unapplied-migration.py`（112 行）—— 读数已逐字进 ADR，搬它不属于交付 3 的"每把尺有臂"，这里只指名它仍是仓外件。
+    ⑥ 本节动 5 枚（装置新／consumers spec 一行 + 收尾行／ADR §5 跑法／计划本节／本条）。判卷口径零处、AC 勾数 0；没动 `package.json`、没动 `pnpm check` 链、没动 `BLOCKED.md`。本线不 push、不自标完成。
+
+    ⑦ **这一趟复跑交付 4 那两道门，两枚现量变了（旧读数指名顶掉，不留抄件）**：
+      `pnpm check:docs` 由 rc=1（三处指那枚未跟踪 runbook）变 **rc=0**（`git ls-files docs/runbooks/android-build-on-linux-dev.md | wc -l` 回 **1** ⇒ 别线入库了）；
+      `node scripts/check-ui-language.mjs` 仍 rc=**1**、仍是 `App.tsx:2560-2561` 那 4 处，但形状变了 ——
+      `git show HEAD:apps/web/src/App.tsx | grep -c 'web.calendar.sidebar.hide'` 现在回 **2** 且该文件工作树干净，
+      ⇒ 它已从"只在别人未提交的编辑里"变成**已入库态的红**（随 `c249bb6f1` 进来的）。归属不变：日历侧栏不是本线的面，本线不代改。
+      所以交付 4 现在只能说："本线新增/改动处全绿（七把尺 + 两面 spec + 两处 tsc），仓库全局仍剩一道红在别线已入库的代码里"。

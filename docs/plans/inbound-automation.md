@@ -5566,3 +5566,83 @@ node scripts/check-docs-voice.mjs                                   # rc=0（禁
 本节之后本线仍欠的只有两类：**归负责人的那八格动作**（push／迁移与上线顺序／生产 env／发布披露／A4 口径／500 是否改启动即红／AC 勾选／范围白名单口径），
 和**一枚被别线占着的输入**（根 `package.json` 一干净，我就把那把新尺的定义接进 `pnpm check` 并删掉临时登记——这条已写进登记表正文，不靠人记）。
 appended
+
+## 2026-10-28 19:4x · 把 ADR-0077 那 22 枚变异臂的台架从"只活在这台机器上"搬进仓库，并在零脏载具上重跑一遍（自动收集线）
+
+写前先跑 `date`（本机 2026-10-28 19:4x）。这一节动的是"复现"这两个字：§5 那张臂表的跑法原先指向
+`~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.py` —— 一枚这台机器上、仓库外的文件，
+而 ADR 按"可复现"引它。同一种缺陷本线在 10-17 已经为 AC 电池修过一次（那枚文件的"来历"段就写着这件事），
+所以这次不再只登记，直接搬。
+
+### 一、装置：`research/tools/verify-inbound-hosted-arms.py`
+
+22 枚臂的**锚点串与注入串逐字照抄**（臂表一字未动），判据口径不变：一臂只动一处、锚点命中≠1 就当场判"臂没落地"、
+跑完只从 `.mut-bak` 还原再比 sha256、判决取 vitest 自己写的 `Tests … N failed` 那一行。
+搬的时候补了三道它原先没有的闸（都是**会拒跑**的，不是注释）：
+
+| 闸 | 形状 | 为什么必须有 |
+|---|---|---|
+| 载具零脏 | 整棵载具 `git status --porcelain` 非空 ⇒ rc=3，一枚都不注入 | 注入期间那枚源文件是**故意写坏的**；共享检出里别人来一发 `git commit -a` 就把它签进 main |
+| 集成面必须给库 | 没有 `HEYTA_INTEGRATION_DATABASE_URL` ⇒ rc=3，并打印建库三步 | 前身默认写死一枚库名，那等于替别人占库；本机那台 Postgres 里坐着 27 枚别人的库 |
+| 对照臂不绿就停 | 三个面各自的"没动树的对照"必须先绿 | "全部臂都红"可能只是这台机器跑不动这套用例，那句话零信息 |
+
+现量读数（全部在零脏载具 `.worktrees/inb-arms` @ `c249bb6f1`、一次性库 `heyta_hosted_arms_1028b`（79 枚迁移逐枚 apply、会话时区钉 UTC））：
+
+```text
+CARRIER_HEAD=c249bb6f1 dirty=0（臂点名的 5 枚文件与整棵树都干净）
+ 0 · 对照臂 server 两枚 spec ⇒ 绿
+ 0 · 对照臂 web 那枚 spec ⇒ 绿
+ 0 · 对照臂 集成那一格（只 H1） ⇒ 绿
+ 1 …22 每臂 ⇒ 红（失败 1～3 条不等，A16/A17 各红 2 条），逐臂 还原_ok
+✓ 全部臂都按预期红：跑过 22 臂／在册 22        rc=0
+```
+
+拒跑那两道也被真量过，不是我写的假设：在共享检出（`dirty=189`）上跑 ⇒ rc=3 并逐枚点名别人在飞的件；
+没给库变量 ⇒ rc=3 并打印建库三步。装置自己的 15 枚反向臂 rc=0（`self_test arms=15 failed=0`），
+常驻由 `server/tests/inbound-lane-rigs-consumers.spec.ts` 消费（该 spec 复跑 `17 passed`、rc=0）。
+
+### 二、搬运过程里被自己的臂抓出来的两处失法（都改了，也都补了会红的臂）
+
+1. **旗标校验把值当旗标**：`--root .worktrees/inb-arms` 里那枚路径被判成"不认的旗标"⇒ 整趟 rc=2 拒跑。
+   最坑的是它的**外观**——看着像"闸门起作用了"。改成分值旗标与布尔旗标两类各自校验，
+   补三臂：合法组合通过（⑧a）／旗标缺值或值位上是另一枚旗标要拒（⑧b）／真·未知旗标要拒（⑧c）。
+2. 🔴 **判决把"没收到用例"读成"0 条失败"**：载具缺 workspace 产物时，vitest 收摊写的是
+   `Test Files  2 failed (2)` + `Tests  no tests`，169ms 结束。第一版认了这行、取不到 `N failed` 就回 0 ⇒
+   **对照臂报"绿"**，随后 22 臂全被读成"这把尺没有牙"。这正是本仓那条元规则的形状（一把恒绿的判据比没有判据更坏）。
+   改成：汇总行在但整行没数字 ⇒ 判"没跑到"（-1），只有带数字的 `passed` 才算真全过。
+   补两臂：②b 钉 `Tests  no tests` 必须 -1、②c 钉 `Tests  33 passed (33)` 才许读成 0。
+
+### 三、顺带量到一枚**不归本线**的红，且它已在我们眼前被别线修掉
+
+旧载具那枚 tip（`71292e2ae`）上 `pnpm build` 回 rc=1，红在 `packages/i18n`：
+`src/locales/en.ts(5568,3): error TS1360 … missing … "web.overlay.discard.title" / ".body" / ".keep" / ".drop"`
+（`zh-CN.ts` 有这四枚、那枚 tip 的 `en.ts` 没有 ⇒ `satisfies Record<MessageKey, string>` 顶不住）。
+它把 `pnpm build`/`pnpm check` 整条顶红，也正是上面 ② 那一形的**起因**。归属现量：
+这四枚键在别线那笔 `c249bb6f1 feat(全局UX/P0-P6)` 里补齐（`git show c249bb6f1:packages/i18n/src/locales/en.ts | grep -c 'web.overlay.discard.title'` 回 **1**），
+载具换到该 tip 后 `pnpm build` 回 **rc=0**（66 个包成功）。⇒ 本线不代改别人的文案，只把这一形登记在册：
+**脏的 i18n 目录不是"界面线的红"就没人看得见**，它会把所有需要 workspace 产物的验收一起变成假绿。
+
+### 四、载具与库的收尾（只对自己创建的对象动手）
+
+载具 `.worktrees/inb-arms`（本线这趟用 `git worktree add --detach` 建的）与两枚一次性库
+`heyta_hosted_arms_1028`（旧 tip 那次，作废）、`heyta_hosted_arms_1028b`（这趟）由本线删除；
+别人的 27 枚库一枚不碰。逐臂原件日志落 `~/.heyta-evidence/inbound-hosted-extraction-20261027/arms-carrier-1028b/`。
+
+⚠️ 本节**没搬**的一枚仓外引用：ADR §6 第 306 行那条部署顺序探针
+（`~/.heyta-evidence/inbound-hosted-extraction-20261027/probe-unapplied-migration.py`，112 行）。
+它的读数已经逐字写进 ADR，搬它不是交付 3 要求的"每把尺有变异臂"，所以这里只指名它仍是仓外件 ——
+下一位若要在干净克隆里复现那一格，得先把它也搬进来。
+
+### 五、这一趟复跑交付 4 那两道门时，两枚现量变了（把旧读数指名顶掉，不留抄件）
+
+| 门 | 16:3x 那一节的读数 | 现在（`2a8446fc1`）的现量 | 结论 |
+|---|---|---|---|
+| `pnpm check:docs`（`docs-link-check.mjs`） | rc=1，三处全指 `docs/runbooks/android-build-on-linux-dev.md`"本机有、仓库没跟踪" | rc=**0**，末行 `✅ 无死链、无"本机有仓库里没有"的链接、无失效章节引用、无失效锚点`；`git ls-files docs/runbooks/android-build-on-linux-dev.md \| wc -l` 回 **1** | 别线把那枚 runbook 入库了 ⇒ 16:3x 那格的"3 处红"作废，**这道门现在仓库全局绿** |
+| `pnpm check:ui-language` | rc=1，4 处全在 `apps/web/src/App.tsx:2560-2561`，且"已入库那版根本没有这两条引用"（当时 HEAD 回 0、工作树回 2） | rc=**1**，仍是这 4 处；`git show HEAD:apps/web/src/App.tsx \| grep -c 'web.calendar.sidebar.hide'` 回 **2**、该文件 `git status --porcelain` 回空 | 形状变了：那 4 处**已随别线 `c249bb6f1` 进 HEAD** ⇒ 现在是已入库态的红，不再是"只在别人未提交的编辑里"。仍不归本线（日历侧栏不是本线的面，`t((cond) ? 'a' : 'b')` 那一形与词条归他们），本线不代改 |
+
+所以交付 4 这一格现在的准确说法是：**本线新增/改动处全绿**（七把尺见上面第一、二节的现量），
+仓库全局仍有两道红 —— `check:docs` 已清，只剩 `check:ui-language` 那 4 处，红因在别线已入库的日历侧栏上。
+
+本节动 5 枚：`research/tools/verify-inbound-hosted-arms.py`（新）、
+`server/tests/inbound-lane-rigs-consumers.spec.ts`（名单加一枚 + 常驻那腿的收尾行）、`docs/adr/0077-….md`（§5 跑法改指仓内装置）、本文件与 `PROGRESS.md`。判卷口径零处、AC 勾数 0；
+没动 `package.json`、没动 `pnpm check` 链。本线不 push、不自标完成。
