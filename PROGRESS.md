@@ -7788,4 +7788,21 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       ⚠️ 一句不扩写：这一趟起跑 `CARRIER_HEAD=76c7399d2 dirty=18`，那 18 枚全是上一趟浏览器腿在载具内重写的证据 png
       （`EVIDENCE_DIRTY=18` 与 `CARRIER_DIRTY=18` 相等 ⇒ 非源码脏目 **0**，`PNG_DIFF_LINES=4`）——"起跑零脏"只属于 20:0x 那一趟。
 
+217. **自动收集线 · 兑现"package.json 干净就转正"那条登记；再给工单 §5.2 那条"三处手抄没人对账"补一把尺 —— 它第一趟就量出一处现成的对外口径分歧**（写前先跑 `date`，本机 2026-10-28 20:3x；tip `6ef3a78be`）
+    ① 转正：那一刻现量 `git status --porcelain -- package.json` 回 **0 行**（别线那 6 处 `check:` 已入库）⇒ 照登记原文加定义 `check:inbound-rule-fixture-parity` 并接进 `check` 链（链段数现量 `141`→`142`），
+      并把 `check-gate-wiring.mjs` 里那枚 `ALLOWED_UNREFERENCED_IMPL` 豁免**删掉**（判据口径一字未动）。读数：`pnpm check:inbound-rule-fixture-parity` rc=**0**（`self_test arms=5 failed=0`、`keys=13 denom=7 exempt=1 missing=0 ok=true`）、
+      `check-gate-wiring` rc=**0**、`check-scripts-parse` rc=**0**（枚举 215 枚）。
+    ② 新尺 `scripts/check-inbound-legal-copy-parity.mjs`：分母**自动派生**（扫 `packages/legal/src/documents/*.ts`，收"非位置编号 id 且出现在 ≥2 枚文件"的小节；`s1..s12` 那种各文档自己的第几节由臂 7 钉住不许进分母），
+      判**字节层逐字相同**、中英**各自**比，分叉就打第几个码点 + 两侧 28 码点原话窗口；已知漂移走登记，登记键按**变体分组**（按裸文件名会把"两组都漂"读成"已登记"），登记过期也判红。
+    ③ 🔴 第一趟就量出现成分歧（不是理论危险）：中文三份**逐字同一份**（421 字节，三处 sha 前缀同为 `d44d0768b669`）；英文两份同文（1231）而 `data-rights.ts`（1327）从**第 431 个码点**起多列
+      `automation entitlement activation / link / subjects` 三项并把 commit permit 写成单数 ⇒ 那三份（三中文 + 两英文）对外说"只预留**两类**明文元数据"时，比 `data-rights` 英文少列了三张真表。
+    ④ 代码侧现量（只读、不含任何值）：`server/prisma/schema.prisma` 确有 `AutomationEntitlementSubject`／`Activation`／`Link` 三枚模型，`server/src/automation/entitlement-issuer.ts` 对它们有真写入
+      （`…Subject.create`、`…Activation.create/update`、`…Link.create/update`）；列形状 `userId`／`subject`／`installationId`／`localAccountUuid`／`codeHash`／时间戳／`resendCount` —— 明文标识与计数，不是密文。
+    ⑤ **本线一个字没改 `packages/legal/**`**（对外法律表征归负责人）。做的是把分歧钉住并**逐枚点名**：`KNOWN_DRIFT` 那条写清两侧各说什么、代码现量、归谁拍、翻案条件；尺的输出把登记打成 `⚪ 已登记漂移` 一行，
+      登记不许变成把缺陷藏起来的口袋（臂 4/4b 两头判这半）。现量：本体 rc=**0**、`扫过 10 枚 *.ts 判了 2 组 登记=1 问题=0 ok=true`（"问题 0"= 除登记那处外无新分歧，那处由 `⚪` 行点名）；`--self-test` **`arms=9 failed=0`**。
+    ⑥ 接线四处（一把没人跑的尺等于没有尺）：`package.json` 定义 + 接进 `check` 链（现量链段数 `142`→`143`）、电池新增腿 `AC7-legal-copy-parity`（`--list` 末行 `legs=31`、自检 `arms=15 failed=0`）、
+      交接书 §4a 的 AC-7 那格补第七枚腿名并把两处写死的"六枚"换成不写死的说法、本节与 PROGRESS 这条。判卷口径零处动：AC 勾数现量仍 **0**。
+    ⑦ 新增归负责人那一格：那句"两类明文元数据"要不要按代码现量补上权益签发那三张表、补哪几种语言、版本号与变更记录怎么同批 —— 本轮只交读数，不代拍、不发布。
+
+
 

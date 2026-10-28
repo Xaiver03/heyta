@@ -5792,5 +5792,28 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 载具 `.worktrees/inb-clean` 由本线 `git worktree remove --force` 销毁（它是本线自己建的、里面唯一的非派生物是那 18 枚重写过的 png），
 现量 `git worktree list` 只剩主检出一行；销毁后 `verify-inbound-evidence-pointers.py` 与另三道文档门各重跑一次均 rc=**0**。
 
+## 2026-10-28 20:2x–20:3x · 把 `package.json` 那把尺转正；再给工单 §5.2 那条"三处手抄没人对账"补一把尺 —— 它一建起来就量出一处**现成的对外口径分歧**（自动收集线）
+
+**一、先兑现上一条登记里那句"转正判据"**（不是新决定，是照登记的判据做）：那一刻 `git status --porcelain -- package.json` 回 **0 行**（别线那 6 处 `check:` 改动已入库）⇒ 按登记原文把 `check:inbound-rule-fixture-parity` 加进 `package.json` 定义并接进 `check` 链（现量：链段数 `141` → `142`，定义存在，`pnpm check:inbound-rule-fixture-parity` rc=**0**，`self_test arms=5 failed=0` + `读数: keys=13 denom=7 exempt=1 missing=0 ok=true`），同时把 `scripts/check-gate-wiring.mjs` 里那条 `ALLOWED_UNREFERENCED_IMPL` 豁免**删掉**（判据口径一个字没动）。删完 `node scripts/check-gate-wiring.mjs` rc=**0**、`check-scripts-parse` rc=**0**（枚举 215 枚）。
+
+**二、工单 §5.2 第一格记过的那条现量危险，这轮补成了尺。** 那句是：那段"自动收集元数据与注册挑战"的正文**手抄在多枚法律文件里，而没有任何一把尺看着它们一致**（当时现量 `grep -rn "automation-metadata" packages/legal/tests scripts e2e` ⇒ 0 命中）。新尺 `scripts/check-inbound-legal-copy-parity.mjs` 的三条设定：
+- **分母自动派生**：扫 `packages/legal/src/documents/*.ts`，把"非位置编号的 id 且出现在 ≥2 枚文件里"的小节全部收进来 ⇒ 以后新加一枚共享小节不用回来改名单；`s1..s12` 那种"各份文档自己的第几节"由臂 7 钉住**不许**进分母（它们本来就该不同文）。
+- 判的是**字节层逐字相同**，不做"语义相近"那种会漂的判据；中英**两种语言各自**比，比出不同就打出第几个码点开始分叉、两侧各 28 个码点的原话窗口。
+- 已知漂移走登记而不是走沉默：登记键按**变体分组**（哪几枚是一组、哪一组是少数那一侧），只登记裸文件名会把"两组都漂"读成"已登记"；登记过期（漂移已被修平而登记没删）也判红。臂 4b 就是钉这一半。
+
+**三、🔴 尺第一趟就量出现成的分歧，不是理论危险**（现量，同一枚命令）：
+- 中文三份（`privacy.ts`、`data-rights.ts`、`personal-info-list.ts`）⇒ **逐字同一份**（421 字节，sha 前缀三处同为 `d44d0768b669`）。
+- 英文三份 ⇒ **两种**：`privacy.ts` 与 `personal-info-list.ts` 同文（1231 字节），而 `data-rights.ts`（1327 字节）从**第 431 个码点**起多列了三项，并把 commit permit 写成单数 —— 原话两侧为：
+  - 多数那侧：`… and automation commit permits (opaque event and rule identifiers, …), to prevent duplicate creation.`
+  - `data-rights`：`… and automation commit permit, automation entitlement activation, automation entitlement link, automation entitlement subjects (…identical 括号内容…), to prevent duplicate creation.`
+- ⇒ 也就是说：这一节对外说"服务端只预留**两类**明文元数据"的那三份（三份中文 + 两份英文）比 `data-rights.ts` 英文那份**少列了三张真表**。代码侧证据（只读现量，不涉任何值）：`server/prisma/schema.prisma` 里确有 `AutomationEntitlementSubject` / `AutomationEntitlementActivation` / `AutomationEntitlementLink` 三枚模型，且 `server/src/automation/entitlement-issuer.ts` 对它们有真写入（`automationEntitlementSubject.create`、`automationEntitlementActivation.create/update`、`automationEntitlementLink.create/update`）；列形状是 `userId` / `subject` / `installationId` / `localAccountUuid` / `codeHash` / 若干时间戳 / `resendCount` —— 都是明文标识与计数，不是密文。
+
+**四、这一格本线做了什么、没做什么**：**一个字都没改 `packages/legal/**`**（对外法律表征归负责人，硬约束写明）。做的是把这处分歧**钉住并逐枚点名**：尺里那条 `KNOWN_DRIFT` 登记写清"两侧各说什么、代码侧现量是什么、改哪一侧归负责人、翻案条件是什么"，且尺的运行输出会把登记的漂移打成 `⚪ 已登记漂移` 一行 —— 登记不许变成把缺陷藏起来的口袋（臂 4/4b 两头判这个）。判卷现量：`node scripts/check-inbound-legal-copy-parity.mjs` ⇒ rc=**0**、`读数: 扫过 10 枚 *.ts 判了 2 组(共享小节×语言) 登记=1 问题=0 ok=true`（问题 0 的含义是"除已登记那一处外没有新分歧"，那一处由 `⚪` 行点名，不是消失）；`--self-test` ⇒ **`arms=9 failed=0`**（臂 1 是"三处逐字相同必须绿"的对照臂，防整把尺恒红；臂 2/3/5 造的是"只改一处""只漂英文""两组各两枚"三种失法；臂 6 判成对；臂 7/8 判分母本身）。
+
+**五、接线四处**（一把没人跑的尺等于没有尺）：① `package.json` 新增定义 `check:inbound-legal-copy-parity` 并接进 `check` 链（现量链段数 `142` → `143`）；② AC 电池新增腿 `AC7-legal-copy-parity`（现量 `--list` 末行 `legs=31`、装置自检 `arms=15 failed=0`）；③ 交接书 §4a 的 AC-7 那格补上第七枚腿名，并把两处写死的"六枚"换成"那一族/枚数看 `--list`"；④ 本节与 PROGRESS 同期那条。判卷口径零处改动：**AC-1～AC-8 勾数现量仍 0**。
+
+**六、归负责人那一格（新增，不代拍）**：那句"服务端预留两类明文元数据"要不要按代码现量补成"两类之外还有权益签发那三张表的标识与计数"，以及补哪几种语言、版本号与变更记录怎么同批 —— 都是对外法律表征，本轮只交上面这些读数。
+
+
 
 

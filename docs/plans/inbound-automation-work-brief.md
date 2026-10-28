@@ -244,11 +244,15 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
 （只在接收那一次请求的内存里，抽完立刻丢弃）。这句话如果不上对外件，就是对外不实陈述；
 如果上得比实现多，就是承诺做不到的事。所以下面每一格都写"**能说的**"与"**不许说的**"。
 
-🔴 **先记一条这仓里的现量危险**：那段"自动收集元数据与注册挑战"的正文现在**手抄在三枚文件里**
-（`privacy.ts`、`data-rights.ts`、`personal-info-list.ts` 各自的 `id: "automation-metadata"` 那一节），
-而**没有任何一把尺**看着它们三处一致（现量：
-`grep -rn "automation-metadata" packages/legal/tests scripts e2e` ⇒ 0 命中）。
-改一处不改另两处，"三处口径一致"这句话就成假话。要么这次三处一起改，要么先补一把对账尺再改。
+🔴 **这条危险已经变成一把尺，并且当场判出一处分歧**（2026-10-28 20:3x）：那段"自动收集元数据与注册挑战"的正文
+**手抄在三枚文件里**（`privacy.ts`、`data-rights.ts`、`personal-info-list.ts` 各自的 `id: "automation-metadata"` 那一节，中英共六处）。
+对账尺已建：`scripts/check-inbound-legal-copy-parity.mjs`（已接进 `pnpm check` 链与 AC 电池的 `AC7-legal-copy-parity` 那一腿；分母自动派生，以后新加一枚共享小节不用改名单）。
+它第一趟的现量是：**中文三份逐字同一份**，而**英文不是** —— `privacy.ts` 与 `personal-info-list.ts` 同文（1231 字节），`data-rights.ts`（1327 字节）从第 431 个码点起多列
+`automation entitlement activation / link / subjects` 三项。代码侧现量：这三张表在 `server/prisma/schema.prisma` 里真存在、在
+`server/src/automation/entitlement-issuer.ts` 里真被写（列是 `userId`／`subject`／`installationId`／`localAccountUuid`／`codeHash`／时间戳／`resendCount`，明文标识）。
+⇒ **"三处口径一致"这句话现在就不成立**（不是将来才会），而且不一致的那一侧更接近代码。
+改哪一侧是对外法律表征，**归负责人**；本线一个字未改，只把这处分歧钉进尺的登记表并让输出逐枚点名（`⚪ 已登记漂移` 那一行）。
+要改这六处时：**同批改齐、跑一遍这把尺**，别再留出手抄不一致。
 
 | # | 落点 | 草稿（中文，英文要同批） | 🔴 这一格不许说成 |
 |---|---|---|---|
@@ -355,9 +359,11 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
    那条窄档「接收即抽取」（规则级开关、只在那一次请求内读、抽完丢弃、结果重封给同一枚收件人公钥、
    任务写回仍归设备）。**§5.1 那两条引用句已按现值重述**（键没变，句子按"两条腿"说）；
    本单其余地方凡是把"开着 heyta"写成**全体规则**的条件句，都按那一句现值理解。
-6. **新增 §5.2：那一档的对外披露六格草稿，一处未发**。其中一条现量危险值得单独看：
-   那段 `automation-metadata` 正文手抄在三枚法务文件里，而**没有任何一把尺**看着它们一致 ——
-   这是本单此前没登记的，改法务件时要么三处同批，要么先补尺。
+6. **新增 §5.2：那一档的对外披露六格草稿，一处未发**。其中那条危险的处理方式已经变了，别再按原句理解：
+   那段 `automation-metadata` 正文手抄在三枚法务文件里、原先**没有任何尺**看着它们一致 ——
+   现在有了（`scripts/check-inbound-legal-copy-parity.mjs`，已进 `pnpm check` 链与电池 `AC7-legal-copy-parity` 那一腿），
+   而它第一趟就量出**英文那三份已经不逐字相同**（`data-rights.ts` 多列三项权益相关的留存表；中文三份仍逐字相同）。
+   逐条读数、代码侧证据与"改哪一侧归负责人"都写在 §5.2 上面那段。
 7. **`docs/plans/email-to-task-brief.md` 已重指向这条窄档**（新增 §0a 与 §3 的 P0.5）：
    邮件那条入口**复用**抽取这条腿，不再造第三条；但归属那一格（一封信凭什么算这个账号的）
    没答案之前不许接，复用抽取 ≠ 复用归属。
