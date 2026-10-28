@@ -7818,6 +7818,14 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ⑤ 文档不再写死枚数：ADR §5 那句"22 臂"、review 附录那两句"22 枚/跑过 22 臂"都改成"读装置 `--list` 末行"（那一趟的历史读数原样保留在原句里）。
     ⑥ 边界：判卷口径零处动、**AC 勾数现量仍 0**、`packages/legal/**` 一个字节未动；载具 `.worktrees/inb-retry-arm` 由本线 `worktree remove` 删除。
 
+219. **自动收集线 · 交付 4 那四条门在当前产物上逐条现量（不是"改过就该绿"），并把"写死的 tip"从台账里去掉**（写前先跑 `date`，本机 2026-10-28 20:5x）
+    ① `check:docs` rc=**0**；i18n 中英对称 `cd packages/i18n && vitest run` ⇒ `Tests 30 passed (30)`；
+      `AC6-web-specs` rc=0 `Tests 33 passed (33)`、`AC4-mobile-inbound` rc=0 `Tests 15 passed (15)`、顺带 `AC4-app-host` rc=0 `Tests 112 passed (112)` ⇒ `legs=3 rc0=3`。
+    ② `check:ui-language` rc=**1**、4 处全在 `apps/web/src/App.tsx:2560/2561` ⇒ 别线文件，本线零字节未动，按既有口径记。
+    ③ 一条自我更正：那张表起初把读数绑在"tip `84c2d7519` 之后"，可读取那几分钟里别线又落了 `f77cea5fa` ⇒ 改成不写死 tip，
+      只写"本机 20:49 那一次读取"＋"本线文件面 `git status` 现量 0 脏"。**读数绑在哪个 tip 上要用现量说，不要用我记得的那个 SHA。**
+
+
 
 
 

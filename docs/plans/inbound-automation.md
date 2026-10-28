@@ -5847,6 +5847,22 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 这恰好违反本线自己那条纪律（`docs/agents/workflow-rules.md` §8：变异类验收不许在共享检出里开窗口）——注入期间任何别线的 `git commit -a` 都会把那枚变异态签进 main。
 随后按规矩重做：建零脏载具跑 A23–A25，正式读数取自载具（本节三、四两段那组）。记在这里是因为**"还原得干净"不等于"那一步可以那么做"**。
 
+## 2026-10-28 20:5x · 交付 4 那四条门在当前 tip 上逐条现量（不是"我改过所以应该绿"，是刚跑的那一次）
+
+| 门 | 命令 | 现量（本机 20:49 那一次读取） | 归属 |
+|---|---|---|---|
+| `check:docs` | `node research/tools/docs-link-check.mjs` | rc=**0** | 本线 |
+| i18n 中英对称 | `cd packages/i18n && npx --no-install vitest run` | `Test Files 4 passed (4)`／`Tests 30 passed (30)` | 本线 |
+| `apps/web` 相关 spec | 电池腿 `AC6-web-specs` | rc=**0**、`Test Files 10 passed (10)`／`Tests 33 passed (33)` | 本线 |
+| `apps/mobile` 相关 spec | 电池腿 `AC4-mobile-inbound` | rc=**0**、`Test Files 1 passed (1)`／`Tests 15 passed (15)` | 本线 |
+| 承载层（顺带） | 电池腿 `AC4-app-host` | rc=**0**、`Tests 112 passed (112)` | 本线 |
+| `check:ui-language` | `node scripts/check-ui-language.mjs` | rc=**1**：4 处，全在 `apps/web/src/App.tsx:2560/2561` | **别线**（产品体验线在飞的文件；本线一个字节没动） |
+
+判卷口径零处动、AC 勾数仍 0。这张表是"当前产物"的读数：上面五条 rc=0 都是**刚刚**那一次取的（那之后别线又落了提交，本线文件面 `git status` 现量仍 0 脏），
+不是从 20:0x 那趟载具照抄 —— 期间别线又落了 `8180d6295`／`cc927bc4f` 等提交（其中 `8180d6295` 修的是 `apps/web` 那枚 spec 的 typecheck 恒红，
+挡的是所有人，与本线无关）。
+
+
 
 
 
