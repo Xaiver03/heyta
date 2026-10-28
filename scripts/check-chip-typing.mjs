@@ -220,6 +220,17 @@ async function selfTest() {
 /* ── 入口 ───────────────────────────────────────────────────────── */
 
 const args = process.argv.slice(2);
+/*
+ * 🔴 拼错的旗标必须**拒跑**，不许静默掉进"跑真树"那一支然后退出 0 ——
+ * 那等于"门禁自己从没跑过"这种绿（下面第 ⑨ 枚自测臂钉的就是这一格，
+ * 而它在这一版脚本里第一次读回来是不过的：臂先写了、闸门没补）。
+ */
+const KNOWN_FLAGS = ['--self-test', '--verbose'];
+const unknownFlags = args.filter((a) => !KNOWN_FLAGS.includes(a));
+if (unknownFlags.length > 0) {
+  console.error(`不认识的旗标：${unknownFlags.join(' ')}（本门禁只吃 ${KNOWN_FLAGS.join(' / ')}）`);
+  process.exit(2);
+}
 if (args.includes('--self-test')) {
   // 🔴 selfTest 是 async：不 await 就等于"九枚臂一条都没跑、一个字没打印、退出码 0"
   //（`check:menu-keyboard` 的装置缺陷 ② 就是这个形状，别再犯一次）。
