@@ -1,0 +1,46 @@
+/*
+ * heyta 安卓构建载体（`linux-dev`）专用：把境外 Maven 仓库换到可达的镜像。
+ *
+ * 与 `scripts/windows/gradle-host/init.d/heyta-cn-mirror.gradle` 同一职责，但**换了一种做法**：
+ *   · Windows 那枚装在打包机的 `~/.gradle/init.d/` 里（构建脚本看不见这回事）；
+ *   · 这一枚由 `scripts/run-gradle.mjs` 用 `-I <本文件>` **显式传进去** ——
+ *     于是它出现在构建命令里、出现在 dry-run 打印里，任何人看那条命令就知道产物是从
+ *     哪个出口解析的。理由不是好看：这台机器上原本已经躺着别的项目的一枚
+ *     `~/.gradle/init.d/tfa-mirror.gradle`，heyta 首趟构建实际上是**靠别人的文件**才解析成功的。
+ *     那种依赖不在任何清单里，别人删掉它，我们的构建就莫名其妙红 —— 显式传参把它变成
+ *     自己的东西，同时不改动这台机器上其他工程的构建行为。
+ *
+ * 2026-10-28 现量（这台机器）：
+ *   · `maven.google.com` 超时（25 秒 0 字节）；
+ *   · `dl.google.com/dl/android/maven2` 200 / 0.45s；
+ *   · `maven.aliyun.com/repository/google` 的 maven-metadata 200 / 0.68s；
+ *   · `services.gradle.org/distributions` 可达但 ~46 KB/s（发行包另由 wrapper 预置）。
+ *
+ * 做了什么：**在前面加镜像**，不删、不改项目自己声明的 `google()` / `mavenCentral()` ——
+ *   原仓库留在后面兜底，所以覆盖不到的坐标（jitpack 等）走原路。
+ *   `beforeSettings` 挂 `pluginManagement`（settings 的 `plugins{}` 在 settings 求值过程中
+ *   就要解析，挂 `settingsEvaluated` 来不及），`beforeProject` 挂各工程自己的仓库。
+ *
+ * 供给链交代：镜像只是同一批字节的其他出口，不引入新坐标。
+ *   核对方法（每次换产物源后至少抽一枚）：远端解析到的产物 sha256 == 官方同版本产物 sha256。
+ *   对不上就是不同的字节，摘掉这一枚文件并回来查。
+ *
+ * 回退：把 `scripts/run-gradle.mjs` 步骤 4 里那句 `-I` 去掉即可（本文件不被任何构建读取）。
+ */
+def heytaMirrors = [
+  'https://maven.aliyun.com/repository/google',
+  'https://maven.aliyun.com/repository/public',
+  'https://maven.aliyun.com/repository/gradle-plugin',
+  'https://dl.google.com/dl/android/maven2/'
+]
+
+beforeSettings { s ->
+  heytaMirrors.each { u -> s.pluginManagement.repositories.maven { it.url = u } }
+  s.pluginManagement.repositories.gradlePluginPortal()
+}
+
+beforeProject { p ->
+  [p.buildscript.repositories, p.repositories].each { h ->
+    heytaMirrors.each { u -> h.maven { it.url = u } }
+  }
+}

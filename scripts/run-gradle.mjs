@@ -21,12 +21,21 @@
  * 三种写法各挂一边，所以只能由 Node 来判断平台。额外好处：Gradle 的退出码
  * 原样透传，`pnpm build:android` 的成败不会再被 shell 吃掉。
  *
- * 为什么需要它（第二层，2026-10-04 的新规则）
+ * 为什么需要它（第二层，2026-10-04 立的规则；2026-10-28 换载体）
  * ------------------------------------------------
- * **Android 构建不再在这台 Mac/Linux 上跑。** 起因是实测：headless Android 模拟器
- * 常驻 3.6G 内存 + 90% CPU，而 SDK/AVD/Gradle 缓存吃掉约 20G 磁盘。产品负责人拍板：
+ * **Android 构建不在执行 `pnpm build:android` 的那台机器上跑。** 起因是实测：headless
+ * Android 模拟器常驻 3.6G 内存 + 90% CPU，而 SDK/AVD/Gradle 缓存吃掉约 20G 磁盘。
  *
- *     之后 Android 任务一律 ssh windows-pc，不要再在 Mac 起新的 Gradle 构建或模拟器。
+ *   · 2026-10-04 产品负责人拍板：「之后 Android 任务一律 ssh windows-pc，不要再在 Mac
+ *     起新的 Gradle 构建或模拟器。」（当时的起因仍然是 Mac 的内存与磁盘。）
+ *   · 2026-10-28 同一位负责人改口：**「安卓我需要在 Linux dev 上做，把整个安卓都迁移到
+ *     Linux dev 上。」** ⇒ 构建与设备侧验收**都**落到 `linux-dev`，`windows-pc` 只留
+ *     Windows 桌面壳（MSIX）那一腿。
+ *
+ * 这一格换的不只是主机名，两侧的形状一起换了：远端命令从 `powershell -NoProfile -Command`
+ * + `gradlew.bat` 变成 bash + `./gradlew`，路径从反斜杠变成正斜杠。载体前置（NDK 27.1.12297006、
+ * JDK 17、gradle 发行包与 Maven 镜像）由 `scripts/linux-dev/setup-android-carrier.sh` 建，
+ * 不靠人记得。
  *
  * 落点选在这里，是因为**所有 Android 构建入口本来就汇成一枚收口点**：
  *
@@ -35,15 +44,15 @@
  *         → apps/mobile/package.json 里逐字都是 `node ../../scripts/run-gradle.mjs <task>`
  *
  * ⇒ 路由只需要改这一个文件，`pnpm build:android` 与各验收脚本的形状**一个字都不用改**。
- * 完整手册：[docs/runbooks/android-build-on-windows.md](../docs/runbooks/android-build-on-windows.md)
+ * 完整手册：[docs/runbooks/android-build-on-linux-dev.md](../docs/runbooks/android-build-on-linux-dev.md)
  *
  * 现在的分流：
  *
  *   | 平台 | 行为 |
  *   |---|---|
  *   | **Windows**（`win32`） | **逐字不变**：本机 `gradlew.bat <task>`。这一条是**承重的**： |
- *   | | windows-pc 上跑的还是这些 pnpm 脚本，它必须落在本机执行分支， |
- *   | | 否则"远程构建"会在远端再发起一次"远程构建"——**递归** |
+ *   | | 它挡住"远程构建在远端再发起一次远程构建"的**递归**（载体机是 Linux， |
+ *   | | 但同一批 pnpm 脚本在 Windows 开发机上仍要能本机跑） |
  *   | macOS / Linux | 同步当前工作树 → `ssh` 远端跑同一个 gradle 任务 → 把产物 scp 回 |
  *   | | **本地消费者原本期望的那个路径**（见"产物落回原路径"那一节） |
  *
@@ -58,9 +67,11 @@
  *   node ../../scripts/run-gradle.mjs assembleRelease --dry-run  # 只打印计划，一个字节都不写
  *
  * 环境变量（都有默认值，默认值就是规则要求的那套）：
- *   HEYTA_ANDROID_HOST          远程构建主机，默认 `windows-pc`
- *   HEYTA_ANDROID_REMOTE_ROOT   远端仓库根，默认 `C:\src\heyta`
- *   HEYTA_ANDROID_LOCAL_GRADLE  =1 时**显式**在本机跑 gradle（例外，不是兜底）
+ *   HEYTA_ANDROID_HOST                 远程构建主机，默认 `linux-dev`
+ *   HEYTA_ANDROID_REMOTE_ROOT          远端仓库根，默认 `/home/xaiver/heyta-android-build`
+ *   HEYTA_ANDROID_SDK_ON_HOST          远端 Android SDK 根（AGP 只认它或 local.properties）
+ *   HEYTA_ANDROID_GRADLE_HOME_ON_HOST  远端**私有** Gradle 用户目录（不与那台机器的 ~/.gradle 混）
+ *   HEYTA_ANDROID_LOCAL_GRADLE         =1 时**显式**在本机跑 gradle（例外，不是兜底）
  */
 
 import { spawnSync } from 'node:child_process';
@@ -86,11 +97,46 @@ const gradleArgs = argv.filter((a) => a !== '--dry-run' && a !== '--print-plan')
 
 /* ── 远程模式的旋钮 ───────────────────────────────────────────────────── */
 
-const HOST = process.env.HEYTA_ANDROID_HOST || 'windows-pc';
-const REMOTE_ROOT = process.env.HEYTA_ANDROID_REMOTE_ROOT || 'C:\\src\\heyta';
-const REMOTE_ANDROID_WIN = `${REMOTE_ROOT}\\apps\\mobile\\android`;
-/** scp 走 SFTP，路径用正斜杠；远端 cmd/tar 用反斜杠。两种形状各有归属。 */
-const REMOTE_ANDROID_SCP = REMOTE_ANDROID_WIN.replace(/\\/g, '/');
+/**
+ * 载体默认值（2026-10-28 由负责人的「安卓都迁到 Linux dev」指令定下）。
+ * `linux-dev` 与远端 SDK 路径这两枚默认值与设备侧那几枚脚本共用同一套口径
+ * （`ANDROID_HOST` / `ANDROID_SDK_ON_HOST`，见 `scripts/verify-android-subscription.sh`）——
+ * 构建与验收落在同一台机器上，服务端地址才能只用一种形状（`10.0.2.2`）。
+ */
+const HOST = process.env.HEYTA_ANDROID_HOST || 'linux-dev';
+const REMOTE_ROOT = process.env.HEYTA_ANDROID_REMOTE_ROOT || '/home/xaiver/heyta-android-build';
+/** 远端 Android SDK 根（与设备侧脚本的 `ANDROID_SDK_ON_HOST` 同一口径、同一默认值）。 */
+const SDK_ON_HOST = process.env.HEYTA_ANDROID_SDK_ON_HOST || '/home/xaiver/.local/opt/android-sdk';
+/**
+ * 载体自己的 Gradle 用户目录（JVM 工具链钉子、wrapper 发行包缓存、依赖解析产物都在这）。
+ * 🔴 刻意**不是**那台机器上的 `~/.gradle` —— 那里的 `init.d/` 属于别的项目，
+ * 见步骤 4 那段。回退：删掉这一枚目录即可，别的项目一律不受影响。
+ */
+const GRADLE_HOME_ON_HOST = process.env.HEYTA_ANDROID_GRADLE_HOME_ON_HOST || '/home/xaiver/.heyta-android-gradle';
+const REMOTE_ANDROID = `${REMOTE_ROOT}/apps/mobile/android`;
+
+// 🔴 这三枚旋钮的值会被拼进远端命令行，所以它们只许是**路径形状**：出现引号、`$`、
+//    反引号、分号、管道、重定向、换行、空格或反斜杠就直接红，不送过去。
+//    旧版本不需要这条守卫（值写死成 Windows 路径），换成正斜杠默认值后"谁来改这枚旋钮"
+//    变成了一件真实可能的事，边界就该在这里判 —— 系统边界之外不重复设卡。
+//    ⚠️ 放在 `runRemote()` 里而不是模块顶层：本文件被 `check-android-gradle-remote`
+//    **import** 进来取 `deriveArtifacts`，模块顶层 exit 会违反"被 import 时不 exit"那条承诺。
+const SHELL_UNSAFE = /['"`$;&|<>\n\r\t \\]/;
+function assertRemoteKnobs() {
+  for (const [name, value] of [
+    ['HEYTA_ANDROID_HOST', HOST],
+    ['HEYTA_ANDROID_REMOTE_ROOT', REMOTE_ROOT],
+    ['HEYTA_ANDROID_SDK_ON_HOST', SDK_ON_HOST],
+  ]) {
+    if (SHELL_UNSAFE.test(value)) {
+      console.error(
+        `🔴 run-gradle：${name} 含会被远端 shell 解释的字符（${JSON.stringify(value)}）。\n` +
+          '   它只许是一条不带引号与命令字符的主机名 / 绝对路径。',
+      );
+      process.exit(1);
+    }
+  }
+}
 
 /* ── 产物路径推导（不写死一张表）────────────────────────────────────── */
 
@@ -130,7 +176,7 @@ export function deriveArtifacts(tasks) {
 
 const ARTIFACTS = deriveArtifacts(gradleArgs);
 
-/** 仓库相对产物路径 → 远端那棵树里的路径（正斜杠，scp 与 PowerShell 都吃这一形状）。 */
+/** 仓库相对产物路径 → 远端那棵树里的路径（POSIX 只有一种形状）。 */
 /**
  * "这个 mtime 可能是真的吗"的下界。
  *
@@ -140,7 +186,7 @@ const ARTIFACTS = deriveArtifacts(gradleArgs);
 const MTIME_FLOOR = Date.parse('2020-01-01T00:00:00Z') / 1000;
 
 function remotePathOf(rel) {
-  return `${REMOTE_ANDROID_SCP}/${rel.replace('apps/mobile/android/', '')}`;
+  return `${REMOTE_ANDROID}/${rel.replace('apps/mobile/android/', '')}`;
 }
 
 /* ── 执行装置：dry-run 下**一个字节都不写** ────────────────────────────── */
@@ -224,12 +270,14 @@ function runLocal(why) {
 /* ── 远程分支 ─────────────────────────────────────────────────────────── */
 
 function runRemote() {
+  assertRemoteKnobs();
   console.log(
     [
       '',
       '═══ Android 构建走远程主机（AGENTS §6.1 的规则）════════════════════',
       `   构建主机   = ${HOST}`,
       `   远端仓库根 = ${REMOTE_ROOT}`,
+      `   远端 SDK   = ${SDK_ON_HOST}`,
       `   gradle 任务= ${gradleArgs.join(' ')}`,
       `   回传产物   = ${ARTIFACTS.length === 0 ? '（这个任务不产出 APK/AAB，见步骤 5 的判据）' : ARTIFACTS.join('\n                  ')}`,
       DRY ? '   模式       = **dry-run：只打印计划，不发任何网络写操作、不写本地文件**' : '',
@@ -262,9 +310,9 @@ function runRemote() {
 
   /* 步骤 1：远端可达性与工具链前置（只读）*/
   console.log('  步骤 1：远端可达性 / 依赖 / local.properties 前置（只读探测）');
-  // 🔴 整条 PowerShell 命令**只用一对**外层双引号、里面全是单引号：cmd 会把内层的
-  //    `"; "` 形状当成参数边界，实测会把命令拆坏。
-  const localProps = `${REMOTE_ANDROID_WIN}\\local.properties`;
+  // 🔴 探测脚本只用**一条 `R=` 赋值**接住远端根，后面全部写 `$R/…`：把根拼进每一条
+  //    判据的路径里，就等于让"远端仓库根"这件事在本文件里有第二份写法（换载体时
+  //    G8 那两条腿会各自漂一节）。
   // 🔴 RNDEPS 量的是 `apps/mobile/node_modules`，**不是** `apps/mobile/android/node_modules`。
   //    这不是笔误修正，是一条"永不开的门"：pnpm-workspace.yaml 的 packages 是
   //    `packages/*` / `apps/*` / `server` ⇒ `apps/mobile/android` 不是工作区包，
@@ -292,15 +340,18 @@ function runRemote() {
       '   这是探针的安全边界，不是构建输入的问题 —— 改这里之前先想清楚为什么要用那种名字。',
     );
   }
-  const depArray = declaredDeps.map((n) => `'${n}'`).join(',');
-  const preCmd =
-    `powershell -NoProfile -Command "Write-Output ('RNDEPS=' + (Test-Path '${REMOTE_ROOT}\\apps\\mobile\\node_modules')); ` +
-    `Write-Output ('ROOTDEPS=' + (Test-Path '${REMOTE_ROOT}\\node_modules\\.pnpm')); ` +
-    `if (Test-Path '${localProps}') { if ((Get-Content -Raw '${localProps}') -match '/Users/|/opt/homebrew') ` +
-    `{ Write-Output 'LOCALPROPS=MAC-PATH' } else { Write-Output 'LOCALPROPS=ok' } } ` +
-    `else { Write-Output 'LOCALPROPS=absent' }; ` +
-    `$n=@(${depArray}); $m=@(); foreach($x in $n){ $p='${REMOTE_ROOT}\\apps\\mobile\\node_modules\\'+$x.Replace('/','\\'); $q='${REMOTE_ROOT}\\node_modules\\'+$x.Replace('/','\\'); if(Test-Path -LiteralPath $p){} elseif(Test-Path -LiteralPath $q){} else {$m+=$x} }; ` +
-    `Write-Output ('DEPCHECK=' + $n.Count); Write-Output ('DEPMISS=' + $m.Count); foreach($x in $m){ Write-Output ('DEPMISS-'+$x) }"`;
+  const depList = declaredDeps.join(' ');
+  const preCmd = [
+    `R='${REMOTE_ROOT}'`,
+    `LP="$R/apps/mobile/android/local.properties"`,
+    `echo "RNDEPS=$( [ -d "$R/apps/mobile/node_modules" ] && echo yes || echo no )"`,
+    `echo "ROOTDEPS=$( [ -d "$R/node_modules/.pnpm" ] && echo yes || echo no )"`,
+    `if [ -f "$LP" ]; then if grep -qE '/Users/|/opt/homebrew' "$LP"; then echo LOCALPROPS=MAC-PATH; else echo LOCALPROPS=ok; fi; else echo LOCALPROPS=absent; fi`,
+    `CHECKED=0; MISS=0`,
+    `for x in ${depList}; do CHECKED=$((CHECKED+1)); if [ ! -d "$R/apps/mobile/node_modules/$x" ] && [ ! -d "$R/node_modules/$x" ]; then MISS=$((MISS+1)); echo "DEPMISS-$x"; fi; done`,
+    `echo "DEPCHECK=$CHECKED"`,
+    `echo "DEPMISS=$MISS"`,
+  ].join('; ');
   const preflight = runCapture('ssh', ['-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes', HOST, preCmd], {
     readOnly: true,
   });
@@ -328,30 +379,35 @@ function runRemote() {
     }
     const rnDeps = marker('RNDEPS');
     const rootDeps = marker('ROOTDEPS');
-    if (rnDeps !== 'True' || rootDeps !== 'True') {
+    if (rnDeps !== 'yes' || rootDeps !== 'yes') {
       die(
         '步骤 1（远端依赖）',
         `远端 node_modules 不在位（apps/mobile=${rnDeps || '?'}，根 .pnpm=${rootDeps || '?'}）。`,
-        `   修它：ssh ${HOST} "cd /d ${REMOTE_ROOT} && pnpm install"` +
-          '\n   （工具链没装则见 scripts/windows/setup-build-host.ps1，手册 §4）',
+        `   修它：ssh ${HOST} "cd ${REMOTE_ROOT} && pnpm install --frozen-lockfile"` +
+          '\n   （载体工具链没装则见 scripts/linux-dev/setup-android-carrier.sh，手册 §二）',
       );
     }
     // 🔴 逐包判定：**先证明探针自己跑成了**，再证明"缺 0 个"。
     //    缺前一半的话，"DEPMISS 行不在"会被读成"没缺"—— 那正是本次要修的那个形状
     //    （目录在 ⇒ ✅，而真正缺的两枚包从未被问起）。
     const depChecked = Number(marker('DEPCHECK'));
-    const depMissCount = Number(marker('DEPMISS'));
+    // 🔴 `Number('')` 是 **0**，而 0 是有限数。旧写法用 `Number(marker('DEPMISS'))` 做
+    //    "读不到 ⇒ 判探针故障"那条守卫，于是**探针只数了 DEPCHECK 没数 DEPMISS** 的那种断法
+    //    会被读成"缺 0 个"直接放行 —— 与 G10 记的那次"mtime 空串读成 1970 年"是同一族，
+    //    只是方向相反（那次错报红，这次错报绿）。所以按**数字字面量**判，不按 Number() 的宽容判。
+    const depMissRaw = marker('DEPMISS');
+    const depMissCount = /^\d+$/.test(depMissRaw) ? Number(depMissRaw) : Number.NaN;
     if (!Number.isFinite(depChecked) || depChecked !== declaredDeps.length) {
       die(
         '步骤 1（远端依赖逐包探测没跑成）',
         `探针该数出 ${declaredDeps.length} 个声明依赖，实际读到 DEPCHECK=[${marker('DEPCHECK') || '（无此行）'}]。`,
-        '   ⇒ 这是**探针故障**，不是"依赖齐"。不要放行；先看远端 PowerShell 的报错（同一份 stdout 里 RNDEPS 行有没有）。',
+        '   ⇒ 这是**探针故障**，不是"依赖齐"。不要放行；先看远端 bash 的报错（同一份 stdout 里 RNDEPS 行有没有）。',
       );
     }
     if (!Number.isFinite(depMissCount)) {
       die(
         '步骤 1（远端依赖逐包探测没跑成）',
-        `DEPCHECK 有读数（${depChecked}）但 DEPMISS 读不到 ⇒ 探测中途断了。`,
+        `DEPCHECK 有读数（${depChecked}）但 DEPMISS 读不到或不是数字（原样读到 〈${depMissRaw || '空'}〉）⇒ 探测中途断了。`,
         '   同样按**探针故障**处理，不按"缺 0 个"放行。',
       );
     }
@@ -361,29 +417,52 @@ function runRemote() {
         '步骤 1（远端声明依赖缺失）',
         `远端解析不到 ${depMissCount}/${depChecked} 个 apps/mobile 声明依赖：\n      ${missList.join('\n      ')}`,
         `   这是**环境**，不是产品：本机这两个都装好了，而同步**永不送 node_modules**（被 gitignore）。\n` +
-          `   修它：ssh ${HOST} "cd /d ${REMOTE_ROOT} && pnpm install --frozen-lockfile"` +
+          `   修它：ssh ${HOST} "cd ${REMOTE_ROOT} && pnpm install --frozen-lockfile"` +
           '\n   ⚠️ 不要改成本机跑（AGENTS §6.1），也不要因为"目录在"就摘掉这一格 —— 上一次就是那样红了 18 分钟。',
       );
     }
-    // local.properties 被 gitignore ⇒ **同步永远不会覆盖它**。
-    // 远端若留着一条 Mac 的 sdk.dir，症状是 gradle 报一句和平台无关的 SDK 找不到 ——
-    // 先在这里点名，别让它变成一次神秘的构建失败。
+    // 🔴 `local.properties` 被 gitignore ⇒ **同步永远不会把它送过去**。这条不是边角：
+    //    2026-10-28 首趟换载体真构建就是死在它上面的 —— 远端没有 `sdk.dir`，而 AGP 在
+    //    某些任务（`processReleaseResources` / `manifest-json-release`）里读的是**这条文件**
+    //    而不是环境变量，报出来的却是一句和平台无关的 "Directory doesn't exist"。
+    //    所以：缺了或留着一条 Mac 的 sdk.dir，都由收口点**当场写成载体的真值**（幂等）。
+    if (marker('LOCALPROPS') === 'absent' || marker('LOCALPROPS') === 'MAC-PATH') {
+      const wrote = runCapture('ssh', [
+        '-o',
+        'ConnectTimeout=10',
+        HOST,
+        `printf 'sdk.dir=%s\\n' '${SDK_ON_HOST}' > '${REMOTE_ANDROID}/local.properties' && echo WROTE=1`,
+      ]);
+      if (wrote.status !== 0 || !/WROTE=1/.test(wrote.stdout ?? '')) {
+        die(
+          '步骤 1（写远端 local.properties）',
+          `写不出远端 ${REMOTE_ANDROID}/local.properties（ssh 退出码 ${wrote.status}）。`,
+          `   修法：ssh ${HOST} "mkdir -p '${REMOTE_ANDROID}'" 后重跑；` +
+            '\n   ⚠️ 不要手工去改本机那份 —— 它不入库，改了也不会送过去。',
+        );
+      }
+      console.log(`  ✅ 远端 local.properties 已写成载体真值（sdk.dir=${SDK_ON_HOST}，原先=${marker('LOCALPROPS')}）`);
+    }
+    // 兜底：写成之后仍被判成别的主机路径（例如载体上留着一条 Windows 的 sdk.dir），点名。
     if (marker('LOCALPROPS') === 'MAC-PATH') {
       die(
         '步骤 1（远端 local.properties）',
-        `远端 ${REMOTE_ANDROID_WIN}\\local.properties 里是一条 Mac 的 sdk.dir（/Users/… 或 /opt/homebrew/…）。`,
+        `远端 ${REMOTE_ANDROID}/local.properties 里是一条 Mac 的 sdk.dir（/Users/… 或 /opt/homebrew/…）。`,
         '   它不入库，所以源码同步不会改掉它。删掉那一行（远端有 ANDROID_HOME，gradle 会用环境变量），' +
           '\n   或把它改成远端真实的 SDK 路径。',
       );
     }
+    // 🔴 这一行不许把**写之前**的读数当成当前状态打印：`local.properties` 刚被上面那一支
+    //    改成载体真值，再印 `absent` 就是在报告一个已经不成立的事实。
+    const lpNow = marker('LOCALPROPS') === 'absent' || marker('LOCALPROPS') === 'MAC-PATH' ? '已改写为载体真值' : marker('LOCALPROPS');
     console.log(
-      `  ✅ 远端依赖在位（声明的 ${depChecked} 个逐包解析得到）；local.properties=${marker('LOCALPROPS') || '（探测无读数）'}`,
+      `  ✅ 远端依赖在位（声明的 ${depChecked} 个逐包解析得到）；local.properties=${lpNow || '（探测无读数）'}`,
     );
   }
 
   /* 步骤 2：同步当前工作树（复用 MSIX 那一腿的同一枚同步机制）*/
   console.log('  步骤 2：同步当前工作树 + packages/*/dist → 远端（tar sha256 对账）');
-  // 🔴 复用 `scripts/lib/sync-windows-sources.sh`，不在这里再写一份 tar/scp：
+  // 🔴 复用 `scripts/lib/sync-build-sources.sh`，不在这里再写一份 tar/scp：
   //    同一个事实抄两遍一定会漂（AGENTS §3.5 与 §7 第 82/174 条都是这笔学费）。
   //    这条同步送的是**当前工作树**（含未提交改动）+ 被 gitignore 的构建输入。
   // 对**瞬时网络**有限重试，对**确定性判断**（对账不上）不重试 ——
@@ -394,11 +473,11 @@ function runRemote() {
       ? { status: 0, stdout: '', stderr: '' }
       : runCapture('bash', [
           '-c',
-          `source scripts/lib/sync-windows-sources.sh && sync_windows_sources_for_android ${HOST} '${REMOTE_ROOT}'`,
+          `source scripts/lib/sync-build-sources.sh && sync_android_sources ${HOST} '${REMOTE_ROOT}'`,
         ]);
     if (DRY) {
       console.log(
-        `   [dry-run] 将执行（**未执行**）：\n      bash -c 'source scripts/lib/sync-windows-sources.sh && sync_windows_sources_for_android ${HOST} '${REMOTE_ROOT}''`,
+        `   [dry-run] 将执行（**未执行**）：\n      bash -c 'source scripts/lib/sync-build-sources.sh && sync_android_sources ${HOST} '${REMOTE_ROOT}''`,
       );
       break;
     }
@@ -430,15 +509,24 @@ function runRemote() {
   // frozen install 是幂等的：依赖不变时 pnpm 只做快速校验，依赖变更时按当前 lockfile
   // 补齐 symlink 与包。它放在同步之后、Gradle 之前，保证构建输入与依赖树来自同一源码包。
   console.log('  步骤 2.5：源码同步后在远端执行 pnpm install --frozen-lockfile');
+  // 🔴 `PATH` 显式带上 `$HOME/.local/bin`：`ssh host 'cmd'` 起的是**非登录** shell，
+  //    那台机器上 node/pnpm 正住在那个目录（实测 `which pnpm` 在 `bash -s` 下解析得到，
+  //    但依赖 profile 被读不是依赖）。不写这一句，换 sshd 配置就会让步骤 2.5 报
+  //    "pnpm: 未找到命令" —— 而那会被归因成"远端依赖坏了"。
   const remoteInstall = runLogged(
     'ssh',
-    ['-o', 'ConnectTimeout=10', HOST, `cd /d ${REMOTE_ROOT} && pnpm install --frozen-lockfile --reporter append-only`],
+    [
+      '-o',
+      'ConnectTimeout=10',
+      HOST,
+      `export PATH="$HOME/.local/bin:$PATH"; cd ${REMOTE_ROOT} && pnpm install --frozen-lockfile --reporter append-only`,
+    ],
   );
   if (remoteInstall.status !== 0) {
     die(
       '步骤 2.5（远端 workspace 依赖安装）',
       `pnpm install --frozen-lockfile 退出码 ${remoteInstall.status}。`,
-      `   命令是：ssh ${HOST} "cd /d ${REMOTE_ROOT} && pnpm install --frozen-lockfile --reporter append-only"`,
+      `   命令是：ssh ${HOST} "cd ${REMOTE_ROOT} && pnpm install --frozen-lockfile --reporter append-only"`,
     );
   }
   console.log('  ✅ 远端 workspace 依赖与当前同步源码一致');
@@ -452,12 +540,7 @@ function runRemote() {
         '-o',
         'ConnectTimeout=10',
         HOST,
-        [
-          'powershell -NoProfile -Command',
-          `"${ARTIFACTS.map((rel) => `Remove-Item -Force -ErrorAction SilentlyContinue '${remotePathOf(rel)}'`).join('; ')}${
-            ARTIFACTS.length > 0 ? '; ' : ''
-          }Write-Output ('BUILDBEGIN=' + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"`,
-        ].join(' '),
+        `${ARTIFACTS.map((rel) => `rm -f '${remotePathOf(rel)}'`).join('; ')}${ARTIFACTS.length > 0 ? '; ' : ''}echo "BUILDBEGIN=$(date -u +%s)"`,
       ]);
   const buildBeginRaw = /BUILDBEGIN=(\d+)/.exec(begin.stdout ?? '')?.[1];
   const buildBeginEpoch = buildBeginRaw ? Number(buildBeginRaw) : null;
@@ -486,7 +569,7 @@ function runRemote() {
     if (/["'&|;<>\n\r`$]/.test(a)) {
       die(
         '步骤 4（参数形状）',
-        `任务参数里有会破坏远端 cmd 命令行的字符：${JSON.stringify(a)}`,
+        `任务参数里有会破坏远端 bash 命令行的字符：${JSON.stringify(a)}`,
         '   远程模式只接受简单 token（任务名 / `-Pkey=value` / `-I 文件`）。',
       );
     }
@@ -497,8 +580,20 @@ function runRemote() {
   // 下一轮步骤 3 明明删了 APK、gradle 全程 up-to-date，步骤 5 却读到
   // "mtime=15:15:47Z < begin=15:16:07Z" 的假"陈旧产物"（两端时钟逐秒同步已排除偏差）。
   // 关掉缓存后，步骤 3 删除过的产物只能由**本次调用**重新写出 ⇒ mtime 证明重新成立。
-  // 代价：远端失去构建缓存（实测 assembleRelease 全程 ~35s，可忽略）。
-  const remoteCmd = `cd /d ${REMOTE_ANDROID_WIN} && gradlew.bat --no-build-cache ${gradleArgs.join(' ')}`;
+  // 代价：远端失去构建缓存（实测冷构建 7m46s / 增量在分钟级，可忽略）。
+  // 🔴 `ANDROID_HOME` 必须由这一侧给：`local.properties` 不入库，源码同步永远不会把它送过去，
+  //    而 AGP 在没有它时只认环境变量（2026-10-28 首趟真构建实测：不导出时挂在 SDK 找不到）。
+  // 🔴 `GRADLE_USER_HOME` 指向载体自己的那一套（不是那台机器的 `~/.gradle`）：那台机器上
+  //    原本躺着**别的项目**的 `init.d/tfa-mirror.gradle`，heyta 首趟构建实际是靠它才解析到
+  //    Maven 的 —— 一个不在任何清单里的依赖，别人删掉它就莫名其妙红。私有 home 里
+  //    只有本仓显式 `-I` 传进去的那枚镜像脚本与自己钉的工具链，回退＝删掉那一枚目录。
+  // 🔴 `-I` 传的是**同步过去的那份文件**（在源码树里，所以它跟着工作树一起对账）：
+  //    镜像规则因此出现在构建命令与 dry-run 打印里，不在远端某个看不见的地方。
+  const remoteCmd =
+    `export PATH="$HOME/.local/bin:$PATH"; ` +
+    `export ANDROID_HOME='${SDK_ON_HOST}'; export ANDROID_SDK_ROOT='${SDK_ON_HOST}'; ` +
+    `export GRADLE_USER_HOME='${GRADLE_HOME_ON_HOST}'; ` +
+    `cd ${REMOTE_ANDROID} && ./gradlew --no-build-cache -I '${REMOTE_ROOT}/scripts/linux-dev/gradle-host/heyta-cn-mirror.init.gradle' ${gradleArgs.join(' ')}`;
   const build = runLogged('ssh', ['-o', 'ConnectTimeout=10', HOST, remoteCmd]);
   if (build.status !== 0) {
     die(
@@ -540,22 +635,20 @@ function runRemote() {
     'ConnectTimeout=10',
     HOST,
     [
-      'powershell -NoProfile -Command',
-      `"${ARTIFACTS.map((rel, i) => {
-        const p = remotePathOf(rel);
-        return (
-          `Write-Output ('A${i}::SIZE=' + (Get-Item '${p}').Length); ` +
-          // 🔴 这里**不能**用 .ToUnixTimeSeconds()：打包机上的 Windows PowerShell 5.1 里
-          //    [DateTime] 没有这个方法（实测 MTIME_ERR=「方法调用失败，因为
-          //    [System.DateTime] 不包含名为 ToUnixTimeSeconds 的方法」）。它一抛错，
-          //    这一行什么都不输出，而下面 Number('') 恰好是 **0** —— 于是
-          //    一次**成功的构建**被判成"产物是 1970 年的"（10-05 01:4x 实测）。
-          //    跨版本稳的写法：远端只给 ISO-8601（UTC），换算留在本地。
-          `Write-Output ('A${i}::MTIME=' + (Get-Item '${p}').LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')); ` +
-          `Write-Output ('A${i}::SHA256=' + (Get-FileHash '${p}' -Algorithm SHA256).Hash)`
-        );
-      }).join('; ')}"`,
-    ].join(' '),
+      // 🔴 文件不在时要显式回 `ABSENT`，**不许**让那一行什么都不输出：
+      //    `Number('')` 恰好是 `0`，于是"探针没读到"会伪装成"产物来自 1970 年"，
+      //    再以"比构建起点旧"这个**错误归因**红出去（旧载体上是 PowerShell 5.1 缺方法
+      //    导致的同一形状，换到 POSIX 一样会犯 —— 所以 G10 跟着换载体继续有效）。
+      'heyta_read() {',
+      '  if [ ! -f "$2" ]; then echo "A$1::SIZE=ABSENT"; echo "A$1::MTIME=ABSENT"; echo "A$1::SHA256=ABSENT"; return; fi;',
+      '  echo "A$1::SIZE=$(stat -c %s "$2")";',
+      '  echo "A$1::MTIME=$(date -u -d @$(stat -c %Y "$2") +%Y-%m-%dT%H:%M:%SZ)";',
+      '  echo "A$1::SHA256=$(sha256sum "$2" | cut -d" " -f1)";',
+      '}',
+      ...ARTIFACTS.map((rel, i) => `heyta_read ${i} '${remotePathOf(rel)}'`),
+      // 🔴 必须用**换行**拼，不能用 `; `：bash 的函数定义写成 `f() {; …` 是语法错误
+      //   （`{` 后面紧跟 `;` 是个空命令）。这一串是原样交给远端 shell 的。
+    ].join('\n'),
   ]);
 
   const pulled = [];
@@ -589,7 +682,7 @@ function runRemote() {
         '步骤 5（远端产物身份）',
         `读不到远端产物的 SIZE/MTIME/SHA256：${rel}（MTIME 原样读到 〈${mtimeRaw || '空'}〉）`,
         `   要么 gradle 没产出它（任务名与产物路径对不上，或该任务在 AGP 里的输出形状不在推导规则内），` +
-          '\n   要么**这一侧的探针坏了**（远端命令抛错时什么都不输出，而空串会被 Number() 读成 0）。' +
+          '\n   要么**这一侧的探针坏了**（远端那一行没输出时，空串会被 Number() 读成 0 —— 所以上面显式回 ABSENT）。' +
           '\n   ⚠️ 不接受"读不到就当没问题"，也不接受"读不到"被写成"产物是旧的"。',
       );
     }
@@ -609,7 +702,7 @@ function runRemote() {
     mkdirSync(dirname(localPath), { recursive: true });
     const remoteSrc = `${HOST}:${remotePathOf(rel)}`;
     console.log(`  步骤 6：scp 回本地**消费者原本期望的路径** ${rel}`);
-    // 🔴 与 `sync-windows-sources.sh` 那一步同族（AGENTS §7：一类不是一个）：`scp` 默认**没有
+    // 🔴 与 `sync-build-sources.sh` 那一步同族（AGENTS §7：一类不是一个）：`scp` 默认**没有
     //    传输超时**，2026-10-14 就在 486 MB 那趟上于 99.3% 僵死过，而这里的产物是 **69 MB**。
     //    挂在这一步比挂在步骤 2 更难查 —— 远端已经构建成功，看上去"就该完了"。
     const got = runLogged('scp', [
@@ -712,8 +805,9 @@ if (invokedDirectly) {
     process.exit(2);
   }
   if (isWindows) {
-    // 🔴 承重的一支：远端（windows-pc）跑的还是同一批 pnpm 脚本，
-    //    它必须落在这里，否则"远程构建"会在远端再发起一次"远程构建"（递归）。
+    // 🔴 承重的一支：任何 Windows 开发机上跑的还是同一批 pnpm 脚本，它必须落在这里，
+    //    否则"远程构建"会在远端再发起一次"远程构建"（递归）。载体本身是 Linux（`linux-dev`），
+    //    走的是下面那条远程支；这一支留着的理由与 2026-10-04 那批相同，只是对侧机器换了。
     process.exit(runLocal('Windows 本机 —— 远程模式的对侧，行为逐字不变'));
   }
   if (process.env.HEYTA_ANDROID_LOCAL_GRADLE === '1') {
@@ -722,7 +816,7 @@ if (invokedDirectly) {
         '',
         '╔═══════════════════════════════════════════════════════════════════',
         '║ 🔴 这是**本机执行**（macOS/Linux 上直接起 gradle）。',
-        '║    规则要求 Android 任务走远程构建主机（默认 ssh windows-pc）。',
+        '║    规则要求 Android 任务走远程构建载体（默认 ssh linux-dev）。',
         '║    触发条件：显式设置了 HEYTA_ANDROID_LOCAL_GRADLE=1。',
         '║    它是**逃生门，不是兜底** —— 远程失败时本文件不会自己走到这里。',
         '╚═══════════════════════════════════════════════════════════════════',

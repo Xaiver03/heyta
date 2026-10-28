@@ -6,36 +6,44 @@
 
 ```bash
 pnpm -r build                   # 🔴 打包前**必须**先跑：APK/.app 里打的是 packages/*/dist
-pnpm build:android              # Android Release APK（🔴 从 Mac/Linux 调用时会 ssh windows-pc，见下方新规）
+pnpm build:android              # Android Release APK（🔴 从 Mac/Linux 调用时会 ssh 载体机 linux-dev，见下方规则）
 pnpm build:android:debug        # Android Debug APK
 pnpm build:ios                  # iOS Release（仅 macOS）
 pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
 ```
 
-> 🔴 **2026-10-04 新规（产品负责人拍板）**：Android 任务一律 `ssh windows-pc`，
-> **不要再在这台 Mac 上起新的 Gradle 构建或模拟器**。原因不是整洁，是资源：
-> headless 模拟器 3.6G+ 常驻 / 90% CPU，SDK+AVD+Gradle 缓存吃掉 20G+ 磁盘。
+> 🔴 **Android 载体规则（两道令，后者换载体、不解除前者的形状）**
 >
-> - 落地方式是**只在一枚收口点分流**：`scripts/run-gradle.mjs`。所有 android 入口
+> - 2026-10-04 产品负责人：「之后 Android 任务一律 ssh windows-pc，不要再在 Mac 起新的
+>   Gradle 构建或模拟器。」起因不是整洁，是资源：headless 模拟器 3.6G+ 常驻 / 90% CPU，
+>   SDK+AVD+Gradle 缓存吃掉 20G+ 磁盘。
+> - **2026-10-28 产品负责人**：「安卓我需要在 Linux dev 上做，把整个安卓都迁移到 Linux dev 上。」
+>   ⇒ 载体换成 `linux-dev`，**构建与设备侧验收同机**；`windows-pc` 只留 Windows 桌面壳（MSIX）那一腿。
+>
+> - 落地方式仍然是**只在一枚收口点分流**：`scripts/run-gradle.mjs`。所有 android 入口
 >   （根 `package.json` 的 `build:android{,:debug,:bundle}` / `clean:android` → `@heyta/mobile`）
 >   本来就汇成那一枚，所以不需要改各端命令，也不需要在 CI 里加条件。
->   Windows 上（就是打包机本身）**逐字不变**地跑本机 gradle；macOS/Linux 走远端并把产物
+>   Windows 上（任何 Windows 开发机）**逐字不变**地跑本机 gradle；macOS/Linux 走远端并把产物
 >   回传到**消费者原本期望的路径**，好让 §7 第 27 条"APK 必须比源码新"继续有效。
-> - **不静默降级**：远端不可达就红。`HEYTA_ANDROID_LOCAL_GRADLE=1` 是**显式例外开关**
->   （给"远程主机正在重装"这类场景），不是兜底。
+> - **不静默降级**：载体不可达就红。`HEYTA_ANDROID_LOCAL_GRADLE=1` 是**显式例外开关**
+>   （给"载体机正在重装"这类场景），不是兜底。
+> - 载体默认值（主机 / 构建根 / SDK 根 / 私有 Gradle 用户目录）的**真源只有一处**：
+>   `scripts/lib/sync-build-sources.sh` 顶部那四行。其余都是抄件，由 G11 逐枚对账 ——
+>   两枚旋钮只移一个就是"构建在 A 树、验收取 B 产物"（§7 第 82 条搬到两台机器之间）。
 > - 门禁：`pnpm check:android-gradle-remote`（已进 `pnpm check`）。它钉的是**形状**——
 >   新开一条 `./gradlew` 入口、白名单比现实宽、回传路径与 `reinstall-all.sh` 的 `$APK`
->   对不上、绕开收口点、远程支里出现 `runLocal(`、第二份源码同步实现 —— 各自都会红
+>   对不上、绕开收口点、远程支里出现 `runLocal(`、第二份源码同步实现、探测不自证、
+>   mtime 换算落错边、载体默认值漂移 —— 各自都会红
 >   （`--self-test` 逐臂证明，臂 0 是阳性对照 —— **臂数由它自己打印，文档里不许抄**）。
-> - 操作步骤 / 验收判据 / Mac 释放清单 / 边界（**Windows 侧没有 Android 模拟器**，
->   所以设备侧验收目前仍在 Mac）见
->   [`docs/runbooks/android-build-on-windows.md`](../../docs/runbooks/android-build-on-windows.md)。
->   ✅ 那条"远程真打出 APK"的判据**已实测通过**（2026-10-05 02:14–02:34：`BUILD SUCCESSFUL in 41s`、
->   回传 `size=66,915,556 B` 且 sha256 与远端逐字相同、本地 mtime 回写为远端完成时刻、
->   `apksigner verify` rc=0 —— 逐项读数在 [`docs/runbooks/android-build-on-windows.md`](../../docs/runbooks/android-build-on-windows.md) §7 那张表的第 2 格）。
->   ⚠️ 它证到的是"远程打出的是一份**合法签名**的 APK"，**不是**"可以上架的发布签名"：
->   四个发布 keystore 键任一缺失时 `build.gradle` 把 release 变体挂到 `signingConfigs.debug`，
->   所以那趟的证书 `CN=Android Debug`。分流**已**替换本机通道，签名这一格没有。
+>   对侧那半是 `pnpm check:android-build-host`：它禁的是"**在跑命令的这台机器上**起模拟器"，
+>   换载体之后豁免**按"那一行是否在 `ssh <载体> <<HEREDOC` 体内"判**，不按文件名放行。
+> - 操作步骤 / 载体前置（一条命令补齐）/ 通道实测 / 设备腿 / 边界，见
+>   [`docs/runbooks/android-build-on-linux-dev.md`](../runbooks/android-build-on-linux-dev.md)。
+>   旧载体（windows-pc）那一侧的历史实测**不重写**，仍在
+>   [`android-build-on-windows.md`](../runbooks/android-build-on-windows.md) §七。
+> - ⚠️ 一条**没被这次迁移解除**的边界：四个发布 keystore 键没落到载体机上，release 变体会挂到
+>   `signingConfigs.debug` ⇒ 打出来的证书是 `CN=Android Debug`，`scripts/upload-dist.sh` 会拒绝发布它。
+>   分流**已**替换本机通道，签名这一格没有。
 
 ### 6.1.1 🔴 固定收尾流程：清旧包 → 重打 → **四端重装**（每轮交付必须）
 

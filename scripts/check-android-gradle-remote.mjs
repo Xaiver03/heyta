@@ -5,9 +5,13 @@
  *
  * ## 判的是哪条规则
  *
- * 产品负责人 2026-10-04 拍板：**之后 Android 任务一律 ssh windows-pc，不要再在 Mac
- * 起新的 Gradle 构建或模拟器。** 落地方式是让 `scripts/run-gradle.mjs` 按平台分流
- * （macOS/Linux 远程、Windows 本机），因为所有 Android 入口本来就汇成那一枚：
+ * 产品负责人两道令，后者换载体、不解除前者的形状：
+ *   · 2026-10-04：「之后 Android 任务一律 ssh windows-pc，不要再在 Mac 起新的 Gradle
+ *     构建或模拟器。」
+ *   · 2026-10-28：「安卓我需要在 Linux dev 上做，把整个安卓都迁移到 Linux dev 上。」
+ *     ⇒ 载体换成 `linux-dev`，构建与设备侧验收同机。
+ * 落地方式是让 `scripts/run-gradle.mjs` 按平台分流（macOS/Linux 远程、Windows 本机），因为所有
+ * Android 入口本来就汇成那一枚：
  *
  *     根 package.json build:android{,:debug,:bundle} / clean:android
  *       → pnpm --filter @heyta/mobile run …
@@ -35,35 +39,43 @@
  *   G5 **远程模式不会在 Windows 上递归**：`isWindows` 那一支必须还在分流处先判，
  *      且 `runRemote()` 的函数体里**不许**出现 `runLocal(` —— 那就是"静默降级"的写法。
  *   G6 **同步机制只有一枚**：`run-gradle.mjs` 必须调
- *      `scripts/lib/sync-windows-sources.sh` 的 `sync_windows_sources_for_android`，
+ *      `scripts/lib/sync-build-sources.sh` 的 `sync_windows_sources_for_android`，
  *      而自己**不实现**第二份源码打包（不许出现 `tar -czf`）；同一文件里
  *      `sync_windows_sources`（MSIX 那一腿的入口）与它的两个消费方必须都还在。
  *      —— 这是 AGENTS §3.5「抽出来的收尾动作是删掉旧的那份并加门禁」那一课的直接应用。
- *   G7 **远程前置不许是一条永不开的门**：步骤 1 探的那些 `<远端根>\…\node_modules`，
+ *   G7 **远程前置不许是一条永不开的门**：步骤 1 探的那些 `<远端根>/…/node_modules`，
  *      去掉 `node_modules` 之后必须匹配 `pnpm-workspace.yaml` 的某一条 packages glob。
- *      理由是真事故：第一版探 `apps\mobile\android\node_modules`，而 `apps/mobile/android`
+ *      理由是真事故：第一版探 `apps/mobile/android/node_modules`，而 `apps/mobile/android`
  *      不是工作区包 ⇒ `pnpm install` 永远不会在那儿建目录，远程构建**恒定**红在步骤 1，
  *      而它给出的修法执行完照样红（§7 元规则 2）。期望值靠**推导**工作区清单，
  *      不靠"这路径在不在" —— 后者在干净检出上必假红。
  *   G8 **远端仓库根单源**：路由必须把 `${REMOTE_ROOT}` 传给同步、同步必须把第二枚实参绑回
- *      `HEYTA_WINDOWS_REPO_ROOT`，且 dry-run 打印的那条要与真跑同形。两个旋钮只移一个就是
+ *      `HEYTA_BUILD_REPO_ROOT`，且 dry-run 打印的那条要与真跑同形。两个旋钮只移一个就是
  *      "同步解包到 A 树、gradle 在 B 树里构建"（§7 第 82 条的远程形态）。三条腿各一臂。
  *   G9 **步骤 1 的依赖前置要逐包、要先证明探针跑成了**：名单由 `apps/mobile/package.json`
  *      推导、`DEPCHECK`/`DEPMISS` 分两条输出、判定侧有"数不对 ⇒ 判探针故障"的守卫。
  *      理由同样是真事故：2026-10-05 第一次真远程构建红了 18m18s，而步骤 1 当时只
- *      `Test-Path` 那枚**目录** ⇒ 远端少两枚已声明的包被伪装成"前置过了"。
+ *      探那枚**目录** ⇒ 远端少两枚已声明的包被伪装成"前置过了"。
  *      与 G7 是同一族（"目录存在"被当成"构建输入齐"），但不是同一件事：G7 拦的是
  *      探错了地方（永不开的门），G9 拦的是探对了地方却只看了目录。
- *   G10 **步骤 5 的 mtime 读回要跨 PowerShell 版本、且不许把"读不到"读成 1970 年**：
- *      远端那一行必须给 ISO-8601（`.ToString('yyyy-MM-ddTHH:mm:ssZ')`），本地必须
- *      `Date.parse` + 一个下界（`MTIME_FLOOR`）。理由是真事故：打包机上是
- *      Windows PowerShell **5.1**，`[DateTime]` 没有 `ToUnixTimeSeconds()`（那是
- *      `DateTimeOffset` 的方法），那一行抛错后**什么都不输出**，而 `Number('')` 恰好
- *      是 `0` —— 于是 `BUILD SUCCESSFUL in 5m 11s` 的那一次真远程构建被报成
- *      "远端产物比本次构建起点还旧：mtime=1970-01-01"。**归因也是坏的**：它指着
- *      §7 第 27 条说"拿旧产物报绿"，而产物是新的、探针是坏的。
+ *   G10 **步骤 5 的 mtime 读回要给 ISO-8601、本地必须 Date.parse、且不许把"读不到"读成 0**：
+ *      远端那一行必须是 `date -u -d @… +%Y-%m-%dT%H:%M:%SZ` 的形状（远端只给字符串，
+ *      换算留在本地），本地必须 `Date.parse(mtimeRaw)` + 一个下界（`MTIME_FLOOR`）。
+ *      理由是真事故两笔：① 旧载体（Windows PowerShell 5.1）上 `[DateTime]` 没有
+ *      `ToUnixTimeSeconds()`，那一行抛错后**什么都不输出**，而 `Number('')` 恰好是 `0`
+ *      ⇒ `BUILD SUCCESSFUL` 的那一次被报成"产物是 1970 年的"，**归因也是坏的**（它指着
+ *      §7 第 27 条说"拿旧产物报绿"，而产物是新的、探针是坏的）；② 换到 bash 之后
+ *      `$(stat -c %Y …)` 在文件不存在时展开成**空串**，是同一个坑的新载体版本 ——
+ *      所以"远端不许只给 Unix 秒"这条在 POSIX 上继续有效，而不是一句 Windows 专属的历史。
  *      与 G9 同族（探针自己坏了），但方向相反：G9 拦"看漏了却报通过"，
  *      G10 拦"看错了却报失败"—— 两边都要有，否则下一次红会给出一个错误的根因。
+ *   G11 **载体默认值只许一处定义，且不许漂回旧载体**：`linux-dev` 这三枚默认值（主机 / SDK 根 /
+ *      私有 Gradle 用户目录）的**真源是 `scripts/lib/sync-build-sources.sh` 顶部那三行**，
+ *      `run-gradle.mjs` 与设备侧的 `verify-android-{subscription,vault-storage}.sh` 的默认值
+ *      必须逐字等于它 —— 两枚 `*_ON_HOST` 与那枚 host 各写各的，就会长成"构建在 A 树、
+ *      验收取 B 产物"（又是 §7 第 82 条）。另一半是 `windows-pc` / `C:\src\heyta` 不许出现在
+ *      收口点的代码里（`.md` 在册的迁移记录除外）：拍板已经改口，漂回去就是**把构建送回
+ *      那台只该管 MSIX 的机器**。两半各有一臂（`--self-test` 的载体臂）。
  *
  * ## 怎么跑
  *
@@ -406,7 +418,7 @@ function checkFunnel(baseRoot) {
 function checkRouterInvariants(baseRoot) {
   const out = [];
   const router = readFileSync(join(baseRoot, 'scripts/run-gradle.mjs'), 'utf8');
-  const lib = readFileSync(join(baseRoot, 'scripts/lib/sync-windows-sources.sh'), 'utf8');
+  const lib = readFileSync(join(baseRoot, 'scripts/lib/sync-build-sources.sh'), 'utf8');
 
   if (!/if \(isWindows\) \{/.test(router)) {
     out.push('G5 run-gradle.mjs 里读不到 `if (isWindows) {` —— Windows 那一支没了，远端会递归回远程模式。');
@@ -425,17 +437,17 @@ function checkRouterInvariants(baseRoot) {
   if (!/HEYTA_ANDROID_LOCAL_GRADLE/.test(router)) {
     out.push('G5 逃生门变量 HEYTA_ANDROID_LOCAL_GRADLE 不见了 —— 显式例外也没了，只剩"要么远程要么红"。');
   }
-  if (!/sync_windows_sources_for_android/.test(router)) {
-    out.push('G6 run-gradle.mjs 不再调用 sync_windows_sources_for_android —— 同步机制可能被复制成了第二份。');
+  if (!/sync_android_sources /.test(router)) {
+    out.push('G6 run-gradle.mjs 不再调用 sync_android_sources —— 同步机制可能被复制成了第二份。');
   }
   if (/tar -czf/.test(router)) {
     out.push('G6 run-gradle.mjs 自己实现了 tar —— 源码同步出现了第二份实现（AGENTS §3.5：抽出来之后要删掉旧的那份）。');
   }
   if (!/^sync_windows_sources\(\) \{/m.test(lib)) {
-    out.push('G6 sync-windows-sources.sh 里 MSIX 那一腿的入口 sync_windows_sources() 没了（两个既有消费方会一起断）。');
+    out.push('G6 sync-build-sources.sh 里 MSIX 那一腿的入口 sync_windows_sources() 没了（两个既有消费方会一起断）。');
   }
-  if (!/^sync_windows_sources_for_android\(\) \{/m.test(lib)) {
-    out.push('G6 sync-windows-sources.sh 里 Android 那一腿的入口 sync_windows_sources_for_android() 没了。');
+  if (!/^sync_android_sources\(\) \{/m.test(lib)) {
+    out.push('G6 sync-build-sources.sh 里 Android 那一腿的入口 sync_android_sources() 没了。');
   }
   for (const consumer of ['scripts/reinstall-all.sh', 'scripts/verify-windows-shell-journey.mjs']) {
     const p = join(baseRoot, consumer);
@@ -444,12 +456,12 @@ function checkRouterInvariants(baseRoot) {
       out.push(`G6 ${consumer} 不再调用 sync_windows_sources —— 同步那半可能被另建了一份。`);
     }
   }
-  readings.push('G6 同步机制一枚（两个入口共用 _heyta_windows_sync_push）');
+  readings.push('G6 同步机制一枚（两条载体腿共用 _heyta_sync_make_tar）');
   // 🔴 G8：**远端仓库根只有一个事实源**。路由侧读 `HEYTA_ANDROID_REMOTE_ROOT`，
   //    同步侧读 `HEYTA_WINDOWS_REPO_ROOT`，两个默认值逐字相同 ⇒ 平时看不出来，
   //    **只移一个**就变成"同步解包到 A、gradle 在 B 里构建"——§7 第 82 条搬到远程路径上。
   //    所以：调用侧必须把手里那枚根**传进**同步入口，同步入口必须把它绑回局部变量。
-  const CALL_SHAPE = /sync_windows_sources_for_android \$\{HOST\} '\$\{REMOTE_ROOT\}'/;
+  const CALL_SHAPE = /sync_android_sources \$\{HOST\} '\$\{REMOTE_ROOT\}'/;
   // 🔴 判的是**真跑那一支**：同一串在 dry-run 的打印里也出现一次，整文件计数会把
   //    "只改了打印、真调用没传"那种情况读成绿（臂 10 第一趟就是这么存活过去的 —— 摘掉实参
   //    仍然 0 条红，因为剩下那条命中在 `console.log` 里）。所以先用 runCapture 的块圈定范围。
@@ -459,7 +471,7 @@ function checkRouterInvariants(baseRoot) {
   } else if (!CALL_SHAPE.test(callBlock[0])) {
     out.push(
       'G8 run-gradle.mjs 调 `sync_windows_sources_for_android` 时没把自己那枚 `${REMOTE_ROOT}` 传过去 —— ' +
-        '远端仓库根又变成两个旋钮（`HEYTA_ANDROID_REMOTE_ROOT` 与 `HEYTA_WINDOWS_REPO_ROOT`），' +
+        '远端仓库根又变成两个旋钮（`HEYTA_ANDROID_REMOTE_ROOT` 与 `HEYTA_ANDROID_BUILD_ROOT`），' +
         '只移一个就是"同步解包到 A、gradle 在 B 里构建"（§7 第 82 条的远程形态）。',
     );
   }
@@ -471,13 +483,13 @@ function checkRouterInvariants(baseRoot) {
         `按计划跑的人会漏掉远端根那一枚实参。`,
     );
   }
-  if (!/local HEYTA_WINDOWS_REPO_ROOT="\$\{_android_remote_root:-\$HEYTA_WINDOWS_REPO_ROOT\}"/.test(lib)) {
+  if (!/local HEYTA_ANDROID_BUILD_ROOT="\$\{_android_remote_root:-\$HEYTA_ANDROID_BUILD_ROOT\}"/.test(lib)) {
     out.push(
-      'G8 sync-windows-sources.sh 的 `sync_windows_sources_for_android` 不再绑定第二枚实参到 ' +
-        '`HEYTA_WINDOWS_REPO_ROOT` —— 传进来的远端根会被静默丢弃，两个旋钮又分开了。',
+      'G8 sync-build-sources.sh 的 `sync_android_sources` 不再绑定第二枚实参到 ' +
+        '`HEYTA_ANDROID_BUILD_ROOT` —— 传进来的远端根会被静默丢弃，两个旋钮又分开了。',
     );
   }
-  if (callBlock && CALL_SHAPE.test(callBlock[0]) && occ === 2 && /local HEYTA_WINDOWS_REPO_ROOT="\$\{_android_remote_root:-\$HEYTA_WINDOWS_REPO_ROOT\}"/.test(lib)) {
+  if (callBlock && CALL_SHAPE.test(callBlock[0]) && occ === 2 && /local HEYTA_ANDROID_BUILD_ROOT="\$\{_android_remote_root:-\$HEYTA_ANDROID_BUILD_ROOT\}"/.test(lib)) {
     readings.push('G8 远端仓库根单源（路由把 REMOTE_ROOT 传进同步，同步绑回局部）');
   }
 
@@ -492,7 +504,10 @@ function checkRouterInvariants(baseRoot) {
    *      误判成探针故障。这不是风格问题，是形状（第 3 条守卫建立在第 2 条之上）；
    *   3. 判定侧有"读不到 / 数不对 ⇒ 判探针故障"的守卫，否则"没数过"会被放行成"缺 0 个"。 */
   const DERIVE = /Object\.keys\(mobilePkg\.dependencies/;
-  const SPLIT_MARKERS = /Write-Output \('DEPCHECK=' \+ \$n\.Count\); Write-Output \('DEPMISS=' \+ \$m\.Count\)/;
+  // 🔴 判的是"两条标记各占一条输出"这个**形状**，不是某一方言的写法：换到 bash 之后
+  //    它是两条 `echo`（旧载体上是两条 `Write-Output`）。挤回同一行照样红 ——
+  //    因为 `marker()` 用 `[^\r\n]*` 取值，同一行会把 `DEPMISS=2` 一起吞进 DEPCHECK 的读数里。
+  const SPLIT_MARKERS = /echo "DEPCHECK=\$CHECKED"[\s\S]{0,60}echo "DEPMISS=\$MISS"/;
   const PROBE_GUARD = /Number\.isFinite\(depChecked\) \|\| depChecked !== declaredDeps\.length/;
   if (!DERIVE.test(router)) {
     out.push(
@@ -516,24 +531,28 @@ function checkRouterInvariants(baseRoot) {
     readings.push('G9 步骤 1 逐包前置（名单由 package.json 推导 ／ 两标记分行 ／ 探针故障守卫在位）');
   }
 
-  /* G10：步骤 5 的 mtime 读回（三条腿，与 G9 一样各自只动一处 ⇒ 每臂恰好 1 条红）。
-   *  1. 远端不许调 [DateTime]::ToUnixTimeSeconds()（PS 5.1 没有 ⇒ 空输出）；
-   *  2. 本地不许 `Number(grab('MTIME'))`（空串读成 0，且 0 是有限数）；
-   *  3. 判定侧必须有下界，否则"读不到"会以"产物是 1970 年的"这个**错误归因**红出去。 */
-  const PS_MTIME_METHOD = /LastWriteTimeUtc\.ToUnixTimeSeconds\(\)/;
-  const ISO_MTIME = /LastWriteTimeUtc\.ToString\('yyyy-MM-ddTHH:mm:ssZ'\)/;
+  /* G10：步骤 5 的 mtime 读回（四条腿，与 G9 一样各自只动一处 ⇒ 每臂恰好 1 条红）。
+   *  1. 远端不许把 `stat -c %Y` 的**裸 Unix 秒**直接落进 MTIME（换算必须留在本地）；
+   *  2. 远端必须给 ISO-8601（`date -u -d @… +%Y-%m-%dT%H:%M:%SZ`）；
+   *  3. 本地必须 `Date.parse(mtimeRaw)`（不许 `Number()` —— 空串读成 0 且 0 是有限数）；
+   *  4. 判定侧必须有下界，否则"读不到"会以"产物是 1970 年的"这个**错误归因**红出去。
+   *  这条判据跨载体有效：旧载体上是 PowerShell 5.1 缺 `ToUnixTimeSeconds()` 造成空输出，
+   *  新载体上 `$(stat -c %Y …)` 在文件不存在时同样展开成空串 —— 同一个坑，换个方言。 */
+  const RAW_EPOCH_MTIME = /::MTIME=\$\(stat -c %Y/;
+  const ISO_MTIME = /date -u -d @\$\(stat -c %Y/;
   const PARSE_ISO = /Date\.parse\(mtimeRaw\)/;
   const FLOOR_GUARD = /mtime < MTIME_FLOOR/;
-  if (PS_MTIME_METHOD.test(router)) {
+  if (RAW_EPOCH_MTIME.test(router)) {
     out.push(
-      'G10 步骤 5 还在用 [DateTime]::ToUnixTimeSeconds() —— 打包机的 PowerShell 5.1 里这个方法不存在，' +
-        '那一行抛错后什么都不输出，而 Number(\'\') 是 0，于是成功的构建被报成"产物是 1970 年的"。',
+      'G10 步骤 5 的远端 MTIME 直接落 `stat -c %Y` 的裸 Unix 秒 —— 文件不存在时那一串展开成**空串**，' +
+        "而 Number('') 恰好是 0，于是成功的构建被报成\"产物是 1970 年的\"，" +
+        '归因还指着 §7 第 27 条（产物明明是新的、坏的是探针）。远端只给 ISO-8601，换算留在本地。',
     );
   }
   if (!ISO_MTIME.test(router)) {
     out.push(
-      'G10 步骤 5 的远端 mtime 不再输出 ISO-8601 —— 换算要留在本地（Date.parse），' +
-        '让远端给 Unix 秒就得依赖 [DateTimeOffset]，而那正是上一次坏掉的地方。',
+      'G10 步骤 5 的远端 mtime 不再输出 ISO-8601（`date -u -d @… +%Y-%m-%dT%H:%M:%SZ`）—— ' +
+        '换算一旦挪到远端，"读不到"就没有稳定的形状可判了。',
     );
   }
   if (!PARSE_ISO.test(router)) {
@@ -549,7 +568,7 @@ function checkRouterInvariants(baseRoot) {
     );
   }
   if (
-    !PS_MTIME_METHOD.test(router) &&
+    !RAW_EPOCH_MTIME.test(router) &&
     ISO_MTIME.test(router) &&
     PARSE_ISO.test(router) &&
     FLOOR_GUARD.test(router)
@@ -597,34 +616,121 @@ function checkRemotePreflightPaths(baseRoot) {
   const toRe = (glob) => new RegExp(`^${glob.split('/').map((seg) => (seg === '*' ? '[^/]+' : seg.replace(/[.+^${}()|[\]\\]/g, '\\$&'))).join('/')}$`);
   const matchers = patterns.map(toRe);
 
-  // 解析远端常量：`const REMOTE_ANDROID_WIN = `${REMOTE_ROOT}\\apps\\mobile\\android`;`
-  const consts = { REMOTE_ROOT: '' };
-  for (const m of router.matchAll(/const\s+([A-Z][A-Z0-9_]*)\s*=\s*`\$\{REMOTE_ROOT\}([^`]*)`/g)) {
-    consts[m[1]] = m[2].replace(/\\\\/g, '/').replace(/\\/g, '/').replace(/^\/+/, '');
+  // 远端根只有一处定义：探测脚本开头那行 `R='<远端根>'`。
+  const rootAssign = /`R='\$\{REMOTE_ROOT\}'`/.test(router);
+  if (!rootAssign) {
+    out.push(
+      'G7 步骤 1 的探测脚本里没有 `R=\'${REMOTE_ROOT}\'` 那一行 —— 远端根又变成逐条拼接，' +
+        '换落点时"探测 A、构建 B"没人拦（§7 第 82 条的远程形态）。',
+    );
   }
-
-  // 扫 preCmd 里的 Test-Path 实参：只挑以 node_modules 结尾的那几条（其它探测项不归这条判）
-  const found = [...router.matchAll(/Test-Path\s+'\$\{([A-Z][A-Z0-9_]*)\}([^']*?)node_modules'/g)];
+  // 扫探测项：`[ -d "$R/<rel>/node_modules…" ]` 里的每一条 `<rel>`。
+  const found = [...router.matchAll(/\[ -d "\$R\/([^"]*?)node_modules/g)];
   if (found.length === 0) {
-    out.push('G7 远程前置探测里读不到任何 `${REMOTE_*}\\…\\node_modules` 形状 —— 依赖前置那一档可能被整段摘掉了。');
+    out.push('G7 远程前置探测里读不到任何 `$R/…/node_modules` 形状 —— 依赖前置那一档可能被整段摘掉了。');
     return out;
   }
   for (const f of found) {
-    const base = consts[f[1]];
-    if (base === undefined) {
-      out.push(`G7 探测路径用了没解析出来的远端常量 \${${f[1]}} —— 这条判据无法判断它指向哪，不算成立。`);
-      continue;
-    }
-    const rel = `${base}/${f[2].replace(/\\\\/g, '/').replace(/\\/g, '/').replace(/\/+$/, '')}`.replace(/^\/+/, '');
+    const rel = f[1].replace(/\/+$/, '');
+    if (rel === '') continue; // `$R/node_modules` 量的是工作区根本身，恒成立
     if (!matchers.some((re) => re.test(rel))) {
       out.push(
-        `G7 远程前置探的 ${rel}/node_modules **不是工作区包目录**（pnpm-workspace 的 packages = ${patterns.join(', ')}）—— ` +
+        `G7 远程前置探的 $R/${rel}/node_modules **不是工作区包目录**（pnpm-workspace 的 packages = ${patterns.join(', ')}）—— ` +
           `pnpm install 永远不会在那儿建 node_modules ⇒ 这是一条永不开的门：远程构建会恒定红在步骤 1，` +
           `而它给的修法执行完也还是红。本机反证：Mac 上没有该目录而 APK 打得出来。`,
       );
     } else {
-      readings.push(`G7 远程前置路径 ${rel}/node_modules 由工作区包 ${rel} 推导成立`);
+      readings.push(`G7 远程前置路径 $R/${rel}/node_modules 由工作区包 ${rel} 推导成立`);
     }
+  }
+  return out;
+}
+
+/* ── G11：载体默认值单源 + 不许漂回旧载体 ────────────────────────────────
+ * 载体那四枚默认值（主机 / 构建根 / SDK 根 / 私有 Gradle 用户目录）的**真源**是
+ * `scripts/lib/sync-build-sources.sh` 顶部那四行；`run-gradle.mjs` 与设备侧那两枚
+ * `*_ON_HOST` 只是抄件。抄件漂了不会自己报错——它会安静地"构建在 A 树、验收取 B 产物"
+ * （§7 第 82 条）。另一半是 `windows-pc` 不许出现在收口点的**代码行**里：拍板已改口，
+ * 漂回去等于把 Android 构建送回那台只该管 MSIX 的机器。
+ * ⚠️ 只判非注释行（与 H2 同一纪律）：手册与本文件的迁移记录**必须**能写出旧载体名。 */
+function checkCarrierDefaults(baseRoot) {
+  const out = [];
+  let lib = '';
+  let router = '';
+  try {
+    lib = readFileSync(join(baseRoot, 'scripts/lib/sync-build-sources.sh'), 'utf8');
+    router = readFileSync(join(baseRoot, 'scripts/run-gradle.mjs'), 'utf8');
+  } catch {
+    return ['G11 读不到 lib 或收口点 —— 载体默认值这条判据无法求值，不要当它成立。'];
+  }
+  const KEYS = {
+    HOST: ['HEYTA_ANDROID_HOST', 'ANDROID_HOST'],
+    BUILD_ROOT: [],
+    SDK_ON_HOST: ['ANDROID_SDK_ON_HOST'],
+    GRADLE_HOME: [],
+  };
+  const defs = {};
+  for (const m of lib.matchAll(/^HEYTA_ANDROID_(HOST|BUILD_ROOT|SDK_ON_HOST|GRADLE_HOME)="\$\{HEYTA_ANDROID_[A-Z_]+:-(.+?)\}"/gm)) {
+    defs[m[1]] = m[2];
+  }
+  const missing = Object.keys(KEYS).filter((k) => !(k in defs));
+  if (missing.length > 0) {
+    return [`G11 lib 顶部缺这几枚载体默认值的定义：${missing.join(', ')} —— 真源没了，抄件无从对账。`];
+  }
+  for (const [k, v] of Object.entries(defs)) {
+    if (v.trim() === '') out.push(`G11 载体默认值 HEYTA_ANDROID_${k} 是空串 —— 空默认值会让远端路径拼成相对形状，比写错更晚暴露。`);
+  }
+  // 抄件逐枚对账
+  const copies = [
+    ['run-gradle 的 HOST', /const HOST = process\.env\.HEYTA_ANDROID_HOST \|\| '([^']+)';/.exec(router), defs.HOST],
+    ['run-gradle 的 REMOTE_ROOT', /const REMOTE_ROOT = process\.env\.HEYTA_ANDROID_REMOTE_ROOT \|\| '([^']+)';/.exec(router), defs.BUILD_ROOT],
+    ['run-gradle 的 SDK_ON_HOST', /const SDK_ON_HOST = process\.env\.HEYTA_ANDROID_SDK_ON_HOST \|\| '([^']+)';/.exec(router), defs.SDK_ON_HOST],
+    ['run-gradle 的 GRADLE_HOME', /const GRADLE_HOME_ON_HOST = process\.env\.HEYTA_ANDROID_GRADLE_HOME_ON_HOST \|\| '([^']+)';/.exec(router), defs.GRADLE_HOME],
+  ];
+  for (const [name, m, want] of copies) {
+    if (!m) {
+      out.push(`G11 ${name} 那一行读不到（形状变了）—— 载体默认值失去对账对象，不算成立。`);
+    } else if (m[1] !== want) {
+      out.push(`G11 ${name} = '${m[1]}' 与 lib 真源 '${want}' 不一致 —— 两枚旋钮只移一个就是"同步解包到 A、gradle 在 B 里构建"。`);
+    }
+  }
+  // 设备侧那两枚（同一台载体机，构建与验收必须落在同一处）
+  for (const f of [
+    'scripts/verify-android-subscription.sh',
+    'scripts/verify-android-vault-storage.sh',
+    // 这枚是别线的装置，但它**自己**读同一组 `HEYTA_ANDROID_*` 旋钮去探构建主机 ——
+    // 默认值留在旧载体上，探的就是那台只管 MSIX 的机器（2026-10-28 实测就是这样漏的）。
+    'research/tools/mutation-rigs/w6-note-restore-device-arm.sh',
+  ]) {
+    let txt = '';
+    try {
+      txt = readFileSync(join(baseRoot, f), 'utf8');
+    } catch {
+      continue; // 脚本被删是另一条判据的事，这里不判"文件在不在"
+    }
+    const h = /HOST="\$\{(?:ANDROID_HOST|HEYTA_ANDROID_HOST):-([^}]+)\}"/.exec(txt);
+    const s = /SDK="\$\{ANDROID_SDK_ON_HOST:-([^}]+)\}"/.exec(txt);
+    // 设备侧那两枚写的是 `$HOME/…` 形状（在远端展开），与真源的绝对路径是同一条路径的
+    //    两种写法 ⇒ 先把 `$HOME` 按真源自己的家目录展开再逐字比，不比"看起来像不像"。
+    const home = `/${defs.BUILD_ROOT.split('/').filter(Boolean).slice(0, 2).join('/')}`;
+    const norm = (v) => (v.startsWith('$HOME/') ? `${v.replace('$HOME', home)}` : v);
+    if (h && h[1] !== defs.HOST) out.push(`G11 ${f} 的构建主机默认 '${h[1]}' ≠ 载体真源 '${defs.HOST}' —— 构建与验收会落在两台机器上。`);
+    if (s && norm(s[1]) !== defs.SDK_ON_HOST) out.push(`G11 ${f} 的 ANDROID_SDK_ON_HOST 默认 '${s[1]}'（展开=${norm(s[1])}）≠ 载体真源 '${defs.SDK_ON_HOST}'。`);
+  }
+  // 旧载体不许漂回收口点的代码行
+  for (const line of router.split('\n')) {
+    if (isCommentLine(line)) continue;
+    if (/\bwindows-pc\b|C:\\+src\\+heyta/.test(line)) {
+      out.push(
+        'G11 收口点的**代码行**里还留着旧载体（windows-pc / C:\\src\\heyta）：' +
+          JSON.stringify(line.trim().slice(0, 90)) +
+          '\n      2026-10-28 起 Android 载体是 linux-dev；旧载体只归 Windows 桌面壳（MSIX）那条腿。',
+      );
+      break;
+    }
+  }
+  if (out.length === 0) {
+    readings.push(`G11 载体默认值单源（host=${defs.HOST}，root=${defs.BUILD_ROOT}，SDK/GradleHome 抄件逐枚相同；代码行无旧载体残留）`);
   }
   return out;
 }
@@ -650,23 +756,31 @@ function selfTest() {
   try {
     /* 夹具基座：一份"最小但形状正确"的树（阳性对照用） */
     const router = readFileSync(join(DEFAULT_ROOT, 'scripts/run-gradle.mjs'), 'utf8');
-    const lib = readFileSync(join(DEFAULT_ROOT, 'scripts/lib/sync-windows-sources.sh'), 'utf8');
+    const lib = readFileSync(join(DEFAULT_ROOT, 'scripts/lib/sync-build-sources.sh'), 'utf8');
     const reinstall = readFileSync(join(DEFAULT_ROOT, 'scripts/reinstall-all.sh'), 'utf8');
     const mobilePkg = readFileSync(join(DEFAULT_ROOT, 'apps/mobile/package.json'), 'utf8');
     const rootPkg = readFileSync(join(DEFAULT_ROOT, 'package.json'), 'utf8');
     const baselineA = readFileSync(join(DEFAULT_ROOT, 'scripts/verify-mobile-aed.sh'), 'utf8');
     const wsYaml = readFileSync(join(DEFAULT_ROOT, 'pnpm-workspace.yaml'), 'utf8');
+    const deviceA = readFileSync(join(DEFAULT_ROOT, 'scripts/verify-android-subscription.sh'), 'utf8');
+    const deviceB = readFileSync(join(DEFAULT_ROOT, 'scripts/verify-android-vault-storage.sh'), 'utf8');
+    // 步骤 5 那一行的**当前真实形状**（两臂都以它为起点做单点变异）
+    const ISO_MTIME_LINE = '  echo "A$1::MTIME=$(date -u -d @$(stat -c %Y "$2") +%Y-%m-%dT%H:%M:%SZ)";';
 
     const seed = (tweaks = {}) => {
       rmSync(dir, { recursive: true, force: true });
       mkdirSync(dir, { recursive: true });
       write('scripts/run-gradle.mjs', tweaks.router ?? router);
-      write('scripts/lib/sync-windows-sources.sh', tweaks.lib ?? lib);
+      write('scripts/lib/sync-build-sources.sh', tweaks.lib ?? lib);
       write('scripts/reinstall-all.sh', tweaks.reinstall ?? reinstall);
       write('scripts/verify-mobile-aed.sh', tweaks.baselineA ?? baselineA);
       write('apps/mobile/package.json', tweaks.mobilePkg ?? mobilePkg);
       write('package.json', tweaks.rootPkg ?? rootPkg);
       write('pnpm-workspace.yaml', tweaks.wsYaml ?? wsYaml);
+      // G11 的夹具：载体真源（lib 顶部那四行）与设备侧那两枚抄件都要在位，
+      // 否则"读不到文件"会被读成"没有漂"（一条不能失败的判据比没有判据更糟）。
+      write('scripts/verify-android-subscription.sh', tweaks.deviceA ?? deviceA);
+      write('scripts/verify-android-vault-storage.sh', tweaks.deviceB ?? deviceB);
     };
 
     /* 臂 0：阳性对照 —— 干净夹具必须 0 红（否则整套判据是恒红装饰） */
@@ -773,11 +887,11 @@ function selfTest() {
      * 执行完仍然红。这是 AGENTS §7 元规则 2 说的"一条永不开的门比没有判据更糟"。 */
     seed();
     const badRouter = router.replace(
-      '${REMOTE_ROOT}\\\\apps\\\\mobile\\\\node_modules',
-      '${REMOTE_ROOT}\\\\apps\\\\mobile\\\\android\\\\node_modules',
+      '[ -d "$R/apps/mobile/node_modules" ]',
+      '[ -d "$R/apps/mobile/android/node_modules" ]',
     );
     if (badRouter === router) {
-      console.log('   🔴 臂 9 没施上：run-gradle.mjs 里读不到 `${REMOTE_ROOT}\apps\mobile\node_modules` 那一串 —— 前置形状变了，G7 无从求值');
+      console.log('   🔴 臂 9 没施上：run-gradle.mjs 里读不到 `[ -d "$R/apps/mobile/node_modules" ]` 那一串 —— 前置形状变了，G7 无从求值');
       fail = 1;
     } else {
       write('scripts/run-gradle.mjs', badRouter);
@@ -793,8 +907,8 @@ function selfTest() {
      * 所以调用侧与同步侧各有一臂：摘任一边都必须恰好 1 条红。 */
     seed();
     const noArgRouter = router.replace(
-      "sync_windows_sources_for_android ${HOST} '${REMOTE_ROOT}'",
-      'sync_windows_sources_for_android ${HOST}',
+      "sync_android_sources ${HOST} '${REMOTE_ROOT}'",
+      'sync_android_sources ${HOST}',
     );
     if (noArgRouter === router) {
       console.log('   🔴 臂 10 没施上：run-gradle.mjs 里找不到"把 REMOTE_ROOT 传给同步"那一串 —— G8 的调用侧无从求值');
@@ -813,8 +927,8 @@ function selfTest() {
      * 这条腿的存在理由：dry-run 是本手册推荐的第一动作，它骗人比真跑错还难发现。 */
     seed();
     const badPrint = router.replace(
-      "\\n      bash -c 'source scripts/lib/sync-windows-sources.sh && sync_windows_sources_for_android ${HOST} '${REMOTE_ROOT}''",
-      "\\n      bash -c 'source scripts/lib/sync-windows-sources.sh && sync_windows_sources_for_android ${HOST}'",
+      "\\n      bash -c 'source scripts/lib/sync-build-sources.sh && sync_android_sources ${HOST} '${REMOTE_ROOT}''",
+      "\\n      bash -c 'source scripts/lib/sync-build-sources.sh && sync_android_sources ${HOST}'",
     );
     if (badPrint === router) {
       console.log('   🔴 臂 10c 没施上：读不到 dry-run 打印那一串 —— 这条腿无从求值');
@@ -831,14 +945,14 @@ function selfTest() {
 
     seed();
     const noBindLib = lib.replace(
-      'local HEYTA_WINDOWS_REPO_ROOT="${_android_remote_root:-$HEYTA_WINDOWS_REPO_ROOT}"',
+      'local HEYTA_ANDROID_BUILD_ROOT="${_android_remote_root:-$HEYTA_ANDROID_BUILD_ROOT}"',
       '  # 变异臂 10b：绑定点被摘掉，传进来的根会被静默丢弃',
     );
     if (noBindLib === lib) {
       console.log('   🔴 臂 10b 没施上：同步入口里找不到那行绑定 —— G8 的同步侧无从求值');
       fail = 1;
     } else {
-      write('scripts/lib/sync-windows-sources.sh', noBindLib);
+      write('scripts/lib/sync-build-sources.sh', noBindLib);
       msgs = checkRouterInvariants(dir);
       if (countRed(msgs, 'G8 ') === 1) console.log('   ✅ 臂 10b 转红：同步侧不绑定第二枚实参，被 G8 抓到（恰好 1 条）');
       else {
@@ -858,8 +972,8 @@ function selfTest() {
       },
       {
         name: '11b（DEPCHECK/DEPMISS 挤在同一行输出）',
-        from: `Write-Output ('DEPCHECK=' + $n.Count); Write-Output ('DEPMISS=' + $m.Count)`,
-        to: `Write-Output ('DEPCHECK=' + $n.Count + ' DEPMISS=' + $m.Count)`,
+        from: '`echo "DEPCHECK=$CHECKED"`,\n    `echo "DEPMISS=$MISS"`',
+        to: '`echo "DEPCHECK=$CHECKED DEPMISS=$MISS"`',
       },
       {
         name: '11c（缺"数不等于名单长度 ⇒ 判探针故障"那一半守卫）',
@@ -891,16 +1005,16 @@ function selfTest() {
         // 这一个改动**同时**违反两条腿（用了 5.1 没有的方法 + 不再给 ISO-8601），
         // 所以期望是 2 而不是 1 —— 写在这里是为了让下一位不把"两条红"当成判据过严。
         name: '12（远端改回 ToUnixTimeSeconds）',
-        from: `.LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')`,
-        to: `.LastWriteTimeUtc.ToUnixTimeSeconds()`,
+        from: ISO_MTIME_LINE,
+        to: '  echo "A$1::MTIME=$(stat -c %Y "$2")";',
         expect: 2,
       },
       {
         name: '12b（远端不再给 ISO-8601）',
         // ⚠️ 必须是**双引号**字符串：这段 needle 里有 `${i}` / `${p}`，
         //    放进模板字符串会被当插值求值（ReferenceError: i is not defined —— 第一次跑就死在这）。
-        from: "Write-Output ('A${i}::MTIME=' + (Get-Item '${p}').LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')); ",
-        to: "Write-Output ('A${i}::MTIME=' + (Get-Item '${p}').LastWriteTimeUtc.Day); ",
+        from: ISO_MTIME_LINE,
+        to: '  echo "A$1::MTIME=$(date -u)";',
       },
       {
         name: '12c（本地不再 Date.parse 那一串）',
@@ -967,6 +1081,63 @@ function selfTest() {
       console.log(`   🔴 臂 13c 存活：evidence 下真跑 gradlew 的 .sh 只报了 ${countRed(msgs, 'G1 ')} 条（应当恰好 1）—— 豁免按目录放行了`);
       fail = 1;
     }
+
+    /* 臂 15 / 15b / 15c / 15d：G11（载体默认值单源 + 不许漂回旧载体）的四条腿。
+     * 施加理由不是假想：换载体这一次本身就同时动了**五处**默认值（lib 真源、收口点四枚
+     * 抄件、设备侧两枚 `*_ON_HOST`）。少动一处不会报错，只会安静地"构建在 A 树、验收取 B 产物"
+     * —— 那正是 §7 第 82 条的形状，只是搬到了两台机器之间。 */
+    const g11Arms = [
+      {
+        name: '15（lib 真源漂回旧载体）',
+        file: 'scripts/lib/sync-build-sources.sh',
+        src: () => lib,
+        from: 'HEYTA_ANDROID_HOST="${HEYTA_ANDROID_HOST:-linux-dev}"',
+        to: 'HEYTA_ANDROID_HOST="${HEYTA_ANDROID_HOST:-windows-pc}"',
+        // 一条红给"收口点的抄件与真源不一致"，另一条给"设备侧的 ANDROID_HOST 与真源不一致"
+        // —— 动真源就是会同时打中两枚抄件，这是**两条独立判据**，不是同一条报两遍。
+        expect: 2,
+      },
+      {
+        name: '15b（收口点的构建根漂了，真源没漂）',
+        file: 'scripts/run-gradle.mjs',
+        src: () => router,
+        from: "const REMOTE_ROOT = process.env.HEYTA_ANDROID_REMOTE_ROOT || '/home/xaiver/heyta-android-build';",
+        to: "const REMOTE_ROOT = process.env.HEYTA_ANDROID_REMOTE_ROOT || '/home/xaiver/heyta-carrier';",
+      },
+      {
+        name: '15c（设备侧的 ANDROID_HOST 与载体脱钩）',
+        file: 'scripts/verify-android-subscription.sh',
+        src: () => deviceA,
+        from: 'HOST="${ANDROID_HOST:-linux-dev}"',
+        to: 'HOST="${ANDROID_HOST:-windows-pc}"',
+      },
+      {
+        name: '15d（收口点代码行里出现旧载体）',
+        file: 'scripts/run-gradle.mjs',
+        src: () => router,
+        from: "const ARTIFACTS = deriveArtifacts(gradleArgs);",
+        to: "const ARTIFACTS = deriveArtifacts(gradleArgs);\nconst legacyHost = 'windows-pc';",
+      },
+    ];
+    for (const arm of g11Arms) {
+      seed();
+      const base = arm.src();
+      const mutated = base.replace(arm.from, arm.to);
+      if (mutated === base) {
+        console.log(`   🔴 臂 ${arm.name} 没施上：${arm.file} 里读不到那一串 —— G11 的这条腿无从求值`);
+        fail = 1;
+        continue;
+      }
+      write(arm.file, mutated);
+      msgs = checkCarrierDefaults(dir);
+      const want = arm.expect ?? 1;
+      if (countRed(msgs, 'G11 ') === want) console.log(`   ✅ 臂 ${arm.name} 转红：G11 抓到（恰好 ${want} 条）`);
+      else {
+        console.log(`   🔴 臂 ${arm.name} 存活：G11 报了 ${countRed(msgs, 'G11 ')} 条（应当恰好 ${want}）\n      ${msgs.join(' | ').slice(0, 220)}`);
+        fail = 1;
+      }
+    }
+
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -994,6 +1165,7 @@ for (const f of [
   ...checkFunnel(root),
   ...checkRouterInvariants(root),
   ...checkRemotePreflightPaths(root),
+  ...checkCarrierDefaults(root),
 ]) {
   failures.push(f);
 }
@@ -1003,8 +1175,8 @@ for (const r of readings) console.log(`   · ${r}`);
 
 if (failures.length > 0) {
   for (const f of failures) console.error(`🔴 ${f}`);
-  console.error(`\n共 ${failures.length} 处。规则本体：之后 Android 任务一律走远程构建主机（windows-pc）。`);
-  console.error('手册：docs/runbooks/android-build-on-windows.md');
+  console.error(`\n共 ${failures.length} 处。规则本体：Android 任务一律走远程构建载体（2026-10-28 起 = linux-dev）。`);
+  console.error('手册：docs/runbooks/android-build-on-linux-dev.md');
   process.exit(1);
 }
 console.log('✅ Android 构建只从 run-gradle.mjs 那一枚收口点出去（含存量基线逐条仍在、路径对账成立）');
