@@ -94,8 +94,9 @@ cp env.example .env
 | `official` | 判定读这台实例自己的付费权益 | 各端现有的跑法都够用 | ✅ 能用，但前提是那三枚（模式 / `AUTOMATION_SENDER_KEK` / `AUTOMATION_COMMIT_KEYS`）都配上 |
 | `selfhost-online` | 要验官方签发的权益票据（另需 `AUTOMATION_OFFICIAL_KEYS`） | 🔴 **取票那三条腿在客户端还没有生产调用者**（取票源 / session 心跳 / 安装身份都只有测试引用） | ❌ 配了也只会一路 402 —— 这一档**本版本在自托管实例上不可用** |
 
-⚠️ `AUTOMATION_ENTITLEMENT_MODE` 写成别的值**不会让容器起不来**：它是在请求处理时抛 ⇒
-界面与探针看到的是 **500**。别按"启动红"去找它。
+✅ 2026-10-28 起 `AUTOMATION_ENTITLEMENT_MODE` 写成别的值**会让容器起不来**：端口绑定之前就退出（`rc=1`，
+日志点名 `Invalid AUTOMATION_ENTITLEMENT_MODE`）。**留空/不配是合法的** —— 那是各端拿到 402 带
+`reason=ENTITLEMENT_MODE_UNCONFIGURED` 那一档，不是崩。
 
 ## 2.6 让这台机器真的把事件做成待办：那条 CLI 的 `worker run`
 

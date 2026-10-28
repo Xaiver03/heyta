@@ -4,6 +4,7 @@ import * as path from 'path';
 import { Logger } from './logger';
 import { PRODUCT_NAME } from './config';
 import { assertPasswordBackend } from './password/hash';
+import { resolveAutomationEntitlementMode } from './entitlement';
 
 // Create server instance with config overrides
 // The server will load additional config from environment variables
@@ -64,6 +65,23 @@ const boot = async (): Promise<string> => {
     );
   } catch (err) {
     Logger.error('❌ Password hashing backend self-check failed — refusing to start.');
+    Logger.error(`   ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+  // The automation entitlement mode is verified **before** the port is bound too, for the
+  // same reason: a typo there used to surface as a 500 on every automation request, one
+  // request at a time, forever. Refusing to start turns a deployment-time mistake into a
+  // deployment-time failure. Leaving the variable unset stays legal — that is the loud
+  // "402 / ENTITLEMENT_MODE_UNCONFIGURED" posture, not a crash.
+  try {
+    const mode = resolveAutomationEntitlementMode();
+    Logger.info(
+      mode === undefined
+        ? '🧭 AUTOMATION_ENTITLEMENT_MODE unset — automation entitlement stays refused with a reason (402)'
+        : `🧭 AUTOMATION_ENTITLEMENT_MODE=${mode}`,
+    );
+  } catch (err) {
+    Logger.error('❌ AUTOMATION_ENTITLEMENT_MODE is invalid — refusing to start.');
     Logger.error(`   ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }

@@ -136,8 +136,9 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
 - 读取点：`grep -rn "process.env.AUTOMATION" server/src`（模式/钥匙环/签发三件套/HMAC keyring/发送 KEK/提交回执 keyring 等）；
 - `server/env.example` 里只有 `AUTOMATION_COMMIT_KEYS` 与 `AUTOMATION_WEBHOOK_KEYS`（现量 `grep -n AUTOMATION server/env.example`）；
 - `server/helm/`、`server/deploy/`、`docs/runbooks/deployment.md` 对 `AUTOMATION` **零提及**（现量 `grep -rl AUTOMATION server/helm server/deploy docs/runbooks`）。
-- ⚠️ 一条会骗人的形状：`AUTOMATION_ENTITLEMENT_MODE` **写错值不在启动时报错**，是**请求处理时抛 ⇒ 用户看到 500**。
-  判据要不要改成启动即红（与 `ENTITLEMENT_GATE_ENABLED` 同形）属**判据口径**，要拍；先把它如实写进 §5 的运维件。
+- ✅ 一条以前会骗人的形状**已经改掉了**（2026-10-28 负责人拍「3-B」）：`AUTOMATION_ENTITLEMENT_MODE` **写错值现在就是启动红** ——
+  端口绑定之前退出、`rc=1`、日志点名；**未配置/留空仍合法**（各端拿 402 带 `reason=ENTITLEMENT_MODE_UNCONFIGURED` 那一档）。
+  三条现量与守它的尺（`server/tests/automation-boot-gate.spec.ts`）记在计划文末③那一节；运维件两份同批改口径。
 
 ### A8 一份类型定义住两处
 
@@ -297,7 +298,8 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
 5. **"邮件转待办"要不要做**——用户口语里的"自动收集"九成指邮件；首版没有。这决定这条线做不做得成。
    ✅ **2026-10-27 负责人拍了：另开一条线**，不塞进本八格。首版仍不含邮件，工单见
    [`email-to-task-brief.md`](email-to-task-brief.md)；对外那篇帮助中心不许写成"什么来源都能自动收"。
-6. **`AUTOMATION_ENTITLEMENT_MODE` 写错 ⇒ 500 要不要改成启动即红**。
+6. **运行形态那一格已定并落地**（2026-10-28 负责人拍「3-B」）：`AUTOMATION_ENTITLEMENT_MODE` 写错 ⇒
+   端口绑定之前就退（`rc=1`）；**未配置仍然合法**，走各端 402 带 `reason=ENTITLEMENT_MODE_UNCONFIGURED` 那一档。
 7. **A2 那两条边界**——补 ServiceWorker/后台腿，还是对外明写"设备开着才处理"。
    ✅ **2026-10-27 负责人拍了：不补后台腿，明写边界**，并要求先把这句做成真话再动文案。
    两枚代码腿（web 循环提到应用级、手机那格渲出原因）已入库，成稿在 §5.1；
