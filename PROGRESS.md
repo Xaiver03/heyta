@@ -7841,6 +7841,14 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ③ 处理：**没删快照**（它是"动手前长什么样"的证据），在它下面加一张"10-27 快照 vs 20:5x 现量 vs 读法"对照表，并写明"再引用时重跑、别抄"。
       这是 ADR 里**我自己写的现量陈述**漂了一次；同类句子下次落笔就该带"跑法"而不是带结论。
 
+222. **自动收集线 · 交接书补臂架入口；`AUTOMATION_ENTITLEMENT_MODE` 那格交现量证据（不代拍）；复量两条边界仍成立**（写前先跑 `date`，本机 2026-10-28 20:5x）
+    ① **缺口**：交接书 §4a 那张"逐格复跑入口表"里**没有臂架** —— 判据 3 那几把尺"会红"的证明全在 `verify-inbound-hosted-arms.py` 里，而入口表找不到跑法。
+      补一行（不是 AC 格）：`--list` 末行打在册枚数、`--self-test` 现量 `arms=18 failed=0`、**必须在零脏载具里跑**（共享检出 rc=3）、集成面要 `HEYTA_INTEGRATION_DATABASE_URL` 而单元面不要。
+    ② ③ 那格（`AUTOMATION_ENTITLEMENT_MODE` 写错⇒500 要不要改成启动即红）交现量：校验在 `entitlement.ts:353`；读取点 **5 处全在请求路径**（`entitlement.ts:432/473/782`、`api.ts:709`、`admin.routes.ts:277`）⇒ 今天是"每个请求撞一次错"不是"起不来"；
+      抛出已有用例钉住（`automation-entitlement-ticket.spec.ts:254`）。改成启动即红要动这 5 处 + 启动路径，属运行形态变更，本线不动。
+    ③ 复量两条边界：`check-ui-language` 仍 rc=1、**4 处仍全在 `apps/web/src/App.tsx:2560/2561`**（别线）；`packages/legal/**` 自 12:40 起 `git log` 仍为空。
+
+
 
 
 
