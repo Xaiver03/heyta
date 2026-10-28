@@ -5697,3 +5697,20 @@ column_before=0  create_p2022_before=2  p2022_before=3  column_after=1  p2022_af
 不是我手敲的 —— 由 `.run-arms-carrier-run2.txt` 那台载具日志程序化生成（解析到 22 臂、全红、全 `还原_ok` 才落笔），
 这样"抄件走样"这一族风险被那条断言挡住了。ADR §5 的指针随即改指仓内；更早两戳仍留仓外并**写明不是复现入口**。
 四把文档尺（表格／口音／证据指针／`check:docs`）改后各 rc=**0**。本节多动 2 枚：那份 review 文档与 ADR 的指针行。
+
+### 九、给移动端那一格补上它的**第一条**腿（同一个盲区不再留着）
+
+AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉了 ⇒ 没有任何东西跑过它。
+顺这条因果去现量电池清单，发现**移动端从来没有腿**：`AC1..AC8`+`SCOPE` 里没有一条跑 `apps/mobile` 的 inbound spec
+（现量 `git show HEAD:research/tools/verify-inbound-ac-battery.py | grep -c mobile` 回 **0** —— 那还是改前的清单；加完之后同一枚命令在工作树那份回 **2**）。
+于是加一条 `AC4-mobile-inbound`，命令写成 glob：
+
+```bash
+("AC4-mobile-inbound", "apps/mobile", "npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts")
+```
+
+用 glob 而不是点文件名，是为了以后新增的移动端 inbound spec **自动**被这条腿覆盖，不用再回来改名单
+（装置臂 3 会校 glob 命中数，通配打空就红，所以"以后没人接上"这件事本身也可红）。
+现量：单腿 `legs=1 rc0=1`、`AC4-mobile-inbound rc=0 :: Tests 15 passed (15)`；
+装置自检 `arms=11 failed=0`；元装置 `negctl arms_tested=8 failed=0`；交接书 §4a 的 AC-4 那格同步补上第四枚腿名
+（那是负责人复跑一格用的入口表，不改它，新腿就只存在于装置里）。

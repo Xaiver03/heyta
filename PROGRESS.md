@@ -7753,3 +7753,7 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ⑥ 补一笔"可复现"的最后一格：`mutation-arms.md`（19 KB 逐臂记录）也在仓外 ⇒ 今日那趟的逐臂记录由装置 stdout
       **程序化**抄进仓内（`docs/research/inbound-automation-review.md` 文末附录，22 行；解析到 22 臂、全红、全 `还原_ok` 才落笔），
       ADR §5 指针改指仓内，更早两戳仍留仓外并写明"不是复现入口"。四把文档尺（表格／口音／证据指针／check:docs）各 rc=**0**。
+    ⑦ 顺那条"腿被剔掉就没人跑"的因果去查清单，量出**移动端那一格从来没有腿**（改前 `git show HEAD:research/tools/verify-inbound-ac-battery.py | grep -c mobile` 回 0，加完工作树那份回 2）
+      ⇒ 加 `AC4-mobile-inbound`，命令写成 `tests/inbound-*.spec.ts` 的 glob（以后新增的移动端 inbound spec 自动进射程；
+      通配打空由装置臂 3 判红）。现量：单腿 `Tests 15 passed`、电池自检 `arms=11 failed=0`、元装置 `arms_tested=8 failed=0`，
+      交接书 §4a 的 AC-4 那格同时补第四枚腿名（不改入口表，新腿就只活在装置里）。
