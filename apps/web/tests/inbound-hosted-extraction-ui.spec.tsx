@@ -78,7 +78,7 @@ const buttonByLabel = (key: 'web.ai.inbound.edit' | 'web.ai.inbound.saveEdit'): 
 const startEdit = async (): Promise<void> => { await act(async () => { buttonByLabel('web.ai.inbound.edit').click(); }); };
 
 afterEach(async () => {
-  if (root !== undefined) await act(async () => { root.unmount(); });
+  if (root !== undefined) await act(async () => { root!.unmount(); });
   container?.remove();
   container = undefined; root = undefined;
   mocks.writes.length = 0;
