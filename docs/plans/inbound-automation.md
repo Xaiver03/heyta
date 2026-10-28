@@ -5932,6 +5932,24 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 - 失败那一侧不双扣：`reserved → released` 会把预留额度在同一个事务里退回去（`ai-metering.ts` 那段注释说的就是"别为用户没发生的那一次收费"）⇒ **双扣只发生在成功那一趟**。
 - 两条候选修法（都动计费口径，本线不代拍）：**A** 让设备腿的预留成为唯一扣费点，代理路由对"内部已预留"的请求跳过 ⑤（要新增一个只在进程内传递的标记）；**B** 设备腿不再预留、只靠代理 ⑤（换来的是"预留先于发送"这条保护会丢，ADR 里 P1-4 正是为它写的）。选哪条、以及历史账要不要回补，归负责人。
 
+**④「六格措辞 / 两类明文元数据」这一格的现量（只交事实，改哪侧归负责人）**：
+现量把 automation 面的 Prisma 模型逐个列了一遍（`server/prisma/schema.prisma`，**14 张表**），剔掉 `*Ciphertext` 之后**仍在库里以明文/摘要形式存在**的类别如下：
+
+| 组 | 表 | 明文字段（择要） | 那句"两类"有没有提到 |
+|---|---|---|---|
+| ① 执行身份 | `AutomationWorker` | `credentialHash`、`syncClientId`、`databaseEpoch`、收发时间 | ✅ 提到了 |
+| ② 提交许可 | `AutomationCommitPermit` | `eventId`/`workerId`/`opId`/`ruleVersion`/`resultDigest`/`itemCount` | ✅ 提到了 |
+| ③ **规则本身** | `AutomationRule` | `allowedFields`、`targetProjectId`、`timezone`、`keyId`、`hostedExtraction`… | ❌ 没提 |
+| ④ 发件凭据 | `AutomationSenderCredential` | `keyId`、`revokedAt`/`rotatedAt` | ❌ 没提 |
+| ⑤ 事件行 | `AutomationEvent` | `dedupeDigest`、`status`、`reasonCode`、`leaseWorkerId`、`attempt`、时间戳 | ❌ 没提 |
+| ⑥ 收件公钥 | `AutomationRecipientKey` | **`publicKey`**、`keyEpoch` | ❌ 没提 |
+| ⑦ 计量账本 | `AutomationAiAttempt` | `periodAnchor`、`billingSource`、`state` | ❌ 没提 |
+| ⑧ 权益（8 张） | `AutomationEntitlement*`（Binding / TicketUse / Clock / Subject / Activation / Link / Revocation） | `subject`、`installationId`、`localAccountUuid`、`codeHash`、`nonce`、`revocationVersion`… | ❌ 没提（这正是 `data-rights.ts` 英文那份**多列的三项**所在的那一族） |
+
+⇒ 结论（只陈述、不拍板）：**"两类"只覆盖 ① ②，而面上实存 14 张表的明文元数据。**
+所以"改哪一侧"这个问题本身不够 —— 即便按 `data-rights.ts` 英文那份把权益那三项补上，**仍是 ③④⑤⑥⑦ 五组没被覆盖**。
+两条可选口径（都归负责人）：**(i) 把句子改成"以下若干类（可枚举/可链到表）"并逐类列出**；**(ii) 维持"两类"但改成明确限定语**（例如"两类**与入站正文直接相邻**的明文元数据"），其余类另起一段或指向第三方/数据流转件。**只补三项、不重述句子，会留下同一形状的下一处不实陈述。**
+
 **②「迁移上线顺序」这一格的现量证据（只交事实，发版动作归负责人）**：
 - 这枚迁移的**全部内容**是一条：`ALTER TABLE "automation_rules" ADD COLUMN IF NOT EXISTS "hosted_extraction" BOOLEAN;`
   —— **可空、无 DEFAULT、无索引**。PG 11+ 加"可空且无默认值"的列是**元数据级**改动：不重写表，只在 `automation_rules` 上取一次极短的 ACCESS EXCLUSIVE 锁
