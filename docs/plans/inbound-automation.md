@@ -5785,4 +5785,12 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 （`EVIDENCE_DIRTY=18` 与 `CARRIER_DIRTY=18` 相等 ⇒ 非源码脏目 **0**；`PNG_DIFF_LINES=4`）。
 "起跑零脏"那句只属于 20:0x 那一趟，别把它安到这一趟头上。
 
+**七、载具收尾**。两趟的原件都收进共享检出（`.gitignore` 内，不进提交）：
+`.run-logs/inb-ac-battery-clean-1028-2000/`（20:0x 那趟全 30 腿 + 逐腿 log）与
+`.run-logs/inb-ac-battery-clean-1028-2014/`（补齐那趟的 `rc.txt` + `AC6-browser.log` + `AC7-license.log` ——
+这两枚 log 是同树对照的两端，头行分别是 `2026-10-28 20:14:33 CARRIER_HEAD=76c7399d2 dirty=18` 与末行 `legs=30 rc0=29 rc_nonzero=1`）。
+载具 `.worktrees/inb-clean` 由本线 `git worktree remove --force` 销毁（它是本线自己建的、里面唯一的非派生物是那 18 枚重写过的 png），
+现量 `git worktree list` 只剩主检出一行；销毁后 `verify-inbound-evidence-pointers.py` 与另三道文档门各重跑一次均 rc=**0**。
+
+
 
