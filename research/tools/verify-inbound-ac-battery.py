@@ -63,6 +63,10 @@ LEGS: list[tuple[str, str, str]] = [
     ("AC4-local-date", "packages/domain", "npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts"),
     ("AC4-app-host", "packages/app-host", "npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts"),
     ("AC4-egress-wire", "packages/app-host", "npx --no-install vitest run --maxWorkers=1 tests/inbound-egress-wire.spec.ts"),
+    # 🔴 这一族不是"多加一枚保险"：AC-6 那次缺陷藏了一整天，起因就是当时把那枚腿从整串里剔了，
+    # 而**移动端那一格从来没有腿** ⇒ 同一个盲区在移动端仍然原样存在。glob 写法让以后新增的
+    # 移动端 inbound spec 自动被这腿覆盖，不用再来改名单。
+    ("AC4-mobile-inbound", "apps/mobile", "npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts"),
     ("AC5-shared-schema", "packages/shared-schema", "npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts"),
     ("AC5-op-log", "packages/op-log", "npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts"),
     ("AC5-batch-actions", "packages/app-host", "npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts"),
