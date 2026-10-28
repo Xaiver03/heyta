@@ -59,15 +59,24 @@ test('行尾那一排：可点 chip 够到触控下限（只读徽标那一半�
   }
 
   /*
-   * 🔴 只读徽标那一半**这一趟没量到**，登记为未判定，不写成"已验收"：
-   *   试过两条落点都不出现 `.ht-chip:not(.ht-chip--action)` ——
-   *     · 在**这一行**里找（`NoteEditor` 那颗 `task-note-badge-*` 不在行内）；
-   *     · 退到**整页**找（写完备注 + 失焦之后仍然 0 枚 ⇒ 徽标画在面单那一侧，
-   *       而这一趟从没把面单打开）。
-   *   下一趟要量它：先按 `e2e/tests/detail-pane-*.spec.ts` 的走法把面单打开，
-   *   再取 `page.getByTestId(`task-note-badge-${id}`)` 的高，断 `< 下限`。
-   *   这一格今天**有**源码那一侧的尺：`check:chip-typing` 的 C2（带 self-test 臂 ③
-   *   "只读徽标带 --action ⇒ 红"），缺的只是浏览器里那一次读数。
+   * 🔴 只读徽标那一半**仍然没有浏览器读数**，登记为未判定 —— 但这一次把"为什么够不到"
+   * 量清楚了（2026-10-28 两发探针 dump）：
+   *
+   *   · 只读徽标 `NoteBadge` 只在 `taskPaneInColumn` 时挂（`App.tsx:1523`：栏里画着
+   *     就换成一枚只读徽标，否则那一格就是编辑器本身）；
+   *   · 默认流（开行尾 → 写备注 → 失焦 → 点行）量到的状态是：
+   *     `detail-column` 在、`task-pane` **不在**、`task-note-badge-*` 0 枚、
+   *     页面上唯一带 `ht-chip` 的 4 枚全是 `--action` 的 `<summary>`；
+   *   · 改成按 `task-row-*`（标题那一格）去选中时，`locator.click` 直接 60s 超时 ——
+   *     那条路要按 `detail-pane-task.spec.ts` 的写法先 `parkCursor`、并在行尾面板
+   *     收起之后才点得到。
+   *
+   * ⇒ 下一趟要量它，照 `e2e/tests/detail-pane-task.spec.ts` 起一条 **detail-pane 配置**
+   *   的用例（`playwright.detail-pane.config.ts`，载体是 `vite preview`），选中之后取
+   *   `[data-testid^="task-note-badge-"]` 的高断 `< 下限`。
+   *   今天这一半**有**源码侧的尺（`check:chip-typing` 的 C2 与它的自测臂 ③：
+   *   只读元素带 `--action` ⇒ 红），缺的只是那一次几何读数。
    */
+
   await page.screenshot({ path: `${EVIDENCE}/row-chips-1280.png` });
 });
