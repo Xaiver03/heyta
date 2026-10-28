@@ -59,7 +59,7 @@ grep -n "payloadCiphertext\|resultCiphertext" server/src/automation/inbound.rout
 | 行状态机已有 `queued/leased/prepared/needs-confirmation` 与租约代号 | `server/src/automation/events.ts` | 两条腿共用同一台状态机，不需要新状态、不需要新列族 |
 | 托管发送腿的七道闸门顺序是**判据**，不是实现细节 | `server/src/ai/managed-proxy.routes.ts` 的文件头那张表与 `managed-proxy.routes.spec.ts` | 抽出来复用就必须**整段**搬走，摘一道就会红掉一条已有用例 |
 | 额度只在 `consumeManagedAiRequest` 那一步原子消耗 | `server/src/ai/metering.ts`，被路由的第 ⑤ 道调用 | 第二条腿只要复用同一枚函数，就**天然**不会多扣一次 |
-| 显式重试只认"结果不确定"那一档，且要求源正文还在 | `server/src/automation/events.ts::retryUncertainAutomationEvent` 里那句 `event.payloadCiphertext === null` 的拒绝 | 抽取成功后正文被抹 ⇒ 那一档根本不会进入重试，两条语义不打架（§4.3 说清后果） |
+| 显式重试只认"结果不确定"那一档，且要求源正文还在 | `server/src/automation/events.ts::retryUncertainAutomationEvent` 里那句 `event.payloadCiphertext === null` 的拒绝（`tests/automation-events.spec.ts` 四条用例钉它：一条绿头 + 正文已丢/窗口已过/已有许可三条该拒；变异臂 A23–A25 各摘一支） | 抽取成功后正文被抹 ⇒ 那一档根本不会进入重试，两条语义不打架（§4.3 说清后果） |
 
 ---
 
@@ -235,7 +235,7 @@ ADR-0054 §7 那句话照旧成立：托管不叫 E2EE。本档把"服务端读�
 臂数与逐臂清单由装置自己打印，不在这里抄：`python3 research/tools/verify-inbound-hosted-arms.py --list | tail -1`。
 它的 15 枚反向臂常驻由 `server/tests/inbound-lane-rigs-consumers.spec.ts` 消费；判据腿（会改源文件）留手跑。
 **逐臂记录现在在仓内**：`docs/research/inbound-automation-review.md` 文末那一节「附录 · 变异臂逐臂记录」
-（2026-10-28 零脏载具那一趟，22 臂各红了哪几条用例、失败条数取框架汇总行）。
+（2026-10-28 零脏载具那一趟逐臂记录：每臂红了哪几条用例、失败条数取框架汇总行；在册枚数读装置 `--list` 末行，别抄某一行的数）。
 更早两戳（10-27 九臂、10-28 上午补 A16-A22）的原文仍在 `~/.heyta-evidence/inbound-hosted-extraction-20261027/mutation-arms.md`，
 那是仓本机存档，不是复现入口。
 
