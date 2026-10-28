@@ -385,7 +385,15 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
   const bobAnchor = '量窗台';
 
   // 面板是模态，先关掉才回到清单面；关完仍在共享的那条清单上（写侧路由读的就是这条筛选）。
+  //
+  // 🔴 P6 把这一层收进共享壳之后，这一格**按表里的 `modal-dirty-form` 走**：上面那发邀请
+  // 故意失败（409），邮箱框里那句 `carol@example.com` 还留着 ⇒ 这一层现在有可丢的输入，
+  // × 只触发「放弃这次的修改？」，选了放弃才真的关。原来这一行钉的是"× = 直接关"，
+  // 那是 P1 契约之前的旧口径 —— 与 `habit-create-options` 那一格同一处置（改契约，不放宽判据）。
   await ownerPage.getByTestId('share-dialog-close').click();
+  await expect(ownerPage.getByTestId('discard-confirm'), '面板里有没发出去的邀请邮箱，× 必须先问一句').toBeVisible();
+  await expect(ownerPage.getByTestId('share-dialog'), '确认框出现时面板不许先没掉').toBeVisible();
+  await ownerPage.getByTestId('discard-confirm-confirm').click();
   await expect(ownerPage.getByTestId('share-dialog')).toHaveCount(0);
   await expect(ownerPage.locator('.ht-header__title')).toHaveText('家庭装修');
 
