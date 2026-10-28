@@ -5718,3 +5718,55 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 现量：单腿 `legs=1 rc0=1`、`AC4-mobile-inbound rc=0 :: Tests 15 passed (15)`；
 装置自检 `arms=11 failed=0`；元装置 `negctl arms_tested=8 failed=0`；交接书 §4a 的 AC-4 那格同步补上第四枚腿名
 （那是负责人复跑一格用的入口表，不改它，新腿就只存在于装置里）。
+⚠️ 上面那两枚臂数是**那一戳的读数**，不是常量 —— 臂数由装置自检末行自己打，别在正文里抄。
+
+## 2026-10-28 20:0x–20:1x · 零脏载具上整串 30 腿回来了；追一枚载具红的路上挖出**另一枚假绿**：浏览器腿换了工具链也算绿（自动收集线）
+
+**这一格为什么要单独取一次**：交付 4 要的是"当前源码产物"的读数，而共享检出此刻混着别线未提交的 web spec
+⇒ 那一族的绿只有在零脏载具上取才算数（载具与主检出同 tip：现量 `git rev-parse --short HEAD` 两处都回 `76c7399d2`）。
+
+**一、载具与整串读数**。`.worktrees/inb-clean` = `git worktree add --detach .worktrees/inb-clean 76c7399d2`，
+建完只做根 `pnpm install --frozen-lockfile` + `pnpm build` ⇒ `BUILD_RC=0`、起跑脏条目现量 **0**。
+电池自己记的那几行（原件 `.run-logs/inb-ac-battery-clean-1028-2000/rc.txt`）：
+`2026-10-28 20:00:26 CARRIER_HEAD=76c7399d2 dirty=0`、`PNG_BEFORE=22 枚`、末行 `legs=30 rc0=28 rc_nonzero=2`。
+副作用那两行同戳：`PNG_DIFF_LINES=18`、`EVIDENCE_DIRTY=18 枚`、`CARRIER_DIRTY=18 枚`（这 18 枚全落在载具自己那棵树里，
+共享检出没被这趟碰 —— 载具随本线销毁，落点不作为回证件）。
+
+**二、两枚非 0 逐条归因，都不算本线回归**：
+- `SCOPE-commit-scope rc=1`：还是 B205 那一格（别线那枚借用「自动收集」标题的提交撞了范围尺的白名单），
+  尺在别人名下，按既有口径记，不改判据、不代拍白名单。
+- `AC7-license rc=1`：**载具条件，不是许可变了**。原话点名「已登记的 store 里有 1 条不在场 ⇒ 清点结果**必然少算**，不出数」，
+  缺的那枚是 `.worktrees/inb-clean/e2e/node_modules/.pnpm` —— `e2e` **不在根 workspace 里**（现量 `grep -n e2e pnpm-workspace.yaml` 打空），
+  所以根安装根本不建它，而清点工具按自己的规矩拒绝少算。同 tip 拿回主检出重量：
+  `node research/tools/license-inventory.mjs` ⇒ **rc=0**、`清点输入集：store 去重后 967 枚，逐枚都能在当前 lockfile 里查到`。
+  这就是环境陷阱 **#523**（`docs/agents/environment-traps-index.md` 号段 523–524）那一格：在载体里红不携带归因信息，
+  定性只有"拿回主检出重量"这一条合法通道 —— 本线四趟主检出读数（15:07 / 15:21 / 16:11 / 19:47）那腿都是 rc=0。
+
+**三、🔴 追这枚红的时候量出来的假绿**（本节真正的交付，比那枚红值钱）。同一棵载具里
+`e2e/node_modules` 根本不存在，可 `AC6-browser` 那腿照样回 **rc=0、`8 passed (20.1s)`** ——
+因为 `npx --no-install playwright` 掉到了 PATH 上那枚**全局**二进制：现量 `which -a playwright` 两枚
+（`.pyenv/shims/` 与 `.nvm/…/bin/`）都报 `Version 1.60.0`，而 `e2e/package.json` 的 devDependencies 钉的是 `@playwright/test` **1.63.0**。
+⇒ 那一格的绿判的是**别的工具链**，而它长得和在册那件一模一样（同一条命令、同一份 spec、同样 8 条全绿）。
+这不是"少装了一棵树所以红"，是"少装了一棵树所以**绿得不可信**" —— 电池以前对这一格没有任何前置，
+所以任何只做根安装的载具（历次复跑都是这个形状）报的 AC-6 浏览器绿都要打上这一层折扣。
+
+**四、修法（只动本线自己那枚装置，零判卷口径改动）**：`research/tools/verify-inbound-ac-battery.py` 加
+`browser_toolchain_refusal()` + `PRECONDITIONS` + `REFUSED_RC=78` —— 那条腿开火前先读 `e2e/package.json` 钉的版本，
+再问 `e2e/node_modules/.bin/playwright --version` 一回话：**不在场或版本不等就记 rc=78、把理由写进那条腿的 log，且命令一个字都不跑**。
+钉的版本从 `package.json` 读，不写死在装置里（换版本不必再来改装置）。
+两头读数（都在**违规现场**取，不是临时树）：
+- 红头（缺那棵树的载具）：`python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-clean --only AC6-browser`
+  ⇒ `AC6-browser rc=78 :: 前置拒绝，没开火 —— e2e/node_modules/.bin/playwright 不在场（在册钉 1.63.0）…`、`legs=1 rc0=0 rc_nonzero=1`，
+  跑完载具非 png 脏条目现量 **0**（那条命令确实没执行）。
+- 绿头（主检出）：同一枚函数打在主检出回 **None**（那枚二进制在、报 1.63.0 等于在册钉的那个）⇒ 前置不是恒红。
+- 四枚新臂（临时树造失，不碰仓里的 `e2e/`，所以跑在任何一棵树上都同样判）：12 不在场就拒 / 13 版本不等就拒 /
+  14 对上才放行 / 15 接线——拒的时候 `echo SHOULD_NOT_RUN` 一个字都不许出现在 log 里且 rc 非 0。
+  现量 `python3 research/tools/verify-inbound-ac-battery.py --self-test` ⇒ **`self_test arms=15 failed=0`**，rc=**0**。
+
+**五、这一格读数的边界**（别把它读宽）：
+- 整串 `legs=30` 里那 28 枚 rc=0 是**载具**上的读数；`AC6-browser` 那一枚在载具上现在是 rc=78（前置拒），
+  它"当前产物上真跑过且 8 条全绿"的证据仍来自主检出那一趟（19:4x，`AC6-browser rc=0`）。
+  ⇒ 想要一棵 30 腿全开火的载具，补一步 `cd e2e && pnpm install` 就行（只往载具自己那棵树写）。
+- 本线**没动**任何判卷口径：AC-1～AC-8 勾数现量仍 **0**（`python3 research/tools/verify-inbound-ac-ticks.py` rc=0）。
+- 本线没动 `package.json`、没动链、没 push、没上线。这节动 2 枚：装置 + 本节（外加 PROGRESS 同期那条）。
+

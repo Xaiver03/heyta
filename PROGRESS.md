@@ -7757,3 +7757,26 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       ⇒ 加 `AC4-mobile-inbound`，命令写成 `tests/inbound-*.spec.ts` 的 glob（以后新增的移动端 inbound spec 自动进射程；
       通配打空由装置臂 3 判红）。现量：单腿 `Tests 15 passed`、电池自检 `arms=11 failed=0`、元装置 `arms_tested=8 failed=0`，
       交接书 §4a 的 AC-4 那格同时补第四枚腿名（不改入口表，新腿就只活在装置里）。
+
+216. **自动收集线 · 零脏载具上整串 30 腿回来；追一枚载具红的时候量出浏览器腿那枚假绿，并给它装上工具链前置**（写前先跑 `date`，本机 2026-10-28 20:1x；tip `76c7399d2`）
+    ① 这一格的所以然：交付 4 要"当前源码产物"的读数，而共享检出此刻混着别线未提交的 web spec ⇒ 只有在零脏载具上取才算数。
+      载具 `.worktrees/inb-clean`（`worktree add --detach … 76c7399d2` + 根 `pnpm install --frozen-lockfile` + `pnpm build` ⇒ `BUILD_RC=0`、起跑脏条目 **0**）。
+      电池自记：`CARRIER_HEAD=76c7399d2 dirty=0`、`legs=30 rc0=28 rc_nonzero=2`（原件 `.run-logs/inb-ac-battery-clean-1028-2000/rc.txt`）。
+    ② 两枚非 0 各自归因：`SCOPE-commit-scope` 仍撞 B205 那枚别线提交（尺在别人名下，不改白名单）；`AC7-license` 是**载具条件**——
+      原话点名缺 `e2e/node_modules/.pnpm`（`e2e` 不在根 workspace，现量 `grep -n e2e pnpm-workspace.yaml` 打空）⇒ 清点工具拒绝少算不出数。
+      同 tip 拿回主检出重量 ⇒ **rc=0**、`store 去重后 967 枚`。这正是环境陷阱 **#523** 那一格，定性只有"回主检出重量"一条合法通道。
+    ③ 🔴 **顺着那枚红量出的假绿（本条的要害）**：同一棵载具里 `e2e/node_modules` 根本不存在，`AC6-browser` 却回 **rc=0、`8 passed`** ——
+      `npx --no-install playwright` 掉到 PATH 上的**全局**二进制（现量 `which -a playwright` 两枚都报 `Version 1.60.0`），
+      而 `e2e/package.json` 钉 `@playwright/test` **1.63.0** ⇒ 那一格绿的是别的工具链，而形状与在册那件完全一样（同命令、同 spec、同 8 条）。
+      波及面：历次只做根安装的载具上报的 AC-6 浏览器绿都要打折 —— 不是"少装就红"，是"少装就**绿得不可信**"。
+    ④ 修法只动本线装置：`verify-inbound-ac-battery.py` 加 `browser_toolchain_refusal()` + `PRECONDITIONS` + `REFUSED_RC=78`，
+      那条腿开火前先读在册钉的版本（从 `package.json` 取，不写死）、再问那枚二进制一回话，不在场或不等就记 rc=78 并把理由写进那条腿的 log，
+      **命令一个字都不跑**。四枚新臂在临时树造失（不碰仓里 `e2e/`，跑在任何一棵树上都同样判）：12 不在场就拒／13 版本不等就拒／14 对上才放行／
+      15 接线（拒时 `echo SHOULD_NOT_RUN` 不许出现在 log 且 rc 非 0）。现量 `--self-test` ⇒ **`arms=15 failed=0`** rc=0。
+    ⑤ 两头都在**违规现场**取，不靠临时树自证：红头 `--root .worktrees/inb-clean --only AC6-browser` ⇒ `rc=78 前置拒绝，没开火`、
+      `legs=1 rc0=0 rc_nonzero=1`，跑完载具非 png 脏条目 **0**（确实没执行）；绿头同一枚函数打在主检出回 **None**（那枚在、报 1.63.0）。
+    ⑥ 读数边界（别读宽）：载具上那 28 枚 rc=0 里现在**不含**浏览器腿（它按前置记 78）；"当前产物上浏览器 8 条全绿"的证据仍来自主检出 19:4x 那趟。
+      要一棵 30 腿全开火的载具，补 `cd e2e && pnpm install` 即可（只写载具自己那棵树）。副作用那三行同戳：`PNG_DIFF_LINES=18 EVIDENCE_DIRTY=18 CARRIER_DIRTY=18`，
+      18 枚全落在载具内，共享检出没被这趟碰。
+    ⑦ 判卷口径零处未动：AC 勾数现量仍 **0**（`verify-inbound-ac-ticks.py` rc=0）；没动 `package.json`、没动链、没 push、没上线。本节动 2 枚（装置 + 计划文末那节）。
+

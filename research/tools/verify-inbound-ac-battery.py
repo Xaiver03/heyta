@@ -31,6 +31,9 @@
   而两枚目录里若出现同名文件会被并成一格。三半分别由臂 8（派生打空/指错）、臂 9（并格）、臂 10（点名）、
   臂 11（脏数按目录筛）兜住。⚠️ 那句"4 与 6 的差就是并格"**不是已证的归因**：那批跑在合成一行的旧装置上，
   差值既可能来自没抄进去的目录，也可能来自非证据件的脏条目 —— 要分辨就得同时看 `PNG_CHANGED` 点名与两枚脏数（今天才有）。
+- 🔴 **`AC6-browser` 那腿开火前先验在册工具链**（见 `TOOLCHAIN_PRECOND`）：`e2e` 不在根 workspace 里，
+  载具只做根安装就没有 `e2e/node_modules/.bin/playwright`，而 `npx --no-install` **不会因此红** —— 它掉到
+  PATH 上的全局二进制，照样回 `rc=0 / 8 passed`，只是那批图是**另一件工具链**判的。验不到就记非 0 并拒开火。
 - 默认只对 `<root>` 只读；日志一律落 `<root>/.run-logs/…`（`.gitignore` 里那条），不进提交。
 - `--root` 指到别的检出（例如隔离载具）时，读的是**那棵树的工作树**，不是 HEAD。
 """
@@ -40,12 +43,14 @@ from __future__ import annotations
 import argparse
 import glob
 import hashlib
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 # (标签, 相对 root 的工作目录, 交给 sh -c 的整条命令) —— 逐字来自 10-17 那趟真跑过的台架。
@@ -91,6 +96,39 @@ LEGS: list[tuple[str, str, str]] = [
 # 的分母自检同一约定）—— 文档新添一格而名单里没它的腿，臂 7 就红；腿挂着一格而文档里已没有它，也红。
 JUDGING_DOC = "docs/plans/inbound-automation.md"
 AC_IN_DOC_RE = re.compile(r"^- \[.\] \*\*AC-(\d+)\b", re.MULTILINE)
+
+# 🔴 载具前置（2026-10-28 20:0x 那趟零脏载具量出来的失法）：`e2e` **不在根 workspace 里**
+# （现量 `grep -n e2e pnpm-workspace.yaml` 打空），所以载具只做根安装就没有 `e2e/node_modules`。
+# 少了那一棵，`npx --no-install playwright` 并不会红 —— 它掉到 PATH 上的全局二进制：那趟载具回
+# `rc=0`、`8 passed`，用的却是 `Version 1.60.0`（现量 `which -a playwright` 两枚全局件都报它），
+# 而 `e2e/package.json` 钉的是 `@playwright/test` 1.63.0。**那一腿绿的是别的工具链判出来的东西。**
+# ⇒ 这条腿开火前先验在册那枚二进制与它的版本，验不到就响亮地拒（`REFUSED_RC`），不把换过工具链的绿当绿。
+REFUSED_RC = 78
+BROWSER_VERSION_RE = re.compile(r"Version\s+(\d+\.\d+\.\d+)")
+
+
+def browser_toolchain_refusal(root: Path) -> str | None:
+    """`AC6-browser` 能不能在这棵树开火 —— 返回理由就是不许开火，返回 `None` 才是可以。"""
+    pkg = root / "e2e" / "package.json"
+    if not pkg.is_file():
+        return "e2e/package.json 不在场 ⇒ 钉的版本取不到"
+    pinned = json.loads(pkg.read_text(encoding="utf-8")).get("devDependencies", {}).get("@playwright/test")
+    if not pinned:
+        return "e2e/package.json 的 devDependencies 里没有 @playwright/test ⇒ 在册钉的版本取不到"
+    bin_ = root / "e2e" / "node_modules" / ".bin" / "playwright"
+    if not bin_.exists():
+        return (f"e2e/node_modules/.bin/playwright 不在场（在册钉 {pinned}）"
+                " ⇒ npx --no-install 会掉到 PATH 上的全局二进制；先 `cd e2e && pnpm install`")
+    taken = subprocess.run([str(bin_), "--version"], capture_output=True, text=True, timeout=60)
+    found = BROWSER_VERSION_RE.search(taken.stdout)
+    if not found:
+        return f"{bin_} --version 原话里解析不出版本（rc={taken.returncode}）：{taken.stdout.strip()[:60]!r}"
+    if found.group(1) != str(pinned):
+        return f"e2e 里那枚 playwright 报 {found.group(1)} ≠ e2e/package.json 钉的 {pinned}"
+    return None
+
+
+PRECONDITIONS: dict[str, Callable[[Path], str | None]] = {"AC6-browser": browser_toolchain_refusal}
 
 SUMMARY_RE = re.compile(r"Test Files|^ *Tests |臂数|读数|结论|已勾|passed|failed|Results:")
 # 命令串里出现的仓内路径前缀：臂 A3 拿它们回查文件在不在（改名必红）。
@@ -160,6 +198,14 @@ def evidence_dirty_count(porcelain: list[str], dirs: list[str]) -> int:
 
 
 def run_leg(root: Path, ev: Path, tag: str, rel_dir: str, cmd: str) -> int:
+    precond = PRECONDITIONS.get(tag)
+    refusal = precond(root) if precond else None
+    if refusal:
+        reason = f"🔴 这一腿**没开火**（载具前置不满足）：{refusal}\n"
+        (ev / f"{tag}.log").write_text(reason, encoding="utf-8")
+        append_rc(ev, f"{time.strftime('%F %T')} {tag} rc={REFUSED_RC} sec=0 :: 前置拒绝：{refusal}")
+        print(f"{tag} rc={REFUSED_RC} :: 前置拒绝，没开火 —— {refusal}", flush=True)
+        return REFUSED_RC
     workdir = root if rel_dir == "." else root / rel_dir
     log = ev / f"{tag}.log"
     started = time.time()
@@ -325,6 +371,37 @@ def self_test(root: Path) -> int:
     got_all = len(dirty_paths(fake_dirty))
     check("11 脏数分两行：只数派生证据目录那一枚不许把非证据件算进来", got_ev == 3 and got_all == 4,
           f"EVIDENCE_DIRTY={got_ev}（该 3：一枚改、一枚未跟踪、一枚改名后在证据目录里）CARRIER_DIRTY={got_all}（该 4）")
+
+    # 臂 12–15 兜的是 2026-10-28 20:0x 那趟零脏载具上量出来的**假绿形状**：载具只做根安装就没有
+    # `e2e/node_modules`（`e2e` 不在根 workspace 里），而 `npx --no-install playwright` 不因此红 ——
+    # 它掉到 PATH 上那枚全局二进制（当时那腿回 `rc=0`、`8 passed`，用的却是 1.60.0，在册钉的是 1.63.0）。
+    # 四枚都在临时树上造失，不碰仓里的 `e2e/` ⇒ 跑在任何一棵树上都同样判（包括缺 e2e 那棵的载具）。
+    tc = Path(root / ".run-logs" / f"toolchain-selftest-{time.strftime('%H%M%S')}")
+    try:
+        (tc / "e2e").mkdir(parents=True)
+        (tc / "e2e" / "package.json").write_text(json.dumps({"devDependencies": {"@playwright/test": "1.63.0"}}),
+                                                 encoding="utf-8")
+        absent = browser_toolchain_refusal(tc) or ""
+        check("12 在册那枚 e2e 二进制不在场 ⇒ 响亮地拒", "不在场" in absent, f"refusal={absent!r}")
+        (tc / "e2e" / "node_modules" / ".bin").mkdir(parents=True)
+        stub = tc / "e2e" / "node_modules" / ".bin" / "playwright"
+        stub.write_text('#!/bin/sh\necho "Version 1.60.0"\n', encoding="utf-8")
+        stub.chmod(0o755)
+        mismatch = browser_toolchain_refusal(tc) or ""
+        check("13 在场但版本不等于在册钉的那个 ⇒ 照样拒", "1.60.0" in mismatch and "1.63.0" in mismatch,
+              f"refusal={mismatch!r}")
+        stub.write_text('#!/bin/sh\necho "Version 1.63.0"\n', encoding="utf-8")
+        check("14 对上了才放行（绿头：这枚前置不是恒红）", browser_toolchain_refusal(tc) is None,
+              f"refusal={browser_toolchain_refusal(tc)!r}")
+        # 15 接线：拒的时候**那条命令一个字都不许跑**，且 rc 记成非 0（把前置从 run_leg 摘掉，这条就退化成 echo 的 0）。
+        stub.write_text('#!/bin/sh\necho "Version 1.60.0"\n', encoding="utf-8")
+        ev2 = tc / "logs"
+        brc = battery(tc, ev2, [("AC6-browser", "e2e", "echo SHOULD_NOT_RUN")])
+        body = (ev2 / "AC6-browser.log").read_text(encoding="utf-8") if (ev2 / "AC6-browser.log").exists() else ""
+        check("15 拒绝时那条命令真没开火，且 rc 记成非 0", brc == 1 and "SHOULD_NOT_RUN" not in body,
+              f"battery rc={brc} log={body[:70]!r}")
+    finally:
+        shutil.rmtree(tc, ignore_errors=True)
 
     # 一条臂都没跑过的尺不算量过：否则"把 check 全删掉"这种失法会留下 arms=0 failed=0 的假绿。
     if arms == 0:
