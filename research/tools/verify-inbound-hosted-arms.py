@@ -177,6 +177,11 @@ ARMS = [
      'tests/automation-events.spec.ts',
      '    select: { eventId: true, ruleId: true, ruleVersion: true, status: true, reasonCode: true, attempt: true, createdAt: true },',
      '    select: { eventId: true, ruleId: true, ruleVersion: true, status: true, reasonCode: true, attempt: true, createdAt: true, payloadCiphertext: true },'),
+    # A27 钉 ADR §4.1 那句"失败时对外只披露稳定码（model-request-failed 这类）"的**兜底那一支**：
+    # 词表外的错误码会落到 `failureForRefusal` 的最后一行；把它改成"透上游 reason"，界面上就会出现上游原话。
+    ('A27 兜底把上游 reason 透出去（错误路径回显上游内容）', 'server/src/automation/hosted-extraction.ts', 'server', SERVER_SPEC,
+     "  return 'model-request-failed';",
+     "  return (result.reason as HostedExtractionFailure) ?? 'model-request-failed';"),
 ]
 
 ARM_FILES = sorted({arm[1] for arm in ARMS})

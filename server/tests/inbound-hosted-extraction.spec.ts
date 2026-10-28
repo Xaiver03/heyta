@@ -168,6 +168,16 @@ describe('抽取没成时，那一行退回设备那条老路（"只可能更早
     expect((store.state.row as Record<string, unknown>).payloadCiphertext).toBe('{"sealed-input":true}');
   });
 
+  it('上游给了词表外的新错误码 ⇒ 只披露稳定码，上游那句原话一个字都不带出来', async () => {
+    // 词表里没有的码会落到 failureForRefusal 的兜底那一支；兜底一旦改成"把上游 reason 透出去"，这条就红。
+    const marker = 'UPSTREAM-SAYS-这行不该出现在我们对外的任何一句话里';
+    const refusal = { ok: false, status: 502, code: 'SOMETHING_NEW_FROM_UPSTREAM', reason: marker } as unknown as ManagedAiCompletionResult;
+    const { outcome, store } = await runExtraction(queuedRow(), refusal);
+    expect(outcome).toEqual({ state: 'failed', reason: 'model-request-failed' });
+    expect(JSON.stringify(outcome)).not.toContain(marker);
+    expect(store.state.updates.at(-1)!.data.status).toBe('queued');
+  });
+
   it('模型给了没授权的字段 ⇒ 也算这一次没成，退回去而不是把半成品冻进库', async () => {
     const bad: ManagedAiCompletionResult = { ok: true, streaming: false, status: 200, contentType: 'application/json',
       text: JSON.stringify({ choices: [{ message: { content: '{"tasks":[{"projectId":"x"}]}' } }] }) };
