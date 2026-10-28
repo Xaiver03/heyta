@@ -234,8 +234,10 @@ ADR-0054 §7 那句话照旧成立：托管不叫 E2EE。本档把"服务端读�
 `Tests … N failed` 那一行；`Tests  no tests`（集合层没收到用例）判"没跑到"而不是"0 条失败"。
 臂数与逐臂清单由装置自己打印，不在这里抄：`python3 research/tools/verify-inbound-hosted-arms.py --list | tail -1`。
 它的 15 枚反向臂常驻由 `server/tests/inbound-lane-rigs-consumers.spec.ts` 消费；判据腿（会改源文件）留手跑。
-逐臂记录的历史原件（10-27 与 10-28 上午那几趟）在 `~/.heyta-evidence/inbound-hosted-extraction-20261027/mutation-arms.md`，
-那是仓外本机存档，不是复现入口。
+**逐臂记录现在在仓内**：`docs/research/inbound-automation-review.md` 文末那一节「附录 · 变异臂逐臂记录」
+（2026-10-28 零脏载具那一趟，22 臂各红了哪几条用例、失败条数取框架汇总行）。
+更早两戳（10-27 九臂、10-28 上午补 A16-A22）的原文仍在 `~/.heyta-evidence/inbound-hosted-extraction-20261027/mutation-arms.md`，
+那是仓本机存档，不是复现入口。
 
 | 臂 | 动的那一处 | 结果 |
 |---|---|---|
