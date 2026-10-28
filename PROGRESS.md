@@ -7848,6 +7848,13 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       抛出已有用例钉住（`automation-entitlement-ticket.spec.ts:254`）。改成启动即红要动这 5 处 + 启动路径，属运行形态变更，本线不动。
     ③ 复量两条边界：`check-ui-language` 仍 rc=1、**4 处仍全在 `apps/web/src/App.tsx:2560/2561`**（别线）；`packages/legal/**` 自 12:40 起 `git log` 仍为空。
 
+223. **自动收集线 · ADR §4.1 那句"失败只披露稳定码"的**兜底支**此前没有用例：补一条 + A27 臂**（写前先跑 `date`，本机 2026-10-28 20:5x）
+    ① `failureForRefusal` 最后那行 `return 'model-request-failed'` 覆盖"词表外的新错误码"，而 spec 里其它拒绝码各有确切断言（如 `model-quota-exhausted`），**只有兜底这一支没人看着** ⇒ 它若改成透上游 reason，界面上就会出现上游原话，谁也不会红。
+    ② 补的用例：给一个词表外的 `code` + 一句带标记串的上游 `reason` ⇒ 断言 `outcome` 恰好 `{state:'failed', reason:'model-request-failed'}`、标记串**不出现在 `JSON.stringify(outcome)` 里**、且那一行仍退 `queued`。现量 `Tests 17 passed (17)`。
+    ③ A27 臂：把这行改成 `return (result.reason as HostedExtractionFailure) ?? 'model-request-failed';` ⇒ 零脏载具（`43749ea1d`，起跑 0 脏、跑完自删）上 A26/A27 一起跑：两面对照臂绿、各红 1 条并点名、`还原_ok`、`跑过 2 臂／在册 27` rc=0。
+    ④ 台账对账表 3·a 那行补上 A27；ADR §4.1 那句后面挂上"兜底那一支也有用例"。
+
+
 
 
 
