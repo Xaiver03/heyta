@@ -5328,6 +5328,22 @@ cd e2e && npx --no-install playwright test --config playwright.inbound.config.ts
 不用等浏览器腿被人剔掉。要不要建、挂不挂进 `pnpm check` 归负责人（建的话按本仓规矩要带自检臂，
 且加尺前先 grep 仓内有没有明文否掉它）。
 
+### 修完之后在最终 tip 上把整串 28 腿重跑了一遍（同一戳，不是拼两张表）
+
+```bash
+python3 research/tools/verify-inbound-ac-battery.py   # 原件 ~/.heyta-evidence/inbound-hosted-extraction-20261027/ac-battery-1028-final.out
+```
+
+⇒ **`legs=28 rc0=27 rc_nonzero=1`**，`AC6-browser rc=0 :: 8 passed (19.2s)`、`AC3-dual-host rc=0`（13 格与 `H1` 三趟都在里面）。
+唯一那枚非 0 是 `SCOPE-commit-scope` —— 它的红因在别线那枚借用「自动收集」标题的提交上（口径与逐笔归因见 `BLOCKED.md` 的 B205／B169），
+本线没动白名单、没动 `--since` 口径，所以这格**保持红**、不在这里替谁关掉。
+这趟它又改写了 12 枚取证图，理由同上一段（同树混着别线未提交的样式），**照旧逐枚还原**：
+还原后 `git status --porcelain -- apps/web/evidence/inbound-recovery` 读回空。
+
+⚠️ 上面那张 15:0x 的表**不作废**：它是"修之前那一戳"的读数，`AC6-browser` 那一格当时确实是红的；
+下面这段是"修之后同一支尺在最终 tip 上"的整串读数。两戳并存才对得上"谁在什么时候是什么形状"这件事。
+
+
 
 
 

@@ -7665,5 +7665,10 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       ⇒ **一张图里分不出谁那批**，按本线名义入库等于替他们署名。回填时机＝两线都入库后在干净载具上重跑那条腿。
       另记一条**没擅自建**的防再犯设计：把 `valid()` 里的字段名从源码派生，再逐处比对 e2e 与 jsdom 的规则 fixture ——
       建不建、挂不挂进 `pnpm check` 归负责人。
+      ⇒ 修完在最终 tip 上把**整串 28 腿重跑了一遍**（同一戳，不是拼两张表）：**`legs=28 rc0=27 rc_nonzero=1`**、
+      `AC6-browser rc=0 :: 8 passed (19.2s)`、`AC3-dual-host rc=0`（13 格与 `H1` 三趟都在里面）。
+      唯一那枚非 0 是 `SCOPE-commit-scope`（红因在别线那枚借用「自动收集」标题的提交，口径见 B205／B169），
+      本线没动白名单也没动 `--since` 口径 ⇒ **保持红、不替谁关掉**。这趟又改写的 12 枚取证图照旧逐枚还原。
+
 
 
