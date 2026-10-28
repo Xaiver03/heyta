@@ -54,7 +54,7 @@ grep -n "payloadCiphertext\|resultCiphertext" server/src/automation/inbound.rout
 
 | 事实 | 位置 | 它为什么决定形状 |
 |---|---|---|
-| 入站那一行先封后写，服务端只持公钥 | `inbound.routes.ts` 的 `sealInbound(...)` 与它的事务 | 抽取窗口 = 这次请求；窗口外没有任何合法路径能读到明文 |
+| 入站那一行先封后写，服务端只持公钥 | `inbound.routes.ts` 的 `sealInbound(...)` 与它的事务 | 抽取窗口 = 这次请求；窗口外没有任何合法路径能读到明文。**查询面那条界线是 `listAutomationEvents` 的 `select`**：`tests/automation-events.spec.ts` 断言它**恰好七列**，多取一列（尤其 `payloadCiphertext`/`resultCiphertext`）就红 —— 臂 A26 |
 | 设备侧**早就**会恢复"别人替我抽好的"结果 | `packages/app-host` 的 `processInboundAutomationEvent` → `readAutomationPreparedResult`（开结果 → 校验摘要 → 领许可 → 写批） | **设备端零改动**就能承接服务端冻好的批；这是本档能做成"窄"的原因 |
 | 行状态机已有 `queued/leased/prepared/needs-confirmation` 与租约代号 | `server/src/automation/events.ts` | 两条腿共用同一台状态机，不需要新状态、不需要新列族 |
 | 托管发送腿的七道闸门顺序是**判据**，不是实现细节 | `server/src/ai/managed-proxy.routes.ts` 的文件头那张表与 `managed-proxy.routes.spec.ts` | 抽出来复用就必须**整段**搬走，摘一道就会红掉一条已有用例 |

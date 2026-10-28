@@ -5870,6 +5870,34 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 （如 `tests/access-sessions.spec.ts(126,52) TS18046`）。⇒ 补这扇门不是本线能顺手做的事（它一出生就是恒红，且要动 185 枚别人的 spec），
 **登记为仓级缺口，不代改**；本线只保证自己新增的那一枚在同样选项下是干净的。
 
+## 2026-10-28 20:5x（续）· 判据 3 的「查询路径」那一半此前没人看着；补一条精确形状断言 + A26 臂，并把三半逐条对账
+
+**一、缺口。** 判据 3 第一句是"源正文在抽取窗口后不可再被读出（**存储层与查询/错误路径**都不出现明文）"。逐半去对：
+存储层由 A1 钉（抽取成功后把 `payloadCiphertext` 写成 null）；错误/响应路径由集成面三行 `202` 出口各一枚臂（A14/A15/A22）钉；
+**查询路径**（`GET /automation/events` 走 `listAutomationEvents`）唯一的那道界线是它 `select` 的**精确形状**，
+而 `grep -rn listAutomationEvents server/tests` ⇒ **0 命中**：多取一列（比如哪天顺手加回 `payloadCiphertext`）没有任何东西会红。
+
+**二、补的。** `server/tests/automation-events.spec.ts` 新增一条：喂一枚只有元数据的行，断言返回体逐字段相等，
+**并断言捕获到的 `select` 的键排序后恰好等于** `attempt/createdAt/eventId/reasonCode/ruleId/ruleVersion/status` 这七枚 ——
+多一列少一列都红（少一列也红，因为返回体那条断言同时钉着形状）。现量：`Tests 13 passed (13)`。
+
+**三、A26 臂，零脏载具实跑。** 往 `select` 里加回 `payloadCiphertext: true` ⇒ 对照臂（未注入）**绿**、A26 红 **1 条**并点名
+「列表接口的 select 只取元数据」、`还原_ok`；汇运 `✓ 全部臂都按预期红：跑过 1 臂／在册 26`、rc=**0**（载具 `.worktrees/inb-query-arm` @`c89f3eb6d`，起跑 `git status` 0 脏，跑完由本线删除）。
+
+**四、判据 3 三半 × 用例 × 臂，逐条对账**（这张表就是"每一半都红得起来"的账）：
+
+| 判据 3 的那一半 | 钉住它的用例 | 变异臂 | 读数 |
+|---|---|---|---|
+| a·存储层：抽取成功后正文密文被抹 | `inbound-hosted-extraction.spec.ts` | A1 | 红 3 条 |
+| a·查询面：列表 `select` 恰好七列 | `automation-events.spec.ts`（本戳新增） | A26 | 红 1 条（本戳实跑） |
+| a·错误/响应面：三行 `202` 各自不回显正文 | H1 集成面 | A14 / A15 / A22 | 各红 1 条 |
+| b·没有收件人公钥 ⇒ 仍然先 503 | `inbound-hosted-extraction.spec.ts` | A10 | 红 1 条 |
+| c·设备侧才是写任务的那方；服务端零 op | H1 集成面 | A18 | 红 1 条 |
+| （补）显式重试守卫：正文不在 / 窗口已过 / 已有许可 | `automation-events.spec.ts`（本戳新增） | A23 / A24 / A25 | 各红 1 条 |
+
+判卷口径零处动、AC 勾数仍 0；`packages/legal/**` 一字未动。
+
+
 
 
 

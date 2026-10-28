@@ -7825,6 +7825,15 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ③ 一条自我更正：那张表起初把读数绑在"tip `84c2d7519` 之后"，可读取那几分钟里别线又落了 `f77cea5fa` ⇒ 改成不写死 tip，
       只写"本机 20:49 那一次读取"＋"本线文件面 `git status` 现量 0 脏"。**读数绑在哪个 tip 上要用现量说，不要用我记得的那个 SHA。**
 
+220. **自动收集线 · 判据 3 的"查询路径"那一半此前没人看着：补精确形状断言 + A26 臂，并把三半逐条对账**（写前先跑 `date`，本机 2026-10-28 20:5x）
+    ① 缺口：`grep -rn listAutomationEvents server/tests` ⇒ **0 命中**。列表接口 `GET /automation/events` 全靠 `select` 的精确形状挡着不吐正文，
+      而"哪天顺手加一列"没有任何东西会红（存储层有 A1、错误/响应面有 A14/A15/A22，查询面是空的）。
+    ② 补：`server/tests/automation-events.spec.ts` 新增一条 —— 返回体逐字段相等 + 捕获到的 `select` 键**排序后恰好七列**，多一列少一列都红。现量 `Tests 13 passed (13)`。
+    ③ A26 臂在零脏载具（`c89f3eb6d`，起跑 0 脏，跑完自删）实跑：往 `select` 加回 `payloadCiphertext` ⇒ 对照绿、A26 红 1 条并点名、`还原_ok`、`跑过 1 臂／在册 26` rc=0。
+    ④ 台账新增一张"判据 3 三半 × 用例 × 臂"对账表（a 存储/查询/响应面、b 503、c 零 op、补重试守卫），每行都有臂与读数。
+    ⑤ 边界：判卷口径零处动、AC 勾数仍 **0**、`packages/legal/**` 一字未动（`git log --since` 那段对 legal 为空）。
+
+
 
 
 
