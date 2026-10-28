@@ -123,11 +123,17 @@
  */
 .ht-habit-create-dialog {
   position: fixed;
-  /* The mobile rail is a contained bottom navigation.  Its labels are part of
-     a separate painted layer, so the create surface must sit above the
-     application's modal tier to keep those labels from bleeding through the
-     sheet while it is open. */
-  z-index: var(--ht-z-splash);
+  /*
+   * 🔴 P7 之前这一枚占的是 `--ht-z-splash`(900) —— 那是**启动屏**那一档，被一个
+   *    新建对话框占了，理由写在被删掉的那段英文注释里（"怕底栏标签透上来"）。
+   *    实测不需要那一档：底栏是 `z.sticky`(100)，`z.modal`(400) 本来就在它上面；
+   *    而占 900 的代价是**任何**嵌在这层里的确认框都永远压不住面板
+   *    （§7 第 607 条那次"画得出来点不动"量的就是这一格，当时的绕法是给确认框
+   *    另开一档 `z.modal-commitment`(550) —— 那是数字竞赛，P7 要治的是刻度本身）。
+   *    现在浮层一律停在 `modal` 这一档，比它更高的只许是"必须按下去的那一层"。
+   *    判据：`pnpm check:z-ladder`（Z2 断 `z.splash` 在功能 CSS 里零消费者）。
+   */
+  z-index: var(--ht-z-modal);
   inset: 0;
   display: grid;
   place-items: center;
