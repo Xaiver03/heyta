@@ -948,6 +948,10 @@ describe.skipIf(!DATABASE_URL)('inbound fault windows across two independent rea
     // 端口在 `baseUrl` 里，匹配键里没有。这里写成 `127.0.0.1:<端口>` 会被判 `not-allowlisted`，
     // 而那一支长得很像"我的合成表没配对"，其实是把闸门的匹配口径猜错了。
     const stubHost = '127.0.0.1';
+    // 🔴 基线按**用户全量**数，不按 `inbound:` 前缀。前缀那一枚证的是"设备那条链没凑出第二枚"，
+    // 证不了"服务端这一趟自己长出一枚别的 id 的 op" —— 补 A16 时在同一族形状（**注释/标题比断言宽**）
+    // 上撞到第二处，落点就是这里：那句"不写任何 op"原先只由前缀计数撑着。
+    const opsBeforeIngest = await db.operation.count({ where: { userId: s.userId } });
     const outcome = await runHostedExtractionAtIngest({
       rule: { id: ruleRow.id, userId: s.userId, version: ruleRow.version,
         allowedFields: ruleRow.allowedFields as InboundAutomationField[], targetProjectId: ruleRow.targetProjectId,
@@ -987,6 +991,10 @@ describe.skipIf(!DATABASE_URL)('inbound fault windows across two independent rea
     expect(await db.automationAiAttempt.count({ where: { userId: s.userId } })).toBe(0);
     expect(await db.automationCommitPermit.count({ where: { eventId } })).toBe(0);
     expect(await serverOps(eventId)).toHaveLength(0);
+    // 这一句才是"服务端这一趟不写任何 op"那一半：它比的是**这一趟前后全库的差**，
+    // 与 op 的 id 长成什么形状无关（变异臂 A18：让这条腿真写一枚合规的 op 进去 ⇒ 红的就是它）。
+    expect(await db.operation.count({ where: { userId: s.userId } }), '托管这一趟在服务端 op-log 里多写了行')
+      .toBe(opsBeforeIngest);
     // 上游重投同一发不许再烧一次额度：去重在路由那一层先命中，那条腿连领都不领。
     // 而**去重那一支的响应同样只许说状态词**：它是这条路径上最容易被"顺手把上一次的内容带回来"
     // 写坏的一支（发送方会拿这个响应做对账，内容一旦进去就落到别人的日志里）。

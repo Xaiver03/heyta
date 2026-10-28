@@ -52,7 +52,14 @@ const completionWith = (tasks: unknown[], needsConfirmation = false): ManagedAiC
  */
 function eventRowStore(row: Record<string, unknown> | null) {
   const updates: Array<{ where: unknown; data: Record<string, unknown> }> = [];
-  const state = { row, updates };
+  // 🔴 这两张表在托管档里**该一次都不被写**（服务端不写 op-log、也不写 attempts 那本台账）。
+  // 替身必须把模型装上、把每一次调用记下来，让断言比的是"没被调用过"。
+  // 这里原来干脆没有 `operation` 那个键 ⇒ 变异臂 A16 注入一发 op 写入时，红来自一句
+  // `TypeError: Cannot read properties of undefined (reading 'create')` —— 替身缺键造成的**意外红**，
+  // 判据本身没比任何东西，换一枚真库就更可能悄悄写成一行。所以键要有、计数要断。
+  const writes: string[] = [];
+  const recordWrite = (model: string) => vi.fn(async (input: unknown) => { writes.push(model); return input; });
+  const state = { row, updates, writes };
   return {
     state,
     tx: () => ({
@@ -66,6 +73,8 @@ function eventRowStore(row: Record<string, unknown> | null) {
         }),
       },
       automationRule: { findFirst: vi.fn(async () => ({ enabled: true, deletedAt: null, version: rule.version })) },
+      operation: { create: recordWrite('operation.create'), createMany: recordWrite('operation.createMany') },
+      automationAiAttempt: { create: recordWrite('automationAiAttempt.create') },
     }),
   };
 }
@@ -100,6 +109,14 @@ describe('接收即抽取：正文不落库、结果封给账号自己的公钥'
       accountId: 'user-7', serverOrigin: 'https://example.test', ruleId, eventId, purpose: 'result', keyEpoch: 2,
     }));
     expect(JSON.parse(opened).tasks[0].title).toBe(MARKER);
+  });
+
+  it('这一趟从头到尾没往 op-log 写入面落一行，也没写 attempts 台账', async () => {
+    // 与上面那枚源码读**不是同一把尺**：门槛只扫 `hosted-extraction.ts` 这一个文件里的字面名，
+    // 而这条比的是这一次事务里真发生过的调用 —— 经由任何 helper 长出来的写入都算（变异臂 A16/A17）。
+    const { outcome, store } = await runExtraction(queuedRow(), completionWith([{ title: MARKER }]));
+    expect(outcome.state).toBe('prepared');
+    expect(store.state.writes, `这条腿写进去的表：${store.state.writes.join(' , ') || '无'}`).toEqual([]);
   });
 
   it('结果回执上的 digest / itemCount 与冻结的那份一致 —— 设备领到时按它校验，不是各算一遍', async () => {
@@ -262,7 +279,12 @@ describe('门槛：这条腿不许长出第二套实现，也不许碰任务写�
     const src = read('src/automation/hosted-extraction.ts')
       .replace(/\/\*[\S\s]*?\*\//gu, '')
       .replace(/(^|[^:])\/\/[^\n]*/gu, '$1');
-    expect(src).not.toMatch(/automationCommitPermit|commit_permit|createTaskBatch|dispatchValidated/u);
+    // 🔴 「不碰 op 写入」这半句的 needle 必须是**真正的 op-log 写入口**，不是那四个许可/批次名。
+    // 本仓写 op 只有两条路（现量：`grep -rn "operation\.create" server/src` ⇒ test-routes 与
+    // operation-upload 各一枚），我第一版只写了 permit 那几个词 ⇒ 变异臂 A16 在这条腿里注入一发
+    // `tx.operation.create` 后**这条用例照样绿**：标题比断言宽，红的是别的用例，等于零信息。
+    // A17 钉另一本台账：`automation_ai_attempts` 归设备那条腿，托管档一行都不许写。
+    expect(src).not.toMatch(/automationCommitPermit|commit_permit|createTaskBatch|dispatchValidated|operation\.create|automationAiAttempt/u);
     // 唯一一次给 `payloadCiphertext` 赋值必须是写成 null。
     expect(src).toMatch(/payloadCiphertext: null/u);
     expect(src).not.toMatch(/payloadCiphertext:\s*(?!null)[,\n}]/u);
