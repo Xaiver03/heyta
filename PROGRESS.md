@@ -7859,6 +7859,15 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ② 副作用自报：`PNG_DIFF_LINES=0`、`EVIDENCE_DIRTY=0` ⇒ 这趟没碰任何入库的取证 png；浏览器腿那一格的读数沿用 20:1x 补齐 `e2e` 的载具（`8 passed (20.5s)`）。
     ③ 原件 `.run-logs/inb-ac-battery-1028-2100/rc.txt`（gitignore 内）；起跑 `CARRIER_HEAD=9316f618a`。
 
+225. **自动收集线 · 非集成面 21 枚臂一次跑全（查"锚点腐烂"），当前 tip 无腐烂**（写前先跑 `date`，本机 2026-10-28 21:0x）
+    ① 为什么值得跑：此前这 27 枚臂**从没一次跑全过**，都是挑着跑。臂的锚点是源码原话 —— 别线改了那行、锚点命中 0 次时，
+      装置会判"臂没落地"（零信息），而**只有真跑才看得见**。这是"锚点腐烂"，静默型。
+    ② 读数：零脏载具上 `--only` 21 枚非集成面臂 ⇒ 三面对照臂全绿、**21 枚逐枚按预期红、逐枚 `还原_ok`**、
+      `✓ 全部臂都按预期红：跑过 21 臂／在册 27` rc=**0**。⇒ 当前 tip 没有锚点腐烂。
+    ③ 射程边界：集成面 5 枚（A12–A15、A18）要真库，未在射程内（库闸门本来就要求 `HEYTA_INTEGRATION_DATABASE_URL`）。
+    ④ 原件 `.run-logs/inb-hosted-arms-sweep-2104/`（24 份），载具跑完由本线删除。
+
+
 
 
 

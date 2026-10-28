@@ -5930,6 +5930,13 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 副作用自报：`PNG_DIFF_LINES=0`、`EVIDENCE_DIRTY=0` ⇒ 这一趟**没碰任何取证图**（浏览器腿被排除，它最近的读数是 20:1x 那趟补齐 `e2e` 的载具：8 passed）。
 原件 `.run-logs/inb-ac-battery-1028-2100/rc.txt`。
 
+**臂架全扫（2026-10-28 21:0x，零脏载具、非集成面 21 枚一次跑完）**：这件事以前只做过"逐枚挑着跑"，**没人一次跑全过** ——
+后果是某枚臂的锚点被别线改掉时会静默变成"臂没落地"，而只有真跑才看得见。读数：三面对照臂全绿（server 两枚 spec / web 那枚 / `automation-events`），
+**21 枚逐枚按预期红、逐枚 `还原_ok`**，汇运 `✓ 全部臂都按预期红：跑过 21 臂／在册 27`、rc=**0**。
+⇒ 当前 tip 上**没有锚点腐烂**；集成面那 5 枚（A12–A15、A18）要真库，未在这一趟的射程内（按库闸门拒跑规则本来就要 `HEYTA_INTEGRATION_DATABASE_URL`）。
+原件 `.run-logs/inb-hosted-arms-sweep-2104/`（24 份：21 臂 + 3 面控制，gitignore 内）。
+
+
 
 **③「`AUTOMATION_ENTITLEMENT_MODE` 写错⇒500 要不要改成启动即红」这一格的现量证据**（只交事实，决定归负责人）：
 - 校验在 `server/src/entitlement.ts::resolveAutomationEntitlementMode`（`:353`）：空/未配 ⇒ `undefined`（自动收集"响的拒绝"）；`official` / `selfhost-online` 之外 ⇒ **抛** `Invalid AUTOMATION_ENTITLEMENT_MODE`。
