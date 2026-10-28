@@ -470,7 +470,7 @@ RN 结构上**根本落不了地**，①不是"成本高"，是不存在。
 **页头那一排已量并立尺（2026-10-28 同日第五格）**：判据两句都是几何的（"同排只有一档高度"、"交互目标 ≥44px"），源码尺量不到，所以先**量**再决定改不改。现量（1440 与 390 两档各一枚，读数逐枚打印在 spec 里）：页头 6 枚可点控件 **全部恰好 44px**，下限 token 也是 44px ⇒ **这一格本来就合规**，缺的只是一把会红的尺。新增 `e2e/tests/header-controls.spec.ts` **2 条全绿**：断（a）每枚可点控件的实测高 ≥ 从同一页现算的 `--ht-touch-target-min`；（b）同排最高与其余各枚之差 ≤0.5px；（c）这一排至少量到 3 枚（防"选择器写歪了所以零枚、于是全都通过"）。<br>能红验证：给 `.ht-header select` 注入 `block-size/min-block-size: 28px` ⇒ 断言精确红并点名 `{"tag":"select","name":"视图","height":28}`，从 `/tmp/cc2.mut-bak` 还原 `cmp` 逐字一致。⚠️ **第一次注入没红**，因为只写了 `block-size: 28px` —— 基档那条 `min-block-size: var(--ht-touch-target-min)` 把它顶回来了；这说明这一排的 44px 是**结构性的**（有硬下限），不是巧合，第二刀把下限一起压掉才红。<br>看图：`apps/web/evidence/header-controls/calendar-header-1440-light.png` —— 一行里"‹ 2026年10月 ›｜回到今天｜+｜视图 月 ⌄"五组动作齐平，按控制对象分得开（移动段位 / 复位 / 捕获 / 视图切换）。<br>⚠️ 390 那一档第一趟出现过一次 **60s 超时**（不是断言红，是等页面）；重试即绿，同一趟 1440 也绿 ⇒ 记为"窄档首屏偶发慢"，不写成产品缺陷，也不据此放宽判据。
 
 **未做的四格（下一趟从这里接）**：① **z 刻度纵切** —— `--ht-z-popover: 500` 高于 `--ht-z-modal: 400` 是第 607 条那枚"画得出来点不动"的根因，今天靠 `z.modal-commitment`(550) 绕过去；现量 `grep -rn "z\.popover" apps/web/src packages/ui/src` 有 **21 处**引用（含注释），真要重排必须先把每一处按"它是页内锚定层还是从模态里开出去的锚定层"分类，因为**单纯把 popover 降到 modal 之下会让从对话框里打开的日期/重复选择器沉到遮罩底下**（`DueEditor.tsx:347,363`、`TaskRepeat.tsx:377` 就是那一类），所以这一格需要的是**加一档语义**而不是改一个数；② 页头按控制对象重排（日历 capture/reset/view 三组控件）；③ 交互 chip ≥44px 与展示 badge 不增高（判据要能分辨"同一排两档高度"那族，见 `docs/agents/design-system.md` 行内动作条那一节）；④ EmptyState 动作槽：空列表/无权限/失败态给对的出口，纯无内容不造假动作。 |
-| P8 全局验收收口 | 待开始 | 待补 |
+| P8 全局验收收口 | 🔄 **已开工：详情面的渐进披露策略有了会红的判据（并量过现量）；四档覆盖矩阵建成、由 `check:ux-coverage` 守着（门禁必须在 `check` 链上、落点必须存在、四档不许空）** | **渐进披露（任务详情属性组）**：先量后判，现量 `[详情面披露] {"details":[{"summary":"高级","open":false}],"dateCells":42}` —— 面里**只有一处折叠**（重复规则的「高级」）且默认关着；截止的整月日历**摊开在面上**，那是 §8.146 的裁决（栏就是来编辑的地方），以前只有散文没有任何东西会在被改掉时红。新增 `e2e/tests/detail-disclosure.spec.ts` **1 条真跑绿**：断（a）面里折叠数恒为 1 且是关的（多出一处默认收起 ⇒ 有核心字段被藏起来了）；（b）日历格 ≥28 枚可见（把它收进折叠就先红一次，逼一次显式决定）。能红验证：给 `task-repeat-advanced` 注入 `open` ⇒ 断言精确红（`那处折叠默认是开的：{"summary":"高级","open":true}`），从 `/tmp/tr.mut-bak` 还原 `cmp` 逐字一致。看图 `apps/web/evidence/detail-disclosure/task-pane-1440-light.png`。<br>**四档覆盖矩阵 + 门禁**（计划末尾那段 `ux-coverage` 围栏块）：9 个控件族（按钮四档×重量／chip 分型／菜单键盘／脏表单／危险确认／撤销回执／焦点环／z 刻度／浮层关闭通道）+ 每族四档落点。新门禁 `pnpm check:ux-coverage` 五臂（C1 块在不在／C2 引用的门禁**必须真在 `check` 链上**／C3 落点必须存在／C4 四档不许空并点名缺哪档／C5 行数与门禁枚数下限）+ **7 枚 self-test 臂全过**：其中 C2 那条治的正是本仓付过代价的那种假绿（脚本写了没人跑 = 没有）。<br>⚠️ 语义测那一档对**源码类规则**（chip 分型、焦点环、z 刻度）指的就是那枚门禁自己的 `--self-test` 夹具臂 —— 对"源码形状"这条命题，夹具臂就是它唯一有意义的语义测；判据在围栏块的表头注释里写明，不是偷偷放宽。<br>⚠️ **几何类判据没有源码尺**（页头同排高度、详情面披露）：它们的 `check:header-controls`/`detail-disclosure` 只有真浏览器 + 截图两档，**故意不进这张四档表**（进去就得给 ① 编一个假门禁）。已收的几何族：页头同排（`e2e/tests/header-controls.spec.ts`，1440+390 两档各 6 枚全 44px）与详情面披露（上面那一条）。<br>复量：`check:ux-coverage`／`check:gate-wiring`／`check:docs`／`check:md-tables` 逐条 rc=0；detail-disclosure 1 条绿。 |
 
 ---
 
@@ -486,3 +486,28 @@ RN 结构上**根本落不了地**，①不是"成本高"，是不存在。
 6. 代表性页面亮暗宽窄与四状态截图实际存在并经过人工查看。
 7. 全仓账本相对本计划立项时只降不升，且每条豁免仍能解释其合理平台差异。
 8. 没有覆盖并行 inbound、协作或其他会话的未提交改动；所有提交可按路径审计归属。
+
+---
+
+## 10. 四档覆盖矩阵（`pnpm check:ux-coverage` 的读数来源）
+
+这一段是**机器读的**，不是散文：`scripts/check-ux-coverage.mjs` 解析下面的围栏块，
+逐格断言"门禁真在 `check` 链上、落点真存在、四档没有空格、行数与门禁枚数不低于下限"。
+表头那一行会被跳过（它是给人看的）。
+
+**列的读法**：① 源码尺（`gate:`，可多枚，逗号分隔）② 语义测（`file:`；**源码类规则**这一格
+指的就是那枚门禁自己的 `--self-test` 夹具臂 —— 对"源码形状"这条命题，夹具臂才是它唯一
+有意义的语义测）③ 真实浏览器（`spec:`）④ 截图矩阵（`file:`，人看过的那一帧）。
+
+<!-- ux-coverage:begin -->
+控件族 | 源码尺 | 语义测 | 真实浏览器 | 截图
+按钮四档×重量档 | gate:check:control-semantics | file:packages/ui/tests/control-states.spec.ts | spec:e2e/tests/control-semantics.spec.ts | file:apps/web/evidence/control-semantics/purge-confirm-1440-light.png
+chip 分型（动作 vs 徽标） | gate:check:chip-typing | file:scripts/check-chip-typing.mjs | spec:e2e/tests/chip-typing.spec.ts | file:apps/web/evidence/chip-typing/row-chips-1280.png
+菜单键盘模型 | gate:check:menu-keyboard | file:apps/web/tests/menu-keyboard-hook.spec.tsx | spec:e2e/tests/menu-keyboard.spec.ts | file:apps/web/evidence/account-menu-ia/account-menu-1440-light-zh.png
+脏表单关闭保护 | gate:check:dirty-form-policy | file:packages/ui/tests/overlay-dirty-popover.spec.ts | spec:e2e/tests/dirty-form-guard.spec.ts | file:apps/web/evidence/dirty-form-guard/habit-create-asks.png
+危险确认与档位派生 | gate:check:danger-confirm | file:apps/web/tests/trash-purge-danger-tier.spec.ts | spec:e2e/tests/danger-confirm-trash.spec.ts | file:apps/web/evidence/danger-confirm/purge-confirm-1440-dark.png
+撤销回执（时长/暂停/失败） | gate:check:undo-receipt | file:apps/web/tests/undo-receipt.spec.tsx | spec:e2e/tests/quadrant-move-ux.spec.ts | file:apps/web/evidence/undo-receipt/quadrant-receipt-1280.png
+焦点环唯一实现 | gate:check:focus-single-source | file:scripts/check-focus-single-source.mjs | spec:e2e/tests/focus-visible-matrix.spec.ts | file:apps/web/evidence/focus-visible-matrix/calendar-default-1440-light.png
+浮层刻度（z 阶梯） | gate:check:z-ladder | file:scripts/check-z-ladder.mjs | spec:e2e/tests/habit-create-shape.spec.ts | file:apps/web/evidence/header-controls/calendar-header-1440-light.png
+空态动作槽 | gate:check:empty-state | file:apps/web/tests/empty-state-action.spec.tsx | spec:e2e/tests/habit-create-options.spec.ts | file:apps/web/evidence/empty-state-action/habits-empty-action.png
+<!-- ux-coverage:end -->
