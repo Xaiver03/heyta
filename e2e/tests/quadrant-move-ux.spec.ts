@@ -36,6 +36,41 @@ for (const width of [1280, 375]) {
         窗口是 8000ms：把手放在回执上停 9 秒，它必须还在。
       */
       const receipt = page.getByTestId('quadrant-drop-undo');
+      /*
+       * 🔴 2026-10-28（P7）：回执**住在板子那一段里**，不在页底。
+       *
+       * 计划 §P7 那条判据是"回执与它说的那次变更在同一块区域里可见 —— 不要求像素相邻，
+       * 要求不需要滚动去找"。原来这一段排在折叠帮助**之后**，1280 宽档上人与出口之间
+       * 隔着一整个板面（取证 `apps/web/evidence/undo-receipt/quadrant-receipt-1280.png`）。
+       *
+       * 落在这里的是**形状**的两枚判据，不是一枚像素距离：第一版我写的是
+       * "回执顶边减板子底边 ≤ 24px"，375 那一档实测 40px 就红了 —— 那个 24 是我对
+       * 上边距的猜测，而窄档的板子下面本来还有一段自己的东西 ⇒ 它量的是猜测不是命题。
+       * 现在钉的是：① 回执排在帮助之前（旧形状下红：帮助在前）；
+       * ② 回执与板子在同一个容器里（把它搬去别的段落也红）。
+       */
+      const boardBox = await page.getByTestId('quadrant-board').boundingBox();
+      const receiptBox = await receipt.boundingBox();
+      const helpBox = await page.getByTestId('quadrant-help').boundingBox();
+      expect(boardBox, '板子量不到框（这一条就空转了）').not.toBeNull();
+      expect(receiptBox, '回执量不到框').not.toBeNull();
+      expect(helpBox, '折叠帮助量不到框').not.toBeNull();
+      expect(receiptBox!.y, '回执排在折叠帮助之后 ⇒ 刚做完动作时出口在页底').toBeLessThan(helpBox!.y);
+      // DOM 那一半用位置关系判，不用 `parentElement ===`：板子外头还裹着 Provider 那层，
+      // 比"同一个父节点"会把实现细节当命题（真要搬走的话搬的是顺序，不是父节点）。
+      expect(
+        await page.evaluate(() => {
+          const board = document.querySelector('[data-testid="quadrant-board"]');
+          const help = document.querySelector('[data-testid="quadrant-help"]');
+          const node = document.querySelector('[data-testid="quadrant-drop-undo"]');
+          if (board === null || help === null || node === null) return '缺节点';
+          const after = (a: Element, b: Element): boolean =>
+            (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+          return after(board, node) && after(node, help) ? '板子→回执→帮助' : `顺序不对:${node.compareDocumentPosition(help)}`;
+        }),
+        '回执没排在板子之后、帮助之前 ⇒ 它说的是板上那次变更，出口却跑到页底了',
+      ).toBe('板子→回执→帮助');
+
       await receipt.hover();
       await page.waitForTimeout(9000);
       await expect(receipt, '手放在回执上、计时照样走完了（暂停通道在真浏览器里没接上）').toBeVisible();

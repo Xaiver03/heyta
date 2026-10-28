@@ -445,33 +445,16 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
       </HeytaUiProvider>
 
       {/*
-        W5（四象限空态减重）：底部那段四象限规则说明不再裸排长文 ——
-        收进折叠帮助。默认折叠（没有 `open` 属性，浏览器不渲染正文）；
-        summary 复用现成的「帮助」词条（`web.shell.nav.help`），
-        正文沿用原文案与原 key（`web.quadrant.footnote`）—— 零新增词条。
-        `<details>` 是 DOM 元素，进不了共享层（那边只许 RN 原语），
-        所以由 web 宿主自己渲染在板子下方。样式走内联 cssVar
-        （不开新的 ht-* 前缀族，理由见 QuadrantCountBadge 的注释）。
-      */}
-      <details data-testid="quadrant-help" style={{ marginTop: cssVar('space.2') }}>
-        <summary
-          className="ht-type-caption"
-          style={{ cursor: 'pointer', color: cssVar('color.foreground-muted') }}
-        >
-          {t('web.quadrant.interactionHelp')}
-        </summary>
-        <p
-          className="ht-type-caption"
-          style={{
-            margin: 0,
-            marginTop: cssVar('space.2'),
-            color: cssVar('color.foreground-muted'),
-          }}
-        >
-          {t('web.quadrant.footnote')}
-        </p>
-      </details>
-
+       * 🔴 回执住在**板子这一段的紧下方**，不在页底。
+       *
+       * 它说的是"这条任务被移进了哪一格"，动作发生在板上；原来这一段住在整屏尾部
+       * （脚注 `<details>` 之后），1280 宽档上"任务被移进中间那一格"那句与
+       * 「撤销移动」那枚按钮隔着一整个板面 —— 人刚把东西拖到板上，出口在页底，
+       * 得滚动才找得到（取证：`apps/web/evidence/undo-receipt/quadrant-receipt-1280.png`，
+       * 那是 P3 看图照出来的**旧形状**，不是 P3 引入的回归）。
+       * 判据按空间归属下：回执与它说的那次变更在同一块区域里可见，不要求像素相邻。
+       * 折叠帮助仍在回执之后 —— 它是"读规则"那一档，不是刚做完动作时要看的东西。
+       */}
       {dropNotice === undefined && undoDrop === null ? null : (
         <div
           style={{
@@ -502,6 +485,35 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
           )}
         </div>
       )}
+      {/*
+        W5（四象限空态减重）：底部那段四象限规则说明不再裸排长文 ——
+        收进折叠帮助。默认折叠（没有 `open` 属性，浏览器不渲染正文）；
+        summary 复用现成的「帮助」词条（`web.shell.nav.help`），
+        正文沿用原文案与原 key（`web.quadrant.footnote`）—— 零新增词条。
+        `<details>` 是 DOM 元素，进不了共享层（那边只许 RN 原语），
+        所以由 web 宿主自己渲染在板子下方。样式走内联 cssVar
+        （不开新的 ht-* 前缀族，理由见 QuadrantCountBadge 的注释）。
+      */}
+      <details data-testid="quadrant-help" style={{ marginTop: cssVar('space.2') }}>
+        <summary
+          className="ht-type-caption"
+          style={{ cursor: 'pointer', color: cssVar('color.foreground-muted') }}
+        >
+          {t('web.quadrant.interactionHelp')}
+        </summary>
+        <p
+          className="ht-type-caption"
+          style={{
+            margin: 0,
+            marginTop: cssVar('space.2'),
+            color: cssVar('color.foreground-muted'),
+          }}
+        >
+          {t('web.quadrant.footnote')}
+        </p>
+      </details>
+
+
 
       {/*
         拖拽的**可视化**：手指下跟着一份标题的浮层。
