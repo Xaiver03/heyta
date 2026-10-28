@@ -7672,3 +7672,14 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
 
 
 
+
+212. **自动收集线 · AC-6 那族缺陷的防再犯尺建成并挂进电池；登记时 `check-gate-wiring` 拦下一枚真红，走了它给的另一条出路**（写前先跑 `date`，本机 2026-10-28 15:5x）
+    ① **尺**：`scripts/check-inbound-rule-fixture-parity.mjs` 从 `valid()` 源码**派生**必填键（不抄清单），逐处比对冒充服务端响应的规则 fixture。三组断言 A 派生集含 `hostedExtraction`／B 分母非空／C 逐枚点名缺键。现量 rc=**0**：`keys=13 denom=7 exempt=1 missing=0`，扫 26 份文件。
+    ② **分母开错两次才收对**：第一版按"任何带 `allowedFields` 的对象"扫 ⇒ 主判报 **88** 条；逐条读来源后确认那是 runner 的**内部规则配置**，不承诺线字段 ⇒ 红的是尺。收窄到 `rules:` 信封后钉住的正是"谁在冒充服务端响应"这一类；`server/tests/**`（Prisma 行）不在分母。
+    ③ **五臂自检** rc=**0**（`self_test arms=5 failed=0`）：对照臂／抹键／改坏谓词／分母打空／**抹掉豁免标记 ⇒ 那一枚的整批缺漏回来**。A4 第一版拿 `ok` 当断言，红的是臂自己的前提（那枚文件里唯一一层 `rules:` 信封就是被豁免的那枚，单独判它 B 组必然红）⇒ 改成比"缺漏条数的差"。
+    ④ **挂进电池**（新腿 `AC6-rule-fixture-parity`，AC-6 那格第三条）：挂前先量"有没有硬编码腿数会被碰红"（`每格腿数` 由派生打印、`--only` 按标签集合校验、AC8 矩阵尺不读腿数 ⇒ 无静默失配的抄件）。现量：单腿 `legs=1 rc0=1`；电池 `--self-test` `arms=11 failed=0`、每格腿数现在打 `AC6=3`；元装置 `verify-inbound-ac-battery-negctl.py` `arms_tested=8 failed=0`，它臂 1 的反向证据打成「**29 枚里唯一名只有 28 枚**」⇒ 枚数确实进了 29 且元装置没过敏。尺补了一行 `读数:` 给电池的 `SUMMARY_RE`，否则 rc.txt 里那一格只剩"判过"没有"判出什么"。
+    ⑤ **这趟唯一一枚由我造成的红**：`node scripts/check-gate-wiring.mjs` rc=**1** —— 新脚本没有任何 package.json 定义引用它 ⇒ 0 次执行而链照样绿。两条出路里"加定义接进链"这趟做不到：根 `package.json` 此刻带着产品体验线**未提交**的改动（现量 `git diff --numstat -- package.json` 回 `7 1`，含他们新加的五枚 `check:` 与整条链那行），显式 pathspec 提交会把别人的 hunk 一起签走 ⇒ 走第二条：进 `ALLOWED_UNREFERENCED_IMPL`，消费方 = 电池里那一整行腿定义（行首锚定，散文提一次不算消费）。之后主判 rc=**0**（`登记 4 条`、`check-inbound-rule-fixture-parity.mjs ← research/tools/verify-inbound-ac-battery.py（1 处）`）、它自己的 `--self-test` `臂数 9 ｜ 不符 0`。**转正判据落在登记表正文**：`git status --porcelain -- package.json` 回空时加定义接链、删登记，口径不动。
+    ⑥ **枚数不再抄进文档**：交接书 §4a 顶部那句 `--list` ⇒ `legs=28`（10-17／10-20 各戳的读数）改成"由装置自己打印，别在这里抄"；AC-6 那格 `--only` 串补第三枚并注明它的读数在本节、不在"同上"那一戳。
+    ⑦ **还原清单取错行这件事量出来了**：本节收尾时又还原了 6 枚 `docs/research/evidence/inbound-automation-review/{panel-layout,date-consistency}` 的脏图（还原后两枚目录 `git status --porcelain` 回空）。成因不是手滑 —— `PNG_CHANGED` 只点**本趟字节变的**，那 6 枚在上一趟浏览器腿里已脏、这趟没再变就不进名单。现量对得上：15:07 那趟 `DIFF_LINES=8`=`EVIDENCE_DIRTY=8`，15:20 那趟 `12` 对 `18`（差 6 正是这两枚目录）。`EVIDENCE_DIRTY` 看得见但**只报数不报名** ⇒ 登记改法（把那行逐枚点名，还原清单据此取），本轮不动装置分母。
+    ⑧ 本节动 7 枚（脚本新／gate-wiring 登记一行／电池新腿／app-host spec 一行注释标记／交接书 §4a 两格／计划本节／本条）。判卷口径零处、AC 勾数 0；没动 `package.json`、没动 `pnpm check` 链、没动 `BLOCKED.md`。本线不 push、不自标完成。
+

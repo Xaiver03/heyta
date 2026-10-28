@@ -4892,7 +4892,7 @@ A4 计费口径、`AUTOMATION_ENTITLEMENT_MODE` 写错 ⇒ 500、B194 那批入�
 
 ### 2. 🔴 这一节最该被下一位读到的：我自己写的两把尺**当场是恒绿的**
 
-变异臂跑法见 `~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.md`（`mutate-arms.py` 可复现，
+变异臂跑法见 `~/.heyta-evidence/inbound-hosted-extraction-20261027/mutation-arms.md`（`mutate-arms.py` 可复现，
 含对照臂 0：**一棵没动的树必须先绿**，否则"全部臂都红"只是这台机器跑不动这套用例）。
 两轮跑下来抓到两处，形状不同、病根同一个（§7 那条元规则"一把永远通过的判据比没有判据更糟"）：
 
@@ -5365,3 +5365,124 @@ git log 99cd8af21..HEAD --name-only --pretty=format: | grep -cE "multi-end-build
 
 
 
+
+## 2026-10-28 15:5x · 把 AC-6 那族缺陷的防再犯尺建成并挂进电池；登记时被门禁接线尺拦下一枚真红（自动收集线）
+
+本节接 15:0x 那节末尾那句"一条防再犯的设计，我不擅自建门禁"。那一格把两件事合写在一起了，拆开看：
+**建不建这把尺**（本线自己的测试装置、一枚可删的文件、带自检臂）是我能自决的可逆动作 —— 做了；
+**挂不挂进 `pnpm check`**（全仓链、要改根 `package.json`）这趟做不到，原因不是判断而是共享检出里的所有权，
+下面第 3 段量给大家看。
+
+### 一、尺本体：`scripts/check-inbound-rule-fixture-parity.mjs`
+
+不抄字段清单（抄一份就立刻变成第四份会漂的抄件），**从 `packages/app-host/src/inbound-rules-remote.ts` 里那枚 `valid()` 的源码派生必填键**，
+再逐处比对被当作服务端响应的规则 fixture。谓词加一支，下一趟所有没跟上的 fixture 当场红。三组断言：
+A 派生集非空且含 `hostedExtraction`（谓词被改坏时"没有违规"是零信息，不许绿）；
+B 分母非空（一枚 fixture 都没扫到 ⇒ 要么写法变了尺瞎了、要么测试被删，两种都不许绿）；
+C 逐枚点名缺哪个键、在哪枚文件第几行。
+
+现量读数（`node scripts/check-inbound-rule-fixture-parity.mjs`，rc=**0**）：
+
+```text
+谓词派生的必填键（现量自 packages/app-host/src/inbound-rules-remote.ts）= 13 枚：allowedFields authorizationVersion createdAt deletedAt enabled hostedExtraction id keyId maxItems parseVersion targetProjectId timezone version
+分母：规则 fixture 7 枚，扫 26 份文件
+豁免：1 枚（挂了 `fixture-parity: 故意不法样本` 的故意不法样本） —— packages/app-host/tests/inbound-rules-remote.spec.ts:46
+读数: keys=13 denom=7 exempt=1 missing=0 ok=true
+✅ 每枚 fixture 都带齐谓词要求的 13 枚键（7 枚全过）
+```
+
+**分母的边界（这一条是被现量教训改过两次的，别当注释看）**：只钉装这份线协议的那层 `rules:` 信封。
+第一版按"任何带 `allowedFields` 的对象"扫，主判报 **88** 条；逐条读来源后确认**那是分母开错了** ——
+`packages/app-host/tests/inbound-process.spec.ts` 与 `inbound-runner.spec.ts` 里那些是喂 runner 的**内部规则配置**，
+本来就不承诺 `createdAt`/`keyId` 这些线字段，拿线协议契约去判一个不承诺它的对象，**尺会红，但红的是尺**。
+`server/tests/**` 同样不在分母里：那边写的是 Prisma 行（库里的列），不是这份客户端读面契约。
+被钉住的因此正好是"谁在冒充服务端响应"这一类。
+
+那枚豁免不是碰巧没扫到：`inbound-rules-remote.spec.ts:46` 是**故意不法样本**（测 fail-closed，这一枚就该被读面拒掉），
+它挂了 `// fixture-parity: 故意不法样本` 这行标记才算豁免。
+
+五臂自检（`node scripts/check-inbound-rule-fixture-parity.mjs --self-test` ⇒ `self_test arms=5 failed=0`，rc=**0**）：
+对照臂（真源码 + 真 fixture ⇒ 绿）、A1 抹掉 fixture 里的 `hostedExtraction` ⇒ 红且点名该键、
+A2 谓词那一支被删/改坏 ⇒ 红、A3 分母打空 ⇒ 红、A4 **抹掉豁免标记 ⇒ 那一枚的整批缺漏回来**。
+⚠️ A4 这臂第一版写错了前提：它拿 `ok` 当断言，而那枚文件里唯一一层 `rules:` 信封就是被豁免的这一枚，
+单独判它时分母为 0、B 组必然红 ⇒ 臂红的是臂自己的前提，不是尺的牙。改成比**缺漏条数的差**（抹掉标记后恰好多出派生集那一整批）才对上"豁免是指着标的"这件事。
+
+### 二、挂进电池：AC-6 那格多一条不碰浏览器的腿
+
+挂之前先量"有没有硬编码腿数会被我碰红"：装置里 `每格腿数` 那行由派生打印、`--only` 按标签集合校验，
+`verify-inbound-ac8-matrix.py` 不读腿数 ⇒ 没有会静默失配的抄件。加进去的三处现量：
+
+| 命令 | 读数 |
+|---|---|
+| `python3 research/tools/verify-inbound-ac-battery.py --only AC6-rule-fixture-parity` | `legs=1 rc0=1 rc_nonzero=0`，rc.txt 那行带正文 `读数: keys=13 denom=7 exempt=1 missing=0 ok=true` |
+| `python3 research/tools/verify-inbound-ac-battery.py --self-test` | `self_test arms=11 failed=0`（rc=**0**），每格腿数行现在打 `AC6=3` |
+| `python3 research/tools/verify-inbound-ac-battery-negctl.py` | `negctl arms_tested=8 failed=0`（rc=**0**）；臂 1 的反向证据现在打的是「29 枚里唯一名只有 28 枚」⇒ 枚数确实进了 29，元装置对新腿没有过敏 |
+
+尺自己补了一行 `读数:` 的理由：电池的 `SUMMARY_RE` 认"读数"，只有 rc 的话 rc.txt 里那一格就只剩"判过"而没有"判出什么"。
+**枚数不再抄进文档**：交接书 §4a 顶部原本写 `--list` ⇒ `legs=28`（那是 10-17 到 10-20 各戳的读数，今天起那枚命令回 29），
+现改成"腿标签与枚数都由装置自己打印，别在这里抄"；AC-6 那格的 `--only` 串补上第三枚，并注明它的读数不在"同上"那一戳、在本节。
+
+顺带把 `packages/app-host/tests/inbound-rules-remote.spec.ts` 加了一行注释标记（就是上面那枚豁免），
+该 spec 复跑 `11 passed`（现量 `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-rules-remote.spec.ts`）。
+
+### 三、这趟真红的那一枚不是我预防性登记的，是门禁接线尺把我拦下了
+
+`node scripts/check-gate-wiring.mjs` 第一次跑 rc=**1**，全文一处：
+`scripts/check-inbound-rule-fixture-parity.mjs` **没有任何 package.json 定义引用它** ⇒ 0 次执行，而链照样绿。
+它给的出路两条：给它加定义并接进链，或进 `ALLOWED_UNREFERENCED_IMPL` 并点名**可验的**消费方。
+
+第一条这趟做不到，理由可查：接进链要改根 `package.json`，而那枚文件此刻带着别线（产品体验线）**未提交**的 6 处 `check:` 改动
+（现量 `git diff --numstat -- package.json` 回 `7 1`，改的行里含他们新加的 `check:focus-single-source` 等五枚与整条 `check` 链本身）。
+本线按显式文件 pathspec 提交 = 把他们的 hunk 一起签走，这是共享检出里不许做的事。⇒ 走第二条。
+
+登记落笔后（`node scripts/check-gate-wiring.mjs` rc=**0**）：
+
+```text
+树上 check-*.mjs 108 枚 ｜ 没有任何定义引用的 4 枚（登记 4 条，每条都要有可验消费方）
+   · 无定义实现的消费方：check-inbound-rule-fixture-parity.mjs ← research/tools/verify-inbound-ac-battery.py（1 处）
+✅ check 链与门禁定义对上了
+```
+
+它的自检也复跑过：`node scripts/check-gate-wiring.mjs --self-test` ⇒ `臂数 9 ｜ 不符 0`（rc=**0**）。
+消费方的 needle 用**电池里那一整行腿定义**、行首锚定 —— 那把尺的 2b 判据就认行首，散文里提一次不算消费（Ⓔ/Ⓕ 两臂就是测这件事）。
+**转正判据写进登记表正文**：`git status --porcelain -- package.json` 回空时，加一枚 `check:inbound-rule-fixture-parity` 定义并接进链，然后把那条登记删掉，判据口径一个字不动。
+
+### 四、收尾时清掉了本线两趟浏览器腿留下的 6 枚脏图，并把"为什么漏了两次"写成装置的改法
+
+`git restore` 之后 `git status --porcelain -- apps/web/evidence/inbound-recovery docs/research/evidence/inbound-automation-review` 回**空**。
+漏还原的成因不是手滑，是**还原依据取错了那一行**：电池的 `PNG_CHANGED` 只点**这一趟字节变了的**，
+而 15:20 那趟跑之前，`docs/research/evidence/inbound-automation-review/{panel-layout,date-consistency}` 那 6 枚
+已经在我上一趟浏览器腿里被改脏了 —— 两次快照之间它们没再变，就不进点名清单；我按清单还原，名单外的一直留着。
+现量对得上：15:07 那趟 `PNG_DIFF_LINES=8`、`EVIDENCE_DIRTY=8`（同值），15:20 那趟 `PNG_DIFF_LINES=12`、`EVIDENCE_DIRTY=18`（差 6 枚正是这两枚目录里的）。
+⚠️ `EVIDENCE_DIRTY` 看得见这 6 枚，但**只报数不报名**，所以当时没被当还原依据。
+本线装置的改法（登记，不在这轮动它的分母）：把那行也逐枚点名，还原清单据此取，`PNG_CHANGED` 继续只承担"本趟改了什么"这一件事。
+
+### 五、本节顺手修的一枚本线自己写错的证据点名
+
+`python3 research/tools/verify-inbound-evidence-pointers.py` 报 rc=**1**，一条 `R4 盘上回读不到的新点名`：
+12:5x 那一节把臂的正文文件名写成了 `…/mutate-arms.md`，而盘上那两枚分别叫 `mutate-arms.py`（装置）与 `mutation-arms.md`（逐臂记录）——
+同节里对 `.py` 的引用都是对的，只有这枚 `.md` 被顺手写成了装置名。已改成真名；改后这把尺回 rc=**0**。
+⚠️ 它只在"新点名"这一档抓到了这枚：指针形状（证据目录前缀 + 那枚错名）已经没了，计划里现在只剩上面那行在**点名错名本身**
+（不带目录前缀，抽取器不当它是指针）。要现量：`grep -n 'mutate-arms\.md' docs/plans/inbound-automation.md` 只回本节那一行。
+而 `docs/adr/0077…md:229` 那枚**已入库那版**写的是对的名字（现量 `git show HEAD:docs/adr/0077-inbound-hosted-extraction-at-ingest.md | grep -c 'mutation-arms.md'` 回 **1**）
+—— 所以这枚错不在 ADR，在计划 12:5x 那一节。
+
+### 六、`pnpm check:docs` 那一格现在的读数（同一失法，从一处变成三处，仍不归本线）
+
+本节提交时 `node research/tools/docs-link-check.mjs` 回 rc=**1**，三处**全部指向同一枚目标** `docs/runbooks/android-build-on-linux-dev.md`
+（本机存在、git 没跟踪）：`docs/agents/multi-end-build.md:41`、`docs/agents/repo-map.md:28`、`docs/runbooks/android-build-on-windows.md:5`。
+15:0x 那节写的"全文只有一处"是**当时的读数**，不作废；多出来的两处怎么归到别线，两条现量：
+那两枚文件此刻都脏着（`git status --porcelain -- docs/agents/repo-map.md docs/runbooks/android-build-on-windows.md` 各回 ` M`），
+而**已入库那版里根本没有这两条引用**（`git show HEAD:docs/agents/repo-map.md | grep -c 'android-build-on-linux-dev'` 与
+`git show HEAD:docs/runbooks/android-build-on-windows.md | grep -c 'android-build-on-linux-dev'` 各回 **0**）。
+⇒ 处置照旧：**不改他们的文件、不替别人往 `UNTRACKED_LINK_OK` 里登记**；本线这一节自己的门是绿的
+（`verify-inbound-doc-tables.py`／`check-docs-voice.mjs`／`verify-inbound-evidence-pointers.py` 各 rc=**0**，见上面各段现量）。
+
+### 七、本节的边界
+
+不勾 AC 格（现量 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**）；
+没动 `package.json`、没动 `pnpm check` 链、没动 `BLOCKED.md`（那枚文件此刻在别线名下脏着）；
+本节动 7 枚：`scripts/check-inbound-rule-fixture-parity.mjs`（新）、`scripts/check-gate-wiring.mjs`（登记一行）、
+`research/tools/verify-inbound-ac-battery.py`（新腿）、`packages/app-host/tests/inbound-rules-remote.spec.ts`（注释标记）、
+`docs/plans/inbound-automation-handoff.md`（§4a 两格）、`docs/plans/inbound-automation.md`、`PROGRESS.md`。
+本线不 push、不自标完成。

@@ -68,6 +68,9 @@ LEGS: list[tuple[str, str, str]] = [
     ("AC5-batch-actions", "packages/app-host", "npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts"),
     ("AC6-web-specs", "apps/web", "npx --no-install vitest run tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts"),
     ("AC6-browser", "e2e", "npx --no-install playwright test --config playwright.inbound.config.ts"),
+    # 上一腿在 10-27 那趟被剔出电池，于是 AC-6 那枚 fixture 缺键的缺陷一直藏到 10-28 才自己红出来。
+    # 这腿补的是**同类**：线协议谓词加了必填键而规则 fixture 没跟上（不靠浏览器腿复活也能判）。
+    ("AC6-rule-fixture-parity", ".", "node scripts/check-inbound-rule-fixture-parity.mjs"),
     ("AC7-doc-tables", ".", "python3 research/tools/verify-inbound-doc-tables.py"),
     ("AC7-doc-endpoints", ".", "python3 research/tools/verify-inbound-doc-endpoints.py"),
     ("AC7-migrations", ".", "node scripts/check-migrations.mjs"),

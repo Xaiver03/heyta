@@ -98,7 +98,7 @@ git -C .worktrees/inb-t10 status --porcelain | wc -l   # 载具应为 0
 
 ## 4a. 八格复跑入口（一格一条命令，给负责人也给下一个接手人）
 
-整串前缀固定为下面这行，表里只写要替换的 `--only` 那串（腿标签现量：`python3 research/tools/verify-inbound-ac-battery.py --list` ⇒ `legs=28`）：
+整串前缀固定为下面这行，表里只写要替换的 `--only` 那串（腿标签与枚数都由装置自己打印，别在这里抄：`python3 research/tools/verify-inbound-ac-battery.py --list | tail -1`）：
 
 ```bash
 python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --ev <新目录> --quiet-gate --only <下面那串>
@@ -113,7 +113,7 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 | AC-3 领取与提交 | `AC3-dual-host,AC3-sync-authz` | 同上 |
 | AC-4 解析 | `AC4-local-date,AC4-app-host,AC4-egress-wire` | 同上 |
 | AC-5 批创建与来源记录 | `AC5-shared-schema,AC5-op-log,AC5-batch-actions` | 同上 |
-| AC-6 规则界面 | `AC6-web-specs,AC6-browser` | 同上；⚠️ `AC6-browser` 会逐名覆写那批待拍的取证图 ⇒ 单跑它前先读 §7 第 4 格 |
+| AC-6 规则界面 | `AC6-web-specs,AC6-browser,AC6-rule-fixture-parity` | 同上；⚠️ `AC6-browser` 会逐名覆写那批待拍的取证图 ⇒ 单跑它前先读 §7 第 4 格。第三枚是 10-28 新添的**不碰浏览器**的防再犯尺（判"线谓词收紧而规则 fixture 没跟上"那一族），它的读数不在"同上"那一戳，见计划文末 10-28 那节 |
 | AC-7 文档 | `AC7-doc-tables,AC7-doc-endpoints,AC7-migrations,AC7-license,AC7-docs-voice,AC7-link` | 同 05:09 那趟（六枚各 rc=0）；⚠️ **这一格就是"为什么必须重跑"的那一格**：AC7 六枚与 `AC8-matrix`／`AC8-ac-ticks` 读的输入里含本文件、`inbound-automation.md`、`PROGRESS.md` ⇒ 第 149 条那笔**只改文档**也构成判卷输入变化。这与"八枚构建输入 delta=0 所以 Linux 取证不必重跑"那把尺**射程不同**，两把尺不许互相顶替。更早那批「已入库态」读数在 `PROGRESS.md` 第 121 条（00:46 那戳的零脏起跑态凭证是同目录 `prefix.txt` 里 `dirty 0` 那一行） |
 | AC-8 验收矩阵 | `AC8-matrix,AC8-producer-seam,AC8-ac-ticks` | 同上（05:09 那戳逐枚：`尺枚=67 有尺行=27 无尺行=7 窗=13/13 平台=10/10 权益=9/9 设备状态=9/9`、`相对导入=237 模块在HEAD=237 尺瞎了=0`、`已勾=0 未勾=8`） |
 | 范围尺（**不是 AC 格**） | `SCOPE-commit-scope` | 仍 rc=1，越界笔名归别线（B205）；05:09 同戳现量 `python3 research/tools/verify-inbound-commit-scope.py` 首行 `本线笔数=346　仅正文提及=16　涉及路径=203　越界=96` ⇒ 别把它算进 AC 结论 |
