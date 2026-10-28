@@ -5862,6 +5862,15 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 不是从 20:0x 那趟载具照抄 —— 期间别线又落了 `8180d6295`／`cc927bc4f` 等提交（其中 `8180d6295` 修的是 `apps/web` 那枚 spec 的 typecheck 恒红，
 挡的是所有人，与本线无关）。
 
+**补充：新增的 server spec 过没过"类型门"？这仓里没有那扇门，读数如下。** `server/tsconfig.json` 的 `include` 只有 `src/**` 与 `scripts/**`
+⇒ **`server/tests/**` 不在任何 typecheck 门里**（`pnpm typecheck` = `pnpm -r typecheck`，server 包没有 `typecheck` 脚本）。
+所以本线那四条新用例用**同一套编译选项**单独量了一次：`npx tsc --noEmit --strict --target ES2020 --module commonjs --esModuleInterop
+--skipLibCheck --forceConsistentCasingInFileNames tests/automation-events.spec.ts` ⇒ rc=**0**、0 条错误。
+顺手量了"把这扇门补上要付多少"：同一套选项扫 `tests/*.spec.ts`（185 枚）⇒ **rc=2、225 条既有类型错**
+（如 `tests/access-sessions.spec.ts(126,52) TS18046`）。⇒ 补这扇门不是本线能顺手做的事（它一出生就是恒红，且要动 185 枚别人的 spec），
+**登记为仓级缺口，不代改**；本线只保证自己新增的那一枚在同样选项下是干净的。
+
+
 
 
 
