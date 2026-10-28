@@ -226,10 +226,16 @@ ADR-0054 §7 那句话照旧成立：托管不叫 E2EE。本档把"服务端读�
 
 ## 5. 判据与它们的变异臂（每把尺各造一次失手）
 
-证据与跑法：`~/.heyta-evidence/inbound-hosted-extraction-20261027/mutation-arms.md`（`mutate-arms.py` 可复现，
-每臂只动一处、跑完只从 `.mut-bak` 还原并比 sha256）。
-臂 0 是**对照臂**：一棵没动的树必须先绿——否则"全部臂都红"只是这台机器跑不动这套用例，那句话零信息。
-（臂数不写死在这里，要现量：`grep -cE "^\s+\('A[0-9]" ~/.heyta-evidence/inbound-hosted-extraction-20261027/mutate-arms.py`。）
+跑法（装置现在在仓库里）：`python3 research/tools/verify-inbound-hosted-arms.py --root <零脏载具>`。
+它的三道闸都是会拒跑的（不是注释）：**载具不零脏 ⇒ rc=3**（注入期间那枚源文件是故意写坏的，共享检出里
+别人一发 `git commit -a` 就会把它签进 main）、**集成面没给 `HEYTA_INTEGRATION_DATABASE_URL` ⇒ rc=3**
+（不替别人占库；拒跑时打印建库三步）、**对照臂不绿 ⇒ rc=1 且一枚臂都不注入**（"全部臂都红"可能只是这台机器
+跑不动这套用例，那句话零信息）。每臂只动一处、跑完只从 `.mut-bak` 还原并比 sha256，判决取 vitest 自己写的
+`Tests … N failed` 那一行；`Tests  no tests`（集合层没收到用例）判"没跑到"而不是"0 条失败"。
+臂数与逐臂清单由装置自己打印，不在这里抄：`python3 research/tools/verify-inbound-hosted-arms.py --list | tail -1`。
+它的 15 枚反向臂常驻由 `server/tests/inbound-lane-rigs-consumers.spec.ts` 消费；判据腿（会改源文件）留手跑。
+逐臂记录的历史原件（10-27 与 10-28 上午那几趟）在 `~/.heyta-evidence/inbound-hosted-extraction-20261027/mutation-arms.md`，
+那是仓外本机存档，不是复现入口。
 
 | 臂 | 动的那一处 | 结果 |
 |---|---|---|

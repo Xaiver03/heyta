@@ -49,6 +49,11 @@ const SELF_TEST_OMITTED: Record<string, string> = {
 const SELF_TEST_ONLY: Record<string, string> = {
   'verify-inbound-chain-ownership.py': 'failed=0',
   'verify-inbound-ac-battery.py': 'failed=0',
+  // 22 枚变异臂的台架（ADR-0077 §5）。判据腿**不能**常驻：它要临时改写被跟踪的源文件再从
+  // `.mut-bak` 还原（AGENTS §8.9 独占验收），还要一枚零脏载具与一次性库 —— 装置自己会把不达标的
+  // 载具拒跑（rc=3）。它的 15 枚反向臂只在临时目录造样本（含"载具脏⇒拒跑""判决把 `Tests no tests`
+  // 读成 0⇒红"这两形），便宜到可以天天跑，所以常驻那一腿。
+  'verify-inbound-hosted-arms.py': 'self_test arms=15 failed=0',
 };
 
 // 不接进来的每一枚都要写下"为什么不接"，否则分母自检那条用例会把它们当成漏网。
