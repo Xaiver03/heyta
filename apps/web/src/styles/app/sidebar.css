@@ -229,11 +229,6 @@
   color: var(--ht-color-foreground);
 }
 
-.ht-sidebar__organizer-add:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-nav__item {
   display: flex;
   align-items: center;
@@ -379,11 +374,6 @@
   color: var(--ht-color-foreground);
 }
 
-.ht-sidebar__month-nav-btn:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 /*
  * 🔴 `minmax(0, 1fr)`，不是 `1fr`。2026-10-04 探针实测（一次性载体
  * `e2e/tests/r1-grid-probe.spec.ts`，跑完已删）：`1fr` 的轨道最小值是 `auto`
@@ -436,11 +426,6 @@
 .ht-sidebar__day:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
-}
-
-.ht-sidebar__day:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 /* 补白格：属于相邻月，看得见、点得着，但要**看得出来不是本月**。 */
@@ -556,11 +541,6 @@
 
 .ht-sidebar__scope-all[aria-pressed='true'] {
   color: var(--ht-color-primary);
-}
-
-.ht-sidebar__scope-all:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 .ht-sidebar__scope-group {

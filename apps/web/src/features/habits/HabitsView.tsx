@@ -63,6 +63,8 @@
 
 import { createPortal } from 'react-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMenuKeyboard } from '../../lib/menu/useMenuKeyboard.js';
+import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';
 import { ICON_SIZE } from '@heyta/design-system';
 import {
   DEFAULT_REVIEW_OFFSETS,
@@ -123,8 +125,38 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
    */
   const [draftIconOpen, setDraftIconOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement | null>(null);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
   const [addError, setAddError] = useState<string | undefined>();
   const [adding, setAdding] = useState(false);
+
+  /* 🔴 这一格的草稿住在 10 个组件本地 state 里（`draft*`），关掉即全部丢失且没有撤销
+     出口 ⇒ 三条关闭通道都必须先问一句。判"脏"用的是**默认值之差**而不是"打开过没有"：
+     只点开没填就关，不该拦人。 */
+  const isDraftDirty = (): boolean =>
+    draft.trim() !== ''
+    || draftIcon !== undefined
+    || draftUnit.trim() !== ''
+    || draftBackfillDays.trim() !== ''
+    || draftTarget !== '1'
+    || draftInterval !== '2'
+    || draftGoalType !== 'atLeast'
+    || draftFrequency !== 'daily'
+    || draftWeeklyDays.length !== 1;
+  const closeCreateForm = (): void => {
+    setCreateOpen(false);
+    setAddError(undefined);
+  };
+  const { requestDismiss, asking, guard } = useDirtyDismissGuard({
+    overlay: 'modal-dirty-form',
+    isDirty: isDraftDirty,
+    onDismiss: closeCreateForm,
+  });
+  // 下面那个一次性 keydown 监听读 ref 而不是 `asking`：进 deps 会让 effect 重跑，
+  // 而它开头那句 `requestAnimationFrame(() => nameInputRef.current?.focus())`
+  // 会把焦点从刚弹出的确认框手里抢回名称输入框。
+  const askingRef = useRef(false);
+  askingRef.current = asking;
   const dialogRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   /**
@@ -218,10 +250,11 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape' && !adding) {
         event.preventDefault();
-        setCreateOpen(false);
-        setAddError(undefined);
+        // 确认框开着时 Esc 归它（= 安全侧的「继续编辑」），这一层不许抢。
+        if (askingRef.current) return;
+        requestDismiss('escape');
       }
-      if (event.key !== 'Tab') return;
+      if (event.key !== 'Tab' || askingRef.current) return;
       const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
         'button:not([disabled]), input:not([disabled]), select:not([disabled])',
       );
@@ -243,14 +276,25 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
     };
   }, [adding, createOpen]);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setMenuOpen(false);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [menuOpen]);
+  /**
+   * 菜单键盘（P5）。
+   *
+   * 🔴 原来这一格是**第四种答案**：挂在 `document` 上的一条 `Escape` 监听 ——
+   * 菜单项既不接焦点也不还焦点、没写 `tabIndex={-1}`，于是按 Tab 会走进菜单项、
+   * 按方向键没反应、按 Esc 关掉之后焦点停在一枚已经不在屏幕上的项上。
+   * 现在与另外两枚菜单共用 `menuActionOf`：打开即进第一项、Esc 关并还给触发者、
+   * Tab 离开即收起、环绕 / Home / End / 类型查找一起有。
+   *
+   * ⚠️ `nestedOpen: createOpen`：这一屏可以从菜单之外开"新建习惯"对话框。
+   * 嵌套层开着时整把键盘（含 Esc）都让出去 —— 否则一次按键两层一起没。
+   */
+  const onMenuKeyDown = useMenuKeyboard({
+    open: menuOpen,
+    containerRef: moreMenuRef,
+    triggerRef: moreButtonRef,
+    onClose: () => setMenuOpen(false),
+    nestedOpen: createOpen,
+  });
 
   /**
    * 选中项的痕迹来源 = **共享选中态本身**。
@@ -304,13 +348,14 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
               aria-expanded={menuOpen}
               aria-haspopup="menu"
               data-testid="habits-more"
+              ref={moreButtonRef}
               onClick={() => setMenuOpen((open) => !open)}
             >
               <MoreHorizontal size={ICON_SIZE.md} aria-hidden="true" />
             </button>
             {menuOpen ? (
-              <div className="ht-header__habits-menu" role="menu" data-testid="habits-menu">
-                <button type="button" role="menuitem" onClick={exportCheckins}>
+              <div ref={moreMenuRef} className="ht-header__habits-menu" role="menu" data-testid="habits-menu" onKeyDown={onMenuKeyDown}>
+                <button type="button" role="menuitem" tabIndex={-1} onClick={exportCheckins}>
                   <Download size={ICON_SIZE.sm} aria-hidden="true" />
                   {t('web.habits.export.action')}
                 </button>
@@ -328,9 +373,12 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
           className="ht-habit-create-dialog"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !adding) setCreateOpen(false);
+            if (event.target === event.currentTarget && !adding) requestDismiss('scrim');
           }}
         >
+          {/* 丢弃确认画在**这一层里面**（不是 body）：它拦的就是这一层，
+              同一个层叠上下文里后来者在上，才不用跟宿主的 z-index 比数字。 */}
+          {guard}
           <div
             ref={dialogRef}
             className="ht-habit-create-dialog__dialog"
@@ -341,7 +389,7 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
           >
             <header className="ht-habit-create-dialog__header">
               <h2 id="ht-habit-create-title" className="ht-type-section-title">{t('web.habits.create.title')}</h2>
-              <button type="button" className="ht-habit-create-dialog__close" aria-label={t('web.habits.create.close')} onClick={() => setCreateOpen(false)} disabled={adding}>
+              <button type="button" className="ht-habit-create-dialog__close" aria-label={t('web.habits.create.close')} onClick={() => requestDismiss('escape')} disabled={adding}>
                 <X size={ICON_SIZE.sm} aria-hidden="true" />
               </button>
             </header>
@@ -627,7 +675,7 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
                 <button
                   type="button"
                   className="ht-btn ht-btn--ghost"
-                  onClick={() => setCreateOpen(false)}
+                  onClick={() => requestDismiss('escape')}
                   disabled={adding}
                 >
                   {t('web.habits.create.cancel')}

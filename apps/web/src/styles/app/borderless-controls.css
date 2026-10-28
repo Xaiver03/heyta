@@ -46,15 +46,33 @@ a[href], a[href]:hover, a[href]:focus-visible {
  */
 :is(input:not([type='checkbox']):not([type='radio']), textarea, [contenteditable='true']):focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring) !important;
-  outline-offset: var(--ht-border-width-thin) !important;
+  outline-offset: var(--ht-focus-ring-offset) !important;
 }
 :is(button, [role='button'], [role='tab'], [role='menuitem'], select, summary, a[href], [role='separator']):focus-visible {
-  outline: 0 !important;
-  background-color: var(--ht-color-primary-subtle) !important;
-  color: var(--ht-color-primary) !important;
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring) !important;
+  outline-offset: var(--ht-focus-ring-offset) !important;
 }
-:is(button, [role='button'], [role='tab'], [role='menuitem']):focus-visible svg {
-  color: var(--ht-color-primary);
+/*
+ * 🔴 环往**里**画的那一层：滚动容器。
+ *
+ * `outline` 会被 `overflow` 非 `visible` 的祖先裁掉 —— 而"控件铺满容器内容宽、
+ * 第一枚还贴着容器上边"在本仓是**一族**，不是一处。现量（1440 键盘扫描）：
+ *   · rail 的 tab：环带上 65 / 左 7 / 右 57，容器 `.ht-rail__tabs` 是 68 / 10 / 54
+ *     ⇒ 上、左、右三条边被切，图上只剩底下一条线；
+ *   · 侧栏的 `.ht-nav__item`：同一族，切左 77<80、右 291>288，第一枚再切上边。
+ *
+ * 那一枚"只剩一条线"的环，用户读到的是"这里多了条线"，不是"焦点进来了" ——
+ * 计算值 `outline-width: 2px` 是绿的，画面是坏的（AGENTS §6.2 规定一第 4 条：判据要看图）。
+ *
+ * 修法只有这一处：**把环带收回盒子内侧**，不去在每一层里再画一枚环
+ * （那正是本文件存在的理由 —— 焦点实现只许有一个来源）。
+ * 哪些层要加进来由**浏览器几何扫描**判，不由人记：
+ * `e2e/tests/focus-visible-matrix.spec.ts` 那条"键盘走到的每一枚控件四条边都画得出来"
+ * 会自己把新加的滚动容器报出来。
+ */
+.ht-rail__tabs,
+.ht-sidebar__body {
+  --ht-focus-ring-offset: calc(var(--ht-space-1) * -1);
 }
 /* 复合输入与浮层由内容、底色及投影组织，不加第二层装饰框。 */
 .ht-ai__composer,
@@ -72,14 +90,8 @@ a[href], a[href]:hover, a[href]:focus-visible {
 [role='dialog'] {
   border-color: transparent !important;
 }
-/* RN-web 的 Text 自带显式颜色，焦点换底色时须同步，否则会白字浅底。 */
-:is(button, [role='button'], [role='tab'], [role='menuitem']):focus-visible :is(span, div) {
-  color: inherit !important;
-}
 @media (forced-colors: active) {
   :is(button, [role='button'], [role='tab'], [role='menuitem'], select, summary, a[href], [role='separator']):focus-visible {
-    forced-color-adjust: none;
-    background-color: Highlight !important;
-    color: HighlightText !important;
+    outline-color: Highlight !important;
   }
 }

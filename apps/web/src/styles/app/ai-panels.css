@@ -121,11 +121,6 @@ input[type="radio"] {
   background: var(--ht-color-hover);
 }
 
-.ht-settings__theme-toggle:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-settings__lang {
   display: inline-grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -169,12 +164,6 @@ input[type="radio"] {
   border-color: transparent;
   background: var(--ht-color-primary-subtle);
   color: var(--ht-color-foreground);
-}
-
-/* 焦点环必须可见 —— 抹掉它是最常见的可访问性回归（`.ht-viewtab` 同一句注释）。 */
-.ht-settings__lang-option:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 /* 设置里的选项组（如“截止时间显示方式”）：每个选项一行，控件与文字对齐。 */
@@ -833,11 +822,6 @@ input[type="radio"] {
   border-color: var(--ht-color-primary);
 }
 
-.ht-ai__suggestion:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 /* 输入框吃弹性宽度，但收到 `layout.input-min` 为止 —— 到限就换行。
    `min-width: 0` 是必须的：没有它 flex 项不肯收缩到内容宽度以下。 */
 .ht-ai__actions .ht-input {
@@ -1045,13 +1029,6 @@ input[type="radio"] {
 
 .ht-ai__history-item:hover {
   background: var(--ht-color-hover);
-}
-
-.ht-ai__history-item:focus-visible,
-.ht-ai__history-new:focus-visible,
-.ht-ai__history-toggle:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 /*

@@ -53,6 +53,12 @@ export const TOKEN_GROUPS = {
     'danger',
     'danger-strong',
     'danger-subtle',
+    /**
+     * 实底危险按钮上面的字。与 `on-primary` 同族：
+     * 它**不是** `foreground-inverse` 的别名，取值由 `AA_PAIRS` 那条配对钉住
+     *（暗色的 danger 是浅红，白字压上去只有 2.77:1）。
+     */
+    'on-danger',
     'info',
     'info-strong',
     'info-subtle',
@@ -119,12 +125,20 @@ export const TOKEN_GROUPS = {
     'splash-exit',
   ],
   ease: ['standard', 'enter', 'exit', 'spring'],
-  z: ['base', 'sticky', 'dropdown', 'overlay', 'modal', 'popover', 'toast', 'tooltip', 'splash'],
+  z: ['base', 'sticky', 'dropdown', 'overlay', 'modal', 'popover', 'modal-commitment', 'toast', 'tooltip', 'splash'],
   icon: ['xs', 'sm', 'md', 'lg', 'xl'],
   /** 触控目标下限（44px 硬性可访问性要求）。 */
   'touch-target': ['min'],
-  /** 焦点环宽度。 */
-  'focus-ring': ['width'],
+  /**
+   * 焦点环：宽度，以及**离盒子多远**（正数 = 画在盒子外面）。
+   *
+   * 🔴 `offset` 存在的理由是：控件住在 `overflow` 非 `visible` 的容器里时，
+   * 向外的环会被容器裁掉（`outline` 一样被裁），于是"计算值有环"而图上只剩一条线。
+   * 那种容器把这一枚改成负数让环落在盒子内侧，而不是各自重画一枚环 ——
+   * 全局唯一实现见 `apps/web/src/styles/app/borderless-controls.css`，
+   * 判据是浏览器几何（`e2e/tests/focus-visible-matrix.spec.ts`）。
+   */
+  'focus-ring': ['width', 'offset'],
   /** 布局尺寸。组件布局应消费它们，而不是写死宽度。 */
   layout: [
     /* 视图导航（rail）。2026-09-29 加：外壳从"顶栏平铺视图 tab"改成
@@ -443,6 +457,19 @@ export const AA_PAIRS: ReadonlyArray<{
   { fg: 'color.foreground-subtle', bg: 'color.surface-raised', min: 4.5, why: '三级文字（浮层）' },
   { fg: 'color.on-primary', bg: 'color.primary', min: 4.5, why: '主按钮文字' },
   { fg: 'color.on-primary', bg: 'color.primary-hover', min: 4.5, why: '主按钮 hover' },
+  /*
+     🔴 **`danger` 当背景这一整条路此前一条配对都没登记过**，而移动端的实底危险按钮
+     一直在这么画（`apps/mobile/src/ui/kit.tsx` 的 `palette.danger`：
+     `bg: color.danger` + `fg: color.foreground-inverse`）。于是"危险按钮上的字够不够黑/
+     够不够白"这件事，整套对比度测试**一个字都没算** —— 正是本文件那句
+     "没被点名的 token 等于没被检查"的又一个实例。
+     登记之后实测：亮色 白字 on `red-600` **4.83:1**、暗色 `slate-950` on `#f87171`
+     **7.29:1**（两个值都由 `tokens.spec.ts` 现算，不是这里抄的数）。
+     ⚠️ 暗色为什么必须换前景而不是沿用白：暗色的 `danger` 是**提亮后的浅红**，
+     白字压上去只剩 2.77:1。`color.on-danger` 存在的理由就是这一格。
+  */
+  { fg: 'color.on-danger', bg: 'color.danger', min: 4.5, why: '实底危险按钮文字' },
+  { fg: 'color.on-danger', bg: 'color.danger-strong', min: 4.5, why: '实底危险按钮 hover/按下' },
   { fg: 'color.primary', bg: 'color.surface', min: 4.5, why: '蓝色文字/链接' },
   { fg: 'color.primary', bg: 'color.background', min: 4.5, why: '蓝色文字（页面底）' },
   { fg: 'color.primary', bg: 'color.surface-raised', min: 4.5, why: '链接（浮层）' },

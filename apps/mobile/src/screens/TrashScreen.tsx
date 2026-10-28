@@ -414,6 +414,7 @@ function ConfirmPurge({
             <Button
               label={copy.submit}
               tone="danger"
+              emphasis="commit"
               disabled={busy}
               onPress={onConfirm}
               style={styles.flex1}

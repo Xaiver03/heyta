@@ -12162,3 +12162,52 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
    ⇒ 规矩：脚本自己消费的参数一律先做**未知旗标拒绝**（`argv.slice(2).filter(a => a.startsWith('-') && !ALLOWED.includes(a))` 非空即 `rc=1` 并点名只认哪几枚），再做工；同时"输入不在场"必须是红而不是空（路径不存在、迁移目录里没有一枚带时间戳前缀的目录，两种都要点名）。两条各自配臂，臂用**恒真空返回**那种变异来证明它能失败（改 `unknownFlags`/`missingInputs` ⇒ 对应臂红、`rc=1`）。
    复量：`for a in "--schema /tmp/other.prisma" "--migrations-dir server/prisma/NOPE" "--self-test --bogus"; do node scripts/check-schema-migration-drift.mjs $a >/dev/null 2>&1; echo "$a rc=$?"; done` ⇒ 三行必须全是 `rc=1`（今天这一把尺全是 1；任何一枚回到 0 就是这格又漏了）。
    归族：#601、#603、#604（同一族"没有信号就是通过"的四种载体：shell 引号、远程 PowerShell、ORM 探针、**CLI 参数**）、§5 元规则二（一条永远通过的判据比没有判据更糟——这里"rc=0"就是那条）。
+606. 🔴 **共享浮层原语（react-native-web 的 `Modal`）在 Web 真实浏览器里那一层根本没出现，而 jsdom 契约测试全绿**（2026-10-27 全局 UX 整改 P1 撞上）：
+   形状：`apps/web/src/lib/form/useDirtyDismissGuard.tsx` 第一版把"放弃修改？"那层走共享 `OverlayModal`。真实浏览器里的读数逐条是 —— 处理器跑了、`policy` 读对了、`dismissActionFor → 'ask'`、`asking=true`、`guard` 非 null、Provider 子树里有我插的探针 div，但 `document.body` 末尾**没有多出那枚 portal 容器**、`[aria-modal]` 计数 **0**、console 与 pageerror **一条都没有**。同一棵树上 `apps/web/tests/overlay-modal-contract.spec.tsx`（jsdom）**通过**。
+   坏在哪：这是"契约测试绿 ≠ 界面有那一层"的最坏版本——**零报错**。前三次我按顺序排掉了三种假设（`testID` 没映射成 `data-testid`；Provider 缺失；选择器写错），而 Provider 那条一进来就被否证：`useHeytaUiTheme` 在 Provider 外是**抛错**（`scripts/check-ui-provider.mjs` 的文件头明写"整层渲染不出来"），抛错会进 console，console 是空的。⇒ 剩下的是装载路径本身，而**没有任何一条信号指向它**。
+   ⇒ 规矩（不依赖成因，今天就能守）：**Web 侧那一层的"存在性"判据只认真实浏览器**——`[aria-modal]` / `[role=dialog]` 的现量计数，不是 jsdom 里的 `getByRole`，也不是"组件返回非 null"。共享层继续持有**判断**（`closePolicyOf` / `dismissActionFor` 那张表），**渲染分端**：Web 就地画，移动端走 RN `Modal`。这条切分写进 `useDirtyDismissGuard.tsx` 的文件头。
+   🔴 **未判定**：成因还没证。能一次定死的断言是——在真浏览器里挂一枚 `<OverlayModal visible>`，同时量三样：`document.body` 子节点增量、`[aria-modal]` 计数、`[role=dialog]` 计数。读 RNW 源码（`dist/exports/Modal/ModalContent.js:42,44`）已知 `aria-modal` 是**无条件**的、`role` 却是 `active ? 'dialog' : null`，而 `active` 来自 `ModalAnimation` 的 `onShow`（`animationType !== 'none'` 时它只在 `animationend` 里触发）⇒ 三种读数**互相不一致**才是"挂载了但没激活"，全为 0 才是"没挂"。P6（自绘浮层迁到 `OverlayModal`）的前提是这一格，**没量出来之前不许按"能迁"排工期**。
+   归族：#570（jsdom 读的是 `dist` 那份，绿的是另一棵树）、#575（`testID` 当到达判据 ⇒ 产品绿、装置红）—— 同一族"读数与真界面脱节"，这一枚是它最安静的版本：连装置红都没有，它是**超时**。§7 元规则二（没有信号的通过最贵）、`ui-acceptance.md` 那条"DOM 回读不等于进 model"。
+   ↩️ **那句"未判定"的三读数已于 2026-10-28 量出**，结论**推翻**了"RNW `Modal` 在 Web 真浏览器里不挂载"这句一般化 —— 见下一条 **#610**。本条记录的**观察本身不改**（那一晚在 P1 那一棵树上量到的就是 0），改的是它被读成的那句一般命题。
+610. 🔴 **P6 的开工前置量完了：`OverlayModal` 在真实浏览器里是挂载且激活的**（2026-10-28，全局 UX 线 P5 收尾时同一条腿）：
+   装置：`apps/web/probe/overlay-modal.html` + `e2e/tests/overlay-modal-mount-probe.spec.ts`。它不猜结论，只把 #606 留的那三样**同帧**量出来，写进 `apps/web/evidence/overlay-modal-mount/probe.json`。
+   读数（真 Chromium、`visible` 由一次真点击置真、等 1.2s 之后）：`bodyChildDelta=0`、`ariaModalCount=1`、`roleDialogCount=1`、`probeBodyInDom=1`、`probeModalHostInDom=1`。
+   ⇒ 三条一起读：**挂载了、也激活了**（`role="dialog"` 在场说明 `ModalAnimation` 那条 `onShow` 真的跑到了），而 RNW 的 `Modal` 在 Web 上**不往 `body` 末尾 append**（`bodyChildDelta=0`）—— 它就地渲染。
+   ⇒ 所以 #606 那句"那一层根本没出现"**不是 RNW 的普适性质**，它是 P1 那一棵树上的一次读数。两件事由此分开：
+     · **P6 可以按"迁到 `OverlayModal`"排工期**（计划 §P6 那条"没量出来之前不许排"的前置已解除）；
+     · 但**焦点陷阱与 `[role=dialog]` 定位要按"就地渲染"来写**：它不在 `body` 末尾 ⇒ 祖先的 `overflow`/`z-index`/`contain` 全都算数，这正是 #607 那格 `popover(500) > modal(400)` 倒挂的机制来源。
+   ↩️ **那两个候选已于同一天用同一枚探针分开**（加了两发对照读数，不是推理）：
+     · 同一次 `evaluate` 里"点下去立刻读"（React 还没 commit）⇒ `aria-modal=0`、`role=dialog=0`、内容也不在 DOM —— **与 #606 那晚逐字相同**；
+     · 跨一次往返读（commit 之后、`animationend` 之前）⇒ `aria-modal=1` 而 `role=dialog=0`（"挂载了但没激活"那一档确实存在，只是不等于 #606 看到的那一档）；
+     · 等 1.2s ⇒ 两个都是 1。
+     ⇒ **①成立且可复现**，#606 那句"那一层根本没出现"不需要 ② 就被解释。
+     🔴 要留下的规矩：**量浮层之前必须先等 commit**（跨一次往返，或直接等一帧）。
+        同一个任务里点完就读，量到的是"还没渲染"，而它与"渲染不出来"长得一模一样 —— #606 就是被它带偏成了一句一般命题。
+        复量：`pnpm --dir e2e exec playwright test tests/overlay-modal-mount-probe.spec.ts --retries=0`（三发一起打印，JSON 里 `syncInClickTask` / `immediate` / `settled` 三个键）。
+   复量：`pnpm --dir e2e exec playwright test tests/overlay-modal-mount-probe.spec.ts --retries=0`（读数同时打印在 stdout 与那份 JSON 里）。
+   归族：#606（它的一般化被本条收窄，观察本身保留）、#607（就地渲染 ⇒ 堆叠上下文归宿主）、§5 元规则三（"测试全绿 ≠ 当前产物"的反向：一次红读数也不自动升级成普适性质）。
+607. 🔴 **z 阶梯 `popover(500) > modal(400)` 让确认框"画得出来但点不动"，而 Playwright 报的是别人**（2026-10-27 同一晚）：
+   形状：确认浮层挂在 `z.modal`，触发它的那枚锚定层是 `z.popover` ⇒ 两层都在 DOM 里、`toBeVisible()` 全过、截图里文字清清楚楚，但 `click()` 60s 超时，报错文本是 `<select> intercepts pointer events`——**指着一枚跟这件事无关的下拉**。真因只有把两层的 `z-index` 逐层读出来才看得见。
+   第二次撞同一个形状时我先做的是**加码**（新 ladder 档 `--ht-z-modal-commitment: 550`），它治了捕获浮层那一格，却治不了习惯新建那一格：`.ht-habit-create-dialog` 用的是 `z.splash`（**900**）⇒ 数字竞赛在这里必然输，而且就算赢，每一层浮层里的确认都得再猜一次数字。
+   ⇒ 规矩：**同一个宿主堆叠上下文里的第二层，就地画在宿主的上下文内**（跟随宿主的 z），别去全局阶梯上抢一个更大的数。全局阶梯只用来排"互相不认识的两层"。
+   顺手登记的事实：`popover(500) > modal(400)` 这个倒挂是**阶梯本身的缺陷**（确认层理应压在任何锚定层之上），整改归 P7；`550` 那档现在只作为"确实需要越过大屏浮层时"的备用，`tokens.css` 的注释里写着它不是正解。
+   复量：`grep -n -- '--ht-z-' packages/design-system/src/tokens.css` ⇒ 阶梯逐档现量；`e2e/tests/dirty-form-guard.spec.ts` 那 6 条里任何一条重新超时并报"intercepts pointer events"，就是有人把某一层的宿主换了。
+   归族：#606（同一晚、同一层浮层的两种"看起来在、其实够不到"）、`ui-acceptance.md` 的"exists 不等于可点"。
+608. 🔴 **改了 token 却只重跑了 `generate`，`dist` 还是上一版 ⇒ 契约测报"这个 token 在真表里不存在"，看着像代码错**（2026-10-28 全局 UX 整改 P4 开工第一条红就是它）：
+   形状：给 `packages/design-system/src/tokens.css` 加 `--ht-color-on-danger` 并登记进 `tokens.ts` 的词表，跑 `pnpm --filter @heyta/design-system run generate` ⇒ `src/generated/tokens.native.ts` 与 `generated/tokens.json` **都**有了那一格（`grep -c on-danger` 各命中 1/2）。紧接着 `packages/ui/tests/control-states.spec.ts` 红：`danger/commit 亮色表里没有：color.on-danger: expected 'undefined' to be 'string'`。真因是 `@heyta/design-system` 的 `exports` 指向 **`./dist/index.js`**，而那枚 `dist` 是 01:12 的旧产物 —— `grep -c on-danger dist/index.js` ⇒ **0**。`generate` 只重写生成件，**不重建包**。
+   坏在哪：报错把矛头指向"我写错了 token 名"，而词表、生成件、CSS 三处都证明名字是对的。同一形状在 `packages/ui` 上也咬过一次：`apps/web` 的 typecheck 报 `TS7016 Could not find a declaration file for module '@heyta/ui'`，因为 `dist/index.d.ts` 缺失 —— 补一次 `pnpm --dir packages/ui build` 就换出一枚**别线名下**的真红（`inbound-hosted-extraction-ui.spec.tsx(81,51) TS18048`），差点被读成"我改出来的"。
+   ⇒ 规矩：**读 workspace 包的契约测之前，先把被读的那一枚包 build 一次**；红的时候第一步是 `grep -c <新符号> <那个包的 dist/…>`，命中 0 就是产物陈旧，不是判据错。`dist/` 在 `.gitignore` 里（`git check-ignore -v` 现量），所以它**不会**随 checkout 更新 —— 换分支、拉别人的提交之后同样会漂。
+   复量：`grep -c on-danger packages/design-system/dist/index.js`（应为 1）；`ls packages/ui/dist/index.d.ts`。
+   归族：§5 元规则三（"测试全绿 ≠ 这是当前产物"的反向版本：**测试红 ≠ 产物是当前产物**）、#570（jsdom 读的是 `dist` 那份，绿的是另一棵树）。
+609. 🔴 **hover 之后立刻 `getComputedStyle` 读到的是过渡的起点色，不是终值**（2026-10-28 同一趟，`e2e/tests/control-semantics.spec.ts`）：
+   形状：`await submit.hover()` 后马上读 `backgroundColor`，期望 `danger-strong` 的 `rgb(185, 28, 28)`，实量 `rgb(220, 38, 38)`（= 静止态的 `danger`）。差值看起来正好是"hover 完全没生效"，而 CSS 那条规则是对的 —— `.ht-btn` 的 `transition: background-color var(--ht-duration-fast)` 让 Chromium 在过渡期间返回**插值中的当前值**。
+   ⇒ 规矩：**任何带 transition 的属性都不许"读一次"**。用 `expect.poll(async () => …).toBe(终值)`（默认按超时轮询）：过渡走完就绿，真的不换则在超时后红 —— 能红的方向没有被削弱，只是不再在错误的时间点取样。同一族还包括 `opacity`/`transform`/`outline-width`。
+   复量：`pnpm --dir e2e exec playwright test tests/control-semantics.spec.ts --retries=0` ⇒ 3 passed；把 `expect.poll` 换回单次 `look()` 应当立刻红在 hover 那一条（这条"应当红"是本条的判据，别只留着当散文）。
+   归族：`ui-acceptance.md` 的"DOM 回读不等于进 model"、#606（同一族的"装置在错误的时间点取样"）。
+611. 🔴 **草稿 state 挂在"关掉后仍存活"的组件上 ⇒ 重开的那一瞬间会拿上一份草稿判脏，问用户从没输入过的内容**（2026-10-28 全局 UX 线 P6 迁第一枚时撞出）：
+   形状：`CategoryCreateDialog` 的 `name`/`color` 住在组件本体，关闭时只是 `if (!open) return null` —— **组件实例没卸载**，state 留着。重开时 React 先以旧 state 提交这一次渲染（实测那一帧 DOM：`value="诊断清单"`、`色槽 1 aria-pressed="true"`），**之后**才跑清草稿的 effect。于是"刚点开就按 Esc / 点背景"会走脏判定并弹出「放弃这次的修改？」。
+   坏在哪：这不是测试竞态。旧代码看起来对，只因为它的 Esc 监听**和清草稿在同一个 effect 里**注册 —— 那一帧根本没有监听器，按 Esc 什么都不发生（把缺陷伪装成了"没反应"）。迁移把通道交给共享壳之后，壳在挂载那一帧就接住了键，缺陷才露出来。
+   ⇒ 规矩：**"关掉即丢"的草稿必须随开合挂载**，不要靠"开完再清"。外层只判开合（`if (!open) return null`），state 全在只在打开时才存在的那一层。清草稿的 effect 是这一族的临时绷带，不是解法。
+   ⇒ 同族的判据联动（这一枚最贵的部分）：把 `role="dialog"` 交给共享壳之后，`check:dirty-form-policy` 的候选判定（按"文件里自报 `role=dialog`/`aria-modal`"认对话框）**看不见这一格了** —— 已接保护读数 5 ⇒ 4，那枚 `PROTECTED_FLOOR` 棘轮当场红。**红得对**：它注释里预写的失法就是"形状一变就掉出候选集、门禁照样绿"。出路是修扫描器的眼睛（`<WebModalShell` 也算自报对话框），**不是把下限降到 4**。修完分母回到 13（迁移前也是 13；12 是瞎了一格时的读数）。
+   复量：`pnpm check:dirty-form-policy`（读数里"已接保护"应 ≥ 5、候选 13）；`pnpm --dir e2e exec playwright test tests/category-dialog-ux.spec.ts --retries=0` ⇒ 6 条（含"重开后按 Esc 必须直接关、不许弹放弃确认"）。
+   归族：#606（同一族"在错误的时间点取样"——那次是量太早，这次是清太晚）、#610（量浮层前先等 commit）、`ui-acceptance.md` 的"DOM 回读不等于进 model"。

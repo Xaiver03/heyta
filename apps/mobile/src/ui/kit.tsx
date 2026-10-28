@@ -38,6 +38,14 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  CONTROL_STATE_TOKENS,
+  DEFAULT_CONTROL_EMPHASIS,
+  DEFAULT_CONTROL_TONE,
+  controlPaletteOf,
+  type ControlEmphasis,
+  type ControlTone,
+} from '@heyta/ui';
 import type { TextStyleName } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import {
@@ -260,11 +268,20 @@ export function IconButton({
         justifyContent: 'center',
         borderRadius: t['radius.full'],
         // 按下即反馈（Apple：反馈必须在 pointer-down 上出现）。
-        backgroundColor: pressed && !reducedMotion && disabled !== true ? t['color.hover'] : 'transparent',
+        // 🔴 原来这一格是**换底**（`color.hover`），而 `Button` 是压暗、`Checkbox`/`Fab`
+        // 是缩放 —— 同一个"按下"在同一个文件里三种机制。收成触屏那一档：缩放，读 token。
+        backgroundColor: 'transparent',
         opacity: disabled === true ? t['state.disabled-opacity'] : 1,
+        transform: [
+          {
+            scale: pressed && !reducedMotion && disabled !== true ? t[CONTROL_STATE_TOKENS.pressScale] : 1,
+          },
+        ],
       })}
     >
-      <Icon name={icon} size="md" color={color ?? t['color.foreground']} />
+      {/* 前景默认值来自共享表的 `ghost` 档（与 Web 工具条图标同一个静止态），
+          调用方仍可用 `color` 覆盖（例如那枚真的表示危险的图标）。 */}
+      <Icon name={icon} size="md" color={color ?? t[controlPaletteOf('ghost')!.fg]} />
     </Pressable>
   );
 }
@@ -722,12 +739,26 @@ export function Card({ children, style, gap = 'default' }: CardProps): React.JSX
   );
 }
 
-export type ButtonTone = 'primary' | 'secondary' | 'ghost' | 'danger';
+/**
+ * 移动端按钮的色调名 = 共享词表的**别名**，这里不再自己列一遍四档。
+ *
+ * 🔴 以前这是第二份清单（与 `packages/ui/src/control/states.ts` 各写一遍），
+ * 于是"加一档"可以只加在一端 —— 那正是 P4 立项要消灭的形状。
+ */
+export type ButtonTone = ControlTone;
 
 export interface ButtonProps {
   label: string;
   onPress: () => void;
+  /** 色调。默认值取自共享表（`DEFAULT_CONTROL_TONE`），不在这一端另写一个。 */
   tone?: ButtonTone;
+  /**
+   * 重量档：`inline`（默认）/ `commit`。
+   *
+   * 🔴 只有**确认层里那枚唯一要按下去的**按钮该写 `commit`。列表行与设置项里那枚
+   * 永远是行内档 —— 默认给实底会把整屏染红（回收站每一行都有「彻底删除」）。
+   */
+  emphasis?: ControlEmphasis;
   /** 可选的左侧图标。用图标时按钮变成"图标 + 文字"，不要 emoji。 */
   icon?: IconName;
   disabled?: boolean;
@@ -753,7 +784,8 @@ export interface ButtonProps {
 export function Button({
   label,
   onPress,
-  tone = 'secondary',
+  tone = DEFAULT_CONTROL_TONE,
+  emphasis = DEFAULT_CONTROL_EMPHASIS,
   icon,
   disabled,
   loading,
@@ -766,17 +798,32 @@ export function Button({
   const text = useText();
   const { native, reducedMotion } = useTheme();
 
-  // 🔴 色名必须**真实存在**。`color.primary-foreground` / `color.danger-foreground`
-  // 这两个名字是我一开始想当然编的，表里没有 —— 于是按钮文字是 undefined，
-  // 在深色背景下完全看不见。正确的名字是 `color.on-primary` /
-  // `color.foreground-inverse`。
-  const palette: Record<ButtonTone, { bg: string; fg: string; border: string }> = {
-    primary: { bg: t['color.primary'], fg: t['color.on-primary'], border: t['color.primary'] },
-    secondary: { bg: t['color.surface'], fg: t['color.foreground'], border: t['color.border'] },
-    ghost: { bg: 'transparent', fg: t['color.foreground-muted'], border: 'transparent' },
-    danger: { bg: t['color.danger'], fg: t['color.foreground-inverse'], border: t['color.danger'] },
+  /**
+   * 配方**只从共享表取**（`packages/ui/src/control/states.ts`）。
+   *
+   * 这里原来有一份 `Record<ButtonTone, …>` 的本地抄件，三格都是第二个答案：
+   *   · `secondary` 用 `color.surface`（Web 那一端没有这一档，设置页又在 `sheets.css`
+   *     里现造了个凹陷底 ⇒ 同一语义三份答案）；
+   *   · `danger` 恒为实底（Web 恒为透明底红字 ⇒ 两端各对一半，缺的是"这一枚站在
+   *     哪个位置"的判断，现在由 `emphasis` 显式表达）；
+   *   · `border` 那一格**从来没被读过**（样式里恒为 `borderWidth: 0`）——
+   *     一份没人消费的抄件字段，删。
+   *
+   * ⚠️ `hoverBg`/`hoverFg`/`activeBg` 在触屏上不存在，这一端**故意不读**：
+   * 按下反馈在两端各用自己的那一档（Web 换底、触屏缩放），
+   * 而不是每一端各发明三种机制。
+   */
+  const recipe = controlPaletteOf(tone, emphasis);
+  if (recipe === undefined) {
+    // 词表外的色调名（只有绕过类型系统才拿得到）⇒ **不画**。
+    // 兜成任何一档默认值都会让"新加一个 tone 名"静默画成次要按钮，
+    // 那正是这张表要消灭的毛病（与 `receiptTimingOf` 同一个保守方向）。
+    return <></>;
+  }
+  const c = {
+    bg: recipe.bg === 'transparent' ? ('transparent' as const) : t[recipe.bg],
+    fg: t[recipe.fg],
   };
-  const c = palette[tone];
   const isDisabled = disabled === true || loading === true;
 
   return (
@@ -800,11 +847,13 @@ export function Button({
           backgroundColor: c.bg,
           borderWidth: 0,
           // disabled 用 token 的不透明度，不写死 0.5。
-          opacity: isDisabled
-            ? t['state.disabled-opacity']
-            : pressed && !reducedMotion
-              ? 0.85
-              : 1,
+          opacity: isDisabled ? t['state.disabled-opacity'] : 1,
+          // 🔴 按下反馈原来是**裸 `0.85`**（`check:design` 抓不到数字裸值的那一格），
+          // 而同一文件里 `Checkbox`/`Fab` 用的是 `motion.press-scale`、`IconButton`
+          // 用的是换底 —— 同一个"按下"三种机制。收成触屏那一档：缩放，读 token。
+          transform: [
+            { scale: pressed && !reducedMotion && !isDisabled ? t[CONTROL_STATE_TOKENS.pressScale] : 1 },
+          ],
         },
         style,
       ]}

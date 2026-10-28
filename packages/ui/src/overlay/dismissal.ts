@@ -41,6 +41,7 @@ export type DismissOutcome = 'dismiss' | 'cancel' | 'ask-discard' | 'deny';
  */
 export type ClosedOverlay =
   | 'popover'
+  | 'popover-dirty-form'
   | 'menu'
   | 'modal-readonly'
   | 'modal-dirty-form'
@@ -74,6 +75,7 @@ export interface ClosePolicy {
  */
 export const CLOSED_OVERLAYS = [
   'popover',
+  'popover-dirty-form',
   'menu',
   'modal-readonly',
   'modal-dirty-form',
@@ -101,6 +103,26 @@ const POLICY_BY_CLASS: Record<ClosedOverlay, ClosePolicy> = {
     systemBack: 'dismiss',
     autoDismiss: false,
     explicitCloseButton: false,
+  },
+
+  /**
+   * 🔴 **带未保存输入的锚定层** —— 这一档原来在表里不存在，而"表里没有"就是缺陷本身：
+   * `popover` 三条通道全 `dismiss`，于是"填了一半点外面就没了"在模型层面是合法的，
+   * 每一处锚定编辑器都只是照那一格各写一遍。
+   *
+   * 本仓的锚定捕获框把草稿存在**组件本地 `useState`**
+   * （`packages/ui/src/capture/CaptureComposer.tsx`），卸载即丢、且没有撤销出口
+   * ⇒ 按危险四档这是"不可逆 + 影响面只这一条"，正确形态是先问一句。
+   *
+   * ⚠️ 这一档的成立条件是**真的会丢**。没有输入的锚定层仍然用 `popover` ——
+   * 给每一次点击都加一道确认，是把成本转嫁给每一次正常操作。
+   */
+  'popover-dirty-form': {
+    scrim: 'ask-discard',
+    escape: 'ask-discard',
+    systemBack: 'ask-discard',
+    autoDismiss: false,
+    explicitCloseButton: true,
   },
 
   // 只读模态：丢弃无代价 ⇒ 背景与 Esc 都是出口。

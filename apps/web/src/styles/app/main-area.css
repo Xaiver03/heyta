@@ -180,17 +180,11 @@
 }
 
 .ht-header__calendar-sidebar-toggle:hover,
-.ht-header__calendar-sidebar-toggle[aria-pressed='true'],
 .ht-header__calendar-scope-reset:hover {
-  background: var(--ht-color-primary-subtle);
+  background: var(--ht-color-hover);
   color: var(--ht-color-primary);
 }
 
-.ht-header__calendar-sidebar-toggle:focus-visible,
-.ht-header__calendar-scope-reset:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
 
 .ht-header__calendar-sidebar-toggle {
   inline-size: var(--ht-touch-target-min);
@@ -396,8 +390,3 @@
   color: var(--ht-color-foreground);
 }
 
-/* 🔴 焦点环不许抹掉（AGENTS §5「容易犯的几个错」）。 */
-.ht-main__announcementDismiss:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}

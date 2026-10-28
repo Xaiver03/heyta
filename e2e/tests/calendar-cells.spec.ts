@@ -96,6 +96,27 @@ test('🔴 工具栏住在页头里，而且整屏只有**一份**（不是页�
   //    但只有这条能抓住"搬家搬漏了"和"搬到两个地方"之外的第三种：一处都没搬。
   await expect(page.getByTestId('calendar-toolbar-month'), '工具栏份数不对').toHaveCount(1);
 
+  const sidebarToggle = page.getByTestId('calendar-sidebar-toggle');
+  const ownership = await sidebarToggle.evaluate((el) => {
+    const title = document.querySelector('[data-testid="calendar-toolbar-month"]');
+    const style = getComputedStyle(el);
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--ht-color-primary)';
+    document.body.appendChild(probe);
+    const primary = getComputedStyle(probe).color;
+    probe.remove();
+    return {
+      toggleLeft: el.getBoundingClientRect().left,
+      titleLeft: title?.getBoundingClientRect().left ?? -1,
+      background: style.backgroundColor,
+      color: style.color,
+      primary,
+    };
+  });
+  expect(ownership.toggleLeft, '控制左侧栏的按钮必须位于日历导航左侧').toBeLessThan(ownership.titleLeft);
+  expect(ownership.background, '侧栏选中态不允许常驻底色').toBe('rgba(0, 0, 0, 0)');
+  expect(ownership.color, '侧栏选中态必须由图标主色表达').toBe(ownership.primary);
+
   // ③ 它是**活的**：点一下 › 月份真的走。
   const before = (await page.getByTestId('calendar-toolbar-month').textContent())?.trim() ?? '';
   await page.getByTestId('calendar-toolbar-next').click();

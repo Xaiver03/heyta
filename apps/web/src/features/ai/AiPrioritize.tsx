@@ -363,7 +363,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
             <div className="ht-ai__actions">
               <button
                 type="button"
-                className="ht-btn"
+                className="ht-btn ht-btn--secondary"
                 data-testid="prioritize-send"
                 onClick={() => void send()}
               >
@@ -462,7 +462,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
         <div className="ht-ai__actions">
           <button
             type="button"
-            className="ht-btn"
+            className="ht-btn ht-btn--secondary"
             data-testid="prioritize-apply"
             disabled={keptSuggestions().length === 0}
             onClick={() => void apply()}

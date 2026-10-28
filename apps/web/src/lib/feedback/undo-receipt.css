@@ -1,0 +1,22 @@
+/*
+ * 一条自消回执（撤销那一档）的行内形状
+ * =====================================
+ *
+ * 只画"这一行里的一段"：**没有定位、没有 z-index、没有遮罩**。
+ * 回执住在宿主的动作行里（页头那一行 / 象限那一行），所以它跟着宿主排布，
+ * 不需要第二套浮层坐标系 —— 立项现量里那几处也是就地画的，收编时不改这一点。
+ *
+ * 🔴 裸值一条都不许出现（`docs/agents/design-system.md`）：间距、圆角、
+ * 字号、颜色全部走语义 token。这里没有新 token —— 用到的都是已有的。
+ */
+.ht-undo-receipt {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+}
+
+.ht-undo-receipt__failure {
+  color: var(--ht-color-danger-strong);
+  font-size: var(--ht-font-size-xs);
+}

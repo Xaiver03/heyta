@@ -31,7 +31,7 @@ import { ICON_SIZE } from '@heyta/design-system';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { AlertTriangle, RotateCcw, Trash2, X } from 'lucide-react';
+import { AlertTriangle, RotateCcw, Trash2 } from 'lucide-react';
 
 import {
   liveTaskCountOfProject,
@@ -39,7 +39,15 @@ import {
   type TrashKind,
 } from '@heyta/domain';
 import { useI18n, type Locale } from '@heyta/i18n';
-import { entityLabelOf, directChildCountsByProject, HeytaUiProvider, TrashBoard } from '@heyta/ui';
+import {
+  entityLabelOf,
+  directChildCountsByProject,
+  HeytaUiProvider,
+  TrashBoard,
+} from '@heyta/ui';
+
+import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
+import { purgeUsesModalCommitment } from './purgeDanger.js';
 
 import { useHabitStore } from '../habits/store.js';
 import { useNoteStore } from '../notes/store.js';
@@ -117,9 +125,8 @@ export function TrashView(): React.JSX.Element {
    * 界面把它咽掉的代价就越大。
    */
   const [error, setError] = useState<string | undefined>(undefined);
-  const dialogRef = useRef<HTMLDivElement>(null);
-
   const pending = items.find((item) => item.id === confirmingId);
+
 
   /**
    * 四路动作的**穷尽表**：键就是 `TrashKind`。
@@ -184,24 +191,27 @@ export function TrashView(): React.JSX.Element {
       ? (directChildCountsByProject(allProjects)[pending.id] ?? 0)
       : 0;
 
+  /**
+   * 🔴 档位是**派生**出来的，不是这一层写死的（P2 的判据）。
+   *
+   * 在此之前 `resolveDangerTier` / `requiresModalCommitment` 在全仓**零调用点**
+   * —— 只有定义与自己的单测，界面那侧一个字都没用。见 `./purgeDanger.ts` 文件头。
+   */
+  // 界面上用得到的就是这一枚布尔；档位本身由
+  // `apps/web/tests/trash-purge-danger-tier.spec.ts` 逐格钉（在那里 bind 一个没人读的
+  // `tier` 只会把"派生接上了"读成一句自我安慰）。
+  //
+  // 🔴 它**只**决定焦点这一层的强度，**不**决定这一层画不画：
+  //    拿它当渲染条件的话，表一旦把这一格派生成非模态，`onPurge` 就变成一次
+  //    **什么都不发生的点击** —— 静默无操作比"多弹一个框"坏得多。
+  //    掉档时正确的出路是换成就地确认行（P2-B 那一档），不是少画一层。
+  const usesModalCommitment = purgeUsesModalCommitment({ strandedChildren });
+
   // 条目在确认框开着的时候被恢复（比如另一台设备同步过来）→ 自动关掉，
   // 否则用户会对着一个指向已不存在条目的确认框点"彻底删除"。
   useEffect(() => {
     if (confirmingId !== undefined && pending === undefined) setConfirmingId(undefined);
   }, [confirmingId, pending]);
-
-  // Esc 关闭 + 打开时把焦点移进对话框（键盘用户不能还停在背后的列表上）。
-  useEffect(() => {
-    if (pending === undefined) return;
-    dialogRef.current?.focus();
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setConfirmingId(undefined);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [pending]);
 
   return (
     <section className="ht-trash" aria-label={t('web.trash.nav')}>
@@ -249,92 +259,69 @@ export function TrashView(): React.JSX.Element {
       </HeytaUiProvider>
 
       {pending !== undefined && (
-        <div role="presentation" className="ht-trash__overlay">
-          <div
-            ref={dialogRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="ht-trash-confirm-title"
-            className="ht-trash__dialog"
-            data-testid="trash-confirm"
-          >
-            <div className="ht-trash__dialog-head">
-              <span className="ht-trash__dialog-icon">
-                <AlertTriangle size={ICON_SIZE.md} aria-hidden="true" />
-              </span>
-              <div className="ht-trash__dialog-body">
-                <h2 id="ht-trash-confirm-title" className="ht-trash__dialog-title">
-                  {t('web.trash.confirm.title', { title: pending.title })}
-                </h2>
-                <p className="ht-trash__dialog-text">{t('web.trash.confirm.body')}</p>
-                {/*
-                  🔴 影响面那句（W4 / P-1）：删清单**不级联删任务**、删习惯**不删打卡记录**。
-                  不说这一句，用户会以为连着 N 条一起没了 —— 那是一个会让人**不敢点**、
-                  而说的又不是实话的确认框。只在清单 / 习惯这两类上出现。
-                */}
-                {pending.kind !== 'PROJECT' && pending.kind !== 'HABIT' ? null : (
-                  <p className="ht-trash__dialog-text" data-testid="trash-confirm-impact">
-                    {pending.kind === 'PROJECT'
-                      ? t('web.trash.confirm.projectTasks', { count: affectedTasks })
-                      : t('web.trash.confirm.habitLogs')}
-                  </p>
-                )}
-                {/*
-                  🔴 第三句：**这条清单底下还挂着几条子清单，彻底删除之后它们在界面上再也找不到**。
-                  `strandedChildren === 0` 时整段不进 DOM（没有数字就不编一句话），
-                  所以"任务/便签那两类的确认框形状逐字不变"是可证的。
-                */}
-                {strandedChildren === 0 ? null : (
-                  <p className="ht-trash__dialog-text" data-testid="trash-confirm-children">
-                    {t('common.trash.confirm.strandChildren', { count: strandedChildren })}
-                  </p>
-                )}
-                {/*
-                  🔴 与移动端**同一句诚实条款**（W5 把两端措辞对齐的那一格）：
-                  `purge` 只加 `purgedAt` 标记，op-log 里的历史载荷没被抹掉。
-                  少这一句，界面就是在对一件没发生过的事做承诺。
-                */}
-                <p className="ht-trash__dialog-text" data-testid="trash-confirm-not-erasure">
-                  {t('web.trash.confirm.notErasure')}
+        <DangerConfirmDialog
+          testId="trash-confirm"
+          labelledBy="ht-trash-confirm-title"
+          modalCommitment={usesModalCommitment}
+          classNames={{
+            overlay: 'ht-trash__overlay',
+            dialog: 'ht-trash__dialog',
+            actions: 'ht-trash__dialog-actions',
+          }}
+          cancelLabel={t('web.trash.confirm.cancel')}
+          // 🔴 主按钮复述动词（「彻底删除」），不是「确定」。
+          confirmLabel={t('web.trash.confirm.submit')}
+          onCancel={() => setConfirmingId(undefined)}
+          onConfirm={() => {
+            // 先关确认框再写：写失败（例如条目已被别处删掉）不该把
+            // 确认框永远卡在屏幕上 —— 失败由上面的 `error` 说给用户。
+            const { id, kind } = pending;
+            setConfirmingId(undefined);
+            run(id, kind, 'purge');
+          }}
+        >
+          <div className="ht-trash__dialog-head">
+            <span className="ht-trash__dialog-icon">
+              <AlertTriangle size={ICON_SIZE.md} aria-hidden="true" />
+            </span>
+            <div className="ht-trash__dialog-body">
+              <h2 id="ht-trash-confirm-title" className="ht-trash__dialog-title">
+                {t('web.trash.confirm.title', { title: pending.title })}
+              </h2>
+              <p className="ht-trash__dialog-text">{t('web.trash.confirm.body')}</p>
+              {/*
+                🔴 影响面那句（W4 / P-1）：删清单**不级联删任务**、删习惯**不删打卡记录**。
+                不说这一句，用户会以为连着 N 条一起没了 —— 那是一个会让人**不敢点**、
+                而说的又不是实话的确认框。只在清单 / 习惯这两类上出现。
+              */}
+              {pending.kind !== 'PROJECT' && pending.kind !== 'HABIT' ? null : (
+                <p className="ht-trash__dialog-text" data-testid="trash-confirm-impact">
+                  {pending.kind === 'PROJECT'
+                    ? t('web.trash.confirm.projectTasks', { count: affectedTasks })
+                    : t('web.trash.confirm.habitLogs')}
                 </p>
-              </div>
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
-                aria-label={t('web.trash.confirm.cancel')}
-                onClick={() => setConfirmingId(undefined)}
-              >
-                <X size={ICON_SIZE.sm} aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className="ht-trash__dialog-actions">
-              <button
-                type="button"
-                className="ht-btn"
-                data-testid="trash-confirm-cancel"
-                onClick={() => setConfirmingId(undefined)}
-              >
-                {t('web.trash.confirm.cancel')}
-              </button>
-              <button
-                type="button"
-                className="ht-btn ht-btn--primary"
-                data-testid="trash-confirm-submit"
-                onClick={() => {
-                  // 先关确认框再写：写失败（例如条目已被别处删掉）不该把
-                  // 确认框永远卡在屏幕上 —— 失败由上面的 `error` 说给用户。
-                  const { id, kind } = pending;
-                  setConfirmingId(undefined);
-                  run(id, kind, 'purge');
-                }}
-              >
-                {t('web.trash.confirm.submit')}
-              </button>
+              )}
+              {/*
+                🔴 第三句：**这条清单底下还挂着几条子清单，彻底删除之后它们在界面上再也找不到**。
+                `strandedChildren === 0` 时整段不进 DOM（没有数字就不编一句话），
+                所以"任务/便签那两类的确认框形状逐字不变"是可证的。
+              */}
+              {strandedChildren === 0 ? null : (
+                <p className="ht-trash__dialog-text" data-testid="trash-confirm-children">
+                  {t('common.trash.confirm.strandChildren', { count: strandedChildren })}
+                </p>
+              )}
+              {/*
+                🔴 与移动端**同一句诚实条款**（W5 把两端措辞对齐的那一格）：
+                `purge` 只加 `purgedAt` 标记，op-log 里的历史载荷没被抹掉。
+                少这一句，界面就是在对一件没发生过的事做承诺。
+              */}
+              <p className="ht-trash__dialog-text" data-testid="trash-confirm-not-erasure">
+                {t('web.trash.confirm.notErasure')}
+              </p>
             </div>
           </div>
-        </div>
+        </DangerConfirmDialog>
       )}
     </section>
   );

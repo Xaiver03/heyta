@@ -188,11 +188,6 @@
   border-block-start: 0;
 }
 
-.ht-settings__nav-link:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-settings__layout {
   display: grid;
   grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
@@ -381,11 +376,6 @@
   color: var(--ht-color-foreground-muted);
 }
 
-.ht-settings__tip-trigger:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
 .ht-settings__tip-bubble {
   position: absolute;
   inset-block-start: calc(100% + var(--ht-space-1));
@@ -472,11 +462,6 @@
 .ht-sheet__close:hover {
   color: var(--ht-color-foreground);
   background: var(--ht-color-hover);
-}
-
-.ht-sheet__close:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
 }
 
 @keyframes ht-sheet-in {

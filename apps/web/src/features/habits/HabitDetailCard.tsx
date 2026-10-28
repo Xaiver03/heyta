@@ -43,6 +43,8 @@ import { HabitGoalEditor } from './HabitGoalEditor.js';
 import { HabitIconPicker } from './HabitIconPicker.js';
 import { habitBoardLabels, habitMonthLabels, habitTrendTabs, habitYearLabels, paneEmptyText } from './board-labels.js';
 import { readNow, useHabitStore } from './store.js';
+import { UndoReceipt } from '../../lib/feedback/UndoReceipt.js';
+import { restoreOrRefuse, undoReceiptFor } from '../../lib/feedback/undo-receipt.js';
 
 /*
   这三个是**模块级常量**而不是 `style={{…}}` 字面量：后者会被
@@ -175,8 +177,28 @@ export function HabitDetailCard({ inset }: { inset: boolean }): React.JSX.Elemen
     [store, now],
   );
 
+  /**
+   * 删除习惯之后那一条可撤销回执（全局 UX 线 P3）。
+   *
+   * 🔴 它**必须画在"没有习惯就返回空面板"那一格的前头**：删掉最后一条习惯之后
+   * `store.habits.length` 就是 0，若回执只住在正常那棵树里，它会被那一格
+   * `return <></>` 一起收掉 —— 于是"撤销最后一条"永远不会被提供，
+   * 而这恰好是唯一一条用户真的想撤销的（前面删掉的还能从列表里看见痕迹）。
+   */
+  const [undo, setUndo] = useState<{ readonly label: string; readonly run: () => Promise<void> } | undefined>(undefined);
+
   // 空数据时空态属于列表侧；不挂载一个只剩空白的详情面板。
-  if (store.habits.length === 0) return <></>;
+  if (store.habits.length === 0) {
+    if (undo === undefined) return <></>;
+    return (
+      <UndoReceipt
+        label={undo.label}
+        onUndo={undo.run}
+        data-testid="habit-undo"
+        onDismiss={() => { setUndo(undefined); }}
+      />
+    );
+  }
 
   return (
     <div
@@ -234,7 +256,17 @@ export function HabitDetailCard({ inset }: { inset: boolean }): React.JSX.Elemen
                   // 先收编辑器再发 op：名字改到一半把习惯删掉，编辑器会指着一条
                   // 已经不存在的习惯（保存按钮还在，而动作层会抛"找不到习惯"）。
                   setRenamingId(null);
-                  void store.deleteHabit(selected.id);
+                  const { id, name } = selected;
+                  void store.deleteHabit(id).then(() => {
+                    if (!undoReceiptFor('habit')) return;
+                    setUndo({
+                      label: t('web.feedback.undo.habit', { title: name }),
+                      run: () => restoreOrRefuse(
+                        () => store.restoreHabit(id),
+                        t('web.feedback.undo.refused', { title: name }),
+                      ),
+                    });
+                  });
                 }}
                 style={iconButtonStyle}
               >

@@ -129,7 +129,10 @@ const MODAL_MARKERS = [
  * 清完一处就把那一行删掉 —— 门禁会因为"读数掉了"而提醒你。
  */
 const NATIVE_LEDGER = {
-  'apps/web/src/features/sync/VaultSettingsPanel.tsx': 1,
+  // 2026-10-27（全局 UX 整改 P2）摘掉一行：`VaultSettingsPanel` 那枚
+  // `window.confirm('…确定继续吗？')` 换成了页内危险确认
+  // （`apps/web/src/lib/dialog/DangerConfirmDialog.tsx` + `e2e/tests/vault-settings.spec.ts`）。
+  // 那是 **Web 侧最后一枚**原生框 —— 这一族此后只剩移动端 4 处与后台 3 处。
   'apps/mobile/src/screens/SecurityScreen.tsx': 1,
   'apps/mobile/src/screens/SessionsSection.tsx': 2,
   'apps/mobile/src/screens/VaultSettingsSection.tsx': 1,
@@ -151,7 +154,6 @@ const MODAL_LEDGER = {
   'apps/web/src/features/ai/AssistantPanel.tsx': { ariaModal: 0, dialogRole: 1 },
   'apps/web/src/features/auth/AuthPanel.tsx': { ariaModal: 1, dialogRole: 1 },
   'apps/web/src/features/calendar/CalendarCapturePopover.tsx': { ariaModal: 0, dialogRole: 1 },
-  'apps/web/src/features/categories/CategoryCreateDialog.tsx': { ariaModal: 1, dialogRole: 1 },
   'apps/web/src/features/habits/HabitsView.tsx': { ariaModal: 1, dialogRole: 1 },
   'apps/web/src/features/inbox/InboxBell.tsx': { ariaModal: 0, dialogRole: 1 },
   'apps/web/src/features/legal-recheck/LegalReconfirmSheet.tsx': { ariaModal: 1, dialogRole: 1 },
@@ -160,7 +162,37 @@ const MODAL_LEDGER = {
   'apps/web/src/features/share/ShareFeature.tsx': { ariaModal: 1, dialogRole: 1 },
   'apps/web/src/features/shell/CompactRailNavigation.tsx': { ariaModal: 0, dialogRole: 1 },
   'apps/web/src/features/sync/ConflictDialog.tsx': { ariaModal: 1, dialogRole: 1 },
-  'apps/web/src/features/trash/TrashView.tsx': { ariaModal: 1, dialogRole: 1 },
+  /*
+   * 2026-10-27（P2）：`TrashView` 自己那一层搬进了 `DangerConfirmDialog`，
+   * 所以它不再被扫到 —— 这一行**跟着删**，不是放宽判据：落点一处没少，
+   * 只是从"每页各画一族"收敛成"共享那一族"（见下面 `lib/dialog` 那两行）。
+   */
+  /*
+   * 🔴 这两行是**带翻案条件的登记**，不是"这里允许自绘"。
+   *
+   * 判据本来要它们用 `OverlayModal` / `DangerDialog`，而那两个的外壳是 react-native-web 的
+   * `Modal` —— 它在 Web 真实浏览器里**那一层根本不挂载**：零 console、零 pageerror，
+   * 同一棵树上 jsdom 契约测试还全绿。逐条读数、已排除的假设与那句能定死成因的断言，
+   * 都在 `docs/reference/environment-traps.md` §7 第 606 条。
+   *
+   * 两枚的共同点：关闭策略**仍然只问那张表**（`closePolicyOf` / `dismissActionFor`），
+   * 自绘的只有渲染那一半 —— 也就是"判断共享、渲染分端"。
+   *
+   * ⚠️ 翻案条件（任一成立就把这两行删掉、改回共享原语）：
+   *   ① §7 第 606 条那句断言量出"挂载了但没激活"，并修好 role/焦点陷阱；
+   *   ② 计划 §P6 给出 Web 侧可用的共享外壳（同一张表、原生 portal）。
+   *
+   * 🔴 **② 于 2026-10-28 成立**（P6）：那枚外壳就是
+   * `apps/web/src/lib/dialog/WebModalShell.tsx`。所以这一格按**它自己写的出路**走：
+   * 危险确认那枚不再自带模态语义，它**消费**共享壳 ⇒ 它那一行**删**，
+   * 换成共享壳自己的一行（`aria-modal` 与 `role="dialog"` 各 1，总数不变）。
+   * 这不是放宽判据：自绘层的**枚数**从"每枚壳一行"收敛成"一枚壳一行"，
+   * 而后面每迁一枚界面，账本只会**少**一行、不会多。
+   * ⚠️ ②里"原生 portal"那半句被 §7 第 607 条否证了：共享壳是**就地画在宿主的
+   *    堆叠上下文里**（portal + 全局 z 阶梯会让确认层被锚定层压住 ⇒ 画得出来点不动）。
+   */
+  'apps/web/src/lib/dialog/WebModalShell.tsx': { ariaModal: 1, dialogRole: 1 },
+  'apps/web/src/lib/form/useDirtyDismissGuard.tsx': { ariaModal: 1, dialogRole: 1 },
 };
 
 /** 剥掉块注释与行注释（注释里的 `aria-modal` 不是落点）。 */

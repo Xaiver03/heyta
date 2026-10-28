@@ -270,6 +270,7 @@ export function AccountClosureScreen({
                 <Button
                   label={t('common.accountClosure.action')}
                   tone="danger"
+                  emphasis="commit"
                   disabled={busy}
                   style={styles.dialogAction}
                   onPress={() => {

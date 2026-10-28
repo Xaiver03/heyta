@@ -1370,3 +1370,64 @@ export {
   type FieldChromeInput,
   type FieldLayout,
 } from './form/anatomy.js';
+
+/* ── 自消回执的时长与暂停（2026-10-28，全局 UX 线 P3）──────────────────
+   `dismissal.ts` 那份模型覆盖第 3–5 级浮层，它自己的文件头写了"Toast / Snackbar
+   不在里面，规则在时长那一条上"—— 这一枚就是那条"时长"在本仓唯一一份实现。
+   判据是**表**，不是各页的 `setTimeout`：立项现量是四处自写的 5000ms 撤销窗口，
+   其中两处没有 hover/focus 暂停、一处把撤销失败写进了会飘走的 `role="status"`。
+   渲染归各端（Web `apps/web/src/lib/feedback/UndoReceipt.tsx`、
+   Mobile `apps/mobile/src/screens/TasksScreen.tsx` 那一行），**时长与暂停归这里**。
+   🔴 本文件只许**末尾追加**。 */
+export {
+  AUTO_DISMISS_RECEIPTS,
+  UNDO_RECEIPT_MIN_MS,
+  receiptTimingOf,
+  type ReceiptKind,
+  type ReceiptTiming,
+} from './feedback/receipt-timing.js';
+
+/* ── 控件的色调与状态（2026-10-28，全局 UX 线 P4）────────────────────────
+   与上面两块的分工要分清，否则这三块会互相顶替：
+     · `feedback/receipt-timing.ts` —— 一条消息**活多久、能不能暂停**；
+     · `control/states.ts`（这一块）—— 一枚控件**长什么样、把状态发成什么属性**；
+     · `overlay/dismissal.ts` —— 一层浮层**能不能被点背景关掉**。
+   这一块补的洞是现量：同一个 `danger` 在 Web 是透明底红字、在 Mobile 是实底白字；
+   Web 根本没有 `secondary` 那一档（于是 18 枚裸 `.ht-btn` 没有底、设置页在
+   `sheets.css` 里局部造了一个凹陷底）；disabled 两端是 0.5 与 0.38 两个数；
+   "按下"在 `kit.tsx` 一个文件里有三种机制。逐条读数与理由在那个文件的头部。
+   🔴 这里只有**判断**（token 名 + 属性名），没有渲染：渲染归各端，
+      与上面 `form/anatomy.ts` 那块的分工同一个形状（§3.5）。
+   🔴 本文件只许**末尾追加**。 */
+export {
+  ARIA_CURRENT_VALUES,
+  CONTROL_STATE_TOKENS,
+  CONTROL_TONES,
+  DEFAULT_CONTROL_EMPHASIS,
+  DEFAULT_CONTROL_TONE,
+  SELECTION_ATTRIBUTES,
+  controlAria,
+  controlAccessibilityState,
+  controlPaletteOf,
+  hasCommitOverride,
+  type ControlAccessibilityState,
+  type ControlColorToken,
+  type ControlEmphasis,
+  type ControlPalette,
+  type ControlStateAxes,
+  type ControlTone,
+  type SelectionContext as ControlSelectionContext,
+} from './control/states.js';
+
+/**
+ * 菜单（`role="menu"`）的键盘判断（全局 UX 线 P5）。
+ * 🔴 与上面 `control/states.ts` 同一分工：这里只有**判断**（一枚键该发生什么），
+ *    不碰 DOM、不管焦点；渲染与各端的 `.focus()` 归宿主。
+ */
+export {
+  MENU_FOCUS_INDEX_ON_OPEN,
+  MENU_NO_ACTIVE_INDEX,
+  menuActionOf,
+  type MenuAction,
+  type MenuKeyInput,
+} from './control/menu.js';

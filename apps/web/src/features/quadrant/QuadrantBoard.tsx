@@ -81,6 +81,7 @@ import {
 import { GripVertical } from 'lucide-react';
 
 import { useTaskStore } from '../tasks/store.js';
+import { UndoReceipt } from '../../lib/feedback/UndoReceipt.js';
 import { dragHandleLabel, quadrantBoardLabels, quadrantCountA11y } from './copy.js';
 
 /**
@@ -219,14 +220,13 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
   const store = useTaskStore();
   const [activeId, setActiveId] = useState<string | undefined>();
   const [overQuadrant, setOverQuadrant] = useState<Quadrant | null>(null);
-  const [dropNotice, setDropNotice] = useState<string>('');
+  /**
+   * 一次拖放的回执。🔴 `tone` 不是装饰：原来成功与失败**共用一句 `role="status"`**，
+   * 而"没拖成"和"拖成了"在屏幕阅读器里被播报成同一类消息（P3 判据里
+   * "失败必须是不自消的 alert"那一格在这一处原本是坏的）。
+   */
+  const [dropNotice, setDropNotice] = useState<{ readonly text: string; readonly error: boolean } | undefined>(undefined);
   const [undoDrop, setUndoDrop] = useState<{ taskId: string; plan: QuadrantTaskPatch } | null>(null);
-
-  useEffect(() => {
-    if (undoDrop === null) return;
-    const timer = window.setTimeout(() => setUndoDrop(null), 5000);
-    return () => window.clearTimeout(timer);
-  }, [undoDrop]);
 
   /**
    * 🔴 **两列还是单列 —— 断点读 token，判定听窗口**（goal-layout-audit 页 1：
@@ -341,14 +341,15 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
     try {
       await store.setQuadrantDrop(taskId, plan);
       setUndoDrop({ taskId, plan: previous });
-      setDropNotice(
-        t(plan.dueDateChange === undefined ? 'web.quadrant.drop.success' : 'web.quadrant.drop.changedDue', {
+      setDropNotice({
+        text: t(plan.dueDateChange === undefined ? 'web.quadrant.drop.success' : 'web.quadrant.drop.changedDue', {
           quadrant: labels.title(over),
         }),
-      );
+        error: false,
+      });
     } catch {
       setUndoDrop(null);
-      setDropNotice(t('web.quadrant.drop.error'));
+      setDropNotice({ text: t('web.quadrant.drop.error'), error: true });
     }
   }
 
@@ -381,15 +382,28 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
     </div>
   );
 
-  const undoLastDrop = useCallback(() => {
-    if (undoDrop === null) return;
-    const action = undoDrop;
-    setUndoDrop(null);
-    void store
-      .setQuadrantDrop(action.taskId, action.plan)
-      .then(() => setDropNotice(''))
-      .catch(() => setDropNotice(t('web.quadrant.drop.error')));
-  }, [store, t, undoDrop]);
+  /**
+   * 撤销这一次拖放。
+   *
+   * 🔴 它是 `UndoReceipt` 的 `onUndo`：返回 Promise、**让拒绝原样冒出去**。
+   * 原来这里是 `void store.setQuadrantDrop(...).then(...).catch(() => setDropNotice(错误句))` ——
+   * 撤销失败被写进那句 `role="status"` 的成功文案里，而 `void` 让这一发在
+   * 任何测试里都读不出成败。失败现在由回执自己切成 `role="alert"` 并且不再自消。
+   *
+   * 也不在这里 `setUndoDrop(null)`：那等于宿主替回执做了"成功"的判断 ——
+   * 交回宿主清这一格的动作只有 `onDismiss`（窗口走完 / 撤销成功）这一个入口。
+   */
+  const undoLastDrop = useCallback((): Promise<void> => {
+    if (undoDrop === null) return Promise.resolve();
+    return store.setQuadrantDrop(undoDrop.taskId, undoDrop.plan).then(() => {
+      // 🔴 撤销成功就把那句"已移动到 X"收掉：它讲的是**当前**状态，而撤销之后
+      //    它已经不成立（屏幕上留一句假陈述，比留一条旧回执坏得多）。
+      //    这一子原来住在 `.then(() => setDropNotice(''))` 里，收编回执时跟着
+      //    旧形状一起被我删了 —— 是看图（`settings-finish/quadrant-move-1280.png`
+      //    末帧上那行"任务已移动到「交给别人」"而任务已经回到「先不做」）照出来的。
+      setDropNotice(undefined);
+    });
+  }, [store, undoDrop]);
 
   const activeTask = activeId === undefined ? undefined : store.entities.tasks[activeId];
 
@@ -458,29 +472,33 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
         </p>
       </details>
 
-      {dropNotice === '' ? null : (
+      {dropNotice === undefined && undoDrop === null ? null : (
         <div
-          role="status"
-          aria-live="polite"
-          data-testid="quadrant-drop-status"
           style={{
-            display: 'flex',
             alignItems: 'center',
+            display: 'flex',
+            flexWrap: 'wrap',
             gap: cssVar('space.2'),
             marginTop: cssVar('space.2'),
-            color: cssVar('color.foreground-muted'),
           }}
         >
-          <span>{dropNotice}</span>
-          {undoDrop === null ? null : (
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
-              onClick={undoLastDrop}
-              data-testid="quadrant-drop-undo"
+          {dropNotice === undefined ? null : (
+            <span
+              role={dropNotice.error ? 'alert' : 'status'}
+              aria-live={dropNotice.error ? 'assertive' : 'polite'}
+              data-testid="quadrant-drop-status"
+              style={{ color: cssVar(dropNotice.error ? 'color.danger-strong' : 'color.foreground-muted') }}
             >
-              {t('web.quadrant.drop.undo')}
-            </button>
+              {dropNotice.text}
+            </span>
+          )}
+          {undoDrop === null ? null : (
+            <UndoReceipt
+              label={t('web.quadrant.drop.undo')}
+              onUndo={undoLastDrop}
+              data-testid="quadrant-drop-undo"
+              onDismiss={() => { setUndoDrop(null); }}
+            />
           )}
         </div>
       )}

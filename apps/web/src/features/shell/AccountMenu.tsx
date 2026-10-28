@@ -76,7 +76,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useI18n } from '@heyta/i18n';
 import { avatarInitialFromEmail } from '@heyta/shared-schema';
-import { placeAnchoredPanel } from '@heyta/ui';
+import { MENU_FOCUS_INDEX_ON_OPEN, placeAnchoredPanel } from '@heyta/ui';
+import { useMenuKeyboard } from '../../lib/menu/useMenuKeyboard.js';
 import { CircleUser, LogIn, LogOut, Settings, UserRound } from 'lucide-react';
 
 /**
@@ -233,8 +234,9 @@ export function AccountMenu({
   useEffect(() => {
     if (!open || pos === undefined || !menuOpenFocusPending.current) return;
     menuOpenFocusPending.current = false;
-    const first = panelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
-    first?.focus();
+    // 入口项由共享常量给出（可以晚一帧，不可以换一项）。
+    const items = Array.from(panelRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    items[MENU_FOCUS_INDEX_ON_OPEN]?.focus();
   }, [open, pos]);
 
   const close = (returnFocus = false): void => {
@@ -242,35 +244,25 @@ export function AccountMenu({
     if (returnFocus) avatarRef.current?.focus();
   };
 
-  /** 菜单内的方向键走动（首尾相接）+ Esc / Tab 关闭。 */
-  const onMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-    const items = Array.from(
-      panelRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [],
-    );
-    if (items.length === 0) return;
-    const current = items.indexOf(document.activeElement as HTMLButtonElement);
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      close(true);
-      return;
-    }
-    if (event.key === 'Tab') {
-      // 菜单不是对话框：Tab 走人就该收起（ARIA menu-button 形态）。
-      close();
-      return;
-    }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      const step = event.key === 'ArrowDown' ? 1 : -1;
-      const from = current === -1 ? (step === 1 ? -1 : 0) : current;
-      items[(from + step + items.length) % items.length]?.focus();
-      return;
-    }
-    if (event.key === 'Home' || event.key === 'End') {
-      event.preventDefault();
-      items[event.key === 'Home' ? 0 : items.length - 1]?.focus();
-    }
-  };
+  /**
+   * 菜单键盘（P5 起：判断在共享层，这里只剩"接上这一枚面板"）。
+   *
+   * 原来这一格是本文件里手写的 31 行：Esc / Tab / 上下环绕 / Home / End。
+   * 那份代码**是全仓三枚菜单里唯一答对的**，而它答对的方式是"这一处恰好有人写全了"——
+   * 另外两处（rail 的 More 只接 Escape、习惯的 More 一条都没有）没有任何测试会红。
+   * 现在三处共用 `menuActionOf`，多出来的类型查找与左右方向键也一起有了。
+   *
+   * ⚠️ `focusOnOpen: false` 是**进度**上的例外，不是换了判断：面板要先量出 fixed 坐标
+   * 才可见，`.focus()` 对不可见元素无效，所以上面那个 effect 仍然自己按 `pos` 触发 ——
+   * 它用的也是共享的 `MENU_FOCUS_INDEX_ON_OPEN`（可以晚一帧，不可以换一项）。
+   */
+  const onMenuKeyDown = useMenuKeyboard({
+    open,
+    containerRef: panelRef,
+    triggerRef: avatarRef,
+    onClose: ({ refocusTrigger }) => close(refocusTrigger),
+    focusOnOpen: false,
+  });
 
   const item = (
     label: string,

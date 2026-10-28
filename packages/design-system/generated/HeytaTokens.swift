@@ -75,6 +75,7 @@ enum HeytaTokens {
     static let colorDanger: String = "#dc2626"
     static let colorDangerStrong: String = "#b91c1c"
     static let colorDangerSubtle: String = "#fef2f2"
+    static let colorOnDanger: String = "#ffffff"
     static let colorInfo: String = "#0284c7"
     static let colorInfoStrong: String = "#0369a1"
     static let colorInfoSubtle: String = "#f0f9ff"
@@ -169,6 +170,7 @@ enum HeytaTokens {
     static let zOverlay: Double = 300
     static let zModal: Double = 400
     static let zPopover: Double = 500
+    static let zModalCommitment: Double = 550
     static let zToast: Double = 600
     static let zTooltip: Double = 700
     static let zSplash: Double = 900
@@ -179,6 +181,7 @@ enum HeytaTokens {
     static let iconXl: Double = 32  // px
     static let touchTargetMin: Double = 44  // px
     static let focusRingWidth: Double = 2  // px
+    static let focusRingOffset: Double = 1  // px
     static let layoutRailWidth: Double = 64  // px
     static let layoutSidebarWidth: Double = 240  // px
     static let layoutSidebarMinWidth: Double = 192  // px
@@ -296,6 +299,7 @@ enum HeytaTokens {
     static let colorDanger: String = "#f87171"
     static let colorDangerStrong: String = "#fca5a5"
     static let colorDangerSubtle: String = "#dc262629"
+    static let colorOnDanger: String = "#020617"
     static let colorInfo: String = "#38bdf8"
     static let colorInfoStrong: String = "#7dd3fc"
     static let colorInfoSubtle: String = "#0284c729"

@@ -411,7 +411,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             />
 
             <div className="ht-ai__actions">
-              <button type="button" className="ht-btn" data-testid="ai-send" onClick={() => void send()}>
+              <button type="button" className="ht-btn ht-btn--secondary" data-testid="ai-send" onClick={() => void send()}>
                 {t('web.ai.action.send')}
               </button>
               <button type="button" className="ht-btn ht-btn--ghost" onClick={reset}>
@@ -495,7 +495,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
         <div className="ht-ai__actions">
           <button
             type="button"
-            className="ht-btn"
+            className="ht-btn ht-btn--secondary"
             data-testid="ai-apply"
             disabled={keptItems().length === 0}
             onClick={() => void apply()}

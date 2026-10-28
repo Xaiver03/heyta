@@ -142,8 +142,7 @@
     cursor: pointer;
   }
 
-  .ht-compact-rail__panel button:hover,
-  .ht-compact-rail__panel button:focus-visible {
+  .ht-compact-rail__panel button:hover {
     background: var(--ht-color-surface-sunken);
   }
 

@@ -892,7 +892,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
               <div className="ht-ai__actions">
                 <button
                   type="button"
-                  className="ht-btn"
+                  className="ht-btn ht-btn--secondary"
                   data-testid="ai-assistant-send"
                   onClick={confirmDisclosure}
                 >

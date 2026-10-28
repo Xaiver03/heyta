@@ -95,6 +95,8 @@ import {
   type TaskFilter,
 } from './features/tasks/store.js';
 import { wantsSignInOnLoad } from './lib/auth-deep-link.js';
+import { UndoReceipt } from './lib/feedback/UndoReceipt.js';
+import { restoreOrRefuse } from './lib/feedback/undo-receipt.js';
 import { settingsSectionOnLoad, settingsStandaloneOnLoad } from './lib/settings-deep-link.js';
 import { type DueDisplayMode } from './lib/due-display.js';
 import { TaskRowMeta } from './features/tasks/row-meta.js';
@@ -509,6 +511,18 @@ export function App(): React.JSX.Element {
     [selectedTaskIds, store.entities.tasks],
   );
   const [bulkError, setBulkError] = useState<string | undefined>(undefined);
+  /**
+   * 删除之后那一条**可撤销回执**（全局 UX 线 P3）。
+   *
+   * 🔴 时长、能不能暂停、失败留不留 —— 都不在这一格，归 `@heyta/ui` 的
+   * `receiptTimingOf()` 与 `UndoReceipt`。这里原来有一枚
+   * `useEffect(() => window.setTimeout(…, 5000))` 配一个裸 `<button>`：
+   * 5 秒、没有暂停、没有 `aria-live`，而且 `void action.run()` 把**撤销失败整个咽掉**。
+   * 那枚 effect 已经删掉了 —— **不许再写回来**，写回来就是表外的第二份裁决。
+   *
+   * 一屏只留一格：新的动作覆盖旧的。这不丢承诺 —— 上一条删除的对象还在回收站里，
+   * 从回收站照样能恢复；两条回执叠在页头那一行才是把布局挤给第二次错误。
+   */
   const [undoAction, setUndoAction] = useState<
     { readonly label: string; readonly run: () => Promise<void> } | undefined
   >(undefined);
@@ -517,12 +531,6 @@ export function App(): React.JSX.Element {
    * 对话框会先走 PIPL 同意模态再创建）。关掉即卸载 —— 密钥状态不常驻内存。
    */
   const [shareDialog, setShareDialog] = useState<{ projectId: string; shareId?: string } | undefined>(undefined);
-
-  useEffect(() => {
-    if (undoAction === undefined) return;
-    const timer = window.setTimeout(() => setUndoAction(undefined), 5000);
-    return () => window.clearTimeout(timer);
-  }, [undoAction]);
 
   useEffect(() => {
     const alive = new Set(
@@ -577,7 +585,9 @@ export function App(): React.JSX.Element {
         } else if (kind === 'delete') {
           await useTaskStore.getState().bulkDeleteTask(ids);
           setUndoAction({
-            label: t('web.shell.bulk.undo'),
+            // 🔴 正文自带条数（P3 判据 a）：`web.shell.bulk.undo` 那句"撤销本次批量操作"
+            //    不告诉用户撤销的是哪一次、几条，而批量回执的全部意义就是那个数。
+            label: t('web.feedback.undo.tasks', { count: ids.length }),
             run: () => useTaskStore.getState().bulkRestoreTask(ids),
           });
         } else {
@@ -1704,7 +1714,25 @@ export function App(): React.JSX.Element {
             className="ht-btn ht-btn--ghost"
             aria-label={t('web.shell.tasks.delete', { title: task.title })}
             onClick={() => {
-              void store.deleteTask(task.id);
+              // 🔴 P3：任务**进回收站**（ADR-0048 四态里的 `deletedAt`），所以撤销是真的
+              //    可执行 ⇒ 这一格必须给回执，而原来它一个字都不给（用户只能自己去
+              //    回收站里找）。正文带对象名，因为页面上同时可能有别的删除。
+              const { id, title } = task;
+              void store.deleteTask(id).then(() => {
+                setUndoAction({
+                  label: t('web.feedback.undo.task', { title }),
+                  run: async () => {
+                    // `restoreTask` 返回布尔而不是抛错：捞不回来（已被 purge）时
+                    // 必须变成**拒绝**，否则 `UndoReceipt` 会当成功把整条收掉 ——
+                    // 那正好把"失败不许静默"这条判据读反。规则住在 `restoreOrRefuse`，
+                    // 四处删除共用一份（各写一遍迟早分家）。
+                    await restoreOrRefuse(
+                      () => store.restoreTask(id),
+                      t('web.feedback.undo.refused', { title }),
+                    );
+                  },
+                });
+              });
             }}
           >
             <Trash2 size={ICON_SIZE.sm} aria-hidden="true" />
@@ -2522,6 +2550,23 @@ export function App(): React.JSX.Element {
               <PanelLeft size={ICON_SIZE.md} aria-hidden="true" />
             </button>
           ) : null}
+          {view === 'calendar' ? (
+            <button
+              type="button"
+              className="ht-btn ht-btn--ghost ht-header__calendar-sidebar-toggle"
+              data-testid="calendar-sidebar-toggle"
+              aria-pressed={narrowLayout ? scopeDrawerOpen : calendarSidebarOpen}
+              aria-controls="calendar-sidebar"
+              aria-label={t((narrowLayout ? scopeDrawerOpen : calendarSidebarOpen) ? 'web.calendar.sidebar.hide' : 'web.calendar.sidebar.show')}
+              title={t((narrowLayout ? scopeDrawerOpen : calendarSidebarOpen) ? 'web.calendar.sidebar.hide' : 'web.calendar.sidebar.show')}
+              onClick={() => {
+                if (narrowLayout) setScopeDrawerOpen((open) => !open);
+                else useCalendarViewStore.getState().toggleCalendarSidebar();
+              }}
+            >
+              <PanelLeft size={ICON_SIZE.md} aria-hidden="true" />
+            </button>
+          ) : null}
           <h1 className="ht-header__title">{title}</h1>
           {view === 'habits' ? <div className="ht-header__habits-slot" data-habits-header-slot /> : null}
 
@@ -2661,18 +2706,12 @@ export function App(): React.JSX.Element {
               <span className="ht-settings__danger" role="alert">{t('web.shell.bulk.error', { message: bulkError })}</span>
             )}
             {undoAction === undefined ? null : (
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
-                onClick={() => {
-                  const action = undoAction;
-                  setUndoAction(undefined);
-                  void action.run();
-                }}
+              <UndoReceipt
+                label={undoAction.label}
+                onUndo={undoAction.run}
                 data-testid="bulk-undo"
-              >
-                {undoAction.label}
-              </button>
+                onDismiss={() => { setUndoAction(undefined); }}
+              />
             )}
             {/*
               🔴 排序档位（2026-10-01，#10(d)）。位置按滴答参照图：**页头右端**
@@ -2742,11 +2781,6 @@ export function App(): React.JSX.Element {
             */}
             {view === 'calendar' ? (
               <CalendarHeaderToolbar
-                sidebarOpen={narrowLayout ? scopeDrawerOpen : calendarSidebarOpen}
-                onToggleSidebar={() => {
-                  if (narrowLayout) setScopeDrawerOpen((open) => !open);
-                  else useCalendarViewStore.getState().toggleCalendarSidebar();
-                }}
                 // 🔴 与 `visibleMainTabs` 同一个来源，不是"再问一遍开关"：
                 // 下拉里出现「时间线」而模块是关的 ⇒ 这条下拉就成了
                 // 绕过功能模块开关的第二条入口（`contentView` 只看 `view`）。

@@ -151,6 +151,14 @@
   --ht-color-danger: var(--ht-red-600);
   --ht-color-danger-strong: var(--ht-red-700);
   --ht-color-danger-subtle: var(--ht-red-50);
+  /*
+     实底危险按钮**上面**的字（与 `--ht-color-danger` 成对，如同 `on-primary` 对 `primary`）。
+     亮色档：白字在 `red-600`(#dc2626) 上实测 **4.83:1**，过 AA 正文档。
+     ⚠️ 它此刻与 `--ht-white` 同值，但**不是** `foreground-inverse` 的别名 ——
+     语义是"危险实底上的字"，取值由 `AA_PAIRS` 里那一条配对钉住；
+     哪天 danger 提亮到白字够不到 4.5，改的是这一格，不是所有用反色的地方。
+  */
+  --ht-color-on-danger: var(--ht-white);
   --ht-color-info: var(--ht-sky-600);
   --ht-color-info-strong: var(--ht-sky-700);
   --ht-color-info-subtle: var(--ht-sky-50);
@@ -311,6 +319,14 @@
   --ht-z-overlay: 300;
   --ht-z-modal: 400;
   --ht-z-popover: 500;
+  /* 🔴 强制表态层（危险确认 / 丢弃确认）：**必须**压得住锚定层。
+     它存在的理由是本阶梯的一处真实缺陷 —— `popover`(500) 竟然在 `modal`(400) **之上**，
+     于是"锚定浮层开着时弹出的模态承诺"会被浮层盖住（2026-10-27 实测：日历快速捕获的
+     丢弃确认，两个按钮的命中点落在浮层上，60s 点不到）。
+     把 `popover` 降到 `modal` 之下才是根治，但那是 12 处 `z.popover` 消费者的独立纵切
+     （`docs/plans/global-ux-system-remediation.md` §P7）。这一枚是**有名字的正确语义**，
+     不是往组件里塞裸数字。 */
+  --ht-z-modal-commitment: 550;
   --ht-z-toast: 600;
   --ht-z-tooltip: 700;
   /* 首屏遮罩：必须压得住之后挂载的任何浮层（包括首启的隐私同意面板与
@@ -331,6 +347,14 @@
   /* 焦点环宽度。2px 是"看得见但不喧宾夺主"的经验值；
      可访问性只要求**可见**，不要求粗。 */
   --ht-focus-ring-width: 2px;
+
+  /* 焦点环离盒子多远。**正数 = 画在盒子外面**。
+     🔴 控件住在 `overflow` 非 `visible` 的容器里时，向外的环会被**裁掉**
+     （`outline` 一样被裁），于是计算值"有 2px 环"而图上只剩一条线 ——
+     那种容器内的控件把这一枚改成负数，让环落在盒子内侧（现例见 `inbox.css`
+     的 `.ht-rail__tabs`）。判据是浏览器几何，不是样式源码：
+     `e2e/tests/focus-visible-matrix.spec.ts` 量环带四边是否都画得出来。 */
+  --ht-focus-ring-offset: 1px;
 
   /* 布局 */
   /* 视图导航（rail）宽度。
@@ -663,6 +687,14 @@
   --ht-color-danger: #f87171;
   --ht-color-danger-strong: #fca5a5;
   --ht-color-danger-subtle: rgb(220 38 38 / 0.16);
+  /*
+     🔴 暗色档**不能跟着亮色档写 `--ht-white`**：暗色的 danger 是 `#f87171`
+     （浅红，它是"提亮的前景色"那一族的形状），白字压上去实测 **2.77:1**，
+     直接掉出 AA；同一个位置换成 `slate-950` 是 **7.29:1**。
+     ⇒ 这一格是"暗色不是亮色反相"这条规范在**前景 token** 上的一个实例，
+     也是 `AA_PAIRS` 里那条 `on-danger on danger` 配对真正在管的两个值。
+  */
+  --ht-color-on-danger: var(--ht-slate-950);
   --ht-color-info: #38bdf8;
   --ht-color-info-strong: #7dd3fc;
   --ht-color-info-subtle: rgb(2 132 199 / 0.16);

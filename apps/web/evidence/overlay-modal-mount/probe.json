@@ -1,0 +1,22 @@
+{
+  "syncInClickTask": {
+    "ariaModalCount": 0,
+    "roleDialogCount": 0,
+    "probeBodyInDom": 0
+  },
+  "immediate": {
+    "bodyChildDelta": 0,
+    "ariaModalCount": 1,
+    "roleDialogCount": 1,
+    "probeBodyInDom": 1,
+    "probeModalHostInDom": 1
+  },
+  "settled": {
+    "bodyChildDelta": 0,
+    "ariaModalCount": 1,
+    "roleDialogCount": 1,
+    "probeBodyInDom": 1,
+    "probeModalHostInDom": 1
+  },
+  "baseline": 3
+}

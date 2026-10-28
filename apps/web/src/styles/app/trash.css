@@ -52,16 +52,14 @@
   gap: var(--ht-space-1);
 }
 
-/* 「彻底删除」是危险动作，用语义 danger 色而不是外观红。 */
-.ht-btn--danger {
-  color: var(--ht-color-danger);
-}
-
-.ht-btn--danger:hover {
-  background: var(--ht-color-danger-subtle);
-  color: var(--ht-color-danger-strong);
-}
-
+/*
+ * 🔴 这里原来有一份 `.ht-btn--danger` 的**第二份配方**（`color` 与
+ * `:hover` 两条声明），逐字抄自 `controls.css`。它不是"回收站专用"的危险色 ——
+ * 回收站那枚按钮本来就带 `ht-btn--danger`，中央那条已经管到它了。
+ * 两份抄件的代价不是多几行，是**其中一份被改时另一份不会跟着改**：
+ * 全局 UX 线 P4 立项现量的第一格就是这个形状。已删，配方只住
+ * `apps/web/src/styles/app/controls.css`（判据：`check:control-semantics` R1）。
+ */
 .ht-trash__overlay {
   position: fixed;
   inset: 0;
