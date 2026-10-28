@@ -1944,3 +1944,39 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 3. 第 11 枚判据（那一叠必须排在按钮下面）单点替换注入不了，用一次性整块交换臂量：把那块挪回按钮上面 ⇒ 恰好 `1 failed / 13 passed`，`git checkout --` 还原后 14 全绿。
 
 **还欠的**：同意面在**设备腿**上那一档——iOS 那枚装置要带着上面第 2 条的 needle 改动重跑一次才算；Android 那枚按 §9.37 末仍是新工作量。本批只量了 web 真浏览器 + 两壳的常驻判据。
+
+### 9.40 Android **整条**迁到 `linux-dev`（负责人 2026-10-28 01:3x 的连带令）——建包不再走 windows-pc，本节记现量与三处必须一起读的更正
+
+负责人原话：「这3件事，我是都允许你来做的。另外，安卓我需要在 Linux dev 上做，**把整个安卓都迁移到 Linux dev 上**。我需要确认好这一点。」
+⇒ §9.37 末那格"APK 仍在 `windows-pc` 出（那条长期令不变）"**被覆盖**：2026-10-04 那道令禁的是"在 Mac 上建包/起模拟器"，
+载体从 `windows-pc` 换成 `linux-dev`，**建包与设备腿同机**。落点与判据见
+[`docs/runbooks/android-build-on-linux-dev.md`](../runbooks/android-build-on-linux-dev.md)（本批新建）。
+
+**改口了哪四处**（每处都带"为什么不能只改主机名"）
+
+| 面 | 改动 | 理由 |
+|---|---|---|
+| 收口点 | `scripts/run-gradle.mjs` 远端步骤 1–7 从 PowerShell + `gradlew.bat` 换成 bash + `./gradlew`；默认主机 `linux-dev`，构建根 `/home/xaiver/heyta-android-build` | 路径方言、时钟读法、哈希命令都不同，**不是换字符串** |
+| 同步 | `scripts/lib/sync-windows-sources.sh` → **`sync-build-sources.sh`**，清单+打包抽成 `_heyta_sync_make_tar` 一枚，Windows/POSIX 两条腿各留自己那半；Android 那腿换 `rsync --partial` | 两条腿各抄一份清单一定漂（§7 第 82 条）；`scp` 无超时且这台通道**会中途断** |
+| 门禁 | `check:android-gradle-remote` 的 G7/G8/G9/G10 重新锚到 bash 形状 + **新增 G11**；`check:android-build-host` 的 H1 换成**按位置豁免** | 判据必须跟着换方言，摘掉就变成一条永远绿的装饰 |
+| 规则入口 | `docs/agents/multi-end-build.md` §6.1、`repo-map.md` 的 `apps/mobile/` 行、旧手册顶部横幅 | 旧手册 §七 是历史读数，**不重写**，只加"别再照它施工"的横幅 |
+
+**这一趟挣到的现量**（换载体本身的答案，逐条可复核）
+
+- 建包：`assembleDebug` 冷构建 `BUILD SUCCESSFUL in 7m 46s`、233 任务全执行，产物 `size=129,953,529 B`、`sha256=3510dcbf…`、远端完成 `2026-10-28T05:45:00Z`；`assembleRelease` 114,487,883 B。
+- 装机到起界面：载体 AVD 上 `topResumedActivity = com.heyta/com.heytamobile.MainActivity`，截图 256,794 B / 1080×2340，**肉眼看图**是首跑同意面（中文、两条法务链接、两颗动作按钮都在）。
+- 通道：Mac→载体推 ≈ 79–141 KB/s、载体→Mac 拉 ≈ 190 KB/s；源码包 47,410,393 B（含 17 枚 `packages/*/dist`）；`ssh 'cat >'` 两次在几十秒处被对端关闭，`rsync --partial` 第 3 趟续传完成 ⇒ 同步那半**必须**可续传。
+- 载体缺口只有两件，都能一条命令补齐：`ndkVersion=27.1.12297006` 与 **JDK 17**（缺后者时 Gradle 9 崩在 `JvmVendorSpec.IBM_SEMERU`，实测 `BUILD FAILED in 39s` 只报那一句）。
+
+**🔴 三处必须一起读的更正**（照 §9.37 施工会撞墙）
+
+1. **`local.properties` 不入库 ⇒ 同步永远不带它**，而 AGP 在 `processReleaseResources` / `manifest-json-release` 读的是**这条文件**不是环境变量。首趟就挂在这上面，报的还是一句和平台无关的 `Directory doesn't exist: /Users/rocalight/Library/Android/sdk`（那条 Mac 路径来自**我本机**那份，远端根本没有它）。现在由收口点步骤 1 当场写成载体真值（幂等）。
+2. **载体用自己私有的 `GRADLE_USER_HOME`**。那台机器上原本躺着**别的项目**的 `~/.gradle/init.d/tfa-mirror.gradle`，heyta 首趟实际是靠它才解析到 Maven 的——一个不在任何清单里的依赖，别人删掉我们就莫名其妙红。现在镜像规则由 `run-gradle.mjs` 用 `-I scripts/linux-dev/gradle-host/heyta-cn-mirror.init.gradle` **显式传**，缓存写进私有目录（回退＝删那一枚目录）。
+3. **H1 的"不许起模拟器"改成按位置判**：豁免不看文件名，看那一行是否处在 `ssh <在册载体> … <<DELIM` 的**体内**。第一版我用"往上找最近一枚 `<<`"粗匹配，被 `avdmanager create avd … <<< 'no'` 那枚 here-string 骗过——**把一台本来在载体上跑的模拟器报成本机入口**。现在按索引扫 `<<`（前后不许再是 `<`）、找独占一行的终止符配对，找不到终止符就**不给**远端身份。四条臂（正照 / 摘掉 ssh / 未登记文件照红 / 登记变宽）各自能红。
+
+**这节没做的事**（别读成已做）
+
+- 既有装置 `research/tools/mutation-rigs/w6-note-restore-device-arm.sh` 的**构建主机**默认已改到 `linux-dev`，但它十几处 `adb` 仍假设设备挂在本机；接 `scripts/android-carrier-device.sh tunnel`（adb server 端口转发）是下一批——在那之前它红在"adb 没有可用设备"是**预期**，不是回归。
+- 本节那条旅程（分享/加入/同意面）的 **Android 装置仍未写**。
+- 🔴 **发布 keystore 没落到载体机**：四个 `HEYTA_RELEASE_*` 键只在 Mac 的 `~/.heyta-signing/`，所以 release 变体挂到 `signingConfigs.debug`，证书仍是 `CN=Android Debug`，`upload-dist.sh` 会拒绝发布。这一步是**凭据搬迁**，要单独点头，本批没做。
+- 整链 `pnpm check` 未跑完（本批只过了这两枚门禁 + 三套单测的受影响面）。

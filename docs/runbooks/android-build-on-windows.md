@@ -1,14 +1,26 @@
-# Android 构建统一到 windows-pc —— 操作手册
+# Android 构建统一到 windows-pc —— 操作手册（**历史载体**）
 
-> 状态：**已跑通一次远程真构建**（分流落在唯一收口点并有门禁；🔴 本行原先写"远程真构建尚未跑过一次 / 判据 0/3"，与**本文件自己的 §7** 对撞 —— 那张表里逐条记着 `BUILD SUCCESSFUL in 41s`、回传 sha256 与远端逐字相同、`apksigner verify` rc=0。
-> ⚠️ 那条闭合带一枚必须一起读的边界：签名证书是 `CN=Android Debug`（四个发布 keystore 键任一缺失时 release 变体挂到 `signingConfigs.debug`），**所以它证的是"远程能打出合法签名的 APK"，不是"可以上架的发布签名"**。判据逐条以 §7 那张表为准，别抄本行的数。）
+> 🔴 **这份手册不再是当前指令。** 2026-10-28 产品负责人改口：
+> 「安卓我需要在 Linux dev 上做，把整个安卓都迁移到 Linux dev 上。」
+> ⇒ **当前载体与操作步骤在 [`android-build-on-linux-dev.md`](android-build-on-linux-dev.md)**。
+> 本文件保留的理由是它 §7 那张表：2026-10-04 → 10-28 那批**逐条实测读数**（41s 远程构建、
+> 回传 sha256 对账、PowerShell 5.1 缺 `ToUnixTimeSeconds()` 造成"成功的构建被报成 1970 年"等）
+> 是历史证据，按本仓纪律**不重写**；§一–§六、§八 里"怎么做"的那几节已经过期，
+> 只在考古"当时为什么这样设计"时读。
+> 2026-10-28 之后**不要照本文件的命令施工** —— 尤其 §二 那几条 `ssh windows-pc` 的远端命令，
+> 载体已换，照着跑会把 Android 构建送回那台只该管 MSIX 的机器（`check:android-gradle-remote`
+> 的 G11 就是钉这件事）。
+>
+> 状态（历史）：**已跑通一次远程真构建**（分流落在唯一收口点并有门禁；🔴 本行原先写"远程真构建尚未跑过一次 / 判据 0/3"，与**本文件自己的 §7** 对撞 —— 那张表里逐条记着 `BUILD SUCCESSFUL in 41s`、回传 sha256 与远端逐字相同、`apksigner verify` rc=0。
+> ⚠️ 那条闭合带一枚必须一起读的边界：签名证书是 `CN=Android Debug`（四个发布 keystore 键任一缺失时 release 变体挂到 `signingConfigs.debug`），**所以它证的是"远程能打出合法签名的 APK"，不是"可以上架的发布签名"**。判据逐条以 §7 那张表为准，别抄本行的数。
+> ⚠️ 这一格边界**没有被这次迁移解除**：发布 keystore 至今没落到任何一台载体机上，见新手册 §八。）
 > 决策来源：产品负责人 2026-10-04 拍板 ——
 > 「之后 Android 任务一律 ssh windows-pc，不要再在 Mac 起新的 Gradle 构建或模拟器。」
 > 起因不是整洁，是资源：Mac 被 headless 模拟器打爆（3.6G+ 常驻、90% CPU），
 > SDK/AVD/Gradle 缓存吃掉约 20G+ 磁盘。
 >
 > **事实源分工**：环境/版本/产物/状态 → [`../reference/build-matrix.md`](../reference/build-matrix.md)；
-> 本文件只写"怎么打、怎么验、边界在哪"。AGENTS 的规则本体在 §6.1。
+> 本文件只写"当时怎么打、怎么验、边界在哪"。AGENTS 的规则本体在 §6.1。
 
 ---
 

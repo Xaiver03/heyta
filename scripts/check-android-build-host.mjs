@@ -25,7 +25,7 @@
  *      `docs/plans/*` 与 `docs/reference/*` **不在面内**：按计划/陷阱层的定位，
  *      它们是**记录**（"当时是这样跑的"），不是**指令**。把它们算成入口，
  *      等于要求历史台账改写历史。
- *   H3 **手册死链**：`scripts/run-gradle.mjs` 与 `scripts/lib/sync-windows-sources.sh`
+ *   H3 **手册死链**：`scripts/run-gradle.mjs` 与 `scripts/lib/sync-build-sources.sh`
  *      引用的那份 runbook 必须**真的在位**。本批开工时那两处链接指向一个不存在的文件
  *      —— `.mjs`/`.sh` 不在 `check:docs`（docs-link-check）的扫描面里，所以那对死链
  *      **一道门禁都不会红**，全靠人读出来。这条判据把"链接有目标"变成机器判据。
@@ -110,6 +110,78 @@ const GRADLE_PATTERNS = [/\bgradlew\b/];
 const SELF_FILE = 'scripts/check-android-build-host.mjs';
 
 /**
+ * 载体侧豁免（2026-10-28 换载体时加）。规则的原意从来不是"不许有人起模拟器"，
+ * 而是"**不许在跑命令的这台 Mac 上**起模拟器"。现在模拟器就该起在载体机 `linux-dev` 上，
+ * 所以 H1 必须能区分这两件事，否则它会把它自己要的东西判红 —— 而一条会把正确写法判红的
+ * 门禁，很快就会被绕过而不是被遵守（§7 元规则 2 的反面，本文件 H2 的文件头写的就是这条）。
+ *
+ * 🔴 豁免**不是**"文件在白名单里就放行"。判据落在**那一行所处的位置**上：它必须在一枚
+ *   `ssh <在册载体> … <<HEREDOC` 的 heredoc **体内**。少了这条，把同一枚脚本改成
+ *   本机起模拟器，白名单照样替它背书 —— 那才是通行证。
+ */
+const REMOTE_CARRIER_SCRIPTS = new Set(['scripts/android-carrier-device.sh']);
+const CARRIER_HOSTS = /\blinux-dev\b|\$\{?HOST\b/;
+const HEREDOC_START = /<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/;
+/**
+ * 这一行是不是在 `ssh <在册载体> … <<DELIM … DELIM` 的**体内**？
+ *
+ * 🔴 不能用"往上找最近一枚 `<<`"那种粗匹配：`<<< 'no'` 这种 here-string 会被当成
+ *    heredoc 起始（实测就栽在这里 —— `avdmanager create avd … <<< 'no'` 那一行让
+ *    豁免判 false，把一台**本来就在载体上跑**的模拟器报成本机入口）。
+ *    所以这里按索引扫 `<<`（前后都不能再是 `<`），取分隔符，再往下找**独占一行**的
+ *    终止符配对，得到一段精确的区间。
+ */
+function carrierHeredocSpans(lines) {
+  const spans = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const l = lines[i];
+    // 🔴 注释行里出现的 `<<XXX` 不是 heredoc 起始（实测栽过一次：文件头那句
+    //    "这一行是否在 ssh <载体> <<HEREDOC 体内"里的 `<<HEREDOC` 被当成起始，
+    //    而它没有终止符 ⇒ 区间一路吃到文件末，把后面**真的**那段远端 heredoc 盖掉）。
+    if (isCommentLine(l)) continue;
+    for (let j = l.indexOf('<<'); j >= 0; j = l.indexOf('<<', j + 2)) {
+      if (l[j - 1] === '<' || l[j + 2] === '<') continue; // here-string / 移位
+      let k = j + 2;
+      if (l[k] === '-' || l[k] === '~') k += 1;
+      while (l[k] === ' ' || l[k] === '\t') k += 1;
+      let quote = '';
+      if (l[k] === "'" || l[k] === '"' || l[k] === '`') {
+        quote = l[k];
+        k += 1;
+      }
+      let name = '';
+      while (k < l.length && /[A-Za-z0-9_]/.test(l[k])) {
+        name += l[k];
+        k += 1;
+      }
+      if (name === '') continue;
+      if (quote && l[k] === quote) k += 1;
+      // 真 heredoc 的分隔符后面到行尾只能是空白与重定向，不该再接标识符
+      const rest = l.slice(k);
+      if (/^\s*[>&|]/.test(rest) && !/^[>&]{1,2}\s*\S+[A-Za-z_]/.test(rest)) continue;
+      let end = -1;
+      for (let m = i + 1; m < lines.length; m += 1) {
+        if (lines[m].trim() === name) {
+          end = m;
+          break;
+        }
+      }
+      // 找不到终止符 = 这枚"起始"是误读（或脚本本身坏了）。**保守**处理：
+      // 不给它远端身份 —— 拿一个读不出边界的东西去放行本机模拟器，就是把它判反。
+      if (end < 0) continue;
+      spans.push({ from: i + 1, to: end, remote: /\bssh\b/.test(l) && CARRIER_HOSTS.test(l) });
+      break;
+    }
+  }
+  return spans;
+}
+function runsOnCarrier(lines, idx) {
+  const hit = idx + 1;
+  const span = carrierHeredocSpans(lines).find((s) => hit > s.from && hit <= s.to);
+  return span ? span.remote : false;
+}
+
+/**
  * H1 的基线：规则生效**之前**就存在的命中，每条写清"为什么它不算入口"。
  * 反向判据（H1b）要求每条都还在现量扫描里命中，否则红 —— 基线不许比现实宽。
  */
@@ -136,8 +208,11 @@ const RUNBOOK_FENCE_BASELINE = [
 ];
 
 /** H3：谁引用了那份 runbook。这两处是本批开工时**实测存在的死链**。 */
-const RUNBOOK_REFERRERS = ['scripts/run-gradle.mjs', 'scripts/lib/sync-windows-sources.sh'];
-const RUNBOOK_PATH = 'docs/runbooks/android-build-on-windows.md';
+const RUNBOOK_REFERRERS = ['scripts/run-gradle.mjs', 'scripts/lib/sync-build-sources.sh'];
+const RUNBOOK_PATH = 'docs/runbooks/android-build-on-linux-dev.md';
+/** 旧载体的手册**不重写**（§七 那张表是历史读数），但它仍然是在位的文件 —— 夹具要带上它，
+ *  否则引用它的脚本在夹具里会被 H3 判成死链，而那是夹具缺件、不是真的断链。 */
+const LEGACY_RUNBOOK = 'docs/runbooks/android-build-on-windows.md';
 
 /** H4：这条规则的两枚门禁与它们各自的定义名。 */
 const RULE_GATES = [
@@ -204,22 +279,53 @@ function findEmulatorSites(baseRoot) {
 }
 
 function checkEmulatorSites(baseRoot) {
+  const out2 = [];
   const sites = findEmulatorSites(baseRoot);
   const hits = new Map();
   const offenders = [];
+  const remoteHits = new Set();
   for (const s of sites) {
     const hit = EMULATOR_BASELINE.find((b) => b.file === s.file && s.text.includes(b.needle));
-    if (hit) hits.set(hit.file, (hits.get(hit.file) ?? 0) + 1);
-    else offenders.push(s);
+    if (hit) {
+      hits.set(hit.file, (hits.get(hit.file) ?? 0) + 1);
+      continue;
+    }
+    if (REMOTE_CARRIER_SCRIPTS.has(s.file)) {
+      let body = [];
+      try {
+        body = readFileSync(join(baseRoot, s.file), 'utf8').split('\n');
+      } catch {
+        body = [];
+      }
+      if (runsOnCarrier(body, s.line - 1)) {
+        remoteHits.add(s.file);
+        continue;
+      }
+      offenders.push({ ...s, carrier: 'registered-but-local' });
+      continue;
+    }
+    offenders.push(s);
   }
-  const out = [];
+  // 反向腿：登记了却没在位 = 这张豁免表比现实宽（与 EMULATOR_BASELINE 同一条纪律）
+  for (const f of REMOTE_CARRIER_SCRIPTS) {
+    if (remoteHits.has(f)) continue;
+    if (!existsSync(join(baseRoot, f))) continue; // 脚本被删是 H4/别的事，这里不判"文件在不在"
+    out2.push(
+      `H1 载体豁免比现实宽：${f} 登记在 REMOTE_CARRIER_SCRIPTS 里，但现量扫描中它**没有一处**` +
+        '在 `ssh <在册载体> <<HEREDOC` 体内起模拟器 —— 那一档没了就把登记删掉，留着就是通行证。',
+    );
+  }
+  const out = out2;
   for (const o of offenders) {
     out.push(
-      `H1 ${o.file}:${o.line} 在**这台机器上**起 Android 模拟器 / 建 AVD —— 规则要求 Android 任务一律走远程构建主机。` +
+      `H1 ${o.file}:${o.line} 在**跑命令的这台机器上**起 Android 模拟器 / 建 AVD —— 规则要求模拟器起在载体机上。` +
+        (o.carrier === 'registered-but-local'
+          ? `\n      ${o.file} 在豁免表里，但**这一行不在 ` + '`ssh <载体> <<HEREDOC`' + ` 体内** ⇒ 它是本机执行，豁免不覆盖它。`
+          : '') +
         `\n      那一行是：${o.text.slice(0, 160)}` +
-        `\n      Windows 侧没有 emulator 本体与 system-images（见 ${RUNBOOK_PATH} §五），` +
-        '所以新开一个本机模拟器入口不是"换台机器跑"，是把 Mac 重新拖回 3.6G 常驻 + 90% CPU 那个状态。' +
-        '\n      要留成例外就写进 EMULATOR_BASELINE 并附"为什么它不算入口"。',
+        `\n      模拟器本体与 system-images 都在载体机上（见 ${RUNBOOK_PATH} §七），` +
+        '所以新开一个**本机**模拟器入口不是"换台机器跑"，是把 Mac 重新拖回 3.6G 常驻 + 90% CPU 那个状态。' +
+        '\n      要留成例外就写进 EMULATOR_BASELINE 并附"为什么它不算入口"；要走载体就在 `ssh <载体> <<HEREDOC` 体内跑并登记进 REMOTE_CARRIER_SCRIPTS。',
     );
   }
   for (const b of EMULATOR_BASELINE) {
@@ -230,7 +336,7 @@ function checkEmulatorSites(baseRoot) {
       );
     }
   }
-  return { failures: out, reading: `H1 扫到模拟器/AVD 形状 ${sites.length} 处（基线命中 ${hits.size} ／ 违规 ${offenders.length}）` };
+  return { failures: out, reading: `H1 扫到模拟器/AVD 形状 ${sites.length} 处（基线命中 ${hits.size} ／ 载体远端豁免 ${remoteHits.size} ／ 违规 ${offenders.length}）` };
 }
 
 /* ── H2：runbook 代码块里的新入口 ───────────────────────────────────────── */
@@ -404,7 +510,7 @@ console.log('Android 构建主机规则的对侧半边（静态：不联网、�
 for (const r of readings) console.log(`   · ${r}`);
 if (failures.length > 0) {
   for (const f of failures) console.error(`🔴 ${f}`);
-  console.error(`\n共 ${failures.length} 处。规则本体：之后 Android 任务一律走远程构建主机，不要再在 Mac 起新的 Gradle 构建或模拟器。`);
+  console.error(`\n共 ${failures.length} 处。规则本体：Android 任务一律走远程构建载体（2026-10-28 起 = linux-dev），不要再在 Mac 起新的 Gradle 构建或模拟器。`);
   console.error(`手册：${RUNBOOK_PATH}`);
   process.exit(1);
 }
@@ -434,16 +540,20 @@ function selfTest() {
   // 夹具基座：真树的几份文件搬进临时树（阳性对照用）。
   const seedFiles = {
     'scripts/run-gradle.mjs': read('scripts/run-gradle.mjs'),
-    'scripts/lib/sync-windows-sources.sh': read('scripts/lib/sync-windows-sources.sh'),
+    'scripts/lib/sync-build-sources.sh': read('scripts/lib/sync-build-sources.sh'),
     'scripts/check-android-build-host.mjs': read('scripts/check-android-build-host.mjs'),
     'scripts/check-android-gradle-remote.mjs': read('scripts/check-android-gradle-remote.mjs'),
     'scripts/check-gate-wiring.mjs': read('scripts/check-gate-wiring.mjs'),
     'scripts/verify-mobile-aed.sh': read('scripts/verify-mobile-aed.sh'),
     'scripts/verify-android-vault-storage.sh': read('scripts/verify-android-vault-storage.sh'),
+    // 载体装置必须在夹具里：H1 的豁免带**反向腿**（登记了却没在位 = 红），
+    // 少了这份文件，臂 0 那枚阳性对照会因为它而红，读的人就去猜"哪条判据坏了"。
+    'scripts/android-carrier-device.sh': read('scripts/android-carrier-device.sh'),
     'scripts/reinstall-all.sh': read('scripts/reinstall-all.sh'),
     'research/tools/r14c-window-retry.sh': read('research/tools/r14c-window-retry.sh'),
     'docs/runbooks/multi-platform-build.md': read('docs/runbooks/multi-platform-build.md'),
     [RUNBOOK_PATH]: read(RUNBOOK_PATH),
+    [LEGACY_RUNBOOK]: read(LEGACY_RUNBOOK),
     'package.json': read('package.json'),
   };
   const seed = (tweaks = {}) => {
@@ -528,6 +638,69 @@ function selfTest() {
     rmSync(dir, { recursive: true, force: true });
   }
 
-  console.log(fail === 0 ? '自检：六臂（臂 0 = 阳性对照）全部按预期转红/转绿' : '自检有臂存活 —— 那条判据等于没有');
+    /* 臂 6 / 6b / 6c / 6d：H1 的**载体豁免**四条腿。
+     * 施加理由就是这次迁移本身：规则禁的是"在跑命令的这台机器上起模拟器"，而换载体之后
+     * 模拟器**就该**起在 `linux-dev` 上 —— 豁免若按文件名放行，同一枚脚本改回本机起模拟器
+     * 它照样绿，那是一条会替坏写法背书的判据。所以四条腿各查一边：
+     *   6  = 正照（登记 + 在 ssh <载体> heredoc 体内 ⇒ 不红）；
+     *   6b = 把同一枚 heredoc 的 ssh 摘掉（变成本机 heredoc）⇒ 体内两枚形状各红一条；
+     *   6c = 逐字相同的内容落在**未登记**的文件里 ⇒ 照红（豁免不是"看到 ssh 就放行"）；
+     *   6d = 登记还在、远端命中全没了 ⇒ "豁免比现实宽"恰好 1 条。 */
+    const carrierFile = 'scripts/android-carrier-device.sh';
+    const carrierText = seedFiles[carrierFile];
+    const SSH_LINE = 'ssh -o ConnectTimeout=15 "$HOST" "AVD=\'$AVD\' SDK=\'$SDK\' bash -s" <<\'REMOTE\'';
+
+    seed();
+    let cmsgs = checkEmulatorSites(dir).failures;
+    if (countRed(cmsgs, 'H1 ') === 0) console.log('   ✅ 臂 6 正照：登记 + 在 ssh <载体> heredoc 体内 ⇒ 不判红（豁免真的在工作）');
+    else {
+      console.log('   🔴 臂 6 坏了：载体装置被判成本机入口（' + countRed(cmsgs, 'H1 ') + ' 条）\n      ' + cmsgs.join(' | ').slice(0, 220));
+      fail = 1;
+    }
+
+    seed();
+    if (!carrierText.includes(SSH_LINE)) {
+      console.log('   🔴 臂 6b 没施上：读不到载体装置里那行 ssh heredoc 起始 —— 豁免判据无从求值');
+      fail = 1;
+    } else {
+      seed({ [carrierFile]: carrierText.replace(SSH_LINE, 'bash -s <<\'REMOTE\'') });
+      cmsgs = checkEmulatorSites(dir).failures;
+      // 恰好 3：体内两行各自红（emulator + avdmanager），外加一条"登记还在、远端命中全没了"
+      // —— 后者由臂 6d 单独钉，这里只是同一发变异顺带打中它，所以期望值写成 3 而不是"≥1"。
+      if (countRed(cmsgs, 'H1 ') === 3) console.log('   ✅ 臂 6b 转红：同一枚脚本不再经 ssh 到载体 ⇒ 体内两行各红一条，外加登记变宽那条（恰好 3）');
+      else {
+        console.log('   🔴 臂 6b 存活：摘掉 ssh 后 H1 报了 ' + countRed(cmsgs, 'H1 ') + ' 条（应当恰好 3）\n      ' + cmsgs.join(' | ').slice(0, 220));
+        fail = 1;
+      }
+    }
+
+    seed();
+    // 夹具基座只写登记过的文件；这份"另一个文件"要单独落盘，否则臂 6c 是在读一个不存在的夹具
+    write('scripts/verify-some-other-device.sh', carrierText);
+    cmsgs = checkEmulatorSites(dir).failures;
+    if (countRed(cmsgs, 'H1 scripts/verify-some-other-device.sh') === 2) console.log('   ✅ 臂 6c 转红：逐字相同的内容落在**未登记**文件里照红（恰好 2 条）');
+    else {
+      console.log('   🔴 臂 6c 存活：未登记文件里的形状只报了 ' + countRed(cmsgs, 'H1 scripts/verify-some-other-device.sh') + ' 条（应当恰好 2）');
+      fail = 1;
+    }
+
+    seed();
+    const inert = carrierText
+      .replace('nohup emulator -avd "$AVD"', 'nohup heyta-emulator-launch --avd "$AVD"')
+      .replace('avdmanager create avd -n "$AVD"', 'heyta-avd-create -n "$AVD"');
+    if (inert === carrierText) {
+      console.log('   🔴 臂 6d 没施上：读不到那两行形状 —— 反向判据无从求值');
+      fail = 1;
+    } else {
+      seed({ [carrierFile]: inert });
+      cmsgs = checkEmulatorSites(dir).failures;
+      if (countRed(cmsgs, 'H1 载体豁免比现实宽') === 1) console.log('   ✅ 臂 6d 转红：登记还在、远端命中全没了 ⇒ "豁免比现实宽"恰好 1 条');
+      else {
+        console.log('   🔴 臂 6d 存活：撤掉两行后反向判据报了 ' + countRed(cmsgs, 'H1 载体豁免比现实宽') + ' 条（应当恰好 1）\n      ' + cmsgs.join(' | ').slice(0, 220));
+        fail = 1;
+      }
+    }
+
+  console.log(fail === 0 ? '自检：逐臂（臂 0 = 阳性对照）全部按预期转红/转绿 —— 臂数见上面逐条打印' : '自检有臂存活 —— 那条判据等于没有');
   return fail;
 }

@@ -77,13 +77,14 @@ curl -sf -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/health" || die3 "服�
 
 # ── 前置 3：产物通道活着（Android 构建走打包主机；不可达就别开这一臂）──────────────
 # 🔴 探法必须是**跨默认 shell 都成立**的那一种：远端是 Windows，默认 shell 可能是 cmd.exe，
-#    给它 `true` 会以"不是内部或外部命令"失败 —— 那会被误读成"主机不可达"，
+#    旧载体（cmd）给它 `true` 会以"不是内部或外部命令"失败 —— 那会被误读成"主机不可达"，
 #    而它其实活着（第一次跑就撞上：stderr 里同时有 openssh 的后量子告警和 cmd 的乱码报错）。
-#    `echo` 在 cmd 与 PowerShell 里都成立，所以拿回显串当唯一判据。
-HOST="${HEYTA_ANDROID_HOST:-windows-pc}"
+#    `echo` 在 cmd / PowerShell / bash 里都成立，所以拿回显串当唯一判据 —— 2026-10-28 载体换成
+#    `linux-dev`（bash）之后这条判据不用改，改的只有下面两枚默认值（由 G11 与收口点对账）。
+HOST="${HEYTA_ANDROID_HOST:-linux-dev}"
 # 远端仓库根必须与 run-gradle 的默认**同源**（它读同一个环境变量）；
 # 写死路径的话，别人改了 REMOTE_ROOT 时这一还原会推到不存在的地方，而"回读对上了"是**自己跟自己比**——假 ok。
-REMOTE_ROOT="${HEYTA_ANDROID_REMOTE_ROOT:-C:/src/heyta}"
+REMOTE_ROOT="${HEYTA_ANDROID_REMOTE_ROOT:-/home/xaiver/heyta-android-build}"
 if [ "${HEYTA_ANDROID_LOCAL_GRADLE:-0}" != "1" ]; then
   PROBE="$(ssh -o ConnectTimeout=8 -o BatchMode=yes "$HOST" 'echo HEYTA_PROBE_OK' 2>"$WORK/ssh.err" | tr -d '\r\n')"
   if [ "$PROBE" != "HEYTA_PROBE_OK" ]; then

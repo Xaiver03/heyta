@@ -1,6 +1,6 @@
 # 🔴 单一所有者：Windows MSIX 装完之后，取证文件里**必须**出现的几条判据。
 #
-# 为什么抽出来（与 `sync-windows-sources.sh` 同一个理由）：这两处以前各写一份 ——
+# 为什么抽出来（与 `sync-build-sources.sh` 同一个理由）：这两处以前各写一份 ——
 # `reinstall-all.sh` 用一份四项清单判"装上的当前源码是真应用"，
 # `package-msix.sh` **一条都不判**（它 `scp … || true`，取证文件缺失也继续往下走）。
 # 于是：

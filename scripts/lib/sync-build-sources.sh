@@ -9,8 +9,10 @@
 # 而这几件事**必须**用同一份同步 + 对账逻辑 —— 一旦两份，就会漂移成
 # "一个脚本送了新树、另一个送了旧树"，正是 §7 第 82 条记录的那次事故形状。
 #
-# 🔴 2026-10-04：Android 构建统一到 windows-pc（见
-# [docs/runbooks/android-build-on-windows.md](../../docs/runbooks/android-build-on-windows.md)）。
+# 🔴 2026-10-04 Android 构建统一到 windows-pc；**2026-10-28 起载体换成 `linux-dev`**
+# （见 [docs/runbooks/android-build-on-linux-dev.md](../../docs/runbooks/android-build-on-linux-dev.md)）。
+# 旧载体那一侧的历史实测仍在
+# [android-build-on-windows.md](../../docs/runbooks/android-build-on-windows.md) §七，不重写。
 # 收口点在 `scripts/run-gradle.mjs`（`pnpm build:android{,:debug,:bundle}` 与
 # `clean:android` 全部经过它），而它需要的是**同一套**"送过去 + 对账"，只是
 # 构建输入不同：MSIX 那一腿要 `apps/web/dist` 与桥的 bundle，Android 那一腿要
@@ -27,7 +29,7 @@
 # ⚠️ 本仓库一律按 **bash 3.2**（macOS 自带）写：不用 `declare -A`。
 #
 # 用法（从 bash 调用）：
-#   source scripts/lib/sync-windows-sources.sh
+#   source scripts/lib/sync-build-sources.sh
 #   sync_windows_sources windows-pc                    # MSIX / 桌面壳那一腿（含原有三条对账）
 #   sync_windows_sources_for_android windows-pc        # Android 构建那一腿（带 packages/*/dist）
 #
@@ -50,25 +52,31 @@ HEYTA_WINDOWS_REPO_ROOT="${HEYTA_WINDOWS_REPO_ROOT:-C:\\src\\heyta}"
 #    ⚠️ 换落点后远端那两枚 tar 名**不受影响**（它们由 `$suffix` 决定，与本地目录无关）。
 HEYTA_SYNC_TMP_DIR="${HEYTA_SYNC_TMP_DIR:-/tmp}"
 
-# ── 内部实现：清单 → tar → scp → tar 哈希对账 → 远端先清后解 ──────────────
-# $1 = host
-# $2 = extra_list：必须本地存在、额外写进清单的**构建输入**（空格分隔，可为空串）
-# $3 = clean_list：远端解包前必须**先删掉**的路径（空格分隔，可为空串）
-# $4 = tag：临时文件/远端 tar 的名字后缀。空串 = 沿用历史名 `heyta-src(.tar.gz)`
-_heyta_windows_sync_push() {
-  local host="$1"
-  local extra_list="${2:-}"
-  local clean_list="${3:-}"
-  local tag="${4:-}"
+# ── Android 载体的三枚默认值（2026-10-28 起，载体 = `linux-dev`）─────────────
+# 🔴 **这三行是它们唯一的真源**。`scripts/run-gradle.mjs` 的默认值与设备侧脚本的
+#    `ANDROID_HOST` / `ANDROID_SDK_ON_HOST` 必须逐字等于这里 —— 各写各的就会长成
+#    "构建在 A 树、验收取 B 产物"（§7 第 82 条）。由 `check:android-gradle-remote` 的
+#    G11 当场对账（含反向臂：漂回旧载体 `windows-pc` 也红）。
+HEYTA_ANDROID_HOST="${HEYTA_ANDROID_HOST:-linux-dev}"
+HEYTA_ANDROID_BUILD_ROOT="${HEYTA_ANDROID_BUILD_ROOT:-/home/xaiver/heyta-android-build}"
+HEYTA_ANDROID_SDK_ON_HOST="${HEYTA_ANDROID_SDK_ON_HOST:-/home/xaiver/.local/opt/android-sdk}"
+HEYTA_ANDROID_GRADLE_HOME="${HEYTA_ANDROID_GRADLE_HOME:-/home/xaiver/.heyta-android-gradle}"
+
+# ── 内部实现（两半）：清单 + tar 打包是**共用**的，远端那一半按载体分 ────────
+# 🔴 为什么拆：MSIX（windows-pc）与 Android（linux-dev）要送的构建输入不同、远端命令的
+#    方言也不同（PowerShell vs bash），但"列清单 → 打 tar → 命名"这一段**必须只有一份**——
+#    两份一定会漂成"一条腿送了新树、另一条送了旧树"（§7 第 82 条的原话形状）。
+# $1 = extra_list（必须本地存在、额外写进清单的构建输入，空格分隔，可为空串）
+# $2 = tag（临时文件名后缀；空串 = 沿用历史名 `heyta-src`）
+# 结果写进 `HEYTA_SYNC_TARBALL` / `HEYTA_SYNC_LIST`（bash 动态作用域，调用方直接读）。
+_heyta_sync_make_tar() {
+  local extra_list="${1:-}"
+  local tag="${2:-}"
   local suffix=""
   [ -n "$tag" ] && suffix="-$tag"
-  local tarball="${HEYTA_SYNC_TMP_DIR%/}/heyta-src${suffix}.tar.gz"
-  local list="${HEYTA_SYNC_TMP_DIR%/}/heyta-src${suffix}-files.txt"
-  # 同一个包有两种路径形状：scp 走 SFTP，用正斜杠；cmd/tar 在 Windows 上，用反斜杠。
-  # 默认（tag 为空）时这两个值**逐字等于本文件历史上硬编码的那两个**。
-  local remote_tar_scp="C:/src/heyta-src${suffix}.tar.gz"
-  local remote_tar_cmd="C:\\src\\heyta-src${suffix}.tar.gz"
-
+  HEYTA_SYNC_TARBALL="${HEYTA_SYNC_TMP_DIR%/}/heyta-src${suffix}.tar.gz"
+  HEYTA_SYNC_LIST="${HEYTA_SYNC_TMP_DIR%/}/heyta-src${suffix}-files.txt"
+  local list="$HEYTA_SYNC_LIST"
   if ! command -v git >/dev/null 2>&1; then
     echo "  🔴 没有 git —— 列不出清单"
     return 1
@@ -106,11 +114,28 @@ _heyta_windows_sync_push() {
     done
   } > "$list"
   # COPYFILE_DISABLE：不带 AppleDouble（`._*`）过去，远端解包才干净。
-  if ! COPYFILE_DISABLE=1 tar -czf "$tarball" -T "$list" > "${HEYTA_SYNC_TMP_DIR%/}/heyta-src-tar.log" 2>&1; then
+  if ! COPYFILE_DISABLE=1 tar -czf "$HEYTA_SYNC_TARBALL" -T "$list" > "${HEYTA_SYNC_TMP_DIR%/}/heyta-src-tar.log" 2>&1; then
     echo "  🔴 打源码包失败（${HEYTA_SYNC_TMP_DIR%/}/heyta-src-tar.log）"
     return 1
   fi
-  echo "  ✅ 源码包 $(du -h "$tarball" | cut -f1)（清单 $(wc -l < "$list" | tr -d ' ') 条，含工作树未提交改动 + 构建输入）"
+  echo "  ✅ 源码包 $(du -h "$HEYTA_SYNC_TARBALL" | cut -f1)（清单 $(wc -l < "$list" | tr -d ' ') 条，含工作树未提交改动 + 构建输入）"
+  return 0
+}
+
+# ── 远端那一半（Windows 载体：MSIX / 桌面壳）───────────────────────────────
+# ⚠️ 实参顺序**逐字保持原样**（host / extra_list / clean_list / tag）：MSIX 那一腿的调用点
+#    一个字都不该因为 Android 换载体而动 —— 动了就是把两条无关的线搅在一起。
+_heyta_windows_sync_push() {
+  local host="$1"
+  local clean_list="${3:-}"
+  _heyta_sync_make_tar "${2:-}" "${4:-}" || return 1
+  local tarball="$HEYTA_SYNC_TARBALL"
+  # 同一个包有两种路径形状：scp 走 SFTP，用正斜杠；cmd/tar 在 Windows 上，用反斜杠。
+  # 默认（tag 为空）时这两个值**逐字等于本文件历史上硬编码的那两个**。
+  local suffix=""
+  [ -n "${4:-}" ] && suffix="-${4}"
+  local remote_tar_scp="C:/src/heyta-src${suffix}.tar.gz"
+  local remote_tar_cmd="C:\\src\\heyta-src${suffix}.tar.gz"
   # 🔴 `scp` **默认没有超时**：2026-10-14 那趟 486 MB 的包就在 99.3% 上僵死（5 分钟 10 次
   #    采样一字节没长），整条远程构建永远挂在步骤 2 —— `-q` 只静音进度条，不会让它在
   #    通道断掉时退出。`ServerAlive*` 是给这条通道装一根"探到死就断"的线：15s 一发、
@@ -170,24 +195,96 @@ _heyta_windows_sync_push() {
   return 0
 }
 
+# ── 远端那一半（POSIX 载体：Android 构建机 `linux-dev`）─────────────────────
+# $1 = host；$2 = remote_root（绝对路径，由调用方给，见 `sync_android_sources`）
+# $3 = clean_list；$4 = tag；$5 = extra_list
+_heyta_posix_sync_push() {
+  local host="$1"
+  local remote_root="$2"
+  local clean_list="${3:-}"
+  local tag="${4:-}"
+  _heyta_sync_make_tar "${5:-}" "$tag" || return 1
+  local tarball="$HEYTA_SYNC_TARBALL"
+  local suffix=""
+  [ -n "$tag" ] && suffix="-$tag"
+  local remote_tar="/tmp/heyta-src${suffix}.tar.gz"
+
+  # 🔴 用 `rsync --partial` 而不是 `scp`：这条通道实测会**中途被对端关闭**
+  #    （2026-10-28 现量：45 MB 的包 `ssh 'cat >'` 两次都在几十秒处断，`rsync` 第 3 趟续传完成）。
+  #    `scp` 没有续传，也没有超时以外的恢复手段 —— 旧载体上那趟 486 MB 僵死就是同一族。
+  if ! command -v rsync >/dev/null 2>&1; then
+    echo "  🔴 本机没有 rsync —— 这条通道要的是**可续传**，不退回 scp（宁可红，不要半包）"
+    return 1
+  fi
+  local attempt rc=1
+  for attempt in 1 2 3; do
+    if rsync -a --partial --timeout=60 -e "ssh -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4" \
+         "$tarball" "$host:$remote_tar"; then rc=0; break; fi
+    rc=$?
+    [ "$attempt" -lt 3 ] && echo "  ⚠️ 第 $attempt 次送包失败（rsync rc=${rc}）—— 链路会断，按瞬时网络续传重试"
+  done
+  if [ "$rc" -ne 0 ]; then
+    echo "  🔴 源码包送不过去（rsync 三次都失败，主机 ${host}）—— 当场分诊可达性"
+    if ssh -o ConnectTimeout=10 -o BatchMode=yes "$host" 'echo ok' >/dev/null 2>&1; then
+      echo "     ⇒ **ssh 建得起来** ⇒ 是**传输通道**断了（链路抖动/拥塞），不是主机下线。"
+    else
+      echo "     ⇒ **连 ssh 都建不起来** ⇒ 主机确实不可达，重试也不会好。"
+    fi
+    return 1
+  fi
+
+  # 🔴 先对账**这一整包**的哈希，再解包（与 Windows 那一腿同一判据、同一理由）：
+  #    远端留着的是"上一个包"时，解包会把那棵树改成两次构建的混合体，
+  #    而混合体在按文件的对账里可以逐项都对上。
+  local local_tar_sha remote_tar_sha
+  local_tar_sha="$(shasum -a 256 "$tarball" | awk '{print $1}')"
+  remote_tar_sha="$(ssh -o ConnectTimeout=10 "$host" "sha256sum '$remote_tar' 2>/dev/null | cut -d' ' -f1" 2>/dev/null |
+    tr -d '\r' | grep -iE '^[0-9a-f]{64}$' | tail -1 | tr 'A-Z' 'a-z')"
+  if [ -z "$remote_tar_sha" ]; then
+    echo "  🔴 读不到远端源码包哈希（$host 上的 ${remote_tar}）—— 对账不成立，拒绝解包"
+    return 1
+  fi
+  if [ "$local_tar_sha" != "$remote_tar_sha" ]; then
+    echo "  🔴 远端源码包**不新鲜**：tar 的 sha256 对不上"
+    echo "     local =${local_tar_sha:0:16}"
+    echo "     remote=${remote_tar_sha:0:16}"
+    echo "     —— 拒绝解包：那样远端是**上一批**的树（§7 第 82 条的形状）"
+    return 1
+  fi
+  echo "  ✅ 远端收到的是这一包（tar sha256=${local_tar_sha:0:16}… 逐字相同）"
+
+  # ⚠️ 覆盖式解包，不删远端整棵树 —— 那棵树里有 node_modules 与 gradle 缓存。
+  # 🔴 但**构建产物目录**必须先清再解（`packages/*/dist` 里改名后的旧 chunk 不会自己消失）。
+  local remove_cmds="" c
+  for c in $clean_list; do
+    remove_cmds="${remove_cmds}rm -rf '${remote_root}/${c}'; "
+  done
+  if ! ssh -o ConnectTimeout=10 "$host" \
+    "${remove_cmds}tar -xzf '$remote_tar' -C '$remote_root'"; then
+    echo "  🔴 远端解包失败（清远端构建输入 + tar）"
+    return 1
+  fi
+  return 0
+}
+
 # ── Android 构建那一腿的入口（run-gradle.mjs 在 Mac/Linux 上调它）──────────
 # 送的构建输入是 `packages/*/dist`：Metro 打进 APK 的是**它们**，不是 `packages/*/src`
 # （AGENTS §6.1「打包前必须先跑 `pnpm -r build`」的全部理由，§7 第 27 条那笔学费）。
-# 对账用的是 tar 的 sha256（在 `_heyta_windows_sync_push` 里），不在这里加锚点 ——
+# 对账用的是 tar 的 sha256（在 `_heyta_posix_sync_push` 里），不在这里加锚点 ——
 # `apps/web/dist/index.html` 那一组对 APK 什么都不证明。
-sync_windows_sources_for_android() {
-  local host="$1"
+sync_android_sources() {
+  local host="${1:-$HEYTA_ANDROID_HOST}"
   # 🔴 远端仓库根由**调用方**给（run-gradle 手里那份 `HEYTA_ANDROID_REMOTE_ROOT`）。
-  #    为什么这条要紧：那一侧读 `HEYTA_ANDROID_REMOTE_ROOT`，这一侧读 `HEYTA_WINDOWS_REPO_ROOT`，
+  #    为什么这条要紧：那一侧读 `HEYTA_ANDROID_REMOTE_ROOT`，这一侧读 `HEYTA_ANDROID_BUILD_ROOT`，
   #    两个默认值逐字相同 ⇒ 平时看不出问题；**只移一个**就变成"同步解包到 A、gradle 在 B 里构建"
   #    —— 与 §7 第 82 条同一种形状，只是搬到了远程路径上。
-  #    不传（第二枚实参为空）时沿用本文件的默认值 ⇒ MSIX 那一腿逐字不受影响。
-  #    `local` 是刻意的：bash 是动态作用域，被调的 `_heyta_windows_sync_push` 读到的就是这一份，
+  #    不传（第二枚实参为空）时沿用本文件的默认值。
+  #    `local` 是刻意的：bash 是动态作用域，被调的那一枚 push 读到的就是这一份，
   #    而函数返回后不会把值泄漏给调用方的 shell。
   #    `${2:-}` 这层中转也是刻意的：调用方普遍 `set -u`，直接写 `${2:-…}` 在未传第二枚实参时
   #    会先把 `$2` 当未绑定变量打死。
   local _android_remote_root="${2:-}"
-  local HEYTA_WINDOWS_REPO_ROOT="${_android_remote_root:-$HEYTA_WINDOWS_REPO_ROOT}"
+  local HEYTA_ANDROID_BUILD_ROOT="${_android_remote_root:-$HEYTA_ANDROID_BUILD_ROOT}"
   local dist_list="" d
   for d in packages/*/dist; do
     [ -d "$d" ] || continue
@@ -197,7 +294,11 @@ sync_windows_sources_for_android() {
     echo "  🔴 本地一个 packages/*/dist 都没有 —— 先跑 pnpm -r build，否则远端拿不到构建输入"
     return 1
   fi
-  _heyta_windows_sync_push "$host" "$dist_list" "$dist_list" "android" || return 1
+  ssh -o ConnectTimeout=10 "$host" "mkdir -p '$HEYTA_ANDROID_BUILD_ROOT'" || {
+    echo "  🔴 远端建不出 '$HEYTA_ANDROID_BUILD_ROOT' —— 载体根不可写，不猜第二个落点"
+    return 1
+  }
+  _heyta_posix_sync_push "$host" "$HEYTA_ANDROID_BUILD_ROOT" "$dist_list" "android" "$dist_list" || return 1
   echo "  ✅ Android 构建输入已同步（$(printf '%s' "$dist_list" | wc -w | tr -d ' ') 个 packages/*/dist，远端已先清后解）"
   return 0
 }
