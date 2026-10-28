@@ -152,6 +152,22 @@ ARMS = [
     ('A22 抽取成功那一支把正文回显给发送方（集成面第三行 202 出口）', 'server/src/automation/inbound.routes.ts', 'server', INTEGRATION_SPEC,
      '          return reply.status(202).send(statusResponse(row.eventId, outcome.state));',
      '          return reply.status(202).send({ ...statusResponse(row.eventId, outcome.state), echo: Buffer.from(rawBody).toString(\'utf8\') });'),
+    # A23–A25 钉的是 ADR-0077 表里那一行「显式重试只认结果不确定那一档，且要求源正文还在」——
+    # 那句此前只有集成面一枚**宽松**的断言（`[202,409,410,503]` 里 202 也算过），摘掉守卫里任何一支都不会红。
+    # 三枚臂各摘一支：正文缺席 / 留存窗口过期 / 已有提交许可。被测面是 `tests/automation-events.spec.ts` 那四条新用例，
+    # 它们自带绿头（正向那一档仍要成功入队），所以红只会来自"该拒的那一支没拒"。
+    ('A23 重试不再要求源正文还在（摘掉 payloadCiphertext 那一支）', 'server/src/automation/events.ts', 'server',
+     'tests/automation-events.spec.ts',
+     '        event.payloadCiphertext === null || event.expiresAt <= now) throw new Error(\'Automation event cannot be retried\');',
+     '        event.expiresAt <= now) throw new Error(\'Automation event cannot be retried\');'),
+    ('A24 重试不看留存窗口（摘掉 expiresAt 那一支）', 'server/src/automation/events.ts', 'server',
+     'tests/automation-events.spec.ts',
+     '        event.payloadCiphertext === null || event.expiresAt <= now) throw new Error(\'Automation event cannot be retried\');',
+     '        event.payloadCiphertext === null) throw new Error(\'Automation event cannot be retried\');'),
+    ('A25 已有提交许可也放行重抽（摘掉 permit 那一支）', 'server/src/automation/events.ts', 'server',
+     'tests/automation-events.spec.ts',
+     '    if (!rule || permit) throw new Error(\'Automation event cannot be retried\');',
+     '    if (!rule) throw new Error(\'Automation event cannot be retried\');'),
 ]
 
 FACES = (('server 两枚 spec', 'server', 'server', SERVER_SPEC),

@@ -82,3 +82,52 @@ describe('automation queue lease fencing', () => {
     expect(tx.automationEvent.update).not.toHaveBeenCalled();
   });
 });
+
+// 🔴 ADR-0077 那句「抽取成功后原文已不在我们手上 ⇒ 这一条不能再重抽第二遍」在代码里就是重试守卫中的
+// `event.payloadCiphertext === null` 那一支。这里钉的正是它：源正文没了就必须拒，而且是**不重新入队**地拒。
+// 头一是绿头（正向那档），所以后三枚红不是因为夹具坏 —— 摘掉守卫里任何一支，对应那一条就红。
+describe('explicit retry guard requires the source payload to still be there', () => {
+  const now = new Date(1_800_000_000_000);
+  const retryTx = (event: Record<string, unknown>, permit: unknown = null, rule: unknown = { id: 'rule' }) => {
+    const update = vi.fn();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      automationEvent: { findFirst: vi.fn().mockResolvedValue(event), update },
+      automationRule: { findFirst: vi.fn().mockResolvedValue(rule) },
+      automationCommitPermit: { findUnique: vi.fn().mockResolvedValue(permit) },
+    };
+    mocks.prisma.$transaction.mockImplementation(async (fn: (value: unknown) => unknown) => fn(tx));
+    return update;
+  };
+  const callRetry = async () => {
+    const { retryUncertainAutomationEvent } = await import('../src/automation/events');
+    return retryUncertainAutomationEvent({ userId: 7, eventId: 'event', expectedAttempt: 1, expectedRuleVersion: 1 }, now);
+  };
+  const uncertain = { status: 'needs-confirmation', reasonCode: 'model-result-uncertain', attempt: 1, ruleVersion: 1,
+    ruleId: 'rule', eventId: 'event', expiresAt: new Date(1_900_000_000_000) };
+
+  it('绿头：结果不确定且源正文还在 ⇒ 重新入队并清掉租约', async () => {
+    const update = retryTx({ ...uncertain, payloadCiphertext: envelope });
+    await expect(callRetry()).resolves.toEqual({ eventId: 'event', state: 'queued' });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      status: 'queued', reasonCode: null, leaseWorkerId: null, leaseExpiresAt: null }) }));
+  });
+
+  it('源正文已丢弃（抽取成功后那一档）⇒ 拒，而且一次重新入队都不许发生', async () => {
+    const update = retryTx({ ...uncertain, payloadCiphertext: null });
+    await expect(callRetry()).rejects.toThrow('Automation event cannot be retried');
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('留存窗口已过 ⇒ 同样拒（窗口外没有正文可抽，重试语义不成立）', async () => {
+    const update = retryTx({ ...uncertain, payloadCiphertext: envelope, expiresAt: new Date(1_700_000_000_000) });
+    await expect(callRetry()).rejects.toThrow('Automation event cannot be retried');
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('已有提交许可 ⇒ 拒（重抽会造出第二个任务）', async () => {
+    const update = retryTx({ ...uncertain, payloadCiphertext: envelope }, { id: 'permit' });
+    await expect(callRetry()).rejects.toThrow('Automation event cannot be retried');
+    expect(update).not.toHaveBeenCalled();
+  });
+});
