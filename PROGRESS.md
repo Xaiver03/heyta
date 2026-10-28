@@ -7650,4 +7650,20 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       `apps/web/evidence/inbound-recovery/`；腿既然是红的，我按 `rc.txt` 里那份 `PNG_CHANGED` 清单逐枚 `git restore`，
       还原后该目录 `git status --porcelain` 读回空 —— **没有把一次失败运行的产物当"当前产物"提交**。
       逐格读数在 `docs/plans/inbound-automation.md` 文末 15:0x 那一节那张表里。
+    ⑩ 🔴 **那枚 `AC6-browser` 的红当场修完了，而且是我自己的漏改**：根因是读面谓词 `valid()` 要求
+      `typeof r.hostedExtraction === 'boolean'`（`packages/app-host/src/inbound-rules-remote.ts`，现量
+      `grep -n "typeof r.hostedExtraction" packages/app-host/src/inbound-rules-remote.ts`），而 **e2e 那三段 `rules` 桩没带这枚键**
+      ⇒ 整份响应被判无效 ⇒ 面板画"规则读取失败"⇒ 一行事件都没有 ⇒ 六条腿一起红。DOM 快照里那行 alert 是当场读到的，不是我推的。
+      为什么藏一天：`67c533212`（10-27 23:41）把**单元侧** fixture 全补了，e2e 那处是**第四处**不在 diff 里；
+      而 18:1x 那趟整串主动剔了 `AC6-browser` ⇒ 这笔落地后没一条腿看过它一眼。
+      ⇒ 教训（说窄）：**当天剔掉某腿，凡改到该腿覆盖的面就得当场补跑那一腿**，否则排除项＝盲区。
+      修的就三处一个键（`e2e/tests/inbound-automation.spec.ts` 三段规则对象各补 `hostedExtraction: false`）；
+      复跑 `cd e2e && npx playwright test --config playwright.inbound.config.ts` ⇒ **`8 passed (19.0s)`**，并按"真跑还要真看"看了
+      `form-1280-light`：那格"由我们的服务器在内容到达时抽取"与两句说明都在位。
+      ⚠️ 这次改写的 **12 枚 png 我仍全部还原**（还原后该目录 status 读回空）：`form-*` 大 20–40 KB 确实是本线那一格的真实新增
+      （HEAD 那批图是 10-27 15:28 的，早于 23:41 那笔），可同一棵树里躺着 UX 线未提交的 `apps/web`/`packages/ui`/`design-system`
+      ⇒ **一张图里分不出谁那批**，按本线名义入库等于替他们署名。回填时机＝两线都入库后在干净载具上重跑那条腿。
+      另记一条**没擅自建**的防再犯设计：把 `valid()` 里的字段名从源码派生，再逐处比对 e2e 与 jsdom 的规则 fixture ——
+      建不建、挂不挂进 `pnpm check` 归负责人。
+
 

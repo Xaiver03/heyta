@@ -5290,5 +5290,44 @@ zsh 的管道状态数组叫 `$pipestatus` 且 **1-indexed**，`${PIPESTATUS[0]}
 `git status --porcelain -- apps/web/evidence/inbound-recovery` 读回空。
 **没有把这 8 枚按"当前产物"提交**——那等于把一次失败运行画成证据。
 
+### 🔴 那枚红当场修完了：是我昨天 23:41 那笔**漏改的第四处落点**
+
+根因一句话：`packages/app-host/src/inbound-rules-remote.ts` 里那枚读面谓词 `valid()` 要求
+`typeof r.hostedExtraction === 'boolean'`（现量 `grep -n "typeof r.hostedExtraction" packages/app-host/src/inbound-rules-remote.ts`），
+而 e2e 那三段 `rules` 桩**没带这枚键** ⇒ 谓词判整份响应无效 ⇒ 面板画那条
+`规则读取失败，请检查登录状态和服务端地址` ⇒ 一行事件都没有 ⇒ 六条腿一起红。
+DOM 快照里那行 alert 就是当场读到的（`/tmp/heyta-inbound-ui-results/<那格>/error-context.md` 第 577 行那一形）。
+
+**为什么藏了一天**：`67c533212`（10-27 23:41 加"抽取归谁"那一格）把单元侧的 fixture 全补了
+（`git show 67c533212 --stat` 里 `apps/web/tests/*` 与 `packages/app-host/tests/*` 各 +2/-1），
+**但 e2e 的桩是第四处**，不在那次 diff 里；而 10-27 18:1x 那趟整串**主动剔掉了 `AC6-browser`**，
+所以这笔落地后没有任何一条腿看过它一眼。⇒ 教训要说窄：**"剔掉某腿"那一天，凡改到该腿覆盖的面，就得当场补跑那一腿**，
+否则排除项会变成盲区。
+
+修的就三处（每处一个键）：`e2e/tests/inbound-automation.spec.ts` 三段 `path.endsWith('/automation/rules')` 的
+规则对象各补 `hostedExtraction: false`。复跑：
+
+```bash
+cd e2e && npx --no-install playwright test --config playwright.inbound.config.ts
+```
+
+⇒ **`8 passed (19.0s)`**（原件 `~/.heyta-evidence/inbound-hosted-extraction-20261027/AC6-rerun-after-fixture-fix.out`，
+时刻 `ls -laT` 现取）。按本仓"真跑还要真看"那条，我看了 `form-1280-light`：
+那格"由我们的服务器在内容到达时抽取"与它下面两句说明都在位，文案与 `packages/i18n` 一致，
+上面那行"只在这台设备开着 heyta 时处理"也对得上 A2 那两条边界。
+
+⚠️ **但这次的 12 枚 png 我仍然全部还原了**（`git restore --pathspec-from-file`，还原后
+`git status --porcelain -- apps/web/evidence/inbound-recovery` 读回空）。理由不是"改动小"：
+`form-*` 大了 20–40 KB 确实**是本线那一格的真实新增**（HEAD 上那批图是 10-27 15:28 的，早于 23:41 那笔），
+可 `retry-*` 反而小了 3–12 KB，而这棵树里同时躺着 UX 线未提交的 `apps/web`、`packages/ui`、`design-system` ——
+**同一张图里分不出哪部分是谁那批**。把混着别人未提交样式的图按本线名义入库，等于替他们署一次名。
+⇒ 回填的时机是"两线都入库之后、在一枚干净载具上重跑这条腿"，那次的图才代表当前产物。
+
+**一条防再犯的设计，我不擅自建门禁**：把 `valid()` 里那些 `typeof r.X === …` 的字段名**从源码派生**出来，
+再逐处比对 e2e 与 jsdom 的规则 fixture 有没有带齐 —— 这样"谓词收紧而某处 fixture 没跟上"下一趟就自己红，
+不用等浏览器腿被人剔掉。要不要建、挂不挂进 `pnpm check` 归负责人（建的话按本仓规矩要带自检臂，
+且加尺前先 grep 仓内有没有明文否掉它）。
+
+
 
 
