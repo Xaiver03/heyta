@@ -5943,6 +5943,14 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 - 顺序上的硬约束只有一条：**列必须先存在**。没 apply 之前，读面 `findFirst` 也会 P2022（探针量到 `p2022_before=3`，不是 2）⇒ 每一发 webhook 在路由里就死，公网形状 500。
   所以「先 apply 再放流量」，不能反过来。
 
+**①「push 与 ref」这一格的现量（只交事实，推送动作归负责人）**：
+- 远端两枚，都是 **SSH 形状**（URL 里不含任何凭据）：`gitee git@gitee.com:dengxiadeng/heyta.git`、`origin git@github.com:Xaiver03/heyta.git`。
+- **`main` 跟踪的上游是 `gitee/main`**（`git status -sb` 首行 `## main...gitee/main [ahead 653]`）。
+- 与两个远端的分叉（**对本地跟踪引用量的，未 fetch ⇒ 远端真实状态可能更靠前**）：`origin` ahead **67** / behind **0**；`gitee` ahead **653** / behind **0**。
+- ⇒ 一句现成的动作（等你点头才跑）：`git push origin main`，之后可选 `git branch --set-upstream-to=origin/main`（把上游从 gitee 挪到 GitHub）。
+- 为什么不能裸 `git push`：上游是 gitee，而那枚仓库体积超配额（记忆中已登记过）；裸 push 会以失败告终，看起来像"网络坏了"。
+
+
 
 
 **对账表的"当前产物"读数（2026-10-28 21:0x 整串重跑，除浏览器腿以外 30 腿全跑）**：`legs=30 rc0=29 rc_nonzero=1`
