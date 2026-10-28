@@ -5916,7 +5916,7 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 | 3·每尺有臂 | 每把尺都要有变异臂 | 臂架**在册枚数读 `--list` 末行**（别抄这里的数），A1–A27 逐枚各自跑红过；A23–A27 是本会话补的。**判据 → 臂**对照：存储 A1／查询 A26／响应 A14·A15·A22／失败兜底 A27／503 A10／零 op A17·A18／重试 A23–A25／零日志 A11 | ✅ |
 | 4·check:docs | 过 | `node research/tools/docs-link-check.mjs` rc=0 | ✅ |
 | 4·i18n 对称 + 单一事实源 | 过 | `cd packages/i18n && vitest run` ⇒ `Tests 30 passed (30)`；本会话改动没新增任何文案 | ✅ |
-| 4·web / mobile spec | 过 | 电池腿 `AC6-web-specs` `10 files / 33 tests`、`AC4-mobile-inbound` `1 / 15`、`AC4-app-host` `15 / 112`，全 rc=0 | ✅ |
+| 4·web / mobile spec | 过 | 电池腿 `AC6-web-specs` `10 files / 33 tests`、`AC4-mobile-inbound` `1 / 15`、`AC4-app-host` `15 / 112`，全 rc=0；另：`pnpm --filter @heyta/web typecheck` 现量 rc=**0** —— B245 登记的那枚红（本线 `inbound-hosted-extraction-ui.spec.tsx` 的可变捕获收窄）已由 `8180d6295` 修掉，本轮复跑确认 | ✅ |
 | 4·check:ui-language | 过 | rc=**1**，4 处全在 `apps/web/src/App.tsx:2560/2561` —— **别线在飞的文件**，本线零字节未动 | 🔴 归别线 |
 | 5·六格草稿 | 逐处草出、列成归负责人的清单、不发布 | 工单 §5.2 六行 + 每行「不许说成」列；`packages/legal/**` 自 12:40 起 `git log` 为空、工作树 0 脏 | ✅ 草稿 / 🔴 发布与措辞归负责人 |
 | 5·帮助中心/价格页两格 | 同上 | 工单 §5.2 第 5/6 行；另：新增一把尺 `check-inbound-legal-copy-parity` 盯"三处手抄" | ✅ 草稿 / 🔴 未发 |
