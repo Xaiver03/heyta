@@ -7833,6 +7833,15 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ④ 台账新增一张"判据 3 三半 × 用例 × 臂"对账表（a 存储/查询/响应面、b 503、c 零 op、补重试守卫），每行都有臂与读数。
     ⑤ 边界：判卷口径零处动、AC 勾数仍 **0**、`packages/legal/**` 一字未动（`git log --since` 那段对 legal 为空）。
 
+221. **自动收集线 · 复量 ADR §5 那四条现量，抓到一条"快照注释已变假话"，就地改成快照＋现量对照**（写前先跑 `date`，本机 2026-10-28 20:5x）
+    ① `grep -rn "chat/completions" server/src` 的**拼接点**现在只有 `managed-completion.ts:306`，而 ADR 那段 10-27 快照的注释写的是"只有 `managed-proxy.routes.ts` 那一处拼接"
+      —— §3 那条 (c) 把拼接搬进 `invokeManagedAiCompletion` 之后，这句就成了假话。不变量（全仓只有一处拼接）没破，**地点变了**。
+    ② 其余三条复量与快照一致：`managedAiProxyRoutes` 两枚（定义＋注册；快照说的是"注册"没错）、`openInbound` 在 `server/src` **0 命中**、
+      `inbound.routes.ts` 里 `resultCiphertext` **0 处**（3 处全是 `payloadCiphertext`：构造/字节上限/入库）。
+    ③ 处理：**没删快照**（它是"动手前长什么样"的证据），在它下面加一张"10-27 快照 vs 20:5x 现量 vs 读法"对照表，并写明"再引用时重跑、别抄"。
+      这是 ADR 里**我自己写的现量陈述**漂了一次；同类句子下次落笔就该带"跑法"而不是带结论。
+
+
 
 
 

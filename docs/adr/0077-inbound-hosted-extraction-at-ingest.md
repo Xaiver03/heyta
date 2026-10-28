@@ -52,6 +52,17 @@ grep -rn "openInbound" server/src packages/inbound-core/src # 只在设备侧/�
 grep -n "payloadCiphertext\|resultCiphertext" server/src/automation/inbound.routes.ts
 ```
 
+**上面那块是 10-27 动手前的快照；同四条在 `2026-10-28 20:5x` 复量如下 —— 别把快照里的注释当现状读。**
+
+| 命令 | 10-27 快照 | 20:5x 现量 | 读法 |
+|---|---|---|---|
+| `grep -rn "chat/completions" server/src` | 只有 `managed-proxy.routes.ts` 一处拼接 | 拼**接点**只有 `managed-completion.ts:306`（路由里已没有它，另有一行注释提到这个词） | 因为选了 §3 那条 (c)：拼接搬进了 `invokeManagedAiCompletion`。**不变量是"全仓只有一处拼接"，地点变了不等于松了** |
+| `grep -rln "managedAiProxyRoutes" server/src` | 只有 `server.ts` 注册它 | 两枚：`managed-proxy.routes.ts`（定义）＋`server.ts`（注册） | 与快照不矛盾：快照说的是"注册"，而这条 grep 连定义文件一起列 |
+| `grep -rn "openInbound" server/src packages/inbound-core/src` | 只在设备侧/测试里出现 | `server/src` **0 命中**；命中都在 `packages/inbound-core`（定义与导出） | 与快照一致：服务端从不 import 它 |
+| `grep -n "payloadCiphertext\|resultCiphertext" server/src/automation/inbound.routes.ts` | （快照未附读数） | 3 处、全是 `payloadCiphertext`（写入前构造／字节上限判断／入库那一行）；`resultCiphertext` **0 处** | 落库那条路径只把"封好的正文"放进这一行，结果列不在路由里写 |
+
+⚠️ 这张对照表本身就是条教训：第一条快照注释在 §3 那条 (c) 落地之后**就变成了假话**。再引用这几条现量时**重跑一遍**，别抄。
+
 | 事实 | 位置 | 它为什么决定形状 |
 |---|---|---|
 | 入站那一行先封后写，服务端只持公钥 | `inbound.routes.ts` 的 `sealInbound(...)` 与它的事务 | 抽取窗口 = 这次请求；窗口外没有任何合法路径能读到明文。**查询面那条界线是 `listAutomationEvents` 的 `select`**：`tests/automation-events.spec.ts` 断言它**恰好七列**，多取一列（尤其 `payloadCiphertext`/`resultCiphertext`）就红 —— 臂 A26 |
