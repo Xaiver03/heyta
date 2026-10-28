@@ -18,7 +18,7 @@
  *   干净那枚必须过、坏那枚必须被判成 parse 红；任何一边不符就退出非 0。
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -71,6 +71,13 @@ function run(dir) {
 const FIXTURE_ROOT = join(E2E, 'test-results');
 
 function fixtureDir(name, specBody) {
+  /*
+   * 🔴 夹具的父目录**不能假设它已经在那儿**：`e2e/test-results/` 是 Playwright 跑起来才建的，
+   * 而它会被清理（本仓实测：跑过一次清理后 `pnpm check:e2e-specs-parse` 直接
+   * `ENOENT: mkdtemp` 崩掉，`rc=1` 报的是"门禁红"，读起来像界面有毛病）。
+   * 崩掉的门禁比会红的门禁更糟 —— 它把"探针自己的环境问题"伪装成产品判决。
+   */
+  mkdirSync(FIXTURE_ROOT, { recursive: true });
   const dir = mkdtempSync(join(FIXTURE_ROOT, `.parse-fixture-${name}-`));
   writeFileSync(
     join(dir, 'playwright.f.config.ts'),
