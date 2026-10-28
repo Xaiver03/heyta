@@ -255,7 +255,7 @@ export function ReminderPanel({ task }: { task: Task }): React.JSX.Element {
         无从分辨要展开哪一个。
       */}
       <summary
-        className={reminders.length > 0 ? 'ht-chip ht-chip--on' : 'ht-chip'}
+        className={reminders.length > 0 ? 'ht-chip ht-chip--action ht-chip--on' : 'ht-chip ht-chip--action'}
         aria-label={t('reminder.a11y.list', { title: task.title })}
       >
         <Bell size={CHIP_ICON_SIZE} aria-hidden="true" />
@@ -311,7 +311,7 @@ function LongOffsetTiers({
           <button
             key={tier.offsetMs}
             type="button"
-            className="ht-chip"
+            className="ht-chip ht-chip--action"
             data-testid={`reminder-long-add-${String(index)}`}
             onClick={() => {
               void addBeforeDue(taskId, tier.offsetMs);
