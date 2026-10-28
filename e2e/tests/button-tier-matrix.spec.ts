@@ -43,6 +43,26 @@ async function look(page: Page, selector: string): Promise<{ bg: string; fg: str
   });
 }
 
+/**
+ * 悬停后的读数**必须等过渡跑完**再取。
+ *
+ * §7 第 609 条：`getComputedStyle` 在过渡中读到的是**起点色**，
+ * 直接比终值会造出一枚"永远红"的假缺陷 —— 所以这里 `expect.poll` 到终值，
+ * 而不是 hover 完立刻读一次。
+ */
+async function lookHovered(page: Page, selector: string, want: { bg?: string; fg?: string }): Promise<void> {
+  await page.locator(selector).first().hover();
+  await expect
+    .poll(
+      async () => {
+        const now = await look(page, selector);
+        return JSON.stringify({ bg: want.bg === undefined || now.bg === want.bg, fg: want.fg === undefined || now.fg === want.fg });
+      },
+      `悬停之后没换到 hover 档（要 ${JSON.stringify(want)}，实际 ${String(JSON.stringify(await look(page, selector)))}）`,
+    )
+    .toBe('{"bg":true,"fg":true}');
+}
+
 /** 走到"回收站里那条的彻底删除确认层"，返回两枚按钮的选择器。 */
 async function openPurgeConfirm(page: Page): Promise<{ cancel: string; submit: string }> {
   // 上一档停在习惯视图，添加任务的输入框只长在任务视图里
@@ -85,6 +105,11 @@ for (const theme of ['light', 'dark'] as const) {
       expect(p.bg, 'primary 的底不是 primary token').toBe(await tokenRgb(page, '--ht-color-primary'));
       expect(p.fg, 'primary 的字不是 on-primary').toBe(await tokenRgb(page, '--ht-color-on-primary'));
       expect(p.opaque, 'primary 画成了透明底').toBe(true);
+      // 悬停档要**在它还在场上的时候**量：这一条后面就切去回收站了，
+      // 第一版把四枚悬停全堆到末尾 ⇒ 等 `habits-empty-add` 等到 60s 测试超时（真红因是探针跑错时机）。
+      await lookHovered(page, '[data-testid="habits-empty-add"]', {
+        bg: await tokenRgb(page, '--ht-color-primary-hover'),
+      });
 
       // ②③ secondary 与 danger+commit：同一层里两枚，重量必须分得出
       const { cancel, submit } = await openPurgeConfirm(page);
@@ -97,6 +122,17 @@ for (const theme of ['light', 'dark'] as const) {
       expect(c.fg, '确认层那枚危险按钮的字不是 on-danger').toBe(await tokenRgb(page, '--ht-color-on-danger'));
       expect(c.opaque, '确认层那枚退回了透明底 —— 它在确认层里必须是实底').toBe(true);
       expect(s.bg, '取消与确认同底 ⇒ 重量档没分出两档').not.toBe(c.bg);
+      await lookHovered(page, cancel, { bg: await tokenRgb(page, '--ht-color-hover') });
+      await lookHovered(page, submit, {
+        bg: await tokenRgb(page, '--ht-color-danger-strong'),
+        fg: await tokenRgb(page, '--ht-color-on-danger'),
+      });
+      if (width === 1440) {
+        await page.locator(submit).first().hover();
+        await page.screenshot({ path: `${EVIDENCE}/confirm-hover-${theme}.png` });
+      }
+      // 拍完把鼠标挪开，别让悬停态影响后面那一段的截图
+      await page.mouse.move(20, 20);
 
       // 关掉确认层再走批量那一段（刚那条已经进了回收站，批量条要的是**列表里**的任务）
       await page.getByTestId('trash-confirm-cancel').click();
@@ -110,6 +146,10 @@ for (const theme of ['light', 'dark'] as const) {
       expect(d.bg, '行内档画成了实底（它就该是透明底红字）').toBe('rgba(0, 0, 0, 0)');
       expect(d.fg, '行内档的字不是 danger').toBe(await tokenRgb(page, '--ht-color-danger'));
       expect(d.bg, '行内档与确认层那枚同形 ⇒ 位置没参与判断').not.toBe(c.bg);
+      await lookHovered(page, danger, {
+        bg: await tokenRgb(page, '--ht-color-danger-subtle'),
+        fg: await tokenRgb(page, '--ht-color-danger-strong'),
+      });
     });
   }
 }
