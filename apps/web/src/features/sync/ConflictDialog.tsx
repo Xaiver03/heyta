@@ -46,7 +46,8 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 门禁照样全绿 —— 已补齐，别再把这一层当成"手工保证"。
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
+import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
 import { AlertTriangle, Check, X } from 'lucide-react';
 
 import { cssVar } from '@heyta/design-system';
@@ -116,7 +117,6 @@ export function ConflictDialog(): React.JSX.Element | null {
   const resolveConflict = useSyncStore((s) => s.resolveConflict);
   const dialogOpen = useSyncStore((s) => s.conflictDialogOpen);
   const closeConflictDialog = useSyncStore((s) => s.closeConflictDialog);
-  const dialogRef = useRef<HTMLDivElement>(null);
 
   const shareConflicts = useShareConflicts();
   const conflicts: AnyConflict[] = [
@@ -127,24 +127,9 @@ export function ConflictDialog(): React.JSX.Element | null {
   // 关掉窗口**不会**清掉冲突状态 —— SyncBar 仍会提示，用户还能再打开。
   const open = dialogOpen && conflicts.length > 0;
 
-  // Esc 关闭。挂在不存在的节点上什么也不会发生，所以只在打开时绑。
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        closeConflictDialog();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open, closeConflictDialog]);
-
-  // 打开时把焦点移进对话框 —— 否则键盘用户还停在背后的页面上
-  useEffect(() => {
-    if (open) dialogRef.current?.focus();
-  }, [open]);
+  // P6：焦点进层 / Esc 关闭 / Tab 不外逃 / 关闭归还触发者全在 `WebModalShell` 里。
+  // 这里原来有两条 `useEffect`（一条把 Esc 监听挂在 `window` 上、一条在打开时手动
+  // `dialogRef.current?.focus()`），它们是那份判断的**第二处**，删掉而不是留着再叠一层。
 
   const labels: ConflictResolutionLabels = useMemo(
     () => ({
@@ -215,7 +200,7 @@ export function ConflictDialog(): React.JSX.Element | null {
   const renderSideAction = (info: ConflictSideRenderInfo<AnyConflict>): React.JSX.Element => (
     <button
       type="button"
-      className={info.preferred ? 'ht-btn ht-btn--primary' : 'ht-btn'}
+      className={info.preferred ? 'ht-btn ht-btn--primary' : 'ht-btn ht-btn--secondary'}
       disabled={info.blockedReason !== undefined || info.busy}
       onClick={() => {
         decide(info.conflict, info.choice);
@@ -228,9 +213,8 @@ export function ConflictDialog(): React.JSX.Element | null {
   );
 
   return (
-    <div
-      role="presentation"
-      style={{
+    <WebModalShell
+      overlayStyle={{
         position: 'fixed',
         inset: 0,
         background: cssVar('color.overlay'),
@@ -240,14 +224,7 @@ export function ConflictDialog(): React.JSX.Element | null {
         padding: cssVar('space.4'),
         zIndex: cssVar('z.modal'),
       }}
-    >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ht-conflict-title"
-        style={{
+      dialogStyle={{
           width: '100%',
           maxWidth: cssVar('layout.content-max'),
           maxHeight: '90vh',
@@ -260,8 +237,15 @@ export function ConflictDialog(): React.JSX.Element | null {
           boxShadow: cssVar('shadow.lg'),
           padding: cssVar('space.6'),
           color: cssVar('color.foreground'),
-        }}
-      >
+      }}
+      labelledBy="ht-conflict-title"
+      policy="modal-readonly"
+      testId="conflict-dialog"
+      /* ⚠️ **不**传 `busy`：这一层没有"提交中"这一格 —— 解决每一条各自落一条 op，
+         而同步本身是常驻状态（`status.kind === 'syncing'` 会长期为真）。拿它去锁三条
+         关闭通道，会把"看着同步条同时关掉对话框"这件正常事变成按不动。 */
+      onCancel={closeConflictDialog}
+    >
         <div
           style={{
             display: 'flex',
@@ -326,7 +310,6 @@ export function ConflictDialog(): React.JSX.Element | null {
             testID="conflict-resolution"
           />
         </HeytaUiProvider>
-      </div>
-    </div>
+    </WebModalShell>
   );
 }

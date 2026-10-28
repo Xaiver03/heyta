@@ -1,5 +1,6 @@
 import { closePolicyOf, dismissActionFor, type ClosedOverlay } from '@heyta/ui';
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useModalFocusIsolation } from './useModalFocusIsolation.js';
 
@@ -70,6 +71,29 @@ export interface WebModalShellProps {
    */
   readonly busy?: boolean;
   /**
+   * 是否把**整层**（遮罩 + 面板 + 确认层）搬到 `document.body`。
+   *
+   * 🔴 默认 `false`：就地画，因为宿主的确认层必须与面板同一个层叠上下文
+   *（§7 第 607 条 `popover(500) > modal(400)` 那次倒挂就是这么来的）。
+   * 这一格存在的唯一理由是一枚**实测**过的宿主形状：宿主挂在 `position: sticky`
+   * 的侧栏里时（`nav.ht-sidebar`），sticky 必然创建层叠上下文，里面的
+   * `fixed` + `z.modal` 被困在该上下文内 ⇒ **看得见、点不到**
+   *（`features/share/JoinSharedListDialog.tsx:293-297` 记的就是这次实测）。
+   * 整层一起搬不破坏上面那条不变量：确认层仍然画在遮罩内、面板之前。
+   */
+  readonly portalToBody?: boolean;
+  /**
+   * 宿主的遮罩/面板样式（与上面两枚类名同用，谁后写谁赢的是**同一格属性**）。
+   *
+   * ⚠️ 存在的理由只有一个：**迁移本身不许产生视觉变化**。剩下那几枚待迁的壳
+   *（`JoinSharedListDialog` / `ShareFeature` / `ConflictDialog` / `PrivacyConsentSheet`）
+   * 用的是一整份内联 `cssVar` 样式对象而不是类名，所以壳必须能把这两格原样接住 ——
+   * 否则"换壳"就顺手改了一次外观，而那一档变化只有看图才判得了（§6.2）。
+   */
+  readonly overlayStyle?: CSSProperties;
+  readonly dialogStyle?: CSSProperties;
+
+  /**
    * 画在**遮罩层内、面板之外**的那一格（默认没有）。
    *
    * 🔴 唯一的用途是宿主的"先问一句"确认层（`modal-dirty-form` 的 `ask` 通道）：
@@ -93,6 +117,9 @@ export function WebModalShell({
   initialFocusRef,
   busy = false,
   overlayChildren,
+  portalToBody = false,
+  overlayStyle,
+  dialogStyle,
 }: WebModalShellProps): ReactNode {
   const containerRef = useModalFocusIsolation({ active: modalCommitment, initialFocusRef });
   const policy = closePolicyOf(policyKey);
@@ -128,10 +155,11 @@ export function WebModalShell({
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  return (
+  const layer = (
     <div
       role="presentation"
       className={overlayClass ?? 'ht-web-modal__overlay'}
+      style={overlayStyle}
       data-testid={`${testId}-scrim`}
       /**
        * 🔴 背景通道走 **mousedown + 目标判定**，不走 `click`。
@@ -156,6 +184,7 @@ export function WebModalShell({
         aria-busy={busy ? true : undefined}
         aria-labelledby={labelledBy}
         className={dialogClass ?? 'ht-web-modal__dialog'}
+        style={dialogStyle}
         data-testid={testId}
         onClick={(event) => {
           event.stopPropagation();
@@ -165,4 +194,10 @@ export function WebModalShell({
       </div>
     </div>
   );
+
+  /**
+   * 🔴 整层一起搬，不搬面板：确认层（`overlayChildren`）仍然画在同一枚遮罩里面板之前，
+   * 所以"后来者在上"那条不变量与 `portalToBody` 无关（理由见属性上的注释）。
+   */
+  return portalToBody ? createPortal(layer, document.body) : layer;
 }

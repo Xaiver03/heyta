@@ -79,6 +79,13 @@ test('取消新增不产生习惯，草稿也不进入页面（脏草稿先问�
   await page.getByTestId('discard-confirm-confirm').click();
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('[data-testid^="habit-row-"]').filter({ hasText: name })).toHaveCount(0);
+
+  // 🔴 P6：那句"放弃"必须真的把草稿放下。原来这一格只关上不清 state（十格草稿住在
+  // 关掉后仍存活的组件上），于是重开时名称框里躺着的还是刚才那份 —— 确认框说丢了、
+  // 实际没丢。断言锚在**重开后的那一格值**上，不是锚在"面板有没有出现过"。
+  await page.getByTestId('habits-add-open').click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('新习惯名称', { exact: true }), '选了「放弃修改」，重开时不该还是上一份草稿').toHaveValue('');
 });
 
 test('atMost 目标为 0 仍可通过新增面板创建', async ({ page }) => {

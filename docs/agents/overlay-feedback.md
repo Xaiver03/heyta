@@ -128,7 +128,10 @@ const action = dismissActionFor(policy, policy.scrim); // 'close' | 'ask' | 'non
 **账本制**：账外出现 ⇒ 红；账内读数涨了 ⇒ 红；**账内读数掉了也红**（要求同步把账本那一行改小）。
 第三臂常被想写成"应该放过"，但那会让门禁失去**唯一能证明自己在缩**的读数，而 T1/T5 的验收口径就是它。
 
-现量（2026-10-23，会漂，**别抄**，跑 `node scripts/check-overlay.mjs` 自取）：原生框 **8 处 / 5 文件**；自绘模态 **42 处 / 19 文件**。
+现量（2026-10-28 那一趟的读数，**会漂，别抄**，跑 `node scripts/check-overlay.mjs` 自取）：原生框 **7 处 / 4 文件**；自绘模态 **34 处 / 15 文件**。
+读数在往下走：P6 每把一枚宿主层换成共享壳，账本里就**删一行**（`HabitsView`、`ShareFeature`、`JoinSharedListDialog`、
+`ConflictDialog` 四行已在 2026-10-28 删掉）—— 删行的理由与"剩下的为什么还不迁"逐条写在
+[`global-ux-system-remediation.md` §8 的 P6 那格](../plans/global-ux-system-remediation.md)，不在这里复述。
 
 ### 5a. `pnpm check:dirty-form-policy` —— 自报对话框 + 里面有输入 ⇒ 必须交代"关掉丢不丢"
 

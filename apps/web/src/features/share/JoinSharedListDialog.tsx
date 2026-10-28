@@ -19,7 +19,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
 import { X } from 'lucide-react';
 
 import { cssVar, ICON_SIZE } from '@heyta/design-system';
@@ -290,25 +290,29 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
     }
   }, [api, getPayloadCipher, inputValue, t]);
 
-  // 🔴 必须走 portal 挂到 body：本组件由侧栏（ProjectsPanel）挂载，而侧栏列
-  // `nav.ht-sidebar` 是 `position: sticky` —— sticky **总是**创建层叠上下文，
-  // 里面的 fixed + z-modal 会被困在该上下文内，整列按树序画在 `.ht-main`
-  // 之前 ⇒ 对话框看得见（fixed 不被裁剪）但**点不到**（命中测试落在主内容上）。
-  // 模态是应用级表面，出口与 App 根部的 ShareFeature 同层（2026-10-10 旅程首跑实测）。
-  return createPortal(
-    <div
-      style={styles.overlay}
-      data-testid="share-join-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) requestDismiss('scrim'); }}
+  /*
+   * P6：遮罩 + 面板 + `role="dialog"`/`aria-modal`/`aria-labelledby`、三条通道查表、
+   * 提交中不许关、焦点三件事全在 `WebModalShell` 里。
+   *
+   * 🔴 `portalToBody` 这一格**必须留着**，理由是被实测过的、不是审美：本组件由侧栏
+   * （ProjectsPanel）挂载，而侧栏列 `nav.ht-sidebar` 是 `position: sticky` —— sticky
+   * **总是**创建层叠上下文，里面的 fixed + `z.modal` 会被困在该上下文内，整列按树序
+   * 画在 `.ht-main` 之前 ⇒ 对话框看得见但**点不到**（命中测试落在主内容上，
+   * 2026-10-10 旅程首跑实测）。搬的是**整层**，确认框仍然画在遮罩里面板之前。
+   */
+  return (
+    <WebModalShell
+      overlayStyle={styles.overlay}
+      dialogStyle={styles.dialog}
+      labelledBy="ht-share-join-title"
+      policy="modal-dirty-form"
+      testId="share-join-dialog"
+      busy={phase.kind === 'accepting' || phase.kind === 'waiting-key'}
+      portalToBody
+      onCancel={onClose}
+      onDismissAttempt={(via) => requestDismiss(via)}
+      overlayChildren={guard}
     >
-      {guard}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ht-share-join-title"
-        data-testid="share-join-dialog"
-        style={styles.dialog}
-      >
         <div style={styles.headRow}>
           <div style={styles.headText}>
             <h2 id="ht-share-join-title" style={styles.dialogTitle}>
@@ -419,8 +423,6 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
             </button>
           </>
         ) : null}
-      </div>
-    </div>,
-    document.body,
+    </WebModalShell>
   );
 }
