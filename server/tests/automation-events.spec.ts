@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ prisma: { $transaction: vi.fn() } }));
+const mocks = vi.hoisted(() => ({ prisma: { $transaction: vi.fn(), automationEvent: { findMany: vi.fn() } } }));
 vi.mock('../src/db', () => ({ prisma: mocks.prisma }));
 
 const identity = { credentialHash: 'a'.repeat(64), databaseEpoch: 'epoch', tokenVersion: 0 };
@@ -123,6 +123,19 @@ describe('explicit retry guard requires the source payload to still be there', (
     const update = retryTx({ ...uncertain, payloadCiphertext: envelope, expiresAt: new Date(1_700_000_000_000) });
     await expect(callRetry()).rejects.toThrow('Automation event cannot be retried');
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it('列表接口的 select 只取元数据：多取一列（尤其正文/结果那两列）就红', async () => {
+    mocks.prisma.automationEvent.findMany.mockResolvedValue([{ eventId: 'e1', ruleId: 'r1', ruleVersion: 1,
+      status: 'queued', reasonCode: null, attempt: 1, createdAt: new Date(1_800_000_000_000) }]);
+    const { listAutomationEvents } = await import('../src/automation/events');
+    expect(await listAutomationEvents(7)).toEqual([{ eventId: 'e1', ruleId: 'r1', ruleVersion: 1,
+      status: 'queued', reasonCode: null, attempt: 1, receivedAt: 1_800_000_000_000 }]);
+    // 🔴 这一句是这枚用例的承重点：查询路径上"不出现明文"靠的就是这个 select 的**精确形状**。
+    // 加进任何一列（`payloadCiphertext`/`resultCiphertext`/租约……）都在这里红 —— 不靠"记得别加"。
+    const args = mocks.prisma.automationEvent.findMany.mock.calls.at(-1)![0] as { select: Record<string, unknown> };
+    expect(Object.keys(args.select).sort()).toEqual(
+      ['attempt', 'createdAt', 'eventId', 'reasonCode', 'ruleId', 'ruleVersion', 'status']);
   });
 
   it('已有提交许可 ⇒ 拒（重抽会造出第二个任务）', async () => {

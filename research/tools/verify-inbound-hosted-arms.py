@@ -171,6 +171,12 @@ ARMS = [
      'tests/automation-events.spec.ts',
      '    if (!rule || permit) throw new Error(\'Automation event cannot be retried\');',
      '    if (!rule) throw new Error(\'Automation event cannot be retried\');'),
+    # A26 钉判据 3 里"**查询路径**不出现明文"那一半：列表接口的 select 就是那条界线，
+    # 此前没有任何用例看着它（多取一列没人会红）。这条臂往 select 里加回 `payloadCiphertext`。
+    ('A26 列表接口把正文密文也选出来（查询路径吐明文）', 'server/src/automation/events.ts', 'server',
+     'tests/automation-events.spec.ts',
+     '    select: { eventId: true, ruleId: true, ruleVersion: true, status: true, reasonCode: true, attempt: true, createdAt: true },',
+     '    select: { eventId: true, ruleId: true, ruleVersion: true, status: true, reasonCode: true, attempt: true, createdAt: true, payloadCiphertext: true },'),
 ]
 
 ARM_FILES = sorted({arm[1] for arm in ARMS})
