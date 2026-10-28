@@ -6020,7 +6020,7 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 - 校验在 `server/src/entitlement.ts::resolveAutomationEntitlementMode`（`:353`）：空/未配 ⇒ `undefined`（自动收集"响的拒绝"）；`official` / `selfhost-online` 之外 ⇒ **抛** `Invalid AUTOMATION_ENTITLEMENT_MODE`。
 - 读取点现量 **5 处、全部在请求路径上**（`entitlement.ts:432/473/782`、`api.ts:709`、`admin.routes.ts:277`）——**不是**启动时读一次，所以今天的形状是"每个请求各自撞一次错"，不是"进程起不来"。
 - 已有用例钉住这条抛出：`server/tests/automation-entitlement-ticket.spec.ts:254`（`resolveAutomationEntitlementMode('hosted')` ⇒ `toThrow(/Invalid AUTOMAT…/)`）；`undefined` 与大小写归一也在同一段（`:252-253`）。
-⇒ 改成"启动即红"要动的是这 5 处读取时机 + 启动路径，属于运行形态变更，本线不动。
+⇒ **这一格已定并落地**（2026-10-28 拍「3-B」）：只动**启动路径**——`server/src/index.ts` 的 `boot()` 里加一道与密码后端自检同形状的闸门，在绑定端口之前拒；上面那 **5 处请求路径的读取点原样不动**，它们从此只在配置合法时才会被走到。三条真起进程的读数、四枚形状断言与两枚变异臂都在文末「2026-10-29 00:2x · ③」那一节。
 
 ## 2026-10-28 23:2x · ⑦ 范围尺那张死表：拿到点头后动表，`越界=` 从 123 到 0
 
@@ -6038,13 +6038,28 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 - 分类器没变钝：ARM-1 在窗口内 244 枚越界里**仍逐枚命中已点名的三枚**（`packages/shared-schema/**` 那两枚与 `pnpm-lock.yaml`）。
 - 电池那条 `SCOPE-commit-scope` 腿用的就是同一条命令，现量 rc=**0** —— 它曾是整条电池唯一非 0 的那一枚腿。
 
+## 2026-10-29 00:2x · ③ 拍板「3-B」落地：`AUTOMATION_ENTITLEMENT_MODE` 写错改成**端口绑定之前就拒**
+
+**拍板记录**：负责人 2026-10-28「同意开始做吧。允许你去做」，按上一报推荐的 **3-B** 执行。提交 `ee71e1197`。
+
+**改了什么**（判据形状照既有那枚 `assertPasswordBackend()`，不新造机制）：
+- `server/src/index.ts` 的 `boot()`：在密码后端自检之后、`return start()` 之前调 `resolveAutomationEntitlementMode()`，抛出就点名错误键与两个合法值并 `process.exit(1)`。**没有**动那 5 处请求路径上的读取点，**也没有**动"未配置=响的拒绝"那一档——留空仍照常起、各端照旧 402 带 `reason=ENTITLEMENT_MODE_UNCONFIGURED`。
+- 新尺 `server/tests/automation-boot-gate.spec.ts`：四枚断言读 `index.ts` 的形状（调用恰一次／在 `start()` 之前／拒绝路径带名与 `process.exit(1)`／`mode === undefined` 那一支仍在）。为什么用形状断言而不是"真起一次进程"写进用例：这一格的判据本身就是**进程起没起**，vitest 里再起一个进程不会比它更可信，而真起的三条读数在下面现量里。
+- 旧口径**逐处同批改**（不是只改红的那一条，仓规"同一结论的几种句子形状"）：`docs/runbooks/deployment.md` 那条会骗人的形状、`docs/runbooks/self-host.md` 那段、`docs/plans/inbound-automation-work-brief.md` 两处、`ADR-0077` §7 的 H-4 行。**没有**留划线旧句当墓碑，改成平实重述。
+
+**现量读数**：
+- 真起进程三条（`PORT=39987/39988`、私有 `DATA_DIR`、`timeout` 包着，跑完即走）：`hosted` ⇒ **rc=1** + `❌ AUTOMATION_ENTITLEMENT_MODE is invalid — refusing to start.` + 端口没绑；留空 ⇒ 打 `🧭 …unset — …refused with a reason (402)` 并 `Server started`；`official` ⇒ 打 `🧭 …=official` 并 `Server started`。原件 `.run-logs/boot-3b/`（3 份）。
+- 新尺：`Tests 4 passed (4)`、rc=0；`server` 整包 `tsc --noEmit -p tsconfig.json` rc=**0**（上一会话正是死在这道门）；新 spec 按仓规单独量一次类型（`server/tests` 不在任何类型门里）⇒ rc=0。
+- **两枚变异在零脏载具上实跑**（载具 `.worktrees/inb-3b` @ `ee71e1197`，起跑 `git status --porcelain` 回 0）：A 摘掉整段闸门 ⇒ `Tests 4 failed (4)`；B 把 `mode === undefined` 改掉（= 未配置也拒，正是本决定明令不许的行为）⇒ `1 failed | 3 passed`；`cp` 还原后 `Tests 4 passed (4)`、载具脏 0，跑完由本线删除。
+- 范围尺：这一格动到 `server/src/index.ts`，它**原先不在白名单里**——先让尺抓到（`越界=1`），再按"每一族注明证据提交"的同一规矩补登记，然后 `越界=0`、自检 `臂数=6，不成立=0`。这条顺序是故意的：绕过尺去改判据等于没改。
+
 ## 决策单索引（负责人看这一页就够；每格的事实块都在上面几节里，这里只指路）
 
 | # | 要你拍的事 | 事实块在哪 | 你回一句什么我就开工 |
 |---|---|---|---|
 | ① | push 与 ref | 本节 20:5x（三）→「① push 与 ref 这一格的现量」 | `push origin main` |
 | ② | 迁移上线顺序 | 同上 →「② 迁移上线顺序」 | `迁移按先 apply 再放流量` |
-| ③ | `AUTOMATION_ENTITLEMENT_MODE` 形态 | 同上 →「③…现量证据」（在 20:5x 那节） | `3-B`（改启动即红） |
+| ③ | `AUTOMATION_ENTITLEMENT_MODE` 形态 | ✅ **已拍已落地**（「3-B」，2026-10-29 00:2x 那一节） | 不用再回这一格 |
 | ④ | 六格发布与措辞（含"两类明文元数据"） | 同 →「④ 六格措辞」＋工单 §5.2 | `④按(i)` 或 `④按(ii)` |
 | ⑤ | A4 双重计费口径 | 同 →「⑤ A4 双重计费口径」 | `⑤选A` 或 `⑤选B` |
 | ⑥ | AC-1～AC-8 勾验 | 同 →「⑥ AC 勾选」 | `⑥ AC-1..N 可以勾` |
