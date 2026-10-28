@@ -5925,6 +5925,12 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 **只归负责人的（本线不代拍，按硬约束）**：① push 与 ref；② 迁移 apply 与发版顺序；③ 生产 env/helm、`AUTOMATION_ENTITLEMENT_MODE` 写错⇒500 要不要改成启动即红；④ 六格对外发布与措辞（含新量出的一处英文漂移、"两类明文元数据"要不要补）；⑤ A4 双重计费口径修法；⑥ AC-1～AC-8 勾选（含"人真打开看过截图"）；⑦ 范围尺白名单口径（B205）。
 **另有一条仓级（不归本线顺手做）**：`server/tests` 不在任何 typecheck 门里，补门要付 225 条既有类型错。
 
+**对账表的"当前产物"读数（2026-10-28 21:0x 整串重跑，除浏览器腿以外 30 腿全跑）**：`legs=30 rc0=29 rc_nonzero=1`
+（起跑时 `CARRIER_HEAD=9316f618a`；唯一非 0 仍是 `SCOPE-commit-scope`＝B205 那枚别线提交）。
+副作用自报：`PNG_DIFF_LINES=0`、`EVIDENCE_DIRTY=0` ⇒ 这一趟**没碰任何取证图**（浏览器腿被排除，它最近的读数是 20:1x 那趟补齐 `e2e` 的载具：8 passed）。
+原件 `.run-logs/inb-ac-battery-1028-2100/rc.txt`。
+
+
 **③「`AUTOMATION_ENTITLEMENT_MODE` 写错⇒500 要不要改成启动即红」这一格的现量证据**（只交事实，决定归负责人）：
 - 校验在 `server/src/entitlement.ts::resolveAutomationEntitlementMode`（`:353`）：空/未配 ⇒ `undefined`（自动收集"响的拒绝"）；`official` / `selfhost-online` 之外 ⇒ **抛** `Invalid AUTOMATION_ENTITLEMENT_MODE`。
 - 读取点现量 **5 处、全部在请求路径上**（`entitlement.ts:432/473/782`、`api.ts:709`、`admin.routes.ts:277`）——**不是**启动时读一次，所以今天的形状是"每个请求各自撞一次错"，不是"进程起不来"。

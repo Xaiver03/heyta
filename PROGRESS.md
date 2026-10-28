@@ -7854,6 +7854,12 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ③ A27 臂：把这行改成 `return (result.reason as HostedExtractionFailure) ?? 'model-request-failed';` ⇒ 零脏载具（`43749ea1d`，起跑 0 脏、跑完自删）上 A26/A27 一起跑：两面对照臂绿、各红 1 条并点名、`还原_ok`、`跑过 2 臂／在册 27` rc=0。
     ④ 台账对账表 3·a 那行补上 A27；ADR §4.1 那句后面挂上"兜底那一支也有用例"。
 
+224. **自动收集线 · 除浏览器腿外整串 30 腿在当前产物上重跑（对账表那列"当前"的读数）**（写前先跑 `date`，本机 2026-10-28 21:0x）
+    ① 分母：`--list` 里 31 腿减掉会重写取证图的 `AC6-browser` ⇒ 30 腿。读数 **`legs=30 rc0=29 rc_nonzero=1`**，唯一非 0 仍是 `SCOPE-commit-scope`（B205 那枚别线提交）。
+    ② 副作用自报：`PNG_DIFF_LINES=0`、`EVIDENCE_DIRTY=0` ⇒ 这趟没碰任何入库的取证 png；浏览器腿那一格的读数沿用 20:1x 补齐 `e2e` 的载具（`8 passed (20.5s)`）。
+    ③ 原件 `.run-logs/inb-ac-battery-1028-2100/rc.txt`（gitignore 内）；起跑 `CARRIER_HEAD=9316f618a`。
+
+
 
 
 
