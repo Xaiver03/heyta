@@ -5478,7 +5478,23 @@ A2 谓词那一支被删/改坏 ⇒ 红、A3 分母打空 ⇒ 红、A4 **抹掉�
 ⇒ 处置照旧：**不改他们的文件、不替别人往 `UNTRACKED_LINK_OK` 里登记**；本线这一节自己的门是绿的
 （`verify-inbound-doc-tables.py`／`check-docs-voice.mjs`／`verify-inbound-evidence-pointers.py` 各 rc=**0**，见上面各段现量）。
 
-### 七、本节的边界
+### 七、本笔提交给范围尺加了三行 OOB —— 一枚我没动的口径，逐行摆给拍板的人
+
+`python3 research/tools/verify-inbound-commit-scope.py`：提交前那戳（15:20 电池里那趟）首行
+`本线笔数=397　涉及路径=246　越界=120`，提交后 `本线笔数=400　涉及路径=248　越界=122`。
+本笔 `bc983822` 被点名的 OOB 有 **3** 枚（`grep -n 'bc983822' <日志>` 回 6 行 = 3 枚行 + 3 行归属说明）：
+`scripts/check-inbound-rule-fixture-parity.mjs`（本线新尺）、`scripts/check-gate-wiring.mjs`（仓级门禁的登记表）、
+`docs/plans/inbound-automation-handoff.md`（交接书）。
+
+**为什么我没动白名单**：`WHITELIST` 里压根**没有任何 `^scripts/` 形状**，也没有交接书那枚路径 ——
+这是本线早就存在、挂在 **B169／B205** 待拍的口径，不是我这次造出来的。同族的前例（现量 `grep -E '^  OOB scripts/' <日志>`）：
+`scripts/check-inbound-system-prompt.mjs`（**本线自己的尺**，被 3 笔早期提交点名）与 `scripts/check-worktree-exceptions.mjs`；
+而 `docs/plans/inbound-automation-handoff.md` 那一行 `bc983822` 之前已经排着 9 枚历史提交。
+⇒ 所以这三行落进的是"本线把尺与交接件写在白名单没覆盖的地方"那一格，
+**改判据（往 `WHITELIST` 加形状）归负责人**：加与不加动的是"这条线允许碰哪些路径"这句话本身，本线不代拍。
+本节只把数写清楚，`SCOPE-commit-scope` 那枚腿继续按 B205 保持红。
+
+### 八、本节的边界
 
 不勾 AC 格（现量 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**）；
 没动 `package.json`、没动 `pnpm check` 链、没动 `BLOCKED.md`（那枚文件此刻在别线名下脏着）；
