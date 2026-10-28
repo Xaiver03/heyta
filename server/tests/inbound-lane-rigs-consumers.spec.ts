@@ -78,6 +78,12 @@ const DELIBERATELY_NOT_WIRED: Record<string, string> = {
   // 八枚反向验证臂由它自己的 `--self-test` 带（只在临时目录造样本），判据腿留手跑。
   'verify-inbound-evidence-pointers.py':
     '判据腿要看仓外本机取证目录，无那批件的机器上必红；PROGRESS 第 141 条 ⑤ 写明不接进电池与链（会改动已交付分母），留手跑',
+  // 2026-10-28 从仓外搬进来的一格部署顺序探针（ADR-0077 §6）。它要 initdb 起一份私有 Postgres、
+  // 再逐枚 apply 78 枚迁移（本机一趟约 40 秒）⇒ 常驻不合算。但它**自带形状闸**：
+  // 档一必须"那一列不存在 + 两头发写面 create 各报一次 P2022"、档二必须"列在 + 旧行经读面回来是 null"，
+  // 任一项不符就 rc=1 —— 所以"跑完了"与"结论成立"在这枚装置上不是同一件事，不靠读的人在场。
+  'verify-inbound-unapplied-migration.py':
+    '要起一次性 initdb + 逐枚 apply 78 枚迁移（约 40 秒），常驻不合算；判决内置（形状闸），留手跑',
 };
 
 function runRig(file: string, extraArgs: string[] = []) {

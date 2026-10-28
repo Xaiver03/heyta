@@ -303,8 +303,13 @@ A16 第一趟红 5 条、门槛那条**一言不发**（标题比断言宽），
    **所以拿 `count()` 当这类探针会读出假结论**（这一形比结论更要紧）。
    而"`NULL` 读成归设备"这句成立的是**另一档**：那一列已经存在、行是加列之前落的旧行 ——
    探针第二档实测裸 SQL 插一行不写那一列，经读面回来是 `null`，`=== true` 为 `false` ⇒ 归设备。
-   复现：`python3 ~/.heyta-evidence/inbound-hosted-extraction-20261027/probe-unapplied-migration.py`
-   （读数同目录 `unapplied-migration-probe.out`）。
+   复现（装置已在仓内）：`python3 research/tools/verify-inbound-unapplied-migration.py`
+   —— 它自己起一份私有 Postgres（`initdb` + 空闲端口）、先 apply 除 `20261027000000_add_hosted_inbound_extraction`
+   之外的全部迁移再补上那一枚，两档各跑一次真 Prisma 客户端；**判决内置**：档一必须"那一列不存在 + 两头发写面
+   create 各报一次 `P2022`"、档二必须"列在 + 旧行经读面回来是 `null`"，不符就 rc=1。
+   2026-10-28 19:5x 在 `31c2b88f1` 上跑过：`column_before=0`、`create_p2022_before=2`、总 `p2022_before=3`
+   （读面那发 `findFirst` 也一起死 ⇒ 比"只有写面死"更响）、`column_after=1`、`p2022_after=0`、`legacy_line=True`、rc=**0**。
+   原先那两枚仓外件（`probe-unapplied-{migration.py,client.cjs}`）自此不再是复现入口。
    ⇒ 由此得出一条**部署顺序**上的话：这一档**不许**"先换容器再补迁移"，而 `docs/runbooks/deployment.md`
    里本来就有一道"先跑迁移、`MIGRATE_RC=0` 才换容器"的闸（现量 `grep -n "先跑迁移" docs/runbooks/deployment.md`）
    —— 本档不改它，只是指名：**绕开那道闸**手工换容器时，红的形状是全量 500，不是"回到设备档"。
