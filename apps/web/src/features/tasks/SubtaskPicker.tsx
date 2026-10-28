@@ -187,7 +187,7 @@ export function SubtaskPicker({
   return (
     <details style={{ display: 'inline-block' }}>
       <summary
-        className={currentParent === undefined ? 'ht-chip' : 'ht-chip ht-chip--on'}
+        className={currentParent === undefined ? 'ht-chip ht-chip--action' : 'ht-chip ht-chip--action ht-chip--on'}
         style={{ listStyle: 'none' }}
         data-testid={`subtask-trigger-${task.id}`}
         aria-label={t('web.subtask.trigger.aria', { title: task.title })}

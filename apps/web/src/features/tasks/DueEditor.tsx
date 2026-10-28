@@ -317,7 +317,7 @@ export function DueEditor({
          * ⇒ 收进 `.ht-chip`：字号/内边距/圆角/前景色全部回到设计系统那一份，
          * 不再在这里手写（手写的那几项与 `.ht-chip` 逐项重复）。
          */
-        className="ht-chip"
+        className="ht-chip ht-chip--action"
         style={{ listStyle: 'none' }}
       >
         <Calendar size={TRIGGER_ICON_SIZE} aria-hidden="true" />

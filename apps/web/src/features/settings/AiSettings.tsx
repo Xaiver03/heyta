@@ -1190,7 +1190,7 @@ export function AiSettings({
                         <button
                           key={endpoint.id}
                           type="button"
-                          className={on ? 'ht-chip ht-chip--on' : 'ht-chip'}
+                          className={on ? 'ht-chip ht-chip--action ht-chip--on' : 'ht-chip ht-chip--action'}
                           aria-pressed={on}
                           onClick={() => toggleRoute(feature, endpoint.id)}
                         >

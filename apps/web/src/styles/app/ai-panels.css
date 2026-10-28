@@ -490,7 +490,12 @@ input[type="radio"] {
   background: var(--ht-color-background);
   color: var(--ht-color-foreground-muted);
   font-size: var(--ht-font-size-2xs);
-  cursor: pointer;
+  /*
+   * 🔴 `cursor: pointer` 原来挂在**这一族**上，而这一族今天同时被两种东西用：
+   *    可点的动作（`<button>`/`<summary>` 上的"截止 / 子任务 / 备注"）与只读的徽标
+   *    （`<span>` 上那颗"这一行有备注"）。指针形状替徽标撒了谎 —— 它承诺可点。
+   *    P7 分型之后 pointer 只属于 `--action` 那一档（判据在 `scripts/check-chip-typing.mjs`）。
+   */
   /*
    * 🔴 这里**原来**有 `transition: background var(--ht-duration-fast)`，而它是个
    *    对比度缺陷，不是审美选择：切主题时 `color` 是瞬切的（暗色 `foreground` 立刻
@@ -504,6 +509,21 @@ input[type="radio"] {
    *    代价只有 chip 选中态切换时少了一个 150ms 的淡入；这个控件的底色变化本来
    *    就是"点一下就完事"的状态确认，不需要动效来解释自己。
    */
+}
+
+/**
+ * 🔴 P7 分型：`.ht-chip` 今天被两种东西共用，而它们的**下限不是一回事** ——
+ * 可点的动作（截止 / 子任务 / 备注 / 提醒 / AI 那几枚，载体是 `<button>` 或 `<summary>`）
+ * 要够到触控下限；只读的徽标（"这一行写过东西"那颗）**不许**跟着长高，
+ * 否则每一行都被一个不能点的东西撑开。原来两种都吃 `.ht-chip` 的 ~20px 盒，
+ * 于是"触控目标 20px"与"徽标该保持紧凑"是同一份样式在互相拉扯。
+ *
+ * 判据在 `scripts/check-chip-typing.mjs`：可点元素带 `ht-chip` 必须带 `--action`，
+ * 只读元素带 `--action` 直接红（反向那一半治的是"把整排都撑成 44px"）。
+ */
+.ht-chip--action {
+  min-block-size: var(--ht-touch-target-min);
+  cursor: pointer;
 }
 
 .ht-chip--on {

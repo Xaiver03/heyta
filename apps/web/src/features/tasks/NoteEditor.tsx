@@ -167,7 +167,7 @@ export function NoteEditor({
         // 🔴 用既有的 `.ht-chip` / `.ht-chip--on`（与设置页的能力开关同一个 chip 族），
         // 而不是在这里现写一套：chip 的边距、圆角、字号、光标都已在 app.css 里。
         // 只留 `listStyle: 'none'` —— `.ht-chip` 不负责隐藏 `<summary>` 的展开三角。
-        className={hasNote ? 'ht-chip ht-chip--on' : 'ht-chip'}
+        className={hasNote ? 'ht-chip ht-chip--action ht-chip--on' : 'ht-chip ht-chip--action'}
         style={{ listStyle: 'none' }}
       >
         <NotebookPen size={ICON_SIZE.xs} aria-hidden="true" />
