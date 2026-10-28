@@ -150,6 +150,40 @@ for (const theme of ['light', 'dark'] as const) {
         bg: await tokenRgb(page, '--ht-color-danger-subtle'),
         fg: await tokenRgb(page, '--ht-color-danger-strong'),
       });
+
+      /* ⑨ 选中档（`aria-pressed`）：日历页头那枚侧栏开关。
+         这一档**只靠颜色表达**（`controls.css` 里 pressed 把字换成 `color.primary`、底仍透明），
+         所以它是四档里最容易"看起来没差别"的一格 —— 不量就没人知道它掉了。
+         按之前/之后各读一次，比的是"哪一次是 pressed 就哪一次该读到 primary"。 */
+      await switchView(page, '日历');
+      const sel = '.ht-header__calendar-sidebar-toggle';
+      const toggle = page.locator(sel);
+      await expect(toggle, '日历页头没有那枚侧栏开关').toHaveCount(1);
+      /*
+       * 🔴 选中档（`aria-pressed`）两件事一起判：
+       *   · **哪一次是 pressed 从界面上读回来**（`aria-pressed`），不靠"我猜点击前是关着的"
+       *     —— 第一版就是这么猜的，红在把 idle 当成 pressed（读数：期望 `foreground-muted`
+       *     拿到 `rgb(37,99,235)`）；
+       *   · 每一档都 `expect.poll` **到过渡终值**再比（§7 第 609 条：过渡中读到的是起点色；
+       *     第二版就栽在这里，390 档读到的是 `rgb(67,87,120)` 这种半程值）。
+       * 基档 ghost 的字色是 `foreground-muted` 而不是 `foreground`（`controls.css:108-111`），
+       * pressed 换成 `color.primary` ⇒ 这一档**只靠颜色表达**，掉了没人看得出来"开着"。
+       */
+      const ON = await tokenRgb(page, '--ht-color-primary');
+      const OFF = await tokenRgb(page, '--ht-color-foreground-muted');
+      const readFg = async (): Promise<string> => (await look(page, sel)).fg;
+      const was = await toggle.getAttribute('aria-pressed');
+      await page.mouse.move(20, 20);
+      await expect.poll(readFg, '开关当前这一档读到的字色不对').toBe(was === 'true' ? ON : OFF);
+      await toggle.click();
+      await expect.poll(async () => await toggle.getAttribute('aria-pressed')).not.toBe(was);
+      await page.mouse.move(20, 20);
+      await expect
+        .poll(readFg, `翻过去之后没换到另一档（pressed 该读到 ${ON}、未 pressed 该读到 ${OFF}）`)
+        .toBe(was === 'true' ? OFF : ON);
+      if (width === 1440) {
+        await page.screenshot({ path: `${EVIDENCE}/pressed-${theme}.png` });
+      }
     });
   }
 }
