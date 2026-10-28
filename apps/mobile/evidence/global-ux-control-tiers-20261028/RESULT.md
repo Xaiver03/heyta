@@ -75,13 +75,24 @@ Web 端 `.ht-btn--secondary` 用的是同一枚 `surface-sunken`，两端同形 
 触控目标：静止帧次档药丸高 121px ÷ 2.75 = **44.0dp**，与 `touch-target.min` 逐字相等；
 按下帧 42.5dp 是缩放的结果，不是另一档尺寸。
 
-## 这一格没做到的（别读成"全绿"）
+## 补跑：实底档与禁用档（同一趟稍后，2026-10-28）
 
-* **回收站「彻底删除」的 `emphasis="commit"` 实底档在设备上没拍到**：从 `我的` 页滚到
-  `回收站` 那一行这一步在 8 次滑动里没走到（列表底部先到 `整理与记录`），没继续耗回合。
-  实底档的两端一致性目前只有 Web 真浏览器腿（`e2e/tests/control-semantics.spec.ts`）与
-  语义测（`packages/ui/tests/control-states.spec.ts`）在守。
-* **禁用档在设备上没拍到**：`disabled` 那一格要 `busy` 才画得出来，本地离线装机没有能稳定
-  制造 busy 的入口。同上一格，目前由语义测与 Web 腿守。
-* `emulator-5556` 上留着这一枚 `com.heyta`（本地离线态、两条测试任务），夜模式已开。
-  收掉：`adb -s emulator-5556 shell cmd uimode night no && adb -s emulator-5556 shell am force-stop com.heyta && adb -s emulator-5556 uninstall com.heyta`。
+上面那两格"设备上没拍到"已经补上，路径是**真点出来的**，不是猜的：
+
+* 回收站入口不在 `我的` 那一列里 —— 列表滚到底只有到 `便签` 为止；`回收站` 那一行住在
+  **`我的` → `设置` → `数据管理`** 这一节里（`ProfileScreen.tsx:1452` 的 `dataActions` 那一格）。
+* 禁用档**零前置**就有：`任务` 页 → `选择任务` ⇒ 批量条上 `批量完成 / 移动到清单 / 批量删除`
+  三枚在"没选中任何一条"时就是 `disabled`（`TasksScreen.tsx:1255/1263/1270`，
+  无障碍树现量 `enabled=false` ×3）。不必造 `busy`。
+
+| 件 | 判的是什么 | 读数 |
+|---|---|---|
+| `purge-confirm-light.png` / `purge-confirm-dark.png` | `emphasis="commit"` 实底档 + `color.on-danger` | 亮：`取消` = `#f1f5f9` 底 + `#0f172a` 字，`彻底删除` = **`#dc2626` 实底 + `#ffffff` 字**；暗：`取消` = `#080e1a` 底 + `#f1f5f9` 字，`彻底删除` = **`#f87171` 实底 + `#020617` 字**（= `--ht-slate-950`，正是暗色档 `on-danger` 那一格）⇒ 重量档在设备上也分得出，且暗色档没跟着亮色档写白 |
+| `bulk-disabled-light.png` / `bulk-disabled-dark.png` | 禁用档的不透明度 | 由**画出来的像素反解 alpha**（`O = αF + (1-α)C`，C 取同一条上按钮间隙的容器底）：暗色下次档底解出 **α≈0.358**、行内危险字解出 **α≈0.376**，对着 token `state.disabled-opacity = 0.38`（`tokens.css:563`）；若是代码里写死的 `0.5` 会解到 0.5 附近 ⇒ 设备上用的是 token 那一档，不是裸值 |
+| `tier-zoom-sheet.png` | 人看图的载体 | 四条按钮带拼在一起看过：两档确认层里"实底那枚才是按下去的"一眼成立；禁用那两条整体淡下去但**没消失**（可读） |
+
+## 这一格没做到的（别读成"全绿"）
+* `emulator-5556` 上留着这一枚 `com.heyta`（本地离线态、两条测试任务）。本趟收尾已把
+  夜模式调回 `no` 并 `force-stop`；卸载：`adb -s emulator-5556 uninstall com.heyta`。
+* **hover 档在触屏上不存在**，这一端只有静止 / 按下 / 禁用三态 —— 计划里"逐态"那句在
+  移动端按这三态判，不拿 Web 的 hover 冒充。
