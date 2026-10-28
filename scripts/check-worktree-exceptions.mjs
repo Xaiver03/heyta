@@ -32,7 +32,11 @@
  *   node scripts/check-worktree-exceptions.mjs --self-test
  *   node scripts/check-worktree-exceptions.mjs --head --range b55e98807  # 第三判：那一笔以来落进 HEAD 的改动，自己是不是半棵树（只读对象库）
  *
- * 规则表住在脚本里，登记正文（每一行为什么不归本线）在 `BLOCKED.md` 的 B238 那一节。
+ * 规则表住在脚本里，登记正文（每一行为什么不归本线）在 `BLOCKED.md` 那张「归谁 / 为什么不由我代提交」的表里。
+ * 🔴 这里**不写 B 号，也不写撞号枚数**：2026-10-28 发现 BLOCKED.md 里有同号开出两节的（其中一枚正是 B232），
+ *   按号引用等于指错地方 —— 我自己就错过一次（原先这两行写「见 B238 那一节」，而那一号讲的是 macOS 窗口门）。
+ *   定位只用形状：`grep -n '^| 归谁 |' BLOCKED.md`；撞号现量另有探针
+ *   `node research/tools/audit-blocked-number-collisions.mjs`（分母与视力臂自己打印）。
  */
 
 import { execFileSync } from 'node:child_process';
@@ -715,7 +719,7 @@ const main = () => {
     for (const u of v.unattributed.slice(0, 20)) console.log(`   ${u.xy} ${u.file}`);
     if (v.unattributed.length > 20) console.log(`   …另 ${v.unattributed.length - 20} 枚`);
   } else {
-    console.log('   ⇒ 每一枚都归到某条已登记的理由；正文见 BLOCKED.md 的 B238 那一节。');
+    console.log("   ⇒ 每一枚都归到某条已登记的理由；正文在 BLOCKED.md 那张「归谁 / 为什么不由我代提交」表，取它的位置：grep -n '^| 归谁 |' BLOCKED.md");
   }
   const trackedSet = new Set(
     execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
