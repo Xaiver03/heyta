@@ -5343,6 +5343,24 @@ python3 research/tools/verify-inbound-ac-battery.py   # 原件 ~/.heyta-evidence
 ⚠️ 上面那张 15:0x 的表**不作废**：它是"修之前那一戳"的读数，`AC6-browser` 那一格当时确实是红的；
 下面这段是"修之后同一支尺在最终 tip 上"的整串读数。两戳并存才对得上"谁在什么时候是什么形状"这件事。
 
+### 顺手登记一枚**别线在飞**的文档死链（本线不代改、也不放宽门禁）
+
+提交这一节时 `pnpm check:docs` 回 rc=1，全文只有一处：
+`docs/agents/multi-end-build.md:41` 指向 `docs/runbooks/android-build-on-linux-dev.md`，
+而后者**本机存在、git 没跟踪**。三条现量把它归到 Linux/Android 那条线，不是本线：
+
+```bash
+git status --porcelain -- docs/runbooks/android-build-on-linux-dev.md   # 回 ??（未跟踪）
+git status --porcelain -- docs/agents/multi-end-build.md                # 回  M（他们未提交的改动）
+git log 99cd8af21..HEAD --name-only --pretty=format: | grep -cE "multi-end-build|android-build-on-linux-dev"   # 回 0（本线这几笔一枚没碰）
+```
+
+⇒ 处置：**不改他们的文件、不往 `UNTRACKED_LINK_OK` 里替别人登记**。那三条出路（`git add` / 改成纯文字 /
+登记刻意只活本机）由那条线自己挑 —— 选哪条动的是**他们那份 runbook 该不该进仓**，本线连判据都不该替他们定。
+本线这一节自己的门是绿的（同一把尺全局只报了这一处，且不在本线文件里；
+`verify-inbound-doc-tables.py` 与 `check-docs-voice.mjs` 各 rc=0）。
+
+
 
 
 
