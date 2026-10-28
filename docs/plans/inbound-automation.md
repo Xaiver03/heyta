@@ -5689,3 +5689,11 @@ column_before=0  create_p2022_before=2  p2022_before=3  column_after=1  p2022_af
    形状比"红"好，因为它不会伪装成结论；② 我初稿在装置说明里写过一枚**不存在的**常驻尺名（`inbound-unapplied-migration-shape.spec.ts`），
    现量核对后删掉，换成真名 `inbound-automation.routes.spec.ts` 并写明"它用假 store、不碰真库 ⇒ 这一格没有常驻替代物"。
    这类"把合理的东西当成存在的"是本仓那条老坑（去找一件不存在的东西），所以两处都在台账里留名，不只改文件。
+
+### 八、§5 那句"可复现"到这里才真的对上：逐臂记录也落进仓内
+
+`mutation-arms.md`（19 KB 逐臂记录）原先也在仓外，本线把它今日那一趟**从装置 stdout 现抄成仓内表**：
+`docs/research/inbound-automation-review.md` 文末「附录 · 变异臂逐臂记录」，22 行 × (臂｜动的那一处｜失败条数｜红了哪几条用例)。
+不是我手敲的 —— 由 `.run-arms-carrier-run2.txt` 那台载具日志程序化生成（解析到 22 臂、全红、全 `还原_ok` 才落笔），
+这样"抄件走样"这一族风险被那条断言挡住了。ADR §5 的指针随即改指仓内；更早两戳仍留仓外并**写明不是复现入口**。
+四把文档尺（表格／口音／证据指针／`check:docs`）改后各 rc=**0**。本节多动 2 枚：那份 review 文档与 ADR 的指针行。

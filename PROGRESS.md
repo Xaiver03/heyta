@@ -7750,3 +7750,6 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
       `inbound-automation.routes.spec.ts` 并写明"它用假 store、不碰真库 ⇒ 这一格没有常驻替代物"。
     ⑤ 本节动 5 枚（探针新／consumers spec 一段／ADR §6 复现入口／计划本节／本条）。判卷口径零处、AC 勾数 0；没动 `package.json`、没动链。本线不 push、不自标完成。
 
+    ⑥ 补一笔"可复现"的最后一格：`mutation-arms.md`（19 KB 逐臂记录）也在仓外 ⇒ 今日那趟的逐臂记录由装置 stdout
+      **程序化**抄进仓内（`docs/research/inbound-automation-review.md` 文末附录，22 行；解析到 22 臂、全红、全 `还原_ok` 才落笔），
+      ADR §5 指针改指仓内，更早两戳仍留仓外并写明"不是复现入口"。四把文档尺（表格／口音／证据指针／check:docs）各 rc=**0**。
