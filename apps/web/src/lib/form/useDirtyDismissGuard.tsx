@@ -129,8 +129,10 @@ function DiscardConfirm({
 
   // 🔴 **不 portal 到 `document.body`**：确认框画在**它所拦的那一层的层叠上下文里**，
   // 靠"同一个上下文里后来者在上"压在宿主面板之上。挂回 body 就要跟宿主比 z-index 数值，
-  // 而本仓的 z 刻度是乱的（`.ht-habit-create-dialog` 占 `z.splash`=900，
-  // 日历快速捕获占 `z.popover`=500）—— 比数字是一场军备竞赛，P7 要治的是刻度本身。
+  // 比数字是一场军备竞赛：`.ht-habit-create-dialog` 当时占 `z.splash`(900)。
+  // P7 已把那一枚越级拆回 `z.modal` 并给它立了尺（`pnpm check:z-ladder`），
+  // 但**这一格仍要留在 `z.modal-commitment`**：锚定层（`z.popover`=500）今天仍在
+  // `modal`(400) 之上，那是"从对话框里开出去的日期/重复选择器"能压住面板的前提。
   //
   // 层：`z.modal-commitment`，**不是** `z.modal`。
   // 实测到的刻度缺陷：`--ht-z-popover: 500` 高于 `--ht-z-modal: 400` ⇒ 锚定浮层压住模态承诺层。

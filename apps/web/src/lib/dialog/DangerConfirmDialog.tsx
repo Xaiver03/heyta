@@ -30,7 +30,8 @@ import { WebModalShell } from './WebModalShell.js';
  *
  * 第一版走 `createPortal` 到 `body` + 全局 z 阶梯，结果被两层坑各撞一次：
  * 锚定层在 `z.popover`(500) 而确认层在 `z.modal`(400) ⇒ 画得出来点不动；
- * 而习惯新建那层用的是 `z.splash`(900) ⇒ 数字竞赛必输。教训与复量命令见 §7 第 607 条。
+ * 而习惯新建那层当时用的是 `z.splash`(900) ⇒ 数字竞赛必输（那一枚已在 P7 拆回
+ * `z.modal`，并由 `pnpm check:z-ladder` 守着不再回来）。教训与复量命令见 §7 第 607 条。
  * ⇒ 宿主传 `className` 进来，确认层跟着宿主的 z 走。
  */
 export interface DangerConfirmClassNames {
