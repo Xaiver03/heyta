@@ -261,27 +261,6 @@ const ALLOWED_UNREFERENCED_IMPL = new Map([
       ],
     },
   ],
-  [
-    'check-inbound-rule-fixture-parity.mjs',
-    {
-      reason:
-        '防再犯尺：判「自动收集规则的读面谓词收紧了而某处 fixture 没跟上」那一族缺陷 ' +
-        '（2026-10-27 那笔把 `hostedExtraction` 加进 `valid()` 时，e2e 三段规则 fixture 没补，' +
-        '红要等到 10-28 真浏览器腿被跑到才出来）。它的载体是 AC 电池的 `AC6-rule-fixture-parity` 那一腿，' +
-        '不在每次提交的 `pnpm check` 链里 —— **不是因为它该被排除在链外**：接进链要改根 `package.json`，' +
-        '而 2026-10-28 那一刻那枚文件带着别线（产品体验线）6 处未提交的 `check:` 改动，' +
-        '本线用显式 pathspec 提交就会把他们的 hunk 一起签走。' +
-        '⇒ 转正判据：`git status --porcelain -- package.json` 回空 时加一枚 `check:inbound-rule-fixture-parity` 定义并接进链，' +
-        '然后把这条登记删掉（判据口径一个字不动）。',
-      consumers: [
-        {
-          file: 'research/tools/verify-inbound-ac-battery.py',
-          needle: '("AC6-rule-fixture-parity", ".", "node scripts/check-inbound-rule-fixture-parity.mjs"),',
-          role: 'AC-6 那格的第三条腿：电池每跑一趟 AC 面就真的 spawn 这道门禁（`--only AC6-rule-fixture-parity` 单跑也是它）',
-        },
-      ],
-    },
-  ],
 ]);
 
 /** 链必须包含的锚点：掉哪一个都是"整条链不再检查一件事"级别的事故。 */

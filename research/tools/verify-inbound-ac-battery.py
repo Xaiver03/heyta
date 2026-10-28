@@ -82,6 +82,8 @@ LEGS: list[tuple[str, str, str]] = [
     ("AC6-rule-fixture-parity", ".", "node scripts/check-inbound-rule-fixture-parity.mjs"),
     ("AC7-doc-tables", ".", "python3 research/tools/verify-inbound-doc-tables.py"),
     ("AC7-doc-endpoints", ".", "python3 research/tools/verify-inbound-doc-endpoints.py"),
+    # 🔴 对外正文手抄在多枚法律文件里 ⇒ 这一尺盯的是"改一处不改另几处"那一族（工单 §5.2 记过的现量危险）。
+    ("AC7-legal-copy-parity", ".", "node scripts/check-inbound-legal-copy-parity.mjs"),
     ("AC7-migrations", ".", "node scripts/check-migrations.mjs"),
     ("AC7-license", ".", "node research/tools/license-inventory.mjs"),
     ("AC7-docs-voice", ".", "node scripts/check-docs-voice.mjs"),
