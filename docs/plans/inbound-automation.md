@@ -5897,6 +5897,35 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
 
 判卷口径零处动、AC 勾数仍 0；`packages/legal/**` 一字未动。
 
+## 2026-10-28 20:5x（三）· 六项交付逐条对账（收口用；只写"现量读到什么"，不写"应该没问题"）
+
+**下表每一行都能当场重跑**。状态只有两种：`✅ 本线已交`、`🔴 卡在负责人`（后者按硬约束"只交证据不代拍"）。
+
+| # | 交付要求（原话摘） | 本线的证据（文件 / 命令 / 读数） | 状态 |
+|---|---|---|---|
+| 1·边界 | 写清服务端在托管档做抽取的边界 | ADR-0077 §1/§2 + §5 事实表；`grep -n "窗口" docs/adr/0077-…md` | ✅ |
+| 1·留存+零日志 | 抽取窗口留存策略与零日志判据 | ADR §4.1：标记串既不在写库参数、也不在全部日志输出；错误路径只出稳定码；真 HTTP 那一面按三行 `202` 出口分臂（A14/A15/A22） | ✅ |
+| 1·红线 | 不持 Vault 根密钥、不写 op-log | ADR §3.x（§2 第 108/115 行那两段）+ A18（集成面 op 差 0）/A19–A21（服务端整个 automation 面不许长出开正文能力） | ✅ |
+| 1·衔接 | 与 ADR-0054 留存条款衔接 | ADR §3.5（同一个 `consumeManagedAiRequest`、同一条境内白名单）+ §5 那句"与 0054 对代理路由的约束同一条形状" | ✅ |
+| 2·链 | `sealInbound` 之后新增领取→抽取→重封→丢弃 | `inbound.routes.ts`：`:141 sealInbound` → `:212 rule.hostedExtraction === true` → `:219 runHostedExtractionAtIngest`；存储层抹正文由 A1 钉 | ✅ |
+| 2·方式+理由 | 模型调用二选一 + 写明理由 | ADR §3 方案 (c)：搬进 `invokeManagedAiCompletion`、两腿同函数；现量：拼接点**全仓**只剩 `managed-completion.ts:306` | ✅ |
+| 2·计量归属 | 写明计量归属，A4 口径只登记不代拍 | ADR §3.5 三条 + §5 ⚠️「A4 不在本档里、归负责人」；H1 读到"额度恰好 +1、attempts 0 行、op 差 0"（spec 注释 :989/:998/:1067 那一族） | ✅ 登记 / 🔴 A4 修法归负责人 |
+| 3·a 存储+查询+错误路径 | 窗口后正文不可再读出，三面都要 | A1（存储）/ A26（查询 `select` 恰七列，本戳新增并实跑）/ A14·A15·A22（三行 202 回显） | ✅ |
+| 3·b 503 不变 | 未配置收件人公钥时行为与现在一致 | A10：没有公钥时仍然先 503，不许降级成"我们代读" | ✅ |
+| 3·c 设备侧仍是写任务那方 | 服务端不新增 op 写入口 | 设备侧两条：`packages/app-host/tests/inbound-worker.spec.ts:98`「recovers an encrypted prepared result without returning task plaintext」＋ H1 那条把整条腿走完的用例（A22 红灯描述就是"设备档接住冻结结果…任务仍在"）；服务端零写入由 A18（集成面 op 差 0）+ A17（不写 attempts 台账）钉。`inbound-process.spec.ts` 那 6 条是权益票据闸门，不承担这一格 | ✅ |
+| 3·每尺有臂 | 每把尺都要有变异臂 | 臂架在册 **26** 枚（`--list` 末行现量），A1–A26 逐枚各自跑红过；A23–A26 是本会话补的 | ✅ |
+| 4·check:docs | 过 | `node research/tools/docs-link-check.mjs` rc=0 | ✅ |
+| 4·i18n 对称 + 单一事实源 | 过 | `cd packages/i18n && vitest run` ⇒ `Tests 30 passed (30)`；本会话改动没新增任何文案 | ✅ |
+| 4·web / mobile spec | 过 | 电池腿 `AC6-web-specs` `10 files / 33 tests`、`AC4-mobile-inbound` `1 / 15`、`AC4-app-host` `15 / 112`，全 rc=0 | ✅ |
+| 4·check:ui-language | 过 | rc=**1**，4 处全在 `apps/web/src/App.tsx:2560/2561` —— **别线在飞的文件**，本线零字节未动 | 🔴 归别线 |
+| 5·六格草稿 | 逐处草出、列成归负责人的清单、不发布 | 工单 §5.2 六行 + 每行「不许说成」列；`packages/legal/**` 自 12:40 起 `git log` 为空、工作树 0 脏 | ✅ 草稿 / 🔴 发布与措辞归负责人 |
+| 5·帮助中心/价格页两格 | 同上 | 工单 §5.2 第 5/6 行；另：新增一把尺 `check-inbound-legal-copy-parity` 盯"三处手抄" | ✅ 草稿 / 🔴 未发 |
+| 6·重指向 | 把 `email-to-task-brief.md` 重指向这条窄档 | 那份 §0a「地基变了（重指向，不是重写）」三行表 + §3 的 **P0.5** | ✅ |
+
+**只归负责人的（本线不代拍，按硬约束）**：① push 与 ref；② 迁移 apply 与发版顺序；③ 生产 env/helm、`AUTOMATION_ENTITLEMENT_MODE` 写错⇒500 要不要改成启动即红；④ 六格对外发布与措辞（含新量出的一处英文漂移、"两类明文元数据"要不要补）；⑤ A4 双重计费口径修法；⑥ AC-1～AC-8 勾选（含"人真打开看过截图"）；⑦ 范围尺白名单口径（B205）。
+**另有一条仓级（不归本线顺手做）**：`server/tests` 不在任何 typecheck 门里，补门要付 225 条既有类型错。
+
+
 
 
 
