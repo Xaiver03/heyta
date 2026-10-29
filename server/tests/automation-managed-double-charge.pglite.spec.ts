@@ -35,6 +35,7 @@ import type { FastifyInstance } from 'fastify';
 import Fastify from 'fastify';
 
 import { advanceAutomationAiAttempt, reconcileAutomationAiMetering, reserveAutomationAiAttempt } from '../src/automation/ai-metering';
+import { invokeManagedAiCompletion } from '../src/ai/managed-completion';
 import { managedAiProxyRoutes } from '../src/ai/managed-proxy.routes';
 import { SERVER_MANAGED_AI_FEATURES } from '../src/ai/managed-upstream';
 import type { SqlExecutor, SqlRunner } from '../src/billing/pricing-store';
@@ -276,5 +277,35 @@ describe('A4：托管档一次完整自动收集周期的额度增量', () => {
     expect(await counterRequests()).toBe(1);
     expect(await advanceAutomationAiAttempt(ATTEMPT_KEY, 'reserved', 'released', executor, undefined, NOW)).toBe(true);
     expect(await counterRequests()).toBe(0);
+  });
+});
+
+describe('A4：认领只属于设备走代理那条腿', () => {
+  /** 服务端抽取那条腿（hosted-extraction）不写台账，所以它进补全时不许带 `claimReservedAttempt`。 */
+  const hostedShapeCompletion = () => invokeManagedAiCompletion({
+    upstream: { baseUrl: upstreamBaseUrl, apiKey: 'sk-stub', modelId: SERVER_MODEL_ID },
+    sql: executor, limit: TEST_LIMIT, now: () => NOW,
+    transport: async () => ({
+      status: 200, contentType: 'application/json',
+      text: async () => JSON.stringify({ choices: [{ index: 0, message: { role: 'assistant', content: COMPLETION_MARKER } }] }),
+      stream: () => { throw new Error('not a stream'); },
+    }),
+    hosts: [{ host: '127.0.0.1', provider: '本文件的假上游', jurisdiction: 'cn', evidence: '合成表' }],
+    plaintextHosts: ['127.0.0.1'],
+    startedAt: NOW,
+  }, { userId: 1, feature: 'inbound-automation', messages: [{ role: 'user', content: '把这条告警解析成待办' }] });
+
+  it('不带认领标记（服务端抽取的形状）⇒ 即使有一枚孤儿 sent 预留在，也照常扣一次', async () => {
+    // 造一枚"预留了但没发出去"的孤儿：state 推到 sent，然后没人再用它。
+    await reserveAutomationAiAttempt(ATTEMPT_KEY, NOW, TEST_LIMIT, executor, undefined, 'managed');
+    await advanceAutomationAiAttempt(ATTEMPT_KEY, 'reserved', 'sent', executor);
+    const before = await counterRequests();
+
+    const result = await hostedShapeCompletion();
+    expect(result.ok).toBe(true);
+    expect(await counterRequests(), '服务端抽取冒领了设备的预留 ⇒ 这一发白送').toBe(before + 1);
+    // 那枚预留没有被标记成已结算 —— 它仍然属于设备那一次。
+    const rows = await pglite.query<{ proxy_billed: boolean | null }>('SELECT proxy_billed FROM automation_ai_attempts');
+    expect(rows.rows[0]?.proxy_billed).toBeNull();
   });
 });

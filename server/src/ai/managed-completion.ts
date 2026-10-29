@@ -56,6 +56,14 @@ export interface ManagedAiCompletionRequest {
   readonly tools?: readonly ManagedAiTool[];
   readonly toolChoice?: 'auto';
   readonly stream?: boolean;
+  /**
+   * 这一发是不是**设备经 `/managed/chat`** 打进来的（工单 A4）。
+   *
+   * 只有那条腿在此前写过一枚预留（`automation/ai-metering.ts`），也只有它有账可认领；
+   * 服务端抽取那条腿**不写** `automation_ai_attempts`（`hosted-extraction.ts` 文件头），
+   * 所以它必须保持 `false` —— 否则一枚孤儿预留会被它冒领，等于白送一次调用。
+   */
+  readonly claimReservedAttempt?: boolean;
 }
 
 export interface ManagedAiMessage {
@@ -327,7 +335,8 @@ export async function invokeManagedAiCompletion(
   // 这里再扣一次，同一次物理调用就记了两次。所以先做**一次原子认领**：
   // 只认领一枚"刚预留过、还没被任何物理调用认领"的 managed 尝试，
   // 领到 ⇒ 这笔账已在预留侧记过，跳过扣费；领不到 ⇒ 照常扣（不给任何请求开免票通道）。
-  const settledByReservation = feature === 'inbound-automation' && await claimReservedAutomationCharge(sql, request.userId);
+  const settledByReservation = request.claimReservedAttempt === true && feature === 'inbound-automation'
+    && await claimReservedAutomationCharge(sql, request.userId);
   const metering = settledByReservation ? undefined : await consumeManagedAiRequest({ userId: request.userId, now: now(), limit, sql });
   if (metering !== undefined && metering.allowed === false) {
     const quota = metering.reason === 'QUOTA_EXCEEDED';
