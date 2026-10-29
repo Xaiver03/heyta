@@ -5781,3 +5781,38 @@ S2 把 `apps/mobile/src/screens/ExportScreen.tsx:357` 那枚真回执整个换�
 发布后逐字节复验的两枚指纹（**那一戳**载体的产物，复算就在载体里跑同一条 `shasum`）：
 `apps/web/dist/index.html` 与 `apps/landing/dist/index.html`——现量命令
 `cd <载体> && shasum -a 256 apps/web/dist/index.html apps/landing/dist/index.html`。
+
+---
+
+### 6.127（2026-10-29 23:4x · 第 ③ 维最后一格没装置的那一格落成尺：无界列表读；它先抓的是我自己）
+
+**为什么这一格先前是散文**：③ 里 N+1、循环内同步 IO、监听器/定时器、读路径索引各有装置，
+"可避免的全量重渲染"住在性能线（P0/P1 各带会红的用例与变异台架，先 grep 过才没另造一把），
+只剩**缺分页**没有尺。本轮补 `research/tools/audit-unbounded-read-paths.mjs`。
+
+**判法（A 档=Prisma 行列表读）**：`findMany` 的实参对象**顶层**没有 `take`/`skip`/`cursor` ⇒ 候选；
+`findMany()` 一枚参数都没有 ⇒ 候选（整张表）。
+`count`/`aggregate`/`groupBy` 不是行列表 ⇒ 不判；实参是变量或 `{ ...opts }` ⇒ 记「判不了」并逐枚给位置；
+`$queryRaw` 整族 ⇒ **射程外**（判一条 SQL 有没有界要真解析 `WHERE` 谓词，本尺没这能力）；
+客户端与 HTTP 层的分页参数是另一套写法 ⇒ 第一行就打印"这两族都没量"。
+
+**牙（这台尺先抓到的是我自己，两发）**：
+① 臂 N3 红 ⇒ `balanced` 交回来的实参**带着那层 `{}`**，顶层键的深度是 1 不是 0 ⇒ 每一枚有界的读都会被误报成候选；
+② 修完仍红一次 ⇒ 括号类写成 `[{[(\])]` 漏了 `}`，嵌套对象只加不减深度。
+两发的教训同一条：**判据里的字符类要写全，臂要"有界不许报"和"无界必须报"两边都有**。
+现在臂全过（枚数由 `--self-test` 自己打印，别在这里抄）；`--mutate` 两个方向（给候选补 `take` ⇒ 候选 −1；从有界的摘掉 `take` ⇒ +1）各只动被点名那一枚。
+⚠️ 变异臂自己也红过一次：`find()` 用闭包变量存 `file`/`text`，第二次 `find()` 把第一次那对覆盖了 ⇒
+拿 A 文件的行号去 B 文件找括号，读数落成"本尺不敏感"的**假红**。改成每枚命中自带 `{file, text, hit}`。
+
+**当趟读数**（分母与候选数由尺自己打印，别抄这里）：`--top 40` 逐枚列 `file:line`，
+分布最厚的是 `server/src/admin/admin.routes.ts` 与 `server/src/shares/share.routes.ts` 两族；
+`server/` 整棵是 **vendored**（AGENTS §2：尽量不改，改了要动 `PROVENANCE.md`）⇒ 这一族**全部只登记不代改**。
+
+🔴 **本线那一枚是"不许照字面修"的那一族**（写在尺头，防下一位照候选去加 `take`）：
+`server/src/account/access-sessions.ts:189` 的 `listSessions` 没有 `take` 是**对的**——
+同文件 `:178` 的注释写着"退出登录撤销不了它们就变成一句界面上的谎"，加 `take` 会把一部分会话静默藏起来；
+它的边界在行的生命周期（`access-sessions.ts:218/239/274` 与 `central-auth/repository.ts:689/749` 自己就在删行），不在查询。
+⇒ 这一格的正确结论是"**候选不是缺陷**，且这一族的缺陷形态是行不清理而不是查询无界"。
+
+复量：`node research/tools/audit-unbounded-read-paths.mjs`（诊断）／ `--strict`（候选非 0 退 1）／
+`--self-test`／ `--mutate`／ `--scope server/src/account`（单面）。
