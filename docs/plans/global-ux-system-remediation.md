@@ -149,7 +149,7 @@
 
 **边界**：不改变 ADR-0048 四态；不承诺“X 天内可恢复”；对不可撤销动作不给撤销出口；移动端原生 `Alert.alert` 留待共享原语可消费后再清。
 
-⚠️ **一格登记为"未判定"而不是"已合规"（2026-10-28 补）**：`apps/web/src/features/settings/AiSettings.tsx` 的
+✅ **那一格已判定并落地（2026-10-29）**（下面 2026-10-28 的原文按现量改口，保留判断过程）：`apps/web/src/features/settings/AiSettings.tsx` 的
 「重置 AI 设置」是**就地两档确认**（`role="alert"` 的清单 + danger 主按钮），门禁 R1/R2 都过（无 ×、主按钮是 danger），
 但它**没有问过那张表**。这格的档位只取决于一个尚未写进任何文档的判断 ——
 **清掉用户填的 API 密钥算不算 `destroysIrrecoverableResource`**：
@@ -163,8 +163,20 @@ console.log(resolveDangerTier(s(true)),  r(resolveDangerTier(s(true))));"
 ```
 
 ⇒ 不算 ⇒ `popconfirm`，那一格的就地形状本来就够；算 ⇒ `alert` ⇒ **需要模态表态**，就地那层就是欠一层。
-**不在 P2 里顺手改**：它是 AI 线已入库的交互与 spec 钉着的形状，而这一格的判断属于"密钥面代价"的产品口径，
-归 P8 收口时逐格裁决（改法与判据都已在这里写死，不需要重新发现）。
+
+🔴 **裁决：算**（2026-10-29，产品口径由本线拍）。三条依据都在界面上写着，不是推测：
+代价清单第 4 条逐字是「存在这台设备上的密钥与令牌」；这一格没有撤销出口，而同一块上那句
+`keepsCorrections` 恰恰说明**只有**纠正过的偏好跟着 op-log 走，密钥不在那一档；密钥是**打码存的**，
+用户看不到自己填过什么 ⇒ "再输一遍"不等于"恢复"，他得回服务商控制台重新取。
+⇒ 与撤设备同一结论：这类动作"可撤销"的前提不成立，重档模态确认是正确结论，不是欠账。
+
+**已落地**：`apps/web/src/features/settings/AiSettings.tsx` 那一格换吃 `DangerConfirmDialog`
+（档位由新落点 `settings/resetAiDanger.ts` 派生，界面只读结果），三条通道与焦点不再由宿主各写一遍。
+判据四档齐：源码尺 `check:danger-confirm` 现量候选 **3 格 / 违规 0**（并把眼睛验过 —— 临时把原语摘掉
+⇒ 读数 3 ⇒ 2，还原后回 3）；语义测 `ai-settings.spec.tsx` **80 条**（原 79 条一字未改全绿 + 新增一条
+钉"模态 + 焦点在安全侧 + 背景不关 + Esc 等价取消"，且那句焦点断言就是裁决的锚：把
+`destroysIrrecoverableResource` 改回 `false` 精确红在它上面，还原 `cmp` 一致）；真浏览器
+`e2e/tests/ai-reset-danger.spec.ts` **2 条**（亮暗各一）；图 `apps/web/evidence/ai-reset-danger/confirm-{light,dark}-1440.png` 逐张看过。
 
 **判据**：无 X；安全动作初始焦点；背景不可确认；Esc 等价取消；危险主按钮使用 danger；焦点不逃出对话框；关闭后归还触发者；失败回执持续可见。
 
@@ -430,7 +442,7 @@ RN 结构上**根本落不了地**，①不是"成本高"，是不存在。
 |---|---|---|
 | P0 焦点安全 | ✅ 已收口 | 实现收成一个入口（`borderless-controls.css`）+ 裁剪容器例外表集中在同一处；门禁 `check:focus-single-source` 已在主链（`node scripts/check-gate-wiring.mjs` 现量链路段数）。**环"画得出来"用真实浏览器几何判**：`focus-visible-matrix` 里环带四边对裁剪祖先逐边比 + 5 视图 × 2 宽度的全键盘扫描。能红验过两次（删表里一条 ⇒ 扫描精确红，从 `/tmp/bc.mut-bak` 还原 `cmp` 逐字一致）。截图逐张看过 `selected-tab-1440-dark`、`calendar-focus-375-dark`、`calendar-focus-1440-light`：四边环都在、选中态不再靠底色块。16 套相关套件串行重跑 **82 passed / 1 failed**，那 1 条是旧契约（见 P1 行）。 |
 | P1 脏表单 | ✅ 已收口 | 共享层补 `popover-dirty-form` 档（契约 5 条含"普通 popover 仍全 dismiss"的对照臂）；Web 侧一个入口 `useDirtyDismissGuard`，**判断共享、渲染分端**（成因见 §7 第 606 条）。接线落点 **5 格** = 计划点名 4 格 + 门禁现量出的第 5 格 `CategoryCreateDialog`。门禁 `check:dirty-form-policy` 四臂 + 保护棘轮，真树两次变异取证（摘保护 ⇒ 两条红；两个 dialog 标记一起漂 ⇒ 棘轮单独红），均从 `.mut-bak` 还原并 `cmp` 一致。**旧契约按作用面找全**：`category-dialog-ux`／`calendar-capture`／`collab-journey` 同跑全绿，同一族只有 `habit-create-options` 那一格钉着"取消即静默丢弃"，已改走新契约并复验绿。 |
-| P2 危险确认 | ✅ Web 侧收口（移动端腿按边界留待共享原语可消费；AI 重置那一格登记在 §P2 边界的"未判定"里） | 回收站"彻底删除"＋ Vault 设备移除两格都收进 `apps/web/src/lib/dialog/DangerConfirmDialog.tsx`：× 出口删除、主按钮 danger tone、初始焦点给安全侧、Tab 不外逃、关闭归还触发者、scrim 不响应、Esc 等价取消，**档位第一次真的被派生**（`purgeDanger.ts` 是 `resolveDangerTier` 在全仓的首个运行时消费者）。Web 侧 `window.confirm` 现量归零（`node scripts/check-overlay.mjs` ⇒ 原生框 **7 处 / 4 文件**，剩下的都在共享层与移动端）。门禁 `check:danger-confirm` **七臂**、真树读数 违规 2 ⇒ 0（现量 `候选 3 格 / 违规 0 条 / 账本 0 条`），且**候选下限**那条治住了"迁完之后门禁自己看不见东西"这种绿；`--self-test` 里 ⑤/⑥ 两臂专治"同一个缺陷换个 JSX 写法就漏"。单测 6 条含两枚对照臂，并**否证了本计划原先那句能红口径**（"翻 `undo` 会降档"指错开关，真开关是 `destroysIrrecoverableResource`，短路顺序在 `danger-tier.ts:131`）。e2e：回收站那格 **13 条全绿**（N2 那枚 Esc 回归是我上一趟删了旧监听没接回去，已修并复跑）；Vault 那格单跑 **3 条全绿**，判据最后一格"失败回执持续可见"补了独立一条 —— 撤销打 401 后回执**过 5.5 秒仍在**，并用一枚真变异（在 `.catch` 后加 4 秒自清计时器）证明它**只红第二发**、第一发照绿，还原后 `cmp` 逐字一致。截图按 `switchTheme` + `data-theme` 逐张看过（第一版用 `classList.add('dark')` 拍出来的"暗色"是假的，已重拍）。 |
+| P2 危险确认 | ✅ Web 侧收口（移动端腿按边界留待共享原语可消费；§P2 那格"未判定"已于 2026-10-29 判定并落地，四档读数见本节末段） | 回收站"彻底删除"＋ Vault 设备移除两格都收进 `apps/web/src/lib/dialog/DangerConfirmDialog.tsx`：× 出口删除、主按钮 danger tone、初始焦点给安全侧、Tab 不外逃、关闭归还触发者、scrim 不响应、Esc 等价取消，**档位第一次真的被派生**（`purgeDanger.ts` 是 `resolveDangerTier` 在全仓的首个运行时消费者）。Web 侧 `window.confirm` 现量归零（`node scripts/check-overlay.mjs` ⇒ 原生框 **7 处 / 4 文件**，剩下的都在共享层与移动端）。门禁 `check:danger-confirm` **七臂**、真树读数 违规 2 ⇒ 0（现量 `候选 3 格 / 违规 0 条 / 账本 0 条`），且**候选下限**那条治住了"迁完之后门禁自己看不见东西"这种绿；`--self-test` 里 ⑤/⑥ 两臂专治"同一个缺陷换个 JSX 写法就漏"。单测 6 条含两枚对照臂，并**否证了本计划原先那句能红口径**（"翻 `undo` 会降档"指错开关，真开关是 `destroysIrrecoverableResource`，短路顺序在 `danger-tier.ts:131`）。e2e：回收站那格 **13 条全绿**（N2 那枚 Esc 回归是我上一趟删了旧监听没接回去，已修并复跑）；Vault 那格单跑 **3 条全绿**，判据最后一格"失败回执持续可见"补了独立一条 —— 撤销打 401 后回执**过 5.5 秒仍在**，并用一枚真变异（在 `.catch` 后加 4 秒自清计时器）证明它**只红第二发**、第一发照绿，还原后 `cmp` 逐字一致。截图按 `switchTheme` + `data-theme` 逐张看过（第一版用 `classList.add('dark')` 拍出来的"暗色"是假的，已重拍）。 |
 | P3 删除撤销 | ✅ Web 收口（移动端换了计时语义；回执 UI 归 P4） | 时长那一格第一次有了权威：`packages/ui/src/feedback/receipt-timing.ts`（`undo` 8000ms + hover/focus 双暂停 + 失败恒不自消；`notice` 4000ms 且**不许带动作**），契约 5 条 + 两枚真变异（8000→5000 只红"下限"那条；摘掉 `pauseOnFocus` 只红 focus 那条），还原 `cmp` 逐字一致。Web 渲染收成一个入口 `apps/web/src/lib/feedback/UndoReceipt.tsx`，单测 7 条含 `kind="notice"` 对照臂（**把 8000 抄进组件的话这条先红**）与"失败推进 10 倍窗口仍在"。接线 **5 格**：批量删除（正文改成带条数那句）、单条任务／便签／清单／习惯（原来三条一个字都不给），象限移动回执一并收编。四家 `restore*` 返回布尔这件事由一枚 `restoreOrRefuse` 统一变成拒绝 —— 直接把布尔递给回执会把它读成"成功"。移动端两处 5000ms 改读同一张表（门禁账本因此清零，只剩 `ShareFeature` 那格**复合动作不给撤销**的豁免，带翻案条件）。门禁 `check:undo-receipt` 七臂已进链（链段 137⇒138，`check:gate-wiring` 绿）。⚠️ 两枚自证臂当场是坏的、被抓出来才修：R1 谓词的前缀写成 `[^)]*` 会**恒读 0**（永不红的尺），棘轮那臂断"下限 + 1 必红"测的是我对下限的猜测而不是尺能不能红。🔴 **看图照出一枚我引入的回归**：收编象限回执时把旧的 `.then(() => setDropNotice(''))` 连着旧形状一起删了，末帧上留着一句已经不成立的"任务已移动到「交给别人」" —— 已修（撤销成功才收那句）并补了一条 `toHaveCount(0)` 断言，让它下次红在断言而不是红在图上。 |
 | P4 控件原语 | ✅ **A2+A3 已落地，移动端设备腿 2026-10-28 补跑并逐张人眼看过 ⇒ P4 收口**（四档 + 重量档 + 禁用档在设备上都有现量读数，触屏没有 hover 这一态写在证据格里） | **A2（Web 侧档位收编）2026-10-28 落地**：共享表 `packages/ui/src/control/states.ts` 加**重量档** `ControlEmphasis`（`inline` 默认 / `commit`）与 `hasCommitOverride`，覆盖表里只有 `danger` 有条目；新 token `color.on-danger`（亮 `--ht-white` 4.83:1 / 暗 `--ht-slate-950` 7.29:1，两条配对进 `AA_PAIRS`，暗色沿用白只有 2.77:1）。中央 `controls.css` 加 `.ht-btn--danger.ht-btn--commit`，`DangerConfirmDialog` 两枚定档（取消=次要档、确认=实底危险档），**15 枚**不带色调的 `.ht-btn` 显式定成 `--secondary`（复量 `grep -rn 'className="ht-btn"' apps/web/src --include='*.tsx'` ⇒ 0；立项现量 18 处含对话框那一枚）。<br>能红验证：契约测 39 条 + **五枚真变异**（默认档改 commit ⇒ 2 红；commit 前景换 `foreground-inverse` ⇒ 1 红；给 primary 建零消费者覆盖 ⇒ 1 红；`controlPaletteOf` 忽略重量参数 ⇒ 1 红；编造色名 ⇒ 2 红），全部从 `.mut-bak` 还原 `cmp` 逐字一致。⚠️ 其中"零消费者槽位"那一枚**第一次是打不到的**：原判据比的是"两档配方是否相同"，而空槽位恰恰长得和原来一样（注入后 38 条全绿）⇒ 改成按**覆盖表的键存在性**判，并把机制写进 `hasCommitOverride` 的注释。<br>新门禁 `pnpm check:control-semantics`（A1 表→CSS 逐格 / A2 CSS→表 / A3 重量档 / A4 幻影类 / A5 零消费者 / A6 功能 CSS 重声明外观 / A7 推导变量名必须存在 / A8 裸档归零 + 候选下限）：**14 枚 self-test 臂全过**、两次真树变异（中央 CSS 漂一格 ⇒ 精确红一条；把 `commit` 换成不存在的类 ⇒ A4+A5 各红一条）还原 `cmp` 一致；已进主链（`check:gate-wiring` rc=0）。账本两本：幻影 1 行（`ht-btn--outline`，全仓零条规则，归注册登录标准套件线名下那格，**不代改**）、外观 2 行（`sheets.css` 设置页换底，owner = P7/P8）。<br>界面取证：`e2e/tests/control-semantics.spec.ts` **3 条真跑全绿**，期望值全部由浏览器现算（探针挂到真属性上读，因为自定义属性的计算值是代入前的 `var(...)`，直接比永远不等），截图逐张看过 `purge-confirm-1440-{light,dark}.png` 与 `purge-confirm-390-light.png`：实底红/浅红两档都读得出"这枚才是按下去的那一枚"，行内那枚仍是透明底红字。⚠️ 第一次跑红在 hover：`getComputedStyle` 在过渡中读到的是**起点色**（`rgb(220,38,38)` 而非终值 `rgb(185,28,28)`）⇒ 假红的是探针不是实现，改成 `expect.poll` 到终态。<br>✅ **那一格本趟量到了**（2026-10-28 补）：禁用档 `opacity` 在真浏览器里读回 **0.38**，与 token
 `state.disabled-opacity` 逐字相同，另带一枚对照臂（同一排里没禁用的那枚必须读 1，否则这把尺分不清两态）。

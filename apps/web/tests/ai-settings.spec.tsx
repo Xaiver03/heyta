@@ -529,6 +529,53 @@ describe('AI 设置界面', () => {
   });
 });
 
+describe('🔴 重置那一格按 alert 档走（§P2 那格未判定的裁决，2026-10-29）', () => {
+  /**
+   * 🔴 2026-10-29 把计划 §P2 登记的那格"未判定"判掉之后，这一枚确认**必须**是模态表态。
+   *
+   * 三条通道与焦点都不再由本文件写，全部问 `packages/ui/src/overlay/dismissal.ts` 的
+   * `danger-confirm` 那一行；而"要不要接管焦点"由 `resolveDangerTier` 派生
+   * —— ⇒ **把裁决改回 `destroysIrrecoverableResource: false` 会红在下面那句焦点断言上**
+   * （那一档不再要求模态表态，初始焦点就不会落到安全侧那枚「取消」）。
+   */
+  it('🔴 重置确认按 alert 档走：模态层 + 初始焦点在安全侧 + 背景不关 + Esc 等价取消', () => {
+    const s = defaultAiSettings();
+    s.routing.enabled = true;
+    const el = render({ initial: s, secrets: createSessionSecretStore() });
+    const persisted = localStorage.getItem(AI_SETTINGS_STORAGE_KEY);
+
+    click(el.querySelector('[data-testid="reset-ai-settings"]'));
+
+    const dialog = el.querySelector('[data-testid="reset-ai-confirm"]');
+    expect(dialog, '确认层没画出来').not.toBeNull();
+    expect(dialog?.getAttribute('role')).toBe('dialog');
+    expect(dialog?.getAttribute('aria-modal'), '这一格是模态表态，不是就地一行').toBe('true');
+    const labelledBy = dialog?.getAttribute('aria-labelledby');
+    expect(labelledBy, '模态层没有可及的名字').not.toBeNull();
+    expect((el.querySelector(`#${labelledBy}`)?.textContent ?? '').trim(), '标题是空的').not.toBe('');
+    expect(
+      document.activeElement,
+      '初始焦点必须在安全侧那枚「取消」上（回车的第一下应当是"不清"）',
+    ).toBe(el.querySelector('[data-testid="reset-ai-confirm-cancel"]'));
+
+    // ① 点背景不关（表里 scrim = deny），而且这一刻仍然什么都没清。
+    const scrim = el.querySelector('[data-testid="reset-ai-confirm-scrim"]');
+    expect(scrim, '这一层没有遮罩 ⇒ 背景通道无从判').not.toBeNull();
+    act(() => {
+      scrim?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    expect(el.querySelector('[data-testid="reset-ai-confirm"]'), '点背景把危险确认关掉了').not.toBeNull();
+
+    // ② Esc = 取消（安全侧那一个动作）：层收回去，设置一个字都不动。
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(el.querySelector('[data-testid="reset-ai-confirm"]'), 'Esc 应当等价于取消').toBeNull();
+    expect((el.querySelector('#ai-enabled') as HTMLInputElement).checked).toBe(true);
+    expect(localStorage.getItem(AI_SETTINGS_STORAGE_KEY), '取消那一下不许清任何东西').toBe(persisted);
+  });
+});
+
 describe('🔴🔴 能力声明 —— 界面必须能声明，否则功能永远没有路', () => {
   it('🔴 每个端点都有四项能力勾选', () => {
     const s = defaultAiSettings();

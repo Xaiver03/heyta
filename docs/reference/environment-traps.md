@@ -12222,3 +12222,18 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
    ⇒ 另一条同批立下的规矩（同一族的"改了什么要有尺"）：**迁移是否零视觉，用逐节点 DOM 对比来证，不用像素差来猜**。临时夹具把换壳前后的面板子树导成 JSON（tag + 排序后的属性 + 文本长度），差异只剩三处：遮罩多 `data-testid="…-scrim"`、两层多挂 `ht-web-modal__overlay`/`ht-web-modal__dialog`（全仓这两个名字**零条 CSS 规则** ⇒ 惰性钩子），内联 style 串逐字相同。像素差只回答"整张图变了多少"，答不了"是哪一笔改的"。
    复量：`pnpm --dir e2e exec playwright test tests/deferrable-sheet.spec.ts --retries=0` ⇒ 5 passed（含那条退场断言）；把 `waitForBootSplashGone` 去掉不会立刻红 —— 它只在 plate 还在场时红，所以断言写成 `toHaveCount(0)` 而不是"不透明度为 0"，慢机器上仍然必红。
    归族：#606/#610（同一族"装置在错误的时间点取样"）、#611（量浮层前先等 commit）、`ui-acceptance.md` 的"同类缺陷没有这句要带现量读数"。
+
+615. 🔴 **往 `packages/i18n` 加一条词条之后，读词条的那把尺仍然说"KEY 不在词表里" —— 它读的是 `dist`，不是源码**（2026-10-29，全局 UX 线补 AI 重置那一格时撞到）：
+   形状：给 `zh-CN.ts` / `en.ts` 各加同一个 key，`pnpm check:i18n-vars` 立刻报
+   `缺参数 apps/web/src/.../AiSettings.tsx:1591 web.ai.settings.reset.confirmTitle {<KEY 不在词表里>}`，
+   看上去像"词条加错了/键名拼错"。实际源码两边都有、逐字一致。
+   真因：`@heyta/i18n` 的 `build` 是 `tsup`，门禁从**构建产物**里取词表；新词条没进 `dist` 之前，
+   门看到的就是"界面上用了一个词表里没有的 key"。同一族的坑还有 `@heyta/ui`
+   （改 `packages/ui/src/**` 后不 build，`apps/web` 的 `typecheck` 会报旧类型）。
+   ⇒ 规矩：**改过 `packages/*` 的源码或词条，跑读它们的门禁之前先 `pnpm --filter <那个包> build`**。
+   报"KEY 不在词表里"时先分清两种可能：① 真的没加（源码里 grep 不到）；② 加了没构建
+   （源码 grep 得到、`dist` 里 grep 不到）。现量命令：
+   `grep -c "<新 key>" packages/i18n/src/locales/zh-CN.ts packages/i18n/src/locales/en.ts packages/i18n/dist/*.js`
+   —— 源码两行 ≥1、`dist` 那行 0 ⇒ 是没构建，不是词条坏了。
+   复量：`pnpm --filter @heyta/i18n build && pnpm check:i18n-vars` ⇒ rc=0（`缺参数=0`）。
+   归族：`docs/agents/multi-end-build.md`（固定收尾要先重建再验）、#602（门禁跑在别人名下产物上）。
