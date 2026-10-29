@@ -33,6 +33,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { balanced, lineOf, maskText, topLevelReturns } from './lib/text-mask.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const argv = process.argv.slice(2);
@@ -59,83 +60,8 @@ const REGISTER_RES = [
 ];
 const ONESHOT_RE = /\bsetTimeout\s*\(/g;
 
-/** 注释与单/双引号字符串换成等长空格 ⇒ 后面所有正则只看真代码。 */
-export function maskText(text) {
-  const out = text.split('');
-  const blank = (from, to) => {
-    for (let i = from; i < to && i < out.length; i += 1) if (out[i] !== '\n') out[i] = ' ';
-  };
-  let i = 0;
-  while (i < text.length) {
-    const two = text.slice(i, i + 2);
-    if (two === '//' || two === '/*') {
-      const term = two === '//' ? '\n' : '*/';
-      const at = text.indexOf(term, i + 2);
-      const end = at < 0 ? text.length : at + term.length;
-      blank(i, end);
-      i = end;
-      continue;
-    }
-    if (text[i] === "'" || text[i] === '"') {
-      const q = text[i];
-      let j = i + 1;
-      let closed = false;
-      while (j < text.length) {
-        if (text[j] === '\\') { j += 2; continue; }
-        if (text[j] === q) { closed = true; break; }
-        if (text[j] === '\n') break;
-        j += 1;
-      }
-      if (closed) { blank(i, j + 1); i = j + 1; continue; }
-    }
-    i += 1;
-  }
-  return out.join('');
-}
-
-/** 从 openIdx 那枚开括号起配对，返回**内部**原文与结束下标；配不上 ⇒ null。 */
-export function balanced(text, openIdx) {
-  const openCh = text[openIdx];
-  const closeCh = openCh === '(' ? ')' : openCh === '{' ? '}' : ']';
-  let depth = 0;
-  for (let i = openIdx; i < text.length; i += 1) {
-    const ch = text[i];
-    if (ch === '(' || ch === '{' || ch === '[') depth += 1;
-    else if (ch === ')' || ch === '}' || ch === ']') {
-      depth -= 1;
-      if (depth === 0) return text[i] === closeCh ? { inner: text.slice(openIdx + 1, i), end: i } : null;
-    }
-  }
-  return null;
-}
-
-export function lineOf(text, idx) {
-  let n = 1;
-  for (let i = 0; i < idx && i < text.length; i += 1) if (text[i] === '\n') n += 1;
-  return n;
-}
-
-/** 取 text 里每一处**顶层**（深度 0）的 `return` 关键字下标，以及它后面那串表达式的首个非空字符。 */
-export function topLevelReturns(body) {
-  const out = [];
-  let depth = 0;
-  const re = /(?<![\w$.])return(?![\w$])|\(|\{|\[|\)|\}|\]/g;
-  let m;
-  while ((m = re.exec(body)) !== null) {
-    const tok = m[0];
-    if (tok === 'return') {
-      if (depth === 0) {
-        const rest = body.slice(m.index + 6);
-        const nl = rest.search(/[;\n]/);
-        out.push({ idx: m.index, expr: (nl < 0 ? rest : rest.slice(0, nl)).trim() });
-      }
-      continue;
-    }
-    if (tok === '(' || tok === '{' || tok === '[') depth += 1;
-    else depth -= 1;
-  }
-  return out;
-}
+// 文本遮蔽 / 括号配对 / 行号 / 顶层 return 四枚工具住在 `research/tools/lib/text-mask.mjs`
+// —— 与本仓另一把按文本判的尺共用，不在这里各写一遍。
 
 /** 一个 effect 的判读。verdict ∈ none / clean / leaky / noCleanup / undetermined */
 export function judgeEffect(argsText) {
