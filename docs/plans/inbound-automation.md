@@ -6175,3 +6175,7 @@ gitee 那枚上游仍超配额，没碰。
   `revocations` 403 / 接收端点 400 / 健康 200；容器里留 5 枚 `AUTOMATION_*`。
   回滚点：`docker-compose.yml.bak-20261029T072423Z` 与 `.bak-<15:34 那一戳>`、`.env.bak-20261029T072423Z`。
 - ⚠️ **这条修复要到下一次发布才进线上镜像**；生产现在的干净 403 靠的是"撤掉空串注入"，两条路都成立。
+
+**终版电池读数（15:38，tip 含 A4 腿接入）**：`legs=32 rc0=32 rc_nonzero=0`。
+新增那条 `AC1-quota-double-charge` 7 条绿。原件 `~/.heyta-evidence/inbound-ac-battery-final2/INDEX.md`
+（逐腿 rc、分格对照、原件路径；`AC8-ac-ticks` 仍是"已勾 0／未勾 8"——AC 的勾归负责人）。
