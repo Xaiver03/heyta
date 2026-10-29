@@ -424,9 +424,9 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
 | 格 | 结果 | 提交 / 原件 |
 |---|---|---|
 | A4 双扣 | ✅ 已修（代理侧原子认领预留；迁移 `..._proxy_billed` 可空无索引；钉 +1 的用例 + 两枚新臂；变异臂各红） | `9904fb671` |
-| A9 四件 | ✅ 全做（上限提示 / reasonCode 人话 / 试发说明 / 手机规则清单） | `28a96ab8a` |
+| A9 四件 | ✅ 全做（上限提示 / reasonCode 人话 / 试发说明 / 手机规则清单）；其中前三项另有一条**真浏览器**用例（`e2e/tests/inbound-automation.spec.ts`，变异臂实测会红） | `28a96ab8a`、`54bf5e9d2` |
 | ④ 六格 | ✅ 已改未发（六处同文 + 当场抽取 + 7 天；版本行/日期/变更同批） | `06798bf3a` |
-| B 组上线 | ✅ env 级已开（8 枚进容器、official、公网从 402→400）；镜像未换 | 取证 `~/.heyta-evidence/inbound-bgroup-20261029/` |
+| B 组上线 | ✅ env 级已开（mode=official + SENDER_KEK + COMMIT_KEYS；公网接收端点从 402→400）；开完当场抓到并修掉一枚"空串被当成配了"的 500（撤销面 403/400/200 复查）；镜像未换 | 取证 `~/.heyta-evidence/inbound-bgroup-20261029/`、`54bf5e9d2` |
 | C 组 AC 证据 | ✅ 电池整串跑 + 沙箱发布验证；**AC 一格未代勾** | `~/.heyta-evidence/inbound-ac-battery-20261029/`、`.run-logs/deploy-sandbox-1029.log` |
 
 **仍归负责人的三件（本轮刻意没做）**：
