@@ -103,6 +103,13 @@ function legalPath(docId: string, locale: 'zh' | 'en'): string {
   return locale === 'zh' ? `/legal/${docId}/` : `/en/legal/${docId}/`;
 }
 
+/** 每份件的**真源状态**（`@heyta/legal` 的注册表）→ 线上该不该出现"尚未生效"横幅。 */
+const DOC_STATUS = new Map(LEGAL_DOCUMENTS.map((doc) => [doc.id as string, doc.status as string]));
+const MISSING_STATUS = LEGAL_DOC_IDS.filter((id) => !DOC_STATUS.has(id));
+test('分母自检：每一份在册文档都有状态，否则下面的横幅判据会对着 undefined 断言', () => {
+  expect(MISSING_STATUS, `这几份在 @heyta/legal 里没有状态：${MISSING_STATUS.join(', ')}`).toEqual([]);
+});
+
 function attachLogs(page: Page): string[] {
   const logs: string[] = [];
   page.on('console', (message) => logs.push(`[console.${message.type()}] ${message.text()}`));
@@ -204,10 +211,17 @@ for (const docId of LEGAL_DOC_IDS) {
         render.tocItems,
         `${path} 的目录条目数（${String(render.tocItems)}）≠ 顶层小节数（${String(render.topLevelSections)}）`,
       ).toBe(render.topLevelSections);
+      // 🔴 「草稿横幅」不是"所有件都该有"：`ai-and-transfer` 自 2026-10-26 起是 `status: effective`
+      // （产品负责人明确不再走签核流程、代码与文本一致即可对外）。对它要求横幅，等于
+      // 反过来把"已生效"说成"尚未生效"。判据按 @heyta/legal 的真源状态对账：
+      // 草稿必须有横幅、已生效必须没有 —— 两个方向都会红。
+      const expectedBanner = DOC_STATUS.get(docId) !== 'effective';
       expect(
         render.hasDraftBanner,
-        `${path} 没有"尚未生效"横幅 —— 这套文本今天全是 draft，缺这条等于把草稿当已生效发布`,
-      ).toBe(true);
+        expectedBanner
+          ? `${path} 是草稿却没有"尚未生效"横幅 —— 缺这条等于把草稿当已生效发布`
+          : `${path} 已经是 effective，却还挂着"尚未生效"横幅 —— 等于把已生效说成草稿`,
+      ).toBe(expectedBanner);
 
       if (docId === 'terms') {
         // 规定一：先截图再断言之余，把中英各一张落到固定路径，供人**真的打开看**。
