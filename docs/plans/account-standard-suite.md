@@ -5462,3 +5462,48 @@ model 枚数、查询点处数、**判得出的处数**、含判不了条目的�
 
 **处置边界**：64 处候选按文件与 model 分布由命令打印，**一枚都不动**——加索引要写迁移（本仓不可逆层），
 不加也得有人写下"这是小表"的判断。这一格进 `BLOCKED.md` 的待拍板表。
+
+### 6.119（2026-10-29 12:2x · 第 ③ 维"无界监听器与定时器"补上一台按 effect 记账的探针；两发假阳性都落成了臂）
+
+这台尺管的是"注册了没人拆"。它报**候选**，一字节不改：
+
+```
+node research/tools/audit-listener-timer-cleanup.mjs            # 读数（诊断档，默认可失败性由 --mutate 证）
+node research/tools/audit-listener-timer-cleanup.mjs --self-test # 臂数与不符数自己打印
+node research/tools/audit-listener-timer-cleanup.mjs --mutate    # 在内存副本上把拆除那一手抹掉，必须看见候选变出来
+```
+
+**当趟读数**（分母、判得出、各档条数都由上面第一条命令自己打印，别抄这里）：射程 = `git ls-tree -r --name-only HEAD` 里
+`apps/<壳>/src` 与 `packages/<包>/src` 下的 `.ts`/`.tsx`；每枚 effect 出一行判读，分四档 ——
+拆除配上了 / 🟠 有注册没拆除 / 🔴 不返回清理 / 判不了（并分因：具名函数、单表达式、返回值看不懂、括号配不上）。
+`setTimeout` 这类一次性定时器与 effect 之外的注册**单列计数、不进候选**：它们与"无界增长"不是同一件事，
+混进来只会让下一位把这把尺关掉。
+
+**这把尺是被自己的臂修了两轮的，不是被测物修了两轮**：
+
+① 第一发 7 枚候选**全是假的**。逐枚开码看（`apps/mobile/src/App.tsx:106`、`nav/navigation.tsx:49`、
+`screens/AuthScreen.tsx:229`、`screens/TasksScreen.tsx:766`、`lib/use-today.ts:51`、`lib/use-reminder-delivery.ts:79`、
+`packages/ui/src/theme.tsx:160`），现场无一例外是 RN 那一味：`const sub = X.addEventListener(…)` ⇒ 收尾 `sub.remove()`。
+词表里没有 `.remove(` 这一手 ⇒ 候选整批假。补词表时加了**变量名限定**（臂 A20）：只有当那个名字确实是从本 effect 里的
+`addEventListener` 赋来的，`.remove()` 才算拆除 —— 否则一句毫不相干的 `node.remove()` 就能替一整枚漏掉的监听器买单，
+那是把尺自己造绿，比造红更糟。
+
+② 第二发 2 枚候选又是假的（`apps/mobile/src/screens/ProfileScreen.tsx:457`、`apps/web/src/features/settings/PrivacyPanel.tsx:47`）。
+它们是另一味合法写法：**收尾直接把退订函数交给 React**（`return subscribePrivacyConsent(cb)`）。
+原判据只认 `return () =>` 那种箭头，于是把它读成"不返回清理函数"。现在认这一味（臂 A25），
+同时留了三条反向的牙：只交了 subscribe 的返回值但同 effect 里还有别的注册 ⇒ 仍要点名（A26）；
+收尾 return 一个看不懂的表达式 ⇒ 落"判不了"而不是"干净"（A27）；`return (a || b)` 的括号不等于箭头（A28）。
+
+③ 顺带抓到一台**分母虚报**：判读只 push"有注册的"那几枚，于是"射程内 275 处 effect"被读成 77 处。
+现在每个 effect 都出一行，并在主读数那一路把 `判读行数` 与 `遮蔽后认得的 effect 调用数` 现场对账，
+对不上就整趟作废退出 2（臂 A18 是同一件事的合成版）。
+
+**能失败**（这一条是本仓的门槛，不是可选项）：`--mutate` 把某一档拆除在**内存副本**里整片抹掉，必须看见候选从 0 变出来；
+抹不动就报"打空"并非零退出。当趟 6 种形状：5 种翻出候选、**0 种打空**、1 种**无宿主** ——
+`abort`（AbortController 当拆除手段）那一味在现量上没有一枚判成干净的 effect 依赖它，所以这一档只在自检的合成臂里证过
+（A4），本趟在真代码上证不了。这把尺**不做原地变异**：共享检出里只有 `--mutate` 的副本，一个字节都不写盘。
+
+**处置边界**：当趟候选为 0 ⇒ 没有要递给别人的一格，`BLOCKED.md` 不新开行。
+它**不接进 `pnpm check` 链**（与另两台 audit 探针同一档）：判据是文本必要条件、词表还会随写法长，
+一接进去就会变成一把"生下来就红"或"永远绿"的尺；要接，先等到能给出 `--strict` 且当场判得出零违规的那个口径。
+复量分母：`git ls-tree -r --name-only HEAD | grep -cE '^(apps|packages)/[^/]+/src/.*\.(ts|tsx)$'`。
