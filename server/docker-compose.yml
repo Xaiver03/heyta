@@ -61,6 +61,9 @@ services:
       - AUTOMATION_OFFICIAL_KEYS=${AUTOMATION_OFFICIAL_KEYS:-}
       - AUTOMATION_SENDER_KEK=${AUTOMATION_SENDER_KEK:-}
       # 签发侧三件套，只有官方实例需要；三缺一 ⇒ 那六条签发路由全 403。
+      # 🔴 这三行在"不填"时会把变量注入成**空字符串**（`${VAR:-}`），而不是不注入 ——
+      # 装载器已按"空白 = 没配"处理（2026-10-29 生产上实测到反例：只判 undefined 会让
+      # 匿名可读的 `GET /automation/entitlement/revocations` 从 403 变成 500）。
       - AUTOMATION_OFFICIAL_PRIVATE_KEY=${AUTOMATION_OFFICIAL_PRIVATE_KEY:-}
       - AUTOMATION_OFFICIAL_ISSUER=${AUTOMATION_OFFICIAL_ISSUER:-}
       - AUTOMATION_OFFICIAL_KEY_ID=${AUTOMATION_OFFICIAL_KEY_ID:-}

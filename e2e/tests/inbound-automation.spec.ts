@@ -395,3 +395,51 @@ for (const zone of zoneList) {
     });
   });
 }
+
+/**
+ * A9 前三项在**真浏览器**里也要成立（工单 §3 A9）。
+ *
+ * 单测 `apps/web/tests/inbound-events-reason-cap.spec.tsx` 钉的是组件的返回值；
+ * 这一条钉的是"真 DOM 里真的渲出来了"——本仓的界面验收要求真跑真看，不许拿单测顶。
+ * 三件事各一枚断言：① 50 条封顶提示；② `reasonCode` 翻成人话、表外码不编句；
+ * ③ 试发那句常驻说明（secret 只活在签发那一次）。
+ */
+test('inbound events cap hint, reason copy and test-send note render in a real browser', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 2200 });
+  await stubLegalRecheck(page); await stubPublicFacts(page);
+  await page.addInitScript((baseUrl) => localStorage.setItem('heyta.sync.credentials', JSON.stringify({ baseUrl,
+    token: 'fixture-token', accountId: 'cap-fixture-account', email: 'cap-fixture@example.test' })), server);
+  const ruleId = 'rule-cap';
+  const events = Array.from({ length: 50 }, (_, index) => ({
+    eventId: `evt-${index}`, ruleId, ruleVersion: 1,
+    status: index === 0 ? 'expired' : index === 1 ? 'cancelled' : 'queued',
+    reasonCode: index === 0 ? 'retention-expired' : index === 1 ? 'worker-revoked' : null,
+    attempt: 1, receivedAt: 1_700_000_000_000,
+  }));
+  await page.route(`${server}/**`, async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    let body: unknown = {};
+    if (path.endsWith('/automation/rules')) body = { rules: [{ id: ruleId, version: 1, enabled: true, keyId: 'hook-cap',
+      createdAt: '2026-10-08T00:00:00Z', deletedAt: null, allowedFields: ['title'], targetProjectId: null,
+      timezone: 'Asia/Shanghai', parseVersion: 1, authorizationVersion: 1, maxItems: 5, hostedExtraction: false }] };
+    else if (path.endsWith('/automation/events')) body = { events };
+    else if (path.endsWith('/sender-credentials')) body = { credentials: [] };
+    else if (path.endsWith('/recipient-key')) body = { keyEpoch: 2, packageVersion: 1 };
+    else if (path.endsWith('/key-package')) { await route.fulfill({ status: 404, body: '' }); return; }
+    else if (path.endsWith('/devices')) body = { devices: [] };
+    else if (path.endsWith('/ops')) body = { ops: [], hasMore: false, latestSeq: 0 };
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  await openApp(page, '/?lang=zh-CN', 'accepted');
+  await openSettingsSheet(page); await selectSettingsSection(page, 'ai');
+  const panel = page.getByTestId('inbound-automation-settings');
+  await expect(panel).toBeVisible();
+
+  // ① 封顶提示：50 条不是"就这些"。
+  await expect(page.getByTestId('inbound-events-capped')).toHaveText(/只显示最近 50 条/);
+  // ② 已知原因 → 人话；表外码（worker-revoked 不在那张表里）→ 不编句。
+  await expect(page.getByTestId('inbound-event-reason-evt-0')).toHaveText('内容保留期已过，原文已被清除。');
+  await expect(page.getByTestId('inbound-event-reason-evt-1')).toHaveCount(0);
+  // ③ 试发那句常驻说明。
+  await expect(panel.getByText('「发送测试事件」只在刚签发这一次可用', { exact: false })).toBeVisible();
+});
