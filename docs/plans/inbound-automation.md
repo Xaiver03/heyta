@@ -6089,3 +6089,67 @@ gitee 那枚上游仍超配额，没碰。
 | ⑦ | ✅ **已闭合**（2026-10-28 点头后按「补白名单 + 借名笔单独记账」动了表，`越界=` 现量 123→0） | 上面「2026-10-28 23:2x · ⑦ 范围尺那张死表」那一节 | 不用再回这一格 |
 
 ⚠️ 这张表**只指路、不抄数**：每格的具体读数与命令都在被指的那一段里，读数会随别线提交漂，引用时重跑那一行命令。
+
+## 2026-10-29 15:2x–15:4x · 开工单剩下五格一口气收口：A9 四件、A4 修法、④ 对外六格、B 组上线、AC 证据（自动收集线）
+
+**授权记录**：负责人 2026-10-29「你就是那个AI，你来启用目标模式，我完全授权你，你来把这些东西全部做完」（附件＝开工单正文）。
+
+### 1. A9 四件（提交 `28a96ab8a`）
+
+- **事件列表上限**：服务端一页 `take: 50`，界面此前把截断当全量。现在到顶就渲一行"只显示最近 {limit} 条"；
+  那个 50 收成 `@heyta/app-host` 的 `INBOUND_EVENT_LIST_LIMIT` 一枚常量，取数与守卫共用（不再两处各写 50）。
+- **`reasonCode` 上界面**：`REASON_COPY` 只列服务端真会写的五档（needs-confirmation / model-result-uncertain /
+  user-cancelled / rule-disabled / retention-expired），表外码**不编句**（状态行已经把"发生了什么"说清楚）。
+- **凭据试发**：secret 只在签发那一次留在内存，界面补一句常驻说明（之后要试发必须重新签发）。
+- **手机能看见规则**：新增 `apps/mobile/src/inbound/rules-store.ts`，前台 worker 按绑定拉一次 `remote.list()`，
+  只保留展示四样（id/keyId/enabled/hostedExtraction）；设置面读 store、仍然不发请求。
+- **判据**：`apps/web/tests/inbound-events-reason-cap.spec.tsx` 3 枚（两枚变异臂实测各红 2 条）；
+  `apps/mobile/tests/inbound-cycle-display.spec.ts` 扩 3 枚（含"不许搭车"形状断言、18 枚全绿）。
+- 门禁：web typecheck / mobile typecheck / app-host typecheck 全 rc=0；inbound 相关 web 套 11 文件 36 条绿。
+
+### 2. A4 双扣修法（提交 `9904fb671`）——取「预留那一侧为权威」
+
+- 代理侧在 ⑤ 之前做一次**原子认领**：`UPDATE … WHERE ctid = (SELECT ctid … state='sent' AND billing_source='managed'
+  AND proxy_billed IS NOT TRUE AND updated_at > now()-5min ORDER BY … LIMIT 1 FOR UPDATE SKIP LOCKED)`。
+  领到 ⇒ 这一次的账已在预留侧记过，跳过扣费；领不到（服务端抽取腿不写台账）⇒ 照常扣。
+- 新迁移 `20261029130000_add_automation_attempt_proxy_billed`：**可空、无默认、无索引**（元数据级，不产生写窗口）。
+- 用例从"钉 +2 现状"改成"钉 +1 承诺"，并**改正了它的顺序错误**：老版本把 `reserved→sent` 排在物理调用之后，
+  那是生产里不会出现的中间态（`inbound-runner.ts` 的 `meteredFetch` 是先 CAS 再发）。
+- 新增两臂：同一枚预留只认领一次（没有免票通道）、两趟周期 = +2。
+- 读数：该文件 7 条绿；变异臂 A（摘掉认领）⇒ 3 红、B（摘掉"只认领一次"守卫）⇒ 1 红，均还原；
+  server `tsc` rc=0；`check:migrations` 80 笔全绿；metering/proxy 四份 79 条绿。
+
+### 3. ④ 对外六格（提交 `06798bf3a`，**已改未发**）
+
+- `automation-metadata` 那一节六处（3 份 × 中英）换成**同一份**逐类列举（八组），
+  并新增两个以前没有任何法务件写过的事实：①"当场抽取"在同一次请求内读、抽完丢弃、结果重封给用户收件公钥、成功后不能重抽；
+  ②未抽取/失败那批密文最多 7 天。
+- `ai-and-transfer`：出站点五个→六个、新增自动收集那一行（投影发生在发送前）、第五节补"一次物理调用只计一次额度"。
+- `third-parties`：加一段，托管 AI 与当场抽取走同一枚供应商、不新增接收方。
+- 帮助中心 `site.docs.automation.s3*`：从"规划中/尚未上线"改成现值。
+- 版本行 + 日期 + 变更记录同批：privacy 1.13 / data-rights 1.8 / personal-info-list 1.9 / ai-and-transfer 1.9 / third-parties 1.7；
+  对账尺的登记项按翻案条件删除（现量 `登记=0 问题=0`）。
+- 🔴 **发布归负责人**：这批只落在源码与 commit，站点构建/上线那一步没做。
+
+### 4. B 组上线（**env 级，不换镜像**）
+
+- 生产现量：`ubuntu-jcli` 可达、`supersync-server` 健康、`MANAGED_AI_*` 4 枚、`AUTOMATION_*` **0 枚**。
+  生产的那份 `docker-compose.yml` 比仓库旧：**白名单里没有那 8 个键**（`.env` 里写了也进不了容器）。
+- 做了三件事（都可逆）：① 备份 `docker-compose.yml`/`.env`（`*.bak-20261029T072423Z`）；
+  ② compose 白名单补 8 行（与仓库同形 `${VAR:-}`）；③ `.env` 写入 `AUTOMATION_ENTITLEMENT_MODE=official`
+  + `AUTOMATION_SENDER_KEK`（`openssl rand -hex 32`）+ `AUTOMATION_COMMIT_KEYS`（`instanceId`/`k1`/32 字节 hex）。
+  密钥只在远端生成、不回显、不进仓库/日志/台账。
+- 重启用的是**现有镜像**（`supersync:local`），没有换容器镜像 ⇒ 不触发"镜像 tag 被覆盖"那种不可逆。
+- 读数：容器内 `AUTOMATION_*` **8 枚**、`AUTOMATION_ENTITLEMENT_MODE=official`、健康；
+  公网匿名 POST `/api/automation/v1/hooks/<uuid>` ⇒ **400 INVALID_REQUEST**（不再是 402 `ENTITLEMENT_MODE_UNCONFIGURED`）；
+  签发面带认证 ⇒ 401（未配 `AUTOMATION_OFFICIAL_*`，这与"官方实例最小集三枚"一致）。
+  原件 `~/.heyta-evidence/inbound-bgroup-20261029/evidence.md`。
+- ⚠️ **仍欠**：新代码（A4/A9）不在线上镜像里，随下一次正常发布；"人真走一遍"（建规则→试发→设备领到→待办出现）
+  归负责人，AC 一格没代勾。
+- 顺手改掉一处会骗人的抄件：仓库 `server/docker-compose.yml` 那句"写错在请求期 500"已按 3-B 改成"端口绑定前就拒"。
+
+### 5. 沙箱与 AC 证据
+
+- `node scripts/deploy-ssh.mjs --ref HEAD`（沙箱，不碰线上）：打包/对账/镜像 VCS_REF 三段全绿，日志 `.run-logs/deploy-sandbox-1029.log`。
+- AC 电池 31 腿在 15:3x 于当前 tip 上整串跑，读数与原件在 `~/.heyta-evidence/inbound-ac-battery-20261029/`。
+- **AC-1～AC-8 一格没代勾**（`verify-inbound-ac-ticks.py` 现量为准）；AC-6 的"人真打开看过截图"只能负责人本人。
