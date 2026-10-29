@@ -5842,3 +5842,35 @@ S2 把 `apps/mobile/src/screens/ExportScreen.tsx:357` 那枚真回执整个换�
 `git log --oneline -3 -- e2e/live-site/live-legal.spec.ts`。
 本线一行不代改（那是对外呈现的判据口径，又在别人的验收套件里），只把它登记进归属表，
 让"未登记栏"读得出真例外。
+
+---
+
+### 6.129（2026-10-29 24:0x · 第 ⑤ 维"同一目的地两个入口"落成装置；「两处都能编辑」明写未判定）
+
+⑤ 那一维先前只有逐枚开码的复核。补上 `research/tools/audit-duplicate-destinations.mjs`：
+认四族字面量写法（`setView/switchView/setActiveView`、`setSection/setTab/openPanel/setPanel`、`href="/…"`、
+`navigate('/…')`），按 **壳 + 族 + 目的地** 分组（web 与 mobile 各有"设置"是平台差异，合法 ⇒ 不判），
+四档阶梯：🔴 `ritual-dup`（同组两枚入口**周围 5 行的调用集合逐字相同**）／🟠 同文件多入口但仪式不同／
+🟡 同壳跨文件／⚪ 跨壳。🔴 不看文件边界——跨文件抄同一件仪式一样是重复实现（臂 E14 钉这条阶梯）。
+
+**三处自纠，都是臂先红：**
+① 字面量必须扫**原文**——`maskText` 把引号里的内容挖成空格，在遮蔽文本上找 `setView('settings')` 永远找不到，
+整枚尺静默读成"零入口"（臂 E8 抓住；E4 也一并补成"枚数必须是 1"，因为 `[].every()` 恒真＝一枚永远绿的臂）；
+② 组件名窗口 400 行太窄——本仓壳入口是几千行的巨型 `App`，读回来全是一片 `(顶层)`，改成一路看到文件头；
+③ 变异臂第一发读回"变化 0"——它盯 🔴 那一档，而插入行的 ±5 行窗口与被模仿那枚的窗口差几行 ⇒ 落成 🟠。
+判"敏感不敏感"要盯**重复入口组**（≥2 枚），🔴 的敏感性由臂 E10/E13/E14 在受控输入上钉。
+
+**当趟读数**（分母、各组枚数由尺自己打印）：🔴 一组，全在 `apps/web/src/App.tsx` 的"打开设置面"那一族：
+- `:932` 与 `:991` 仪式逐字同（`setSecondaryAccountSurface/setSettingsAnchor/setSettingsFocus/setSettingsReturnSurface/setSettingsSection/setView`）；
+- `:2424`、`:2430`、`:2450` 三枚同仪式（分别是 `onOpenProfile`、`onOpenProfileCenter`、`onOpenHelp`）。
+🔴 **顺链看出来的产品形状**（这才是 ⑤ 要的话）：`apps/web/src/features/shell/AccountMenu.tsx:101-102` 同时收
+`onOpenProfile` 与 `onOpenProfileCenter` 两枚 prop 并且都渲染（`:351` 只在后者缺席时才退化成一枚）——
+**同一个账号菜单里并排两个"个人资料"入口，且两者走的还是不同的状态字段**（一枚设 `settingsAnchor='profile'`、
+一枚设 `secondaryAccountSurface='profile'`）。它们是不是两个真目的地，本线不判：
+`App.tsx` 归日历/详情面线登记地界、账号菜单与"面"的分层归全局 UX 线，而"该留哪一个"是产品口径 ⇒ 入待拍板表不代改。
+
+⚠️ **射程外的那半句要留在读数里**：「两处都能编辑」这一族**没有装置**——要知道两个控件写的是不是同一个业务字段，
+得跨组件对账 state 的语义来源（`setTitle` 与 `setTitleDraft` 静态分不开）。这一格是**未判定**，不是"查过没有"。
+
+复量：`node research/tools/audit-duplicate-destinations.mjs`（诊断）／`--strict`（只被 🔴 触发）／
+`--self-test`（臂数它自己打印）／`--mutate`（先注入再拆除，两步都不依赖树上恰好有什么形状）。
