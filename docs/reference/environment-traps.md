@@ -12214,3 +12214,11 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
 
 612. 🔴 **载体上构建的 APK 不必 scp 回本机再装 —— 装机腿要的产物在载体那一头，本机只要 adb server 隧道**（2026-10-28，P4 移动端设备腿）：`scripts/run-gradle.mjs` 第 6 步把 69,827,016 B 的 `app-release.apk` scp 回 Mac，8 分钟没走完，而且两端读数不一致（本机半件 69,826,924 / `a47e9a47…` vs 载体完整 69,827,016 / `54b7f698…`）。杀掉自己的 scp 之后改在载体上 `adb -s <serial> install -r -g <载体路径>`，一条命令装机 `Success`。判据：要钉"哪一枚产物"就记**载体上那枚**的 sha256 与字节数，别为了"本机也算得出 sha"去搬 70 MB。⚠️ 半件不会自己报错 —— scp 卡住时两端都有文件，只有 size/hash 对账能发现（与"截断的读数不是全集"同族）。
 613. 🔴 **触屏"按住那一帧"用 `input tap` 拿不到；缩放类按下态用固定取色框也量不出来**（2026-10-28 同一趟）：要 `adb shell input motionevent DOWN x y` → `screencap` → `UP`，`tap` 是 DOWN+UP 的原子动作，截图时已经回弹。第二层坑更阴：`kit.tsx` 的 `Button` 按下档是 `motion.press-scale`（**不换底色**），在按钮外接矩形里做颜色直方图会读成"静止帧与按下帧逐像素相同"——那是假绿，它恰好和"按下档没实现"同形。要量的是色块外接矩形的宽高：实测 485×121px → 469×117px、两轴同比例 0.967，这才是缩放生效的证据。归族：#609（同一族"探针取错了量"）、`ui-acceptance.md` 的"DOM 回读不等于进 model"。
+
+614. 🔴 **首屏 splash 的 plate 压在模态之上 ⇒ 不等它退场就截图，整张像蒙了一层白，会被读成"这次改动改了外观"**（2026-10-29，全局 UX 线 P6 第五批迁 `PrivacyConsentSheet`/`LegalReconfirmSheet` 时量到）：
+   形状：拿两套既有取证套件的产物与它们各自的入库图做像素对比 —— 补签面板那张差 **83%**、隐私面板那张整屏发白。第一反应是"换壳换坏了"。
+   真因：`#heyta-boot` 的 `--heyta-boot-z: 900`，而模态是 `--ht-z-modal`（400）—— plate 在**模态之上**退场。这两套套件都是"面板一出现就 `page.screenshot()`"，于是拍到的是退场动画中途：整屏被 `--heyta-boot-bg` 那层半透明白压过一遍。剩下的差是 27 天的外壳漂移（rail/顶栏换了形状），与这一笔迁移无关。
+   ⇒ 规矩：**量任何浮层之前先等首屏动画退场，并且把"退场"写成会红的断言**（`waitForBootSplashGone()` + `expect(page.locator('#heyta-boot')).toHaveCount(0)`），不要写 `waitForTimeout` —— 后者在慢机器上会静默失效，正是要防的那种"永远通过的判据"。
+   ⇒ 另一条同批立下的规矩（同一族的"改了什么要有尺"）：**迁移是否零视觉，用逐节点 DOM 对比来证，不用像素差来猜**。临时夹具把换壳前后的面板子树导成 JSON（tag + 排序后的属性 + 文本长度），差异只剩三处：遮罩多 `data-testid="…-scrim"`、两层多挂 `ht-web-modal__overlay`/`ht-web-modal__dialog`（全仓这两个名字**零条 CSS 规则** ⇒ 惰性钩子），内联 style 串逐字相同。像素差只回答"整张图变了多少"，答不了"是哪一笔改的"。
+   复量：`pnpm --dir e2e exec playwright test tests/deferrable-sheet.spec.ts --retries=0` ⇒ 5 passed（含那条退场断言）；把 `waitForBootSplashGone` 去掉不会立刻红 —— 它只在 plate 还在场时红，所以断言写成 `toHaveCount(0)` 而不是"不透明度为 0"，慢机器上仍然必红。
+   归族：#606/#610（同一族"装置在错误的时间点取样"）、#611（量浮层前先等 commit）、`ui-acceptance.md` 的"同类缺陷没有这句要带现量读数"。

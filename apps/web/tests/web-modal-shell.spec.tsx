@@ -15,7 +15,7 @@ import { WebModalShell } from '../src/lib/dialog/WebModalShell.js';
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-async function mount(props: Partial<Parameters<typeof WebModalShell>[0]> & { policy: 'modal-readonly' | 'modal-forced-read' | 'danger-confirm' }): Promise<void> {
+async function mount(props: Partial<Parameters<typeof WebModalShell>[0]> & { policy: Parameters<typeof WebModalShell>[0]['policy'] }): Promise<void> {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -170,5 +170,55 @@ describe('二、三条通道全部查表（两向都要有分辨力）', () => {
       overlay()?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     expect(onCancel, '按下发生在面板里 ⇒ 这一串不该被当成点背景').not.toHaveBeenCalled();
+  });
+
+  /**
+   * `modal-deferrable` 那一行是 2026-10-29 为意思表示层（隐私单独同意 / 条款再确认）新增的。
+   * 它的两半各自有对照臂：与 `modal-readonly` 的差别只在**背景**那一格，
+   * 与 `modal-forced-read` 的差别只在**Esc**那一格 ⇒ 只测一半的话，两行写反了也量不出来。
+   */
+  it('modal-deferrable：点遮罩**不关**（区别于 modal-readonly），按 Esc 关（区别于 modal-forced-read）', async () => {
+    const onCancel = vi.fn();
+    await mount({ policy: 'modal-deferrable', onCancel });
+    await act(async () => {
+      overlay()?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    expect(onCancel, '误点遮罩不许把一次法律表态推掉').not.toHaveBeenCalled();
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(onCancel, 'Esc 是有意动作 ⇒ 允许退出（关掉不等于同意）').toHaveBeenCalledTimes(1);
+  });
+
+  it('🔴 这一层真的接住了 Esc ⇒ 不再往下传；判成 deny 时**不吞**，下面那层照常收到', async () => {
+    // 吞与不吞的分界是"这一层动不动手"：动手了才归它，没动手就不该替别人作决定。
+    const seenByOthers = vi.fn();
+    await mount({ policy: 'modal-deferrable', onCancel: () => undefined });
+    window.addEventListener('keydown', seenByOthers);
+    try {
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+      });
+      expect(seenByOthers, '壳接住了 Esc 还往外传 ⇒ 一次 Esc 会连着关掉两层').not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('keydown', seenByOthers);
+      seenByOthers.mockClear();
+    }
+
+    await act(async () => root?.unmount());
+    host?.remove();
+    host = null;
+    root = null;
+
+    await mount({ policy: 'modal-forced-read', onCancel: () => undefined });
+    window.addEventListener('keydown', seenByOthers);
+    try {
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+      });
+      expect(seenByOthers, '强制阅读那一层按 Esc 没反应 ⇒ 它无权替别人吞掉这一下').toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('keydown', seenByOthers);
+    }
   });
 });

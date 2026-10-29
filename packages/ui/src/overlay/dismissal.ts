@@ -44,6 +44,7 @@ export type ClosedOverlay =
   | 'popover-dirty-form'
   | 'menu'
   | 'modal-readonly'
+  | 'modal-deferrable'
   | 'modal-dirty-form'
   | 'modal-forced-read'
   | 'danger-confirm'
@@ -78,6 +79,7 @@ export const CLOSED_OVERLAYS = [
   'popover-dirty-form',
   'menu',
   'modal-readonly',
+  'modal-deferrable',
   'modal-dirty-form',
   'modal-forced-read',
   'danger-confirm',
@@ -128,6 +130,26 @@ const POLICY_BY_CLASS: Record<ClosedOverlay, ClosePolicy> = {
   // 只读模态：丢弃无代价 ⇒ 背景与 Esc 都是出口。
   'modal-readonly': {
     scrim: 'dismiss',
+    escape: 'dismiss',
+    systemBack: 'dismiss',
+    autoDismiss: false,
+    explicitCloseButton: true,
+  },
+
+  /**
+   * 「可延后，但延后要有意」—— 意思表示层（隐私单独同意、条款再确认）。
+   *
+   * 🔴 为什么不复用 `modal-readonly`：那一档把**背景点击**也算成退出。
+   *   对一层"要不要接受新条款 / 要不要允许联网"的面板来说，误点一下遮罩就把表态推掉，
+   *   是这一类里最不该有的失效（用户会以为"刚才那个提示闪了一下"，而它其实记成了没决定）。
+   *   Esc 与 × 是**有意**的动作，保留；背景是**无意**的动作，去掉。
+   * 🔴 为什么也不升成 `modal-forced-read`：关掉不等于同意（闸门保持关闭），
+   *   而下一次要出门的动作会再问一次 ⇒ 决定不会丢。强制现在表态会把"我没空"
+   *   变成"我必须现在选一个"，对本就允许拒绝的单独同意是反向的诱导。
+   * 出口文案已经说的是这件事：`common.privacy.consent.close` = 「以后再说」。
+   */
+  'modal-deferrable': {
+    scrim: 'deny',
     escape: 'dismiss',
     systemBack: 'dismiss',
     autoDismiss: false,

@@ -202,12 +202,26 @@ describe('面板的基本形状：一句话要说清"这个决定只决定能不
 });
 
 describe('🔴 关掉不等于同意（不许把"没选"记成"选了"）', () => {
+  /**
+   * jsdom 里 `offsetParent` 恒为 `null`（它没有布局），而共享壳的焦点隔离用
+   * `el.offsetParent !== null` 剔掉"没画出来"的控件 ⇒ 不标一下，它会认为这一层里
+   * 一个可聚焦的东西都没有，Tab 环绕就无从判起。
+   * 与 `menu-keyboard-hook.spec.tsx:78` 同一处理，且那条真浏览器判据在
+   * `e2e/tests/dirty-form-guard.spec.ts`（N6）里量的是同一枚钩子。
+   */
+  function makeFocusablesVisible(box: Element): void {
+    for (const item of Array.from(box.querySelectorAll<HTMLElement>('button, a[href]'))) {
+      Object.defineProperty(item, 'offsetParent', { value: box, configurable: true });
+    }
+  }
+
   it('Tab 留在面板内，Escape 只关闭顶层并返回触发按钮', async () => {
     const el = await mount(<><button data-testid="privacy-trigger" onClick={() => usePrivacyStore.getState().openSheet('settings')}>选择</button><PrivacyConsentSheet /></>);
     const trigger = el.querySelector<HTMLButtonElement>('[data-testid="privacy-trigger"]')!;
     trigger.focus();
     await click(trigger);
     expect(document.activeElement).toBe(el.querySelector(DIALOG));
+    makeFocusablesVisible(el.querySelector(DIALOG)!);
     const key = async (value: string, shiftKey = false): Promise<void> => {
       await act(async () => {
         document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: value, shiftKey, bubbles: true, cancelable: true }));
@@ -265,7 +279,13 @@ describe('🔴 关掉不等于同意（不许把"没选"记成"选了"）', () =
   it('🔴 点背景（遮罩）不许等于同意，也不许等于"只用本机"', async () => {
     const el = await openSheet();
     const overlay = dialog(el).parentElement!;
-    await click(overlay);
+    // 🔴 按下 → 松手 → 点击整串都发一遍：共享壳的背景通道认的是 **mousedown + 目标判定**
+    //（"在面板里按下、松手滑到背景上"不算点背景），只发 `click` 的话这一条会退化成空判据。
+    await act(async () => {
+      overlay.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      overlay.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
 
     expect(el.querySelector(DIALOG), '点背景把面板关了 —— 同意不能靠点空白处作出').not.toBeNull();
     expect(storedRecord()).toBeNull();

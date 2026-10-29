@@ -249,6 +249,35 @@ describe('两个动作各自的后果', () => {
   });
 });
 
+describe('🔴 关闭通道全部查表（`modal-deferrable`：背景 deny／Esc dismiss）', () => {
+  it('按 Esc ⇒ 面板收起、闸门**仍然拦着**、一个请求都不发（Esc 与「稍后再说」同义）', async () => {
+    await ask(true);
+    const el = await mountSheet();
+    const before = requests.length;
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(el.querySelector(DIALOG), 'Esc 没把这一层收起来 —— 壳那三条通道没接上').toBeNull();
+    expect(legalRecheck.dataEgressAllowed(), 'Esc 被当成同意 ⇒ 闸门放开了').toBe(false);
+    expect(legalRecheck.current().phase).toBe('needs-reconfirm');
+    expect(requests.slice(before), '推迟那一下发出了请求').toHaveLength(0);
+  });
+
+  it('点背景 ⇒ 这一问**不许**被推掉（误点遮罩不是"以后再说"）', async () => {
+    await ask(true);
+    const el = await mountSheet();
+    const overlay = el.querySelector(DIALOG)!.parentElement!;
+    // 与隐私面板那条同理：背景通道认 mousedown + 目标判定，整串都发一遍才不是空判据。
+    await act(async () => {
+      overlay.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      overlay.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(el.querySelector(DIALOG), '点空白处就把重新确认推掉了').not.toBeNull();
+    expect(legalRecheck.dataEgressAllowed()).toBe(false);
+  });
+});
+
 describe('同步这条出站路真的被拦住', () => {
   it('🔴 待补签时 `syncNow()` 回 `legal-reconfirm-required`，且**一个请求都没发**', async () => {
     await ask(true);

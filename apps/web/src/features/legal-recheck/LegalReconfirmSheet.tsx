@@ -39,7 +39,7 @@
  * 所以类名挂在既有的 `.ht-sheet` 族下（`.ht-sheet__reconfirm-*`），不自开一族。
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollText } from 'lucide-react';
 
 import { ICON_SIZE } from '@heyta/design-system';
@@ -47,6 +47,7 @@ import { useI18n } from '@heyta/i18n';
 import { resolveLegalLinks } from '@heyta/app-host';
 
 import { authBaseUrl } from '../../lib/auth-endpoint.js';
+import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
 import { legalRecheck } from './gate.js';
 import { useLegalReconfirmStore } from './store.js';
 import { useSyncStore } from '../sync/store.js';
@@ -59,7 +60,6 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
   const confirm = useLegalReconfirmStore((s) => s.confirm);
   const defer = useLegalReconfirmStore((s) => s.defer);
   const baseUrl = useSyncStore((s) => s.baseUrl);
-  const dialogRef = useRef<HTMLDivElement>(null);
   /**
    * 闸门的状态在这里**不是** React state —— 它是订阅式的。
    * 不订阅的话，界面会在"点了确认、闸门已经放开"之后仍然显示那一句旧的拦提示。
@@ -70,20 +70,6 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
   useEffect(() => legalRecheck.subscribe(() => setFailure(legalRecheck.current().confirmFailure)), []);
 
   const links = resolveLegalLinks(authBaseUrl(baseUrl), locale);
-
-  useEffect(() => {
-    if (!open) return;
-    // Esc = 推迟（与那个按钮同义），不是"同意"，也不是"不同意"。
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') defer();
-    };
-    // 🔴 捕获阶段：react-native-web 的输入框会在冒泡阶段吞掉 keydown（§7 第 80 条）。
-    window.addEventListener('keydown', onKey, true);
-    dialogRef.current?.focus();
-    return () => {
-      window.removeEventListener('keydown', onKey, true);
-    };
-  }, [open, defer]);
 
   if (!open) return null;
 
@@ -96,100 +82,105 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
           ? t('common.legal.reconfirm.failRejected')
           : null;
 
+  /**
+   * 🔴 关闭通道全部查表（`CLOSED_OVERLAYS['modal-deferrable']`，与隐私面板同一行）：
+   * 背景 = **不许**把这一问推掉，Esc = **推迟**（与那枚「稍后再说」同义），× 不给 ——
+   * 这一层本来就只有一枚从属的文字出口，再摆一枚 ✕ 会读成"关掉就好了"。
+   * 焦点接管 / Tab 不外逃 / 关闭归还触发者由壳与 `useModalFocusIsolation` 负责。
+   */
   return (
-    <div role="presentation" className="ht-sheet__reconfirm">
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        data-testid="legal-reconfirm-dialog"
-        aria-modal="true"
-        aria-labelledby="ht-legal-reconfirm-title"
-        className="ht-sheet__reconfirm-dialog"
-      >
-        <div className="ht-sheet__reconfirm-head">
-          <span className="ht-sheet__reconfirm-icon">
-            <ScrollText size={ICON_SIZE.md} aria-hidden="true" />
-          </span>
-          <div className="ht-sheet__reconfirm-titles">
-            <h2 id="ht-legal-reconfirm-title" className="ht-sheet__reconfirm-title ht-type-section-title">
-              {t('common.legal.reconfirm.title')}
-            </h2>
-            {reason === 'required-for-action' ? (
-              // 用户刚点了同步，界面却拦下来 —— 不解释为什么，那看起来像坏了。
-              <p className="ht-sheet__reconfirm-reason ht-type-row-meta">
-                {t('common.sync.error.legalReconfirmRequired')}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <p className="ht-sheet__reconfirm-intro ht-type-row-title">{t('common.legal.reconfirm.intro')}</p>
-
-        <p className="ht-sheet__reconfirm-note ht-type-row-meta">{t('common.legal.reconfirm.localDataSafe')}</p>
-
-        {links === null ? null : (
-          <div className="ht-sheet__reconfirm-links ht-type-row-meta">
-            <span className="ht-sheet__reconfirm-links-label">
-              {t('common.legal.reconfirm.readFirst')}
-            </span>
-            {/* 🔴 链接排在按钮外面：链在按钮里时点链接会顺带触发那个控件（链 2 的 M3 变异抓的就是这个）。 */}
-            <a
-              data-testid="legal-reconfirm-terms"
-              className="ht-sheet__reconfirm-link"
-              href={links.terms}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t('common.privacy.consent.termsLink')}
-            </a>
-            <a
-              data-testid="legal-reconfirm-privacy"
-              className="ht-sheet__reconfirm-link"
-              href={links.privacy}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t('common.privacy.consent.privacyLink')}
-            </a>
-          </div>
-        )}
-
-        {failureLine === null ? null : (
-          <p
-            role="status"
-            data-testid="legal-reconfirm-failure"
-            className="ht-sheet__reconfirm-failure ht-type-row-meta"
-          >
-            {failureLine}
-          </p>
-        )}
-
-        <div className="ht-sheet__reconfirm-actions">
-          <button
-            type="button"
-            data-testid="legal-reconfirm-action"
-            className="ht-btn ht-btn--primary"
-            disabled={submitting}
-            onClick={() => void confirm()}
-          >
-            {submitting
-              ? t('common.legal.reconfirm.pending')
-              : t('common.legal.reconfirm.action')}
-          </button>
-          {/* 🔴 一条**从属**的文字按钮，不是与上面同等的第二个决定：
-              它的语义是"推迟"，措辞里必须自带后果（"继续不同步"），
-              否则它会读起来像"不同意"，而这里没有"不同意"这个选项。 */}
-          <button
-            type="button"
-            data-testid="legal-reconfirm-defer"
-            className="ht-btn ht-btn--ghost"
-            onClick={defer}
-          >
-            {t('common.legal.reconfirm.later')}
-          </button>
+    <WebModalShell
+      policy="modal-deferrable"
+      testId="legal-reconfirm-dialog"
+      labelledBy="ht-legal-reconfirm-title"
+      onCancel={defer}
+      busy={submitting}
+      overlayClass="ht-sheet__reconfirm"
+      dialogClass="ht-sheet__reconfirm-dialog"
+    >
+      <div className="ht-sheet__reconfirm-head">
+        <span className="ht-sheet__reconfirm-icon">
+          <ScrollText size={ICON_SIZE.md} aria-hidden="true" />
+        </span>
+        <div className="ht-sheet__reconfirm-titles">
+          <h2 id="ht-legal-reconfirm-title" className="ht-sheet__reconfirm-title ht-type-section-title">
+            {t('common.legal.reconfirm.title')}
+          </h2>
+          {reason === 'required-for-action' ? (
+            // 用户刚点了同步，界面却拦下来 —— 不解释为什么，那看起来像坏了。
+            <p className="ht-sheet__reconfirm-reason ht-type-row-meta">
+              {t('common.sync.error.legalReconfirmRequired')}
+            </p>
+          ) : null}
         </div>
       </div>
-    </div>
+
+      <p className="ht-sheet__reconfirm-intro ht-type-row-title">{t('common.legal.reconfirm.intro')}</p>
+
+      <p className="ht-sheet__reconfirm-note ht-type-row-meta">{t('common.legal.reconfirm.localDataSafe')}</p>
+
+      {links === null ? null : (
+        <div className="ht-sheet__reconfirm-links ht-type-row-meta">
+          <span className="ht-sheet__reconfirm-links-label">
+            {t('common.legal.reconfirm.readFirst')}
+          </span>
+          {/* 🔴 链接排在按钮外面：链在按钮里时点链接会顺带触发那个控件（链 2 的 M3 变异抓的就是这个）。 */}
+          <a
+            data-testid="legal-reconfirm-terms"
+            className="ht-sheet__reconfirm-link"
+            href={links.terms}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t('common.privacy.consent.termsLink')}
+          </a>
+          <a
+            data-testid="legal-reconfirm-privacy"
+            className="ht-sheet__reconfirm-link"
+            href={links.privacy}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t('common.privacy.consent.privacyLink')}
+          </a>
+        </div>
+      )}
+
+      {failureLine === null ? null : (
+        <p
+          role="status"
+          data-testid="legal-reconfirm-failure"
+          className="ht-sheet__reconfirm-failure ht-type-row-meta"
+        >
+          {failureLine}
+        </p>
+      )}
+
+      <div className="ht-sheet__reconfirm-actions">
+        <button
+          type="button"
+          data-testid="legal-reconfirm-action"
+          className="ht-btn ht-btn--primary"
+          disabled={submitting}
+          onClick={() => void confirm()}
+        >
+          {submitting
+            ? t('common.legal.reconfirm.pending')
+            : t('common.legal.reconfirm.action')}
+        </button>
+        {/* 🔴 一条**从属**的文字按钮，不是与上面同等的第二个决定：
+            它的语义是"推迟"，措辞里必须自带后果（"继续不同步"），
+            否则它会读起来像"不同意"，而这里没有"不同意"这个选项。 */}
+        <button
+          type="button"
+          data-testid="legal-reconfirm-defer"
+          className="ht-btn ht-btn--ghost"
+          onClick={defer}
+        >
+          {t('common.legal.reconfirm.later')}
+        </button>
+      </div>
+    </WebModalShell>
   );
 }
+
