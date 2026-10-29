@@ -12603,6 +12603,11 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 | 尺的 `KNOWN_GAPS` 两枚：`automation_sender_credentials_user_id_rule_id_key_id_idx`（库里只有同列的**部分唯一** + 一条 (user_id,rule_id,revoked_at) 普通索引 ⇒ 查已撤销凭据那条路没索引）、`automation_commit_permits_op_id_key`（迁移 20261018080000 有意撤掉单列唯一换成 (user_id,op_id)，schema 的 `opId @unique` 没跟着改 ⇒ 不变量收窄） | 两格都归自动收集线判：补迁移或改声明都是他们的口径，本尺先登记不代改 | `grep -n "KNOWN_GAPS" -A 20 scripts/check-schema-migration-drift.mjs` |
 | `main` 的上游仍指 `gitee/main` | 改它 = 改 git 配置（系统级禁令），只报不动；本轮推的是显式 `git push origin main:main` | `git rev-parse --abbrev-ref 'main@{upstream}'`（🔴 裸写 `main@upstream` 读不出：`fatal: ambiguous argument` —— 这行以前就是坏的，照着跑会得到"没有上游"这个假事实）；`git rev-list --count 'main@{upstream}..main'` 读的是**上游那一侧还没收到多少枚**（上游是 gitee，所以这个数大是常态 —— 早先这里写作"落后枚数"会把方向读反）；真正要复验的那一枚用远端事实 `gh api repos/Xaiver03/heyta/git/ref/heads/main --jq .object.sha` 比 `git rev-parse HEAD` |
 | 本线之外那批正在被别人改的文件（枚数现量见右栏，别抄这里的数） | 两条会话**正在写**（`stat -f "%Sm %N"` 读回 mtime 落在最近十几分钟内），代提交 = 替他们把半份落仓 | `git status --porcelain=v1 \| wc -l`；`stat -f "%Sm %N" apps/web/src/App.tsx` |
+| 🔴 手机端登出时 `serverUrl` 解析失败 ⇒ **两步安全清理整段跳过**，界面却报「已清干净」（候选，一枚没动） | `apps/mobile/src/screens/ProfileScreen.tsx:243` 的 catch 只 `console.warn` 并把 `scope` 留 `undefined`，而 `apps/mobile/src/lib/vault-session-cleanup.ts:48/57` 在 `scope === undefined` 时把 `disableVaultAutoUnlock` 与 `removeRootKey` 两步都跳过、返回 `{}` ⇒ 调用方 `:272` 读成「没有 `secureStorageError`」，`setVaultCleanupPending(undefined)` 就是「没有待清理」。这不是「只 console.log」那一档，是**失败支呈现成功**。不代改有三条：① 它是设备撤销那条线的契约（`b3d9ad394`，现有断言 `apps/mobile/tests/device-revocation-behavior.spec.ts`）；② 「取不到 scope 该按失败呈现还是按无需清理呈现」是他们那条安全边的口径；③ 可达性我判不了死——`serverUrl` 是保存时被校验过的值，今天多半走不到，但**走不到的支路报成功**与走得到的报成功是同一个形状 | `grep -n "secure root cleanup skipped" apps/mobile/src/screens/ProfileScreen.tsx`；`sed -n '42,65p' apps/mobile/src/lib/vault-session-cleanup.ts`（看 `scope !== undefined` 那两个守卫）；候选全集 `node research/tools/audit-silent-failure-branch.mjs`，判它能不能红 `--self-test` / `--mutate`；正文与另 10 枚候选的逐枚开码结论见台账 §6.122 |
+| 🟠 本机 op-log 迁移失败只在控制台留一句「将从空库开始」，而同一处注释说的是「必须留下**可见**痕迹」（候选，没动） | `apps/web/src/lib/oplog.ts:437` 的 `catch` 与 `:413-415` 的守卫 #5 之间有意图落差：不阻断启动是对的（否则用户连导出/反馈的入口都没有），但浏览器里没人看得见控制台 ⇒ 用户的旧数据没搬进来而界面没有任何一行字。改它是「要不要为这一档加一枚用户可见呈现」的产品决定，且落在浮层与反馈那条线的债务账本上（`docs/agents/overlay-feedback.md`），不在本线授权内 | `grep -n "迁移失败，将从空库开始" apps/web/src/lib/oplog.ts`；上面那段守卫注释 `grep -n "失败不阻断启动" apps/web/src/lib/oplog.ts` |
+| 🟠 第 ③ 维「循环里逐行查库 / 循环内同步 IO」那六格候选（一枚没动） | 六格逐格的归属与「为什么不由我收」在台账 §6.121 末尾那张表里：同步/配额线的 `server/src/sync/services/storage-quota.service.ts` 三处（注释自写「Exact semantics over a faster plan」，改它要连着改那条 sweep 的正确性论证）、设计系统生成 CLI 两处、桌面冒烟一处、存储驱动拆卸一处（有界且在卸载路径上必须同步）、AI 路由那枚已被**改判成尺的「判不了」那一档**而不是缺陷、邀请活动两处是有界重试同样改判 ⇒ 这一族的共同点是「要么改判断口径、要么是不可逆层、要么根本不是缺陷」，没有一枚可由探针代改 | 分母与逐处清单：`node research/tools/audit-loop-io.mjs`（`--top 500` 全列，四格「不判/判不了」各带条数与 `file:line`）；判它有没有牙：`--self-test`、`--mutate`；台账 §6.121 |
+| 🟠 「同一枚展示逻辑在 `apps/mobile` 与 `apps/web` 各写一遍」是一族，不是几格（候选，一枚没动） | 🔴 这一族是 AGENTS §3.5「业务语义只许在 `packages/*`」那条铁律的**现量证据**：导出文案表、看板标签、周期标签、倒计时过滤语、剩余时间文案、优先级标签、分享花名册注册各自在两个壳里有一份，最长的一对是百行级（AI 意图文案）。修法不是逐格删重复，而是「下沉到哪一枚包、公共面长成什么形状」的决定，且会动 barrel（`packages/app-host/src/index.ts` 那格 hunk 切不开是已登记的限制）⇒ 归全局 UX 分层整改线与各特性线，本线只出尺 | 桶与逐格 `file:line`：`node research/tools/audit-duplicate-function-bodies.mjs --top 500`（族表与「上一轮那句『只有七格』作废」在台账 §6.124；口径修正的因由在尺内注释与臂 D14）|
+| 🔴 本账本**被整文件写回抹掉过 6 行**（已还原，留这一行是给下一位的纪律） | 形状：并行会话整份读入这枚文件、追加自己那 388 行、再整份写回 ⇒ 它读与写之间落地的 6 笔提交的内容不在它那一版里，`git diff` 只看会读成「一次纯追加 + 顺手删 6 行」，链上没有任何门禁报这一族。当天那 6 行的事**一件都没结**（索引覆盖/导出面候选照旧、撞号尺 `--strict` 仍退 1、脏截图照旧）。还原做法与三条对账在台账 §6.123 | 提交这枚文件**之前**跑：`node research/tools/audit-ledger-row-loss.mjs --strict; echo $?`（1=有已入库的行消失）；判它有没有牙：`--self-test` 与 `--mutate`（后者含「抹连续 5 行＝事故形状」那一形）；事故回放：按 `git diff -U0` 的 hunk 头从 `HEAD` 里剔掉那几行喂给尺，它报 6 枚 |
 
 **发布已落地（2026-10-27 22:35–22:56 +08:00 · 负责人授权原话：「直接换线上容器」）**
 
@@ -12722,3 +12727,391 @@ node scripts/live-web-freshness.mjs
 # 判据 2a 那枚变异（改的是断言那一行的形状，不是那个名字）
 cd e2e/live-site && perl -pi -e 's/\[data-testid="auth-form-login-code-trigger"\]/[data-testid="auth-form-login-code-trigger-MUTANT"]/' live-signin-entry.spec.ts
 ```
+
+---
+
+### B239（2026-10-28 01:4x · 全局 UX 线 P2 收尾读数）：两枚**别线的红**＋一枚**我自己造的事故**（整条 e2e 套被我一行命令传错跑起来了）
+
+**先答我造的那件**，因为它动了别人名下的文件。
+
+形状：我想只跑 `vault-settings.spec.ts` 那一枚文件，写的是
+`pnpm --dir e2e run test -- vault-settings.spec.ts`。日志头一行是
+`$ playwright test -- vault-settings.spec.ts`，紧跟着
+`Running 464 tests using 1 worker` —— **`--` 没有起过滤作用**：`pnpm run` 把它原样传给 CLI，
+而 playwright 把 `--` 之后的东西当参数分隔而不是文件选择器。约 90 秒后我 `TaskStop` 掉。
+
+⚠️ 为什么这件事必须记账而不是"重跑一次就好"：**整条 e2e 套会写截图**，
+而那些截图是**别条线已经入库的证据**（§7 第 602 条记过同一件事，那时数是"几十枚"）。
+门禁不只是读树，它会写别人名下的文件。
+
+归因与处置（照 #602 规矩 ③）：
+① `TaskStop` 后按端口复核真的没有残留 —— `lsof -nP -iTCP -sTCP:LISTEN | grep -E "43[0-9][0-9]"`
+读回空（只有一枚 postgres 因为 pid 里带 43 被我的 grep 匹配上，那不是监听端口）；
+② 用 **mtime 窗口**而不是目录名归因：脏图共 68 枚，`stat -f '%Sm' -t '%H:%M:%S'` 逐枚取戳，
+只有落在本地 `01:41:51–01:43:40`（我那趟的起止）里的 **6 枚**是我写的 ——
+`account-suite/05,06,11` 与 `admin-console/announcements-light,grants-dark,grants-light`，
+**全在别线名下**；其余 62 枚的戳早于我的窗口，不是我这次动的；
+③ 还原前先 `cp -p` 存到仓外 `~/.heyta-evidence/ux-p2-aborted-sweep-1028/`（6 枚，`find … -name '*.png' | wc -l` 现量），
+再 `git restore --pathspec-from-file=<那 6 枚的清单>`，还原后
+`git status --porcelain -- apps/web/evidence/account-suite apps/web/evidence/admin-console` **读回空**；
+④ 顺带一条索引事实：`git diff --cached --name-only` 对这两个目录**读回空** ⇒ 它们此前**没有被暂存过**，
+所以还原到 HEAD 不会踩掉别人 staged 的中间态（这格不先量的话，"还原"本身可能就是第二次破坏）。
+
+第二枚形状更正（我第一版只数到"account-suite 那几枚"）：受害面按 `shot(...)` 的落点算，
+**不看我盯着的那两个目录** —— 本条的判据是 mtime 窗口，不是目录名。
+
+**别线的红之一：`pnpm run check:ui-language` rc=1，4 处全在同一格**
+
+```
+apps/web/src/App.tsx:2532 / :2533   文案：web.calendar.sidebar.hide / .show
+```
+
+现量三件事：① 那 4 处**在 `t(...)` 里面**（`aria-label={t(cond ? 'web.calendar.sidebar.hide' : 'web.calendar.sidebar.show')}`），
+② 两枚 key 在 `packages/i18n/src/locales/zh-CN.ts:3114-3115` 与 `en.ts:2873-2874` **都有词条**，
+③ 这一段是**别人未提交的 hunk**：`git show HEAD:apps/web/src/App.tsx | grep -n "web.calendar.sidebar"` 读回 0 命中，
+而 `git diff -- apps/web/src/App.tsx` 里它是 `+` 段（把日历侧栏开关从 `CalendarHeaderToolbar` 移进页头那一趟）。
+⇒ 红的是**扫描器不认 `t(条件式)` 这种实参形状**（它只认 `t('字面量')` 直接包着），不是界面里有硬编码文案。
+**不代改**：既不改别人那 18 行未提交的 hunk，也不动这枚尺的判据口径。
+
+**别线的红之二：`pnpm --filter @heyta/web run typecheck` rc=2，1 处**
+
+```
+tests/inbound-hosted-extraction-ui.spec.tsx(81,51): error TS18048: 'root' is possibly 'undefined'.
+```
+
+现量：`git status --porcelain -- apps/web/tests/inbound-hosted-extraction-ui.spec.tsx` **读回空**，
+且 `git show HEAD:…:81` 就是那一行 ⇒ **这枚红在 HEAD 里**，不是我这棵树的临时态。
+归自动收集线 `67c533212`（2026-10-27，`feat(自动收集/界面): 规则上加一格"抽取归谁"`）。
+成因是 TS 不对 **mutable 捕获变量**做跨闭包的收窄：外层 `if (root !== undefined)` 已经守住了，
+闭包里的 `root.unmount()` 仍判"可能是 undefined"。最小改法（零运行时差）是把闭包里那一枚写成
+`root?.unmount()`，外层守卫留着。
+⚠️ 我**没**照这格改：那条线此刻正在跑（`fixture-failure.png` 的戳是 `01:34:18`，比我这趟早 8 分钟），
+改他们刚提交的测试文件会让"谁动了这枚"读不出来。
+
+**本线自己名下的读数（同趟取的，供下一位对照）**：全量单测 `pnpm -r test` **rc=0**，
+21 个包全绿（`apps/web` 211 files / 2614 passed｜13 skipped；`server` 3132 passed；`packages/ui` 52 files；`apps/mobile` 91 files）；
+`check:design`、`check:l4-no-style`、`check:i18n-vars` 各 rc=0；
+`vault-settings.spec.ts` 单跑 3 条全绿（含新加的"失败回执过 5.5 秒仍在"那一格）。
+
+复现（一条一条串行跑，别并）：
+```sh
+node scripts/check-ui-language.mjs; echo rc=$?
+pnpm --filter @heyta/web run typecheck; echo rc=$?
+pnpm --dir e2e exec playwright test tests/vault-settings.spec.ts   # ← 用 exec＋文件路径，不要用 run test --
+stat -f '%Sm  %N' -t '%H:%M:%S' apps/web/evidence/vault-panel/fixture-failure.png
+git -C . show HEAD:apps/web/tests/inbound-hosted-extraction-ui.spec.tsx | sed -n '81p'
+```
+
+归族：#602（门禁会写别人名下的文件 —— 这次连"整条套件"都不是我点的名义，是命令行传错）、
+#600（带时态的声称 —— "这几个目录是我这次的"只在 mtime 窗口那一下成立）、
+#603/#605（打空仍然 rc=0 那族：`--` 被吞掉时没有任何报错，它只是开始跑 464 条）、
+B234（自己造的事故当场记，含"我第一版数错了"那一格）。
+
+---
+
+### B240（2026-10-28 04:5x · 全局 UX 线 P3 落地）：一枚跨线的红是我引起的，外加三次"探针/夹具/Codemod 自己坏"
+
+**先答本线做完了什么**（读数都在计划 §8 的 P3 行里，这里只记**形状**）：
+时长那一格第一次有了权威（`packages/ui/src/feedback/receipt-timing.ts`），
+Web 渲染收成一个入口（`apps/web/src/lib/feedback/UndoReceipt.tsx`），
+接线五格（批量 + 单条任务／便签／清单／习惯）+ 象限移动收编 + 移动端两处 5000ms 改读同一张表，
+门禁 `check:undo-receipt` 七臂进链。
+
+**① 我引起的跨线红（当场修完，没动别线的尺）**
+
+`pnpm -r test` 里 `apps/landing tests/mockup-shell-shape.spec.tsx` 两条红：
+"登记处 ⟷ 页头实际 testid 双向等集"与它的阳性对照。根因**不是**产品少了锚点 ——
+运行时 DOM 上 `data-testid="bulk-undo"` 一模一样；是我把那一枚从
+App.tsx 里的字面 `data-testid="bulk-undo"` 换成了组件 prop `testId="bulk-undo"`，
+而那把尺对的是**源码文本**（`app-shell-shape.ts:224-227` 明写"去掉注释之后的 `data-testid` 全集"）。
+
+⇒ 修法在我这一侧：prop 名跟着 DOM 走，改成 `data-testid`（`<UndoReceipt data-testid="bulk-undo" …>`）。
+**没有**去放宽别线那把尺的谓词。复量：`pnpm --filter @heyta/landing exec vitest run tests/mockup-shell-shape.spec.tsx`
+⇒ 21 passed。⚠️ 这条的形状值得记：**"运行时等价"不等于"对账等价"** ——
+一个仓库里如果有按源码文本对账的门禁，改属性名就是改契约，哪怕画面一个字没变。
+
+**② 批量 codemod 误伤（同一趟里我自己撞的第二下）**
+
+为了做 ① 那枚改名，我跑了一条 `perl -pi -e 's/\btestId="…"/data-testid="…"/g'` 扫六个文件。
+它的谓词是**属性名形状**，不是"哪个组件的哪个 prop" ⇒ 顺手把三处
+`SettingsInfoTip testId="tip-profile-overview" / "tip-detail-pane" / "settings-account-needs-sign-in"`
+一起改了（那个组件的 prop 就叫 `testId`，改完它拿不到值）。
+被抓出来的方式：`git diff -U0 | grep -E "^[+-].*(testid|testId)"` 逐行看 —— 三行 `-testId / +data-testid`
+出现在我根本没打算动的行号上。已逐行还原（`grep -c 'data-testid="tip-' apps/web/src/App.tsx` 现量 0）。
+⇒ 规矩：**改属性名的 codemod 必须带组件名限定**（或只列到"我这次新写的那几处"的字面值上），
+且改完必须逐行看 diff，不能只看"我要的那几处改到了"。这一族与 §7 里"批量命令打空仍 rc=0"
+是同一枚硬币的两面：**打宽与打空都不会自己报告**。
+
+**③ 看图照出来的一枚我引入的回归**
+
+`apps/web/evidence/settings-finish/quadrant-move-1280.png` 末帧上留着
+"任务已移动到「交给别人」，截止时间已调整"，而任务已经回到「先不做」。
+根因：收编象限回执时我把旧的 `.then(() => setDropNotice(''))` 连着旧形状一起删了。
+⇒ 已修（撤销成功才收那句），并在 `e2e/tests/quadrant-move-ux.spec.ts` 里补了一条
+`toHaveCount(0)` 断言 —— **让它下次红在断言，而不是红在我看图那一趟**。
+这条与 §6.2 界面验收那条同源：断言原文与截图是两条腿，只有截图能照出"陈述已经不成立"。
+
+**④ 一次 package.json 字符串手术，被别线那把尺的阳性对照臂抓出来**
+
+我给链子插 `pnpm check:undo-receipt` 时用 `slice(idx+len+2)` 去跳 `" &&"`，
+跳错了两个字符 ⇒ 我的新段与 `pnpm check:settings-prose` 被并成**一段**（少了 `&&`），
+`check:gate-wiring` 的 Ⓐ 臂（"链与载体原样 ⇒ 必须绿"）当场报
+`check:settings-prose: 定义还在，但不在这次的 check 链里`。
+⇒ 处置：`cp -p /tmp/pkg.mut-bak` 还原后改用**整串锚点**
+（`'pnpm check:danger-confirm && pnpm check:settings-prose'` 一次替换成三段），
+复量链段数 137⇒138、`settings-prose 在场 = true`、`check:gate-wiring` rc=0。
+**这一条值得留在账本里的理由**：那把尺的 Ⓐ 臂是"阳性对照"，
+它平时看起来什么都没判（只是"原样跑一遍必须绿"），而这一次是它**唯一**会说话的场合。
+
+**⑤ B239 那两枚别线的红，本趟复查仍在**
+
+`node scripts/check-ui-language.mjs` 仍 rc=1（4 处，全在别线未提交的日历侧栏 hunk 里，
+文案确实在 `t()` 内 ⇒ 红的是扫描器不认 `t(条件式)`）；
+`pnpm --filter @heyta/web run typecheck` 仍 rc=2，且**只剩**
+`tests/inbound-hosted-extraction-ui.spec.tsx(81,51) TS18048` 那一枚（HEAD 自带，归 `67c533212`）。
+本线名下：`apps/web` 与 `apps/landing` 的相关套件、`pnpm -r test`、
+`check:undo-receipt`／`check:danger-confirm`／`check:dirty-form-policy`／`check:overlay`／
+`check:design`／`check:l4`／`check:i18n-vars`／`check:gate-wiring`／`check:e2e-specs-parse` 逐条 rc=0。
+
+复现（串行跑）：
+```sh
+node scripts/check-undo-receipt.mjs --self-test && node scripts/check-undo-receipt.mjs
+pnpm --filter @heyta/landing exec vitest run tests/mockup-shell-shape.spec.tsx
+pnpm --dir e2e exec playwright test tests/quadrant-move-ux.spec.ts   # 含真浏览器 hover 暂停那一格，约 35s/条
+git diff -U0 apps/web/src | grep -E "^[+-].*(testid|testId)"          # 逐行看 codemod 的落点
+```
+
+归族：#602（门禁会写别人名下的文件 —— 这次是我**读**别人的尺读出了我的改动）、
+#605/#603（打空/打宽仍然 rc=0 那一族在 codemod 上的镜像）、
+§6.2 界面验收（断言与截图是两条腿）、B234/B239（自己造的事故当场记，含"我第一版数错了"那一格）。
+
+## B240 · P5 菜单键盘：`rail-roving` 那条 dnd-kit 共存用例**间歇红**，机制上排除了本期改动（2026-10-28）
+
+**读数（逐次现量，不是"跑一次绿了"）**
+
+| 跑法 | 结果 |
+|---|---|
+| 5 套并跑（account-menu／rail-roving／rail-geometry／habit-create-options／dirty-form-guard） | ✘ 该条红（第 1 次） |
+| 同样 5 套再跑一遍 | ✘ 同一条红（第 2 次，同样 16.8s 超时） |
+| 单独跑该条（`-g "dnd-kit KeyboardSensor"`） | ✓ 2.3s 过 |
+| `rail-roving` + `dirty-form-guard`，`--workers=1` 串跑 | ✘ 红（第 3 次） |
+| `rail-roving` + `account-menu` 并跑 | ✓ 6 条全过 |
+| `rail-roving` + `habit-create-options` 串跑 | ✓ 8 条全过 |
+| `rail-roving` 自己 `--repeat-each=2` | ✘ 红（第 4 次） |
+| 同一条命令**再跑一次** `--repeat-each=2` | ✓ rc=0（`test-results/` 空） |
+
+⇒ **间歇红，不是确定性回归**。红的位置是**前置那一格**：
+`按 Space 要真的进入 dnd-kit 的键盘拖拽模式` 这个 `expect.poll` 15s 内没等到 `rl-Dragging`，
+后面"方向键不许挪焦点"那一句**根本没跑到**。
+
+**为什么本期改动可以被排除（机制，不是"应该无关"）**
+
+P5 在 `RailNavigation.tsx` 上只动三处：More 面板的 `onKeyDown` 换成共享钩子、
+`SortableMoreItem` 那枚按钮补 `tabIndex={-1}`、以及 import。
+唯一会**跨出面板**影响键盘事件的是钩子里那条
+`document.addEventListener('keydown', …, true)`，而它挂在
+`useEffect(() => { if (!open) return; … }, [open])` 里 ——
+`open` 就是 `moreOpen`，这条用例**从头到尾没打开过 More 菜单**，监听器一次都没挂上。
+主区那排 `role="tab"` 的 Space/方向键路径（`onTabRovingKeyDown` + dnd-kit `KeyboardSensor`）
+本期一个字没改。
+
+**最可能的成因（未判定，别当结论用）**：`openApp` 之后立刻 `target.focus()` + `Space`，
+而 dnd-kit 的 sensor 要等 React 挂上监听；这台机器此刻有内存压力（同一批里
+`check:ui-language` 之外还有并行会话在跑），慢起来就把这个窗口放大成 15s。
+**判它是不是这一条的断言**：把前置 `poll` 换成"先 `expect(target).toBeFocused()` 再按 Space"
+并量同一批的失败率是否下降 —— 没做这个实验之前，上面这句只是候选，不是结论。
+
+**本线名下此刻的真实读数**（复量命令逐条给）
+```sh
+node scripts/check-menu-keyboard.mjs --self-test && node scripts/check-menu-keyboard.mjs   # 9 枚臂 + 真树
+pnpm --dir packages/ui exec vitest run tests/control-menu.spec.ts                            # 34 条
+pnpm --dir apps/web exec vitest run tests/menu-keyboard-hook.spec.tsx                         # 5 条
+pnpm --dir e2e exec playwright test tests/menu-keyboard.spec.ts --retries=0                   # 3 枚菜单全绿
+pnpm --dir e2e exec playwright test tests/rail-roving.spec.ts -g "dnd-kit KeyboardSensor" --retries=0  # 单跑绿
+```
+归属：这条间歇红**留给下一次碰到它的人**（不在本期收口范围内代改 P0 的那枚装置）。
+
+## B241 · `check:docs` 现在红在一枚**别线刚建的未跟踪文件**上（不是本线，2026-10-28 07:23）
+
+`docs/agents/multi-end-build.md:41 -> ../runbooks/android-build-on-linux-dev.md`：
+目标文件在本机存在（`docs/runbooks/android-build-on-linux-dev.md`，mtime 14:49，
+就在我跑门禁前几分钟），但 `git status` 是 `??`（未跟踪）⇒ 干净检出上是死链。
+本线名下 13 处文档改动**一条都没进这份报告**。
+⚠️ **读数会漂，别抄这一句的数**：07:23 现量是 1 处，08:43 复量已经变成 **4 处**
+（同一枚未跟踪文件被四处引用 —— 那条线还在写它）。复量：`pnpm check:docs 2>&1 | grep -A6 "本机有、仓库里没有"`。
+归属：那两枚文件都在 Linux/Android 那条线名下（`multi-end-build.md` 是他们的入口、
+runbook 是他们新建的），出路是**他们 `git add` 那枚 runbook**，不是本线代改，
+也不是往 `UNTRACKED_LINK_OK` 里登记（那是"刻意只活在本机"的出口，这里明显不是）。
+复量：`pnpm check:docs`（本线自己那几处改动的判据是"这一条不再出现"，不是整条 rc=0）。
+
+## B242 · 载体机 `/home/xaiver/heyta-android-build` 与 `heyta-android-probe` 两棵树 + `heyta_build_api36` 那台 AVD 在 13:2x–14:4x 之间被整体删掉（归因未定，2026-10-28）
+
+现量：14:2x 那趟设备腿还读出 `topResumedActivity=com.heyta/…MainActivity` 与 256,750 B 截图；14:42 再查，
+`ls -l ~/heyta-android-build/` 报"无法访问"，`~/.android/avd/` 里 `heyta_build_api36.*` 没了，`/tmp/heyta-avd.log` 也没了。
+**工具链没动**（NDK 2.0G、JDK 17、`~/.gradle` 5.4G、`/tmp/heyta-probe-src.tar.gz` 47MB 全在），
+`/home/xaiver` 目录 mtime = 13:28，磁盘用量反而**涨了** 8G（139G→147G）⇒ 不像整机磁盘回收。
+`who` 只有本机控制台一个会话，没有第二个在线 ssh。
+
+为什么挂在这里而不是"重建完就没事"：这三个路径**现在是载体的组成部分**（构建根 / 私有 Gradle 目录 / 设备腿 AVD），
+按 `heyta-*` 通配清扫远端残留的任何动作都会打掉它们——重建 = 重跑一次全量同步 + 冷解析。
+已把三处写进新手册 §十"在册目录"，`check:android-gradle-remote` 的 G11 钉住默认值不被悄悄挪走。
+
+**要谁裁**：如果这趟清扫是**人**做的（或某条线的脚本做的），请在本节回一句"是谁、按什么规则"，
+否则下一次构建根消失时又要重新归因一遍。本线**不**去查别人的 shell 历史，也不改那台机器的任何自动任务。
+
+## B243 · 载体机上的**发布签名**要不要搬（`HEYTA_RELEASE_*` 四个键 + keystore 现在只在 Mac）（2026-10-28）
+
+迁移之后新暴露的一格：Android 构建已在 `linux-dev` 上出包，但 `apps/mobile/android/app/build.gradle` 的
+release 签名读的是**跑 gradle 那台机器**的 `~/.gradle/gradle.properties`。载体机上没有那四个键 ⇒
+release 变体按设计回落到 `signingConfigs.debug`，实测证书 `CN=Android Debug`，
+`scripts/upload-dist.sh` 的 `assert_android_release_signature` 会拒绝发布它。
+
+不是本批漏做：这一步要把 **keystore 与口令复制到第二台机器**（`/Users/rocalight/.heyta-signing/heyta-release.keystore`）。
+旧载体 `windows-pc` 上同样没落过（那份手册 §7.3 记的就是这件事），所以**迁移没有让它变坏**，
+但"整个安卓都在 linux-dev 上做"要真正闭环到发布，它必须在。
+
+**要谁裁**：凭据搬迁要点头。给的话是一次 `scp` + 载体机 `~/.gradle/gradle.properties` 四行（口令**不**进本台账），
+回退＝删那四行与那份文件；不给则载体只能出 debug 签名的包，这条边界留在手册 §八。
+
+## B244 · `package.json` 被 UX 线改着（4 枚新门禁 + `check` 链），本批**没有**把自己的载体命令登记进去（2026-10-28）
+
+现量：`git status --porcelain -- package.json` 读 ` M`，diff 里是 `check:focus-single-source` /
+`check:dirty-form-policy` / `check:danger-confirm` / `check:undo-receipt` 四枚（其中一枚缩进在列 0）。
+本批想加的 `carrier:android`（= `ssh linux-dev 'bash -s' < scripts/linux-dev/setup-android-carrier.sh`）
+如果直接落这个文件，**提交时会把别人那四行一起卷进我的 commit**（同一棵树并行会话的已知形状）。
+
+处置：本批**不加**pnpm 脚本，载体入口以"一条 ssh 命令"的形式写在手册 §二与 `scripts/linux-dev/setup-android-carrier.sh` 文件头，
+不需要 package.json 也能跑。等 UX 线那批落地后，谁要登记再补一行——**它不是本批的阻塞**，
+只是别让下一次读 `package.json` 的人以为载体入口曾经存在过又消失了。
+
+## B245 · 回 B244：UX 线那批 `package.json` 已入库，那一行现在可以加了（2026-10-28，UX 线）
+
+B244 说的"四枚新门禁 + `check` 链缩进在列 0"那批，本线已按路径提交：`c249bb6f1`（P0–P6 落地）
+与 `2a8446fc1` / `5475a3344`（P6 第二批与看图腿）。现量 `git status --porcelain -- package.json`
+读**空**（本线不再持有该文件的未提交改动），六枚 `check:*` 都在 `check` 链里，缩进已修。
+⇒ 载体入口 `carrier:android` 那一行现在加进去不会卷走别人的改动。
+
+同趟量到的一枚**别线名下**的红（本线未碰那个文件，登记不代改）：
+`pnpm typecheck` 在 `apps/web` 读 rc=2，唯一一条是
+`apps/web/tests/inbound-hosted-extraction-ui.spec.tsx(81,51): error TS18048: 'root' is possibly 'undefined'`。
+`git log -1 -- …/inbound-hosted-extraction-ui.spec.tsx` = `67c533212 feat(自动收集/界面)`，
+`git status --porcelain` 对该文件读空 ⇒ 红在**已入库**的自动收集线文件里，形状是
+`afterEach` 里 `if (root !== undefined)` 之后又在 `act(async () => …)` 的**嵌套闭包**里读 `root`，
+可变捕获让 TS 收窄失效。修法归他们（要么把收窄提进闭包，要么让 `root` 成为不可变读取）。
+
+## B246 · `verify:vault-web` 那两条既有测在当前 HEAD 上红在"设置浮层分节"之后（2026-10-28，UX 线登记，不代改）
+
+本线为了补 P6 欠的那一格（`ConflictDialog` 的真浏览器腿），第一次跑起这套真浏览器 + 真服务端
+装置。现量读数：`vault/ai-egress.spec.ts` 与 `vault/vault-journey.spec.ts` 的 three-device 那一条
+**报的是同一句** ——
+
+```
+Error: 设置浮层里没有「同步」那一节
+expect(locator).toBeVisible() failed
+Locator:  getByTestId('sync-settings-panel')
+Received: hidden
+```
+
+成因（读源码，不是猜）：设置浮层现在是**分节**的 —— 每一节写成
+`<section … hidden={activeSettingsSection !== 'settings-group-sync'}>`（`apps/web/src/App.tsx:3494`），
+"打开设置"只把浮层画出来，那一节仍在 `hidden` 里；要先点导航里那枚
+`[aria-controls="settings-group-sync"]`（`App.tsx:354-361` 那一段，导航按钮**没有 testID**）。
+那两条测的 `settings()` helper 停在分节之前的形状 ⇒ 恒红。
+
+归属：`App.tsx` 那批分节改动在设置中心那一档（`.handoff/2026-10-24-heyta-settings-center.md`），
+本线没碰 `App.tsx`，也没碰那两个 spec —— 只登记，不代改（改法虽机械，但那是别人套件里的夹具）。
+为什么以前没人发现：这套件不在 `pnpm check` 链里（要起真服务端），只有手动 `verify:vault-web` 会跑到。
+
+本线新加的 `e2e/vault/conflict-dialog.spec.ts` 用的是**当前形状**（点 `[aria-controls=…]` 再断可见），
+顺带说明：跑它必须 `node scripts/verify-vault-web-journey.mjs vault/conflict-dialog.spec.ts` ——
+经 `pnpm verify:vault-web -- <path>` 那一层，路径过滤会**静默失效**、整套件 8 条一起跑，
+并把 `apps/web/evidence/vault-panel/` 下 6 张已入库的取证图重画（本线已 `git checkout` 还原）。
+
+## B247 · `check:row-single-source` 断言 B 在 2026-10-25 那笔账户菜单提交上就红了，本线不代改（2026-10-29，UX 线登记）
+
+**现量**（2026-10-29 03:09，工作树只带 UX 线的浮层改动）：
+
+```
+$ pnpm check:row-single-source
+🔴 ht-* 前缀族 29 个，超过基线 28（多了 1 个）
+   当前族：.ht-accountmenu …
+```
+
+**归因**：多的那一族是 `.ht-accountmenu`，由 `85999fd3a`（2026-10-25 `feat(web): 设置深链 ?settings=<section> 与账户菜单里的那一格`）
+引进 `apps/web/src/styles/app/sheets.css`。三条反查都指向同一处：`git status --porcelain -- apps/web/src/styles/` **空**
+（这一族在 HEAD 里，不在任何人的未提交改动里），而 UX 线这一批只碰 `features/privacy`、`features/legal-recheck`、
+`lib/dialog`、`packages/ui` 与两份测试 —— 一行 CSS 都没写。
+
+**为什么不代改**：过关的两条路都不归本线 —— ① 把 `HT_FAMILY_BASELINE` 从 28 抬到 29 是**改别人的判据口径**
+（AGENTS §6 第 3 条"不许为了让测试变绿而改判据"）；② 把 `.ht-accountmenu` 收进既有族（像 G-27 那枚把
+`.ht-reconfirm` 收进 `.ht-sheet` 那样）改的是**账户菜单那一格的样式归属**，是别人名下的界面。
+所以这一格登记给账户菜单的负责人，两条出路都写在上面。
+
+**顺带说明本线为什么仍然可信**：`check:overlay`／`check:dirty-form-policy`／`check:ux-coverage`／`check:l4`／
+`check:design`／`check:gate-wiring` 六条逐条 rc=0（读数在计划 §8 的 P6 行第五批那一段），红的只有这一条别线尺。
+
+## B248 · 主链逐道跑下来还有两把**别线**的尺红着（`settings-prose` / `shell-surfaces`），本线不代改（2026-10-29，UX 线登记）
+
+**现量**（2026-10-29 04:18，工作树里 UX 线这一轮的改动都已提交；下面两处文件 `git status --porcelain` **为空** ⇒ 红在 HEAD 上就有）：
+
+```
+$ pnpm check:settings-prose     # rc=1
+  🔴 账本外的新说明文字：apps/web/src/features/settings/InboundAutomationSettings.tsx（2 处）
+  🔴 账本外的新说明文字：apps/web/src/features/sync/VaultSettingsPanel.tsx（1 处）
+$ pnpm check:shell-surfaces     # rc=1
+   判定 6 条 / 5 格：5 绿 / 1 红；未取证 3 栏
+   ⚠️ 未取证：desktop-macos / countdown · 产物
+   ⚠️ 未取证：desktop-windows / countdown · 产物
+   ⚠️ 未取证：desktop-linux / countdown · 产物
+```
+
+**归因**：`InboundAutomationSettings.tsx` 那一处最后由 `67c533212`（2026-10-27 `feat(自动收集/界面): 规则上加一格"抽取归谁"`）落进来；
+`shell-surfaces` 红的是三个桌面上 `countdown` 的**产物取证**栏。本线这一轮改的东西是
+`packages/ui` 的关闭策略表、`apps/web` 的浮层壳与两枚意思表示面板、`AiSettings` 那一格的确认层 ——
+一行设置说明文字与一份桌面产物都没碰。
+
+**为什么不代改**（两把尺自己写着禁区，动手就会踩）：
+
+- `settings-prose` 给的出路是"换成 `SettingsInfoTip` 问号气泡"或"给它 `role="alert"` + testid 带 `failure/error/status`"。
+  选哪条取决于**那两格界面到底在说明还是在反馈**，那是写这两格的那条线的内容决定，不是本线的。
+- `shell-surfaces` 打印的"不要用下列任一手法修绿"里，第 ① 条（从 LEDGER 删格）、第 ③ 条（改 `defaultOn` 凑 tab 数）、
+  第 ⑤ 条（给 Linux 手写一屏原生倒数日）正是路过的线最容易做的三件事；真要过这一格得去补构建与装机取证腿。
+
+**本线自己那批门与全量验证的读数**另记在计划 §8 各行末段（`check:overlay`／`check:danger-confirm`／
+`check:dirty-form-policy`／`check:ux-coverage`／`check:control-semantics`／`check:menu-keyboard`／
+`check:chip-typing`／`check:z-ladder`／`check:focus-single-source`／`check:ui-language`／`check:l4`／
+`check:design`／`check:gate-wiring`／`check:docs`／`check:md-tables` 逐条 rc=0）。
+
+## B249 · 主链最后那一步 `pnpm -r test` 能在**一条断言都没红**的情况下退非 0（冷缓存），本线只补了读数（2026-10-29，UX 线登记）
+
+**现量**（2026-10-29 04:19，UX 线这一轮改动已全部提交之后跑的跨端全量验证）：
+
+```
+$ pnpm -r typecheck        # rc=0  ← 含 apps/mobile / apps/desktop / apps/node-host，全过
+$ pnpm -r test             # rc=1
+   apps/mobile test:  Test Files  91 passed (91)
+   apps/mobile test:        Tests  1184 passed (1184)
+   apps/mobile test:        Errors  1 error        ← RolldownError: Parse failure: Flow is not supported
+   apps/mobile test:      At file: …/react-native@0.84.1/…/react-native/index.js:1:0
+   apps/mobile test:      This error originated in "tests/auth-flow.spec.ts" … while it was running.
+   apps/mobile test: Failed
+$ cd apps/mobile && npx vitest run   # 紧接着暖缓存复跑 ⇒ rc=0，91 文件 / 1184 条全过
+```
+
+⇒ **两次的断言结果一模一样（全过），差别只在退出码**。这就是本文件第 321 行那格早就登记过的
+同一条（"冷缓存下某条动态 import 把 `@heyta/ui` 的入口（含 RN）拖进 node 环境"），
+traps 里也有对应那条；本条补的是**它今天仍然成立**这个读数，以及"主链最后一步会被它决定"这件事。
+
+**为什么本线不顺手修**（不是怕麻烦，是这条路要先做一次边界判定）：
+现量移动端从 `@heyta/ui` 那个 barrel 取用的符号是 **158 个 / 64 个 import 站点**，
+里面既有 `CalendarBoard`、`BottomSheet` 这类带 RN 的组件，也有
+`CONTROL_STATE_TOKENS`、`resolveDangerTier` 同族的纯逻辑（`controlPaletteOf`、`receiptTimingOf`、
+`syncStatusSeverity`…）。"给纯逻辑开一个子入口"要先回答**哪些符号 RN-free** ——
+那是一次包边界设计（要配 `exports` 图与一条守住它的尺），不是改几行 import。
+另一条出路（让 vitest 不把转换期 rejection 记成失败）**本线不走**：那等于把
+"退出码说谎"从偶发变成永久，比现在更坏。
+
+**要动手的人可以先拿走的分母**：`apps/mobile/tests` 里直接 import barrel 的有 5 枚
+（`ai-panel-local-selection` / `projects-sections` / `share-ui-assembly` / `sync-status-text` /
+`calendar-event-source`），而报错被 vitest 记在 `auth-flow.spec.ts` 名下 —— **那个文件名不是肇事文件**，
+它只是撞上 transform 时机的那一个（同一族的"读数不能按标签归因"）。
