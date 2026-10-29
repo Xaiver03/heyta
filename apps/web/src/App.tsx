@@ -909,6 +909,9 @@ export function App(): React.JSX.Element {
   const calendarSidebarOpen = useCalendarViewStore((state) => state.calendarSidebarOpen);
   const [scopeDrawerOpen, setScopeDrawerOpen] = useState(false);
   const narrowLayout = useNarrowLayout();
+  // 三元只写这一次：出口文案因此能写成 `cond ? t('a') : t('b')`，
+  // 而 `check:ui-language` 认的正是"键紧跟在 `t(` 后面"那一形。
+  const calendarSidebarToggleOn = narrowLayout ? scopeDrawerOpen : calendarSidebarOpen;
   const withSidebar = view === 'tasks' || (view === 'calendar' && !narrowLayout && calendarSidebarOpen);
 
   const [settingsFocus, setSettingsFocus] = useState<SettingsTarget | undefined>(undefined);
@@ -2555,10 +2558,10 @@ export function App(): React.JSX.Element {
               type="button"
               className="ht-btn ht-btn--ghost ht-header__calendar-sidebar-toggle"
               data-testid="calendar-sidebar-toggle"
-              aria-pressed={narrowLayout ? scopeDrawerOpen : calendarSidebarOpen}
+              aria-pressed={calendarSidebarToggleOn}
               aria-controls="calendar-sidebar"
-              aria-label={t((narrowLayout ? scopeDrawerOpen : calendarSidebarOpen) ? 'web.calendar.sidebar.hide' : 'web.calendar.sidebar.show')}
-              title={t((narrowLayout ? scopeDrawerOpen : calendarSidebarOpen) ? 'web.calendar.sidebar.hide' : 'web.calendar.sidebar.show')}
+              aria-label={calendarSidebarToggleOn ? t('web.calendar.sidebar.hide') : t('web.calendar.sidebar.show')}
+              title={calendarSidebarToggleOn ? t('web.calendar.sidebar.hide') : t('web.calendar.sidebar.show')}
               onClick={() => {
                 if (narrowLayout) setScopeDrawerOpen((open) => !open);
                 else useCalendarViewStore.getState().toggleCalendarSidebar();
