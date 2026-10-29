@@ -357,6 +357,64 @@ export function thirdVersionRows(indexSha, headSha, worktreeSha) {
 }
 
 /**
+ * HEAD 里 shell 的 `source` / `.` 指向一枚**不在 HEAD** 的文件 ⇒ 干净检出上那条入口一启动就炸。
+ * ================================================================================
+ * 立项不是推测，是 2026-10-29 现量抓到并已修的一枚：`scripts/lib/sync-windows-sources.sh` 被改名成
+ * `sync-build-sources.sh`，而 HEAD 里 4 行还指着旧名（`git grep -n sync-windows-sources HEAD -- scripts research`），
+ * 后果是干净检出上 `pnpm reinstall:all` 直接失败 —— **链上没有任何一道门禁扫 shell 的 source**，
+ * 本尺原先那一判只读工作树文本、且只认 `.ts/.tsx/.mts`（后来补了 `.js/.mjs/.cjs`），两样都拦不住它。
+ *
+ * 解析方式是**取锚点后缀**，不是求值变量：本仓所有 `source` 的变量前缀按约定都是仓库根
+ * （`$ROOT`、`$REPO`、`$DIR` 派生自 `dirname`），所以把 token 里从已知顶层目录
+ * （`scripts|packages|apps|server|docs|research|e2e`）起的那一段取出来查 HEAD 即可。
+ * 🔴 取不到锚点的（`source ./x.sh`、`source "$V/x"`）一律计入「未判定」并**报出条数** ——
+ *   静默跳过就等于把"没看到"记成"没有"，那是本仓最贵的一类错。
+ * 注释行（`#` 起头）与散文里的 "source" 不算（第一发就栽在把注释行读成引用）。
+ */
+const SHELL_ANCHORS = ['scripts', 'packages', 'apps', 'server', 'docs', 'research', 'e2e'];
+
+export function extractShellSources(text) {
+  const found = [];
+  const skipped = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (line === '' || line.startsWith('#')) continue;
+    const m = /^(?:source|\.)[ \t]+(["']?)([^\s"']+)\1/.exec(line);
+    if (!m) continue;
+    const token = m[2];
+    if (!token.includes('.sh') && !token.includes('.bash')) {
+      // `source` 也能带无扩展名的脚本，但本仓 77 条全带扩展名；不带就归到未判定，不猜。
+      skipped.push(token);
+      continue;
+    }
+    const seg = token.split('/');
+    const ai = seg.findIndex((s) => SHELL_ANCHORS.includes(s));
+    if (ai < 0) {
+      skipped.push(token);
+      continue;
+    }
+    found.push({ path: seg.slice(ai).join('/') });
+  }
+  return { found, skipped };
+}
+
+/** 在 HEAD 的那份文本里查 shell 悬空 source。`headFiles` 是 HEAD 全树路径集合。 */
+export function headDanglingSources(grepText, headFiles) {
+  const bad = [];
+  let unresolved = 0;
+  for (const line of grepText.split('\n')) {
+    if (line.trim() === '') continue;
+    const m = /^([^:]+):(\d+):(.*)$/.exec(line);
+    if (!m) continue;
+    const file = m[1];
+    const { found, skipped } = extractShellSources(m[3]);
+    unresolved += skipped.length;
+    for (const f of found) if (!headFiles.has(f.path)) bad.push({ file, line: Number(m[2]), target: f.path });
+  }
+  return { bad, unresolved };
+}
+
+/**
  * 逐行抽出**真正的**相对引用语句：`import … from './x';` / `export … from './x';` / `import './x';`。
  * 两头都锚死（行首是关键字、说明符后面到行尾只剩 `;`），注释行先丢 —— 否则散文与断言字符串会灌进读数：
  * `--head` 第一发 381 处里，抽样三处全是这类（`pages.ts:59` 的注释、`theme.tsx:14` 的注释、
@@ -580,6 +638,15 @@ const SELF_TEST_ARMS = () => {
     ),
     [],
   );
+  push(
+    '㊳ shell 悬空 source 必须命中（就是 2026-10-29 那枚真事：`$ROOT/scripts/lib/sync-windows-sources.sh` 已改名，HEAD 里还指着旧名）',
+    headDanglingSources('scripts/reinstall-all.sh:388:source "$ROOT/scripts/lib/gone.sh"', new Set(['scripts/lib/ok.sh'])),
+    { bad: [{ file: 'scripts/reinstall-all.sh', line: 388, target: 'scripts/lib/gone.sh' }], unresolved: 0 },
+  );
+  push('㊔ 同一形状但目标在 HEAD ⇒ 不许命中（防假红）', headDanglingSources('a.sh:1:. "$ROOT/scripts/lib/ok.sh"', new Set(['scripts/lib/ok.sh'])), { bad: [], unresolved: 0 });
+  push('㊕ 取不到锚点的要落成「未判定」计数，不许静默当没有（`source ./local.sh` 这一类）', headDanglingSources('a.sh:1:source ./local.sh', new Set()), { bad: [], unresolved: 1 });
+  push('㊖ 注释行里的 source 不算引用（第一发就把注释读成命中的那个坑）', headDanglingSources('a.sh:1:# source "$ROOT/scripts/lib/gone.sh"', new Set()), { bad: [], unresolved: 0 });
+  push('㊗ `.`（dot-source）与 `source` 同权：`$REPO` 前缀也要能取到锚点', headDanglingSources('apps/desktop-windows/scripts/package-msix.sh:84:. "$REPO/scripts/lib/nope.sh"', new Set()), { bad: [{ file: 'apps/desktop-windows/scripts/package-msix.sh', line: 84, target: 'scripts/lib/nope.sh' }], unresolved: 0 });
   push('④ 目录规则要按前缀吃下整棵子树', classify([E('e2e/tests/dirty-form-guard.spec.ts')], OWNER_RULES).rows[0].line, '全局 UX 分层整改线');
   push('⑤ 规则表自己必须干净（现在这份必须无违规）', auditRules(OWNER_RULES), []);
   push(
@@ -810,6 +877,29 @@ const main = () => {
   } else {
     console.log("   ⇒ 每一枚都归到某条已登记的理由；正文在 BLOCKED.md 那张「归谁 / 为什么不由我代提交」表，取它的位置：grep -n '^| 归谁 |' BLOCKED.md");
   }
+  // 🔴 HEAD 自身的完整性：shell 的 `source` 指向不在 HEAD 的文件 ⇒ 干净检出上那条入口一启动就炸。
+  //    这一判与前面两判不同：它读的是 **HEAD 的文本**（不是工作树），所以别人没提交的重命名拦不住它 —— 这正是 2026-10-29 那一枚的成因。
+  //    默认就进退出码：HEAD 此刻 0 处 ⇒ 不是天生红的尺。
+  const headGrep = execFileSync('git', ['grep', '-n', '-E', "^[[:space:]]*(source|\\.)[[:space:]]+[\"']?[^[:space:]\"']+", 'HEAD', '--', '*.sh', '*.bash'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 })
+    .split('\n')
+    .filter((l) => l.startsWith('HEAD:'))
+    .map((l) => l.slice('HEAD:'.length))
+    .join('\n');
+  const headFiles = new Set(
+    execFileSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 })
+      .split('\n')
+      .filter((l) => l.trim() !== ''),
+  );
+  const dangling = headDanglingSources(headGrep, headFiles);
+  if (headGrep.trim() !== '' && headFiles.size === 0) {
+    console.error('🔴 HEAD 全树清单读回空 ⇒ 探针不合，这一判今天不许报"没有悬空"');
+    process.exit(2);
+  }
+  if (dangling.bad.length > 0) {
+    console.log(`🔴 HEAD 里有 ${dangling.bad.length} 处 shell 的 source 指向不在 HEAD 的文件 ⇒ 干净检出上那条入口一跑就炸：`);
+    for (const d of dangling.bad) console.log(`   ${d.file}:${d.line} → ${d.target}（HEAD 里没有）`);
+  }
+  console.log(`   · HEAD shell source 对账：扫 ${headGrep.split('\n').filter((l) => l.trim() !== '').length} 行 ｜ 悬空 ${dangling.bad.length} ｜ 无锚点未判定 ${dangling.unresolved}`);
   const trackedSet = new Set(
     execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
       .split('\n')
@@ -826,7 +916,7 @@ const main = () => {
     if (cross.length > 20) console.log(`   …另 ${cross.length - 20} 处`);
     console.log('   ⇒ 归属表按路径分堆，看不出这一类：两堆各自登记齐了，按堆提交照样红。');
   }
-  process.exit(opts.strict && v.unattributed.length + cross.length > 0 ? 1 : 0);
+  process.exit(dangling.bad.length > 0 || (opts.strict && v.unattributed.length + cross.length > 0) ? 1 : 0);
 };
 
 main();
