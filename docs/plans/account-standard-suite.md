@@ -5725,3 +5725,29 @@ S2 把 `apps/mobile/src/screens/ExportScreen.tsx:357` 那枚真回执整个换�
 🔴 这一族的教训是 §7 元规则「**先怀疑探针**」的又一次现量，并且它纠正的是我自己写下的一句话：
 上一轮我把 `consent-gate` 那对当成"尺没抓到 ⇒ 没有重叠"记进了 §6.120 的结论，那句现在作废 ——
 **一把尺在某处读 0，只说明它扫的那套写法里没有**，不说明被测物里没有。
+
+---
+
+### 6.125（2026-10-29 16:2x · 本轮收尾三件读数：推远端、线上落地页逐字节、线上那盘应用旧在哪）
+
+- **推**：`git push origin main:main` 前过 pre-push 闸（9 笔待推、1286 行 diff、在册值 21 枚 ⇒ 0 命中）；
+  推后复验三条各取一次：本地 `git rev-parse HEAD` 与 `gh api repos/Xaiver03/heyta/git/refs/heads/main --jq '.object.sha'`
+  逐字相同，`git rev-list --count origin/main..HEAD` 与反向都是 0，`git rev-parse --abbrev-ref main@{upstream}` 仍读 `gitee/main`
+  （系统级禁令：改 git 配置不做，只报）。
+- **线上落地页**：`node scripts/live-web-freshness.mjs --landing` ⇒ 分母、齐、不齐、线上没这页四项由尺自己打印，
+  不齐 0；唯一那枚 404 是 `/pitch/`（在册的待拍板格，仓库有 HTML 但不在注册表里、也不会被发布）。
+- **线上登录链路（发布后读数，真浏览器 + 真 TLS）**：
+  `pnpm --dir e2e exec playwright test --config playwright.live-site.config.ts live-signin-entry live-credential-pages`
+  ⇒ 全绿，逐条打印：五张凭据页各自引的脚本与 `pages.ts` 声明逐字相同、四枚凭据 POST 的 `code` 各自是机读形状、
+  `/signin/` 只剩出口、中文与英文同一条路都一次到登录界面。**B232 那两处（导航不带 signin、产物旧于 HEAD）在这一半边是闭的。**
+- **线上那盘应用旧在哪**：`node scripts/live-web-freshness.mjs` ⇒ 不在场的那几枚针脚由尺自己点名（含来源提交），
+  判决行读回"线上那盘旧于 `<当时那一笔>`"。**这一族今天多了一条现量**：
+  `node research/tools/publish-public-sites.mjs`（不带 `--confirm`，纯守卫读数）当场拒发，理由是
+  "构建输入有未提交改动"——脏的那批是 `apps/web/evidence/**` 的截图，落在 `apps/web` 这个前缀里，
+  尺按前缀把它们算成构建输入。⇒ 于是"代收那批过期截图"与"发一次线上"在这一格是**互斥**的：
+  要么由改 UI 的那条线把截图矩阵重跑并随自己的提交落地，要么走手册 §3.7 那条**干净检出**路线
+  （`git worktree add --detach` + 在那棵干净树里 `pnpm install && pnpm build` 再 rsync），
+  手册自己写着"发布应用时不要直接用这个工作区构建"。两都不是本线能代拍的：发出去是对外的，
+  而 `rsync --delete` 打的是生产目录。**本轮没有再发一次**：上一轮那句"发，按老命令走一遍"是那一趟的授权，
+  单次授权不外扩。要发的人需要知道的就一行：`node research/tools/publish-public-sites.mjs --confirm`
+  （它拒绝发不是正好 `main` 那一笔的字节，也不动服务端镜像）。
