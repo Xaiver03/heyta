@@ -94,6 +94,9 @@ WHITELIST = [
     r'^docs/agents/environment-traps-index\.md$',     # 陷阱索引随正文追加（7d76e762、24d05137）
     r'^docs/runbooks/self-host\.md$',                 # 这一档八枚 env 键的自托管面（b6a5feef）
     r'^server/(docker-compose\.yml|env\.example)$',   # 同上：env 表面（b6a5feef）
+    # ↓ 2026-10-29 按负责人「完全授权、把这些东西全部做完」补的一族：
+    #   ④ 六格对外口径的落点就是这三份法务件（× 中英六处同文），本笔证据=06798bf3。
+    r'^packages/legal/src/documents/[a-z-]+\.ts$',    # ④：privacy / data-rights / personal-info-list / ai-and-transfer / third-parties（06798bf3）
 ]
 
 
