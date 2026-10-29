@@ -55,7 +55,8 @@ services:
       - AUTOMATION_WEBHOOK_KEYS=${AUTOMATION_WEBHOOK_KEYS:-}
       # 自动收集的权益模式与凭据面。空值等价于"没配"（每一枚读取点都是 `if (!raw)` 先行），
       # 所以这里带 `:-` 默认值不改变现状；配了就必须是下面 env.example 写的形状。
-      # 🔴 `AUTOMATION_ENTITLEMENT_MODE` 写了非法值不在启动时报错，是**请求期抛 ⇒ 用户看到 500**。
+      # 🔴 `AUTOMATION_ENTITLEMENT_MODE` 写了非法值**在端口绑定之前就拒**（rc=1，日志点名）；
+      # 留空仍合法 —— 各端拿 402 带 `reason=ENTITLEMENT_MODE_UNCONFIGURED`。
       - AUTOMATION_ENTITLEMENT_MODE=${AUTOMATION_ENTITLEMENT_MODE:-}
       - AUTOMATION_OFFICIAL_KEYS=${AUTOMATION_OFFICIAL_KEYS:-}
       - AUTOMATION_SENDER_KEK=${AUTOMATION_SENDER_KEK:-}
