@@ -900,6 +900,63 @@ location / {
 日常对账与安装改用 `server/scripts/nginx-sync.sh --check` / `--apply`（先 `--check` 再 `--apply`，
 理由见 `server/deploy/nginx/README.md` 的纪律 2）。
 
+#### 线上自动收集的测试账号与"走一遍"（2026-10-30 固定）
+
+自动收集的 L4 与"设备那一趟"都需要一条**真账号**。生产 `subscriptions=0` 时没有账号能持有
+`automation` 权益，`admin:grant` 又只授管理员、不建用户 —— 所以这条流程必须写下来，别每次重新推导。
+
+**① 建号（L4 那条判据就靠这一步）**
+
+```bash
+curl -sS -X POST -H 'content-type: application/json' \
+  --data '{"email":"<测试邮箱>","password":"<强口令>","termsAccepted":true}' \
+  https://heyta.waytofuture.cn/api/register/email-password          # 期望 201
+```
+
+响应是"去看收件箱"，账号已建但 `is_verified=0`。接着核**那一行**（L4 的判据）：
+
+```bash
+ssh ubuntu-jcli 'sudo docker exec -i supersync-postgres psql -U heyta -d heyta -tA -F"|" \
+  -c "select id,email,is_verified,terms_document_version from users order by id desc limit 1;"'
+```
+
+`terms_document_version` 必须**逐字等于**镜像里的 `LEGAL_SET_VERSION`
+（`pnpm verify:consent-trail` 的 L5 已经替你比过两侧）。
+
+**② 让它能登录、能持有权益（只用于测试账号）**
+
+```sql
+update users set is_verified = 1 where email = '<测试邮箱>';
+insert into subscriptions (provider, external_subscription_id, status, current_period_end,
+  created_at, updated_at, user_id, grants, price_id)
+select 'e2e', 'e2e-' || extract(epoch from now())::text, 'active',
+       extract(epoch from now())::bigint * 1000 + 2592000000,   -- ⚠️ 30*24*3600*1000 会整数溢出
+       extract(epoch from now())::bigint * 1000, extract(epoch from now())::bigint * 1000,
+       id, array['hosting','ai','automation'], 'e2e'
+from users where email = '<测试邮箱>';
+```
+
+**③ 收件密钥与 vault（网页那一侧）**：新建账号没有 Vault。网页上 **设置 → 同步与隐私 → 加密数据密钥**
+走创建；创建后**还有一步**：把恢复码抄进 `vault-recovery-confirm` 再点 **发布**（`vault-publish`）——
+少这一步，服务端就没有 key package，后面每一步都报"请先解锁密钥库"。
+🔴 收件私钥住在**浏览器 profile** 里：无头跑要用 `launchPersistentContext(<固定目录>)`，
+否则每次都是新 profile、每次签发一把新钥匙，队列里那一条就再也解不开。
+
+**④ 建规则 → 签发凭据 → 启用 → 投递**：`POST /api/automation/rules` → `POST …/sender-credentials`
+（body 必须带 `{"keyId":…}`）→ `PUT …/enabled {"enabled":true}` → 用 `packages/inbound-core` 的
+`signWebhook(secret, input)` 签一条 POST（**参数顺序是 secret 在前**）⇒ 期望 **202 queued**。
+
+**⑤ 设备那一趟**还需要在同一个浏览器会话里：解锁 Vault → AI 与集成里启用远程 + 选托管档 +
+对 `inbound-automation` 给出境授权 → 收件密钥 → 注册为处理设备 → 处理一条。缺任一项，
+事件会**一直停在 queued**（本轮实测：没有 AI 路由授权时就是这个形状）。
+
+**⑥ 收尾（不写会让 `users` 计数漂）**
+
+```sql
+delete from subscriptions where user_id = <id>;  -- automation_* 随 user 级联
+delete from users where id = <id>;
+```
+
 #### 同意留痕到底生效了没有：`pnpm verify:consent-trail`（2026-10-02 增）
 
 G-32 的结论以前**只以散文形式存在**于台账里。散文的问题是它会被读成"这件事已经查过了"，
