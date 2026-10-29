@@ -44,7 +44,7 @@ import { Readable } from 'node:stream';
 import { Logger } from '../logger';
 import type { ManagedAiConfig } from '../config';
 import type { SqlExecutor } from '../billing/pricing-store';
-import { consumeManagedAiRequest } from './metering';
+import { consumeManagedAiRequest, peekManagedAiUsage } from './metering';
 import { domesticUpstreamVerdict, type ServerManagedAiFeature, type ServerManagedModelHost } from './managed-upstream';
 
 /** 一次托管调用的入参：**没有** `model`、`baseUrl`，也**没有**客户端自报的计数（AGENTS §8.10）。 */
@@ -228,13 +228,49 @@ export const recordManagedAiAttempt = (entry: {
 };
 
 /**
+ * 认领一枚"刚刚预留过、还没被任何物理调用认领"的 managed 尝试（工单 §3 A4 的修法）。
+ *
+ * 预留那一侧（`automation/ai-metering.ts`）写下这一行时**已经**消费过周期额度；
+ * 设备那条腿随后打出的这一发 `/managed/chat` 若再扣一次，同一次物理调用就记了两次。
+ * 原子性不在事务里，而在这条 UPDATE 的 WHERE 上：
+ *   · `state = 'sent'` —— 只有"已经决定要发出去"的那一行可能是这一发的来源；
+ *   · `proxy_billed IS NOT TRUE` —— 一枚预留只认领一次（并发两发各领一行，不可能同领一行）；
+ *   · `FOR UPDATE SKIP LOCKED` —— 并发时互相跳过，不排队、不互相等；
+ *   · 5 分钟窗口 —— 预留与物理调用之间的正常间隔是秒级；窗口收紧到 5 分钟，
+ *     孤儿行（预留在发出前就死了）才不会被几分钟后的另一发误认领。
+ * 领到 ⇒ 跳过 ⑤ 的扣费；领不到（例如服务端抽取那条腿根本不写台账）⇒ 照常扣。
+ */
+const claimReservedAutomationCharge = async (
+  sql: ManagedAiCompletionContext['sql'],
+  userId: number,
+): Promise<boolean> => {
+  const rows = await sql.query<{ claimed: number }>(
+    `UPDATE "automation_ai_attempts"
+        SET "proxy_billed" = true, "updated_at" = CURRENT_TIMESTAMP
+      WHERE "ctid" = (
+        SELECT "ctid" FROM "automation_ai_attempts"
+         WHERE "user_id" = $1 AND "state" = 'sent' AND "billing_source" = 'managed'
+           AND "proxy_billed" IS NOT TRUE
+           AND "updated_at" > (CURRENT_TIMESTAMP - interval '5 minutes')
+         ORDER BY "updated_at" DESC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+      )
+      RETURNING 1 AS claimed`,
+    [userId],
+  );
+  return rows.length > 0;
+};
+
+/**
  * 过一遍闸门并把这一次补全发出去。**不做** HTTP：拒绝以判别式返回，
  * 由调用方决定它是变成响应码（路由）还是变成事件上的稳定原因码（自动收集的服务端抽取腿）。
  *
  * 🔴 额度只在 ⑤ 消耗**一次**，`consumeManagedAiRequest` 在同一条 SQL 语句里读占用、
  * 对上限裁决、+1（AGENTS §8.15）。自动收集那条腿**不再**经过 `POST /managed/chat`，
- * 所以它不会像设备走托管路由那样"预留扣一次、代理再扣一次"（工单 A4 那格已确认的
- * 双重计费：修法归负责人，本文件不替它改语义）。
+ * 所以服务端抽取不会像设备走托管路由那样"预留扣一次、代理再扣一次"。
+ * 设备那条腿的重复扣费由 ⑤ 之前的 `claimReservedAutomationCharge` 消除（工单 A4）：
+ * 那一次扣费已经在预留侧记过，代理侧领到就不再记第二笔。
  */
 export async function invokeManagedAiCompletion(
   context: ManagedAiCompletionContext,
@@ -286,8 +322,14 @@ export async function invokeManagedAiCompletion(
   const outboundBytes = Buffer.byteLength(outboundBody, 'utf8');
 
   // ── ⑤ 权益 + 额度（**原子**，一次调用两件事）─────────────────────
-  const metering = await consumeManagedAiRequest({ userId: request.userId, now: now(), limit, sql });
-  if (metering.allowed === false) {
+  // 🔴 A4（工单 §3 A4）：设备那条腿在发出这一发**之前**已经由 `reserve` 消费过周期额度
+  // （`automation/ai-metering.ts` 的 `billingSource === 'managed'` 那一支）。
+  // 这里再扣一次，同一次物理调用就记了两次。所以先做**一次原子认领**：
+  // 只认领一枚"刚预留过、还没被任何物理调用认领"的 managed 尝试，
+  // 领到 ⇒ 这笔账已在预留侧记过，跳过扣费；领不到 ⇒ 照常扣（不给任何请求开免票通道）。
+  const settledByReservation = feature === 'inbound-automation' && await claimReservedAutomationCharge(sql, request.userId);
+  const metering = settledByReservation ? undefined : await consumeManagedAiRequest({ userId: request.userId, now: now(), limit, sql });
+  if (metering !== undefined && metering.allowed === false) {
     const quota = metering.reason === 'QUOTA_EXCEEDED';
     const status = quota ? 409 : 402;
     recordManagedAiAttempt({ event: 'AI_PROXY_REQUEST', userId: request.userId, feature,
@@ -301,6 +343,10 @@ export async function invokeManagedAiCompletion(
       detail: { used: metering.used, limit: metering.limit, periodAnchor: metering.periodAnchor },
     };
   }
+  // 认领那一路不扣费，但错误分支里仍要给"已用 X / N" ⇒ 读一次（只读，不改计数）。
+  const usage: { used: number; limit: number; periodAnchor: number | null } = metering !== undefined && metering.allowed
+    ? { used: metering.used, limit: metering.limit, periodAnchor: metering.periodAnchor }
+    : await peekManagedAiUsage({ userId: request.userId, now: now(), limit, sql });
 
   // ── ⑥ 发送点复算（ADR-0056 §5 第 2 条）───────────────────────────
   const url = `${upstream.baseUrl}/chat/completions`;
@@ -344,7 +390,7 @@ export async function invokeManagedAiCompletion(
     return {
       ok: false, status: 502, code: MANAGED_AI_ERROR_CODES.UPSTREAM_FAILED, reason: 'upstream_status',
       // 额度**确实被消耗了**，所以这两个数仍然要给（用户质疑的是"我这一期用了几次"）。
-      detail: { used: metering.used, limit: metering.limit, periodAnchor: metering.periodAnchor },
+      detail: { used: usage.used, limit: usage.limit, periodAnchor: usage.periodAnchor },
     };
   }
 

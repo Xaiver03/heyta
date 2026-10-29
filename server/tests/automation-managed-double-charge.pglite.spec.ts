@@ -15,10 +15,10 @@
  * 本文件用**真库**（PGlite）把这两条腿按宿主实际的先后顺序跑一遍，读的是
  * `ai_usage_counters.requests` 那一列本身 —— 不是语句桩、不是推断。
  *
- * ⚠️ 这条判据钉的是**现状**（一次 managed 周期 = +2），不是承诺。
- * 承诺是"一次物理调用 = +1"。两者不符即 `docs/plans/inbound-automation-work-brief.md`
- * §3 A4 那格；摘掉哪一个扣点属**计费口径**（同文件 §6 第 3 格），归产品负责人拍。
- * 拍定修法后本文件第一档断言要改成 `1` 并删掉这段说明。
+ * ⚠️ 这条判据在 2026-10-29 从"钉现状（+2）"改成"钉承诺（+1）"：修法取
+ * 「预留那一侧记为权威」——代理侧扣费前先原子认领一枚刚预留过、尚未被认领的
+ * managed 尝试（`server/src/ai/managed-completion.ts::claimReservedAutomationCharge`），
+ * 领到就跳过那一笔。认领标记是 `automation_ai_attempts.proxy_billed`（可空、无默认、无索引）。
  *
  * 载体形状沿用 `managed-proxy.routes.spec.ts`（真进程内 HTTP 假上游 + 真 Fastify 路由）
  * 与 `automation-ai-metering.pglite.spec.ts`（DDL 从发布中的迁移文件读，不手抄）。
@@ -60,6 +60,7 @@ const COUNTERS_DDL = migrationSqlFor('_add_ai_usage_counters', ['CREATE TABLE "a
 const ATTEMPTS_DDL = migrationSqlFor('_add_automation_ai_attempts', ['CREATE TABLE "automation_ai_attempts"']);
 const ATTEMPTS_DIRECT_DDL = migrationSqlFor('_separate_direct_automation_ai_attempts', ['ADD COLUMN "billing_source"']);
 const ATTEMPTS_LOCAL_DDL = migrationSqlFor('_allow_local_automation_ai_attempts', ['automation_ai_attempts_billing_source_known']);
+const ATTEMPTS_PROXY_BILLED_DDL = migrationSqlFor('_add_automation_attempt_proxy_billed', ['ADD COLUMN "proxy_billed"']);
 
 const MINIMAL_SUBSCRIPTIONS_DDL = `
   CREATE TABLE subscriptions (
@@ -166,6 +167,7 @@ beforeAll(async () => {
   await pglite.exec(ATTEMPTS_DDL);
   await pglite.exec(ATTEMPTS_DIRECT_DDL);
   await pglite.exec(ATTEMPTS_LOCAL_DDL);
+  await pglite.exec(ATTEMPTS_PROXY_BILLED_DDL);
   await pglite.query('INSERT INTO users (id, email) VALUES (1, $1)', ['owner@example.test']);
   executor = createExecutor(pglite);
   await startFakeUpstream();
@@ -200,35 +202,59 @@ describe('A4：托管档一次完整自动收集周期的额度增量', () => {
     expect(await counterRequests()).toBe(1);
   });
 
-  it('🔴 现状：预留 + 物理调用 = 一次 managed 周期扣 **2** 下（承诺是 1，差异即 A4）', async () => {
+  it('🔴 修法后：预留 + 物理调用 = 一次 managed 周期只扣 **1** 下', async () => {
     // ① 宿主先预留（生产里是 POST /api/automation/events/:id/ai-attempt/reserve，
     //    路由体就是转调这个函数；见 server/src/api.ts 的 ai-attempt/reserve）。
     const reserved = await reserveAutomationAiAttempt(ATTEMPT_KEY, NOW, TEST_LIMIT, executor, undefined, 'managed');
     expect(reserved.billingSource).toBe('managed');
     expect(await counterRequests()).toBe(1);
 
-    // ② 宿主再把那一枚物理请求打到托管代理（packages/ai 的 managedChatUrl）。
+    // ② 再生产顺序：`inbound-runner.ts` 的 `meteredFetch` 是**先**把行推到 `sent`，**然后**才发请求。
+    //    （老版本这条用例把这一步排在物理调用之后，测的是一张生产里不会出现的中间态。）
+    expect(await advanceAutomationAiAttempt(ATTEMPT_KEY, 'reserved', 'sent', executor)).toBe(true);
+
+    // ③ 宿主再把那一枚物理请求打到托管代理（packages/ai 的 managedChatUrl）。
     const chat = await managedChat();
     expect(chat.statusCode).toBe(200);
     expect(chat.payload).toContain(COMPLETION_MARKER);
     expect(upstreamHits).toHaveLength(1);
 
-    // ③ 结算（sent → consumed）不产生新的扣点。
-    expect(await advanceAutomationAiAttempt(ATTEMPT_KEY, 'reserved', 'sent', executor)).toBe(true);
+    // ④ 结算（sent → consumed）不产生新的扣点。
     expect(await advanceAutomationAiAttempt(ATTEMPT_KEY, 'sent', 'consumed', executor)).toBe(true);
 
-    const after = await counterRequests();
-    // 🔴 这一行钉的是**现状**。上游一次物理调用（`upstreamHits` 恰好 1）本应只扣 1。
-    expect(after).toBe(2);
+    // 一次物理调用 = 1：代理侧认领了那一枚预留，没有扣第二笔。
+    expect(await counterRequests()).toBe(1);
 
-    // 对账读路径同戳读数：账本记 1 次占用，计数器却记了 2 —— 多出来的那一格
-    // 在这里**不能**读成"用户还有别人工用量"，因为这张表整个生命周期只有这一条周期。
+    // 对账读路径同戳读数：账本 1 次占用、计数器 1 次 —— 两本账现在对得上。
     const ledger = await reconcileAutomationAiMetering({ userId: 1, sql: executor });
     expect(ledger.periods).toHaveLength(1);
     expect(ledger.periods[0]?.chargedAttempts).toBe(1);
-    expect(ledger.periods[0]?.counterRequests).toBe(2);
+    expect(ledger.periods[0]?.counterRequests).toBe(1);
     expect(ledger.periods[0]?.short).toBe(false);
-    expect(ledger.periods[0]?.unexplainedByAutomation).toBe(1);
+    expect(ledger.periods[0]?.unexplainedByAutomation).toBe(0);
+  });
+
+  it('认领只发生一次：同一枚预留之后再来一发不带预留的调用，照常扣（没有免票通道）', async () => {
+    await reserveAutomationAiAttempt(ATTEMPT_KEY, NOW, TEST_LIMIT, executor, undefined, 'managed');
+    await advanceAutomationAiAttempt(ATTEMPT_KEY, 'reserved', 'sent', executor);
+    await managedChat();
+    expect(await counterRequests()).toBe(1);
+    // 这一发没有任何"刚预留过"的尝试可认领 ⇒ 走正常扣费。
+    await managedChat();
+    expect(await counterRequests()).toBe(2);
+    expect(upstreamHits).toHaveLength(2);
+  });
+
+  it('两趟完整周期 = +2（不是 +4）：每枚预留各被认领一次', async () => {
+    for (const attempt of [1, 2]) {
+      const key = { ...ATTEMPT_KEY, attempt };
+      await reserveAutomationAiAttempt(key, NOW, TEST_LIMIT, executor, undefined, 'managed');
+      await advanceAutomationAiAttempt(key, 'reserved', 'sent', executor);
+      await managedChat();
+      await advanceAutomationAiAttempt(key, 'sent', 'consumed', executor);
+    }
+    expect(await counterRequests()).toBe(2);
+    expect(upstreamHits).toHaveLength(2);
   });
 
   it('反向臂：摘掉预留那一步（只发物理调用）⇒ 恰好 +1，证明第二下来自预留', async () => {
