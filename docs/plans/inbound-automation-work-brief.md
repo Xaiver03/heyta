@@ -438,3 +438,73 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
 3. **AC-1～AC-8 的勾**，含 AC-6"人真打开看过截图"。机器证据都在上面两条路径里。
 
 （原本列的"换镜像发布"已做：15:51 与 16:06 各发一次，见台账 §7 与 `~/.heyta-evidence/inbound-release-20261029/`。）
+
+---
+
+## 11. 2026-10-29 23:5x 复核：负责人三句决定 + 生产现量 + 还开的格子
+
+写前先 `date`（本机 `2026-10-29 23:4x`）。本节**取代**本文 10-27 版 §3/§4 里那些已经被 §9／§10 做完的格子；
+两处说法冲突时以本节那几条现量命令为准。
+
+### 11.1 负责人这三句（逐字），别再拿出来问他
+
+| 原话 | 含义 | 落点 |
+|---|---|---|
+| 「当然要给上线呀」 | 生产接收面允许开 | **已落**（11.2 现量）。还欠的只有"有人真走一遍" |
+| 「邮件转待办要做呀。肯定只收 JSON 的。毕竟这个就是 DIY 的」 | 🔴 **不是**要我们代收邮件。形态 = 用户那一侧的转发器把内容转成 JSON，POST 进现有那枚 webhook。裁决正文、被它解掉的格子与**没**被解掉的三格都写在 [`email-to-task-brief.md`](email-to-task-brief.md) 的 §0b | 交付物 = 11.3 的 **G1** |
+| 「肯定额度双扣，肯定的话用后者」 | 修法取「事件账本为唯一扣费依据」 | **已落**，且正是 §10 那一行 `9904fb671`；他拍的与执行 AI 做的是同一头，无需重做 |
+
+### 11.2 生产此刻的形状（本戳现量，接手时重取）
+
+```bash
+ssh ubuntu-jcli 'sudo -n docker exec supersync-server env | cut -d= -f1 | grep -E "^(AUTOMATION|ENTITLEMENT)" | sort'
+ssh ubuntu-jcli 'sudo -n docker exec supersync-server printenv AUTOMATION_ENTITLEMENT_MODE'
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  'https://heyta.waytofuture.cn/api/automation/v1/hooks/00000000-0000-4000-8000-000000000000' \
+  -H 'content-type: application/json' -H 'x-heyta-key-id: probe' \
+  -H "x-heyta-timestamp: $(date +%s)000" -H 'x-heyta-event-id: probe-event-000000000000' \
+  -H 'x-heyta-signature: aaaa' --data-binary '{"text":"probe"}'
+```
+
+本戳读到：`AUTOMATION_COMMIT_KEYS`／`AUTOMATION_ENTITLEMENT_MODE=official`／`AUTOMATION_OFFICIAL_KEYS`／
+`AUTOMATION_SENDER_KEK`／`AUTOMATION_WEBHOOK_KEYS` 五枚在位；那条 POST 回 **401 `invalid_webhook_signature`**
+⇒ 接收路由活着、密钥环装载了、验签那一步真的在挡。
+⚠️ 同形状的状态查询腿（`GET …/events/:eventId`）本戳回 **400 `INVALID_REQUEST`**：那是**我这枚探针的头不合规**，
+**不判成缺陷**；判它的那条断言是"合规签名头 + 真实存在的 eventId ⇒ 200 且只回 `{eventId, state}`"。
+🔴 **仍然没人走过端到端**（§10 那句"仍归负责人"没变）：生产 `subscriptions=0`，没有一枚持有 `automation` 的账号。
+
+### 11.3 还开的格子（这才是要做的，按顺序）
+
+**G1 邮件/上游转发那条口的对接件**（负责人刚拍的形态，交付物本体还不存在）。
+现量：`grep -n "邮件\|IMAP" docs/reference/inbound-automation-protocol.md` 回空，
+帮助中心那篇只说"首版只接收 JSON 与文本"。要做的是：
+1. 一段能照抄的样例——上游把邮件正文砍成 `{ title, dueAt?, list? }` 这类 JSON，带 HMAC 签名头打进回调地址；
+   合成密钥、写明"这把密钥只在签发那一刻显示一次"、可撤销可轮换。
+2. 边界如实写：我们不读邮箱、不收附件、不解析 HTML；"任何邮件都能收"这种话**一句都不许出现**。
+3. 改完过这四道：`pnpm check:docs`、`pnpm check:ui-language`、
+   `python3 research/tools/verify-inbound-doc-endpoints.py`、`python3 research/tools/verify-inbound-doc-tables.py`。
+失败形状：样例照抄跑不通 ⇒ 样例错，不是产品错；样例里出现真密钥或出现"我们代收"字样 ⇒ 直接返工。
+
+**G2 「设备开着才干活」这条边界：补腿或明写，二选一**（负责人没拍，先做明写那一半）。
+本戳现量：`grep -rln inbound apps/web/src/pwa` 回空（浏览器仍无 ServiceWorker 那条腿）；
+`grep -rli inbound apps/desktop-macos/Sources apps/desktop-windows` 回空（三个原生壳仍零接线）；
+mobile 仍是前台限定。**所以"24 小时无人值守"这句今天不能说**。
+
+**G3 `selfhost-online` 那一档：取票两条腿仍只是库**。
+本戳现量：`grep -rln "createAutomationTicketSource\|startAutomationSessionKeepalive" apps packages/*/src server/src`
+⇒ 只命中它们自己那两枚文件与 `index.ts` 的导出，**没有宿主调用者**。
+官方实例不受影响（`official` 只看订阅行），但自托管在线在真机上拿不到放行 ⇒ 要么接线，要么对外件明写"本版本不可用"，
+**不许默默留着**（那是"看起来支持"）。
+
+**G4 一份类型定义还住两处**：`grep -c InboundAutomationHostOptions packages/app-host/src/host.ts` 本戳仍回非 0
+（权威那份在 `inbound-host-options.ts`）。纯清理，别与行为变更混一笔；判据 `pnpm --dir packages/app-host typecheck`。
+
+**G5 AC 一格没勾**（现量见 §0）。只交"命令 + 逐字输出 + 原件路径"。
+
+### 11.4 别重做（本文 10-27 版里这些已经被 §9／§10 闭掉）
+
+A3 权益等待态文案 · A4 双扣 · A5 实例退役清扫 · A6 七天保留对账尺 · A7 配置表面（`env.example` 八枚齐）·
+A9 界面四件 · node 宿主的 worker 入口 · 非法模式值改成端口绑定前就拒（10-27 那笔 `3-B`）·
+对外披露六格草稿**已改文未发布**（发布仍归负责人，见 §10 那三件）。
+helm 那一格按 §9 第 4 项的理由**故意没做**。
+
