@@ -122,6 +122,10 @@ export const OWNER_RULES = [
       //   按"清理未跟踪文件"的直觉把它删掉，就会在别人下一次还原时把人家的母本删了 ⇒ 这一族里任何 `*.mut-bak` / `*.teeth-bak` 都不许碰。
       'packages/ui/src/control/',
       'packages/ui/tests/control-states.spec.ts',
+      // 10-29 12:0x 这一族（P2 剩的那格「未判定」被判掉了）：`resetAiDanger.ts` 文件头自己写
+      // 「2026-10-29，把 P2 登记的那格『未判定』判掉」，`AiSettings.tsx` 是接它的那一枚（`grep -c resetAiDanger apps/web/src/features/settings/AiSettings.tsx` 现量 2 处）
+      'apps/web/src/features/settings/resetAiDanger.ts',
+      'apps/web/src/features/settings/AiSettings.tsx',
       // 10-29 10:3x 这一族（P6 关闭策略表的最后一格）：两枚文件的注释各写
       // 「这一档是为『隐私单独同意 / 条款再确认』这两层新加的（全局 UX 线 P6 的最后一格）」与
       // 「『关掉不等于同意』的可判红版本（全局 UX 线 P6 最后一格的产品口径）」
