@@ -225,9 +225,16 @@ export const OWNER_RULES = [
     prefixes: ['research/tools/selfhost-windows-sync-arms.mjs', 'scripts/reinstall-all.sh', 'scripts/verify-windows-shell-journey.mjs', '.run-arms-*.txt'],
   },
   {
-    line: '别线的变异台架（research/tools/mutation-rigs/）',
-    why: '台架改的是它自己的判据臂，作者正在按读数调臂；这类文件的"对不对"只有那条线能判',
+    line: '别线的变异台架（脚本 + 还原备份 *.mut-bak* / *.teeth-bak*）',
+    why: '台架改的是它自己的判据臂，作者正在按读数调臂；这类文件的"对不对"只有那条线能判。' +
+      '🔴 备份那一半必须按**机制**认而不是按目录穷举：本仓纪律是"还原只从 `.mut-bak` 取，不从 git 取"，' +
+      '所以树上任何深度的 `*.mut-bak` / `*.teeth-bak` 都是别人台架的母本，**不是残渣**——' +
+      '按"清理未跟踪文件"的直觉删掉就等于在别人下一次还原时把人家的母本删了。' +
+      '10-29 14:3x 现量：这枚尺的目录前缀只写了 `research/tools/mutation-rigs/`，' +
+      '于是 `apps/web/.mut-bak-2`（带序号的备份、且不在那个目录里）落到"没登记过"那一栏——' +
+      '按深度穷举前缀永远会漏一种命名，机制判据不会',
     prefixes: ['research/tools/mutation-rigs/'],
+    mechRe: /(?:\.(?:mut|teeth)-bak)(?:-\d+)?$/,
   },
   {
     line: '本线（注册登录标准套件线）在飞的这一笔',
@@ -310,7 +317,9 @@ export function classify(entries, rules, worktreeDirty = null) {
       ? null
       : rules.find(
           (r) =>
-            r.skipUntracked && e.xy.includes('?') ? false : r.prefixes.some((p) => matchPrefix(e.file, p)),
+            r.skipUntracked && e.xy.includes('?')
+              ? false
+              : r.prefixes.some((p) => matchPrefix(e.file, p)) || (r.mechRe ? r.mechRe.test(e.file) : false),
         );
     rows.push({ ...e, line: hit ? hit.line : null, indexOnly });
   }
@@ -672,6 +681,12 @@ const SELF_TEST_ARMS = () => {
   push('㊕ 取不到锚点的要落成「未判定」计数，不许静默当没有（`source ./local.sh` 这一类）', headDanglingSources('a.sh:1:source ./local.sh', new Set()), { bad: [], unresolved: 1 });
   push('㊖ 注释行里的 source 不算引用（第一发就把注释读成命中的那个坑）', headDanglingSources('a.sh:1:# source "$ROOT/scripts/lib/gone.sh"', new Set()), { bad: [], unresolved: 0 });
   push('㊗ `.`（dot-source）与 `source` 同权：`$REPO` 前缀也要能取到锚点', headDanglingSources('apps/desktop-windows/scripts/package-msix.sh:84:. "$REPO/scripts/lib/nope.sh"', new Set()), { bad: [{ file: 'apps/desktop-windows/scripts/package-msix.sh', line: 84, target: 'scripts/lib/nope.sh' }], unresolved: 0 });
+  push('㉘ 台架的还原备份按机制认：任何深度、带序号的 `.mut-bak-2` 都不许落到"没登记过"那一栏（10-29 14:3x 现量漏过的一枚）',
+    classify([E('apps/web/.mut-bak-2'), E('packages/ui/src/states.ts.mut-bak'), E('apps/web/src/App.tsx.teeth-bak')], OWNER_RULES).rows.map((r) => r.line),
+    ['别线的变异台架（脚本 + 还原备份 *.mut-bak* / *.teeth-bak*）', '别线的变异台架（脚本 + 还原备份 *.mut-bak* / *.teeth-bak*）', '别线的变异台架（脚本 + 还原备份 *.mut-bak* / *.teeth-bak*）']);
+  push('㉙ 反例：普通源码文件名里带 "bak" 不算台架备份（机制判据不许吞掉真例外）',
+    classify([E('apps/web/src/backup-panel.tsx')], OWNER_RULES).rows[0].line,
+    null);
   push('④ 目录规则要按前缀吃下整棵子树', classify([E('e2e/tests/dirty-form-guard.spec.ts')], OWNER_RULES).rows[0].line, '全局 UX 分层整改线');
   push('⑤ 规则表自己必须干净（现在这份必须无违规）', auditRules(OWNER_RULES), []);
   push(
