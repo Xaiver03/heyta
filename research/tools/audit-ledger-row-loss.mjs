@@ -19,6 +19,7 @@
  * ⚠️ 有意保守：改缩进、行内加粗、把 A 句拆成 B 句都会读成「消失」。
  * 这一把尺的任务是**别让人把销毁读成没变化**，多报由人逐行判，比漏报便宜。
  * 完全不比：新增的行（那是别人在写）、顺序（搬家不算丢，见臂 L3/L4）。
+ * 单独一档不判红：**就地改写**（行首 40 码点仍在别处 ⇒ 按「改口不删旧文」的常态处理，臂 L13/L14 钉这一格）。
  *
  * ## 它**不**做的事
  *
@@ -46,34 +47,55 @@ const PREVIEW = 120;
 
 const norm = (line) => line.replace(/\s+$/, '');
 
-/** ref 里有、worktree 里少的行。返回按 ref 行号升序的 {line, text, kind}。 */
+/** ref 里有、worktree 里少的行；**就地改写不算消失**。
+ *
+ * 🔴 为什么不"只按整行文本比"就够：本仓的规矩是「改口不删旧文」，而改口最常见的落点就是
+ * **往同一格里追加一段追记**——整行文本因此变了，按纯整行比会把它读成"已入库的行消失"。
+ * 这不是把尺放宽：判定改成"行首 40 码点还在不在同一枚文件的别处"——
+ * 追加追记 ⇒ 前缀还在 ⇒ 记 `revised`（单独报条数与位置，不判红）；
+ * 整行换成不相干的内容或删掉 ⇒ 前缀找不到 ⇒ 仍是 `vanished`，`--strict` 照样退 1。
+ * 短于 25 码点的行（分隔线、`|---|`）不参与前缀判定，它们本来就靠多重集数。
+ */
 export function findVanished(refText, wtText) {
   const refLines = refText.split('\n');
+  const wtLines = wtText.split('\n');
   const wt = new Map();
-  for (const raw of wtText.split('\n')) {
+  for (const raw of wtLines) {
     const l = norm(raw);
     if (l === '') continue;
     wt.set(l, (wt.get(l) ?? 0) + 1);
   }
-  const needed = new Map();
-  for (const raw of refLines) {
+  // 前缀索引：worktree 里每一行的前 40 码点 → 出现次数（用来认"就地改写"）
+  const wtPrefix = new Map();
+  for (const raw of wtLines) {
     const l = norm(raw);
-    if (l === '') continue;
-    needed.set(l, (needed.get(l) ?? 0) + 1);
+    if (l.length < 25) continue;
+    const pre = l.slice(0, 40);
+    wtPrefix.set(pre, (wtPrefix.get(pre) ?? 0) + 1);
   }
   const seen = new Map();
+  const prefixSeen = new Map();
   const vanished = [];
+  const revised = [];
   refLines.forEach((raw, idx) => {
     const l = norm(raw);
     if (l === '') return;
-    const nth = (seen.get(l) ?? 0) + 1; // 同一行文本的第 n 次出现 ⇒ 多重集配对
+    const nth = (seen.get(l) ?? 0) + 1;
     seen.set(l, nth);
-    const have = wt.get(l) ?? 0;
-    if (nth > have) {
-      vanished.push({ line: idx + 1, text: l, kind: kindOf(l) });
+    if (nth <= (wt.get(l) ?? 0)) return; // 这一枚还在（可能只是搬了家）
+    if (l.length >= 25) {
+      const pre = l.slice(0, 40);
+      const pth = (prefixSeen.get(pre) ?? 0) + 1;
+      prefixSeen.set(pre, pth);
+      if (pth <= (wtPrefix.get(pre) ?? 0)) {
+        const at = wtLines.findIndex((w, i) => norm(w).slice(0, 40) === pre && norm(w).length >= 25);
+        revised.push({ refLine: idx + 1, wtLine: at + 1, text: l });
+        return;
+      }
     }
+    vanished.push({ line: idx + 1, text: l, kind: kindOf(l) });
   });
-  return { vanished, refNonBlank: countNonBlank(refLines), wtNonBlank: countNonBlank(wtText.split('\n')) };
+  return { vanished, revised, refNonBlank: countNonBlank(refLines), wtNonBlank: countNonBlank(wtLines) };
 }
 
 const kindOf = (l) =>
@@ -90,7 +112,7 @@ function readRef(file, ref) {
 }
 
 function report(file, refText, wtText, ref, opts) {
-  const { vanished, refNonBlank, wtNonBlank } = findVanished(refText, wtText);
+  const { vanished, revised, refNonBlank, wtNonBlank } = findVanished(refText, wtText);
   if (refNonBlank === 0) {
     console.log(`⚠️ ${file}@${ref} 的非空行分母是 0 ⇒ 这把尺在这一枚上是瞎的，本行读数不代表「没有消失的行」。`);
     return { blind: true, count: 0 };
@@ -105,6 +127,9 @@ function report(file, refText, wtText, ref, opts) {
     console.log(`   ${file}:${v.line}@${ref} [${v.kind}] ${v.text.slice(0, PREVIEW)}`);
   });
   if (vanished.length > opts.top) console.log(`   …另有 ${vanished.length - opts.top} 枚（加 --top 500 全列）`);
+  revised.slice(0, opts.top).forEach((r) => {
+    console.log(`   ✎ 就地改写 ref ${file}:${r.refLine} → worktree 第 ${r.wtLine} 行 ｜ ${r.text.slice(0, 60)}`);
+  });
   if (vanished.length > 0) {
     console.log(
       `   ↑ 逐行判两件事：① 这一行讲的事真结了吗（本仓规矩「改口不删旧文」，结了也该留字）；` +
@@ -194,6 +219,26 @@ function selfTest() {
     0,
   );
   arm('L10 标题行单独被删也点名', t((f) => f.replace('# 标题\n', '')).vanished.map((v) => v.kind).join(','), 'heading');
+  // L13/L14 用一枚**足够长**的夹具行：前缀判定有 25 码点的下限（短行如 `- 项目符号行`
+  // 走多重集那档，拿它测前缀会测不到东西——这一发第一版就是这么假红了一次）。
+  const LONG = '| 🟠 这一格的枚数由尺自己打印，正文里不抄会漂的值，读的人按右栏那条命令自取 |\n';
+  const longFixture = `# 标题\n\n${LONG}| 另一格 | 别的现量 |\n`;
+  arm(
+    'L13 往同一格里追加追记（行首不变、行尾变长）⇒ 记「就地改写」，不许读成消失（「改口不删旧文」的常态落点）',
+    (() => {
+      const r = findVanished(longFixture, longFixture.replace(LONG.slice(0, -1), `${LONG.slice(0, -1)} ✅ 10-29 本线复跑并追加读数 |`));
+      return [r.vanished.length, r.revised.length];
+    })(),
+    [0, 1],
+  );
+  arm(
+    'L14 整行换成完全不相干的内容 ⇒ 前缀找不到，仍算消失（豁免不许把销毁读成改写）',
+    (() => {
+      const r = findVanished(longFixture, longFixture.replace(LONG, '| 🟠 今天写了一格与上面毫无关系的新内容，右栏照样给命令 |\n'));
+      return [r.vanished.length, r.revised.length];
+    })(),
+    [1, 0],
+  );
   // 阳性对照：真账本拿自己比 ⇒ 必须 0（这一枚否证的是「尺在长文件上会自己造红」）
   const realRef = readRef('BLOCKED.md', 'HEAD');
   if (realRef === null) {
@@ -212,7 +257,10 @@ function selfTest() {
   for (const r of results) {
     console.log(`${r.ok ? '✅' : '🔴'} ${r.name}${r.ok ? '' : `  得到=${JSON.stringify(r.got)} 期望=${JSON.stringify(r.want)}`}`);
   }
-  const failed = results.filter((r) => !r.ok).length;
+  const nums = results.map((r) => Number(/^L(\d+)/.exec(r.name)?.[1] ?? 0));
+  const seqOk = Math.max(...nums) === results.length && new Set(nums).size === results.length;
+  console.log(`${seqOk ? '✅' : '🔴'} L15 臂号连续且不重号（判的是上面 ${results.length} 枚：最大 ${Math.max(...nums)} ｜ 去重 ${new Set(nums).size}）`);
+  const failed = results.filter((r) => !r.ok).length + (seqOk ? 0 : 1);
   console.log(`臂 ${results.length} 枚，红 ${failed} 枚`);
   return failed === 0 ? 0 : 1;
 }
