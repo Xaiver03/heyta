@@ -6197,3 +6197,8 @@ gitee 那枚上游仍超配额，没碰。
 
 🔴 **对外站点没有跟着发**：`/var/www/heyta-landing` 现量仍是 11:34 那一版（还能 grep 到「（规划中）」「此功能尚未上线」），
 所以帮助中心/价格页/公网法务页仍是旧口径 —— 那是 `apps/landing` 的单独发布，归负责人（本笔刻意不动）。
+
+**15:59–16:08 收尾两笔**：① `76a125efa` 把"认领"收紧到**只有设备走代理那条腿**（请求带 `claimReservedAttempt`，
+hosted-extraction 默认不带）——上一版按 feature 认领，服务端抽取可能冒领设备的孤儿预留；新用例造孤儿行验证
+"服务端抽取仍 +1、那行 `proxy_billed` 仍 NULL"，变异臂摘门 ⇒ 该条红。② 沙箱 + apply 再发一次（`ROLLBACK_TAG=supersync:rollback-20261029T080600`），
+发布后：OCI revision `76a125efa`、容器 `baf20168…`、健康、`AUTOMATION_*` 5 枚、`/health` 200、hooks 400、revocations 403。
