@@ -5340,3 +5340,46 @@ git -c core.quotepath=off status --porcelain -- apps packages server/public e2e 
    `ERR_MODULE_NOT_FOUND`——看起来像仓库坏了，实际缺一格前置。守卫补一句"dist 未构建 ⇒ 先 `pnpm -r build`"
    比让人去猜这条红强。
    两条都带现量命令，落在下面的 ③ 那一节；**发与不发的判据口径不在我这边改**。
+
+### 6.115（2026-10-29 11:4x · 发布跑成：两站都换成 `main` 的字节，逐字节对账「不齐 0」，登录三件按名字各自绿；线上验收带出一条**从 10-26 就在那儿**的 legal 红）
+
+发布器 `--confirm` 在干净载体（先 `pnpm -r build`，`RBUILD_RC=0`）上的 9 步读数：
+**1–8 全 `exit 0`**（两站构建、两次产物对账、远端 `tar` 备份、落地页与应用两条 `rsync --delete` 都跑成），
+第 9 步线上验收 **51 passed / 1 failed**。日志在 `/tmp/pub-confirm2.log`，
+🔴 它自己把"已经跑成的 rsync"点名列出并给了还原入口（取 `/tmp/heyta-public-backup-*.tgz` 最新一枚解回 `/var/www`）——
+**这条设计在这里兑现了**：第 9 步红的时候，脚本没有假装"整链没发生"。
+
+**目标第 4 件要的三样，逐样现量**（都在载体根跑，跑的就是发出去那份）：
+
+```sh
+node scripts/live-web-freshness.mjs --landing
+#  落地页逐字节对账 ｜ 分母 79 份已入库 HTML ｜ 齐 78 ｜ 不齐 0 ｜ 线上没这页 1 ｜ 抓取失败 0
+#  ⚠️ /pitch/ 线上回 404 —— 不在注册表、也不会被发布（这是早就登记的那一格，不是新红）
+pnpm --dir e2e exec playwright test --config playwright.live-site.config.ts live-signin-entry live-credential-pages
+#  4 passed：中文「登录」点一次直达、英文页同一条路（语言参数不许挤掉 signin）、
+#            /signin/ 只剩出口、邮件里每一枚目的地在线上都可达
+```
+
+⇒ **台账里那一格"线上产物比 HEAD 旧"这半件事关闭**（不齐 0，且抓取失败 0 = 不是"扫不到所以齐"）。
+另注：正文里不写 SHA —— 要核对发的是哪一笔，`git ls-remote origin refs/heads/main` 与载体的 `git rev-parse HEAD` 现取现比。
+
+**那条 legal 红，定性是"断言的前提过期"，不是线上说假话，也不是这次发布带出来的。** 三方时刻：
+
+| 什么事 | 时刻 / 现量 |
+|---|---|
+| `hasDraftBanner` 这条断言写进线上验收 | `55768bd94`（10-01 23:58）—— 那一天 10 篇**全是** draft，前提成立 |
+| `ai-and-transfer` 翻成 `effective` | `41f2ba1ea`（10-26 21:20），带 `effectiveDate: '2026-10-26'`；正文双语两处都写着"这一版起不再是草案"，并注明是产品负责人当天定的口径 |
+| 现在线上这页有没有横幅 | 没有 —— 而源码里横幅只在 `status === 'draft'` 时渲染（`apps/landing/src/pages/LegalDocumentPage.tsx:56`），所以**线上与仓库自己的数据一致** |
+
+`grep -rn "status: '" packages/legal/src/documents` 现量是 9 枚 `draft` + 1 枚 `effective`，
+而 `e2e/live-site/live-legal.spec.ts:174` 那个 `for (const docId of LEGAL_DOC_IDS)` 对**每一篇**都要横幅
+⇒ 这一条从 10-26 起就会红，任何一次跑线上验收都会撞上它。
+
+**为什么不代改**：改这条断言等于改法务页对外呈现的判据口径（"哪几篇算已生效、要不要挂草案横幅"），
+而且它落在别人的线上验收套件里 —— 两条都越过本线的授权。该写的不变量是
+"横幅存在 ⟺ 该篇在 `draft` 名单里"（名单本身 `packages/legal/src/index.ts:138` 已经导出，
+断言却把 10 篇一视同仁），这一格连同时刻表已进 `BLOCKED.md` 的待拍板表。
+
+**载体留着**（`~/heyta-carriers/web-pub-<短 SHA>`，`git worktree` 一枚，脏条目 0）：
+UX 线那 9 枚源码一落地，重发只需 `git -C <载体> checkout --force main` + `pnpm -r build` + 再跑发布器，省一趟装依赖。
+不要了就这样收（是本会话创建的对象）：`git worktree remove --force <载体>`。
