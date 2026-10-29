@@ -560,6 +560,26 @@ const SELF_TEST_ARMS = () => {
   );
   push('㉞ 坏形状的通配必须被规则表自检拒（首尾裸星号 / 整段一个星号＝会跨段认领）', auditRules([{ line: 'X', why: '这条夹具的理由要够十二字以上才被认', prefixes: ['*', 'a*', '*.txt'] }]).length, 3);
   push('㉟ 普通与目录前缀的旧语义不许被这次改动带跑（回归臂）', [matchPrefix('a/b.ts', 'a/'), matchPrefix('a/b.ts', 'a/c.ts'), matchPrefix('a/c.ts', 'a/c.ts')], [true, false, true]);
+  push(
+    '㊱ `.mjs` 的 importer 也要扫（2026-10-29 补的那一格：原先只扫 ts 族，脚本侧的 .mjs 引用未入库模块时这条判据完全看不见）',
+    crossLineImports(
+      [{ xy: ' M', file: 'scripts/verify-windows-shell-journey.mjs' }],
+      {
+        read: () => "import { syncSources } from './lib/sync-build-sources.mjs';\n",
+        isTracked: () => false,
+        exists: () => true,
+      },
+    ),
+    [{ importer: 'scripts/verify-windows-shell-journey.mjs', target: 'scripts/lib/sync-build-sources.mjs', kind: 'untracked' }],
+  );
+  push(
+    '㊲ 诚实记下没覆盖的那一格：shell 的 `source "$ROOT/…"` 扫不出来（展开变量要第二个解析器），这一臂断言的是"确实不点名"，不许有人把它读成"shell 也管到了"',
+    crossLineImports(
+      [{ xy: ' M', file: 'scripts/reinstall-all.sh' }],
+      { read: () => 'source "$ROOT/scripts/lib/sync-build-sources.sh"\n', isTracked: () => false, exists: () => true },
+    ),
+    [],
+  );
   push('④ 目录规则要按前缀吃下整棵子树', classify([E('e2e/tests/dirty-form-guard.spec.ts')], OWNER_RULES).rows[0].line, '全局 UX 分层整改线');
   push('⑤ 规则表自己必须干净（现在这份必须无违规）', auditRules(OWNER_RULES), []);
   push(
