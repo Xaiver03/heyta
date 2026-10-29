@@ -141,7 +141,7 @@ sed -n '/^#### 没关掉的边界/,/^#### /p' docs/adr/0051-mobile-reminder-deli
 另有 `check:empty-state` / `check:mobile-renew-shape` / `check:text-color` / `check:rn-aria`
 与平台类红）。本线自己的闸门逐道绿。
 
-### 并行轨道：全局 UX 分层整改 P0–P8（✅ 九批全部收口 2026-10-28；两格外送口径归人拍）
+### 并行轨道：全局 UX 分层整改 P0–P8（✅ 九批全部收口 2026-10-28；P6 意思表示层那两枚 2026-10-29 补迁完）
 
 **一句话**：把"每个界面各画一套控件档位 / 各定一套关闭策略"收敛成**共享层一张表 + 各端一个渲染器**，
 并且每一档都能被四档尺（源码尺 / 语义测 / 真浏览器 / 人看截图）各自判红。
@@ -151,8 +151,8 @@ sed -n '/^#### 没关掉的边界/,/^#### /p' docs/adr/0051-mobile-reminder-deli
 | 计划真身与逐批状态 | [`docs/plans/global-ux-system-remediation.md`](../plans/global-ux-system-remediation.md) §8 那张表（九行全 ✅，每行带完成证据） |
 | 一份判断 | `packages/ui/src/control/states.ts`（色调 × 重量档）、`control/menu.ts`、`overlay/dismissal.ts`、`feedback/receipt-timing.ts`、`empty-state/model.ts` |
 | 两端渲染 | Web `apps/web/src/styles/app/controls.css` + `lib/dialog/WebModalShell.tsx`；移动端 `apps/mobile/src/ui/kit.tsx`（薄壳，读同一张表） |
-| 本线门禁 | `check:control-semantics` / `check:chip-typing` / `check:z-ladder` / `check:ux-coverage`（四档覆盖矩阵，11 族）；全部在 `check` 链上，`check:gate-wiring` 守这一条 |
-| 真浏览器腿 | `e2e/tests/` 里 14 枚本线 spec（跑法见计划 §8 的 P8 行），另加 `e2e/vault/conflict-dialog.spec.ts`（两台真设备真并发） |
+| 本线门禁 | `check:control-semantics` / `check:chip-typing` / `check:z-ladder` / `check:ux-coverage`（四档覆盖矩阵；族数与每族四档齐不齐**由脚本自己打印**，别在这里抄）；全部在 `check` 链上，`check:gate-wiring` 守这一条 |
+| 真浏览器腿 | `e2e/tests/` 里本线那批 spec（本线清单在计划 §8 的 P8 行与四档台账那张表里；整套枚数现量看 `pnpm check:ux-coverage` 自己打印的那行），另加 `e2e/vault/conflict-dialog.spec.ts`（两台真设备真并发） |
 | 设备腿 | `apps/mobile/evidence/global-ux-control-tiers-20261028/RESULT.md`（载体 `linux-dev`，装机语言要显式设 `zh-CN`） |
 
 现量入口：`pnpm check:ux-coverage`（矩阵与门禁在不在链上）·

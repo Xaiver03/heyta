@@ -155,9 +155,17 @@ const MODAL_LEDGER = {
   'apps/web/src/features/auth/AuthPanel.tsx': { ariaModal: 1, dialogRole: 1 },
   'apps/web/src/features/calendar/CalendarCapturePopover.tsx': { ariaModal: 0, dialogRole: 1 },
   'apps/web/src/features/inbox/InboxBell.tsx': { ariaModal: 0, dialogRole: 1 },
-  'apps/web/src/features/legal-recheck/LegalReconfirmSheet.tsx': { ariaModal: 1, dialogRole: 1 },
-  'apps/web/src/features/privacy/PrivacyConsentSheet.tsx': { ariaModal: 1, dialogRole: 1 },
   'apps/web/src/features/shell/CompactRailNavigation.tsx': { ariaModal: 0, dialogRole: 1 },
+  /*
+   * 🔴 2026-10-29（P6 第三批）：`PrivacyConsentSheet` 与 `LegalReconfirmSheet` 这两行**跟着删**。
+   * 它们不是"换了一种自绘"，而是**关闭口径改吃那张表**：两枚都落到新那一行
+   * `CLOSED_OVERLAYS['modal-deferrable']`（背景 deny／Esc dismiss／给 ×），
+   * 所以 `role="dialog"`/`aria-modal` 只剩壳那一处。
+   * ⚠️ 这一格先前登记的理由是「没人替它拍 Esc 该不该有反应」，那条**由本仓自己拍了**：
+   * 误点遮罩是无意动作 ⇒ 不许把一次法律表态推掉，而 Esc／「以后再说」是有意动作 ⇒ 保留；
+   * 不升成 `modal-forced-read` 是因为强制当场表态对本就允许拒绝的单独同意是反向诱导
+   * （口径正文在 `packages/ui/src/overlay/dismissal.ts` 那一行上方）。
+   */
   /*
    * 🔴 2026-10-28（P6 第二批）：这四行**跟着删**，不是放宽判据 ——
    * `HabitsView` 的新建习惯、`ShareFeature` 的分享面板、`JoinSharedListDialog` 的入群、

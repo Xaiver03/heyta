@@ -91,6 +91,34 @@ describe('关闭策略表：危险确认与强制阅读', () => {
   });
 });
 
+describe('关闭策略表：可延后的意思表示层', () => {
+  /*
+   * 这一档是为"隐私单独同意 / 条款再确认"这两层新加的（全局 UX 线 P6 的最后一格）。
+   * 它存在的**唯一理由**是背景点击与 Esc 的差别：
+   *   · 误点遮罩是**无意**动作 ⇒ 不许把一次法律表态推掉（deny）；
+   *   · 按 Esc / 点那枚写着「以后再说」的 × 是**有意**动作 ⇒ 允许退出，
+   *     且退出**不记成同意**（闸门保持关闭，下一次要出门的动作会再问）。
+   * 所以它既不是 `modal-readonly`（那一档背景也算退出），也不是
+   * `modal-forced-read`（那一档三条通道全 deny、不给 ×，等于逼用户当场表态）。
+   */
+  it('背景 deny、Esc 与返回键 dismiss、给 ×（三件事必须同时成立）', () => {
+    const policy = closePolicyOf('modal-deferrable');
+    expect(policy.scrim, '可延后层的背景点击必须不响应').toBe('deny');
+    expect(policy.escape, 'Esc 必须能延后（它是有意动作）').toBe('dismiss');
+    expect(policy.systemBack, '系统返回键必须能延后').toBe('dismiss');
+    expect(policy.explicitCloseButton, '必须有一枚具名出口（「以后再说」）').toBe(true);
+    expect(policy.autoDismiss, '这一类绝不能自动消失').toBe(false);
+  });
+
+  it('🔴 它必须与左右两档都不同形（同形就等于这一档不存在）', () => {
+    const mine = closePolicyOf('modal-deferrable');
+    expect(mine, '与只读层同形 ⇒ 不必新增这一档').not.toEqual(closePolicyOf('modal-readonly'));
+    expect(mine, '与强制阅读同形 ⇒ 这一档没有把"延后"和"必须表态"分开').not.toEqual(
+      closePolicyOf('modal-forced-read'),
+    );
+  });
+});
+
 describe('关闭策略表：三条通道问出来的是同一种答案', () => {
   it('ask-discard 的原语动作是**先去问**，不是直接关（宿主没给 onDismissAttempt 就什么都不做）', () => {
     const policy = closePolicyOf('modal-dirty-form');

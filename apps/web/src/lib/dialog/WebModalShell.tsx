@@ -85,10 +85,10 @@ export interface WebModalShellProps {
   /**
    * 宿主的遮罩/面板样式（与上面两枚类名同用，谁后写谁赢的是**同一格属性**）。
    *
-   * ⚠️ 存在的理由只有一个：**迁移本身不许产生视觉变化**。剩下那几枚待迁的壳
-   *（`JoinSharedListDialog` / `ShareFeature` / `ConflictDialog` / `PrivacyConsentSheet`）
-   * 用的是一整份内联 `cssVar` 样式对象而不是类名，所以壳必须能把这两格原样接住 ——
-   * 否则"换壳"就顺手改了一次外观，而那一档变化只有看图才判得了（§6.2）。
+   * ⚠️ 存在的理由只有一个：**迁移本身不许产生视觉变化**。消费者里有几枚用的是一整份
+   * 内联 `cssVar` 样式对象而不是类名（`PrivacyConsentSheet`／`ConflictDialog` 那两枚），
+   * 所以壳必须能把这两格原样接住 —— 否则"换壳"就顺手改了一次外观，
+   * 而那一档变化只有看图才判得了（§6.2）。
    */
   readonly overlayStyle?: CSSProperties;
   readonly dialogStyle?: CSSProperties;
@@ -124,7 +124,11 @@ export function WebModalShell({
   const containerRef = useModalFocusIsolation({ active: modalCommitment, initialFocusRef });
   const policy = closePolicyOf(policyKey);
 
-  const requestDismiss = (channel: 'scrim' | 'escape'): void => {
+  /**
+   * 这一条通道**动了没有**？（返回值只给 Esc 那一家用：见下面 `stopImmediatePropagation`）
+   * `false` = 表里判成 `deny`，或者提交中 ⇒ 这一层对那一下没有反应。
+   */
+  const requestDismiss = (channel: 'scrim' | 'escape'): boolean => {
     /**
      * 🔴 提交中**任何关闭通道都不动手**（含 Esc 与背景）。
      *
@@ -133,14 +137,15 @@ export function WebModalShell({
      * 第二枚消费者（`CategoryCreateDialog`）原本在自己那 50 行里用 `busyRef` 守它 ——
      * 那是每一枚壳都要重写一遍的东西，收到这里来。
      */
-    if (busy) return;
+    if (busy) return false;
     const action = dismissActionFor(policy, channel === 'escape' ? policy.escape : policy.scrim);
-    if (action === 'none') return;
+    if (action === 'none') return false;
     if (action === 'ask') {
       onDismissAttempt?.(channel);
-      return;
+      return true;
     }
     onCancel();
+    return true;
   };
 
   const requestDismissRef = useRef(requestDismiss);
@@ -148,8 +153,23 @@ export function WebModalShell({
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
+      /**
+       * 🔴 **这一层真的接住了那一下** ⇒ 不再往下传。
+       *
+       * 迁移 `PrivacyConsentSheet` 之前它是自己挂捕获监听 + `stopImmediatePropagation()`
+       * 的，那份契约由 `apps/web/tests/privacy-consent-sheet.spec.tsx` 钉着（"一次 Esc 只关一层"
+       * 的代理读数：同一时刻窗口上的另一个监听**不许**看到这次 Esc）。收到壳里来，
+       * 七枚消费者就共用同一个答案，而不是各写一遍。
+       *
+       * ⚠️ **表里判成 `deny`（或提交中）时不吞**：那一下归别人 —— 强制阅读那一层按 Esc
+       *   没反应，但它下面那一层该收的还是要收。
+       * ⚠️ 这一条只覆盖**窗口上的冒泡监听**：更深的监听（`document` 冒泡、以及各层自己
+       *   挂在窗口的**捕获**监听，含 `useModalDismiss` 那四份）早于本监听执行，吞不掉。
+       *   所以"一次 Esc 只关一层"在这里成立的范围是壳与壳之间；把它做成真命题要先有
+       *   "谁是顶层"的判断（`lib/use-modal-dismiss.ts` 文件头登记的同一条边界）。
+       */
       event.preventDefault();
-      requestDismissRef.current('escape');
+      if (requestDismissRef.current('escape')) event.stopImmediatePropagation();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
