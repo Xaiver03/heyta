@@ -99,7 +99,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '下表是**全部**出境面。它不是"主要字段清单"：每一个 AI 功能各自只喂这几列里的字段，全产品也只有这五个出站调用点，没有任何一处把整库数据、完整操作日志或导出文件塞进请求。',
+        text: '下表是**全部**出境面。它不是"主要字段清单"：每一个 AI 功能各自只喂这几列里的字段，全产品也只有这六个出站调用点，没有任何一处把整库数据、完整操作日志或导出文件塞进请求。',
       },
       {
         kind: 'table',
@@ -110,15 +110,16 @@ const zh = [
           ['优先级建议', '`today`、`tasks`，可选 `preferences`', '这台设备的本地日期与星期，加上至多 50 条任务的标识、标题、截止时间、优先级，按 JSON 原文', '50 条，且在构造请求之前就收窄'],
           ['估时', '`today`、`title`，可选 `note`、`history`，可选 `preferences`', '这台设备的本地日期与星期，加上标题与备注原文；最近至多 20 条专注记录的"计划用时 / 实际用时"分钟数', '20 条记录；记录本身里面没有时间戳、也没有任务标识'],
           ['工具选择', '`today`、`text`、`tools`', '这台设备的本地日期与星期，加上你那句话的原文，以及这台设备上**已授权工具的名字、描述与参数结构**', '500 字符；纯规则能选中的场景一次都不出境'],
+          ['自动收集（只在你为某条规则打开"由我们当场抽取"时）', '你在那条规则里勾选的那几列（标题 / 备注 / 优先级 / 清单 / 截止日期 / 开始日期 / 时长 的子集）', '外部服务投递进来的 JSON 或文本，**先投影到你勾选的那几列**，再附上接收时间与你为规则设的时区；不整段转发', '投影发生在发送**之前**；单条事件最多 50 项，由规则决定'],
         ],
       },
       {
         kind: 'callout',
-        text: '**没有"脱敏"这一步。** 发送前不存在任何脱敏、匿名化或摘要处理 —— 发出去的就是上面这些字段的原文，一字不改。真正在保护你的是"默认关闭 + 逐功能授权 + 目的地由你指定"这套闸门，而不是"我们帮你改掉几个字"。任何一份政策如果在这里写"已做匿名化处理"，那它就是假的。',
+        text: '**没有"脱敏"这一步。** 发送前不存在任何脱敏、匿名化或摘要处理 —— 发出去的就是上面这些字段的原文，一字不改。唯一会"少掉一些字段"的是自动收集那一档：它按**你在规则里勾选的子集**投影后再发，那是你自己划定的范围，不是我们替你改字。真正在保护你的是"默认关闭 + 逐功能授权 + 目的地由你指定"这套闸门，而不是"我们帮你改掉几个字"。任何一份政策如果在这里写"已做匿名化处理"，那它就是假的。',
       },
       {
         kind: 'p',
-        text: '**对话式助手是"工具选择"那一行的多轮形态，不是第六个功能。** 它一次会话会发**多次**请求：每一轮都把你要办的那句话、已授权工具的名字与参数结构，连同**这些工具在上一轮读回来的内容**一起回送给模型。读回来的字段就是第六节那张表里逐工具写明的那几列；任何一步要回送清单之外的字段都会被**拦下来不发**（界面上的原话是"某一步要送出你没有批准过出境的字段，助手已经停下，那一步一个字节都没发"）。所以别把它读成"问一句 = 一次出境"：一次会话最多几轮、单次请求多少条消息与多少字节，上界都写在会话开始前那份清单里，触顶时它明确说停在哪一步，不截断后接着发。',
+        text: '**对话式助手是"工具选择"那一行的多轮形态，不是又一个功能。** 它一次会话会发**多次**请求：每一轮都把你要办的那句话、已授权工具的名字与参数结构，连同**这些工具在上一轮读回来的内容**一起回送给模型。读回来的字段就是第六节那张表里逐工具写明的那几列；任何一步要回送清单之外的字段都会被**拦下来不发**（界面上的原话是"某一步要送出你没有批准过出境的字段，助手已经停下，那一步一个字节都没发"）。所以别把它读成"问一句 = 一次出境"：一次会话最多几轮、单次请求多少条消息与多少字节，上界都写在会话开始前那份清单里，触顶时它明确说停在哪一步，不截断后接着发。',
       },
       {
         kind: 'p',
@@ -173,6 +174,7 @@ const zh = [
           '**运营方要先在这台实例上配好境内上游**。没配的实例会在**下单**与**调用**两处各自如实拒绝（下单被拒并说明"要交付的能力本机没有"，调用回"未配置"），不会出现"收了钱却打不开"。',
           '**你在设置里选了托管**才算把目的地指向我们。选它之前，你的内容只去你自己填的那个端点。',
           '**每个 AI 功能仍然要你单独授权**，而且随时可以逐项撤销 —— 订阅**不**等于同意出境（第四段那句话是这一条的正面写法）。',
+          '**自动收集走托管档时，一次物理模型调用只计一次额度**：设备先预留的那一笔与真正发出请求的那一笔不会各记一次（同一枚预留只被认领一次，多出来的那份不会记在你头上）。',
         ],
       },
       {
@@ -386,6 +388,7 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期', '变化'],
         rows: [
+          ['1.9', '2026-10-29', '自动收集那一节按代码现量重写：加上"由我们当场抽取"这一行的字段投影与"成功后不能重抽"；第三节的出站点从五个改成六个。中英同批。**状态：仍是草案，尚未经法务复核、尚未生效。**'],
           ['1.0', '2026-10-01', '首版草案（尚未生效）：逐字段出境表按实现写；明确不做脱敏；云端 AI 写作"当前不可用"；出境定性标为待法务复核。'],
           [
             '1.1',
@@ -492,7 +495,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'The table below is the **complete** egress surface. It is not a list of "the main fields": each AI feature feeds only the fields in its row, there are exactly five outbound call sites in the whole product, and nowhere is a full data export, the complete operation log, or a database dump put into a request.',
+        text: 'The table below is the **complete** egress surface. It is not a list of "the main fields": each AI feature feeds only the fields in its row, there are exactly six outbound call sites in the whole product, and nowhere is a full data export, the complete operation log, or a database dump put into a request.',
       },
       {
         kind: 'table',
@@ -503,15 +506,16 @@ const en = [
           ['Prioritisation', '`today`, `tasks`, optionally `preferences`', 'This device\'s local date and weekday, plus up to 50 tasks\' identifier, title, due date and priority, as JSON in the original', '50 items, narrowed before the request is even constructed'],
           ['Duration estimate', '`today`, `title`, optionally `note`, `history`, optionally `preferences`', 'This device\'s local date and weekday, plus the original title and note; up to the 20 most recent focus records as "planned / actual" minutes', '20 records; the records themselves carry no timestamps and no task identifiers'],
           ['Tool selection', '`today`, `text`, `tools`', 'This device\'s local date and weekday, plus the original text of your line, and **the names, descriptions and parameter structures of the tools authorised on this device**', '500 characters; where pure rules can pick the tool, nothing leaves at all'],
+          ['Automatic capture (only when you turn on "extract on our server" for a rule)', 'The columns you ticked on that rule (a subset of title / note / priority / list / due date / start date / duration)', 'The JSON or text an external service delivered, **projected to the columns you ticked** before sending, plus the receive time and the timezone you set on the rule; never forwarded as-is', 'Projection happens **before** sending; at most 50 items per event, set by the rule'],
         ],
       },
       {
         kind: 'callout',
-        text: '**There is no redaction step.** Before sending, nothing is anonymised, de-identified, summarised, or scrubbed — what goes out is the original text of the fields above, unchanged. What protects you is the set of gates — "off by default, authorised per feature, destination chosen by you" — not "we changed a few words for you". Any policy that wrote "data is anonymised before sending" here would simply be false.',
+        text: '**There is no redaction step.** Before sending, nothing is anonymised, de-identified, summarised, or scrubbed — what goes out is the original text of the fields above, unchanged. The one place where fields are dropped is automatic capture: it is projected to **the subset you ticked on the rule** before sending, which is a scope you set, not us rewriting your words. What protects you is the set of gates — "off by default, authorised per feature, destination chosen by you" — not "we changed a few words for you". Any policy that wrote "data is anonymised before sending" here would simply be false.',
       },
       {
         kind: 'p',
-        text: '**The conversational assistant is the multi-step form of the "Tool selection" row, not a sixth feature.** One session sends **several** requests: each one carries the line you typed, the names and parameter structures of the authorised tools, and **whatever those tools read back on the previous step**, all returned to the model. The fields read back are exactly the per-tool columns written out in section six; any step that would carry a field outside that list is **stopped and not sent** (the interface says, in these words, that a step wanted to send a field you never approved, so the assistant stopped and that step sent not one byte). So do not read it as "one question, one egress": how many steps a session may take, and how many messages and bytes a single request may carry, are all written in the list shown before the session starts, and when a limit is hit it says which step it stopped at instead of truncating and carrying on.',
+        text: '**The conversational assistant is the multi-step form of the "Tool selection" row, not another feature.** One session sends **several** requests: each one carries the line you typed, the names and parameter structures of the authorised tools, and **whatever those tools read back on the previous step**, all returned to the model. The fields read back are exactly the per-tool columns written out in section six; any step that would carry a field outside that list is **stopped and not sent** (the interface says, in these words, that a step wanted to send a field you never approved, so the assistant stopped and that step sent not one byte). So do not read it as "one question, one egress": how many steps a session may take, and how many messages and bytes a single request may carry, are all written in the list shown before the session starts, and when a limit is hit it says which step it stopped at instead of truncating and carrying on.',
       },
       {
         kind: 'p',
@@ -566,6 +570,7 @@ const en = [
           '**The operator must first point this instance at a domestic upstream.** On an instance where that is unset, both the **order** and the **call** are refused honestly and separately (the order is rejected as "the capability this tier delivers is not present here"; the call answers "not configured"), so there is no state where money is taken for something that cannot run.',
           '**You have to choose hosted** in Settings before the destination becomes us. Until you do, your content only goes to the endpoint you typed yourself.',
           '**Every AI feature still needs its own consent from you**, revocable feature by feature at any time — a subscription is **not** consent to send anything out (the fourth paragraph states this positively).',
+          '**When automatic capture uses the hosted tier, one physical model call counts once**: the reservation the device makes just before sending and the request itself are not counted separately (a reservation is claimed at most once, so the duplicate is never charged to you).',
         ],
       },
       {
@@ -777,6 +782,7 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date', 'Change'],
         rows: [
+          ['1.9', '2026-10-29', 'Rewrote the automatic-capture row from the code: field projection for "extract on our server" and "no second extraction after success"; the egress call-site count in section three went from five to six. Both languages updated together. **Status: draft, not yet reviewed by counsel or in effect.**'],
           ['1.0', '2026-10-01', 'First draft (not yet in force): field-by-field egress table written from the implementation; redaction explicitly disclaimed; cloud AI described as currently unavailable; the cross-border characterisation marked as pending legal review.'],
           [
             '1.1',
@@ -858,9 +864,9 @@ export const aiAndTransfer: LegalDocument = {
   // `MANAGED_CAPABILITIES` 里的 `tool_calling` 摘掉：那才是"不提供"的实现，只改文本不改它
   // 就是"对外说不含、代码里还能跑"。同时本文件转为生效（产品负责人 2026-10-26 明确
   // 不需要签核流程，代码与文本一致即可对外）—— 它在此之前一直是草案。
-  version: '1.8',
+  version: '1.9',
   status: 'effective',
-  updatedDate: '2026-10-26',
+  updatedDate: '2026-10-29',
   effectiveDate: '2026-10-26',
   title: {
     'zh-CN': 'AI 功能与数据流向',

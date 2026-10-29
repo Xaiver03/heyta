@@ -149,6 +149,10 @@ const zh = [
       },
       {
         kind: 'p',
+        text: '**关于云端 AI（含自动收集的“当场抽取”）。** 这一档的接收方是**这台实例配置的那一枚境内模型供应商**，由部署者选择，代码里不写死。自动收集里“由我们当场抽取”那一档走的是**同一枚供应商、同一份流转说明**，不新增接收方；发出去的字段见《AI 与数据流转》第三节那张表，自动收集那一行只发你在规则里勾选的字段。官方托管实例用的是哪一家，与邮件服务商一样在定稿时单独披露。',
+      },
+      {
+        kind: 'p',
         text: '**关于邮件。** 我们只发**十一封纯功能性邮件**：验证邮箱、注册验证码、登录验证码、魔法登录链接、找回通行密钥、重置口令、口令已改通知、换绑-新邮箱确认、换绑-旧邮箱授权、换绑完成通知、新增认证器告知。🔴 **没有营销邮件、没有订阅列表、没有任何群发** —— 这一条我们敢确定地写。正文是封闭词表的固定文案，**不含你的任务内容**；但收件人邮箱和正文里那条一次性链接会以明文经过邮件服务商的通道，所以「端到端加密」这句话**不能**延伸到邮件这一段。至于具体是哪家邮件服务商：代码里没有写死，由每个实例的部署者配置；官方托管实例用的是哪一家，会在定稿时单独披露。',
       },
       {
@@ -532,6 +536,10 @@ const en = [
       },
       {
         kind: 'p',
+        text: '**About the hosted AI provider (including automatic capture’s on-server extraction).** The recipient for this tier is **the one domestic model provider configured on this instance**; the deployment chooses it and it is not hard-coded. The “extract on our server” mode of automatic capture uses **the same provider and the same transfer description** and adds no new recipient. What leaves is the table in section three of AI and Data Transfer; for automatic capture it is only the fields you ticked on the rule. Which provider an officially hosted instance uses is disclosed separately at finalisation, exactly as with the mail provider.',
+      },
+      {
+        kind: 'p',
         text: '**About mail.** We send **eleven purely functional e-mails and nothing else**: address verification, registration code, sign-in code, magic sign-in link, passkey recovery, password reset, password-changed notice, rebinding confirmation for the new address, rebinding authorisation for the current address, e-mail change completed notice, authenticator-added notice. 🔴 **There is no marketing mail, no mailing list, no bulk send of any kind** — that sentence we are confident in. The bodies are fixed text drawn from a closed word list and **contain none of your task content**; but the recipient address and the one-time link inside the body do traverse the mail provider\'s channel in cleartext, which is exactly why "end-to-end encryption" **cannot** be extended to the mail leg. As for which provider: nothing is hard-coded, it is set per deployment, and the provider used by the official hosted instance will be disclosed separately at finalisation.',
       },
       {
@@ -808,9 +816,9 @@ const en = [
 
 export const thirdParties: LegalDocument = {
   id: 'third-parties',
-  version: '1.6',
+  version: '1.7',
   status: 'draft',
-  updatedDate: '2026-10-10',
+  updatedDate: '2026-10-29',
   title: {
     'zh-CN': '第三方与共享清单',
     en: 'Third Parties and Data Sharing Inventory',
