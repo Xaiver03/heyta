@@ -382,10 +382,10 @@ shot_ok_logged() {
 #    （`dist/windows/packaged-first-run.png` 里那三行「M2-B 真数据」）。
 #    **判据全绿、东西是错的** —— 这正是 §6.1.1 想消灭的那一类。
 #    所以规则是：**同步 → 验新鲜度 → 才允许打包**；验不过判红退出，不装旧的。
-# 🔴 同步 + 新鲜度对账抽到 `scripts/lib/sync-windows-sources.sh`：
+# 🔴 同步 + 新鲜度对账抽到 `scripts/lib/sync-build-sources.sh`：
 #    Windows 旅程验收（`scripts/verify-windows-shell-journey.mjs`）用的是**同一份**。
 #    两份实现会漂移成"一个送新树、一个送旧树"，正是 §7 第 82 条那次事故的形状。
-source "$ROOT/scripts/lib/sync-windows-sources.sh"
+source "$ROOT/scripts/lib/sync-build-sources.sh"
 # 🔴 Windows 取证的判据清单同样只有一个所有者（`package-msix.sh` 也调它）。
 #    以前只有这里有一份四项清单，而打包脚本**一条都不判** ⇒ 快捷方式那条新判据
 #    只加进了生成它的一侧，读它的另一侧看不见。

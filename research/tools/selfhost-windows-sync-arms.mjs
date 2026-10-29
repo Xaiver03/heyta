@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const LIB = 'scripts/lib/sync-windows-sources.sh';
+const LIB = 'scripts/lib/sync-build-sources.sh';
 const FAKE_HOST = '__shim_host__';
 const source = (() => {
   const i = process.argv.indexOf('--source');

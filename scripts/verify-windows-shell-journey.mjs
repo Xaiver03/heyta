@@ -292,7 +292,7 @@ let syncOk = false;
 for (let attempt = 1; attempt <= 3 && !syncOk; attempt += 1) {
   const sync = spawnSync(
     'bash',
-    ['-c', `source scripts/lib/sync-windows-sources.sh && sync_windows_sources ${WIN_HOST}`],
+    ['-c', `source scripts/lib/sync-build-sources.sh && sync_windows_sources ${WIN_HOST}`],
     { cwd: ROOT, encoding: 'utf8' },
   );
   const out = `${sync.stdout ?? ''}${sync.stderr ?? ''}`;
