@@ -16,7 +16,7 @@
  * 🔴 码的唯一存储形态是 HMAC 摘要（purpose + challengeId 一起防跨挑战重放），
  * 与注册那条共用同一个密钥派生但**purpose 不同** —— 两边的码互不可用。
  */
-import { createHmac, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import {
   EMAIL_LOGIN_CODE_LENGTH,
   EMAIL_LOGIN_CODE_TTL_MS,
@@ -25,6 +25,7 @@ import {
   type EmailLoginErrorCode,
 } from '@heyta/shared-schema';
 import { prisma } from '../db';
+import { sameHexDigest } from '../util/hex-digest';
 import { getJwtSecret, issueSession } from '../auth';
 import { newJti, type SessionMeta } from '../account/access-sessions';
 import { SESSION_MAX_AGE_MS } from '../central-auth/session-policy';
@@ -71,12 +72,6 @@ const getLoginCodeKey = (): Buffer =>
   createHmac('sha256', getJwtSecret())
     .update('heyta:email-login-code-key:v1', 'utf8')
     .digest();
-
-const sameDigest = (left: string, right: string): boolean => {
-  const a = Buffer.from(left, 'hex');
-  const b = Buffer.from(right, 'hex');
-  return a.length === b.length && timingSafeEqual(a, b);
-};
 
 const invalidChallenge = (): LoginOtpError =>
   new LoginOtpError('invalid_login_challenge', 'This login code is invalid or has expired.');
@@ -252,7 +247,7 @@ export const verifyLoginCode = async (input: {
   }
 
   const validShape = /^\d{6}$/.test(input.code);
-  const digestMatches = validShape && sameDigest(challenge.codeDigest, loginCodeDigest(challenge.id, input.code));
+  const digestMatches = validShape && sameHexDigest(challenge.codeDigest, loginCodeDigest(challenge.id, input.code));
   if (!digestMatches) {
     await prisma.emailLoginChallenge.updateMany({
       where: {

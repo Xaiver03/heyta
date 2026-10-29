@@ -5,7 +5,7 @@
  * pendingPasswordHash，验证时只激活它绑定的用户。这样不会把一个未验证 User
  * 当前碰巧存在的 passwordHash 当成这次注册的密码，也不会用注册链接令牌列存低熵验证码。
  */
-import { createHmac, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import {
   EMAIL_PASSWORD_REGISTRATION_CODE_LENGTH,
@@ -13,6 +13,7 @@ import {
   EMAIL_PASSWORD_REGISTRATION_RESEND_COOLDOWN_MS,
 } from '@heyta/shared-schema';
 import { prisma } from '../db';
+import { sameHexDigest } from '../util/hex-digest';
 import { Logger } from '../logger';
 import { getDefaultStorageQuotaBytes } from '../sync/services/storage-quota.service';
 import { attachInviteOnRegister, settleReferralActivation } from '../activity/invite';
@@ -88,12 +89,6 @@ const getRegistrationCodeKey = (): Buffer =>
   createHmac('sha256', getJwtSecret())
     .update('heyta:email-password-registration-code-key:v1', 'utf8')
     .digest();
-
-const sameDigest = (left: string, right: string): boolean => {
-  const a = Buffer.from(left, 'hex');
-  const b = Buffer.from(right, 'hex');
-  return a.length === b.length && timingSafeEqual(a, b);
-};
 
 const invalidChallenge = (): RegistrationOtpError =>
   new RegistrationOtpError('invalid_registration_challenge', INVALID_CHALLENGE_MESSAGE);
@@ -361,7 +356,7 @@ export const verifyRegistrationCode = async (
   }
 
   const validShape = /^\d{6}$/.test(input.code);
-  const digestMatches = validShape && sameDigest(challenge.codeDigest, registrationCodeDigest(challenge.id, input.code));
+  const digestMatches = validShape && sameHexDigest(challenge.codeDigest, registrationCodeDigest(challenge.id, input.code));
   if (!digestMatches) {
     await prisma.emailPasswordRegistrationChallenge.updateMany({
       where: {
