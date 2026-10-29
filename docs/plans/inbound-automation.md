@@ -6159,3 +6159,19 @@ gitee 那枚上游仍超配额，没碰。
 按尺子文件头"每族注明证据提交"的规矩补了一族（证据笔 06798bf3）⇒ 越界=0、自检 `臂数=6 不成立=0`、
 电池那条腿重跑 rc=0（提交 b02c11cd0）。原件 `~/.heyta-evidence/inbound-ac-battery-20261029/INDEX.md`。
 `AC6-browser` 8 passed（真 Playwright）、`AC1-offline11` 113 条、`AC6-web-specs` 36 条、`AC3-dual-host` WINDOW=8 全绿。
+
+### 6. 15:3x 复审：A9 补一条**真浏览器**判据；B 组开完当场发现并修掉一枚 500（提交 `54bf5e9d2`）
+
+- **A9 的界面证据从"单测"升到"真 DOM"**：`e2e/tests/inbound-automation.spec.ts` 新增一条真浏览器用例
+  （50 条封顶提示 / `reasonCode` 人话 / 试发说明三枚断言）。变异臂：把 `>=` 改成 `>` ⇒ 该条红。
+  这样 A9 的三项不再只有组件级证据；手机那一行仍只有单测 + 类型（本机没起设备，见 §4 的边界说明）。
+- **B 组开完的复审抓到一枚真缺陷**：`AUTOMATION_ENTITLEMENT_MODE=official` 打开后，匿名可读的
+  `GET /api/automation/entitlement/revocations` 从 403 变成 **500**。根因：compose 白名单 `- AUTOMATION_OFFICIAL_*=${VAR:-}`
+  会把"没填"注入成**空字符串**，而 `loadAutomationEntitlementIssuer` 只判 `undefined` ⇒ 空串进 zod ⇒ 抛 ⇒ 匿名路由 500。
+  这是**本仓 compose 一直有的形状**（不是这次新加的），只是以前这 8 个键根本没进生产白名单，所以从没被触发过。
+- **修法**：装载器改成"空白 = 没配"（`trim()` 后空 ⇒ undefined），语义仍是"三缺一 ⇒ 签发面全 403"；
+  非空但形状不对仍抛（配错必须响）。三枚用例 + 变异臂（守卫改回只判 `undefined` ⇒ 2 条红）。
+- **生产当场处置**：把三枚签发私钥键的注入撤掉（本实例只做托管档，不替别人签票），复查
+  `revocations` 403 / 接收端点 400 / 健康 200；容器里留 5 枚 `AUTOMATION_*`。
+  回滚点：`docker-compose.yml.bak-20261029T072423Z` 与 `.bak-<15:34 那一戳>`、`.env.bak-20261029T072423Z`。
+- ⚠️ **这条修复要到下一次发布才进线上镜像**；生产现在的干净 403 靠的是"撤掉空串注入"，两条路都成立。
