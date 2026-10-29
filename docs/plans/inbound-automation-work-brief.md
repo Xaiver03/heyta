@@ -103,6 +103,12 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
 
 ### A4 托管 AI 额度**疑似一次扣两下**（本文最该先证伪/证实的一格）
 
+> ✅ **已修**（2026-10-29，提交 `9904fb671`）：修法取「预留那一侧为权威」——代理侧扣费前原子认领一枚
+> `state='sent'` + `managed` + 未被认领 + 5 分钟内的尝试（`FOR UPDATE SKIP LOCKED`），领到即跳过；
+> 认领标记 `automation_ai_attempts.proxy_billed`（可空、无默认、无索引）。用例从钉 +2 改成钉 +1，
+> 并改正了它"先发请求后 CAS"的顺序错误；新增两臂（同一枚预留只认领一次 / 两趟周期 = +2）。
+> 变异臂实测：摘认领 ⇒ 3 红，摘"只认领一次" ⇒ 1 红。本节原文保留作历史。
+
 > 🔴 **"疑似"已升成"确证"**（真 PGlite + 真代理路由，逐字读数在回执第 2 项）：一次 managed 周期 `ai_usage_counters.requests` = **+2**，而上游只命中 1 次。摘哪一个扣点动的是计费口径 ⇒ 仍归 §6 第 3 格，本节原文一字未改。
 - 预留那一次：`server/src/automation/ai-metering.ts` 里 `billingSource==='managed'` 时调 `consumeManagedAiRequest`；
 - 真调用又一次：worker 走 `invokeRouted` ⇒ `packages/ai/src/wire.ts` 的 `managedChatUrl()` ⇒ `POST /api/ai/managed/chat` ⇒
@@ -150,9 +156,25 @@ python3 research/tools/verify-inbound-ac-battery.py --root . --list | wc -l  # �
 事件列表无分页且上限处无提示、事件的 `reasonCode` 不展示给用户、发送方 secret 只在签发那一刻留在内存里
 （关掉面板就不能再试发同一条凭据）、mobile/原生端没有规则 UI（连"看规则"都没有）。
 
+> ✅ **四件全做**（2026-10-29，提交 `28a96ab8a`）：
+> ① 到顶渲一行"只显示最近 {limit} 条"，`limit` 与服务端取数共用 `INBOUND_EVENT_LIST_LIMIT`（分页没做：
+> 服务端没有游标，造假分页就是第二个事实源）；
+> ② `REASON_COPY` 按服务端真会写的五档翻人话，表外码不编句；
+> ③ 试发那句常驻说明（secret 只活在签发那一次，要再试发必须重新签发 —— 这是凭据契约，不是缺陷）；
+> ④ 手机新增 `inbound/rules-store.ts`，前台按绑定拉一次规则清单、只留展示四样；设置面读 store、仍不发请求。
+> 判据：`apps/web/tests/inbound-events-reason-cap.spec.tsx`（3 枚，两枚变异臂各红 2 条）＋
+> `apps/mobile/tests/inbound-cycle-display.spec.ts` 扩 3 枚（18 枚绿）。
+
 ---
 
 ## 4. B 组：生产上开起来要配什么（顺序即风险）
+
+> ✅ **2026-10-29 已开（env 级，未换镜像）**：生产 `docker-compose.yml` 的白名单原比仓库旧（8 个键一个都没有）；
+> 备份两份文件后补上白名单，`.env` 写入 `AUTOMATION_ENTITLEMENT_MODE=official` + `AUTOMATION_SENDER_KEK` +
+> `AUTOMATION_COMMIT_KEYS`（密钥只在远端生成、不回显），用**现有镜像**重启 ⇒ 容器内 8 枚、模式 official、健康；
+> 公网匿名戳 `/api/automation/v1/hooks/<uuid>` 从 402 变成 **400 INVALID_REQUEST**（模式闸门不再是第一道）。
+> 原件 `~/.heyta-evidence/inbound-bgroup-20261029/evidence.md`。
+> ⚠️ 新代码（A4/A9）不在线上镜像里，随下一次正常发布；下面那条"开完必须有人真走一遍"仍归负责人。
 
 **本文写作时（2026-10-27）线上那台容器的现量**：`MANAGED_AI_*` 四枚已配；
 `AUTOMATION_ENTITLEMENT_MODE` / `ENTITLEMENT_GATE_ENABLED` / 任何 `AUTOMATION_WEBHOOK_KEYS` **都没配**；
@@ -185,6 +207,12 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
 ---
 
 ## 5. D 组：对外口径要逐处改的地方（上线那天才动）
+
+> ✅ **2026-10-29 六格已按 §5.2 定稿落进源码（提交 `06798bf3a`），一处未发**：三份法务件 × 中英六处换成同一份
+> 逐类列举（八组）并新增"当场抽取"与"7 天"两句；《AI 与数据流转》出站点 5→6 并加自动收集那一行；
+> 《第三方清单》加"同一枚供应商、不新增接收方"；帮助中心 `s3*` 从"规划中"改成现值；五份件版本行/日期/变更记录同批。
+> 门禁：legal-copy-parity（登记 0 / 问题 0）、i18n-vars、gen-site-copy --check 全绿。
+> 🔴 **发布仍归负责人**（站点点发布那一步没做）；价格页那格是条件格，本轮**没写**。
 
 | 件 | 现在写的是什么 | 上线时要改成 |
 |---|---|---|
@@ -390,3 +418,18 @@ selfhost-online 另需 `AUTOMATION_OFFICIAL_KEYS`，官方签发端另需 `AUTOM
 **当场恒绿**——一枚是数 ANSI 包裹的失败字形、一枚是被自己文件的注释喂饱。
 两者都只有跑变异臂才暴露，且对照臂（一棵没动的树必须绿）是发现它的前提。
 细节与跑法在计划文末 2026-10-28 那一节第 2 项。
+
+## 10. 执行回执（2026-10-29 · 负责人授权"全部做完"之后）
+
+| 格 | 结果 | 提交 / 原件 |
+|---|---|---|
+| A4 双扣 | ✅ 已修（代理侧原子认领预留；迁移 `..._proxy_billed` 可空无索引；钉 +1 的用例 + 两枚新臂；变异臂各红） | `9904fb671` |
+| A9 四件 | ✅ 全做（上限提示 / reasonCode 人话 / 试发说明 / 手机规则清单） | `28a96ab8a` |
+| ④ 六格 | ✅ 已改未发（六处同文 + 当场抽取 + 7 天；版本行/日期/变更同批） | `06798bf3a` |
+| B 组上线 | ✅ env 级已开（8 枚进容器、official、公网从 402→400）；镜像未换 | 取证 `~/.heyta-evidence/inbound-bgroup-20261029/` |
+| C 组 AC 证据 | ✅ 电池整串跑 + 沙箱发布验证；**AC 一格未代勾** | `~/.heyta-evidence/inbound-ac-battery-20261029/`、`.run-logs/deploy-sandbox-1029.log` |
+
+**仍归负责人的三件（本轮刻意没做）**：
+1. **对外发布**：站点点发布 / 帮助中心上线那一步（源码已定稿，发布动作没做）。
+2. **换镜像发布**：A4 与 A9 的新代码要随下一次正常发布才进线上；沙箱已证明这一版可建可迁可起（`VCS_REF` 对账通过）。
+3. **AC-1～AC-8 的勾**，含 AC-6"人真打开看过截图"。机器证据都在上面两条路径里。
