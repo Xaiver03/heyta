@@ -1,6 +1,7 @@
 import { AppState } from 'react-native';
 import {
   INBOUND_AUTOMATION_SYSTEM_PROMPT,
+  createInboundRulesRemote,
   startInboundWorkerLoop,
   type AppHost,
   type InboundAutomationHostOptions,
@@ -9,6 +10,7 @@ import { readSyncConfig } from '../sync/config';
 import { openTaskHost } from '../db/open-host';
 import { getAiSettings, aiSecrets } from '../ai/settings-store';
 import { publishInboundCycle, publishInboundReadiness } from './status';
+import { publishInboundRules } from './rules-store';
 
 /**
  * Foreground-only mobile worker. It deliberately does not create keys or
@@ -20,6 +22,7 @@ export function startMobileInboundWorker(): () => void {
   let stopped = false;
   let host: AppHost | undefined;
   let binding = '';
+  let rulesBinding = '';
   let options: InboundAutomationHostOptions | undefined;
   const processOnce = async (): Promise<void> => {
     if (stopped || AppState.currentState !== 'active') return;
@@ -46,6 +49,16 @@ export function startMobileInboundWorker(): () => void {
         return;
       }
       publishInboundReadiness('ready');
+      // 规则清单只在账号/服务端换绑的那一趟拉一次：设置面要能说出"我有几条规则、谁在处理"，
+      // 而这条列表不是每 20 秒都会变的东西。拉不到不算这一趟失败——接收能力与"看得见规则"是两件事。
+      if (rulesBinding !== currentBinding) {
+        rulesBinding = currentBinding;
+        try {
+          publishInboundRules(await createInboundRulesRemote({ baseUrl: config.serverUrl, getToken: async () => config.token }).list());
+        } catch {
+          rulesBinding = '';
+        }
+      }
       const ai = getAiSettings();
       options = {
         userId: config.accountId,

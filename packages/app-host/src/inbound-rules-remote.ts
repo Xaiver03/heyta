@@ -34,6 +34,11 @@ export interface InboundAutomationEventSummary {
   eventId: string; ruleId: string; ruleVersion: number; status: string;
   reasonCode: string | null; attempt: number; receivedAt: number;
 }
+/**
+ * 服务端一页最多回多少条接收记录（`server/src/automation/events.ts` 的 `take: 50`）。
+ * 界面要拿它判"这一页是不是被截断了"，所以只能是这一枚常量，不许两处各写一个 50。
+ */
+export const INBOUND_EVENT_LIST_LIMIT = 50;
 const validEvent = (value: unknown): value is InboundAutomationEventSummary => {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
   const e = value as Record<string, unknown>;
@@ -166,7 +171,7 @@ export function createInboundRulesRemote(options: {
     },
     async listEvents(): Promise<readonly InboundAutomationEventSummary[]> {
       const body = await (await request('/events', 'GET')).json() as { events?: unknown };
-      if (!Array.isArray(body.events) || body.events.length > 50 || !body.events.every(validEvent)) throw new InboundRulesRemoteError('transport');
+      if (!Array.isArray(body.events) || body.events.length > INBOUND_EVENT_LIST_LIMIT || !body.events.every(validEvent)) throw new InboundRulesRemoteError('transport');
       return body.events;
     },
     async retryEvent(event: InboundAutomationEventSummary): Promise<void> {

@@ -1075,7 +1075,7 @@ export {
   InboundRecipientRemoteError,
   type InboundRecipientRegistration,
 } from './inbound-recipient-remote.js';
-export { createInboundRulesRemote, InboundRulesRemoteError, type InboundAutomationRule, type InboundAutomationRuleConfig, type InboundAutomationField, type InboundAutomationEventSummary, type InboundSenderCredential } from './inbound-rules-remote.js';
+export { createInboundRulesRemote, INBOUND_EVENT_LIST_LIMIT, InboundRulesRemoteError, type InboundAutomationRule, type InboundAutomationRuleConfig, type InboundAutomationField, type InboundAutomationEventSummary, type InboundSenderCredential } from './inbound-rules-remote.js';
 export { createInboundDraftReviewer, type InboundDraftReviewOptions, type InboundDraftReview } from './inbound-draft-review.js';
 export type { InboundDraftTask } from '@heyta/shared-schema';
 
