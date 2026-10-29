@@ -115,7 +115,7 @@ export const OWNER_RULES = [
       'apps/web/src/features/projects/ProjectsPanel.tsx',
       'apps/web/src/features/quadrant/QuadrantBoard.tsx',
       'apps/web/evidence/undo-receipt/',
-      // 10-28 04:3x 又一族（P4 交互控件状态）：`packages/ui/tests/control-states.spec.ts` 头一行写
+      // 10-28 10:0x 又一族（P4 交互控件状态）：`packages/ui/tests/control-states.spec.ts` 头一行写
       // 「`control/states.ts` 的契约 —— 全局 UX 线 P4」，`packages/ui/src/control/states.ts` 的 mtime 距当时 47 秒（正在写）。
       // 🔴 顺带记一条**别动手**的现场事实：那一分钟里该目录还躺着一枚 `states.ts.mut-bak`，几分钟后自己消失了 ——
       //   那是他们变异台架的还原备份（本仓纪律：还原只从 `.mut-bak` 取，不从 git 取），**不是残渣**。
@@ -142,7 +142,7 @@ export const OWNER_RULES = [
       'server/src/automation/',
       'server/src/ai/managed-completion.ts',
       'server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts',
-      // 10-28 04:3x 现量这一枚正在改：新加的注释自己点名「变异臂 A16」「托管档那两张表该一次都不被写」，
+      // 10-28 10:0x 现量这一枚正在改：新加的注释自己点名「变异臂 A16」「托管档那两张表该一次都不被写」，
       // 那是这条线自己的判据与自己的台架，不是别人顺手改的测试。
       'server/tests/inbound-hosted-extraction.spec.ts',
       'docs/plans/inbound-automation.md',
