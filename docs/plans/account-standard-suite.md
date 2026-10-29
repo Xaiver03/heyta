@@ -5507,3 +5507,57 @@ node research/tools/audit-listener-timer-cleanup.mjs --mutate    # 在内存副�
 它**不接进 `pnpm check` 链**（与另两台 audit 探针同一档）：判据是文本必要条件、词表还会随写法长，
 一接进去就会变成一把"生下来就红"或"永远绿"的尺；要接，先等到能给出 `--strict` 且当场判得出零违规的那个口径。
 复量分母：`git ls-tree -r --name-only HEAD | grep -cE '^(apps|packages)/[^/]+/src/.*\.(ts|tsx)$'`。
+
+### 6.120（2026-10-29 14:3x · 第 ① 维"重复实现"补上一台按函数体对账的探针；本面那一枚当场收掉，别面的逐条登记）
+
+新装置两枚，加上共用的一枚文本工具：
+
+```
+node research/tools/lib/text-mask.mjs            # 注释与字符串遮蔽、括号配对、行号、顶层 return（四把尺共用一份）
+node research/tools/audit-duplicate-function-bodies.mjs --self-test    # 臂数与不符数自打印
+node research/tools/audit-duplicate-function-bodies.mjs                 # 全树读数（诊断档）
+node research/tools/audit-duplicate-function-bodies.mjs --strict --scope server/src/password   # 只钉本面那一层的棘轮
+```
+
+**为什么先把遮蔽那几枚下沉**：这台尺和刚做的监听器尺都要"先挖掉注释与字符串再正则"。各写一遍，
+将来某一枚里修了遮蔽规则、另一枚留着旧规则 ⇒ 两把尺对同一份代码给出互相矛盾的读数，那正是第 ① 维点名的形状。
+下沉是**行为不变**的：监听器尺下沉前后两次读数逐字相同（分母、各档条数、候选枚数都没动）。
+
+**这台尺判什么**：把每一枚**声明级**函数体折掉空白做哈希，跨**不同文件**撞进同一枚桶 ⇒ 候选。两档分得很死 ——
+🔴 逐字相同（连字符串都对得上）、🟠 只差注释或文案（遮蔽后相同而原文不同）。同文件里各写一遍的另立一档，
+不混进"跨文件重叠"。**口径要写在读数里**：内部回调与带泛型参数的箭头不在射程 ⇒ "没有重叠"只覆盖声明级这一层。
+
+**这台尺自己被自己的臂修了三回**（每一回都是判据错，不是被测物错）：
+① 取体时把 `balanced()` 返回的 `end` 当成"闭括号之后"，其实它就是那枚 `)` 本身 ⇒ 每一枚 `function` 声明
+都被读成"表达式体"跳过：整树只解析出 60 枚函数（真值 996）。D1 那枚臂当场判红。
+现在加了两半阳性对照：整树跑要求**两路都吃到东西**，带 `--scope` 时只要求本层那一路（一个全是箭头声明的目录里
+`function` 为 0 是事实，不是尺坏）。
+② D2 那条臂的夹具把差异注释写在**函数外面** ⇒ 两枚体本来就逐字相同，测的根本不是 🟠 档（实读 `[1,0]` 才暴露）。
+③ `--mutate` 第一发抹掉一枚"4 员桶"里的一个成员 ⇒ 桶照旧 ⇒ 报了个"本尺不敏感"的**假红**。
+正确的证法是把整桶成员剔干净、要求那一枚桶消失（现在还会打印有没有牵连到别的桶，并说明那不算判据坏）。
+
+**当趟全树读数**（枚数与桶数由上面第三条命令自己打印）：射程含 `server/src`，跨文件 🔴 与 🟠 两档都有桶，
+明细带 `file:line(函数名,行数)`。
+
+**本面那一格当场收掉**：`server/src/password/login-otp.ts` 与 `registration-otp.ts` 各写过一份**逐字相同**的
+`sameDigest`（hex 摘要的时序安全比较）。这枚不是"难看但无害"：长度守卫 `a.length === b.length` 必须在
+`timingSafeEqual` 之前，谁在重构时漏掉它，长度不等就从"返回 false"变成**抛异常**，而调用点把它当"码不对"处理。
+收成 `server/src/util/hex-digest.ts` 一份，两处的调用点改指它。
+判据：`--strict --scope server/src/password` 在改之前 `rc=1`（列出那一枚桶），改之后 `rc=0`。
+行为复核：`pnpm --dir server exec tsc --noEmit -p tsconfig.json` 过；
+`vitest run tests/registration-otp.spec.ts`（注册那条流）与 `tests/password-auth-routes.spec.ts`（登录那条流）全过。
+
+**别面的候选逐条登记，不混进"已修"**（每条的复量就是那条 `--scope` 换成它自己的目录；**一枚都不代改**）：
+
+| 叠在哪 | 归谁 | 为什么不由我收 |
+|---|---|---|
+| `apps/mobile/src/lib/export-copy.ts` 与 `apps/web/src/features/settings/export-copy.ts` 的 `priorityLabel`（🔴 逐字 + 🟠 只差注释） | 导出/习惯那两面各自的负责人 | 跨端文案表收不散收是个产品口径（要不要一份共享 copy 表），不是我这一层的判断 |
+| `apps/web/src/features/share/` 里 `toBase64` / `fromBase64` 各两份 | 共享协作线 | 同面同线，但它有自己的迁移节奏；且这三枚要不要进 `packages/` 属于边界判断 |
+| `packages/sync-core/src/{key-lifecycle,share-keys}.ts` 的 `decodeStrictBase64` | vendored 层 | 本仓铁律：动 vendored 要同步 `PROVENANCE.md` |
+| `packages/app-host/` 里 `parseJson`/`readBody`/`body`/`responseBody` 那一枚 4 员桶，以及 `fetchImpl` 那一对 | app-host 各家 | 逐枚都不是本线写的 |
+| `apps/mobile/src/screens/{LegalReconfirmSheet,PrivacyConsentSheet}.tsx` 的 `openLegalLink` | 同意面线 | 同上 |
+| `apps/{mobile,web}` 习惯频率编辑器的 `submit`（🟠） | 习惯线 | 同上 |
+| `server/src/billing/paycenter.adapter.ts:224` 的 `timingSafeEqualHex` | 计费线 | 它比本面那枚多一道 `a.length > 0` 守卫 ⇒ **不是逐字相同**，是不是同一件事要它自己判；如果是，可以直接改用 `server/src/util/hex-digest.ts` |
+
+🔴 这一张表**还没进 `BLOCKED.md`**：那本账本此刻在别人手里脏着（`git status --porcelain -- BLOCKED.md` 现量），
+按既有纪律先落在本计划，等它空了再由搬运者按"立新条还是并入既有条目"复核一次。
