@@ -5549,6 +5549,11 @@ node research/tools/audit-duplicate-function-bodies.mjs --strict --scope server/
 
 **别面的候选逐条登记，不混进"已修"**（每条的复量就是那条 `--scope` 换成它自己的目录；**一枚都不代改**）：
 
+> 🔴 **2026-10-29 16:1x 改口不删旧文**：下面这张表**不是全集**。当时那把尺漏掉了带返回类型标注的
+> `function` 声明，整树少报约 4 倍 ⇒ 表里每一格仍然成立，但"**只有**这些"这句不成立。
+> 全集由 `node research/tools/audit-duplicate-function-bodies.mjs --top 500` 自己打印，
+> 族表与作废声明见 §6.124。
+
 | 叠在哪 | 归谁 | 为什么不由我收 |
 |---|---|---|
 | `apps/mobile/src/lib/export-copy.ts` 与 `apps/web/src/features/settings/export-copy.ts` 的 `priorityLabel`（🔴 逐字 + 🟠 只差注释） | 导出/习惯那两面各自的负责人 | 跨端文案表收不散收是个产品口径（要不要一份共享 copy 表），不是我这一层的判断 |
@@ -5605,3 +5610,118 @@ node research/tools/audit-duplicate-function-bodies.mjs --strict --scope server/
 
 🔴 与 §6.120 同一格纪律：这张表**还没进 `BLOCKED.md`**（那本账此刻在别人手里脏着，
 `git status --porcelain -- BLOCKED.md` 现量），先落本计划，等它空了由搬运者复核"立新条还是并入既有条目"。
+
+---
+
+### 6.122（2026-10-29 16:0x · 第 ④ 维"失败支有没有真回执"补上一台分六桶的探针；11 枚候选逐枚开码，结论不是一把尺给的）
+
+**为什么这一维先前只有散文**：①②③⑤ 各有装置，④ 只靠人读 diff。而"吞异常"这件事人眼只在
+**看到的那一枚**上成立 ⇒ 与 §6.119 同一格毛病：负结论没有分母。
+
+**判法（`research/tools/audit-silent-failure-branch.mjs`）**：对每枚 `catch` 取体，按体里做了什么分六桶：
+
+| 桶 | 判据 | 算不算候选 |
+|---|---|---|
+| `empty` | 体是空的 | 🔴 算 |
+| `consoleOnly` | 只有 `console.*` 与注释 | 🟠 算 |
+| `commentOnly` | 只有注释（一条真语句都没有） | 不算——那是文档 |
+| `throw` | 重新抛出 | 不算——失败已经上抛 |
+| `receipt` | 调了回执形状（`*Notice(` / `*Toast(` / `setFeedback(` / `setError(` / `setAlert(` 等**带括号**的调用） | 不算 |
+| `otherState` | 只 setState / 只赋值 | 不算——它可能把失败写进了界面状态，尺看不见语义 |
+| `other` / `unbalanced` | 其余 / 体配不上 | 不算，`unbalanced` 单独报条数 |
+
+词表从可选 `[=(]?` 收紧成必须 `\(` 的那一发，与 `aria-live` 那枚死词目（被遮蔽挖掉、永不命中）都记在臂 Q6/Q7；
+判定用不带 `g` 的那枚正则 ⇒ 臂 Q4/Q5 比的是同一件事，`/g` 的 `lastIndex` 状态污染过一次的教训在 §6.120。
+
+**分母自证**（打印在尺自己的第一行，不抄进这里）：扫了几枚客户端文件、几枚 `catch`、回执词表命中几处，
+以及"要人眼看的（判不了那一族）"条数。**候选数 ≠ 覆盖率**这一格就是靠这行说清的。
+
+**能失败**：15 枚臂（`--self-test`，含最大号=条数那枚编号臂）；`--mutate` 两形 2/2 ——
+S1 在 `apps/desktop/src/reminder-notify-electron.ts` 的内存副本里插一枚空 catch ⇒ 候选 +1；
+S2 把 `apps/mobile/src/screens/ExportScreen.tsx:357` 那枚真回执整个换掉 ⇒ `receipt` −1。都不写盘。
+
+**11 枚候选逐枚开码后的归属**（这一步是尺做不了的，也是"候选不是判词"的意思）：
+
+- 🔴 **一枚是真的，且不在本线**：`apps/mobile/src/screens/ProfileScreen.tsx:243` ——
+  登出时 `new URL(config.serverUrl)` 抛 ⇒ `scope` 留 `undefined`，而 `apps/mobile/src/lib/vault-session-cleanup.ts:48/57`
+  在 `scope === undefined` 时**两步都跳过**（`disableVaultAutoUnlock` 与 `removeRootKey`）并返回 `{}` ⇒
+  调用方 `ProfileScreen.tsx:272` 读成"没有 `secureStorageError`"，`setVaultCleanupPending(undefined)` = 界面报"已清干净"，
+  而设备上的根密钥与自动解锁开关原封不动。这是"失败支静默成功"那一形，不是"只 console.log"。
+  **不代改**：改它是改那条安全边的契约（`b3d9ad394 feat(mobile): 设备撤销与账户抹除的手机侧接线` 那一族，
+  现有断言在 `apps/mobile/tests/device-revocation-behavior.spec.ts`），且"跳过时要不要按失败呈现"是他们的口径。
+  可达性我判不了死：`serverUrl` 是保存时被校验过的值，所以这一支今天多半走不到 —— 但走不到的支路**报成功**
+  与走得到的支路报成功是同一个形状，登记由下一位连可达性一起判。
+- 其余 10 枚**都是写下过的决定**，不是缺陷：`apps/{mobile,web}/src/**/privacy/consent-gate.ts` 与
+  `apps/mobile/src/sync/config.ts:111` 的注释明写"一个订阅者抛错不许影响其余的 / 凭据本身已经清掉了"；
+  `apps/mobile/src/widgets/lifecycle.ts:89/108/129` 与 `apps/web/src/pwa/lifecycle.ts:81`、
+  `apps/web/src/pwa/widget-drain.ts:155` 都是"组件是增强，不是功能前提"；
+  `apps/web/src/features/settings/CloseAccountPanel.tsx:94` 的 `catch` 体做 `setPending(undefined)`，
+  而同文件 `:79-80` 写着为什么——"显示 0 会让人敢按下，显示未知会被读成没有"。
+  ⚠️ 这一格上一轮我差点判成缺陷（理由是"界面没有回执"），开码后**就地作废那个判断**。
+- 🟠 一枚留在"该改但归别人拍"：`apps/web/src/lib/oplog.ts:437` —— 局部 op-log 迁移失败时 `console.error` 一句
+  "将从空库开始"。同文件 `:413-415` 的守卫 #5 写明这是**有意不阻断启动**（否则用户连导出/反馈的入口都没有），
+  但同一句注释说的是"必须留下**可见**痕迹"，实现只留了控制台 ⇒ 意图与实现之间差一档用户可见的呈现。
+  改它要碰浮层与反馈那条线（`docs/agents/overlay-feedback.md` 的债务账本），不在本线授权内。
+
+复量：`node research/tools/audit-silent-failure-branch.mjs`（诊断）／ `--strict`（候选非 0 则退 1）／
+`--self-test`／ `--mutate`。单枚反查：`awk 'NR>=A && NR<=B' <文件>` 或直接开上面那些 `file:line`。
+
+---
+
+### 6.123（2026-10-29 16:0x · 共享检出的**整文件写回**抹掉了本线 6 行待拍板登记；补一把能抓"已入库的行消失"的尺）
+
+形状：一枚并行会话把 `BLOCKED.md` 整份读入、追加自己那 388 行（B239–B249）、再整份写回。
+在它读与写之间，最近 6 笔碰过这枚文件的提交落了地 ⇒ 它写回的那一版**不带那 6 行**，
+`git diff` 于是长成"一次纯追加 + 顺手删了 6 行"——这形状在共享检出里**没有任何门禁会报**。
+
+先证明那 6 件不是"已经结了"（结了当然该删）：`node research/tools/audit-blocked-number-collisions.mjs --strict`
+仍退 1、`git -c core.quotepath=off status --porcelain -- apps/web/evidence docs/research/evidence` 仍有脏图、
+索引覆盖与导出面两把探针照旧出候选。⇒ 是**销毁记录**，不是收尾。
+
+**还原做法**（不碰别人那 388 行）：以 `git show HEAD:BLOCKED.md` 与当前工作树做**顺序无关的行并集**，
+只把"ref 里有、工作树里没有"的行搬回去。对账三条：`git diff --numstat` 由 `388 6` 变 `388 0`；
+逐主题 `grep -c` 由 0 回 1；搬完再跑新尺 ⇒ 报消失 0 枚。
+
+**新尺**：`research/tools/audit-ledger-row-loss.mjs`。比的是**整行文本（只去行尾空白）的多重集差**，
+所以搬家不算丢（臂 L3/L4）、格式化不算丢（臂 L5/L6）、改缩进**有意**算丢（臂 L8，保守：宁可多报由人判）。
+分母自己打印；`ref` 取不到或为空 ⇒ 退 2，不许把瞎尺读成"没有消失的行"（臂 L9 + 主读那条 ⚠️ 行）。
+牙：`--self-test` 全过（臂数由尺自己打印，别在这里抄），`--mutate` 两形
+（抹 1 行 / 抹**连续 5 行**＝事故形状，逐枚对得上被抹的那几行）、以及**把事故那一版回放一次**：
+按当时的 hunk 头从 `HEAD` 里剔掉那 6 行喂给尺 ⇒ 报 6 枚。回放用的是真账本，不是夹具自证。
+
+🔴 **下一位的操作纪律**（这才是这条的本体）：动 `BLOCKED.md` 这类多人追加的账本，
+**提交前跑一次** `node research/tools/audit-ledger-row-loss.mjs --strict; echo $?`。
+退 1 就有两种可能：要么这一行讲的事真结了（那按本仓规矩应留字并标作废），要么就是这一族。
+另：本尺默认诊断退 0，别把它接进 `pnpm check` 当恒绿门禁——**永远通过的判据比没有判据更糟**（§7 元规则）。
+
+---
+
+### 6.124（2026-10-29 16:1x · 重叠探针的**口径漏**：带返回类型标注的声明整枚不在分母，旧读数就地作废）
+
+发现路径不是"尺报了红"，是**反着查出来的**：第 ④ 维那 11 枚候选里有一对
+`subscribePrivacyConsent()`（`apps/mobile/src/privacy/consent-gate.ts:110` 与
+`apps/web/src/features/privacy/consent-gate.ts:144`）逐字只差一行注释，按 §6.120 的判据**应当**落 🟠 桶，
+但 `node research/tools/audit-duplicate-function-bodies.mjs` 里 `grep consent-gate` 读回 0。
+顺着"0 读数先归因搜法"去挖，`extractFns` 对这两枚文件返回**空数组** —— 整枚文件不在分母。
+
+成因：判据要求 `{` 紧跟参数表闭括号，而本仓主流写法带返回类型标注
+（`function f(x): void {` / `async f(): Promise<void> {`）⇒ 每一枚这样的声明被当成"表达式体"**静默跳过**。
+修法见尺内注释与臂 D14（三个读数：单枚解析到 / 成对落桶 / 重载签名不吃掉下一枚声明）；
+"跳过一段不含 `{`/`;` 的类型"是有意保守——对象返回类型 `): {a: T} {` 落 exprBody 计数，可反查，不假装解析得动。
+
+**旧读数作废声明**（§6.120 与 §6.121 那两张候选表都是同一枚尺的旧口径产物）：改后整树读数由尺自己打印，
+本面那一档复核 `node research/tools/audit-duplicate-function-bodies.mjs --strict --scope server/src/password; echo $?`
+**仍退 0** ⇒ §6.120 里"本面那格已收口"这句不受影响；受影响的是"**别面只有七格**"那句——它是少报约 4 倍的读数。
+新读数的材料族（逐格 `file:line` 由 `--top 500` 打印，这里只点名族与代表格）：
+
+| 族 | 代表格 | 归谁 |
+|---|---|---|
+| 🔴 展示逻辑在两个壳各写一遍（同一枚函数、跨 `apps/mobile` 与 `apps/web`） | `apps/mobile/src/lib/export-copy.ts:16/25` 与 `apps/web/src/features/settings/export-copy.ts:16/17`；`apps/mobile/src/lib/habits-display.ts:274` 与 `apps/web/src/features/habits/board-labels.ts:166`；`apps/mobile/src/lib/countdown-display.ts:160` 与 `apps/web/src/features/countdown/CountdownView.tsx:109`；`apps/mobile/src/lib/due-display.ts:55` 与 `apps/web/src/lib/due-display.ts:78` | 这一族是 AGENTS §3.5 那条铁律的**现量证据**（业务语义只许在 `packages/*`），要的是"下沉到哪一枚包"的决定，不是逐格删重复 ⇒ 归全局 UX 分层整改线与各自特性线 |
+| 🟠 AI 意图文案表两份（百行级） | `apps/mobile/src/ai/intent-copy.ts:53`（88 行）与 `apps/web/src/features/ai/AiToolRun.tsx:125`（102 行） | AI 线 |
+| 🔴 同一包内两份 | `packages/sync-core/src/key-lifecycle.ts:78` 与 `packages/share-keys.ts:133` 的 `decodeStrictBase64`；`packages/storage/src/memory/memory-adapter.ts:120` 与 `sqlite/sqlite-adapter.ts:95` | ⚠️ `sync-core` 是 **vendored**（改要跟 `PROVENANCE.md`），存储那对是两种适配器的同类谓词 ⇒ 各自负责人 |
+| 🔴 订阅器骨架在 13 枚 store 各写一遍 | `apps/mobile/src/{ai/settings-store,inbound/rules-store,inbound/status,sync/store,sync/write-signal,privacy/consent-gate,privacy/consent-ui,legal-recheck/reconfirm-ui,lib/focus-timer,lib/native-reminder-scheduler,share/share-activity-notify}.ts` + `apps/web/src/features/privacy/consent-gate.ts`、`apps/web/src/features/settings/inbound-lifecycle.ts` | 抽 `makeSubscriber` 是跨线公共面决定，且会动 barrel（`packages/app-host/src/index.ts` 那格 hunk 切不开的已知限制） |
+| 🟠 **不是**重叠、由人判掉的一格 | `apps/web/src/features/settings/EmailChangePanel.tsx:56` 与 `apps/web/src/features/settings/PasskeyPanel.tsx:84` | 两枚 `switch` 的**分支集合与词条都不同**（`network` 那支的文案承担"邮箱没有改动"这句），形状相同是巧合 ⇒ 🟠 档天生会报"以文案为本体"的映射函数，这一族**开码不可省**，已判掉 |
+
+🔴 这一族的教训是 §7 元规则「**先怀疑探针**」的又一次现量，并且它纠正的是我自己写下的一句话：
+上一轮我把 `consent-gate` 那对当成"尺没抓到 ⇒ 没有重叠"记进了 §6.120 的结论，那句现在作废 ——
+**一把尺在某处读 0，只说明它扫的那套写法里没有**，不说明被测物里没有。
