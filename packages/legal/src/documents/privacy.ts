@@ -663,6 +663,7 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期与变更摘要'],
         rows: [
+          ['1.13', '`2026-10-29` 自动收集那一节按代码现量重写：从"预留两类明文元数据"改成逐类列举八组；新增"由我们当场抽取"这一档的披露（同一次请求内读取、抽完丢弃、结果重封给用户收件公钥、成功后不能重抽）与"未抽取/失败那一批最多 7 天"的保留句。三份法务件逐字同一份，中英同批。**状态：仍是草案，尚未经法务复核、尚未生效。**'],
           ['1.12', '`2026-10-20` 补充原生设备登录交接：待领产品会话密文最多十分钟，领取即清，未领取转撤销；同步更新定时清理和产品注销接线状态。尚未开放，中英同步，仍为草案。'],
           ['1.11', '`2026-10-19` 中央认证持久层新增身份映射、授权尝试、会话及撤销队列；同步披露类别、服务端加密边界、用途、期限和注销例外。功能尚未开放，定时清理与中央接线仍是开放前条件。中英同步，仍为草案。'],
           ['1.9', "`2026-10-08` **注册登录标准套件（ADR-0063）落地后的联动改写**：第 2 条那句「端到端加密覆盖内容、不覆盖元数据」补了一处**内容级**例外 —— 一次换绑在途时那个新邮箱地址是明文；第 3 条把功能邮件从「五封」改成**十封**并逐类点名（换绑的两封、完成通知、认证器告知与注册验证码邮件此前都不在那份封闭词表里），同时写明「唯一的直接标识符」只有那一个例外；第 6 条「更正与补充」由 ❌邮箱不可更换 改成 ✅双侧确认的自助换绑；第 7 条的一次性凭据时长表补上注册验证码（10 分钟）与换绑的两枚（各 24 小时），并把「换绑生效即全设备登出」写进去；注销那一格按迁移终态重算级联数字 —— 旧数里含一张早已被 `DROP TABLE` 的表，而「墓碑随注销级联删除」这句对两张表都不成立，改为**故意保留的注销标记**。中英同步，仍为待审核草案。"],
@@ -686,7 +687,7 @@ const zh = [
       },
     ],
   },
-  { id: "automation-metadata", title: "自动收集元数据与注册挑战", blocks: [{ kind: "p", text: "自动收集尚未开放。服务端预留两类明文元数据：自动收集执行身份（账号、设备标识、本地数据库实例标识、随机凭据的 SHA-256、创建及撤销时间），用于确认哪台设备有权提交；自动收集提交许可（不透明事件与规则标识、规则和解析版本、执行身份、固定操作标识、结果摘要、条数及创建时间），用于防止重复创建。这些记录不含任务标题、正文或随机凭据原文。执行身份保留至账号注销；提交许可的规则删除清理必须在功能开放前完成，许可一旦发出不因租约到期而转交另一设备。注销账号时两类记录随账号级联删除，不能据此远程擦除离线设备的本地副本。另有邮箱注册验证码挑战：保存待验证身份、验证码摘要、有效期、尝试次数和待激活的口令散列，用于完成邮箱验证，不保存验证码原文；关联账号的挑战也随注销删除。" }] },
+  { id: "automation-metadata", title: "自动收集元数据与注册挑战", blocks: [{ kind: "p", text: "自动收集按规则决定由谁抽取：默认由你自己的设备抽取；你也可以在规则上开启“由我们当场抽取”，默认不开。开启后，服务端在收到那条数据的同一次请求内读取它、由 AI 抽出任务字段，请求结束就把原文丢弃；库里只留下抽取结果用你自己的收件公钥重新封存的那一份，我们看不到它的内容。没有开启这一档、或者抽取没有成功的那一批，输入原文与冻结结果以密文形式暂存，最多 7 天，到期由每日清理抹掉密文、只留下不含正文的账本行。开启并抽取成功后，那条内容不能再重新抽取一次，因为原文已经不在我们手上。这条功能在服务端保存以下明文元数据（不含任务标题、正文或凭据原文），用于投递、去重、计量与权益核对：① 执行身份（账号、设备标识、本地数据库实例标识、随机凭据的 SHA-256、创建及撤销时间）；② 提交许可（不透明事件与规则标识、规则和解析版本、执行身份、固定操作标识、结果摘要、条数及创建时间）；③ 规则本身（允许字段、目标清单、时区、发送方 keyId、抽取位置）；④ 发件凭据（keyId 与签发、轮换、撤销时间）；⑤ 事件行（去重摘要、状态与原因码、租约设备、尝试次数与时间戳）；⑥ 收件公钥（公钥本身与代次）；⑦ 计量账本（计费周期、计费来源、尝试状态）；⑧ 权益签发与绑定（主体标识、安装标识、本地账号标识、激活码摘要、nonce、撤销版本与若干时间戳）。执行身份与权益记录保留至账号注销；注销账号时这些记录随账号级联删除，不能据此远程擦除离线设备上的本地副本。另有邮箱注册验证码挑战：保存待验证身份、验证码摘要、有效期、尝试次数和待激活的口令散列，用于完成邮箱验证，不保存验证码原文；关联账号的挑战也随注销删除。" }] },
 ] as const;
 
 const en = [
@@ -1271,6 +1272,7 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date and summary of changes'],
         rows: [
+          ['1.13', '`2026-10-29` Rewrote the automatic-capture section from the code: the "two categories of plaintext metadata" sentence became an eight-group enumeration; added the "extract on our server" disclosure (read within the same request, discarded afterwards, result re-sealed to the user recipient key, no second extraction after success) and the "at most 7 days" sentence for batches that were not extracted. All three legal documents carry the same text in both languages. **Status: draft, not yet reviewed by counsel or in effect.**'],
           ['1.12', '`2026-10-20` Adds native-device login handoff: a product session awaiting collection is encrypted for at most ten minutes, cleared on collection, and an unclaimed grant is queued for revocation. Updates cleanup and product-closure wiring status. Unavailable; both languages remain draft.'],
           ['1.11', '`2026-10-19` Central identity persistence adds bindings, request attempts, grants and revocation queues. Both languages disclose categories, server-side encryption, purposes, retention and closure exceptions. Authentication remains unavailable; scheduling and provider integration remain release requirements. Still a draft.'],
           ['1.9', "`2026-10-08` Follow-up rewrite after the **standard account flow shipped (ADR-0063)**: the sentence in section 2 about end-to-end encryption covering content but not metadata now also names a **content-level** exception - the new address of an in-flight rebinding is stored in cleartext; section 3 changes the five functional emails to **ten** and lists every one by name (the two rebinding letters, the completion notice, the authenticator-added notice and the registration code were all outside the old closed list), and states the single exception to the only-direct-identifier claim; the correction row in section 6 moves from ❌ the address cannot be changed to ✅ self-service rebinding with two-sided confirmation; the one-time-credential lifetimes in section 7 gain the registration code (10 minutes) and both rebinding tokens (24 hours each) and record that a completed rebinding signs every other device out; the closure cell is recomputed from the final migration state - the old figure counted a table that was `DROP TABLE`d long ago, and the claim that tombstones cascade away was untrue for both tombstone tables, so it now states the **closure marker we deliberately keep**. Both language columns updated together; remains a draft awaiting review."],
@@ -1294,7 +1296,7 @@ const en = [
       },
     ],
   },
-  { id: "automation-metadata", title: "Automation metadata and registration challenges", blocks: [{ kind: "p", text: "Automatic capture is not yet available. Two categories of plaintext metadata are reserved on the server: automation worker identities (account, device and local database identifiers, SHA-256 of a random credential, creation and revocation times), to authenticate the submitting device; and automation commit permits (opaque event and rule identifiers, rule and parse versions, worker identity, fixed operation identifier, result digest, item count and creation time), to prevent duplicate creation. Neither contains task titles, body content or the original credential. Worker identities remain until account closure. Rule-deletion cleanup of permits must be implemented before launch; an issued permit is not reassigned when a lease expires. Both categories cascade on account closure, which cannot remotely erase local copies on offline devices. Email registration challenges also store pending identity, a verification-code digest, expiry, attempt counts and a pending password hash to verify the email address; they do not store the original code. Challenges associated with an account cascade on closure." }] },
+  { id: "automation-metadata", title: "Automation metadata and registration challenges", blocks: [{ kind: "p", text: "Automatic capture decides per rule who extracts the content: by default your own device does; you may also turn on “extract on our server when content arrives” for a rule, which is off by default. When that mode is on, the server reads the content inside the same request that receives it, lets AI extract the task fields, and discards the original when the request ends; the database keeps only the extracted result re-sealed to your own recipient public key, whose contents we cannot read. For batches that did not use this mode or were not extracted successfully, the original input and the frozen result are stored as ciphertext for at most 7 days, after which a daily cleanup clears the ciphertext and keeps only a body-free ledger row. Once that mode has extracted a payload successfully, the content cannot be extracted again, because the original is no longer with us. The service also stores the following categories of plaintext metadata for this feature (never task titles, bodies, or the original credential), used for delivery, deduplication, metering and entitlement checks: (1) worker identities (account, device and local database identifiers, SHA-256 of a random credential, creation and revocation times); (2) commit permits (opaque event and rule identifiers, rule and parse versions, worker identity, fixed operation identifier, result digest, item count and creation time); (3) the rules themselves (allowed fields, target list, timezone, sender keyId, extraction location); (4) sender credentials (keyId and issuance, rotation and revocation times); (5) event rows (deduplication digest, status and reason code, leasing device, attempt counts and timestamps); (6) recipient public keys (the public key and its epoch); (7) the metering ledger (billing period, billing source, attempt state); (8) entitlement issuance and bindings (subject identifier, installation identifier, local account identifier, activation-code digest, nonce, revocation version and several timestamps). Worker identities and entitlement records remain until account closure; on closure they cascade with the account, which cannot remotely erase local copies on offline devices. Email registration challenges also store pending identity, a verification-code digest, expiry, attempt counts and a pending password hash to verify the email address; they do not store the original code. Challenges associated with an account cascade on closure." }] },
 ] as const;
 
 export const privacy: LegalDocument = {
@@ -1304,9 +1306,9 @@ export const privacy: LegalDocument = {
   // 45 天必须分开写，否则第 7 条那段限定会被读成也管着托管那一档。
   // 版本号进同意指纹（`legalSetVersion()` 把每张文档拼成 `id@version`），
   // 改了对外承诺而不 bump，等于让旧那枚同意去覆盖一段它没见过的话。
-  version: '1.12',
+  version: '1.13',
   status: 'draft',
-  updatedDate: '2026-10-19',
+  updatedDate: '2026-10-29',
   title: {
     'zh-CN': '隐私政策',
     en: 'Privacy Policy',

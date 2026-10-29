@@ -30,19 +30,10 @@ const DOCS_DIR = 'packages/legal/src/documents';
 // 🔴 登记按**变体**而不是按文件：同一 id 同一语言里每一组互相同文的副本算一枚变体，登记要说清哪几枚
 // 是一组、哪一组是少数那一侧 —— 只登记文件名会把"两份都漂了"读成"已登记"。
 const KNOWN_DRIFT = new Map([
-  [
-    'automation-metadata|en|data-rights.ts\x00personal-info-list.ts,privacy.ts',
-    {
-      id: 'automation-metadata',
-      locale: 'en',
-      outlier: ['data-rights.ts'],
-      rest: ['personal-info-list.ts', 'privacy.ts'],
-      reason:
-        '英文那份多列 automation entitlement activation / link / subjects 三项，中文三份与另两份英文都只列两类 ⇒ ' +
-        '这是**对外法律表征**的口径分歧，改哪一侧归负责人（工单 §5.2 第 2 格）；本线一个字不许代改。' +
-        '翻案条件：负责人定了口径、两侧逐字相同后，把这条登记删掉（删之前这尺会因"登记过期"红，那是提醒不是缺陷）。',
-    },
-  ],
+  // 2026-10-29：`automation-metadata` 那条登记已按翻案条件删掉 ——
+  // 负责人授权把三份法务件（中英各一处）改成同一份逐类列举的正文，
+  // 英文那侧也不再比另两份多列权益三项。留空表是"现在没有已登记的漂移"，
+  // 不是"这把尺不再看漂移"：新出现的漂移照样判红。
 ]);
 
 // 键里的"变体形状"= 每组互相同文的副本文件名（组内排序、组间按拼好的串排序），所以登记说的是
