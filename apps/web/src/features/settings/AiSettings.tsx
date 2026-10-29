@@ -127,7 +127,9 @@ import {
 import './ai-settings.css';
 import { InboundAutomationSettings } from './InboundAutomationSettings.js';
 import { FormField } from '../../lib/form/FormField.js';
+import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
 import { SettingsInfoTip } from './SettingsInfoTip.js';
+import { aiSettingsResetUsesModalCommitment } from './resetAiDanger.js';
 
 /**
  * 某个功能在**当前路由里**缺哪些能力。
@@ -1564,7 +1566,30 @@ export function AiSettings({
           {t('web.ai.settings.reset.warning')}
         </p>
         {confirmingReset ? (
-          <div role="alert" aria-live="assertive" data-testid="reset-ai-confirm">
+          /*
+           * 🔴 这一格从"就地两档"换吃共享危险确认（2026-10-29）：它清的是**存在这台设备上的
+           * 密钥与令牌**，没有撤销出口 ⇒ 档位是 `alert` ⇒ 需要模态表态。裁决与三条依据写在
+           * `./resetAiDanger.ts`。换吃之后，背景/Esc/× 三条通道与"初始焦点在安全侧"
+           * 都不再由本文件各写一遍，全部问 `packages/ui/src/overlay/dismissal.ts` 那张表。
+           */
+          <DangerConfirmDialog
+            testId="reset-ai-confirm"
+            labelledBy="reset-ai-confirm-title"
+            modalCommitment={aiSettingsResetUsesModalCommitment()}
+            cancelLabel={t('web.ai.action.cancel')}
+            confirmLabel={t('web.ai.settings.reset.confirm')}
+            onCancel={() => { setConfirmingReset(false); }}
+            onConfirm={() => {
+              secrets.clear();
+              setRejected([]);
+              update(defaultAiSettings());
+              // 重置做完就把这一层收掉：下一次还得再问一遍，不留在"已确认"的形状上。
+              setConfirmingReset(false);
+            }}
+          >
+            <h2 id="reset-ai-confirm-title" className="ht-settings__h3">
+              {t('web.ai.settings.reset.confirmTitle')}
+            </h2>
             <ul className="ht-settings__list">
               <li>{t('web.ai.settings.reset.clearsEndpoints')}</li>
               <li>{t('web.ai.settings.reset.clearsRoutes')}</li>
@@ -1575,31 +1600,7 @@ export function AiSettings({
             <p className="ht-settings__notice" data-testid="reset-ai-keeps">
               {t('web.ai.settings.reset.keepsCorrections')}
             </p>
-            <div className="ht-settings__actions">
-              <button
-                type="button"
-                className="ht-btn ht-btn--danger"
-                data-testid="reset-ai-confirm-submit"
-                onClick={() => {
-                  secrets.clear();
-                  setRejected([]);
-                  update(defaultAiSettings());
-                  // 重置做完就把第二段收起来：下一次还得再问一遍，不留在"已确认"的形状上。
-                  setConfirmingReset(false);
-                }}
-              >
-                {t('web.ai.settings.reset.confirm')}
-              </button>
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
-                data-testid="reset-ai-confirm-cancel"
-                onClick={() => { setConfirmingReset(false); }}
-              >
-                {t('web.ai.action.cancel')}
-              </button>
-            </div>
-          </div>
+          </DangerConfirmDialog>
         ) : (
           <div className="ht-settings__actions">
             <button

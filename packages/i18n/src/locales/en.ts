@@ -2418,6 +2418,7 @@ export const en = {
   'web.ai.settings.reset.clearsSwitches': 'The AI master switch, the remote switch, the local API configuration and the memory preference switch',
   'web.ai.settings.reset.keepsCorrections': 'Preferences you corrected are not cleared here: they live in the operation log and travel with your data.',
   'web.ai.settings.reset.confirm': 'Confirm reset',
+  'web.ai.settings.reset.confirmTitle': 'Reset this group of AI settings?',
   // Rejection reason -> primary copy. Pick the catalog entry by `reason` code
   // instead of rendering the cross-package Chinese `message`: the gate cannot
   // see `{r.message}` (a variable, not a literal), but the user can.
