@@ -92,10 +92,15 @@ export type AutomationEntitlementIssuer = z.infer<typeof issuerConfigSchema>;
 export function loadAutomationEntitlementIssuer(
   env: NodeJS.ProcessEnv = process.env,
 ): AutomationEntitlementIssuer | undefined {
-  const seed = env.AUTOMATION_OFFICIAL_PRIVATE_KEY;
-  const issuer = env.AUTOMATION_OFFICIAL_ISSUER;
-  const keyId = env.AUTOMATION_OFFICIAL_KEY_ID;
-  if (seed === undefined || issuer === undefined || keyId === undefined) return undefined;
+  // 🔴 空白也是"没配"，不只是 `undefined`：compose 的白名单写成 `${VAR:-}`，
+  // 于是"没填"在容器里是一枚**空字符串**。只判 `undefined` 的话，空串会进 zod、
+  // 抛 `Invalid automation entitlement issuer configuration`，而这条抛发生在一个
+  // **匿名可读**的路由里（`GET /automation/entitlement/revocations`）⇒ 对外 500。
+  // 2026-10-29 在生产上实测到这个形状；语义仍按"三缺一 ⇒ 签发面全 403"。
+  const seed = env.AUTOMATION_OFFICIAL_PRIVATE_KEY?.trim() ?? '';
+  const issuer = env.AUTOMATION_OFFICIAL_ISSUER?.trim() ?? '';
+  const keyId = env.AUTOMATION_OFFICIAL_KEY_ID?.trim() ?? '';
+  if (seed === '' || issuer === '' || keyId === '') return undefined;
   try {
     return issuerConfigSchema.parse({ issuer, keyId, privateKeySeed: seed });
   } catch {

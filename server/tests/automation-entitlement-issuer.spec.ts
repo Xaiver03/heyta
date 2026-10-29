@@ -9,6 +9,7 @@ import {
   ensureAutomationEntitlementSubject,
   inspectAutomationRevocationManifest,
   issueAutomationEntitlementActivation,
+  loadAutomationEntitlementIssuer,
   loadEffectiveAutomationKeyring,
   readAutomationRevocationFloor,
   redeemAutomationEntitlementActivation,
@@ -372,5 +373,29 @@ describe('自动收集权益签发端', () => {
       expect(inspectAutomationEntitlementTicket(signed.token, keyring, { action: 'worker-register', localAccountUuid: localAccount }))
         .toMatchObject({ ok: false, code: AUTOMATION_ENTITLEMENT_DENIALS.TICKET_SCOPE_MISMATCH });
     });
+  });
+});
+
+describe('签发端配置装载：空串 ≠ 配了（2026-10-29 生产实测到的 500）', () => {
+  it('三枚都是空串（compose 白名单 `${VAR:-}` 的形状）⇒ 当作没配，返回 undefined 而不是抛', () => {
+    expect(loadAutomationEntitlementIssuer({
+      AUTOMATION_OFFICIAL_PRIVATE_KEY: '', AUTOMATION_OFFICIAL_ISSUER: '', AUTOMATION_OFFICIAL_KEY_ID: '',
+    })).toBeUndefined();
+    expect(loadAutomationEntitlementIssuer({
+      AUTOMATION_OFFICIAL_PRIVATE_KEY: '   ', AUTOMATION_OFFICIAL_ISSUER: '  ', AUTOMATION_OFFICIAL_KEY_ID: ' ',
+    })).toBeUndefined();
+  });
+
+  it('三缺一也当作没配（brief：三缺一 ⇒ 签发面六条路由全 403，不是 500）', () => {
+    expect(loadAutomationEntitlementIssuer({ AUTOMATION_OFFICIAL_PRIVATE_KEY: 'x'.repeat(43) })).toBeUndefined();
+    expect(loadAutomationEntitlementIssuer({
+      AUTOMATION_OFFICIAL_PRIVATE_KEY: 'x'.repeat(43), AUTOMATION_OFFICIAL_ISSUER: 'https://issuer.test', AUTOMATION_OFFICIAL_KEY_ID: '',
+    })).toBeUndefined();
+  });
+
+  it('非空但形状不对 ⇒ 仍然抛（配错必须响，别退化成"悄悄没配"）', () => {
+    expect(() => loadAutomationEntitlementIssuer({
+      AUTOMATION_OFFICIAL_PRIVATE_KEY: 'not-a-seed', AUTOMATION_OFFICIAL_ISSUER: 'https://issuer.test', AUTOMATION_OFFICIAL_KEY_ID: 'k1',
+    })).toThrow(/Invalid automation entitlement issuer configuration/);
   });
 });
