@@ -12643,6 +12643,7 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 | 🔴 web 的 **owner 侧同意闸从未接线**：那一屏的初始相位无条件进同意面，`shouldShowConsent`/`applyShareConsent` 只在 import 名单里出现零次调用；模态会写记录但这一屏永不读它 ⇒ 勾了「不再提示」仍然每次都弹，那个复选框在这一格是装饰（`share-consent-model.ts:9-11` 的红线正是"否则它就是装饰"） | 三重：① 它改的是**同意语义**（哪一屏免弹），不是可代改的小毛病；② `apps/web/src/features/share/` 那两只壳**此刻正被协作线写着**（现量两枚 `M`）；③ web 侧唯一的同意闸用例 `share-join-consent-gate.spec.tsx` 只覆盖 join 侧 ⇒ 做成门禁它**生下来就红**，所以这里只登记判决与那条该写的断言，不装门。判决本身已开码复核，且 `b55e98807` 同形 = **本来就在那儿**，不是本轮引入 | 台账 §6.110 那四条复核命令（`grep -cw shouldShowConsent apps/web/src/features/share/ShareFeature.tsx` 读 1，就是 import 那一行；对照 `ShareSpaceScreen.tsx:519` 与 `JoinSharedListDialog.tsx:145` 都真读） |
 | 🟠 自带自检臂的尺里有一批**定义不跑那些臂**（臂不跑不等于臂没用，等于**臂会烂**：判据改了、夹具没跟着改，没有任何东西会红） | 每一枚要不要把自己的臂接进定义，是那条线自己的口径；而 `check` 那条 `&&` 串的分母正被并行会话计数（同一形见 `check:android-build-host` 为什么不进链）。本线只交一张债表 + 一枚视力臂，不代他们接链。⚠️ 反面我也犯过一次：第一版探针按双引号匹配 `--self-test`，读出"总数 0"，那是**尺瞎**不是"没有臂" —— 债表因此自带阳性对照，不成立就退 2 拒答 | `node research/tools/audit-gate-selftest-consumers.mjs`（"有定义但没人跑臂"那一行就是这格的读数） |
 | 🔴 **此刻正压在索引里的旧内容**：`scripts/check-gate-wiring.mjs` 在索引中是 `6 增 / 209 删`（= 它被改之前的版本），`package.json` 也是 `1/1` 的旧 def | 这不是"谁该拍板"，是**谁按一次裸 `git commit` 就把刚落的自检顶回去**，而且顶回去之后没有任何东西会红（旧版正好把 `--self-test` 当不认的旗标走过去）。我不替别人 unstage（只对自己创建的对象动手），所以这格写给他们那一趟：**提交前重新 `git add scripts/check-gate-wiring.mjs package.json`，或改用 `git commit -- <路径>`**。正文与三次"尺自己瞎"的同族记录在台账 §6.108 | `git diff --cached --numstat`（现量：那两枚就是这格的读数） |
+| 🟠 一条**已入库**的台账把「这 22 臂不是我手敲的」这句凭据指给一枚没进版本库的跑批日志（`docs/plans/inbound-automation.md` 文末第八节点名 `.run-arms-carrier-run2.txt`，归自动收集线；2026-10-30 00:1x 本线量到） | 日志**在本机盘上、不在 HEAD 里**，而且住在归属门已登记的例外桶 `.run-arms-*.txt` 中 ⇒ 那句"程序化生成"的**回证件有保质期**：桶被清掉那天，下一位只剩一份抄件加一句复核不了的话。不代做有三条：① 那枚日志是他们那一趟运行的产物，按本仓纪律我不把别线的未跟踪件按自己的名义入库（同表"门禁自己的产物回执"那一格的理由）；② 改那一行 = 改他们台账里的**证据口径**（要么把日志当证据件入库，要么把那半句换成"装置在仓里、可重跑"——两种都是他们的选择）；③ 这一族的门我**没装**：窄口径"未跟踪件被已入库 .md 点到裸名"本线量到 1 枚（就是这一格那枚），可它的分母是"当前脏集"——同一分钟里实测从 22 枚漂到 19 枚（别线清掉了三枚未跟踪件），而树一彻底干净时它恒 0 ⇒ 一把只在树脏时有意义、还随并行会话漂的尺当不了门；宽口径"文档点名的路径在当前树里不存在"则是噪声主导（命中的 top 全是 `*.png` 这类通配与本来就住仓外的产物名，读数与两种口径的命令都在表外代码块）。**这格比看着轻**：造它的装置已入库、载具 commit 也在仓里，缺的不是复现能力而是那枚原件，所以 🟠 不是 🔴 | `grep -n "run-arms-carrier-run2" docs/plans/inbound-automation.md`（指针本体）；`git ls-tree HEAD -- .run-arms-carrier-run2.txt` 回**空**＝不在库里，而 `ls -la` 它在盘上；`grep -n "run-arms" scripts/check-worktree-exceptions.mjs`＝它属于哪只例外桶；`grep -n "CARRIER_HEAD=" research/tools/verify-inbound-hosted-arms.py`＝生成它的装置在仓里；三把现成的尺都看不见这一形（死链尺 `node research/tools/docs-link-check.mjs` 今天 rc=0 且输出里这个名命中 0 枚 —— 它只走 markdown 链接，不吃反引号里的裸文件名；本线那把证据指针尺的分母锚在 `~/.heyta-evidence/`；截图 pin 尺只吃 png+md5 对）。整段可复制的复量命令在表外代码块 |
 
 ```sh
 # 【上面四格的复量，整条可复制】逐条独立可读，不依赖表格
@@ -12651,6 +12652,45 @@ grep -n "看不到任务明文" packages/i18n/src/locales/zh-CN.ts
 sed -n '268,273p' server/src/automation/hosted-extraction.ts
 sed -n '106,114p' server/src/automation/hosted-extraction.ts
 grep -rn "INBOUND_AUTOMATION_FIELDS as readonly" server/src/automation
+```
+
+```sh
+# 【上面那格 🟠（台账把凭据指给一枚没进库的跑批日志）的复量，整条可复制】
+grep -n "run-arms-carrier-run2" docs/plans/inbound-automation.md   # 指针本体那一行
+git ls-tree HEAD -- .run-arms-carrier-run2.txt                     # 空输出 = 这一枚不在版本库里
+ls -l .run-arms-carrier-run2.txt                                   # 而它在本机盘上（第一行钉着载具 commit）
+grep -n "CARRIER_HEAD=" research/tools/verify-inbound-hosted-arms.py   # 生成它的装置已入库 = 缺的不是复现能力
+head -1 .run-arms-carrier-run2.txt                                 # 载具 commit；拿它跑 git cat-file -t 应回 commit
+grep -n "run-arms" scripts/check-worktree-exceptions.mjs           # 它住在哪只已登记的例外桶里
+
+# 三把现成的文档尺为什么都看不见这一形（逐把现量，不是我的猜测）
+node research/tools/docs-link-check.mjs; echo "死链尺 rc=$?"       # rc=0 = 它没把这枚当死链
+node research/tools/docs-link-check.mjs | grep -c "run-arms"        # 0 枚命中 = 这一形根本不在它分母里（它只走 markdown 链接，不吃反引号里的裸文件名）
+grep -n "DEFAULT_PATTERN" research/tools/verify-inbound-evidence-pointers.py   # 本线那把证据指针尺的分母锚在 ~/.heyta-evidence/
+head -3 research/tools/check-evidence-pins.mjs                     # 截图 pin 尺只吃「png 文件名 + 32 位 md5」成对写法
+
+# 【窄口径】未跟踪件里被已入库 .md 点到裸名的（本线量到 1 枚；枚数自己打印，别抄）
+git -c core.quotepath=off status --porcelain -uall | grep -c '^?? '                 # 分母 = 当前未跟踪件枚数（会随并行会话漂）
+git -c core.quotepath=off status --porcelain -uall | grep '^?? ' | sed 's/^?? //' | while read -r p; do
+  b=$(basename "$p"); [ "${#b}" -ge 6 ] || continue
+  hit=$(git grep -lF -e "$b" -- '*.md' | grep -v '^BLOCKED\.md$')                  # 剔掉本账本自己：它点名自己讨论的件是本职，不是死指针
+  [ -n "$hit" ] && printf '被点名：%s ← %s\n' "$p" "$(echo $hit)"
+done
+# 🔴 上面这段循环的退出码由**最后一次判语**决定（没有命中时最后一条 `[ -n ]` 为假 ⇒ 整段退 1），
+#    所以别拿它的 rc 当结论，要看有没有"被点名"那行 —— 我自己第一发就把 `grep '^?? '` 漏了，
+#    于是 ` M BLOCKED.md` 这类**已跟踪有改动**的行也被喂进循环（`read` 吃掉前导空格，basename 读到 `BLOCKED.md`），
+#    读数从 1 枚虚报成 39 枚（现量：把上面那段的第一根 `grep '^?? '` 去掉再跑，其余不动）。漏掉那个过滤器不会红，只会静默把分母换成另一件事。
+
+# 【宽口径】"文档点名的路径在当前树里不存在"——噪声主导，所以没当门（top 见输出）
+python3 - <<'PY'
+import os, re, subprocess, collections
+md = subprocess.run(['git', 'ls-files', '--', '*.md'], capture_output=True, text=True).stdout.split()
+pat = re.compile(r'`([^`\s]*[\\/][^`\s]*\.(?:txt|json|log|png|md|csv|sh|mjs|py))`')
+hits = [m for f in md for m in pat.findall(open(f, encoding='utf-8', errors='ignore').read())
+        if not os.path.exists(m.strip('./'))]
+print('命中', len(hits), '枚名去重', len(set(hits)))
+print('top:', ', '.join(f'{n}×{k}' for k, n in collections.Counter(os.path.basename(h) for h in hits).most_common(6)))
+PY
 ```
 
 
