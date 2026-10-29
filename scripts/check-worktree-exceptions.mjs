@@ -196,8 +196,10 @@ export const OWNER_RULES = [
       '而 10-28 20:19 / 20:38 / 20:45 与 10-29 11:40 又有四笔**会改像素**的 UI 提交落库' +
       '（`git log --since=<拍照时刻> --oneline -- apps/web/src packages/ui/src packages/design-system`）' +
       '⇒ 未提交那一版与 HEAD 那一版**都比当前产品旧**，谁替谁收都等于把过期证据再钉一次。' +
-      '正解是改 UI 的那条线重跑矩阵再随自己那笔提交；本尺不判这层"证据 vs 产品"的新鲜度（现量只到 mtime 比对，见台账 §6.116）',
-    prefixes: ['apps/web/evidence/'],
+      '正解是改 UI 的那条线重跑矩阵再随自己那笔提交；本尺不判这层"证据 vs 产品"的新鲜度（现量只到 mtime 比对，见台账 §6.116）。' +
+      '10-29 15:4x 补第二个目录：`docs/research/evidence/` 下那批已入库 PNG 也在被同一机制重写' +
+      '（现量六枚 `M`、mtime 落在两分钟内，是自动收集那条线跑它自己的日期一致性/面板矩阵留下的）',
+    prefixes: ['apps/web/evidence/', 'docs/research/evidence/'],
     skipUntracked: true,
   },
   {
