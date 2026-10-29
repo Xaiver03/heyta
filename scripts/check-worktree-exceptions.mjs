@@ -126,6 +126,9 @@ export const OWNER_RULES = [
       // 「2026-10-29，把 P2 登记的那格『未判定』判掉」，`AiSettings.tsx` 是接它的那一枚（`grep -c resetAiDanger apps/web/src/features/settings/AiSettings.tsx` 现量 2 处）
       'apps/web/src/features/settings/resetAiDanger.ts',
       'apps/web/src/features/settings/AiSettings.tsx',
+      // 12:2x 这枚跟着上面那一族：新增的 describe 头自己写「§P2 那格未判定的裁决，2026-10-29」，
+      // 断言的对象就是 `resetAiDanger` 画的那层（`data-testid="reset-ai-confirm"`），不是本线一行
+      'apps/web/tests/ai-settings.spec.tsx',
       // 10-29 10:3x 这一族（P6 关闭策略表的最后一格）：两枚文件的注释各写
       // 「这一档是为『隐私单独同意 / 条款再确认』这两层新加的（全局 UX 线 P6 的最后一格）」与
       // 「『关掉不等于同意』的可判红版本（全局 UX 线 P6 最后一格的产品口径）」
