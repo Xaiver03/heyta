@@ -159,6 +159,19 @@ export const OWNER_RULES = [
       'server/tests/inbound-hosted-extraction.spec.ts',
       'docs/plans/inbound-automation.md',
       'docs/adr/0077-inbound-hosted-extraction-at-ingest.md',
+      // 10-29 14:3x 现量这一族（事件分页 + reasonCode 上界面那一档）：新 spec 的头自己写
+      // 「`inbound-automation-work-brief.md` §3 A9 的前两项」，barrel 那行加的正是 `INBOUND_EVENT_LIST_LIMIT` 的再导出。
+      // ⚠️ `packages/app-host/src/index.ts` 是**共享 barrel**：归属尺按文件分堆，切不开 hunk ——
+      //    这一条登记的是"此刻那一段脏内容归他们"，别的日子改这枚 barrel 时会被一并算进来（已知限制，不是判据坏了）。
+      'packages/app-host/src/inbound-rules-remote.ts',
+      'packages/app-host/src/index.ts',
+      'apps/web/src/features/settings/InboundAutomationSettings.tsx',
+      'apps/web/tests/inbound-events-reason-cap.spec.tsx',
+      // 14:3x 同一族的移动侧那一半（各文件头自己点名工单 §3 A9 第 4 项 / §3 A3）：
+      // 新 store + 前台那一趟的拉取 + 设置面的只读展示 + 周期结果露出的 spec。
+      'apps/mobile/src/inbound/',
+      'apps/mobile/src/ai/AiSettingsSection.tsx',
+      'apps/mobile/tests/inbound-cycle-display.spec.ts',
     ],
   },
   {
