@@ -122,6 +122,11 @@ export const OWNER_RULES = [
       //   按"清理未跟踪文件"的直觉把它删掉，就会在别人下一次还原时把人家的母本删了 ⇒ 这一族里任何 `*.mut-bak` / `*.teeth-bak` 都不许碰。
       'packages/ui/src/control/',
       'packages/ui/tests/control-states.spec.ts',
+      // 10-29 10:3x 这一族（P6 关闭策略表的最后一格）：两枚文件的注释各写
+      // 「这一档是为『隐私单独同意 / 条款再确认』这两层新加的（全局 UX 线 P6 的最后一格）」与
+      // 「『关掉不等于同意』的可判红版本（全局 UX 线 P6 最后一格的产品口径）」
+      'packages/ui/tests/overlay-dismissal-model.spec.ts',
+      'e2e/tests/consent-defer.spec.ts',
       'package.json',
     ],
   },
@@ -186,6 +191,15 @@ export const OWNER_RULES = [
     ],
   },
   {
+    line: '自托管分发 / Windows 打包那一条线在飞的这一族',
+    why: '三枚改动都指向同一个新落点：`research/tools/selfhost-windows-sync-arms.mjs`、`scripts/reinstall-all.sh`、' +
+      '`scripts/verify-windows-shell-journey.mjs` 的加行都在接 `scripts/lib/sync-build-sources.sh`（那枚 lib 已在 HEAD，现量 ' +
+      '`git cat-file -e HEAD:scripts/lib/sync-build-sources.sh`），是同一次重构的三条腿，提一条红两条。' +
+      '仓根那批 `.run-arms-*.txt` 是他们跑批的临时日志（现量形状见文件第一行"载具闸门 …不是零脏"），' +
+      '既不是产物也不该入库 —— 登记它只为让"未登记栏"读得出真例外，删与不删归作者（不是本会话创建的对象，不动）',
+    prefixes: ['research/tools/selfhost-windows-sync-arms.mjs', 'scripts/reinstall-all.sh', 'scripts/verify-windows-shell-journey.mjs', '.run-arms-*.txt'],
+  },
+  {
     line: '别线的变异台架（research/tools/mutation-rigs/）',
     why: '台架改的是它自己的判据臂，作者正在按读数调臂；这类文件的"对不对"只有那条线能判',
     prefixes: ['research/tools/mutation-rigs/'],
@@ -220,6 +234,20 @@ export function parseArgs(argv) {
   return { ...out, unknown };
 }
 
+/**
+ * 一条规则前缀怎么吃下一枚路径。
+ * 🔴 带 `*` 的写法只许用在**一个路径段内**：`*` 展开成 `[^/]*`，所以 `.run-arms-*.txt`
+ *   命中仓根那批跑批日志，但**不会**跨目录去命中 `docs/run-arms-x.txt`（跨段匹配等于把别的线的
+ *   同名文件也认领走，那正是这张表最不能犯的错）。逐枚列 19 条路径则是一份会漂的抄件 ——
+ *   作者每跑一轮就会多一枚或少一枚日志。
+ */
+export function matchPrefix(file, p) {
+  if (p.endsWith('/')) return file.startsWith(p);
+  if (!p.includes('*')) return file === p;
+  const re = new RegExp(`^${p.split('*').map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')}$`);
+  return re.test(file);
+}
+
 /** 规则表自检：目录前缀必须带斜杠、每条必须带理由。坏规则会让整把尺假绿，所以先判尺。 */
 export function auditRules(rules) {
   const bad = [];
@@ -227,6 +255,11 @@ export function auditRules(rules) {
     if (!r.why || String(r.why).trim().length < 12) bad.push(`${r.line}：理由缺失或过短`);
     for (const p of r.prefixes) {
       if (p.endsWith('/') && !path.posix.extname(p.slice(0, -1))) continue; // 目录规则
+      if (p.includes('*')) {
+        // 通配规则必须落在某个具体段里，且不能整段就是一个 `*`（那等于"什么都认领"）。
+        if (/^\*/.test(p) || /\*$/.test(p) || p.split('/').some((seg) => seg === '*')) bad.push(`${r.line}：通配前缀 ${p} 形状不合（首尾裸星号或整段星号＝会跨段认领）`);
+        continue;
+      }
       if (path.posix.extname(p) === '') bad.push(`${r.line}：前缀 ${p} 既不是目录（缺尾斜杠）也不是带扩展名的文件`);
     }
   }
@@ -252,7 +285,7 @@ export function classify(entries, rules, worktreeDirty = null) {
       ? null
       : rules.find(
           (r) =>
-            (r.skipUntracked && e.xy.includes('?') ? false : r.prefixes.some((p) => (p.endsWith('/') ? e.file.startsWith(p) : e.file === p))),
+            r.skipUntracked && e.xy.includes('?') ? false : r.prefixes.some((p) => matchPrefix(e.file, p)),
         );
     rows.push({ ...e, line: hit ? hit.line : null, indexOnly });
   }
@@ -340,7 +373,12 @@ export function extractRelativeSpecs(text) {
   return specs;
 }
 
-const SCANNED_EXT = new Set(['.ts', '.tsx', '.mts']);
+// 2026-10-29 补 `.mjs/.cjs/.js`：原先只扫 ts 族，而本仓有一批**脚本侧的 `.mjs` importer**
+// （现量一枚就是 `scripts/verify-windows-shell-journey.mjs`，它 relative-import 自己的 lib）——
+// 那种 importer 引用未入库模块时，"单独提一组 = 半棵树"这一判据完全看不见。
+// ⚠️ 仍未覆盖的形状：shell 的 `source` / `.`（路径常带 `$ROOT` 这类变量，展开它要引另一个解析器），
+//    这一格登记在台账 §6.113 里当"已知边界"，不当"已覆盖"。
+const SCANNED_EXT = new Set(['.ts', '.tsx', '.mts', '.js', '.mjs', '.cjs']);
 
 /**
  * 一条相对说明符在本仓约定下可能的磁盘落点。
@@ -515,6 +553,13 @@ const SELF_TEST_ARMS = () => {
     })(),
     [['server/src/api.ts'], ['server/src/api.ts']],
   );
+  push(
+    '㉝ 通配前缀只吃一段：`.run-arms-*.txt` 命中仓根那批日志，但不许跨目录去吃 docs/ 里的同名件',
+    [matchPrefix('.run-arms-guard.txt', '.run-arms-*.txt'), matchPrefix('docs/run-arms-x.txt', '.run-arms-*.txt')],
+    [true, false],
+  );
+  push('㉞ 坏形状的通配必须被规则表自检拒（首尾裸星号 / 整段一个星号＝会跨段认领）', auditRules([{ line: 'X', why: '这条夹具的理由要够十二字以上才被认', prefixes: ['*', 'a*', '*.txt'] }]).length, 3);
+  push('㉟ 普通与目录前缀的旧语义不许被这次改动带跑（回归臂）', [matchPrefix('a/b.ts', 'a/'), matchPrefix('a/b.ts', 'a/c.ts'), matchPrefix('a/c.ts', 'a/c.ts')], [true, false, true]);
   push('④ 目录规则要按前缀吃下整棵子树', classify([E('e2e/tests/dirty-form-guard.spec.ts')], OWNER_RULES).rows[0].line, '全局 UX 分层整改线');
   push('⑤ 规则表自己必须干净（现在这份必须无违规）', auditRules(OWNER_RULES), []);
   push(
