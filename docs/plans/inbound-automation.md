@@ -6153,3 +6153,9 @@ gitee 那枚上游仍超配额，没碰。
 - `node scripts/deploy-ssh.mjs --ref HEAD`（沙箱，不碰线上）：打包/对账/镜像 VCS_REF 三段全绿，日志 `.run-logs/deploy-sandbox-1029.log`。
 - AC 电池 31 腿在 15:3x 于当前 tip 上整串跑，读数与原件在 `~/.heyta-evidence/inbound-ac-battery-20261029/`。
 - **AC-1～AC-8 一格没代勾**（`verify-inbound-ac-ticks.py` 现量为准）；AC-6 的"人真打开看过截图"只能负责人本人。
+
+**AC 电池这一趟的逐腿读数（15:2x–15:3x，当前 tip）**：`legs=31 rc0=30 rc_nonzero=1`，唯一非 0 是
+`SCOPE-commit-scope` —— 它拦下的正是本笔 ④ 的 5 枚法务件（`packages/legal/src/documents/*.ts`）。
+按尺子文件头"每族注明证据提交"的规矩补了一族（证据笔 06798bf3）⇒ 越界=0、自检 `臂数=6 不成立=0`、
+电池那条腿重跑 rc=0（提交 b02c11cd0）。原件 `~/.heyta-evidence/inbound-ac-battery-20261029/INDEX.md`。
+`AC6-browser` 8 passed（真 Playwright）、`AC1-offline11` 113 条、`AC6-web-specs` 36 条、`AC3-dual-host` WINDOW=8 全绿。
