@@ -5292,3 +5292,51 @@ node scripts/check-worktree-exceptions.mjs                              # 分档
 ① 推 `main` 到 GitHub：这一推会**连带公开 UX 线那几笔本地提交**（逐枚 SHA 用
 `git log --oneline origin/main..HEAD` 现取，别抄这里）。
 ② 重新发布 `/var/www/heyta-app` 那盘 SPA（命令与可见变化在 §6.110 与本文件那两条 runbook 引用里，已说过两次）。
+
+### 6.114（2026-10-29 11:3x · 发布这一拍：共享树被守卫**正确**拦停，换干净载体又撞到一条 runbook 没写的前置）
+
+负责人批了"按老命令走一遍"。走的是 runbook §3.7 自己固化的那条
+`node research/tools/publish-public-sites.mjs`（它比手敲多三道闸：必须正好是 `main` 那一笔、
+发前先备份、站点先发应用后发）。**两发读数**：
+
+**第一发（主检出，dry-run）：守卫拒绝执行，拒得对。**
+它读"构建输入脏条目"非零就不动一行。这一趟脏的不是我的码，是**别人正在写的源码**——
+按它的粗 pathspec 报 74 条，其中真正参与构建的只有 9 条（其余是门禁重写的已入库截图）。
+9 条那批就是 UX 线 P6「可延后的意思表示层」那一族（`apps/web/src/features/legal-recheck/`、
+`privacy/PrivacyConsentSheet.tsx`、`packages/ui/src/overlay/dismissal.ts`、三枚 spec、
+一枚 `?? e2e/tests/deferrable-sheet.spec.ts`）。现量：
+
+```sh
+git -c core.quotepath=off status --porcelain -- apps packages server/public e2e pnpm-lock.yaml package.json \
+  | grep -vE '/evidence/|/dist/|/node_modules/'
+```
+
+⇒ **拿主检出直接发，发出去的就是别人没写完的源码**。守卫在这里挡的是真事，不是仪式。
+
+**第二发（`main` 的干净 detached 载体）：先红在第 1 步，而且线上一个字节都没动。**
+载体是 `git worktree add --detach ~/heyta-carriers/web-pub-<短 SHA> main`，脏条目 0、守卫放行。
+它停下来的位置和原因不在我预期里：
+
+```
+1/9 pnpm --filter @heyta/landing check:entries
+  ERR_MODULE_NOT_FOUND: apps/landing/node_modules/@heyta/i18n/dist/provider.js
+🔴 一条 rsync 都没执行 ⇒ 线上还是发之前那一份，不用回滚（宁可不发，也不发一半）
+```
+
+**根因不是仓库坏，是"干净检出"这件事本身缺一格**：`dist/` 不进 git，
+而 `apps/landing` 与 `apps/web` 是**通过 workspace 包的 `dist` 入口**消费 `@heyta/i18n` 的
+（`packages/*/package.json` 里把 `main`/`exports` 指向 `dist/` 的包共 15 枚：
+`grep -l '"main": "dist\|"exports"' packages/*/package.json`）。
+主检出里 `packages/i18n/dist` 早就存在（现量 `ls -d packages/i18n/dist`），所以 runbook 那三条命令
+**在任何一棵构建过的树上都能照抄成功**，而在干净检出上手敲就会在第一发炸——
+**它缺的前置是"先把 workspace 包构建出来"**，这一条 §3.7 那一段里没有写。
+修法用的是仓库自己的口径（不发明）：载体里先 `pnpm -r build`，再重跑发布器。
+
+**两条登记给自托管分发那一条线（不代改——都是判据/装置口径，且那枚装置不是本线创建的对象）**：
+① 发布器的"构建输入"分母按 `apps packages …` 粗路径算，把 `apps/*/evidence/**`（门禁自己重写的截图）
+   也算进去 ⇒ 报出来的条数系统性高估（这一趟 74 vs 9），读的人会以为"有一大片源码没落库"。
+   同一族的高估在"要不要再跑一趟四端重装"那格已经量过一次（见项目记忆里那条粗 pathspec 的教训）。
+② 发布器不检查"workspace 包的 `dist` 在不在"，所以干净载体上它的第一发是一条
+   `ERR_MODULE_NOT_FOUND`——看起来像仓库坏了，实际缺一格前置。守卫补一句"dist 未构建 ⇒ 先 `pnpm -r build`"
+   比让人去猜这条红强。
+   两条都带现量命令，落在下面的 ③ 那一节；**发与不发的判据口径不在我这边改**。
