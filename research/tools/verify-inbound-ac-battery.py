@@ -59,6 +59,9 @@ LEGS: list[tuple[str, str, str]] = [
     ("AC1-entitlement3", "server", "npx --no-install vitest run --maxWorkers=1 tests/entitlement.spec.ts tests/entitlement-gate.routes.spec.ts tests/entitlement-across.spec.ts"),
     ("AC1-quota-http", "server", "npx --no-install vitest run --maxWorkers=1 tests/inbound-ai-quota-route.spec.ts"),
     ("AC1-pglite", "server", "npx --no-install vitest run --maxWorkers=1 tests/automation-ai-metering.pglite.spec.ts"),
+    # A4（工单 §3 A4）：一次物理托管调用只扣一次。这条以前只手动跑过 ——
+    # 不进电池就等于"修完没人看着"，而它的失败形状（+2）正是本轮修掉的那个缺陷。
+    ("AC1-quota-double-charge", "server", "npx --no-install vitest run --maxWorkers=1 tests/automation-managed-double-charge.pglite.spec.ts"),
     ("AC1-worker-identity", ".", "python3 research/tools/verify-inbound-worker-identity.py"),
     ("AC1-cjs-order", ".", "python3 research/tools/verify-inbound-cjs-require-order.py"),
     ("AC2-inbound-core", "packages/inbound-core", "npx --no-install vitest run --maxWorkers=1"),
