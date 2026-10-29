@@ -218,6 +218,14 @@ export const OWNER_RULES = [
     ],
   },
   {
+    line: '法务/条款线（线上验收套件那条横幅断言）',
+    why: '10-29 23:5x 现量：`e2e/live-site/live-legal.spec.ts` 这次的未提交 diff 自己新增 `DOC_STATUS`（从 `@heyta/legal` 的注册表取每份件的状态）' +
+      '与一枚「分母自检」用例，并把「尚未生效」横幅的断言改成**双向**（草稿必须有、`effective` 必须没有）——' +
+      '这正是待拍板表里那条 legal 那一格（`49899b546` 登记）写的不变量"横幅存在 ⟺ 该篇在 draft 名单里"，由它自己的负责人在落。' +
+      '代提交 = 替别人把对外呈现的判据口径落仓，两道授权都不在本线',
+    prefixes: ['e2e/live-site/live-legal.spec.ts'],
+  },
+  {
     line: '自托管分发 / Windows 打包那一条线在飞的这一族',
     why: '三枚改动都指向同一个新落点：`research/tools/selfhost-windows-sync-arms.mjs`、`scripts/reinstall-all.sh`、' +
       '`scripts/verify-windows-shell-journey.mjs` 的加行都在接 `scripts/lib/sync-build-sources.sh`（那枚 lib 已在 HEAD，现量 ' +
@@ -501,6 +509,14 @@ export function candidateTargets(importer, spec) {
  * `dangling` = 磁盘上根本没有这个落点（比未跟踪更硬：谁都跑不动）。
  * 未跟踪的 importer 不扫 —— 它自己还没进仓库，和它的 target 同一笔提交就自洽。
  */
+/** 这枚 target 是不是"某个已入库包的构建产物/依赖件"（那样它按设计就不在 HEAD 里，不算缺件）。 */
+export function isBuildArtifactOfTrackedPackage(target, isTracked) {
+  if (target.includes('/node_modules/')) return true;
+  const m = /^(packages|apps)\/([^/]+)\/dist\//.exec(target);
+  if (!m) return false;
+  return isTracked(`${m[1]}/${m[2]}/package.json`);
+}
+
 export function crossLineImports(entries, { read, isTracked, exists }) {
   const found = [];
   const seen = new Set();
@@ -519,6 +535,13 @@ export function crossLineImports(entries, { read, isTracked, exists }) {
       if (cands.some((c) => isTracked(c))) continue;
       const onDisk = cands.find((c) => exists(c));
       const target = onDisk ?? cands[0];
+      // 🔴 构建产物与依赖目录**不当"缺件的模块"**：`packages/<p>/dist/**` 与 `node_modules/**`
+      //    由 `pnpm build` / 安装生成，按设计不入库。先前只有 `--head` 那一臂承认这是噪声
+      //    （"指向 `packages/*/dist/*` 这种构建产物…都要真正的解析器才分得清"），
+      //    默认模式却没滤 ⇒ 谁碰一枚 import 了 dist 的在册文件（现量：`e2e/live-site/live-legal.spec.ts:69`
+      //    引 `../../packages/legal/dist/index.js`），这臂就自己红三次。
+      //    豁免只到"产物所属的那枚包在 HEAD 里"为止：**包本身没入库就是真半棵树，照报**。
+      if (isBuildArtifactOfTrackedPackage(target, isTracked)) continue;
       const key = `${e.file} ${target}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -791,6 +814,40 @@ const SELF_TEST_ARMS = () => {
       OWNER_RULES
     ).unattributed.map((r) => r.file),
     ['apps/web/evidence/whatever/new-shot.png'],
+  );
+  // 🔴 构建产物豁免的三臂（现量取自 2026-10-29 那一发：法律线一碰 `live-legal.spec.ts`，
+  //    这臂就因为它 import `packages/legal/dist/index.js` 而自报三处"跨线依赖"）
+  const DIST_IMPORTER = 'e2e/live-site/live-legal.spec.ts';
+  const distCase = (trackedPkgJson) =>
+    crossLineImports(
+      [{ xy: ' M', file: DIST_IMPORTER }],
+      {
+        read: () => "import { LEGAL_DOCUMENTS } from '../../packages/legal/dist/index.js';\nexport const Y = 1;\n",
+        isTracked: (f) => f === trackedPkgJson,
+        exists: (f) => f === 'packages/legal/dist/index.js',
+      }
+    );
+  push(
+    '㉞ import 某枚**已入库包**的 dist 产物 ⇒ 不许点名（产物按设计不入库，报出来就是假红）',
+    distCase('packages/legal/package.json'),
+    [],
+  );
+  push(
+    '㉟ 同一形状但那枚包自己没入库 ⇒ 必须点名（豁免不许把真半棵树放走）',
+    distCase('packages/other/package.json').map((r) => `${r.target}|${r.kind}`),
+    ['packages/legal/dist/index.js|untracked'],
+  );
+  push(
+    '㊀ import 走 node_modules ⇒ 不许点名（依赖目录同理不是"缺件"）',
+    crossLineImports(
+      [{ xy: ' M', file: 'apps/web/src/x.ts' }],
+      {
+        read: () => "import React from './node_modules/react/index.js';\n",
+        isTracked: () => false,
+        exists: () => true,
+      }
+    ),
+    [],
   );
   return arms;
 };
