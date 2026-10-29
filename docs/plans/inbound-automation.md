@@ -6179,3 +6179,21 @@ gitee 那枚上游仍超配额，没碰。
 **终版电池读数（15:38，tip 含 A4 腿接入）**：`legs=32 rc0=32 rc_nonzero=0`。
 新增那条 `AC1-quota-double-charge` 7 条绿。原件 `~/.heyta-evidence/inbound-ac-battery-final2/INDEX.md`
 （逐腿 rc、分格对照、原件路径；`AC8-ac-ticks` 仍是"已勾 0／未勾 8"——AC 的勾归负责人）。
+
+### 7. 15:50–15:56 按 runbook 真发了一趟生产（沙箱先过、留了回滚 tag）
+
+**顺序**：先沙箱验当前 HEAD（`d1117dd1f`，`.run-logs/deploy-sandbox-final.log`，rc=0：镜像可建／迁移在空库跑通／
+`VCS_REF` 对账／HEALTH=200／CLEANUP=OK），再取发布基线（容器 `a58722b4…`、镜像 `2da49c39…`、compose sha、38 枚 env），
+然后 `node scripts/deploy-ssh.mjs --apply --yes-production --ref d1117dd1f` ⇒ `MIGRATE_RC=0`、`SWAPPED`、`INSTALLED_IMAGE=OK`、`HEALTH=200`。
+
+**发布后读数**（`~/.heyta-evidence/inbound-release-20261029/after.md`）：
+- 容器 `796223e1…`、镜像 `sha256:6c7e77a6…`（都与基线不同）；健康；OCI revision 标签 == `d1117dd1f…` == 送出去的 ref。
+- 迁移：`_prisma_migrations` 里出现 `20261029130000_add_automation_attempt_proxy_billed`（A4 那枚）。
+- 自动收集：容器内 `AUTOMATION_*` 5 枚；公网 `POST /api/automation/v1/hooks/<uuid>` **400**、`GET …/revocations` **403**、
+  签发面带认证缺口 **401**、`/health` **200**。
+- 前端产物：镜像 `web-dist` 里有本轮新词条 `inbound-events-capped`，也有法务版本 `1.13` ⇒ A9 的界面与法务正文在**应用内**已上线。
+- **回滚**：`ROLLBACK_TAG=supersync:rollback-20261029T075136`（脚本另导出了活容器的文件系统快照）；
+  手工回退＝服务器上 `docker tag supersync:rollback-20261029T075136 supersync:local` 再 `docker compose up -d --no-deps supersync`。
+
+🔴 **对外站点没有跟着发**：`/var/www/heyta-landing` 现量仍是 11:34 那一版（还能 grep 到「（规划中）」「此功能尚未上线」），
+所以帮助中心/价格页/公网法务页仍是旧口径 —— 那是 `apps/landing` 的单独发布，归负责人（本笔刻意不动）。
