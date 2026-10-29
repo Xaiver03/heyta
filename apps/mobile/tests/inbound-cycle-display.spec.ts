@@ -29,6 +29,7 @@ import {
   subscribeInboundCycle,
   subscribeInboundReadiness,
 } from '../src/inbound/status';
+import { getInboundRules, publishInboundRules } from '../src/inbound/rules-store';
 
 /** 共享层那四档终态。**新增一档而这里没补 ⇒ 前两条一起红**（这就是分母自己站在判据里的写法）。 */
 const CYCLE_STATES = ['empty', 'submitted', 'needs-confirmation', 'waiting-entitlement'] as const;
@@ -155,5 +156,36 @@ describe('移动壳把"这台设备还没准备好接收"说出来（A2 那两�
     expect(translate('en', INBOUND_BOUNDARY_COPY_KEY)).not.toBe('');
     // 写死那句中文当字面量就是第二份句子（web 那端换了措辞而这里跟着抄，正是本仓反复登记的漂移源）。
     expect(SECTION).not.toMatch(/开着 heyta 时处理|常年接收/);
+  });
+});
+
+describe('移动壳能看见规则本身（A9 第 4 项：以前手机上连"看规则"都做不到）', () => {
+  const RULES_STORE = stripComments(read('apps/mobile/src/inbound/rules-store.ts'));
+
+  it('拉取接在 lifecycle 上，且经只有展示四样的 store 出门', () => {
+    expect(LIFECYCLE).toContain('publishInboundRules(await createInboundRulesRemote(');
+    expect(RULES_STORE).toContain('export function publishInboundRules(');
+  });
+
+  it('渲出：设置面无请求，只读 store，且有 testID', () => {
+    expect(SECTION).toContain('useInboundRules()');
+    expect(SECTION).toContain('testID="inbound-rules-title"');
+    expect(SECTION).toContain('testID={`inbound-rule-');
+  });
+
+  it('store 只留展示四样：凭据/密钥/事件标识都不许搭车', () => {
+    publishInboundRules([
+      {
+        id: 'rule-1', version: 2, enabled: true, keyId: 'default', createdAt: '2026-01-01T00:00:00.000Z',
+        deletedAt: null, allowedFields: ['title'], targetProjectId: null, timezone: null, parseVersion: 1,
+        authorizationVersion: 1, maxItems: 5, hostedExtraction: false,
+        // 现实里存在但不该上界面的东西，故意用假值钉形状。
+        senderSecret: 'must-not-travel', eventId: 'must-not-travel',
+      } as never,
+      { id: 'rule-2', version: 1, enabled: false, keyId: 'old', createdAt: '2026-01-01T00:00:00.000Z', deletedAt: '2026-02-01T00:00:00.000Z', allowedFields: ['title'], targetProjectId: null, timezone: null, parseVersion: 1, authorizationVersion: 1, maxItems: 5, hostedExtraction: true } as never,
+    ]);
+    const snapshot = getInboundRules();
+    expect(snapshot).toEqual([{ id: 'rule-1', keyId: 'default', enabled: true, hostedExtraction: false }]);
+    expect(JSON.stringify(snapshot)).not.toContain('must-not-travel');
   });
 });

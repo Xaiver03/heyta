@@ -59,6 +59,7 @@ import { AI_FEATURE_LABEL_KEY, healthCopy, managedUsageCopy } from './copy';
 import { aiSecrets, saveAiSettings, useAiSettings } from './settings-store';
 import { INBOUND_BOUNDARY_COPY_KEY, INBOUND_CYCLE_COPY_KEY, INBOUND_READINESS_COPY_KEY } from '../inbound/copy';
 import { useInboundCycle, useInboundReadiness } from '../inbound/status';
+import { useInboundRules } from '../inbound/rules-store';
 import { readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
 /** 五个功能在设置里的渲染顺序 —— 与助手面的顺序同一份，不重排。 */
@@ -266,6 +267,9 @@ export function AiSettingsSection(): React.JSX.Element {
   // 而这台设备**能不能**开始接收。它和上面那格是两件事：没建过收件密钥的设备不会跑那一趟，
   // 以前这里只是安静着，用户分不清"还没准备好"与"准备好了但没内容"。
   const inboundReadiness = useInboundReadiness();
+  // 这个账号有哪些规则、每条由谁抽取。手机上此前连"看规则"都做不到，只能回 web。
+  // 🔴 拉取住在 `lifecycle.ts`（前台那一趟），这里只读 store —— 本组件仍然不发请求。
+  const inboundRules = useInboundRules();
 
   return (
     <Stack gap="loose" testID="ai-settings-section">
@@ -293,6 +297,17 @@ export function AiSettingsSection(): React.JSX.Element {
       <Text variant="row-meta" testID="inbound-boundary">
         {t(INBOUND_BOUNDARY_COPY_KEY)}
       </Text>
+      {/* 规则清单（只读）：手机上以前连"我有几条规则、它们谁在处理"都说不出。 */}
+      {inboundRules === undefined || inboundRules.length === 0 ? null : (
+        <Card gap="tight">
+          <Text testID="inbound-rules-title">{t('web.ai.inbound.title')}</Text>
+          {inboundRules.map((rule) => (
+            <Text key={rule.id} variant="row-meta" testID={`inbound-rule-${rule.id}`}>
+              {`${rule.keyId} · ${t(rule.enabled ? 'web.ai.inbound.enabled' : 'web.ai.inbound.disabled')} · ${t(rule.hostedExtraction ? 'web.ai.inbound.hosted.stateHosted' : 'web.ai.inbound.hosted.stateDevice')}`}
+            </Text>
+          ))}
+        </Card>
+      )}
 
       {/* ── 闸 1：总开关 ─────────────────────────────────────────────── */}
       <Card gap="loose">

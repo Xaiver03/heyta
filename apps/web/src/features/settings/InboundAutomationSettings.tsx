@@ -2,6 +2,7 @@ import './inbound-automation.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createInboundRulesRemote,
+  INBOUND_EVENT_LIST_LIMIT,
   type InboundAutomationField,
   type InboundAutomationRule,
   type InboundAutomationEventSummary,
@@ -80,6 +81,20 @@ export const PROCESS_COPY: Partial<Record<InboundAutomationCycleState | 'failed'
   'needs-confirmation': 'web.ai.inbound.process.needs-confirmation',
   failed: 'web.ai.inbound.process.failed',
   'waiting-entitlement': 'web.ai.inbound.process.waiting-entitlement',
+};
+
+/**
+ * 事件的 `reasonCode` 到人话。**只列服务端真的会写的值**（`server/src/automation/events.ts`：
+ * `needs-confirmation` / `model-result-uncertain` / `user-cancelled` / `rule-disabled` /
+ * `retention-expired`）。表外值**不渲染**——状态行已经把"发生了什么"说清楚了，
+ * 拿一个认不出的码编一句话就是替服务端猜。
+ */
+export const REASON_COPY: Record<string, MessageKey> = {
+  'needs-confirmation': 'web.ai.inbound.events.reason.needs-confirmation',
+  'model-result-uncertain': 'web.ai.inbound.events.reason.model-result-uncertain',
+  'user-cancelled': 'web.ai.inbound.events.reason.user-cancelled',
+  'rule-disabled': 'web.ai.inbound.events.reason.rule-disabled',
+  'retention-expired': 'web.ai.inbound.events.reason.retention-expired',
 };
 
 /** Settings-only CRUD surface for the server-side automatic-capture rules. */
@@ -484,6 +499,8 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                   <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void revokeCredential(credential)}>{t('web.ai.inbound.credential.revoke')}</button>
                 </div>)}
                 <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void issueCredential(rule)}>{t('web.ai.inbound.credential.rotate')}</button>
+                {/* 试发要现成的 secret，而 secret 只在刚签发那一刻留在内存里 ⇒ 这句话必须常驻，别让用户以为随时能拿旧凭据试发。 */}
+                <p className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.testSendOnce')}</p>
               </div> : null}
               {oneTimeSecret?.ruleId === rule.id ? <aside className="ht-inbound__credential-secret" role="status" data-testid="inbound-credential-secret">
                 <p className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.secretOnce', { keyId: oneTimeSecret.keyId })}</p>
@@ -551,6 +568,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                 return <article className="ht-inbound__group" key={event.eventId} data-testid={`inbound-event-${event.eventId}`}>
                   <p className="ht-settings__hint" role="status">{t('web.ai.inbound.events.event', { id: event.eventId })}</p>
                   <strong>{t(`web.ai.inbound.events.${status}` as any)}</strong>
+                  {event.reasonCode !== null && REASON_COPY[event.reasonCode] !== undefined ? <p className="ht-settings__hint" role="status" data-testid={`inbound-event-reason-${event.eventId}`}>{t(REASON_COPY[event.reasonCode]!)}</p> : null}
                   {canReview ? <>
                     <div className="ht-settings__actions">
                       <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void openDraft(event)}>{t('web.ai.inbound.draft.open')}</button>
@@ -601,6 +619,8 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                   </div> : null}
                 </article>;
               })}
+              {/* 服务端一页只回 50 条（`take: 50`）；到顶了却说"就这些"，就是把截断说成全量。 */}
+              {events.length >= INBOUND_EVENT_LIST_LIMIT ? <p className="ht-settings__hint" role="status" data-testid="inbound-events-capped">{t('web.ai.inbound.events.capped', { limit: INBOUND_EVENT_LIST_LIMIT })}</p> : null}
             </div>
           </div>
         </>
