@@ -1022,6 +1022,18 @@ pnpm check:web-artifact:app
 rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 ```
 
+🔴 **换钉一棵**已有 `node_modules` 的载体（`git checkout --detach <新 SHA>`）之后，必须在这棵树上先补一次
+根构建 `pnpm build`，再跑 §3.7 那三条。**这不是仪式**：`apps/web` 吃的是 `packages/*` 的**构建产物**
+（词条联合类型、`@heyta/ui` 的 `.d.ts`），换钉只换源码不换 `dist`。2026-10-29 现量两种后果：
+① 直接红在第 3 步——`tsc` 报一串"键不存在于 `MessageKey`"，而源码里 `grep -c` 两边各有 1（属 §7 第 615 条那一族）；
+② **更坏的是不红**——把 `packages/i18n/src/locales/zh-CN.ts` 单独 `touch` 一下（源码比 `dist` 新、内容没变），
+第 3、4 步照样 `rc=0` 走过去。⇒ 第 3/4 步**挡不住**"拿着上一戳的包产物打包对外发布"。
+现量这把陈旧尺（新鲜回 0、陈旧回 ≥1，且 `touch` 不会让 `git status` 变脏，所以守卫不能只看脏不脏）：
+`find packages/i18n/src -type f \( -name '*.ts' -o -name '*.tsx' \) -newer packages/i18n/dist/index.d.ts | wc -l`
+（逐包换名：`packages/ui`、`packages/app-host`、`packages/domain` 各一枚 `dist/index.d.*`）。
+把这一格加进发布装置的守卫是**另一件事**，已登记待那条线拍板，见 `BLOCKED.md` 那张「待拍板 / 跨线」表里
+"发布装置不校验 `packages/*/dist` 陈旧"那一行。
+
 ⚠️ 2026-09-27 那次 `pnpm install` 得加 `--no-frozen-lockfile`：当时 HEAD 的
 `pnpm-lock.yaml` 已经引用 `packages/widget-core`，而那个包**还没被提交**
 （`git ls-tree HEAD packages/` 里没有它），所以 frozen 安装直接失败。
