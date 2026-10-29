@@ -5751,3 +5751,33 @@ S2 把 `apps/mobile/src/screens/ExportScreen.tsx:357` 那枚真回执整个换�
   而 `rsync --delete` 打的是生产目录。**本轮没有再发一次**：上一轮那句"发，按老命令走一遍"是那一趟的授权，
   单次授权不外扩。要发的人需要知道的就一行：`node research/tools/publish-public-sites.mjs --confirm`
   （它拒绝发不是正好 `main` 那一笔的字节，也不动服务端镜像）。
+
+---
+
+### 6.126（2026-10-29 16:2x · 把"要不要再发一次"变成"只差一句点头"：载体路线逐步骤跑通，顺带量出发布装置的一格真空）
+
+上一格留下的那一格（线上那盘应用旧于 main）本轮**不再是拦路状态**，做法是手册 §3.7 那条载体路线：
+`~/heyta-carriers/web-pub-d703f1baa` 从 `d703f1baa` 换钉到当前 `main`（换钉前先看
+`git diff --stat d703f1baa..HEAD -- pnpm-lock.yaml package.json pnpm-workspace.yaml` 回空 ⇒ 免重装），
+再把那棵树唯一一枚脏件（`apps/web/evidence/help-link-render-1013/readout.json`，门禁自己重写的读数件）
+先 `git diff` 存到 `~/.heyta-evidence/carrier-webpub-1029/` 再 `git restore` ⇒ `git status --porcelain` 现量 0 枚。
+
+**守卫过了**：`cd <载体> && node research/tools/publish-public-sites.mjs` ⇒ `HEAD==main`、构建输入脏 0 条、`✅ 守卫成立`，
+九步原样打印且一步没执行（第 6 步是远端备份，第 7/8 步两条 `rsync --delete`，第 9 步线上验收）。
+
+**本地那五步逐条跑绿**（都在载体里，一个字节没往生产写）：
+第 1 步 `pnpm --filter @heyta/landing check:entries` 与第 5 步 `verify-landing-dist.mjs` 各 rc=0；
+第 4 步 `node scripts/check-web-artifact.mjs --mount /app/ --dist apps/web/dist` rc=0。
+第 3 步第一次是 **rc=1**，第二次 **rc=0**，成因就是本轮记进手册的那格：换钉只换源码不换 `packages/*/dist`，
+`tsc` 于是报一串"键不存在于 `MessageKey`"（属 §7 第 615 条那一族），补一次根 `pnpm build` 就绿。
+**更要紧的是第二种后果**：把 `packages/i18n/src/locales/zh-CN.ts` 单独 `touch` 一下（内容不变、`git status` 仍 0 枚脏），
+第 3、4 步照样 rc=0 ⇒ 发布链条**没有任何一步**比过"包产物 vs 包源码"，可以拿着上一戳的包产物对外发布。
+陈旧尺的形状量清楚了（新鲜回 0、陈旧回 ≥1）：`find packages/i18n/src -type f \( -name '*.ts' -o -name '*.tsx' \) -newer packages/i18n/dist/index.d.ts | wc -l`。
+把它加进那枚装置的守卫 = 改别人的工具与它 20 枚臂的账，**登记不代改**，格在 `BLOCKED.md` 那张「待拍板 / 跨线」表里。
+
+**要发的人现在只需要一条命令**（在载体根跑）：`node research/tools/publish-public-sites.mjs --confirm`。
+可见变化：`/var/www/heyta-landing` 与 `/var/www/heyta-app` 各自被换成这一笔的产物（两条 `rsync` 都带 `--delete`，
+发之前第 6 步先在远端 `tar` 一份到 `/tmp/heyta-public-backup-<戳>.tgz`），先发站点后发应用，最后第 9 步线上验收真跑。
+发布后逐字节复验的两枚指纹（**那一戳**载体的产物，复算就在载体里跑同一条 `shasum`）：
+`apps/web/dist/index.html` 与 `apps/landing/dist/index.html`——现量命令
+`cd <载体> && shasum -a 256 apps/web/dist/index.html apps/landing/dist/index.html`。
