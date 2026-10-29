@@ -86,8 +86,17 @@ export function extractFns(file, text) {
         // 🔴 `balanced` 返回的 `end` 就是那枚**闭括号本身**的下标 ⇒ 必须从 end+1 起看，
         //    否则 slice 以 `)` 开头，每一枚 function 声明都会被当成"表达式体"跳掉
         //    （本线第一发就是这么把 1059 枚文件只解析出 60 枚函数，被 D1 当场抓住）。
-        if (!/^\s*\{/.test(masked.slice(paren.end + 1))) { skipped.exprBody += 1; continue; }
-        bodyOpen = masked.indexOf('{', paren.end + 1);
+        // 🔴 返回类型标注（`: void` / `: Promise<void>`）在本仓是主流写法 ⇒ 必须先跳过它再要求 `{`，
+        //    否则每一枚带标注的 function 声明都被当成"表达式体"**静默跳过**：
+        //    本发就是这么让 `apps/mobile/src/privacy/consent-gate.ts` 与
+        //    `apps/web/src/features/privacy/consent-gate.ts` 那两枚只差注释的 `notify()`
+        //    （连整枚文件）不在分母里，被 D15 当场抓住。
+        //    类型里不许出现 `{`（对象返回类型）或 `;`（重载签名，本来就没有体）⇒ 落到 exprBody 计数，可反查。
+        const afterParen = masked.slice(paren.end + 1);
+        const typeRun = /^\s*:[^{;]*/.exec(afterParen);
+        const bodyAt = paren.end + 1 + (typeRun ? typeRun[0].length : 0);
+        if (!/^\s*\{/.test(masked.slice(bodyAt))) { skipped.exprBody += 1; continue; }
+        bodyOpen = masked.indexOf('{', bodyAt);
       } else if (/^\s*\{/.test(masked.slice(start))) {
         bodyOpen = masked.indexOf('{', start);
       } else {
@@ -236,10 +245,20 @@ if (selfTest) {
   push('D13 --scope 只吃目录前缀：password 不许把 passwordish.ts 算进来',
     [applyScope(['server/src/password/login-otp.ts', 'server/src/passwordish.ts'], 'server/src/password').length, applyScope(['a.ts'], '').length],
     [1, 1]);
+  push('D14 带返回类型标注的 function 声明必须解析到（本发真漏过的那一族：`: void` / `: Promise<void>`）',
+    (() => {
+      const one = extractFns(A, 'function f(x: number): void {\n  return;\n}').rows.length;
+      const pair = S([[A, 'async function f(x: number): Promise<void> {\n  const y = x + 1;\n  return;\n}'],
+        [B, 'async function f(x: number): Promise<void> {\n  const y = x + 1;\n  return;\n}']]).exact.length;
+      // 重载签名（无体）不许被当成体，更不许把**下一枚**有体的声明一起吃掉
+      const overloads = extractFns(A, 'function f(x: number): void;\nfunction g(): void {\n  return;\n}').rows.map((r) => r.name).join(',');
+      return [one, pair, overloads];
+    })(),
+    [1, 1, 'g']);
   const nums = labels.map((l) => Number(/^D(\d+)/.exec(l)?.[1] ?? 0));
   const seqOk = Math.max(...nums) === labels.length && new Set(nums).size === labels.length;
-  console.log(`${seqOk ? '✅' : '🔴'} D14 臂编号连续且不重号（判的是上面 ${labels.length} 枚：最大号 ${Math.max(...nums)} ｜ 去重 ${new Set(nums).size}）`);
-  if (!seqOk) bad.push(`D14 臂编号跳号或重号 ｜ 最大 ${Math.max(...nums)} ｜ 条数 ${labels.length}`);
+  console.log(`${seqOk ? '✅' : '🔴'} D15 臂编号连续且不重号（判的是上面 ${labels.length} 枚：最大号 ${Math.max(...nums)} ｜ 去重 ${new Set(nums).size}）`);
+  if (!seqOk) bad.push(`D15 臂编号跳号或重号 ｜ 最大 ${Math.max(...nums)} ｜ 条数 ${labels.length}`);
   console.log(`\n臂数 ${labels.length + 1} ｜ 不符 ${bad.length}`);
   for (const b of bad) console.log(`🔴 ${b}`);
   process.exit(bad.length === 0 ? 0 : 1);
@@ -332,7 +351,7 @@ console.log(
   `跨文件重叠实现探针 ｜ 分母 ${scope.length} 枚文件${SCOPE ? `（已按 --scope ${SCOPE} 收窄）` : ''}（工作树里脏的 ${dirtyScope(scope).length} 枚，读数含它们）` +
     `｜ 解析出函数 ${s.total} 枚（在桶里 ${s.inCluster} ｜ 各一枚 ${s.singletons}）｜ 跳过 表达式体 ${exprBody} · 配不上 ${unbalanced} · 读不到 ${unreadable}`,
 );
-console.log(`  · 口径：只看**声明级**函数（function 声明与 const 名 = 箭头块体），内部回调与带泛型参数的箭头不在射程 ⇒ "没有重叠"这句的范围就是这个口径`);
+console.log(`  · 口径：只看**声明级**函数（function 声明与 const 名 = 箭头块体；带返回类型标注的算在内，重载签名无体不算），内部回调与带泛型参数的声明不在射程 ⇒ "没有重叠"这句的范围就是这个口径`);
 for (const min of [3, 5, 10]) {
   console.log(
     `  ≥${min} 行那一档：🔴 逐字相同 ${s.exact.filter((c) => tierLines(c, min)).length} 桶 ｜ 🟠 只差注释或文案 ${s.maskedOnly.filter((c) => tierLines(c, min)).length} 桶`,
