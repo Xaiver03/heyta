@@ -946,9 +946,12 @@ from users where email = '<测试邮箱>';
 （body 必须带 `{"keyId":…}`）→ `PUT …/enabled {"enabled":true}` → 用 `packages/inbound-core` 的
 `signWebhook(secret, input)` 签一条 POST（**参数顺序是 secret 在前**）⇒ 期望 **202 queued**。
 
-**⑤ 设备那一趟**还需要在同一个浏览器会话里：解锁 Vault → AI 与集成里启用远程 + 选托管档 +
-对 `inbound-automation` 给出境授权 → 收件密钥 → 注册为处理设备 → 处理一条。缺任一项，
-事件会**一直停在 queued**（本轮实测：没有 AI 路由授权时就是这个形状）。
+**⑤ 设备那一趟**还需要在同一个浏览器会话里：解锁 Vault → AI 与集成里**先开总闸**（`启用 AI 功能`，
+它关着时 `ai-remote-gate` 根本不渲染）→ 允许远程 → 选托管档 → 收件密钥 → 注册为处理设备 → 处理一条。
+缺任一项，事件会**一直停在 queued**。
+🔴 **无头浏览器跑不完最后一步**：面板能读到"处理设备已就绪"，签名投递也回 202，但标签页
+在无头模式下不满足循环的 `visibilityState === 'visible'` 判据 ⇒ 领不动。这一步要么用有头浏览器，
+要么由人打开页面（工单 AC-6 本来就要求"人真打开看过"）。
 
 **⑥ 收尾（不写会让 `users` 计数漂）**
 
