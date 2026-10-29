@@ -5108,7 +5108,7 @@ grep -rln shouldShowConsent apps/web/tests e2e/tests apps/mobile/tests packages/
 且这条 🔴 改的是**同意语义**（哪一屏免弹），不满足"一子可删 + 运行时形状逐字段等于改前 + 一条命令可回退"三条齐。
 ⇒ 全部进 `BLOCKED.md` 的待拍板表，不进"已修"。
 
-### 6.111（2026-10-28 04:1x–04:4x · 「第三版索引」这一类雷是**我自己那套 plumbing 造的**：三枚全拆、尺补一栏、台架六种注入全咬住）
+### 6.111（2026-10-28 04:1x–04:5x · 「第三版索引」这一类雷是**我自己那套 plumbing 造的**：三枚全拆、尺补一栏、台架六种注入全咬住）
 
 **起因不是找雷，是收「未登记的例外」。** 例外归属尺当时报 `⚠️ 索引旧内容 1 枚 ｜ MM scripts/check-gate-wiring.mjs`。
 那枚文件的工作树**对 HEAD 是干净的**，脏的只有索引那一格，而且索引那版跟 HEAD、工作树**都不相同**：
@@ -5199,3 +5199,48 @@ plumbing 只在「这枚文件里含别人的行」时才有理由用，且**用
 node scripts/check-worktree-exceptions.mjs          # 分档 + 未登记栏 + 跨线依赖，全部现量打印
 git ls-files --error-unmatch apps/web/src/lib/form/useDirtyDismissGuard.tsx   # 读回 error = 仍未入库
 ```
+
+### 6.112（2026-10-28 09:4x–10:1x · 第 3 件"审自己这轮的码"抓到两处自己的毛病：一栏重复打印、一条打不到的守卫）
+
+**这一节审的是本线今晚新写的码，不是别人的产品面。** 五个维度各量一发，读数如下。
+
+**① 重复实现 —— 有，就在同一枚文件里。** `check-worktree-exceptions.mjs` 打印「索引旧内容」那一档的路径集合，
+是新建的「第三版」那一栏的**真子集**（工作树==HEAD 且 索引≠HEAD ⇒ 索引既不等于 HEAD 也不等于工作树 ⇒ 必命中）。
+两栏并排印同一批路径 ⇒ 下一位读者不知道哪一栏是权威。处置：**归属那一档照旧参与计算**
+（索引旧内容不算"未登记的例外"这个结论要留着，它挡住的是假例外），**只是不再单独打印**；
+`wt === head` 那一支的正解行里补上"这就是旧版单独打印的那一档，正文见 §6.108"，把交叉引用接回去。
+🔴 折叠不许把路径吞掉，所以加了**包含性臂 ㉛**：`classify` 判为 `indexOnly` 的每一枚，
+`thirdVersionRows` 必须同时点名 —— 两条谓词今后谁被单独改动而破坏包含关系，这一臂就红。
+
+**④ 错误处理 —— 有一条是死的。** 我写完 `git hash-object --stdin-paths` 之后加了一句
+"取回条数 != 分母枚数 ⇒ 退 2"。这句话**永远轮不到执行**：路径读不到时 `hash-object` 整发失败，
+`zip` 配对器先抛 ⇒ 长度不等早在异常里发生了。这就是本仓那句"写了但打不到的错误处理等于没有"的现量样本。
+处置：守卫包到真正会失败的那一步外面（`try/catch` ⇒ `🔴 工作树哈希这一发没取成 …` + `rc=2`），
+死分支删掉。**可达性怎么证的**：`node -e` 直接喂一发 `git hash-object --bogus-flag` ⇒ 真抛
+（`Command failed:` 进 catch），不吞。这一发是**机制级**验证，端到端那一列我**没有**在真树上造出
+"某枚脏文件在两次 git 调用之间消失"的形状，所以写成机制读数，不写成端到端已证。
+
+**③ 性能 —— 量了，没问题。** 整把尺（含三条批量 git：`ls-files -s -z` / `ls-tree -r -z HEAD` / `hash-object --stdin-paths`）
+**同一趟**取到的一对读数是分母 144 枚 / `real 0.20` 秒（10:5x 那一戳；分母与耗时必须同趟取，
+我上一版把 140 与 0.21 配成一对，那是两个时刻的读数硬拼出来的，已改掉）。臂全是纯函数、不碰 git。
+没有逐枚 spawn 那条 N+1 形状。
+```sh
+N=$(node scripts/check-worktree-exceptions.mjs | grep -oE '未提交 [0-9]+' | grep -oE '[0-9]+')   # 先取分母
+T=$(/usr/bin/time -p node scripts/check-worktree-exceptions.mjs 2>&1 >/dev/null | awk '/^real/{print $2}')
+echo "同一趟：分母 $N 枚 ｜ real ${T}s"
+```
+
+**② 死代码 —— 一条。** 上面那个死分支就是。其余新增（`parseLsFilesStage` / `parseLsTree` / `zip` / `thirdVersionRows`）
+各有臂消费：`grep -n "㉑\|㉒\|㉓\|㉔\|㉕\|㉖\|㉗\|㉘\|㉙\|㉚\|㉛" scripts/check-worktree-exceptions.mjs` 逐枚有点名。
+
+**判据能不能红（不靠自证）**：母本被我这轮改过之后，台架六种注入**仍全打得到**——
+`node research/tools/mutate-worktree-third-version.mjs` ⇒ 注入形状 6 种、打空 0 种；
+`node scripts/check-worktree-exceptions.mjs --self-test` ⇒ 臂数与不符数由尺自己打印。
+
+**顺带两条现场事实（都归别人，我只登记不动手）**：
+- UX 线新起了 P4 一族（`packages/ui/src/control/`、`packages/ui/tests/control-states.spec.ts`），
+  spec 头行自写「`control/states.ts` 的契约 —— 全局 UX 线 P4」，`states.ts` 的 mtime 距我读数 47 秒 ⇒ 正在写。已按原文登记进归属表。
+- 🔴 那一分钟里 `packages/ui/src/control/` 还躺着一枚 `states.ts.mut-bak`，几分钟后自己消失 ——
+  那是**变异台架的还原备份**，不是残渣（本仓 18 份文档明文写着"还原只从 `.mut-bak` 取，不从 git 取"，
+  现量 `grep -rl 'mut-bak' docs | wc -l`）。按"清理未跟踪文件"的直觉删掉它，就会在别人下一次还原时把人家的母本删了。
+  ⇒ 别人名下任何 `*.mut-bak` / `*.teeth-bak` 一律不碰；这一条也写进了归属表的注释里，挡住下一个想"顺手清理"的人。
