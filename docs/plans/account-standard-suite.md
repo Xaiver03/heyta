@@ -5561,3 +5561,47 @@ node research/tools/audit-duplicate-function-bodies.mjs --strict --scope server/
 
 🔴 这一张表**还没进 `BLOCKED.md`**：那本账本此刻在别人手里脏着（`git status --porcelain -- BLOCKED.md` 现量），
 按既有纪律先落在本计划，等它空了再由搬运者按"立新条还是并入既有条目"复核一次。
+
+### 6.121（2026-10-29 15:4x · 第 ③ 维"循环里逐行查库 / 同步 IO"补上一台有分母的探针；顺手把共用遮蔽工具的两处洞补上）
+
+新装置：`research/tools/audit-loop-io.mjs`。两档形状 ——
+🟠 A 档"循环里逐行查库"（`for` / `while` / `do` / `.forEach`·`.map` 这类每行调一次回调），
+🟠 B 档"循环内或 async 路径里的同步 IO"（`*Sync(` 系列）。报的都是**候选**，一枚都不改。
+
+四格显式落成"不判/判不了"并**报条数**：批量形状（`createMany`、`where:{in:}`）、有界计数重试
+（`for (let i = 0; i < 5; i += 1)`）、动态模型名 `prisma[name]`、循环体括号配不上（**带 file:line**，不是只报个数）。
+`setTimeout` 那种一次性定时器由另一把尺管（见 §6.119）。分母自证写在主读数那一路：
+"判读到的调用点数"必须等于"遮蔽后正则命中数"，对不上整趟作废退出 2。
+
+四把尺各自的自检：`node research/tools/lib/text-mask.mjs --self-test`（共用遮蔽）与另三把的 `--self-test`；
+臂数由每条命令自己打印。全树三把 audit 探针 + 归属尺一次跑完的墙钟在秒级
+（`S=$(date +%s); for f in research/tools/lib/text-mask.mjs research/tools/audit-*.mjs; do node "$f" --self-test >/dev/null; done; echo $(( $(date +%s) - S ))`）。
+
+**这一轮我自己造的三个错，都被臂/读数当场抓住**（记下来是因为它们都是"判据错"而不是"被测物错"）：
+① 取循环体时把 `balanced()` 的 `end`（就是那枚闭括号本身）当成"闭括号之后" ⇒ `for`/`while` 两路整体失效，
+   只剩 `.map`/`.forEach` 那一路还能吃 —— 现量：D1/P1/P5 三条臂同时红。
+② 给共用遮蔽工具加自测时，我只判了"`--self-test` 在不在 argv 里"，没判"它是不是被直接执行的那一枚" ⇒
+   **三把 import 它的尺一跑自检，就先执行库里的自测并 `process.exit`** —— 症状是四把尺报出同一个臂数。
+   "几台仪器给出同一个数"本身就是信号，别当巧合。现在库的守卫同时要求旗标与 `pathToFileURL(argv[1])` 是自己。
+③ 补正则字面量遮蔽时，判定"前一个非空白字符"写成了 `text.slice(0, i)` —— 把整趟遮蔽变成 O(n²)，
+   三把消费方一起挂住（一次读数超时到被移到后台）。现在只维护一个游标，关键字那次判断只看最后 14 个字符。
+
+**共用遮蔽工具补的那一格洞**：它以前不认正则字面量，于是 `/[\s,}\]]/` 这种字符类里的花括号把后面的配对全搅乱 ——
+现量两处"循环体配不上"（`packages/inbound-core/src/webhook.ts`、`packages/design-system/src/generate.ts`）都是它。
+补上之后 webhook 那一处从"判不了"变成"判得出"。除法不许被误认成正则（臂 T7），
+关键字后面接正则要认（T8），未闭合撇号不许吞掉整行（T5）。
+
+**本面那一档是绿的（现量）**：`node research/tools/audit-loop-io.mjs --strict --scope server/src/password` 退出 0 ⇒
+注册登录这条线自己的面上没有"循环里逐行查库"。整层 `--scope server/src` 退出 1，红在别人那一面，见下表。
+
+| 叠在哪 | 归谁 | 为什么不由我收 |
+|---|---|---|
+| `server/src/sync/services/storage-quota.service.ts` 三处：两处 `findFirst` 在 `for` 里逐用户查、一处 `findMany` 在 `while` 里 | 同步/配额那条线 | 那三处的注释自己写着"Exact semantics over a faster plan"——是**明知 slower 而选 exact** 的判断，改它要连着改那条 sweep 的正确性论证 |
+| `packages/design-system/src/generate-cli.ts` 两处循环内同步 IO | 设计系统 token 生成 | 构建期脚本，不在任何在线请求路径上；它阻塞的是生成那一趟，不是用户请求 |
+| `apps/desktop/src/smoke.ts` 一处循环内同步 IO | 桌面壳冒烟 | 冒烟脚本，同上 |
+| `packages/storage/src/sqlite/node-sqlite-driver.ts:64` 循环内 `rmSync` | 存储驱动 | 那是 `['', '-wal', '-shm']` 三元素的**拆卸**循环，有界且必须在卸载路径上同步 |
+| `packages/ai/src/routing.ts` 的 `secretStore.get`（已被本尺改判成"判不了"那一档） | AI 路由 | 它是密钥库取物不是查库 ⇒ 这一格我已经**按机制修掉尺**而不是算成缺陷 |
+| `server/src/activity/invite.ts` 两处（`create` + `findUnique` 在 `for (attempt<5)` 里） | 邀请/活动 | 有界计数重试，已被本尺改判成"不判"那一档 |
+
+🔴 与 §6.120 同一格纪律：这张表**还没进 `BLOCKED.md`**（那本账此刻在别人手里脏着，
+`git status --porcelain -- BLOCKED.md` 现量），先落本计划，等它空了由搬运者复核"立新条还是并入既有条目"。
