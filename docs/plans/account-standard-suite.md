@@ -5383,3 +5383,36 @@ pnpm --dir e2e exec playwright test --config playwright.live-site.config.ts live
 **载体留着**（`~/heyta-carriers/web-pub-<短 SHA>`，`git worktree` 一枚，脏条目 0）：
 UX 线那 9 枚源码一落地，重发只需 `git -C <载体> checkout --force main` + `pnpm -r build` + 再跑发布器，省一趟装依赖。
 不要了就这样收（是本会话创建的对象）：`git worktree remove --force <载体>`。
+
+### 6.116（2026-10-29 11:4x–11:5x · 一次"替并行会话收"的判断：三个假设里两个被现量否证，第三个是 HEAD 上真断的）
+
+目标第 1 件写明"含并行会话留下的"。剩下这批脏件 15 小时没人动过（mtime 全在 10-28 18:2x–20:0x），
+所以"他们还在写"这句**不再成立**——该替他们收的就收。但我没有直接动手，先量三件事，前两件都量错了方向：
+
+| 我先假设的 | 现量把假设否证在哪 |
+|---|---|
+| 「那枚新 lib 在 HEAD 里没有消费者 ⇒ 是死代码」 | `git grep -l sync-build-sources HEAD` 读回 11 处，其中 `scripts/android-carrier-device.sh`、`check-android-build-host.mjs`、`check-android-gradle-remote.mjs`、`lib/msix-install-facts.sh` 是真消费者；它是随 `fa907e7cd`（10-28 16:36）**带着消费者一起**进的 ⇒ 不是死代码 |
+| 「`reinstall-all.sh` 里还留着同一份逻辑的内联 ⇒ HEAD 有重复实现」 | 拿 lib 自己的函数名去 HEAD 的那份里找，四个名字各命中 0；再看它 `source` 的是哪枚——指向**旧名** ⇒ 不是重复，是下面那一格 |
+| 「HEAD 里有人 `source` 一枚不在 HEAD 的文件」 | ✅ 成立：`scripts/lib/sync-windows-sources.sh` 已不在 HEAD（`git cat-file -e HEAD:…` 退 128），而 HEAD 里 4 行还指着它：`reinstall-all.sh:385`（注释）、`:388`（`source`）、`verify-windows-shell-journey.mjs:295`、`research/tools/selfhost-windows-sync-arms.mjs:27` |
+
+**⇒ 干净检出上 `pnpm reinstall:all` 一启动就炸。** 而这件事链上没有任何一层会报：
+`check:shell-erasure-parity`、`check:shell-exit-chain` 那族判的是别的东西，本尺原先那一判**读工作树文本**
+（工作树里别人已经改成新名了）、且只认模块 `import`——两条都拦不住它。
+
+**怎么收的（代收的唯一一格，其余仍归各自线）**：那三枚脏文件的未提交内容**就是这处改名本身**——
+逐枚 `git diff HEAD --numstat` 是 2/2、1/1、1/1，四行全同一路径名，没有夹带任何别的改动；
+新 lib 在 HEAD 里且导出的正是它们调用的 `sync_windows_sources`（`git show HEAD:scripts/lib/sync-build-sources.sh` 的函数名单）。
+⇒ 提交它只把 HEAD 从不一致变成一致，不改任何语义。归属照旧记在自托管分发那条线名下（提交信息第一行写明"代收拢"）。
+复量：`git grep -c sync-windows-sources HEAD` 现在读回 0 处。
+
+**把那一判固化下来（先修后上尺，所以它生下来不红）**：`check-worktree-exceptions.mjs` 新增
+「HEAD 的 shell `source` 是否指向不在 HEAD 的文件」。解析取的是**锚点后缀**不是变量求值
+（本仓 `source` 的变量前缀按约定都是仓库根，所以从 `scripts|packages|apps|server|docs|research|e2e` 起那一段就够）；
+取不到锚点的 14 处落成**「未判定」计数照实打印**——静默跳过等于把"没看到"记成"没有"，那是本仓最贵的一类错。
+五枚臂：㊳ 命中（形状就是今天这枚）、㊔ 目标在 HEAD ⇒ 不许命中、㊕ 无锚点 ⇒ 未判定不是绿、㊖ 注释行不算、㊗ dot-source 与 `$REPO` 前缀同权。
+默认进退出码；`node scripts/check-worktree-exceptions.mjs` 那行 `HEAD shell source 对账` 自己打印扫了多少行、悬空几处、未判定几处。
+
+**另一件只登记不代办的（归全局 UX 线）**：`apps/web/evidence/` 那批被门禁重写的 PNG，
+mtime 全落在 10-28 18:2x–20:0x，而 10-28 20:19 / 20:38 / 20:45 与 10-29 11:40 又有会改像素的 UI 提交落库
+⇒ **未提交那一版和 HEAD 那一版都比当前产品旧**。所以"替他们收截图"是错的动作——谁收都把过期证据再钉一次；
+正解是改 UI 的那条线重跑截图矩阵、随自己那笔一起提交。这一格连同现量命令进了 `BLOCKED.md` 的待拍板表。
