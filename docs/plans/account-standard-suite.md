@@ -5941,3 +5941,23 @@ L13 第一发是假红的夹具自己太短（拿 `- 项目符号行` 测前缀�
 
 入库前的对账：`node research/tools/audit-ledger-row-loss.mjs --strict` 退 **0**（消失 0 枚；
 本节的追加不改任何已入库行），尺自己打印 ref/worktree 非空行数。
+
+### 6.132（2026-10-30 00:2x · 发布那一格只剩"要不要发"这一句；顺手量到手册那枚载体目录是会被清掉的）
+
+线上那盘应用与 HEAD 还差一笔对外动作，本线**不自己按**。要点头的可见效果与命令在
+`docs/runbooks/deployment.md` §3.7（干净检出构建 → `pnpm check:web-artifact:app` → `rsync` 到 `/var/www/heyta-app`），
+发完的凭据按老形状取：`node scripts/live-web-freshness.mjs --landing`（今天 **齐 78 ｜ 不齐 0 ｜ 线上没这页 1**，
+那 1 枚是 `/pitch/`，已在待拍板表里）＋ `pnpm --dir e2e exec playwright test --config playwright.live-site.config.ts`。
+
+**量到一件事**：手册 §3.7 让所有人把载体建在 `/tmp/heyta-head`，而这一枚 00:2x 已经不在了——
+`git -C /tmp/heyta-head rev-parse --short HEAD` 回 `fatal: cannot change to '/tmp/heyta-head'`。
+不是谁删的，那本来就是重启/清理会走掉的位置（本仓那条"可复现物不要住 /tmp"说的就是这件事）。
+后果分两种，都对外：要么发布那一趟现建现装（慢，但结论正确），要么下一位图快**直接在本工作区构建**——
+那正是手册用🔴标出来的那条（这里有并行会话在写 `packages/domain` / `packages/app-host`，
+`apps/web` 从它们的**源码**编译，直接把未提交的半成品推上线）。
+载体该住哪儿（`<仓>/.worktrees/head-publish` 之类）是发布这条链的口径，归它拍；本线只登记现量与那一发 fatal 的形状。
+
+另一枚瞬时读数（**别照抄，它一分钟就换名**）：`node scripts/check-worktree-exceptions.mjs`
+在 00:20 那一趟报"未登记例外 1 枚"，点名的是一枚 `e2e/tmp-inbound-*.mjs`；同一分钟里它的名字已经换过一次，
+而两趟都 rc=0 —— 那条🔴是**读数**，`--strict` 也不进退出码（尺自己 `:390` 注释写着"能拆的雷只有这格是谁留下的才知道答案"）。
+不归本线动：那是别人此刻正在写的探针。
