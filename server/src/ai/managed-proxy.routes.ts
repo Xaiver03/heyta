@@ -215,7 +215,9 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
       const result = await invokeManagedAiCompletion(
         { upstream, sql, limit, now, transport, hosts, plaintextHosts, startedAt },
         { userId, feature, messages, ...(tools === undefined ? {} : { tools }),
-          ...(toolChoice === undefined ? {} : { toolChoice }), ...(stream === undefined ? {} : { stream }) },
+          ...(toolChoice === undefined ? {} : { toolChoice }), ...(stream === undefined ? {} : { stream }),
+          // 设备那条腿的预留在它发这一发之前已经写过（工单 A4）；只有这里允许认领。
+          claimReservedAttempt: true },
       );
       return shapeCompletionReply(reply, result);
     },
