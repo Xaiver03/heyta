@@ -5816,3 +5816,29 @@ S2 把 `apps/mobile/src/screens/ExportScreen.tsx:357` 那枚真回执整个换�
 
 复量：`node research/tools/audit-unbounded-read-paths.mjs`（诊断）／ `--strict`（候选非 0 退 1）／
 `--self-test`／ `--mutate`／ `--scope server/src/account`（单面）。
+
+---
+
+### 6.128（2026-10-29 23:5x · 例外尺自己有一处只在一个模式下滤噪声；顺带记一条"等人在飞"的瞬时读数）
+
+撞见的形状：`e2e/live-site/live-legal.spec.ts` 一被别人改脏，归属尺的第二判就报三处"跨线依赖"
+（它 import `../../packages/legal/dist/index.js`、`packages/i18n/dist/locales/{zh-CN,en}.js`，见 `:69/:72/:73`）。
+那些是 `pnpm build` 的**产物**，按设计不入库 ⇒ 假红。
+根因不是判据写错，是**同一类噪声只在一个模式下被承认过**：`--head` 那一臂当初就因为
+"指向 `packages/*/dist/*` 这种构建产物…都要真正的解析器才分得清"而撤掉了（尺内那条 `console.error` 还留着），
+默认模式却没滤 ⇒ 谁碰这枚文件谁吃三行假红，而假红的代价是别人开始不信这栏。
+
+修法按机制不按计划表：`isBuildArtifactOfTrackedPackage(target, isTracked)`——
+`*/node_modules/*` 一律豁免；`packages/<p>/dist/*`、`apps/<p>/dist/*` 只有在**那枚包自己在 HEAD 里**时豁免
+（`packages/<p>/package.json` 取不到 ⇒ 整枚包没入库，那就是真半棵树，照报）。
+牙三臂：㉞ 已入库包的 dist 不许点名、㉟ 包没入库必须点名（防豁免放走真缺陷）、㊀ `node_modules` 不许点名。
+现量：`node scripts/check-worktree-exceptions.mjs --self-test`（臂数由它自己打印）；
+同一趟默认模式那三行"跨线依赖"读回消失，未登记例外 0 枚。
+
+🟠 **一条瞬时读数（"等人在飞"不是状态，旁边要连命令）**：法务线此刻正在按待拍板表里那一格
+（`49899b546` 登记的"横幅断言前提已过期"）改 `e2e/live-site/live-legal.spec.ts`——
+这次未提交的 diff 自己新增 `DOC_STATUS`（从 `@heyta/legal` 注册表取每份件状态）+ 一枚"分母自检"用例，
+并把横幅断言改成双向。复取：`git status --porcelain -- e2e/live-site/live-legal.spec.ts`（空=他们已落地）、
+`git log --oneline -3 -- e2e/live-site/live-legal.spec.ts`。
+本线一行不代改（那是对外呈现的判据口径，又在别人的验收套件里），只把它登记进归属表，
+让"未登记栏"读得出真例外。
