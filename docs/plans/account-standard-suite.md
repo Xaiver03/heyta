@@ -6216,3 +6216,31 @@ for a in $(grep -oE '/app/assets/[A-Za-z0-9._-]+\.(js|css)' $C/apps/web/dist/ind
 后写 `const BLIND = [...]` ⇒ **TDZ 直接抛 ReferenceError**，`--self-test` 整趟崩（崩在第一枚臂都没打印出来的那种"红得很难看"，
 反而比静默绿好查）。修法是提到模块级 `BLIND_TIERS`，两处共用 —— 顺带把"打印集合与断言集合必须是同一枚"这条钉进注释。
 
+### 6.141（2026-10-30 14:2x · 「有导出面却没入口判定」这一族逐枚数了一遍：5 枚当场补，分母从 81 收到 4）
+
+§6.137 记下过第一枚（`audit-duplicate-function-bodies.mjs` 被 import 就劫持 argv）。这一轮它**第二次**露头：
+我想用探针验 `audit-unused-package-exports.mjs` 的误差方向，结果 `await import()` 把整套扫描跑完并打印了一屏——
+那枚模块明明`export { bucket, declaredExports }` 给臂复用，却没有入口判定。于是先数这一族有几枚，再逐枚修。
+
+**分母是两下属实出来的，不是一下子下对的**（第一发太宽，必须记下来）：
+① 第一版谓词「有 `^export (function|const|class)` 且没有 `IS_ENTRY`」抓到 **81 枚** —— 那是假候选一片：
+   **有导出面 ≠ 被 import 时会跑副作用**（大多数那批只是把常量/函数导出给别处用，顶层没有调用）。
+② 收窄到「顶层确实有一行裸调用 `main();` / `run();`」⇒ **4 枚**（加我这轮正在修的这枚，共 5 枚）。
+   复量（两下并一起的那条，逐字可贴）：
+   `for f in $(git ls-files 'research/tools/*.mjs' 'scripts/*.mjs' 'scripts/**/*.mjs'); do grep -qE "^export (function|const|class)" "$f" && ! grep -q "IS_ENTRY" "$f" && grep -qE "^(main|run)\s*\(\s*\)\s*;?\$" "$f" && echo "$f"; done`
+   （枚数由它自己打印，别抄在这里。）
+③ 再问一句「谁 import 它」才分得出**今天就在咬人**的与**只是潜在**的：3 枚有真实 importer
+   （`check-worktree-exceptions` ← 它自己的变异台架、`audit-blocked-number-collisions` ← 同一枚归属尺、
+   `ledger-health` ← `ledger-evidence-rerun`），1 枚（`audit-server-read-index-coverage`）暂时没人 import ⇒ 潜在。
+
+**判据（修之前先让它红）**：`node --input-type=module -e "await import('./<那枚尺>'); console.log('ONLY_IMPORT')"`
+—— 修前每枚都先打印自己的报表（工作树归属报表 / 账本分母 / 台账健康表），修后 5 枚一律只回 `ONLY_IMPORT`。
+**这就是"能失败的判据"在这一族上的形状**：判的是"只 import 不许有副作用"，不依赖树上恰好有什么。
+修完逐枚复跑命令行仍绿：`--self-test` 48／11／7 枚臂各自 `不符 0`，命令行读数照常打印。
+
+同轮顺手量到一处**账本卫生**的新形状（不是我这轮改出来的，是尺自己报的）：
+`node research/tools/audit-blocked-number-collisions.mjs` ⇒ 编号 151 枚里**同号开多节 18 枚**。
+我自己今天取证时就被它绊过一次：`B232` 同时是 10-18 的 macOS 门那一节和 10-27 的落地页那一节
+（现量 `grep -n "^### B232\|🟡 \*\*B232" BLOCKED.md`）。它是几条线共用的取证账本，**重编号 = 改写别人写过的引用** ⇒
+登记进待拍板表，不由我改。
+
