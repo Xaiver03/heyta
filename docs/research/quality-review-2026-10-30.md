@@ -11,14 +11,16 @@
 >    **严重度与待拍板那张表同一口径**：🔴 = 开码后判成真缺陷；🟠 = 候选或"要人看"；⚪ = 未判定。
 >    同一格在两处不同级，就算两份互相矛盾的账（🟠 那一格"候选，一枚没动"是这个意思）。
 >
-> 台账逐轮过程在 [`../plans/account-standard-suite.md`](../plans/account-standard-suite.md) §6.116–§6.135；
+> 台账逐轮过程在 [`../plans/account-standard-suite.md`](../plans/account-standard-suite.md)（末节号现量：
+> `grep -n "^### 6\.1" docs/plans/account-standard-suite.md | tail -1`）；
 > 需要谁点头的都记在 [`../../BLOCKED.md`](../../BLOCKED.md) 那张「待拍板 / 跨线」表里
 > （取位置：`grep -n "新落到的一格待拍板" BLOCKED.md`）。
 
 一把尺一条命令：
 
 ```sh
-node research/tools/audit-duplicate-function-bodies.mjs --top 500   # ① 跨文件重叠实现
+node research/tools/audit-duplicate-function-bodies.mjs --top 500   # ① 跨文件重叠实现（逐字）
+node research/tools/audit-duplicate-logic-skeletons.mjs --top 500   # ① 只改名的复制（文本尺看不见的那族）
 node research/tools/audit-duplicate-destinations.mjs --top 50       # ⑤ 同一目的地两个入口
 node research/tools/audit-dual-edit-controls.mjs --hints            # ⑤ 两处都能编辑
 node research/tools/audit-unused-package-exports.mjs --top 500      # ② 导出面未被引用
@@ -42,8 +44,13 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
 | 🟠 | **同一枚展示逻辑在 `apps/mobile` 与 `apps/web` 各写一遍是一族**（导出文案表、看板标签、周期标签、倒计时过滤语、剩余时间文案、优先级标签、分享花名册注册；最长的一对是百行级的 AI 意图文案）——这条同时是 AGENTS §3.5「业务语义只许在 `packages/*`」的现量证据 | `node research/tools/audit-duplicate-function-bodies.mjs --top 500`（分桶：🔴 逐字相同 / 🟠 只差注释或文案，按 ≥3/≥5/≥10 行三档） | **待拍板**：修法不是逐格删，而是"下沉到哪一枚包、公共面长什么样"；且会动 barrel |
 | 🟠 | **同一条夹取/校验逻辑在两处手抄**（自动收集规则 config 在 create 与 saveEdit 两处，同一行 `Math.min(50` 逐字符相同） | `grep -rn "Math.min(50" apps/web/src packages/app-host/src` | **待拍板**（自动收集线；与他们那条"新建不重置"宜同一笔做） |
 
-**射程**：按**文本**对账的尺看不见"语义相同、写法不同"的重复（例如两处各自实现同一套重试退避）。
-这一族要人读，或者改天按 AST 比对——目前**未判定**，不是"查过没有"。
+| 🟠 | **同一守卫被手抄多份**：`packages/app-host` 各 `*-actions.ts` 里的 `xxxOf` 存取器（"取不到或已立墓碑就返回 `undefined`"这一条规则各抄一份，共 8 枚）。🔴 逐枚开码对过：**规则一致，没有哪一份漏掉墓碑判断** ⇒ 这是"漂移风险"候选，不是现行缺陷 | `grep -rn "deletedAt !== undefined) return undefined" packages/app-host/src/*-actions.ts \| wc -l`；组级候选 `node research/tools/audit-duplicate-logic-skeletons.mjs --top 500` | **待拍板**：收成一条共用存取器会动到 op-log 写入口那批工厂的签名，属共享层口径，一枚没动 |
+| 🟠 | **同一仪式跨壳各写一遍**（`listeners.add` + 返回 `delete` 的订阅器；`localStorage` 偏好读写四件套 save/clear；`stripComments` 之类夹具）——这一族**逐字尺读不到**，因为每份的标识符名不一样 | `node research/tools/audit-duplicate-logic-skeletons.mjs --top 500`（第一栏就是最大的一组，成员名逐枚打全）| **待拍板**：订阅器与偏好读写该不该下沉成一枚共用件是包边界问题（AGENTS §3.5 只规定"业务语义"在哪，没规定这类通用件）；测试面夹具另计一档，不算产品重复 |
+
+**射程**：这一维现在有两把尺——按**文本**对账的那把抓逐字与只差注释/文案的复制，按**骨架**（控制流关键字序列 + 标识符个数）对账的那把抓"只改名的复制"；
+后者只比控制流形状，**不比语义**：`if (a) return b` 与 `if (x) return y` 同骨架，所以它的每一组都要逐枚开码才成判词（`--mutate` 那枚臂钉的是"改名确实追得回来、且落进同一组"，不是"这组是缺陷"）。
+两把尺都只看**声明级函数体**：表达式体箭头函数与回调被跳过（跳过的枚数由尺自己打印在分母那行）。
+"同一套逻辑用**不同控制流**写成"（例如两枚不同形状的重试退避）仍然读不到 ⇒ 那一族**未判定**，不是"查过没有"。
 
 ---
 
