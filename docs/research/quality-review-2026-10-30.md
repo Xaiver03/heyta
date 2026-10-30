@@ -49,6 +49,8 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
 | 🟠 | **同一守卫被手抄多份**：`packages/app-host` 各 `*-actions.ts` 里的 `xxxOf` 存取器（"取不到或已立墓碑就返回 `undefined`"这一条规则各抄一份）。🔴 逐枚开码对过：**规则一致，没有哪一份漏掉墓碑判断** ⇒ 这是"漂移风险"候选，不是现行缺陷 | `grep -rn "deletedAt !== undefined) return undefined" packages/app-host/src/*-actions.ts \| wc -l`；组级候选 `node research/tools/audit-duplicate-logic-skeletons.mjs --top 500` | **待拍板**：收成一条共用存取器会动到 op-log 写入口那批工厂的签名，属共享层口径，一枚没动 |
 | 🟠 | **同一仪式跨壳各写一遍**（`listeners.add` + 返回 `delete` 的订阅器；`localStorage` 偏好读写四件套 save/clear；`stripComments` 之类夹具）——这一族**逐字尺读不到**，因为每份的标识符名不一样 | `node research/tools/audit-duplicate-logic-skeletons.mjs --top 500`（第一栏就是最大的一组，成员名逐枚打全） | **待拍板**：订阅器与偏好读写该不该下沉成一枚共用件是包边界问题（AGENTS §3.5 只规定"业务语义"在哪，没规定这类通用件）；测试面夹具另计一档，不算产品重复 |
 
+| 🟠 | **同一条服务端读路径（向量时钟全史聚合）在两个文件里各写一遍**：`server/src/sync/services/operation-download.service.ts:385` 与 `server/src/sync/services/operation-upload.service.ts:170`—— 投影、`FROM operations, LATERAL jsonb_each_text(vector_clock)`、`jsonb_typeof` 那条、`kv.value ~ '^[0-9]+$'`、`GROUP BY kv.key` **逐字同**，只差 `<= latestSnapshotSeq` 对 `< beforeServerSeq` 与 `prisma.` 对 `tx.`，而且**两侧各配了一份自己的慢日志**（`elapsedMs > 5000` 与 `SLOW_FULL_STATE_AGGREGATE_MS`）。三把尺都没报：它们比的是**声明级函数体**，这两枚是内联在函数体里的模板字面量 | `git grep -n "LATERAL jsonb_each_text(vector_clock)" -- server/src`（本仓现量就这两枚）；这枚候选是 ③ 那把裸 SQL 尺报出来的：`node research/tools/audit-raw-sql-bounds.mjs` | **待拍板**（同步线）：合并成一条共用读要同时收掉两份慢日志；`server/` 整棵 vendored，动它要更新 `PROVENANCE.md` ⇒ 一枚没动 |
+
 **射程**：这一维现在有三把尺，各管一种"看不出来"：按**文本**（逐字与只差注释/文案）、按**骨架**（只改名的复制）、按**调用面**（同一圈 API 换个控制流写法）。
 第三把只比"打了哪些名、各几次"，**不比语义**，也不看接收者 —— 所以 `set` 与 `set` 会并到一起，每组都要逐枚开码才成判词。
 它的 `--mutate` 钉两件事：换个控制流写法仍被抓；改成同骨架只换名后**交回骨架尺**（两把尺不重复计同一笔 —— 判的是"这组有没有新面孔"，
@@ -80,9 +82,12 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
 | 🟠 | 循环里逐行查库与循环内同步 IO 两档（各若干处，逐处清单由尺打印） | `node research/tools/audit-loop-io.mjs --top 500` | **已逐枚开码**：多数判成"要么改判断口径、要么不可逆层、要么根本不是缺陷"（同步配额那条腿注释自写"Exact semantics over a faster plan"；有界重试与被卸载路径上的同步拆卸都不是缺陷）⇒ 全部**待拍板**，一枚没动 |
 | 🟠 | **可避免的全量重渲染**：A 族下标当 key（本仓唯一一枚候选开码后是顶层字面量表 ⇒ 无风险）；B 族内联字面量打穿 `memo` **没有分母**——`git grep -nw memo` 剔掉 `useMemo` 与注释后全仓**一处具名 `React.memo` 都没有** | `node research/tools/audit-avoidable-rerenders.mjs`；`--self-test`（14 枚臂）/ `--mutate`（两发都不依赖树上恰好有什么） | **待拍板（边界）**：见 BLOCKED 那张表——先有运行时 profiling 再谈要不要引入 memo 策略；"B 族没东西可判"**不等于**"性能没问题" |
 | ✅ | 监听器/定时器没有无界增长或漏清理的候选 | `node research/tools/audit-listener-timer-cleanup.mjs` | 本轮无候选；尺留着（判不了那一族逐枚给位置） |
+| ✅ | **裸 SQL 的读有没有界**（这一格今天从"没装置"落成尺）：分档 = 有界 / 行锁 / 🟠 候选 / 写与 DDL（不判界）/ 🔴 判不了（逐枚带 `file:line`）。🟠 那 5 枚与 🔴 那 4 枚**已逐枚开码判完**：3 枚界来自等值 `WHERE`、2 枚是同一读路径各写一遍（已单列进 ① 那一维）、2 枚指向的两条 `Prisma.sql` builder 都以 `LIMIT 1` 收尾、2 枚是 `createPrismaSqlRunner` 端口本身（SQL 由调用方拼）⇒ **没有一枚是"忘了写 LIMIT"的缺陷** | `node research/tools/audit-raw-sql-bounds.mjs`（分母那行给"原文命中 − 非调用点 = 调用点"三段）；`--non-call` 把每一枚没进分母的位置连理由打全；判它有没有牙 `--self-test`（23 枚臂）/ `--mutate`（两向：有/无 LIMIT、投影全聚合/混裸列）；候选反查 `git grep -n "LATERAL jsonb_each_text(vector_clock)" -- server/src` | 闭合（账在台账 §6.143，含"改完尺读数变干净要先问尺是否自己坏了"那一发）；两处**射程**留在下面 |
 
-**射程**：raw SQL 的 `WHERE` 有没有界、客户端与 HTTP 层的分页参数、以及"这次重渲染代价值不值"（运行时问题）
-都**没量** ⇒ "没有无界读""性能没问题"这两句都不许由这些尺的 0 候选得出。
+**射程**：客户端与 HTTP 层的分页参数、以及"这次重渲染代价值不值"（运行时问题）**仍没量**；
+裸 SQL 这一面新量的边界是三条 —— ① `Prisma.sql` 拼片段的面不在分母里（上面那两条 builder 靠人开码判掉）；
+② `WHERE` 的选择性静态读不出 ⇒ 候选仍需逐枚判，尺的产出是清单不是判词；③ 把 tag 解构出来裸调读不到（`--non-call` 那一栏给得出本仓现量只有 interface 声明这一形）。
+"没有无界读""性能没问题"这两句都不许由这些尺的 0 候选得出。
 
 ---
 
