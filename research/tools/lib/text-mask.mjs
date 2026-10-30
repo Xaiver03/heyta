@@ -45,7 +45,14 @@ export function maskText(text) {
       prevNonWs === '' ||
       REGEX_OK_BEFORE.test(prevNonWs) ||
       /(?:return|typeof|instanceof|\bcase|\bin|\bof|new|delete|void|\bdo|else)[\s]*$/.test(tail14);
-    if (text[i] === '/' && isRegexHere) {
+    // 🔴 JSX 的两枚斜杠**不是**正则开头（2026-10-30 实测：`</li>` 与 `<Foo />` 都会被上面那个
+    //    启发式当成正则起点，于是从那里一路挖到下一个 `/`——**整行真代码被抹掉**，
+    //    含 `value={x}` 这类结构。两把新尺的对账臂（key 归属 / 属性计数）就是这么把 `.map(` 的
+    //    闭括号读成"配不上"抓出来的。判据：`/` 紧跟 `>`（自闭合 `/>` 与片段收尾 `</>`），
+    //    或 `/` 直接挨在 `<` 之后（`</Tag>` 闭标签）。`a </b` 这种没空格的比较写法本仓没有，
+    //    prettier 也不许它存在；真出现了，代价是那一枚正则不再被挖——比抹掉整行代码小一个量级。
+    const jsxClosing = text[i + 1] === '>' || (prevNonWs === '<' && i > 0 && text[i - 1] === '<');
+    if (text[i] === '/' && isRegexHere && !jsxClosing) {
       let j = i + 1;
       let cls = false;
       let closed = false;
