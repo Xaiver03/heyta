@@ -84,6 +84,8 @@ const REPLY_RE = /\breply\.status\(\s*(\d{3})\s*\)\s*\.send\s*\(\s*/g;
 const CODE_IN_BODY = /\b(?:code|reasonCode|errorCode)\s*:/;
 const OTHER_CODE_IN_BODY = /\b(?:status|reason|channel|state|db)\s*:\s*['"`]/;
 const SPREAD_IN_BODY = /\.\.\./;
+// 打印盲区与臂断言吃**同一枚**集合：两处各写一遍的话，臂可以一直绿而打印那段偷偷漏枚。
+const BLIND_TIERS = ['unreadable-send', 'unreadable-body', 'spread-body'];
 const TESTISH = /(^|\/)(tests?|__tests__)\/|\.spec\.[tm]sx?$/;
 
 function operandOf(raw, at, len) {
@@ -348,6 +350,12 @@ function selfTest() {
       const r = scanText(srv, 'app.get("/x", (req, reply) => {\n  reply.status(503).send({ message: "nope" });\n  reply.status(400).send({ code: "bad", message: "x" });\n  reply.status(409).send({ status: "approved", channel: "unavailable" });\n  reply.status(402).send({ ...body(reason), used: 3 });\n  reply.status(200).send({ ok: true });\n});\n');
       return [r.replies.map((x) => x.tier), r.replyTotal, r.replyUnreadable];
     })(), [['reply-5xx-no-code', 'has-code', 'other-code-field', 'spread-body'], 4, 1]);
+  push('G20 每一枚"判不了"都带 file:line（盲区只报枚数＝藏起来；打印那一段吃的就是这个集合）',
+    (() => {
+      const r = scanText('server/src/api.ts', 'app.get("/x", (req, reply) => {\n  reply.status(402).send(body(reason));\n  reply.status(404).send({ ...body(r), used: 1 });\n});\n');
+      const blind = r.replies.filter((x) => BLIND_TIERS.includes(x.tier));
+      return [blind.length, blind.every((x) => !!x.file && x.line > 0)];
+    })(), [2, true]);
   const nums = labels.map((l) => Number(/^G(\d+)/.exec(l)?.[1] ?? 0));
   const uniq = new Set(nums);
   const seqOk = Math.max(...nums) === uniq.size;
@@ -387,6 +395,13 @@ function main() {
   const rOk = base.replies.filter((x) => x.tier === 'has-code').length;
   console.log(`F4 对外响应体（server/src）：reply.status(4xx/5xx).send 共 ${base.replyTotal} 处 ｜ 统一码位 ${rOk} ｜ 另一种码位（status/reason/channel 类枚举字段）${base.replies.filter((x) => x.tier === 'other-code-field').length} ｜ 🔴 5xx 什么都没有 ${r5.length} ｜ 🟠 4xx 什么都没有 ${r4.length} ｜ 判不了 ${base.replyUnreadable} 处（send(变量)、带 ...展开、括号配不上）`);
   if (base.replyTotal !== base.replies.length) { console.log('🔴 F4 对账不成立 ⇒ 响应体归属漏了，本趟读数不可信。'); process.exit(2); }
+  // 🔴 「判不了」必须带位置：只报枚数等于把盲区藏在一个数字后面，下一位没法去开码。
+  const blind = base.replies.filter((x) => BLIND_TIERS.includes(x.tier));
+  if (blind.length) {
+    console.log(`   ⚪ 判不了那 ${blind.length} 枚的位置（逐枚开码才成判词；字面量在 helper 里就要去读 helper）：`);
+    for (const b of blind.slice(0, top)) console.log(`      ${b.file}:${b.line}  ${b.tier}  状态 ${b.status}`);
+    if (blind.length > top) console.log(`      …另有 ${blind.length - top} 枚（加 --top 500 全列）`);
+  }
   if (cand.length) {
     console.log('\n🔴 候选（生产代码里把自家文案当契约；逐枚开码才成判词）：');
     for (const c of cand.slice(0, top)) console.log(`   ${c.file}:${c.line}  .message … "${c.operand}"`);
