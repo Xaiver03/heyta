@@ -28,9 +28,15 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
+
+// 🔴 本模块把 `declaredExports`/`bucket` 导出给臂复用，所以**必须有入口判定**：
+//    没有它，只 import 也会拿调用方的 argv 去跑整套扫描（同一族缺陷在
+//    `audit-duplicate-function-bodies.mjs` 上先踩过一次，见台账 §6.137）。
+const IS_ENTRY = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const argv = process.argv.slice(2);
+const argv = IS_ENTRY ? process.argv.slice(2) : [];
 const strict = argv.includes('--strict');
 const selfTest = argv.includes('--self-test');
 const unknown = argv.filter((a) => !['--strict', '--self-test'].includes(a) && a !== '--top' && !/^\d+$/.test(a));
@@ -192,4 +198,4 @@ const run = () => {
   process.exit(strict && zero.length > 0 ? 1 : 0);
 };
 
-run();
+if (IS_ENTRY) run();

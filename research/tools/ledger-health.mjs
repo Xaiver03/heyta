@@ -27,6 +27,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// 🔴 本模块有导出面 ⇒ 必须有入口判定：没有它，只 import 也会拿调用方的 argv 跑整套扫描并打印。
+import { pathToFileURL } from 'node:url';
+const IS_ENTRY = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+
 import {
   classify,
   decisionProblems,
@@ -264,4 +269,4 @@ function main() {
   );
 }
 
-main();
+if (IS_ENTRY) main();
