@@ -6284,3 +6284,54 @@ for a in $(grep -oE '/app/assets/[A-Za-z0-9._-]+\.(js|css)' $C/apps/web/dist/ind
 🔴 而 `node scripts/live-web-freshness.mjs` 的针脚法**看不见这件事**：它抽的是 `packages/i18n` 里"被 web 引用的词条值"，
 我这枚改动一个字的词条都没动 ⇒ 它会照样打印"✅ 全部在场"。**针脚是下界，不是等号**；
 判"要不要再发一趟"只能用打包输入差集，那条 §6.138 已经这么写，这一轮是它第一次被自己人验证。
+
+### 6.143（2026-10-30 15:1x · ③ 最后一格"裸 SQL 有没有界"落成尺；改完尺读数变干净，差点被我当成改善写进台账）
+
+`audit-unbounded-read-paths.mjs` 的射程里明写着一句"raw SQL 的 `WHERE` 有没有界没量"，索引覆盖那把尺吃的也是 Prisma 的
+`where` 谓词。这一轮把那格落成装置：`research/tools/audit-raw-sql-bounds.mjs`（四档互斥 + 有对账 ⇒ 判不了逐枚带 `file:line`）。
+**当趟读数**由尺自己打印：`node research/tools/audit-raw-sql-bounds.mjs`（分母那行给的是"原文命中 − 非调用点 = 调用点"三段，
+`--non-call` 把剔掉的每一枚连理由列出来；`--self-test` 23 枚臂 `不符 0`，`--mutate` 两向绿）。
+
+这一轮真正值得留的是**三发自己的账**，全是"探针先怀疑自己"那一族：
+
+① **tag 扫的是原文** ⇒ 文档注释里"提到 `$queryRaw`"、`Pick<Client, '$executeRaw'>` 那种类型位、还有
+`interface PrismaTransactionClient { $queryRawUnsafe<T>(…): Promise<T> }` 那种**成员声明**，全被当成调用点进了分母，
+而且**一枚不漏地正好落进 🔴 判不了那一档** —— 盲区被自己的探针灌水，比漏报更坏（那张待办本来就是把盲区交给人的唯一通道）。
+修法两条形过滤：tag 只在 `maskText` 遮蔽后的文本里找（遮蔽等长 ⇒ 偏移与行号仍与原文逐字对齐，SQL 字面量照样从原文切）；
+只认挂在属性访问上的（前面那枚字符是 `.`）。剔掉的 14 枚逐枚开码对过：12 枚注释/类型位 + 2 枚 interface 声明，没有一枚是真查询。
+
+② **泛型跨行且嵌套**：`tx.$queryRaw<⏎ Array<{ id: number; email: string }>⏎ >\`SELECT … FOR UPDATE\`` 这一形，
+第一版按"第一个 `>`"切泛型 ⇒ 切在 `Array<…>` 自己的闭括号上，落在外层 `>` 上，于是**明明读得到字面量的调用被报成判不了**。
+改成往后逐字符走到参数起点，且 `;` `}` 只在括号深度归零时才算语句边界（对象类型里的 `;` 是分隔符，不是语句结束），
+再补一条"没看见 `<` 就不许换行"（臂 R17 钉它：否则 `pick(tx.$queryRaw)` 会一路走到**下一条语句**的反引号，把别人的 SQL 记到它头上）。
+这一发把 🔴 判不了从 20 枚打到 6 枚 ⇒ 后面逐枚开码才判得完。
+
+③ 🔴 **最贵的一发，留着当纪律**：为了少让人反复判"单行聚合"那一形，我加了"外层投影每条都含聚合 ⇒ 恰好一行"的规则
+（Postgres 里合法 SQL 不写 `GROUP BY` 就不可能既含裸列又出多行，所以这前提安全）。第一版把括号当分支消耗掉了，
+`COUNT(*)` 进了条目只剩 `COUNT` ⇒ 正则永不匹配 ⇒ **整枚函数恒假**，实读**比改之前还差**（那一趟：有界 6→4、候选 8→10）。
+是 `--self-test` 里 R18/R19 两枚新臂当场把它抓住。**如果没有那两枚臂，我会看着"候选从 8 降到 5"把这一版当改善入库** ——
+数字变小看着像变好，这是本仓那条老判据的第四次现形：**改完尺读数变干净，先问是不是尺自己坏了**（与 §7「先怀疑探针」、
+traps「读数不能按标签归因」同族）。所以 `--mutate` 这一轮补了第二条腿：同一枚查询从"投影全是聚合"换成"混一个裸列"，
+候选必须 +1（只测 LIMIT 那一向的话，"聚合规则把多行读判成一行"这种漏报会留在尺里没人知道）。
+
+**5 枚候选逐枚开码判完**（候选 ≠ 判词，这是尺自己规定的）：
+· `automation/worker-identity.ts:220`、`sync/services/snapshot.service.ts:82`、`sync/services/storage-quota.service.ts:169`
+  ⇒ 界来自等值 `WHERE`（worker 身份那一族是五列等值 + `p.op_id = ANY(本次请求的 op 数组)`）⇒ **不是缺陷**，静态读不出选择性所以留在候选。
+· `sync/services/operation-download.service.ts:385` 与 `sync/services/operation-upload.service.ts:170`
+  ⇒ 这两枚是一件事的两半：同一条向量时钟聚合读**各写一遍**（投影、`FROM operations, LATERAL jsonb_each_text(vector_clock)`、
+  `jsonb_typeof` 那条、`kv.value ~ '^[0-9]+$'`、`GROUP BY kv.key` 逐字同，只差 `<= latestSnapshotSeq` 对 `< beforeServerSeq`
+  与 `prisma.` 对 `tx.`），且**两侧各配了一份自己的慢日志**（`elapsedMs > 5000` 与 `SLOW_FULL_STATE_AGGREGATE_MS`）。
+  行数受"该用户向量时钟里出现过的 client_id 个数"约束，但**扫描量随该用户 operations 历史长度增长**——
+  这不是"忘了写 LIMIT"的缺陷（按 user 全史聚合是这个算法本身），是 ① 那一维的一枚**新事实证据**（前两把尺没并进来：
+  它们比的是声明级函数体，这两枚 SQL 是内联模板）。复量：`git grep -n "LATERAL jsonb_each_text(vector_clock)" -- server/src`。
+  去处：合并成一条共用读要同时收掉两份慢日志，且 `server/` 是 vendored 面（AGENTS §2），动它要更新 `PROVENANCE.md` ⇒ 归同步线，本线只登记不代改。
+
+**4 枚判不了逐枚开码判完**：两枚落在 `billing/pricing-store.ts:1226/1230`，那是 `createPrismaSqlRunner` **端口本身**
+（SQL 由调用方拼进来，这一枚静态就没有界可判）；两枚落在 `operation-download.service.ts:177`、`storage-quota.service.ts:630`，
+指向 `server/src/sync/sync.types.ts:74 latestCausalFullStateSql` 与 `:103 agedPrefixCausalFullStateSql` —— 开码判：
+两条都以 `ORDER BY server_seq DESC LIMIT 1` 收尾 ⇒ **有界**，那一格不是"没量"，是"尺不跟函数调用链"。
+
+**射程（不许读成"全部有界"）**：① `Prisma.sql` 拼片段的面**不在分母里**（tag 只认 `$queryRaw*`/`$executeRaw*`），
+上面那两条 builder 就是靠人开码判掉的；② `WHERE` 的选择性静态读不出 ⇒ 候选仍需人逐枚判；
+③ 把 tag 解构出来再裸调的写法读不到 —— 这一面本仓现量只有 interface 声明那一形，复量就是 `--non-call` 那栏；
+④ 迁移 SQL / `server/scripts` / `server/tests` 按头部③刻意不进分母（那几面"全表扫"常常是故意的）。
