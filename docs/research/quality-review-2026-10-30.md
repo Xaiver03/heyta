@@ -121,6 +121,7 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
 | 改了什么 | 判它能不能红 | 那一笔 |
 |---|---|---|
 | 共用遮蔽器把 TSX 闭标签 `</li>` 当正则起点，一路抹掉整段真代码（含 `value={x}`）；改按"两条 JSX 斜杠判据"处理 | 新尺自带的对账臂（第一发读出 73 ≠ 60 抓到它）＋ `node research/tools/audit-avoidable-rerenders.mjs --self-test` | `d5b818200` |
+| 被复用的那枚重叠尺**没有入口判定**：别的模块只 import 它的 `extractFns`，也会拿调用方的 argv 去跑整套扫描（`--self-test` 被调用方的 argv 抢走）；加 `IS_ENTRY`（`import.meta.url === pathToFileURL(process.argv[1]).href`）把命令行那段整块包住 | 只 import 不再打印分母那行（当场实测）＋ `node research/tools/audit-duplicate-function-bodies.mjs --self-test` 仍全绿 | `7422c5d67` |
 | 重叠探针漏掉带返回类型标注的 `function` 声明 ⇒ 整树读数少报 4 倍 | `node research/tools/audit-duplicate-function-bodies.mjs --self-test`（臂 D14/D15） | `cc9ff3b41` |
 | 归属尺的构建产物噪声只在一个模式下被滤过 ⇒ 默认模式也按机制豁免 | `node scripts/check-worktree-exceptions.mjs --self-test`（㉞/㉟/㊀ 三臂） | `83eb19791` |
 | 台账尺把一次合规的"往同一格追加追记"读成行消失 ⇒ 另立「就地改写」一档 | `--self-test`（L13/L14 两臂）＋ `--mutate` 2/2 | `baee627b3` |
@@ -130,11 +131,17 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
 
 ---
 
-## 还没做完的（就两件）
+## 还没做完的（只剩一件）
 
-1. **对外发布**：`/app/` 那盘 SPA 仍比 HEAD 旧（线上落地页与登录那三格已对齐并复验过；
-   台账 B232 那格已修）。命令与可见效果在 [`../runbooks/deployment.md`](../runbooks/deployment.md) §3.7。
-   这一步是对外的动作，**等一句确认**才执行；发布后用真浏览器取发布后读数
-   （`node scripts/live-web-freshness.mjs --landing` ＋ `pnpm --dir e2e exec playwright test --config playwright.live-site.config.ts`）。
+1. **发布这一格：已量成"线上那份就是 HEAD 的产物"**，不是"等点头"。
+   在干净 HEAD 的独立载体上重建两盘产物并与线上逐字节比：应用入口那两枚 asset 的文件名与 sha256 全同，
+   落地页主 JS 与 `index.html` 也各同值；真浏览器那套 live-site 判据整条通过（含台账 B232 曾红的两枚）。
+   ⇒ "发"这一步对当前 HEAD 的净效果是零。取数与构建命令见
+   [`../runbooks/deployment.md`](../runbooks/deployment.md) §3.7（那节也写了落地页构建必须带
+   `VITE_SITE_URL`/`VITE_APP_URL`，少给会造出一枚假"线上旧"）；逐轮现量：
+   `node scripts/live-web-freshness.mjs` ＋ `node scripts/live-web-freshness.mjs --landing` ＋
+   `cd e2e && npx playwright test --config playwright.live-site.config.ts`。
+   ⚠️ 这条结论只对**写它那一刻的 HEAD**成立：`apps/web`/`packages` 一有提交就要重新量，
+   判"要不要再发一趟"用的是打包输入差集，不是这行字。
 2. **待拍板那张表**：`grep -n "新落到的一格待拍板" BLOCKED.md` 起，逐格归人。
    本线一律**只交装置、候选与复量命令**，没替任何一条线改判据口径。
