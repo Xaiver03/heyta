@@ -6170,3 +6170,30 @@ for a in $(grep -oE '/app/assets/[A-Za-z0-9._-]+\.(js|css)' $C/apps/web/dist/ind
 回收这枚载体（它是我这一趟建的；`~/heyta-carriers/` 下别的载体不是我建的，别顺手删）：
 `git worktree remove --force ~/heyta-carriers/head-pubcheck-2026-10-30`。
 
+### 6.139（2026-10-30 11:4x · 「只剩明确登记的例外」第一次逐枚落干：管理后台线那一族 15 枚登记完，未登记栏读 0）
+
+第 1 件事的收干净标准有两种答法：脏集为空，或**只剩带理由的登记例外**。前者在这棵树上做不到
+（并行会话正在写），所以只能走后者 —— 而后者的真身是这枚尺的"没登记过"那一栏：
+`node scripts/check-worktree-exceptions.mjs` 里那一栏读几枚，标准就满足到几分。
+
+**当趟读数**：登记前 `🔴 没登记过的例外 15 枚`；登记后那一栏读**空**，打印只剩
+`⇒ 每一枚都归到某条已登记的理由`。枚数与规则行数都不抄在这里，现量：
+`node scripts/check-worktree-exceptions.mjs | grep -E '没登记过|规则'`（尺自己那 48 枚臂仍 `不符 0`，`--self-test`）。
+枚数不抄在这里：`node scripts/check-worktree-exceptions.mjs | grep '没登记过'`。
+
+**这 15 枚凭什么归管理后台线** —— 不靠目录名，靠文件自己写的话（这一条是本轮真正的方法，登记错归属比不登记更坏，
+因为登记等于替别人认领）：`head -3 apps/web/src/features/privacy/first-launch.ts` 回
+"（G-11）…管理后台页 `/admin` 现在走独立启动路径（ADR-0078…）"；
+`head -3 apps/web/src/lib/startup-mode.ts` 回"这次启动该走哪一条路径 —— 唯一的判定…`/admin` 与主应用共用同一个 bundle（ADR-0038）"；
+`git diff -- docs/README.md` 只有 +1 行，那一行就是 ADR-0078 的登记；
+`grep -n "first-launch\|startup-mode" apps/web/src/main.tsx` 回的两行 import 恰好指向那两枚**没入库**的新模块。
+⇒ 这是一整族同一件事，提一枚留十四枚 = 干净检出上半棵树。
+
+⚠️ **登记把"未登记栏"洗成 0，但洗不掉另外两栏**，这两栏才是这一趟真正交出去的东西（枚数都由尺自己打印）：
+① 🔴 **跨线依赖**（`App.tsx` × 1、`main.tsx` × 2 指向未入库的 `first-launch.ts`/`startup-mode.ts`）——
+归属表按路径分堆看不出这一类，两堆各自登记齐了、按堆提交照样红；闭合它只有"新模块与 importer 同一笔"一条路，
+而归那条线自己。② ⚠️ **索引槽里躺着旧版 1 枚**（`docs/adr/0078-*.md` 呈 `AM`）：不带 pathspec 的提交会把索引那一版写进历史，
+丢掉写的人最新那一段 —— **我不替别的会话改索引槽**（§6.108 那条纪律），只把逐枚正解由尺打印出来。
+所以第 1 件事的诚实答案是：**我名下零未提交；别人名下那批全部有归属、有理由，其中上面那两栏红着等它们各自的负责人**
+（现量：`node scripts/check-worktree-exceptions.mjs | sed -n '/跨线依赖/,$p'`）。
+
