@@ -6132,3 +6132,41 @@ F2：具名错误类 87 枚，其中 13 枚没有机读字段**但都有 `instan
 其中"同一逻辑用不同控制流写成"仍**未判定**（这把尺比的是控制流形状，不是语义）。
 汇总稿头上一处会漂的值顺手换成现量命令（旧写的是"§6.116–§6.135"，写它的时候末节已经不是 135）。
 
+### 6.138（2026-10-30 11:3x · 第 4 件事那句"要不要发"量成了"不用发"：线上那盘与 HEAD 建出来的**逐字节同值**）
+
+前一节把发布那一格压成只剩一句点头。这一轮不等点头也能先量：如果 HEAD 建出来的产物就是线上那份，
+"发"这个动作的净效果是零，也就没有必须先点头才能做的事。取法（全程只读线上，不动线上）：
+
+```sh
+# ㈠ 干净 HEAD 的独立载体（不复用别人的载体：归属不明的对象不动手）
+git worktree add --detach ~/heyta-carriers/head-pubcheck-2026-10-30 HEAD
+cd ~/heyta-carriers/head-pubcheck-2026-10-30 && pnpm install && pnpm build
+HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build
+VITE_SITE_URL=https://heyta.waytofuture.cn VITE_APP_URL=https://heyta.waytofuture.cn/app/ \
+  pnpm --filter @heyta/landing build
+# ㈡ 逐字节对账（左边线上、右边 HEAD 建出来的，比 sha256 前 16 位）
+C=~/heyta-carriers/head-pubcheck-2026-10-30
+for a in $(grep -oE '/app/assets/[A-Za-z0-9._-]+\.(js|css)' $C/apps/web/dist/index.html | sort -u); do
+  n=${a##*/}; printf "%s 线上 %s ｜ HEAD %s\n" "$n" \
+    "$(curl -s https://heyta.waytofuture.cn$a | shasum -a 256 | cut -c1-16)" \
+    "$(shasum -a 256 $C/apps/web/dist/assets/$n | cut -c1-16)"; done
+```
+
+**当趟读数**：应用本体入口那两枚（`.js` 与 `.css`）文件名与 sha256 **四格全同**；
+落地页主 JS 与 `index.html` 也各**同值**。B232（2026-10-27 那一枚，落地页入口 + 产物旧）当时记的两件
+——旧件 `main-d1EwLveP.js` 与"干净 HEAD 应得"的 `main-k7HohaCf.js`——**都不在线上**；
+线上现在是 `main-DYYUGvRW.js`，而这正是当前 HEAD 建出来的那一枚（`grep -oE '/assets/main-[A-Za-z0-9_-]+\.js'`
+在载体 `apps/landing/dist/index.html` 与线上首页各自回同一枚）。⇒ **B232 那两件事由现量收掉，不需要发**。
+同趟真浏览器：`cd e2e && npx playwright test --config playwright.live-site.config.ts` ⇒ 全绿（条数由它自己打印），
+其中含 `live-signin-entry` 那三条（2026-10-27 红的两枚就在里面）与 `live-credential-pages`。
+另两把尺也各自过：`node scripts/live-web-freshness.mjs --landing`（分母由它自己数）、`pnpm check:credential-routes`。
+
+⚠️ **这一趟差点给自己造出一发假红**：第一遍照手册 §3.7 那三条命令原样跑，而
+`pnpm --filter @heyta/landing build` **不带 `VITE_SITE_URL`/`VITE_APP_URL`** —— 那两个变量是发布装置
+在它自己的第 2 步里注进去的（`research/tools/publish-public-sites.mjs` 的 `planSteps` ⇒ `env`）。
+少给输入就建出另一枚包名，读起来正像"线上比 HEAD 旧"。已把这条写进手册 §3.7。
+不变量：**比产物之前先确认构建输入（含 env）与发布那一趟一致。**
+
+回收这枚载体（它是我这一趟建的；`~/heyta-carriers/` 下别的载体不是我建的，别顺手删）：
+`git worktree remove --force ~/heyta-carriers/head-pubcheck-2026-10-30`。
+

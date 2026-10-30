@@ -1082,6 +1082,22 @@ pnpm check:web-artifact:app
 rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 ```
 
+🔴 **拿这棵树去对"线上是不是这一版"时，落地页那步必须带上发布装置注的两个 env**：
+`VITE_SITE_URL` 与 `VITE_APP_URL`（它们不在上面三条里，而是 `research/tools/publish-public-sites.mjs`
+的 `planSteps` 第 2 步 `env` 给的）。少了它们会建出另一枚包名，读起来正像"线上比 HEAD 旧"——
+2026-10-30 实测踩过，见 `docs/plans/account-standard-suite.md` 末节里"要不要发量成不用发"那一节。
+逐字节对账（只读线上，不动线上）：
+
+```sh
+C=<干净 HEAD 载体>
+for a in $(grep -oE '/app/assets/[A-Za-z0-9._-]+\.(js|css)' $C/apps/web/dist/index.html | sort -u); do
+  n=${a##*/}; printf "%s 线上 %s ｜ HEAD %s\n" "$n" \
+    "$(curl -s https://heyta.waytofuture.cn$a | shasum -a 256 | cut -c1-16)" \
+    "$(shasum -a 256 $C/apps/web/dist/assets/$n | cut -c1-16)"; done
+VITE_SITE_URL=https://heyta.waytofuture.cn VITE_APP_URL=https://heyta.waytofuture.cn/app/ \
+  pnpm --filter @heyta/landing build   # ← 落地页比的是这个 dist
+```
+
 🔴 **换钉一棵**已有 `node_modules` 的载体（`git checkout --detach <新 SHA>`）之后，必须在这棵树上先补一次
 根构建 `pnpm build`，再跑 §3.7 那三条。**这不是仪式**：`apps/web` 吃的是 `packages/*` 的**构建产物**
 （词条联合类型、`@heyta/ui` 的 `.d.ts`），换钉只换源码不换 `dist`。2026-10-29 现量两种后果：

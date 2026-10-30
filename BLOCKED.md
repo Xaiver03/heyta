@@ -12343,7 +12343,24 @@ B231 里那两处"还是未提交的改动"已被那条线自己收掉。
 而**发落地页会把那条线此刻在制品的其它部分一起推上生产** —— 那是别人的在飞工作，
 我不代发布。复量命令就是上面那两行，发完之后 `live-signin-entry` 三条应全过。
 
+🟢 **B232 追记（2026-10-30 11:3x，本会话 · 上面那两句都由现量收掉，而且**不需要发**）**：写前先跑 `date`（本机 11:38）。
+① **入口那一句**：整条 live-site 真浏览器判据跑完（`cd e2e && npx playwright test --config playwright.live-site.config.ts`，
+退出码只在这条命令自己那拿，别接管道尾巴），2026-10-27 红的 `live-signin-entry` 中文/英文两条**连同第三枚**一起在场通过；
+`live-credential-pages`（邮件里每一枚目的地）也过。条数由那趟自己打印，不在这里抄。
+② **产物旧那一句现在不成立**：在干净 HEAD 的独立载体上重建（`git worktree add --detach ~/heyta-carriers/head-pubcheck-2026-10-30 HEAD`
+→ `pnpm install` → 根 `pnpm build` → `HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build`
+→ 带 `VITE_SITE_URL`/`VITE_APP_URL` 的 `pnpm --filter @heyta/landing build`），逐字节比：
+应用入口那两枚 asset **文件名与 sha256 全同**，落地页主 JS 与 `index.html` **各同值**
+（比法见 `deployment.md` §3.7 新贴的那段）。⇒ 线上那份就是当前 HEAD 建出来的那一版；
+上面表里那两枚（旧 `main-d1EwLveP.js`、当时 HEAD 应得的 `main-k7HohaCf.js`）**都不在线上**，
+说明 10-27 之后那条线自己已经发过一趟，本会话没有代它发布，只把这一格从"等点头"量成"发的净效果为零"。
+③ **这一趟差点给自己造出一发假红**（值得留，因为它和 #602 那一族同一形状：尺的输入没给全）：
+第一遍照 §3.7 那三条原样跑，而 `pnpm --filter @heyta/landing build` **少了发布装置 `planSteps` 第 2 步注入的
+`VITE_SITE_URL`/`VITE_APP_URL`** —— 少给输入会建出另一枚包名，读起来正像"线上比 HEAD 旧"。
+手册 §3.7 已把这条和逐字节对账的命令写在那里；台账那一族的正文在 `docs/plans/account-standard-suite.md` 末节。
+
 ### B233（2026-10-27 · 我这轮跑全量 `pnpm check` 时撞上的）：**整条链现在红两枚，两枚都不归我这几笔**
+
 
 我为了给自己这轮的改动做整合验收，跑了完整的一条链：
 
