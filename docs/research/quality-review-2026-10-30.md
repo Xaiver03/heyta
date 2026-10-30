@@ -89,11 +89,12 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
 | 🔴 | **失败支呈现成功**（本轮唯一一枚开码后判成真缺陷）：`apps/mobile/src/screens/ProfileScreen.tsx:243` 的 catch 只 `console.warn` 并把 `scope` 留 `undefined`，而 `apps/mobile/src/lib/vault-session-cleanup.ts:48/57` 在 `scope === undefined` 时把禁用金库自动解锁与移除根密钥**两步都跳过**、返回 `{}` ⇒ 调用方 `:272` 读成"没有 `secureStorageError`"，界面报「已清干净」 | `grep -n "secure root cleanup skipped" apps/mobile/src/screens/ProfileScreen.tsx`；`sed -n '42,65p' apps/mobile/src/lib/vault-session-cleanup.ts`；候选全集 `node research/tools/audit-silent-failure-branch.mjs` | **待拍板**（设备撤销那条线的契约与安全边口径；不代改三条理由在台账 §6.122） |
 | 🟠 | 本机 op-log 迁移失败只在控制台留一句"将从空库开始"，而同处注释写着"必须留下**可见**痕迹"（`apps/web/src/lib/oplog.ts:437` 对 `:413-415`） | `grep -n "迁移失败，将从空库开始" apps/web/src/lib/oplog.ts` | **待拍板**：要不要为这一档加一枚用户可见呈现是产品决定，落在浮层与反馈那条线的债务账本上 |
 | 🟠 | 两条保存路径的 catch 不绑 error，服务端明写的 `code`（含 402 付费门槛）在界面层丢成同一句"没接受这次改动" | `node research/tools/audit-error-shape-machine-readable.mjs`；`grep -rn "没接受这次改动" packages/i18n/src/locales/zh-CN.ts` | **待拍板**（分档出回执文案牵动 i18n 与四端壳） |
-| ✅ | **错误形状机读性整体过关**：生产代码里"拿自家文案当分支"0 枚；"抛出去又谁也分不开"的错误类 0 枚 | `node research/tools/audit-error-shape-machine-readable.mjs`；`--self-test`（20 枚臂）/ `--mutate`（两向） | 两格"要人看"已单列进待拍板表（测试面拿文案当断言、往 `message` 里塞 slug） |
-| ✅ | **F4 服务端对外响应体（原先挂"未判定"那格，现已按真实形状量掉）**：`reply.status(4xx/5xx).send({...})` 那一片里，什么码位都没有的 **0 处**——绝大多数带统一 `code`，两处用 `status: 'approved'` 这类枚举字段，三处判不了（`send(变量)`、带 `...展开`） | `node research/tools/audit-error-shape-machine-readable.mjs`（F4 那行打印四档与判不了）；判它能不能红 `--self-test`（臂 G18/G19）；谓词现量 `git grep -lE "res\\.status\\([0-9]{3}\\)\\.json\\(" -- server/src`（读空＝本仓没这族写法，所以谓词是按 Fastify 真形状下的） | 闭合；判不了的三处留在尺的读数里，不许读成"全部有码" |
+| ✅ | **错误形状机读性整体过关**：生产代码里"拿自家文案当分支"0 枚；"抛出去又谁也分不开"的错误类 0 枚 | `node research/tools/audit-error-shape-machine-readable.mjs`；`--self-test`（臂数由它自己打印）/ `--mutate`（两向） | 两格"要人看"已单列进待拍板表（测试面拿文案当断言、往 `message` 里塞 slug） |
+| ✅ | **F4 服务端对外响应体（原先挂"未判定"那格，现已按真实形状量掉）**：`reply.status(4xx/5xx).send({...})` 那一片里，什么码位都没有的 **0 处**——绝大多数带统一 `code`，两处用 `status: 'approved'` 这类枚举字段 | `node research/tools/audit-error-shape-machine-readable.mjs`（F4 那行打印四档，"判不了"那档**逐枚带 file:line**）；判它能不能红 `--self-test`（臂 G18/G19/G20）；谓词现量 `git grep -lE "res\\.status\\([0-9]{3}\\)\\.json\\(" -- server/src`（读空＝本仓没这族写法，所以谓词是按 Fastify 真形状下的） | 闭合。原先"判不了"那几处已**逐枚开码判过**：字面量在 helper 里，helper 自己就带 `code` —— `server/src/entitlement.ts:548` 那枚装配函数返 `{ code: ENTITLEMENT_ERROR_CODE, … }`（`:576` 整份交给它、`:605` 展开它再补两格数值），`server/src/sync/sync.routes.quota.ts:138` 的 `code` 就写在展开**前面**。复量：`sed -n '544,556p' server/src/entitlement.ts`；`sed -n '125,142p' server/src/sync/sync.routes.quota.ts` |
 
-**射程**：F4 那三处 `send(变量)`／带 `...展开` 的响应体**看不见里面有什么** ⇒ 逐处留在"判不了"计数里；
-"对外全部带码位"这句不许由 F4 的 0 候选得出。
+**射程**：F4 现在仍看不见 `send(变量)`／带 `...展开` 那几处的**字面量内容**（这是静态对账的边界），但它把每一枚的位置点名出来，
+所以"判不了"是一条**可以去开码的待办**，不再是一个数字；本仓那几枚已各自开码判完（上一行）。
+"对外全部带码位"这句仍不许由 F4 的 0 候选得出——它只覆盖 `reply.status(...).send(...)` 这一族写法。
 
 ---
 
