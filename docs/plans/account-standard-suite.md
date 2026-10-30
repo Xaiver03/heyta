@@ -6335,3 +6335,16 @@ traps「读数不能按标签归因」同族）。所以 `--mutate` 这一轮补
 上面那两条 builder 就是靠人开码判掉的；② `WHERE` 的选择性静态读不出 ⇒ 候选仍需人逐枚判；
 ③ 把 tag 解构出来再裸调的写法读不到 —— 这一面本仓现量只有 interface 声明那一形，复量就是 `--non-call` 那栏；
 ④ 迁移 SQL / `server/scripts` / `server/tests` 按头部③刻意不进分母（那几面"全表扫"常常是故意的）。
+
+**追记（同一趟，自己的账）· 一笔裸 `git commit` 把别线 staged 的 ADR 卷走了**：
+我这笔提交是 `git add -- <我的那枚尺>` + `git commit -m …`（**commit 没带 pathspec**）⇒ 它连**索引槽里别人 staged 的那枚
+`docs/adr/0078-admin-console-boots-without-local-store.md`（112 行新文件）**一起提交进去了，`git show --stat` 一眼就看出来（两枚文件、766 行）。
+🔴 这条正是 `check:worktree-exceptions` 那张表里"索引槽"那一栏在防的形状，只是**方向反过来**：
+以前记的是"我 staged 的会被别线裸 commit 顺走"，这一次是**别线 staged 的被我的裸 commit 顺走**。
+处置（当场、未 push，远端当时还是 `git ls-remote origin refs/heads/main` 那枚旧 SHA）：
+先 `git log -1` 确认 HEAD 就是我这枚（不是就把整条链停下别动）⇒ `git reset --soft HEAD~1`（只退 ref，索引与工作树原样留着）
+⇒ 改用 **`git commit --only -m … -- <显式 pathspec>`** 重放，随后逐枚回读两件事：
+`git show --stat` 只有我这一枚文件；`git status --porcelain -- <别线那两枚>` 读回 `AM` / ` M`（**它们的 staged 内容一点没被我碰掉**）。
+所以本仓的入库纪律要写成一句可判红的：**共享工作树里 `git commit` 永远带 `--only` + 显式 pathspec**，
+`git add` 之后不带路径的那一发等于把整棵索引当成自己的待提交集；
+而"我这组到底改了哪几行"的判据是**提交后回读 `--stat`**（这一发就是它先发现的，不是人先发现的）。
