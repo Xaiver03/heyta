@@ -8,6 +8,8 @@
 >    下一次 `main` 前进就会漂。要现量就跑命令，别引用这里。
 > 2. **候选不是判词**。尺只负责"这个形状值得看一眼"；判红只发生在开码之后。
 >    本表里"去处"一列写 `已修`／`待拍板`／`有意不动`／`未判定`，四种不许混为一谈。
+>    **严重度与待拍板那张表同一口径**：🔴 = 开码后判成真缺陷；🟠 = 候选或"要人看"；⚪ = 未判定。
+>    同一格在两处不同级，就算两份互相矛盾的账（🟠 那一格"候选，一枚没动"是这个意思）。
 >
 > 台账逐轮过程在 [`../plans/account-standard-suite.md`](../plans/account-standard-suite.md) §6.116–§6.135；
 > 需要谁点头的都记在 [`../../BLOCKED.md`](../../BLOCKED.md) 那张「待拍板 / 跨线」表里
@@ -62,7 +64,7 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
 
 | 严重度 | 形状与落点 | 复量 | 去处 |
 |---|---|---|---|
-| 🔴 | **服务端读路径没有索引兜着**：一批 `where` 没有任何索引以其中任一字段作最左列 ⇒ 全表扫那条谓词。抽验一枚是真的：`User` 只有四枚 token 列索引，而 `server/src/admin/admin.routes.ts:351`、`admins.ts:73`、`credential-sweep.ts:166` 按 `isVerified` / `isAdmin` 过滤 | `node research/tools/audit-server-read-index-coverage.mjs --top 500`；判它有没有牙 `--self-test`；单枚反查 `awk '/^model <Model> /,/^\}/' server/prisma/schema.prisma` | **待拍板**：加索引是迁移（不可逆层），不加也得有人写下"这表就这么大"——两边都是服务端那条线的口径 |
+| 🟠 | **服务端读路径没有索引兜着**（严重度与待拍板表同一口径：候选，一枚没动）：一批 `where` 没有任何索引以其中任一字段作最左列 ⇒ 全表扫那条谓词。抽验一枚是真的：`User` 只有四枚 token 列索引，而 `server/src/admin/admin.routes.ts:351`、`admins.ts:73`、`credential-sweep.ts:166` 按 `isVerified` / `isAdmin` 过滤 | `node research/tools/audit-server-read-index-coverage.mjs --top 500`；判它有没有牙 `--self-test`；单枚反查 `awk '/^model <Model> /,/^\}/' server/prisma/schema.prisma` | **待拍板**：加索引是迁移（不可逆层），不加也得有人写下"这表就这么大"——两边都是服务端那条线的口径 |
 | 🟠 | **无界行列表读**（Prisma 列表读没有顶层 `take`/`skip`/`cursor`）。⚠️ 反例已钉死：`server/src/account/access-sessions.ts:189` **不许**加 `take`——同文件 `:178` 写着"退出登录撤销不了它们就变成一句界面上的谎"，真正的边界在行的生命周期（`:218/239/274` 与 `central-auth/repository.ts:689/749` 自己就在删行） | `node research/tools/audit-unbounded-read-paths.mjs --top 500`；`--self-test` / `--mutate` | **待拍板**（`server/` 整棵 vendored，改要动 `PROVENANCE.md`；分布最厚在管理面与分享面） |
 | 🟠 | 循环里逐行查库与循环内同步 IO 两档（各若干处，逐处清单由尺打印） | `node research/tools/audit-loop-io.mjs --top 500` | **已逐枚开码**：多数判成"要么改判断口径、要么不可逆层、要么根本不是缺陷"（同步配额那条腿注释自写"Exact semantics over a faster plan"；有界重试与被卸载路径上的同步拆卸都不是缺陷）⇒ 全部**待拍板**，一枚没动 |
 | 🟠 | **可避免的全量重渲染**：A 族下标当 key（本仓唯一一枚候选开码后是顶层字面量表 ⇒ 无风险）；B 族内联字面量打穿 `memo` **没有分母**——`git grep -nw memo` 剔掉 `useMemo` 与注释后全仓**一处具名 `React.memo` 都没有** | `node research/tools/audit-avoidable-rerenders.mjs`；`--self-test`（14 枚臂）/ `--mutate`（两发都不依赖树上恰好有什么） | **待拍板（边界）**：见 BLOCKED 那张表——先有运行时 profiling 再谈要不要引入 memo 策略；"B 族没东西可判"**不等于**"性能没问题" |
