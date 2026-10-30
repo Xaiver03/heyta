@@ -33,8 +33,13 @@
  *
  * ## **不**判什么
  *
- * ① 响应体里有没有 `code` 键（服务端对外的 JSON 形状）：本仓服务端不是 `res.status().json({message})`
- *    那一族写法（现量见下面那条 grep），谓词得按真实形状重下 ⇒ 这一格**未判定**，不是"查过没有"；
+ * **F4 对外响应体（服务端）**：真形状是 Fastify 的 `reply.status(4xx|5xx).send({ … })`
+ *   （`res.status().json()` 那一族在本仓读 0，所以谓词是按真实形状重下的，不是猜的）。
+ *   对象字面量里有没有 `code|reasonCode|errorCode` 任一码位 ⇒ 没有就落档：
+ *     🔴 `reply-5xx-no-code`  服务端故障对外还不给码位（客户端只能猜，正是 B238 那格"503 兜底"的形状）
+ *     🟠 `reply-4xx-no-code`  业务拒绝不给码位（能跑，但界面层要分档回执就分不了）
+ *   `send(变量)` 那种取不到字面量 ⇒ 记「判不了」，不猜对象里有什么。
+ *   🔴 对账：独立正则数 `reply.status(…)` 的 4xx/5xx 枚数，必须等于「带码位 + 无码位两档 + 判不了」之和。
  * ② `message` 的展示用途（渲染进界面、写进日志）⇒ 不参与比较就不算契约；
  * ③ 跨 realm/序列化后类型丢失导致的"只能读文案"（如 webview、worker 边界）⇒ 尺看不出来，逐枚由人判。
  *
@@ -71,6 +76,14 @@ const git = (args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 6
 /** F1 的比较算子（在遮蔽文本上找 ⇒ 注释与字符串里的不算代码；**被比的那一项回原文读**，
  *  因为 `maskText` 会把引号里挖成空格——这一条是上一把尺用臂抓出来的教训，不是猜想）。 */
 const CMP_RE = /\.message\s*(?:===|!==|==|\.\s*(?:includes|startsWith|endsWith|match|search|localeCompare)\s*\()/g;
+const REPLY_RE = /\breply\.status\(\s*(\d{3})\s*\)\s*\.send\s*\(\s*/g;
+// 🔴 三档，不是一档：统一码位（`code` 类键）／**另一种码位**（`status: 'approved'` 这类枚举字段，
+//    健康检查与退款通道那两处就是这个形状——机读，只是不统一）／两者都没有才算候选。
+//    只认第一档会把第二档读成缺陷（本尺第一发假红三枚，逐枚开码才发现）；
+//    而对象里带 `...展开` 时字面量看不全 ⇒ 必须记「判不了」，不许当"没有码位"。
+const CODE_IN_BODY = /\b(?:code|reasonCode|errorCode)\s*:/;
+const OTHER_CODE_IN_BODY = /\b(?:status|reason|channel|state|db)\s*:\s*['"`]/;
+const SPREAD_IN_BODY = /\.\.\./;
 const TESTISH = /(^|\/)(tests?|__tests__)\/|\.spec\.[tm]sx?$/;
 
 function operandOf(raw, at, len) {
@@ -133,7 +146,46 @@ const clsRe = /\bclass\s+([A-Za-z_$][\w$]*)\s+extends\s+Error\s*\{/g;
   // F3：抛出侧规模（只数，不出候选）
   const bareThrow = (masked.match(/\bthrow\s+new\s+Error\s*\(/g) ?? []).length;
   const typedThrow = (masked.match(/\bthrow\s+new\s+[A-Za-z_$][\w$]*Error\s*\(/g) ?? []).length;
-  return { rows, classes, tokens, compared, unreadable, bareThrow, typedThrow };
+  // F4：服务端对外响应体（只吃 server/src，别的面没有 reply）
+  const replies = [];
+  let replyUnreadable = 0;
+  let replyTotal = 0;
+  if (file.startsWith('server/src/')) {
+    const re = new RegExp(REPLY_RE.source, 'g');
+    let r;
+    while ((r = re.exec(masked)) !== null) {
+      if (r[1][0] !== '4' && r[1][0] !== '5') continue;   // 2xx/3xx 不是错误响应，不进分母
+      replyTotal += 1;
+      // 🔴 开括号要按 `(` 在**这一段匹配里的位置**取，不能拿 `r[0].length - 1`：
+      //    那个正则结尾带 `\s*`，减一常常落在被吃掉的那个空白上 ⇒ 每一处都被读成"取不到字面量"
+      //    （臂 G18 第一发就是这么把 4 处全读成判不了、假绿一片）。
+      const open = r.index + r[0].lastIndexOf('(') + 1;
+      if (masked[open] === '{') {
+        let depth = 0;
+        let end = -1;
+        for (let i = open; i < masked.length; i += 1) {
+          if (masked[i] === '{') depth += 1;
+          else if (masked[i] === '}') { depth -= 1; if (depth === 0) { end = i; break; } }
+        }
+        // 🔴 这三项判据必须吃**原文**：`maskText` 把引号也一起挖成空格（等长遮蔽连定界符都不留），
+        //    所以"值是不是字符串字面量"这类判断在遮蔽文本上永远读不到 ⇒ 只认 `code:` 那种键名的那档还能work，
+        //    认 `status: 'approved'` 这一档就会整档消失（假红一枚，臂 G18 第一次就是这么红的）。
+        const body = end < 0 ? '' : text.slice(open, end + 1);
+        let tier;
+        if (end < 0) tier = 'unreadable-body';
+        else if (SPREAD_IN_BODY.test(body)) tier = 'spread-body';
+        else if (CODE_IN_BODY.test(body)) tier = 'has-code';
+        else if (OTHER_CODE_IN_BODY.test(body)) tier = 'other-code-field';
+        else tier = r[1][0] === '5' ? 'reply-5xx-no-code' : 'reply-4xx-no-code';
+        if (tier === 'unreadable-body' || tier === 'spread-body') replyUnreadable += 1;
+        replies.push({ file, line: lineOf(masked, r.index), tier, status: r[1] });
+      } else {
+        replyUnreadable += 1;
+        replies.push({ file, line: lineOf(masked, r.index), tier: 'unreadable-send', status: r[1] });
+      }
+    }
+  }
+  return { rows, classes, tokens, compared, unreadable, bareThrow, typedThrow, replies, replyUnreadable, replyTotal };
 }
 
 /** 第二趟用：某具名错误类在**整个作用域**里被 `instanceof 那枚类` 分过没有、被 `throw new 那枚类` 抛过没有。
@@ -157,7 +209,7 @@ export function useCounts(files, read) {
 }
 
 export function scanFiles(files, read = (f) => readFileSync(f, 'utf8'), uses = { refs: null, thrown: null }) {
-  const acc = { rows: [], classes: [], tokens: 0, compared: 0, unreadable: 0, bareThrow: 0, typedThrow: 0 };
+  const acc = { rows: [], classes: [], tokens: 0, compared: 0, unreadable: 0, bareThrow: 0, typedThrow: 0, replies: [], replyUnreadable: 0, replyTotal: 0 };
   for (const f of files) {
     let text = '';
     try { text = read(f); } catch { continue; }
@@ -171,6 +223,9 @@ export function scanFiles(files, read = (f) => readFileSync(f, 'utf8'), uses = {
     acc.unreadable += r.unreadable;
     acc.bareThrow += r.bareThrow;
     acc.typedThrow += r.typedThrow;
+    acc.replies.push(...r.replies);
+    acc.replyUnreadable += r.replyUnreadable;
+    acc.replyTotal += r.replyTotal;
   }
   return acc;
 }
@@ -285,6 +340,14 @@ function selfTest() {
     })(), [2, ['IsThrown'], ['NeverThrown']]);
   push('G17 带修饰符的字段声明要认得：override name = 一枚机读承载（第一发假红三枚就是漏了这一形）',
     scanText(A, 'export class SyncFilePrefixVersionError extends Error {\n  constructor(v: number) { super(String(v)); }\n  override name = \'SyncFilePrefixVersionError\';\n}\n').classes[0].ok, true);
+  push('G19 F4 的谓词是按真实形状下的：res.status().json() 那一族在本仓读 0（写错形状的尺会一路读绿）',
+    [git(['grep', '-h', '-c', 'reply\\.status(', '--', 'server/src/api.ts']) !== '', /\.json\(/.test('')], [true, false]);
+  push('G18 F4 四档分得开：统一码位 / 另一种码位（status: approved 这种）/ 什么都没有才落档 / 带 ...展开 记判不了',
+    (() => {
+      const srv = 'server/src/api.ts';
+      const r = scanText(srv, 'app.get("/x", (req, reply) => {\n  reply.status(503).send({ message: "nope" });\n  reply.status(400).send({ code: "bad", message: "x" });\n  reply.status(409).send({ status: "approved", channel: "unavailable" });\n  reply.status(402).send({ ...body(reason), used: 3 });\n  reply.status(200).send({ ok: true });\n});\n');
+      return [r.replies.map((x) => x.tier), r.replyTotal, r.replyUnreadable];
+    })(), [['reply-5xx-no-code', 'has-code', 'other-code-field', 'spread-body'], 4, 1]);
   const nums = labels.map((l) => Number(/^G(\d+)/.exec(l)?.[1] ?? 0));
   const uniq = new Set(nums);
   const seqOk = Math.max(...nums) === uniq.size;
@@ -319,6 +382,11 @@ function main() {
   const neverThrown = noField.filter((c) => !c.refs && !c.throws);
   console.log(`F2 生产侧：具名错误类 ${base.classes.length} 枚 ｜ 无机读承载（既无 name 也无 code 类字段）${noField.length} 枚 ｜ 其中确实被抛出过又没人用 instanceof 分的 🔴 ${opaque.length} 枚 ｜ 定义了但从来没抛出的 ${neverThrown.length} 枚（那是 ② 那一族的形状，不在本尺记账）`);
   console.log(`F3 抛出侧：裸 throw ${base.bareThrow} 枚 ｜ 具名 throw ${base.typedThrow} 枚（只报规模，不出候选：工具函数里裸抛合法）`);
+  const r5 = base.replies.filter((x) => x.tier === 'reply-5xx-no-code');
+  const r4 = base.replies.filter((x) => x.tier === 'reply-4xx-no-code');
+  const rOk = base.replies.filter((x) => x.tier === 'has-code').length;
+  console.log(`F4 对外响应体（server/src）：reply.status(4xx/5xx).send 共 ${base.replyTotal} 处 ｜ 统一码位 ${rOk} ｜ 另一种码位（status/reason/channel 类枚举字段）${base.replies.filter((x) => x.tier === 'other-code-field').length} ｜ 🔴 5xx 什么都没有 ${r5.length} ｜ 🟠 4xx 什么都没有 ${r4.length} ｜ 判不了 ${base.replyUnreadable} 处（send(变量)、带 ...展开、括号配不上）`);
+  if (base.replyTotal !== base.replies.length) { console.log('🔴 F4 对账不成立 ⇒ 响应体归属漏了，本趟读数不可信。'); process.exit(2); }
   if (cand.length) {
     console.log('\n🔴 候选（生产代码里把自家文案当契约；逐枚开码才成判词）：');
     for (const c of cand.slice(0, top)) console.log(`   ${c.file}:${c.line}  .message … "${c.operand}"`);
@@ -334,9 +402,11 @@ function main() {
     console.log('\n🔴 无机读承载、没有 instanceof 消费者、又确实被抛出过的错误类（抛出去谁也区分不了；逐枚开码才成判词）：');
     for (const c of opaque.slice(0, top)) console.log(`   ${c.file}:${c.line}  class ${c.name}（抛出 ${c.throws} 处）`);
   }
-  console.log(`\n候选 F1 ${cand.length} 枚 ＋ F2 ${opaque.length} 枚${strict ? '' : '｜诊断尺默认退 0，加 --strict 才判红（两族任一枚即红）'}`);
+  if (r5.length) { console.log('\n🔴 5xx 对外没给码位（客户端只能猜；逐枚开码才成判词）：'); for (const c of r5.slice(0, top)) console.log(`   ${c.file}:${c.line}  status ${c.status}`); }
+  if (r4.length) { console.log('\n🟠 4xx 对外没给码位（界面层要分档回执就分不了）：'); for (const c of r4.slice(0, top)) console.log(`   ${c.file}:${c.line}  status ${c.status}`); }
+  console.log(`\n候选 F1 ${cand.length} 枚 ＋ F2 ${opaque.length} 枚 ＋ F4 ${r5.length + r4.length} 枚${strict ? '' : '｜诊断尺默认退 0，加 --strict 才判红（两族任一枚即红）'}`);
   if (argv.includes('--mutate')) process.exit(mutate(files, (f) => readFileSync(f, 'utf8'), useCounts(files, (f) => readFileSync(f, 'utf8'))));
-  process.exit(strict && (base.rows.some((r) => r.tier === 'copy-contract') || opaque.length > 0) ? 1 : 0);
+  process.exit(strict && (base.rows.some((r) => r.tier === 'copy-contract') || opaque.length > 0 || r5.length > 0 || r4.length > 0) ? 1 : 0);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
