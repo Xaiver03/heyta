@@ -28,13 +28,18 @@
  * 退出：0 = 只报读数；1 = --strict 且有 🔴 档 / --mutate 的敏感度没证到；2 = 分母为空、一枚函数都没解析出来、或对账不成立
  */
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { balanced, lineOf, maskText } from './lib/text-mask.mjs';
 
+// 🔴 这一枚文件**既是命令行也是库**（骨架尺复用同一份抽取器）。没有入口判定的话，
+//    别人 `import { extractFns }` 就会顺带把本尺的 CLI 跑一遍——旗标还会串味（`--self-test`
+//    传进宿主那把尺的进程里，这里就当众抢答了一份自己的臂清单）。骨架尺第一发就是这么撞上的。
+const IS_ENTRY = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const argv = process.argv.slice(2);
+const argv = IS_ENTRY ? process.argv.slice(2) : [];
 const strict = argv.includes('--strict');
 const selfTest = argv.includes('--self-test');
 const mutate = argv.includes('--mutate');
@@ -264,6 +269,7 @@ if (selfTest) {
   process.exit(bad.length === 0 ? 0 : 1);
 }
 
+if (IS_ENTRY) {   // ↓↓↓ 整段是命令行：分母、打印、--strict 退出码
 const scope = applyScope(scopeFiles(), SCOPE);
 if (scope.length === 0) {
   console.error('🔴 分母为空：HEAD 里一枚射程内的源文件都没列出 ⇒ 本尺没干活，不许读成"没有重叠"');
@@ -366,3 +372,5 @@ if (s.exact.length + s.maskedOnly.length > 0) {
   console.log('\n✅ 没有跨文件重叠的函数体');
 }
 if (strict && s.exact.length > 0) process.exit(1);
+
+}
