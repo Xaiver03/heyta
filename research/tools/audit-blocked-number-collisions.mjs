@@ -23,9 +23,14 @@ import path from 'node:path';
 import process from 'node:process';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
+
+// 🔴 本模块有导出面 ⇒ 必须有入口判定：没有它，只 import 也会拿调用方的 argv 跑整套扫描并打印。
+import { pathToFileURL } from 'node:url';
+const IS_ENTRY = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
 const LEDGER = process.env.HEYTA_LEDGER || path.join(ROOT, 'BLOCKED.md');
 
-const argv = process.argv.slice(2);
+const argv = IS_ENTRY ? process.argv.slice(2) : [];
 const strict = argv.includes('--strict');
 const wantSelfTest = argv.includes('--self-test');
 const unknown = argv.filter((a) => !['--strict', '--self-test'].includes(a));
@@ -104,4 +109,4 @@ const run = () => {
   process.exit(strict && dup.length > 0 ? 1 : 0);
 };
 
-run();
+if (IS_ENTRY) run();
