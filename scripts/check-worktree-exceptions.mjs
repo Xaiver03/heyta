@@ -218,6 +218,34 @@ export const OWNER_RULES = [
     ],
   },
   {
+    line: '管理后台线（ADR-0078 后台页独立启动那一族在飞）',
+    why:
+      '2026-10-30 11:4x 现量：这一族每一枚都指向同一件没入库的事 —— ADR-0078（后台页 `/admin` 不初始化本地 op-log）。' +
+      '证据不在目录名里，在文件自己写的话里：`apps/web/src/features/privacy/first-launch.ts` 头一行点名"（G-11）…管理后台页 `/admin` 现在走独立启动路径（ADR-0078…）"，' +
+      '`apps/web/src/lib/startup-mode.ts` 头一行写"这次启动该走哪一条路径 —— 唯一的判定…`/admin` 与主应用共用同一个 bundle（ADR-0038）"，' +
+      '`docs/README.md` 那枚未提交 diff 就是 +1 行登记 ADR-0078（`git diff -- docs/README.md` 现量只有一行加号），' +
+      '`apps/web/src/main.tsx` 那枚 `M` 加的两行 import 恰好指向上面两枚新模块（`grep -n "first-launch\\|startup-mode" apps/web/src/main.tsx`）。' +
+      '⇒ 按堆提交里任一枚都会留下"代码引用仓库里没有的模块"（第四判正点名它），而代提交整堆 = 替别线把未定的启动顺序契约落仓。' +
+      '⚠️ `apps/web/src/main.tsx` 与 `docs/README.md` 都是**共享件**：本条登记的是"此刻这一段脏内容归他们"，' +
+      '别的日子改这两枚时会被一并算进来（与上面自动收集那条 barrel 的已知限制同一形状，不是判据坏了）。' +
+      '`apps/web/evidence/admin-console/` 那三枚未跟踪 PNG 是他们准备入库的真证据（不是门禁重写的产物），' +
+      '登记在此是为了让"未登记栏"只报真没人认领的路径；提交它们归那条线随自己那笔代码一起走。',
+    prefixes: [
+      'apps/web/src/features/admin/',
+      'apps/web/src/features/privacy/first-launch.ts',
+      'apps/web/src/lib/startup-mode.ts',
+      'apps/web/src/main.tsx',
+      'apps/web/tests/startup-mode.spec.ts',
+      'apps/web/tests/admin-console-route.spec.tsx',
+      'e2e/tests/admin-console-route.spec.ts',
+      'apps/web/evidence/admin-console/',
+      'docs/adr/0038-admin-console-scope.md',
+      'docs/adr/0078-admin-console-boots-without-local-store.md',
+      'docs/plans/admin-console.md',
+      'docs/README.md',
+    ],
+  },
+  {
     line: '法务/条款线（线上验收套件那条横幅断言）',
     why: '10-29 23:5x 现量：`e2e/live-site/live-legal.spec.ts` 这次的未提交 diff 自己新增 `DOC_STATUS`（从 `@heyta/legal` 的注册表取每份件的状态）' +
       '与一枚「分母自检」用例，并把「尚未生效」横幅的断言改成**双向**（草稿必须有、`effective` 必须没有）——' +
