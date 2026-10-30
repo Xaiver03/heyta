@@ -67,6 +67,7 @@ import {
   localDateTimeToEpoch,
   dueLocalDateOf,
   localTimeOf,
+  toLocalDate,
   noteProjectId,
   noteRejection,
   reminderPhase,
@@ -246,11 +247,7 @@ const NAME_TO_PRIORITY: Readonly<Record<string, Priority>> = {
  * 会在 UTC+8 的下午之后整体差一天。
  */
 export function toLocalDateString(epochMs: number): string {
-  const d = new Date(epochMs);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return toLocalDate(epochMs);
 }
 
 /**
