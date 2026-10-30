@@ -6277,3 +6277,10 @@ for a in $(grep -oE '/app/assets/[A-Za-z0-9._-]+\.(js|css)' $C/apps/web/dist/ind
 ③ 设计错一发最贵：我第一版把"与骨架尺有重叠对子"当成违规条件（期望 0），而**一组里混着老对子是正常的** ——
    正确的不变量是"**整组都是老对子 ⇒ 本尺跳过**"。改成按组数新面孔，并把对账写成
    `C(n,2) == 新面孔 + 已报过`（不等就退 2 拒答，臂 C8/C9 各钉一侧）。
+
+⚠️ **同轮顺手把这枚新尺与 §6.138 那条结论的边界钉在一起**（因为它当场就应验了）：
+那枚代码修复落在 `packages/app-host/src/local-api-host.ts`，**是 web 的打包输入** ⇒
+从这一笔起，"线上等于 HEAD"那句作废（现量 `git diff --name-only <载体那枚>..HEAD -- apps/landing apps/web packages server/public pnpm-lock.yaml package.json` 读出非空）。
+🔴 而 `node scripts/live-web-freshness.mjs` 的针脚法**看不见这件事**：它抽的是 `packages/i18n` 里"被 web 引用的词条值"，
+我这枚改动一个字的词条都没动 ⇒ 它会照样打印"✅ 全部在场"。**针脚是下界，不是等号**；
+判"要不要再发一趟"只能用打包输入差集，那条 §6.138 已经这么写，这一轮是它第一次被自己人验证。
