@@ -6244,3 +6244,36 @@ for a in $(grep -oE '/app/assets/[A-Za-z0-9._-]+\.(js|css)' $C/apps/web/dist/ind
 （现量 `grep -n "^### B232\|🟡 \*\*B232" BLOCKED.md`）。它是几条线共用的取证账本，**重编号 = 改写别人写过的引用** ⇒
 登记进待拍板表，不由我改。
 
+
+### 6.142（2026-10-30 14:5x · ① 补第三把尺（按调用面对账）；它一上来就抓到一枚真重复，顺手量出 HEAD 自己红着一枚对账 spec）
+
+§6.137 那节收尾时留了一句"仍读不到：同一逻辑用**不同控制流**写成"。这一轮把它落成装置：
+`research/tools/audit-duplicate-call-paths.mjs` —— 分组键是**调用面签名**（每个被调名 + 次数，排序拼串；
+`ctx.set(` 与 `store.set(` 折成同一枚 `set`，接收者不参与），只比"打了哪些名、各几次"，不比语义。
+前两把尺（文本 / 骨架）各有看不见的形状，这一把补第三种；**三把各数各的**，所以本尺只报"组里有新面孔"的那些。
+
+**当趟读数**（`node research/tools/audit-duplicate-call-paths.mjs` 自己打印）：生产跨文件一组组数与测试面另计那档都由它自己数，
+`--self-test` 11 枚臂 `不符 0`、`--mutate` 两向绿（注入"同调用面换控制流"必须被抓；改成"同骨架只换名"必须**交回骨架尺**）。
+
+它第一趟就抓到一枚不是候选、开码即判成事实的：`packages/domain/src/date.ts:36 toLocalDate` 与
+`packages/app-host` 里那枚 `toLocalDateString` —— 函数体逐字同，只差名字与返回类型标注（`LocalDate` 就是 `string` 别名）。
+文本尺没并进来（签名不同），骨架尺也没并进来（一边 `if/return`、一边别的形状）。
+**当场修完**：app-host 那枚改成委托 `@heyta/domain`（依赖本来就在，`grep -n '"@heyta/domain"' packages/app-host/package.json`）；
+`pnpm --dir packages/app-host typecheck` 过，同包测试套 `120 passed / 1 failed`。
+
+⚠️ 那 1 枚红**不是我这一手**，而且是这一轮最有用的一条读数：
+先把 HEAD 那版原文件放回同跑一条 spec ⇒ 一样红；再在**干净 HEAD 的独立载体**上单跑 ⇒ 还是红。
+成因是 `packages/app-host/tests/ai-egress-legal-parity.spec.ts:78` 把"那张表有几行"写死成 5，
+而表已被 `06798bf3ab`（2026-10-29，自动收集线）撑到 6 行、正文同笔改成"这六个出站调用点"
+（现量 `git blame -L 106,116 -- packages/legal/src/documents/ai-and-transfer.ts`）。
+⇒ **当前 HEAD 的 `pnpm -r test` 那一腿必然红**。改断言还是撤那一行都是那条线的裁决（"第六个出境面算不算已上线口径"），
+本线只交位置与复量，登记成 `BLOCKED.md` 的 **B250**，不混进"已修"。
+这一枚也正是本仓那条老纪律的第三次现形：**判据里的分母写成字面量，产物一扩它就悄悄红**（与 traps 里"读数不能按标签归因"同族）。
+
+自己这一轮付的三发账，都是"尺自己没牙"那一族，逐枚记：
+① `applyScope(files, prefix)` 参数序我反着传 ⇒ `prefix.endsWith is not a function` 当场崩（接错就红，比静默好，但是自己的账）；
+② 臂 C6 第一版**判的不是它宣称的东西**：夹具里那枚测试面函数与原函数同骨架，落进的是混合组，"全员测试面"那一档根本没被构出来 ⇒ 读起来绿、其实没测；
+   重做夹具（两枚都在 `tests/`、控制流不同）之后臂才有牙。
+③ 设计错一发最贵：我第一版把"与骨架尺有重叠对子"当成违规条件（期望 0），而**一组里混着老对子是正常的** ——
+   正确的不变量是"**整组都是老对子 ⇒ 本尺跳过**"。改成按组数新面孔，并把对账写成
+   `C(n,2) == 新面孔 + 已报过`（不等就退 2 拒答，臂 C8/C9 各钉一侧）。

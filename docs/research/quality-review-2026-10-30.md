@@ -21,6 +21,7 @@
 ```sh
 node research/tools/audit-duplicate-function-bodies.mjs --top 500   # ① 跨文件重叠实现（逐字）
 node research/tools/audit-duplicate-logic-skeletons.mjs --top 500   # ① 只改名的复制（文本尺看不见的那族）
+node research/tools/audit-duplicate-call-paths.mjs --top 500        # ① 同一圈调用、控制流写成另一种（前两把都看不见）
 node research/tools/audit-duplicate-destinations.mjs --top 50       # ⑤ 同一目的地两个入口
 node research/tools/audit-dual-edit-controls.mjs --hints            # ⑤ 两处都能编辑
 node research/tools/audit-unused-package-exports.mjs --top 500      # ② 导出面未被引用
@@ -43,14 +44,17 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
 | 🔴 | **同一件仪式在同一枚文件里被抄了多遍**：`apps/web/src/App.tsx:932` 与 `:991` 逐字同（六枚 setter 一起设）；`:2424`、`:2430`、`:2450` 三枚同仪式（`onOpenProfile` / `onOpenProfileCenter` / `onOpenHelp`） | `node research/tools/audit-duplicate-destinations.mjs`（🔴 只由"周围 5 行调用集合逐字相同"决定，跨文件一样升档） | **待拍板**：合并会连带改"从哪一面返回"那个行为；`App.tsx` 归日历/详情面线、账号菜单分层归全局 UX 线 |
 | 🟠 | **同一枚展示逻辑在 `apps/mobile` 与 `apps/web` 各写一遍是一族**（导出文案表、看板标签、周期标签、倒计时过滤语、剩余时间文案、优先级标签、分享花名册注册；最长的一对是百行级的 AI 意图文案）——这条同时是 AGENTS §3.5「业务语义只许在 `packages/*`」的现量证据 | `node research/tools/audit-duplicate-function-bodies.mjs --top 500`（分桶：🔴 逐字相同 / 🟠 只差注释或文案，按 ≥3/≥5/≥10 行三档） | **待拍板**：修法不是逐格删，而是"下沉到哪一枚包、公共面长什么样"；且会动 barrel |
 | 🟠 | **同一条夹取/校验逻辑在两处手抄**（自动收集规则 config 在 create 与 saveEdit 两处，同一行 `Math.min(50` 逐字符相同） | `grep -rn "Math.min(50" apps/web/src packages/app-host/src` | **待拍板**（自动收集线；与他们那条"新建不重置"宜同一笔做） |
+| 🔴 | **同一个"epoch ms → 本地日历日"写了两份**：`packages/domain/src/date.ts:36 toLocalDate` 与 `packages/app-host/src/local-api-host.ts` 里那枚 `toLocalDateString` —— 函数体逐字同（`getFullYear/getMonth/getDate` + `padStart`），只差名字与返回类型标注（`LocalDate` 就是 `string` 的别名）。前两把尺都没报：文本尺因签名不同没并进来，骨架尺因两边控制流形状不同也没并进来 | 修前它是最大的一组：`node research/tools/audit-duplicate-call-paths.mjs \| grep -B1 -A1 toLocalDate`；两处形状 `sed -n '34,43p' packages/domain/src/date.ts`、`grep -n -A3 "function toLocalDateString" packages/app-host/src/local-api-host.ts` | **已修**：app-host 那枚改成委托 `@heyta/domain` 的 `toLocalDate`（依赖本来就在：`grep -n '"@heyta/domain"' packages/app-host/package.json`）；`pnpm --dir packages/app-host typecheck` 与同包测试套都过 |
+| 🟠 | **同一圈 base64url 解码在两处各写一遍**（`apps/web/src/features/auth/passkey-browser.ts:69 fromBase64Url` 与 `apps/web/src/pwa/push-subscribe.ts:97 urlBase64ToUint8Array`：同样的 `atob`/`charCodeAt`/`Uint8Array`，但校验与补齐的写法不同 ⇒ 前两把尺看不见这一族） | `node research/tools/audit-duplicate-call-paths.mjs \| grep -A1 "atob:1"` | **待拍板**：合成一枚要先把两边的"坏数据该怎么办"对齐（一枚静默补齐、一枚直接抛），那是口径，归身份面与 PWA 面 |
+| 🟠 | **同一守卫被手抄多份**：`packages/app-host` 各 `*-actions.ts` 里的 `xxxOf` 存取器（"取不到或已立墓碑就返回 `undefined`"这一条规则各抄一份）。🔴 逐枚开码对过：**规则一致，没有哪一份漏掉墓碑判断** ⇒ 这是"漂移风险"候选，不是现行缺陷 | `grep -rn "deletedAt !== undefined) return undefined" packages/app-host/src/*-actions.ts \| wc -l`；组级候选 `node research/tools/audit-duplicate-logic-skeletons.mjs --top 500` | **待拍板**：收成一条共用存取器会动到 op-log 写入口那批工厂的签名，属共享层口径，一枚没动 |
+| 🟠 | **同一仪式跨壳各写一遍**（`listeners.add` + 返回 `delete` 的订阅器；`localStorage` 偏好读写四件套 save/clear；`stripComments` 之类夹具）——这一族**逐字尺读不到**，因为每份的标识符名不一样 | `node research/tools/audit-duplicate-logic-skeletons.mjs --top 500`（第一栏就是最大的一组，成员名逐枚打全） | **待拍板**：订阅器与偏好读写该不该下沉成一枚共用件是包边界问题（AGENTS §3.5 只规定"业务语义"在哪，没规定这类通用件）；测试面夹具另计一档，不算产品重复 |
 
-| 🟠 | **同一守卫被手抄多份**：`packages/app-host` 各 `*-actions.ts` 里的 `xxxOf` 存取器（"取不到或已立墓碑就返回 `undefined`"这一条规则各抄一份，共 8 枚）。🔴 逐枚开码对过：**规则一致，没有哪一份漏掉墓碑判断** ⇒ 这是"漂移风险"候选，不是现行缺陷 | `grep -rn "deletedAt !== undefined) return undefined" packages/app-host/src/*-actions.ts \| wc -l`；组级候选 `node research/tools/audit-duplicate-logic-skeletons.mjs --top 500` | **待拍板**：收成一条共用存取器会动到 op-log 写入口那批工厂的签名，属共享层口径，一枚没动 |
-| 🟠 | **同一仪式跨壳各写一遍**（`listeners.add` + 返回 `delete` 的订阅器；`localStorage` 偏好读写四件套 save/clear；`stripComments` 之类夹具）——这一族**逐字尺读不到**，因为每份的标识符名不一样 | `node research/tools/audit-duplicate-logic-skeletons.mjs --top 500`（第一栏就是最大的一组，成员名逐枚打全）| **待拍板**：订阅器与偏好读写该不该下沉成一枚共用件是包边界问题（AGENTS §3.5 只规定"业务语义"在哪，没规定这类通用件）；测试面夹具另计一档，不算产品重复 |
-
-**射程**：这一维现在有两把尺——按**文本**对账的那把抓逐字与只差注释/文案的复制，按**骨架**（控制流关键字序列 + 标识符个数）对账的那把抓"只改名的复制"；
-后者只比控制流形状，**不比语义**：`if (a) return b` 与 `if (x) return y` 同骨架，所以它的每一组都要逐枚开码才成判词（`--mutate` 那枚臂钉的是"改名确实追得回来、且落进同一组"，不是"这组是缺陷"）。
-两把尺都只看**声明级函数体**：表达式体箭头函数与回调被跳过（跳过的枚数由尺自己打印在分母那行）。
-"同一套逻辑用**不同控制流**写成"（例如两枚不同形状的重试退避）仍然读不到 ⇒ 那一族**未判定**，不是"查过没有"。
+**射程**：这一维现在有三把尺，各管一种"看不出来"：按**文本**（逐字与只差注释/文案）、按**骨架**（只改名的复制）、按**调用面**（同一圈 API 换个控制流写法）。
+第三把只比"打了哪些名、各几次"，**不比语义**，也不看接收者 —— 所以 `set` 与 `set` 会并到一起，每组都要逐枚开码才成判词。
+它的 `--mutate` 钉两件事：换个控制流写法仍被抓；改成同骨架只换名后**交回骨架尺**（两把尺不重复计同一笔 —— 判的是"这组有没有新面孔"，
+并把账写成 `C(n,2) == 新面孔 + 已报过`，不等就退 2 拒答）。
+三把尺都只看**声明级函数体**：表达式体箭头函数与回调被跳过（跳过的枚数由各自分母那行打印）。
+仍读不到的：同一逻辑用**不同调用面**写成（例如两枚不同形状的重试退避）⇒ 那一族**未判定**，不是"查过没有"。
 
 ---
 
@@ -124,6 +128,7 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
 | 共用遮蔽器把 TSX 闭标签 `</li>` 当正则起点，一路抹掉整段真代码（含 `value={x}`）；改按"两条 JSX 斜杠判据"处理 | 新尺自带的对账臂（第一发读出 73 ≠ 60 抓到它）＋ `node research/tools/audit-avoidable-rerenders.mjs --self-test` | `d5b818200` |
 | 被复用的那枚重叠尺**没有入口判定**：别的模块只 import 它的 `extractFns`，也会拿调用方的 argv 去跑整套扫描（`--self-test` 被调用方的 argv 抢走）；加 `IS_ENTRY`（`import.meta.url === pathToFileURL(process.argv[1]).href`）把命令行那段整块包住 | 只 import 不再打印分母那行（当场实测）＋ `node research/tools/audit-duplicate-function-bodies.mjs --self-test` 仍全绿 | `7422c5d67` |
 | **同一族第二次露头，于是逐枚数了一遍**：五枚"有导出面、顶层还裸调 `main()`/`run()`、又没入口判定"的尺（归属尺、账本编号尺、台账健康尺、读路径索引尺、导出面尺）——只 import 就把整套扫描跑完并打印。分母是**两下属实**收窄出来的：先"有导出面"抓到一把假候选（有导出面 ≠ 被 import 会跑副作用），再钉"顶层有一行裸调用"才收到这几枚 | 修前先让它红：`node --input-type=module -e "await import('./scripts/check-worktree-exceptions.mjs'); console.log('ONLY_IMPORT')"` 会先打印归属报表；修后五枚一律只回 `ONLY_IMPORT`，且各尺 `--self-test` 仍 `不符 0`（臂数由它们自己打印）。逐枚分母命令与两下收窄见台账 §6.141 | 本轮 |
+| `packages/app-host` 那枚 `toLocalDateString` 是 `packages/domain` 里 `toLocalDate` 的逐字复制（只差名字与类型标注）；改成委托，包内依赖本来就在 | 新那把调用面尺：修前它是最大的一组；修后 `node research/tools/audit-duplicate-call-paths.mjs \| grep -c toLocalDate` 少一枚。`pnpm --dir packages/app-host typecheck` 与同包测试套（那一枚红经 A/B 证明与这一手无关，见 B250） | 本轮（见台账 §6.142） |
 | 重叠探针漏掉带返回类型标注的 `function` 声明 ⇒ 整树读数少报 4 倍 | `node research/tools/audit-duplicate-function-bodies.mjs --self-test`（臂 D14/D15） | `cc9ff3b41` |
 | 归属尺的构建产物噪声只在一个模式下被滤过 ⇒ 默认模式也按机制豁免 | `node scripts/check-worktree-exceptions.mjs --self-test`（㉞/㉟/㊀ 三臂） | `83eb19791` |
 | 台账尺把一次合规的"往同一格追加追记"读成行消失 ⇒ 另立「就地改写」一档 | `--self-test`（L13/L14 两臂）＋ `--mutate` 2/2 | `baee627b3` |
@@ -147,7 +152,13 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
    判"要不要再发一趟"用的是打包输入差集，不是这行字。
 2. **待拍板那张表**：`grep -n "新落到的一格待拍板" BLOCKED.md` 起，逐格归人。
    本线一律**只交装置、候选与复量命令**，没替任何一条线改判据口径。
-   本轮新增一格（**账本卫生**，不是代码缺陷）：取证账本里同号开多节一批 ——
+   本轮新增一格账本卫生（**账本编号**，不是代码缺陷）：取证账本里同号开多节一批 ——
    `node research/tools/audit-blocked-number-collisions.mjs`（枚数由它自己打印）。
    我自己今天就被它绊过：同一枚 B232 同时是 10-18 的 macOS 门那一节与 10-27 的落地页那一节
    （现量 `grep -n "B232" BLOCKED.md`）。这是几条线共用的账本，**重编号＝改写别人写过的引用** ⇒ 只登记，不由本线改。
+3. **当前 HEAD 自己红着一枚对账 spec**（不是候选，是已判真红；但它动的是别人的判据口径 ⇒ 不混进"已修"）：
+   `packages/app-host/tests/ai-egress-legal-parity.spec.ts:78` 那句"分母必须是 5 行"，而第三节那张出境表已被
+   `06798bf3ab`（2026-10-29 自动收集线）撑到 6 行、正文也改成"这六个出站调用点"。
+   复量（在**干净 HEAD 的独立载体**上跑，排除"别人没提交的东西"这一支）：
+   `pnpm --dir packages/app-host exec vitest run tests/ai-egress-legal-parity.spec.ts`。
+   归自动收集/法务那条线自己判"第六个出境面算不算已上线口径"⇒ 改断言还是撤那一行都是他们的裁决，见 `BLOCKED.md` 的 B250。
