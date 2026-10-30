@@ -6197,3 +6197,22 @@ for a in $(grep -oE '/app/assets/[A-Za-z0-9._-]+\.(js|css)' $C/apps/web/dist/ind
 所以第 1 件事的诚实答案是：**我名下零未提交；别人名下那批全部有归属、有理由，其中上面那两栏红着等它们各自的负责人**
 （现量：`node scripts/check-worktree-exceptions.mjs | sed -n '/跨线依赖/,$p'`）。
 
+### 6.140（2026-10-30 14:1x · ④ 最后那格"判不了"从计数变成带位置的待办，并逐枚开码判完）
+
+§6.135/6.136 把 F4 落成尺之后留了一句射程：`send(变量)` 与带 `...展开` 的响应体看不见里面有什么 ⇒ 记"判不了"。
+**只报枚数的盲区等于把盲区藏在一个数字后面** —— 下一位拿到"3 处"什么也做不了。这一轮补两点：
+① 打印逐枚 `file:line + 档位 + 状态码`；② 臂 G20 钉"每一枚判不了都带位置"，且打印那一段与臂吃**同一枚**
+`BLIND_TIERS` 常量（两处各写一遍的话，臂可以一直绿而打印那段偷偷漏枚 —— 这正是本仓"同一守卫手抄多份"那一族，
+尺自己也不能例外）。当趟：`--self-test` 臂数由它自己打印、`不符 0`；`--mutate` 两向绿。
+
+**逐枚开码的判词**（三处都不是缺陷，字面量在装配函数里）：
+`server/src/entitlement.ts:548` 那枚 `automationRejectionBody` 返回 `{ code: ENTITLEMENT_ERROR_CODE, message, reason, ticketCode? }` ⇒
+`:576`（整份交给它）与 `:605`（展开它再补 `used`/`limit` 两格数值）都有码位；
+`server/src/sync/sync.routes.quota.ts:138` 的 `code: SYNC_ERROR_CODES.STORAGE_QUOTA_EXCEEDED` 就写在展开**前面**。
+复量：`sed -n '544,556p' server/src/entitlement.ts`；`sed -n '125,142p' server/src/sync/sync.routes.quota.ts`。
+⇒ 汇总稿 ④ 那行的"三处判不了"改成"逐枚带位置、且已各自判完"，射程那句也换成"看不见字面量内容，但每一枚都是可以去开码的待办"。
+
+自己又付了一次账（同一族，记下来因为它每次都换新面具）：臂里先写 `const blind = ... BLIND.includes(...)`、
+后写 `const BLIND = [...]` ⇒ **TDZ 直接抛 ReferenceError**，`--self-test` 整趟崩（崩在第一枚臂都没打印出来的那种"红得很难看"，
+反而比静默绿好查）。修法是提到模块级 `BLIND_TIERS`，两处共用 —— 顺带把"打印集合与断言集合必须是同一枚"这条钉进注释。
+
