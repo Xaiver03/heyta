@@ -123,6 +123,7 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
 |---|---|---|
 | 共用遮蔽器把 TSX 闭标签 `</li>` 当正则起点，一路抹掉整段真代码（含 `value={x}`）；改按"两条 JSX 斜杠判据"处理 | 新尺自带的对账臂（第一发读出 73 ≠ 60 抓到它）＋ `node research/tools/audit-avoidable-rerenders.mjs --self-test` | `d5b818200` |
 | 被复用的那枚重叠尺**没有入口判定**：别的模块只 import 它的 `extractFns`，也会拿调用方的 argv 去跑整套扫描（`--self-test` 被调用方的 argv 抢走）；加 `IS_ENTRY`（`import.meta.url === pathToFileURL(process.argv[1]).href`）把命令行那段整块包住 | 只 import 不再打印分母那行（当场实测）＋ `node research/tools/audit-duplicate-function-bodies.mjs --self-test` 仍全绿 | `7422c5d67` |
+| **同一族第二次露头，于是逐枚数了一遍**：五枚"有导出面、顶层还裸调 `main()`/`run()`、又没入口判定"的尺（归属尺、账本编号尺、台账健康尺、读路径索引尺、导出面尺）——只 import 就把整套扫描跑完并打印。分母是**两下属实**收窄出来的：先"有导出面"抓到一把假候选（有导出面 ≠ 被 import 会跑副作用），再钉"顶层有一行裸调用"才收到这几枚 | 修前先让它红：`node --input-type=module -e "await import('./scripts/check-worktree-exceptions.mjs'); console.log('ONLY_IMPORT')"` 会先打印归属报表；修后五枚一律只回 `ONLY_IMPORT`，且各尺 `--self-test` 仍 `不符 0`（臂数由它们自己打印）。逐枚分母命令与两下收窄见台账 §6.141 | 本轮 |
 | 重叠探针漏掉带返回类型标注的 `function` 声明 ⇒ 整树读数少报 4 倍 | `node research/tools/audit-duplicate-function-bodies.mjs --self-test`（臂 D14/D15） | `cc9ff3b41` |
 | 归属尺的构建产物噪声只在一个模式下被滤过 ⇒ 默认模式也按机制豁免 | `node scripts/check-worktree-exceptions.mjs --self-test`（㉞/㉟/㊀ 三臂） | `83eb19791` |
 | 台账尺把一次合规的"往同一格追加追记"读成行消失 ⇒ 另立「就地改写」一档 | `--self-test`（L13/L14 两臂）＋ `--mutate` 2/2 | `baee627b3` |
@@ -146,3 +147,7 @@ node research/tools/audit-error-shape-machine-readable.mjs           # ④ 错�
    判"要不要再发一趟"用的是打包输入差集，不是这行字。
 2. **待拍板那张表**：`grep -n "新落到的一格待拍板" BLOCKED.md` 起，逐格归人。
    本线一律**只交装置、候选与复量命令**，没替任何一条线改判据口径。
+   本轮新增一格（**账本卫生**，不是代码缺陷）：取证账本里同号开多节一批 ——
+   `node research/tools/audit-blocked-number-collisions.mjs`（枚数由它自己打印）。
+   我自己今天就被它绊过：同一枚 B232 同时是 10-18 的 macOS 门那一节与 10-27 的落地页那一节
+   （现量 `grep -n "B232" BLOCKED.md`）。这是几条线共用的账本，**重编号＝改写别人写过的引用** ⇒ 只登记，不由本线改。
