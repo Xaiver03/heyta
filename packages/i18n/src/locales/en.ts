@@ -4923,6 +4923,7 @@ export const en = {
   'web.admin.console.back': 'Back to the app',
   'web.admin.console.navLabel': 'Console sections',
   'web.admin.console.leadUnavailable': 'This page is open to administrator accounts only. The server decides who counts as one; there is no self-service request here.',
+  'web.admin.console.signIn': 'Sign in',
   'web.admin.tab.overview': 'Overview',
   'web.admin.tab.users': 'Users',
   'web.admin.tab.subscriptions': 'Subscriptions',

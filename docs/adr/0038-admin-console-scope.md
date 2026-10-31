@@ -5,6 +5,10 @@
 > 相关：[ADR-0011](0011-local-api-mcp.md)（本机 API/MCP 的授权立场）、
 > [ADR-0023](0023-managed-ai-quota-not-implemented.md)（未交付能力必须挡住入口）
 > 落地计划：[`../plans/admin-console.md`](../plans/admin-console.md)
+>
+> 🔴 2026-10-30 补充：[ADR-0078](0078-admin-console-boots-without-local-store.md)
+> 让 `/admin` 走独立启动路径（不初始化本地 op-log），并把分区导航收窄到「仅管理员可见」。
+> §2 与 §4.3 的权限结论不变 —— 服务端 `requireAdmin` 仍是唯一裁决者。
 
 ---
 

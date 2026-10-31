@@ -111,6 +111,17 @@ export const ADMIN_REASON_KEY: Record<AdminFailureReason, string> = {
 };
 
 /**
+ * 这一档失败能否靠**重新登录**解决 —— 决定后台页给不给「登录」入口。
+ *
+ * 🔴 只认「没有会话」与「会话过期」这两格。`forbidden`（403）**不**给：
+ * 那个人已经登录了，问题在权限，让他重登一遍只会把原因搅浑；
+ * `unconfigured` 也不给：那是服务地址没配，登录表单救不了。
+ */
+export function canSignInFrom(errorKey: string | null): boolean {
+  return errorKey === ADMIN_REASON_KEY['no-token'] || errorKey === ADMIN_REASON_KEY.unauthorized;
+}
+
+/**
  * 发放被拒时服务端给的那个**机器码** → 词条键。
  *
  * 🔴 只按码取文案，**不许**读那句散文 —— `admin.routes.ts` 的 `reason` 带的是码，

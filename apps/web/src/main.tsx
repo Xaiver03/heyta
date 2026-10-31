@@ -21,7 +21,9 @@ import { registerLocalEraser } from '@heyta/app-host';
 
 import { App } from './App.js';
 import { armBootSplashDismiss } from './boot-splash.js';
+import { AdminConsolePage } from './features/admin/AdminConsolePage.js';
 import { holdPendingLogin, releasePendingLogin } from './features/auth/pending-login.js';
+import { armFirstLaunchConsent } from './features/privacy/first-launch.js';
 import { createStartupNetwork } from './features/privacy/startup-network.js';
 import {
   installConsentGatedFetch,
@@ -39,6 +41,8 @@ import { armWebShareSession } from './features/share/share-session.js';
 import { initOpLog } from './features/tasks/store.js';
 import { LocaleHost } from './lib/locale-host.js';
 import { eraseWebLocalData } from './lib/local-data-destruction.js';
+import { startupMode } from './lib/startup-mode.js';
+import { applyTheme, resolveInitialTheme } from './lib/theme.js';
 import { startWidgetLifecycle } from './pwa/lifecycle.js';
 import { registerWidgetServiceWorker } from './pwa/register.js';
 
@@ -137,7 +141,13 @@ armBootSplashDismiss(container);
  * ⚠️ 这**不是**一个功能开关，也不该被产品代码引用 ——
  * 它是给 `scripts/verify-universal-slice.sh` 用的确定性挂载点。
  */
-if (new URLSearchParams(window.location.search).has('shell')) {
+/**
+ * 这次启动走哪一条路径 —— 判定本身在 `lib/startup-mode.ts`（纯函数，可测）。
+ * 顺序：`?shell=` > `?slice=` > `/admin` > 主应用。
+ */
+const mode = startupMode(window.location.search, window.location.pathname);
+
+if (mode === 'shell') {
   /**
    * 🔴 M2-B 验证入口（`?shell=1`）：共享 UI 渲染**原生壳推过来的真数据**。
    *
@@ -152,7 +162,7 @@ if (new URLSearchParams(window.location.search).has('shell')) {
       </StrictMode>,
     );
   });
-} else if (new URLSearchParams(window.location.search).has('slice')) {
+} else if (mode === 'slice') {
   import('./dev/universal-slice.js').then(({ UniversalSlice }) => {
     root.render(
       <StrictMode>
@@ -160,6 +170,35 @@ if (new URLSearchParams(window.location.search).has('shell')) {
       </StrictMode>,
     );
   });
+} else if (mode === 'console') {
+  /**
+   * 🔴 管理后台页（`/admin`）**不建本地库**（ADR-0078）。
+   *
+   * 它的数据全部走服务端 HTTP（`features/admin/store.ts` → `@heyta/app-host`
+   * 的 `fetchAdmin*`），凭据在 `localStorage`；而 web 的本地库是 OPFS 上的
+   * SQLite，`createSyncAccessHandle` 对文件是**排他锁** —— 主应用在另一张
+   * 标签页里开着，这里就必然抢不到，落成「无法初始化本地存储」的崩溃屏。
+   * 后台被一件自己不需要的资源挡住，而那条提示还会把产品缺陷说成用户操作问题。
+   *
+   * ⚠️ 所以**不要**为了"和主应用统一"把 `initOpLog()` 加回来。将来后台真要用
+   * 本地数据，先改 ADR-0078，并回答"另一张标签页占着锁时怎么办"。
+   *
+   * 首启的隐私同意也必须在这里 arm：`useNetworkAllowed` 恒假时后台永远停在
+   * 「正在加载…」，而那句话读起来像"服务器连不上" —— 是一句谎。
+   *
+   * 主题同理：`App()` 里有一条 effect 把主题写到 `<html data-theme>`，
+   * 而 tokens.css 的暗色覆盖就挂在那里。这一页不经过 `App()`，必须自己写一次
+   * —— 漏掉的表现是「后台页在暗色设置下仍是亮色」，判据是 e2e 的暗色用例。
+   */
+  applyTheme(resolveInitialTheme());
+  armFirstLaunchConsent();
+  root.render(
+    <StrictMode>
+      <LocaleHost>
+        <AdminConsolePage />
+      </LocaleHost>
+    </StrictMode>,
+  );
 } else {
   /**
    * 🔴 必须先完成 op-log 初始化（含**崩溃恢复**）再渲染。
