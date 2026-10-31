@@ -226,6 +226,17 @@ bash scripts/clean-build-tmp.sh --self-test        # 分类器 + **端到端**�
                                 #   （不静默跳过 —— 静默跳过在读数上和"没扫到"一样）/
                                 #   证据类 `*.png` 默认保留（界面验收的唯一证据载体，§6.2 规定一）
                                 #   ⚠️ 见 §7 第 434 条：macOS 上 `find` 有两个会**安静**出错的地方
+
+# ── 构建产物清理（仓库内）+ 超预算门禁 ──────────────────────────────────────
+# `clean-build-tmp.sh` 管 `/tmp`，`clean-carriers.sh` 管一次性搬运树；**仓库自身**的
+# dist / .build / ios build / android build / Playwright 结果由这一条管。
+# 默认 dry-run；`--apply` 只删可重建的产物，保留 node_modules / Pods / .pnpm-store /
+# .worktrees / evidence。`reinstall-all.sh` 的第 0a 步会自动跑它（可跳过）。
+bash scripts/clean-artifacts.sh                    # 干跑：列可清项与体量
+bash scripts/clean-artifacts.sh --apply            # 真删
+bash scripts/clean-artifacts.sh --json             # stdout 只留 JSON（给门禁读）
+bash scripts/clean-artifacts.sh --self-test        # 5 臂：dry-run 不删 / 该删删 / 保护项留 / 清完为 0 / 根形状
+pnpm check:disk-budget                             # 可回收 > 2048 MB 就红（HEYTA_ARTIFACT_BUDGET_MB 可调）
 ```
 
 ## 6.6 边缘配置：改站点之前先跑这一条

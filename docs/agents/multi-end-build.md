@@ -92,6 +92,11 @@ pnpm reinstall:mobile           # 只 android + ios
   收尾（含失败路径）若 `HEYTA_KEEP_DIST` 未设为 1，删掉本轮 `$MAC_OUT` 里的 `Heyta.app`
   与 `*.dmg` —— 装好的那份在 `/Applications`，产物留着只会被 Spotlight 再索引一遍；
   **打包/安装自检的截图与日志不删**，那是证据。`HEYTA_PRUNE_ONLY=1` 只清场不打包（自检用）。
+- 🔴 **每轮开工先清旧的、可回收的构建产物**（第 0a 步）：`scripts/clean-artifacts.sh --apply`。
+  它只删可重建的 dist / `.build` / ios build / android build / Playwright 结果与部署暂存 tar，
+  保留 `node_modules` / `Pods` / `.pnpm-store` / `.worktrees` / `evidence`；清理失败只警告、
+  不阻断重建。`HEYTA_SKIP_ARTIFACT_CLEAN=1` 跳过这一步。超预算由 `pnpm check:disk-budget`
+  判红（默认 2048 MB，`HEYTA_ARTIFACT_BUDGET_MB` 可调）。
 - 🔴 **别再每轮手写一个新的 `HEYTA_REINSTALL_TMP_DIR`。** 那正是上面那 29 GB 的成因：
   每轮一个 `~/heyta-r<NNN>-tmp`，而脚本此前没有保留策略也没有收尾删除 ⇒ 每轮留下约
   430 MB 的 `.app` + `.dmg`，Spotlight 又索引**任意位置**的 `.app`。要隔离就把轮次号交给
