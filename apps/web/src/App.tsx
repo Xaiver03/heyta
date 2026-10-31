@@ -119,6 +119,7 @@ import { ConflictDialog } from './features/sync/ConflictDialog.js';
 import { PrivacyConsentSheet } from './features/privacy/PrivacyConsentSheet.js';
 import { LegalReconfirmSheet } from './features/legal-recheck/LegalReconfirmSheet.js';
 import { shouldAskOnFirstLaunch, usePrivacyStore } from './features/privacy/store.js';
+import { armFirstLaunchConsent } from './features/privacy/first-launch.js';
 import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
 import { useNarrowLayout } from './features/shell/useNarrowLayout.js';
 import { ScopeDrawer } from './features/shell/ScopeDrawer.js';
@@ -701,7 +702,9 @@ export function App(): React.JSX.Element {
    *    只是把同一个 `open: true` 写进去，幂等，不会叠两层浮层。
    */
   useEffect(() => {
-    if (shouldAskOnFirstLaunch()) usePrivacyStore.getState().openSheet('first-launch');
+    // 判定与动作都在共享入口里：`/admin` 走独立启动路径（ADR-0078），
+    // 它不经过 `App()`，但同样要问这一层。
+    armFirstLaunchConsent();
   }, []);
 
   /**

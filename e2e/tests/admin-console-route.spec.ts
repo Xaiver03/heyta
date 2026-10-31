@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   decidePrivacyConsent,
+  openApp,
   pinChineseUi,
   stubLegalRecheck,
   stubPublicFacts,
@@ -183,11 +184,12 @@ const GRANT_LOG = {
 };
 
 /**
- * 装一个只认后台那几个端点的假服务端，并把浏览器停在 `/admin`。
+ * 装一个只认后台那几个端点的假服务端。**不动地址** —— 需要把后台页当
+ * "第二张标签页"来开的用例复用它（主应用开在另一张时，这一页也要能进内容区）。
  *
  * @param overviewStatus 200 = 这个账号是管理员；403 = 不是。
  */
-async function openConsole(page: Page, overviewStatus: number): Promise<void> {
+async function installConsoleFixtures(page: Page, overviewStatus: number): Promise<void> {
   await page.addInitScript((server: string) => {
     localStorage.setItem(
       'heyta.sync.credentials',
@@ -307,6 +309,14 @@ async function openConsole(page: Page, overviewStatus: number): Promise<void> {
   await waitForBootSplashGone(page);
 }
 
+/** 装上假服务端，并把浏览器停在 `/admin`（单标签页那一族全走这一格）。 */
+async function openConsole(page: Page, overviewStatus: number): Promise<void> {
+  await installConsoleFixtures(page, overviewStatus);
+  await page.goto('/admin');
+  await decidePrivacyConsent(page, 'accepted');
+  await waitForBootSplashGone(page);
+}
+
 test.describe('/admin 这个地址（真浏览器）', () => {
   test('后台壳画出来了，而应用本体没有', async ({ page }) => {
     await openConsole(page, 200);
@@ -366,6 +376,9 @@ test.describe('/admin 这个地址（真浏览器）', () => {
     await expect(page.getByTestId('admin-console-reason')).toContainText('当前账号没有管理后台权限');
     // 内容区一块都不许出现。
     await expect(page.getByTestId('admin-panel')).toHaveCount(0);
+    // 分区导航也不画（ADR-0078 D4），也不给登录入口（问题在权限，不是会话）。
+    await expect(page.locator('.ht-settings__console-navItem')).toHaveCount(0);
+    await expect(page.getByTestId('admin-console-signin')).toHaveCount(0);
     // 数字也不许出现（"没有权限"的那一屏上不该有从别处漏出来的读数）。
     await expect(console_.getByText('8', { exact: true })).toHaveCount(0);
 
@@ -573,5 +586,101 @@ test.describe('/admin 这个地址（真浏览器）', () => {
 
     // 「返回应用」走的是构建期 base（dev 是 `/`），落回去之后任务视图在。
     await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+  });
+
+  /**
+   * 🔴 ADR-0078 的判据：**另一张标签页占着本地库，后台页仍然打得开。**
+   *
+   * 改之前这一条必红：`main.tsx` 不分地址、一律先 `initOpLog()`，而 OPFS 的
+   * `createSyncAccessHandle` 是排他锁 —— 第一张标签页跑着主应用，第二张
+   * `/admin` 就抢不到，落成「无法初始化本地存储」的崩溃屏。
+   *
+   * 复现的正是产品负责人报的那个形状：应用开着 → 敲 /admin → 崩溃屏。
+   * 所以第一张标签页**必须是真的主应用**（`openApp` 等到任务输入框），
+   * 不是随便开一个页面。
+   */
+  test('🔴 另一张标签页开着主应用时，/admin 仍然打得开（ADR-0078）', async ({ page, context }) => {
+    // 第一张：真主应用 —— 它启动那一刻就抢走了 OPFS 的排他锁。
+    // 同意给 `accepted`：后台页要过 `useNetworkAllowed` 才显示原因块，
+    // 而同意状态是**同一个 context 的 localStorage**，两张标签页必须一致。
+    await openApp(page, '/', 'accepted');
+    await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+
+    // 第二张：同源、同 context —— 这是产品负责人真实走的那条路。
+    const admin = await context.newPage();
+    await pinChineseUi(admin);
+    await admin.goto('/admin');
+    await decidePrivacyConsent(admin, 'accepted');
+    await waitForBootSplashGone(admin);
+
+    await expect(admin.getByTestId('admin-console')).toBeVisible();
+    // 崩溃屏一句话都不许出现 —— 那正是本用例修掉的那一屏。
+    await expect(admin.getByText('无法初始化本地存储')).toHaveCount(0);
+    // 没塞凭据 ⇒ 后台说"尚未登录"并给登录出路，而不是停在"加载中"。
+    await expect(admin.getByTestId('admin-console-reason')).toContainText('尚未登录');
+    await expect(admin.getByTestId('admin-console-signin')).toBeVisible();
+
+    await admin.screenshot({ path: `${EVIDENCE}/admin-route-two-tabs.png`, fullPage: true });
+
+    /**
+     * 🔴 反过来也要成立：后台页**不占**那把锁。
+     *
+     * 关掉主应用那张之后，再开一张主应用必须正常起来 —— 如果 `console` 分支哪天
+     * 又把 `initOpLog()` 加回来，后台页就会自己攥着锁，这里会红在
+     * 「无法初始化本地存储」。这一条把"摘出来的是锁、不是功能"变成读数。
+     */
+    await page.close();
+    const appAgain = await context.newPage();
+    await pinChineseUi(appAgain);
+    await appAgain.goto('/');
+    await decidePrivacyConsent(appAgain, 'accepted');
+    await expect(appAgain.locator('input[placeholder^="添加任务"]')).toBeVisible();
+  });
+
+  /**
+   * 🔴 运营者**真实**的那条路：已经登录、主应用开着、第二张标签页敲 `/admin`。
+   *
+   * 上一条只证到"壳能画出来（尚未登录）"。这一条把凭据与服务端读数一起塞上，
+   * 证的是**内容区真的进来了** —— 导航在、概览念的是服务端给的数。
+   * 两条缺一条，"后台还能用"就只算半个结论。
+   */
+  test('🔴 已登录的操作者：主应用开着时 /admin 直接出内容区', async ({ page, context }) => {
+    await openApp(page, '/', 'accepted');
+    await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+
+    const admin = await context.newPage();
+    await installConsoleFixtures(admin, 200);
+    await admin.goto('/admin');
+    await decidePrivacyConsent(admin, 'accepted');
+    await waitForBootSplashGone(admin);
+
+    await expect(admin.getByTestId('admin-console')).toBeVisible();
+    await expect(admin.getByText('无法初始化本地存储')).toHaveCount(0);
+
+    // 分区导航按**名字**点得到（刻意不数个数：清单加一格不该把判据弄红）。
+    await expect(admin.getByRole('button', { name: '概览', exact: true })).toBeVisible();
+    await expect(admin.getByRole('button', { name: '退款', exact: true })).toBeVisible();
+    // 内容区念的是服务端给的读数（`OVERVIEW.users.total = 8`）。
+    await expect(admin.getByTestId('admin-panel')).toContainText('8');
+
+    await admin.screenshot({ path: `${EVIDENCE}/admin-route-two-tabs-logged-in.png`, fullPage: true });
+  });
+
+  test('🔴 未登录：分区导航不画，登录入口点开就是同一个 AuthPanel', async ({ page }) => {
+    await pinChineseUi(page);
+    await page.goto('/admin');
+    await decidePrivacyConsent(page, 'accepted');
+    await waitForBootSplashGone(page);
+
+    await expect(page.getByTestId('admin-console')).toBeVisible();
+    // 分区名是后台结构，非管理员看不到（ADR-0078 D4）。
+    await expect(page.locator('.ht-settings__console-navItem')).toHaveCount(0);
+    await expect(page.getByTestId('admin-console-reason')).toContainText('尚未登录');
+
+    await page.getByTestId('admin-console-signin').click();
+    // 同一份 AuthPanel（`features/auth` 的唯一实现）就地打开。
+    await expect(page.locator('.ht-sheet__auth')).toBeVisible();
+
+    await page.screenshot({ path: `${EVIDENCE}/admin-route-anonymous-signin.png`, fullPage: true });
   });
 });

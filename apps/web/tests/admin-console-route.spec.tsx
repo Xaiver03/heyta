@@ -25,7 +25,7 @@ import { I18nProvider } from '@heyta/i18n';
 
 import { AdminConsolePage } from '../src/features/admin/AdminConsolePage.js';
 import { isAdminConsolePath } from '../src/features/admin/route.js';
-import { __resetAdminForTests, useAdminStore } from '../src/features/admin/store.js';
+import { __resetAdminForTests, canSignInFrom, useAdminStore } from '../src/features/admin/store.js';
 import { privacyConsentActions } from '../src/features/privacy/consent-gate.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 
@@ -241,8 +241,10 @@ describe('🔴 非管理员 / 未登录在 /admin 上', () => {
     expect(el.textContent).toContain('当前账号没有管理后台权限');
     // 内容区那块**不许**出现（设置页里它是 null，这一页由状态块接管）。
     expect(el.querySelector('[data-testid="admin-panel"]')).toBeNull();
-    // 导航仍然画：让人知道这个地址是干什么的，而不是撞上一堵墙。
-    expect(el.querySelectorAll('.ht-settings__console-navItem').length).toBeGreaterThan(0);
+    // 🔴 分区导航**不画**（ADR-0078 D4）：非管理员看不到后台有哪 11 个分区。
+    expect(el.querySelectorAll('.ht-settings__console-navItem').length).toBe(0);
+    // 403 也不给「登录」：那个人已经登录了，问题在权限（`canSignInFrom`）。
+    expect(el.querySelector('[data-testid="admin-console-signin"]')).toBeNull();
   });
 
   it('没有令牌 ⇒ 一个后台请求都不发，并说明"尚未登录"', async () => {
@@ -253,6 +255,54 @@ describe('🔴 非管理员 / 未登录在 /admin 上', () => {
     // `packages/app-host/tests/admin-client.spec.ts`；这里只做端到端确认。
     expect(seen.filter((url) => url.includes('/api/admin'))).toHaveLength(0);
     expect(el.textContent).toContain('尚未登录');
+  });
+
+  it('🔴 未登录 ⇒ 不画分区导航，给一条能点的登录出路（ADR-0078 D3/D4）', async () => {
+    useSyncStore.setState({ token: undefined });
+    const { el, seen } = await render(200);
+
+    // 分区名是后台的结构信息，非管理员看不到。
+    expect(el.querySelectorAll('.ht-settings__console-navItem').length).toBe(0);
+
+    const button = el.querySelector<HTMLButtonElement>('[data-testid="admin-console-signin"]');
+    expect(button).not.toBeNull();
+    expect(button!.textContent).toContain('登录');
+
+    await act(async () => {
+      button!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // 就地开的是**同一份** AuthPanel（`features/auth` 的唯一实现），不是跳回主应用。
+    expect(el.querySelector('.ht-sheet__auth')).not.toBeNull();
+    // 打开登录面板本身不该发任何后台请求。
+    expect(seen.filter((url) => url.includes('/api/admin'))).toHaveLength(0);
+  });
+
+  it('登录入口只在「没有会话 / 会话过期」两格出现', () => {
+    // 这张表决定"点登录"会不会把人支去查一个没坏的东西。
+    expect(canSignInFrom('web.admin.error.no-token')).toBe(true);
+    expect(canSignInFrom('web.admin.error.unauthorized')).toBe(true);
+    expect(canSignInFrom('web.admin.error.forbidden')).toBe(false);
+    expect(canSignInFrom(null)).toBe(false);
+  });
+
+  it('🔴 会话中途拿到令牌 ⇒ 再探一次就进内容区（登录成功后自动重判的那条路）', async () => {
+    // 起点就是"未登录"：`probe()` 在 no-token 上短路，一个请求都不发。
+    useSyncStore.setState({ token: undefined });
+    const { el, seen } = await render(200);
+    expect(el.querySelectorAll('.ht-settings__console-navItem').length).toBe(0);
+
+    // 登录成功之后壳做的事：带上新令牌再探一次（`clientOptions()` 每次调用现读令牌）。
+    await act(async () => {
+      useSyncStore.setState({ token: 'fresh-session-token' });
+      await useAdminStore.getState().probe();
+    });
+
+    expect(seen.some((url) => url.includes('/overview'))).toBe(true);
+    expect(useAdminStore.getState().access).toBe('admin');
+    // 判定成管理员之后，分区导航才画出来。
+    expect(el.querySelectorAll('.ht-settings__console-navItem').length).toBeGreaterThan(0);
   });
 
   it('🔴 未登录**且**地址也还没填（线上未登录那一屏的真实形状）⇒ 仍然只许说"尚未登录"', async () => {

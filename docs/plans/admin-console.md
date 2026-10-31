@@ -541,3 +541,94 @@ cd e2e && HEYTA_E2E_APP_PORT=4418 HEYTA_E2E_STUB_PORT=4419 npx playwright test t
 `admin.js list` 现量「共 1 位管理员：#23 `al***@163.com` 已验证=是」。
 ⚠️ 口令是**临时**的（负责人要求先设一个短的、进去再改）—— 这条不是后台的缺陷，
 但它意味着"这台现在只有一个能进后台的人，而他用的是一次性口令"，进去之后第一件事是改密。
+
+## 10. 追加（2026-10-30）：后台页独立启动 —— 另一张标签页占着本地库时也能进
+
+决策与理由已写成 [ADR-0078](../adr/0078-admin-console-boots-without-local-store.md)，本节只记落地。
+
+### 10.1 现场
+
+产品负责人在浏览器里敲 `/admin` → 提示未登录 → 返回主应用后落「无法初始化本地存储 /
+被其它标签页挡住了」，详情是 OPFS 的
+`Access Handles cannot be created if there is another open Access Handle …`。
+根因：`main.tsx` 不分地址、一律先 `initOpLog()` 再渲染，而 `initOpLog` 一进去就抢
+`createSyncAccessHandle` 的排他锁；后台页与主应用同源同库，另一张标签页还开着就必然抢不到。
+后台页的数据全部走服务端 HTTP，根本不需要本地库。
+
+### 10.2 改动清单
+
+| 文件 | 改什么 |
+|---|---|
+| `apps/web/src/lib/startup-mode.ts`（新） | 纯函数 `startupMode(search, pathname)`：`shell` > `slice` > `console` > `app` |
+| `apps/web/src/main.tsx` | 按 `startupMode` 分支；`console` 分支不初始化 op-log、渲染 `LocaleHost + AdminConsolePage` |
+| `apps/web/src/features/privacy/first-launch.ts`（新） | `armFirstLaunchConsent()`：`shouldAskOnFirstLaunch()` → `openSheet('first-launch')` |
+| `apps/web/src/App.tsx` | 那条 mount effect 改调共享入口（行为不变） |
+| `apps/web/src/features/admin/AdminConsolePage.tsx` | 导航仅 `access === 'admin'` 时画；`no-token`/`unauthorized` 给「登录」按钮，就地挂 `AuthPanel`，登录后 `probe()` |
+| `packages/i18n/src/locales/zh-CN.ts`、`en.ts` | 新增 `web.admin.console.signIn` |
+| `apps/web/tests/startup-mode.spec.ts`（新） | 四种地址形状 + 优先级 |
+| `apps/web/tests/admin-console-route.spec.tsx` | 403/匿名 ⇒ 导航 0 项；匿名 ⇒ 登录按钮在、点开出 `AuthPanel`；403 ⇒ 无登录按钮 |
+| `e2e/tests/admin-console.spec.ts` | 两标签页（主应用占锁）⇒ `/admin` 正常；匿名 ⇒ 登录按钮点开面板 |
+
+### 10.3 判据（每条都要能红）
+
+1. `pnpm --filter @heyta/web exec vitest run tests/startup-mode.spec.ts`
+   —— 把 `console` 分支挪到 `app` 之后必须红。
+2. `pnpm --filter @heyta/web exec vitest run tests/admin-console-route.spec.tsx`
+   —— 导航改回无条件渲染必须红。
+3. `cd e2e && HEYTA_E2E_APP_PORT=4418 HEYTA_E2E_STUB_PORT=4419 npx playwright test tests/admin-console-route.spec.ts`
+   —— 删掉 `main.tsx` 的 `console` 分支必须红（本轮实测：1 failed）。
+
+### 10.4 不做的事
+
+- 主应用"同一浏览器开两个标签页"仍不支持（要实现得走 SharedWorker / leader 代理 /
+  SQLite 3.50 `pauseVfs` 协作移交，成本远大于本目标；见环境陷阱 #111）。
+- 后台页在未同意隐私时仍然要先回答那一层 —— 合规要求，不是缺陷。
+- **登录表单真正提交那一步没有 e2e**：后台页挂的 `AuthPanel` 不带 `allowAdvanced`，
+  官方构建走中央设备流，而 e2e 里没有中央后端（自托管部署下它会正常渲染标准表单）。
+  这一段的契约由 `apps/web/tests/auth-*.spec.tsx`（53 条）与 `e2e/tests/auth-*.spec.ts` 守；
+  本页只守"入口能点开"与"令牌变了能重判"两格。
+
+### 10.5 读数（2026-10-30，同机同树）
+
+| 那一趟 | 现量 |
+|---|---|
+| `pnpm --filter @heyta/web typecheck` | rc=0 |
+| 单测：`startup-mode` + `admin-console-route` + `admin-panel` | 67 passed |
+| 其余后台单测（entitlements / grants / announcements / revenue） | 49 passed |
+| `app-mount` + `signin-entry`（主应用挂载与登录入口没被带坏） | 35 passed |
+| `packages/i18n` 全量 | 30 passed（zh 4340 / en 4340，`check:ui-language` 也各 4340） |
+| `check:ui-provider` / `check:ui-language` / `check:design` / `check:layering` / `check:i18n-vars` / `check:docs` / `check:evidence-hygiene` / `check:journey-coverage` | 全 rc=0 |
+| e2e `admin-console-route.spec.ts`（含三条新判据） | 12 passed |
+
+两标签页这一族本轮**加严过两次**，因为"能打开"有两种强度：
+- 匿名 + 主应用占着锁 ⇒ `/admin` 照开（壳 + 原因 + 登录入口）；
+- **已登录** + 主应用占着锁 ⇒ 直接进内容区（导航与概览读数都是服务端给的）；
+- 再加一条反向断言：关掉主应用之后再开一张主应用照常起来 —— 证明后台页**不占**那把锁
+  （把 `initOpLog()` 加回 `console` 分支会让它红）。
+
+为此把 `openConsole` 拆成 `installConsoleFixtures`（装假服务端、不动地址）+ 一个
+"装上并停在 `/admin`"的包装 —— 第二张标签页那一格复用的是前者。
+
+登录之后**自动重判**那条路也钉住了：单测「会话中途拿到令牌 ⇒ 再探一次就进内容区」
+（起点 no-token 一个请求都不发 → 写进新令牌 → `probe()` 打到 `/overview` → `access`
+变 `admin` → 导航才画）。壳里那句 `void store.probe()` 依赖的正是 `clientOptions()`
+每次现读令牌这一条，两处合起来才算闭合。
+| e2e `admin-console.spec.ts`（设置页那个壳，回归面） | 10 passed |
+| `HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build` + `node scripts/check-web-artifact.mjs --mount /app/` | 构建 rc=0；产物自洽（`index.html` 5 个本地引用、manifest 15 个文件、267 个 `--ht-*` 对得上） |
+
+**变异三臂**（还原只从 `.mut-bak`）：
+
+| 臂 | 改什么 | 结果 |
+|---|---|---|
+| M1 | `main.tsx` 的 `console` 分支永不命中 | 两标签页那条 **1 failed** |
+| M2 | 分区导航改回无条件渲染 | 单测 **2 failed**（403 + 匿名） |
+| M3 | `startupMode` 对 `/admin` 返回 `app` | `startup-mode` **5 failed** |
+
+**本轮真跑撞出来的一件回归**：暗色用例红在 `<html data-theme>` 没写 —— 主题应用原来
+挂在 `App()` 的 effect 里，后台页绕开 `App()` 之后没人写。已在 `console` 启动分支里
+补 `applyTheme(resolveInitialTheme())`，并把这条件写进 ADR-0078 §3 的"副作用清点"。
+
+**证据图**（`apps/web/evidence/admin-console/`，四张都看过）：`admin-route-two-tabs.png`
+（主应用占着本地库时后台页照开，匿名态）、`admin-route-two-tabs-logged-in.png`
+（同一场景下已登录：导航 + 服务端读数）、`admin-route-anonymous-signin.png`
+（匿名态：无导航 + 登录按钮 + 就地 AuthPanel）、`admin-route-denied.png`（403：无导航、无登录）。

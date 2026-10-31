@@ -5244,6 +5244,7 @@ export const zhCN = {
   'web.admin.console.back': '返回应用',
   'web.admin.console.navLabel': '后台分区',
   'web.admin.console.leadUnavailable': '这一页只对管理员账号开放。权限由服务端裁决，界面里没有自助申请的入口。',
+  'web.admin.console.signIn': '登录',
   'web.admin.tab.overview': '概览',
   'web.admin.tab.users': '用户',
   'web.admin.tab.subscriptions': '订阅',
