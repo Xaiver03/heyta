@@ -1667,6 +1667,14 @@ PostgreSQL 禁止在事务块内 `CREATE INDEX CONCURRENTLY`，而 `deploy` 会�
 **换完仍然要重取 §3.8.1 那五条线上判据** —— 本脚本只证 `sha256 对账` / `镜像 revision 标签` /
 `/health=200` 这三格，**它不证明用户那条旅程通了**。
 
+🔴 **部署装置自己清旧物（2026-10-31 起）**：本地 `/tmp/heyta-deploy-*.tar.gz` 每趟开跑前
+清掉旧的（只清 `HEYTA_LOCAL_STAGING_KEEP_HOURS` 小时前的，默认 1）、送达并验完即删本趟；
+远端沙箱 `~/heyta-deploy-sandbox/runs/` 只保留最近 `HEYTA_SANDBOX_KEEP_RUNS` 轮
+（默认 2，含本趟），**两小时内**的轮次视为可能正在跑、不删也不计入保留数。此前两处都没人清
+—— 实测本机攒了 8 份 tar（约 1.9 GB）、部署机 15 轮沙箱（6.9 GB）。现量：
+`ls /tmp/heyta-deploy-*.tar.gz 2>/dev/null | wc -l`、
+`ssh ubuntu-jcli 'ls ~/heyta-deploy-sandbox/runs | wc -l'`。
+
 <!--DEPLOY-SSH-MEASURED-->
 
 #### 为什么不是"在 Mac 上建好 amd64 镜像再管道送过去"
