@@ -39,11 +39,20 @@
  *   HEYTA_DEPLOY_HOST   默认 `ubuntu-jcli`（= finlaw）
  *   HEYTA_DEPLOY_DIR    生产目录，默认 `~/heyta`（脚本从不动它，除非 --apply）
  *   HEYTA_DEPLOY_SANDBOX_DIR 沙箱根，默认 `~/heyta-deploy-sandbox`
+ *   HEYTA_SANDBOX_KEEP_RUNS  沙箱轮次保留数（含本趟），默认 2；旧轮次每轮约 530 MB
+ *   HEYTA_LOCAL_STAGING_KEEP_HOURS  只清超过这么多小时的本地暂存 tar，默认 1
  *   PRISMA_ENGINES_MIRROR  Prisma 引擎源，默认 `https://binaries.prisma.sh`
+ *
+ * 🔴 「先清旧的、可回收的，再创建新的」：
+ *   · 本地 `/tmp/heyta-deploy-*.tar.gz` 每趟先清掉旧的（只留本趟与 1 小时内的），送达验完即删本趟；
+ *   · 远端 `~/heyta-deploy-sandbox/runs/` 只保留最近 N 轮（默认 2，含本趟）；**两小时内**
+ *     的轮次视为可能正在跑（多条会话共用部署机），不删也不计入保留数。
+ *   这两处此前都没有清 —— 2026-10-31 实测本机攒了 8 份 tar（约 1.9 GB）、
+ *   部署机攒了 15 轮沙箱（6.9 GB）。
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -79,6 +88,82 @@ const die = (step, detail, extra = '') => {
   process.exit(1);
 };
 const sha256 = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
+
+/**
+ * 沙箱轮次保留数（含本趟）。旧轮次每轮约 530 MB，此前无人清理 ⇒ 2026-10-31 实测
+ * 15 轮攒了 6.9 GB。默认保留 2 轮（本趟 + 上一次，够对比一次回归）；
+ * `HEYTA_SANDBOX_KEEP_RUNS=1` 只留本趟。
+ */
+const KEEP_RUNS = (() => {
+  const raw = process.env.HEYTA_SANDBOX_KEEP_RUNS || '2';
+  if (!/^[0-9]+$/.test(raw) || Number(raw) < 1) {
+    die(
+      '参数',
+      `HEYTA_SANDBOX_KEEP_RUNS 要是 ≥1 的整数（读到：${raw}）`,
+      '   0 会让"本趟也要被下一趟删掉"——保留策略至少留 1。'
+    );
+  }
+  return Number(raw);
+})();
+
+/**
+ * 本地暂存归档的"够旧"门槛（小时）。多条会话可能共用一个检出：另一条会话
+ * 正在跑的部署，它的 tar 就在 /tmp —— 按文件名删会直接毁掉在途那一份。
+ * 一场部署是分钟级，1 小时足够把"在途"与"残留"分开。
+ */
+const STAGING_KEEP_HOURS = (() => {
+  const raw = process.env.HEYTA_LOCAL_STAGING_KEEP_HOURS || '1';
+  if (!/^[0-9]+$/.test(raw)) {
+    die('参数', `HEYTA_LOCAL_STAGING_KEEP_HOURS 要是非负整数（读到：${raw}）`);
+  }
+  return Number(raw);
+})();
+
+/** 先清旧的本地暂存归档，再创建本趟那个（当前路径与"新鲜"的都不动）。 */
+function pruneLocalStagingArchives(current) {
+  let names;
+  try {
+    names = readdirSync('/tmp');
+  } catch {
+    return;
+  }
+  let n = 0;
+  for (const name of names) {
+    if (!/^heyta-deploy-.*\.tar\.gz$/.test(name)) continue;
+    const p = `/tmp/${name}`;
+    if (p === current) continue;
+    try {
+      if (Date.now() - statSync(p).mtimeMs < STAGING_KEEP_HOURS * 3600 * 1000) continue;
+      unlinkSync(p);
+      n += 1;
+    } catch {}
+  }
+  if (n > 0) console.log(`   🗑 清掉 ${n} 份旧的本地暂存归档（保留本趟与 ${STAGING_KEEP_HOURS} 小时内的）`);
+}
+
+/**
+ * 远端沙箱只保留最近 KEEP_RUNS 轮：本趟创建之后正好占满。
+ * 🔴 2 小时内的轮次视为**可能正在跑**（多条会话共用一台部署机），不删也不计入保留数。
+ */
+function pruneSandboxRuns() {
+  const list = ssh(
+    `find ${SBX}/runs -mindepth 1 -maxdepth 1 -type d -mmin +120 -printf '%f\\n' 2>/dev/null || true`
+  );
+  const names = (list.stdout || '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter((n) => /^[0-9]{8}T[0-9]{6}-[0-9a-f]{6,}(-dirty)?$/.test(n))
+    .sort();
+  const keepOld = Math.max(0, KEEP_RUNS - 1);
+  const drop = names.slice(0, Math.max(0, names.length - keepOld));
+  if (drop.length === 0) return;
+  const r = ssh(`rm -rf -- ${drop.map((n) => `${SBX}/runs/${n}`).join(' ')}`);
+  if (r.status !== 0) {
+    console.log(`   ⚠️ 旧沙箱轮次没删干净：${(r.stderr || '').slice(0, 160)}`);
+  } else {
+    console.log(`   🗑 清掉 ${drop.length} 轮旧沙箱（保留最近 ${KEEP_RUNS} 轮，含本趟）`);
+  }
+}
 
 if (APPLY && !has('--yes-production')) {
   die(
@@ -220,6 +305,8 @@ const short = headSha.slice(0, 12);
 const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '');
 const runId = `${stamp}-${short}`;
 const tar = `/tmp/heyta-deploy-${runId}.tar.gz`;
+// 先清旧的、可回收的暂存归档，再创建本趟那个（它们每份约 233 MiB，此前从未回收）。
+if (!DRY) pruneLocalStagingArchives(tar);
 const pack = run('sh', ['-c', `git archive --format=tar.gz -o ${tar} ${ref || 'HEAD'} ${inputs.map((p) => JSON.stringify(p)).join(' ')}`]);
 if (!DRY && (pack.status !== 0 || !existsSync(tar))) die('步骤 2（git archive）', pack.stderr.slice(0, 400) || '没产出归档');
 if (!DRY) {
@@ -234,6 +321,8 @@ const localSha = DRY ? '<dry-run>' : sha256(tar);
 /* ── 步骤 3：SSH 送达 + 🔴 逐字对账 ── */
 const DIR = SANDBOX ? `${SBX}/runs/${runId}` : `${PROD_DIR}`;
 console.log(`步骤 3：送达 ${HOST}:${DIR}（SSH 22 端口）`);
+// 先清旧的沙箱轮次，再创建本趟 —— 保留策略至少留 1（含本趟）。
+if (!DRY && SANDBOX) pruneSandboxRuns();
 ssh(`mkdir -p ${DIR}/src`);
 const sc = run('scp', ['-q', '-o', 'ConnectTimeout=20', tar, `${HOST}:${DIR}/src.tar.gz`]);
 if (!DRY && sc.status !== 0) die('步骤 3（scp）', `rc=${sc.status}`, sc.stderr.slice(0, 300));
@@ -246,6 +335,8 @@ if (!DRY) {
   const un = ssh(`cd ${DIR} && tar xzf src.tar.gz -C src && echo UNPACK=OK`);
   if (!/UNPACK=OK/.test(un.stdout)) die('步骤 3（解包）', un.stderr.slice(0, 300));
   console.log(`   ✅ 对账成立 sha256=${localSha.slice(0, 16)}…（两端逐字相同）`);
+  // 送达并验完就不再需要本地这份了（远端已有 src.tar.gz + 解包）。
+  try { unlinkSync(tar); } catch {}
 } else console.log('   [dry-run] 未传输 ⇒ 对账这一步**没有被验证**');
 
 /* ── 步骤 4：基础镜像必须在机器上（不在就停，不许悄悄 pull） ── */

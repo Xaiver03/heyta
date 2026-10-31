@@ -91,7 +91,7 @@ classify() {
   # ③ 派生数据与传输中间物（可重建 ⇒ 可清）
   case "$base" in
     heyta-ios-release*|heyta-isolated-ios-release*|heyta-macos-dist*|heyta-*-dist*|heyta-widget-qa-*|\
-    heyta-src*.tar.gz|heyta-src*-files.txt|heyta-src-tar.log|\
+    heyta-src*.tar.gz|heyta-src*-files.txt|heyta-src-tar.log|heyta-deploy-*.tar.gz|\
     *.xcarchive|*.ipa|*.app|heyta-*.bundle|\
     heyta-reinstall-*.log|heyta-rnjs-*.log|heyta-*-build.log|heyta-e2e-server.log|\
     heyta-*-mutA|heyta-*-mutB|heyta-mut-*|heyta-goal-b*|heyta-auth-legal-b*|\

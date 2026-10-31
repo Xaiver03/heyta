@@ -413,6 +413,21 @@ done
 
 RESULT_mac="" ; RESULT_windows="" ; RESULT_android="" ; RESULT_ios=""
 
+# ── ⓪ 开工前：先清旧的、可回收的构建产物，再创建新的 ──────────────────────
+# 每轮都会重建 dist / .build / ios build / android build；上一轮的产物**没有任何一层**
+# 会清（2026-10-31 实测：一轮发布+重装后本机可回收产物约 6.1 GB，其中 iOS build 5.3 GB）。
+# 清理失败只警告、不阻断重建 —— 打包会覆盖同名产物，删不掉的项不应把整轮判死。
+if [ "${HEYTA_SKIP_ARTIFACT_CLEAN:-0}" = 1 ]; then
+  echo "═══ 0a. 开工前清理旧构建产物：已显式跳过（HEYTA_SKIP_ARTIFACT_CLEAN=1）═══"
+else
+  echo "═══ 0a. 开工前：清掉旧的、可回收的构建产物 ═══"
+  if bash "$ROOT/scripts/clean-artifacts.sh" --apply; then
+    echo "  ✅ 旧产物已清（下面从当前源码重建）"
+  else
+    echo "  ⚠️ 清理未全部成功（不阻断重建；删不掉的项见上面的 warn）"
+  fi
+fi
+
 # ── ① 前置：全仓构建（AGENTS §6.1：打包前必须先跑，APK/.app 里打的是 packages/*/dist）──
 echo "═══ 0. 前置：pnpm -r build ═══"
 if "$PNPM" -r build > $RT/heyta-reinstall-build.log 2>&1; then
