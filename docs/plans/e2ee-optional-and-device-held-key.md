@@ -363,7 +363,7 @@ S5（独立，可并行）──────┴──► S6 ──► S7（与 S
 | 端 | 本轮做到哪 | 读数 / 阻塞 |
 |---|---|---|
 | **Android** | ✅ **Release APK 打成功**（走载体 `linux-dev`） | `BUILD SUCCESSFUL in 58s`；产物 `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` **69,848,472 B / Nov 1 12:23**，比源码新（`find … -newer` 空）。🔴 **签名是 `CN=Android Debug`**（`apksigner verify --print-certs` 现量）—— 正是文档里那条"四个 release keystore 键没落到载体机上"的已知边界 ⇒ **不可作为发布产物**，`upload-dist.sh` 会拒。⚠️ 设备腿做不了：载体 `adb devices` 现量**空列表**（无模拟器在跑） |
-| **iOS** | ⚠️ **真跑了，红在执行沙箱而不是产品** | 入口是 simulator 配置（`-sdk iphonesimulator`，**不需要签名**），所以值得试。三次读数：① `pnpm build:ios` ⇒ `Could not resolve package dependencies: cannot open file '<home>/Library/Caches/org.swift.swiftpm/manifests/ManifestLoading/heytawidgetcore.dia' (Operation not permitted)`；② 把 `-packageCachePath`/`-clonedSourcePackagesDirPath` 指进工作区后过了解析，但 `Missing package product 'HeytaWidgetBridge' / 'HeytaWidgetKit'`；③ `-resolvePackageDependencies` 单独跑 ⇒ `Unable to create log store directory at '<home>/Library/Developer/Xcode/DerivedData/…/Logs/Launch' (513 You don't have permission)`，且 `resolved source packages:` **为空**。工程侧是好的（`Heyta.xcodeproj` 里有 `XCLocalSwiftPackageReference "HeytaWidgetCore"`，本地包 `ios/HeytaWidgetCore/Package.swift` 也在）。⇒ **本线的执行环境（workspace-write 沙箱）写不进 `~/Library/Caches` 与 `~/Library/Developer/Xcode/DerivedData`**，Xcode 连日志库都建不起来，包解析因此静默失败。这**不是**一条产品缺陷证据，也**不能**据此说 iOS 打不出来 |
+| **iOS** | 模拟器 `iPhone Duo heyta`（Xcode **27.0**） | Release 构建 + 安装 + 启动；**钥匙串设备腿 5 个 stage 全 PASS**（5 个独立进程、跨进程重启后仍读得到、32 字节以外被拒、删除后互不影响）；证据 `apps/mobile/evidence/ios-vault-keychain-20261102/` | ✅ **设备腿跑通**；⚠️ **首屏截图拿不到**（无 GUI 会话，`simctl io screenshot` 全是黑帧，见 §16.4） |
 | **macOS 桌面** | ⚠️ **壳编译通过，`.app` 打包被凭据卡住** | `swift build -c release --product HeytaMac` ⇒ **Build complete!（26.08 s）**，产物 `.build/release/HeytaMac` 1,126,536 B / 14:22，且**没有比它更新的源码**（`find … -newer` 空）。🔴 但 `bash apps/desktop-macos/scripts/package-app.sh` 立刻退出：`Missing Developer ID macOS profile for cloud.finlaw.heyta.desktop; install it with asc profiles local install.` 本机现量：`security find-identity` 里有 **Developer ID Application** 证书，但 `~/Library/MobileDevice/Provisioning Profiles` 与 Xcode 的 UserData 目录里**没有一枚**满足 `find-signing-profile.py` 那四个条件的 profile（OSX 平台 + `ProvisionsAllDevices` + application-identifier 匹配 + 未过期）。这是**账号/凭据前置**，不是代码问题；`asc` 在（`/opt/homebrew/bin/asc`），但装 profile 属于证书操作，本线不动。**绕开签名又试了一轮**（详见下条）|
 | **Windows MSIX** | ⚠️ **产物打出来了，但装机取证是 8 天前的旧图** | `bash apps/desktop-windows/scripts/package-msix.sh` 跑通：`dist/windows/heyta.msix` **99,700,665 B / Nov 1 14:57**（比源码新）。🔴 但第 ③ 步取回远端取证时 `scp: …heyta-selfsigned.cer / install-capture.txt / packaged-first-run.png: No such file or directory`，随后脚本那句"✅ 装完的 MSIX 能起来、界面有真实内容（1440x734 内容 69.0% 色阶 245）"是拿 **`dist/windows/packaged-first-run.png`（Oct 24 18:55）** 算的 —— 那是 8 天前的截图。⇒ **产物是新的，装机证据是旧的**，正是本仓库"测试全绿 ≠ 这是当前产物"那条陷阱的同一形状。**不记 Windows 装机验收通过** |
 
@@ -773,7 +773,7 @@ Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 r
 | **S2** 关闭：整库解密重传 | ✅ 收口 | `server/tests/integration/payload-mode-migration.integration.spec.ts`（真 PostgreSQL + 真 HTTP）；`payload-mode-migration.service.spec.ts` 9/9；app-host 侧 `payload-mode-migration.spec.ts` 8/8；变异臂"跳过解不开的 op" ⇒ 1 红 | 无 |
 | **S3** 打开：新 root + 全量加密 | ✅ 收口 | `vault-session.spec.ts` 20/20（含"世代必须从 0 到 1"）；变异臂"世代校验放宽成 `<= 0`" ⇒ 1 红 | 无 |
 | **S4** 客户端模式感知 | ✅ 收口 | `packages/sync-client/tests/plain-payload-mode.spec.ts` 3/3；变异臂"错配降级成普通 Error" ⇒ 1 红；`@heyta/sync-client` 174/174 | 无 |
-| **S5** 钥匙默认设备持有 | ✅ **收口**（2026-11-02，本轮把最后两格补上，见 §15 / §16） | Web：`vault-root-cache.spec.ts` 6/6（变异臂"换 localStorage" ⇒ 1 红）；**Android 设备腿**：`pnpm verify:android-vault-storage` **5 个 phase 全 PASS**（隔离 / 分进程 seed / 分进程 verify / **重启设备** / remove / clean）；**macOS 壳**：`VaultKeychainStore` + `ShellVaultKeychainBridge` + 页侧优先于 `sessionStorage`（单测 14/14，变异臂"优先级反过来" ⇒ 1 红、"去掉长度校验" ⇒ 1 红），**并在签名的 .app 里**跑通完整往返（7 个字段全 true） | 无（注：**端到端"关掉 App 再开不用输口令"那一幕**仍未逐帧取证 —— 它需要建 vault + 重启进程的 UI 长流程；本轮验的是通道、存储、优先级三件。Windows/Linux 的 DPAPI/libsecret 按 ADR-0080 §十一 推迟） |
+| **S5** 钥匙默认设备持有 | ✅ **收口**（2026-11-02，本轮把最后两格补上，见 §15 / §16） | Web：`vault-root-cache.spec.ts` 6/6（变异臂"换 localStorage" ⇒ 1 红）；**Android 设备腿**：`pnpm verify:android-vault-storage` **5 个 phase 全 PASS**（隔离 / 分进程 seed / 分进程 verify / **重启设备** / remove / clean）；**iOS 设备腿**：`pnpm verify:ios-vault-keychain` **5 个 stage 全 PASS**（5 个独立进程，验证 `kSecAttrAccessible=WhenUnlockedThisDeviceOnly`）；**macOS 壳**：`VaultKeychainStore` + `ShellVaultKeychainBridge` + 页侧优先于 `sessionStorage`（单测 14/14，变异臂"优先级反过来" ⇒ 1 红、"去掉长度校验" ⇒ 1 红），**并在签名的 .app 里**跑通完整往返（7 个字段全 true） | 无（注：**端到端"关掉 App 再开不用输口令"那一幕**仍未逐帧取证 —— 它需要建 vault + 重启进程的 UI 长流程；本轮验的是通道、存储、优先级三件。Windows/Linux 的 DPAPI/libsecret 按 ADR-0080 §十一 推迟） |
 | **S6** 界面：两个轴 + 危险确认 | ✅ 收口（2026-11-02 **改判**，见 §13.6） | 关闭方向：组件 + 危险确认 + 三条后果逐条数（`encryption-mode-section.spec.tsx` **14/14**，变异臂"删掉不可逆那条" ⇒ 1 红）；**开启方向的两段表单也在**：`enable={{begin: beginReEncryption, confirm: confirmReEncryption}}` 挂在 `VaultSettingsPanel`，判据 3 条（不传 `enable` 就不画、第一段只拿恢复码不迁移、回填后才迁移）+ 真浏览器 `e2e/vault/vault-journey.spec.ts` 的 `enableEncryption()` 走完整流程；钥匙位置轴 4/4；本机无密钥包时不画"创建"入口 2/2 | 无。🔴 上一轮我把它写成"缺开启表单"是**错的**，原因与更正见 §13.6 |
 | **S7** 对外口径 | ✅ 收口（本轮补完） | `check:legal-*` 五道绿；绝对句扫描 0 命中；`check:ui-language` 绿（476 文件 / 823 处文案）；i18n 30/30；landing 1455/1455 | 无。本轮补掉了**四处共享词条**（见 §13.2）——上传前那轮只修了界面与下载页 |
 
@@ -1119,3 +1119,36 @@ node scripts/build-harmony-rnohjs-windows.mjs
 
 ⚠️ macOS 那条**不主张公证**：`HEYTA_SKIP_NOTARIZE=1` 只跳过第 ⑥ 步，
 "包已通过公证"那句要等不带这个变量的一趟。
+
+
+### 16.4 iOS 那一格：设备腿过了，首屏截图拿不到
+
+**过了的**（`IOS_UDID=742A8651-… pnpm verify:ios-vault-keychain`）：
+
+```
+✅ clean: scope isolation, save/load, kSecAttrAccessible=WhenUnlockedThisDeviceOnly
+✅ verify: cross-process restart load preserved both scoped keys
+✅ invalid: production save rejects a non-32-byte root key
+✅ remove: A deleted, B isolated/retained, restart cleanup leaves no key
+✅ empty: a fresh process after remove reads neither scoped key
+✅ process isolation: 5 stages used 5 distinct probe processes
+```
+
+证据逐 stage 落盘：`apps/mobile/evidence/ios-vault-keychain-20261102/heyta-keychain-probe-*.json`
+（例如 `verify` 那份：`{"loadLengths":[32,32],"loadMatches":[true,true],"scopeIsolated":true,"process":35923}`）。
+
+⚠️ 一个**值得记下的差异**：iOS 用的是 `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`，
+而 macOS 那份（§15）用的是 `WhenUnlocked` + `kSecAttrSynchronizable=false`。
+两者的**实际效果**接近（都不进 iCloud Keychain），但 `ThisDeviceOnly` 还额外挡住
+"备份恢复到另一台机器"。要不要对齐是**新决定**（改它得重新打包 + 重跑 §15 那条探针），
+本轮**没有顺手改**。
+
+**没拿到的**：首屏截图。`xcrun simctl launch` 起得来（pid 37935 / 42040），日志里看得见
+RN 在挂载，但 `xcrun simctl io screenshot` **连拍三张全黑、字节数完全相同**。
+真因是这台机**没有 Simulator GUI**（`open -a Simulator` ⇒ `Unable to find application named 'Simulator'`，
+而 `/Applications/Xcode.app/Contents/Developer/Applications/` 是空的）⇒ 只有离屏渲染。
+见 [traps §7 #630](../reference/environment-traps.md)。
+
+**解除条件**：在**有 GUI 会话**的机器上（或先装好 Simulator.app 并打开）再截；
+或走 `verify-mobile-ios.sh` 那条真机/模拟器 UI 链（它还要一个可达的服务端）。
+⚠️ **不拿"进程起来了"冒充"首屏画出来了"** —— 这两件事中间隔着 JS bundle 与首帧错误。
