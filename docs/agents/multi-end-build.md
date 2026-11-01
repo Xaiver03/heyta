@@ -213,3 +213,13 @@ pnpm remote:typecheck          # 同一套同步，跑 pnpm typecheck
 
 Android 构建默认也走 `linux-dev`（`scripts/run-gradle.mjs`）。两条路都**不静默回落本机**：
 远端连不上就红，唯一逃生门是显式 `HEYTA_REMOTE_FALLBACK_LOCAL=1`。
+
+鸿蒙（RNOH）构建在 **`windows-pc`**（DevEco 只在那台机器上）：
+
+```bash
+node scripts/build-harmony-windows.mjs [--pull] [--dry-run]
+```
+
+细节与已踩的四个坑见 [`docs/runbooks/harmony-build-on-windows.md`](../runbooks/harmony-build-on-windows.md)。
+⚠️ 它产出的是 **entry 模块的 HAP**（400 KB，含 `ets/modules.abc`），**不含** `.so` 与 hermes bundle ——
+RNOH 全量包还差 codegen/autolinking + bundle 两步移植。
