@@ -256,6 +256,16 @@ async function stubUnrelatedStartupCalls(page: Page): Promise<void> {
   await page.route(`${SERVER}/api/announcements/active**`, async (route) => {
     await json(route, { announcements: [] });
   });
+  /*
+   * 🔴 `GET /api/sync/payload-mode` 是 ADR-0080 之后**应用一启动就会发**的读（载荷模式）。
+   * 这个夹具的规矩是"没登记的请求算意外"，所以新端点必须在这里登记 ——
+   * 与本文件里 `/api/announcements/active` 那几条同一条纪律。
+   * 回 `readable`（明文账号）而不是 `e2ee`：`e2ee` 会让 vault 面板去探 key-package，
+   * 而本用例的主题不是加密，不该把那一路请求带进来。
+   */
+  await page.route(`${SERVER}/api/sync/payload-mode**`, async (route) => {
+    await json(route, { mode: 'readable' });
+  });
   await page.routeWebSocket(WS_GLOB, () => {
     // 保持连接打开即可：本用例不验实时同步。
   });

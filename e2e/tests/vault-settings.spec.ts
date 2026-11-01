@@ -66,11 +66,13 @@ async function installHttpFixture(
 ): Promise<{
   getCount: () => number;
   putCount: () => number;
+  modeCount: () => number;
   published: () => Record<string, unknown> | undefined;
   unexpected: () => string[];
 }> {
   let getCount = 0;
   let putCount = 0;
+  let modeCount = 0;
   let packageData: Record<string, unknown> | undefined;
   const unexpected: string[] = [];
 
@@ -78,6 +80,20 @@ async function installHttpFixture(
     const url = new URL(route.request().url());
     unexpected.push(`${route.request().method()} ${url.pathname}`);
     return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+  });
+  /*
+   * 🔴 `GET /api/sync/payload-mode` 是 ADR-0080 之后**面板一挂载就会发**的读。
+   * 这个 fixture 的规矩是"没登记的请求算 `unexpected`"，所以新端点必须在这里登记 ——
+   * 但登记之后还要**盯住次数**：面板曾经把这条读挂在 `revision` 上，于是一次流程
+   * （建钥匙/确认/锁定/解锁/轮换）里被拉了 15 次。只登记次数等于把那个缺陷放行。
+   */
+  await page.route(`${SERVER}/api/sync/payload-mode`, async (route) => {
+    modeCount += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ mode: 'e2ee' }),
+    });
   });
   await page.route(`${SERVER}/api/sync/key-package`, async (route) => {
     if (route.request().method() === 'GET') {
@@ -158,6 +174,7 @@ async function installHttpFixture(
   return {
     getCount: () => getCount,
     putCount: () => putCount,
+    modeCount: () => modeCount,
     published: () => packageData,
     unexpected: () => unexpected,
   };
@@ -278,6 +295,8 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   await expect(sectionAfterReload.getByTestId('vault-error')).toBeVisible();
   await expect(sectionAfterReload.getByTestId('vault-unlocked')).toHaveCount(0);
 
+  /* 动作序列的基线：这一行之后发生的一切都不该再产生模式读（见本用例末尾那条判据）。 */
+  const modeReadsAfterReload = fixture.modeCount();
   await fillVaultSecret(sectionAfterReload.getByTestId('vault-recovery-code'), recoveryCode ?? '');
   await sectionAfterReload.getByTestId('vault-unlock-recovery').click();
   await expect(sectionAfterReload.getByTestId('vault-recovery-rotation')).toBeVisible();
@@ -300,17 +319,35 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
     'rotated recovery code is absent from storage').toBe(false);
   expect(fixture.unexpected(), `unexpected fixture requests: ${fixture.unexpected().join(' | ')}`).toEqual([]);
   /*
-   * 🔴 2026-10-25 改判据：**一次 404 都不许有**（原来是"恰好一次 key-package 404"）。
+   * 🔴 模式读数**不许跟着动作数涨**（2026-11-02 由这条用例抓出来的缺陷）。
    *
-   * 旧口径的由来：建库之前应用会先探一次 `GET /api/sync/key-package`，那份 404 是
-   * "还没建库"的预期应答。现在这个探**不再发生**（本轮实测：`notFoundResponses` 是空数组，
-   * 而上面每一条 vault 断言都照旧通过 —— 也就是"库建起来了、能锁能换口令"全都没变）。
+   * 面板曾把 `GET /api/sync/payload-mode` 挂在 `revision` 上，而 `run()` 每成功一次就
+   * `setRevision(+1)` ⇒ 建钥匙 / 确认 / 锁定 / 解锁 / 轮换这五步**各多打一次**，
+   * 一次流程里被拉了 15 条（当时这条判据红成了"unexpected fixture requests"）。
    *
-   * 新口径比旧的**更严**，不是更松：旧写法只允许那一条 404，一旦应用开始探别的东西
-   * 也能被这条抓住；现在连那一条都不许有。若哪天产品又把"先探一次"加回来，
-   * 这一条会红 —— 那时该改的是这段注释与这个期望，而不是把白名单放宽成"任意 404"。
+   * 不钉绝对条数，是因为绝对数取决于 StrictMode 与挂载次数（dev 下 effect 会双跑）——
+   * 钉死 2 就变成一条"环境一换就假红"的判据。这里钉的是**性质**：
+   * reload 之后那一段动作序列，**一条新的模式读都不该产生**。
+   * 把依赖再挂回任何随动作变化的值上，下次跑就红。
    */
-  expect(notFoundResponses, `404 responses: ${notFoundResponses.join(' | ')}`).toEqual([]);
+  expect(fixture.modeCount(), 'GET /api/sync/payload-mode 在动作序列里被多拉了')
+    .toBe(modeReadsAfterReload);
+  /*
+   * 🔴 404 判据：**允许的只有"还没建库"那一次探库**，条数按整页装载次数推导，其余一律不许有。
+   *
+   * 沿革（别把这条读成"放宽了"）：
+   *   · 2026-10-25 的版本写"一次 404 都不许有"，理由是当时产品**不再**在建库前探库；
+   *   · 2026-11-02（ADR-0080 S6）这个探**按设计回来了**：`session.keyPackage === undefined`
+   *     只说明"本机没加载到"，不等于"服务端没有"。要画「创建加密数据钥匙」之前必须真的问一次，
+   *     否则会对着已有的密文再发一把新钥匙。于是 `notFoundResponses` 里重新出现探库 404。
+   *
+   * 所以这里不是把白名单放宽成"任意 404"，而是把它**钉到可推导的那个数**：
+   * 本用例有 2 次整页装载（初次 + reload），每次装载探一次 ⇒ 恰好 2 条，且必须都是探库那条。
+   * 应用要是开始探别的东西，或多探一次，这条立刻红。
+   */
+  const keyPackageProbe404 = `GET ${SERVER}/api/sync/key-package`;
+  expect(notFoundResponses, `404 responses: ${notFoundResponses.join(' | ')}`)
+    .toEqual([keyPackageProbe404, keyPackageProbe404]);
   /*
     🔴 浏览器错误白名单：**条数由真实可观察量推导，不写死**。
     来源只有两枚，都登记过：
