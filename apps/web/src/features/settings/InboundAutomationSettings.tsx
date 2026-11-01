@@ -410,7 +410,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
           <div className="ht-inbound__group">
             <p className="ht-settings__hint" role="status">{readinessMessage}</p>
             {/* 那句边界现在是真的，所以可以写出来：循环由应用级挂载点起，前台指的是这个应用可见。 */}
-            <p className="ht-settings__hint" data-testid="inbound-boundary">{t('web.ai.inbound.boundary.foregroundOnly')}</p>
+            <p className="ht-settings__hint" data-settings-disclosure data-testid="inbound-boundary">{t('web.ai.inbound.boundary.foregroundOnly')}</p>
             <p className="ht-settings__hint tabular-nums" role="status">{keyEpoch === undefined ? t('web.ai.inbound.keyMissing') : t('web.ai.inbound.keyReady', { epoch: keyEpoch })}</p>
             <div className="ht-settings__actions">
               {keyEpoch === undefined ? <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void setupRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keySetup')}</button> : <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void rotateRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keyRotate')}</button>}
@@ -436,7 +436,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
             </label>
             {/* 🔴 这一格是把"我们这一次确实读了明文"说给用户听的那一句，不许写成审计话术，
                 也不许在开了这一档之后再宣称"服务端看不到内容"。 */}
-            <p className="ht-settings__hint" data-testid="inbound-hosted-notice">{t('web.ai.inbound.hosted.notice')}</p>
+            <p className="ht-settings__hint" data-settings-disclosure data-testid="inbound-hosted-notice">{t('web.ai.inbound.hosted.notice')}</p>
             <FormField id="inbound-target" label={t('web.ai.inbound.target')}>
               {(field) => (
                 <input {...field} value={targetProjectId} onChange={(event) => setTargetProjectId(event.target.value)} />
@@ -499,8 +499,12 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                   <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void revokeCredential(credential)}>{t('web.ai.inbound.credential.revoke')}</button>
                 </div>)}
                 <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void issueCredential(rule)}>{t('web.ai.inbound.credential.rotate')}</button>
-                {/* 试发要现成的 secret，而 secret 只在刚签发那一刻留在内存里 ⇒ 这句话必须常驻，别让用户以为随时能拿旧凭据试发。 */}
-                <p className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.testSendOnce')}</p>
+                {/* 试发要用刚签发那一刻的 secret ⇒ 这句解释走 ⓘ（设置界面禁止内联说明段落）。 */}
+                <SettingsInfoTip
+                  testId="tip-inbound-test-send-once"
+                  label={t('web.ai.inbound.credential.rotate')}
+                  text={t('web.ai.inbound.credential.testSendOnce')}
+                />
               </div> : null}
               {oneTimeSecret?.ruleId === rule.id ? <aside className="ht-inbound__credential-secret" role="status" data-testid="inbound-credential-secret">
                 <p className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.secretOnce', { keyId: oneTimeSecret.keyId })}</p>

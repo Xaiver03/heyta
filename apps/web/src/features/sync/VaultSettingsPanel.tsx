@@ -478,7 +478,10 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
           onConfirm={runRevoke}
         >
           <h2 id="vault-revoke-confirm-title">{t('web.sync.devices.revokeConfirm.title')}</h2>
-          <p className="ht-settings__hint">{t('web.sync.devices.revokeConfirm.body')}</p>
+          {/* 危险确认的正文必须常显（撤销后所有设备都要重新登录）—— 这是披露，不是设置页的解释段。 */}
+          <p className="ht-settings__hint" data-settings-disclosure>
+            {t('web.sync.devices.revokeConfirm.body')}
+          </p>
         </DangerConfirmDialog>
       ) : null}
 

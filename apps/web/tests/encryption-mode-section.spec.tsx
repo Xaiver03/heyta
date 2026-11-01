@@ -60,7 +60,7 @@ describe('同步加密开关（ADR-0080）', () => {
     mount();
 
     expect(q('encryption-mode-section')?.getAttribute('data-mode')).toBe('e2ee');
-    expect(q('encryption-mode-state')?.textContent).toContain('服务器读不到');
+    expect(q('encryption-mode-status')?.textContent).toContain('服务器读不到');
     expect(q('encryption-mode-disable')).not.toBeNull();
     expect(q('encryption-mode-enable')).toBeNull();
   });
@@ -69,7 +69,7 @@ describe('同步加密开关（ADR-0080）', () => {
     mount({ mode: 'plain' });
 
     expect(q('encryption-mode-section')?.getAttribute('data-mode')).toBe('plain');
-    const state = q('encryption-mode-state')?.textContent ?? '';
+    const state = q('encryption-mode-status')?.textContent ?? '';
     expect(state).toContain('服务器');
     expect(state).toContain('能读到');
     expect(state).not.toContain('更安全');
@@ -121,7 +121,7 @@ describe('同步加密开关（ADR-0080）', () => {
   it('迁移进行中显示进度，且按钮禁用', () => {
     mount({ busy: true, progress: { completed: 2, total: 5 } });
 
-    expect(q('encryption-mode-busy')?.textContent).toContain('2/5');
+    expect(q('encryption-mode-status-busy')?.textContent).toContain('2/5');
     expect((q('encryption-mode-disable') as HTMLButtonElement).disabled).toBe(true);
   });
 });
