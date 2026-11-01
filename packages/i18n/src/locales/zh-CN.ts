@@ -921,6 +921,7 @@ export const zhCN = {
   'web.settings.syncUx.encryptionHint': '登录密码只用于账号认证。下面的加密口令或数据钥匙，才用于解锁任务内容；服务端看不到它们的明文。',
   'web.sync.vault.title': '加密数据钥匙',
   'web.sync.encryption.title': '同步加密',
+  'web.sync.vault.packageLoading': '正在读取加密数据钥匙…',
   'web.sync.encryption.on': '已开启：任务内容在你设备上加密后才上传，服务器读不到。',
   'web.sync.encryption.off': '已关闭：任务内容以明文上传，服务器（包括我们）能读到。',
   'web.sync.encryption.disable': '关闭端到端加密',

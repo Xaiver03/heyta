@@ -600,3 +600,28 @@ S0–S7 的代码与判据侧全部落地：**317 条**自动化判据全绿（�
 
 - 设置页在明文模式下的首屏文案应以"可开启"为主语（现在已经是，但还没有真浏览器证据）
 - 四端装机验收（见 §11，凭据/设备/沙箱）
+
+### 12.4 真浏览器 E2E 的新读数：**一个真缺陷**
+
+按 ADR-0081 改完 spec（旧"创建数据钥匙"改成两段式"开启加密"）后重跑，失败点前移到**设备 B 解锁**。
+用一次性探针把面板当时的 testid 全打出来，读数是：
+
+```
+encryption-mode-status = "On: task content is encrypted on your device before upload…"   ← 服务端确实是 e2ee
+encryption-mode-disable / encryption-key-placement 都在
+vault-create-form / vault-create-passphrase / vault-create            ← 在（错）
+vault-passphrase                                                      ← 不在（该在的是这个）
+```
+
+**缺陷**：`hasPackage` 用的是**本机是否已加载**那把包。B 这一刻还没加载到，
+于是落进"没有包"分支；而模式是 e2ee，我那条守卫就放行了「创建加密数据钥匙」——
+**对着服务端已有的密文再发一把新钥匙**。这对用户是实打实的误导（还可能把旧数据变成解不开）。
+
+**根因归属**：`VaultSettingsPanel` 用"本地有没有包"当"这个账号有没有加密"的代理，
+这两个不是一回事（本地未加载 ≠ 服务端没有）。ADR-0081 之前它被测试掩盖着
+（那时 spec 在 A 上先创建，B 的加载总在 20s 内完成）。
+
+**修法（下一刀）**：e2ee 模式下**永不**画创建表单 —— 没加载到包就画"正在读取加密数据钥匙…"，
+加载完自然变成解锁框；创建只属于"明文账号显式开启"那条路（已有两段式入口）。
+判据：`vault-settings-plain-mode.spec.tsx` 那一族补一条"e2ee + 无本地包 ⇒ 不出现创建表单"，
+并让它能红。

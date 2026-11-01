@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@heyta/i18n';
 import { setArgon2ParamsForTesting } from '@heyta/sync-core';
 import { VaultSettingsPanel } from '../src/features/sync/VaultSettingsPanel.js';
+import { invalidateWebVaultSession } from '../src/lib/vault-session.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 
 const SERVER = 'https://sync.example.test';
@@ -49,6 +50,11 @@ beforeEach(async () => {
     request.onsuccess = request.onerror = request.onblocked = () => resolve();
   });
   published = undefined;
+  // 每个用例都要干净：上一条用例把 root 记进了 sessionStorage，下一条会被它自动解锁。
+  localStorage.clear();
+  sessionStorage.clear();
+  // 会话是模块级单例：不显式作废，上一条用例解锁过的会话会被下一条沿用。
+  invalidateWebVaultSession();
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     if (init?.method === 'PUT') {
       published = JSON.parse(String(init.body)).package as Record<string, unknown>;
@@ -117,4 +123,53 @@ describe('web encrypted data key settings', () => {
     await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="vault-publish"]')!.click());
     await waitForSelector('[data-testid="vault-ready"]');
   });
+});
+
+/**
+ * ADR-0081 之后新暴露的一条真缺陷的判据：
+ *
+ * `session.keyPackage === undefined` 只说明**本机还没加载到**，不等于**服务端没有**。
+ * 拿前者当后者用，就会在本机尚未加载时画出「创建加密数据钥匙」—— 对着已有的密文
+ * 再发一把新钥匙。这里让服务端**已经有包**，断言面板给的是解锁框、不是创建表单。
+ */
+it('服务端已有包但本机还没加载 ⇒ 给解锁框，不给"创建"', async () => {
+  const serverPackage = {
+    version: 1,
+    keyVersion: 1,
+    rootKeyFingerprint: 'b'.repeat(64),
+    passphrase: {
+      kdf: 'argon2id', salt: Buffer.alloc(16, 1).toString('base64'),
+      iv: Buffer.alloc(12, 2).toString('base64'), ciphertext: Buffer.alloc(48, 3).toString('base64'),
+    },
+    recovery: {
+      kdf: 'argon2id', salt: Buffer.alloc(16, 4).toString('base64'),
+      iv: Buffer.alloc(12, 5).toString('base64'), ciphertext: Buffer.alloc(48, 6).toString('base64'),
+    },
+  };
+  vi.stubGlobal('fetch', vi.fn(async () => response(200, { package: serverPackage, payloadKeyVersion: 1 })));
+
+  act(() => root.unmount());
+  container.remove();
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  act(() => {
+    root.render(<I18nProvider locale="en"><VaultSettingsPanel /></I18nProvider>);
+  });
+  await flush();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  await flush();
+  await flush();
+
+  try {
+    await waitForSelector('[data-testid="vault-unlock-form"]');
+  } catch (error) {
+    const ids = Array.from(container.querySelectorAll('[data-testid]')).map((n) => n.getAttribute('data-testid'));
+    console.log('PANEL_IDS', JSON.stringify(ids));
+    throw error;
+  }
+  expect(
+    container.querySelector('[data-testid="vault-create-form"]'),
+    '服务端已经有包了，还给"创建"入口 = 让用户对着已有密文再造一把钥匙',
+  ).toBeNull();
 });

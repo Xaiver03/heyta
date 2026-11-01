@@ -85,12 +85,20 @@ test('unlocked vault exports only the disclosed task fields to the breakdown pro
     await decidePrivacyConsent(page, 'accepted');
     await openSyncSection(page);
     const passphrase = 'synthetic egress vault passphrase';
-    await fillVaultSecret(page.getByTestId('vault-create-passphrase'), passphrase);
-    await page.getByTestId('vault-create').click();
-    await expect(page.getByTestId('vault-recovery-display')).toBeVisible();
-    const recovery = (await page.getByTestId('vault-recovery-display').textContent())!;
-    await fillVaultSecret(page.getByTestId('vault-recovery-confirm'), recovery);
-    await page.getByTestId('vault-publish').click();
+    /*
+     * ADR-0081：新账号默认明文，端到端加密要**显式开启**（两段：设口令 → 抄/回填恢复码）。
+     * 旧的「创建数据钥匙」入口在明文模式下故意不可见（只发包不迁移载荷 = 有包但云上还是明文）。
+     */
+    await page.getByTestId('encryption-mode-enable').click();
+    await fillVaultSecret(page.getByTestId('encryption-enable-passphrase'), passphrase);
+    await page.getByTestId('encryption-enable-start').click();
+    const recoveryDisplay = page.getByTestId('encryption-enable-recovery-code');
+    await expect(recoveryDisplay).toBeVisible();
+    const recovery = ((await recoveryDisplay.textContent()) ?? '').trim();
+    expect(recovery.length, 'recovery code must be shown once').toBeGreaterThan(0);
+    await fillVaultSecret(page.getByTestId('encryption-enable-recovery'), recovery);
+    await page.getByTestId('encryption-enable-confirm').click();
+    await expect(page.getByTestId('encryption-mode-status')).toContainText(/encrypted|已开启|On/u);
     await expect(page.getByTestId('vault-ready')).toBeVisible();
     await closeSyncSettings(page);
 
