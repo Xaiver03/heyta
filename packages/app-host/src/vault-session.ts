@@ -104,6 +104,18 @@ export interface VaultRootRotationMigrationResult {
   payloadKeyVersion: number;
 }
 
+/**
+ * 重新开启加密（ADR-0080 §5.3）：readable 起点**没有**当前包，所以输入里只有 target。
+ */
+export interface VaultReEncryptionMigrationInput {
+  targetPackage: VaultKeyPackage;
+  targetRootKey: Uint8Array;
+}
+
+export type VaultReEncryptionMigration = (
+  input: VaultReEncryptionMigrationInput,
+) => Promise<VaultRootRotationMigrationResult>;
+
 /** Host-owned executor for the atomic ciphertext migration protocol. */
 export type VaultRootRotationMigration = (
   input: VaultRootRotationMigrationInput,
@@ -149,6 +161,17 @@ export interface VaultKeySession {
   getPayloadCipher(): Promise<SyncPayloadCipher | undefined>;
   beginCreation(passphrase: string): Promise<PendingVaultCreation>;
   beginPassphraseChange(newPassphrase: string): Promise<PendingVaultCreation>;
+  /**
+   * 明文账号重新开启加密：确认恢复码 → 用**新** root 全量重加密 → 原子发布首包与世代 1。
+   *
+   * 与 `confirmAndMigrateRootRotation` 的区别只有一处：这里**没有** currentPackage
+   * （readable 期间服务端上那份包已经被删了），所以迁移只携带目标。
+   */
+  confirmAndMigrateReEncryption(
+    pending: PendingVaultCreation,
+    enteredRecoveryCode: string,
+    migrate: VaultReEncryptionMigration,
+  ): Promise<VaultRootRotationMigrationResult>;
   /** Generate a new root and wrappers; no server mutation occurs yet. */
   beginRootRotation(newPassphrase: string): Promise<PendingVaultCreation>;
   /** Cancel a local root-rotation draft after releasing any server staging. */
@@ -659,6 +682,73 @@ class VaultKeySessionImpl implements VaultKeySession {
     await this.store.saveBound(pendingPackage, this.scope, result.payloadKeyVersion);
     if (epoch !== this.lifecycleEpoch || this.pendingConsumed.has(key)) {
       throw new VaultSessionError('Vault session was locked while installing migrated root', 'vault-locked');
+    }
+    this.currentPackage = pendingPackage;
+    this.activePayloadKeyVersion = result.payloadKeyVersion;
+    this.replaceRoot(pendingRoot);
+    this.recoveryRotationRequired = false;
+    this.pendingConsumed.add(key);
+    wipe(pendingRoot);
+    this.pendingRoots.delete(key);
+    this.pendingCodes.delete(key);
+    this.pendingPackages.delete(key);
+    this.pendingKeys.delete(key);
+    this.pendingRootRotation = undefined;
+    return result;
+  }
+
+  async confirmAndMigrateReEncryption(
+    pending: PendingVaultCreation,
+    enteredRecoveryCode: string,
+    migrate: VaultReEncryptionMigration,
+  ): Promise<VaultRootRotationMigrationResult> {
+    const key = pending as object;
+    if (this.pendingConsumed.has(key)) throw new VaultSessionError('Pending vault package was already consumed', 'pending-invalid');
+    const pendingPackage = this.pendingPackages.get(key);
+    const pendingRoot = this.pendingRoots.get(key);
+    const pendingCode = this.pendingCodes.get(key);
+    if (pendingPackage === undefined || pendingRoot === undefined) {
+      throw new VaultSessionError('Pending vault package is unavailable', 'pending-invalid');
+    }
+    // 这条路只服务"服务端上没有包"的账号。有包就该走 root 轮换那条，两条路不许混。
+    if (this.currentPackage !== undefined) {
+      throw new VaultSessionError('Re-encryption requires an account without a key package', 'remote-publish-conflict');
+    }
+    if (pendingPackage.keyVersion !== 1) {
+      throw new VaultSessionError('Re-encryption must publish key version one', 'remote-publish-conflict');
+    }
+    if (pendingCode === undefined) {
+      let recovered: Uint8Array | undefined;
+      try {
+        recovered = await unlockVaultWithRecoveryCode(pendingPackage, enteredRecoveryCode);
+        if (vaultRootKeyFingerprint(recovered) !== pendingPackage.rootKeyFingerprint) {
+          throw new Error('Recovery code fingerprint mismatch');
+        }
+      } catch {
+        throw new VaultSessionError('Recovery code confirmation did not match', 'recovery-confirmation-mismatch');
+      } finally {
+        wipe(recovered);
+      }
+    } else if (enteredRecoveryCode.replaceAll('-', '').replaceAll(' ', '').toUpperCase() !== pendingCode) {
+      throw new VaultSessionError('Recovery code confirmation did not match', 'recovery-confirmation-mismatch');
+    }
+    const epoch = this.lifecycleEpoch;
+    const targetRootCopy = cloneKey(pendingRoot);
+    let result: VaultRootRotationMigrationResult;
+    try {
+      result = await migrate({ targetPackage: pendingPackage, targetRootKey: targetRootCopy });
+    } finally {
+      wipe(targetRootCopy);
+    }
+    if (epoch !== this.lifecycleEpoch || this.pendingConsumed.has(key)) {
+      throw new VaultSessionError('Vault session was locked during re-encryption', 'vault-locked');
+    }
+    if (result.keyVersion !== 1 || result.payloadKeyVersion !== 1) {
+      throw new VaultSessionError('Re-encryption returned an invalid published generation', 'remote-publish-conflict');
+    }
+    await this.store.saveBound(pendingPackage, this.scope, result.payloadKeyVersion);
+    if (epoch !== this.lifecycleEpoch || this.pendingConsumed.has(key)) {
+      throw new VaultSessionError('Vault session was locked while installing the re-encrypted package', 'vault-locked');
     }
     this.currentPackage = pendingPackage;
     this.activePayloadKeyVersion = result.payloadKeyVersion;

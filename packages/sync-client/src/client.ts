@@ -28,7 +28,12 @@ import {
   suggestConflictResolution,
 } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
-import { createPasswordPayloadCipher, type SyncPayloadCipher, type SyncEncryptionOptions } from './payload-cipher.js';
+import {
+  createPasswordPayloadCipher,
+  type PayloadWriteMode,
+  type SyncPayloadCipher,
+  type SyncEncryptionOptions,
+} from './payload-cipher.js';
 
 /** 服务端单次上传/下载的上限（契约里的常量，声明在此以便分页）。 */
 const MAX_OPS_PER_UPLOAD = 500;
@@ -350,6 +355,16 @@ export type SyncFailureReason =
    */
   | 'undecryptable-page'
   /**
+   * 账号是**明文模式**（ADR-0080），服务端却回了密文行。
+   *
+   * 这不是"口令不对"那一类：明文账号根本没有口令可对。它意味着"整库同模式"
+   * 这个承重假设被破坏 —— 最可能是关闭加密的迁移没有完成，服务端还留着旧密文。
+   *
+   * 🔴 与 `'undecryptable-page'` 分成两个原因：那句话叫用户"核对口令"，
+   * 而这里的用户动作是"重新开启加密并完成迁移"或"联系我们"。给错动作比不给更糟。
+   */
+  | 'payload-mode-mismatch'
+  /**
    * 服务端**拒绝了本机上传的 op**，这些改动不在云上。
    *
    * 🔴 单独一种原因，因为它和"网络不好"是**完全相反**的处置：
@@ -495,6 +510,26 @@ interface UnreadableOp {
  *
  * `message` 因此只放**可机器定位**的非中文诊断（序号 + opId + 错误名）。
  */
+/**
+ * 明文账号读到了密文行（ADR-0080）。
+ *
+ * 与 `UndecryptablePageError` 同理：用**类型**承载分类，`message` 只放可机器定位的诊断。
+ */
+class PayloadModeMismatchError extends Error {
+  override readonly name = 'PayloadModeMismatchError';
+
+  constructor(
+    readonly count: number,
+    readonly firstServerSeq: number,
+    readonly firstOpId: string,
+  ) {
+    super(
+      `${String(count)} op(s) are ciphertext but this account stores plaintext; ` +
+        `first=${String(firstServerSeq)}:${firstOpId}`,
+    );
+  }
+}
+
 class UndecryptablePageError extends Error {
   override readonly name = 'UndecryptablePageError';
 
@@ -687,7 +722,7 @@ export type SyncClientOptions = SyncEncryptionOptions & {
  */
 async function decodeServerOp(
   envelope: ServerOperation,
-  payloadCipher: SyncPayloadCipher,
+  writeMode: PayloadWriteMode,
 ): Promise<Operation<string>> {
   const op = envelope.op;
   if (op === undefined || typeof op !== 'object') {
@@ -700,12 +735,17 @@ async function decodeServerOp(
   let payload: unknown = op.payload;
 
   if (op.isPayloadEncrypted === true) {
+    if (writeMode.mode !== 'e2ee') {
+      // 🔴 账号说是明文，服务端却给了密文行：保持沉默就等于把这条 op 丢掉。
+      // 这不是网络问题，是"整库同模式"这个承重假设被破坏了。
+      throw new PayloadModeMismatchError(1, envelope.serverSeq, op.id);
+    }
     if (typeof op.payload !== 'string') {
       throw new Error(
         `op ${op.id} 标记为加密但 payload 不是字符串 —— 服务端数据可能损坏`,
       );
     }
-    const plain = await payloadCipher.decrypt(op.payload, op);
+    const plain = await writeMode.cipher.decrypt(op.payload, op);
     payload = JSON.parse(plain) as unknown;
   }
 
@@ -791,15 +831,15 @@ export class SyncClient {
     if (this.frontierSession !== frontierSession) this.causalFrontier = undefined;
     this.frontierSession = frontierSession;
 
-    let payloadCipher: SyncPayloadCipher | undefined;
+    let writeMode: PayloadWriteMode | undefined;
     try {
-      payloadCipher = await this.getPayloadCipher();
+      writeMode = await this.resolveWriteMode();
     } catch {
       // Secure-storage and package validation errors must remain an observable
       // locked state. Do not expose secret-bearing exception messages to logs/UI.
       return report({ kind: 'error', reason: 'no-encryption-password', retryable: false });
     }
-    if (payloadCipher === undefined) {
+    if (writeMode === undefined) {
       // 🔴 绝不降级成明文。服务端会 400，但更糟的是"看起来同步成功"。
       // 宁可明确失败，也不让用户以为数据安全地上云了。
       return report({
@@ -825,7 +865,7 @@ export class SyncClient {
       // 实测：队列里混进一条 `INVALID_CLIENT_ID` 的 op 后，连续两次同步都是
       // error、待上传数恒为 1、设备再没拉到过任何远端数据。
       // 上传的问题只该影响"能不能上传"，不该影响"能不能下载"。
-      await this.upload(token, payloadCipher, conflicts);
+      await this.upload(token, writeMode, conflicts);
 
       // 🔴 顺序：上传 → 下载 → 解决冲突 → 再上传。
       //
@@ -834,10 +874,10 @@ export class SyncClient {
       // 我第一版没有这一步，于是 CONCURRENT 会被当成硬错误 ——
       // 离线改一次就永远同步不上去。
       report({ kind: 'syncing', phase: 'download' });
-      await this.download(token, payloadCipher);
+      await this.download(token, writeMode);
 
       if (conflicts.length > 0) {
-        const unresolved = await this.resolveConflicts(conflicts, token, payloadCipher);
+        const unresolved = await this.resolveConflicts(conflicts, token, writeMode);
         if (unresolved.length > 0) {
           // 结构化上报，不是一句文案 —— 用户得看见两边分别是什么才能选
           return report({ kind: 'conflict', conflicts: unresolved });
@@ -937,6 +977,14 @@ export class SyncClient {
        * 语义不变：这条路仍然是在 `download()` 里**抛**出来的，游标没有推进、
        * 一条 op 都没应用（ADR-0016 的 fail-closed）。
        */
+      if (error instanceof PayloadModeMismatchError) {
+        return report({
+          kind: 'error',
+          reason: 'payload-mode-mismatch',
+          retryable: false,
+          message: error.message,
+        });
+      }
       if (error instanceof UndecryptablePageError) {
         return report({
           kind: 'error',
@@ -1017,7 +1065,7 @@ export class SyncClient {
   /** 上传本地 op。分批，避免超过服务端单次上限。 */
   private async upload(
     token: string,
-    payloadCipher: SyncPayloadCipher,
+    writeMode: PayloadWriteMode,
     conflicts: ConflictReport[],
   ): Promise<void> {
     const pending = await this.options.getLocalOps();
@@ -1082,14 +1130,18 @@ export class SyncClient {
           );
         }
 
-        const cipher = await payloadCipher.encrypt(JSON.stringify(op.payload ?? {}), op);
+        const plaintext = JSON.stringify(op.payload ?? {});
+        let wirePayload = plaintext;
+        if (writeMode.mode === 'e2ee') {
+          wirePayload = await writeMode.cipher.encrypt(plaintext, op);
 
-        // 自检：服务端会检查形状，本地先确认我们真的产出了合规密文。
-        // 这里失败说明加密层出了问题，而不是网络问题。
-        if (!isEncryptedPayloadTransportShape(cipher)) {
-          throw new Error(
-            `op ${op.id} 的密文不满足服务端传输形状要求 —— 加密层异常`,
-          );
+          // 自检：服务端会检查形状，本地先确认我们真的产出了合规密文。
+          // 这里失败说明加密层出了问题，而不是网络问题。
+          if (!isEncryptedPayloadTransportShape(wirePayload)) {
+            throw new Error(
+              `op ${op.id} 的密文不满足服务端传输形状要求 —— 加密层异常`,
+            );
+          }
         }
 
         const frontier = this.causalFrontier;
@@ -1103,12 +1155,12 @@ export class SyncClient {
           entityType: op.entityType,
           ...(op.entityId !== undefined ? { entityId: op.entityId } : {}),
           ...(op.entityIds !== undefined ? { entityIds: op.entityIds } : {}),
-          payload: cipher,
+          payload: wirePayload,
           ...(op.opType === 'REPAIR' && isHeytaFullStatePayload(op.payload)
             ? { repairBaseServerSeq: op.payload.repairBaseServerSeq }
             : {}),
-          // 服务端要求**显式 true**；缺失算违规，不是"当作 false"
-          isPayloadEncrypted: true,
+          // 服务端要求标志**显式出现**：e2ee 写 true、plain 写 false，缺失算违规。
+          isPayloadEncrypted: writeMode.mode === 'e2ee',
           vectorClock: canCompact
             ? compactVectorClockAgainstFrontier(
                 op.vectorClock,
@@ -1275,7 +1327,7 @@ export class SyncClient {
         const attempts = await Promise.all(
           body.newOps.map(async (o) => {
             try {
-              return { ok: true as const, op: await decodeServerOp(o, payloadCipher) };
+              return { ok: true as const, op: await decodeServerOp(o, writeMode) };
             } catch (error: unknown) {
               return {
                 ok: false as const,
@@ -1292,7 +1344,7 @@ export class SyncClient {
 
         const failedSnapshot = failed.find((failure) => body.newOps!.some((envelope) =>
           envelope.op?.id === failure.opId && (SUPER_SYNC_SNAPSHOT_OP_TYPES as readonly string[]).includes(envelope.op.opType)));
-        if (failedSnapshot !== undefined) throw new UndecryptablePageError(body.newOps.length, failedSnapshot);
+        if (failedSnapshot !== undefined) throw this.pageFailure(body.newOps.length, failedSnapshot);
 
         if (decoded.length > 0) await this.options.applyRemote(decoded);
 
@@ -1369,7 +1421,7 @@ export class SyncClient {
   private async resolveConflicts(
     conflicts: ConflictReport[],
     token: string,
-    payloadCipher: SyncPayloadCipher,
+    writeMode: PayloadWriteMode,
   ): Promise<ConflictInfo[]> {
     const unresolved: ConflictInfo[] = [];
     const toRedispatch: Operation<string>[] = [];
@@ -1474,7 +1526,7 @@ export class SyncClient {
       // 重传仍然冲突说明自动判定不成立，那正是**该交给用户**的情况，
       // 而不是我们自己再猜一轮。
       const retryConflicts: ConflictReport[] = [];
-      await this.upload(token, payloadCipher, retryConflicts);
+      await this.upload(token, writeMode, retryConflicts);
       if (retryConflicts.length > 0) {
         const history = await this.options.getOpsForEntity(
           retryConflicts[0]!.op.entityType,
@@ -1519,13 +1571,13 @@ export class SyncClient {
     choice: 'keep-local' | 'keep-remote',
   ): Promise<SyncStatus> {
     const token = this.options.authTransport === 'cookie' ? '__cookie__' : await this.options.getToken();
-    let payloadCipher: SyncPayloadCipher | undefined;
+    let writeMode: PayloadWriteMode | undefined;
     try {
-      payloadCipher = await this.getPayloadCipher();
+      writeMode = await this.resolveWriteMode();
     } catch {
       return { kind: 'error', reason: 'no-encryption-password', retryable: false };
     }
-    if (token === undefined || payloadCipher === undefined) {
+    if (token === undefined || writeMode === undefined) {
       // 分成两条精确原因，而不是原来那句"未登录或缺少加密口令" ——
       // 用户能做的事完全不同（去登录 vs 去填口令），混着说等于没说。
       if (token === undefined) {
@@ -1591,6 +1643,27 @@ export class SyncClient {
     return this.fetchImpl(input, { ...init, headers });
   }
 
+  /**
+   * 写侧能力（ADR-0080）：
+   * - `encryptionMode === 'plain'` ⇒ 账号就是明文（调用方已从服务端读到模式）；
+   * - 其它 ⇒ 必须有钥匙，拿不到就是 `no-encryption-password`（**不降级**）。
+   */
+  private async resolveWriteMode(): Promise<PayloadWriteMode | undefined> {
+    if (this.options.encryptionMode === 'plain') return { mode: 'plain' };
+    const cipher = await this.getPayloadCipher();
+    return cipher === undefined ? undefined : { mode: 'e2ee', cipher };
+  }
+
+  /**
+   * 整页解不开时决定报哪一种：**模式错配**与**口令不对**是两句话、两个动作。
+   * 判据只看第一条失败的诊断名，因为两类失败在成因上互斥。
+   */
+  private pageFailure(count: number, first: UnreadableOp): Error {
+    return first.errorName === 'PayloadModeMismatchError'
+      ? new PayloadModeMismatchError(count, first.serverSeq, first.opId)
+      : new UndecryptablePageError(count, first);
+  }
+
   private async getPayloadCipher(): Promise<SyncPayloadCipher | undefined> {
     if (this.options.encryptionMode === 'vault') {
       // Runtime guard as well: JS/native callers do not all pass through tsc.
@@ -1608,7 +1681,7 @@ export class SyncClient {
   }
 
   /** 增量下载。按 serverSeq 游标分页，直到 hasMore 为 false。 */
-  private async download(token: string, payloadCipher: SyncPayloadCipher): Promise<void> {
+  private async download(token: string, writeMode: PayloadWriteMode): Promise<void> {
     for (;;) {
       const since = await this.options.getLastServerSeq();
       const url = new URL(`${this.options.baseUrl}/api/sync/ops`);
@@ -1666,7 +1739,7 @@ export class SyncClient {
         const attempts = await Promise.all(
           ops.map(async (o) => {
             try {
-              return { ok: true as const, op: await decodeServerOp(o, payloadCipher) };
+              return { ok: true as const, op: await decodeServerOp(o, writeMode) };
             } catch (error: unknown) {
               return {
                 ok: false as const,
@@ -1685,7 +1758,7 @@ export class SyncClient {
         // Unlike an isolated unreadable delta, skipping it loses that prefix.
         const failedSnapshot = failed.find((failure) => ops.some((envelope) =>
           envelope.op?.id === failure.opId && (SUPER_SYNC_SNAPSHOT_OP_TYPES as readonly string[]).includes(envelope.op.opType)));
-        if (failedSnapshot !== undefined) throw new UndecryptablePageError(ops.length, failedSnapshot);
+        if (failedSnapshot !== undefined) throw this.pageFailure(ops.length, failedSnapshot);
 
         if (decoded.length > 0) await this.options.applyRemote(decoded);
 
@@ -1702,7 +1775,7 @@ export class SyncClient {
              */
             const first = failed[0];
             if (first !== undefined) {
-              throw new UndecryptablePageError(ops.length, first);
+              throw this.pageFailure(ops.length, first);
             }
             // `failed.length > 0` 保证 `first` 一定存在；这里只是让控制流对
             // `noUncheckedIndexedAccess` 收敛，并**绝不**退化成"跳过整页"。

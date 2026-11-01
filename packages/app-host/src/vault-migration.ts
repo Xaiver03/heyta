@@ -319,6 +319,31 @@ const validateStage = (
  * never cross the transport and no intermediate record is written to storage.
  * A dropped commit response is recovered by querying the same requestId.
  */
+/**
+ * ADR-0080：这套编排**只**发布加密载荷。
+ *
+ * 关掉加密（`readable`）那一趟没有新包、没有世代，它的客户端编排是另一条路。
+ * 所以这里把"必须是 e2ee"显式写出来，而不是用非空断言把可空字段糊过去 ——
+ * 类型变宽的原因正好就是这个语义。
+ */
+const requireEncryptedTarget = (
+  manifest: VaultKeyMigrationManifest,
+): { pkg: NonNullable<VaultKeyMigrationManifest['package']>; targetPayloadKeyVersion: number } => {
+  if (manifest.targetMode === 'readable' || manifest.package === undefined || manifest.targetPayloadKeyVersion === undefined) {
+    throw new VaultMigrationError('This orchestration only publishes encrypted payloads', 'inventory_changed');
+  }
+  return { pkg: manifest.package, targetPayloadKeyVersion: manifest.targetPayloadKeyVersion };
+};
+
+const requireEncryptedStage = (
+  stage: VaultKeyMigrationStageResponse,
+): { keyVersion: number; payloadKeyVersion: number } => {
+  if (stage.keyVersion === null || stage.payloadKeyVersion === null) {
+    throw new VaultMigrationError('Server reported a plaintext migration for an encrypted transition', 'migration_failed');
+  }
+  return { keyVersion: stage.keyVersion, payloadKeyVersion: stage.payloadKeyVersion };
+};
+
 export async function migrateVaultPayloads(options: VaultMigrationOptions): Promise<VaultKeyMigrationResponse> {
   if (options.currentRootKey.length !== 32 || options.targetRootKey.length !== 32) {
     throw new VaultMigrationError('Vault root keys must be 32 bytes', 'invalid_key');
@@ -342,6 +367,7 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
     // A journal is the sole resume source after a process restart. It is
     // intentionally checked before inventory/decryption so ciphertext and its
     // nonce are reused byte-for-byte rather than randomly re-encrypted.
+    const priorTarget = requireEncryptedTarget(prior.manifest);
     const journalMatchesRequest = JSON.stringify(prior.manifest.package) === JSON.stringify(options.package) &&
       prior.manifest.expectedKeyVersion === options.expectedKeyVersion &&
       prior.manifest.targetPayloadKeyVersion === options.targetPayloadKeyVersion;
@@ -352,16 +378,16 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
       // request. Only self-heal when all local-generation evidence matches
       // the old manifest *and* the authenticated server says it is PUBLISHED.
       const priorWasInstalled = options.requestId === undefined &&
-        prior.manifest.package.keyVersion === options.expectedKeyVersion &&
-        prior.manifest.targetPayloadKeyVersion === options.currentPayloadKeyVersion &&
-        vaultRootKeyFingerprint(options.currentRootKey) === prior.manifest.package.rootKeyFingerprint;
+        priorTarget.pkg.keyVersion === options.expectedKeyVersion &&
+        priorTarget.targetPayloadKeyVersion === options.currentPayloadKeyVersion &&
+        vaultRootKeyFingerprint(options.currentRootKey) === priorTarget.pkg.rootKeyFingerprint;
       if (priorWasInstalled) {
         try {
           const published = validateStage(await options.remote.status(prior.requestId), prior.requestId);
           if (published.state === 'PUBLISHED' &&
               published.requestId === prior.requestId &&
-              published.keyVersion === prior.manifest.package.keyVersion &&
-              published.payloadKeyVersion === prior.manifest.targetPayloadKeyVersion) {
+              published.keyVersion === priorTarget.pkg.keyVersion &&
+              published.payloadKeyVersion === priorTarget.targetPayloadKeyVersion) {
             await options.journal.clear(options.journalScope, prior.requestId);
             return migrateVaultPayloads(options);
           }
@@ -377,10 +403,11 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
       if (options.clearJournalOnPublished !== false) {
         await options.journal.clear(options.journalScope, requestId);
       }
+      const resumed = requireEncryptedStage(resumedStage);
       return {
         requestId: resumedStage.requestId,
-        keyVersion: resumedStage.keyVersion,
-        payloadKeyVersion: resumedStage.payloadKeyVersion,
+        keyVersion: resumed.keyVersion,
+        payloadKeyVersion: resumed.payloadKeyVersion,
         latestSeq: resumedStage.latestSeq,
         migratedOperationCount: resumedStage.migratedOperationCount,
       };
@@ -400,10 +427,11 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
     if (options.clearJournalOnPublished !== false) {
       await options.journal.clear(options.journalScope, requestId);
     }
+    const resumed = requireEncryptedStage(resumedStage);
     return {
       requestId: resumedStage.requestId,
-      keyVersion: resumedStage.keyVersion,
-      payloadKeyVersion: resumedStage.payloadKeyVersion,
+      keyVersion: resumed.keyVersion,
+      payloadKeyVersion: resumed.payloadKeyVersion,
       latestSeq: resumedStage.latestSeq,
       migratedOperationCount: resumedStage.migratedOperationCount,
     };
@@ -486,10 +514,11 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
     if (options.clearJournalOnPublished !== false) {
       await options.journal.clear(options.journalScope, requestId);
     }
+    const published = requireEncryptedStage(stage);
     return {
       requestId: stage.requestId,
-      keyVersion: stage.keyVersion,
-      payloadKeyVersion: stage.payloadKeyVersion,
+      keyVersion: published.keyVersion,
+      payloadKeyVersion: published.payloadKeyVersion,
       latestSeq: stage.latestSeq,
       migratedOperationCount: stage.migratedOperationCount,
     };
@@ -515,10 +544,11 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
   if (options.clearJournalOnPublished !== false) {
     await options.journal.clear(options.journalScope, requestId);
   }
+  const published = requireEncryptedStage(stage);
   return {
     requestId: stage.requestId,
-    keyVersion: stage.keyVersion,
-    payloadKeyVersion: stage.payloadKeyVersion,
+    keyVersion: published.keyVersion,
+    payloadKeyVersion: published.payloadKeyVersion,
     latestSeq: stage.latestSeq,
     migratedOperationCount: stage.migratedOperationCount,
   };

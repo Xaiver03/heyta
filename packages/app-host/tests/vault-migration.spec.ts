@@ -54,6 +54,8 @@ const identity = (id: string, serverSeq: number): VaultMigrationInventoryOperati
 const stage = (overrides: Partial<VaultKeyMigrationStageResponse> = {}): VaultKeyMigrationStageResponse => ({
   requestId: 'migration-1',
   state: 'STAGING',
+  // ADR-0080：这套编排只发加密载荷，夹具因此显式写 e2ee（不是靠缺省糊过去）。
+  targetMode: 'e2ee',
   keyVersion: 2,
   payloadKeyVersion: 2,
   expectedLatestSeq: 2,
@@ -182,7 +184,7 @@ describe('vault payload migration orchestration', () => {
     };
     const remote = createVaultKeyMigrationRemote({ baseUrl: 'https://sync.example.test/', getToken: async () => 'token-1', fetchImpl });
     await remote.begin({
-      requestId: 'migration-1', expectedKeyVersion: 1, expectedLatestSeq: 0,
+      requestId: 'migration-1', targetMode: 'e2ee', expectedKeyVersion: 1, expectedLatestSeq: 0,
       targetPayloadKeyVersion: 2, package: keyPackage, expectedOperationCount: 0, expectedPayloadBytes: 0,
     });
     expect(requests[0]!.url).toBe('https://sync.example.test/api/sync/key-migration');
@@ -347,8 +349,9 @@ describe('vault payload migration orchestration', () => {
     const publishedFor = (manifest: VaultKeyMigrationManifest): VaultKeyMigrationStageResponse => stage({
       requestId: manifest.requestId,
       state: 'PUBLISHED',
-      keyVersion: manifest.package.keyVersion,
-      payloadKeyVersion: manifest.targetPayloadKeyVersion,
+      // 这个夹具只服务 e2ee 那一趟；readable 目标没有包，取不到就该在这一行炸。
+      keyVersion: manifest.package?.keyVersion ?? (() => { throw new Error('e2ee fixture requires a package'); })(),
+      payloadKeyVersion: manifest.targetPayloadKeyVersion ?? (() => { throw new Error('e2ee fixture requires a target generation'); })(),
       expectedLatestSeq: manifest.expectedLatestSeq,
       expectedOperationCount: manifest.expectedOperationCount,
       expectedPayloadBytes: manifest.expectedPayloadBytes,
@@ -387,6 +390,7 @@ describe('vault payload migration orchestration', () => {
       async uploadChunk() { throw new Error('unexpected chunk'); },
       async status(requestId) { statusRequestId = requestId; return publishedFor({
         requestId: firstRequestId,
+        targetMode: 'e2ee',
         expectedKeyVersion: 1,
         expectedLatestSeq: 0,
         targetPayloadKeyVersion: 2,
@@ -423,6 +427,7 @@ describe('vault payload migration orchestration', () => {
     const scope = 'scope-crash-mismatched-status';
     const priorManifest: VaultKeyMigrationManifest = {
       requestId: firstRequestId,
+      targetMode: 'e2ee',
       expectedKeyVersion: 1,
       expectedLatestSeq: 0,
       targetPayloadKeyVersion: 2,
