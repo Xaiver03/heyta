@@ -214,6 +214,8 @@ test('three devices recover, rotate root, and rebuild tasks from the migrated se
     //    记过的那个假绿）。开→点→**关**：不关的话下一张图拍的是设置浮层，
     //    而不是它声称在量的那台暗色应用（§6.2 规定一：图里得真是那件事）。
     await openSettingsSheet(c.page);
+    // 主题开关住在「外观」节；本页之前停在同步节，浮层会记着那一节 ⇒ 先切回来。
+    await c.page.locator('[aria-controls="settings-group-appearance"]').click();
     await c.page.getByTestId('theme-toggle').click();
     await closeSyncSettings(c.page);
     await shot(c.page, 'pg-05-new-device-after-rotation-dark');

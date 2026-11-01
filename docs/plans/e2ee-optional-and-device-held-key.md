@@ -702,3 +702,20 @@ spec 随后重新登录拿 `signedIn.token` 再建 C；C 的 `refreshFromRemote`
 | `ai-egress`：习惯输入框 placeholder 找不到 | 与加密无关的习惯面板漂移 |
 | `vault-journey:457` legacy 历史：上传历史密文 **400** | **正确行为**：新账号默认明文，服务端拒收密文（`PLAINTEXT_REQUIRED`）。这条用例的前提"账号已有口令时代的密文"现在没法从 UI 造出来 —— 它需要一个 TEST_MODE 的"把账号设成 e2ee"测试钩子，属 e2e 夹具补件 |
 | `conflict-dialog` / `three devices` | 待逐条定位（同为尺子老化，未验） |
+
+### 12.9 真浏览器读数：8 红 → **1 红 / 7 绿**
+
+这一轮的三个动作，每个都对应一条具体的尺子老化：
+
+| 修的 | 症状 | 做法 |
+|---|---|---|
+| legacy 旅程 | 上传口令时代密文被 **400 `PLAINTEXT_REQUIRED`**（这是**正确行为**：新账号默认明文） | 加 `POST /api/test/payload-mode`（仅 TEST_MODE）把账号摆成 e2ee，入口回到「创建加密数据钥匙」（e2ee + 无包，不是"明文→加密"） |
+| `conflict-dialog` | 还在走旧「创建钥匙」 | 改成两段式开启 |
+| `three devices` | 在同步节里点 `theme-toggle` | 主题在外观节：先点 `aria-controls="settings-group-appearance"` |
+
+**剩余 1 条**：`ai-egress` 在「习惯」视图里找不到 `新习惯，例如「喝水」` 那个输入框
+（`web.habits.addPlaceholder` 词条仍在、组件仍在用）。**与加密无关**，
+属习惯视图的导航/渲染漂移，未定位。
+
+⚠️ 过程事故照实记：第一次修 legacy 时替换串写得太泛，**误改了第一条测试的入口**；
+`git checkout` 恢复后改成"按 legacy 测试块切片"重做，才只动那一处。
