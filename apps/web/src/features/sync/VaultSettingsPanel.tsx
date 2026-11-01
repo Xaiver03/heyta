@@ -4,6 +4,7 @@ import { deviceRevocationUsesModalCommitment } from './deviceRevocationDanger.js
 import { FormField } from '../../lib/form/FormField.js';
 import { SettingsInfoTip } from '../settings/SettingsInfoTip.js';
 import { useI18n } from '@heyta/i18n';
+import { createVaultPayloadCipher } from '@heyta/sync-client';
 import {
   HostedDeviceManagementError,
   VaultSessionError,
@@ -14,7 +15,27 @@ import {
   type HostedSyncDevice,
   type VaultKeySession,
 } from '@heyta/app-host';
-import { cancelWebVaultRootRotation, confirmWebVaultRootRotation, getWebVaultRemote, getWebVaultSession } from '../../lib/vault-session.js';
+import {
+  cancelWebVaultRootRotation,
+  confirmWebVaultRootRotation,
+  getWebVaultRemote,
+  getWebVaultSession,
+  lockWebVaultSession,
+  rememberCurrentWebVaultRoot,
+} from '../../lib/vault-session.js';
+import {
+  createVaultKeyMigrationRemote,
+  createVaultMigrationInventorySource,
+  disableVaultPayloadEncryption,
+  enableVaultPayloadEncryption,
+  readRemotePayloadMode,
+} from '@heyta/app-host';
+import { EncryptionModeSection } from './EncryptionModeSection.js';
+import {
+  readVaultKeyPlacement,
+  writeVaultKeyPlacement,
+  type VaultKeyPlacement,
+} from '../../lib/vault-root-preference.js';
 import { useSyncStore } from './store.js';
 import { SettingsNotice } from '../settings/SettingsNotice.js';
 
@@ -272,6 +293,114 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
     }
   };
 
+  const [payloadMode, setPayloadMode] = useState<'e2ee' | 'plain'>('e2ee');
+  const [encryptionBusy, setEncryptionBusy] = useState(false);
+  const [keyPlacement, setKeyPlacement] = useState<VaultKeyPlacement>(() => readVaultKeyPlacement());
+  const [encryptionProgress, setEncryptionProgress] = useState<{ completed: number; total: number }>();
+
+  // 模式是**服务端事实**，不是本地偏好：读失败按 e2ee（写错方向的代价不对称）。
+  useEffect(() => {
+    let cancelled = false;
+    if (sync.baseUrl.trim() === '' || sync.token === undefined) return undefined;
+    void readRemotePayloadMode({ baseUrl: sync.baseUrl, token: sync.token })
+      .then((mode) => { if (!cancelled) setPayloadMode(mode); })
+      .catch(() => { /* fail-closed 已在读取层处理 */ });
+    return () => { cancelled = true; };
+  }, [sync.baseUrl, sync.token, revision]);
+
+  const disableEncryption = async (): Promise<void> => {
+    if (sync.baseUrl.trim() === '' || sync.token === undefined) {
+      setError('web.sync.vault.errorMismatch');
+      return;
+    }
+    setEncryptionBusy(true);
+    setEncryptionProgress(undefined);
+    try {
+      const current = await getWebVaultSession(sync.accountId ?? '', sync.baseUrl, async () => sync.token);
+      const cipher = await current.getPayloadCipher();
+      const keyPackage = current.keyPackage;
+      if (cipher === undefined || keyPackage === undefined) {
+        setError('web.sync.vault.errorMismatch');
+        return;
+      }
+      const remoteOptions = { baseUrl: sync.baseUrl, getToken: async () => sync.token };
+      await disableVaultPayloadEncryption({
+        inventory: createVaultMigrationInventorySource(remoteOptions),
+        remote: createVaultKeyMigrationRemote(remoteOptions),
+        expectedKeyVersion: keyPackage.keyVersion,
+        requestId: `turnoff_${String(Date.now())}_${Math.random().toString(36).slice(2, 10)}`,
+        decrypt: async (ciphertext, operation) => cipher.decrypt(ciphertext, {
+          id: operation.id,
+          clientId: operation.clientId,
+          actionType: operation.actionType,
+          opType: operation.opType,
+          entityType: operation.entityType,
+          ...(operation.entityId === undefined ? {} : { entityId: operation.entityId }),
+          ...(operation.entityIds === undefined ? {} : { entityIds: operation.entityIds }),
+          timestamp: operation.timestamp,
+          schemaVersion: operation.schemaVersion,
+        }),
+        onProgress: setEncryptionProgress,
+      });
+      // 服务端已经翻成明文：本地这把 key 从此没有对应的包，清掉并翻模式。
+      lockWebVaultSession();
+      setPayloadMode('plain');
+      setRevision((value) => value + 1);
+    } finally {
+      setEncryptionBusy(false);
+      setEncryptionProgress(undefined);
+    }
+  };
+
+  // 开启方向第一段产出的 pending（含一次性恢复码）必须留到第二段用，但它不落盘。
+  const pendingReEncryption = useRef<Awaited<ReturnType<Awaited<ReturnType<typeof getWebVaultSession>>['beginCreation']>> | undefined>(undefined);
+
+  const beginReEncryption = async (passphrase: string): Promise<{ recoveryCode: string }> => {
+    const current = await getWebVaultSession(sync.accountId ?? '', sync.baseUrl, async () => sync.token);
+    const pending = await current.beginCreation(passphrase);
+    pendingReEncryption.current = pending;
+    return { recoveryCode: pending.recoveryCode };
+  };
+
+  const confirmReEncryption = async (enteredRecoveryCode: string): Promise<void> => {
+    const pending = pendingReEncryption.current;
+    if (pending === undefined) throw new Error('No pending re-encryption');
+    if (sync.baseUrl.trim() === '' || sync.token === undefined) throw new Error('Sync credentials unavailable');
+    const current = await getWebVaultSession(sync.accountId ?? '', sync.baseUrl, async () => sync.token);
+    const remoteOptions = { baseUrl: sync.baseUrl, getToken: async () => sync.token as string };
+    setEncryptionBusy(true);
+    try {
+      await current.confirmAndMigrateReEncryption(pending, enteredRecoveryCode, async (input) => {
+        const cipher = createVaultPayloadCipher({ current: { keyVersion: 1, rootKey: input.targetRootKey } });
+        await enableVaultPayloadEncryption({
+          inventory: createVaultMigrationInventorySource(remoteOptions),
+          remote: createVaultKeyMigrationRemote(remoteOptions),
+          package: input.targetPackage,
+          requestId: `turnon_${String(Date.now())}_${Math.random().toString(36).slice(2, 10)}`,
+          encrypt: async (plaintext, operation) => cipher.encrypt(plaintext, {
+            id: operation.id,
+            clientId: operation.clientId,
+            actionType: operation.actionType,
+            opType: operation.opType,
+            entityType: operation.entityType,
+            ...(operation.entityId === undefined ? {} : { entityId: operation.entityId }),
+            ...(operation.entityIds === undefined ? {} : { entityIds: operation.entityIds }),
+            timestamp: operation.timestamp,
+            schemaVersion: operation.schemaVersion,
+          }),
+          onProgress: setEncryptionProgress,
+        });
+        return { keyVersion: 1, payloadKeyVersion: 1 };
+      });
+      pendingReEncryption.current = undefined;
+      setPayloadMode('e2ee');
+      setRevision((value) => value + 1);
+    } finally {
+      setEncryptionBusy(false);
+      setEncryptionProgress(undefined);
+    }
+  };
+
   const remote = session === undefined || sync.baseUrl === '' || sync.token === undefined
     ? undefined
     : getWebVaultRemote(sync.baseUrl, async () => sync.token);
@@ -286,6 +415,23 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
       data-testid="vault-settings"
       className="ht-settings ht-settings__vault"
     >
+
+      <EncryptionModeSection
+        mode={payloadMode}
+        busy={encryptionBusy}
+        {...(encryptionProgress === undefined ? {} : { progress: encryptionProgress })}
+        onDisable={disableEncryption}
+        enable={{ begin: beginReEncryption, confirm: confirmReEncryption }}
+        keyPlacement={{
+          value: keyPlacement,
+          onChange: (next) => {
+            writeVaultKeyPlacement(next);
+            setKeyPlacement(next);
+            // 切到"每次都要输"立刻把已记住的那份清掉，不留到下次刷新才生效。
+            if (next === 'ask') lockWebVaultSession();
+          },
+        }}
+      />
       <h3 id="vault-settings-title" className="ht-settings__h3 ht-type-row-title">
         {t('web.sync.vault.title')}
         <SettingsInfoTip
@@ -373,7 +519,13 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
         </div>
       ) : null}
 
-      {!loading && session !== undefined && !hasPackage && pending === undefined ? (
+      {/*
+        🔴 ADR-0080：明文模式（readable）下**不许**走这条路。
+        这里只 `beginCreation` + 发布包、**不迁移载荷**，而服务端在"历史非空 + 新建包"
+        时会把世代留成 null —— 结果是"有包、但云上还是明文"，用户却以为加密开了。
+        明文 → 加密必须走整库重加密那条入口（`encryption-mode-section` 的 enable）。
+      */}
+      {!loading && session !== undefined && !hasPackage && pending === undefined && payloadMode === 'e2ee' ? (
         <div data-testid="vault-create-form" className="ht-settings__section">
           <strong>{t('web.sync.vault.createTitle')}</strong>
           <FormField id="vault-create-passphrase" label={t('web.sync.vault.passphrase')}>
@@ -425,6 +577,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
           <div className="ht-settings__actions">
             <button type="button" className="ht-btn ht-btn--primary" data-testid="vault-unlock" disabled={busy || passphrase.length === 0} onClick={() => void run(async () => {
               await session.unlockWithPassphrase(passphrase);
+              rememberCurrentWebVaultRoot();
               const restored = session.getPendingRootRotation();
               if (restored !== undefined) {
                 setPending(restored);
@@ -441,6 +594,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
           </FormField>
           <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-unlock-recovery" disabled={busy || recoveryCode.length === 0} onClick={() => void run(async () => {
             await session.unlockWithRecoveryCode(recoveryCode);
+            rememberCurrentWebVaultRoot();
             const restored = session.getPendingRootRotation();
             if (restored !== undefined) {
               setPending(restored);
@@ -552,7 +706,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
             {session.requiresRecoveryRotation ? t('web.sync.vault.recoveryRotationRequired') : t('web.sync.vault.ready')}
           </p>
           <div className="ht-settings__actions">
-            <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-lock" onClick={() => { session.lock(); setRevision((value) => value + 1); }}>
+            <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-lock" onClick={() => { lockWebVaultSession(); setRevision((value) => value + 1); }}>
               {t('web.sync.vault.lock')}
             </button>
           </div>
