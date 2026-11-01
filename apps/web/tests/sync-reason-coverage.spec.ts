@@ -63,6 +63,7 @@ const EXPECTED: Record<SyncFailureReason, SyncFailureMessageKey | undefined> = {
   'remote-version-unavailable': 'common.sync.error.remoteVersionUnavailable',
   'undecryptable-ops': 'common.sync.error.undecryptableOps',
   'undecryptable-page': 'common.sync.error.undecryptablePage',
+  'payload-mode-mismatch': 'common.sync.error.payloadModeMismatch',
   'upload-rejected': 'common.sync.error.uploadRejected',
   'unauthorized': 'common.sync.error.unauthorized',
   // 🔴 G-12：被本机拦下、**一个请求都没发**。这句绝不能复用上面任何一句 ——
@@ -131,7 +132,7 @@ describe('同步失败原因的词条覆盖（compiler + 两份词条表 + 句�
   it('表里登记的成员数与联合的成员数对得上（防止两边各长一半）', () => {
     // 这条断言的**唯一价值**是把"总共数了几个"印出来：上面几条都是循环，
     // 循环体一条没跑也能全绿（§7 第 50 条那一类）。这里给出总数。
-    expect(REASONS.length, 'EXPECTED 表的成员数').toBe(13);
-    expect(WITH_KEY.length).toBe(12);
+    expect(REASONS.length, 'EXPECTED 表的成员数').toBe(14);
+    expect(WITH_KEY.length).toBe(13);
   });
 });

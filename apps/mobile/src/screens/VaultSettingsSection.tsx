@@ -101,7 +101,9 @@ export function VaultSettingsSection({
   const [pendingCode, setPendingCode] = useState('');
   const [pending, setPending] = useState<PendingVaultCreation>();
   const [pendingAction, setPendingAction] = useState<PendingAction>();
-  const [rememberUnlock, setRememberUnlock] = useState(false);
+  // ADR-0080 §5.4：**默认由这台设备持有 root** —— 口令只在加设备 / 恢复 / 轮换时出现。
+  // 用户仍然可以显式关掉（那时每次冷启动都要重输）；登出 fence 的语义一个字没动。
+  const [rememberUnlock, setRememberUnlock] = useState(true);
   const [revision, setRevision] = useState(0);
   const [migrationProgress, setMigrationProgress] = useState<{ completed: number; total: number }>();
   const [devices, setDevices] = useState<readonly HostedSyncDevice[]>([]);
@@ -134,7 +136,7 @@ export function VaultSettingsSection({
     setPending(undefined);
     setPendingAction(undefined);
     setError(undefined);
-    setRememberUnlock(false);
+    setRememberUnlock(true);
     setLegacyPassphrase('');
     setMigrationProgress(undefined);
     if (scope === undefined || accountId === undefined || accountId.trim() === '' || serverUrl === undefined) {

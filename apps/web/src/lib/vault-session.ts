@@ -25,6 +25,9 @@ import { createWebAuthFetch } from './central-fetch.js';
 
 const DB_NAME = 'heyta-vault';
 
+import { clearSessionVaultRoot, readSessionVaultRoot, writeSessionVaultRoot } from './vault-root-cache';
+import { readVaultKeyPlacement } from './vault-root-preference';
+
 let storePromise: ReturnType<typeof createVaultKeyPackageStore> | undefined;
 let adapterPromise: Promise<IndexedDbAdapter> | undefined;
 let session: VaultKeySession | undefined;
@@ -112,6 +115,24 @@ export async function getWebVaultSession(
       sessionScopeKey = key;
       sessionBindingKey = binding;
       created = true;
+      // ADR-0080：这台设备记住过 root 就直接解锁 —— 刷新之后不该再要一次口令。
+      // 解不开（换过口令/换过 root）就把缓存清掉，退回"请解锁"，不猜。
+      const remembered = readVaultKeyPlacement() === 'ask'
+        ? undefined
+        : readSessionVaultRoot({ accountId: normalizedAccountId, serverOrigin: origin });
+      if (remembered === undefined && readVaultKeyPlacement() === 'ask') {
+        // 从"设备"切到"每次都要输"之后，旧的那份必须真的消失，而不是留着等下次。
+        clearSessionVaultRoot({ accountId: normalizedAccountId, serverOrigin: origin });
+      }
+      if (remembered !== undefined) {
+        try {
+          nextSession.unlockWithRootKey(remembered);
+        } catch {
+          clearSessionVaultRoot({ accountId: normalizedAccountId, serverOrigin: origin });
+        } finally {
+          remembered.fill(0);
+        }
+      }
     }
     const epoch = sessionEpoch;
     if (created && getToken !== undefined) {
@@ -135,8 +156,46 @@ export async function getWebVaultSession(
   }
 }
 
+/**
+ * 成功解锁之后把 root 记进这个标签页（ADR-0080 §5.4）。
+ *
+ * 恢复码解锁也记：它同样证明"这台设备现在是可信的"。但**轮换要求未满足**
+ * （`requiresRecoveryRotation`）时不记 —— 那时旧 root 马上就要作废。
+ */
+export function rememberCurrentWebVaultRoot(): void {
+  if (session === undefined || sessionScopeKey === undefined) return;
+  if (session.requiresRecoveryRotation) return;
+  // 第二个轴（ADR-0080 §5.5）：用户选了"每次都要输"就**不写**这把钥匙。
+  if (readVaultKeyPlacement() === 'ask') return;
+  const [accountId, serverOrigin] = sessionScopeKey.split('\u0000');
+  if (accountId === undefined || serverOrigin === undefined) return;
+  const root = session.copyUnlockedRootKey();
+  try {
+    writeSessionVaultRoot({ accountId, serverOrigin }, root);
+  } finally {
+    root.fill(0);
+  }
+}
+
+/** 显式锁定：清掉这台设备记住的 root，然后锁会话。 */
+export function lockWebVaultSession(): void {
+  if (sessionScopeKey !== undefined) {
+    const [accountId, serverOrigin] = sessionScopeKey.split('\u0000');
+    if (accountId !== undefined && serverOrigin !== undefined) {
+      clearSessionVaultRoot({ accountId, serverOrigin });
+    }
+  }
+  session?.lock();
+}
+
 /** Synchronously fence the web vault before credentials are cleared. */
 export function invalidateWebVaultSession(): void {
+  if (sessionScopeKey !== undefined) {
+    const [accountId, serverOrigin] = sessionScopeKey.split('\u0000');
+    if (accountId !== undefined && serverOrigin !== undefined) {
+      clearSessionVaultRoot({ accountId, serverOrigin });
+    }
+  }
   sessionEpoch += 1;
   session?.lock();
   session = undefined;

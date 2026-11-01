@@ -85,6 +85,7 @@ const KNOWN_FAILURE_REASON_COVERAGE = {
   'remote-version-unavailable': true,
   'undecryptable-ops': true,
   'undecryptable-page': true,
+  'payload-mode-mismatch': true,
   'upload-rejected': true,
   'unauthorized': true,
   'account-closed': true,

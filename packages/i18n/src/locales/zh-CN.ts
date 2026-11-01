@@ -92,6 +92,7 @@ export const zhCN = {
   'common.sync.error.remoteVersionUnavailable': '取不到对端版本，没法保留远端 —— 请选择保留本地',
   'common.sync.error.undecryptableOps': '有部分历史数据用当前口令解不开（可能是在另一个口令下写入的），已跳过 —— 其余数据已同步',
   'common.sync.error.undecryptablePage': '这一页数据全部用当前口令解不开，同步已暂停，没有跳过任何历史 —— 多半是端到端加密口令与服务器上的数据不匹配，请核对口令后重新同步',
+  'common.sync.error.payloadModeMismatch': '这个账号已经关掉了端到端加密，服务器上却还留着加密的历史数据 —— 同步已暂停，没有跳过任何内容。请在设置里重新开启端到端加密并完成迁移，或联系我们。',
   'common.sync.error.uploadRejected': '有改动被服务端拒绝了，它们不在云端 —— 已停止重传，请查看同步详情',
   /**
    * `reason === 'unauthorized'`：这枚访问令牌被服务端拒了（401/403）。
@@ -646,17 +647,8 @@ export const zhCN = {
   'web.settings.nav.data': '数据管理',
   'web.settings.nav.account': '账号与安全',
   'web.settings.nav.help': '关于与帮助',
-  // ── 每一节开头的一句话（2026-10-24）───────────────────────────────
-  // 🔴 设置页的毛病从来不是"控件不对"，而是**不知道这一页在管什么**：
-  //    七节里只有两节有一句说明。这句只回答"这一页管哪几件事"，不重复标题。
-  'web.settings.lead.profile': '昵称、头像与登录邮箱。只给自己看，不会公开。',
-  'web.settings.lead.subscription': '官方托管同步的订阅状态与续费。软件本体自托管永久免费。',
-  'web.settings.lead.appearance': '任务怎么显示、日期怎么写、详情栏收不收。',
-  'web.settings.lead.syncPrivacy': '数据出门去哪个服务器，以及出门前那几道闸。',
-  'web.settings.lead.ai': '云端 AI、自带端点与记忆偏好。',
-  'web.settings.lead.data': '备份、还原、从别的应用迁移。',
-  'web.settings.lead.account': '登录方式、已登录的设备、注销账号。',
-  'web.settings.lead.help': '帮助入口、价格与版本信息。',
+  // 每一节的"这一页管什么"不再有词条（2026-10-31）：内容面不再画节标题，
+  // 而侧栏标签已经把"你在哪一节"说完了。见 `App.tsx` 的 `isSettingsSectionId` 下那段注释。
   'web.settings.dataUx.backupTitle': '备份与还原',
   'web.settings.dataUx.backupLead': '保留一份完整的本地备份，也可以将它还原到一台空设备。',
   'web.settings.dataUx.migrationTitle': '从其他应用迁移',
@@ -710,31 +702,15 @@ export const zhCN = {
   'common.profile.avatar.remove': '移除头像',
   'common.profile.avatar.removed': '头像已移除',
   'common.profile.avatar.uploading': '正在上传…',
-  // 🔴 这条不是错误提示，是**产品事实**：钥匙从不落盘（`credential-storage.ts`），
-  // 所以刷新之后内存里没有它，而头像是用它加密的。没有它谁也解不开，包括我们自己。
-  //
-  // 🔴 2026-10-24 改短（原来是三行长句 + 指向「同步设置」，而登录态账号在那一节
-  //    里**看不到**口令输入框 —— `SyncSettingsPanel` 的 `!vaultMode` 分支）。
-  //    现在行里只说"现在缺什么 + 按哪个按钮"，为什么、钥匙去哪了，搬进标签旁的 `?`
-  //    （`…avatar.why`）。短句仍含「端到端加密口令」这几个字，因为读侧的
-  //    `undecryptable` 那句指的也是它，两处必须能对上。
-  'common.profile.avatar.needPassword': '端到端加密口令不在这台设备上 —— 解锁一次之后就能换头像。',
-  // `?` 里的那一段。**这不是装饰性 help text**：它要回答用户唯一真正会问的问题
-  // （"我就换个头像，凭什么要口令"），而且答案必须与实现一致：
-  // 头像在本机加密后上传，服务端只有密文；钥匙就是口令本身，且它不落盘。
-  'common.profile.avatar.whyLabel': '头像为什么要加密',
-  // ⚠️ 长度是**设计约束**：这枚气泡最宽 20rem，四行以内才像"提示"。
-  //    写满七行就是把刚才那句长解释从行里搬到气泡里，问题一点没解决。
-  'common.profile.avatar.why': '头像在你本机加密后才上传，服务端只存密文。钥匙就是你的口令，它从不落盘 —— 刷新或重开之后要重新解锁一次。',
-  'common.profile.avatar.unlock': '去解锁',
+  // 🔴 头像**不再**是加密载荷（ADR-0079，2026-11-01 绝对决策）：
+  // 它是基础资料，明文读写，不需要 E2EE 口令或 vault 解锁。
+  // 因此"为什么会话里没有口令""这台设备解不开头像"这两类文案整批下线 ——
+  // 留着它们就会继续告诉用户"改头像要密码学操作"。
   'common.profile.avatar.badType': '只支持 {types} 格式的图片。',
   'common.profile.avatar.tooBig': '图片压缩后仍超过 {max}，换一张小一点的。',
   'common.profile.avatar.failed': '头像没有传上去，请稍后再试。',
-  // 🔴 读侧的三句（已上传 / 解不开 / 暂时取不到）与写侧那句**不能合并**：
-  // 用户动作分别是"等着""去核对口令""稍后重试"。以前读侧只有 `failed` 一句，
-  // 于是"这台设备解不开"被说成"头像没有传上去"——界面在讲一件没发生过的事。
+  // 读侧的"暂时取不到"与写侧"没有传上去"仍是两件事：用户动作是"稍后重试" vs "重选一张"。
   'common.profile.avatar.uploaded': '头像已更新',
-  'common.profile.avatar.undecryptable': '这台设备解不开你的头像 —— 端到端加密口令不对。在「同步设置」里重新填一次口令即可。',
   'common.profile.avatar.unreadable': '暂时读不到头像，请稍后再试。',
   'common.profile.loadFailed': '个人信息没有读到，请稍后再试。',
   'common.profile.signInToEdit': '登录后可以编辑昵称和头像；本地任务与回顾无需登录。',
@@ -944,6 +920,31 @@ export const zhCN = {
   'web.settings.syncUx.encryptionTitle': '端到端加密',
   'web.settings.syncUx.encryptionHint': '登录密码只用于账号认证。下面的加密口令或数据钥匙，才用于解锁任务内容；服务端看不到它们的明文。',
   'web.sync.vault.title': '加密数据钥匙',
+  'web.sync.encryption.title': '同步加密',
+  'web.sync.encryption.on': '已开启：任务内容在你设备上加密后才上传，服务器读不到。',
+  'web.sync.encryption.off': '已关闭：任务内容以明文上传，服务器（包括我们）能读到。',
+  'web.sync.encryption.disable': '关闭端到端加密',
+  'web.sync.encryption.enable': '重新开启端到端加密',
+  'web.sync.encryption.confirmTitle': '关闭端到端加密？',
+  'web.sync.encryption.confirmIntro': '关闭之后，服务器能读到你的任务正文。具体后果：',
+  'web.sync.encryption.c1': '服务器（包括我们的运维与客服）能看到任务内容，不再只是密文。',
+  'web.sync.encryption.c2': '忘记口令不再等于丢数据 —— 我们可以协助你找回。',
+  'web.sync.encryption.c3': '已经进入每日备份与快照的明文收不回来，之后重新开启加密也不会让那些副本消失。',
+  'web.sync.encryption.confirmAction': '确认关闭',
+  'web.sync.encryption.cancel': '取消',
+  'web.sync.encryption.busy': '正在把你的历史解密重传，请保持应用打开…',
+  'web.sync.encryption.enablePassphrase': '设置一个新的端到端加密口令',
+  'web.sync.encryption.enableStart': '开始重新加密',
+  'web.sync.encryption.enableRecoveryHint': '把下面这串恢复码抄下来（只显示这一次）。忘记口令时，它是你唯一的退路。',
+  'web.sync.encryption.enableRecoveryInput': '重新输入恢复码以确认',
+  'web.sync.encryption.enableConfirm': '确认并开始重加密',
+  'web.sync.encryption.enableCancel': '取消',
+  'web.sync.encryption.enableMismatch': '恢复码不匹配，请重新输入。',
+  'web.sync.encryption.enableRunning': '正在把你的历史重新加密，请保持应用打开…',
+  'web.sync.encryption.placementTitle': '钥匙放在哪',
+  'web.sync.encryption.placementDevice': '这台设备（推荐）—— 加新设备或重装才需要口令',
+  'web.sync.encryption.placementAsk': '每次都要输 —— 刷新或重开都要输入口令',
+  'web.sync.encryption.placementHint': '这一项只决定你要不要每次输口令，不改变"谁能读"—— 加密开着的就一直是密文。',
   'web.sync.vault.description': '这把钥匙用于解锁已同步的数据。它与登录密码分开，绝不会保存在浏览器里。',
   'web.sync.devices.title': '已连接设备',
   'web.sync.devices.description': '撤销会让这个账号的所有设备（包括当前设备）退出登录。设备离线时不会被远程擦除；重新登录后，请在可信设备上轮换数据密钥并迁移保留的密文。',
@@ -4364,9 +4365,9 @@ export const zhCN = {
   'site.integrations.title': '数据在你手里',
   'site.integrations.lede': '多数工具默认把你的数据存在他们的服务器上。heyta 反过来：**数据在你手里**，我们只在你允许时碰它。这一页讲这种差别具体落在哪。',
   'site.integrations.e2ee.title': '端到端加密同步',
-  'site.integrations.e2ee.body': '任务在你的设备上加密之后才上传，服务器只经手密文。所以服务器上**不存在**一份可读的任务库 —— 就算有人拿到，也只是一串乱码。',
-  'site.integrations.e2ee.item.ingress': '服务器只收密文 —— 明文一律拒绝。这不是设置项，是写死的',
-  'site.integrations.e2ee.item.keys': '解密钥匙留在你的设备上。设置数据钥匙后可用保存的恢复码解锁；口令与恢复码都丢失时，服务端无法替你解密',
+  'site.integrations.e2ee.body': '任务在你的设备上加密之后才上传，服务器只经手密文。所以**默认情况下**服务器上保存的只是一串乱码，而不是可读的任务库。你可以在设置里关掉加密，那时服务器就能读到你任务的正文。',
+  'site.integrations.e2ee.item.ingress': '服务器默认只收密文 —— 明文一律拒绝。但这是**默认值，不是写死的**：你在设置里关掉加密之后，服务端就只收明文',
+  'site.integrations.e2ee.item.keys': '解密钥匙默认留在你的设备上（这台设备会记住它，你不用每次输）。加新设备或恢复时才需要口令或恢复码；两者都丢了，服务端无法替你解密',
   'site.integrations.selfhost.title': '自建服务器，永久免费',
   'site.integrations.selfhost.body': '同步服务器可以完整跑在你自己的机器上：一条 docker compose 起全套，数据落在你自己的磁盘。不产生费用，也不需要经过我们同意。',
   'site.integrations.selfhost.item.compose': '一条命令起全套服务，数据落在你自己的磁盘上',
