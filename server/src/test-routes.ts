@@ -31,6 +31,43 @@ interface MintLoginLinkBody {
 
 export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
   /**
+   * 把某个账号的载荷模式**直接设成指定值**（仅 TEST_MODE）。
+   *
+   * 为什么必须有它：ADR-0081 之后新账号默认是 `readable`，而"账号上已经有口令时代的
+   * 密文"这个前提（legacy 迁移那类旅程）**没法再从界面造出来** —— 服务端会按设计
+   * 拒收密文（`PLAINTEXT_REQUIRED`）。夹具需要一个能直接摆放前置状态的钩子，
+   * 而不是让产品为了测试少一道闸。
+   *
+   * 🔴 只在 TEST_MODE 注册（与 `/create-user` 同一条边界）；它不写 op、不写密钥包，
+   * 只改 `user_sync_state.payload_mode`。
+   */
+  fastify.post<{ Body: { userId: number; mode: 'e2ee' | 'readable' } }>(
+    '/payload-mode',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['userId', 'mode'],
+          properties: {
+            userId: { type: 'number' },
+            mode: { type: 'string', enum: ['e2ee', 'readable'] },
+          },
+        },
+      },
+      config: { rateLimit: false },
+    },
+    async (request, reply) => {
+      const { userId, mode } = request.body;
+      await prisma.userSyncState.upsert({
+        where: { userId },
+        create: { userId, lastSeq: 0, payloadMode: mode },
+        update: { payloadMode: mode },
+      });
+      return reply.send({ userId, mode });
+    },
+  );
+
+  /**
    * Create a test user with auto-verification.
    * Returns a JWT token immediately without email verification.
    */
