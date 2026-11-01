@@ -89,9 +89,12 @@ spec_for() {
     calendar-day-time) echo calendar-day.spec.ts ;;
     # 15:5x 加：`--all` 现在把 profile-panel 也报成过期（钉在 39032107，而 HEAD 之后
     # profile 面的判据源码动了）。映射**不是按名字猜的**：
-    #   grep -rln 'profile-panel' e2e/tests/*.ts  →  只有 profile-avatar-e2ee.spec.ts，
-    # 它第 58 行的 SHOT() 写的就是 `../apps/web/evidence/profile-panel/<name>.png`。
-    profile-panel) echo profile-avatar-e2ee.spec.ts ;;
+    #   grep -rln 'evidence/profile-panel' e2e/tests/*.ts
+    # 🔴 2026-11-01 改：产出方从 `profile-avatar-e2ee.spec.ts` 换成
+    #    `profile-avatar-plaintext.spec.ts` —— ADR-0079 把头像改成明文基础资料，
+    #    旧 spec 连同它拍的 `r15b-*` 四张一起删了。映射不改就会拿一条**不存在的 spec**
+    #    去对账，臂 h 报 `未认领`（读起来像"证据目录覆盖不全"，其实是尺子指着空地）。
+    profile-panel) echo profile-avatar-plaintext.spec.ts ;;
     *) echo "" ;;
   esac
 }
