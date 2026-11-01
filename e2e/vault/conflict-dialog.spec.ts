@@ -82,11 +82,18 @@ async function closeSettings(page: Page): Promise<void> {
 /** A 那台建库（建口令 + 确认恢复码），返回口令本身 —— B 那台用同一把口令解锁。 */
 async function createVault(page: Page): Promise<void> {
   await openSyncSettings(page);
-  await fillVaultSecret(page.getByTestId('vault-create-passphrase'), passphrase);
-  await page.getByTestId('vault-create').click();
-  const code = (await page.getByTestId('vault-recovery-display').textContent())!;
-  await fillVaultSecret(page.getByTestId('vault-recovery-confirm'), code);
-  await page.getByTestId('vault-publish').click();
+  /*
+   * ADR-0081：新账号默认明文，加密是**显式开启**（两段：设口令 → 抄/回填恢复码）。
+   * 旧的「创建数据钥匙」入口在明文模式下故意不可见。
+   */
+  await page.getByTestId('encryption-mode-enable').click();
+  await fillVaultSecret(page.getByTestId('encryption-enable-passphrase'), passphrase);
+  await page.getByTestId('encryption-enable-start').click();
+  const display = page.getByTestId('encryption-enable-recovery-code');
+  await expect(display).toBeVisible();
+  const code = ((await display.textContent()) ?? '').trim();
+  await fillVaultSecret(page.getByTestId('encryption-enable-recovery'), code);
+  await page.getByTestId('encryption-enable-confirm').click();
   await expect(page.getByTestId('vault-ready')).toBeVisible();
   await closeSettings(page);
 }
