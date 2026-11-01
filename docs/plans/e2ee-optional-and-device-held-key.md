@@ -290,12 +290,12 @@ S5（独立，可并行）──────┴──► S6 ──► S7（与 S
 
 | 层 | 判据 | 归属 |
 |---|---|---|
-| 契约 | 无 `payloadMode` 的旧响应 ⇒ 读成 `e2ee` | S0 |
+| 契约 | 无 `payloadMode` 的旧响应 ⇒ 读成 `e2ee` ⚠️ **已被 ADR-0081 改写**："无行" ⇒ 明文；"读失败/值不认识" ⇒ 仍 `e2ee`（见 §13.7） | S0 |
 | 闸门 | 四格表逐格；拒绝零落库 | S1 |
 | 迁移 | 关闭后新设备无秘密读全量；包已删；结束态字段正确 | S2 |
 | 迁移 | 打开后旧凭据解不开、新凭据可读；世代递增 | S3 |
 | 客户端 | 模式错配必须被拒；整库同模式 | S4 |
-| 钥匙 | 冷启动免输（Android/iOS/macOS）；web reload 免输；logout 仍锁 | S5 |
+| 钥匙 | 冷启动免输（Android/iOS/macOS）；web reload 免输；logout 仍锁 ⚠️ **macOS 那半没有做到，ADR-0080 §十一 记下了这件事**（不撤回判据，只记事实）：三端原生钥匙串都还没有，见 §13.7 | S5 |
 | 界面 | 确认浮层列全三条后果 | S6 |
 | 口径 | 绝对句 0 命中；`check:legal-*` 绿 | S7 |
 
@@ -913,3 +913,49 @@ node scripts/build-harmony-rnohjs-windows.mjs [--pull] [--dry-run]
 `scripts/verify-harmony-rnoh.sh` / `-rnoh-js.sh` 写死 `/Applications/DevEco-Studio.app/Contents`，
 **在这台 Mac 上从来跑不了**（那里没有 DevEco）。Windows 版是它们的移植，判据一条没改。
 要不要删掉 macOS 版是另一个决定（它们记录了判据的来处），本轮**不动**。
+
+### 13.7 判据表与 ADR 的对齐（2026-11-02）
+
+目标 (A) 里有一句"文档口径与 ADR-0080/ADR-0081 一致"。§5 那张**判据总表**有两行是反转前的写法，
+不改的话，它会在下一次被当成现行判据引用：
+
+| 判据行 | 原写法 | 现在按什么算 | 谁改的 |
+|---|---|---|---|
+| 契约 | 无 `payloadMode` 的旧响应 ⇒ 读成 `e2ee` | **无行 ⇒ 明文**（新账号默认）；**读失败/值不认识 ⇒ 仍 `e2ee`** | ADR-0081（取代 ADR-0080 §一 第 1 条） |
+| 钥匙 | 冷启动免输（Android/iOS/**macOS**）；web reload 免输；logout 仍锁 | **判据不变，只是没做到**：ADR-0080 §十一 记的现状是"三端的原生钥匙串都还没有"。已做到的是 Web reload 免输（6 条单测）与移动端宿主接线；**macOS/Windows/Linux 与移动端设备腿都是欠账**，不是被撤回的要求 | ADR-0080 §十一（只记事实，不改判据） |
+
+代码与 ADR 一致，**是这张表落后于两者**。两行都加了行内注记，指向本节 —— ADR 本身不可改，
+所以注记只能落在计划里。
+
+⚠️ 本节第一版把钥匙那行写成"macOS 那半已被 ADR-0080 §九 附记撤回"，也是**错的**：
+ADR 的 §十一（"落地后事实，只追加，不改上面任何结论"）**只记录现状**，没有撤回任何判据。
+"没做到"和"不要求了"是两件事，混起来就是把欠账写成已销账。
+
+### 13.8 S5 的移动端设备腿：今天的可复跑读数与它缺什么
+
+`pnpm verify:android-vault-storage`（`scripts/verify-android-vault-storage.sh`）就是这把尺子：
+它装 Debug + 测试 APK，跑「账号隔离 → 分进程 seed/verify → **重启设备** → remove/clean」，
+Phase 之间靠 PID 分开，所以"进程内重跑"冒充不了持久化证据。
+
+2026-11-02 本轮实测（**没跑成，因为没设备**）：
+
+```
+$ adb devices -l
+List of devices attached
+                        # 空
+$ $ANDROID_HOME/emulator/emulator -list-avds
+                        # 空（0 个工作副本）
+$ ls $ANDROID_HOME/system-images
+No such file or directory
+```
+
+本轮一度出现一个 `127.0.0.1:5555` 的模拟器条目，脚本刚起步就变成 `device offline`，
+随后从 `adb devices` 里消失（无 qemu 进程、无 system-image）——**那不是可用设备**。
+
+解除条件（任一条即可）：
+1. 接一台真机（`adb devices` 出现 `device` 状态），然后
+   `HEYTA_ANDROID_SERIAL=<serial> pnpm verify:android-vault-storage`；
+2. 或装一个 system-image 并建一个 AVD（`sdkmanager "system-images;android-36;google_apis;x86_64"`
+   + `avdmanager create avd`），再跑同一条命令。
+
+⚠️ 两条都要先有**远端 gradle 能出 Debug + androidTest 两个 APK**——这一步不依赖设备，本轮没验。
