@@ -141,6 +141,10 @@ const zh = [
       },
       {
         kind: 'p',
+        text: '**端到端加密是默认值，不是不可更改的固有限制。** 用户可以在应用的同步设置里关闭它。关闭之后，本公司按普通云存储处理**内容数据**：能够读取，也能在法律法规要求时依法提供。关闭是一次整库迁移（历史数据一并转为明文），并且存在**不可撤回的窗口** —— 已经进入每日备份与快照的明文无法撤回，之后重新开启加密也不会使那些副本消失。应用在关闭前会逐条列明上述后果并要求用户确认。本条前述"无法读取"的表述，在用户关闭加密后不再适用。',
+      },
+      {
+        kind: 'p',
         text: '关于本地存储的保护范围，明确如下：**端到端加密适用于同步通道，不适用于用户设备上的本地存储。** 为支持离线读写及故障恢复，设备本地保存的数据为明文，并由设备锁屏、账户隔离及文件权限等系统安全措施提供保护。设备遗失且未设置锁屏，或解锁凭据被第三方取得，可能导致本地数据被访问。（桌面小组件生成的快照为 AES-256-GCM 密文。）',
       },
       {
@@ -509,6 +513,10 @@ const en = [
       {
         kind: 'callout',
         text: 'Accordingly, we cannot read task titles, list names or note text, but the metadata above can reveal the object type, object identifier, operation count, time and device identifier associated with an operation. These terms therefore do not make the broad statement that the server is unable to obtain any data.',
+      },
+      {
+        kind: 'p',
+        text: '**End-to-end encryption is the default, not an unchangeable property of the service.** Users can turn it off in the app\'s sync settings. Once it is off, we handle **content data** as an ordinary cloud storage provider: we can read it, and we will disclose it where the law requires. Turning it off performs a whole-history migration (existing data becomes plaintext too) and opens an **irreversible window** - plaintext already captured in daily backups and snapshots cannot be recalled, and turning encryption back on later will not remove those copies. The app lists these consequences item by item and asks the user to confirm before switching. The "we cannot read" statements above no longer apply once a user has turned encryption off.',
       },
       {
         kind: 'p',

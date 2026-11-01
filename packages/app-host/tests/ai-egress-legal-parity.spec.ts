@@ -75,7 +75,10 @@ function tableRows(headLiteral: string): { label: string; cell: string }[] {
   const block = DOC.slice(rowsAt, DOC.indexOf('\n        ],', rowsAt));
   const rows = [...block.matchAll(ROW)].map((m) => ({ label: m[1] as string, cell: m[2] as string }));
   // 🔴 阳性对照：分母。这一句坏了，下面所有"零违规"都什么都不是。
-  expect(rows, `那张表应当有 5 行，实际数出 ${String(rows.length)} 行`).toHaveLength(5);
+  // 6 行：四个 AI 功能 + 工具选择 + **自动收集（按规则抽取）**。
+  // 最后那一行是 2026-11 由"自动收集"那一批加进条款的（提交 06798bf3a），
+  // 本判据当时停在 5 行 —— 于是它红了两个星期，而红的原因不是条款错、是尺子旧了。
+  expect(rows, `那张表应当有 6 行，实际数出 ${String(rows.length)} 行`).toHaveLength(6);
   return rows;
 }
 
@@ -257,6 +260,33 @@ describe('🔴🔴 条款第三节的字段表 == 代码实际披露的 fields',
     expect(parseCell(String(enRows.find((r) => r.label === 'Tool selection')?.cell)).required).toContain('today');
   });
 
+  it('🔴 自动收集那一行：字段由规则勾选决定，这里只核"它明说了子集"与中英列清单同序', () => {
+    // ⚠️ **不假装核对字段集合**：这一档发出去的是用户在规则里勾选的那几列，
+    // 不存在一条固定的最小/最大集合可比（单元格里也没写成反引号字段名，是散文）。
+    // 真正管它的是服务端抽取闸门与 `check:legal-tools` 那套目录对账。
+    const zh = zhRows.find((r) => r.label.startsWith('自动收集'));
+    const en = enRows.find((r) => r.label.startsWith('Automatic capture'));
+    expect(zh, '中文表缺自动收集那一行').toBeDefined();
+    expect(en, '英文表缺自动收集那一行').toBeDefined();
+
+    expect(String(zh?.cell)).toContain('子集');
+    expect(String(en?.cell)).toContain('subset');
+
+    // 中英必须列出**同一组**可勾选列、且同序 —— 少一列就是"英文版少说一项"。
+    const ZH_COLUMNS = ['标题', '备注', '优先级', '清单', '截止日期', '开始日期', '时长'];
+    const EN_COLUMNS = ['title', 'note', 'priority', 'list', 'due date', 'start date', 'duration'];
+    const positions = (haystack: string, needles: readonly string[]): number[] =>
+      needles.map((needle) => {
+        const at = haystack.indexOf(needle);
+        expect(at, `这一列没出现在条款里：${needle}`).toBeGreaterThan(-1);
+        return at;
+      });
+    const zhPositions = positions(String(zh?.cell), ZH_COLUMNS);
+    const enPositions = positions(String(en?.cell), EN_COLUMNS);
+    expect([...zhPositions].sort((a, b) => a - b)).toEqual(zhPositions);
+    expect([...enPositions].sort((a, b) => a - b)).toEqual(enPositions);
+  });
+
   it('🔴 阳性对照：解析器自己认得"可选"（中英两种写法各一条）', () => {
     // 没有这一条，`OPTIONAL_WORD` 写坏（例如给中文加了 `\b`）会让**所有**字段
     // 落进 required，于是"必发字段 == 代码最小集合"整族变成假的比较对象。
@@ -277,6 +307,7 @@ describe('🔴🔴 条款第三节的字段表 == 代码实际披露的 fields',
       '优先级建议',
       '估时',
       '工具选择',
+      '自动收集（只在你为某条规则打开"由我们当场抽取"时）',
     ]);
     expect(enRows.map((r) => r.label)).toEqual([
       'One-line capture',
@@ -284,6 +315,7 @@ describe('🔴🔴 条款第三节的字段表 == 代码实际披露的 fields',
       'Prioritisation',
       'Duration estimate',
       'Tool selection',
+      'Automatic capture (only when you turn on "extract on our server" for a rule)',
     ]);
   });
 });

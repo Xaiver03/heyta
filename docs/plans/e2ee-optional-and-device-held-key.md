@@ -1,6 +1,6 @@
 # E2EE 可选 + 钥匙由设备持有：实施计划（ADR-0080）
 
-> 状态：**规划中**（待产品负责人确认后转「进行中」）
+> 状态：**进行中 · 阻塞**（S0–S7 代码与判据侧已收口；端到端与四端装机被外部条件挡住，见 §11）
 > 决策：[ADR-0080](../adr/0080-e2ee-is-optional-with-device-held-key.md)
 > 依据：[key-decisions](../agents/key-decisions.md)（2026-11-01 那条）、[db-migrations](../agents/db-migrations.md)、[overlay-feedback](../agents/overlay-feedback.md)、[ui-acceptance](../agents/ui-acceptance.md)
 
@@ -17,10 +17,10 @@ ADR-0080 定了"是什么"，本篇只定"按什么顺序做、每刀怎么证�
 | # | 事实 | 出处（现量） |
 |---|---|---|
 | 1 | 服务端**主动拒收明文**：`isPayloadEncrypted !== true` 或不是密文形状 ⇒ 拒，ops 与 snapshot 两条入口 | `server/src/sync/sync.routes.payload.ts:47-52`；调用点 `sync.routes.ops-handler.ts:139`、`sync.routes.snapshot-handler.ts:124` |
-| 2 | 客户端只有两种写法，**都是加密**：`'password'`（legacy）与 `'vault'` | `packages/sync-client/src/payload-cipher.ts:24-27` |
+| 2 | 客户端只有两种写法，**都是加密**：`'password'`（legacy）与 `'vault'` | `packages/sync-client/src/payload-cipher.ts:25-27` |
 | 3 | 无钥即停：`getPayloadCipher()` 拿不到 ⇒ `no-encryption-password`，**绝不降级明文** | `packages/sync-client/src/client.ts:794-810` |
 | 4 | 账号级世代在 `vault_key_packages.active_payload_key_version`；`null` = 还没做过首次迁移 | `server/prisma/schema.prisma:701-715` |
-| 5 | 迁移 staging 已有：`VaultKeyMigration` + chunk + staged operation，commit 是原子发布边界 | 同文件 `:717-750` |
+| 5 | 迁移 staging 已有：`VaultKeyMigration` + chunk + staged operation，commit 是原子发布边界；契约在 `vault-key-migration-contract.ts` | 同文件 `:717-750`、`packages/shared-schema/src/vault-key-migration-contract.ts` |
 | 6 | **每条 op 已自带 `isPayloadEncrypted`（默认 false）**，且 `conflict.ts` / `op-replay.ts` 会读它 | `schema.prisma:259`、`sync/conflict.ts:521-583`、`sync/op-replay.ts:160` |
 | 7 | 移动端已有 Keystore/Keychain，"记住解锁"是**显式 opt-in** | `docs/adr/0050` §移动端 OS 安全存储边界 |
 | 8 | 桌面钥匙串**只在 macOS 可用**（`/usr/bin/security -i`） | `apps/node-host/src/keychain-secret-store.ts:19-45,125` |
@@ -60,10 +60,10 @@ ADR-0080 定了"是什么"，本篇只定"按什么顺序做、每刀怎么证�
 
 | 改动 | 文件 |
 |---|---|
-| `user_sync_state` 加 `payload_mode`（`TEXT NOT NULL DEFAULT 'e2ee'`，CHECK 只允许两值） | `server/prisma/schema.prisma` + 新迁移 |
-| `VaultKeyMigration` 加 `target_mode`，并把两个 key 版本列改**可空** + CHECK 配对（`e2ee` 必须有世代、`readable` 必须没有） | 同上 + 新迁移 |
+| `user_sync_state` 加 `payload_mode`（`TEXT NOT NULL DEFAULT 'e2ee'`，CHECK 只允许两值） | `server/prisma/schema.prisma`、`server/prisma/migrations/20261101120000_add_payload_mode/` |
+| ⚠️ `VaultKeyMigration` 的 `target_mode` 与 key 列可空化**推后到 S2** —— 那是 S2 真正要用它的时候，S0 不先改结构 | 见 §3 S2 |
 | 读模式的**唯一**入口：`sync/services/` 里一个 `readPayloadMode(tx, userId)`，失败一律返回 `'e2ee'`（fail-closed） | `server/src/sync/services/` |
-| 契约：`GET /api/sync/key-package` 响应**只增可选** `payloadMode`（缺省按 `e2ee`） | `server/src/sync/sync.routes.ts` + `packages/shared-schema` 的线协议类型 |
+| 契约：`GET /api/sync/key-package` 响应**只增可选** `payloadMode`（缺省按 `e2ee`） | `server/src/sync/sync.routes.ts` + `packages/shared-schema/src/vault-key-contract.ts` |
 
 **判据**
 
@@ -72,6 +72,10 @@ ADR-0080 定了"是什么"，本篇只定"按什么顺序做、每刀怎么证�
 - 迁移：`pnpm check:migrations` 绿；`payload_mode` 对既有行回填 `e2ee`（开发阶段本就全 e2ee）。
 
 **可回滚**：是（列可留，代码不读）。
+
+**落地读数（2026-11-01）**：`server/tests/payload-mode.spec.ts` **5/5**；
+变异臂「把 fail-closed 改成 fail-open」⇒ **2 红**（未知值 + 读抛异常两格）。
+`check:migrations`、`check:schema-migration-drift`、shared-schema 11 文件 173 条 全绿。
 
 ---
 
@@ -99,6 +103,11 @@ ADR-0080 定了"是什么"，本篇只定"按什么顺序做、每刀怎么证�
 
 **可回滚**：是（模式恒为 `e2ee` 时与今天等价）。
 
+**落地读数（2026-11-01）**：`server/tests/payload-gate.spec.ts` **8/8**（四格纯函数表 +
+两条路由拒绝 + 一条 fail-closed）；变异臂「闸门两种都放行」⇒ **6 红**。
+回归：上传/操作/金库四套 **61/61**；`check:server-error-shape`、`check:safe-error-fallbacks`、
+`check:layering` 全绿。
+
 ---
 
 ### S2 · 关闭：整库解密重传
@@ -122,6 +131,14 @@ ADR-0080 定了"是什么"，本篇只定"按什么顺序做、每刀怎么证�
 - 并发：关闭期间另一台设备上传 ⇒ 被 `staleLatestSeq`/模式拒收，**不得**混进一条密文行。
 
 **可回滚**：❌ 不可。commit 之后数据已明文，撤回只能再走 S3。
+
+**落地读数（2026-11-01，真实 PostgreSQL 14）**：
+`tests/integration/payload-mode-migration.integration.spec.ts` **3/3**
+（关闭 → 明文/readable/包已删；重复关闭 ⇒ `wrong_payload_mode`；再打开 ⇒ 首次发包含：
+`keyVersion=1`、`payloadKeyVersion=1`、行重新标成已加密）。
+单元侧 `tests/payload-mode-migration.service.spec.ts` **7/7**，变异臂「发布时把
+`is_payload_encrypted` 写死成 TRUE」⇒ **1 红**。
+⚠️ **客户端那一半（读 `payloadMode`、切换入口）属于 S4**，本阶段只证服务端边界。
 
 ---
 
@@ -156,6 +173,20 @@ ADR-0080 定了"是什么"，本篇只定"按什么顺序做、每刀怎么证�
 | 宿主把服务端 `payloadMode` 传给 sync client；readable 时不构造 vault session | `packages/app-host/src/host.ts`、`sync-wiring.ts`、`vault-session.ts` |
 | **整库同模式断言**：读到与账号模式不符的行 ⇒ 结构化上报，不静默合并 | 同上 |
 
+**落地读数（2026-11-01）**：
+`packages/sync-client/tests/plain-payload-mode.spec.ts` **3/3**（明文上传写 `isPayloadEncrypted:false`
++ 明文 JSON；无钥可同步；读到密文行 ⇒ `payload-mode-mismatch` 且一条都不交给 op-log）。
+变异臂「把模式错配降级成普通 Error」⇒ **1 红**（原因会退回 `undecryptable-page`，
+那会叫明文账号的用户去"核对口令"——一个他根本没有的东西）。
+整套 `@heyta/sync-client` **174/174**。
+
+新增闭集成员 `payload-mode-mismatch` 的五处登记（这是本仓库"原因必须能翻成人话"的纪律）：
+`sync-client` 联合、`packages/ui/src/sync/model.ts` 映射、i18n 中英两句、
+`apps/web/tests/sync-reason-coverage.spec.ts` 表与计数、`apps/mobile/src/sync/status-text.ts` 见证表。
+
+⚠️ **宿主"按服务端模式选客户端"的接线留到 S6**：那一步依赖设置页拿到模式与开关，
+本阶段只证 `@heyta/app-host` 能把 `encryptionMode:'plain'` 原样透传（app-host 2070 条绿）。
+
 **判据**
 
 - 单测：三模式 × 有钥/无钥 × 行自带标志 的组合表。
@@ -175,6 +206,17 @@ ADR-0080 定了"是什么"，本篇只定"按什么顺序做、每刀怎么证�
 
 ⚠️ Web 那条要在文案里说清它挡的是服务器、不是本机浏览器（ADR-0080 §九 第 2 条）。
 
+**落地读数（2026-11-01）**
+
+| 面 | 状态 | 证据 |
+|---|---|---|
+| Web（含 macOS 壳里那套 `web-dist`） | ✅ 已落 | `apps/web/src/lib/vault-root-cache.ts` + `vault-session.ts` 的读/写/清三处接线；`tests/vault-root-cache.spec.ts` **6/6**，变异臂「换 `localStorage`」⇒ **1 红**（"一个字都不进 localStorage"那条）；面板回归 **7/7** |
+| Android / iOS | ⚠️ 默认值已改（`useState(true)`），**设备腿未验** | 需要当前源码的 Release 包跑"创建 vault → 冷启动免输"，本机没有该产物；不做声明 |
+| macOS / Windows / Linux 的 **原生**钥匙串 | ❌ 未做，且 macOS 不是"顺手接一下" | 现量：`grep -c vaultRootKeyStore apps/desktop/src/host.ts` = **0**、`apps/desktop-macos/.../HeytaMacApp.swift` = **0** —— 桌面壳根本没有这个端口。macOS 壳是 WKWebView 载 `web-dist`，要接到 `security`/Keychain 得先造一层 Swift↔JS 桥，那是一件独立工程 |
+
+🔴 因此 ADR-0080 §九 第 1 条要从"Windows/Linux 未实现"扩成"三端原生都未实现"，
+而 macOS 的理由是**壳里没有这个端口**，不是没来得及。
+
 ---
 
 ### S6 · 界面：两个轴 + 危险确认
@@ -183,6 +225,22 @@ ADR-0080 定了"是什么"，本篇只定"按什么顺序做、每刀怎么证�
 - 关闭走确认浮层，按 [overlay-feedback](../agents/overlay-feedback.md) 的"危险四档"定档，逐条列后果：
   ① 服务端能看到任务内容；② 忘记口令不再等于丢数据；③ 已进快照的明文收不回来。
 - 关闭按钮文案**不许**写"更安全/更私密"式比较，只写"谁能读"。
+
+**落地读数（2026-11-01，只到"宿主编排"这一层）**
+
+| 面 | 状态 | 证据 |
+|---|---|---|
+| 宿主按服务端模式选客户端 | ✅ | `packages/app-host/src/payload-mode-client.ts` + `host.ts` 在 `sync()`/`resolveConflict()` 前刷新；`tests/payload-mode-client.spec.ts` **6/6**；`tests/payload-mode-host.spec.ts` 用**真实 SQLite** 证明 readable 账号上传的是明文 JSON 且 `isPayloadEncrypted:false`。变异臂「忽略服务端模式」⇒ **1 红** |
+| 关闭编排（整库解密重传） | ✅ 库层 | `packages/app-host/src/payload-mode-migration.ts`；`tests/payload-mode-migration.spec.ts` **4/4**（begin 不带包/世代、翻页期间历史变了不 begin、解密失败不发布混合历史、没到 PUBLISHED 就报错）。变异臂「跳过解不开的 op」⇒ **1 红** |
+| 设置页"同步加密"那一格 + 危险确认 | ✅ **组件与判据已落，尚未挂进面板** | `apps/web/src/features/sync/EncryptionModeSection.tsx`：一个轴（加密开/关）+ 复用 `DangerConfirmDialog`；`tests/encryption-mode-section.spec.tsx` **7/7**（三格：开/关文案、点关闭先弹确认不执行、**三条后果逐条数**）。变异臂「删掉不可逆那条」⇒ **1 红**。`check:overlay` / `check:danger-confirm` 绿 |
+| 钥匙放在哪那一轴 | ✅ 已落 | `vault-root-preference.ts`（偏好只存 `device`/`ask` 两个字面量，**不含秘密**；读不到一律回默认 `device`）；`vault-session.ts` 在**写**与**读**两处都尊重它（选 `ask` 时既不写钥匙、也不用旧缓存自动解锁，并把旧的那份清掉）；面板切到 `ask` 时立刻 `lockWebVaultSession()`。判据：`vault-root-preference.spec.ts` **4/4** + 组件侧 **14/14**（含"不传就不画""加密=关时不画""aria-pressed 反映当前值"）。变异臂「明文模式也画这一行」⇒ **1 红** |
+| 宿主接线入口 | ✅ 已落 | `AppHost.getPayloadMode()` / `disablePayloadEncryption()`；后者**未解锁直接拒绝**（没有钥匙就没有能解密的路径），成功后翻模式缓存并作废会话 |
+| 挂进面板 | ✅ 已落 | `VaultSettingsPanel` 顶部渲染；web 侧直接调 `disableVaultPayloadEncryption` + 现有 inventory/remote 端口 |
+| 开启方向的**编排库层** | ✅ 已落 | `enableVaultPayloadEncryption`：起点版本 0 / 目标世代 1 / 包由迁移**携带**（先 PUT 会造出服务端不可表示的中间态）。`tests/payload-mode-migration.spec.ts` **8/8**；变异臂「删掉'起点已是密文'守卫」⇒ **1 红**（第一版测试没抓住 —— 因为经 JSON 分支也回同一个 code，改成断言具体句子后才咬住） |
+| 开启方向的**会话入口** | ✅ 已落 | `VaultKeySession.confirmAndMigrateReEncryption`：确认恢复码 → 用新 root 迁移 → 原子安装首包与世代 1；`currentPackage` 必须为空（有包走轮换那条）。`tests/vault-session.spec.ts` **20/20**；变异臂「世代校验放宽成 `<= 0`」⇒ **1 红** |
+| 开启方向的**宿主入口** | ✅ 已落 | `beginPayloadEncryption(passphrase)` / `confirmPayloadEncryption(pending, code, onProgress)`，与既有创建/轮换同形（两步：先抄恢复码）。app-host 相关 5 套 **61/61** |
+| 🔴 顺手堵掉一个**我引入的**风险 | ✅ 已修 | 明文模式下，面板里原有的「创建加密数据钥匙」入口只发包含、**不迁移载荷**；服务端在"历史非空 + 新建包"时会把世代留成 `null` ⇒ **有包、云上却还是明文**，而用户以为加密开了。已加 `payloadMode === 'e2ee'` 守卫。`tests/vault-settings-plain-mode.spec.tsx` **2/2**，变异臂「删掉那条件」⇒ **1 红** |
+| 开启方向的**界面** | ❌ 仍未画 | 它需要"输口令 + 抄/回填恢复码"两段表单，组件目前只有 `onEnable` 一个回调位。**不画按钮**的规矩不变 |
 
 **判据**：真浏览器 e2e（亮暗各一遍，按 [ui-acceptance](../agents/ui-acceptance.md) 真跑真看图）；
 `check:overlay` / `check:danger-confirm` 绿；确认浮层缺一条后果 ⇒ 断言红。
@@ -197,6 +255,17 @@ ADR-0080 定了"是什么"，本篇只定"按什么顺序做、每刀怎么证�
 | `packages/i18n` 的 `site.integrations.e2ee.*`、`site.docs.passphrase.*` | 加"这是默认值，可以关"；删"这不是设置项，是写死的" |
 | `apps/landing` 托管同步 §3 | "我们没有能力读取" → "默认没有；关闭加密后可以" |
 | `README.md` | 同上 |
+
+**落地读数（2026-11-01）**
+
+| 面 | 改法 | 判据 |
+|---|---|---|
+| `packages/i18n` 的 `site.integrations.e2ee.*` | `body` 改成"**默认**没有可读的那份，你可以在设置里关掉"；`item.ingress` 从"这不是设置项，是写死的"改成"这是**默认值，不是写死的**"；`item.keys` 改成"钥匙默认留在设备上，你不用每次输" | `@heyta/i18n` **30/30** |
+| `packages/legal` `terms.ts` | 第四条新增一段（中英各一）：**端到端加密是默认值，不是固有限制**；关闭按普通云存储处理、依法可提供；关闭是整库迁移且有**不可撤回窗口**；并明说"本条前述'无法读取'在用户关闭后不再适用" | `check:legal-closure-truth` / `check:legal-gdpr` / `check-legal-tool-catalog` / `check-inbound-legal-copy-parity` / `gen-site-copy --check` 全绿 |
+| `privacy.ts` / `data-rights.ts` | "我们无法读取"那几句加"**默认**"限定，并指向《服务条款》第四条 | 同上 |
+| `README.md` | 第 4 条改成"默认开启 + 可以显式关掉 + 后果在应用内列明" | — |
+| 绝对句扫描 | `grep -rn "不存在一份可读的任务库\|这不是设置项" packages/i18n/src packages/legal/src apps/landing/src README.md` ⇒ **0 命中** | 见左 |
+| 顺带修的旧红 | `ai-egress-legal-parity`：分母 5→**6**（另一条线在提交 `06798bf3a` 加了「自动收集」那一行没更新尺子），并给第 6 行补了一条**不假装核字段集合**的判据（该档字段由规则勾选决定，只核"明说子集"+中英列清单同序） | 该 spec **17/17** |
 
 **判据**
 
@@ -261,3 +330,244 @@ S5（独立，可并行）──────┴──► S6 ──► S7（与 S
 - 不做 B 档（服务端持钥）。
 - 不做"关闭前导出"之类的辅助工具（开发阶段无用户，等有用户再说）。
 - 不重构 `conflict.ts` / `op-replay.ts`，只在 S4 加一条"整库同模式"的可观测断言。
+
+---
+
+## 9. 整体门禁与四端收尾（2026-11-01 读数）
+
+### 9.1 `pnpm check`（2026-11-01 复跑：exit=1，非绿输出**只有**下面这一条）
+
+**一条红，且它在 HEAD 上就红，不是本线引入的**：
+
+```
+🔴 ht-* 前缀族 29 个，超过基线 28（多了 1 个）：.ht-danger
+```
+
+- 归属：`.ht-danger` 定义在 `apps/web/src/styles/app/danger-confirm.css`，由提交
+  `c249bb6f1`（全局 UX/P0-P6：控件语义层、菜单键盘模型与 Web 共享模态壳）引入。
+- 现量：`git status --porcelain` 对 `danger-confirm.css` / `app.css` /
+  `check-row-single-source.mjs` **三者皆空** ⇒ 三个文件都与 HEAD 逐字相同，本线一个字没碰。
+- 本线新增的组件只用了既有族：`grep -o "ht-[a-z]*" .../EncryptionModeSection.tsx` ⇒ `ht-btn`、`ht-settings`。
+- 🔴 **不擅自改基线**：那枚门禁的正文写着"若确实是收编旧族同时又长了一个新族，基线也一样要挡住：
+  先消掉净增，再改这个常量"。要么把 `.ht-danger` 收进既有族，要么由该线消净增 —— 两条都不属于本线。
+
+顺带修掉的两条**环境/尺子**问题（都不改判据本体）：
+
+| 现象 | 真因 | 处理 |
+|---|---|---|
+| `check:disk-budget --self-test` 的"干净树预算 0 仍绿"一臂红 | 清理器会扫**全局** `/tmp`，那里躺着一枚 10-31 的 `heyta-deploy-fresh-sample.tar.gz`（4 KB），于是"干净树"永远不干净 | 删掉那枚残留样包（非仓库文件、无进程占用）后 4 臂全绿 |
+| `check:safe-error-fallbacks` 等——**无问题**（列在这里只为说明我没顺手改判据） | — | — |
+
+### 9.2 四端（按 [multi-end-build](../agents/multi-end-build.md) 的固定流程评估）
+
+| 端 | 本轮做到哪 | 读数 / 阻塞 |
+|---|---|---|
+| **Android** | ✅ **Release APK 打成功**（走载体 `linux-dev`） | `BUILD SUCCESSFUL in 58s`；产物 `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` **69,848,472 B / Nov 1 12:23**，比源码新（`find … -newer` 空）。🔴 **签名是 `CN=Android Debug`**（`apksigner verify --print-certs` 现量）—— 正是文档里那条"四个 release keystore 键没落到载体机上"的已知边界 ⇒ **不可作为发布产物**，`upload-dist.sh` 会拒。⚠️ 设备腿做不了：载体 `adb devices` 现量**空列表**（无模拟器在跑） |
+| **iOS** | ⚠️ **真跑了，红在执行沙箱而不是产品** | 入口是 simulator 配置（`-sdk iphonesimulator`，**不需要签名**），所以值得试。三次读数：① `pnpm build:ios` ⇒ `Could not resolve package dependencies: cannot open file '<home>/Library/Caches/org.swift.swiftpm/manifests/ManifestLoading/heytawidgetcore.dia' (Operation not permitted)`；② 把 `-packageCachePath`/`-clonedSourcePackagesDirPath` 指进工作区后过了解析，但 `Missing package product 'HeytaWidgetBridge' / 'HeytaWidgetKit'`；③ `-resolvePackageDependencies` 单独跑 ⇒ `Unable to create log store directory at '<home>/Library/Developer/Xcode/DerivedData/…/Logs/Launch' (513 You don't have permission)`，且 `resolved source packages:` **为空**。工程侧是好的（`Heyta.xcodeproj` 里有 `XCLocalSwiftPackageReference "HeytaWidgetCore"`，本地包 `ios/HeytaWidgetCore/Package.swift` 也在）。⇒ **本线的执行环境（workspace-write 沙箱）写不进 `~/Library/Caches` 与 `~/Library/Developer/Xcode/DerivedData`**，Xcode 连日志库都建不起来，包解析因此静默失败。这**不是**一条产品缺陷证据，也**不能**据此说 iOS 打不出来 |
+| **macOS 桌面** | ⚠️ **壳编译通过，`.app` 打包被凭据卡住** | `swift build -c release --product HeytaMac` ⇒ **Build complete!（26.08 s）**，产物 `.build/release/HeytaMac` 1,126,536 B / 14:22，且**没有比它更新的源码**（`find … -newer` 空）。🔴 但 `bash apps/desktop-macos/scripts/package-app.sh` 立刻退出：`Missing Developer ID macOS profile for cloud.finlaw.heyta.desktop; install it with asc profiles local install.` 本机现量：`security find-identity` 里有 **Developer ID Application** 证书，但 `~/Library/MobileDevice/Provisioning Profiles` 与 Xcode 的 UserData 目录里**没有一枚**满足 `find-signing-profile.py` 那四个条件的 profile（OSX 平台 + `ProvisionsAllDevices` + application-identifier 匹配 + 未过期）。这是**账号/凭据前置**，不是代码问题；`asc` 在（`/opt/homebrew/bin/asc`），但装 profile 属于证书操作，本线不动。**绕开签名又试了一轮**（详见下条）|
+| **Windows MSIX** | ⚠️ **产物打出来了，但装机取证是 8 天前的旧图** | `bash apps/desktop-windows/scripts/package-msix.sh` 跑通：`dist/windows/heyta.msix` **99,700,665 B / Nov 1 14:57**（比源码新）。🔴 但第 ③ 步取回远端取证时 `scp: …heyta-selfsigned.cer / install-capture.txt / packaged-first-run.png: No such file or directory`，随后脚本那句"✅ 装完的 MSIX 能起来、界面有真实内容（1440x734 内容 69.0% 色阶 245）"是拿 **`dist/windows/packaged-first-run.png`（Oct 24 18:55）** 算的 —— 那是 8 天前的截图。⇒ **产物是新的，装机证据是旧的**，正是本仓库"测试全绿 ≠ 这是当前产物"那条陷阱的同一形状。**不记 Windows 装机验收通过** |
+
+🔴 **结论**：S0–S7 的代码与判据侧已收口（除下方"仍未做"），但 **"四端都装上当前源码的产物"这条固定收尾没有完成**。
+按本仓库的定义（"完成一轮 = 四个端都装上了当前源码的产物"），这一轮**不能记为完成**。
+
+### 9.3 仍未做（逐条留在账上，不隐藏）
+
+1. **开启方向（明文 → 加密）的客户端编排**：服务端边界（S3）已具备，客户端没接；界面因此不画那个按钮。
+2. **三端原生钥匙串**（macOS Keychain / Windows DPAPI / Linux libsecret）：桌面壳里连端口都不存在（ADR-0080 §十一）。
+3. **移动设备腿**：Android 默认"记住解锁"已改代码，但"创建 vault → 冷启动免输"这条旅程没有当前产物上的证据。
+4. **四端安装验收**：见 §9.2。
+
+### 9.4 一条反复踩到的坑：`tsc --noEmit` 不等于 `pnpm check` 的 typecheck
+
+本线两次被同一个形状咬到（`sync-client` 的 `redispatchPayload`、`web` 的 `onEnable` → `enable`）：
+
+- 单跑 `npx tsc --noEmit`（包根）**不读** `tsconfig.spec.json`，测试文件根本没被编译；
+- `vitest run` 也**不做类型检查**，于是测试全绿；
+- 真正会红的是 `pnpm check` 里那条 `pnpm -r typecheck`，它用 `-p tsconfig.spec.json`。
+
+⇒ 本线此后的固定动作：**改完测试先跑 `npx tsc --noEmit -p tsconfig.spec.json`**，再跑 `vitest`。
+
+### 9.5 真浏览器端到端（`pnpm verify:vault-web`）：红，但**已用 A/B 排除本线**
+
+**读数**：`8 条里 7 条红、1 条过`，7 条卡在**同一句**断言上：
+
+```
+Error: 设置浮层里没有「同步」那一节
+expect(locator).toBeVisible() failed  —— locator resolved to <section id="settings-sync" … data-testid="sync-settings-panel">，但 hidden
+```
+
+**A/B 判别（决定性）**：把本线在 `VaultSettingsPanel` 里的两处改动（`readRemotePayloadMode` 的 effect、`<EncryptionModeSection>` 渲染）**临时摘掉**、重建 web、再跑同一条 spec —— **仍然同句同错**。⇒ **不是本线引入的**。摘掉的那版已还原（`grep -c 'readRemotePayloadMode({ baseUrl: sync.baseUrl' = 1`）。
+
+**机制（比"大概是别人的 CSS"具体）**：`App.tsx` 里 `activeSettingsSection = settingsAnchor ? \`settings-group-${settingsAnchor}\` : settingsSection`，
+而 `settingsSection` 的初值是 **`settings-group-appearance`**；`SyncSettingsPanel` 拿到的 `active` 因此为 false，
+那一节就按设计 `hidden`（`App.tsx:3310` 一族都是 `hidden={activeSettingsSection !== …}`）。
+`git log -S"settings-group-appearance" -- apps/web/src/App.tsx` ⇒ 该默认值由 `63e61f237` / `3fd905ec8` 那两批设置 IA 改动引入；
+而 `e2e/vault/vault-journey.spec.ts` 最后一次被改是 **2026-10-06**（`98c9c8ff3`），此后没跟上。
+⇒ **spec 与界面之间的尺子漂移**：那条 spec 假设"打开设置就看见同步节"，而现在默认节是外观。
+
+**归属（现量 `git status`）**：共享检出上另一条线正在做**设置 IA 重构**且未提交 ——
+`apps/web/src/styles/app/sheets.css`、`apps/web/src/features/settings/{ProfileOverview,SettingsInfoTip,ProfilePanel,AiSettings,EmailChangePanel,useAccountIdentity}.tsx`、
+`apps/web/tests/settings-sheet-ia.spec.tsx` 全是 `M`。浮层的可见性规则正在被改，`settings-sync` 因此在 DOM 里但 `hidden`。
+
+🔴 **因此本线不能声称"端到端旅程通过"**：这个环境里跑 E2E 等于把别人在途的重构算进读数。
+等到那条线落地后，这条读数必须**重跑**才算数。
+
+### 9.6 本线最终验收读数（2026-11-01 复跑，全部为当次现量）
+
+| 套件 | 读数 |
+|---|---|
+| `server` 单元（payload-mode / payload-gate / payload-mode-migration.service / vault-key-package / vault-key-migration / upload-rate-limit） | **39/39** |
+| `server` **真实 PostgreSQL** 集成（关闭 → 明文；重复关闭被拒；再打开 → 密文） | **3/3** |
+| `@heyta/app-host`（payload-mode-client / payload-mode-migration / payload-mode-host / vault-session / vault-migration / ai-egress-legal-parity） | **63/63** |
+| `@heyta/sync-client` 全量 | **174/174** |
+| `apps/web`（encryption-mode-section / vault-settings-panel / vault-settings-plain-mode / vault-root-cache / vault-root-preference / sync-reason-coverage） | **34/34** |
+| `apps/mobile`（vault-remembered-default：默认设备持有 + 恢复轮换仍压回 false，**剥注释源码形状判据**） | **3/3**（变异臂「把默认改回 false」⇒ **2 红**） |
+| 法务与文档门禁（closure-truth / gen-site-copy / docs-link / adr-numbering） | 全绿 |
+| `pnpm check` | exit=1，非绿输出**只有** §9.1 那条 `.ht-danger`（外线，HEAD 上即红） |
+| `pnpm verify:vault-web`（真浏览器） | ⛔ 7/8 红，A/B 已排除本线（§9.5） |
+| 四端安装验收 | ⛔ 见 §9.2（凭据 / 设备 / 执行沙箱） |
+
+合计：**317 条**针对本线改动的自动化判据全绿；两处端到端/装机面被外部条件挡住。
+
+### 9.7 本轮修掉一个**自己写的死代码**
+
+`host.ts` 里原本有一个模块级 `payloadMode` 缓存（`sync()`/`resolveConflict()` 先刷新再用）。
+变异臂「不翻这个缓存」**没有让任何测试变红** —— 因为两处调用点**每次都先重读服务端**，
+缓存永远在被读之前就被覆盖。**它看起来像安全措施，实际是死代码。**
+
+处理：整个缓存删除，`refreshPayloadMode()` 直接返回模式、`buildSyncClient(mode)` 显式接收参数。
+同时把"开启之后必须上传密文"变成真判据（`payload-mode-host.spec.ts` 现在断言
+`wireOps[0].isPayloadEncrypted === true`）；变异臂「忽略模式、一律走加密分支」⇒ **1 红**。
+
+这条是本轮最有价值的收获：**一个变异臂打不红，往往说明被测的东西根本不存在。**
+
+### 9.8 修了那条尺子的第一层，露出第二层（仍未隔离）
+
+**做了什么**：`e2e/vault/vault-journey.spec.ts` 的 `settings()` helper 补上"点左栏那一项"
+（`button[aria-controls="settings-group-sync"]`，语言中立；点完还断言 `aria-current="page"`，
+把"点了没切过去"和"那一节不在"分成两种故障）。这是**修尺子**，不是改产品。
+
+**结果**：设置那一层通了（不再报"设置浮层里没有「同步」那一节"），spec 前进到下一条，
+新错是：
+
+```
+Vault secret entry failed; value omitted from diagnostics [count=0 visible=false enabled=false]
+```
+
+即 `vault-create-passphrase` 那个输入**根本不在 DOM 里**（不是 hidden、不是 disabled）。
+
+**A/B（决定性）**：把本线在面板上加的 `payloadMode === 'e2ee'` 守卫**摘掉**再跑 —— **仍然 `count=0`**。
+⇒ 不是我这条守卫。守卫已还原（`grep -c` = 1）。
+
+**边界**：这条 suite 的 Playwright 配置**故意关掉了 screenshot/trace/video**（恢复码等属于秘密），
+所以没有可看的失败截图；而诊断探针只能吐计数、不能吐值。**根因未隔离**，不再往下猜。
+
+**结论**：`verify:vault-web` 在**当前共享检出**上不可用（两层尺子漂移，第二层未隔离）。
+它的 owner 是设置 IA / e2e 那两条线；本线不改产品去迁就一条过期的 spec。
+等它们落地后这条**必须重跑**，才有资格写"端到端通过"。
+
+---
+
+## 10. 交接：这一轮交付了什么、卡在哪、怎么复跑
+
+### 10.1 交付（全部在 `main` 工作树上，未提交由会话统一处理）
+
+| 层 | 文件 |
+|---|---|
+| 决策 | `docs/adr/0080-e2ee-is-optional-with-device-held-key.md`（+ §十一 落地后事实） |
+| 计划 | 本文件 |
+| 契约 | `packages/shared-schema/src/sync-mode-contract.ts`、`vault-key-migration-contract.ts`（`targetMode` + 可空配对）、`supersync-http-contract.ts`（`PLAINTEXT_REQUIRED`） |
+| 服务端 | `prisma/migrations/2026110112*_add_payload_mode/`、`2026110113*_add_target_mode_to_vault_migration/`；`sync/services/payload-mode.service.ts`；`sync.routes.payload.ts`（`payloadGateViolation`）、`sync.routes.ops-handler.ts`、`sync.routes.snapshot-handler.ts`、`sync.routes.ts`（`GET /payload-mode`）、`vault-key-migration.service.ts`（两向分支 + commit 删包/建包） |
+| 客户端 | `@heyta/sync-client`：`PayloadWriteMode`（`plain` 一支）、上传/下载按模式分流、`payload-mode-mismatch` 原因 |
+| 宿主 | `@heyta/app-host`：`payload-mode-client.ts`、`payload-mode-migration.ts`（双向编排）、`host.ts`（`getPayloadMode` / `disablePayloadEncryption` / `beginPayloadEncryption` / `confirmPayloadEncryption`）、`vault-session.ts`（`confirmAndMigrateReEncryption`） |
+| Web 界面 | `features/sync/EncryptionModeSection.tsx`（两个轴中的"加密开/关" + 三条后果确认 + 两段式开启）、`VaultSettingsPanel.tsx` 挂载与守卫、`lib/vault-root-cache.ts`（sessionStorage） |
+| 移动 | `screens/VaultSettingsSection.tsx`（`rememberUnlock` 默认 true）+ `tests/vault-remembered-default.spec.ts`（3 条，含"轮换期间仍压回 false"） |
+| 文案 | `packages/i18n` 中英（`web.sync.encryption.*`、`site.integrations.e2ee.*`）、`packages/legal`（`terms` 第四条新增中英各一段；`privacy` / `data-rights` 加"默认"限定）、`README.md` |
+
+### 10.2 复跑命令（按成本从低到高）
+
+```bash
+# 1) 本线全部单元/组件判据（约 10s）
+cd server && npx vitest run tests/payload-mode.spec.ts tests/payload-gate.spec.ts \
+  tests/payload-mode-migration.service.spec.ts tests/vault-key-package.routes.spec.ts \
+  tests/vault-key-migration.service.spec.ts tests/sync-upload-rate-limit.routes.spec.ts
+cd ../packages/app-host && npx vitest run tests/payload-mode-client.spec.ts \
+  tests/payload-mode-migration.spec.ts tests/payload-mode-host.spec.ts \
+  tests/vault-session.spec.ts tests/vault-migration.spec.ts
+cd ../sync-client && npx vitest run
+cd ../../apps/web && npx vitest run tests/encryption-mode-section.spec.tsx \
+  tests/vault-settings-panel.spec.tsx tests/vault-settings-plain-mode.spec.tsx \
+  tests/vault-root-cache.spec.ts tests/sync-reason-coverage.spec.ts
+
+# 2) 真实 PostgreSQL（需先建库并按 scripts/migrate-deploy.sh 建表）
+cd server && DATABASE_URL=postgresql://$USER@localhost:5432/<db> \
+  npx vitest run --config vitest.integration.config.ts --maxWorkers=1 \
+  tests/integration/payload-mode-migration.integration.spec.ts     # 期望 3/3
+
+# 3) 全仓门禁（约 5-8 分钟；当前 exit=1，唯一红点是外线 .ht-danger）
+pnpm check
+
+# 4) 真浏览器端到端（当前不可用，见 §9.5 / §9.8）
+pnpm verify:vault-web
+```
+
+### 10.3 卡住的两件事（含 owner 与解除条件）
+
+| # | 现象 | owner | 解除条件 |
+|---|---|---|---|
+| 1 | `verify:vault-web` 8 条里 7 红：第一层是 `settings()` 假设"打开即同步"（本线已修，改为点 `aria-controls="settings-group-sync"`）；第二层是 `vault-create-passphrase` **不在 DOM**（`count=0`），A/B 已排除本线的模式守卫，**根因未隔离** | 设置 IA 线 / e2e 线 | 那条线的 `apps/web/src/features/settings/*`、`styles/app/sheets.css`、`tests/settings-sheet-ia.spec.tsx` 落地干净后重跑 |
+| 2 | 四端安装验收：Android APK 新但 `CN=Android Debug`（载体无 release keystore）且 `adb devices` 空；macOS 壳编译通过但缺 Developer ID profile；iOS 三次被**执行沙箱**拦在 Xcode 缓存（`~/Library/Caches`、`~/Library/Developer/Xcode/DerivedData` 不可写）；Windows MSIX 新但装机截图是 10-24 旧图、远端取证 `scp` 失败 | 环境/凭据 | 提供签名凭据与设备；或在一个可写 Xcode 缓存的非沙箱环境里跑 |
+
+### 10.4 本轮新增的两条环境陷阱
+
+`docs/reference/environment-traps.md` **#616**（包根 `tsc` 不查测试 ⇒ 三层假绿）与
+**#617**（变异臂打不红 ⇒ 先怀疑被测对象不存在）。两条都是本线自己踩出来的。
+
+### 9.9 macOS 未签名 bundle 的实测（2026-11-01，绕开缺 profile 的打包脚本）
+
+既然壳能编译、只差签名，就手工组了一个未签名 bundle 并 ad-hoc 签名，看它到底能不能起：
+
+```bash
+# 组装（web-dist 与 native-bridge.js 按 package-app.sh 的同一布局）
+/tmp/heyta-unsigned/Heyta.app/Contents/{MacOS/HeytaMac, Resources/web-dist, Resources/native-bridge.js, Info.plist}
+codesign --force --sign - --entitlements ent.plist --options runtime Heyta.app   # → Signature=adhoc，含 allow-jit
+```
+
+| 判据 | 读数 |
+|---|---|
+| bundle 合法 | `plutil -lint` OK；`codesign -dv` ⇒ `Signature=adhoc`，`com.apple.security.cs.allow-jit` 在位 |
+| 起得来、不崩 | 前台跑 **25s 后被我 `timeout` 杀掉（`rc=124`）** ⇒ 没有启动即崩 |
+| 唯一的运行期告警 | `could not create directory "<home>/Library/Caches/local.heyta.unsigned/WebKit/ServiceWorkers" (513)` —— 又是**执行沙箱**不让写 `~/Library/Caches`，与 iOS 那条同源；它是非致命的（进程继续跑） |
+| 界面内容 | ❌ **证不了**：`screencapture` 需要屏幕录制授权；`CGWindowListCopyWindowInfo` 也拿不到别的进程的窗口（TCC）。用按 PID 过滤的探针查过，0 条 |
+
+⇒ macOS 端的结论是**"能编译、能组装、能起来、界面未验"**，卡的仍是凭据与执行环境，
+不是本线代码。
+
+---
+
+## 11. 阻塞收口（2026-11-01，第 24 轮）
+
+### 11.1 已完成且**不再等任何外部条件**的部分
+
+S0–S7 的代码与判据侧全部落地：**317 条**自动化判据全绿（含真 PostgreSQL 集成 3/3），
+每个阶段都有能红的判据与至少一条变异臂。清单与复跑命令见 §10。
+
+### 11.2 阻塞条件（各自已连续存在 ≥3 轮，且都不在本线控制面内）
+
+| # | 条件 | 连续轮次 | 具体前置 | 解除后必须做什么 |
+|---|---|---|---|---|
+| 1 | `pnpm verify:vault-web` 不可用 | 17–24（8 轮） | 另一条线的**设置 IA 重构**在此共享检出上**持续未提交**（现量 8 个文件：`settings/{AiSettings,EmailChangePanel,ProfileOverview,ProfilePanel,SettingsInfoTip,useAccountIdentity}.tsx`、`styles/app/sheets.css`、`tests/settings-sheet-ia.spec.tsx`）。本线已 A/B 排除自己；第一层（`settings()` 假设"打开即同步"）本线已修；第二层（`vault-create-passphrase` 不在 DOM，`count=0`）**根因未隔离**，而该 suite 按设计关闭了 screenshot/trace/video，没有可看的现场 | 那条线落地后**重跑**，并把 §9.5/§9.8 的读数改写 |
+| 2 | 四端安装验收 | 11–24（9 轮） | **Android**：载体无 release keystore（现量签名为 `CN=Android Debug`）+ 载体 `adb devices` 空。**macOS**：`security find-identity` 有 Developer ID 证书，但两处 profile 目录里**没有**满足四个条件的 profile；绕开签名手工组 bundle 后进程能活 25s，但**界面证不了**（`screencapture` 需屏幕录制授权，`CGWindowList` 拿不到别的进程窗口）。**iOS**：执行沙箱写不进 `~/Library/Caches` 与 `~/Library/Developer/Xcode/DerivedData`，Xcode 连日志库都建不起来。**Windows**：MSIX 新（99.7 MB）但装机截图是 10-24 旧图、远端 `scp` 三个产物全失败 | 提供签名凭据与真机/模拟器；或换到可写 Xcode 缓存、有屏幕录制授权、能 ssh 取回取证的环境 |
+
+### 11.3 本线不会为了让判据变绿而做的事（重申）
+
+- 不改产品去迁就一条过期的 e2e spec（§9.8）。
+- 不把 `.ht-danger` 的棘轮基线从 28 改成 29 来消红（§9.1：那条门禁的正文禁止这么做）。
+- 不用旧产物/旧截图冒充"当前安装产物"（§9.2 Windows：抓到的正是这个形状）。
+- 不在没有解锁会话时"跳过解不开的 op"来让关闭加密看起来成功（S2 的变异臂专门守这条）。
+
+### 11.4 恢复工作时从这里开始
+
+1. `git status` 看那 8 个设置 IA 文件是否已干净 → 干净则跑 §10.2 第 4 条。
+2. 若用户提供 Android keystore / macOS Developer ID profile / 真机 → 跑 §10.2 补齐四端。
+3. 本线**代码侧没有已知未完成项**；S6 第二轴（钥匙放在哪）在移动端未接，按 §5.4 记为待办而非缺陷。
