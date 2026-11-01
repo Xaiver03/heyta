@@ -55,9 +55,9 @@ GRADLE_URL='https://mirrors.cloud.tencent.com/gradle/gradle-'"$GRADLE_VER"'-bin.
 # wrapper 的缓存目录名 = distributionUrl 的 MD5 按 36 进制编码（`PathAssembler.getHash` 的形状）。
 # URL 改了这里必须跟着改，否则预置的那份没人读，症状是"构建挂在 46 KB/s 的下载上"。
 GRADLE_URL_OFFICIAL='https://services.gradle.org/distributions/gradle-'"$GRADLE_VER"'-bin.zip'
-# 🔴 用 python3 算 MD5 与 36 进制，**不用 `md5sum`**：那是 GNU 专属工具，
-# macOS 上根本没有（`md5` 才在），而这条脚本两侧都要能跑
-# （`check:shell-portability` 把这条做成了门禁，§7 第 364/370 条）。
+# 🔴 用 python3 算 MD5 与 36 进制，不调外部摘要工具：GNU 那版在 macOS 上不存在
+# （那边叫 md5），而这条脚本两侧都要能跑 —— 门禁会把工具名直接判红，注释里也别写。
+# 依据：§7 第 364/370 条。
 WRAPPER_DIST_DIR="$GRADLE_USER_HOME/wrapper/dists/gradle-$GRADLE_VER-bin/$(python3 -c 'import hashlib,sys
 n=int(hashlib.md5(sys.argv[1].encode()).hexdigest(),16)
 d="0123456789abcdefghijklmnopqrstuvwxyz"
