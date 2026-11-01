@@ -81,12 +81,40 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 // 是为了让"来自 gradle.properties"与"来自环境变量"走同一条惰性路径，
 // 不必在配置阶段就判断存在性。
 
-/** 依次找 gradle 属性 → 环境变量。找不到返回 null（**不是空串**）。 */
+/**
+ * 兜底清单：**按固定路径**读本机那两份 properties。
+ *
+ * 🔴 为什么不能用 `providers.gradleProperty` 一条路走到底（2026-11-01 实测）：
+ * 这台机器的四个 `HEYTA_RELEASE_*` 明明写在 `~/.gradle/gradle.properties` 里，
+ * `providers.gradleProperty(...)` 却一律返回 null（项目级属性/缓存/守护进程序列都会影响它），
+ * 于是 release 变体**静默退回 `signingConfigs.debug`** —— 打出来的包证书是 `CN=Android Debug`，
+ * 而构建日志只有一行容易被忽略的警告。凭据"存在却读不到"必须变成本文件自己去找，
+ * 不能要求人记得 export 一遍。
+ */
+def heytaSigningFiles = [
+    System.getProperty('user.home') + '/.gradle/gradle.properties',
+    System.getProperty('user.home') + '/.heyta-signing/keystore.properties',
+]
+def heytaSigningFileValues = [:]
+heytaSigningFiles.each { path ->
+    def file = new File(path as String)
+    if (!file.isFile()) return
+    file.eachLine { line ->
+        def m = line =~ /^\s*(HEYTA_RELEASE_[A-Z_]+)\s*=\s*(.*)$/
+        if (m.find() && !m.group(2).trim().isEmpty()) {
+            heytaSigningFileValues[m.group(1)] = m.group(2).trim()
+        }
+    }
+}
+
+/** 依次找 gradle 属性 → 环境变量 → 本机 properties 文件。找不到返回 null（**不是空串**）。 */
 def heytaSigningValue = { String key ->
     def fromProperty = providers.gradleProperty(key).orNull
     if (fromProperty != null && !fromProperty.trim().isEmpty()) return fromProperty.trim()
     def fromEnv = providers.environmentVariable(key).orNull
     if (fromEnv != null && !fromEnv.trim().isEmpty()) return fromEnv.trim()
+    def fromFile = heytaSigningFileValues[key]
+    if (fromFile != null && !fromFile.trim().isEmpty()) return fromFile.trim()
     return null
 }
 

@@ -187,3 +187,17 @@ bash scripts/clean-carriers.sh --json              # 只往 stdout 吐 JSON（�
 - 可删名单**只认精确目录名**（`tmp-*` 与扩展名是仅有的通配族），不认模糊 glob：
   `dist-esm` 是产物、`distribution-notes.md` 是文档、`node_modules.bak` 可能是别人正在救的现场。
 - 删除失败只 warn、继续，最后用 `exit 1` 报"有 N 项没删掉"。
+
+
+## 🔑 凭据在哪：先看 `credentials/README.md`，不要问人
+
+macOS 的 Developer ID profile 已固化在仓库里（`credentials/macos/developer-id.provisionprofile`，
+Team `V5S2LT9YV8`，有效期到 2044）；Android 的 release keystore 在
+`~/.heyta-signing/heyta-release.keystore`，四个 `HEYTA_RELEASE_*` 键在
+`~/.gradle/gradle.properties`。
+
+⚠️ 别再凭"目录里没找到"就断言缺凭据：2026-11-01 我两次这样误判过 ——
+一次是 `security cms -D` 在沙箱里报 `Operation not permitted` 却**退出码 0**（profile 其实在），
+一次是只查仓库、没查 `~/.gradle/gradle.properties`（四个签名键其实在）。
+判据要能证明"读得到"，读不到要**红**，不许静默跳过。
+
