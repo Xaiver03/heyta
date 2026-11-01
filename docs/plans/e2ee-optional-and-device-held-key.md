@@ -1187,3 +1187,39 @@ $ mdfind -name "Simulator.app"
 若要走 `verify-mobile-ios.sh` 那条链，还要一个可达的服务端。
 
 ⚠️ **不拿"进程起来了"冒充"首屏画出来了"** —— 这两件事中间隔着 JS bundle 与首帧错误。
+
+### 15.6 macOS 与 iOS 的钥匙串等级**不一致，而且是平台事实**（2026-11-02，第 38 轮实测）
+
+起点是一个看起来"顺手对齐一下"的想法：iOS 用 `whenUnlockedThisDeviceOnly`，macOS 用
+`WhenUnlocked`，那把 macOS 也改成 `…ThisDeviceOnly` 就一致了。**实测之后撤回了这个改动**，
+因为它**不会生效**，而且生效的路要付一笔构建期的代价：
+
+| 探针 | 结果 |
+|---|---|
+| 写的时候传 `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` | 读写**照样全通**（这就是最坑的地方：传错一档，什么都看不出来） |
+| 用 `kSecReturnAttributes` 读回来 | `SecItemCopyMatching` 回 **status=0（成功）**，但返回的字典里 **`kSecAttrAccessible` 与 `kSecAttrSynchronizable` 两枚都不在** |
+| 换**数据保护钥匙串**（`kSecUseDataProtectionKeychain: true`） | **`errSecMissingEntitlement (-34018)`** —— 连存都存不进去（它要 `keychain-access-groups` 授权） |
+
+⇒ **macOS 传统钥匙串接受但忽略、且不回报**这两枚属性。所以现在两侧的真实能力是：
+
+| 保证 | iOS | macOS（本仓当前实现） |
+|---|---|---|
+| 锁屏读不到 | ✅ | ✅（`WhenUnlocked`） |
+| 不进 iCloud 钥匙串 | ✅ | ✅（写时 `kSecAttrSynchronizable=false`；**但回读不到，无法用判据钉住**） |
+| 不随备份恢复到另一台机器 | ✅（`ThisDeviceOnly`） | ❌ **给不了**，除非上数据保护钥匙串 + `keychain-access-groups` |
+
+**规矩**：判据只压在**真的能被观察到**的东西上。冒烟里那一格从"❌ 读不到属性"改成
+**`ℹ️` 如实打印**（`status=0 synchronizable=nil accessible=nil`）—— 读不到不等于没设对，
+但更不等于设对了；把它写成判据，就只能靠"绿"骗自己。
+
+**要做成 iOS 那样，是一次独立改动**（新增 entitlement + 用带 `keychain-access-groups` 的
+profile 重签 + 重新打包 + 重跑本节所有探针），不是"顺手改一行"。本轮**不做**。
+
+### 15.7 本轮复核（改完重跑，不是引用旧读数）
+
+| 项 | 读数 |
+|---|---|
+| `pnpm check:macos-shell` | 通过，新增那格为 `ℹ️ status=0 synchronizable=nil accessible=nil` |
+| 重新打包 | `✅ 打包后的 .app 能起来、界面有真实内容`，`签名档位：developer-id` |
+| 真 `.app` 里的钥匙串探针 | `{"absentFirst":true,"saved":true,"readBack":true,"updated":true,"cleared":true,"absentAfterClear":true,"rejectedShort":true}` |
+| `/Applications/Heyta.app` | 已换成这一趟的产物（02:07:15 / `cloud.finlaw.heyta.desktop` / `V5S2LT9YV8`） |
