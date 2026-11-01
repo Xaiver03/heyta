@@ -577,7 +577,7 @@ S0–S7 的代码与判据侧全部落地：**317 条**自动化判据全绿（�
 ## 12. 方向反转：默认改为**不加密**（2026-11-01，ADR-0081）
 
 产品负责人在本线收口后改判：**默认明文，端到端加密由用户显式开启**。
-[ADR-0081](../../docs/adr/0081-encryption-is-opt-in-not-default.md) 取代
+[ADR-0081](../adr/0081-encryption-is-opt-in-not-default.md) 取代
 [ADR-0080](../../docs/adr/0080-e2ee-is-optional-with-device-held-key.md) §一第 1 条；0080 其余结论不动。
 
 ### 12.1 代码侧改动（本次）
@@ -728,7 +728,7 @@ spec 随后重新登录拿 `signedIn.token` 再建 C；C 的 `refreshFromRemote`
 ❌ 臂 h：出厂映射表有目录覆盖不全 ⇒ profile-panel:未认领:r15b-3-ready-dark.png
 ```
 
-- 归属：[ADR-0079](0081-encryption-is-opt-in-not-default.md) 那条线删掉了产出这些图的
+- 归属：ADR-0079 那条线删掉了产出这些图的
   `e2e/tests/profile-avatar-e2ee.spec.ts`，但 `apps/web/evidence/profile-panel/r15b-*.png`
   四张仍留在树上；该目录的 `README.md` 已经写明"这四张已作废"。
 - 为什么会现在才红：这批证据在此之前是**未提交**状态，我按用户授权把它们入库之后，
