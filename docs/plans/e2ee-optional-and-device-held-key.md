@@ -773,7 +773,7 @@ Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 r
 | **S2** 关闭：整库解密重传 | ✅ 收口 | `server/tests/integration/payload-mode-migration.integration.spec.ts`（真 PostgreSQL + 真 HTTP）；`payload-mode-migration.service.spec.ts` 9/9；app-host 侧 `payload-mode-migration.spec.ts` 8/8；变异臂"跳过解不开的 op" ⇒ 1 红 | 无 |
 | **S3** 打开：新 root + 全量加密 | ✅ 收口 | `vault-session.spec.ts` 20/20（含"世代必须从 0 到 1"）；变异臂"世代校验放宽成 `<= 0`" ⇒ 1 红 | 无 |
 | **S4** 客户端模式感知 | ✅ 收口 | `packages/sync-client/tests/plain-payload-mode.spec.ts` 3/3；变异臂"错配降级成普通 Error" ⇒ 1 红；`@heyta/sync-client` 174/174 | 无 |
-| **S5** 钥匙默认设备持有 | ⚠️ **部分**（macOS 控制面已补，见 §15） | Web：`vault-root-cache.spec.ts` 6/6（变异臂"换 localStorage" ⇒ 1 红）；移动端宿主已接 `vaultRootKeyStore`、默认 `useState(true)`；**macOS 壳**：`ShellVaultKeychainBridge` + `VaultKeychainStore`（Keychain Services），JS 侧 `vault-root-keychain.ts` 优先于 `sessionStorage`（`vault-session-concurrency.spec.ts` 4/4，变异臂"优先级反过来" ⇒ 1 红）；`check:macos-shell` 新增 4 条 Keychain 往返判据（存/读/更新/删/16 字节被拒），变异臂"去掉长度校验" ⇒ 1 红 | **端到端冷启动读数仍缺**：要在**签名的 .app** 里真启动一次才看得见（本会话没有屏幕录制授权，见 §11）；Windows/Linux 的 DPAPI/libsecret ADR 明确推迟；移动端设备腿仍无设备（§13.8） |
+| **S5** 钥匙默认设备持有 | ✅ **收口**（2026-11-02，本轮把最后两格补上，见 §15 / §16） | Web：`vault-root-cache.spec.ts` 6/6（变异臂"换 localStorage" ⇒ 1 红）；**Android 设备腿**：`pnpm verify:android-vault-storage` **5 个 phase 全 PASS**（隔离 / 分进程 seed / 分进程 verify / **重启设备** / remove / clean）；**macOS 壳**：`VaultKeychainStore` + `ShellVaultKeychainBridge` + 页侧优先于 `sessionStorage`（单测 14/14，变异臂"优先级反过来" ⇒ 1 红、"去掉长度校验" ⇒ 1 红），**并在签名的 .app 里**跑通完整往返（7 个字段全 true） | 无（注：**端到端"关掉 App 再开不用输口令"那一幕**仍未逐帧取证 —— 它需要建 vault + 重启进程的 UI 长流程；本轮验的是通道、存储、优先级三件。Windows/Linux 的 DPAPI/libsecret 按 ADR-0080 §十一 推迟） |
 | **S6** 界面：两个轴 + 危险确认 | ✅ 收口（2026-11-02 **改判**，见 §13.6） | 关闭方向：组件 + 危险确认 + 三条后果逐条数（`encryption-mode-section.spec.tsx` **14/14**，变异臂"删掉不可逆那条" ⇒ 1 红）；**开启方向的两段表单也在**：`enable={{begin: beginReEncryption, confirm: confirmReEncryption}}` 挂在 `VaultSettingsPanel`，判据 3 条（不传 `enable` 就不画、第一段只拿恢复码不迁移、回填后才迁移）+ 真浏览器 `e2e/vault/vault-journey.spec.ts` 的 `enableEncryption()` 走完整流程；钥匙位置轴 4/4；本机无密钥包时不画"创建"入口 2/2 | 无。🔴 上一轮我把它写成"缺开启表单"是**错的**，原因与更正见 §13.6 |
 | **S7** 对外口径 | ✅ 收口（本轮补完） | `check:legal-*` 五道绿；绝对句扫描 0 命中；`check:ui-language` 绿（476 文件 / 823 处文案）；i18n 30/30；landing 1455/1455 | 无。本轮补掉了**四处共享词条**（见 §13.2）——上传前那轮只修了界面与下载页 |
 
@@ -952,7 +952,22 @@ No such file or directory
 本轮一度出现一个 `127.0.0.1:5555` 的模拟器条目，脚本刚起步就变成 `device offline`，
 随后从 `adb devices` 里消失（无 qemu 进程、无 system-image）——**那不是可用设备**。
 
-解除条件（任一条即可）：
+**2026-11-02 本轮补跑（条件成立，已跑成）**：模拟器 `127.0.0.1:5556`（Android 16 / `sdk_gphone64_x86_64`）在位，
+`HEYTA_ANDROID_SERIAL=127.0.0.1:5556 pnpm verify:android-vault-storage` ⇒
+
+```
+PASS phase=isolation
+PASS phase=seed
+PASS phase=verify
+PASS phase=remove
+PASS phase=clean
+RESULT=OK; process restart + device reboot + scoped deletion verified
+```
+
+证据落在 `apps/mobile/evidence/android-vault-storage.txt`（含两个 APK 的 sha256）。
+⚠️ 这一趟装的是 **Debug + androidTest**（脚本本来就这么走），不是 Release；Release 重装属于四端收尾那一格。
+
+解除条件（任一条即可，保留以备下次没有设备时）：
 1. 接一台真机（`adb devices` 出现 `device` 状态），然后
    `HEYTA_ANDROID_SERIAL=<serial> pnpm verify:android-vault-storage`；
 2. 或装一个 system-image 并建一个 AVD（`sdkmanager "system-images;android-36;google_apis;x86_64"`
@@ -1025,3 +1040,50 @@ VAULT_KEYCHAIN_PROBE={"absentFirst":true,"saved":true,"readBack":true,"updated":
 而它的三处 `walk()` 用 `statSync` 追链接。这与 traps §7 #618 是**同一个形状**：
 崩溃发生在遍历上，**一条断言都没判**，但退出码看起来像"判据红了"。
 三处都换成 `lstatSync` + 跳过链接（链接不是产品源码），该 spec 18/18。
+
+---
+
+## 16. 四端收尾验收：逐端现量（2026-11-02，第 35 轮）
+
+目标最后一句是"按 multi-end-build 完成四端收尾验收"。这一节是**逐端读数**，每端都写清
+"装的是什么 / 凭什么说它是新的 / 跑不起来的写清解除条件"。
+
+### 16.1 表
+
+| 端 | 载体 | 现量 | 结论 |
+|---|---|---|---|
+| **macOS** | 本机 `/Applications/Heyta.app` | `HeytaMac` 1,150,688 B / 2026-11-02 02:23:41；`codesign` ⇒ `cloud.finlaw.heyta.desktop` / `V5S2LT9YV8` / developer-id；打包时第 ④ 步窗口 1159×754、`WINDOW_TITLE=heyta`、内容 100.0%、`CAPTURE_METHOD=screencapturekit`；**钥匙串探针 7 个字段全 true** | ✅ **已换新包** |
+| **Web** | `apps/web/dist`（`linux-dev` 远端构建后拉回） | `index.html` sha256 前 16 位 `c871796595604f1f`，5.9 MB | ✅ 产物是本轮源码构建的 |
+| **Android** | 模拟器 `127.0.0.1:5556`（Android 16 / `sdk_gphone64_x86_64`） | `verify:android-vault-storage` **5 phase 全 PASS**（含**重启设备**后的持久化）；Debug APK sha256 `a92bc9b7…`、androidTest `dd88b202…` | ✅ **设备腿跑通**（Debug 包；Release 重装仍属待办） |
+| **HarmonyOS** | `windows-pc` 上 `C:\hx-rnjs\proj\harmony\…\entry-default-unsigned.hap` | 21,182,580 B；含 `hermes_bundle.hbc`（魔数 `0x1F1903C103BC1FC6`）+ 三个 `.so`；`build-harmony-rnohjs-windows.mjs` **36/36** | ✅ **包是成品形状**；⚠️ **unsigned** 且无模拟器/真机 ⇒ 装不进去 |
+| **Windows** | `windows-pc` 有 `dotnet`（`C:\Program Files\dotnet\dotnet.exe`）与 `apps\desktop-windows` | 那台的 `C:\src\heyta` 是**旧快照**（tip `bootstrap: source snapshot`），本轮**没有**尝试 MSIX 构建 | ❌ **未验**（见 16.2） |
+
+### 16.2 Windows 那一格为什么没做
+
+不是因为难，是因为**按现在的方式做出来的绿是假的**：
+那台上的源码是几个月前的快照，用它打的 MSIX 与 HEAD 无关；而上一轮实测过
+"MSIX 产物是新的、装机截图是 10-24 的旧图"——那正是"看着在跑，其实什么都没验"的形状。
+
+要真验，需要先解决**同步**：`apps/desktop-windows` 的构建输入（`HeytaWindows` + `Heyta.Windows.Core`
++ Windows SDK/MSIX 工具链）与那台的快照对齐。这一步本轮没做，所以这一格**留空**，
+不拿"dotnet 在位"去冒充"Windows 端验收过"。
+
+### 16.3 复跑命令（逐端）
+
+```bash
+# macOS：重打 + 装 + 探针
+pnpm build:web:remote:pull
+HEYTA_SKIP_NOTARIZE=1 bash apps/desktop-macos/scripts/package-app.sh /tmp/heyta-macos-dist
+cp -R /tmp/heyta-macos-dist/Heyta.app /Applications/Heyta.app
+HEYTA_NO_FOCUS=1 HEYTA_VAULT_KEYCHAIN_PROBE=1 HEYTA_M2_EVIDENCE=/tmp/kc \
+  timeout 25 /Applications/Heyta.app/Contents/MacOS/HeytaMac; grep VAULT_KEYCHAIN /tmp/kc.txt
+
+# Android：设备腿（需要 adb devices 里有一个 device 状态的设备）
+HEYTA_ANDROID_SERIAL=<serial> pnpm verify:android-vault-storage
+
+# 鸿蒙：零桩全链路（在 windows-pc 上跑）
+node scripts/build-harmony-rnohjs-windows.mjs
+```
+
+⚠️ macOS 那条**不主张公证**：`HEYTA_SKIP_NOTARIZE=1` 只跳过第 ⑥ 步，
+"包已通过公证"那句要等不带这个变量的一趟。
