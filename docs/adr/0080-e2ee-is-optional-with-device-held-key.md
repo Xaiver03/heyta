@@ -189,3 +189,11 @@
 - 不许在 readable 模式下上传密文，也不许在 e2ee 模式下上传明文 —— 哪怕"只有一次"。
 - 不许在 readable 模式下保留旧 key package 或旧恢复码，制造"也许还能救"的暗示。
 - 不许把托管 AI 描述成端到端加密（ADR-0013 那条没被本 ADR 取代）。
+
+## 十一、落地后事实（2026-11-01，只追加，不改上面任何结论）
+
+- §5.4 的表格里"macOS 桌面"那一格在当时写的是"复用到宿主"。实施时现量发现**桌面壳里根本没有这个端口**：
+  `grep -c vaultRootKeyStore apps/desktop/src/host.ts` = 0、`apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift` = 0 ——
+  macOS 壳是 WKWebView 载 `web-dist`，钥匙串要接就得上 Swift↔JS 桥。
+  ⇒ 三端的**原生**钥匙串都还没有；Web（含 macOS 壳里的共享 UI）走 `sessionStorage`。
+- Web 的 `sessionStorage` 实测在**刷新**后仍可用、**关标签页**即失效（6 条单测钉住，含"一个字都不进 localStorage"）。

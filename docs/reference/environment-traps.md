@@ -12237,3 +12237,24 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
    —— 源码两行 ≥1、`dist` 那行 0 ⇒ 是没构建，不是词条坏了。
    复量：`pnpm --filter @heyta/i18n build && pnpm check:i18n-vars` ⇒ rc=0（`缺参数=0`）。
    归族：`docs/agents/multi-end-build.md`（固定收尾要先重建再验）、#602（门禁跑在别人名下产物上）。
+
+616. 🔴 **`npx tsc --noEmit` 在包根**不读** `tsconfig.spec.json` ⇒ 测试文件根本没被编译；`vitest run` 也不做类型检查 ⇒ 两边都绿，直到 `pnpm check` 才红**（2026-11-01，ADR-0080 那条线，**同一个形状连咬两次**）：
+
+    - 第一次：`packages/sync-client/tests/plain-payload-mode.spec.ts` 少传必填的 `redispatchPayload`；
+    - 第二次：`apps/web/tests/encryption-mode-section.spec.tsx` 还在传已改名的 `onEnable`（新名 `enable`）。
+
+    两次的现场一模一样：`npx tsc --noEmit`（包根）exit 0、`npx vitest run` 全绿、`pnpm check` 里那条
+    `pnpm -r typecheck` 报 `TS2322/TS2304`。因为 `pnpm -r typecheck` 用的是 **`tsc -p tsconfig.spec.json`**，
+    只有它会把 `tests/**` 纳入编译。
+    **固定动作**：改完测试先 `npx tsc --noEmit -p tsconfig.spec.json`，再跑 vitest。
+    判据（能红）：在那两个 spec 上故意传一个不存在的 prop，包根 `tsc` 必须仍然绿 —— 证明它确实没看测试文件。
+
+617. 🔴 **一条变异臂打不红，先怀疑"被测的东西根本不存在"，而不是"判据不够狠"**（2026-11-01，同一条线，第二次）：
+
+    `AppHost` 里写过一个模块级 `payloadMode` 缓存，注释写着"下一次 sync() 会按它写密文"。
+    变异臂「删掉那句赋值」⇒ **零测试变红**。查下来：`sync()` 与 `resolveConflict()` 每次都先
+    `refreshPayloadMode()` 再 `buildSyncClient()`，**缓存永远在被读之前就被覆盖** ⇒ 它是死代码，
+    而它长得像一道安全措施（下一个读代码的人会信它）。处理：缓存整个删掉，`buildSyncClient(mode)` 显式收参。
+    同族：把"断言 code"放宽成"断言具体那句话"也一样 —— 早一版的 `already ciphertext` 守卫删掉后测试仍绿，
+    因为经 JSON 分支也抛同一个 `code`。
+    **动作**：变异臂打不红时，第一件事是问"这条断言真的观察到了那个行为吗"，而不是再加一条断言。

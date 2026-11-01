@@ -48,6 +48,23 @@ async function device(browser: Browser, credentials: { baseUrl: string; token: s
  */
 async function settings(page: Page): Promise<Locator> {
   await openSettingsSheet(page);
+  /*
+   * 🔴 2026-11-01：浮层打开时**默认落在「外观」节**（`App.tsx` 的
+   * `useState<SettingsSectionId>('settings-group-appearance')`），所以直接断言
+   * `sync-settings-panel` 可见会稳定地读到 `hidden` —— 这不是产品坏了，是这份
+   * helper 停在"打开就是同步"的旧形状上（那次默认值由 `63e61f237` / `3fd905ec8`
+   * 两批设置 IA 改动引入，而本文件最后一次被改是 2026-10-06）。
+   *
+   * 现在显式点左栏那一项。选择器用 `aria-controls`（导航按钮没有 testid，
+   * 但它逐项指向 `settings-group-<id>`）⇒ 语言中立，这一套跑的是英文界面。
+   * 点完再断言 `aria-current="page"`：不然"点了但没切过去"会被下一条断言
+   * 误报成"那一节不在"，而那是两种完全不同的故障。
+   */
+  const navSync = page.locator('button[aria-controls="settings-group-sync"]');
+  if (await navSync.isVisible().catch(() => false)) {
+    await navSync.click();
+    await expect(navSync, '点了「同步」那一项，但导航没有把它标成当前项').toHaveAttribute('aria-current', 'page');
+  }
   const section = page.getByTestId('sync-settings-panel');
   await expect(section, '设置浮层里没有「同步」那一节').toBeVisible();
   await section.scrollIntoViewIfNeeded();
