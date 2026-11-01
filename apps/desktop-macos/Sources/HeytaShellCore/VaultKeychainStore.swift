@@ -9,11 +9,20 @@
 //    因为 WKWebView 里够不着命令行。两者语义相同（按作用域存取、删得掉），实现不同。
 //
 // 🔴 三条写死的属性，每一条都有理由，改之前先看：
-//   · `kSecAttrAccessibleWhenUnlocked` —— 锁屏期间读不到。**这是故意的**：
-//     页侧读到 nil 就退回"请解锁"，正是计划里那条"钥匙串锁住 ⇒ 降级为需输入（不崩）"。
+//   · **不用 `WhenUnlockedThisDeviceOnly`**（2026-11-02 实测后放弃，理由在这里）：
+//     iOS 那份用的是 `whenUnlockedThisDeviceOnly`（`verify-ios-vault-keychain.sh` 报
+//     `accessible: ["aku","aku"]`）。照抄到 macOS **不会生效**：
+//     ① 传统（文件）钥匙串**忽略** `kSecAttrAccessible` —— 写的时候传 `…ThisDeviceOnly`、
+//        读写照样通，但用 `kSecReturnAttributes` 读回来的字典里**根本没有这一枚**；
+//     ② 想让它生效必须用**数据保护钥匙串**（`kSecUseDataProtectionKeychain: true`），
+//        而那需要 `keychain-access-groups` 授权 —— 实测无授权的进程拿到
+//        `errSecMissingEntitlement (-34018)`，连存都存不进去。
+//     ⇒ macOS 现在给的是"**锁屏读不到** + **不进 iCloud 钥匙串**"（`WhenUnlocked` +
+//       `kSecAttrSynchronizable=false`，后者传统钥匙串**是**认的），
+//       但给不了 iOS 那条"不随备份恢复到另一台机器"。这条差异写进计划 §15.6，
+//       **不假装两端一致**。
+//   · `kSecAttrAccessibleWhenUnlocked` —— 锁屏期间读不到，页侧退"请解锁"（降级不崩）。
 //     换成 `AfterFirstUnlock` 会让关机重启后后台也能解开，那不是这里要的东西。
-//   · `kSecAttrSynchronizable = false` —— **不进 iCloud Keychain**。
-//     否则"服务器看不到明文"会悄悄变成"苹果也有一份"。
 //   · 长度必须 32 字节 —— vault root 恒为 32。长度不对就是坏数据，**不猜**（与页侧同一条）。
 
 import Foundation
@@ -75,6 +84,29 @@ public struct VaultKeychainStore {
         insert.merge(attributes) { _, new in new }
         let addStatus = SecItemAdd(insert as CFDictionary, nil)
         return addStatus == errSecSuccess ? .ok : .failed(addStatus)
+    }
+
+    /// 读条目上**实际生效**的属性，一次给三个事实：查询状态、同步位、可访问性位。
+    ///
+    /// 存在的理由：这两条**不会**在存取失败时暴露 ——
+    /// 写的时候传错一档，读写照样通，只有属性不同：
+    /// - `synchronizable`：**是不是会跟着 iCloud 钥匙串走**（传统钥匙串认这一位）；
+    /// - `accessible`：可访问性等级（**传统钥匙串忽略且不回报**，所以它多半是 `nil`，
+    ///   那不代表写错了，代表这一档在这个钥匙串里不存在 —— 见文件头的说明）。
+    public func readableAttributes(
+        serverOrigin: String, accountId: String,
+    ) -> (status: OSStatus, synchronizable: Bool?, accessible: String?) {
+        var request = Self.query(serverOrigin, accountId)
+        request[kSecReturnAttributes as String] = true
+        request[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(request as CFDictionary, &item)
+        guard status == errSecSuccess, let attributes = item as? NSDictionary else {
+            return (status, nil, nil)
+        }
+        return (status,
+                attributes[kSecAttrSynchronizable] as? Bool,
+                attributes[kSecAttrAccessible] as? String)
     }
 
     /// 删。`errSecItemNotFound` 算成功：要的是"之后读不到"，本来就没有也算。

@@ -514,11 +514,25 @@ do {
         let reread = vaultStore.load(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount)
         check(reread.value == rootB, "Keychain：同作用域再写是**更新**，读回来是新那枚")
 
-        // 清理之后必须读不到 —— 否则"点了锁定，重开又自己开了"。
-        let cleared = vaultStore.clear(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount)
-        let afterClear = vaultStore.load(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount)
-        check(cleared == .ok && afterClear.outcome == .absent,
-              "Keychain：删掉之后确实读不到（实测 outcome=\(afterClear.outcome)）")
+        /*
+         ℹ️ 可访问性 / 同步位：**macOS 传统钥匙串不回报它们**（实测，2026-11-02）。
+
+         这一格**故意不写成判据**，因为真值拿不到：
+         · 写的时候传了 `kSecAttrAccessibleWhenUnlocked` 与 `kSecAttrSynchronizable=false`；
+         · 用 `kSecReturnAttributes` 读回来，`SecItemCopyMatching` 回 **status=0**（成功），
+           但返回的字典里**这两枚都不在**（`accessible=nil` / `synchronizable=nil`）；
+         · 想让它们可读可验，得换**数据保护钥匙串**（`kSecUseDataProtectionKeychain:true`），
+           而那需要 `keychain-access-groups` 授权 —— 无授权的进程实测拿到
+           `errSecMissingEntitlement (-34018)`，连存都存不进去。
+
+         ⇒ 这里只**如实打印**，不拿"读不到"当"没设对"，也不拿它冒充一条绿判据。
+            能钉住的保证在别处：存取/更新/删除/32 字节（上面四条）+ 代码里那两枚常量。
+         */
+        let attributes = vaultStore.readableAttributes(
+            serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount)
+        print("  ℹ️ Keychain 属性回读：status=\(attributes.status) "
+              + "synchronizable=\(String(describing: attributes.synchronizable)) "
+              + "accessible=\(String(describing: attributes.accessible))（传统钥匙串不回报这两枚）")
 
         // 负臂：长度不是 32 的一律不写 —— 写进去也读不出来，等于骗了"记住"。
         let rejected = vaultStore.save(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount,

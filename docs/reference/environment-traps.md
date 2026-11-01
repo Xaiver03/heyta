@@ -12465,3 +12465,23 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
 
     **判据不能是"截图非空"**：三张黑帧的字节数一模一样，而一个真的静态界面也该有像素差异；
     "字节数一致"本身就是"没渲染"的旁证。
+
+631. 🔴 **macOS 传统钥匙串接受 `kSecAttrAccessible` 却**忽略**它，而且回读不到；换数据保护钥匙串要授权**（2026-11-02，想对齐 iOS 的 `ThisDeviceOnly`）：
+
+    看起来是一行改动：iOS 用 `whenUnlockedThisDeviceOnly`，macOS 也改成
+    `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`。**改了，测了，撤回了**：
+
+    | 探针 | 结果 |
+    |---|---|
+    | 写的时候传 `…ThisDeviceOnly` | 读写**照样全通** —— 传错一档什么都看不出来 |
+    | 用 `kSecReturnAttributes` 读回来 | `SecItemCopyMatching` 回 **status=0（成功）**，但返回的字典里 `kSecAttrAccessible`、`kSecAttrSynchronizable` **两枚都不在** |
+    | 换 `kSecUseDataProtectionKeychain: true` | **`errSecMissingEntitlement (-34018)`** —— 连存都存不进去（要 `keychain-access-groups` 授权） |
+
+    ⇒ macOS 传统（文件）钥匙串对这两枚属性是"接受但忽略、且不回报"。
+    相同的代码在 iOS 上是真的生效的（那边 `accessible: ["aku","aku"]` 读得回来），
+    **所以"两端用同一个常量"不等于"两端给同一个保证"**。
+
+    **规矩**：① 判据只压在**能观察到**的东西上 —— 读不到就打印 `ℹ️`，不要写成 ❌ 或 ✅；
+    ② 想验证"这枚钥匙会不会跟着备份去另一台机器"，macOS 上只有数据保护钥匙串能给，
+    而那要先加 `keychain-access-groups` + 换 profile 重签 —— 是一次独立改动，别当"顺手一行"；
+    ③ 看到"改完测试全绿"就以为属性生效了？这类**平台静默忽略**的坑，绿恰恰是它的正常症状。
