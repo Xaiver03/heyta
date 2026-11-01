@@ -38,7 +38,7 @@ export function SettingsInfoTip({
   text,
   testId,
 }: {
-  /** 那枚问号的无障碍名字（"头像为什么要加密"这种）。 */
+  /** 那枚问号的无障碍名字（"昵称会显示在哪里"这种）。 */
   label: string;
   /**
    * 解释正文。一句话到三句，超过就该考虑写成帮助页。

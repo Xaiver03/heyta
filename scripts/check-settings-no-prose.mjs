@@ -253,6 +253,12 @@ function listFiles() {
     .split('\0')
     .filter(Boolean)
     .filter((p) => /\.(tsx|ts)$/u.test(p))
+    /*
+     * 工作树里**删掉但还没暂存**的被跟踪文件仍会出现在 `git ls-files --cached` 里。
+     * 那种文件没有内容可扫，留着只会让 `readFileSync` 在门禁启动时 ENOENT ——
+     * 症状是整道门直接崩掉，而不是报一条可读的问题。删文件是正常改动，这里跳过。
+     */
+    .filter((p) => existsSync(join(ROOT, p)))
     .filter(
       (p) => SCAN_FILES.includes(p) || SCAN_ROOTS.some((root) => p.startsWith(`${root}/`)),
     );

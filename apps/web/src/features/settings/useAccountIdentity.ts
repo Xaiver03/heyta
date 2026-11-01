@@ -23,7 +23,6 @@ import {
   privacyConsent,
   subscribePrivacyConsent,
 } from '../privacy/consent-gate.js';
-import { useAvatarKey } from '../sync/avatar-key.js';
 import { useSyncStore } from '../sync/store.js';
 
 export type AccountIdentityStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -40,7 +39,7 @@ export function notifyAccountIdentityChanged(): void {
 export interface AccountIdentity {
   /** 还没登录或资料尚未读到时为 undefined；已读到但用户未设置时为 null。 */
   readonly displayName: string | null | undefined;
-  /** 解密成功时存在；其它头像状态必须由调用方按 avatarState 处理。 */
+  /** 头像取回成功时存在；其它状态必须由调用方按 avatarState 处理。 */
   readonly avatarDataUri: string | undefined;
   readonly avatarState: AccountAvatarImage['state'] | undefined;
   readonly status: AccountIdentityStatus;
@@ -72,12 +71,7 @@ export function useAccountIdentity(): AccountIdentity {
   const baseUrl = useSyncStore((state) => state.baseUrl);
   const token = useSyncStore((state) => state.token);
   const email = useSyncStore((state) => state.email);
-  /**
-   * 🔴 钥匙**不再**直接读 `password`：登录态账号（vault 模式）里它是永久的
-   * `undefined`，用它判"能不能解开头像"会让每个登录用户都拿到 `needs-password`。
-   * 口径只有一处：`useAvatarKey`。
-   */
-  const { key: avatarKey } = useAvatarKey();
+  // 头像明文（ADR-0079）：读它只需要令牌，不需要口令或 vault 钥匙。
   const [consentRevision, setConsentRevision] = useState(0);
   const [profileRevision, setProfileRevision] = useState(0);
   const scope = accountScope(baseUrl, token);
@@ -137,7 +131,7 @@ export function useAccountIdentity(): AccountIdentity {
       }
 
       // The profile GET is sufficient to answer the primary identity question.
-      // Publish the nickname immediately; avatar decryption is a secondary read.
+      // Publish the nickname immediately; the avatar fetch is a secondary read.
       setIdentity({
         scope,
         displayName: profile.displayName,
@@ -146,12 +140,7 @@ export function useAccountIdentity(): AccountIdentity {
         status: 'ready',
       });
 
-      const reading = await resolveAccountAvatarImage(
-        options,
-        token,
-        avatarKey,
-        profile.avatarHash,
-      );
+      const reading = await resolveAccountAvatarImage(options, token, profile.avatarHash);
       if (!current) return;
       setIdentity((previous) =>
         previous.scope === scope
@@ -168,7 +157,7 @@ export function useAccountIdentity(): AccountIdentity {
       current = false;
       controller.abort();
     };
-  }, [avatarKey, baseUrl, consentRevision, profileRevision, scope, token]);
+  }, [baseUrl, consentRevision, profileRevision, scope, token]);
 
   // Effects run after render. Scope the returned snapshot as well so a new
   // account can never see one frame of the previous account's nickname.

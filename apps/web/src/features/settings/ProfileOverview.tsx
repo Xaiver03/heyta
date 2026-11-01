@@ -84,11 +84,7 @@ export function ProfileOverview({
             label={t('web.profile.overview.title')}
             text={t('web.profile.overview.localOnly')}
           />
-          {identity.avatarState === 'needs-password' ? (
-            <p className="ht-settings__profile-note" role="status">
-              {t('common.profile.avatar.needPassword')}
-            </p>
-          ) : identity.avatarState === 'undecryptable' || identity.avatarState === 'unreadable' ? (
+          {identity.avatarState === 'unreadable' ? (
             <p className="ht-settings__profile-note" role="status">
               {t('common.profile.avatar.unreadable')}
             </p>

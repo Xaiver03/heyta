@@ -367,13 +367,13 @@ async function seed({
    * 它一挂载就拉 `/api/automation/rules` 与 `/api/automation/events`；
    * 假端点只实现了模型接口 ⇒ 404 混进"不该有非 2xx"，八条用例一起红。
    * 形状逐字抄**别人那条线**的同名补位（`account-email-change-and-sessions.spec.ts:239-247`
-   * 与 `profile-avatar-e2ee.spec.ts:209`），空但合法：两条都必须回**数组**
+   * 与 `profile-avatar-plaintext.spec.ts:209`），空但合法：两条都必须回**数组**
    * （`packages/app-host/src/inbound-rules-remote.ts` 读到非数组会判 `malformed-response`）。
    * ⚠️ 这里刻意只答**读侧**、且只答"没有规则/没有事件"：本支用例不验自动化，
    *    写侧一律 `fallback()` 交回 catch-all，让"本套件不该发的写请求"仍然计入红集
    *    （与 `helpers.ts` 的 `stubPublicFacts` 同一条纪律）。
    * ⚠️ 抽取欠账：这一族补位现在有 4 处（本文件、`account-email-change-and-sessions`、
-   *    `profile-avatar-e2ee`、`inbound-automation` 的自家夹具），下次动它时按仓规
+   *    `profile-avatar-plaintext`、`inbound-automation` 的自家夹具），下次动它时按仓规
    *    "一次抽干净"（抽进 `helpers.ts` 并删掉旧的那几份）。
    */
   for (const [path, key] of [
