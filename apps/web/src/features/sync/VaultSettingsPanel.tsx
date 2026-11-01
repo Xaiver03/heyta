@@ -294,6 +294,12 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
   };
 
   const [payloadMode, setPayloadMode] = useState<'e2ee' | 'plain'>('e2ee');
+  /**
+   * 🔴 模式是否**已经问过服务端**。在它变 true 之前不画任何按模式分叉的控件 ——
+   * 否则明文账号会先闪一下"加密已开启"的界面（初值是 e2ee），用户/验收脚本都可能
+   * 点到一个几百毫秒后就消失的按钮。
+   */
+  const [modeKnown, setModeKnown] = useState(false);
   const [encryptionBusy, setEncryptionBusy] = useState(false);
   const [keyPlacement, setKeyPlacement] = useState<VaultKeyPlacement>(() => readVaultKeyPlacement());
   /**
@@ -312,7 +318,8 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
     if (sync.baseUrl.trim() === '' || sync.token === undefined) return undefined;
     void readRemotePayloadMode({ baseUrl: sync.baseUrl, token: sync.token })
       .then((mode) => { if (!cancelled) setPayloadMode(mode); })
-      .catch(() => { /* fail-closed 已在读取层处理 */ });
+      .catch(() => { /* fail-closed 已在读取层处理 */ })
+      .finally(() => { if (!cancelled) setModeKnown(true); });
     return () => { cancelled = true; };
   }, [sync.baseUrl, sync.token, revision]);
 
@@ -440,7 +447,13 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
       className="ht-settings ht-settings__vault"
     >
 
-      <EncryptionModeSection
+      {!modeKnown ? (
+        <p className="ht-settings__hint" role="status" data-testid="encryption-mode-loading">
+          {t('web.sync.vault.packageLoading')}
+        </p>
+      ) : null}
+
+      {modeKnown ? <EncryptionModeSection
         mode={payloadMode}
         busy={encryptionBusy}
         {...(encryptionProgress === undefined ? {} : { progress: encryptionProgress })}
@@ -455,7 +468,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
             if (next === 'ask') lockWebVaultSession();
           },
         }}
-      />
+      /> : null}
       <h3 id="vault-settings-title" className="ht-settings__h3 ht-type-row-title">
         {t('web.sync.vault.title')}
         <SettingsInfoTip

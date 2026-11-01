@@ -31,6 +31,12 @@ import {
 async function openSyncSection(page: Page): Promise<Locator> {
   await page.getByTestId('account-menu-avatar').click();
   await page.getByTestId('account-menu-settings').click();
+  /*
+   * 设置浮层是**分节**的（每节 `<section hidden={active !== id}>`），打开时默认落在
+   * 「外观」节 ⇒ `sync-settings-panel` 一定在 DOM 里但 hidden。先点导航那一项。
+   * 按 `aria-controls` 认，不按文案（语言中立）。
+   */
+  await page.locator('[aria-controls="settings-group-sync"]').click();
   const section = page.getByTestId('sync-settings-panel');
   await expect(section, '设置浮层里没有「同步」那一节').toBeVisible();
   await section.scrollIntoViewIfNeeded();
