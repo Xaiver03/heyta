@@ -466,6 +466,12 @@ test('legacy history survives first vault publication and explicit migration to 
   const credentials = { baseUrl: api, token: account.token, accountId: String(account.userId), email };
   const legacyPassword = 'legacy test encryption passphrase';
   const title = `legacy task before vault ${stamp}`;
+  /*
+   * ADR-0081 之后新账号默认**明文**，而这一步要摆的前提是"账号上已经有口令时代的密文"。
+   * 服务端按设计拒收密文（`PLAINTEXT_REQUIRED`），所以先用 TEST_MODE 的钩子把模式摆成 e2ee。
+   */
+  const primed = await request.post(`${api}/api/test/payload-mode`, { data: { userId: account.userId, mode: 'e2ee' } });
+  expect(primed.status()).toBe(200);
   const uploaded = await request.post(`${api}/api/sync/ops`, { headers, data: {
     clientId: 'legacy-device', lastKnownServerSeq: 0,
     ops: [{ id: `legacy-op-${stamp}`, clientId: 'legacy-device', actionType: 'CREATE_TASK', opType: 'CRT',
@@ -489,7 +495,13 @@ test('legacy history survives first vault publication and explicit migration to 
   const devices = [a];
   try {
     await settings(a.page);
-    await enableEncryption(a.page, passphrase);
+    /*
+     * 🔴 这一条摆的是 **e2ee + 无密钥包**（口令时代遗留密文），入口仍是「创建加密数据钥匙」；
+     * `enableEncryption` 是"明文 → 加密"的另一条路，不能混用。
+     */
+    await fillVaultSecret(a.page.getByTestId('vault-create-passphrase'), passphrase);
+    await a.page.getByTestId('vault-create').click();
+    await confirmCode(a.page);
     await expect(a.page.getByTestId('vault-ready')).toBeVisible();
     const first = await request.get(`${api}/api/sync/key-package`, { headers });
     expect(first.status()).toBe(200);
