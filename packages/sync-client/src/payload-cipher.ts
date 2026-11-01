@@ -21,10 +21,22 @@ export interface SyncPayloadCipher {
   decrypt(payload: string, identity: SyncPayloadIdentity): Promise<string>;
 }
 
+/**
+ * 写侧能力：要么有钥匙（加密上传），要么账号就是明文（ADR-0080）。
+ *
+ * 🔴 `plain` **不是**"没有钥匙时的降级" —— 没钥匙仍然是 `no-encryption-password`
+ * 停下。`plain` 只由调用方在**服务端说这个账号是 readable** 时显式选中，
+ * 所以它不可能是"悄悄把明文传上去"那条路。
+ */
+export type PayloadWriteMode =
+  | { mode: 'e2ee'; cipher: SyncPayloadCipher }
+  | { mode: 'plain' };
+
 /** A vault host must supply an unlock-session provider; omission is not legacy mode. */
 export type SyncEncryptionOptions =
   | { encryptionMode?: 'password'; getPayloadCipher?: never }
-  | { encryptionMode: 'vault'; getPayloadCipher: () => Promise<SyncPayloadCipher | undefined> };
+  | { encryptionMode: 'vault'; getPayloadCipher: () => Promise<SyncPayloadCipher | undefined> }
+  | { encryptionMode: 'plain'; getPayloadCipher?: never };
 
 // ASCII marker distinguishes the new envelope from unversioned legacy salts.
 // A recognised marker with a bad version/tag NEVER falls back to the password.

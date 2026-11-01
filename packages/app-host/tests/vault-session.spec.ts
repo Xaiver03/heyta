@@ -350,3 +350,74 @@ describe('vault key session', () => {
     }
   });
 });
+
+describe('confirmAndMigrateReEncryption（ADR-0080：明文账号重新开启加密）', () => {
+  it('确认恢复码后用新 root 迁移，并原子安装首包与世代 1', async () => {
+    const store = await makeStore();
+    const session = await createVaultKeySession({ store, scope });
+    const pending = await session.beginCreation('correct horse battery staple');
+
+    const seen: { keyVersion: number; fingerprint: string }[] = [];
+    const result = await session.confirmAndMigrateReEncryption(pending, pending.recoveryCode, async (input) => {
+      seen.push({
+        keyVersion: input.targetPackage.keyVersion,
+        fingerprint: input.targetPackage.rootKeyFingerprint,
+      });
+      // 迁移器拿到的是**可丢弃的副本**，用完必须被擦掉。
+      expect(input.targetRootKey).toHaveLength(32);
+      return { keyVersion: 1, payloadKeyVersion: 1 };
+    });
+
+    expect(result).toEqual({ keyVersion: 1, payloadKeyVersion: 1 });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.keyVersion).toBe(1);
+    expect(session.state).toBe('unlocked');
+    expect(session.keyPackage?.keyVersion).toBe(1);
+    expect(session.payloadKeyVersion).toBe(1);
+    // 包真的落进本地 store，而不是只活在内存里。
+    expect((await store.load())?.keyVersion).toBe(1);
+  });
+
+  it('恢复码不对 ⇒ 不执行迁移', async () => {
+    const store = await makeStore();
+    const session = await createVaultKeySession({ store, scope });
+    const pending = await session.beginCreation('correct horse battery staple');
+    let called = 0;
+
+    await expect(
+      session.confirmAndMigrateReEncryption(pending, 'WRONG-CODE', async () => {
+        called++;
+        return { keyVersion: 1, payloadKeyVersion: 1 };
+      }),
+    ).rejects.toMatchObject({ code: 'recovery-confirmation-mismatch' });
+    expect(called).toBe(0);
+    expect(session.state).toBe('locked');
+  });
+
+  it('已经有包时根本拿不到 pending（`beginCreation` 直接拒），所以这条路只服务无包账号', async () => {
+    const store = await makeStore();
+    const session = await createVaultKeySession({ store, scope });
+    const first = await session.beginCreation('correct horse battery staple');
+    await session.confirmAndPublish(first, first.recoveryCode);
+
+    // ⚠️ 方法里那条"currentPackage 必须为空"的守卫是**纵深防御**：
+    // 公开 API 走不到那里（`beginCreation` 在已有包时就拒了），所以这里能测的
+    // 只是"拿不到 pending"这个可达事实，不假装测到了那条守卫。
+    const second = await session.beginCreation('another passphrase').catch(() => undefined);
+    expect(second).toBeUndefined();
+  });
+
+  it('迁移器报回的世代不是 1 ⇒ 拒绝安装', async () => {
+    const store = await makeStore();
+    const session = await createVaultKeySession({ store, scope });
+    const pending = await session.beginCreation('correct horse battery staple');
+
+    await expect(
+      session.confirmAndMigrateReEncryption(pending, pending.recoveryCode, async () => ({
+        keyVersion: 1,
+        payloadKeyVersion: 2,
+      })),
+    ).rejects.toMatchObject({ code: 'remote-publish-conflict' });
+    expect(session.state).toBe('locked');
+  });
+});

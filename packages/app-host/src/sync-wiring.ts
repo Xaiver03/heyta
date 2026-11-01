@@ -124,7 +124,11 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
     getPassword: options.getPassword,
     ...(options.encryptionMode === 'vault'
       ? { encryptionMode: 'vault' as const, getPayloadCipher: options.getPayloadCipher }
-      : { encryptionMode: 'password' as const }),
+      : options.encryptionMode === 'plain'
+        // ADR-0080：账号是明文模式时显式选中这一支。**它只能是调用方选的**，
+        // 绝不是"没钥匙时的降级" —— 拿不到钥匙仍然是 no-encryption-password。
+        ? { encryptionMode: 'plain' as const }
+        : { encryptionMode: 'password' as const }),
     // 游标走 OpLogStore 接口，不碰 adapter：键名与事务语义只由存储层决定。
     getLastServerSeq: () => store.getLastServerSeq(),
     setLastServerSeq: (seq) => store.setLastServerSeq(seq),

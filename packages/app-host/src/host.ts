@@ -52,6 +52,8 @@ import type { VaultKeyMigrationResponse } from '@heyta/shared-schema';
 import { randomId } from './ids.js';
 import { hasLocalEraser, registerLocalEraser } from './local-erasure.js';
 import { createSyncClient } from './sync-wiring.js';
+import { readRemotePayloadMode, type HostPayloadMode } from './payload-mode-client.js';
+import { disableVaultPayloadEncryption, enableVaultPayloadEncryption } from './payload-mode-migration.js';
 import type { SyncClientOptions } from '@heyta/sync-client';
 import {
   createVaultKeyMigrationRemote,
@@ -68,6 +70,7 @@ import {
   type VaultKeyPackageRemote,
   type VaultKeySession,
 } from './vault-session.js';
+import { createVaultPayloadCipher } from '@heyta/sync-client';
 import type { PendingVaultCreation } from './vault-session.js';
 import { createVaultKeyPackageStore } from './vault-key-package-store.js';
 import type { VaultKeyPackageScope } from './vault-key-package-store.js';
@@ -226,6 +229,43 @@ export interface AppHost {
   ): Promise<VaultKeyMigrationResponse>;
   /** Release any staged root migration and remove its local encrypted draft. */
   cancelVaultRootRotation(): Promise<void>;
+
+  /**
+   * 这个账号当前在服务端上的载荷模式（ADR-0080）。界面只用来显示；
+   * 写路径上的一次判定在 `sync()` 里做，且**读失败按 e2ee**。
+   */
+  getPayloadMode(): Promise<HostPayloadMode>;
+
+  /**
+   * 关掉端到端加密：把服务端上全部保留历史解密重传（ADR-0080 §5.2）。
+   *
+   * 🔴 不可撤销的那一半：已经进了每日备份/快照的明文收不回来。
+   * 所以这个方法只负责做事，**要问的话在上面问**（危险确认在界面）。
+   * 调用前必须已解锁 —— 没解锁就没有能解密的钥匙，会直接拒绝。
+   */
+  disablePayloadEncryption(
+    onProgress?: (progress: { completed: number; total: number }) => void,
+  ): Promise<{ requestId: string; migratedOperationCount: number }>;
+
+  /**
+   * 重新开启加密的**第一步**：只生成本地 root 与包，不碰服务端。
+   *
+   * 与 `beginVaultRootRotation` 同形：先拿到 pending（含一次性恢复码），
+   * 用户把恢复码抄下来并回填之后，才走第二步去真的迁移。
+   */
+  beginPayloadEncryption(passphrase: string): Promise<PendingVaultCreation>;
+
+  /**
+   * 重新开启加密的**第二步**：全量重加密并原子发布首包与世代 1。
+   *
+   * 🔴 这一步会改写云端全部历史（明文 → 密文）。失败则整体不发布，
+   * 账号仍停在明文模式 —— 不允许出现半密半明。
+   */
+  confirmPayloadEncryption(
+    pending: PendingVaultCreation,
+    enteredRecoveryCode: string,
+    onProgress?: (progress: { completed: number; total: number }) => void,
+  ): Promise<{ keyVersion: number; payloadKeyVersion: number }>;
 
   /**
    * 当前物化状态。
@@ -577,13 +617,76 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
    * 未配置时返回 `undefined`，**不返回一个"什么也不做"的客户端** ——
    * 后者会把"没配置"伪装成"同步成功且没有新数据"，那是最坏的一类静默失败。
    */
-  const buildSyncClient = (): SyncClient | undefined => {
+  /**
+   * 读一次服务端载荷模式（ADR-0080）。**默认 e2ee**，读失败也回 e2ee。
+   *
+   * 🔴 故意**不留缓存**：`sync()` / `resolveConflict()` 每次都会先读一次再用，
+   * 任何"上次读到的值"都会在读取前被覆盖 —— 那种缓存是死代码，而它看起来
+   * 像是安全措施，比没有更糟（这一段是实测发现的：摘掉赋值，测试照样绿）。
+   */
+  const refreshPayloadMode = async (): Promise<HostPayloadMode> => {
+    const config = readSyncConfig();
+    const accountId = config.accountId?.trim();
+    if (accountId === undefined || accountId === '' || config.token === undefined) {
+      return 'e2ee';
+    }
+    return readRemotePayloadMode({
+      baseUrl: config.serverUrl,
+      token: config.token,
+      ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+    });
+  };
+
+  /**
+   * 立即作废当前会话并写下 auto-unlock fence（ADR-0050 的顺序）。
+   *
+   * 抽成局部函数是因为两个调用点（对象方法本身、以及"关掉加密之后"）必须
+   * **逐字相同**：任何一处少写一根字段，症状都是"登出后还能自动解锁"。
+   */
+  const invalidateVaultSessionNow = (): void => {
+    vaultEpoch += 1;
+    const config = readSyncConfig();
+    let scopeKey = vaultSessionScope;
+    if (scopeKey === undefined && config?.accountId !== undefined && config.serverUrl.trim() !== '') {
+      try {
+        scopeKey = `${config.accountId.trim()}\u0000${new URL(config.serverUrl).origin}`;
+      } catch {
+        // Invalid configuration is cleared by the caller.
+      }
+    }
+    if (scopeKey !== undefined) autoUnlockDisabledScope = scopeKey;
+    vaultSession?.lock();
+    vaultSession = undefined;
+    vaultSessionScope = undefined;
+    vaultSessionBinding = undefined;
+  };
+
+  const buildSyncClient = (payloadMode: HostPayloadMode): SyncClient | undefined => {
     const config = readSyncConfig();
     // 口令可以不填（那样同步会在 E2EE 那一步明确失败，且不会降级成明文），
     // 但地址与令牌缺一不可 —— 没有它们连请求都发不出去。
     if (config.serverUrl === '' || config.token === undefined) return undefined;
 
     if (config.accountId !== undefined && config.accountId.trim() !== '') {
+      // 🔴 账号模式决定写什么形状：readable 账号写密文会被服务端 400 拒掉，
+      // 而那是**用户主动关掉加密**之后必然发生的事 —— 静默失败最难查。
+      if (payloadMode === 'plain') {
+        return createSyncClient({
+          engine,
+          store,
+          baseUrl: config.serverUrl,
+          getToken: async () => readSyncConfig().token,
+          getPassword: async () => undefined,
+          encryptionMode: 'plain',
+          applyRemote: async (ops) => {
+            await engine.applyRemote(ops);
+          },
+          ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+          getInboundUploadAuthorization: options.getInboundUploadAuthorization ?? createInboundUploadAuthorization({
+            userId: config.accountId, secrets: inboundWorkerSecrets, journal: inboundCommitJournal,
+          }),
+        });
+      }
       return createSyncClient({
         engine,
         store,
@@ -635,28 +738,119 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     getVaultKeyPackageRemote: readVaultRemote,
 
     invalidateVaultSession(): void {
-      vaultEpoch += 1;
-      // Record the fence synchronously even when the first load is still in
-      // flight and has not installed a session yet.
-      const config = readSyncConfig();
-      let scopeKey = vaultSessionScope;
-      if (scopeKey === undefined && config?.accountId !== undefined && config.serverUrl.trim() !== '') {
-        try {
-          scopeKey = `${config.accountId.trim()}\u0000${new URL(config.serverUrl).origin}`;
-        } catch {
-          // Invalid configuration is cleared by the caller; no scope can be
-          // safely associated with it here.
-        }
-      }
-      if (scopeKey !== undefined) autoUnlockDisabledScope = scopeKey;
-      vaultSession?.lock();
-      vaultSession = undefined;
-      vaultSessionScope = undefined;
-      vaultSessionBinding = undefined;
+      invalidateVaultSessionNow();
     },
 
     async beginVaultRootRotation(newPassphrase: string): Promise<PendingVaultCreation | undefined> {
       return (await readVaultSession())?.beginRootRotation(newPassphrase);
+    },
+
+    async getPayloadMode(): Promise<HostPayloadMode> {
+      return refreshPayloadMode();
+    },
+
+    async disablePayloadEncryption(
+      onProgress?: (progress: { completed: number; total: number }) => void,
+    ): Promise<{ requestId: string; migratedOperationCount: number }> {
+      return withVaultExclusive(async () => {
+        const session = await readVaultSession();
+        if (session === undefined || session.state !== 'unlocked') {
+          // 没有解锁就没有能解密的钥匙。绝不允许"因为解不开就跳过"——
+          // 那会发布一份半密半明的历史。
+          throw new Error('Vault must be unlocked before encryption can be turned off');
+        }
+        const cipher = await session.getPayloadCipher();
+        const keyPackage = session.keyPackage;
+        if (cipher === undefined || keyPackage === undefined) {
+          throw new Error('Vault key package is unavailable');
+        }
+        const config = readSyncConfig();
+        if (config.token === undefined || config.token === '' || config.serverUrl.trim() === '') {
+          throw new Error('Sync credentials are unavailable');
+        }
+        const remoteOptions = {
+          baseUrl: config.serverUrl,
+          getToken: async () => config.token as string,
+          ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        };
+        const result = await disableVaultPayloadEncryption({
+          inventory: createVaultMigrationInventorySource(remoteOptions),
+          remote: createVaultKeyMigrationRemote(remoteOptions),
+          expectedKeyVersion: keyPackage.keyVersion,
+          requestId: `turnoff_${String(Date.now())}_${Math.random().toString(36).slice(2, 10)}`,
+          decrypt: async (ciphertext, operation) => cipher.decrypt(ciphertext, {
+            id: operation.id,
+            clientId: operation.clientId,
+            actionType: operation.actionType,
+            opType: operation.opType,
+            entityType: operation.entityType,
+            ...(operation.entityId === undefined ? {} : { entityId: operation.entityId }),
+            ...(operation.entityIds === undefined ? {} : { entityIds: operation.entityIds }),
+            timestamp: operation.timestamp,
+            schemaVersion: operation.schemaVersion,
+          }),
+          ...(onProgress === undefined ? {} : { onProgress }),
+        });
+        // 包已经在服务端被删掉，本地会话里的那一份从此无效：锁掉。
+        // （模式不在这里"记住"——下一次 sync() 会自己读一次服务端事实。）
+        invalidateVaultSessionNow();
+        return { requestId: result.requestId, migratedOperationCount: result.migratedOperationCount };
+      });
+    },
+
+    async beginPayloadEncryption(passphrase: string): Promise<PendingVaultCreation> {
+      const session = await readVaultSession();
+      if (session === undefined) throw new Error('Vault session is unavailable');
+      // 有包就不该走这条路（那是 root 轮换）。这条守卫与 session 里那条互为表里。
+      if (session.keyPackage !== undefined) {
+        throw new Error('Re-encryption requires an account without a key package');
+      }
+      return session.beginCreation(passphrase);
+    },
+
+    async confirmPayloadEncryption(
+      pending: PendingVaultCreation,
+      enteredRecoveryCode: string,
+      onProgress?: (progress: { completed: number; total: number }) => void,
+    ): Promise<{ keyVersion: number; payloadKeyVersion: number }> {
+      return withVaultExclusive(async () => {
+        const session = await readVaultSession();
+        if (session === undefined) throw new Error('Vault session is unavailable');
+        const config = readSyncConfig();
+        if (config.token === undefined || config.token === '' || config.serverUrl.trim() === '') {
+          throw new Error('Sync credentials are unavailable');
+        }
+        const remoteOptions = {
+          baseUrl: config.serverUrl,
+          getToken: async () => config.token as string,
+          ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        };
+        const result = await session.confirmAndMigrateReEncryption(pending, enteredRecoveryCode, async (input) => {
+          const cipher = createVaultPayloadCipher({
+            current: { keyVersion: 1, rootKey: input.targetRootKey },
+          });
+          await enableVaultPayloadEncryption({
+            inventory: createVaultMigrationInventorySource(remoteOptions),
+            remote: createVaultKeyMigrationRemote(remoteOptions),
+            package: input.targetPackage,
+            requestId: `turnon_${String(Date.now())}_${Math.random().toString(36).slice(2, 10)}`,
+            encrypt: async (plaintext, operation) => cipher.encrypt(plaintext, {
+              id: operation.id,
+              clientId: operation.clientId,
+              actionType: operation.actionType,
+              opType: operation.opType,
+              entityType: operation.entityType,
+              ...(operation.entityId === undefined ? {} : { entityId: operation.entityId }),
+              ...(operation.entityIds === undefined ? {} : { entityIds: operation.entityIds }),
+              timestamp: operation.timestamp,
+              schemaVersion: operation.schemaVersion,
+            }),
+            ...(onProgress === undefined ? {} : { onProgress }),
+          });
+          return { keyVersion: 1, payloadKeyVersion: 1 };
+        });
+        return result;
+      });
     },
 
     async confirmVaultRootRotation(
@@ -767,7 +961,7 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
 
     async sync(): Promise<SyncStatus> {
       return withVaultExclusive(async () => {
-        const client = buildSyncClient();
+        const client = buildSyncClient(await refreshPayloadMode());
         if (client === undefined) return notConfigured();
         return client.sync();
       });
@@ -778,7 +972,7 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
       choice: 'keep-local' | 'keep-remote',
     ): Promise<SyncStatus> {
       return withVaultExclusive(async () => {
-        const client = buildSyncClient();
+        const client = buildSyncClient(await refreshPayloadMode());
         if (client === undefined) return notConfigured();
         return client.resolveConflict(conflict, choice);
       });

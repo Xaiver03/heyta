@@ -450,7 +450,6 @@ export {
   completePasskeyRegistration,
   confirmLegalConsent,
   deleteAccountAvatar,
-  decodeAvatarCipher,
   deletePasskey,
   extractAuthLinkToken,
   fetchAccountAvatar,
@@ -478,7 +477,6 @@ export {
   requestPasswordReset,
   resetPasswordWithToken,
   resolveAccountAvatarImage,
-  resolveAvatarKey,
   setInitialPassword,
   updateAccountDisplayName,
   updateAccountLocale,
@@ -487,8 +485,7 @@ export {
   verifyMagicLink,
   closeAccount,
   type AccountAvatarImage,
-  type AvatarDecodeResult,
-  type AvatarKey,
+  type AvatarFetchResult,
   type DisplayNameWritePlan,
   type HostedAuthFailure,
   type HostedAuthFailureReason,
@@ -1105,3 +1102,19 @@ export {
   type AnnouncementClientOptions,
   type AnnouncementsResult,
 } from './announcement-client.js';
+
+// ADR-0080：关掉端到端加密 = 一次整库解密重传（宿主编排，不碰钥匙）。
+export {
+  disableVaultPayloadEncryption,
+  enableVaultPayloadEncryption,
+  type EnableEncryptionOptions,
+  DisableEncryptionError,
+  type DisableEncryptionOptions,
+  type DisableEncryptionResult,
+} from './payload-mode-migration.js';
+export {
+  payloadModeUrl,
+  readRemotePayloadMode,
+  type HostPayloadMode,
+  type PayloadModeReadOptions,
+} from './payload-mode-client.js';
