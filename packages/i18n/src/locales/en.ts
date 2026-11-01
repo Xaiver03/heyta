@@ -3907,7 +3907,7 @@ export const en = {
   // ── Home SEO (was hard-coded in index.html; now in the table so every page
   //    can be generated from one source) ──
   'site.home.seo.title': 'heyta: local-first task management you can self-host',
-  'site.home.seo.description': 'heyta is a local-first task manager for tasks, lists, habits and focus. Your data stays on your device first, syncs end-to-end encrypted, and can run on your own server.',
+  'site.home.seo.description': 'heyta is a local-first task manager for tasks, lists, habits and focus. Your data stays on your device first, can sync with end-to-end encryption turned on, and can run on your own server.',
 
   // ── Features ──
   // ⚠️ SEO audit 2026-10-19: `seo.title` only — the visible copy (`site.features.title`) is
@@ -4084,7 +4084,7 @@ export const en = {
   // ⚠️ SEO audit 2026-10-19: `seo.title` only. "Your data, in your hands" is a claim, not a
   //    query; the two real terms already used in the description moved up into the title.
   'site.integrations.seo.title': 'What sets heyta apart: end-to-end encryption and self-hosting',
-  'site.integrations.seo.description': 'What sets heyta apart: end-to-end encrypted sync, a self-hostable server, AI assistant access, bring-your-own AI endpoints, complete export, and no feature gating.',
+  'site.integrations.seo.description': 'What sets heyta apart: optional end-to-end encrypted sync, a self-hostable server, AI assistant access, bring-your-own AI endpoints, complete export, and no feature gating.',
   'site.integrations.title': 'Your data, in your hands',
   'site.integrations.lede': 'Most tools keep your data on their servers by default. heyta is the other way round: **your data stays in your hands**, and it is only touched when you allow it. This page is where that difference becomes concrete.',
   'site.integrations.e2ee.title': 'End-to-end encryption (optional)',
@@ -4661,12 +4661,12 @@ export const en = {
   'web.sync.help.link': 'View help',
   'site.signin.recover.link': 'Recover your passkey in the app',
 
-  'site.og.imageAlt': 'heyta share card: local-first task management where your data lands on your own device first; end-to-end encrypted sync, self-hostable, no feature gating.',
+  'site.og.imageAlt': 'heyta share card: local-first task management where your data lands on your own device first; optional end-to-end encrypted sync, self-hostable, no feature gating.',
   // 🔴 R16：the card is **generated per language** (og-card.png / og-card-en.png),
   //    so these are the words actually printed on it — not a description for alt.
   'site.og.card.title1': 'Local-first task management',
   'site.og.card.title2': 'Your data lands on your own device first',
-  'site.og.card.lede': 'End-to-end encrypted sync · Self-hostable · No feature gating',
+  'site.og.card.lede': 'Optional end-to-end encrypted sync · Self-hostable · No feature gating',
 
   // ═══════════════════════════════════════════════════════════════════════
   // M3 第四刀（sync）收尾 —— entity names / conflict reasons shared by both

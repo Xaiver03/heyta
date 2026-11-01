@@ -78,7 +78,7 @@ function Cover(): React.JSX.Element {
       <p className="pd-cover__sub">功能对标滴答清单，但可以自建自托管</p>
       <div className="pd-chips">
         <span className="pd-chip">本地优先</span>
-        <span className="pd-chip">端到端加密</span>
+        <span className="pd-chip">端到端加密（可选）</span>
         <span className="pd-chip">开源 MIT</span>
       </div>
       <p className="pd-cover__meta">产品介绍 · 2026</p>
@@ -291,11 +291,11 @@ function Privacy(): React.JSX.Element {
   return (
     <div className="pd-body">
       <Eyebrow>隐私架构</Eyebrow>
-      <h2 className="pd-h2 pd-h2--onDark">数据先落本地，服务端只收密文</h2>
+      <h2 className="pd-h2 pd-h2--onDark">数据先落本地；开启加密后，服务端只收密文</h2>
       <div className="pd-grid4">
         <Card n="01" title="本地存储" body="SQLite 或 IndexedDB，就落在你自己那台设备上。" />
         <Card n="02" title="op-log 事件溯源" body="一个用户意图 = 一条 op，只追加，不覆盖历史。" />
-        <Card n="03" title="端到端加密" body="密钥不出设备，上行之前载荷已经是密文。" />
+        <Card n="03" title="端到端加密（可选）" body="默认开启：密钥不出设备，上行之前载荷已经是密文。也可以关掉 —— 那时服务端能读到任务内容。" />
         <Card n="04" title="云端只是通道" body="同步不是事实源，随时换成你自己那台服务器。" />
       </div>
     </div>
