@@ -201,3 +201,15 @@ Team `V5S2LT9YV8`，有效期到 2044）；Android 的 release keystore 在
 一次是只查仓库、没查 `~/.gradle/gradle.properties`（四个签名键其实在）。
 判据要能证明"读得到"，读不到要**红**，不许静默跳过。
 
+## ☁️ 构建搬到 `linux-dev`
+
+Web / 共享包的构建走远端，产物留那边：
+
+```bash
+pnpm build:web:remote          # rsync + 远端 pnpm -r build + web 打包
+pnpm build:web:remote:pull     # 需要本机产物时（打 macOS .app 之前）再拉回 apps/web/dist
+pnpm remote:typecheck          # 同一套同步，跑 pnpm typecheck
+```
+
+Android 构建默认也走 `linux-dev`（`scripts/run-gradle.mjs`）。两条路都**不静默回落本机**：
+远端连不上就红，唯一逃生门是显式 `HEYTA_REMOTE_FALLBACK_LOCAL=1`。
