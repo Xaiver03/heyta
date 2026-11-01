@@ -1114,6 +1114,34 @@ New-SelfSignedCertificate -CertStoreLocation 'Cert:\LocalMachine\My'  ⇒ OK 626
 下一轮的最小可验路径：用 `git archive` 把 `apps/desktop-windows` 与它的依赖推到那台
 （与鸿蒙那两条脚本同一手法，避开"那台不是 origin 克隆"的坑），再 `dotnet build` + `makeappx`。
 
+### 16.5 读数采集器（本轮新增，§16 那张表不再手抄）
+
+```bash
+node scripts/four-ends-readings.mjs          # 打印表
+node scripts/four-ends-readings.mjs --json    # 给别的脚本吃
+```
+
+它**只读**：本机看 `/Applications/Heyta.app` 与 `apps/web/dist`，远端通过 ssh 问
+`windows-pc` 要 MSIX 体积与 `explorer.exe` 计数，`adb` 问设备，`xcrun` 问模拟器与是否装了
+`Simulator.app`。判据只有两条，且都要求"缺了就红"：
+① 本机产物必须在位（缺 ⇒ exit 1，那是"收尾没做"，不是"没采到读数"）；
+② 远端那一端要么给读数、要么明确写 `BLOCKED:` 带原因 —— **不许静默跳过**。
+
+2026-11-02 本轮实跑：
+
+```
+✅ macOS     1151456 B / cloud.finlaw.heyta.desktop / team V5S2LT9YV8 / 包内 web-dist c871796595604f1f
+✅ Web       c871796595604f1f
+⚠️ Android   设备 127.0.0.1:5556        → HEYTA_ANDROID_SERIAL=127.0.0.1:5556 pnpm verify:android-vault-storage
+⚠️ iOS       Booted：heyta (742A8651-…) → BLOCKED: 这台机没有 Simulator.app（无 GUI 的 Xcode）
+⚠️ Windows   MSIX 101478614 B（已签名）  → BLOCKED: 那台没有登录的桌面会话（explorer.exe=0）
+⚠️ HarmonyOS HAP 21182580 B（unsigned）  → node scripts/build-harmony-rnohjs-windows.mjs
+```
+
+**一处一致性旁证**：`.app` 内 `Contents/Resources/web-dist/index.html` 的 sha 前 16 位
+是 `c871796595604f1f`，与 `apps/web/dist` 那份**逐位相同** —— 证明装到机器上的那个包
+里嵌的是本轮构建的界面，不是旧产物。
+
 ### 16.3 复跑命令（逐端）
 
 ```bash
