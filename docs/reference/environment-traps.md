@@ -12430,6 +12430,19 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     交互式登录过的机器上把 `.pfx` 备好再拷过去。**不要**为了让它变绿去跳过签名 ——
     未签名的 MSIX 装不进 Windows，那等于把"没验"写成"验过"。
 
+    **补（同日，已实测）：坑只在 `Cert:\CurrentUser\My`，`Cert:\LocalMachine\My` 是好的。**
+    同一个 ssh 会话里：
+
+    ```
+    New-SelfSignedCertificate -CertStoreLocation 'Cert:\CurrentUser\My'   ⇒ 0x80090010 NTE_PERM
+    New-SelfSignedCertificate -CertStoreLocation 'Cert:\LocalMachine\My'  ⇒ OK 626657655A27…（有私钥）
+    ```
+
+    拿到机器店的证书之后 `signtool sign /sm /sha1 <thumb>` 成功、`signtool verify /pa` **0 错误**，
+    `heyta.msix` 101,478,614 bytes 已签名。
+    **规矩**：ssh 里要签名就**用机器店**（`/sm` + `Cert:\LocalMachine\My`），
+    不要因为用户店失败就断言"ssh 签不了"。
+
 630. 🔴 **没有 GUI 的 `xcrun simctl io screenshot` 全是黑帧 —— 而应用其实跑得好好的**（2026-11-02，iOS 首屏取证）：
 
     模拟器上 `xcrun simctl launch` 起了应用（pid 有），日志里也看得见 RN 在挂载
