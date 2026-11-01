@@ -425,12 +425,18 @@ export class VaultKeyMigrationService {
         select: { payloadMode: true },
       });
       const currentMode = syncStateRow?.payloadMode === 'readable' ? 'readable' : 'e2ee';
-      if (currentMode === targetMode) {
+      /*
+       * 🔴 **只有"再一次关掉加密"才是无意义的一趟。**
+       *
+       * `e2ee → e2ee` 是**合法的**：那是 root 轮换（ADR-0050）—— 换一把根钥匙、
+       * 全量重加密，模式不变。这里曾经写成 `currentMode === targetMode` 就把两条都拒了，
+       * 于是**根轮换被整个挡死**（真浏览器 E2E 报 `wrong_payload_mode` 才抓出来）。
+       * 判据：`payload-mode-migration.service.spec.ts` 的"同模式轮换"那一格。
+       */
+      if (targetMode === 'readable' && currentMode === 'readable') {
         throw new VaultKeyMigrationError(
           'wrong_payload_mode',
-          targetMode === 'readable'
-            ? 'this account already stores plaintext payloads'
-            : 'this account already stores end-to-end encrypted payloads',
+          'this account already stores plaintext payloads',
           409,
         );
       }

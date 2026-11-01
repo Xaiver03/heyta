@@ -269,3 +269,48 @@ describe('关掉加密的 publish（ADR-0080）', () => {
     expect(state.syncState.payloadMode).toBe('e2ee');
   });
 });
+
+describe('同模式轮换（ADR-0050 root rotation）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.migration = null;
+    state.stagedOps = [];
+    state.payloadFlags = [];
+  });
+
+  it('🔴 e2ee → e2ee 的 begin 必须被接受（换根钥匙时模式不变）', async () => {
+    // 这条是回归判据：曾经写成 `currentMode === targetMode` 就把根轮换一起拒了，
+    // 真浏览器 E2E 报 `wrong_payload_mode` 才暴露。
+    state.syncState = { userId: 1, lastSeq: 2, payloadMode: 'e2ee', snapshotData: null };
+    state.packageRow = {
+      userId: 1,
+      keyVersion: 1,
+      packageData: packageFor(1),
+      activePayloadKeyVersion: 1,
+      updatedAt: 1n,
+    };
+    const service = new VaultKeyMigrationService();
+
+    await service.begin(1, {
+      requestId: 'rotate-1',
+      targetMode: 'e2ee',
+      expectedKeyVersion: 1,
+      expectedLatestSeq: 2,
+      targetPayloadKeyVersion: 2,
+      package: packageFor(2),
+      expectedOperationCount: 2,
+      expectedPayloadBytes: 2 * 64,
+    });
+
+    expect(state.migration.targetMode).toBe('e2ee');
+    expect(state.migration.keyVersion).toBe(2);
+    expect(state.migration.targetPayloadKeyVersion).toBe(2);
+  });
+
+  it('readable → readable 仍然要拒（没有可关的东西）', async () => {
+    state.syncState = { userId: 1, lastSeq: 2, payloadMode: 'readable', snapshotData: null };
+    const service = new VaultKeyMigrationService();
+
+    await expect(service.begin(1, readableManifest())).rejects.toMatchObject({ code: 'wrong_payload_mode' });
+  });
+});
