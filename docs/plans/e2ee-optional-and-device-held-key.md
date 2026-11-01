@@ -1,6 +1,6 @@
 # E2EE 可选 + 钥匙由设备持有：实施计划（ADR-0080）
 
-> 状态：**进行中 · 阻塞**（S0–S7 代码与判据侧已收口；端到端与四端装机被外部条件挡住，见 §11）
+> 状态：**进行中 · S0–S4 与 S7 收口；S5 缺三端原生钥匙串、S6 缺"开启加密"表单**（逐阶段对账见 §13；端到端与四端装机的边界见 §11）
 > 决策：[ADR-0080](../adr/0080-e2ee-is-optional-with-device-held-key.md)
 > 依据：[key-decisions](../agents/key-decisions.md)（2026-11-01 那条）、[db-migrations](../agents/db-migrations.md)、[overlay-feedback](../agents/overlay-feedback.md)、[ui-acceptance](../agents/ui-acceptance.md)
 
@@ -755,3 +755,78 @@ Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 r
 
 证据：`apps/mobile/evidence/android-install-20261101/`
 —— `02-first-run-fixed.png`（新文案）、`04-welcome-after-fix.png`、`05-main.png`（进到主界面）。
+
+---
+
+## 13. S0–S7 逐阶段盘点（2026-11-02，第 33 轮）
+
+上面每一节的"落地读数"都是**当时**的现量。这一节是一次**逐阶段对账**：哪些阶段真的收口了、
+哪些只是"代码在了但判据没到位"、哪些还缺一块。**判据能红**一律注明变异臂；**本轮新修的两处**
+（`§13.5` 的两条）也在这里。
+
+### 13.1 结论表
+
+| 阶段 | 结论 | 依据（判据 + 变异臂） | 还缺什么 |
+|---|---|---|---|
+| **S0** 契约与模式判定 | ✅ 收口 | `server/tests/payload-mode.spec.ts` 5/5；变异臂"fail-closed 改 fail-open" ⇒ 2 红；`check:migrations` / `check:schema-migration-drift` 绿 | 无。⚠️ 计划正文写的是"无行 ⇒ e2ee"，**ADR-0081 之后无行 ⇒ 明文**（读失败仍 e2ee）—— 代码与 ADR 一致，本文件 §3 S0 的措辞是反转前的 |
+| **S1** 闸门模式化 | ✅ 收口 | `server/tests/payload-gate.spec.ts` 8/8（四格逐格 + 两条路由拒绝 + 一条 fail-closed）；变异臂"两种都放行" ⇒ 6 红 | 无 |
+| **S2** 关闭：整库解密重传 | ✅ 收口 | `server/tests/integration/payload-mode-migration.integration.spec.ts`（真 PostgreSQL + 真 HTTP）；`payload-mode-migration.service.spec.ts` 9/9；app-host 侧 `payload-mode-migration.spec.ts` 8/8；变异臂"跳过解不开的 op" ⇒ 1 红 | 无 |
+| **S3** 打开：新 root + 全量加密 | ✅ 收口 | `vault-session.spec.ts` 20/20（含"世代必须从 0 到 1"）；变异臂"世代校验放宽成 `<= 0`" ⇒ 1 红 | 无 |
+| **S4** 客户端模式感知 | ✅ 收口 | `packages/sync-client/tests/plain-payload-mode.spec.ts` 3/3；变异臂"错配降级成普通 Error" ⇒ 1 红；`@heyta/sync-client` 174/174 | 无 |
+| **S5** 钥匙默认设备持有 | ⚠️ **部分** | Web：`vault-root-cache.spec.ts` 6/6（变异臂"换 localStorage" ⇒ 1 红）；移动端：`apps/mobile/src/db/open-host.ts` 已把 `vaultRootKeyStore` 接进宿主、默认值改成 `useState(true)` | 🔴 **三端原生钥匙串都没有**（ADR-0080 §九 附记已承认）：macOS 壳是 WKWebView 载 `web-dist`，接 `security`/Keychain 要先造 Swift↔JS 桥；Windows/Linux 未做。移动端**设备腿未验**（"创建 vault → 冷启动免输"需要当前源码的 Release 包） |
+| **S6** 界面：两个轴 + 危险确认 | ⚠️ **部分** | 关闭方向：组件 + 危险确认 + 三条后果逐条数（`encryption-mode-section.spec.tsx` 14/14，变异臂"删掉不可逆那条" ⇒ 1 红）；面板已挂进 `VaultSettingsPanel`；钥匙位置轴 4/4；本机无密钥包时不画"创建"入口 2/2 | 🔴 **"开启加密"的表单没画**：编排队列（`beginPayloadEncryption` / `confirmPayloadEncryption` / `confirmAndMigrateReEncryption`）全在且各自有判据，但界面只有 `onDisable` 一个回调位；要"输口令 + 抄/回填恢复码"两段表单。**不画按钮**的规矩仍在生效，所以这不是"漏了一个按钮"，是"还原路径只能靠有钥匙的老设备/恢复码" |
+| **S7** 对外口径 | ✅ 收口（本轮补完） | `check:legal-*` 五道绿；绝对句扫描 0 命中；`check:ui-language` 绿（476 文件 / 823 处文案）；i18n 30/30；landing 1455/1455 | 无。本轮补掉了**四处共享词条**（见 §13.2）——上传前那轮只修了界面与下载页 |
+
+### 13.2 本轮补的两处（都被现量抓出来，不是自查）
+
+**① `GET /api/sync/payload-mode` 被拉的次数跟着动作数涨**（`VaultSettingsPanel`）
+
+真浏览器 e2e 抓的：`e2e/tests/vault-settings.spec.ts` 的夹具是**故意严格**的，一次建钥匙/确认/
+锁定/解锁/轮换流程里记到了 **15 条** `unexpected`。根因是上一轮我把这条读挂在了
+`[baseUrl, token, revision]` 上，而 `run()` 每成功一次就 `setRevision(+1)`。
+
+改法：依赖里去掉 `revision`（两个方向都自己 `setPayloadMode`，本地刚改完不必再问服务端）。
+判据钉的是**性质**而不是绝对条数（绝对数取决于 StrictMode 与挂载次数，dev 下实测 10 条）：
+"reload 之后那段动作序列，一条新的模式读都不该产生"。变异臂：把 `revision` 挂回去 ⇒ 15 vs 10，红。
+
+同批把新端点登记进四处**故意严格**的夹具，并把 vault 那条"一次 404 都不许有"改回
+"恰好两条探库 404"（沿革写在注释里：S6 让"建库前探一次"按设计回来了）。
+
+**② 对外口径里还有四处把端到端加密写成无条件事实**
+
+`site.home.seo.description` / `site.integrations.seo.description` / `site.og.imageAlt` /
+`site.og.card.lede`。第三条最要紧：它进**每一份** HTML（78 份），所以"首页改了、文档页没改"
+这种漏法在绝对句扫描里看不见 —— 扫描抓的是那两个具体句子，而这四处是同一种错的另一个说法。
+
+改法：加限定词不改语义；分享卡**真图重新生成**（`gen-og-card.mjs`），否则 alt 说"可选"、图上说"必选"。
+
+### 13.3 门禁读数（本轮）
+
+| 项 | 读数 |
+|---|---|
+| `pnpm check` | 见 §13.4 —— 本轮修掉 20 条浏览器失败后**重跑中**，读数以重跑为准 |
+| `pnpm verify:vault-web` | **7 绿 / 1 红**，唯一的红是 `vault/ai-egress.spec.ts`（AI 拆解按钮 `not visible`），与本线无关 |
+| web 侧五套（加密轴） | 28/28 |
+| `@heyta/sync-client` / `server` 加密轴 | 174/174、22/22（payload-mode 5 + gate 8 + migration service 9） |
+
+### 13.4 `pnpm check` 里那 40 条浏览器失败：20 条是我的，20 条不是
+
+第一次整链跑（HEAD `f49fc49f7` 工作树）报 **40 failed / 450 passed**。逐条看错误正文后分成两堆：
+
+**我的（20 条，本轮已修）**：`account-email-change-and-sessions`(7)、`admin-console`(9)、
+`renew-panel`(6)、`profile-avatar-plaintext`(1)、`vault-settings`(1)。
+全部是"新端点没登记进严格夹具" + 那一条真的拉多了。重跑：15/15、10/10、3/3 全绿。
+
+**不是我的（约 16 条）**：`help-entry-ux`(4)、`inbound-automation`(3)、`public-facts`(3)、
+`habit-month`(3)、`habit-year`(1)、`sidebar-resize`(1)、`calendar-capture`(1)。
+共同形状是"元素数量/文案对不上"，例如 `help-entry-ux` 报
+`getByTestId('settings-sheet').getByRole('heading')` 期望 1 实得 **0** —— 设置页骨架变了；
+`inbound-automation` 是同一按钮解析到 **2** 个元素（重复渲染）。
+工作树里有另一条线未提交的 36 个文件（AI 分层重构，含 `apps/web/src/App.tsx`），
+**在那批改动落定之前，整链不可能绿**。本线不替它改，也不把它算进自己的账。
+
+### 13.5 一句话回答"完没完"
+
+**S0–S4、S7 完了；S5、S6 各缺一块，且缺的那两块都不是"再点几下"的量：**
+S5 缺三端原生钥匙串（macOS 要先造 Swift↔JS 桥），S6 缺"开启加密"的两段表单。
+两者的**库层与会话层入口都已经在且有判据**，所以缺的是界面与平台通道，不是协议。
