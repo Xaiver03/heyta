@@ -719,3 +719,24 @@ spec 随后重新登录拿 `signedIn.token` 再建 C；C 的 `refreshFromRemote`
 
 ⚠️ 过程事故照实记：第一次修 legacy 时替换串写得太泛，**误改了第一条测试的入口**；
 `git checkout` 恢复后改成"按 legacy 测试块切片"重做，才只动那一处。
+
+### 12.10 门禁现状（本线收尾时的准确读数）
+
+`pnpm check` **exit=1**，非绿输出只有一条，且**不是本线的**：
+
+```
+❌ 臂 h：出厂映射表有目录覆盖不全 ⇒ profile-panel:未认领:r15b-3-ready-dark.png
+```
+
+- 归属：[ADR-0079](0081-encryption-is-opt-in-not-default.md) 那条线删掉了产出这些图的
+  `e2e/tests/profile-avatar-e2ee.spec.ts`，但 `apps/web/evidence/profile-panel/r15b-*.png`
+  四张仍留在树上；该目录的 `README.md` 已经写明"这四张已作废"。
+- 为什么会现在才红：这批证据在此之前是**未提交**状态，我按用户授权把它们入库之后，
+  检查器才开始扫到它们。
+- 🔴 **本线不擅自删**：`docs/plans/calendar-profile-handoff.md` 里有两处按**路径**引用这四张图
+  （`check:doc-citations` 验路径存在性）。删图要连同那两处引用一起改，属该线收尾。
+
+**在此之前**，本线自己那批门禁一直全绿：`check:migrations`、`check:schema-migration-drift`、
+`check:integration-coverage`、`check:row-single-source`（`.ht-danger` 已收进 `ht-sheet` 族）、
+`check:settings-no-prose`（0 处）、`check:legal-*` 五道、`check:ui-language`、
+`check:e2e-specs-parse`、`check:docs` / `check:doc-citations` / `check:adr-numbering`。
