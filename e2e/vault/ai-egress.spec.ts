@@ -114,6 +114,11 @@ test('unlocked vault exports only the disclosed task fields to the breakdown pro
     await addTask(page, target);
     await addTask(page, unrelated);
     await switchView(page, '习惯');
+    /*
+     * 习惯的"新建"现在是**对话框**（`habits-add-open` → `ht-habit-create-dialog`），
+     * 输入框不再常驻在页面上 —— 旧的"直接 fill 占位符"会一直等不到元素。
+     */
+    await page.getByTestId('habits-add-open').click();
     const input = page.getByPlaceholder('新习惯，例如「喝水」');
     await input.fill(habit); await input.press('Enter');
     await expect(page.locator('[data-testid^="habit-row-"]').filter({ hasText: habit })).toBeVisible();
