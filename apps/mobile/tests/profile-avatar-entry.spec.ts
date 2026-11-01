@@ -10,11 +10,9 @@
  *
  * ## 这一族判据要防的那一种事故
  *
- * 头像是**加密的**，所以"取不到"有五种原因，而五种对应的用户动作不同。
- * web 那边曾经把 `AvatarDecodeResult` 的失败支并成一个 `undefined`：
- * 口令不对的人因此被告知"你还没有头像"，他接着点「换一张」，
- * **把自己原来那张覆盖掉了**。数据没有丢，丢的是那张图 —— 没有任何一层会报错。
- * 移动端接的是同一个功能，所以这里从第一天就把五种分开钉住。
+ * 头像**不再是加密载荷**（ADR-0079，2026-11-01）：它是基础资料，明文读写，
+ * 只需要登录令牌。所以"取不到"只剩一种原因：这次往返没成。
+ * 本组同时钉住**反向形状**：本屏不许再出现口令解锁、密文解不开这类分支。
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -40,8 +38,8 @@ const fetchImageBody = (): string => {
   const src = screen();
   const start = src.indexOf('const fetchAvatarImage');
   expect(start, '源码里找不到 `const fetchAvatarImage`').toBeGreaterThan(-1);
-  const end = src.indexOf('const needsPassword', start);
-  expect(end, '源码里找不到 `const needsPassword`').toBeGreaterThan(start);
+  const end = src.indexOf('const prepareMessage', start);
+  expect(end, '源码里找不到 `const prepareMessage`').toBeGreaterThan(start);
   return src.slice(start, end);
 };
 
@@ -90,11 +88,13 @@ describe('移动端 Profile 的头像（R15b）', () => {
     expect(fetchImageBody()).toMatch(/readSyncConfig\(\)/u);
   });
 
-  it('🔴 读侧的每种失败各有一句，且都不是"头像没有传上去"', () => {
+  it('🔴 读侧只剩"暂时读不到"；口令 / 密文那一族分支必须不存在', () => {
     const src = screen();
-    expect(src).toContain('common.profile.avatar.undecryptable');
     expect(src).toContain('common.profile.avatar.unreadable');
-    expect(src).toContain('common.profile.avatar.needPassword');
+    // 反向：明文之后这两句必须下线（ADT-0079 的反向形状）。
+    expect(src).not.toContain('common.profile.avatar.undecryptable');
+    expect(src).not.toContain('common.profile.avatar.needPassword');
+    expect(src).not.toContain('needsPassword');
     // 上传失败那句只准出现在**写侧**：读侧用它就是在讲一件没发生过的事。
     const readSlice = fetchImageBody();
     expect(readSlice).not.toContain('avatar.failed');
@@ -110,12 +110,14 @@ describe('移动端 Profile 的头像（R15b）', () => {
     expect(body).toMatch(/setAvatarHash\(outcome\.avatarHash\)/u);
   });
 
-  it('没有口令时**不发**上传，说的是"为什么现在不能换"', () => {
+  it('🔴 上传不再要求口令：没有登录令牌才拦，且拦下时不说"缺 E2EE 口令"', () => {
     const body = changeBody();
-    expect(body).toMatch(/password === ''/u);
-    expect(body).toMatch(/common\.profile\.avatar\.needPassword/u);
+    expect(body).not.toMatch(/password === ''/u);
+    expect(body).not.toContain('common.profile.avatar.needPassword');
+    expect(body).toMatch(/token === ''/u);
     // 正向对照：过了这道闸才走 pick/upload。
     expect(body).toMatch(/await pick\(/u);
+    expect(body).toMatch(/uploadAccountAvatar\s*\(/u);
   });
 
   it('🔴 "这台设备没有读图通道"是单独一句，不折叠进"图不行"', () => {
@@ -183,7 +185,6 @@ describe('移动端 Profile 的头像（R15b）', () => {
     const en = readFileSync(EN, 'utf8');
     const keys = [
       'common.profile.avatar.uploaded',
-      'common.profile.avatar.undecryptable',
       'common.profile.avatar.unreadable',
       'common.profile.loadFailed',
       'mobile.profile.avatar.noChannel',

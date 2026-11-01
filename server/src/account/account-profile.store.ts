@@ -12,13 +12,13 @@ import { prisma } from '../db';
 /**
  * 资料的读取形状。**登录响应也用它**（`auth.ts` 里那三处），
  * 所以 `select` 只有一个实现 —— 三处各写一遍的话，
- * 迟早有一处会把 `cipher` 一起拖进登录路径。
+ * 迟早有一处会把头像字节一起拖进登录路径。
  */
 export const readAccountProfile = async (userId: number): Promise<{
   displayName: string | null;
   avatarHash: string | null;
 }> => {
-  // 🔴 `select` 里**只有** `hash`，没有 `cipher`：头像密文是 100 KB 量级，
+  // 🔴 `select` 里**只有** `hash`，没有 `data`：头像字节是 100 KB 量级，
   // 而这段读的是登录与鉴权路径 —— 每次建立会话都要跑。要图是另一条 GET。
   // 判据：`server/tests` 里那条"登录响应的字节数必须很小"就是钉这一行的。
   const user = await prisma.user.findUnique({

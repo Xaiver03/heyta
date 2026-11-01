@@ -63,7 +63,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '为什么不核验，理由要说清，因为它不是疏忽：heyta 注册只需要一个邮箱地址。没有姓名、没有电话、没有证件、没有人脸，也没有任何身份要素 —— 我们的数据库里只有这一个直接标识符。要核验年龄，就必须先收集比现在多得多的个人信息，那与"数据最小化"直接冲突。**我们选择的不是"更安全"，而是"更少收集"，于是把年龄这条边界交给了声明。**',
+        text: '为什么不核验，理由要说清，因为它不是疏忽：heyta 注册只需要一个邮箱地址。没有姓名、没有电话、没有证件、没有人脸识别，也没有任何身份要素 —— 我们的数据库里只有这一个直接标识符（另有你自己选填的昵称与一张头像图片，它们不用于识别）。要核验年龄，就必须先收集比现在多得多的个人信息，那与"数据最小化"直接冲突。**我们选择的不是"更安全"，而是"更少收集"，于是把年龄这条边界交给了声明。**',
       },
       {
         kind: 'callout',
@@ -300,6 +300,11 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期', '变化'],
         rows: [
+          [
+            '1.4',
+            '2026-11-01',
+            '头像改为明文基础资料（ADR-0079）：第十节引用「没有任何身份要素」时补上限定 —— 你自己选填的昵称与一张头像图片不用于识别。',
+          ],
           ['1.0', '2026-10-01', '首版草案（尚未生效）：作为《个人信息保护法》第 31 条要求的专门处理规则发布；明确不核验年龄；条例义务逐条判适用性，其中第 36 条如实登记一处未落地。'],
           [
             '1.1',
@@ -352,7 +357,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'The reason is stated because it is a deliberate trade-off rather than an oversight: registering for heyta requires one email address and nothing else — no name, no phone number, no identity document, no face scan, no identity attribute of any kind. Our database holds exactly one direct identifier. Verifying age would require collecting far more personal information than we collect today, which conflicts head-on with data minimisation. **We chose "collect less" rather than "verify more", and handed the age boundary over to declarations.**',
+        text: 'The reason is stated because it is a deliberate trade-off rather than an oversight: registering for heyta requires one email address and nothing else — no name, no phone number, no identity document, no face scan, no identity attribute of any kind. Our database holds exactly one direct identifier (plus the nickname and avatar image you may choose to add; neither is used to identify you). Verifying age would require collecting far more personal information than we collect today, which conflicts head-on with data minimisation. **We chose "collect less" rather than "verify more", and handed the age boundary over to declarations.**',
       },
       {
         kind: 'callout',
@@ -589,6 +594,11 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date', 'Change'],
         rows: [
+          [
+            '1.4',
+            '2026-11-01',
+            'Avatars become plaintext profile data (ADR-0079): where section ten says there is no identity attribute, it now adds that the nickname and avatar image you may choose to add are not used to identify you.',
+          ],
           ['1.0', '2026-10-01', 'First draft (not yet in force): published as the dedicated processing rules required by Article 31; states that we do not verify age; assesses each article of the Regulations for applicability, and records one unmet point under Article 36.'],
           [
             '1.1',
@@ -613,11 +623,10 @@ const en = [
 
 export const minors: LegalDocument = {
   id: 'minors',
-  // 🔴 1.2 → 1.3：新增第九节（GDPR 年龄规则）。改的是"哪一条我们做不到"的披露面，
-  // 不是措辞：同意留痕必须能回答"他同意的那一版里，有没有写明我们不运作第八条"。
-  version: '1.3',
+  // 🔴 1.3 → 1.4：头像改为明文（ADR-0079）之后，"没有任何身份要素"那句补上限定。
+  version: '1.4',
   status: 'draft',
-  updatedDate: '2026-10-04',
+  updatedDate: '2026-11-01',
   title: {
     'zh-CN': '未成年人保护',
     en: 'Protection of Minors',

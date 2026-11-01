@@ -204,7 +204,7 @@ const zh = [
           ],
           [
             '邮箱地址',
-            '登录账号；发十一封功能邮件（验证邮箱、注册验证码、登录验证码、魔法登录、找回通行密钥、重置口令、口令已改通知、换绑-新邮箱确认、换绑-旧邮箱授权、换绑完成通知、新增认证器告知）。它是本地认证路径的**直接标识符**；新增中央身份映射与授权材料另列下行 —— 只有一种例外：一次换绑还在途的时候，你填的那个**新地址**会以明文暂存在换绑请求那一行里，直到两边都点完生效、或者到期被清掉。除这一列以外，库里没有真实姓名、电话、地址、生日、地理位置、通讯录；另有你自填的**昵称**（非实名、不做唯一）与一张**我们解不开的头像密文**，两行都在第 3 条的表里单列。',
+            '登录账号；发十一封功能邮件（验证邮箱、注册验证码、登录验证码、魔法登录、找回通行密钥、重置口令、口令已改通知、换绑-新邮箱确认、换绑-旧邮箱授权、换绑完成通知、新增认证器告知）。它是本地认证路径的**直接标识符**；新增中央身份映射与授权材料另列下行 —— 只有一种例外：一次换绑还在途的时候，你填的那个**新地址**会以明文暂存在换绑请求那一行里，直到两边都点完生效、或者到期被清掉。除这一列以外，库里没有真实姓名、电话、地址、生日、地理位置、通讯录；另有一张你自选上传的**头像图片**（另存其 SHA-256 仅用于判断"换过没有"），与昵称一起在第 3 条的表里单列。',
             '我们的服务器',
             '明文',
           ],
@@ -258,9 +258,9 @@ const zh = [
           ],
           [
             '你自填的昵称，以及（可选）一张头像',
-            '只为了在你自己的设备上认出这个账号。🔴 heyta 没有共享与协作，所以两者今天**都只有你本人读得到**，服务端也不存在"按别人身份查资料"的端点。昵称是**显示名不是实名**、不做唯一性，登录标识始终是邮箱；头像在你本机压小后用**你的 E2EE 口令**整块加密上传，🔴 **我们存的是解不开的密文**，另存该密文的 SHA-256 仅用于跨设备判断"换过没有"。',
+            '只为了在你自己的设备上认出这个账号。🔴 heyta 没有共享与协作，所以两者今天**都只有你本人读得到**，服务端也不存在"按别人身份查资料"的端点。昵称是**显示名不是实名**、不做唯一性，登录标识始终是邮箱；头像是一张你自选的展示图片，**不用于人脸识别或身份核验**。基础资料不需要端到端加密口令，换头像也不会向你索要任何密钥。',
             '我们的服务器（另在你本机）',
-            '昵称**明文**；头像**密文**',
+            '两者都是**明文**（头像存图片字节；另存其 SHA-256 仅用于跨设备判断"换过没有"）',
           ],
           [
             '你在应用里输入与生成的全部内容（任务、清单、标签、便签、习惯、专注记录、提醒）',
@@ -410,7 +410,7 @@ const zh = [
             '整行删除。我们刻意不加第二个旋钮 —— 多一个参数就多一处会漂移的地方。',
           ],
           [
-            '账号本身（邮箱、口令散列、通行密钥、语言、昵称、头像密文、条款接受时刻）',
+            '账号本身（邮箱、口令散列、通行密钥、语言、昵称、头像图片、条款接受时刻）',
             '到你注销账号为止。',
             '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、登录会话、通行密钥（含未完成的通行密钥注册）、邮箱变更请求、登录验证码挑战、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、推送订阅、加密密钥包、密钥迁移记录、撤销设备记录、托管 AI 用量计数、自动收集执行身份、自动收集提交许可、自动收集额度启用记录、自动收集额度关联、自动收集额度主体、自动化 AI 尝试、自动化事件、自动化接收方密钥、自动化规则、自动化发送方凭据、自动化权益绑定、自动化权益票据使用记录、分享记录、分享邀请、分享成员、邮箱注册验证码挑战、中央身份映射，按数据库外键级联删除（共 39 处级联，覆盖 38 张表），**没有冷静期，也没有回收站**。🔴 有一件东西**故意不跟着删：注销标记** —— 你的账号标识、注销时刻，以及那一刻该账号邮箱的 **SHA-256 摘要**（摘要不是邮箱本身，我们无法从它还原出地址）。它存在的唯一理由是"从整库备份恢复时拒绝把已注销账号带回来"，所以它必须比账号活得久；中央认证开放后还需保留完成撤销所必需的加密材料和最少状态，期限与未确认结果在本节中央认证行说明；它们不含同步内容。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库：你点下注销的那台**当场**清掉本机明文，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。所以这一条既不写成"你的所有数据立即彻底销毁"，也不写成"你在所有设备上的数据都会被删除" —— 一台从此不再上线、也不再登录的设备，我们没有远程擦除它的能力。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
           ],
@@ -514,7 +514,7 @@ const zh = [
         kind: 'ul',
         items: [
           '**查阅与复制**：✅ 三个端（Web、命令行、移动端）都能导出**全量**数据 —— 你看得见的全部内容、完整的事件日志、已删除记录（墓碑），外加可核对的计数。**导出文件本身是明文 JSON、不加任何保护**，它落在哪里、要不要转给别人，由你负责。',
-          '**更正与补充**：✅ 任务、清单、标签、习惯等业务字段你在任一端改一次，就会同步到其他所有端。⚠️ 服务器上那些事件是密文，我们**无法读取、也无法替你改写**其中某一条 —— 只能由你登录后自行修改。✅ **邮箱可以自己换绑**：在设置里发起，我们同时给**当前地址**和**新地址**各发一封信，**两边都点过才生效**（先后无关，任何一边没点就什么都不变），链接 24 小时内有效。生效那一刻所有设备上的登录同时失效，需要用新地址重新登录，两个地址各收到一封完成通知；库里不保留历史地址。⚠️ 这条要求你同时控制两个收件箱：旧地址已经收不到信的时候没有自助通道，只能走联系邮箱。',
+          '**更正与补充**：✅ 任务、清单、标签、习惯等业务字段你在任一端改一次，就会同步到其他所有端。⚠️ 服务器上那些事件**默认**是密文，我们无法读取、也无法替你改写其中某一条 —— 只能由你登录后自行修改。用户在设置里关闭端到端加密之后，这些内容按明文处理，我们能够读取（见《服务条款》第四条）。✅ **邮箱可以自己换绑**：在设置里发起，我们同时给**当前地址**和**新地址**各发一封信，**两边都点过才生效**（先后无关，任何一边没点就什么都不变），链接 24 小时内有效。生效那一刻所有设备上的登录同时失效，需要用新地址重新登录，两个地址各收到一封完成通知；库里不保留历史地址。⚠️ 这条要求你同时控制两个收件箱：旧地址已经收不到信的时候没有自助通道，只能走联系邮箱。',
           '**删除**：✅ 应用内的删除在事件模型里是**追加一条删除事件**，不是抹掉记录。它从你的所有设备与界面上消失。🔴 至于服务器上承载它的那段加密历史：**当前不会定期清理**。我们部署了每日运行的保留期清扫（窗口 45 天），但它只对已经存在"完整状态边界"的账号动手，而本产品当前的客户端不会产生那种边界 —— 实测每天清掉的条数是 0。所以在那之前，这段加密历史实际只有一条路真的消失：**注销账号**。界面里的"彻底删除"**只是一个标记**，它不缩短任何期限，也不等于"已从服务器销毁"。我们不会把"会到期清理"写成承诺，除非它真的对我们的数据成立。',
           '**注销账号**：服务端有真正的硬删除能力，**入口也在三个面上给了**：网页版设置页、手机端「我的」与命令行版（`account close`），三处都要先勾一次"我知道这会把本机上包括还没同步出去的数据一起清掉"、再做第二次确认，并且都先提示导出。也可以**写信给我们**（`heyta@waytofuture.cn`，从你注册时用的那个邮箱发出，以便我们核验归属），我们在 15 个工作日内完成核查与删除。注销之后仍可能存在的副本有**四处**，我们逐处写明：① 上条那个 14 天的整库备份窗口；② 🔴 **你其它设备上的本地数据** —— 本地优先意味着每台设备自己存着一份可读的库：你点下注销的那台**当场**清掉本机明文，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份，所以我们只写"下次联网的设备会自己清掉"，不写"你在所有设备上的数据都会被删除" —— 一台从此不再上线的设备，我们没有远程擦除它的能力；③ 🟡 **macOS 与 Windows 的桌面壳**：这一层清到哪一格、边界在哪，以《你的数据权利》第五节为准，本文件不抄第二份；④ 支付事件的审计行，它没有账号外键，注销后指向订阅的指针被置空、只剩金额与时间，仅用于履行法定留存义务。',
           '**撤回同意**：✅ **联网这件事有它自己的撤回入口** —— 设置页里那一项叫「隐私同意」，点「撤回同意」之后这台设备**立刻**停止对外发出任何请求，**已经建立的实时连接当场关掉**，而且状态清回"没问过"：界面会重新问你一次，不是默默换成"你已经拒绝了"。本地数据一条都不动。此外 AI 出境授权、记忆偏好层、推送订阅三处也各自能撤回，关掉之后**下一次调用连输入都不再被读取**（不是只在数据库里标成"已关闭"）。限制：撤回不溯及已经发出的请求。',
@@ -663,6 +663,7 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期与变更摘要'],
         rows: [
+          ['1.14', '`2026-11-01` **头像改为基础资料明文（ADR-0079）**：第 2、3 条把「头像密文」改成「头像图片（明文）」，并写明它不需要端到端加密口令、不用于人脸识别或身份核验；注销范围里的「头像密文」同步改成「头像图片」。中英同批。**状态：仍是草案，尚未经法务复核、尚未生效。**'],
           ['1.13', '`2026-10-29` 自动收集那一节按代码现量重写：从"预留两类明文元数据"改成逐类列举八组；新增"由我们当场抽取"这一档的披露（同一次请求内读取、抽完丢弃、结果重封给用户收件公钥、成功后不能重抽）与"未抽取/失败那一批最多 7 天"的保留句。三份法务件逐字同一份，中英同批。**状态：仍是草案，尚未经法务复核、尚未生效。**'],
           ['1.12', '`2026-10-20` 补充原生设备登录交接：待领产品会话密文最多十分钟，领取即清，未领取转撤销；同步更新定时清理和产品注销接线状态。尚未开放，中英同步，仍为草案。'],
           ['1.11', '`2026-10-19` 中央认证持久层新增身份映射、授权尝试、会话及撤销队列；同步披露类别、服务端加密边界、用途、期限和注销例外。功能尚未开放，定时清理与中央接线仍是开放前条件。中英同步，仍为草案。'],
@@ -813,7 +814,7 @@ const en = [
           ],
           [
             'Email address',
-            'Your sign-in identity; delivering the eleven functional emails (address verification, registration code, sign-in code, magic sign-in link, passkey recovery, password reset, password-changed notice, rebinding confirmation for the new address, rebinding authorisation for the current address, e-mail change completed notice, authenticator-added notice). It is a **direct identifier** in local authentication; central identity and authorization records are listed separately below, with one exception: while a rebinding is in flight, the new address you typed is held in cleartext in that request row until both sides confirm and it takes effect, or until it expires and is cleared. Apart from that column there is no legal name, phone number, postal address, date of birth, location or contacts. There is also a nickname you type yourself (not a legal name, not unique) and an optional avatar **we cannot decrypt**; both are listed as their own rows in section 3.',
+            'Your sign-in identity; delivering the eleven functional emails (address verification, registration code, sign-in code, magic sign-in link, passkey recovery, password reset, password-changed notice, rebinding confirmation for the new address, rebinding authorisation for the current address, e-mail change completed notice, authenticator-added notice). It is a **direct identifier** in local authentication; central identity and authorization records are listed separately below, with one exception: while a rebinding is in flight, the new address you typed is held in cleartext in that request row until both sides confirm and it takes effect, or until it expires and is cleared. Apart from that column there is no legal name, phone number, postal address, date of birth, location or contacts. There is also an optional **avatar image** you choose to upload (its SHA-256 is stored only to tell whether it changed), listed together with the nickname in section 3.',
             'Our servers',
             'Plaintext',
           ],
@@ -867,9 +868,9 @@ const en = [
           ],
           [
             'The nickname you type, and an optional avatar',
-            'Solely so you can recognise this account on your own devices. 🔴 heyta has no sharing and no collaboration, so today **only you can read either of them**, and the server exposes no endpoint that looks another user’s profile up by identity. The nickname is a **display name, not your legal name**, and is not unique — the sign-in identifier stays the email address. The avatar is downscaled on your device and encrypted with **your own E2EE passphrase** before upload; 🔴 **we store ciphertext we cannot open**, plus the SHA-256 of that ciphertext used only to tell across devices whether it changed.',
+            'Solely so you can recognise this account on your own devices. 🔴 heyta has no sharing and no collaboration, so today **only you can read either of them**, and the server exposes no endpoint that looks another user’s profile up by identity. The nickname is a **display name, not your legal name**, and is not unique — the sign-in identifier stays the email address. The avatar is a display image you choose; it is **not used for face recognition or identity verification**, and changing it never asks you for an encryption key.',
             'Our servers (and on your device)',
-            'Nickname **plaintext**; avatar **ciphertext**',
+            'Both are **plaintext** (the avatar is stored as image bytes; its SHA-256 is kept only to tell across devices whether it changed)',
           ],
           [
             'Everything you enter and generate inside the app (tasks, lists, labels, notes, habits, focus records, reminders)',
@@ -1019,7 +1020,7 @@ const en = [
             'The whole row is deleted. We deliberately do not add a second knob — one more parameter is one more place that can drift.',
           ],
           [
-            'The account itself (email address, password hash, passkeys, language, nickname, avatar ciphertext, moment of accepting the terms)',
+            'The account itself (email address, password hash, passkeys, language, nickname, avatar image, moment of accepting the terms)',
             'Until you close the account.',
             '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, access sessions, passkeys (including pending passkey registrations), email change requests, sign-in code challenges, subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, push subscriptions, wrapped key packages, key migration records, revoked device records, managed-AI usage counters, automation worker identities, automation commit permits, automation entitlement activations, automation entitlement links, automation entitlement subjects, automation AI attempts, automation events, automation recipient keys, automation rules, automation sender credentials, automation entitlement bindings, automation entitlement ticket uses, shares, share invitations, share members, email registration challenges and central identity bindings — are deleted (39 cascades in total, across 38 tables). **There is no cooling-off period and no trash bin.** 🔴 One record deliberately **outlives that deletion: the closure marker** — your account identifier, the moment of closure, and the **SHA-256 digest** of the e-mail address that belonged to the account at that moment (a digest is not the address; we cannot recover the address from it). It exists for exactly one reason: when a whole-database backup is restored, the gate refuses to bring a closed account back, so this marker has to survive the account it guards against. Central authentication additionally retains the minimum encrypted material and state needed for revocation under the limits in the central-authentication row of this section; no synced content is included. 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database: the device you press it on wipes its local plaintext **on the spot**, and every other device wipes its own copy **the next time it synchronises and receives the "account closed" signal**. So we write neither "all your data is destroyed immediately" nor "your data is gone from every device" — a device that never connects or signs in again is one we cannot wipe remotely. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
           ],
@@ -1272,6 +1273,7 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date and summary of changes'],
         rows: [
+          ['1.14', '`2026-11-01` **Avatars become plaintext profile data (ADR-0079)**: sections 2 and 3 change "avatar ciphertext" to "avatar image (plaintext)", state that it needs no E2EE passphrase and is not used for face recognition or identity verification; the closure scope changes "avatar ciphertext" to "avatar image" in the same pass. Both languages updated together. **Status: draft, not yet reviewed by counsel or in effect.**'],
           ['1.13', '`2026-10-29` Rewrote the automatic-capture section from the code: the "two categories of plaintext metadata" sentence became an eight-group enumeration; added the "extract on our server" disclosure (read within the same request, discarded afterwards, result re-sealed to the user recipient key, no second extraction after success) and the "at most 7 days" sentence for batches that were not extracted. All three legal documents carry the same text in both languages. **Status: draft, not yet reviewed by counsel or in effect.**'],
           ['1.12', '`2026-10-20` Adds native-device login handoff: a product session awaiting collection is encrypted for at most ten minutes, cleared on collection, and an unclaimed grant is queued for revocation. Updates cleanup and product-closure wiring status. Unavailable; both languages remain draft.'],
           ['1.11', '`2026-10-19` Central identity persistence adds bindings, request attempts, grants and revocation queues. Both languages disclose categories, server-side encryption, purposes, retention and closure exceptions. Authentication remains unavailable; scheduling and provider integration remain release requirements. Still a draft.'],
@@ -1306,9 +1308,9 @@ export const privacy: LegalDocument = {
   // 45 天必须分开写，否则第 7 条那段限定会被读成也管着托管那一档。
   // 版本号进同意指纹（`legalSetVersion()` 把每张文档拼成 `id@version`），
   // 改了对外承诺而不 bump，等于让旧那枚同意去覆盖一段它没见过的话。
-  version: '1.13',
+  version: '1.14',
   status: 'draft',
-  updatedDate: '2026-10-29',
+  updatedDate: '2026-11-01',
   title: {
     'zh-CN': '隐私政策',
     en: 'Privacy Policy',
