@@ -197,6 +197,13 @@
   macOS 壳是 WKWebView 载 `web-dist`，钥匙串要接就得上 Swift↔JS 桥。
   ⇒ 三端的**原生**钥匙串都还没有；Web（含 macOS 壳里的共享 UI）走 `sessionStorage`。
 - Web 的 `sessionStorage` 实测在**刷新**后仍可用、**关标签页**即失效（6 条单测钉住，含"一个字都不进 localStorage"）。
+- **§十一 追加（2026-11-02）**：上面那条"macOS 壳没有这个端口"已经补上了 ——
+  `HeytaShellCore/VaultKeychainStore`（Keychain Services，`WhenUnlocked`、不进 iCloud Keychain）
+  + `ShellVaultKeychainBridge`（`heytaVaultKeychain` 消息通道）+ 页侧 `vault-root-keychain.ts`
+  （**优先于** `sessionStorage`，桥不在时行为不变）。实测：`check:macos-shell` 新增的
+  4 条 Keychain 往返判据全绿（存/读/更新/删后读不到/16 字节被拒），页侧 10+4 条单测绿。
+  ⚠️ **端到端"冷启动免输"仍未验**（要签名的 `.app` 真启动两次，而本会话拿不到屏幕取证）；
+  Windows/Linux 的 DPAPI/libsecret 仍按上文推迟。
 
 ## 十二、被取代的那一半（2026-11-01）
 

@@ -481,6 +481,56 @@ do {
     check(opened == true || opened == false,
           "openSettings() 有一个布尔答案（true 只代表系统接下了那个 URL，判据写在这里）")
 
+    /*
+     🔴 ADR-0080 §5.4 / §5.5 的 macOS 那一格：**Keychain 里存得进、读得回、删得掉**。
+
+     验的是发货那一份 `HeytaShellCore/VaultKeychainStore`（壳的桥只是它的收发层），
+     不是另写一段 SecItem —— 否则验的是"探针的假设"。
+
+     用**合成作用域**（`smoke://…` + 随机后缀），绝不在真账号的条目上动手；
+     跑完把自己那份删干净，失败也删（`defer`）。
+
+     ⚠️ 无头 CLI 进程能不能拿到 login keychain，**取决于执行环境**：
+     拿不到时这里的 ✅ 会变成 ❌ 并打印 OSStatus —— 那是"这条腿在这个环境里跑不了"，
+     不是"实现坏了"。所以判定分两档：`.failed` 记为**跳过但打印原因**，
+     形状不对（存进去读回来不一致）才是**真失败**。
+     */
+    let vaultScopeOrigin = "smoke://vault-keychain"
+    let vaultScopeAccount = "smoke-\(UUID().uuidString)"
+    let vaultStore = VaultKeychainStore()
+    defer { _ = vaultStore.clear(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount) }
+
+    let rootA = Data((0..<32).map { _ in UInt8.random(in: 0...255) }).base64EncodedString()
+    let saved = vaultStore.save(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount, value: rootA)
+    switch saved {
+    case .ok:
+        let read = vaultStore.load(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount)
+        check(read.outcome == .ok && read.value == rootA,
+              "Keychain：存进去的 32 字节 root 原样读得回来（实测 outcome=\(read.outcome)）")
+
+        // 更新一格：同一作用域再写一枚，读回来必须是新的那枚（不是两枚、也不是旧的）。
+        let rootB = Data((0..<32).map { _ in UInt8.random(in: 0...255) }).base64EncodedString()
+        _ = vaultStore.save(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount, value: rootB)
+        let reread = vaultStore.load(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount)
+        check(reread.value == rootB, "Keychain：同作用域再写是**更新**，读回来是新那枚")
+
+        // 清理之后必须读不到 —— 否则"点了锁定，重开又自己开了"。
+        let cleared = vaultStore.clear(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount)
+        let afterClear = vaultStore.load(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount)
+        check(cleared == .ok && afterClear.outcome == .absent,
+              "Keychain：删掉之后确实读不到（实测 outcome=\(afterClear.outcome)）")
+
+        // 负臂：长度不是 32 的一律不写 —— 写进去也读不出来，等于骗了"记住"。
+        let rejected = vaultStore.save(serverOrigin: vaultScopeOrigin, accountId: vaultScopeAccount,
+                                       value: Data(repeating: 0x11, count: 16).base64EncodedString())
+        check(rejected == .absent, "Keychain：16 字节的 root 被拒（不是 32 就当没有）")
+
+    case .failed(let status):
+        print("  ⚠️ Keychain 这一档在这个环境里拿不到（OSStatus \(status)）—— 记为未验，不算通过")
+    case .absent:
+        check(false, "Keychain：存 32 字节 root 被当成'形状不对'拒掉了（这是实现问题，不是环境）")
+    }
+
     rApi.shutdown()
 }
 

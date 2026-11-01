@@ -13,7 +13,7 @@
  *     库名、VFS 目录名、令牌键名各有一条比对，漂了就红。
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
@@ -199,7 +199,16 @@ describe('E2 —— 清单与真源逐字对账（抄件一定会漂）', () => 
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir)) {
         const path = join(dir, entry);
-        if (statSync(path).isDirectory()) {
+        // 同一个陷阱的三处：`Pods/` 里的符号链接可能指向不存在的目录，追链接会 ENOENT。
+        // 那会让整条用例炸在遍历上（一条断言都没判），而症状看起来像"判据红了"。
+        let stats;
+        try {
+          stats = lstatSync(path);
+        } catch {
+          continue;
+        }
+        if (stats.isSymbolicLink()) continue;
+        if (stats.isDirectory()) {
           walk(path);
           continue;
         }
@@ -247,7 +256,21 @@ describe('E2 —— 清单与真源逐字对账（抄件一定会漂）', () => 
       for (const entry of readdirSync(dir)) {
         if (SKIP_DIRS.has(entry)) continue;
         const path = join(dir, entry);
-        if (statSync(path).isDirectory()) {
+        /*
+         * 🔴 用 `lstatSync` 而不是 `statSync`（traps §7 #618 的同一条）：
+         * `apps/mobile/ios/Pods/` 里有指向 `ios/build/generated/ios/` 的符号链接，
+         * 而那个目录**只有跑过 `pod install` 才存在**。`statSync` 追链接 ⇒ `ENOENT`
+         * ⇒ 整条用例炸在遍历上，**一条断言都没判**（退出码看着像"红了"，
+         * 但红的是遍历，不是判据）。链接本身不是我们要扫的产品源码，直接跳过。
+         */
+        let stats;
+        try {
+          stats = lstatSync(path);
+        } catch {
+          continue;
+        }
+        if (stats.isSymbolicLink()) continue;
+        if (stats.isDirectory()) {
           walk(path);
           continue;
         }
@@ -499,7 +522,16 @@ describe('E2 —— 这个宿主的销毁器真的被接到了同步层上', () 
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir)) {
         const path = join(dir, entry);
-        if (statSync(path).isDirectory()) {
+        // 同一个陷阱的三处：`Pods/` 里的符号链接可能指向不存在的目录，追链接会 ENOENT。
+        // 那会让整条用例炸在遍历上（一条断言都没判），而症状看起来像"判据红了"。
+        let stats;
+        try {
+          stats = lstatSync(path);
+        } catch {
+          continue;
+        }
+        if (stats.isSymbolicLink()) continue;
+        if (stats.isDirectory()) {
           walk(path);
           continue;
         }

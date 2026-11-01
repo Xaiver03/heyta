@@ -635,7 +635,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
           <div className="ht-settings__actions">
             <button type="button" className="ht-btn ht-btn--primary" data-testid="vault-unlock" disabled={busy || passphrase.length === 0} onClick={() => void run(async () => {
               await session.unlockWithPassphrase(passphrase);
-              rememberCurrentWebVaultRoot();
+              await rememberCurrentWebVaultRoot();
               const restored = session.getPendingRootRotation();
               if (restored !== undefined) {
                 setPending(restored);
@@ -652,7 +652,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
           </FormField>
           <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-unlock-recovery" disabled={busy || recoveryCode.length === 0} onClick={() => void run(async () => {
             await session.unlockWithRecoveryCode(recoveryCode);
-            rememberCurrentWebVaultRoot();
+            await rememberCurrentWebVaultRoot();
             const restored = session.getPendingRootRotation();
             if (restored !== undefined) {
               setPending(restored);

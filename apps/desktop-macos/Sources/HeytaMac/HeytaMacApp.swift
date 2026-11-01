@@ -634,6 +634,19 @@ struct SharedWebView: NSViewRepresentable {
         config.userContentController.addScriptMessageHandler(
             context.coordinator.reminderBridge, contentWorld: .page, name: "heytaReminder"
         )
+        /**
+         * 🔴 钥匙串腿（ADR-0080 §5.4 的 macOS 那一格）。同样 `.page` world + 一句 shim：
+         * 页侧 `vault-root-keychain.ts` 只看 `window.heytaVaultKeychain` 在不在，
+         * 不在就退回 `sessionStorage`（普通浏览器的行为因此一个字都没变）。
+         *
+         * ⚠️ 必须在 `atDocumentStart` 注入：应用在启动那一刻就会去读"这台设备记没记住钥匙"。
+         */
+        config.userContentController.addScriptMessageHandler(
+            context.coordinator.vaultKeychainBridge, contentWorld: .page, name: "heytaVaultKeychain"
+        )
+        config.userContentController.addUserScript(WKUserScript(
+            source: ShellVaultKeychainBridge.shim, injectionTime: .atDocumentStart, forMainFrameOnly: true
+        ))
         let webView = WKWebView(frame: .zero, configuration: config)
         context.coordinator.widgetBridge.webView = webView
         webView.navigationDelegate = context.coordinator
@@ -661,6 +674,9 @@ struct SharedWebView: NSViewRepresentable {
         let widgetBridge = ShellWidgetBridge()
         /// 页侧提醒投递腿（`heytaReminder` 消息通道，见 `ShellReminderBridge.swift`）。
         let reminderBridge = ShellReminderBridge()
+        /// 页侧钥匙串腿（`heytaVaultKeychain` 消息通道，见 `ShellVaultKeychainBridge.swift`）。
+        /// 🔴 它让 macOS 壳里的"钥匙放在设备里"活过**进程重启**（`sessionStorage` 只活到关标签页）。
+        let vaultKeychainBridge = ShellVaultKeychainBridge()
         var storageHost: ShellStorageHost?
         /// 🔴 **weak**：见 `makeNSView` 里的说明（强引用会成环）。
         weak var webView: WKWebView?
