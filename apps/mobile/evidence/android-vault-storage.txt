@@ -1,6 +1,6 @@
 Android vault storage: pending
-ad35d671d4f4fe81f9763a3d23198211caa9a4031d948b7cf647f3a09658d31e  apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-937ba5a3e41ae0668d1e551c5062df50b0ab86617e874f3d196aecf4b3b0f67e  apps/mobile/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+a92bc9b71203077b8a5392723126a316fe0225c3fbf540049a91ceb0bf2492c1  apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+dd88b202b6260363fe83b7d7cc31f0cbd0886921625b294f7f56cf6edb8268b4  apps/mobile/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 PASS phase=isolation
 PASS phase=seed
 PASS phase=verify
