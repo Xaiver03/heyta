@@ -101,6 +101,28 @@ async function closeSyncSettings(page: Page): Promise<void> {
   ).toHaveCount(0);
 }
 
+/**
+ * ADR-0081：新账号默认**明文**，端到端加密要显式开启（两段：设口令 → 抄/回填恢复码）。
+ *
+ * 旧的「创建加密数据钥匙」（`vault-create-passphrase` + `vault-create` + `vault-publish`）
+ * 在明文模式下**故意不可见**：那条入口只发包、不迁移载荷，会造出"有包但云上还是明文"。
+ * 所以这条 helper 走的是真正的开启流程，并返回那枚一次性恢复码供其它设备解锁。
+ */
+async function enableEncryption(page: Page, secret: string): Promise<string> {
+  await page.getByTestId('encryption-mode-enable').click();
+  await fillVaultSecret(page.getByTestId('encryption-enable-passphrase'), secret);
+  await page.getByTestId('encryption-enable-start').click();
+  const display = page.getByTestId('encryption-enable-recovery-code');
+  await expect(display, '恢复码必须显示出来（它只显示一次）').toBeVisible();
+  const code = ((await display.textContent()) ?? '').trim();
+  expect(code.length, '恢复码不能是空的').toBeGreaterThan(0);
+  await fillVaultSecret(page.getByTestId('encryption-enable-recovery'), code);
+  await page.getByTestId('encryption-enable-confirm').click();
+  // 确认之后会跑整库加密迁移；完成时模式读数翻成"已开启"。
+  await expect(page.getByTestId('encryption-mode-status')).toContainText(/encrypted|已开启|On/u);
+  return code;
+}
+
 async function confirmCode(page: Page) {
   const pending = page.getByTestId('vault-recovery-display');
   await expect(pending).toBeVisible();
@@ -132,9 +154,7 @@ test('three devices recover, rotate root, and rebuild tasks from the migrated se
   const devices = [a];
   try {
     await settings(a.page);
-    await fillVaultSecret(a.page.getByTestId('vault-create-passphrase'), passphrase);
-    await a.page.getByTestId('vault-create').click();
-    const recovery = await confirmCode(a.page);
+    const recovery = await enableEncryption(a.page, passphrase);
     await shot(a.page, 'pg-01-created');
     await expect(a.page.getByTestId('vault-ready')).toBeVisible();
     await shot(a.page, 'pg-01-created');
@@ -220,9 +240,7 @@ test('migration resumes after a browser restart and cancellation releases real s
   const a = await device(browser, { baseUrl: api, token: account.token, accountId: String(account.userId), email });
   try {
     await settings(a.page);
-    await fillVaultSecret(a.page.getByTestId('vault-create-passphrase'), passphrase);
-    await a.page.getByTestId('vault-create').click();
-    await confirmCode(a.page);
+    await enableEncryption(a.page, passphrase);
     await expect(a.page.getByTestId('vault-ready')).toBeVisible();
     await closeSyncSettings(a.page);
     const title = `resume migration task ${Date.now()}`;
@@ -326,9 +344,7 @@ test('a task added during root migration syncs with the new generation after pub
   let releaseInventory = () => {};
   try {
     await settings(a.page);
-    await fillVaultSecret(a.page.getByTestId('vault-create-passphrase'), passphrase);
-    await a.page.getByTestId('vault-create').click();
-    await confirmCode(a.page);
+    await enableEncryption(a.page, passphrase);
     await expect(a.page.getByTestId('vault-ready')).toBeVisible();
     let inventorySeen = false;
     const inventoryRelease = new Promise<void>((resolve) => { releaseInventory = resolve; });
@@ -389,9 +405,7 @@ test('a reload after server commit restores the unpublished local root and clear
   let releaseCommit = () => {};
   try {
     await settings(a.page);
-    await fillVaultSecret(a.page.getByTestId('vault-create-passphrase'), passphrase);
-    await a.page.getByTestId('vault-create').click();
-    await confirmCode(a.page);
+    await enableEncryption(a.page, passphrase);
     await expect(a.page.getByTestId('vault-ready')).toBeVisible();
     const holdCommit = new Promise<void>((resolve) => { releaseCommit = resolve; });
     let committedRequest = '';
@@ -475,9 +489,7 @@ test('legacy history survives first vault publication and explicit migration to 
   const devices = [a];
   try {
     await settings(a.page);
-    await fillVaultSecret(a.page.getByTestId('vault-create-passphrase'), passphrase);
-    await a.page.getByTestId('vault-create').click();
-    await confirmCode(a.page);
+    await enableEncryption(a.page, passphrase);
     await expect(a.page.getByTestId('vault-ready')).toBeVisible();
     const first = await request.get(`${api}/api/sync/key-package`, { headers });
     expect(first.status()).toBe(200);
@@ -532,9 +544,7 @@ test('device settings revoke every old session, then trusted reauthentication an
   let pendingBody: { clientId: string; ops: Array<{ id: string; isPayloadEncrypted: boolean }> } | undefined;
   try {
     await settings(a.page);
-    await fillVaultSecret(a.page.getByTestId('vault-create-passphrase'), passphrase);
-    await a.page.getByTestId('vault-create').click();
-    await confirmCode(a.page);
+    await enableEncryption(a.page, passphrase);
     await expect(a.page.getByTestId('vault-ready')).toBeVisible();
     await closeSyncSettings(a.page);
     await a.page.locator('input[placeholder^="Add a task"]').fill(title);
@@ -602,12 +612,19 @@ test('device settings revoke every old session, then trusted reauthentication an
     const removeButton = a.page.getByTestId(`vault-device-revoke-${stale.clientId}`);
     await shot(a.page, 'pg-device-list-before-revoke');
     await expect(removeButton).toBeVisible();
-    let confirmation = '';
-    a.page.once('dialog', async (dialog) => { confirmation = dialog.message(); await dialog.accept(); });
+    /*
+     * 🔴 撤销早就不走原生 `window.confirm` 了：那枚是 Web 侧最后一枚原生确认，
+     * 已被页内 `DangerConfirmDialog` 取代（`vault-revoke-confirm` 前缀，
+     * 按钮是 `-cancel` / `-submit`）。等 dialog 事件会永远等不到。
+     * 同时"所有设备都要重新登录"这句话现在在**页内正文**里，不再从 dialog.message() 取。
+     */
     const deletion = a.page.waitForResponse((response) => response.request().method() === 'DELETE' && response.url().endsWith(`/api/sync/devices/${encodeURIComponent(stale.clientId)}`));
     await removeButton.click();
+    const confirmBox = a.page.getByTestId('vault-revoke-confirm');
+    await expect(confirmBox, '撤销必须先过页内危险确认').toBeVisible();
+    await expect(confirmBox).toContainText(/all|every|所有|重新登录/iu);
+    await a.page.getByTestId('vault-revoke-confirm-submit').click();
     expect((await deletion).status()).toBe(200);
-    expect(confirmation).toMatch(/all|every/iu);
     await expect.poll(() => b.page.evaluate(() => (globalThis as unknown as { __vaultRevocationSocket: { closeCode: number } }).__vaultRevocationSocket.closeCode)).toBe(4003);
     await shot(a.page, 'pg-device-revoked-signin-required');
     await expect(a.page.getByTestId('vault-ready')).toHaveCount(0);

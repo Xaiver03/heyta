@@ -296,6 +296,14 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
   const [payloadMode, setPayloadMode] = useState<'e2ee' | 'plain'>('e2ee');
   const [encryptionBusy, setEncryptionBusy] = useState(false);
   const [keyPlacement, setKeyPlacement] = useState<VaultKeyPlacement>(() => readVaultKeyPlacement());
+  /**
+   * 🔴 本机是否已经**向服务端确认过**这个账号有没有密钥包。
+   *
+   * `session.keyPackage === undefined` 只说明"本机还没加载到"，不等于"服务端没有"。
+   * 拿前者当后者用，就会在本机尚未加载时画出「创建加密数据钥匙」—— 对着已有的密文
+   * 再发一把新钥匙。所以 e2ee 模式下必须先真的读一次，读不到才允许画创建入口。
+   */
+  const [packageChecked, setPackageChecked] = useState(false);
   const [encryptionProgress, setEncryptionProgress] = useState<{ completed: number; total: number }>();
 
   // 模式是**服务端事实**，不是本地偏好：读失败按 e2ee（写错方向的代价不对称）。
@@ -307,6 +315,22 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
       .catch(() => { /* fail-closed 已在读取层处理 */ });
     return () => { cancelled = true; };
   }, [sync.baseUrl, sync.token, revision]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (payloadMode !== 'e2ee') { setPackageChecked(true); return undefined; }
+    if (session === undefined) { setPackageChecked(false); return undefined; }
+    if (session.keyPackage !== undefined) { setPackageChecked(true); return undefined; }
+    const target = session === undefined || sync.baseUrl === '' || sync.token === undefined
+      ? undefined
+      : getWebVaultRemote(sync.baseUrl, async () => sync.token);
+    if (target === undefined) { setPackageChecked(true); return undefined; }
+    setPackageChecked(false);
+    void session.refreshFromRemote(target)
+      .catch(() => undefined)
+      .finally(() => { if (!cancelled) setPackageChecked(true); });
+    return () => { cancelled = true; };
+  }, [payloadMode, revision, session, sync.baseUrl, sync.token]);
 
   const disableEncryption = async (): Promise<void> => {
     if (sync.baseUrl.trim() === '' || sync.token === undefined) {
@@ -528,7 +552,13 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
         时会把世代留成 null —— 结果是"有包、但云上还是明文"，用户却以为加密开了。
         明文 → 加密必须走整库重加密那条入口（`encryption-mode-section` 的 enable）。
       */}
-      {!loading && session !== undefined && !hasPackage && pending === undefined && payloadMode === 'e2ee' ? (
+      {!loading && session !== undefined && !hasPackage && !packageChecked && pending === undefined && payloadMode === 'e2ee' ? (
+        <p className="ht-settings__hint" role="status" data-testid="vault-package-loading">
+          {t('web.sync.vault.packageLoading')}
+        </p>
+      ) : null}
+
+      {!loading && session !== undefined && !hasPackage && packageChecked && pending === undefined && payloadMode === 'e2ee' ? (
         <div data-testid="vault-create-form" className="ht-settings__section">
           <strong>{t('web.sync.vault.createTitle')}</strong>
           <FormField id="vault-create-passphrase" label={t('web.sync.vault.passphrase')}>

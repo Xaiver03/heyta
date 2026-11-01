@@ -832,6 +832,7 @@ export const en = {
   'web.settings.syncUx.encryptionHint': 'Your sign-in password authenticates the account. The encryption passphrase or data key below unlocks task content; the server never sees their plaintext.',
   'web.sync.vault.title': 'Encrypted data key',
   'web.sync.encryption.title': 'Sync encryption',
+  'web.sync.vault.packageLoading': 'Reading the encrypted data key...',
   'web.sync.encryption.on': 'On: task content is encrypted on your device before upload, so the server cannot read it.',
   'web.sync.encryption.off': 'Off: task content is uploaded as plaintext, so the server (including us) can read it.',
   'web.sync.encryption.disable': 'Turn off end-to-end encryption',
