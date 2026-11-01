@@ -107,8 +107,8 @@ export function DangerConfirmDialog({
    */
   return (
     <WebModalShell
-      overlayClass={classNames?.overlay ?? 'ht-danger-confirm__overlay'}
-      dialogClass={classNames?.dialog ?? 'ht-danger-confirm__dialog'}
+      overlayClass={classNames?.overlay ?? 'ht-sheet-danger__overlay'}
+      dialogClass={classNames?.dialog ?? 'ht-sheet-danger__dialog'}
       labelledBy={labelledBy}
       policy="danger-confirm"
       testId={testId}
@@ -117,7 +117,7 @@ export function DangerConfirmDialog({
       initialFocusRef={cancelRef}
     >
       {children}
-        <div className={classNames?.actions ?? 'ht-danger-confirm__actions'}>
+        <div className={classNames?.actions ?? 'ht-sheet-danger__actions'}>
           {/*
               两枚的重量是**有序**的：「取消」走次要档（有填充），主按钮走危险实底档。
               🔴 这里不许"简化"成两枚都不带色调 —— 确认层里破坏性那枚必须比安全侧更重，
