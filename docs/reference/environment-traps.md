@@ -12258,3 +12258,84 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     同族：把"断言 code"放宽成"断言具体那句话"也一样 —— 早一版的 `already ciphertext` 守卫删掉后测试仍绿，
     因为经 JSON 分支也抛同一个 `code`。
     **动作**：变异臂打不红时，第一件事是问"这条断言真的观察到了那个行为吗"，而不是再加一条断言。
+
+618. 🔴 **门禁的目录遍历用 `statSync` ⇒ 遇到断掉的符号链接整条门禁崩成一行 Node 栈**（2026-10-26，`check:i18n-vars`）：
+
+    `scripts/check-i18n-vars.mjs` 的 `walk()` 原来用 `statSync(p)` —— 它**跟随**符号链接。
+    `apps/mobile/ios/Pods/Headers/Private/ReactCodegen/` 下面是一堆指向
+    `ios/build/generated/ios/` 的链接，而那个目录**只有跑过 `pod install` 才存在**。
+    于是这台机器上（codegen 没跑、`ios/build` 被清过）门禁在读第一棵树时就 `ENOENT`，
+    退出码 2，输出里**一条断言都没有** —— 谁也不知道到底有没有不匹配的 `{占位符}`。
+    **修法**：`lstatSync` + 只走真实目录/普通文件（跳过链接），并按构建产物处理 `Pods`。
+    这不是"把红改成绿"：崩溃本来就没判过任何一条断言；而且链接目标存在时会把同一份代码扫两遍。
+    **识别**：门禁退出码 2 且 stderr 里只有 `at Object.<anonymous>` / `at ModuleJob.run`，
+    正文一句 `✅/❌` 都没有 ⇒ 先看它是不是在遍历上死了。
+    **判据（能红）**：`node scripts/check-i18n-vars.mjs --self-test` 的 13 枚臂必须全过，
+    且正式跑必须打印 `SUMMARY … 缺参数=0`（没有 SUMMARY 就是没跑到底）。
+
+619. 🔴 **一条"验收脚本"可以写得很像样、却从来没绿过：过期文案 + 到不了的步骤**（2026-10-26，`verify-mobile-auth.sh`）：
+
+    四个独立的坏点叠在一起，而症状全是"找不到按钮"，看起来像产品坏了：
+
+    - `L_TERMS="我同意该服务端提供的服务条款与隐私政策"`，而词条早改成
+      「我同意服务条款与隐私政策，并允许本机联网」⇒ 第 3 步必红；
+    - 它点「注册新账号」（`其他登录方式` 折叠区里的**邮件链接注册**），但既不切模式也不展开折叠区
+      ⇒ 那个节点**根本不在树上**；
+    - 第 4 步要「粘贴令牌」，而那一栏只在 `allowServerSelection` 时渲染，脚本却是从**欢迎页**进认证屏
+      ⇒ 那一栏不存在；
+    - 两处标签栏点击写死 `(945,2253)/(135,2253)`，那是 1080×2340 模拟器的坐标 ——
+      换成 1156×2510 的真机就落在空白处。
+
+    **规矩**：① 验收脚本里的界面文案**一律**从词条表取（用 `node --input-type=module -e`
+    从 `packages/i18n/dist` 读真值，别手抄）；② 点击**按 testID**（线上是 `resource-id`）而不是文案，
+    文案会合成、会撞名；③ 标签栏点击按无障碍名，不按坐标；④ 设备侧服务端地址：
+    模拟器有 `10.0.2.2` 别名，**真机没有**，要 `adb reverse tcp:<port> tcp:<port>` +
+    `HEYTA_E2E_DEVICE_SERVER=http://127.0.0.1:<port>`。
+    **最省事的自查**：`bash -n` 只验语法；真正的验是"它上次是什么时候绿的、绿在哪台设备上"。
+    一条没人跑过的验收脚本，可信度低于没有它。
+
+620. 🔴 **`sdk-pkg.json` 里的 `displayName` 不能直接填进 `compatibleSdkVersion`**（2026-11-01，鸿蒙 RNOH 探针上 `windows-pc` 实测）：
+
+    那台机装的 SDK 是 `HarmonyOS 26.0.0`（API 26），`sdk-pkg.json` 里写着
+    `displayName: "HarmonyOS 26.0.0"`、`apiVersion: "26"`。按 macOS 版探针的写法拼成
+    `26.0.0(26)` 填进 `compatibleSdkVersion` / `targetSdkVersion` ⇒
+
+    ```
+    hvigor ERROR: 00308018 Unknown Error
+    ```
+
+    **这条错误码什么也不告诉你。** 真因只在
+    `<proj>/.hvigor/outputs/build-logs/build.log` 里：
+
+    ```
+    Error: api version parameter is illegal! Expected format: <major>[.<minor>][.<patch>], e.g., "17", "17.2", "17.2.3"
+        at new ApiVersion (…/@ohos/sdkmanager-common/…/abstract-component-dto.js:99:19)
+        at ValidateUtil.integrationVersionCheck (…/hvigor-ohos-plugin/src/utils/validate/validate-util.js)
+    ```
+
+    这一版 `hvigor-ohos-plugin` 不认识 `26.0.0(26)` 这个形状，而**认识 `6.1.1(24)`**
+    —— 也正是本仓 `apps/mobile/harmony/build-profile.json5` 自己声明的那个值。
+    换成它 ⇒ `BUILD SUCCESSFUL`，`BuildNativeWithNinja` 跑满 3 分 51 秒。
+
+    **规矩**：① 声明值**抄本仓已验证过的那个**，不要从 `sdk-pkg.json` 现算；
+    ② 遇到 `00308018` 先去 `.hvigor/outputs/build-logs/build.log` 找 `[ERROR]`，
+    终端上那句 "contact the developer's official website" 是废话；
+    ③ 装的是哪个 SDK 照实打印（`INFO`），别让读者以为声明值和安装值对得上。
+
+621. 🔴 **从 Node 在 Windows 上跑带空格的 `.bat/.cmd`：引号会被吃掉两层**（2026-11-01，同一轮）：
+
+    `DevEco Studio` 的路径是 `C:\Program Files\Huawei\DevEco Studio`。三种写法依次踩：
+
+    | 写法 | 结果 |
+    |---|---|
+    | `spawnSync('cmd.exe', ['/d','/c', '"C:\\…\\npm.cmd" pack x'])` | `<路径>' 不是内部或外部命令` —— **cmd 不肯执行以引号开头的 /c 命令**（它会先剥一层引号，路径里再有空格就散架） |
+    | 同上 + `/s` 外层再包一层引号 | 仍红：Node 替参数套引号时会把内部 `"` 转成 `\"`，**而 cmd 不认这个转义** |
+    | `spawnSync(cmd, ['/d','/s','/c', line], { windowsVerbatimArguments: true })` + **裸命令名** | ✅ |
+
+    **规矩**：① 执行一律用**裸命令名**（`npm` / `ohpm` / `hvigorw`），靠自己拼的 `PATH` +
+    `PATHEXT` 解析；绝对路径只用来 `fs.existsSync` 做存在性检查；
+    ② 要自己控制整条命令行就开 `windowsVerbatimArguments: true`（Node 就一个字都不改写）；
+    ③ 判断"那台上有没有这个工具"用
+    `powershell -NoProfile -Command "Test-Path 'C:\…'"` + **单引号字面量**，
+    不要用 `cmd /c "if exist \"…\""` —— `\"` 在 PowerShell 里不是转义符，会得到假阴性
+    （第一次跑就在这里假红了一条"DevEco 没装"）。
