@@ -1098,6 +1098,65 @@ struct SharedWebView: NSViewRepresentable {
                     self.runReminderChannelProbe(webView)
                 }
             }
+            /**
+             🔬 **钥匙串腿的往返取证**（`HEYTA_VAULT_KEYCHAIN_PROBE=1` 才跑；产品路径不碰这一段）。
+
+             它验的是这一轮补上的那一米：页侧 `window.heytaVaultKeychain` →
+             `heytaVaultKeychain` 消息通道 → `VaultKeychainStore`（Keychain Services）。
+             **不需要登录、不需要真的建 vault** —— 用合成作用域（`probe://…`）走完
+             存 / 读 / 更新 / 删 / 过短值被拒，跑完自己删干净。
+
+             🔴 为什么必须在这里验、而不是只跑 `check:macos-shell`：
+             那一条跑的是**同一个 Store**，但它是无头 CLI 进程；这一条跑的是
+             **签过名的 .app 里的 WKWebView**，路径上多了「shim 注入了没有」「换 world 之后
+             `postMessage` 还通不通」这两格 —— 少了它，"macOS 控制面通了"只在单元层成立。
+             */
+            if ProcessInfo.processInfo.environment["HEYTA_VAULT_KEYCHAIN_PROBE"] == "1" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self, weak webView] in
+                    guard let self, let webView else { return }
+                    self.runVaultKeychainProbe(webView)
+                }
+            }
+        }
+
+        /// 页侧 ⇄ 钥匙串的一次完整往返。判据写在 JS 里（一把尺），壳只负责把结果抄进日志。
+        ///
+        /// 🔴 必须用 `callAsyncJavaScript`，**不能**用 `evaluateJavaScript`：
+        /// 后者不 await Promise，实测直接回
+        /// `JavaScript execution returned a result of an unsupported type` ——
+        /// 那条错误看起来像"桥坏了"，其实只是"结果是个 Promise"。
+        private func runVaultKeychainProbe(_ webView: WKWebView) {
+            let body = """
+            const bridge = window.heytaVaultKeychain;
+            if (!bridge) return 'BRIDGE_MISSING';
+            const origin = 'probe://vault-keychain';
+            const account = 'probe-' + Date.now().toString(16);
+            const b64 = (bytes) => btoa(String.fromCharCode(...bytes));
+            const fresh = () => b64(Array.from({ length: 32 }, () => Math.floor(Math.random() * 256)));
+            const rootA = fresh();
+            const rootB = fresh();
+            const out = {};
+            out.absentFirst = (await bridge.load(origin, account)) === null;
+            out.saved = await bridge.save(origin, account, rootA);
+            out.readBack = (await bridge.load(origin, account)) === rootA;
+            await bridge.save(origin, account, rootB);
+            out.updated = (await bridge.load(origin, account)) === rootB;
+            out.cleared = await bridge.clear(origin, account);
+            out.absentAfterClear = (await bridge.load(origin, account)) === null;
+            // 负臂：16 字节必须被拒（不是 32 就当没有）。
+            out.rejectedShort = (await bridge.save(origin, account, b64(Array(16).fill(17)))) === false;
+            await bridge.clear(origin, account);
+            return JSON.stringify(out);
+            """
+            webView.callAsyncJavaScript(body, arguments: [:], in: nil, in: .page) { [weak self] result in
+                guard let self else { return }
+                switch result {
+                case .success(let value):
+                    self.onStorageFact("VAULT_KEYCHAIN_PROBE=\(value as? String ?? "nil")")
+                case .failure(let error):
+                    self.onStorageFact("VAULT_KEYCHAIN_PROBE=ERROR \(error.localizedDescription)")
+                }
+            }
         }
 
         /// Help, pricing and changelog belong to the public site. Opening them in
