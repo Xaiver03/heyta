@@ -117,7 +117,6 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
 
   const baseUrl = useSyncStore((s) => s.baseUrl);
   const token = useSyncStore((s) => s.token);
-  const email = useSyncStore((s) => s.email);
 
   const state = useEmailChangeStore((s) => s.state);
   const requesting = useEmailChangeStore((s) => s.requesting);
@@ -204,15 +203,11 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
         />
       </h3>
 
-      {/* 当前邮箱：值来自本机存的凭据（不是我们猜的）。没读到就**不编一个**。 */}
-      {email === undefined ? null : (
-        <div className="ht-settings__field" data-testid="email-change-current-row">
-          <div className="ht-settings__item-label">{t('common.emailChange.currentLabel')}</div>
-          <p className="ht-settings__hint" role="status" data-testid="email-change-current">
-            {email}
-          </p>
-        </div>
-      )}
+      {/*
+        🔴 这里**不再回显「当前邮箱」**（2026-10-31）。它和正上方「邮箱」那一行
+        是同一个值，同一张卡片里写两遍 —— 读起来像两个不同的地址，用户得逐字比对
+        才敢确认。当前地址的唯一落点是上面那一行；这一块只说"要换成什么"。
+      */}
 
       {/*
         🔴 读侧失败**不是**"没有进行中的换绑"（见 emailChangeStore 文件头那条纪律），

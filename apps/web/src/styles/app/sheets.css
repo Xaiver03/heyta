@@ -35,14 +35,8 @@
 
 
 
-.ht-settings__page-title,
-.ht-settings__lead {
+.ht-settings__page-title {
   margin: 0;
-}
-
-.ht-settings__lead {
-  margin-block-start: var(--ht-space-1);
-  color: var(--ht-color-foreground-muted);
 }
 
 .ht-settings__nav {
@@ -212,11 +206,8 @@
   scroll-margin-block-start: var(--ht-space-4);
 }
 
-.ht-settings__group-title {
-  margin: 0;
-  padding-block-end: var(--ht-space-2);
-  border-block-end: 0;
-}
+/* 设置页的节标题只有一处：左侧导航（`aria-current="page"`）。
+   内容面曾经在这里再写一遍同一个词，两行同名字并排读起来像两个层级。 */
 
 /* 行式面板：间距交给行自己（行内有 `padding-block`），面板只留内边距与背景。 */
 .ht-settings--rows {
@@ -744,26 +735,6 @@
     padding-inline-end: calc(var(--ht-space-6) + var(--ht-touch-target-min));
     scroll-padding-inline-end: calc(var(--ht-space-6) + var(--ht-touch-target-min));
   }
-}
-
-/* ── 每一节的开头（2026-10-24，「设置中心」统一版式）──────────────
- *
- * 产品负责人对设置页的两句原话是「排版混乱」与「需要有单独的订阅界面」。
- * 逐屏看下来，"乱"的最大来源不是控件，而是**每节的开头都不一样**：
- * 七节里只有两节有一句说明，而有些面板又自带一个和节标题近义的 `<h2>`
- * （「设置 / 个人资料 / 个人信息」三行标题就是这么叠出来的）。
- *
- * 现在统一成：**一个标题 + 一句"这一页管什么"**。说明用 muted、限行宽 ——
- * 它的作用是让人一眼确认自己来对了地方，不是用来读的。 */
-.ht-settings__head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-1);
-}
-
-.ht-settings__head .ht-settings__lead {
-  max-inline-size: var(--ht-layout-prose-max);
-  color: var(--ht-color-foreground-muted);
 }
 
 /* ── 订阅页（2026-10-24 独立成节）────────────────────────────────

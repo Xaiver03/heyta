@@ -23,7 +23,7 @@
  * | 一屏三个近义标题（设置 / 个人资料 / 个人信息） | 组标题 `个人资料` + 面板自己的 `个人信息` 两级同名，层级塌成一条 |
  * | 头像和昵称的左边界各不相同 | 每块各自 `flex-direction: column`，标签/控件/按钮各起一行，缩进靠手感 |
  * | 昵称那一格看起来只是几行灰字 | `.ht-input` 的背景是 `surface`，而卡片**也是** `surface` ⇒ 没有框 |
- * | 三行长说明把三行的面板读成说明书 | 解释写进行里（`…nickname.hint`、`…avatar.needPassword`） |
+ * | 三行长说明把三行的面板读成说明书 | 解释写进行里（`…nickname.hint`、`…avatar.needPassword`）；头像那一段已在 ADR-0079 连同加密一起删除 |
  *
  * 所以现在的形状是 **一行一件事**：左列标签（+ 需要解释时一个 `?`），右列控件；
  * 行与行之间只隔一条发丝线。解释一律进 `?`（`SettingsInfoTip`），行里只留
@@ -36,7 +36,7 @@
  * | 端点路径、请求体、失败归类 | `@heyta/app-host` 的 `hosted-auth.ts` |
  * | 32 个码点 / 512 KB / 允许的格式 | `@heyta/shared-schema` 的 `account-profile-contract.ts` |
  * | 加密本身（Argon2id + AES-GCM / vault 信封） | `@heyta/sync-core` + `@heyta/sync-client` |
- * | 「这台设备有哪把钥匙」 | `useAvatarKey`（`features/sync/avatar-key.ts`） |
+ * | 「这台设备有哪把钥匙」 | **已经没有这一层**：头像是明文基础资料（ADR-0079） |
  * | 任何措辞 | `@heyta/i18n`（`check:ui-language` 拦硬编码） |
  *
  * 这里只有三件事：**渲染**、**收集输入**、**把图片压成契约要的形状**。
@@ -45,12 +45,9 @@
  *
  * ## 🔴 三条容易写错的地方
  *
- *   1. **钥匙不在本机的时候，头像既看不见也换不了，而这不是错误。**
- *      钥匙（口令 / vault 根钥匙）从不落盘，所以每个新会话都要解锁一次
- *      （`credential-storage.ts`、ADR-0040 §7.2）。没有它，服务端那份密文对**我们**
- *      也一样解不开。所以这里给的是一个**陈述句** + 一个「去解锁」，
- *      不是红字、不是"加载失败"。
- *      ⚠️ 把它做成错误提示的症状：从没设过头像的人每次刷新都被凶一次。
+ *   1. **头像与昵称是基础资料，读写都不需要任何钥匙**（ADR-0079）。
+ *      服务端保存图片字节，界面只要登录就能换；**不要**再引入"先解锁才能换头像"
+ *      这类形态 —— 它曾经把一次密码学操作塞进"换张照片"里。
  *
  *   2. **昵称的字数用码点，不用 `.length`。**
  *      `displayNameCodePoints` 与 `ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS` 都来自契约：
@@ -83,7 +80,6 @@ import {
   displayNameCodePoints,
 } from '@heyta/shared-schema';
 
-import { useAvatarKey } from '../sync/avatar-key.js';
 import { useSyncStore } from '../sync/store.js';
 import { EmailChangePanel } from './EmailChangePanel.js';
 import { SettingsInfoTip } from './SettingsInfoTip.js';
@@ -100,36 +96,23 @@ type Notice =
 
 export function ProfilePanel({
   active = true,
-  onRequestUnlock,
 }: {
   active?: boolean;
-  /**
-   * 「去解锁」的去处。
-   *
-   * 🔴 为什么是回调而不是这里自己 `setState`：这一节住在设置浮层里，而"切到哪一节"
-   * 是浮层（`App.tsx`）的事。面板自己记住一个 section 名，就等于在这里抄了一份
-   * 导航表 —— 那张表已经有一处漂过一次（`settings-anchors.ts` 的注释）。
-   */
-  onRequestUnlock?: (() => void) | undefined;
 }): React.JSX.Element {
   const { t } = useI18n();
 
   const baseUrl = useSyncStore((s) => s.baseUrl);
   const token = useSyncStore((s) => s.token);
   const email = useSyncStore((s) => s.email);
-  /** 钥匙（口令或 vault 根钥匙）—— 唯一口径见 `useAvatarKey`。 */
-  const { key: avatarKey } = useAvatarKey({ active });
 
   /** 🔴 没有令牌就**一个请求都不发**（规则住在 app-host，这里只是不去调它）。 */
   const signedIn = baseUrl !== '' && token !== undefined;
-  /** 钥匙只在内存里，所以它决定的是"这台设备今天能不能碰头像"。 */
-  const canTouchAvatar = signedIn && avatarKey !== undefined;
 
   const [draft, setDraft] = useState('');
   /** 服务端当前那个昵称。用来区分"没改过"与"改回原值"，也用来出占位符。 */
   const [savedName, setSavedName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
-  /** 读侧的结论由共享裁决给出（`absent` / `needs-password` / `undecryptable` / `unreadable`）。 */
+  /** 读侧的结论由共享裁决给出（`absent` / `ready` / `unreadable`）。 */
   const [avatarState, setAvatarState] = useState<AccountAvatarImage['state'] | undefined>(
     undefined,
   );
@@ -159,10 +142,8 @@ export function ProfilePanel({
   /**
    * 读取当前资料。
    *
-   * 🔴 头像**分两步**：先拿 `avatarHash`（服务端给的就是这个，它解不开内容），
-   * 再用钥匙把密文解出来。所以"有没有头像"和"这台设备能不能显示头像"
-   * 是两个不同的问题，界面上必须分开答 —— 合并成一个的症状是没有钥匙的人
-   * 被告知"你还没有头像"，然后他传一张上去，把**自己原来那张**覆盖掉。
+   * 🔴 头像**分两步**：先拿 `avatarHash`（服务端给的缓存键），有 hash 才去取图片。
+   * 明文之后没有"有没有钥匙 / 解不解得开"这一档：登录着就能读（ADR-0079）。
    */
   useEffect(() => {
     const generation = ++sessionGenerationRef.current;
@@ -193,31 +174,28 @@ export function ProfilePanel({
       setLoadNotice({ kind: 'idle' });
       setSavedName(profile.displayName);
       setDraft(profile.displayName ?? '');
-      // 🔴 "要不要取图 / 有没有钥匙 / 解不解得开"不在这里判 —— 见
-      //   `resolveAccountAvatarImage`。移动端接的是同一个函数（AGENTS §3.5）。
-      //   原来这里是三段 `if (avatarHash === null) … / if (password === '') return;`，
-      //   把解码失败的四种原因压成了同一个 `undefined`：口令不对的人因此被界面
-      //   告知"你还没有头像"，他接着点「换一张」，把自己原来那张覆盖掉。
-      const reading = await resolveAccountAvatarImage(options, token, avatarKey, profile.avatarHash);
+      // 🔴 "要不要取图"不在这里判 —— 见 `resolveAccountAvatarImage`。
+      //   头像明文之后没有"有没有钥匙"这一档：登录着就能读（ADR-0079）。
+      const reading = await resolveAccountAvatarImage(options, token, profile.avatarHash);
       if (!isCurrent()) return;
       setAvatarState(reading.state);
       if (reading.state === 'ready') setAvatarUrl(reading.dataUri);
       else if (reading.state === 'absent') setAvatarUrl(undefined);
-      // 其余三种**不动**已显示的图：一次取不到不该让已经看到的头像凭空消失，
+      // `unreadable` **不动**已显示的图：一次取不到不该让已经看到的头像凭空消失，
       // 而 `avatarState` 那句话会说明它可能不是最新的。
     })();
     return () => {
       cancelled = true;
     };
-  }, [active, avatarKey, baseUrl, signedIn, t, token]);
+  }, [active, baseUrl, signedIn, t, token]);
 
   /** 换一张：编码在前、上限判断在后，任何一步不对都**不发请求**。 */
   const onPickFile = async (file: File): Promise<void> => {
     const generation = sessionGenerationRef.current;
-    if (!activeRef.current || !signedIn || token === undefined || avatarKey === undefined) {
+    if (!activeRef.current || !signedIn || token === undefined) {
       setAvatarNotice({
         kind: 'error',
-        text: t('common.profile.avatar.needPassword'),
+        text: t('common.profile.avatar.failed'),
       });
       return;
     }
@@ -231,7 +209,6 @@ export function ProfilePanel({
     const outcome = await uploadAccountAvatar(
       { baseUrl },
       token,
-      avatarKey,
       encoded.image,
     );
     if (!activeRef.current || !aliveRef.current || sessionGenerationRef.current !== generation) return;
@@ -307,13 +284,9 @@ export function ProfilePanel({
   const codePoints = displayNameCodePoints(draft);
   /** 没有头像时圈里的字母 —— 判定在共享层，与移动端同一份（这里只是渲染它）。 */
   const avatarInitial = avatarInitialFromEmail(email);
-  /** 读侧那三种"有头像但这台设备显示不出来"的状态才需要说一句话。 */
+  /** 读侧只有"有头像但此刻取不到"这一种需要说话；`absent` 不是一件事。 */
   const avatarReadMessage =
-    avatarState === 'undecryptable'
-      ? t('common.profile.avatar.undecryptable')
-      : avatarState === 'unreadable'
-        ? t('common.profile.avatar.unreadable')
-        : null;
+    avatarState === 'unreadable' ? t('common.profile.avatar.unreadable') : null;
   const tooLong = codePoints > ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS;
 
   if (!signedIn) return (
@@ -346,18 +319,13 @@ export function ProfilePanel({
       {/*
         一行一件事：左列标签，右列控件。
 
-        🔴 `?` 是**常驻**的，不是"钥匙缺失时才出现"的补丁：它回答的是
-        "头像为什么是加密的"，而这个事实在钥匙齐备时同样成立。
-        钥匙缺失时多出来的是下面那句**可执行**的短句 +「去解锁」。
+        🔴 头像**没有 `?`**（ADR-0079）：它是基础资料，不是需要解释的密码学对象。
+        旧版这里挂着一枚「头像为什么要加密」，而那个前提已经被产品决策推翻 ——
+        留着它只会继续告诉用户"改头像需要口令"。
       */}
       <div className="ht-settings__row" data-testid="profile-avatar-row">
         <div className="ht-settings__row-label">
           <span className="ht-settings__item-label">{t('common.profile.avatar.label')}</span>
-          <SettingsInfoTip
-            label={t('common.profile.avatar.whyLabel')}
-            text={t('common.profile.avatar.why')}
-            testId="profile-avatar-why"
-          />
         </div>
         <div className="ht-settings__row-body">
           <div className="ht-settings__avatar-line">
@@ -373,7 +341,7 @@ export function ProfilePanel({
             {/*
               文件输入本身**不显示**：它是隐藏的，点「换一张」才弹系统选择框。
               ⚠️ 但它必须**在 DOM 里**而不是条件渲染 —— 真浏览器判据要点它，
-              而 `accept` 白名单是契约的一部分（服务端只看密文，格式只有这里能拦）。
+              而 `accept` 白名单是契约的一部分（服务端也校验同一份白名单）。
             */}
             <input
               ref={fileRef}
@@ -392,7 +360,7 @@ export function ProfilePanel({
                 type="button"
                 className="ht-btn ht-btn--ghost"
                 data-testid="profile-avatar-change"
-                disabled={!canTouchAvatar}
+                disabled={!signedIn}
                 onClick={() => fileRef.current?.click()}
               >
                 {t('common.profile.avatar.change')}
@@ -402,7 +370,7 @@ export function ProfilePanel({
                   type="button"
                   className="ht-btn ht-btn--ghost"
                   data-testid="profile-avatar-remove"
-                  disabled={!canTouchAvatar}
+                  disabled={!signedIn}
                   onClick={() => void removeAvatar()}
                 >
                   {t('common.profile.avatar.remove')}
@@ -410,37 +378,6 @@ export function ProfilePanel({
               )}
             </div>
           </div>
-          {/*
-            钥匙不在本机：**一句可执行的话 + 一个真的能去的地方**。
-            原来这里是三行长句，而且指向设置里一个登录态下根本不渲染的输入框。
-          */}
-          {canTouchAvatar ? null : (
-            <div className="ht-settings__action-line">
-              {/*
-                ⚠️ 「去解锁」**不在**这句话里面：那句话是一个 `data-testid` 的
-                文案载体，判据（`e2e/tests/profile-avatar-e2ee.spec.ts`）对它的
-                断言是**整段文字相等**。把按钮塞进同一个元素，读到的就成了
-                「…就能换头像。去解锁」—— 一条因为排版而变红的假缺陷。
-              */}
-              <p
-                className="ht-settings__hint"
-                role="status"
-                data-testid="profile-avatar-need-password"
-              >
-                {t('common.profile.avatar.needPassword')}
-              </p>
-              {onRequestUnlock === undefined ? null : (
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost ht-settings__inline-action"
-                  data-testid="profile-avatar-unlock"
-                  onClick={onRequestUnlock}
-                >
-                  {t('common.profile.avatar.unlock')}
-                </button>
-              )}
-            </div>
-          )}
           <NoticeLine notice={avatarNotice} testId="profile-avatar-notice" />
           {/*
             读侧那句与写侧那句**分开渲染**：`avatarNotice` 记的是"用户刚做的那件事的结果"，
@@ -505,6 +442,15 @@ export function ProfilePanel({
         </div>
       </div>
 
+      {/*
+        邮箱这一行**只显示值**（2026-10-31）。
+
+        🔴 它曾经挂着一枚 `?`，而那枚问号落在**值下面**一列的空位里 —— 同一屏里
+        头像/昵称的问号都在标签后面，只有这一枚换了锚点，于是它读起来像"邮箱地址
+        自己的注释"。而它的正文（"登录标识、换地址用下面那块"）在正下方的
+        「更换登录邮箱」里已经逐条展开，属于同一屏说两遍。
+        现在问号只出现在它解释的那个标签/小标题之后，值那一列不出现问号。
+      */}
       {email === undefined ? null : (
         <div className="ht-settings__row" data-testid="profile-email-row">
           <div className="ht-settings__row-label">
@@ -514,11 +460,6 @@ export function ProfilePanel({
             <p className="ht-settings__value" data-testid="profile-email">
               {email}
             </p>
-            <SettingsInfoTip
-            testId="tip-profile-email"
-            label={t('common.profile.email.label')}
-            text={t('common.profile.email.hint')}
-          />
           </div>
         </div>
       )}

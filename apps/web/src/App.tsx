@@ -291,41 +291,18 @@ function isSettingsSectionId(value: string): value is SettingsSectionId {
   return SETTINGS_NAV_ITEMS.some((item) => item.id === value);
 }
 
-/**
- * 每一节的开头：**一个**页面标题 + 一句"这一页管什么"。
+/*
+ * 🔴 2026-10-31：内容面**不再渲染节标题**。
  *
- * 🔴 为什么值得单开一个组件：设置页原来的毛病不是"控件不对"，而是**每节的开头不一样** ——
- * 七节里只有两节有说明，有的面板又自带一个和节标题几乎同名的 `<h2>`，
- * 于是同一屏出现"设置 / 个人资料 / 个人信息"三行近义标题（2026-10-24 实拍）。
- * 现在标题与那句说明都从这里出，谁也长不出第二个。
+ * 左栏已经用 `aria-current="page"` 和主色底指出"你在哪一节"；内容面再写一遍
+ * 同一个词（「个人资料」紧挨着「个人资料」）就是同一份信息架构画了两次，
+ * 而两行同名字并排读起来像两个层级不同的东西（产品负责人实拍）。
+ *
+ * 节的可访问名改挂 `<section aria-label>`（文案仍来自 `SETTINGS_NAV_ITEMS`
+ * 的同一个键，没有第二份文案）。原来挂在标题上的那句"这一页管什么"随标题一起
+ * 下线：它只是对导航词的扩写，而解释本就不该常驻（禁令见
+ * `docs/agents/design-system.md`）。
  */
-function SettingsSectionHead({
-  id,
-  title,
-  lead,
-}: {
-  id: string;
-  title: string;
-  /**
-   * 这一节"管什么"的那一句。
-   *
-   * 🔴 2026-10-24 晚：它原来是标题下面**常驻的一行说明**，产品负责人第二次发火之后
-   * （「严禁说明文字出现……只允许一个圈里一个问号」「彻底禁止」）搬进了标题旁边的 `?`。
-   * 句子一个字没改 —— 换的是**什么时候读到它**：想确认"这页管什么"时点一下，
-   * 而不是每次进设置都先读八行。
-   * 判据：`pnpm check:settings-prose`（账本只许变小）。
-   */
-  lead: string;
-}): React.JSX.Element {
-  return (
-    <header className="ht-settings__head">
-      <h2 className="ht-settings__group-title ht-type-section-title" id={id}>
-        {title}
-        <SettingsInfoTip testId={`tip-section-${id}`} label={title} text={lead} />
-      </h2>
-    </header>
-  );
-}
 
 function SettingsSectionNav({ active, onSelect }: {
   active: SettingsSectionId;
@@ -3330,26 +3307,9 @@ export function App(): React.JSX.Element {
               它不带 `ht-*` 前缀，因为 `check:row-single-source` 只许 `ht-*` 前缀族
               **下降**，新造一族（哪怕只包一层）是要被拒的。
             */}
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-profile'} id="settings-group-profile" aria-labelledby="settings-group-profile-title">
-              <SettingsSectionHead
-                id="settings-group-profile-title"
-                title={t('web.settings.nav.profile')}
-                lead={t('web.settings.lead.profile')}
-              />
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-profile'} id="settings-group-profile" aria-label={t('web.settings.nav.profile')}>
               <div id="settings-profile" data-testid="profile-section-anchor">
-                <ProfilePanel
-                  active={activeSettingsSection === 'settings-group-profile'}
-                  /*
-                   * 「去解锁」落到**同步与隐私**那一节，并且用与其它入口同一个锚点
-                   * （`SETTINGS_ANCHORS.sync`）。🔴 不在这里手写 `setSettingsSection`
-                   * 的理由：锚点表是"从别处点一下，要落在哪一节、焦点给谁"的唯一
-                   * 事实源，绕开它就等于第二份实现 —— 而第二份总会漏掉焦点。
-                   */
-                  onRequestUnlock={() => {
-                    setSettingsFocus(undefined);
-                    setSettingsAnchor('sync');
-                  }}
-                />
+                <ProfilePanel active={activeSettingsSection === 'settings-group-profile'} />
               </div>
             </section>
             {/*
@@ -3359,20 +3319,10 @@ export function App(): React.JSX.Element {
               ⚠️ 支付渠道与入口由 `check:payment-entry` 钉成同一件事：没配渠道时
               界面如实说"这台实例没有配置收款通道"，不假装能买。
             */}
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-subscription'} id="settings-group-subscription" aria-labelledby="settings-group-subscription-title">
-              <SettingsSectionHead
-                id="settings-group-subscription-title"
-                title={t('web.settings.nav.subscription')}
-                lead={t('web.settings.lead.subscription')}
-              />
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-subscription'} id="settings-group-subscription" aria-label={t('web.settings.nav.subscription')}>
               <SubscriptionPanel active={activeSettingsSection === 'settings-group-subscription'} />
             </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-appearance'} id="settings-group-appearance" aria-labelledby="settings-group-appearance-title">
-              <SettingsSectionHead
-                id="settings-group-appearance-title"
-                title={t('web.settings.nav.appearance')}
-                lead={t('web.settings.lead.appearance')}
-              />
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-appearance'} id="settings-group-appearance" aria-label={t('web.settings.nav.appearance')}>
             {/*
               🔴 **显示偏好**（2026-09-30 从任务页头搬进来）：「日期 | 倒计时」
               两个词悬在页头上，用户不知道它是什么、影响什么 —— 它其实是
@@ -3380,7 +3330,7 @@ export function App(): React.JSX.Element {
               设备本地持久化（`due-display-pref.ts`），不进 op-log。
             */}
             <section className="ht-settings" data-testid="display-pref-panel">
-              {/* 页标题是「任务与显示」；这里再写一个「显示」就是同一屏两行近义标题。 */}
+              {/* 左侧导航已经写着「任务与显示」；这里再写一个「显示」就是同一屏两行近义标题。 */}
               <div className="ht-settings__preference-row">
               <h3 className="ht-settings__h3 ht-type-row-title">{t('web.shell.dueMode.aria')}</h3>
               <div
@@ -3497,12 +3447,7 @@ export function App(): React.JSX.Element {
               <WidgetJourneyPanel />
               <WidgetPushPanel active={activeSettingsSection === 'settings-group-appearance'} />
             </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-sync'} id="settings-group-sync" aria-labelledby="settings-group-sync-title">
-              <SettingsSectionHead
-                id="settings-group-sync-title"
-                title={t('web.settings.nav.syncPrivacy')}
-                lead={t('web.settings.lead.syncPrivacy')}
-              />
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-sync'} id="settings-group-sync" aria-label={t('web.settings.nav.syncPrivacy')}>
               {/*
                 🔴 **同步**（工单 H9 第 3 刀，2026-10-06）：地址 / 令牌 / 口令 / 密钥库
                 这一组原来是一个**同级浮层**（rail 那颗齿轮点开它）。产品负责人第 2 条
@@ -3534,12 +3479,7 @@ export function App(): React.JSX.Element {
               */}
               <PrivacyPanel active={activeSettingsSection === 'settings-group-sync'} />
             </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-ai'} id="settings-group-ai" aria-labelledby="settings-group-ai-title">
-              <SettingsSectionHead
-                id="settings-group-ai-title"
-                title={t('web.settings.nav.aiIntegrations')}
-                lead={t('web.settings.lead.ai')}
-              />
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-ai'} id="settings-group-ai" aria-label={t('web.settings.nav.aiIntegrations')}>
               <AiSettings
                 active={activeSettingsSection === 'settings-group-ai'}
                 initial={aiSettings}
@@ -3576,20 +3516,10 @@ export function App(): React.JSX.Element {
                 }}
               />
             </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-data'} id="settings-group-data" aria-labelledby="settings-group-data-title">
-              <SettingsSectionHead
-                id="settings-group-data-title"
-                title={t('web.settings.nav.data')}
-                lead={t('web.settings.lead.data')}
-              />
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-data'} id="settings-group-data" aria-label={t('web.settings.nav.data')}>
               <DataSettingsPanel active={activeSettingsSection === 'settings-group-data'} />
             </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-account'} id="settings-group-account" aria-labelledby="settings-group-account-title">
-              <SettingsSectionHead
-                id="settings-group-account-title"
-                title={t('web.settings.nav.account')}
-                lead={t('web.settings.lead.account')}
-              />
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-account'} id="settings-group-account" aria-label={t('web.settings.nav.account')}>
               {accountNeedsSignIn ? (
                 <SettingsAccountGate
                   messageKey="web.settings.accountSignIn"
@@ -3618,12 +3548,7 @@ export function App(): React.JSX.Element {
                 </>
               )}
             </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-help'} id="settings-group-help" aria-labelledby="settings-group-help-title">
-              <SettingsSectionHead
-                id="settings-group-help-title"
-                title={t('web.settings.nav.help')}
-                lead={t('web.settings.lead.help')}
-              />
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-help'} id="settings-group-help" aria-label={t('web.settings.nav.help')}>
               {/*
                 🔴 「帮助与关于」是**产品孤岛的另一半**：在此之前，应用里
                 没有任何一处能到达站点的帮助 / 价格 / 更新动态。

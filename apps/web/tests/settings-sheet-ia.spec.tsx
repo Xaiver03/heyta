@@ -135,6 +135,47 @@ describe('设置浮层的 IA：下层必须可见', () => {
     expect(sheet?.getAttribute('aria-modal')).toBe('false');
     expect(sheet?.getAttribute('aria-label')).toBe('设置');
   });
+
+  /**
+   * 🔴 2026-10-31 产品负责人实拍：「信息架构重复了」。
+   *
+   * 左栏已经用主色底 + `aria-current="page"` 指出"你在哪一节"，内容面又写了一遍
+   * 同一个词 —— 两行同名字并排，一屏里同一个信息架构画了两次。
+   *
+   * 判据按**文案**判而不按类名判：导航里每一个标签都算一次分母，内容面里
+   * 任何一枚 `<h2>` 只要和它逐字相同就是重复。⚠️ 不能只查当前这一节 ——
+   * 其余七节也在 DOM 里（`hidden`），它们同样会长出重复标题。
+   *
+   * 反向形状：给 `#settings-group-profile` 加回一枚同名的节 `<h2>` ⇒ 本条报
+   * 「内容面又画了一遍『个人资料』」。
+   */
+  it('内容面不重复侧栏已经指出的节标题（侧栏是唯一的节标题）', async () => {
+    const el = await mountApp();
+    await openSettings(el);
+    const nav = el.querySelector('.ht-settings__nav');
+    const content = el.querySelector('[data-testid="settings-sheet"] .ht-settings__content');
+    expect(nav, '设置左侧目录必须在').not.toBeNull();
+    expect(content, '设置内容面必须在').not.toBeNull();
+
+    const labels = [...nav!.querySelectorAll('button')]
+      .map((button) => button.textContent?.trim() ?? '')
+      .filter((label) => label !== '');
+    expect(labels.length, '导航里必须有多节').toBeGreaterThan(1);
+
+    for (const label of labels) {
+      const duplicates = [...content!.querySelectorAll('h2')].filter(
+        (heading) => heading.textContent?.trim() === label,
+      );
+      expect(
+        duplicates.map(() => label),
+        `内容面又画了一遍「${label}」—— 节标题只许出现在侧栏`,
+      ).toEqual([]);
+    }
+
+    // 标题下线 ≠ 这一节没有名字：可访问名改挂在 `aria-label` 上，且文案同源。
+    const profileSection = content!.querySelector('[id="settings-group-profile"]');
+    expect(profileSection?.getAttribute('aria-label')).toBe('个人资料');
+  });
 });
 
 /**

@@ -398,7 +398,7 @@ describe('两种语言', () => {
     await clickPlace(el);
     const text = el.textContent ?? '';
     // 页标题（「托管同步续费」）已经没有了自己的 h2 —— 它现在住在「订阅」这一节里
-    // （2026-10-24 独立成节），标题由设置壳的 `SettingsSectionHead` 给。
+    // （2026-10-24 独立成节），节名只由左侧导航给出（2026-10-31 起内容面不再重复）。
     // 这里改为断言**这一屏自己的**那些词条：档位名与那句计费说明。
     expect(text).toContain(translate(locale, 'landing.pricing.hosted.name'));
     expect(text).toContain(translate(locale, 'web.subscription.plans.hint'));
