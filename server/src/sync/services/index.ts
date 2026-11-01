@@ -13,6 +13,7 @@
  */
 export { ValidationService, ALLOWED_ENTITY_TYPES } from './validation.service';
 export type { ValidationResult } from './validation.service';
+export { readPayloadMode, readPayloadModeFromDb } from './payload-mode.service';
 export { RateLimitService } from './rate-limit.service';
 export { RequestDeduplicationService } from './request-deduplication.service';
 export type {

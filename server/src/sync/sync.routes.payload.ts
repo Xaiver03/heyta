@@ -43,9 +43,46 @@ interface E2eeGateItem {
  * and the payload must have the ciphertext transport shape. Shape check only —
  * a lying flag over base64-encoded plaintext is out of scope by design (see
  * docs/e2ee-legacy-data-eradication-plan.md).
+ *
+ * ADR-0080 起它只是 `payloadGateViolation('e2ee', item)` 的一层皮：账号级模式
+ * 决定该收哪种载荷，而**这个函数本身的判据一个字没放宽**。
  */
 export const violatesE2eeGate = (item: E2eeGateItem): boolean =>
   item.isPayloadEncrypted !== true || !isEncryptedPayloadTransportShape(item.payload);
+
+/** 闸门结论：放行（`null`）或"这个账号要的是另一种载荷"。 */
+export type PayloadGateViolation = 'need-e2ee' | 'need-plaintext';
+
+/**
+ * ADR-0080 S1：按**账号模式**判定这次上传该不该收。
+ *
+ * 两个方向都拒错配，且都要求标志**显式**出现（缺失既不是加密也不是明文）：
+ *
+ * | 账号模式   | isPayloadEncrypted | 形状          | 结论           |
+ * |-----------|--------------------|---------------|----------------|
+ * | `e2ee`    | true               | 密文          | 放行           |
+ * | `e2ee`    | 其它               | —             | need-e2ee      |
+ * | `readable`| false              | 明文          | 放行           |
+ * | `readable`| 其它               | —             | need-plaintext |
+ *
+ * 🔴 为什么"拒错配"而不是"两种都收"：混进来一条另一种形状的行，冲突合并与
+ * 快照重放就要各自处理四种组合，而"整库同模式"正是这套设计的承重假设。
+ * 让服务端在入口就把混合挡住，客户端就不必证明它不会混。
+ */
+export const payloadGateViolation = (
+  mode: 'e2ee' | 'readable',
+  item: E2eeGateItem,
+): PayloadGateViolation | null => {
+  if (mode === 'e2ee') {
+    return item.isPayloadEncrypted === true && isEncryptedPayloadTransportShape(item.payload)
+      ? null
+      : 'need-e2ee';
+  }
+  // readable：必须显式 false，且**不得**是密文形状（那是"半开半关"的信号）。
+  return item.isPayloadEncrypted === false && !isEncryptedPayloadTransportShape(item.payload)
+    ? null
+    : 'need-plaintext';
+};
 
 /**
  * Rejects an upload at the encrypted-only ingress gate. Callers must invoke
@@ -69,6 +106,34 @@ export const sendE2eeRequiredReply = (
   return reply.status(400).send({
     code: SYNC_ERROR_CODES.E2EE_REQUIRED,
     message: E2EE_REQUIRED_CLIENT_MESSAGE,
+  });
+};
+
+/**
+ * ADR-0080：`readable` 模式下收到密文时的镜像拒绝。
+ *
+ * 消息里**不含**载荷，理由与 `E2EE_REQUIRED` 同一条：被拒的值可能就是用户正文。
+ */
+export const PLAINTEXT_REQUIRED_CLIENT_MESSAGE =
+  'This account has end-to-end encryption turned off, so this server only accepts plaintext payloads. ' +
+  'Enable sync encryption in the app, then retry.';
+
+export const sendPlaintextRequiredReply = (
+  reply: FastifyReply,
+  userId: number,
+  context: { clientId: string; surface: 'ops' | 'snapshot'; opsCount: number },
+): FastifyReply => {
+  Logger.audit({
+    event: 'PLAINTEXT_REQUIRED',
+    userId,
+    clientId: context.clientId,
+    errorCode: SYNC_ERROR_CODES.PLAINTEXT_REQUIRED,
+    surface: context.surface,
+    opsCount: context.opsCount,
+  });
+  return reply.status(400).send({
+    code: SYNC_ERROR_CODES.PLAINTEXT_REQUIRED,
+    message: PLAINTEXT_REQUIRED_CLIENT_MESSAGE,
   });
 };
 

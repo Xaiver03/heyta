@@ -99,6 +99,9 @@ export const SUPER_SYNC_ERROR_CODES = {
   // Encrypted-only ingress gate: upload rejected because a payload is not
   // flagged encrypted or lacks the ciphertext transport shape.
   E2EE_REQUIRED: 'E2EE_REQUIRED',
+  // ADR-0080 的镜像闸门：账号处于 'readable' 模式（用户显式关掉了端到端加密），
+  // 服务端只收明文。收到密文即拒 —— 让"半密半明"在服务端就不可能出现。
+  PLAINTEXT_REQUIRED: 'PLAINTEXT_REQUIRED',
 
   // Server errors (500)
   INTERNAL_ERROR: 'INTERNAL_ERROR',

@@ -36,6 +36,7 @@ export class VaultKeyMigrationError extends Error {
       | 'migration_coverage_mismatch'
       | 'legacy_payload'
       | 'wrong_payload_generation'
+      | 'wrong_payload_mode'
       | 'invalid_payload'
       | 'migration_already_active'
       | 'migration_expired'
@@ -66,10 +67,11 @@ type MigrationManifestRow = {
   requestId: string;
   requestFingerprint: string;
   state: string;
+  targetMode: string;
   expectedKeyVersion: number;
   expectedLatestSeq: number;
-  targetPayloadKeyVersion: number;
-  keyVersion: number;
+  targetPayloadKeyVersion: number | null;
+  keyVersion: number | null;
   latestSeq: number;
   expectedOperationCount: number;
   expectedPayloadBytes: bigint;
@@ -87,30 +89,48 @@ const requestFingerprint = (request: VaultKeyMigrationRequest): string =>
     .update(stableJsonStringify(request))
     .digest('base64url');
 
+/**
+ * 单请求（inline）迁移的响应。它**只服务 e2ee 目标**：关掉加密那一趟必须走
+ * staging（大历史 + 明文替换本来就该分片），所以这里遇到空世代就是行状态错。
+ */
 const responseFromRow = (row: {
   requestId: string;
-  keyVersion: number;
-  targetPayloadKeyVersion: number;
+  keyVersion: number | null;
+  targetPayloadKeyVersion: number | null;
   latestSeq: number;
   migratedOperationCount: number;
-}): VaultKeyMigrationResponse => ({
-  requestId: row.requestId,
-  keyVersion: row.keyVersion,
-  payloadKeyVersion: row.targetPayloadKeyVersion,
-  latestSeq: row.latestSeq,
-  migratedOperationCount: row.migratedOperationCount,
-});
+}): VaultKeyMigrationResponse => {
+  if (row.keyVersion === null || row.targetPayloadKeyVersion === null) {
+    throw new VaultKeyMigrationError(
+      'migration_coverage_mismatch',
+      'inline key migration cannot target a plaintext payload',
+      409,
+    );
+  }
+  return {
+    requestId: row.requestId,
+    keyVersion: row.keyVersion,
+    payloadKeyVersion: row.targetPayloadKeyVersion,
+    latestSeq: row.latestSeq,
+    migratedOperationCount: row.migratedOperationCount,
+  };
+};
 
 const asMigrationState = (state: string): MigrationState =>
   (MIGRATION_STATES as readonly string[]).includes(state)
     ? state as MigrationState
     : 'STAGING';
 
+const asTargetMode = (mode: string): 'e2ee' | 'readable' =>
+  mode === 'readable' ? 'readable' : 'e2ee';
+
 const stageResponseFromRow = (row: MigrationManifestRow): VaultKeyMigrationStageResponse => ({
   requestId: row.requestId,
   state: asMigrationState(row.state),
-  keyVersion: row.keyVersion,
-  payloadKeyVersion: row.targetPayloadKeyVersion,
+  targetMode: asTargetMode(row.targetMode),
+  // `null` 表示目标是明文：这一趟没有新包装版本、也没有载荷世代。
+  keyVersion: row.keyVersion ?? null,
+  payloadKeyVersion: row.targetPayloadKeyVersion ?? null,
   expectedLatestSeq: row.expectedLatestSeq,
   expectedOperationCount: row.expectedOperationCount,
   uploadedOperationCount: row.uploadedOperationCount,
@@ -126,6 +146,7 @@ const migrationSelect = {
   requestId: true,
   requestFingerprint: true,
   state: true,
+  targetMode: true,
   expectedKeyVersion: true,
   expectedLatestSeq: true,
   targetPayloadKeyVersion: true,
@@ -144,6 +165,22 @@ const migrationSelect = {
 
 const jsonBytes = (value: unknown): number =>
   Buffer.byteLength(JSON.stringify(value ?? null) ?? 'null', 'utf8');
+
+/**
+ * ADR-0080：明文迁移的替换载荷必须是**一个 JSON 对象**。
+ *
+ * 形状检查（与密文那头对称）——服务端不承诺能证明"这真是用户写的明文"，
+ * 只承诺"到了 readable 目标这里的东西至少是可解析的 JSON，不是密文字节"。
+ */
+const isPlaintextJsonPayload = (value: unknown): boolean => {
+  if (typeof value !== 'string') return false;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+};
 
 interface InventoryCursor {
   v: 1;
@@ -382,14 +419,64 @@ export class VaultKeyMigrationService {
         throw new VaultKeyMigrationError('migration_expired', 'migration requestId cannot be reused after cancellation or expiry', 409);
       }
 
+      const targetMode = manifest.targetMode;
+      const syncStateRow = await tx.userSyncState.findUnique({
+        where: { userId },
+        select: { payloadMode: true },
+      });
+      const currentMode = syncStateRow?.payloadMode === 'readable' ? 'readable' : 'e2ee';
+      if (currentMode === targetMode) {
+        throw new VaultKeyMigrationError(
+          'wrong_payload_mode',
+          targetMode === 'readable'
+            ? 'this account already stores plaintext payloads'
+            : 'this account already stores end-to-end encrypted payloads',
+          409,
+        );
+      }
+
       const currentPackage = await tx.vaultKeyPackage.findUnique({ where: { userId } });
-      if (!currentPackage) throw new VaultKeyMigrationError('key_package_not_found', 'a key package must exist before payload migration', 404);
-      const currentPackageData = vaultKeyPackageSchema.safeParse(currentPackage.packageData);
-      if (!currentPackageData.success) throw new VaultKeyMigrationError('key_package_not_found', 'stored key package is invalid', 409);
-      if (manifest.expectedKeyVersion !== currentPackage.keyVersion) throw new VaultKeyMigrationError('stale_key_version', 'key package version changed', 409);
-      if (manifest.package.keyVersion !== manifest.expectedKeyVersion + 1) throw new VaultKeyMigrationError('stale_key_version', 'atomic migration must advance the wrapper revision exactly once', 409);
-      const currentPayloadVersion = currentPackage.activePayloadKeyVersion ?? 0;
-      if (manifest.targetPayloadKeyVersion !== currentPayloadVersion + 1) throw new VaultKeyMigrationError('wrong_payload_generation', 'target payload generation must advance exactly one generation', 409);
+      const currentPackageData = currentPackage === null
+        ? null
+        : vaultKeyPackageSchema.safeParse(currentPackage.packageData);
+      const assertUsableCurrentPackage = (): void => {
+        if (!currentPackage) throw new VaultKeyMigrationError('key_package_not_found', 'a key package must exist before payload migration', 404);
+        if (!currentPackageData?.success) throw new VaultKeyMigrationError('key_package_not_found', 'stored key package is invalid', 409);
+        if (manifest.expectedKeyVersion !== currentPackage.keyVersion) throw new VaultKeyMigrationError('stale_key_version', 'key package version changed', 409);
+      };
+
+      const nextPackage = manifest.package;
+      const targetPayloadKeyVersion = manifest.targetPayloadKeyVersion;
+
+      if (targetMode === 'readable') {
+        // 关掉加密：起点必须是还在用的包 —— 它既是 CAS 的锚，也是"确实有东西可关"的证据。
+        assertUsableCurrentPackage();
+        if (nextPackage !== undefined || targetPayloadKeyVersion !== undefined) {
+          // 这一趟没有新包、也没有新世代。带着它们来就是语义错，不是宽容一下就过去的事。
+          throw new VaultKeyMigrationError('migration_coverage_mismatch', 'turning encryption off must not carry a key package or target generation', 400);
+        }
+      } else if (currentMode === 'readable') {
+        // 打开加密：readable 期间**没有**包，所以 expectedKeyVersion 只能是 0，
+        // 新包从 keyVersion 1 开始，目标世代也只能是 1（此前没有任何已加密世代）。
+        if (currentPackage !== null) {
+          throw new VaultKeyMigrationError('migration_coverage_mismatch', 'a readable account must not have a key package before re-encryption', 409);
+        }
+        if (manifest.expectedKeyVersion !== 0) throw new VaultKeyMigrationError('stale_key_version', 're-encryption must start from key version zero', 409);
+        if (!nextPackage || targetPayloadKeyVersion === undefined) {
+          throw new VaultKeyMigrationError('migration_coverage_mismatch', 'an e2ee migration must carry a package and a target generation', 400);
+        }
+        if (nextPackage.keyVersion !== 1) throw new VaultKeyMigrationError('stale_key_version', 're-encryption must publish key version one', 409);
+        if (targetPayloadKeyVersion !== 1) throw new VaultKeyMigrationError('wrong_payload_generation', 're-encryption must publish payload generation one', 409);
+      } else {
+        // 同模式内的 root 轮换（既有行为，一个字没动）。
+        assertUsableCurrentPackage();
+        if (!nextPackage || targetPayloadKeyVersion === undefined) {
+          throw new VaultKeyMigrationError('migration_coverage_mismatch', 'an e2ee migration must carry a package and a target generation', 400);
+        }
+        if (nextPackage.keyVersion !== manifest.expectedKeyVersion + 1) throw new VaultKeyMigrationError('stale_key_version', 'atomic migration must advance the wrapper revision exactly once', 409);
+        const currentPayloadVersion = currentPackage!.activePayloadKeyVersion ?? 0;
+        if (targetPayloadKeyVersion !== currentPayloadVersion + 1) throw new VaultKeyMigrationError('wrong_payload_generation', 'target payload generation must advance exactly one generation', 409);
+      }
       if (manifest.expectedLatestSeq !== latestSeq) throw new VaultKeyMigrationError('stale_latest_seq', 'operation history changed; re-read and rebuild the migration manifest', 409);
 
       const operationCount = await tx.operation.count({ where: { userId } });
@@ -419,15 +506,16 @@ export class VaultKeyMigrationService {
           requestId: manifest.requestId,
           requestFingerprint: fingerprint,
           state: 'STAGING',
+          targetMode,
           expectedKeyVersion: manifest.expectedKeyVersion,
           expectedLatestSeq: manifest.expectedLatestSeq,
-          targetPayloadKeyVersion: manifest.targetPayloadKeyVersion,
-          keyVersion: manifest.package.keyVersion,
+          targetPayloadKeyVersion: manifest.targetPayloadKeyVersion ?? null,
+          keyVersion: manifest.package?.keyVersion ?? null,
           latestSeq: manifest.expectedLatestSeq,
           expectedOperationCount: manifest.expectedOperationCount,
           expectedPayloadBytes: BigInt(manifest.expectedPayloadBytes),
           reservedStorageBytes: BigInt(manifest.expectedPayloadBytes),
-          packageData: manifest.package as unknown as Prisma.InputJsonValue,
+          packageData: (manifest.package ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           expiresAt,
           createdAt: BigInt(now),
         },
@@ -483,10 +571,20 @@ export class VaultKeyMigrationService {
       const staged = chunk.operations.map((operation) => {
         const row = byId.get(operation.id);
         if (!row || row.serverSeq !== operation.serverSeq) throw new VaultKeyMigrationError('migration_coverage_mismatch', 'chunk operation identity does not match retained history', 409);
-        const envelope = inspectVaultPayloadGeneration(operation.payload);
-        if (envelope.kind === 'legacy') throw new VaultKeyMigrationError('legacy_payload', 'migration replacements must use the vault envelope', 409);
-        if (envelope.kind === 'invalid') throw new VaultKeyMigrationError('invalid_payload', envelope.reason, 400);
-        if (envelope.keyVersion !== migration.targetPayloadKeyVersion) throw new VaultKeyMigrationError('wrong_payload_generation', 'migration payload generation does not match the target', 409);
+        if (migration.targetMode === 'readable') {
+          // 明文目标：替换载荷必须是明文 JSON 对象，且**不得**是密文形状。
+          if (isEncryptedPayloadTransportShape(operation.payload)) {
+            throw new VaultKeyMigrationError('invalid_payload', 'a plaintext migration must not stage ciphertext', 400);
+          }
+          if (!isPlaintextJsonPayload(operation.payload)) {
+            throw new VaultKeyMigrationError('invalid_payload', 'plaintext migration replacement is not a JSON payload', 400);
+          }
+        } else {
+          const envelope = inspectVaultPayloadGeneration(operation.payload);
+          if (envelope.kind === 'legacy') throw new VaultKeyMigrationError('legacy_payload', 'migration replacements must use the vault envelope', 409);
+          if (envelope.kind === 'invalid') throw new VaultKeyMigrationError('invalid_payload', envelope.reason, 400);
+          if (envelope.keyVersion !== migration.targetPayloadKeyVersion) throw new VaultKeyMigrationError('wrong_payload_generation', 'migration payload generation does not match the target', 409);
+        }
         const bytes = jsonBytes(operation.payload);
         return {
           operation,
@@ -552,6 +650,8 @@ export class VaultKeyMigrationService {
         throw new VaultKeyMigrationError('migration_not_ready', 'migration chunks are incomplete', 409);
       }
 
+      // ADR-0080：目标模式决定这次发布写进去的行标不标"已加密"。
+      const targetIsEncrypted = migration.targetMode === 'e2ee';
       const stagedCount = await tx.vaultKeyMigrationOperation.count({ where: { migrationId: migration.id } });
       const currentCount = await tx.operation.count({ where: { userId } });
       if (stagedCount !== migration.expectedOperationCount || currentCount !== migration.expectedOperationCount) {
@@ -588,7 +688,7 @@ export class VaultKeyMigrationService {
         UPDATE operations AS o
         SET payload = s.payload,
             payload_bytes = s.storage_bytes,
-            is_payload_encrypted = TRUE
+            is_payload_encrypted = ${targetIsEncrypted}
         FROM vault_key_migration_operations AS s
         WHERE s.migration_id = ${migration.id}
           AND o.user_id = ${userId}
@@ -622,36 +722,77 @@ export class VaultKeyMigrationService {
         select: { keyVersion: true, packageData: true },
       });
       const currentPackageData = vaultKeyPackageSchema.safeParse(currentPackage?.packageData);
-      if (!currentPackage || !currentPackageData.success ||
-          currentPackage.keyVersion !== migration.expectedKeyVersion) {
+      // readable → e2ee 那一趟，包是在迁移期间**第一次**出现的：起点本来就没有包。
+      const publishingFirstPackage =
+        migration.targetMode === 'e2ee' && currentPackage === null;
+      if (!publishingFirstPackage && (!currentPackage || !currentPackageData.success ||
+          currentPackage.keyVersion !== migration.expectedKeyVersion)) {
         throw new VaultKeyMigrationError(
           'stale_key_version',
           'key package changed while the payload migration was staging',
           409,
         );
       }
-      const packageUpdated = await tx.vaultKeyPackage.updateMany({
-        where: {
-          userId,
-          keyVersion: migration.expectedKeyVersion,
-          packageData: {
-            path: ['rootKeyFingerprint'],
-            equals: currentPackageData.data.rootKeyFingerprint,
-          },
-        },
-        data: {
-          keyVersion: migration.keyVersion,
-          packageData: migration.packageData as Prisma.InputJsonValue,
-          activePayloadKeyVersion: migration.targetPayloadKeyVersion,
-        },
+      if (migration.targetMode === 'e2ee') {
+        if (migration.keyVersion === null || migration.targetPayloadKeyVersion === null || migration.packageData === null) {
+          throw new VaultKeyMigrationError('migration_coverage_mismatch', 'e2ee migration row is missing its package revision', 409);
+        }
+        if (publishingFirstPackage) {
+          // 从 readable 打开：首次发布包。`create` 而不是 `updateMany`，
+          // 因为此刻没有任何一行可更新 —— 用 update 会静默地"成功零行"。
+          await tx.vaultKeyPackage.create({
+            data: {
+              userId,
+              keyVersion: migration.keyVersion,
+              packageData: migration.packageData as Prisma.InputJsonValue,
+              activePayloadKeyVersion: migration.targetPayloadKeyVersion,
+              createdAt: BigInt(now),
+              updatedAt: BigInt(now),
+            },
+          });
+        } else {
+          const packageUpdated = await tx.vaultKeyPackage.updateMany({
+            where: {
+              userId,
+              keyVersion: migration.expectedKeyVersion,
+              packageData: {
+                path: ['rootKeyFingerprint'],
+                equals: currentPackageData.data!.rootKeyFingerprint,
+              },
+            },
+            data: {
+              keyVersion: migration.keyVersion,
+              packageData: migration.packageData as Prisma.InputJsonValue,
+              activePayloadKeyVersion: migration.targetPayloadKeyVersion,
+            },
+          });
+          if (packageUpdated.count !== 1) {
+            throw new VaultKeyMigrationError(
+              'stale_key_version',
+              'key package changed while the payload migration was staging',
+              409,
+            );
+          }
+        }
+      } else {
+        // 关掉加密：包必须**真的消失**。留着它就是一个"也许还能救"的暗示，
+        // 而 readable 模式下没有任何一把钥匙能打开它的内容。
+        const removed = await tx.vaultKeyPackage.deleteMany({
+          where: { userId, keyVersion: migration.expectedKeyVersion },
+        });
+        if (removed.count !== 1) {
+          throw new VaultKeyMigrationError(
+            'stale_key_version',
+            'key package changed while the payload migration was staging',
+            409,
+          );
+        }
+      }
+      // 模式与载荷在同一个事务里翻：先写载荷、后翻模式，任何一步失败都整体回滚。
+      await tx.userSyncState.update({
+        where: { userId },
+        data: { payloadMode: migration.targetMode },
       });
-      if (packageUpdated.count !== 1) {
-        throw new VaultKeyMigrationError(
-          'stale_key_version',
-          'key package changed while the payload migration was staging',
-          409,
-        );
-      }
       await tx.vaultKeyMigrationOperation.deleteMany({ where: { migrationId: migration.id } });
       await tx.vaultKeyMigrationChunk.deleteMany({ where: { migrationId: migration.id } });
       const published = await tx.vaultKeyMigration.update({

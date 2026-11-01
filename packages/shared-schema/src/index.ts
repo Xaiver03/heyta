@@ -175,7 +175,7 @@ export type { ApiErrorBody } from './api-error-contract';
 export {
   ACCOUNT_PROFILE_PATHS,
   ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS,
-  ACCOUNT_AVATAR_MAX_CIPHER_BASE64_BYTES,
+  ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES,
   ACCOUNT_AVATAR_MAX_SOURCE_BYTES,
   ACCOUNT_AVATAR_EDGE_PX,
   ACCOUNT_AVATAR_CONTENT_TYPES,
@@ -192,6 +192,8 @@ export {
   accountProfileUpdateSchema,
   accountProfileResponseSchema,
   accountAvatarUpdateSchema,
+  accountAvatarResponseSchema,
+  accountAvatarUploadResponseSchema,
 } from './account-profile-contract';
 
 // 换绑登录邮箱（ADR-0063 §2.1–§2.4）与登录会话（§2.5）：路径 / 稳定码 / 时限 / 响应形状。
@@ -218,6 +220,16 @@ export type {
   SessionSummary,
   SessionListResponse,
 } from './session-contract';
+
+// ADR-0080：账号级载荷模式（e2ee / readable）。它只说"云上那份能不能被服务端读"，
+// 不说钥匙放在哪 —— 后者不上线协议。
+export {
+  SYNC_PAYLOAD_MODES,
+  SYNC_PAYLOAD_MODE_PATHS,
+  syncPayloadModeResponseSchema,
+  syncPayloadModeSchema,
+} from './sync-mode-contract';
+export type { SyncPayloadMode, SyncPayloadModeResponse } from './sync-mode-contract';
 
 // Opaque E2EE key-package transport. Root keys and recovery codes never cross
 // this boundary; the service may persist only the wrapped package.

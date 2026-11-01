@@ -25,8 +25,10 @@ import {
   MAX_DECOMPRESSED_SIZE_SNAPSHOT,
   sendCompressedBodyParseFailure,
   sendE2eeRequiredReply,
-  violatesE2eeGate,
+  sendPlaintextRequiredReply,
+  payloadGateViolation,
 } from './sync.routes.payload';
+import { readPayloadModeFromDb } from './services/payload-mode.service';
 import {
   applyStorageUsageDelta,
   computeJsonStorageBytes,
@@ -115,14 +117,21 @@ export const uploadSnapshotHandler = async (
       repairBaseServerSeq === undefined &&
       isCleanSlate === true;
 
-    // Encrypted-only ingress gate: applies to every snapshot op type,
-    // including SYNC_IMPORT, BACKUP_IMPORT, and REPAIR — the legacy plaintext
-    // repair upload is no longer externally reachable. Runs BEFORE
-    // fingerprinting, dedup, quota work, and prepareSnapshotCache, so a
-    // rejected upload leaves no server-side trace and burns no CPU on the
-    // full-state hash or gzip.
-    if (violatesE2eeGate({ isPayloadEncrypted, payload: state })) {
+    // 载荷形状闸门（ADR-0080）：适用于每一种快照类型，包括 SYNC_IMPORT、
+    // BACKUP_IMPORT 与 REPAIR —— 账号模式下只认一种形状，另一个方向拒。
+    // 跑在指纹、去重、配额与 prepareSnapshotCache **之前**，所以被拒的上传
+    // 在服务端不留痕迹，也不为全量哈希或 gzip 烧 CPU。
+    const payloadMode = await readPayloadModeFromDb(userId);
+    const gateViolation = payloadGateViolation(payloadMode, { isPayloadEncrypted, payload: state });
+    if (gateViolation === 'need-e2ee') {
       return sendE2eeRequiredReply(reply, userId, {
+        clientId,
+        surface: 'snapshot',
+        opsCount: 1,
+      });
+    }
+    if (gateViolation === 'need-plaintext') {
+      return sendPlaintextRequiredReply(reply, userId, {
         clientId,
         surface: 'snapshot',
         opsCount: 1,
