@@ -12429,3 +12429,26 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     **解除条件**：在那台机的**交互式会话**（RDP / 控制台）里跑打包脚本，或预先在一台
     交互式登录过的机器上把 `.pfx` 备好再拷过去。**不要**为了让它变绿去跳过签名 ——
     未签名的 MSIX 装不进 Windows，那等于把"没验"写成"验过"。
+
+630. 🔴 **没有 GUI 的 `xcrun simctl io screenshot` 全是黑帧 —— 而应用其实跑得好好的**（2026-11-02，iOS 首屏取证）：
+
+    模拟器上 `xcrun simctl launch` 起了应用（pid 有），日志里也看得见 RN 在挂载
+    （`RCTScrollViewComponentView implements focusItemsInRect:` 这类），
+    但 `xcrun simctl io <udid> screenshot` 连拍三张都是**纯黑**，三次字节数完全相同。
+
+    真因不是"界面没画出来"，而是**显示没有被渲染到被截取的那个 framebuffer**：
+    这台机 `open -a Simulator` 报 `Unable to find application named 'Simulator'`，
+    而 `/Applications/Xcode.app/Contents/Developer/Applications/` 是空的 ——
+    没有 Simulator GUI，`simctl` 就只有离屏渲染。
+
+    🔴 **这条最危险的地方**：它和"应用白屏"长得一模一样，而两者要修的东西完全相反。
+    "应用白屏"要去查 JS bundle / 首帧错误；"没 GUI"要去挂 GUI。
+
+    **区分办法**（按成本从低到高）：
+    1. 看应用**是否真的在跑**：`simctl spawn <udid> log show --last 2m --predicate 'processImagePath CONTAINS "<App>"'`，
+       有 RN/UIKit 的日志就说明它在跑；
+    2. 看应用包里**有没有 JS bundle**：`ls <App>.app | grep main.jsbundle`；
+    3. 换一台**有 GUI 会话**的机器再截 —— 黑帧如果只在无 GUI 机器上出现，就是这条坑。
+
+    **判据不能是"截图非空"**：三张黑帧的字节数一模一样，而一个真的静态界面也该有像素差异；
+    "字节数一致"本身就是"没渲染"的旁证。
