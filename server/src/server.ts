@@ -594,7 +594,7 @@ export const createServer = (
       // entitlement 闸门只挂创建/邀请两端（owner 付费、成员免费）。
       await fastifyServer.register(shareRoutes, { prefix: '/api' });
 
-      // 账号资料（R10：昵称 + 密文头像）。它**不在** `apiRoutes` 里，理由和
+      // 账号资料（R10：昵称 + 明文头像，ADR-0079）。它**不在** `apiRoutes` 里，理由和
       // `activityRoutes` 一样：那一个文件已经 1868 行，而这几条路由与认证/同步
       // 没有任何共享状态。路径与客户端共用 `@heyta/shared-schema` 的常量。
       // ⚠️ 它同样不受计费闸门影响 —— 改自己的昵称不是付费能力。

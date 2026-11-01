@@ -50,9 +50,6 @@ const token = (userId: number): string =>
   `Bearer ${jwt.sign({ userId, email: `u${userId}@example.test`, tokenVersion: 0 }, SECRET, { expiresIn: '1h' })}`;
 
 const AUTH = { authorization: token(1) };
-/** 形状合法的最小密文：40 字节 → base64 56 字符（闸门要求 ≥ 28 字节）。 */
-const CIPHER = Buffer.alloc(40, 7).toString('base64');
-
 let app: FastifyInstance;
 
 beforeEach(async () => {
@@ -121,7 +118,11 @@ describe('归属只从令牌来', () => {
       method: 'PUT',
       url: '/api/account/avatar',
       headers: AUTH,
-      payload: { cipherBase64: CIPHER, userId: 999 },
+      payload: {
+        contentType: 'image/png',
+        dataBase64: Buffer.alloc(64, 7).toString('base64'),
+        userId: 999,
+      },
     });
     expect(res.statusCode).toBe(200);
     const call = mocks.userAvatar.upsert.mock.calls[0]?.[0] as { where: { userId: number } };
@@ -174,75 +175,63 @@ describe('昵称：长度与"清除"的区分', () => {
   });
 });
 
-describe('头像：服务端只收密文，而且 hash 由它自己算', () => {
+describe('头像：基础资料明文，服务端自己校验格式与大小（ADR-0079）', () => {
+  const IMAGE_B64 = Buffer.alloc(64, 7).toString('base64');
+
   it.each([
-    ['短于形状门（6 字节）', Buffer.from('hello').toString('base64'), 'payload-not-encrypted'],
-    ['带 base64url 字符（`-`/`_`）', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-_==', 'payload-not-encrypted'],
-    ['长度不是 4 的倍数', 'AAAAAAAAA', 'payload-not-encrypted'],
-    // 非字符串走的是 zod 那道门（400 也是统一信封：`validation_failed`）。
-    ['根本不是字符串', 42 as unknown as string, 'validation_failed'],
-  ])('头像载荷 %s ⇒ 400，且不写库', async (_label, value, code) => {
+    ['格式不在白名单', { contentType: 'image/svg+xml', dataBase64: IMAGE_B64 }],
+    ['不是标准 base64', { contentType: 'image/png', dataBase64: 'not base64!!' }],
+    ['长度不是 4 的倍数', { contentType: 'image/png', dataBase64: 'AAAAAAAAA' }],
+    ['contentType 缺失', { dataBase64: IMAGE_B64 }],
+    ['dataBase64 不是字符串', { contentType: 'image/png', dataBase64: 42 }],
+  ])('头像载荷 %s ⇒ 400，且不写库', async (_label, payload) => {
     const res = await app.inject({
       method: 'PUT',
       url: '/api/account/avatar',
       headers: AUTH,
-      payload: { cipherBase64: value },
+      payload,
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().code).toBe(code);
+    expect(res.json().code).toBe('validation_failed');
     expect(mocks.userAvatar.upsert).not.toHaveBeenCalled();
   });
 
-  it('⚠️ 这道闸门量的是**形状**，不是"有没有加密"—— 长 enough 的明文 base64 会过', async () => {
-    // 🔴 这一条**故意写成"它会通过"**。`transport-shape.ts` 的文件头自己就写着：
-    // "This is a shape check, not proof of encryption"。把它写成一条"服务端会拒绝明文"
-    // 的判据，会得到一个**永远通过但内容是假的**断言，而下一个人会信它。
-    // 真正的保护是：客户端确实加密了（`encodeAvatarCipher`），而服务端**没有钥匙**。
-    const plaintextJson = Buffer.from(
-      '{"contentType":"image/png","dataBase64":"' + 'A'.repeat(64) + '"}',
-    ).toString('base64');
+  it('🔴 解码后超过 512 KB ⇒ 400（旧版服务端只能量密文，现在能直接量图片）', async () => {
+    const tooBig = Buffer.alloc(512 * 1024 + 3, 9).toString('base64');
     const res = await app.inject({
       method: 'PUT',
       url: '/api/account/avatar',
       headers: AUTH,
-      payload: { cipherBase64: plaintextJson },
+      payload: { contentType: 'image/png', dataBase64: tooBig },
     });
-    expect(res.statusCode).toBe(200);
-    // 服务端把它**逐字节存下来**并算哈希 —— 它没有钥匙，所以它既不加密也不解密。
-    expect(res.json().avatarHash).toBe(
-      createHash('sha256').update(Buffer.from(plaintextJson, 'base64')).digest('hex'),
-    );
-    const storedCipher = (
-      mocks.userAvatar.upsert.mock.calls[0]?.[0] as { create: { cipher: Buffer } }
-    ).create.cipher;
-    expect(storedCipher.toString('base64')).toBe(plaintextJson);
-    // 🔴 这条**必须**是"包含了"：客户端不加密的话，服务端存的就是明文，
-    // 而它没有任何一层能发现。把这句写成 `not.toContain` 才是真的假判据
-    //（第一版就是这么错的 —— 它红在正确的地方，才暴露出断言本身站反了）。
-    // ⇒ "服务端看不到内容"这句话的承重**全部在客户端那一侧**，
-    //   判据是 `packages/app-host/tests/hosted-account-profile.spec.ts` 的双向证明。
-    expect(storedCipher.toString('utf8')).toContain('contentType');
+    expect(res.statusCode).toBe(400);
+    expect(mocks.userAvatar.upsert).not.toHaveBeenCalled();
   });
 
-  it('返回的 hash 等于**密文字节**的 SHA-256，客户端塞进来的 hash 被忽略', async () => {
+  it('PUT 头像：逐字节存下图片与 MIME，hash 由服务端算（客户端塞的值被忽略）', async () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/api/account/avatar',
       headers: AUTH,
-      payload: { cipherBase64: CIPHER, avatarHash: 'client-controlled-value' },
+      payload: {
+        contentType: 'image/png',
+        dataBase64: IMAGE_B64,
+        avatarHash: 'client-controlled-value',
+      },
     });
     expect(res.statusCode).toBe(200);
-    const expected = createHash('sha256').update(Buffer.from(CIPHER, 'base64')).digest('hex');
+    const expected = createHash('sha256').update(Buffer.from(IMAGE_B64, 'base64')).digest('hex');
     expect(res.json().avatarHash).toBe(expected);
+
     const callArg = mocks.userAvatar.upsert.mock.calls[0]?.[0] as {
-      create: { hash: string };
-      update: { hash: string };
+      create: { data: Buffer; contentType: string; hash: string };
+      update: { data: Buffer; contentType: string; hash: string };
     };
-    expect(callArg.create.hash).toBe(expected);
-    expect(callArg.update.hash).toBe(expected);
-    // 🔴 客户端能**左右** avatarHash 的两种写法都要挡：塞进 create/update 的
-    // 不是它给的串，而响应里也没有它给的值。
-    expect(expected).not.toBe('client-controlled-value');
+    for (const branch of [callArg.create, callArg.update]) {
+      expect(branch.data.toString('base64')).toBe(IMAGE_B64);
+      expect(branch.contentType).toBe('image/png');
+      expect(branch.hash).toBe(expected);
+    }
     expect(res.json().avatarHash).not.toBe('client-controlled-value');
   });
 
@@ -252,14 +241,19 @@ describe('头像：服务端只收密文，而且 hash 由它自己算', () => {
     expect(res.json().code).toBe('avatar-absent');
   });
 
-  it('GET 有头像 ⇒ 原样回密文，服务端**没有**解出任何东西', async () => {
+  it('GET 有头像 ⇒ 回明文载荷（contentType + dataBase64 + hash）', async () => {
     mocks.userAvatar.findUnique.mockResolvedValue({
-      cipher: Buffer.from(CIPHER, 'base64'),
+      data: Buffer.from(IMAGE_B64, 'base64'),
+      contentType: 'image/png',
       hash: 'abc',
     });
     const res = await app.inject({ method: 'GET', url: '/api/account/avatar', headers: AUTH });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ cipherBase64: CIPHER, avatarHash: 'abc' });
+    expect(res.json()).toEqual({
+      contentType: 'image/png',
+      dataBase64: IMAGE_B64,
+      avatarHash: 'abc',
+    });
   });
 
   it('DELETE 幂等：本来就没有（deleteMany 返回 0）也算 200', async () => {
@@ -269,28 +263,25 @@ describe('头像：服务端只收密文，而且 hash 由它自己算', () => {
     expect(res.json()).toEqual({ avatarHash: null });
   });
 
-  it('密文上限两侧都测：1.5 MiB 收、3 MiB 拒', async () => {
-    // 🔴 这条**必须两侧都测**，只测"超限被拒"是抓不到东西的（实测过）：
-    // 把 `bodyLimit` 从路由选项挪进 `config` ⇒ 路由限制**静默失效**，
-    // 而 3 MiB 依然被拒 —— 因为夹具是裸 `Fastify()`，它自己的默认值是 1 MiB。
-    // 一个错误的挡箭牌恰好也挡住了这一次请求，用例就绿了。
-    // 补上"1.5 MiB 必须**收**"这一侧，失效的限制会把它挡掉 ⇒ 红。
-    const under = Buffer.alloc(1_500_000, 65).toString('base64');
+  it('请求体上限两侧都测：1 MiB 内的包收、超过 1 MiB 的 413', async () => {
+    // 路由级 `bodyLimit` 是**路由选项**；挪进 `config` 会静默失效 ——
+    // 只测"超限被拒"抓不到它（夹具自己的默认值恰好也挡住），所以两侧都测。
+    const under = Buffer.alloc(400 * 1024, 65).toString('base64');
     const ok = await app.inject({
       method: 'PUT',
       url: '/api/account/avatar',
       headers: AUTH,
-      payload: { cipherBase64: under },
+      payload: { contentType: 'image/png', dataBase64: under },
     });
-    expect(ok.statusCode, '2 MiB 的路由上限没生效（1.5 MiB 被更小的默认值挡了）').toBe(200);
+    expect(ok.statusCode, '1 MiB 的路由上限没生效（400 KB 图被更小的默认值挡了）').toBe(200);
 
-    const huge = Buffer.alloc(3 * 1024 * 1024, 65).toString('base64');
+    const huge = Buffer.alloc(1_200_000, 65).toString('base64');
     mocks.userAvatar.upsert.mockClear();
     const res = await app.inject({
       method: 'PUT',
       url: '/api/account/avatar',
       headers: AUTH,
-      payload: { cipherBase64: huge },
+      payload: { contentType: 'image/png', dataBase64: huge },
     });
     expect(res.statusCode).toBe(413);
     expect(mocks.userAvatar.upsert, '超限的包写进库了').not.toHaveBeenCalled();
@@ -340,7 +331,7 @@ describe('登录响应的白名单投影（TypeScript 抓不到那一类）', ()
     expect(JSON.stringify(out)).not.toContain('raw-token');
   });
 
-  it('资料这一族的读取只 select `hash`，不把密文拖进鉴权路径', async () => {
+  it('资料这一族的读取只 select `hash`，不把头像字节拖进鉴权路径', async () => {
     await app.inject({ method: 'GET', url: '/api/account/profile', headers: AUTH });
     const call = mocks.user.findUnique.mock.calls
       .map((c) => c[0] as { select?: { avatar?: { select: object } } })
@@ -351,6 +342,6 @@ describe('登录响应的白名单投影（TypeScript 抓不到那一类）', ()
     const select = (call as unknown as { select: { avatar: { select: Record<string, unknown> } } })
       .select;
     expect(Object.keys(select.avatar.select)).toEqual(['hash']);
-    expect(select.avatar.select).not.toHaveProperty('cipher');
+    expect(select.avatar.select).not.toHaveProperty('data');
   });
 });

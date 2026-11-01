@@ -7,8 +7,8 @@
  * |---|---|---|
  * | GET    | `/api/account/profile`  | 读自己的资料（昵称 + `avatarHash`，**不含**任何图片字节） |
  * | PUT    | `/api/account/profile`  | 改昵称 |
- * | PUT    | `/api/account/avatar`   | 上传**密文**头像 |
- * | GET    | `/api/account/avatar`   | 取密文头像（给另一台设备用） |
+ * | PUT    | `/api/account/avatar`   | 上传头像（**明文**图片载荷） |
+ * | GET    | `/api/account/avatar`   | 取头像（本人，另一台设备用） |
  * | DELETE | `/api/account/avatar`   | 移除头像 |
  *
  * ## 🔴 身份一律取自令牌，不取自输入
@@ -23,29 +23,22 @@
  *（`packages/shared-schema/src/account-profile-contract.ts`）。
  * ⚠️ 契约与实现漂移的症状是 404，而不是报错 —— 所以这里**不靠**测试兜，靠只有一个字面量。
  *
- * ## 为什么头像是密文，以及密文为什么不需要上传通道
+ * ## 🔴 头像是**基础资料**，明文存储（ADR-0079，2026-11-01 绝对决策）
  *
- * 见 `server/prisma/schema.prisma` 的 `UserAvatar` 那段（法务表 E 的结构性依据）
- * 与 `docs/plans/ui-review-fill-zh-timeline.md` §8.6。
- * 线上传的是 `encrypt()` 的 base64 输出，走 JSON body ⇒ 与 op 上传**完全同形**：
- * 不需要 multipart、不需要自定义 content type parser、不引入任何新依赖。
+ * 昵称与头像只用来"认出这个账号"，不是用户的实质内容。端到端加密只留给任务、
+ * 便签这类实质内容。⇒ 这条路由收的是 `{contentType, dataBase64}` 明文，
+ * 服务端**能且必须**自己校验格式白名单与解码后的字节上限
+ *（`ACCOUNT_AVATAR_MAX_SOURCE_BYTES`）—— 不再有"服务端看不到内容"这个前提。
  *
- * 🔴 而且"它是不是密文"用的就是**同步通道那一道闸门**
- *（`isEncryptedPayloadTransportShape`，`server/src/sync/sync.routes.payload.ts:48` 同款），
- * 不是为头像另写一份形状校验 —— 两份校验一定会漂。
+ * 明文 ≠ 公开：GET 仍要求 Bearer，只回本人那一行；没有按别人身份查资料的端点。
  *
- * ## ⚠️ 服务端**不**校验原图大小，因为它做不到
- *
- * 它看不到明文，所以 `ACCOUNT_AVATAR_MAX_SOURCE_BYTES`（512 KB 原图）是**客户端纪律**。
- * 服务端能强制的是密文上限（`ACCOUNT_AVATAR_MAX_CIPHER_BASE64_BYTES`）。
- * 把这条写明白，是为了不让下一个人以为服务端兜住了原图体积。
+ * 走 JSON body（base64）而不是 multipart：与既有上传同形，不引新依赖。
  */
 import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { isEncryptedPayloadTransportShape } from '@heyta/sync-core';
 import {
   ACCOUNT_PROFILE_PATHS,
-  ACCOUNT_AVATAR_MAX_CIPHER_BASE64_BYTES,
+  ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES,
   accountAvatarUpdateSchema,
   accountDisplayNameSchema,
   accountProfileUpdateSchema,
@@ -112,22 +105,19 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
   );
 
   /**
-   * 上传密文头像。
+   * 上传头像（明文图片载荷）。
    *
-   * 🔴 `hash` 由**服务端**算，客户端**不参与**：
-   * 定义是"密文字节（base64 解码后）的 SHA-256"，如果两端各算一次，
-   * Hermes 上没有 `crypto.subtle`（这条仓库已经为同类问题付过一次代价，
-   * 见 legacy 密文在移动端无纯 JS 兜底那次），两端就会算出两个 hash。
+   * 🔴 `hash` 由**服务端**算，客户端**不参与**：它就是**图片字节**的 SHA-256。
+   * 两端各算一次的话，Hermes 上没有 `crypto.subtle`，会算出两个 hash
    * ⇒ 客户端把服务端返回的 `avatarHash` 当缓存键用，自己一个字节都不算。
    */
   fastify.put(
     `/${ACCOUNT_PROFILE_PATHS.avatar}`,
     {
-      // 密文上限 2 MiB，比全局 20 MB 的 `bodyLimit` 小一个量级 —— 头像不该能占满请求体额度。
+      // 上传体 1 MiB（base64 后），比全局 20 MB 小一个量级 —— 头像不该能占满请求体额度。
       // ⚠️ `bodyLimit` 是**路由选项**，不是 `config` 的键。放进 `config` 里 TypeScript 会报
-      // TS2769（这次就是这么发现的），但 `config` 本身是自由形状 —— 也就是说
-      // 写错位置的后果是"限制静默失效"，而不是运行时报错。
-      bodyLimit: ACCOUNT_AVATAR_MAX_CIPHER_BASE64_BYTES,
+      // TS2769，但 `config` 本身是自由形状 —— 写错位置的后果是"限制静默失效"。
+      bodyLimit: ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES,
       config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
       preHandler: authenticate,
     },
@@ -141,31 +131,17 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
             details: parsed.error.issues,
           });
         }
-        const { cipherBase64 } = parsed.data;
-
-        // 🔴 与同步通道**同一道**闸门：只收密文形状。
-        if (!isEncryptedPayloadTransportShape(cipherBase64)) {
-          return reply.status(400).send({
-            code: 'payload-not-encrypted',
-            message: 'Avatar payload must be an encrypted blob',
-          });
-        }
+        const { contentType, dataBase64 } = parsed.data;
 
         const { userId } = getAuthUser(req);
         // Prisma 的 `Bytes` 要 Buffer（包一层 `new Uint8Array(...)` 会 TS2740）。
-        const cipher = Buffer.from(cipherBase64, 'base64');
-        // ⚠️ 这里**曾经**有一条"解出零字节就 400"的兜底，已删。理由值得留着：
-        // 上面的形状闸门要求"长度 % 4 == 0 + 规范字母表 + 至少 28 字节"，
-        // 而满足这三条的串解码后**不可能**是 0 字节 —— `Buffer.from(_, 'base64')`
-        // 静默丢无效字符那件事，恰恰被"只接受规范字母表"这一步挡在外面了。
-        // 判据实测：能同时过闸门的输入里，最短的那条解出 28 字节。
-        // AGENTS §8 的"不许为不可能发生的场景写错误处理"，这一条就是它。
-        const hash = createHash('sha256').update(cipher).digest('hex');
+        const data = Buffer.from(dataBase64, 'base64');
+        const hash = createHash('sha256').update(data).digest('hex');
 
         await prisma.userAvatar.upsert({
           where: { userId },
-          create: { userId, cipher, hash, updatedAt: BigInt(Date.now()) },
-          update: { cipher, hash, updatedAt: BigInt(Date.now()) },
+          create: { userId, data, contentType, hash, updatedAt: BigInt(Date.now()) },
+          update: { data, contentType, hash, updatedAt: BigInt(Date.now()) },
         });
         return reply.send({ avatarHash: hash });
       } catch (err) {
@@ -177,11 +153,11 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
   );
 
   /**
-   * 取密文头像（另一台设备用）。
+   * 取头像（本人；另一台设备用）。
    *
-   * ⚠️ 返回的是 **JSON 里的 base64**，不是 `image/*` 字节流。
-   * 这是有意的：图本来就得先解密才能显示，做成 `<img src>` 直链反而要求
-   * 服务端能给出明文图片 —— 那正是这一整段要避免的东西。
+   * 返回 JSON 里的 `{contentType, dataBase64, avatarHash}`，不是 `image/*` 字节流：
+   * 客户端已经有"带 Bearer 取回再拼 data URI"的通道，做成直链会把鉴权从令牌
+   * 挪到 URL 上（要么公开、要么引入签名 URL），那是另一套东西。
    * 没有头像时回 404 + 结构化 code，不回 200 + 空串（"没有"和"是空的"是两件事）。
    */
   fastify.get(
@@ -195,13 +171,14 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
         const { userId } = getAuthUser(req);
         const row = await prisma.userAvatar.findUnique({
           where: { userId },
-          select: { cipher: true, hash: true },
+          select: { data: true, contentType: true, hash: true },
         });
         if (row === null) {
           return reply.status(404).send({ code: 'avatar-absent', message: 'No avatar.' });
         }
         return reply.send({
-          cipherBase64: Buffer.from(row.cipher).toString('base64'),
+          contentType: row.contentType,
+          dataBase64: Buffer.from(row.data).toString('base64'),
           avatarHash: row.hash,
         });
       } catch (err) {

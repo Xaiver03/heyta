@@ -596,16 +596,12 @@ export function ProfileScreen(): React.JSX.Element {
   }, [fetchDisplayName, nameDraft, nameSaving, savedName, t]);
 
   /**
-   * 头像：一张**端到端加密的图片**，读写都要那把同步口令。
+   * 头像：**基础资料**，明文读写，只需要登录令牌（ADR-0079）。
    *
-   * 🔴 读它分两步，而且这两步答的是**两个不同的问题**：
-   * `getAccountProfile` 给的是 `avatarHash`（服务端只知道这个，它看不到内容），
-   * 有了 hash 才去 `GET account/avatar` 取密文并用口令解开。
-   * 所以"这台设备现在显示不出头像"有五种原因，而它们对应的**用户动作不同**：
-   * 没有头像（想设就设）/ 本机没填口令（去填）/ 口令不对（去核对）/
-   * 暂时取不到（稍后重试）/ 这台设备没有读图通道（先用网页版）。
-   * 把这五种并成一句"头像没有传上去"，症状是界面在对着一件没发生过的事说话 ——
-   * 这正是 web 那边已经钉过一次的那一族，所以这里从一开始就分开。
+   * 🔴 读它分两步：`getAccountProfile` 给的是 `avatarHash`（缓存键），
+   * 有了 hash 才去 `GET account/avatar` 取明文图片。
+   * 所以"这台设备现在显示不出头像"只剩两种原因：
+   * 没有头像（想设就设）/ 暂时取不到（稍后重试）。
    * 判定住在 `resolveAccountAvatarImage`（app-host），界面只按状态出句子。
    *
    * ⚠️ `avatarHash` 的三态与 `savedName` 同一条理由：`undefined` = 还没读到
@@ -621,11 +617,7 @@ export function ProfileScreen(): React.JSX.Element {
 
   /** 读侧的那句话：只有"有头像却显示不出来"才需要说，`absent` 不是一件事。 */
   const avatarReadMessage =
-    avatarState === 'undecryptable'
-      ? t('common.profile.avatar.undecryptable')
-      : avatarState === 'unreadable'
-        ? t('common.profile.avatar.unreadable')
-        : null;
+    avatarState === 'unreadable' ? t('common.profile.avatar.unreadable') : null;
 
   const fetchAvatarImage = useCallback((): Promise<void> => {
     const generation = profileGeneration.current;
@@ -638,7 +630,6 @@ export function ProfileScreen(): React.JSX.Element {
     return resolveAccountAvatarImage(
       { baseUrl: config.serverUrl },
       token,
-      config.password,
       avatarHash,
     ).then((reading) => {
       if (generation !== profileGeneration.current) return;
@@ -653,15 +644,7 @@ export function ProfileScreen(): React.JSX.Element {
     void fetchAvatarImage();
   }, [fetchAvatarImage]);
 
-  /**
-   * 需要口令的那句话只在**共享裁决**说"缺口令"时出现。
-   *
-   * ⚠️ 这里刻意不在渲染期读 `readSyncConfig()`：凭据是模块级可变状态，
-   * 渲染期读它会在"用户刚在设置面填了口令"那一刻保持旧值，
-   * 于是界面继续说"本机没有口令"。`avatarState` 是上一次真实读到的结论，
-   * 而"去设置里填一次"这个动作完成后会重读资料 —— 它跟着事实走，不跟着猜测走。
-   */
-  const needsPassword = avatarState === 'needs-password';
+  // 头像明文（ADR-0079）：读它只需要令牌，不需要口令或 vault 钥匙。
 
   const prepareMessage = useCallback(
     (error: AvatarPrepareError): string =>
@@ -684,10 +667,9 @@ export function ProfileScreen(): React.JSX.Element {
     const generation = profileGeneration.current;
     const config = readSyncConfig();
     const token = config?.token ?? '';
-    const password = config?.password ?? '';
-    if (config === undefined || config.serverUrl === '' || token === '' || password === '') {
-      // 说的是"为什么现在不能换"，不是"换失败了"——一次请求都没发出去。
-      setAvatarNotice({ text: t('common.profile.avatar.needPassword'), danger: true });
+    if (config === undefined || config.serverUrl === '' || token === '') {
+      // 说的是"现在没有登录凭据"，不是"换失败了"——一次请求都没发出去。
+      setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
       return;
     }
     setAvatarNotice(null);
@@ -714,7 +696,6 @@ export function ProfileScreen(): React.JSX.Element {
     const outcome = await uploadAccountAvatar(
       { baseUrl: config.serverUrl },
       token,
-      password,
       prepared.image,
     );
     if (generation !== profileGeneration.current) return;
@@ -1103,16 +1084,11 @@ export function ProfileScreen(): React.JSX.Element {
   }
 
   /**
-   * 头像那一行**一次只说一句**，优先级从"用户刚做的事"往"环境缺什么"排：
-   * 刚上传/刚移除的结果 > 这台设备读不到头像 > 本机没有口令。
+   * 头像那一行**一次只说一句**：刚上传/刚移除的结果 > 这台设备读不到头像。
    *
-   * 🔴 叠三句会被读成"出过三件事"，而这里三句互相排斥：
-   * 上传成功后再说一句"缺口令"就是自相矛盾（他刚用完口令）。
+   * 头像明文（ADR-0079）之后不再有"本机没有口令"这一档。
    */
-  const avatarLine =
-    avatarNotice?.text ??
-    avatarReadMessage ??
-    (needsPassword ? t('common.profile.avatar.needPassword') : null);
+  const avatarLine = avatarNotice?.text ?? avatarReadMessage;
   const avatarLineDanger =
     avatarNotice !== null ? avatarNotice.danger : avatarReadMessage !== null;
 

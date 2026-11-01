@@ -292,7 +292,7 @@ const zh = [
             '头像图片',
             '同上：只给你自己看',
             '你选一张，应用在本机把它压成小方形后上传',
-            '🔴 **服务器密文**（用它自己的 Argon2id + AES-GCM 口令加密后整块存二进制，我们解不开）。服务器上另存该密文的 SHA-256，只用于跨设备判断"换过没有"；原图不存磁盘、不进对象存储。两条边界：① 它需要**已设置 E2EE 口令**才能上传与读回；② 密文相同即哈希相同，严格说这一点泄露"同一张图重复上传过"',
+            '服务器**明文**（图片字节本身）。服务器上另存该图片的 SHA-256，只用于跨设备判断"换过没有"；压缩前的原图不存磁盘、不进对象存储。🔴 它**不需要** E2EE 口令或 vault 解锁，也**不用于**人脸识别或身份核验；相同图片即哈希相同，严格说这一点泄露"同一张图重复上传过"',
             '非必要',
           ],
           [
@@ -306,7 +306,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '一句能逐项核对的话：账号表里**没有真实姓名、没有电话、没有地址、没有生日、没有地理位置、没有通讯录**；昵称是你自填的显示名（不是实名、不做唯一），头像是我们**解不开的密文**。列清单就是上面这些。',
+        text: '一句能逐项核对的话：账号表里**没有真实姓名、没有电话、没有地址、没有生日、没有地理位置、没有通讯录**；昵称是你自填的显示名（不是实名、不做唯一），头像是你自选上传的展示图片（明文存储，不用于身份核验）。列清单就是上面这些。',
       },
       {
         kind: 'callout',
@@ -480,7 +480,7 @@ const zh = [
           [
             '生物识别',
             '❌ 不收集',
-            '通行密钥的指纹或面部匹配在你的设备安全芯片内完成。我们只拿到公钥、凭据句柄与签名计数器，**没有任何生物特征模板离开你的设备**，也不采集认证声明数据',
+            '通行密钥的指纹或面部匹配在你的设备安全芯片内完成。我们只拿到公钥、凭据句柄与签名计数器，**没有任何生物特征模板离开你的设备**，也不采集认证声明数据。⚠️ 用户可选上传的头像图片只是一张展示素材，我们不做人脸比对或身份识别，也不从它提取任何特征模板',
           ],
           [
             '宗教信仰',
@@ -928,7 +928,7 @@ const en = [
             'Avatar image',
             'Same purpose: it is only ever shown to you',
             'You pick one; the app downscales it to a small square on your device before uploading',
-            '🔴 **Ciphertext on the server** — encrypted with your own Argon2id + AES-GCM passphrase and stored as one indivisible binary blob we cannot open. The server also stores the SHA-256 of that ciphertext, used only to tell across devices whether it changed. The original file is never written to disk or to object storage. Two boundaries: ① uploading and reading it back require an **E2EE passphrase to be set**; ② identical ciphertext yields an identical hash, so strictly speaking that leaks "the same image was uploaded twice"',
+            '**Plaintext on the server** (the image bytes themselves). The server also stores the image’s SHA-256, used only to tell across devices whether it changed; the pre-compression original never leaves your device. 🔴 It needs **no** E2EE passphrase or vault unlock, and it is **not** used for face recognition or identity verification. Identical images yield an identical hash, so strictly speaking that leaks "the same image was uploaded twice"',
             'Not necessary',
           ],
           [
@@ -942,7 +942,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'One sentence that can be checked column by column: the account table holds **no legal name, no phone number, no postal address, no date of birth, no location and no contacts**; the nickname is a display name you type yourself (not your legal name, not unique), and the avatar is a blob **we cannot decrypt**. What is listed above is the entire list.',
+        text: 'One sentence that can be checked column by column: the account table holds **no legal name, no phone number, no postal address, no date of birth, no location and no contacts**; the nickname is a display name you type yourself (not your legal name, not unique), and the avatar is an image you choose to display (stored in plaintext, not used for identity verification). What is listed above is the entire list.',
       },
       {
         kind: 'callout',
@@ -1116,7 +1116,7 @@ const en = [
           [
             'Biometric identification',
             '❌ Not collected',
-            'Fingerprint or face matching for a passkey completes inside your device\'s secure element. We receive only a public key, a credential handle and a signature counter; **no biometric template ever leaves your device**, and attestation data is not collected',
+            'Fingerprint or face matching for a passkey completes inside your device\'s secure element. We receive only a public key, a credential handle and a signature counter; **no biometric template ever leaves your device**, and attestation data is not collected. ⚠️ The optional avatar image is a display asset only: we do not run face matching or identity verification on it and do not extract any feature template from it',
           ],
           [
             'Religious beliefs',
@@ -1302,13 +1302,13 @@ const en = [
 
 export const personalInfoList: LegalDocument = {
   id: 'personal-info-list',
-  // 🔴 1.3 → 1.4：保留期限那张表新增两格**对外承诺**（托管 AI 一次调用的内容不落盘、
-  // 运维元数据的期限定为 45 天且到期删除尚未实现），并把那段"45 天不是可选项"的说明
-  // 补成"表里有两个同值的 45 天，不是同一个旋钮"。版本号进同意指纹（`legalSetVersion()`），
-  // 改了期限表述而不 bump = 让旧那枚同意覆盖一段它没见过的话。
-  version: '1.9',
+  // 🔴 1.9 → 1.10：头像从「服务器密文」改成「服务器明文（ADR-0079）」，
+  // 并写明它不需要 E2EE 口令、不用于人脸识别或身份核验。
+  // 版本号进同意指纹（`legalSetVersion()`）：改了存储形态而不 bump，
+  // 等于让旧那枚同意覆盖一段它没见过的话。
+  version: '1.10',
   status: 'draft',
-  updatedDate: '2026-10-29',
+  updatedDate: '2026-11-01',
   title: {
     'zh-CN': '个人信息收集清单',
     en: 'Personal Information Collection Inventory',

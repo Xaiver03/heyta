@@ -5,6 +5,22 @@
 > `127.0.0.1:5199` 的一次性静态服务提供，Playwright **无头** Chromium 驱动。
 > 上位文档：[`docs/plans/ui-review-fill-zh-timeline.md`](../../../../docs/plans/ui-review-fill-zh-timeline.md) §8.7 / §10.1
 
+## 🔴 2026-11-01：头像改为明文基础资料（ADR-0079）—— `r15b-*` 四张已作废
+
+产品负责人拍板：昵称与头像是**基础资料**，不适用端到端加密；只有任务/便签这类实质内容才加密。
+旧的 `r15b-1-need-password` / `r15b-2-ready` / `r15b-3-ready-dark` / `r15b-4-after-reload`
+记录的是**已推翻的行为**（换头像要先输入 E2EE 口令），保留只为考古，**不要引用它们证明当前产品**。
+
+当前判据与截图由 `e2e/tests/profile-avatar-plaintext.spec.ts` 产生（真浏览器、假服务端只搬明文）：
+
+| 文件 | 证明的判据 |
+|---|---|
+| `avatar-plain-1-profile.png` | 冷启动、未输入任何口令：「换一张」可用，页面上**没有**解锁提示、没有「去解锁」 |
+| `avatar-plain-2-ready.png` | 选一张真图后：出站 body 是 `{contentType,dataBase64}`；预览画出真像素；成功句是「头像已更新」 |
+| `avatar-plain-3-ready-dark.png` | 暗色是实际切过 `data-theme` 后拍的（同一状态，不是反相） |
+| `avatar-plain-4-after-reload.png` | **刷新后不需要解锁**，图仍然显示 —— 这正是旧行为做不到的那一格 |
+
+
 ## 为什么不是 `pnpm check:ai-e2e`
 
 那个套件会先 `pkill` 机器上在跑的 vite dev server（AGENTS §7 第 87 条）。

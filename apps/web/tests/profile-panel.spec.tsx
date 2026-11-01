@@ -38,8 +38,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '@heyta/i18n';
-import { HOSTED_AUTH_PATHS, decodeAvatarCipher } from '@heyta/app-host';
-import { createVaultPayloadCipher } from '@heyta/sync-client';
+import { HOSTED_AUTH_PATHS } from '@heyta/app-host';
 
 // 🔴 路径**必须**用 app-host 那枚常量（它自带 `/api` 前缀）。本文件第一版按
 // `ACCOUNT_PROFILE_PATHS` 手拼出 `/account/profile` ⇒ 桩一路 404，
@@ -61,34 +60,21 @@ vi.mock('../src/features/settings/avatar-encode.js', () => ({
       : { ok: false, error: encoder.fail },
 }));
 
-/**
- * vault 会话（登录态账号的钥匙来源）。
- *
- * 🔴 真跑 IndexedDB 是不可能的（jsdom 没有），但**不能因此把这段接线测成"没有"**：
- * 「登录态账号的头像用 vault 钥匙」正是那个实拍缺陷的修法，而它在没有账号
- * （`accountId` 为空）的用例里**一次都不会被走到** —— 覆盖率为零。
- * 所以这里换掉的是"从哪拿到 cipher"（平台能力），保留的是"拿到之后走哪条路"
- * （`resolveAvatarKey` + `encodeAvatarCipher`，那两条在 app-host 有自己的判据）。
- */
-const vault = vi.hoisted(() => ({ cipher: undefined as undefined | object }));
-vi.mock('../src/lib/vault-session.js', () => ({
-  getWebVaultSession: async () => ({
-    getPayloadCipher: async () => vault.cipher,
-  }),
-}));
-
 import { ProfilePanel } from '../src/features/settings/ProfilePanel.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 
 const SERVER = 'https://sync.example.test';
 const TOKEN = 'token-from-login';
-const PASSWORD = 'e2ee-passphrase';
 
 /** 有状态的假服务端。它就是"刷新之后还在不在"的那个"在"。 */
-const state: { displayName: string | null; avatarHash: string | null; cipher: string | null } = {
+const state: {
+  displayName: string | null;
+  avatarHash: string | null;
+  avatar: { contentType: string; dataBase64: string } | null;
+} = {
   displayName: null,
   avatarHash: null,
-  cipher: null,
+  avatar: null,
 };
 let calls: { method: string; path: string; body: unknown }[] = [];
 /** 让 `PUT /account/profile` 回 500 —— 「保存失败时说什么」那条判据的开关。 */
@@ -102,7 +88,8 @@ let getProfileFails = false;
  * 于是用户点「换一张」就把自己原来那张**覆盖掉**了。数据没丢，图丢了，
  * 而服务端全程都只回 2xx —— 没有任何一层会报错。
  */
-let avatarUndecryptable = false;
+/** 让 `GET account/avatar` 回 500 —— 「读失败时说哪一句」那条判据的开关。 */
+let avatarReadFails = false;
 let holdProfileGets = false;
 let heldProfileGets: Array<(response: Response) => void> = [];
 
@@ -177,19 +164,18 @@ beforeEach(() => {
   localStorage.clear();
   state.displayName = null;
   state.avatarHash = null;
-  state.cipher = null;
+  state.avatar = null;
   calls = [];
   encoder.fail = null;
   putProfileFails = false;
   getProfileFails = false;
-  avatarUndecryptable = false;
+  avatarReadFails = false;
   holdProfileGets = false;
   heldProfileGets = [];
 
   useSyncStore.setState({
     baseUrl: SERVER,
     token: TOKEN,
-    password: PASSWORD,
     email: 'you@example.test',
     status: { kind: 'idle' },
     syncNow: async () => ({ kind: 'idle' as const }),
@@ -224,23 +210,22 @@ beforeEach(() => {
         return profile();
       }
       if (path === AVATAR && method === 'PUT') {
-        const cipher = (body as { cipherBase64: string }).cipherBase64;
-        state.cipher = cipher;
-        state.avatarHash = 'hash-of-' + cipher.slice(0, 8);
+        const image = body as { contentType: string; dataBase64: string };
+        state.avatar = image;
+        state.avatarHash = 'hash-of-' + image.dataBase64.slice(0, 8);
         return profile();
       }
       if (path === AVATAR && method === 'GET') {
-        if (avatarUndecryptable) {
-          // 一份"形状像密文但解不开"的东西：服务端仍是 200（它只看字节）。
-          return Response.json({ cipherBase64: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' });
+        if (avatarReadFails) {
+          return Response.json({ error: 'boom', code: 'server-error' }, { status: 500 });
         }
-        if (state.cipher === null) {
+        if (state.avatar === null) {
           return Response.json({ error: 'No avatar.', code: 'avatar-absent' }, { status: 404 });
         }
-        return Response.json({ cipherBase64: state.cipher });
+        return Response.json({ ...state.avatar, avatarHash: state.avatarHash });
       }
       if (path === AVATAR && method === 'DELETE') {
-        state.cipher = null;
+        state.avatar = null;
         state.avatarHash = null;
         return profile();
       }
@@ -248,7 +233,6 @@ beforeEach(() => {
     }),
   );
 
-  vault.cipher = undefined;
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -295,6 +279,55 @@ describe('个人信息面板（R10）', () => {
     state.displayName = '小鹿';
     await mount();
     expect(find<HTMLInputElement>('profile-nickname-input')?.value).toBe('小鹿');
+  });
+
+  /**
+   * 🔴 2026-10-31 产品负责人实拍：「tooltip 过于泛滥，而且位置不统一」。
+   *
+   * 屏幕上的事实是：头像/昵称的问号挂在**标签**后面，而邮箱那一枚落在**值**
+   * 下面一列的空位里 —— 同一屏两种锚点，读起来像"邮箱地址自己的注释"。
+   * 所以判据不按"这一枚在不在"写，而按**位置**写：
+   *
+   *   ① 值那一列（`.ht-settings__row-body`）里**一枚问号都不许有**；
+   *   ② 每一枚问号都必须紧跟在它解释的**标签或小标题**（`.ht-settings__row-label`
+   *      / `.ht-settings__h3`）后面；
+   *   ③ 邮箱那一行不再挂问号（它的正文在正下方「更换登录邮箱」里）。
+   *
+   * 反向形状：把邮箱那枚 `?` 放回 `row-body` 里 ⇒ ①② 同时报红。
+   */
+  it('问号只挂在标签/小标题后面，值那一列不出现问号', async () => {
+    await mount();
+    const panel = find<HTMLElement>('profile-panel')!;
+    const triggers = [...panel.querySelectorAll<HTMLElement>('[data-testid$="-trigger"]')];
+    expect(triggers.length, '面板里应当仍有问号（头像/昵称/换邮箱各一枚）').toBeGreaterThan(0);
+
+    for (const trigger of triggers) {
+      const name = trigger.getAttribute('data-testid');
+      expect(
+        trigger.closest('.ht-settings__row-body'),
+        `「${name}」落在了值那一列 —— 问号只许跟在标签/小标题后面`,
+      ).toBeNull();
+      expect(
+        trigger.closest('.ht-settings__row-label, .ht-settings__h3'),
+        `「${name}」没有紧跟任何标签或小标题`,
+      ).not.toBeNull();
+    }
+
+    expect(find('tip-profile-email'), '邮箱那一行不再挂问号').toBeNull();
+  });
+
+  /**
+   * 🔴 同一个地址在同一张卡片里只出现一次。
+   *
+   * 此前「邮箱」行显示一次，「更换登录邮箱 → 当前邮箱」再显示一次 ——
+   * 两个同值字段挨着，用户要逐字比对才敢确认它们不是两个不同的地址。
+   * 现在当前地址只由「邮箱」那一行承载。
+   */
+  it('登录邮箱只显示一次（换邮箱块不再回显当前地址）', async () => {
+    await mount();
+    const panel = find<HTMLElement>('profile-panel')!;
+    const occurrences = (panel.textContent ?? '').split('you@example.test').length - 1;
+    expect(occurrences, `同一张卡片里出现了 ${occurrences} 次同一个邮箱`).toBe(1);
   });
 
   it('凭据更换后，旧的 StrictMode 读取响应不能覆盖当前账号', async () => {
@@ -409,7 +442,10 @@ describe('个人信息面板（R10）', () => {
     expect(put, 'emoji 昵称被误判成超长 ⇒ 计数用的是 .length').toBeTruthy();
   });
 
-  it('有口令 + 上传 ⇒ 发 PUT 头像、预览出现，服务端拿到的是**解不开的密文**', async () => {
+  it('🔴 没有口令 / vault 未解锁也能换头像：出站就是明文载荷，预览立刻出现', async () => {
+    // ADR-0079：头像是基础资料，不适用端到端加密。这条判据与旧版**方向相反** ——
+    // 以前这里断言"出站是解不开的密文"，现在断言"出站就是明文，且不需要任何钥匙"。
+    useSyncStore.setState({ password: undefined });
     await mount();
     expect(find<HTMLElement>('profile-avatar-img')).toBeNull();
 
@@ -427,16 +463,13 @@ describe('个人信息面板（R10）', () => {
 
     const put = calls.find((c) => c.method === 'PUT' && c.path === AVATAR);
     expect(put, '换了头像却没有出站 PUT').toBeTruthy();
-    const sent = (put?.body as { cipherBase64: string }).cipherBase64;
-    expect(typeof sent).toBe('string');
-    // 🔴 双向证明，不是"串里找不到原图"那种弱断言（base64 套 base64 本来就不含
-    // 子串，明文上传也能把它骗过去 —— 同一个坑在 app-host 那边被变异实测抓出）。
-    // 正向：用同步口令能把出站那串解回**原图**。
-    const decoded = await decodeAvatarCipher(PASSWORD, sent);
-    expect(decoded.ok && decoded.image.dataBase64).toBe(ENCODED.dataBase64);
-    // 反向：它的明文里不含图片字节 ⇒ 服务端什么也没拿到。
-    expect(Buffer.from(sent, 'base64').toString('utf8')).not.toContain(ENCODED.dataBase64);
+    expect(put?.body, '头像上传必须带明文载荷（服务端要校验格式与大小）').toEqual({
+      contentType: 'image/png',
+      dataBase64: ENCODED.dataBase64,
+    });
     expect(find<HTMLElement>('profile-avatar-img')).not.toBeNull();
+    expect(text('profile-avatar-need-password'), '还在显示解锁提示').toBe('');
+    expect(find<HTMLElement>('profile-avatar-unlock')).toBeNull();
   });
 
   it('移除头像 ⇒ 发 DELETE、预览消失、服务端不再返回 hash', async () => {
@@ -458,61 +491,20 @@ describe('个人信息面板（R10）', () => {
     expect(find<HTMLElement>('profile-avatar-img')).toBeNull();
   });
 
-  it('本机没有口令时：说明原因，**不**说"你没有头像"，也不去拉密文', async () => {
-    useSyncStore.setState({ password: undefined });
+  it('🔴 本机没有口令、账号还是 vault 模式：头像仍然读得到，界面不出现任何解锁提示', async () => {
+    // 这条是旧缺陷（登录态账号永远换不了头像）的**反向回归**：
+    // 现在不再有"钥匙"这一层，`password` 与 vault 解锁状态都不参与头像读写。
+    useSyncStore.setState({ password: undefined, accountId: 'acct-1' });
     state.avatarHash = 'some-existing-hash';
+    state.avatar = { contentType: 'image/png', dataBase64: ENCODED.dataBase64 };
     await mount();
-    expect(text('profile-avatar-need-password')).toContain('端到端加密口令');
+    await waitUntil('头像取回', () => find<HTMLElement>('profile-avatar-img') !== null);
+    expect(text('profile-avatar-need-password')).toBe('');
+    expect(find<HTMLElement>('profile-avatar-unlock')).toBeNull();
     expect(
       calls.some((c) => c.method === 'GET' && c.path === AVATAR),
-      '没有口令还去拉密文：拉回来也解不开，白跑一趟还会显示成错误'
-    ).toBe(false);
-  });
-
-  /**
-   * 🔴 登录态账号（vault 模式）的头像钥匙 —— 2026-10-24 那条实拍缺陷的回归判据。
-   *
-   * 缺陷的形状：`accountId` 有值时 `sync` store 的 `password` **永远**是
-   * `undefined`（同步走 vault 根钥匙，`getPassword` 固定返回 undefined），
-   * 而头像只认口令 ⇒ 界面永远说「本机没有保存这个口令」，设置里那一格还不渲染。
-   * 每一个登录用户都换不了头像，而所有既有判据都是**没有 accountId** 的。
-   *
-   * 这条钉两半：
-   *   · 拿到 vault cipher 之后，界面**不再**说"缺口令"，`换一张` 可用；
-   *   · 传上去的是 **vault 信封**（`heyta-vault-op/` 开头），不是口令密文。
-   */
-  it('登录态账号：有 vault 钥匙就不说缺口令，上传走的是 vault 信封', async () => {
-    useSyncStore.setState({ accountId: 'acct-1', password: undefined });
-    vault.cipher = createVaultPayloadCipher({
-      current: { keyVersion: 1, rootKey: new Uint8Array(32).fill(3) },
-    });
-    await mount();
-    await waitUntil('头像那一行的状态落定', () => find<HTMLElement>('profile-avatar-change') !== null);
-    expect(
-      text('profile-avatar-need-password'),
-      '有 vault 钥匙时界面还在说缺口令',
-    ).toBe('');
-    expect(find<HTMLButtonElement>('profile-avatar-change')?.disabled).toBe(false);
-
-    const fileInput = find<HTMLInputElement>('profile-avatar-file')!;
-    await act(async () => {
-      Object.defineProperty(fileInput, 'files', {
-        value: [new File([new Uint8Array([137, 80, 78, 71])], 'a.png', { type: 'image/png' })],
-        configurable: true,
-      });
-      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await waitUntil('头像 PUT 出站', () =>
-      calls.some((c) => c.method === 'PUT' && c.path === AVATAR),
-    );
-    const put = calls.find((c) => c.method === 'PUT' && c.path === AVATAR);
-    const sent = (put?.body as { cipherBase64: string }).cipherBase64;
-    expect(
-      Buffer.from(sent, 'base64').subarray(0, 15).toString(),
-      '登录态账号传出去的居然是口令密文（不是 vault 信封）',
-    ).toBe('heyta-vault-op/');
-    // 反向对照：**口令**解不开它 —— 否则上面那条"是 vault 信封"只是形状对。
-    expect((await decodeAvatarCipher(PASSWORD, sent)).ok).toBe(false);
+      '头像确实去取了（不是被界面跳过）',
+    ).toBe(true);
   });
 
   it('点「换一张」把系统文件框弹出来（隐藏的原生 input 必须仍在 DOM 里）', async () => {
@@ -559,22 +551,18 @@ describe('个人信息面板（R10）', () => {
     expect(find<HTMLElement>('profile-avatar-img')).not.toBeNull();
   });
 
-  it('🔴 口令解不开时说的是"解不开"，**不是**"你没有头像"，且服务端的 hash 原样留着', async () => {
-    // 这是 R15b 抽 `resolveAccountAvatarImage` 的**唯一理由**：
-    // 合并失败支的症状不是报错，是用户点「换一张」把自己那张好图覆盖掉。
-    avatarUndecryptable = true;
+  it('取图失败只说"暂时读不到"，服务端 hash 原样保留，不催用户做任何事', async () => {
+    // 明文之后不再有"口令不对"这一档；读失败只有一种：这次往返没成。
+    avatarReadFails = true;
     state.avatarHash = 'someone-elses-avatar';
     await mount();
     await waitUntil('读侧提示出现', () => text('profile-avatar-read-notice').length > 0);
     const notice = text('profile-avatar-read-notice');
-    // 合法结果集是这两句（解不开 / 暂时取不到），取决于假密文撞到哪条分支；
-    // 两者都是**读侧**句子，都明确"头像在那里"。不许的是第三种：沉默。
-    expect(notice).toContain('头像');
-    expect(notice, `读失败被说成上传失败：「${notice}」`).not.toContain('没有传上去');
+    expect(notice).toContain('暂时读不到头像');
+    expect(notice, `读失败里还在提口令/解锁：「${notice}」`).not.toContain('口令');
     expect(find<HTMLElement>('profile-avatar-img')).toBeNull();
-    // 🔴 承重的那一条：**没有**因为解不开就把服务端那枚 hash 抹掉。
+    // 🔴 承重的那一条：**没有**因为这一次读失败就把服务端那枚 hash 抹掉。
     expect(state.avatarHash).toBe('someone-elses-avatar');
-    // 正向对照：取图请求真的发出去了（提示不是因为"根本没读"而产生的空壳）。
     expect(calls.some((c) => c.method === 'GET' && c.path === AVATAR)).toBe(true);
   });
 });

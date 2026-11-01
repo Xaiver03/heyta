@@ -13,12 +13,20 @@
  * 🔴 服务端是**唯一裁决者**：客户端的 `maxLength` 只是让人少打几个字，
  * 真正的拒绝必须发生在 `PUT /account/profile` 里。判据据此写，不据此**期望**。
  *
- * ## 为什么昵称明文、头像密文
+ * ## 🔴 基础资料是**明文**，不进端到端加密
  *
- * 见 `server/prisma/schema.prisma` 里 `UserAvatar` 那段（表 E 的结构性依据），
- * 以及 `docs/plans/ui-review-fill-zh-timeline.md` §8.6。这里只落一件事：
- * **头像的线上传的是密文字符串**，所以 `avatar` 那条 PUT 的 body 与 op 上传同形
- *（JSON + base64），服务端不需要 multipart、不需要新依赖。
+ * 昵称与头像属于**基础资料**：它们的用途是"在界面上认出这个账号"，不是用户的
+ * 实质内容。端到端加密只留给实质内容（任务、便签、财务/账目这类绝对隐私）；
+ * 基础资料由服务端按普通账号字段保存与返回，读写**都不需要 E2EE 口令或 vault 钥匙**。
+ *
+ * 这条是产品负责人 2026-11-01 的**绝对决策**（ADR-0079）：
+ * 「谁会把头像当成隐私？……只有涉及绝对隐私、比如财务数据这种实质性内容时，
+ *  才允许适用这种加密。我们都允许自托管了，真的想要隐私完全可以自托管。」
+ *
+ * ⇒ 契约层面的后果：头像的线上 body 是**明文** `{contentType, dataBase64}`，
+ * 服务端能校验格式与大小；服务端保存的也是图片字节本身，不是密文。
+ * ⚠️ 仍然**没有**"按 userId/email 查别人资料"的端点：明文不等于公开，
+ * 只有本人带令牌能读（今天没有协作；开放他人可见是另一次独立决定）。
  */
 
 import { z } from 'zod';
@@ -28,7 +36,7 @@ export const ACCOUNT_PROFILE_PATHS = {
   /** `PUT` 改昵称 / `GET` 读自己的资料。Bearer 归属。 */
   profile: 'account/profile',
   /**
-   * `PUT` 上传密文头像 / `DELETE` 移除 / `GET` 取密文。Bearer 归属。
+   * `PUT` 上传头像 / `DELETE` 移除 / `GET` 取头像。Bearer 归属。
    *
    * 🔴 **没有**"按 userId 或 email 查别人资料"的形态 —— heyta 今天无协作，
    * 开公开可读是一次独立的产品决定（§8.6 那条边界），不在本次实现里顺手做。
@@ -93,22 +101,23 @@ export const accountProfileUpdateSchema = z.object({
 });
 
 /**
- * 头像密文的上限：**2 MiB**（base64 字符串的字节数）。
+ * 头像上传请求体的上限：**1 MiB**（JSON 里 base64 字符串的字节数）。
  *
- * 推导链（不是随手取的数）：客户端把原图压到 ≤ `ACCOUNT_AVATAR_MAX_SOURCE_BYTES`
- * → 装进 `{contentType, dataBase64}` 的 JSON 时**又** base64 一次（×1.34）
- * → `encrypt()` 输出再 base64（×1.34）⇒ 80 KB 的原图约 144 KB 密文，
- * 512 KB 的原图约 920 KB 密文。2 MiB 是"最大原图 + 三倍余量"，
- * 留余量是因为 Argon2 密文头（salt 16 + IV 12）与 JSON 包裹也在里面。
+ * 推导链：图片压到 ≤ `ACCOUNT_AVATAR_MAX_SOURCE_BYTES`（512 KiB）
+ * → base64 放大 4/3 ≈ 683 KiB → 再加 `contentType` 与 JSON 包裹的几十字节。
+ * 1 MiB 是"最大图 + 约 50% 余量"，同时把请求体挡在全局 `bodyLimit`（20 MB）之外。
+ *
+ * 🔴 与旧版 2 MiB 的差别是**不再包含加密膨胀**：明文上传只有一次 base64，
+ * 服务端也能解码后按 `ACCOUNT_AVATAR_MAX_SOURCE_BYTES` 真正校验。
  */
-export const ACCOUNT_AVATAR_MAX_CIPHER_BASE64_BYTES = 2 * 1024 * 1024;
+export const ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES = 1024 * 1024;
 
 /**
- * 原图上限：**512 KB**，由**客户端**在压缩后执行。
+ * 原图上限：**512 KB**，由**客户端**在压缩后执行、由**服务端**在解码后复核。
  *
- * 🔴 服务端**看不到**这个数（它只看到密文，解不开 ⇒ 无从判断原图多大）。
- * 所以这一条是**客户端纪律**，不是契约的强制项 —— 服务端能强制的只有上一条。
- * 写在这里是为了让两端引用同一个数，而不是 UI 里写一个、文档里另一个。
+ * 🔴 旧版服务端只能强制密文上限（它解不开，无从判断原图多大）。头像改成明文
+ * 之后这个数终于是**两端同一道**闸门：客户端是"别让用户白等一次往返"，
+ * 服务端是"拒掉超限请求"。
  */
 export const ACCOUNT_AVATAR_MAX_SOURCE_BYTES = 512 * 1024;
 
@@ -118,24 +127,22 @@ export const ACCOUNT_AVATAR_MAX_SOURCE_BYTES = 512 * 1024;
  * 与上面那条同为**客户端纪律**，因此也住在契约层而不是 UI 里：
  * 界面文件里写一个裸 `512`，下次有人改 UI 时不会知道它是"规格"还是"随手试的数"。
  * 为什么是 512：显示侧最大只到 `--ht-size-avatar-lg`（40 px）的 2× 视网膜密度 = 80 px，
- * 512 留了 6 倍余量给"将来头像出现在更大的位置"，同时把密文压在
- * `ACCOUNT_AVATAR_MAX_CIPHER_BASE64_BYTES` 推导链假设的那个量级里。
+ * 512 留了 6 倍余量给"将来头像出现在更大的位置"，同时把上传体压在
+ * `ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES` 推导链假设的那个量级里。
  */
 export const ACCOUNT_AVATAR_EDGE_PX = 512;
 
-/** 头像允许的格式。**客户端**编码前校验；服务端只看密文，不看格式。 */
+/** 头像允许的格式。**两端都校验**：客户端编码前、服务端落库前。 */
 export const ACCOUNT_AVATAR_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 export type AccountAvatarContentType = (typeof ACCOUNT_AVATAR_CONTENT_TYPES)[number];
 
 /**
- * 头像的**加密载荷**形状：`{ contentType, dataBase64 }`。
+ * 头像的**载荷**形状：`{ contentType, dataBase64 }`。
  *
- * 🔴 为什么校验函数住在这里而不是 app-host：`@heyta/app-host` **没有** zod 依赖
- *（实测 `packages/app-host/package.json`），而它必须校验一段从远端拿回来、
- * 刚解密的 JSON。两个选项：给 app-host 加一个依赖，或者把校验搬到本包导出一个函数。
- * 选后者 —— 白名单与形状因此只有一份，加 `image/avif` 时不会出现"契约改了、
- * 客户端还拒收"的那种漂移。
+ * 上传与读取用的是同一个形状（明文）。校验函数住在这里的理由没变：
+ * `@heyta/app-host` 没有 zod 依赖，而它必须校验一段从远端拿回来的 JSON；
+ * 把白名单与形状放在本包，两端只有一份。
  */
 export const avatarPayloadSchema = z.object({
   contentType: z.enum(ACCOUNT_AVATAR_CONTENT_TYPES),
@@ -145,12 +152,10 @@ export const avatarPayloadSchema = z.object({
 export type AvatarPayload = z.infer<typeof avatarPayloadSchema>;
 
 /**
- * 把解密的文本变成 `AvatarPayload`，**任何一步不对都回 null**。
+ * 把服务端返回的明文 JSON 变成 `AvatarPayload`，**任何一步不对都回 null**。
  *
- * ⚠️ 口令错的时候 `decrypt()` 不保证抛异常 —— 它可能"成功"并吐出一堆乱码
- *（GCM 校验失败会抛，但 legacy 分支与兜底路径不一定）。所以这里
- * **JSON.parse 也要包起来**：不包的话症状是界面抛 `Unexpected token`，
- * 而不是干净地显示"这台设备解不开头像"。
+ * ⚠️ 即使已经是服务端回来的东西也不能直接当可信对象：`JSON.parse` 也包起来，
+ * 否则症状是界面抛 `Unexpected token`，而不是干净地显示"暂时取不到头像"。
  */
 export const parseAvatarPayload = (plaintext: string): AvatarPayload | null => {
   let raw: unknown;
@@ -280,27 +285,52 @@ export const avatarDataUri = (image: AvatarPayload): string =>
  * `GET account/profile` 的响应，也是登录响应里 `user` 带的那两个字段。
  *
  * ⚠️ 只有 `avatarHash`，**没有**头像字节 —— 取图是另一条 `GET account/avatar`。
- * 这条区分是承重的：登录与鉴权路径每次都跑，把密文塞进登录响应就等于
- * 把 144 KB 挂到最热的那条读路径上（`schema.prisma` 里 `UserAvatar` 那段讲的是同一件事）。
+ * 这条区分是承重的：登录与鉴权路径每次都跑，把头像字节塞进登录响应就等于
+ * 把几百 KB 挂到最热的那条读路径上（`schema.prisma` 里 `UserAvatar` 那段讲的是同一件事）。
  */
 export const accountProfileResponseSchema = z.object({
   displayName: z.string().nullable(),
-  /** 密文的 SHA-256（hex）。`null` = 没有头像。同时充当缓存键。 */
+  /** 图片字节的 SHA-256（hex）。`null` = 没有头像。同时充当缓存键。 */
   avatarHash: z.string().nullable(),
 });
 
 export type AccountProfileUpdate = z.infer<typeof accountProfileUpdateSchema>;
 export type AccountProfileResponse = z.infer<typeof accountProfileResponseSchema>;
 
-/** `PUT account/avatar` 的请求体：base64 密文（`encrypt()` 的原样输出）。 */
+/**
+ * `PUT account/avatar` 的请求体：**明文**图片载荷。
+ *
+ * 🔴 服务端校验的是三件事，不是"看起来像不像密文"：
+ * ① `contentType` 在白名单里；② base64 解出来不超过 `ACCOUNT_AVATAR_MAX_SOURCE_BYTES`；
+ * ③ 整个字段不超过 `ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES`（请求体额度）。
+ */
 export const accountAvatarUpdateSchema = z.object({
-  cipherBase64: z
+  contentType: z.enum(ACCOUNT_AVATAR_CONTENT_TYPES),
+  dataBase64: z
     .string()
     .min(1)
+    // 规范 base64：拒绝 `Buffer.from(_, 'base64')` 会静默丢字符的那些输入，
+    // 否则"解码后字节数"与服务端真正落库的字节会差一截。
+    .regex(/^[A-Za-z0-9+/]+={0,2}$/u, '头像必须是标准 base64')
+    .refine((v) => v.length % 4 === 0, '头像 base64 长度必须是 4 的倍数')
     .refine(
-      (v) => v.length <= ACCOUNT_AVATAR_MAX_CIPHER_BASE64_BYTES,
-      `头像密文超过 ${ACCOUNT_AVATAR_MAX_CIPHER_BASE64_BYTES} 字节上限`,
+      (v) => v.length <= ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES,
+      `头像上传体超过 ${ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES} 字节上限`,
+    )
+    .refine(
+      (v) => base64DecodedBytes(v) <= ACCOUNT_AVATAR_MAX_SOURCE_BYTES,
+      `头像图片超过 ${ACCOUNT_AVATAR_MAX_SOURCE_BYTES} 字节上限`,
     ),
 });
 
 export type AccountAvatarUpdate = z.infer<typeof accountAvatarUpdateSchema>;
+
+/** `GET account/avatar` 的响应：明文载荷 + 服务端算的缓存键。 */
+export const accountAvatarResponseSchema = accountAvatarUpdateSchema.extend({
+  avatarHash: z.string(),
+});
+
+/** `PUT account/avatar` 的响应：只回服务端算的缓存键。 */
+export const accountAvatarUploadResponseSchema = z.object({
+  avatarHash: z.string(),
+});
