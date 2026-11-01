@@ -1251,3 +1251,43 @@ profile 重签 + 重新打包 + 重跑本节所有探针），不是"顺手改�
 | 重新打包 | `✅ 打包后的 .app 能起来、界面有真实内容`，`签名档位：developer-id` |
 | 真 `.app` 里的钥匙串探针 | `{"absentFirst":true,"saved":true,"readBack":true,"updated":true,"cleared":true,"absentAfterClear":true,"rejectedShort":true}` |
 | `/Applications/Heyta.app` | 已换成这一趟的产物（02:07:15 / `cloud.finlaw.heyta.desktop` / `V5S2LT9YV8`） |
+
+---
+
+## 17. 本轮 `pnpm check` 的准确读数：它**没跑到浏览器那一段**（2026-11-02，第 38 轮）
+
+§13.3/§13.4 记的是上一轮"40 红 → 16 红"的读数。这一轮重跑，链条在**更早的一格**就停了：
+
+```
+$ pnpm check          ⇒ exit=1
+❌ M1 apps/web/src/features/tasks/TaskRowMenu.tsx 画了 role="menu" 却没接 useMenuKeyboard
+❌ M2 ... 的菜单项没有 tabIndex={-1} ⇒ Tab 会走进菜单而它仍开着（三条）
+出路是把这一格接回 `useMenuKeyboard`（判断在 packages/ui/src/control/menu.ts），不是往这里加豁免。
+```
+
+**归属清楚，不在本线**：`apps/web/src/features/tasks/TaskRowMenu.tsx` 是**未跟踪文件**
+（`git status` 显示 `??`），属于另一条正在做的行尾动作重做
+（`docs/plans/row-actions-redesign.md`）。门禁自己把出路写得很明白。
+
+**为什么这条读数比"16 红"更重要**：`check` 是 `&&` 链，这一格红了**后面全部不跑**。
+也就是说——
+
+> "上一轮 16 条浏览器失败" 这个读数，在本轮的工作树上**已经不成立了**：
+> 链在浏览器之前就停了，浏览器那一段这次**一条都没跑**。
+
+这正是"测试全绿 ≠ 这是当前产物"的镜像：**"上次红了 16 条"也不等于"现在还红那 16 条"**。
+所以 §16 的四端读数用采集器现读，而不是引用旧表；门禁读数也一样 —— 以最后一次跑的为准，
+并且**写清楚它停在哪一格**。
+
+### 17.1 本线范围内的门禁（本轮逐个跑过，各自有读数）
+
+| 门禁 | 读数 |
+|---|---|
+| `check:macos-shell` | ✅ 通过（含新增的 Keychain 四格 + 一行 `ℹ️` 属性回读） |
+| `check:layering` | ✅ 525 文件 / 9 条规则 |
+| `check:ui-language` | ✅ 479 文件 / 823 处文案 / 词条 4359 条（中英对等） |
+| `check:scripts-parse` | ✅ 228 枚脚本，语法红 0 |
+| `check:gate-wiring` | ✅ 链与门禁定义对得上 |
+| `check:doc-command-claims` / docs 链接 / md 表格 / ADR 编号 | ✅ 全绿 |
+| `@heyta/web` 全套 | ✅ 2711 passed / 13 skipped（上一轮读数；本轮改动只碰 macOS Swift 与文档） |
+| `apps/web` vault 五套 + 新增 keychain 一套 | ✅ 28 + 10 / 10 |
