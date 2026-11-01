@@ -648,3 +648,28 @@ vault-passphrase                                                      ← 不在
 **本线自己的证据链不依赖它**：单元/组件/真实 PostgreSQL 共 **317+ 条**判据全绿，
 其中真库集成覆盖"关闭→明文→再打开→密文"整条迁移；E2E 唯一不可替代的价值是
 "真浏览器里点得通"，而它现在**已经被这次返工证明能抓到真缺陷**（第 3 条）。
+
+### 12.6 第 5 堵墙的定位进展：**不是迁移协议的问题**
+
+轮换失败时面板报的是通用错误，并同时露出了 `vault-legacy-passphrase` 字段 —— 说明
+**设备 C 的会话认为 `payloadKeyVersion === null`**（legacy 世代），于是走了"旧口令迁移"那条路。
+
+去数据库现量同一批账号（`heyta_bc_devices_20261003`）：
+
+```sql
+select user_id, key_version, active_payload_key_version from vault_key_packages order by updated_at desc limit 5;
+ user_id | key_version | active_payload_key_version
+     145 |           1 |                          1
+     144 |           1 |                          1
+     ...
+select user_id, payload_mode from user_sync_state …  → 全部 e2ee
+```
+
+⇒ **服务端完全正确**：开启之后 `key_version=1`、`active_payload_key_version=1`、模式 e2ee。
+**开启链路（S3 客户端编排 + 服务端 commit）没有问题。**
+
+失败落在**设备 C 自己的会话/令牌路径**上：撤销旧设备那一步服务端会 `revokeAllTokens(userId)`，
+spec 随后重新登录拿 `signedIn.token` 再建 C；C 的 `refreshFromRemote` 若拿不到包
+（401/时序），会话就停在 `payloadKeyVersion === undefined`，面板于是显示 legacy 口令框。
+**待验**：C 那次 `GET /api/sync/key-package` 的实际状态码。这一条属于 e2e 流程的令牌编排，
+不是 ADR-0080/0081 的迁移协议。
