@@ -1,7 +1,7 @@
 {
   "name": "heyta",
   "short_name": "heyta",
-  "description": "本地优先、端到端加密的待办与习惯应用",
+  "description": "本地优先、可选端到端加密的待办与习惯应用",
   "id": ".",
   "start_url": ".",
   "scope": ".",

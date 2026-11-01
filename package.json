@@ -178,6 +178,8 @@
     "verify:consent-trail": "node scripts/verify-consent-trail-production.mjs",
     "verify:harmony-toolchain": "bash scripts/verify-harmony-toolchain.sh",
     "verify:harmony-rnoh": "bash scripts/verify-harmony-rnoh.sh",
+    "verify:harmony-rnoh:windows": "node scripts/build-harmony-rnoh-windows.mjs",
+    "build:harmony:windows": "node scripts/build-harmony-windows.mjs",
     "verify:web-sqlite": "node scripts/verify-web-sqlite.mjs",
     "verify:harmony-rnoh-js": "bash scripts/verify-harmony-rnoh-js.sh",
     "verify:i18n-failures": "node scripts/verify-i18n-failures.mjs",
