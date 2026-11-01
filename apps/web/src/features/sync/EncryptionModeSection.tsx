@@ -4,6 +4,7 @@ import { useI18n } from '@heyta/i18n';
 
 import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
 import { FormField } from '../../lib/form/FormField.js';
+import { SettingsInfoTip } from '../settings/SettingsInfoTip.js';
 
 /**
  * ADR-0080 的第一个轴：**同步加密开 / 关**。
@@ -78,12 +79,12 @@ export function EncryptionModeSection({
   return (
     <section className="ht-settings__group" data-testid="encryption-mode-section" data-mode={mode}>
       <h3 className="ht-settings__h3">{t('web.sync.encryption.title')}</h3>
-      <p className="ht-settings__hint" data-testid="encryption-mode-state">
+      <p className="ht-settings__hint" role="status" data-testid="encryption-mode-status">
         {t(mode === 'e2ee' ? 'web.sync.encryption.on' : 'web.sync.encryption.off')}
       </p>
 
       {busy ? (
-        <p className="ht-settings__hint" data-testid="encryption-mode-busy">
+        <p className="ht-settings__hint" role="status" data-testid="encryption-mode-status-busy">
           {t('web.sync.encryption.busy')}
           {progress === undefined ? null : ` ${String(progress.completed)}/${String(progress.total)}`}
         </p>
@@ -123,8 +124,14 @@ export function EncryptionModeSection({
       */}
       {keyPlacement === undefined || mode !== 'e2ee' ? null : (
         <fieldset className="ht-settings__section" data-testid="encryption-key-placement">
-          <legend className="ht-settings__h3">{t('web.sync.encryption.placementTitle')}</legend>
-          <p className="ht-settings__hint">{t('web.sync.encryption.placementHint')}</p>
+          <legend className="ht-settings__h3">
+            {t('web.sync.encryption.placementTitle')}
+            <SettingsInfoTip
+              testId="tip-encryption-placement"
+              label={t('web.sync.encryption.placementTitle')}
+              text={t('web.sync.encryption.placementHint')}
+            />
+          </legend>
           <div className="ht-settings__actions">
             <button
               type="button"
@@ -195,7 +202,9 @@ export function EncryptionModeSection({
             </>
           ) : (
             <>
-              <p className="ht-settings__hint">{t('web.sync.encryption.enableRecoveryHint')}</p>
+              <p className="ht-settings__hint" data-settings-disclosure>
+                {t('web.sync.encryption.enableRecoveryHint')}
+              </p>
               <p className="ht-settings__notice" data-testid="encryption-enable-recovery-code">
                 {enableStep.recoveryCode}
               </p>
@@ -212,7 +221,7 @@ export function EncryptionModeSection({
                 )}
               </FormField>
               {enableError === undefined ? null : (
-                <p className="ht-settings__hint" data-testid="encryption-enable-error">{enableError}</p>
+                <p className="ht-settings__hint" role="alert" data-testid="encryption-enable-error">{enableError}</p>
               )}
               <div className="ht-settings__actions">
                 <button
@@ -262,7 +271,6 @@ export function EncryptionModeSection({
           <h2 id="encryption-mode-confirm-title" className="ht-settings__h3">
             {t('web.sync.encryption.confirmTitle')}
           </h2>
-          <p className="ht-settings__hint">{t('web.sync.encryption.confirmIntro')}</p>
           {/*
             🔴 三条后果各自一条，**不许合并**：合并之后用户只能看到"会变得不加密"，
             而真正要他承担的是"备份里那份也收不回来"。
