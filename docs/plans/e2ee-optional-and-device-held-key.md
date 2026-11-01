@@ -571,3 +571,32 @@ S0–S7 的代码与判据侧全部落地：**317 条**自动化判据全绿（�
 1. `git status` 看那 8 个设置 IA 文件是否已干净 → 干净则跑 §10.2 第 4 条。
 2. 若用户提供 Android keystore / macOS Developer ID profile / 真机 → 跑 §10.2 补齐四端。
 3. 本线**代码侧没有已知未完成项**；S6 第二轴（钥匙放在哪）在移动端未接，按 §5.4 记为待办而非缺陷。
+
+---
+
+## 12. 方向反转：默认改为**不加密**（2026-11-01，ADR-0081）
+
+产品负责人在本线收口后改判：**默认明文，端到端加密由用户显式开启**。
+[ADR-0081](../../docs/adr/0081-encryption-is-opt-in-not-default.md) 取代
+[ADR-0080](../../docs/adr/0080-e2ee-is-optional-with-device-held-key.md) §一第 1 条；0080 其余结论不动。
+
+### 12.1 代码侧改动（本次）
+
+| 层 | 改动 | 判据 |
+|---|---|---|
+| 契约 | `DEFAULT_SYNC_PAYLOAD_MODE = 'readable'`（单一来源） | 导出并参与服务端判定 |
+| 数据库 | `payload_mode` 默认改 `readable` + 存量回填（迁移 `20261101160000_…`） | `check:migrations`、`check:schema-migration-drift` 绿 |
+| 服务端 | `readPayloadMode`：**行不存在 ⇒ 默认值**；**读失败 ⇒ `e2ee`**（两条退路刻意不同） | `payload-mode.spec.ts` 5/5（含"新账号 ⇒ readable"与"读抛错 ⇒ e2ee"两格） |
+| 真实 PG | 全新库跑完迁移后，关闭/再打开整条旅程 | 集成 **3/3** |
+| 口径 | `site.integrations.e2ee.*`、条款第四条、隐私政策、数据权利、README 全部反转；标题改成"端到端加密（可选）" | `check:legal-closure-truth`、`check-legal-gdpr`、`check-ui-language`、`gen-site-copy --check` 绿 |
+
+### 12.2 没有变的东西
+
+开启方向（S3）与关闭方向（S2）的整库迁移机制、两个方向都拒错配、
+`fail-closed 到 e2ee`（读失败时）、钥匙可由设备持有（S5）、设置页两个轴（S6）——
+一律保留。**变的只有"新账号落在哪一档"。**
+
+### 12.3 仍待做
+
+- 设置页在明文模式下的首屏文案应以"可开启"为主语（现在已经是，但还没有真浏览器证据）
+- 四端装机验收（见 §11，凭据/设备/沙箱）

@@ -141,7 +141,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '**端到端加密是默认值，不是不可更改的固有限制。** 用户可以在应用的同步设置里关闭它。关闭之后，本公司按普通云存储处理**内容数据**：能够读取，也能在法律法规要求时依法提供。关闭是一次整库迁移（历史数据一并转为明文），并且存在**不可撤回的窗口** —— 已经进入每日备份与快照的明文无法撤回，之后重新开启加密也不会使那些副本消失。应用在关闭前会逐条列明上述后果并要求用户确认。本条前述"无法读取"的表述，在用户关闭加密后不再适用。',
+        text: '**端到端加密是可选项，默认不开启。** 默认情况下，本公司按普通云存储处理**内容数据**：能够读取，也能在法律法规要求时依法提供 —— 这也正是本公司能够为用户提供找回与协助的前提。用户可以在应用的同步设置里**显式开启**端到端加密；开启是一次整库迁移（历史数据一并转为密文），此后本公司无法读取内容数据，本条前述"无法读取"的表述自开启生效时起适用。开启之后，口令与恢复码由用户自行保管，两者均遗失时本公司无法解密；用户也可以再次关闭加密，关闭同样是一次整库迁移，但**已经进入每日备份与快照的明文无法撤回**。应用在开启与关闭前都会逐条列明后果并要求用户确认。',
       },
       {
         kind: 'p',
@@ -516,7 +516,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: '**End-to-end encryption is the default, not an unchangeable property of the service.** Users can turn it off in the app\'s sync settings. Once it is off, we handle **content data** as an ordinary cloud storage provider: we can read it, and we will disclose it where the law requires. Turning it off performs a whole-history migration (existing data becomes plaintext too) and opens an **irreversible window** - plaintext already captured in daily backups and snapshots cannot be recalled, and turning encryption back on later will not remove those copies. The app lists these consequences item by item and asks the user to confirm before switching. The "we cannot read" statements above no longer apply once a user has turned encryption off.',
+        text: '**End-to-end encryption is optional and off by default.** By default we handle **content data** as an ordinary cloud storage provider: we can read it, and we will disclose it where the law requires - which is also what lets us help users recover it. Users can **explicitly turn end-to-end encryption on** in the app\'s sync settings. Turning it on performs a whole-history migration (existing data becomes ciphertext too); from that point we cannot read content data, and the "we cannot read" statements above apply. The passphrase and recovery code are then the user\'s own to keep: if both are lost we cannot decrypt. Users may turn encryption off again, which is likewise a whole-history migration, but **plaintext already captured in daily backups and snapshots cannot be recalled**. The app lists these consequences item by item and asks the user to confirm before either switch.',
       },
       {
         kind: 'p',

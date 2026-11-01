@@ -197,3 +197,10 @@
   macOS 壳是 WKWebView 载 `web-dist`，钥匙串要接就得上 Swift↔JS 桥。
   ⇒ 三端的**原生**钥匙串都还没有；Web（含 macOS 壳里的共享 UI）走 `sessionStorage`。
 - Web 的 `sessionStorage` 实测在**刷新**后仍可用、**关标签页**即失效（6 条单测钉住，含"一个字都不进 localStorage"）。
+
+## 十二、被取代的那一半（2026-11-01）
+
+本文 §一 第 1 条「端到端加密仍是**默认**，也是卖点」已由
+[ADR-0081](0081-encryption-is-opt-in-not-default.md) 取代：**默认改为明文，加密由用户显式开启**。
+本文其余结论（两个轴分开、关闭=整库迁移、钥匙可由设备持有、两个方向都拒错配、
+fail-closed 到 e2ee）**一条不动**。

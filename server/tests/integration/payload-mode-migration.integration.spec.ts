@@ -58,7 +58,8 @@ describe.skipIf(!DATABASE_URL)('关掉端到端加密：真实 PostgreSQL 发布
       data: { email: `turn-off-${randomUUID()}@test.local`, isVerified: 1, storageQuotaBytes: BigInt(1 << 30) },
     });
     userId = user.id;
-    await db.userSyncState.create({ data: { userId, lastSeq: 2 } });
+    // 这条用例模拟"已经开着加密的账号"：显式写 e2ee（ADR-0081 之后新账号默认是明文）。
+    await db.userSyncState.create({ data: { userId, lastSeq: 2, payloadMode: 'e2ee' } });
     await db.vaultKeyPackage.create({
       data: { userId, keyVersion: 1, packageData: packageFor(1), activePayloadKeyVersion: 1, createdAt: 1n, updatedAt: 1n },
     });

@@ -224,6 +224,7 @@ export type {
 // ADR-0080：账号级载荷模式（e2ee / readable）。它只说"云上那份能不能被服务端读"，
 // 不说钥匙放在哪 —— 后者不上线协议。
 export {
+  DEFAULT_SYNC_PAYLOAD_MODE,
   SYNC_PAYLOAD_MODES,
   SYNC_PAYLOAD_MODE_PATHS,
   syncPayloadModeResponseSchema,
