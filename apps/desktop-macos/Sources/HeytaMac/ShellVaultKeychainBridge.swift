@@ -67,7 +67,14 @@ final class ShellVaultKeychainBridge: NSObject, WKScriptMessageHandlerWithReply 
             }
             let result = store.load(serverOrigin: origin, accountId: accountId)
             onFact?("VAULT_ROOT_LOAD=\(result.outcome == .ok ? "present" : "absent")")
-            replyHandler(result.value, nil)
+            /**
+             🔴 "没有"要回 **`NSNull()`**，不能回 Swift 的 `nil`。
+             `WKScriptMessageHandlerWithReply` 收到 `nil` 时，页侧那个 Promise 解出来的
+             是 **`undefined`**；而页侧契约（`vault-root-keychain.ts` 的 `load`）写的是
+             `Promise<string | null>`。两者之差实测过一次：探针里 `=== null` 判"没记住"
+             直接判成 false（看起来像"钥匙串里凭空多了一条"，其实是回的 `undefined`）。
+             */
+            replyHandler(result.value ?? NSNull(), nil)
 
         case "save":
             guard args.count == 3, let origin = args[0] as? String, let accountId = args[1] as? String,

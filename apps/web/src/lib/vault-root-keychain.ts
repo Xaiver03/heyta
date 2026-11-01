@@ -69,7 +69,13 @@ export async function loadDeviceVaultRoot(
   if (bridge === undefined) return undefined;
   try {
     const encoded = await bridge.load(scope.serverOrigin, scope.accountId);
-    if (encoded === null || encoded === '') return null;
+    /*
+     * `undefined` 也要当成"没记住"：壳那一侧如果哪天又回成 Swift 的 `nil`，
+     * `WKScriptMessageHandlerWithReply` 会让页侧解出 `undefined` 而不是 `null`。
+     * 契约写的是 `string | null`，但**判据不能只认一种空值** —— 认漏了的表现是
+     * "读出一枚不存在的钥匙"，那是方向性最坏的错。
+     */
+    if (encoded === null || encoded === undefined || encoded === '') return null;
     const bytes = decodeBase64ToBytes(encoded);
     return bytes.length === 32 ? bytes : null;
   } catch {

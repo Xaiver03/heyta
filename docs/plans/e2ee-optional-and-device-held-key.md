@@ -988,13 +988,37 @@ ADR-0080 §十一 记的是"macOS 壳里根本没有这个端口"。这一轮把
 | `swift build` | 通过；`nm` 能查到 `vaultKeychainBridge` 符号 | — |
 | web 全套 | **2711 passed / 13 skipped**（含修掉一条与本线无关的遍历崩溃，见 §15.4） | — |
 
-### 15.3 还没验的那一格（不许读多）
+### 15.3 真 `.app` 里的往返读数（2026-11-02，本轮补上）
 
-**端到端"冷启动免输"没验**。它需要：签名后的 `.app` 真启动一次 → 建/开 vault →
-**退出进程** → 再启动 → 界面不再要口令。本会话拿不到屏幕取证（§11 那条外部条件），
-所以这一格留空，**不拿"Keychain 往返通了"去冒充它**。
+签过名的 `.app` 里注入 `HEYTA_VAULT_KEYCHAIN_PROBE=1`，走
+`window.heytaVaultKeychain` → 消息通道 → `VaultKeychainStore` → Keychain Services：
 
-### 15.4 顺带修掉一条**与本线无关**的红
+```
+VAULT_KEYCHAIN_PROBE={"absentFirst":true,"saved":true,"readBack":true,"updated":true,
+                      "cleared":true,"absentAfterClear":true,"rejectedShort":true}
+```
+
+`/tmp/heyta-macos-dist4/Heyta.app` 与装到 `/Applications/Heyta.app` 的那一份**读数一致**
+（`codesign` 仍是 `cloud.finlaw.heyta.desktop` / `V5S2LT9YV8` / developer-id）。
+
+🔴 **这一条比单测重要，因为它在真壳里**：单测跑的是同一个 Store，但少了
+「shim 注入了没有」「换 content world 之后 `postMessage` 还通不通」这两格。
+
+**一条非人造的红**（价值比变异臂高）：第一版探针用 `evaluateJavaScript`，直接回
+`JavaScript execution returned a result of an unsupported type` —— 它不 await Promise；
+换成 `callAsyncJavaScript` 之后又露出第二层：`absentFirst:false` / `absentAfterClear:false`，
+因为壳回 Swift 的 `nil` 时页侧解出的是 **`undefined`** 而不是 `null`，而契约写的是
+`Promise<string | null>`。改成 `replyHandler(NSNull(), nil)`，并在页侧把 `undefined` 也当"没有"。
+**"读出一枚不存在的钥匙"是方向性最坏的错**，所以这条负臂留着（`absentFirst` / `absentAfterClear`）。
+
+### 15.4 还没验的那一格（不许读多）
+
+**端到端"冷启动免输"没验**。它需要：在 `.app` 里建/开 vault → **退出进程** → 再启动 →
+界面不再要口令。上面那条验的是**通道与存储**，不是"用户看到的那一幕"。
+本会话没有驱动 WKWebView 设置页的能力（那是长流程 UI 驱动），所以这一格留空，
+**不拿"Keychain 往返通了"去冒充它**。
+
+### 15.5 顺带修掉一条**与本线无关**的红
 
 `apps/web/tests/local-data-destruction.spec.ts` 在 `apps/mobile/ios/Pods/` 上 `ENOENT` 崩了 ——
 `Pods` 里有指向 `ios/build/generated/ios/`（只有跑过 `pod install` 才存在）的符号链接，

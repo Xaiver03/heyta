@@ -12369,3 +12369,25 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     并且**先在正常构建上跑一遍**看它是不是能找着；
     ③ 判据红了先怀疑判据：那一次 `walk()` 的错误让一条通过的构建看起来像失败，
     比反过来更容易骗人 —— 因为人会先去修"构建"。
+
+627. 🔴 **`evaluateJavaScript` 不 await Promise；而壳回 Swift `nil` 时页侧拿到的是 `undefined`，不是 `null`**（2026-11-02，macOS 壳的钥匙串探针连撞两下）：
+
+    想从壳里验"页侧 ⇄ 原生"的一整趟往返，写了：
+
+    ```
+    webView.evaluateJavaScript("(async () => { ...; return JSON.stringify(out); })()") { value, _ in ... }
+    ```
+
+    回的是 **`JavaScript execution returned a result of an unsupported type`** ——
+    那条错误读起来像"桥坏了"，实际只是"结果是个 Promise"。`evaluateJavaScript` 不 await；
+    要跑异步体就得用 **`callAsyncJavaScript(_:arguments:in:in:)`**。
+
+    换成 `callAsyncJavaScript` 之后露出第二层：探针里 `absentFirst` 与 `absentAfterClear`
+    都是 `false`（看起来像"钥匙串里凭空多了一条"）。真因不是多了一条，而是
+    `WKScriptMessageHandlerWithReply` 里 `replyHandler(nil, nil)` 让页侧那个 Promise 解出
+    **`undefined`**，而页侧契约写的是 `Promise<string | null>`，探针用的是 `=== null`。
+
+    **规矩**：① 壳里跑异步 JS 用 `callAsyncJavaScript`，别用 `evaluateJavaScript`；
+    ② "没有值"在 Swift↔JS 之间**必须显式**：要 `null` 就回 `NSNull()`，Swift 的 `nil` 等于 JS 的 `undefined`；
+    ③ 页侧判断空值要**同时认 `null` 与 `undefined`** —— 认漏了的表现是"读出一枚不存在的钥匙"，
+    那是方向性最坏的错（比"读不到"坏得多，因为读不到会退回要口令，读出假的会去解一个错的历史）。
