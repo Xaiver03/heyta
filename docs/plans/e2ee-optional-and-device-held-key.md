@@ -804,7 +804,7 @@ Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 r
 
 | 项 | 读数 |
 |---|---|
-| `pnpm check` | 见 §13.4 —— 本轮修掉 20 条浏览器失败后**重跑中**，读数以重跑为准 |
+| `pnpm check` | **exit=1**。门禁段（浏览器之前那一整串，约 240 条 ✅）**全绿**；红的只有浏览器段的 **16 条**，逐条归属见 §13.4 —— 没有一条在本线。修之前是 40 条 |
 | `pnpm verify:vault-web` | **7 绿 / 1 红**，唯一的红是 `vault/ai-egress.spec.ts`（AI 拆解按钮 `not visible`），与本线无关 |
 | web 侧五套（加密轴） | 28/28 |
 | `@heyta/sync-client` / `server` 加密轴 | 174/174、22/22（payload-mode 5 + gate 8 + migration service 9） |
@@ -817,13 +817,17 @@ Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 r
 `renew-panel`(6)、`profile-avatar-plaintext`(1)、`vault-settings`(1)。
 全部是"新端点没登记进严格夹具" + 那一条真的拉多了。重跑：15/15、10/10、3/3 全绿。
 
-**不是我的（约 16 条）**：`help-entry-ux`(4)、`inbound-automation`(3)、`public-facts`(3)、
-`habit-month`(3)、`habit-year`(1)、`sidebar-resize`(1)、`calendar-capture`(1)。
-共同形状是"元素数量/文案对不上"，例如 `help-entry-ux` 报
-`getByTestId('settings-sheet').getByRole('heading')` 期望 1 实得 **0** —— 设置页骨架变了；
-`inbound-automation` 是同一按钮解析到 **2** 个元素（重复渲染）。
+**不是我的（16 条，修完重跑的现量）**：`help-entry-ux`(4)、`public-facts`(3)、
+`inbound-automation`(3)、`task-organize`(2)、`shell-no-document-scroll`(1)、
+`shell-sidebar-height`(1)、`sidebar-resize`(1)、`calendar-capture`(1)。
+
+共同形状是"元素数量/文案对不上"，两处已定位到具体断点：
+`help-entry-ux` 报 `getByTestId('settings-sheet').getByRole('heading')` 期望 1 实得 **0**
+（设置页骨架变了）；`inbound-automation` 是同一按钮解析到 **2** 个元素（重复渲染）。
 工作树里有另一条线未提交的 36 个文件（AI 分层重构，含 `apps/web/src/App.tsx`），
 **在那批改动落定之前，整链不可能绿**。本线不替它改，也不把它算进自己的账。
+
+重跑读数：**40 failed / 450 passed ⇒ 16 failed / 473 passed**（另 2 flaky、2 skipped）。
 
 ### 13.5 一句话回答"完没完"
 
