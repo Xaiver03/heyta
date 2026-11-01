@@ -1163,6 +1163,27 @@ RN 在挂载，但 `xcrun simctl io screenshot` **连拍三张全黑、字节数
 而 `/Applications/Xcode.app/Contents/Developer/Applications/` 是空的）⇒ 只有离屏渲染。
 见 [traps §7 #630](../reference/environment-traps.md)。
 
-**解除条件**：在**有 GUI 会话**的机器上（或先装好 Simulator.app 并打开）再截；
-或走 `verify-mobile-ios.sh` 那条真机/模拟器 UI 链（它还要一个可达的服务端）。
+**这台机根本没有 Simulator GUI**（三条都验过）：
+
+```
+$ xcode-select -p
+/Applications/Xcode.app/Contents/Developer
+$ ls -d /Applications/Xcode.app/Contents/Developer/Applications
+（不存在）
+$ pgrep -f "Simulator.app/Contents/MacOS/Simulator"
+（无输出；只有 CoreSimulator 的 XPC 服务在跑）
+$ mdfind -name "Simulator.app"
+/System/Library/CoreServices/WidgetKit Simulator.app      ← 无关
+/System/Library/Frameworks/QuickLookUI.framework/.../Quick Look Simulator.app  ← 无关
+```
+
+⇒ 这是一套**没有 GUI 的 Xcode**。`simctl` 能跑（boot/install/launch/截图都走它），
+但**没有任何东西把模拟设备的画面渲染出来**，也**没有宿主 AX 树**——
+所以 `verify-mobile-ios.sh` 那条 AX 链（`scripts/tools/axpress.swift`）在这台机上同样跑不了。
+
+**解除条件**：装一套**带 GUI 的 Xcode**（让
+`/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app` 存在），
+或在有 GUI 的机器上截；然后 `open -a Simulator` + `simctl io screenshot`。
+若要走 `verify-mobile-ios.sh` 那条链，还要一个可达的服务端。
+
 ⚠️ **不拿"进程起来了"冒充"首屏画出来了"** —— 这两件事中间隔着 JS bundle 与首帧错误。
