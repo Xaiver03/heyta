@@ -1,6 +1,6 @@
 # E2EE 可选 + 钥匙由设备持有：实施计划（ADR-0080）
 
-> 状态：**进行中 · S0–S4 与 S7 收口；S5 缺三端原生钥匙串、S6 缺"开启加密"表单**（逐阶段对账见 §13；端到端与四端装机的边界见 §11）
+> 状态：**进行中 · S0–S4、S6、S7 收口；S5 缺三端原生钥匙串与移动端设备腿**（逐阶段对账见 §13；端到端与四端装机的边界见 §11）
 > 决策：[ADR-0080](../adr/0080-e2ee-is-optional-with-device-held-key.md)
 > 依据：[key-decisions](../agents/key-decisions.md)（2026-11-01 那条）、[db-migrations](../agents/db-migrations.md)、[overlay-feedback](../agents/overlay-feedback.md)、[ui-acceptance](../agents/ui-acceptance.md)
 
@@ -774,7 +774,7 @@ Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 r
 | **S3** 打开：新 root + 全量加密 | ✅ 收口 | `vault-session.spec.ts` 20/20（含"世代必须从 0 到 1"）；变异臂"世代校验放宽成 `<= 0`" ⇒ 1 红 | 无 |
 | **S4** 客户端模式感知 | ✅ 收口 | `packages/sync-client/tests/plain-payload-mode.spec.ts` 3/3；变异臂"错配降级成普通 Error" ⇒ 1 红；`@heyta/sync-client` 174/174 | 无 |
 | **S5** 钥匙默认设备持有 | ⚠️ **部分** | Web：`vault-root-cache.spec.ts` 6/6（变异臂"换 localStorage" ⇒ 1 红）；移动端：`apps/mobile/src/db/open-host.ts` 已把 `vaultRootKeyStore` 接进宿主、默认值改成 `useState(true)` | 🔴 **三端原生钥匙串都没有**（ADR-0080 §九 附记已承认）：macOS 壳是 WKWebView 载 `web-dist`，接 `security`/Keychain 要先造 Swift↔JS 桥；Windows/Linux 未做。移动端**设备腿未验**（"创建 vault → 冷启动免输"需要当前源码的 Release 包） |
-| **S6** 界面：两个轴 + 危险确认 | ⚠️ **部分** | 关闭方向：组件 + 危险确认 + 三条后果逐条数（`encryption-mode-section.spec.tsx` 14/14，变异臂"删掉不可逆那条" ⇒ 1 红）；面板已挂进 `VaultSettingsPanel`；钥匙位置轴 4/4；本机无密钥包时不画"创建"入口 2/2 | 🔴 **"开启加密"的表单没画**：编排队列（`beginPayloadEncryption` / `confirmPayloadEncryption` / `confirmAndMigrateReEncryption`）全在且各自有判据，但界面只有 `onDisable` 一个回调位；要"输口令 + 抄/回填恢复码"两段表单。**不画按钮**的规矩仍在生效，所以这不是"漏了一个按钮"，是"还原路径只能靠有钥匙的老设备/恢复码" |
+| **S6** 界面：两个轴 + 危险确认 | ✅ 收口（2026-11-02 **改判**，见 §13.6） | 关闭方向：组件 + 危险确认 + 三条后果逐条数（`encryption-mode-section.spec.tsx` **14/14**，变异臂"删掉不可逆那条" ⇒ 1 红）；**开启方向的两段表单也在**：`enable={{begin: beginReEncryption, confirm: confirmReEncryption}}` 挂在 `VaultSettingsPanel`，判据 3 条（不传 `enable` 就不画、第一段只拿恢复码不迁移、回填后才迁移）+ 真浏览器 `e2e/vault/vault-journey.spec.ts` 的 `enableEncryption()` 走完整流程；钥匙位置轴 4/4；本机无密钥包时不画"创建"入口 2/2 | 无。🔴 上一轮我把它写成"缺开启表单"是**错的**，原因与更正见 §13.6 |
 | **S7** 对外口径 | ✅ 收口（本轮补完） | `check:legal-*` 五道绿；绝对句扫描 0 命中；`check:ui-language` 绿（476 文件 / 823 处文案）；i18n 30/30；landing 1455/1455 | 无。本轮补掉了**四处共享词条**（见 §13.2）——上传前那轮只修了界面与下载页 |
 
 ### 13.2 本轮补的两处（都被现量抓出来，不是自查）
@@ -838,9 +838,36 @@ Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 r
 
 ### 13.5 一句话回答"完没完"
 
-**S0–S4、S7 完了；S5、S6 各缺一块，且缺的那两块都不是"再点几下"的量：**
-S5 缺三端原生钥匙串（macOS 要先造 Swift↔JS 桥），S6 缺"开启加密"的两段表单。
-两者的**库层与会话层入口都已经在且有判据**，所以缺的是界面与平台通道，不是协议。
+**S0–S4、S6、S7 完了；只剩 S5。** S5 缺的是**三端原生钥匙串**（macOS 要先在 WKWebView 里造
+Swift↔JS 桥，Windows/Linux 的 DPAPI/libsecret 未做）与**移动端的设备腿**（代码已接进宿主，
+但"建库 → 冷启动免输"没有在当前源码的 Release 包上跑过）。协议与会话层入口都在且有判据，
+缺的是**平台通道**，不是协议。
+
+### 13.6 🔴 更正：S6 不是"缺开启表单"，是我查错了
+
+§13.1 的第一版把 S6 判成"缺开启加密的两段表单"，理由是
+"组件只有 `onDisable` 一个回调位"。**那是错的**，两个原因叠在一起：
+
+1. 我去 grep 的标识符是 `onEnable`，而组件实际的 prop 叫 **`enable`**（对象，含 `begin`/`confirm`）——
+   grep 不到不等于不存在；
+2. 我同时信了本文件 §3 S6 表格里那句"开启方向的**界面** ❌ 仍未画"，而那一行是**更早一轮**的读数，
+   后来的落地没有回写进那张表。
+
+现量（可复跑）：
+
+```
+apps/web/src/features/sync/EncryptionModeSection.tsx   enable={{ begin, confirm }} 两段表单齐
+apps/web/src/features/sync/VaultSettingsPanel.tsx      挂载点：enable={{ begin: beginReEncryption,
+                                                              confirm: confirmReEncryption }}
+apps/web/tests/encryption-mode-section.spec.tsx        14/14（含"不传 enable 就不画"/两段各一条）
+e2e/vault/vault-journey.spec.ts:111                    enableEncryption() 真浏览器走完：
+                                                        设口令 → 拿恢复码 → 回填 → 模式翻成"已开启"
+```
+
+🔴 **教训（比这次的结论更值钱）**：判"某功能没做"之前，
+① grep 要搜**行为**（`encryption-enable` 这个 testid、`begin(` 这个调用），不要搜你**以为**的 prop 名；
+② 计划里的"❌ 未画"是**当时**的读数，用之前先看有没有更晚的落地；
+③ 反向也要防：**"没找到"和"不存在"是两件事**，而它们在 grep 的输出里长得一模一样。
 
 ---
 
