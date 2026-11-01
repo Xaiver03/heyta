@@ -9,7 +9,7 @@ import { syncPayloadModeResponseSchema } from '@heyta/shared-schema';
  * 这组断言只钉四件事 —— 它们全都是"读不到时怎么办"，因为读取成功那一格
  * 由数据库决定，而**读取失败那一格决定安全边界**：
  *   ① 存的是 readable ⇒ 读回 readable
- *   ② 没有行（从没同步过）⇒ e2ee
+ *   ② 没有行（从没同步过）⇒ **默认明文**（ADR-0081）
  *   ③ 存了个不认识的值 ⇒ e2ee（不是抛错、不是放行）
  *   ④ 读抛异常 ⇒ e2ee 且**仍然回 200**（一次数据库抖动不该让整条同步挂掉，
  *      更不该因为挂了就落到宽松那一档）
@@ -65,13 +65,13 @@ describe('GET /api/sync/payload-mode (ADR-0080)', () => {
     expect(syncPayloadModeResponseSchema.safeParse(res.json()).success).toBe(true);
   });
 
-  it('returns e2ee for an account that has never synced (no row at all)', async () => {
+  it('没同步过的新账号 ⇒ 默认明文（ADR-0081）', async () => {
     mocks.userSyncState.findUnique.mockResolvedValue(null);
 
     const res = await app.inject({ method: 'GET', url: '/api/sync/payload-mode', headers: AUTH });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ mode: 'e2ee' });
+    expect(res.json()).toEqual({ mode: 'readable' });
   });
 
   it('fails closed to e2ee when the stored value is unrecognised', async () => {

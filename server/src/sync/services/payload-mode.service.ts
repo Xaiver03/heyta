@@ -1,6 +1,10 @@
 import type { PrismaClient } from '@prisma/client';
 
-import { syncPayloadModeSchema, type SyncPayloadMode } from '@heyta/shared-schema';
+import {
+  DEFAULT_SYNC_PAYLOAD_MODE,
+  syncPayloadModeSchema,
+  type SyncPayloadMode,
+} from '@heyta/shared-schema';
 
 import { prisma } from '../../db';
 import { Logger } from '../../logger';
@@ -12,8 +16,10 @@ import { Logger } from '../../logger';
  * 上传/快照入口的闸门（决定该收哪种载荷）。两处各写一份的话，
  * "客户端以为自己是 readable、服务端以为它是 e2ee"这种错配会在某次改动后悄悄出现。
  *
- * 🔴 **fail-closed 到 `'e2ee'`**：读失败、行不存在、值不认识，一律按最严那一档。
- * 反过来（失败时猜 `readable`）等于因为一次数据库抖动就把明文放进来。
+ * 🔴 **两条不同的退路**（ADR-0081 之后尤其不能混）：
+ * - **行不存在** ⇒ 新账号 ⇒ 用 `DEFAULT_SYNC_PAYLOAD_MODE`（现在是明文）；
+ * - **读失败 / 值不认识** ⇒ fail-closed 到 `'e2ee'`。
+ *   反过来（失败时猜明文）等于因为一次数据库抖动就把明文放进来。
  */
 type PayloadModeReader = Pick<PrismaClient, 'userSyncState'>;
 
@@ -26,8 +32,9 @@ export const readPayloadMode = async (
       where: { userId },
       select: { payloadMode: true },
     });
-    // 没有 `user_sync_state` 行 = 这个账号还从没同步过 = 按默认值。
-    const parsed = syncPayloadModeSchema.safeParse(row?.payloadMode ?? 'e2ee');
+    // 没有 `user_sync_state` 行 = 这个账号还从没同步过 ⇒ 按**新账号默认值**（ADR-0081：明文）。
+    // ⚠️ 与下面 catch 里那条不同：那是"读失败"，不能猜明文。
+    const parsed = syncPayloadModeSchema.safeParse(row?.payloadMode ?? DEFAULT_SYNC_PAYLOAD_MODE);
     if (!parsed.success) {
       Logger.error(`[user:${userId}] Unrecognised payload mode stored; treating as e2ee`);
       return 'e2ee';

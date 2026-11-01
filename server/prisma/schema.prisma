@@ -298,7 +298,7 @@ model UserSyncState {
   /// ADR-0080：账号级载荷模式。'e2ee'（默认）= 入口只收密文；'readable' = 只收明文。
   /// 🔴 它必须在 user_sync_state 上，不能挂在 vault_key_packages 上 —— readable 模式下
   /// 我们要删掉那一行，模式不能住在被删的对象上。CHECK 只允许这两个值。
-  payloadMode                String  @default("e2ee") @map("payload_mode")
+  payloadMode                String  @default("readable") @map("payload_mode")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

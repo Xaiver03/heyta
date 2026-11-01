@@ -10,6 +10,17 @@ import { z } from 'zod';
  * 钥匙由设备持有还是每次输入，是客户端自己的偏好，不上线协议。
  */
 export const SYNC_PAYLOAD_MODES = ['e2ee', 'readable'] as const;
+
+/**
+ * 新账号的默认载荷模式（ADR-0081）。
+ *
+ * 🔴 默认是 `readable`：绝大多数人用任务/记账软件时不会为"服务端能不能读"
+ * 付出口令与不可恢复的代价。加密是**显式开启**的可选项，不是强制的入场券。
+ *
+ * ⚠️ 它与"读取失败时退回哪一档"是**两件事**：失败仍旧退回 `e2ee`（见
+ * `payload-mode.service.ts`），因为猜明文等于一次抖动就把明文写上去。
+ */
+
 export type SyncPayloadMode = (typeof SYNC_PAYLOAD_MODES)[number];
 
 export const syncPayloadModeSchema = z.enum(SYNC_PAYLOAD_MODES);
@@ -34,3 +45,6 @@ export const syncPayloadModeResponseSchema = z.object({
 }).strict();
 
 export type SyncPayloadModeResponse = z.infer<typeof syncPayloadModeResponseSchema>;
+
+/** 新账号的默认载荷模式（ADR-0081）。 */
+export const DEFAULT_SYNC_PAYLOAD_MODE: SyncPayloadMode = 'readable';
