@@ -829,6 +829,13 @@ Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 r
 
 重跑读数：**40 failed / 450 passed ⇒ 16 failed / 473 passed**（另 2 flaky、2 skipped）。
 
+🔴 **归属有旁证，不是"猜大概是别人"**：同一棵工作树上还有三份**未提交**的计划与实现 ——
+`docs/plans/settings-information-architecture.md`（设置页信息架构重排）、
+`docs/plans/row-actions-redesign.md` + `apps/web/src/features/tasks/TaskRowMenu.tsx`（行尾动作重做）、
+以及 AI 分层重构那 36 个文件。剩下 16 条失败正好落在三者覆盖的面上：
+`help-entry-ux` 看的是设置页骨架、`task-organize` / `sidebar-resize` / `shell-*` 看的是行尾触发器、
+`inbound-automation` 是重复渲染。**那三件落定之前，整链不可能绿。**
+
 ### 13.5 一句话回答"完没完"
 
 **S0–S4、S7 完了；S5、S6 各缺一块，且缺的那两块都不是"再点几下"的量：**
