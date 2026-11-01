@@ -85,6 +85,15 @@ async function fakeServer(page: Page, store: AvatarStore): Promise<string[]> {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ announcements: [] }) }));
   await page.route(`${SERVER}/api/auth/central/config`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  /*
+   * 🔴 `GET /api/sync/payload-mode` 是 ADR-0080 之后**应用一启动就会发**的读（载荷模式）。
+   * 这个夹具的规矩是"没登记的请求算意外"，所以新端点必须在这里登记 ——
+   * 与本文件里 `/api/announcements/active` 那几条同一条纪律。
+   * 回 `readable`（明文账号）而不是 `e2ee`：`e2ee` 会让 vault 面板去探 key-package，
+   * 而本用例的主题不是加密，不该把那一路请求带进来。
+   */
+  await page.route(`${SERVER}/api/sync/payload-mode`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ mode: 'readable' }) }));
 
   await page.route(`${SERVER}/api/account/profile**`, async (route) => {
     const method = route.request().method();

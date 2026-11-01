@@ -828,6 +828,8 @@ const KNOWN_MISSING = [
   // 中央账号配置（带凭据的探测）。它的**CORS** 那一层已在 `stub-provider.mjs` 修好
   // （默认模式回显来源 + `allow-credentials`），这里只剩"桩里没有这条路由"。
   '/api/auth/central/config',
+  // 载荷模式（ADR-0080 之后应用一启动就读）：后台桩里没有这一路。
+  '/api/sync/payload-mode',
 ] as const;
 
 function assertNoProblems(problems: PageProblems, expectedBad: readonly string[] = []): void {

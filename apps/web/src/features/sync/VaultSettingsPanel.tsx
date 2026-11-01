@@ -312,7 +312,19 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
   const [packageChecked, setPackageChecked] = useState(false);
   const [encryptionProgress, setEncryptionProgress] = useState<{ completed: number; total: number }>();
 
-  // 模式是**服务端事实**，不是本地偏好：读失败按 e2ee（写错方向的代价不对称）。
+  /*
+   * 模式是**服务端事实**，不是本地偏好：读失败按 e2ee（写错方向的代价不对称）。
+   *
+   * 🔴 依赖里**故意没有 `revision`**（2026-11-02）。两个方向都自己调了
+   * `setPayloadMode(...)`（`disableEncryption` 置 `plain`、`confirmReEncryption` 置 `e2ee`），
+   * 所以"本地刚改完"不需要再去问一次服务端 —— 那只是把同一个答案重拉一遍。
+   *
+   * 代价是这条 effect 以前**跟着每一次动作重跑**：`run()` 每成功一次就 `setRevision(+1)`，
+   * 于是建钥匙 / 确认 / 锁定 / 解锁 / 轮换口令这五步会各多打一次 `GET /api/sync/payload-mode`。
+   * 真浏览器 e2e 把它抓了出来（`e2e/tests/vault-settings.spec.ts` 的 fixture 是**故意严格**的：
+   * 每条没登记的请求都记一条 `unexpected`），一次流程里记到了 15 条。
+   * 那不是"夹具太严"，是本该一次就够的读被拉成了随动作线性增长的序列。
+   */
   useEffect(() => {
     let cancelled = false;
     if (sync.baseUrl.trim() === '' || sync.token === undefined) return undefined;
@@ -321,7 +333,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
       .catch(() => { /* fail-closed 已在读取层处理 */ })
       .finally(() => { if (!cancelled) setModeKnown(true); });
     return () => { cancelled = true; };
-  }, [sync.baseUrl, sync.token, revision]);
+  }, [sync.baseUrl, sync.token]);
 
   useEffect(() => {
     let cancelled = false;
