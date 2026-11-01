@@ -188,7 +188,9 @@ pnpm --filter @heyta/web build
 本张 12:43 那趟的 md5 现量 5ddcbf4f1e33921a569c1452187f3d20。
 
 ```
-UIPIN r15b-3-ready-dark.png 73ad62a3 apps/web/src/features/settings/ProfilePanel.tsx packages/design-system/src/tokens.css apps/web/src/styles/app/main-area.css
+# 🔴 2026-11-01：这一枚 UIPIN 已随 `r15b-3-ready-dark.png` 一起删除（ADR-0079 之后它不再是当前形状的证据）。
+# 留一条注释而不是换个文件名，是为了让"这枚锚点去哪了"有据可查；新形状的锚点是下面这枚。
+UIPIN avatar-plain-3-ready-dark.png 73ad62a3 apps/web/src/features/settings/ProfilePanel.tsx packages/design-system/src/tokens.css apps/web/src/styles/app/main-area.css
 ```
 
 钉 `73ad62a3` 的理由（10-05 重钉，与同批另外 5 枚目录用同一个批次号）：这四条路径里
