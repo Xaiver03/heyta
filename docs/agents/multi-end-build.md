@@ -214,12 +214,24 @@ pnpm remote:typecheck          # 同一套同步，跑 pnpm typecheck
 Android 构建默认也走 `linux-dev`（`scripts/run-gradle.mjs`）。两条路都**不静默回落本机**：
 远端连不上就红，唯一逃生门是显式 `HEYTA_REMOTE_FALLBACK_LOCAL=1`。
 
-鸿蒙（RNOH）构建在 **`windows-pc`**（DevEco 只在那台机器上）：
+鸿蒙（RNOH）构建在 **`windows-pc`**（DevEco 只在那台机器上）。**三条命令，三种产物，别混着读**：
 
 ```bash
-node scripts/build-harmony-windows.mjs [--pull] [--dry-run]
+node scripts/build-harmony-windows.mjs         # ① 应用壳：entry 模块 HAP，~400 KB
+node scripts/build-harmony-rnoh-windows.mjs    # ② 原生侧探针：~38 MB，含三个 .so（codegen 是桩）
+node scripts/build-harmony-rnohjs-windows.mjs  # ③ JS 侧全链路（零桩）：~21 MB，含 .so + hermes bundle
 ```
 
-细节与已踩的四个坑见 [`docs/runbooks/harmony-build-on-windows.md`](../runbooks/harmony-build-on-windows.md)。
-⚠️ 它产出的是 **entry 模块的 HAP**（400 KB，含 `ets/modules.abc`），**不含** `.so` 与 hermes bundle ——
-RNOH 全量包还差 codegen/autolinking + bundle 两步移植。
+`--pull` 把 HAP 拉回 `dist/harmony/`，`--dry-run` 只打印计划。三条都**不静默回落本机**
+（本机没有 DevEco），判据按 `OK`/`BAD` 行计数 —— 不看退出码。
+
+| # | 产物 | 内含 | 顶替了什么 |
+|---|---|---|---|
+| ① | `entry-default-unsigned.hap`（400,390 B） | `ets/modules.abc` | 无原生侧 |
+| ② | `entry-default-unsigned.hap`（38 MB） | 三个 `.so` + 945 KB `modules.abc` | codegen/autolinking **用桩** |
+| ③ | `entry-default-unsigned.hap`（**21,182,580 B**） | 三个 `.so` + `hermes_bundle.hbc` | **零桩**（真插件/真 autolinking/真 Hermes） |
+
+🔴 **只有 ③ 是自包含的成品形状**（bundle 进包，不依赖 Metro）。但它仍**装不进设备**：
+产物是 unsigned，且本机没有模拟器镜像 —— 三条都**不对「RN 应用在鸿蒙上跑得起来」下结论**。
+
+细节、判据与已踩的坑见 [`docs/runbooks/harmony-build-on-windows.md`](../runbooks/harmony-build-on-windows.md)。
