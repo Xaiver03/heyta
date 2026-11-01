@@ -1068,6 +1068,19 @@ VAULT_KEYCHAIN_PROBE={"absentFirst":true,"saved":true,"readBack":true,"updated":
 + Windows SDK/MSIX 工具链）与那台的快照对齐。这一步本轮没做，所以这一格**留空**，
 不拿"dotnet 在位"去冒充"Windows 端验收过"。
 
+工具链现状（本轮探过，省得下一轮再摸一遍）：
+
+| 项 | 读数 |
+|---|---|
+| `dotnet` | `10.0.401`（`C:\Program Files\dotnet\sdk`） |
+| `dotnet workload list` | **空**（没有任何 workload 已安装） |
+| Windows SDK | `C:\Program Files (x86)\Windows Kits\10\bin` 下有 10.0.14393 / 15063 / 16299 / 17134 / 22621 / **26100** |
+| MSIX 打包器 | `…\10.0.22621.0\x64\makeappx.exe` 在位 |
+
+⇒ 打包器与 SDK 都不缺，缺的是**源码对齐**与"装上去之后的那张图"。
+下一轮的最小可验路径：用 `git archive` 把 `apps/desktop-windows` 与它的依赖推到那台
+（与鸿蒙那两条脚本同一手法，避开"那台不是 origin 克隆"的坑），再 `dotnet build` + `makeappx`。
+
 ### 16.3 复跑命令（逐端）
 
 ```bash
