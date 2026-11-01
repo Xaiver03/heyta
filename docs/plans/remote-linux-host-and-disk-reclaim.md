@@ -235,3 +235,42 @@ CI 级的 `-r build` / `-r typecheck` / 单测 / `check:linux-shell` / Playwrigh
 这个形状是**缺共享 e2e 载体/夹具**，不是产品真有 200 处缺陷。
 🔴 **但其中有一条有效读数**：本线自己那份 `account-email-change-and-sessions.spec.ts` 是 **7 通过 / 0 失败** ——
 同期别的 spec 在大面积红 ⇒ 本线这一段在真浏览器上是好的。
+
+---
+
+## 5. 2026-11-01 更新：Web 构建正式搬上 `linux-dev`；本机再回收一轮
+
+### 5.1 先纠正本文 §2/§3 的过时结论
+
+本文 10-11 写"Android 构建在 Windows 打包机、不该搬去 Linux"。
+**10-28 产品负责人已改判并把安卓整体迁到 `linux-dev`**（`scripts/run-gradle.mjs` 现在默认
+`HEYTA_ANDROID_HOST=linux-dev` / `HEYTA_ANDROID_REMOTE_ROOT=/home/xaiver/heyta-android-build`）。
+所以 §3 那条"别迁"的论证**已作废**，请以 `run-gradle.mjs` 的现行默认值为准。
+
+### 5.2 Web / 共享包的构建：`pnpm build:web:remote`
+
+新增 [`scripts/remote-web-build.mjs`](../../scripts/remote-web-build.mjs)：rsync 源码到
+`linux-dev:/home/xaiver/heyta-web-build` → 远端 `pnpm install` + `pnpm -r build` + web 打包 →
+**产物留在远端**；只有需要本机产物时才 `--pull`（打 macOS .app 那一步）。
+
+🔴 与 `run-gradle.mjs` 同一条纪律：**远端连不上就响亮失败并点名哪一步，不静默回落本机**
+（唯一逃生门是显式 `HEYTA_REMOTE_FALLBACK_LOCAL=1`，且会把"本机执行"印出来）。
+
+首次实测（2026-11-01 20:0x）：`✅ 远端构建完成（linux-dev:/home/xaiver/heyta-web-build）`，
+产物 6.0 MB，`sha256sum apps/web/dist/index.html` 在远端读得到。
+
+### 5.3 本轮本机回收（现量读数）
+
+| 动作 | 依据 |
+|---|---|
+| 卸载 `/Users/rocalight/Library/Developer/CoreDevice/DeviceFS` 的**残留 devicefs 挂载** | 它是只读挂载投映，`rm` 报 `Operation not permitted`；`umount` 之后该路径归零 |
+| 删 `~/Library/Developer/Xcode/DerivedData` | Xcode 可重生成 |
+| 删 `~/Library/Developer/CoreSimulator/Devices` 里**heyta 自己的** 9 台模拟器 | `xcrun simctl delete`；`ssos-*` / `Litopia-*` 属别的项目，**没动** |
+| 删 `~/.gradle/{caches,daemon,wrapper}` | 安卓构建已迁远端 |
+| `brew cleanup -s` | 约 427 MB |
+| 删仓库内 `apps/mobile/android/app/build`、`apps/desktop-macos/.build`、`tmp/` | 均可重生成 |
+
+**可用空间 88 GiB → 101 GiB**（`df` 前后各取一次）。
+
+⚠️ 仍**没**动的（各自有主）：`.worktrees/`（并行会话）、
+`~/Library/Caches/ms-playwright`（`check:ai-e2e` 要用）、`node_modules`（本地脚本还要跑）。

@@ -256,7 +256,10 @@
     "verify:downloads-servable": "node scripts/verify-downloads-servable.mjs --self-test && node scripts/verify-downloads-servable.mjs",
     "verify:artifact-facts": "node scripts/verify-artifact-facts.mjs --self-test && node scripts/verify-artifact-facts.mjs",
     "verify:android-signing-identity": "node scripts/verify-android-signing-identity.mjs --self-test && node scripts/verify-android-signing-identity.mjs",
-    "verify:downloads-page-state": "node scripts/verify-downloads-page-state.mjs --self-test && node scripts/verify-downloads-page-state.mjs"
+    "verify:downloads-page-state": "node scripts/verify-downloads-page-state.mjs --self-test && node scripts/verify-downloads-page-state.mjs",
+    "build:web:remote": "node scripts/remote-web-build.mjs",
+    "build:web:remote:pull": "node scripts/remote-web-build.mjs --pull",
+    "remote:typecheck": "node scripts/remote-web-build.mjs --run \"pnpm typecheck\""
   },
   "devDependencies": {
     "@heyta/shared-schema": "workspace:*",
