@@ -109,6 +109,51 @@ describe('明文模式的写侧（ADR-0080 S4）', () => {
 });
 
 describe('明文模式的读侧（ADR-0080 S4）', () => {
+  /*
+   * 🔴 **正例**：明文行照原文读回来，且 `payload` 已经被解析成**对象**。
+   *
+   * 这条以前只有反例（"读到密文行 ⇒ 报错"）。只有反例的话，
+   * "明文行被悄悄丢掉"与"明文行交出去时还是原始 JSON 字符串"这两种缺陷**都能全绿通过** ——
+   * 而下游（op-log）拿到的 `payload` 在密文那条路上是**对象**。两条路的形状必须一致，
+   * 否则明文账号读到的东西与加密账号读到的东西是两种类型，而没有任何一层会报错。
+   */
+  it('明文行照原文读回来，且 payload 已解析成对象（与密文那条同一个形状）', async () => {
+    const { client, applied } = makePlainClient(() =>
+      okJson({
+        ops: [{
+          serverSeq: 1,
+          receivedAt: Date.now(),
+          op: {
+            id: 'remote-plain-1',
+            clientId: 'device-b',
+            actionType: 'CREATE_TASK',
+            opType: 'CRT',
+            entityType: 'TASK',
+            entityId: 't1',
+            payload: JSON.stringify({ title: '买牛奶' }),
+            isPayloadEncrypted: false,
+            vectorClock: { 'device-b': 1 },
+            timestamp: 1,
+            schemaVersion: 1,
+          },
+        }],
+        hasMore: false,
+        latestSeq: 1,
+        serverTime: Date.now(),
+      }),
+    );
+
+    const status = await client.sync();
+
+    expect(status.kind === 'error' ? status.reason : 'ok').toBe('ok');
+    // `applyRemote` 收的是**一批** op：`applied` 的每一项是一个批次，不是一条 op。
+    expect(applied, '明文行一条都不许丢').toHaveLength(1);
+    expect(applied[0], '这一批里就该有一条').toHaveLength(1);
+    expect(applied[0]![0]!.payload, 'payload 必须是对象，不是原始 JSON 字符串')
+      .toEqual({ title: '买牛奶' });
+  });
+
+
   it('读到密文行 ⇒ 明确报错，且不把它交给 op-log（不静默跳过）', async () => {
     const { client, applied, uploads } = makePlainClient(() =>
       okJson({

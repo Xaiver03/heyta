@@ -720,7 +720,9 @@ describe('同步客户端 — 上传与游标', () => {
               opType: 'CRT',
               entityType: 'TASK',
               entityId: 'e1',
-              payload: 'x',
+              // 明文账号的线上 payload 是 **JSON 文本**（上传那一侧 JSON.stringify 出来的）。
+              // 裸 'x' 不是合法 JSON —— 本用例验的是**游标**，不该顺带造一份违反线协议的夹具。
+              payload: '"x"',
               vectorClock: { other: 1 },
               timestamp: 1,
               schemaVersion: 1,

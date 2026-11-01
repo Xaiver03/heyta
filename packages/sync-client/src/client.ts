@@ -747,6 +747,23 @@ async function decodeServerOp(
     }
     const plain = await writeMode.cipher.decrypt(op.payload, op);
     payload = JSON.parse(plain) as unknown;
+  } else if (typeof op.payload === 'string') {
+    /*
+     * 🔴 明文账号：服务端存的是**上传那一侧 `JSON.stringify` 出来的文本**
+     * （见 `isPayloadEncrypted: false` 那条写路径），所以读回来必须解析成对象。
+     *
+     * 不解析的后果不是"报错"，是**静默的形状不一致**：密文那条交给 op-log 的是对象，
+     * 明文这条交给它的是原始字符串。下游按对象读字段 ⇒ 读不到；而这中间没有任何一层会响。
+     * 2026-11-02 由 `plain-payload-mode.spec.ts` 的正例抓出来（此前只有反例）。
+     *
+     * 解析失败就**明确报错**：服务端说这是明文，却不是合法 JSON ⇒ 数据可能损坏，
+     * 不能靠"当字符串用"糊过去。
+     */
+    try {
+      payload = JSON.parse(op.payload) as unknown;
+    } catch {
+      throw new Error(`op ${op.id} 标记为明文，但 payload 不是合法 JSON —— 服务端数据可能损坏`);
+    }
   }
 
   return {
