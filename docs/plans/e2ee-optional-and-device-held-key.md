@@ -673,3 +673,32 @@ spec 随后重新登录拿 `signedIn.token` 再建 C；C 的 `refreshFromRemote`
 （401/时序），会话就停在 `payloadKeyVersion === undefined`，面板于是显示 legacy 口令框。
 **待验**：C 那次 `GET /api/sync/key-package` 的实际状态码。这一条属于 e2e 流程的令牌编排，
 不是 ADR-0080/0081 的迁移协议。
+
+### 12.7 修掉一个**我引入的回归**：根轮换被整个挡死
+
+用"非 2xx 就打印 + 打印响应体"的探针定位到：
+
+```
+409 POST /api/sync/key-migration  {"code":"wrong_payload_mode"}
+```
+
+那是 **ADR-0080 自己加的那条守卫**写宽了：`currentMode === targetMode ⇒ 拒`。
+而 `e2ee → e2ee` 正是**根轮换**（ADR-0050：换一把根钥匙、全量重加密、模式不变）。
+于是"换根钥匙"这个既有功能对所有账号都坏了。
+
+**为什么没被单测抓到**：`vault-key-migration.service.spec.ts` 只覆盖**单请求**的 `migrate()`；
+轮换走的是 `begin()`。真库集成只覆盖 readable↔e2ee 两个方向。**只有真浏览器 E2E 走 begin。**
+
+修法与判据：只有 `readable → readable`（再一次关掉加密）才拒；`e2ee → e2ee` 放行。
+新增两格判据；变异臂「把守卫改回 `currentMode === targetMode`」⇒ **1 红**。
+
+**真浏览器读数：`pnpm verify:vault-web` 从 8 红降到 4 红 / 4 绿**，
+其中"设备撤销 + 重认证 + 轮换拒绝旧钥匙写入"那条整条通过（6.9 s）。
+
+### 12.8 剩下 4 条的性质（继续说明它们不是加密缺陷）
+
+| 卡在哪 | 性质 |
+|---|---|
+| `ai-egress`：习惯输入框 placeholder 找不到 | 与加密无关的习惯面板漂移 |
+| `vault-journey:457` legacy 历史：上传历史密文 **400** | **正确行为**：新账号默认明文，服务端拒收密文（`PLAINTEXT_REQUIRED`）。这条用例的前提"账号已有口令时代的密文"现在没法从 UI 造出来 —— 它需要一个 TEST_MODE 的"把账号设成 e2ee"测试钩子，属 e2e 夹具补件 |
+| `conflict-dialog` / `three devices` | 待逐条定位（同为尺子老化，未验） |
