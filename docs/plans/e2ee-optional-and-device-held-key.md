@@ -1056,7 +1056,7 @@ VAULT_KEYCHAIN_PROBE={"absentFirst":true,"saved":true,"readBack":true,"updated":
 | **Web** | `apps/web/dist`（`linux-dev` 远端构建后拉回） | `index.html` sha256 前 16 位 `c871796595604f1f`，5.9 MB | ✅ 产物是本轮源码构建的 |
 | **Android** | 模拟器 `127.0.0.1:5556`（Android 16 / `sdk_gphone64_x86_64`） | `verify:android-vault-storage` **5 phase 全 PASS**（含**重启设备**后的持久化）；Debug APK sha256 `a92bc9b7…`、androidTest `dd88b202…` | ✅ **设备腿跑通**（Debug 包；Release 重装仍属待办） |
 | **HarmonyOS** | `windows-pc` 上 `C:\hx-rnjs\proj\harmony\…\entry-default-unsigned.hap` | 21,182,580 B；含 `hermes_bundle.hbc`（魔数 `0x1F1903C103BC1FC6`）+ 三个 `.so`；`build-harmony-rnohjs-windows.mjs` **36/36** | ✅ **包是成品形状**；⚠️ **unsigned** 且无模拟器/真机 ⇒ 装不进去 |
-| **Windows** | `windows-pc` 有 `dotnet`（`C:\Program Files\dotnet\dotnet.exe`）与 `apps\desktop-windows` | 那台的 `C:\src\heyta` 是**旧快照**（tip `bootstrap: source snapshot`），本轮**没有**尝试 MSIX 构建 | ❌ **未验**（见 16.2） |
+| **Windows** | `windows-pc` + `C:\src\heyta`（本轮已用 `git archive` 同步到 HEAD） | **编译 0 警告 0 错误**；`dotnet publish` ⇒ 376 文件 / 265.5 MiB（含 `HeytaWindows.exe`、`native-bridge.js`、`Assets\HeytaTokens.xaml`）；**`makeappx pack` 成功 ⇒ `heyta.msix` 101,461,065 bytes**（内含 60 份 web-dist，`index.html` 7666 B 与 HEAD 产物 sha 前 16 位 `C871796595604F1F` 一致） | ⚠️ **包能打，签不了也装不了**：自签私钥在 ssh 会话里 `NTE_PERM`（见 16.2） |
 
 ### 16.2 Windows 那一格为什么没做
 
@@ -1067,6 +1067,25 @@ VAULT_KEYCHAIN_PROBE={"absentFirst":true,"saved":true,"readBack":true,"updated":
 要真验，需要先解决**同步**：`apps/desktop-windows` 的构建输入（`HeytaWindows` + `Heyta.Windows.Core`
 + Windows SDK/MSIX 工具链）与那台的快照对齐。这一步本轮没做，所以这一格**留空**，
 不拿"dotnet 在位"去冒充"Windows 端验收过"。
+
+**本轮推进到哪（2026-11-02，第 36 轮）**：把源码同步过去之后一路走到"包打出来了"。
+
+| 步 | 结果 | 读数 |
+|---|---|---|
+| 同步 | ✅ | `git archive HEAD apps/desktop-windows packages/app-host`（排除 `evidence`）+ `scp` 那份 `native-bridge.js`（**未入库的构建产物**）+ `tar` 推 `apps/web/dist` |
+| 清伴生文件 | ✅ | 删掉 **429 个** `._*`（AppleDouble）—— 不清就 `CS2015`，见 [traps §7 #628](../reference/environment-traps.md) |
+| `dotnet build` | ✅ | **0 警告 0 错误**，出 `Heyta.Windows.Core.dll` + `HeytaWindows.dll` |
+| `dotnet publish` | ✅ | 376 文件 / 265.5 MiB，含 `HeytaWindows.exe`（308,736 B）、`native-bridge.js`、`Assets\HeytaTokens.xaml` |
+| `makeappx pack` | ✅ | **`heyta.msix` = 101,461,065 bytes**；那一步的 manifest Publisher = `CN=heyta local build` |
+| `New-SelfSignedCertificate` | ❌ | `CertEnroll::CX509Enrollment::_CreateRequest: 0x80090010 NTE_PERM` —— **只有私钥那一步不行**（`.cer` 导入 `TrustedPeople` 是成功的，且会话确实 elevated=True） |
+| openssl 兜底 | ❌ | Git for Windows 的 openssl 3.5 **没有 legacy provider**（`-legacy` 导 PKCS#12 报 `provider_init:reason(37)`）；现代 PKCS#12 导出来了，但 `Import-PfxCertificate` 同样拿不到私钥容器、signtool `/f` 报 "No certificates were found" |
+| 安装 + 截图 | ❌ | 未签名 ⇒ 装不进；脚本第 7 步 `RESULT=INSTALL_FAILED` |
+
+**解除条件（唯一一条）**：在那台机的**交互式会话**（RDP / 控制台）里跑
+`apps\desktop-windows\scripts\package-msix.ps1`。ssh 会话没有完整的用户加密上下文，
+所以"生成/导入私钥"这一步无论是不是管理员都会失败（[traps §7 #629](../reference/environment-traps.md)）。
+
+⚠️ **不跳签名**：未签名的 MSIX 装不进 Windows，跳过它等于把"没验"写成"验过"。
 
 工具链现状（本轮探过，省得下一轮再摸一遍）：
 
