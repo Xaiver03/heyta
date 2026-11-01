@@ -41,6 +41,7 @@ import {
 } from './sync.routes.payload';
 import { uploadOpsHandler } from './sync.routes.ops-handler';
 import { getWsConnectionService } from './services/websocket-connection.service';
+import { readPayloadModeFromDb } from './services/payload-mode.service';
 import {
   VaultKeyMigrationError,
   vaultKeyMigrationService,
@@ -357,6 +358,25 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         Logger.error(`Get devices error: ${errorMessage(err)}`);
         return reply.status(500).send({ code: 'internal_server_error', message: 'Internal server error' });
       }
+    },
+  );
+
+  // GET /api/sync/payload-mode - ADR-0080：这个账号的载荷模式。
+  //
+  // 为什么它必须是独立端点：readable 模式下 key package 会被删掉，
+  // 于是 `GET /sync/key-package` 只会回 404 —— 而客户端**必须**能区分
+  // "这个账号还没建过包"与"这个账号关掉了加密"。两者要写的载荷形状相反。
+  fastify.get(
+    '/payload-mode',
+    {
+      config: {
+        rateLimit: routeRateLimit(60, '1 minute'),
+      },
+    },
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      const userId = getAuthUser(req).userId;
+      const mode = await readPayloadModeFromDb(userId);
+      return reply.send({ mode });
     },
   );
 

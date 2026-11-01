@@ -1,5 +1,16 @@
 import { z } from 'zod';
+import { SYNC_PAYLOAD_MODES } from './sync-mode-contract';
 import { vaultKeyPackageSchema } from './vault-key-contract';
+
+/**
+ * ADR-0080：迁移的**目标**载荷模式。缺省 `e2ee` = 今天唯一存在过的行为
+ * （改口令包装 / 轮换 root 时全量重新加密）。
+ *
+ * `readable` 是"关掉端到端加密"那一趟：历史也要解密重传，所以它同样是一次
+ * 全量迁移，只是**没有新密钥包、没有目标载荷世代** —— 这两个字段在那一档必须缺席，
+ * 由下面的 superRefine 与数据库 CHECK 双重把关。
+ */
+const migrationTargetModeSchema = z.enum(SYNC_PAYLOAD_MODES).default('e2ee');
 
 /**
  * The server cannot decrypt an E2EE operation.  A migration therefore carries
@@ -47,14 +58,32 @@ export const vaultKeyMigrationRequestSchema = z.object({
  */
 export const vaultKeyMigrationManifestSchema = z.object({
   requestId: vaultKeyMigrationRequestIdSchema,
+  targetMode: migrationTargetModeSchema,
   expectedKeyVersion: safeNonNegativeInteger,
   expectedLatestSeq: safeNonNegativeInteger,
-  targetPayloadKeyVersion: safePositiveInteger,
-  package: vaultKeyPackageSchema,
+  /** 目标载荷世代：只有 `e2ee` 目标才有。 */
+  targetPayloadKeyVersion: safePositiveInteger.optional(),
+  package: vaultKeyPackageSchema.optional(),
   expectedOperationCount: safeNonNegativeInteger.max(5_000_000),
   /** Sum of UTF-8 JSON bytes of replacement payloads. */
   expectedPayloadBytes: safeNonNegativeInteger.max(50 * 1024 * 1024 * 1024),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.targetMode === 'readable') {
+    if (value.package !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['package'], message: 'turning encryption off must not carry a new key package' });
+    }
+    if (value.targetPayloadKeyVersion !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['targetPayloadKeyVersion'], message: 'turning encryption off has no target payload generation' });
+    }
+    return;
+  }
+  if (value.package === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['package'], message: 'an e2ee migration must carry the next key package' });
+  }
+  if (value.targetPayloadKeyVersion === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['targetPayloadKeyVersion'], message: 'an e2ee migration must name its target payload generation' });
+  }
+});
 
 const vaultKeyMigrationChunkIdSchema = z
   .string()
@@ -86,8 +115,11 @@ export const vaultKeyMigrationCancelSchema = z.object({
 export const vaultKeyMigrationStageResponseSchema = z.object({
   requestId: vaultKeyMigrationRequestIdSchema,
   state: z.enum(['STAGING', 'PUBLISHED', 'CANCELLED', 'EXPIRED']),
-  keyVersion: safePositiveInteger,
-  payloadKeyVersion: safePositiveInteger,
+  // 缺省 e2ee：老服务端不会发这个字段，而它们的迁移**只可能是** e2ee 那一种。
+  targetMode: z.enum(SYNC_PAYLOAD_MODES).default('e2ee'),
+  /** `null` = 目标是明文，这一趟没有新的包装版本 / 载荷世代。 */
+  keyVersion: safePositiveInteger.nullable(),
+  payloadKeyVersion: safePositiveInteger.nullable(),
   expectedLatestSeq: safeNonNegativeInteger,
   expectedOperationCount: safeNonNegativeInteger,
   uploadedOperationCount: safeNonNegativeInteger,

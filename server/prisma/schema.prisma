@@ -295,6 +295,10 @@ model UserSyncState {
   latestFullStateSeq         Int?    @map("latest_full_state_seq")
   latestFullStateVectorClock Json?   @map("latest_full_state_vector_clock")
   latestStateReplacementSeq  Int?    @map("latest_state_replacement_seq")
+  /// ADR-0080：账号级载荷模式。'e2ee'（默认）= 入口只收密文；'readable' = 只收明文。
+  /// 🔴 它必须在 user_sync_state 上，不能挂在 vault_key_packages 上 —— readable 模式下
+  /// 我们要删掉那一行，模式不能住在被删的对象上。CHECK 只允许这两个值。
+  payloadMode                String  @default("e2ee") @map("payload_mode")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -724,10 +728,15 @@ model VaultKeyMigration {
   requestId               String  @map("request_id")
   requestFingerprint      String  @map("request_fingerprint")
   state                   String  @default("STAGING")
+  /// ADR-0080：这次迁移的**目标**载荷模式。
+  /// 'e2ee'     = 全量重新加密（从 readable 打开）；
+  /// 'readable' = 全量解密重传（关掉加密）。后者的三个密钥列必须为空，
+  /// 由数据库 CHECK 配对，别在代码里靠约定。
+  targetMode              String  @default("e2ee") @map("target_mode")
   expectedKeyVersion      Int     @map("expected_key_version")
   expectedLatestSeq       Int     @map("expected_latest_seq")
-  targetPayloadKeyVersion Int     @map("target_payload_key_version")
-  keyVersion              Int     @map("key_version")
+  targetPayloadKeyVersion Int?    @map("target_payload_key_version")
+  keyVersion              Int?    @map("key_version")
   latestSeq               Int     @map("latest_seq")
   expectedOperationCount  Int     @default(0) @map("expected_operation_count")
   expectedPayloadBytes    BigInt  @default(0) @map("expected_payload_bytes")
@@ -737,7 +746,7 @@ model VaultKeyMigration {
   migratedOperationCount  Int     @default(0) @map("migrated_operation_count")
   expiresAt               BigInt  @map("expires_at")
   cancelledAt             BigInt? @map("cancelled_at")
-  packageData             Json    @map("package_data")
+  packageData             Json?   @map("package_data")
   createdAt               BigInt  @map("created_at")
 
   user             User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1501,56 +1510,39 @@ model UserConsent {
   @@map("user_consents")
 }
 
-/// 账号头像（R10，2026-10-02 产品负责人裁决）。**一行一个人**，主键就是 `user_id`。
+/// 账号头像（R10）。**一行一个人**，主键就是 `user_id`。
 ///
-/// ## 🔴 存的是**密文**，而且这一条不是"更安全一点"，是自家对外文本的依据问题
+/// ## 🔴 基础资料是**明文**，不进端到端加密（ADR-0079，2026-11-01 绝对决策）
 ///
-/// `packages/legal/src/documents/personal-info-list.ts` 的**表 E「敏感个人信息」**
-/// 逐项对照《个人信息保护法》第二十八条，"生物识别"那一行写的是 **❌ 不收集**，
-/// 而它给的理由是**结构性**的：「没有任何生物特征模板**离开你的设备**」。
-/// 一张明文人脸照片一旦进库，那句话说的是**这个字段/这条通道不存在**，
-/// 于是那一行的依据当场失效 —— 不是"变弱"，是**变成假的**。
-///（同族裁决见 ADR-0025；调研与逐行对照在
-/// `docs/research/countdown-anniversary-data-and-images.md` §4。）
+/// 头像与昵称的用途是"在界面上认出这个账号"，不是用户的实质内容。产品负责人
+/// 2026-11-01 的原话：「谁会把头像当成隐私？……只有涉及绝对隐私、比如财务数据
+/// 这种实质性内容时，才允许适用这种加密。我们都允许自托管了，真的想要隐私
+/// 完全可以自托管。」⇒ 服务端保存图片字节本身，`content_type` 也是普通列。
 ///
-/// 表 E 末尾还有一句反过来读才是要害的话：
-/// 「这个结论建立在**我们不判断内容**这个前提上，不是建立在**我们看不到内容**上」。
-/// 一旦某条通道让我们**看得到**（明文图片），"我们不判断内容"就不再是理由了。
+/// 端到端加密只覆盖**实质内容**：任务、便签、清单这类正文（以及未来的财务/账目）。
+/// 头像不该要求 E2EE 口令或 vault 解锁 —— 那会让"改个头像"变成一次密码学操作，
+/// 是纯粹加到用户身上的负担。
 ///
-/// ⚠️ 也**不能**用"自托管的人自己承担代价"把它做成明文：隐私政策是我们写的，
-/// 自托管部署者读的是**同一份**，"不收集生物识别"不能因为部署形态不同就变成假的。
-/// 承担代价说的是**存储与带宽**，不是**改变对外承诺的事实**。
+/// ## 边界：明文 ≠ 公开
 ///
-/// ## 为什么这一条不新增任何前提
+/// `GET /api/account/avatar` 仍然要 Bearer，只回**本人**那一行；今天没有协作，
+/// 也没有"按 userId/email 查别人资料"的端点。将来若开放"别人能看到头像"，
+/// 那是**另一次独立的产品决定**，不许顺手加。
 ///
-/// 密文用的是**同步通道那把口令**（`sync-core` 的 `encrypt`）。而
-/// `sync-client/src/client.ts:703-709` 已经写明：**没有口令根本同步不了**
-///（`reason: 'no-encryption-password'`）。⇒ 头像要跨设备，前提本来就是"能同步"，
-/// 而"能同步"蕴含"有口令"。**加密不引入任何一个明文方案没有的条件。**
+/// ## `hash` 是什么
 ///
-/// ## 密文是 base64 字符串 ⇒ 不需要上传通道
-///
-/// 载荷走 JSON body，与 op 上传**完全同形**，所以服务端不需要 multipart、
-/// 不需要自定义 content type parser、不引入任何新依赖（AGENTS §3.1/§3.2 两道门）。
-/// 也正因为服务端解不开，它**不知道**这张图是什么格式 ——
-/// 所以这里**没有 `content_type` 列**：格式和字节一起进密文，由客户端读回来。
-///
-/// ## 🔴 `hash` 泄露什么，说清楚
-///
-/// 它是**密文**的 SHA-256，用作缓存失效键（换图即换 URL，抄 Discord 那个形状）。
-/// 同一张图重复上传会得到相同 hash ⇒ 严格说它泄露"两次内容相等"。
-/// 今天这条信息只对**本人**可见（无协作、无公开端点），而本人已经知道自己的图，
-/// 所以不构成泄露面。⚠️ **将来若开放"别人能看到头像"，这一列要重新评估** ——
-/// 那是一次独立决定（同 §8.6 那条边界），不许顺手加。
+/// 它是**图片字节**的 SHA-256，用作缓存失效键（换图即换 hash）。
+/// 同一张图重复上传会得到相同 hash ⇒ 严格说它泄露"两次内容相等"；今天只对本人可见。
 model UserAvatar {
   userId Int @id @map("user_id")
 
-  /// 密文字节（`encrypt()` 产出的 base64 解码后的 BYTEA —— 存解码形态省 33% 体积，
-  /// 线上传输仍是 base64 字符串）。里面是 `{contentType, dataBase64}` 的 JSON，
-  /// 所以**图片格式本身也在密文里**。
-  cipher Bytes
+  /// 图片字节本身（base64 解码后的 BYTEA —— 存解码形态省 33% 体积，线上仍是 base64）。
+  data Bytes
 
-  /// `cipher` 的 SHA-256（hex）。用途见上面那段。
+  /// 图片 MIME（白名单见 `packages/shared-schema` 的 `ACCOUNT_AVATAR_CONTENT_TYPES`）。
+  contentType String @map("content_type")
+
+  /// `data` 的 SHA-256（hex）。用途见上面那段。
   hash String
 
   /// 上传时刻（epoch ms）。

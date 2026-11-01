@@ -29,8 +29,11 @@ import {
   MAX_OPS_PER_BATCH,
   sendCompressedBodyParseFailure,
   sendE2eeRequiredReply,
-  violatesE2eeGate,
+  sendPlaintextRequiredReply,
+  payloadGateViolation,
+  type PayloadGateViolation,
 } from './sync.routes.payload';
+import { readPayloadModeFromDb } from './services/payload-mode.service';
 import {
   computeOpsStorageBytesExcludingUnstorableIds,
   enforceStorageQuota,
@@ -132,12 +135,24 @@ export const uploadOpsHandler = async (
       });
     }
 
-    // Encrypted-only ingress gate: every op must be flagged encrypted and
-    // carry the ciphertext transport shape. Reject the whole batch AFTER the
-    // rate limit (floods stay cheap) but BEFORE fingerprinting, dedup, quota
-    // work, and persistence, so a rejected upload leaves no server-side trace.
-    if (ops.some(violatesE2eeGate)) {
+    // 载荷形状闸门（ADR-0080）：账号模式决定该收密文还是明文，**两个方向都拒错配**。
+    // 拒绝整批 AFTER 限流（洪水仍然便宜）但 BEFORE 指纹、去重、配额与落库，
+    // 所以被拒的上传在服务端不留任何痕迹。
+    const payloadMode = await readPayloadModeFromDb(userId);
+    let gateViolation: PayloadGateViolation | null = null;
+    for (const op of ops) {
+      gateViolation = payloadGateViolation(payloadMode, op as unknown as { isPayloadEncrypted?: boolean; payload: unknown });
+      if (gateViolation) break;
+    }
+    if (gateViolation === 'need-e2ee') {
       return sendE2eeRequiredReply(reply, userId, {
+        clientId,
+        surface: 'ops',
+        opsCount: ops.length,
+      });
+    }
+    if (gateViolation === 'need-plaintext') {
+      return sendPlaintextRequiredReply(reply, userId, {
         clientId,
         surface: 'ops',
         opsCount: ops.length,
