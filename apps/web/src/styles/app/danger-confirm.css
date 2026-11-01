@@ -15,7 +15,7 @@
  * 全部取值走 token：裸 hex/px/ms/z-index 会被 `check:design` 与 `check:l4` 拦。
  */
 
-.ht-danger-confirm__overlay {
+.ht-sheet-danger__overlay {
   position: fixed;
   inset: 0;
   display: flex;
@@ -26,7 +26,7 @@
   z-index: var(--ht-z-modal);
 }
 
-.ht-danger-confirm__dialog {
+.ht-sheet-danger__dialog {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-5);
@@ -39,7 +39,7 @@
   color: var(--ht-color-foreground);
 }
 
-.ht-danger-confirm__actions {
+.ht-sheet-danger__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
