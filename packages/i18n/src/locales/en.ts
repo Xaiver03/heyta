@@ -121,7 +121,7 @@ export const en = {
   'common.privacy.consent.title': 'Before any network feature runs',
   'common.privacy.consent.intro': 'heyta is local-first: your tasks, lists, notes and history are written to this device first. This choice decides one thing only - whether this device may talk to a server.',
   'common.privacy.consent.localOnlyGuarantee': 'With "This device only", everything still works: creating, editing, calendar, quadrants, focus timer, habits and export. Nothing is synced, no account is used, and no server push notifications are received. Local reminders on mobile remain available after you grant system notification permission.',
-  'common.privacy.consent.acceptedGuarantee': 'Allow networking to sign in to heyta and sync across devices. Task data is end-to-end encrypted before upload; the server cannot read your tasks.',
+  'common.privacy.consent.acceptedGuarantee': 'Allow networking to sign in to heyta and sync across devices. Task data is uploaded as plaintext by default, which is also what lets us help you recover it; you can turn on end-to-end encryption in settings, and from then on the server only handles ciphertext.',
   'common.privacy.consent.termsLink': 'Terms of Service',
   'common.privacy.consent.privacyLink': 'Privacy Policy',
   'common.privacy.consent.readFirst': 'Read the full text before deciding:',

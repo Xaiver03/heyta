@@ -740,3 +740,18 @@ spec 随后重新登录拿 `signedIn.token` 再建 C；C 的 `refreshFromRemote`
 `check:integration-coverage`、`check:row-single-source`（`.ht-danger` 已收进 `ht-sheet` 族）、
 `check:settings-no-prose`（0 处）、`check:legal-*` 五道、`check:ui-language`、
 `check:e2e-specs-parse`、`check:docs` / `check:doc-citations` / `check:adr-numbering`。
+
+### 12.11 真机/模拟器截图抓到的最后一处自相矛盾（已修）
+
+Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 release APK、证书 `CN=heyta`），
+首屏就暴露一处我漏掉的文案：隐私同意页仍写"任务数据经端到端加密后才上传，服务器看不到任务明文"，
+而 ADR-0081 之后默认是明文。
+
+🔴 **这一类只有"真跑起来看第一屏"才抓得到**：`check:ui-language` 扫的是字面量与用词规范，
+判不了"这句话与新决策互相打脸"。
+
+同批修掉 6 处无条件断言（欢迎页 tagline、PWA 描述、AI 披露引导句、两处明文连接的传输提示、
+下载页 SEO 描述）与 3 处文档页措辞（把"载荷是密文"限定为"用户开启加密之后"）。
+
+证据：`apps/mobile/evidence/android-install-20261101/`
+—— `02-first-run-fixed.png`（新文案）、`04-welcome-after-fix.png`、`05-main.png`（进到主界面）。
