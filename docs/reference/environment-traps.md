@@ -12391,3 +12391,41 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ② "没有值"在 Swift↔JS 之间**必须显式**：要 `null` 就回 `NSNull()`，Swift 的 `nil` 等于 JS 的 `undefined`；
     ③ 页侧判断空值要**同时认 `null` 与 `undefined`** —— 认漏了的表现是"读出一枚不存在的钥匙"，
     那是方向性最坏的错（比"读不到"坏得多，因为读不到会退回要口令，读出假的会去解一个错的历史）。
+
+628. 🔴 **macOS 的 `._*` 伴生文件会让 C# 编译直接红：`CS2015 是二进制文件而非文本文件`**（2026-11-02，`windows-pc` 上编 WinUI 壳）：
+
+    从这台 Mac 推源码过去之后，`dotnet build` 报 8 条 `CS2015`，点名的全是
+    `._AppApi.cs`、`._SqliteBridge.cs`、`._WindowsDataPaths.cs` 这种**前缀 `._`** 的文件。
+
+    它们是 AppleDouble 伴生文件（资源分支），**不是源码**。`git archive` 打出来的包里没有，
+    但只要那台机上有过一次"用 `tar -czf -` 直接打工作树"的同步，就会留下 429 个。
+    `dotnet` 会把目标目录里的 `*.cs` 全收进来 ⇒ 逐个判"二进制" ⇒ 编译红，
+    而错误信息里没有一个字提到 AppleDouble。
+
+    **规矩**：① 往 Windows 推源码**只用 `git archive`**（只含已跟踪文件、无伴生文件）；
+    ② 已经脏了的目录，编译前先清：
+    `Get-ChildItem <dir> -Recurse -Force -Filter '._*' | Remove-Item -Force`；
+    ③ `CS2015` 点名的文件名带 `._` 前缀时，先怀疑是伴生文件，不要去看那个 `.cs` 本身。
+
+629. 🔴 **ssh 会话里创建/导入带私钥的证书会 `0x80090010 NTE_PERM` —— 与"是不是管理员"无关**（2026-11-02，MSIX 自签）：
+
+    打包脚本第 5 步 `New-SelfSignedCertificate` 失败，第 6 步打印的
+    `packager session elevated = True` 却是真的（`IsInRole(Administrator)` 为真，
+    往 `LocalMachine\TrustedPeople` 导 `.cer` 也成功）。真正的错是这个：
+
+    ```
+    CertEnroll::CX509Enrollment::_CreateRequest: 拒绝访问。 0x80090010 (-2146893808 NTE_PERM)
+    ```
+
+    **只有私钥那一步不行**：`New-SelfSignedCertificate`（生成密钥）与
+    `Import-PfxCertificate`（导入私钥）都拿不到 CNG 密钥容器 ——
+    走 ssh 得到的登录会话没有完整的用户加密上下文。
+    用 openssl 生成 PEM 也一样救不了：Git for Windows 的 openssl 3.5 **没有 legacy provider**，
+    `-legacy` 导出的 PKCS#12 要加载 `legacy` provider，报 `provider_init:reason(37)`。
+
+    分清两件事：**"证书"能进店（公钥，成功）≠"私钥"能用（失败）**。
+    所以 MSIX 那一步的判据是 `signtool sign` 的退出码，不是 `cert imported = True`。
+
+    **解除条件**：在那台机的**交互式会话**（RDP / 控制台）里跑打包脚本，或预先在一台
+    交互式登录过的机器上把 `.pfx` 备好再拷过去。**不要**为了让它变绿去跳过签名 ——
+    未签名的 MSIX 装不进 Windows，那等于把"没验"写成"验过"。
