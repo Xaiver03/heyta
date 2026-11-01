@@ -23,6 +23,41 @@ describe('web vault session loading', () => {
     setArgon2ParamsForTesting({ parallelism: 1, memorySize: 8, iterations: 1 });
   });
 
+  /*
+   * 🔴 S5 的 macOS 那一格（ADR-0080 §5.4 / §5.5）：**壳的钥匙串优先于 `sessionStorage`**。
+   *
+   * 顺序反了不会报错 —— 只会在壳里表现为"关掉 App 就要重新输口令"：
+   * 冷启动时 `sessionStorage` 是空的，先读它就拿不到任何东西，钥匙串那份永远轮不到。
+   * 所以这里同时钉两件事：**问了钥匙串**，且**没去读 sessionStorage 那一格**。
+   */
+  it('放进壳的钥匙串里 ⇒ 先问它，且不读 sessionStorage（冷启动免输靠的就是这个顺序）', async () => {
+    const account = `${ACCOUNT_PREFIX}-keychain`;
+    const root = 'WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo=';
+    const load = vi.fn(async () => root);
+    (globalThis as { heytaVaultKeychain?: unknown }).heytaVaultKeychain = {
+      load,
+      save: vi.fn(async () => true),
+      clear: vi.fn(async () => true),
+    };
+    const getItem = vi.spyOn(Storage.prototype, 'getItem');
+    const fetchImpl = vi.fn(async () => ({ status: 404, ok: false } as Response));
+    vi.stubGlobal('fetch', fetchImpl);
+    try {
+      await getWebVaultSession(account, SERVER, async () => 'token');
+      expect(load).toHaveBeenCalledWith(SERVER, account);
+      /* 只数"读那一格"的调用：别的 key 与本次判据无关。 */
+      const vaultKeyReads = getItem.mock.calls
+        .map((call) => String(call[0]))
+        .filter((key) => key.startsWith('heyta.vault.root.v1'));
+      expect(vaultKeyReads, '壳里不该再退回去读 sessionStorage 那一格').toHaveLength(0);
+    } finally {
+      delete (globalThis as { heytaVaultKeychain?: unknown }).heytaVaultKeychain;
+      getItem.mockRestore();
+      vi.unstubAllGlobals();
+      invalidateWebVaultSession();
+    }
+  });
+
   it('shares a concurrent same-binding load instead of invalidating the first caller', async () => {
     const fetchImpl = vi.fn(async () => ({ status: 404, ok: false } as Response));
     vi.stubGlobal('fetch', fetchImpl);

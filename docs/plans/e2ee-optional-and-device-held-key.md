@@ -773,7 +773,7 @@ Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 r
 | **S2** 关闭：整库解密重传 | ✅ 收口 | `server/tests/integration/payload-mode-migration.integration.spec.ts`（真 PostgreSQL + 真 HTTP）；`payload-mode-migration.service.spec.ts` 9/9；app-host 侧 `payload-mode-migration.spec.ts` 8/8；变异臂"跳过解不开的 op" ⇒ 1 红 | 无 |
 | **S3** 打开：新 root + 全量加密 | ✅ 收口 | `vault-session.spec.ts` 20/20（含"世代必须从 0 到 1"）；变异臂"世代校验放宽成 `<= 0`" ⇒ 1 红 | 无 |
 | **S4** 客户端模式感知 | ✅ 收口 | `packages/sync-client/tests/plain-payload-mode.spec.ts` 3/3；变异臂"错配降级成普通 Error" ⇒ 1 红；`@heyta/sync-client` 174/174 | 无 |
-| **S5** 钥匙默认设备持有 | ⚠️ **部分** | Web：`vault-root-cache.spec.ts` 6/6（变异臂"换 localStorage" ⇒ 1 红）；移动端：`apps/mobile/src/db/open-host.ts` 已把 `vaultRootKeyStore` 接进宿主、默认值改成 `useState(true)` | 🔴 **三端原生钥匙串都没有**（ADR-0080 §九 附记已承认）：macOS 壳是 WKWebView 载 `web-dist`，接 `security`/Keychain 要先造 Swift↔JS 桥；Windows/Linux 未做。移动端**设备腿未验**（"创建 vault → 冷启动免输"需要当前源码的 Release 包） |
+| **S5** 钥匙默认设备持有 | ⚠️ **部分**（macOS 控制面已补，见 §15） | Web：`vault-root-cache.spec.ts` 6/6（变异臂"换 localStorage" ⇒ 1 红）；移动端宿主已接 `vaultRootKeyStore`、默认 `useState(true)`；**macOS 壳**：`ShellVaultKeychainBridge` + `VaultKeychainStore`（Keychain Services），JS 侧 `vault-root-keychain.ts` 优先于 `sessionStorage`（`vault-session-concurrency.spec.ts` 4/4，变异臂"优先级反过来" ⇒ 1 红）；`check:macos-shell` 新增 4 条 Keychain 往返判据（存/读/更新/删/16 字节被拒），变异臂"去掉长度校验" ⇒ 1 红 | **端到端冷启动读数仍缺**：要在**签名的 .app** 里真启动一次才看得见（本会话没有屏幕录制授权，见 §11）；Windows/Linux 的 DPAPI/libsecret ADR 明确推迟；移动端设备腿仍无设备（§13.8） |
 | **S6** 界面：两个轴 + 危险确认 | ✅ 收口（2026-11-02 **改判**，见 §13.6） | 关闭方向：组件 + 危险确认 + 三条后果逐条数（`encryption-mode-section.spec.tsx` **14/14**，变异臂"删掉不可逆那条" ⇒ 1 红）；**开启方向的两段表单也在**：`enable={{begin: beginReEncryption, confirm: confirmReEncryption}}` 挂在 `VaultSettingsPanel`，判据 3 条（不传 `enable` 就不画、第一段只拿恢复码不迁移、回填后才迁移）+ 真浏览器 `e2e/vault/vault-journey.spec.ts` 的 `enableEncryption()` 走完整流程；钥匙位置轴 4/4；本机无密钥包时不画"创建"入口 2/2 | 无。🔴 上一轮我把它写成"缺开启表单"是**错的**，原因与更正见 §13.6 |
 | **S7** 对外口径 | ✅ 收口（本轮补完） | `check:legal-*` 五道绿；绝对句扫描 0 命中；`check:ui-language` 绿（476 文件 / 823 处文案）；i18n 30/30；landing 1455/1455 | 无。本轮补掉了**四处共享词条**（见 §13.2）——上传前那轮只修了界面与下载页 |
 
@@ -959,3 +959,45 @@ No such file or directory
    + `avdmanager create avd`），再跑同一条命令。
 
 ⚠️ 两条都要先有**远端 gradle 能出 Debug + androidTest 两个 APK**——这一步不依赖设备，本轮没验。
+
+
+---
+
+## 15. S5 的 macOS 控制面补齐（2026-11-02，第 34 轮）
+
+ADR-0080 §十一 记的是"macOS 壳里根本没有这个端口"。这一轮把端口补上了。
+
+### 15.1 三层，各自的边界
+
+| 层 | 文件 | 负责什么 |
+|---|---|---|
+| 存储（**唯一**一份 SecItem） | `apps/desktop-macos/Sources/HeytaShellCore/VaultKeychainStore.swift` | 按 `(serverOrigin, accountId)` 存取一枚 **32 字节**值；`WhenUnlocked`、**不进 iCloud Keychain** |
+| 传输 | `apps/desktop-macos/Sources/HeytaMac/ShellVaultKeychainBridge.swift` | `heytaVaultKeychain` 消息通道 + `atDocumentStart` 注入 shim；**不写第二份 SecItem** |
+| 页侧 | `apps/web/src/lib/vault-root-keychain.ts` + `vault-session.ts` | 钥匙串**优先于** `sessionStorage`；桥不在 ⇒ 行为与以前一个字不差 |
+
+页侧那条**优先级**是整个 S5 的关键：壳里两条腿都在，只有钥匙串活过进程重启。
+反过来先读 `sessionStorage` 不会报错 —— 只是"冷启动免输"永远拿不到。
+
+### 15.2 读数
+
+| 判据 | 结果 | 变异臂 |
+|---|---|---|
+| `apps/web/tests/vault-root-keychain.spec.ts` | **10/10** | 半座桥当有桥 / 去掉 32 字节校验 ⇒ 各有对应用例 |
+| `apps/web/tests/vault-session-concurrency.spec.ts` | **4/4**（新增 1 条：先问钥匙串、**不读** `sessionStorage` 那一格） | 优先级反过来 ⇒ **1 红** |
+| `pnpm check:macos-shell` 新增 4 条 | 存 → 读（32 字节原样）→ 更新 → 删后读不到 → 16 字节被拒，**全绿** | 去掉长度校验 ⇒ **1 红** |
+| `swift build` | 通过；`nm` 能查到 `vaultKeychainBridge` 符号 | — |
+| web 全套 | **2711 passed / 13 skipped**（含修掉一条与本线无关的遍历崩溃，见 §15.4） | — |
+
+### 15.3 还没验的那一格（不许读多）
+
+**端到端"冷启动免输"没验**。它需要：签名后的 `.app` 真启动一次 → 建/开 vault →
+**退出进程** → 再启动 → 界面不再要口令。本会话拿不到屏幕取证（§11 那条外部条件），
+所以这一格留空，**不拿"Keychain 往返通了"去冒充它**。
+
+### 15.4 顺带修掉一条**与本线无关**的红
+
+`apps/web/tests/local-data-destruction.spec.ts` 在 `apps/mobile/ios/Pods/` 上 `ENOENT` 崩了 ——
+`Pods` 里有指向 `ios/build/generated/ios/`（只有跑过 `pod install` 才存在）的符号链接，
+而它的三处 `walk()` 用 `statSync` 追链接。这与 traps §7 #618 是**同一个形状**：
+崩溃发生在遍历上，**一条断言都没判**，但退出码看起来像"判据红了"。
+三处都换成 `lstatSync` + 跳过链接（链接不是产品源码），该 spec 18/18。
