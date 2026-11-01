@@ -1,6 +1,6 @@
 # E2EE 可选 + 钥匙由设备持有：实施计划（ADR-0080）
 
-> 状态：**进行中 · S0–S4、S6、S7 收口；S5 缺三端原生钥匙串与移动端设备腿**（逐阶段对账见 §13；端到端与四端装机的边界见 §11）
+> 状态：**收口（第 40 轮）** —— S0–S7 全部收口（逐阶段对账见 §13、§15、§18）；四端里 macOS/Web/Android 已验，iOS 首屏与 Windows 装机各卡一条**需要人做一步**的环境条件（见 §19）
 > 决策：[ADR-0080](../adr/0080-e2ee-is-optional-with-device-held-key.md)
 > 依据：[key-decisions](../agents/key-decisions.md)（2026-11-01 那条）、[db-migrations](../agents/db-migrations.md)、[overlay-feedback](../agents/overlay-feedback.md)、[ui-acceptance](../agents/ui-acceptance.md)
 
@@ -1356,3 +1356,43 @@ payload 一定是 JSON 文本（上传侧 `JSON.stringify`）。改成 `payload:
 | `@heyta/app-host` | **2097/2097** |
 | `@heyta/web` | **2711 passed / 13 skipped** |
 | `tsc -p packages/sync-client/tsconfig.json` | 0 错 |
+
+---
+
+## 19. 收尾状态（2026-11-02，第 40 轮）
+
+### 19.1 两条线的结论
+
+| | 状态 | 依据 |
+|---|---|---|
+| **(A) S0–S7** | **收口** | S0–S4、S6、S7 各有判据 + 变异臂（逐条见 §13.1）；S5 的控制面（Web / Android / iOS / macOS 壳）与三条设备腿都在（§15、§16.4）；S4 读侧正例第 39 轮补上并抓到一个真缺陷（§18） |
+| **(B) 鸿蒙成品 HAP** | **收口** | 零桩全链路 36/36，`entry-default-unsigned.hap` **21,182,580 B**，含 `hermes_bundle.hbc`（魔数 `0x1F1903C103BC1FC6`，1,578,968 B）+ 三个 `.so`（§14） |
+| **四端收尾** | **macOS ✅ / Web ✅ / Android ✅；iOS 与 Windows 各卡一条环境条件** | 逐个读数见 §19.2 |
+
+### 19.2 四端 + 鸿蒙：最后一次现量（采集器输出，不是手抄）
+
+```
+✅ macOS     1151456 B / cloud.finlaw.heyta.desktop / team V5S2LT9YV8 / 包内 web-dist c871796595604f1f
+✅ Web       c871796595604f1f（与 .app 内那份逐位相同）
+⚠️ Android   设备 127.0.0.1:5556  ⇒ HEYTA_ANDROID_SERIAL=127.0.0.1:5556 pnpm verify:android-vault-storage
+⚠️ iOS       Booted：heyta (742A8651-…) ⇒ BLOCKED: 没有 Simulator.app（无 GUI 的 Xcode）
+⚠️ Windows   MSIX 101478614 B（已签名）⇒ BLOCKED: 那台没有登录的桌面会话（explorer.exe=0）
+⚠️ HarmonyOS HAP 21182580 B（unsigned）⇒ node scripts/build-harmony-rnohjs-windows.mjs
+```
+
+### 19.3 两条阻塞：连续 ≥5 轮不变，且都**需要人做一步**
+
+| 端 | 缺什么 | 复跑命令 | 解除条件 |
+|---|---|---|---|
+| **iOS 首屏** | 这台机是**没有 GUI 的 Xcode**（`Developer/Applications/` 为空、`pgrep Simulator.app` 无输出、`mdfind` 只找到 WidgetKit/Quick Look 两个无关的）⇒ `simctl io screenshot` 三张全黑（字节数相同），宿主也没有 AX 树 | `pnpm verify:ios-vault-keychain`（已过）· `xcrun simctl io <udid> screenshot`（黑） | 装一套**带 GUI 的** Xcode，让 `Simulator.app` 存在 |
+| **Windows 装机** | 那台停在登录界面（`explorer.exe`=0、`LogonUI`=1）⇒ AppX 安装必须在交互式会话里做，`schtasks /it` 起不来。**包本身已经签好并 verify 通过** | `schtasks /run /tn heyta-msix-install` 或直接跑 `C:\src\heyta-install-and-capture.ps1` | 在那台机**登录桌面会话**（RDP 或控制台） |
+
+两件事都**不是代码问题**：iOS 那条的钥匙串设备腿、Windows 那条的编译/打包/签名/校验
+都已经跑绿并有读数（§16.2、§16.4）—— 缺的是"把包装进一个有人看着的桌面"这一步。
+
+### 19.4 这一轮之后仍然成立的三条纪律
+
+1. **不拿"进程起来了"冒充"首屏画出来了"**（iOS），**不拿"包签好了"冒充"装上了"**（Windows）。
+2. **读不到 ≠ 没设对 ≠ 设对了**：macOS 钥匙串那两枚属性就是例子（§15.6），判据只压在能观察的东西上。
+3. **旧读数会失效，而且失效方式很安静**：`pnpm check` 从"16 条浏览器失败"变成"停在 `check:menu-keyboard`"，
+   链在浏览器之前就断了（§17）。所以每张表都要**现读**，并写清停在哪一格。
