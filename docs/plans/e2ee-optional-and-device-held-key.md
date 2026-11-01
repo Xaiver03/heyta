@@ -772,7 +772,7 @@ Android 本轮**装上了并跑起来**（模拟器 `heyta-w3-yearly`、签名 r
 | **S1** 闸门模式化 | ✅ 收口 | `server/tests/payload-gate.spec.ts` 8/8（四格逐格 + 两条路由拒绝 + 一条 fail-closed）；变异臂"两种都放行" ⇒ 6 红 | 无 |
 | **S2** 关闭：整库解密重传 | ✅ 收口 | `server/tests/integration/payload-mode-migration.integration.spec.ts`（真 PostgreSQL + 真 HTTP）；`payload-mode-migration.service.spec.ts` 9/9；app-host 侧 `payload-mode-migration.spec.ts` 8/8；变异臂"跳过解不开的 op" ⇒ 1 红 | 无 |
 | **S3** 打开：新 root + 全量加密 | ✅ 收口 | `vault-session.spec.ts` 20/20（含"世代必须从 0 到 1"）；变异臂"世代校验放宽成 `<= 0`" ⇒ 1 红 | 无 |
-| **S4** 客户端模式感知 | ✅ 收口 | `packages/sync-client/tests/plain-payload-mode.spec.ts` 3/3；变异臂"错配降级成普通 Error" ⇒ 1 红；`@heyta/sync-client` 174/174 | 无 |
+| **S4** 客户端模式感知 | ✅ 收口（读侧正例于第 39 轮补上，见 §18） | `plain-payload-mode.spec.ts` **4/4**（第 4 条是读侧正例：明文行 payload 必须解析成对象）；变异臂"错配降级成普通 Error" ⇒ 1 红、"去掉明文解析" ⇒ 1 红；`@heyta/sync-client` **175/175**、`@heyta/app-host` **2097/2097** | 无 |
 | **S5** 钥匙默认设备持有 | ✅ **收口**（2026-11-02，本轮把最后两格补上，见 §15 / §16） | Web：`vault-root-cache.spec.ts` 6/6（变异臂"换 localStorage" ⇒ 1 红）；**Android 设备腿**：`pnpm verify:android-vault-storage` **5 个 phase 全 PASS**（隔离 / 分进程 seed / 分进程 verify / **重启设备** / remove / clean）；**iOS 设备腿**：`pnpm verify:ios-vault-keychain` **5 个 stage 全 PASS**（5 个独立进程，验证 `kSecAttrAccessible=WhenUnlockedThisDeviceOnly`）；**macOS 壳**：`VaultKeychainStore` + `ShellVaultKeychainBridge` + 页侧优先于 `sessionStorage`（单测 14/14，变异臂"优先级反过来" ⇒ 1 红、"去掉长度校验" ⇒ 1 红），**并在签名的 .app 里**跑通完整往返（7 个字段全 true） | 无（注：**端到端"关掉 App 再开不用输口令"那一幕**仍未逐帧取证 —— 它需要建 vault + 重启进程的 UI 长流程；本轮验的是通道、存储、优先级三件。Windows/Linux 的 DPAPI/libsecret 按 ADR-0080 §十一 推迟） |
 | **S6** 界面：两个轴 + 危险确认 | ✅ 收口（2026-11-02 **改判**，见 §13.6） | 关闭方向：组件 + 危险确认 + 三条后果逐条数（`encryption-mode-section.spec.tsx` **14/14**，变异臂"删掉不可逆那条" ⇒ 1 红）；**开启方向的两段表单也在**：`enable={{begin: beginReEncryption, confirm: confirmReEncryption}}` 挂在 `VaultSettingsPanel`，判据 3 条（不传 `enable` 就不画、第一段只拿恢复码不迁移、回填后才迁移）+ 真浏览器 `e2e/vault/vault-journey.spec.ts` 的 `enableEncryption()` 走完整流程；钥匙位置轴 4/4；本机无密钥包时不画"创建"入口 2/2 | 无。🔴 上一轮我把它写成"缺开启表单"是**错的**，原因与更正见 §13.6 |
 | **S7** 对外口径 | ✅ 收口（本轮补完） | `check:legal-*` 五道绿；绝对句扫描 0 命中；`check:ui-language` 绿（476 文件 / 823 处文案）；i18n 30/30；landing 1455/1455 | 无。本轮补掉了**四处共享词条**（见 §13.2）——上传前那轮只修了界面与下载页 |
@@ -1291,3 +1291,68 @@ $ pnpm check          ⇒ exit=1
 | `check:doc-command-claims` / docs 链接 / md 表格 / ADR 编号 | ✅ 全绿 |
 | `@heyta/web` 全套 | ✅ 2711 passed / 13 skipped（上一轮读数；本轮改动只碰 macOS Swift 与文档） |
 | `apps/web` vault 五套 + 新增 keychain 一套 | ✅ 28 + 10 / 10 |
+
+---
+
+## 18. S4 的读侧只有反例 —— 正例补上，抓到一个真缺陷（2026-11-02，第 39 轮）
+
+### 18.1 缺口
+
+§13 给 S4 打的"✅ 收口"里，读侧其实**只有反例**：
+
+```ts
+it('读到密文行 ⇒ 明确报错，且不把它交给 op-log（不静默跳过）', ...)   // ← 只有这一条
+```
+
+没有正例意味着两种缺陷**都能全绿通过**：
+① 明文行被悄悄丢掉；② 明文行交出去时形状不对（下游读不到字段）。
+
+②刚好是真的。
+
+### 18.2 抓到的东西
+
+补上正例（`明文行照原文读回来，且 payload 已解析成对象（与密文那条同一个形状）`）之后立刻红：
+
+```
+AssertionError: payload 必须是对象，不是原始 JSON 字符串
+  expected '{"title":"买牛奶"}' to deeply equal { title: '买牛奶' }
+```
+
+根因在 `packages/sync-client/src/client.ts` 的 `decodeServerOp`：
+
+```ts
+if (op.isPayloadEncrypted === true) { … payload = JSON.parse(plain) … }   // 密文：解析成对象
+// 明文：什么都不做 ⇒ payload 保持线上的 JSON **字符串**
+```
+
+而上传那一侧写的是 `payload: JSON.stringify(payload)` ⇒ 线上是 JSON 文本。
+于是**两条路交给 op-log 的是两种类型**：加密账号拿到对象、明文账号拿到字符串。
+下游 `obj.title` 读不到，而**中间没有任何一层会响**。
+
+### 18.3 修法与判据
+
+`else if (typeof op.payload === 'string')` 里 `JSON.parse`，解析失败**明确报错**
+（服务端说这是明文，却不是合法 JSON ⇒ 数据可能损坏，不能靠"当字符串用"糊过去）。
+解析失败抛错与密文那条（`JSON.parse(plain)`）对称。
+
+**变异臂**：把这段解析删掉 ⇒ 新正例红，报的正是
+`expected '{"title":"买牛奶"}' to deeply equal { title: '买牛奶' }`。
+（这一条不是人造变异 —— 它就是修复前的真实状态。）
+
+### 18.4 连带修掉一份**违反线协议**的夹具
+
+`packages/sync-client/tests/sync.spec.ts` 里有一条用例（验的是**游标**）用了
+`payload: 'x'` + `isPayloadEncrypted: false`。裸 `'x'` 不是合法 JSON，而明文账号的线上
+payload 一定是 JSON 文本（上传侧 `JSON.stringify`）。改成 `payload: '"x"'`（JSON 里的字符串 `"x"`），
+用例的**主题（游标推进）一个字没动**。
+⚠️ 这不是"为了让测试变绿改测试"：被改的是一个**不满足线协议的夹具**，
+而它恰好掩盖了上面那个缺陷。
+
+### 18.5 复核读数（改完重跑）
+
+| 套件 | 读数 |
+|---|---|
+| `@heyta/sync-client` | **175/175**（新增 1 条正例） |
+| `@heyta/app-host` | **2097/2097** |
+| `@heyta/web` | **2711 passed / 13 skipped** |
+| `tsc -p packages/sync-client/tsconfig.json` | 0 错 |
