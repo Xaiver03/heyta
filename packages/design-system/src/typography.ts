@@ -128,16 +128,36 @@ export const TEXT_STYLES = {
     leading: 'line-height.tight',
     tracking: 'tracking.body',
   },
-  /** 任务行主文字。全应用最高频的样式。 */
+  /**
+   * 任务行主文字。全应用最高频的样式。
+   *
+   * 🔴 **2026-11-02 字重 400 → 500。** 理由不是"看着更好看"，是**层级塌了**：
+   * 全仓 132 处字号声明里 116 处（88%）落在 11/12/14 三档，而标题是 16、元信息
+   * 原本是 14 —— 16:14 = **1.14**，在阅读距离上不构成层级，两行读起来是同一层。
+   * 单靠字号拉不开，就只能用**字重**拉：这是最高频样式唯一能同时压住元信息、
+   * 又不改变行高的杠杆（`row-meta` 同步降到 12，见下）。
+   *
+   * ⚠️ 不改行高：`line-height.normal`（1.5）在 16px 上是 24，两行标题不挤。
+   *   收紧到 `tight`（1.25 → 20）会让换行标题的行距小于字高，汉字会粘在一起。
+   */
   'row-title': {
     size: 'font-size.base',
-    weight: 'font-weight.regular',
+    weight: 'font-weight.medium',
     leading: 'line-height.normal',
     tracking: 'tracking.body',
   },
-  /** 任务行的次要信息：日期、清单名、标签、重复规则。 */
+  /**
+   * 任务行的次要信息：日期、清单名、标签、重复规则。
+   *
+   * 🔴 **2026-11-02 字号 14 → 12。** 它和标题的比值是这一档存在的全部意义：
+   * 16:14 = 1.14（读不出层级），16:12 = **1.33**（一眼分层）。
+   * 元信息是第三层角色 —— 扫读时**应该被跳过**；14px 让它在视觉上够得着正文，
+   * 于是每一行都在争注意力。12px 也是 `caption` 的档（密集列表的通行取值），
+   * 两者的差别留在**字重**上（这里 400，`caption` 是 500），
+   * 所以它们仍是两个角色，不是同值冗余。
+   */
   'row-meta': {
-    size: 'font-size.sm',
+    size: 'font-size.xs',
     weight: 'font-weight.regular',
     leading: 'line-height.normal',
     tracking: 'tracking.body',

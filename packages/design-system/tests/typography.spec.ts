@@ -22,14 +22,29 @@ import type { TextStyleName } from '../src/typography.js';
 const STYLE_NAMES = Object.keys(TEXT_STYLES) as TextStyleName[];
 
 describe('语义文字样式：值正确性', () => {
-  it('row-title = 16px / 400 / 行高 24 / 字距 -0.176', () => {
+  it('row-title = 16px / 500 / 行高 24 / 字距 -0.176', () => {
     // 全应用最高频的样式。行高必须是绝对点值（1.5 倍数 × 16），
     // 字距必须是点值（-0.011 em × 16）。
+    // 🔴 2026-11-02 字重 400 → 500：16:14 的标题/元信息比是 1.14，读不出层级，
+    // 字重是唯一不改行高就能拉开层级的杠杆。改回去等于把那次修复撤销。
     const s = resolveTextStyle('row-title', lightTokens);
     expect(s.fontSize).toBe(16);
-    expect(s.fontWeight).toBe('400');
+    expect(s.fontWeight).toBe('500');
     expect(s.lineHeight).toBe(24);
     expect(s.letterSpacing).toBeCloseTo(-0.176, 3);
+  });
+
+  it('🔴 row-title : row-meta 的字号比必须 ≥ 1.33 —— 1.14 等于没有层级', () => {
+    // 这条钉的是**关系**，不是某个像素值：谁都能把某一档调一个数，
+    // 但"标题与元信息必须一眼分得开"是与界面无关的不变量。
+    // 16:14 = 1.14（2026-11-02 之前的现状，实测被产品负责人指出"排版比人家差很多"），
+    // 16:12 = 1.33。低于 1.25 时两行的视觉重量差不足以承担"标题 / 附属"的分工。
+    const title = resolveTextStyle('row-title', lightTokens);
+    const meta = resolveTextStyle('row-meta', lightTokens);
+    expect(meta.fontSize).toBe(12);
+    expect(title.fontSize / meta.fontSize).toBeGreaterThanOrEqual(1.33);
+    // 字重也要赢或至少不平：标题不许比元信息更轻。
+    expect(Number(title.fontWeight)).toBeGreaterThanOrEqual(Number(meta.fontWeight));
   });
 
   it('numeric-display = 36px / 700 / 行高 45 / 字距 -0.792', () => {
