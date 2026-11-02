@@ -114,7 +114,36 @@ function firstStyle(source: string, from: number): string {
 const TAIL_DEF = APP.indexOf('const renderTaskTrailing = useCallback(');
 // 🔴 锚点找不到时必须是空串，不能让 `indexOf(…, -1)` 退化成"从文件头找第一个 style"
 //    —— 那会让下面两条改成"给页面里随便一个容器打分"。
-const TAIL_STYLE = TAIL_DEF < 0 ? '' : firstStyle(APP, TAIL_DEF);
+const TAIL_INLINE_STYLE = TAIL_DEF < 0 ? '' : firstStyle(APP, TAIL_DEF);
+
+/**
+ * 🔴 2026-11 行操作 UX 重设计：行尾那层容器的样式**搬家了** ——
+ * 从 `App.tsx` 里的一个内联 `style={{…}}` 搬进
+ * `features/tasks/task-row-menu.css` 的 `.ht-row-badges`。
+ *
+ * 判据的**内容一个字没改**（折行 + 右对齐 + 两份必须同时在），变的是载体：
+ * 搬家是刻意的，`check:l4-no-style` 的断言 C 要求 L4 视图的内联样式**只减不增**
+ * （那一趟把 web features 从 98 行降到 74 行，正好是这一族搬出去的结果）。
+ * 所以这里改成读 CSS 块 —— 如果哪天有人把这三条删掉，判据照样红。
+ */
+const TAIL_CSS = codeOf('apps/web/src/features/tasks/task-row-menu.css');
+
+/** 取一个 CSS 规则块（`.ht-row-badges { … }`），按大括号配对。 */
+function cssBlock(source: string, selector: string): string {
+  const start = source.indexOf(`${selector} {`);
+  if (start < 0) return '';
+  let depth = 0;
+  for (let i = start + selector.length; i < source.length; i += 1) {
+    if (source[i] === '{') depth += 1;
+    else if (source[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  return '';
+}
+
+const TAIL_STYLE = cssBlock(TAIL_CSS, '.ht-row-badges');
 
 describe('一行任务必须始终渲染出它的标题', () => {
   it('前提：两个被测锚点都还在（找不到块 = 判据在测空气）', () => {
@@ -155,20 +184,22 @@ describe('一行任务必须始终渲染出它的标题', () => {
 
   it('B1. 宿主行尾那层容器允许折行（只加下限会把控件推出可视区，实测 a 档 FAIL）', () => {
     expect(TAIL_DEF, '找不到 `const renderTaskTrailing = useCallback(` ⇒ 这两条在测空气').toBeGreaterThanOrEqual(0);
-    expect(TAIL_STYLE.length, '没取到行尾容器的 style 块 ⇒ 判据没在测任何东西').toBeGreaterThan(0);
-    expect(TAIL_STYLE, '行尾不换行 ⇒ 窄窗口下控件出界').toMatch(/flexWrap:\s*'wrap'/);
+    expect(TAIL_STYLE.length, '没取到行尾容器的样式块 ⇒ 判据没在测任何东西').toBeGreaterThan(0);
+    // 行尾容器现在是一枚带类的 `<span className="ht-row-badges">`（搬家理由见上面那段）
+    expect(APP).toContain('className="ht-row-badges"');
+    expect(TAIL_STYLE, '行尾不换行 ⇒ 窄窗口下控件出界').toMatch(/flex-wrap:\s*wrap/);
   });
 
   it('B2. 折行后仍右对齐（否则第二行从左边缘起、压进标题列）', () => {
-    expect(TAIL_STYLE).toMatch(/justifyContent:\s*'flex-end'/);
-    expect(TAIL_STYLE).toMatch(/alignContent:\s*'center'/);
+    expect(TAIL_STYLE).toMatch(/justify-content:\s*flex-end/);
+    expect(TAIL_STYLE).toMatch(/align-content:\s*center/);
   });
 
   it('B3. 下限与折行必须同时在（缺一档实测就是红的）', () => {
     // 这条只把"两者是一组"写死，防止有人"修一半就提交"：
     // 实测 a 档（只有下限）尾出界、b 档（只有折行）标题 0 宽。
     const hasFloor = /minWidth:\s*'[\d.]+%'/.test(BODY);
-    const hasWrap = /flexWrap:\s*'wrap'/.test(TAIL_STYLE);
+    const hasWrap = /flex-wrap:\s*wrap/.test(TAIL_STYLE);
     expect(hasFloor && hasWrap, `下限=${hasFloor} 折行=${hasWrap}：必须同时成立`).toBe(true);
   });
 });

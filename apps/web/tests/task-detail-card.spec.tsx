@@ -230,25 +230,43 @@ describe('行尾那枚只读徽标（备注搬进栏里之后，列表还要看�
 describe('宿主的落点接线（读 App.tsx 的源码形状）', () => {
   const src = stripComments(APP_SRC);
 
-  it('🔴 栏里那一支与行尾那两支用的是**同一枚布尔**（编辑器只有一份，另一支是只读徽标）', () => {
-    expect(src).toMatch(/<TaskDetailCard\s*\/>/);
-    expect(
-      src,
-      '栏里画着的时候行尾还在挂 `<NoteEditor/>` ⇒ 备注两处可编辑（两套写入语义迟早漂）',
-    ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*\(\s*<NoteBadge\s+task=\{task\}\s*\/>\s*\)\s*:\s*\(\s*<NoteEditor/);
-    expect(src, '栏里那一支不看这枚布尔 ⇒ 窄档会在 display:none 里藏一只编辑器').toMatch(
-      /\)\s*:\s*taskPaneInColumn\s*\?\s*\(\s*<TaskDetailCard/,
+  it('🔴 面单是**唯一**的编辑器所有者：行尾只剩只读徽标（备注这一字段）', () => {
+    /*
+     * 🔴 2026-11 行操作 UX 重设计：原来的三目 `taskPaneInColumn ? <NoteBadge/> : <NoteEditor/>`
+     * 整个撤掉了 —— 产品负责人要求把行尾那排编辑器拿掉，编辑只发生在面单里。
+     * 判据因此从"两个落点共用一枚布尔"变成"**行上不可能长出编辑器**"（更强的形状）：
+     *   · `NoteBadge` 必须留在行尾插槽（§8.138：扫一眼要能看出哪些任务写过东西）；
+     *   · `NoteEditor` 不许出现在 `App.tsx`（它的落点只有面单，见 `NoteField`）。
+     * ⚠️ 用 `(?![A-Za-z])` 的边界：`<NoteEditorCard`（便签那一格）是**另一个**组件。
+     */
+    expect(src).toMatch(/<NoteBadge task=\{task\} \/>/);
+    expect(src, '`<NoteEditor/>` 又回到行上了 ⇒ 备注两处可编辑（两套写入语义迟早漂）').not.toMatch(
+      /<NoteEditor(?![A-Za-z])/,
     );
+    // 面单有两个落点（详情列 / 窄档对话框），两处都要把宿主的自动化格递进去。
+    expect(src, '面单没有渲染点').toMatch(/<TaskDetailCard automationSlot=\{automationSlotNode\} \/>/);
+    expect(
+      (src.match(/<TaskDetailCard automationSlot=\{automationSlotNode\} \/>/g) ?? []).length,
+      '面单只画在一处 ⇒ 窄档（没有详情列）里所有字段都不可编辑',
+    ).toBe(2);
   });
 
-  it('🔴 这枚布尔只有一个定义处，且同时看**几何**与**任务那一族的三个视图**', () => {
-    const definitions = src.match(/const taskPaneInColumn =/g) ?? [];
-    expect(definitions.length, `taskPaneInColumn 被定义${definitions.length}次（第二份就是漂移的起点）`).toBe(1);
-    const block = /const taskPaneInColumn =([\s\S]*?);/.exec(src)?.[1] ?? '';
-    expect(block).toContain('detailColumnShown');
+  it('🔴 这枚判断只有一个定义处，且同时看**几何**与**任务那一族的三个视图**', () => {
+    /*
+     * 2026-11：判断拆成两枚**共用一处定义**的布尔，而不是把条件抄两遍 ——
+     *   · `taskPaneWillShow` = 几何 + 视图族（不看"选中了没有"）；
+     *   · `taskPaneInColumn` = 它 && 真的选中了一条。
+     * 拆的理由写在 `App.tsx` 那一格：右键菜单要在**选中之前**决定"面单落在详情列还是对话框"。
+     * 条件本身仍然只有一份（几何与三个视图都只在 `taskPaneWillShow` 里）。
+     */
+    expect((src.match(/const taskPaneWillShow =/g) ?? []).length).toBe(1);
+    expect((src.match(/const taskPaneInColumn =/g) ?? []).length).toBe(1);
+    const block = /const taskPaneWillShow =([\s\S]*?);/.exec(src)?.[1] ?? '';
+    expect(block, '几何那一半不见了').toContain('detailColumnShown');
     for (const view of ['tasks', 'quadrant', 'timeline']) {
       expect(block, `任务那一族少了 ${view}：那一面按了 Enter 会落空`).toContain(`'${view}'`);
     }
+    expect(/const taskPaneInColumn =([\s\S]*?);/.exec(src)?.[1] ?? '').toContain('taskPaneWillShow');
   });
 });
 
@@ -377,12 +395,23 @@ describe('重复这一字段此刻归谁（§8.141）', () => {
     expect(chip?.querySelectorAll('input').length ?? 0, '徽标里长出可编辑控件（那是第二个编辑器）').toBe(0);
   });
 
-  it('🔴 宿主那一支也读同一枚布尔：栏里画着时行尾只剩只读徽标', () => {
+  it('🔴 行尾只有只读徽标：重复的编辑器不许回到行上', () => {
+    /*
+     * 🔴 2026-11 行操作 UX 重设计之后，这条判据的**形状变了、内容没变**。
+     *
+     * 原来它钉的是"`taskPaneInColumn ? 徽标 : 编辑器` 这个三目"——两个落点用同一枚布尔，
+     * 保证同一个字段任何时刻只有一个编辑器所有者。
+     * 产品负责人把行尾那排编辑器整排撤掉了（「不需要有更多的三个点」），
+     * 于是现在**没有第二支**：行上只有只读徽标，编辑器只在面单里。
+     *
+     * 新形状是**更强**的那一条（不是放松）：不管布尔怎么变，行上都长不出第二个编辑器。
+     * 判据因此改成两句：徽标必须在行尾插槽里；编辑器组件不许出现在 `App.tsx`。
+     */
     const src = stripComments(APP_SRC);
-    expect(
-      src,
-      '栏里画着的时候行尾还在挂 `<TaskRepeat/>` ⇒ 重复两处可编辑',
-    ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*\(\s*<RepeatChip\s+task=\{task\}\s+now=\{store\.now\}\s*\/>\s*\)\s*:\s*\(\s*<TaskRepeat/);
+    expect(src, '行尾插槽里没有 `RepeatChip` ⇒ 扫一眼看不出哪条任务是重复的').toMatch(
+      /<RepeatChip task=\{task\} now=\{store\.now\} \/>/,
+    );
+    expect(src, '`<TaskRepeat/>` 又回到行上了 ⇒ 重复两处可编辑').not.toMatch(/<TaskRepeat(?![A-Za-z])/);
   });
 });
 
@@ -481,12 +510,23 @@ describe('子任务这一字段此刻归谁（§8.144）', () => {
     host2.remove();
   });
 
-  it('🔴 宿主那一支也读同一枚布尔：栏里画着时行尾只剩只读徽标', () => {
+  it('🔴 行尾只有只读徽标：子任务的编辑器不许回到行上', () => {
+    /*
+     * 🔴 2026-11 行操作 UX 重设计之后，这条判据的**形状变了、内容没变**。
+     *
+     * 原来它钉的是"`taskPaneInColumn ? 徽标 : 编辑器` 这个三目"——两个落点用同一枚布尔，
+     * 保证同一个字段任何时刻只有一个编辑器所有者。
+     * 产品负责人把行尾那排编辑器整排撤掉了（「不需要有更多的三个点」），
+     * 于是现在**没有第二支**：行上只有只读徽标，编辑器只在面单里。
+     *
+     * 新形状是**更强**的那一条（不是放松）：不管布尔怎么变，行上都长不出第二个编辑器。
+     * 判据因此改成两句：徽标必须在行尾插槽里；编辑器组件不许出现在 `App.tsx`。
+     */
     const src = stripComments(APP_SRC);
-    expect(
-      src,
-      '栏里画着的时候行尾还在挂 `<SubtaskPicker/>` ⇒ 子任务两处可编辑',
-    ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*\(\s*<SubtaskBadge\s+task=\{task\}\s*\/>\s*\)\s*:\s*\(\s*<SubtaskPicker/);
+    expect(src, '行尾插槽里没有 `SubtaskBadge` ⇒ 扫一眼看不出哪条挂在谁下面').toMatch(
+      /<SubtaskBadge task=\{task\} \/>/,
+    );
+    expect(src, '`<SubtaskPicker/>` 又回到行上了 ⇒ 子任务两处可编辑').not.toMatch(/<SubtaskPicker(?![A-Za-z])/);
   });
 });
 
@@ -587,12 +627,23 @@ describe('提醒这一字段此刻归谁（§8.145）', () => {
     host.remove();
   });
 
-  it('🔴 宿主那一支也读同一枚布尔：栏里画着时行尾只剩只读徽标', () => {
+  it('🔴 行尾只有只读徽标：提醒的编辑器不许回到行上', () => {
+    /*
+     * 🔴 2026-11 行操作 UX 重设计之后，这条判据的**形状变了、内容没变**。
+     *
+     * 原来它钉的是"`taskPaneInColumn ? 徽标 : 编辑器` 这个三目"——两个落点用同一枚布尔，
+     * 保证同一个字段任何时刻只有一个编辑器所有者。
+     * 产品负责人把行尾那排编辑器整排撤掉了（「不需要有更多的三个点」），
+     * 于是现在**没有第二支**：行上只有只读徽标，编辑器只在面单里。
+     *
+     * 新形状是**更强**的那一条（不是放松）：不管布尔怎么变，行上都长不出第二个编辑器。
+     * 判据因此改成两句：徽标必须在行尾插槽里；编辑器组件不许出现在 `App.tsx`。
+     */
     const src = stripComments(APP_SRC);
-    expect(
-      src,
-      '栏里画着的时候行尾还在挂 `<ReminderPanel/>` ⇒ 提醒两处可编辑',
-    ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*\(\s*<ReminderBadge\s+task=\{task\}\s*\/>\s*\)\s*:\s*\(\s*<ReminderPanel/);
+    expect(src, '行尾插槽里没有 `ReminderBadge` ⇒ 扫一眼看不出哪条挂了几条提醒').toMatch(
+      /<ReminderBadge task=\{task\} \/>/,
+    );
+    expect(src, '`<ReminderPanel/>` 又回到行上了 ⇒ 提醒两处可编辑').not.toMatch(/<ReminderPanel(?![A-Za-z])/);
   });
 });
 
@@ -674,18 +725,23 @@ describe('截止这一字段此刻归谁（§8.146）', () => {
     ).not.toBeNull();
   });
 
-  it('🔴 宿主那一支读同一枚布尔，且宽档**不补徽标**（这一格与前四格不同形）', () => {
+  it('🔴 行上既没有截止编辑器、**也不补**截止徽标（这一格与前四格不同形）', () => {
+    /*
+     * 🔴 2026-11 行操作 UX 重设计之后，这条判据的**形状变了、内容没变**。
+     *
+     * 原来它钉的是"`taskPaneInColumn ? 徽标 : 编辑器` 这个三目"——两个落点用同一枚布尔，
+     * 保证同一个字段任何时刻只有一个编辑器所有者。
+     * 产品负责人把行尾那排编辑器整排撤掉了（「不需要有更多的三个点」），
+     * 于是现在**没有第二支**：行上只有只读徽标，编辑器只在面单里。
+     *
+     * 新形状是**更强**的那一条（不是放松）：不管布尔怎么变，行上都长不出第二个编辑器。
+     * 判据因此改成两句：徽标必须在行尾插槽里；编辑器组件不许出现在 `App.tsx`。
+     */
     const src = stripComments(APP_SRC);
-    expect(
-      src,
-      '栏里画着的时候行尾还在挂 `<DueEditor/>` ⇒ 截止两处可编辑',
-    ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*null\s*:\s*\(\s*<DueEditor/);
-    /* 这一格宽档留的是 `null` 而不是徽标 —— 断言把它钉住，否则"顺手补一枚 DueBadge"
-       会把同一件事实变成行上的第二份显示（截止的显示在共享元信息条 `task-meta` 上）。 */
-    expect(
-      /taskPaneInColumn\s*\?\s*<DueBadge/.test(src),
-      '宽档行尾长出了截止徽标 ⇒ 行上把截止的显示说了两遍',
-    ).toBe(false);
+    expect(src, '`<DueEditor/>` 又回到行上了 ⇒ 截止两处可编辑').not.toMatch(/<DueEditor(?![A-Za-z])/);
+    /* 这一格连徽标都不补 —— 截止的显示在共享元信息条 `task-meta` 上（`TaskBadges.due`）。
+       断言把它钉住，否则"顺手补一枚 DueBadge"会把同一件事实变成行上的第二份显示。 */
+    expect(/<DueBadge/.test(src), '行尾长出了截止徽标 ⇒ 行上把截止的显示说了两遍').toBe(false);
   });
 });
 
@@ -882,18 +938,23 @@ describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
     expect(after.querySelector('details'), 'chip 里长出了展开机关').toBeNull();
   });
 
-  it('宿主两支读同一枚布尔（源码形状）', () => {
-    const src = readFileSync(join(process.cwd(), 'src', 'App.tsx'), 'utf8');
-    expect(
-      /\{\s*taskPaneInColumn\s*\?\s*\(\s*<TagChips\s+task=\{task\}\s*\/>\s*\)\s*:\s*\(\s*<TaskOrganizer/.test(
-        stripComments(src),
-      ),
-      '行尾那两支不是读同一枚 taskPaneInColumn 的三目 ⇒ 开关没接上或长出了第二份',
-    ).toBe(true);
-    expect(
-      /taskPaneInColumn\s*\?\s*<TaskOrganizer/.test(stripComments(src)),
-      '宽档行尾还挂着整块 TaskOrganizer ⇒ 整理长出第二个编辑器',
-    ).toBe(false);
+  it('行尾只留 `TagChips`，整理那块编辑器不许回到行上（源码形状）', () => {
+    /*
+     * 🔴 2026-11 行操作 UX 重设计之后，这条判据的**形状变了、内容没变**。
+     *
+     * 原来它钉的是"`taskPaneInColumn ? 徽标 : 编辑器` 这个三目"——两个落点用同一枚布尔，
+     * 保证同一个字段任何时刻只有一个编辑器所有者。
+     * 产品负责人把行尾那排编辑器整排撤掉了（「不需要有更多的三个点」），
+     * 于是现在**没有第二支**：行上只有只读徽标，编辑器只在面单里。
+     *
+     * 新形状是**更强**的那一条（不是放松）：不管布尔怎么变，行上都长不出第二个编辑器。
+     * 判据因此改成两句：徽标必须在行尾插槽里；编辑器组件不许出现在 `App.tsx`。
+     */
+    const src = stripComments(readFileSync(join(process.cwd(), 'src', 'App.tsx'), 'utf8'));
+    expect(src, '行尾插槽里没有 `TagChips` ⇒ 列表看不出哪条挂了标签').toMatch(/<TagChips task=\{task\} \/>/);
+    expect(src, '`<TaskOrganizer/>` 又回到行上了 ⇒ 整理长出第二个编辑器').not.toMatch(
+      /<TaskOrganizer(?![A-Za-z])/,
+    );
   });
 });
 

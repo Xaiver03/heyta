@@ -243,9 +243,17 @@ describe('自定义 RRULE', () => {
   });
 });
 
-describe('🔴 接线：重复控件的入口真的挂在任务行上', () => {
-  it('挂真 App，任务行上能找到重复入口', async () => {
-    await seedTask('挂载检查');
+describe('🔴 接线：重复控件的入口真的接进了整棵树', () => {
+  /*
+   * 🔴 2026-11 行操作 UX 重设计：行尾那枚「⋯ 更多」被撤掉（它把九个同级控件摊成一行，
+   * 产品负责人的原话是「不需要有更多的三个点」），重复的入口搬进**详情面**。
+   *
+   * 判据的**内容**没变：它钉的是"`TaskRepeat` 被接进 `App.tsx`"——那个洞的症状是
+   * 组件与 `setRepeat` 都在、用户改不了重复（B2-3）。变的是住址：现在要先打开这一条。
+   * 行上还有一枚**只读** `RepeatChip`，所以"看得出哪条是重复的"这一档也没丢（见 P4）。
+   */
+  it('挂真 App，打开一条任务之后能改它的重复', async () => {
+    const taskId = await seedTask('挂载检查');
 
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -258,9 +266,24 @@ describe('🔴 接线：重复控件的入口真的挂在任务行上', () => {
       );
     });
 
+    await act(async () => {
+      container!.querySelector<HTMLElement>(`[data-testid="task-row-${taskId}"]`)?.click();
+    });
+
+    // 面单里那一支是 `RepeatField`（裸编辑本体，没有浮层外壳），它的单选组按
+    // `name="repeat-<id>"` 锚定（不带 id 会把整页所有任务合成同一组，见该文件注释）。
     expect(
-      container.querySelector('[data-testid="task-repeat-summary"]'),
-      '任务行上缺少重复入口 —— B2-3 的 Web 入口没有调用点',
+      container.querySelector(`[data-testid="task-pane"] input[name="repeat-${taskId}"]`),
+      '详情面里缺少重复入口 —— B2-3 的 Web 入口没有调用点',
     ).not.toBeNull();
+    /*
+     * 行上**不再有**编辑器：只读 chip 当没有重复规则时不渲染（`RepeatChip` 返回 null），
+     * 所以这里钉的是"那颗 `<summary>` 触发器不在行上了"，而不是"chip 一定在"。
+     * "扫一眼看得出哪条是重复的"由 `RepeatChip` 承担，判据在 P5 那条源码形状里。
+     */
+    expect(
+      container.querySelector(`[data-testid="task-trailing-${taskId}"] [data-testid="task-repeat-summary"]`),
+      '重复的编辑器又回到行尾了 —— 行上只许留只读徽标',
+    ).toBeNull();
   });
 });

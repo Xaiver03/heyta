@@ -1,0 +1,164 @@
+/*
+ * 任务行的右键菜单（行操作 UX 重设计，2026-11）
+ * ============================================
+ *
+ * 🔴 **这是新加的一个 css 文件**，不是改既有样式表：`apps/web/src/styles/**` 与
+ * `features/**\/*.css` 那一批正由断点收敛那一路在同一份工作区上改，
+ * 所以本族的类只长在**自己的文件**里（同目录 `auth-dialog.css` /
+ * `category-create-dialog.css` 是先例）。合并回去时整族搬走即可。
+ *
+ * 取值纪律：本文件**每一行含数字的声明都走 `var(--ht-*)`**
+ * （`check:design` 的 `LINE_ALLOW` 对含 `--ht-` 的行整行放行，但这不是"放过"，
+ * 而是要求"值只许来自 token"）。刻意**不写** `font-size`/`font-weight` 成对声明：
+ * 那不是档位（`design-system.md` 的排版纪律），字号继承宿主。
+ *
+ * 定位不在这里：`inset-block-start` / `inset-inline-start` 由组件用
+ * `style.setProperty` 落（见 `TaskRowMenu.tsx` 那段注释 —— 不写内联字面量、
+ * 也不自造 CSS 变量）。
+ */
+
+.ht-row-menu {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  /* 弹出的层：阴影只给真正的浮层（`design-system.md` 的"扁平风格用边框表达层次"）。 */
+  box-shadow: var(--ht-shadow-lg);
+  border-radius: var(--ht-radius-lg);
+  padding: var(--ht-space-1);
+  /* 一条命令一行，不要把宽度交给最长那句去撑 —— 菜单的宽度应当由宿主语种决定，
+     而不是由某一句"含 3 条子任务"的后果说明撑成一条横幅。 */
+  max-inline-size: 18rem;
+}
+
+.ht-row-menu__item {
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+  /* 一档高度里的一行命令：与行内动作同一档（不是表单控件那一档）。 */
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  text-align: start;
+  cursor: pointer;
+}
+
+.ht-row-menu__item:hover {
+  background: var(--ht-color-hover);
+}
+
+/*
+ * 危险那一档：**就地动作**（`CONTROL_PALETTE` 的 `inline` 重量）——
+ * 透明底 + 危险色字，不是实底。实底那枚只给确认层里唯一要按下去的那一下。
+ */
+.ht-row-menu__item--danger {
+  color: var(--ht-color-danger);
+}
+
+.ht-row-menu__item--danger:hover {
+  background: var(--ht-color-danger-subtle);
+}
+
+/* 分组只有一条线，且跨整个菜单宽（`ux-principles.md` §6：线数 = 组数 − 1）。 */
+.ht-row-menu__sep {
+  block-size: 1px;
+  margin: var(--ht-space-1) 0;
+  background: var(--ht-color-border);
+}
+
+/* `popconfirm` 那一档的后果句：就地说明"还会发生什么"，不是菜单项。 */
+.ht-row-menu__consequence {
+  margin: 0;
+  padding: 0 var(--ht-space-3) var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+}
+
+/*
+ * 窄档的「任务详情」对话框。
+ *
+ * 🔴 两枚类名**必须由宿主给**：`WebModalShell` 的缺省值 `ht-web-modal__*`
+ * 在全仓**没有定义**（`grep ht-web-modal apps/web/src/styles` 零命中）——
+ * 不给类名拿到的是一层没有任何样式的 div（没有遮罩、不居中）。
+ * 取值照 `category-create-dialog.css` 那一族（同一个"居中模态"形状）。
+ *
+ * 壳自己不画 ×，所以标题行与关闭按钮在这里补。
+ */
+.ht-row-menu__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ht-z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--ht-space-4);
+  background: var(--ht-color-overlay);
+}
+
+.ht-row-menu__dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  inline-size: min(100%, var(--ht-layout-modal-max));
+  /* 一屏放不下时**正文滚动**，标题与关闭那一行留在顶上（它本身就是出口）。 */
+  max-block-size: calc(100dvh - var(--ht-space-8));
+  overflow-y: auto;
+  padding: var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface-raised);
+  color: var(--ht-color-foreground);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.ht-row-menu__dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+}
+
+.ht-row-menu__dialog-head h2 {
+  margin: 0;
+}
+
+.ht-row-menu__dialog-close {
+  display: grid;
+  place-items: center;
+  /* 44px 是触控下限（`ux-principles.md` §2 那一档，不另立新档）。 */
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  flex: 0 0 auto;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-row-menu__dialog-close:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+/*
+ * 行尾的**只读徽标**那一排（备注 / 子任务 / 标签 / 重复 / 提醒）。
+ *
+ * 🔴 它们是行上**唯一**剩下的东西：2026-11 起行不再挂任何编辑器（见 `App.tsx`
+ * `renderTaskTrailing`），但 §8.138 那条不变量要求"扫一眼要能看出哪些任务写过 /
+ * 是重复的 / 挂在谁下面 / 打了几条标签" ⇒ 徽标一个都不能少。
+ *
+ * ⚠️ 这一族**替换**的是原来 `.ht-compose-actions__items` 承担的排布（那一排编辑器
+ * 连同它的容器一起撤掉了，`controls.css` 里那几段现在没有消费者 —— 归断点收敛那一路
+ * 一并删，不在这里动别人的文件）。
+ */
+.ht-row-badges {
+  display: inline-flex;
+  align-items: center;
+  /* 折行之后**每一行**也要居中：只给 `align-items` 管不到行与行之间。 */
+  align-content: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+  /* 徽标只是"这条任务的注脚"，不许把标题挤没（与 `TaskRow` 的 `minWidth: 30%` 同向）。 */
+  max-inline-size: 40%;
+}
