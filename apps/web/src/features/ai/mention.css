@@ -1,0 +1,60 @@
+/**
+ * `@` 候选与芯片
+ * ==============
+ * 全部取值走 token（无裸 hex / 裸 px）。候选列表是**浮层**，所以它必须自己
+ * 拿到层级——用 `--ht-z-*` 而不是随手写一个数字。
+ */
+
+.ht-ai__mention-list {
+  position: relative;
+  z-index: var(--ht-z-overlay);
+  margin: 0;
+  padding: var(--ht-space-1);
+  list-style: none;
+  max-height: 12rem;
+  overflow-y: auto;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+}
+
+.ht-ai__mention-option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  cursor: pointer;
+}
+
+.ht-ai__mention-option[aria-selected='true'] {
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-ai__mention-title {
+  color: var(--ht-color-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-ai__mention-suffix {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-caption);
+  flex: none;
+}
+
+.ht-ai__mention-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 芯片复用全局 `.ht-chip`；这里只补"对不上的 @"那一种态。 */
+.ht-ai__mention-chip[data-resolved='false'] {
+  color: var(--ht-color-foreground-subtle);
+  text-decoration: underline dotted;
+}
