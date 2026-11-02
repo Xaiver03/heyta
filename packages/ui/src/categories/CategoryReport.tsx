@@ -326,7 +326,15 @@ export function CategoryReportView({
 
       {report === null ? null : isEmptyCategoryReport(report) ? (
         <EmptyState
-          icon={Clock}
+          /*
+            🔴 2026-10-26 产品负责人：「空状态也应该有良好的空状态……绝对不允许单屏
+            全都是文字的情况。」原来这里只给了一枚 `icon`（`Clock`），于是空态是
+            "一个小图标 + 两行字" —— 与这一屏**无内容**时的观感没差。
+            现在给的是共享层那套矢量空态（`StateIllustration`），与任务/习惯/日历
+            的空态同一族。挑 `calendar` 的理由：这一屏画的是**近 12 周的时间分布**，
+            时间轴才是它的比喻，而不是"钟"。
+          */
+          illustration="calendar"
           title={labels.emptyTitle ?? labels.empty}
           hint={labels.emptyHint}
           size="section"

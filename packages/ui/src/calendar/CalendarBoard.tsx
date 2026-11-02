@@ -801,7 +801,18 @@ export function CalendarBoard({
             ]}
             testID={`${testID}-today`}
           >
-            <Text style={[text['row-title'], { color: tokens['color.primary'] }]}>
+            {/*
+              🔴 按钮标签用 `headline`（base + semibold），与共享 `Button` 的标签同一档
+              （`apps/mobile/src/ui/kit.tsx#Button` 里就是 `text.headline`）。
+              这一枚是**有边框、`touch-target.min` 高、`accessibilityRole="button"` 的真按钮**，
+              它原来写的是 `row-title`（base + **regular**）—— 于是同一句「回到今天」
+              在工具栏那版是 `row-meta`、在这一版是 `row-title`，两档都不带字重：
+              分享同一枚控件语言的 `Button` 是 semibold，这里却是 regular。见本轮收敛记录。
+
+              ⚠️ 这一枚**只在移动端画**（web 传了 `onToday`，那颗归工具栏），
+              所以这次改的只是移动端的按钮标签档位，不动 web 的版面。
+            */}
+            <Text style={[text['headline'], { color: tokens['color.primary'] }]}>
               {labels.backToToday}
             </Text>
           </Pressable>

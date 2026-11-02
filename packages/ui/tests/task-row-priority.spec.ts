@@ -30,7 +30,7 @@
  *    `pnpm --filter @heyta/ui build`（工单 §1 闸门 4）。
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { darkTokens, lightTokens } from '@heyta/design-system';
@@ -60,18 +60,23 @@ const THEMES = [
  *
  * 🔴 为什么不用一个写死的文件清单：这条判据要抓的是"有人在别处又写了一份"，
  * 而"别处"是一个还没被命名的文件 —— 点名清单在这个形状上必然是空的。
+ *
+ * 🔴 2026-11-02 改用 `withFileTypes`：旧版对**每一个**条目调 `statSync`（连 `.h`
+ * 都不放过），于是在有 CocoaPods 的机器上撞到 `apps/mobile/ios/Pods` 里的**断链
+ * 符号链接**，`statSync` 抛 `ENOENT`，整条判据红 —— 而它跟"有没有第二份定义"
+ * 毫无关系。`Dirent` 直接给出目录与否，不需要 stat；符号链接一律不跟
+ * （跟随会走出 worktree，也会把生成目录再拉回来）。
  */
 function* sourceFiles(dir: URL): Generator<string> {
-  for (const entry of readdirSync(dir)) {
-    if (['node_modules', 'dist', 'dist-types', 'test-results', 'coverage', '.git'].includes(entry)) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (['node_modules', 'dist', 'dist-types', 'test-results', 'coverage', '.git'].includes(entry.name)) {
       continue;
     }
-    const abs = fileURLToPath(new URL(entry, dir));
-    const st = statSync(abs);
-    if (st.isDirectory()) {
-      yield* sourceFiles(new URL(`${entry}/`, dir));
-    } else if (/\.(?:ts|tsx|js|jsx)$/.test(entry)) {
-      yield abs;
+    if (entry.isSymbolicLink()) continue;
+    if (entry.isDirectory()) {
+      yield* sourceFiles(new URL(`${entry.name}/`, dir));
+    } else if (/\.(?:ts|tsx|js|jsx)$/.test(entry.name)) {
+      yield fileURLToPath(new URL(entry.name, dir));
     }
   }
 }

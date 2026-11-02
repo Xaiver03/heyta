@@ -34,13 +34,13 @@
 
 .ht-type-row-title {
   font-size: var(--ht-font-size-base);
-  font-weight: var(--ht-font-weight-regular);
+  font-weight: var(--ht-font-weight-medium);
   line-height: var(--ht-line-height-normal);
   letter-spacing: var(--ht-tracking-body);
 }
 
 .ht-type-row-meta {
-  font-size: var(--ht-font-size-sm);
+  font-size: var(--ht-font-size-xs);
   font-weight: var(--ht-font-weight-regular);
   line-height: var(--ht-line-height-normal);
   letter-spacing: var(--ht-tracking-body);
