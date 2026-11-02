@@ -257,6 +257,10 @@ apps/web/evidence/web-ui-sweep-latest/
 # 不忽略它的代价实测过：`git status` 里会持续冒出几十个 `??`，把真正待裁决的改动淹掉。
 .run-logs/
 
+# 同一类落点的**根目录**变体：`.run-arms-*.txt` 等直接写在仓库根上，
+# 不在 `.run-logs/` 里，所以上面那条 regex 管不到。按本节同一判据（"现场，不是证据"）通配。
+.run-*.txt
+
 # 中央服务凭据（本地生成，不入库）
 .central/
 
