@@ -29,6 +29,7 @@
 import process from 'node:process';
 
 import { createProvider, MAX_ASSISTANT_EGRESS_BYTES } from '../packages/ai/dist/index.js';
+import { requestCapture } from '../packages/app-host/dist/index.js';
 import { requireLiveProviderConfig } from './lib/live-provider-config.mjs';
 
 /**
@@ -206,6 +207,70 @@ async function main() {
       '模型读出了图里的 BUY MILK',
       text.includes('MILK'),
       `正文前 120 字：${result.suggestion.text.slice(0, 120)}`,
+    );
+    check('不到 60 秒', elapsed < 60_000, `${elapsed} ms`);
+  }
+
+  // ── 5. 编排层：真的走 `requestCapture`（截图转任务的最终判据）──────
+  //
+  // 上面四节证明的是**线格式与闸门**。这一节证明的是**产品那句话**：
+  // 「贴一张截图 → 得到一个任务标题」。中间还有编排、提示词、解析三个环节，
+  // 任何一环错都能让线格式全绿而功能不可用。
+  console.log('');
+  console.log('5) 编排层：`requestCapture` 带一张真图，必须给出任务标题');
+  {
+    const started = Date.now();
+    const outcome = await requestCapture(
+      {
+        // 🔴 一个字都不打 —— 截图转任务就是这么用的
+        text: '',
+        // ⚠️ 用英文界面：中文界面下模型会把图里的英文**翻译成中文**再写进标题
+        //（"BUY MILK 9AM" → "买牛奶"，这是 `outputLanguageDirective` 的职责，
+        // 不是 bug）。而这里的断言要精确匹配图里的字，所以固定英文。
+        locale: 'en',
+        now: Date.now(),
+        images: [{ mediaType: 'image/png', base64: PROBE_PNG_BASE64 }],
+      },
+      {
+        routing: {
+          enabled: true,
+          allowRemote: true,
+          endpoints: [
+            {
+              id: 'live',
+              label: 'live',
+              endpoint: config.endpoint,
+              model: config.model,
+              keyRef: 'live-key',
+              capabilities: ['structured_output', 'vision'],
+            },
+          ],
+          routes: { capture: [{ endpointId: 'live' }] },
+        },
+        consents,
+        preferences: [],
+        /**
+         * 🔴 凭据走 `SecretStore` 端口，**不写进 config**：`AiEndpointConfig` 里
+         * 只有 `keyRef`（配置文件会被同步/导出/贴进 issue，钥匙串里的不会）。
+         * 早先漏了这一格，表现是 401 —— 而 `requestCapture` 把它归成
+         * `ai-unavailable`，看错误码完全猜不到"没带 key"。
+         */
+        routed: {
+          secretStore: { get: async (ref) => (ref === 'live-key' ? config.apiKey : undefined) },
+          timeoutMs: 120_000,
+        },
+      },
+    );
+    const elapsed = Date.now() - started;
+
+    check('捕获成功', outcome.ok === true, outcome.ok ? undefined : `reason=${outcome.reason}`);
+    if (!outcome.ok) throw new Error(outcome.message);
+
+    const title = outcome.proposal.title.toUpperCase();
+    check(
+      '任务标题来自图里的字（不是空标题、不是占位）',
+      title.includes('MILK'),
+      `title="${outcome.proposal.title}"`,
     );
     check('不到 60 秒', elapsed < 60_000, `${elapsed} ms`);
   }
