@@ -70,8 +70,12 @@ grep -nE "\-\-ht-(font-size|radius|space)-" packages/design-system/src/tokens.cs
 |---|---|---|---|
 | `Input` | **8px** | `radius-md` 8px | ✅ 已经一致 |
 | `Tag` | 999px | `radius-full` 9999px | ✅ 等效（胶囊） |
-| `Button` | **18px** | `radius-md` 8px | ⏸ **没动**：18 是 DSH 自己的按钮语言，照搬会让全站按钮突然变圆，需要产品点头 |
-| `Modal` | **24px** | `radius-xl` 16px | ⏸ 同上 |
+| `Button` | **18px** | `radius-md` 8px | ✅ **已改**：新增 `--ht-radius-button: 18px`（产品负责人 2026-11-02 拍板） |
+| `Modal` | **24px** | `radius-lg` 12px / `xl` 16px | ✅ **已改**：新增 `--ht-radius-dialog: 24px` |
+
+🔴 两个坑（都实测过）：① 弹窗圆角是 `WebModalShell` 的 `dialogStyle` **内联样式**
+（调用方传 `cssVar('radius.lg')`），**内联压过类选择器** —— 只改 CSS 类实测仍是 12px；
+② `--ht-radius-*` 这类变量改了**必须重启 dev server**，Vite 的 CSS HMR 不重算变量。
 
 直方图里 6px 出现 45 次，但那是**菜单项 / 小 chip**，不是按钮 —— 这也是一条教训：
 **先问"这个值用在哪"，再问"用了多少次"。**
