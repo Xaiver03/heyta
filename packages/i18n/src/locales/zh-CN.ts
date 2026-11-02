@@ -2916,6 +2916,7 @@ export const zhCN = {
   'web.capture.unused': '未采用，仍在标题中',
   'web.capture.previewLead': '实际标题：',
   'web.capture.previewEmpty': '（空）',
+  'web.ai.mention.aria': '选择要引用的任务',
   'web.ai.attach.label': '附一张图',
   'web.ai.attach.busy': '正在压…',
   'web.ai.attach.hint': '也可以直接粘贴截图',

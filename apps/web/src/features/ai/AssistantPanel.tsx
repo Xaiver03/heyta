@@ -1,6 +1,8 @@
 import { AssistantIcon } from './AssistantIcon.js';
 import { ImageAttach } from './ImageAttach.js';
 import type { EncodedImage } from './image-encode.js';
+import { MentionChips, MentionPicker } from './MentionPicker.js';
+import './mention.css';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 对话式助手 —— 面向用户的入口（W12 / ADR-0045）
@@ -57,6 +59,19 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, Maximize2, Minimize2, Send, X } from 'lucide-react';
 
 import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
+
+import {
+  activeMention,
+  applyMention,
+  findMentions,
+  isLive,
+  mentionCandidates,
+  mentionLookupFor,
+  mentionSegments,
+  toLocalDate,
+  type MentionTaskCandidate,
+  type MentionTaskLike,
+} from '@heyta/domain';
 import {
   buildDisclosure,
   fromHealthSnapshot,
@@ -92,7 +107,7 @@ import { FailureSettingsAction } from './RouteUnavailable.js';
 import { LIST_SEPARATOR } from './locale-punctuation.js';
 import { resolveFeatureRoute, type SettingsTarget } from './route-explanation.js';
 import { intentText } from './AiToolRun.js';
-import { createAiToolHost } from '../tasks/store.js';
+import { createAiToolHost, useTaskStore } from '../tasks/store.js';
 import {
   clearAssistantHistory,
   assistantSessionStorage,
@@ -347,6 +362,57 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
    */
   const [images, setImages] = useState<readonly EncodedImage[]>([]);
   const plan = planAssistantEgress({ hasImages: images.length > 0 });
+
+  // ── `@` 提及 ────────────────────────────────────────────────────────────
+  //
+  // 三条纪律都在 `@heyta/domain` 的 `mentions.ts` 里：文本是事实源、芯片是投影、
+  // 键盘与解析共用同一套语法。这里只负责"把光标位置和选中项接上"。
+  const entities = useTaskStore((state) => state.entities);
+  const [caret, setCaret] = useState(0);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  /** 按过 Esc 之后，直到下一次输入才重新弹候选。 */
+  const [mentionClosed, setMentionClosed] = useState(false);
+
+  const mentionTasks = useMemo<readonly MentionTaskLike[]>(() => {
+    const projects = entities.projects;
+    return Object.values(entities.tasks)
+      .filter((task) => isLive(task))
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        // 🔴 `Task.dueDate` 是 epoch ms，而 `MentionTaskLike` 要的是 `YYYY-MM-DD`：
+        // 消歧后缀要**给用户看**（"开会（08-15）"），不是给程序看的数字。
+        ...(task.dueDate === undefined ? {} : { dueDate: toLocalDate(task.dueDate) }),
+        ...(task.projectId === undefined
+          ? {}
+          : { projectTitle: projects[task.projectId]?.name ?? '' }),
+      }));
+  }, [entities]);
+
+  const lookupMention = useMemo(() => mentionLookupFor(mentionTasks), [mentionTasks]);
+  const mentionSegmentsOfDraft = useMemo(
+    () => mentionSegments(draft, findMentions(draft)),
+    [draft],
+  );
+  const active = mentionClosed ? undefined : activeMention(draft, caret);
+  const mentionList =
+    active === undefined ? [] : mentionCandidates(mentionTasks, active.query);
+
+  function pickMention(candidate: MentionTaskCandidate): void {
+    if (active === undefined) return;
+    const next = applyMention(draft, active, candidate.label);
+    if (next === undefined) return;
+    setDraft(next.text);
+    setCaret(next.caret);
+    setMentionClosed(true);
+    // 光标跟着插入位置走 —— 否则用户选中之后要继续打字，光标会跳回末尾。
+    requestAnimationFrame(() => {
+      const el = composerRef.current;
+      if (el === null) return;
+      el.focus();
+      el.setSelectionRange(next.caret, next.caret);
+    });
+  }
   const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
   // 🔴 助手**不是**第 6 个 `AiFeature`：它就是 `tool-calling` 的多步形态
   //（见 ADR-0045 §2.1）。所以目的地、能力缺口、熔断都按 `tool-calling` 算。
@@ -586,6 +652,13 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         pasteScope="[data-heyta-chat-root]"
         testIdPrefix="chat-attach"
       />
+      <MentionChips segments={mentionSegmentsOfDraft} resolve={lookupMention} />
+      <MentionPicker
+        candidates={mentionList}
+        activeIndex={mentionIndex}
+        onPick={pickMention}
+        onHover={setMentionIndex}
+      />
       <div className="ht-ai__composer">
       <textarea
         ref={composerRef}
@@ -595,8 +668,42 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         value={draft}
         rows={2}
         data-testid="ai-assistant-input"
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          setCaret(e.target.selectionStart ?? e.target.value.length);
+          setMentionClosed(false);
+          setMentionIndex(0);
+        }}
+        onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
         onKeyDown={(e) => {
+          /**
+           * 🔴 候选打开时，方向键 / Enter / Esc 属于**候选**，不属于输入框。
+           * 这一层不与 `MentionPicker` 分工：键盘判断只能有一处，
+           * 拆到两个组件的直接后果是"按 Enter 既选中候选又发送了消息"。
+           */
+          if (mentionList.length > 0) {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setMentionIndex((index) => (index + 1) % mentionList.length);
+              return;
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setMentionIndex((index) => (index - 1 + mentionList.length) % mentionList.length);
+              return;
+            }
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              const candidate = mentionList[mentionIndex];
+              if (candidate !== undefined) pickMention(candidate);
+              return;
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              setMentionClosed(true);
+              return;
+            }
+          }
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             send();

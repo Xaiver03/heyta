@@ -2697,6 +2697,7 @@ export const en = {
   'web.capture.unused': 'Not used, still in the title',
   'web.capture.previewLead': 'Actual title:',
   'web.capture.previewEmpty': '(empty)',
+  'web.ai.mention.aria': 'Choose a task to mention',
   'web.ai.attach.label': 'Attach an image',
   'web.ai.attach.busy': 'Compressing…',
   'web.ai.attach.hint': 'You can also paste a screenshot',
