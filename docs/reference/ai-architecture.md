@@ -81,6 +81,10 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 | `packages/app-host/src/ai-tool-call.ts` | — | **内置 AI 的模型路径**：规则先跑（命中即零出境短路）→ `invokeRouted` 带 `tools` → 校验后复用 `runSelectedTool`。出境字段 = `text` + `tools` |
 | `packages/app-host/src/ai-assistant.ts` | — | 🔴 **对话式助手的多步循环**（[ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md)）：整份目录 → grants（`assistantGrants()`，**没有档位**，ADR-0082）、**循环前一次算完的字段并集**（`planAssistantEgress`）、观察回送模型、写只出提案、越界即停。`assistantMessages()` 是 `system`/`user` 的**唯一来源** |
 | `packages/ai/src/assistant-limits.ts` | — | 三个硬上界（步数 / 消息条数 / 单请求字节）+ `egressBytesFor()`。**住在这个包**：上界是出境层的纪律，不是编排层的偏好。单位是**字节**（UTF-8） |
+| `packages/ai/src/image-limits.ts` | 265 | **图片出境的预算与几何**（纯函数）：五元组（单张 45 KB / 2 张 / 总额 80 KB / 像素 / 单边）、`planImageRequest()` 的封闭拒绝词表、`base64ByteLength()`。🔴 单张上限 × 张数**故意大于**总额 ⇒ "两张都不大、合起来太大"这条分支真的可达（相等的话它就是个没有构造点的死成员） |
+| `packages/ai/src/wire.ts` 的 `ContentPart` | — | 多段内容（文本 / 图片）。**我们的**词表；`image_url` 那种 OpenAI 形状只在 `toWireContentParts()` 里转换一次。🔴 有图而 `fields` 缺 `images` **在组装请求体时**抛错 —— 出境清单漏报图片等于对用户撒谎 |
+| `packages/ai` 的 `AiInvocation.requires` | — | 本次请求**额外**要求的能力（叠加在功能要求之上）。图片走它而**不**新开一个 `AiFeature`：后者是对外契约，加成员等于给三端界面各加一格配置。`vision` 从此有了真实消费者 |
+| `apps/web/src/features/ai/image-encode.ts` | — | 图片归一化（**平台能力**，要画布）：按**实测字节**降档（PNG → JPEG 0.75/0.6/0.45 → 缩尺寸），不按尺寸估。与头像那一段同一条 §3.5 分界线 |
 | `packages/app-host/src/calendar-anchor.ts` | — | 🔴 「今天是 …（周X，UTC±HH:MM）」的**唯一生产者** + 日期硬规则。不用 `Intl`（Hermes 上可选），偏移走纯算术 |
 | `packages/ai/src/capability-manifest.generated.ts` | 424 | **生成物**：给模型看的"哪个实体、哪些字段、可读还是可写"。手写不可能，`--check` 不一致即红 |
 | `scripts/gen-ai-capability-manifest.mjs` | — | 上面那份的生成器（从工具目录 + `EntityModelMap`）。`check:ai-tools` 规则 7 调它的 `--check` |
