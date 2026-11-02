@@ -93,6 +93,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 
 | 编号 | 决策 | 状态 |
 |---|---|---|
+| [0082](adr/0082-assistant-has-no-permission-tier.md) | 🤖 **内置助手不设权限档**：删掉 `assistantTier`（只读 / 执行）——助手看得见整份工具目录，写入靠风险闸门（低风险自动、高风险逐条确认）+ 一次性并集披露，不由一个用户要先拨对的开关决定。取代 [ADR-0045](adr/0045-conversational-assistant-split-authorization-from-catalog.md) §5 D-5 的"两档起步落地"，其余结论一条不动 | ✅ **已接受**（产品负责人 2026-11-01：「都不需要有权限的设计，没必要区分只读和执行」）|
 | [0081](adr/0081-encryption-is-opt-in-not-default.md) | 🔐 **默认不加密**：新账号载荷模式默认 `readable`（服务端可读），端到端加密改成设置里**显式开启**；开启/关闭仍各是一次整库迁移，两个方向都拒「半密半明」。取代 [ADR-0080](adr/0080-e2ee-is-optional-with-device-held-key.md) §一第 1 条的「默认+卖点」，其余结论不动 | ✅ **已接受**（产品负责人 2026-11-01：「默认是明文；加密变成用户显式开启」）|
 | [0080](adr/0080-e2ee-is-optional-with-device-held-key.md) | 🔐 端到端加密是**默认**而不是**强制**：用户可以显式关掉（关闭 = **整库解密重传**，两个方向都走既有 staging，不留"半密半明"）；口令从"每次都要"降级为"加设备 / 恢复 / 轮换"才出现，root 默认由设备持有；服务端入口闸门改成**按账号模式互斥拒收**（`readable` 收明文拒密文）。改的只是"能不能选"，默认值与卖点不变 | ✅ **已接受**（产品负责人 2026-11-01 拍板；开发阶段无存量 ⇒ 可逆性两向都开，推广前须重审"不可撤回窗口"） |
 | [0078](adr/0078-admin-console-boots-without-local-store.md) | 管理后台页**独立启动**：`/admin` 不初始化本地 op-log（它只用服务端 HTTP），另一张标签页占着 OPFS 排他锁时也能进；未登录就地给 `AuthPanel`；非管理员不画分区导航 | ✅ **已接受**（D4 产品负责人 2026-10-30 拍板；D1–D3 工程裁决）；实施见 [后台计划](plans/admin-console.md) §10 |
