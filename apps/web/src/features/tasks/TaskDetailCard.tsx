@@ -258,10 +258,33 @@ const statusLineStyle: CSSProperties = {
  *
  * 🔴 它**只**在详情列画（`App.tsx` 那一支要求 `detailColumnShown`），所以这里没有
  * `inset` 参数：便签与习惯那两个生产者有第二落点（板子/列表旁边），因此"哪一支带内边距"
- * 必须显式说清；这一格的窄档回落**住在行尾**（那颗 chip），不是同一只卡片的第二个落点。
+ * 必须显式说清。
+ *
+ * ⚠️ **2026-11 行操作重设计之后它确实有了第二个落点**：行尾那一排编辑器（备注 / 子任务 /
+ * 清单+标签 / 重复 / 截止 / 提醒）整排撤掉了 ⇒ 窄档与"详情列被收起"这两档如果没有落点，
+ * 那些字段就变成不可编辑。所以宿主在**同一只卡片**外面套了一层 `WebModalShell`
+ * （`App.tsx` 的「任务详情」对话框），内边距由对话框那一层给。
+ * 判据：`tests/task-row-menu.spec.tsx` 的 P3 —— 行尾不再有编辑器，而两档都够得着面单。
  * 内边距由 `.ht-app__detail-task` 给（挂在既有 `.ht-app` 族下，理由见上面棘轮那段）。
  */
-export function TaskDetailCard(): React.JSX.Element | null {
+export function TaskDetailCard({
+  automationSlot,
+}: {
+  /**
+   * 「自动化」组里属于**宿主**的那一格（行操作 UX 重设计，2026-11）。
+   *
+   * 🔴 为什么是插槽而不是把 AI 那两个组件搬进来：`AiBreakdown` / `AiDuration` 要吃
+   * `aiRouting` / `consents` / `secrets` / `health` / `preferenceSet` 五组**只住在
+   * `App.tsx` 的状态**，而本卡片是**唯一**能同时出现在详情列与窄档对话框里的面单
+   * （两份落点）。把那些状态灌进来会变成"卡片认识 AI 的接线"，与它"只读 store"的
+   * 定位相反；传一个 `ReactNode` 则保持**一份实现、两个落点**（与
+   * `renderMeta` / `renderTrailing` 同一形状）。
+   *
+   * ⚠️ 此前 AI 拆解 / 估时住在行尾那枚「⋯ 更多」里 —— 那是"自动化"组的临时住址。
+   * 行尾不再挂编辑器之后，它们的正确住址就是这里（审计 §4.6 早已把这一组留给它们）。
+   */
+  automationSlot?: React.ReactNode;
+} = {}): React.JSX.Element | null {
   const { t } = useI18n();
   const store = useTaskStore();
 
@@ -484,6 +507,14 @@ export function TaskDetailCard(): React.JSX.Element | null {
           void store.setRepeat(task.id, rule);
         }}
       />
+
+      {/*
+        AI 那一格（宿主注入，见 `automationSlot` 的注释）。
+        空组不画：`automationSlot` 没给时这一组只剩重复，与改前逐字相同。
+      */}
+      {automationSlot === undefined ? null : (
+        <div data-testid="task-detail-automation-slot">{automationSlot}</div>
+      )}
 
       {/*
         ══ 协作区：评论（W4）═══════════════════════════════════════════
