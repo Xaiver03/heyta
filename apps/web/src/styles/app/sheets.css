@@ -90,6 +90,17 @@
 .ht-settings__content > .ht-settings__group > div > .ht-settings {
   border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);
+  /**
+   * 🔴 **卡片靠阴影浮起来，不靠压深页面底色。**
+   *
+   * 实测：卡片 `#fff` 与页面 `#f8fafc` 只差 7/255，一屏三张卡糊成一片白。
+   * 试过把页面压一档到 `slate-100`（差 14/255）—— 四端 AA 用例当场红：
+   * `foreground-subtle` 在页面底上掉到 4.34:1（要求 ≥4.5）。而它已经是最浅一档
+   * 文字色，再深一档就与 `foreground-muted` 合并，两个层级会塌成一个。
+   *
+   * ⇒ 换 DSH 浮层卡的做法：**阴影**。它不进对比度计算，所以不会拿可读性换观感。
+   */
+  box-shadow: var(--ht-shadow-md);
   background: var(--ht-color-surface);
   max-inline-size: none;
 }
