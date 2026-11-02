@@ -5,8 +5,6 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { AssistantMark } from '@heyta/ui';
 import { inferPreferences, renderPreferenceHints } from '@heyta/domain';
 import {
-  ASSISTANT_TIER_EXECUTE,
-  ASSISTANT_TIER_READ_ONLY,
   assistantEgressFields,
   createAssistantHistoryAccountResolver,
   createLocalApiHost,
@@ -156,7 +154,6 @@ export function AssistantScreen({
       resolveRouting,
       localize: (key, vars) => t(key as MessageKey, vars),
       onHealth: persistHealth,
-      onTierChange: (tier) => saveAiSettings({ ...getAiSettings(), assistantTier: tier }),
     }),
     [settings, t, toolHost],
   );
@@ -197,7 +194,7 @@ export function AssistantScreen({
       }),
     [settings.health, settings.routing, snapshot.routeTime, sync.status],
   );
-  const plan = useMemo(() => planAssistantEgress(settings.assistantTier), [settings.assistantTier]);
+  const plan = planAssistantEgress();
   const configured = isAiConfiguredOnThisDevice(settings);
 
   const renderItems = snapshot.items.map<ChatTranscriptItem>((entry) => {
@@ -243,7 +240,7 @@ export function AssistantScreen({
           confirmed={entry.confirmed}
           error={snapshot.proposalErrors[entry.id]}
           expired={entry.expired === true}
-          disabled={snapshot.phase !== 'idle' || settings.assistantTier === ASSISTANT_TIER_READ_ONLY}
+          disabled={snapshot.phase !== 'idle'}
           expanded={snapshot.expandedEntry === entry.id}
           onToggle={() => controller.toggleExpandedEntry(entry.id)}
           onConfirm={() => controller.confirmProposal(entry.id)}
@@ -308,8 +305,6 @@ export function AssistantScreen({
           ) : null}
           <HStack gap="tight" align="center" style={{ flexWrap: 'wrap' }}>
             <Button label={t('web.ai.chat.history.open')} tone="ghost" onPress={() => controller.toggleHistory()} testID="assistant-history" />
-            <Chip tone="quiet" label={t('web.ai.chat.tier.readOnly')} selected={settings.assistantTier === ASSISTANT_TIER_READ_ONLY} onPress={() => controller.setTier(ASSISTANT_TIER_READ_ONLY)} />
-            <Chip tone="quiet" label={t('web.ai.chat.tier.readAndPropose')} selected={settings.assistantTier === ASSISTANT_TIER_EXECUTE} onPress={() => controller.setTier(ASSISTANT_TIER_EXECUTE)} />
           </HStack>
           {snapshot.historyOpen ? (
             <Card gap="tight">
@@ -398,7 +393,7 @@ function DisclosureCard({ target, plan, consents, onConfirm, onCancel, onOpenSet
       </Stack>
     );
   }
-  const fields = assistantEgressFields(plan.tier);
+  const fields = assistantEgressFields();
   // 🔴 「出境的是哪个功能」只在这一处取字面量：闸门、披露块与同意提示**同源**。
   //    三处各写一遍 `'tool-calling'` 的话，改了一处就会让提示念着别的功能。
   const feature = 'tool-calling' as const;

@@ -99,6 +99,14 @@ def node_record(node):
  return {'text':node.get('text'),'contentDescription':node.get('content-desc'),'resourceId':node.get('resource-id'),'class':node.get('class'),'clickable':node.get('clickable'),'visibleToUser':node.get('visible-to-user'),'bounds':bounds_record(node)}
 
 def countdown_entry(root):
+ # 🔴 2026-10-27 IA 迁移：倒数纪念日搬进「功能与 AI」二级页。
+ # 首屏找不到就先点枢纽（不在这里硬编码坐标：枢纽是首屏第一张卡的最后一枚）。
+ if not find_resource(root,'profile-entry-countdown'):
+     hub=find_resource(root,'profile-entry-features')
+     if hub is not None:
+         hub.click()
+         time.sleep(2)
+         root=dump_root()
  resource=find_resource(root,'profile-entry-countdown')
  if resource is not None and resource.get('clickable') == 'true':return resource
  pressable=find_pressable(root,countdown_label())

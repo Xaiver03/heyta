@@ -42,7 +42,6 @@ export interface MobileFeatureEntry {
   readonly key: FeatureModuleKey;
   /** 入口行的标题。**存 key 不存文案**（同 `nav/TabBar.tsx`：写中文就是硬编码）。 */
   readonly labelKey: MessageKey;
-  readonly hintKey: MessageKey;
   /** 稳定测试锚点：设备验收脚本与本壳的判据都指它，改名要一起改。 */
   readonly testID: string;
   /**
@@ -73,14 +72,12 @@ export const MOBILE_FEATURE_ENTRIES = [
   {
     key: 'growth',
     labelKey: 'mobile.growth.entry',
-    hintKey: 'mobile.growth.entry.hint',
     testID: 'profile-entry-growth',
     screen: 'GrowthScreen',
   },
   {
     key: 'habits',
     labelKey: 'mobile.habits.entry',
-    hintKey: 'mobile.habits.entry.hint',
     testID: 'profile-entry-habits',
     screen: 'HabitsScreen',
   },
@@ -92,7 +89,6 @@ export const MOBILE_FEATURE_ENTRIES = [
     //    与 `lib/habits-display.ts` 复用 `web.habits.*` 是同一条先例（命名残差已登记）。
     key: 'countdown',
     labelKey: 'mobile.countdown.entry',
-    hintKey: 'mobile.countdown.entry.hint',
     testID: 'profile-entry-countdown',
     screen: 'CountdownScreen',
   },
@@ -104,14 +100,13 @@ export const MOBILE_FEATURE_ENTRIES = [
  * 🔴 它**不进** `MOBILE_FEATURE_ENTRIES`，因为那张表按词表逐条判"在不在
  * `FEATURE_MODULE_KEYS` 里"（本文件头第 1 条），而"共享"**不是那个词表的成员**：
  * web 那端的共享入口也不走 rail 开关（M7 的 `check:share-entry-visible` 单独钉它）。
- * 形状与那三行**逐字段相同**（key/labelKey/hintKey/testID/screen），所以「我的」页
+ * 形状与那三行**逐字段相同**（key/labelKey/testID/screen），所以「我的」页
  * 第二层的生成、穷尽 switch、`feature-entries.spec.ts` 的接线判据**同一把尺量两条**，
  * 不是又一份手写入口行。
  */
 export interface MobileShareEntry {
   readonly key: 'share';
   readonly labelKey: MessageKey;
-  readonly hintKey: MessageKey;
   readonly testID: string;
   readonly screen: string;
 }
@@ -120,7 +115,6 @@ export const MOBILE_SHARE_ENTRIES = [
   {
     key: 'share',
     labelKey: 'mobile.share.entry',
-    hintKey: 'mobile.share.entry.hint',
     testID: 'profile-entry-share',
     screen: 'ShareSpaceScreen',
   },

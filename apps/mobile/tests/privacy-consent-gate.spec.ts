@@ -565,11 +565,23 @@ describe('调用点与顺序（源码级：删掉或挪晚都会红）', () => {
     );
   });
 
-  it('🔴 `AuthScreen` 五个出门动作**每一个**都先过闸门', () => {
+  /*
+    🔴 2026-10-26 更新：这张清单跟着**壳里真实存在的出门动作**走。
+    这一轮移动端改用共享 `AuthForm`、并去掉了"用邮件链接注册"（注册主路是
+    邮箱 + 口令 + 验证码；邮件链接只用来登录）。清单没有变短，反而变长：
+    新接入的找回通行密钥、注册验证码的确认与重发也都是出门动作，
+    而"新动作忘了过闸门"正是这类清单最容易漏的一格。
+  */
+  it('🔴 `AuthScreen` 每一个出门动作都先过闸门', () => {
     const code = codeOf('screens/AuthScreen.tsx');
     const handlers: Array<[name: string, egress: RegExp]> = [
+      ['login', /loginWithEmailPassword\(/],
+      ['register', /requestEmailPasswordRegistrationCode\(/],
+      ['verifyRegistrationCode', /verifyEmailPasswordRegistrationCode\(/],
+      ['resendRegistrationCode', /resendEmailPasswordRegistrationCode\(/],
+      ['forgotPassword', /requestPasswordReset\(/],
+      ['recoverPasskey', /requestPasskeyRecovery\(/],
       ['sendLoginLink', /requestMagicLink\(/],
-      ['register', /registerWithMagicLink\(/],
       ['passkeyLogin', /beginPasskeyLogin\(/],
       ['passkeyRegister', /beginPasskeyRegistration\(/],
       ['redeemPasted', /redeemPastedAuthToken\(/],

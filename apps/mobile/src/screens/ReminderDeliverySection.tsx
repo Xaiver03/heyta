@@ -59,14 +59,19 @@ export function ReminderDeliverySection(): React.JSX.Element | null {
             role: landing.copy.alert ? 'alert' : undefined,
           },
         ] as const)),
-    { kind: 'note', testID: 'reminder-settings-note', text: t('reminder.settings.note'), tone: 'muted' },
   ];
 
+  /*
+    🔴 `reminder.settings.note`（81 字）原来是 `kind: 'note'` 的**一整行正文**，
+    现在挂在这一节的「?」上（`note=` 是 `check-settings-no-prose` 认的载体之一）。
+    产品负责人的禁令只允许这种形态：正文摆在行里不行，点开才看到才行。
+  */
   return (
     <SettingsSection
       variant="card"
       testID="reminder-delivery-section"
       title={t('reminder.settings.section')}
+      note={t('reminder.settings.note')}
       leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
       rows={models}
     />

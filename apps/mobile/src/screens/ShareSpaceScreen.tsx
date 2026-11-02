@@ -678,7 +678,10 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
         </Text>
       ) : null}
       {creatingError !== undefined ? (
-        <Text variant="row-title" tone="danger" testID="share-create-error">
+        // 「上一次动作失败了」是**辅助信息**那一档（`row-meta`），与它上面
+        // `share-storage-error` 同一句词条的档位一致 —— 同一句 `web.share.error.action`
+        // 在这一屏原来画成 14px 与 16px 两档（见本轮收敛记录）。
+        <Text variant="row-meta" tone="danger" testID="share-create-error">
           {t('web.share.error.create', { message: creatingError })}
         </Text>
       ) : null}
@@ -865,7 +868,7 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
           ) : null}
 
           {transferFailure !== undefined ? (
-            <Text variant="row-title" tone="danger" testID="share-transfer-error">
+            <Text variant="row-meta" tone="danger" testID="share-transfer-error">
               {transferFailure.kind === 'target-unsealed'
                 ? // 与面板行内那句等待提示同一份文案：同一件事不许有两个说法（B-10 的收口句）。
                   t('common.share.member.waitingForEnvelope')
@@ -873,7 +876,7 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
             </Text>
           ) : null}
           {panelError !== undefined ? (
-            <Text variant="row-title" tone="danger" testID="share-panel-error">
+            <Text variant="row-meta" tone="danger" testID="share-panel-error">
               {t('web.share.error.action', { message: panelError })}
             </Text>
           ) : null}

@@ -656,7 +656,10 @@ goto_me_page || echo "   · 底部标签没按下 —— 下面的同帧邻锚�
 #   这里同时当两件事用：① 桥与 `AXUniqueId` 通道是通的（整棵树没有一枚 AXUniqueId 时
 #   `id:` 前缀会恒取空，那条反向判据就变成装饰）；② 页面确实停在「我的」。
 NEIGH=""
-for n in profile-entry-settings profile-entry-habits profile-entry-trash; do
+# 🔴 2026-10-27 IA 迁移：`profile-entry-habits` 搬进「功能与 AI」二级页，
+# 不在「我的」首屏了 —— 它当同帧邻锚会恒为空，把这一整条判据拖成"探针没落到这一页"。
+# 换成三枚**仍在首屏**的：设置 / 回收站 / 枢纽（枢纽本身也在首屏）。
+for n in profile-entry-settings profile-entry-features profile-entry-trash; do
   found_id "$n" && NEIGH="$NEIGH $n"
 done
 if [ -z "$NEIGH" ]; then

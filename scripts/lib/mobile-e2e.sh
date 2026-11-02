@@ -142,7 +142,12 @@ E2EE=$(cat "${HEYTA_E2E_E2EE_FILE:-/tmp/heyta_mobile_e2ee.txt}")
 #   - 同步步骤失败 → 看起来像同步协议坏了。
 # `10.0.2.2` 是模拟器眼里的宿主机，所以两处端口必须同时改。
 E2E_PORT="${PORT:-3000}"
-SERVER=http://10.0.2.2:${E2E_PORT}
+# 🔴 设备侧地址默认是**模拟器**眼里的宿主机（`10.0.2.2`）。真机没有这个别名 ——
+#    真机上要用 `adb reverse tcp:<port> tcp:<port>` 让设备走 `127.0.0.1`，
+#    再用 `HEYTA_E2E_DEVICE_SERVER=http://127.0.0.1:<port>` 覆盖这一行。
+#    不覆盖的后果不是报错，是设备去连一个不存在的地址：超时、界面停在"正在…"，
+#    而日志里所有失败都长得像产品缺陷。
+SERVER="${HEYTA_E2E_DEVICE_SERVER:-http://10.0.2.2:${E2E_PORT}}"
 HOST_SERVER=http://127.0.0.1:${E2E_PORT}
 
 PASS=0; FAIL=0
@@ -559,7 +564,7 @@ ensure_phone_sync() {
   # 这一棵树上没有 ⇒ 按当前源码的形状进浮层那一组再试（不静默：成功会打印是哪一面）。
   # ⚠️ 进组之后**必须"见到为止"而不是单次判定**：高负载时 `dump()` 会抓空
   #    （lib 里 `settle_for` 那段记的就是这个形状 —— 抓空那次读到的"没有按钮"是假红）。
-  if ! open_settings_section sync; then
+  if ! open_settings_section data; then
     bad "同步按钮既不空闲也不在忙（desc 里既没有「立即同步」也没有「正在同步…」），而进设置面「同步与隐私」那一组这一步也没做成"
     return 1
   fi
@@ -1627,7 +1632,13 @@ open_settings_section() {  # <key: profile|general|sync|ai|data|security>
     $ADB shell input tap $row; sleep 3
     dump
   fi
+  # 🔴 先直接取；取不到再**滚**着找。目录现在有 7 组，`sync` 会落在折叠线以下，
+  #    而 `xy_rid` 只认当前树里存在的节点 ⇒ 不滚就报"这一组没渲染"，
+  #    把"在下面一点"说成"不存在"（2026-10-26 实测：`verify-mobile-auth.sh` 第 1.5 步）。
   row=$(xy_rid "settings-section-$1")
+  if [ -z "$row" ]; then
+    row=$(scroll_to_rid "settings-section-$1")
+  fi
   if [ -z "$row" ]; then
     bad "设置面里没有「settings-section-$1」这一行 —— 要么没落在分组目录，要么那一组按当前状态根本没渲染（例如没有账号时没有「个人资料」组）"
     return 1
@@ -1658,12 +1669,16 @@ close_settings_sheet() {
 # 一份修好了、另一份还按旧逻辑跑，而两边都声称自己验过。
 configure_sync_credentials() {
   disable_ime; sleep 2
-  $ADB shell input tap 945 2253; sleep 3   # 「我的」
+  # 🔴 按无障碍名点，不按坐标：这台机器上的分辨率不一定是 1080×2340，
+  #    写死的 (945,2253) 在别的分辨率上落在空白处。
+  MINE_XY=$(xy_desc "我的")
+  if [ -z "$MINE_XY" ]; then bad "标签栏上没有「我的」"; return 1; fi
+  $ADB shell input tap $MINE_XY; sleep 3
   # 🔴 凭据表单在「设置」Modal 的「同步与隐私」组里，不在「我的」滚动流上（设置 IA
   #    收进 `SettingsScreen` 那一刀搬进去的，之后又加了目录层）。旧写法直接在
   #    我的页 / 目录层找输入框，三个字段全部"找不到"，而页面明明就在 ——
   #    实测卡过 verify-mobile-inbox 的每一轮，改前四枚红见 `ab-before.txt`。
-  open_settings_section sync || return 1
+  open_settings_section data || return 1
   # 表单还要 `advancedSync` 为真才渲染（`SettingsScreen.tsx:163-165`：初值 = 令牌与
   # 地址都非空且地址不是默认值）。三种落点都过一遍现量：
   #   ① 未配置自托管 ⇒ 组内第一屏就能看到那一行（实测 `[84,756][501,871]`）；

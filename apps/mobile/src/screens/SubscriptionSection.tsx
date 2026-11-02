@@ -27,6 +27,8 @@
 import React from 'react';
 import { useI18n } from '@heyta/i18n';
 
+import { SettingsInfoTip } from '@heyta/ui';
+
 import { Stack, Text } from '../ui/kit';
 import { EntitlementSection } from './EntitlementSection';
 import { RenewSection } from './RenewSection';
@@ -42,9 +44,12 @@ export function SubscriptionSection(): React.JSX.Element {
       <EntitlementSection />
       {/* 选档 + 下单：收银台机器在这一枚里，本屏不重复任何判断。 */}
       <RenewSection />
-      <Text variant="row-meta" tone="subtle" testID="subscription-footnote">
-        {t('mobile.subscription.footnote')}
-      </Text>
+      {/* 🔴 计费口径原来是**一段正文**；禁令下它只能躲在「?」里（`SettingsInfoTip`）。 */}
+      <SettingsInfoTip
+        testID="subscription-footnote"
+        text={t('mobile.subscription.footnote')}
+        label={t('common.tip.label')}
+      />
     </Stack>
   );
 }

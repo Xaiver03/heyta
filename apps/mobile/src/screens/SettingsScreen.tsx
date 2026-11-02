@@ -146,13 +146,31 @@ function makeStyles(tokens: HeytaNativeTokens) {
  * 「我的」的滚动流里，用户要滚过"清单/标签/便签"才看得到。
  */
 export type SettingsSectionKey =
-  | 'profile'
+  | 'account'
   | 'subscription'
-  | 'general'
-  | 'sync'
-  | 'ai'
   | 'data'
-  | 'security';
+  | 'notifications'
+  | 'appearance'
+  | 'features'
+  | 'about';
+
+/**
+ * 旧 key（**深链与宿主还会传**）→ 新分组。
+ *
+ * 🔴 为什么不直接改旧 key：`profile` / `sync` / `ai` / `security` / `general` / `data` 这几个
+ * 字符串被「我的」页的入口、别人的深链、以及 e2e 引用着。改 key 等于同时改 4 个包，
+ * 而用户看到的是**分组名与内容**，不是 key。所以旧名一律按这张表落到新分组，
+ * 新代码只写新名。
+ */
+const LEGACY_SECTION: Record<string, SettingsSectionKey> = {
+  profile: 'account',
+  security: 'account',
+  subscription: 'subscription',
+  sync: 'data',
+  data: 'data',
+  general: 'notifications',
+  ai: 'features',
+};
 
 export function SettingsScreen({
   visible,
@@ -402,7 +420,6 @@ export function SettingsScreen({
       text: t(key),
     })),
     { kind: 'note', text: t('mobile.widgetJourney.cannotAutoAdd'), divider: true },
-    { kind: 'note', text: t('mobile.widgetJourney.openOnce') },
     {
       kind: 'toggle',
       testID: 'widget-privacy-toggle',
@@ -425,24 +442,39 @@ export function SettingsScreen({
       : []),
   ];
 
+  /**
+   * 分组标题 = **用户意图**，不是技术模块。
+   *
+   * 🔴 改前是 7 个桶：个人资料 / 订阅 / 常规 / 同步与隐私 / AI 与集成 / 数据管理 / 账号安全 ——
+   * 用户每次进设置都要先猜"这个词是按什么分的"。改后每一组回答的是
+   * "我要做的那件事属于哪一类"，而「常规」那个"别的都不是"的垃圾桶被拆成了
+   * 提醒与通知 / 外观与语言 / 关于与帮助 三组。
+   */
   const sectionLabels: Record<SettingsSectionKey, string> = {
-    profile: t('mobile.settings.section.profile'),
+    account: t('mobile.settings.section.account'),
     subscription: t('mobile.settings.section.subscription'),
-    general: t('mobile.settings.section.general'),
-    sync: t('mobile.settings.section.sync'),
-    ai: t('mobile.settings.section.ai'),
     data: t('mobile.settings.section.data'),
-    security: t('mobile.settings.section.security'),
+    notifications: t('mobile.settings.section.notifications'),
+    appearance: t('mobile.settings.section.appearance'),
+    features: t('mobile.settings.section.features'),
+    about: t('mobile.settings.section.about'),
   };
 
+  /**
+   * 图标：**七个两两不同**。
+   *
+   * 🔴 改前 `subscription` 与 `ai` 都是 `action.more`、`general` 是齿轮 ——
+   * 三个组共用两枚图标，读起来是"这几组差不多"。图标在这里是**唯一的分组线索**
+   * （标题只有 2–4 个字），撞图标等于丢线索。
+   */
   const sectionIcons: Record<SettingsSectionKey, React.ComponentProps<typeof Icon>['name']> = {
-    profile: 'tab.profile',
-    subscription: 'action.more',
-    general: 'action.settings',
-    sync: 'action.sync',
-    ai: 'action.more',
-    data: 'action.share',
-    security: 'privacy.consent',
+    account: 'tab.profile',
+    subscription: 'action.share',
+    data: 'action.sync',
+    notifications: 'task.reminder',
+    appearance: 'action.settings',
+    features: 'tab.focus',
+    about: 'action.more',
   };
 
   const sectionRows: readonly SettingsRowModel[] = (
@@ -450,7 +482,8 @@ export function SettingsScreen({
   )
     .filter(
       (key) =>
-        key !== 'profile' ||
+        // 账号那一组只有在宿主给了身份编辑器时才出现（没有账号时它是空的）。
+        key !== 'account' ||
         (profileEditor !== undefined && profileEditor !== null && profileEditor !== false),
     )
     .map((key): SettingsRowModel => ({
@@ -544,15 +577,18 @@ export function SettingsScreen({
               keyboard="url"
               hint={t('mobile.profile.serverUrl.hint')}
             />
+            {/*
+              🔴 这两句**故意看得见**，不躲进「?」：它们不是"设置项的说明"，而是
+              **当前配置的危险后果**（令牌会明文过网、可能被截获）。这类是"反馈/告警"，
+              门禁的例外通道就是它（`role` 声明成 alert，读屏器也会念）。
+              ⚠️ 谁想把它改回普通正文行之前先想清楚：这一点是**安全**信息，
+              藏起来的代价是用户不知道自己在明文上。
+            */}
             {form.transport === 'plaintext' ? (
-              <Text variant="caption" tone="warning">
-                {t('mobile.profile.transport.plaintext')}
-              </Text>
+              <Text variant="caption" tone="warning">{t('mobile.profile.transport.plaintext')}</Text> // settings-prose-ok: 明文传输的安全告警，藏起来比看得见危险
             ) : null}
             {form.transport === 'plaintext-local' ? (
-              <Text variant="caption" tone="warning">
-                {t('mobile.profile.transport.plaintextLocal')}
-              </Text>
+              <Text variant="caption" tone="warning">{t('mobile.profile.transport.plaintextLocal')}</Text> // settings-prose-ok: 同上，明文的安全告警
             ) : null}
             <TextField
               label={t('mobile.profile.token.label')}
@@ -621,24 +657,35 @@ export function SettingsScreen({
     </>
   );
 
-  const renderGeneral = (): React.JSX.Element => (
+  /**
+   * G4 提醒与通知。
+   *
+   * 🔴 从原来的「常规」里拆出来：那一组是 5 种东西（系统授权 / 小组件 / 语言 / 反馈 / 备案号）
+   * 4 种频率混在一个桶里。现在这一组只回答一个问题：**"我的提醒会不会响、小组件怎么加"**。
+   *
+   * ⚠️ `ReminderDeliverySection` 放在**最上面**：这一屏其他内容都与"提醒为什么不响"
+   * 无关，而被拒之后能做的只有这一件事。
+   */
+  const renderNotifications = (): React.JSX.Element => (
     <>
-      {/* 🔴 放在这一节**最上面**：这一屏的其他内容都跟"提醒为什么不响"无关，
-          而被拒之后能做的只有这一件事。它自己会在"三道门都读不到"时返回 null，
-          所以不存在"多出一张空卡"的那一种。 */}
       <ReminderDeliverySection />
       {shouldShowWidgetJourney(widgetBridgeAvailable) ? (
         <SettingsSection
           variant="card"
           testID="widget-journey"
           title={t('mobile.widgetJourney.sectionTitle')}
+          /* 「添加后打开一次就会填充」是**点开才知道**的操作指引 ⇒ 「?」，不摆成正文行。 */
+          note={t('mobile.widgetJourney.openOnce')}
           leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
           rows={widgetRows}
         />
       ) : null}
-      <Text variant="caption" tone="subtle">
-        {t('mobile.profile.footnote')}
-      </Text>
+    </>
+  );
+
+  /** G5 外观与语言。 */
+  const renderAppearance = (): React.JSX.Element => (
+    <>
       <SettingsSection
         variant="card"
         testID="profile-language"
@@ -657,57 +704,59 @@ export function SettingsScreen({
           ))}
         </View>
       </SettingsSection>
-      <SettingsSection
-        variant="card"
-        testID="settings-feedback"
-        title={t('mobile.settings.feedback.section')}
-        leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
-        rows={
-          [
-            {
-              kind: 'action',
-              testID: 'settings-entry-feedback',
-              label: t('common.feedback.label'),
-              hint: t('common.feedback.hint'),
-              leading: <Icon name="action.send" size="sm" color={tokens['color.foreground-muted']} />,
-              onPress: openFeedbackMail,
-            },
-            ...(feedbackFailed
-              ? [
-                  {
-                    kind: 'note' as const,
-                    testID: 'settings-feedback-failed',
-                    text: t('mobile.settings.feedback.failed', { email: OPERATOR.contactEmail }),
-                    tone: 'warning' as const,
-                  },
-                ]
-              : []),
-            /*
-              运营者与备案号。
-
-              🔴 **它是隐私政策里一句承诺在移动端的兑现**：政策写着
-              「App 备案号**以应用内「关于」页与服务端对外页公布者为准**」——
-              而移动端才是要提审的那个壳，应用商店会看这一行。
-              2026-10-16 查实：在那之前 `OPERATOR.appFilingNumber` **UI 侧零消费者**，
-              核准那天光填字段，它不会出现在任何地方。
-
-              ⚠️ 文本由 `@heyta/legal` 的 `operatorFilingLine` 生成，**与 web 的「关于」页同一份实现**
-              —— 各写一遍的话，最可能漂移的恰恰是"未核准"那个空值分支，
-              而它正是法务管着的地方（不印任何号码、也不放占位）。
-            */
-            ...(isOfficialHostedInstance(readSyncConfig()?.serverUrl ?? '')
-              ? [
-                  {
-                    kind: 'note' as const,
-                    testID: 'settings-operator',
-                    text: operatorFilingLine(OPERATOR),
-                  },
-                ]
-              : []),
-          ] as readonly SettingsRowModel[]
-        }
-      />
+      <Text variant="caption" tone="subtle">
+        {t('mobile.profile.footnote')}
+      </Text>
     </>
+  );
+
+  /** G7 关于与帮助：反馈、运营者与备案号（法务承诺在移动端的兑现）。 */
+  const renderAbout = (): React.JSX.Element => (
+    <SettingsSection
+      variant="card"
+      testID="settings-feedback"
+      title={t('mobile.settings.feedback.section')}
+      leading={<Icon name="action.more" size="sm" color={tokens['color.foreground-muted']} />}
+      rows={
+        [
+          {
+            kind: 'action',
+            testID: 'settings-entry-feedback',
+            label: t('common.feedback.label'),
+            hint: t('common.feedback.hint'),
+            leading: <Icon name="action.send" size="sm" color={tokens['color.foreground-muted']} />,
+            onPress: openFeedbackMail,
+          },
+          ...(feedbackFailed
+            ? [
+                {
+                  kind: 'note' as const,
+                  testID: 'settings-feedback-failed',
+                  text: t('mobile.settings.feedback.failed', { email: OPERATOR.contactEmail }),
+                  tone: 'warning' as const,
+                  // 失败反馈不是说明（门禁例外通道）。
+                  role: 'alert' as const,
+                },
+              ]
+            : []),
+          /*
+            运营者与备案号 —— 隐私政策里一句承诺在移动端的兑现：政策写着
+            「App 备案号以应用内「关于」页与服务端对外页公布者为准」，
+            而移动端才是要提审的那个壳。文本由 `@heyta/legal` 的 `operatorFilingLine`
+            生成，与 web 的「关于」页同一份实现。
+          */
+          ...(isOfficialHostedInstance(readSyncConfig()?.serverUrl ?? '')
+            ? [
+                {
+                  kind: 'note' as const,
+                  testID: 'settings-operator',
+                  text: operatorFilingLine(OPERATOR),
+                },
+              ]
+            : []),
+        ] as readonly SettingsRowModel[]
+      }
+    />
   );
 
   const renderSecurity = (): React.JSX.Element => (
@@ -716,7 +765,7 @@ export function SettingsScreen({
         <SettingsSection
           variant="card"
           testID="settings-security-actions"
-          title={sectionLabels.security}
+          title={sectionLabels.account}
           leading={<Icon name="privacy.consent" size="sm" color={tokens['color.foreground-muted']} />}
           rows={securityActions}
         />
@@ -769,26 +818,44 @@ export function SettingsScreen({
 
   const renderSection = (): React.JSX.Element => {
     switch (section) {
-      case 'profile':
-        return <>{profileEditor}</>;
+      /*
+        G1 账号：身份 + 登录方式 + 会话 + 危险区。
+        🔴 `security` 那一屏**并进这里**了：它原来是一个独立的第七组，
+        而它管的正是"我这个人怎么登录"—— 与账号是同一个意图。
+      */
+      case 'account':
+        return (
+          <>
+            {profileEditor}
+            {renderSecurity()}
+          </>
+        );
       case 'subscription':
         return <SubscriptionSection />;
-      case 'general':
-        return renderGeneral();
-      case 'sync':
-        return renderSync();
-      case 'ai':
-        return <AiSettingsSection />;
+      /* G3 数据与同步：同步状态/凭据/保险库/导入导出/回收站，同一个意图。 */
       case 'data':
         return (
-          <SettingsSection
-            variant="card"
-            testID="settings-data-actions"
-            rows={dataActions ?? []}
-          />
+          <>
+            {renderSync()}
+            <SettingsSection
+              variant="card"
+              testID="settings-data-actions"
+              rows={dataActions ?? []}
+            />
+          </>
         );
-      case 'security':
-        return renderSecurity();
+      /* G4 提醒与通知：系统授权、提醒默认、小组件（含"怎么加"的旅程）。 */
+      case 'notifications':
+        return renderNotifications();
+      /* G5 外观与语言。 */
+      case 'appearance':
+        return renderAppearance();
+      /* G6 功能与 AI。 */
+      case 'features':
+        return <AiSettingsSection />;
+      /* G7 关于与帮助：反馈、备案号、法务、版本。 */
+      case 'about':
+        return renderAbout();
       case undefined:
         return (
           <SettingsSection

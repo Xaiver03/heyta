@@ -156,6 +156,8 @@ export function SessionsSection({
   }, [baseUrl, locale, token, hasSession, busy, onSignedOutEverywhere]);
 
   const askSignOutEverywhere = useCallback((): void => {
+    /* 上面那句是危险确认框的正文（后果句），按 overlay-feedback.md 就该在这儿说清楚。 */
+    // settings-prose-ok: 危险确认框正文，不是设置项说明
     Alert.alert(t('mobile.sessions.logoutAll.title'), t('mobile.sessions.logoutAll.message'), [
       { text: t('mobile.common.cancel'), style: 'cancel' },
       {

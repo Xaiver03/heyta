@@ -756,6 +756,22 @@ back_to_tabs() {
 #    自己的 state 里（列表 → 选中那份 → 任务详情，`backAction` 逐层 `setSelected/setCommentTask`）。
 #    第 26 跑实测：沿用第 6 步的"按「我的」"5 次全空转、`where_am_i` 恒为「共享清单」。
 # <到达判据（id:... 或只在目标层出现的标签）>；先量后按 ⇒ 已经在那一层上不白按。
+# 「我的」首页上已经**不在**入口（2026-10-27 IA 迁移）：
+# 习惯 / 倒数 / 共享清单 / AI 助手 / AI 工具箱 移进了「功能与 AI」二级页。
+# 这几个 id 现在要先点一次枢纽行才看得见 —— 而本脚本有十几处
+# `back_to_anchor "id:profile-entry-share"` 之类的调用，改调用点等于改十几处。
+# 所以把"进二级页"这一步收在**回退本身**：退到「我的」还没找到目标、而目标属于
+# 那五个之一时，先点枢纽再找。改一处，所有调用点都继续成立。
+MOVED_TO_FEATURES_HUB="profile-entry-share profile-entry-countdown profile-entry-ai profile-entry-ai-toolbox profile-entry-habit"
+
+is_moved_to_hub() {  # <id 或不带 id: 的 id>
+  local want=${1#id:} one
+  for one in $MOVED_TO_FEATURES_HUB; do
+    [ "$one" = "$want" ] && return 0
+  done
+  return 1
+}
+
 back_to_anchor() {
   local arrive=$1 try=1
   while [ "$try" -le 4 ]; do
@@ -768,6 +784,16 @@ back_to_anchor() {
     sleep 2
     try=$((try + 1))
   done
+  # 已经退到「我的」首页仍未找到 ⇒ 若目标是搬到二级页的那几个，进枢纽再试一次。
+  if is_moved_to_hub "$arrive" && tree_has_id "profile-entry-features" >/dev/null 2>&1; then
+    ax_press_until "id:profile-entry-features" "id:profile-entry-features" >/dev/null 2>&1 || ax_press "id:profile-entry-features"
+    sleep 2
+    if [ "${arrive#id:}" != "$arrive" ]; then
+      tree_has_id "${arrive#id:}" >/dev/null 2>&1 && return 0
+    else
+      tree_has "$arrive" >/dev/null 2>&1 && return 0
+    fi
+  fi
   return 1
 }
 

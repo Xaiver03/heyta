@@ -299,8 +299,8 @@ test('关闭旧账号标签页后才能导出、清除并接入新中央账号',
   await other.close();
 });
 
-test.describe('Chatbot：执行、只读与批量确认是真实写入语义', () => {
-  test('普通单条写入自动执行，切换只读后绝不写入', async ({ page, request }) => {
+test.describe('Chatbot：低风险写入自动执行、高风险批量确认是真实写入语义', () => {
+  test('普通单条写入自动执行，且不产生待确认提案', async ({ page, request }) => {
     await mkdir(EVIDENCE, { recursive: true });
     await resetStubAt(request);
     await openApp(page, '/');
@@ -312,7 +312,7 @@ test.describe('Chatbot：执行、只读与批量确认是真实写入语义', (
     });
     await switchView(page, '任务');
 
-    const title = `执行档真实任务-${Date.now()}`;
+    const title = `自动执行的真实任务-${Date.now()}`;
     await page.getByTestId('ai-assistant-input').fill(`新建任务：${title}`);
     await page.getByTestId('ai-assistant-send-button').click();
     await expect(page.getByTestId('ai-assistant-disclosure')).toBeVisible();
@@ -321,21 +321,6 @@ test.describe('Chatbot：执行、只读与批量确认是真实写入语义', (
     await expect(rowFor(page, title)).toHaveCount(1);
     await expect(page.getByTestId('ai-chat-proposal')).toHaveCount(0);
     await screenshot(page, 'ai-execute-created');
-
-    await openSettingsSheet(page);
-    await selectSettingsSection(page, 'ai');
-    await page.locator('[data-testid="assistant-tier-read-only"] input').check();
-    await page.getByTestId('settings-sheet-close').click();
-
-    const readOnlyTitle = `只读不应创建-${Date.now()}`;
-    await resetStubAt(request);
-    await page.getByTestId('ai-assistant-input').fill(`新建任务：${readOnlyTitle}`);
-    await page.getByTestId('ai-assistant-send-button').click();
-    // 首次发送已经完成过出境披露；只读档随后直接执行只读请求，但绝不产生写入。
-    await expect(page.getByTestId('ai-chat-assistant')).toBeVisible();
-    await expect(rowFor(page, readOnlyTitle)).toHaveCount(0);
-    await expect(page.getByTestId('ai-chat-proposal')).toHaveCount(0);
-    await screenshot(page, 'ai-read-only-no-write');
   });
 
   test('批量完成在确认前不写，确认后通过真实 op-log 完成两条任务', async ({ page, request }) => {

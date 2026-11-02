@@ -499,12 +499,16 @@ export function SecurityScreen({
       {/* ── 通行密钥：管理 + 已登录添加 + 找回 ──────────────── */}
       <Card>
         <Stack gap="loose">
+          {/*
+            🔴 原先这里有一整段 `mobile.security.passkeys.hint`（58 字）正文。
+            IA 迁移的统一口径：解释只允许在「?」里 —— 这一段直接删掉，
+            因为同一件事已经在「找回通行密钥」那一行的 `hint` 里说过了
+            （两处说同一句正是 §3.1 的重复入口）。
+          */}
           <Text variant="row-title" tone="default">
             {t('mobile.security.passkeys.title')}
           </Text>
-          <Text variant="row-meta" tone="muted">
-            {t('mobile.security.passkeys.hint')}
-          </Text>
+
           {passkeyError !== null ? (
             <Text variant="row-meta" tone="danger">
               {t(passkeyError.key, passkeyError.vars)}
@@ -646,9 +650,7 @@ export function SecurityScreen({
                 </Text>
               ) : null}
               {recoverDone ? (
-                <Text variant="row-meta" tone="default" selectable>
-                  {t('mobile.security.passkeys.recoverDone')}
-                </Text>
+                <Text variant="row-meta" tone="default" selectable>{t('mobile.security.passkeys.recoverDone')}</Text> // settings-prose-ok: 恢复成功的反馈句
               ) : null}
               <TextField
                 label={t('mobile.security.passkeys.recoverEmail')}

@@ -147,16 +147,18 @@ describe('每一条登记的入口：词条取到字、屏接得上', () => {
   });
 
   it('中英两条词条都**真的取得到字**（缺 key 会抛，不是返回空串）', () => {
+    /*
+      🔴 2026-10-26：这几行不再带 `hintKey`。产品负责人要求把"凭 UX 和名字就能理解"
+      的 tooltip 拿掉，于是「我的」页那批入口行不再渲染 tooltip，`hintKey` 也一起删了 ——
+      留着一枚**没人渲染**的词条键，会让这条测试变成假信号（它验的是用户看不到的文案）。
+      现在钉的是**真正会出现在屏幕上**的那一份：label。
+    */
     for (const entry of MOBILE_PROFILE_ENTRIES) {
       const zh = translate('zh-CN', entry.labelKey);
-      const zhHint = translate('zh-CN', entry.hintKey);
       const en = translate('en', entry.labelKey);
-      const enHint = translate('en', entry.hintKey);
       for (const [name, text] of [
         ['zh label', zh],
-        ['zh hint', zhHint],
         ['en label', en],
-        ['en hint', enHint],
       ] as const) {
         expect(text.trim(), `${entry.key} 的 ${name} 是空串`).not.toBe('');
       }
