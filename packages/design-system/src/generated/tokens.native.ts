@@ -185,6 +185,7 @@ export interface HeytaNativeTokens {
   readonly 'layout.input-min': number;
   readonly 'layout.modal-max': number;
   readonly 'layout.form-label-width': number;
+  readonly 'border-width.hairline': number;
   readonly 'border-width.thin': number;
   readonly 'border-width.thick': number;
   readonly 'nav.tab-bar-height': number;
@@ -413,6 +414,7 @@ export const lightTokens: HeytaNativeTokens = {
   'layout.input-min': 224,
   'layout.modal-max': 640,
   'layout.form-label-width': 96,
+  'border-width.hairline': 0.5,
   'border-width.thin': 1,
   'border-width.thick': 2,
   'nav.tab-bar-height': 64,
@@ -637,6 +639,7 @@ export const darkTokens: HeytaNativeTokens = {
   'layout.input-min': 224,
   'layout.modal-max': 640,
   'layout.form-label-width': 96,
+  'border-width.hairline': 0.5,
   'border-width.thin': 1,
   'border-width.thick': 2,
   'nav.tab-bar-height': 64,

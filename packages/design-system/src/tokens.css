@@ -446,6 +446,18 @@
   /* 边框宽度。
      扁平风格**用边框表达层次**（阴影只给真正的浮层），
      所以边框宽度是被反复使用的设计变量，必须 token 化。 */
+  /**
+   * 发丝线 —— **DSH 对齐新增**。
+   *
+   * 实测 DeepSeek Harness 的卡片边全是 `border: 0.5px solid …`
+   * （`ui-tool/.../AskQuestionCard`、`ui-attachment/.../FileCard`），
+   * 而 heyta 一直是 1px。1px 在 2 倍屏上会比 0.5px 明显"重"一档，
+   * 卡片看起来就更像一个框、而不是一层边。
+   *
+   * ⚠️ 0.5px 在 1 倍屏（老 Windows）会被舍入成 1px —— 那是可接受的退化方向
+   * （不会消失），所以不需要 fallback 分支。
+   */
+  --ht-border-width-hairline: 0.5px;
   --ht-border-width-thin: 1px;
   --ht-border-width-thick: 2px;
 }

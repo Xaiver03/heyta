@@ -184,7 +184,8 @@ export const TOKEN_GROUPS = {
        6rem = 96px：容得下最长的两字标签（频次/目标/达成/补打卡）+ 与控件之间的气。 */
     'form-label-width',
   ],
-  'border-width': ['thin', 'thick'],
+  // `hairline`(0.5px) 是 DSH 对齐新增的一档：卡片边。1px 在 2 倍屏上明显更重。
+  'border-width': ['hairline', 'thin', 'thick'],
 
   /**
    * 导航与外壳。4 个 tab 页共享同一套尺寸 —— 外壳是产品结构，
