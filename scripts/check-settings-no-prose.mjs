@@ -73,6 +73,15 @@ const CARRIER_MARKERS = [
   'tip={',
   'tip=',
   'note={',
+  /*
+   * 🔴 对象写法是同一件东西：移动端的行模型是 `{ kind: 'action', hint: t(...) }`，
+   * 而上面几条只认 JSX 的 `hint={`/`tip={` —— 于是"已经挂在问号里"的行被判成违规
+   * （2026-10-27 扩臂时实测 `security-set-first-row` 就是这样被误报的）。
+   * 载体是"这个字符串会不会被渲染成 ?"，不是"用的是哪种语法"。
+   */
+  'hint:',
+  'note:',
+  'tip:',
   'SettingsNotice',
   'role="alert"',
   'role="status"',
@@ -158,6 +167,18 @@ function isFeedbackCopySite(lines, index, rawLine, rawPrev) {
    * 由纯函数拼出来，渲染处才是合法的载体）摊到台面上：每一条都带着理由，
    * 而且会被打印出来，不会像静默豁免那样越用越多。
    */
+  /*
+   * 🔴 2026-10-27 补实现缺口：本文件的「改法」提示里写着
+   * 「让 testid 里带上 failure / error / status —— 反馈不是说明，允许直接写」，
+   * 而这段代码**从来没查过 testID**。于是 `settings-feedback-failed`（44 字的失败句）
+   * 明明就是反馈，照样被判成违规 —— 判据与它自己的说明书不一致。
+   * 现在按**上下 3 行**里出现的 `testID: '…failed|failure|error|status…'` 认，
+   * 范围窄到"这一行所属的那条记录"，不会把整屏都放过。
+   */
+  const near = lines.slice(Math.max(0, index - 3), index + 4).join(String.fromCharCode(10));
+  if (/testID:\s*['"][^'"]*(?:fail(?:ed|ure)?|error|status)[^'"]*['"]/iu.test(near)) {
+    return true;
+  }
   /* 标记可以写在**这一行**，也可以写在**上一行**（注释单独占一行更好读）。 */
   return /settings-prose-ok:/u.test(rawLine ?? '') || /settings-prose-ok:/u.test(rawPrev ?? '');
 }
@@ -309,16 +330,33 @@ const details = [];
 for (const file of files) {
   const text = readFileSync(join(ROOT, file), 'utf8');
   /*
-   * 第二臂（按文案长度）**只跑 Web 的设置面**。
-   * 移动端那些长句分散在 20 多个 screen 里（对话确认、同意闸门、法务重申…），
-   * 其中大半是**反馈或法务文本**，不是"设置项旁边的说明"；一刀切进去会把
-   * "这一单没下成"也判成违规。移动端这一半按屏幕逐个迁，进度记在 `.handoff/`
-   * 的那份交接里，不在本门的读数里假装已经清了。
+   * 第二臂（按文案长度）现在跑**两端**的设置面。
+   *
+   * 🔴 2026-10-27 补洞：这一臂原来**只跑 Web**，于是移动端设置面里真实存在 7 段整句说明
+   * （小组件旅程若干段、`mobile.profile.footnote`、`ReminderDeliverySection` 那句 75 字），
+   * 而本门打印的是「设置界面里一句内联说明文字都没有」——**它在撒谎**。
+   * 产品负责人对这条下过两次死命令，门禁读数与事实不一致比没有门禁更糟。
+   *
+   * ⚠️ 范围仍然**只到设置面**：`apps/mobile/src` 整包里有大量法务、同意闸门、反馈确认的长句，
+   * 那些**不是**"设置项旁边的说明"，一刀切进去会把它们判成违规（会造出假缺陷，
+   * 而假缺陷会让整道门被忽略）。所以移动端只认设置面这一组文件，逐个列出来 ——
+   * 新加一个设置分组时**要把它加进这张表**，否则它悄悄不在读数里。
    */
+  const MOBILE_SETTINGS_SURFACE = [
+    'apps/mobile/src/screens/SettingsScreen.tsx',
+    'apps/mobile/src/screens/ReminderDeliverySection.tsx',
+    'apps/mobile/src/screens/VaultSettingsSection.tsx',
+    'apps/mobile/src/screens/EmailChangeSection.tsx',
+    'apps/mobile/src/screens/SessionsSection.tsx',
+    'apps/mobile/src/screens/SubscriptionSection.tsx',
+    'apps/mobile/src/screens/EntitlementSection.tsx',
+    'apps/mobile/src/screens/SecurityScreen.tsx',
+  ];
   const copyArmApplies = file.startsWith('apps/web/src/features/settings')
     || file.startsWith('apps/web/src/features/subscription')
     || file.startsWith('apps/web/src/features/sync')
-    || file === 'apps/web/src/App.tsx';
+    || file === 'apps/web/src/App.tsx'
+    || MOBILE_SETTINGS_SURFACE.includes(file);
   const hits = [...findViolations(text), ...(copyArmApplies ? findLongCopy(text, zh) : [])];
   if (hits.length > 0) {
     counts[file] = hits.length;
@@ -396,7 +434,7 @@ if (problems.length > 0) {
 
 if (total === 0) {
   console.log(
-    '✅ 设置界面里一句内联说明文字都没有：全部走「?」（2026-10-24 禁令已清到 0）。' +
+    '✅ 设置界面里一句内联说明文字都没有：全部走「?」（2026-10-24 禁令已清到 0；本读数覆盖 **web + 移动端设置面**）。' +
       `\n   账本 ${relative(ROOT, LEDGER)} 记着 0 处；再写回来就是红的。`,
   );
 } else {

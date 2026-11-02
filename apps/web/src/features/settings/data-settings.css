@@ -101,7 +101,7 @@
   font-size: var(--ht-font-size-xs);
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 48rem) {
   .ht-settings__data-card {
     padding: var(--ht-space-3);
   }

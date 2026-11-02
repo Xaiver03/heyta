@@ -29,7 +29,7 @@
   gap: var(--ht-space-2);
 }
 
-@media (max-width: 30rem) {
+@media (max-width: 48rem) {
   .privacy-settings__actions .ht-btn {
     flex: 1;
   }

@@ -87,7 +87,7 @@
   font-weight: var(--ht-font-weight-medium);
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 48rem) {
   .ht-settings__account-gate {
     align-items: stretch;
     flex-direction: column;

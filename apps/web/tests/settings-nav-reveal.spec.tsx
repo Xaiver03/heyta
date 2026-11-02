@@ -176,16 +176,17 @@ describe('设置分组导航的当前项要被滚进可视窗口', () => {
     click(el.querySelector('[data-testid="rail-help"]')!);
     scrolls.length = 0;
 
-    const syncNav = el.querySelector<HTMLButtonElement>('[aria-controls="settings-group-sync"]');
-    expect(syncNav, '导航里必须有「同步与隐私」').not.toBeNull();
-    click(syncNav!);
+    // 换到「数据与同步」那一档（七组同构之后同步并进了这一组，id 是 `-data`）。
+    const dataNav = el.querySelector<HTMLButtonElement>('[aria-controls="settings-group-data"]');
+    expect(dataNav, '导航里必须有「数据与同步」').not.toBeNull();
+    click(dataNav!);
 
     expect(
-      scrolls.some((s) => s.target === 'nav:settings-group-sync'),
+      scrolls.some((s) => s.target === 'nav:settings-group-data'),
       `点按钮换档后新当前项没被滚（本趟滚到的：${JSON.stringify(scrolls.map((s) => s.target))}）`,
     ).toBe(true);
     expect(el.querySelector('.ht-settings__nav [aria-current="page"]')?.getAttribute('aria-controls'))
-      .toBe('settings-group-sync');
+      .toBe('settings-group-data');
   });
 
   /**
