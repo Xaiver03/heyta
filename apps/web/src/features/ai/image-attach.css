@@ -1,6 +1,6 @@
 /**
- * 捕获框的图片附件区
- * ==================
+ * 图片附件区（捕获框与对话面板**共用**）
+ * ====================================
  *
  * 🔴 全部取值走 token（`--ht-*`），没有裸 hex / 裸 px —— 写 UI 的硬规则
  * （见 `docs/agents/design-system.md`）。缩略图的尺寸用 `--ht-size-chip-height`
@@ -74,4 +74,19 @@
   margin: 0;
   color: var(--ht-color-danger);
   font-size: var(--ht-font-size-caption);
+}
+
+/*
+ * 对话面板里附件条与输入行的**竖向容器**。
+ *
+ * ⚠️ 它住在 `image-attach.css` 而不是 `assistant-layout.css` 是**权宜**：
+ * 后者当时正被另一条并行轨道改写，两处同时改同一个文件只会制造冲突。
+ * 等那条轨道落库后，这个类应当搬进 `styles/app/assistant-layout.css`，
+ * 与 `.ht-ai__composer` 放在一起（它们是一组）。
+ */
+.ht-ai__attach-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  width: 100%;
 }

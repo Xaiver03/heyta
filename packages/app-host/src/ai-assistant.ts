@@ -60,7 +60,9 @@ import {
   MAX_ASSISTANT_TOOL_STEPS,
   egressBytesFor,
   invokeRouted,
+  type AiCapability,
   type AiFailureReason,
+  type AiImagePart,
   type AiRoutingConfig,
   type AiRoutingPolicy,
   type AssistantLimit,
@@ -162,10 +164,14 @@ export interface AssistantEgressPlan {
   readonly maxBytesPerRequest: number;
 }
 
-export function planAssistantEgress(): AssistantEgressPlan {
+export function planAssistantEgress(options: { hasImages?: boolean } = {}): AssistantEgressPlan {
   const grants = assistantGrants();
   return {
-    fields: assistantEgressFields(),
+    // 带图的那一轮，披露里必须有 `images` —— 否则用户以为只发文字。
+    fields:
+      options.hasImages === true
+        ? [...assistantEgressFields(), 'images']
+        : assistantEgressFields(),
     tools: LOCAL_API_TOOLS.filter((tool) => grants[tool.name] === true).map((tool) => tool.name),
     maxRequests: MAX_ASSISTANT_TOOL_STEPS + 1,
     maxMessages: MAX_ASSISTANT_MESSAGES,
@@ -607,12 +613,26 @@ export function assistantNeedsEgressDisclosure(
 let anonymousExecutionCounter = 0;
 
 export async function requestAssistantTurn(
-  source: { text: string },
+  source: {
+    text: string;
+    /**
+     * 本轮一并交给模型的图片（已归一化到出境预算内）。
+     *
+     * 🔴 **只在第一步带**。对话循环每一步都会重建 `messages` 再发一次，
+     * 而图片挂在最后一条 user 消息上 —— 每步都带的结果是同一张图被重复计费、
+     * 并且第二三步大概率直接撞穿 `MAX_ASSISTANT_EGRESS_BYTES`（两张图 ≈ 120 KB，
+     * 上界 200 KB），表现是"一句话里带张图，助手走到第二步就停了"。
+     * 第一步之后工具观察结果已经带上了模型需要的一切。
+     */
+    images?: readonly AiImagePart[];
+  },
   deps: AssistantTurnDeps,
 ): Promise<AssistantOutcome> {
   const text = source.text.trim();
   const emptySteps: readonly AssistantStep[] = [];
-  if (text === '') {
+  const images = source.images ?? [];
+  // 只有图、没有字是合法输入（与捕获那条同一条判据）：用户贴了截图就问"这是什么"。
+  if (text === '' && images.length === 0) {
     return { ok: false, reason: 'empty-text', message: '还没有输入内容。', steps: emptySteps, health: {} };
   }
   if (text.length > MAX_TOOL_CALL_TEXT_LENGTH) {
@@ -802,13 +822,26 @@ export async function requestAssistantTurn(
     }
 
     const model = budgetModelName(deps.routing, deps.model);
+    /**
+     * 图片**只在第一步发**（理由见 `source.images` 的注释）。
+     * 后面几步里模型已经拿到了工具观察结果，再发一次图只是重复计费。
+     */
+    const stepImages = step === 0 ? images : [];
+
     const invocation = {
       feature: 'tool-calling' as const,
       // 🔴 派生：这两项**就是** messages 的第 0 条与本轮那句用户话 ——
       // 同一个变量递进去的，所以"披露说的"与"实际发的"不可能不一致。
       system,
       user: text,
-      fields: assistantEgressFields(),
+      // 有图就必须在披露里出现 `images` —— 漏了它就是**对用户撒谎**，
+      // 而 `wire.ts` 会在组装请求体时把这种漏报直接抛出来。
+      fields:
+        stepImages.length === 0 ? assistantEgressFields() : [...assistantEgressFields(), 'images'],
+      // 端点在 `capabilities` 里没声明 `vision` 时，这一步根本不该走这个端点。
+      ...(stepImages.length === 0
+        ? {}
+        : { images: stepImages, requires: ['vision'] as const satisfies readonly AiCapability[] }),
       tools,
       messages,
     };

@@ -89,7 +89,7 @@ import { formatDayTitleText } from '@heyta/ui';
 
 import { dateWithRemaining } from '../ai/locale-punctuation.js';
 import { AiCapture } from '../ai/AiCapture.js';
-import { CaptureImageAttach } from '../ai/CaptureImageAttach.js';
+import { ImageAttach } from '../ai/ImageAttach.js';
 import type { EncodedImage } from '../ai/image-encode.js';
 import { WEB_EMPTY_SECRET_STORE } from '../settings/aiStore.js';
 import { useTaskStore } from '../tasks/store.js';
@@ -239,7 +239,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
       const hasContent = ctx.draft.trim() !== '' || images.length > 0;
       return (
         <>
-          <CaptureImageAttach images={images} onChange={setImages} />
+          <ImageAttach images={images} onChange={setImages} />
           {hasContent ? (
         <AiCapture
           text={ctx.draft}
