@@ -289,6 +289,7 @@ python3 research/tools/ghinfo.py owner/repo   # 最后提交/发版时间（可�
 | `harin/todoist-matrix` | MIT | "给已有任务系统加矩阵视图层、不改数据层"的架构范式 |
 | `Spikeysanju/Einsen` | Apache-2.0 | 四象限 UI 信息架构 |
 | `remvze/moodist` | MIT | 白噪音功能设计 |
+| DeepSeek Harness（`deepseek-harness`，MIT，release `dsh-0.1.6-alpha.2`）的 `attachment/` 与 `context/file-reference/` | MIT | **只借形状，不搬表达式**：①图片"本地存大、出境发小"与五元组预算（单张/张数/总额/像素/单边）；②`@` 提及是**纯文本语法**而非富文本状态（`activeAtToken` 那种"从光标往前找活动 token"的解法思路）。`packages/ai/src/image-limits.ts` 的几何与预算函数是**本仓自己写的**（同一判据的独立实现），故不产生 MIT 署名义务；若日后真的搬字，必须改为 §1 vendored 并附版权声明 |
 
 > ⚠️ 即使许可证允许，heyta 也**不使用**滴答清单（TickTick）的商标、图标、文案与界面素材。
 > 见 `docs/research/licensing-and-compliance.md`。

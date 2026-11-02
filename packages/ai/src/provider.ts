@@ -55,6 +55,12 @@ import {
   managedChatUrl,
   type ChatMessage,
 } from './wire.js';
+import type { ImageMediaType } from './image-limits.js';
+/**
+ * ⚠️ 只取类型：`routing.ts` 在运行时 import 本文件（`invokeRouted` 吃 `AiInvocation`），
+ * 这里反向取值会成环。`import type` 在编译后被整行抹掉，所以这一行不产生环。
+ */
+import type { AiCapability } from './routing.js';
 
 /**
  * 一个可供模型调用的工具（**中性描述**，与厂商无关）。
@@ -123,6 +129,46 @@ export interface AiInvocation {
    * ⚠️ 省略时请求体与从前**逐字相同**（既有四个面板 + 工具调用零影响，有测试钉住）。
    */
   messages?: readonly ChatMessage[];
+  /**
+   * 这次要一并发出的图片（**已经归一化过**的）。
+   *
+   * 语义是"挂到**最后一条 user 消息**上"，不是"另起一轮" —— 图是用户那句话的一部分。
+   *
+   * 🔴 给了它，`fields` 里**必须**含 `'images'`：`fields` 是给用户看的出境清单，
+   * 漏了它就是对用户撒谎。这条由 `wire.ts` 的 `buildChatRequestBody()` 在组装请求体时
+   * **断言**，不是靠调用方自觉 —— 两个地方各写一半的错误拦不住 code review。
+   *
+   * ⚠️ 预算见 `image-limits.ts`：单张 40 KB（二进制）/ 一次 2 张 / 总额 80 KB。
+   * 超预算的图不会被截断，而是**在请求体存在之前**就抛错。
+   */
+  images?: readonly AiImagePart[];
+  /**
+   * 本次请求**额外**要求的能力，叠加在功能本身的要求之上。
+   *
+   * 为什么不是给图片单开一个 `AiFeature`：`AiFeature` 是对外契约 ——
+   * 设置界面按它逐条渲染授权与路由，加一个成员就是给三端界面加一格配置。
+   * 而"这次带了图"是**一次请求的属性**，不是一种新功能：同一个"捕获"，
+   * 带图时要求端点声明 `vision`，不带图时不要求。
+   *
+   * 于是 `vision` 这个能力终于有了真实消费者（`routing.ts` 里那句"没有任何功能
+   * 要求它"的警告到此为止），而功能词表一个成员都没动。
+   */
+  requires?: readonly AiCapability[];
+}
+
+/**
+ * 一张待发出的图片。
+ *
+ * ⚠️ 只有 **base64**，没有 `File` / 路径 / URL：出境层不认识宿主文件系统，
+ * 也不该认识（那会让 `packages/ai` 依赖平台 API）。归一化与编码在壳里做，
+ * 到这里只剩"要发的字节"。
+ */
+export interface AiImagePart {
+  readonly mediaType: ImageMediaType;
+  /** Canonical base64，**不带** `data:` 前缀（前缀由线格式那一层拼）。 */
+  readonly base64: string;
+  /** 诊断用的展示名。🔴 **不进请求体** —— 文件名常常比图更敏感（"客户报价单.png"）。 */
+  readonly name?: string;
 }
 
 /**
