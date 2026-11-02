@@ -61,7 +61,7 @@
  *    **在这个仓库里，`grep` 的命中必须先区分"代码"与"描述代码的文字"。**
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { useI18n } from '@heyta/i18n';
 
@@ -89,6 +89,8 @@ import { formatDayTitleText } from '@heyta/ui';
 
 import { dateWithRemaining } from '../ai/locale-punctuation.js';
 import { AiCapture } from '../ai/AiCapture.js';
+import { CaptureImageAttach } from '../ai/CaptureImageAttach.js';
+import type { EncodedImage } from '../ai/image-encode.js';
 import { WEB_EMPTY_SECRET_STORE } from '../settings/aiStore.js';
 import { useTaskStore } from '../tasks/store.js';
 import { remainingText } from '../../lib/due-display.js';
@@ -210,16 +212,38 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
     onHealth,
   } = props;
 
+  /**
+   * 图片附件的状态**住在这一层**：它要跨"输入框 → AI 面板 → 发送"三段存在，
+   * 而这三段分属共享 composer（输入框）与 web 的 AI 面板。
+   *
+   * ⚠️ 它**不进 op-log、不同步**：图片只活在这一次请求里，落库的只有模型解析出的
+   * 标题/日期/优先级。这条是 ADR-0005「AI 是输入法」的直接后果 ——
+   * 输入法不存你打的字。
+   */
+  const [images, setImages] = useState<readonly EncodedImage[]>([]);
+
   const renderAssistant = useCallback(
     (ctx: CaptureAssistantContext) => {
       // ⚠️ 只在**有内容**时出现：空输入框上挂一个"AI 解析"按钮，
       //    点下去必然失败，那是在制造一次注定报错的交互。
       //    没配置 AI 时也照样出现 —— "找不到入口"和"入口说为什么不可用"
       //    是两件事（`AiCapture` 自己会说该去开什么）。
-      if (routing === undefined || ctx.draft.trim() === '') return null;
+      if (routing === undefined) return null;
+      /**
+       * 🔴 判断的是"有没有内容"，不是"有没有打字"。
+       *
+       * 截图转任务的入口就是这么用的：用户只贴了一张图、一个字都没打。
+       * 原来这里判 `draft.trim() === ''`，于是那条路**永远不可能开始** ——
+       * 界面看起来正常，只是按下粘贴之后什么都没发生。
+       */
+      const hasContent = ctx.draft.trim() !== '' || images.length > 0;
       return (
+        <>
+          <CaptureImageAttach images={images} onChange={setImages} />
+          {hasContent ? (
         <AiCapture
           text={ctx.draft}
+          images={images.map((image) => ({ mediaType: image.mediaType, base64: image.base64 }))}
           routing={routing}
           consents={consents ?? []}
           secrets={secrets ?? WEB_EMPTY_SECRET_STORE}
@@ -229,19 +253,37 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
           {...(onFeedback !== undefined ? { onFeedback } : {})}
           {...(onHealth !== undefined ? { onHealth } : {})}
         />
+          ) : null}
+        </>
       );
     },
-    [routing, consents, secrets, healthSnapshot, preferenceSet, onFeedback, onHealth],
+    [
+      routing,
+      consents,
+      secrets,
+      healthSnapshot,
+      preferenceSet,
+      onFeedback,
+      onHealth,
+      images,
+    ],
   );
 
   return (
     <HeytaUiProvider>
+      {/*
+        🔴 `data-heyta-capture-root` 是**粘贴归属判据**：文档级 paste 监听
+        （见 `CaptureImageAttach`）靠它区分"在捕获框里粘贴"与"在搜索框里粘贴"。
+        没有它，贴图会全局劫持 —— 在搜索框粘一张图也会被捕获框吃掉。
+      */}
+      <div data-heyta-capture-root="">
       <SharedCaptureComposer
         labels={labels}
         onSubmit={onSubmit}
         anchorDate={anchorDate}
         renderAssistant={renderAssistant}
       />
+      </div>
     </HeytaUiProvider>
   );
 }
