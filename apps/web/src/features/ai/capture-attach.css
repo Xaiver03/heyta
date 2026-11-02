@@ -1,0 +1,77 @@
+/**
+ * 捕获框的图片附件区
+ * ==================
+ *
+ * 🔴 全部取值走 token（`--ht-*`），没有裸 hex / 裸 px —— 写 UI 的硬规则
+ * （见 `docs/agents/design-system.md`）。缩略图的尺寸用 `--ht-size-chip-height`
+ * 起算而不是另立一个数：它和输入框里的胶囊是同一档视觉重量。
+ */
+
+.ht-capture-attach {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding-block: var(--ht-space-2);
+}
+
+.ht-capture-attach__row {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  flex-wrap: wrap;
+}
+
+.ht-capture-attach__hint {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-caption);
+}
+
+.ht-capture-attach__list {
+  display: flex;
+  gap: var(--ht-space-3);
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-capture-attach__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+}
+
+.ht-capture-attach__thumb {
+  width: calc(var(--ht-size-chip-height) * 2);
+  height: var(--ht-size-chip-height);
+  object-fit: cover;
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-capture-attach__meta {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-capture-attach__remove {
+  min-height: auto;
+  padding-inline: var(--ht-space-1);
+}
+
+.ht-capture-attach__sum {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-caption);
+}
+
+.ht-capture-attach__error {
+  margin: 0;
+  color: var(--ht-color-danger);
+  font-size: var(--ht-font-size-caption);
+}

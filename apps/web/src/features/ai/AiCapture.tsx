@@ -66,6 +66,7 @@ import {
 import {
   buildDisclosure,
   fromHealthSnapshot,
+  type AiImagePart,
 } from '@heyta/ai';
 import type {
   AiHealthSnapshot,
@@ -185,6 +186,14 @@ export interface AiCaptureProps {
    * 因为输入框的位置与提交行为是产品决策（对照 `CaptureComposer`）。
    */
   text: string;
+  /**
+   * 这次一并交给模型的图片（已归一化）。
+   *
+   * 🔴 与 `text` 一样**由调用方持有**，而且同样在点"捕获"那一刻**冻结**：
+   * 披露块里写着"会发 N 张图"，用户在这之后又贴了一张，就会出现
+   * "披露的是 1 张、实际发 2 张" —— 那正是披露制度要防的事。
+   */
+  images?: readonly AiImagePart[];
   routing: AiRoutingConfig;
   consents: readonly EgressConsent[];
   secrets: SecretStore;
@@ -246,6 +255,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
     onFeedback,
     onOpenSettings: onOpenSettingsProp,
   } = props;
+  const images = props.images ?? [];
   const { t, locale } = useI18n();
   /**
    * 🔴 本组件由 `CaptureComposer` 渲染，而那个文件**不在**本轮的写入白名单里。
@@ -266,6 +276,8 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
    * 它将要发送的那一句（见 `capture-text-preview`）。
    */
   const [frozenText, setFrozenText] = useState('');
+  /** 🔴 与 `frozenText` 同一个理由：披露与发送必须基于**同一份输入**。 */
+  const [frozenImages, setFrozenImages] = useState<readonly AiImagePart[]>([]);
   const [frozenAt, setFrozenAt] = useState(() => Date.now());
   const [proposal, setProposal] = useState<CaptureProposal | undefined>(undefined);
   const [draftTitle, setDraftTitle] = useState('');
@@ -301,7 +313,13 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
    * 「输出语言」那一段（模型若按指令语言回话，中文标题会被用户确认**写进数据并同步**），
    * 所以这里不能两处各写一遍字面量 —— 漏改一处的表现是「披露与实发不是同一份」。
    */
-  const source = { text: frozenText, now: frozenAt, locale };
+  const source = {
+    text: frozenText,
+    now: frozenAt,
+    locale,
+    // 没图时这个键**整个不出现**，请求体与从前逐字相同（`ai-capture.spec.ts` 钉住）。
+    ...(frozenImages.length > 0 ? { images: frozenImages } : {}),
+  };
 
   const invocation = buildCaptureInvocation(source, hints);
 
@@ -322,6 +340,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
   function start(): void {
     setApplied(false);
     setFrozenText(text);
+    setFrozenImages(images);
     setFrozenAt(Date.now());
     setPhase('disclosing');
   }

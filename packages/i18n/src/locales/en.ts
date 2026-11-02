@@ -430,6 +430,11 @@ export const en = {
   // `display` says "Default" rather than "No sorting" - it does have rules
   // (open first, due date ascending, undated last).
   'web.shell.sort.aria': 'Sort order',
+  // The header's `⋯` (2026-11-02). Not reused from `web.shell.views.groupMore`
+  // ("More") or `web.shell.tasks.moreLabel` (row-level more): same word,
+  // three different scopes.
+  'web.shell.overflow.label': 'More actions',
+  'web.shell.overflow.sortSection': 'Sort',
   'web.shell.sort.display': 'Default (due date)',
   'web.shell.sort.addedAt': 'Date added',
   'web.shell.sort.priority': 'Priority',
@@ -2692,6 +2697,16 @@ export const en = {
   'web.capture.unused': 'Not used, still in the title',
   'web.capture.previewLead': 'Actual title:',
   'web.capture.previewEmpty': '(empty)',
+  'web.capture.attach.label': 'Attach an image',
+  'web.capture.attach.busy': 'Compressing…',
+  'web.capture.attach.hint': 'You can also paste a screenshot',
+  'web.capture.attach.meta': '{width}×{height} · {kb} KB',
+  'web.capture.attach.remove': 'Remove image {index}',
+  'web.capture.attach.sum': '{count} attached · {kb} KB',
+  'web.capture.attach.tooMany': 'Up to {max} images',
+  'web.capture.attach.badType': 'Only PNG / JPEG / WebP',
+  'web.capture.attach.tooBig': 'Still too large after compressing — try another image or a smaller crop',
+  'web.capture.attach.undecodable': 'This image cannot be opened (possibly corrupt)',
 
   // ── Web · how a due date is *said* (not how it is computed) ───
   //

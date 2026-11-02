@@ -505,6 +505,16 @@ export const zhCN = {
    * "把顺序弄乱了"。
    */
   'web.shell.sort.aria': '排序方式',
+  /**
+   * 页头那枚 `⋯`（2026-11-02）。
+   *
+   * 🔴 不复用 `web.shell.views.groupMore`（'更多'）与 `web.shell.tasks.moreLabel`：
+   * 前者是侧栏"更多视图"、后者是**行级**更多（右键菜单/AI 拆解），
+   * 三者作用域不同。同一句文案挂在三个作用域上，读屏用户听到的是同一个词、
+   * 得到的是三种范围 —— 文案一样不等于意思一样。
+   */
+  'web.shell.overflow.label': '更多操作',
+  'web.shell.overflow.sortSection': '排序',
   'web.shell.sort.display': '默认（按截止时间）',
   'web.shell.sort.addedAt': '按添加时间',
   'web.shell.sort.priority': '按优先级',
@@ -2906,6 +2916,16 @@ export const zhCN = {
   'web.capture.unused': '未采用，仍在标题中',
   'web.capture.previewLead': '实际标题：',
   'web.capture.previewEmpty': '（空）',
+  'web.capture.attach.label': '附一张图',
+  'web.capture.attach.busy': '正在压…',
+  'web.capture.attach.hint': '也可以直接粘贴截图',
+  'web.capture.attach.meta': '{width}×{height} · {kb} KB',
+  'web.capture.attach.remove': '移除第 {index} 张',
+  'web.capture.attach.sum': '已附 {count} 张 · {kb} KB',
+  'web.capture.attach.tooMany': '最多 {max} 张',
+  'web.capture.attach.badType': '只支持 PNG / JPEG / WebP',
+  'web.capture.attach.tooBig': '这张图压完还是太大，换一张或截小一点',
+  'web.capture.attach.undecodable': '这张图打不开（可能是坏文件）',
 
   // ── Web · 截止时间怎么说（不是怎么算）──────────────────────
   //
