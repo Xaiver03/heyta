@@ -88,7 +88,9 @@
  */
 .ht-settings__content > .ht-settings__group > .ht-settings,
 .ht-settings__content > .ht-settings__group > div > .ht-settings {
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  /* 卡片边用**发丝线**（DSH 对齐）：0.5px。实测 DSH 的卡片边全是 0.5px；
+     1px 在 2 倍屏上明显更重，卡片看起来像一个框而不是一层边。 */
+  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);
   background: var(--ht-color-surface);
   max-inline-size: none;
@@ -828,7 +830,9 @@
   gap: var(--ht-space-2);
   min-inline-size: 0;
   padding: var(--ht-space-3) var(--ht-space-4);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  /* 卡片边用**发丝线**（DSH 对齐）：0.5px。实测 DSH 的卡片边全是 0.5px；
+     1px 在 2 倍屏上明显更重，卡片看起来像一个框而不是一层边。 */
+  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
   cursor: pointer;
@@ -896,7 +900,9 @@
   flex-direction: column;
   gap: var(--ht-space-3);
   padding: var(--ht-space-3) var(--ht-space-4);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  /* 卡片边用**发丝线**（DSH 对齐）：0.5px。实测 DSH 的卡片边全是 0.5px；
+     1px 在 2 倍屏上明显更重，卡片看起来像一个框而不是一层边。 */
+  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
 }
@@ -950,7 +956,9 @@
 .ht-settings--cards > .ht-settings__subsection,
 .ht-settings--cards > .ht-ai-card {
   padding: var(--ht-space-4);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  /* 卡片边用**发丝线**（DSH 对齐）：0.5px。实测 DSH 的卡片边全是 0.5px；
+     1px 在 2 倍屏上明显更重，卡片看起来像一个框而不是一层边。 */
+  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);
   background: var(--ht-color-surface);
 }
