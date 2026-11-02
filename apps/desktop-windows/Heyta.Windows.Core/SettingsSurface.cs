@@ -44,14 +44,20 @@ public static class SettingsSurface
     /// </summary>
     public static readonly string[] KnownSections =
     [
+        // 七组（2026-10-27 IA 迁移后的**新** id）：账号 / 订阅 / 数据与同步 /
+        // 提醒与通知 / 外观与语言 / 功能与 AI / 关于与帮助。
         "settings-group-profile",
         "settings-group-subscription",
-        "settings-group-appearance",
-        "settings-group-sync",
-        "settings-group-ai",
         "settings-group-data",
-        "settings-group-account",
+        "settings-group-notifications",
+        "settings-group-appearance",
+        "settings-group-ai",
         "settings-group-help",
+        // 旧 id 仍然收：网页端有一张折叠表把它们落到新组（`settings-deep-link.ts`），
+        // 而窗口这边**不该比网页更早拒绝**——否则同一个深链在两处表现不同。
+        "settings-group-sync",
+        "settings-group-account",
+        "settings-group-general",
     ];
 
     /// <summary>
