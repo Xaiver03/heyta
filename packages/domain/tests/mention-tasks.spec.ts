@@ -106,3 +106,52 @@ describe('lookup：精确匹配，不做模糊', () => {
     expect(mentionLookupFor([T('a', '买牛奶')])(' 买牛奶 ')).toBe('a');
   });
 });
+
+describe('端到端（纯函数链）：用户实际做的那一串动作', () => {
+  const tasks = [
+    T('a', '开会', '2026-08-13'),
+    T('b', '开会', '2026-08-15'),
+    T('c', '买牛奶'),
+  ];
+
+  it('打 `@开` → 候选 → 选中 → 回填 → 再解析，必须回到同一个 taskId', async () => {
+    const { activeMention, applyMention } = await import('../src/mentions.js');
+    const lookup = mentionLookupFor(tasks);
+
+    // ① 用户打到这里，光标在末尾
+    const typed = '提醒我 @开';
+    const active = activeMention(typed, typed.length);
+    expect(active?.query).toBe('开');
+
+    // ② 界面按查询给候选（同名两条都在，带消歧后缀）
+    const candidates = mentionCandidates(tasks, active?.query ?? '');
+    expect(candidates.map((c) => c.label)).toEqual(['开会（08-13）', '开会（08-15）']);
+
+    // ③ 用户选了第二条
+    const chosen = candidates[1];
+    if (chosen === undefined || active === undefined) throw new Error('夹具不对');
+    const applied = applyMention(typed, active, chosen.label);
+    expect(applied?.text).toBe('提醒我 @开会（08-15）');
+
+    // ④ 发送前再解析一次 —— 🔴 这一环是整条链唯一的真判据：
+    //    格式化与解析若对不上，这里会给出 undefined（于是那句 @ 白写了）。
+    const resolved = lookup('开会（08-15）');
+    expect(resolved).toBe('b');
+  });
+
+  it('🔴 带空格的任务标题走引号形态，仍然能解析回来', async () => {
+    const { activeMention, applyMention } = await import('../src/mentions.js');
+    const spaced = [T('x', '下周三 评审会')];
+    const lookup = mentionLookupFor(spaced);
+
+    const typed = '@下';
+    const active = activeMention(typed, typed.length);
+    const candidate = mentionCandidates(spaced, active?.query ?? '')[0];
+    if (candidate === undefined || active === undefined) throw new Error('夹具不对');
+
+    const applied = applyMention(typed, active, candidate.label);
+    // 标签里有空格 ⇒ 引号形态
+    expect(applied?.text).toBe('@"下周三 评审会"');
+    expect(lookup(candidate.label)).toBe('x');
+  });
+});
