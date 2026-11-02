@@ -108,6 +108,15 @@
   --ht-color-on-primary: var(--ht-white);
 
   /* 表面与背景：白底为主，蓝作强调 */
+  /**
+   * 页面底色。
+   *
+   * ⚠️ **2026-11-02 试过压一档（slate-50 → slate-100），已回退。**
+   * 动机是"卡片 `#fff` 与页面 `#f8fafc` 只差 7/255，一屏三张卡糊成一片白"。
+   * 实测代价：`color.foreground-subtle` 在页面底上的对比度从 ≥4.5 掉到 **4.34:1**
+   * （四端 AA 用例同时红）。⇒ 想改这一档，必须**同一批**把 `foreground-subtle`
+   * 也调深一档，让三级文字重新过 AA；单独改底色是拿可读性换观感。
+   */
   --ht-color-background: var(--ht-slate-50);
   --ht-color-surface: var(--ht-white);
   --ht-color-surface-subtle: var(--ht-slate-50);

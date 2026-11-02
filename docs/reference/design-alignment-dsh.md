@@ -55,11 +55,37 @@ grep -nE "\-\-ht-(font-size|radius|space)-" packages/design-system/src/tokens.cs
 | 档 | DSH 实测 | heyta 对齐前 | 本轮 |
 |---|---|---|---|
 | 圆角 | 6×45 / 8×42 / 12×39 / 10×25 / 4×18 / 2×8 | `sm`4 / `md`8 / `lg`12 / `xl`16 / `full` | 卡片边已经是 12 ✓；**6 与 10 仍缺**（见 §6） |
-| 卡片边 | **0.5px**（三张卡全一样） | `border-width-thin` 1px | ✅ 新增 `hairline` 并用到 4 张卡 |
+| 卡片边 | **0.5px**（三张卡全一样） | `border-width-thin` 1px | ✅ 新增 `hairline`；**1x 用 1px、2x 才用 0.5px**（理由见 §3.1） |
 | 卡片 padding | `12×16`（HoverCard）/ `16×20`（AskQuestionCard）| `space-4` 四边 16 | ⏸ 未改（见 §6） |
 | 卡片内 gap | 8 / 16 | `space-1` 4 | ⏸ **刻意不改**：那个 4 有实测依据（52+4=56，落在 macOS 44–56 上沿，见 `sheets.css` 的注释） |
 | 卡片内正文 | 14（`--dsh-content-font-size` 默认 14） | 已落在 11–14 区间 | ✓ |
 | 间距档 | gap 8×15 / 6×9 / 4×8 / 12×8 | `4/8/12/16/20/24…` | **6 与 10 仍缺**（见 §6） |
+
+### 3.2 页面底色：一次**被门禁否决**的对齐尝试
+
+观察（截图）：卡片 `#ffffff` 与页面 `#f8fafc` 只差 **7/255**，一屏三张卡糊成一片白。
+DSH 的做法是页面压一档、卡片留纯白。于是把 `--ht-color-background` 改成 `slate-100`
+（`#f1f5f9`，差 14/255），浏览器实测确实生效（`getComputedStyle(document.body).backgroundColor
+=== 'rgb(241, 245, 249)'`）。
+
+**但它红了 4 条 AA 用例**：`color.foreground-subtle` 在页面底上的对比度
+从 ≥4.5 掉到 **4.34:1**（RN Light / SwiftLight / ArkTS 四端同时红）。
+
+⇒ 回退。要改进这一档，必须**同一批**把 `foreground-subtle` 也调深一档，
+让三级文字重新过 AA —— 单独改底色是拿可读性换观感。
+**这一条是"对齐 DSH"最容易被忽略的代价：DSH 的配色是配它自己的文字色阶量的。**
+
+### 3.1 为什么发丝线要按 DPR 分开（一条被截图推翻的判断）
+
+一开始的判断是"0.5px 在 1x 屏上会淡到看不见"，于是在 1x 上退回 1px、只在 2x 用 0.5px。
+后来拿两张验收截图**逐字节比对**：`0.5px` 与 `1px` 在 `deviceScaleFactor: 1` 下
+**sha256 完全相同** —— 浏览器把 0.5px 舍入成 1px 来画。
+
+结论不变（两种屏两个值），但**理由换了**：
+- 1x：两者同形 ⇒ 写 1px（意图明确，不依赖舍入行为）
+- 2x：0.5px 是真的半像素 ⇒ 那才是 DSH 的样子
+
+⇒ 记这一条是为了提醒：**"对齐 DSH"里的每个数，都要先问它是在什么 DPR 下量的。**
 
 🔴 卡片这一栏的取法是**读组件而不是读 token**：DSH 没有卡片 token，
 `radius: 12` 与 `border: 0.5px` 是直接写在 `ui-tool/…/AskQuestionCard.module.css`、
@@ -75,7 +101,8 @@ grep -nE "\-\-ht-(font-size|radius|space)-" packages/design-system/src/tokens.cs
 | 分组标题 | `group-label` 14 → 13 | `组标题档压得住它管辖的每一档说明` |
 | 区块标题 | `section-title` 18 → 16 | `check:design-tokens` 全绿 |
 | 数值正文 | `numeric-body` 16 → 14 | 同上 |
-| 发丝线 | 新增 `--ht-border-width-hairline`(0.5px)，用于 **4 张卡片的边**（设置主卡 / 订阅计划 / 订阅订单 / AI 卡） | `check:tokens`(222 token)、546 测试、Web 构建 |
+| 发丝线 | 新增 `--ht-border-width-hairline`(0.5px)，**仅在 2x 屏**用于 4 张卡片的边 | `check:tokens`(222 token)、546 测试、Web 构建 |
+| 页面底色 | ⛔ **试过、已回退**（见 §3.2） | 四端 AA 用例：`foreground-subtle` 在页面底上 4.34:1 < 4.5 |
 
 ---
 

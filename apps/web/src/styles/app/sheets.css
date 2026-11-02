@@ -88,9 +88,7 @@
  */
 .ht-settings__content > .ht-settings__group > .ht-settings,
 .ht-settings__content > .ht-settings__group > div > .ht-settings {
-  /* 卡片边用**发丝线**（DSH 对齐）：0.5px。实测 DSH 的卡片边全是 0.5px；
-     1px 在 2 倍屏上明显更重，卡片看起来像一个框而不是一层边。 */
-  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);
   background: var(--ht-color-surface);
   max-inline-size: none;
@@ -830,9 +828,7 @@
   gap: var(--ht-space-2);
   min-inline-size: 0;
   padding: var(--ht-space-3) var(--ht-space-4);
-  /* 卡片边用**发丝线**（DSH 对齐）：0.5px。实测 DSH 的卡片边全是 0.5px；
-     1px 在 2 倍屏上明显更重，卡片看起来像一个框而不是一层边。 */
-  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
   cursor: pointer;
@@ -900,9 +896,7 @@
   flex-direction: column;
   gap: var(--ht-space-3);
   padding: var(--ht-space-3) var(--ht-space-4);
-  /* 卡片边用**发丝线**（DSH 对齐）：0.5px。实测 DSH 的卡片边全是 0.5px；
-     1px 在 2 倍屏上明显更重，卡片看起来像一个框而不是一层边。 */
-  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
 }
@@ -956,9 +950,7 @@
 .ht-settings--cards > .ht-settings__subsection,
 .ht-settings--cards > .ht-ai-card {
   padding: var(--ht-space-4);
-  /* 卡片边用**发丝线**（DSH 对齐）：0.5px。实测 DSH 的卡片边全是 0.5px；
-     1px 在 2 倍屏上明显更重，卡片看起来像一个框而不是一层边。 */
-  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);
   background: var(--ht-color-surface);
 }
@@ -1082,4 +1074,27 @@
    窗口里唯一的账号入口是「账号与安全」那一节本身。 */
 .ht-app[data-settings-standalone] .ht-accountmenu__panel {
   display: none;
+}
+
+/* ── 卡片边：1x 用 1px，2x 用发丝线（DSH 对齐）─────────────────────────
+ *
+ * 实测 DSH 的卡片边全是 `0.5px`（AskQuestionCard / FileCard）。
+ * 但**先别急着照抄**：本仓这次拿两张截图逐字节比对过 ——
+ * `0.5px` 与 `1px` 在 `deviceScaleFactor: 1` 的截图上**像素完全相同**
+ * （sha256 一致），因为浏览器会把 0.5px 舍入成 1px 来画。
+ *
+ * ⇒ 于是两种 DPR 下的真实差别是：
+ *   - **1x**：0.5px 与 1px 同形 ⇒ 写哪个都一样，那就不如写 1px（意图明确、不依赖舍入）
+ *   - **2x**：0.5px 才是**真的半像素**线，比 1px 细一档 —— 那才是 DSH 看起来的样子
+ *
+ * 🔴 所以这里不是"为了保险"，是**两种屏要两个值**。前面一版注释说
+ * "0.5px 在 1x 上会淡到看不见" —— 那是**错的**，比对截图推翻了它，留此更正。
+ */
+@media (min-resolution: 2dppx) {
+  .ht-settings__content > .ht-settings__group > div > .ht-settings,
+  .ht-settings__sub-plan,
+  .ht-settings__sub-order,
+  .ht-settings--cards > .ht-ai-card {
+    border-width: var(--ht-border-width-hairline);
+  }
 }
