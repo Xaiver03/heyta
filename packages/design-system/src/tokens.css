@@ -233,6 +233,15 @@
   --ht-font-size-2xs: 0.6875rem; /* 11px — 仅极致紧凑标签 */
   --ht-font-size-xs: 0.75rem;    /* 12px — 辅助文字下限 */
   --ht-font-size-sm: 0.875rem;   /* 14px — 密集列表 */
+  /**
+   * 13px —— **DSH 对齐新增的一档**。
+   *
+   * 实测 DeepSeek Harness 客户端的真实用量（`grep -rhoE "font-size:\s*[0-9.]+px"`）：
+   * 14px×14 / 12px×12 / 11px×6 / **13px×3** / 16px×1 —— 13 是它"分组标题 / 次级标签"
+   * 那一档。heyta 原来从 12 直接跳到 14，于是这一类文字只能**借用** 14（显得比正文重），
+   * 或者借用 12（显得像脚注）。补这一档就是为了让它不必再借。
+   */
+  --ht-font-size-md: 0.8125rem;  /* 13px — 分组标题（DSH 对齐） */
   --ht-font-size-base: 1rem;     /* 16px — 正文基准 */
   --ht-font-size-lg: 1.125rem;   /* 18px */
   --ht-font-size-xl: 1.25rem;    /* 20px */

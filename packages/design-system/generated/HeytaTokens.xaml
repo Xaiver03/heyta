@@ -86,6 +86,7 @@
     <x:Double x:Key="HeytaSpace16">64</x:Double>
     <x:Double x:Key="HeytaFontSize2xs">11</x:Double>
     <x:Double x:Key="HeytaFontSizeXs">12</x:Double>
+    <x:Double x:Key="HeytaFontSizeMd">13</x:Double>
     <x:Double x:Key="HeytaFontSizeSm">14</x:Double>
     <x:Double x:Key="HeytaFontSizeBase">16</x:Double>
     <x:Double x:Key="HeytaFontSizeLg">18</x:Double>

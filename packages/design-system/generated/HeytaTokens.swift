@@ -122,6 +122,7 @@ enum HeytaTokens {
     static let space16: Double = 64  // px
     static let fontSize2xs: Double = 11  // px
     static let fontSizeXs: Double = 12  // px
+    static let fontSizeMd: Double = 13  // px
     static let fontSizeSm: Double = 14  // px
     static let fontSizeBase: Double = 16  // px
     static let fontSizeLg: Double = 18  // px

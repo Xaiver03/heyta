@@ -103,7 +103,9 @@ export const TOKEN_GROUPS = {
     'overlay',
   ],
   space: ['0', '1', '2', '3', '4', '5', '6', '8', '10', '12', '16'],
-  'font-size': ['2xs', 'xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl'],
+  // `md`(13px) 是 DSH 对齐新增的一档：分组标题 / 次级标签。
+  // 顺序按**数值**排（2xs 11 → md 13 → sm 14），不是字母序。
+  'font-size': ['2xs', 'xs', 'md', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl'],
   'font-weight': ['regular', 'medium', 'semibold', 'bold'],
   'line-height': ['tight', 'normal', 'relaxed'],
   /** 组名用 `font` 而非 `font-family`，以匹配 `--ht-font-sans` 的实际写法。 */

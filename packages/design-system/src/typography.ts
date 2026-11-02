@@ -72,7 +72,7 @@ export const TEXT_STYLES = {
   },
   /** 区块标题（如"今天""已完成""收集箱"）。用于分组，不用于页面主标题。 */
   'section-title': {
-    size: 'font-size.lg',
+    size: 'font-size.base',
     weight: 'font-weight.semibold',
     leading: 'line-height.tight',
     tracking: 'tracking.title',
@@ -105,7 +105,7 @@ export const TEXT_STYLES = {
    *    比正文**小**是它想要的效果。
    */
   'group-label': {
-    size: 'font-size.sm',
+    size: 'font-size.md',
     weight: 'font-weight.semibold',
     leading: 'line-height.tight',
     tracking: 'tracking.caption',
@@ -230,7 +230,7 @@ export const TEXT_STYLES = {
   },
   /** 行内数字（时长、次数、日期跨度）。必须等宽。 */
   'numeric-body': {
-    size: 'font-size.base',
+    size: 'font-size.sm',
     weight: 'font-weight.medium',
     leading: 'line-height.normal',
     tracking: 'tracking.body',

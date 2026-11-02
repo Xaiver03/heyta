@@ -119,6 +119,7 @@ export const HEYTA_SPACE_12: number = 48;  // px
 export const HEYTA_SPACE_16: number = 64;  // px
 export const HEYTA_FONT_SIZE_2XS: number = 11;  // px
 export const HEYTA_FONT_SIZE_XS: number = 12;  // px
+export const HEYTA_FONT_SIZE_MD: number = 13;  // px
 export const HEYTA_FONT_SIZE_SM: number = 14;  // px
 export const HEYTA_FONT_SIZE_BASE: number = 16;  // px
 export const HEYTA_FONT_SIZE_LG: number = 18;  // px
