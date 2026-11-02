@@ -15,6 +15,8 @@
  * 4. **粘贴只在捕获框里生效**：在别处粘贴不该被吃掉（判据是 `data-heyta-capture-root`）。
  */
 
+import type { AiRoutingConfig } from '@heyta/ai';
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -49,7 +51,7 @@ vi.mock('../src/features/tasks/store.js', () => ({
 
 const { CaptureComposer } = await import('../src/features/capture/CaptureComposer.js');
 
-const ROUTING = {
+const ROUTING: AiRoutingConfig = {
   enabled: true,
   allowRemote: false,
   endpoints: [
