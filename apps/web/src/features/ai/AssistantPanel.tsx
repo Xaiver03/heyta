@@ -1,4 +1,6 @@
 import { AssistantIcon } from './AssistantIcon.js';
+import { ImageAttach } from './ImageAttach.js';
+import type { EncodedImage } from './image-encode.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 对话式助手 —— 面向用户的入口（W12 / ADR-0045）
@@ -51,7 +53,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  * （`check:layering` 的 `no-model-endpoint-in-apps` 会拦下试图在这里 fetch 的代码）。
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, Maximize2, Minimize2, Send, X } from 'lucide-react';
 
 import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
@@ -119,6 +121,18 @@ export interface AssistantPanelProps {
   memoryEnabled?: boolean;
   /** 估时工具需要的最小偏好提示，由外壳按当前语言与授权派生。 */
   getDurationPreferenceHints?: () => readonly { id: string; text: string }[];
+  /**
+   * 组织类 AI 动作（批量）的插槽 —— 目前是「AI 排优先级」。
+   *
+   * 🔴 为什么是插槽而不是写死在这里：动作要拿到当前清单、路由、授权、熔断状态，
+   * 那些都在宿主（`App.tsx`）手里。面板保持哑的，宿主决定挂什么 ——
+   * AGENTS §3.5「`apps/*` 不许有一行决定业务上该怎么做」，同理这一层也不该决定
+   * "哪些动作存在"。
+   *
+   * ⚠️ 它渲染在**面板正文顶端、常驻**，不是欢迎态的一部分：
+   * 一有对话就消失的入口等于"用一次就找不到第二次"。
+   */
+  orgActions?: ReactNode;
   /** 网络实现。可注入**只为测试**（与五个既有面板同一约定）。 */
   fetchImpl?: typeof fetch;
   /** 「去设置」的导航。注入缝，只为测试。 */
@@ -323,7 +337,16 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   const settingsNavigation = useAiSettingsNavigation();
   const onOpenSettings = props.onOpenSettings ?? settingsNavigation;
 
-  const plan = planAssistantEgress();
+  /**
+   * 🔴 披露要跟着**这一轮有没有图**走：带图时不写 `images`，用户就会以为只发文字。
+   * 它在这里算而不是发送时算，因为披露必须在任何一次请求之前成立。
+   */
+  /**
+   * 附件图片。**只活在这个面板的内存里**：不进 op-log、不同步、不落会话历史。
+   * 与捕获那条同一条纪律（ADR-0005「AI 是输入法」—— 输入法不存你打的字）。
+   */
+  const [images, setImages] = useState<readonly EncodedImage[]>([]);
+  const plan = planAssistantEgress({ hasImages: images.length > 0 });
   const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
   // 🔴 助手**不是**第 6 个 `AiFeature`：它就是 `tool-calling` 的多步形态
   //（见 ADR-0045 §2.1）。所以目的地、能力缺口、熔断都按 `tool-calling` 算。
@@ -378,7 +401,13 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     // 并逐片回调。省略它 = 回到"整段回来再显示"（移动端就是这样）。
     ephemeral.write(session.account, { live: EMPTY_LIVE });
     const outcome = await requestAssistantTurn(
-      { text },
+      {
+        text,
+        // ⚠️ 图只在**第一步**发（循环里每步都会重建 messages，见 app-host 的注释）。
+        ...(images.length === 0
+          ? {}
+          : { images: images.map((image) => ({ mediaType: image.mediaType, base64: image.base64 })) }),
+      },
       {
         routing: props.routing,
         consents: props.consents,
@@ -444,9 +473,14 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     // 经过同一阶段闸门。披露阶段同样不能再追加第二条待发送消息。
     if (controls.phase !== 'idle') return;
     const text = draft.trim();
-    if (text === '') return;
+    // 🔴 只有图、没有字是**合法的一次提问**（"这张截图是什么"）。
+    // 原来这里 `if (text === '') return;` 会把那条路整条掐掉。
+    if (text === '' && images.length === 0) return;
     append({ role: 'user', text });
     setDraft('');
+    // 图只属于这一条消息：发出去之后输入框回到"没附件"的状态，
+    // 否则下一句会**悄悄**再带一次同一张图。
+    setImages([]);
     // 🔴 先按规则试一次（本机、纯函数、零出境）：命中就说明这一句根本不会出境，
     // 那就**不该弹出境披露** —— 单步面板 `AiToolRun` 一直是这个顺序。
     // 判定住在 `@heyta/app-host`（和循环里那一次是同一个函数），壳不另写规则。
@@ -539,7 +573,20 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
 
   const HeadingTag = props.expanded === true ? 'h1' : 'h2';
   const composer = (
-    <div className="ht-ai__composer">
+    /*
+      🔴 `data-heyta-chat-root` 是**粘贴归属判据**（见 `ImageAttach` 的 `pasteScope`）：
+      文档级 paste 监听靠它区分"在对话输入框里粘贴"与"在搜索框里粘贴"。
+      没有它，贴图会在别处把用户的图片吃掉。
+    */
+    <div className="ht-ai__attach-stack" data-heyta-chat-root="">
+      <ImageAttach
+        images={images}
+        onChange={setImages}
+        disabled={phase === 'running'}
+        pasteScope="[data-heyta-chat-root]"
+        testIdPrefix="chat-attach"
+      />
+      <div className="ht-ai__composer">
       <textarea
         ref={composerRef}
         className="ht-input ht-ai__input"
@@ -562,11 +609,12 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         aria-label={t('web.ai.chat.send')}
         data-testid="ai-assistant-send-button"
         onClick={send}
-        disabled={draft.trim() === '' || phase === 'running'}
+        disabled={(draft.trim() === '' && images.length === 0) || phase === 'running'}
       >
         <Send size={ICON_SIZE.xs} aria-hidden="true" />
         <span className="sr-only">{t('web.ai.chat.send')}</span>
       </button>
+      </div>
     </div>
   );
 
@@ -673,6 +721,19 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
             </div>
           </header>
       <div className={`ht-ai__chat-body ${!hasConversation ? 'ht-ai__chat-body--welcome' : ''}`}>
+      {/*
+        组织类动作（宿主注入，见 `orgActions`）。
+
+        🔴 它挂在正文**顶端**、两种状态都在 —— 有对话之后也还在。
+        原来「AI 排优先级」住在任务列表中间（组头与任务行之间），
+        长得和一行任务一样，而它其实是一次批量写入的入口。
+        搬到这里之后，"跟助手有关的动作"只有一处能找到。
+      */}
+      {props.orgActions !== undefined && (
+        <div className="ht-ai__org" data-testid="ai-assistant-org">
+          {props.orgActions}
+        </div>
+      )}
       {/*
        * 空会话不应该让用户面对一块“什么都没有”的技术面板。
        * 快捷建议只是把自然语言填入同一个输入框，不创建第二套执行入口；

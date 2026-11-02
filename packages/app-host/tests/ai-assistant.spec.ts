@@ -927,3 +927,129 @@ describe('本机回答的渲染形状', () => {
     expect(text).not.toContain('request');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// 图片：贴一张图问助手
+// ─────────────────────────────────────────────────────────────────────────
+
+const PNG_PART = {
+  mediaType: 'image/png' as const,
+  base64:
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+};
+
+/** 声明了视觉的同一台本机端点。 */
+// ⚠️ 必须**保留** `tool_calling`：助手的 feature 是 `'tool-calling'`，
+// 能力过滤是 and 关系 —— 只写 vision 会让这台端点连工具都过不了，
+// 于是"没声明 vision"那条测试会因为另一个原因红（假绿的反面）。
+const LOCAL_VISION: AiEndpointConfig = {
+  ...LOCAL,
+  capabilities: ['structured_output', 'tool_calling', 'vision'],
+};
+
+describe('🔴 图片：只在第一步发', () => {
+  it('无图时首步请求里没有 image_url（请求体与从前一致）', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '好。' }]);
+
+    await requestAssistantTurn(
+      { text: '你好' },
+      { routing: routing(LOCAL), consents: [], localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
+    );
+
+    expect(JSON.stringify(calls[0]?.body)).not.toContain('image_url');
+  });
+
+  it('有图时首步带 image_url，且披露字段里有 images', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '这张图上写的是买牛奶。' }]);
+
+    const outcome = await requestAssistantTurn(
+      { text: '图里是什么', images: [PNG_PART] },
+      {
+        routing: routing(LOCAL_VISION),
+        consents: [],
+        localize: LOCALIZE_ZH,
+        host,
+        routed: { fetchImpl: impl },
+      },
+    );
+
+    expect(outcome.ok).toBe(true);
+    const body = JSON.stringify(calls[0]?.body);
+    expect(body).toContain('image_url');
+    expect(body).toContain(PNG_PART.base64.slice(0, 32));
+  });
+
+  it('🔴 多步循环里**只有第一步**带图（否则重复计费，并撞穿 200 KB 上界）', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([
+      { kind: 'call', id: 'c1', name: 'list_tasks', args: '{}' },
+      { kind: 'text', text: '看到了。' },
+    ]);
+
+    await requestAssistantTurn(
+      { text: '图里这条任务在清单里吗', images: [PNG_PART] },
+      {
+        routing: routing(LOCAL_VISION),
+        consents: [],
+        localize: LOCALIZE_ZH,
+        host,
+        routed: { fetchImpl: impl },
+      },
+    );
+
+    expect(calls.length).toBe(2);
+    expect(JSON.stringify(calls[0]?.body)).toContain('image_url');
+    expect(JSON.stringify(calls[1]?.body)).not.toContain('image_url');
+  });
+
+  it('🔴 端点没声明 vision ⇒ 不发请求', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '不该走到这里' }]);
+
+    const outcome = await requestAssistantTurn(
+      { text: '图里是什么', images: [PNG_PART] },
+      {
+        // 同一个端点，只是**没有声明** vision
+        routing: routing(LOCAL),
+        consents: [],
+        localize: LOCALIZE_ZH,
+        host,
+        routed: { fetchImpl: impl },
+      },
+    );
+
+    expect(calls.length).toBe(0);
+    expect(outcome.ok).toBe(false);
+  });
+
+  it('只有图、没有字是合法输入（不会被 empty-text 拒）', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '买牛奶。' }]);
+
+    const outcome = await requestAssistantTurn(
+      { text: '', images: [PNG_PART] },
+      {
+        routing: routing(LOCAL_VISION),
+        consents: [],
+        localize: LOCALIZE_ZH,
+        host,
+        routed: { fetchImpl: impl },
+      },
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(calls.length).toBe(1);
+  });
+});
+
+describe('披露计划：带图时必须写明 images', () => {
+  it('默认不出现 images', () => {
+    expect(planAssistantEgress().fields).not.toContain('images');
+  });
+
+  it('带图时出现 images', () => {
+    expect(planAssistantEgress({ hasImages: true }).fields).toContain('images');
+  });
+});
