@@ -26,7 +26,7 @@
   border-radius: var(--ht-radius-lg);
   box-shadow: var(--ht-shadow-lg);
 }
-@media (max-width: 1023px), (max-height: 479px) {
+@media (max-width: 63.9375rem), (max-height: 29.9375rem) {
   .ht-app[data-detail-agent]:not([data-detail='collapsed']):not([data-detail-empty]):not([data-detail-suppressed]) {
     --ht-detail-track: 0;
   }

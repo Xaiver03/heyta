@@ -65,7 +65,6 @@ import {
   runSelectedTool,
   type AiToolRunOutcome,
 } from './ai-tool-run.js';
-import type { AssistantTier } from './ai-assistant.js';
 
 /** 单句输入上限。工具选择只处理短命令，长文不是它的场景。 */
 export const MAX_TOOL_CALL_TEXT_LENGTH = 500;
@@ -187,8 +186,6 @@ export interface RequestToolCallDeps {
   policy?: AiRoutingPolicy;
   routed?: RoutedDeps;
   now?: () => number;
-  /** 执行档由调用方传入；未传时保留旧的“只产出提案”单步语义。 */
-  tier?: AssistantTier;
   /** 最终执行前读取当前工具授权。 */
   getGrants?: () => LocalApiConfig['grants'];
   /** 与对话助手共用的一次用户发送标识，供低风险自动提交防重放。 */
@@ -201,7 +198,6 @@ async function applyExecutionMode(
 ): Promise<AiToolRunOutcome> {
   if (
     run.kind !== 'proposal' ||
-    deps.tier !== 'read-and-propose' ||
     deps.executionId === undefined ||
     aiToolProposalRequiresConfirmation(run.proposal)
   ) {

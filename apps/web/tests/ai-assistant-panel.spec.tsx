@@ -25,7 +25,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { I18nProvider, en, zhCN } from '@heyta/i18n';
 import { HeytaUiProvider } from '@heyta/ui';
-import { planAssistantEgress, type AssistantTier } from '@heyta/app-host';
+import { planAssistantEgress } from '@heyta/app-host';
 import type { AiRoutingConfig } from '@heyta/ai';
 import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
 
@@ -155,7 +155,6 @@ let root: Root | undefined;
 async function render(props: {
   host: LocalApiHost;
   fetchImpl?: typeof fetch;
-  tier?: AssistantTier;
   routing?: AiRoutingConfig;
   locale?: 'zh-CN' | 'en';
   consents?: typeof CONSENTS;
@@ -179,7 +178,6 @@ async function render(props: {
         <AssistantPanel
           routing={props.routing ?? ROUTING}
           consents={props.consents ?? CONSENTS}
-          tier={props.tier ?? 'read-only'}
           secrets={secrets}
           host={props.host}
           {...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl })}
@@ -311,7 +309,7 @@ describe('🔴 一次性披露在循环之前', () => {
     const { impl } = scriptedFetch([
       { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
     ]);
-    const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
+    const el = await render({ host, fetchImpl: impl });
     await type(el, '把买咖啡和写周报都完成');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
@@ -345,14 +343,14 @@ describe('🔴 一次性披露在循环之前', () => {
     expect(host.submits).toBe(0);
   });
 
-  it('🔴 披露的字段与工具**逐字等于** `planAssistantEgress(tier)`，不是界面另抄的一份', async () => {
+  it('🔴 披露的字段与工具**逐字等于** `planAssistantEgress()`，不是界面另抄的一份', async () => {
     const host = fakeHost();
     const { impl } = scriptedFetch([{ kind: 'text', text: '好。' }]);
-    const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
+    const el = await render({ host, fetchImpl: impl });
     await type(el, '帮我建一条');
     await click(el, 'ai-assistant-send-button');
 
-    const plan = planAssistantEgress('read-and-propose');
+    const plan = planAssistantEgress();
     await click(el, 'ai-assistant-fields-toggle');
     const disclosureText =
       el.querySelector('[data-testid="ai-assistant-disclosure"]')?.textContent ?? '';
@@ -363,10 +361,9 @@ describe('🔴 一次性披露在循环之前', () => {
     for (const tool of plan.tools) {
       expect(toolsText, `披露里缺工具 ${tool}`).toContain(tool);
     }
-    // 🔴 写工具**不该**出现在只读档的披露里 —— 档位决定可达集合。
-    const readOnly = planAssistantEgress('read-only');
-    expect(readOnly.tools).not.toContain('create_task');
+    // 🔴 没有只读档之后，写工具**也**在披露里 —— 少说一个工具等于少说一项出境。
     expect(plan.tools).toContain('create_task');
+    expect(plan.tools).toContain('complete_task');
   });
 
   it('上界的三个数字在披露里说得出（都来自 `planAssistantEgress`）', async () => {
@@ -376,7 +373,7 @@ describe('🔴 一次性披露在循环之前', () => {
     await type(el, '看看');
     await click(el, 'ai-assistant-send-button');
     const limits = el.querySelector('[data-testid="ai-assistant-disclosure-limits"]')?.textContent ?? '';
-    const plan = planAssistantEgress('read-only');
+    const plan = planAssistantEgress();
     expect(limits).toContain(String(plan.maxRequests));
     expect(limits).toContain(String(plan.maxMessages));
     expect(limits).toContain(String(plan.maxBytesPerRequest));
@@ -545,7 +542,7 @@ describe('🔴 助手请求竞态：一次发送、一次运行、一次会话',
   it('运行中即使请求最终产生写入，也不能被新会话隐藏', async () => {
     const host = fakeHost();
     const fetch = delayedFetch();
-    const el = await render({ host, fetchImpl: fetch.impl, tier: 'read-and-propose' });
+    const el = await render({ host, fetchImpl: fetch.impl });
 
     await type(el, '创建一条任务');
     await click(el, 'ai-assistant-send-button');
@@ -607,7 +604,7 @@ describe('🔴 写：低风险自动执行，高风险提案确认', () => {
     const { impl } = scriptedFetch([
       { kind: 'call', id: 'c1', name: 'create_task', args: '{"title":"买咖啡"}' },
     ]);
-    const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
+    const el = await render({ host, fetchImpl: impl });
     await type(el, '记一下 买咖啡');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
@@ -622,7 +619,7 @@ describe('🔴 写：低风险自动执行，高风险提案确认', () => {
     const { impl } = scriptedFetch([
       { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
     ]);
-    const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
+    const el = await render({ host, fetchImpl: impl });
     await type(el, '记一下 买咖啡');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
@@ -639,7 +636,7 @@ describe('🔴 写：低风险自动执行，高风险提案确认', () => {
       // 故意留一条：循环没停在提案上就会消费它、请求数变成 2。
       { kind: 'text', text: '我还想再问一句' },
     ]);
-    const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
+    const el = await render({ host, fetchImpl: impl });
     await type(el, '记一下 买咖啡');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
@@ -745,12 +742,14 @@ describe('过程可见与失败', () => {
     );
   });
 
-  it('免责声明常驻，且当前档位写在界面上（用户知道自己在用哪一档）', async () => {
+  it('免责声明常驻，但**没有**"助手权限"控件（ADR-0082）', async () => {
     const host = fakeHost();
     const { impl } = scriptedFetch([{ kind: 'text', text: '好' }]);
-    const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
+    const el = await render({ host, fetchImpl: impl });
     expect(el.querySelector('[data-testid="ai-assistant-disclaimer"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="ai-assistant-tier"]')?.textContent).toContain('执行');
+    // 🔴 反方向钉住 ADR-0082：那个下拉再回来，这条就红。
+    expect(el.querySelector('[data-testid="ai-assistant-tier-select"]')).toBeNull();
+    expect(el.querySelector('[data-testid="ai-assistant-tier"]')).toBeNull();
   });
 });
 

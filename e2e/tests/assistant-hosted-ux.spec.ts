@@ -9,9 +9,7 @@ test('Chatbot keeps an unclipped empty prompt, a bottom conversation composer an
   await openApp(page, '/?lang=zh-CN');
   const assistant = page.getByTestId('ai-assistant');
   const input = page.getByTestId('ai-assistant-input');
-  const tier = page.getByTestId('ai-assistant-tier-select');
   await expect(assistant).toHaveCount(1);
-  await expect(tier).toHaveValue('read-and-propose');
   await input.fill('整理明天的待办');
   for (const theme of ['light', 'dark'] as const) {
     if (theme === 'dark') await switchTheme(page, theme);
@@ -82,9 +80,6 @@ test('Chatbot keeps an unclipped empty prompt, a bottom conversation composer an
     }
     await page.setViewportSize({width:1280,height:800});
   }
-  await tier.selectOption('read-only');
-  await page.reload();
-  await expect(tier).toHaveValue('read-only');
 });
 
 test('Signed-out sync and Profile have a login path, advanced connection stays collapsed', async ({ page }) => {

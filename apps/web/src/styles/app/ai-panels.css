@@ -11,6 +11,22 @@
   font-size: var(--ht-font-size-sm);
 }
 
+/*
+ * 「一屏里的**一个行组**」：沿用 `.ht-settings` 的内边距（否则这一组的左缘
+ * 会比其它组偏 16px），但**不要**它的 `gap`。
+ *
+ * 那个 `--ht-space-4` 是给"一屏里几个子块之间"用的；行与行之间本来就靠
+ * `.ht-settings__preference-row + .ht-settings__preference-row` 的发丝线分节，
+ * 再叠 16px 空隙就等于**每个行组被拆成几个孤立的块**。
+ *
+ * 🔴 2026-10-27 现量（外观组）：带 gap 时行距中位数 **72**，而
+ * `e2e/tests/settings-row-grammar.spec.ts` 钉的是 **44–56**（macOS 设置的行高区间）。
+ * 那不是阈值该改，是这一层壳套错了 —— 修内容，不修阈值（计划 §6.2 第 3 条）。
+ */
+.ht-settings__rows {
+  gap: 0;
+}
+
 /* 同步设置里的 Vault 区域沿用设置页的 L1 原语；Vault 视图只负责状态与动作。 */
 .ht-settings__vault {
   gap: var(--ht-space-2);
@@ -183,7 +199,16 @@ input[type="radio"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   inline-size: fit-content;
   max-inline-size: 100%;
-  padding: var(--ht-space-1);
+  /*
+   * 🔴 只留**横向**内缩，纵向归零。
+   *
+   * 轨道原来四边都缩 `--ht-space-1`，于是轨道高 = 44（选项触控档）+ 4×2 = **52**，
+   * 行高跟着变成 60，行距中位数 72 —— 同一屏里它比别的组的 44 高出一档，
+   * 一列里出现两种行（判据 `settings-row-grammar.spec.ts` 的 44–56 就是在抓这个）。
+   * 横向内缩是分段控件的"轨道"观感，保留；纵向那 8px 谁也看不出来，去掉之后
+   * 轨道高回到 44，与「一屏只有一种行」同一个档。
+   */
+  padding: 0 var(--ht-space-1);
   gap: var(--ht-space-1);
   border: 0;
   border-radius: var(--ht-radius-md);
@@ -928,7 +953,7 @@ input[type="radio"] {
   gap: var(--ht-space-1);
 }
 
-@media (max-width: 36rem) {
+@media (max-width: 48rem) {
   .ht-ai__header {
     align-items: flex-start;
     flex-direction: column;

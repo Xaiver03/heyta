@@ -1,5 +1,4 @@
 import { AssistantIcon } from './AssistantIcon.js';
-import { FormField } from '../../lib/form/FormField.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 对话式助手 —— 面向用户的入口（W12 / ADR-0045）
@@ -16,14 +15,17 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 字段并集（来自目录 `egressFields`）+ 工具名 + 三个硬上界。
  * 之后同一段会话不再拦；「新会话」重新问一次。
  *
- * 字段与上界**都从 `planAssistantEgress(tier)` 取**，本文件不列任何名单 ——
+ * 字段与上界**都从 `planAssistantEgress()` 取**，本文件不列任何名单 ——
  * 手抄一份会漂，漂了界面就在替隐私承诺撒一个过期的谎。
  *
  * ## 🔴 2. 写：低风险自动执行，高风险提案卡确认
  *
  * `requestAssistantTurn` 对写工具只产出一个意图并**当场停**（`stopsHere`），
- * 模型看不到"它被批准了"。执行档的低风险意图已经由 app-host 提交；高风险动作
+ * 模型看不到"它被批准了"。低风险意图已经由 app-host 提交；高风险动作
  * 才显示「确认」按钮，并走 `confirmAiToolProposal()` → `host.submit()` → `dispatch()`。
+ *
+ * ⚠️ 这里**没有**"只读 / 执行"档（ADR-0082）：安全性由风险闸门与上面的
+ * 一次性披露提供，不由一个用户要先拨对的开关提供。
  *
  * ## 🔴 3. 会话历史落在这台设备上（D-4 的 (i)，不是 (ii)）
  *
@@ -50,7 +52,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ChevronDown, Maximize2, Minimize2, Send, X } from 'lucide-react';
+import { AlertTriangle, Maximize2, Minimize2, Send, X } from 'lucide-react';
 
 import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
 import {
@@ -64,8 +66,6 @@ import {
   type SecretStore,
 } from '@heyta/ai';
 import {
-  ASSISTANT_TIER_READ_ONLY,
-  ASSISTANT_TIER_EXECUTE,
   assistantEgressFields,
   assistantNeedsEgressDisclosure,
   assistantGrants,
@@ -75,7 +75,6 @@ import {
   type AssistantFailureReason,
   type AssistantMessage,
   type AssistantStep,
-  type AssistantTier,
   type AssistantTurnEvent,
 } from '@heyta/app-host';
 import { webManagedTransport } from './managed-transport.js';
@@ -105,15 +104,6 @@ import { currentAccount, usePanelEphemeral, usePanelSession } from './panel-ephe
 export interface AssistantPanelProps {
   routing: AiRoutingConfig;
   consents: readonly EgressConsent[];
-  /**
-   * 能力档位 —— **第二个授权前端**的结果（设置页 `assistantTier`）。
-   *
-   * ⚠️ 它**不是** `localApi.grants`：那张表管外部程序能不能调工具，
-   * 这一档管内置助手看得见哪些工具，以及低风险写意图是否可自动提交。
-   */
-  tier: AssistantTier;
-  /** Chat 内临时切换能力档位；持久化仍由设置页这一事实源负责。 */
-  onTierChange?: (tier: AssistantTier) => void;
   /** 覆盖面打开时由父级提供；桌面常驻右栏不传，因此不显示关闭动作。 */
   onClose?: () => void;
   /** 将当前 Chatbot 切换到宿主提供的专注工作区；状态仍由父级持有。 */
@@ -219,7 +209,6 @@ interface AssistantEphemeralShape {
     epoch: number;
     nextId: number;
     confirming: boolean;
-    tier: AssistantTier;
   };
 }
 
@@ -253,7 +242,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     disclosed: session.history?.disclosed ?? false,
     controls: {
       phase: 'idle', epoch: 0, nextId: session.history?.items.length ?? 0,
-      confirming: false, tier: props.tier,
+      confirming: false,
     },
   }));
   const ephemeral = usePanelEphemeral('assistant', session.account, initialSession);
@@ -264,9 +253,6 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     }));
   };
   const setDisclosed = (value: boolean): void => ephemeral.write(session.account, { disclosed: value });
-  /** 档位本身跨挂载保留；父级设置变化仍由下面的 effect 接入。 */
-  const [selectedTier, setSelectedTier] = useState<AssistantTier>(controls.tier);
-  controls.tier = selectedTier;
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyToggleRef = useRef<HTMLButtonElement>(null);
   const historyCloseRef = useRef<HTMLButtonElement>(null);
@@ -302,9 +288,6 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     setHistoryOpen(false);
     historyToggleRef.current?.focus();
   }
-  useEffect(() => {
-    setSelectedTier(props.tier);
-  }, [props.tier]);
   /**
    * 等披露确认后才要发出去的那句。
    *
@@ -340,7 +323,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   const settingsNavigation = useAiSettingsNavigation();
   const onOpenSettings = props.onOpenSettings ?? settingsNavigation;
 
-  const plan = planAssistantEgress(selectedTier);
+  const plan = planAssistantEgress();
   const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
   // 🔴 助手**不是**第 6 个 `AiFeature`：它就是 `tool-calling` 的多步形态
   //（见 ADR-0045 §2.1）。所以目的地、能力缺口、熔断都按 `tool-calling` 算。
@@ -354,7 +337,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
           // 🔴 用**并集**，不是 `TOOL_CALL_EGRESS_FIELDS` 那两项 ——
           // 单步只送"这句话 + 工具名"，一轮循环还会把**每个工具结果**回送。
           // 少说一项就是用户在不知情下多送一份数据。
-          fields: assistantEgressFields(selectedTier),
+          fields: assistantEgressFields(),
         });
 
   const history: readonly AssistantMessage[] = items
@@ -399,11 +382,10 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
       {
         routing: props.routing,
         consents: props.consents,
-        tier: selectedTier,
         host,
         getGrants: () =>
           ephemeral.isCurrent() && epoch === controls.epoch && currentAccount() === session.account
-            ? assistantGrants(controls.tier)
+            ? assistantGrants()
             : {},
         localize: (key, vars) => t(key as MessageKey, vars),
         executionId: `web:${session.account}:${String(controls.nextId)}`,
@@ -468,7 +450,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     // 🔴 先按规则试一次（本机、纯函数、零出境）：命中就说明这一句根本不会出境，
     // 那就**不该弹出境披露** —— 单步面板 `AiToolRun` 一直是这个顺序。
     // 判定住在 `@heyta/app-host`（和循环里那一次是同一个函数），壳不另写规则。
-    if (!assistantNeedsEgressDisclosure(text, { tier: selectedTier })) {
+    if (!assistantNeedsEgressDisclosure(text)) {
       void turn(text);
       return;
     }
@@ -520,7 +502,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
       const result = await confirmAiToolProposal(host, item.proposal, {
         getGrants: () =>
           ephemeral.isCurrent() && epoch === controls.epoch && currentAccount() === session.account
-            ? assistantGrants(controls.tier) : {},
+            ? assistantGrants() : {},
       });
       if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
       if (result.ok) {
@@ -661,32 +643,6 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
               >
                 {historyOpen ? t('web.ai.chat.history.close') : t('web.ai.chat.history.open')}
               </button>
-              <FormField
-                id="ai-assistant-tier"
-                label={t('web.ai.chat.tierLabel')}
-                layout="inline"
-                testID="ai-assistant-tier"
-              >
-                {(field) => (
-                  <div className="ht-input-field__select">
-                    <select
-                      {...field}
-                      aria-label={t('web.ai.chat.tierLabel')}
-                      value={selectedTier}
-                      onChange={(event) => {
-                        const next = event.target.value as AssistantTier;
-                        setSelectedTier(next);
-                        props.onTierChange?.(next);
-                      }}
-                      data-testid="ai-assistant-tier-select"
-                    >
-                      <option value={ASSISTANT_TIER_READ_ONLY}>{t('web.ai.chat.tier.readOnly')}</option>
-                      <option value={ASSISTANT_TIER_EXECUTE}>{t('web.ai.chat.tier.readAndPropose')}</option>
-                    </select>
-                    <ChevronDown size={ICON_SIZE.sm} aria-hidden="true" />
-                  </div>
-                )}
-              </FormField>
               {props.onToggleExpanded !== undefined && (
                 <button
                   type="button"

@@ -2,7 +2,7 @@
  * AI 设置的**持久化语义**（宿主无关）
  * ==================================
  *
- * 与 `./assistant-tier-settings.ts` 同一条分工：**这里管判断，壳只管通道。**
+ * 分工只有一条：**这里管判断，壳只管通道。**
  *
  * ## 为什么这一层要在 `packages/app-host`
  *
@@ -26,8 +26,7 @@
  *
  * 通道属于壳：Web 是 `localStorage` 那块 `heyta.ai.settings` 的 JSON，
  * 移动端是设备偏好库里的一行（`apps/mobile/src/prefs/device-prefs.ts`），
- * node-host 可以是文件。所以端口形状与 `assistant-tier-settings.ts` 一致：
- * **读文本 / 写文本**，别的都不问。
+ * node-host 可以是文件。所以端口形状就是**读文本 / 写文本**，别的都不问。
  *
  * ## 🔴 这里**没有**密钥
  *
@@ -50,9 +49,6 @@ import {
 } from '@heyta/ai';
 import { DEFAULT_LOCAL_API_CONFIG, type LocalApiConfig } from '@heyta/local-api';
 
-import type { AssistantTier } from './ai-assistant.js';
-import { DEFAULT_ASSISTANT_TIER, normalizeAssistantTier } from './assistant-tier-settings.js';
-
 /** 一份 AI 设置。⚠️ 这里**没有**任何密钥字段（见文件头）。 */
 export interface AiSettingsState {
   routing: AiRoutingConfig;
@@ -68,14 +64,12 @@ export interface AiSettingsState {
   health: AiHealthSnapshot;
   /** 🔴 记忆总开关（ADR-0014）。默认关，且只认真正的 `true`。 */
   memoryEnabled: boolean;
-  /** 🔴 助手能力档位（ADR-0045 §2.2）。默认值与归一都由 `assistant-tier-settings.ts` 给。 */
-  assistantTier: AssistantTier;
 }
 
 /**
  * 壳要提供的**唯一**通道。
  *
- * `read()` 的契约与 `AssistantTierStorePort` 逐字同一条：
+ * `read()` 的契约：
  * 取回原始文本，取不到返回 `undefined`，**不许抛** ——
  * 抛异常会把"存储坏了"变成"应用起不来"，而这一层最安全的结果一直是"全关"。
  *
@@ -98,8 +92,10 @@ export interface AiSettingsStore {
 }
 
 /**
- * 出厂默认：**四道闸全是关的**（总开关 / 允许远程 / 本机 API / 记忆），
- * 助手默认处于**执行**模式，高风险写入仍需用户确认；`routes` 为空 —— 不预置任何功能。
+ * 出厂默认：**四道闸全是关的**（总开关 / 允许远程 / 本机 API / 记忆）；`routes` 为空 —— 不预置任何功能。
+ *
+ * 助手**没有**"权限档"这一项（ADR-0082）：能做什么由工具目录与风险确认决定，
+ * 不由一份可以拨到"只读"的设置决定，所以这里也没有那个字段。
  *
  * 🔴 空路由是刻意的：预置会让"我打开了总开关"变成"好几个功能悄悄开始跑"。
  */
@@ -115,7 +111,6 @@ export function defaultAiSettingsState(): AiSettingsState {
     consents: [],
     health: { version: HEALTH_SNAPSHOT_VERSION, entries: [] },
     memoryEnabled: false,
-    assistantTier: DEFAULT_ASSISTANT_TIER,
   };
 }
 
@@ -200,7 +195,6 @@ export function parseAiSettingsState(raw: string | undefined): AiSettingsState {
     localApi: sanitizeLocalApi(candidate.localApi, fallback.localApi),
     consents: Array.isArray(candidate.consents) ? candidate.consents : [],
     memoryEnabled: candidate.memoryEnabled === true,
-    assistantTier: normalizeAssistantTier(candidate.assistantTier),
     health: {
       version: HEALTH_SNAPSHOT_VERSION,
       entries: toHealthSnapshot(fromHealthSnapshot(candidate.health, Date.now()), Date.now()).entries,

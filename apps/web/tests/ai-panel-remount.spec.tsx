@@ -141,12 +141,11 @@ let root: Root | undefined;
  * ⚠️ Provider 必须在 `slot` 这一层**之上**：它要是跟着面板一起换位置，
  * 就还是每次挂载一份，这条判据会退化成"什么都没测"。
  */
-function tree(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost; tier?: 'read-only' | 'read-and-propose' }): React.JSX.Element {
+function tree(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost }): React.JSX.Element {
   const panel = (
     <AssistantPanel
       routing={ROUTING}
       consents={CONSENTS}
-      tier={props.tier ?? 'read-only'}
       secrets={secrets}
       host={props.host ?? fakeHost()}
       historyStorage={null}
@@ -167,7 +166,7 @@ function tree(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost
   );
 }
 
-async function mount(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost; tier?: 'read-only' | 'read-and-propose' }): Promise<HTMLDivElement> {
+async function mount(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost }): Promise<HTMLDivElement> {
   if (root === undefined) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -183,7 +182,7 @@ async function mount(props: { slot: Slot; fetchImpl?: typeof fetch; host?: Local
  * 单步工具面板的同一形状 —— 它和助手面板**共用那份 Provider**，
  * 而它自己的四样（输入 / 阶段 / 结果 / 提案确认）原来也住在组件里。
  */
-function toolTree(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost; tier?: 'read-only' | 'read-and-propose' }): React.JSX.Element {
+function toolTree(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost }): React.JSX.Element {
   const panel = (
     <AiToolRun
       routing={ROUTING}
@@ -206,7 +205,7 @@ function toolTree(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApi
   );
 }
 
-async function mountToolRun(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost; tier?: 'read-only' | 'read-and-propose' }): Promise<HTMLDivElement> {
+async function mountToolRun(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost }): Promise<HTMLDivElement> {
   if (root === undefined) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -454,7 +453,7 @@ describe('账号绑定：换账号不许带一个字', () => {
       } }],
     } }] }), { status: 200, headers: { 'content-type': 'application/json' } }))) as typeof fetch;
     setAccount('a@example.com');
-    const el = await mount({ slot: 'detail', host, fetchImpl, tier: 'read-and-propose' });
+    const el = await mount({ slot: 'detail', host, fetchImpl });
     await type(el, '帮任务增加清单');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');

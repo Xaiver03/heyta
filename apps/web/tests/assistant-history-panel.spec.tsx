@@ -138,7 +138,6 @@ async function render(storage: HistoryStorage, fetchImpl?: typeof fetch): Promis
         <AssistantPanel
           routing={ROUTING}
           consents={CONSENTS}
-          tier="read-only"
           secrets={secrets}
           host={fakeHost()}
           historyStorage={storage}

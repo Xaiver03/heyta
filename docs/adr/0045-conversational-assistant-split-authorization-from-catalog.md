@@ -354,3 +354,25 @@ ADR-0005 给的否决理由有三条（隐私面 / 工程面 / **失败模式**�
   **单点生产**，且 `today` 若不进声明，`assistantEgressFields` 的测试会红。
   ⚠️ 为什么非注入不可、以及为什么**不许**改成"让模型自己算日期"：
   见该文件头与 `packages/ai/src/index.ts` 文件头那条实测（模型把"明天"算错四个半月）。
+
+---
+
+## 6. 勘误（2026-11-01）
+
+🔴 **本 ADR §5 的 D-5（助手按 `read-only` / `read-and-propose` 两档起步落地）
+以及 §2.2 表里"助手侧授权前端 = 能力档位"那一格，已被
+[ADR-0082](0082-assistant-has-no-permission-tier.md) 取代。**
+
+- 触发它的实测：产品负责人 2026-11-01 指着设置页那枚「助手权限」分段选择器
+  （`apps/web/src/features/settings/AiSettings.tsx` 当时的 `assistant-tier-group`）
+  判定"都不需要有权限的设计，没必要区分只读和执行"。
+- 现状（现量）：`packages/app-host/src/assistant-tier-settings.ts` **已删除**，
+  `AiSettingsState` 不再有 `assistantTier` 字段，`assistantGrants()` /
+  `assistantEgressFields()` / `planAssistantEgress()` 都**不再收档位参数**；
+  `apps/web` 的 `ai-assistant-tier-select` 与 `assistant-tier-group`、
+  `apps/mobile` 的两枚档位 Chip 同时删除。
+- **本 ADR 其余结论一条不动**：§2.1「至多一个写提案」、§2.3 一次性并集披露与三个硬上界、
+  §2.4 那五条不变量、§2.2 的"一份目录 + 一个执行核"、入站侧全部判据。
+  写入的"低风险自动 / 高风险确认"原样保留（`aiToolProposalRequiresConfirmation()` 未改）。
+- ⚠️ 上面 §5 D-5 末尾那句"这次落地不构成永久答案"当时是对的：它被推翻的方式
+  不是"换个粒度"，而是**那条粒度本身被删掉**。

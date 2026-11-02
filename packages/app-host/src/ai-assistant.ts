@@ -111,21 +111,21 @@ import {
 export const ASSISTANT_BASE_EGRESS_FIELDS = ['text', 'today', 'tools', ...TOOL_ENVELOPE_EGRESS_FIELDS];
 
 /**
- * 助手的能力档位（第二个授权前端的唯一旋钮）。
+ * 模型看得见的工具 = **整个目录**（ADR-0082）。
  *
- * 🔴 当前产品默认是**执行**：低风险写意图自动提交，高风险写意图产出待确认提案。
- * `AssistantTier` 的默认值由 `assistant-tier-settings.ts` 统一提供；本文件只消费
- * 调用方传入的档位，确保只读仍然完全没有写工具授权。
- * ⚠️ 持久化不在本文件：`tier` 由调用方（壳 / 设置存储）传进来。
+ * 🔴 这里没有"只读档"，也没有第二个旋钮。ADR-0045 早期把助手做成
+ * "只读 / 执行"两档，但那个旋钮回答的问题（"这一次能不能写"）在真实使用里
+ * 只有一个答案：用户已经在对话框里说了要做什么，再逼他去另一个界面把开关
+ * 拨到"执行"才肯动手，是把一个安全决策伪装成一项配置 —— 而没有任何一款
+ * 同类产品让用户先选权限再聊天。
+ *
+ * 写入的安全性**不靠**"看不见写工具"，靠两件事：
+ *   1. `aiToolProposalRequiresConfirmation()` —— 破坏性动作逐条确认；
+ *   2. 一次性并集披露 —— 用户在任何一次请求之前就知道最坏会送出什么。
  */
-export type AssistantTier = 'read-only' | 'read-and-propose';
-
-/** 这个档位下模型看得见的工具（读工具两档都有；写工具只在高一级）。 */
-export function assistantGrants(tier: AssistantTier): NonNullable<LocalApiConfig['grants']> {
+export function assistantGrants(): NonNullable<LocalApiConfig['grants']> {
   const grants: Record<string, boolean> = {};
-  for (const tool of LOCAL_API_TOOLS) {
-    grants[tool.name] = tool.kind === 'read' || tier === 'read-and-propose';
-  }
+  for (const tool of LOCAL_API_TOOLS) grants[tool.name] = true;
   return grants;
 }
 
@@ -134,12 +134,9 @@ export function assistantGrants(tier: AssistantTier): NonNullable<LocalApiConfig
  *
  * 🔴 从目录的 `egressFields` 取，不在这里列字段名单 —— 列了就是一份抄件，
  * 而抄件一定漂（本仓库对这件事有账）。
- *
- * ⚠️ 档位决定可达集合：`read-only` 档里**写工具根本不进来**，
- * 所以它们的字段不会出现在披露里 —— 披露只说真会发出去的东西。
  */
-export function assistantEgressFields(tier: AssistantTier): readonly string[] {
-  const grants = assistantGrants(tier);
+export function assistantEgressFields(): readonly string[] {
+  const grants = assistantGrants();
   const fields = new Set<string>(ASSISTANT_BASE_EGRESS_FIELDS);
   for (const tool of LOCAL_API_TOOLS) {
     if (grants[tool.name] !== true) continue;
@@ -156,7 +153,6 @@ export function assistantEgressFields(tier: AssistantTier): readonly string[] {
  * 不需要发任何请求就能渲染。
  */
 export interface AssistantEgressPlan {
-  readonly tier: AssistantTier;
   readonly fields: readonly string[];
   /** 会进入模型上下文的工具名（工具名本身也是出境数据）。 */
   readonly tools: readonly string[];
@@ -166,11 +162,10 @@ export interface AssistantEgressPlan {
   readonly maxBytesPerRequest: number;
 }
 
-export function planAssistantEgress(tier: AssistantTier): AssistantEgressPlan {
-  const grants = assistantGrants(tier);
+export function planAssistantEgress(): AssistantEgressPlan {
+  const grants = assistantGrants();
   return {
-    tier,
-    fields: assistantEgressFields(tier),
+    fields: assistantEgressFields(),
     tools: LOCAL_API_TOOLS.filter((tool) => grants[tool.name] === true).map((tool) => tool.name),
     maxRequests: MAX_ASSISTANT_TOOL_STEPS + 1,
     maxMessages: MAX_ASSISTANT_MESSAGES,
@@ -325,14 +320,12 @@ export type AssistantOutcome =
 export interface AssistantTurnDeps {
   readonly routing: AiRoutingConfig;
   readonly consents: readonly EgressConsent[];
-  /** 能力档位 —— 第二授权前端的输入，**不是** `localApi.grants`。 */
-  readonly tier: AssistantTier;
   readonly host: LocalApiHost;
-  /** 最终写入前读取当前助手授权；默认按本轮 tier 生成。 */
+  /** 最终写入前读取当前助手授权；默认是整份目录（`assistantGrants()`）。 */
   readonly getGrants?: () => LocalApiConfig['grants'];
   /** 本机规则命中后的用户可见句子，由宿主按当前界面语言取唯一词条表。 */
   readonly localize: LocalObservationTranslate;
-  /** 一次用户发送的稳定标识；执行档以此防止重放产生重复 op。 */
+  /** 一次用户发送的稳定标识；低风险写入据此防止重放产生重复 op。 */
   readonly executionId?: string;
   /**
    * 过程事件回调。**给了它这一轮才走流式**（`invokeRouted` 的 `onDelta`）。
@@ -579,13 +572,12 @@ export function localObservationText(
 export function assistantLocalSelection(
   text: string,
   opts: {
-    readonly tier: AssistantTier;
     readonly rules?: readonly ToolSelectionRule[];
     readonly now?: number;
-  },
+  } = {},
 ): ToolSelection {
   return resolveToolSelection(text, {
-    grants: assistantGrants(opts.tier),
+    grants: assistantGrants(),
     ...(opts.rules === undefined ? {} : { rules: opts.rules }),
     now: () => opts.now ?? Date.now(),
   });
@@ -605,10 +597,9 @@ export function assistantLocalSelection(
 export function assistantNeedsEgressDisclosure(
   text: string,
   opts: {
-    readonly tier: AssistantTier;
     readonly rules?: readonly ToolSelectionRule[];
     readonly now?: number;
-  },
+  } = {},
 ): boolean {
   return assistantLocalSelection(text, opts).kind !== 'tool';
 }
@@ -634,7 +625,7 @@ export async function requestAssistantTurn(
     };
   }
 
-  const grants = assistantGrants(deps.tier);
+  const grants = assistantGrants();
   const tools = toToolDescriptors(grants);
   if (tools.length === 0) {
     return {
@@ -646,9 +637,9 @@ export async function requestAssistantTurn(
     };
   }
 
-  const disclosed = new Set(assistantEgressFields(deps.tier));
+  const disclosed = new Set(assistantEgressFields());
   const disclosedPlain = [...disclosed].map((field) => field.split('.')[1] ?? field);
-  const getGrants = deps.getGrants ?? (() => assistantGrants(deps.tier));
+  const getGrants = deps.getGrants ?? (() => assistantGrants());
   const runnerDeps = { host: deps.host, grants, getGrants };
   const anchorNow = deps.now ?? Date.now();
   const executionId =
@@ -660,7 +651,7 @@ export async function requestAssistantTurn(
     health: HealthMap,
     destination: EgressDestination | undefined,
   ): Promise<AssistantOutcome> => {
-    if (deps.tier === 'read-and-propose' && !aiToolProposalRequiresConfirmation(proposal)) {
+    if (!aiToolProposalRequiresConfirmation(proposal)) {
       const authorization: AiToolAuthorization = { getGrants };
       const result = await executeAiToolProposal(deps.host, proposal, executionId, authorization);
       if (!result.ok) {
@@ -711,7 +702,6 @@ export async function requestAssistantTurn(
   // ⚠️ 规则命中但**渲染不出人话**时不硬编一句回答，退回模型那一步
   // （见 `localObservationText`）。退回是有测试钉着的，不是"反正能跑"。
   const local = assistantLocalSelection(text, {
-    tier: deps.tier,
     ...(deps.rules === undefined ? {} : { rules: deps.rules }),
     now: anchorNow,
   });
@@ -818,7 +808,7 @@ export async function requestAssistantTurn(
       // 同一个变量递进去的，所以"披露说的"与"实际发的"不可能不一致。
       system,
       user: text,
-      fields: assistantEgressFields(deps.tier),
+      fields: assistantEgressFields(),
       tools,
       messages,
     };
