@@ -294,3 +294,117 @@ export function rankMentionCandidates<T>(
   }
   return [...starts, ...contains].slice(0, limit);
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// 从"文本里有哪些 @"到"这条消息引用了哪些任务"再到"界面该怎么画"
+// ─────────────────────────────────────────────────────────────────────────
+
+/** 一处已经对上号的提及。 */
+export interface ResolvedMention<T> {
+  readonly span: MentionSpan;
+  readonly target: T;
+}
+
+/**
+ * 解析结果。
+ *
+ * 🔴 `unresolved` **不是错误**，是必须如实保留的东西：用户 @ 了一个已被删除、
+ * 或改过名字的任务时，那个 @ 仍是这句话的一部分。把它悄悄抹掉等于替用户
+ * 改了他写的话；而"@ 不生效"至少是可解释的。
+ */
+export interface MentionResolution<T> {
+  /** 按文中出现顺序，逐处给出对上的目标（同一目标出现两次就有两项）。 */
+  readonly refs: readonly ResolvedMention<T>[];
+  /** 对不上号的提及，原样保留。 */
+  readonly unresolved: readonly MentionSpan[];
+  /** 去重后的目标 —— 出境与"引用了什么"的披露用这一份，避免同一个任务发两遍。 */
+  readonly targets: readonly T[];
+}
+
+/**
+ * 把文本里的 @ 逐个对上号。
+ *
+ * @param text 整段文本
+ * @param lookup 标签 → 目标；返回 `undefined` 表示对不上（已删除、改名、歧义）
+ * @param options.spans 已经扫好的区间（省一次扫描）；省略就自己扫
+ * @param options.key **去重用的身份键**。
+ *   🔴 省略时按**引用相等**去重 —— 目标是从同一份 state 里取出来的同几个对象时，
+ *   这没问题；但 `lookup` 若每次**新建**一个对象（`() => ({ id })` 那种写法），
+ *   每个目标都是不同的引用，去重会静默失效，于是同一个任务被发两遍。
+ *   值类型的目标**必须**传它，例如 `key: (t) => t.id`。
+ *   这条坑在第一次写这份测试时就踩了（两个 `{id:'t1'}` 被判成两个目标）。
+ */
+export function resolveMentions<T>(
+  text: string,
+  lookup: (label: string) => T | undefined,
+  options: {
+    readonly spans?: readonly MentionSpan[];
+    readonly key?: (target: T) => string;
+  } = {},
+): MentionResolution<T> {
+  const spans = options.spans ?? findMentions(text);
+  const seenKeys = new Set<string>();
+  const seenRefs = new Set<T>();
+  const refs: ResolvedMention<T>[] = [];
+  const unresolved: MentionSpan[] = [];
+  const targets: T[] = [];
+
+  for (const span of spans) {
+    const target = lookup(span.label);
+    if (target === undefined) {
+      unresolved.push(span);
+      continue;
+    }
+    refs.push({ span, target });
+    // 有 `key` 就按键去重；没有就按**引用**去重（`Set` 的对象语义）。
+    // 后者对"从同一份 state 取出的同几个对象"是对的，对值类型是错的 ——
+    // 所以上面那条注释不是免责声明，是**必须传给值类型调用方**的说明。
+    if (options.key !== undefined) {
+      const key = options.key(target);
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        targets.push(target);
+      }
+    } else if (!seenRefs.has(target)) {
+      seenRefs.add(target);
+      targets.push(target);
+    }
+  }
+
+  return { refs, unresolved, targets };
+}
+
+/** 界面要画的一段：普通文字，还是那枚 chip。 */
+export type MentionSegment =
+  | { readonly kind: 'text'; readonly text: string }
+  | { readonly kind: 'mention'; readonly span: MentionSpan };
+
+/**
+ * 把文本切成"普通文字 / 提及"两类片段，**顺序与原文一致**。
+ *
+ * 🔴 渲染层只该做映射，不该自己扫一遍 @。让渲染层自己扫的后果是
+ * **两套语法**：输入时按一套高亮、发送时按另一套解析，而两者只在
+ * "带引号且中间有空格"这类边界上分叉 —— 那种 bug 只在个别标题上出现。
+ *
+ * 重叠的区间按"先到的赢"跳过（正常路径不会出现重叠，但外部传入的 spans
+ * 可能是拼出来的，这里不能因此抛错或吐出重复文字）。
+ */
+export function mentionSegments(
+  text: string,
+  spans: readonly MentionSpan[],
+): readonly MentionSegment[] {
+  const segments: MentionSegment[] = [];
+  let cursor = 0;
+
+  for (const span of [...spans].sort((a, b) => a.start - b.start)) {
+    if (span.start < cursor || span.end > text.length) continue;
+    if (span.start > cursor) {
+      segments.push({ kind: 'text', text: text.slice(cursor, span.start) });
+    }
+    segments.push({ kind: 'mention', span });
+    cursor = span.end;
+  }
+
+  if (cursor < text.length) segments.push({ kind: 'text', text: text.slice(cursor) });
+  return segments;
+}

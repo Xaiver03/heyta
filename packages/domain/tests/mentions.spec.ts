@@ -18,7 +18,9 @@ import {
   applyMention,
   findMentions,
   formatMention,
+  mentionSegments,
   rankMentionCandidates,
+  resolveMentions,
 } from '../src/mentions.js';
 
 describe('activeMention —— 什么时候弹出候选', () => {
@@ -187,5 +189,70 @@ describe('rankMentionCandidates —— 打两个字就要看到想选的那个',
     expect(rankMentionCandidates(['Buy MILK', 'read book'], 'buy', (t) => t)).toEqual([
       'Buy MILK',
     ]);
+  });
+});
+
+describe('resolveMentions —— 对不上号的不许被抹掉', () => {
+  const spans = findMentions('@买牛奶 和 @已删除的任务');
+
+  it('对上的进 refs，对不上的进 unresolved', () => {
+    const out = resolveMentions('@买牛奶 和 @已删除的任务', (label) =>
+      label === '买牛奶' ? { id: 't1' } : undefined,
+    );
+    expect(out.refs.map((r) => r.target)).toEqual([{ id: 't1' }]);
+    expect(out.unresolved.map((s) => s.label)).toEqual(['已删除的任务']);
+  });
+
+  it('🔴 同一个任务被 @ 两次：refs 两项，targets 去重一项', () => {
+    // 🔴 值类型必须传 key：`lookup` 每次新建对象 ⇒ 引用相等去重会静默失效
+    const out = resolveMentions('@甲 和 @甲', () => ({ id: 't1' }), { key: (t) => t.id });
+    expect(out.refs).toHaveLength(2);
+    expect(out.targets).toEqual([{ id: 't1' }]);
+
+    // 不传 key 且 lookup 每次都新建对象 ⇒ 如实给出两个（这里记录这个语义，
+    // 不是为了让它通过：值类型场景就该传 key）
+    const naive = resolveMentions('@甲 和 @甲', () => ({ id: 't1' }));
+    expect(naive.targets).toHaveLength(2);
+  });
+
+  it('不传 spans 时自己扫（与 activeMention 同一套语法）', () => {
+    expect(spans.map((s) => s.label)).toEqual(['买牛奶', '已删除的任务']);
+  });
+});
+
+describe('mentionSegments —— 界面只做映射，不重扫', () => {
+  it('切成 文字 / 提及 / 文字 三段，顺序保持', () => {
+    const text = '先说 @买牛奶 再说';
+    const segments = mentionSegments(text, findMentions(text));
+    expect(segments.map((s) => s.kind)).toEqual(['text', 'mention', 'text']);
+    expect(segments[0]).toEqual({ kind: 'text', text: '先说 ' });
+    expect(segments[2]).toEqual({ kind: 'text', text: ' 再说' });
+  });
+
+  it('拼回去必须等于原文（一个字都不许丢）', () => {
+    const text = '开头 @"带 空格" 中间 @甲 结尾';
+    const segments = mentionSegments(text, findMentions(text));
+    const rebuilt = segments
+      .map((s) => (s.kind === 'text' ? s.text : text.slice(s.span.start, s.span.end)))
+      .join('');
+    expect(rebuilt).toBe(text);
+  });
+
+  it('提及在开头或结尾时不产生空文字段', () => {
+    expect(mentionSegments('@甲', findMentions('@甲'))).toHaveLength(1);
+    expect(mentionSegments('@甲 尾', findMentions('@甲 尾')).map((s) => s.kind)).toEqual([
+      'mention',
+      'text',
+    ]);
+  });
+
+  it('重叠/越界的 spans 被跳过，不抛错也不吐重复文字', () => {
+    const text = '@甲 后面';
+    const segments = mentionSegments(text, [
+      { start: 0, end: 2, label: '甲', quoted: false },
+      { start: 1, end: 3, label: '甲', quoted: false }, // 与前一段重叠
+      { start: 5, end: 99, label: '越界', quoted: false }, // 越界
+    ]);
+    expect(segments.filter((s) => s.kind === 'mention')).toHaveLength(1);
   });
 });
