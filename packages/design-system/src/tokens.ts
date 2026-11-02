@@ -110,7 +110,9 @@ export const TOKEN_GROUPS = {
   'line-height': ['tight', 'normal', 'relaxed'],
   /** 组名用 `font` 而非 `font-family`，以匹配 `--ht-font-sans` 的实际写法。 */
   font: ['sans', 'mono'],
-  radius: ['none', 'sm', 'md', 'lg', 'xl', 'full'],
+  // `button`(18) / `dialog`(24) 是 DSH 对齐新增：DSH 的 Button 与 Modal 就是这个量。
+  // 刻意**不复用** md/xl —— md 同时管输入框，而 DSH 的 Input 是 8。
+  radius: ['none', 'sm', 'md', 'lg', 'xl', 'button', 'dialog', 'full'],
   shadow: ['none', 'sm', 'md', 'lg', 'xl', 'focus'],
   duration: [
     'instant',

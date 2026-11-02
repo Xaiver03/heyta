@@ -35,7 +35,7 @@
   overflow-y: auto;
   padding: var(--ht-space-6);
   border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-lg);
+  border-radius: var(--ht-radius-dialog);
   background: var(--ht-color-surface-raised);
   color: var(--ht-color-foreground);
   box-shadow: var(--ht-shadow-lg);

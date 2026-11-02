@@ -136,7 +136,7 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   gap: var(--ht-space-4);
   margin-block: auto;
   padding: var(--ht-space-5);
-  border-radius: var(--ht-radius-lg);
+  border-radius: var(--ht-radius-dialog);
   background: var(--ht-color-surface);
 }
 
@@ -415,7 +415,7 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 .ht-auth-plan-paper {
   position: absolute;
   inset: var(--ht-space-4) var(--ht-space-2);
-  border-radius: var(--ht-radius-lg);
+  border-radius: var(--ht-radius-dialog);
   background: var(--ht-color-primary);
   opacity: 0.08;
   transform: rotate(-4deg);

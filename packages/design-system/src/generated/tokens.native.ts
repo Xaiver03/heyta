@@ -117,6 +117,8 @@ export interface HeytaNativeTokens {
   readonly 'radius.md': number;
   readonly 'radius.lg': number;
   readonly 'radius.xl': number;
+  readonly 'radius.button': number;
+  readonly 'radius.dialog': number;
   readonly 'radius.full': number;
   /** box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。 */
   readonly 'shadow.none': string;
@@ -357,6 +359,8 @@ export const lightTokens: HeytaNativeTokens = {
   'radius.md': 8,
   'radius.lg': 12,
   'radius.xl': 16,
+  'radius.button': 18,
+  'radius.dialog': 24,
   'radius.full': 9999,
   'shadow.none': "none",
   'shadow.sm': "0 1px 2px rgb(15 23 42 / 0.05)",
@@ -582,6 +586,8 @@ export const darkTokens: HeytaNativeTokens = {
   'radius.md': 8,
   'radius.lg': 12,
   'radius.xl': 16,
+  'radius.button': 18,
+  'radius.dialog': 24,
   'radius.full': 9999,
   'shadow.none': "none",
   'shadow.sm': "0 1px 2px rgb(0 0 0 / 0.4)",
