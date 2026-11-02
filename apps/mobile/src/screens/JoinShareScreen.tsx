@@ -248,7 +248,9 @@ export default function JoinShareScreen({
       return (
         <Stack>
           {phase.kind === 'error' ? (
-            <Text variant="row-title" tone="danger" testID="share-join-error">
+            // 「上一次动作失败了」= 辅助信息那一档（`row-meta`）。全仓的错误句绝大多数
+            // 是这一档，`row-title`（16px）此前只有分享这两个屏在用 —— 见本轮收敛记录。
+            <Text variant="row-meta" tone="danger" testID="share-join-error">
               {phase.message}
             </Text>
           ) : null}

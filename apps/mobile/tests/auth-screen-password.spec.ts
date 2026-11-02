@@ -1,35 +1,29 @@
 /**
- * 移动端「邮箱 + 密码」这条路（W7）—— 源码级判据
- * ==============================================
+ * 移动端认证壳的不变量（2026-10-26 重写）
+ * =====================================
  *
- * ## 为什么这里全是源码级断言
+ * ## 为什么重写，而不是"删掉旧的"
  *
- * 本壳**没有** RN 组件测试栈：`@testing-library/react-native` 不在依赖里，
- * 而为一条判据引新依赖要先过 AGENTS §3.1（可维护性）+ §3.2（许可证）两道门。
- * 所以这个屏的**行为**由设备脚本验（`pnpm verify:mobile-auth`，需要真模拟器），
- * 这里钉的是「删掉或写反就会红」的那几件**结构**事实。同一个做法与理由见
- * `privacy-consent-gate.spec.ts` 文件末段（它的 `codeOf` / `bodyOf` 在这里复用）。
+ * 这一份原来钉的是 `AuthScreen.tsx` 里**手写的字段与状态**（`loginPassword`、
+ * `passwordRevealed`、`missingField`…）。那一版已经被删掉：移动端现在用
+ * `@heyta/ui` 的 `AuthForm`（与 Web 同一份），字段、显隐、本地校验、错误落点
+ * 全部归共享层。**旧判据里有价值的那些没有丢**，它们分两类搬了家：
  *
- * ## 钉住的六件事，每件都对应一种**不会报错**的坏法
+ *   · 「字段怎么摆、怎么报错」→ 共享层 `packages/ui/tests/auth-form.spec.ts`
+ *     （那份本来就在，且 web 的 126 条也在守）；
+ *   · 「**壳**这一半必须怎么接」→ 就是本文件。这一半是**本端独有**的：
+ *     隐私闸门、请求代际、中央设备配对、加密口令那一步。
  *
- *   1. **两个秘密不混用** —— 把 `loginPassword` 接成 `password`（E2EE 口令），
- *      等于把设计上永不出设备的秘密发上服务端；反方向接错的症状是
- *      "能登录、同步却解不开自己的数据"。两种都不抛异常。
- *   2. **服务端地址不是第一栏** —— 这是产品负责人定的硬约束，
- *      原话："绝对不允许什么用自己正在用的域名才能够注册"。
- *   3. **未勾同意不发注册** —— 让服务端回 400 也是一种实现，界面看起来一样。
- *   4. **出门动作先过隐私闸门** —— 顺序反了就是"同意之前已经把包发出去"。
- *   5. **失败句子走共享映射、连数字一起拿** —— 只拿 key 会把 `{min}` / `{seconds}`
- *      原样印在屏幕上（`translateIn` 对缺省的 vars 保留占位符），不报错。
- *   6. **口令不做客户端组成规则**：不 `trim()`、无 `maxLength`、不提前按长度拒绝。
- *      NIST SP 800-63B 明确禁止；静默截断比拒绝更糟。
- *   7. **读屏念的就是屏幕上那行** —— RN 里容器带上 `accessibilityLabel` 会把子节点的可见
- *      文字挤出无障碍树，所以名称写错第三种说法**不会有任何报错**，只有 VoiceOver 用户
- *      听到的是另一句（注册档还会被告知"用邮件链接登录"而按钮做的是注册）。web 端不写
- *      这个属性，两端不同形也是这一条在管。
+ * 所以本文件现在钉的是「**壳不许自己再实现一遍表单**」以及「壳独有的那几条口径」。
+ *
+ * ## 为什么仍是源码级断言
+ *
+ * 与重排前同一个理由：本壳没有 RN 组件测试栈（引 `@testing-library/react-native`
+ * 要先过 AGENTS §3.1 + §3.2 两道门），行为由 `pnpm verify:mobile-auth` 在真机验。
+ * 这里只钉**结构事实** —— 每一条都对应一种**不会报错**的坏法。
  *
  * ⚠️ 判据一律先去掉注释再匹配（`codeOf`）：把一句调用**注释掉**来糊过判据，
- *    是这个仓库记过的第一种假绿（§7 第 50 条）。
+ * 是这个仓库记过的第一种假绿（§7 第 50 条）。
  */
 
 import { describe, expect, it } from 'vitest';
@@ -65,10 +59,10 @@ function braceBalanced(code: string, open: number): string {
 }
 
 /**
- * 取 `const <name> = (…) => { … }` 的**函数体**。
+ * 取 `const <name> = async (…) => { … }` 的**函数体**。
  *
- * 花括号的起点必须从**参数列表之后**找：`(mode: AuthFormMode): AuthFormField | undefined =>`
- * 这类签名里就带 `{`（默认值），直接找第一个会把函数体整个看丢。
+ * 花括号的起点必须从**参数列表之后**找：签名里可能已经带 `{`（解构参数），
+ * 直接找第一个会把函数体整个看丢。
  */
 function bodyOf(code: string, name: string): string {
   const at = code.indexOf(`const ${name} =`);
@@ -92,145 +86,79 @@ function assertOrdered(text: string, before: RegExp, after: RegExp, why: string)
 
 const code = codeOf('screens/AuthScreen.tsx');
 
-describe('两个秘密各自绑到各自的框 —— 接错不抛异常，只会把口令发上服务端', () => {
-  it('🔴 登录密码框绑 `loginPassword`，加密口令框绑 `password`', () => {
-    expect(code).toMatch(/value=\{loginPassword\}/);
-    expect(code).toMatch(/onChangeText=\{setLoginPassword\}/);
-    expect(code).toMatch(/value=\{password\}/);
-    expect(code).toMatch(/onChangeText=\{setPassword\}/);
-    // 两栏各自的 label 来自**共享层那两个常量**，不是壳里现编的字符串：
-    // 「登录密码」与「加密口令」在四端必须同名，否则用户会以为它们是同一个东西。
-    expect(code).toMatch(/label=\{t\(SIGN_IN_PASSWORD_LABEL_KEY\)\}/);
-    expect(code).toMatch(/label=\{t\(E2EE_PASSPHRASE_LABEL_KEY\)\}/);
+describe('表单归共享层：壳里不许再有一份字段', () => {
+  it('🔴 渲染的是共享的 `AuthForm`', () => {
+    expect(code).toMatch(/<AuthForm/);
+    expect(code).toMatch(/from '@heyta\/ui'/);
   });
 
-  it('🔴 发出去的永远是 `loginPassword`；落进活配置的永远是 `password`（E2EE）', () => {
-    for (const name of ['loginWithPassword', 'registerWithPassword']) {
-      const body = bodyOf(code, name);
-      expect(
-        /password:\s*loginPassword/.test(body),
-        `${name} 没把登录密码绑到 loginPassword —— 接成 password 就是把 E2EE 口令发上服务端`,
-      ).toBe(true);
-      expect(/password,|password:\s*password/.test(body), `${name} 把 E2EE 口令发出去了`).toBe(
-        false,
-      );
-    }
+  it('🔴 壳里只有一个输入框 —— 加密口令那一个', () => {
+    // 多出第二个就说明"登录密码/邮箱"又被抄回来了。它是**这一版之前**的病根：
+    // 同一张表单两份实现，Web 的布局与动效永远到不了手机。
+    const fields = code.match(/<TextField/g) ?? [];
+    expect(fields, `壳里有 ${String(fields.length)} 个手写输入框`).toHaveLength(1);
+  });
 
+  it('🔴 那一枚输入框绑的是加密口令，不是登录密码', () => {
+    const at = code.indexOf('<TextField');
+    const own = code.slice(at, at + 320);
+    expect(own).toContain('value={passphrase}');
+    expect(own).toContain('E2EE_PASSPHRASE_LABEL_KEY');
+    expect(own).toMatch(/\bsecure\b(?!\s*=)/);
+  });
+
+  it('🔴 壳不持有任何「登录密码」的 state 或 prop', () => {
+    // 结构上的保证比"两处 state 各自接对"强：口令根本不进这个文件。
+    expect(code).not.toMatch(/loginPassword/);
+    expect(code).not.toMatch(/confirmLoginPassword/);
+    expect(code).not.toMatch(/passwordRevealed/);
+  });
+
+  it('🔴 不许把加密口令预填进共享表单的「登录密码」', () => {
+    // `AuthForm` 的 `initialPassword` 是**登录密码**的预填口。把本屏的加密口令
+    // 喂进去，就是把设计上不该出设备的秘密塞进一个"要发出去"的框里。
+    // ⚠️ 本屏自己的 `initialPassword` prop 是加密口令的**入参**，它出现在文件里是对的 ——
+    // 所以判据取的是 AuthForm 那一块 JSX，不是整个文件。
+    const at = code.indexOf('<AuthForm');
+    expect(at, '找不到 <AuthForm>').toBeGreaterThanOrEqual(0);
+    const formJsx = code.slice(at, code.indexOf('/>', at));
+    expect(formJsx).not.toMatch(/initialPassword/);
+  });
+
+  it('发出去的永远是共享表单交回来的口令；落进活配置的永远是加密口令', () => {
+    const login = bodyOf(code, 'login');
+    expect(login, 'login 没把共享表单交回来的口令发出去').toMatch(/loginWithEmailPassword\(options, \{ email, password \}\)/);
     const saved = bodyOf(code, 'saveAndSync');
-    expect(/password,/.test(saved), '写进活配置的不是 E2EE 口令那一个 state').toBe(true);
-    // 🔴 反向的那半：登录密码**不许**被存成同步口令。它进了磁盘就等于多了一份
-    //    可被读到的凭据，而同步口令的契约是"只在内存里、服务端看不到明文"。
-    expect(/loginPassword/.test(saved), 'saveAndSync 里出现了 loginPassword').toBe(false);
+    expect(saved, '写进活配置的不是加密口令那一个 state').toMatch(/password: passphrase/);
+    // 反方向：登录密码**不许**被存成同步口令。它进了磁盘就等于多了一份可读到的凭据。
+    expect(saved, 'saveAndSync 里把登录密码存成了同步口令').not.toMatch(/password:\s*password\b/);
   });
 });
 
-describe('切换服务端时清理认证边界', () => {
-  it('地址变化会清掉旧会话、两种口令、粘贴令牌与二级入口状态', () => {
-    const body = bodyOf(code, 'updateServerUrl');
-    expect(/serverUrl\.trim\(\) !== next\.trim\(\)/.test(body)).toBe(true);
-    for (const expression of [
-      "setPhase({ kind: 'idle' })",
-      'setSessionServerUrl(undefined)',
-      "setPassword('')",
-      "setLoginPassword('')",
-      "setPasted('')",
-      'setOtherWaysOpen(false)',
-    ]) {
-      expect(body, `服务端边界变化后缺少 ${expression}`).toContain(expression);
-    }
-  });
-
-  it('忘记密码使用独立 busy action，魔法链接登录显示自己的 loading', () => {
-    const forgot = bodyOf(code, 'forgotPassword');
-    expect(forgot).toContain("setPhase({ kind: 'busy', action: 'forgot-password' })");
-    expect(forgot).toMatch(/requestPasswordReset\(options, email\)/);
-    expect(code).toContain("setPhase({ kind: 'busy', action: 'magic-login' })");
-    expect(code).toMatch(/loading=\{action === \(mode === 'sign-in' \? 'magic-login' : 'magic-register'\)\}/);
-  });
-});
-
-describe('表单形状（产品负责人定的硬约束）', () => {
-  it('注册同意项只由 Checkbox 自己呈现一次，法律链接不使用下划线', () => {
-    expect(code.match(/label=\{t\('mobile\.auth\.terms\.label'\)\}/g)).toHaveLength(1);
-    expect(code).not.toContain("textDecorationLine: 'underline'");
-  });
-
-  it('🔴 服务端地址是**最后一栏**，邮箱是第一栏', () => {
-    const email = code.indexOf("t('mobile.auth.email.label')");
-    const signIn = code.indexOf('SIGN_IN_PASSWORD_LABEL_KEY)');
-    const e2ee = code.indexOf('E2EE_PASSPHRASE_LABEL_KEY)');
-    const server = code.indexOf("t('mobile.profile.serverUrl.label')");
-    for (const [name, at] of [
-      ['邮箱', email],
-      ['登录密码', signIn],
-      ['加密口令', e2ee],
-      ['服务器地址', server],
-    ]) {
-      expect(at, `${name} 那一栏不存在`).toBeGreaterThanOrEqual(0);
-    }
-    // 顺序本身就是要钉的东西：地址在第一栏 = 用户在开始注册之前必须先回答
-    // "你要连哪台机器"。
-    expect(email < signIn && signIn < e2ee && e2ee < server, '四栏的先后不对').toBe(true);
-  });
-
-  it('默认认证入口不提供自托管或粘贴令牌；设置路径才允许选择服务端', () => {
-    expect(code).toMatch(/allowServerSelection = false/);
-    expect(code).toMatch(/allowServerSelection \?/);
-    expect(code).toMatch(/allowServerSelection/);
-    expect(code).toMatch(/sessionServerUrl/);
-    expect(code).toMatch(/enterSession\(/);
-    expect(code).toMatch(/sessionServerUrl !== serverUrl\.trim\(\)/);
-  });
-
-  it('🔴 登录密码有显隐开关，默认档取自共享层（不在壳里写死 true/false）', () => {
-    expect(code).toMatch(/secure=\{!passwordRevealed\}/);
-    expect(code).toMatch(/useState\(defaultPasswordRevealed\('mobile'\)\)/);
-    expect(code).toMatch(/'common\.auth\.form\.showPassword'/);
-    expect(code).toMatch(/'common\.auth\.form\.hidePassword'/);
-    // ⚠️ 开关的 label 必须**跟着状态变**（这一档是"现在看得见"）：固定写「显示密码」
-    //    是 web 那侧靠 `aria-pressed` 表达的，RN 这里没有那个属性可用。
-    expect(/passwordRevealed \? 'common\.auth\.form\.hidePassword'/.test(code)).toBe(true);
-  });
-
-  it('🔴 加密口令那一栏**不给**显隐开关（它不进网络，肩窥是唯一威胁）', () => {
-    const fieldAt = code.indexOf('value={password}');
-    const own = code.slice(fieldAt - 260, fieldAt + 200);
-    expect(/secure\b(?!=)/.test(own), '口令栏没有 secure').toBe(true);
-    expect(/secure=\{!passwordRevealed\}/.test(own), 'E2EE 口令被接到了显隐开关上').toBe(false);
-  });
-
-  it('⚠️ 口令不做客户端组成规则：不 trim、不截断、不提前按长度拒绝', () => {
-    expect(code, '对登录密码做了 trim() —— 空格是指令的合法字符').not.toMatch(/loginPassword\.trim\(\)/);
-    expect(code).not.toMatch(/maxLength/);
-    // 判空只比"是不是空串"（省一次无谓往返），长度与常见度归服务端裁决。
-    expect(/passwordMissing: loginPassword === ''/.test(bodyOf(code, 'missingField'))).toBe(true);
-  });
-});
-
-describe('注册的两道本地闸（顺序错了就是"已经发出去了"）', () => {
-  it('🔴 未勾同意 → 一个请求都不发：`missingField(\'register\')` 排在请求之前', () => {
-    const body = bodyOf(code, 'registerWithPassword');
+describe('两道本地闸（顺序错了就是"已经发出去了"）', () => {
+  it('🔴 未勾同意 → 一个请求都不发：`AuthForm` 与壳**各**一道闸', () => {
+    const body = bodyOf(code, 'register');
     assertOrdered(
       body,
-      /missingField\('register'\)/,
+      /if \(!accepted\) return failWithKey\(AUTH_TERMS_REQUIRED_KEY\)/,
       /requestEmailPasswordRegistrationCode\(/,
       '同意项没勾也发出了注册请求（服务端会回 400，但那次枚举尝试本身已经出门了）',
     );
-    const missing = bodyOf(code, 'missingField');
-    expect(
-      /termsMissing: mode === 'register' && !termsAccepted/.test(missing),
-      '`missingField` 不在 register 档检查同意项',
-    ).toBe(true);
-    // 登录**不**重新要同意：把同意挡在登录前面，老用户会以为自己被登出了。
-    expect(/termsMissing: mode === 'register'/.test(missing), '登录也被同意项挡住').toBe(true);
+    // 共享层那一道（AuthForm 内部）也必须还在 —— 只靠壳这一道就等于两道都没有。
+    const form = readFileSync(resolve(SRC, '../../../packages/ui/src/auth/AuthForm.tsx'), 'utf8');
+    expect(form).toMatch(/termsMissing: mode === 'register' && !termsAccepted/);
   });
 
-  it('🔴 两个口令动作也都先过隐私闸门，再发请求', () => {
-    // 与 `privacy-consent-gate.spec.ts` 那条「五个出门动作」是同一件事的两侧：
-    // 那一份管已有的五条，这一条管本轮新增的两条 —— 两份都不许有人后补动作不登记。
+  it('🔴 每一个出门动作都先过隐私闸门，再发请求', () => {
     for (const [name, egress] of [
-      ['registerWithPassword', /requestEmailPasswordRegistrationCode\(/],
-      ['loginWithPassword', /loginWithEmailPassword\(/],
+      ['login', /loginWithEmailPassword\(/],
+      ['register', /requestEmailPasswordRegistrationCode\(/],
+      ['verifyRegistrationCode', /verifyEmailPasswordRegistrationCode\(/],
+      ['resendRegistrationCode', /resendEmailPasswordRegistrationCode\(/],
+      ['forgotPassword', /requestPasswordReset\(/],
+      ['recoverPasskey', /requestPasskeyRecovery\(/],
+      ['sendLoginLink', /requestMagicLink\(/],
+      ['redeemPasted', /redeemPastedAuthToken\(/],
     ] as Array<[string, RegExp]>) {
       assertOrdered(
         bodyOf(code, name),
@@ -241,153 +169,78 @@ describe('注册的两道本地闸（顺序错了就是"已经发出去了"）',
     }
   });
 
-  it('🔴 注册成功后那句是**中性**的，不许断言"账号已创建"', () => {
-    const body = bodyOf(code, 'registerWithPassword');
-    // 2026-10-07：邮箱密码注册现在先创建验证码 challenge，成功后进入验证码阶段；
-    // 邮件发送失败仍然使用明确的失败提示。
-    expect(
-      /setPhase\(\{\s*kind: 'registration-code'/s.test(body),
-      '注册成功没有进入验证码阶段',
-    ).toBe(true);
-    // 服务端对"邮箱已属已验证账号"**故意**回成功而不写凭据（防枚举），
-    // 所以任何"已创建"的措辞都是假话。
-    expect(body, '注册结果读了服务端的 message').not.toMatch(/result\.message/);
+  it('🔴 通行密钥先判能力，再发请求', () => {
+    // 反过来的话请求已经出去了，而 `passkey-unsupported` 的契约是"一个请求都没发"。
+    assertOrdered(
+      bodyOf(code, 'passkeyLogin'),
+      /passkeyProvider === undefined/,
+      /beginPasskeyLogin\(/,
+      '没有通行密钥实现时仍然发出了 begin 请求',
+    );
   });
 
-  it('🔴 登录产出会话后**停在 session 那一档**，不直接算完成', () => {
-    const body = bodyOf(code, 'loginWithPassword');
-    expect(/enterSession\(result\.session\)/.test(body)).toBe(true);
-    // 规范 §3.2 的第 ④ 步：登录成功 ≠ 同步可用（那是另一个秘密）。
-    expect(body, '登录顺手把会话存了，等于跳过了 E2EE 口令那一步').not.toMatch(/saveAuthSession\(/);
+  it('🔴 勾选同意同时就是联网的明示（注册与通行密钥注册两处）', () => {
+    for (const name of ['register', 'passkeyRegister']) {
+      const body = bodyOf(code, name);
+      assertOrdered(body, /acceptNetworkConsent\(\)/, /requireNetworkConsent\(\)/,
+        `${name} 没把"勾了同意"记成联网许可`);
+    }
+  });
+});
+
+describe('拿到令牌 ≠ 完成：加密口令是独立的一档', () => {
+  it('🔴 登录成功后停在 `session` 那一档', () => {
+    expect(bodyOf(code, 'enterSession')).toContain("setPhase({ kind: 'session'");
+    expect(code).toMatch(/phase\.kind === 'session'/);
+    expect(code).toMatch(/passphraseStep/);
+  });
+
+  it('切换服务端会清掉会话与口令（认证边界变了）', () => {
+    const body = bodyOf(code, 'updateServerUrl');
+    for (const expression of [
+      'authGeneration.current += 1',
+      "setPhase({ kind: 'idle' })",
+      'setSessionServerUrl(undefined)',
+      "setPassphrase('')",
+      'setTermsAccepted(false)',
+    ]) {
+      expect(body, `服务端边界变化后缺少 ${expression}`).toContain(expression);
+    }
   });
 });
 
 describe('失败句子走共享映射，并连要填的数字一起拿', () => {
-  it('🔴 用 `authFailureMessage`，不许回到只给 key 的那两个旧函数', () => {
+  it('🔴 用 `authFailureMessage`，不许回到只给 key 的旧函数', () => {
     expect(code).toMatch(/authFailureMessage\(/);
-    // 只拿 key 的那一半实现不会报错 —— `translateIn` 会把 `{min}` / `{seconds}` 原样印出来。
-    expect(code, '用了 authFailureMessageKey（只给句子、不给数字）').not.toMatch(
-      /authFailureMessageKey\(/,
-    );
-    expect(code, '自己再映射了一遍 policyCode').not.toMatch(/passwordPolicyMessageKey\(/);
+    expect(code).toMatch(/message\.vars/);
+  });
+
+  it('🔴 状态区渲染时把 vars 一起传进去', () => {
+    expect(code).toMatch(/vars === undefined \? t\(key\) : t\(key, vars\)/);
   });
 
   it('🔴 契约数字不在本壳里出现：8 与 256 只有一个事实源', () => {
-    expect(code, '壳里 import 了 shared-schema').not.toMatch(/@heyta\/shared-schema/);
-    expect(code, '壳里写死了口令下限').not.toMatch(/\b(8|256)\b\s*(个字符|码点)/);
-    expect(code).not.toMatch(/AUTH_PASSWORD_MIN_CODE_POINTS|AUTH_PASSWORD_MAX_CODE_POINTS/);
+    expect(code).not.toMatch(/\b256\b/);
+    expect(code).not.toMatch(/length\s*<\s*8\b/);
   });
 
   it('🔴 这里没有一行协议知识：不出现端点、不出现 fetch', () => {
-    expect(code, '屏里出现了 /api/ 端点 —— 那是 app-host 的边界').not.toMatch(/\/api\//);
-    expect(code, '屏里自己发请求').not.toMatch(/\bfetch\(/);
-  });
-
-  it('🔴 状态区渲染时必须把 vars 传进去', () => {
-    expect(
-      code,
-      '失败句子渲染时漏了 vars —— 带占位符的那几条会印出字面量'
-    ).toMatch(/phase\.vars === undefined \? t\(phase\.key\) : t\(phase\.key, phase\.vars\)/);
+    expect(code).not.toMatch(/\bfetch\(/);
+    expect(code).not.toMatch(/\/api\//);
   });
 });
 
-describe('口令是主路，邮件链接与通行密钥退到「或者用别的方式」', () => {
-  it('🔴 两个按钮都在，且各自的 loading 绑在自己的 action 上', () => {
-    expect(code).toMatch(/t\('mobile\.auth\.password\.login'\)/);
-    expect(code).toMatch(/t\('mobile\.auth\.password\.register'\)/);
-    expect(code).toMatch(/action === 'password-login'/);
-    expect(code).toMatch(/action === 'password-register'/);
-    // busy 期间两个按钮都禁用：同时点两次会发两个请求，而后回来的那个覆盖前一个。
-    for (const name of ['loginWithPassword', 'registerWithPassword']) {
-      const at = code.indexOf(`t('mobile.auth.password.${name === 'loginWithPassword' ? 'login' : 'register'}')`);
-      expect(at, `按钮 ${name} 不存在`).toBeGreaterThanOrEqual(0);
-      expect(/disabled=\{busy\}/.test(code.slice(at, at + 400)), `${name} 的按钮没在 busy 时禁用`).toBe(
-        true,
-      );
-    }
+describe('中性文案（规范 §2-A2）', () => {
+  it('🔴 注册之后那句不断言"账号已创建"', () => {
+    expect(code).not.toContain('账号已创建');
+    expect(code).not.toContain('账号已经创建');
   });
 
-  it('🔴 「或者用别的方式」这一组标题排在邮件链接按钮之前', () => {
-    assertOrdered(
-      code,
-      /t\('common\.auth\.form\.otherWays(?:Open|Close)'\)/,
-      /t\('mobile\.auth\.magicLink\.login'\)/,
-      '魔法链接仍和口令并排 —— 主路与第二条路在界面上没有区别',
-    );
-  });
-
-  // 🔴 下面两条钉的是**读屏念到的是哪一句**。RN 里容器一旦带 `accessibilityLabel`，
-  // 子节点的可见文字就不再进无障碍树（真机实测：屏幕上「其他登录方式」，VoiceOver 念
-  // 「或者用别的方式」，展开后屏幕换成「收起其他登录方式」而名字一动不动）。
-  // web 端同一份表单不写这个属性，念的就是可见文字 ⇒ 两端不同形。
-  it('🔴 展开开关：无障碍名称与屏幕上那行取同一个表达式（钉死第三种说法就会红）', () => {
-    const label = /accessibilityLabel=\{([^{}]+)\}\n\s*aria-expanded=\{otherWaysOpen\}/.exec(code);
-    const title = /<SectionHeader icon="action\.more" title=\{([^{}]+)\}/.exec(code);
-    expect(label, '找不到那枚带 aria-expanded 的展开开关的 accessibilityLabel').not.toBeNull();
-    expect(title, '找不到那枚 `action.more` 段头的 title 表达式').not.toBeNull();
-    expect(label![1].replace(/\s+/g, ' ').trim()).toBe(title![1].replace(/\s+/g, ' ').trim());
-  });
-
-  it('🔴 邮件链接那枚按钮不许把名称钉死在登录那枚键上（注册档会说错动作）', () => {
-    // `label` 按 `mode` 切两枚键，而 kit 的默认就是 `accessibilityLabel ?? label`
-    // ⇒ 不写这一行才是对的；写了就把「注册新账号」念成「用邮件链接登录」。
-    expect(code).not.toMatch(/accessibilityLabel=\{t\('mobile\.auth\.magicLink\.login'\)\}/);
-    expect(/label=\{mode === 'sign-in' \? t\('mobile\.auth\.magicLink\.login'\) : t\('mobile\.auth\.magicLink\.register'\)\}/.test(code)).toBe(true);
-  });
-});
-
-describe('词条齐备（中英两张表必须同时有）', () => {
-  const zh = readFileSync(join(LOCALES, 'zh-CN.ts'), 'utf8');
-  const en = readFileSync(join(LOCALES, 'en.ts'), 'utf8');
-
-  for (const key of [
-    'mobile.auth.password.register',
-    'mobile.auth.password.login',
-    'common.auth.signInPassword.label',
-    'common.auth.e2eePassphrase.label',
-    'common.auth.form.passwordHint',
-    'common.auth.form.showPassword',
-    'common.auth.form.hidePassword',
-    'common.auth.form.otherWays',
-    'common.auth.form.confirmPassword',
-    'common.auth.form.passwordConfirmationRequired',
-    'common.auth.form.passwordMismatch',
-    'common.auth.form.passwordStrength.tooShort',
-    'common.auth.form.passwordStrength.weak',
-    'common.auth.form.passwordStrength.fair',
-    'common.auth.form.passwordStrength.strong',
-  ]) {
-    it(`${key} 在中英两张表里都有`, () => {
-      expect(zh, `zh-CN 缺 ${key}`).toContain(`'${key}'`);
-      expect(en, `en 缺 ${key}`).toContain(`'${key}'`);
-    });
-  }
-
-  it('🔴 引导句说的是这条路：不再只提"邮件链接或通行密钥"', () => {
-    expect(zh).toContain("'mobile.auth.intro': '用邮箱和密码注册或登录");
-  });
-});
-
-describe('注册确认密码与强度提示', () => {
-  it('确认字段仅出现在注册分支，且强度估计是本地组件', () => {
-    expect(code).toMatch(/mode === 'register'[\s\S]{0,1600}mobile-auth-password-confirmation/);
-    expect(code).toContain('<PasswordStrength');
-    expect(code).toContain('common.auth.form.passwordStrength.strong');
-  });
-
-  it('确认密码为空或不一致时不发注册请求', () => {
-    const body = bodyOf(code, 'registerWithPassword');
-    expect(body).toMatch(/confirmLoginPassword === ''/);
-    expect(body).toMatch(/confirmLoginPassword !== loginPassword/);
-    expect(body.indexOf('confirmLoginPassword !== loginPassword')).toBeLessThan(
-      body.indexOf('requestEmailPasswordRegistrationCode('),
-    );
-  });
-
-  it('确认密码不会被发送到服务端', () => {
-    const body = bodyOf(code, 'registerWithPassword');
-    expect(body).toMatch(/password:\s*loginPassword/);
-    expect(body).not.toMatch(/password:\s*confirmLoginPassword/);
+  it('🔴 只有服务端**明确**说没发出去时才改口（`=== false`，不是"有值就算"）', () => {
+    // 它是**表达式体**的箭头函数（没有花括号块），所以不用 bodyOf。
+    expect(code).toMatch(/result\.emailDelivered === false\s*\?\s*'mobile\.auth\.sent\.mailNotSent'\s*:\s*'mobile\.auth\.sent\.register'/);
+    // 把 `undefined` 当 false 会让每个"无需邮箱验证"的自托管用户看到"邮件没发出去"。
+    expect(code).not.toMatch(/emailDelivered !== true[\s\S]{0,60}mailNotSent/);
   });
 });
 
@@ -399,11 +252,55 @@ describe('移动端认证请求代际隔离', () => {
   });
 
   it('验证码验证与重发都在代际检查之后才写回界面状态', () => {
-    const verifyBody = bodyOf(code, 'verifyRegistrationCode');
-    const resendBody = bodyOf(code, 'resendRegistrationCode');
-    expect(verifyBody).toMatch(/verifyEmailPasswordRegistrationCode\(/);
-    expect(verifyBody).toMatch(/isCurrentAuthAction\(generation\)/);
-    expect(resendBody).toMatch(/resendEmailPasswordRegistrationCode\(/);
-    expect(resendBody).toMatch(/isCurrentAuthAction\(generation\)/);
+    // ⚠️ 不能拿"第一个 setPhase"当判据：进 busy 的那一次**必然**在闸门之前。
+    // 要钉的是**响应回来之后**的那次写回。
+    assertOrdered(
+      bodyOf(code, 'verifyRegistrationCode'),
+      /isCurrentAuthAction\(generation\)/,
+      /enterSession\(result\.session\)/,
+      '验证码通过后，会话在代际检查之前就被写进了状态',
+    );
+    assertOrdered(
+      bodyOf(code, 'resendRegistrationCode'),
+      /isCurrentAuthAction\(generation\)/,
+      /kind: 'registration-code'/,
+      '重发之后，新挑战在代际检查之前就覆盖了旧挑战',
+    );
+  });
+});
+
+describe('词条齐备（中英两张表必须同时有）', () => {
+  const zh = readFileSync(join(LOCALES, 'zh-CN.ts'), 'utf8');
+  const en = readFileSync(join(LOCALES, 'en.ts'), 'utf8');
+
+  for (const key of [
+    'common.auth.signInPassword.label',
+    'common.auth.e2eePassphrase.label',
+    'common.auth.form.showPassword',
+    'common.auth.form.hidePassword',
+    'common.auth.form.otherWays',
+    'common.auth.form.otherWaysOpen',
+    'common.auth.form.otherWaysClose',
+    'common.auth.form.confirmPassword',
+    'common.auth.form.passwordConfirmationRequired',
+    'common.auth.form.passwordMismatch',
+    'web.auth.registrationCode.title',
+    'web.auth.recovery.request',
+    'mobile.auth.sent.register',
+    'mobile.auth.sent.mailNotSent',
+  ]) {
+    it(`${key} 在中英两张表里都有`, () => {
+      expect(zh, `zh-CN 缺 ${key}`).toContain(`'${key}'`);
+      expect(en, `en 缺 ${key}`).toContain(`'${key}'`);
+    });
+  }
+
+  it('🔴 认证面上**不挂说明文字**（2026-10-26 产品负责人的禁令）', () => {
+    // 「去掉所有说明文字，现在严禁有任何说明文字，除了必要的。」
+    // 所以那一段「用邮箱和密码注册或登录。登录成功后…」整句搬去了文档中心，
+    // 词条一起删了 —— 留着一枚没人渲染的键，这条测试就会变成假信号。
+    expect(zh, 'mobile.auth.intro 又被写回词条表了').not.toContain("'mobile.auth.intro'");
+    // 共享表单的副标题口子也不许被填上（填了就是说明文字回来了）。
+    expect(code).not.toMatch(/subtitle:\s*t\(/);
   });
 });

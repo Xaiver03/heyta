@@ -54,12 +54,19 @@ HEYTA_E2E_E2EE_FILE="${HEYTA_E2E_E2EE_FILE:-/tmp/heyta_mobile_e2ee.txt}"
 # 这道断言就会变成恒真，那比没有断言更糟。改动时两处一起改。
 HEYTA_E2E_CLOCK_LIMIT=20
 
+# 🔴 建号用的**固定口令**也只有一个住处（2026-10-26）。
+#    移动端认证验收要用**产品那条登录路径**登进这个号，所以它必须知道口令；
+#    两处各写一份字面量的症状是：改了一边之后，设备腿在"口令错"上红，
+#    而方向会被引去怀疑登录实现。
+HEYTA_E2E_PASSWORD="${HEYTA_E2E_PASSWORD:-mobile-e2e-password}"
+export HEYTA_E2E_PASSWORD
+
 # 建号并把三份凭据落盘。成功返回 0。
 heyta_e2e_fresh_account() {
   local stamp email password e2ee resp token
   stamp=$(date +%s)
   email="mobile-e2e-${stamp}@example.com"
-  password="mobile-e2e-password"
+  password="$HEYTA_E2E_PASSWORD"
   e2ee="mobile-e2e-e2ee-pass"
 
   resp=$(curl -s -X POST "$HEYTA_E2E_SERVER/api/test/create-user" \

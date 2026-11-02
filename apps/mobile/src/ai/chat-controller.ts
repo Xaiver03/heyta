@@ -2,8 +2,6 @@ import {
   assistantNeedsEgressDisclosure,
   assistantEgressFields,
   assistantGrants,
-  ASSISTANT_TIER_READ_AND_PROPOSE,
-  DEFAULT_ASSISTANT_TIER,
   confirmAiToolProposal,
   requestAssistantTurn,
   resolveAiRoute,
@@ -56,7 +54,6 @@ export interface ChatRuntime {
    */
   readonly resolveRouting: () => AiRoutingConfig;
   readonly onHealth: (health: HealthMap) => void;
-  readonly onTierChange: (tier: AiSettingsState['assistantTier']) => void;
 }
 
 export interface ChatSnapshot {
@@ -86,7 +83,6 @@ export interface ChatController {
   newSession(): void;
   toggleHistory(): void;
   toggleExpandedEntry(id: number): void;
-  setTier(tier: AiSettingsState['assistantTier']): void;
 }
 
 export const MOBILE_CHAT_HISTORY_STORAGE: HistoryStorage = {
@@ -143,7 +139,7 @@ class MobileChatController implements ChatController {
     this.runtime = runtime;
     this.disclosureFingerprint = nextFingerprint;
     // Persisted history only predates the runtime configuration. It cannot
-    // prove that the current route, destination, tier, and field set were
+    // prove that the current route, destination, and field set were
     // shown to the user, so the first configured runtime must disclose again.
     if (disclosureChanged) {
       this.update({ routeTime, disclosed: false });
@@ -188,8 +184,7 @@ class MobileChatController implements ChatController {
     const history = this.assistantHistory();
     this.append({ role: 'user', text });
     this.update({ draft: '' });
-    const tier = runtime.settings.assistantTier;
-    if (!assistantNeedsEgressDisclosure(text, { tier, now: routeTime })) {
+    if (!assistantNeedsEgressDisclosure(text, { now: routeTime })) {
       void this.runTurn(text, history, routeTime);
       return;
     }
@@ -239,7 +234,6 @@ class MobileChatController implements ChatController {
     const host = runtime?.host;
     if (
       entry === undefined ||
-      runtime?.settings.assistantTier !== ASSISTANT_TIER_READ_AND_PROPOSE ||
       host === null ||
       host === undefined ||
       entry.expired === true ||
@@ -250,10 +244,7 @@ class MobileChatController implements ChatController {
     const epoch = this.accountEpoch;
     this.update({ phase: 'running' });
     void confirmAiToolProposal(resolvedHost, entry.proposal, {
-      getGrants: () =>
-        epoch === this.accountEpoch
-          ? assistantGrants(this.runtime?.settings.assistantTier ?? DEFAULT_ASSISTANT_TIER)
-          : {},
+      getGrants: () => (epoch === this.accountEpoch ? assistantGrants() : {}),
     })
       .then((result) => {
         if (epoch !== this.accountEpoch) return;
@@ -309,13 +300,6 @@ class MobileChatController implements ChatController {
     this.update({ expandedEntry: this.state.expandedEntry === id ? undefined : id });
   }
 
-  setTier(tier: AiSettingsState['assistantTier']): void {
-    if (this.state.phase !== 'idle' || this.runtime === undefined) return;
-    if (this.runtime.settings.assistantTier === tier) return;
-    this.runtime.onTierChange(tier);
-    this.update({ disclosed: false });
-  }
-
   private async runTurn(text: string, history: readonly AssistantMessage[], routeTime: number): Promise<void> {
     const runtime = this.runtime;
     if (runtime === undefined || runtime.host === null || this.sendInFlight) return;
@@ -330,11 +314,7 @@ class MobileChatController implements ChatController {
         {
           routing: runtime.resolveRouting(),
           consents: runtime.settings.consents,
-          tier: runtime.settings.assistantTier,
-          getGrants: () =>
-            epoch === this.accountEpoch
-              ? assistantGrants(this.runtime?.settings.assistantTier ?? DEFAULT_ASSISTANT_TIER)
-              : {},
+          getGrants: () => (epoch === this.accountEpoch ? assistantGrants() : {}),
           host,
           localize: runtime.localize,
           executionId: `${this.executionPrefix}:${String(this.executionNumber)}`,
@@ -464,8 +444,7 @@ function createDisclosureFingerprint(runtime: ChatRuntime, routeTime: number): s
     { health: fromHealthSnapshot(runtime.settings.health, routeTime) },
   );
   return JSON.stringify({
-    tier: runtime.settings.assistantTier,
-    fields: assistantEgressFields(runtime.settings.assistantTier),
+    fields: assistantEgressFields(),
     target: route.target,
     routing: runtime.resolveRouting(),
   });

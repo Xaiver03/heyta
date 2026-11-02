@@ -10,9 +10,14 @@
  *      onPressIn 阶段就变样式。等 onPress 才变会让界面"发木" —— 反馈延迟
  *      超过 ~100ms 就直接读成卡顿。因此用 `duration.press` 而不是 `normal`。
  *
- *   2. **选中态不用实心图标。** Lucide 是线性图标集，把它描边加粗/填充
- *      会得到与未选中的**另一种字形风格**。所以选中态由
- *      **颜色 + 顶部指示条**两件事共同表达，字形始终一致。
+ *   2. **选中态只靠颜色，不靠字形。** Lucide 是线性图标集，把它描边加粗/填充
+ *      会得到与未选中的**另一种字形风格**。所以选中态是**图标与文字一起换成主色**，
+ *      字形始终一致。
+ *
+ *      🔴 2026-10-26 产品负责人的话：「导航上面怎么会有个上划线？把这个上划线去掉，
+ *      只需要按钮变色就可以了，没有必要加个上划线。」于是删掉了原来那枚标签顶端的
+ *      短指示条（`nav.tab-indicator-*` 三个 token 因此不再被这里消费）。
+ *      原来那条理由仍然成立 —— 它支持的是**颜色**，不是"再多加一个装饰"。
  *
  *   3. **标签栏是"结构区"不是"内容区"。** 它不随内容滚动，且必须有上边框
  *      把自己和内容分开 —— 扁平风格里边界靠边框而非阴影。
@@ -106,26 +111,6 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
           justifyContent: 'center',
           gap: tokens['space.1'],
         },
-        indicator: {
-          position: 'absolute',
-          // 🔴 不能让出 0：贴到顶边会与标签栏的**上边框线重叠**，
-          // 两者糊成一条，看起来像渲染错位。
-          top: tokens['nav.tab-indicator-inset'],
-          width: tokens['nav.tab-indicator-width'],
-          height: tokens['nav.tab-indicator-height'],
-          borderBottomLeftRadius: tokens['radius.full'],
-          borderBottomRightRadius: tokens['radius.full'],
-          backgroundColor: tokens['color.primary'],
-        },
-        // 指示条只在选中时占位，未选中时用同尺寸的透明占位 ——
-        // 否则选中切换时整个标签会上下跳动（布局位移）。
-        indicatorSpacer: {
-          position: 'absolute',
-          top: tokens['nav.tab-indicator-inset'],
-          width: tokens['nav.tab-indicator-width'],
-          height: tokens['nav.tab-indicator-height'],
-          backgroundColor: 'transparent',
-        },
         // 图标容器：角标靠它定位。RN 里 position 默认就是 relative，
         // 但这个 View 是角标能压在图标右上角的**唯一**锚点。
         iconWrap: {
@@ -177,7 +162,6 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
                   : null,
               ]}
             >
-              <View style={selected ? styles.indicator : styles.indicatorSpacer} />
               <View style={styles.iconWrap}>
                 <Icon
                   name={tab.icon}

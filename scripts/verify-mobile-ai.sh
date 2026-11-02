@@ -1543,7 +1543,10 @@ step "2. 配端点之前：入口整行不在树里（aiEntryVisible 的反向�
 #    （见 reveal_rid 的现量）。所以这里必须先把"助手的两枚邻锚凑到同一帧"做出来，
 #    缺席才有判决力；凑不出那样的帧 ⇒ 载体响亮失败，不记产品红、也不记通过。
 goto_me_page || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
-reveal_between profile-entry-habits profile-entry-trash \
+# 🔴 2026-10-27 IA 迁移：habits 搬进二级页，不再与本屏的 trash 同帧。
+# 换成同在首屏的「设置」与「回收站」—— 判据要的是"同一帧里两枚邻锚都在"，
+# 不是特定哪两枚。
+reveal_between profile-entry-settings profile-entry-trash \
   || summary "移动端 AI 助手真机验收" "载体滚不出邻锚同帧（反向判据无从判定）" 1
 if [ "$(has_rid profile-entry-assistant)" = "1" ]; then
   bad "还没配端点，「AI 助手」那一格就已经在树里 —— 未配置的功能不该进 DOM，那这条反向判据也就守不住任何东西"
@@ -1713,17 +1716,19 @@ done
 if [ -z "$MISSING" ]; then ok "助手屏五档 chips 全在（check:ai-coverage 在设备上的对应物）"; else bad "缺 chips:$MISSING"; fi
 # 🔴 needle 换成了**当前那枚词条的原文**（逐字取自 `packages/i18n/src/locales/zh-CN.ts`
 #   的 `mobile.ai.proposalNeverAuto`）。旧 needle 是「AI 只给建议」—— 它是这句话
-#   **被改之前**的子串，而过期的是 needle 不是界面文案：产品侧是刻意改的，
-#   旧句承诺"没有任何一条改动会在你确认之前写进去"，`read-and-propose` 执行档上线后
-#   它**变成了假话**（低风险写入会自动完成）。iOS 载体同一格早就按 key 取
-#   （`FOOT=$(zh mobile.ai.proposalNeverAuto)`，见 `verify-mobile-ios-ai.sh:725`），
-#   所以两侧现在读的是同一条词条 —— 只是 Android 这侧留的是**字面 needle**
-#   （刻意不用 `$(zh …)`：那样它就从 `check:verify-script-copy` 的对账面上消失了，
-#   见 `check-mobile-ai-anchors.mjs` 判据 ⑳ 那段"挪到视野外就是一种逃逸"）。
-if [ "$(has_sub "只读档不会写入；执行档会自动完成低风险写入，高风险改动会先请你确认。")" = "1" ]; then
-  ok "档位写入边界那句常驻脚注在屏上（原文逐字来自 mobile.ai.proposalNeverAuto）"
+#   **被改之前**的子串，而过期的是 needle 不是界面文案：产品侧是刻意改的。
+#   2026-11-01 又改了一次：ADR-0082 删掉了"只读 / 执行"两档之后，
+#   `mobile.ai.proposalNeverAuto` 的原文变成"低风险写入会自动完成，高风险改动会先请你确认。"
+#   —— need 跟着换，**没换的话这条会红在"界面文案过期"，而界面是对的**。
+#   iOS 载体同一格早就按 key 取（`FOOT=$(zh mobile.ai.proposalNeverAuto)`，见
+#   `verify-mobile-ios-ai.sh:725`），所以两侧现在读的是同一条词条 —— 只是 Android
+#   这侧留的是**字面 needle**（刻意不用 `$(zh …)`：那样它就从
+#   `check:verify-script-copy` 的对账面上消失了，见 `check-mobile-ai-anchors.mjs`
+#   判据 ⑳ 那段"挪到视野外就是一种逃逸"）。
+if [ "$(has_sub "低风险写入会自动完成，高风险改动会先请你确认。")" = "1" ]; then
+  ok "写入边界那句常驻脚注在屏上（原文逐字来自 mobile.ai.proposalNeverAuto）"
 else
-  bad "常驻脚注没出现（那句说明两个档位会不会自动写入的文案）"
+  bad "常驻脚注没出现（那句说明低风险自动写入、高风险要确认的文案）"
 fi
 shot_evidence "android-ai-1-assistant.png"
 # 走多步循环那一档：Goal-1 的短路补在 loop 上，不在单步面板。
@@ -1759,7 +1764,7 @@ dump
 # 🔴 旧文保留·已退休（2026-10-16，理由见第 5 步注释）：这一格要的 `tool-start-assistant`
 #    是旧多模式面的「发送（多轮）」按钮，现量源码里 grep 不到它。
 #    if [ "$(rid_attr tool-start-assistant enabled)" != "true" ]; then
-#      bad "输入框里有文字、按钮却还是 disabled ⇒ 这一档的候选集是空的；两种成因用库回读分辨——\n      现量 routes/同意：$(routes_reading)\n      （rig25 库回读已把「点击没写进去」这一条**排除**：五档 routes 各 1 枚、enabled/allowRemote 都 True。剩下三个候选：这一档的逐功能同意没给（consents=0）／这一枚端点没声明**工具能力**（stub-model 零能力声明，而能力按 ADR-0010 是显式声明、不做推断）／助手档位 assistantTier 把这一档挡在外面。载体不替产品选一个，也不许读成「产品闸门正常工作」——那条闸门另有判据）"
+#      bad "输入框里有文字、按钮却还是 disabled ⇒ 这一档的候选集是空的；两种成因用库回读分辨——\n      现量 routes/同意：$(routes_reading)\n      （rig25 库回读已把「点击没写进去」这一条**排除**：五档 routes 各 1 枚、enabled/allowRemote 都 True。剩下三个候选：这一档的逐功能同意没给（consents=0）／这一枚端点没声明**工具能力**（stub-model 零能力声明，而能力按 ADR-0010 是显式声明、不做推断）／这一枚端点没配成助手的 `tool-calling` 路由。载体不替产品选一个，也不许读成「产品闸门正常工作」——那条闸门另有判据）"
 #      screen_txt
 #      summary "移动端 AI 助手真机验收" "路由没绑上" 1
 #    fi

@@ -97,18 +97,21 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
       value: String(snapshot.week.focusMinutes),
       valueTestID: 'profile-progress-focus',
     },
+    /*
+      🔴 2026-10-27（IA 迁移的第 2 批：12 → 11 行）：**成就那一行自己就是成长入口**。
+      原来它下面还有一行「查看完整成长」，两行去同一张屏 —— 那是 §3.1 说的重复入口。
+      现在把跳转挂在成就行上（`kind: 'action'` + 值仍然显示），少一行、功能不减。
+    */
     {
+      // `kind: 'value'` 本身就支持 `onPress`（见 `SettingsValueRow`）——
+      // 于是"读数"和"进成长"合在一行，不必再多一行「查看完整成长」。
       kind: 'value',
       label: t('mobile.profile.progress.achievements'),
       value: `${String(snapshot.reached)}/${String(snapshot.total)}`,
       valueTestID: 'profile-progress-achievements',
-    },
-    {
-      kind: 'action',
-      label: t('mobile.profile.progress.openGrowth'),
-      hint: t('mobile.profile.progress.openGrowthHint'),
+      // ⚠️ 锚点必须留在**这一行**上：`verify-mobile-*` 与 3 条源码判据都用它
+      //    定位"成长入口"，换成别的 id 等于把它们的输入悄悄抽掉。
       testID: 'profile-progress-growth',
-      leading: <Icon name="growth.week" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: onOpenGrowth,
     },
   ];

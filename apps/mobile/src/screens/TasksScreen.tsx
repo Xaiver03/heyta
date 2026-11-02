@@ -1300,9 +1300,23 @@ export function TasksScreen({
 
   const taskControls = (
     <>
-        {/* 大标题 + 日期。大标题属于**内容区**（会随内容滚动），不属于顶栏。 */}
+        {/*
+          日期 + 计数。两块都属于**内容区**（会随内容滚动），不属于顶栏。
+
+          🔴 日期用 `section-title`，**不是** `screen-title`（2026-11 收敛）。
+          它此前是 `screen-title`（3xl / 30px / bold），于是这一屏出现过**两个**
+          页级标题：顶栏的「任务」（`AppBar`，`headline`）+ 内容区这个日期 ——
+          而"一屏两个大标题等于没有大标题"（`typography.ts` 里 `screen-title`
+          那条注释的原话）。
+
+          日期在这屏上是**当前视图的副标题**（"我在看哪一天"），不是页面主标题；
+          页面主标题在顶栏。web 那两处早就是同一条判据，注释可以互相对读：
+          `apps/web/src/features/motivation/GrowthView.tsx`
+          与 `apps/web/src/features/categories/CategoryBreakdown.tsx`
+          ——"页面大标题在顶栏（视图 tab），所以内容区标题用 section-title"。
+        */}
         <View style={{ paddingTop: tokens['space.2'], gap: tokens['space.1'] }}>
-          <Text variant="screen-title">{formatDayTitleText(toLocalDate(now), t)}</Text>
+          <Text variant="section-title">{formatDayTitleText(toLocalDate(now), t)}</Text>
           <Text variant="row-meta" tone="muted">
             {nothing
               ? t('mobile.tasks.summary.empty')

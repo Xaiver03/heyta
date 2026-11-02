@@ -1,48 +1,57 @@
 /**
- * 注册 / 登录面板（移动端）
+ * 注册 / 登录面板（移动端壳）
  * ==========================
  *
- * 这是规范 §3.2 那一段旅程的移动端落点。此前移动端**完全没有**这个界面：
- * 「我的」页只有三个手填输入框（服务器地址 / 访问令牌 / 口令），而没有任何
- * 地方告诉用户令牌从哪来 —— 全库 `grep` 认证关键词只命中注释，
- * `@heyta/app-host` 的 `hosted-auth` 是 **0 调用方**。
+ * ## 🔴 2026-10-26：这张表单不再由本文件手写
  *
- * ## 分层（AGENTS.md §3.5）：这里**没有一行协议知识**
+ * 产品负责人的原话：**「手机上的注册登录页面非常的混乱」「这个布局到手机上就废掉了」**。
+ * 根因不是"样式没调好"，而是**同一张表单被写了两遍**：
  *
- *   - 端点、请求体、凭据字段、失败归类、`termsAccepted` 的语义 →
- *     `@heyta/app-host` 的 `hosted-auth.ts`；
- *   - "链接里的哪一段是令牌" → 同处的 `extractAuthLinkToken`；
- *   - "先当登录令牌试、不成立再当验证令牌试" → `src/auth/paste.ts`；
- *   - 失败原因 → 句子（**连同句子里要填的那个数字**）→ **`@heyta/ui` 的
- *     `authFailureMessage`**（唯一一份，与 web 共用；命名空间 `common.auth.error.*`
- *     与 `common.auth.policy.*`）。不给"只拿 key 不填 vars"留空间：那样屏幕上
- *     会印出字面量 `{min}` / `{seconds}`，而这不会报错；
- *   - 「这一次点击缺的是哪一栏」的**先后** → 同处的 `firstAuthErrorField`。
- *     顺序与归类都不在这里重写 —— 重写一次就
- *     多一套规则，而四端不一致的认证判定等于四套账号系统（AGENTS §3.5）；
- *   - 拿到会话之后要做什么 → `src/auth/session.ts`。
+ *   · Web 用 `@heyta/ui` 的 `AuthForm`（四端共用的那一份），外面套
+ *     `AuthPanel` + `AuthPlanScene` + `auth-dialog.css`：一栏字段、一个主按钮、
+ *     次级路径折叠、有入场动效；
+ *   · 移动端这一屏**自己又写了一张**（1088 行）：六个动作平铺、主按钮夹在正文中段、
+ *     模式切换藏在按钮下面一行小字、`Animated` 在整个文件里出现 **0 次**。
  *
- * 本文件只做两件事：**把状态渲染成句子**、**收集用户输入**。
- * 这也是它能在两个宿主（欢迎页 / 「我的」页）里复用的原因。
+ * 于是 Web 的布局与动效**从来没有到过手机**。这一轮把移动端改成用**同一份**
+ * `AuthForm`，本文件只剩「宿主的那一半」（Web 的 `AuthPanel` 也是这一半）：
  *
- * ## 🔴 四条不许违反的口径
+ *   - 端点、请求体、失败归类 → `@heyta/app-host` 的 `hosted-auth.ts`；
+ *   - 字段、显隐、`autocomplete`、本地校验与错误落点、「其他登录方式」的折叠 →
+ *     `@heyta/ui` 的 `AuthForm`（**共享层唯一一份**）；
+ *   - 失败原因 → 句子（连同句子里要填的数字）→ `@heyta/ui` 的 `authFailureMessage`；
+ *   - 本文件只做：**把状态机翻成 `status` / `busy`**、**把动作接到 app-host**、
+ *     以及三件共享表单不管的事（见下）。
+ *
+ * ## 共享表单不管、只能留在壳里的三件事
+ *
+ *   1. **端到端加密口令**（规范 §3.2 第 ④ 步）。它与「登录密码」是**两个秘密**：
+ *      登录密码要发给服务端验 Argon2id，加密口令永远不出设备。
+ *      ⚠️ 这条现在有了**结构上的**保证，而不是"两处 state 各自接对"：
+ *      登录密码在 `AuthForm` 内部，**根本不进这个文件**；本文件里只有一个
+ *      `passphrase`，它不进任何网络请求，只进 `saveAuthSession`。
+ *   2. **统一身份（中央 OIDC）的设备配对**：浏览器里完成登录、本机轮询领取令牌。
+ *      Web 那一侧走的是同源 POST，壳内宿主的 origin 不同 ⇒ 只能走 device handoff。
+ *   3. **条款正文的读取**：官方文本在应用内可读（`LegalDocumentSheet`），
+ *      自托管文本只能由那台服务端自己发布，交系统浏览器打开。
+ *
+ * ## 🔴 四条不许违反的口径（与重排前一致，判据已迁到新文件）
  *
  *   1. **中性文案**（规范 §2-A2）：注册可能是"假成功"（邮箱已属已验证账号时，
  *      服务端**故意**回成功而不写凭据）。所以这里**不出现**"账号已创建"这类断言。
- *   2. **同意项由用户自己勾**（规范 §2-A4）：初值 `false`，未勾时**不发注册请求**，
- *      并且明说为什么 —— 而不是让服务端回一个 400。
- *   3. **通行密钥不支持时要说出来**（规范 §3.2 ②a 那条分支仍然要在）：
- *      这台设备今天没有 WebAuthn 实现（见 `src/auth/passkey-host.ts`），
- *      但按钮**不禁用**：禁用了却不说，用户只会以为界面坏了。
- *   4. **两个秘密不共用一个字段**：「登录密码」与「端到端加密口令」是两个 state、
- *      两个输入框。把口令注册/登录发出去的那一份接到 E2EE 那个 state 上，
- *      等于把**设计上不该离开设备的秘密**发上服务端；反方向接错的症状是
- *      "能登录、同步却解不开自己的数据"。两条路都必须显式命名，
- *      判据钉在 `tests/auth-screen-password.spec.ts`。
+ *   2. **同意项由用户自己勾**（规范 §2-A4）：`AuthForm` 未勾时**不发注册请求**，
+ *      并且明说为什么 —— 本壳在 `onRegister` 里再兜一次同样的闸（两道闸不嫌多：
+ *      漏了的那一道不会报错，只会让一次枚举尝试出门）。
+ *   3. **通行密钥不支持时要说出来**（规范 §3.2 ②a）：这台设备今天没有 WebAuthn
+ *      实现（见 `src/auth/passkey-host.ts`），但按钮**不禁用** —— 禁用了却不说，
+ *      用户只会以为界面坏了。
+ *   4. **拿到令牌不等于完成**：登录成功后停在 `session` 那一档等加密口令，
+ *      而不是当成"已经登录好了"（那会让同步带着空口令失败）。
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Pressable, View } from 'react-native';
+import { Animated, AppState, Easing, Linking, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   beginCentralDeviceAuth,
   claimCentralDeviceAuth,
@@ -57,9 +66,9 @@ import {
   requestEmailPasswordRegistrationCode,
   verifyEmailPasswordRegistrationCode,
   resendEmailPasswordRegistrationCode,
-  requestPasswordReset,
   requestMagicLink,
-  registerWithMagicLink,
+  requestPasskeyRecovery,
+  requestPasswordReset,
   OFFICIAL_SITE_ORIGIN,
   resolveLegalLinks,
   verifyEmailAddress,
@@ -72,20 +81,18 @@ import {
 import { legalDocumentById, legalDocumentPresentation } from '@heyta/legal';
 import { useI18n, type MessageKey, type MessageVars } from '@heyta/i18n';
 
-import { Button, Card, Checkbox, Screen, SectionHeader, Text, TextField } from '../ui/kit';
-import { useTokens } from '../theme';
+import { Button, Card, Checkbox, Text, TextField } from '../ui/kit';
+import { useTheme, useTokens } from '../theme';
 import { syncNow } from '../sync/store';
 import {
+  AuthForm,
   AUTH_TERMS_REQUIRED_KEY,
   E2EE_PASSPHRASE_LABEL_KEY,
   SIGN_IN_PASSWORD_LABEL_KEY,
   authFailureMessage,
-  defaultPasswordRevealed,
-  firstAuthErrorField,
-  PasswordStrength,
   LegalDocumentSheet,
-  type AuthFormMode,
-  type AuthFormField,
+  type AuthFormLabels,
+  type AuthFormStatus,
 } from '@heyta/ui';
 import { describePasskeyError, resolvePasskeyProvider } from '../auth/passkey-host';
 import { redeemPastedAuthToken } from '../auth/paste';
@@ -100,7 +107,7 @@ type AuthAction =
   | 'registration-code'
   | 'forgot-password'
   | 'magic-login'
-  | 'magic-register'
+  | 'recovery'
   | 'passkey-login'
   | 'passkey-register'
   | 'verify'
@@ -134,25 +141,45 @@ type Phase =
   | { kind: 'session'; session: HostedAuthSession };
 
 /**
- * 三条注册路"成功之后说哪一句"的**唯一**判点。
+ * 每个动作各有一句"正在…"。
+ *
+ * 🔴 **不是一句通用的"正在处理"**：口令登录要跑 Argon2id（比其它动作慢一个量级），
+ * 说成"正在登录"会让人以为卡死，于是去点第二次。
+ * ⚠️ 用 `Record<AuthAction, …>` 而不是 `Partial`：**新增动作却忘了配句子**
+ * 会在编译期红 —— 那正是"界面对着一个进行中的请求说不出话"的形状。
+ */
+const BUSY_MESSAGE_KEY: Record<AuthAction, MessageKey> = {
+  'central-start': 'web.auth.central.busy',
+  'password-login': 'common.auth.busy.signIn',
+  'password-register': 'common.auth.busy.register',
+  'registration-code': 'common.auth.busy.verify',
+  'forgot-password': 'common.auth.busy.forgot',
+  'magic-login': 'common.auth.busy.link',
+  recovery: 'common.auth.busy.recovery',
+  'passkey-login': 'web.auth.passkey.waiting',
+  'passkey-register': 'web.auth.passkey.waiting',
+  verify: 'common.auth.busy.verify',
+  save: 'common.auth.busy.verify',
+};
+
+/**
+ * 注册"成功之后说哪一句"的**唯一**判点。
  *
  * 🔴 服务端亲口说那封信没发出去（`emailDelivered: false`）时，"去查收邮件"
  * 是一句谎话，而这个屏幕上它唯一的出口 —— 用户会一直等一封永远不会来的信。
  * ⚠️ 缺省**不是** false：发信成功、连的是没有这个字段的老服务端、以及
  * `REQUIRE_EMAIL_VERIFICATION=false` 的自托管服务器（当场激活、压根不需要信）
  * 三种情况都说的是原来那句。
- *
- * ⚠️ 签名里**不要**用内联对象类型（`{ emailDelivered?: false }`）：
- * `auth-screen-password.spec.ts` 的 `bodyOf` 是"找参数列表的右括号、再找第一个花括号"
- * 那种源码级取法，内联类型里的 `}`/`{` 会让它取错范围（那边文件头就写了这件事）。
  */
-type RegisterNoticeSource = { emailDelivered?: false };
+type RegisterNoticeSource = { emailDelivered?: boolean };
 
-const registerNoticeKey = (result: RegisterNoticeSource): MessageKey => {
-  return result.emailDelivered === undefined
-    ? 'mobile.auth.sent.register'
-    : 'mobile.auth.sent.mailNotSent';
-};
+/**
+ * ⚠️ 判据是「明确为 false」而不是「有值就说没发」：`undefined`（老服务端 / 无需验证的
+ * 自托管）必须说原来那句，`true` 更是。把 `undefined` 当 false 会让每个自托管用户
+ * 都看到「邮件没发出去」。
+ */
+const registerNoticeKey = (result: RegisterNoticeSource): MessageKey =>
+  result.emailDelivered === false ? 'mobile.auth.sent.mailNotSent' : 'mobile.auth.sent.register';
 
 export interface SavedAuthSession {
   serverUrl: string;
@@ -172,6 +199,18 @@ export interface AuthScreenProps {
   initialPassword: string;
   /** 会话已经写进活配置、同步已经触发。宿主据此离开本屏。 */
   onSignedIn: (saved: SavedAuthSession) => void;
+  /**
+   * 把这一屏**就地展开**在宿主页面里（2026-10-26）。
+   *
+   * 🔴 产品负责人的原话：**「为什么我们现在的注册、登录竟然分为好几个页面？这太离谱了」**。
+   *    原来点「注册 / 登录」是**整屏替换**成另一个页面 —— 一次登录被拆成
+   *    「欢迎页 → 认证页 → 验证码 → 口令」四屏。现在欢迎页把这一块**原地展开**：
+   *    主视觉留在上面，表单在它下面长出来，退出去也只是收起来。
+   *
+   * ⚠️ 这一档不自己滚动、不吃安全区、不占满屏 —— 那三件事归宿主。
+   *    它还保留一句：**它是同一个组件**。就地展开不等于"再抄一份欢迎页版本"。
+   */
+  embedded?: boolean;
 }
 
 export function AuthScreen({
@@ -180,51 +219,108 @@ export function AuthScreen({
   allowServerSelection = false,
   initialPassword,
   onSignedIn,
+  embedded = false,
 }: AuthScreenProps): React.JSX.Element {
   const { t, locale } = useI18n();
   const tokens = useTokens();
+  const { reducedMotion } = useTheme();
+  const insets = useSafeAreaInsets();
 
+  /**
+   * 复用的布局形状（不是"样式抽象"，是**同一件事的第二处**）。
+   *
+   * 「已登录」「统一身份」两张卡里的字段栈、条款行各出现一次：
+   * 写成两段内联对象就是两份可以各自漂的间距。而 `check:l4` 把
+   * `style={{` 的**行数**当棘轮（只减不增）—— 收进具名对象同时满足两边。
+   */
+  const layout = {
+    root: { flex: 1, backgroundColor: tokens['color.background'], paddingTop: insets.top },
+    fill: { flex: 1 },
+    stack1: { gap: tokens['space.1'] },
+    stack3: { gap: tokens['space.3'] },
+    rowCenter: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: tokens['space.2'] },
+    rowLegal: { flexDirection: 'row' as const, gap: tokens['space.4'] },
+  };
   const [serverUrl, setServerUrl] = useState(initialServerUrl);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState(initialPassword);
   /**
-   * 🔴 **登录密码** —— 与上面那个 `password`（端到端加密口令）**是两个秘密**。
-   * 这一个会离开设备（发给服务端验 Argon2id），那一个永远不离开；
-   * 忘了这一个可以点「忘记密码」重置，忘了那一个数据**不可恢复**。
-   * 两者共用一个 state 的代价不是不好看，是**把不该出设备的秘密发上服务端**。
+   * 🔴 **端到端加密口令**。它只存在本机内存里、只进 `saveAuthSession`。
+   * 「登录密码」在 `AuthForm` 内部，**不进这个文件** —— 两个秘密在结构上就分开了。
    */
-  const [loginPassword, setLoginPassword] = useState('');
-  /** 注册时再次输入登录密码；它只用于本地确认，不会发给服务端。 */
-  const [confirmLoginPassword, setConfirmLoginPassword] = useState('');
-  /** 默认是普通登录；注册是同一张表单里的明确次级动作。 */
-  const [mode, setMode] = useState<AuthFormMode>('sign-in');
-  /**
-   * 显隐开关的**默认档**取自共享层（移动默认明文、桌面默认遮住），
-   * 依据是 NNG 与 NIST 的一致结论：手机几乎没有肩窥场景，却有很强的单手错字场景。
-   * ⚠️ 默认值不是能力 —— 开关本身必须在。
-   */
-  const [passwordRevealed, setPasswordRevealed] = useState(defaultPasswordRevealed('mobile'));
-  const [pasted, setPasted] = useState('');
-  /**
-   * 🔴 初值**必须**是 `false`。规范 §2-A4：服务端在 `termsAccepted` 上用的是
-   * `z.literal(true)`，我们**不替用户发明同意**。预勾就是发明。
-   */
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [passphrase, setPassphrase] = useState(initialPassword);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
-  const [otherWaysOpen, setOtherWaysOpen] = useState(false);
-  const [registrationCode, setRegistrationCode] = useState('');
-  const [now, setNow] = useState(() => Date.now());
   const [sessionServerUrl, setSessionServerUrl] = useState<string | undefined>(undefined);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [centralAttempt, setCentralAttempt] = useState<(CentralDeviceStart & { generation: number }) | undefined>();
+  const [openLegalDocument, setOpenLegalDocument] = useState<string | null>(null);
   const authGeneration = useRef(0);
   const centralClaiming = useRef(false);
   const centralStarting = useRef(false);
+  const scrollRef = useRef<ScrollView | null>(null);
 
   const busy = phase.kind === 'busy';
   const action = phase.kind === 'busy' ? phase.action : undefined;
   const session = phase.kind === 'session' ? phase.session : undefined;
   const centralMode = isOfficialCentralAuthEndpoint(serverUrl);
   const termsLabel = t('mobile.auth.terms.label');
+
+  /** 这台设备有没有通行密钥实现。没有时**如实说**，而不是把按钮藏起来。 */
+  const passkeyProvider = resolvePasskeyProvider();
+
+  /**
+   * 勾选框旁边两条条款链接的地址。分流规则在 `@heyta/app-host` 的 `legal-links.ts`
+   * ——「哪份文本适用于这台服务端」是协议知识，四个壳各写一遍必然漂移（AGENTS §3.5）。
+   */
+  const legalLinks = resolveLegalLinks(serverUrl, locale);
+  const officialLegalLinks =
+    legalLinks !== null && legalLinks.terms.startsWith(`${OFFICIAL_SITE_ORIGIN}/`);
+  const options = { baseUrl: serverUrl, locale };
+
+  /**
+   * ── 入场与状态切换的动效 ────────────────────────────────────────────────
+   *
+   * 重排前这一屏**一点动效都没有**：状态从「填表」跳到「已登录」是整块瞬变。
+   * 这里只做一件事：内容淡入 + 轻微上浮，**只发生一次**。
+   * 没有循环、没有呼吸、没有注意力钩子（Web 那侧的 `ht-sheet-auth-in` 同一口径）。
+   *
+   * 🔴 `reducedMotion` 时**一帧都不动**（直接钉到进度 1），不是"动画跑快一点"：
+   * 系统设置里关掉动效的人，看到的应该是最终状态。
+   * ⚠️ 依赖列里是**数字**而不是整个 `tokens` 对象：主题一变 `tokens` 引用就换，
+   * 那样用户切一次系统配色，整屏会重新淡入一遍。
+   */
+  const entryDuration = tokens['duration.normal'];
+  const entry = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  useEffect(() => {
+    if (reducedMotion) {
+      entry.setValue(1);
+      return;
+    }
+    Animated.timing(entry, {
+      toValue: 1,
+      duration: entryDuration,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [entry, entryDuration, reducedMotion]);
+
+  const entryStyle = {
+    opacity: entry,
+    transform: [
+      { translateY: entry.interpolate({ inputRange: [0, 1], outputRange: [tokens['space.3'], 0] }) },
+    ],
+  };
+
+  /**
+   * 失败时把正文滚回顶部。
+   *
+   * 🔴 这是结构问题不是美化：失败句渲染在表单顶部，而人在屏幕下方按按钮。
+   * 不滚的话，用户看到的是"点了没反应"。
+   * ⚠️ 只有失败才滚：中性提示（"邮件已发出"）不抢滚动位置。
+   */
+  const failedKey = phase.kind === 'failed' ? phase.key : undefined;
+  useEffect(() => {
+    if (failedKey === undefined) return;
+    scrollRef.current?.scrollTo({ y: 0, animated: !reducedMotion });
+  }, [failedKey, reducedMotion]);
 
   useEffect(() => {
     if (centralAttempt === undefined) return;
@@ -255,12 +351,6 @@ export function AuthScreen({
     return () => { disposed = true; clearInterval(timer); foreground.remove(); };
   }, [centralAttempt, serverUrl]);
 
-  useEffect(() => {
-    if (phase.kind !== 'registration-code') return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [phase.kind]);
-
   /** 切换服务端必须丢掉刚拿到的会话，避免把旧 token 绑定到新地址。 */
   const updateServerUrl = (next: string): void => {
     if (serverUrl.trim() !== next.trim()) {
@@ -268,10 +358,8 @@ export function AuthScreen({
       setPhase({ kind: 'idle' });
       setSessionServerUrl(undefined);
       setCentralAttempt(undefined);
-      setPassword('');
-      setLoginPassword('');
-      setPasted('');
-      setOtherWaysOpen(false);
+      setPassphrase('');
+      setTermsAccepted(false);
     }
     setServerUrl(next);
   };
@@ -285,62 +373,35 @@ export function AuthScreen({
     return authGeneration.current;
   };
 
-  const isCurrentAuthAction = (generation: number): boolean =>
-    generation === authGeneration.current;
+  const isCurrentAuthAction = (generation: number): boolean => generation === authGeneration.current;
 
   const enterSession = (next: HostedAuthSession): void => {
     setSessionServerUrl(serverUrl.trim());
     setPhase({ kind: 'session', session: next });
   };
 
-  const startCentralLogin = async (): Promise<void> => {
-    if (centralStarting.current || centralAttempt !== undefined) return;
-    if (!requireNetworkConsent()) return;
-    if (!termsAccepted) return failWithKey('mobile.auth.central.termsRequired');
-    centralStarting.current = true;
-    try {
-      const generation = beginAuthAction();
-      setPhase({ kind: 'busy', action: 'central-start' });
-      const options = { baseUrl: serverUrl.trim() };
-      const config = await getCentralAuthConfig(options);
-      if (!isCurrentAuthAction(generation)) return;
-      if (!config.ok || config.value.mode !== 'oidc' || !config.value.documentVersion) {
-        return failWithKey('mobile.auth.central.unavailable');
-      }
-      const started = await beginCentralDeviceAuth({ ...options, termsAccepted: true,
-        documentVersion: config.value.documentVersion });
-      if (!isCurrentAuthAction(generation)) return;
-      if (!started.ok) return failWithKey('mobile.auth.central.unavailable');
-      setCentralAttempt({ ...started.value, generation });
-      setPhase({ kind: 'notice', key: 'mobile.auth.central.waiting' });
-    } finally {
-      centralStarting.current = false;
-    }
+  const fail = (reason: HostedAuthFailureReason): void => {
+    const message = authFailureMessage({ reason });
+    failWithKey(message.key, message.vars);
   };
 
-  /** 这台设备有没有通行密钥实现。没有时**如实说**，而不是把按钮藏起来。 */
-  const passkeyProvider = resolvePasskeyProvider();
-
   /**
-   * 勾选框旁边两条条款链接的地址。分流规则在 `@heyta/app-host` 的 `legal-links.ts`
-   * ——「哪份文本适用于这台服务端」是协议知识，四个壳各写一遍必然漂移（AGENTS §3.5）。
-   */
-  const legalLinks = resolveLegalLinks(serverUrl, locale);
-  const officialLegalLinks =
-    legalLinks !== null && legalLinks.terms.startsWith(`${OFFICIAL_SITE_ORIGIN}/`);
-  const [openLegalDocument, setOpenLegalDocument] = useState<string | null>(null);
-
-  /**
-   * 打开一条外部链接。
+   * 直接在界面上说一句话，**不走** `HostedAuthFailureReason`。
    *
-   * 🔴 用 `Linking` 而不是 RN 内建 `<Text onPress>` 的隐式行为：系统浏览器是唯一
-   * 合理的载体（条款是给读的，而壳里没有第二个渲染器），但**打开失败必须看得见** ——
-   * 没有浏览器 / 被系统拦截时静默什么都不发生，用户会以为界面卡住。
-   * ⚠️ **不**把 `canOpenURL()` 加进来当预检：iOS 13+ 要在 Info.plist 里逐 scheme 登记
-   * `LSApplicationQueriesSchemes` 才查得到，没登记时它恒返回 false，
-   * 于是"能不能打开"这个判断会变成一台设备的 Info.plist 决定的假红 ——
-   * 直接 `openURL()` 失败再说话，才是两端一致的口径。
+   * 🔴 只有"未勾同意项"用它，而且这是**刻意的**：那个原因集合是**协议**的
+   * 失败集合（服务端会怎么回答），而"你没勾同意项"是**本地**的输入问题 ——
+   * 它甚至没发出请求。
    */
+  const failWithKey = (key: MessageKey, vars?: MessageVars): void => {
+    setPhase(vars === undefined ? { kind: 'failed', key } : { kind: 'failed', key, vars });
+  };
+
+  const failFrom = (failure: HostedAuthFailure): void => {
+    const message = authFailureMessage(failure);
+    failWithKey(message.key, message.vars);
+  };
+
+  /** 打开一条外部链接。失败必须看得见 —— 静默什么都不发生会让人以为界面卡住。 */
   const openLegalLink = (href: string): void => {
     Linking.openURL(href).catch(() => {
       failWithKey('mobile.auth.link.unopenable');
@@ -357,106 +418,72 @@ export function AuthScreen({
     if (href !== undefined) openLegalLink(href);
   };
 
-  const fail = (reason: HostedAuthFailureReason): void => {
-    const message = authFailureMessage({ reason });
-    failWithKey(message.key, message.vars);
+  const startCentralLogin = async (): Promise<void> => {
+    if (centralStarting.current || centralAttempt !== undefined) return;
+    if (!requireNetworkConsent()) return;
+    if (!termsAccepted) return failWithKey('mobile.auth.central.termsRequired');
+    centralStarting.current = true;
+    try {
+      const generation = beginAuthAction();
+      setPhase({ kind: 'busy', action: 'central-start' });
+      const centralOptions = { baseUrl: serverUrl.trim() };
+      const config = await getCentralAuthConfig(centralOptions);
+      if (!isCurrentAuthAction(generation)) return;
+      if (!config.ok || config.value.mode !== 'oidc' || !config.value.documentVersion) {
+        return failWithKey('mobile.auth.central.unavailable');
+      }
+      const started = await beginCentralDeviceAuth({ ...centralOptions, termsAccepted: true,
+        documentVersion: config.value.documentVersion });
+      if (!isCurrentAuthAction(generation)) return;
+      if (!started.ok) return failWithKey('mobile.auth.central.unavailable');
+      setCentralAttempt({ ...started.value, generation });
+      setPhase({ kind: 'notice', key: 'mobile.auth.central.waiting' });
+    } finally {
+      centralStarting.current = false;
+    }
   };
 
   /**
-   * 直接在界面上说一句话，**不走** `HostedAuthFailureReason`。
+   * 登录（邮箱 + 密码）—— 产出会话的三条路之一（另两条是邮件链接与通行密钥）。
    *
-   * 🔴 只有"未勾同意项"用它，而且这是**刻意的**：那个原因集合是**协议**的
-   * 失败集合（服务端会怎么回答），而"你没勾同意项"是**本地**的输入问题 ——
-   * 它甚至没发出请求。把它塞进协议集合会污染那份封闭清单，
-   * 也会让 app-host 对这个纯界面状态负责。
+   * 🔴 口令**原样**交出去：不 trim / 不改大小写 / 不提前按长度拒绝。
+   * 归一化只在服务端一处发生，客户端多算一次就是第二套规则（NIST 禁止组成规则）。
+   * 拿到会话之后仍然**停在** `session` 那一档等加密口令：登录成功不等于同步可用。
    */
-  const failWithKey = (key: MessageKey, vars?: MessageVars): void => {
-    setPhase(vars === undefined ? { kind: 'failed', key } : { kind: 'failed', key, vars });
-  };
-
-  /**
-   * 带**上下文**的失败。
-   *
-   * 🔴 两条不许塌成一条，而这两条**都不在这里判**：
-   *   · `password-policy` 的四种拒绝（太短 / 太长 / 太常见 / 已在泄露库）
-   *     状态码与 `code` **完全相同**，而用户要做的动作四种都不同 ——
-   *     只说"不符合要求"等于没说；
-   *   · `password-locked` 有秒数就说"等 N 秒"，没有就只说换别的路，
-   *     **不能把 `undefined` 当 0** —— 那会显示成"再等 0 秒"。
-   * 两半（句子 + 句子里要填的数）由共享层 `authFailureMessage` **一次交出**：
-   * 分两次拿就有"只拿了句子、忘了填数"的空间，而那不会报错 —— `translateIn`
-   * 在 vars 缺省时原样保留占位符，屏幕上就是字面量 `{min}` / `{seconds}`。
-   * web 的两处面板真实漏过这个形状，所以这里从一开始就不给第二次机会。
-   */
-  const failFrom = (failure: HostedAuthFailure): void => {
-    const message = authFailureMessage(failure);
-    failWithKey(message.key, message.vars);
-  };
-
-  /**
-   * 这一次点击**缺**的是哪一栏（`undefined` = 齐了，可以出门）。
-   *
-   * 🔴 先后顺序取自共享层的 `firstAuthErrorField`，**不在这里重写**：
-   *    重写一次就有了第二套规则，症状是"web 让你前进、移动端不让你"那种两端不一致。
-   * ⚠️ 口令只判**空串**（空串是一次没必要的往返）。长度与常见度归服务端裁决并
-   *    给 `policyCode` —— 客户端提前按长度拒绝一句 20 字符的口令是 NIST 明令禁止的
-   *    组成规则，而且这个屏**没有** `maxLength`，静默截断口令是更糟的错法。
-   * ⚠️ `termsMissing` 只在**注册**这条路成立：登录不需要重新同意一次，
-   *    把同意项挡在登录前面会让老用户以为自己被登出了。
-   */
-  const missingField = (mode: AuthFormMode): AuthFormField | undefined =>
-    firstAuthErrorField({
-      baseUrlMissing: serverUrl.trim() === '',
-      emailMissing: email.trim() === '',
-      // 🔴 这里是 `loginPassword`（要发出去的那一个），不是 `password`（E2EE 口令）。
-      passwordMissing: loginPassword === '',
-      termsMissing: mode === 'register' && !termsAccepted,
-    });
-
-  /** 缺的那一栏怎么说。句子在词条表里，这里只给落点。 */
-  const missingFieldKey = (field: AuthFormField): MessageKey => {
-    if (field === 'baseUrl') return 'common.auth.error.unconfigured';
-    if (field === 'email') return 'common.auth.form.emailRequired';
-    if (field === 'password') return 'common.auth.form.passwordRequired';
-    return AUTH_TERMS_REQUIRED_KEY;
-  };
-
-  const options = { baseUrl: serverUrl, locale };
-
-  /**
-   * 注册（邮箱 + 密码）—— 现在这是**主路**。
-   *
-   * 🔴 未勾同意项时**一个请求都不发**（`missingField('register')` 就把 `terms`
-   *    报出来），而且说清为什么 —— 不是让服务端回一个 400。
-   * ⚠️ 成功后那句是**中性**的：服务端对"邮箱已被占用"回同一句、同一个状态码，
-   *    所以这里不能写"账号已创建"（规范 §2-A2）。
-   */
-  const registerWithPassword = async (): Promise<void> => {
+  const login = async (email: string, password: string): Promise<void> => {
     const generation = beginAuthAction();
-    const missing = missingField('register');
-    if (missing !== undefined) return failWithKey(missingFieldKey(missing));
-    if (confirmLoginPassword === '') {
-      return failWithKey('common.auth.form.passwordConfirmationRequired');
-    }
-    if (confirmLoginPassword !== loginPassword) {
-      return failWithKey('common.auth.form.passwordMismatch');
-    }
-    // The checked registration agreement also explicitly authorizes networking.
+    if (!requireNetworkConsent()) return;
+    setPhase({ kind: 'busy', action: 'password-login' });
+    const result = await loginWithEmailPassword(options, { email, password });
+    if (!isCurrentAuthAction(generation)) return;
+    if (!result.ok) return failFrom(result);
+    enterSession(result.session);
+  };
+
+  /**
+   * 注册（邮箱 + 密码）。
+   *
+   * 🔴 `AuthForm` 已经保证"未勾同意项不会调到这里"，这里**再兜一次**：
+   * 一次漏勾的注册请求会让服务端回 400，但那次**枚举尝试**已经出门了。
+   * 勾选同意同时就是"允许本机联网"的明示（规范 §2-A4），所以先记下来再判闸门。
+   */
+  const register = async (email: string, password: string, accepted: boolean): Promise<void> => {
+    if (!accepted) return failWithKey(AUTH_TERMS_REQUIRED_KEY);
+    const generation = beginAuthAction();
     acceptNetworkConsent();
     if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'password-register' });
     const result = await requestEmailPasswordRegistrationCode(options, {
       email,
-      password: loginPassword,
+      password,
       termsAccepted: true,
     });
     if (!isCurrentAuthAction(generation)) return;
     if (!result.ok) return failFrom(result);
     if (result.emailDelivered === false) {
-      setPhase({ kind: 'notice', key: 'mobile.auth.sent.mailNotSent' });
+      setPhase({ kind: 'notice', key: registerNoticeKey(result) });
       return;
     }
-    setRegistrationCode('');
     setPhase({
       kind: 'registration-code',
       challengeId: result.challengeId,
@@ -466,11 +493,9 @@ export function AuthScreen({
     });
   };
 
-  const verifyRegistrationCode = async (): Promise<void> => {
+  const verifyRegistrationCode = async (code: string): Promise<void> => {
     if (phase.kind !== 'registration-code') return;
     if (Date.now() >= phase.expiresAt) return;
-    const code = registrationCode.replace(/\D/g, '').slice(0, 6);
-    if (code.length !== 6) return failWithKey('mobile.auth.registrationCode.invalid');
     const generation = beginAuthAction();
     if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'registration-code' });
@@ -484,7 +509,7 @@ export function AuthScreen({
   };
 
   const resendRegistrationCode = async (): Promise<void> => {
-    if (phase.kind !== 'registration-code' || now < phase.resendAvailableAt) return;
+    if (phase.kind !== 'registration-code' || Date.now() < phase.resendAvailableAt) return;
     const challenge = phase;
     const generation = beginAuthAction();
     if (!requireNetworkConsent()) return;
@@ -492,11 +517,15 @@ export function AuthScreen({
     const result = await resendEmailPasswordRegistrationCode(options, challenge.challengeId);
     if (!isCurrentAuthAction(generation)) return;
     if (!result.ok) return failFrom(result);
-    setRegistrationCode('');
     setPhase({ kind: 'registration-code', email: challenge.email, ...result });
   };
 
-  const forgotPassword = async (): Promise<void> => {
+  const cancelRegistrationCode = (): void => {
+    authGeneration.current += 1;
+    setPhase({ kind: 'idle' });
+  };
+
+  const forgotPassword = async (email: string): Promise<void> => {
     const generation = beginAuthAction();
     if (email.trim() === '') return failWithKey('common.auth.form.emailRequired');
     if (!requireNetworkConsent()) return;
@@ -507,36 +536,24 @@ export function AuthScreen({
     setPhase({ kind: 'notice', key: 'common.auth.sent.reset' });
   };
 
-  /**
-   * 登录（邮箱 + 密码）—— **产出会话的第三条路**（另两条是魔法链接与通行密钥）。
-   *
-   * 拿到会话之后仍然**停在** `session` 那一档等端到端加密口令（规范 §3.2 第 ④ 步）：
-   * 登录成功不等于同步可用，那是两件事、两个秘密。
-   */
-  const loginWithPassword = async (): Promise<void> => {
+  /** 找回通行密钥（`labels.recovery`）。与"忘记密码"是两条不同的邮件，所以是两个入口。 */
+  const recoverPasskey = async (email: string): Promise<void> => {
     const generation = beginAuthAction();
-    const missing = missingField('sign-in');
-    if (missing !== undefined) return failWithKey(missingFieldKey(missing));
+    if (email.trim() === '') return failWithKey('common.auth.form.emailRequired');
     if (!requireNetworkConsent()) return;
-    setPhase({ kind: 'busy', action: 'password-login' });
-    const result = await loginWithEmailPassword(options, {
-      email,
-      password: loginPassword,
-    });
+    setPhase({ kind: 'busy', action: 'recovery' });
+    const result = await requestPasskeyRecovery(options, email);
     if (!isCurrentAuthAction(generation)) return;
     if (!result.ok) return failFrom(result);
-    enterSession(result.session);
+    setPhase({ kind: 'notice', key: 'web.auth.sent.recovery' });
   };
 
   /**
    * 🔴 这里的顺序是**口径**，不是风格：`false` 时**不 `setPhase(busy)`**、不发请求，
-   * 面板由 `requireNetworkConsent()` 替用户打开。
-   *
-   * 先进 busy 再判闸门的话，症状是"菊花转起来、什么都没人发"，
-   * 而那块面板被一个"正在登录"的界面盖着 —— 用户看到的是应用卡住，
-   * 不是"我们还不能替你出门"。
+   * 面板由 `requireNetworkConsent()` 替用户打开。先进 busy 再判闸门的话，
+   * 症状是"菊花转起来、什么都没发"。
    */
-  const sendLoginLink = async (): Promise<void> => {
+  const sendLoginLink = async (email: string): Promise<void> => {
     const generation = beginAuthAction();
     if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'magic-login' });
@@ -546,27 +563,11 @@ export function AuthScreen({
     setPhase({ kind: 'notice', key: 'mobile.auth.sent.login' });
   };
 
-  const register = async (): Promise<void> => {
-    const generation = beginAuthAction();
-    // 🔴 未勾同意项 → **一个请求都不发**，并说清原因。
-    if (!termsAccepted) return failWithKey(AUTH_TERMS_REQUIRED_KEY);
-    acceptNetworkConsent();
-    if (!requireNetworkConsent()) return;
-    setPhase({ kind: 'busy', action: 'magic-register' });
-    const result = await registerWithMagicLink(options, { email, termsAccepted: true });
-    if (!isCurrentAuthAction(generation)) return;
-    if (!result.ok) return fail(result.reason);
-    // 中性：不读 `result.message`（那是服务端给的安全文案，而且它本身中性），
-    // 也不渲染成"账号已建"。
-    setPhase({ kind: 'notice', key: registerNoticeKey(result) });
-  };
-
-  const passkeyLogin = async (): Promise<void> => {
+  const passkeyLogin = async (email: string): Promise<void> => {
     const generation = beginAuthAction();
     // 🔴 **先判能力，再发请求。** 反过来的话请求已经出去了，
-    //    而 `passkey-unsupported` 的契约是"一个请求都没发"（见 hosted-auth.ts）。
+    //    而 `passkey-unsupported` 的契约是"一个请求都没发"。
     if (passkeyProvider === undefined) return fail('passkey-unsupported');
-    // 能力之后、闸门之前：这两条本地检查都不该被"要不要联网"这个问题打断。
     if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'passkey-login' });
     const begun = await beginPasskeyLogin(options, email);
@@ -585,9 +586,9 @@ export function AuthScreen({
     enterSession(done.session);
   };
 
-  const passkeyRegister = async (): Promise<void> => {
+  const passkeyRegister = async (email: string, accepted: boolean): Promise<void> => {
+    if (!accepted) return failWithKey(AUTH_TERMS_REQUIRED_KEY);
     const generation = beginAuthAction();
-    if (!termsAccepted) return failWithKey(AUTH_TERMS_REQUIRED_KEY);
     if (passkeyProvider === undefined) return fail('passkey-unsupported');
     acceptNetworkConsent();
     if (!requireNetworkConsent()) return;
@@ -609,35 +610,31 @@ export function AuthScreen({
     setPhase({ kind: 'notice', key: registerNoticeKey(done) });
   };
 
-  const redeemPasted = async (): Promise<void> => {
+  const redeemPasted = async (token: string): Promise<void> => {
     const generation = beginAuthAction();
     if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'verify' });
     const outcome = await redeemPastedAuthToken(
       {
-        verifyLoginToken: async (token) => {
-          const result = await verifyMagicLink(options, token);
-          return result.ok
-            ? { ok: true, session: result.session }
-            : { ok: false, reason: result.reason };
+        verifyLoginToken: async (value) => {
+          const result = await verifyMagicLink(options, value);
+          return result.ok ? { ok: true, session: result.session } : { ok: false, reason: result.reason };
         },
-        verifyEmailToken: async (token) => {
-          const result = await verifyEmailAddress(options, token);
+        verifyEmailToken: async (value) => {
+          const result = await verifyEmailAddress(options, value);
           return result.ok ? { ok: true } : { ok: false, reason: result.reason };
         },
       },
-      pasted,
+      token,
     );
     if (!isCurrentAuthAction(generation)) return;
 
     switch (outcome.kind) {
       case 'session':
-        setPasted('');
         enterSession(outcome.session);
         return;
       case 'email-verified':
         // 验证成功但**没有令牌**（规范 §2-A1）—— 明确说"还要再登录一次"。
-        setPasted('');
         setPhase({ kind: 'notice', key: 'mobile.auth.emailVerified' });
         return;
       case 'failed':
@@ -649,14 +646,14 @@ export function AuthScreen({
     if (session === undefined || sessionServerUrl !== serverUrl.trim()) {
       setPhase({ kind: 'idle' });
       setSessionServerUrl(undefined);
-      setPassword('');
+      setPassphrase('');
       return;
     }
     setPhase({ kind: 'busy', action: 'save' });
     const saved = saveAuthSession({
       serverUrl,
       token: session.token,
-      password,
+      password: passphrase,
       email: session.user.email,
       accountId: String(session.user.id),
     });
@@ -666,362 +663,222 @@ export function AuthScreen({
     onSignedIn({ ...saved, email: session.user.email, accountId: String(session.user.id) });
   };
 
+  /**
+   * 状态机 → 一句人话。
+   *
+   * 🔴 三条口径，缺一条界面就会说谎：
+   *   · **`notice` 一律是 `info` 不是 `success`** —— 服务端用中性文案防邮箱枚举，
+   *     "信已发出"不等于"你收到了"；
+   *   · **只有真的拿到令牌才可能 `success`**（本屏把它换成独立那一档，不走 status）；
+   *   · **服务端失败不指 `field`** —— 那类失败没有"哪个框错了"的答案
+   *     （邮箱存在性故意不区分）。唯一例外是口令策略不合格：那一格确实错了。
+   */
+  const formStatus = (): AuthFormStatus | null => {
+    if (phase.kind === 'failed') {
+      const { key, vars } = phase;
+      const isPolicy = key.startsWith('common.auth.policy.');
+      return {
+        tone: 'error',
+        message: vars === undefined ? t(key) : t(key, vars),
+        ...(isPolicy ? { field: 'password' as const } : {}),
+      };
+    }
+    if (phase.kind === 'notice') return { tone: 'info', message: t(phase.key) };
+    return null;
+  };
+
+  const labels: AuthFormLabels & {
+    readonly otherWaysToggle: { readonly open: string; readonly close: string };
+  } = {
+    title: t('mobile.auth.title'),
+    titleText: t('mobile.auth.title'),
+    /*
+      🔴 2026-10-26 产品负责人：「可以去掉绝大多数注册登录相关的说明文字……
+      去掉所有说明文字，现在严禁有任何说明文字，除了必要的。」
+
+      所以这里**没有 `subtitle`**：原来那段「用邮箱和密码注册或登录。登录成功后，
+      服务器地址、访问令牌与端到端加密口令会自动接上同步。」说的是**这个产品怎么运作**，
+      不是"你现在要做什么"—— 它属于文档中心，不属于登录框上方。
+
+      留在这里的每一句都必须回答"现在该做什么 / 刚才发生了什么"：
+      字段标签、错误句、验证码已发出、通行密钥不可用（点不动的原因）。
+    */
+    close: t('mobile.auth.back'),
+    email: t('web.auth.email.label'),
+    emailPlaceholder: t('web.auth.email.placeholder'),
+    continue: t('common.auth.form.continue'),
+    accountSummary: (email) => t('common.auth.form.accountSummary', { email }),
+    changeEmail: t('common.auth.form.changeEmail'),
+    // 🔴 「登录密码」，不是「密码」：另一个秘密是端到端加密口令，
+    // 一句话同时指两样东西的界面，会让人以为忘了登录密码也就忘了数据。
+    password: t(SIGN_IN_PASSWORD_LABEL_KEY),
+    signIn: t('common.auth.form.signIn'),
+    signUp: t('web.auth.register'),
+    showPassword: t('common.auth.form.showPassword'),
+    hidePassword: t('common.auth.form.hidePassword'),
+    confirmPassword: t('common.auth.form.confirmPassword'),
+    passwordMismatch: t('common.auth.form.passwordMismatch'),
+    passwordConfirmationRequired: t('common.auth.form.passwordConfirmationRequired'),
+    registrationCode: {
+      title: t('web.auth.registrationCode.title'),
+      sent: (email) => t('web.auth.registrationCode.sent', { email }),
+      label: t('web.auth.registrationCode.label'),
+      placeholder: t('web.auth.registrationCode.placeholder'),
+      verify: t('web.auth.registrationCode.verify'),
+      resend: t('web.auth.registrationCode.resend'),
+      resendIn: (seconds) => t('web.auth.registrationCode.resendIn', { seconds }),
+      changeEmail: t('web.auth.registrationCode.changeEmail'),
+      expired: t('web.auth.registrationCode.expired'),
+      codeLength: 6,
+    },
+    passwordStrength: {
+      tooShort: (current, minimum) => t('common.auth.form.passwordStrength.tooShort', { current, min: minimum }),
+      tooLong: (current, maximum) => t('common.auth.form.passwordStrength.tooLong', { current, max: maximum }),
+      weak: t('common.auth.form.passwordStrength.weak'),
+      fair: t('common.auth.form.passwordStrength.fair'),
+      strong: t('common.auth.form.passwordStrength.strong'),
+    },
+    forgotPassword: t('common.auth.form.forgotPassword'),
+    switchToRegister: t('common.auth.form.switchToRegister'),
+    switchToSignIn: t('common.auth.form.switchToSignIn'),
+    otherWays: t('common.auth.form.otherWays'),
+    // 🔴 折叠是**信息架构**裁决（`ux-principles.md` §4「配置项默认收起」）：
+    // 邮件链接、通行密钥、找回入口都是低频路，不该与主路平铺。
+    otherWaysToggle: {
+      open: t('common.auth.form.otherWaysOpen'),
+      close: t('common.auth.form.otherWaysClose'),
+    },
+    terms: t('mobile.auth.terms.label'),
+    magicLink: t('web.auth.sendLoginLink'),
+    recovery: t('web.auth.recovery.request'),
+    passkeyRegister: t('web.auth.passkey.register'),
+    passkeyLogin: t('web.auth.passkey.login'),
+    passkeyUnavailable: t('web.auth.passkey.unavailable'),
+    passkeyWaiting: t('web.auth.passkey.waiting'),
+    emptyTitle: '',
+    emptyBody: '',
+    localErrors: {
+      baseUrl: t('common.auth.form.serverUrlRequired'),
+      email: t('common.auth.form.emailRequired'),
+      password: t('common.auth.form.passwordRequired'),
+      // 「这一项必须由你自己做出」那半句不许丢：界面不许替他勾，也不许写成走过场。
+      terms: (key) => t(key),
+    },
+    ...(busy && action !== undefined ? { busyText: t(BUSY_MESSAGE_KEY[action]) } : {}),
+    // 地址只在这个壳**显式**允许时才出现，而且和粘贴令牌一起收在同一个展开入口里 ——
+    // 与 Web 的 `advanced` 分组同一个裁决（两个来源 = 漂移）。
+    ...(allowServerSelection
+      ? {
+          serverUrl: {
+            label: t('web.auth.server.label'),
+            placeholder: t('web.auth.server.placeholder'),
+          },
+          paste: {
+            label: t('web.auth.paste.label'),
+            placeholder: t('web.auth.paste.placeholder'),
+            verify: t('web.auth.verify'),
+          },
+          advancedToggle: {
+            open: t('web.auth.advanced.open'),
+            close: t('web.auth.advanced.close'),
+          },
+        }
+      : {}),
+    ...(legalLinks === null
+      ? {}
+      : {
+          legal: {
+            terms: t('common.legal.termsDoc'),
+            privacy: t('common.legal.privacyDoc'),
+            ...(officialLegalLinks ? {} : { hrefs: legalLinks }),
+          },
+        }),
+  };
+
+  const waitingForPasskey = busy && (action === 'passkey-login' || action === 'passkey-register');
+
+  /** 已经拿到令牌：停在第 ④ 步，等加密口令。 */
+  const passphraseStep = session !== undefined || action === 'save';
+
   return (
-    <Screen
-      title={t('mobile.auth.title')}
-      actions={[
-        {
-          icon: 'action.back',
-          label: t('mobile.auth.back'),
-          onPress: onBack,
-        },
-      ]}
-    >
-      <Text variant="caption" tone="subtle">
-        {t(centralMode ? 'mobile.auth.central.intro' : 'mobile.auth.intro')}
-      </Text>
-
-      {/* 状态区。失败用 danger，中性提示用 muted —— 两者**不能同色**，
-          否则"链接已发出"和"登录失败"在视觉上分不出来。 */}
-      {phase.kind === 'failed' ? (
-        <Text variant="caption" tone="danger">
-          {phase.vars === undefined ? t(phase.key) : t(phase.key, phase.vars)}
-        </Text>
-      ) : null}
-      {phase.kind === 'notice' ? (
-        <Text variant="caption" tone="muted">
-          {t(phase.key)}
-        </Text>
-      ) : null}
-      {phase.kind === 'session' ? (
-        <Card>
-          <View style={{ gap: tokens['space.1'] }}>
-            <Text variant="row-title" tone="success">
-              {t('mobile.auth.signedIn.title')}
-            </Text>
-            <Text variant="caption" tone="muted">
-              {t('mobile.auth.signedIn.body', { email: phase.session.user.email })}
-            </Text>
-          </View>
-        </Card>
-      ) : null}
-
-      {!centralMode && phase.kind === 'registration-code' ? (
-        <Card>
-          <View style={{ gap: tokens['space.3'] }}>
-            <Text variant="section-title">{t('mobile.auth.registrationCode.title')}</Text>
-            <Text variant="caption" tone="muted">
-              {t('mobile.auth.registrationCode.sent', { email: phase.email })}
-            </Text>
-            <TextField
-              label={t('mobile.auth.registrationCode.label')}
-              value={registrationCode}
-              onChangeText={(next) => setRegistrationCode(next.replace(/\D/g, '').slice(0, 6))}
-              placeholder={t('mobile.auth.registrationCode.placeholder')}
-              onSubmitEditing={() => { void verifyRegistrationCode(); }}
-              testID="mobile-auth-registration-code"
-            />
-            {now >= phase.expiresAt ? (
-              <Text variant="caption" tone="danger">{t('mobile.auth.registrationCode.expired')}</Text>
-            ) : null}
-            <Button
-              label={t('mobile.auth.registrationCode.verify')}
-              onPress={() => { void verifyRegistrationCode(); }}
-              tone="primary"
-              disabled={busy || now >= phase.expiresAt || registrationCode.length !== 6}
-              loading={action === 'registration-code'}
-            />
-            <Button
-              label={now < phase.resendAvailableAt
-                ? t('mobile.auth.registrationCode.resendIn', { seconds: Math.ceil((phase.resendAvailableAt - now) / 1000) })
-                : t('mobile.auth.registrationCode.resend')}
-              onPress={() => { void resendRegistrationCode(); }}
-              disabled={busy || now < phase.resendAvailableAt}
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => { authGeneration.current += 1; setRegistrationCode(''); setPhase({ kind: 'idle' }); }}
-            >
-              <Text variant="caption" tone="primary">{t('mobile.auth.registrationCode.changeEmail')}</Text>
-            </Pressable>
-          </View>
-        </Card>
-      ) : null}
-
-      {!centralMode ? <View style={phase.kind === 'registration-code' ? { display: 'none' } : undefined}>
-
-      <SectionHeader icon="action.settings" title={t('mobile.profile.section.account')} />
-      <Card>
-        <View style={{ gap: tokens['space.4'] }}>
-          <TextField
-            label={t('mobile.auth.email.label')}
-            value={email}
-            onChangeText={setEmail}
-            placeholder={t('mobile.auth.email.placeholder')}
-          />
-          {/*
-            🔴 **登录密码** —— 与下面那栏「加密口令」是**两个秘密**、两个 state：
-            这一栏的值要发给服务端验 Argon2id，那一栏的值永远不出这台设备。
-            显隐开关**必须在**（NNG：口令错字主要来自看不见的最后一位），
-            而移动端的默认档是明文 —— 取自共享层
-            `defaultPasswordRevealed('mobile')`，不在这里重新决定。
-          */}
-          <View style={{ gap: tokens['space.1'] }}>
-            <TextField
-              label={t(SIGN_IN_PASSWORD_LABEL_KEY)}
-              value={loginPassword}
-              onChangeText={setLoginPassword}
-              secure={!passwordRevealed}
-            />
-            <Pressable
-              accessibilityRole="button"
-              hitSlop={tokens['gesture.hit-slop']}
-              onPress={() => {
-                setPasswordRevealed((current) => !current);
-              }}
-            >
-              <Text variant="caption" tone="primary">
-                {t(passwordRevealed ? 'common.auth.form.hidePassword' : 'common.auth.form.showPassword')}
-              </Text>
-            </Pressable>
-          </View>
-          {mode === 'register' ? (
-            <>
-              <PasswordStrength
-                password={loginPassword}
-                labels={{
-                  tooShort: (current, minimum) =>
-                    t('common.auth.form.passwordStrength.tooShort', { current, min: minimum }),
-                  tooLong: (current, maximum) =>
-                    t('common.auth.form.passwordStrength.tooLong', { current, max: maximum }),
-                  weak: t('common.auth.form.passwordStrength.weak'),
-                  fair: t('common.auth.form.passwordStrength.fair'),
-                  strong: t('common.auth.form.passwordStrength.strong'),
-                }}
-                testID="mobile-auth-password-strength"
-              />
-              <TextField
-                label={t('common.auth.form.confirmPassword')}
-                value={confirmLoginPassword}
-                onChangeText={setConfirmLoginPassword}
-                secure={!passwordRevealed}
-                hint={
-                  confirmLoginPassword !== '' && confirmLoginPassword !== loginPassword
-                    ? t('common.auth.form.passwordMismatch')
-                    : undefined
-                }
-                hintTone="danger"
-                testID="mobile-auth-password-confirmation"
-              />
-            </>
-          ) : null}
-          {session !== undefined || action === 'save' ? (
-            <TextField
-              label={t(E2EE_PASSPHRASE_LABEL_KEY)}
-              value={password}
-              onChangeText={setPassword}
-              secure
-              hint={t('mobile.auth.passwordNeeded')}
-            />
-          ) : null}
-          {/* 🔴 口令放在**动作按钮之上**：它是规范 §3.2 的第 ④ 步，
-              而且登录完之后要停在 `session` 那一档等它 —— 放在屏底会让人以为
-              登录已经全部完成了。 */}
-          {/*
-            🔴 服务端地址是**最后一栏**。放第一栏等于要求用户在开始注册之前
-            先回答"你要连哪台机器" —— 而绝大多数人连的是这项服务默认提供的那台，
-            他们没有自己的地址可填。这不是排序偏好，是产品负责人定的硬约束。
-          */}
-          {allowServerSelection ? (
-            <TextField
-              label={t('mobile.profile.serverUrl.label')}
-              value={serverUrl}
-              onChangeText={updateServerUrl}
-              keyboard="url"
-              hint={t('mobile.profile.serverUrl.hint')}
-            />
-          ) : null}
-        </View>
-      </Card>
-
-      {/* 同意项（规范 §2-A4）。**必须由用户自己勾**，初值 false。 */}
-      {mode === 'register' ? (
-        <View style={{ gap: tokens['space.2'] }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
-            <Checkbox
-              checked={termsAccepted}
-              onToggle={() => {
-                setTermsAccepted((current) => !current);
-              }}
-              label={t('mobile.auth.terms.label')}
-            />
-            <Text variant="caption" grow>{termsLabel}</Text>
-          </View>
-
-          {/* 链接与勾选项保持紧凑，但仍是 checkbox 行的兄弟，避免点链接误触同意。 */}
-          {legalLinks !== null ? (
-            <View style={{ flexDirection: 'row', gap: tokens['space.4'] }}>
-              <Pressable
-                accessibilityRole="link"
-                hitSlop={tokens['gesture.hit-slop']}
-                onPress={() => {
-                  openLegalDocumentOrLink('terms');
-                }}
-                testID="mobile-auth-legal-terms"
-              >
-                <Text variant="caption" tone="primary">
-                  {t('common.legal.termsDoc')}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="link"
-                hitSlop={tokens['gesture.hit-slop']}
-                onPress={() => {
-                  openLegalDocumentOrLink('privacy');
-                }}
-                testID="mobile-auth-legal-privacy"
-              >
-                <Text variant="caption" tone="primary">
-                  {t('common.legal.privacyDoc')}
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <Text variant="caption" tone="subtle">
-            {t('mobile.auth.terms.hint')}
-          </Text>
-        </View>
-      ) : null}
-
-      {/*
-        口令这条路（规范 §3.2 的主路）。**登录在前**：它是唯一直接产出会话的按钮，
-        而注册只发一封验证邮件（规范 §2-A1 —— 注册不给令牌）。
-        ⚠️ 按钮文案**不许**写成"已注册 / 已登录"：点下去只是发出请求，
-        结果由状态区那句说，而那句在中性情形下不能断言账号已建（§2-A2）。
-      */}
-      <Button
-        label={mode === 'sign-in' ? t('mobile.auth.password.login') : t('mobile.auth.password.register')}
-        onPress={() => {
-          void (mode === 'sign-in' ? loginWithPassword() : registerWithPassword());
+    <View style={layout.root}>
+      <ScrollView
+        ref={scrollRef}
+        // 🔴 内嵌档不自己滚：宿主那一层已经在滚，两层都能滚的话，
+        //    手指在表单上滑会滑里层，滑到底也不继续 —— 用户以为页面卡住了。
+        scrollEnabled={!embedded}
+        style={embedded ? undefined : layout.fill}
+        contentContainerStyle={{
+          paddingHorizontal: embedded ? 0 : tokens['screen.gutter'],
+          paddingTop: embedded ? 0 : tokens['space.4'],
+          paddingBottom: embedded ? 0 : insets.bottom + tokens['space.6'],
         }}
-        tone="primary"
-        disabled={busy}
-        loading={mode === 'sign-in' ? action === 'password-login' : action === 'password-register'}
-      />
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => {
-          setMode((current) => {
-            const next = current === 'sign-in' ? 'register' : 'sign-in';
-            if (next === 'sign-in') setConfirmLoginPassword('');
-            return next;
-          });
-        }}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text variant="caption" tone="primary">
-          {t(mode === 'sign-in' ? 'common.auth.form.switchToRegister' : 'common.auth.form.switchToSignIn')}
-        </Text>
-      </Pressable>
-      {mode === 'sign-in' ? (
-        <Pressable accessibilityRole="button" onPress={() => { void forgotPassword(); }}>
-          <Text variant="caption" tone="primary">{t('common.auth.form.forgotPassword')}</Text>
-        </Pressable>
-      ) : null}
-
-      {/* 邮件链接与通行密钥现在明确是**第二条路**（规范 §3.2 ②a / ②b）。 */}
-      <Pressable
-        accessibilityRole="button"
-        // 🔴 名称必须等于屏幕上那行：这枚 Pressable 一旦带 `accessibilityLabel`，子 `SectionHeader`
-        // 的可见文字就**不会**进无障碍树（真机实测：屏幕上写「其他登录方式」，读屏念「或者用别的方式」，
-        // 两态皆然，而 web 端同一份表单念的就是可见文字）。所以这里跟着 `otherWaysOpen` 换。
-        accessibilityLabel={otherWaysOpen ? t('common.auth.form.otherWaysClose') : t('common.auth.form.otherWaysOpen')}
-        aria-expanded={otherWaysOpen}
-        onPress={() => setOtherWaysOpen((open) => !open)}
-      >
-        <SectionHeader icon="action.more" title={otherWaysOpen ? t('common.auth.form.otherWaysClose') : t('common.auth.form.otherWaysOpen')} />
-      </Pressable>
-      {otherWaysOpen ? <>
-      <Button
-        label={mode === 'sign-in' ? t('mobile.auth.magicLink.login') : t('mobile.auth.magicLink.register')}
-        // 不写 `accessibilityLabel`：kit 默认取 `label`（`ui/kit.tsx` 的 `accessibilityLabel ?? label`）。
-        // 原先这里硬写登录那枚键，于是**注册档**下屏幕上写「注册新账号」而读屏念「用邮件链接登录」——
-        // 说错的正是"按下去会发生什么账号动作"。
-        onPress={() => {
-          void (mode === 'sign-in' ? sendLoginLink() : register());
-        }}
-        disabled={busy}
-        loading={action === (mode === 'sign-in' ? 'magic-login' : 'magic-register')}
-      />
-
-      {/* 通行密钥那条路（规范 §3.2 ②a）。**不禁用**，因为"为什么点不了"必须说出来。 */}
-      <Button
-        label={t('mobile.auth.passkey.login')}
-        onPress={() => {
-          void passkeyLogin();
-        }}
-        disabled={busy}
-        loading={action === 'passkey-login'}
-      />
-      <Button
-        label={t('mobile.auth.passkey.register')}
-        onPress={() => {
-          void passkeyRegister();
-        }}
-        disabled={busy}
-        loading={action === 'passkey-register'}
-      />
-      {passkeyProvider === undefined ? (
-        <Text variant="caption" tone="subtle">
-          {t('mobile.auth.passkey.unavailable')}
-        </Text>
-      ) : null}
-
-      {/* 粘贴邮件里的链接 / 令牌（规范 §2-A6 在各端的共同出口）。 */}
-      {allowServerSelection ? (
-        <>
-          <TextField
-            label={t('mobile.auth.paste.label')}
-            value={pasted}
-            onChangeText={setPasted}
-            placeholder={t('mobile.auth.paste.placeholder')}
-          />
-          <Button
-            label={t('mobile.auth.verify')}
-            onPress={() => {
-              void redeemPasted();
-            }}
-            disabled={busy}
-            loading={action === 'verify'}
-          />
-        </>
-      ) : null}
-      </> : null}
-
-      {/* 规范 §3.2 第 ④ 步：拿到令牌之后**停在**这里，等 E2EE 口令。 */}
-      {session !== undefined || action === 'save' ? (
-        <>
-        <Button
-          label={t('mobile.auth.enableSync')}
-          onPress={saveAndSync}
-          tone="primary"
-          icon="action.sync"
-          disabled={phase.kind === 'busy'}
-        />
-        </>
-      ) : null}
-      </View> : null}
-      {centralMode ? (
-        <Card>
-          <View style={{ gap: tokens['space.3'] }}>
-            {session === undefined ? (
-              <>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
-                  <Checkbox checked={termsAccepted} onToggle={() => setTermsAccepted((value) => !value)}
-                    label={termsLabel} />
+        <Animated.View style={[{ gap: tokens['space.4'] }, entryStyle]}>
+          {passphraseStep && session !== undefined ? (
+            <Card>
+              <View style={layout.stack3}>
+                <View style={layout.stack1}>
+                  <Text variant="row-title" tone="success">
+                    {t('mobile.auth.signedIn.title')}
+                  </Text>
+                  <Text variant="caption" tone="muted">
+                    {t('mobile.auth.signedIn.body', { email: session.user.email })}
+                  </Text>
+                </View>
+                {/*
+                  🔴 **加密口令**那一栏。它与 AuthForm 里的「登录密码」是两个秘密，
+                  而这个文件里只有这一个 state —— 它不进任何网络请求。
+                */}
+                <TextField
+                  label={t(E2EE_PASSPHRASE_LABEL_KEY)}
+                  value={passphrase}
+                  onChangeText={setPassphrase}
+                  secure
+                />
+                <Button
+                  label={t('mobile.auth.enableSync')}
+                  onPress={saveAndSync}
+                  tone="primary"
+                  icon="action.sync"
+                  disabled={busy}
+                  loading={action === 'save'}
+                />
+                <Pressable accessibilityRole="button" onPress={onBack} testID="mobile-central-auth-back">
+                  <Text variant="caption" tone="primary">{t('mobile.auth.back')}</Text>
+                </Pressable>
+              </View>
+            </Card>
+          ) : centralMode ? (
+            <Card>
+              <View style={layout.stack3}>
+                <View style={layout.stack1}>
+                  <Text variant="section-title">{t('mobile.auth.title')}</Text>
+                  <Text variant="caption" tone="muted">{t('mobile.auth.central.intro')}</Text>
+                </View>
+                {/* 状态区。失败用 danger，中性提示用 muted —— 两者**不能同色**，
+                    否则"链接已发出"和"登录失败"在视觉上分不出来。 */}
+                {phase.kind === 'failed' ? (
+                  <Text variant="caption" tone="danger" accessibilityLiveRegion="polite">
+                    {phase.vars === undefined ? t(phase.key) : t(phase.key, phase.vars)}
+                  </Text>
+                ) : null}
+                {phase.kind === 'notice' ? (
+                  <Text variant="caption" tone="muted" accessibilityLiveRegion="polite">
+                    {t(phase.key)}
+                  </Text>
+                ) : null}
+                <View style={layout.rowCenter}>
+                  <Checkbox
+                    checked={termsAccepted}
+                    onToggle={() => setTermsAccepted((value) => !value)}
+                    label={termsLabel}
+                  />
                   <Text variant="caption" grow>{termsLabel}</Text>
                 </View>
                 {legalLinks !== null ? (
-                  <View style={{ flexDirection: 'row', gap: tokens['space.4'] }}>
+                  <View style={layout.rowLegal}>
                     <Pressable accessibilityRole="link" onPress={() => openLegalDocumentOrLink('terms')}>
                       <Text variant="caption" tone="primary">{t('common.legal.termsDoc')}</Text>
                     </Pressable>
@@ -1030,40 +887,87 @@ export function AuthScreen({
                     </Pressable>
                   </View>
                 ) : null}
-                <Button label={t('mobile.auth.central.start')} tone="primary"
-                  onPress={() => { void startCentralLogin(); }} disabled={busy || centralAttempt !== undefined}
-                  loading={action === 'central-start'} testID="mobile-central-auth-start" />
+                <Button
+                  label={t('mobile.auth.central.start')}
+                  tone="primary"
+                  onPress={() => { void startCentralLogin(); }}
+                  disabled={busy || centralAttempt !== undefined}
+                  loading={action === 'central-start'}
+                  testID="mobile-central-auth-start"
+                />
                 {centralAttempt !== undefined ? (
                   <>
                     <Text variant="caption" tone="muted">{t('mobile.auth.central.pairing')}</Text>
                     <Text variant="row-title">{centralAttempt.pairingCode}</Text>
-                    <Button label={t('mobile.auth.central.openBrowser')}
-                      onPress={() => { void Linking.openURL(centralAttempt.launchUrl).catch(() => {
-                        failWithKey('mobile.auth.link.unopenable');
-                      }); }} testID="mobile-central-auth-browser" />
+                    <Button
+                      label={t('mobile.auth.central.openBrowser')}
+                      onPress={() => {
+                        void Linking.openURL(centralAttempt.launchUrl).catch(() => {
+                          failWithKey('mobile.auth.link.unopenable');
+                        });
+                      }}
+                      testID="mobile-central-auth-browser"
+                    />
                   </>
                 ) : null}
-              </>
-            ) : (
-              <>
-                <TextField label={t(E2EE_PASSPHRASE_LABEL_KEY)} value={password}
-                  onChangeText={setPassword} secure hint={t('mobile.auth.passwordNeeded')} />
-                <Button label={t('mobile.auth.enableSync')} onPress={saveAndSync} tone="primary"
-                  icon="action.sync" disabled={busy} />
-              </>
-            )}
-          </View>
-        </Card>
-      ) : null}
-      {allowServerSelection && session === undefined ? (
-        <Pressable accessibilityRole="button" onPress={() => {
-          updateServerUrl(centralMode ? '' : OFFICIAL_SITE_ORIGIN);
-        }}>
-          <Text variant="caption" tone="primary">
-            {t(centralMode ? 'mobile.auth.selfHost.open' : 'mobile.auth.central.back')}
-          </Text>
-        </Pressable>
-      ) : null}
+                {allowServerSelection ? (
+                  <Pressable accessibilityRole="button" onPress={() => updateServerUrl('')}>
+                    <Text variant="caption" tone="primary">{t('mobile.auth.selfHost.open')}</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable accessibilityRole="button" onPress={onBack}>
+                  <Text variant="caption" tone="primary">{t('mobile.auth.back')}</Text>
+                </Pressable>
+              </View>
+            </Card>
+          ) : (
+            <AuthForm
+              labels={labels}
+              onClose={onBack}
+              platform="mobile"
+              status={formStatus()}
+              busy={busy}
+              passkeyAvailable={passkeyProvider !== undefined}
+              waitingForPasskey={waitingForPasskey}
+              /* 🔴 **不给 `initialPassword`**：那个 prop 是「登录密码」的预填，
+                 而本壳手里只有加密口令 —— 接错这一根线就是把
+                 设计上不该出设备的秘密预填进要发出去的框里。 */
+              onSignIn={({ email, password }) => { void login(email, password); }}
+              onRegister={({ email, password, termsAccepted: accepted }) => {
+                void register(email, password, accepted);
+              }}
+              {...(phase.kind === 'registration-code'
+                ? {
+                    registrationChallenge: {
+                      email: phase.email,
+                      expiresAt: phase.expiresAt,
+                      resendAvailableAt: phase.resendAvailableAt,
+                      onVerify: (code: string) => { void verifyRegistrationCode(code); },
+                      onResend: () => { void resendRegistrationCode(); },
+                      onChangeEmail: cancelRegistrationCode,
+                    },
+                  }
+                : {})}
+              onMagicLink={(email) => { void sendLoginLink(email); }}
+              onPasskey={({ kind, email, termsAccepted: accepted }) => {
+                if (kind === 'register') {
+                  void passkeyRegister(email, accepted);
+                  return;
+                }
+                void passkeyLogin(email);
+              }}
+              onRecovery={(email) => { void recoverPasskey(email); }}
+              onForgotPassword={(email) => { void forgotPassword(email); }}
+              onVerifyToken={(token) => { void redeemPasted(token); }}
+              onOpenLegal={(kind) => openLegalDocumentOrLink(kind)}
+              {...(allowServerSelection
+                ? { serverUrl: { value: serverUrl, onChange: updateServerUrl } }
+                : {})}
+              testID="mobile-auth-form"
+            />
+          )}
+        </Animated.View>
+      </ScrollView>
 
       {openLegalDocument !== null ? (() => {
         const document = legalDocumentPresentation(legalDocumentById(openLegalDocument));
@@ -1083,6 +987,6 @@ export function AuthScreen({
           />
         );
       })() : null}
-    </Screen>
+    </View>
   );
 }

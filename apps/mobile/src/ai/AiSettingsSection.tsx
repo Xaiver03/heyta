@@ -15,9 +15,8 @@
  * 🔴 本组件**不发任何请求**，也不构造任何 op：它只写本机配置。
  * 出境的判定住在 `@heyta/ai` 的闸门里，写入的判定住在 `@heyta/app-host` 的动作层里。
  *
- * 🔴 档位的**字面量、出厂默认、渲染顺序**都不在这里 —— 它们来自
- * `@heyta/app-host` 的 `assistant-tier-settings.ts`；
- * 这里出现 `'read-only'` 这样的引号字面量会让 `check:layering` 直接红。
+ * 🔴 这里**没有**"助手权限"这一节（ADR-0082）：助手不设只读 / 执行档。
+ * 能做什么由工具目录与风险闸门决定，设置面只负责出境授权与本机 API。
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -37,15 +36,9 @@ import {
   type AiFeature,
 } from '@heyta/ai';
 import {
-  ASSISTANT_TIER_ORDER,
-  ASSISTANT_TIER_EXECUTE,
-  ASSISTANT_TIER_READ_ONLY,
-  DEFAULT_ASSISTANT_TIER,
-  createAssistantTierStore,
   destinationForFeature,
   fetchManagedAiUsage,
   recomputeConsents,
-  type AssistantTier,
   type ManagedAiUsageReading,
 } from '@heyta/app-host';
 import { LOCAL_API_TOOLS } from '@heyta/local-api';
@@ -60,7 +53,6 @@ import { aiSecrets, saveAiSettings, useAiSettings } from './settings-store';
 import { INBOUND_BOUNDARY_COPY_KEY, INBOUND_CYCLE_COPY_KEY, INBOUND_READINESS_COPY_KEY } from '../inbound/copy';
 import { useInboundCycle, useInboundReadiness } from '../inbound/status';
 import { useInboundRules } from '../inbound/rules-store';
-import { readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
 /** 五个功能在设置里的渲染顺序 —— 与助手面的顺序同一份，不重排。 */
 const FEATURE_ORDER = [
@@ -72,18 +64,6 @@ const FEATURE_ORDER = [
   // Inbound automation is configured here, not exposed as a Chatbot mode.
   'inbound-automation',
 ] as const satisfies readonly AiFeature[];
-
-/**
- * 助手档位仓库：判断（默认值 / fail-closed 归一 / 顺序）全在 app-host，
- * 本壳只给通道 —— 与 `createAssistantTierStore` 文件头说的那个用法一致
- * （原生端寄存在设备偏好库，与整块 AI 设置同一个通道，**不新表**）。
- */
-const tierStore = createAssistantTierStore({
-  read: () => readDevicePref('heyta.ai.tier'),
-  write: (tier) => {
-    writeDevicePref('heyta.ai.tier', tier);
-  },
-});
 
 export function AiSettingsSection(): React.JSX.Element {
   const { t } = useI18n();
@@ -598,33 +578,6 @@ export function AiSettingsSection(): React.JSX.Element {
         })}
       </Card>
 
-      {/* ── 助手档位（第二个授权前端，ADR-0045 §2.2） ───────────────── */}
-      <Card gap="loose">
-        <Text variant="row-title">{t('web.ai.assistant.egressTitle')}</Text>
-        <HStackish>
-          {ASSISTANT_TIER_ORDER.map((tier) => (
-            <Chip
-              key={tier}
-              label={t(TIER_LABEL_KEY[tier])}
-              selected={settings.assistantTier === tier}
-              onPress={() => {
-                const committed = tierStore.set(tier);
-                const wrote = saveAiSettings({ ...settings, assistantTier: committed });
-                setSavedWithoutKey(!wrote);
-              }}
-            />
-          ))}
-        </HStackish>
-        <Text variant="caption" tone="subtle">
-          {t(TIER_NOTE_KEY[settings.assistantTier])}
-        </Text>
-        <Text variant="caption" tone="subtle">
-          {t('mobile.ai.tier.defaultNote', {
-            tier: t(TIER_LABEL_KEY[DEFAULT_ASSISTANT_TIER]),
-          })}
-        </Text>
-      </Card>
-
       {/* ── 逐工具授权（本机 API / 内置 AI 共用同一份表，ADR-0035） ── */}
       <Card gap="loose">
         <Text variant="row-title">{t('web.ai.settings.localApi.title')}</Text>
@@ -753,15 +706,3 @@ const PRESET_COPY_KEYS = {
   },
 } as const satisfies Record<string, { readonly label: MessageKey; readonly prerequisite: MessageKey }>;
 
-// 🔴 档位这两张表用 **app-host 的常量**当键，不写字面量（AGENTS §3.5 / check:layering）。
-// 档位决定"模型这一次能不能改用户的数据"，它的词表是产品语义；壳只负责"存在哪"。
-// web 那边（`AiSettings.tsx`）已经是这个写法了，这里照同一形状，不另立一套。
-const TIER_LABEL_KEY = {
-  [ASSISTANT_TIER_READ_ONLY]: 'web.ai.assistant.tier.readOnly.label',
-  [ASSISTANT_TIER_EXECUTE]: 'web.ai.assistant.tier.readAndPropose.label',
-} as const satisfies Record<AssistantTier, MessageKey>;
-
-const TIER_NOTE_KEY = {
-  [ASSISTANT_TIER_READ_ONLY]: 'web.ai.assistant.tier.readOnly.note',
-  [ASSISTANT_TIER_EXECUTE]: 'web.ai.assistant.tier.readAndPropose.note',
-} as const satisfies Record<AssistantTier, MessageKey>;

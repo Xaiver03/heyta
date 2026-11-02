@@ -44,7 +44,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { pick } from '@react-native-documents/picker';
 import type { SyncStatus } from '@heyta/sync-client';
 import { useI18n } from '@heyta/i18n';
@@ -70,7 +70,6 @@ import {
   AssistantMark,
   SettingsRow,
   resolvePendingUploadPresentation,
-  shouldRenderSettingsRow,
   type SettingsRowModel,
 } from '@heyta/ui';
 
@@ -433,6 +432,15 @@ export function ProfileScreen(): React.JSX.Element {
     if (open) navigation.push('profile:ai-toolbox');
     else navigation.pop();
   };
+
+  /**
+   * 「功能与 AI」枢纽页（5 个功能域的第二层入口）。
+   *
+   * 🔴 它和成长 / 回收站 / 导出同一条纪律：**第二层整屏**，不是第 6 个 tab
+   *    （ADR-0015 §4 / P10：底部标签保持 5 个）。走上层那条 `navigation` 栈，
+   *    所以返回键与 Android 硬件返回是同一条路径（不是本屏的局部状态）。
+   */
+  const featuresOpen = navigation.stacks.profile.at(-1)?.key === 'profile:features';
 
   /**
    * 「通知」入口行的未读徽标（批二，多端覆盖审计 P0-2）。
@@ -803,17 +811,93 @@ export function ProfileScreen(): React.JSX.Element {
    */
 
   /**
+   * 同步**只留一行摘要**（§5.2 的「同步一行」）。
+   *
+   * 🔴 判据是"异常才展开"。`error` / `conflict` 是**需要用户做一件事**的两种状态
+   *    （核对地址或口令 / 逐条选一个），其余（`idle` / `syncing` / `synced` /
+   *    `offline`）都能用一句话说完 —— 把它们也画成状态卡，就是让 90% 的时间
+   *    为 10% 的情况占版面。
+   *
+   * ⚠️ 时间用 `formatStamp` 的**绝对**戳，不用"N 分钟前"：词条表里没有相对时间
+   *    模板（加了就得动 `packages/i18n`，不在本轮文件白名单里）。绝对戳不会说谎。
+   */
+  const syncDetailVisible = status.kind === 'error' || status.kind === 'conflict';
+  const syncSummaryValue =
+    status.kind === 'synced' && lastSyncedAt !== undefined
+      ? `${describeSyncStatus(status, t)} · ${formatStamp(lastSyncedAt)}`
+      : describeSyncStatus(status, t);
+  const syncSummaryRow: SettingsRowModel = {
+    kind: 'value',
+    label: t('mobile.profile.section.sync'),
+    value: syncSummaryValue,
+    tone: statusTone(status) === 'muted' ? 'subtle' : 'default',
+    valueTestID: 'profile-sync-summary',
+  };
+
+  /**
+   * 通知是**首屏唯一的收件入口**（§5.5：移动端没有 web 那种顶栏铃铛位）。
+   *
+   * 🔴 它从 `entryRows` 里**搬出来单独定义**，因为 `entryRows` 现在的语义是
+   *    "定义在「我的」、但渲染在**别的表面**上的行"（设置面的 data/security 两组、
+   *    以及「功能与 AI」二级页）。通知渲染在首屏，混进那张表就又是
+   *    "定义在哪一屏 ≠ 用户在哪一屏看见它"。
+   */
+  const notificationsRow: SettingsRowModel = {
+    kind: 'action',
+    testID: 'profile-entry-notifications',
+    label: t('mobile.inbox.trigger'),
+    onPress: () => {
+      setNotificationsOpen(true);
+    },
+    leading: (
+      <HStack gap="tight" align="center">
+        <Icon name="task.reminder" size="sm" color={tokens['color.foreground-muted']} />
+        {inboxBadge > 0 ? (
+          <View
+            accessibilityLabel={t('mobile.inbox.badge.aria', { count: inboxBadge })}
+            style={{
+              minWidth: tokens['space.6'],
+              paddingHorizontal: tokens['space.2'],
+              paddingVertical: tokens['space.1'],
+              borderRadius: tokens['radius.full'],
+              backgroundColor: tokens['color.primary'],
+              alignItems: 'center',
+            }}
+          >
+            <Text variant="caption" style={{ color: tokens['color.on-primary'] }}>
+              {inboxBadge}
+            </Text>
+          </View>
+        ) : null}
+      </HStack>
+    ),
+  };
+
+  /**
    * 功能域那几行**由注册表生成**（`nav/feature-entries.ts`）。
    *
    * 🔴 这里不许再出现一份手写的 `{ key: 'habits', label: t('…') }`：
    * 同一件事写两遍，迟早只改一遍（AGENTS §3.5 的那条教训）。
    */
+  /*
+    🔴 2026-10-26 产品负责人：「tooltip 有点泛滥了……用户能够凭借 UX 和名字直接理解的东西，
+    就不要用这种东西来加重认知负担了。」
+
+    所以这几行**不再挂 tooltip**（`hint` 整条删掉，不是换成内联说明 ——
+    内联说明是 `check:settings-prose` 明令禁止的，禁令仍然有效）。
+
+    判据是"这行点开之后，名字本身能不能说明它是什么"：
+      · 设置 / 消息 / 安全 / 回收站 / 导入导出 / AI 工具箱 / 成长 / 习惯 / 倒计时 / 分享
+        ⇒ 名字已经说完，删；
+      · **删号**（不可逆）、**反馈**（会打开邮件应用）、**锁屏小组件**（会改变锁屏上看得见什么）、
+        **设密码 / 找回通行密钥**（做与不做分别会发生什么）⇒ 说的是**后果**，
+        名字说不出来，留（它们是这一页仅剩的 tooltip 的主要用途）。
+  */
   const featureRows: readonly SettingsRowModel[] = MOBILE_PROFILE_ENTRIES.map(
     (entry): SettingsRowModel => ({
       kind: 'action',
       testID: entry.testID,
       label: t(entry.labelKey),
-      hint: t(entry.hintKey),
       leading: <Icon name={FEATURE_ENTRY_ICONS[entry.key]} size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         navigation.push(featureRouteKey(entry.key));
@@ -829,7 +913,6 @@ export function ProfileScreen(): React.JSX.Element {
     kind: 'action',
     testID: 'profile-entry-settings',
     label: t('mobile.profile.entry.settings'),
-    hint: t('mobile.profile.entry.settings.hint'),
     leading: <Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />,
     onPress: () => {
       setSettingsSection(undefined);
@@ -837,46 +920,79 @@ export function ProfileScreen(): React.JSX.Element {
     },
   };
 
-  const entryRows: readonly SettingsRowModel[] = [
-    {
-      kind: 'action',
-      testID: 'profile-entry-notifications',
-      label: t('mobile.inbox.trigger'),
-      hint: t('mobile.inbox.entry.hint'),
-      onPress: () => {
-        setNotificationsOpen(true);
-      },
-      leading: (
-        <HStack gap="tight" align="center">
-          <Icon name="task.reminder" size="sm" color={tokens['color.foreground-muted']} />
-          {inboxBadge > 0 ? (
-            <View
-              accessibilityLabel={t('mobile.inbox.badge.aria', { count: inboxBadge })}
-              style={{
-                minWidth: tokens['space.6'],
-                paddingHorizontal: tokens['space.2'],
-                paddingVertical: tokens['space.1'],
-                borderRadius: tokens['radius.full'],
-                backgroundColor: tokens['color.primary'],
-                alignItems: 'center',
-              }}
-            >
-              <Text variant="caption" style={{ color: tokens['color.on-primary'] }}>
-                {inboxBadge}
-              </Text>
-            </View>
-          ) : null}
-        </HStack>
-      ),
+  /**
+   * 订阅：**一行**，不是一组（§5.2 / §3.7 批评的正是"一个商业入口独占一块"）。
+   *
+   * ⚠️ 行尾**不带**"本地版 / 托管 · 到期日"那个状态 —— §5.2 想要它，
+   *    但拿到它唯一的路是 `fetchHostedEntitlementReading`（`EntitlementSection` 的
+   *    探测）。那会变成"同一件事第二个请求方"：每进一次「我的」发一次带 Bearer 的
+   *    探测，而设置里那一份还要再探一次。本地没有权益快照，所以这一行今天只承诺
+   *    "去哪"，不承诺"现在是什么"——**宁可少说一句，不说一句过期的**。
+   */
+  const subscriptionRow: SettingsRowModel = {
+    kind: 'action',
+    testID: 'profile-entry-subscription',
+    label: t('mobile.settings.section.subscription'),
+    leading: <Icon name="action.more" size="sm" color={tokens['color.foreground-muted']} />,
+    onPress: () => {
+      setSettingsSection('subscription');
+      navigation.push('settings');
     },
+  };
+
+  /**
+   * 「功能与 AI」枢纽：习惯 / 倒数纪念日 / 共享清单 / AI 助手 / AI 工具箱的落点。
+   *
+   * 🔴 为什么是**一条入口 + 一个二级页**，而不是五个功能域各占「我的」一行：
+   *    那五行是**导航**（去另一张屏），不是"关于我"；把导航和身份、同步、整理
+   *    混在一列，正是 §3.2 说的"找不到设置"的主因。§7.4 把"移出后去哪"留成了
+   *    待拍板项，三个候选各有代价（任务页溢出菜单 / 枢纽二级页 / 模块开关）。
+   *    本轮选**枢纽页**，因为它要动的只有本文件：
+   *      · 溢出菜单要改 `apps/web` 与 `check:share-entry-visible`（不在本轮白名单）；
+   *      · 模块开关与 `account-information-architecture.md` §4 那句
+   *        "不虚构跨端已同步的开关语义"冲突；
+   *      · 而"删掉不显示"是硬禁令 —— 五条都必须仍然可达。
+   *    代价是**多一次点击**（我的 → 功能与 AI → 习惯），换来首屏少 4 行；
+   *    这条代价写在交付报告里，产品可以随时推翻（那时改的是本文件的一处 filter）。
+   *
+   * ⚠️ 标题复用 `mobile.settings.section.features`（"功能与 AI"）**是刻意的**：
+   *    设置目录里 G6 也叫这个名字，而两者确实是同一个用户意图（这台 App 开了哪些能力）。
+   *    更好的做法是新增一条 `mobile.profile.entry.features`（"全部功能"），
+   *    但那要动 `packages/i18n`（本轮禁改），所以先复用同一句，别造一句新话。
+   */
+  const featuresHubRow: SettingsRowModel = {
+    kind: 'action',
+    testID: 'profile-entry-features',
+    label: t('mobile.settings.section.features'),
+    leading: <Icon name="tab.focus" size="sm" color={tokens['color.foreground-muted']} />,
+    onPress: () => {
+      navigation.push('profile:features');
+    },
+  };
+
+  /**
+   * 定义在「我的」、**渲染在别的表面上**的那些行（不是首屏那 12 行）。
+   *
+   * | 行 | 用户在哪一屏看见它 |
+   * |---|---|
+   * | 账号与安全 / 注销账号 | 设置 → G1 账号（`securityActions`） |
+   * | 备份与迁移 / 回收站 | 设置 → G3 数据与同步（`dataActions`） |
+   * | 习惯 / 倒数纪念日 / 共享清单 / AI 助手 / AI 工具箱 | **「功能与 AI」二级页**（`hubRows`） |
+   *
+   * 🔴 定义与渲染分居两处**不是**这次的发明（现状就是），但它有一个代价：
+   *    "定义在哪一屏"与"用户在哪一屏看见它"不一致时，信息架构就没有唯一归属
+   *    （计划 §2.1 末尾那段就是这条诊断）。首屏那 12 行**不从这里生成**，
+   *    它们是本文件里具名的行（`settingsRow` / `subscriptionRow` / …），
+   *    所以"首屏多了几行"这件事在源码里数得出来（`profile-settings-ia.spec.ts` 钉着）。
+   */
+  const entryRows: readonly SettingsRowModel[] = [
     {
       kind: 'action',
       testID: 'profile-entry-security',
       label: t('mobile.security.trigger'),
-      hint: t('mobile.security.entry.hint'),
       leading: <Icon name="privacy.consent" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
-        setSettingsSection('security');
+        setSettingsSection('account');
         setSecurityOpen(true);
       },
     },
@@ -885,7 +1001,10 @@ export function ProfileScreen(): React.JSX.Element {
       kind: 'action',
       testID: 'profile-entry-assistant',
       label: t('mobile.ai.entry'),
-      hint: t('mobile.ai.entry.hint'),
+      // 🔴 2026-10-26 的 tooltip 禁令扫到这里还剩最后一条：`mobile.ai.entry.hint`
+      //    说的是"让一个助手帮你记录、安排、拆解或回顾任务"。而这一行点开之后
+      //    第一屏就是助手自己，那句话是在用一句解释去替代一次点击 —— 删。
+      //    （tooltip 只留给"名字说不出后果"的那几项：注销、反馈、锁屏小组件。）
       leading: <AssistantMark size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />,
       onPress: () => setAssistantOpen(true),
     },
@@ -893,7 +1012,6 @@ export function ProfileScreen(): React.JSX.Element {
       kind: 'action',
       testID: 'profile-entry-ai-toolbox',
       label: t('mobile.ai.toolbox.entry'),
-      hint: t('mobile.ai.toolbox.entry.hint'),
       leading: <AssistantMark size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />,
       onPress: () => setToolboxOpen(true),
     },
@@ -901,7 +1019,6 @@ export function ProfileScreen(): React.JSX.Element {
       kind: 'action',
       testID: 'profile-entry-trash',
       label: t('mobile.trash.entry'),
-      hint: t('mobile.trash.entry.hint'),
       leading: <Icon name="task.delete" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         setSettingsSection('data');
@@ -912,7 +1029,6 @@ export function ProfileScreen(): React.JSX.Element {
       kind: 'action',
       testID: 'profile-entry-export',
       label: t('mobile.export.entry'),
-      hint: t('mobile.export.entry.hint'),
       leading: <Icon name="action.share" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         setSettingsSection('data');
@@ -928,11 +1044,22 @@ export function ProfileScreen(): React.JSX.Element {
       hint: t('common.accountClosure.entryHint'),
       leading: <Icon name="privacy.consent" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
-        setSettingsSection('security');
+        setSettingsSection('account');
         setClosureOpen(true);
       },
     },
   ];
+
+  const HUB_ROW_TEST_IDS = [
+    'profile-entry-habits',
+    'profile-entry-countdown',
+    'profile-entry-share',
+    'profile-entry-assistant',
+    'profile-entry-ai-toolbox',
+  ] as const;
+  const hubRows: readonly SettingsRowModel[] = entryRows.filter((row) =>
+    (HUB_ROW_TEST_IDS as readonly string[]).includes(row.testID ?? ''),
+  );
 
   /**
    * 🔴 提前 return **必须在所有 hook 之后**。
@@ -945,6 +1072,32 @@ export function ProfileScreen(): React.JSX.Element {
     return (
       <Screen title={t(titleKey)} actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: () => { navigation.pop(); } }]}>
         {managementPage === 'profile:lists' ? <ListsSection /> : managementPage === 'profile:tags' ? <TagsSection /> : <NotesSection />}
+      </Screen>
+    );
+  }
+
+  if (featuresOpen) {
+    /*
+      「功能与 AI」：习惯 / 倒数纪念日 / 共享清单 / AI 助手 / AI 工具箱。
+
+      🔴 这 5 行**曾经各占「我的」一行**（16 行里占 5 行）。它们不是"关于我"的东西，
+      是**去另一张屏的导航**；和身份卡、同步状态、整理入口混在一列，就是"找不到设置"
+      的主因（计划 §3.2）。搬到这一页之后首屏少 4 行（成长那一行并进了「近期状态」卡），
+      代价是多一次点击 —— 这条代价是**产品可以推翻的**（§7.4 仍是待拍板项）。
+
+      ⚠️ 返回动作走 `navigation.pop()`，与上面那批二级页同一个形状：
+      本壳没有导航库，返回只靠这条线（`feature-entries.spec.ts` 钉着"屏里必须有 onBack"）。
+    */
+    return (
+      <Screen
+        title={t('mobile.settings.section.features')}
+        actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: () => { navigation.pop(); } }]}
+      >
+        <Card>
+          {hubRows.map((row) => (
+            <SettingsRow key={row.testID ?? row.kind} row={row} />
+          ))}
+        </Card>
       </Screen>
     );
   }
@@ -992,11 +1145,11 @@ export function ProfileScreen(): React.JSX.Element {
     return (
       <AssistantScreen
         onOpenPrivacy={() => {
-          setSettingsSection('sync');
+          setSettingsSection('data');
           navigation.push('settings');
         }}
         onOpenSettings={() => {
-          setSettingsSection('ai');
+          setSettingsSection('features');
           navigation.push('settings');
         }}
         visible={isProfileAssistantVisible(navigation.tab, navigation.stacks)}
@@ -1011,7 +1164,7 @@ export function ProfileScreen(): React.JSX.Element {
     return (
       <AiToolboxScreen
         onOpenSettings={() => {
-          setSettingsSection('ai');
+          setSettingsSection('features');
           navigation.push('settings');
         }}
         onBack={() => {
@@ -1282,39 +1435,66 @@ export function ProfileScreen(): React.JSX.Element {
   return (
     <Screen title={t('mobile.profile.title')}>
       {/*
-        🔴 **账号卡片（顶部，一级可见）** —— W3 · 规范 §3.1 的「前置」落点。
-        在这一刀之前，本屏**只有**三个手填输入框，而没有任何地方告诉用户
-        访问令牌从哪来。现在注册/登录是这一屏的**第一条**内容。
+        ══════════════════════════════════════════════════════════════════════
+        「我的」首屏 = **6 块 / 12 行**（2026-10-27 重排，计划 §5.2 的 16 → 10）
+        ══════════════════════════════════════════════════════════════════════
+
+        | # | 块 | 行 |
+        |---|---|---|
+        | ① | 账号卡 | 1（整卡可点 → 设置·账号组）|
+        | ② | 配置入口 | 2：订阅 / 设置 |
+        | ③ | 近期状态 | 4：本周任务 / 专注 / 成就 / 查看完整成长 |
+        | ④ | 同步 | 1（异常才展开成状态卡）|
+        | ⑤ | 通知与功能 | 2：通知 / 功能与 AI（枢纽）|
+        | ⑥ | 整理与记录 | 3：清单 / 标签 / 便签 |
+
+        行数口径与 §5.6 的 B4 判据同一条：**可见 `SettingsRow` 的条数**
+        （账号卡是 `Card`，不计数）。重排前是 **16**：设置 1 + 近期状态 4 +
+        入口列 7 + 订阅 1 + 整理 3。重排后 **12** = 少掉的 7 行里，5 个功能域进了
+        ⑤ 的枢纽页、成长并进 ③、通知从"入口列"挪进 ⑤；同时 ④ 从状态卡压成一行。
+
+        ⚠️ §5.2 的字面目标是 **10**。差的 2 行正是**计划自己没定去处**的两行：
+        通知（§5.5 要求移动端必须在「我的」有一行，因为没有 web 那种顶栏铃铛位）
+        与枢纽入口（不删功能域 ⇒ 必须留一条路）。要落到 10，需要产品在这两条上拍板；
+        两条都不在我能改的文件里，所以这里如实留 12 并登记（见交付报告）。
       */}
-      <SectionHeader icon="action.settings" title={t('mobile.profile.section.account')} />
-      <Card>
-        <View style={{ gap: tokens['space.3'] }}>
-          <View testID="profile-account-value">
-            <HStack gap="default" align="center">
-              {signedInEmail === undefined ? null : <AvatarBadge dataUri={avatarImage} email={signedInEmail} />}
-              <Text variant="row-title" grow>
-                {savedName ?? signedInEmail ?? t('mobile.profile.account.offline')}
-              </Text>
-            </HStack>
-            {savedName && signedInEmail ? <Text variant="caption" tone="subtle">{signedInEmail}</Text> : null}
-          </View>
-          {accountHasCredential ? (
-            <Button
-              label={t('mobile.profile.edit')}
-              tone="ghost"
-              onPress={() => {
-                setSettingsSection('profile');
-                navigation.push('settings');
-              }}
-            />
-          ) : null}
-          <Text variant="caption" tone="subtle">
-            {signedInEmail === undefined
-              ? t('mobile.profile.account.offlineHint')
-              : t('mobile.profile.account.signedInHint')}
-          </Text>
-        </View>
-      </Card>
+      {/*
+        ── ① 账号卡 ────────────────────────────────────────────────────────
+        🔴 **整张卡就是账号组的入口**（§5.2 的"账号卡 + 右箭头 → account"）。
+        在这一刀之前，卡片本身是只读的，旁边还有一个「编辑」幽灵按钮 ——
+        同一个目的地两枚控件（§3.1 的重复入口），而且那个按钮说的是"编辑"、
+        点下去却是"账号组"，名字和后果不一致。现在只剩卡片这一处。
+
+        ⚠️ 少了 §5.2 说的**右箭头**：`SettingsRow` 的 `action` 行没有 trailing 槽，
+        而移动端的图标注册表里也没有一枚 `action.disclose`（语义名）——
+        借 `action.next-month`（ChevronRight）会把"翻月"和"进下一层"混成一个字形，
+        那正是 `ui/icons.tsx` 里那条注释禁止的事。两处都不在本轮可改范围，
+        所以这一版用"整卡可点 + 无障碍 role=button"表达可进，箭头登记为欠账。
+      */}
+      <Pressable
+        testID="profile-account-value"
+        accessibilityRole="button"
+        accessibilityLabel={t('mobile.profile.edit')}
+        onPress={() => {
+          setSettingsSection('account');
+          navigation.push('settings');
+        }}
+      >
+        <Card>
+          <HStack gap="default" align="center">
+            {signedInEmail === undefined ? null : <AvatarBadge dataUri={avatarImage} email={signedInEmail} />}
+            <Text variant="row-title" grow>
+              {savedName ?? signedInEmail ?? t('mobile.profile.account.offline')}
+            </Text>
+          </HStack>
+          {savedName && signedInEmail ? <Text variant="caption" tone="subtle">{signedInEmail}</Text> : null}
+        </Card>
+      </Pressable>
+      {/*
+        注册 / 登录（W3 · 规范 §3.1 的「前置」）。
+        🔴 保留为一枚**按钮**而不是一行入口：未登录时设置里那一组整块不渲染
+        （`account` 组要 `profileEditor` 才出现），所以这里是冷启动唯一的一击入口。
+      */}
       <Button
         label={
           accountHasCredential
@@ -1357,49 +1537,89 @@ export function ProfileScreen(): React.JSX.Element {
           </Stack>
         </Card>
       )}
-      <SettingsRow row={settingsRow} />
+
+      {/*
+        ── ② 配置入口：订阅 / 设置 ────────────────────────────────────────
+        🔴 设置**紧跟在账号卡之后**（`profile-settings-ia.spec.ts` 钉着这个位置）：
+        它是这一屏唯一的高频配置入口。订阅与它同一张卡 —— 订阅原来独占一个
+        `SectionHeader` + `Card`（§3.7 批评的正是"一个商业入口独占一块"）。
+      */}
+      <Card>
+        <SettingsRow row={subscriptionRow} />
+        <SettingsRow row={settingsRow} />
+      </Card>
+
+      {/*
+        ── ③ 近期状态（由 `ProfileProgressSummary` 画）────────────────────
+        🔴 4 行：本周任务 / 专注 / 成就 + 「查看完整成长」。成长**只在这里**——
+        原来「我的」上有两处到同一张屏（`profile-progress-growth` 与
+        `profile-entry-growth`），§5.3 明写"收进近期状态卡内，删掉重复那一行"。
+      */}
       <ProfileProgressSummary
         onOpenGrowth={() => {
           navigation.push(featureRouteKey('growth'));
         }}
       />
 
-      <StatusRow status={status} busy={busy} onOpenConflicts={() => { setConflictsOpen(true); }} />
       {/*
-        「关于我 / 我的数据」的低频入口行（设置已在身份卡后单独展示）。
-        🔴 成长**不是第 6 个底部标签**：标签栏必须保持 5 个（P10 / ADR-0015 §4）。
+        ── ④ 同步：**一行**（§5.2）────────────────────────────────────────
+        判据见 `syncDetailVisible`：`error` / `conflict` 才展开成今天的状态卡
+        （失败要说清是哪一种、冲突要给出口），其余状态一句话说完。
+        `StatusRow` 这时只画**细节**（`detailOnly`），标题已经在上面那一行里 ——
+        同一张卡里说两遍同一句话是本仓 §7 明令禁止的形状。
       */}
-      <View style={{ gap: tokens['space.3'] }} testID="profile-entries">
-        {entryRows.filter((row) => !['profile-entry-security', 'profile-entry-close-account', 'profile-entry-export', 'profile-entry-trash'].includes(row.testID ?? '')).filter(shouldRenderSettingsRow).map((row) => (
-          <SettingsRow key={row.testID ?? row.kind} row={row} />
-        ))}
-      </View>
+      <Card>
+        <SettingsRow row={syncSummaryRow} />
+        {syncDetailVisible ? (
+          <>
+            <Divider />
+            <StatusRow
+              status={status}
+              busy={busy}
+              detailOnly
+              onOpenConflicts={() => {
+                setConflictsOpen(true);
+              }}
+            />
+          </>
+        ) : null}
+      </Card>
+      {/*
+        「立即同步」只在**有事可做**时出现（未同步 / 离线 / 出错 / 正在进行）。
+        🔴 一切正常时这一块就只剩那一行 "已是最新 · 时间" —— §4「同屏一个主任务」：
+        一个永远在那儿的实底按钮，会让人以为"同步"就是这一屏要他做的那件事。
+        ⚠️ 这一枚是**新加的**（重排前「我的」上没有任何触发同步的控件，只能进设置面点）。
+        加它的理由：异常态现在只展开细节、不再常驻一整张卡，失败时需要有就地重试的路。
+      */}
+      {form.configured && status.kind !== 'synced' ? (
+        <Button
+          label={busy ? t('mobile.profile.sync.busy') : t('mobile.profile.sync.now')}
+          onPress={form.submit}
+          tone="primary"
+          icon="action.sync"
+          loading={busy}
+          style={{ alignSelf: 'flex-start' }}
+        />
+      ) : null}
+      {form.configured && slowKdf && status.kind !== 'synced' ? (
+        <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
+          {t('mobile.profile.sync.slowKdf')}
+        </Text>
+      ) : null}
 
       {/*
-        订阅（2026-10-24）：这里是**一个入口**，不再是两块内联内容。
-        产品负责人要"单独的订阅界面"——状态与收银台原来直接摊在本屏的滚动流里，
-        想付钱的人得先滚过半个屏幕，而且那一屏没有"我在买什么"。
-        现在它们住在设置里独立的一节（`SubscriptionSection`），这一行只负责去那儿。
-        🔴 只留一个入口：两处指向同一个动作时，其中一处必然先过期。
+        ── ⑤ 通知与功能 ──────────────────────────────────────────────────
+        通知：§5.5 要求它在「我的」有一行（移动端没有 web 那种顶栏铃铛位），
+        而且徽标是共享动态"打扰到了"的唯一回执 —— 所以它留在首屏，只是从
+        "入口列"挪进了这一块，视觉上不再与功能域并列。
+        功能与 AI：5 个功能域的枢纽（理由见 `featuresHubRow` 上方）。
       */}
-      <SectionHeader icon="action.more" title={t('mobile.settings.section.subscription')} />
       <Card>
-        <SettingsRow
-          row={{
-            kind: 'action',
-            testID: 'profile-entry-subscription',
-            label: t('mobile.settings.section.subscription'),
-            hint: t('mobile.subscription.entry.hint'),
-            leading: <Icon name="action.more" size="sm" color={tokens['color.foreground-muted']} />,
-            onPress: () => {
-              setSettingsSection('subscription');
-              navigation.push('settings');
-            },
-          }}
-        />
+        <SettingsRow row={notificationsRow} />
+        <SettingsRow row={featuresHubRow} />
       </Card>
 
-      {/* 清单 / 标签 / 便签管理。顺序是**清单在标签前**（与任务详情页一致），
+      {/* 清单 / 标签 / 便签管理（⑥）。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
       <SectionHeader icon="task.project" title={t('mobile.profile.tools')} />
       <Card>
@@ -1503,23 +1723,36 @@ function featureScreen(key: MobileProfileEntryKey, onBack: () => void, onOpenHab
 
 /**
  * 同步状态那一行。**它必须说清是哪一种失败**，不能只写"同步失败"。
+ *
+ * `detailOnly` 是 2026-10-27 重排加的：首屏的同步块现在**先有一行摘要**
+ * （`syncSummaryRow`，值就是 `describeSyncStatus` 那句），异常时才在下面展开
+ * 细节。同一个失败句如果在同一张卡里念两遍，用户会以为那是两件事
+ * （本仓 §7「同一行只说一句话」）。所以展开态只要**细节**：
+ * 失败原因原文 / 冲突说明 + 「逐条处理」那颗按钮。
+ *
+ * ⚠️ 设置面（`syncStatus`）**不用**这个开关：那儿没有摘要行，标题必须自己说。
  */
 function StatusRow({
   status,
   busy,
   onOpenConflicts,
+  detailOnly = false,
 }: {
   status: SyncStatus;
   busy: boolean;
   onOpenConflicts: () => void;
+  /** 标题已在别处说过（首屏摘要行）—— 只画细节。 */
+  detailOnly?: boolean;
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
   return (
     <View style={{ gap: tokens['space.1'] }}>
-      <Text variant="row-title" tone={busy ? 'muted' : statusTone(status)}>
-        {describeSyncStatus(status, t)}
-      </Text>
+      {detailOnly ? null : (
+        <Text variant="row-title" tone={busy ? 'muted' : statusTone(status)}>
+          {describeSyncStatus(status, t)}
+        </Text>
+      )}
       {status.kind === 'error' ? (
         <Text variant="caption" tone="danger" selectable>
           {status.message}

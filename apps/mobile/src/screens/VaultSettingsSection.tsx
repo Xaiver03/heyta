@@ -9,6 +9,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { SettingsInfoTip } from '@heyta/ui';
 import { Alert, View } from 'react-native';
 import {
   type AppHost,
@@ -374,7 +375,10 @@ export function VaultSettingsSection({
         <Card>
           <Stack>
             <Text variant="row-title">{t('mobile.vault.devicesTitle')}</Text>
-            <Text variant="caption" tone="subtle">{t('mobile.vault.devicesDescription')}</Text>
+            <SettingsInfoTip
+              text={t('mobile.vault.devicesDescription')}
+              label={t('mobile.vault.devicesTitle')}
+            />
             {devicesLoading ? <Text variant="caption" tone="subtle">{t('mobile.vault.devicesLoading')}</Text> : null}
             {deviceError !== undefined ? <Text variant="caption" tone="danger">{t(deviceError)}</Text> : null}
             {!devicesLoading && deviceError === undefined && devices.length === 0 ? <Text variant="caption" tone="subtle">{t('mobile.vault.devicesEmpty')}</Text> : null}
@@ -464,7 +468,10 @@ export function VaultSettingsSection({
           <Stack>
             <Text variant="row-title">{t('mobile.vault.recoveryLabel')}</Text>
             {pending.recoveryCode !== '' ? <Text selectable>{pending.recoveryCode}</Text> : <Text variant="caption" tone="subtle">{t('mobile.vault.recoveryResume')}</Text>}
-            <Text variant="caption" tone="subtle">{t('mobile.vault.recoveryHint')}</Text>
+            <SettingsInfoTip
+              text={t('mobile.vault.recoveryHint')}
+              label={t('mobile.vault.recoveryLabel')}
+            />
             <TextField
               label={t('mobile.vault.recoveryConfirm')}
               value={pendingCode}
@@ -535,9 +542,10 @@ export function VaultSettingsSection({
                   secure
                   testID="mobile-vault-legacy-passphrase"
                 />
-                <Text variant="caption" tone="subtle">
-                  {t('web.sync.vault.legacyPassphraseHint')}
-                </Text>
+                <SettingsInfoTip
+                  text={t('web.sync.vault.legacyPassphraseHint')}
+                  label={t('common.tip.label')}
+                />
               </>
             ) : null}
             {migrationProgress !== undefined ? <Text>{t('mobile.vault.rootRotationProgress', migrationProgress)}</Text> : null}
@@ -556,7 +564,7 @@ export function VaultSettingsSection({
                 {requiresRecoveryRotation
                   ? t('mobile.vault.recoveryRotationRequired')
                   : legacyPayloadMigrationRequired
-                    ? t('mobile.vault.legacyMigrationRequired')
+                    ? t('mobile.vault.legacyMigrationRequired') // settings-prose-ok: 状态词，不是说明
                     : t('mobile.vault.ready')}
               </Text>
             </View>

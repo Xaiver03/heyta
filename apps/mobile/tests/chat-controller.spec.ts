@@ -46,10 +46,7 @@ function memoryStorage(): HistoryStorage & { raw: (key?: string) => string | nul
 }
 
 function runtime(overrides: Partial<ChatRuntime> = {}): ChatRuntime {
-  const settings: AiSettingsState = {
-    ...defaultAiSettingsState(),
-    assistantTier: 'read-only',
-  };
+  const settings: AiSettingsState = { ...defaultAiSettingsState() };
   const base = {
     settings,
     host: {} as LocalApiHost,
@@ -57,7 +54,6 @@ function runtime(overrides: Partial<ChatRuntime> = {}): ChatRuntime {
     secretStore: { get: async () => undefined },
     managedTransport: async () => undefined,
     onHealth: vi.fn(),
-    onTierChange: vi.fn(),
     ...overrides,
   };
   return {
@@ -73,13 +69,9 @@ function runtime(overrides: Partial<ChatRuntime> = {}): ChatRuntime {
   } as ChatRuntime;
 }
 
-function routedSettings(
-  endpoint: string,
-  assistantTier: AiSettingsState['assistantTier'],
-): AiSettingsState {
+function routedSettings(endpoint: string): AiSettingsState {
   return {
     ...defaultAiSettingsState(),
-    assistantTier,
     routing: {
       enabled: true,
       allowRemote: true,
@@ -266,7 +258,7 @@ describe('移动端 Chatbot controller 行为', () => {
       }),
     );
     const controller = controllerWith(storage, 'alice@example.com', {
-      settings: { ...defaultAiSettingsState(), assistantTier: 'read-and-propose' },
+      settings: { ...defaultAiSettingsState() },
     });
     controller.setDraft('记一下买牛奶');
     controller.send();
@@ -295,7 +287,7 @@ describe('移动端 Chatbot controller 行为', () => {
       .mockResolvedValueOnce({ ok: false, reason: 'rejected', message: '授权已撤销' })
       .mockResolvedValueOnce({ ok: true, taskId: 'task-2' });
     const controller = controllerWith(storage, 'alice@example.com', {
-      settings: { ...defaultAiSettingsState(), assistantTier: 'read-and-propose' },
+      settings: { ...defaultAiSettingsState() },
     });
     controller.setDraft('记一下买牛奶');
     controller.send();
@@ -319,30 +311,6 @@ describe('移动端 Chatbot controller 行为', () => {
       confirmed: { ok: true, taskId: 'task-2' },
     });
     expect(appHostMocks.confirmAiToolProposal).toHaveBeenCalledTimes(2);
-  });
-
-  it('档位设置只在 idle 时转交给宿主', async () => {
-    const storage = memoryStorage();
-    seedDisclosed(storage);
-    let resolve: ((value: AssistantOutcome) => void) | undefined;
-    appHostMocks.requestAssistantTurn.mockImplementation(
-      () => new Promise<AssistantOutcome>((done) => {
-        resolve = done;
-      }),
-    );
-    const onTierChange = vi.fn();
-    const controller = controllerWith(storage, 'alice@example.com', { onTierChange });
-
-    controller.setTier('read-and-propose');
-    expect(onTierChange).toHaveBeenCalledWith('read-and-propose');
-    expect(controller.getSnapshot().disclosed).toBe(false);
-
-    controller.setDraft('今天有什么任务');
-    controller.send();
-    controller.setTier('read-only');
-    expect(onTierChange).toHaveBeenCalledTimes(1);
-    resolve?.(answer());
-    await flush();
   });
 
   it('切换账号时丢弃在途结果，旧请求完成后新账号仍可发起请求', async () => {
@@ -452,12 +420,12 @@ describe('移动端 Chatbot controller 行为', () => {
     expect(appHostMocks.requestAssistantTurn).toHaveBeenCalledTimes(2);
   });
 
-  it('configure 改变目的地或档位后，下一句必须重新披露', async () => {
+  it('configure 改变目的地后，下一句必须重新披露', async () => {
     const storage = memoryStorage();
     seedDisclosed(storage);
     appHostMocks.requestAssistantTurn.mockResolvedValueOnce(answer('初始配置回答'));
     const controller = controllerWith(storage, 'alice@example.com', {
-      settings: routedSettings('https://provider-a.example/v1', 'read-only'),
+      settings: routedSettings('https://provider-a.example/v1'),
     });
     expect(controller.getSnapshot().disclosed).toBe(false);
 
@@ -467,7 +435,7 @@ describe('移动端 Chatbot controller 行为', () => {
     await flush();
 
     controller.configure(
-      runtime({ settings: routedSettings('https://provider-b.example/v1', 'read-and-propose') }),
+      runtime({ settings: routedSettings('https://provider-b.example/v1') }),
     );
     appHostMocks.requestAssistantTurn.mockClear();
     controller.setDraft('请帮我安排一下这周');
@@ -522,7 +490,7 @@ it('🔴 路由**现算**：送出的是 `resolveRouting()` 返回的那个对�
   };
   const stale = { enabled: true, allowRemote: true, endpoints: [], routes: {} };
   const controller = controllerWith(storage, 'alice@example.com', {
-    settings: { ...defaultAiSettingsState(), assistantTier: 'read-only', routing: stale },
+    settings: { ...defaultAiSettingsState(), routing: stale },
     resolveRouting: () => live,
   });
 

@@ -21,10 +21,12 @@ const SETTINGS = stripComments(read('apps/mobile/src/screens/SettingsScreen.tsx'
 /** 受理邮箱的唯一主人（法律文本与备案材料都从它取）。 */
 const LEGAL = stripComments(read('packages/legal/src/index.ts'));
 
-/** 从 `const renderGeneral` 到下一个 `const render` 之间 —— 通用那一屏。 */
+/** 从 `const renderAbout` 到下一个 `const render` 之间 —— 「关于与帮助」那一屏（IA 迁移后反馈住这里）。 */
 function generalBody(): string {
-  const start = SETTINGS.indexOf('const renderGeneral');
-  const end = SETTINGS.indexOf('const renderSecurity', start);
+  const start = SETTINGS.indexOf('const renderAbout');
+  // 🔴 IA 迁移后 `renderSecurity` 移到了 `renderAbout` **之前**，所以"下一个 const render"
+  //    不能再写死成它 —— 否则片段为空，判据会以"没找到那一行"的形式假红。
+  const end = SETTINGS.indexOf('\n  const render', start + 1);
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
   return SETTINGS.slice(start, end);
@@ -37,8 +39,14 @@ describe('入口在，且指向法律文本公示的那一枚邮箱', () => {
     expect(body).toContain("t('common.feedback.label')");
     expect(body).toContain('onPress: openFeedbackMail');
     expect(body).toContain("testID=\"settings-feedback\"");
-    // 正向对照：同一把尺在同一个片段里读得到别的东西（读不到任何 testID 就是尺坏了）。
-    expect(body).toContain("testID=\"profile-language\"");
+    /*
+      正向对照：同一把尺在同一个片段里读得到别的东西（读不到任何 testID 就是尺坏了）。
+      🔴 2026-10-27 IA 迁移：这一段原来是「常规」那个大杂烩，语言和反馈同一屏；
+      现在反馈搬进「关于与帮助」、语言搬进「外观与语言」。所以对照物换成**同一段里
+      仍然存在**的那枚 —— 备案号那一行（`settings-operator`）。
+      ⚠️ 不许把对照改成"任意 testID 出现过"：那会让尺子在删空整段时照样绿。
+    */
+    expect(body).toContain('settings-operator');
   });
 
   it('🔴 地址取 `OPERATOR.contactEmail`，文件里**没有**第二份邮箱字面量', () => {
