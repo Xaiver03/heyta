@@ -115,6 +115,18 @@ describe('🔴 没有"助手权限"这个设置', () => {
 });
 
 describe('披露：界面说的是目录，不是自己抄的一份', () => {
+  it('🔴 披露默认收起，但清单**在 DOM 里**（收起 ≠ 删掉）', () => {
+    const el = render(enabledSettings());
+    const details = el.querySelector<HTMLDetailsElement>('[data-testid="assistant-disclosure"]');
+    expect(details).not.toBeNull();
+    // 默认收起：30 个工具名铺在设置页上就是一堵墙，读不完的披露等于没披露。
+    expect(details?.open).toBe(false);
+    // 但一个字都没删 —— 展开就有。
+    expect(el.querySelector('[data-testid="assistant-egress-fields"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="assistant-tools"]')?.textContent).toContain('create_task');
+    expect(el.querySelector('[data-testid="assistant-limits"]')).not.toBeNull();
+  });
+
   it('🔴 字段名与工具名逐字来自 `planAssistantEgress()`', () => {
     const el = render(enabledSettings());
     const fields = el.querySelector('[data-testid="assistant-egress-fields"]')?.textContent ?? '';

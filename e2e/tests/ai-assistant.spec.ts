@@ -12,11 +12,12 @@
  *   2. 🔴 第二轮请求里带着 `role:'tool'` 的结果（`toolStep === 1`）——
  *      "多步"是真的把观察回送给了模型，不是界面上画了个数字。
  *   3. 同一段会话不重复拦；「新会话」重新拦。
- *   4. 设置里的档位是**真持久化**（刷新后仍在），且它不改 `localApi` 那张表。
+ *   4. 设置里的助手那一块**没有权限档**（ADR-0082），只留出境披露；
+ *      它不碰 `localApi` 那张逐工具表。
  *   5. 四张截图落在 `apps/web/evidence/assistant/`（固定文件名，人必须打开看）。
  *      ⚠️ 其中 `2b-chat-dark.png` 是**暗色主题**那张 —— AGENTS §5 明确把
  *      "不测暗色主题就交付"列为常犯错，而气泡的角色区分正是靠底色，只有图能证明
- *      暗色下还分得出来。第一轮的 `3-settings-tier.png` 还拍成了**入场动画中途**
+ *      暗色下还分得出来。第一轮的 `3-settings-assistant.png` 还拍成了**入场动画中途**
  *      （下层视图以接近同等的浓度叠上来，读起来像排版事故），所以浮层截图前
  *      必须等动画落位（`helpers.ts` 的 `waitForOverlaySettled`）。
  */
@@ -66,7 +67,7 @@ function captureConsole(page: Page): string[] {
 }
 
 test.describe('对话助手：真浏览器端到端旅程', () => {
-  test('披露前零出境 → 多步读循环 → 第二句不再拦 → 档位刷新后仍在', async ({ page, request }) => {
+  test('披露前零出境 → 多步读循环 → 第二句不再拦 → 设置面只有披露', async ({ page, request }) => {
     const errors = captureConsole(page);
     await resetStub(request);
     /**
@@ -89,13 +90,14 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     await switchView(page, '任务');
     await addTask(page, '写周报');
 
-    // ══ 1. 面板在任务视图里，档位默认"执行" ═══════════════════════════
+    // ══ 1. 面板在任务视图里，且**没有**权限档控件（ADR-0082）═══════════
     const panel = page.locator('[data-testid="ai-assistant"]');
     await expect(panel).toBeVisible();
     await expect(page.locator('[data-testid="ai-agent-surface"]')).toBeVisible();
     await expect(page.locator('[data-testid="ai-assistant-suggestions"]')).toBeVisible();
     await expect(page.locator('[data-testid="ai-tool-run"]')).toHaveCount(0);
-    await expect(page.locator('[data-testid="ai-assistant-tier"]')).toContainText('执行');
+    await expect(page.locator('[data-testid="ai-assistant-tier"]')).toHaveCount(0);
+    await expect(page.getByTestId('ai-assistant-tier-select')).toHaveCount(0);
     await expect(page.locator('[data-testid="ai-assistant-disclaimer"]')).toBeVisible();
 
     // ══ 1b. 🔴 规则本机就答得出的那一句：**不弹披露**，而且一个请求都不发 ══
@@ -223,42 +225,44 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     await page.locator('[data-testid="ai-assistant-send-button"]').click();
     await expect(page.locator('[data-testid="ai-assistant-disclosure"]')).toBeVisible();
 
-    // ══ 6. 档位是第二个授权前端：切换 + 刷新后仍在 ══════════════════════
+    // ══ 6. 设置里的助手那一块：只有出境披露，没有权限档（ADR-0082）══════════
     await switchView(page, '设置');
     await selectSettingsSection(page, 'ai');
     const section = page.locator('[data-testid="ai-assistant-section"]');
     await expect(section).toBeVisible();
-    // 默认执行：普通写入直接执行，高风险操作按风险策略确认。
-    await expect(section.locator('[data-testid="assistant-tier-read-and-propose"] input')).toBeChecked();
-    await expect(section.locator('[data-testid="assistant-tier-read-only"] input')).not.toBeChecked();
-    await section.locator('[data-testid="assistant-tier-read-and-propose"] input').check();
-    await page.reload();
-    await switchView(page, '设置');
-    await selectSettingsSection(page, 'ai');
-    const again = page.locator('[data-testid="ai-assistant-section"]');
-    await expect(again.locator('[data-testid="assistant-tier-read-and-propose"] input')).toBeChecked();
-    await expect(again.locator('[data-testid="assistant-tier-read-only"] input')).not.toBeChecked();
+    await expect(section.locator('[data-testid="assistant-tier-group"]')).toHaveCount(0);
+    await expect(section.locator('input[name="assistant-tier"]')).toHaveCount(0);
+    // 披露默认**收起**（一堵 30 个工具名的墙等于没披露），展开之后三件套齐全。
+    const settingsDisclosure = section.locator('[data-testid="assistant-disclosure"]');
+    await expect(settingsDisclosure).not.toHaveAttribute('open', '');
+    await section.locator('[data-testid="assistant-egress-title"]').click();
+    await expect(settingsDisclosure).toHaveAttribute('open', '');
+    await expect(section.locator('[data-testid="assistant-egress-fields"]')).not.toBeEmpty();
+    await expect(section.locator('[data-testid="assistant-tools"]')).toContainText('create_task');
+    await expect(section.locator('[data-testid="assistant-limits"]')).not.toBeEmpty();
     /* 🔴 证据必须**拍到被断言的那一块**。`.ht-sheet` 自带 `overflow-y: auto`，
        而 `fullPage` 拍不进滚动容器（它扩的是文档高度，不是滚动容器的视口）——
-       所以不先滚到位，这张"档位证据"里根本没有档位选择器，只有浮层第一屏。
+       所以不先滚到位，这张"披露证据"里根本没有那几行，只有浮层第一屏。
        断言过 ≠ 证据里有：证据是给人看的那一张。 */
-    await again.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `${EVIDENCE}/3-settings-tier.png`, fullPage: true });
+    await section.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${EVIDENCE}/3-settings-assistant-expanded.png`, fullPage: true });
+    // 收起再拍一张：这是用户**打开设置页时**看到的那一屏，也是"没有权限档"的证据。
+    await section.locator('[data-testid="assistant-egress-title"]').click();
+    await expect(settingsDisclosure).not.toHaveAttribute('open', '');
+    await section.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${EVIDENCE}/3-settings-assistant.png`, fullPage: true });
 
-    // ══ 7. 🔴 两个前端互不越界（双向都验）══════════════════════════════
+    // ══ 7. 🔴 助手与入站本机 API 是两张表（ADR-0035 / ADR-0045 §2.2）════════
     // 入站那张表在 `localApi.enabled` 之前**根本不渲染** —— 所以先把它打开。
     await page.locator('#local-api-enabled').check();
     const createTaskGrant = page.locator('input[aria-label="create_task"]');
     await expect(createTaskGrant).toBeVisible();
-    // 方向一：助手开了"执行"，外部程序的逐工具授权**没跟着变**。
+    // 助手不设逐工具授权，所以外部程序这张表默认仍是**全关** —— 它不会因为
+    // 对话里跑过写入就跟着变。
     await expect(createTaskGrant).not.toBeChecked();
-    // 方向二：给外部程序开一个工具，助手的档位**也不跟着变**。
     await createTaskGrant.check();
-    await expect(
-      page.locator('[data-testid="assistant-tier-read-and-propose"] input'),
-    ).toBeChecked();
-    await page.locator('[data-testid="assistant-tier-read-only"] input').check();
-    await expect(page.locator('input[aria-label="create_task"]')).toBeChecked();
+    // 反过来：给外部程序开一个工具，助手的设置面不会多出一个开关。
+    await expect(section.locator('input[name="assistant-tier"]')).toHaveCount(0);
 
     expect(errors, `控制台不该有错误：\n${errors.join('\n')}`).toEqual([]);
   });
@@ -271,7 +275,6 @@ test('Chatbot 默认执行，出境同意前不创建，授权后创建一次且
   await configureEndpoint(page, { capabilities: ['tool_calling'], features: ['tool-calling'] });
   await switchView(page, '任务');
   const title = '整理下一周的计划';
-  await expect(page.getByTestId('ai-assistant-tier-select')).toHaveValue('read-and-propose');
   await page.getByTestId('ai-assistant-input').fill(`新建任务：${title}`);
   await page.getByTestId('ai-assistant-send-button').click();
   await expect(page.getByTestId('ai-assistant-disclosure')).toBeVisible();

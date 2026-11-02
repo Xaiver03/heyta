@@ -664,23 +664,11 @@ export {
   type AssistantMessage,
   type AssistantOutcome,
   type AssistantStep,
-  type AssistantTier,
   type AssistantTurnDeps,
   type AssistantTurnEvent,
   type LocalObservationKey,
   type LocalObservationTranslate,
 } from './ai-assistant.js';
-export {
-  ASSISTANT_TIER_ORDER,
-  ASSISTANT_TIER_EXECUTE,
-  ASSISTANT_TIER_READ_AND_PROPOSE,
-  ASSISTANT_TIER_READ_ONLY,
-  DEFAULT_ASSISTANT_TIER,
-  createAssistantTierStore,
-  normalizeAssistantTier,
-  type AssistantTierStore,
-  type AssistantTierStorePort,
-} from './assistant-tier-settings.js';
 export {
   createAiSettingsStore,
   defaultAiSettingsState,

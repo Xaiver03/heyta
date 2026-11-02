@@ -146,7 +146,6 @@ describe('过程事件', () => {
       {
         routing: routing(LOCAL),
         consents: [],
-        tier: 'read-only',
         localize: LOCALIZE_ZH,
         host: fakeHost(),
         routed: { fetchImpl: impl },
@@ -181,7 +180,6 @@ describe('过程事件', () => {
       {
         routing: routing(LOCAL),
         consents: [],
-        tier: 'read-only',
         localize: LOCALIZE_ZH,
         host: fakeHost(),
         routed: { fetchImpl: impl },
@@ -205,7 +203,6 @@ describe('过程事件', () => {
       {
         routing: routing(LOCAL),
         consents: [],
-        tier: 'read-only',
         localize: LOCALIZE_ZH,
         host: fakeHost(),
         routed: { fetchImpl: impl },
@@ -232,7 +229,6 @@ describe('过程事件', () => {
       {
         routing: routing(LOCAL),
         consents: [],
-        tier: 'read-only',
         localize: LOCALIZE_ZH,
         host: fakeHost(),
         routed: { fetchImpl: impl },

@@ -172,12 +172,12 @@ describe('模型路径：严格校验', () => {
     expect(host.submits).toBe(0);
   });
 
-  it('执行档低风险写工具 → 自动执行一次并返回 executed', async () => {
+  it('低风险写工具 + 执行标识 → 自动执行一次并返回 executed', async () => {
     const host = fakeHost();
     const { impl } = countingFetch(toolCallResponse('create_task', '{"title":"写周报"}'));
     const outcome = await requestToolCall(
       { text: '帮我记一下写周报这件事' },
-      { ...deps(impl, host), tier: 'read-and-propose', executionId: 'tool-call-create-1' },
+      { ...deps(impl, host), executionId: 'tool-call-create-1' },
     );
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
@@ -185,12 +185,12 @@ describe('模型路径：严格校验', () => {
     expect(host.submits).toBe(1);
   });
 
-  it('执行档高风险批量完成 → 仍返回提案，不自动提交', async () => {
+  it('高风险批量完成 → 仍返回提案，不自动提交', async () => {
     const host = fakeHost();
     const { impl } = countingFetch(toolCallResponse('complete_task', '{"taskIds":["t1","t2"]}'));
     const outcome = await requestToolCall(
       { text: '把这些任务都完成' },
-      { ...deps(impl, host), tier: 'read-and-propose', executionId: 'tool-call-complete-1' },
+      { ...deps(impl, host), executionId: 'tool-call-complete-1' },
     );
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;

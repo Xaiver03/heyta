@@ -26,7 +26,7 @@
  *
  * ⚠️ **作用面边界（别读多）**：本文件只核对**四个 `buildXxxInvocation` 功能**。
  * 「工具选择」那一行只核对 `today` 在不在 —— 它的完整字段集合是
- * `assistantEgressFields()`（按授权档位从工具目录推导），那张表住在第六节，
+ * `assistantEgressFields()`（从工具目录推导），那张表住在第六节，
  * 由 `check:legal-tools` 逐条对账，不在这里重复一遍第二套口径。
  */
 

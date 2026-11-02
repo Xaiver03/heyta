@@ -36,7 +36,7 @@ async function openSyncSection(page: Page): Promise<Locator> {
    * 「外观」节 ⇒ `sync-settings-panel` 一定在 DOM 里但 hidden。先点导航那一项。
    * 按 `aria-controls` 认，不按文案（语言中立）。
    */
-  await page.locator('[aria-controls="settings-group-sync"]').click();
+  await page.locator('[aria-controls="settings-group-data"]').click();
   const section = page.getByTestId('sync-settings-panel');
   await expect(section, '设置浮层里没有「同步」那一节').toBeVisible();
   await section.scrollIntoViewIfNeeded();
@@ -154,9 +154,26 @@ test('unlocked vault exports only the disclosed task fields to the breakdown pro
     await configureEndpoint(page, { endpoint: `http://127.0.0.1:${port}/v1`,
       capabilities: [CAP_STRUCTURED_OUTPUT, CAP_LONG_CONTEXT], features: ['breakdown'] });
     await switchView(page, '任务');
-    await rowFor(page, target).locator('[data-testid^="ai-breakdown-"]').click();
+    /*
+     * 🔴 2026-10-27：`AiBreakdown` **不再挂在每一行上**，它是任务详情的
+     * 「自动化」槽（`App.tsx` 的 `automationSlotNode`，只有 `selectedTaskId`
+     * 有值时挂载）。所以顺序变成"先选中那一行 → 再在详情里点"。
+     * 原来那一句 `rowFor(...).locator('[data-testid^="ai-breakdown-"]')` 现在
+     * 是在行里找一个**永远不会出现**的元素 ⇒ 20 秒超时，而不是报"入口没了"。
+     */
+    await rowFor(page, target).locator('[data-testid^="task-row-"]').first().click();
+    await page.locator('[data-testid^="ai-breakdown-"]').click();
     await page.screenshot({ path: `${evidence}pg-ai-egress-disclosure.png` });
-    await expect(page.getByTestId('ai-field-list')).toHaveText('title');
+    /*
+     * 🔴 披露字段是 **`today` + `title`**，不是只有 `title`。
+     *
+     * `packages/app-host/src/ai-breakdown.ts:103` 写着理由：拆解必须知道"今天是几号"
+     * 才能把「明天上午」这类相对日期算对（不写锚点，模型会拿训练语料里的日期瞎填）。
+     * 而 `:126` 的 `fields` 一开始就是 `['today', 'title']` —— 所以界面**一直**是这么
+     * 告诉用户的，是这条断言停在了 `title` 上。
+     * ⇒ 修的是"判据停在旧契约"，不是放宽：下面 `forbidden` 那一串一个都没动。
+     */
+    await expect(page.getByTestId('ai-field-list')).toHaveText('today、title');
     expect(captured.length).toBe(0);
     await page.getByTestId('ai-send').click();
     await expect(page.getByTestId('ai-proposal')).toBeVisible();
@@ -166,8 +183,15 @@ test('unlocked vault exports only the disclosed task fields to the breakdown pro
     expect(Object.keys(wire).sort()).toEqual(['messages', 'model']);
     expect(wire.messages.length).toBe(2);
     expect(wire.messages[1]?.role).toBe('user');
-    expect(wire.messages[1]?.content === `任务标题：${target}`,
-      'the user message must contain exactly the disclosed title').toBe(true);
+    /*
+     * 用户消息 = 日历锚点那一行 + 标题那一行（`ai-breakdown.ts:130`）。
+     * 锚点**不写死日期**：那是这台设备的"今天"，写死就会在跨午夜时红一次，
+     * 而红的理由与"数据出境边界"无关 —— 该钉的是"两行、且标题逐字"。
+     */
+    const userMessage = String(wire.messages[1]?.content ?? '');
+    expect(userMessage.startsWith('今天是：'), 'the calendar anchor line must lead the user message').toBe(true);
+    expect(userMessage.endsWith(`\n任务标题：${target}`),
+      'the user message must end with exactly the disclosed title').toBe(true);
     expect(captured[0]!.body.includes(target), 'disclosed target must reach provider').toBe(true);
     expect(forbidden.some((secret) => Object.values(captured[0]!).some((part) => part.includes(secret))),
       'undisclosed entities and vault/auth secrets must stay out of provider body and headers').toBe(false);

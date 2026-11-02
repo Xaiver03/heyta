@@ -342,7 +342,6 @@ class Probe:
             "localApi": {"enabled": False, "bindAddress": "127.0.0.1", "port": 47119},
             "consents": [],
             "memoryEnabled": False,
-            "assistantTier": "read-and-propose",
             "health": {"version": 1, "entries": []},
         }
         encoded = base64.b64encode(json.dumps(settings, ensure_ascii=False, separators=(",", ":")).encode()).decode()

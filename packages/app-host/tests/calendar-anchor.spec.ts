@@ -206,7 +206,7 @@ describe('🔴🔴 四条出站链路都带锚点，且都披露 today', () => {
 
   it('🔴 工具调用链路：系统提示带锚点 + 硬规则，且 today 在出境字段里', () => {
     expect(assistantSystemPrompt(N)).toContain(`${canonical}\n\n${CALENDAR_ANCHOR_RULES}`);
-    expect(assistantEgressFields('read-only')).toContain('today');
+    expect(assistantEgressFields()).toContain('today');
   });
 
   it('🔴 阳性对照：上面那四条链路确实各有 4 条，分母不许悄悄缩水', () => {
