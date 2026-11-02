@@ -28,13 +28,23 @@ import { IMAGE_BUDGET } from '@heyta/ai';
 import { useI18n } from '@heyta/i18n';
 
 import { encodeImageForEgress, imagesFromClipboard, type EncodedImage, type ImageFileError } from './image-encode.js';
-import './capture-attach.css';
+import './image-attach.css';
 
-export interface CaptureImageAttachProps {
+export interface ImageAttachProps {
   readonly images: readonly EncodedImage[];
   readonly onChange: (next: readonly EncodedImage[]) => void;
   /** AI 面板正在发送时冻住入口，避免"发到一半又换了一张"。 */
   readonly disabled?: boolean;
+  /**
+   * 粘贴归属判据的**选择器**。
+   *
+   * 捕获框用 `[data-heyta-capture-root]`，对话面板用 `[data-heyta-chat-root]`。
+   * 定成一个参数是因为它决定"这次粘贴是不是冲我来的"——
+   * 写死一个会让另一个界面**要么抢粘贴、要么完全不响应**，而两者都不会报错。
+   */
+  readonly pasteScope?: string;
+  /** 测试前缀。捕获与对话用不同前缀，避免两处同时挂载时选择器撞车。 */
+  readonly testIdPrefix?: string;
 }
 
 /**
@@ -44,16 +54,18 @@ export interface CaptureImageAttachProps {
  * 会把键放宽成 `string`，于是 `t()` 不再校验它存在 —— 少一个键就变成运行时的空白。
  */
 const ERROR_KEYS = {
-  'bad-type': 'web.capture.attach.badType',
-  'too-big': 'web.capture.attach.tooBig',
-  undecodable: 'web.capture.attach.undecodable',
+  'bad-type': 'web.ai.attach.badType',
+  'too-big': 'web.ai.attach.tooBig',
+  undecodable: 'web.ai.attach.undecodable',
 } as const satisfies Record<ImageFileError, string>;
 
-export function CaptureImageAttach({
+export function ImageAttach({
   images,
   onChange,
   disabled = false,
-}: CaptureImageAttachProps): React.JSX.Element {
+  pasteScope = '[data-heyta-capture-root]',
+  testIdPrefix = 'capture-attach',
+}: ImageAttachProps): React.JSX.Element {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ImageFileError | 'too-many' | undefined>(undefined);
@@ -105,9 +117,8 @@ export function CaptureImageAttach({
     if (disabled) return;
     function onPaste(event: ClipboardEvent): void {
       const active = document.activeElement;
-      const inCapture =
-        active !== null && active.closest('[data-heyta-capture-root]') !== null;
-      if (!inCapture) return;
+      const inScope = active !== null && active.closest(pasteScope) !== null;
+      if (!inScope) return;
       const files = imagesFromClipboard(event.clipboardData);
       if (files.length === 0) return;
       // 真的收到了图才拦 —— 只有文字时让粘贴照常落进输入框。
@@ -116,31 +127,31 @@ export function CaptureImageAttach({
     }
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
-  }, [accept, disabled]);
+  }, [accept, disabled, pasteScope]);
 
   const totalBytes = images.reduce((sum, image) => sum + image.bytes, 0);
 
   return (
-    <div className="ht-capture-attach" data-testid="capture-attach">
+    <div className="ht-capture-attach" data-testid={`${testIdPrefix}`}>
       <div className="ht-capture-attach__row">
         <button
           type="button"
           className="ht-btn ht-btn--ghost"
-          data-testid="capture-attach-pick"
-          aria-label={t('web.capture.attach.label')}
+          data-testid={`${testIdPrefix}-pick`}
+          aria-label={t('web.ai.attach.label')}
           disabled={disabled || busy || images.length >= IMAGE_BUDGET.maxImagesPerRequest}
           onClick={() => inputRef.current?.click()}
         >
-          {busy ? t('web.capture.attach.busy') : t('web.capture.attach.label')}
+          {busy ? t('web.ai.attach.busy') : t('web.ai.attach.label')}
         </button>
-        <span className="ht-capture-attach__hint">{t('web.capture.attach.hint')}</span>
+        <span className="ht-capture-attach__hint">{t('web.ai.attach.hint')}</span>
         <input
           ref={inputRef}
           type="file"
           accept={IMAGE_BUDGET.mediaTypes.join(',')}
           multiple
           hidden
-          data-testid="capture-attach-input"
+          data-testid={`${testIdPrefix}-input`}
           onChange={(event) => {
             void accept(Array.from(event.currentTarget.files ?? []));
           }}
@@ -149,7 +160,7 @@ export function CaptureImageAttach({
 
       {images.length > 0 && (
         <>
-          <ul className="ht-capture-attach__list" data-testid="capture-attach-list">
+          <ul className="ht-capture-attach__list" data-testid={`${testIdPrefix}-list`}>
             {images.map((image, index) => (
               <li key={`${image.base64.slice(0, 16)}-${String(index)}`} className="ht-capture-attach__item">
                 <img
@@ -157,8 +168,8 @@ export function CaptureImageAttach({
                   alt=""
                   src={`data:${image.mediaType};base64,${image.base64}`}
                 />
-                <span className="ht-capture-attach__meta" data-testid="capture-attach-meta">
-                  {t('web.capture.attach.meta', {
+                <span className="ht-capture-attach__meta" data-testid={`${testIdPrefix}-meta`}>
+                  {t('web.ai.attach.meta', {
                     width: image.width,
                     height: image.height,
                     kb: Math.max(1, Math.round(image.bytes / 1024)),
@@ -167,8 +178,8 @@ export function CaptureImageAttach({
                 <button
                   type="button"
                   className="ht-btn ht-btn--ghost ht-capture-attach__remove"
-                  data-testid={`capture-attach-remove-${String(index)}`}
-                  aria-label={t('web.capture.attach.remove', { index: index + 1 })}
+                  data-testid={`${testIdPrefix}-remove-${String(index)}`}
+                  aria-label={t('web.ai.attach.remove', { index: index + 1 })}
                   onClick={() => onChange(images.filter((_, i) => i !== index))}
                 >
                   ✕
@@ -176,8 +187,8 @@ export function CaptureImageAttach({
               </li>
             ))}
           </ul>
-          <p className="ht-capture-attach__sum" data-testid="capture-attach-sum">
-            {t('web.capture.attach.sum', {
+          <p className="ht-capture-attach__sum" data-testid={`${testIdPrefix}-sum`}>
+            {t('web.ai.attach.sum', {
               count: images.length,
               kb: Math.max(1, Math.round(totalBytes / 1024)),
             })}
@@ -186,9 +197,9 @@ export function CaptureImageAttach({
       )}
 
       {error !== undefined && (
-        <p className="ht-capture-attach__error" role="alert" data-testid="capture-attach-error">
+        <p className="ht-capture-attach__error" role="alert" data-testid={`${testIdPrefix}-error`}>
           {error === 'too-many'
-            ? t('web.capture.attach.tooMany', { max: IMAGE_BUDGET.maxImagesPerRequest })
+            ? t('web.ai.attach.tooMany', { max: IMAGE_BUDGET.maxImagesPerRequest })
             : t(ERROR_KEYS[error])}
         </p>
       )}

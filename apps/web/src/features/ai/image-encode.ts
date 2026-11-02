@@ -26,6 +26,7 @@ import {
   requestImageDimensions,
   type ImageMediaType,
 } from '@heyta/ai';
+import { JPEG_MATTE_COLOR } from '@heyta/design-system';
 
 /** 失败原因分类。**每种对应界面上一句不同的话**，所以不许合并。 */
 export type ImageFileError =
@@ -173,7 +174,7 @@ function drawAndEncode(
   // ⚠️ JPEG 没有 alpha 通道，透明背景会被铺成**黑**底 —— 截图常带透明边缘，
   // 黑底上的深色小字等于没了。先铺白，再把图压上去。
   if (mediaType === 'image/jpeg') {
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = JPEG_MATTE_COLOR;
     ctx.fillRect(0, 0, target.width, target.height);
   }
   ctx.drawImage(bitmap, 0, 0, target.width, target.height);
