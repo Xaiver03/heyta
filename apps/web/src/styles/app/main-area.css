@@ -287,7 +287,7 @@
  * 再叠一层会把塌缩态的滚动参照系改成两层嵌套，而那一批几何判据（含设备侧脚本）
  * 量的是 `.ht-main`。这一单的改动范围是"桌面"，不是"顺手统一两种模型"。
  */
-@media (min-width: 769px) {
+@media (min-width: 48.0625rem) {
   .ht-content {
     overflow-y: auto;
   }

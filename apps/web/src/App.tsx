@@ -14,27 +14,24 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useShallow } from 'zustand/react/shallow';
 import {
   ArrowLeft,
-  MoreHorizontal,
   PanelLeft,
   Moon,
   PanelRightClose,
   PanelRightOpen,
   Sun,
-  Trash2,
   Users,
   X,
   CircleHelp,
   CreditCard,
-  Database,
+  Bell,
   Palette,
   RefreshCw,
-  ShieldCheck,
   Sparkles,
   UserRound,
   type LucideIcon,
 } from 'lucide-react';
 
-import { searchNotes, searchTasks } from '@heyta/domain';
+import { buildTaskTree, searchNotes, searchTasks } from '@heyta/domain';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
 import {
@@ -97,7 +94,12 @@ import {
 import { wantsSignInOnLoad } from './lib/auth-deep-link.js';
 import { UndoReceipt } from './lib/feedback/UndoReceipt.js';
 import { restoreOrRefuse } from './lib/feedback/undo-receipt.js';
-import { settingsSectionOnLoad, settingsStandaloneOnLoad } from './lib/settings-deep-link.js';
+import { WebModalShell } from './lib/dialog/WebModalShell.js';
+import {
+  canonicalSettingsSection,
+  settingsSectionOnLoad,
+  settingsStandaloneOnLoad,
+} from './lib/settings-deep-link.js';
 import { type DueDisplayMode } from './lib/due-display.js';
 import { TaskRowMeta } from './features/tasks/row-meta.js';
 import { loadDueDisplay, saveDueDisplay } from './features/tasks/due-display-pref.js';
@@ -107,12 +109,14 @@ import {
   saveDetailPane,
   type DetailPanePref,
 } from './features/shell/detail-pane-pref.js';
-import { TagChips, TaskOrganizer } from './features/tasks/TaskOrganizer.js';
+import { TagChips } from './features/tasks/TaskOrganizer.js';
 import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
-import { RepeatChip, TaskRepeat } from './features/tasks/TaskRepeat.js';
-import { DueEditor } from './features/tasks/DueEditor.js';
-import { NoteBadge, NoteEditor } from './features/tasks/NoteEditor.js';
-import { SubtaskBadge, SubtaskPicker } from './features/tasks/SubtaskPicker.js';
+import { RepeatChip } from './features/tasks/TaskRepeat.js';
+import { NoteBadge } from './features/tasks/NoteEditor.js';
+import { SubtaskBadge } from './features/tasks/SubtaskPicker.js';
+// 行操作 UX 重设计（2026-11）：行尾不再挂「⋯ 更多」那一排编辑器，
+// 行操作的主入口是**右键上下文菜单**（`TaskRowMenu`），可发现入口是**点行 → 详情**。
+import { TaskRowMenu } from './features/tasks/TaskRowMenu.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
@@ -180,7 +184,7 @@ import { NotesView } from './features/notes/NotesView.js';
 import { NoteEditorCard } from './features/notes/NoteEditorCard.js';
 import { TaskDetailCard } from './features/tasks/TaskDetailCard.js';
 import { useDetailColumnShown } from './features/shell/detail-pane-visible.js';
-import { ReminderBadge, ReminderPanel } from './features/reminders/ReminderPanel.js';
+import { ReminderBadge } from './features/reminders/ReminderPanel.js';
 import { TimelinePanel } from './features/timeline/TimelinePanel.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
@@ -258,22 +262,54 @@ import { isAdminConsoleLocation } from './features/admin/route.js';
  * 在 12–14px 字号下要逐条读才能定位；macOS 系统设置、微信、QQ 的设置窗
  * 都有图标，它们的作用是让"我想改外观"变成一次形状识别，而不是一次阅读。
  * ⚠️ 图标**不替代文字**：`aria-hidden` 只加在 svg 上，可访问名仍是 label。
+ *
+ * ## 🔴 七组，与移动端**同一套顺序、同一套词条**（2026-10 三端同构）
+ *
+ * 改前是八组，四条命名轴混用（按对象 / 按能力 / 按合规 / 按商业），外加一个
+ * 无意义的桶：「任务与显示」里同时装着**主题 · 语言 · 日期显示方式**（"长什么样"）、
+ * **七个功能模块开关**（"开哪些能力"）、**提醒**（"什么时候吵你"）和**桌面小组件**。
+ * 用户每次进设置都要先猜"这个词是按什么分的"。
+ *
+ * 改后每组回答一句用户会说出口的话，与移动端 `SettingsSectionKey` 逐项对齐：
+ *   账号（我是谁、谁能登录）/ 订阅 / 数据与同步（东西在哪、怎么带走）/
+ *   提醒与通知（什么时候找我）/ 外观与语言（长什么样、怎么念）/
+ *   功能与 AI（开哪些能力、AI 能拿数据做什么）/ 关于与帮助。
+ *
+ * 🔴 **`id` 一个都没改**（产品裁决，见
+ * `docs/plans/settings-information-architecture.md` §5.1/§7）。分组从 8 变 7、
+ * 显示名全部换掉，但 `settings-group-*` 这串字被落地页购买链接、桌面三壳的
+ * 默认载荷与合法节清单、QA 装置、以及别人发出去的旧链接引用着。
+ * ⇒ 内部 id 与显示名从此不一致（`settings-group-profile` 显示成「账号」），
+ * 旧 id 由 `lib/settings-deep-link.ts` 的 `LEGACY_SETTINGS_SECTIONS` 折到新组。
+ *
+ * ⚠️ **词条借用 `mobile.settings.section.*`**：七组的**组名**是这次同构的产物，
+ * 它属于"同一句话三端只写一份"那一类（本仓先例：`priority-display.ts` 的
+ * `mobile.priority.*`，判据 `row-meta-shared.spec.tsx` 钉着两端同键）。
+ * `packages/i18n` 是共享事实源、不归本端改，所以这里直接引用移动端那七条 ——
+ * 抄七条 `web.*` 新词条出来才是第二份文案。
  */
 const SETTINGS_NAV_ITEMS = [
-  { id: 'settings-group-profile', labelKey: 'web.settings.nav.profile', icon: UserRound },
+  /* G1 账号：「个人资料」与「账号与安全」合并 —— 它们回答的是同一个问题
+     （我是谁 / 谁能用这个账号登录），移动端也是这么并的（`profile`+`security` ⇒ `account`）。 */
+  { id: 'settings-group-profile', labelKey: 'mobile.settings.section.account', icon: UserRound },
   /*
-   * 「订阅」独立成节（2026-10-24 产品负责人："需要有单独的订阅界面"）。
-   * 它排在**个人资料之后、任务与显示之前**：身份 → 付钱 → 用起来，
-   * 与"我"相关的两件事在前，偏好类在后。原来它在「账号与安全」里，
+   * G2 订阅：「订阅」独立成节（2026-10-24 产品负责人："需要有单独的订阅界面"）。
+   * 它排在账号之后、其余偏好之前：身份 → 付钱 → 用起来。原来它在「账号与安全」里，
    * 而那让"付钱"躲在"安全"底下，还和通行密钥、注销账号挤在同一列。
    */
-  { id: 'settings-group-subscription', labelKey: 'web.settings.nav.subscription', icon: CreditCard },
-  { id: 'settings-group-appearance', labelKey: 'web.settings.nav.appearance', icon: Palette },
-  { id: 'settings-group-sync', labelKey: 'web.settings.nav.syncPrivacy', icon: RefreshCw },
-  { id: 'settings-group-ai', labelKey: 'web.settings.nav.aiIntegrations', icon: Sparkles },
-  { id: 'settings-group-data', labelKey: 'web.settings.nav.data', icon: Database },
-  { id: 'settings-group-account', labelKey: 'web.settings.nav.account', icon: ShieldCheck },
-  { id: 'settings-group-help', labelKey: 'web.settings.nav.help', icon: CircleHelp },
+  { id: 'settings-group-subscription', labelKey: 'mobile.settings.section.subscription', icon: CreditCard },
+  /* G3 数据与同步：「数据管理」与「同步与隐私」合并 —— 我的东西在哪、怎么带走、删错了怎么办。
+     保险库跟着这一组（它管"数据能不能出门"，不是"谁能登录"），与移动端 `sync`⇒`data` 同口径。 */
+  { id: 'settings-group-data', labelKey: 'mobile.settings.section.data', icon: RefreshCw },
+  /* G4 提醒与通知：**新开的一组**（拆掉「任务与显示」那个桶）。
+     系统授权 + 提醒方式 + 打扰偏好 + 桌面小组件 —— 全是"它什么时候、用什么方式找我"。 */
+  { id: 'settings-group-notifications', labelKey: 'mobile.settings.section.notifications', icon: Bell },
+  /* G5 外观与语言：日期/倒计时显示、详情栏默认、语言、主题 —— 组名终于与内容一致。 */
+  { id: 'settings-group-appearance', labelKey: 'mobile.settings.section.appearance', icon: Palette },
+  /* G6 功能与 AI：功能模块开关（"这个应用长什么样"）+ AI 的三道闸与端点（"开哪些能力"）。 */
+  { id: 'settings-group-ai', labelKey: 'mobile.settings.section.features', icon: Sparkles },
+  /* G7 关于与帮助：帮助/更新/价格/反馈/备案号。 */
+  { id: 'settings-group-help', labelKey: 'mobile.settings.section.about', icon: CircleHelp },
 ] as const satisfies readonly { id: string; labelKey: MessageKey; icon: LucideIcon }[];
 
 type SettingsSectionId = (typeof SETTINGS_NAV_ITEMS)[number]['id'];
@@ -289,6 +325,23 @@ type SettingsSectionId = (typeof SETTINGS_NAV_ITEMS)[number]['id'];
  */
 function isSettingsSectionId(value: string): value is SettingsSectionId {
   return SETTINGS_NAV_ITEMS.some((item) => item.id === value);
+}
+
+/**
+ * 深链 id ⇒ **现行分组 id**，认不出就 `null`（= 不打开设置）。
+ *
+ * 🔴 两步而不是一步：先按 `LEGACY_SETTINGS_SECTIONS` 把旧 id 折到新组
+ * （`settings-group-sync` ⇒ `settings-group-data` 之类），再走上面那个收窄。
+ * 顺序反过来的话，折叠表里那些"合法但已不在左栏"的 id 会**先被判成认不出**，
+ * 于是旧链接退回"点了没反应" —— 那正是这次迁移要保住的兼容性
+ * （判据：`apps/web/tests/settings-deep-link.spec.tsx` 里旧 id 那一条）。
+ *
+ * 折叠表在 `lib/settings-deep-link.ts`（深链的唯一事实源），这里只做收窄 ——
+ * 第二张表会长出第二套口径，而两套口径漂移的症状是"某一条链接静默失效"。
+ */
+function resolveSettingsSection(value: string): SettingsSectionId | null {
+  const canonical = canonicalSettingsSection(value);
+  return isSettingsSectionId(canonical) ? canonical : null;
 }
 
 /*
@@ -376,13 +429,13 @@ export function App(): React.JSX.Element {
    */
   const selectedTaskId = useSelected('task');
   /**
-   * 🔴 必须是 `useCallback` 而不是行内箭头：`TaskList` 把 `onOpenTask` 放进了
-   * 行渲染的 `useMemo` 依赖里，每次渲染换新函数 = 整表所有行重建，
-   * 而这一栏是要装常驻详情面的（W2），白重渲染的代价会从"看不见"变成"看得见地卡"。
+   * 窄档 / 栏被收起时那只「任务详情」对话框开着没有。
+   *
+   * 🔴 状态住在这里（而不是 `openTask` 旁边）：`openTask` 要读 `taskPaneWillShow`
+   * 才能决定"选中就够"还是"还得开对话框"，而那一枚布尔在下面才定义得出来
+   * （它依赖 `detailColumnShown` 与 `contentView`）。声明顺序跟着依赖走。
    */
-  const openTask = useCallback((taskId: string) => {
-    selection.select('task', taskId);
-  }, []);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [view, setView] = useState<ViewKey>('tasks');
   /**
    * 已启用的功能模块（**设备本地**，见 `features/shell/modules.ts`）。
@@ -600,8 +653,16 @@ export function App(): React.JSX.Element {
    */
   const [settingsAnchor, setSettingsAnchor] = useState<SettingsAnchor | undefined>(undefined);
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>('settings-group-appearance');
+  /**
+   * 🔴 落在哪一组由**锚点表**说了算（`SETTINGS_ANCHORS[...].section`），
+   * 不再用 `` `settings-group-${settingsAnchor}` `` 拼。拼的写法依赖"锚点名 == 分组名后缀"
+   * 这条隐含约定，而七组同构之后它已经不成立：「同步」的锚点落进「数据与同步」
+   * （`settings-group-data`）。拼出来的 `settings-group-sync` 会是一个**合法但不在左栏里**
+   * 的 id ⇒ 每一节都 `hidden` ⇒ 用户看到一张空白设置页，而 TS 一个字都不会说。
+   * 类型上 `SettingsAnchorSection` 是 `SettingsSectionId` 的子集，所以表里写错就编译红。
+   */
   const activeSettingsSection: SettingsSectionId = settingsAnchor
-    ? `settings-group-${settingsAnchor}` : settingsSection;
+    ? SETTINGS_ANCHORS[settingsAnchor].section : settingsSection;
   /** 设置 surface 的内容模式；个人中心与设置共用同一层，不再各造一套浮层。 */
   const [secondaryAccountSurface, setSecondaryAccountSurface] = useState<'settings' | 'profile'>('settings');
   /** 从个人中心进入设置时，保留一条回到个人中心的路径。 */
@@ -852,8 +913,8 @@ export function App(): React.JSX.Element {
    */
   useEffect(() => {
     if (settingsAnchor === undefined || view !== 'settings') return;
-    setSettingsSection(`settings-group-${settingsAnchor}`);
     const anchor = SETTINGS_ANCHORS[settingsAnchor];
+    setSettingsSection(anchor.section);
     document.getElementById(anchor.id)?.scrollIntoView({ block: 'start' });
     if (anchor.focus !== undefined) {
       (document.querySelector<HTMLElement>(anchor.focus) ?? undefined)?.focus();
@@ -944,10 +1005,14 @@ export function App(): React.JSX.Element {
    * （设置 → 订阅 → `RenewPanel` → `startCheckout`）。没有这条参数时，
    * 「立即购买」只能把人丢到任务列表让他自己找 —— 那不是购买按钮。
    *
-   * 🔴 两条纪律：
+   * 🔴 三条纪律：
    *   1. **只在挂载时跑一次**（`[]`），它不是状态、是一次性意图；跟着 URL 变化重跑
    *      会在用户手动切节之后又把他拽回去。
-   *   2. **认不出的 id 不猜**：落到默认节，而不是把一整页 hidden 掉（见 `isSettingsSectionId`）。
+   *   2. **认不出的 id 不猜**：不打开设置，而不是把一整页 hidden 掉或猜一个默认组
+   *      （见 `resolveSettingsSection`）。
+   *   3. **旧 id 要折到新组**：七组同构之后 `settings-group-sync` / `-account` /
+   *      `-general` 这些还在别人手里（旧链接、桌面壳、移动端口径的深链），
+   *      折叠表在 `lib/settings-deep-link.ts` 的 `LEGACY_SETTINGS_SECTIONS`。
    * 参数名的唯一事实源在 `lib/settings-deep-link.ts`（落地页抄了一份字面量，判据钉着相等）。
    */
   /**
@@ -962,12 +1027,13 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     const wanted = settingsSectionOnLoad();
-    if (wanted === null || !isSettingsSectionId(wanted)) return;
+    const section = wanted === null ? null : resolveSettingsSection(wanted);
+    if (section === null) return;
     setSecondaryAccountSurface('settings');
     setSettingsReturnSurface(undefined);
     setSettingsFocus(undefined);
     setSettingsAnchor(undefined);
-    setSettingsSection(wanted);
+    setSettingsSection(section);
     setView('settings');
   }, []);
 
@@ -1226,10 +1292,41 @@ export function App(): React.JSX.Element {
     assistantWorkspace || ['tasks', 'focus', 'notes', 'habits'].includes(contentView) ||
     (selectedTaskId !== null && ['quadrant', 'timeline'].includes(contentView))
   );
-  const taskPaneInColumn =
-    detailColumnShown &&
-    selectedTaskId !== null &&
-    (contentView === 'tasks' || contentView === 'quadrant' || contentView === 'timeline');
+  /**
+   * 详情列**这一档会不会接住任务面单** —— 只看几何与视图族，不看"选中了没有"。
+   *
+   * 🔴 它与 `taskPaneInColumn` 拆开是为了让"选一条任务之后面单会不会出现"
+   * **在选中之前就能回答**：右键菜单的「打开详情」要在选中之前决定
+   * "落在详情列还是落在对话框"（选中之后再算就晚了一帧，用户看到的是一下闪动）。
+   * 合成一个布尔必然要把 `selectedTaskId` 塞进去，于是又答不了这个问题。
+   */
+  const taskPaneWillShow =
+    detailColumnShown && (contentView === 'tasks' || contentView === 'quadrant' || contentView === 'timeline');
+  const taskPaneInColumn = taskPaneWillShow && selectedTaskId !== null;
+
+  /**
+   * 点一行 = **打开它**（行操作 UX 重设计之后这是界面上**唯一看得见**的入口，
+   * 右键菜单只是它的加速键，见 `TaskRowMenu` 文件头）。
+   *
+   * 🔴 两档落点，同一只 `TaskDetailCard`：
+   *   · 详情列这一档在（几何够 + 视图对）⇒ 选中即可，面单自己出现在右栏；
+   *   · 否则（窄窗口 / 用户把栏收起了 / 日历这种没有栏的视图）⇒ 对话框。
+   *
+   * 🔴 第二档不是锦上添花：行尾那一排编辑器被撤掉之后，这里是那些字段
+   * （截止 / 提醒 / 清单 / 标签 / 子任务 / 备注 / 优先级 / 重复 / AI）在窄档的**唯一**落点。
+   * 少了它，窄窗口下"改截止"这个动作会**整个消失**，而且不报错。
+   *
+   * 🔴 必须是 `useCallback` 而不是行内箭头：`TaskList` 把 `onOpenTask` 放进了
+   * 行渲染的 `useMemo` 依赖里，每次渲染换新函数 = 整表所有行重建，
+   * 而这一栏是要装常驻详情面的（W2），白重渲染的代价会从"看不见"变成"看得见地卡"。
+   */
+  const openTask = useCallback(
+    (taskId: string) => {
+      selection.select('task', taskId);
+      if (!taskPaneWillShow) setDetailDialogOpen(true);
+    },
+    [taskPaneWillShow],
+  );
 
   /**
    * ⌘/Ctrl + Shift + \\ 开合详情列 —— 三条恢复路径里的"快捷键"那一条。
@@ -1455,289 +1552,259 @@ export function App(): React.JSX.Element {
   );
 
   /**
-   * 行尾：本端特有的交互控件。**顺序与迁移前逐字一致** ——
-   * 备注 → 清单/标签 → AI 拆解 → AI 估时 → 删除。
+   * 行尾：**只有只读徽标，没有任何编辑器**（行操作 UX 重设计，2026-11）。
    *
-   * 🔴 不把它们留在 web 侧手写整行，只是"把控件放进共享行的尾部插槽"——
-   * 行的骨架、触控区、排序、无障碍 role/state 仍然只有 `TaskList` 一份实现。
+   * ## 改之前是什么
+   *
+   * 行尾是一枚「⋯ 更多」的 `<details>`，展开后把九个控件摊成一行：
+   * 备注 / 子任务 / 清单+标签 / 重复 / 截止 / 提醒 / AI 拆解 / AI 估时 / 删除。
+   * 九个同级、无分组、无主次，"删除"与"重复"同一视觉重量。产品负责人的原话是
+   * 「不需要有更多的三个点」，参照产品那一行只有**勾选 + 标题 + 一行淡元信息**。
+   *
+   * ## 现在
+   *
+   * | 东西 | 去哪 | 为什么 |
+   * |---|---|---|
+   * | 字段编辑器（备注 / 子任务 / 清单+标签 / 重复 / 截止 / 提醒 / 优先级） | `TaskDetailCard`（详情列，或窄档的对话框） | 每个字段只有一个编辑所有者；行上九个编辑器的第二个代价是行宽被吃光 |
+   * | AI 拆解 / AI 估时 | `TaskDetailCard` 的「自动化」组（`automationSlot`） | 审计 §4.6 早就把这一组留给它们；顺带修掉"行尾常驻 517px" |
+   * | 只读徽标（这几枚） | **留在这里** | §8.138 那条不变量：**扫一眼要能看出**哪些任务写过备注 / 是重复的 / 挂在谁下面 / 挂了几条提醒 / 打了什么标签。删掉就是功能倒退 |
+   * | 完整的删除入口 | 右键菜单（`TaskRowMenu`） | 危险项不与日常项并列 |
+   *
+   * 🔴 **能力没有减少一条**：徽标是只读的，编辑器全在面单里，而面单在两档（详情列 /
+   * 对话框）都可达 —— 判据 `apps/web/tests/task-row-menu.spec.tsx` 的 P3 钉的就是这件事。
+   * 🔴 也不再把控件留在 web 侧手写整行：行的骨架、触控区、排序、无障碍 role/state
+   * 仍然只有共享 `TaskList` 一份实现。
    */
   const renderTaskTrailing = useCallback(
     (row: SharedTaskRow): React.ReactNode => {
       const task = row.source;
       return (
-        <details className="ht-compose-actions">
-          <summary
-            className="ht-compose-actions__trigger"
-            aria-label={t('web.shell.tasks.more', { title: task.title })}
-            data-testid={`task-actions-summary-${task.id}`}
-          >
-            <MoreHorizontal size={ICON_SIZE.sm} aria-hidden="true" />
-            <span>{t('web.shell.tasks.moreLabel')}</span>
-          </summary>
-          <div className="ht-compose-actions__panel ht-material">
-            {/*
-             * 这些是渐进披露的次级编辑入口：默认行只保留勾选、标题与元信息，
-             * 打开「更多操作」后仍复用原来的控件与 action 回调，不减少能力。
-             */}
-            {bulkSelecting ? null : (
-              <div
-                className="ht-compose-actions__items"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  alignContent: 'center',
-                  justifyContent: 'flex-end',
-                  flexWrap: 'wrap',
-                  gap: 'var(--ht-space-2)',
-                  // 选择框是行级选择的主控件，放到共享完成框和标题之前，
-                  // 让选择态从左到右先读到「选中」再读到任务内容。
-                  order: bulkSelecting ? -1 : 0,
-                }}
-              >
-          {/* 备注。🔴 在它之前 Web 上**没有备注输入框** ——
-              `Task.note` 与 `setNote` 都在，但唯一调用点是 AI 拆解与 AI 估时，
-              于是"我自己能不能在任务上写点东西"的答案是"不能"。
-
-              ⚠️ 工单 §8.138 之后它**只在详情列没在画时挂在这里**：栏里画着的时候正文输入框
-              住在 `TaskDetailCard` 那一格，这里换成一枚**只读徽标**（`NoteBadge`）。
-              理由是那道二选一的裁决要的不变量 —— 同一字段任何时刻只有一个编辑器所有者，
-              两处都能改就会漂移成两套写入语义；而"扫一眼列表要能看出哪些任务写了东西"
-              这一档不能因为搬进栏里就丢掉（第一趟看图照出来的正是这个）。
-              窄档（栏不出现）时它退回这一格，所以"写不了备注"在任何档都不会发生。 */}
-          {taskPaneInColumn ? (
-            <NoteBadge task={task} />
-          ) : (
-            <NoteEditor
-              task={task}
-              onSetNote={(note) => {
-                void store.setNote(task.id, note);
-              }}
-            />
-          )}
-
-          {/* 子任务。🔴 在它之前：`packages/domain/src/subtasks.ts`（616 行，
-              建树 + 环防护 + 深度/子数上限）与 `app-host` 的 `setParent`
-              **都已经写好**，但 Web 上一次调用点都没有 —— 于是
-              "模型支持、树能建、用户没有任何办法造出一个子任务"，
-              且**不报错**，只是这个功能不存在（方案 §5.5 的"看起来有其实没有"）。
-
-              ⚠️ 工单 §8.144 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
-              （候选 + 原生 `<select>` + 拒绝提示）住在 `TaskDetailCard` 那一格，这里只剩一枚
-              **只读徽标** `SubtaskBadge` —— 同一枚不变量（每个字段只有一个编辑器所有者），
-              而"扫一眼要能看出哪条挂在谁下面"这一档不因搬进栏里就丢掉。
-              🔴 这一格顺带改掉一条**写在别处的取数前提**：`e2e/tests/selection-projections.spec.ts`
-              文件头那句"按标题找行不能用 `task-item-*`，因为行里常驻的 `subtask-select-*` 会把别的任务
-              标题写进 `textContent`" —— 宽档下那只 `<select>` 不在行里了，窄档下仍在。
-              那边的解法（用 `task-title-*`）两种档都对，所以不动它，只把这条变化记下来。 */}
-          {taskPaneInColumn ? (
-            <SubtaskBadge task={task} />
-          ) : (
-            <SubtaskPicker
-              task={task}
-              onSetParent={(parentId) => store.setParent(task.id, parentId)}
-            />
-          )}
-
-          {/* 清单归属 + 标签。Web 端此前**根本没有入口** ——
-              `moveToProject` 没有任何调用点、`tagIds` 全仓库零读写，
-              于是侧栏里建出来的清单和标签一个也用不上。
-
-              ⚠️ 工单 §8.147 起它**只在详情列没在画时整块挂在这里**：栏里画着的时候编辑本体
-              （清单下拉 + 标签复选框）住在 `TaskDetailCard` 那一格。
-              🔴 这一格留的是**只读 chip**（`TagChips`），不是截止那种"整块不画"：
-              截止的显示另有其人（共享 `task-meta` 那一槽），而**标签在共享层没有对应槽**，
-              行上这两枚 chip 就是它唯一的显示位 —— 撤掉会让列表里"看不出哪条挂了标签"，
-              那是 §8.138 那条不变量明确不许的。归属的显示本来就在 `task-meta`，所以这里
-              不重复画清单名（同一行说两遍）。窄档（栏不出现）时整块退回这一格，
-              所以"归不了类"在任何一档都不会发生。 */}
-          {taskPaneInColumn ? (
-            <TagChips task={task} />
-          ) : (
-            <TaskOrganizer
-              task={task}
-              onMoveToProject={(projectId) => {
-                void store.moveToProject(task.id, projectId);
-              }}
-              onSetTags={(tagIds) => {
-                void store.setTags(task.id, tagIds);
-              }}
-            />
-          )}
-
-          {/* 重复。🔴 Web 此前**没有入口** —— 移动端早就能设，
-              两端不一致；这一处补的正是 B2-3 的「Web 入口」那一半，
-              并额外给了移动端也还没有的**自定义 RRULE**。
-
-              ⚠️ 工单 §8.141 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
-              （预设单选 + 自定义 RRULE）住在 `TaskDetailCard` 那一格，这里只剩一枚
-              **只读徽标** `RepeatChip`。理由与备注同一枚不变量 —— 同一字段任何时刻
-              只有一个编辑器所有者；而"扫一眼列表要能看出哪些任务是重复的"不能因为
-              搬进栏里就丢掉。窄档（栏不出现）时它整块退回这一格，所以"设不了重复"在任何档都不会发生。 */}
-          {taskPaneInColumn ? (
-            <RepeatChip task={task} now={store.now} />
-          ) : (
-            <TaskRepeat
-              task={task}
-              now={store.now}
-              onSetRepeat={(rule) => {
-                void store.setRepeat(task.id, rule);
-              }}
-            />
-          )}
-
-          {/* 截止。🔴 多端覆盖审计 P0-3：`setDueDate` 的语义早就完整，
-              但 Web 上**没有任何调用点** —— 想给任务定"周五截止"没有直接入口
-              （唯一沾边的是 AI 捕获，那是建任务时）。移动端早就能改；
-              这里补上后两端共用同一只共享 `DatePicker`。
-
-              ⚠️ 工单 §8.146 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
-              （共享 `DatePicker`：四个快捷项 + 月历 + 清除）住在 `TaskDetailCard` 那一格。
-              🔴 这一格与前四格（备注 / 重复 / 子任务 / 提醒）**不同形**：这里**不补只读徽标**，
-              宽档整块不画。理由不是省事 —— 截止的显示一直在共享行的元信息条上
-              （`task-meta` → `TaskBadges.due`，`date` 档 `10-05` / `countdown` 档「明天」），
-              而原先那颗 `<summary>` 也在写当前值（「截止 10月5日」），也就是同一行把同一件事实
-              说了两遍。工单 §8.141 第 5 节那条硬约束（截止的**显示**必须留在行上）由 `task-meta`
-              满足，撤掉第二份显示不会让它失效；真浏览器 T12 把这条钉成判据（设了截止 ⇒
-              行上仍写着日期）。窄档（栏不出现）时 `DueEditor` 整块退回这一格，
-              所以"改不了截止"在任何一档都不会发生。 */}
-          {taskPaneInColumn ? null : (
-            <DueEditor
-              task={task}
-              now={store.now}
-              onSetDueDate={(due, dueDateLocal) => {
-                void store.setDueDate(task.id, due, dueDateLocal);
-              }}
-            />
-          )}
-
-          {/* 提醒。🔴 在这一刀之前 `REMINDER` 有写路径、op 能同步，
-              但 Web 上**没有任何入口能建它** —— 提醒面板补的就是这最后一米。
-              状态与动作全在 `features/reminders/store.ts`（唯一一处
-              `createReminderActions`），这里只把它挂在行的尾部插槽上。
-
-              ⚠️ 工单 §8.145 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
-              （共享 `ReminderList` + 六个动作 + 错误提示）住在 `TaskDetailCard` 那一格，
-              这里只剩一枚**只读徽标** `ReminderBadge`。同一枚不变量（每个字段只有一个编辑器所有者）。
-              🔴 徽标与 `NoteBadge`/`RepeatChip` 有一处**刻意的不同**：零条提醒时它**不渲染**，
-              而原来那颗 chip 在零条时显示「提醒」二字 = 入口。入口如今住在栏里那一格的区块头，
-              把它留在行上就成了一份"两处都能开始编辑"（拍板 #8 的 `record` 档：徽标可隐藏）。
-              窄档（栏不出现）时 `ReminderPanel` 整块退回这一格，那颗带文字的入口 chip 也一起回来，
-              所以"建不了提醒"在任何一档都不会发生。 */}
-          {taskPaneInColumn ? (
-            <ReminderBadge task={task} />
-          ) : (
-            <ReminderPanel task={task} />
-          )}
-
-          {/* AI 拆解。配置关着时它仍然在 —— 点了会说明该去开什么，
-              而不是消失（"找不到入口"和"入口说为什么不可用"是两件事）。 */}
-          <AiBreakdown
-            task={task}
-            routing={aiRouting}
-            consents={aiSettings.consents}
-            secrets={aiSecrets}
-            // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
-            healthSnapshot={aiSettings.health}
-            // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
-            preferenceSet={memory.preferenceSet}
-            onApplyNote={(note) => store.setNote(task.id, note)}
-            /**
-             * 🔴 反馈落到 op-log（跨设备同步）。
-             * 不接这个回调，AI 就永远学不到"该给你几项"——
-             * 界面上的逐条取舍会变成白点，没有任何记录。
-             */
-            onFeedback={(fb) => {
-              void store.recordAiFeedback({ feature: 'breakdown', ...fb });
-            }}
-            onHealth={(health) => {
-              // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
-              // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
-              setAiSettings((previous) => {
-                const next = {
-                  ...previous,
-                  health: toHealthSnapshot(health, Date.now()),
-                };
-                saveAiSettings(next);
-                return next;
-              });
-            }}
-          />
-
-          {/* AI 估时。
-              🔴 结果**写进备注**，不新增持久化字段 —— 加字段要产品先拍板
-              （见 `packages/app-host/src/duration-note.ts` 文件头与
-              `ai-capability-branches.md` §5.1）。
-              ⚠️ 刻意**不传 `history`**：web 壳目前没有暴露专注历史，
-              而不传的语义是"这次估时没有历史可用"，是 fail closed 的一侧。
-              等专注历史接出来再传，不要在这里编一份假的。 */}
-          <AiDuration
-            task={task}
-            routing={aiRouting}
-            consents={aiSettings.consents}
-            secrets={aiSecrets}
-            healthSnapshot={aiSettings.health}
-            preferenceSet={memory.preferenceSet}
-            onApply={async (minutes) => {
-              await store.setNote(task.id, writeDurationIntoNote(task.note, minutes));
-            }}
-            onHealth={(health) => {
-              setAiSettings((previous) => {
-                const next = {
-                  ...previous,
-                  health: toHealthSnapshot(health, Date.now()),
-                };
-                saveAiSettings(next);
-                return next;
-              });
-            }}
-          />
-
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
-            aria-label={t('web.shell.tasks.delete', { title: task.title })}
-            onClick={() => {
-              // 🔴 P3：任务**进回收站**（ADR-0048 四态里的 `deletedAt`），所以撤销是真的
-              //    可执行 ⇒ 这一格必须给回执，而原来它一个字都不给（用户只能自己去
-              //    回收站里找）。正文带对象名，因为页面上同时可能有别的删除。
-              const { id, title } = task;
-              void store.deleteTask(id).then(() => {
-                setUndoAction({
-                  label: t('web.feedback.undo.task', { title }),
-                  run: async () => {
-                    // `restoreTask` 返回布尔而不是抛错：捞不回来（已被 purge）时
-                    // 必须变成**拒绝**，否则 `UndoReceipt` 会当成功把整条收掉 ——
-                    // 那正好把"失败不许静默"这条判据读反。规则住在 `restoreOrRefuse`，
-                    // 四处删除共用一份（各写一遍迟早分家）。
-                    await restoreOrRefuse(
-                      () => store.restoreTask(id),
-                      t('web.feedback.undo.refused', { title }),
-                    );
-                  },
-                });
-              });
-            }}
-          >
-            <Trash2 size={ICON_SIZE.sm} aria-hidden="true" />
-          </button>
-              </div>
-            )}
-          </div>
-        </details>
+        <span className="ht-row-badges" data-testid={`task-trailing-${task.id}`}>
+          <NoteBadge task={task} />
+          <SubtaskBadge task={task} />
+          <TagChips task={task} />
+          <RepeatChip task={task} now={store.now} />
+          <ReminderBadge task={task} />
+        </span>
       );
     },
-    [
-      aiSecrets,
-      aiSettings,
-      bulkSelecting,
-      memory.preferenceSet,
-      selectedTaskIds,
-      store,
-      t,
-      taskPaneInColumn,
-      toggleBulkSelection,
-    ],
+    [store.now],
   );
+
+  /**
+   * 「自动化」组里属于宿主的那一格（AI 拆解 / AI 估时）。理由见
+   * `TaskDetailCard` 的 `automationSlot` 注释：五组 AI 状态只住在 `App.tsx`，
+   * 而面单有两个落点，所以传节点、不传状态。
+   */
+  const automationSlotNode = useMemo(() => {
+    if (selectedTaskId === null) return null;
+    const task = store.entities.tasks[selectedTaskId];
+    if (task === undefined || task.deletedAt !== undefined) return null;
+    return (
+      <>
+        {/* AI 拆解。配置关着时它仍然在 —— 点了会说明该去开什么，
+            而不是消失（"找不到入口"和"入口说为什么不可用"是两件事）。 */}
+        <AiBreakdown
+          task={task}
+          routing={aiRouting}
+          consents={aiSettings.consents}
+          secrets={aiSecrets}
+          // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
+          healthSnapshot={aiSettings.health}
+          // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
+          preferenceSet={memory.preferenceSet}
+          onApplyNote={(note) => store.setNote(task.id, note)}
+          /**
+           * 🔴 反馈落到 op-log（跨设备同步）。
+           * 不接这个回调，AI 就永远学不到"该给你几项"——
+           * 界面上的逐条取舍会变成白点，没有任何记录。
+           */
+          onFeedback={(fb) => {
+            void store.recordAiFeedback({ feature: 'breakdown', ...fb });
+          }}
+          onHealth={(health) => {
+            // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
+            // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
+            setAiSettings((previous) => {
+              const next = {
+                ...previous,
+                health: toHealthSnapshot(health, Date.now()),
+              };
+              saveAiSettings(next);
+              return next;
+            });
+          }}
+        />
+
+        {/* AI 估时。
+            🔴 结果**写进备注**，不新增持久化字段 —— 加字段要产品先拍板
+            （见 `packages/app-host/src/duration-note.ts` 文件头与
+            `ai-capability-branches.md` §5.1）。
+            ⚠️ 刻意**不传 `history`**：web 壳目前没有暴露专注历史，
+            而不传的语义是"这次估时没有历史可用"，是 fail closed 的一侧。
+            等专注历史接出来再传，不要在这里编一份假的。 */}
+        <AiDuration
+          task={task}
+          routing={aiRouting}
+          consents={aiSettings.consents}
+          secrets={aiSecrets}
+          healthSnapshot={aiSettings.health}
+          preferenceSet={memory.preferenceSet}
+          onApply={async (minutes) => {
+            await store.setNote(task.id, writeDurationIntoNote(task.note, minutes));
+          }}
+          onHealth={(health) => {
+            setAiSettings((previous) => {
+              const next = {
+                ...previous,
+                health: toHealthSnapshot(health, Date.now()),
+              };
+              saveAiSettings(next);
+              return next;
+            });
+          }}
+        />
+      </>
+    );
+  }, [aiSecrets, aiSettings, memory.preferenceSet, selectedTaskId, store]);
+
+  /**
+   * 删一条任务 + 撤销回执（P3）。
+   *
+   * 🔴 任务**进回收站**（ADR-0048 四态里的 `deletedAt`），所以撤销是真的可执行
+   * ⇒ 这一格必须给回执。原先它只写在行尾那枚删除按钮的 `onClick` 里；
+   * 入口换成右键菜单之后**抽出来共用一份** —— 两个入口各写一遍回执，
+   * 迟早一个有一句、一个没有（`check:undo-receipt` R2 钉的就是这档）。
+   */
+  const deleteTaskWithReceipt = useCallback(
+    (taskId: string) => {
+      const title = store.entities.tasks[taskId]?.title ?? '';
+      void store.deleteTask(taskId).then(() => {
+        setUndoAction({
+          label: t('web.feedback.undo.task', { title }),
+          run: async () => {
+            // `restoreTask` 返回布尔而不是抛错：捞不回来（已被 purge）时
+            // 必须变成**拒绝**，否则 `UndoReceipt` 会当成功把整条收掉 ——
+            // 那正好把"失败不许静默"这条判据读反。规则住在 `restoreOrRefuse`，
+            // 四处删除共用一份（各写一遍迟早分家）。
+            await restoreOrRefuse(
+              () => store.restoreTask(taskId),
+              t('web.feedback.undo.refused', { title }),
+            );
+          },
+        });
+      });
+    },
+    [store, t],
+  );
+
+  /**
+   * ── 行操作：右键上下文菜单（行操作 UX 重设计，2026-11）─────────────────
+   *
+   * ## 三条通路，一条判断
+   *
+   * | 通路 | 谁用 | 落地 |
+   * |---|---|---|
+   * | **右键** | 有鼠标的人 | 本文件的 `onContextMenu`（一个**委托**监听，挂在 `.ht-content` 上） |
+   * | **键盘** | 没有鼠标的人 | `Shift+F10` / 菜单键 ⇒ 同一个处理函数（浏览器会替聚焦元素派发 `contextmenu`；个别引擎不派发，所以宿主另接了一条 `keydown`） |
+   * | **点行 → 详情** | 所有人（**可发现的那一条**） | `openTask` 已有行为；窄档由下面的对话框接住 |
+   *
+   * 🔴 **为什么用委托，而不是在 `TaskRow` 上加一个 `onContextMenu` 属性**：
+   * `packages/ui` 的 `TaskRow` 是四个端共用的一份，而"右键"是 **web 独有的输入方式**
+   * （RN 上没有这个事件）⇒ 它属于 `apps/*` 的平台差异层（AGENTS §3.5）。
+   * 委托还顺带解决了一件事：列表在页面上有两个渲染面（平铺 / 按日期分组），
+   * 一个监听覆盖两处，不会出现"分组那一面忘了接"。
+   *
+   * 🔴 **右键不做任何选中**：它只开菜单。改选中会让右侧详情列跳走，
+   * 而用户可能只是想删掉那条、继续看原来那条。
+   */
+  const [rowMenu, setRowMenu] = useState<{ taskId: string; x: number; y: number } | null>(null);
+
+  /** 从任一后代元素回溯到"这是哪一行"（`task-item-<id>` 是共享行唯一的稳定 handle）。 */
+  const taskIdFromEventTarget = (target: EventTarget | null): { taskId: string; row: HTMLElement } | null => {
+    if (!(target instanceof Element)) return null;
+    const row = target.closest('[data-testid^="task-item-"]');
+    if (!(row instanceof HTMLElement)) return null;
+    const testId = row.getAttribute('data-testid') ?? '';
+    const taskId = testId.slice('task-item-'.length);
+    return taskId === '' ? null : { taskId, row };
+  };
+
+  const openRowMenuFromRow = useCallback((taskId: string, row: HTMLElement, x?: number, y?: number) => {
+    const rect = row.getBoundingClientRect();
+    /*
+     * 没有指针坐标（键盘那条通路）⇒ 落在这一行的**左下角**：
+     * 菜单从行的位置长出来，读者仍然知道"这是哪一条的菜单"。
+     */
+    setRowMenu({ taskId, x: x ?? rect.left, y: y ?? rect.bottom });
+  }, []);
+
+  const handleTaskContextMenu = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const hit = taskIdFromEventTarget(event.target);
+      if (hit === null) return;
+      event.preventDefault();
+      // ⚠️ 键盘派发的合成 `contextmenu` 坐标恒为 (0,0)：那不是"左上角"，
+      //    而是"没有坐标"。按 0 处理会把菜单画到屏幕角上 —— 分离这两档。
+      const hasPointer = event.clientX !== 0 || event.clientY !== 0;
+      openRowMenuFromRow(hit.taskId, hit.row, hasPointer ? event.clientX : undefined, hasPointer ? event.clientY : undefined);
+    },
+    [openRowMenuFromRow],
+  );
+
+  const handleTaskRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      // `ContextMenu` 是键盘上那枚菜单键；`Shift+F10` 是 Windows/Linux 的等价键。
+      const wantsMenu = event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10');
+      if (!wantsMenu) return;
+      const hit = taskIdFromEventTarget(event.target);
+      if (hit === null) return;
+      event.preventDefault();
+      openRowMenuFromRow(hit.taskId, hit.row);
+    },
+    [openRowMenuFromRow],
+  );
+
+  /**
+   * 关菜单 + **把焦点还给那一行**。
+   *
+   * 🔴 不还焦点 = 键盘用户打开一次菜单之后，焦点落在 `body` 上，接下来
+   * ↑↓ 不动、Tab 从头开始。`WebModalShell` 那一族由共享壳负责归还原位，
+   * 菜单不是模态、壳不管这一格，所以由宿主补。
+   */
+  const closeRowMenu = useCallback(() => {
+    const taskId = rowMenu?.taskId;
+    setRowMenu(null);
+    if (taskId === undefined) return;
+    document
+      .querySelector<HTMLElement>(`[data-testid="task-item-${taskId}"] [data-testid="task-row-${taskId}"]`)
+      ?.focus();
+  }, [rowMenu]);
+
+  // 栏回来了 / 换了视图 ⇒ 对话框自动退场，不留下两个都在画的同一张面单。
+  useEffect(() => {
+    if (taskPaneWillShow || selectedTaskId === null) setDetailDialogOpen(false);
+  }, [taskPaneWillShow, selectedTaskId]);
+
+  /** 菜单上那一条任务（有的数据层面已被删掉 ⇒ 菜单自己收走）。 */
+  const rowMenuTask = rowMenu === null ? undefined : store.entities.tasks[rowMenu.taskId];
+  useEffect(() => {
+    if (rowMenu !== null && rowMenuTask === undefined) setRowMenu(null);
+  }, [rowMenu, rowMenuTask]);
+
+  /**
+   * 直接子任务数 —— 危险档位的 `collateralImpact`。
+   *
+   * 🔴 口径来自领域层，不在宿主里数：删除只给**父任务**写墓碑，而
+   * `buildTaskTree` 会把"父已删除"的子任务**提到顶层**（那是它文件头里
+   * `promotedFromDeletedParent` 那条读时安全网）。所以"带子任务还删"的后果是
+   * "子任务跑到顶层"，不是"子任务一起没了" —— 那句后果文案与这个数同源。
+   */
+  const rowMenuChildCount = useMemo(() => {
+    if (rowMenu === null) return 0;
+    const tree = buildTaskTree(Object.values(store.entities.tasks));
+    return tree.nodeById.get(rowMenu.taskId)?.children.length ?? 0;
+  }, [rowMenu, store.entities.tasks]);
 
   /** 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。 */
   const taskRowLabels = useMemo(
@@ -2248,12 +2315,6 @@ export function App(): React.JSX.Element {
             onClose={assistantOverlay ? () => setCompactAssistantOpen(false) : undefined}
             routing={aiRouting}
             consents={aiSettings.consents}
-            tier={aiSettings.assistantTier}
-            onTierChange={(assistantTier) => setAiSettings((previous) => {
-              const next = { ...previous, assistantTier };
-              saveAiSettings(next);
-              return next;
-            })}
             secrets={aiSecrets}
             memoryEnabled={aiSettings.memoryEnabled}
             getDurationPreferenceHints={getDurationPreferenceHints}
@@ -2822,7 +2883,18 @@ export function App(): React.JSX.Element {
           </div>
         </header>
 
-        <div className="ht-content">
+        {/*
+          🔴 行操作的两条**输入**通路挂在 `.ht-content` 这一层（委托），不是每一行上：
+          右键是 web 独有的输入方式（`packages/ui` 的 `TaskRow` 四个端共用，不能长出
+          web 专属属性 —— AGENTS §3.5），而任务列表在本文件里有**两个渲染面**
+          （平铺 / 按日期分组），委托一次覆盖两处，不会出现"分组那一面忘了接"。
+          两条通路最终都走同一个 `openRowMenuFromRow`。
+        */}
+        <div
+          className="ht-content"
+          onContextMenu={handleTaskContextMenu}
+          onKeyDown={handleTaskRowKeyDown}
+        >
           {/**
            * 这里**曾经**是「今日进度」卡（`0/0 今天还没有安排`）。
            * 🔴 2026-10-01 产品负责人看图后拍板彻底删除，不是"再挪一次位置"——
@@ -3307,30 +3379,165 @@ export function App(): React.JSX.Element {
               它不带 `ht-*` 前缀，因为 `check:row-single-source` 只许 `ht-*` 前缀族
               **下降**，新造一族（哪怕只包一层）是要被拒的。
             */}
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-profile'} id="settings-group-profile" aria-label={t('web.settings.nav.profile')}>
+            {/*
+              G1 账号 = 「个人资料」+「账号与安全」的合体（2026-10 七组同构）。
+
+              🔴 为什么并成一组：这两块回答的是**同一个问题** —— "我是谁、谁能用这个
+              账号登录"。拆成两组时，用户想改昵称要点第一组、想改密码要点第七组，
+              而两组之间隔着订阅、同步、AI 三整屏。移动端先落地的六→七组也是这么并的
+              （`profile` + `security` ⇒ `account`，见移动端 `LEGACY_SECTION`）。
+
+              ⚠️ id 仍是 `settings-group-profile`（**没有改 id**，理由见
+              `SETTINGS_NAV_ITEMS` 上面那段）；`settings-group-account` 由
+              `LEGACY_SETTINGS_SECTIONS` 折到这一组，旧链接照样落得进来。
+
+              组内顺序 = 身份 → 登录方式 → 已登录的设备 → 危险区（注销账号最后）：
+              危险动作不进日常项中间（`ux-principles.md` §6 / 计划 §5.2 的 G1）。
+            */}
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-profile'} id="settings-group-profile" aria-label={t('mobile.settings.section.account')}>
               <div id="settings-profile" data-testid="profile-section-anchor">
                 <ProfilePanel active={activeSettingsSection === 'settings-group-profile'} />
               </div>
+              {/*
+                账号门槛：**四个账号能力共享一个登录入口**，避免未登录时同一屏重复渲染四张卡。
+                🔴 未登录时这一块整段由下面这张卡承接；四个面板自身仍保留独立 guard，
+                单独挂载时不会误显示注销控件。
+              */}
+              {accountNeedsSignIn ? (
+                <SettingsAccountGate
+                  messageKey="web.settings.accountSignIn"
+                  testId="settings-account-needs-sign-in"
+                />
+              ) : (
+                <>
+              {/* 账号安全：管理自己的通行密钥（列 / 删）。见 PasskeyPanel 文件头。 */}
+              <PasskeyPanel active={activeSettingsSection === 'settings-group-profile'} />
+              {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
+              <PasswordPanel />
+              {/*
+                账号安全：**谁现在还能用你的账号登录**（列 / 逐个撤销）。
+                它排在两种"登录方式"之后、"注销账号"之前 —— 这一面板管的不是能不能登录，
+                而是**已经登录着的那些**还在不在。见 SessionsPanel 文件头。
+              */}
+              <SessionsPanel active={activeSettingsSection === 'settings-group-profile'} />
+              {/*
+                账号安全：注销账号（批次 E3）。服务端 `DELETE /api/account` 一直在，
+                缺的是调用点 —— 而 E2 那条"收到注销信号就清本机"的反应也等在这里
+                被主动触发一次，不然它只能靠下一次同步的回声。
+                🔴 它是这一组的**最后一块**、也是唯一的不可逆动作（计划 §5.2 的"危险区"）。
+              */}
+              <CloseAccountPanel />
+                </>
+              )}
             </section>
             {/*
               🔴 「订阅」是**独立一节**（2026-10-24）。页内三段：状态 → 选一档 → 关于收费。
-              它不再挂在「账号与安全」下面：那一节管的是"谁能登录这台账号"，
+              它不再挂在账号下面：那一节管的是"谁能登录这台账号"，
               而这一节管的是"我们替你运维的那台服务器还要不要续" —— 两件不同的事。
               ⚠️ 支付渠道与入口由 `check:payment-entry` 钉成同一件事：没配渠道时
               界面如实说"这台实例没有配置收款通道"，不假装能买。
             */}
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-subscription'} id="settings-group-subscription" aria-label={t('web.settings.nav.subscription')}>
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-subscription'} id="settings-group-subscription" aria-label={t('mobile.settings.section.subscription')}>
               <SubscriptionPanel active={activeSettingsSection === 'settings-group-subscription'} />
             </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-appearance'} id="settings-group-appearance" aria-label={t('web.settings.nav.appearance')}>
+            {/*
+              G3 数据与同步 = 「数据管理」+「同步与隐私」的合体（2026-10 七组同构）。
+
+              🔴 为什么并：这两块回答的是**同一个问题** —— "我的东西在哪、怎么带走、
+              删错了怎么办"。拆成两组时，"备份"在第六组、"同步状态"在第四组，
+              而它们是同一条链上的前后两段（移动端同样是 `sync` ⇒ `data`）。
+
+              ⚠️ id 仍是 `settings-group-data`；`settings-group-sync` 由
+              `LEGACY_SETTINGS_SECTIONS` 折到这一组。
+
+              组内顺序 = 连到哪 → 准不准出门 → 带走/找回：
+              地址是隐私同意与 AI 出境的**前提**，反过来排会让人在一个永远不可能
+              生效的开关上花时间。
+            */}
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-data'} id="settings-group-data" aria-label={t('mobile.settings.section.data')}>
+              {/*
+                🔴 **同步**（工单 H9 第 3 刀，2026-10-06）：地址 / 令牌 / 口令 / 密钥库
+                这一块原来是一个**同级浮层**（rail 那颗齿轮点开它）。产品负责人第 2 条
+                「设置不应该点击头像之后再打开吗？」的病根就在这：那颗齿轮长得像全局设置，
+                点开的却只是同步。现在它是设置里的**一节**，与「隐私同意」「数据」并列 ——
+                一个屏幕、一套出口（✕ / Esc / 点回别的视图），§8.2 第 6 条登记的
+                "这个浮层没有 Esc、焦点进不去"从此没有载体。
+              */}
+              <SyncSettingsPanel
+                active={activeSettingsSection === 'settings-group-data'}
+              />
+              {/*
+                🔴 **隐私同意排在 AI 出境开关之前**（后面 G6 那三道闸）：那一组回答的是
+                "哪一类数据可以出境"，而本面板回答的是"**这台设备准不准出门**" ——
+                后者是前者的前提，顺序反过来会让人在一个永远不可能生效的开关上花时间。
+                它同时是 PIPL 第 15 条要求的**撤回入口**（同意只在首启弹一次）。
+              */}
+              <PrivacyPanel active={activeSettingsSection === 'settings-group-data'} />
+              {/* 导入与迁移 / 备份 / 回收站（`DataSettingsPanel` 文件头）。 */}
+              <DataSettingsPanel active={activeSettingsSection === 'settings-group-data'} />
+            </section>
+            {/*
+              G4 提醒与通知：**这一组是拆出来的**（2026-10 七组同构）。
+
+              🔴 改前这四块全挤在「任务与显示」里 —— 那一组同时装着"长什么样"（主题/语言/
+              日期显示）、"开哪些能力"（功能模块）、"什么时候吵你"（提醒）和"桌面长什么样"
+              （小组件）。组名叫任务与显示、内容的一半跟显示无关，用户每次都要先猜
+              "这个词是按什么分的"。现在它们回答的是同一句用户会说出口的话：
+              **它什么时候、用什么方式找我。**
+
+              组内顺序 = 系统授权 → 打扰偏好 → 桌面小组件（怎么加 → 怎么刷新）。
+            */}
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-notifications'} id="settings-group-notifications" aria-label={t('mobile.settings.section.notifications')}>
+              {/*
+                提醒送达：拒绝授权之后**唯一**的再授权入口（用户得先知道它被拒了，
+                而入口必须和那句话在同一屏上 —— 挂在详情面板里等于要用户再找第二条路）。
+              */}
+              <ReminderNotifyPanel />
+              {/*
+                共享协作的**本地**通知偏好（W5）：它是同步的下游偏好（服务端只广播信号，
+                响不响由本机过滤），所以归属是"打扰偏好"而不是"连到哪"。
+                没配同步时整节不渲染，避免把一堆永不生效的开关摆到界面上。
+              */}
+              {syncConfigured ? <ShareNotificationSettings /> : null}
+              {/*
+                Windows 小组件的后台刷新（Web Push）。
+                🔴 **能力不可用时这个面板自己不画** —— http:// 上、没配 VAPID 的
+                自托管实例上、权限被拒之后，它都是一个点了必然失败的开关。
+                判断逻辑在 `WidgetPushPanel` 里（`probeWidgetPush`），
+                **不在这里** —— 调用点判断条件会被漏掉，而组件自己判断不会。
+              */}
+              {/*
+                卡片从哪来 —— 这一段必须在推送开关**之前**。
+                🔴 顺序是有意的：Windows 的卡片**只来自已安装的 PWA**，
+                用户不先把 heyta 装成应用，推送开关对他毫无意义
+                （卡片还不存在，刷新谁？）。
+              */}
+              <WidgetJourneyPanel />
+              <WidgetPushPanel active={activeSettingsSection === 'settings-group-notifications'} />
+            </section>
+            {/*
+              G5 外观与语言：「它长什么样、怎么念」。
+
+              🔴 组名改前叫「任务与显示」，而它装着主题、语言、日期显示方式、详情栏默认
+              —— 一条都不"任务"。现在组名与内容终于一致（移动端同一组用同一条词条
+              `mobile.settings.section.appearance`，两端一字不差）。
+            */}
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-appearance'} id="settings-group-appearance" aria-label={t('mobile.settings.section.appearance')}>
             {/*
               🔴 **显示偏好**（2026-09-30 从任务页头搬进来）：「日期 | 倒计时」
               两个词悬在页头上，用户不知道它是什么、影响什么 —— 它其实是
               “任务行上的截止时间怎么显示”。显示偏好属于设置：带说明、带上下文。
               设备本地持久化（`due-display-pref.ts`），不进 op-log。
             */}
-            <section className="ht-settings" data-testid="display-pref-panel">
-              {/* 左侧导航已经写着「任务与显示」；这里再写一个「显示」就是同一屏两行近义标题。 */}
+            {/*
+              这一块是「一组行」，不是「一屏」—— 所以是 `.ht-settings` **加**
+              `.ht-settings__rows`：内边距与字号照留（否则这一组的左缘会比别的组
+              偏 16px），`gap` 归零。套整层 `.ht-settings` 的后果是四行之间各多出
+              16px 空隙，行距中位数从 53 撑到 **72**，而判据钉的是 44–56；
+              发丝线本来就在分节，再叠空隙等于把一屏拆成四个孤块。
+            */}
+            <section className="ht-settings ht-settings__rows" data-testid="display-pref-panel">
+              {/* 左侧导航已经写着「外观与语言」；这里再写一个「显示」就是同一屏两行近义标题。 */}
               <div className="ht-settings__preference-row">
               <h3 className="ht-settings__h3 ht-type-row-title">{t('web.shell.dueMode.aria')}</h3>
               <div
@@ -3423,63 +3630,24 @@ export function App(): React.JSX.Element {
               </button>
               </div>
             </section>
-              {/*
-                🔴 **功能模块放在设置页最前**：它决定的不是某一项配置，而是
-                **这个应用长什么样**（关掉的模块从左侧导航消失）。
-                放在最后会变成"翻到底才发现原来能关" —— 而它本该是
-                用户想减负时第一个看到的东西。
-              */}
-              <FeatureModulesPanel enabled={enabledModules} onToggle={onToggleModule} />
-              <ReminderNotifyPanel />
-              {/*
-                Windows 小组件的后台刷新（Web Push）。
-                🔴 **能力不可用时这个面板自己不画** —— http:// 上、没配 VAPID 的
-                自托管实例上、权限被拒之后，它都是一个点了必然失败的开关。
-                判断逻辑在 `WidgetPushPanel` 里（`probeWidgetPush`），
-                **不在这里** —— 调用点判断条件会被漏掉，而组件自己判断不会。
-              */}
-              {/*
-                卡片从哪来 —— 这一段必须在推送开关**之前**。
-                🔴 顺序是有意的：Windows 的卡片**只来自已安装的 PWA**，
-                用户不先把 heyta 装成应用，推送开关对他毫无意义
-                （卡片还不存在，刷新谁？）。
-              */}
-              <WidgetJourneyPanel />
-              <WidgetPushPanel active={activeSettingsSection === 'settings-group-appearance'} />
             </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-sync'} id="settings-group-sync" aria-label={t('web.settings.nav.syncPrivacy')}>
-              {/*
-                🔴 **同步**（工单 H9 第 3 刀，2026-10-06）：地址 / 令牌 / 口令 / 密钥库
-                这一组原来是一个**同级浮层**（rail 那颗齿轮点开它）。产品负责人第 2 条
-                「设置不应该点击头像之后再打开吗？」的病根就在这：那颗齿轮长得像全局设置，
-                点开的却只是同步。现在它是设置里的**一节**，与「显示」「隐私同意」「AI」并列 ——
-                一个屏幕、一套出口（✕ / Esc / 点回别的视图），§8.2 第 6 条登记的
-                "这个浮层没有 Esc、焦点进不去"从此没有载体。
+            {/*
+              G6 功能与 AI = 「AI 与集成」+ 功能模块开关（2026-10 七组同构）。
 
-                排在**功能模块之后、隐私与 AI 之前**是有意的：这一节写的是
-                "数据出门去哪个服务端"，而下面那三道闸（隐私同意 / 允许远程 / 逐功能授权）
-                决定的是"准不准出门" —— 地址是它们的前提，反过来排会让人在一个
-                永远不可能生效的开关上花时间（同一条理由见下面 `PrivacyPanel` 那段）。
-              */}
-              <SyncSettingsPanel
-                active={activeSettingsSection === 'settings-group-sync'}
-              />
-              {/*
-                共享协作的**本地**通知偏好（W5）：跟同步同一组 —— 它是同步的下游
-                偏好（服务端只广播信号，响不响由本机过滤）。没配同步时整节不渲染，
-                避免把一堆永不生效的开关摆到界面上。
-              */}
-              {syncConfigured ? <ShareNotificationSettings /> : null}
-              {/*
-                🔴 **隐私同意排在 AI 出境开关之前**：那三道闸（总开关 / 允许远程 /
-                逐功能授权）回答的是"哪一类数据可以出境"，而本面板回答的是
-                "**这台设备准不准出门**" —— 后者是前者的前提，顺序反过来会让人
-                在一个永远不可能生效的开关上花时间。
-                它同时是 PIPL 第 15 条要求的**撤回入口**（同意只在首启弹一次）。
-              */}
-              <PrivacyPanel active={activeSettingsSection === 'settings-group-sync'} />
-            </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-ai'} id="settings-group-ai" aria-label={t('web.settings.nav.aiIntegrations')}>
+              🔴 为什么并：这两块回答的是**同一个问题** —— "它要开哪些能力、
+              AI 能拿我的数据做什么"。功能模块决定"这个应用长什么样"，
+              AI 的三道闸决定"准不准拿数据出去" —— 都属于"开什么"。
+
+              🔴 **功能模块排在这一组的最前**：关掉的模块从左侧导航消失，
+              所以它是用户想减负时第一个该看到的东西（放最后会变成
+              "翻到底才发现原来能关"）。它原来排在整个设置页最前、与主题/语言/提醒
+              挤在同一组里 —— 那条理由在七组结构里落在这一组的最前。
+
+              ⚠️ id 仍是 `settings-group-ai`；移动端这一组叫 `features`
+              （"功能与 AI"），`settings-group-features` 由折叠表折到这里。
+            */}
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-ai'} id="settings-group-ai" aria-label={t('mobile.settings.section.features')}>
+              <FeatureModulesPanel enabled={enabledModules} onToggle={onToggleModule} />
               <AiSettings
                 active={activeSettingsSection === 'settings-group-ai'}
                 initial={aiSettings}
@@ -3516,46 +3684,18 @@ export function App(): React.JSX.Element {
                 }}
               />
             </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-data'} id="settings-group-data" aria-label={t('web.settings.nav.data')}>
-              <DataSettingsPanel active={activeSettingsSection === 'settings-group-data'} />
-            </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-account'} id="settings-group-account" aria-label={t('web.settings.nav.account')}>
-              {accountNeedsSignIn ? (
-                <SettingsAccountGate
-                  messageKey="web.settings.accountSignIn"
-                  testId="settings-account-needs-sign-in"
-                />
-              ) : (
-                <>
-              {/* 账号安全：管理自己的通行密钥（列 / 删）。见 PasskeyPanel 文件头。 */}
-              <PasskeyPanel active={activeSettingsSection === 'settings-group-account'} />
-              {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
-              <PasswordPanel />
-              {/*
-                账号安全：**谁现在还能用你的账号登录**（列 / 逐个撤销）。
-                它排在两种"登录方式"之后、"注销账号"之前 —— 这一面板管的不是能不能登录，
-                而是**已经登录着的那些**还在不在。见 SessionsPanel 文件头。
-              */}
-              <SessionsPanel active={activeSettingsSection === 'settings-group-account'} />
-              {/*
-                账号安全：注销账号（批次 E3）。服务端 `DELETE /api/account` 一直在，
-                缺的是调用点 —— 而 E2 那条"收到注销信号就清本机"的反应也等在这里
-                被主动触发一次，不然它只能靠下一次同步的回声。
-                🔴 未登录时账号组由上面的统一登录入口承接；面板自身仍保留
-                独立 guard，单独挂载时不会误显示注销控件。
-              */}
-              <CloseAccountPanel />
-                </>
-              )}
-            </section>
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-help'} id="settings-group-help" aria-label={t('web.settings.nav.help')}>
-              {/*
-                🔴 「帮助与关于」是**产品孤岛的另一半**：在此之前，应用里
-                没有任何一处能到达站点的帮助 / 价格 / 更新动态。
-                放在最后是按「关于」类内容的惯例 —— 它不是日常操作，
-                但必须**存在**（否则用户在应用里遇到问题只能去搜索引擎找，
-                而那意味着他会找到别家的产品）。
-              */}
+            {/*
+              G7 关于与帮助（id 沿用 `settings-group-help`）。
+
+              🔴 「帮助与关于」是**产品孤岛的另一半**：在此之前，应用里
+              没有任何一处能到达站点的帮助 / 价格 / 更新动态。
+              放在最后是按「关于」类内容的惯例 —— 它不是日常操作，
+              但必须**存在**（否则用户在应用里遇到问题只能去搜索引擎找，
+              而那意味着他会找到别家的产品）。
+              ⚠️ 移动端这一组叫 `about`（同一条词条 `mobile.settings.section.about`），
+              `settings-group-about` 由折叠表折到这里。
+            */}
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-help'} id="settings-group-help" aria-label={t('mobile.settings.section.about')}>
               <div id="settings-help">
                 <HelpPanel />
               </div>
@@ -3650,7 +3790,7 @@ export function App(): React.JSX.Element {
              因为同一枚布尔还决定行尾让不让位，拆开就会写成"行尾让位、栏里没人接"。
              🔴 备注编辑器的落点在**这一格**，所以行尾那颗备注 chip 在这一支成立时不渲染
              （`renderTaskTrailing` 里的 `noteInColumn`）—— 同一字段任何时刻只有一个所有者。 */
-          <TaskDetailCard />
+          <TaskDetailCard automationSlot={automationSlotNode} />
         ) : contentView === 'tasks' ? (
           /* 兜底那一格是 AI 面（2026-10-04 拍板：无选中时默认显示 Chatbot；
              2026-10-06 第二刀才真的兑现它，判据 = `ai-row-layout.spec.ts` 的落点那一支）。
@@ -3663,6 +3803,64 @@ export function App(): React.JSX.Element {
       </div>
       {/* Keep global decisions outside the view grid: hidden views must not
           hide them, and mobile grid order must not put authentication above them. */}
+      {/*
+        🔴 行操作的两条渲染物：右键菜单与窄档的「任务详情」对话框。
+        都排在**全局决策层之外**（与 `ConflictDialog` 同级），因为它们不是视图内容 ——
+        任务视图切走时菜单必须已经不在了（`rowMenuTask` 那条 effect 会把失效的收走）。
+      */}
+      {rowMenu !== null && rowMenuTask !== undefined ? (
+        <TaskRowMenu
+          taskId={rowMenu.taskId}
+          taskTitle={rowMenuTask.title}
+          childCount={rowMenuChildCount}
+          anchor={{ x: rowMenu.x, y: rowMenu.y }}
+          onClose={closeRowMenu}
+          onOpenDetail={openTask}
+          onDelete={deleteTaskWithReceipt}
+        />
+      ) : null}
+
+      {/*
+        窄档的「任务详情」。走 `WebModalShell` 而不是自绘一层：关闭策略由
+        `closePolicyOf('modal-readonly')` 裁决（背景 / Esc / 返回键都是出口 —— 这一层
+        里没有"关掉就丢"的草稿，字段改一个写一个），焦点隔离与归还也在壳里。
+
+        🔴 为什么要它：行尾那一排编辑器撤掉之后，**这一档是窄窗口下唯一能编辑字段的地方**。
+        少了它，"改截止 / 加提醒 / 挂标签"在窄窗口里会整个消失，而且不报错。
+      */}
+      {detailDialogOpen && selectedTaskId !== null ? (
+        <WebModalShell
+          policy="modal-readonly"
+          testId="task-detail-dialog"
+          /* 🔴 两枚类名必须显式给：共享壳的缺省 `ht-web-modal__*` 在全仓**没有定义**，
+             不给就是一层没有遮罩、不居中的 div（见 `task-row-menu.css` 那一段）。 */
+          overlayClass="ht-row-menu__scrim"
+          dialogClass="ht-row-menu__dialog"
+          labelledBy="task-detail-dialog-title"
+          onCancel={() => {
+            setDetailDialogOpen(false);
+          }}
+        >
+          <div className="ht-row-menu__dialog-head">
+            <h2 id="task-detail-dialog-title" className="ht-type-panel-title" data-testid="task-detail-dialog-title">
+              {t('web.rowMenu.detailTitle')}
+            </h2>
+            <button
+              type="button"
+              className="ht-row-menu__dialog-close"
+              aria-label={t('web.rowMenu.detailClose')}
+              data-testid="task-detail-dialog-close"
+              onClick={() => {
+                setDetailDialogOpen(false);
+              }}
+            >
+              <X size={ICON_SIZE.sm} aria-hidden="true" />
+            </button>
+          </div>
+          <TaskDetailCard automationSlot={automationSlotNode} />
+        </WebModalShell>
+      ) : null}
+
       <ConflictDialog />
       <PrivacyConsentSheet />
       <LegalReconfirmSheet />

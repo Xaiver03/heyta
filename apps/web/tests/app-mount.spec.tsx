@@ -563,18 +563,32 @@ describe('侧栏导航', () => {
     ).toBe('工作');
   });
 
-  it('🔴 任务行上真的有备注输入框（不是只有组件、没人用它）', async () => {
+  it('🔴 备注输入框真的在界面上（不是只有组件、没人用它）', async () => {
     await freshDb();
     await act(async () => {
       await useTaskStore.getState().addTask('写周报');
     });
+    /** `addTask` 不返回 id（它只负责写 op）⇒ 从物化状态里取那一枚。 */
+    const id = Object.keys(useTaskStore.getState().entities.tasks)[0] ?? '';
 
     await mount();
 
-    const noteField = container!.querySelector('textarea[aria-label^="编辑"]');
+    /*
+     * 🔴 2026-11 行操作 UX 重设计：行尾不再挂编辑器（那九项搬进详情面），
+     * 所以这里先**点开这一条**，再找备注输入框。
+     *
+     * 判据本身一个字没改：它钉的是 `NoteEditor` 有没有**被接进整棵树**——
+     * 那个洞的症状是"组件存在、用户写不了备注"。变的是它现在住在哪儿
+     * （详情面），而不是"要不要有备注输入框"。行上写不了、面单里也写不了 = 仍然红。
+     */
+    await act(async () => {
+      container!.querySelector<HTMLElement>(`[data-testid="task-row-${id}"]`)?.click();
+    });
+
+    const noteField = container!.querySelector('[data-testid="task-pane"] textarea[aria-label^="编辑"]');
     expect(
       noteField,
-      '任务行上没有备注输入框：`NoteEditor` 没被接进 `App.tsx`，' +
+      '详情面里没有备注输入框：`NoteEditor` 没被接进 `App.tsx`（行尾与面单都没有），' +
         '于是用户还是写不了备注 —— 这正是要修的那个洞',
     ).not.toBeNull();
   });

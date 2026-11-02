@@ -25,6 +25,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FocusOverview } from '@heyta/app-host';
 import { FocusDetailPane } from '../src/features/focus/FocusDetailPane.js';
 import { useFocusStore } from '../src/features/focus/store.js';
+import { DETAIL_FITS_QUERY } from '../src/lib/breakpoints.js';
 import { LocaleHost } from '../src/lib/locale-host.js';
 import { emptyState } from '@heyta/op-log';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
@@ -73,7 +74,7 @@ beforeEach(() => {
   // 这组接线判据覆盖桌面三栏：任务无选中时，详情列由单一 AI Agent 占位。
   // 直接挂 FocusDetailPane 的单元测试不依赖这个媒体查询。
   window.matchMedia = ((query: string) => ({
-    matches: query === '(min-width: 1024px) and (min-height: 480px)',
+    matches: query === DETAIL_FITS_QUERY,
     media: query,
     onchange: null,
     addEventListener: () => undefined,

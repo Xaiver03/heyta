@@ -31,7 +31,13 @@ async function openWidgetJourney(page: Page) {
   await page.getByTestId('account-menu-avatar').click();
   await page.getByTestId('account-menu-settings').click();
   const sheet = page.getByTestId('settings-sheet');
-  await sheet.locator('[aria-controls="settings-group-appearance"]').click();
+  /*
+   * 🔴 「桌面小组件」那一块 2026-10-27 起住在 **G4 提醒与通知**里，不在「外观与语言」。
+   * 这里原来点的是 `-appearance`：组还在、按钮还在，所以**不会报"选择器找不到"** ——
+   * 症状是切过去之后 `widget-journey-panel` 仍然 `hidden`，红在下一行。
+   * 分组归属的现量在 `apps/web/src/App.tsx` 的 `<section id="settings-group-notifications">`。
+   */
+  await sheet.locator('[aria-controls="settings-group-notifications"]').click();
   const panel = sheet.getByTestId('widget-journey-panel');
   await expect(panel).toBeVisible();
   return panel;

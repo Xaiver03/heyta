@@ -1,4 +1,4 @@
-/* ── 窄屏塌缩（≤768px）────────────────────────────────────
+/* ── 窄屏塌缩（≤48rem = 768px）────────────────────────────────────
  * 🔴 本块必须排在**所有基础规则之后**（同特异性、源序后者胜）。
  * 2026-09-30：塌缩规则曾写在文件前部，被后面的基础规则整块覆盖
  *（"grid 塌了、rail 没塌"），且一个多余的 `}` 让 sidebar 规则逃出媒体块
@@ -38,7 +38,7 @@
  *   在这一档同样要收回；级联上 narrow.css 恒排在 sidebar.css 之后，
  *   不需要再写一份 `.ht-sidebar--calendar` 的重复真源。
  */
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
   /* Stable compact navigation. Long desktop pin lists live in More, not in
      a horizontally scrolling strip that hides recovery actions offscreen. */
   .ht-rail.ht-compact-rail {
@@ -430,7 +430,7 @@
 }
 
 
-/* 平板横屏到小笔记本（769–1023px）：详情列**先不出现**。
+/* 平板横屏到小笔记本（48.0625–63.9375rem = 769–1023px）：详情列**先不出现**。
  *
  * 🔴 这条不是"还没做 W4"的遮羞布，是一个能算出来的账：这一档里
  * rail 4rem + 侧栏 15rem + 详情 22rem 已经吃掉 ~41rem，800px 的窗口只剩 ~256px
@@ -439,7 +439,7 @@
  * 三条恢复路径）在 W4。轨道用 `0` 而不是删掉声明：`--ht-detail-track` 只在
  * `.ht-app` 上算一次，这里覆盖它，两条 `grid-template-columns` 都不用重抄。
  */
-@media (min-width: 769px) and (max-width: 1023px) {
+@media (min-width: 48.0625rem) and (max-width: 63.9375rem) {
   .ht-app {
     --ht-detail-track: 0;
   }
@@ -454,7 +454,7 @@
 
 
 /*
- * 宽**够**但矮（≥1024px 且高 < 480px）：详情列不出现，页头那个开关也不出现（工单 W4 ①）。
+ * 宽**够**但矮（≥64rem = 1024px 且高 < 30rem = 480px）：详情列不出现，页头那个开关也不出现（工单 W4 ①）。
  *
  * 🔴 这一档不是"窄屏的另一种写法"，是把 Android 那条一手规则搬到桌面上。出处是仓库里
  * 已经取过证的这一行（[调研 A1「业界一手规范：四家各自规定了什么」](../../../research/detail-pane-alignment-and-spaced-review.md)，
@@ -474,7 +474,7 @@
  * 把它画出来，得到的是"右边那一栏只看得见一个标题、还得内部滚动，
  * 而中间那一列被挤掉 22rem"。收起的那一栏至少还能看列表，反之不行。
  *
- * ⚠️ 阈值写成 `max-height: 479px` 而不是 `480px`：`(max-height: 480px)` 会把
+ * ⚠️ 阈值写成 `max-height: 29.9375rem`（=479px）而不是 `30rem`（=480px）：`(max-height: 30rem)` 会把
  * **正好 480** 也算进"矮"这一档，而 480 恰好是高度 Medium 的下沿（= 可行）。
  * 边界写错的方向是"把能用的窗口判成不能用"，那比反过来更难被看出来 ——
  * 没人会去截图一个"本该出现却没出现"的界面。
@@ -483,7 +483,7 @@
  * ⚠️ 这条只管几何可行性。**用户主动收起**是另一件事（`base.css` 的
  * `.ht-app[data-detail='collapsed']`），两处的理由不同，不许合成一个布尔。
  */
-@media (min-width: 1024px) and (max-height: 479px) {
+@media (min-width: 64rem) and (max-height: 29.9375rem) {
   .ht-app {
     --ht-detail-track: 0;
   }
@@ -501,7 +501,7 @@
    —— 断链那天用户最需要看见「累计」（ADR-0022）。所以整列换到窗格**上方**，
    而不是把 chip 收进悬停。
    ⚠️ 这条单独成一个媒体块、写在文件末尾：基础规则在它上面，源序保证覆盖成立。 */
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
   .ht-habit {
     grid-template-columns: 1fr;
     gap: var(--ht-space-4);

@@ -156,7 +156,7 @@
 }
 
 /* 窄屏：两种解剖都退回"标签在上"。两列在 36rem 以下会把控件压到不可读。 */
-@media (max-width: 36rem) {
+@media (max-width: 48rem) {
   .ht-input-field--inline {
     grid-template-columns: minmax(0, 1fr);
   }

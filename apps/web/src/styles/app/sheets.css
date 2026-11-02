@@ -292,7 +292,17 @@
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 40rem) {
+/* 设置行的解剖换档：`inline`（标签在左）→ `stacked`（标签在上）。
+ *
+ * 🔴 这是 `docs/agents/ux-principles.md` §1 的两档之一换位，不是"卡片窄了就缩一下"：
+ * 标签那一列 `--ht-layout-form-label-width`（6rem）加上值那一列，在紧凑档里读起来
+ * 是"两个窄条并排"，标签与值会各自折行。档位取**同一把尺**的紧凑上沿（48rem = 768px），
+ * 与导航变底栏、设置双栏变单栏是**同一个**窗口宽度 —— 不是另立一个 640。
+ *
+ * ⚠️ 这一档原来写的是 `40rem`（640px）：于是 641–768 的窗口得到"底栏导航 + 双栏设置行"
+ * —— 导航已经承认自己在移动版式，而行解剖还按桌面排。尺见
+ * `docs/agents/design-system.md` §响应式断点。 */
+@media (max-width: 48rem) {
   .ht-settings__row {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -412,7 +422,7 @@
   }
 }
 
-@media (max-width: 30rem) {
+@media (max-width: 48rem) {
   .ht-sheet {
     padding: var(--ht-space-4);
   }
@@ -913,7 +923,7 @@
   border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 48rem) {
   .ht-settings__sub-plans {
     grid-template-columns: minmax(0, 1fr);
   }

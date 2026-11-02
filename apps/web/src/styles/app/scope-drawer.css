@@ -1,6 +1,6 @@
 .ht-scope-trigger { display: none; }
 
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
   .ht-scope-trigger { display: inline-flex; }
   .ht-scope-drawer {
     padding: 0;

@@ -69,7 +69,8 @@
   function withPlaceholderGate(realContent) {
     return [
       textBlock("${placeholderText}", { isSubtle: true, isVisible: "${showPlaceholder}" }),
-      { type: "Container", isVisible: "${!showPlaceholder}", items: realContent }
+      // $when skips template evaluation too: placeholder data has no quadrant slots.
+      { type: "Container", $when: "${!showPlaceholder}", isVisible: "${!showPlaceholder}", items: realContent }
     ];
   }
   var ADAPTIVE_CARD_TEMPLATES = {

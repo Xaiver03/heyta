@@ -409,6 +409,46 @@ export async function closeSettingsSheet(page: Page): Promise<void> {
 }
 
 /**
+ * 左栏现有七个分组的**后缀**（`aria-controls="settings-group-<slug>"`）。
+ *
+ * 🔴 这一组字与其顺序必须与 `apps/web/src/App.tsx` 的 `SETTINGS_NAV_ITEMS` 一致。
+ * 之前它是就地写进下面那个联合类型里的字面量，而**没有任何判据看着它** ——
+ * 2026-10-27 七组同构之后，四个 e2e 文件还在点 `settings-group-sync` /
+ * `settings-group-account`，那两枚按钮已经不在左栏，症状不是报错而是
+ * 「点了但没切过去」被下一条断言误报成"那一节不在"。
+ * ⇒ 判据是 `scripts/check-e2e-settings-ids.mjs`（它读 `App.tsx` 现量对账，会红）。
+ */
+export const SETTINGS_SLUGS = [
+  'profile',
+  'subscription',
+  'data',
+  'notifications',
+  'appearance',
+  'ai',
+  'help',
+] as const;
+
+export type SettingsSlug = (typeof SETTINGS_SLUGS)[number];
+
+/**
+ * 旧分组名 → 现在那一组（只写**后缀**这一半；整 id 的折叠表在
+ * `apps/web/src/lib/settings-deep-link.ts` 的 `LEGACY_SETTINGS_SECTIONS`）。
+ *
+ * 为什么要留别名而不是一次性改掉 33 处调用点：`selectSettingsSection(page,'sync')`
+ * 表达的是「我要操作同步那一块」，而那一块 2026-10-27 之后住在「数据与同步」里 ——
+ * **意思没变，只是组名变了**。别名让调用点继续成立；一次性改写则漏一处就是
+ * 一条"点了没反应"的假绿（它不会红，只会让断言测到上一节）。
+ */
+const LEGACY_SETTINGS_SLUGS: Readonly<Record<string, SettingsSlug>> = {
+  sync: 'data',
+  account: 'profile',
+  security: 'profile',
+  general: 'notifications',
+  features: 'ai',
+  about: 'help',
+};
+
+/**
  * 在设置浮层里显式选择一个分类。
  *
  * 设置现在是「左侧分类 + 右侧内容」的 IA；打开浮层只负责打开设置，不能偷偷
@@ -417,13 +457,14 @@ export async function closeSettingsSheet(page: Page): Promise<void> {
  */
 export async function selectSettingsSection(
   page: Page,
-  section: 'profile' | 'subscription' | 'appearance' | 'sync' | 'ai' | 'data' | 'account' | 'help',
+  section: SettingsSlug | keyof typeof LEGACY_SETTINGS_SLUGS,
 ): Promise<void> {
-  const button = page.locator(`button[aria-controls="settings-group-${section}"]`);
-  await expect(button, `设置分类 ${section} 必须存在`).toHaveCount(1);
+  const slug: SettingsSlug = LEGACY_SETTINGS_SLUGS[section] ?? (section as SettingsSlug);
+  const button = page.locator(`button[aria-controls="settings-group-${slug}"]`);
+  await expect(button, `设置分类 ${slug} 必须存在`).toHaveCount(1);
   await button.click();
   await expect(button).toHaveAttribute('aria-current', 'page');
-  await expect(page.locator(`#settings-group-${section}`)).toBeVisible();
+  await expect(page.locator(`#settings-group-${slug}`)).toBeVisible();
 }
 
 /**
