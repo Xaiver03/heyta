@@ -65,10 +65,11 @@ async function openSyncSettings(page: Page): Promise<void> {
    * 🔴 设置浮层现在是**分节**的：每一节 `<section hidden={active !== id}>`，
    * 所以"打开设置"之后 `sync-settings-panel` 一定在 DOM 里但**是 hidden** ——
    * 先点导航里那一节才画得出来。按 `aria-controls` 认，不按文案（语言中立）。
-   * ⚠️ 同一枚失效让 vault 套件的两条既有测在当前 HEAD 上就红了（`ai-egress` 与本目录
-   *    那条 three-device 报的是同一句"设置浮层里没有「同步」那一节"），已登记，不代改。
+   * ✅ 2026-10-27 已改：`sync-settings-panel` 现在住在 **G3 数据与同步**（`settings-group-data`），
+   *    所以点的是那一枚。`ai-egress` 与 `vault-journey` 两处同批改掉；
+   *    这类"点了但没切过去"不会再无声发生 —— `scripts/check-e2e-settings-ids.mjs` 会红。
    */
-  await page.locator('[aria-controls="settings-group-sync"]').click();
+  await page.locator('[aria-controls="settings-group-data"]').click();
   const section = page.getByTestId('sync-settings-panel');
   await expect(section, '设置浮层里没有「同步」那一节（或点了导航也没切过去）').toBeVisible();
   await section.scrollIntoViewIfNeeded();

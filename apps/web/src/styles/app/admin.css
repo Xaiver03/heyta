@@ -489,7 +489,7 @@
 /* 窄屏（与 `controls.css` 同一档 40rem）：侧栏从"左列"折成"顶部横条"。
    后台是给运营者用的，运营者多半在宽屏，但地址是公开的 ——
    手机上敲 /admin 也该读得下去，而不是把一格导航压成竖排一个字。 */
-@media (max-width: 40rem) {
+@media (max-width: 48rem) {
   .ht-settings__console-main {
     flex-direction: column;
   }

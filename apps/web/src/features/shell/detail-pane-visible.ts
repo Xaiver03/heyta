@@ -6,14 +6,20 @@
  * 一个藏在 `display:none` 里的编辑器：界面上什么都没发生，数据却已经进模型。
  * 所以放置决定必须读同一个条件，而不是各写一套。
  *
- * ⚠️ 两处规则逐字对齐（改 CSS 就要改这里；`note-editor-placement` 那组判据钉着两侧）：
- *   · `narrow.css` `@media (max-width: 1023px)` ⇒ 隐藏；
- *   · `narrow.css` `@media (min-width: 1024px) and (max-height: 479px)` ⇒ 隐藏。
- *   ⇒ 放得下 = 宽 ≥ 1024 **且** 高 ≥ 480。
+ * ⚠️ 两侧同源现在由 `lib/breakpoints.ts` + 门禁 `scripts/check-breakpoints.mjs` 保证，
+ * **不再靠"逐字对齐"这句注释**（那是两份会各自漂的抄件）：
+ *   · `narrow.css` `@media (max-width: 63.9375rem)` ⇒ 隐藏；
+ *   · `narrow.css` `@media (min-width: 64rem) and (max-height: 29.9375rem)` ⇒ 隐藏。
+ *   ⇒ 放得下 = 宽 ≥ 64rem **且** 高 ≥ 30rem（= 1024 × 480）。
+ * 🔴 这三个数以前在 JS 里是 `1024px` / `480px` 两枚手写字面量 —— "同一个阈值两种拼法"
+ * 那一类缺陷的 JS 版；现在读 `lib/breakpoints.ts`，而 `apps/web/src` 里别的 `.ts`
+ * 再写宽/高字面量会被门禁 B5 判红。
  */
 import { useEffect, useState } from 'react';
 
-export const DETAIL_FITS_QUERY = '(min-width: 1024px) and (min-height: 480px)';
+import { DETAIL_FITS_QUERY } from '../../lib/breakpoints';
+
+export { DETAIL_FITS_QUERY };
 
 const hasMatchMedia = () =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function';

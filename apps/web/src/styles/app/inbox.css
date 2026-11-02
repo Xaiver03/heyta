@@ -358,7 +358,7 @@
  * 窄屏：rail 变成**底部横条**（见 `.ht-rail` 的 `@media`），
  * 所以面板不能再挂在左边 —— 改成贴着那条横条上方、占满宽度。
  */
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
   .ht-inbox__panel {
     left: var(--ht-space-2);
     right: var(--ht-space-2);
@@ -729,7 +729,7 @@
    我第一版又写了一遍，既是冗余，也引入了裸值 1ms。 */
 
 /* Portal keeps this menu above the narrow rail's paint/scroll containment. */
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
   .ht-rail__tab {
     inline-size: auto;
   }

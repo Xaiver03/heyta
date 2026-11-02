@@ -241,7 +241,7 @@
   min-inline-size: 0;
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 48rem) {
   .ht-compose-actions__panel {
     inline-size: min(22rem, calc(100vw - var(--ht-space-6)));
   }
@@ -390,7 +390,7 @@
   --ht-compose-panel-inline: min(24rem, calc(100vw - var(--ht-space-8)));
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 48rem) {
   .ht-compose-actions {
     --ht-compose-panel-inline: min(22rem, calc(100vw - var(--ht-space-6)));
   }

@@ -3,18 +3,24 @@ import { X } from 'lucide-react';
 import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 
-/** Keep the same scope controls; small windows present them on demand. */
+import { COMPACT } from '../../lib/breakpoints';
+
+/**
+ * Keep the same scope controls; small windows present them on demand.
+ *
+ * 🔴 断点读 `lib/breakpoints.ts` 的 `COMPACT`，不写第二个字面量 —— 它与
+ * `useNarrowLayout` 和 `narrow.css` 是同一个判断（门禁 `check:breakpoints` 的 B5 钉着）。 */
 export function ScopeDrawer({ open, onClose, children }: {
   open: boolean; onClose: () => void; children: ReactNode;
 }): React.JSX.Element {
   const { t } = useI18n();
-  const [narrow, setNarrow] = useState(() => typeof matchMedia === 'function' && matchMedia('(max-width: 768px)').matches);
+  const [narrow, setNarrow] = useState(() => typeof matchMedia === 'function' && matchMedia(COMPACT).matches);
   const dialog = useRef<HTMLDialogElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
     if (typeof matchMedia !== 'function') return;
-    const query = matchMedia('(max-width: 768px)');
+    const query = matchMedia(COMPACT);
     const change = (event: MediaQueryListEvent) => {
       if (!event.matches) {
         dialog.current?.close();

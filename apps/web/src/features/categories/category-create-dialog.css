@@ -185,7 +185,7 @@
   }
 }
 
-@media (max-width: 30rem) {
+@media (max-width: 48rem) {
   .ht-category-create-dialog {
     align-items: end;
     padding: 0;

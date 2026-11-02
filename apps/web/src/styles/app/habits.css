@@ -45,7 +45,9 @@
      `.ht-habit` 的轨道会随面单落点搬家（宽屏单列铺满 / 窄屏塌缩 / 回落那支只有 2fr），
      用视口媒体查询会得到"视口够宽而这一列其实很窄"的错判 —— 那正是把卡片挤成
      半张卡宽度、数字被裁的那一份坏（判据 `e2e/tests/habits-two-column.spec.ts` T5）。 */
-  container-type: inline-size;
+  /* 🔴 容器**必须有名字**（2026-10-26）：无名容器解析到"最近的容器祖先"，今天恰好是这一格，
+     改一层 DOM 就换了一把尺，而它不会红。门禁 `check:breakpoints` 的 B6 钉着这一条。 */
+  container: habit / inline-size;
 }
 
 /* 习惯页的工具只属于习惯页：由页头插槽承载，新增不会再挤占清单内容。
@@ -326,7 +328,7 @@
   background: var(--ht-color-surface-raised);
 }
 
-@media (max-width: 36rem) {
+@media (max-width: 48rem) {
   .ht-habit-create-dialog {
     align-items: end;
     padding: var(--ht-space-2);
@@ -459,7 +461,7 @@
   color: var(--ht-color-danger);
 }
 
-@container (min-width: 33rem) {
+@container habit (min-width: 33rem) {
   .ht-habit__add-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -511,7 +513,7 @@
   list-style: none;
 }
 
-@container (min-width: 33rem) {
+@container habit (min-width: 33rem) {
   .ht-habit__list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

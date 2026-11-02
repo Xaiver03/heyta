@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 import { LocaleHost } from '../src/lib/locale-host.js';
+import { DETAIL_FITS_QUERY } from '../src/lib/breakpoints.js';
 import { selection } from '../src/lib/selection.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
 import { usePrivacyStore } from '../src/features/privacy/store.js';
@@ -75,7 +76,7 @@ const railTabs = (): string[] =>
 beforeEach(async () => {
   // jsdom 默认把详情列判成“放不下”；这组测试明确覆盖桌面三栏行为。
   window.matchMedia = ((query: string) => ({
-    matches: query === '(min-width: 1024px) and (min-height: 480px)',
+    matches: query === DETAIL_FITS_QUERY,
     media: query,
     onchange: null,
     addEventListener: () => undefined,

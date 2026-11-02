@@ -146,7 +146,7 @@
   border-block-start: 0;
 }
 
-@media (max-width: 30rem) {
+@media (max-width: 48rem) {
   .ht-settings__profile-section-heading {
     flex-wrap: wrap;
   }

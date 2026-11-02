@@ -60,10 +60,10 @@ async function settings(page: Page): Promise<Locator> {
    * 点完再断言 `aria-current="page"`：不然"点了但没切过去"会被下一条断言
    * 误报成"那一节不在"，而那是两种完全不同的故障。
    */
-  const navSync = page.locator('button[aria-controls="settings-group-sync"]');
-  if (await navSync.isVisible().catch(() => false)) {
-    await navSync.click();
-    await expect(navSync, '点了「同步」那一项，但导航没有把它标成当前项').toHaveAttribute('aria-current', 'page');
+  const navData = page.locator('button[aria-controls="settings-group-data"]');
+  if (await navData.isVisible().catch(() => false)) {
+    await navData.click();
+    await expect(navData, '点了「数据与同步」那一项，但导航没有把它标成当前项').toHaveAttribute('aria-current', 'page');
   }
   const section = page.getByTestId('sync-settings-panel');
   await expect(section, '设置浮层里没有「同步」那一节').toBeVisible();

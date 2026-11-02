@@ -121,7 +121,7 @@
   display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
   [data-testid='growth-milestones'] { grid-template-columns: minmax(0, 1fr); }
   [data-testid='growth-board'] {
     gap: var(--ht-space-5);

@@ -314,7 +314,23 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   }
 }
 
-@media (max-width: 30rem) {
+/*
+  🔴 2026-10-26：这一档原来是 `(max-width: 30rem)`（=480px），只覆盖"竖屏的小手机"。
+  产品负责人的要求是「我用手机浏览器打开对应的界面……也要按照移动端来显示」——
+  而横屏手机（844×390）、折叠屏外屏、以及部分 WebView 的 CSS 宽度都在 480px 以上，
+  它们当时全都落进两栏桌面版。
+
+  所以判据改成**两条并集**：
+    · 窄屏 `≤48rem`（768px）：竖屏手机、小平板、分屏窗口；
+    · **粗指针** `(pointer: coarse)`：触屏设备 —— 宽度可能很大，但输入方式是手指。
+      这与 `AuthPanel` 里用 `pointer: coarse` 判断"口令要不要默认遮住"是同一条依据
+      （NNG/NIST：肩窥与单手错字的权衡），不是新发明的一套判断。
+
+  ⚠️ 触屏笔记本会一起变成这个版式：它们有键盘鼠标、也有手指。取舍是"手指优先"——
+  因为这个版式的每一个控件都仍然可点、可键盘 Tab，而反过来（把手机判成桌面）
+  会让手机用户掉进一个两栏布局，那才是真的用不了。
+*/
+@media (max-width: 48rem), (pointer: coarse) {
   .ht-sheet__auth {
     align-items: end;
     padding: 0;
@@ -328,13 +344,13 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
     border-end-end-radius: 0;
   }
 
+  /*
+    手机上**整块不显示**品牌栏：移动端 App 的认证面本来就没有它（那一屏是
+    "一屏一件事"）。上一版把它压成一条横带留在表单顶上，读起来像"表单上面还有
+    半截东西"，而这正是产品负责人反复说的"上下割裂"。
+  */
   .ht-sheet__auth-plan {
-    grid-row: auto;
-    display: block;
-    min-block-size: auto;
-    padding: var(--ht-space-3) var(--ht-space-4);
-    border-block-end: 0;
-    border-inline-end: 0;
+    display: none;
   }
 
   .ht-sheet__auth-plan-kicker,
@@ -447,7 +463,12 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   75% { transform: scaleX(0.5); }
   100% { transform: scaleX(1); }
 }
-@media (max-width: 30rem) {
+/* 装饰性的"计划预览"只在**两栏**版式里有位置。
+   原来这一档是 `(max-width: 30rem)`（480px）—— 那意味着 481–768 的窗口会同时得到
+   "单栏底部弹层"（上面那条 48rem 的规则）**和**一堆没有地方放的装饰卡片。
+   版式换了、装饰就该跟着走，所以判据与上面那条完全一致：
+   窄屏 `≤48rem` **或** 粗指针。尺见 docs/agents/design-system.md §响应式断点。 */
+@media (max-width: 48rem), (pointer: coarse) {
   .ht-auth-plan-stack { display: none; }
   .ht-auth-plan-backdrop { opacity: 0.06; }
 }

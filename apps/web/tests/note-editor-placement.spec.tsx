@@ -26,6 +26,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emptyState } from '@heyta/op-log';
 import { I18nProvider } from '@heyta/i18n';
 
+import { ABOVE_COMPACT, BELOW_WIDE, COMPACT, SHORT, TALL, WIDE } from '../src/lib/breakpoints.js';
 import { selection } from '../src/lib/selection.js';
 import { __resetOpLogForTests, initOpLog, useTaskStore } from '../src/features/tasks/store.js';
 import { useNoteStore } from '../src/features/notes/store.js';
@@ -99,16 +100,23 @@ const editorsIn = (view: HTMLElement) =>
   Array.from(view.querySelectorAll<HTMLElement>('[data-testid="notes-editor"]'));
 
 describe('P1 那一栏"放不放得下"只有一个算法', () => {
+  /**
+   * 🔴 2026-10-26：这三条媒体查询串**不再逐字抄在判据里**（原来是 `768px` / `769px` /
+   * `1023px` / `1024px` / `479px` 五枚手写字面量 —— 也就是这一轮要收口的那类缺陷：
+   * 同一个阈值两种拼法、互补的两半各写一处）。现在判据的输入是**尺本身**：
+   * `lib/breakpoints.ts` 导出的 `BELOW_WIDE` / `SHORT` 与 `narrow.css` 里那三条规则。
+   *
+   * 判据的**意图一字未改**，反而更紧了一格：任一侧改档而另一侧没跟，这里就红
+   * （之前两侧都写死成 px，改 CSS 的人只要不手抄一遍旧串就会红 —— 而通常他会连同判据一起改）。
+   */
   it('查询串与 narrow.css 的三条隐藏规则同源', () => {
-    expect(DETAIL_FITS_QUERY).toBe('(min-width: 1024px) and (min-height: 480px)');
     const css = readFileSync(join(process.cwd(), 'src/styles/app/narrow.css'), 'utf8');
-    // 🔴 反向钉的是"那三条**各自**都藏了详情列"，不是"文件里有这三个串" ——
-    // 只查串在不在，等于把判据写成一份会漂的抄件：别人加一条不藏详情列的同款媒体查询，
-    // 这里照样绿。三条的并集 = 宽 ≤1023 或（宽 ≥1024 且高 ≤479）⇒ 看得见 = 宽 ≥1024 且高 ≥480。
+    // 判据的输入来自尺（不是抄件）：`BELOW_WIDE` = 宽屏档的互补上限，`SHORT` = 矮屏。
+    expect(DETAIL_FITS_QUERY).toBe(`${WIDE} and ${TALL}`);
     for (const q of [
-      '@media (max-width: 768px)',
-      '@media (min-width: 769px) and (max-width: 1023px)',
-      '@media (min-width: 1024px) and (max-height: 479px)',
+      `@media ${COMPACT}`,
+      `@media ${ABOVE_COMPACT} and ${BELOW_WIDE}`,
+      `@media ${WIDE} and ${SHORT}`,
     ]) {
       const at = css.indexOf(q);
       expect(at, `narrow.css 里找不到 ${q}`).toBeGreaterThan(-1);
