@@ -426,7 +426,7 @@ export const zhCN = {
   'landing.mock.date': '日期',
   'landing.mock.countdown': '倒计时',
   'landing.mock.synced': '已同步',
-  'landing.mock.composeHint': '添加任务，回车确认（可写「明天」「下周三」「!1」）',
+  'landing.mock.composeHint': '添加任务，回车确认（可写「明天」「下周三」）',
   'landing.mock.add': '添加',
 
   // 任务示例（四象限网格与番茄钟的"关联任务"复用同几条）
@@ -799,6 +799,21 @@ export const zhCN = {
   'web.shell.tasks.more': '更多操作：{title}',
   'web.shell.tasks.moreLabel': '更多',
   'web.shell.tasks.delete': '删除：{title}',
+  // ── 任务行的右键菜单（行操作 UX 重设计，2026-11）────────────────
+  // 一级菜单**只有两枚**：打开详情 / 删除。移动、标签、子任务、截止、重复、提醒、
+  // 专注、AI 一律不进这里 —— 它们住在详情面（`TaskDetailCard`）。
+  // ⚠️ `label` 必须带标题：屏幕上同时有多行，读屏念一串"任务操作"分不出是哪一条。
+  'web.rowMenu.label': '任务操作：{title}',
+  'web.rowMenu.open': '打开详情',
+  'web.rowMenu.delete': '删除',
+  // `popconfirm` 那一档的后果句（带子任务时才出现）。事实依据：删除只给父任务写墓碑，
+  // `@heyta/domain` 的 `buildTaskTree` 会把"父已删除"的子任务**提到顶层**显示。
+  'web.rowMenu.childConsequence': '它下面还有 {count} 条子任务，删除后它们会被提到顶层。',
+  'web.rowMenu.confirmDelete': '仍要删除',
+  'web.rowMenu.cancel': '取消',
+  // 窄档（详情列放不下 / 被收起）时，那一格改成对话框 —— 标题与关闭按钮的读法。
+  'web.rowMenu.detailTitle': '任务详情',
+  'web.rowMenu.detailClose': '关闭任务详情',
   // 🔴 任务动作失败时要显示的那一行（布局审计 §8.2 第 12 条）。
   // 刻意**不插值内部错误原文**：上游给不出原因分类，而把 `error.message`
   // 贴到界面上等于把诊断信息当文案。对应的码是
@@ -2867,11 +2882,11 @@ export const zhCN = {
   // ── Web · 捕获输入框 ──────────────────────────────────────
   // ✅ 日期那一条里**不再**嵌 `formatRemainingUntil()` 的中文了 ——
   // 剩余天数现在由壳按当前语言说（`web.due.*`，见下）。
-  'web.capture.placeholder': '添加任务，回车确认（可写「明天」「下周三」「!1」）',
+  'web.capture.placeholder': '添加任务，回车确认（可写「明天」「下周三」）',
   // 🔴 「添加到哪儿」必须出现在占位符里。当下面板停在某个清单时，
   // 「添加任务」这句话只说了一半 —— 用户按回车后任务落进收集箱、
   // 从眼前这条列表里消失，而界面上没有任何一处说过这件事。
-  'web.capture.placeholderTo': '添加任务到「{list}」，回车确认（可写「明天」「下周三」「!1」）',
+  'web.capture.placeholderTo': '添加任务到「{list}」，回车确认（可写「明天」「下周三」）',
   // R11 批五：日历里选中了某一天时，捕获框要**说出落点**。
   // 悄悄改变一条任务的落点属于『界面没说谎、但用户以为没说』那一类，
   // 所以这句提示是功能的一部分，不是装饰。
@@ -3157,7 +3172,7 @@ export const zhCN = {
   'mobile.tab.calendar': '日历',
   'mobile.tab.focus': '专注',
   'mobile.tab.profile': '我的',
-  'mobile.tab.categories': '分类',
+  'mobile.tab.categories': '统计',
 
   // ── 移动端 · 分类时长 ──────────────────────────────────────
   // 🔴 这一组里**只许有事实句**：某类做了多久、这些时间怎么算出来的。
@@ -3298,7 +3313,7 @@ export const zhCN = {
   //    识别芯片，而移动端一直以来只是一个纯标题输入框 —— 同一句话在两端
   //    建出不同的任务。现在两端共用同一个 `@heyta/ui` 的 `CaptureComposer`，
   //    差别只剩措辞。
-  'mobile.capture.placeholder': '添加任务（可写「明天」「下周三」「!1」）',
+  'mobile.capture.placeholder': '添加任务（可写「明天」「下周三」）',
   'mobile.capture.addLabel': '新任务标题',
   'mobile.capture.add': '添加',
   'mobile.capture.matchesAria': '识别出的字段',
@@ -3556,14 +3571,11 @@ export const zhCN = {
   //    （规范 §0）。所以这里必须**同时**有主按钮（注册 / 登录）与出口（先离线使用）——
   //    少了出口，应用就从「本地优先」变成「必须联网才能开始用」。
   'mobile.welcome.title': '开始安排今天',
-  'mobile.welcome.tagline': '本地优先的任务管理：离线照常可用，加密可以自己开，服务器可以是你自己的。',
   'mobile.welcome.signIn': '注册 / 登录',
   'mobile.welcome.offline': '先离线使用',
-  'mobile.welcome.offlineHint': '不登录也能建任务、打卡、专注；以后随时可以在「我的」页登录。',
 
   // ── 移动端 · 注册 / 登录面板（规范 §3.2）────────────────────
   'mobile.auth.title': '注册 / 登录',
-  'mobile.auth.intro': '用邮箱和密码注册或登录。登录成功后，服务器地址、访问令牌与端到端加密口令会自动接上同步。',
   'mobile.auth.central.intro': '使用统一身份登录 heyta；登录完成后，再用本机的端到端加密口令启用同步。',
   'mobile.auth.central.start': '使用统一身份登录',
   'mobile.auth.central.termsRequired': '先勾选同意项，再继续统一身份登录。',
@@ -3639,11 +3651,19 @@ export const zhCN = {
   'mobile.profile.title': '我的',
   // 🔴 设置是**独立的第二层表面**（RN Modal），不是「我的」滚动流里的一段 ——
   //    对标 §11.5 的规律（次级表面独立成面）。入口行在「我的」上，内容在设置面里。
+  // ── 设置分组的**意图命名**（2026-10-27 IA 迁移）────────────────────────────
+  // 旧的 section.profile/general/sync/security 等键保留（深链与 e2e 还引用），
+  // 但目录里显示的是下面这七条 —— 每一组回答"我要做的那件事属于哪一类"。
+  'mobile.settings.section.account': '账号',
+  'mobile.settings.section.notifications': '提醒与通知',
+  'mobile.settings.section.appearance': '外观与语言',
+  'mobile.settings.section.features': '功能与 AI',
+  'mobile.settings.section.about': '关于与帮助',
   'mobile.settings.section.profile': '个人资料',
   'mobile.settings.section.general': '常规',
   'mobile.settings.section.sync': '同步与隐私',
   'mobile.settings.section.ai': 'AI 与集成',
-  'mobile.settings.section.data': '数据管理',
+  'mobile.settings.section.data': '数据与同步',
   'mobile.settings.section.security': '账号安全',
   'mobile.settings.directory.title': '偏好与账号',
   'mobile.settings.directory.hint': '选择要调整的内容。',

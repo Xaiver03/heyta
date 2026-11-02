@@ -12370,6 +12370,46 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ③ 判据红了先怀疑判据：那一次 `walk()` 的错误让一条通过的构建看起来像失败，
     比反过来更容易骗人 —— 因为人会先去修"构建"。
 
+624. 🔴 **设备腿跑在"英文环境的模拟器"上 ⇒ 中文锚点全部落空，而报错说"面板没出现"**（2026-10-26）：
+
+    在 `linux-dev` 的 AVD 上跑 `verify-mobile-auth.sh`，第 0.5 步报
+    「pm clear 之后冷启动**没有**征求隐私同意」——截图一看，**弹窗在**，
+    只是整屏是英文（`Before any network feature runs` / `Agree and connect`），
+    而脚本的锚点是 `L_TERMS="我同意服务条款与隐私政策，并允许本机联网"` 这类**中文原文**。
+    `xy_text` / `has_text` 都是逐字匹配 ⇒ 一条都命中不了，于是**功能全对、判据全红**。
+
+    **固定动作**（新建 AVD / 换机器时先做一次，重启生效）：
+    ```sh
+    adb -s <serial> root            # 模拟器可 root
+    adb -s <serial> shell 'setprop persist.sys.locale zh-CN; setprop persist.sys.language zh; setprop persist.sys.country CN'
+    adb -s <serial> reboot
+    ```
+    ⚠️ `settings put system system_locales zh-CN` **对已启动的系统不够**：属性要 zygote
+    重启后才会被读进资源配置。判据：截图里 UI 是中文，且 `getprop persist.sys.locale` = `zh-CN`。
+
+625. 🔴 **`adb reverse` 是设备级映射，**设备一重启就没了**——症状是界面说"连不上服务端"**（2026-10-26）：
+
+    为切 locale 重启了模拟器，之后第 3 步（注册）界面报
+    「连不上服务端，检查地址与网络后重试。」——而服务端、隧道、地址全是对的，
+    只是那条 `adb reverse tcp:3210 tcp:3210` 随重启消失了。
+    **规矩**：设备侧地址是回环时，**脚本自己在开跑前重建一次**（现在
+    `verify-mobile-auth.sh` 的 setup 段就会做，失败直接 `exit 3`），
+    不要指望调用方记得。判据：脚本开头的 `✅ 已建立 adb reverse tcp:…` 那行。
+
+626. 🔴 **屏幕上有一个永不停止的动画 ⇒ `uiautomator dump` 永远等不到 idle**（2026-10-26）：
+
+    首屏加过一层 Ken Burns（`Animated.loop` 缓慢放大再回落），于是
+    `adb shell uiautomator dump` 报 `could not get idle state`，
+    设备腿里**每一条**基于 dump 的断言都拿不到界面，报"拿不到真实界面（环境失败）"。
+
+    两处都要修：① **应用侧不要常驻循环**（换页淡入这类**有终点**的动画可以留）；
+    ② **脚本侧**在开跑前把系统动画关掉（`animator_duration_scale` /
+    `transition_animation_scale` / `window_animation_scale` 置 0，并在 **EXIT trap 里还原**），
+    它同时让 RN 的 `reduceMotion` 为真 ⇒ "减少动效"那条分支在真机上也被走了一遍。
+    ⚠️ **还原要串到已有的 EXIT trap 上**，不要裸 `trap … EXIT`：共享库
+    `lib/mobile-e2e.sh` 已经装了一个（`restore_ime`），裸覆盖会把它静默换掉，
+    跑完设备就**没有软键盘**了（`verify-mobile-auth.sh` 第 7 步会自己报出来）。
+
 627. 🔴 **`evaluateJavaScript` 不 await Promise；而壳回 Swift `nil` 时页侧拿到的是 `undefined`，不是 `null`**（2026-11-02，macOS 壳的钥匙串探针连撞两下）：
 
     想从壳里验"页侧 ⇄ 原生"的一整趟往返，写了：
@@ -12485,3 +12525,92 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ② 想验证"这枚钥匙会不会跟着备份去另一台机器"，macOS 上只有数据保护钥匙串能给，
     而那要先加 `keychain-access-groups` + 换 profile 重签 —— 是一次独立改动，别当"顺手一行"；
     ③ 看到"改完测试全绿"就以为属性生效了？这类**平台静默忽略**的坑，绿恰恰是它的正常症状。
+
+632. 🔴 **验收库落后于代码 ⇒ 同步在**服务端**就失败了，而症状是"另一台设备读不到"**（2026-10-27）：
+
+    `verify-mobile-auth.sh` 第 6 步（手机建任务 → 另一台设备读到）连续多轮红，
+    报"900 秒内没读到"。方向很容易被带到同步协议或冲突解决上。查服务端日志才看到真身：
+
+    ```
+    The column `user_sync_state.payload_mode` does not exist in the current database.
+    [ERROR] [user:359] Payload mode read failed
+    Download: 0 ops (sinceSeq=0, latestSeq=0, ...)
+    ```
+
+    也就是说：`heyta_mobile_smoke` 这个库**从来没迁移到最新 schema**。
+    `mobile-e2e-up.sh` 只**断言**"库要先存在且已迁移"，它自己**不跑迁移**
+    （注释里写着这句），于是换了一台机器/隔了几天跑，库就落后了。
+    而"落后"的表现是**服务端在 sync 里抛错**，客户端只看到"没数据"。
+
+    **固定动作**（用仓库自己的迁移脚本，不要裸 `prisma migrate deploy`）：
+    ```sh
+    cd server && DATABASE_URL="postgresql://$(whoami)@127.0.0.1:5432/heyta_mobile_smoke" sh scripts/migrate-deploy.sh
+    ```
+    判据：跑完打印 `All migrations have been successfully applied.`，
+    且 `information_schema.columns` 里 `user_sync_state` 有 `payload_mode`。
+    ⚠️ 迁移之后**服务端不用重启**（Prisma 不缓存 schema），但**已经失败的同步要重跑**。
+
+    诊断该看哪里：服务端日志里 `[ERROR] [user:N]` 那几行，不要只看客户端返回码。
+    实测修复后同一账号的 `latestSeq` 从 0 变成 1 —— 手机的 op **确实上去了**，
+    剩下的只是对端游标/解密问题，与认证链路无关。
+
+633. 🔴 **子 Agent "中途失败" 不是任务问题：上游 provider 抖动（`PI_AI_ERROR`）**（2026-10-27）：
+
+    连着派三个子 Agent 去清设置页说明文字，两个**都中途没了收尾消息**，看起来像
+    "任务太重 / 提示词有问题 / 上下文爆了"。查会话转录才知道真身：
+
+    ```
+    turn/end {"reason":{"kind":"error","error":{"code":"PI_AI_ERROR",
+      "message":"server_error: Upstream request failed: [api_error]
+      The upstream provider is temporarily unavailable. Please try again later."}}}
+    ```
+
+    同一批 7 个子 Agent 里 **5 个正常收尾**，2 个死在这个错误码上，两次相隔约 8 分钟
+    —— 一段上游故障窗口。**同一窗口里图片生成路由也在连不上**（`Connection error`），
+    是同一件事，不是两件。
+
+    **怎么判**：子 Agent 失败时先读它的转录尾巴
+    （`~/.dsh/sessions/<workspace>/<agent-id>/session.v4.jsonl.zstd`），看
+    `turn/end.reason.error.code`：
+      · `PI_AI_ERROR` / `api_error` / "temporarily unavailable" ⇒ **重试**，活儿没丢；
+      · 正常 `ok` 却报失败 ⇒ 才是任务/提示词的问题。
+
+    **怎么防**：① 把一件大活拆小（单次跑得越久，撞上故障窗口的概率越高）；
+    ② 关键路径**自己在主线程做**，别把唯一能推进的一步押在子 Agent 上；
+    ③ 失败后**重派同一个任务**是正确动作，不要因为"它又挂了"就换方案。
+
+### 634. `apps/web` 的 5s 用例上限在这台机器上会批量假红 —— 量到的全是 transform 时间
+
+**症状**：`pnpm --filter @heyta/web test` 一次报 **51–61 个文件 / 154–210 条**失败，
+失败的几乎每一句都是 `Error: Test timed out in 5000ms.`，而且集中在**凡是会挂载整个 `App`**
+的用例（`app-mount` / 设置面 / 日历 / 习惯 / inbound / 任务详情）。
+
+**一眼看上去像**：一次大面积回归。实际不是 —— 其中任何一条单独加长上限就过。
+
+**根因**：本机的 `vitest` **没有开 transform 缓存**（它自己会提示
+`persist transforms across runs with fsModuleCache: true`），每次跑都重新转译整棵
+react-native-web / 共享包依赖。实测单文件 26 条用例：
+
+| 读数 | 值 |
+|---|---|
+| 整个文件耗时 | 195s（其中 transform **87s**） |
+| 单条用例上限 | 5s（默认） |
+| 同一条用例加长到 60s | **通过**（transform 仍需 45s，但用例本身 3% 时间） |
+
+也就是说 5s 那条线的**分母**是"用例自己跑多久"，而失败的用例总是在等待首次挂载 +
+首次 import 完成 —— 一旦这台机器同时在跑别的重活（e2e 的 chromium / `pnpm -r build`），
+5s 立刻不够。
+
+**怎么防**：
+
+1. **先分清两件事**：`Test timed out in 5000ms` 是**环境读数**，不是产品判据。
+   要证明"我的改动没坏东西"，挑**相关**那几支用 `--testTimeout=60000` 单独跑，
+   别拿全量红/绿当证据；
+2. **不要**用"把 5s 改成 60s"来消红 —— 那会让真的死循环用例也变成 60s 才报，
+   而且没解决"每次重转译"这个代价；
+3. 真正要治的是**并发**：`pnpm -r build` / playwright 套件 / vitest 三者**不要同时跑**。
+   本轮实测：先跑 e2e 再跑 vitest 时 `packages/ui/dist/index.js.map` 在跑的途中被重建，
+   于是 e2e 侧报 `ENOENT ... .map`、挂载等待 15s 超时（那条被记成 flaky），
+   而 vitest 侧报 210 条超时 —— **两个红都是自己制造的**；
+4. 想彻底解决是**一次独立的决定**（`fsModuleCache` / 提高默认上限 / 拆分 App 挂载夹具），
+   不在"顺手改一下测试配置"的范围里。
