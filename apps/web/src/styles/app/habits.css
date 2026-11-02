@@ -336,7 +336,7 @@
 
   .ht-habit-create-dialog__dialog {
     max-block-size: 92dvh;
-    border-radius: var(--ht-radius-lg);
+    border-radius: var(--ht-radius-dialog);
   }
 }
 

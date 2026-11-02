@@ -607,7 +607,8 @@
   max-height: 90vh;
   overflow-y: auto;
   padding: var(--ht-space-6);
-  border-radius: var(--ht-radius-lg);
+  /* 弹窗圆角 24px（DSH Modal）。比卡片(12)明显更圆 —— 它在层级上就是更高一层的东西。 */
+  border-radius: var(--ht-radius-dialog);
   background: var(--ht-color-surface-raised);
   box-shadow: var(--ht-shadow-lg);
   color: var(--ht-color-foreground);

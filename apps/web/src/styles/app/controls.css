@@ -1,5 +1,17 @@
 /* ── 按钮 ───────────────────────────────────────────── */
 
+/**
+ * 🔴 **共享弹窗壳的缺省类名一直没人定义**（`task-row-menu.css` 的注释点名过这件事：
+ * "`ht-web-modal__*` 在全仓没有定义（`grep ht-web-modal apps/web/src/styles` 零命中）"）。
+ * 调用方都得显式传 `dialogClass` 才不至于渲染成一层不居中、无遮罩的 div。
+ *
+ * 这里只补**圆角**这一格，不补遮罩/居中 —— 那属于布局，交给调用方自己的类；
+ * 而圆角是"弹窗"这个东西的属性，没有理由每个调用方抄一遍。
+ */
+.ht-web-modal__dialog {
+  border-radius: var(--ht-radius-dialog);
+}
+
 .ht-btn {
   display: inline-flex;
   align-items: center;
@@ -7,7 +19,8 @@
   gap: var(--ht-space-2);
   min-block-size: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-4);
-  border-radius: var(--ht-radius-md);
+  /* 按钮圆角走**自己的**语义档（18px，DSH Button）：输入框仍是 md(8)，两者不同源。 */
+  border-radius: var(--ht-radius-button);
   font-size: var(--ht-font-size-sm);
   font-weight: var(--ht-font-weight-medium);
   /* 按钮文字不随容器收缩竖折 —— 折行的按钮不是按钮，是排版事故。 */

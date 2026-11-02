@@ -144,6 +144,8 @@ enum HeytaTokens {
     static let radiusMd: Double = 8  // px
     static let radiusLg: Double = 12  // px
     static let radiusXl: Double = 16  // px
+    static let radiusButton: Double = 18  // px
+    static let radiusDialog: Double = 24  // px
     static let radiusFull: Double = 9999  // px
     static let shadowNone: String = "none"
     static let shadowSm: String = "0 1px 2px rgb(15 23 42 / 0.05)"

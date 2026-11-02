@@ -285,7 +285,19 @@
   --ht-radius-sm: 0.25rem;  /* 4px  — 标签 */
   --ht-radius-md: 0.5rem;   /* 8px  — 按钮、输入框 */
   --ht-radius-lg: 0.75rem;  /* 12px — 卡片 */
-  --ht-radius-xl: 1rem;     /* 16px — 弹窗 */
+  --ht-radius-xl: 1rem;     /* 16px — 弹窗（旧档，逐步让位给 dialog） */
+  /**
+   * **按钮**与**弹窗**两档 —— DSH 对齐新增（2026-11-02 产品负责人拍板：
+   * 「按钮和弹窗可以变圆一些。也应该变圆一些。」）。
+   *
+   * 实测 DSH：`Button.module.css` = **18px**、`Modal.module.css` = **24px**，
+   * 而 heyta 分别是 8（`radius-md`）与 16（`radius-xl`）。
+   * 🔴 不直接把 `radius-md` 改成 18：那个 token 同时管**输入框**，
+   * 而 DSH 的 `Input.module.css` 恰好是 **8px** —— 改它会把输入框一起带圆，
+   * 与 DSH 反向而行。所以按钮/弹窗各给一个**语义 token**。
+   */
+  --ht-radius-button: 1.125rem; /* 18px — 按钮（DSH Button） */
+  --ht-radius-dialog: 1.5rem;   /* 24px — 弹窗（DSH Modal） */
   --ht-radius-full: 9999px; /* 胶囊、头像 */
 
   /* 阴影：克制。扁平风格优先用边框表达层次，阴影只用于浮层。 */

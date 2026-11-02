@@ -79,7 +79,7 @@ const styles = {
     flexDirection: 'column',
     gap: cssVar('space.4'),
     background: cssVar('color.surface-raised'),
-    borderRadius: cssVar('radius.lg'),
+    borderRadius: cssVar('radius.dialog'),
     boxShadow: cssVar('shadow.lg'),
     padding: cssVar('space.6'),
     color: cssVar('color.foreground'),
