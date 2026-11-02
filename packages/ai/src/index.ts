@@ -118,6 +118,9 @@ export {
   readServerCode,
   type AiFailure,
   type AiFailureReason,
+  // 一张待发图片的形状。**壳要能构造它**（编码完就是这样交给编排层的），
+  // 所以类型必须出包 —— 但组装请求体那份实现不出包（同 `buildChatRequestBody`）。
+  type AiImagePart,
   type AiInvocation,
   type AiProvider,
   type AiProviderConfig,

@@ -955,3 +955,105 @@ describe('🔴🔴 回退不跨越隐私边界', () => {
     expect(outcome.ok).toBe(true);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// 图片：截图转任务
+// ─────────────────────────────────────────────────────────────────────────
+
+const VISION_ENDPOINT = {
+  ...LOCAL_ENDPOINT,
+  id: 'local-vision',
+  label: '本机视觉',
+  capabilities: ['structured_output', 'vision'],
+};
+
+/** 一张 1×1 PNG。这里不解码它 —— 判据是"字节有没有出现在请求体里"。 */
+const PNG_PART = {
+  mediaType: 'image/png' as const,
+  base64:
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+};
+
+describe('🔴 图片：截图转任务', () => {
+  it('有图时 `fields` 多一个 `images`，并要求端点声明 `vision`', () => {
+    const inv = buildCaptureInvocation({
+      locale: 'zh-CN',
+      text: '这条截图里是什么',
+      now: NOW,
+      images: [PNG_PART],
+    });
+
+    expect(inv.fields).toContain('images');
+    expect(inv.requires).toEqual(['vision']);
+    expect(inv.images).toHaveLength(1);
+    // 提示词要**如实**说有几张，否则模型不知道自己该看几张图
+    expect(inv.user).toContain('1 张图片');
+  });
+
+  it('🔴 没图时 `images` / `requires` 两个键**整个不出现**（请求体逐字不变）', () => {
+    const inv = buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: NOW });
+    expect('requires' in inv).toBe(false);
+    expect('images' in inv).toBe(false);
+    expect(inv.fields).not.toContain('images');
+  });
+
+  it('只有图、没有字是**合法输入**：给模型一句默认指令，不是一句空话', () => {
+    const inv = buildCaptureInvocation({
+      locale: 'zh-CN',
+      text: '',
+      now: NOW,
+      images: [PNG_PART],
+    });
+    expect(inv.user).toContain('没打字，只有图');
+    expect(inv.user).not.toContain('要捕获的一句话：\n');
+  });
+
+  it('🔴 只有图时不会被 `empty-text` 拒在路由之前（真发请求）', async () => {
+    const { impl, calls } = fetchReturning('{"title":"买牛奶"}');
+    const outcome = await requestCapture(
+      { locale: 'zh-CN', text: '', now: NOW, images: [PNG_PART] },
+      {
+        routing: routing([VISION_ENDPOINT], { capture: ['local-vision'] }),
+        consents: [],
+        routed: { fetchImpl: impl },
+      },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(outcome.ok).toBe(true);
+  });
+
+  it('🔴 图片真的进了线格式（请求体里是 image_url + data URL）', async () => {
+    const { impl, calls } = fetchReturning('{"title":"买牛奶"}');
+    await requestCapture(
+      { locale: 'zh-CN', text: '看图', now: NOW, images: [PNG_PART] },
+      {
+        routing: routing([VISION_ENDPOINT], { capture: ['local-vision'] }),
+        consents: [],
+        routed: { fetchImpl: impl },
+      },
+    );
+
+    const body = calls[0]?.body ?? '';
+    expect(body).toContain('"image_url"');
+    expect(body).toContain('data:image/png;base64,');
+    expect(body).toContain(PNG_PART.base64.slice(0, 32));
+  });
+
+  it('🔴 端点没声明 `vision` ⇒ 被排除，且一个字节都不发', async () => {
+    const { impl, calls } = fetchReturning('{"title":"买牛奶"}');
+    const outcome = await requestCapture(
+      { locale: 'zh-CN', text: '看图', now: NOW, images: [PNG_PART] },
+      {
+        // 同一个端点、同一条路由，只是**没有声明** vision
+        routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
+        consents: [],
+        routed: { fetchImpl: impl },
+      },
+    );
+
+    expect(calls).toHaveLength(0);
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.reason).toBe('ai-unavailable');
+  });
+});

@@ -65,7 +65,9 @@ import {
 } from '@heyta/domain';
 import {
   invokeRouted,
+  type AiCapability,
   type AiFeature,
+  type AiImagePart,
   type AiRoutingConfig,
   type AiRoutingPolicy,
   type EgressConsent,
@@ -133,6 +135,18 @@ export interface CaptureSource {
    *      披露里的"今天"和真正发出去的不是同一天（见 `AiCapture.tsx`）。
    */
   now?: number;
+  /**
+   * 这次一并交给模型的图片（**已归一化到出境预算内**）。
+   *
+   * 🔴 有图时这条路的要求会变：`fields` 多一个 `images`、请求多一条
+   * `requires: ['vision']`。后者是"本次请求额外要求端点声明视觉能力"——
+   * 不给图片另开一个 `AiFeature`，理由见 `@heyta/ai` 的 `AiInvocation.requires`。
+   *
+   * ⚠️ 图片**不进 op-log、不同步**：它只活在这一次请求里。落库的只有模型
+   * 解析出来的标题/日期/优先级。这条是 ADR-0005"AI 是输入法"的直接后果 ——
+   * 输入法不存你打的字。
+   */
+  images?: readonly AiImagePart[];
 }
 
 /**
@@ -164,8 +178,11 @@ export function buildCaptureInvocation(
   system: string;
   user: string;
   fields: readonly string[];
+  images?: readonly AiImagePart[];
+  requires?: readonly AiCapability[];
 } {
   const fields: string[] = ['today', 'text'];
+  const images = source.images ?? [];
 
   // 🔴 锚点由 `calendar-anchor.ts` **唯一**生产（原来这里自己算 day/weekday，
   //    是"每条链路各写一句"的第一份）。多出来的时区不是装饰：
@@ -178,7 +195,17 @@ export function buildCaptureInvocation(
   const text =
     raw.length > MAX_CAPTURE_INPUT_LENGTH ? raw.slice(0, MAX_CAPTURE_INPUT_LENGTH) : raw;
 
-  const lines = [anchor, `要捕获的一句话：${text}`];
+  // ⚠️ 只有图、没有字是**合法输入**（截图转任务就是这么用的）。这时给模型
+  // 一句默认指令，而不是让它对着一句空话猜。
+  const spoken = text === '' && images.length > 0 ? '（没打字，只有图）' : text;
+  const lines = [anchor, `要捕获的一句话：${spoken}`];
+
+  if (images.length > 0) {
+    fields.push('images');
+    lines.push(
+      `附了 ${String(images.length)} 张图片。图片里可能写着任务（截图、清单、聊天记录），把图里的文字一起读出来。`,
+    );
+  }
 
   // 🔴 偏好看成**一个字段**（`preferences`），不是每项一个。
   // 理由：出境授权与披露是按字段名绑定的（见文件头），
@@ -191,6 +218,10 @@ export function buildCaptureInvocation(
 
   return {
     feature: 'capture',
+    // 有图才多要一条能力；没图时这个键**整个不出现**，请求体与从前逐字相同。
+    ...(images.length > 0
+      ? { images, requires: ['vision'] as const satisfies readonly AiCapability[] }
+      : {}),
     system: [
       '你是一个任务捕获助手。把用户给出的一句话解析成任务字段。',
       '只输出一个 JSON 对象，不要输出任何解释、前言或代码围栏。',
@@ -536,7 +567,9 @@ export async function requestCapture(
   deps: RequestCaptureDeps,
 ): Promise<CaptureOutcome> {
   const text = source.text.trim();
-  if (text === '') {
+  // 🔴 「只有图、没有字」是合法输入（截图转任务），所以空文本闸门要看图。
+  // 没有这条，用户粘一张截图按发送会得到"还没有输入内容" —— 而他明明给了内容。
+  if (text === '' && (source.images ?? []).length === 0) {
     // 还没走到路由，没有任何端点被尝试 —— 空 health。
     return { ok: false, reason: 'empty-text', message: '还没有输入内容。', health: {} };
   }
