@@ -12614,3 +12614,31 @@ react-native-web / 共享包依赖。实测单文件 26 条用例：
    而 vitest 侧报 210 条超时 —— **两个红都是自己制造的**；
 4. 想彻底解决是**一次独立的决定**（`fsModuleCache` / 提高默认上限 / 拆分 App 挂载夹具），
    不在"顺手改一下测试配置"的范围里。
+
+### 635. 遍历工作树的测试会被 **RN Pods 的悬空符号链接**打死：报的是 `ENOENT`，而不是"测试失败"
+
+- **症状**：`packages/domain` 整套测试里**只有一条**红：
+  `tests/habit-backfill.spec.ts` 的 B8（"窗口判定只有一处所有者"）抛
+  `ENOENT: no such file or directory, stat '.../apps/mobile/ios/Pods/Headers/Private/ReactAppDependencyProvider/RCTAppDependencyProvider.h'`。
+  该用例与补打卡窗口毫无关系 —— 红的原因在**它遍历目录那一步**，不在它断言的语义。
+- **根因**：`apps/mobile/ios/Pods/Headers/**` 里的头文件是指向
+  `apps/mobile/ios/build/generated/ios/**` 的符号链接，而那个目录在本机**不存在**
+  （`pod install` 没跑过，或被清理过）⇒ 链接是**悬空**的。
+  用例用 `statSync` 走目录，**跟随**符号链接 ⇒ 第一条悬空链接就抛。
+  `readdirSync` 只读名字，所以"列得出来"与"stat 得到"在这台机器上是两件事。
+- **一条命令确认**（不必跑测试）：
+  ```bash
+  find apps/mobile/ios/Pods -type l ! -exec test -e {} \; -print | head
+  ```
+  有输出 = 有悬空链接。
+- **处理**：两条路，选哪条都要写清，别混着做——
+  1. **补齐生成物**：在 `apps/mobile/ios` 跑一次 `pod install`（或重建 iOS 工程），
+     链接就有目标了。这条是"修环境"。
+  2. **让遍历不跟随链接**：`lstatSync` + 跳过符号链接。这条是"修测试的健壮性"。
+     ⚠️ 它**不是**为了让红变绿而放宽判据 —— B8 断的"只有一个 `backfillDays` 读取点"
+     一个字都不改，改的只是"怎么走目录"。做的时候必须在注释里写明这一点，
+     否则下一个人会以为判据被削弱过。
+- **元教训**：任何**遍历工作树**的测试都依赖一个从未声明的环境前提：
+  "树里没有悬空符号链接、没有读不了的权限、没有 FIFO"。
+  这类前提一旦破，红的形态是**在无关用例上抛系统错误** ——
+  而系统错误看起来永远像"测试写错了"，于是最容易被顺手改测试掩盖。

@@ -69,3 +69,6 @@ export * from './comments.js';
 // `overlay-feedback-patterns`，这里是本仓唯一一份可被调用的阈值实现 ——
 // 各页自判会让「删一条」和「删一批」的摩擦差异由页面作者临时决定。
 export * from './danger-tier.js';
+
+// `@` 提及的文本语法（纯函数）：chip 只是它的可视化投影，文本才是事实源。
+export * from './mentions.js';
