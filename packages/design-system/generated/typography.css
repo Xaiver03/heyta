@@ -12,14 +12,14 @@
 }
 
 .ht-type-section-title {
-  font-size: var(--ht-font-size-lg);
+  font-size: var(--ht-font-size-base);
   font-weight: var(--ht-font-weight-semibold);
   line-height: var(--ht-line-height-tight);
   letter-spacing: var(--ht-tracking-title);
 }
 
 .ht-type-group-label {
-  font-size: var(--ht-font-size-sm);
+  font-size: var(--ht-font-size-md);
   font-weight: var(--ht-font-weight-semibold);
   line-height: var(--ht-line-height-tight);
   letter-spacing: var(--ht-tracking-caption);
@@ -92,7 +92,7 @@
 }
 
 .ht-type-numeric-body {
-  font-size: var(--ht-font-size-base);
+  font-size: var(--ht-font-size-sm);
   font-weight: var(--ht-font-weight-medium);
   line-height: var(--ht-line-height-normal);
   letter-spacing: var(--ht-tracking-body);

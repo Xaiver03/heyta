@@ -93,6 +93,7 @@ export interface HeytaNativeTokens {
   readonly 'space.16': number;
   readonly 'font-size.2xs': number;
   readonly 'font-size.xs': number;
+  readonly 'font-size.md': number;
   readonly 'font-size.sm': number;
   readonly 'font-size.base': number;
   readonly 'font-size.lg': number;
@@ -333,6 +334,7 @@ export const lightTokens: HeytaNativeTokens = {
   'space.16': 64,
   'font-size.2xs': 11,
   'font-size.xs': 12,
+  'font-size.md': 13,
   'font-size.sm': 14,
   'font-size.base': 16,
   'font-size.lg': 18,
@@ -556,6 +558,7 @@ export const darkTokens: HeytaNativeTokens = {
   'space.16': 64,
   'font-size.2xs': 11,
   'font-size.xs': 12,
+  'font-size.md': 13,
   'font-size.sm': 14,
   'font-size.base': 16,
   'font-size.lg': 18,

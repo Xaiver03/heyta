@@ -40,7 +40,7 @@
 
 .ht-ai__mention-suffix {
   color: var(--ht-color-foreground-subtle);
-  font-size: var(--ht-font-size-caption);
+  font-size: var(--ht-font-size-xs);
   flex: none;
 }
 
