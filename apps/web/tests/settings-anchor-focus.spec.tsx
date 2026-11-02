@@ -129,13 +129,16 @@ describe('设置浮层的落位与焦点', () => {
 
     const sheet = el.querySelector('[data-testid="settings-sheet"]')!;
     const nav = sheet.querySelector('nav.ht-settings__nav')!;
-    // 目录条数跟着信息架构走：2026-10-24 把「订阅」独立成节 ⇒ 7 → 8。
+    // 目录条数跟着信息架构走：2026-10-24 把「订阅」独立成节 ⇒ 7 → 8；
+    // 2026-10 七组同构（账号 ← 个人资料+账号与安全、数据与同步 ← 数据管理+同步与隐私）⇒ 8 → 7。
     // 🔴 这条数的是"目录里每一项都长成了按钮"，不是"必须是 7" —— 加节时改这个数字，
     //    但**不许**为了让它绿而删掉任何一节（`SETTINGS_NAV_ITEMS` 是唯一事实源）。
-    expect(nav.querySelectorAll('button')).toHaveLength(8);
+    expect(nav.querySelectorAll('button')).toHaveLength(7);
     expect(nav.querySelector('[aria-controls="settings-group-subscription"]')).not.toBeNull();
-    expect(nav.querySelector('[aria-controls="settings-group-sync"]')?.getAttribute('aria-current')).toBe('page');
-    expect(sheet.querySelector('#settings-group-sync')?.hasAttribute('hidden')).toBe(false);
+    // 🔴 这个请求的落点是**数据与同步**：同步并进了 `settings-group-data`
+    //    （锚点表 `SETTINGS_ANCHORS.sync.section` 明写着，不再靠名字后缀推）。
+    expect(nav.querySelector('[aria-controls="settings-group-data"]')?.getAttribute('aria-current')).toBe('page');
+    expect(sheet.querySelector('#settings-group-data')?.hasAttribute('hidden')).toBe(false);
     expect(sheet.querySelector('#settings-group-profile')?.hasAttribute('hidden')).toBe(true);
     const close = sheet.querySelector('[data-testid="settings-sheet-close"]')!;
     expect(close.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -144,7 +147,7 @@ describe('设置浮层的落位与焦点', () => {
     const scrollTo = vi.fn();
     Object.defineProperty(sheet, 'scrollTo', { value: scrollTo, configurable: true });
     click(nav.querySelector('[aria-controls="settings-group-help"]')!);
-    expect(sheet.querySelector('#settings-group-sync')?.hasAttribute('hidden')).toBe(true);
+    expect(sheet.querySelector('#settings-group-data')?.hasAttribute('hidden')).toBe(true);
     expect(sheet.querySelector('#settings-group-help')?.hasAttribute('hidden')).toBe(false);
     expect(nav.querySelector('[aria-controls="settings-group-help"]')?.getAttribute('aria-current')).toBe('page');
   });

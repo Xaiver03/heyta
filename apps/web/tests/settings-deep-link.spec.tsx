@@ -124,6 +124,29 @@ describe('🔴 带 `?settings=<节 id>` 冷启动 = 设置直接开在那一节'
     expect(sectionVisible(view, 'settings-group-appearance')).toBe(false);
   });
 
+  /*
+   * 🔴 旧的节 id 必须落到**现在那一组**（2026-10 七组同构）。
+   *
+   * 分组从 8 变 7、显示名全换，但 `settings-group-*` 的 id 一个都没改
+   * （产品裁决；理由见 `lib/settings-deep-link.ts` 里 `LEGACY_SETTINGS_SECTIONS` 那段）。
+   * ⇒ 别人手里那些旧链接必须还能落对地方，否则症状是"点了没反应"。
+   * 这里量的是**落到了哪一节**，不是"没报错"：落错组和没打开一样让人找不到东西。
+   */
+  it('旧 id `settings-group-sync`（同步与隐私）⇒ 落在「数据与同步」', async () => {
+    const view = await mountApp('/app?settings=settings-group-sync');
+    expect(sectionVisible(view, 'settings-group-data')).toBe(true);
+  });
+
+  it('旧 id `settings-group-account`（账号与安全）⇒ 落在「账号」', async () => {
+    const view = await mountApp('/app?settings=settings-group-account');
+    expect(sectionVisible(view, 'settings-group-profile')).toBe(true);
+  });
+
+  it('旧 id `settings-group-general`（移动端的「常规」）⇒ 落在「提醒与通知」', async () => {
+    const view = await mountApp('/app?settings=settings-group-general');
+    expect(sectionVisible(view, 'settings-group-notifications')).toBe(true);
+  });
+
   it('🔴 认不出的 id：不开设置，也**绝不**把整页弄成空白', async () => {
     // 一个手打的地址、或一条旧链接会带着不存在的 id 进来。若实现直接把 URL 值
     // 断言成 `SettingsSectionId` 就 `setSettingsSection(...)`，后果不是报错：
@@ -183,10 +206,12 @@ describe('🔴 `standalone=1`：这一页只画设置（桌面端独立窗口的
 });
 
 describe('设置导航：每个菜单都要有图标（独立窗口里那一列是唯一导航）', () => {
-  it('8 个分类逐项都有 svg，且文字仍在（图标不替代可访问名）', async () => {
+  it('七个分类逐项都有 svg，且文字仍在（图标不替代可访问名）', async () => {
     const view = await mountApp(`/app?settings=${SUBSCRIPTION_SETTINGS_SECTION}`);
     const links = [...view.querySelectorAll<HTMLElement>('.ht-settings__nav-link')];
-    expect(links.length, '分类数量').toBeGreaterThanOrEqual(8);
+    // 七组（2026-10 三端同构后的分组数）。这条钉的是"每一枚都有图标"，
+    // 数量只是分母 —— 加组时改这个数，但不许为了让它绿去删图标或文字。
+    expect(links.length, '分类数量').toBe(7);
     for (const link of links) {
       expect(link.querySelector('svg'), `「${link.textContent ?? ''}」缺图标`).not.toBeNull();
       // 🔴 图标 aria-hidden，可访问名必须仍是文字 —— 少这条，读屏用户听到的是"按钮"。

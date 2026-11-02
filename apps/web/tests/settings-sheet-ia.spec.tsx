@@ -173,8 +173,15 @@ describe('设置浮层的 IA：下层必须可见', () => {
     }
 
     // 标题下线 ≠ 这一节没有名字：可访问名改挂在 `aria-label` 上，且文案同源。
+    //
+    // 🔴 2026-10 起这里**不再写死当时的文案**（原值是「个人资料」，七组同构之后
+    //    这一组叫「账号」）。判据要的是"节名与左栏是同一句话"，而组名属于词条表 ——
+    //    写死一个字面量等于在这里存第二份文案，两边一漂就只剩这条红着、
+    //    却说不出是文案错了还是归属错了。所以从左栏那一项读回来比对。
+    const profileNav = nav!.querySelector('button[aria-controls="settings-group-profile"]');
     const profileSection = content!.querySelector('[id="settings-group-profile"]');
-    expect(profileSection?.getAttribute('aria-label')).toBe('个人资料');
+    expect(profileNav, '左栏必须有账号那一项').not.toBeNull();
+    expect(profileSection?.getAttribute('aria-label')).toBe(profileNav?.textContent?.trim());
   });
 });
 
@@ -196,7 +203,9 @@ describe('设置浮层的退出口：Esc 与 ✕ 都要能关', () => {
     const el = await mountApp();
     await openSettings(el);
     const settings = el.querySelector<HTMLElement>('[data-testid="settings-sheet"]')!;
-    const syncNav = el.querySelector<HTMLButtonElement>('[aria-controls="settings-group-sync"]')!;
+    // 隐私同意住在「数据与同步」这一组（七组同构之后同步并进了 data；见
+    // `lib/settings-deep-link.ts` 的 `LEGACY_SETTINGS_SECTIONS`）。
+    const syncNav = el.querySelector<HTMLButtonElement>('[aria-controls="settings-group-data"]')!;
     // jsdom 没有滚动 API；只补这两枚真实节点的浏览器边界，不替换导航逻辑。
     settings.scrollTo = () => undefined;
     syncNav.scrollIntoView = () => undefined;

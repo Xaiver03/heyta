@@ -92,14 +92,10 @@ function featuresNeeding(capability: AiCapability, t: I18nValue['t'], locale: Lo
 }
 import { LOCAL_API_TOOLS, validateLocalApiConfig } from '@heyta/local-api';
 import {
-  ASSISTANT_TIER_ORDER,
-  ASSISTANT_TIER_EXECUTE,
-  ASSISTANT_TIER_READ_ONLY,
   destinationForFeature,
   fetchManagedAiUsage,
   planAssistantEgress,
   recomputeConsents,
-  type AssistantTier,
   type ManagedAiUsageReading,
 } from '@heyta/app-host';
 import {
@@ -187,29 +183,6 @@ const FEATURE_ORDER: readonly AiFeature[] = [
   // Inbound automation is configured here, not exposed as a Chatbot mode.
   'inbound-automation',
 ];
-
-/**
- * 助手能力档位，**按权限从低到高**排（`ASSISTANT_TIER_ORDER`，来自 `@heyta/app-host`）。
- *
- * ⚠️ 顺序是承重的：界面用 `.map()` 渲染，默认档必须排在第一格，
- * 否则"出厂状态"在界面上看起来像第二格那个更高的权限。
- * 这份顺序**不在这里声明** —— 声明了就有两份，而两份的顺序可以不一样。
- */
-
-/** 档位的中文名与说明（`Record` 是穷尽的：加一档忘词条 = 编译错误）。 */
-function tierLabels(t: I18nValue['t']): Readonly<Record<AssistantTier, string>> {
-  return {
-    [ASSISTANT_TIER_READ_ONLY]: t('web.ai.assistant.tier.readOnly.label'),
-    [ASSISTANT_TIER_EXECUTE]: t('web.ai.assistant.tier.readAndPropose.label'),
-  };
-}
-
-function tierNotes(t: I18nValue['t']): Readonly<Record<AssistantTier, string>> {
-  return {
-    [ASSISTANT_TIER_READ_ONLY]: t('web.ai.assistant.tier.readOnly.note'),
-    [ASSISTANT_TIER_EXECUTE]: t('web.ai.assistant.tier.readAndPropose.note'),
-  };
-}
 
 /**
  * `validateEndpointUrl()` 拒绝时的 `reason` 码。
@@ -452,8 +425,6 @@ export function AiSettings({
   const { t, locale } = useI18n();
   const capabilityLabel = capabilityLabels(t);
   const featureLabel = featureLabels(t);
-  const tierLabel = tierLabels(t);
-  const tierNote = tierNotes(t);
 
   function update(next: PersistedAiSettings): void {
     setSettings(next);
@@ -689,7 +660,7 @@ export function AiSettings({
    * 征求同意（逐步同意 = 用户无脑点下去的疲劳闸门），所以开聊之前必须把**并集**说完。
    * 字段名来自目录的 `egressFields`，这里不另列一份名单。
    */
-  const assistantPlan = planAssistantEgress(settings.assistantTier);
+  const assistantPlan = planAssistantEgress();
 
   return (
     <div
@@ -1264,16 +1235,14 @@ export function AiSettings({
             })}
           </section>
 
-          {/* ── 助手能力档位（ADR-0045 §2.2）：第二个授权前端 ──────────
-              🔴 为什么"又一个开关"不是重复：下面「本机 API」那张逐工具表管的是
-              **外部程序**（MCP / 本机 HTTP）能不能调某个工具（ADR-0011：默认全关）。
-              内置助手如果共用那张表，用户为了"让 AI 帮我看看今天有什么"就得去开
-              一个他并不想开给别的进程的口子。两档最后都汇到同一个判据
-              `isToolGranted()` —— **授权只有一份**（ADR-0035 没变），变的只是谁来勾。
+          {/* ── 助手：出境披露（ADR-0045 §2.3 / ADR-0082）──────────────
+              🔴 这里**没有**"只读 / 执行"的单选：助手不设权限档。能做什么由工具
+              目录与风险闸门决定（低风险自动完成、高风险逐条确认），而不是由用户
+              先去另一个界面把开关拨对。下面这些仍然必须在**任何一次对话之前**说清：
+              多步循环中途不再逐步征求同意，所以这里报的是**这一次最多会送出的全部**。
 
-              ⚠️ 这一块必须出现在**任何一次对话之前**，因为它同时是那条
-              "一次性并集披露"：多步循环中途不再逐步征求同意（那会变成用户
-              无脑点下去的疲劳闸门），所以这里说的必须是**这一次最多会送出的全部**。 */}
+              ⚠️ 与下面「本机 API」那张逐工具表是两件事：那张表管的是**外部程序**
+              （MCP / 本机 HTTP）能不能调某个工具（ADR-0011：默认全关）。 */}
           <section className="ht-settings__section" data-testid="ai-assistant-section">
             <h3 className="ht-settings__h3 ht-type-row-title">
               {t('web.ai.assistant.title')}
@@ -1284,56 +1253,43 @@ export function AiSettings({
               />
             </h3>
 
-            <div
-              className="ht-settings__options"
-              role="radiogroup"
-              aria-label={t('web.ai.assistant.title')}
-              data-testid="assistant-tier-group"
-            >
-              {ASSISTANT_TIER_ORDER.map((tier) => (
-                <label key={tier} className="ht-settings__option" data-testid={`assistant-tier-${tier}`}>
-                  <input
-                    type="radio"
-                    name="assistant-tier"
-                    checked={settings.assistantTier === tier}
-                    onChange={() => update({ ...settings, assistantTier: tier })}
-                  />
-                  <span>
-                    {tierLabel[tier]}
-                    <span className="ht-settings__hint" role="status">
-                  {' '}
-                  {tierNote[tier]}
-                </span>
-                  </span>
-                </label>
-              ))}
-            </div>
+            {/*
+              🔴 披露默认**收起**，但一个字都不删。
+              没有权限档之后，这一节只剩披露；而披露的原始形状是 30 个工具名 + 40 多个
+              字段名 —— 铺在设置页上就是一堵墙，用户读不完也记不住（那等于没披露）。
+              所以这里与「本机 API → 连接 MCP 需要额外一步」用同一个载体：
+              一句可点的 `summary` + `details` 里的完整清单。
 
-            {/* 🔴 披露的字段名**来自目录的 `egressFields`**，不是这里手写一份名单 ——
-                手写的就是抄件，而抄件一定漂（本仓库为这件事付过几次学费）。
-                档位换了，这份集合跟着变：`read-only` 档里写工具根本不进来。 */}
-            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-egress-title">
-              {t('web.ai.assistant.egressTitle')}
-            </p>
-            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-egress-fields">
-              {assistantPlan.fields.join(LIST_SEPARATOR[locale])}
-            </p>
-            {/* 档位之间**真正**的差别在这一行：写工具只在高一级进模型上下文。
-                （出境字段两档相同 —— 写工具只产出提案、结果不回送模型，
-                所以它们不贡献字段。这句话不写出来，用户会以为"换了档就没送正文"。） */}
-            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-tools-title">
-              {t('web.ai.assistant.toolsTitle')}
-            </p>
-            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-tools">
-              {assistantPlan.tools.join(LIST_SEPARATOR[locale])}
-            </p>
-            <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-limits">
-              {t('web.ai.assistant.maxRequests', { n: assistantPlan.maxRequests })}
-              {LIST_SEPARATOR[locale]}
-              {t('web.ai.assistant.maxMessages', { n: assistantPlan.maxMessages })}
-              {LIST_SEPARATOR[locale]}
-              {t('web.ai.assistant.maxBytes', { n: assistantPlan.maxBytesPerRequest })}
-            </p>
+              ⚠️ 收起**不等于**降级：真正拦住发送的那一次披露在对话面板里
+              （`AssistantPanel` 的披露卡，字段明面可见），这里只是"开聊之前先说清"的
+              预览。谁要把它整个删掉，先读 ADR-0045 §2.3。
+
+              🔴 字段名与工具名**来自目录**（`egressFields` / `LOCAL_TOOLS`），
+              不在这里手写名单 —— 手写的就是抄件，而抄件一定漂。
+            */}
+            <details className="ht-ai-settings__technical" data-testid="assistant-disclosure">
+              <summary data-testid="assistant-egress-title">
+                {t('web.ai.assistant.egressTitle')}
+              </summary>
+              <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-egress-fields">
+                {assistantPlan.fields.join(LIST_SEPARATOR[locale])}
+              </p>
+              <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-tools-title">
+                {t('web.ai.assistant.toolsTitle')}
+              </p>
+              <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-tools">
+                {assistantPlan.tools.join(LIST_SEPARATOR[locale])}
+              </p>
+              <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-limits">
+                {t('web.ai.assistant.maxRequests', { n: assistantPlan.maxRequests })}
+                {LIST_SEPARATOR[locale]}
+                {t('web.ai.assistant.maxMessages', { n: assistantPlan.maxMessages })}
+                {LIST_SEPARATOR[locale]}
+                {t('web.ai.assistant.maxBytes', { n: assistantPlan.maxBytesPerRequest })}
+              </p>
+            </details>
+            {/* 这一句**留在明面上**：没有逐工具开关之后，"哪张表管什么"是用户最先会问的
+                问题，而它只有一句，收起来反而要人多点一次。 */}
             <p className="ht-settings__hint" data-settings-disclosure="true" data-testid="assistant-mcp-split">
               {t('web.ai.assistant.mcpSplit')}
             </p>

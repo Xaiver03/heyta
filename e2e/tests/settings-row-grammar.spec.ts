@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp } from './helpers';
+import { SETTINGS_SLUGS, openApp } from './helpers';
 
 /**
  * 设置中心的**形状**判据：一屏只有一种行。
@@ -13,15 +13,13 @@ import { openApp } from './helpers';
  *   · 控件高度档位 ≤ 2（大档 = 触控目标，小档 = 行内小按钮；再多的档就是没规矩）
  *   · 行距中位数落在 44–56（macOS 设置的行高区间）
  *   · 侧栏 240±8、内容区 ≥ 80% 宽（两级导航，不是三层、不是半屏留白）
+ *
+ * 🔴 分组清单**不许再抄字面量**：这里原本是 6 个写死的 id，而 2026-10-27 七组同构
+ * 之后其中 2 个（`-sync` / `-account`）已不在左栏 —— 那两格不是"通过"，是
+ * **点了没切过去、然后在上一节上量了行距**（一种比红更坏的绿）。
+ * 现在从 `SETTINGS_SLUGS` 派生：加一组就自动多一格，少一组也不会有孤儿。
  */
-const SECTIONS = [
-  'settings-group-appearance',
-  'settings-group-ai',
-  'settings-group-sync',
-  'settings-group-data',
-  'settings-group-account',
-  'settings-group-help',
-] as const;
+const SECTIONS = SETTINGS_SLUGS.map((slug) => `settings-group-${slug}`);
 
 for (const section of SECTIONS) {
 test(`设置中心：一屏只有一种行（${section}）`, async ({ page }) => {
