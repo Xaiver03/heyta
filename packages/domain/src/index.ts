@@ -72,3 +72,6 @@ export * from './danger-tier.js';
 
 // `@` 提及的文本语法（纯函数）：chip 只是它的可视化投影，文本才是事实源。
 export * from './mentions.js';
+
+// `@任务` 的候选与标签：同名任务必须加消歧后缀，否则标签没有唯一解。
+export * from './mention-tasks.js';
