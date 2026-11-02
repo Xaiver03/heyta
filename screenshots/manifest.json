@@ -1,14 +1,14 @@
 {
-  "capturedAt": "2026-10-07T08:13:20.119Z",
+  "capturedAt": "2026-11-02T12:48:58.877Z",
   "targets": 1,
   "artifacts": [
     {
-      "path": "screenshots/web-desktop/W01-en-Tasks.png",
+      "path": "screenshots/web-desktop/W08-设置.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.0876,
+      "contentRatio": 0.0859,
       "colorSpan": 228,
-      "sha256": "ab6f4ba6533911d94eb67d0db290c66d84549e7953bc263b299ec3fc189562ba"
+      "sha256": "613050ee58abfb4efb72d5d0d2caa67a50e3d4ef9cca045cc160fd091b651f82"
     }
   ]
 }
