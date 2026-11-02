@@ -1,0 +1,13 @@
+{
+  "what": "移动端首屏（WelcomeScreen）的背景动效素材：四张竖版整屏图，对应任务/日历/专注/统计四个功能面",
+  "why": "产品负责人：「整个动效都应该作为背景图，包括注册登录按钮的背景图」——方形卡片图铺满手机会必然出现上下割裂，所以要按竖版整屏构图生成（主体在上 2/3，底部 1/3 自带渐隐，给文字与按钮留白）。",
+  "generator": "gpt-image-2",
+  "route": "创业OS AI服务平台（CC Switch 路由，经 ~/.agents/skills/gpt-image/scripts/with_provider.py）",
+  "generatedAt": "2026-10-26",
+  "size": "1024x1792（竖版 9:16）",
+  "prompts": ["prompt-bg-tasks.txt", "prompt-bg-calendar.txt", "prompt-bg-focus.txt", "prompt-bg-stats.txt"],
+  "postProcess": "sips -Z 900 -s format jpeg -s formatOptions 72（1024×1792 PNG → 900px 宽 JPEG，约 28–44 KB/张，四张合计 ~138 KB）",
+  "constraints": "提示词明确禁止：文字/字母/数字/logo/水印/人物/UI 外框/圆角矩形容器；并要求底部 1/3 留空且无硬边。四张均已逐张肉眼看图核对。",
+  "license": "由本项目以自有账号生成，随本仓库 MIT 分发；不含第三方素材。",
+  "consumers": ["apps/mobile/src/screens/WelcomeScreen.tsx"]
+}

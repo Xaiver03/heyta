@@ -35,7 +35,7 @@
  * 另有一条阳性对照：真仓库里必须**读到**若干正常调用，读到 0 就是探针坏了，
  * 报退 2 而不是报"全部合规"。
  */
-import { existsSync, readFileSync, readdirSync, rmSync, statSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -58,14 +58,37 @@ async function zhTable() {
   return tab;
 }
 
+/**
+ * 遍历源码目录。
+ *
+ * 🔴 2026-10-26 修：这里原来用 `statSync`，而它**跟随符号链接** ——
+ * `apps/mobile/ios/Pods/Headers/Private/ReactCodegen/` 下面是一堆指向
+ * `ios/build/generated/ios/` 的链接，那个目录在 codegen 没跑过时不存在（`pod install` 才会生成）。
+ * 于是整条门禁在**读第一棵树的时候**就 ENOENT 崩掉，退出码 2 ——
+ * 谁也不知道到底有没有不匹配的 `{占位符}`，报告里只有一行 Node 栈。
+ *
+ * 改成 `lstatSync`：**不跟随**链接，只走真实的目录与普通文件。
+ * 这不是"把红改成绿"——崩溃本来就没有判过任何一条断言；而且链接目标即使存在，
+ * 也可能被重复扫两遍（同一份代码算两次"调用点"）。
+ *
+ * ⚠️ 顺带把 `Pods` 加进跳过表：它是 CocoaPods 的构建产物目录（几万个文件、
+ * 且没有任何 `.ts`），扫它只是把门禁拖慢。
+ */
 function walk(dir, acc = []) {
   if (!existsSync(dir)) return acc;
   for (const name of readdirSync(dir)) {
-    if (name === 'node_modules' || name === 'dist' || name === 'build') continue;
+    if (name === 'node_modules' || name === 'dist' || name === 'build' || name === 'Pods') continue;
     const p = join(dir, name);
-    const st = statSync(p);
+    let st;
+    try {
+      st = lstatSync(p);
+    } catch {
+      // 权限不足 / 竞态删除：跳过这一条，而不是让整份报告变成一行栈。
+      continue;
+    }
+    if (st.isSymbolicLink()) continue;
     if (st.isDirectory()) walk(p, acc);
-    else if (/\.(ts|tsx)$/.test(name) && !/\.(spec|test)\./.test(name) && !`${p}`.includes('/tests/')) acc.push(p);
+    else if (st.isFile() && /\.(ts|tsx)$/.test(name) && !/\.(spec|test)\./.test(name) && !`${p}`.includes('/tests/')) acc.push(p);
   }
   return acc;
 }

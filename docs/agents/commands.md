@@ -55,6 +55,13 @@ pnpm check:ai-e2e               # 跑整个 e2e 套件（起 vite dev + 假端�
                                 #   激励体系的设计契约：e2e/tests/motivation.spec.ts（6 条）
 
 # 移动端验收：真模拟器（emulator-5554）+ 真服务端 + 真笔记本设备（node-host），全部零 mock
+                                #
+                                # 🔴 **跑任何设备腿之前先跑这道静态闸**：
+pnpm check:mobile-e2e-labels    # 设备腿脚本里的界面锚点（`L_*` 文案 / `ID_*` testID）与真源逐字比对。
+                                #   起因：`verify-mobile-auth.sh` 曾拿着一句**早已改掉**的
+                                #   服务条款原文，从没绿过，而报错长成"找不到同意项"。
+                                #   文案会改、脚本里的字面量不会 ⇒ 让它在改名那一刻红。
+                                #   它已在 `pnpm check` 链里；`--self-test` 4 枚臂（两红两绿）。
 pnpm verify:mobile-edit         # 任务可编辑（截止时间/优先级/重命名/删除）
 pnpm verify:mobile-conflict     # 冲突解决闭环（真的造出并发冲突，再在界面上解决）
 pnpm verify:mobile-autosync     # 🔴 自动同步：**全程不点任何同步按钮**，建一条任务
@@ -178,6 +185,12 @@ pnpm check:settings-prose       # **设置界面禁止内联说明文字**（202
                                 #   例外只有三种：反馈（alert/aria-live/danger）、
                                 #   ADR-0054 §7 的出境披露（`data-settings-disclosure`）、
                                 #   「个人资料」概览那一句副句。规则正文在 design-system.md。
+pnpm check:breakpoints          # **响应式断点的一把尺**（2026-10-26）。宽度只许 4 个登记值
+                                #   （48 / 48.0625 / 63.9375 / 64rem），高度 3 个；登记值的 px 拼写
+                                #   （`768px`）单独判红、`@container` 必须带容器名、JS 侧宽高字面量
+                                #   只许住在 `apps/web/src/lib/breakpoints.ts`。尺与理由在
+                                #   `docs/agents/design-system.md` §响应式断点；`--self-test` 17 臂，
+                                #   含「迁移前那 9 种值必须红」那一条。
 pnpm check:design               # 只跑设计变量硬编码检查
 pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:ui-language          # 界面文案必须全是中文（见 §5）

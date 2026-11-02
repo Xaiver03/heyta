@@ -151,15 +151,19 @@ const SCOPES = [
      *
      * ⚠️ 再降时必须先看**实测**，且只降到实测值；**不许**为了让某次改动通过而调高。
      */
-    /** 🔴 P1 棘轮第五次：104 → **98**（Vault 设置迁入共享 settings 原语后实测，-6）。只降到实测值。 */
-    baseline: 98,
+    /**
+     * 🔴 P1 棘轮第五次：104 → **98**（Vault 设置迁入共享 settings 原语后实测，-6）。只降到实测值。
+     * 🔴 2026-11 行操作重设计：98 → **74**（行尾那排编辑器连同它的内联样式整排撤掉，
+     *    含件搬进 `features/tasks/task-row-menu.css` 一族；实测值由本脚本自己打）。
+     */
+    baseline: 74,
   },
   {
     label: 'apps/mobile/src/screens（L4 视图）',
     root: 'apps/mobile/src/screens',
     exemptDirs: [],
-    /** 🔴 棘轮第四次：93 → **90**（M3 第九刀 projects 落地后实测，-3）。 */
-    baseline: 90,
+    /** 🔴 棘轮第六次：93 → 90 → 77 → **73**（2026-10-26 移动端认证屏改用共享 AuthForm 后实测，-4）。只降到实测值。 */
+    baseline: 73,
   },
 ];
 

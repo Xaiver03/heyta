@@ -1,0 +1,7 @@
+Full-screen vertical wallpaper for a dark task-management app onboarding screen. Portrait 9:16.
+
+Composition (critical): one continuous image, NOT a card and NOT a floating panel. Edge-to-edge deep navy gradient from #0B1220 at the bottom to a subtly lit #101A2E at the top. In the UPPER HALF, a soft glowing motif of a single week strip — seven equal rounded cells in a row, the fourth filled with electric blue to mark today — floating with a gentle bloom, slightly angled. The motif fades into the background, it has no visible border or frame.
+
+The LOWER THIRD must be intentionally almost empty: a smooth dark gradient fading to near-black (#080D17) with no shapes, so UI text and buttons can sit on it. A faint blue rim-light separates the motif area from the empty area, blending gradually — absolutely no hard edge, no seam, no rectangle.
+
+Constraints: no text, no letters, no numbers, no logos, no watermarks, no people, no UI chrome, no card border, no rounded rectangle frame. Smooth cinematic gradient, subtle grain.

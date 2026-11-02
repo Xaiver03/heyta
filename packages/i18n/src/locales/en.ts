@@ -365,7 +365,7 @@ export const en = {
   'landing.mock.date': 'Date',
   'landing.mock.countdown': 'Countdown',
   'landing.mock.synced': 'Synced',
-  'landing.mock.composeHint': 'Add a task and press Enter (try "tomorrow", "next Wednesday", "!1")',
+  'landing.mock.composeHint': 'Add a task and press Enter (try "tomorrow", "next Wednesday")',
   'landing.mock.add': 'Add',
 
   'landing.mock.task.quote': 'Reply to the client about the quote',
@@ -701,6 +701,25 @@ export const en = {
   'web.shell.tasks.more': 'More actions: {title}',
   'web.shell.tasks.moreLabel': 'More',
   'web.shell.tasks.delete': 'Delete: {title}',
+  // ── The task row's context menu (row-action UX redesign, 2026-11) ──────────
+  // The first-level menu has exactly two items: open details / delete. Move, tags,
+  // subtasks, due, repeat, reminders, focus and AI never live here — they live in
+  // the detail surface (`TaskDetailCard`).
+  // ⚠️ `label` must carry the title: several rows are on screen at once, and a run of
+  // identical "Task actions" leaves a screen-reader user unable to tell which row.
+  'web.rowMenu.label': 'Task actions: {title}',
+  'web.rowMenu.open': 'Open details',
+  'web.rowMenu.delete': 'Delete',
+  // The `popconfirm` tier's consequence line (only shown when the task has subtasks).
+  // Factual basis: delete only tombstones the parent; `@heyta/domain`'s `buildTaskTree`
+  // promotes its subtasks to the top level.
+  'web.rowMenu.childConsequence': 'It has {count} subtasks; after deleting, they move up to the top level.',
+  'web.rowMenu.confirmDelete': 'Delete anyway',
+  'web.rowMenu.cancel': 'Cancel',
+  // Narrow layouts (the detail column does not fit / is collapsed) render that cell as a
+  // dialog — the label and the close button need a reading.
+  'web.rowMenu.detailTitle': 'Task details',
+  'web.rowMenu.detailClose': 'Close task details',
   // The line shown when a task action fails (layout audit §8.2 item 12).
   // Deliberately **no interpolation of the internal error text**: the layer above
   // cannot classify the cause, and rendering `error.message` would turn diagnostic
@@ -2653,10 +2672,10 @@ export const en = {
   // ── Web · capture composer ────────────────────────────────
   // ✅ The embedded `formatRemainingUntil()` Chinese is gone: the remaining
   // days are now spoken by the shell in the current language (`web.due.*`).
-  'web.capture.placeholder': 'Add a task, press Enter to confirm (you can write "tomorrow", "next Wednesday", "!1")',
+  'web.capture.placeholder': 'Add a task, press Enter to confirm (you can write "tomorrow", "next Wednesday")',
   // The destination belongs in the placeholder: with a list open, "Add a task"
   // only says half of it — the task lands in Inbox and vanishes from the list.
-  'web.capture.placeholderTo': 'Add a task to "{list}", press Enter to confirm (you can write "tomorrow", "next Wednesday", "!1")',
+  'web.capture.placeholderTo': 'Add a task to "{list}", press Enter to confirm (you can write "tomorrow", "next Wednesday")',
   'web.capture.placeholderToDay': 'Add to {day}, press Enter to confirm (a written "tomorrow" wins)',
   'web.calendar.capture.add': 'Add to the selected day',
   'web.calendar.capture.close': 'Dismiss the input',
@@ -2923,7 +2942,7 @@ export const en = {
   'mobile.tab.calendar': 'Calendar',
   'mobile.tab.focus': 'Focus',
   'mobile.tab.profile': 'Profile',
-  'mobile.tab.categories': 'Categories',
+  'mobile.tab.categories': 'Stats',
 
   // ── Mobile · time by category ──────────────────────────────
   // Verbatim the same as `web.categories.*` (except where the interaction differs).
@@ -3059,7 +3078,7 @@ export const en = {
   //    while mobile had only a plain title field — the same sentence produced
   //    different tasks on the two ends. Both now share one `CaptureComposer`
   //    from `@heyta/ui`; only the wording differs.
-  'mobile.capture.placeholder': 'Add a task (try "tomorrow", "next Wed", "!1")',
+  'mobile.capture.placeholder': 'Add a task (try "tomorrow", "next Wed")',
   'mobile.capture.addLabel': 'New task title',
   'mobile.capture.add': 'Add',
   'mobile.capture.matchesAria': 'Recognised fields',
@@ -3293,14 +3312,11 @@ export const en = {
   // local features behind a sign-in. So the primary button and the way out
   // (use offline) must both exist.
   'mobile.welcome.title': 'Plan your day',
-  'mobile.welcome.tagline': 'Local-first task management: offline still works, data is end-to-end encrypted, and the server can be your own.',
   'mobile.welcome.signIn': 'Sign in or register',
   'mobile.welcome.offline': 'Use offline for now',
-  'mobile.welcome.offlineHint': 'You can create tasks, check in and focus without signing in; you can sign in later from the Profile tab.',
 
   // ── Mobile · sign-in panel (spec §3.2) ────────────────────
   'mobile.auth.title': 'Sign in or register',
-  'mobile.auth.intro': 'Sign in or register with an email and password. Once you are in, the server address, access token and end-to-end passphrase are wired into sync for you.',
   'mobile.auth.central.intro': 'Sign in to heyta with your central identity, then use this device’s end-to-end encryption passphrase to enable sync.',
   'mobile.auth.central.start': 'Sign in with central identity',
   'mobile.auth.central.termsRequired': 'Check the consent box before continuing to central sign-in.',
@@ -3373,11 +3389,16 @@ export const en = {
   // 🔴 Settings is a standalone second-layer surface (RN Modal), not a section of
   //    the Profile scroll — see INTERFACE-NOTES §11.5 (secondary surfaces get their
   //    own face). The entry row lives on Profile; the content lives in the sheet.
+  'mobile.settings.section.account': 'Account',
+  'mobile.settings.section.notifications': 'Reminders & notifications',
+  'mobile.settings.section.appearance': 'Appearance & language',
+  'mobile.settings.section.features': 'Features & AI',
+  'mobile.settings.section.about': 'About & help',
   'mobile.settings.section.profile': 'Profile',
   'mobile.settings.section.general': 'General',
   'mobile.settings.section.sync': 'Sync and privacy',
   'mobile.settings.section.ai': 'AI and integrations',
-  'mobile.settings.section.data': 'Data management',
+  'mobile.settings.section.data': 'Data & sync',
   'mobile.settings.section.security': 'Account security',
   'mobile.settings.directory.title': 'Preferences and account',
   'mobile.settings.directory.hint': 'Choose what to adjust.',
