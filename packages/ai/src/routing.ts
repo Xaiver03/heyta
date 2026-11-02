@@ -620,7 +620,20 @@ function routingMode(config: AiRoutingConfig): AiSupplyMode {
 export function resolveRoute(
   config: AiRoutingConfig,
   feature: AiFeature,
-  options: { health?: HealthMap; now: number },
+  options: {
+    health?: HealthMap;
+    now: number;
+    /**
+     * 本次调用的**额外**能力要求，叠加在功能本身的要求之上（取并集）。
+     *
+     * 用它的是"这次带了图"：同一个 `capture`，带图要端点声明 `vision`，不带图不要。
+     * 见 `provider.ts` 的 `AiInvocation.requires` —— 那里写了为什么不新开一个 `AiFeature`。
+     *
+     * ⚠️ 重复项由 `Set` 去掉：`requires: ['structured_output']` 不该让"缺一个能力"
+     * 这条排除原因变成两条。
+     */
+    requires?: readonly AiCapability[];
+  },
 ): RouteResolution {
   const byId = new Map(config.endpoints.map((e) => [e.id, e]));
   const health = options.health ?? EMPTY_HEALTH;
@@ -630,7 +643,9 @@ export function resolveRoute(
     return { candidates: [], excluded: [], unconfigured: true };
   }
 
-  const required = requiredCapabilities(feature);
+  const required = [
+    ...new Set([...requiredCapabilities(feature), ...(options.requires ?? [])]),
+  ];
   const candidates: ResolvedCandidate[] = [];
   const excluded: CandidateExclusion[] = [];
 
@@ -791,7 +806,11 @@ export async function invokeRouted(
 
   let health = deps.healthSeed ?? EMPTY_HEALTH;
 
-  const resolution = resolveRoute(config, invocation.feature, { health, now: now() });
+  const resolution = resolveRoute(config, invocation.feature, {
+    health,
+    now: now(),
+    ...(invocation.requires === undefined ? {} : { requires: invocation.requires }),
+  });
 
   // ── 第 1 道闸 ────────────────────────────────────────────────────────
   if (!config.enabled) {

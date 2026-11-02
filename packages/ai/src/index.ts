@@ -134,6 +134,28 @@ export {
 // 导出组装器就等于邀请包外再拼一份请求体（工单 W7 刚删掉过两份）。
 // 但 `AiInvocation.messages` 的类型在包外必须能写，所以类型单独放行。
 export type { ChatMessage } from './wire.js';
+// 多段内容里的一段（文本 / 图片）。**我们的**词表，不是 OpenAI 的
+// （`image_url` 那种形状只在 `wire.ts` 内部转换一次）。
+export type { ContentPart } from './wire.js';
+// 图片出境的预算与几何。🔴 界面读的是**同一份**常量，不要自己再定一套阈值：
+// 两份阈值的表现是"界面放行、出境层抛错"（或反过来），而两边都不会说明原因。
+export {
+  IMAGE_BUDGET,
+  base64ByteLength,
+  base64Length,
+  fitWithinDimension,
+  fitWithinPixels,
+  planImageRequest,
+  requestImageDimensions,
+} from './image-limits.js';
+export type {
+  ImageBudget,
+  ImageDimensions,
+  ImageMediaType,
+  ImagePlanResult,
+  ImageRejection,
+  PlannedImage,
+} from './image-limits.js';
 // 流式响应的**片段类型**。它是 app-host 与界面共用的词表（"文本到了" /
 // "思考到了" / "要调工具了"），所以要导出。⚠️ 解析器本身不导出：
 // 与 `buildChatRequestBody` 同一条纪律 —— 导出解析器等于邀请包外再写一份读流的实现。

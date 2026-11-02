@@ -25,7 +25,15 @@
  */
 
 import type { AiFeature } from './egress.js';
-import type { AiInvocation, AiToolDescriptor } from './provider.js';
+import type { AiImagePart, AiInvocation, AiToolDescriptor } from './provider.js';
+import {
+  base64ByteLength,
+  base64Length,
+  IMAGE_BUDGET,
+  planImageRequest,
+  type ImageMediaType,
+  type PlannedImage,
+} from './image-limits.js';
 
 /**
  * 一条对话消息。线格式的形状（`role` + `content`），不是领域概念。
@@ -37,9 +45,29 @@ import type { AiInvocation, AiToolDescriptor } from './provider.js';
  */
 export interface ChatMessage {
   readonly role: 'system' | 'user' | 'assistant' | 'tool';
-  readonly content: string;
+  /**
+   * 文本，或者**多段内容**（文本 + 图片）。
+   *
+   * 🔴 为什么是 `string | parts[]` 而不是"一律 parts"：既有五条调用点、三条工具线路径
+   * 与它们的字节形状判据全部建立在 `content: string` 上（`wire.spec.ts` 按原始串比对）。
+   * 统一成数组会让每一个既有请求体换形 —— 那是拿一个已有能力去给一个新能力让路。
+   * 省略时逐字相同，是这条扩展能落地的唯一形态。
+   */
+  readonly content: string | readonly ContentPart[];
   readonly toolCallId?: string;
 }
+
+/**
+ * 多段内容里的一段。
+ *
+ * ⚠️ 这是**我们的**词表，不是 OpenAI 的。线上的形状（`{type:'image_url', image_url:{url}}`）
+ * 由 `toWireContentParts()` 转换 —— 换 provider 时只改那一个函数，
+ * 不必让"调用方"知道某个供应商把图片叫 `image_url` 还是 `input_image`。
+ */
+export type ContentPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image'; readonly mediaType: ImageMediaType; readonly base64: string };
+
 
 /** 一个工具声明在线上的包装形状（OpenAI 兼容）。 */
 export interface WireTool {
@@ -120,6 +148,22 @@ function toWireTools(tools: readonly AiToolDescriptor[]): {
 }
 
 /**
+ * 组装请求体**需要**的那几格 `AiInvocation`。
+ *
+ * `fields` / `images` 是**可选**的，理由是承重的：五条既有调用点、三条工具线路径
+ * 的入参都没有这两格，而它们的请求体字节形状有测试逐字钉住。要求它们必填
+ * 会把"加一个可选能力"变成"改八个调用点"，而改调用点这件事从不只是改签名。
+ *
+ * ⚠️ 但它们**不是装饰**：一旦 `images` 非空，`fields` 就必须存在且含 `'images'`，
+ * 否则 `assertImagesSendable()` 直接抛错。也就是说省略是安全的（没有图片就没有
+ * 需要披露的图片），而"有图但不披露"是发不出去的。
+ */
+export type WireInvocation = Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages'> & {
+  readonly fields?: readonly string[];
+  readonly images?: readonly AiImagePart[];
+};
+
+/**
  * 组装 `chat.completions` 的请求体。
  *
  * 🔴 数据面**恰好**是披露出去的那几个字段（`system` + `user`，将来是多轮 `messages`），
@@ -137,7 +181,7 @@ function toWireTools(tools: readonly AiToolDescriptor[]): {
  */
 export function buildChatRequestBody(
   model: string,
-  invocation: Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages'>,
+  invocation: WireInvocation,
   options?: ChatRequestOptions,
 ): {
   model: string;
@@ -146,20 +190,126 @@ export function buildChatRequestBody(
   tool_choice?: 'auto';
   stream?: true;
 } {
+  const images = invocation.images ?? [];
+  if (images.length > 0) assertImagesSendable(invocation.fields, images);
+
+  const base: readonly ChatMessage[] = invocation.messages ?? [
+    { role: 'system', content: invocation.system },
+    { role: 'user', content: invocation.user },
+  ];
   const withTools = invocation.tools !== undefined && invocation.tools.length > 0;
   return {
     model,
     // 🔴 给了 `messages` 就以它为准（对话式助手的多轮）；否则退回写死两条
     // `[system, user]` —— 那五个既有调用点的字节形状**一个字都不许变**。
-    messages: (invocation.messages ?? [
-      { role: 'system', content: invocation.system },
-      { role: 'user', content: invocation.user },
-    ]).map(toWireMessage),
+    messages: (images.length === 0 ? base : attachImages(base, images)).map(toWireMessage),
     ...(withTools ? toWireTools(invocation.tools ?? []) : {}),
     // 🔴 放在**最后**，且只在要求流式时才出现：省略时键的顺序与缺键形态
     // 与加流式之前逐字相同（`wire.spec.ts` 按原始串比对）。
     ...(options?.stream === true ? { stream: true as const } : {}),
   };
+}
+
+/**
+ * 把图片挂到**最后一条 user 消息**上。
+ *
+ * 为什么是"最后一条 user"而不是"新加一条"：多轮助手里模型按顺序读，
+ * 图片跟着用户那一句话走才合理（图是那句话的一部分，不是独立的一轮）。
+ * 没有 user 消息说明调用方拿图片做了别的事 —— 那是编程错误，响亮失败，
+ * 不要悄悄把图丢给模型当第一条。
+ */
+function attachImages(
+  messages: readonly ChatMessage[],
+  images: readonly AiImagePart[],
+): readonly ChatMessage[] {
+  let lastUserIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === 'user') {
+      lastUserIndex = i;
+      break;
+    }
+  }
+  if (lastUserIndex < 0) {
+    throw new Error(
+      '这次请求带了图片，却没有一条 user 消息可以承载它们。' +
+        '图片是「用户那句话的一部分」，不是独立的一轮 —— 请把 images 挂到已有的 user 轮次上。',
+    );
+  }
+
+  const target = messages[lastUserIndex];
+  if (target === undefined) return messages;
+
+  const textParts: readonly ContentPart[] =
+    typeof target.content === 'string'
+      ? target.content === ''
+        ? []
+        : [{ type: 'text', text: target.content }]
+      : target.content;
+
+  const attached: ChatMessage = {
+    ...target,
+    content: [
+      ...textParts,
+      ...images.map(
+        (image): ContentPart => ({
+          type: 'image',
+          mediaType: image.mediaType,
+          base64: image.base64,
+        }),
+      ),
+    ],
+  };
+
+  return messages.map((message, index) => (index === lastUserIndex ? attached : message));
+}
+
+/**
+ * 图片出境的两道断言 —— **在组装请求体时**执行，不是发出去之前。
+ *
+ * 🔴 两条都必须在**请求体存在之前**成立：
+ * 1. **披露**：图片会离开设备，而 `fields` 是给用户看的出境清单。
+ *    `fields` 里没有 `images` 而请求体里有图片 = **对用户撒谎**。
+ *    这类错误不能靠 code review 拦住（它是两个地方各写一半），只能靠这一处断言。
+ * 2. **预算**：见 `image-limits.ts` 文件头 —— 单次请求 200 KB 是安全边际，
+ *    一张原图就能撞穿它，所以超预算的图**根本不该被装进请求体**。
+ */
+function assertImagesSendable(
+  fields: readonly string[] | undefined,
+  images: readonly AiImagePart[],
+): void {
+  if (fields === undefined || !fields.includes('images')) {
+    throw new Error(
+      '这次请求会发出 ' +
+        String(images.length) +
+        ' 张图片，但 `fields` 里没有 `images` —— 出境清单会漏报图片。' +
+        '出境数据面必须恰好等于披露字段集合，不多一个。',
+    );
+  }
+
+  const plan = planImageRequest(
+    images.map(
+      (image): PlannedImage => ({
+        mediaType: image.mediaType,
+        bytes: base64ByteLength(image.base64),
+        // 出境层不信任调用方报的尺寸：只校验字节，尺寸由归一化那一步保证。
+        // 这里给 0 会误判成"尺寸非法"，所以给一个恒在预算内的占位值。
+        width: 1,
+        height: 1,
+      }),
+    ),
+    IMAGE_BUDGET,
+  );
+  if (!plan.ok) {
+    throw new Error(
+      '这张图片超出出境预算（' +
+        plan.reason +
+        '）：单张 ≤ ' +
+        String(IMAGE_BUDGET.maxImagesPerRequest) +
+        ' 张 / ' +
+        String(Math.round(IMAGE_BUDGET.maxBytesPerImage / 1000)) +
+        ' KB。请先归一化（`requestImageDimensions` + 重编码），不要抬高上界。',
+    );
+  }
 }
 
 /**
@@ -262,9 +412,19 @@ export function isEmptyModelResponse(parts: {
 function toWireMessage(message: ChatMessage): Record<string, unknown> {
   return {
     role: message.role,
-    content: message.content,
+    content:
+      typeof message.content === 'string' ? message.content : toWireContentParts(message.content),
     ...(message.toolCallId === undefined ? {} : { tool_call_id: message.toolCallId }),
   };
+}
+
+/** 我们的段落词表 → OpenAI 兼容的线上形状。**唯一**一处做这个转换的地方。 */
+function toWireContentParts(parts: readonly ContentPart[]): readonly Record<string, unknown>[] {
+  return parts.map((part) =>
+    part.type === 'text'
+      ? { type: 'text', text: part.text }
+      : { type: 'image_url', image_url: { url: `data:${part.mediaType};base64,${part.base64}` } },
+  );
 }
 
 /**
@@ -276,6 +436,6 @@ function toWireMessage(message: ChatMessage): Record<string, unknown> {
  * ⚠️ 它**不返回请求体**，只返回长度：线格式组装器仍然不出包
  * （工单 W7 刚删掉过两份各自拼请求体的实现）。
  */
-export function egressBytesFor(model: string, invocation: Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages'>): number {
+export function egressBytesFor(model: string, invocation: WireInvocation): number {
   return new TextEncoder().encode(JSON.stringify(buildChatRequestBody(model, invocation))).length;
 }
