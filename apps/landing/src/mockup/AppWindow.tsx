@@ -602,7 +602,7 @@ export function AppWindow({
                 <h2>{t('web.tasks.detail.section.time')}</h2>
                 <div className="mk-detail__field">
                   <span className="mk-detail__label">{t('web.due.trigger')}</span>
-                  <span className="mk-detail__value">{selectedTask.dueKey === undefined ? t('web.ai.capture.priority.none') : t(selectedTask.dueKey)}</span>
+                  <span className="mk-detail__value">{selectedTask.dueKey === undefined ? t('web.tasks.detail.unset') : t(selectedTask.dueKey)}</span>
                 </div>
               </section>
 
@@ -610,7 +610,7 @@ export function AppWindow({
                 <h2>{t('web.tasks.detail.section.organize')}</h2>
                 <div className="mk-detail__field">
                   <span className="mk-detail__label">{t('web.organize.projectLabel')}</span>
-                  <span className="mk-detail__value">{selectedTask.projectKey === undefined ? t('web.ai.capture.priority.none') : t(selectedTask.projectKey)}</span>
+                  <span className="mk-detail__value">{selectedTask.projectKey === undefined ? t('web.tasks.detail.unset') : t(selectedTask.projectKey)}</span>
                 </div>
                 <div className="mk-detail__field">
                   <span className="mk-detail__label">{t('web.subtask.none')}</span>
