@@ -23,6 +23,7 @@
 import type {
   AiFeedback,
   AssistantTurn,
+  Attachment,
   Comment,
   CountdownEvent,
   FocusSession,
@@ -100,6 +101,15 @@ export interface MaterializedState {
    * 个人 op-log 里不会有 COMMENT op（白名单 + role 门都在服务端）。
    */
   comments: Record<string, Comment>;
+  /**
+   * 任务附件的**元数据**（工单 #9）。
+   *
+   * 🔴 这个桶里永远没有字节。文件的原始数据以 `id` 为键存在服务端另一条通道上
+   * （`packages/shared-schema/src/attachment-http-contract.ts`），因为 op 载荷会
+   * 进每一次全量快照与增量同步 —— 把一张 3MB 的图塞进 op，等于每台新设备首同步
+   * 都重传这张图，并把 `payloadBytes` / 单条 op 上限全撑变形。
+   */
+  attachments: Record<string, Attachment>;
 }
 
 export function emptyState(): MaterializedState {
@@ -117,6 +127,7 @@ export function emptyState(): MaterializedState {
     events: {},
     assistantTurns: {},
     comments: {},
+    attachments: {},
   };
 }
 
@@ -135,6 +146,7 @@ const BUCKET_BY_ENTITY = {
   EVENT: 'events',
   ASSISTANT_TURN: 'assistantTurns',
   COMMENT: 'comments',
+  ATTACHMENT: 'attachments',
 } as const;
 
 type ModeledEntity = keyof typeof BUCKET_BY_ENTITY;

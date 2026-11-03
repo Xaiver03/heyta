@@ -534,6 +534,53 @@ export function canSetParent(
   return validateParentChange(tasks, taskId, newParentId).ok;
 }
 
+/**
+ * 「**新建**一条直接挂在 `newParentId` 下面的任务」的写前校验。
+ *
+ * ## 为什么不让调用方直接用 {@link validateParentChange}
+ *
+ * 那个函数第一行就要求被移动的任务**已存在**（`task_not_found`），而新建时它
+ * 还没有 id。把一条伪造的草稿塞进 `tasks` 再校验虽然能跑通，但"校验的到底是
+ * 哪条规则"从此读不出来 —— 而且草稿的 `deletedAt` / `parentId` 都得编。
+ *
+ * ## 🔴 这条函数存在的真正理由：少了它，深度闸就有后门
+ *
+ * 上限只有 `MAX_SUBTASK_DEPTH` / `MAX_SUBTASK_CHILDREN` 这一份定义。
+ * 如果"改父"校验上限而"直接建一条带父的任务"不校验，那么已经挂到第 3 层的任务
+ * 下面还能凭空长出一个第 4 层 —— 界面上成立、树上非法，而 {@link buildTaskTree}
+ * 对非法数据只做 `limitViolations` **上报、不截断**（那是给历史数据兜底的，
+ * 不是给写入路径开的洞）。两个入口必须给同一个答案，否则四端会分叉（§3.5）。
+ *
+ * 新建的任务是一条**叶子**：`movedHeight` 恒为 0，也不可能成环
+ * （环要求被移动者已经占有子树），且它自己不可能是那个父 ——
+ * 所以六个原因里只有这三个可能命中。
+ */
+export function validateNewChildPosition(
+  tasks: readonly Task[],
+  newParentId: string,
+): ParentChangeResult {
+  const byId = new Map<string, Task>();
+  for (const task of tasks) {
+    if (task.deletedAt === undefined) byId.set(task.id, task);
+  }
+
+  if (!byId.has(newParentId)) return { ok: false, reason: 'parent_not_found' };
+
+  const parentOf = new Map<string, string | undefined>();
+  for (const candidate of byId.values()) parentOf.set(candidate.id, parentIdOf(candidate));
+
+  // 与 validateParentChange 里 `newParentDepth + 1 + movedHeight` 同一式子，
+  // 只是 `movedHeight` 取叶子常量 0 —— 不另立一套算法，改动上限时两处一起变。
+  if (depthOf(parentOf, newParentId) + 1 > MAX_SUBTASK_DEPTH) {
+    return { ok: false, reason: 'depth_exceeded' };
+  }
+  if (countDirectChildren(parentOf, newParentId) >= MAX_SUBTASK_CHILDREN) {
+    return { ok: false, reason: 'children_exceeded' };
+  }
+
+  return { ok: true, parentId: newParentId };
+}
+
 /** 节点到根的距离；顶层为 0。带访问集，数据里有环也不会死循环。 */
 function depthOf(parentOf: ReadonlyMap<string, string | undefined>, id: string): number {
   const visited = new Set<string>();

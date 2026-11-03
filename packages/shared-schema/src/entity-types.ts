@@ -113,6 +113,31 @@ export const ENTITY_TYPES = [
    */
   'COMMENT',
 
+  // ── 附件（工单 `task-detail-ticktick-parity` #9）───────────────────
+  /**
+   * 一条任务的一个附件。
+   *
+   * 🔴 **粒度与 `ASSISTANT_TURN` / `COMMENT` 同一条推理：一个附件 = 一个实体。**
+   * 做成 `Task.attachments[]` 的话，"加一个附件"与"改标题"会在同一实体上
+   * 字段级 LWW 互斥，两台设备各加一个附件时胜出的那一整组会把对端刚加的吞掉
+   * （数组是覆盖语义）。"只增不减"要结构给，不靠约定守。
+   *
+   * 🔴 **这个实体里只有元数据，没有字节。** 字节走单独那条通道
+   * （先例 `UserAvatar.data Bytes` + 账号上的 `storageQuotaBytes`），
+   * 因为 op-log 的载荷要参与**每一次**全量快照与增量同步：把一张 3MB 的图
+   * 塞进 op，等于每台新设备第一次同步都要重传这张图，而且配额、
+   * 单条 op 上限（`payloadBytes`）全被撑变形。
+   * blob 以**本实体的 id** 为键存在服务端，所以实体里不需要再放一个引用字段。
+   *
+   * ⚠️ 可加性变更，**不 bump `CURRENT_SCHEMA_VERSION`**：老客户端读到它的 op
+   * 会当未知实体优雅跳过（ADR-0014 §3.2）。
+   * 🔴 **服务端必须先于客户端上线** —— 白名单（从本数组派生）里没有它时，
+   * 上传会被判 `INVALID_ENTITY_TYPE` 永久拒绝（§2.1 的硬顺序）。
+   * ⚠️ 进 `EntityModelMap` 的同一批要处理 `check:ai-coverage` 的分母 +1
+   * （登记 `ENTITY_COVERAGE_DEBT` 或补读写工具）。
+   */
+  'ATTACHMENT',
+
   // ── 系统（同步基础设施，不可删） ───────────────────────────
   'GLOBAL_CONFIG',
   'MIGRATION',

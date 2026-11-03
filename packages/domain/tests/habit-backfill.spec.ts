@@ -18,7 +18,7 @@
  *    也不测写路径（`packages/app-host/tests/habit-actions.spec.ts`）。
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -215,12 +215,34 @@ function stripComments(src: string): string {
  */
 function sourceFiles(): string[] {
   const acc: string[] = [];
-  const skip = new Set(['node_modules', 'dist', 'generated', '__tests__', 'tests']);
+  const skip = new Set(['node_modules', 'dist', 'generated', '__tests__', 'tests', 'Pods']);
   const walk = (dir: string): void => {
     for (const name of readdirSync(dir)) {
+      // 🔴 名字先判再碰文件系统：顺序反过来时，`statSync` 会在跳过集生效**之前**抛掉，
+      // 那个集合就成了摆设（实测症状见下面 `lstatSync` 那段）。
+      if (skip.has(name)) continue;
       const full = join(dir, name);
-      if (statSync(full).isDirectory()) {
-        if (skip.has(name)) continue;
+      /**
+       * `lstatSync` 而不是 `statSync` —— iOS 的 `apps/mobile/ios/Pods/Headers`
+       * 是一片**符号链接农场**，里面出现悬空链接是常态（跑过一次 `pod install` 就有）。
+       * `statSync` 会跟随链接并在悬空处抛 `ENOENT`，于是这道"扫产品源码里第二个
+       * `backfillDays` 读取"的门禁会整体变红，报的还是一个跟判据毫无关系的原生路径 ——
+       * 而它的表现是"谁都没改判据，判据自己红了"。
+       * ⚠️ 悬空链接按 `lstat` 读是"不是目录"，于是整条链连同它指向的子树都不进扫描；
+       *   产品源码不是软链，这个收窄不改变判据的射程。
+       *
+       * 🔴 `try/catch` 那一层是**另一件事**，别把它当重复：这道门禁爬的是**一棵正在被
+       *    别的进程改动的树**（并行会话在跑构建、`dist/` 与原生构建目录随时增删）。
+       *    条目在 `readdirSync` 与 `lstat` 之间消失时抛 `ENOENT`，症状是
+       *    "单独跑绿、整套跑红"。一个刚消失的条目必然不是产品源码，跳过它不改变射程。
+       */
+      let isDir = false;
+      try {
+        isDir = lstatSync(full).isDirectory();
+      } catch {
+        continue;
+      }
+      if (isDir) {
         walk(full);
       } else if (/\.tsx?$/.test(name)) {
         acc.push(relative(REPO, full));

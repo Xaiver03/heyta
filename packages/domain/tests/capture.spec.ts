@@ -293,7 +293,17 @@ describe('parseCapture —— 中文优先级词（被真实输入逼出来的�
     const r = parseCapture('明天下午三点开周会 高优先级', { now: FRIDAY });
     expect(r.priority).toBe(Priority.High);
     expect(r.title).not.toContain('高优先级');
-    expect(r.title.trim()).toBe('下午三点开周会');
+    // ⚠️ 这条断言**在 2026-11 改过**，原来是 `'下午三点开周会'`。
+    //
+    // 那时规则表只认 `HH:MM`，所以「明天下午三点」里只有「明天」被吃掉，
+    // 「下午三点」原样留在标题里 —— 那条旧断言把这个**缺陷**当成了预期，
+    // 一直钉在那里。而用户的反馈正是「为什么识别不了下午什么几点」。
+    //
+    // 现在「下午三点」= 15:00 且落在明天，所以标题只剩「开周会」。
+    // 这条用例的本意（优先级词必须被删掉）没变，变的是它旁边那个字段。
+    expect(r.dueDate).toBe('2026-09-26');
+    expect(r.dueTime).toBe('15:00');
+    expect(r.title.trim()).toBe('开周会');
   });
 
   it('🔴 「最高优先级」不会被「高优先级」抢走（长的必须排前面）', () => {
@@ -550,6 +560,145 @@ describe('parseCapture —— 时刻（R14：`明天16:00 交周报`）', () => 
     // 否则"移除原文"和"写入的值"会互相顶替。
     expect(r.matches[1]!.raw).toBe('9:05');
     expect(r.matches[1]!.display).toBe('09:05');
+  });
+});
+
+/**
+ * 中文时刻（2026-11）。
+ *
+ * 🔴 这一组的**存在理由**是一次真实使用反馈：用户输入「下午1点给网信办打电话」，
+ * 界面一个字段都没识别出来 —— 而那是中文里最普通的一种时刻说法。
+ * 在此之前规则表只认 `HH:MM`（冒号写法），也就是说**整个形状缺席**。
+ *
+ * 这一组同时钉住两件相反的事，缺一半就会退化成另一种错：
+ *   1. **带时段词的一定要认**（下午/晚上/凌晨/中午/今晚/明早……）；
+ *   2. **不带时段词的裸 1–11 点一定不要认**（`3点` 是 03:00 还是 15:00，
+ *      字面上读不出来，猜错比不认更糟）。见 `capture.ts` 的「中文时刻」段。
+ */
+describe('parseCapture —— 中文时刻（「下午三点半」「今晚八点」）', () => {
+  it('🔴 用户报的那一句：下午1点 + 事项', () => {
+    const r = parseCapture('下午1点给网信办打电话', { now: FRIDAY });
+    expect(r.dueTime).toBe('13:00');
+    // 没有日期词 ⇒ 落在今天（滴答同款；结果会先变成可取消的芯片）
+    expect(r.dueDate).toBe('2026-09-25');
+    expect(r.title).toBe('给网信办打电话');
+    expect(r.matches.map((m) => m.applied)).toEqual([true]);
+  });
+
+  it('时段词 + 中文数字：下午三点 → 15:00', () => {
+    const r = parseCapture('下午三点', { now: FRIDAY });
+    expect(r.dueTime).toBe('15:00');
+    expect(r.title).toBe('');
+  });
+
+  it('半小时 / 一刻 / 三刻 / 整 都算得对', () => {
+    const cases = [
+      ['明天下午三点半', '2026-09-26', '15:30'],
+      ['明天晚上九点一刻', '2026-09-26', '21:15'],
+      ['明天上午九点三刻', '2026-09-26', '09:45'],
+      ['明天中午十二点整', '2026-09-26', '12:00'],
+      ['明天下午三点15分', '2026-09-26', '15:15'],
+      ['明天下午3点15', '2026-09-26', '15:15'],
+    ] as const;
+    for (const [input, date, time] of cases) {
+      const r = parseCapture(input, { now: FRIDAY });
+      expect([r.dueDate, r.dueTime], input).toEqual([date, time]);
+    }
+  });
+
+  it('各时段词换算：凌晨/上午/中午/下午/傍晚/晚上/深夜', () => {
+    const cases = [
+      ['凌晨2点', '02:00'],
+      ['上午10点', '10:00'],
+      ['中午12点', '12:00'],
+      ['中午1点', '13:00'],
+      ['下午5点', '17:00'],
+      ['傍晚6点', '18:00'],
+      ['晚上8点', '20:00'],
+      ['深夜11点', '23:00'],
+      // 12 点在上午/夜间侧是零点
+      ['上午12点', '00:00'],
+      ['晚上12点', '00:00'],
+    ] as const;
+    for (const [input, time] of cases) {
+      expect(parseCapture(input, { now: FRIDAY }).dueTime, input).toBe(time);
+    }
+  });
+
+  it('🔴 「差十分三点」= 2:50，且必须带时段词才认（裸的是歧义）', () => {
+    expect(parseCapture('下午差十分三点', { now: FRIDAY }).dueTime).toBe('14:50');
+    // 裸的「差十分三点」无从判断上午下午 → 不产生匹配，原样留在标题里
+    const bare = parseCapture('差十分三点', { now: FRIDAY });
+    expect(bare.dueTime).toBeUndefined();
+    expect(bare.title).toBe('差十分三点');
+  });
+
+  it('🔴 裸 1–11 点**一条匹配都不产生**（不是 applied:false）', () => {
+    // 这一条是本组最容易被"好心"改坏的：给裸小时补一个"最近的那个"，
+    // 就会让「9点上班」变成晚上九点、「11点睡」变成上午十一点。
+    for (const text of ['3点开会', '9点上班', '11点睡', '6点前交周报', '一点问题']) {
+      const r = parseCapture(text, { now: FRIDAY });
+      expect(r.dueTime, text).toBeUndefined();
+      expect(r.matches, `${text}：不该留下任何识别`) .toHaveLength(0);
+      expect(r.title, text).toBe(text);
+    }
+  });
+
+  it('24 小时制的裸写法仍然认：13–23 点、0 点、12 点', () => {
+    for (const [input, time] of [
+      ['13点交材料', '13:00'],
+      ['20点开会', '20:00'],
+      ['23点收工', '23:00'],
+      ['0点重跑', '00:00'],
+      ['12点吃饭', '12:00'],
+    ] as const) {
+      expect(parseCapture(input, { now: FRIDAY }).dueTime, input).toBe(time);
+    }
+  });
+
+  it('🔴 「今晚」「明早」自带日期：一条匹配同时给日期和时刻', () => {
+    const tonight = parseCapture('今晚八点', { now: FRIDAY });
+    expect([tonight.dueDate, tonight.dueTime]).toEqual(['2026-09-25', '20:00']);
+    // 整段「今晚八点」都被吃掉 —— 不会剩下一个孤零零的「晚」
+    expect(tonight.title).toBe('');
+    expect(tonight.matches).toHaveLength(1);
+
+    const tomorrowMorning = parseCapture('明早九点出发', { now: FRIDAY });
+    expect([tomorrowMorning.dueDate, tomorrowMorning.dueTime]).toEqual(['2026-09-26', '09:00']);
+    expect(tomorrowMorning.title).toBe('出发');
+  });
+
+  it('「今晚」单用（后面没有点数）也算今天', () => {
+    const r = parseCapture('今晚交周报', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-09-25');
+    expect(r.dueTime).toBeUndefined();
+    expect(r.title).toBe('交周报');
+  });
+
+  it('🔴 显式日期优先于时刻自带的「今天」：明天下午3点 = 明天的 15:00', () => {
+    const r = parseCapture('明天下午3点', { now: FRIDAY });
+    expect([r.dueDate, r.dueTime]).toEqual(['2026-09-26', '15:00']);
+  });
+
+  it('时段词 + 冒号时刻：下午3:30 → 15:30（且「下午」不会残留）', () => {
+    const r = parseCapture('下午3:30 对齐', { now: FRIDAY });
+    expect(r.dueTime).toBe('15:30');
+    expect(r.title).toBe('对齐');
+  });
+
+  it('🔴 假阳性反例：这些字里没有时刻', () => {
+    for (const text of [
+      '提高效率',
+      '三个代表学习',
+      '有一点问题',
+      '剪 9:16 的视频',
+      '8小时后再看',
+      '下午开会',
+    ]) {
+      const r = parseCapture(text, { now: FRIDAY });
+      expect(r.dueTime, text).toBeUndefined();
+      expect(r.title, text).toBe(text);
+    }
   });
 });
 
