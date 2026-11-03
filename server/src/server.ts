@@ -46,6 +46,7 @@ import { activityRoutes } from './activity/activity.routes';
 import { shareRoutes } from './shares/share.routes';
 import { accountSecurityRoutes } from './account/account-security.routes';
 import { accountProfileRoutes } from './account/account-profile.routes';
+import { attachmentRoutes } from './attachments/attachment.routes';
 import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
 import { announcementRoutes } from './announcements/announcement.routes';
 import { adminRoutes } from './admin/admin.routes';
@@ -602,6 +603,12 @@ export const createServer = (
       // 换绑登录邮箱 + 登录会话（工单 W1/W2/W3，ADR-0063）。同一枚 `/api` 前缀，
       // 路径常量在 `@heyta/shared-schema` 里，服务端与客户端拼的是同一个字面量。
       await fastifyServer.register(accountSecurityRoutes, { prefix: '/api' });
+      // 任务附件的**字节**通道（工单 #9）。同样不在 `apiRoutes` 里：它与同步没有
+      // 共享状态，而它的 20 MiB 级 `bodyLimit` 只能按路由设（全局是 20 MB，
+      // 放全局会让任何一个接口都能吃满请求体额度）。
+      // 🔴 上线顺序：`ATTACHMENT` 已在 `ENTITY_TYPES` 里，同步白名单派生自它，
+      // 所以**这个服务端必须先于客户端部署**，否则上传既被 op 侧拒绝、也没人收字节。
+      await fastifyServer.register(attachmentRoutes, { prefix: '/api' });
 
       // 调休/补班（公共事实）的**匿名只读**下行。W4b，定性见 ADR-0052。
       //
