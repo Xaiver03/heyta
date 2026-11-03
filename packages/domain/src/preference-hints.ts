@@ -37,7 +37,6 @@ import {
  */
 export type PreferenceRelevance =
   | 'breakdown'
-  | 'capture'
   | 'prioritize'
   | 'duration-estimate'
   | 'tool-calling'
@@ -52,8 +51,6 @@ export type PreferenceRelevance =
 const RELEVANT_PREFERENCES: Record<PreferenceRelevance, readonly PreferenceId[]> = {
   // 拆解：要几项（粒度）、什么风格（表达）、每项估多久（估算偏差）
   breakdown: ['granularity', 'title-style', 'estimate-bias'],
-  // 捕获：只是补全一个标题，只需要风格
-  capture: ['title-style'],
   // 排序：什么时候做（时段）、什么时候必须完成（提前量）
   prioritize: ['lead-time', 'deep-work-window'],
   // 估时：偏差系数 + 时段（不同时段效率不同）

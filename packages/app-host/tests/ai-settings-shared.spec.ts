@@ -90,7 +90,7 @@ describe('destinationForFeature —— 目的地由端点地址推导，一个�
   });
 
   it('路由指向一个已经不在端点表里的 id 时是 none（不拿旧配置当授权依据）', () => {
-    expect(destinationForFeature('capture', routing([LOOPBACK], { capture: ['ghost'] }))).toBe('none');
+    expect(destinationForFeature('prioritize', routing([LOOPBACK], { prioritize: ['ghost'] }))).toBe('none');
   });
 });
 
@@ -111,18 +111,18 @@ describe('recomputeConsents —— 换端点必须让旧授权作废', () => {
   });
 
   it('🔴 none 的授权一条都不许留', () => {
-    const before = [consent('capture', 'none')];
-    expect(recomputeConsents(before, routing([LOOPBACK], { capture: ['ollama'] }))).toEqual([]);
+    const before = [consent('prioritize', 'none')];
+    expect(recomputeConsents(before, routing([LOOPBACK], { prioritize: ['ollama'] }))).toEqual([]);
   });
 
   it('按功能各判各的：改了一个功能的路由不会顺手作废另一个功能的授权', () => {
-    const before = [consent('breakdown', 'user-endpoint'), consent('capture', 'user-endpoint')];
+    const before = [consent('breakdown', 'user-endpoint'), consent('prioritize', 'user-endpoint')];
     const after = recomputeConsents(
       before,
-      // breakdown 换到本机；capture 仍走自备云端点。
-      routing([LOOPBACK, REMOTE], { breakdown: ['ollama'], capture: ['cloud'] }),
+      // breakdown 换到本机；prioritize 仍走自备云端点。
+      routing([LOOPBACK, REMOTE], { breakdown: ['ollama'], prioritize: ['cloud'] }),
     );
-    expect(after).toEqual([consent('capture', 'user-endpoint')]);
+    expect(after).toEqual([consent('prioritize', 'user-endpoint')]);
   });
 
   it('授权里出现了一个路由表根本没有的功能时不崩（存储是磁盘上的旧数据）', () => {

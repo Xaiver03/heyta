@@ -119,7 +119,7 @@ export const algorithmDisclosure: LegalDocument = {
           {
             kind: 'ol',
             items: [
-              '界面发起：四类入口（收集箱一句话捕获、任务详情拆解任务、时间线与看板的耗时与优先级建议、助手对话面板）。',
+              '界面发起：三类入口（任务详情拆解任务、时间线与看板的耗时与优先级建议、助手对话面板）。',
               '组装上下文：只带这次请求需要的最小必要内容。',
               '过闸：AI 功能总开关、「允许远程」、逐功能的出境授权三道闸，默认全部关闭。',
               '模型端点生成中文文本；端点由用户自行配置。',
@@ -271,7 +271,7 @@ export const algorithmDisclosure: LegalDocument = {
           {
             kind: 'ol',
             items: [
-              'Started from the UI: four entry points (inbox one-line capture, decompose-task in task detail, time and priority estimates in timeline and board, assistant panel).',
+              'Started from the UI: three entry points (decompose-task in task detail, time and priority estimates in timeline and board, assistant panel).',
               'Context assembled: only what this request needs.',
               'Three gates: AI master switch, "allow remote", and per-feature egress consent — all off by default.',
               'A model endpoint generates Chinese text; the endpoint is configured by you.',

@@ -357,7 +357,7 @@ describe('🔴 发送点复算：构造之后改端点，一个请求都不发',
     config.endpoint = 'https://api.openai.com/v1';
 
     const result = await provider.invoke(
-      { feature: 'capture', system: 's', user: '帮我记一条', fields: ['title'] },
+      { feature: 'prioritize', system: 's', user: '帮我记一条', fields: ['title'] },
       // ⚠️ 空授权队列：目的地是 `none` 时闸门本来就**不索要授权** ——
       // 正因如此，"端点被换掉而目的地没重算"才是那个不会被任何闸门拦住的洞。
       [],
@@ -383,7 +383,7 @@ describe('🔴 发送点复算：构造之后改端点，一个请求都不发',
       { fetchImpl },
     );
     const result = await provider.invoke(
-      { feature: 'capture', system: 's', user: '帮我记一条', fields: ['title'] },
+      { feature: 'prioritize', system: 's', user: '帮我记一条', fields: ['title'] },
       [],
     );
     expect(result.ok).toBe(true);

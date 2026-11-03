@@ -278,7 +278,7 @@ describe('⑤ 发送点复算：托管端点在构造之后被换成境外 ⇒ �
     config.endpoint = 'https://api.openai.com/v1';
 
     const result = await provider.invoke(
-      { feature: 'capture', system: 's', user: 'u', fields: ['title'] },
+      { feature: 'prioritize', system: 's', user: 'u', fields: ['title'] },
       [], // 故意不给授权：复算必须排在索要同意之前
     );
 
@@ -299,7 +299,7 @@ describe('⑤ 发送点复算：托管端点在构造之后被换成境外 ⇒ �
     config.endpoint = 'http://localhost:11434/v1';
 
     const result = await provider.invoke(
-      { feature: 'capture', system: 's', user: 'u', fields: ['title'] },
+      { feature: 'prioritize', system: 's', user: 'u', fields: ['title'] },
       [],
     );
 
@@ -333,18 +333,18 @@ describe('⑥ 路由配置必须知道供给模式（ADR-0056 §5 第 1 条那�
     endpoints: [
       { id: 'managed', label: 'heyta 托管', endpoint: ALLOWLISTED_ENDPOINT, model: 'deepseek' },
     ],
-    routes: { capture: [{ endpointId: 'managed' }] },
+    routes: { prioritize: [{ endpointId: 'managed' }] },
   });
 
   it('🔴 `mode: managed` + 白名单端点 ⇒ 目的地是 `heyta-cloud`（过去这里恒为 `user-endpoint`）', () => {
-    const { candidates } = resolveRoute(managedRouting('managed'), 'capture', { now: 0 });
+    const { candidates } = resolveRoute(managedRouting('managed'), 'prioritize', { now: 0 });
 
     expect(candidates).toHaveLength(1);
     expect(candidates[0]?.destination).toBe('heyta-cloud');
   });
 
   it('⚠️ 不写 `mode` ⇒ 与引入这个字段之前**逐字相同**（`user-endpoint`），没有静默行为变更', () => {
-    const { candidates } = resolveRoute(managedRouting(), 'capture', { now: 0 });
+    const { candidates } = resolveRoute(managedRouting(), 'prioritize', { now: 0 });
 
     expect(candidates[0]?.destination).toBe('user-endpoint');
   });
@@ -358,7 +358,7 @@ describe('⑥ 路由配置必须知道供给模式（ADR-0056 §5 第 1 条那�
           { ...routing.endpoints[0]!, endpoint: 'https://api.example.com/v1' },
         ],
       },
-      'capture',
+      'prioritize',
       { now: 0 },
     );
 
@@ -368,7 +368,7 @@ describe('⑥ 路由配置必须知道供给模式（ADR-0056 §5 第 1 条那�
 
   it('🔴 发送点复算与解析候选**用同一个 mode**：端点换成境外之后，同一份 mode 下推不出 `heyta-cloud`', () => {
     // 解析候选那一侧（`resolveRoute` → `validateEndpointUrl`）
-    const { candidates } = resolveRoute(managedRouting('managed'), 'capture', { now: 0 });
+    const { candidates } = resolveRoute(managedRouting('managed'), 'prioritize', { now: 0 });
     expect(candidates[0]?.destination).toBe('heyta-cloud');
 
     // 发送点那一侧（`attemptOnce` → `validateEndpointUrl`，同一个函数、同一个 mode）
@@ -389,7 +389,7 @@ describe('⑥ 路由配置必须知道供给模式（ADR-0056 §5 第 1 条那�
  * 3. 带工具时**响亮拒绝**（服务端不转发 `tools`，静默降级=纯文本回答）。
  */
 describe('⑦ 托管档的传输：打到我们自己的代理，而不是 OpenAI 兼容端点', () => {
-  const consent = (feature: 'capture' | 'tool-calling') => [
+  const consent = (feature: 'prioritize' | 'tool-calling') => [
     { feature, destination: 'heyta-cloud' as const, grantedAt: 0 },
   ];
   const okResponse = () =>
@@ -412,8 +412,8 @@ describe('⑦ 托管档的传输：打到我们自己的代理，而不是 OpenA
     });
 
     const result = await provider.invoke(
-      { feature: 'capture', system: 'sys', user: 'usr', fields: ['title'] },
-      consent('capture'),
+      { feature: 'prioritize', system: 'sys', user: 'usr', fields: ['title'] },
+      consent('prioritize'),
     );
 
     expect(result.ok).toBe(true);
@@ -424,7 +424,7 @@ describe('⑦ 托管档的传输：打到我们自己的代理，而不是 OpenA
     // 🔴 这次调用**没有 `tools`** ⇒ 键集恰好两项：没有 `model`（服务端定），也没有 `tools`
     // （请求构造器只在 invocation.tools 非空时才加进来；见 `wire.ts` 的 `withTools` 判定）
     expect(Object.keys(body).sort()).toEqual(['feature', 'messages']);
-    expect(body.feature).toBe('capture');
+    expect(body.feature).toBe('prioritize');
     expect(init.headers).toMatchObject({ authorization: 'Bearer T0K' });
   });
 
@@ -436,8 +436,8 @@ describe('⑦ 托管档的传输：打到我们自己的代理，而不是 OpenA
     });
 
     const result = await provider.invoke(
-      { feature: 'capture', system: 's', user: 'u', fields: ['title'] },
-      consent('capture'),
+      { feature: 'prioritize', system: 's', user: 'u', fields: ['title'] },
+      consent('prioritize'),
     );
 
     expect(result.ok).toBe(false);
@@ -490,10 +490,10 @@ describe('⑧ 生产路径 invokeRouted 上的托管档', () => {
     endpoints: [
       { id: 'managed', label: 'heyta 托管', endpoint: ALLOWLISTED_ENDPOINT, model: 'deepseek' },
     ],
-    routes: { capture: [{ endpointId: 'managed' }] },
+    routes: { prioritize: [{ endpointId: 'managed' }] },
   });
-  const invocation = { feature: 'capture' as const, system: 's', user: 'u', fields: ['title'] };
-  const consents = [{ feature: 'capture' as const, destination: 'heyta-cloud' as const, grantedAt: 0 }];
+  const invocation = { feature: 'prioritize' as const, system: 's', user: 'u', fields: ['title'] };
+  const consents = [{ feature: 'prioritize' as const, destination: 'heyta-cloud' as const, grantedAt: 0 }];
   const okResponse = () =>
     new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), {
       status: 200,
@@ -566,10 +566,10 @@ describe("⑨ 运行时兜底：磁盘上的 `mode: 'off'` 不许拆掉出境闸
       enabled: true,
       allowRemote: false,
       endpoints: [{ id: 'r', label: 'R', endpoint: 'https://api.example.com/v1', model: 'm' }],
-      routes: { capture: [{ endpointId: 'r' }] },
+      routes: { prioritize: [{ endpointId: 'r' }] },
     } as unknown as AiRoutingConfig;
 
-    const { candidates, excluded } = resolveRoute(routing, 'capture', { now: 0 });
+    const { candidates, excluded } = resolveRoute(routing, 'prioritize', { now: 0 });
 
     // 若 `'off'` 生效：目的地会是 `'none'` ⇒ 不被 `allowRemote` 排除 ⇒ candidates 有 1 条
     expect(candidates).toHaveLength(0);
@@ -594,11 +594,11 @@ describe('⑩ 托管档被拒：服务端稳定码要一路带出来', () => {
     endpoints: [
       { id: 'managed', label: 'heyta 托管', endpoint: ALLOWLISTED_ENDPOINT, model: 'm' },
     ],
-    routes: { capture: [{ endpointId: 'managed' }] },
+    routes: { prioritize: [{ endpointId: 'managed' }] },
   });
-  const invocation = { feature: 'capture' as const, system: 's', user: 'u', fields: ['title'] };
+  const invocation = { feature: 'prioritize' as const, system: 's', user: 'u', fields: ['title'] };
   const consents = [
-    { feature: 'capture' as const, destination: 'heyta-cloud' as const, grantedAt: 0 },
+    { feature: 'prioritize' as const, destination: 'heyta-cloud' as const, grantedAt: 0 },
   ];
   const refuse = (status: number, code: string) =>
     new Response(JSON.stringify({ code, message: 'x', reason: 'y' }), {

@@ -54,7 +54,7 @@ function config(overrides: Partial<AiRoutingConfig> = {}): AiRoutingConfig {
     enabled: true,
     allowRemote: false,
     endpoints: [LOCAL, LOCAL_VISION],
-    routes: { capture: [{ endpointId: 'local' }] },
+    routes: { prioritize: [{ endpointId: 'local' }] },
     ...overrides,
   };
 }
@@ -292,18 +292,18 @@ describe('planImageRequest 的拒绝原因按"最该先解决的那条"给', () 
 
 describe('resolveRoute：本次请求的额外能力要求', () => {
   it('不带 requires 时，没声明 vision 的端点仍是候选', () => {
-    const r = resolveRoute(config(), 'capture', { now: 0 });
+    const r = resolveRoute(config(), 'prioritize', { now: 0 });
     expect(r.candidates.map((c) => c.endpointConfig.id)).toEqual(['local']);
   });
 
   it('带 requires: [vision] 时，没声明 vision 的端点被排除为 capability-missing', () => {
-    const r = resolveRoute(config(), 'capture', { now: 0, requires: ['vision'] });
+    const r = resolveRoute(config(), 'prioritize', { now: 0, requires: ['vision'] });
     expect(r.candidates).toHaveLength(0);
     expect(r.excluded.map((e) => e.reason)).toEqual(['capability-missing']);
   });
 
   it('requires 的重复项不会让同一条排除原因出现两次', () => {
-    const r = resolveRoute(config(), 'capture', {
+    const r = resolveRoute(config(), 'prioritize', {
       now: 0,
       requires: ['vision', 'vision', 'structured_output'],
     });
@@ -312,8 +312,8 @@ describe('resolveRoute：本次请求的额外能力要求', () => {
 
   it('功能本身的要求与本次要求取并集：两边都满足才进候选', () => {
     const r = resolveRoute(
-      config({ routes: { capture: [{ endpointId: 'local-vision' }] } }),
-      'capture',
+      config({ routes: { prioritize: [{ endpointId: 'local-vision' }] } }),
+      'prioritize',
       { now: 0, requires: ['vision'] },
     );
     expect(r.candidates.map((c) => c.endpointConfig.id)).toEqual(['local-vision']);

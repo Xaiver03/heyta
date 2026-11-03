@@ -54,7 +54,7 @@ describe('destinationDisclosure：目的地 → 性质', () => {
   });
 
   it('本地的 kind 与"要授权"的结论一致：本地不需要出境授权', () => {
-    const d = buildDisclosure({ feature: 'capture', destination: 'none', fields: ['title'] });
+    const d = buildDisclosure({ feature: 'prioritize', destination: 'none', fields: ['title'] });
     expect(d.destinationDisclosure.kind).toBe('local');
     expect(d.requiresConsent).toBe(false);
   });
@@ -105,8 +105,8 @@ describe('两条路径同源：结构化结论与兼容文本必须互相印证'
 
 describe('previewDisclosure 的关闭态', () => {
   it('关闭态等于"目的地是本地"的那一份披露，而不是一份空文本', () => {
-    const preview = previewDisclosure({ mode: 'off' }, { feature: 'capture', fields: ['title'] });
-    const none = buildDisclosure({ feature: 'capture', destination: 'none', fields: ['title'] });
+    const preview = previewDisclosure({ mode: 'off' }, { feature: 'prioritize', fields: ['title'] });
+    const none = buildDisclosure({ feature: 'prioritize', destination: 'none', fields: ['title'] });
 
     expect(preview.destination).toBe('none');
     expect(preview.requiresConsent).toBe(false);

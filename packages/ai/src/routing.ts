@@ -185,7 +185,6 @@ export const CAPABILITY_ORDER: readonly AiCapability[] = [
 export const DEFAULT_FEATURE_CAPABILITIES: Readonly<
   Record<AiFeature, readonly AiCapability[]>
 > = {
-  capture: ['structured_output'],
   breakdown: ['structured_output', 'long_context'],
   prioritize: ['structured_output'],
   'duration-estimate': ['structured_output'],

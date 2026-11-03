@@ -101,7 +101,7 @@ function countingFetch(
 }
 
 const INVOCATION = {
-  feature: 'capture' as const,
+  feature: 'prioritize' as const,
   system: 's',
   user: 'u',
   fields: ['title'],
@@ -112,13 +112,13 @@ function config(overrides: Partial<AiRoutingConfig> = {}): AiRoutingConfig {
     enabled: true,
     allowRemote: false,
     endpoints: [LOCAL, REMOTE],
-    routes: { capture: [{ endpointId: 'local' }] },
+    routes: { prioritize: [{ endpointId: 'local' }] },
     ...overrides,
   };
 }
 
 const REMOTE_CONSENT: EgressConsent = {
-  feature: 'capture',
+  feature: 'prioritize',
   destination: 'user-endpoint',
   grantedAt: 1_000,
 };
@@ -198,7 +198,7 @@ describe('能力声明 —— 不做推断，未声明 = 保守', () => {
   });
 
   it('各功能需要的能力是明确写出来的', () => {
-    expect(requiredCapabilities('capture')).toEqual(['structured_output']);
+    expect(requiredCapabilities('prioritize')).toEqual(['structured_output']);
     // 拆解天然需要长上下文（要读整条任务的备注）
     expect(requiredCapabilities('breakdown')).toContain('long_context');
   });
@@ -224,9 +224,9 @@ describe('resolveRoute —— 候选解析', () => {
     const r = resolveRoute(
       config({
         allowRemote: true,
-        routes: { capture: [{ endpointId: 'remote' }, { endpointId: 'local' }] },
+        routes: { prioritize: [{ endpointId: 'remote' }, { endpointId: 'local' }] },
       }),
-      'capture',
+      'prioritize',
       { now: 0 },
     );
     expect(r.candidates.map((c) => c.endpointConfig.id)).toEqual(['remote', 'local']);
@@ -236,9 +236,9 @@ describe('resolveRoute —— 候选解析', () => {
     const r = resolveRoute(
       config({
         allowRemote: false,
-        routes: { capture: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
+        routes: { prioritize: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
       }),
-      'capture',
+      'prioritize',
       { now: 0 },
     );
     expect(r.candidates.map((c) => c.endpointConfig.id)).toEqual(['local']);
@@ -250,9 +250,9 @@ describe('resolveRoute —— 候选解析', () => {
   it('路由目标可以覆盖端点的默认模型', () => {
     const r = resolveRoute(
       config({
-        routes: { capture: [{ endpointId: 'local', model: 'qwen3:32b' }] },
+        routes: { prioritize: [{ endpointId: 'local', model: 'qwen3:32b' }] },
       }),
-      'capture',
+      'prioritize',
       { now: 0 },
     );
     expect(r.candidates[0]?.model).toBe('qwen3:32b');
@@ -262,9 +262,9 @@ describe('resolveRoute —— 候选解析', () => {
     const r = resolveRoute(
       config({
         endpoints: [LOCAL, { ...REMOTE, disabled: true }],
-        routes: { capture: [{ endpointId: 'nope' }, { endpointId: 'remote' }] },
+        routes: { prioritize: [{ endpointId: 'nope' }, { endpointId: 'remote' }] },
       }),
-      'capture',
+      'prioritize',
       { now: 0 },
     );
     expect(r.candidates).toHaveLength(0);
@@ -272,15 +272,17 @@ describe('resolveRoute —— 候选解析', () => {
   });
 
   it('没配路由的功能报告 unconfigured（不是"回退到默认模型"）', () => {
-    const r = resolveRoute(config(), 'prioritize', { now: 0 });
+    // ⚠️ 用一个**不在 fixture 路由表里**的功能：「一句话捕获」删掉之后，
+    //    原来这里用它是顺手的（它没有路由），现在换成估时。
+    const r = resolveRoute(config(), 'duration-estimate', { now: 0 });
     expect(r.unconfigured).toBe(true);
     expect(r.candidates).toHaveLength(0);
   });
 
   it('跳闸中的端点在冷却期内被排除，冷却后恢复', () => {
     const health = { local: { endpointId: 'local', consecutiveFailures: 3, circuitOpenUntil: 5_000 } };
-    expect(resolveRoute(config(), 'capture', { health, now: 4_000 }).candidates).toHaveLength(0);
-    expect(resolveRoute(config(), 'capture', { health, now: 5_000 }).candidates).toHaveLength(1);
+    expect(resolveRoute(config(), 'prioritize', { health, now: 4_000 }).candidates).toHaveLength(0);
+    expect(resolveRoute(config(), 'prioritize', { health, now: 5_000 }).candidates).toHaveLength(1);
   });
 
   it('🔴 非法 URL 的端点在解析阶段就被排除', () => {
@@ -288,9 +290,9 @@ describe('resolveRoute —— 候选解析', () => {
       config({
         allowRemote: true,
         endpoints: [{ id: 'bad', label: '明文远端', endpoint: 'http://api.example.com/v1', model: 'm' }],
-        routes: { capture: [{ endpointId: 'bad' }] },
+        routes: { prioritize: [{ endpointId: 'bad' }] },
       }),
-      'capture',
+      'prioritize',
       { now: 0 },
     );
     expect(r.candidates).toHaveLength(0);
@@ -301,8 +303,8 @@ describe('resolveRoute —— 候选解析', () => {
 describe('describeRouteIntent —— 静态意图（零生产调用点，但仍要钉住行为）', () => {
   it('有候选时：目的地取首选，标签带模型名', () => {
     const intent = describeRouteIntent(
-      config({ allowRemote: true, routes: { capture: [{ endpointId: 'remote' }] } }),
-      'capture',
+      config({ allowRemote: true, routes: { prioritize: [{ endpointId: 'remote' }] } }),
+      'prioritize',
     );
     expect(intent.destination).toBe('user-endpoint');
     expect(intent.labels).toEqual(['云端中转（some-model）']);
@@ -310,15 +312,15 @@ describe('describeRouteIntent —— 静态意图（零生产调用点，但仍�
 
   it('路由目标覆盖模型时，标签用覆盖后的模型（与 resolveRoute 同源，不是第三次推导）', () => {
     const intent = describeRouteIntent(
-      config({ routes: { capture: [{ endpointId: 'local', model: 'qwen3:32b' }] } }),
-      'capture',
+      config({ routes: { prioritize: [{ endpointId: 'local', model: 'qwen3:32b' }] } }),
+      'prioritize',
     );
     expect(intent.destination).toBe('none');
     expect(intent.labels).toEqual(['本机 Ollama（qwen3:32b）']);
   });
 
   it('一个候选都没有时 → destination 是 none、labels 为空（不抛错）', () => {
-    const intent = describeRouteIntent(config(), 'prioritize');
+    const intent = describeRouteIntent(config(), 'duration-estimate');
     expect(intent.destination).toBe('none');
     expect(intent.labels).toEqual([]);
   });
@@ -423,7 +425,7 @@ describe('invokeRouted —— 闸门与短路', () => {
 
   it('没配路由时是 no-route（与"AI 整体没开"区分开）', async () => {
     const { impl, calls } = countingFetch(() => okResponse());
-    const out = await invokeRouted(config(), { ...INVOCATION, feature: 'prioritize' }, [], DEFAULT_ROUTING_POLICY, {
+    const out = await invokeRouted(config(), { ...INVOCATION, feature: 'duration-estimate' }, [], DEFAULT_ROUTING_POLICY, {
       fetchImpl: impl,
     });
     expect(out.result.ok).toBe(false);
@@ -434,7 +436,7 @@ describe('invokeRouted —— 闸门与短路', () => {
   it('🔴 全部是远端而 allowRemote=false → no-route，且**不发请求**', async () => {
     const { impl, calls } = countingFetch(() => okResponse());
     const out = await invokeRouted(
-      config({ allowRemote: false, routes: { capture: [{ endpointId: 'remote' }] } }),
+      config({ allowRemote: false, routes: { prioritize: [{ endpointId: 'remote' }] } }),
       INVOCATION,
       [],
       DEFAULT_ROUTING_POLICY,
@@ -457,7 +459,7 @@ describe('invokeRouted —— 闸门与短路', () => {
     const out = await invokeRouted(
       config({
         endpoints: [{ ...LOCAL, disabled: true }],
-        routes: { capture: [{ endpointId: 'local' }] },
+        routes: { prioritize: [{ endpointId: 'local' }] },
       }),
       INVOCATION,
       [],
@@ -482,7 +484,7 @@ describe('invokeRouted —— 闸门与短路', () => {
   it('首选端点需要授权时 → egress-not-authorized，带披露，且不发请求', async () => {
     const { impl, calls } = countingFetch(() => okResponse());
     const out = await invokeRouted(
-      config({ allowRemote: true, routes: { capture: [{ endpointId: 'remote' }] } }),
+      config({ allowRemote: true, routes: { prioritize: [{ endpointId: 'remote' }] } }),
       INVOCATION,
       [],
       DEFAULT_ROUTING_POLICY,
@@ -550,7 +552,7 @@ describe('🔴🔴 invokeRouted —— 回退不得跨越隐私边界（本文�
     const out = await invokeRouted(
       config({
         allowRemote: true,
-        routes: { capture: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
+        routes: { prioritize: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
       }),
       INVOCATION,
       [], // ← 没有任何授权
@@ -583,7 +585,7 @@ describe('🔴🔴 invokeRouted —— 回退不得跨越隐私边界（本文�
     const out = await invokeRouted(
       config({
         allowRemote: true,
-        routes: { capture: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
+        routes: { prioritize: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
       }),
       INVOCATION,
       [REMOTE_CONSENT], // ← 用户授权了
@@ -611,7 +613,7 @@ describe('🔴🔴 invokeRouted —— 回退不得跨越隐私边界（本文�
     const out = await invokeRouted(
       config({
         endpoints: [LOCAL, local2],
-        routes: { capture: [{ endpointId: 'local' }, { endpointId: 'local2' }] },
+        routes: { prioritize: [{ endpointId: 'local' }, { endpointId: 'local2' }] },
       }),
       INVOCATION,
       [], // 本机端点本来就不需要授权
@@ -632,7 +634,7 @@ describe('🔴🔴 invokeRouted —— 回退不得跨越隐私边界（本文�
     const out = await invokeRouted(
       config({
         allowRemote: false,
-        routes: { capture: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
+        routes: { prioritize: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
       }),
       INVOCATION,
       [],
@@ -656,7 +658,7 @@ describe('invokeRouted —— 重试分级与熔断持久化', () => {
     const out = await invokeRouted(
       config({
         allowRemote: true,
-        routes: { capture: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
+        routes: { prioritize: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
       }),
       INVOCATION,
       [REMOTE_CONSENT],
@@ -674,7 +676,7 @@ describe('invokeRouted —— 重试分级与熔断持久化', () => {
     const out = await invokeRouted(
       config({
         allowRemote: true,
-        routes: { capture: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
+        routes: { prioritize: [{ endpointId: 'local' }, { endpointId: 'remote' }] },
       }),
       INVOCATION,
       [REMOTE_CONSENT],
@@ -691,7 +693,7 @@ describe('invokeRouted —— 重试分级与熔断持久化', () => {
       config({
         allowRemote: true,
         routes: {
-          capture: [{ endpointId: 'local' }, { endpointId: 'remote' }, { endpointId: 'local' }],
+          prioritize: [{ endpointId: 'local' }, { endpointId: 'remote' }, { endpointId: 'local' }],
         },
       }),
       INVOCATION,
@@ -738,7 +740,7 @@ describe('invokeRouted —— 重试分级与熔断持久化', () => {
       },
     };
     await invokeRouted(
-      config({ allowRemote: true, routes: { capture: [{ endpointId: 'remote' }] } }),
+      config({ allowRemote: true, routes: { prioritize: [{ endpointId: 'remote' }] } }),
       INVOCATION,
       [REMOTE_CONSENT],
       DEFAULT_ROUTING_POLICY,
@@ -806,9 +808,9 @@ describe('端点预设 —— 只内置本机', () => {
         config({
           allowRemote: false,
           endpoints: [preset.config],
-          routes: { capture: [{ endpointId: preset.config.id }] },
+          routes: { prioritize: [{ endpointId: preset.config.id }] },
         }),
-        'capture',
+        'prioritize',
         { now: 0 },
       );
       expect(r.candidates, preset.id).toHaveLength(1);

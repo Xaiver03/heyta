@@ -314,7 +314,7 @@ describe('🔴 出境闸门：授权绑定在 (功能, 目的地) 上', () => {
       // @ts-expect-error `consent-required` 从来没有构造点（见 egress.ts 的说明）。
       reason: 'consent-required',
       disclosure: buildDisclosure({
-        feature: 'capture',
+        feature: 'prioritize',
         destination: 'heyta-cloud',
         fields: ['title'],
       }),
@@ -374,13 +374,13 @@ describe('buildDisclosure / previewDisclosure', () => {
   });
 
   it('关闭态预览不报错，且不需要授权', () => {
-    const d = previewDisclosure({ mode: 'off' }, { feature: 'capture', fields: ['title'] });
+    const d = previewDisclosure({ mode: 'off' }, { feature: 'prioritize', fields: ['title'] });
     expect(d.requiresConsent).toBe(false);
     expect(d.destination).toBe('none');
   });
 
   it('托管态预览会抛错（因为整体不许启用）', () => {
-    expect(() => previewDisclosure({ mode: 'managed' }, { feature: 'capture', fields: ['title'] })).toThrow(
+    expect(() => previewDisclosure({ mode: 'managed' }, { feature: 'prioritize', fields: ['title'] })).toThrow(
       AiConfigError,
     );
   });
@@ -390,7 +390,7 @@ describe('createProvider —— 关闭态', () => {
   it('关闭态调用明确失败，不静默返回空建议', async () => {
     const p = createProvider({ mode: 'off' });
     expect(p.mode).toBe('off');
-    const r = await p.invoke({ feature: 'capture', system: 's', user: 'u', fields: ['title'] }, []);
+    const r = await p.invoke({ feature: 'prioritize', system: 's', user: 'u', fields: ['title'] }, []);
     expect(r.ok).toBe(false);
     if (r.ok) throw new Error('unreachable');
     expect(r.reason).toBe('not-configured');
@@ -410,7 +410,7 @@ describe('createProvider —— 闸门在**网络之前**', () => {
     );
 
     const r = await p.invoke(
-      { feature: 'capture', system: 's', user: 'u', fields: ['title'] },
+      { feature: 'prioritize', system: 's', user: 'u', fields: ['title'] },
       [], // 没有授权
     );
 
@@ -434,7 +434,7 @@ describe('createProvider —— 闸门在**网络之前**', () => {
       { fetchImpl: fetchImpl as unknown as typeof fetch },
     );
 
-    const r = await p.invoke({ feature: 'capture', system: 's', user: 'u', fields: ['title'] }, []);
+    const r = await p.invoke({ feature: 'prioritize', system: 's', user: 'u', fields: ['title'] }, []);
     expect(r.ok).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
@@ -453,10 +453,10 @@ describe('createProvider —— 闸门在**网络之前**', () => {
     );
 
     const consents: EgressConsent[] = [
-      { feature: 'capture', destination: 'user-endpoint', grantedAt: 1 },
+      { feature: 'prioritize', destination: 'user-endpoint', grantedAt: 1 },
     ];
     const r = await p.invoke(
-      { feature: 'capture', system: 's', user: 'u', fields: ['title'] },
+      { feature: 'prioritize', system: 's', user: 'u', fields: ['title'] },
       consents,
     );
     expect(r.ok).toBe(true);
@@ -476,7 +476,7 @@ describe('createProvider —— 闸门在**网络之前**', () => {
       { mode: 'own', endpoint: 'http://localhost:9/v1', model: 'my-model' },
       { fetchImpl: fetchImpl as unknown as typeof fetch },
     );
-    await p.invoke({ feature: 'capture', system: 'S', user: 'U', fields: ['title'] }, []);
+    await p.invoke({ feature: 'prioritize', system: 'S', user: 'U', fields: ['title'] }, []);
 
     const call = fetchImpl.mock.calls[0] as unknown as [string, { body: string }];
     const body = JSON.parse(call[1].body) as Record<string, unknown>;
@@ -500,7 +500,7 @@ describe('createProvider —— 失败分类', () => {
         ) as unknown as typeof fetch,
       },
     );
-    const r = await p.invoke({ feature: 'capture', system: 's', user: 'u', fields: ['title'] }, []);
+    const r = await p.invoke({ feature: 'prioritize', system: 's', user: 'u', fields: ['title'] }, []);
     expect(r.ok).toBe(false);
     if (r.ok) throw new Error('unreachable');
     expect(r.reason).toBe('http-error');
@@ -512,7 +512,7 @@ describe('createProvider —— 失败分类', () => {
       { mode: 'own', endpoint: 'http://localhost:9/v1' },
       { fetchImpl: okFetch({ choices: [{ message: { content: '   ' } }] }) },
     );
-    const r = await p.invoke({ feature: 'capture', system: 's', user: 'u', fields: ['title'] }, []);
+    const r = await p.invoke({ feature: 'prioritize', system: 's', user: 'u', fields: ['title'] }, []);
     expect(r.ok).toBe(false);
     if (r.ok) throw new Error('unreachable');
     expect(r.reason).toBe('empty-response');
@@ -525,7 +525,7 @@ describe('createProvider —— 失败分类', () => {
         fetchImpl: vi.fn(() => Promise.reject(new Error('ECONNREFUSED'))) as unknown as typeof fetch,
       },
     );
-    const r = await p.invoke({ feature: 'capture', system: 's', user: 'u', fields: ['title'] }, []);
+    const r = await p.invoke({ feature: 'prioritize', system: 's', user: 'u', fields: ['title'] }, []);
     expect(r.ok).toBe(false);
     if (r.ok) throw new Error('unreachable');
     expect(r.reason).toBe('network');
