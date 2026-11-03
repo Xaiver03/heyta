@@ -304,9 +304,36 @@ test('🔴 与 dnd-kit KeyboardSensor 共存：Space 进入拖拽后方向键不
   const during = await activeId(page);
   expect(during, '拖拽中方向键归 KeyboardSensor，焦点不许被漫游甩走（那是"一边拖一边跳"）').toBe(before);
 
-  // 收场：Esc 取消拖拽（不留状态给后续用例，也验一次能退出）。
+  /*
+   * 收场：Esc 取消拖拽（不留状态给后续用例，也验一次能退出）。
+   *
+   * 🔴 这里**最多按两次** Esc。理由是一条实测出来的第三方时序窗口，不是"放宽判据"：
+   * 同一个 spec 跑 `--repeat-each=3`，逐次在 window/document 的 capture 与 bubble
+   * 四档打印 `defaultPrevented`，读数分成两类 ——
+   *
+   *   通过的那几趟： `document-bubble prevented=true`   ← dnd-kit 在冒泡阶段消费了 Esc
+   *   失败的那几趟： 四档全是 `prevented=false`        ← **没有任何人**消费它
+   *
+   * 也就是说 Esc 没有被漫游抢走（那一支有 `draggedKey === null` 闸门），
+   * 而是 dnd-kit 的 `KeyboardSensor` 在那一瞬间**还没把 document 上的监听挂上** ——
+   * 而 `.ht-rail__item--dragging` 早就在了（它由 `sortable.isDragging` 驱动，
+   * 与"传感器挂监听"不是同一步）。激活时序窗口，不是界面缺陷。
+   *
+   * ⇒ 判据一个字没改：拖拽态必须**归零**；第二次也拿不到就交给下面那条 15 秒 poll 红。
+   */
+  const draggingCount = (): Promise<number> =>
+    page.evaluate(() => document.querySelectorAll('.ht-rail__item--dragging').length);
   await page.keyboard.press('Escape');
+  const exited = await expect
+    .poll(draggingCount, { message: '按一次 Esc 之后拖拽态应当归零', timeout: 2000 })
+    .toBe(0)
+    .then(() => true)
+    .catch(() => false);
+  if (!exited) {
+    // 只补一次：Esc 在传感器挂监听之前被丢掉的那一趟（读数见上面注释）。
+    await page.keyboard.press('Escape');
+  }
   await expect
-    .poll(() => page.evaluate(() => document.querySelectorAll('.ht-rail__item--dragging').length === 0))
-    .toBe(true);
+    .poll(draggingCount, { message: 'Esc 之后拖拽态没有归零（补按一次也没退出）' })
+    .toBe(0);
 });
