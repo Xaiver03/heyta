@@ -323,7 +323,18 @@ const DIR = SANDBOX ? `${SBX}/runs/${runId}` : `${PROD_DIR}`;
 console.log(`步骤 3：送达 ${HOST}:${DIR}（SSH 22 端口）`);
 // 先清旧的沙箱轮次，再创建本趟 —— 保留策略至少留 1（含本趟）。
 if (!DRY && SANDBOX) pruneSandboxRuns();
-ssh(`mkdir -p ${DIR}/src`);
+/*
+ * 🔴 解包目标是**清空的**，不是复用的（2026-11 实测的一条真事故）。
+ *
+ * `tar xzf` 只**覆盖**同名文件，**不会删掉**上一轮存在、这一轮已经删掉的文件。
+ * 于是 tar 的 sha256 对账完美通过（字节确实是这一趟送的），而 `~/heyta/src` 里
+ * 躺着上一轮的 `apps/web/src/features/ai/AiCapture.tsx` 与
+ * `features/sync/avatar-key.ts` —— Docker 读的是**这棵脏树**，
+ * 构建报的错是"这两个文件引用了已经不存在的词条/导出"，
+ * 读起来像"这批代码编译不过"，而真正的成因是**没人清过那个目录**。
+ * ⇒ 先清后建；下面解包之后再补一条**树级**对账（字节对 ≠ 树对）。
+ */
+ssh(`rm -rf ${DIR}/src && mkdir -p ${DIR}/src`);
 const sc = run('scp', ['-q', '-o', 'ConnectTimeout=20', tar, `${HOST}:${DIR}/src.tar.gz`]);
 if (!DRY && sc.status !== 0) die('步骤 3（scp）', `rc=${sc.status}`, sc.stderr.slice(0, 300));
 const rr = ssh(`cd ${DIR} && sha256sum src.tar.gz | cut -d" " -f1`);
@@ -335,6 +346,34 @@ if (!DRY) {
   const un = ssh(`cd ${DIR} && tar xzf src.tar.gz -C src && echo UNPACK=OK`);
   if (!/UNPACK=OK/.test(un.stdout)) die('步骤 3（解包）', un.stderr.slice(0, 300));
   console.log(`   ✅ 对账成立 sha256=${localSha.slice(0, 16)}…（两端逐字相同）`);
+
+  /*
+   * 🔴 树级对账：解出来的文件集合必须**恰好等于** tar 里的清单。
+   *
+   * sha256 那一条只证明"我送出去的 tar 与远端那份逐字相同"，它**不覆盖**
+   * "远端那棵树里还有没有别的东西"。上一版就是死在这一格：字节全对、树多两个
+   * 已删除文件，构建失败三次而每次都指向不同的"代码问题"。
+   * `comm -13` = 树里有、tar 里没有 ⇒ 任何一行都必须是陈尸。
+   */
+  const audit = ssh(
+    `cd ${DIR} && tar tzf src.tar.gz | sed 's|^\\./||' | grep -v '/$' | sort > /tmp/ht-tar.list && ` +
+      `(cd src && find . -type f | sed 's|^\\./||' | sort) > /tmp/ht-tree.list && ` +
+      `comm -13 /tmp/ht-tar.list /tmp/ht-tree.list`,
+  );
+  const stale = (audit.stdout || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l !== '');
+  if (stale.length > 0) {
+    die(
+      '步骤 3（树级对账）',
+      `解出来的树里有 ${String(stale.length)} 个文件不在 tar 里（陈尸）：\n      ` +
+        stale.slice(0, 10).join('\n      '),
+      '   ⇒ 这棵树上一轮留下的删除没有被清掉；Docker 会照着脏树构建，\n' +
+        '      而报出来的错长得像"这批代码编译不过"。',
+    );
+  }
+  console.log('   ✅ 树级对账成立：解出来的文件集合 == tar 清单（无陈尸）');
   // 送达并验完就不再需要本地这份了（远端已有 src.tar.gz + 解包）。
   try { unlinkSync(tar); } catch {}
 } else console.log('   [dry-run] 未传输 ⇒ 对账这一步**没有被验证**');
