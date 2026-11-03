@@ -539,39 +539,59 @@ async function dismissFullBleedOverlay(page: Page): Promise<void> {
 }
 
 /**
- * 把某一行行尾那条「折叠的动作区」展开（`<details class="ht-compose-actions">`）。
+ * 守卫「这一行还在列表里」，并钉住**行尾已经没有可展开的动作区**了。
+ * ==================================================================
  *
- * 🔴 2026-10-25：**这一步是真实用户路径，不是绕过**。行尾的 chip（备注 / 重复 / 截止 /
- * 整理）现在住在 `.ht-compose-actions__panel` 里，而那一层**收起时 `opacity: 0`**：
- * 节点有盒子、`summary` 的 `pointer-events` 也是 `auto`，但它不在命中栈里 ——
- * 于是 `locator.click` 会一直重试到 60 秒超时，而报错长得像"这个 chip 有问题"。
- * 取证（`document.elementsFromPoint`）：chip 中心那一点的命中栈里只有
- * `div.ht-content / main.ht-main / …`，chip 那一层**根本不在里面**。
+ * 🔴 2026-11（行操作 UX 重设计之后）：这个函数**原来的语义已经不存在**。
+ * 它以前要把每行那条 `<details class="ht-compose-actions">` 展开，好点到里面那排行内
+ * 字段编辑器（备注 / 重复 / 截止 / 整理 / 提醒 / AI）—— 产品负责人那句话
+ * 「把所有这种铺开式组件全都删掉，全都收拢进来」之后，编辑器的**唯一**所有者是
+ * `TaskDetailCard`（宽档在详情列、窄档在点行弹出的对话框，两条落点由
+ * `task-detail-entry.ts` 的 `openTaskPane` / `openNarrowTaskPane` 收口）。
  *
- * ⚠️ 别改成 `click({ force: true })`：那会把"用户点不到"这件事一并测掉。
+ * 行尾现在只剩**只读徽标**：`task-note-badge-*` / `task-subtask-badge-*` /
+ * `task-chip-repeat` / `task-reminder-badge-*` / `TagChips`（`App.tsx` 的
+ * `renderTaskTrailing`），一枚都不可点，**没有任何东西要"展开"**。
+ * 实测（2026-11，1280×900）：行尾容器 `[data-testid^="task-trailing-"]` 里
+ * `.ht-compose-actions` **0 枚**、`.ht-chip--action` **0 枚**，整行高 62px。
+ *
+ * ## 为什么保留函数名，而不是删掉它再把调用点全部改成面单入口
+ *
+ * 它原来那句"抛错"治的是一件**仍然成立**的真错误：刷新之后侧栏会把范围恢复到
+ * 刚被摘掉的清单/标签上，那一行压根不在列表里（实测读数 `row-visible=0`），
+ * 而下游每一个 `locator.click()` 都会把这个事实读成"60 秒超时、这个控件坏了"。
+ * 所以这里保留一条守卫：**行不在 ⇒ 当场抛一句能指路的话**（绝不当成"不用展开"静默放过）。
+ *
+ * 反过来那一半也是守卫，不是装饰：真有人把整排行内编辑器搬回行尾
+ * （`.ht-compose-actions` 重新出现），这里当场红 —— 否则红的是下游那句
+ * "面单里应该有编辑器"，因果隔了两层。编辑权在哪一格是产品的裁决，
+ * 这一句只负责"它没有偷偷搬回来"。
+ *
+ * ⚠️ 调用点**不再**指望它做任何事：要编辑字段的用例紧接着走
+ * `openTaskPane` / `openNarrowTaskPane`，要删除的走 `TaskRowMenu`（右键）。
  */
 export async function openRowTail(page: Page, rowLocator: Locator): Promise<void> {
-  const trigger = rowLocator.locator('.ht-compose-actions__trigger').first();
+  const row = rowLocator.first();
   /*
-   * 🔴 2026-10-25：**不再静默 return**。原来那一版"这一行没有触发器就当作不用展开"，
-   * 于是一个点不到的 chip 会被读成"折叠面板没展开"，而真实原因是"这一行根本不是那一行"
-   * （例如刷新后侧栏把范围切到了刚被摘掉的标签上，行压根不在列表里）。
-   * 现在直接抛一句能指路的话，调用点不会被一句 60 秒超时糊住。
+   * 🔴 先分辨"这一行不在列表里"和"这一行在、只是没东西可展开"这两件事。
+   * `count()` 是快照，所以后面那句 `toBeVisible()` 才是等渲染落位的那一次等待。
    */
-  if ((await trigger.count()) === 0) {
-    const text = (await rowLocator.first().innerText().catch(() => '')).replace(/\n/g, ' ');
+  if ((await rowLocator.count()) === 0) {
     throw new Error(
-      `这一行没有行尾动作区触发器（\`.ht-compose-actions__trigger\`）—— 多半是"这一行不在当前范围里"` +
-        `或"这一行根本不是那条任务"。行文本：${text.slice(0, 60)}`,
+      '这一行根本不在列表里 —— 多数是"当前范围里没有它"（刷新后侧栏把范围切到了' +
+        '刚被摘掉的清单/标签上，实测 row-visible=0）。行尾已经没有动作区要展开，' +
+        '所以这不是入口深了一层，而是那一行不在。',
     );
   }
-  const open = await rowLocator
-    .locator('.ht-compose-actions')
-    .first()
-    .evaluate((el) => (el as HTMLDetailsElement).open)
-    .catch(() => false);
-  if (!open) await trigger.click();
-  await expect(rowLocator.locator('.ht-compose-actions__panel').first()).toHaveCSS('opacity', '1');
+  const text = (await row.innerText().catch(() => '')).replace(/\n/g, ' ');
+  await expect(row, `这一行没画出来（行文本：${text.slice(0, 60)}）`).toBeVisible();
+  await expect(
+    row.locator('.ht-compose-actions'),
+    '行尾又长出了折叠动作区（`.ht-compose-actions`）—— 行操作 UX 重设计把整排字段编辑器' +
+      '收进了 `TaskDetailCard`（「把所有这种铺开式组件全都删掉，全都收拢进来」）。' +
+      '调用点现在应当走 `task-detail-entry.ts` 的面单入口；这条红了说明那件事被回退了，' +
+      '而不是"这一条用例写错了"。',
+  ).toHaveCount(0);
 }
 
 export async function switchView(

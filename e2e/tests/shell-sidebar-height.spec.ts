@@ -15,8 +15,11 @@
  * 滚动交给里面那一层 `.ht-sidebar__body`，而右边缘那枚 `SidebarResizer` **留在滚动层外面**
  * （在里面会被 `overflow-x: clip` 裁掉半个命中带 —— 那是日历线写下来的第二条后果）。
  *
- * X1 🔴 **真手势**：内联表单展开着 → 页面滚到底 → 在**最靠下那一行**行尾的整理触发器上按下并松开 →
- *    那一下必须**打开**编辑器。这一条钉的是用户要的结果，不是 CSS 属性。
+ * X1 🔴 **真手势**：内联表单展开着 → 页面滚到底 → 在**最靠下那一行**的**行体**上按下并松开 →
+ *    那一下必须**打开**面单里的编辑器。这一条钉的是用户要的结果，不是 CSS 属性。
+ *    ⚠️ 2026-11：目标从"行尾整理触发器"换成"行体"—— 行尾那一排编辑器被撤掉之后，
+ *    点行开面单是界面上**唯一**的编辑入口（`App.tsx` 的 `openTask`），
+ *    而这条要验的"第一下点击必须落在这一行上"一个字没变。
  *    它另外量/断四件事，缺一条这一条就会变成装饰（第一版臂台就是这么照出来的）：
  *      · P0（工单 H11 之后加的）：**外壳不许滚** —— `docH ≤ vh` 且 `scrollY === 0`。
  *        这一格不是顺手补的：H11 把滚动从 window 搬到 `.ht-content` 之后，下面三条的
@@ -88,7 +91,7 @@ async function measure(page: Page, title: string) {
 }
 
 test.describe('侧栏不许把主区顶得跳起来（H9 第二刀）', () => {
-  test('X1 内联表单展开着、页面滚到底时，行尾触发器的**第一下**点击就要打开编辑器', async ({ page }) => {
+  test('X1 内联表单展开着、页面滚到底时，行体的**第一下**点击就要打开编辑器', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (m) => {
       if (m.type() === 'error') errors.push(m.text());
@@ -146,14 +149,22 @@ test.describe('侧栏不许把主区顶得跳起来（H9 第二刀）', () => {
     const target = await bottomRowTitle(page, titles);
 
     /*
-     * 🔴 2026-10-25：先把行尾那条折叠动作区展开（`openRowTail`）。
-     * 行尾的整理触发器住在 `<details class="ht-compose-actions">` 的折叠面板里 ——
-     * 收起时面板 `opacity: 0`、不在命中栈里，"第一下点击"点到的从来不是它，
-     * 而是那一层空气（这一条之前红在"触发器底边 615px > 视口 600px"这种读数上，
-     * 看起来像"它被顶出屏幕"，实际是"它还没被展开"）。展开是真实用户的第一步。
+     * 🔴 2026-11（行操作 UX 重设计）：这里的**目标物换了，判据没换**。
+     *
+     * 旧写法盯的是行尾那枚整理触发器（`task-organize-summary`，住在
+     * `<details class="ht-compose-actions">` 的折叠面板里）。整排行内编辑器被收进
+     * `TaskDetailCard`（「把所有这种铺开式组件全都删掉，全都收拢进来」），
+     * 行尾现在只有只读徽标 ⇒ 那个触发器**在页面上是 0 枚**（实测）。
+     *
+     * 界面上剩下的编辑入口就是**点行体**（`App.tsx` 的 `openTask`：宽档落详情列、
+     * 窄档落对话框；本例 900×600 走窄档）。所以"第一下点击"现在打在行体上 ——
+     * 这条用例真正要验的那件事（版面若在指针底下跳，mouseup 就落到别的元素上，
+     * 那一下不会打开编辑入口）逐字不变。
+     *
+     * `openRowTail` 留着当守卫：这一行必须在列表里，且行尾不许再长出折叠动作区。
      */
     await openRowTail(page, rowOf(page, target));
-    const trigger = rowOf(page, target).getByTestId('task-organize-summary');
+    const trigger = rowOf(page, target).locator('[data-testid^="task-row-"]').first();
 
     // 🔴 滚到**最大滚动量**（不是 `scrollIntoViewIfNeeded`：那一行本来就看得见时它一下都不滚，
     //   而 B94 那一跳只在滚动轴停在最大值上才会发生）。人的操作就是这样：先滚到底，再点行尾。
@@ -193,10 +204,10 @@ test.describe('侧栏不许把主区顶得跳起来（H9 第二刀）', () => {
     ).toBeGreaterThanOrEqual(before.hostScrollH - before.hostH - 2);
 
     const box = await trigger.boundingBox();
-    expect(box, '量不到行尾触发器 ⇒ 窄档回落没画出来，后面几条没有基准').not.toBeNull();
+    expect(box, '量不到行体 ⇒ 这一行没画出来，后面几条没有基准').not.toBeNull();
     expect(
       (box?.y ?? 0) + (box?.height ?? 0),
-      `触发器底边在 ${String(Math.round((box?.y ?? 0) + (box?.height ?? 0)))}px，视口只有 ${String(before.vh)}px ⇒ ` +
+      `行体底边在 ${String(Math.round((box?.y ?? 0) + (box?.height ?? 0)))}px，视口只有 ${String(before.vh)}px ⇒ ` +
         '它不在屏幕里，这一条点的是空气',
     ).toBeLessThanOrEqual(before.vh);
 
@@ -215,12 +226,23 @@ test.describe('侧栏不许把主区顶得跳起来（H9 第二刀）', () => {
 
     await page.screenshot({ path: SHOT('after-first-click') });
 
-    // 存在性判据：编辑器必须**看得见**（不是"在 DOM 里" —— 关着的 `<details>` 里也有它）。
-    // 症状排在机制前面：红的时候先看见"点了没反应"，再看见"是谁动了"。
+    /*
+     * 存在性判据：编辑入口必须真的打开了 —— 而且是**编辑器本体**在里面，
+     * 不是"对话框壳弹了一下"。
+     * 症状排在机制前面：红的时候先看见"点了没反应"，再看见"是谁动了"。
+     * ⚠️ 900×600 是窄档 ⇒ 面单落在 `task-detail-dialog` 里；整理编辑器
+     *（`任务「…」所属清单`）就在对话框内的面单里（它可能在对话框的滚动范围下方，
+     * 所以判的是"渲染出来了"而不是"当前视口里"—— 旧写法在行尾浮层上也是这个口径）。
+     */
+    const dialog = page.getByTestId('task-detail-dialog');
     await expect(
-      rowOf(page, target).getByLabel(`任务「${target}」所属清单`),
-      '第一下点击没打开整理编辑器 ⇒ 版面在指针底下跳走了（B94 §3）',
+      dialog,
+      '第一下点击没打开面单对话框 ⇒ 版面在指针底下跳走了（B94 §3），或者这一下没落到行上',
     ).toBeVisible();
+    await expect(
+      dialog.getByLabel(`任务「${target}」所属清单`),
+      '面单里没有整理编辑器 ⇒ 行尾那排撤掉之后，这一档就没有改清单的地方了',
+    ).toHaveCount(1);
 
     expect(
       afterDown.hostScrollH,

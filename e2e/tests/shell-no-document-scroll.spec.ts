@@ -259,10 +259,10 @@ test.describe('外壳不滚（H11 桌面那一半）', () => {
   });
 });
 
-test.describe('滚到底之后，行尾整理编辑器仍够得着（B95 那一档）', () => {
+test.describe('滚到底之后，整理编辑器仍够得着（B95 那一档）', () => {
   test.use({ viewport: { width: 900, height: 700 } });
 
-  test('W2 真手势：滚到底 → 点最靠下一行的整理触发器 → 编辑器可见且能滚到完整', async ({ page }) => {
+  test('W2 真手势：滚到底 → 点最靠下一行 → 面单里的整理编辑器可见且能滚到完整', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (m) => {
       if (m.type() === 'error') errors.push(m.text());
@@ -295,59 +295,84 @@ test.describe('滚到底之后，行尾整理编辑器仍够得着（B95 那一�
       '内容列滚不动 ⇒ W1 那条"它是滚动宿主"已经不成立，这一条的量法失去前提',
     ).toBeGreaterThan(0);
 
-    // 🔴 2026-10-25：行尾那几个 chip 住在 `<details class="ht-compose-actions">` 的
-    // 折叠面板里（`opacity: 0` ⇒ 不在命中栈里，点了等于点空气）。先展开它，
-    // 与 `detail-pane-task` 共用 `helpers.openRowTail` 那一处收口。
+    /*
+     * 🔴 2026-11（行操作 UX 重设计）：**点了之后落在哪儿换了，判据没换。**
+     *
+     * 这一条原来点的是行尾那枚整理触发器（`task-organize-summary`，住在折叠面板里），
+     * 要验的是"那枚浮层展开后到底算不算进这一栏的可滚范围"（B95）。
+     * 整排行内编辑器被收进 `TaskDetailCard`（「把所有这种铺开式组件全都删掉，全都收拢进来」），
+     * 触发器现在是 0 枚；900×700 是窄档 ⇒ 点行体落在**对话框**里，而对话框自己就是
+     * 一个 `overflow-y: auto` 的滚动宿主（实测 700 视口下 clientHeight 666 / scrollHeight 1668）。
+     * 于是"够得着"这件事现在只能问对话框自己 —— 这正是同一个问题换了参照物。
+     */
     await openRowTail(page, rowFor(page, target));
-    const trigger = rowFor(page, target).getByTestId('task-organize-summary');
+    const trigger = rowFor(page, target).locator('[data-testid^="task-row-"]').first();
     const tBox = await trigger.boundingBox();
-    expect(tBox, '量不到行尾整理触发器 ⇒ 这一条点的是空气').not.toBeNull();
+    expect(tBox, '量不到行体 ⇒ 这一条点的是空气').not.toBeNull();
     await page.mouse.click(
       Math.round((tBox?.x ?? 0) + (tBox?.width ?? 0) / 2),
       Math.round((tBox?.y ?? 0) + (tBox?.height ?? 0) / 2),
     );
 
-    const editor = page.getByLabel(`任务「${target}」所属清单`);
-    await expect(editor, '点行尾触发器没打开整理编辑器').toBeVisible();
+    const dialog = page.getByTestId('task-detail-dialog');
+    await expect(dialog, '点行体没打开任务面单 ⇒ 窄档下整理编辑器没有落点了').toBeVisible();
+    const editor = dialog.getByTestId('organize-project-select');
+    await expect(editor, '面单里没有整理编辑器（清单下拉）').toBeVisible();
     await page.screenshot({ path: SHOT('w2-editor-open-before-fit') });
 
-    // 🔴 "够得着"必须**展开之后再真的滚到底**才知道。第一版用的是
-    // `editor.scrollIntoViewIfNeeded()`，而它只保证**那个输入框**可见 —— 失败的是浮层的
-    // **底边**（实测 top=611 bottom=765 而可视区底是 700），于是这一条会读成通过。
-    // 浮层是绝对定位的（`TaskOrganizer.tsx` 里那枚 `.ht-material`），
-    // 它到底算不算进内容列的 `scrollHeight` 正是这一条要验的东西 —— 只能真的滚一次。
+    /*
+     * 🔴 "够得着"必须**打开之后再真的滚到底**才知道。第一版用的是
+     * `editor.scrollIntoViewIfNeeded()`，而它只保证**那个控件**可见 —— 失败的是那一层
+     * 浮层的**底边**（实测 top=611 bottom=765 而可视区底是 700），于是这一条会读成通过。
+     * 现在量的是同一件事的另一半：面单对话框**自己**是滚动宿主，整理编辑器在它
+     * 1668px 的内容里；把它滚到 max 之后，编辑器的框必须完整落在对话框的框里
+     * （且对话框自己完整落在视口里）—— 否则"改清单"在这个尺寸下点不到。
+     */
     const fitted = await editor.evaluate((el) => {
-      const content = document.querySelector<HTMLElement>('.ht-content');
-      // 🔴 从**编辑器自己**往上找它那张浮层，而不是 `document.querySelector('details[open]')`：
-      // 一行里并列的 disclosure 不止一枚（「备注」也有一枚，理由写在
-      // `TaskOrganizer.tsx` 里那段 testID 注释），全页第一个展开的可能根本是别行的。
-      const panel = el.closest('details')?.querySelector<HTMLElement>('.ht-material');
-      if (content) content.scrollTop = content.scrollHeight;
-      const c = content?.getBoundingClientRect();
-      const p = panel?.getBoundingClientRect();
+      const scroller = el.closest<HTMLElement>('[data-testid="task-detail-dialog"]');
+      if (scroller === null) {
+        return {
+          hasScroller: false,
+          panelTop: -1,
+          panelBottom: -1,
+          boxTop: -1,
+          boxBottom: -1,
+          scrollTop: -1,
+          hostScrollH: -1,
+          hostH: -1,
+          viewportH: window.innerHeight,
+          dialogInViewport: false,
+        };
+      }
+      scroller.scrollTop = scroller.scrollHeight;
+      const c = scroller.getBoundingClientRect();
+      const p = el.getBoundingClientRect();
       return {
-        hasPanel: Boolean(p),
-        panelTop: Math.round(p?.top ?? -1),
-        panelBottom: Math.round(p?.bottom ?? -1),
-        boxTop: Math.round(c?.top ?? -1),
-        boxBottom: Math.round(c?.bottom ?? -1),
-        scrollTop: Math.round(content?.scrollTop ?? -1),
-        hostScrollH: Math.round(content?.scrollHeight ?? -1),
-        hostH: Math.round(content?.clientHeight ?? -1),
-        triggerTop: Math.round(
-          el.closest('details')?.querySelector<HTMLElement>('summary')?.getBoundingClientRect().top ?? -1,
-        ),
+        hasScroller: true,
+        panelTop: Math.round(p.top),
+        panelBottom: Math.round(p.bottom),
+        boxTop: Math.round(c.top),
+        boxBottom: Math.round(c.bottom),
+        scrollTop: Math.round(scroller.scrollTop),
+        hostScrollH: Math.round(scroller.scrollHeight),
+        hostH: Math.round(scroller.clientHeight),
+        viewportH: window.innerHeight,
+        dialogInViewport: c.top >= -1 && c.bottom <= window.innerHeight + 1,
       };
     });
-    expect(fitted.hasPanel, '展开后量不到那一行的整理浮层 ⇒ 下面两条没有基准').toBe(true);
+    expect(fitted.hasScroller, '面单不在 `task-detail-dialog` 里 ⇒ 下面两条没有基准').toBe(true);
+    expect(
+      fitted.dialogInViewport,
+      `面单对话框自己跑出了视口（top=${String(fitted.boxTop)} bottom=${String(fitted.boxBottom)}，` +
+        `视口高 ${String(fitted.viewportH)}px）⇒ 它下半截在折叠线以下，够不着`,
+    ).toBe(true);
     expect(
       fitted.panelBottom <= fitted.boxBottom + 1 && fitted.panelTop >= fitted.boxTop - 1,
       `整理编辑器 top=${String(fitted.panelTop)} bottom=${String(fitted.panelBottom)}，` +
-        `可视区 top=${String(fitted.boxTop)} bottom=${String(fitted.boxBottom)}；` +
-        `内容列 scrollTop=${String(fitted.scrollTop)}（已滚到 max）scrollHeight=${String(fitted.hostScrollH)} ` +
-        `clientHeight=${String(fitted.hostH)}，触发器 top=${String(fitted.triggerTop)} ⇒ ` +
-        '展开那枚浮层**不进**这一栏的可滚范围，外壳钉死之后它够不着（B95 那一档）：' +
-        '要么让它参与 scrollHeight，要么让它在贴底时朝上弹',
+        `面单对话框 top=${String(fitted.boxTop)} bottom=${String(fitted.boxBottom)}；` +
+        `对话框 scrollTop=${String(fitted.scrollTop)}（已滚到 max）` +
+        `scrollHeight=${String(fitted.hostScrollH)} clientHeight=${String(fitted.hostH)} ⇒ ` +
+        '滚到底之后整理编辑器仍不在面单的可视范围里，这一档点不到它（B95 那一档换了参照物之后仍然成立）',
     ).toBe(true);
 
     await page.screenshot({ path: SHOT('w2-editor-open-fitted') });

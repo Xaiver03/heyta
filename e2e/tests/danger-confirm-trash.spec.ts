@@ -50,8 +50,26 @@ async function openPurgeConfirm(page: Page, theme?: 'dark'): Promise<void> {
   await addTask(page, TITLE);
   const row = rowOf(page, TITLE);
   await expect(row, `列表里没有刚加的「${TITLE}」—— 外壳或 addTask 没生效，后面读数全废`).toBeVisible();
+  /*
+   * 🔴 2026-11（行操作 UX 重设计）：**行尾那枚 `删除：<标题>` 已经不存在**。
+   *
+   * 旧写法是「展开行尾折叠动作区 → 点那一排里的删除」。整排铺开的行内控件被产品负责人
+   * 收掉了（「把所有这种铺开式组件全都删掉，全都收拢进来」），删除现在住在行右键菜单
+   * `TaskRowMenu`（`task-row-menu-delete`）—— 那一级只有「打开详情 / 删除」两枚，
+   * 危险项在分隔线以下（`apps/web/src/features/tasks/TaskRowMenu.tsx` 文件头那张表）。
+   *
+   * 判据**没有放宽**，只换了手势：仍然是"这一下真的把它删进回收站"，后面那句
+   * `toHaveCount(0)` 一个字没动。无子任务时档位是 `undo`（`resolveDangerTier`），
+   * 所以这里**不该**多出一次就地确认 —— 菜单若弹了二次确认，下面那句会红。
+   */
   await openRowTail(page, row);
-  await page.getByRole('button', { name: `删除：${TITLE}` }).click();
+  await row.click({ button: 'right' });
+  const rowMenu = page.getByTestId('task-row-menu');
+  await expect(
+    rowMenu,
+    '右键没打开行菜单 ⇒ 行尾删除按钮撤掉之后，列表上就没有删除入口了',
+  ).toBeVisible();
+  await page.getByTestId('task-row-menu-delete').click();
   await expect(row, '删了一下之后它还留在主列表 ⇒ 那一格不是"进回收站"').toHaveCount(0);
 
   await switchView(page, '回收站');

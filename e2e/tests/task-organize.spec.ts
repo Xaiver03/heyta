@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { addTask, metaFor, openApp, openRowTail, rowFor, switchView } from './helpers.js';
+import { closeTaskDetailIfOpen, openNarrowTaskPane } from './task-detail-entry.js';
 
 /**
  * 任务整理：清单归属 + 标签（真浏览器，零 mock）
@@ -101,14 +102,24 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await expect(metaFor(page, TITLE)).not.toContainText(LIST);
     await expect(row.getByTestId('task-chip-tag')).toHaveCount(0);
 
-    // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
+    /*
+     * 🔴 2026-11（行操作 UX 重设计）：**行尾那枚整理触发器不存在了**。
+     *
+     * 旧写法是「展开行尾折叠区 → 点 `task-organize-summary` → 在那一层里选清单/勾标签」。
+     * 整排行内编辑器被收进 `TaskDetailCard`（「把所有这种铺开式组件全都删掉，全都收拢进来」），
+     * 900 宽这一档（详情列收起）面单落在**点行弹出的对话框**里。
+     * ⇒ 真实用户路径变成"点行 → 在面单里改"，`openNarrowTaskPane` 就是那一步，
+     * 它另外钉住"面单真的在对话框里"（否则窄档等于没有改字段的地方）。
+     *
+     * 判据一个字没放宽：仍然是"选完清单之后行的元信息槽里出现它，且刷新后还在"。
+     */
     await openRowTail(page, row);
-    await row.getByTestId('task-organize-summary').click();
+    const pane = await openNarrowTaskPane(page, TITLE);
 
-    await row.getByLabel(`任务「${TITLE}」所属清单`).selectOption({ label: LIST });
+    await pane.getByLabel(`任务「${TITLE}」所属清单`).selectOption({ label: LIST });
     await expect(metaFor(page, TITLE), '归属没有出现在行的元信息槽里').toContainText(LIST);
 
-    const checkbox = row.getByRole('checkbox', {
+    const checkbox = pane.getByRole('checkbox', {
       name: `给任务「${TITLE}」加上或去掉标签「${TAG}」`,
     });
     /**
@@ -144,6 +155,11 @@ test.describe('任务整理：清单归属 + 标签', () => {
       后者在跑剩的数据下也成立。
     */
     await expect(organizerRow(page, TAG).locator('[data-testid$="-count"]')).toHaveText('1');
+    /*
+     * 🔴 截图前必须关掉面单对话框：`modal-readonly` 那层遮罩会盖住整页，
+     * 开着它拍出来的侧栏是**暗的**，那张图就不再是"计数位显示 1"的证据（§6.2 规定一）。
+     */
+    await closeTaskDetailIfOpen(page);
     // 规定一：截图放固定路径，失败时也在。
     await page.screenshot({
       path: 'test-results/sidebar-tag-count.png',
@@ -167,17 +183,16 @@ test.describe('任务整理：清单归属 + 标签', () => {
     // 计数位也得是从 op-log **物化出来**的那一个（不是上一次渲染留下的 DOM）。
     await expect(organizerRow(page, TAG).locator('[data-testid$="-count"]')).toHaveText('1');
 
-    // 展开面板里控件的**状态**也要跟着回来（不只是那几个 chip 好看）。
-    // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
+    // 面单里控件的**状态**也要跟着回来（不只是那几个 chip 好看）。
     await openRowTail(page, afterReload);
-    await afterReload.getByTestId('task-organize-summary').click();
+    const paneAfterReload = await openNarrowTaskPane(page, TITLE);
     // 直接断言**被选中的那个 option 的文字** —— 比拿 value（清单 id）去比对
     // 更贴近"用户看到的是对的"，也少一次 await。
     await expect(
-      afterReload.getByLabel(`任务「${TITLE}」所属清单`).locator('option:checked'),
+      paneAfterReload.getByLabel(`任务「${TITLE}」所属清单`).locator('option:checked'),
     ).toHaveText(LIST);
     await expect(
-      afterReload.getByRole('checkbox', {
+      paneAfterReload.getByRole('checkbox', {
         name: `给任务「${TITLE}」加上或去掉标签「${TAG}」`,
       }),
     ).toBeChecked();
@@ -185,7 +200,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
 
   test('取消归属：标签摘掉、任务回到收集箱，刷新后依然是取消态', async ({ page }) => {
     const title = `${TITLE}-undo`;
-    // 同一理由：这一支量的仍是**窄档行尾**那枚触发器（§8.147 起宽档不画它）。
+    // 900 宽 ⇒ 详情列收起这一档 ⇒ 面单落在点行弹出的对话框里（`task-detail-entry.ts` 那张表）。
     await page.setViewportSize({ width: 900, height: 600 });
     await openApp(page);
     await addTask(page, title);
@@ -200,18 +215,22 @@ test.describe('任务整理：清单归属 + 标签', () => {
     /*
      * 🔴 2026-10-25（还原前提，不是改判据）：**建标签也会把当前范围切到那个新标签上**
      * （与建清单同一件事）。而这条任务还在收集箱、身上没有那个标签 ⇒ 它压根不在当前列表里，
-     * `rowFor()` 数到 **0**（实测读数：`STEP row-visible=0`），于是后面 `openRowTail` 抛
-     * "这一行没有行尾动作区触发器"，整个用例拖到 60 秒超时。
+     * `rowFor()` 数到 **0**（实测读数：`STEP row-visible=0`），于是后面每一步都只能等超时。
+     * ⚠️ 行尾那枚触发器已经不存在（编辑权搬进面单），但这条前提**照旧成立**：
+     * 行不在列表里 ⇒ 点行开面单也无从谈起。
      * 切回「任务」是真实用户回到任务列表的那一步。
      */
     await switchView(page, '任务');
 
     const row = rowFor(page, title);
     await expect(row, '建完标签之后那一行不在当前范围里 ⇒ 这一条后面全是空判据').toBeVisible();
-    // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
+    /*
+     * 🔴 2026-11：整理编辑器住在面单里（900 宽 ⇒ 点行弹出的对话框），行尾那枚
+     * `task-organize-summary` 已经不存在。判据不变：勾上标签 ⇒ 行尾那颗只读 chip 出现。
+     */
     await openRowTail(page, row);
-    await row.getByTestId('task-organize-summary').click();
-    const checkbox = row.getByRole('checkbox', {
+    const pane = await openNarrowTaskPane(page, title);
+    const checkbox = pane.getByRole('checkbox', {
       name: `给任务「${title}」加上或去掉标签「${TAG}」`,
     });
     // ⚠️ 同样用 `click()` 而不是 `check()` / `uncheck()` —— 理由见第一条用例。
@@ -243,10 +262,9 @@ test.describe('任务整理：清单归属 + 标签', () => {
     // 写 `[]` 的话 chip 也会消失，但下一次**加**标签的合并结果会不一样
     // （`[]` 是个真值，会在 reducer 的字段合并里继续占位）。
     const row2 = rowFor(page, title);
-    // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
     await openRowTail(page, row2);
-    await row2.getByTestId('task-organize-summary').click();
-    await row2
+    const pane2 = await openNarrowTaskPane(page, title);
+    await pane2
       .getByRole('checkbox', {
         name: `给任务「${title}」加上或去掉标签「${TAG}」`,
       })
@@ -260,8 +278,8 @@ test.describe('任务整理：清单归属 + 标签', () => {
      *
      * 刷新会连侧栏选中一起恢复：这时当前范围还是刚被摘掉的那个**标签**，
      * 而这条任务已经没有那个标签了 ⇒ 它压根不在当前列表里。
-     * 于是下面两句（"tag chip 为 0"）**恒真**、而 `task-organize-summary` 的定位
-     * 永远解析不到（报出来是 60 秒超时的 "waiting for locator"，看着像触发器坏了）。
+     * 于是下面两句（"tag chip 为 0"）**恒真**、而后面"点行开面单"那一步
+     * 永远解析不到（报出来是 60 秒超时的 "waiting for locator"，看着像行坏了）。
      * 这既是修复也是**加强**：先断言那一行真的在，那两句"没有 chip"才有意义。
      */
     await switchView(page, '任务');
@@ -278,11 +296,11 @@ test.describe('任务整理：清单归属 + 标签', () => {
       任务摘干净就没有了。
     */
     await expect(organizerRow(page, TAG).locator('[data-testid$="-count"]')).toHaveCount(0);
-    // 行尾动作区收起时 chip 在 `opacity: 0` 的面板里、不在命中栈 ⇒ 先展开（真实用户路径）。
+    // 面单里的勾选态也必须是从 op-log 物化出来的那一个（不只是行尾 chip 好看）。
     await openRowTail(page, afterReload);
-    await afterReload.getByTestId('task-organize-summary').click();
+    const paneAfterReload = await openNarrowTaskPane(page, title);
     await expect(
-      afterReload.getByRole('checkbox', {
+      paneAfterReload.getByRole('checkbox', {
         name: `给任务「${title}」加上或去掉标签「${TAG}」`,
       }),
     ).not.toBeChecked();
