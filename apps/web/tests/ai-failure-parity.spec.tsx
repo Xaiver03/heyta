@@ -49,7 +49,7 @@ const AI_DIR = resolve(HERE, '../src/features/ai');
  * 加进清单之后必须同时满足本文件其余四条（统一工厂 / `t(failure.key)` /
  * 原文只进 `<details>` / 折叠详情 testid 形状）。
  */
-const PANELS = ['AiBreakdown', 'AiCapture', 'AiDuration', 'AiPrioritize', 'AiToolRun', 'AssistantPanel'] as const;
+const PANELS = ['AiBreakdown', 'AiDuration', 'AiPrioritize', 'AiToolRun', 'AssistantPanel'] as const;
 
 function panelSource(name: (typeof PANELS)[number]): string {
   return readFileSync(join(AI_DIR, `${name}.tsx`), 'utf8');
@@ -94,7 +94,6 @@ describe('六个 AI 入口的失败文案只有一个来源', () => {
     const copy = readFileSync(join(AI_DIR, 'ai-failure-copy.ts'), 'utf8');
     for (const factory of [
       'breakdownFailureCopy',
-      'captureFailureCopy',
       'durationFailureCopy',
       'prioritizeFailureCopy',
       'toolRunFailureCopy',

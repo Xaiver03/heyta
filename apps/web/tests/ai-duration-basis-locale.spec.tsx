@@ -38,7 +38,6 @@ import type { PreferenceSet, Task } from '@heyta/domain';
 
 const { AiDuration } = await import('../src/features/ai/AiDuration.js');
 const { AiBreakdown } = await import('../src/features/ai/AiBreakdown.js');
-const { AiCapture } = await import('../src/features/ai/AiCapture.js');
 const { AiPrioritize } = await import('../src/features/ai/AiPrioritize.js');
 
 const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF]/;
@@ -241,25 +240,8 @@ describe('🔴 四个 AI 面板的英文披露态都不许露中文', () => {
     return container;
   }
 
-  it('捕获 / 拆解 / 排序 / 估时 —— 英文披露态 textContent 无汉字', () => {
+  it('拆解 / 排序 / 估时 —— 英文披露态 textContent 无汉字', () => {
     const cases: readonly { name: string; open: () => void; render: () => HTMLDivElement }[] = [
-      {
-        name: 'capture',
-        render: () =>
-          renderPanel('en', (
-            <AiCapture
-              text="Buy milk tomorrow"
-              routing={routingFor('capture')}
-              consents={[]}
-              secrets={EMPTY_SECRETS}
-              preferenceSet={PREFERENCE_SET}
-              onApply={() => Promise.resolve()}
-            />
-          )),
-        open: () => {
-          container?.querySelector<HTMLButtonElement>('[data-testid="capture-ai"]')?.click();
-        },
-      },
       {
         name: 'breakdown',
         render: () =>

@@ -31,7 +31,7 @@ const AI_DIR = resolve(HERE, '../src/features/ai');
 
 import { AiPanelHost } from '../src/features/ai/AiPanelHost.js';
 
-const PANELS = ['AiBreakdown', 'AiCapture', 'AiDuration', 'AiPrioritize', 'AiToolRun'] as const;
+const PANELS = ['AiBreakdown', 'AiDuration', 'AiPrioritize', 'AiToolRun'] as const;
 
 function panelSource(name: (typeof PANELS)[number]): string {
   return readFileSync(join(AI_DIR, `${name}.tsx`), 'utf8');
@@ -150,9 +150,12 @@ describe('AI 面板容器：一个共享实现 + 三件套', () => {
     expect(wrong, '角色用错了（加载态没有可操作内容，不该是 dialog）：').toEqual([]);
   });
 
-  it('容器数还是 19（加了一屏就回来看一眼）', () => {
+  it('容器数还是 15（加了一屏就回来看一眼）', () => {
+    // ⚠️ 2026-11 由 19 改成 15：`AiCapture` 的四个容器随「一句话捕获」一起删除了
+    // （产品负责人裁决：解析是收集框自己的功能，不该是一个独立的 AI 功能）。
+    // 这条数字变红时要先分辨：**有人又手写了容器**（真问题）还是**某个面板被删了**。
     const found = PANELS.flatMap((name) => [...panelSource(name).matchAll(/<AiPanelHost/gu)]).length;
-    expect(found).toBe(19);
+    expect(found).toBe(15);
   });
 });
 

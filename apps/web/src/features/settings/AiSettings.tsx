@@ -77,7 +77,6 @@ function capabilityLabels(t: I18nValue['t']): Readonly<Record<AiCapability, stri
 /** 哪些功能需要这个能力 —— 让用户知道勾了有什么用。 */
 function featuresNeeding(capability: AiCapability, t: I18nValue['t'], locale: Locale): string {
   const names: Partial<Record<AiFeature, string>> = {
-    capture: t('web.ai.needs.capture'),
     breakdown: t('web.ai.needs.breakdown'),
     prioritize: t('web.ai.needs.prioritize'),
     'duration-estimate': t('web.ai.needs.duration'),
@@ -165,7 +164,6 @@ export function capabilityGaps(
 /** 功能的中文名。**不直接用 `AiFeature` 字面量**，那对用户没有意义。 */
 function featureLabels(t: I18nValue['t']): Readonly<Record<AiFeature, string>> {
   return {
-    capture: t('web.ai.feature.capture'),
     breakdown: t('web.ai.feature.breakdown'),
     prioritize: t('web.ai.feature.prioritize'),
     'duration-estimate': t('web.ai.feature.duration'),
@@ -175,7 +173,6 @@ function featureLabels(t: I18nValue['t']): Readonly<Record<AiFeature, string>> {
 }
 
 const FEATURE_ORDER: readonly AiFeature[] = [
-  'capture',
   'breakdown',
   'prioritize',
   'duration-estimate',

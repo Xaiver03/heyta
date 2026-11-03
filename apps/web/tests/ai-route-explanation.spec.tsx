@@ -345,7 +345,7 @@ describe('原因优先级与不变式', () => {
   it('既没配路由、又没有排除记录时，宁可承认"判断不了"也不编一个原因', () => {
     const explanation = explainNoCandidate(
       { candidates: [], excluded: [], unconfigured: false },
-      'capture',
+      'duration-estimate',
     );
     expect(explanation.reason).toBe('unknown');
     expect(explanation.key).toBe('web.ai.routeExplain.unknown');

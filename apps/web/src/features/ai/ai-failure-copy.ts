@@ -56,7 +56,6 @@
 import type {
   AssistantFailureReason,
   BreakdownFailureReason,
-  CaptureFailureReason,
   DurationFailureReason,
   PrioritizeFailureReason,
   ToolCallFailureReason,
@@ -154,13 +153,6 @@ const BREAKDOWN_KEY: Record<BreakdownFailureReason, MessageKey> = {
   'ai-unavailable': 'web.ai.failure.aiUnavailable',
   unparseable: 'web.ai.failure.breakdown.unparseable',
   'empty-title': 'web.ai.failure.breakdown.emptyTitle',
-};
-
-const CAPTURE_KEY: Record<CaptureFailureReason, MessageKey> = {
-  'ai-unavailable': 'web.ai.failure.aiUnavailable',
-  unparseable: 'web.ai.failure.capture.unparseable',
-  'empty-text': 'web.ai.failure.capture.emptyText',
-  'text-too-long': 'web.ai.failure.capture.textTooLong',
 };
 
 const DURATION_KEY: Record<DurationFailureReason, MessageKey> = {
@@ -404,21 +396,6 @@ export function breakdownFailureCopy(
   return {
     // 有原因码就用它 —— 它比 `ai-unavailable` 那句话具体得多。
     key: reason === 'ai-unavailable' ? failureKey(ctx) : BREAKDOWN_KEY[reason],
-    detail,
-    showDetail: showDetailFor(reason, ctx),
-    settingsTarget: settingsTargetFor(reason, ctx),
-    originHint: originHintFor(ctx),
-  };
-}
-
-export function captureFailureCopy(
-  reason: CaptureFailureReason,
-  detail: string,
-  ctx: AiFailureContext,
-): AiFailureCopy {
-  return {
-    // 有原因码就用它 —— 它比 `ai-unavailable` 那句话具体得多。
-    key: reason === 'ai-unavailable' ? failureKey(ctx) : CAPTURE_KEY[reason],
     detail,
     showDetail: showDetailFor(reason, ctx),
     settingsTarget: settingsTargetFor(reason, ctx),

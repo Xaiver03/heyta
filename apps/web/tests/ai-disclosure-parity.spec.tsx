@@ -51,7 +51,6 @@ import type {
 import { AiBreakdown } from '../src/features/ai/AiBreakdown.js';
 import { AiPrioritize } from '../src/features/ai/AiPrioritize.js';
 import { AiDuration } from '../src/features/ai/AiDuration.js';
-import { AiCapture } from '../src/features/ai/AiCapture.js';
 import { AiToolRun } from '../src/features/ai/AiToolRun.js';
 import { PanelEphemeralProvider } from '../src/features/ai/panel-ephemeral.js';
 
@@ -91,7 +90,6 @@ const ROUTING: AiRoutingConfig = {
     breakdown: ROUTE,
     prioritize: ROUTE,
     'duration-estimate': ROUTE,
-    capture: ROUTE,
     'tool-calling': ROUTE,
   },
 };
@@ -100,7 +98,6 @@ const CONSENTS: readonly EgressConsent[] = [
   { feature: 'breakdown', destination: 'user-endpoint', grantedAt: 1 },
   { feature: 'prioritize', destination: 'user-endpoint', grantedAt: 1 },
   { feature: 'duration-estimate', destination: 'user-endpoint', grantedAt: 1 },
-  { feature: 'capture', destination: 'user-endpoint', grantedAt: 1 },
   { feature: 'tool-calling', destination: 'user-endpoint', grantedAt: 1 },
 ];
 
@@ -255,20 +252,6 @@ async function collectDisclosureDimensions(): Promise<Record<string, string[]>> 
   evidence['AiDuration'] = renderedDimensions(el, 'duration-');
   act(() => root?.unmount());
 
-  // ④ 捕获
-  el = mount(
-    <AiCapture
-      text="明天下午三点和张总开周会"
-      routing={ROUTING}
-      consents={CONSENTS}
-      secrets={SECRETS}
-      onApply={() => Promise.resolve()}
-    />,
-  );
-  click(el.querySelector('[data-testid="capture-ai"]'));
-  evidence['AiCapture'] = renderedDimensions(el, 'capture-');
-  act(() => root?.unmount());
-
   // ⑤ 工具调用 —— 🔴 修复前这一项缺 fallbacks 与 e2ee-warning。
   el = mount(
     <AiToolRun
@@ -300,12 +283,11 @@ describe('🔴🔴 同一条路由解析下，5 个入口渲染同一组披露�
       });
     }
 
-    // 再断言"五份完全相同" —— 防止某个入口**多**渲染一维而没人发现。
+    // 再断言"四份完全相同" —— 防止某个入口**多**渲染一维而没人发现。
     expect(evidence).toEqual({
       AiBreakdown: expected,
       AiPrioritize: expected,
       AiDuration: expected,
-      AiCapture: expected,
       AiToolRun: expected,
     });
   });
