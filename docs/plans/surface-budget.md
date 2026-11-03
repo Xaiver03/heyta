@@ -192,55 +192,52 @@
 > ⇒ 整轮 e2e 被自己的载体判定判成"作废"（`ECONNRESET`），而那一轮的红**一条都不回答界面对不对**。
 > 跑 e2e 前先确认 `packages/*/dist` 存在且比源码新；能隔离产物目录就隔离。
 
-### 5.4 🔴 全量 e2e 的现状：56 条红，三个根因族（**尚未修完**）
+### 5.4 e2e 与 `pnpm check`：从 57 条红到 0（这一节记的是**怎么修的**）
 
-`pnpm check` 的 `check:ai-e2e` 段：**435 passed / 57 failed / 2 skipped（墙钟 1.6 h）**。
-57 条全部用 `--last-failed` **孤立重跑复现**（`57 failed`，0 条转绿）⇒ 都是真红，
-不是"整串高负载多报红"那一族。
+起点：`check:ai-e2e` **435 passed / 57 failed / 2 skipped**，57 条全部用 `--last-failed`
+孤立重跑复现（0 条转绿）⇒ 都是真红。收尾读数：**492 passed / 0 failed / 2 skipped（46.6 min）**，
+`pnpm check` 全链 rc=0。
 
-> ⚠️ 之后删掉独立的「一句话捕获」功能（产品负责人：「已经集成到收集框里面了，
-> 不需要单独有一个产品入口」），`ai-capture.spec.ts` 整条随之删除 ⇒ 现在是 **56 条**。
-> 下面的分类与条数按 57 那条读数记着，减掉的正是 `C 族` 里的 `ai-capture` 那一条。
+三族根因与处置：
 
-三类根因：
-
-| 族 | 条数 | 形状 | 收口点 |
+| 族 | 条数 | 根因 | 处置 |
 |---|---|---|---|
-| **A. 行尾动作区没了** | **27** | `helpers.ts` 的 `openRowTail()` 抛「这一行没有行尾动作区触发器（`.ht-compose-actions__trigger`）」 | 一枚共用 helper；调用点还要连带把"点行尾编辑器"换成"点行 ⇒ 面单" |
-| **B. 焦点环量的是已替换的机制** | **7**（+1 真缺陷） | `outline-style === 'none'` 被判成"环被抹掉了" | 判据该量"画面上有一圈可见的环"，不量它画在 `outline` 还是 `box-shadow` |
-| **C. 设置 IA / 捕获入口 / 其它** | **23** | `settings-group-sync` 那枚按钮 0 枚、`settings-sheet` 里 0 个 `heading`、`capture-ai` 不可见 | 未逐条定性，见下表 |
+| **A** 行尾动作区没了 | 27 | `helpers.ts` 的 `openRowTail()` 还在找 `.ht-compose-actions__trigger` | helper 保留"行不在列表里"的守卫，并**反向钉住**"行尾不许再长出折叠动作区"；8 个 spec 按"要看什么"三分：改字段 → 走面单入口，删任务 → 走右键菜单，量几何 → 主体搬到面单或改问只读徽标 |
+| **B** 焦点环量的是已替换的机制 | 7 + 1 | 输入类控件的环从 `outline` 换成 `box-shadow`（WebKit 的 outline 不跟随 `border-radius`），5 个 spec 仍在断言 `outlineStyle !== 'none'` | 新建共用判据 `e2e/tests/focus-ring.ts`（接受两种形态，但要求那一层 `偏移 0 / 模糊 0 / spread > 0 / 颜色 === --ht-color-ring`；做过"去掉全局环就变红"的反证）+ **修掉一条真缺陷** |
+| **C** 设置 IA / 已删功能 / 其它 | 22 | 七组同构（`sync`→`data` 等）、页头收拢（展开详情列进了 `⋯`）、`capture` 功能整体删除 | 按新落点重钉；`capture` 那一段整段删掉并按**现量**改"四个入口"的个数 |
 
-**A 族逐 spec**：`danger-confirm-trash` 13、`button-tier-matrix` 4、`control-semantics` 3、
-`chip-typing` 2、`task-organize` 2、`checkbox-group-spacing` 1、
-`shell-no-document-scroll` 1、`shell-sidebar-height` 1。
+B 族那条真缺陷值得单记：原报的「任务」那 1 枚并不是裁剪（它量到的是"没有环"，环以
+`box-shadow` 画着；几何实测 1440 余量 22px / 375 余量 14px）。把扫描从 22 站加到 80 站
+（5 视图 × 2 尺寸）逐站量环带之后，找到同族真实的一格 ——
+`button[data-testid="calendar-scope-all"]`（日历侧栏「所有」）被
+`div.ht-sidebar__calendar-body`（`overflow-y: auto`）裁掉了左/右/下三条边，
+失败截图上是只剩一个「⌐」形的环。修法是把那个**兄弟**滚动容器加进既有的
+`--ht-focus-ring-offset` 名单，并补一条先红后绿的见证用例。
 
-**B 族逐 spec**：`focus-visible-matrix` 3、`assistant-resize-ux` 1、`borderless-ux` 1、
-`habit-create-shape` 1、`search-overlay` 1。
-⚠️ **其中一条是真缺陷，不是测量口径**：`focus-visible-matrix` 报
-「「任务」有 1 枚控件的焦点环在画面上不完整（环带被视口或裁剪容器切掉）」——
-`box-shadow` 画在盒子外面，滚动容器一样会裁它。修法与 `outline` 时代同一条：
-那一层把 `--ht-focus-ring-offset` 指成负数（那张表在
-`apps/web/src/styles/app/borderless-controls.css`）。
-🔴 **已看图确认产品是对的**：正对照臂那张失败截图里，输入框那一圈蓝色环清楚可见，
-而且**跟着圆角走** —— 这正是把 `outline` 换成 `box-shadow` 的理由。所以 B 族是
-"判据量了机制"，不是"环没了"。
+顺带修掉的**真缺陷**（不是测试问题）：
 
-**C 族逐 spec**：`inbound-automation` 5（`toHaveAttribute`）、`help-entry-ux` 4
-（`settings-sheet` 里 `heading` 0 枚）、`public-facts` 3（`toHaveText`）、
-`detail-pane-collapse` 3（超时）、`glass-materials` 2（超时）、`global-responsive-ux` 1
-（`button[aria-controls="settings-group-sync"]` 0 枚）、`profile-avatar-plaintext` 1
-（假服务端收到未登记的 `GET /api/auth/sessions`）、`sidebar-resize` 1、
-`ai-capture` 1（`capture-ai` 不可见）、`calendar-capture` 1、`ai-unavailable` 1（超时）。
+- **整页白屏**：管理员概览接口回 `200 {}` 时 `probe()` 把 `access` 记成 `'admin'`、
+  `overview` 记成 `{}`，面板读 `overview.users.total` 直接崩。修在唯一收口点
+  （`fetchAdminOverview` 先过形状），并补三条会红的单测。这条是 `inbound-automation`
+  那两条红的真因。
+- **两处日期炸弹**（`admin-revenue` 5 条 / `admin-entitlements` 1 条）：夹具把时刻写死在
+  过去某天，而窗口是"从今天往回 N 天" ⇒ 时间走过那几天之后整体落到窗口外。
+  症状分别是"聚合坏了"和"并集回退成了最新那一行说了算"，都不是真因。
+- **ADR-0081 的载荷模式没进夹具**（`sync-fixes` 10 条）：那一批送的是密文，而
+  `readPayloadMode` 读的是 `userSyncState` 那一行；夹具没写 `payloadMode` ⇒ 按新账号
+  默认值走明文 ⇒ 全被 `PLAINTEXT_REQUIRED` 拒成 400。夹具里有**三个**同名 mock
+  （事务客户端 / 主 prisma / `user` 表），只有主 prisma 那份算数。
+- **两本账随功能删除对齐**（`check:overlay` 的 R2 账本、`check:dirty-form-policy` 的
+  欠判定账本）；后者更隐蔽：自证臂①读到 2 而不是 1，门禁自判"这条检查没有价值"。
+- **一把会静默失明的尺**：`check:inbound-rule-fixture-parity` 的 `stripComments` 不认识
+  字符串，e2e 的路由通配 `${server}/**` 被当成块注释开头、吞掉 9409 字符。
+  修好后分母从 **6 枚变 10 枚** —— 此前有 4 枚 fixture 从来没被这把尺看过（见陷阱 #638）。
 
-> 这一族**没有再往下定性**，也就没有猜着改。两条已知线索：
-> ① `settings-group-sync` 与 `settings-sheet` 的 `heading` 都指向**设置 IA 七组迁移**，
-> 而 `check:e2e-settings-ids` 明禁点旧 id —— 那批 spec 得按新 id 重钉；
-> ② `capture-ai` 不可见与「规则读不懂才问模型」那条收窄同源，但
-> `ai-capture` 用的 `把登录页在 Safari 上的错位修掉` 看起来不该被规则读懂，
-> 所以**先查 `routing === undefined`**（配置了 `features: ['capture']` 之后
-> 那条路由是否还成立），别直接照着改文本。
-
----
+⚠️ 还有一条**没修、但已登记**的债：`check:locator-labels` 的「死标签」26 条
+（7 枚移动端旅程脚本按旧文案点，那一面改版后两种语态下都打不中）。按该门禁文件头
+对"单语标签"写下的同一条口径（归脚本负责人、不该让共享 `pnpm check` 变红），
+改成**账本 + 只减不增**：每条都写明为什么打不中，新写的死标签照旧判红，
+账上每一条都必须真的命中（否则红）。现量 26/26 命中。
 
 ## 6. 复量命令
 
