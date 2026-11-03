@@ -503,11 +503,17 @@ export function AppWindow({
                     <div key={action.id} className="mk-bulk" data-testid="bulk-toolbar">
                       <span className="mk-bulk__select">{t(action.labelKey)}</span>
                     </div>
-                  ) : action.kind === 'sort-select' ? (
-                    <div key={action.id} className="mk-sort">
-                      {/* 与真应用同一条：**带可见的文字标签**，不是光秃秃一枚下拉。 */}
-                      <span className="mk-sort__label">{t(action.labelKey)}</span>
-                      <span className="mk-sort__value">{t(action.optionKey ?? action.labelKey)}</span>
+                  ) : action.kind === 'overflow-menu' ? (
+                    /* 页头那枚 `⋯`（2026-11-02）。排序、选择任务、共享都收在它里面 ——
+                       复刻只画这一枚按钮，不画菜单（静态展厅没有"点开"这一态，
+                       照抄一份菜单内容会立刻开始漂）。 */
+                    <div
+                      key={action.id}
+                      className="mk-iconbtn"
+                      role="img"
+                      aria-label={t(action.labelKey)}
+                    >
+                      <MoreHorizontal size={ICON_SIZE.md} />
                     </div>
                   ) : (
                     <div
