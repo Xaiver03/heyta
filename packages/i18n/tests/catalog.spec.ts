@@ -52,6 +52,22 @@ describe('词条表完整性', () => {
       'web.ai.settings.localApi.source.command',
       // Example email address in an input placeholder; it is the example itself.
       'web.share.invite.emailPlaceholder',
+      /**
+       * 单位符号（KB / MB）。工单 `task-detail-ticktick-parity` #9 的附件体积那一行。
+       *
+       * 🔴 与上面那几条同一类：**它们本来就不该有汉字**，不是"用英文占位中文"。
+       * 中文界面写「千字节 / 兆字节」反而没人看得懂（主流中文 App 与系统设置里
+       * 都是 `2.4 MB`），而这条规则存在的理由是拦"把整句英文当中文交差"。
+       * ⚠️ 与门禁 `check-ui-language` 的 `UNTRANSLATABLE_KEYS` 是**同一个判断的两处登记**
+       *（那边已经登记过；这里的缺口就是门禁注释点名的"两处各说一套"）。
+       */
+      'mobile.detail.attachments.size.kb',
+      'mobile.detail.attachments.size.mb',
+      // 同一条判断补全：这一枚键**早已**在 `check-ui-language` 的 `UNTRANSLATABLE_KEYS`
+      // 里登记（理由：整条只有数字、乘号与单位符号，一个可翻译的字都没有），
+      // 只是没同步到这张表，于是本测试在 2026-11-02 现量红着。
+      // 这里对齐的是**两处登记**，不是放宽规则 —— 规则对它自己那一条照旧会红。
+      'web.ai.attach.meta',
     ]);
     /**
      * 🔴 `.evidence` 是**按后缀**开的第二类例外，而不是逐 key 列。
