@@ -944,6 +944,31 @@ const ENTITY_COVERAGE_DEBT = new Map([
       '单做目录工具会造出一个 AI 碰不到的假功能——与"一个碰不到的 AI 功能不是功能"同一条纪律。' +
       '台账：docs/plans/ai-event-tool-contract.md §5.1（AI-COV-8）。',
   }],
+  /**
+   * 任务附件（工单 `task-detail-ticktick-parity` #9，2026-11-03 进 `EntityModelMap`）。
+   *
+   * 🔴 理由**不是**"还没做"，而是写工具在这一刀里**做不出正确的那一半**：
+   *   · 助手的输出是文本，它产不出一个真实文件的字节。而
+   *     `packages/app-host/src/attachment-actions.ts` 的写路径明确拒绝
+   *     "先建实体、字节后补"那个顺序（那样会留下每一台设备都点不开的附件，
+   *     而没有任何一层知道该重试）。⇒ 一个"创建附件"的工具只能造出
+   *     **有元数据没有字节**的那条被拒绝的形状，或者只能拒绝调用者。
+   *   · 单独做读工具也不满足本段的口径（读**和**写都要有），而且读回来的只有
+   *     文件名与大小 —— 这条通道上此刻连 `GET` 都没有（为什么没有，写在
+   *     `packages/shared-schema/src/attachment-http-contract.ts` 的
+   *     `ATTACHMENT_ROUTES` 那一段，`packages/shared-schema/tests/attachment-contract.spec.ts`
+   *     有一条断言守着它）。助手"看得见一个打不开的文件"，同样不是功能。
+   * 归口：这条线的尾巴那一刀 —— 原生"下载进本机文件"+ `GET` + 界面"点开"，
+   * 三件齐了才谈得上给助手一组能用的读写工具。
+   */
+  ['ATTACHMENT', {
+    gap: 'AI-COV-9',
+    reason:
+      '任务附件的字节只能由用户手里的文件产生，助手没有这个来源；而这条通道刻意拒绝' +
+      '"先建实体后补字节"的顺序（那会留下点不开的附件），所以写工具在这一刀里做不出正确的形状。' +
+      '读工具单独存在既不满足"读写都有"的口径，读回来的也只是文件名与大小 —— ' +
+      '这条通道上还没有 GET。台账：docs/plans/task-detail-ticktick-parity.md §5.9。',
+  }],
 ]);
 
 const GEN = join(ROOT, 'scripts/gen-ai-capability-manifest.mjs');

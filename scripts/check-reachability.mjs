@@ -348,6 +348,24 @@ const ACTION_FAMILIES = [
    * 🔴 仍然不成立的：**移动端一条都签不出来**（M6 那六段没接），所以别把这行读成"评论在所有端可用"。
    */
   { entity: 'COMMENT', family: 'createCommentActions' },
+  /**
+   * 任务附件（工单 `task-detail-ticktick-parity` #9，`app-host/src/attachment-actions.ts`）。
+   *
+   * 合法性按 `REMINDER` / `NOTE` / `ASSISTANT_TURN` / `COMMENT` 那四行的同一条纪律核过：
+   * **先有实现，后进表**。`createAttachmentActions` 在 `attachment-actions.ts` 里
+   * 真的存在（全仓定义 1 处 + `index.ts` 导出 1 处），`entityType: 'ATTACHMENT'`
+   * 的写路径也在同一文件里（判据 B 的扫描面），宿主调用点是
+   * `apps/mobile/src/screens/TasksScreen.tsx`（生产代码，不是测试）。
+   *
+   * ⚠️ **这一行只回答"有没有宿主接上了"，不回答"每一端、每一步都接上了"**。现量：
+   *   · 只有移动端装了它；`apps/web` / 桌面壳**没有**附件入口。
+   *   · 移动端自己那条**读字节**的通道还没接：iOS 没有 `HeytaLocalFs`，
+   *     Android 的 `readUriBase64` 写了但**不在本机编译**（Android 构建在 linux-dev）。
+   *   · 这条通道上**没有 GET**（点开/预览没做）。
+   * 三条边界都记在 `docs/plans/task-detail-ticktick-parity.md` §5.9，
+   * 别把这行读成"附件在所有端可用"。
+   */
+  { entity: 'ATTACHMENT', family: 'createAttachmentActions' },
 ];
 
 /** 写 op 的锚点：`entityType: 'X'` 后允许 `as EntityType` 之类的类型断言。 */
