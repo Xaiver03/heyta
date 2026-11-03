@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { revealRowActions } from './ai-entry.js';
 import { metaFor, openApp } from './helpers';
+import { closeTaskDetailIfOpen, openTaskPane } from './task-detail-entry.js';
 
 /**
  * 日历侧栏（迷你月历 + 显示范围）—— 真浏览器，零 mock
@@ -118,19 +118,30 @@ async function seed(page: Page): Promise<void> {
   // 建完清单再播第二条：它会自然落进那个清单（这正是本用例要的一端）。
   await capture(IN_LIST);
 
-  const row = page.locator('[data-testid^="task-item-"]').filter({
+  const row = page.locator('[data-testid^="task-item-"]:visible').filter({
     has: page.getByRole('checkbox', { name: `完成：${IN_LIST}` }),
   });
-  // 🔴 2026-10-17：`task-organize-summary` 现在住在每行那枚「更多」披露里面
-  //（`details.ht-compose-actions`）——折叠时它**在 DOM 里但不可见**，`click()` 会一直等
-  //（实测形状：locator 解析到了、waiting for element to be visible, enabled and stable）。
-  // 用与 AI 那一族同一条两条形态都能跑的 helper（披露存在就打开、不存在就原样返回）。
-  await revealRowActions(page, IN_LIST);
-  await row.getByTestId('task-organize-summary').click();
-  await row.getByLabel(`任务「${IN_LIST}」所属清单`).selectOption({ label: LIST });
-  // 🔴 归属现在只有**一个显示位**：共享 `TaskBadges` 那一槽（清单 chip 已删）。
-  await expect(metaFor(page, IN_LIST)).toContainText(LIST);
-
+  /*
+   * 🔴 2026-11 换落点（**不是**放宽）：行内那一排字段编辑器整排被删了
+   * （产品负责人：「把所有这种铺开式组件全都删掉，全都收拢进来」）。
+   * 旧写法是 `revealRowActions(...)` 展开行尾「更多」披露、再点 `task-organize-summary`
+   * 那颗 `<summary>` —— 那颗 `<summary>` 与它 `<details>` 里的清单下拉现在**整页 0 枚**
+   *（实测：`task-organize-summary` = 0、`organize-project-select` = 0，未选中时）。
+   * 字段编辑器现在只有一处所有者 —— 面单：宽档在详情列（`[data-testid="detail-column"]`
+   * 里的 `task-pane`），窄档在点行弹出的对话框（`task-detail-dialog`）。
+   * 本文件跑默认视口（1280×720 ⇒ 宽档），所以 `openTaskPane` 落在详情列里；
+   * 它两档都适用，视口一变也不会红在"找不到入口"上。
+   * ⚠️ 判据本义一个字没改：**归属要写进共享元信息条 `task-meta`**（`TaskBadges` 那一槽，
+   * 清单 chip 已删，行上只有这一个显示位）。
+   */
+  await expect(row, '前提：那条任务的整行在屏上').toHaveCount(1);
+  const pane = await openTaskPane(page, IN_LIST);
+  await pane.getByTestId('organize-project-select').selectOption({ label: LIST });
+  await expect(metaFor(page, IN_LIST), '把归属选成了那条清单，行上却读不到').toContainText(LIST);
+  /* 🔴 面单若以**对话框**形式出现（视口 < 1024 时它会），必须先把出口走掉：
+     遮罩会把后面点「日历」tab 的点击全吃掉（`modal-readonly` 策略），
+     而那条红的形状是"tab 点不到"，读起来像导航坏了。宽档调用它什么也不做。 */
+  await closeTaskDetailIfOpen(page);
 }
 
 

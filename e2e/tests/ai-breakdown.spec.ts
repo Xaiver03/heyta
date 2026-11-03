@@ -15,7 +15,7 @@
 
 import { expect, test } from '@playwright/test';
 
-import { revealRowActions } from './ai-entry.js';
+import { openTaskDetail } from './ai-entry.js';
 import {
   addTask,
   CAP_LONG_CONTEXT,
@@ -50,8 +50,11 @@ test.describe('AI 拆解：真浏览器端到端旅程', () => {
     await switchView(page, '任务');
 
     // ══ 2. 建一条任务（走真 CaptureComposer → op-log）══════════════════
+    // ⚠️ 2026-11 起「AI 拆解」的入口住在**任务详情的「自动化」组**，不再挂在行尾
+    //    （行内动作行已删）。所以这里先选中那一行把详情栏打开，再点入口 ——
+    //    下面每一条断言（披露只算不发 / feature 路由 / 逐条取舍 / 落库）逐字未改。
     await addTask(page, '把新版本发到生产环境');
-    await revealRowActions(page, '把新版本发到生产环境');
+    await openTaskDetail(page, '把新版本发到生产环境');
 
     const openButton = page.locator('[data-testid^="ai-breakdown-"]');
     await expect(openButton).toBeVisible();
@@ -98,7 +101,7 @@ test.describe('AI 拆解：真浏览器端到端旅程', () => {
     // 有备注 → 字段列表变成 `title、note`；没落库则仍是 `title`。
     await page.reload();
     await expect(rowFor(page, '把新版本发到生产环境')).toBeVisible();
-    await revealRowActions(page, '把新版本发到生产环境');
+    await openTaskDetail(page, '把新版本发到生产环境');
     await page.locator('[data-testid^="ai-breakdown-"]').click();
     await expect(page.locator('[data-testid="ai-field-list"]')).toHaveText('today、title、note');
 

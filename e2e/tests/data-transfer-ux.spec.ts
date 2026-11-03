@@ -8,7 +8,13 @@ async function openData(page: Page) {
   await page.getByTestId('account-menu-settings').click();
   await page.locator('[aria-controls="settings-group-data"]').click();
   await expect(page.getByTestId('bulk-toolbar')).toHaveCount(0);
-  await expect(page.getByTestId('task-sort')).toHaveCount(0);
+  /*
+   * 页头那枚 `⋯` 是任务视图的东西，进了设置就不该在。
+   * 原来这里钉的是 `task-sort`（排序那枚常驻下拉）—— 它在 2026-11-02 收进了 `⋯`，
+   * 所以这条锚点跟着搬到**入口**上：判的意思一个字没变，量的是同一件事
+   * （"任务视图的页头控件不许跟到设置里"）。
+   */
+  await expect(page.getByTestId('task-menu-open')).toHaveCount(0);
 }
 
 for (const theme of ['light', 'dark'] as const) {

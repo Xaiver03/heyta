@@ -1,6 +1,15 @@
 import { mkdir } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
+
+import { expect, test, type Page } from '@playwright/test';
 import { closeSettingsSheet, openApp, openSettingsSheet, selectSettingsSection, switchTheme, waitForBootSplashGone } from './helpers';
+
+/** 打开页头那枚 `⋯` —— 助手入口在 2026-11-02 第三刀搬进了它里面。 */
+async function openTaskMenu(page: Page): Promise<void> {
+  const trigger = page.getByTestId('task-menu-open');
+  await expect(trigger, '任务视图页头必须有一枚 ⋯（助手入口住在里面）').toBeVisible();
+  await trigger.click();
+  await expect(page.getByTestId('task-menu')).toBeVisible();
+}
 
 const evidence = '../apps/web/evidence/ux-final';
 
@@ -24,6 +33,7 @@ test('Agent workspace expands from the rail and returns without losing the draft
       const input = page.getByTestId('ai-assistant-input');
       const compact = viewport.width < 1024;
       if (compact) {
+        await openTaskMenu(page);
         await page.getByTestId('assistant-open').click();
         await expect(input).toBeVisible();
       } else {
