@@ -111,6 +111,35 @@ export function isArchived(entity: { archived?: boolean }): boolean {
 }
 
 /**
+ * 「这条被放弃了吗」—— 第五态的唯一判据（
+ * [ADR-0083](../../../docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md) §3.1）。
+ *
+ * 🔴 与 {@link isLive} **正交**，不是它的子集：一条已放弃的任务仍然是"活着的"
+ * —— 它没进回收站、能被恢复、要被统计看得见。把放弃写成 `deletedAt` 的别名
+ * 会让它顺着"彻底删除"那条链走下去，而放弃的人并不想丢数据。
+ *
+ * 权威放在领域层，理由与 `isLive` / `isArchived` 同一条（上面那两段注释记着
+ * "六处各写一遍"的实测代价）：动作层的分裂出口、领域层的过滤族、共享 UI 的板子
+ * 都要问同一句话，写两份字面量就是一边改了另一边没改。
+ */
+export function isAbandoned(entity: { abandonedAt?: number }): boolean {
+  return entity.abandonedAt !== undefined;
+}
+
+/**
+ * 「这条被置顶了吗」—— 判据只有一个字段（[ADR-0083](../../../docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md) §3.2）。
+ *
+ * 🔴 宿主**不许**直接写 `task.pinnedAt === undefined` 来选菜单文案。
+ * 同一条纪律在本仓已有两处成文先例：`isImportant()` 取代裸读 `task.important`
+ * （老数据没这个字段，裸读会显示成"不重要"，而象限视图按优先级推导会把它放进 Q1 ——
+ * 于是"详情页说不重要、象限里它在 Q1"），以及 `isLive()` 文件头记的"散在六处各写一遍"。
+ * 置顶这一格现在是同一族：读裸字段的那一处和调谓词的那一处，会在下一次字段改名时分开失效。
+ */
+export function isPinned(entity: { pinnedAt?: number }): boolean {
+  return entity.pinnedAt !== undefined;
+}
+
+/**
  * 「这条还活着吗」—— 未软删除的唯一判据。
  *
  * 🔴 它**不等于** `!inTrash(x)`：一条已彻底删除（`purgedAt`）的实体既不在回收站里
@@ -160,6 +189,30 @@ export function byCreatedAtOrder(
 ): number {
   if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * 把置顶的那几条排到最前，其余按 `then` 排。
+ *
+ * 🔴 它是**组内**顺序，不是全局顺序 —— 这一点不是靠这里写的规则达成的，
+ * 而是靠调用方的形状：日期分组（`task-filter.ts` 的 `groupTasksByDate`）
+ * 只按到期日分桶、**保持入参顺序**，所以出口在这里前置一次，
+ * 落到界面上就是"每个日期组里置顶的排最前"，而一条任务**不会**
+ * 因为被置顶就从"明天"跳进"今天"（[ADR-0083](../../../docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md) §3.2
+ * 要的就是这条边界；把置顶做成跨组搬运，是把注意力语义和排程语义混成一个字段）。
+ *
+ * ⚠️ 只比"有没有 `pinnedAt`"，**不比时刻**：比时刻会变成"后置顶的压过先前置顶的"，
+ * 而用户说"这几条都钉住"时他要的是同一档优先级，不是一个 LIFO 栈。
+ */
+export function byPinnedFirst<T extends { pinnedAt?: number }>(
+  then: (a: T, b: T) => number,
+): (a: T, b: T) => number {
+  return (a, b) => {
+    const aPinned = a.pinnedAt !== undefined;
+    const bPinned = b.pinnedAt !== undefined;
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+    return then(a, b);
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -289,6 +342,38 @@ export interface Task extends EntityBase {
    * 写入走 `setSchedule`（动作层夹到 [MIN, MAX] 并取整）。
    */
   durationMinutes?: number;
+  /**
+   * 置顶时刻（epoch ms）。可选；`undefined` = 未置顶。**纯可加性，不 bump schema。**
+   *
+   * 🔴 **这一个字段同时就是"排在最前"**，不许另设 `isPinned` / `sortOrder`
+   * （[ADR-0083](../../../docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md) §3.2；
+   * 同一条推理先例见下面 `CountdownEvent.pinnedAt` 与 `Note.isPinnedToToday`：
+   * 两个字段必然在某一次编辑里漂移）。
+   *
+   * ⚠️ 置顶只作用于**同一分组内部**的顺序。把一条任务从"明天"提到"今天"最前是错的 ——
+   * 那是排程语义，不是注意力语义。
+   */
+  pinnedAt?: number;
+  /**
+   * 放弃时刻（epoch ms）。可选；`undefined` = 未放弃。**纯可加性，不 bump schema。**
+   *
+   * 🔴 这是任务的**第五个独立状态** ——
+   * [ADR-0083](../../../docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md) §3.1
+   * 给 [ADR-0048](../../../docs/adr/0048-deletion-four-states-and-the-no-physical-erase-boundary.md)
+   * 钉死的四态加的那一格。与另外四态的关系逐条是：
+   *
+   *   · **≠ 完成**：不写 `completedAt`、不计入完成率、不被"完成即推进"顺移到下一周期；
+   *   · **≠ 删除**：不进回收站，与 `deletedAt` / `purgedAt` 无关，
+   *     也不受"彻底删除"那条链影响（放弃的人并不想丢数据）；
+   *   · 恢复 = 写 `null` 清除本字段，直接回到 alive，**不经过回收站**。
+   *
+   * 🔴 **隐藏由层负责，不由调用点负责**（ADR-0048 的 I5，也是它用 D1/D8/D9/D11
+   * 四条实测缺陷换来的那条不变量）：默认的任务列表出口**不含**已放弃，
+   * 另给一个只含已放弃的出口 —— 形状照 `Project.archived` 那对
+   * `listProjects()` / `listArchivedProjects()`（`packages/app-host/src/project-actions.ts:148`）。
+   * 判据：**把物化状态里原始的 `tasks` 表整个递给宿主，也不得出现已放弃的任务。**
+   */
+  abandonedAt?: number;
   /**
    * 重复规则（RFC 5545 RRULE 串）。不存在即不重复。
    *
@@ -850,6 +935,46 @@ export interface Comment extends EntityBase {
 }
 
 /**
+ * 任务附件（工单 #9）。
+ *
+ * 🔴 **这个实体里没有任何字节。** 它只是"有这么一个文件"的元数据；
+ * 原始字节走独立的 HTTP 通道，以**本实体的 `id`** 为键。理由在
+ * [`attachment-http-contract.ts`](../../shared-schema/src/attachment-http-contract.ts)：
+ * op 载荷会进每一次全量快照与增量同步，把 3MB 的图塞进 op 等于每台新设备
+ * 首同步都重传这张图，并把 `payloadBytes` 统计与单条 op 上限全撑变形。
+ *
+ * **为什么是独立实体而不是 `Task.attachments[]`**：与 `Reminder` 相对 `dueDate`、
+ * `Comment` 相对 `Task` 同一条推理（AGENTS.md §3.4「一个用户意图 = 一个 op」）——
+ * 数组字段让"加一个文件"与"改标题"在同一实体上 LWW 互斥，
+ * 而且单条附件的重命名/删除都表达不出来。
+ *
+ * ⚠️ 持久化字段的可选性（AGENTS.md §3.3）：`taskId` / `fileName` 是**实体身份的
+ * 一部分**（没有它们这条附件不知道挂哪、点开显示什么），必填 —— 与
+ * `Reminder.taskId` / `Comment.body` 同一先例；`mimeType` / `sizeBytes` 可选，
+ * 老数据或缺这两列时界面降级为"未知类型 / 不显示大小"，而不是炸 hydration。
+ */
+export interface Attachment extends EntityBase {
+  /** 附件归属的任务 id。 */
+  taskId: string;
+  /**
+   * 展示用的文件名（含扩展名）。
+   *
+   * ⚠️ 它**不是**服务端的存储路径 —— 字节一律以 `id` 为键取，
+   * 所以改名是一条不涉及数据的 Update op，用户输入里有什么字符都不影响读取。
+   */
+  fileName: string;
+  /** MIME 类型，用于选图标与"能不能预览"。缺 = 未知类型。 */
+  mimeType?: string;
+  /**
+   * 字节数（**上传前**客户端已知，所以由客户端报）。
+   *
+   * ⚠️ 服务端不拿它做配额判定，只用于显示：真正的额度以服务端自己收到的
+   * `Content-Length` 为准，否则客户端虚报一个 `1` 就能绕过配额。
+   */
+  sizeBytes?: number;
+}
+
+/**
  * 实体类型 → 领域模型 的映射。
  * 用于 op-log 的 apply 阶段做类型收窄。
  */
@@ -867,6 +992,7 @@ export interface EntityModelMap {
   REMINDER: Reminder;
   EVENT: CountdownEvent;
   ASSISTANT_TURN: AssistantTurn;
+  ATTACHMENT: Attachment;
 }
 
 export type ModeledEntityType = keyof EntityModelMap;
@@ -897,6 +1023,7 @@ export const MODELED_ENTITY_TYPES = [
   'EVENT',
   'ASSISTANT_TURN',
   'COMMENT',
+  'ATTACHMENT',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */

@@ -34,6 +34,17 @@ export {
   type HeytaTaskRepeatCompletionPayload,
 } from './task-repeat-completion-contract';
 export { reminderOwnerFromId, validateReminderOwnerOperation } from './reminder-owner-contract';
+export {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_UPLOAD_BASE64_BYTES,
+  ATTACHMENT_ROUTES,
+  ATTACHMENT_ROUTE_PATTERN,
+  ATTACHMENT_ID_REGEX,
+  ATTACHMENT_ERROR_CODES,
+  attachmentUploadSchema,
+  type AttachmentErrorCode,
+  type AttachmentUploadPayload,
+} from './attachment-http-contract';
 export { isHeytaFullStatePayload, type HeytaFullStatePayload } from './full-state-payload';
 export {
   CURRENT_SCHEMA_VERSION,

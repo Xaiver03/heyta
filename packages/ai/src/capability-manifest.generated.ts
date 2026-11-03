@@ -31,15 +31,15 @@ export type AiCapabilityEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
     'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
-    'COMMENT' | 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' | 'MIGRATION' |
-    'RECOVERY' | 'ALL';
+    'COMMENT' | 'ATTACHMENT' | 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' |
+    'MIGRATION' | 'RECOVERY' | 'ALL';
 
 /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
 export type AiCapabilityModeledEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
     'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
-    'COMMENT';
+    'COMMENT' | 'ATTACHMENT';
 
 /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
 export type AiCapabilityToolKind = 'read' | 'write';
@@ -104,8 +104,8 @@ export const AI_CAPABILITY_MANIFEST =
   },
   'coverage': {
     'covered': 9,
-    'denominator': 10,
-    'ratio': '9/10',
+    'denominator': 11,
+    'ratio': '9/11',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -118,6 +118,7 @@ export const AI_CAPABILITY_MANIFEST =
     'REMINDER',
     'EVENT',
     'COMMENT',
+    'ATTACHMENT',
   ],
   'modelledEntityTypes': [
     'TASK',
@@ -133,6 +134,7 @@ export const AI_CAPABILITY_MANIFEST =
     'EVENT',
     'ASSISTANT_TURN',
     'COMMENT',
+    'ATTACHMENT',
   ],
   'excludedFromDenominator': [
     {
@@ -150,6 +152,7 @@ export const AI_CAPABILITY_MANIFEST =
   ],
   'entityTypesWithoutTools': [
     'COMMENT',
+    'ATTACHMENT',
   ],
   'entities': [
     {
@@ -298,6 +301,14 @@ export const AI_CAPABILITY_MANIFEST =
     },
     {
       'entityType': 'COMMENT',
+      'materialized': true,
+      'countsTowardCoverage': true,
+      'coverage': 'none',
+      'readToolNames': [] as const,
+      'writeToolNames': [] as const,
+    },
+    {
+      'entityType': 'ATTACHMENT',
       'materialized': true,
       'countsTowardCoverage': true,
       'coverage': 'none',
@@ -912,7 +923,7 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 10 个，其中 9 个**读和写都有**工具（9/10）。',
+  '覆盖口径：用户可操作的已物化实体 11 个，其中 9 个**读和写都有**工具（9/11）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
@@ -959,8 +970,9 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] create_event（title*:string, date*:string, kind:string, isLunar:boolean, recurrence:string, notes:string）',
   '  · [写] update_event（eventId*:string, fields*:object）',
   '',
-  '二、产品里有、但我没有任何工具的实体（1 个）—— 实体存在，只是我没配工具',
+  '二、产品里有、但我没有任何工具的实体（2 个）—— 实体存在，只是我没配工具',
   '- COMMENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
+  '- ATTACHMENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '',
   '三、不计入上面分母的已物化实体（设计如此，不是遗漏）',
   '- AI_FEEDBACK：AI 建议处置的落库载体（用户不直接创建它）',

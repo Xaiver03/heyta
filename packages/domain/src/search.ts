@@ -31,7 +31,7 @@
  */
 
 import type { Note, Task } from './entities.js';
-import { aliveTasks } from './task-filter.js';
+import { visibleTasks } from './task-filter.js';
 
 /** 一条任务里**可被搜索**的字段。加字段时这里与 `haystackOf` 一起改。 */
 export interface SearchableText {
@@ -101,17 +101,17 @@ export function searchNotes(notes: readonly Note[], query: string): Note[] {
  * 在手机上搜不到。这类"滤不滤看心情"的分叉不会报错，只会让用户以为
  * 回收站没删干净（而它确实没从搜索里消失）。
  *
- * 复用 `aliveTasks` 而不是在这里另写一遍判定：**"什么算隐藏"必须只有一处定义**
+ * 复用 `visibleTasks` 而不是在这里另写一遍判定：**"什么算隐藏"必须只有一处定义**
  * （`deletedAt` 有值即隐藏，`purgedAt` 必然带着 `deletedAt`，见 `entities.ts` 的
  * 四态语义）。所以判据的形状是一句话：**把原始表整个递进来也不得出现墓碑**。
  *
  * ⚠️ 空查询那条分支也要滤 —— 它是"返回全部"，不是"返回整张表"。
  */
 export function searchTasks(tasks: readonly Task[], query: string): Task[] {
-  const alive = aliveTasks(tasks);
+  const visible = visibleTasks(tasks);
   const terms = termsOf(query);
-  if (terms.length === 0) return alive;
-  return alive.filter((task) => matchesQuery(task, query));
+  if (terms.length === 0) return visible;
+  return visible.filter((task) => matchesQuery(task, query));
 }
 
 /**

@@ -38,7 +38,7 @@ import {
   startLocalDateOf,
   toLocalDate,
 } from './date.js';
-import { Quadrant, isLive, type Task } from './entities.js';
+import { Quadrant, isAbandoned, isLive, type Task } from './entities.js';
 import { bucketByQuadrant } from './quadrant.js';
 
 /**
@@ -73,9 +73,25 @@ export interface FilterContext {
   readonly now: number;
 }
 
-/** 未删除的任务。**每一个筛选都先过这一道**，所以它是单独一步而不是分支里的重复。 */
+/** 未删除的任务（**含已放弃**）。显示侧要的是下面那个 `visibleTasks`，不是这一个。 */
 export function aliveTasks(tasks: readonly Task[]): Task[] {
   return tasks.filter(isLive);
+}
+
+/**
+ * 可显示的任务：未删除 **且** 未放弃。
+ *
+ * 🔴 **每一个显示路径都先过这一道**，所以它是单独一步而不是分支里的重复 ——
+ * 这条纪律是 [ADR-0048](../../../docs/adr/0048-deletion-four-states-and-the-no-physical-erase-boundary.md)
+ * 的 I5（「隐藏由层负责，不由调用点负责」）。放弃态落在这一步上的理由是同一个：
+ * 让宿主各自 `filter(t => !t.abandonedAt)`，就会出现"列表不显示、日历还显示"
+ * 那种**两端不同答案且都不报错**的形状（0048 §1 那四条实测缺陷的共同根因）。
+ *
+ * ⚠️ 它**不是** `aliveTasks` 的替代品：回收站、"已放弃"出口、统计与恢复都要问
+ * "活着的（含放弃）"那一问，那一问的答案是 `aliveTasks`。
+ */
+export function visibleTasks(tasks: readonly Task[]): Task[] {
+  return tasks.filter((task) => isLive(task) && !isAbandoned(task));
 }
 
 /** 是否已完成。「已完成」只有一个判据：`completedAt` 有值。 */
@@ -111,16 +127,16 @@ export function filterTasks(
   filter: TaskFilter,
   context: FilterContext,
 ): Task[] {
-  const alive = aliveTasks(tasks);
+  const visible = visibleTasks(tasks);
 
   switch (filter.kind) {
     case 'all':
-      return alive.filter((t) => !isCompleted(t));
+      return visible.filter((t) => !isCompleted(t));
     case 'completed':
-      return alive.filter(isCompleted);
+      return visible.filter(isCompleted);
     case 'today': {
       const today = toLocalDate(context.now);
-      return alive.filter(
+      return visible.filter(
         (t) => !isCompleted(t) && dueLocalDate(t) === today,
       );
     }
@@ -141,18 +157,18 @@ export function filterTasks(
        */
       const first = toLocalDate(context.now);
       const last = addDays(first, NEXT_SEVEN_DAYS - 1);
-      return alive.filter((t) => {
+      return visible.filter((t) => {
         if (isCompleted(t)) return false;
         const due = dueLocalDate(t);
         return due !== undefined && due >= first && due <= last;
       });
     }
     case 'quadrant':
-      return bucketByQuadrant(alive, { now: context.now })[filter.quadrant];
+      return bucketByQuadrant(visible, { now: context.now })[filter.quadrant];
     case 'project':
-      return alive.filter((t) => !isCompleted(t) && t.projectId === filter.projectId);
+      return visible.filter((t) => !isCompleted(t) && t.projectId === filter.projectId);
     case 'tag':
-      return alive.filter((t) => !isCompleted(t) && (t.tagIds?.includes(filter.tagId) ?? false));
+      return visible.filter((t) => !isCompleted(t) && (t.tagIds?.includes(filter.tagId) ?? false));
   }
 }
 
@@ -181,7 +197,7 @@ export function sectionTasks(
   const today = toLocalDate(context.now);
   const sections: TaskSections = { overdue: [], dueToday: [], inbox: [], completed: [] };
 
-  for (const task of aliveTasks(tasks)) {
+  for (const task of visibleTasks(tasks)) {
     if (isCompleted(task)) {
       sections.completed.push(task);
       continue;
@@ -255,7 +271,7 @@ export function groupTasksByDate(
   const undated: Task[] = [];
   const byDate = new Map<LocalDate, Task[]>();
 
-  for (const task of aliveTasks(tasks)) {
+  for (const task of visibleTasks(tasks)) {
     if (isCompleted(task)) continue;
     const dueDate = dueLocalDate(task);
     if (dueDate === undefined) {
@@ -336,14 +352,14 @@ export function isScopeEmpty(scope: TaskScope): boolean {
 /**
  * 落在范围内的任务（**含已完成**，见上面第 2 条）。
  *
- * 仍然先过 `aliveTasks` 那一道：墓碑不该在任何视图里出现。
+ * 仍然先过 `visibleTasks` 那一道：墓碑不该在任何视图里出现，已放弃的也不该。
  */
 export function scopeTasks(tasks: readonly Task[], scope: TaskScope): Task[] {
-  const alive = aliveTasks(tasks);
-  if (isScopeEmpty(scope)) return alive;
+  const visible = visibleTasks(tasks);
+  if (isScopeEmpty(scope)) return visible;
   const projects = new Set(scope.projectIds);
   const tags = new Set(scope.tagIds);
-  return alive.filter(
+  return visible.filter(
     (task) =>
       (task.projectId !== undefined && projects.has(task.projectId)) ||
       (task.tagIds ?? []).some((id) => tags.has(id)),

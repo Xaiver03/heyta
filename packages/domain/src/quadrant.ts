@@ -9,7 +9,7 @@
  * 两者不能都推导 —— "这件事重不重要"是主观的，任何算法都猜不对。
  */
 
-import { Quadrant, type Task } from './entities.js';
+import { Quadrant, isAbandoned, isLive, type Task } from './entities.js';
 import { diffDays, dueLocalDateOf, toLocalDate } from './date.js';
 
 /** 紧迫性的判定窗口：截止时间在 N 天内算"紧急"。 */
@@ -104,7 +104,11 @@ export function bucketByQuadrant(
 
   for (const task of tasks) {
     if (task.completedAt !== undefined) continue;
-    if (task.deletedAt !== undefined) continue;
+    // 🔴 判据走 `isLive` / `isAbandoned`，不留字面量：`entities.ts` 的 `isLive`
+    //    文件头记着这句判断曾散在六处各写一遍，而**漏写的那一半不会报错** ——
+    //    这里原来是 `task.deletedAt !== undefined`，是第七份字面量。
+    //    放弃态同一条理由：象限是"今天该干什么"的视图，已放弃的不该占一格。
+    if (!isLive(task) || isAbandoned(task)) continue;
     buckets[classifyQuadrant(task, options)].push(task);
   }
 

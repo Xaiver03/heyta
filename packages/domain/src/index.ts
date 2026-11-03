@@ -14,6 +14,7 @@ export * from './date.js';
 export * from './task-order.js';
 export * from './quadrant.js';
 export * from './task-filter.js';
+export * from './task-activity.js';
 export * from './subtasks.js';
 export * from './project-hierarchy.js';
 export * from './reminders.js';
@@ -65,6 +66,10 @@ export * from './assistant-turn.js';
 // ADR-0062 W3：共享清单里任务评论的**判定**（一条评论=一个实体；
 // 正文上限 / 空白拒绝 / 线程顺序只在这里定义 —— UI 与动作层都从这里取）。
 export * from './comments.js';
+// 工单 `task-detail-ticktick-parity` #9：任务附件的**判定**（一个附件=一个实体；
+// 文件名闸门 / 列表顺序 / 字节求和只在这里定义 —— UI 与动作层都从这里取，
+// 字节本身走 shared-schema 的那条 HTTP 契约，领域层不碰）。
+export * from './attachments.js';
 // 危险操作的**档位判定**（轻/中/重/重+键入名称）。通用判据住在全局 Skill
 // `overlay-feedback-patterns`，这里是本仓唯一一份可被调用的阈值实现 ——
 // 各页自判会让「删一条」和「删一批」的摩擦差异由页面作者临时决定。
@@ -75,3 +80,10 @@ export * from './mentions.js';
 
 // `@任务` 的候选与标签：同名任务必须加消歧后缀，否则标签没有唯一解。
 export * from './mention-tasks.js';
+
+// 任务动态（谁在什么时候改了什么）：投影给「清单动态」用，纯函数。
+// ⚠️ 这一行是**补的**（2026-11-02）：模块与 `apps/web`/`app-host` 的消费点都已在树上，
+//    唯独 barrel 没接 —— 于是 `@heyta/app-host` 的 DTS 构建报
+//    「Module '@heyta/domain' has no exported member 'projectTaskActivity'」，
+//    而 domain 自己的 build 是绿的（它编译的是模块，不是入口）。
+export * from './task-activity.js';

@@ -76,10 +76,15 @@ export interface CaptureMatch {
   /**
    * `field === 'dueTime'` 且被采纳时存在（`HH:MM`）。
    *
-   * 🔴 它**从不单独成立**：没有采纳到日期的时刻一律 `applied: false`
-   * （见 `parseCapture` 里那条 `dueTimeNeedsDate` 判定）。理由是"16:00"
-   * 既可能是"今天 16:00"，也可能是"明天 16:00"，还可能是"9:16 比例"——
-   * 猜一个日子比留着不动更糟。
+   * 🔴 它**从不单独成立**：这条匹配自己**没带日子**、而且整次解析也没认到日子时，
+   * 它一律 `applied: false`（见 `parseCapture` 里那条 `dueTimeNeedsDate` 判定）。
+   * 理由是裸的 `16:00` 既可能是"今天 16:00"，也可能是"明天 16:00"，
+   * 还可能是"9:16 比例"—— 猜一个日子比留着不动更糟。
+   *
+   * ⚠️ 与它相邻、容易混淆的一条：**带时段词的中文时刻**（「下午3点」「今晚八点」）
+   * 走的是同一个 `field`，但那条匹配**自己带着 `dueDate`**（见「中文时刻」那一段）。
+   * 所以它们的 `dueDate` 会出现在这条匹配上 —— 读 `dueDate` 时别只看
+   * `field === 'dueDate'` 的那些。
    */
   dueTime?: LocalTime;
   /** `field === 'priority'` 且被采纳时存在。 */
@@ -337,6 +342,174 @@ function mondayOf(date: LocalDate): LocalDate {
   return addDays(date, -(isoWeekday(date) - 1));
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 中文时刻：「下午三点半」「差十分三点」「今晚八点」
+ *
+ * 🔴 **这一段是 2026-11 由真实使用反馈补上的，不是"再细化一点规则"。**
+ *
+ * 在此之前，规则表只认 `HH:MM` 这种**冒号写法**。于是「下午1点给网信办打电话」
+ * 里一个时刻都认不出来 —— 而中文用户几乎不写冒号，写的是「下午三点」。
+ * 缺的不是精度，是**整个形状**：一天里最常说的那种时刻，规则表里没有。
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 🔴 为什么裸「3点」**不认**，而「下午3点」认
+ *
+ * 中文的裸小时是**真歧义**，不是解析器不够聪明：
+ *
+ *   · 「9点上班」= 09:00    · 「11点睡」= 23:00
+ *   · 「3点开会」≈ 15:00    · 「3点醒来」= 03:00
+ *
+ * 同一个「N点」，上午还是下午**取决于那件事**，字面上读不出来。任何"聪明"的
+ * 补法（取最近的那个、1–5 点算下午……）都会在一半的句子上**自信地猜错**，
+ * 而猜错的代价是用户拿到一个错的截止时间，还得自己发现。
+ *
+ * 所以这里沿用文件开头那条原则（宁可少认，不可错认）：
+ * **只在「时段词 + 点数」这种形状下采纳时刻。** 时段词（上午/下午/晚上/凌晨/
+ * 中午……）就是用户自己已经给出的那半个信息 —— 采纳它就是**读**，不是猜。
+ *
+ * 裸 `13点`–`23点` 仍然认（24 小时制写法没有歧义），裸 `12点` 也认（中午）。
+ * 裸 `1点`–`11点` **不产生任何匹配** —— 不是 `applied: false`。
+ * 这个区别是有意的：一条"未采用"的芯片也换不出正确时刻，让那几个字老实
+ * 留在标题里，比给用户一条"我看见了但我不确定"的噪音更有用。
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 🔴 无日期的时刻落在**今天**（与滴答清单同款）
+ *
+ * 原来的规则是「时刻从不单独成立」：没有日期就不采纳，理由是
+ * 「今天 16:00 / 明天 16:00 / 9:16 的视频」三义。
+ *
+ * 那条对**冒号写法**依然成立 —— `9:16` 真的会在"剪 9:16 的视频"里误报，
+ * 所以下面 `HH:MM` 那条规则**一个字都没改**，仍然要求先有日期。
+ *
+ * 但「下午3点」不是那种形状：时段词已经排除了比例、也排除了凌晨，
+ * 用户说这句话时指的就是**最近的那个下午三点**。落到"今天"是滴答清单的做法，
+ * 而这里敢跟的理由是**可撤销性**：解析结果一定会先变成输入框下方的芯片
+ * （`CaptureComposer` 的三态芯片，可逐条取消），
+ * 所以"今天"是一个**看得见、可撤的**默认值，不是偷改用户的数据。
+ */
+
+/** 中文数字 → 整数。只覆盖时刻用得到的小数字（0–59）。 */
+const CN_DIGIT: Readonly<Record<string, number>> = {
+  零: 0,
+  '〇': 0,
+  一: 1,
+  二: 2,
+  两: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+  七: 7,
+  八: 8,
+  九: 9,
+};
+
+/**
+ * `三` / `十五` / `二十` / `59` → 整数；读不懂返回 `undefined`，**不抛**。
+ *
+ * 只处理到 59（时刻用不到更大的数）：一–九、十、十一–十九、二十–五十九。
+ * 再大或形状奇怪的（`三五`、`十十`）一律返回 `undefined` —— 宁可这一段不认。
+ */
+function cnNumber(raw: string): number | undefined {
+  const text = raw.trim();
+  if (text === '') return undefined;
+
+  if (/^\d{1,2}$/.test(text)) return Number(text);
+
+  if (!/^[零〇一二两三四五六七八九十]{1,3}$/.test(text)) return undefined;
+
+  const tenAt = text.indexOf('十');
+  if (tenAt < 0) {
+    // 没有「十」⇒ 只能是单个数字。两个都单字的（`三五`）不是数。
+    return text.length === 1 ? CN_DIGIT[text] : undefined;
+  }
+
+  const tensPart = text.slice(0, tenAt);
+  const onesPart = text.slice(tenAt + 1);
+  // 「十」开头 = 十到十九：十、十一 … 十九
+  const tens = tensPart === '' ? 1 : CN_DIGIT[tensPart];
+  const ones = onesPart === '' ? 0 : CN_DIGIT[onesPart];
+  if (tens === undefined || ones === undefined) return undefined;
+  return tens * 10 + ones;
+}
+
+/**
+ * 分钟片段 → 分钟数：`半` 30 / `一刻` 15 / `三刻` 45 / `整` 0 / `十分` 10 / `15分` 15。
+ *
+ * 「差」那一侧也用这个函数（`差十分三点` 里的 `十分` 就是 10），
+ * 只是那边算的是 `60 - 分钟`。读不懂返回 `undefined`。
+ */
+function minuteOfPart(raw: string): number | undefined {
+  if (raw === '半') return 30;
+  if (raw === '一刻') return 15;
+  if (raw === '三刻') return 45;
+  if (raw === '整') return 0;
+
+  const withUnit = /^(.+?)\s*分$/.exec(raw);
+  if (withUnit !== null) return cnNumber(withUnit[1]!);
+
+  // 「3点15」这种不带「分」的写法（口语里很常见）。
+  return /^\d{1,2}$/.test(raw) ? Number(raw) : undefined;
+}
+
+/**
+ * 时段词怎么把 12 小时制的小时换算成 24 小时制。
+ *
+ * `dayOffset` 只给**自带一天**的词（「今晚」= 今天）。没给的词不携带日期，
+ * 由规则统一落到今天 —— 见上面那段「无日期的时刻落在今天」。
+ */
+interface PeriodSpec {
+  toHour(hour: number): number;
+  dayOffset?: number;
+}
+
+/** 上午侧：12 点其实是零点（`上午12点` 在中文里就是 00:00）。 */
+const morningHour = (hour: number): number => (hour === 12 ? 0 : hour);
+/** 下午侧：1–11 点各加 12，12 点保持中午（`下午12点` = 12:00）。 */
+const afternoonHour = (hour: number): number => (hour === 12 ? 12 : hour + 12);
+/** 夜间侧：1–11 点各加 12，但 12 点是零点（`晚上12点` = 00:00）。 */
+const nightHour = (hour: number): number => (hour === 12 ? 0 : hour + 12);
+
+const PERIOD_SPECS: ReadonlyMap<string, PeriodSpec> = new Map<string, PeriodSpec>([
+  ['凌晨', { toHour: morningHour }],
+  ['清晨', { toHour: morningHour }],
+  ['早上', { toHour: morningHour }],
+  ['早晨', { toHour: morningHour }],
+  ['上午', { toHour: morningHour }],
+  // 「中午1点」在口语里是 13:00（午饭/午休之后），所以中午侧对 1–5 点也加 12。
+  ['中午', { toHour: (hour) => (hour === 12 ? 12 : hour < 6 ? hour + 12 : hour) }],
+  ['下午', { toHour: afternoonHour }],
+  ['傍晚', { toHour: afternoonHour }],
+  ['晚上', { toHour: nightHour }],
+  ['夜里', { toHour: nightHour }],
+  ['夜间', { toHour: nightHour }],
+  ['深夜', { toHour: nightHour }],
+  ['半夜', { toHour: morningHour }],
+  // 自带一天的那几个。它们出现在**时刻规则里**，所以「今晚八点」是一条完整匹配
+  // （日期与时刻一起成立），不需要再被下面的日期规则咬一口。
+  ['今晚', { toHour: nightHour, dayOffset: 0 }],
+  ['明晚', { toHour: nightHour, dayOffset: 1 }],
+  ['今早', { toHour: morningHour, dayOffset: 0 }],
+  ['明早', { toHour: morningHour, dayOffset: 1 }],
+]);
+
+/**
+ * 拼进正则的时段词分支。
+ *
+ * 🔴 **长的必须排前面**：`晚上` 若排在 `晚上` 之后……更实际的理由是
+ * `明早` / `今早` 这类两字词与单字前缀共存的未来扩展 —— 一旦有人加一个
+ * 单字时段词（`晚`），短的排前面会把 `晚上` 咬成 `晚` + `上…`。
+ */
+const PERIOD_PATTERN = [...PERIOD_SPECS.keys()]
+  .sort((a, b) => b.length - a.length)
+  .join('|');
+
+/** 小时数的写法：阿拉伯数字，或中文数字（`三` / `十一` / `二十三`）。 */
+const HOUR_NUMBER = String.raw`(?:\d{1,2}|[零〇一二两三四五六七八九十]{1,3})`;
+
+/** 分钟片段：`半` / `一刻` / `三刻` / `整` / `十分` / `15分` / 裸 `15`。 */
+const MINUTE_PART = String.raw`(?:半|一刻|三刻|整|${HOUR_NUMBER}\s*分|\d{1,2})`;
+
 /**
  * 规则表。**顺序即优先级** —— 长模式必须排在短模式前面，
  * 否则 `大后天` 会被 `后天` 先吃掉，`下下周三` 会被 `下周三` 先吃掉。
@@ -538,6 +711,103 @@ const RULES: Rule[] = [
     },
   },
 
+  // ── 中文时刻（见文件内「中文时刻」那一整段）────────────────
+  //
+  // 🔴 **这两条必须排在这段的最前面**，因为同一个位置可能同时命中下面的
+  //    `HH:MM` 规则（「下午3:30」里也有一个 `3:30`）。去重叠按 `start` 优先，
+  //    起点相同时按**规则顺序**，所以"带时段词的"必须排在"裸冒号"前面 ——
+  //    否则 `下午` 会留在标题里，而时刻只被吃掉一半。
+  {
+    field: 'dueTime',
+    re: new RegExp(
+      `(${PERIOD_PATTERN})?\\s*(?:差\\s*(${MINUTE_PART}))?\\s*(${HOUR_NUMBER})\\s*(?:点|时)\\s*(${MINUTE_PART})?`,
+      'g',
+    ),
+    resolve: (m, ctx) => {
+      // 手写边界（不用 lookbehind，理由见 `isDigit` 的 Hermes 说明）。
+      // 挡掉的典型误报：「3点」从「23点」这类更长数字里被咬一口。
+      const before = m.index > 0 ? ctx.input.charAt(m.index - 1) : '';
+      if (isDigit(before)) return undefined;
+      const afterIdx = m.index + m[0].length;
+      const after = afterIdx < ctx.input.length ? ctx.input.charAt(afterIdx) : '';
+      if (isDigit(after)) return undefined;
+
+      const hourRaw = cnNumber(m[3]!);
+      if (hourRaw === undefined) return undefined;
+
+      let hour = hourRaw;
+      let minute = 0;
+
+      const diffRaw = m[2];
+      if (diffRaw !== undefined) {
+        // 「差十分三点」= 2:50 —— 分是从**下一个**整点倒着数过来的。
+        // 两侧都写了分钟（「差十分三点一刻」）说不清是哪一个，整条不认。
+        if (m[4] !== undefined) return undefined;
+        const diff = minuteOfPart(diffRaw);
+        if (diff === undefined || diff <= 0 || diff >= 60) return undefined;
+        if (hour < 1) return undefined;
+        hour -= 1;
+        minute = 60 - diff;
+      } else if (m[4] !== undefined) {
+        const suffix = minuteOfPart(m[4]);
+        if (suffix === undefined || suffix > 59) return undefined;
+        minute = suffix;
+      }
+
+      if (hour > 23) return undefined;
+
+      const period = m[1] === undefined ? undefined : PERIOD_SPECS.get(m[1]);
+      if (period === undefined) {
+        // 裸 1–11 点：真歧义（见「中文时刻」那段），**不产生匹配**。
+        if (hour >= 1 && hour <= 11) return undefined;
+      } else {
+        hour = period.toHour(hour);
+      }
+
+      if (hour > 23 || minute > 59) return undefined;
+      const time = parseLocalTime(
+        `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+      );
+      if (time === undefined) return undefined;
+
+      // 时刻自己带上那一天（没有日期规则命中时，它就是"今天"）。
+      return { display: time, dueTime: time, dueDate: addDays(ctx.today, period?.dayOffset ?? 0) };
+    },
+  },
+  {
+    field: 'dueTime',
+    // 「下午3:30」：时段词 + 冒号时刻。宁可单独一条，也不要让裸 `HH:MM`
+    // 去吞「下午」—— 吞了之后 `下午` 会以"未采用"的形式留在标题里。
+    re: new RegExp(`(${PERIOD_PATTERN})\\s*([01]?\\d|2[0-3]):([0-5]\\d)`, 'g'),
+    resolve: (m, ctx) => {
+      const period = PERIOD_SPECS.get(m[1]!);
+      if (period === undefined) return undefined;
+      const rawHour = Number(m[2]);
+      // 用户自己写了 13–23 就已经是 24 小时制，不要再加 12（`晚上20:00` 不是 32 点）。
+      const hour = rawHour >= 13 ? rawHour : period.toHour(rawHour);
+      if (hour > 23) return undefined;
+      const time = parseLocalTime(
+        `${String(hour).padStart(2, '0')}:${String(Number(m[3])).padStart(2, '0')}`,
+      );
+      if (time === undefined) return undefined;
+      return { display: time, dueTime: time, dueDate: addDays(ctx.today, period.dayOffset ?? 0) };
+    },
+  },
+  {
+    field: 'dueDate',
+    // 「今晚」「明早」**单用**（后面没有点数）也要算一天：「今晚交周报」。
+    //
+    // 🔴 这一条**必须排在上面两条时刻规则之后**：`今晚八点` 在起点 0 上
+    // 同时命中本规则与时刻规则，`start` 相同 ⇒ 由 `order` 决定，而时刻规则
+    // 的 order 更小。反过来排的话，本规则会先吃掉「今晚」，
+    // 然后时刻规则因为「八点」挨着已被认领的区间被丢掉 —— 结果只剩一个日期。
+    re: /(?:今晚|明晚|今早|明早)/g,
+    resolve: (m, ctx) => {
+      const d = addDays(ctx.today, m[0].startsWith('明') ? 1 : 0);
+      return { display: d, dueDate: d };
+    },
+  },
+
   // ── 时刻（`HH:MM`）──────────────────────────────────────
   //
   // 🔴 这一条**只在认领到日期之后才成立**（判定在 `parseCapture` 末尾，
@@ -663,14 +933,24 @@ export function parseCapture(input: string, options: CaptureOptions = {}): Captu
   }
 
   /*
-   * 🔴 `dueTimeNeedsDate`：时刻**不单独成立**。
+   * 🔴 `dueTimeNeedsDate`：**只到时刻、到不了日子的**一律不采纳。
+   *
+   * 判据是"这一次解析里，有没有一个**具体日子**配得上这个时刻"。两个来源：
+   *   · 日期规则被采纳了（「明天」「下周三」「10月8号」）；
+   *   · 或者这个时刻**自己带着**日子（「今晚八点」「下午3点」——见文件内
+   *     「中文时刻」那一段，它们的 `dueDate` 在同一份 `Resolved` 里）。
    *
    * 把 `firstOfField` 里那条删掉，而不是在规则表里判断 —— 因为规则表看不到
-   * 别的规则认了什么（它是逐条扫全文的），而"有没有日期"是**整次解析**的事实。
+   * 别的规则认了什么（它是逐条扫全文的），而"有没有日子"是**整次解析**的事实。
    * 删掉之后 `applied` 自然是 `false`，于是那条不变量自动成立：
    * **没被采纳的片段一定留在标题里**（"剪 9:16 的视频"不会被吃掉 9:16）。
+   *
+   * ⚠️ 注意这里**没有被放宽成"时刻可以单独成立"**：裸 `HH:MM` 仍然要到日期
+   * 才算数（`9:16` 的误报是真的）。放宽的只是"带时段词的中文时刻"，
+   * 而它们自带的日子就是用户自己说的那半个信息。
    */
-  const dueTimeNeedsDate = !firstOfField.has('dueDate');
+  const dueTimeNeedsDate =
+    !firstOfField.has('dueDate') && firstOfField.get('dueTime')?.dueDate === undefined;
   if (dueTimeNeedsDate) firstOfField.delete('dueTime');
 
   const matches: CaptureMatch[] = nonOverlapping.map((c) => {
@@ -705,7 +985,19 @@ export function parseCapture(input: string, options: CaptureOptions = {}): Captu
   // 合并因移除产生的空白（`明天 开会` → ` 开会` → `开会`）。
   title = title.replace(/\s+/g, ' ').trim();
 
-  const dueDate = firstOfField.get('dueDate')?.dueDate;
+  /**
+   * 🔴 日期现在有两个来源，顺序是**显式日期优先**：
+   *
+   *   1. `dueDate` 字段上被采纳的那条（「明天」「下周三」「10月8号」）；
+   *   2. 时刻匹配**自带**的那一天（「下午3点」= 今天、「今晚八点」= 今天）。
+   *
+   * 第 2 条存在，是因为「下午3点」这句话里**没有日期词**，但它必须落在一个
+   * 具体的日子上才是一条可用的截止时间（滴答清单同款）。而它**不会**盖掉
+   * 第 1 条：「明天下午3点」里 `明天` 的起点更靠前，
+   * 去重叠之后它才是 `dueDate` 字段上被采纳的那一条。
+   */
+  const dueDate =
+    firstOfField.get('dueDate')?.dueDate ?? firstOfField.get('dueTime')?.dueDate;
   const dueTime = firstOfField.get('dueTime')?.dueTime;
   const priority = firstOfField.get('priority')?.priority;
 

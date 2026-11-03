@@ -30,6 +30,7 @@ import {
   isDescendantOf,
   isTopLevel,
   parentIdOf,
+  validateNewChildPosition,
   validateParentChange,
   type TaskTreeNode,
 } from '../src/subtasks.js';
@@ -371,5 +372,77 @@ describe('validateParentChange：深度与数量上限', () => {
     expect(validateParentChange(tasks, 'c0', 'p')).toEqual({ ok: true, parentId: 'p' });
     expect(canSetParent(tasks, 'newcomer', 'p')).toBe(false);
     expect(canSetParent(tasks, 'newcomer', undefined)).toBe(true);
+  });
+});
+
+/**
+ * 🔴 这一族钉的是**后门**：「直接建一条带父的任务」绕过深度闸。
+ *
+ * 写路径有两个入口（改父 / 就地新建），上限只有一个来源。如果只给其中一个装闸，
+ * 另一个就成了合法的后门 —— 界面点得到、`buildTaskTree` 只上报不截断
+ * （那是给历史数据的兜底，不是给写入路径开的洞），后果是树上凭空多出一层，
+ * 而**没有任何一处报错**。
+ */
+describe('validateNewChildPosition（就地新建子任务的写前校验）', () => {
+  it('挂在顶级任务下 ⇒ 放行，并带回那个父 id', () => {
+    const tasks = [task({ id: 'p' }), task({ id: 'q', parentId: 'p' })];
+    expect(validateNewChildPosition(tasks, 'p')).toEqual({ ok: true, parentId: 'p' });
+  });
+
+  it('父不存在 ⇒ parent_not_found', () => {
+    expect(validateNewChildPosition([task({ id: 'p' })], 'ghost')).toEqual({
+      ok: false,
+      reason: 'parent_not_found',
+    });
+  });
+
+  it('🔴 父已软删除 ⇒ 同样 parent_not_found（墓碑不是可以挂孩子的父）', () => {
+    // 与 validateParentChange 同一条口径：建 byId 时只收 `deletedAt === undefined`。
+    // 若这里放行，删除中的任务会重新长出孩子，而它在哪一个视图里都不出现。
+    const tasks = [task({ id: 'p', deletedAt: 500 }), task({ id: 'live' })];
+    expect(validateNewChildPosition(tasks, 'p')).toEqual({
+      ok: false,
+      reason: 'parent_not_found',
+    });
+  });
+
+  it('🔴 最深的父下面建孩子 ⇒ depth_exceeded（后门正是这一条）', () => {
+    // 深度口径：顶层 depth=0，MAX_SUBTASK_DEPTH=3 ⇒ 最深的合法节点在第 3 层。
+    const a = task({ id: 'a' });
+    const b = task({ id: 'b', parentId: 'a' });
+    const c = task({ id: 'c', parentId: 'b' });
+    const d = task({ id: 'd', parentId: 'c' });
+    const tasks = [a, b, c, d];
+
+    // 浅一层的父仍然放行 —— 判据不能宽到把正常情况一起拦掉。
+    expect(validateNewChildPosition(tasks, 'b')).toEqual({ ok: true, parentId: 'b' });
+    // 挂在 d（第 3 层）下面就是第 4 层。
+    expect(validateNewChildPosition(tasks, 'd')).toEqual({
+      ok: false,
+      reason: 'depth_exceeded',
+    });
+  });
+
+  it('子数已达上限 ⇒ children_exceeded，且与改父用的是同一个数', () => {
+    const tasks = [task({ id: 'p' })];
+    for (let i = 0; i < MAX_SUBTASK_CHILDREN; i += 1) {
+      tasks.push(task({ id: `c${i}`, parentId: 'p' }));
+    }
+    expect(validateNewChildPosition(tasks, 'p')).toEqual({
+      ok: false,
+      reason: 'children_exceeded',
+    });
+    // 同一份数据上"改父"也是同一个结论 —— 两个入口不许分叉。
+    const outsider = task({ id: 'outsider' });
+    expect(validateParentChange([...tasks, outsider], 'outsider', 'p')).toEqual({
+      ok: false,
+      reason: 'children_exceeded',
+    });
+  });
+
+  it('数据里已有环时不死循环（深度带访问集）', () => {
+    // 磁盘上可能存在带环的历史数据；校验函数必须能给出结论而不是挂住。
+    const tasks = [task({ id: 'x', parentId: 'y' }), task({ id: 'y', parentId: 'x' })];
+    expect(() => validateNewChildPosition(tasks, 'x')).not.toThrow();
   });
 });
