@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_SHEET_DETENT,
   DETENT_FRACTION,
   SHEET_DETENTS,
   detentForHeight,
@@ -8,10 +9,16 @@ import {
   dismissThresholdPx,
   nextDetent,
   normalizeDetents,
+  resolveDetentSeed,
   resolveInitialDetent,
   shouldDismissOnRelease,
   type SheetDetent,
 } from '../src/overlay/sheet-detents.js';
+import {
+  SHEET_DRAG_REGIONS,
+  isSheetDragRegion,
+  type SheetDragRegion,
+} from '../src/overlay/sheet-drag.js';
 
 /** 规范档位集合。`SHEET_DETENTS` 是 `as const`，测试用例里要当数组用。 */
 const ALL: readonly SheetDetent[] = SHEET_DETENTS;
@@ -74,12 +81,65 @@ describe('sheet-detents · 记忆档位', () => {
     expect(resolveInitialDetent('small', ALL)).toBe('small');
   });
 
-  it('没有记忆时用最大档（本仓这批面板是从 90% 迁来的）', () => {
-    expect(resolveInitialDetent(undefined, ALL)).toBe('large');
+  it('没有记忆时用 medium —— 底部面板的全部意义是底下还看得见上下文', () => {
+    // ⚠️ 这一条**曾经是 `large`**，而那个读数把"半屏面板"钉成了"打开即准全屏"。
+    // 改它不是"让测试变绿"：是被判的那个默认值本身被推翻了，
+    // 依据写在 `sheet-detents.ts` 的 `fallbackDetent` 与
+    // `docs/plans/task-detail-ticktick-parity.md` §1.1。
+    expect(resolveInitialDetent(undefined, ALL)).toBe('medium');
+    // 默认值只有**一个**出口，组件里不许再写第二处 `'large'` / `0.9`。
+    expect(DEFAULT_SHEET_DETENT).toBe('medium');
   });
 
   it('记忆失效（不在允许集合内）时回落，不让记忆绕过档位约束', () => {
     expect(resolveInitialDetent('large', ['small', 'medium'])).toBe('medium');
+  });
+
+  it('记忆失效时回落到**允许集合内**的那一档，而不是绕过集合', () => {
+    // 🔴 上一那条现在**分不出好坏**：允许集合里有 medium，而默认档也是 medium，
+    // 所以"回落对了"与"根本没判允许集合"会给出同一个读数。
+    // 这一条换成单档集合：记住的 `large` 不在集合里 ⇒ 只能回落到 `small`，
+    // 任何"原样返回记住的那一档"或"返回不在集合里的默认档"都会红。
+    expect(resolveInitialDetent('large', ['small'])).toBe('small');
+  });
+});
+
+describe('sheet-detents · 起始档位优先级（记忆 > 宿主默认 > 模型默认）', () => {
+  it('记忆压过宿主写死的默认档 —— 否则每次打开都把手势选择抹掉', () => {
+    expect(resolveDetentSeed('small', 'large', ALL)).toBe('small');
+  });
+
+  it('没有记忆时用宿主默认档', () => {
+    expect(resolveDetentSeed(undefined, 'large', ALL)).toBe('large');
+  });
+
+  it('两者都没有时落回模型默认档', () => {
+    expect(resolveDetentSeed(undefined, undefined, ALL)).toBe(DEFAULT_SHEET_DETENT);
+  });
+
+  it('记忆不在允许集合内时**不**绕过约束（与 `resolveInitialDetent` 同一条不变量）', () => {
+    expect(resolveDetentSeed('large', undefined, ['small'])).toBe('small');
+  });
+});
+
+describe('sheet-drag · 哪些区域能发起拖拽', () => {
+  it('把手与标题栏能拖', () => {
+    expect(isSheetDragRegion('handle')).toBe(true);
+    expect(isSheetDragRegion('header')).toBe(true);
+  });
+
+  it('🔴 内容区不接拖拽 —— 没有 gesture-handler 时"想滚却把面板关了"比没有更糟', () => {
+    // 这一条是**反向**判据：将来有人"顺手补全"成四区全可拖，它必须红。
+    expect(isSheetDragRegion('body')).toBe(false);
+  });
+
+  it('🔴 × 不接拖拽 —— 它是宿主唯一的具名出口，被抢走 responder 会变成点了没反应', () => {
+    expect(isSheetDragRegion('closeButton')).toBe(false);
+  });
+
+  it('可拖集合就是那张表，不靠"除…之外"的补集写法', () => {
+    const all: readonly SheetDragRegion[] = ['handle', 'header', 'closeButton', 'body'];
+    expect(SHEET_DRAG_REGIONS).toEqual(all.filter(isSheetDragRegion));
   });
 });
 

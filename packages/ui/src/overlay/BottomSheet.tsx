@@ -57,6 +57,7 @@ import { useHeytaText, useHeytaTokens, useHeytaUiTheme } from '../theme.js';
 import {
   closePolicyOf,
   dismissActionFor,
+  explicitCloseOutcomeOf,
   hasExplicitClose,
   type ClosedOverlay,
   type DismissAction,
@@ -68,10 +69,12 @@ import {
   largestDetent,
   nextDetent,
   normalizeDetents,
+  resolveDetentSeed,
   resolveInitialDetent,
   shouldDismissOnRelease,
   type SheetDetent,
 } from './sheet-detents.js';
+import { isSheetDragRegion, type SheetDragRegion } from './sheet-drag.js';
 
 /** 这一层原语覆盖的类别：几何是"贴底升起"的那几类。 */
 export type BottomSheetClass = Extract<
@@ -86,10 +89,30 @@ export type BottomSheetDismissVia = 'scrim' | 'back' | 'drag';
 export interface BottomSheetLabels {
   /** 右上角 × 的无障碍名。策略判为"给 ×"的那些类必须给。 */
   readonly close: string;
-  /** 把手：点它会变成更大的那一档。 */
-  readonly expand: string;
-  /** 把手：点它会回到最小那一档（已到最大档时的循环）。 */
-  readonly collapse: string;
+  /**
+   * 关闭出口的**具名文字**（G2）。给了它，右上角显示这句话而不是那只 ×。
+   *
+   * 🔴 为什么要有这一档：一个只有 × 的出口，用户**在读它之前就得猜它干什么**。
+   * 法律/条款类面板（"稍后再处理"、"我已阅读并同意"）尤其明显 ——
+   * 那种面板的关闭是有后果的（不点就等于没读完），把后果写在那个可点区域上，
+   * 比让它变成一个抽象符号便宜，也不是装饰。
+   * ⚠️ 省略 = 维持原样（画 ×）。这一档**不替换** `close`：
+   * 文字按钮仍然要 `close` 当无障碍名的兜底吗？不要 —— 按钮的可见文字本身就是名字，
+   * 所以给了 `closeText` 时 `accessibilityLabel` 用它，避免读屏念两句。
+   */
+  readonly closeText?: string;
+  /**
+   * 把手：点它会变成更大的那一档。
+   *
+   * ⚠️ **单档面板可以不给**（`detents` 只有一档时永远读不到它 —— 那一档没有把手可拖）。
+   * 之前它们是必填的，实测后果是宿主被迫拿**关闭**那句文案去占位
+   * （`ConflictSheet` 就写了 `expand: t('mobile.conflict.close')`），
+   * 于是无障碍树里出现两句"稍后再处理"，而其中一句的名字在说"展开"。
+   * 必填项逼出来的假文案，比缺一项更糟。
+   */
+  readonly expand?: string;
+  /** 把手：点它会回到最小那一档（已到最大档时的循环）。见 `expand` 那条。 */
+  readonly collapse?: string;
 }
 
 export interface BottomSheetProps {
@@ -120,8 +143,19 @@ export interface BottomSheetProps {
   readonly detents?: readonly SheetDetent[];
   /** 受控档位。给了它，本组件不再自己记。 */
   readonly detent?: SheetDetent;
-  /** 非受控时的起始档位。缺省用允许集合里最大那一档（见模型里的理由）。 */
+  /** 非受控时的起始档位。缺省用 `DEFAULT_SHEET_DETENT`（medium，见模型里的理由）。 */
   readonly defaultDetent?: SheetDetent;
+  /**
+   * 宿主从自己的持久层读回来的"上次那一档"。
+   *
+   * 🔴 优先级是 **记忆 > `defaultDetent` > 模型默认**（`resolveDetentSeed`）。
+   * 让宿主写死的默认档赢，等于每次打开都把用户的手势选择抹掉 ——
+   * 而"记不住档位"正是这一格立项时要修的缺陷
+   * （`onDetentChange` 全仓零宿主使用那条）。
+   * ⚠️ 允许**异步**送到（宿主先渲染后取本地库），组件里那一次"只采纳、不回写"
+   * 的更新就是为它准备的；受控（`detent`）时本 prop 被忽略。
+   */
+  readonly rememberedDetent?: SheetDetent;
   /** 档位变了（点把手 / 拖拽吸附）。宿主据此做"记忆"。 */
   readonly onDetentChange?: (detent: SheetDetent) => void;
 
@@ -151,6 +185,7 @@ export function BottomSheet({
   detents = SHEET_DETENTS,
   detent,
   defaultDetent,
+  rememberedDetent,
   onDetentChange,
   bottomInset = 0,
   children,
@@ -175,11 +210,29 @@ export function BottomSheet({
   const maxHeight = detentHeight(largestDetent(allowed), viewportHeight);
 
   const [inner, setInner] = useState<SheetDetent>(() =>
-    resolveInitialDetent(detent ?? defaultDetent, allowed),
+    resolveDetentSeed(rememberedDetent, defaultDetent, allowed),
   );
   // 🔴 受控优先；非受控时组件自己记 —— 面板靠 `visible` 收起而不是卸载，
   // 所以这份 state 天然跨"开/关"留着，用户上次拉到哪一档，下次打开还是那一档。
   const current = detent ?? inner;
+
+  /**
+   * 用户在这一世（本次挂载内）**自己**拖过 / 点过把手。
+   *
+   * 🔴 它存在的理由只有一个：记忆是宿主异步读上来的，可能在挂载之后才到，
+   * 而"我刚把面板拖到 60%，宿主的记忆这时候读回来了"会把面板拽回上次那一档，
+   * 读起来像被抢了一下。所以迟到的记忆只在不覆盖用户手势时被采纳。
+   */
+  const userChoseDetent = useRef(false);
+
+  // 迟到的记忆：采纳，但**不回写** `onDetentChange`。
+  // 采纳一次读取不是用户改了档位，回写会把一次纯粹的"读"变成一次"持久化写入"。
+  useEffect(() => {
+    if (detent !== undefined || rememberedDetent === undefined) return;
+    if (userChoseDetent.current) return;
+    const seed = resolveInitialDetent(rememberedDetent, allowed);
+    setInner((prev) => (prev === seed ? prev : seed));
+  }, [detent, rememberedDetent, allowed]);
 
   const offsetFor = (value: SheetDetent): number =>
     maxHeight - detentHeight(value, viewportHeight);
@@ -226,6 +279,8 @@ export function BottomSheet({
   }, [current, viewportHeight, maxHeight, offset, theme.reducedMotion]);
 
   const applyDetent = (next: SheetDetent): void => {
+    // 走到这里的一定是**用户手势**（拖拽吸附 / 点把手），所以从此迟到的记忆不再采纳。
+    userChoseDetent.current = true;
     if (detent === undefined) setInner(next);
     onDetentChange?.(next);
   };
@@ -234,6 +289,13 @@ export function BottomSheet({
   const backAction = dismissActionFor(policy, policy.systemBack);
   // 下拉拖拽与背景同一条判据（见文件头）。
   const dragAction = scrimAction;
+  /**
+   * 🔴 × 读 `explicitCloseOutcomeOf`，不读 `scrimAction`：`modal-deferrable` 与
+   * `full-screen` 的背景是 `deny`，接 `scrimAction` 会得到一个**按下去什么都不发生**的
+   * ×（实测缺陷，2026-11-02 由 `RowActionMenu` 那一族的迁移撞出来）。
+   * 反过来 `bottom-sheet` 的 `escape` 是 `deny`，所以也不能固定读键盘那一格。
+   */
+  const explicitCloseAction = dismissActionFor(policy, explicitCloseOutcomeOf(policy));
 
   const runDismiss = (
     action: DismissAction,
@@ -381,6 +443,11 @@ export function BottomSheet({
           paddingHorizontal: tokens['screen.gutter'],
           paddingBottom: tokens['space.2'],
         },
+        /**
+         * 标题栏里**可拖的那一段**。它不占满整条 header —— × 必须留在外面，
+         * 理由见 `sheet-drag.ts` 文件头（move 阶段抢走 responder 会让 × 点不动）。
+         */
+        headerDrag: { flex: 1 },
         title: { flex: 1, color: tokens['color.foreground'] },
         closeButton: {
           minWidth: tokens['touch-target.min'],
@@ -402,6 +469,16 @@ export function BottomSheet({
   );
 
   const animationType = Platform.OS === 'web' || theme.reducedMotion ? 'none' : 'slide';
+
+  /** 单档面板没有把手可拖（`nextDetent` 的理由），手势与可及性都跟着这一判据走。 */
+  const draggable = allowed.length > 1;
+  /**
+   * 一块区域接不接拖拽 —— 🔴 判断只住在 `sheet-drag.ts` 那张表里，
+   * 组件里不许出现第二处"哪一块能拖"的字面量（判据问两次就有两种问法，
+   * 第二种通常是错的）。
+   */
+  const dragHandlers = (region: SheetDragRegion): object =>
+    draggable && isSheetDragRegion(region) ? pan.panHandlers : {};
 
   return (
     <Modal
@@ -450,11 +527,11 @@ export function BottomSheet({
               <View
                 style={styles.handleZone}
                 // 多档才挂手势：单档的把手是一条装饰，挂上会变成"拖了没反应"。
-                {...(allowed.length > 1 ? pan.panHandlers : {})}
-                accessible={allowed.length > 1}
-                accessibilityRole={allowed.length > 1 ? 'button' : undefined}
+                {...dragHandlers('handle')}
+                accessible={draggable}
+                accessibilityRole={draggable ? 'button' : undefined}
                 accessibilityLabel={
-                  allowed.length > 1
+                  draggable
                     ? nextDetent(current, allowed) === current
                       ? labels.collapse
                       : labels.expand
@@ -466,25 +543,36 @@ export function BottomSheet({
               </View>
 
               <View style={styles.header}>
-                <Text accessibilityRole="header" style={[text['section-title'], styles.title]}>
-                  {title}
-                </Text>
+                {/* 可拖的是标题这一段，不是整条 header：× 留在拖拽段之外。
+                    按住标题往上往下都是拖 —— 用户不需要瞄准一条几 px 的把手。 */}
+                <View style={styles.headerDrag} {...dragHandlers('header')}>
+                  <Text accessibilityRole="header" style={[text['section-title'], styles.title]}>
+                    {title}
+                  </Text>
+                </View>
                 {hasExplicitClose(policy) ? (
                   <Pressable
-                    accessibilityLabel={labels.close}
+                    // 具名文字出口在时，可见文字就是它的名字（见 `BottomSheetLabels.closeText`）。
+                    accessibilityLabel={labels.closeText ?? labels.close}
                     accessibilityRole="button"
-                    onPress={() => runDismiss(scrimAction, 'scrim')}
+                    onPress={() => runDismiss(explicitCloseAction, 'scrim')}
                     style={({ pressed }) => [
                       styles.closeButton,
                       pressed ? styles.pressed : undefined,
                     ]}
                     testID={`${testID}-close`}
                   >
-                    <HeytaIcon
-                      data={X}
-                      size={tokens['icon.sm']}
-                      color={tokens['color.foreground-muted']}
-                    />
+                    {labels.closeText !== undefined ? (
+                      <Text style={[text['section-title'], { color: tokens['color.foreground-muted'] }]}>
+                        {labels.closeText}
+                      </Text>
+                    ) : (
+                      <HeytaIcon
+                        data={X}
+                        size={tokens['icon.sm']}
+                        color={tokens['color.foreground-muted']}
+                      />
+                    )}
                   </Pressable>
                 ) : null}
               </View>
@@ -499,6 +587,21 @@ export function BottomSheet({
                   { paddingBottom: tokens['space.8'] + bottomInset },
                 ]}
                 keyboardShouldPersistTaps="handled"
+                /**
+                 * 🔴 键盘弹起时把滚动内容顶出键盘之上，并让系统把**当前第一响应者**
+                 * 滚进可视区（iOS 13.4+ 的平台行为）。
+                 *
+                 * 为什么必须有：外层那只 `KeyboardAvoidingView` 只把**整块面板**抬起来，
+                 * 面板高度仍由档位决定 ⇒ 焦点输入框如果在折叠内容更靠下的位置，
+                 * 抬完还是被键盘盖住。2026-11-03 真机实测（iPhone 模拟器，Release 构建）：
+                 * 详情面板里点「添加子任务」，键盘起来了、输入框拿到了焦点，
+                 * 而屏幕上从头部三件套到键盘之间**整段是空白** ——
+                 * 用户视角就是"点了没反应"。静态判据、类型检查、2100+ 条测试全绿。
+                 *
+                 * ⚠️ 这一条修的是"看得见"。宿主如果要更讲究（比如自动展开到最高档），
+                 * 那是产品取向，不是这里的前置条件。
+                 */
+                automaticallyAdjustKeyboardInsets
               >
                 {children}
               </ScrollView>

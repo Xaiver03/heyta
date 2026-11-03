@@ -562,14 +562,13 @@ export {
  * 🔴 **解析本身一条都没重写** —— 它仍然是 `@heyta/domain#parseCapture`。
  * 这里新增的只有"展示 / 交互 / 换算"。
  *
- * ⚠️ `renderAssistant` 是给宿主内容留的插槽（web 的 AI 一句话捕获）。
- * 它**不**等于把 AI 面板收进了共享层 —— 移动端本轮仍只有确定性捕获，
- * 理由与最小一步写在 `capture/CaptureComposer.tsx` 文件头。
+ * ⚠️ 这里**没有** AI：捕获框只做确定性解析，AI 的"一句话解析"在右侧助手
+ * （`AssistantPanel`）。原来为此留的 `renderAssistant` 插槽已删除，
+ * 理由写在 `capture/CaptureComposer.tsx` 与 `capture/model.ts` 文件头。
  */
 export {
   CaptureComposer,
   CaptureProjectPickerRow,
-  type CaptureAssistantContext,
   type CaptureComposerLabels,
   type CaptureComposerProps,
 } from './capture/CaptureComposer.js';
@@ -1305,6 +1304,7 @@ export {
   CLOSED_OVERLAYS,
   closePolicyOf,
   dismissActionFor,
+  explicitCloseOutcomeOf,
   hasExplicitClose,
   type ClosedOverlay,
   type ClosePolicy,
@@ -1332,6 +1332,7 @@ export {
    移动端 4 个 `*Sheet.tsx` 现在的形状。
    `sheet-detents.ts` 是纯模型（不碰主题），与 `dismissal.ts` 同形状。 */
 export {
+  DEFAULT_SHEET_DETENT,
   DETENT_FRACTION,
   SHEET_DETENTS,
   detentForHeight,
@@ -1340,12 +1341,20 @@ export {
   largestDetent,
   nextDetent,
   normalizeDetents,
+  resolveDetentSeed,
   resolveInitialDetent,
   shouldDismissOnRelease,
   smallestDetent,
   type NonEmptyDetents,
   type SheetDetent,
 } from './overlay/sheet-detents.js';
+/* 哪一块面板区域能发起拖拽 —— 判据只住在这张表里，宿主与组件都不许另写一份
+   （`sheet-drag.ts` 文件头记着 `body` 与 `closeButton` 为什么**故意**不在表里）。 */
+export {
+  SHEET_DRAG_REGIONS,
+  isSheetDragRegion,
+  type SheetDragRegion,
+} from './overlay/sheet-drag.js';
 export {
   BottomSheet,
   type BottomSheetClass,
@@ -1353,6 +1362,27 @@ export {
   type BottomSheetLabels,
   type BottomSheetProps,
 } from './overlay/BottomSheet.js';
+/* 行上下文菜单（移动端长按那一层）。**动作的分组与危险档只住在 `row-actions.ts`**，
+   宿主只决定"这一行现在有哪些项"，不决定哪一项算危险 —— 与 §3.5 同一条分工。 */
+export { RowActionMenu, type RowActionMenuProps } from './overlay/RowActionMenu.js';
+export {
+  type RowAction,
+  type RowActionId,
+  type TaskRowSwipeSpec,
+  deleteNeedsConfirm,
+  deleteTierForTask,
+  groupRowActions,
+  isDangerousRowAction,
+} from './task-list/row-actions.js';
+/* 左滑露出动作（不做全滑直删，见 row-actions-redesign §9.3）。 */
+export { SwipeReveal, type SwipeRevealProps } from './task-list/SwipeReveal.js';
+/* 任务动态的「事件 → 词条」映射（唯一一份；理由见该文件头）。 */
+export {
+  taskActivityCoverageMessageKey,
+  taskActivityDeviceMessageKey,
+  taskActivityFieldMessageKeys,
+  taskActivityKindMessageKey,
+} from './task-list/activity-model.js';
 
 /* ── 表单行（2026-10-24）────────────────────────────────────────────
    `anatomy.ts` 是**判断**，两端各有自己的渲染器并且都消费它：

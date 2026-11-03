@@ -47,11 +47,13 @@
  *    "这段代码里有没有任何一行在决定业务上该怎么做？" 本文件只产出
  *    `{ title, dueDate?, priority? }` 这个**纯数据**，写库由宿主的 action 层做。
  *
- * 3. **AI 一句话捕获面板**（`AiCapture`）留在 web。它是 `apps/web/src/features/ai/**`
- *    的 DOM 实现，且 `apps/mobile` 没有 AI（P8 的移动端阻塞在宿主 SecretStore，
- *    不在 UI）。共享层给的是 `renderAssistant` **插槽**，不是那份面板本身。
- *    · 影响：mobile 本轮（以及可预见的几轮）只有确定性捕获。
- *    · 最小一步：M3 `ai` 的"流程型面板族"落地后，把披露块 + 候选行接进这个插槽。
+ * 3. **AI 一句话捕获面板**（`AiCapture`）**不在捕获框这条路上了**（2026-11）。
+ *    它整体搬进了右侧助手（`AssistantPanel`），连同"捕获框里的贴图入口"。
+ *    共享层原来为此留过一个 `renderAssistant` 插槽 —— 已随搬家一并删除：
+ *    两端都不再往捕获框里挂 AI，留着插槽就是留一条没人走的路。
+ *    · 影响：捕获框只剩确定性解析（这是产品裁决，不是能力缺口）。
+ *    · 想看它的落点：`apps/web/src/features/ai/AssistantPanel.tsx` 的
+ *      `captureTarget` 那一段。
  *
  * 4. **输入框的交互降级**：web 迁移前用 `.ht-input` 的 CSS（`:hover` /
  *    `:focus-visible` 换边框色），共享层是 RN `TextInput`，RN 没有 hover。

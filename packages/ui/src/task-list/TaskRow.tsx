@@ -47,6 +47,8 @@ import { useHeytaText, useHeytaTokens } from '../theme.js';
 import { resolveTaskRowDensity, type TaskRowDensity } from './density.js';
 import type { TaskRow as TaskRowModel } from './model.js';
 import { priorityColorToken } from './priority-color.js';
+import { SwipeReveal } from './SwipeReveal.js';
+import { deleteNeedsConfirm, type TaskRowSwipeSpec } from './row-actions.js';
 
 /**
  * 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。
@@ -101,8 +103,23 @@ export interface TaskRowProps {
    * 那个默认值会让"忘了传"表现成**点一下就误完成一条任务**。
    */
   readonly onOpenTask?: (taskId: string) => void;
-  /** 长按行的入口，供移动端进入批量选择态；Web 不传则保持原行为。 */
+  /**
+   * 长按行的入口。🔴 本组件**不认识**"长按算哪件事"：
+   * 移动端现在把它用作**上下文菜单**（`docs/plans/row-actions-redesign.md` §3.4），
+   * 进入批量选择态之后宿主又把同一个回调改派成勾选/取消勾选 ——
+   * 手势归派是宿主那一层的一行三元，写在组件里就变成第二份裁决。
+   * Web 不传则保持原行为（行不可长按）。
+   */
   readonly onLongPressTask?: (taskId: string) => void;
+  /**
+   * **左滑露出的动作**（移动端第二入口，§3.4/§9.3）。
+   *
+   * 不传 = 这一行**完全不响应横向手势**（Web、日历格、四象限都不传）。
+   * 🔴 滑动只负责"露出来"，执行永远来自那枚按钮自己的点击 —— 没有"滑到底即删"。
+   * 与 `density` 的关系走 `DENSITY_SPEC` 的 `showTrailing`（行尾那一档不渲染的
+   * 密度同样不露动作），所以这里**没有** `if (density === …)` 分支。
+   */
+  readonly swipeActions?: (row: TaskRowModel) => TaskRowSwipeSpec | null;
   readonly labels?: TaskRowLabels;
   /** 标题下方的元信息行（截止 / 优先级 / 重复…）。`minimal` 档不渲染它。 */
   readonly renderMeta?: (row: TaskRowModel) => React.ReactNode;
@@ -133,6 +150,7 @@ export function TaskRow({
   onToggleTask,
   onOpenTask,
   onLongPressTask,
+  swipeActions,
   labels,
   renderMeta,
   renderTrailing,
@@ -297,7 +315,7 @@ export function TaskRow({
    */
   const title = (
     <Text
-      style={[text[TASK_ROW_TEXT.title], row.done ? styles.titleDone : null]}
+      style={[text[spec.title], row.done ? styles.titleDone : null]}
       testID={`task-title-${row.id}`}
       numberOfLines={2}
     >
@@ -305,7 +323,7 @@ export function TaskRow({
     </Text>
   );
 
-  return (
+  const rowNode = (
     /**
      * 🔴 外层行也要有一个稳定的 handle。
      *
@@ -385,5 +403,32 @@ export function TaskRow({
 
       {renderTrailing === undefined || !spec.showTrailing ? null : renderTrailing(row)}
     </View>
+  );
+
+  /**
+   * 🔴 行的**那一份**实现到 `rowNode` 就结束了 —— 下面这一层只加手势与几何，
+   * 不重画勾选框/标题/截止（`check-row-single-source` 断言 A 钉的就是这件事）。
+   *
+   * 两道闸：宿主没给 `swipeActions`（Web、日历、四象限）与这一档密度不渲染行尾
+   *（`DENSITY_SPEC`）。任一条成立就**逐字节交回原来那一行**，不套任何壳。
+   */
+  const swipe = swipeActions === undefined || !spec.showTrailing ? null : swipeActions(row);
+  if (swipe === null || swipe.actions.length === 0) return rowNode;
+
+  return (
+    <SwipeReveal
+      subjectId={row.id}
+      actions={swipe.actions}
+      // 档位判定不在这里写：`deleteNeedsConfirm` 问的是 `@heyta/domain` 的
+      // `resolveDangerTier()`，与长按菜单问的是同一枚（§3.3「危险项不手填档位」）。
+      confirmDanger={deleteNeedsConfirm(swipe.childCount)}
+      consequence={swipe.consequence}
+      closeLabel={swipe.closeLabel}
+      disabled={busy || swipe.busy === true}
+      onAction={swipe.onAction}
+      testID={`task-swipe-${row.id}`}
+    >
+      {rowNode}
+    </SwipeReveal>
   );
 }

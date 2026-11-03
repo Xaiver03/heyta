@@ -265,3 +265,25 @@ export function dismissActionFor(policy: ClosePolicy, outcome: DismissOutcome): 
 export function hasExplicitClose(policy: ClosePolicy): boolean {
   return policy.explicitCloseButton;
 }
+
+/**
+ * 右上角那枚 × 该走哪一条通道。
+ *
+ * 🔴 它**不是**"键盘那一格"，也不是"背景那一格"，而是**这两格里没被禁的那一个**：
+ *
+ * · `bottom-sheet` 是 `scrim: dismiss` + `escape: deny`（这一类的关闭语言是手势，
+ *   桌面 Esc 故意不给）⇒ 读 `escape` 会得到一个**点了没反应的 ×**；
+ * · `modal-deferrable`（隐私单独同意）与 `full-screen` 是 `scrim: deny` +
+ *   `escape: dismiss` ⇒ 读 `scrim` 同样得到一个点了没反应的 ×。
+ *
+ * 也就是任何"固定读某一格"的写法都会在某一类上画出一个按下去什么都不发生的按钮，
+ * 而本仓对这件事的立场是明确的：**没有入口比坏入口好**（见
+ * `apps/mobile/src/screens/TaskDetailSheet.tsx` 里"这台设备给不出那一页时不画入口"）。
+ *
+ * ⚠️ 刻意**不**给策略表加第五个字段：那七行里没有任何一行需要 × 与这两格都不同，
+ *   多一个字段就是多一处可以被写错、且写错了也没有判据能发现的自由度。
+ *   真出现那种类别时再加，加的时候下面那条表级不变量会要求它一起绿。
+ */
+export function explicitCloseOutcomeOf(policy: ClosePolicy): DismissOutcome {
+  return policy.scrim === 'deny' ? policy.escape : policy.scrim;
+}
