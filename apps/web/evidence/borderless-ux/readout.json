@@ -3,13 +3,17 @@
     "theme": "light",
     "width": 1440,
     "appearance": {
-      "outline": "2px",
-      "outlineStyle": "solid",
+      "outline": "3px",
+      "outlineStyle": "none",
+      "outlineColor": "rgb(15, 23, 42)",
+      "outlineOffset": "2px",
       "ring": "2px",
       "border": "0px",
       "borderColor": "rgba(0, 0, 0, 0)",
-      "shadow": "none",
-      "caret": "rgb(37, 99, 235)"
+      "boxShadow": "rgb(37, 99, 235) 0px 0px 0px 2px, rgb(248, 250, 252) 0px 0px 0px 1px",
+      "caret": "rgb(37, 99, 235)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "ringColor": "rgb(37, 99, 235)"
     },
     "calendarCells": 42,
     "overflow": false
@@ -18,13 +22,17 @@
     "theme": "light",
     "width": 390,
     "appearance": {
-      "outline": "2px",
-      "outlineStyle": "solid",
+      "outline": "3px",
+      "outlineStyle": "none",
+      "outlineColor": "rgb(15, 23, 42)",
+      "outlineOffset": "2px",
       "ring": "2px",
       "border": "0px",
       "borderColor": "rgba(0, 0, 0, 0)",
-      "shadow": "none",
-      "caret": "rgb(37, 99, 235)"
+      "boxShadow": "rgb(37, 99, 235) 0px 0px 0px 2px, rgb(248, 250, 252) 0px 0px 0px 1px",
+      "caret": "rgb(37, 99, 235)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "ringColor": "rgb(37, 99, 235)"
     },
     "calendarCells": 42,
     "overflow": false
@@ -33,13 +41,17 @@
     "theme": "dark",
     "width": 1440,
     "appearance": {
-      "outline": "2px",
-      "outlineStyle": "solid",
+      "outline": "3px",
+      "outlineStyle": "none",
+      "outlineColor": "rgb(241, 245, 249)",
+      "outlineOffset": "2px",
       "ring": "2px",
       "border": "0px",
       "borderColor": "rgba(0, 0, 0, 0)",
-      "shadow": "none",
-      "caret": "rgb(96, 165, 250)"
+      "boxShadow": "rgb(96, 165, 250) 0px 0px 0px 2px, rgb(2, 6, 23) 0px 0px 0px 1px",
+      "caret": "rgb(96, 165, 250)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "ringColor": "rgb(96, 165, 250)"
     },
     "calendarCells": 42,
     "overflow": false
@@ -48,13 +60,17 @@
     "theme": "dark",
     "width": 390,
     "appearance": {
-      "outline": "2px",
-      "outlineStyle": "solid",
+      "outline": "3px",
+      "outlineStyle": "none",
+      "outlineColor": "rgb(241, 245, 249)",
+      "outlineOffset": "2px",
       "ring": "2px",
       "border": "0px",
       "borderColor": "rgba(0, 0, 0, 0)",
-      "shadow": "none",
-      "caret": "rgb(96, 165, 250)"
+      "boxShadow": "rgb(96, 165, 250) 0px 0px 0px 2px, rgb(2, 6, 23) 0px 0px 0px 1px",
+      "caret": "rgb(96, 165, 250)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "ringColor": "rgb(96, 165, 250)"
     },
     "calendarCells": 42,
     "overflow": false
