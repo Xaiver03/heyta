@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 
 import { expect, test, type Page } from '@playwright/test';
+import { visibleFocusRing } from './focus-ring';
 import { openApp, switchTheme } from './helpers';
 
 /** 打开页头那枚 `⋯` —— 助手入口在 2026-11-02 第三刀搬进了它里面。 */
@@ -67,7 +68,14 @@ test('助手随侧栏连续拖动重排，输入区无嵌套焦点框', async ({
        * 这条判据要防的事没变，只是要量的东西变了：**不许嵌套两层焦点框**
        * （输入框一层 + 外层 composer 再来一层）。所以现在量两件事：
        *   ① 输入框自己的焦点环 = 全局那一条（`--ht-border-width-thick`，2px）；
-       *   ② 外层 `.ht-ai__composer` **没有** outline（层叠两层会在拐角处露双线）。
+       *   ② 外层 `.ht-ai__composer` **没有**第二枚环（层叠两层会在拐角处露双线）。
+       *
+       * 🔴 2026-11-03 改机制（不是放宽）：输入类控件的环从 `outline` 换成了 `box-shadow`
+       * —— WebKit 的 `outline` 不跟随 `border-radius`，产品负责人看着这个对话框问
+       * 「为什么这个对话框还是没有圆角」。环还在画面上，只是不再画在 `outline` 上，
+       * 所以①改成共用判据 `./focus-ring`，环宽仍判"等于全局那条 token"；
+       * ②从"没有 outline"扩到"**两种形态都不许有环**"（否则换成 box-shadow 之后，
+       * 外面再套一层就查不出来了 —— 那等于把这条判据的牙齿拔掉）。
        */
       const ring = await page.evaluate(() => {
         const inputEl = document.querySelector('[data-testid="ai-assistant-input"]');
@@ -75,32 +83,51 @@ test('助手随侧栏连续拖动重排，输入区无嵌套焦点框', async ({
         if (inputEl === null || composer === null) return null;
         const inputStyle = getComputedStyle(inputEl);
         const composerStyle = getComputedStyle(composer);
+        // 把 token 解析成具体颜色（`--ht-color-ring` 是 `var(...)` 链，直接读 custom property 是空串）。
+        const colorProbe = document.createElement('span');
+        colorProbe.style.cssText = 'position:absolute;visibility:hidden;color:var(--ht-color-ring)';
+        document.body.appendChild(colorProbe);
+        const ringColor = getComputedStyle(colorProbe).color;
+        colorProbe.remove();
         return {
-          inputOutlineWidth: inputStyle.outlineWidth,
-          inputOutlineStyle: inputStyle.outlineStyle,
-          // ⚠️ 别用 `outline-width` 判"有没有画框"：`outline-style` 为 none 时
-          //    Chrome 仍把 `outline-width` 报成初始值 `medium`（= 3px），
-          //    于是"没画"会被读成"画了一条 3px"（这一条我当场踩了）。
-          composerOutlineStyle: composerStyle.outlineStyle,
-          composerOutlineWidth: composerStyle.outlineWidth,
+          input: {
+            outlineStyle: inputStyle.outlineStyle,
+            outlineWidth: inputStyle.outlineWidth,
+            outlineColor: inputStyle.outlineColor,
+            outlineOffset: inputStyle.outlineOffset,
+            boxShadow: inputStyle.boxShadow,
+            backgroundColor: inputStyle.backgroundColor,
+            ringColor,
+          },
+          composer: {
+            outlineStyle: composerStyle.outlineStyle,
+            outlineWidth: composerStyle.outlineWidth,
+            outlineColor: composerStyle.outlineColor,
+            outlineOffset: composerStyle.outlineOffset,
+            boxShadow: composerStyle.boxShadow,
+            backgroundColor: composerStyle.backgroundColor,
+            ringColor,
+          },
           focused: document.activeElement === inputEl,
           ringToken: getComputedStyle(document.documentElement).getPropertyValue('--ht-border-width-thick').trim(),
         };
       });
       expect(ring, '量不到输入框或 composer ⇒ 这一条没有基准').not.toBeNull();
       expect(ring!.focused, '输入框没拿到焦点 ⇒ 焦点环这一条无从谈起').toBe(true);
+      const inputRing = visibleFocusRing(ring!.input);
       expect(
-        ring!.inputOutlineWidth,
-        '输入框的焦点环不见了 ⇒ 键盘用户看不出焦点在哪（WCAG 2.4.7）',
-      ).toBe(ring!.ringToken);
+        inputRing,
+        `输入框的焦点环不见了 ⇒ 键盘用户看不出焦点在哪（WCAG 2.4.7）：读数 ${JSON.stringify(ring!.input)}`,
+      ).not.toBeNull();
       expect(
-        ring!.inputOutlineStyle,
-        '焦点环被改成 none ⇒ 等于没画',
-      ).not.toBe('none');
+        inputRing!.widthPx,
+        `输入框的焦点环不是全局那一条（${String(inputRing!.widthPx)}px ≠ ${ring!.ringToken}）`,
+      ).toBe(Number.parseFloat(ring!.ringToken));
       expect(
-        ring!.composerOutlineStyle,
-        '外层 composer 也画了 outline ⇒ 输入区出现嵌套双框（这条判据防的就是它）',
-      ).toBe('none');
+        visibleFocusRing(ring!.composer),
+        `外层 composer 也画了一枚焦点环（${ring!.composer.outlineStyle} / ${ring!.composer.boxShadow}）`
+          + ' ⇒ 输入区出现嵌套双框（这条判据防的就是它）',
+      ).toBeNull();
       await expect(input).toHaveCSS('border-top-width', '0px');
       await page.screenshot({ path: `${evidence}/${theme}-${target}.png` });
     }

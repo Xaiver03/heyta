@@ -24,6 +24,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { visibleFocusRing } from './focus-ring';
 import { assertFormRhythm, openApp, switchView } from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
@@ -195,20 +196,60 @@ test('S6 键盘焦点必须画得出来，且环对底色 ≥ 3:1（WCAG 2.4.7 +
       const lb = luminance(b);
       return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
     };
+    const colorProbe = document.createElement('span');
+    colorProbe.style.cssText = 'position:absolute;visibility:hidden;color:var(--ht-color-ring)';
+    document.body.appendChild(colorProbe);
+    const ringColor = getComputedStyle(colorProbe).color;
+    colorProbe.remove();
     return {
-      outlineWidth: parseFloat(cs.outlineWidth),
       outlineStyle: cs.outlineStyle,
-      ratio: ratio(parse(cs.outlineColor), parse(cs.backgroundColor)),
+      outlineWidth: cs.outlineWidth,
+      outlineColor: cs.outlineColor,
+      outlineOffset: cs.outlineOffset,
+      boxShadow: cs.boxShadow,
+      backgroundColor: cs.backgroundColor,
+      ringColor,
     };
   });
+
+  /*
+   * 🔴 2026-11-03 改读数来源（**不是放宽**）：这条原来量 `outline-style` / `outline-width`
+   * 与 `outlineColor`。输入类控件的环同一天换成了 `box-shadow` —— 理由是 WebKit 的
+   * `outline` 不跟随 `border-radius`（圆角一上就露出方框，产品负责人原话：
+   * 「为什么这个对话框还是没有圆角？」）。所以"环宽"与"环色"改从共用判据
+   * `./focus-ring` 取：两种形态都认，`box-shadow` 那一支必须是
+   * `0 0 0 Npx --ht-color-ring` 这一种形状（装饰投影不算环，牙齿在这一条上）。
+   *
+   * 判的东西一点没松：环要**有厚度**，而且要**够亮**（WCAG 1.4.11 的 3:1）。
+   * 对比度仍是"环色 vs 这个控件自己的底色"—— 与改前同一对量，只是环色不再从
+   * `outline-color` 取。
+   */
+  const visible = visibleFocusRing(ring);
 
   // 🔴 两条一起判：环既要有厚度，也要够亮。
   //    改前 `borderless-controls.css` 用 `:focus { outline: 0 !important }` 把**所有
   //    输入框**的焦点环抹掉了 —— 全仓零可见焦点，而没有任何判据能发现。
-  expect(ring.outlineStyle, '焦点环被抹掉了（outline-style = none）').not.toBe('none');
-  expect(ring.outlineWidth, `焦点环宽度 ${ring.outlineWidth}px 太细`).toBeGreaterThanOrEqual(1);
   expect(
-    Math.round(ring.ratio * 100) / 100,
-    `焦点环对比只有 ${ring.ratio.toFixed(2)}:1，WCAG 1.4.11 要求 ≥ 3:1`,
+    visible,
+    `焦点环被抹掉了（outline 与 box-shadow 两种形态都没量到）：读数 ${JSON.stringify(ring)}`,
+  ).not.toBeNull();
+  expect(visible!.widthPx, `焦点环宽度 ${String(visible!.widthPx)}px 太细`).toBeGreaterThanOrEqual(1);
+  const parse = (value: string): [number, number, number] => {
+    const parts = value.match(/[\d.]+/g) ?? ['0', '0', '0'];
+    return [Number(parts[0]), Number(parts[1]), Number(parts[2])];
+  };
+  const channel = (c: number): number => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = ([r, g, b]: [number, number, number]): number =>
+    0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  const la = luminance(parse(visible!.color));
+  const lb = luminance(parse(ring.backgroundColor));
+  const contrast = (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  expect(
+    Math.round(contrast * 100) / 100,
+    `焦点环对比只有 ${contrast.toFixed(2)}:1，WCAG 1.4.11 要求 ≥ 3:1`
+      + `（环色 ${visible!.color} / 底色 ${ring.backgroundColor}）`,
   ).toBeGreaterThanOrEqual(3);
 });

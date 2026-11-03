@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
+import { decorativeShadowLayers, visibleFocusRing } from './focus-ring';
 import { openApp, switchTheme, switchView } from './helpers';
 
 const out = fileURLToPath(new URL('../../apps/web/evidence/borderless-ux', import.meta.url));
@@ -30,23 +31,47 @@ test('无描边搜索、键盘结果导航与连续月历在深浅和窄屏可�
        * 补回了可见焦点环（WCAG 2.4.7 Focus Visible / 1.4.11 Boundaries，注释里写明它顶着
        * "无描边"观感）。所以现在焦点框**就该有** 2px 主色环，没有才是缺陷。
        * 这条用例要守的仍是"无描边"：**面板/边框**不许画（下面两条照旧），
-       * 而焦点指示必须看得见（改成量"环 = 全局 token 且 style ≠ none"）。
+       * 而焦点指示必须看得见。
+       *
+       * 🔴 2026-11-03 再改一处（同一件事，换了机制）：环从 `outline` 换成了 `box-shadow`
+       * （WebKit 的 `outline` 不跟随 `border-radius`）。所以这里不再量 `outline-*`，
+       * 而是用共用判据 `./focus-ring`：两种形态都认，环宽仍必须等于全局那条 token。
+       * 原来的 `expect(appearance.shadow).toBe('none')`（"输入框一点阴影都不许画"）
+       * 也随之过期 —— 阴影现在是**环本身**。它防的事改成：除了环公式那一种形状
+       * （`0 0 0 Npx`），不许出现任何带偏移/模糊的装饰投影。
        */
       const appearance = await input.evaluate(el => {
         const s = getComputedStyle(el);
+        const ringProbe = document.createElement('span');
+        ringProbe.style.cssText = 'position:absolute;visibility:hidden;color:var(--ht-color-ring)';
+        document.body.appendChild(ringProbe);
+        const ringColor = getComputedStyle(ringProbe).color;
+        ringProbe.remove();
         return {
           outline: s.outlineWidth,
           outlineStyle: s.outlineStyle,
+          outlineColor: s.outlineColor,
+          outlineOffset: s.outlineOffset,
           ring: getComputedStyle(document.documentElement).getPropertyValue('--ht-border-width-thick').trim(),
           border: s.borderTopWidth,
           borderColor: s.borderTopColor,
-          shadow: s.boxShadow,
+          boxShadow: s.boxShadow,
           caret: s.caretColor,
+          backgroundColor: s.backgroundColor,
+          ringColor,
         };
       });
-      expect(appearance.outlineStyle, '焦点环被改成 none ⇒ 键盘用户看不出焦点在哪').not.toBe('none');
-      expect(appearance.outline, '焦点环宽度必须等于全局那条 token').toBe(appearance.ring);
-      expect(appearance.shadow).toBe('none');
+      const ring = visibleFocusRing(appearance);
+      expect(
+        ring,
+        `焦点环不见了 ⇒ 键盘用户看不出焦点在哪（WCAG 2.4.7）。判据接受 outline 与 box-shadow `
+          + `两种形态，读数 ${JSON.stringify(appearance)}`,
+      ).not.toBeNull();
+      expect(ring!.widthPx, '焦点环宽度必须等于全局那条 token').toBe(Number.parseFloat(appearance.ring));
+      expect(
+        decorativeShadowLayers(appearance.boxShadow),
+        '输入框上出现了焦点环以外的装饰投影（环公式只有 `0 0 0 Npx` 这一种形状）',
+      ).toEqual([]);
       expect(appearance.border === '0px' || appearance.borderColor === 'rgba(0, 0, 0, 0)').toBe(true);
       await input.press('ArrowDown');
       await page.screenshot({ path: `${out}/search-${width}-${theme}.png` });
