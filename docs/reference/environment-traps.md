@@ -12741,3 +12741,37 @@ react-native-web / 共享包依赖。实测单文件 26 条用例：
 
     **元教训**：像素判据只在**先用框定过位置之后**才可用；
     而任何"数出现次数"的判据，都要先问一句**这个产物会不会把字符串去重**。
+
+636. 🔴 **`tar xzf` 覆盖不透删除：部署机上的源码目录留着上一轮的陈尸，而字节对账是绿的**（2026-11-03，生产镜像连续三次构建失败）：
+
+    `deploy-ssh.mjs` 的送达段原来是 `mkdir -p $DIR/src` + `tar xzf src.tar.gz -C src`。
+    `tar` 只**覆盖**同名文件，**不删**上一轮存在、这一轮已经删掉的文件 ——
+    于是 `sha256` 那条对账（本地 tar == 远端 tar）**完美通过**，
+    而 `~/heyta/src` 里躺着上一次部署时的 `apps/web/src/features/ai/AiCapture.tsx`
+    与 `features/sync/avatar-key.ts`（两者在 HEAD 上早已删除）。
+    Docker 读的是**那棵脏树**，报出来的错是：
+    `AiCapture.tsx(649,93): '"web.ai.capture.noteTail"' is not assignable to parameter`
+    与 `avatar-key.ts(32,10): Module '"@heyta/app-host"' has no exported member 'resolveAvatarKey'`
+    —— 读起来完全是"这批代码编译不过"，而**代码是对的**。最坏的一格是：每次重跑都
+    换了两个文件名，于是"每次都红在别处"又被误读成"并行轨道在改树"。
+
+    修法两条，都要有：清理（`rm -rf $DIR/src` 之后再解包）**和**一条树级判据
+    （`comm -13 <tar 清单> <解出来的文件清单>` 必须为空，任何一行都是陈尸）。
+    只加清理不加判据，下一次有人改回"复用目录"时症状会原样回来。
+
+    **元教训**：这条与 #82（"远端的字节 = 本地当前工作树"）是**两种不同的对账**。
+    #82 说的是"送出去的东西对不对"，这一条说的是"收件箱里还有没有别的东西"。
+    **字节一致 ≠ 树一致**；凡是"解包/同步到一个长期存在的目录"，都要单独判一次树。
+
+637. ⚠️ **`pnpm check` 的 `pnpm build` 会继承 `apps/web/tsconfig.tsbuildinfo`，于是"从零编译不过"可以被藏很久**（2026-11-03，由上面那条顺出来的第二层）：
+
+    同一个提交：本机 `pnpm check` 的 `pnpm build` 绿，Docker 里 `tsc -b` 红。
+    差别只有一个 —— Docker 里没有 `tsbuildinfo`。`tsc -b` 判"没变"就跳过重编，
+    而"没变"是按**产物时间戳与文件列表**判的，**不保证上一次编译真的成功过**
+    （一次 `--force` 之外的增量成功后，后续的成员增删可能不触发重编）。
+
+    ⇒ 判断"这批代码能不能构建"时，唯一可信的动作是 `npx tsc -b --force`
+    （或在一个没有 `tsbuildinfo` 的干净检出里构建）。
+    本仓踩过两次：一次是 `JPEG_MATTE_COLOR` 的**生产者没入库**（消费者已入库存），
+    一次是 `AiFeature` 少一个成员而 web 仍按成员用它。
+    两次在 `pnpm check` 里都是绿的。
