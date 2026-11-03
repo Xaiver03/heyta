@@ -52,6 +52,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom';
 import { isUndoableDeletion, resolveDangerTier } from '@heyta/domain';
 import { closePolicyOf, dismissActionFor } from '@heyta/ui';
+import { useMenuKeyboard } from '../../lib/menu/useMenuKeyboard.js';
 import { useI18n } from '@heyta/i18n';
 
 import './task-row-menu.css';
@@ -171,41 +172,35 @@ export function TaskRowMenu({
     };
   }, [onClose]);
 
-  const items = (): HTMLElement[] =>
-    [...(panelRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])].filter(
-      (el) => !el.hasAttribute('disabled'),
-    );
-
-  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      closeIfAllowed('escape');
-      return;
-    }
-    /*
-     * Tab 走人 = 这一层跟着收。菜单不是模态，焦点不该被关在里面；
-     * 留在背后那种"看得见但焦点不在"的状态比关掉更让人困惑。
-     */
-    if (event.key === 'Tab') {
-      onClose();
-      return;
-    }
-    const list = items();
-    if (list.length === 0) return;
-    const current = list.indexOf(document.activeElement as HTMLElement);
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      const delta = event.key === 'ArrowDown' ? 1 : -1;
-      const next = (current + delta + list.length) % list.length;
-      list[next]?.focus();
-      return;
-    }
-    if (event.key === 'Home' || event.key === 'End') {
-      event.preventDefault();
-      (event.key === 'Home' ? list[0] : list[list.length - 1])?.focus();
-    }
-  };
+  /**
+   * 键盘：**交给全仓唯一那份判断**（`packages/ui/src/control/menu.ts` +
+   * `lib/menu/useMenuKeyboard.ts`）。
+   *
+   * 🔴 这里原本是**第四份**手写键盘模型：只认 Escape / Tab / 上下 / Home-End，
+   * 没有类型查找、没有环绕（`menuActionOf` 的 `focus` 动作自带环绕），
+   * 而且三枚菜单项都**没有** `tabIndex={-1}` —— 于是 Tab 会走进菜单而菜单还开着
+   * （`check:menu-keyboard` 的 M1/M2 两格各红一次）。
+   *
+   * 关闭仍然走 `closeIfAllowed`：共享判断只给出"要不要还焦点"，
+   * **这一层的关闭策略是查表来的**（`closePolicyOf('menu')`），不是它的事。
+   * `refocusTrigger` 恰好就是"Esc（还焦点）"与"Tab（去下一枚控件，不还）"的分界，
+   * 所以两者用同一个布尔分开，不会把 Tab 也当成 Esc 处理。
+   */
+  const noTriggerRef = useRef<HTMLElement | null>(null);
+  const onKeyDown = useMenuKeyboard({
+    open: true,
+    containerRef: panelRef,
+    triggerRef: noTriggerRef,
+    itemSelector: '[role="menuitem"]',
+    // 焦点进入由上面那条既有 `useEffect` 负责（它按"第一枚"取，与共享常量同值）。
+    focusOnOpen: false,
+    // 焦点归还由宿主做（它才知道是哪一行触发的菜单），见文件头那段说明。
+    focusTrigger: () => {},
+    onClose: ({ refocusTrigger }) => {
+      if (refocusTrigger) closeIfAllowed('escape');
+      else onClose();
+    },
+  });
 
   const runDelete = (): void => {
     if (deleteNeedsConfirm && !confirming) {
@@ -227,6 +222,7 @@ export function TaskRowMenu({
       <button
         type="button"
         role="menuitem"
+        tabIndex={-1}
         className="ht-row-menu__item"
         data-testid="task-row-menu-open"
         onClick={() => {
@@ -249,6 +245,7 @@ export function TaskRowMenu({
       <button
         type="button"
         role="menuitem"
+        tabIndex={-1}
         className="ht-row-menu__item ht-row-menu__item--danger"
         data-testid="task-row-menu-delete"
         onClick={runDelete}
@@ -260,6 +257,7 @@ export function TaskRowMenu({
         <button
           type="button"
           role="menuitem"
+          tabIndex={-1}
           className="ht-row-menu__item"
           data-testid="task-row-menu-cancel"
           onClick={() => {

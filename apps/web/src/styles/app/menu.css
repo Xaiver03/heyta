@@ -1,0 +1,126 @@
+/* 锚定菜单（`⋯`）—— 全仓唯一一份。渲染在 `lib/menu/AnchoredMenu.tsx`。
+ *
+ * 🔴 视觉为什么与 rail 的 More 菜单**同一个家族**：它们在用户眼里是同一类东西
+ * （"这里还有一批动作"）。长得不一样的第二枚菜单会让用户以为它是另一种东西。
+ *
+ * 与 `.ht-rail__more-menu` 的差别只有两处，都是几何而不是风格：
+ *   · `min-inline-size` 更宽 —— 页头菜单装的是"排序：默认（按截止时间）"这种长文案，
+ *     rail 那份装的是清单名；
+ *   · 单选型菜单项多一列（勾位），三列栅格固定下来，勾不出现时文案也不会左右跳。 */
+
+.ht-header__menu {
+  position: fixed;
+  inset-inline-start: auto;
+  inset-block-end: auto;
+  z-index: var(--ht-z-popover);
+  display: grid;
+  gap: 0;
+  min-inline-size: calc(var(--ht-touch-target-min) * 4);
+  padding: var(--ht-space-1);
+  /**
+   * 🔴 **必须有描边与投影**（2026-11-02 真浏览器截图抓出来的）。
+   *
+   * 第一版照抄了 rail 那份的 `border: 0` —— 那份贴在深色 rail 旁边，背景色差本身就
+   * 说明了边界；而页头菜单浮在**白底主区**上，`surface-raised` 在亮色主题里与
+   * `background` 几乎同色，于是菜单看起来是"文字直接盖在列表上"，
+   * 连"这是一块可以点的面板"都读不出来。
+   *
+   * 浮层与它下面的内容必须**有边界**，这条在 `overlay-feedback.md` §1 的
+   * 四要素里属于"类"那一格的一部分：popover 不是一个飘着的东西。
+   */
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-lg);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  overflow-y: auto;
+}
+
+.ht-header__menu-item {
+  display: grid;
+  grid-template-columns: var(--ht-icon-sm) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ht-space-2);
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 没有图标的项：第一列留空，文案与有图标的项左缘对齐。
+ * 这一条不是洁癖 —— 对齐破了之后，"排序"两个字的起点会比"选择任务"靠左 20px。 */
+.ht-header__menu-item > .ht-header__menu-label:first-child {
+  grid-column: 1 / span 2;
+}
+
+/* 🔴 **只有 hover 改底色，`:focus-visible` 不在这里。**
+ *
+ * `check:focus-single-source` 钉的是"焦点状态只有一份全局实现"：
+ * 逐族自己写 `:focus-visible` 的背景/文字色，就是让同一枚键在不同控件上
+ * 长得不一样（而那样不会有任何测试红）。焦点环由全局实现给，
+ * 菜单项要做的只是**不覆盖它**。 */
+.ht-header__menu-item:hover:not(:disabled) {
+  background: var(--ht-color-hover);
+}
+
+.ht-header__menu-item:disabled {
+  color: var(--ht-color-disabled-fg);
+  cursor: default;
+}
+
+.ht-header__menu-item--danger {
+  color: var(--ht-color-danger);
+}
+
+.ht-header__menu-item--danger:hover:not(:disabled) {
+  background: var(--ht-color-danger-subtle);
+}
+
+.ht-header__menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-header__menu-label {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 单选型菜单项：勾位常驻（选中时画勾），宽度固定。
+ * 只有选中项画勾、不占位的话，切换档位时整列文案会横跳一下。 */
+.ht-header__menu-item--radio .ht-header__menu-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-icon-xs);
+  block-size: var(--ht-icon-xs);
+}
+
+/* 分组标题（"排序"）。
+ *
+ * 🔴 排版整条来自 `.ht-type-caption`（JSX 一起挂着），这里**只写盒模型与颜色** ——
+ * 自己拼 `2xs + semibold` 会被 `check:design` 判成"档位表外的第二套排版"，
+ * 而那条判据是对的：同一屏出现两套没人登记的字号组合，下一次调整必然只改一处。
+ * 分组标题的语气靠**颜色**（subtle）而不是靠字重压过菜单项。 */
+.ht-header__menu-section {
+  padding: var(--ht-space-2) var(--ht-space-2) var(--ht-space-1);
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-header__menu-separator {
+  block-size: var(--ht-border-width-thin);
+  margin: var(--ht-space-1) var(--ht-space-2);
+  background: var(--ht-color-border-subtle);
+}

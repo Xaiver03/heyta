@@ -67,7 +67,9 @@ describe('一、DOM 形状', () => {
     host = null;
     root = null;
     await mount({ policy: 'modal-readonly', onCancel: () => undefined });
-    expect(dialog()?.className).toBe('ht-web-modal__dialog');
+    // 缺省面板类 2026-11-03 并进 `.ht-app` 族（原来叫 `.ht-web-modal__dialog`）：
+    // `check:row-single-source` 的 `ht-*` 族棘轮只减不增，而弹窗是**应用级浮层**。
+    expect(dialog()?.className).toBe('ht-app__modal-dialog');
   });
 
   it('busy 只在真忙时落 aria-busy —— 不忙时那一格必须**不存在**', async () => {

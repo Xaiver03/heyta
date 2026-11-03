@@ -115,37 +115,77 @@ async function seedThree(): Promise<void> {
   });
 }
 
-/** 选档位。原生 `<select>`：改 `value` 再派发 `change`（React 认这个组合）。 */
-async function pickSort(el: HTMLElement, value: string): Promise<void> {
-  const select = el.querySelector<HTMLSelectElement>('[data-testid="task-sort-select"]')!;
+/**
+ * 点开页头那枚 `⋯`，返回挂出来的菜单。
+ *
+ * 🔴 `document` 而不是 `el`：`AnchoredMenu` 门户到 `body`（页头是 `overflow` 容器，
+ * 挂在里面会被裁掉半截）。所以菜单项**不在**组件容器子树里 —— 拿 `el.querySelector`
+ * 找菜单项会恒为 null，而那条断言会看起来像"功能坏了"。
+ */
+async function openMenu(el: HTMLElement): Promise<HTMLElement> {
+  const trigger = el.querySelector<HTMLElement>('[data-testid="task-menu-open"]');
+  expect(trigger, '任务视图页头必须有一枚 ⋯（排序、选择任务、共享都收在里面）').not.toBeNull();
   await act(async () => {
-    select.value = value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    trigger!.click();
+    await Promise.resolve();
+  });
+  const menu = document.querySelector<HTMLElement>('[data-testid="task-menu"]');
+  expect(menu, '点开 ⋯ 之后菜单必须真的挂出来').not.toBeNull();
+  return menu!;
+}
+
+/** 选档位：走 `⋯` 里的单选组（2026-11-02 起，原来是一枚原生 `<select>`）。 */
+async function pickSort(el: HTMLElement, value: string): Promise<void> {
+  const menu = await openMenu(el);
+  const item = menu.querySelector<HTMLElement>(`[data-testid="task-sort-${value}"]`);
+  expect(item, `菜单里没有档位 ${value}`).not.toBeNull();
+  await act(async () => {
+    item!.click();
+    await Promise.resolve();
   });
 }
 
 describe('任务列表的排序控件', () => {
-  it('🔴 控件带**可见的文字标签**，且长在页头（不是列表上方另起一条）', async () => {
+  /**
+   * 🔴 判据在 2026-11-02 换了形状，**不是放宽**。
+   *
+   * 旧形状钉的是"页头里有一枚带可见文字标签的原生 `<select>`"。那枚控件是
+   * `12px 文字标签 + 44px 带框下拉`，与旁边的图标按钮、ghost 按钮三种控制语法并列；
+   * 而且它 gate 在 `visible.length > 0` 上 —— 空列表时整个消失。
+   *
+   * 新形状钉的是同一件**用户能做的事**：从页头找到排序、看懂每一档、看见当前是哪一档。
+   * 换掉的是形状（收进 `⋯` 的单选组），减掉的是"页头上多一枚常驻下拉"。
+   */
+  it('🔴 排序从页头 `⋯` 可达：三档都在、都是可见文字、当前档位有 aria-checked', async () => {
     await seedThree();
     const el = await mountApp();
-    const toolbar = el.querySelector<HTMLElement>('[data-testid="task-sort"]');
-    expect(toolbar, '任务视图有行时就该有排序控件').not.toBeNull();
-    expect(toolbar!.textContent, '标签文字必须渲染在屏上（只挂 aria-label 不算）').toContain(
-      '排序方式',
-    );
-    // 滴答参照图第三列的页头 = 标题 + 排序 + ⋯。放在列表上方会把第一组的组头
-    // 往下顶一格，而组头本身就是这一列的分区标 —— 两条工具带叠在一起读不出层级。
+
+    // 页头里不再有第二枚带文字标签的控件 —— 这是这一轮的目的，也钉住"别搬回来"。
     expect(
-      toolbar!.closest('header.ht-header'),
-      '排序控件必须在页头里',
-    ).not.toBeNull();
-    const select = toolbar!.querySelector<HTMLSelectElement>('[data-testid="task-sort-select"]');
-    expect(
-      select,
-      '用原生 select：与 SubtaskPicker/TaskOrganizer 一致，暗色下不必自绘弹层',
-    ).not.toBeNull();
-    expect(select!.getAttribute('aria-label')).toBe('排序方式');
-    expect(select!.selectedOptions[0]?.textContent).toBe('默认（按截止时间）');
+      el.querySelector('[data-testid="task-sort"]'),
+      '排序不该再是页头上一枚常驻控件（它已收进 ⋯）',
+    ).toBeNull();
+
+    const menu = await openMenu(el);
+    expect(menu.textContent, '分组标题必须渲染在屏上（只挂 aria-label 不算）').toContain('排序');
+
+    const items = [...menu.querySelectorAll<HTMLElement>('[data-testid^="task-sort-"]')];
+    expect(items.map((item) => item.textContent)).toEqual([
+      '默认（按截止时间）',
+      '按添加时间',
+      '按优先级',
+    ]);
+    // 单选语义：当前档位必须报出来，否则"我现在按什么排"无处可读。
+    expect(items.map((item) => item.getAttribute('role'))).toEqual([
+      'menuitemradio',
+      'menuitemradio',
+      'menuitemradio',
+    ]);
+    expect(items.map((item) => item.getAttribute('aria-checked'))).toEqual([
+      'true',
+      'false',
+      'false',
+    ]);
   });
 
   it('默认档就是领域的 display：插入顺序（无截止 ⇒ 组内稳定原序）', async () => {
@@ -195,8 +235,10 @@ describe('任务列表的排序控件', () => {
     container = undefined;
 
     const again = await mountApp();
-    const select = again.querySelector<HTMLSelectElement>('[data-testid="task-sort-select"]')!;
-    expect(select.value, '重挂后选中项要来自存储').toBe('priority');
+    // 选中项从存储读 —— 读的是菜单里那一项的 `aria-checked`（页头上已没有 select）。
+    const menu = await openMenu(again);
+    const checked = menu.querySelector<HTMLElement>('[aria-checked="true"]');
+    expect(checked?.getAttribute('data-testid'), '重挂后选中项要来自存储').toBe('task-sort-priority');
     expect(rowOrder(again), '重挂后顺序也得是那一档的').toEqual([
       '完成：乙',
       '完成：丙',
@@ -208,23 +250,48 @@ describe('任务列表的排序控件', () => {
     await seedThree();
     localStorage.setItem('heyta.taskSort', '"按心情"');
     const el = await mountApp();
-    const select = el.querySelector<HTMLSelectElement>('[data-testid="task-sort-select"]')!;
-    expect(select.value).toBe('display');
+    const menu = await openMenu(el);
+    const checked = menu.querySelector<HTMLElement>('[aria-checked="true"]');
+    expect(checked?.getAttribute('data-testid')).toBe('task-sort-display');
     expect(rowOrder(el), '非法值不能让列表变空').toHaveLength(3);
   });
 
-  it('一行都没有时不出现排序条（没有可排的东西，就不该有个能点的控件）', async () => {
+  /**
+   * 🔴 **这一条在 2026-11-02 被反着钉了。**
+   *
+   * 旧判据："一行都没有时不出现排序条（没有可排的东西，就不该有个能点的控件）"。
+   * 那条判据的前提是"排序是一枚动作按钮"，而它其实是**视图属性**：
+   * 空列表里用户仍然需要知道"这个清单按什么排"（而且加了任务之后立刻生效的那一档
+   * 就是它）。旧形状下这条判据真正钉住的东西是"别的地方漏了 gate"，
+   * 而不是"用户不需要排序"。
+   *
+   * 新判据钉两件事：`⋯` 在空列表里**仍然在**（入口不随数据条数变形），
+   * 而「选择任务」在空列表里**被禁用而不是消失**（禁用态仍然说明"有这个能力"，
+   * 消失则让用户以为产品没有这个功能）。
+   */
+  it('空列表：`⋯` 仍然在、排序三档仍可选，而「选择任务」是禁用而不是消失', async () => {
     const el = await mountApp();
-    expect(el.querySelector('[data-testid="task-sort"]')).toBeNull();
+    const menu = await openMenu(el);
+    expect(
+      [...menu.querySelectorAll('[data-testid^="task-sort-"]')],
+      '排序是视图属性，不该随数据条数消失',
+    ).toHaveLength(3);
+    const selectItem = menu.querySelector<HTMLButtonElement>('[data-testid="task-select-open"]');
+    expect(selectItem, '没有任务时入口应当还在（说明能力存在）').not.toBeNull();
+    expect(selectItem!.disabled, '没有任务时选不出东西 ⇒ 禁用').toBe(true);
   });
 
   it('批量选择入口只在任务列表里出现，完成后退出选择态', async () => {
     await seedThree();
     const el = await mountApp();
-    const selectButton = [...el.querySelectorAll('button')].find((button) => button.textContent?.includes('选择任务'));
-    expect(selectButton).toBeDefined();
+    // 🔴 入口在 `⋯` 里（2026-11-02 起）。它以前是页头上一枚常驻的「选择任务」按钮 ——
+    // 任何时候都在，而绝大多数时候用户并不在选任务。
+    const menu = await openMenu(el);
+    const selectItem = menu.querySelector<HTMLButtonElement>('[data-testid="task-select-open"]');
+    expect(selectItem, '有任务时「选择任务」必须可用').not.toBeNull();
+    expect(selectItem!.disabled).toBe(false);
     await act(async () => {
-      selectButton?.click();
+      selectItem!.click();
       await Promise.resolve();
     });
     const task = Object.values(useTaskStore.getState().entities.tasks)[0]!;
@@ -248,18 +315,36 @@ describe('任务列表的排序控件', () => {
     expect(complete).toBeDefined();
     await act(async () => {
       complete?.click();
-      await new Promise((resolve) => setTimeout(resolve, 50));
     });
-    expect(useTaskStore.getState().entities.tasks[task.id]?.completedAt).toBeDefined();
-    expect(el.textContent).not.toContain('已选 1 项');
+    /**
+     * 🔴 这里原来是一个**固定 50ms 的 sleep**，然后在下面断言 `completedAt`。
+     * 一条 BATCH op 要过 op-log 与动作层，50ms 在空闲机器上够、在整包并发时不够 ——
+     * 实测同一棵树、同一条用例，全量跑红、单独跑绿。固定 sleep 量的是"机器有多快"，
+     * 不是"批量完成会不会写回"。改成**有界等待**：断言一个字没变，
+     * 只是把"等到它发生"从猜一个数换成等到它真发生（上限 5s）。
+     */
+    await vi.waitFor(
+      () => {
+        expect(useTaskStore.getState().entities.tasks[task.id]?.completedAt).toBeDefined();
+      },
+      { timeout: 5000 },
+    );
+    // 写回与"退出选择态"是**两拍**（后者在 op 落盘之后）：同一份有界等待，不猜时间。
+    await vi.waitFor(
+      () => {
+        expect(el.textContent).not.toContain('已选 1 项');
+      },
+      { timeout: 5000 },
+    );
   });
 
   it('Esc 退出批量选择态并清除已选任务', async () => {
     await seedThree();
     const el = await mountApp();
-    const selectButton = [...el.querySelectorAll('button')].find((button) => button.textContent?.includes('选择任务'))!;
+    const menu = await openMenu(el);
+    const selectItem = menu.querySelector<HTMLButtonElement>('[data-testid="task-select-open"]')!;
     await act(async () => {
-      selectButton.click();
+      selectItem.click();
       await Promise.resolve();
     });
     const task = Object.values(useTaskStore.getState().entities.tasks)[0]!;

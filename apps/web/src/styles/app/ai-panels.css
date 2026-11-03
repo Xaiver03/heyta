@@ -840,6 +840,18 @@ input[type="radio"] {
   margin-block-start: 0;
 }
 
+/* 组织类动作（宿主注入）—— 正文顶端的常驻一行。
+ *
+ * 与 `.ht-ai__suggestions` 分开：建议是**填空**（把一句话塞进输入框），
+ * 这一条是**直接执行**（批排列 + 提案 + 确认）。两者混在同一格里，
+ * 用户会以为"排优先级"也会先问一句。
+ * 不加边框/底色：它是一行动作，不是一块面板 —— 面板套面板是这一屏之前的病。 */
+.ht-ai__org {
+  display: flex;
+  justify-content: flex-start;
+  padding-block-end: var(--ht-space-2);
+}
+
 .ht-ai__suggestions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -931,6 +943,7 @@ input[type="radio"] {
 }
 
 .ht-ai__composer {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
@@ -940,6 +953,25 @@ input[type="radio"] {
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface-sunken);
   box-shadow: var(--ht-shadow-sm);
+}
+
+/* 输入框内部左下角的那枚附件图标（2026-11-02）。
+ *
+ * 🔴 它不再是一个"独立的附件区"：框是输入框本身，图标只是框里的一枚。
+ * 绝对定位 + 给 textarea 让出 padding，是这个形状唯一稳的写法 ——
+ * 换成在框上方另起一行，就回到了被否掉的那个版本。 */
+.ht-ai__composer-action {
+  position: absolute;
+  inset-inline-start: var(--ht-space-1);
+  inset-block-end: var(--ht-space-1);
+  display: inline-flex;
+  align-items: center;
+}
+
+.ht-ai__composer:has(.ht-ai__composer-action) .ht-ai__input {
+  padding-inline-start: calc(
+    var(--ht-size-field-padding-x) + var(--ht-icon-sm) + var(--ht-space-2)
+  );
 }
 
 .ht-ai__input {

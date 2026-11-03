@@ -1,5 +1,5 @@
 import { AssistantIcon } from './AssistantIcon.js';
-import { ImageAttach } from './ImageAttach.js';
+import { useImageAttach } from './ImageAttach.js';
 import type { EncodedImage } from './image-encode.js';
 import { MentionChips, MentionPicker } from './MentionPicker.js';
 import './mention.css';
@@ -100,7 +100,8 @@ import type { LocalApiHost } from '@heyta/local-api';
 import { AiDisclosureHost } from './AiDisclosureHost.js';
 import { AiPanelHeadHost } from './AiPanelHeadHost.js';
 import { AiPanelHost } from './AiPanelHost.js';
-import { AiGeneratedLabel, EmptyState, HeytaUiProvider } from '@heyta/ui';
+import { AiCapture, type CaptureApplyFields } from './AiCapture.js';
+import { AiGeneratedLabel, EmptyState, HeytaUiProvider, toAiCaptureSubmitPlan } from '@heyta/ui';
 import { assistantFailureCopy } from './ai-failure-copy.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import { FailureSettingsAction } from './RouteUnavailable.js';
@@ -361,6 +362,18 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
    * 与捕获那条同一条纪律（ADR-0005「AI 是输入法」—— 输入法不存你打的字）。
    */
   const [images, setImages] = useState<readonly EncodedImage[]>([]);
+
+  /**
+   * 附件：图标进输入框内部左下角，缩略图落在字段下方（与任务列同一套形状）。
+   * `pasteScope` 用对话根，别抢任务列与搜索框的粘贴。
+   */
+  const attach = useImageAttach({
+    images,
+    onChange: setImages,
+    disabled: phase === 'running',
+    pasteScope: '[data-heyta-chat-root]',
+    testIdPrefix: 'chat-attach',
+  });
   const plan = planAssistantEgress({ hasImages: images.length > 0 });
 
   // ── `@` 提及 ────────────────────────────────────────────────────────────
@@ -417,6 +430,46 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   // 🔴 助手**不是**第 6 个 `AiFeature`：它就是 `tool-calling` 的多步形态
   //（见 ADR-0045 §2.1）。所以目的地、能力缺口、熔断都按 `tool-calling` 算。
   const { target, explanation } = resolveFeatureRoute(props.routing, 'tool-calling', { health });
+  /**
+   * 🔴 「一句话解析」并进助手（2026-11 产品裁决）。
+   *
+   * 它原来挂在**任务输入框下面**：每次新建任务时都能看见一枚「AI 捕获」按钮。
+   * 用户的判断是那枚按钮"很突兀"——它是 AI 的能力，不该占着采集框的位置，
+   * 而 AI 在界面上只有一个地方：右边这个助手。
+   *
+   * 所以它搬到这里，而且**不新增任何产品入口**：不加侧栏项、不加导航、
+   * 不另起名字。它就是助手自己的一个动作，出现在助手输入框下面。
+   *
+   * ⚠️ 入口仍然由**设置里那几道闸**决定（总开关 + 逐功能勾端点 + 端点可用）：
+   * 没给「一句话解析」配端点的人，看到的是一个没有任何多余按钮的助手。
+   * 判据复用设置页同一个解析器，不另写一套"看起来配了"。
+   *
+   * ⚠️ 这张面板**不能删**，哪怕它看起来只是一个小入口：
+   * 助手对**自由文本**是按设计只读的（见 `ai-tool-selection.ts`：
+   * "从自由文本里抽任务标题是 `capture.ts` 的工作"），所以它是"一句人话 → 任务"
+   * 唯一的模型通路；`check:ai-coverage` 在 web 端认的 `capture` 入口也是它。
+   */
+  const captureTarget = resolveFeatureRoute(props.routing, 'capture', { health }).target;
+  const addTask = useTaskStore((state) => state.addTask);
+
+  /**
+   * 捕获候选确认后落库。
+   *
+   * 🔴 走 `toAiCaptureSubmitPlan`（共享层）而不是自己拼 epoch：模型给的是
+   * **本地日期时间串**，而 `Task.dueDate` 是 epoch ms，中间那一刀时区换算
+   * 只允许有一处。自己再算一遍 = 第二套裁决，而它会和任务列上的显示差一天。
+   */
+  async function applyCapture(fields: CaptureApplyFields): Promise<void> {
+    const plan = toAiCaptureSubmitPlan(fields);
+    await addTask(plan.title, {
+      ...(plan.dueDate === undefined ? {} : { dueDate: plan.dueDate }),
+      ...(plan.priority === undefined ? {} : { priority: plan.priority }),
+    });
+    // 与任务输入框那条同一个收尾：落库之后把输入框清掉，
+    // 否则同一句话再按一次回车会建出第二条。
+    setDraft('');
+    setImages([]);
+  }
   const disclosure =
     target === undefined
       ? undefined
@@ -645,13 +698,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
       没有它，贴图会在别处把用户的图片吃掉。
     */
     <div className="ht-ai__attach-stack" data-heyta-chat-root="">
-      <ImageAttach
-        images={images}
-        onChange={setImages}
-        disabled={phase === 'running'}
-        pasteScope="[data-heyta-chat-root]"
-        testIdPrefix="chat-attach"
-      />
+      {attach.thumbs}
       <MentionChips segments={mentionSegmentsOfDraft} resolve={lookupMention} />
       <MentionPicker
         candidates={mentionList}
@@ -660,6 +707,8 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         onHover={setMentionIndex}
       />
       <div className="ht-ai__composer">
+      {/* 附件图标住在输入框**内部左下角**（框是唯一的框，图标只是它里面的一枚）。 */}
+      <span className="ht-ai__composer-action">{attach.picker}</span>
       <textarea
         ref={composerRef}
         className="ht-input ht-ai__input"
@@ -722,6 +771,26 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         <span className="sr-only">{t('web.ai.chat.send')}</span>
       </button>
       </div>
+      {/*
+        「一句话解析」的落点（见上面 `captureTarget` 那段）。
+
+        🔴 它**只在两个条件下出现**：这个功能真的配了端点、而输入框里确实有字。
+        空输入框上挂一个"AI 解析"按钮，点下去必然失败 —— 那是制造一次注定报错的交互。
+        「一个字都没打、只贴了图」也算有内容：截图转任务走的正是这条路。
+      */}
+      {captureTarget !== undefined && (draft.trim() !== '' || images.length > 0) ? (
+        <AiCapture
+          text={draft}
+          images={images.map((image) => ({ mediaType: image.mediaType, base64: image.base64 }))}
+          routing={props.routing}
+          consents={props.consents}
+          secrets={props.secrets}
+          {...(props.healthSnapshot === undefined ? {} : { healthSnapshot: props.healthSnapshot })}
+          onApply={applyCapture}
+          onOpenSettings={onOpenSettings}
+          {...(props.onHealth === undefined ? {} : { onHealth: props.onHealth })}
+        />
+      ) : null}
     </div>
   );
 

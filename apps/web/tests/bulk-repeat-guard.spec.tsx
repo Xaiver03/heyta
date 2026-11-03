@@ -67,8 +67,13 @@ describe('批量完成的重复任务保护', () => {
     });
     await flush();
 
-    const toolbar = container.querySelector('[data-testid="bulk-toolbar"]')!;
-    (toolbar.querySelector('button') as HTMLButtonElement).click();
+    // 🔴 批量模式只能从页头 `⋯` 进（2026-11-02 起）。它以前是页头上一枚常驻的
+    // 「选择任务」按钮 —— 这里原来点的是 `bulk-toolbar` 里的第一个 button。
+    const menuTrigger = container.querySelector<HTMLButtonElement>('[data-testid="task-menu-open"]')!;
+    menuTrigger.click();
+    await flush();
+    const selectItem = document.querySelector<HTMLButtonElement>('[data-testid="task-select-open"]')!;
+    selectItem.click();
     await flush();
     (container.querySelector(`[data-testid="bulk-select-${repeatedId}"]`) as HTMLElement).click();
     (container.querySelector(`[data-testid="bulk-select-${normalId}"]`) as HTMLElement).click();

@@ -14,6 +14,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useShallow } from 'zustand/react/shallow';
 import {
   ArrowLeft,
+  ListChecks,
+  MoreHorizontal,
   PanelLeft,
   Moon,
   PanelRightClose,
@@ -184,6 +186,7 @@ import { NotesView } from './features/notes/NotesView.js';
 import { NoteEditorCard } from './features/notes/NoteEditorCard.js';
 import { TaskDetailCard } from './features/tasks/TaskDetailCard.js';
 import { useDetailColumnShown } from './features/shell/detail-pane-visible.js';
+import { AnchoredMenu, MenuItem, MenuSection, MenuSeparator } from './lib/menu/AnchoredMenu.js';
 import { ReminderBadge } from './features/reminders/ReminderPanel.js';
 import { TimelinePanel } from './features/timeline/TimelinePanel.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
@@ -534,6 +537,17 @@ export function App(): React.JSX.Element {
    * 真正的批量写入由 app-host 生成一条 BATCH op，列表这里只负责选择与反馈。
    */
   const [bulkSelecting, setBulkSelecting] = useState(false);
+  /**
+   * 页头那枚 `⋯`（2026-11-02）。
+   *
+   * 🔴 它存在的理由是**减法**：在这之前页头平铺着 9 个可交互控件
+   * （分享 / 选择任务 / 完成 / 重复警告 / 撤销 / 排序标签 / 排序下拉 / 助手 / 详情开关），
+   * 而且排序那个还是 `12px 文字 + 44px 原生 select` 的混合体、空列表时整个消失。
+   * 一个功能一个控件的界面，每加一个功能就必然更乱 —— 收进这一枚之后，
+   * 页头右侧只剩「图标按钮 + ⋯」，加功能不再改变页头形状。
+   */
+  const [taskMenuOpen, setTaskMenuOpen] = useState(false);
+  const taskMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -1241,7 +1255,6 @@ export function App(): React.JSX.Element {
   const [compactAssistantOpen, setCompactAssistantOpen] = useState(false);
   const [assistantExpanded, setAssistantExpanded] = useState(false);
   const assistantWorkspace = assistantExpanded && view === 'tasks';
-  const assistantTriggerRef = useRef<HTMLButtonElement>(null);
   const assistantOverlay = !assistantWorkspace && compactAssistantOpen && !detailColumnShown && contentView === 'tasks' && view !== 'settings';
   useEffect(() => {
     if (detailColumnShown || contentView !== 'tasks' || view === 'settings') setCompactAssistantOpen(false);
@@ -2297,6 +2310,55 @@ export function App(): React.JSX.Element {
 
 
   /**
+   * 「AI 排优先级」这一枚组织类动作（2026-11-02 搬进对话助手）。
+   *
+   * 🔴 它原来渲染在**任务列表上方**，长得像一行任务（`ht-btn--ghost` 铺满整列 + 图标），
+   * 位置在一组组头与任务行之间。产品负责人的裁决是"AI 排优先级应该直接在对话助手里面有，
+   * 而不是放在这个地方" —— 这一版兑现它。
+   *
+   * 为什么搬得动、而上一版只搬了 `AiBreakdown`：这两件事的**范围**不同。
+   * `AiBreakdown` 拆的是**一条**任务（属于任务详情的自动化槽），
+   * 这一枚排的是**当前清单**（属于"我跟助手说一句"这件事）。上一版拿
+   * "它是批量的" 当理由把它留在列表里，那个理由说明的是"它不能进单条任务详情"，
+   * 不说明"它该待在列表体中间"。
+   *
+   * ⚠️ 配置关着时它**仍然在**（与 `AiBreakdown` 同一条）：点了会说明该去开什么，
+   * 而不是消失 —— "找不到入口"和"入口说为什么不可用"是两件事。
+   */
+  const aiPrioritizeAction = visible.length > 0 ? (
+    <AiPrioritize
+      tasks={visible}
+      routing={aiRouting}
+      consents={aiSettings.consents}
+      secrets={aiSecrets}
+      // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
+      healthSnapshot={aiSettings.health}
+      // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
+      preferenceSet={memory.preferenceSet}
+      /**
+       * 🔴 只写用户勾选保留的那些（`decisions` 已经是取舍后的结果），
+       * 并把整批交给一个动作层意图：一条 BATCH op 同时携带每条任务各自的优先级。
+       * 这样它能同步到别的设备，也不会留下半批已写、半批未写的中间态。
+      */
+      onApply={async (decisions) => {
+        await store.bulkSetPriorities(decisions);
+      }}
+      onHealth={(health) => {
+        // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
+        // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
+        setAiSettings((previous) => {
+          const next = {
+            ...previous,
+            health: toHealthSnapshot(health, Date.now()),
+          };
+          saveAiSettings(next);
+          return next;
+        });
+      }}
+    />
+  ) : null;
+
+  /**
    * AI 面：**一个 Agent，一个聊天入口**。
    *
    * 工具调用是 Agent 的内部执行过程，不再作为与会话并列的产品面板展示。
@@ -2304,7 +2366,9 @@ export function App(): React.JSX.Element {
    * 写入仍然遵守提案 → 用户确认的安全边界，工具目录与授权继续留在设置里。
    * 这一份 JSX 同时是右栏内容与窄屏回退内容，挂载点不变，未决披露状态也不丢。
    *
-   * ⚠️ `AiPrioritize` **不在这里**：它是批量比较建议，仍留在任务列表上方。
+   * 🔴 组织类动作（`aiPrioritizeAction`）经 `orgActions` 插进这一份，
+   * 挂在**会话上方、常驻**（不是空态的一部分）：它是有状态的流程，
+   * 一有对话就消失的入口等于"用一次就找不到第二次"。
    */
   const aiPanels = (
     contentView === 'tasks' ? (
@@ -2318,6 +2382,7 @@ export function App(): React.JSX.Element {
             secrets={aiSecrets}
             memoryEnabled={aiSettings.memoryEnabled}
             getDurationPreferenceHints={getDurationPreferenceHints}
+            orgActions={aiPrioritizeAction}
             healthSnapshot={aiSettings.health}
             onHealth={(health) => {
               setAiSettings((previous) => {
@@ -2634,116 +2699,102 @@ export function App(): React.JSX.Element {
           */}
           <div className="ht-header__actions">
             {/*
-              共享清单入口（ADR-0062 W4）：只停在**自己的清单**上时出现 ——
-              智能清单（今天/收集箱…）不是"存放位置"，共享无从谈起。
-              已共享的清单换 aria-label（管理共享 vs 共享此清单），图标相同：
-              入口稳定、状态用文案说。
+              🔴 2026-11-02：这里原本平铺着 9 个控件，现在只剩「图标按钮 + 一枚 `⋯`」。
 
-              这道入口**不再**藏在实验开关后面：P-1 那条降级（内容面到不了用户眼前 ⇒
-              入口先按住）的翻案条件在 2026-10-23 由 `verify:collab-journey` 的
-              "两台真浏览器互见"那一格满足并验过（读数见计划 §9.11）。
-              判据反过来钉"可达"：`check:share-entry-visible`（源码层）+
-              `apps/web/tests/share-entry-visible.spec.tsx`（行为层）+ 旅程里那枚默认态断言。
+              搬走的三件与它们的现居地：
+                · 共享清单入口 → `⋯` 里的 `share-open-button`（低频动作：建清单时点一次，
+                  却常年占着页头一份横向空间）；
+                · 排序（`12px 文字 + 44px 原生 select` 的混合体）→ `⋯` 里的单选组；
+                · 「选择任务」→ `⋯` 里的一项，**进入批量模式**之后才由下面对那段渲染。
+              判据一条没放宽，只是换了位置：`check:share-entry-visible` 仍钉入口可达、
+              `task-sort.spec.tsx` 改钉"排序可从页头 `⋯` 到达"，理由写在那两份文件里。
             */}
-            {currentProject !== undefined && syncConfigured ? (
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
-                data-testid="share-open-button"
-                aria-label={currentProject.shareId === undefined ? t('web.share.open.new') : t('web.share.open.manage')}
-                onClick={() => {
-                  setShareDialog({ projectId: currentProject.id, shareId: currentProject.shareId });
-                }}
-              >
-                <Users size={ICON_SIZE.sm} aria-hidden="true" />
-                <span>{t('web.share.open.label')}</span>
-              </button>
-            ) : null}
-            {view === 'tasks' && visible.length > 0 ? (
-              <div
-                style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.2'), flexWrap: 'wrap' }}
-                data-testid="bulk-toolbar"
-              >
+            {/*
+              🔴 批量选择是**模式**，不是一枚常驻控件。
+              原来它常驻：非模式态下页头也画着「选择任务」，与排序下拉、分享按钮并列 ——
+              于是用户在任何时刻都在看一组自己没在用的控件，而每加一个功能页头就更长一寸。
+              现在非模式态这里什么都没有；进入模式的动作在 `⋯` 里（`task-select-open`）。
+            */}
+            {view === 'tasks' && bulkSelecting ? (
+              <div className="ht-header__bulk" data-testid="bulk-toolbar" role="group" aria-label={t('web.shell.bulk.select')}>
+                <span className="ht-type-caption" role="status">
+                  {t('web.shell.bulk.selected', { count: selectedTaskIds.size })}
+                </span>
                 <button
                   type="button"
                   className="ht-btn ht-btn--ghost"
-                  aria-pressed={bulkSelecting}
-                  onClick={() => {
-                    if (bulkSelecting) clearBulkSelection();
-                    else setBulkSelecting(true);
+                  disabled={selectedTaskIds.size === 0 || selectedHasRepeat}
+                  data-testid="bulk-complete"
+                  aria-describedby={selectedHasRepeat ? 'bulk-repeat-warning' : undefined}
+                  onClick={() => void runBulkAction('complete')}
+                >
+                  {t('web.shell.bulk.complete')}
+                </button>
+                {selectedHasRepeat ? (
+                  <span
+                    id="bulk-repeat-warning"
+                    className="ht-type-caption ht-settings__hint"
+                    role="status"
+                    data-testid="bulk-repeat-warning"
+                  >
+                    {t('web.shell.bulk.repeatNotice')}
+                  </span>
+                ) : null}
+                <select
+                  aria-label={t('web.shell.bulk.move')}
+                  disabled={selectedTaskIds.size === 0 || bulkMoveNowhere}
+                  defaultValue=""
+                  onChange={(event) => {
+                    if (event.target.value === '') return;
+                    void runBulkAction('move', event.target.value === '__inbox__' ? undefined : event.target.value);
+                    event.currentTarget.value = '';
+                  }}
+                  style={{
+                    minHeight: cssVar('touch-target.min'),
+                    paddingInline: cssVar('space.2'),
+                    borderRadius: cssVar('radius.md'),
+                    border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
+                    background: cssVar('color.background'),
+                    color: cssVar('color.foreground'),
+                    fontSize: cssVar('font-size.sm'),
                   }}
                 >
-                  {bulkSelecting ? t('web.shell.bulk.cancel') : t('web.shell.bulk.select')}
+                  <option value="">{t('web.shell.bulk.move')}</option>
+                  <option value="__inbox__" disabled={bulkMoveBlocked(undefined)}>
+                    {t('web.shell.bulk.moveInbox')}
+                  </option>
+                  {projects.projects.map((project) => (
+                    <option
+                      key={project.id}
+                      value={project.id}
+                      disabled={bulkMoveBlocked(project.id)}
+                      title={bulkMoveBlocked(project.id) ? t('web.organize.moveBlockedShared') : undefined}
+                    >
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="ht-btn ht-btn--danger"
+                  disabled={selectedTaskIds.size === 0}
+                  data-testid="bulk-delete"
+                  onClick={() => void runBulkAction('delete')}
+                >
+                  {t('web.shell.bulk.delete')}
                 </button>
-                {bulkSelecting ? (
-                  <>
-                    <span className="ht-type-caption" role="status">
-                      {t('web.shell.bulk.selected', { count: selectedTaskIds.size })}
-                    </span>
-                    <button
-                      type="button"
-                      className="ht-btn ht-btn--ghost"
-                      disabled={selectedTaskIds.size === 0 || selectedHasRepeat}
-                      data-testid="bulk-complete"
-                      aria-describedby={selectedHasRepeat ? 'bulk-repeat-warning' : undefined}
-                      onClick={() => void runBulkAction('complete')}
-                    >
-                      {t('web.shell.bulk.complete')}
-                    </button>
-                    {selectedHasRepeat ? (
-                      <span
-                        id="bulk-repeat-warning"
-                        className="ht-type-caption ht-settings__hint"
-                        role="status"
-                        data-testid="bulk-repeat-warning"
-                      >
-                        {t('web.shell.bulk.repeatNotice')}
-                      </span>
-                    ) : null}
-                    <select
-                      aria-label={t('web.shell.bulk.move')}
-                      disabled={selectedTaskIds.size === 0 || bulkMoveNowhere}
-                      defaultValue=""
-                      onChange={(event) => {
-                        if (event.target.value === '') return;
-                        void runBulkAction('move', event.target.value === '__inbox__' ? undefined : event.target.value);
-                        event.currentTarget.value = '';
-                      }}
-                      style={{
-                        minHeight: cssVar('touch-target.min'),
-                        paddingInline: cssVar('space.2'),
-                        borderRadius: cssVar('radius.md'),
-                        border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-                        background: cssVar('color.background'),
-                        color: cssVar('color.foreground'),
-                        fontSize: cssVar('font-size.sm'),
-                      }}
-                    >
-                      <option value="">{t('web.shell.bulk.move')}</option>
-                      <option value="__inbox__" disabled={bulkMoveBlocked(undefined)}>
-                        {t('web.shell.bulk.moveInbox')}
-                      </option>
-                      {projects.projects.map((project) => (
-                        <option
-                          key={project.id}
-                          value={project.id}
-                          disabled={bulkMoveBlocked(project.id)}
-                          title={bulkMoveBlocked(project.id) ? t('web.organize.moveBlockedShared') : undefined}
-                        >
-                          {project.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="ht-btn ht-btn--danger"
-                      disabled={selectedTaskIds.size === 0}
-                      onClick={() => void runBulkAction('delete')}
-                    >
-                      {t('web.shell.bulk.delete')}
-                    </button>
-                  </>
-                ) : null}
+                {/* 退出模式：图标而不是又一句文字。模式栏里已经有三个文字按钮了。 */}
+                <button
+                  type="button"
+                  className="ht-btn ht-btn--ghost"
+                  data-testid="bulk-exit"
+                  aria-label={t('web.shell.bulk.cancel')}
+                  onClick={() => {
+                    clearBulkSelection();
+                  }}
+                >
+                  <X size={ICON_SIZE.sm} aria-hidden="true" />
+                </button>
               </div>
             ) : null}
             {bulkError === undefined ? null : (
@@ -2758,70 +2809,18 @@ export function App(): React.JSX.Element {
               />
             )}
             {/*
-              🔴 排序档位（2026-10-01，#10(d)）。位置按滴答参照图：**页头右端**
-              （页头 = 标题 + 排序 + ⋯），不是列表上方另起一条 —— 列表上方那条
-              会把第一组组头往下推，而组头本身就是这一列的分区标。
+              🔴 排序（2026-10-01 进页头；2026-11-02 进 `⋯`）。
 
-              带**可见的文字标签**，不是光秃秃一个下拉：页头上裸 chip 的教训还记在
-              下面「显示偏好」那一段（2026-09-30 产品负责人："用户根本不知道它们
-              是什么"）—— 说不清自己作用范围的控件，加了等于没加。
+              进页头那一版是"页头 = 标题 + 排序 + ⋯"的中间态 —— 其中 `⋯` 从来没被造出来，
+              于是排序自己占了一格，形态是 `12px 文字标签 + 44px 原生 select`：
+              页头上唯一一枚**带边框的下拉**，与旁边的图标按钮、ghost 文字按钮
+              三种控制语法并列。而且它 gate 在 `visible.length > 0` 上 ——
+              空的收集箱里排序整个消失，而排序是**视图属性**，不该随数据条数变形。
 
-              选项来自领域的 `TASK_SORT_KEYS`（判据也在那里），这里只渲染、只转交选择；
-              排序**不进 op-log**（§3.4：那是阅读偏好，不是一个用户意图），
-              落盘走设备本地存储（`features/tasks/sort-pref.ts`），刷新后仍在、
-              另一台设备各按各的。
-            */}
-            {view === 'tasks' && visible.length > 0 && (
-              <label
-                data-testid="task-sort"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: cssVar('space.2'),
-                  fontSize: cssVar('font-size.xs'),
-                  color: cssVar('color.foreground-muted'),
-                }}
-              >
-                {t('web.shell.sort.aria')}
-                <select
-                  data-testid="task-sort-select"
-                  aria-label={t('web.shell.sort.aria')}
-                  value={effectiveTaskSort}
-                  onChange={(event) => {
-                    changeTaskSort(event.target.value as TaskSortKey);
-                  }}
-                  style={{
-                    // 🔴 原生 `<select>` 而不是自制下拉：与 `SubtaskPicker`、
-                    // `TaskOrganizer` 一致，而且暗色下不用自己重画弹层。
-                    minHeight: cssVar('touch-target.min'),
-                    paddingInline: cssVar('space.2'),
-                    borderRadius: cssVar('radius.md'),
-                    borderWidth: cssVar('border-width.thin'),
-                    borderStyle: 'solid',
-                    borderColor: cssVar('color.border'),
-                    background: cssVar('color.background'),
-                    color: cssVar('color.foreground'),
-                    fontSize: cssVar('font-size.sm'),
-                  }}
-                >
-                  {TASK_SORT_KEYS.map((key) => (
-                    <option key={key} value={key}>
-                      {t(SORT_LABEL[key])}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {/* 截止时间呈现方式开关。
-                只在任务视图里有意义 —— 其他视图不显示截止时间。
-                🔴 它是**开关**而不是固定行为：倒计时是待验证的 UI 假设，
-                有开关才有对照组，也才能一键回退（见 DueBadge.tsx 文件头）。 */}
-            {/*
-              R11 批二：日历那一屏的顶部工具栏（`‹ 2026年10月 ›  今天`）。
-              与上面那个任务排序下拉**同一个位置、同一个锚点**（`task-sort.spec.tsx`
-              钉的就是"视图专属控件住在 header.ht-header 里"）。
-              🔴 渲染的是共享层 `CalendarToolbar`（移动端把同一个组件画在月历卡片里，
-              那边没有页头插槽），这里只提供摆位与状态。
+              现在它是 `⋯` 里的单选组：入口恒定存在（空列表也在），档位一屏可见，
+              选完自动收起。选项仍来自 `TASK_SORT_KEYS`（判据在领域层），
+              排序仍**不进 op-log**（§3.4：阅读偏好不是用户意图），
+              落盘仍走 `features/tasks/sort-pref.ts`。
             */}
             {view === 'calendar' ? (
               <CalendarHeaderToolbar
@@ -2854,13 +2853,126 @@ export function App(): React.JSX.Element {
               `aria-pressed` 报的是"这一栏现在在不在"，与名字互为对照 ——
               读屏用户不需要看见图标就能知道自己刚按下会收还是会展。
             */}
-            {view === 'tasks' && !detailColumnShown ? (
-              <button ref={assistantTriggerRef} type="button" className="ht-btn ht-btn--ghost"
-                data-testid="assistant-open" aria-label={t('web.ai.assistant.title')}
-                aria-expanded={assistantOverlay} aria-controls="assistant-detail"
-                onClick={() => setCompactAssistantOpen(true)}>
-                <AssistantIcon size={ICON_SIZE.md} aria-hidden="true" />
-              </button>
+            {/*
+              🔴 助手入口**不再是页头的一枚图标**（2026-11-02 第三刀）。
+
+              它原来是「详情列收起时」出现在页头的回退按钮 —— 于是宽档把详情列收起之后，
+              页头上会同时有「助手」「⋯」「详情开关」三枚，而那正是这一轮要消灭的形状。
+
+              现在它住在 `⋯` 里（`assistant-open` 这个 testid 跟着搬过去，判据不用改语义）。
+              **没有丢可达性**：rail 底部那枚「助手」tab 仍在，`⋯` 里也有一项。
+              焦点归还也仍然成立 —— 选中时先把焦点交回 `⋯` 触发者，
+              浮层关掉时它回到的是**一个还挂在树上的元素**（菜单项在选完那一刻就没了）。
+            */}
+            {/*
+              🔴 页头唯一的功能入口（2026-11-02）。
+
+              在这之前，任务视图页头是"一个功能一个控件"的加法结果：分享按钮、
+              「选择任务」、排序标签 + 排序下拉、助手、详情开关 —— 五组并列，
+              三种控制语法。每加一个功能页头就更长一寸，而没有任何一条门禁会红
+              （几何都合规：字是 token、色是 token、行高对）。
+
+              收进这一枚之后，页头形状**不再随功能数量变化**：加功能 = 加一项菜单项。
+              这也是滴答那套界面的做法 —— 它不是在显示功能，是在决定什么不配出现在表面上。
+
+              ⚠️ 排序那三项在**空列表时也渲染**（原来 gate 在 `visible.length > 0`）：
+              排序是视图属性，不该随数据条数出现和消失。
+              只有「选择任务」按 `visible.length` 禁用 —— 没有任务时选不出东西，
+              禁用态仍然说明"这里有这个能力"。
+            */}
+            {view === 'tasks' ? (
+              <>
+                <button
+                  ref={taskMenuTriggerRef}
+                  type="button"
+                  className="ht-btn ht-btn--ghost"
+                  data-testid="task-menu-open"
+                  aria-haspopup="menu"
+                  aria-expanded={taskMenuOpen}
+                  aria-label={t('web.shell.overflow.label')}
+                  onClick={() => { setTaskMenuOpen((open) => !open); }}
+                >
+                  <MoreHorizontal size={ICON_SIZE.md} aria-hidden="true" />
+                </button>
+                <AnchoredMenu
+                  open={taskMenuOpen}
+                  onClose={() => { setTaskMenuOpen(false); }}
+                  triggerRef={taskMenuTriggerRef}
+                  label={t('web.shell.overflow.label')}
+                  testID="task-menu"
+                >
+                  <MenuSection>{t('web.shell.overflow.sortSection')}</MenuSection>
+                  {TASK_SORT_KEYS.map((key) => (
+                    <MenuItem
+                      key={key}
+                      checked={effectiveTaskSort === key}
+                      testID={`task-sort-${key}`}
+                      onSelect={() => { changeTaskSort(key as TaskSortKey); }}
+                    >
+                      {t(SORT_LABEL[key])}
+                    </MenuItem>
+                  ))}
+                  <MenuSeparator />
+                  <MenuItem
+                    testID="task-select-open"
+                    icon={<ListChecks size={ICON_SIZE.sm} aria-hidden="true" />}
+                    disabled={visible.length === 0}
+                    onSelect={() => { setBulkSelecting(true); }}
+                  >
+                    {t('web.shell.bulk.select')}
+                  </MenuItem>
+                  {/*
+                    助手入口（详情列收起时）。选中后**先把焦点交回 `⋯`** 再开浮层：
+                    菜单项在下一次提交时会被卸载，而浮层关闭时要把焦点还给
+                    "打开它的那个元素"（否则焦点落到 `body`）。
+                  */}
+                  {!detailColumnShown ? (
+                    <MenuItem
+                      testID="assistant-open"
+                      icon={<AssistantIcon size={ICON_SIZE.sm} aria-hidden="true" />}
+                      onSelect={() => {
+                        taskMenuTriggerRef.current?.focus();
+                        setCompactAssistantOpen(true);
+                      }}
+                    >
+                      {t('web.ai.assistant.title')}
+                    </MenuItem>
+                  ) : null}
+                  {/*
+                    详情列收起之后，**展开它的入口在 `⋯` 里**（页头那枚图标让位给助手）。
+                    页头因此在每一档都只有「一枚图标 + 一枚 ⋯」。
+                  */}
+                  {!detailColumnShown && canToggleDetailPane ? (
+                    <MenuItem
+                      testID="detail-pane-open"
+                      icon={<PanelRightOpen size={ICON_SIZE.sm} aria-hidden="true" />}
+                      onSelect={() => { toggleDetailPane(); }}
+                    >
+                      {t('web.shell.detailPane.expand')}
+                    </MenuItem>
+                  ) : null}
+                  {/*
+                    共享清单入口（ADR-0062 W4）从页头搬到这里。
+
+                    条件一个字没改：只停在**自己的清单**上、且同步已配置时才出现 ——
+                    智能清单（今天/收集箱…）不是"存放位置"，共享无从谈起；
+                    未配置同步的屏上挂一枚点了必失败的按钮更糟。
+                    可达性由 `check:share-entry-visible` 与
+                    `apps/web/tests/share-entry-visible.spec.tsx` 一起钉，两者都跟着搬到这一层。
+                  */}
+                  {currentProject !== undefined && syncConfigured ? (
+                    <MenuItem
+                      testID="share-open-button"
+                      icon={<Users size={ICON_SIZE.sm} aria-hidden="true" />}
+                      onSelect={() => {
+                        setShareDialog({ projectId: currentProject.id, shareId: currentProject.shareId });
+                      }}
+                    >
+                      {t(currentProject.shareId === undefined ? 'web.share.open.new' : 'web.share.open.manage')}
+                    </MenuItem>
+                  ) : null}
+                </AnchoredMenu>
+              </>
             ) : null}
             {canToggleDetailPane ? <button
               type="button"
@@ -2942,71 +3054,30 @@ export function App(): React.JSX.Element {
             （切回来正要重新想的那句话，值不上一个跨视图的全局状态）。
           */}
           {contentView === 'tasks' && (
-            <CaptureComposer
-              destination={captureDestination}
-              routing={aiRouting}
-              consents={aiSettings.consents}
-              secrets={aiSecrets}
-              // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
-              healthSnapshot={aiSettings.health}
-              // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
-              preferenceSet={memory.preferenceSet}
-              onFeedback={(fb) => {
-                void store.recordAiFeedback({ feature: 'capture', ...fb });
-              }}
-              onHealth={(health) => {
-                // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
-                // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
-                setAiSettings((previous) => {
-                  const next = {
-                    ...previous,
-                    health: toHealthSnapshot(health, Date.now()),
-                  };
-                  saveAiSettings(next);
-                  return next;
-                });
-              }}
-            />
+            /*
+              🔴 **这里不再有任何 AI 配置**（2026-11 产品裁决）。
+
+              「一句话解析」（AI 捕获）连同它的图片附件一起搬进了右侧助手
+              （`AssistantPanel` 的 `captureTarget` 那段写了理由与判据）。
+              留在这个调用点上的那几个 prop —— routing / consents / secrets /
+              healthSnapshot / preferenceSet / onFeedback / onHealth ——
+              全部随它一起移除：留着它们就是留一条"配置了但没人读"的路。
+
+              于是这个输入框回到滴答那种形状：**你写什么，规则就当场读什么**，
+              底下不再挂任何 AI 按钮。
+            */
+            <CaptureComposer destination={captureDestination} />
           )}
 
-          {/* AI 优先级建议（功能 ②）。
-              🔴 它是**批量**的，而且只能出现在列表上方 —— "哪件事更重要"只有在
-              互相比较时才成立；逐条问模型"这一条重要吗"既贵又没有意义。
+          {/*
+            🔴 这里**曾经**是「AI 排优先级」那一行（在组头与任务行之间、长得像一行任务）。
+            2026-11-02 搬进对话助手的会话上方（`aiPrioritizeAction` → `orgActions`）。
 
-              与 `AiBreakdown` 一样：配置关着时它**仍然在**，点了会说明该去开什么，
-              而不是消失（"找不到入口"和"入口说为什么不可用"是两件事）。 */}
-          {contentView === 'tasks' && visible.length > 0 && (
-            <AiPrioritize
-              tasks={visible}
-              routing={aiRouting}
-              consents={aiSettings.consents}
-              secrets={aiSecrets}
-              // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
-              healthSnapshot={aiSettings.health}
-              // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
-              preferenceSet={memory.preferenceSet}
-              /**
-               * 🔴 只写用户勾选保留的那些（`decisions` 已经是取舍后的结果），
-               * 并把整批交给一个动作层意图：一条 BATCH op 同时携带每条任务各自的优先级。
-               * 这样它能同步到别的设备，也不会留下半批已写、半批未写的中间态。
-              */
-              onApply={async (decisions) => {
-                await store.bulkSetPriorities(decisions);
-              }}
-              onHealth={(health) => {
-                // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
-                // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
-                setAiSettings((previous) => {
-                  const next = {
-                    ...previous,
-                    health: toHealthSnapshot(health, Date.now()),
-                  };
-                  saveAiSettings(next);
-                  return next;
-                });
-              }}
-            />
-          )}
+            **不要搬回来。** 它不是"位置偏好"问题，是**层级**问题：动作不该住进列表体。
+            列表体里只放任务 —— 否则每一行"这行点下去会发生什么"都要先分辨它是任务还是动作，
+            而它长得和任务一模一样（同样的 ghost 按钮、同样的整列宽度、同样的图标位）。
+            判据：`check:surface-budget` 的「列表体不许有动作行」那一臂。
+          */}
 
 
           {/*
@@ -3832,8 +3903,8 @@ export function App(): React.JSX.Element {
         <WebModalShell
           policy="modal-readonly"
           testId="task-detail-dialog"
-          /* 🔴 两枚类名必须显式给：共享壳的缺省 `ht-web-modal__*` 在全仓**没有定义**，
-             不给就是一层没有遮罩、不居中的 div（见 `task-row-menu.css` 那一段）。 */
+          /* 两枚类名显式给：共享壳的缺省值只带**圆角**（`.ht-app__modal-*`，
+             2026-11-03 起有定义），遮罩与居中仍归宿主。 */
           overlayClass="ht-row-menu__scrim"
           dialogClass="ht-row-menu__dialog"
           labelledBy="task-detail-dialog-title"
