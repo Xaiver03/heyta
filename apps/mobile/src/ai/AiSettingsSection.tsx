@@ -54,9 +54,8 @@ import { INBOUND_BOUNDARY_COPY_KEY, INBOUND_CYCLE_COPY_KEY, INBOUND_READINESS_CO
 import { useInboundCycle, useInboundReadiness } from '../inbound/status';
 import { useInboundRules } from '../inbound/rules-store';
 
-/** 五个功能在设置里的渲染顺序 —— 与助手面的顺序同一份，不重排。 */
+/** 功能在设置里的渲染顺序 —— 与助手面的顺序同一份，不重排。 */
 const FEATURE_ORDER = [
-  'capture',
   'breakdown',
   'prioritize',
   'duration-estimate',

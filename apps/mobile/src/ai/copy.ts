@@ -45,7 +45,6 @@ import type {
   AiNoCandidateReason,
   AssistantFailureReason,
   BreakdownFailureReason,
-  CaptureFailureReason,
   DurationFailureReason,
   ManagedAiUsageReading,
   PrioritizeFailureReason,
@@ -54,7 +53,6 @@ import type {
 
 /** 五个 AI 功能在界面上的名字（封闭词表：少一条编译不过）。 */
 export const AI_FEATURE_LABEL_KEY: Record<AiFeature, MessageKey> = {
-  capture: 'web.ai.feature.capture',
   breakdown: 'web.ai.feature.breakdown',
   prioritize: 'web.ai.feature.prioritize',
   'duration-estimate': 'web.ai.feature.duration',
@@ -89,7 +87,6 @@ export const AI_PRESET_COPY_KEY: Record<
 };
 
 /** "这个功能压根没配路由"那一句（与"配了但全被排除"必须分开）。 */export const AI_NO_TARGET_KEY: Record<AiFeature, MessageKey> = {
-  capture: 'web.ai.noTarget.capture',
   breakdown: 'web.ai.noTarget.breakdown',
   prioritize: 'web.ai.noTarget.prioritize',
   'duration-estimate': 'web.ai.noTarget.duration',
@@ -181,13 +178,6 @@ export function managedUsageCopy(
 export const SERVER_CODE_KEY: Readonly<Record<string, MessageKey>> = {
   SUBSCRIPTION_REQUIRED: 'web.ai.failure.serverCode.subscriptionRequired',
   AI_QUOTA_EXCEEDED: 'web.ai.failure.serverCode.quotaExceeded',
-};
-
-export const CAPTURE_FAILURE_KEY: Record<CaptureFailureReason, MessageKey> = {
-  'ai-unavailable': 'web.ai.failure.aiUnavailable',
-  unparseable: 'web.ai.failure.capture.unparseable',
-  'empty-text': 'web.ai.failure.capture.emptyText',
-  'text-too-long': 'web.ai.failure.capture.textTooLong',
 };
 
 export const BREAKDOWN_FAILURE_KEY: Record<BreakdownFailureReason, MessageKey> = {

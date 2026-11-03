@@ -31,10 +31,10 @@ describe('① 共享层：两条提交路都带落点', () => {
     );
   });
 
-  it('AI 那一路（apply）也过，且不是只包了一半', () => {
-    expect(code).toMatch(
-      /withCaptureProject\(toAiCaptureSubmitPlan\(fields\), captureSelectedProject\(projectPicker\)\?\.id\)/,
-    );
+  it('AI 那一路**已经不在了**（2026-11 随「一句话捕获」整体删除）', () => {
+    // 捕获框只剩规则解析那一条提交路：`submit`。原来那第二条（AI 应用）
+    // 连着 `toAiCaptureSubmitPlan` 一起从共享层删掉了 —— 它不再有调用方。
+    expect(code).not.toContain('toAiCaptureSubmitPlan');
   });
 
   it('那一行只在宿主给了 picker 时才画（web 不传 ⇒ 一处都不许多画）', () => {

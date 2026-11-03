@@ -188,8 +188,9 @@ describe('移动端 ↔ web 的 AI 文案表对账', () => {
     );
   });
 
-  it('🔴 四组失败原因表（捕获/拆解/排序/估时）两端同 key', () => {
-    for (const feature of ['capture', 'breakdown', 'prioritize', 'duration'] as const) {
+  it('🔴 三组失败原因表（拆解/排序/估时）两端同 key', () => {
+    // ⚠️ 2026-11 去掉「捕获」那一组：该功能整体删除，两端都不再有它的失败文案。
+    for (const feature of ['breakdown', 'prioritize', 'duration'] as const) {
       expectSameFamily(
         `failure.${feature}.*`,
         read(MOBILE_COPY),

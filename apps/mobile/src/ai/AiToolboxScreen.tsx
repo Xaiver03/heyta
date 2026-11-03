@@ -1,5 +1,5 @@
 /**
- * 移动端 AI 工具箱 —— capture / breakdown / prioritize / duration-estimate 四枚入口。
+ * 移动端 AI 工具箱 —— breakdown / prioritize / duration-estimate 三枚入口。
  *
  * 每一枚走**同一条链路**：填表 → 现算披露 → 用户点确认 → `requestX` 走 `invokeRouted`
  * → 候选原样显示 → 用户再点一次「写入」→ `taskActions` 经 op-log 落库
@@ -11,25 +11,22 @@
  * 用户知道按了会出什么。两把尺子分别钉得住。
  *
  * ⚠️ 候选写库这一步刻意由用户**看到候选之后**再点一次，不合并成"点发送=直接写"。
- * 理由与 web 那四份 `AiCapture/Breakdown/Prioritize/Duration` 逐字同源。
+ * 理由与 web 那三份 `AiBreakdown/Prioritize/Duration` 逐字同源。
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import {
   buildBreakdownInvocation,
-  buildCaptureInvocation,
   buildDurationInvocation,
   buildPrioritizeInvocation,
   createManagedTransport,
   createTaskActions,
   requestBreakdown,
-  requestCapture,
   requestDuration,
   requestPrioritize,
   resolveAiRoute,
   type AppHost,
   type BreakdownOutcome,
-  type CaptureOutcome,
   type DurationOutcome,
   type PrioritizeOutcome,
 } from '@heyta/app-host';
@@ -52,7 +49,7 @@ import { readSyncConfig } from '../sync/config';
 import { AiDisclosureBlock } from './disclosure';
 import { getAiSettings, saveAiSettings, useAiSettings, aiSecrets } from './settings-store';
 
-type TabKey = 'capture' | 'breakdown' | 'prioritize' | 'duration';
+type TabKey = 'breakdown' | 'prioritize' | 'duration';
 
 const resolveRouting = () =>
   withManagedEndpoint(getAiSettings().routing, readSyncConfig()?.serverUrl);
@@ -73,7 +70,7 @@ export function AiToolboxScreen({
 }): React.JSX.Element {
   const { t, locale } = useI18n();
   const tokens = useTokens();
-  const [tab, setTab] = useState<TabKey>('capture');
+  const [tab, setTab] = useState<TabKey>('breakdown');
   const [host, setHost] = useState<AppHost | null>(null);
   const [hostError, setHostError] = useState<string | undefined>();
 
@@ -86,7 +83,6 @@ export function AiToolboxScreen({
   }, []);
 
   const tabs: Array<{ key: TabKey; labelKey: MessageKey }> = [
-    { key: 'capture', labelKey: 'mobile.ai.toolbox.tab.capture' },
     { key: 'breakdown', labelKey: 'mobile.ai.toolbox.tab.breakdown' },
     { key: 'prioritize', labelKey: 'mobile.ai.toolbox.tab.prioritize' },
     { key: 'duration', labelKey: 'mobile.ai.toolbox.tab.duration' },
@@ -112,9 +108,7 @@ export function AiToolboxScreen({
             />
           ))}
         </HStack>
-        {host === null ? null : tab === 'capture' ? (
-          <CapturePanel host={host} locale={outputLocale} onOpenSettings={onOpenSettings} />
-        ) : tab === 'breakdown' ? (
+        {host === null ? null : tab === 'breakdown' ? (
           <BreakdownPanel host={host} locale={outputLocale} onOpenSettings={onOpenSettings} />
         ) : tab === 'prioritize' ? (
           <PrioritizePanel host={host} locale={outputLocale} onOpenSettings={onOpenSettings} />
@@ -163,71 +157,6 @@ function routedDeps() {
 
 function persistHealth(health: Parameters<typeof toHealthSnapshot>[0]) {
   saveAiSettings({ ...getAiSettings(), health: toHealthSnapshot(health, Date.now()) });
-}
-
-// ── Capture ────────────────────────────────────────────────────────────────
-function CapturePanel({ host, locale, onOpenSettings }: { host: AppHost; locale: AiOutputLocale; onOpenSettings?: () => void }): React.JSX.Element {
-  const { t } = useI18n();
-  const settings = useAiSettings();
-  const routing = resolveRouting();
-  const [text, setText] = useState('');
-  const [phase, setPhase] = useState<'idle' | 'loading' | 'proposal' | 'failed'>('idle');
-  const [outcome, setOutcome] = useState<CaptureOutcome | null>(null);
-  const actions = useMemo(() => createTaskActions(host), [host]);
-
-  const source = { text, locale, now: Date.now() };
-  const invocation = text.trim() === '' ? undefined : buildCaptureInvocation(source, []);
-  const view = usePanel('capture', invocation);
-
-  const ask = async (): Promise<void> => {
-    setPhase('loading');
-    const result = await requestCapture(source, { routing, consents: settings.consents, routed: routedDeps() });
-    setOutcome(result);
-    persistHealth(result.health);
-    setPhase(result.ok ? 'proposal' : 'failed');
-  };
-
-  const apply = async (): Promise<void> => {
-    if (outcome === null || !outcome.ok) return;
-    const { proposal } = outcome;
-    const dueDateMs = proposal.dueDate === undefined ? undefined : Date.parse(proposal.dueDate);
-    await actions.create(proposal.title, {
-      ...(proposal.priority === undefined ? {} : { priority: proposal.priority }),
-      ...(dueDateMs === undefined || Number.isNaN(dueDateMs) ? {} : { dueDate: dueDateMs, dueDateLocal: proposal.dueDate }),
-    });
-    setPhase('idle'); setText(''); setOutcome(null);
-  };
-
-  return (
-    <Card>
-      <Stack gap="default">
-        <Text variant="section-title">{t('mobile.ai.toolbox.capture.title')}</Text>
-        <Text variant="caption" tone="subtle">{t('mobile.ai.toolbox.capture.hint')}</Text>
-        <TextField label={t('mobile.ai.toolbox.capture.field')} value={text} onChangeText={setText} placeholder={t('mobile.ai.toolbox.capture.placeholder')} multiline />
-        {view.target !== undefined ? (
-          <AiDisclosureBlock testIdPrefix="mobile-ai-capture" target={view.target} fields={view.fields} retentionDisclosure={view.retentionDisclosure} />
-        ) : null}
-        {phase === 'idle' || phase === 'failed' ? (
-          <Button label={t('mobile.ai.toolbox.send')} tone="primary" disabled={text.trim() === '' || view.target === undefined} onPress={() => { void ask(); }} />
-        ) : null}
-        {phase === 'loading' ? <Text variant="caption" tone="subtle">{t('mobile.ai.toolbox.loading')}</Text> : null}
-        {phase === 'failed' && outcome !== null && !outcome.ok ? <Text variant="row-title" tone="danger">{outcome.message}</Text> : null}
-        {phase === 'proposal' && outcome !== null && outcome.ok ? (
-          <Stack gap="tight">
-            <Text variant="caption" tone="subtle">{t('mobile.ai.toolbox.proposalHint')}</Text>
-            <Text variant="row-title">{outcome.proposal.title}</Text>
-            {outcome.proposal.dueDate !== undefined ? <Text variant="row-meta">{t('mobile.ai.toolbox.due')}: {outcome.proposal.dueDate}</Text> : null}
-            {outcome.proposal.priority !== undefined ? <Text variant="row-meta">{t('mobile.ai.toolbox.priority')}: {outcome.proposal.priority}</Text> : null}
-            <HStack gap="tight">
-              <Button label={t('mobile.ai.toolbox.apply')} tone="primary" onPress={() => { void apply(); }} />
-              <Button label={t('mobile.ai.toolbox.cancel')} tone="ghost" onPress={() => { setPhase('idle'); setOutcome(null); }} />
-            </HStack>
-          </Stack>
-        ) : null}
-        {onOpenSettings !== undefined ? <Button label={t('mobile.ai.toolbox.openSettings')} tone="ghost" onPress={onOpenSettings} /> : null}
-      </Stack>
-    </Card>
-  );
 }
 
 // ── Breakdown ─────────────────────────────────────────────────────────────
