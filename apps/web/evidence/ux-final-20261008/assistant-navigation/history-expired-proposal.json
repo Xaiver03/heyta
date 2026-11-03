@@ -2,31 +2,31 @@
   "before": {
     "opCount": 1,
     "task": {
-      "id": "task-f5ce6184-abe1-4087-908a-4eb537becaaf",
+      "id": "task-f6a232d5-d965-48ad-be99-6e64a67818a8",
       "title": "刷新前尚未确认的任务",
       "priority": 0,
-      "createdAt": 1793096117116,
-      "updatedAt": 1793096117116,
-      "_lastOpId": "0884ae87-28e5-4698-932f-2decfe2e0dda-1793096117116-1",
+      "createdAt": 1793684801714,
+      "updatedAt": 1793684801714,
+      "_lastOpId": "4e749d87-4230-4088-bfb3-1da5d7ad5ff0-1793684801714-1",
       "_lastClock": {
-        "0884ae87-28e5-4698-932f-2decfe2e0dda": 1
+        "4e749d87-4230-4088-bfb3-1da5d7ad5ff0": 1
       },
-      "_lastClientId": "0884ae87-28e5-4698-932f-2decfe2e0dda"
+      "_lastClientId": "4e749d87-4230-4088-bfb3-1da5d7ad5ff0"
     }
   },
   "after": {
     "opCount": 1,
     "task": {
-      "id": "task-f5ce6184-abe1-4087-908a-4eb537becaaf",
+      "id": "task-f6a232d5-d965-48ad-be99-6e64a67818a8",
       "title": "刷新前尚未确认的任务",
       "priority": 0,
-      "createdAt": 1793096117116,
-      "updatedAt": 1793096117116,
-      "_lastOpId": "0884ae87-28e5-4698-932f-2decfe2e0dda-1793096117116-1",
+      "createdAt": 1793684801714,
+      "updatedAt": 1793684801714,
+      "_lastOpId": "4e749d87-4230-4088-bfb3-1da5d7ad5ff0-1793684801714-1",
       "_lastClock": {
-        "0884ae87-28e5-4698-932f-2decfe2e0dda": 1
+        "4e749d87-4230-4088-bfb3-1da5d7ad5ff0": 1
       },
-      "_lastClientId": "0884ae87-28e5-4698-932f-2decfe2e0dda"
+      "_lastClientId": "4e749d87-4230-4088-bfb3-1da5d7ad5ff0"
     }
   },
   "modelCalls": 1,

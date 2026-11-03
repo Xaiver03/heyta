@@ -13,6 +13,10 @@
         "deleted": 0,
         "total": 0
       },
+      "ATTACHMENT": {
+        "deleted": 0,
+        "total": 0
+      },
       "COMMENT": {
         "deleted": 0,
         "total": 0
@@ -68,6 +72,7 @@
   "entities": {
     "AI_FEEDBACK": [],
     "ASSISTANT_TURN": [],
+    "ATTACHMENT": [],
     "COMMENT": [],
     "EVENT": [],
     "FOCUS_SESSION": [],
@@ -80,37 +85,37 @@
     "TAG": [],
     "TASK": [
       {
-        "_lastClientId": "d1bc1ddc-2ec8-433b-bbf0-9bd737cc01c4",
+        "_lastClientId": "13c1726d-c391-41a7-a43f-51540b827b4e",
         "_lastClock": {
-          "d1bc1ddc-2ec8-433b-bbf0-9bd737cc01c4": 1
+          "13c1726d-c391-41a7-a43f-51540b827b4e": 1
         },
-        "_lastOpId": "d1bc1ddc-2ec8-433b-bbf0-9bd737cc01c4-1793096561082-1",
-        "createdAt": 1793096561082,
-        "id": "task-4c91a1cf-b9a7-436a-8339-c8e7394d41bf",
+        "_lastOpId": "13c1726d-c391-41a7-a43f-51540b827b4e-1793685827574-1",
+        "createdAt": 1793685827574,
+        "id": "task-b64d2750-b628-4743-bed2-d82a85365833",
         "priority": 0,
         "title": "数据往返验收 light",
-        "updatedAt": 1793096561082
+        "updatedAt": 1793685827574
       }
     ]
   },
-  "exportedAt": "2026-10-27T10:22:41.885Z",
+  "exportedAt": "2026-11-03T06:03:48.765Z",
   "formatVersion": 1,
   "opLog": [
     {
       "actionType": "CRT_TASK",
-      "clientId": "d1bc1ddc-2ec8-433b-bbf0-9bd737cc01c4",
-      "entityId": "task-4c91a1cf-b9a7-436a-8339-c8e7394d41bf",
+      "clientId": "13c1726d-c391-41a7-a43f-51540b827b4e",
+      "entityId": "task-b64d2750-b628-4743-bed2-d82a85365833",
       "entityType": "TASK",
-      "id": "d1bc1ddc-2ec8-433b-bbf0-9bd737cc01c4-1793096561082-1",
+      "id": "13c1726d-c391-41a7-a43f-51540b827b4e-1793685827574-1",
       "opType": "CRT",
       "payload": {
         "priority": 0,
         "title": "数据往返验收 light"
       },
       "schemaVersion": 1,
-      "timestamp": 1793096561082,
+      "timestamp": 1793685827574,
       "vectorClock": {
-        "d1bc1ddc-2ec8-433b-bbf0-9bd737cc01c4": 1
+        "13c1726d-c391-41a7-a43f-51540b827b4e": 1
       }
     }
   ],
