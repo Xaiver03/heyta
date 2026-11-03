@@ -580,6 +580,10 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
     { table: 'account_notifications', zh: '通知', en: 'notification' },
     { table: 'user_avatars', zh: '头像', en: 'avatar' },
     { table: 'user_consents', zh: '条款接受记录', en: 'consent' },
+    // 2026-11-03 新增：ADR-0083 的任务附件字节（`20261103000000_add_attachment_blobs`）。
+    // 它引用 `users` 且 CASCADE ⇒ 进这张账的同时，对外那句「N 处级联 / N 张表」
+    // 与外键真源一起从 39/38 变成 40/39。
+    { table: 'attachment_blobs', zh: '任务附件', en: 'task attachment' },
     // 🔴 2026-10-08 摘掉 `{ table: 'tombstones', zh: '墓碑', en: 'tombstone' }`：那张表在
     // `20251228000001_remove_tombstones` 里已被 `DROP TABLE`，它留在账上只是探针不认识 DROP。
     // 文案因此把「墓碑」写进了"随注销级联删除"的清单 —— 而真实的墓碑表 `account_tombstones`
