@@ -657,6 +657,10 @@ describe('ValidationService', () => {
       'ASSISTANT_TURN',
       // 分享实体的评论（分享/评论线，2026-10-10 并入 main）。同一条纪律。
       'COMMENT',
+      // 任务附件的字节（ADR-0083 / `20261103000000_add_attachment_blobs`，2026-11-03）。
+      // 🔴 又一条"服务端必须先于客户端上线"：附件上传的 op 走同一张白名单，
+      // 生产库里没有它，带 `ATTACHMENT` 的 op 会被判 `INVALID_ENTITY_TYPE` 永久拒绝。
+      'ATTACHMENT',
     ];
 
     it('should include all heyta entity types', () => {

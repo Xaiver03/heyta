@@ -310,7 +310,13 @@ const dumpAllRows = async (): Promise<string> => {
 };
 
 const chatBody = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
-  feature: 'capture',
+  /*
+   * 🔴 用 `'breakdown'` 而不是 `'capture'`（2026-11 换）。
+   * `'capture'` 那一档功能已经整体删除（并入收集框），`AiFeature` 与
+   * `SERVER_MANAGED_AI_FEATURES` 里都没有它 —— 再发它会被 zod 枚举拒成 400，
+   * 而这些用例测的是**闸门顺序**（权益 → 额度 → 体积 → 白名单），与是哪个功能无关。
+   */
+  feature: 'breakdown',
   messages: [{ role: 'user', content: `今天的任务：${PROMPT_MARKER}` }],
   ...extra,
 });
@@ -417,7 +423,7 @@ describe('闸门顺序：每一步都有两个独立观测量', () => {
   });
 
   it('请求体不合法 ⇒ 400，且**不消耗额度**（格式错误不该算一次使用）', async () => {
-    const res = await post({ feature: 'capture' });
+    const res = await post({ feature: 'breakdown' });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toMatchObject({ code: MANAGED_AI_ERROR_CODES.INVALID_BODY });
     expect(upstream.hits()).toHaveLength(0);

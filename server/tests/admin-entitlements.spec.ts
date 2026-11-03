@@ -41,7 +41,16 @@ const { ADMIN_GRANT_PROVIDER } = await import('../src/admin/subscription-grant-s
 let app: FastifyInstance;
 const AUTH = { authorization: 'Bearer test-token' };
 
-const NOW = Date.parse('2026-10-25T08:00:00.000Z');
+/**
+ * 🔴 基准时刻必须是**相对今天**的（2026-11 修掉一颗日期炸弹）。
+ *
+ * 原来写死 `2026-10-25T08:00Z`，而下面那些夹具写的是 `NOW + 5 * DAY` / `NOW + 20 * DAY`
+ * —— 时间一走过 10-30 之后，"`+5 天`"那条就变成**过去**的了。症状极其误导：
+ * 「两条行都授予同一项能力 ⇒ 两条都念出来」突然只剩一条，
+ * 读起来像并集判定回退成了"最新那一行说了算"，而真正发生的事只是**写测试的那天过去了**。
+ * （本仓已经因为同一类问题红过一次：`admin-revenue` 那五条。）
+ */
+const NOW = Date.now();
 const DAY = 86_400_000;
 const OPERATOR_ID = 1;
 const TARGET_ID = 5;

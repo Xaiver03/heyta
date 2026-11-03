@@ -53,7 +53,12 @@ const SELF_TEST_ONLY: Record<string, string> = {
   // `.mut-bak` 还原（AGENTS §8.9 独占验收），还要一枚零脏载具与一次性库 —— 装置自己会把不达标的
   // 载具拒跑（rc=3）。它的 15 枚反向臂只在临时目录造样本（含"载具脏⇒拒跑""判决把 `Tests no tests`
   // 读成 0⇒红"这两形），便宜到可以天天跑，所以常驻那一腿。
-  'verify-inbound-hosted-arms.py': 'self_test arms=15 failed=0',
+  /*
+   * 2026-11 现量更新：脚本的自证臂从 15 长到 **18**（最后三枚是 ②b/②c 那对"没跑到 vs 0 条失败"
+   * 的区分，加上 ⑩c 的规格去重）。这条值是**脚本自己打印的**读数快照 ——
+   * 它红了说明臂数变了，回来重取一次是正确动作，不是把断言放宽。
+   */
+  'verify-inbound-hosted-arms.py': 'self_test arms=18 failed=0',
 };
 
 // 不接进来的每一枚都要写下"为什么不接"，否则分母自检那条用例会把它们当成漏网。
