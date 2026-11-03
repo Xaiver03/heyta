@@ -1,10 +1,15 @@
 /**
- * 捕获框里的"附一张图"—— **截图转任务**的入口
+ * 助手输入框里的"附一张图"—— **截图转任务**的入口
  * ================================================
+ *
+ * ⚠️ 2026-11 之前它同时服务捕获框；随「一句话解析」搬进右侧助手之后，
+ * 它只服务助手（`data-heyta-chat-root` / `chat-attach`）。
  *
  * 这个文件活在 web 壳里，理由与 `image-encode.ts` 同一条：它要读 `DataTransfer`
  * 与 `<input type=file>`，而共享的 `CaptureComposer` 是 web 与 RN 的同一份实现。
- * 共享层只留一个插槽（`renderAssistant`），DOM 事件留在各端。
+ * 它**现在只服务右侧助手**（`data-heyta-chat-root`）—— 捕获框那条贴图入口
+ * 随「一句话解析」一起搬走了（2026-11），共享层原来的 `renderAssistant` 插槽也已删除。
+ * DOM 事件留在各端。
  *
  * ## 🔴 为什么粘贴要监听 `document`
  *
@@ -25,6 +30,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { IMAGE_BUDGET } from '@heyta/ai';
+import { ICON_SIZE } from '@heyta/design-system';
+import { ImagePlus } from 'lucide-react';
 import { useI18n } from '@heyta/i18n';
 
 import { encodeImageForEgress, imagesFromClipboard, type EncodedImage, type ImageFileError } from './image-encode.js';
@@ -59,13 +66,29 @@ const ERROR_KEYS = {
   undecodable: 'web.ai.attach.undecodable',
 } as const satisfies Record<ImageFileError, string>;
 
-export function ImageAttach({
+/**
+ * 附件能力的**一次性装配**：`picker` 进输入框内部左下角，`thumbs` 落在字段下方。
+ *
+ * 🔴 为什么拆成两半（2026-11-02，产品负责人第四次为同一个地方发火）：
+ * 上一版是一个"独立的附件区"—— 一枚方框按钮，**浮在输入框上方单独一行**。
+ * 原话：「这个框简直是方方正正的，也太丑了……把那个框放到对话框里面不就好了吗？
+ * 就是那个添加的框，放到对话框左下角有什么不行？」
+ *
+ * 所以取景变成：**输入框是唯一的框**，附件按钮是它内部左下角的一枚图标；
+ * 图片缩略图（那是**数据**，不是 chrome）落在字段下方。
+ * 拆成 hook 是因为两半必须共享同一份 `busy`/`error`/`accept` ——
+ * 写两个组件就会各自持有一份状态，而 `too-many` 恰恰发生在"一张都没收下"的时候。
+ */
+export function useImageAttach({
   images,
   onChange,
   disabled = false,
   pasteScope = '[data-heyta-capture-root]',
   testIdPrefix = 'capture-attach',
-}: ImageAttachProps): React.JSX.Element {
+}: ImageAttachProps): {
+  readonly picker: React.JSX.Element;
+  readonly thumbs: React.JSX.Element | null;
+} {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ImageFileError | 'too-many' | undefined>(undefined);
@@ -131,33 +154,44 @@ export function ImageAttach({
 
   const totalBytes = images.reduce((sum, image) => sum + image.bytes, 0);
 
-  return (
-    <div className="ht-capture-attach" data-testid={`${testIdPrefix}`}>
-      <div className="ht-capture-attach__row">
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
-          data-testid={`${testIdPrefix}-pick`}
-          aria-label={t('web.ai.attach.label')}
-          disabled={disabled || busy || images.length >= IMAGE_BUDGET.maxImagesPerRequest}
-          onClick={() => inputRef.current?.click()}
-        >
-          {busy ? t('web.ai.attach.busy') : t('web.ai.attach.label')}
-        </button>
-        <span className="ht-capture-attach__hint">{t('web.ai.attach.hint')}</span>
-        <input
-          ref={inputRef}
-          type="file"
-          accept={IMAGE_BUDGET.mediaTypes.join(',')}
-          multiple
-          hidden
-          data-testid={`${testIdPrefix}-input`}
-          onChange={(event) => {
-            void accept(Array.from(event.currentTarget.files ?? []));
-          }}
-        />
-      </div>
+  const picker = (
+    <span className="ht-capture-attach__picker" data-testid={testIdPrefix}>
+      {/*
+        🔴 **一枚纯图标，没有自己的框**（2026-11-02）。
+        它住在**输入框内部**的左下角（助手自己摆位；捕获框那个兄弟槽位已随搬家删除）——
+        "输入框是唯一的框"，附件按钮只是它里面的一枚图标。
 
+        两条禁令都在这一块上：不写说明文字（上一版是「也可以直接粘贴截图」，
+        而它在任务列与助手里各出现一遍），也不给自己再画一个方框
+        （那是"面板套面板"在控件尺度上的重演）。
+      */}
+      <button
+        type="button"
+        className="ht-capture-attach__pick"
+        data-testid={`${testIdPrefix}-pick`}
+        aria-label={busy ? t('web.ai.attach.busy') : t('web.ai.attach.label')}
+        title={t('web.ai.attach.label')}
+        disabled={disabled || busy || images.length >= IMAGE_BUDGET.maxImagesPerRequest}
+        onClick={() => inputRef.current?.click()}
+      >
+        <ImagePlus size={ICON_SIZE.sm} aria-hidden="true" />
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={IMAGE_BUDGET.mediaTypes.join(',')}
+        multiple
+        hidden
+        data-testid={`${testIdPrefix}-input`}
+        onChange={(event) => {
+          void accept(Array.from(event.currentTarget.files ?? []));
+        }}
+      />
+    </span>
+  );
+
+  const thumbs = images.length === 0 && error === undefined ? null : (
+    <div className="ht-capture-attach__below">
       {images.length > 0 && (
         <>
           <ul className="ht-capture-attach__list" data-testid={`${testIdPrefix}-list`}>
@@ -205,4 +239,6 @@ export function ImageAttach({
       )}
     </div>
   );
+
+  return { picker, thumbs };
 }

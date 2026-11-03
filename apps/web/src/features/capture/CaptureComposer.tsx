@@ -6,13 +6,20 @@
  *
  * 输入行、识别芯片（原文 → 解析结果 → 取消/恢复/「未采用」）、实际标题预览，
  * 全部由 `@heyta/ui` 的 `CaptureComposer` 渲染 —— 与移动端将是**同一份实现**。
- * 这里只回答 web 自己的三个问题：
+ * 这里只回答 web 自己的两个问题：
  *
  *   1. **文案**从哪来 → `@heyta/i18n` 的 `web.capture.*`；
  *      芯片的剩余天数由共享层算，措辞在这里说成当前语言；
  *   2. **提交**到哪去 → `useTaskStore#addTask`（op-log 的唯一写入口，AGENTS.md §3.4），
- *      落点由 `destination` 决定 —— **当下面板停在哪个清单，新任务就留在哪个清单**；
- *   3. **AI 一句话捕获面板** → `renderAssistant` 插槽（见下）。
+ *      落点由 `destination` 决定 —— **当下面板停在哪个清单，新任务就留在哪个清单**。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 2026-11：这里**不再有任何 AI**（第 3 个问题被删掉了）
+ *
+ * 「一句话捕获」连同图片附件一起搬进了右侧助手
+ * （见 `apps/web/src/features/ai/AssistantPanel.tsx` 的 `captureTarget` 那段，
+ * 那里写了搬家的理由、判据，以及"为什么它不能顺手删掉"）。
+ * 于是这个输入框回到滴答那种形状：**你写什么，规则就当场读什么**。
  *
  * 解析一行都不在这里：它仍然是 `@heyta/domain#parseCapture`。判据还是
  * AGENTS.md §3.5 那句：这里有没有任何一行在决定"业务上该怎么做"？
@@ -32,17 +39,6 @@
  * 的 `PROVIDER_DEPENDENT`（那个缺口此前连续出现过五次，见
  * `apps/web/src/features/settings/HelpPanel.tsx` 文件头）。别把下面这层删掉：
  * 删了门禁会红。
- *
- * ─────────────────────────────────────────────────────────────────────────
- * 🔴 AI 面板留在 web（经 `renderAssistant` 插槽），不进共享层
- *
- * `AiCapture` 约 380 行，是 DOM + `@heyta/ai` 的实现；而 `apps/mobile` 里
- * AI 是 **0 行**（P8 的移动端阻塞在宿主 SecretStore，不在 UI 层）。
- * 强行共享等于让 iOS 去解析 DOM。最小一步：M3 `ai` 的"流程型面板族"
- * 落地后接进这个插槽（披露块已经有共享 `AiDisclosure`）。
- *
- * ⚠️ 插槽的渲染条件（"空输入框上不出现 AI 按钮"）留在这里，因为
- * "什么算空"与"点下去会不会必然失败"是 AI 交互的产品决策。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 本刀真实丢掉的东西（登记，不是修复）
@@ -65,14 +61,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { useI18n } from '@heyta/i18n';
 
-import type { AiFeedbackOutcome, LocalDate, PreferenceSet } from '@heyta/domain';
-import type {
-  AiHealthSnapshot,
-  AiRoutingConfig,
-  EgressConsent,
-  HealthMap,
-  SecretStore,
-} from '@heyta/ai';
+import type { LocalDate } from '@heyta/domain';
 
 import {
   CaptureComposer as SharedCaptureComposer,
@@ -80,7 +69,6 @@ import {
   captureChipRemainingDays,
   captureChipTimeLabel,
   capturePriorityLabelKey,
-  type CaptureAssistantContext,
   type CaptureComposerLabels,
   type CaptureSubmitPlan,
 } from '@heyta/ui';
@@ -88,31 +76,21 @@ import {
 import { formatDayTitleText } from '@heyta/ui';
 
 import { dateWithRemaining } from '../ai/locale-punctuation.js';
-import { AiCapture } from '../ai/AiCapture.js';
-import { ImageAttach } from '../ai/ImageAttach.js';
-import type { EncodedImage } from '../ai/image-encode.js';
-import { WEB_EMPTY_SECRET_STORE } from '../settings/aiStore.js';
 import { useTaskStore } from '../tasks/store.js';
 import { remainingText } from '../../lib/due-display.js';
 
 /**
- * 接线所需的 AI 配置 —— 全部由 `App.tsx` 透传，本组件**不做任何判断**。
+ * 这个组件现在**只有确定性捕获**，一行 AI 都没有。
  *
- * 它们是可选的：不传就退化成纯确定性捕获（本组件的单测就是这么用的）。
- * 这样"AI 没配置"和"AI 关了"走的都是同一条路，不需要两套渲染。
+ * 🔴 「一句话解析」（AI）已经搬进右侧助手（2026-11 产品裁决）：
+ * 它是 AI 的能力，不该占着每次新建任务的输入框。搬走的理由、以及
+ * "为什么它不能被删掉"，写在 `AssistantPanel.tsx` 的 `captureTarget` 那段。
+ *
+ * 因此本组件的 props 也一起瘦了：`routing` / `consents` / `secrets` /
+ * `healthSnapshot` / `preferenceSet` / `onHealth` / `onFeedback` 全部移除。
+ * 留着它们等于留一条"配置了但没人读"的路 —— 那正是本仓库最忌讳的形状。
  */
 export interface CaptureComposerProps {
-  routing?: AiRoutingConfig | undefined;
-  consents?: readonly EgressConsent[] | undefined;
-  secrets?: SecretStore | undefined;
-  healthSnapshot?: AiHealthSnapshot | undefined;
-  preferenceSet?: PreferenceSet | undefined;
-  onHealth?: ((health: HealthMap) => void) | undefined;
-  onFeedback?: ((feedback: {
-    outcome: AiFeedbackOutcome;
-    proposedCount: number;
-    appliedCount: number;
-  }) => void) | undefined;
   /**
    * 这一条新任务要落进哪个**清单**。没有就是收集箱（`addTask` 不带 `projectId`）。
    *
@@ -173,7 +151,24 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
       valueLabel: (chip, now) => {
         // 🔴 时刻芯片先走共享层那句（否则它会掉进下面的优先级兜底、念成「不设置」）。
         const timeLabel = captureChipTimeLabel(chip);
-        if (timeLabel !== undefined) return timeLabel;
+        if (timeLabel !== undefined) {
+          /**
+           * 自带日期的时刻芯片要**把哪一天一起念出来**。
+           *
+           * 「下午3点」在领域层是一条匹配（日期与时刻同时成立，落在今天），
+           * 所以芯片只有一条。只念「15:00」的话，用户看不出解析器认的是
+           * 今天还是明天 —— 而"猜错了哪一天"正是这个字段唯一致命的错法。
+           * 念成「今天 15:00」一次说清（滴答清单同款）。
+           */
+          const timeDays = captureChipRemainingDays(chip, now);
+          if (chip.dueDate !== undefined && timeDays !== undefined) {
+            return t('web.capture.value.dayTime', {
+              day: remainingText(timeDays, t),
+              time: timeLabel,
+            });
+          }
+          return timeLabel;
+        }
         const days = captureChipRemainingDays(chip, now);
         if (chip.dueDate !== undefined && days !== undefined) {
           return dateWithRemaining(chip.dueDate, remainingText(days, t), locale);
@@ -202,88 +197,22 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
     [addTask, destination],
   );
 
-  const {
-    routing,
-    consents,
-    secrets,
-    healthSnapshot,
-    preferenceSet,
-    onFeedback,
-    onHealth,
-  } = props;
-
-  /**
-   * 图片附件的状态**住在这一层**：它要跨"输入框 → AI 面板 → 发送"三段存在，
-   * 而这三段分属共享 composer（输入框）与 web 的 AI 面板。
-   *
-   * ⚠️ 它**不进 op-log、不同步**：图片只活在这一次请求里，落库的只有模型解析出的
-   * 标题/日期/优先级。这条是 ADR-0005「AI 是输入法」的直接后果 ——
-   * 输入法不存你打的字。
-   */
-  const [images, setImages] = useState<readonly EncodedImage[]>([]);
-
-  const renderAssistant = useCallback(
-    (ctx: CaptureAssistantContext) => {
-      // ⚠️ 只在**有内容**时出现：空输入框上挂一个"AI 解析"按钮，
-      //    点下去必然失败，那是在制造一次注定报错的交互。
-      //    没配置 AI 时也照样出现 —— "找不到入口"和"入口说为什么不可用"
-      //    是两件事（`AiCapture` 自己会说该去开什么）。
-      if (routing === undefined) return null;
-      /**
-       * 🔴 判断的是"有没有内容"，不是"有没有打字"。
-       *
-       * 截图转任务的入口就是这么用的：用户只贴了一张图、一个字都没打。
-       * 原来这里判 `draft.trim() === ''`，于是那条路**永远不可能开始** ——
-       * 界面看起来正常，只是按下粘贴之后什么都没发生。
-       */
-      const hasContent = ctx.draft.trim() !== '' || images.length > 0;
-      return (
-        <>
-          <ImageAttach images={images} onChange={setImages} />
-          {hasContent ? (
-        <AiCapture
-          text={ctx.draft}
-          images={images.map((image) => ({ mediaType: image.mediaType, base64: image.base64 }))}
-          routing={routing}
-          consents={consents ?? []}
-          secrets={secrets ?? WEB_EMPTY_SECRET_STORE}
-          healthSnapshot={healthSnapshot}
-          preferenceSet={preferenceSet}
-          onApply={ctx.apply}
-          {...(onFeedback !== undefined ? { onFeedback } : {})}
-          {...(onHealth !== undefined ? { onHealth } : {})}
-        />
-          ) : null}
-        </>
-      );
-    },
-    [
-      routing,
-      consents,
-      secrets,
-      healthSnapshot,
-      preferenceSet,
-      onFeedback,
-      onHealth,
-      images,
-    ],
-  );
-
   return (
     <HeytaUiProvider>
       {/*
-        🔴 `data-heyta-capture-root` 是**粘贴归属判据**：文档级 paste 监听
-        （见 `CaptureImageAttach`）靠它区分"在捕获框里粘贴"与"在搜索框里粘贴"。
-        没有它，贴图会全局劫持 —— 在搜索框粘一张图也会被捕获框吃掉。
+        🔴 `data-heyta-capture-root` **跟着图片附件一起走了**。
+
+        它原来是粘贴归属判据：文档级 paste 监听靠它区分"在捕获框里粘贴"与
+        "在搜索框里粘贴"。现在捕获框不再收图（截图转任务搬进了右侧助手，
+        那里有自己的 `data-heyta-chat-root`），留着一个没有任何监听方的
+        作用域属性只会让下一个读代码的人以为这里还在收图。
       */}
-      <div data-heyta-capture-root="">
       <SharedCaptureComposer
         labels={labels}
         onSubmit={onSubmit}
         anchorDate={anchorDate}
-        renderAssistant={renderAssistant}
+        showPreview={false}
       />
-      </div>
     </HeytaUiProvider>
   );
 }

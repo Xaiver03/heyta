@@ -58,10 +58,24 @@ const DEFAULT_ITEM_SELECTOR = '[role="menuitem"]';
 /** 类型查找的输入缓冲窗口（毫秒）：超过它就当作重新起头。 */
 const TYPEAHEAD_RESET_MS = 500;
 
+/**
+ * 菜单里**可停靠**的项。
+ *
+ * 🔴 2026-11-02 补了"量不到就退回全集"那一格。原实现只认
+ * `offsetParent !== null || getClientRects().length > 0` —— 在真浏览器里那是
+ * "跳过 `display:none` 的项"，完全正确；而在 **jsdom 里这两条对每一个元素都恒假**
+ * （没有布局引擎：`offsetParent` 恒为 `null`、`getClientRects()` 恒为空集）。
+ * 于是同一份代码在单测里 `itemCount` 永远是 0，方向键一下都不动 ——
+ * 表现是"键盘通路只在测试里坏"，而它不可能在真浏览器里被发现。
+ *
+ * 判据：**有项但一项都量不到 ⇒ 这个环境量不了布局**（不是"菜单里没有可点的东西"）。
+ * 真浏览器里如果所有项都真的被藏起来了，容器本身也看不见，方向键无处可去 ——
+ * 退回全集不会造出任何在屏幕上成立的新行为。
+ */
 function itemsOf(container: HTMLElement, selector: string): HTMLElement[] {
-  return Array.from(container.querySelectorAll<HTMLElement>(selector)).filter(
-    (item) => item.offsetParent !== null || item.getClientRects().length > 0,
-  );
+  const all = Array.from(container.querySelectorAll<HTMLElement>(selector));
+  const measured = all.filter((item) => item.offsetParent !== null || item.getClientRects().length > 0);
+  return measured.length > 0 ? measured : all;
 }
 
 export function useMenuKeyboard({

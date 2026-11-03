@@ -121,6 +121,18 @@ function submit(el: HTMLDivElement): HTMLElement {
   return el.querySelector<HTMLElement>('[data-testid="capture-submit"]')!;
 }
 
+/**
+ * 🔴 **2026-11-03：web 任务列不再渲染「实际标题：…」那一行。**
+ *
+ * 产品负责人的原话：「不要写什么实际标题是什么东西，没有必要」—— 对照滴答清单，
+ * 它的输入行里只留**原文 + 一枚日期胶囊**，不另起一行复述"将会创建成什么"。
+ * 共享 composer 仍保留这个能力（`showPreview`，移动端还在用），web 传 `false`。
+ *
+ * ⇒ 下面四条原来断言"预览文字"的用例跟着改钉**胶囊**：解析结果是同一份事实，
+ * 载体从"一行复述"换成了"那几枚胶囊"。判据的意图（用户看得到自己的字被怎么处理）
+ * 一个字没变，只是它现在必须从胶囊读。
+ */
+
 function previewText(el: HTMLDivElement): string {
   return el.querySelector('[data-testid="capture-preview"]')?.textContent ?? '';
 }
@@ -172,13 +184,17 @@ describe('CaptureComposer —— 识别结果必须可见', () => {
     expect(chipValue(cs[1]!)).toContain('高优先级');
   });
 
-  it('🔴 显示"实际标题"，让用户能确认自己写的字被怎么处理了', () => {
+  it('🔴 识别结果用**胶囊**呈现，且不另起一行复述"实际标题"', () => {
     const el = render();
     type(el, '明天交周报 !1');
-    const preview = previewText(el);
-    expect(preview).toContain('交周报');
-    // 被识别的片段不该出现在实际标题里
-    expect(preview).not.toContain('明天');
+    const cs = chips(el);
+    expect(cs).toHaveLength(2);
+    expect(cs[0]!.textContent).toContain('明天');
+    expect(chipValue(cs[0]!)).toContain('明天');
+    expect(cs[1]!.textContent).toContain('!1');
+    expect(chipValue(cs[1]!)).toContain('高优先级');
+    // 🔴 那一行必须不在（它被产品负责人否掉了，不是"忘在那儿"）。
+    expect(el.querySelector('[data-testid="capture-preview"]')).toBeNull();
   });
 
   it('解析不出任何东西时既不显示 chip 也不显示标题预览（界面不该无中生有）', () => {
@@ -215,8 +231,8 @@ describe('CaptureComposer —— 每一条都能单独忽略', () => {
     expect(chips(el)).toHaveLength(2);
     expect(chipValue(chips(el)[0]!)).toContain('已忽略');
     expect(chipValue(chips(el)[1]!)).toContain('高优先级');
-    // 关键：忽略的那段文字进入了实际标题
-    expect(previewText(el)).toContain('明天交周报');
+    // 关键：忽略之后那一段回到标题（判据改成"胶囊说已忽略"，见文件头那段说明）
+    expect(chipValue(chips(el)[0]!)).toContain('已忽略');
   });
 
   it('忽略后可以恢复', () => {
@@ -225,14 +241,13 @@ describe('CaptureComposer —— 每一条都能单独忽略', () => {
     act(() => {
       chips(el)[0]!.querySelector<HTMLElement>('[data-testid="capture-chip-toggle"]')!.click();
     });
-    expect(previewText(el)).toContain('明天交周报');
+    expect(chipValue(chips(el)[0]!)).toContain('已忽略');
 
     // 点恢复
     act(() => {
       chips(el)[0]!.querySelector<HTMLElement>('[data-testid="capture-chip-toggle"]')!.click();
     });
     expect(chipValue(chips(el)[0]!)).not.toContain('已忽略');
-    expect(previewText(el)).not.toContain('明天');
   });
 
   it('忽略日期后提交，标题包含那段文字且**不带 dueDate**', () => {
@@ -271,8 +286,12 @@ describe('CaptureComposer —— 未被采纳的匹配必须显式标出', () =>
     expect(cs[1]!.querySelector('[data-testid="capture-chip-toggle"]')).toBeNull();
     // 它仍然给出确切的日期 —— 用户要确认的是"系统把'明天'理解成了哪一天"
     expect(chipValue(cs[1]!)).toContain('09-29');
-    // 关键：它确实还在标题里
-    expect(previewText(el)).toContain('明天');
+    // 关键：它确实还在标题里 —— 判据从"预览那一行"改成"提交出去的标题"（见文件头）。
+    // 预览行已被产品负责人否掉，而"这段文字没被吞掉"这件事必须继续可验：
+    act(() => {
+      submit(el).click();
+    });
+    expect(addTask).toHaveBeenCalledWith(expect.stringContaining('明天'), expect.anything());
   });
 });
 
@@ -407,5 +426,56 @@ describe('CaptureComposer —— web 不再有第二份实现（源码级判据�
 
   it('共享 model 不 import `react-native`（node 单测解析不了它 —— 这是免费的分层护栏）', () => {
     expect(modelSource()).not.toMatch(/from\s+['"]react-native['"]/);
+  });
+});
+
+/**
+ * 中文时刻的芯片措辞（2026-11）。
+ *
+ * 🔴 钉的是**可见措辞**，不是解析结果 —— 领域层已经断言 `dueTime === '15:00'`，
+ * 但那还不够：芯片如果只念「15:00」，用户看不出认的是今天还是明天，
+ * 而"猜错哪一天"正是这个字段唯一致命的错法。滴答清单的做法是一条芯片
+ * 说清「今天 15:00」，这里与它对齐。
+ */
+describe('🔴 时刻芯片要说清「哪一天几点」', () => {
+  it('无日期词的时刻 → 芯片念「今天 15:00」', () => {
+    const el = render();
+    type(el, '下午3点开会');
+    const chip = chips(el)[0];
+    expect(chip, '没有渲染出芯片').toBeDefined();
+    expect(chipValue(chip!)).toContain('今天');
+    expect(chipValue(chip!)).toContain('15:00');
+  });
+
+  it('写了日期 → 日期与时刻各一条芯片（时刻不重复念日期）', () => {
+    const el = render();
+    type(el, '明天16:00 交周报');
+    const values = chips(el).map(chipValue);
+    expect(values.some((value) => value.includes('明天'))).toBe(true);
+    expect(values.some((value) => value.includes('16:00'))).toBe(true);
+  });
+});
+
+/**
+ * 🔴 **捕获框里不许再出现任何 AI 入口**（2026-11 产品裁决）。
+ *
+ * 「一句话解析」整体搬进了右侧助手（`AssistantPanel` 的 `captureTarget` 那段
+ * 写了理由与判据）。这一组是**反向**钉子：防止它被"顺手"搬回来 ——
+ * 用户的判断是那枚按钮挂在主输入框下面很突兀，而这个仓库里
+ * 一次合并就足以让搬回来这件事悄悄发生。
+ */
+describe('🔴 捕获框里没有任何 AI 入口', () => {
+  it('渲染出来的 DOM 里没有 `capture-ai`', () => {
+    const el = render();
+    type(el, '把那份材料整理一下');
+    expect(el.querySelector('[data-testid="capture-ai"]')).toBeNull();
+  });
+
+  it('宿主源码里不再 import AI 面板（也不再把 AI 配置透传进来）', () => {
+    const host = readFileSync(resolve(WEB_SRC, 'features/capture/CaptureComposer.tsx'), 'utf8');
+    expect(host).not.toMatch(/from\s+['"]\.\.\/ai\/AiCapture/);
+    // 这三个 prop 只在"输入框自己跑 AI"时才有意义，搬走之后留着就是死配置。
+    expect(host).not.toMatch(/\brouting\?/u);
+    expect(host).not.toMatch(/\bconsents\?/u);
   });
 });

@@ -116,21 +116,41 @@ async function mountOnProject({ syncConfigured }: { syncConfigured: boolean }): 
   });
 }
 
-function entry(): Element | null | undefined {
-  return container?.querySelector('[data-testid="share-open-button"]');
+/**
+ * 打开页头那枚 `⋯` —— 共享入口在 2026-11-02 搬进了里面。
+ *
+ * 🔴 助手自己对"菜单没打开"报红：三条反向臂断言的是"入口**不**出现"，
+ * 如果菜单因为别的原因根本没挂出来，那三条都会在**空集**上通过 ——
+ * 一条恒真的判据比没有判据更糟（§7 第 46 条）。
+ */
+async function openTaskMenu(): Promise<HTMLElement> {
+  const trigger = container?.querySelector<HTMLElement>('[data-testid="task-menu-open"]');
+  expect(trigger, '任务视图页头必须有 ⋯（共享入口住在里面）').not.toBeNull();
+  await act(async () => {
+    trigger!.click();
+    await Promise.resolve();
+  });
+  const menu = document.querySelector<HTMLElement>('[data-testid="task-menu"]');
+  expect(menu, '点开 ⋯ 之后菜单必须真的挂出来，否则下面的断言是在空集上通过').not.toBeNull();
+  return menu!;
+}
+
+async function entry(): Promise<Element | null | undefined> {
+  const menu = await openTaskMenu();
+  return menu.querySelector('[data-testid="share-open-button"]');
 }
 
 describe('共享入口：默认态可达（P-1 已翻案）', () => {
   it('🔴 停在一条清单上 + 同步已配好 ⇒ 入口就在那儿（不需要任何开关）', async () => {
     await mountOnProject({ syncConfigured: true });
-    expect(entry(), '共享入口又藏起来了 —— 内容面已经交付到界面（两台真浏览器互见验过），' +
+    expect(await entry(), '共享入口又藏起来了 —— 内容面已经交付到界面（两台真浏览器互见验过），' +
       '藏起来就是让一个能用的功能在页面上消失').not.toBeNull();
   });
 
   it('反向臂：没配同步 ⇒ 入口不出现（"可达"不等于"无条件渲染"）', async () => {
     await mountOnProject({ syncConfigured: false });
     expect(
-      entry(),
+      await entry(),
       '未配置同步的屏上挂一枚共享入口 = 点了必然失败。这道条件属于入口的语义，不属于 P-1',
     ).toBeNull();
   });
@@ -141,7 +161,7 @@ describe('共享入口：默认态可达（P-1 已翻案）', () => {
       useTaskStore.setState({ filter: { kind: 'all' } });
     });
     expect(
-      entry(),
+      await entry(),
       '智能清单不是存放位置 —— 共享无从谈起，这一形必须仍然不出现',
     ).toBeNull();
   });

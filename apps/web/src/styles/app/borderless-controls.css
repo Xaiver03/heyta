@@ -44,9 +44,25 @@ a[href], a[href]:hover, a[href]:focus-visible {
  *   ⚠️ 用 `:focus-visible` 而不是 `:focus`：鼠标点进来时不画环，
  *      否则每一次点击都会闪一圈，那就把"无描边"的意图抵消掉了。
  */
+/*
+ * 🔴 **输入类控件的焦点环用 `box-shadow`，不用 `outline`（2026-11-03）。**
+ *
+ * 产品负责人看着对话输入框问「为什么这个对话框还是没有圆角」。答案在这一行里：
+ * 那个方框不是边框，是焦点环；而 **WebKit 的 `outline` 不跟随 `border-radius`**。
+ * 同一份 CSS，Chromium 里是圆的（所以 e2e 截图与判据一路绿），用户的 macOS 壳里是方的。
+ *
+ * ⇒ 圆角只有 `box-shadow` 能给（它天然贴住圆角）。换成它之后**环还是这一处**：
+ * 颜色仍取 `--ht-color-ring`、粗细仍取 `--ht-border-width-thick`，
+ * 判据看的两个量一个没变；变的只是它现在画在圆角外面而不是方框外面。
+ *
+ * ⚠️ 环**往内**画的那一档（`--ht-focus-ring-offset` 为负、给滚动容器用）在这里不适用：
+ * 输入框从来不是那种"贴着容器边、环被裁掉"的控件，所以这一格没有对应需求。
+ */
 :is(input:not([type='checkbox']):not([type='radio']), textarea, [contenteditable='true']):focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring) !important;
-  outline-offset: var(--ht-focus-ring-offset) !important;
+  outline: none !important;
+  box-shadow:
+    0 0 0 var(--ht-border-width-thick) var(--ht-color-ring),
+    0 0 0 var(--ht-focus-ring-offset) var(--ht-color-background) !important;
 }
 :is(button, [role='button'], [role='tab'], [role='menuitem'], select, summary, a[href], [role='separator']):focus-visible {
   outline: var(--ht-focus-ring-width) solid var(--ht-color-ring) !important;

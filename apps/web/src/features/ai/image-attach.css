@@ -21,9 +21,13 @@
   flex-wrap: wrap;
 }
 
-.ht-capture-attach__hint {
-  color: var(--ht-color-foreground-subtle);
-  font-size: var(--ht-font-size-xs);
+/* 那枚"附一张图"按钮：纯图标。
+ *
+ * 🔴 它旁边**曾经**有一条 `__hint`（「也可以直接粘贴截图」），而这一区在任务列与
+ * 对话助手里**各挂一次** —— 一屏两遍同一句说明。说明文字在做事面上没有位置，
+ * 这条 CSS 的删除和 `ImageAttach.tsx` 里那段注释是同一次改动。 */
+.ht-capture-attach__pick {
+  padding-inline: var(--ht-space-2);
 }
 
 .ht-capture-attach__list {

@@ -82,6 +82,23 @@
   max-inline-size: 100%;
 }
 
+/* 批量栏（2026-11-02）。
+ *
+ * 🔴 它现在只在**批量模式打开时**存在，非模式态下页头没有它 ——
+ * 进入模式的动作在页头那枚 `⋯` 里。原来它常驻，于是"选择任务"这枚按钮
+ * 和排序下拉、分享按钮一起把页头塞满，用户在任何时刻都在看一组自己没在用的控件。
+ *
+ * 为什么是类而不是内联：`check:l4` 的内联棘轮只许降不许升。 */
+.ht-header__bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
 /* 批量工具栏是页头动作中的一个可换行单元。让它能收缩到当前主列，
    内层按钮随后才有机会按触控尺寸换行，而不是把页头撑出视口。 */
 .ht-header__actions > [data-testid="bulk-toolbar"] {

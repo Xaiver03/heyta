@@ -39,7 +39,7 @@ import { useModalFocusIsolation } from './useModalFocusIsolation.js';
  *    教训与复量见 §7 第 607 条（`popover(500) > modal(400)` 倒挂 ⇒ 画得出来点不动）。
  */
 export interface WebModalShellProps {
-  /** 宿主自己的两枚类名（遮罩 / 面板）。缺省用共享壳那两枚 `ht-web-modal__*`。 */
+  /** 宿主自己的两枚类名（遮罩 / 面板）。缺省用共享壳那两枚 `ht-app__modal-*`。 */
   readonly overlayClass?: string;
   readonly dialogClass?: string;
   /** `aria-labelledby` 指向宿主那一枚标题的 id。 */
@@ -178,7 +178,7 @@ export function WebModalShell({
   const layer = (
     <div
       role="presentation"
-      className={overlayClass ?? 'ht-web-modal__overlay'}
+      className={overlayClass ?? 'ht-app__modal-overlay'}
       style={overlayStyle}
       data-testid={`${testId}-scrim`}
       /**
@@ -203,7 +203,7 @@ export function WebModalShell({
            否则这次抽取会给原本没有该属性的壳（危险确认）凭空加一个 DOM 属性。 */
         aria-busy={busy ? true : undefined}
         aria-labelledby={labelledBy}
-        className={dialogClass ?? 'ht-web-modal__dialog'}
+        className={dialogClass ?? 'ht-app__modal-dialog'}
         style={dialogStyle}
         data-testid={testId}
         onClick={(event) => {

@@ -113,7 +113,13 @@ export function NoteField({
           }}
         />
       </div>
-      <p className="ht-settings__hint">{t('web.note.hint')}</p>
+      {/*
+        🔴 这里**曾经**有一句 `web.note.hint`：「离开输入框时自动保存」。
+        2026-11-02 删掉 —— 做事面上不挂说明文字（产品负责人的禁令，见
+        `docs/agents/overlay-feedback.md` 与 `check:surface-budget` 的"主界面不许有
+        `__hint` 类说明容器"那一臂）。自动保存是行为，行为不需要一句标签来证明自己；
+        而它占的那一行在每次打开备注时都在。
+      */}
     </>
   );
 }

@@ -21,6 +21,9 @@
 @import './app/profile.css';
 @import './app/material.css';
 @import './app/controls.css';
+/* 锚定菜单（`⋯`）—— 2026-11-02。放在 controls 之后、borderless-controls 之前：
+   后者的 `:focus-visible` 环要能落到菜单项上，所以它必须最后读。 */
+@import './app/menu.css';
 /* 表单行（FormField）—— 2026-10-24。放在 controls 之后、功能 CSS 之前：
    它给的是**解剖**，功能 CSS 只该改配色/宽度，不该重新定义字段形状。 */
 @import './app/form.css';
