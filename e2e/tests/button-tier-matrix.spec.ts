@@ -70,8 +70,20 @@ async function openPurgeConfirm(page: Page): Promise<{ cancel: string; submit: s
   await addTask(page, TITLE);
   const row = page.locator('[data-testid^="task-item-"]').filter({ hasText: TITLE });
   await expect(row, `列表里没有刚加的「${TITLE}」`).toBeVisible();
+  /*
+   * 🔴 2026-11：**行尾那枚 `删除：<标题>` 已经不存在**（整排行内控件被收进面单，
+   * 删除搬进行右键菜单 `TaskRowMenu`，见 `apps/web/src/features/tasks/TaskRowMenu.tsx`
+   * 文件头那张表：一级只有「打开详情 / 删除」，危险项在分隔线以下）。
+   * 这一步只是"造出回收站里那一条"，判据在确认层里，所以换手势不算改判据 ——
+   * 下面那句 `toHaveCount(0)` 与后面两枚按钮的选择器一个字都没动。
+   */
   await openRowTail(page, row);
-  await page.getByRole('button', { name: `删除：${TITLE}` }).click();
+  await row.click({ button: 'right' });
+  await expect(
+    page.getByTestId('task-row-menu'),
+    '右键没打开行菜单 ⇒ 行尾删除按钮撤掉之后，列表上就没有删除入口了',
+  ).toBeVisible();
+  await page.getByTestId('task-row-menu-delete').click();
   await expect(row, '删了一下之后它还留在主列表').toHaveCount(0);
   await switchView(page, '回收站');
   await page.getByRole('button', { name: `彻底删除：${TITLE}` }).click();
@@ -83,7 +95,14 @@ async function openPurgeConfirm(page: Page): Promise<{ cancel: string; submit: s
 /** 选中一条 ⇒ 批量条出现，那枚「删除」是危险行的行内档。 */
 async function openBulkBar(page: Page): Promise<string> {
   await switchView(page, '任务');
-  await page.getByRole('button', { name: '选择任务' }).click();
+  /*
+   * 🔴 2026-11：页头**只剩 `⋯` 与详情开关**（「一个功能一个控件」的加法页头被收掉了，
+   * `App.tsx` 那段注释记着五组并列 → 一枚 `⋯`）。「选择任务」现在是 `⋯` 里的
+   * `task-select-open` 那一项，因此这一句必须先开菜单再点项 ——
+   * 旧写法 `getByRole('button', { name: '选择任务' })` 在页面上解析到 0 枚。
+   */
+  await page.getByTestId('task-menu-open').click();
+  await page.getByTestId('task-select-open').click();
   await page.locator('[data-testid^="bulk-select-"]').first().click();
   await expect(page.getByTestId('bulk-toolbar'), '选中一条之后批量条没出现').toBeVisible();
   return '[data-testid="bulk-toolbar"] button.ht-btn--danger';

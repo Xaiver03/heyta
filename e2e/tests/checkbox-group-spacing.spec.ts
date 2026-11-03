@@ -4,9 +4,15 @@
  *
  * ## 它补的是哪一格
  *
- * `e2e/tests/auth-form-spacing.spec.ts` 量的是登录面板。这一条量的是任务行尾的标签多选组
+ * `e2e/tests/auth-form-spacing.spec.ts` 量的是登录面板。这一条量的是任务面单里的标签多选组
  * （一行一枚可勾的复选框）；同族的另一处 `TaskRepeat` 重复方式单选**同法已改**，
  * 但它不进这里的分母 —— 理由与它的读数写在测试体那段注释里，别在这儿复述。
+ *
+ * 🔴 2026-11（行操作 UX 重设计）：这一组**搬进了面单**（`TaskDetailCard` 的
+ * `OrganizerField`）。行尾那一排行内编辑器整排被撤掉（「把所有这种铺开式组件全都删掉，
+ * 全都收拢进来」），900 宽这一档的面单落在点行弹出的对话框里。
+ * ⇒ 量法一字未改（同一个 `fieldset` / `legend` / `label`），只是**它现在被画在哪一格**
+ * 变了：判据的主体跟着编辑器走，不跟着行尾那一格走。
  * 这两处原本的宿主容器都写 `gap: space.1`（4px）—— 而 4px 这一档在本仓的语义是
  * **同一个控件内部**（标签↔输入框↔提示），不是"下一枚控件"。
  *
@@ -41,6 +47,7 @@ import { existsSync, rmSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
 import { addTask, openApp, openRowTail, rowFor, switchView } from './helpers.js';
+import { openNarrowTaskPane } from './task-detail-entry.js';
 
 const STAMP = Date.now().toString().slice(-6);
 const TITLE = `group-gap-${STAMP}`;
@@ -90,8 +97,14 @@ test('标签多选组：行距与分组标题到第一行的距离都在合规�
 
   const row = rowFor(page, TITLE);
   await expect(row).toBeVisible();
+  /*
+   * 🔴 旧写法是「展开行尾折叠区 → 点 `task-organize-summary` → 在那一层里量这个组」。
+   * 那一层不存在了：标签多选组现在只住在 `TaskDetailCard` 的 `OrganizerField` 里，
+   * 900 宽这一档落在**点行弹出的对话框**中。所以走 `openNarrowTaskPane`（点行），
+   * 量法本身与阈值一字未改。
+   */
   await openRowTail(page, row);
-  await row.getByTestId('task-organize-summary').click();
+  await openNarrowTaskPane(page, TITLE);
 
   const failures: string[] = [];
   const groups = [
@@ -135,6 +148,11 @@ test('标签多选组：行距与分组标题到第一行的距离都在合规�
     }
   }
 
+  /*
+   * 图里必须**看得见量到的那个组**：它现在住在面单对话框里，而对话框自己有滚动轴 ——
+   * 不滚过去的话这张证据图上是一段无关的标题与备注框（§6.2 规定一要求人能看懂）。
+   */
+  await groups[0]!.locator.scrollIntoViewIfNeeded().catch(() => undefined);
   await page.screenshot({ path: SHOT });
   expect(failures, failures.join('\n')).toEqual([]);
 });

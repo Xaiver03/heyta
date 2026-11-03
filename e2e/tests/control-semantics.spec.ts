@@ -71,8 +71,19 @@ async function openPurgeConfirm(page: Page): Promise<{ cancel: Locator; submit: 
   await addTask(page, TITLE);
   const row = page.locator('[data-testid^="task-item-"]').filter({ hasText: TITLE });
   await expect(row, `列表里没有刚加的「${TITLE}」`).toBeVisible();
+  /*
+   * 🔴 2026-11：删除的行内入口撤掉了 —— 整排行内控件被收进面单
+   *（「把所有这种铺开式组件全都删掉，全都收拢进来」），删除搬进行右键菜单
+   * `TaskRowMenu`。这一句只是"把任务送进回收站"的前置，判据全在确认层里
+   *（下面那些 token 对账一个字没动）。
+   */
   await openRowTail(page, row);
-  await page.getByRole('button', { name: `删除：${TITLE}` }).click();
+  await row.click({ button: 'right' });
+  await expect(
+    page.getByTestId('task-row-menu'),
+    '右键没打开行菜单 ⇒ 行尾删除按钮撤掉之后，列表上就没有删除入口了',
+  ).toBeVisible();
+  await page.getByTestId('task-row-menu-delete').click();
   await expect(row, '删了一下之后它还留在主列表').toHaveCount(0);
   await switchView(page, '回收站');
   const purge = page.getByRole('button', { name: `彻底删除：${TITLE}` });
