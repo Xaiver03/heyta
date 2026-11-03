@@ -94,12 +94,12 @@ const LEDGER = [
     reason: '壳文件，里面既有自绘对话框也有输入；要逐格分清"关掉丢不丢 authored 内容"'
       + '才能定档。P1 未逐格核 ⇒ 记欠账，不许读成豁免。',
   },
-  {
-    file: 'apps/web/src/features/ai/AiCapture.tsx',
-    status: 'owed',
-    reason: '它内嵌 `CaptureComposer`（草稿在共享组件本地 state）⇒ 形状与日历快速捕获同源；'
-      + '要确认这一面的关闭出口是否真的会卸载那个 composer 才能定档。',
-  },
+  /*
+   * 2026-11 删掉一条：`apps/web/src/features/ai/AiCapture.tsx` 随「一句话捕获」那一档功能
+   * 一起去掉（产品负责人：「已经集成到收集框里面了，不需要单独有一个产品入口」）。
+   * 它与 `CaptureComposer` 同源这一格**没有消失，只是搬了住址** —— 收集框那一份仍在扫，
+   * 所以这里的欠判定不是被豁免了，而是被并进了收集框那条候选。
+   */
   {
     file: 'apps/web/src/features/ai/AssistantPanel.tsx',
     status: 'owed',

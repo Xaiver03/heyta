@@ -147,7 +147,9 @@ const NATIVE_LEDGER = {
 const MODAL_LEDGER = {
   'apps/web/src/App.tsx': { ariaModal: 3, dialogRole: 2 },
   'apps/web/src/features/ai/AiBreakdown.tsx': { ariaModal: 0, dialogRole: 3 },
-  'apps/web/src/features/ai/AiCapture.tsx': { ariaModal: 0, dialogRole: 3 },
+  // 2026-11 删除：`AiCapture.tsx` 随「一句话捕获」那一档功能一起去掉
+  // （产品负责人：「已经集成到收集框里面了，不需要单独有一个产品入口」）。
+  // 这一行是按本账本的规矩删的 —— **迁走一格就删一行**，不是把判据放宽。
   'apps/web/src/features/ai/AiDuration.tsx': { ariaModal: 0, dialogRole: 3 },
   'apps/web/src/features/ai/AiPrioritize.tsx': { ariaModal: 0, dialogRole: 3 },
   'apps/web/src/features/ai/AiToolRun.tsx': { ariaModal: 0, dialogRole: 3 },
