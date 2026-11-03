@@ -147,6 +147,25 @@ export const TEXT_STYLES = {
     tracking: 'tracking.body',
   },
   /**
+   * 详情面板里那一行的标题（同一个 `<TaskRow>`，`density="detail"` 那一档）。
+   *
+   * 🔴 为什么是 `font-size.xl`（20）而不是 `lg`（18）：本文件上面刚用比值判过
+   * "16:14 = 1.14 在阅读距离上不构成层级"。18:16 = **1.125**，比它抱怨的那个还小 ——
+   * 加一档却读不出差别，等于把"大字档"变成一个没人能验证的形容词。
+   * 20:16 = 1.25（与列表行分得开），20:12（`row-meta`）= 1.67（与元信息更分得开）。
+   *
+   * ⚠️ 字重**沿用** `row-title` 的 medium，不靠加粗补层级：
+   * 这一档要的是"同一条信息在详情里更大"，不是"更强的强调"；
+   * 换字重会让详情标题与 `headline`（semibold）那两个角色又混起来。
+   * 行高也沿用 `normal` —— 收紧到 `tight` 在 20px 上会让换行标题的汉字粘在一起（同 `row-title` 那条理由）。
+   */
+  'detail-title': {
+    size: 'font-size.xl',
+    weight: 'font-weight.medium',
+    leading: 'line-height.normal',
+    tracking: 'tracking.body',
+  },
+  /**
    * 任务行的次要信息：日期、清单名、标签、重复规则。
    *
    * 🔴 **2026-11-02 字号 14 → 12。** 它和标题的比值是这一档存在的全部意义：

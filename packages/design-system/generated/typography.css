@@ -39,6 +39,13 @@
   letter-spacing: var(--ht-tracking-body);
 }
 
+.ht-type-detail-title {
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
+}
+
 .ht-type-row-meta {
   font-size: var(--ht-font-size-xs);
   font-weight: var(--ht-font-weight-regular);
