@@ -476,8 +476,44 @@ function query(params: Record<string, string | number | undefined>): string {
 // 接口
 // ─────────────────────────────────────────────────────────────────────
 
-export const fetchAdminOverview = (options: AdminClientOptions): Promise<AdminResult<AdminOverview>> =>
-  adminRequest<AdminOverview>(options, `${ADMIN_API_PREFIX}/overview`);
+/**
+ * 🔴 2xx 且是 JSON **不等于**"这是一份概览"。
+ *
+ * `adminRequest` 的成功分支是 `(await response.json()) as T` —— 一次盲转。
+ * 于是服务端回 `200 {}`（路由还在、代理却改写了载荷；或自建者接了个半成品网关）时，
+ * `probe()` 拿到 `ok:true` 就把 `access` 记成 `'admin'`、把 `overview` 记成 `{}`，
+ * 而面板随即读 `overview.users.total` ⇒ **整页白屏**（2026-11 实测：e2e 的
+ * `inbound-automation` 点开「数据与同步」后页面全空，`pageerror` 停在
+ * `AdminPanel.tsx` 那一行；截图是一整张空背景）。
+ *
+ * 这与上面"2xx 但不是 JSON ⇒ `server`"是**同一件事的另一半**：都是"服务端给的
+ * 东西不是契约里的形状"，都不该被说成"你是管理员"。所以判据放在这里、理由码复用
+ * `server`（不加新码：它不是一个新的用户处境，就是服务端坏了）。
+ * ⚠️ 这不违反文件头那条"这里不做权限判断"—— 权限判断是"这个账号能不能看"，
+ * 这里问的是"这份载荷是不是那份载荷"。
+ */
+const OVERVIEW_GROUPS = ['users', 'subscriptions', 'orders', 'coupons', 'invites'] as const;
+
+function isAdminOverview(value: unknown): value is AdminOverview {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value as Record<string, unknown>;
+  // 五组必须都是对象（渲染层逐组解引用），且 `users.total` 必须是数字 ——
+  // 那一格是面板画的第一个数，缺了必崩，所以拿它当"形状成立"的最小见证。
+  for (const group of OVERVIEW_GROUPS) {
+    const part = record[group];
+    if (typeof part !== 'object' || part === null) return false;
+  }
+  return typeof (record['users'] as Record<string, unknown>)['total'] === 'number';
+}
+
+export const fetchAdminOverview = async (
+  options: AdminClientOptions,
+): Promise<AdminResult<AdminOverview>> => {
+  const result = await adminRequest<unknown>(options, `${ADMIN_API_PREFIX}/overview`);
+  if (!result.ok) return result;
+  if (!isAdminOverview(result.data)) return { ok: false, reason: 'server' };
+  return { ok: true, data: result.data };
+};
 
 export const fetchAdminUsers = (
   options: AdminClientOptions,
