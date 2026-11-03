@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { visibleFocusRing } from './focus-ring';
 import { openApp } from './helpers';
 
 /**
@@ -182,18 +183,32 @@ test('搜索：贴顶浮层透出下层视图 + 顶栏没有第二个框 + 面�
    *  ② 输入框：原来是 `outline-width === 0px`（"输入框不画焦点环"）。那个口径已被
    *     2026-10-24 的无障碍决定取代（`borderless-controls.css:44-51`：所有文本输入
    *     都要有可见键盘焦点环，据 WCAG 2.4.7 / 1.4.11）⇒ 现在拿到焦点**就该有**
-   *     2px 主色环。改成"环宽 = 全局 token 且 `outline-style ≠ none`"。
+   *     2px 主色环。
+   *     🔴 2026-11-03 第三次改（换了机制，不是改口径）：环从 `outline` 换成 `box-shadow`
+   *     （WebKit 的 `outline` 不跟随 `border-radius`）。所以这里量的是共用判据
+   *     `./focus-ring` 的 `visibleFocusRing()`，环宽仍必须等于全局那条 token。
    *     ⚠️ 与 `assistant-resize-ux` 同一条口径、同一处出处，两边不许各写一套。
    */
   const appearance = await card.evaluate((el) => {
     const panel = getComputedStyle(el);
-    const input = getComputedStyle(el.querySelector('input')!);
+    const inputEl = el.querySelector('input')!;
+    const input = getComputedStyle(inputEl);
+    const ringProbe = document.createElement('span');
+    ringProbe.style.cssText = 'position:absolute;visibility:hidden;color:var(--ht-color-ring)';
+    document.body.appendChild(ringProbe);
+    const ringColor = getComputedStyle(ringProbe).color;
+    ringProbe.remove();
     return {
       bg: panel.backgroundColor,
       borderColor: panel.borderTopColor,
       borderStyle: panel.borderTopStyle,
       outlineStyle: input.outlineStyle,
       outlineWidth: input.outlineWidth,
+      outlineColor: input.outlineColor,
+      outlineOffset: input.outlineOffset,
+      boxShadow: input.boxShadow,
+      backgroundColor: input.backgroundColor,
+      ringColor,
       ring: getComputedStyle(document.documentElement).getPropertyValue('--ht-border-width-thick').trim(),
     };
   });
@@ -203,8 +218,9 @@ test('搜索：贴顶浮层透出下层视图 + 顶栏没有第二个框 + 面�
     appearance.borderColor,
     '浮层画了可见描边（判颜色不判宽度：透明边框不算描边）',
   ).toBe('rgba(0, 0, 0, 0)');
-  expect(appearance.outlineWidth, '输入框的键盘焦点环 = 全局那一条').toBe(appearance.ring);
-  expect(appearance.outlineStyle, '焦点环被改成 none ⇒ 键盘用户看不出焦点').not.toBe('none');
+  const ring = visibleFocusRing(appearance);
+  expect(ring, `输入框的键盘焦点环不见了：读数 ${JSON.stringify(appearance)}`).not.toBeNull();
+  expect(ring!.widthPx, '输入框的键盘焦点环 = 全局那一条').toBe(Number.parseFloat(appearance.ring));
 
   await page.screenshot({ path: 'test-results/search-spotlight-empty.png', fullPage: false });
 

@@ -71,7 +71,8 @@ a[href], a[href]:hover, a[href]:focus-visible {
 /*
  * 🔴 环往**里**画的那一层：滚动容器。
  *
- * `outline` 会被 `overflow` 非 `visible` 的祖先裁掉 —— 而"控件铺满容器内容宽、
+ * 向外的焦点环会被 `overflow` 非 `visible` 的祖先裁掉 —— `outline` 与 `box-shadow`
+ * 都一样（阴影同样画在盒子外侧，滚动容器照样切）。而"控件铺满容器内容宽、
  * 第一枚还贴着容器上边"在本仓是**一族**，不是一处。现量（1440 键盘扫描）：
  *   · rail 的 tab：环带上 65 / 左 7 / 右 57，容器 `.ht-rail__tabs` 是 68 / 10 / 54
  *     ⇒ 上、左、右三条边被切，图上只剩底下一条线；
@@ -83,11 +84,23 @@ a[href], a[href]:hover, a[href]:focus-visible {
  * 修法只有这一处：**把环带收回盒子内侧**，不去在每一层里再画一枚环
  * （那正是本文件存在的理由 —— 焦点实现只许有一个来源）。
  * 哪些层要加进来由**浏览器几何扫描**判，不由人记：
- * `e2e/tests/focus-visible-matrix.spec.ts` 那条"键盘走到的每一枚控件四条边都画得出来"
- * 会自己把新加的滚动容器报出来。
+ * `e2e/tests/focus-visible-matrix.spec.ts` 那几条"键盘走到的每一枚控件四条边都画得出来"
+ * （5 个视图各一条）会自己把新加的滚动容器报出来。
+ *
+ * 🔴 2026-11-03 补进第三层：`.ht-sidebar__calendar-body`（`sidebar.css:316`）。
+ * 它是 `.ht-sidebar__body` 的**兄弟**滚动容器（日历侧栏的迷你月历 + 「所有」那一列），
+ * 名字不像，所以上一次登记漏了它 —— 漏的后果是现量的这一条：
+ *   · 元素 `[data-testid="calendar-scope-all"]`（`button.ht-sidebar__scope-all`）
+ *     盒子 80..288 × 239..271（1280×720 视口），裁剪容器 `.ht-sidebar__calendar-body`
+ *     是 80..288 × 16..271 —— 左/右/下三条边与裁剪边**完全重合**；
+ *   · 环带 = `outline-offset` 1px + `outline-width` 2px = 外扩 3px
+ *     ⇒ 左 77<80、右 291>288、下 274>271，三条边各出界 3px，
+ *     画面上只剩上边那一条（`e2e/test-results/focus-calendar-scope-all.png`）。
+ * 判据：`focus-visible-matrix.spec.ts` 的「日历侧栏「全部」那一枚的焦点环四条边都画得出来」。
  */
 .ht-rail__tabs,
-.ht-sidebar__body {
+.ht-sidebar__body,
+.ht-sidebar__calendar-body {
   --ht-focus-ring-offset: calc(var(--ht-space-1) * -1);
 }
 /* 复合输入与浮层由内容、底色及投影组织，不加第二层装饰框。 */
