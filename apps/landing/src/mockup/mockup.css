@@ -634,9 +634,16 @@ button.mk-task__body:focus-visible {
 /* 标题：**语义文字样式** `TASK_ROW_TEXT.title`（= `row-title`）的四个 token。
    这里原来抄的是 `--ht-font-size-sm`，而 `row-title` 是 `font-size.base` ——
    另一处实测漂移。 */
+/*
+ * 🔴 这两格必须**跟着 `TASK_ROW_TEXT` 走**（判据：`tests/mockup-task-row.spec.tsx`
+ * 逐项比对语义样式）。2026-11 的排印调整把它们各推了一档：
+ *   · `row-title` 400 → **500**：正文与标题同字重时，一眼扫列表分不出哪一行是标题；
+ *   · `row-meta`  14 → **12**：与标题的比从 1.14 拉到 1.33，密度一高才不会"两行字差不多大"。
+ * 落地页这张模拟图如果停在旧值，它就是一张**画着已不存在排版**的图。
+ */
 .mk-task__title {
   font-size: var(--ht-font-size-base);
-  font-weight: var(--ht-font-weight-regular);
+  font-weight: var(--ht-font-weight-medium);
   line-height: var(--ht-line-height-normal);
   letter-spacing: var(--ht-tracking-body);
   min-inline-size: 0;
@@ -662,7 +669,7 @@ button.mk-task__body:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
-  font-size: var(--ht-font-size-sm);
+  font-size: var(--ht-font-size-xs);
   font-weight: var(--ht-font-weight-regular);
   line-height: var(--ht-line-height-normal);
   letter-spacing: var(--ht-tracking-body);
@@ -724,11 +731,12 @@ button.mk-task__body:focus-visible {
 
 /* 大标题：真实现用 `text['row-meta']`（字号 sm）+ 覆盖成 semibold。
    四个 token 全部与 `TEXT_STYLES['row-meta']` 对账（weight 是 semibold 覆盖）。 */
+/* 与 `row-meta` 同一档：2026-11 由 `sm` 收到 `xs`（判据逐项比对语义样式）。 */
 .mk-quad__head {
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
-  font-size: var(--ht-font-size-sm);
+  font-size: var(--ht-font-size-xs);
   font-weight: var(--ht-font-weight-semibold);
   line-height: var(--ht-line-height-normal);
   letter-spacing: var(--ht-tracking-body);
