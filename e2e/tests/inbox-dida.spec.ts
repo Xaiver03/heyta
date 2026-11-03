@@ -192,7 +192,7 @@ test('最近 7 天：侧栏计数 == 点进去的行数，逾期那条不在里�
  * 种的数据全部**不带截止日期**：三条落进同一个「无截止时间」组，
  * 于是屏上的行序验的就是排序本身，不是分组。
  */
-test('页头排序：换档位真的换行序，控件带可见标签', async ({ page }) => {
+test('页头排序：从 ⋯ 里换档位真的换行序，三档都是可见文字', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openApp(page);
 
@@ -205,26 +205,44 @@ test('页头排序：换档位真的换行序，控件带可见标签', async ({
     await composer.press('Enter');
   }
 
-  const sort = page.locator('[data-testid="task-sort"]');
-  await expect(sort, '有行时页头就该有排序控件').toBeVisible();
-  await expect(sort).toContainText('排序方式');
-  const select = page.locator('[data-testid="task-sort-select"]');
+  /*
+   * 排序在 2026-11-02 收进了页头那枚 `⋯`（原来是页头上一枚常驻的
+   * `12px 文字标签 + 44px 原生下拉`）。**判据没放宽**：这里仍然验
+   * "从页头能找到排序、选下去真的换行序、两档是两个顺序"，
+   * 换掉的只是入口形状 —— 多了一步"先点开 ⋯"。
+   */
+  const menuTrigger = page.locator('header.ht-header [data-testid="task-menu-open"]');
+  await expect(menuTrigger, '任务视图页头必须有一枚 ⋯（排序在里面）').toBeVisible();
   const rows = page.locator('[data-testid^="task-group-"] [role="checkbox"]');
 
   const order = async (): Promise<string[]> =>
     (await rows.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''))) as string[];
 
-  await expect(page.locator('header.ht-header [data-testid="task-sort"]'), '控件必须长在页头里（滴答参照图第三列）').toBeVisible();
+  /** 点开 `⋯` 并选一档排序。顺带留一张**菜单开着**的取证图。 */
+  const pickSort = async (key: 'display' | 'addedAt' | 'priority'): Promise<void> => {
+    await menuTrigger.click();
+    const item = page.locator(`[data-testid="task-sort-${key}"]`);
+    await expect(item, `菜单里没有档位 ${key}`).toBeVisible();
+    if (key === 'addedAt') {
+      // 判据要看见的是"整枚菜单"（分组标题 + 三档 + 勾），不是某一项可见。
+      await expect(page.locator('[data-testid="task-menu"]')).toBeVisible();
+      await page.screenshot({ path: SHOT('sort-menu-open') });
+    }
+    await item.click();
+    // 选完必须收起：不收的菜单会让用户以为"点了没生效"而又点一次。
+    await expect(page.locator('[data-testid="task-menu"]')).toHaveCount(0);
+  };
+
   const byDefault = await order();
   await page.screenshot({ path: SHOT('sort-default') });
 
-  await select.selectOption('addedAt');
+  await pickSort('addedAt');
   const byAdded = await order();
   expect(byAdded, '按添加时间 = 新的在前').toEqual([...byDefault].reverse());
   expect(new Set([byDefault.join('|'), byAdded.join('|')]).size, '两档必须是两个顺序').toBe(2);
   await page.screenshot({ path: SHOT('sort-addedAt') });
 
-  await select.selectOption('priority');
+  await pickSort('priority');
   await page.screenshot({ path: SHOT('sort-priority') });
 
   // 暗色：下拉的底色/边框/文字是否跟着 token 翻（AGENTS §5）。

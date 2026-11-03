@@ -8,8 +8,9 @@
  * 栏里编辑"）在本单裁成**栏里编辑**，理由与推翻代价写在工单那一节。
  *
  * 🔴 这一层量的是 jsdom 那一族**量不到**的四件事：
- *   ① 那一栏被 CSS 藏掉时，备注输入框**回不回得来**（`display:none` 里藏一只编辑器 =
- *      界面不说、模型已变，§8.130 那条同一个形状）—— T4；
+ *   ① 那一栏**不画**的档（窄窗口）里，字段编辑权**还有没有落点**
+ *      （`display:none` 里藏一只编辑器 = 界面不说、模型已变，§8.130 那条同一个形状；
+ *      2026-11 行操作重设计之后这个落点是**点行弹出的面单对话框**，不是行尾那颗 chip）—— T4；
  *   ② 用户打进去的备注**真落成了一条 op**（jsdom 只看到 `onBlur` 被调用过）—— T1 的后半；
  *   ③ 面单里的控件**留得出栏内间距**、长标题不许把 22rem 的栏撑破（几何只在浏览器成立）—— T1/T5；
  *   ④ Enter 之后焦点**真的落在那只框里**（`focus()` 在非 form 元素上要真浏览器才算数）—— T3。
@@ -20,8 +21,8 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { revealRowActionsBy } from './ai-entry.js';
-import { addTask, openApp, openRowTail, parkCursor, switchView } from './helpers';
+import { addTask, openApp, parkCursor, switchView } from './helpers';
+import { closeTaskDetailIfOpen, openNarrowTaskPane } from './task-detail-entry.js';
 
 const SHOT = (name: string) =>
   fileURLToPath(new URL(`../../apps/web/evidence/detail-pane-task/${name}.png`, import.meta.url));
@@ -111,21 +112,29 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     await addTaskAndRelease(page, '面单甲');
 
     /* 前提（这一档仍是**裁决的一部分**，不是漏做）：宽档 + 未选中时栏里没有面单。
-       🔴 而"整机也没有备注输入框"这一半在 2026-10-06 第二刀之后不成立了：那一刀把
-       `taskPaneInColumn` 补上"真的选中了一条任务"，于是未选中时编辑权**回到行尾那枚 chip**
-       （`<details>` 收着，不是摊开的 textarea）。旧写法是 §8.138 那版的形状 ——
-       行尾让位给一个**没在画东西的栏**，两半都不接，用户谁都写不了备注。
-       不变量还是那一条：**任何时刻不许两处同时可编辑** ⇒ 输入框数 == 任务行数，
-       而栏里那一格零只输入框。 */
+       🔴 2026-11 行操作 UX 重设计之后，"未选中"这一半的判据**换向了**：
+       旧写法钉的是"输入框数 == 任务行数" —— 那时每一行行尾都挂着一颗「备注」chip
+       （`<details>` 收着 textarea）接住编辑权，于是"行行有一只输入框"是对的。
+       那条模型整个被删掉了（产品负责人：「把所有这种铺开式组件全都删掉，全都收拢进来」）：
+       行尾只剩**只读徽标**，字段编辑器只有一处所有者 —— 面单。⇒ 未选中时
+       "没有任何人接编辑权"成了**正确状态**，实测（1280×720、一条任务、未选中）
+       `task-note-input` = **0**。同一件事的反面照旧要挡，而且现在更严：
+       谁再往行里塞第二个编辑器，这条计数立刻不是 0。
+       不变量还是那一条：**任何时刻不许两处同时可编辑** —— 只是形状从
+       "输入框数 == 行数"变成了"整页最多一只，且它在面单里"。 */
     await expect(paneInColumn(page), '没选中却画了面单').toHaveCount(0);
     await expect(
       page.getByTestId('detail-column').getByTestId('task-note-input'),
       '栏里没画面单，却藏着一只备注框（那正是"编辑权没人接"的反面）',
     ).toHaveCount(0);
     await expect(
+      page.locator('[data-testid^="task-item-"]:visible'),
+      '前提：这一屏只该有一条任务（下面那两条计数说的是"整页"）',
+    ).toHaveCount(1);
+    await expect(
       fieldEverywhere(page),
-      '未选中时行尾没把编辑权接回去 ⇒ 整机没有备注入口',
-    ).toHaveCount(await page.locator('[data-testid^="task-item-"]').count());
+      '未选中时整页出现了备注编辑器 —— 行尾又长回第二个所有者了',
+    ).toHaveCount(0);
 
     await page.keyboard.press('ArrowDown');
     const pane = paneInColumn(page);
@@ -243,7 +252,7 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
-  test('🔴 T4 窄档（栏不出现）⇒ 备注框**回到行尾那颗 chip**，不许藏在 display:none 里', async ({
+  test('🔴 T4 窄档（栏不出现）⇒ 点行弹出面单对话框，备注编辑器在里面且真画得出来', async ({
     page,
   }) => {
     const errors = watchErrors(page);
@@ -252,21 +261,62 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     await addTaskAndRelease(page, '窄档回落甲');
     await page.setViewportSize({ width: 900, height: 600 });
 
-    // 栏这一支整个不画（`taskPaneInColumn` 为假 ⇒ 行尾那一支的条件反向成立）。
+    // 栏这一支整个不画（`taskPaneInColumn` 为假），而未选中时**整页零个编辑器**。
     await expect(paneEverywhere(page), '窄档还在往不存在的栏里画面单').toHaveCount(0);
-    await expect(fieldEverywhere(page), '窄档下行尾那颗 chip 没回来 = 这一档根本写不了备注').toHaveCount(1);
-    /* 🔴 那颗 chip 是一个 `<details>`：**收起时框在 DOM 里但画不出来**（第一趟就是把这条
-       判成"hidden"红的，红的是探针不是产品 —— 判"能写"必须走到用户真会走的那一步）。
-       点开它，框才必须真画得出来。 */
-    await openRowTail(page, page.locator('[data-testid^="task-item-"]').first());
-    await page.locator('.ht-note > summary').first().click();
-    await paintedBox(page, fieldEverywhere(page));
-    await fieldEverywhere(page).fill('窄档也写得进去');
+    await expect(
+      fieldEverywhere(page),
+      '未选中时行里又出现了备注编辑器 ⇒ 行尾长回了第二个所有者',
+    ).toHaveCount(0);
+
+    /* 🔴 判据换向（2026-11 行操作重设计）：**旧前提整个消失了**。
+       旧写法问的是"行尾那颗 chip 回来了没有"（`openRowTail` + `.ht-note > summary`
+       点开那个 `<details>`），因为那一刀之前编辑权确实是行尾接的。
+       现在行尾只有只读徽标，窄档的落点是 `openTask` 弹出的面单对话框
+       （`WebModalShell` + `task-pane`）—— 于是同一件事改问：**点行 ⇒ 对话框开 ⇒
+       备注编辑器在面单里、且真实画得出来**。
+       几何判据按面单宽度兜底，不抄字面量：实测（900×600）面单 590 宽、备注框 558 宽
+       = 95%，所以 60% 这条线只有"控件被挤扁"才会踩到。 */
+    const pane = await openNarrowTaskPane(page, '窄档回落甲');
+    const paneBox = await paintedBox(page, pane);
+    const field = pane.getByTestId('task-note-input');
+    const box = await paintedBox(page, field);
+    expect(
+      box.width,
+      `面单里那只备注框只有 ${String(box.width)}px 宽（面单 ${String(paneBox.width)}px）—— 画不出来`,
+    ).toBeGreaterThan(paneBox.width * 0.6);
+
+    await field.fill('窄档也写得进去');
     await releaseFocus(page);
-    await expect(fieldEverywhere(page)).toHaveValue('窄档也写得进去');
+    await expect(field).toHaveValue('窄档也写得进去');
 
     await parkCursor(page);
-    await page.screenshot({ path: SHOT('t4-narrow-falls-back-to-row') });
+    await page.screenshot({ path: SHOT('t4-narrow-note-in-dialog') });
+
+    /* 承重：那一笔要真落成 op。两件事各量一次 ——
+       ① 关掉对话框之后行上的**只读徽标**写着刚才那段（列表要能扫一眼看出写过东西，
+          与 T1 后半同一个口径）；
+       ② 刷新之后重新打开面单，正文还在（本地优先：重放 op，不是内存态）。 */
+    await closeTaskDetailIfOpen(page);
+    await expect(
+      fieldEverywhere(page),
+      '关掉面单之后整页仍有备注编辑器 ⇒ 又有一处没被收拢的编辑权',
+    ).toHaveCount(0);
+    const badge = page.locator('[data-testid^="task-note-badge-"]');
+    await expect(badge, '行尾没有备注徽标 ⇒ 列表看不出哪条任务写过备注').toHaveCount(1);
+    await expect(badge).toContainText('窄档也写得进去');
+    await expect(badge.locator('textarea'), '徽标里长出正文框（那是第二个编辑器）').toHaveCount(0);
+
+    await page.reload();
+    await openApp(page);
+    await switchView(page, '任务');
+    const paneAfter = await openNarrowTaskPane(page, '窄档回落甲');
+    await expect(
+      paneAfter.getByTestId('task-note-input'),
+      '刷新后备注没了 —— 说明那一格写的是本地态，不是 op',
+    ).toHaveValue('窄档也写得进去');
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('t4-narrow-note-after-reload') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
@@ -358,7 +408,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
-  test('T7 窄档：那一栏整个不在，重复的编辑入口回到行尾那颗浮层', async ({ page }) => {
+  test('T7 窄档：那一栏整个不在，重复的编辑入口在点行弹出的面单对话框里', async ({ page }) => {
     const errors = watchErrors(page);
     await page.setViewportSize({ width: 900, height: 600 });
     await openApp(page, '/?lang=zh-CN');
@@ -366,20 +416,31 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     await addTaskAndRelease(page, '窄档重复甲');
 
     await expect(paneEverywhere(page), '窄档不该画面单').toHaveCount(0);
-    const trigger = page.getByTestId('task-repeat-summary');
-    await expect(trigger, '窄档下行尾没有重复入口 ⇒ "设不了重复"').toHaveCount(1);
-    // 行尾动作区收起时 `opacity: 0`、不在命中栈里（见 `openRowTail` 的理由）。
-    await openRowTail(page, page.locator('[data-testid^="task-item-"]').first());
-    await trigger.first().click();
-
-    // ⚠️ `<details>` 收起时面板在 DOM 里但不画得出来（§8.138 T4 同一件事）：
-    // 判"写不写得进去"必须量真实渲染，不能只看 `toHaveCount`。
+    /* 🔴 判据换向（2026-11 行操作重设计）：**旧前提整个消失了**。
+       旧写法问"行尾那颗 `task-repeat-summary` 浮层回来了没有"，
+       而那颗 `<summary>` 与它所在的 `<details>` 是**行内编辑器时代**的落点
+       （`RepeatField` 的注释至今写着"一份实现两个落点"，那两个落点是
+       "行尾浮层"与"栏里"—— 前者已被删掉，实测整页 `task-repeat-summary` = 0）。
+       同一件事现在是：**点行 ⇒ 对话框开 ⇒ 重复的编辑本体在面单里、真画得出来**。
+       实测（900×600）：面单 590 宽，自定义 RRULE 那只框 558×44。 */
+    const pane = await openNarrowTaskPane(page, '窄档重复甲');
+    const paneBox = await paintedBox(page, pane);
+    await expect(pane.getByTestId('task-repeat-custom-input'), '面单里没有重复的编辑本体').toHaveCount(1);
+    // ⚠️ 原始 RRULE 框收在「高级」里（W6），默认折叠 ⇒ 判"写不写得进去"必须先展开。
     await openRepeatAdvanced(page);
-    const field = page.getByTestId('task-repeat-custom-input');
-    const box = await paintedBox(page, field.first());
-    expect(box.width, '窄档那只在行尾的框被挤成 0 宽').toBeGreaterThan(40);
-    await field.first().fill('FREQ=MONTHLY;BYMONTHDAY=15');
-    await field.first().press('Enter');
+    const field = pane.getByTestId('task-repeat-custom-input');
+    const box = await paintedBox(page, field);
+    expect(
+      box.width,
+      `面单里那只 RRULE 框只有 ${String(box.width)}px 宽（面单 ${String(paneBox.width)}px）—— 画不出来`,
+    ).toBeGreaterThan(paneBox.width * 0.6);
+    await field.fill('FREQ=MONTHLY;BYMONTHDAY=15');
+    await field.press('Enter');
+
+    await closeTaskDetailIfOpen(page);
+    const chip = page.getByTestId('task-chip-repeat');
+    await expect(chip, '面单里设了重复而行上没有痕迹').toHaveCount(1);
+    await expect(chip).toContainText('FREQ=MONTHLY;BYMONTHDAY=15');
 
     await page.reload();
     await openApp(page, '/?lang=zh-CN');
@@ -388,12 +449,21 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
       page.getByTestId('task-chip-repeat').first(),
       '窄档设的重复规则没落成（刷新后行上没有痕迹）',
     ).toContainText('FREQ=MONTHLY;BYMONTHDAY=15');
+    await expect(
+      page.getByTestId('task-chip-repeat').first().locator('input, textarea, select, details'),
+      '行上那枚重复 chip 里长出可编辑控件（那是第二个编辑器）',
+    ).toHaveCount(0);
 
     // 🔴 截图前把被量的那一行滚进视口：900×600 下 AI 那几块把列表推到首屏之外，
     //   不滚的话这张图里**没有判据量的那一格** —— 而 §6.2 规定一要的是"人看图"，
     //   一张看不见被量对象的图不构成证据（本轮第一版 t7 就是这样，读数绿、图没用）。
     await page.getByTestId('task-chip-repeat').first().scrollIntoViewIfNeeded();
-    await page.screenshot({ path: SHOT('t7-narrow-repeat-falls-back-to-row') });
+    await page.screenshot({ path: SHOT('t7-narrow-repeat-chip-on-row') });
+    // 再补一张面单里的那一格（判据量的是"它在面单里"，行上那张图看不见它）。
+    await openNarrowTaskPane(page, '窄档重复甲');
+    await openRepeatAdvanced(page);
+    await page.screenshot({ path: SHOT('t7-narrow-repeat-in-dialog') });
+    await parkCursor(page);
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
@@ -493,7 +563,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
-  test('T9 窄档：那一栏整个不在，子任务的编辑入口回到行尾那颗 chip', async ({ page }) => {
+  test('T9 窄档：那一栏整个不在，子任务的编辑入口在点行弹出的面单对话框里', async ({ page }) => {
     const errors = watchErrors(page);
     await page.setViewportSize({ width: 900, height: 600 });
     await openApp(page, '/?lang=zh-CN');
@@ -502,41 +572,52 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     await addTaskAndRelease(page, '窄档子任务子');
 
     await expect(paneEverywhere(page), '窄档不该画面单').toHaveCount(0);
-    /**
-     * 🔴 定位走**可访问名**，不走"行容器里找"。两个理由各挡一种假绿/假红：
-     *   ① 尾部动作是行体（`task-row-*`）的**兄弟节点**，不在它里面（`TaskRow.tsx` 的注释），
-     *       所以 `rowOf(...).locator('[data-testid^="subtask-trigger-"]')` 恒为 0；
-     *   ② 也不能退到 `task-item-*` + `hasText`：窄档那颗 chip 的 `<select>` 把**别的任务标题**
-     *       写进了 `option`，于是"含『窄档子任务父』的行"两行都命中
-     *       （`selection-projections.spec.ts` 文件头第 1 条记的就是这个）。
-     * `aria-label` 是界面自己声明的名字（`web.subtask.trigger.aria` / `…pick.aria`），
-     * 只有那一行会带着它。
-     */
-    // 🔴 2026-10-17：这枚入口住进了每行「更多」披露里（折叠时不可见 ⇒ click 一直等）。
-    // 用**按可访问名**定位披露的变体：本用例的 `hasText` 找行不安全（窄档 select 的
-    // option 会写进别的任务标题，两行都命中）。HEAD 上没有披露这层 ⇒ helper 原样返回。
-    await revealRowActionsBy(page, '把「窄档子任务子」移到别的任务下面');
-    const trigger = page.getByLabel('把「窄档子任务子」移到别的任务下面');
-    await expect(trigger, '窄档下行尾没有子任务入口 ⇒ "挂不到谁下面"').toHaveCount(1);
-    await trigger.click();
-
-    // ⚠️ 与 T7 同一条：`<details>` 收起时那只 select 在 DOM 里但**不画**，
-    // 所以必须量真实渲染，`toHaveCount(1)` 不构成"写得进去"。
-    const select = page.getByLabel('选一个父任务：窄档子任务子');
+    /* 🔴 判据换向（2026-11 行操作重设计）：**旧前提整个消失了**。
+       旧写法走行尾那枚 `<summary>`（`aria-label` = 「把「…」移到别的任务下面」，
+       `subtask-trigger-*`）—— 它是行内编辑器时代的入口，实测整页现在数到 **0**。
+       旧注释里那一整段"定位要走可访问名、不能 `task-item-*` + `hasText`"的顾虑
+       也一起消失：那颗 chip 的 `<select>` 会把**别的任务的标题**写进 `option`，
+       而那颗 chip 已经不存在了（`option` 污染源随之消失）。
+       同一件事现在是：**点行 ⇒ 对话框开 ⇒ 那只 `<select>` 在面单里、真画得出来**。
+       实测（900×600）：面单 590 宽，那只 select 558×44，候选是
+       `["（顶级任务）","窄档子任务父"]`。 */
+    const pane = await openNarrowTaskPane(page, '窄档子任务子');
+    const paneBox = await paintedBox(page, pane);
+    const select = pane.locator('[data-testid^="subtask-select-"]').first();
     const box = await paintedBox(page, select);
-    expect(box.width, '窄档那只在行尾的 select 被挤成 0 宽').toBeGreaterThan(40);
+    expect(
+      box.width,
+      `面单里那只父任务下拉只有 ${String(box.width)}px 宽（面单 ${String(paneBox.width)}px）—— 画不出来`,
+    ).toBeGreaterThan(paneBox.width * 0.6);
+    await expect(
+      page.locator('[data-testid^="subtask-select-"]'),
+      '窄档出现了不止一份子任务下拉 ⇒ 又有一处没被收拢的编辑权',
+    ).toHaveCount(1);
+    const optionTexts = await select.locator('option').allTextContents();
+    expect(optionTexts, '自己出现在候选里').not.toContain('窄档子任务子');
+    expect(optionTexts, '合法父没进候选 ⇒ 这一格根本改不了').toContain('窄档子任务父');
     await select.selectOption({ label: '窄档子任务父' });
 
+    await closeTaskDetailIfOpen(page);
     await page.reload();
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
+    const badge = page.locator('[data-testid^="task-subtask-badge-"]');
+    await expect(badge, '窄档那次改父没落成（刷新后行上没有"挂在谁下面"的徽标）').toHaveCount(1);
+    await expect(badge).toContainText('窄档子任务父');
     await expect(
-      page.getByLabel('把「窄档子任务子」移到别的任务下面'),
-      '窄档那次改父没落成（刷新后行上的 chip 没写挂在谁下面）',
-    ).toContainText('窄档子任务父');
+      badge.locator('select, details, input, textarea, button'),
+      '徽标里长出可编辑控件（那是第二个编辑器）',
+    ).toHaveCount(0);
 
-    await page.getByLabel('把「窄档子任务子」移到别的任务下面').scrollIntoViewIfNeeded();
-    await page.screenshot({ path: SHOT('t9-narrow-subtask-falls-back-to-row') });
+    await badge.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: SHOT('t9-narrow-subtask-chip-on-row') });
+    const paneAfter = await openNarrowTaskPane(page, '窄档子任务子');
+    await expect(
+      paneAfter.locator('[data-testid^="subtask-select-"]').first().locator('option:checked'),
+      '刷新后面单里选中的不是那个父任务（这一格读回来是空的）',
+    ).toHaveText('窄档子任务父');
+    await page.screenshot({ path: SHOT('t9-narrow-subtask-in-dialog') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
@@ -606,67 +687,74 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
-  test('T11 窄档：那一栏整个不在，提醒的编辑入口回到行尾那颗 chip', async ({ page }) => {
+  test('T11 窄档：那一栏整个不在，提醒的编辑入口在点行弹出的面单对话框里', async ({ page }) => {
     const errors = watchErrors(page);
-    /* 🔴 窄档这里用 **900×900** 而不是 T7/T9 的 900×600，理由只有一条且是实测出来的：
-       行尾那颗 chip 的面板**朝下开**（`.ht-compose-panel{position:absolute}`），600 高时
-       锚点行下方没有余量 ⇒ 面板伸出视口下沿，图里只露出"提醒"两个字。
-       宽度仍是 900（< 1024 ⇒ 栏不画，见 `detail-pane-visible.ts` 的 `DETAIL_FITS_QUERY`），
-       所以"窄档"这一档没有因为高度被换掉。 */
-    await page.setViewportSize({ width: 900, height: 900 });
+    /* ⚠️ 窄档这里仍用 900×600（与 T7/T9 同档）—— 宽 < 1024 ⇒ 栏不画，见
+       `detail-pane-visible.ts` 的 `DETAIL_FITS_QUERY`。旧版用 900×**900** 是因为
+       行尾那颗 chip 的面板朝下开、600 高时伸到视口外；那个面板**已经不存在了**
+       （见下面那段判据换向），所以高度不必再为它让路。 */
+    await page.setViewportSize({ width: 900, height: 600 });
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
     await addTaskAndRelease(page, '窄档提醒乙');
 
     await expect(paneEverywhere(page), '窄档不该画面单').toHaveCount(0);
-    /**
-     * 🔴 定位走**可访问名**（`reminder.a11y.list`），与 T9 同一条理由：尾部动作是行体的
-     * 兄弟节点，而窄档那颗 chip 的面板会把别的任务正文写进 DOM。
-     * ⚠️ 零条提醒时那颗 chip 显示的是「提醒」二字 = **入口**（`record` 档只约束栏里那枚徽标）。
-     */
-    // 🔴 2026-10-17：同上 —— 这颗 chip 是**嵌在行「更多」披露里**的 `<details>`，
-    // 折叠时它的 summary（就是这颗 chip）在 DOM 里但不画。
-    await revealRowActionsBy(page, '「窄档提醒乙」的提醒');
-    const trigger = page.getByLabel('「窄档提醒乙」的提醒');
-    await expect(trigger, '窄档下行尾没有提醒入口 ⇒ "建不了提醒"').toHaveCount(1);
-    // 先把锚点行滚到它所在分组容器的上沿：那一格是 `overflow:hidden auto` 的滚动容器，
-    // 面板朝下开，不滚的话整块在容器外（Playwright 的 click 自己也会滚，所以这一步是为了**拍得到**）。
-    // ⚠️ 不用 `scrollIntoViewIfNeeded()`：它只在"完全看不见"时才滚，露出半个就什么都不做。
-    await trigger.evaluate((el) => el.scrollIntoView({ block: 'start' }));
-    await trigger.click();
-
-    /* 🔴 那只按钮必须**钉在本行的那颗 chip 上**：`<details>` 收起时子树留在 DOM 里，
-       所以列表里有几行就有几枚 `reminder-add-absolute`（实测：垫一条邻居 ⇒ strict mode violation，
-       报的是"resolved to 2 elements"而不是"没找到"）。整页 `getByTestId` 在这一族里从来不安全。 */
-    const ownChip = page.locator('details:has(> summary[aria-label="「窄档提醒乙」的提醒"])');
-    const button = ownChip.getByTestId('reminder-add-absolute');
-    const box = await paintedBox(page, button);
-    expect(box.width, '窄档那只在行尾的按钮被挤成 0 宽').toBeGreaterThan(20);
-    /* 🔴 等**入场动效走完**再拍：`.ht-material` 带 200ms 的 `opacity 0 → 1` 淡入
-       （`material.css` 的 `ht-material-in`），而 `toBeVisible()` 不看 opacity ——
-       第一趟看图照出来的是"整块面板像被调到了 15% 不透明度"，字都在但读不清。
-       那是探针抢跑，不是界面坏；`toHaveCSS('opacity','1')` 会轮询，正好把它等掉。 */
-    await expect(ownChip.locator('.ht-compose-panel')).toHaveCSS('opacity', '1');
-    /* 🔴 这张图**故意**留着它现在的样子：面板被一个只有 **90px 高**的分组滚动容器裁掉了
+    /* 🔴 判据换向（2026-11 行操作重设计）：**旧前提整个消失了**。
+       旧写法走行尾那颗 chip（`aria-label` = 「「窄档提醒乙」的提醒」，
+       `details.ht-compose--popover` + `.ht-compose-panel.ht-material`），
+       并为此写了一整段几何取证：那颗面板**朝下开**（`position:absolute`），
+       900×600 时被一个只有 **90px 高**的分组滚动容器裁掉
        （实测 2026-10-05：容器 top 546 / bottom 636，面板 top 586 / bottom 751，
-       那颗按钮 top 664 —— 整颗在容器外，`elementFromPoint` 命中的是 `.ht-content`）。
-       同一趟还量到第二档：行包装 div 是 `position:relative; z-index:0`，所以面板的
-       `z-index:500` 出不了自己那一行 ⇒ 下面还有行时会被下一行的尾部控件盖住。
-       两档都**与 §8.145 无关**（`ReminderPanel` 的 DOM/样式这一单没动），
-       登记在待办 #58（行尾下拉面板的可见性）。
-       ⚠️ 所以这一族的判据读的是"入口在不在、写没写进去"，**不是**"面板整块看得见"。 */
-    await page.screenshot({ path: SHOT('t11-narrow-reminder-panel-open') });
+       按钮 top 664 —— 整颗在容器外，`elementFromPoint` 命中 `.ht-content`），
+       所以那一族只能读"入口在不在、写没写进去"，不能读"面板整块看得见"。
+       ⇒ 那套几何**在面单里不适用**：面单是对话框里的**流内**内容（实测
+       `.ht-material` / `details.ht-compose--popover` 整页都数到 **0**），
+       没有朝下开、没有 90px 容器、没有 Portal。那段被裁的截图判据随之删掉。
+       保留下来的三条实质判据一条没改口径：**入口在不在、值写没写进去、刷新后行上读得到**。
+       实测（900×600）：面单 590 宽，「1 小时后提醒」那枚按钮 111×44。 */
+    const pane = await openNarrowTaskPane(page, '窄档提醒乙');
+    await expect(
+      pane.locator('[data-testid^="reminder-list-"]').first(),
+      '面单里没有提醒列表 ⇒ 这一档建不了提醒',
+    ).toBeVisible();
+    await expect(
+      page.locator('details.ht-compose--popover'),
+      '行尾又出现了那颗提醒浮层（那会把提醒变成两处可编辑）',
+    ).toHaveCount(0);
+    const button = pane.getByTestId('reminder-add-absolute');
+    const box = await paintedBox(page, button);
+    expect(box.width, `面单里那枚「1 小时后提醒」按钮只有 ${String(box.width)}px 宽`).toBeGreaterThan(20);
+    // 控件高度一档（AGENTS §5 / ux-principles）：实测 44，与同一栏里其余控件同档。
+    expect(box.height, `那枚按钮只有 ${String(box.height)}px 高 —— 低于控件高度那一档`).toBeGreaterThanOrEqual(
+      40,
+    );
+    // 🔴 假绿前提：点**之前**行上不该有提醒徽标（零条提醒时 `ReminderBadge` 不占位）。
+    //    少了这一条，"点完长出了徽标"在"它本来就在"的情况下也通过。
+    await expect(
+      page.locator('[data-testid^="task-reminder-badge-"]'),
+      '起始态行上就有提醒徽标 ⇒ 后面那条"长出了"读不出因果',
+    ).toHaveCount(0);
+    await page.screenshot({ path: SHOT('t11-narrow-reminder-in-dialog') });
     await button.click();
 
-    await expect(trigger, '窄档点了提醒而 chip 上没写条数').toHaveText('1');
+    const badge = page.locator('[data-testid^="task-reminder-badge-"]');
+    await expect(badge, '面单里点了「1 小时后提醒」而行上没有痕迹').toHaveCount(1);
+    await expect(badge, '行上那枚只读徽标没写条数').toHaveText('1');
+    await expect(
+      badge.locator('button, details, [data-testid^="reminder-"]'),
+      '徽标里长出可编辑控件（那是第二个编辑器）',
+    ).toHaveCount(0);
+
+    await closeTaskDetailIfOpen(page);
     await page.reload();
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
-    const chipAfter = page.getByLabel('「窄档提醒乙」的提醒');
-    await expect(chipAfter, '窄档那次点击没落成（刷新后行上的 chip 没写条数）').toHaveText('1');
+    const badgeAfter = page.locator('[data-testid^="task-reminder-badge-"]');
+    await expect(badgeAfter, '窄档那次点击没落成（刷新后行上没有提醒徽标）').toHaveCount(1);
+    await expect(badgeAfter, '刷新后徽标上的条数不对').toHaveText('1');
 
-    await chipAfter.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-    await page.screenshot({ path: SHOT('t11-narrow-reminder-falls-back-to-row') });
+    await badgeAfter.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: SHOT('t11-narrow-reminder-badge-after-reload') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
   test('T12 宽档：截止的编辑本体在栏里那一格，行尾整块不画（§8.146）', async ({ page }) => {
@@ -769,30 +857,39 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
-  test('T13 窄档：那一栏整个不在，截止的编辑入口回到行尾那颗 chip', async ({ page }) => {
+  test('T13 窄档：那一栏整个不在，截止的编辑入口在点行弹出的面单对话框里', async ({ page }) => {
     const errors = watchErrors(page);
-    // 900×600 与 T7/T9 同档（宽 < 1024 ⇒ 栏不画）。这里不需要 T11 那 900 高的理由：
-    // 截止的面板是 Portal + fixed，本来就画在滚动容器之外。
+    // 900×600 与 T7/T9 同档（宽 < 1024 ⇒ 栏不画）。
     await page.setViewportSize({ width: 900, height: 600 });
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
     await addTaskAndRelease(page, '窄档截止乙');
 
     await expect(paneEverywhere(page), '窄档不该画面单').toHaveCount(0);
-    /* 🔴 定位走**行内**那颗 summary（它带 `aria-label` = 「设置任务「…」的截止日期」），
-       与 T9/T11 同一条理由：尾部动作是行体的兄弟节点，而 Portal 出去的面板会把
-       **别的**日子写进 DOM。 */
-    await openRowTail(page, page.locator('[data-testid^="task-item-"]').first());
-    const summary = page.getByLabel('设置任务「窄档截止乙」的截止日期');
-    await expect(summary, '窄档下行尾没有截止入口 ⇒ "改不了截止"').toHaveCount(1);
-    const box = await paintedBox(page, summary.first());
-    expect(box.width, '窄档那颗行尾触发器被挤成 0 宽').toBeGreaterThan(40);
+    /* 🔴 判据换向（2026-11 行操作重设计）：**旧前提整个消失了**。
+       旧写法走行尾那颗 `<summary data-testid="due-editor-summary">`
+       （`aria-label` = 「设置任务「…」的截止日期」），点开的是一个 Portal + fixed 的
+       行尾面板 —— 那两件都是"行尾那一支在哪儿画"的细节，而那一支已被删掉
+       （实测整页 `due-editor-summary` = **0**）。
+       同一件事现在是：**点行 ⇒ 对话框开 ⇒ 月历在面单里、真画得出来 ⇒ 点一格**。
+       面单里的月历是流内内容（与 T12 宽档同一份 `DatePicker`），没有 Portal、不会"一滚就关"。
+       实测（900×600）：面单 590 宽，月历 558×487。 */
+    const pane = await openNarrowTaskPane(page, '窄档截止乙');
+    const paneBox = await paintedBox(page, pane);
+    const picker = pane.getByTestId('date-picker');
+    await expect(picker, '面单里没有月历 ⇒ 这一档改不了截止').toHaveCount(1);
+    const pickBox = await paintedBox(page, picker);
+    expect(
+      pickBox.width,
+      `面单里那张月历只有 ${String(pickBox.width)}px 宽（面单 ${String(paneBox.width)}px）—— 画不出来`,
+    ).toBeGreaterThan(paneBox.width * 0.6);
+    await expect(
+      page.locator('[data-testid="date-picker"]'),
+      '窄档整页出现了不止一张月历 ⇒ 又有一处没被收拢的编辑权',
+    ).toHaveCount(1);
 
-    await summary.first().click();
-    const picker = page.locator('[data-testid="date-picker"]:visible');
-    await expect(picker, '点了行尾那颗触发器而面板没开').toBeVisible();
     const cell = picker.locator('[role="button"][aria-label$="18日"]').first();
-    await expect(cell, '窄档面板里应有某月 18 日这格').toBeVisible();
+    await expect(cell, '窄档面单里应有某月 18 日这格').toBeVisible();
     const dayLabel = (await cell.getAttribute('aria-label'))!;
     const md = /(\d+)月(\d+)日/.exec(dayLabel)!;
     const compact = `${md[1]!.padStart(2, '0')}-${md[2]!.padStart(2, '0')}`;
@@ -801,20 +898,24 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
       rowOf(page, '窄档截止乙').getByTestId('task-meta'),
       `窄档点了 ${dayLabel} 而行上没写着 ${compact}`,
     ).toContainText(compact);
-    /* 🔴 拍之前把那一行**滚进视野中间**：这一趟的行尾面板刚收起，行落在视口下沿，
-       第一张图里那一行只有上半截（读得出「截止 10月18日」，但行体被切了一半）。
-       不用 `scrollIntoViewIfNeeded()` —— 它只在"完全看不见"时才滚，露出半个什么都不做
-       （T11 同一条）。 */
+    /* 🔴 拍之前把那一行**滚进视野中间**：这一趟没有行尾面板需要收起，但 900×600 下
+       列表可能被 AI 那几块推到首屏之外，图里就没有被量的那一行（T7 同一条）。
+       不用 `scrollIntoViewIfNeeded()` —— 它只在"完全看不见"时才滚，露出半个什么都不做。 */
+    await closeTaskDetailIfOpen(page);
     await rowOf(page, '窄档截止乙').evaluate((el) => el.scrollIntoView({ block: 'center' }));
-    await page.screenshot({ path: SHOT('t13-narrow-due-falls-back-to-row') });
+    await page.screenshot({ path: SHOT('t13-narrow-due-on-row') });
 
     await page.reload();
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
+    /* 🔴 承重判据的载体换了，问的仍是同一件事：**那一笔落成 op 了没有**。
+       旧写法读的是"刷新后行尾触发器上没写日期"（`due-editor-summary` 的文本），
+       而那颗触发器已经不存在了 —— 截止的**显示**一直在共享元信息条 `task-meta` 上
+       （`TaskDetailCard` 与 `DueEditor` 文件头那张表的第三行），刷新后从那里读同一件事。 */
     await expect(
-      page.getByLabel('设置任务「窄档截止乙」的截止日期'),
-      '窄档那次点击没落成（刷新后行尾触发器上没写日期）',
-    ).toContainText(dayLabel);
+      rowOf(page, '窄档截止乙').getByTestId('task-meta'),
+      '窄档那次点击没落成 op（刷新后行上读不到日期）',
+    ).toContainText(compact);
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
@@ -867,9 +968,12 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
      * 而新建清单会让侧栏选中它 ⇒ 当前视图被筛到那个**空清单**上。
      * 真浏览器探针（900×600，与 T15 同视口）实测：
      *   `afterSeedList.rowCount = 0`、`afterSeedList.allRows = 0`（一条任务都不在屏上）；
-     *   切回「任务」之后 `rowCount = 1`，而那时 `task-organize-summary` 数到 **1**（开着可见）。
+     *   切回「任务」之后 `rowCount = 1` —— 那时判据才问得到那个入口。
      * 也就是说产品这一侧没问题 —— 是判据**在被问到一条不在屏上的行**，
      * 于是 `toHaveCount(1)` 读成 0，消息却说"窄档行尾没有整理入口"（把它读成产品坏了）。
+     * ⚠️ 2026-11：那个入口已随行内编辑器整排撤掉、从行尾搬进面单（宽档 = 详情列，
+     * 窄档 = 点行弹出的对话框），但"先切回任务视图"这一步仍然必要 ——
+     * 它建立的是"那一行在屏上"这个前提，与入口住哪儿无关。
      */
     await switchView(page, '任务');
 
@@ -943,9 +1047,9 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
-  test('T15 窄档：那一栏整个不在，整理的编辑入口回到行尾那颗触发器', async ({ page }) => {
+  test('T15 窄档：那一栏整个不在，整理的编辑入口在点行弹出的面单对话框里', async ({ page }) => {
     const errors = watchErrors(page);
-    // 🔴 900 宽恒窄档（`DETAIL_FITS_QUERY` 要 ≥1024）：这一档量的是回落，不是栏。
+    // 🔴 900 宽恒窄档（`DETAIL_FITS_QUERY` 要 ≥1024）：这一档量的是"落在对话框里"，不是栏。
     await page.setViewportSize({ width: 900, height: 600 });
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
@@ -957,50 +1061,70 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
      * 而新建清单会让侧栏选中它 ⇒ 当前视图被筛到那个**空清单**上。
      * 真浏览器探针（900×600，与 T15 同视口）实测：
      *   `afterSeedList.rowCount = 0`、`afterSeedList.allRows = 0`（一条任务都不在屏上）；
-     *   切回「任务」之后 `rowCount = 1`，而那时 `task-organize-summary` 数到 **1**（开着可见）。
+     *   切回「任务」之后 `rowCount = 1` —— 那时判据才问得到那个入口。
      * 也就是说产品这一侧没问题 —— 是判据**在被问到一条不在屏上的行**，
      * 于是 `toHaveCount(1)` 读成 0，消息却说"窄档行尾没有整理入口"（把它读成产品坏了）。
+     * ⚠️ 2026-11：那个入口已随行内编辑器整排撤掉、从行尾搬进面单（宽档 = 详情列，
+     * 窄档 = 点行弹出的对话框），但"先切回任务视图"这一步仍然必要 ——
+     * 它建立的是"那一行在屏上"这个前提，与入口住哪儿无关。
      */
     await switchView(page, '任务');
 
     await expect(paneInColumn(page), '窄档却画出了详情栏').toHaveCount(0);
-    // 🔴 窄档要量的东西**全在行尾**（触发器、`<details>` 里的下拉与复选框、chip），
-    //    所以这一档从头到尾用整行 `task-item-*`（见上面 `rowItemOf` 的注释）。
-    const row = rowItemOf(page, '整理窄档乙');
-    await openRowTail(page, row);
-    const summary = row.getByTestId('task-organize-summary');
-    await expect(summary, '窄档行尾没有整理入口 ⇒ 回落丢了，这一档根本归不了类').toHaveCount(1);
-    /* 🔴 阈值从**触发器自己画的那枚图标**推导，不是我挑的字面量。
-       `TaskOrganizer` 的 summary 里只有 `<SlidersHorizontal size={TRIGGER_ICON_SIZE}/>`。
-       这一档实测触发器的框是 **16.9375px**（行尾并排六格把它挤窄，是既有形状）。
-       原来这里写的是 `> 20` —— 那是**我猜的**，于是把"当前形状"读成了"回落坏了"，
-       一条猜出来的阈值比没有阈值更容易骗人（它看起来像在量东西）。
-       "不许裁掉自己的图标"这条同时有牙：挤到 0 宽时触发器先过不了 `paintedBox`，
-       比图标窄时这一行直接红。图标的框由同一个探针当场量，不写死。 */
-    const iconBox = await paintedBox(page, summary.locator('svg'));
-    const box = await paintedBox(page, summary);
-    expect(box.width, '行尾触发器比它自己的图标还窄 ⇒ 图标被裁掉了').toBeGreaterThanOrEqual(
-      iconBox.width,
-    );
-
-    await summary.click();
-    // 🔴 窄档整页也只许一份编辑本体（这一档它是从 `<details>` 里出来的，不是栏里那一份）。
+    /* 🔴 判据换向（2026-11 行操作重设计）：**旧前提整个消失了**。
+       旧写法走行尾那颗 `task-organize-summary`（一个 `<details>` 的 summary），
+       并为它专门写了一段"阈值从触发器自己画的那枚图标推导"的几何（实测 16.9375px）。
+       那颗触发器与它所在的 `<details>` 是**行内编辑器时代**的落点，现已删掉
+       （实测整页 `task-organize-summary` = **0**）。
+       同一件事现在是：**点行 ⇒ 对话框开 ⇒ 清单下拉与标签勾选框在面单里、真画得出来**。
+       实测（900×600）：面单 590 宽，清单下拉 558×44。 */
+    const pane = await openNarrowTaskPane(page, '整理窄档乙');
+    const paneBox = await paintedBox(page, pane);
+    const select = pane.getByTestId('organize-project-select');
+    await expect(select, '面单里没有清单下拉 ⇒ 这一档归不了类').toHaveCount(1);
+    const box = await paintedBox(page, select);
+    expect(
+      box.width,
+      `面单里那只清单下拉只有 ${String(box.width)}px 宽（面单 ${String(paneBox.width)}px）—— 画不出来`,
+    ).toBeGreaterThan(paneBox.width * 0.6);
+    // 🔴 窄档整页也只许一份编辑本体（只量"面单里有"会把"两处都能编辑"读成对）。
     await expect(
       page.getByTestId('organize-project-select'),
-      '窄档出现了两份清单下拉（行尾 + 栏里）',
+      '窄档出现了两份清单下拉（行尾 + 面单）',
     ).toHaveCount(1);
-    await row.getByLabel('任务「整理窄档乙」所属清单').selectOption({ label: '整理清单乙' });
+
+    // ── 承重 ①：在面单里选清单 ⇒ **行的元信息槽**写着那条清单 ──────────────
     await expect(
-      row.getByTestId('task-meta'),
+      rowOf(page, '整理窄档乙').getByTestId('task-meta'),
+      '起始态就带着清单名 ⇒ 后面的断言永真',
+    ).not.toContainText('整理清单乙');
+    await select.selectOption({ label: '整理清单乙' });
+    await expect(
+      rowOf(page, '整理窄档乙').getByTestId('task-meta'),
       '窄档选了清单而行上没写',
     ).toContainText('整理清单乙');
-    await row
+
+    // ── 承重 ②：在面单里勾标签 ⇒ **行上长出那枚只读 chip** ────────────────
+    await expect(
+      rowItemOf(page, '整理窄档乙').getByTestId('task-chip-tag'),
+      '起始态行上就有标签 chip ⇒ 后面那条"长出了"读不出因果',
+    ).toHaveCount(0);
+    // 🔴 用 `click()` 不用 `check()`：受控复选框 + async `dispatchIntent`
+    //    ⇒ Playwright 会报 `Clicking the checkbox did not change its state`（假红，op 已派发）。
+    //    判据看的是**结果**（行上真长出了 chip），不是控件此刻的勾选态。
+    await pane
       .getByRole('checkbox', { name: '给任务「整理窄档乙」加上或去掉标签「整理标签乙」' })
       .click();
-    await expect(row.getByTestId('task-chip-tag'), '窄档勾了标签而 chip 没画出来').toHaveCount(1);
+    const chips = rowItemOf(page, '整理窄档乙').getByTestId('task-chip-tag');
+    await expect(chips, '窄档勾了标签而 chip 没画出来').toHaveCount(1);
+    await expect(chips, 'chip 上没写标签名').toContainText('整理标签乙');
+    await expect(chips.locator('select, input, details'), '行上那枚 chip 里长出了控件').toHaveCount(0);
 
-    await row.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-    await page.screenshot({ path: SHOT('t15-narrow-organizer-falls-back-to-row') });
+    await page.screenshot({ path: SHOT('t15-narrow-organizer-in-dialog') });
+
+    await closeTaskDetailIfOpen(page);
+    await rowItemOf(page, '整理窄档乙').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await page.screenshot({ path: SHOT('t15-narrow-organizer-on-row') });
 
     await page.reload();
     await openApp(page, '/?lang=zh-CN');
@@ -1009,6 +1133,10 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
       rowOf(page, '整理窄档乙').getByTestId('task-meta'),
       '窄档那次选择没落成（刷新后行上读不到归属）',
     ).toContainText('整理清单乙');
+    await expect(
+      rowItemOf(page, '整理窄档乙').getByTestId('task-chip-tag'),
+      '刷新后标签 chip 没了 ⇒ 面单里那次勾选没落成 op',
+    ).toHaveCount(1);
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 });

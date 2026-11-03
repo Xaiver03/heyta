@@ -1,6 +1,15 @@
 import { mkdir } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
+
+import { expect, test, type Page } from '@playwright/test';
 import { openApp, openSettingsSheet, selectSettingsSection, closeSettingsSheet, switchTheme } from './helpers';
+
+/** 打开页头那枚 `⋯` —— 助手入口在 2026-11-02 第三刀搬进了它里面。 */
+async function openTaskMenu(page: Page): Promise<void> {
+  const trigger = page.getByTestId('task-menu-open');
+  await expect(trigger, '任务视图页头必须有一枚 ⋯（助手入口住在里面）').toBeVisible();
+  await trigger.click();
+  await expect(page.getByTestId('task-menu')).toBeVisible();
+}
 
 const evidence = '../apps/web/evidence/goal-settings-final';
 test('Chatbot keeps an unclipped empty prompt, a bottom conversation composer and one persistent draft', async ({ page }) => {
@@ -16,7 +25,10 @@ test('Chatbot keeps an unclipped empty prompt, a bottom conversation composer an
     for (const viewport of [{ width: 1280, height: 800 }, { width: 1078, height: 640 }, { width: 375, height: 720 }, { width: 900, height: 400 }]) {
       await page.setViewportSize(viewport);
       const compact = viewport.width < 1024 || viewport.height < 480;
-      if (compact) await page.getByTestId('assistant-open').click();
+      if (compact) {
+        await openTaskMenu(page);
+        await page.getByTestId('assistant-open').click();
+      }
       await expect(input).toBeVisible();
       await expect(input).toHaveValue('整理明天的待办');
       const pane = await page.getByTestId('detail-column').boundingBox();
@@ -32,7 +44,9 @@ test('Chatbot keeps an unclipped empty prompt, a bottom conversation composer an
       await page.screenshot({ path: `${evidence}/assistant-${viewport.width}-${viewport.height}-${theme}.png` });
       if (compact) {
         await page.keyboard.press('Escape');
-        await expect(page.getByTestId('assistant-open')).toBeFocused();
+        // 焦点回到**打开它的那个元素**。入口在 `⋯` 里，所以回到 `⋯` ——
+        // 菜单项在选中那一刻就卸载了，绝不能把焦点还给一个不在树上的节点。
+        await expect(page.getByTestId('task-menu-open')).toBeFocused();
         await expect(assistant).not.toBeVisible();
       }
     }
@@ -54,7 +68,10 @@ test('Chatbot keeps an unclipped empty prompt, a bottom conversation composer an
     for (const viewport of [{ width: 1280, height: 800 }, { width: 1078, height: 640 }, { width: 375, height: 720 }, { width: 900, height: 400 }]) {
       await page.setViewportSize(viewport);
       const compact = viewport.width < 1024 || viewport.height < 480;
-      if (compact) await page.getByTestId('assistant-open').click();
+      if (compact) {
+        await openTaskMenu(page);
+        await page.getByTestId('assistant-open').click();
+      }
       await expect(input).toBeVisible();
       await expect(input).toHaveValue('继续编辑这段草稿');
       const pane = await page.getByTestId('detail-column').boundingBox();
