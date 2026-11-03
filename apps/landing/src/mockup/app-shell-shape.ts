@@ -231,10 +231,16 @@ export const SHELL_PANEL_SECTIONS: readonly ShellPanelSection[] = [
  * 那条绿色的判据 positively 要求"页头要有同步 + 立即同步 + 设置 + 语言 + 主题"。
  * 一条把过时的形状钉成期望的判据，比没有判据更糟（AGENTS §8 第 3 条）。
  */
-export type ShellHeaderActionKind = 'bulk-toolbar' | 'sort-select' | 'detail-toggle' | 'assistant-toggle' | 'share-open';
+export type ShellHeaderActionKind =
+  | 'bulk-toolbar'
+  /** 页头那枚 `⋯`（2026-11-02）。排序、选择任务、共享都收在它里面。 */
+  | 'overflow-menu'
+  | 'detail-toggle'
+  | 'assistant-toggle'
+  | 'share-open';
 
 export type ShellHeaderAction = {
-  readonly id: 'bulk-toolbar' | 'task-sort' | 'detail-pane-toggle' | 'assistant-open' | 'share-open-button';
+  readonly id: 'bulk-toolbar' | 'task-menu' | 'detail-pane-toggle' | 'assistant-open' | 'share-open-button';
   readonly kind: ShellHeaderActionKind;
   /** 图上读到的名字（产品用它当可访问名 / 可见标签）。 */
   readonly labelKey: MessageKey;
@@ -242,8 +248,6 @@ export type ShellHeaderAction = {
   readonly anchors: readonly string[];
   /** 只有某个视图才画 —— 与产品的条件一致，不是复刻自己的偏好。 */
   readonly onlyForView?: MockView;
-  /** `sort-select` 展示的那一档（产品的默认值）。 */
-  readonly optionKey?: MessageKey;
   /**
    * 真实应用只在详情列收起时显示这枚回退入口。Landing 默认展示任务详情列，
    * 因此不额外画一枚没有行为的 AI 按钮，避免把静态展厅误读成可用 Chatbot。
@@ -256,18 +260,30 @@ export const SHELL_HEADER_ACTIONS: readonly ShellHeaderAction[] = [
     id: 'bulk-toolbar',
     kind: 'bulk-toolbar',
     labelKey: 'web.shell.bulk.select',
-    anchors: ['bulk-toolbar', 'bulk-complete', 'bulk-repeat-warning', 'bulk-undo'],
+    anchors: ['bulk-toolbar', 'bulk-complete', 'bulk-repeat-warning', 'bulk-undo', 'bulk-delete', 'bulk-exit', 'task-select-open'],
     onlyForView: 'tasks',
+    /**
+     * 🔴 不在展厅画：它是**模式**，不是默认态控件。
+     * 2026-11-02 之前它常驻在页头，展厅也照着画了一条"选择任务" ——
+     * 那正好把"页头上永远有一枚选择按钮"画成了产品该有的样子。
+     */
+    mockedInLanding: false,
   },
   {
-    id: 'task-sort',
-    kind: 'sort-select',
-    labelKey: 'web.shell.sort.aria',
-    anchors: ['task-sort', 'task-sort-select'],
-    // 产品那边是 `contentView === 'tasks' && visible.length > 0`；展厅的任务屏有样例任务，
-    // 其余视图没有列表 ⇒ 只有任务屏画它。
+    /**
+     * 页头那枚 `⋯`（2026-11-02）。
+     *
+     * 🔴 它登记的不只是一个按钮，是**页头形状的规则**：产品页头右侧 =
+     * 「图标按钮 + ⋯」。排序原来那一枚 `12px 标签 + 原生 select` 已经收进它里面，
+     * 所以这里不再登记 `task-sort` —— 反过来，`SHELL_HEADER_MOVED_OUT` 里有一条
+     * 专门钉"它不许再以常驻控件的形状回到页头"。
+     */
+    id: 'task-menu',
+    kind: 'overflow-menu',
+    labelKey: 'web.shell.overflow.label',
+    anchors: ['task-menu-open', 'task-menu'],
+    // 产品那边是 `view === 'tasks'`（**不是** `visible.length > 0`）—— 空列表里 `⋯` 也在。
     onlyForView: 'tasks',
-    optionKey: 'web.shell.sort.display',
   },
   {
     id: 'assistant-open',
@@ -280,8 +296,14 @@ export const SHELL_HEADER_ACTIONS: readonly ShellHeaderAction[] = [
   {
     id: 'share-open-button',
     kind: 'share-open',
-    // 产品页头那段最前面这枚共享入口（ADR-0062 W4，`web.share.open.label`=「共享」）。
-    labelKey: 'web.share.open.label',
+    /**
+     * 共享入口（ADR-0062 W4）。它 2026-11-02 从页头搬进了 `⋯`。
+     *
+     * ⚠️ 登记的**可访问名**是"共享此清单"那一枚而不是 `web.share.open.label`（「共享」）：
+     * 产品在菜单里用的是**随状态翻转**的两句（`web.share.open.new` / `web.share.open.manage`），
+     * 那个短标签只出现在 `aria-label` 的位置上、且装饰性更强。登记一口能给读屏用的名字。
+     */
+    labelKey: 'web.share.open.new',
     anchors: ['share-open-button'],
     // 产品那边条件是 `currentProject !== undefined && syncConfigured` —— 只在选中自己的
     // 清单且同步已配置时出现。静态展厅没有"选中的清单"这一态，也不该画一枚点了没行为的
@@ -294,7 +316,9 @@ export const SHELL_HEADER_ACTIONS: readonly ShellHeaderAction[] = [
     // 图上画的是"展开"那一态：复刻是静态图，详情列在图里没有画出来，
     // 所以按钮的自带名说的是"点下去会怎样"（与产品同一条语义）。
     labelKey: 'web.shell.detailPane.expand',
-    anchors: ['detail-pane-toggle'],
+    // 详情列**收起之后**展开它的入口在 `⋯` 里（`detail-pane-open`）——
+    // 页头那枚图标让位给助手回退，于是页头每一档只有「一枚图标 + 一枚 ⋯」。
+    anchors: ['detail-pane-toggle', 'detail-pane-open'],
   },
 ];
 
@@ -348,5 +372,30 @@ export const SHELL_HEADER_MOVED_OUT: readonly {
     since: '2026-09-30',
     absentInWeb: ['due-display-pref', 'web.shell.dueMode.aria'],
     absentInMock: ['web.shell.dueMode.date', 'web.shell.dueMode.countdown'],
+  },
+  {
+    /**
+     * 🔴 这一条是 2026-11-02 那一轮的核心，也是**最容易被人"补回来"的一条**。
+     *
+     * 排序原来是页头上一枚常驻控件（`12px 文字标签 + 44px 原生 select`），
+     * 现在收进 `⋯` 里的单选组（`task-sort-<key>`）。
+     * 下一个人看见"页头上没有排序"，最自然的动作就是把它加回去 —— 那正好把
+     * 「一个功能一个控件」的加法恢复出厂设置。所以这里正着钉"不许回来"。
+     */
+    what: '排序（常驻的 `task-sort` 标签 + `task-sort-select` 原生下拉）',
+    nowIn: '页头 `⋯` 菜单里的单选组（`task-sort-<key>`，`role="menuitemradio"`）',
+    since: '2026-11-02',
+    absentInWeb: ['task-sort-select', 'data-testid="task-sort"'],
+    // 复刻那一侧当年画的是"排序方式 + 默认（按截止时间）"两段文字。
+    absentInMock: ['web.shell.sort.aria', 'web.shell.sort.display'],
+  },
+  {
+    what: '「选择任务」这枚常驻按钮',
+    nowIn: '页头 `⋯` 菜单里的 `task-select-open`（进入批量模式后才出现批量栏）',
+    since: '2026-11-02',
+    // 那枚按钮的代码形状：一枚 `aria-pressed` 跟着选择态翻转的 ghost 按钮。
+    // 只钉形状不钉文案 —— 文案（'选择任务'）现在同时是菜单项与批量栏的可访问名。
+    absentInWeb: ['aria-pressed={bulkSelecting}'],
+    absentInMock: [],
   },
 ];

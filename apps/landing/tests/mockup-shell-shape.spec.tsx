@@ -499,25 +499,53 @@ describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () =
     const app = appSource();
     const start = app.indexOf('<div className="ht-header__actions">');
     if (start < 0) throw new Error('App.tsx 里找不到 .ht-header__actions —— 判据锚点已失效');
-    const end = app.indexOf('<div className="ht-content">', start);
-    if (end < 0) throw new Error('.ht-header__actions 之后找不到 .ht-content —— 判据锚点已失效');
+    /**
+     * 终点锚点：`.ht-content` 那个 `className`。
+     *
+     * 🔴 曾经写的是整串 `'<div className="ht-content">'` —— 那段 JSX 后来多了
+     * `onContextMenu` / `onKeyDown` 两个属性、被格式化成多行，于是这个 `indexOf`
+     * 恒返回 -1，三条判据一起抛「锚点已失效」。**那不是产品变坏，是判据锚在排版上。**
+     * 现在只锚 `className="ht-content"` 这一段（排版无关），再退一个 `<` 找回标签起点。
+     */
+    const contentAt = app.indexOf('className="ht-content"', start);
+    if (contentAt < 0) throw new Error('.ht-header__actions 之后找不到 .ht-content —— 判据锚点已失效');
+    const end = app.lastIndexOf('<', contentAt);
     return stripComments(app.slice(start, end));
   }
 
+  /**
+   * 页头那一段里出现的锚点。
+   *
+   * 🔴 两种写法都要认：`data-testid="x"`（原生 DOM 元素）与 `testID="x"`
+   * （共享组件 `AnchoredMenu` / `MenuItem` 的 prop，它最终落成的还是 `data-testid`）。
+   * 只认前一种的话，2026-11-02 搬进 `⋯` 的那三枚（`task-menu` / `task-select-open` /
+   * `share-open-button`）会从这份读数里**整体消失**，而"登记处 ⇔ 产品"那条等集判据
+   * 会因为两边都少同一个而继续绿 —— 这正是本条阳性对照要挡的形状。
+   */
   function webTestids(): string[] {
-    return [...headerActionsSource().matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1] ?? '');
+    return [...headerActionsSource().matchAll(/(?:data-testid|testID)="([^"]+)"/g)].map(
+      (m) => m[1] ?? '',
+    );
   }
 
   it('解析器读得出东西（阳性对照：挡"改名/挪走之后恒返回空集，于是双向都绿"）', () => {
     expect(webTestids()).toEqual([
-      'share-open-button',
+      // 批量栏（模式态才渲染）
       'bulk-toolbar',
       'bulk-complete',
       'bulk-repeat-warning',
+      'bulk-delete',
+      'bulk-exit',
       'bulk-undo',
-      'task-sort',
-      'task-sort-select',
+      // 页头唯一的功能入口
+      'task-menu-open',
+      'task-menu',
+      'task-select-open',
+      // 下面两枚住在 `⋯` 里（详情列收起时才渲染）：助手回退 + 展开详情列
       'assistant-open',
+      'detail-pane-open',
+      'share-open-button',
+      // 结构性开关
       'detail-pane-toggle',
     ]);
   });
@@ -532,13 +560,25 @@ describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () =
   it('每一件的可访问名，产品那边确实按那个 key 在渲染', () => {
     const app = appSource();
     for (const action of SHELL_HEADER_ACTIONS) {
+      // ⚠️ 2026-11-02 去掉了 `optionKey` 那一半：它只服务过 `sort-select`
+      //（"默认（按截止时间）"那一档的可见标签），而排序已经收进 `⋯` 的单选组、
+      // 不再是页头登记项。留着那个字段就是留着一条没人读的分支。
       expect(
-        app.includes(`'${action.labelKey}'`) || app.includes(`'${action.optionKey ?? ''}'`),
+        app.includes(`'${action.labelKey}'`),
         `${action.id} 登记的词条 ${action.labelKey} 在产品源码里找不到`,
       ).toBe(true);
     }
-    // 排序那一档的**可见标签**是真应用与复刻共用的一条（裸 chip 的教训）。
-    expect(app).toContain("t('web.shell.sort.aria')");
+    /**
+     * 页头两枚词条的锚点。
+     *
+     * 🔴 原来这里钉的是 `t('web.shell.sort.aria')`（"排序方式"）—— 那是排序**自己
+     * 占一格页头**时的词条。2026-11-02 排序收进 `⋯` 之后，页头上的词条变成
+     * `web.shell.overflow.label`（"更多操作"）与 `web.shell.overflow.sortSection`（"排序"）；
+     * 而 `web.shell.sort.aria` 仍在使用（手机端任务页的排序选择器），
+     * 所以这条断言改成钉**页头现在真正渲染的那两条**，而不是删掉。
+     */
+    expect(app).toContain("t('web.shell.overflow.label')");
+    expect(app).toContain("t('web.shell.overflow.sortSection')");
   });
 
   it('复刻页头画的就是登记的这一批，数量与顺序逐字一致', () => {
