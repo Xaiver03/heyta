@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import {
+  SETTINGS_SLUGS,
   addTask,
   closeSettingsSheet,
   openApp,
@@ -31,7 +32,19 @@ const VIEWS = [
   ['trash', '回收站', 'Trash'],
 ] as const;
 
-const SETTINGS_SECTIONS = ['profile', 'appearance', 'sync', 'ai', 'data', 'account', 'help'] as const;
+/*
+ * 🔴 2026-11 设置 IA 迁移之后，这一组**必须从 `helpers.ts` 的 `SETTINGS_SLUGS` 取**，
+ * 不许再就地写一份字面量。
+ *
+ * 原来写的是 `['profile', 'appearance', 'sync', 'ai', 'data', 'account', 'help']` ——
+ * 七组同构之后 `sync` 并进了 `data`、`account` 并进了 `profile`，那两枚按钮已经不在左栏。
+ * 现量（2026-11-04 那一趟）：`button[aria-controls="settings-group-sync"]` count **0**，
+ * 报错是「设置分类 sync 必须存在」，而它红在**第三个** section ⇒ 作为"逐组拍一遍"
+ * 的审计，它连订阅 / 提醒与通知这两组从来没被拍过（旧清单里压根没有它们）。
+ * 判据本义不变（七组**组组**都要在每一档视口下过一遍几何审计），改的是清单的来处：
+ * 一份会跟着 `SETTINGS_NAV_ITEMS` 漂的第二份字面量，比没有更糟（§7 元规则 2）。
+ */
+const SETTINGS_SECTIONS = SETTINGS_SLUGS;
 
 type Surface =
   | { kind: 'view'; id: string; label: string }

@@ -62,11 +62,27 @@ test('🔴 点 `+` → 输入一句话 → 任务条出现在**刚指着的那�
   await page.getByRole('button', { name: '往选中那天加一条' }).click();
   // 选中日期本身会打开编辑器；上面的 `+` 测的是同一个入口，避免重复切换将它关闭。
   await page.locator(`[data-testid="calendar-cell-${target}"]`).click();
-  await expect(page.getByText('10月', { exact: false }).first()).toBeVisible();
+  const [ty, tm, td] = target.split('-').map(Number);
+  /*
+   * 🔴 这一句原来写的是 `getByText('10月')` —— 一句**绝对月份**，它只在"跑这一趟时
+   * 日历正好停在 2026 年 10 月"时成立。2026-11-04 那一趟的首个错误就是它：
+   * `Locator: getByText('10月').first()` / `Error: element(s) not found`
+   * （日历画的是 11 月）—— 它测的其实是"今天是几月"，不是这一条用例主张的任何事。
+   *
+   * 本义是"点中的那一格真的把编辑器**锚到了那一天**"。编辑器自己就把这件事说出来了：
+   * `CalendarCapturePopover` 的根节点是 `role="dialog"`，`aria-label` 就是落点日期
+   * （`dayTitle`，`{month}月{day}日 星期{weekday}`）。所以判据改钉那个名字 ——
+   * 比原来的月份字面量更严：月份只能说明"日历翻在那一页"，日期才说明"锚的是那一格"。
+   */
+  const popover = page.locator('[data-testid="calendar-capture"]');
+  await expect(popover).toBeVisible();
+  await expect(
+    popover,
+    `编辑器锚到的不是点中的那一天（${target}）`,
+  ).toHaveAttribute('aria-label', new RegExp(`^${String(tm)}月${String(td)}日`, 'u'));
   const input = page.locator('[data-testid="capture-input"]');
   await expect(input).toBeVisible();
   const placeholder = (await input.getAttribute('placeholder')) ?? '';
-  const [ty, tm, td] = target.split('-').map(Number);
   expect(
     placeholder,
     `输入框没说清这条会落在哪一天（实测 placeholder=「${placeholder}」）`,

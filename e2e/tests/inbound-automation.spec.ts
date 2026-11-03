@@ -201,8 +201,22 @@ for (const width of [1280, 390]) {
     const card = page.getByTestId(`inbound-rule-${ruleId}`);
     await expect(card).toBeVisible();
 
+    /*
+     * 🔴 2026-11：这一格**多了一枚同名按钮** —— `SettingsInfoTip`（ⓘ）的触发按钮拿 `label`
+     * 当可访问名，而这一格的 ⓘ 的 label 恰好就是 `credential.rotate` 那句话
+     * （`InboundAutomationSettings.tsx:502-507`：试发说明挂在「生成或轮换发送方凭据」这个 ⓘ 上）。
+     * 于是 `getByRole('button', { name: '生成或轮换发送方凭据', exact: true })` 命中 **2** 枚：
+     * `strict mode violation`（2026-11-04 那趟的原文，1280 与 390 两条都红在同一句）。
+     * ⇒ 定位改成"**带那句可见文字**的那一枚"：动作按钮的文字就是这句话，ⓘ 是图标按钮
+     * （`textContent` 为空）。判据本义不变 —— 点的仍是签发/轮换那一下。
+     * ⚠️ 顺带记一笔（不在本文件修）：那枚 ⓘ 的可访问名与它要说的话不是一回事
+     * （名字是"生成或轮换…"，内容是试发说明），读屏会听到两枚同名按钮。
+     */
+    const rotateButton = card.locator('button', { hasText: '生成或轮换发送方凭据' });
+    await expect(rotateButton, '签发按钮必须唯一（同名的 ⓘ 不算）').toHaveCount(1);
+
     // 签发一次凭据，让一次性凭据卡出现在页面上（它落在哪一格是这次要取证的决定之一）。
-    await card.getByRole('button', { name: '生成或轮换发送方凭据', exact: true }).click();
+    await rotateButton.click();
     const secretCard = page.getByTestId('inbound-credential-secret');
     await expect(secretCard).toBeVisible();
 
@@ -261,7 +275,7 @@ for (const width of [1280, 390]) {
 
     // 通栏的 ghost 按钮会被读成区块标题（截图实测：「生成或轮换发送方凭据」压在凭据卡上方，
     // 看起来像那张卡的表头）。动作按钮要跟卡片里其它动作一样按内容取宽。
-    const rotateBox = await card.getByRole('button', { name: '生成或轮换发送方凭据', exact: true }).boundingBox();
+    const rotateBox = await rotateButton.boundingBox();
     const credentialBox = await card.locator('.ht-inbound__credential').boundingBox();
     expect(rotateBox!.width, '动作按钮不许通栏').toBeLessThan(credentialBox!.width * 0.9);
 
@@ -440,6 +454,27 @@ test('inbound events cap hint, reason copy and test-send note render in a real b
   // ② 已知原因 → 人话；表外码（worker-revoked 不在那张表里）→ 不编句。
   await expect(page.getByTestId('inbound-event-reason-evt-0')).toHaveText('内容保留期已过，原文已被清除。');
   await expect(page.getByTestId('inbound-event-reason-evt-1')).toHaveCount(0);
-  // ③ 试发那句常驻说明。
-  await expect(panel.getByText('「发送测试事件」只在刚签发这一次可用', { exact: false })).toBeVisible();
+  /*
+   * ③ 试发那句说明。
+   *
+   * 🔴 2026-11 起它**从常驻段落搬进了 ⓘ**（产品裁决：「设置里一句常驻说明都不留」，
+   * 逐字见 `App.tsx:3386-3390` 与 `SettingsInfoTip` 文件头）。所以原来那句
+   * `expect(...).toBeVisible()` 的前提没了 —— 那一趟解析到的是
+   * `<span role="tooltip" data-hidden="true">`，报 `Received: hidden`。
+   *
+   * 判据本义不变（这句话必须还在，而且挂在「签发」那一格上），分三段钉：
+   *   · 文案还在（词条 `web.ai.inbound.credential.testSendOnce`）；
+   *   · 它挂在一枚**可聚焦的 ⓘ** 上（不是被删成一句看不见的死文本）；
+   *   · 聚焦之后它**真的画出来** —— 键盘与触摸用户拿不到说明＝说明不存在，
+   *     而"打开条件 = 悬停或聚焦"正是 `SettingsInfoTip` 文件头写下的那条契约。
+   */
+  const tipBubble = page.getByTestId('tip-inbound-test-send-once');
+  const tipTrigger = page.getByTestId('tip-inbound-test-send-once-trigger');
+  await expect(tipBubble).toContainText('「发送测试事件」只在刚签发这一次可用');
+  await expect(tipTrigger, '试发那句说明的 ⓘ 触发件必须在').toBeVisible();
+  await tipTrigger.focus();
+  await expect(
+    tipBubble,
+    '聚焦那枚 ⓘ 之后说明必须真的画出来（键盘用户拿不到 ＝ 这句说明没了）',
+  ).toBeVisible();
 });

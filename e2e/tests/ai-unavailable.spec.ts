@@ -42,7 +42,7 @@ import {
 } from './helpers.js';
 
 test.describe('AI 不可用：一次请求都不许发出去', () => {
-  test('出厂状态（零配置）：四个入口都说明"还没配端点"，假端点计数为 0', async ({
+  test('出厂状态（零配置）：三个入口都说明"还没配端点"，假端点计数为 0', async ({
     page,
     request,
   }) => {
@@ -93,22 +93,26 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
     await page.locator('[data-testid="duration-disclosure"] button[aria-label="取消"]').click();
 
     // ── 捕获 ────────────────────────────────────────────────────────────
-    // ⚠️ 捕获入口只在**输入框有内容**时出现（空输入框不渲染一个注定失败的按钮）。
-    await expect(page.locator('[data-testid="capture-ai"]')).toHaveCount(0);
     /*
-      🔴 这段文字必须让**确定性规则一个字段都认不出来**，否则入口根本不该出现。
-      2026-11 起这个按钮收窄成"只在规则读不懂时才问模型"——用户原话是
-      「没有任何作用」：`明天交周报` 这种句子规则已经给出日期与标题，再问一次模型
-      只是噪音，还要多过一次出境披露。判据用的是同一个解析器
-      （`parseCaptureDraft`），所以这里写一句**没有日期/时间/优先级/标签**的话。
-      ⇒ 这条用例钉的仍是"零配置时入口会说明还没配端点"，只是现在得先让入口有理由出现。
+      🔴 这一段**整段删掉了**，不是"它今天红了先绕过"。
+
+      「一句话捕获」那个**独立 AI 入口**已被产品整体删除（产品负责人：「已经集成到
+      收集框里面了，不需要单独有一个产品入口」）：`AiCapture.tsx` 不在了、
+      `capture-ai` 这个 testid **全仓 0 枚**（`grep -rn 'capture-ai' apps/ packages/`
+      回 0）、`AiFeature` 里没有 `capture`、`web.ai.capture.*` 词条已删。
+      那一趟的首个错误就是它：`locator('[data-testid="capture-ai"]')` 一路
+      `waiting for` 到 60 秒测试超时 —— 在测的是一个**没有被测物**的功能。
+
+      所以「四个入口」这句话本身也过期了：**现在真的存在、且在本条路径上能点开的
+      出口是三个** —— 优先级（列级）/ 拆解 / 估时（后两个在任务面单里）。
+      少掉的那一个不是漏测，是入口不存在；它的能力（在收集框里解析一句话）由
+      收集框自己的判据守（`calendar-capture` 那一路就是收集框 + 解析的端到端）。
     */
-    await page.locator('input[placeholder^="添加任务"]').fill('把季度复盘的结论整理成文档');
-    await page.locator('[data-testid="capture-ai"]').click();
-    await expect(page.locator('[data-testid="capture-no-target"]')).toContainText(
-      '还没有给「一句话捕获」配置端点',
-    );
-    await expect(page.locator('[data-testid="capture-send"]')).toHaveCount(0);
+    // 收集框仍然在，而且**在里面打字不会发出任何 AI 请求** —— 这正是"入口并进收集框"
+    // 之后最该守住的那一半：能力留在原地，出境没顺手被打开。
+    const composer = page.locator('input[placeholder^="添加任务"]');
+    await composer.fill('把季度复盘的结论整理成文档');
+    await expect(composer).toHaveValue('把季度复盘的结论整理成文档');
 
     await expectNoStubCall(request);
   });

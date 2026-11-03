@@ -5,15 +5,27 @@ import { openApp, switchView } from './helpers';
  * 🔴 玻璃材质三态验收（ADR-0042 / P1）—— 只有真浏览器能证的那一半
  * =================================================================
  *
- * 覆盖 P1 落地的五个悬浮功能层：
+ * 覆盖 P1 落地后**现存的四个悬浮功能层**：
  *   搜索浮层（chrome 档，共享层 tint + 宿主 blur）
- *   账号菜单 / 通知面板 / 任务「整理」下拉 / 任务「提醒」下拉（panel 档）
+ *   账号菜单 / 通知面板 / 任务行右键菜单（panel 档）
  *
- * ⚠️ 第五枚原本是「重复」下拉：§8.141 之后宽档行尾不再渲染它（编辑本体进了栏里那一格，
- *   行尾只剩只读徽标）。替补的选取口径写在 `SURFACES` 最后一项的注释里 ——
- *   **要用 ADR-0042 §3 名单上的面**，不是"长得像的另一枚下拉"。
- *   🔴 §8.145 之后连替补那一枚也不在宽档了 ⇒ 那一腿**自己把视口收到窄档**再量（覆盖面不变）。
- *   ⚠️ 所以本文件不再"五面同在 1440×900 下拍"：判据仍是计算样式，截图的**窗口宽度**逐腿而定。
+ * 🔴 **数量从五降到四，是覆盖面跟着界面走，不是删判据**（2026-11 行操作 UX 重设计）：
+ *   原来第三、四、五腿钉的是「清单+标签下拉」与「提醒下拉」（中间那腿曾由「重复」换成
+ *   「提醒」，换的理由写在旧注释里）。这一轮把**行尾那一排字段编辑器整排删了** ——
+ *   编辑器唯一所有者是 `TaskDetailCard`，而栏里那几格是**在流内**的
+ *   （`TaskDetailCard.tsx:379/401/420/493` 逐条写着"这一格里没有 `<details>`、
+ *   没有 Portal、也没有 `.ht-material`"）。三个行尾浮层外壳（`TaskOrganizer` /
+ *   `ReminderPanel` / `TaskRepeat`）**不再被 `App.tsx` 渲染**：
+ *   现量 `grep -rn '<TaskOrganizer\|<ReminderPanel\|<TaskRepeat' apps/web/src` = 0 / 0 / 0，
+ *   于是 `[data-testid="task-organize-summary"]` 与 `details.ht-compose--popover`
+ *   在真界面上各 0 枚 —— 那两腿只能一路等到 60 秒超时（2026-11-04 那趟的首个错误
+ *   正是 `locator('[data-testid="task-organize-summary"]').first()` 的 click 超时）。
+ *   ⇒ 行内弹出层的位置由这一轮**新加的那一枚**接住：任务行右键菜单
+ *   （`TaskRowMenu`，`role="menu"` + `.ht-row-menu ht-material`）。它同样从任务行上
+ *   弹出、同样压着可滚动的内容，"内容会从它下面滚过去吗"这条 ADR-0042 §3 的判据
+ *   对它成立，而它正是这一轮**新引入**的悬浮面 —— 比任何一枚存量面都更该被盯着。
+ *   ⚠️ 所以本文件不再"四面同在 1440×900 下拍"：判据仍是计算样式，截图的**窗口宽度**
+ *   逐腿而定（下面 `row-menu` 那一腿的注释写着为什么它不需要再改视口）。
  *
  * 每个面 × 三个状态各截一张（固定路径，人必须看，AGENTS §6.2 规定一）：
  *   light / dark / reduced-transparency（系统"减少透明度"）
@@ -95,162 +107,54 @@ const SURFACES: Surface[] = [
     },
   },
   {
-    // 🔴 §8.147 起这一腿必须**先把视口收到窄档**，理由与本文件 `reminder-dropdown` 那条
-    //   （§8.145 同一件事）逐字同形：工单 §8.147 把「清单 + 标签」的编辑本体搬进栏里那一格之后，
-    //   宽档（本套件的 1440×900，详情列在画）行尾只剩只读 `TagChips`、`<summary>` 不再渲染
-    //   ⇒ 原先这一腿在 1440 档**超时等不到** `task-organize-summary`（light 与 dark 两条一起红）。
-    //   覆盖面一个字没换：「清单标签下拉」是 ADR-0042 §3 那五个玻璃候选之一，
-    //   窄档（详情列不画）时那块面板原样回到行尾 —— 换的只是"在哪一档量它"，**删掉这一腿才是把覆盖丢掉**。
-    //   ⚠️ `close` 里把视口还回 1440×900：本套件其余四面按宽档拍，继承窄档 = 截图互相污染。
-    name: 'organize-dropdown',
+    /*
+     * 🔴 **这一腿接过的是「清单+标签下拉」与「提醒下拉」两腿的覆盖面** ——
+     * 而它们已经**没有被测物**了（行操作 UX 重设计，2026-11）：
+     *   · 行尾那一排字段编辑器整排被删，三个行尾浮层外壳
+     *     （`TaskOrganizer` / `ReminderPanel` / `TaskRepeat`）**不再被 `App.tsx` 渲染**
+     *     （现量：`grep -rn '<TaskOrganizer\|<ReminderPanel\|<TaskRepeat' apps/web/src`
+     *     = 0 / 0 / 0），行尾只剩只读徽标（`task-*-badge` / `task-chip-repeat`…）；
+     *   · 字段编辑器的唯一所有者在 `TaskDetailCard`，而栏里那几格是**在流内**的
+     *     （那个文件逐条写着"这一格里没有 `<details>`、没有 Portal、也没有 `.ht-material`"）。
+     *   ⇒ `[data-testid="task-organize-summary"]` 与 `details.ht-compose--popover`
+     *     在真界面上各 0 枚：原来那两腿一路等到 60 秒超时。2026-11-04 那趟的首个错误原文是
+     *     `locator.click: Test timeout of 60000ms exceeded.`
+     *     `waiting for locator('[data-testid="task-organize-summary"]').first()`
+     *     （light 与 dark 两条一起红）。
+     *
+     * 🔴 替补**不是**随手挑的：ADR-0042 §3 第 6 条把"各下拉"列为玻璃候选，而这一轮
+     * **新加**的那枚行右键菜单正是行内唯一的弹出层（`TaskRowMenu`：`role="menu"` +
+     * `.ht-row-menu ht-material`，层从 `.ht-material` 的 tint + blur 来，自己只加定位）。
+     * 它一样从任务行上弹出、一样压在可滚动的内容之上 —— ADR-0042 §3 那条
+     * "内容会从它下面滚过去吗"对它是成立的。而且它是这一轮**新引入**的面：
+     * 新面比存量面更该被材质判据盯着（"新加的浮层忘了走材质"正是这条 ADR 要防的回归）。
+     *
+     * ⚠️ 它**不需要**再收窄视口（与前面那两腿不同）：右键菜单不看详情列在不在画，
+     *    1440×900 下原样从行上弹出。所以这一腿把视口留在宽档，截图与其余三面同一档。
+     */
+    name: 'row-menu',
     open: async (page) => {
-      /*
-       * 🔴 2026-10-17（第二个坑，已复现）：这一面在 `SURFACES` 里排第 4，**前面 `inbox-panel`
-       * 会把视图切到收集箱**（它的 `close` 只关面板、不还视图）⇒ 锚点那两行根本不在屏上，
-       * 于是后面所有"找那一行/那一枚"的动作一律走到 60s 超时（第 33 轮在 `detail-pane-task`
-       * 上踩过同一个坑）。⇒ 打开之前先切回任务视图（同族既有手法，`switchView` 在 helpers 里）。
-       */
+      /* 🔴 同 `organize-dropdown` 的第二个坑：前面的 `inbox-panel` 会把视图切到收集箱
+         （它的 `close` 只关面板、不还视图）⇒ 锚点那一行根本不在屏上。先切回任务视图。 */
       await switchView(page, '任务');
-      await page.setViewportSize({ width: 900, height: 600 });
+      const row = page.locator('[data-testid^="task-item-"]').first();
+      await expect(row, '任务行必须先画出来（右键菜单是从它上面弹出来的）').toBeVisible();
       /*
-       * 🔴 2026-10-17：整理入口现在住在**每行那枚「更多」披露**里（`details.ht-compose-actions`）
-       * —— 折叠时它在 DOM 里但不画，直接点会一路
-       * `waiting for element to be visible` 到 60s 超时（现量）。先把披露打开（按它自己的
-       * `task-actions-summary-*` 定位，不需要知道任务标题），再点整理入口。
+       * 走**真手势**（右键），不直接点菜单里的东西：这一面存在的唯一入口就是它，
+       * 而"右键弹不出来"正是这一轮最该被发现的那种回归（行尾的删除/整理入口全撤了）。
        */
-      const more = page.locator('[data-testid^="task-actions-summary-"]').first();
-      if (
-        (await more.count()) > 0 &&
-        !(await page
-          .locator('[data-testid="task-organize-summary"]')
-          .first()
-          .isVisible()
-          .catch(() => false))
-      ) {
-        await more.click();
-      }
-      await page.locator('[data-testid="task-organize-summary"]').first().click();
-      return page
-        .locator('details:has([data-testid="task-organize-summary"]) .ht-material')
-        .first();
+      await row.click({ button: 'right' });
+      const menu = page.getByTestId('task-row-menu');
+      await expect(menu, '右键之后行菜单必须出现（它是行上唯一的弹出层）').toBeVisible();
+      return menu;
     },
     close: async (page) => {
       /*
-       * 🔴 2026-10-17：**关**两层 —— 整理入口住在每行那枚「更多」披露里，
-       * 只点整理入口只会把里面那层收起来，外层 `details.ht-compose-actions`
-       * 还开着 ⇒ 判据 `…关干净再拍下一个（不可见即关闭）` 读到 `.ht-material`
-       * 仍然 visible（现量：`Expected: hidden, Received: visible`）。
-       * 这里按"点外层 summary 收起"来关（它本来就是 toggle），再按 Esc 兜底。
-       *
-       * 🔴 2026-10-17（第六个读数，**这一条是本轮真因**）：只收外层**不够**。
-       * 在真实流程里插桩量到：下一面点 chip 时，命中点是 `label`，而它属于
-       * **同一行**的另一个 `.ht-material__row-pop` 面板（`popRow == chipRow`）——
-       * 也就是**这一面的整理面板并没有随外层披露一起消失**，它压在下一面的目标上
-       * （探针里单任务、干净状态量不到）。
-       * ⇒ 关法改成**先关内层、再收外层**（内层还可见时才点它，避免"关掉又打开"）。
-       * ⚠️ 应用侧仍有一个真问题留在台账里：**同一时刻只允许一个行内浮层**这条不变量
-       * 现在没有谁在保证（行内浮层彼此重叠是真实存在的），它不该靠用例的关闭顺序兜住。
-       */
-      const chip = page.locator('[data-testid="task-organize-summary"]').first();
-      if (await chip.isVisible().catch(() => false)) await chip.click();
-      const more = page.locator('[data-testid^="task-actions-summary-"]').first();
-      if ((await more.count()) > 0) {
-        const outer = more.locator('xpath=ancestor::details[1]');
-        if ((await outer.getAttribute('open')) !== null) await more.click();
-      }
-      await page.keyboard.press('Escape');
-    },
-  },
-  {
-    // 🔴 这一腿原本是 `repeat-dropdown`：工单 §8.141 把「重复」的编辑本体搬进栏里那一格之后，
-    //   宽档（本套件的 1440×900，详情列在画）行尾只剩只读徽标、`<summary>` 不再渲染 ⇒ 那一腿
-    //   会点在不存在的选择器上。
-    //
-    // ⚠️ 替补**不是**随手挑的：第一版换成了「截止」那一枚，跑出来 `bgAlpha=1` 直接红 ——
-    //   因为 `DueEditor` 的两副身体都带内联 `backgroundColor: color.surface`（实色），
-    //   而 ADR-0042 §3 的逐面裁决表（审计 §3.4）里那五个玻璃候选是
-    //   账号菜单 / 通知面板 / 清单标签下拉 / 重复规则下拉 / **捕获条下拉**，
-    //   截止下拉**从来不在名单上**。⇒ 拿它替「重复」等于把覆盖面换成一个非玻璃面。
-    //   这里换成提醒那一枚（`.ht-compose--popover` + `.ht-compose-panel ht-material`，
-    //   无内联底色覆盖），它既在名单上、又仍在宽档行尾渲染。
-    //
-    // 🔴 §8.145 之后**宽档也没有它了**（提醒的编辑本体进了栏里那一格，行尾只剩 `ReminderBadge`）。
-    //   这一腿不删、改成**先把视口收到窄档**：`details.ht-compose--popover` 整块是条件挂载，
-    //   窄档（详情列不画）时它原样回到行尾 ⇒ 覆盖面（名单上的那一面）一个字没换，
-    //   换的只是"在哪一档量它"。删掉这一腿才是把覆盖丢掉。
-    //   ⚠️ `close` 里必须把视口还回 1440×900：本套件其余四面都按宽档拍，
-    //   让下一腿继承窄档 = 截图互相污染（同一循环里已经有一条"关干净再拍下一个"的判据）。
-    name: 'reminder-dropdown',
-    open: async (page) => {
-      /* 🔴 同 `organize-dropdown`：这一面排第 5，前面的面会把视图切走 ⇒ 先切回任务视图。 */
-      await switchView(page, '任务');
-      await page.setViewportSize({ width: 900, height: 600 });
-      /*
-       * 🔴 2026-10-17：提醒那枚 `summary` 现在也住在**每行那枚「更多」披露**里
-       *（`details.ht-compose-actions`）—— 折叠时它在 DOM 里但不画，直接点会一路
-       * `waiting for element to be visible` 到 60s 超时（现量，第三次遇到同一族）。
-       * 先按 `task-actions-summary-*` 把外层披露打开，再点提醒那一枚。
-       */
-      /*
-       * 先把**目标那一枚自己的祖先披露**打开 —— 用 `evaluate` 按元素自己置位，
-       * 而不是去点"包含 popover 的第一行"那枚按钮：后者与本行不一定是同一行
-       * （现量教训：点了另一行 ⇒ 目标那枚始终折叠 ⇒ `waiting for element to be visible` 一路 60s）。
-       * 点开披露只是**取出元素**的仪器动作；真正要被检验的是下面那一次对 chip 的
-       * `locator.click()`（actionability 比 `mouse.click` 严，能抓住"看得见点不着"）。
-       */
-      const popSummary = page.locator('details.ht-compose--popover > summary').first();
-      await popSummary.evaluate((el) => {
-        const outer = el.closest('details.ht-compose-actions');
-        if (outer !== null && !outer.open) outer.open = true;
-      });
-      /*
-       * 🔴 2026-10-17（第四个坑，逐行读数定位）：`expect(...).toBeVisible()` 与下一句
-       * `locator.click()` **各自重新解析一次 `.first()`**，而 popover 打开之后 DOM 里有两个
-       * 实例（现量 `matches=2`）⇒ 两次解析之间可能指向**另一枚（折叠的）**元素：
-       * 现量就是"可见断言过了、紧接着 click 报 `waiting for element to be visible`"，
-       * 失败行精确落在 `await popSummary.click();`。
-       * ⇒ 把目标**绑成同一个元素句柄**再断言/滚动/点击（不再重解析）。
-       * 点击本身仍是 `elementHandle.click()`（真实 actionability，能抓住"看得见点不着"）。
-       *
-       * 🔴 2026-10-17（第五个读数，**仍未解决**）：在真实流程里插桩量到 —— 点击那一刻
-       * 目标 chip 在 `540..594`，而 `elementFromPoint` 命中的是 **`label.`（rect 525..769）**，
-       * 它属于**另一个** `.ht-material__row-pop` 面板（`513..781`）⇒ **上一条面的行内浮层
-       * 还没关干净，正压在这一枚上**（探针里单任务、干净状态量不到这一条）。
-       * 下一手：查 `organize-dropdown` 的 close 是否真的把它的 `.ht-material__row-pop` 关掉
-       * （或应用侧是否本该"同一时刻只允许一个行内浮层"）。
-       */
-      const chip = await popSummary.elementHandle();
-      expect(chip, '要找得到提醒那一枚').not.toBeNull();
-      await chip!.waitForElementState('visible');
-      await chip!.scrollIntoViewIfNeeded();
-      await chip!.click();
-      const panel = page.locator('details.ht-compose--popover .ht-material').first();
-      // 🔴 把锚点那一行滚到可视区中部再量：这一族的锚点任务落在列表末尾，而
-      //   `position: absolute` 的行尾面板开在**滚动容器**里 ⇒ 朝下开就被容器底裁掉。
-      //   2026-10-05 看图实测：不滚的时候 `toBeVisible()` 与计算样式**全绿**，截图里
-      //   却整块面板都没画（既有的 `organize-dropdown` 腿同一件事）。
-      //   ⇒ 材质判据量的是元素，"用户看得见"要另有一条，见工单 §8.141 边界。
-      await panel.scrollIntoViewIfNeeded();
-      return panel;
-    },
-    close: async (page) => {
-      /*
-       * 🔴 2026-10-17（第三个坑，已用读数定位）：这里原来又去点
-       * `details.ht-compose--popover > summary` 的 `.first()` —— 而**popover 打开之后
-       * DOM 里多出一个实例**（现量：`matches=2`，两枚都 visible、各挂在一条 task-item 行上），
-       * 于是 `close` 的 `.first()` 已经指向**另一个（折叠的）**元素 ⇒
-       * `waiting for element to be visible` 一路 60s（而 `open` 里同一句是好的，因为它发生在
-       * 打开之前、那时只有一个实例）。
-       * ⇒ 关法改成**不依赖"第几个实例"**：Esc（这一族的面板本来就是 Esc 关，`organize-dropdown`
-       * 的 close 也是这么兜的）+ 把外层披露收回去（按行自己那枚「更多」的状态决定要不要点）。
+       * 菜单是**条件挂载**（不是 `<details>`）：Esc 之后就整块卸载。
+       * 只按 Esc、不补鼠标兜底 —— 菜单不吃 Esc 这件事本身该红（`check:menu-keyboard`
+       * 盯的是同一格），用一次 `mouse.click` 兜过去等于把它测掉。
        */
       await page.keyboard.press('Escape');
-      const more = page.locator('[data-testid^="task-actions-summary-"]').first();
-      if ((await more.count()) > 0) {
-        const outer = more.locator('xpath=ancestor::details[1]');
-        if ((await outer.getAttribute('open')) !== null) await more.click();
-      }
-      await page.setViewportSize({ width: 1440, height: 900 });
     },
   },
 ];
@@ -279,7 +183,7 @@ async function materialOf(
 }
 
 for (const state of ['light', 'dark', 'reduced-transparency'] as const) {
-  test(`玻璃三态 · ${state}：五个悬浮层截图 + 材质判据`, async ({ page }) => {
+  test(`玻璃三态 · ${state}：四个悬浮层截图 + 材质判据`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     if (state === 'dark') await page.emulateMedia({ colorScheme: 'dark' });
     if (state === 'reduced-transparency') {

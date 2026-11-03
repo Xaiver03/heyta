@@ -44,7 +44,31 @@ for (const width of [375, 1440]) {
         currentBox!.x >= navBox!.x - 0.5 && currentBox!.x + currentBox!.width <= navBox!.x + navBox!.width + 0.5,
         `当前项落在导航可视窗口外：窗口 x=${navBox!.x}..${navBox!.x + navBox!.width}，当前项 x=${currentBox!.x}..${currentBox!.x + currentBox!.width}`,
       ).toBe(true);
-      await expect(page.getByTestId('settings-sheet').getByRole('heading')).toHaveCount(1);
+      /*
+       * 🔴 2026-10-31 起设置内容面**不再渲染节标题**（裁决与理由逐字在
+       * `apps/web/src/App.tsx:350-358`：左栏已经用主色底 + `aria-current="page"`
+       * 说了"你在哪一节"，内容面再写一遍同一个词，就是同一份信息架构画了两次）。
+       * ⇒ 原来这一句（`settings-sheet` 里 heading === 1）的**前提整个消失**，
+       * 现量是 `33 × locator resolved to 0 elements`（2026-11-04 那一趟的原文）。
+       *
+       * 判据本义不变 —— "这一屏有且只有一个名字，而且就是当前那一节"。它现在挂在三处
+       * 现量上，三处缺一条都会让"无名的一屏"或"两份名字"重新长出来：
+       *   ① 浮层自己是 `role="dialog"`，必须有可访问名（空名字 = 读屏只听到"对话框"）；
+       *   ② 内容面**只有一节**是显示着的（其余节带 `hidden`，不进无障碍树）；
+       *   ③ 那一节的名字与左栏选中项**是同一句话**（同一个词条键，不是第二份文案）。
+       * 同一件事的 jsdom 版判据在 `apps/web/tests/settings-sheet-ia.spec.tsx`
+       * 「内容面不重复侧栏已经指出的节标题」那一条。
+       */
+      const sheet = page.getByTestId('settings-sheet');
+      await expect(sheet).toHaveAttribute('role', 'dialog');
+      const sheetName = (await sheet.getAttribute('aria-label'))?.trim() ?? '';
+      expect(sheetName, '设置浮层没有可访问名 —— 读屏用户听到的会是一个没有名字的对话框').not.toBe('');
+      const shownGroups = sheet.locator('section.ht-settings__group:not([hidden])');
+      await expect(shownGroups, '设置内容面同时画出了不只一节（或一节都没画）').toHaveCount(1);
+      await expect(shownGroups).toHaveAttribute(
+        'aria-label',
+        (await currentNav.textContent())?.trim() ?? '',
+      );
       await expect(page.getByTestId('detail-pane-toggle')).toHaveCount(0);
       const links = page.getByTestId('about-links').getByRole('link');
       await expect(links).toHaveCount(4);
