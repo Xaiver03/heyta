@@ -99,7 +99,6 @@ export type FeatureRoute =
     };
 
 const NO_TARGET_KEY: Record<AiFeature, MessageKey> = {
-  capture: 'web.ai.noTarget.capture',
   breakdown: 'web.ai.noTarget.breakdown',
   prioritize: 'web.ai.noTarget.prioritize',
   'duration-estimate': 'web.ai.noTarget.duration',

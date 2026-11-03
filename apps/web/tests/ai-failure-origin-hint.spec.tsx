@@ -42,7 +42,6 @@ import type { Task } from '@heyta/domain';
 
 import {
   breakdownFailureCopy,
-  captureFailureCopy,
   durationFailureCopy,
   prioritizeFailureCopy,
   toolRunFailureCopy,
@@ -195,16 +194,15 @@ describe('🔴 诊断不成立时一个字都不许多（保守方向）', () =>
   });
 });
 
-describe('🔴 五个入口吃同一个上下文（第 5 个不许再漏一次）', () => {
+describe('🔴 四个入口吃同一个上下文（第 5 个曾漏过一次）', () => {
   const factories: readonly [string, (detail: string, c: AiFailureContext) => AiFailureCopy][] = [
     ['breakdown', (d, c) => breakdownFailureCopy('ai-unavailable', d, c)],
-    ['capture', (d, c) => captureFailureCopy('ai-unavailable', d, c)],
     ['duration', (d, c) => durationFailureCopy('ai-unavailable', d, c)],
     ['prioritize', (d, c) => prioritizeFailureCopy('ai-unavailable', d, c)],
     ['tool-run', (d, c) => toolRunFailureCopy('ai-unavailable', d, c)],
   ];
 
-  it('同一份失败输入 ⇒ 五个工厂给出同一份 key / settingsTarget / originHint / showDetail', () => {
+  it('同一份失败输入 ⇒ 四个工厂给出同一份 key / settingsTarget / originHint / showDetail', () => {
     withHostOrigin(PROD_ORIGIN, () => {
       const first = factories[0]![1]('x', ctx('network', LOOPBACK_ENDPOINT_URL));
       for (const [name, build] of factories) {

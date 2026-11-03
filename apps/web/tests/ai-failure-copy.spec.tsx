@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { createProvider, type AiFailureReason } from '@heyta/ai';
 import { translate } from '@heyta/i18n';
 
-import { captureFailureCopy, causeKey, serverCodeKey } from '../src/features/ai/ai-failure-copy.js';
+import { breakdownFailureCopy, causeKey, serverCodeKey } from '../src/features/ai/ai-failure-copy.js';
 
 /** 有没有汉字。 */
 const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF]/;
@@ -138,12 +138,12 @@ describe('托管档被拒：两个稳定码要说两句不同的话', () => {
     expect(translate('en', notConfigured!)).not.toBe('');
 
     // 且主文案**不是**没有码时那句泛泛的 http-error
-    const generic = captureFailureCopy('ai-unavailable', 'raw', {
+    const generic = breakdownFailureCopy('ai-unavailable', 'raw', {
       cause: 'http-error',
       endpointUrl: 'https://heyta.waytofuture.cn',
       serverCode: undefined,
     });
-    const told = captureFailureCopy('ai-unavailable', 'raw', {
+    const told = breakdownFailureCopy('ai-unavailable', 'raw', {
       cause: 'http-error',
       endpointUrl: 'https://heyta.waytofuture.cn',
       serverCode: 'MANAGED_AI_NOT_CONFIGURED',
@@ -151,16 +151,16 @@ describe('托管档被拒：两个稳定码要说两句不同的话', () => {
     expect(told.key).not.toBe(generic.key);
   });
 
-  it('🔴 同一次 `http-error`：带不同码时，`captureFailureCopy` 给出的主文案不同', () => {
+  it('🔴 同一次 `http-error`：带不同码时，`breakdownFailureCopy` 给出的主文案不同', () => {
     const ctx = (serverCode: string) => ({
       cause: 'http-error' as const,
       endpointUrl: 'https://heyta.waytofuture.cn',
       serverCode,
     });
 
-    const a = captureFailureCopy('ai-unavailable', 'raw', ctx('SUBSCRIPTION_REQUIRED'));
-    const b = captureFailureCopy('ai-unavailable', 'raw', ctx('AI_QUOTA_EXCEEDED'));
-    const plain = captureFailureCopy('ai-unavailable', 'raw', {
+    const a = breakdownFailureCopy('ai-unavailable', 'raw', ctx('SUBSCRIPTION_REQUIRED'));
+    const b = breakdownFailureCopy('ai-unavailable', 'raw', ctx('AI_QUOTA_EXCEEDED'));
+    const plain = breakdownFailureCopy('ai-unavailable', 'raw', {
       cause: 'http-error',
       endpointUrl: undefined,
       serverCode: undefined,

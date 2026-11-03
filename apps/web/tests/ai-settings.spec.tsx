@@ -849,9 +849,9 @@ describe('capabilityGaps（纯函数）', () => {
       endpoints: [
         { id: 'e1', label: 'A', endpoint: 'http://localhost:11434/v1', model: 'm', capabilities: ['structured_output'] as never },
       ],
-      routes: { capture: [{ endpointId: 'e1' }] },
+      routes: { prioritize: [{ endpointId: 'e1' }] },
     };
-    expect(capabilityGaps('capture', routing)?.[0]?.missing).toEqual([]);
+    expect(capabilityGaps('prioritize', routing)?.[0]?.missing).toEqual([]);
   });
 
   it('端点不存在时跳过（不留一条假的缺口）', () => {
