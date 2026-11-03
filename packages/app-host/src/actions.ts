@@ -37,6 +37,8 @@ import {
   MIN_DURATION_MINUTES,
   Priority,
   byCreatedAtOrder,
+  byPinnedFirst,
+  isAbandoned,
   dueLocalDateOf,
   isLive,
   isValidRecurrenceRule,
@@ -46,6 +48,7 @@ import {
   startOfDay,
   toLocalDate,
   today,
+  validateNewChildPosition,
   validateParentChange,
   type QuadrantTaskPatch,
   type Task,
@@ -161,6 +164,32 @@ export interface TaskActions {
    * 应当自己在调用前判断 —— 那是**交互**决策，不是**数据**决策。
    */
   create(title: string, over?: NewTaskFields): Promise<string>;
+
+  /**
+   * 在 `parentId` 下**新建一条子任务**（详情面板里就地添加走的就是这里）。
+   *
+   * 🔴 **一条 op，不是「create + setParent」两条。**
+   * 挂一个子任务是一个用户意图。拆两条的后果是中间态可被看见：新任务会先以
+   * **顶级任务**的身份出现在列表里；而如果随后那条 `setParent` 被拒（超深 /
+   * 超子数），它就**永久留成一条多余的顶级任务** —— op-log 没有"撤回上一条 op"
+   * 这回事，界面只能提示失败，脏数据却已经写下去了。
+   * `CREATE` 载荷里直接带 `parentId` 则要么成立、要么一条都没写。
+   *
+   * ⚠️ **上限校验在这个动作里，不在界面里**：`NewTaskFields` 刻意**没有** `parentId`
+   * 字段，就是为了不让 `create(title, {parentId})` 成为一条绕过
+   * `MAX_SUBTASK_DEPTH` / `MAX_SUBTASK_CHILDREN` 的后门路径。
+   * 校验用领域层的 `validateNewChildPosition` —— 四端必须给同一个答案（§3.5）。
+   *
+   * 产品语义（住在这里）：子任务**继承父所在的清单**。不继承的话，
+   * 「在项目里加一个子任务」会把子任务丢进收集箱，而它在项目视图里不再出现 ——
+   * 用户看到的就是"加完就不见了"。父在收集箱时，子任务也在收集箱。
+   *
+   * 失败时 `throw`，原因串与 `setParent` 用同一份词表（`parent_not_found` /
+   * `depth_exceeded` / `children_exceeded`），因为界面走的是同一张
+   * 「原因 → 人话」映射表（`packages/ui/src/subtasks/model.ts`）。
+   */
+  createSubtask(parentId: string, title: string): Promise<string>;
+
   /** 改标题。 */
   rename(entityId: string, title: string): Promise<void>;
   /** 显式设置完成态（幂等，不像 `toggle` 依赖当前状态）。 */
@@ -234,6 +263,22 @@ export interface TaskActions {
   bulkSetPriorities(entries: readonly { id: string; priority: Priority }[]): Promise<void>;
   /** 四象限的"重要"维度。 */
   setImportant(entityId: string, important: boolean): Promise<void>;
+  /**
+   * 置顶 / 取消置顶（写 `Task.pinnedAt`，见
+   * [ADR-0083](../../../docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md) §3.2）。
+   *
+   * 🔴 置顶**只改同一分组内的顺序**，不改排程 —— 这一条判断住在这里，
+   * 不许由各宿主在渲染时自己排。
+   */
+  setPinned(entityId: string, pinned: boolean): Promise<void>;
+  /**
+   * 放弃 / 恢复（写 `Task.abandonedAt`，任务的第五个独立状态，
+   * 见 [ADR-0083](../../../docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md) §3.1）。
+   *
+   * 🔴 它**不碰** `completedAt`：放弃的任务不计入完成率，也不该被"完成即推进"顺移。
+   * ⚠️ 默认列表出口不含已放弃那一层归 list 分裂（ADR-0048 I5），不在本方法里判。
+   */
+  setAbandoned(entityId: string, abandoned: boolean): Promise<void>;
   /** Validate and write task details as one UPDATE op. */
   patchDetails(entityId: string, patch: TaskDetailsPatch): Promise<void>;
   /**
@@ -383,6 +428,16 @@ export interface TaskActions {
   /** 未删除的任务，按创建时间排序（同刻按 id 字典序，保证跨端顺序一致）。 */
   listTasks(): Task[];
   /**
+   * **只含已放弃**（且未删除）的任务，顺序与 `listTasks()` 同一条。
+   *
+   * 🔴 这一对分裂出口是 [ADR-0048](../../../docs/adr/0048-deletion-four-states-and-the-no-physical-erase-boundary.md)
+   * 的 I5（「隐藏由层负责，不由调用点负责」）在放弃这一态上的落点，
+   * 形状照 `project-actions.ts:148/:155` 那对 `listProjects()` / `listArchivedProjects()`。
+   * 宿主**不许**自己拿 `listTasks()` 再 filter 一遍 —— 那正是 I5 拦的形状，
+   * 而它的表现是"同一件事两端不同答案，且都不报错"。
+   */
+  listAbandonedTasks(): Task[];
+  /**
    * 回收站：**已软删除且未彻底删除**的任务，最近删除的排在最前面。
    *
    * 排序必须跨端一致（同刻按 id 字典序），否则同一份数据在两台设备上
@@ -516,19 +571,51 @@ export function createTaskActions(
 
   };
 
+  /**
+   * `create` 与 `createSubtask` 共用的那条 CREATE 发射。
+   *
+   * 抽出来的理由是**不想要两份 trim / 两个 id 生成 / 两种默认优先级**：
+   * 这两个动作是同一件事（建一条任务），差别只在载荷里有没有 `parentId`。
+   * `over` 收到的是**展开后的匿名对象**，所以能直接当 `Record<string, unknown>` 用
+   * （`NewTaskFields` 是 interface，直接传会撞 TS 的"缺索引签名"）。
+   */
+  const dispatchCreate = async (
+    title: string,
+    over: Record<string, unknown>,
+  ): Promise<string> => {
+    const trimmed = title.trim();
+    if (trimmed === '') throw new Error('任务标题不能为空');
+
+    const entityId = makeId();
+    await ctx.dispatch({
+      entityType: 'TASK' as EntityType,
+      entityId,
+      opType: OpType.Create,
+      payload: { title: trimmed, priority: Priority.None, ...over },
+    });
+    return entityId;
+  };
+
   return {
     async create(title, over = {}) {
-      const trimmed = title.trim();
-      if (trimmed === '') throw new Error('任务标题不能为空');
+      return dispatchCreate(title, { ...over });
+    },
 
-      const entityId = makeId();
-      await ctx.dispatch({
-        entityType: 'TASK' as EntityType,
-        entityId,
-        opType: OpType.Create,
-        payload: { title: trimmed, priority: Priority.None, ...over },
+    async createSubtask(parentId, title) {
+      const verdict = validateNewChildPosition(Object.values(ctx.getState().tasks), parentId);
+      if (!verdict.ok) {
+        // 与 `setParent` 同一个形状：原因在括号里（界面用 `rejectionReasonOf` 取），
+        // 括号外那半句是给人看的上下文。**不降级成静默空操作**。
+        throw new Error(`建子任务被拒绝（${verdict.reason}）：父 ${parentId}`);
+      }
+      const parent = taskOf(parentId);
+      return dispatchCreate(title, {
+        parentId: verdict.parentId,
+        // 子任务继承父所在的清单（见接口上那条注释）。父已在收集箱时这里是空对象，
+        // 于是载荷里**没有** `projectId` —— 与"显式写成 null"是两回事，
+        // 前者是"不给这个字段"，后者才是"清掉它"（文件头第 2 条）。
+        ...(parent?.projectId !== undefined ? { projectId: parent.projectId } : {}),
       });
-      return entityId;
     },
 
     async rename(entityId, title) {
@@ -738,6 +825,29 @@ export function createTaskActions(
 
     setImportant(entityId, important) {
       return update(entityId, { important });
+    },
+
+    async setPinned(entityId, pinned) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      // 幂等：已经是那个状态就不写 op —— 界面上"连点两下置顶"是常事，
+      // 随机写两条会让 op-log 里多一条什么都没改的噪音。
+      if ((task.pinnedAt !== undefined) === pinned) return;
+      // null 而不是 undefined —— 见文件头第 2 条（`undefined` = 不改，`null` = 清除）。
+      await update(entityId, { pinnedAt: pinned ? now() : null });
+    },
+
+    async setAbandoned(entityId, abandoned) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      if ((task.abandonedAt !== undefined) === abandoned) return;
+      /**
+       * 🔴 **只写这一个字段。** 放弃不碰 `completedAt`
+       * （[ADR-0083](../../../docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md) §3.1 第 3 条）：
+       * 写成"放弃即完成"会让它凭空进完成率，而且重复任务的"完成即推进"
+       * 会把它顺移到下一个周期 —— 用户说的是"我不做了"，系统却每周再问他一次。
+       */
+      await update(entityId, { abandonedAt: abandoned ? now() : null });
     },
 
     setQuadrantDrop(entityId, plan) {
@@ -998,14 +1108,24 @@ export function createTaskActions(
     },
 
     listTasks(): Task[] {
-      return listAlive(ctx.getState().tasks).sort(byCreatedAtOrder);
+      // 🔴 未删除 **且** 未放弃 —— 放弃那一层在这里滤，不归调用方滤（ADR-0048 I5）。
+      return listAlive(ctx.getState().tasks)
+        .filter((task) => !isAbandoned(task))
+        .sort(byPinnedFirst<Task>(byCreatedAtOrder));
+    },
+
+    listAbandonedTasks(): Task[] {
+      // 与 `listTasks()` 共用同一个"未删除"判据与同一份顺序，只有放弃那一层反过来。
+      return listAlive(ctx.getState().tasks)
+        .filter(isAbandoned)
+        .sort(byPinnedFirst<Task>(byCreatedAtOrder));
     },
 
     listPendingTasks(): Task[] {
-      // 与 listTasks 同一份顺序、同一个"未删除"判据 —— 只有"未完成"是新增的。
+      // 与 listTasks 同一份顺序、同一个"未删除 + 未放弃"判据 —— 只有"未完成"是新增的。
       return listAlive(ctx.getState().tasks)
-        .filter((task) => task.completedAt === undefined)
-        .sort(byCreatedAtOrder);
+        .filter((task) => !isAbandoned(task) && task.completedAt === undefined)
+        .sort(byPinnedFirst<Task>(byCreatedAtOrder));
     },
 
     listTrashed(): Task[] {

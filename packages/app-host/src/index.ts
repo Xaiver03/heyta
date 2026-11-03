@@ -119,6 +119,20 @@ export {
   type ReminderActions,
   type ReminderActionsOptions,
 } from './reminder-actions.js';
+/**
+ * 任务动态（一条任务的变更流水）—— **纯读路径**。
+ *
+ * 🔴 判据在 `@heyta/domain` 的 `projectTaskActivity`，这里只取 op 与问覆盖范围。
+ * 宿主拿 `coverage` 决定能说什么：`'device-local-only'` 时只许说
+ * "这台设备记录到的变更"，说成"完整历史"是不实陈述（新设备只有快照+增量）。
+ */
+export {
+  readTaskActivity,
+  type ReadTaskActivityOptions,
+  type TaskActivityCoverage,
+  type TaskActivityOpSource,
+  type TaskActivityRead,
+} from './task-activity.js';
 export { planNativeReminders, type NativeReminderPlan } from './reminder-scheduler.js';
 export {
   createVaultKeyMigrationRemote,
@@ -204,6 +218,27 @@ export {
   type SharedCommentEntityType,
   type UnsharedListReason,
 } from './comment-actions.js';
+/**
+ * 任务附件（工单 `task-detail-ticktick-parity` #9）。
+ *
+ * 两件事分两个文件，是刻意的：`attachment-actions.ts` 只构造 op（一个附件=一个实体），
+ * `attachment-http.ts` 只做字节的那条 HTTP 通道。动作层认的是**端口**而不是 fetch，
+ * 这样"上传失败 ⇒ 一个字节都不写进 op-log"这条最重要的路径能在不碰网络的情况下测。
+ * 字节为什么绝不进 op-log，写在 `@heyta/shared-schema` 的 `attachment-http-contract.ts`。
+ */
+export {
+  createAttachmentActions,
+  type AttachmentActions,
+  type AttachmentActionsOptions,
+  type NewAttachmentFields,
+} from './attachment-actions.js';
+export {
+  createAttachmentBlobPort,
+  type AttachmentBlobPort,
+  type AttachmentRemoveResult,
+  type AttachmentUploadReceipt,
+  type AttachmentUploadResult,
+} from './attachment-http.js';
 export {
   createEventActions,
   type EventActions,
