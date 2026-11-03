@@ -58,6 +58,64 @@ class LocalFsModule(reactContext: ReactApplicationContext) :
     }
 
     /**
+     * 读一个本机 URI 的**原始字节**，回 base64（无换行）。工单 #9 的附件上传走这条。
+     *
+     * ## 为什么头像那条 `prepareAvatarBase64` 不能复用
+     *
+     * 它按头像契约**重编码**：居中裁方、缩到边长、转成 PNG/JPEG。对附件来说是错的 ——
+     * 用户传的是一张 PDF 或一张原图，附件要的是**字节本身**，改一个比特就换了文件。
+     *
+     * ## 为什么必须在原生侧
+     *
+     * 与 `readTextUri` 同一个理由（RN 0.84.1 在 Android 上读不出本机 URI），
+     * 而 `readTextUri` 按 `Charsets.UTF_8` 强转字符串，对二进制是**有损**的 ——
+     * 症状是"上传成功而服务端解不开"。
+     *
+     * 🔴 `maxBytes` 是**这个模块自己**的护栏，不是产品规则：超限就拒，
+     * 不把几十 MB 读进 `ByteArrayOutputStream` 再抛（那会把 app 直接压崩，
+     * 而崩掉的表现是"我一点添加附件应用就退出"，不是一句能看懂的错）。
+     * 产品侧的单文件上限在 `@heyta/shared-schema` 的 `MAX_ATTACHMENT_BYTES`，
+     * 由 JS 传进来 —— 这里不判断任何业务语义（AGENTS §3.5）。
+     *
+     * 失败**分码回抛**，与同文件另两条同一个纪律。
+     */
+    @ReactMethod
+    fun readUriBase64(uri: String, maxBytes: Int, promise: Promise) {
+        if (maxBytes <= 0) {
+            promise.reject("BAD_MAX", "maxBytes 必须是正整数，收到 $maxBytes")
+            return
+        }
+        try {
+            val stream = reactApplicationContext.contentResolver.openInputStream(Uri.parse(uri))
+            if (stream == null) {
+                promise.reject("OPEN_NULL", "openInputStream 对 $uri 返回 null")
+                return
+            }
+            val out = ByteArrayOutputStream()
+            stream.use { input ->
+                val buffer = ByteArray(64 * 1024)
+                var total = 0
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read == -1) break
+                    total += read
+                    if (total > maxBytes) {
+                        // 不保留已经读到的部分：超限的文件一块字节都不该留在内存里。
+                        promise.reject("TOO_LARGE", "超过 $maxBytes 字节上限（实际至少 $total）")
+                        return
+                    }
+                    out.write(buffer, 0, read)
+                }
+            }
+            promise.resolve(Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP))
+        } catch (e: SecurityException) {
+            promise.reject("READ_DENIED", e.message ?: e.javaClass.simpleName)
+        } catch (e: Exception) {
+            promise.reject("READ_FAILED", e.message ?: e.javaClass.simpleName)
+        }
+    }
+
+    /**
      * 把一个本机 URI 的图**压成头像契约要的那张方形图**，回 base64（无换行）。
      *
      * ## 为什么这件事必须在原生侧，而不是一行 `readBase64Uri`

@@ -103,6 +103,7 @@ import { SecurityScreen } from './SecurityScreen';
 import { SettingsScreen, type SettingsSectionKey } from './SettingsScreen';
 import { TagsSection } from './TagsSection';
 import { TrashScreen } from './TrashScreen';
+import { AbandonedScreen } from './AbandonedScreen';
 import { formatStamp } from '../lib/date';
 import { useTokens } from '../theme';
 import { useSyncCredentialForm } from '../sync/credential-form';
@@ -329,6 +330,16 @@ export function ProfileScreen(): React.JSX.Element {
   const trashOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:trash';
   const setTrashOpen = (open: boolean): void => {
     if (open) navigation.push('profile:trash');
+    else navigation.pop();
+  };
+  /**
+   * 「已放弃」与回收站同一个形状：第二层**整屏**，不是第 6 个 tab。
+   * 它登记的唯一理由在 ADR-0083 §4.3 —— 放弃必须有看得见的出口。
+   */
+  const abandonedOpen =
+    navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:abandoned';
+  const setAbandonedOpen = (open: boolean): void => {
+    if (open) navigation.push('profile:abandoned');
     else navigation.pop();
   };
   const exportOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:export';
@@ -1027,6 +1038,19 @@ export function ProfileScreen(): React.JSX.Element {
     },
     {
       kind: 'action',
+      testID: 'profile-entry-abandoned',
+      label: t('mobile.abandoned.entry'),
+      // 🔴 这一行是 ADR-0083 §4.3 的出口：放弃之后必须看得见回来的路。
+      // 字形用 `task.unabandon`（ArchiveRestore）而不是 `task.abandon`：
+      // 这一屏要做的是"把它取回来"，图标说反了会比少一个图标更贵。
+      leading: <Icon name="task.unabandon" size="sm" color={tokens['color.foreground-muted']} />,
+      onPress: () => {
+        setSettingsSection('data');
+        setAbandonedOpen(true);
+      },
+    },
+    {
+      kind: 'action',
       testID: 'profile-entry-export',
       label: t('mobile.export.entry'),
       leading: <Icon name="action.share" size="sm" color={tokens['color.foreground-muted']} />,
@@ -1179,6 +1203,16 @@ export function ProfileScreen(): React.JSX.Element {
       <TrashScreen
         onBack={() => {
           setTrashOpen(false);
+        }}
+      />
+    );
+  }
+
+  if (abandonedOpen) {
+    return (
+      <AbandonedScreen
+        onBack={() => {
+          setAbandonedOpen(false);
         }}
       />
     );
@@ -1645,7 +1679,7 @@ export function ProfileScreen(): React.JSX.Element {
         syncStatus={syncStatus}
         onOpenAuth={openAuth}
         onUseOfficialSync={onClearCredentials}
-        dataActions={entryRows.filter((row) => ['profile-entry-export', 'profile-entry-trash'].includes(row.testID ?? ''))}
+        dataActions={entryRows.filter((row) => ['profile-entry-export', 'profile-entry-trash', 'profile-entry-abandoned'].includes(row.testID ?? ''))}
         securityActions={entryRows.filter((row) => ['profile-entry-security', 'profile-entry-close-account'].includes(row.testID ?? ''))}
         // Shell 保留各 tab 的屏幕实例；设置是 profile 的二级 surface，
         // 离开 profile 时必须隐藏 Modal，回到 profile 再恢复原栈位置。

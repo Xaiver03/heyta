@@ -38,6 +38,15 @@ interface LocalFsNative {
    * ⚠️ 可选的：iOS 侧目前没有这个原生模块，调用方必须自己判缺。
    */
   prepareAvatarBase64?(uri: string, edgePx: number, format: string): Promise<string>;
+  /**
+   * 读一个本机 URI 的**原始字节**，回 base64（无换行）。工单 #9 的附件上传走这条。
+   *
+   * ⚠️ 同样是**可选**的：iOS 侧没有这个原生模块，调用方（`lib/attachment-pick.ts`）
+   * 必须自己判缺并说清是"这台设备没通道"，而不是"这个文件读不开"。
+   * ⚠️ 它**不是** `prepareAvatarBase64` 的泛化可以互相替换 —— 后者按头像契约
+   * 重编码过（裁方、缩放、转格式），对附件而言那是换了一个文件。
+   */
+  readUriBase64?(uri: string, maxBytes: number): Promise<string>;
 }
 
 function errText(e: unknown): string {

@@ -50,6 +50,12 @@ import {
   // 待办口径也只有一份 —— "哪几组算待办"是产品说法，不是某一屏的选择。
   pendingCount,
   toLocalDate,
+  // 「它下面还有 N 条子任务」那句后果的取数口径（§3.3）：**建树只有一份**，
+  // 删除父任务后被提到顶层的子任务就是这一枚数出来的（`promotedFromDeletedParent`）。
+  buildTaskTree,
+  // 放弃是第五态（`ADR-0083` §3.1）：判断"这条是不是已放弃"归领域层，不归界面。
+  isAbandoned,
+  isPinned,
 } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 // 🔴 共享捕获件：与 web 用的是**同一份**（识别日期/优先级 + 芯片 + 预览）。
@@ -64,14 +70,18 @@ import {
 import { useCaptureLabels, useCaptureProjectLabels } from '../lib/capture-labels';
 import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import {
+  createAttachmentActions,
+  createAttachmentBlobPort,
   createNoteActions,
   createProjectActions,
   createTaskActions,
   type AppHost,
+  type AttachmentActions,
   type NoteActions,
   type ProjectActions,
   type TaskActions,
 } from '@heyta/app-host';
+import { readSyncConfig } from '../sync/config';
 import { useToday } from '../lib/use-today';
 // 🔴 日期措辞已上移到共享层（见 `lib/date.ts` 文件头）：日历要在四端共用。
 import { formatDayTitleText } from '@heyta/ui';
@@ -108,7 +118,14 @@ import {
   TaskBadges,
   TaskList,
   listNameFor,
+  // 行的上下文菜单（移动端主入口 = 长按，`row-actions-redesign.md` §3.4）。
+  // 🔴 档位判定与危险项分组都住在共享层（`resolveDangerTier` 那一枚），
+  // 本屏只交事实（子任务数）与文案，不自己判"要不要弹一句"。
+  RowActionMenu,
+  type RowAction,
+  type RowActionId,
   type TaskRow as SharedTaskRow,
+  type TaskRowSwipeSpec,
   type TaskSection,
 } from '@heyta/ui';
 
@@ -669,6 +686,33 @@ export function TasksScreen({
    */
   const noteActions = useMemo<NoteActions | null>(() => (host ? createNoteActions(host) : null), [host]);
   /**
+   * 附件动作集（工单 #9）。
+   *
+   * 🔴 服务端地址与令牌都**按调用时刻**读，不是建 port 时抓一次快照：
+   * `baseUrl` 用 getter、`token` 用函数，都是为了这一点。写成快照的表现是
+   * "在设置页换了服务端，附件仍然往旧服务器传"和"重新登录后令牌已轮换，
+   * 但上传一路 401" —— 两种都不会有人报错，只会让用户以为附件功能坏了。
+   *
+   * ⚠️ `readSyncConfig()` 在没有服务端/没登录时给空串，此时那三个方法**一个请求
+   * 都不发**、直接回 `rejected`；界面据此说的是"没配上服务端"，不是"上传失败"。
+   */
+  const attachmentActions = useMemo<AttachmentActions | null>(
+    () =>
+      host === null
+        ? null
+        : createAttachmentActions(host, {
+            blobs: createAttachmentBlobPort(
+              {
+                get baseUrl(): string {
+                  return readSyncConfig()?.serverUrl ?? '';
+                },
+              },
+              () => readSyncConfig()?.token,
+            ),
+          }),
+    [host],
+  );
+  /**
    * 可选的清单。**与「我的」页读的是同一份物化状态**，所以两处永远一致。
    *
    * 🔴 这里**不含「收集箱」**：「收集箱」不是一条清单，而是
@@ -1069,6 +1113,118 @@ export function TasksScreen({
   );
 
   /**
+   * 行的上下文菜单（§3.4：移动端的主入口 = **长按**行）。
+   *
+   * 🔴 它开在哪一条上是**视图态**（与 `busyId` / `bulkSelecting` 同一类）：
+   * 不进 op-log、不进 store，由本屏的本地 state 持有。
+   */
+  const [rowMenuId, setRowMenuId] = useState<string | null>(null);
+
+  const openRowMenu = useCallback((id: string): void => {
+    setRowMenuId(id);
+  }, []);
+
+  const closeRowMenu = useCallback((): void => {
+    setRowMenuId(null);
+  }, []);
+
+  /**
+   * 直接子任务数 —— 危险档**唯一**的输入（§3.3「不手填，问 `resolveDangerTier()`」）。
+   *
+   * 取数口径走共享的 `buildTaskTree`，不在界面里 `filter(t => t.parentId === id)` 数一遍：
+   * 后者会漏掉"父已删除 ⇒ 被提到顶层"那一类（`promotedFromDeletedParent`），
+   * 于是那句后果句就会在一个真实的场景里说错话。
+   */
+  const childCountByTaskId = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const [id, node] of buildTaskTree(tasks).nodeById) counts.set(id, node.children.length);
+    return counts;
+  }, [tasks]);
+
+  // 菜单开着的那一条消失了（本机删掉、或另一台设备删了同步过来）⇒ 这一层自己收走。
+  // 不写这一条的话，用户会看见一个挂在**已经不存在的任务**上的菜单。
+  // 切到别的 tab 同样收走：这一层是任务屏的行级浮层，留着它会在回来时凭空出现。
+  useEffect(() => {
+    if (rowMenuId === null) return;
+    if (navigation.tab !== 'tasks') {
+      setRowMenuId(null);
+      return;
+    }
+    if (tasks.some((task) => task.id === rowMenuId)) return;
+    setRowMenuId(null);
+  }, [navigation.tab, rowMenuId, tasks]);
+
+  /**
+   * 菜单/左滑那一项被按下 = 一个用户意图 = 动作层的一次调用。
+   *
+   * 🔴 本屏只回答"点的是哪一项"，**不**回答"该不该弹确认"（那归共享层的档位判定）。
+   * ⚠️ 与上面几个回调同样的判空理由：声明在提前 return **之前**，TS 收窄不到 `actions`。
+   */
+  const handleRowAction = useCallback(
+    (actionId: RowActionId, id: string): void => {
+      if (actions === null) return;
+      switch (actionId) {
+        case 'open':
+          // 与"点行"同一个目的地（§3.4 的可发现入口）。
+          pushTaskRoute();
+          selection.select('task', id);
+          return;
+        case 'pin':
+          runFor(id, actions.setPinned(id, true));
+          return;
+        case 'unpin':
+          runFor(id, actions.setPinned(id, false));
+          return;
+        case 'abandon':
+          runFor(id, actions.setAbandoned(id, true));
+          return;
+        case 'unabandon':
+          runFor(id, actions.setAbandoned(id, false));
+          return;
+        case 'select':
+          // 长按原来是"进入多选"的手势（`mobile.tasks.gestureHint` 钉过它）。
+          // 手势改派给菜单之后，这条既有效率路径搬进菜单成为一项 —— **没有丢**。
+          enterBulkSelection(id);
+          return;
+        case 'delete':
+          runFor(id, actions.remove(id));
+          // 单条删除也给撤销回执（R2 的语义；窗口时长读共享表 `receiptTimingOf('undo')`，
+          // 见上面那条 effect —— 不在这里自定一个毫秒数）。
+          setBulkUndoIds([id]);
+          return;
+      }
+    },
+    [actions, enterBulkSelection, pushTaskRoute, runFor],
+  );
+
+  /**
+   * 菜单里的项：**状态换面**由本屏决定（已置顶就给「取消置顶」），
+   * 顺序、分组、危险项在哪一组由共享层决定（`groupRowActions`）。
+   */
+  const rowMenuActions = useCallback(
+    (task: Task): readonly RowAction[] => [
+      { id: 'open', label: t('web.rowMenu.open'), icon: <Icon name="task.open" size="sm" /> },
+      isPinned(task)
+        ? { id: 'unpin', label: t('web.rowMenu.unpin'), icon: <Icon name="task.unpin" size="sm" /> }
+        : { id: 'pin', label: t('web.rowMenu.pin'), icon: <Icon name="task.pin" size="sm" /> },
+      // ⚠️ 今天的 `tasks` 来自 `listTasks()`（不含已放弃，`ADR-0083` §3.1），
+      // 所以这一支在当前列表里只会走 `abandon`。留着三元是为了"已放弃那一档"接上时
+      // 不必再改形状；那个入口本身还没落，登记为边界，不在本单。
+      isAbandoned(task)
+        ? { id: 'unabandon', label: t('web.rowMenu.unabandon'), icon: <Icon name="task.unabandon" size="sm" /> }
+        : { id: 'abandon', label: t('web.rowMenu.abandon'), icon: <Icon name="task.abandon" size="sm" /> },
+      { id: 'select', label: t('web.rowMenu.select'), icon: <Icon name="task.select" size="sm" /> },
+      {
+        id: 'delete',
+        label: t('web.rowMenu.delete'),
+        confirmingLabel: t('web.rowMenu.confirmDelete'),
+        icon: <Icon name="task.delete" size="sm" color={tokens['color.danger']} />,
+      },
+    ],
+    [t, tokens],
+  );
+
+  /**
    * 行内插槽。**这些是"内容"，本来就该各端各写**，所以留在本文件。
    *
    * ⚠️ 这里不能用 hook（`useTokens` 之类）—— `renderMeta` 是在共享组件的
@@ -1108,46 +1264,62 @@ export function TasksScreen({
     [actions, dueMode, locale, now, projects, t, tokens],
   );
 
-  const renderTaskTrailing = useCallback(
-    (row: SharedTaskRow): React.ReactNode => {
-      // ⚠️ 这个回调声明在下面那两个守卫**之前**（hook 必须在守卫之前，见守卫处的注释），
-      //    所以 TS 在这里收窄不到 `actions`。实际运行时到不了：`actions === null` 时
-      //    组件会在守卫处提前 return，这个回调根本不会被调用。用一句显式判空换回类型安全。
-      return (
-        <IconButton
-          icon="task.delete"
-          label={t('mobile.tasks.a11y.delete', { title: row.title })}
-          color={tokens['color.foreground-subtle']}
-          onPress={() => {
-            // ⚠️ 判空放在**这里**而不是让整个回调返回 null：这个回调签名要求返回
-            //    `ReactNode`，返回 null 会把 `TaskListLabels` 那一侧的类型一起带偏
-            //    （`open` 会变成 `string | null`）。实际运行到不了 null。
-            if (actions === null) return;
-            runFor(row.id, actions.remove(row.id));
-          }}
-        />
-      );
+  /**
+   * 行尾那几枚动作 —— 🔴 **只在左滑时露出**，不再常驻。
+   *
+   * §3.2 的结论是"一级行上零个新增 affordance、行尾不再有任何按钮"，
+   * 原先这里是一枚常驻删除 IconButton（与长按菜单、左滑形成三个删除入口），
+   * 现在它归位成"露出动作、点击执行"的那一枚（§3.4 移动第二入口）。
+   *
+   * ⚠️ **名字的前缀不许改**：`apps/web/tests/row-meta-shared.spec.tsx` 的 E7
+   * 用 `indexOf('const renderTaskTrailing')` 当 `renderTaskMeta` 区间的右边界；
+   * 改名会把那条判据变成"找不到区间"而红（它判的是依赖数组里有 `projects`）。
+   */
+  const renderTaskTrailingActions = useCallback(
+    (row: SharedTaskRow): TaskRowSwipeSpec => {
+      const childCount = childCountByTaskId.get(row.id) ?? 0;
+      return {
+        // 滑动条只露「删除」一枚：§3.4 写的是"滑动是列表删除的第一惯例"，
+        // 把菜单那五项再排一遍就变成第二个行尾编辑器（§3.1 要打的那个形状）。
+        actions: [
+          {
+            id: 'delete',
+            label: t('web.rowMenu.delete'),
+            confirmingLabel: t('web.rowMenu.confirmDelete'),
+            icon: <Icon name="task.delete" size="sm" color={tokens['color.on-danger']} />,
+          },
+        ],
+        childCount,
+        consequence: t('web.rowMenu.childConsequence', { count: childCount }),
+        closeLabel: t('mobile.tasks.swipe.close'),
+        busy: busyId === row.id,
+        onAction: (actionId) => handleRowAction(actionId, row.id),
+      };
     },
-    [actions, runFor, t, tokens],
+    [busyId, childCountByTaskId, handleRowAction, t, tokens],
   );
 
-  /** 四象限里的显式移动入口：一行意图一次调用，沿用领域层投放计划。 */
+  /**
+   * 四象限里的显式移动入口：一行意图一次调用，沿用领域层投放计划。
+   *
+   * 🔴 原来这一格还挂着 `{renderTaskTrailing(row)}` 那枚**常驻删除**按钮。
+   * §3.2 的结论是行尾不常驻删除，四象限不是例外（同一条判断在两端只有一份）：
+   * 删除归长按菜单（象限里的行同样接了 `onLongPressTask`），
+   * 三个删除入口并排就是 §3.1 要打的那个形状。
+   */
   const renderQuadrantTrailing = useCallback(
     (row: SharedTaskRow): React.ReactNode => (
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
-        <IconButton
-          icon="action.more"
-          label={t('web.quadrant.moveTask', { title: row.title })}
-          color={tokens['color.foreground-subtle']}
-          onPress={() => {
-            setQuadrantMoveError(null);
-            setQuadrantMoveTaskId(row.id);
-          }}
-        />
-        {renderTaskTrailing(row)}
-      </View>
+      <IconButton
+        icon="action.more"
+        label={t('web.quadrant.moveTask', { title: row.title })}
+        color={tokens['color.foreground-subtle']}
+        onPress={() => {
+          setQuadrantMoveError(null);
+          setQuadrantMoveTaskId(row.id);
+        }}
+      />
     ),
-    [renderTaskTrailing, t, tokens],
+    [t, tokens],
   );
 
   /**
@@ -1188,7 +1360,7 @@ export function TasksScreen({
    * 🔴 **两个提前 return 必须在**所有 hook **之后。**
    *
    * 这里踩过一个真 bug（在 Android 模拟器上才暴露）：这两个守卫原本在
-   * 组件中部，而 `busyId` / `runFor` / `renderTaskMeta` / `renderTaskTrailing` /
+   * 组件中部，而 `busyId` / `runFor` / `renderTaskMeta` / `renderTaskTrailingActions` /
    * `taskRowLabels` **五个 hook 在它们之后**。于是：
    *
    *   第 1 次渲染：`host === null`（还在加载）→ 提前 return，只用掉 24 个 hook；
@@ -1229,6 +1401,12 @@ export function TasksScreen({
       </Screen>
     );
   }
+
+  /**
+   * 菜单为哪一条打开 —— 上面那条 effect 已经保证"任务消失了这一层就自己收走"，
+   * 这里只是把 id 换成实体（菜单要读标题，也要决定给「置顶」还是「取消置顶」）。
+   */
+  const rowMenuTask = rowMenuId === null ? undefined : tasks.find((task) => task.id === rowMenuId);
 
   const bulkControls = (
     <>
@@ -1477,7 +1655,7 @@ export function TasksScreen({
            * 而且不会有任何测试变红。现在象限**只有这一个实现**。
            *
            * ⚠️ 行的元信息 / 行尾动作 / 行级无障碍文案全部**复用列表视图的那三份**
-           * （`renderTaskMeta` / `renderTaskTrailing` / `taskRowLabels`），
+           * （`renderTaskMeta` / `renderTaskTrailingActions` / `taskRowLabels`），
            * 所以两档里的同一行读屏拿到的是同一句话。
            */
           <QuadrantScreen
@@ -1499,7 +1677,10 @@ export function TasksScreen({
               pushTaskRoute();
               selection.select('task', id);
             }}
-            onLongPressTask={enterBulkSelection}
+            // 🔴 手势改派（§3.4）：非批量态 = 长按开**上下文菜单**；
+            //    进了批量态之后长按恢复成勾选/取消勾选（那条效率路径本身
+            //    搬进了菜单里的「多选」一项，见 `handleRowAction` 的 `select`）。
+            onLongPressTask={bulkSelecting ? toggleBulkSelection : openRowMenu}
             selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined}
             selectionMode={bulkSelecting}
           />
@@ -1544,14 +1725,18 @@ export function TasksScreen({
               sort={taskSort}
               onToggleTask={handleTaskToggle}
               onOpenTask={handleTaskOpen}
-              onLongPressTask={enterBulkSelection}
+              // 🔴 手势改派（§3.4）：非批量态 = 长按开**上下文菜单**；
+            //    进了批量态之后长按恢复成勾选/取消勾选（那条效率路径本身
+            //    搬进了菜单里的「多选」一项，见 `handleRowAction` 的 `select`）。
+            onLongPressTask={bulkSelecting ? toggleBulkSelection : openRowMenu}
               selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined}
               selectionMode={bulkSelecting}
               activeTaskId={detailTaskId}
               busyTaskId={busyId}
               labels={taskRowLabels}
               renderMeta={renderTaskMeta}
-              renderTrailing={bulkSelecting ? undefined : renderTaskTrailing}
+              // 🔴 行尾不常驻动作（§3.2）：那一枚删除改成"左滑才露出"（§3.4 第二入口）。
+              swipeActions={bulkSelecting ? undefined : renderTaskTrailingActions}
               renderSectionHeader={(section) => (
                 <View style={{ paddingTop: tokens['space.3'] }}>
                   <SectionHeader
@@ -1584,8 +1769,43 @@ export function TasksScreen({
           tasks={tasks}
           onChanged={refresh}
           now={now}
+          // 点子任务 = 把面板切到那条子任务上（还是同一个"当前看的是哪一条"的
+          // 所有者，与行菜单走的是同一条 `select`，不新开第二份选中态）。
+          onOpenSubtask={(taskId) => {
+            selection.select('task', taskId);
+          }}
+          // 「任务动态」的数据源就是本机 op-log。`host` 还在加载时给 null，
+          // 那一格于是**整格不出现** —— 而不是出现并空着（空着会被读成
+          // "这条任务没被改过"，而我们此刻什么都不知道）。
+          activitySource={host?.engine ?? null}
+          attachmentActions={attachmentActions}
         />
       ) : null}
+
+      {/**
+       * 行的**上下文菜单**（§3.4 的移动端主入口 = 长按行）。
+       *
+       * 与详情面板同样的 tab 闸门：常驻挂载的隐藏 tab 不该把自己的 `Modal` 浮出来。
+       * 🔴 档位（要不要弹那一句后果）由共享层问 `resolveDangerTier`，本屏只交
+       * 事实（`childCountByTaskId`）与词条；`handleRowAction` 只负责执行。
+       */}
+      {rowMenuTask === undefined ? null : (
+        <RowActionMenu
+          visible={navigation.tab === 'tasks'}
+          taskId={rowMenuTask.id}
+          label={t('web.rowMenu.label', { title: rowMenuTask.title })}
+          actions={rowMenuActions(rowMenuTask)}
+          childCount={childCountByTaskId.get(rowMenuTask.id) ?? 0}
+          consequence={t('web.rowMenu.childConsequence', {
+            count: childCountByTaskId.get(rowMenuTask.id) ?? 0,
+          })}
+          cancelLabel={t('web.rowMenu.cancel')}
+          onSelect={handleRowAction}
+          onDismiss={closeRowMenu}
+          bottomInset={insets.bottom}
+          testID="mobile-row-menu"
+        />
+      )}
 
       {/**
        * 全局搜索。任务**就地**递给浮层（同一条数据源，不另读一次库），
