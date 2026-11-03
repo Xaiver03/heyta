@@ -490,6 +490,16 @@ const ROW_ID_CLASSES = ['in-flight', 'inline-rename', 'confirm-gate', 'dragging'
 /** §8.28 那一趟逐处归类后的结果（条数以断言 G 打印的为准，别在这里抄数）。改名／删掉某处时必须同时改这里，否则 G 报过期豁免。 */
 const ROW_ID_EXEMPT = [
   ['apps/web/src/features/calendar/CalendarView.tsx', 'busyId', 'in-flight'],
+  // 「已放弃」那一屏（ADR-0083 §4.3 的出口）：`busyId` 记的是"哪一条的恢复请求在飞"，
+  // 用来把那枚按钮置忙、避免连点发出两条 op。它不决定"当前看的是哪一条"
+  // （那一格在任务屏，走 `useSelected('task')`），所以是 in-flight 那一类。
+  ['apps/mobile/src/screens/AbandonedScreen.tsx', 'busyId', 'in-flight'],
+  // 详情面板里附件的**二次确认**（工单 #9）：`pendingRemoveId` 记的是
+  // "哪一条附件已经点过一次『移除』、再点一次才真删"。
+  // 🔴 它不决定"当前看的是哪一条"—— 那一格在 `selection` 里（`useSelected('task')`），
+  // 而且这个值 6 秒后自己过期、面板一关就清，删掉它只会让"再点一次"那句话没有落点。
+  // ⇒ 词表里的 `confirm-gate` 那一类（与 `PasskeyPanel.confirmingId` 同一个形状）。
+  ['apps/mobile/src/screens/TaskDetailSheet.tsx', 'pendingRemoveId', 'confirm-gate'],
   // 🔴 §8.133：这两处随面单一起从 `HabitsView.tsx` 搬进 `HabitDetailCard.tsx`
   // （面单落进详情列那一格，视图只剩列表）。语义类别没变，变的是宿主文件 ——
   // 表按「文件 + 变量名」索引，所以搬家必须两行一起改，否则 G 报过期豁免。
@@ -510,6 +520,11 @@ const ROW_ID_EXEMPT = [
   ['apps/mobile/src/screens/SecurityScreen.tsx', 'renamingId', 'inline-rename'],
   ['apps/mobile/src/screens/SecurityScreen.tsx', 'confirmDeleteId', 'confirm-gate'],
   ['apps/mobile/src/screens/TasksScreen.tsx', 'busyId', 'in-flight'],
+  // 行上下文菜单：长按第一下只记下"哪一行的菜单开着"，第二下点某项才发 op。
+  // ⇒ 与 `SecurityScreen.confirmDeleteId` / `AdminPanel.pendingApproveId` **同一形状**
+  //   （两步、单所有者、互斥），不是"当前看的是哪一条" —— 那一格已经是
+  //   `useSelected('task')`（`detailTaskId`），菜单关掉后它还留着。
+  ['apps/mobile/src/screens/TasksScreen.tsx', 'rowMenuId', 'confirm-gate'],
   ['apps/mobile/src/screens/TrashScreen.tsx', 'busyId', 'in-flight'],
   ['apps/mobile/src/screens/TrashScreen.tsx', 'confirmingId', 'confirm-gate'],
   // ── 2026-10-16 逐处读代码补登的 6 处（此前未登记 ⇒ 断言 G 红）──────────────

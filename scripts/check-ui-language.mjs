@@ -277,6 +277,23 @@ const UNTRANSLATABLE_KEYS = new Set([
   // 🔴 同一个判断早由协作线 `2f59b075` 写在 `packages/i18n/tests/catalog.spec.ts` 的
   //    `allowed` 里；这一行只是把那份判断补到它漏登记的本门禁，两处不再各说一套。
   'web.share.invite.emailPlaceholder',
+  // 图片的尺寸/体积那一行（`{width}×{height} · {kb} KB`）。它**整条都是数字与单位**，
+  // 一个可翻译的字都没有 —— 中文版写成「宽×高」既更长又对不上乘号两边的数。
+  // 与 en 逐字相同是**正确形态**，不是拿英文占位。
+  'web.capture.attach.meta',
+  'web.ai.attach.meta',
+  // 附件体积的 KB / MB 两档（工单 #9）。同上一条先例：整条只有数字与**单位符号**，
+  // 中英逐字相同是正确形态 —— 中文版写「千字节」反而没人看得懂，
+  // 而字节那一档（`...size.bytes`）**没有**登记，因为它确实需要翻译（字节 / bytes）。
+  'mobile.detail.attachments.size.kb',
+  'mobile.detail.attachments.size.mb',
+  // 自带日期的时刻芯片：`{day} {time}` —— **整条只有两个占位符**，一个可翻译的字都没有。
+  // 两个片段各自已经本地化过（`{day}` 来自「今天 / Today」那一族，`{time}` 是归一化后的
+  // `HH:MM`），所以"zh 版里没有汉字"是**正确形态**，不是拿英文占位 —— 写成
+  // 「{day} 的 {time}」反而会把中文钉死成一句多余的句式，还会让那一格比同排更长。
+  // web 与 mobile 是**同一件事的两个落点**（两端逐字同规则），所以两条一起登记。
+  'web.capture.value.dayTime',
+  'mobile.capture.value.dayTime',
 ]);
 
 /**
