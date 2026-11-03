@@ -816,6 +816,16 @@ export const zhCN = {
   'web.rowMenu.label': '任务操作：{title}',
   'web.rowMenu.open': '打开详情',
   'web.rowMenu.delete': '删除',
+  // ↓ 移动端行菜单落地时补的几项。**与 web 共用这一族而不是另起 `mobile.rowMenu.*`**：
+  //   同一组动作两份文案就是两处会各自漂移的裁决（`open`/`delete`/`childConsequence`
+  //   本来就在这一族里）。依据 `docs/plans/task-detail-ticktick-parity.md`。
+  'web.rowMenu.pin': '置顶',
+  'web.rowMenu.unpin': '取消置顶',
+  'web.rowMenu.abandon': '放弃',
+  // ⚠️ 「取消放弃」而不是「恢复」：后者在本仓是回收站那一格的动词
+  //   （`ADR-0048` 的 restore），两个态共用一个词会让人分不清从哪儿回来。
+  'web.rowMenu.unabandon': '取消放弃',
+  'web.rowMenu.select': '多选',
   // `popconfirm` 那一档的后果句（带子任务时才出现）。事实依据：删除只给父任务写墓碑，
   // `@heyta/domain` 的 `buildTaskTree` 会把"父已删除"的子任务**提到顶层**显示。
   'web.rowMenu.childConsequence': '它下面还有 {count} 条子任务，删除后它们会被提到顶层。',
@@ -2892,11 +2902,14 @@ export const zhCN = {
   // ── Web · 捕获输入框 ──────────────────────────────────────
   // ✅ 日期那一条里**不再**嵌 `formatRemainingUntil()` 的中文了 ——
   // 剩余天数现在由壳按当前语言说（`web.due.*`，见下）。
-  'web.capture.placeholder': '添加任务，回车确认（可写「明天」「下周三」）',
+  // 🔴 例句里必须有一条**带时刻**的（2026-11）：规则表原来只认 `HH:MM`，
+  // 「下午3点」根本读不出来，占位符也就只敢举日期。现在中文时刻能读了，
+  // 例句要跟着换 —— 否则用户永远不知道这个框认时刻（他就是这么报上来的）。
+  'web.capture.placeholder': '添加任务，回车确认（可写「明天下午3点」「下周三」）',
   // 🔴 「添加到哪儿」必须出现在占位符里。当下面板停在某个清单时，
   // 「添加任务」这句话只说了一半 —— 用户按回车后任务落进收集箱、
   // 从眼前这条列表里消失，而界面上没有任何一处说过这件事。
-  'web.capture.placeholderTo': '添加任务到「{list}」，回车确认（可写「明天」「下周三」）',
+  'web.capture.placeholderTo': '添加任务到「{list}」，回车确认（可写「明天下午3点」「下周三」）',
   // R11 批五：日历里选中了某一天时，捕获框要**说出落点**。
   // 悄悄改变一条任务的落点属于『界面没说谎、但用户以为没说』那一类，
   // 所以这句提示是功能的一部分，不是装饰。
@@ -2914,6 +2927,9 @@ export const zhCN = {
   'web.capture.restoreAria': '恢复识别：{raw}',
   'web.capture.ignoreAria': '忽略识别：{raw}',
   'web.capture.unused': '未采用，仍在标题中',
+  // 时刻芯片**自带日期**时念「今天 15:00」（滴答清单同款：一条芯片就说清哪天几点）。
+  // 只有时刻、日期来自另一条芯片时才念裸 `HH:MM`（`captureChipTimeLabel`）。
+  'web.capture.value.dayTime': '{day} {time}',
   'web.capture.previewLead': '实际标题：',
   'web.capture.previewEmpty': '（空）',
   'web.ai.mention.aria': '选择要引用的任务',
@@ -3351,6 +3367,9 @@ export const zhCN = {
   'mobile.capture.project.inboxAria': '落点选为收集箱',
   'mobile.capture.project.optionAria': '落点选为「{name}」',
   'mobile.capture.valueWithRemaining': '截止 {date}（{remaining}）',
+  // 与 web 的 `web.capture.value.dayTime` 同一件事（时刻芯片自带日期时念
+  // 「今天 15:00」）。两端措辞必须一起改，否则同一条输入在两端读出两个样子。
+  'mobile.capture.value.dayTime': '{day} {time}',
   'mobile.tasks.loadError.title': '打开本地数据库失败',
   'mobile.tasks.loadError.hint': '数据在本地，不会丢。重开应用通常能恢复。',
   'mobile.tasks.loadError.detail': '技术细节：{detail}',
@@ -3393,7 +3412,10 @@ export const zhCN = {
   'mobile.tasks.a11y.open': '打开任务：{title}',
   'mobile.tasks.a11y.openRepeat': '打开任务：{title}，重复：{repeat}',
   'mobile.tasks.a11y.delete': '删除任务：{title}',
-  'mobile.tasks.gestureHint': '长按任务可多选；在四象限里点「更多」即可移动任务。',
+  // 🔴 手势改派之后这一句必须跟着改口：长按现在是**操作菜单**（多选收进菜单里一项），
+  //   不是"直接进多选"。判据是 `apps/mobile/tests/row-actions-mobile.spec.ts` ——
+  //   它专门钉"提示不许再教错手势"，因为手势说明说错了比没有更糟。
+  'mobile.tasks.gestureHint': '长按任务打开操作菜单（含多选）；左滑可删除；在四象限里点「更多」即可移动任务。',
 
   // ── 移动端 · 日历 ─────────────────────────────────────────
   'mobile.calendar.title': '日历',
@@ -3490,6 +3512,30 @@ export const zhCN = {
   // 它由截止时间推导，不该让人填两遍（ADR-0015 §3）。
   'mobile.detail.field.important': '重要',
   'mobile.detail.important.hint': '紧急程度由截止时间推导，不由你填。',
+  // ── 折叠层的「属性名 → 当前值」──────────────────────────────────
+  // `docs/agents/ux-principles.md` §1 的 `inline` 解剖：这一屏是**扫读已有值**，
+  // 所以收起态必须看得见现值；而 §4 要求收起态**不画编辑控件**。
+  // 中文没有单复数变形，`*One` 与复数同文（先例：`web.due.overdue` / `overdueOne`）。
+  'mobile.detail.value.none': '未设置',
+  'mobile.detail.value.tagsOne': '{count} 个标签',
+  'mobile.detail.value.tags': '{count} 个标签',
+  'mobile.detail.value.remindersOne': '{count} 条提醒',
+  'mobile.detail.value.reminders': '{count} 条提醒',
+  'mobile.detail.due.notSet': '未设截止',
+  'mobile.detail.header.switchList': '切换清单',
+  'mobile.detail.section.expandAll': '展开全部',
+  'mobile.detail.section.collapseAll': '收起全部',
+  // 动作层已有 `postponeToToday`（保留原时刻），移动端此前零调用点 —— 这一格接上它。
+  'mobile.detail.postpone.today': '顺延到今天',
+  // 标题/备注在内容层是**正文**，点它才进编辑；无障碍名说的是"要去编辑"。
+  'mobile.detail.edit.title': '编辑标题',
+  'mobile.detail.edit.note': '编辑备注',
+  'mobile.detail.title.untitled': '未命名任务',
+  'mobile.detail.important.yes': '重要',
+  'mobile.detail.important.no': '不重要',
+  // 左滑行露出动作后收回去那一枚。归 `mobile.tasks.*` 族（它属于行，不属于详情面板），
+  // 放在这一块只是因为同批落地。
+  'mobile.tasks.swipe.close': '收起',
   // ── 清单归属 ──────────────────────────────────────────────────────────
   // 「收集箱」是**未归类**的显示名，不是一条真的清单：`Task.projectId`
   // 为 `undefined` 时它不存在于任何 PROJECT 实体里。所以这里它是选项之一，
@@ -3497,6 +3543,40 @@ export const zhCN = {
   'mobile.detail.field.project': '清单',
   'mobile.detail.field.parent': '上级任务',
   'mobile.detail.parent.topLevel': '（顶级任务）',
+  // ── 子任务（内容层，常驻不折叠）───────────────────────────────────────
+  // 它是**工作内容**（这条任务由哪几件小事组成），不是"这条记录的某一列"，
+  // 所以排在备注之后、折叠层之前 —— 与备注同一个理由（§1 的内容层/折叠层分工）。
+  'mobile.detail.field.subtasks': '子任务',
+  // 计数写成「已完成 n/总数」而不是光一串数字，也不是"33%"：
+  // 用户要看的是"还剩几件"，而 `check:ui-language` 也拒绝一条不含汉字的中文词条
+  // —— 那种形状通常是"拿别的语言占位"漏进来的，这里不借那个豁免。
+  'mobile.detail.subtasks.progress': '已完成 {done}/{total}',
+  'mobile.detail.subtasks.empty': '还没有子任务，点下面的「添加子任务」建一条。',
+  'mobile.detail.subtasks.add': '添加子任务',
+  'mobile.detail.subtasks.newPlaceholder': '子任务标题',
+  // 行体的无障碍名要说清"点它会怎样"：面板语境里它不是"打开详情"，
+  // 而是把面板切到那条子任务上（宿主没给这个入口时，整行根本不可点）。
+  'mobile.detail.subtasks.open': '打开子任务「{title}」',
+  // ── 附件（工单 `task-detail-ticktick-parity` #9）───────────────────
+  // ⚠️ 那两条"取不到"的句子必须分开：`absent` 说的是**另一个设备还没传完**，
+  // 而 `error.read-failed` 说的是**这台设备没读出这个文件**。合成一句，
+  // 用户就会去删一条其实没坏的附件。
+  'mobile.detail.attachments.title': '附件',
+  'mobile.detail.attachments.add': '添加附件',
+  'mobile.detail.attachments.empty': '还没有附件',
+  'mobile.detail.attachments.count': '{n} 个附件',
+  'mobile.detail.attachments.remove': '移除',
+  'mobile.detail.attachments.remove.confirm': '再点一次确认移除',
+  'mobile.detail.attachments.uploading': '正在上传…',
+  'mobile.detail.attachments.size.bytes': '{n} 字节',
+  'mobile.detail.attachments.size.kb': '{n} KB',
+  'mobile.detail.attachments.size.mb': '{n} MB',
+  'mobile.detail.attachments.error.no-channel': '这台设备还不能选本机文件，请在电脑上添加。',
+  'mobile.detail.attachments.error.too-large': '这个文件超过单文件上限（{max} MB）。',
+  'mobile.detail.attachments.error.read-failed': '这个文件没能读出来，换一个试试。',
+  'mobile.detail.attachments.error.quota-exceeded': '存储空间已经用满，先清理或升级后再添加。',
+  'mobile.detail.attachments.error.network': '没连上服务器，附件没有加进来，可以再试一次。',
+  'mobile.detail.attachments.error.rejected': '附件没能加进来。',
   'mobile.detail.project.inbox': '收集箱',
   'mobile.detail.project.create': '新建清单',
   'mobile.detail.project.newPlaceholder': '清单名称',
@@ -3578,9 +3658,12 @@ export const zhCN = {
   'mobile.tags.removeHint': '删除标签不会删掉任何任务，只是把它们身上的这个标签摘掉。',
   'mobile.tags.remove': '删除标签「{name}」',
   'mobile.detail.field.tags': '标签',
-  // 一个标签都没有时的提示。指向「我的」页 —— 那里是唯一能新建标签的地方，
-  // 不指路的话用户会以为"这里应该有东西可点，只是坏了"。
-  'mobile.detail.tags.empty': '还没有标签，先到「我的」页新建一个。',
+  // 一个标签都没有时的提示。🔴 这句话的**指向必须真的在界面上**：
+  // 详情面板现在能就地建标签了，所以指「下面的按钮」，不再指「我的」页 ——
+  // 指向一个本页已经不缺的入口，等于把用户支走到另一屏去办本页能办的事。
+  // 按钮文案复用 `mobile.tags.add`（那句「新建标签」在「我的」页也在用，
+  // 两处同一个名字才不会出现"同一件事两个叫法"）。
+  'mobile.detail.tags.empty': '还没有标签，点下面的「新建标签」建一个。',
   'mobile.detail.important.on': '标记为重要',
   'mobile.detail.important.off': '取消重要',
   'mobile.detail.markIncomplete': '标记为未完成',
@@ -3968,6 +4051,48 @@ export const zhCN = {
   // （本地与云端）都还在 —— Web 的措辞没有这一句，照抄会漏掉这个事实。
   'mobile.trash.title': '回收站',
   'mobile.trash.entry': '回收站',
+  // ── 「已放弃」出口（ADR-0083 §4.3）────────────────────────────────────
+  // 没有这一档，"放弃"就是**只进不出**的抽屉：用户点得到放弃，却没有任何地方
+  // 能把它找回来（除非改数据）。文案里那句"没有被删除"是这条态的**定义**，
+  // 不是修辞 —— 用户最怕的就是"我放弃的东西是不是没了"。
+  'mobile.abandoned.entry': '已放弃',
+  'mobile.abandoned.title': '已放弃的任务',
+  'mobile.abandoned.hint': '放弃的任务不出现在任何列表里，但也没有被删除。恢复后它回到原来的清单。',
+  'mobile.abandoned.empty': '没有被放弃的任务。',
+  // 空态的第二句要说"东西是怎么进来的"，而不是再说一遍"这里空着" ——
+  // 用户站在这一屏时最可能的问题是"我上次放弃的那条呢"。
+  'mobile.abandoned.emptyHint': '在任务的行菜单里点「放弃」，它会离开所有列表，但留在这里。',
+  'mobile.abandoned.at': '放弃于 {date}',
+  'mobile.abandoned.count': '{count} 条',
+
+  // ── 详情面板的「任务动态」（工单 #2 的界面尾巴）───────────────────────
+  // 🔴 那句"只是这台设备记录到的"必须能说出口：新设备的本地日志可能只有
+  // 快照之后的增量，把它念成"完整历史"是不实陈述（判据在
+  // `packages/domain/src/task-activity.ts` 的文件头）。
+  'mobile.detail.field.activity': '任务动态',
+  // 收起态那一格给的是**条数**（§1 判据：收起态仍要看得见当前值）。
+  'mobile.detail.activity.count': '{count} 条变更',
+  'mobile.detail.activity.empty': '这台设备上还没记录到这条任务的变更。',
+  // 🔴 「读不到」与「没有记录」是两句话。把一次故障念成"这条任务没被改过"，
+  // 用户会把它当成事实 —— 而那正是本仓反复拦的那类不实陈述。
+  'mobile.detail.activity.unavailable': '暂时读不到这台设备上的记录，请稍后再试。',
+  'mobile.detail.activity.localOnly': '以下只是这台设备记录到的变更，不是这条任务的完整历史。',
+  'mobile.detail.activity.device.local': '本机',
+  'mobile.detail.activity.device.other': '其他设备',
+  'mobile.detail.activity.batched': '批量操作',
+  'mobile.detail.activity.kind.created': '创建了这条任务',
+  // `updated` 那句是兜底：一条 op 认不出任何被跟踪字段时（远端旧客户端写的载荷、
+  // 或 BATCH 里结构认不出来），行里仍然要有话说，不能画一行空白。
+  'mobile.detail.activity.kind.updated': '改过这条任务',
+  'mobile.detail.activity.kind.deleted': '删除过这条任务',
+  'mobile.detail.activity.kind.restored': '把这条任务恢复了',
+  // 只有这四格**没有**可复用的段落标题词条；其余字段直接复用
+  // `mobile.detail.field.*`（同一件事在同一个屏里不该有两个名字）。
+  'mobile.detail.activity.field.completedAt': '完成状态',
+  'mobile.detail.activity.field.pinnedAt': '置顶',
+  'mobile.detail.activity.field.abandonedAt': '放弃',
+  'mobile.detail.activity.field.deletedAt': '删除',
+  'mobile.detail.activity.field.other': '其他字段',
   'mobile.trash.entry.hint': '已删除的任务、便签、清单和习惯可以在这里恢复',
   // ── 通知中心 / 活动（批二，多端覆盖审计 P0-2）────────────────────
   //    通知 kind 是封闭词表（referral-activated），措辞与 web 的
@@ -5024,6 +5149,7 @@ export const zhCN = {
   'common.entity.PREFERENCE_CORRECTION': '偏好纠正',
   'common.entity.ASSISTANT_TURN': '助手消息',
   'common.entity.COMMENT': '评论',
+  'common.entity.ATTACHMENT': '附件',
   'common.entity.GLOBAL_CONFIG': '全局设置',
   'common.entity.MIGRATION': '数据迁移',
   'common.entity.RECOVERY': '灾难恢复',
