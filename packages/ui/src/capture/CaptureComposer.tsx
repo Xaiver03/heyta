@@ -39,12 +39,10 @@
  * 🔴 没装进共享层的（逐条写清：证据 + 影响 + 最小一步）
  *
  * 1. **AI 一句话捕获面板**（`apps/web/src/features/ai/AiCapture.tsx`，约 380 行）
- *    留在 web：它是 DOM + `@heyta/ai` 的实现，而 `apps/mobile` 里 AI 是 0 行
- *    （P8 的移动端阻塞在宿主 SecretStore，不在 UI 层）。本组件给的是
- *    `renderAssistant` **插槽**。
- *    · 影响：mobile 只有确定性捕获（规则解析），没有模型兜底。
- *    · 最小一步：M3 `ai` 的"流程型面板族"落地后接进这个插槽
- *      （披露块已经有共享 `AiDisclosure`）。
+ *    **不在本组件里**，也不再由任何宿主插进本组件（2026-11）。
+ *    它整体搬进了右侧助手（`AssistantPanel`）。本组件原来给它留过
+ *    `renderAssistant` 插槽，搬家时一并删掉了。
+ *    · 影响：捕获框只剩确定性解析 —— 这是产品裁决，不是能力缺口。
  *
  * 2. **提交到 op-log 的那一步**（`addTask`）留在宿主。判据是 AGENTS.md §3.5：
  *    本组件产出的是 `CaptureSubmitPlan`（纯数据），"写哪些字段、发什么 op"
@@ -88,12 +86,10 @@ import {
   captureSelectedProject,
   parseCaptureDraft,
   shouldResetCaptureIgnore,
-  toAiCaptureSubmitPlan,
   toCaptureChips,
   toCaptureSubmitPlan,
   toggleCaptureIgnore,
   withCaptureProject,
-  type CaptureAiFields,
   type CaptureChip,
   type CaptureProjectPicker,
   type CaptureSubmitPlan,
@@ -136,18 +132,6 @@ export interface CaptureComposerLabels {
   readonly valueLabel: (chip: CaptureChip, now: number) => string;
 }
 
-/** AI 面板（或别的宿主内容）渲染时拿到的上下文。 */
-export interface CaptureAssistantContext {
-  /** 当前草稿（AI 要解析的就是它）。 */
-  readonly draft: string;
-  /**
-   * 把 AI 解析出的字段按**和回车完全相同的那条路**提交，并清空输入框。
-   *
-   * 🔴 这是"AI 没有旁路"的落点：`onApply` 拿到的东西最终走同一个 `onSubmit`。
-   */
-  readonly apply: (fields: CaptureAiFields) => Promise<void>;
-}
-
 export interface CaptureComposerProps {
   readonly labels: CaptureComposerLabels;
   /** 提交。字段已换算成 `Task` 约定（`dueDate` = epoch ms）。 */
@@ -162,12 +146,14 @@ export interface CaptureComposerProps {
    */
   readonly anchorDate?: LocalDate | undefined;
   /**
-   * 宿主内容（web 是 AI 一句话捕获）。不传就不渲染。
+   * 是否渲染「实际标题：…」那一行（默认 `true`）。
    *
-   * ⚠️ 它在**输入行与预览之下**，且只有在宿主自己决定渲染时才出现 ——
-   * "空输入框上挂一个 AI 按钮"是宿主该拒绝的交互（点下去必然失败）。
+   * 🔴 2026-11-03 由产品负责人裁决在 **web 任务列关掉**：原话「不要写什么实际标题
+   * 是什么东西，没有必要」—— 对照滴答清单，它的输入行里只留原文 + 一枚日期胶囊，
+   * 不另起一行复述"将会创建成什么"。
+   * 共享层保留这个能力（移动端仍用它做识别回执），所以是**可选关闭**而不是删除。
    */
-  readonly renderAssistant?: (ctx: CaptureAssistantContext) => React.ReactNode;
+  readonly showPreview?: boolean;
   /**
    * 时间源（epoch ms）。默认 `Date.now()`（每次渲染取一次）。
    * 显式传入才能让"跨零点/今天是几号"可复现（与 `parseCapture` 同一约定）。
@@ -363,7 +349,7 @@ export function CaptureComposer({
   labels,
   onSubmit,
   anchorDate,
-  renderAssistant,
+  showPreview = true,
   now,
   autoFocus,
   testID,
@@ -421,23 +407,6 @@ export function CaptureComposer({
     setDraft(value);
     if (shouldResetCaptureIgnore(ignored)) setIgnored([]);
   }
-
-  /**
-   * AI / 宿主内容提交的那条路。
-   *
-   * 🔴 与 `submit` 共用 `onSubmit`，并同样清空输入 —— "AI 应用"与"回车"
-   * 必须是同一种结果，否则残留的文字会让下一次回车建出重复任务。
-   */
-  const apply = useCallback(
-    async (fields: CaptureAiFields): Promise<void> => {
-      await onSubmit(
-        withCaptureProject(toAiCaptureSubmitPlan(fields), captureSelectedProject(projectPicker)?.id),
-      );
-      setDraft('');
-      setIgnored([]);
-    },
-    [onSubmit, projectPicker],
-  );
 
   return (
     <View style={styles.wrap} testID={testID}>
@@ -553,7 +522,7 @@ export function CaptureComposer({
         </View>
       ) : null}
 
-      {chips.length > 0 ? (
+      {showPreview && chips.length > 0 ? (
         <Text style={[text.caption, styles.preview]} testID="capture-preview">
           {labels.previewLead}{' '}
           <Text style={styles.previewTitle}>
@@ -562,7 +531,6 @@ export function CaptureComposer({
         </Text>
       ) : null}
 
-      {renderAssistant === undefined ? null : renderAssistant({ draft, apply })}
     </View>
   );
 }

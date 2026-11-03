@@ -70,6 +70,7 @@ import type { Task, TaskSortKey } from '@heyta/domain';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import type { TaskRowDensity } from './density.js';
 import { TaskRow, type TaskRowLabels } from './TaskRow.js';
+import type { TaskRowSwipeSpec } from './row-actions.js';
 import {
   flattenSections,
   toTaskRows,
@@ -105,8 +106,13 @@ interface TaskListSharedProps {
    * 而这是不可撤销语义上的破坏。宁可不可点。
    */
   readonly onOpenTask?: (taskId: string) => void;
-  /** 长按行的入口，供移动端进入批量选择态。 */
+  /** 长按行的入口（移动端 = 上下文菜单；批量态 = 勾选）。归派由宿主决定，见 `TaskRow.tsx`。 */
   readonly onLongPressTask?: (taskId: string) => void;
+  /**
+   * **左滑露出的动作**（移动端第二入口，`row-actions-redesign.md` §3.4）。
+   * 透传给 `TaskRow`；不传 = 行不响应横向手势（Web 与日历档都不传）。
+   */
+  readonly swipeActions?: (row: TaskRowModel) => TaskRowSwipeSpec | null;
   readonly labels?: TaskListLabels;
   /** 标题下方的元信息行（截止 / 优先级 / 重复…）。 */
   readonly renderMeta?: (row: TaskRowModel) => React.ReactNode;
@@ -211,6 +217,7 @@ export function TaskList<TMeta = undefined>({
   onToggleTask,
   onOpenTask,
   onLongPressTask,
+  swipeActions,
   labels,
   renderMeta,
   renderTrailing,
@@ -301,13 +308,14 @@ export function TaskList<TMeta = undefined>({
           onToggleTask={onToggleTask}
           {...(onOpenTask === undefined ? {} : { onOpenTask })}
           {...(onLongPressTask === undefined ? {} : { onLongPressTask })}
+          {...(swipeActions === undefined ? {} : { swipeActions })}
           {...(labels === undefined ? {} : { labels })}
           {...(renderMeta === undefined ? {} : { renderMeta })}
           {...(renderTrailing === undefined ? {} : { renderTrailing })}
         />
       );
     },
-    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density, selectedTaskIds, selectionMode],
+    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density, selectedTaskIds, selectionMode],
   );
 
   const keyExtractor = useCallback((item: Item) => item.key, []);

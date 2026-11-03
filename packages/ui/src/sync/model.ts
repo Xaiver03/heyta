@@ -497,6 +497,7 @@ export type EntityLabelKey =
   | 'common.entity.PREFERENCE_CORRECTION'
   | 'common.entity.ASSISTANT_TURN'
   | 'common.entity.COMMENT'
+  | 'common.entity.ATTACHMENT'
   | 'common.entity.GLOBAL_CONFIG'
   | 'common.entity.MIGRATION'
   | 'common.entity.RECOVERY'
@@ -522,6 +523,10 @@ export const ENTITY_LABEL_KEYS: Record<string, EntityLabelKey> = {
   // 而冲突面板里显示 `ASSISTANT_TURN` 这种代号，用户就没法判断该保哪一边。
   ASSISTANT_TURN: 'common.entity.ASSISTANT_TURN',
   COMMENT: 'common.entity.COMMENT',
+  // 任务附件的**元数据**（工单 #9）。它也会同步、也会冲突（两台设备各改一次
+  // 同一个附件的文件名），所以冲突面板必须叫得出它是谁 —— 显示 `ATTACHMENT`
+  // 这种代号，用户就没法在"保哪一边"上做决定。字节本身不在同步里，见契约文件。
+  ATTACHMENT: 'common.entity.ATTACHMENT',
   GLOBAL_CONFIG: 'common.entity.GLOBAL_CONFIG',
   MIGRATION: 'common.entity.MIGRATION',
   RECOVERY: 'common.entity.RECOVERY',

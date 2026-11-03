@@ -65,6 +65,14 @@ export type OverlayModalClass =
   | 'modal-readonly'
   | 'modal-dirty-form'
   | 'modal-forced-read'
+  /**
+   * 可以**显式推迟**的意思表示层：隐私单独同意与条款再确认。
+   *
+   * 🔴 它**不是** `modal-forced-read` —— 那一格 deny 返回键，等于把"我必须现在
+   * 表态"写成硬约束，对本就允许拒绝的单独同意是反向诱导（策略表那一格写着理由）。
+   * 移动端那两枚面板迁不过来，就是因为这一格从来没进过本联合类型。
+   */
+  | 'modal-deferrable'
   | 'danger-confirm';
 
 /** 一次"想关"的来源 —— 宿主据此决定问法（背景 / Esc / 返回键的措辞不一样）。 */

@@ -21,6 +21,7 @@ import {
   CLOSED_OVERLAYS,
   closePolicyOf,
   dismissActionFor,
+  explicitCloseOutcomeOf,
   hasExplicitClose,
   type DismissOutcome,
 } from '../src/overlay/dismissal.js';
@@ -155,5 +156,38 @@ describe('关闭策略表：三条通道问出来的是同一种答案', () => {
   it('命令面板必须允许 Esc 直退', () => {
     const policy = closePolicyOf('command');
     expect(dismissActionFor(policy, policy.escape)).toBe('close');
+  });
+});
+
+describe('🔴 具名出口不许是一个"点了没反应"的按钮', () => {
+  /**
+   * 表里 `explicitCloseButton: true` 的类别，组件就会画一枚 ×。而 × 走哪一格
+   * 曾经被写死成"读背景那一格"（`BottomSheet`）与"读键盘那一格"（`OverlayModal`）
+   * **两种各半的读法** —— 于是 `bottom-sheet`（键盘 `deny`）与
+   * `modal-deferrable` / `full-screen`（背景 `deny`）里必然有一头得到一个
+   * 按下去什么都不发生的按钮。
+   *
+   * 这条不变量把"两头都不能坏"钉成表级的：**新增类别时如果两格都禁、
+   * 却还给了 ×，这里会红**，而不是等到某个浮层上出现一枚死按钮才发现。
+   */
+  for (const overlay of CLOSED_OVERLAYS) {
+    const policy = closePolicyOf(overlay);
+    if (!hasExplicitClose(policy)) continue;
+    it(`${overlay}：× 必须真的能做事`, () => {
+      expect(dismissActionFor(policy, explicitCloseOutcomeOf(policy))).not.toBe('none');
+    });
+  }
+
+  it('bottom-sheet 的 × 读背景那一格（它的键盘是刻意 deny 的）', () => {
+    const policy = closePolicyOf('bottom-sheet');
+    expect(explicitCloseOutcomeOf(policy)).toBe('dismiss');
+    // 反证：谁把规则改成"固定读键盘"，这一条会先红 —— 症状是任务详情面板的 × 失效。
+    expect(policy.escape).toBe('deny');
+  });
+
+  it('modal-deferrable 的 × 读键盘那一格（它的背景是刻意 deny 的）', () => {
+    const policy = closePolicyOf('modal-deferrable');
+    expect(policy.scrim).toBe('deny');
+    expect(dismissActionFor(policy, explicitCloseOutcomeOf(policy))).toBe('close');
   });
 });

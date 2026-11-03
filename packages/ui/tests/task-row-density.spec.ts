@@ -48,7 +48,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { TASK_ROW_SHAPE } from '@heyta/design-system';
+import { TASK_ROW_SHAPE, TASK_ROW_TEXT } from '@heyta/design-system';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -70,11 +70,12 @@ function plan(density: TaskRowDensity): {
   readonly minHeight: string | null;
   readonly bodyPaddingBlock: string;
   readonly gap: string;
+  readonly title: string;
 } {
   const spec = resolveTaskRowDensity(density);
   return {
     slots: [
-      // 骨架槽位**三档都在**：勾选框 + 标题是"这是一行"的定义，
+      // 骨架槽位**每一档都在**：勾选框 + 标题是"这是一行"的定义，
       // 密度不许把它改掉（改了就是"另一种行"，不是"更紧凑的行"）。
       'checkbox',
       'title',
@@ -84,6 +85,9 @@ function plan(density: TaskRowDensity): {
     minHeight: spec.minHeight,
     bodyPaddingBlock: spec.bodyPaddingBlock,
     gap: spec.gap,
+    // 排印轴：`detail` 档与 `comfortable` 的差别**只有这一格**，
+    // 所以它必须进计划 —— 否则判据 A 会把两档当成同一份规格而红。
+    title: spec.title,
   };
 }
 
@@ -106,7 +110,7 @@ function stripComments(text: string): string {
 
 describe('TaskRow 的 density 档位', () => {
   it('档位是有界的，且表与清单一一对应（加了档位忘登记会红）', () => {
-    expect(TASK_ROW_DENSITIES.length).toBe(3);
+    expect(TASK_ROW_DENSITIES.length).toBe(4);
     expect([...TASK_ROW_DENSITIES].sort()).toEqual(Object.keys(DENSITY_SPEC).sort());
   });
 
@@ -137,6 +141,24 @@ describe('TaskRow 的 density 档位', () => {
     expect(plan('minimal').minHeight).toBeNull();
   });
 
+  it('A3. 排印轴只给 `detail` 一档用，其余三档逐字沿用登记的默认样式', () => {
+    // 🔴 这条是"密度不许变成随便调排版"的边界尺：
+    // 加排印轴的唯一理由是详情面板要大字档（工单第一步），
+    // 所以**只允许** `detail` 那一档偏离；其余三档一旦被人顺手改字号，这里红。
+    expect(DENSITY_SPEC.detail.title).toBe('detail-title');
+    for (const density of ['comfortable', 'compact', 'minimal'] as const) {
+      expect(DENSITY_SPEC[density].title, `${density} 不该有自己的标题样式`).toBe(
+        TASK_ROW_TEXT.title,
+      );
+    }
+    // `detail` 与默认档的差别**只有**排印这一格 —— 几何与两个插槽必须完全一致，
+    // 否则它就不是"同一行的另一档"，而是偷偷的另一种行。
+    expect({ ...DENSITY_SPEC.detail, title: null }).toEqual({
+      ...DENSITY_SPEC.comfortable,
+      title: null,
+    });
+  });
+
   it('B. 默认档缺省即 comfortable，且与"抽取之前"的几何逐项一致', () => {
     expect(DEFAULT_TASK_ROW_DENSITY).toBe('comfortable');
     expect(resolveTaskRowDensity()).toEqual(DENSITY_SPEC.comfortable);
@@ -150,6 +172,9 @@ describe('TaskRow 的 density 档位', () => {
       gap: TASK_ROW_SHAPE.gap,
       showMeta: true,
       showTrailing: true,
+      // 默认档的标题逐字等于 `task-row-shape.ts` 登记的那枚 ——
+      // "不传 density 的调用点一字不变"这条前提就钉在这一格。
+      title: TASK_ROW_TEXT.title,
     });
   });
 
@@ -165,11 +190,15 @@ describe('TaskRow 的 density 档位', () => {
     // 默认档名不许写死在组件里（否则"缺省档"与"表"会漂开两份真相）。
     expect(row).not.toContain("'comfortable'");
 
-    // 计划里的三个槽位真的被读到了：否则表改了组件也不动。
+    // 计划里的槽位真的被读到了：否则表改了组件也不动。
     expect(row).toContain('spec.showMeta');
     expect(row).toContain('spec.showTrailing');
     expect(row).toContain('spec.minHeight');
     expect(row).toContain('spec.bodyPaddingBlock');
+    // 🔴 排印轴同样必须走表。组件里再直接取 `TASK_ROW_TEXT.title`
+    // 就等于"档位改了标题也不动" —— 那 `detail` 档会变成一枚装饰。
+    expect(row).toContain('spec.title');
+    expect(row).not.toMatch(/text\[\s*TASK_ROW_TEXT\.title\s*\]/);
 
     // 行骨架的可寻址名字（各端按它做断言）必须在行组件里，不在列表里。
     expect(row).toContain('task-item-');

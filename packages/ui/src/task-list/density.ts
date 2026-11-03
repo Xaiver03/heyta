@@ -29,7 +29,19 @@
  * | 差异轴 | 允许改什么 | 不允许改什么 |
  * |---|---|---|
  * | 空间 | `minHeight` / `bodyPaddingBlock` / `gap` 三个槽位换成别的 token | 引入新 token；写裸数字（`check:design` 会拦） |
- * | 内容 | `showMeta` / `showTrailing`（**要不要渲染宿主给的次要插槽**） | 改行骨架（勾选框 + 标题一定在）；改文字样式语义（标题永远是 `row-title`） |
+ * | 内容 | `showMeta` / `showTrailing`（**要不要渲染宿主给的次要插槽**） | 改行骨架（勾选框 + 标题一定在） |
+ * | 排印 | `title` 换成**另一枚已登记的语义样式**（`TEXT_STYLES` 的键） | 写裸字号/字重；新增一枚只为某个调用点服务的样式 |
+ *
+ * ⚠️ **排印那一行是 2026-11-03 加的**，之前这张表写着"标题永远是 `row-title`"。
+ * 改这条规则的不是审美，是一个具体的两难：详情面板要"大字标题"，
+ * 而当时的两条出路是 —— ① 在宿主里再手写一份"勾选框 + 标题 + 截止"（
+ * `check:row-single-source` 断言 A 抓的就是它，也是本工单第一步要消掉的那条红），
+ * ② 让密度表允许换标题的语义样式。① 是"同一判断两份渲染"，比 ② 糟得多，
+ * 所以选了 ②。⚠️ 它**不是**"密度从此可以随便调排版"的开口：
+ * 值仍然只能取自唯一事实源（裸值被 `check:design` 拦），
+ * 每档用哪一枚样式由 `tests/task-row-density.spec.ts` 逐档钉住，
+ * 而默认档 `comfortable` 的 `title` 逐字等于 `TASK_ROW_TEXT.title` ——
+ * 也就是"不传 `density` 的调用点行为一字不变"这条前提仍然成立。
  *
  * ⚠️ **勾选框几何刻意不进密度**：`size.checkbox` / `touch-target.min` /
  * `radius.sm` 是三端一致的可访问性契约（44 触控下限 + 22 视觉尺寸），
@@ -39,19 +51,28 @@
  * 与 `task-row-shape.ts` 同一条边界。
  */
 
-import { TASK_ROW_SHAPE, type TokenName } from '@heyta/design-system';
+import {
+  TASK_ROW_SHAPE,
+  TASK_ROW_TEXT,
+  type TextStyleName,
+  type TokenName,
+} from '@heyta/design-system';
 
 /**
- * 一行有哪几档紧凑度。**有界**（三档），不做 `number` 之类的连续轴 ——
+ * 一行有哪几档紧凑度。**有界**（四档），不做 `number` 之类的连续轴 ——
  * 连续轴会让"这一屏该多高"从设计决定变成每个调用点各写一个数字。
+ *
+ * ⚠️ `detail` 不是"第三份行"：它是同一份 `<TaskRow>` 的一档，
+ * 差异只有表里那五个槽位（其中 `title` 是这一档带来的，见 `TaskRowDensitySpec`）。
  */
-export type TaskRowDensity = 'comfortable' | 'compact' | 'minimal';
+export type TaskRowDensity = 'comfortable' | 'compact' | 'minimal' | 'detail';
 
 /** 全档位清单（测试与 `satisfies` 共用，避免"加了档位忘了登记"）。 */
 export const TASK_ROW_DENSITIES = [
   'comfortable',
   'compact',
   'minimal',
+  'detail',
 ] as const satisfies readonly TaskRowDensity[];
 
 /**
@@ -85,6 +106,15 @@ export interface TaskRowDensitySpec {
   readonly showMeta: boolean;
   /** 宿主给的 `renderTrailing`（删除按钮 / 拖动手柄…）要不要渲染。 */
   readonly showTrailing: boolean;
+  /**
+   * 标题用哪一枚**语义文字样式**（只能是 `TEXT_STYLES` 里登记过的名字）。
+   *
+   * 🔴 这一格是 2026-11-03 随 `detail` 档加进来的，加它的理由与不加它的边界
+   * 都写在文件头那张差异表里 —— 它不是"密度可以随便改排版"的开口：
+   * 值仍然只能取自唯一事实源，裸值会被 `check:design` 拦，
+   * 而"这一档到底换了哪枚样式"由 `tests/task-row-density.spec.ts` 逐档钉住。
+   */
+  readonly title: TextStyleName;
 }
 
 /**
@@ -92,11 +122,16 @@ export interface TaskRowDensitySpec {
  *
  * 三档的实际差异（这就是全部，没有藏在别处的）：
  *
- * | 档位 | 用途 | minHeight | bodyPaddingBlock | showMeta | showTrailing |
- * |---|---|---|---|---|---|
- * | `comfortable` | 列表 / 详情（默认） | `size.row-min-height`（56） | `space.2`（8） | ✅ | ✅ |
- * | `compact` | 四象限卡 | `touch-target.min`（44） | `space.1`（4） | ✅ | ✅ |
- * | `minimal` | 日历格 / 时间线泳道 | 无下限 | `space.1`（4） | ❌ | ❌ |
+ * | 档位 | 用途 | minHeight | bodyPaddingBlock | showMeta | showTrailing | title |
+ * |---|---|---|---|---|---|---|
+ * | `comfortable` | 列表（默认） | `size.row-min-height`（56） | `space.2`（8） | ✅ | ✅ | `row-title` |
+ * | `compact` | 四象限卡 | `touch-target.min`（44） | `space.1`（4） | ✅ | ✅ | `row-title` |
+ * | `minimal` | 日历格 / 时间线泳道 | 无下限 | `space.1`（4） | ❌ | ❌ | `row-title` |
+ * | `detail` | 详情面板内容层那一行 | `size.row-min-height`（56） | `space.2`（8） | ✅ | ✅ | **`detail-title`** |
+ *
+ * ⚠️ 上面这段"三档"是旧话，第四档 `detail` 于 2026-11-03 加入（表里已列全）。
+ * 判"某档有没有偷偷多改东西"的尺不是这段注释，是
+ * `packages/ui/tests/task-row-density.spec.ts`：它逐档读出这六个槽位。
  *
  * 为什么 `compact` 的 `minHeight` 是 `touch-target.min` 而不是新造一个
  * `size.row-min-height-compact`：44 正是勾选框的**触控下限**，紧凑档压到它为止 ——
@@ -115,6 +150,7 @@ export const DENSITY_SPEC = {
     gap: TASK_ROW_SHAPE.gap,
     showMeta: true,
     showTrailing: true,
+    title: TASK_ROW_TEXT.title,
   },
   compact: {
     minHeight: 'touch-target.min',
@@ -122,6 +158,7 @@ export const DENSITY_SPEC = {
     gap: 'space.1',
     showMeta: true,
     showTrailing: true,
+    title: TASK_ROW_TEXT.title,
   },
   minimal: {
     minHeight: null,
@@ -129,6 +166,23 @@ export const DENSITY_SPEC = {
     gap: 'space.1',
     showMeta: false,
     showTrailing: false,
+    title: TASK_ROW_TEXT.title,
+  },
+  /**
+   * 详情面板那一档（工单「任务详情面对标滴答清单」第一步要的"大字档"）。
+   *
+   * 与默认档的差别**只有标题那枚样式**：几何（`minHeight` / 内间距 / `gap`）
+   * 全部沿用 `comfortable`，两个次要插槽也照旧渲染 ——
+   * 详情面板要的是"同一条信息更大"，不是"另一种紧凑度"。
+   * 这正是它配得上待在密度表里、而不是变成 `TaskRow` 上第二个 `variant` 的原因。
+   */
+  detail: {
+    minHeight: TASK_ROW_SHAPE.minHeight,
+    bodyPaddingBlock: TASK_ROW_SHAPE.bodyPaddingBlock,
+    gap: TASK_ROW_SHAPE.gap,
+    showMeta: true,
+    showTrailing: true,
+    title: 'detail-title',
   },
 } as const satisfies Record<TaskRowDensity, TaskRowDensitySpec>;
 
