@@ -201,7 +201,22 @@ test('新建入口打开统一对话框：校验、取消、颜色能力和标�
   // Escape 是明确取消，不会写入一条空记录。
   await addList.click();
   await listInput.fill('不该存在');
+  /*
+   * 🔴 2026-10-27 起「Esc = 静默丢弃」不再是这一格的行为：`CategoryCreateDialog` 的草稿
+   * 走 `useDirtyDismissGuard`（`overlay: 'modal-dirty-form'`，策略查
+   * `packages/ui/src/overlay/dismissal.ts` 的 `closePolicyOf` 那张表），**有内容**时
+   * Esc 先问一句。那一趟的首个错误是
+   * `expect(locator).toHaveCount(0)` / `Received: 1`（34 × resolved to 1 element）——
+   * 对话框没关，因为确认框挂在它上面。
+   *
+   * 判据本义不变（"Esc 是一条真的出口，而且不写入"），只是多了一步用户本来就要做的
+   * 确认：先钉"它确实问了"（不许静默丢弃，那是 §overlay 关闭策略表里 `ask` 那一档），
+   * 再走"丢弃"，最后仍断言**一条记录都没写**。
+   */
   await listInput.press('Escape');
+  const discard = page.getByTestId('discard-confirm');
+  await expect(discard, '有草稿时 Esc 必须先问一句，不许静默丢弃').toBeVisible();
+  await discard.getByTestId('discard-confirm-confirm').click();
   await expect(page.locator('[data-testid="category-create-dialog"]')).toHaveCount(0);
   await expect(sidebar.getByText('不该存在', { exact: true })).toHaveCount(0);
 

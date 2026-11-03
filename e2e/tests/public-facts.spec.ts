@@ -37,6 +37,42 @@ const markerOf = (date: string): string => `[data-testid="calendar-day-marker-${
 const miniMarkerOf = (date: string): string =>
   `[data-testid="calendar-mini-marker-${date}"]`;
 
+/**
+ * 把日历翻到**判据钉的那一月**（这里恒为 2026-10：随包调休表的 10-01「休」/10-10「班」）。
+ *
+ * 🔴 为什么必须翻：日历默认停在"今天"所在的那一月，而这三条原来把"今天在 2026 年 10 月"
+ * 当成了前提。2026-11-04 那一趟的首个错误就是这件事 ——
+ *   `Locator: locator('[data-testid="calendar-day-marker-2026-10-01"]')`
+ *   `Expected: "休"` / `Error: element(s) not found`
+ * A / B / C 三条**全部**红在同一句上（C 红在 10-17 那一格）。
+ * 判据本义一个字没改（"随包表 / 404 / 整年替换三档，要在**界面上**看得见"），
+ * 改的只是"先在真界面上翻到那一月"，否则这三条只在 2026 年 10 月成立 ——
+ * 一条会随时间自己变红的判据，比没有判据更容易被误读成产品缺陷。
+ *
+ * ⚠️ 走工具栏那两枚 `‹ ›`（`calendar-toolbar-prev/next`）而**不是**往 store 里塞值：
+ * 这是用户真会用的那条路，而且它顺带证明"翻月之后标记仍然跟着画"。
+ * ⚠️ 步数用现读的标题算，不写死「往回点一下」—— 今天离 2026-10 几个月，是运行期的事实。
+ */
+async function gotoMonth(page: Page, year: number, month: number): Promise<void> {
+  const title = page.getByTestId('calendar-toolbar-month');
+  await expect(title, '日历工具栏的月份标题必须在').toBeVisible();
+  const read = async (): Promise<readonly [number, number]> => {
+    const text = (await title.textContent())?.trim() ?? '';
+    const hit = /^(\d{4})年(\d{1,2})月$/u.exec(text);
+    expect(hit, `月份标题读不出年月（实测「${text}」）`).not.toBeNull();
+    return [Number(hit![1]), Number(hit![2])];
+  };
+  const [currentYear, currentMonth] = await read();
+  const delta = (year - currentYear) * 12 + (month - currentMonth);
+  for (let step = 0; step < Math.abs(delta); step += 1) {
+    await page.getByTestId(delta < 0 ? 'calendar-toolbar-prev' : 'calendar-toolbar-next').click();
+  }
+  expect(await read(), `翻月没有落到 ${String(year)} 年 ${String(month)} 月`).toEqual([year, month]);
+}
+
+const FACTS_YEAR = 2026;
+const FACTS_MONTH = 10;
+
 /** 往凭据里塞服务端地址 = "这台设备连的是那个部署方"。 */
 async function pointAtDeployer(page: Page): Promise<void> {
   await page.addInitScript((origin) => {
@@ -57,6 +93,7 @@ test('A：没配服务端 ⇒ 日历完整，标记来自随包表（判据①�
   await openApp(page, APP_ZH, 'local-only');
   await page.getByRole('tab', { name: '日历' }).click();
   await expect(page.locator(BOARD)).toBeVisible();
+  await gotoMonth(page, FACTS_YEAR, FACTS_MONTH);
 
   await page.screenshot({ path: 'test-results/public-facts-local-only.png', fullPage: false });
 
@@ -86,6 +123,7 @@ test('B：那条通道 404（自托管旧版本）⇒ 与 A 逐字一样：不�
   await openApp(page, APP_ZH, 'accepted');
   await page.getByRole('tab', { name: '日历' }).click();
   await expect(page.locator(BOARD)).toBeVisible();
+  await gotoMonth(page, FACTS_YEAR, FACTS_MONTH);
 
   await page.screenshot({ path: 'test-results/public-facts-self-hosted-404.png', fullPage: false });
 
@@ -121,6 +159,7 @@ test('C：部署方只下发 10-17 一天 ⇒ 10-17 出现「班」，随包表 
   await openApp(page, APP_ZH, 'accepted');
   await page.getByRole('tab', { name: '日历' }).click();
   await expect(page.locator(BOARD)).toBeVisible();
+  await gotoMonth(page, FACTS_YEAR, FACTS_MONTH);
 
   // 存在性：先等那一格真的画出标记（画不出来就是这条链没通）。
   await expect(page.locator(markerOf('2026-10-17'))).toHaveText('班', { timeout: 15_000 });

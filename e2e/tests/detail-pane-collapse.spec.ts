@@ -24,6 +24,7 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { closeSettingsSheet, openApp, openSettingsView, parkCursor, reselectDetailColumnContent, showDetailColumnContent, switchView } from './helpers';
+import { closeTaskDetailIfOpen } from './task-detail-entry.js';
 
 const STORAGE_KEY = 'heyta.detailPane';
 
@@ -158,7 +159,22 @@ test.describe('详情列的出现条件与收起', () => {
     // 反向对照：这一栏并没有被"永久藏起来"——再点开关就回来，而且是同一个机制。
     // ⚠️ 刷新之后**选中态不在了**（选中是视图内状态，不落盘），所以先重新点开一条：
     // 回来的是"有内容 ⇒ 占位"这一档，与上面那条前提同一个口径。
+    /*
+     * 🔴 2026-11 补一步（**判据口径不变**，改的是"在什么状态下点那一枚开关"）：
+     * 栏被收起时**点行的落点已经不是"什么都不发生"了** —— 行操作 UX 重设计之后，
+     * 面单在窄档（= 栏被收起、几何不够、或日历那种没有栏的视图）的落点是
+     * `task-detail-dialog` 对话框，它那层遮罩 `task-detail-dialog-scrim` 盖着整个外壳。
+     * 于是这一步原来那句 `detail-pane-toggle().click()` 会被遮罩接住：
+     * 现量（2026-11-04 那趟）`<div role="presentation" class="ht-row-menu__scrim"
+     * data-testid="task-detail-dialog-scrim">…</div> intercepts pointer events`，
+     * 一路重试到 `Test timeout of 60000ms exceeded`。
+     * ⇒ 先按 Esc 收掉对话框（这正是这一档用户必须做的同一件事：出口在壳里，
+     * `closePolicyOf('modal-readonly')` 给的三个出口之一），再点页头那颗开关。
+     * ⚠️ 不许改成"绕过遮罩点"（force / evaluate click）：那会把"开关被对话框盖住时
+     *    用户点不到"这件事一并测掉，而那是真行为。
+     */
     await reselectDetailColumnContent(page);
+    await closeTaskDetailIfOpen(page);
     await page.getByTestId('detail-pane-toggle').click();
     await expect(page.getByTestId('detail-column')).toBeVisible();
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
@@ -174,6 +190,14 @@ test.describe('详情列的出现条件与收起', () => {
     await showDetailColumnContent(page);
     await expect(page.getByTestId('detail-column')).toBeHidden();
 
+    /*
+     * 🔴 「栏被收起时点行会开窄档面单对话框」这一步在 2026-11 之后是**必经**的：
+     * 它的遮罩盖着整个外壳，页头那颗开关点不到（T2 里那串
+     * `task-detail-dialog-scrim intercepts pointer events` 是同一条）。
+     * 先按壳的出口收掉（`modal-readonly`：Esc / 背景 / 返回键），再走页头。
+     * 判据仍是"页头那颗开关能把栏叫回来"，只在它前面补了这一步前置。
+     */
+    await closeTaskDetailIfOpen(page);
     await page.getByTestId('detail-pane-toggle').click();
     await expect(page.getByTestId('detail-column')).toBeVisible();
     await expect(page.locator('.ht-app')).toHaveAttribute('data-detail', 'open');
@@ -192,6 +216,10 @@ test.describe('详情列的出现条件与收起', () => {
     await showDetailColumnContent(page);
     await expect(page.getByTestId('detail-column')).toBeHidden();
 
+    // 🔴 同 T3a：窄档面单对话框的遮罩挡着页头，先走壳的出口收掉 ——
+    // 不加这一步，红的是 `openSettingsView` 里点头像那一下（实测）
+    // 与"设置里那一项能不能把栏叫回来"毫无关系的动作。
+    await closeTaskDetailIfOpen(page);
     await openSettingsView(page);
     const group = page.getByTestId('detail-pane-pref');
     await expect(group).toBeVisible();

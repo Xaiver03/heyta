@@ -185,6 +185,22 @@ async function fakeServer(page: Page, store: AvatarStore): Promise<string[]> {
     }));
   await page.route(`${SERVER}/api/sync/ops**`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ results: [], latestSeq: 0 }) }));
+  /*
+   * 🔴 `GET /api/auth/sessions` 是「账号」那一组里**已登录设备列表**（`SessionsPanel`）
+   * 一挂载就会发的读（服务端契约 `server/src/account/account-security.routes.ts`
+   * `fastify.get('/auth/sessions')` → `{ sessions: [...] }`）。这个夹具的规矩是
+   * "没登记的请求算意外"，所以新端点必须在这里登记 ——
+   * 与上面 `/api/sync/payload-mode` 那条**同一条纪律**。
+   * 那一趟的失败原文：`假服务端收到了没登记过的调用：GET /api/auth/sessions |
+   * GET /api/auth/sessions`（两次：进设置一次 + 刷新后一次）。
+   *
+   * ⚠️ 回**空列表**而不是 404：`sessionsStore` 把读侧失败画成一条失败提示（它刻意
+   * 不画成空列表），而这一条用例的主题是"基础资料明文"，不该让一条与头像无关的
+   * 失败横幅混进截图与断言。空列表 = "这台设备是唯一登录着的那一台"，是这一趟的
+   * 合成账号本来的事实。
+   */
+  await page.route(`${SERVER}/api/auth/sessions**`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sessions: [] }) }));
 
   return unexpected;
 }
