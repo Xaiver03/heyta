@@ -70,7 +70,14 @@ async function setPermission(page: Page, setting: PermissionSetting): Promise<vo
 
 async function openReminderPanel(page: Page): Promise<void> {
   await openSettingsSheet(page);
-  await selectSettingsSection(page, 'appearance');
+  /*
+   * ⚠️ 2026-11 换组（判据本义不变）：提醒送达那一块原来挂在「外观」下，
+   * 七组同构之后归到 **「通知」**（`settings-group-notifications`）——
+   * 产品侧的原话写在 `App.tsx` 那一节的上方：组的划分按"它什么时候、用什么方式找我"，
+   * 组内顺序是「系统授权 → 打扰偏好 → 桌面小组件」。
+   * 点「外观」时面板在 DOM 里但那一节是 `hidden`，症状是 `toBeVisible` 超时。
+   */
+  await selectSettingsSection(page, 'notifications');
   await waitForOverlaySettled(page, 'settings-sheet');
   await expect(page.getByTestId('reminder-notify-panel')).toBeVisible();
 }
