@@ -25,7 +25,11 @@ def T(zh,en): return en if english else zh
 # The labels live in `packages/i18n`; the emulator's system locale decides which
 # column the app renders, so every locator has to carry both.
 def countdown_label(): return T('倒数纪念日','Countdowns')
-def tab_labels(): return (T('任务','Tasks'),T('日历','Calendar'),T('专注','Focus'),T('分类','Categories'),T('我的','Profile'))
+# ⚠️ 2026-11 改名：第四个 tab 从「分类 / Categories」变成「统计 / Stats」
+# （`mobile.tab.categories` 的值现在是 统计 / Stats）。脚本原来两侧都停在旧名上 ——
+# 于是 `check:locator-labels` 报"英文那一侧不在 en.ts 的词值上"，
+# 而真相是**整对都过期了**：设备上那一枚 tab 早就不是这个名字。
+def tab_labels(): return (T('任务','Tasks'),T('日历','Calendar'),T('专注','Focus'),T('统计','Stats'),T('我的','Profile'))
 def adb(*args):
  return subprocess.run(['adb','-s',serial,*args],capture_output=True,timeout=adb_timeout,check=True).stdout
 
