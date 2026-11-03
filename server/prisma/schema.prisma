@@ -113,6 +113,7 @@ model User {
   notifications                       AccountNotification[]
   consents                            UserConsent[]
   avatar                              UserAvatar?
+  attachmentBlobs                     AttachmentBlob[]
   aiUsageCounters                     AiUsageCounter[]
   automationAiAttempts               AutomationAiAttempt[]
   automationEntitlementBinding       AutomationEntitlementBinding?
@@ -1551,6 +1552,74 @@ model UserAvatar {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_avatars")
+}
+
+/// 任务附件的**字节**（工单 `task-detail-ticktick-parity` #9）。
+///
+/// 🔴 **这张表不是 `ATTACHMENT` 实体的副本，只是它的另一条通道。**
+/// 附件的元数据（文件名 / MIME / 大小）走 op-log 同步，跨设备、受整库加密档位管；
+/// 这里的行只有字节，**不参与同步** —— 每个字节只需存一份，由上传它的那台设备
+/// 直传服务端。键是客户端先生成的附件实体 id，所以"传字节"与"发 CREATE op"
+/// 不需要服务端发号，重试天然幂等。
+///
+/// ## 为什么字节不进 op-log
+///
+/// op 载荷要进**每一次**全量快照与增量同步。一张 3MB 的图塞进 op，等于每台新设备
+/// 首同步都重传这张图，并把 `operations.payload_bytes` 的账号统计与单条 op 上限
+/// 全撑变形。完整推理写在
+/// `packages/shared-schema/src/attachment-http-contract.ts`。
+///
+/// ## 加密口径（ADR-0081）
+///
+/// 默认档是明文 `readable`；E2EE 是**整库**的显式选择。附件不在这条例外之外：
+/// 客户端按当前档位在上传前加密，服务端**只存不解读**，`data` 里是什么它不知道。
+///
+/// ## 🔴 为什么这里有 `byte_count` 而 `users.storage_used_bytes` 不含它
+///
+/// 账号上的 `storageUsedBytes` 是 op-log + 快照的**缓存计数**，它的对账路径
+/// （`calculateStorageUsage` 扫描、clean-slate 归零）只认识 op 与快照两种来源。
+/// 把附件字节加进那个计数器，任何一次对账都会把它们**静默抹掉** —— 症状是
+/// 配额显示突然变小。所以计数器**保持原语义**，附件用量按这张表
+/// `SUM(byte_count)` 现算，配额闸门把两项**相加**后再判。
+/// `user_avatars` 早有同一个先例：它的字节也从不进 `storageUsedBytes`。
+///
+/// `byte_count` 存的是**服务端自己收到并解码后的长度**，不是客户端报的那个数 ——
+/// 后者虚报 `1` 就能绕过配额。
+///
+/// ⚠️ 一行删掉后如果 op 里的实体墓碑还在，这条字节就是"没有主人的 blob"。
+/// 墓碑与实体都不在这张表里，所以回收靠 `DELETE /:id`（界面删附件时调用）；
+/// 没有主人且超过保留期的孤儿 blob 由清理任务按 `created_at` 扫（本表 `@@index([createdAt])` 就是为它准备的）。
+model AttachmentBlob {
+  /// 客户端生成的 `ATTACHMENT` 实体 id —— 与 op-log 里那条元数据同一个 id。
+  attachmentId String @id @map("attachment_id")
+
+  /// 归属账号。🔴 身份**只**取自 Bearer 令牌，永远不取自请求体（见路由文件头）。
+  userId Int @map("user_id")
+
+  /// 字节本身（明文档 = 图片原字节；E2EE 档 = 客户端加密后的密文）。
+  data Bytes
+
+  /// `data` 的实际长度（服务端测量）。配额的唯一依据。
+  byteCount Int @map("byte_count")
+
+  /// 客户端带来的 MIME；E2EE 档下服务端不知道内容，但仍需要它在 GET 时回填 `Content-Type`。
+  contentType String @map("content_type")
+
+  /// `data` 的 SHA-256（hex）。客户端用它判断"我这台设备上的副本还新不新"，
+  /// 而不是把整块字节再下一遍（与头像同一个理由：两端各算一次会在 Hermes 上算出两个值）。
+  hash String
+
+  /// 首次上传时刻（epoch ms）。孤儿回收按它扫。
+  createdAt BigInt @map("created_at")
+
+  /// 最近一次覆盖时刻（epoch ms）。
+  updatedAt BigInt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("attachment_blobs")
 }
 
 /// 账号级通知（应用内通知中心的一条）。
