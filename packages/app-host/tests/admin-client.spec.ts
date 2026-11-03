@@ -174,7 +174,21 @@ describe('🔴 失败原因是可区分的（403 ≠ 401 ≠ 网络）', () => {
   });
 
   it('成功时把响应体原样交出去', async () => {
-    const payload = { users: { total: 1 } };
+    /*
+     * ⚠️ 2026-11 换了夹具形状（判据本义不变：**原样**交出去，不重排、不补字段）。
+     * 旧夹具是 `{ users: { total: 1 } }` —— 只有一组。那时"2xx + JSON"就等于成功，
+     * 于是一份缺四组的载荷也会被 `probe()` 判成"你是管理员"，面板读
+     * `overview.users.total` 之外的格子时**整页白屏**。现在 `fetchAdminOverview`
+     * 先过形状（见同文件末尾那三条），所以这里必须给一份**形状成立**的载荷；
+     * "原样"这一半仍然靠 `toEqual` 逐字比对（多补一个字段就会红）。
+     */
+    const payload = {
+      users: { total: 1, verified: 0, admins: 0, locked: 0 },
+      subscriptions: { total: 0, active: 0, entitledStatuses: [], byStatus: [] },
+      orders: { total: 0, byStatus: [], paidByCurrency: [] },
+      coupons: { total: 0, enabled: 0, settledRedemptions: 0 },
+      invites: { codes: 0, codesDisabled: 0, referrals: 0, referralsActivated: 0, referralsRewarded: 0 },
+    };
     const fetchImpl = stubResponse(200, payload);
     const result = await fetchAdminOverview(withFetch(fetchImpl));
     expect(result).toEqual({ ok: true, data: payload });
@@ -680,5 +694,43 @@ describe('订阅发放五条端点的传输形状', () => {
       reason: 'no-token',
     });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  🔴 概览载荷的**形状**判据（2026-11 补）。
+  在此之前"2xx + JSON"就等于"概览拿到了"，于是 `200 {}` 会让 `probe()` 把账号判成
+  管理员、把 `overview` 记成空对象，面板读 `overview.users.total` 时**整页白屏**。
+  下面三条一起钉：空对象要红、缺一组要红、完整的要原样通过（否则守卫会变成"永远不可用"）。
+*/
+describe('概览载荷形状：2xx + 不完整的 JSON 不是"你是管理员"', () => {
+  const full = {
+    users: { total: 3, verified: 2, admins: 1, locked: 0 },
+    subscriptions: { total: 1, active: 1, entitledStatuses: ['active'], byStatus: [] },
+    orders: { total: 0, byStatus: [], paidByCurrency: [] },
+    coupons: { total: 0, enabled: 0, settledRedemptions: 0 },
+    invites: { codes: 0, codesDisabled: 0, referrals: 0, referralsActivated: 0, referralsRewarded: 0 },
+  };
+
+  it('`200 {}` ⇒ server（不是 ok —— 它会让整页白屏）', async () => {
+    const fetchImpl = stubResponse(200, {});
+    await expect(fetchAdminOverview(withFetch(fetchImpl))).resolves.toEqual({
+      ok: false,
+      reason: 'server',
+    });
+  });
+
+  it('少了 `invites` 那一组（其它四组齐）⇒ server', async () => {
+    const { invites: _drop, ...partial } = full;
+    const fetchImpl = stubResponse(200, partial);
+    await expect(fetchAdminOverview(withFetch(fetchImpl))).resolves.toEqual({
+      ok: false,
+      reason: 'server',
+    });
+  });
+
+  it('五组齐全 ⇒ ok，且载荷原样交出去（守卫不许变成"永远不可用"）', async () => {
+    const fetchImpl = stubResponse(200, full);
+    await expect(fetchAdminOverview(withFetch(fetchImpl))).resolves.toEqual({ ok: true, data: full });
   });
 });
