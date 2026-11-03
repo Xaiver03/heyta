@@ -155,6 +155,88 @@ ZH = invert(ZH_TABLE)
 EN = invert(EN_TABLE)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 死标签账本（2026-11-04 建立）
+# ─────────────────────────────────────────────────────────────────────────────
+# 判据三（`is_mobile(script) and all(k not in MOBILE_KEYS …)`）会红"这枚中文标签在移动端
+# 一个键都不读"。它抓的是真事：那几屏改版之后，脚本按旧文案点，**两种语态下都打不中**。
+#
+# 但那件事的**修法在脚本那一侧**（把定位换成新文案，或直接改成 resource-id），
+# 而脚本是各端旅程负责人的地界 —— 本门禁文件头对"单语标签"那一档已经写下了同一条口径：
+# 「归该脚本的负责人，欠项记在计划里」，不该由这枚门把共享的 `pnpm check` 按红。
+# 所以这里用**账本**而不是静默跳过（与 `MODAL_LEDGER` / `EMPTY_SITES` 同一套做法）：
+#
+#   · 每一条都必须写明**为什么现在打不中**（哪一面改版了、现在读的是哪几个键）；
+#   · **只减不增**：账上没有的标签仍然照旧判红 —— 新写的死标签进不来；
+#   · 账上每一条都必须在本次扫描里**真的命中**，命中不了就红（那说明脚本已经改了、
+#     或者那一面又长回来了）⇒ 逼下一个人回来删掉这一行。
+#
+# 现量：26 条 / 7 枚脚本。主要三族：设置七组同构（`常规`/`同步与隐私`/`数据管理`/
+# `AI 与集成`/`账号安全` 五枚组名被 7 个 `mobile.settings.section.*` 取代）、
+# 详情面与排期披露改版（`任务详情`/`展开排期`/`收起排期`）、认证面改版（两种登录方式）。
+DEAD_LABEL_LEDGER: dict[tuple[str, str], str] = {
+    # ── 设置七组同构：移动端现量只读 account/subscription/data/notifications/
+    #    appearance/features/about 这七枚（`apps/mobile/src` 全扫），旧组名全部 0 引用。
+    ('scripts/qa/profile-settings-android.py', '同步与隐私'):
+        '七组同构后「同步与隐私」并入「数据与同步」（mobile.settings.section.data），旧键 0 引用',
+    ('scripts/qa/profile-settings-android.py', '常规'):
+        '七组同构后「常规」一分为「提醒与通知」与「外观与语言」，旧键 mobile.settings.section.general 0 引用',
+    ('scripts/qa/profile-settings-android.py', '数据管理'):
+        '七组同构后改名「数据与同步」；脚本点的是 web.settings.nav.data，移动端不读它',
+    ('scripts/qa/profile-settings-ios.py', 'AI 与集成'):
+        '七组同构后改名「功能与 AI」（mobile.settings.section.features）',
+    ('scripts/qa/profile-settings-ios.py', '同步与隐私'):
+        '七组同构后并入「数据与同步」（mobile.settings.section.data）',
+    ('scripts/qa/profile-settings-ios.py', '常规'):
+        '七组同构后一分为「提醒与通知」与「外观与语言」，旧键 0 引用',
+    ('scripts/qa/profile-settings-ios.py', '数据管理'):
+        '七组同构后改名「数据与同步」；脚本点的是 web.settings.nav.data',
+    ('scripts/qa/profile-settings-ios.py', '账号安全'):
+        '七组同构后并入「账号」（mobile.settings.section.account），旧键 0 引用',
+    ('scripts/qa/ai-face-ios.py', 'AI 与集成'):
+        '七组同构后改名「功能与 AI」（mobile.settings.section.features）',
+    ('scripts/qa/ai-face-ios.py', '常规'):
+        '七组同构后一分为「提醒与通知」与「外观与语言」，旧键 0 引用',
+    ('scripts/qa/ios-app-language.py', '同步与隐私'):
+        '七组同构后并入「数据与同步」（mobile.settings.section.data）',
+    ('scripts/qa/ios-app-language.py', '常规'):
+        '七组同构后一分为「提醒与通知」与「外观与语言」，旧键 0 引用',
+    ('scripts/qa/ios-app-language.py', '数据管理'):
+        '七组同构后改名「数据与同步」；脚本点的是 web.settings.nav.data',
+    ('scripts/qa/ios-app-language.py', '账号安全'):
+        '七组同构后并入「账号」（mobile.settings.section.account），旧键 0 引用',
+    # ── 详情面 / 排期披露：`mobile.detail.title` 与 `…schedule.open/close` 现量 0 引用
+    #    （详情面改成带任务标题的面单，排期不再是可展开的披露）。
+    ('scripts/qa/tasks-ux-android.py', '任务详情'):
+        '详情面不再渲染 mobile.detail.title（标题直接用任务标题），该键 0 引用',
+    ('scripts/qa/tasks-ux-android.py', '展开排期'):
+        '排期不再是「展开/收起」披露，mobile.detail.schedule.open 0 引用',
+    ('scripts/qa/tasks-ux-android.py', '收起排期'):
+        '排期不再是「展开/收起」披露，mobile.detail.schedule.close 0 引用',
+    ('scripts/qa/tasks-ux-ios.py', '任务详情'):
+        '详情面不再渲染 mobile.detail.title（标题直接用任务标题），该键 0 引用',
+    ('scripts/qa/tasks-ux-ios.py', '展开排期'):
+        '排期不再是「展开/收起」披露，mobile.detail.schedule.open 0 引用',
+    ('scripts/qa/tasks-ux-ios.py', '收起排期'):
+        '排期不再是「展开/收起」披露，mobile.detail.schedule.close 0 引用',
+    # ── 其它三处同族
+    ('scripts/qa/profile-settings-android.py', '查看完整成长'):
+        '成长入口文案改版，mobile.profile.progress.openGrowth 0 引用',
+    ('scripts/qa/profile-settings-ios.py', '查看完整成长'):
+        '成长入口文案改版，mobile.profile.progress.openGrowth 0 引用',
+    ('scripts/qa/profile-settings-android.py', '记下要盯的日子，看它还有几天'):
+        '倒计时入口提示改版，mobile.countdown.entry.hint 0 引用',
+    ('scripts/qa/account-face-ios.py', '用邮件链接登录'):
+        '认证面改版（统一身份入口 / 自托管档），mobile.auth.magicLink.login 0 引用',
+    ('scripts/qa/account-face-ios.py', '用邮箱和密码登录'):
+        '认证面改版（统一身份入口 / 自托管档），mobile.auth.password.login 0 引用',
+    ('scripts/qa/reminder-block-ios.py', '删除任务：{title}'):
+        '删除动作的无障碍标签改版，mobile.tasks.a11y.delete 0 引用',
+}
+
+# 本次扫描真正命中的账本条目（`main` 用它判"账上有没有过期行"）。
+DEAD_LABEL_HITS: set[tuple[str, str]] = set()
+
 def reachable_on_mobile(part: str) -> bool:
     """AX shim 的 `find()` 是"精确优先，找不到退化成子串"，所以一段中文即使不是完整词条，
     只要落在某个 `mobile.*`/`common.*` 值里，脚本照样打得中 —— 这一类不能报成缺陷。"""
@@ -246,10 +328,14 @@ def check(script: Path) -> tuple[list[str], dict[str, int]]:
             if part not in ZH:
                 problems.append(f"中文标签在词条真源里不存在：{part!r}（脚本字面量 {value!r}）")
             elif is_mobile(script) and all(k not in MOBILE_KEYS for k in ZH[part]):
-                problems.append(
-                    f"{part!r} 只挂在移动端从不读的键上（{', '.join(ZH[part])}）—— "
-                    f"这一条在两种语态下都打不中"
-                )
+                entry = (str(script), part)
+                if entry in DEAD_LABEL_LEDGER:
+                    DEAD_LABEL_HITS.add(entry)
+                else:
+                    problems.append(
+                        f"{part!r} 只挂在移动端从不读的键上（{', '.join(ZH[part])}）—— "
+                        f"这一条在两种语态下都打不中"
+                    )
 
     for vals in groups:
         cjk = [v for v in vals if CJK.search(v)]
@@ -389,6 +475,18 @@ def main(argv: list[str]) -> int:
                 "英文下点不到；`then`/`absent` 位的单语按脚本自己的注释是**刻意**（防语言不对冒充通过）；"
                 "分支条件位最坏，它不超时而是**走错岔路**。逐条分诊才知道哪几处是欠项"
             )
+    # 账本只减不增：本次一条都没命中的行，说明脚本已经改了、或那一面又长回来了。
+    stale = sorted(set(DEAD_LABEL_LEDGER) - DEAD_LABEL_HITS)
+    if stale:
+        failed = True
+        print(f"🔴 死标签账本里有 {len(stale)} 条本次**没有命中**（脚本已改，或那一面又长回来了）—— 删掉这些行：")
+        for script_name, label in stale:
+            print(f"   {script_name}  {label!r}")
+    if DEAD_LABEL_HITS:
+        print(
+            f"📒 死标签账本：本次命中 {len(DEAD_LABEL_HITS)}/{len(DEAD_LABEL_LEDGER)} 条（**只减不增**；"
+            "每一条都写了为什么现在打不中，修法是脚本那一侧换定位）"
+        )
     return 1 if failed else 0
 
 
