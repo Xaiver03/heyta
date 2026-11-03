@@ -74,3 +74,112 @@ describe('移动端的子任务入口（源码级；这里没有组件测试栈�
     }
   });
 });
+/**
+ * 就地新建子任务 + 子任务列表 + 计数（工单 #6）
+ * =============================================
+ *
+ * 上面那一族钉的是"能不能改父"，这一族钉的是"能不能**在这条任务上长出孩子**"。
+ * 每一条都同时给正向锚点与反向形状 —— 只有"没命中"能被判成违规，绿才是证据。
+ *
+ * 🔴 反向断言之前**必须剥注释**：本文件上半部分不剥（`sheet()` 是原文），因为
+ * 那一族的违规形状没有出现在说明文字里。这一族不一样 —— 要防的形状（"自己按父
+ * id 过滤列表"、"create 之后再改父"）恰好都写在 `TaskDetailSheet.tsx` 的**注释**
+ * 里，那些注释正是在解释"为什么不走那条路"。不剥的话，"讲过这个坑"会被读成
+ * "还踩着这个坑"。
+ */
+const stripComments = (src: string): string =>
+  src.replace(/\/\*[\S\s]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+const body = (): string => stripComments(sheet());
+
+describe('详情面板的子任务区（就地新建 / 列表 / 计数）', () => {
+  it('🔴 建子任务走 `createSubtask`（**一条** op），不是 create 之后再改父', () => {
+    const src = body();
+    expect(src).toMatch(/\.createSubtask\(/);
+    // 反向：面板里没有"先建一条顶级任务"的调用点。拆两条 op 的后果是**中间态
+    // 可被看见**，而改父被拒时那条顶级任务会永久留下（op-log 没有撤回）——
+    // 用户看到"失败了"，库里却多了一条挂不上的脏数据。
+    expect(src, '出现 .create( ⇒ 子任务被拆成了两条 op').not.toMatch(/\.create\(/);
+  });
+
+  it('🔴 列表取数走共享的 `buildTaskTree`，不在界面里自己过滤', () => {
+    const src = body();
+    expect(src).toMatch(/buildTaskTree\(tasks\)\.nodeById\.get\(task\.id\)/);
+    // 反向：自己过滤会漏掉稳定排序、打断已有的环、以及"父已删除"的兜底
+    // ⇒ 同一份数据在两台设备上条数与顺序都可能不同，而且不报错。
+    expect(src, '界面里自己按父 id 拼了一份列表').not.toMatch(/parentId === task\.id/);
+  });
+
+  it('🔴 子任务行渲染**共享 `TaskRow`**，本文件不出现第二棵勾选框', () => {
+    const src = body();
+    expect(src).toMatch(/density="compact"/);
+    expect(src, '出现 <Checkbox ⇒ 行骨架被重画了第二份').not.toMatch(/<Checkbox\b/);
+    expect(src).not.toMatch(/accessibilityRole="checkbox"/);
+  });
+
+  it('「什么算完成」问领域层，不在界面里比完成时刻', () => {
+    const src = body();
+    expect(src).toMatch(/isCompleted\(node\.task\)/);
+    expect(src, '界面里自己判完成时刻 ⇒ 这是第三份"什么算完成"').not.toMatch(
+      /node\.task\.completedAt\s*===\s*undefined/,
+    );
+  });
+
+  it('🔴 空态之外**必须有真的入口**（那句文案指的是下面那枚按钮）', () => {
+    const src = body();
+    expect(src).toMatch(/task-detail-add-subtask/);
+    // 入口若被关进"有子任务才渲染"那一支，0 条子任务时就只剩一句"点下面的按钮"
+    // 而下面什么也没有 —— 这一条测的就是那两句的**先后与同现**。
+    // 入口**由谁决定**才是这条判据的内容：它必须落在 `newSubtaskOpen` 那枚三元的
+    // 收起支里（收起 = 画按钮），而不是由"已经有子任务"决定。
+    // 被关进非空分支的后果是：0 条子任务时界面上只剩一句"点下面的按钮"，
+    // 而下面什么也没有 —— 那句空态文案自己把自己否定了。
+    const addBranch =
+      /newSubtaskOpen \?[\S\s]{0,1400}?task-detail-add-subtask/.exec(src)?.[0] ?? '';
+    expect(addBranch, '添加入口不在 newSubtaskOpen 三元的收起支里').not.toBe('');
+    expect(addBranch, '入口由"已经有子任务"决定 ⇒ 空态下没有入口').not.toMatch(
+      /subtaskNodes\.length > 0/,
+    );
+  });
+
+  it('`createSubtask` 的拒绝被接住并翻成人话（`run()` 不接错误）', () => {
+    const src = body();
+    const addBlock = /const runAddSubtask[\S\s]*?\n {2}\}, \[/.exec(src)?.[0] ?? '';
+    expect(addBlock, '没找到 runAddSubtask 这一块').not.toBe('');
+    expect(addBlock).toMatch(/\.catch\(/);
+    expect(addBlock).toMatch(/subtaskRejectionMessageKey\(rejectionReasonOf\(cause\)\)/);
+  });
+
+  it('宿主把「打开子任务」接上了（否则行看得见却点不动）', () => {
+    const src = readFileSync(join(REPO, SCREEN), 'utf8');
+    expect(src, '<TaskDetailSheet> 没传 onOpenSubtask').toMatch(
+      /<TaskDetailSheet[\s\S]*?onOpenSubtask=\{/,
+    );
+  });
+
+  it('🔴 空态文案里「」点名的那个按钮，真的就叫那个名字', () => {
+    // 「点下面的『新建标签』」而按钮写着别的字，是**只有真机才会暴露**的缺陷：
+    // 读屏用户与看界面的人拿到两个不同的指路，而类型检查与样式门禁都不会红。
+    const zh = readFileSync(join(REPO, 'packages/i18n/src/locales/zh-CN.ts'), 'utf8');
+    const value = (key: string): string =>
+      new RegExp(`'${key}':\\s*'([^']*)'`).exec(zh)?.[1] ?? '';
+
+    for (const [emptyKey, buttonKey] of [
+      ['mobile.detail.tags.empty', 'mobile.tags.add'],
+      ['mobile.detail.subtasks.empty', 'mobile.detail.subtasks.add'],
+    ] as const) {
+      const named = /「([^」]+)」/.exec(value(emptyKey))?.[1];
+      expect(named, `${emptyKey} 里没有「…」这句指路`).toBeDefined();
+      expect(value(buttonKey), `${buttonKey} 缺失`).not.toBe('');
+      expect(named, `${emptyKey} 指的名字与按钮文案「${value(buttonKey)}」不同名`).toBe(
+        value(buttonKey),
+      );
+    }
+  });
+
+  it('标签可以就地新建（建完立刻点亮到这条任务上）', () => {
+    const src = body();
+    expect(src).toMatch(/projectActions\s*\n?\s*\.createTag\(/);
+    expect(src).toMatch(/setTags\(task\.id,\s*\[\.\.\.\(task\.tagIds \?\? \[\]\), tagId\]\)/);
+  });
+});

@@ -19,10 +19,54 @@
  * 每一侧一个「保留这一版」、把"为什么点不了"说出来。
  *
  * 本文件只负责：
- *   · **底部弹层外壳**（`Modal` + 遮罩 + 圆角浮层 + 阴影）—— 那是 L3；
- *   · **标题 / 说明 / 关闭**（mobile 的 `IconButton` 与 kit `Text`）；
- *   · **词条**（`labels`）—— 共享层不许 import `@heyta/i18n`；
+ *   · **底部弹层外壳** —— 现在是共享原语 `@heyta/ui` 的 `BottomSheet`（适配层 §4 **T7**）；
+ *   · **说明文字与词条**（`labels`）—— 共享层不许 import `@heyta/i18n`；
  *   · **把点击接到 `resolveConflictNow`**（见下面 `pick` 的注释）。
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * ## 🔴 2026-11 迁移：外壳从自绘「`Modal` + 遮罩 + 居中卡片」换成 `BottomSheet`
+ *
+ * 迁移前这枚面板的名字是 Sheet，几何上是**居中弹窗**（遮罩 `justifyContent:'center'`
+ * + 卡片 `maxHeight:'90%'`，把手 / 分档 / 档位记忆 0 处）—— 那正是
+ * `packages/ui/src/overlay/sheet-detents.ts` 文件头记着的那个实测形状。
+ *
+ * ### 类别判定：`bottom-sheet`（不是 `modal-deferrable`，也不是 `modal-forced-read`）
+ *
+ * 判据逐条走 `dismissal.ts`，**依据是这个面板自己的语义**，不是抄邻居：
+ *
+ * · **它不是意思表示层。** `modal-deferrable` 那一格存在的理由是"误点一下遮罩就把
+ *   表态推掉，而用户会以为它记成了没决定"（隐私单独同意 / 条款再确认）——
+ *   这枚面板**不记录任何表态**：解决动作只在点「保留这一版」时发生。
+ * · **随手关无代价。** 文件头那条纪律说的是这件事：关掉不清冲突状态，
+ *   `status` 仍是 `conflict`，「我的」屏照样提示还剩几处，随时能回来继续。
+ *   `bottom-sheet` 那一格给的是「背景 / 下拉 / × 三条随手出口 + 不响应 Esc」，
+ *   成立条件就是"丢弃无代价" ⇒ 对得上。
+ * · **也不是 `modal-forced-read`。** 那一格三条通道全 `deny`，等于逼用户此刻表态；
+ *   冲突可以以后处理（出口文案 `mobile.conflict.close` 写的就是「稍后再处理」），
+ *   拦着人不让走是反向的。
+ *
+ * ⚠️ **两条随迁移而来的变化**（都是原语的既定行为，不是顺手改的）：
+ *   · 点背景 / 下拉**现在会关**（迁移前遮罩是一个没有 `onPress` 的 `View`，
+ *     那一格是复制隐私面板的形状留下的，不是拍过板的决策 —— 隐私面板**必须**
+ *     禁背景，那是 PIPL 那条；这里没有那条理由）；
+ *   · 压暗从 `color.overlay`（0.5）变成 `material.scrim`（0.32）：底部面板的
+ *     全部意义是底下还看得见上下文，这一格由原语统一给（`BottomSheet.tsx:355-368`）。
+ *
+ * ### 档位：单档 `large`，把手暂时不响应
+ *
+ * `DETENT_FRACTION.large = 0.9` 与迁移前的 `maxHeight:'90%'` **逐字同一格**，
+ * 而这里的内容是变长清单（N 处冲突 × 两侧并排摘要），矮一档就只能滚动看全，
+ * 所以取 `large`。多档要 `labels.expand` / `labels.collapse` 两枚新词条
+ * （`packages/i18n` 不在本次可改范围），未入库前**不开把手**：
+ * `allowed.length === 1` 时原语的 `draggable` 为假，把手画出来但不接手势
+ * （否则变成"拖了没反应"），那两格文案也永不被人读到。
+ *
+ * 🔴 迁移后**刻意不变**的三条：
+ *   · 出口只有一个 `onClose`：背景 / × 都走 `onDismiss={onClose}`，
+ *     返回键走同一条（`onBack` 不给 ⇒ 原语按定义与 `onDismiss` 同义，
+ *     等价于迁移前的 `onRequestClose={onClose}`）；
+ *   · `summaryLines={3}` 与共享版按钮这两处**有意的端差异**原样保留；
+ *   · 「点了之后不 await 就报已解决」的纪律不变（见 `pick`）。
  *
  * ⚠️ 两处**有意的端差异**（与 web 不同，都写在共享层的文件头里）：
  *   · `summaryLines={3}` —— 手机横向只有 411dp 左右，一处长备注会把界面撑成竖线；
@@ -45,13 +89,15 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import type { ConflictInfo } from '@heyta/sync-client';
 import { compareConflictFreshness, summarizeConflictPayload } from '@heyta/sync-client';
 import {
+  BottomSheet,
   ConflictResolutionView,
   conflictLookupCode,
   conflictReasonLabelOf,
@@ -60,46 +106,32 @@ import {
   type ConflictResolutionLabels,
 } from '@heyta/ui';
 
-import { useTheme, useTokens } from '../theme';
+import { useTokens } from '../theme';
 import { useMobileSync, resolveConflictNow } from '../sync/store';
 import { formatStamp } from '../lib/date';
-import { IconButton, Text } from '../ui/kit';
+import { Text } from '../ui/kit';
 // 🔴 `Icon` 不在 kit 里 —— 它在登记表 `ui/icons.tsx`。
 // kit 只是**内部**用它，没有把它再导出。
 import { Icon } from '../ui/icons';
 
 /**
- * 弹层外壳的样式：模块级工厂 + `useMemo`（与 `PrivacyConsentSheet` /
- * `AccountClosureScreen` 同一惯用法）。
+ * 面板内**只剩这一块**自定义布局的样式：模块级工厂 + `useMemo`
+ * （与 `PrivacyConsentSheet` / `AccountClosureScreen` 同一惯用法）。
  *
  * 🔴 L4 视图（`apps/mobile/src/screens`）的内联样式**只减不增**
- * （`scripts/check-l4-no-style.mjs` 断言 C）。原先这几处是 `style={{…}}`：
- * 对象每次渲染都新建，也进不了 `StyleSheet` 的 ID 引用路径。取值一律经
- * tokens 表，不写裸值（`check:design` / `check:l4` 双盯）。
- * ⚠️ `shadow` 是 `useTheme().native.shadow(...)` 的运行时结果，所以卡片那一处
- * 仍是 `style={[styles.card, shadow ?? undefined]}` —— 数组形态不被断言 C 计数。
+ * （`scripts/check-l4-no-style.mjs` 断言 C）。迁移前的 `scrim` / `card` /
+ * `headRow` / `headText` 四条与那句 `contentContainerStyle={{…}}` 一起没了 ——
+ * 外壳的几何与压暗现在由 `BottomSheet` 与 tokens 决定，宿主不再自己算一份。
+ * ⚠️ 取值一律经 tokens 表，不写裸值（`check:design` / `check:l4` 双盯）。
  */
 function makeStyles(tokens: HeytaNativeTokens) {
   return StyleSheet.create({
-    scrim: {
-      flex: 1,
-      justifyContent: 'center',
-      padding: tokens['screen.gutter'],
-      backgroundColor: tokens['color.overlay'],
-    },
-    card: {
-      maxHeight: '90%',
-      gap: tokens['space.4'],
-      padding: tokens['space.5'],
-      borderRadius: tokens['radius.lg'],
-      backgroundColor: tokens['color.surface-raised'],
-    },
-    headRow: {
+    introRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: tokens['space.2'],
     },
-    headText: { flex: 1, minWidth: 0, gap: tokens['space.1'] },
+    introText: { flex: 1, minWidth: 0 },
   });
 }
 
@@ -113,11 +145,9 @@ export function ConflictSheet({
   const tokens = useTokens();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const { t } = useI18n();
-  // 🔴 `shadow.lg` 在 token 里是 **CSS 字符串**（`0 8px 24px rgb(...)`），
-  // RN 不认，展开它也不是对象。必须经 `native.shadow()` 归一化成 RN 的
-  // shadowColor/shadowOffset/... 一组属性 —— 与 kit 里 `Fab` 的用法一致。
-  const { native } = useTheme();
-  const shadow = native.shadow('shadow.lg');
+  // 🔴 安全区由宿主递进原语：共享层没有 `react-native-safe-area-context`
+  //（它只在移动端），而 `BottomSheet` 要靠这个数把最后一行抬出手势条。
+  const insets = useSafeAreaInsets();
   const { status, busy } = useMobileSync();
   const [pending, setPending] = useState<string | null>(null);
 
@@ -176,67 +206,62 @@ export function ConflictSheet({
   };
 
   return (
-    <Modal
+    <BottomSheet
       visible={open}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      accessibilityViewIsModal
+      overlay="bottom-sheet"
+      // 英文单复数：只有 1 处时走单数兄弟词条（词条表没有 ICU）。
+      // 只在 JSX 子节点里分支，不放进属性 —— 属性里门禁只认
+      // "字面量紧跟 `t(`"这一种形状。
+      // 🔴 单数那一支**也要传 `{count}`**：`tests/plural-keys.spec.ts` 钉住了
+      // 中文的单数兄弟词条与复数版**刻意逐字相同**（中文本来不分单复数），
+      // 所以那句里就有 `{count}` 这个洞 —— 不传，用户看到"这 {count} 处"。
+      title={
+        conflicts.length === 1
+          ? t('mobile.conflict.titleOne', { count: conflicts.length })
+          : t('mobile.conflict.title', { count: conflicts.length })
+      }
+      // 单档 ⇒ 没有把手可拖，所以**不给** `expand` / `collapse`。
+      // 原来这里拿 `mobile.conflict.close` 占位，是原语把两枚标签定成必填逼出来的
+      // 假文案（无障碍树里会出现两句"稍后再处理"，其中一句的名字在说"展开"）。
+      // 原语已改为可选；将来放开多档时补两枚真词条即可。
+      labels={{
+        close: t('mobile.conflict.close'),
+        // G2：右上角那格现在是**看得见的字**「以后再说」，不是一个匿名 ×。
+        // 这一族的关闭有后果（关掉 = 这批冲突留在这里没处理），
+        // 所以后果要写在可点区域上，而不是让用户先猜符号。
+        // ⚠️ `close` 仍然要给：它是"没有具名文字时"的无障碍名（原语两档都支持）。
+        closeText: t('mobile.conflict.close'),
+      }}
+      // 三条随手关的通道（背景 / × / 返回键）共用这一个出口：
+      // 关掉**不清冲突状态**，`status` 仍是 `conflict`，随时能回来继续。
+      onDismiss={onClose}
+      detents={['large']}
+      bottomInset={insets.bottom}
+      testID="conflict-sheet"
     >
-      <View
-        style={styles.scrim}
-      >
-        <View
-          style={[
-            styles.card,
-            // 阴影只给真正的浮层（AGENTS.md §5），而对话框就是浮层。
-            shadow ?? undefined,
-          ]}
-        >
-          <View style={styles.headRow}>
-            <Icon name="conflict.warning" size="md" color={tokens['color.warning-strong']} />
-            <View style={styles.headText}>
-              <Text variant="section-title">
-                {/* 英文单复数：只有 1 处时走单数兄弟词条（词条表没有 ICU）。
-                    只在 JSX 子节点里分支，不放进属性 —— 属性里门禁只认
-                    "字面量紧跟 `t(`"这一种形状。
-                    🔴 单数那一支**也要传 `{count}`**：`tests/plural-keys.spec.ts` 钉住了
-                    中文的单数兄弟词条与复数版**刻意逐字相同**（中文本来不分单复数），
-                    所以那句里就有 `{count}` 这个洞 —— 不传，用户看到"这 {count} 处"。 */}
-                {conflicts.length === 1
-                  ? t('mobile.conflict.titleOne', { count: conflicts.length })
-                  : t('mobile.conflict.title', { count: conflicts.length })}
-              </Text>
-              <Text variant="caption" tone="muted">
-                {t('mobile.conflict.body')}
-              </Text>
-            </View>
-            <IconButton
-              icon="action.close"
-              label={t('mobile.conflict.close')}
-              onPress={onClose}
-            />
-          </View>
-
-          <ScrollView contentContainerStyle={{ gap: tokens['space.5'] }}>
-            {/* 🔴 共享的那一段（与 web 同一份源码）。
-                宿主不必自己挂 Provider —— 移动端整棵树都在
-                `<ThemeProvider>`（= `HeytaUiProvider`）之内。 */}
-            <ConflictResolutionView
-              conflicts={conflicts}
-              labels={labels}
-              freshnessOf={(conflict) =>
-                compareConflictFreshness(conflict.local, conflict.remote)
-              }
-              summarize={summarizeConflictPayload}
-              summaryLines={3}
-              busy={busy || pending !== null}
-              onResolve={pick}
-              testID="conflict-resolution"
-            />
-          </ScrollView>
-        </View>
+      <View style={styles.introRow}>
+        <Icon name="conflict.warning" size="md" color={tokens['color.warning-strong']} />
+        <Text variant="caption" tone="muted" style={styles.introText}>
+          {t('mobile.conflict.body')}
+        </Text>
       </View>
-    </Modal>
+
+      {/* 🔴 共享的那一段（与 web 同一份源码）。
+          宿主不必自己挂 Provider —— 移动端整棵树都在
+          `<ThemeProvider>`（= `HeytaUiProvider`）之内。
+          滚动由 `BottomSheet` 自己的 body 承担，这里不再套第二层 `ScrollView`。 */}
+      <ConflictResolutionView
+        conflicts={conflicts}
+        labels={labels}
+        freshnessOf={(conflict) =>
+          compareConflictFreshness(conflict.local, conflict.remote)
+        }
+        summarize={summarizeConflictPayload}
+        summaryLines={3}
+        busy={busy || pending !== null}
+        onResolve={pick}
+        testID="conflict-resolution"
+      />
+    </BottomSheet>
   );
 }

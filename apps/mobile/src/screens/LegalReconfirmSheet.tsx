@@ -26,6 +26,27 @@
  * 与隐私面板那句"落盘失败不许静默"同一条纪律：闸门仍然拦着时
  * `reconfirm-ui.ts` 会**保持** `open`，并把结构化的失败原因翻成一句人话摆在这块上。
  * 收起来就等于"点了没反应"。
+ *
+ * ## 🔴 2026-11 浮层迁移的判定：**这枚现在也不能迁**（与隐私面板同一格）
+ *
+ * 类别 = `dismissal.ts` 的 **`modal-deferrable`**（那一格点名的第二枚就是"条款再确认"；
+ * web 同级实现 `apps/web/src/features/legal-recheck/LegalReconfirmSheet.tsx:93`
+ * 已经在吃 `policy="modal-deferrable"`）。逐通道对今天的自绘形状：
+ *   · 背景 `deny` —— 今天那块遮罩没有 `onPress`，点了本来就不关；这一格对
+ *     "要不要补签新条款"是**必须**的：误点遮罩不能把表态记成"没决定"；
+ *   · Esc / 系统返回 `dismiss` —— 今天的 `onRequestClose={deferLegalReconfirm}`，
+ *     语义是**推迟**，不是同意（`tests/legal-recheck-mobile.spec.ts` 钉着
+ *     收起之后 `dataEgressAllowed()` 仍是 `false`）；
+ *   · 出口是**具名动作**：footer 里 `tone="ghost"` 的「稍后再说」，没有 ×。
+ *
+ * 🔴 挡路的是能力，不是判断：RN 侧 `OverlayModalClass` 与 `BottomSheetClass`
+ * 都不含 `'modal-deferrable'`，而三个候选都会改行为 ——
+ * `modal-forced-read` 会把返回键变成 `deny`（离线时等于把应用锁死，
+ * 与本文件"一个不可关的面板"那段纪律正面对撞）；`modal-readonly` 会让背景能关；
+ * `modal-dirty-form` 是假类别（这里没有未保存输入）。
+ * ⇒ 等 `'modal-deferrable'` 进 `OverlayModalClass` 后与隐私面板同一批迁；
+ *   迁移时 footer 那两个按钮的**不等宽**摆法（一主一从）要原样带过去，
+ *   等宽会把它读成"二选一"，而这里没有另一个选择。
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';

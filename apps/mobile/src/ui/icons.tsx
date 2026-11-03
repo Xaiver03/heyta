@@ -19,8 +19,11 @@
 
 import React from 'react';
 import {
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   ArrowUpDown,
+  ArrowUpRight,
   BadgeCheck,
   Bell,
   CalendarDays,
@@ -45,6 +48,8 @@ import {
   Monitor,
   Pause,
   Pencil,
+  Pin,
+  PinOff,
   Play,
   Plus,
   RefreshCw,
@@ -57,6 +62,7 @@ import {
   ShieldCheck,
   Smartphone,
   Square,
+  SquareCheck,
   StickyNote,
   Tag,
   Target,
@@ -95,6 +101,21 @@ const ICONS = {
   'task.reopen': RotateCcw,
   'task.reminder': Bell,
   'task.priority': Flag,
+
+  /**
+   * 行上下文菜单与左滑动作（`docs/plans/row-actions-redesign.md` §3.4 的移动那一列）。
+   *
+   * 🔴 语义名而不是图标名：菜单项与左滑那枚用的是**同一组语义**，
+   * 换字形只改这一处。`task.unabandon` 用 `ArchiveRestore` 而不是 `RotateCcw`，
+   * 因为 `task.reopen` 已经是「取消完成」那一格 —— 同一个字形在两处表示两件事，
+   * 正是本文件开头要避免的那类缺陷（依据 `ADR-0083` §3.1：放弃与完成互不推导）。
+   */
+  'task.open': ArrowUpRight,
+  'task.pin': Pin,
+  'task.unpin': PinOff,
+  'task.abandon': Archive,
+  'task.unabandon': ArchiveRestore,
+  'task.select': SquareCheck,
   /**
    * 清单（PROJECT）。
    *

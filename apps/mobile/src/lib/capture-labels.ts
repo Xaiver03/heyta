@@ -61,7 +61,18 @@ export function captureLabels(t: Translate): CaptureComposerLabels {
       // 🔴 与 web 同一处判定：时刻芯片念归一化后的 `HH:MM`（共享层给串），
       //   掉进下面的优先级兜底会念成「不设置」。
       const timeLabel = captureChipTimeLabel(chip);
-      if (timeLabel !== undefined) return timeLabel;
+      if (timeLabel !== undefined) {
+        // 自带日期的时刻芯片念「今天 15:00」—— 与 web 逐字同规则。
+        // 只念时刻的话，用户看不出认的是哪一天，而"哪一天"是这里唯一致命的错法。
+        const timeDays = captureChipRemainingDays(chip, now);
+        if (chip.dueDate !== undefined && timeDays !== undefined) {
+          return t('mobile.capture.value.dayTime', {
+            day: remainingText(timeDays, t),
+            time: timeLabel,
+          });
+        }
+        return timeLabel;
+      }
       const days = captureChipRemainingDays(chip, now);
       if (chip.dueDate !== undefined && days !== undefined) {
         return t('mobile.capture.valueWithRemaining', {

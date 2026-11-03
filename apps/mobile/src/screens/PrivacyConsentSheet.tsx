@@ -48,6 +48,37 @@
  *   **不用** `canOpenURL()` 预检（iOS 13+ 没在 Info.plist 登记 scheme 时它恒为
  *   false，会把「能不能打开」变成一台设备的 plist 决定的假红），
  *   打开失败再如实说出来。
+ *
+ * ## 🔴 2026-11 浮层迁移的判定：**这枚现在不能迁到共享原语**（结论，不是没做）
+ *
+ * 类别查表的结果是 `dismissal.ts` 的 **`modal-deferrable`** —— 那一格的注释里
+ * 点名的就是本面板（「意思表示层（隐私单独同意、条款再确认）」），
+ * 而 web 的同级实现 `apps/web/src/features/privacy/PrivacyConsentSheet.tsx:122`
+ * 已经在吃 `policy="modal-deferrable"`。三条通道与今天的自绘形状逐字对得上：
+ * 背景 = `deny`（今天那块遮罩是一个没有 `onPress` 的 `View`）、
+ * Esc / 系统返回 = `dismiss`（今天的 `onRequestClose={closePrivacySheet}`）、
+ * 显式出口 = 有，但屏幕上必须是**可见文字**「以后再说」（见上面 r150 那一节，
+ * `tests/privacy-consent-gate.spec.ts` 钉着），不是原语那枚 icon-only 的 ×。
+ *
+ * 🔴 为什么不能"先迁了再说"：RN 侧两枚原语的类别联合类型里**都没有 `modal-deferrable`
+ * 这一格** —— `OverlayModal.tsx` 的 `OverlayModalClass`（modal-readonly /
+ * modal-dirty-form / modal-forced-read / danger-confirm）与 `BottomSheet.tsx` 的
+ * `BottomSheetClass`（bottom-sheet / drawer / modal-readonly / modal-dirty-form /
+ * modal-forced-read）。逐个试过的替代都是一次行为回归：
+ *   · `modal-forced-read`：三条通道全 `deny` ⇒ Android 返回键**不再**收起面板
+ *     （原语按表把 `onRequestClose` 传成 `undefined`），把"我没空"变成"必须现在表态"
+ *     —— `dismissal.ts` 那一格明确写了为什么**不许**升成 forced-read；
+ *   · `modal-readonly`：背景变 `dismiss` ⇒ 误点一下遮罩就把同意推掉，
+ *     而 `modal-deferrable` 存在的那条理由正是这件事；
+ *   · `modal-dirty-form`：本面板没有任何未保存输入，把类别写成脏表单是**假判据**，
+ *     而 `check:dirty-form-policy` 之后会信它。
+ * ⚠️ 另一处能力缺口（同一族走 BottomSheet 时会撞上）：`BottomSheet.tsx` 里那枚 ×
+ * 走的是 `scrimAction`（`OverlayModal` 走 `policy.escape`），所以任何"背景禁点"的
+ * 类别在 BottomSheet 上都会得到一个**点了没反应的 ×** —— 这本身说明它不是为这一族准备的。
+ *
+ * ⇒ 等 `OverlayModalClass` 加上 `'modal-deferrable'`（几何本来就是居中卡片，
+ * 而那三条通道的计算已经全对）之后，这枚与 `LegalReconfirmSheet.tsx` 一起迁。
+ * 在那之前**保留自绘外壳**：判错类别比不迁更糟。
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
