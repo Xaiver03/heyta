@@ -1,8 +1,8 @@
 {
-  "taskId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
-  "peerTaskId": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
-  "rowTestId": "task-item-task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
-  "peerRowTestId": "task-item-task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+  "taskId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
+  "peerTaskId": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
+  "rowTestId": "task-item-task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
+  "peerRowTestId": "task-item-task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
   "stages": [
     {
       "name": "append_task_checklist",
@@ -10,152 +10,152 @@
         "opCount": 3,
         "ops": [
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926375-1",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793569-1",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "title": "原子工具旅程任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 1
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 1
             },
-            "timestamp": 1793728926375,
+            "timestamp": 1793737793569,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926418-2",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793612-2",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+            "entityId": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
             "payload": {
               "title": "原子工具批量任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 2
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 2
             },
-            "timestamp": 1793728926418,
+            "timestamp": 1793737793612,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926527-3",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793719-3",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 3
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 3
             },
-            "timestamp": 1793728926527,
+            "timestamp": 1793737793719,
             "schemaVersion": 1
           }
         ],
         "task": {
-          "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+          "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
           "title": "原子工具旅程任务",
           "priority": 0,
-          "createdAt": 1793728926375,
+          "createdAt": 1793737793569,
           "note": "已有备注",
-          "updatedAt": 1793728926527,
-          "_lastOpId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926527-3",
+          "updatedAt": 1793737793719,
+          "_lastOpId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793719-3",
           "_lastClock": {
-            "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 3
+            "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 3
           },
-          "_lastClientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7"
+          "_lastClientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4"
         }
       },
       "after": {
         "opCount": 4,
         "ops": [
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926375-1",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793569-1",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "title": "原子工具旅程任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 1
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 1
             },
-            "timestamp": 1793728926375,
+            "timestamp": 1793737793569,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926418-2",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793612-2",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+            "entityId": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
             "payload": {
               "title": "原子工具批量任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 2
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 2
             },
-            "timestamp": 1793728926418,
+            "timestamp": 1793737793612,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926527-3",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793719-3",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 3
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 3
             },
-            "timestamp": 1793728926527,
+            "timestamp": 1793737793719,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926929-4",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794123-4",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注\n\n- [ ] 检查登录流程"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 4
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 4
             },
-            "timestamp": 1793728926929,
+            "timestamp": 1793737794123,
             "schemaVersion": 1
           }
         ],
         "task": {
-          "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+          "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
           "title": "原子工具旅程任务",
           "priority": 0,
-          "createdAt": 1793728926375,
+          "createdAt": 1793737793569,
           "note": "已有备注\n\n- [ ] 检查登录流程",
-          "updatedAt": 1793728926929,
-          "_lastOpId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926929-4",
+          "updatedAt": 1793737794123,
+          "_lastOpId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794123-4",
           "_lastClock": {
-            "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 4
+            "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 4
           },
-          "_lastClientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7"
+          "_lastClientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4"
         }
       },
       "opDelta": 1
@@ -166,197 +166,197 @@
         "opCount": 4,
         "ops": [
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926375-1",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793569-1",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "title": "原子工具旅程任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 1
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 1
             },
-            "timestamp": 1793728926375,
+            "timestamp": 1793737793569,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926418-2",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793612-2",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+            "entityId": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
             "payload": {
               "title": "原子工具批量任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 2
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 2
             },
-            "timestamp": 1793728926418,
+            "timestamp": 1793737793612,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926527-3",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793719-3",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 3
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 3
             },
-            "timestamp": 1793728926527,
+            "timestamp": 1793737793719,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926929-4",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794123-4",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注\n\n- [ ] 检查登录流程"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 4
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 4
             },
-            "timestamp": 1793728926929,
+            "timestamp": 1793737794123,
             "schemaVersion": 1
           }
         ],
         "task": {
-          "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+          "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
           "title": "原子工具旅程任务",
           "priority": 0,
-          "createdAt": 1793728926375,
+          "createdAt": 1793737793569,
           "note": "已有备注\n\n- [ ] 检查登录流程",
-          "updatedAt": 1793728926929,
-          "_lastOpId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926929-4",
+          "updatedAt": 1793737794123,
+          "_lastOpId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794123-4",
           "_lastClock": {
-            "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 4
+            "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 4
           },
-          "_lastClientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7"
+          "_lastClientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4"
         }
       },
       "after": {
         "opCount": 5,
         "ops": [
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926375-1",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793569-1",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "title": "原子工具旅程任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 1
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 1
             },
-            "timestamp": 1793728926375,
+            "timestamp": 1793737793569,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926418-2",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793612-2",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+            "entityId": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
             "payload": {
               "title": "原子工具批量任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 2
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 2
             },
-            "timestamp": 1793728926418,
+            "timestamp": 1793737793612,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926527-3",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793719-3",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 3
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 3
             },
-            "timestamp": 1793728926527,
+            "timestamp": 1793737793719,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926929-4",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794123-4",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注\n\n- [ ] 检查登录流程"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 4
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 4
             },
-            "timestamp": 1793728926929,
+            "timestamp": 1793737794123,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927164-5",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794373-5",
             "opType": "BATCH",
             "actionType": "BATCH_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "entityIds": [
-              "task-2f866451-6522-44a4-8b51-b41b12e4e24f"
+              "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d"
             ],
             "payload": {
               "heytaTaskPriorityBatch": 1,
               "items": [
                 {
-                  "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+                  "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
                   "priority": 3
                 },
                 {
-                  "id": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+                  "id": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
                   "priority": 1
                 }
               ]
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 5
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 5
             },
-            "timestamp": 1793728927164,
+            "timestamp": 1793737794373,
             "schemaVersion": 1
           }
         ],
         "task": {
-          "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+          "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
           "title": "原子工具旅程任务",
           "priority": 3,
-          "createdAt": 1793728926375,
+          "createdAt": 1793737793569,
           "note": "已有备注\n\n- [ ] 检查登录流程",
-          "updatedAt": 1793728927164,
-          "_lastOpId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927164-5",
+          "updatedAt": 1793737794373,
+          "_lastOpId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794373-5",
           "_lastClock": {
-            "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 5
+            "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 5
           },
-          "_lastClientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7"
+          "_lastClientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4"
         }
       },
       "opDelta": 1
@@ -367,242 +367,242 @@
         "opCount": 5,
         "ops": [
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926375-1",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793569-1",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "title": "原子工具旅程任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 1
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 1
             },
-            "timestamp": 1793728926375,
+            "timestamp": 1793737793569,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926418-2",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793612-2",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+            "entityId": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
             "payload": {
               "title": "原子工具批量任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 2
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 2
             },
-            "timestamp": 1793728926418,
+            "timestamp": 1793737793612,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926527-3",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793719-3",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 3
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 3
             },
-            "timestamp": 1793728926527,
+            "timestamp": 1793737793719,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926929-4",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794123-4",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注\n\n- [ ] 检查登录流程"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 4
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 4
             },
-            "timestamp": 1793728926929,
+            "timestamp": 1793737794123,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927164-5",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794373-5",
             "opType": "BATCH",
             "actionType": "BATCH_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "entityIds": [
-              "task-2f866451-6522-44a4-8b51-b41b12e4e24f"
+              "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d"
             ],
             "payload": {
               "heytaTaskPriorityBatch": 1,
               "items": [
                 {
-                  "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+                  "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
                   "priority": 3
                 },
                 {
-                  "id": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+                  "id": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
                   "priority": 1
                 }
               ]
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 5
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 5
             },
-            "timestamp": 1793728927164,
+            "timestamp": 1793737794373,
             "schemaVersion": 1
           }
         ],
         "task": {
-          "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+          "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
           "title": "原子工具旅程任务",
           "priority": 3,
-          "createdAt": 1793728926375,
+          "createdAt": 1793737793569,
           "note": "已有备注\n\n- [ ] 检查登录流程",
-          "updatedAt": 1793728927164,
-          "_lastOpId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927164-5",
+          "updatedAt": 1793737794373,
+          "_lastOpId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794373-5",
           "_lastClock": {
-            "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 5
+            "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 5
           },
-          "_lastClientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7"
+          "_lastClientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4"
         }
       },
       "after": {
         "opCount": 6,
         "ops": [
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926375-1",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793569-1",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "title": "原子工具旅程任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 1
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 1
             },
-            "timestamp": 1793728926375,
+            "timestamp": 1793737793569,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926418-2",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793612-2",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+            "entityId": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
             "payload": {
               "title": "原子工具批量任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 2
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 2
             },
-            "timestamp": 1793728926418,
+            "timestamp": 1793737793612,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926527-3",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793719-3",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 3
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 3
             },
-            "timestamp": 1793728926527,
+            "timestamp": 1793737793719,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926929-4",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794123-4",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注\n\n- [ ] 检查登录流程"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 4
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 4
             },
-            "timestamp": 1793728926929,
+            "timestamp": 1793737794123,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927164-5",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794373-5",
             "opType": "BATCH",
             "actionType": "BATCH_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "entityIds": [
-              "task-2f866451-6522-44a4-8b51-b41b12e4e24f"
+              "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d"
             ],
             "payload": {
               "heytaTaskPriorityBatch": 1,
               "items": [
                 {
-                  "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+                  "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
                   "priority": 3
                 },
                 {
-                  "id": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+                  "id": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
                   "priority": 1
                 }
               ]
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 5
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 5
             },
-            "timestamp": 1793728927164,
+            "timestamp": 1793737794373,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927345-6",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794555-6",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注\n\n- [ ] 检查登录流程\n预计耗时：480 分钟"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 6
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 6
             },
-            "timestamp": 1793728927345,
+            "timestamp": 1793737794555,
             "schemaVersion": 1
           }
         ],
         "task": {
-          "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+          "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
           "title": "原子工具旅程任务",
           "priority": 3,
-          "createdAt": 1793728926375,
+          "createdAt": 1793737793569,
           "note": "已有备注\n\n- [ ] 检查登录流程\n预计耗时：480 分钟",
-          "updatedAt": 1793728927345,
-          "_lastOpId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927345-6",
+          "updatedAt": 1793737794555,
+          "_lastOpId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794555-6",
           "_lastClock": {
-            "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 6
+            "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 6
           },
-          "_lastClientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7"
+          "_lastClientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4"
         }
       },
       "opDelta": 1
@@ -613,258 +613,258 @@
         "opCount": 6,
         "ops": [
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926375-1",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793569-1",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "title": "原子工具旅程任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 1
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 1
             },
-            "timestamp": 1793728926375,
+            "timestamp": 1793737793569,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926418-2",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793612-2",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+            "entityId": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
             "payload": {
               "title": "原子工具批量任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 2
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 2
             },
-            "timestamp": 1793728926418,
+            "timestamp": 1793737793612,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926527-3",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793719-3",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 3
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 3
             },
-            "timestamp": 1793728926527,
+            "timestamp": 1793737793719,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926929-4",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794123-4",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注\n\n- [ ] 检查登录流程"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 4
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 4
             },
-            "timestamp": 1793728926929,
+            "timestamp": 1793737794123,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927164-5",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794373-5",
             "opType": "BATCH",
             "actionType": "BATCH_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "entityIds": [
-              "task-2f866451-6522-44a4-8b51-b41b12e4e24f"
+              "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d"
             ],
             "payload": {
               "heytaTaskPriorityBatch": 1,
               "items": [
                 {
-                  "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+                  "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
                   "priority": 3
                 },
                 {
-                  "id": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+                  "id": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
                   "priority": 1
                 }
               ]
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 5
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 5
             },
-            "timestamp": 1793728927164,
+            "timestamp": 1793737794373,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927345-6",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794555-6",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注\n\n- [ ] 检查登录流程\n预计耗时：480 分钟"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 6
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 6
             },
-            "timestamp": 1793728927345,
+            "timestamp": 1793737794555,
             "schemaVersion": 1
           }
         ],
         "task": {
-          "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+          "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
           "title": "原子工具旅程任务",
           "priority": 3,
-          "createdAt": 1793728926375,
+          "createdAt": 1793737793569,
           "note": "已有备注\n\n- [ ] 检查登录流程\n预计耗时：480 分钟",
-          "updatedAt": 1793728927345,
-          "_lastOpId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927345-6",
+          "updatedAt": 1793737794555,
+          "_lastOpId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794555-6",
           "_lastClock": {
-            "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 6
+            "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 6
           },
-          "_lastClientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7"
+          "_lastClientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4"
         }
       },
       "after": {
         "opCount": 6,
         "ops": [
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926375-1",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793569-1",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "title": "原子工具旅程任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 1
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 1
             },
-            "timestamp": 1793728926375,
+            "timestamp": 1793737793569,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926418-2",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793612-2",
             "opType": "CRT",
             "actionType": "CRT_TASK",
             "entityType": "TASK",
-            "entityId": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+            "entityId": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
             "payload": {
               "title": "原子工具批量任务",
               "priority": 0
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 2
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 2
             },
-            "timestamp": 1793728926418,
+            "timestamp": 1793737793612,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926527-3",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737793719-3",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 3
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 3
             },
-            "timestamp": 1793728926527,
+            "timestamp": 1793737793719,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728926929-4",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794123-4",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注\n\n- [ ] 检查登录流程"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 4
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 4
             },
-            "timestamp": 1793728926929,
+            "timestamp": 1793737794123,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927164-5",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794373-5",
             "opType": "BATCH",
             "actionType": "BATCH_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "entityIds": [
-              "task-2f866451-6522-44a4-8b51-b41b12e4e24f"
+              "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d"
             ],
             "payload": {
               "heytaTaskPriorityBatch": 1,
               "items": [
                 {
-                  "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+                  "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
                   "priority": 3
                 },
                 {
-                  "id": "task-2f866451-6522-44a4-8b51-b41b12e4e24f",
+                  "id": "task-3fcea4f1-4eda-4fe4-8364-79766a62df7d",
                   "priority": 1
                 }
               ]
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 5
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 5
             },
-            "timestamp": 1793728927164,
+            "timestamp": 1793737794373,
             "schemaVersion": 1
           },
           {
-            "id": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927345-6",
+            "id": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794555-6",
             "opType": "UPD",
             "actionType": "UPD_TASK",
             "entityType": "TASK",
-            "entityId": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+            "entityId": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
             "payload": {
               "note": "已有备注\n\n- [ ] 检查登录流程\n预计耗时：480 分钟"
             },
-            "clientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7",
+            "clientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4",
             "vectorClock": {
-              "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 6
+              "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 6
             },
-            "timestamp": 1793728927345,
+            "timestamp": 1793737794555,
             "schemaVersion": 1
           }
         ],
         "task": {
-          "id": "task-8c540209-a4aa-4187-9fdc-2dc02f2c94bc",
+          "id": "task-d7114d6a-967a-4001-ae5b-1d350fe01ab0",
           "title": "原子工具旅程任务",
           "priority": 3,
-          "createdAt": 1793728926375,
+          "createdAt": 1793737793569,
           "note": "已有备注\n\n- [ ] 检查登录流程\n预计耗时：480 分钟",
-          "updatedAt": 1793728927345,
-          "_lastOpId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7-1793728927345-6",
+          "updatedAt": 1793737794555,
+          "_lastOpId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4-1793737794555-6",
           "_lastClock": {
-            "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7": 6
+            "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4": 6
           },
-          "_lastClientId": "ce1ceaa7-1fe2-446e-8124-4f6e809e36c7"
+          "_lastClientId": "bf2bf6cc-4144-4a2b-b497-1cfd6653d6e4"
         }
       },
       "opDelta": 0

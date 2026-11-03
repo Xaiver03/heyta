@@ -85,37 +85,37 @@
     "TAG": [],
     "TASK": [
       {
-        "_lastClientId": "61b2ab21-80d9-4348-812f-803ac5e7235e",
+        "_lastClientId": "2396d1d2-7489-49c2-954d-c6b7a75786f7",
         "_lastClock": {
-          "61b2ab21-80d9-4348-812f-803ac5e7235e": 1
+          "2396d1d2-7489-49c2-954d-c6b7a75786f7": 1
         },
-        "_lastOpId": "61b2ab21-80d9-4348-812f-803ac5e7235e-1793729635558-1",
-        "createdAt": 1793729635558,
-        "id": "task-cbc4d53f-c272-4c62-8b27-ee0567823430",
+        "_lastOpId": "2396d1d2-7489-49c2-954d-c6b7a75786f7-1793738499666-1",
+        "createdAt": 1793738499666,
+        "id": "task-5efedc08-ae7a-4529-b036-b9b79b3f3647",
         "priority": 0,
         "title": "数据往返验收 dark",
-        "updatedAt": 1793729635558
+        "updatedAt": 1793738499666
       }
     ]
   },
-  "exportedAt": "2026-11-03T18:13:56.261Z",
+  "exportedAt": "2026-11-03T20:41:40.350Z",
   "formatVersion": 1,
   "opLog": [
     {
       "actionType": "CRT_TASK",
-      "clientId": "61b2ab21-80d9-4348-812f-803ac5e7235e",
-      "entityId": "task-cbc4d53f-c272-4c62-8b27-ee0567823430",
+      "clientId": "2396d1d2-7489-49c2-954d-c6b7a75786f7",
+      "entityId": "task-5efedc08-ae7a-4529-b036-b9b79b3f3647",
       "entityType": "TASK",
-      "id": "61b2ab21-80d9-4348-812f-803ac5e7235e-1793729635558-1",
+      "id": "2396d1d2-7489-49c2-954d-c6b7a75786f7-1793738499666-1",
       "opType": "CRT",
       "payload": {
         "priority": 0,
         "title": "数据往返验收 dark"
       },
       "schemaVersion": 1,
-      "timestamp": 1793729635558,
+      "timestamp": 1793738499666,
       "vectorClock": {
-        "61b2ab21-80d9-4348-812f-803ac5e7235e": 1
+        "2396d1d2-7489-49c2-954d-c6b7a75786f7": 1
       }
     }
   ],
