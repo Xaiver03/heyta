@@ -63,9 +63,62 @@ const FIXTURE_GLOBS = [
 
 // 🔴 剥注释必须**保持行数**：豁免标记住在注释里，而它是拿"原文件的那一行"去认的 ——
 // 一旦剥完行号错位，豁免就会飘到别行上去（要么漏豁免、要么豁免错对象）。
-const stripComments = (text) => text
-  .replace(/\/\*[\S\s]*?\*\//gu, (block) => '\n'.repeat((block.match(/\n/gu) || []).length))
-  .replace(/(^|[^:])\/\/[^\n]*/gu, '$1');
+//
+// 🔴 而且必须**认识字符串**（2026-11 修）。原来那版是两条正则：
+//   `.replace(/\/\*[\S\s]*?\*\//gu, …)` 与 `.replace(/(^|[^:])\/\/[^\n]*/gu, '$1')`。
+// 它们把 `/*` 一律当注释开头 —— 而 e2e 的路由通配就长这样：
+//   `page.route(`${server}/**`, async (route) => { … })`
+// `${server}/**` 里那两个字符被读成块注释的起点，于是从那一格起一路吞到**下一个** `*/`。
+// 实测（2026-11-04）：`e2e/tests/inbound-automation.spec.ts` 被吞掉 **9409 字符**，
+// 正好把 `rules: […]` 那层线信封（本尺唯一的锚）连同它一起吃掉 ⇒ 分母变成 0。
+// 🔴 危险的方向是**静默失明**：分母变小、`missing` 变空，而 `ok` 只在分母为 0 时才红 ——
+// 也就是说"少扫一枚 fixture"这件事在这把尺上是无声的（本尺文件头第 30 行那条 B 组判据
+// 恰好只挡住"全都扫不到"这一档）。
+// ⇒ 改成一个**逐字符**的扫描器：字符串（含模板串）整段跳过，只在代码里认注释。
+// 模板串里的 `${…}` 不单独处理 —— 目的只是"不在字符串里找注释"，那已经够了。
+const stripComments = (text) => {
+  let out = '';
+  let i = 0;
+  let quote = null;
+  while (i < text.length) {
+    const c = text[i];
+    const n = text[i + 1];
+    if (quote !== null) {
+      out += c;
+      if (c === '\\') {
+        out += text[i + 1] ?? '';
+        i += 2;
+        continue;
+      }
+      if (c === quote) quote = null;
+      i += 1;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') {
+      quote = c;
+      out += c;
+      i += 1;
+      continue;
+    }
+    if (c === '/' && n === '*') {
+      const close = text.indexOf('*/', i + 2);
+      const stop = close < 0 ? text.length : close + 2;
+      const block = text.slice(i, stop);
+      out += '\n'.repeat((block.match(/\n/gu) || []).length);
+      i = stop;
+      continue;
+    }
+    if (c === '/' && n === '/') {
+      // 行注释：把这一行剩下的删掉，换行留给下一轮（保持行数）。
+      const eol = text.indexOf('\n', i);
+      i = eol < 0 ? text.length : eol;
+      continue;
+    }
+    out += c;
+    i += 1;
+  }
+  return out;
+};
 
 
 /** 从 `valid()` 的函数体里派生"必填键"集合 —— 只认代码，不认散文。 */
