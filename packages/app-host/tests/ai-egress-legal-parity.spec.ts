@@ -40,7 +40,6 @@ import { renderPreferenceHints, type PreferenceSet } from '@heyta/domain';
 
 import {
   buildBreakdownInvocation,
-  buildCaptureInvocation,
   buildDurationInvocation,
   buildPrioritizeInvocation,
   type PrioritizeTaskInput,
@@ -75,10 +74,11 @@ function tableRows(headLiteral: string): { label: string; cell: string }[] {
   const block = DOC.slice(rowsAt, DOC.indexOf('\n        ],', rowsAt));
   const rows = [...block.matchAll(ROW)].map((m) => ({ label: m[1] as string, cell: m[2] as string }));
   // 🔴 阳性对照：分母。这一句坏了，下面所有"零违规"都什么都不是。
-  // 6 行：四个 AI 功能 + 工具选择 + **自动收集（按规则抽取）**。
-  // 最后那一行是 2026-11 由"自动收集"那一批加进条款的（提交 06798bf3a），
-  // 本判据当时停在 5 行 —— 于是它红了两个星期，而红的原因不是条款错、是尺子旧了。
-  expect(rows, `那张表应当有 6 行，实际数出 ${String(rows.length)} 行`).toHaveLength(6);
+  // 5 行：三个 AI 功能（拆解 / 优先级 / 估时）+ 工具选择 + **自动收集（按规则抽取）**。
+  // ⚠️ 2026-11 由 6 行改成 5 行：产品负责人把「一句话捕获」这条模型路径整体删掉了
+  // （解析是收集框自己的功能，不该是一个独立的 AI 功能），条款里那一行也随之删除。
+  // 这条尺子变红时先分辨两件事：**条款少了一行**（真问题）还是**功能被删了**（这一行要跟）。
+  expect(rows, `那张表应当有 5 行，实际数出 ${String(rows.length)} 行`).toHaveLength(5);
   return rows;
 }
 
@@ -154,7 +154,6 @@ const withPrefs = (): PreferenceSet => ({
   },
   // 🔴 四个功能都要能**真的**产出一条偏好，否则 `max()` 里根本没有 `preferences`，
   // 上面那条"全部字段 == 代码最大集合"就会因为夹具不全而红 —— 那是夹具的 bug，
-  // 不是判据的。capture 只吃 title-style，所以这一格不能省。
   titleStyle: {
     id: 'title-style',
     value: { cjkShare: 1, medianTitleLength: 12, emojiShare: 0 },
@@ -172,23 +171,13 @@ const withPrefs = (): PreferenceSet => ({
   withheld: [],
 });
 
-/** 四个功能：条款里的行名（中英）↔ 代码里最小/最大的字段集合。 */
+/** 三个功能：条款里的行名（中英）↔ 代码里最小/最大的字段集合。 */
 const CHAINS: readonly {
   readonly zhLabel: string;
   readonly enLabel: string;
   readonly min: () => readonly string[];
   readonly max: () => readonly string[];
 }[] = [
-  {
-    zhLabel: '一句话捕获',
-    enLabel: 'One-line capture',
-    min: () => buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: NOW }).fields,
-    max: () =>
-      buildCaptureInvocation(
-        { locale: 'zh-CN', text: '买牛奶', now: NOW },
-        renderPreferenceHints(withPrefs(), 'capture'),
-      ).fields,
-  },
   {
     zhLabel: '拆解任务',
     enLabel: 'Task breakdown',
@@ -302,7 +291,6 @@ describe('🔴🔴 条款第三节的字段表 == 代码实际披露的 fields',
 
   it('🔴 阳性对照：那张表的行名与分母都不许悄悄换', () => {
     expect(zhRows.map((r) => r.label)).toEqual([
-      '一句话捕获',
       '拆解任务',
       '优先级建议',
       '估时',
@@ -310,7 +298,6 @@ describe('🔴🔴 条款第三节的字段表 == 代码实际披露的 fields',
       '自动收集（只在你为某条规则打开"由我们当场抽取"时）',
     ]);
     expect(enRows.map((r) => r.label)).toEqual([
-      'One-line capture',
       'Task breakdown',
       'Prioritisation',
       'Duration estimate',

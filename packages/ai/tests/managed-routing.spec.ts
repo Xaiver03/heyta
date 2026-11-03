@@ -41,7 +41,7 @@ const owned = (): AiRoutingConfig => ({
   endpoints: [
     { id: 'mine', label: '我自己的', endpoint: 'https://api.example.com/v1', model: 'm' },
   ],
-  routes: { capture: [{ endpointId: 'mine' }] },
+  routes: { prioritize: [{ endpointId: 'mine' }] },
 });
 
 describe('withManagedEndpoint', () => {
@@ -62,7 +62,7 @@ describe('withManagedEndpoint', () => {
     const endpoint = out.endpoints.find((entry) => entry.id === MANAGED_ENDPOINT_ID);
     expect(endpoint?.endpoint).toBe(`https://${SELF_HOST}`);
 
-    const { candidates } = resolveRoute(out, 'capture', { now: 0 });
+    const { candidates } = resolveRoute(out, 'prioritize', { now: 0 });
     expect(candidates).toHaveLength(1);
     expect(candidates[0]?.destination).toBe('heyta-cloud');
   });
@@ -83,7 +83,7 @@ describe('withManagedEndpoint', () => {
     const out = withManagedEndpoint({ ...owned(), mode: 'managed' }, `https://${SELF_HOST}`);
 
     // 路由表整份换成"每个功能 → 托管端点"
-    expect(out.routes.capture).toEqual([{ endpointId: MANAGED_ENDPOINT_ID }]);
+    expect(out.routes.prioritize).toEqual([{ endpointId: MANAGED_ENDPOINT_ID }]);
 
     // 🔴 但用户自己那条端点的**配置要留着** —— 路由表已经不指向它了，
     // 它是惰性的；删掉等于"切一次托管档就把我的配置抹了"，而那不可逆。
@@ -91,7 +91,7 @@ describe('withManagedEndpoint', () => {
     expect(out.endpoints.map((e) => e.id)).toContain('mine');
 
     // 惰性证据：解析出来只有托管那一条候选
-    const { candidates } = resolveRoute(out, 'capture', { now: 0 });
+    const { candidates } = resolveRoute(out, 'prioritize', { now: 0 });
     expect(candidates.map((c) => c.endpointConfig.id)).toEqual([MANAGED_ENDPOINT_ID]);
   });
 
@@ -114,7 +114,7 @@ describe('withManagedEndpoint', () => {
     const out = withManagedEndpoint(managed(), `https://${SELF_HOST}`);
 
     for (const feature of [
-      'capture',
+      'prioritize',
       'breakdown',
       'prioritize',
       'duration-estimate',

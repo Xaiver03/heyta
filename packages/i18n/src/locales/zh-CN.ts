@@ -2219,7 +2219,6 @@ export const zhCN = {
   'web.ai.source.remote': '来自云端',
 
   // 没配端点时的整句（每个功能名字不同，所以按功能各一条，不做拼接）。
-  'web.ai.noTarget.capture': '还没有给「一句话捕获」配置端点。去「设置」里添加端点并指定路由。',
   'web.ai.noTarget.breakdown': '还没有给「拆解任务」配置端点。去「设置」里添加端点并指定路由。',
   'web.ai.noTarget.duration': '还没有给「耗时估计」配置端点。去「设置」里添加端点并指定路由。',
   'web.ai.noTarget.prioritize': '还没有给「优先级排序」配置端点。去「设置」里添加端点并指定路由。',
@@ -2227,14 +2226,12 @@ export const zhCN = {
   'web.ai.noTarget.inboundAutomation': '还没有给「自动收集」配置端点。去「设置」里添加端点并指定路由。',
 
   // ── Web · AI · 功能名 / 能力名 ────────────────────────────
-  'web.ai.feature.capture': '一句话捕获',
   'web.ai.feature.breakdown': '拆解任务',
   'web.ai.feature.prioritize': '优先级建议',
   'web.ai.feature.duration': '预估耗时',
   'web.ai.feature.toolCalling': 'AI 工具调用',
   'web.ai.feature.inboundAutomation': '自动收集',
   // 能力勾选框旁的"哪些功能需要它"——原文是另一套更短的用法名。
-  'web.ai.needs.capture': '快速捕获',
   'web.ai.needs.breakdown': '拆解任务',
   'web.ai.needs.prioritize': '排序建议',
   'web.ai.needs.duration': '耗时估计',
@@ -2333,30 +2330,9 @@ export const zhCN = {
   'web.ai.breakdown.manual': '手动写一份空清单',
 
   // ── Web · AI · 捕获面板 ───────────────────────────────────
-  'web.ai.capture.button': 'AI 捕获',
-  'web.ai.capture.runAria': '用 AI 解析这句话',
-  'web.ai.capture.applied': '已填入候选字段',
-  'web.ai.capture.disclosureAria': 'AI 捕获 —— 发送前确认',
-  'web.ai.capture.textPreviewLead': '将解析：',
-  'web.ai.capture.proposalAria': 'AI 捕获结果',
-  'web.ai.capture.proposalHead': '捕获结果（可以改）',
-  'web.ai.capture.droppedLead': '模型给的',
-  'web.ai.capture.droppedTail': '没法用，已经留空 —— 需要的话自己填。',
   'web.ai.capture.field.title': '标题',
   'web.ai.capture.field.titleAria': '任务标题',
-  'web.ai.capture.field.dueDate': '截止日期',
-  'web.ai.capture.field.dueTime': '截止时间',
   'web.ai.capture.field.priority': '优先级',
-  'web.ai.capture.priority.none': '不设置',
-  'web.ai.capture.priority.low': '低',
-  'web.ai.capture.priority.medium': '中',
-  'web.ai.capture.priority.high': '高',
-  'web.ai.capture.noteLead': '确认后会按上面的字段写入。截止时间是',
-  'web.ai.capture.noteStrong': '模型的推算',
-  'web.ai.capture.noteTail': '，请核对后再填。',
-  'web.ai.capture.apply': '填入任务',
-  'web.ai.capture.failedAria': 'AI 捕获失败',
-  'web.ai.capture.failedHead': '没能捕获',
 
   // ── Web · AI · 估时面板 ───────────────────────────────────
   'web.ai.duration.button': 'AI 估时',
@@ -2816,14 +2792,11 @@ export const zhCN = {
   // 估时说「估不出耗时」—— 同一个 reason 在两个功能里对用户是两件事。
   'web.ai.failure.breakdown.emptyTitle': '任务没有标题，没什么可拆的。',
   'web.ai.failure.breakdown.unparseable': '模型返回的内容里没有能识别的子项清单。可以再试一次，或者手动写。',
-  'web.ai.failure.capture.emptyText': '还没有输入内容。',
-  'web.ai.failure.capture.unparseable': '模型返回的内容没法读成任务字段。可以再试一次，或者手动填。',
   'web.ai.failure.duration.emptyTitle': '任务没有标题，估不出耗时。',
   'web.ai.failure.duration.unparseable': '模型返回的内容里没有能识别的分钟数（比如「约两小时」这种写法）。可以再试一次，或者自己填一个。',
   'web.ai.failure.prioritize.emptyTasks': '没有可排序的任务。',
   'web.ai.failure.prioritize.unparseable': '模型返回的内容里没有能识别的优先级建议。可以再试一次，或者手动调整。',
   // 缺少输入 / 太长这类**本地就能判定**的拒绝 —— 不消耗网络调用。
-  'web.ai.failure.capture.textTooLong': '这句话太长了（{length} 个字，上限 {max}）。一句话捕获只处理短句。',
   // 路由层没给出结果（未开启 / 没路由 / 未授权 / 网络失败……）。
   // ⚠️ 这条**只是主文案**：此时 `outcome.message` 里可能带着端点返回的原文，
   // 壳会把它降级成「技术详情」（见 `web.ai.failure.details`）。
@@ -2923,6 +2896,7 @@ export const zhCN = {
   'web.capture.priority.medium': '中优先级',
   'web.capture.priority.low': '低优先级',
   'web.capture.priority.none': '无优先级',
+  'web.tasks.detail.unset': '未设置',
   'web.capture.rejected': '已忽略（当作标题文字）',
   'web.capture.restoreAria': '恢复识别：{raw}',
   'web.capture.ignoreAria': '忽略识别：{raw}',
@@ -4386,7 +4360,7 @@ export const zhCN = {
   'site.features.item.sync.selfhost': '自建服务器：一条命令在自己机器上跑起来，数据只落在你手里',
   'site.features.item.ai.byok': 'AI 用**你自己的**推理端点（本地 Ollama / LM Studio 或任何 OpenAI 兼容地址）',
   'site.features.item.ai.gate': 'AI 默认关闭；开启后逐功能授权，你允许了什么才发什么',
-  'site.features.item.ai.features': '四个功能：一句话捕获、任务拆解、象限与优先级建议、时长估算',
+  'site.features.item.ai.features': '三个功能：任务拆解、象限与优先级建议、时长估算',
   'site.features.item.api.mcp': '接入 AI 助手（MCP）：让 Claude 这类助手直接读任务、建任务、完成任务，共 6 个动作',
   'site.features.item.api.local': '本机接口：默认关闭；开启后也只接受你这台电脑的连接，每个工具单独授权',
   'site.features.note': '以上是**当前版本**已经上线的功能。最新进展与下一步计划见「更新动态」。',
@@ -5853,14 +5827,9 @@ export const zhCN = {
   'mobile.ai.toolbox.entry': 'AI 工具箱',
   'mobile.ai.toolbox.entry.hint': '捕获 · 拆解 · 排序 · 耗时四枚 AI 快捷面板',
   'mobile.ai.toolbox.title': 'AI 工具箱',
-  'mobile.ai.toolbox.tab.capture': '捕获',
   'mobile.ai.toolbox.tab.breakdown': '拆解',
   'mobile.ai.toolbox.tab.prioritize': '排序',
   'mobile.ai.toolbox.tab.duration': '耗时',
-  'mobile.ai.toolbox.capture.title': 'AI 一句话捕获',
-  'mobile.ai.toolbox.capture.hint': '写下一句话，AI 拆成标题 / 日期 / 优先级；你点确认才写入。',
-  'mobile.ai.toolbox.capture.field': '这句话',
-  'mobile.ai.toolbox.capture.placeholder': '例：明天下午 3 点开周会',
   'mobile.ai.toolbox.breakdown.title': 'AI 任务拆解',
   'mobile.ai.toolbox.breakdown.hint': '写下一条任务标题，AI 列出可执行子任务；每条都会新建。',
   'mobile.ai.toolbox.breakdown.field': '任务标题',

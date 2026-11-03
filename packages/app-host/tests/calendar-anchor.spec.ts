@@ -32,7 +32,6 @@ import {
   assistantEgressFields,
   assistantSystemPrompt,
   buildBreakdownInvocation,
-  buildCaptureInvocation,
   buildDurationInvocation,
   buildPrioritizeInvocation,
   calendarAnchor,
@@ -165,18 +164,13 @@ describe('助手的系统提示带着锚点，且锚点是**每次现算**的', 
 //   3. **"有人抄了第二份日期格式化逻辑"** —— 措辞与 `calendarAnchorLine`
 //      逐字不同就红。抄件一定会漂，而"哪条链路里的今天是哪天"这种漂移
 //      没有任何一层会失败。
-describe('🔴🔴 四条出站链路都带锚点，且都披露 today', () => {
+describe('🔴🔴 三条出站链路都带锚点，且都披露 today', () => {
   /** 本地中午：任何时区下本地日历日都是 2026-09-25（周五）。 */
   const N = Date.parse('2026-09-25T12:00:00');
   const TASKS: readonly PrioritizeTaskInput[] = [{ id: 't1', title: '做发布' }];
   const canonical = calendarAnchorLine(calendarAnchor(N));
 
   const chains = [
-    {
-      name: 'capture',
-      prompt: () => buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: N }).user,
-      fields: () => buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: N }).fields,
-    },
     {
       name: 'breakdown',
       prompt: () => buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布', now: N }).user,
@@ -209,8 +203,8 @@ describe('🔴🔴 四条出站链路都带锚点，且都披露 today', () => {
     expect(assistantEgressFields()).toContain('today');
   });
 
-  it('🔴 阳性对照：上面那四条链路确实各有 4 条，分母不许悄悄缩水', () => {
+  it('🔴 阳性对照：上面那三条链路确实各有 4 条，分母不许悄悄缩水', () => {
     // 少一条链路 = 这条判据的作用面自己变小而没人红（§7 元规则二）。
-    expect(chains.map((c) => c.name)).toEqual(['capture', 'breakdown', 'prioritize', 'duration-estimate']);
+    expect(chains.map((c) => c.name)).toEqual(['breakdown', 'prioritize', 'duration-estimate']);
   });
 });

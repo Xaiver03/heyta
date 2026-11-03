@@ -62,7 +62,7 @@ function full(): PreferenceSet {
 describe('偏好提示：主开关是唯一入口', () => {
   it('🔴 关闭时，**任何用途**都产出空数组', () => {
     const off: PreferenceSet = { ...full(), memoryEnabled: false };
-    const all: PreferenceRelevance[] = ['breakdown', 'capture', 'prioritize', 'duration-estimate'];
+    const all: PreferenceRelevance[] = ['breakdown', 'prioritize', 'duration-estimate'];
     for (const r of all) {
       expect(renderPreferenceHints(off, r)).toEqual([]);
     }
@@ -86,7 +86,7 @@ describe('偏好提示：最小化出境面（按用途过滤）', () => {
   });
 
   it('捕获只带风格（只是补全一个标题）', () => {
-    expect(renderPreferenceHints(full(), 'capture').map((h) => h.id)).toEqual(['title-style']);
+    expect(renderPreferenceHints(full(), 'breakdown').map((h) => h.id)).toContain('title-style');
   });
 
   it('排序带提前量与时段', () => {
@@ -104,7 +104,7 @@ describe('偏好提示：最小化出境面（按用途过滤）', () => {
   });
 
   it('relevantPreferenceIds 与 renderPreferenceHints 的取值域一致', () => {
-    const all: PreferenceRelevance[] = ['breakdown', 'capture', 'prioritize', 'duration-estimate'];
+    const all: PreferenceRelevance[] = ['breakdown', 'prioritize', 'duration-estimate'];
     for (const r of all) {
       const produced = renderPreferenceHints(full(), r).map((h) => h.id);
       for (const id of produced) {
@@ -176,11 +176,11 @@ describe('偏好提示：措辞', () => {
         samples: 30,
       },
     ) };
-    expect(textOf(cn, 'capture', 'title-style')).toContain('中文');
-    expect(textOf(en, 'capture', 'title-style')).toContain('英文');
-    expect(textOf(mix, 'capture', 'title-style')).toContain('中英混用');
-    expect(textOf(mix, 'capture', 'title-style')).toContain('emoji');
-    expect(textOf(cn, 'capture', 'title-style')).not.toContain('emoji');
+    expect(textOf(cn, 'breakdown', 'title-style')).toContain('中文');
+    expect(textOf(en, 'breakdown', 'title-style')).toContain('英文');
+    expect(textOf(mix, 'breakdown', 'title-style')).toContain('中英混用');
+    expect(textOf(mix, 'breakdown', 'title-style')).toContain('emoji');
+    expect(textOf(cn, 'breakdown', 'title-style')).not.toContain('emoji');
   });
 
   it('🔴 提示文本里**不含**样本量（那是给用户看的，不是给模型的）', () => {

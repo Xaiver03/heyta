@@ -42,7 +42,6 @@ import {
 } from '@heyta/ai';
 
 import { requestBreakdown } from '../src/ai-breakdown.js';
-import { requestCapture } from '../src/ai-capture.js';
 import { requestDuration } from '../src/ai-duration.js';
 import { requestPrioritize } from '../src/ai-prioritize.js';
 
@@ -59,7 +58,7 @@ const NOW = Date.parse('2026-09-25T10:00:00');
  * `breakdown` 需要 `long_context`（`DEFAULT_FEATURE_CAPABILITIES`），
  * 少声明它会被**能力过滤**拦成 `no-route` —— 那会让"缺授权"这条用例
  * 测到一个完全不同的分支（本文件的第一版就差点这么写）。
- * 多声明对 capture/prioritize/duration 无害：能力过滤只查"缺不缺"。
+ * 多声明对 prioritize/duration 无害：能力过滤只查"缺不缺"。
  */
 const LOCAL = {
   id: 'local',
@@ -167,14 +166,10 @@ interface FeatureCase {
 }
 
 /**
- * 四个功能各一行。**差别只有"怎么造一份合法输入"** ——
+ * 三个功能各一行。**差别只有"怎么造一份合法输入"** ——
  * 断言与场景全部共享，这正是本文件存在的意义。
  */
 const FEATURES: readonly FeatureCase[] = [
-  {
-    name: 'capture',
-    run: async (d) => view(await requestCapture({ locale: 'zh-CN', text: '明天下午三点开会', now: NOW }, requestDeps(d))),
-  },
   {
     name: 'breakdown',
     run: async (d) => view(await requestBreakdown({ locale: 'zh-CN', title: '搬家' }, requestDeps(d))),
@@ -210,7 +205,7 @@ describe('🔴 `cause` 通道 —— 场景 2：远端端点但没有出境授�
   it.each(FEATURES)('$name：cause 是 `egress-not-authorized`，且一个请求都不发', async (feature) => {
     const { impl, calls } = rejectingFetch();
     const v = await feature.run({
-      routing: routing([REMOTE], { capture: ['remote'], breakdown: ['remote'], prioritize: ['remote'], 'duration-estimate': ['remote'] }),
+      routing: routing([REMOTE], { breakdown: ['remote'], prioritize: ['remote'], 'duration-estimate': ['remote'] }),
       consents: [], // ← 没有授权
       fetchImpl: impl,
     });
@@ -227,7 +222,6 @@ describe('🔴 `cause` 通道 —— 场景 3：首选失败且回退跨隐私�
     const { impl, calls } = rejectingFetch();
     const v = await feature.run({
       routing: routing([LOCAL, REMOTE], {
-        capture: ['local', 'remote'],
         breakdown: ['local', 'remote'],
         prioritize: ['local', 'remote'],
         'duration-estimate': ['local', 'remote'],
@@ -266,7 +260,6 @@ describe('🔴 `cause` 通道 —— 负向：解析失败**没有** cause（不
   it.each(FEATURES)('$name：模型回了一坨没用的东西 → cause 必须是 undefined', async (feature) => {
     const v = await feature.run({
       routing: routing([LOCAL], {
-        capture: ['local'],
         breakdown: ['local'],
         prioritize: ['local'],
         'duration-estimate': ['local'],

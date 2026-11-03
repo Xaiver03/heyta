@@ -99,13 +99,12 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '下表是**全部**出境面。它不是"主要字段清单"：每一个 AI 功能各自只喂这几列里的字段，全产品也只有这六个出站调用点，没有任何一处把整库数据、完整操作日志或导出文件塞进请求。',
+        text: '下表是**全部**出境面。它不是"主要字段清单"：每一个 AI 功能各自只喂这几列里的字段，全产品也只有这五个出站调用点，没有任何一处把整库数据、完整操作日志或导出文件塞进请求。',
       },
       {
         kind: 'table',
         head: ['功能', '出境的字段', '发出去的是什么', '上限'],
         rows: [
-          ['一句话捕获', '`today`、`text`，可选 `preferences`', '你刚敲进去的那句话**原文**，加上这台设备的本地日期与星期', '输入超过 500 字符直接拒绝，不截断后发送'],
           ['拆解任务', '`today`、`title`，可选 `note`，可选 `preferences`', '这台设备的本地日期与星期（用于把"下周三"这类说法算对），加上任务标题原文与任务备注**整段正文**', '备注不截断；只有完全为空才不发送'],
           ['优先级建议', '`today`、`tasks`，可选 `preferences`', '这台设备的本地日期与星期，加上至多 50 条任务的标识、标题、截止时间、优先级，按 JSON 原文', '50 条，且在构造请求之前就收窄'],
           ['估时', '`today`、`title`，可选 `note`、`history`，可选 `preferences`', '这台设备的本地日期与星期，加上标题与备注原文；最近至多 20 条专注记录的"计划用时 / 实际用时"分钟数', '20 条记录；记录本身里面没有时间戳、也没有任务标识'],
@@ -495,13 +494,12 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'The table below is the **complete** egress surface. It is not a list of "the main fields": each AI feature feeds only the fields in its row, there are exactly six outbound call sites in the whole product, and nowhere is a full data export, the complete operation log, or a database dump put into a request.',
+        text: 'The table below is the **complete** egress surface. It is not a list of "the main fields": each AI feature feeds only the fields in its row, there are exactly five outbound call sites in the whole product, and nowhere is a full data export, the complete operation log, or a database dump put into a request.',
       },
       {
         kind: 'table',
         head: ['Feature', 'Fields that leave', 'What is actually sent', 'Cap'],
         rows: [
-          ['One-line capture', '`today`, `text`, optionally `preferences`', 'The **original text** of the line you just typed, plus this device\'s local date and weekday', 'Input over 500 characters is refused outright, never truncated and sent'],
           ['Task breakdown', '`today`, `title`, optionally `note`, optionally `preferences`', 'This device\'s local date and weekday (so that wording like "next Wednesday" resolves against a real day), plus the original task title and the **entire note body** of that task', 'Notes are not truncated; an entirely blank note is what is left out'],
           ['Prioritisation', '`today`, `tasks`, optionally `preferences`', 'This device\'s local date and weekday, plus up to 50 tasks\' identifier, title, due date and priority, as JSON in the original', '50 items, narrowed before the request is even constructed'],
           ['Duration estimate', '`today`, `title`, optionally `note`, `history`, optionally `preferences`', 'This device\'s local date and weekday, plus the original title and note; up to the 20 most recent focus records as "planned / actual" minutes', '20 records; the records themselves carry no timestamps and no task identifiers'],

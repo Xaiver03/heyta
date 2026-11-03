@@ -316,7 +316,7 @@ describe('每一个工具都在清单里，且 kind 与目录一致', () => {
 //    它不是结论（结论是那条规则），所以不去改已接受的 ADR，只在这里写明口径。）
 // ─────────────────────────────────────────────────────────────────────────
 
-describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
+describe('分母恰好 11（W2 物化 EVENT、ADR-0083 加 ATTACHMENT 之后），且逐条点名', () => {
   it('分母成员逐条点名（多一个少一个都红 —— 这条挡住"顺手把视图加进分母"）', async () => {
     const [gen, upstream] = [await loadGenerator(), await upstreamDirectory()];
     const excludedNames = gen.DENOMINATOR_EXCLUSIONS.map((e) => e.entityType);
@@ -330,8 +330,14 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     // 台账 `docs/plans/ai-event-tool-contract.md` §5.1），理由写在登记里 ——
     // 评论的可读性依赖 share 域上下文（成员身份 + 清单密钥解密后的任务视图），
     // 单做目录工具会造出一个 AI 碰不到的假功能。
-    expect(manifest.userOperableEntityTypes.length).toBe(10);
-    expect(manifest.coverage.denominator).toBe(10);
+    // ⚠️ 2026-11 第四次搬：分母 10 → 11。`ATTACHMENT` 随 ADR-0083（任务附件）进了
+    // `EntityModelMap`，而它此刻**没有**读写工具 —— 缺口按 `AI-COV-9` 登记在
+    // `scripts/check-ai-coverage.mjs` 的 `ENTITY_COVERAGE_DEBT` 里，理由写在登记处：
+    // 附件的字节只能由用户手里的文件产生，而那条通道刻意拒绝"先建实体后补字节"
+    // （会留下点不开的附件），所以写工具在这一刀里做不出正确的形状。
+    // ⇒ 与 `COMMENT`（AI-COV-8）同形：**登记缺口**，不是放假工具。
+    expect(manifest.userOperableEntityTypes.length).toBe(11);
+    expect(manifest.coverage.denominator).toBe(11);
     // 🔴 W10 **之前**这里是 `toContain('EVENT')` —— 清单的职责就是把"实体有了、
     // 工具还没接"这件事显形。W10 做完之后它必须**不再**出现（这条改向就是那件事
     // 做完了的机器化证据；反向漏做 ⇒ 这条与上面 3/9 那条一起红）。
@@ -340,7 +346,7 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     // （`COMMENT` / AI-COV-8）。⇒ 这条判据现在同时管两件事：目录**不许**再长出"没工具又没登记"
     // 的实体（多一个就红），而 AI-COV-8 一旦补上工具（或 `ENTITY_COVERAGE_DEBT` 摘掉它），
     // 这句也会立刻红，逼下一个动目录的人回来重新判断。
-    expect([...manifest.entityTypesWithoutTools].sort()).toEqual(['COMMENT']);
+    expect([...manifest.entityTypesWithoutTools].sort()).toEqual(['ATTACHMENT', 'COMMENT']);
   });
 
   it('分母的每个成员都**必须**在 `MODELED_ENTITY_TYPES` 里 —— 视图不是实体', async () => {
@@ -382,7 +388,7 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     }
   });
 
-  it('现状基线 9/10：分母里除已登记缺口外每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
+  it('现状基线 9/11：分母里除两处已登记缺口外每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
     // 2026-10-03 两次搬这条基线，都在这里重新判断过：
     // ① PROJECT 补 `create_project`、HABIT 补 `list_habits` + `create_habit`（3/8）；
     // ② 补齐 TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER 的读写工具（8/8）。
@@ -413,14 +419,17 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     // 基线从 8/8（W11 批次）与 3/9（批次二当时的中间态）收拢为 9/9；
     // 2026-10-17 起读作 9/10（COMMENT 进分母、无工具，缺口按 AI-COV-8 登记）。
     expect(manifest.coverage.covered).toBe(9);
-    expect(manifest.coverage.denominator).toBe(10);
-    expect(manifest.coverage.ratio).toBe('9/10');
+    expect(manifest.coverage.denominator).toBe(11);
+    expect(manifest.coverage.ratio).toBe('9/11');
     // `covered` 是分母名单的**统计结果**，`userOperableEntityTypes.length` 是名单本身：
     // 两个数取自生成器里两条不同的路径。2026-10-17 之前这里要求它们相等（= 分母全有工具）；
     // 现在把等式改成"**每个没工具的实体都必须有一张登记的欠账**"，
     // 于是这条依然是**有牙**的：既挡住"少算一个分母成员"，也挡住"漏登记一格缺口"。
     const withoutTools = manifest.entityTypesWithoutTools.length;
-    expect(withoutTools, '没工具的实体数必须与登记的缺口数一致（现量 1：AI-COV-8）').toBe(1);
+    expect(
+      withoutTools,
+      '没工具的实体数必须与登记的缺口数一致（现量 2：AI-COV-8 COMMENT / AI-COV-9 ATTACHMENT）',
+    ).toBe(2);
     expect(manifest.coverage.covered + withoutTools).toBe(manifest.userOperableEntityTypes.length);
   });
 

@@ -25,7 +25,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildBreakdownInvocation } from '../src/ai-breakdown.js';
-import { buildCaptureInvocation } from '../src/ai-capture.js';
 import { buildDurationInvocation } from '../src/ai-duration.js';
 import { buildPrioritizeInvocation } from '../src/ai-prioritize.js';
 import {
@@ -42,18 +41,13 @@ const TASKS = [
 ];
 
 /**
- * 四个构建器 + 各自最小输入。`locale` 由调用方填。
+ * 三个构建器 + 各自最小输入。`locale` 由调用方填。
  *
  * 🔴 这里刻意用**构建器**而不是 `request*`：要钉的是"发出去的字"，
  * 而 `request*` 那条路要造假 fetch、过出境闸门，会把这条测试变成集成测试。
  * 出境链路的集成侧已经有 `fields` 逐字段核对（各 `ai-*.spec.ts`）。
  */
 const builders = [
-  {
-    name: 'capture',
-    build: (locale: AiOutputLocale) =>
-      buildCaptureInvocation({ text: '明天下午三点和张总开周会', now: NOW, locale }),
-  },
   {
     name: 'breakdown',
     build: (locale: AiOutputLocale) => buildBreakdownInvocation({ title: '上线新版本', locale }),
@@ -168,6 +162,5 @@ describe('未知语言不许悄悄发出去', () => {
   it('构建器同样把异常传出来（不会退回中文）', () => {
     const broken = 'ja' as AiOutputLocale;
     expect(() => buildBreakdownInvocation({ title: 'x', locale: broken })).toThrow();
-    expect(() => buildCaptureInvocation({ text: 'x', now: NOW, locale: broken })).toThrow();
   });
 });

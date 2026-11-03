@@ -655,21 +655,6 @@ export {
   type RequestDurationDeps,
 } from './ai-duration.js';
 export {
-  MAX_CAPTURE_INPUT_LENGTH,
-  MAX_CAPTURE_RESPONSE_LENGTH,
-  MAX_CAPTURE_TITLE_LENGTH,
-  buildCaptureInvocation,
-  parseCaptureResult,
-  requestCapture,
-  type CaptureFailureReason,
-  type CaptureField,
-  type CaptureOutcome,
-  type CaptureProposal,
-  type CaptureSource,
-  type ParsedCaptureResult,
-  type RequestCaptureDeps,
-} from './ai-capture.js';
-export {
   DEFAULT_TOOL_SELECTION_RULES,
   findCatalogTool,
   resolveToolSelection,

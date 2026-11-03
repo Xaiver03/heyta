@@ -291,7 +291,6 @@ describe('buildBreakdownInvocation', () => {
     const off: PreferenceSet = { ...withPrefs(), memoryEnabled: false };
     expect(renderPreferenceHints(off, 'breakdown')).toEqual([]);
     expect(renderPreferenceHints(off, 'prioritize')).toEqual([]);
-    expect(renderPreferenceHints(off, 'capture')).toEqual([]);
     expect(renderPreferenceHints(off, 'duration-estimate')).toEqual([]);
   });
 
