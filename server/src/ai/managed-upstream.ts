@@ -105,7 +105,8 @@ export const SERVER_MANAGED_MODEL_HOSTS: readonly ServerManagedModelHost[] = [
  * 于是第 3 节那句"不保留内容"从后门被推翻。所以这里按词表校验，词表外的值 400。
  */
 export const SERVER_MANAGED_AI_FEATURES = [
-  'capture',
+  // 2026-11 摘掉 `'capture'`：那一档功能整体删除（并入收集框），`AiFeature` 里已经没有它。
+  // 服务端留着会让 zod 枚举接受一个客户端永远发不出的值，而"功能名词表两端相等"那条判据会红。
   'breakdown',
   'prioritize',
   'duration-estimate',

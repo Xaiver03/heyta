@@ -143,6 +143,20 @@ vi.mock('../src/db', async () => {
             }),
           },
           userSyncState: {
+            /*
+             * 🔴 `payloadMode: 'e2ee'` 不能省（2026-11 补）。
+             *
+             * ADR-0081 把**新账号**的默认载荷模式改成 `readable`，而
+             * `readPayloadMode`（`sync/services/payload-mode.service.ts`）读的是
+             * **`userSyncState`** 这一行：读不到 `payloadMode` 就按新账号默认值走明文。
+             * 本文件这一整批送的是**密文**（`isPayloadEncrypted: true`），于是全被
+             * `payloadGateViolation` 判成 `PLAINTEXT_REQUIRED`（HTTP 400）——
+             * 而红的话是"上传被拒"，读起来像同步坏了，不像一个夹具少了一格。
+             *
+             * ⚠️ 加在 `user.findUnique` 上没有用：那条路径根本不读用户表。
+             */
+            // ⚠️ `payloadMode` 不在这里加：读它的那条路径走的是下面**主 prisma** 那一份
+            //（`readPayloadMode` 直接 `readPayloadMode(prisma, userId)`，不经过事务客户端）。
             findUnique: vi.fn().mockResolvedValue({ lastSeq: serverSeqCounter }),
             upsert: vi.fn().mockResolvedValue({}),
             update: vi.fn().mockImplementation(async (args: any) => {
@@ -207,8 +221,21 @@ vi.mock('../src/db', async () => {
         }),
       },
       userSyncState: {
+        /*
+         * 🔴 `payloadMode: 'e2ee'` 不能省（2026-11 补）。
+         *
+         * ADR-0081 把**新账号**的默认载荷模式改成 `readable`，而
+         * `readPayloadMode`（`sync/services/payload-mode.service.ts`）读的就是
+         * **`userSyncState` 这一行** —— 读不到 `payloadMode` 就按新账号默认值走明文。
+         * 本文件这一整批送的是**密文**（`isPayloadEncrypted: true`），于是全被
+         * `payloadGateViolation` 判成 `PLAINTEXT_REQUIRED`（HTTP 400）——
+         * 红的话是"上传被拒"，读起来像同步坏了，不像一个夹具少了一格。
+         *
+         * ⚠️ 加在事务客户端那一份或 `user` 表上都没用：两条路径都不读它们。
+         */
         findUnique: vi.fn().mockImplementation(async () => ({
           lastSeq: serverSeqCounter,
+          payloadMode: 'e2ee',
         })),
         upsert: vi.fn().mockResolvedValue({}),
         update: vi.fn().mockResolvedValue({}),
@@ -348,7 +375,8 @@ describe('Sync System Fixes', () => {
           requestId,
         },
       });
-      expect(firstResponse.statusCode).toBe(200);
+      // 把响应体带进断言消息：400 有很多种原因，只说 "expected 200" 会让人重新查一遍。
+      expect(firstResponse.statusCode, firstResponse.body).toBe(200);
       const firstBody = firstResponse.json();
       expect(firstBody.results[0].accepted).toBe(true);
       const clientASeq = firstBody.latestSeq;

@@ -37,6 +37,21 @@ const AUTH = { authorization: 'Bearer test-token' };
 /** 一个 UTC 时刻的 epoch 毫秒。 */
 const at = (iso: string): number => Date.parse(iso);
 
+/**
+ * 🔴 夹具日期必须是**相对今天**的（2026-11 修掉一颗日期炸弹）。
+ *
+ * 原来这里写死 `2026-10-23T15:00:00Z`，而 `/api/admin/revenue?days=7` 的窗口是
+ * "从今天往回 7 天" ⇒ 时间一走到 10-31 之后，那几笔就整体落到窗口外，
+ * 五条用例全变成 `expected [] to have length 2`。红的话像"聚合坏了"，
+ * 而真正发生的事只是**写测试的那天过去了**。
+ *
+ * 取"三天前"而不是"今天"：窗口两端都留余量，跑在午夜前后也不会翻车。
+ * 时刻（15:00Z / 20:00Z）逐字保留 —— 它们承载的是判据本身：
+ * 北京 23:00 与次日 04:00 在 `offsetMinutes=480` 下跨日，在 UTC 下同日。
+ */
+const baseDay = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
+const atBase = (time: string): number => Date.parse(`${baseDay}T${time}Z`);
+
 beforeEach(async () => {
   vi.clearAllMocks();
   mocks.user.findUnique.mockResolvedValue({ isAdmin: true });
@@ -64,8 +79,8 @@ describe('日界由调用方给的时区偏移裁', () => {
    */
   it('offsetMinutes=480 时，跨过北京午夜的两笔落在不同的日格', async () => {
     mocks.checkoutOrder.findMany.mockResolvedValue([
-      { paidAt: BigInt(at('2026-10-23T15:00:00Z')), currency: 'CNY', finalAmountMinor: 500 },
-      { paidAt: BigInt(at('2026-10-23T20:00:00Z')), currency: 'CNY', finalAmountMinor: 700 },
+      { paidAt: BigInt(atBase('15:00:00')), currency: 'CNY', finalAmountMinor: 500 },
+      { paidAt: BigInt(atBase('20:00:00')), currency: 'CNY', finalAmountMinor: 700 },
     ]);
 
     const res = await app.inject({
@@ -86,8 +101,8 @@ describe('日界由调用方给的时区偏移裁', () => {
 
   it('offsetMinutes 缺省（0 = UTC）时，那两笔落在同一格', async () => {
     mocks.checkoutOrder.findMany.mockResolvedValue([
-      { paidAt: BigInt(at('2026-10-23T15:00:00Z')), currency: 'CNY', finalAmountMinor: 500 },
-      { paidAt: BigInt(at('2026-10-23T20:00:00Z')), currency: 'CNY', finalAmountMinor: 700 },
+      { paidAt: BigInt(atBase('15:00:00')), currency: 'CNY', finalAmountMinor: 500 },
+      { paidAt: BigInt(atBase('20:00:00')), currency: 'CNY', finalAmountMinor: 700 },
     ]);
 
     const res = await app.inject({ method: 'GET', url: '/api/admin/revenue?days=7', headers: AUTH });
@@ -103,8 +118,8 @@ describe('日界由调用方给的时区偏移裁', () => {
 describe('币种', () => {
   it('🔴 两个币种各一条序列，响应里没有任何跨币种合计', async () => {
     mocks.checkoutOrder.findMany.mockResolvedValue([
-      { paidAt: BigInt(at('2026-10-23T01:00:00Z')), currency: 'CNY', finalAmountMinor: 1_200 },
-      { paidAt: BigInt(at('2026-10-23T02:00:00Z')), currency: 'USD', finalAmountMinor: 990 },
+      { paidAt: BigInt(atBase('01:00:00')), currency: 'CNY', finalAmountMinor: 1_200 },
+      { paidAt: BigInt(atBase('02:00:00')), currency: 'USD', finalAmountMinor: 990 },
     ]);
 
     const res = await app.inject({ method: 'GET', url: '/api/admin/revenue?days=7', headers: AUTH });
@@ -122,7 +137,7 @@ describe('币种', () => {
 describe('零与缺席', () => {
   it('窗口里的每一天都有一个点（没有活动的那几天是 0，不是不列）', async () => {
     mocks.checkoutOrder.findMany.mockResolvedValue([
-      { paidAt: BigInt(at('2026-10-23T01:00:00Z')), currency: 'CNY', finalAmountMinor: 100 },
+      { paidAt: BigInt(atBase('01:00:00')), currency: 'CNY', finalAmountMinor: 100 },
     ]);
 
     const res = await app.inject({ method: 'GET', url: "/api/admin/revenue?days=7", headers: AUTH });
@@ -136,7 +151,7 @@ describe('零与缺席', () => {
 describe('退款的谓词', () => {
   it('🔴 按 `refunded_at` 非空取，而不是按 `status`', async () => {
     mocks.refund.findMany.mockResolvedValue([
-      { refundedAt: BigInt(at('2026-10-23T03:00:00Z')), currency: 'CNY', amountMinor: 300 },
+      { refundedAt: BigInt(atBase('03:00:00')), currency: 'CNY', amountMinor: 300 },
     ]);
 
     const res = await app.inject({ method: 'GET', url: '/api/admin/revenue?days=7', headers: AUTH });
