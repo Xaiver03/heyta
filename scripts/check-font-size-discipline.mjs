@@ -46,28 +46,53 @@ async function main() {
 
   if (selfTest) {
     const original = readFileSync(TARGET_FILE, 'utf-8');
-    const mutated = original.replace(
-      'font-size: var(--ht-font-size-xs);\n}\n\n.ht-settings__toggle',
-      'font-size: var(--ht-font-size-2xs);\n}\n\n.ht-settings__toggle',
-    );
-    if (mutated === original) {
-      console.error('self-test: 找不到可注入的 __notice font-size 行');
-      process.exit(1);
-    }
     const { writeFileSync } = await import('node:fs');
-    writeFileSync(TARGET_FILE, mutated);
-    try {
-      const { code } = await exec('node', ['scripts/check-font-size-discipline.mjs']).then(
-        () => ({ code: 0 }),
-        (e) => ({ code: e.code ?? 1 }),
-      );
-      if (code === 0) {
-        console.error('self-test: 注入 2xs 后门仍绿 ⇒ 这把尺不能失败');
-        process.exit(1);
+
+    /**
+     * 两臂各自注入、各自必须红 —— 一把尺有两个判据就要有两次失法，
+     * 只测其中一臂等于另一臂从没被验过（AGENTS §6 第 2 条）。
+     */
+    const ARMS = [
+      {
+        name: 'G-3 字号（__notice 注入 2xs）',
+        from: 'font-size: var(--ht-font-size-xs);\n}\n\n.ht-settings__toggle',
+        to: 'font-size: var(--ht-font-size-2xs);\n}\n\n.ht-settings__toggle',
+      },
+      {
+        // 这一臂注的正是 2026-11-04 修掉的那个真缺陷原状（审计报告 C-1）。
+        name: 'G-2 danger 语义色（改回 foreground）',
+        from: '  color: var(--ht-color-danger);\n  font-size: var(--ht-font-size-sm);',
+        to: '  color: var(--ht-color-foreground);\n  font-size: var(--ht-font-size-sm);',
+      },
+    ];
+
+    let failed = 0;
+    for (const arm of ARMS) {
+      const mutated = original.replace(arm.from, arm.to);
+      if (mutated === original) {
+        console.error(`self-test: ❌ ${arm.name} 找不到注入锚点，夹具失效`);
+        failed++;
+        continue;
       }
-      console.log('self-test: ✅ 变异臂红（注入 2xs 到 __notice 后门禁正确拒绝）');
-    } finally {
-      writeFileSync(TARGET_FILE, original);
+      writeFileSync(TARGET_FILE, mutated);
+      try {
+        const { code } = await exec('node', ['scripts/check-font-size-discipline.mjs']).then(
+          () => ({ code: 0 }),
+          (e) => ({ code: e.code ?? 1 }),
+        );
+        if (code === 0) {
+          console.error(`self-test: ❌ ${arm.name} 注入后门仍绿 ⇒ 这一臂不能失败`);
+          failed++;
+        } else {
+          console.log(`self-test: ✅ ${arm.name} → 门禁正确拒绝`);
+        }
+      } finally {
+        writeFileSync(TARGET_FILE, original);
+      }
+    }
+    if (failed > 0) {
+      console.error(`self-test: ${failed}/${ARMS.length} 臂无牙`);
+      process.exit(1);
     }
     return;
   }

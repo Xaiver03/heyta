@@ -400,15 +400,21 @@ export function check({ tones, palettes, commitPalettes, rules, tokensText, used
     if (hover.decls.get('color') !== wantHoverFg) problems.push(`A3 commit/${tone} 的 hoverFg：表=${wantHoverFg}，CSS=${hover.decls.get('color') ?? '（未声明）'}`);
   }
 
-  /* A4 幻影类：账本按 variant 名对，读数只降不升。 */
+  /* A4 幻影类：账本按 variant 名对，读数只降不升。
+   * 🔴 账本从 `used.phantomLedger` 取（默认才是真账本）：臂 ⑥ 要测的是
+   * 「账本里有、界面没人用 ⇒ 过期红」这条**逻辑**，它不许依赖真账本此刻非空 ——
+   * 2026-11-04 把 `ht-btn--outline` 修成 `--secondary` 之后真账本清空，
+   * 依赖真账本的那一臂当场失去前置，报的是"夹具不过"而不是"尺没牙"。
+   */
+  const phantomLedger = used.phantomLedger ?? PHANTOM_LEDGER;
   const phantom = [...used.variants]
     .filter((v) => !declared.has(v))
-    .filter((v) => !PHANTOM_LEDGER.some((row) => row.variant === v));
+    .filter((v) => !phantomLedger.some((row) => row.variant === v));
   for (const v of phantom) {
     const sites = [...used.sitesByVariant.get(v) ?? []].join('、');
     problems.push(`A4 界面用了 .${BASE_CLASS}--${v} 而中央 CSS 没有那一档（画出来就是裸按钮）：${sites}`);
   }
-  for (const row of PHANTOM_LEDGER) {
+  for (const row of phantomLedger) {
     if (!used.variants.has(row.variant)) {
       problems.push(`A4 账本过期：.${BASE_CLASS}--${row.variant} 已经没有使用点，删掉这一行。`);
     }
@@ -603,6 +609,8 @@ async function selftest(real) {
     variants: new Set(USED_BASE),
     sitesByVariant: new Map(),
     bare: [],
+    // 🔴 夹具自带一枚"界面没人用"的账本行，这一臂才与真账本的当前内容脱钩。
+    phantomLedger: [{ variant: 'ghosttone', site: 'apps/web/src/features/settings/Fixture.tsx' }],
   };
   const ledgerRead = check(ledgerStale);
   push('⑥ 账本里的幻影类已经没有使用点 ⇒ 必须红（不许留永久豁免）', ledgerRead.some((l) => l.startsWith('A4') && l.includes('过期')), ledgerRead.join(' | '));
