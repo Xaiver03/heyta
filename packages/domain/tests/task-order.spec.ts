@@ -40,6 +40,45 @@ describe('sortTasks —— 每一档共同的前提', () => {
     const todo = mkTask('todo');
     expect(ids(sortTasks([zero, todo], 'addedAt'))).toEqual(['todo', 'zero']);
   });
+
+  /**
+   * 🔴 这一组治的是 2026-11-04 滴答对齐 B5 的真缺陷：Web 的行顺序**只**过这一个函数
+   * （`packages/ui/src/task-list/model.ts` 每组调一次 `sortTasks`，壳不再排），
+   * 而它当时不看 `pinnedAt` —— 于是右键菜单里点「置顶」写进了字段、另一台设备也看得到，
+   * 界面上却**一行都没动**（移动端不会坏，因为它读的是 `listTasks()` 那份已排好的序）。
+   * 症状是"点了没反应"，而类型、构建、单测全都不会红 —— 只有这条判据会。
+   */
+  it('🔴 置顶在前在**每一档**都成立（换排序档位不该让钉住的东西沉下去）', () => {
+    const pinned = mkTask('pinned', { pinnedAt: 5, dueDate: 999, createdAt: 1, priority: Priority.None });
+    const normal = mkTask('normal', { dueDate: 1, createdAt: 9, priority: Priority.High });
+    for (const key of TASK_SORT_KEYS) {
+      expect(ids(sortTasks([normal, pinned], key)), `口径 ${key}`).toEqual(['pinned', 'normal']);
+    }
+  });
+
+  it('pinnedAt: 0 也算置顶（与 completedAt 同一条判据：看存在性，不是真值）', () => {
+    const zero = mkTask('zero', { pinnedAt: 0 });
+    const plain = mkTask('plain');
+    expect(ids(sortTasks([plain, zero], 'display'))).toEqual(['zero', 'plain']);
+  });
+
+  it('两条都置顶 ⇒ 不比钉的时刻，保持原序（不是 LIFO 栈）', () => {
+    const first = mkTask('first', { pinnedAt: 1 });
+    const later = mkTask('later', { pinnedAt: 999 });
+    expect(ids(sortTasks([first, later], 'display'))).toEqual(['first', 'later']);
+    expect(ids(sortTasks([later, first], 'display'))).toEqual(['later', 'first']);
+  });
+
+  it('已完成仍然压在置顶之前（两条前提同时成立时，"做完的"先沉底）', () => {
+    const donePinned = mkTask('done-pinned', { completedAt: 1, pinnedAt: 1 });
+    const todoPinned = mkTask('todo-pinned', { pinnedAt: 2 });
+    const todoPlain = mkTask('todo-plain');
+    expect(ids(sortTasks([donePinned, todoPlain, todoPinned], 'display'))).toEqual([
+      'todo-pinned',
+      'todo-plain',
+      'done-pinned',
+    ]);
+  });
 });
 
 describe("sortTasks —— 'display'（默认档）", () => {
