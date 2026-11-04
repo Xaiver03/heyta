@@ -63,11 +63,26 @@ export const TASK_SORT_KEYS: readonly TaskSortKey[] = ['display', 'addedAt', 'pr
  * 🔴 「已完成沉底」在**每一档**都排在最前：它不是排序偏好，而是这张列表的
  * 前提（"接下来做什么"里不该混进已经做完的）。所以它写在分支**外面** ——
  * 让「按添加时间」把刚勾掉的那条顶到第一行，用户的第一反应是自己点错了。
+ *
+ * 🔴 「置顶在前」同样写在分支**外面**，理由不是抄上面那条的形状：
+ * 用户点「置顶」说的是"这条我要先看见"，而它**不该因为他顺手换了排序档位就失效** ——
+ * 把 pin 塞进 `case 'display'` 里，表现就是"切到「按优先级」之后我钉的东西不见了"。
+ * 它只比**有没有 `pinnedAt`**，不比时刻（比时刻会变成"后钉的压过先前钉的"，
+ * 与 `entities.ts` 的 `byPinnedFirst` 同一个口径，见
+ * [ADR-0083](../../../docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md) §3.2）。
+ *
+ * ⚠️ 它是**组内**顺序，不是跨组搬运：分组由 `task-filter.ts` 的 `groupTasksByDate`
+ * 决定，而它保持入参顺序，所以这里前置一次落到界面上就是"每个日期组里置顶的排最前"。
+ * 做成跨组搬运等于把注意力语义和排程语义混成一个字段（0083 §3.2 明确不要那个）。
  */
 function compareBySortKey(key: TaskSortKey, a: Task, b: Task): number {
   const aDone = a.completedAt !== undefined;
   const bDone = b.completedAt !== undefined;
   if (aDone !== bDone) return aDone ? 1 : -1;
+
+  const aPinned = a.pinnedAt !== undefined;
+  const bPinned = b.pinnedAt !== undefined;
+  if (aPinned !== bPinned) return aPinned ? -1 : 1;
 
   switch (key) {
     case 'display': {
