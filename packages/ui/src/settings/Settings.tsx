@@ -409,6 +409,13 @@ export function SettingsRow({ row, styles, testID }: SettingsRowProps): React.JS
       return <ActionLine row={row} styles={active} testID={testID} />;
     case 'trailing':
       return <TrailingLine row={row} styles={active} testID={testID} />;
+    case 'host':
+      /**
+       * 顺序与分组归契约，内容自己的解剖归它那一族（字段就还是 `FormField`）。
+       * ⚠️ 这里刻意**不套** `styles.row` —— 套上就等于用行容器包住一格字段，
+       *    那是第三种解剖，正是 §1「两档之外不许有第三档」要拦的东西。
+       */
+      return <>{row.node ?? null}</>;
     case 'note':
       return <NoteLine row={row} styles={active} testID={testID} />;
     case 'heading':
