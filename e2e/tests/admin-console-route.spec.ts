@@ -713,4 +713,29 @@ test.describe('/admin 这个地址（真浏览器）', () => {
 
     await page.screenshot({ path: `${EVIDENCE}/admin-route-anonymous-signin-dismissed.png`, fullPage: true });
   });
+
+  test('🔴 线上那台的形状（中央配置回 `mode:"local"`）：标题是「heyta 管理后台」，下面就是邮箱口令表单', async ({ page }) => {
+    // 现量：`https://heyta.waytofuture.cn/api/auth/central/config` 回的是
+    // `{"mode":"local","documentVersion":null}` ⇒ `centralMode` 不成立，挂的是共享表单那一支。
+    // 上面那条用例判的是官方单点登录那一支（部署上另一种真实形状），两支的标题层不是同一处渲染。
+    await page.route('**/api/auth/central/config**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ mode: 'local', loginPath: '/api/auth/oidc/start', documentVersion: null }),
+      });
+    });
+    await pinChineseUi(page);
+    await page.goto('/admin');
+    await decidePrivacyConsent(page, 'accepted');
+    await waitForBootSplashGone(page);
+
+    const dialog = page.locator('.ht-sheet__auth');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('管理后台');
+    await expect(dialog).toContainText('使用你的邮箱和登录密码继续');
+    await expect(dialog.locator('[data-testid="auth-form-email"]')).toBeVisible();
+
+    await page.screenshot({ path: `${EVIDENCE}/admin-route-anonymous-signin-local.png`, fullPage: true });
+  });
 });
