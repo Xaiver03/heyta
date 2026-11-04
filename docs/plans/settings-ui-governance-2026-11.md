@@ -259,6 +259,7 @@ iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devi
 | W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
 | W1（本轮） | G-4 迁移那一半 | ✅ 四格字段迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令）+ 一格行迁 `trailing` 档（SessionsPanel）；账本两次收缩（54→53→50） |
 | W2 | G-4 的 mobile 那一格 | ⏸ `apps/mobile/src/screens/SessionsSection.tsx` 改吃 `trailing` 档：契约已就位，欠一次设备腿（Android 载体在 linux-dev，iOS 那枚可能被别线占） |
+| W2 | 暗色两档的常驻看图腿 | ⏸ 现量：`grep -c settings-row-grammar package.json` ⇒ 0 —— 设置面那几枚 e2e（`settings-row-grammar` / `settings-form-alignment` / `narrow-sweep`）**一枚都不在 `pnpm check` 链里**，`check:e2e-specs-parse` 只验"能不能解析"。所以再写一枚暗色 spec 也还是 0 次执行：先要定"由哪条 `check:*` 跑 e2e 全量/分片"，那是 e2e 射程的裁决，不是本线能顺手加的 |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
 ---
