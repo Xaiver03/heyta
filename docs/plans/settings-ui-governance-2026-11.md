@@ -205,17 +205,19 @@
 ⚠️ `host` 不是逃生口：它只回答"一屏里两族能不能按读到的顺序排在一起"，
 "这一格属于哪族"的口径没变（`docs/agents/ux-principles.md` §1 / §1b）。
 `shouldRenderSettingsRow` 对 `node` 为空的 host 行**整条不占位**（否则会留出一段空间距）。
-验证：`profile-panel` + `account-profile-entry` 23/23，`account-*` e2e 7/7（第一趟有一条
-在负载下 flaky，第二趟干净），`ui-language` / `form-anatomy` / `settings-prose` /
+验证：`profile-panel` + `account-profile-entry` 23/23，`account-*` e2e 7/7（第一趟有一条红、第二趟干净，
+当时记成"负载 flaky"—— ⚠️ 这个归因**没被证过**，而下面暗色腿那一节实测到同一症状的真因是**端口复用**，
+下一次撞到先换端口再谈负载），`ui-language` / `form-anatomy` / `settings-prose` /
 `control-semantics` / `tip-adjacency` / `design` / `overlay` 全 rc=0，
 `@heyta/ui` 与 `apps/web` typecheck rc=0。
 
-**还剩（这一格没做，理由不是"来不及"）**：
-`apps/mobile/src/screens/SessionsSection.tsx` 仍自己手搓同一形状（`Pressable` + 尾随按钮）。
-迁移它需要**设备腿取证**，而这一趟没有跑：Android 载体不在本机（见 `docs/agents/multi-end-build.md`），
-iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devices booted | grep -c Booted` 现量 1），
-按 `ui-acceptance` 的口径**不抢别人的设备、也不许没真看图就宣布"两端一致"**。
-契约已经就位，那一格现在只欠一次设备验证，不欠设计。
+**还剩（这一格没做，理由不是"来不及"，也不是"欠一次设备腿"）**：
+`apps/mobile/src/screens/SessionsSection.tsx` 仍自己手搓同一形状（`Stack` + `Divider` +
+`HStack` 标签行 + 时间戳一行 + 按钮一行）。2026-11-04 复核把原因改了：**拦路的是别线一枚按源码文本切片的判据**
+（`apps/mobile/tests/account-security-wiring.spec.ts:152` 用 `indexOf('{session.current ? (')` 切三元），
+`trailing` 档的正确写法会把这个字面量消掉；三种绕行本线都排过并写进 **BLOCKED B260**，
+其中"靠文本相邻蒙过正向对照"那一种会把别人判据的牙悄悄磨掉，本线不做。
+设备腿那一半也确实还没有（现量 `xcrun simctl list devices booted` 那枚是别线的），两半都在 B260 里点名了谁能收。
 
 **顺带现量到一个门禁的边界**（不是本次引入的，但这次撞上了）：`check-ui-provider` 按**文件**近似
 （脚本自己写着"不覆盖①"）。变异实测：拆掉 `SessionsPanel.tsx` 里包 `<SettingsSection>` 的那层
@@ -239,9 +241,9 @@ iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devi
 |---|---|
 | 13 个文件各写一套容器，可能长出第 6 套 | ✅ `check-settings-row-anatomy.mjs` 账本制冻结，新增即红，变异臂实测能红；账本逐格只减（`--update` 只许改小） |
 | 字段格手写 label + 手拼 id | ✅ 四格已迁 `FormField`（ProfilePanel / EmailChangePanel / PasskeyPanel / PasswordPanel） |
-| 对象行（设备 / 凭证）各写一套尾随动作骨架 | ✅ `SettingsRowModel` 加 `trailing` 档，web 的 SessionsPanel 已迁；mobile 的 `SessionsSection.tsx` 欠一次设备腿 |
+| 对象行（设备 / 凭证）各写一套尾随动作骨架 | ✅ `SettingsRowModel` 加 `trailing` 档，web 的 SessionsPanel 已迁；mobile 的 `SessionsSection.tsx` 卡在别线一枚源码文本判据上（BLOCKED B260） |
 
-**优先级**: 门 ✅；迁移 ✅ 五格已落地（四格字段 + 一格行）。剩 mobile 那一格，欠的是设备验证而不是设计。
+**优先级**: 门 ✅；迁移 ✅ 五格已落地（四格字段 + 一格行）。剩 mobile 那一格，欠的是**别人手里的判据口径 + 一次设备腿**，两样都不是本线能替的（B260）。
 
 ---
 
@@ -347,7 +349,7 @@ iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devi
 | W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
 | W1（本轮） | G-4 迁移那一半 | ✅ 四格字段迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令）+ 一格行迁 `trailing` 档（SessionsPanel）；账本逐次收缩，现量 `cat scripts/settings-row-anatomy-ledger.json` |
 | W2 | G-6 位置尺进链 | ✅ `check:tip-adjacency` 的定义与链上那一节已入库，同批把本线四枚同族尺的定义都带上 `--self-test` 臂（做法与卡点见 G-6 第三半）|
-| W2 | G-4 的 mobile 那一格 | ⏸ `apps/mobile/src/screens/SessionsSection.tsx` 改吃 `trailing` 档：契约已就位，欠一次设备腿（Android 载体在 linux-dev，iOS 那枚可能被别线占） |
+| W2 | G-4 的 mobile 那一格 | 🔴 **不是欠看图腿，是欠别人一枚判据**（BLOCKED B260）：`apps/mobile/tests/account-security-wiring.spec.ts:152` 按**源码文本切三元**（`indexOf('{session.current ? (')`），而 `trailing` 档的正确写法（提示句进 `note`、按钮进 `actions`）会把这个字面量整块消掉。三种写法本线都排过：设计正确的 ⇒ 判据红；保住字面量的 ⇒ 二十多字提示被挤进右列，而本机没有能签字的移动端看图腿；靠文本相邻蒙过正向对照的 ⇒ 判据的牙被悄悄磨掉没人签字。归注册登录线（`b6581174f` 立的那四条），改完本线立刻迁 |
 | W2 | 暗色两档的常驻看图腿 | ✅ 已建并真看过（`account-email-change-and-sessions.spec.ts` 第 8 条，1440 + 375 暗色，抓到并修掉确认复选框那一格）。**这一行原来那句"设置面那几枚 e2e 一枚都不在链里"是假的** —— 链里 `check:ai-e2e` 跑整条默认套（现量 `pnpm --dir e2e exec playwright test --list` 的总数），新 spec 自动有人跑，不需要额外裁决 |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
