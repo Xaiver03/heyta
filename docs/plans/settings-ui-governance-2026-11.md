@@ -90,11 +90,15 @@
 | `SettingsRowCommon` | ✗ 只有 `testID` + `divider` |
 
 全契约唯一的 `ReactNode` 插槽是三处 `leading`（标签**前面**的图标），
-**没有任何尾部或可编辑插槽**。⇒ 迁移要先给跨端契约加第 6 档，那要同时改：
-`packages/ui/src/settings/Settings.tsx`（共享渲染器）+ 移动端 4 个屏幕的穷尽 switch
-（`ProfileScreen` / `SettingsScreen` / `ProfileProgressSummary` / `ReminderDeliverySection`，
-联合是穷尽的，漏一档编译就失败 —— 这是安全网不是障碍），
-而**移动端运行时验证在这台机上没有腿**（就绪裁判现量：AVD 0 台、emulator-5554 不可达）。
+**没有任何尾部或可编辑插槽**。⇒ 迁移要先给跨端契约加第 6 档。
+
+加一档要改的地方（2026-11-04 现量更正）：**只有 `packages/ui` 两处** ——
+`Settings.tsx:375 SettingsRow` 的分派 switch 与 `model.ts` 的 `settingsRowKey` switch
+（10 处 `case` 全在这两个文件里）。`apps/mobile` 那 4 个屏幕
+（`ProfileScreen` / `SettingsScreen` / `ProfileProgressSummary` / `ReminderDeliverySection`）
+只是 `import { SettingsSection } from '@heyta/ui'` 的**消费者**，没有自己的 switch
+⇒ 两端共用一份渲染器，代码量比本节上一稿估的小；
+但**移动端运行时验证在这台机上仍然没有腿**（就绪裁判现量：AVD 0 台、emulator-5554 不可达）。
 
 #### 本节已做完的那一半（也是计划 G-4 标题的意图："新面板强制使用"）
 
@@ -125,24 +129,31 @@
 「头像和昵称的**左边界各不相同**」，手段就是这**一列标签 + 一列控件**的网格。
 把网格换成 flex 行，等于把那条已批的决定原样退回去。
 
-⇒ **正确的收敛顺序**（下一趟要按这个做，不是按"迁面板"做）：
+⇒ **本节的迁移那一半按原写法不做**，三条源码级理由（不是"太大所以推后"）：
 
-1. 给 `packages/ui` 的契约加两样：
-   - `SettingsFieldRow`（label + 可编辑控件 + 尾随动作 + `valueTestID`）—— 解掉上面"五档无可编辑插槽"；
-   - 一个**排版档**选择（`layout: 'inline' | 'grid'`），把 `__row` 那套两列网格与
-     `__item` 那套 flex 行都表达出来 —— 而不是让调用方二选一地降级。
-   - 值那格不许 `numberOfLines={1}`，要能选换行（邮箱这类长值要能看全）。
-2. 移动端 4 个屏幕的穷尽 switch 各补新档（`ProfileScreen` / `SettingsScreen` /
-   `ProfileProgressSummary` / `ReminderDeliverySection`）—— 联合是穷尽的，漏一档编译就红，
-   这条是安全网。
-3. **运行时验证两条腿都得有**：Android 在 linux-dev（本机 0 台 AVD），iOS 要 booted 模拟器。
-   只 typecheck 过 ≠ 移动端画得对 —— 这正是 `model.ts` 文件头那条纪律防的事。
-4. 然后才逐面板迁，每迁一格跑 `check:settings-prose` + `check:settings-row-anatomy`
-   （读数应掉）+ typecheck + 界面验收，并 `--update` 把账本改小。
+1. **契约自己把表单划给了 `children`，不是 rows。**
+   `Settings.tsx:290` 的 `SettingsSectionProps.children` 注释原话：
+   「宿主特有的内容（mobile 的语言胶囊、**web 的表单**…）」。
+   ⇒ "把表单面板迁成 `rows`"与契约的设计意图相反；照做是给共享层加一档它自己声明不需要东西。
+2. **已批的网格解剖在共享渲染器里表达不出来。**
+   `sheets.css:246-252` 用的是 CSS Grid `minmax(5rem, 8rem) minmax(0, 1fr)`；
+   而 `Settings.tsx:184 makeStyles` 是 RN `StyleSheet`（flex 模型，**没有 `minmax`**）。
+   用 `minWidth/maxWidth + flex` 只能**近似**，近似出来的就不是产品负责人 2026-10-24 拍板的那一列。
+   ⇒ 要么这一档只有 web 生效（"一份实现"当场失效），要么改的是已批排版。两者都不该由这趟替产品决定。
+3. **两端共用一份渲染器，移动端运行时验证这趟没有腿。**
+   （更正本节上一稿：10 处 switch **全在 `packages/ui`** —— `Settings.tsx` 的分派 + `model.ts` 的
+   `settingsRowKey`；`apps/mobile` 那 4 个屏幕只是 `import { SettingsSection } from '@heyta/ui'` 的**消费者**，
+   没有自己的 switch。所以加一档的代码量比上一稿估的小，但验证那一格没变：
+   本机 AVD 0 台、emulator-5554 不可达。）
 
-**为什么不先把能迁的迁掉（比如 ProfilePanel 的邮箱行看着像 `value` 档）**：
-它形状上像，排版上不是同一件事（上面三条同时命中），迁完是一屏**可见的退步**，
-而账本读数会掉一格、看起来"治理有进展"。那是拿一个错的收敛换一个好读的数。
+**那"行解剖不统一"这个真问题归谁？** 归已经落地的门 + 设计系统层，不归"迁面板"：
+
+| 真问题 | 处置 |
+|---|---|
+| 13 个文件各写一套容器，可能长出第 6 套 | ✅ `check-settings-row-anatomy.mjs` 账本制冻结（13 文件 / 54 处），新增即红，变异臂实测能红 |
+| 圆角在容器层来回 | **审计报重了**（2026-11-04 逐类现量）：`__section`/`__field`/`__danger-card`/`__account-gate` **全是 `radius-md`(8)**，只有 `__notice` 是 `radius-sm`(4)（行内提示条不是卡片）；外层面板卡 `lg`(12) 是 MASTER 成文分档。**不是漂移，不立项** |
+
+**优先级**: 门 ✅；"迁这 4 个面板" ⇒ **撤销该行动项**，理由如上三条，都是源码级的。
 
 ---
 
@@ -191,7 +202,7 @@
 | 真因 | 落点 |
 |---|---|
 | 输入框无边框 + `flex:1` 铺满 ⇒ 占位文字是**唯一**"这里可输入"的线索（`EmailChangePanel.tsx:295-297` 自己记着这条实测） | 本轮已修：昵称格补 `__field` 宽度约束；`__hint` 字号 12→14 |
-| 同屏 13 个文件各写各的行解剖（圆角 8/12 来回、分隔方式不一） | G-4：门已落地防新增，迁移待移动端腿 |
+| 同屏 13 个文件各写一套行解剖容器（54 处） | G-4：门已落地冻结新增（圆角那条经复核**不是**漂移，见 G-4 节表格） |
 
 **优先级**: ✅ 关闭（前提否证，无待决）
 
@@ -204,7 +215,7 @@
 | W1（本轮） | G-1 + G-2 落地为门禁 | ✅ G-1 账本清空、A4 硬拒；✅ G-2 静态 CSS 臂（`check-font-size-discipline.mjs`） |
 | W1（本轮） | G-3 + G-5 落地为门禁 | ✅ G-3 `check-font-size-discipline.mjs`；✅ G-5 `check-spinner-discipline.mjs`（均带变异臂实测能红） |
 | W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
-| 下一趟（顺序已改） | G-4 迁移那一半：**先给契约加 `field` 档 + `layout: inline/grid` 档**，再迁面板 | 共享渲染器画的不是 2026-10-24 拍板的那套两列网格（三条退步见 G-4 节）；且移动端运行时验证两条腿本机都没有 |
+| — | G-4 迁移那一半（"迁这 4 个面板"） | **撤销该行动项**：契约把 web 表单划给 `children`（`Settings.tsx:290`）、已批的 `minmax` 网格在 RN StyleSheet 里表达不出来、迁完是可见退步。三条源码级理由见 G-4 节 |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
 ---
