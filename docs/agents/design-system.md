@@ -123,7 +123,10 @@ React Native 的 `View` 默认 `flex: 0 0 auto`（与 CSS 的 `0 1 auto` **不�
 | 端 | 合法载体 |
 |---|---|
 | web | `SettingsInfoTip`（`apps/web/src/features/settings/SettingsInfoTip.tsx`），渲染成 `?`，悬停**或**聚焦展开，`Esc` 收起，正文常驻 DOM 由 `aria-describedby` 指向 |
-| mobile | 同名组件的移动版（`InfoTip`，点击展开）—— ⚠️ 尚未建，移动端的存量在账本里 |
+| mobile | 共享层那份 `SettingsInfoTip`（`packages/ui/src/settings/Settings.tsx`，RN 原语，**点一下**展开 —— 原生没有 hover）。它与 web 那份只差开合方式，语义同一（`aria-expanded` / `accessibilityRole`） |
+
+> ⚠️ 这一行**曾经写着"mobile 尚未建"**，而共享层那份早就在用（`grep -rn "SettingsInfoTip" apps/mobile/src` 现量）。
+> 状态一变注释不会自己跟着变 —— 要核载体在不在，读那份 `export function` 与它的调用点，别读这句话。
 
 三条例外（**写清楚才好反驳**）：
 
