@@ -200,7 +200,7 @@ function PasswordField(props: {
       }
     >
       {(fieldProps) => (
-        <div className="ht-settings__actions">
+        <div className="ht-input-field__fieldrow">
           <input
             {...fieldProps}
             ref={props.inputRef}
@@ -426,7 +426,7 @@ export function PasswordPanel(): React.JSX.Element {
             所以这里不再单起一行。
           */}
 
-          <div className="ht-settings__actions">
+          <div className="ht-input-field__actions">
             <button
               type="button"
               className="ht-btn ht-btn--primary"
@@ -456,17 +456,19 @@ export function PasswordPanel(): React.JSX.Element {
             >
               {t('web.settings.password.switchToChange')}
             </button>
-          </div>
 
-          {/*
-            🔴 这句与改密那张的 `otherDevices` 是**相反**的后果，且必须在点之前看得见：
-            加一个认证器不把任何人踢下线（这条不 bump `tokenVersion`）。
-          */}
-          <SettingsInfoTip
-            testId="tip-password-set-consequence"
-            label={t('web.settings.password.setConsequence')}
-            text={t('web.settings.password.setConsequence')}
-          />
+            {/*
+              🔴 这句与改密那张的 `otherDevices` 是**相反**的后果，且必须在点之前看得见：
+              加一个认证器不把任何人踢下线（这条不 bump `tokenVersion`）。
+              ⚠️ 与改密那张同一处毛病：这句要挂在**按钮旁**，不是独立一块 ——
+              独立一块在屏幕上就是一枚没有归属的问号（2026-11-04 看图腿抓到）。
+            */}
+            <SettingsInfoTip
+              testId="tip-password-set-consequence"
+              label={t('web.settings.password.setConsequence')}
+              text={t('web.settings.password.setConsequence')}
+            />
+          </div>
 
           <div aria-live="polite" data-testid="password-set-live">
             {localError !== undefined && (
@@ -527,7 +529,7 @@ export function PasswordPanel(): React.JSX.Element {
           }}
           />
 
-          <div className="ht-settings__actions">
+          <div className="ht-input-field__actions">
             <button
               type="button"
               className="ht-btn ht-btn--primary"
@@ -562,6 +564,18 @@ export function PasswordPanel(): React.JSX.Element {
                 {t('common.auth.form.forgotPassword')}
               </button>
             )}
+
+            {/*
+              🔴 这句在**点之前**就得能看到 —— 但"看到"不等于"占一整行"
+              （2026-10-24 禁令）：它是**按钮旁**的 `?`，点开就是后果说明。
+              ⚠️ 2026-11-04 看图腿抓到的正是这里：注释写的是"按钮旁"，代码却把它
+              排在段落后面当独立一块 ⇒ 屏幕上是一枚没有归属的孤零零问号。
+            */}
+            <SettingsInfoTip
+              testId="tip-password-consequence"
+              label={t('web.settings.password.otherDevices')}
+              text={t('web.settings.password.otherDevices')}
+            />
           </div>
 
           {/*
@@ -573,16 +587,6 @@ export function PasswordPanel(): React.JSX.Element {
               {t('web.settings.password.resetTo', { email })}
             </p>
           )}
-
-          {/*
-            🔴 这句在**点之前**就得能看到 —— 但"看到"不等于"占一整行"
-            （2026-10-24 禁令）：它是按钮旁的 `?`，点开就是后果说明。
-          */}
-          <SettingsInfoTip
-            testId="tip-password-consequence"
-            label={t('web.settings.password.otherDevices')}
-            text={t('web.settings.password.otherDevices')}
-          />
 
           {/*
             「从来没设过？」是**主动**出口：不必先撞一次墙才找得到另一张表。

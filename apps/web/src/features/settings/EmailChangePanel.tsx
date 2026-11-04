@@ -298,7 +298,7 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
           testID="email-change-form"
         >
           {(fieldProps) => (
-            <div className="ht-settings__actions">
+            <div className="ht-input-field__fieldrow">
               <input
                 {...fieldProps}
                 className="ht-input"
