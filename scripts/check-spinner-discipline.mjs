@@ -41,18 +41,27 @@ async function main() {
       process.exit(1);
     }
     writeFileSync(target, mutated);
+    /**
+     * 🔴 退出放在还原之后：`process.exit` 写在 `try` 里会跳过 `finally`，
+     *   注入的变异就被留在工作树里（本仓两把尺都踩过这个）。
+     */
+    let failure = null;
     try {
       const { code } = await exec('node', ['scripts/check-spinner-discipline.mjs']).then(
         () => ({ code: 0 }),
         (e) => ({ code: e.code ?? 1 }),
       );
       if (code === 0) {
-        console.error('self-test: 注入违规后门仍绿 ⇒ 这把尺不能失败，没有价值');
-        process.exit(1);
+        failure = 'self-test: 注入违规后门仍绿 ⇒ 这把尺不能失败，没有价值';
+      } else {
+        console.log(`self-test: ✅ 变异臂红（注入不带 ${SPINNER_CLASS} 的 Loader2 后门禁正确拒绝）`);
       }
-      console.log(`self-test: ✅ 变异臂红（注入不带 ${SPINNER_CLASS} 的 Loader2 后门禁正确拒绝）`);
     } finally {
       writeFileSync(target, original);
+    }
+    if (failure !== null) {
+      console.error(`${failure}（工作树已还原）`);
+      process.exit(1);
     }
     return;
   }

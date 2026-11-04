@@ -49,7 +49,7 @@
 | 层 | 位置 | 谁用 |
 |---|---|---|
 | **判断**（错误让位 / 必填 / id 怎么拼） | `packages/ui/src/form/anatomy.ts`（`resolveFieldChrome` / `fieldDescribedById`） | 两端 |
-| web 渲染器（HTML + CSS） | `apps/web/src/lib/form/FormField.tsx` + `apps/web/src/styles/app/form.css` | web 的 3 处已迁移 |
+| web 渲染器（HTML + CSS） | `apps/web/src/lib/form/FormField.tsx` + `apps/web/src/styles/app/form.css` | 调用点数由 `grep -rln "lib/form/FormField" apps/web/src` 给，别抄这里 |
 | 移动端渲染器（RN） | `apps/mobile/src/ui/kit.tsx#TextField`（**已消费同一份判断**） | 移动端全部 `TextField` 调用点 |
 
 判据：`packages/ui/tests/form-anatomy.spec.ts` A1–C2（10 条，钉判断）+
@@ -73,6 +73,39 @@ AI 端点的三行 `inline` 字段、保险库口令的六格 `stacked` 字段�
 基线从 72 重设为 **35**，当天晚些时候降到 **0** —— web 壳里**一处手写字段标签都不剩**
 （最后 10 处是后台 `admin/AdminPanel.tsx`）。重设基线用 `--reseed`，
 它只许在**指标定义变了**时用。
+
+### 1b. 🔴 同一屏里还有第二种"行"：对象行不许跟着字段走
+
+上面那张表只解决了**字段**（改一个属性）。设置页里另一族行**不是字段**：
+**一行 = 一个对象**（一台登录设备、一枚通行密钥），带几行事实，外加只对得起那个对象的动作。
+这一族也只有**一份实现**：`packages/ui/src/settings/model.ts` 的 `SettingsRowModel`
+（渲染器 `Settings.tsx`，两端共用）。
+
+| 这一行是什么 | 走哪份 | 为什么不能混 |
+|---|---|---|
+| 改同一对象的一个属性（昵称、新邮箱、口令、改名输入框） | `FormField`（§1 那两档解剖之一） | 它需要 `htmlFor`/`id`/错误让位/必填记号 —— 对象行没有这些概念 |
+| 一个对象 + 尾随动作（撤销这台设备 / 删除这枚凭据） | `SettingsRowModel` 的 **`trailing`** 档 | 不能用 `action` 档：那让**整行**可点，会把"选中这行"与"销毁这个对象"混成同一个手势，而两者代价完全不同 |
+| 只读的一行"名字 → 值" | `value` 档 | 它不是输入框，套 `FormField` 会多出一层控件语义 |
+| 开关 / 说明 / 小标题 | `toggle` / `note` / `heading` 档 | 同上，各档语义不同 |
+
+**说明文字（`?`）的载体也只有一个**，且**位置**有尺：字段的 `?` 走 `FormField.labelTip`、
+分组标题的 `?` 走 `SettingsSection.titleTip`、行自己的 `?` 走行模型的 `hint`；
+把它当独立一块排在段落之后 = 屏幕上出现一枚没有归属的问号。
+
+判据（都做过注入验证，现量各由脚本自己打印）：
+
+| 尺 | 钉住什么 |
+|---|---|
+| `pnpm check:form-anatomy` | 手写字段标签只减不增；`.ht-input-field*` 只在 `form.css` 定义 |
+| `pnpm check:settings-row-anatomy` | web 设置面**不许长出新一套行容器**（账本制，逐文件） |
+| `pnpm check:tip-adjacency` | 每一枚 `?` 紧跟它所解释的标签/小标题（账本制） |
+| `pnpm check:settings-prose` | 说明文字不许内联（只许进 `?`），例外三族见 `docs/agents/design-system.md` |
+
+🔴 **已知的契约缺口（不是偷懒）**：`SettingsSection` 只支持"先 rows 后 children"，
+所以**类型化行与宿主字段不能交错**。`ProfilePanel` 的头像行 / 邮箱行因此还留在手写容器里
+（昵称字段夹在中间）。要收掉它只有三条路，每一条都会改变外观或契约：
+支持混排 / 重排三格顺序 / 多一块容器（分节线随之变）。这条待决在
+`docs/plans/settings-ui-governance-2026-11.md` G-4 那节，**别用"再写一套行"来绕它**。
 
 ---
 
@@ -189,6 +222,7 @@ WCAG 1.4.11 的 Boundaries 一节原文：
 | 原则 | 判据 | 能红吗 |
 |---|---|---|
 | §1 两种解剖 | `check:form-anatomy`（R1 账本 / R2 单一来源）+ e2e **S3** | ✅ 两条臂注入验证过（新增一处 `<label>`、在 habits.css 加一条 `.ht-input-field--rogue`，各自精确红） |
+| §1b 对象行只有一份 | `check:settings-row-anatomy`（行容器账本）+ `check:tip-adjacency`（`?` 的位置账本）+ `check:settings-prose`（说明只许进 `?`） | ✅ 三把尺**都有 `--self-test` 变异臂并接进链**：塞一枚新行容器 / 塞一枚独立一块的 `?` / 塞一句 ≥40 字的内联说明，各自精确红。"缩了不回来改账本"那一臂也在 2026-11-04 被真实改动各抓到一次 |
 | §2 一档高度 | `e2e/tests/helpers.ts#assertFormRhythm`（**共享判据**），被 e2e **S2** 与自动收集规则面板调用 | ✅ 注入 `block-size: 32` ⇒ 报「表单里出现了 2 档控件高度：44 / 32」 |
 | §3 动作常驻 | e2e **S1** | ✅ 改前实测 689 > 632 |
 | §4 配置收起 | e2e **S4** | ✅ 反向断言（收起态必须为 0） |

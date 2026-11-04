@@ -50,6 +50,68 @@ import { join, relative } from 'node:path';
 const ROOT = process.cwd();
 
 /**
+ * 🔴 变异臂（2026-11-04 补）。这把尺 2026-10-24 就立了，但**它自己从来没有能失败过一次**
+ *   —— 没有 `--self-test`，"它能红"只是文件里的一句话。本仓的元规则二写着：
+ *   **一条永远通过的判据比没有判据更糟**。今天手工注入验过一次（红在
+ *   `账本外的新说明文字：…WidgetPushPanel.tsx（1 处）`），就把它固化成臂，
+ *   否则下一次改动悄悄让它失明，谁都不会知道。
+ *
+ * 注入的是**按内容判**的那一臂（第二臂）：一条 zh 长度 ≥ 40 的文案出现在没有载体标记的行里。
+ * 第一版探针选了 `common.sessions.intro`（39 字）⇒ 注入后仍绿 —— 那不是尺没牙，
+ * 是探针没够到阈值；所以这里用 68 字的 `web.widgetPush.description`，
+ * 并且**先要求未变异时门是绿的**，避免"环境本来就红"被读成"臂成功了"。
+ *
+ * ⚠️ 还原只从**当前工作树那份字节**（不是 `git show HEAD:` —— 那会把未入库的改动抹掉），
+ *   而且**退出一律放在还原之后**（`process.exit` 在 `finally` 里会跳过 `finally` 本身）。
+ */
+if (process.argv.includes('--self-test')) {
+  const target = join(ROOT, 'apps/web/src/features/settings/WidgetPushPanel.tsx');
+  const rel = relative(ROOT, target);
+  const original = readFileSync(target, 'utf8');
+  const anchor = '    <HeytaUiProvider>\n';
+  const injected =
+    anchor + '    <p className="ht-settings__hint">{t(\'web.widgetPush.description\')}</p>\n';
+  if (!original.includes(anchor)) {
+    console.error('self-test: 找不到注入锚点（`<HeytaUiProvider>` 那一行），夹具失效');
+    process.exit(1);
+  }
+  const run = () => {
+    try {
+      execFileSync(process.execPath, ['scripts/check-settings-no-prose.mjs'], {
+        cwd: ROOT,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      return { code: 0, out: '' };
+    } catch (e) {
+      return { code: e.status ?? 1, out: `${e.stdout ?? ''}${e.stderr ?? ''}` };
+    }
+  };
+  let verdict = 0;
+  try {
+    const baseline = run();
+    if (baseline.code !== 0) {
+      console.error('self-test: 变异**之前**门就是红的 ⇒ 无法归因，先修环境再验臂');
+      verdict = 1;
+    } else {
+      writeFileSync(target, original.replace(anchor, injected));
+      const mutated = run();
+      if (mutated.code === 0) {
+        console.error('self-test: 注入一句 ≥40 字的内联说明后门仍绿 ⇒ 这把尺不能失败');
+        verdict = 1;
+      } else if (!mutated.out.includes(rel)) {
+        console.error(`self-test: 注入了 ${rel}，红的却不是它`);
+        verdict = 1;
+      } else {
+        console.log(`self-test: ✅ 变异臂红（注入内联说明后门禁正确拒绝，并点名 ${rel}）`);
+      }
+    }
+  } finally {
+    writeFileSync(target, original);
+  }
+  process.exit(verdict);
+}
+
+/**
  * 第二臂：**按文案长度判**（2026-10-24 晚加，因为第一臂漏了一整片）。
  *
  * 第一臂只认 `ht-settings__*hint*` 那族类名 —— 而「AI 与集成 → 自动收集规则」那一块

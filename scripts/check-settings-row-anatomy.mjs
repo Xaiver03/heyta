@@ -113,15 +113,25 @@ function main() {
       process.exit(1);
     }
     writeFileSync(join(ROOT, target), mutated);
+    /**
+     * 🔴 退出一律放在**还原之后**：`process.exit` 写在 `try` 里会跳过 `finally`，
+     *   于是注入的变异被留在工作树里 —— 本仓另一把尺（`check-tip-adjacency` 第一版）
+     *   真踩过这个，症状是别人下一次读到一份带 `__MUT_` 的源码。
+     */
+    let failure = null;
     try {
       const reds = evaluate(scan(), readLedger());
       if (reds.length === 0) {
-        console.error('self-test: ❌ 注入第六套容器后门仍绿 ⇒ 这把尺不能失败，没有价值');
-        process.exit(1);
+        failure = 'self-test: ❌ 注入第六套容器后门仍绿 ⇒ 这把尺不能失败，没有价值';
+      } else {
+        console.log(`self-test: ✅ 变异臂红（注入一处 ht-settings__section 后门禁拒绝：${reds[0]}）`);
       }
-      console.log(`self-test: ✅ 变异臂红（注入一处 ht-settings__section 后门禁拒绝：${reds[0]}）`);
     } finally {
       writeFileSync(join(ROOT, target), original);
+    }
+    if (failure !== null) {
+      console.error(`${failure}（工作树已还原）`);
+      process.exit(1);
     }
     return;
   }

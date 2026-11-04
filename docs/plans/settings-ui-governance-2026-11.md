@@ -318,3 +318,16 @@ iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devi
    ⇒ 前 3 条只保证"这把尺能量"，第 4 条才保证"有人踩上去"。三枚现已各有
    `pnpm check:{spinner-discipline,font-size-discipline,settings-row-anatomy}` 定义并进链
    （G-1 那枚本来就接在 `check:control-semantics` 里），`check:gate-wiring` 现量 rc=0。
+
+5. **变异臂要跟着别名跑**，不能只在脚本里躺着。本轮把设置面这五枚的别名统一成
+   `… --self-test && …`（与仓里 `check:dirty-form-policy` / `check:danger-confirm` 同一形状）：
+   `settings-prose` / `spinner-discipline` / `font-size-discipline` / `settings-row-anatomy` / `tip-adjacency`。
+   现量：`grep -nE '"check:(settings-prose|spinner-discipline|font-size-discipline|settings-row-anatomy|tip-adjacency)"' package.json`
+   ⇒ 五行都带 `--self-test`；五条别名各跑一遍全 rc=0；跑完 `grep -r "__MUT_ANATOMY\|mut-tip-standalone\|MUT{" apps/web/src` ⇒ 0 残留。
+   ⚠️ 顺带修掉两处**会把变异留在工作树**的写法：`check-settings-row-anatomy` 与
+   `check-spinner-discipline` 的臂在失败分支上直接 `process.exit(1)`，而 `process.exit` 会**跳过 `finally`**
+   ⇒ 注入的那一行留在源码里。两处都改成"只记状态，退出放在还原之后"。
+   `check-settings-no-prose` 原来**根本没有臂**（"它能红"只是文件里的一句话，2026-10-24 立尺到本轮没人失败过它）——
+   补了一枚：注入一句 68 字的内联说明 ⇒ 红并点名文件；**并且先要求未变异时门是绿的**，
+   免得"环境本来就红"被读成"臂成功了"。探针第一版选了 39 字的文案，注入后仍绿 ——
+   那不是尺没牙，是探针没够到 40 字阈值，这条也写在脚本注释里。
