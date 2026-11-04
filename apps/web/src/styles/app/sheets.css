@@ -438,7 +438,13 @@
     margin-inline: calc(var(--ht-space-6) * -1);
     padding-inline: var(--ht-space-6);
     border-block-end: 0;
-    mask-image: linear-gradient(to right, transparent 0%, black 8px, black calc(100% - 8px), transparent 100%);
+    /*
+      淡出停靠位用 **em** 而不是裸 px，也不是新造 token：它是"这一条横向导航自己的字号"
+      的一个比例（渲染几何），不是一条会被设计师调的尺度 —— 为一处单用途的渐变停靠位
+      造一枚 `--ht-*`，得到的只是一个换不出语义的别名（`check:design` 也认相对单位这一条：
+      相对单位随上下文变化，不属于设计尺度）。
+    */
+    mask-image: linear-gradient(to right, transparent 0%, black 0.5em, black calc(100% - 0.5em), transparent 100%);
   }
 
   .ht-settings__nav-link {
