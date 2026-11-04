@@ -143,13 +143,42 @@
 ⚠️ **四象限的现量分布（别把这行读成"都看过了"）**：
 1440 亮 = 真看过（上表那三处就是这么抓到的）；375 亮 = 真看过（`tests/narrow-settings.png`，
 横向导航条与行都正常，那枚 `0.5em` 遮罩淡出在窄屏导航左缘生效）；
-**暗色两档 = 没做像素级看图**。暗色这一格本线的现量是"没有新增任何颜色字面量"：
-`git diff f78a328a4^ HEAD -- …/form.css …/ai-panels.css` 的新增行里
-`grep -cE '#hex|rgb|rgba|[0-9]+px'` ⇒ **0**（只有 token 与 token 的 calc），
-`check:theme` 与 `check:design` 均 rc=0 ⇒ 暗色跟随 token 表，不是跟随这批几何改动。
-**常驻的暗色腿还没建**，而且它不是"再写一个 spec"就完：`settings-row-grammar` 这类 e2e
-**一枚都不在 `pnpm check` 链里**（现量：`grep -c settings-row-grammar package.json` ⇒ 0），
-新建的暗色 spec 同样会 0 次执行 —— 要先定"由哪条 `check:*` 跑它"，那是 e2e 射程的裁决。
+**暗色两档 = 2026-11-04 补看，看图腿已常驻**（见下一节）。
+
+**这一行原来还写着两句错的判断，都被现量否证**（留着是因为它们是同族教训，不是结论）：
+
+1. ~~"暗色这一格本线的现量是没有新增颜色字面量"~~ —— 那是**间接**证据。它否证不了"暗色下画不出来"，
+   而暗色真正会出的事故（文字与底同色）恰恰不动任何字面量。现在这一条改由 e2e 直接判亮度差。
+2. ~~"`settings-row-grammar` 这类 e2e 一枚都不在 `pnpm check` 链里，新建的暗色 spec 同样会 0 次执行"~~ ——
+   这句是**按别名名字去 grep** 读出来的，而链里那枚 `check:ai-e2e` 跑的是 `pnpm --dir e2e run test`
+   （默认 `playwright.config.ts`，`testDir: ./tests`）。现量：`pnpm --dir e2e exec playwright test --list`
+   ⇒ **510 条 / 134 个文件**，其中 `settings-row-grammar` 7 条、`settings-form-alignment` 2 条、
+   `narrow-sweep` 10 条、`theme-switch-contrast` 1 条、`account-email-change-and-sessions` 7 条
+   （逐枚复量：`pnpm --dir e2e exec playwright test --list | grep -c "› <文件名>"`）。
+   **所以这一族不需要新的接线，也不需要谁裁决"哪条 check 跑 e2e"** —— 写新 spec 就自动有人跑。
+   教训与 `docs/agents/` 那条"一把尺在某处读 0，只说明它扫的那套写法里没有"是同一件事：
+   这次扫的是**别名名字**，而消费方是**整条 e2e 套**。
+
+**常驻暗色腿（2026-11-04 补，`account-email-change-and-sessions.spec.ts` 第 8 条）**：
+一条用例跑 1440 与 375 两档，暗色下把迁进共享契约的三格（`profile-avatar-row` /
+`profile-nickname-row` / `profile-email-row`）与会话面板各拍一张，落在受版本控制的
+`apps/web/evidence/account-suite/12…15-*.png`。判据不是只有图：
+
+| 判据 | 为什么这条必须能红 | 现量 |
+|---|---|---|
+| 三格行容器**左缘唯一、宽度唯一** | 本批把三格交给同一个列表渲染；两列网格与 `FormField` 网格混用时左缘会散（1440 亮档那三处缺陷就是这么抓到的） | 两档都过 |
+| 行不许越过浮层右缘 | 窄档溢出只会出现在 375，亮色 1440 那趟看不见 | 两档都过 |
+| **暗色下文字比底亮**（WCAG 相对亮度差 >0.1） | 文字与底同色是暗色最典型的事故，而它**不动任何颜色字面量** ⇒ 上面那条"没有新增字面量"的间接证据抓不到 | 两档都过 |
+| 确认复选框**盒子不被拉伸**（≤24px）**且**与正文相邻（≤16px） | 看图时抓到：注销账号那句确认话被画在两列网格的第二列，复选框在 8rem 的标签列里 | 修后过；变异臂（把 label 挂回 `__row`）报 **121px** |
+
+⚠️ **只量"复选框到文字的距离"会读成绿**：盒子被撑满整列时右缘恰好贴着下一列，变异臂实测距离只有
+**19px**（看着像挨着），而屏幕上那个小方块离正文一百多像素。所以这一格是**两把尺子**，缺一把漏一半。
+
+🔴 **这一族的一个探针坑（本线踩过两次）**：`HEYTA_E2E_APP_PORT` / `HEYTA_E2E_STUB_PORT` **复用上一趟的号码**
+会得到一次假红 —— 症状是应用停在启动闪屏（page snapshot 只有 `img "heyta"`），
+`openApp` 等 `input[placeholder^="添加任务"]` 15s 超时，**看起来像负载问题**。
+同一趟里换一对没用过的端口 ⇒ 立刻 8/8 绿；同一对端口再跑 ⇒ 又红。
+复量：`lsof -nP -iTCP:<port> -sTCP:LISTEN`（跑完应当为空；不为空就是上一趟的服务没退）。
 
 **看图时顺带撞到的两处，登记但本线不修**：
 
@@ -319,7 +348,7 @@ iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devi
 | W1（本轮） | G-4 迁移那一半 | ✅ 四格字段迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令）+ 一格行迁 `trailing` 档（SessionsPanel）；账本逐次收缩，现量 `cat scripts/settings-row-anatomy-ledger.json` |
 | W2 | G-6 位置尺进链 | ✅ `check:tip-adjacency` 的定义与链上那一节已入库，同批把本线四枚同族尺的定义都带上 `--self-test` 臂（做法与卡点见 G-6 第三半）|
 | W2 | G-4 的 mobile 那一格 | ⏸ `apps/mobile/src/screens/SessionsSection.tsx` 改吃 `trailing` 档：契约已就位，欠一次设备腿（Android 载体在 linux-dev，iOS 那枚可能被别线占） |
-| W2 | 暗色两档的常驻看图腿 | ⏸ 现量：`grep -c settings-row-grammar package.json` ⇒ 0 —— 设置面那几枚 e2e（`settings-row-grammar` / `settings-form-alignment` / `narrow-sweep`）**一枚都不在 `pnpm check` 链里**，`check:e2e-specs-parse` 只验"能不能解析"。所以再写一枚暗色 spec 也还是 0 次执行：先要定"由哪条 `check:*` 跑 e2e 全量/分片"，那是 e2e 射程的裁决，不是本线能顺手加的 |
+| W2 | 暗色两档的常驻看图腿 | ✅ 已建并真看过（`account-email-change-and-sessions.spec.ts` 第 8 条，1440 + 375 暗色，抓到并修掉确认复选框那一格）。**这一行原来那句"设置面那几枚 e2e 一枚都不在链里"是假的** —— 链里 `check:ai-e2e` 跑整条默认套（现量 `pnpm --dir e2e exec playwright test --list` 的总数），新 spec 自动有人跑，不需要额外裁决 |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
 ---

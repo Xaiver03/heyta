@@ -1,8 +1,8 @@
 {
- "total": 39,
+ "total": 38,
  "files": {
   "AiSettings.tsx": 8,
-  "CloseAccountPanel.tsx": 2,
+  "CloseAccountPanel.tsx": 1,
   "DataSettingsPanel.tsx": 6,
   "EmailChangePanel.tsx": 2,
   "ExportPanel.tsx": 2,

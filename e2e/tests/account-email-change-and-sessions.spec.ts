@@ -25,6 +25,8 @@ import {
   selectSettingsSection,
   stubLegalRecheck,
   stubPublicFacts,
+  switchTheme,
+  waitForOverlaySettled,
 } from './helpers';
 
 /** 一个**不属于**假端点（4319）的地址：这样"这条请求归谁"没有歧义。 */
@@ -605,4 +607,171 @@ test('🔴 反证：改密那条路由 500 时不许画成"已修改"（读失�
 
   await closeSettingsSheet(page);
   assertNoProblems(problems, ['/api/password/change']);
+});
+
+/*
+  暗色两档的常驻看图腿（治理计划 G-4 收尾，2026-11-04）。
+
+  为什么这一条存在：本批把头像 / 昵称 / 邮箱三格迁进共享契约，而看图腿此前只覆盖
+  **亮色**（`docs/plans/settings-ui-governance-2026-11.md` 四象限那行写着"暗色两档 = 没做像素级看图"）。
+  暗色此前本线的现量只有"没有新增颜色字面量"—— 那是**间接**证据，不等于"暗色下画得出来"。
+
+  🔴 它不只是拍图，两条能判红的断言：
+    · 暗色下文字必须**比底亮**（文字与底同色是暗色最容易出的事故，而它不会让任何一条亮色判据变红）；
+    · 三格行容器必须**同一个左缘与同一个宽度**，且整行不许超出面板右缘（窄档溢出就是这么露出来的）。
+  ⚠️ 图与亮色那十一张同目录、同纪律（受版本控制，`e2e/test-results/` 里不留东西）。
+*/
+
+type Swatch = { readonly color: string; readonly bg: string };
+
+/** `rgb()/rgba()` → 相对亮度（WCAG 那条线性化）。取不到就返回 -1，让断言自己红。 */
+function luminOf(cssColor: string): number {
+  const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/u.exec(cssColor);
+  if (m === null) return -1;
+  const channel = (raw: string): number => {
+    const s = Number(raw) / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const alpha = m[4] === undefined ? 1 : Number(m[4]);
+  // 半透明底先按"贴在纯白上"折算，再判亮度：暗色主题里带 alpha 的面板不该被读成"很暗"。
+  const mix = (s: number): number => s * alpha + 255 * (1 - alpha);
+  const [r, g, b] = [m[1]!, m[2]!, m[3]!].map((raw) => channel(String(mix(Number(raw)))));
+  return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
+}
+
+test('暗色两档看图腿：迁进共享契约的三格在 1440 与 375 的暗色下画得出来、文字比底亮', async ({
+  page,
+}) => {
+  const problems = captureProblems(page);
+  const fx = newFixture();
+
+  const measure = async (): Promise<{
+    readonly rows: Array<{ readonly x: number; readonly width: number }>;
+    readonly swatch: Swatch;
+    readonly overflow: Array<{ readonly id: string; readonly over: number }>;
+  }> =>
+    page.evaluate(() => {
+      const ids = ['profile-avatar-row', 'profile-nickname-row', 'profile-email-row'];
+      const panel = document.querySelector<HTMLElement>('[data-testid="profile-panel"]');
+      const rows = ids.map((id) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`));
+      // 底的亮度：从文字所在行往上找**第一层不透明**的背景，找不到就用 `html` 的。
+      let node: HTMLElement | null = rows[2] ?? panel;
+      let bg = 'rgba(0, 0, 0, 0)';
+      while (node !== null) {
+        const c = getComputedStyle(node).backgroundColor;
+        if (!/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)/u.test(c)) {
+          bg = c;
+          break;
+        }
+        node = node.parentElement;
+      }
+      const value = document.querySelector<HTMLElement>('[data-testid="profile-email"]');
+      const sheet = document.querySelector<HTMLElement>('[data-testid="settings-sheet"]') ?? document.body;
+      const sheetBox = sheet.getBoundingClientRect();
+      const overflow = rows
+        .map((row, i) => ({
+          id: ids[i]!,
+          over: row === null ? 0 : row.getBoundingClientRect().right - sheetBox.right,
+        }))
+        .filter((entry) => entry.over > 1);
+      return {
+        rows: rows.map((row) => {
+          const box = row?.getBoundingClientRect();
+          return { x: box?.left ?? -1, width: box?.width ?? -1 };
+        }),
+        swatch: { color: value === null ? 'rgb(0, 0, 0)' : getComputedStyle(value).color, bg },
+        overflow,
+      };
+    });
+
+  for (const width of [1440, 375]) {
+    await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
+    if (width === 1440) {
+      await boot(page, fx);
+      await closeSettingsSheet(page);
+      await switchTheme(page, 'dark');
+    }
+    await openSettingsSheet(page);
+    await waitForOverlaySettled(page, 'settings-sheet');
+    await selectSettingsSection(page, 'profile');
+
+    const panel = page.getByTestId('profile-panel');
+    await expect(panel, '暗色下这三格必须**存在**（不存在会被下面那条 unique 断言掩盖）').toHaveCount(1);
+    for (const id of ['profile-avatar-row', 'profile-nickname-row', 'profile-email-row']) {
+      await expect(page.getByTestId(id), `暗色窄档少了 ${id}`).toBeVisible();
+    }
+    const m = await measure();
+    // 🔴 三格同一左缘、同一宽度 —— 这正是本批要消掉的那件事，暗色/窄档不许把它换回来。
+    const lefts = new Set(m.rows.map((r) => Math.round(r.x)));
+    expect(lefts.size, `三格行容器左缘不唯一：${JSON.stringify(m.rows)}`).toBe(1);
+    const widths = new Set(m.rows.map((r) => Math.round(r.width)));
+    expect(widths.size, `三格行容器宽度不唯一：${JSON.stringify(m.rows)}`).toBe(1);
+    expect(m.overflow, '有行超出浮层右缘（窄档溢出）').toEqual([]);
+    // 暗色最典型的事故：文字与底同色。亮色判据抓不到它，所以这一句必须在这里判。
+    const textLum = luminOf(m.swatch.color);
+    const bgLum = luminOf(m.swatch.bg);
+    expect(textLum, `读不到文字颜色：${m.swatch.color}`).toBeGreaterThanOrEqual(0);
+    expect(bgLum, `读到底色：${m.swatch.bg}`).toBeGreaterThanOrEqual(0);
+    expect(
+      textLum - bgLum,
+      `暗色下文字不比底亮：color=${m.swatch.color} bg=${m.swatch.bg}`,
+    ).toBeGreaterThan(0.1);
+    await shot(page, panel, width === 1440 ? '12-profile-dark-1440' : '14-profile-dark-375');
+
+    await selectSettingsSection(page, 'account');
+    const sessions = page.getByTestId('sessions-panel');
+    await expect(sessions).toBeVisible();
+    await shot(page, sessions, width === 1440 ? '13-sessions-dark-1440' : '15-sessions-dark-375');
+
+    /*
+      🔴 两条**只有看图才会想到要量**的几何断言 —— 它们都是这一趟看图时抓到的形状，
+      不是先写规则再找证据：
+      · 注销账号那张卡里的确认复选框原来被套进 `.ht-settings__row`（两列网格，第一列
+        `minmax(5rem, 8rem)`），现量 1440 档复选框的盒子宽 **121px**、375 档 **270px**，
+        它要确认的那句话在第二列 —— 控件与标签隔了一整列宽。已改成 inline 流，这里钉住"相邻"。
+      · 换绑邮箱那一格在 375 档输入框与「发起更换」按钮**不许互相压住**（现量 1440 间隔 8px、
+        375 间隔 8px；placeholder 被输入框自己截断是正常的，压住才是事故）。
+    */
+    const ack = await page.evaluate(() => {
+      const box = document.querySelector<HTMLInputElement>('#close-account-ack');
+      if (box === null) return null;
+      let textX: number | null = null;
+      box.closest('label')?.childNodes.forEach((node) => {
+        if (node.nodeType === 3 && (node.textContent ?? '').trim() !== '') {
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          const x = range.getBoundingClientRect().x;
+          if (textX === null || x < textX) textX = x;
+        }
+      });
+      const b = box.getBoundingClientRect();
+      return { width: Math.round(b.width), gap: textX === null ? null : Math.round(textX - b.right) };
+    });
+    expect(ack, '注销账号的确认复选框找不到').not.toBeNull();
+    /*
+      🔴 两把尺子，缺一把都会漏：
+      · **盒子宽度**：原生复选框是固有尺寸的小方块。盒子被拉开（实测套进两列网格时是 121px，
+        375 档单列时 270px）就说明它被放进了**给文字用**的那一列 —— 屏幕上看到的是
+        "小方块孤零零在左边，句子在很远的右边"。
+      · **与正文的距离**：盒子右缘到那句话第一个字。
+      为什么不能只量距离：盒子被撑满整列时，右缘恰好贴着下一列，距离只有 19px（变异臂实测到的数），
+      看着像"挨着"，而真正的小方块离正文一百多像素。**只量距离会把这一族缺陷读成绿。**
+    */
+    expect(ack!.width, `确认复选框的盒子被拉到 ${ack!.width}px（原生复选框不该被拉伸）`).toBeLessThanOrEqual(24);
+    expect(ack!.gap, '确认复选框与它那句话之间找不到文字').not.toBeNull();
+    expect(ack!.gap!, `确认复选框与它的标签隔了 ${ack!.gap}px（>16 就是不挨着）`).toBeLessThanOrEqual(16);
+
+    const fieldOverlap = await page.evaluate(() => {
+      const input = document.querySelector<HTMLElement>('[data-testid="email-change-new"]');
+      const button = document.querySelector<HTMLElement>('[data-testid="email-change-submit"]');
+      if (input === null || button === null) return null;
+      return Math.round(input.getBoundingClientRect().right - button.getBoundingClientRect().left);
+    });
+    expect(fieldOverlap, '换绑邮箱的输入框压到了「发起更换」按钮').not.toBeNull();
+    expect(fieldOverlap, `输入框右缘越过按钮左缘 ${fieldOverlap}px`).toBeLessThanOrEqual(0);
+
+    await closeSettingsSheet(page);
+  }
+
+  assertNoProblems(problems);
 });
