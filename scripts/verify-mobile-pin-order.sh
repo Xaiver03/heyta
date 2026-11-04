@@ -67,9 +67,20 @@ jget() { printf '%s' "$1" | python3 -c "import json,sys;print(json.load(sys.stdi
 phone_db() { echo "$(xcrun simctl get_app_container "$UDID" "${BID}" data 2>/dev/null)/Library/heyta.sqlite"; }
 apps_count() { sqlite3 "${PHONE_DB}" "SELECT COUNT(*) FROM ops;" 2>/dev/null | tr -d ' '; }
 
-# 行的中心点（设备坐标）。找不到就返回空 —— 调用方必须把空当成红，不许当 0。
-row_center() {  # <标题>
+# 取那一行无障碍节点上的一个字段（y / height / …）。
+row_raw_field() {  # <标题> <字段>
   local out; out=$(ax "打开任务：$1" --pressable --list --json)
+  [ "$(jget "$out" found)" = "True" ] || return 1
+  jget "$out" "$2"
+}
+
+# 行的中心点（设备坐标）。找不到就返回空 —— 调用方必须把空当成红，不许当 0。
+# 🔴 读数之前先 `--scroll-into-view`：这台设备的库里会**攒下上一趟钉住的那条**
+#    （置顶是持久状态，不会自己消失），于是这一趟新建的两行被挤到 ScrollView 折叠线
+#    附近 —— 长按落在半截行上就打不开菜单（实测：截图里目标行只剩上半截，
+#    「置顶」不在树上）。滚进可见区之后 y 坐标才是能点的那块地。
+row_center() {  # <标题>
+  local out; out=$(ax "打开任务：$1" --pressable --scroll-into-view --list --json)
   [ "$(jget "$out" found)" = "True" ] || return 1
   python3 -c 'import sys;a=[float(x) for x in sys.argv[1:]];print(int(a[0]+a[2]/2),int(a[1]+a[3]/2))' \
     "$(jget "$out" x)" "$(jget "$out" y)" "$(jget "$out" width)" "$(jget "$out" height)"
@@ -77,9 +88,38 @@ row_center() {  # <标题>
 
 # 行的 y（顺序读数的唯一依据）。
 row_y() {  # <标题>
-  local out; out=$(ax "打开任务：$1" --pressable --list --json)
+  local out; out=$(ax "打开任务：$1" --pressable --scroll-into-view --list --json)
   [ "$(jget "$out" found)" = "True" ] || return 1
   jget "$out" y
+}
+
+# 🔴 长按这一格必须"按下之后回读，没开成就重来"，而不是"调用了 tap 就算开了"。
+#    实测（2026-11-05 00:1x，本机 iPhone Duo heyta）：目标行的无障碍框报 y=455、
+#    高 74，看起来整行都在列表里；但**短按同一个点 (217,492) 什么都没打开**，
+#    而长按上一行 (217,410) 立刻开出菜单 —— 也就是那一行的**真命中区比 AX 框低一档**
+#    （截图里它正好压在列表下沿，标题被裁掉半截）。
+#    所以这里不猜坐标：按下去 → 回读菜单在不在 → 不在就把列表往上滚一段再来。
+#    滚动用 `idb ui swipe --duration 1.0`（直接操纵、无惯性，单位是**秒**）。
+menu_open() {
+  local _p
+  for _p in "置顶" "取消置顶"; do
+    [ "$(jget "$(ax "$_p" --pressable --exact --list --json)" found)" = "True" ] && return 0
+  done
+  return 1
+}
+
+open_row_menu() {  # <标题>
+  local i cxy
+  for i in 1 2 3; do
+    cxy=$(row_center "$1") || return 1
+    idb_ui tap --duration 0.9 ${cxy} >/dev/null 2>&1
+    sleep 2
+    menu_open && return 0
+    echo "     （第 $i 次长按没开出菜单，把列表往上滚一段再来）"
+    idb_ui swipe 196 470 196 300 --duration 1.0 >/dev/null 2>&1
+    sleep 1
+  done
+  return 1
 }
 
 fill_composer_title() {  # <标题>（三层兜底，理由照 journey 那条：AXSetValue 偶发静默失败）
@@ -130,35 +170,67 @@ mkdir -p "$EVIDENCE_DIR"
 # 恢复的就是那一屏 ⇒ 再点 FAB 时那一下落在遮罩上，症状是"Composer 没打开"。
 dismiss_overlays() {
   ax --dismiss-keyboard --json >/dev/null 2>&1 || true
-  for _m in "关闭排序选择" "关闭" "取消" "以后再说" "完成" "返回"; do
-    ax "$_m" --pressable --press --json >/dev/null 2>&1
+  for _m in "关闭排序选择" "以后再说" "完成" "返回"; do
+    # 🔴 `--exact` 是必须的，不是洁癖。实测踩过（本脚本自己写进去的一条 op）：
+    #    不带 --exact 时「取消」子串命中「取消置顶」，于是归一化这一步**自己按下了
+    #    取消置顶**，手机里凭空多一条 `UPD_TASK {"pinnedAt":null}`（现量：
+    #    `sqlite3 <库> "SELECT rowid,json_extract(data,'$.op.actionType'),
+    #     json_extract(data,'$.op.payload') FROM ops ORDER BY rowid DESC LIMIT 8;"`）。
+    #    这正是 traps #109 记过的那一族：标签匹配是子串匹配，会撞车。
+    ax "$_m" --pressable --exact --press --json >/dev/null 2>&1
   done
-  sleep 1
+  # 🔴 行级菜单**没有**「取消」那枚可点的按钮（现量：`"取消" --exact` 在树上
+  #    found=False；不带 --exact 命中的其实是「取消置顶」那一行 —— 按下去就写了一条
+  #    `pinnedAt: null`，见上面那条注释）。能关它的产品手势是**点遮罩**。
+  #    坐标不写死：读这一层最后一项（「删除」）自己的 y，往下挪一段就是遮罩。
+  #    ⚠️ 原来这里走的是"切 tab 收走这一层"（`TasksScreen.tsx` 那条 effect 确实写着），
+  #    但菜单开着的时候底部 tab 被遮罩挡住、按不动（实测：`新建任务` found=False，
+  #    那一步等于没做）—— 所以这条路只在**菜单没开**时成立，不能当收场手段。
+  if [ "$(jget "$(ax "打开详情" --pressable --exact --list --json)" found)" = "True" ]; then
+    local dy
+    dy=$(jget "$(ax "删除" --pressable --exact --list --json)" y)
+    [ -n "$dy" ] || dy=300
+    ax --tap 196 "$((dy + 150))" --json >/dev/null 2>&1
+    sleep 2
+    if [ "$(jget "$(ax "打开详情" --pressable --exact --list --json)" found)" = "True" ]; then
+      ax --tap 196 700 --json >/dev/null 2>&1
+      sleep 2
+    fi
+  fi
 }
 
-# 🔴 图那一格必须**自证不是全黑**：这台机器上 Simulator 没开窗口时，
-#    `xcrun simctl io … screenshot` 返回的是一张 `colorSpan=0` 的黑帧，
-#    尺寸和退出码全部正常 —— 只看"命令没报错"就把它当成取证，等于没取证。
-#    空白判定用仓库现成的那把尺（`scripts/screenshots/png-stats.mjs`，零依赖）。
+# 🔴 图那一格必须**自证不是全黑**，而且要判对"全黑"的形状：
+#    · 黑帧的特征是 colorSpan=0（整屏亮度全同）。仓库那把尺 `looksBlank()` 的另一半是
+#      `contentRatio < 0.01`（非白像素太少），而**白底界面本来就 99% 是白的** ——
+#      现量（2026-11-04 桌面壳那张 desktop-window.png）：contentRatio=0.007、
+#      colorSpan=255、色桶 66，真有内容却被那一半误判成空白。所以这里只用 colorSpan。
+#    · 取图必须显式 --display=primary。不带它时 simctl 挑的是 enumerate 里那个
+#      com.apple.display.captureservice 端口（**宿主的**显示捕获服务）：要么超时
+#      （NSPOSIXErrorDomain code=60 Timeout waiting for screen surfaces），
+#      要么返回一张 colorSpan=0 的全黑帧 —— 尺寸与退出码全部正常，
+#      只看"命令没报错"永远发现不了。真设备那一屏住在 DisplayAdapter 的
+#      Device Name: primary（现量：xcrun simctl io "$UDID" enumerate）。
+# ⚠️ 下面那段 node 代码**不许**用双引号包：双引号里反引号会被 shell 当命令替换执行。
+#    实测踩过：注释里写 contentRatio < 0.01 与 desktop-window.png 各带一对反引号，
+#    跑起来就是 "0.01: No such file or directory" 与 "desktop-window.png: command not found"，
+#    而 node 仍然算出了正确结论 ⇒ 这是一颗会自己藏起来的雷（判据绿着，shell 在报错）。
+#    路径一律走环境变量传入，node 侧只读 process.env。
 SHOT_MISSING=0
 shot() {  # <文件名>
   local f="$EVIDENCE_DIR/$1"
-  xcrun simctl io "$UDID" screenshot "$f" >/dev/null 2>&1
+  xcrun simctl io "$UDID" screenshot --display=primary "$f" >/dev/null 2>&1
   local verdict
-  verdict=$(node --input-type=module -e "
-    import {inspectPng} from '$REPO_ROOT/scripts/screenshots/png-stats.mjs';
-    const s = inspectPng('$f');
-    // 🔴 只按 colorSpan 判"全黑"，不用 looksBlank()：那把尺的另一半是
-    //    `contentRatio < 0.01`（非白像素太少），而**白底界面本来就 99% 是白的**。
-    //    现量（2026-11-04，桌面壳那张 `desktop-window.png`）：contentRatio=0.007
-    //    而 colorSpan=255、色桶 66 —— looksBlank 会把它误判成空白。
-    //    黑帧的形状是 colorSpan=0（亮度全同），这一半才是"全黑"的判据。
-    console.log(s.colorSpan < 16 ? 'blank' : 'ok ' + s.colorSpan);
-  " 2>/dev/null)
+  verdict=$(PNG_PATH="$f" STATS_MODULE="$REPO_ROOT/scripts/screenshots/png-stats.mjs" \
+    node --input-type=module -e '
+      // import 的来源必须是字面量字符串，所以这里走动态 import。
+      const {inspectPng} = await import(process.env.STATS_MODULE);
+      const s = inspectPng(process.env.PNG_PATH);
+      console.log(s.colorSpan < 16 ? "blank" : "ok " + s.colorSpan);
+    ' 2>/dev/null)
   case "$verdict" in
-    ok*) ok "证据图 $1 有内容（色阶差 ${verdict#ok }）" ;;
+    ok*) ok "证据图 $(basename "$f") 有内容（色阶差 ${verdict#ok }）" ;;
     *)   rm -f "$f"; SHOT_MISSING=1
-         echo "   ⚠️  证据图 $1 是全黑帧（colorSpan=0），已删掉不留 —— 这一趟的图那一格**没取到**" ;;
+         echo "   ⚠️  证据图 $1 取回来是空的或全黑（判定：${verdict:-读不到}），已删掉不留 —— 这一趟的图那一格**没取到**" ;;
   esac
 }
 
@@ -192,12 +264,8 @@ YT=$(row_y "$TARGET"); YO=$(row_y "$OTHER")
 ok "置顶之前：「$TARGET」在「$OTHER」下面（y $YT > $YO）"
 
 step "2. 长按「$TARGET」开行菜单"
-CENTER=$(row_center "$TARGET") || { bad "长按点取不到（那一行不在树上）"; summary "iOS 置顶顺序"; }
-idb_ui tap --duration 0.9 ${CENTER} >/dev/null 2>&1
-sleep 2
-PIN_JSON=$(ax "置顶" --pressable --exact --list --json)
-if [ "$(jget "$PIN_JSON" found)" = "True" ]; then
-  ok "长按之后菜单里出现了「置顶」这一项"
+if open_row_menu "$TARGET"; then
+  ok "长按之后菜单里出现了「置顶」/「取消置顶」这一项"
 else
   bad "长按没开出行菜单（「置顶」不在树上）—— 要么手势没送达，要么这一档菜单没接线"
   shot fail-no-menu.png
@@ -218,9 +286,7 @@ fi
 shot after-pin.png
 
 step "4. 反向：再开一次菜单，那一项要说「取消置顶」"
-CENTER2=$(row_center "$TARGET") || { bad "再取长按点失败"; summary "iOS 置顶顺序"; }
-idb_ui tap --duration 0.9 ${CENTER2} >/dev/null 2>&1
-sleep 2
+open_row_menu "$TARGET" || { bad "再开菜单失败（三次长按都没开出那一层）"; summary "iOS 置顶顺序"; }
 if [ "$(jget "$(ax "取消置顶" --pressable --exact --list --json)" found)" = "True" ]; then
   ok "已置顶的行，菜单里那一项自己说「取消置顶」（写进去的是状态，不是一帧视觉）"
 else
@@ -242,6 +308,10 @@ else
 fi
 
 summary "iOS 置顶顺序"
+# 收尾：把这一趟打开的菜单关掉（走应用自己的"切 tab 收走这一层"），
+#   否则下一趟进来面对的就是一个盖住 FAB 的浮层。
+dismiss_overlays
+
 if [ "$SHOT_MISSING" = "1" ]; then
   echo "   ⚠️  图那一格没取到：数值判据（AX 几何 + 真 op-log）成立，但屏幕上没有一张能给人看的图。"
   echo "      候选解法：让 simctl 走有窗口的渲染路径（`open -g -a Simulator --args -CurrentDeviceUDID $UDID`）"
