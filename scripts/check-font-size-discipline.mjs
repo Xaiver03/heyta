@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /**
  * G-3 门禁：可见消息禁 2xs（11px）。
+ * G-2 门禁：.ht-settings__danger 前景必须是 --ht-color-danger。
  *
  * 判据：apps/web/src/styles/app/ai-panels.css 里，
  *   `.ht-settings__danger` / `.ht-settings__notice` / `.ht-settings__hint`
  *   的 font-size 声明不许用 `--ht-font-size-2xs`。
- * 违反 ⇒ 用户最需要看清的字（成功/失败/时间/风险）字号是最小的一档。
+ *   `.ht-settings__danger` 的 color 必须是 `var(--ht-color-danger)`。
+ * 违反 ⇒ 用户最需要看清的字（成功/失败/时间/风险）字号是最小的一档，
+ *        或错误反馈与正文无法区分。
  *
  * 用法：node scripts/check-font-size-discipline.mjs [--self-test]
  */
@@ -81,6 +84,14 @@ async function main() {
   }
 
   console.log(`G-3 字号纪律：✅ ${GUARDED_CLASSES.length} 个消息类均 ≥ xs（12px）`);
+
+  // G-2: .ht-settings__danger 前景必须是 --ht-color-danger
+  const dangerBlock = content.match(/\.ht-settings__danger\s*\{[^}]*\}/s);
+  if (!dangerBlock || !dangerBlock[0].includes('color: var(--ht-color-danger)')) {
+    console.error('G-2 danger 语义色：.ht-settings__danger 的 color 不是 --ht-color-danger');
+    process.exit(1);
+  }
+  console.log('G-2 danger 语义色：✅ .ht-settings__danger → var(--ht-color-danger)');
 }
 
 main().catch((e) => {
