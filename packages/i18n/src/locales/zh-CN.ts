@@ -816,6 +816,13 @@ export const zhCN = {
   'web.rowMenu.label': '任务操作：{title}',
   'web.rowMenu.open': '打开详情',
   'web.rowMenu.delete': '删除',
+  // ↓ 2026-11 滴答对齐：右键菜单扩充（优先级 / 移动 / 子任务 / 标签）
+  'web.rowMenu.priority': '优先级',
+  'web.rowMenu.moveTo': '移动到',
+  'web.rowMenu.addSubtask': '添加子任务',
+  'web.rowMenu.tags': '标签',
+  // 收集箱（无清单归属时的默认落点）
+  'web.rowMenu.inbox': '收集箱',
   // ↓ 移动端行菜单落地时补的几项。**与 web 共用这一族而不是另起 `mobile.rowMenu.*`**：
   //   同一组动作两份文案就是两处会各自漂移的裁决（`open`/`delete`/`childConsequence`
   //   本来就在这一族里）。依据 `docs/plans/task-detail-ticktick-parity.md`。
