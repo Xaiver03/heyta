@@ -280,15 +280,10 @@
     opacity: 1;
   }
 
-  .ht-rail__tab--tool:first-of-type,
-  .ht-rail__tools {
-    /* 塌缩档整条 rail 已经在底部，工具段不再需要自己贴底。 */
+  .ht-rail__tab--tool:first-of-type {
+    /* 塌缩档整条 rail 已经在底部，下段不再需要自己贴底。 */
     margin-top: 0;
     flex-direction: row;
-  }
-
-  .ht-rail__tab--tool-start {
-    margin-top: 0;
   }
 
   /* ══ sidebar：范围筛选区（底栏上方那一区，order 2）══

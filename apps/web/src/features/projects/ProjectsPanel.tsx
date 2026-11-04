@@ -284,6 +284,14 @@ export function ProjectsPanel({
             ) : null}
           </div>
 
+          {/* 分组说明（滴答对齐 D3）：一句话说清这一格装的是什么。
+              列表为空时不画 —— 空态那两句已经讲了同一件事，同一屏说两遍就是噪音。 */}
+          {tree.length === 0 ? null : (
+            <p className="ht-sidebar__organizer-hint ht-type-caption" data-testid="projects-heading-hint">
+              {t('web.projects.headingHint')}
+            </p>
+          )}
+
           <OrganizerList
             kind="project"
             items={tree}
@@ -432,6 +440,13 @@ export function ProjectsPanel({
               <Plus size={ICON_SIZE.sm} aria-hidden="true" />
             </button>
           </div>
+          {/* 分组说明（滴答对齐 D3）：一句话说清这一格装的是什么。
+              列表为空时不画 —— 空态那两句已经讲了同一件事，同一屏说两遍就是噪音。 */}
+          {tagNodes.length === 0 ? null : (
+            <p className="ht-sidebar__organizer-hint ht-type-caption" data-testid="tags-heading-hint">
+              {t('web.tags.headingHint')}
+            </p>
+          )}
 
           {/*
             🔴 标签名此前是一个**不可点的 `<span>`** —— 于是 `TaskFilter` 的

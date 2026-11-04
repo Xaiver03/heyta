@@ -594,6 +594,30 @@ export async function openRowTail(page: Page, rowLocator: Locator): Promise<void
   ).toHaveCount(0);
 }
 
+/**
+ * 走**真路径**进回收站：侧栏底部那一行。
+ *
+ * 🔴 2026-11-04 滴答对齐 D2：回收站原来住 rail 下段（`role="tab"`），现在搬进了
+ * **侧栏底部**（`App.tsx` 的 `SIDEBAR_TOOL_TABS` 那一组）。这一搬带来两个前置，
+ * helper 必须自己处理，否则每个调用点各抄一遍就会漂：
+ *   ① 侧栏只在**任务视图**渲染 ⇒ 人在别的视图时这一行不在 DOM 里，先回「任务」；
+ *   ② 窄档那一列住在抽屉里（`ScopeDrawer` + `task-scope-toggle`）⇒ 先拉开抽屉。
+ * ⚠️ 这两步都是**用户的操作顺序**，不是替产品补洞：真实用户也是这么走到回收站的。
+ */
+async function goTrashViaSidebar(page: Page): Promise<void> {
+  const row = page.getByTestId('sidebar-tool-trash');
+  const narrowRail = page.locator('nav.ht-compact-rail');
+  if (!(await row.isVisible().catch(() => false))) {
+    if (await narrowRail.count()) {
+      await narrowRail.getByRole('button', { name: '任务', exact: true }).click();
+      await page.getByTestId('task-scope-toggle').click();
+    } else {
+      await page.getByRole('tab', { name: '任务' }).click();
+    }
+  }
+  await row.click();
+}
+
 export async function switchView(
   page: Page,
   /**
@@ -633,6 +657,13 @@ export async function switchView(
   if (label === '设置') {
     await dismissFullBleedOverlay(page);
     await openSettingsView(page);
+    return;
+  }
+  // 🔴 「回收站」也不在 rail 上了（2026-11-04 滴答对齐 D2，搬进侧栏底部）——
+  // 它走 `goTrashViaSidebar` 那条真路径，不走下面"rail tab → 更多菜单"那两级。
+  if (label === '回收站') {
+    await dismissFullBleedOverlay(page);
+    await goTrashViaSidebar(page);
     return;
   }
   /**

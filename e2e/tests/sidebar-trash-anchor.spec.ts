@@ -2,26 +2,27 @@ import { expect, test } from '@playwright/test';
 import { openApp } from './helpers';
 
 /**
- * rail 下段：回收站贴在「通知 / 帮助」那一组上面（左下角），不挂在上段列表的尾巴。
+ * 回收站住在**侧栏底部**（2026-11-04 滴答对齐 D2）。
  *
- * 2026-10-04 产品负责人看图后拍的形：「左边回收站的那个 logo 应该放到那个帮助那上面，
- * 就是放到左下角。」在此之前它其实**已经**是"工具段"了（`TOOL_VIEW_TABS`），
- * 但那段从来没真的贴到底 —— `.ht-rail__tab--tool:first-of-type { margin-top: auto }`
- * 里的 `:first-of-type` 选的是**父元素里第一个 `<button>`**，而工具段的父元素是
- * `role="tablist"`，那里第一个按钮是「任务」。于是那条规则实际只作用在 tablist
- * **外面**的铃铛上，回收站一直跟着上段列表排。
+ * 它原来住 rail 下段（贴左下角），那是 2026-10-04 看图拍的形；滴答把它排在**侧栏底部**，
+ * 产品负责人拍板照滴答搬。这一搬换来一个**真实代价**，判据因此必须连代价一起钉住，
+ * 否则下一个会话只会看见"少了一枚按钮"：
  *
- * 🔴 这条用例钉的是**几何**，jsdom 测不到（`getBoundingClientRect` 在那里恒为 0），
- * 所以它必须在真浏览器里跑。而它同时钉住两件容易做错的事：
- * ① 回收站仍然是 `role="tab"` 且**在 tablist 里面** —— 把它挪到铃铛与帮助之间
- *    在视觉上更"贴着帮助"，但那会让 `role=tab` 跑到 tablist 外面（无效 a11y 结构，
- *    `App.tsx` 与 `inbox.css` 里各写了一次这个理由）；
- * ② 它必须**离开**上段：与上段最后一项（搜索）的间距要明显大于与铃铛的间距。
+ *   侧栏只在**任务视图**渲染（`App.tsx` 的 `view === 'tasks'` 那一支），所以这一行
+ *   在习惯 / 便签 / 番茄 等视图里**不存在**。剩下两条路是先回任务视图点这一行，
+ *   或在搜索的「快速跳转」里打「回收站」。窄档还多一层：那一列住在抽屉里。
+ *
+ * 🔴 这里同时钉住**反向**那一半：rail 上不许留着第二枚回收站。
+ * 「一个目的地只允许一个控件」不是新加的偏好，是 2026-10-04 删侧栏「收集箱」那一行时
+ * 写进 `view-tabs.ts` 的判据（见 `PRIMARY_NAV` 文件头）—— 两处都画，两处的高亮状态
+ * 迟早各说各话。
+ *
+ * ⚠️ 几何判据必须在真浏览器里量：jsdom 的 `getBoundingClientRect` 恒为 0。
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
-test.describe('rail 下段：回收站贴底', () => {
-  test('回收站在左下角，排在通知与帮助之前，且仍是 tablist 里的 tab', async ({ page }) => {
+test.describe('侧栏底部：回收站', () => {
+  test('宽屏：这一行在侧栏最下方、点它进回收站，而 rail 上没有第二枚', async ({ page }) => {
     const consoleErrors: string[] = [];
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
@@ -30,73 +31,64 @@ test.describe('rail 下段：回收站贴底', () => {
 
     await openApp(page);
 
-    const rail = page.locator('nav.ht-rail');
-    const trash = page.getByRole('tab', { name: '回收站' });
-    const lastMainTab = page.getByRole('tab', { name: '搜索' });
-    const bell = page.locator('nav.ht-rail > button[aria-haspopup="dialog"]');
-    const help = page.getByTestId('rail-help');
+    const sidebar = page.locator('nav.ht-sidebar');
+    const trash = page.getByTestId('sidebar-tool-trash');
+    const tagsHeading = sidebar.locator('.ht-nav__section').last();
 
-    // 存在性先于取值：拿不到这几个按钮就说明外壳没起来，后面的几何读数全是废的。
+    // 存在性先于取值：拿不到就说明外壳或那一列没起来，后面的几何读数全是废的。
+    await expect(sidebar).toBeVisible();
     await expect(trash).toBeVisible();
-    await expect(bell).toBeVisible();
-    await expect(help).toBeVisible();
+    await expect(trash).toHaveText('回收站');
 
-    // ① a11y 结构：它必须在 tablist 里面（这条会挡住"为了贴着帮助把它挪出去"的改法）
-    await expect(
-      page.locator('[role="tablist"] [role="tab"]:has-text("回收站")'),
-    ).toHaveCount(1);
+    // 🔴 rail 上不许再有它（搬走 ≠ 复制）。
+    await expect(page.locator('nav.ht-rail [role="tab"]').filter({ hasText: '回收站' })).toHaveCount(0);
+    await expect(page.locator('.ht-rail__tools')).toHaveCount(0);
 
-    // 先截图，再断言 —— 失败时也要有图可看（AGENTS §6.2 规定一）
-    await page.screenshot({ path: 'test-results/rail-trash-anchor.png' });
+    await page.screenshot({ path: 'test-results/sidebar-trash-anchor.png' });
 
-    const [r, t, m, b, h] = [
-      await rail.boundingBox(),
+    const [sidebarBox, trashBox, tagsBox] = [
+      await sidebar.boundingBox(),
       await trash.boundingBox(),
-      await lastMainTab.boundingBox(),
-      await bell.boundingBox(),
-      await help.boundingBox(),
+      await tagsHeading.boundingBox(),
     ];
-    for (const [name, box] of [['rail', r], ['回收站', t], ['搜索', m], ['通知', b], ['帮助', h]] as const) {
-      expect(box, `${name} 量不到包围盒（外壳没渲染？）`).not.toBeNull();
-    }
-    const railBox = r!;
-    const trashBox = t!;
-    const mainBox = m!;
-    const bellBox = b!;
-    const helpBox = h!;
+    expect(sidebarBox, '量不到侧栏的包围盒').not.toBeNull();
+    expect(trashBox, '量不到回收站那一行的包围盒').not.toBeNull();
+    expect(tagsBox, '量不到「标签」分组头的包围盒').not.toBeNull();
 
-    // ② 自上而下的顺序：回收站 → 通知 → 帮助
-    expect(trashBox.y + trashBox.height, '回收站的下沿应在通知上沿之前').toBeLessThanOrEqual(bellBox.y + 1);
-    expect(bellBox.y + bellBox.height, '通知的下沿应在帮助上沿之前').toBeLessThanOrEqual(helpBox.y + 1);
-
-    // ③ 它属于**下段**：与上段最后一项的间距，要明显大于与通知的间距
-    const gapAbove = trashBox.y - (mainBox.y + mainBox.height);
-    const gapBelow = bellBox.y - (trashBox.y + trashBox.height);
-    expect(gapAbove, `回收站与上段最后一项只隔 ${String(Math.round(gapAbove))}px —— 它没贴到底`).toBeGreaterThan(
-      gapBelow * 3,
-    );
-
-    // ④ 它在 rail 的下半段，且整组离底部不远
-    expect(trashBox.y, '回收站不在 rail 的下半段').toBeGreaterThan(railBox.y + railBox.height / 2);
-    /*
-      🔴 这一条原来量的是「帮助」的底边 —— 因为写它的时候帮助就是下段**最后一枚**。
-      2026-10-06 工单 H9 把同步那一组搬到下段末尾（产品负责人："同步按钮不应该放在
-      左下角侧边栏的左下角吗？"），于是"贴着 rail 底部"的那个人换了。
-      这里跟着换成下段的**末位**（同步那一组），而不是把阈值放松 ——
-      这条钉的从来是"下段这一组贴底"，不是"帮助这一枚贴底"。
-    */
-    const syncGroup = page.getByTestId('sync-rail');
-    const syncBox = await syncGroup.boundingBox();
-    expect(syncBox, '量不到同步那一组的盒子 ⇒ 下段末尾没画出来').not.toBeNull();
+    // ① 它在侧栏的**下半段**：比侧栏中点低。
     expect(
-      railBox.y + railBox.height - (syncBox!.y + syncBox!.height),
-      '同步那一组没有贴着 rail 底部（下段末尾浮起来了）',
-    ).toBeLessThan(syncBox!.height);
+      trashBox!.y,
+      `回收站那一行在 y=${String(Math.round(trashBox!.y))}，侧栏中点在 ${String(Math.round(sidebarBox!.y + sidebarBox!.height / 2))} —— 它没贴底`,
+    ).toBeGreaterThan(sidebarBox!.y + sidebarBox!.height / 2);
+
+    // ② 它排在清单/标签那两块的**下面**（这一列的读序：智能清单 → 四象限 → 清单 → 标签 → 工具）。
     expect(
-      syncBox!.y,
-      '同步那一组不在「帮助」之下 ⇒ 下段顺序变了（回收站 → 通知 → 帮助 → 同步）',
-    ).toBeGreaterThan(helpBox.y + helpBox.height - 1);
+      trashBox!.y,
+      '回收站那一行没有排在「标签」分组头之下',
+    ).toBeGreaterThan(tagsBox!.y);
+
+    // ③ 它横向落在侧栏里，不在主区或 rail。
+    expect(trashBox!.x).toBeGreaterThanOrEqual(sidebarBox!.x);
+    expect(trashBox!.x + trashBox!.width).toBeLessThanOrEqual(sidebarBox!.x + sidebarBox!.width + 1);
+
+    // ④ 点它真的到得了回收站（不是画在那里好看的一行）。
+    await trash.click();
+    await expect(page.getByTestId('trash-board')).toBeVisible();
 
     expect(consoleErrors, `控制台报错：${consoleErrors.join(' | ')}`).toEqual([]);
+  });
+
+  test('窄屏：先拉开范围抽屉，那一行点得到且真的切视图', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openApp(page);
+
+    const trash = page.getByTestId('sidebar-tool-trash');
+    // 窄档那一列住在抽屉里，收起时不该在屏幕上。
+    await expect(trash).toBeHidden();
+    await page.getByTestId('task-scope-toggle').click();
+    await expect(trash).toBeVisible();
+    await page.screenshot({ path: 'test-results/sidebar-trash-anchor-narrow.png' });
+    await trash.click();
+    await expect(page.getByTestId('trash-board')).toBeVisible();
   });
 });

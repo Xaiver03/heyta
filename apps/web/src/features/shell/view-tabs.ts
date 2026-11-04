@@ -249,19 +249,27 @@ export const MODULE_VIEW_TABS: readonly ViewTab[] = [
  * 把它们做成可关的，等于给用户一个"把回收站关掉、然后无处可找回"的选项。
  */
 /**
- * rail 下段「工具」：**只有回收站**。
+ * 工具段（**侧栏底部**）：**只有回收站**。
  *
- * 它**贴底**、**不给关**（关掉回收站等于给用户一个"删错了无处可找回"的选项）。
+ * 🔴 **2026-11-04 从 rail 搬进侧栏**（滴答对齐 D2，产品负责人拍板）。原来的形是
+ * 「回收站贴 rail 左下角」（2026-10-04 看图拍的），滴答的对应位置在**侧栏底部**。
+ * 这一搬换到的是一个**真实代价**，写在这里免得后来人以为是顺手改的：
+ * 侧栏只在**任务视图**渲染（`App.tsx` 的 `view === 'tasks'` 那一支），所以回收站在
+ * 习惯 / 便签 / 番茄 这些视图里**不再有导航入口** —— 剩下的两条路是
+ * 先回任务视图点这一行，或在搜索的「快速跳转」里打「回收站」（`quickActions`
+ * 仍从这份常量取，见 `App.tsx`）。
+ * ⚠️ 它**不给关**、也**不进 rail 的编排**（`splitRailTabs` 收不到它）：
+ * 关掉回收站等于给用户一个"删错了无处可找回"的选项。
  *
  * ⚠️ **「设置」不在这里** —— 2026-09-29 按滴答的 IA 收进了**顶部的头像菜单**
  *（rail 是每天点几十次的地方，设置是低频的）。它仍登记在下面的 `SETTINGS_VIEW_TAB`，
  * 但**渲染时不在 rail 上**。
  *
- * ⚠️ **「帮助」也不在这里** —— 它是**动作**（切到设置页并滚到帮助那一段），
+ * ⚠️ **「帮助」也不在 rail 上** —— 它是**动作**（切到设置页并滚到帮助那一段），
  * 而 `role="tab"` 的元素必须是"切视图"那一类，所以它在 `App.tsx` 里单独渲染、
  * 且在 `role="tablist"` **外面**。
  */
-export const TOOL_VIEW_TABS: readonly ViewTab[] = [
+export const SIDEBAR_TOOL_TABS: readonly ViewTab[] = [
   { key: 'trash', labelKey: 'web.trash.nav', Icon: Trash2 },
 ];
 
@@ -301,7 +309,7 @@ export const VIEW_TABS: readonly ViewTab[] = [
   ...ALWAYS_ON_VIEW_TABS,
   ...MODULE_VIEW_TABS,
   SEARCH_VIEW_TAB,
-  ...TOOL_VIEW_TABS,
+  ...SIDEBAR_TOOL_TABS,
   SETTINGS_VIEW_TAB,
 ];
 

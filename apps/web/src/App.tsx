@@ -246,7 +246,7 @@ import {
   QUADRANT_NAV,
   PRIMARY_NAV,
   SORT_LABEL,
-  TOOL_VIEW_TABS,
+  SIDEBAR_TOOL_TABS,
   VIEW_TABS,
   type ViewKey,
 } from './features/shell/view-tabs.js';
@@ -2021,10 +2021,10 @@ export function App(): React.JSX.Element {
           keywords: [tab.key],
           onSelect: () => goToView(tab.key),
         })),
-      // 回收站也是 rail 上的目的地（贴底那段），跳过去和点它等价。
-      // ⚠️ 读模块级的 `TOOL_VIEW_TABS` 而不是下面的 `visibleToolTabs`：那个 const
-      //    声明在本 memo **之后**，读它会撞 TDZ。两者本来就是同一张表。
-      ...TOOL_VIEW_TABS.map((tab) => ({
+      // 回收站也是**侧栏底部**那一行（2026-11-04 滴答对齐 D2 从 rail 搬过来的），
+      // 跳过去和点它等价 —— 而它是此刻**唯一**在非任务视图也走得通的路。
+      // ⚠️ 读模块级的 `SIDEBAR_TOOL_TABS` 而不是把它复制一份：那张表的家在 `view-tabs.ts`。
+      ...SIDEBAR_TOOL_TABS.map((tab) => ({
         id: `view:${tab.key}`,
         label: t(tab.labelKey),
         group: 'view' as const,
@@ -2298,19 +2298,6 @@ export function App(): React.JSX.Element {
   }, [view, closeSecondarySurface]);
 
   /**
-   * rail 下段「工具」= **回收站**。**贴底**，不参与模块开关。
-   *
-   * ⚠️ 上段「去哪看」（`visibleMainTabs`）声明在**上面**的搜索段之前 ——
-   * 「快速跳转」要列的就是 rail 上真有的那些目的地，而 `const` 没有提升，
-   * 放在这里会让下面那个 `quickActions` 在初始化前被读到（TDZ 直接抛错）。
-   *
-   * ⚠️ **「设置」不在这里** —— 它收进了顶部的**头像菜单**（滴答的做法：
-   * rail 是每天点几十次的地方，设置是低频的）。
-   * 「帮助」也不在这里 —— 它是**动作**（切到设置页并滚到帮助），不是 tab。
-   */
-  const visibleToolTabs = TOOL_VIEW_TABS;
-
-  /**
    * 开关一个功能模块。
    *
    * 🔴 **立刻落盘、立刻反映到 rail**：把"存哪儿"与"看到什么"分成两步，
@@ -2519,7 +2506,6 @@ export function App(): React.JSX.Element {
       <RailNavigation
         view={view}
         visibleMainTabs={visibleMainTabs}
-        visibleToolTabs={visibleToolTabs}
         syncEmail={syncEmail}
         syncNeedsSignIn={syncNeedsSignIn}
         growthEnabled={enabledModules.has('growth')}
@@ -2640,6 +2626,33 @@ export function App(): React.JSX.Element {
               ))}
             </div>
             <ProjectsPanel onFilterWith={goToFilter} />
+
+            {/*
+              侧栏底部「工具」= **回收站**（2026-11-04 滴答对齐 D2，从 rail 贴底那段搬过来）。
+              形状照这一列自己的导航行（`NavButton` 那一族：同一个 `.ht-nav__item`），
+              所以它与「已完成」看起来就是一组并列的行。
+
+              🔴 **它不是 `role="tab"`**：rail 那一段才是"视图标签组"（一组互斥、方向键漫游），
+              这一列的行点的是**筛选与目的地**，原生按钮 + `aria-current` 才是对的语义。
+              ⚠️ 搬过来的代价写在 `view-tabs.ts` 的 `SIDEBAR_TOOL_TABS` 文件头：
+              这一列只在**任务视图**存在，所以在习惯 / 便签 这些视图里回收站没有导航行，
+              那两条路是先回任务视图点这一行、或在搜索的「快速跳转」里打「回收站」。
+            */}
+            <div className="ht-nav ht-sidebar__tools" role="group" aria-label={t('web.shell.views.groupTools')}>
+              {SIDEBAR_TOOL_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  className="ht-nav__item"
+                  aria-current={view === tab.key}
+                  data-testid={`sidebar-tool-${tab.key}`}
+                  onClick={() => goToView(tab.key)}
+                >
+                  <tab.Icon size={ICON_SIZE.sm} aria-hidden="true" />
+                  <span>{t(tab.labelKey)}</span>
+                </button>
+              ))}
+            </div>
           </div>
           {/* 右边缘的拖拽手柄（绝对定位在这一列上，不占布局）。 */}
           <SidebarResizer />

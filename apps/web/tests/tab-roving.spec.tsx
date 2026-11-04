@@ -26,7 +26,7 @@ import { I18nProvider } from '@heyta/i18n';
 
 import { onTabRovingKeyDown, rovingTabKey, type TabRovingOrientation } from '../src/lib/tab-roving.js';
 import { RailNavigation } from '../src/features/shell/RailNavigation.js';
-import { TOOL_VIEW_TABS, VIEW_TABS, type ViewKey } from '../src/features/shell/view-tabs.js';
+import { VIEW_TABS, type ViewKey } from '../src/features/shell/view-tabs.js';
 import { InboxBell } from '../src/features/inbox/InboxBell.js';
 
 let root: Root | undefined;
@@ -212,7 +212,6 @@ async function renderRail(view: ViewKey = 'tasks', assistantActive = false): Pro
     <RailNavigation
       view={view}
       visibleMainTabs={mainTabs}
-      visibleToolTabs={TOOL_VIEW_TABS}
       syncNeedsSignIn
       growthEnabled={false}
       onNavigate={onNavigate}
@@ -266,14 +265,10 @@ describe('C. 真组件渲染出来的那一格', () => {
     expect(tabsOf(nav).filter((tab) => tab.getAttribute('tabindex') === '0')).toHaveLength(1);
   });
 
-  it('工具标签也在同一组里（按到底能走到回收站）', async () => {
+  it('🔴 rail 上**没有**回收站那一枚了（2026-11-04 滴答对齐 D2：搬进侧栏底部）', async () => {
     const { nav } = await renderRail('tasks');
-    const tabs = tabsOf(nav);
-    const trash = nav.querySelector<HTMLElement>('.ht-rail__tab--tool[role="tab"]');
-    expect(trash).toBeDefined();
-    expect(tabs[tabs.length - 1]).toBe(trash);
-    press(tabs[tabs.length - 2]!, 'ArrowDown');
-    expect(document.activeElement).toBe(trash);
+    expect(nav.querySelector<HTMLElement>('[data-testid="rail-view-trash"]')).toBeNull();
+    expect(nav.querySelector<HTMLElement>('.ht-rail__tab--tool[role="tab"]')).toBeNull();
   });
 
   it('通知面板打开后：两枚 tab 里恰好一枚 0，ArrowRight 走到「活动」', async () => {

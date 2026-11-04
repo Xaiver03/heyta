@@ -371,47 +371,18 @@
  * 工具段**贴底**（rail 下段）。
  *
  * 🔴 用 `margin-top: auto` 而不是插一个 `flex:1` 的 spacer 元素：
- * spacer 会作为 `<nav>` 的一个子元素插在回收站和帮助之间，而这一段的
+ * spacer 会作为 `<nav>` 的一个子元素插在下一段之间，而这一段的
  * "谁贴底"是靠 flex 分配的，多一个空白元素会让下一段的位置变得含糊。
  *
- * ⚠️ **改这段时别信旧版这条注释**：它原先写的是"工具按钮仍在同一个
- * `role="tablist"` 里" —— 现量是**不在**：`.ht-rail__tabs[role=tablist]` 只包住主标签与助手，
- * 工具段（`RailNavigation.tsx` 的 `visibleToolTabs`）是 `<nav>` 的直接子元素，
- * 而它带着 `role="tab"`。这个结构差已经登记在 `docs/plans/goal-layout-audit.md` §8.2 的第 15 行，
- * 键盘漫游因此挂在 `<nav>` 容器上、按 DOM 顺序把两段当成一组（见 `src/lib/tab-roving.ts`）。
+ * ⚠️ **2026-11-04（滴答对齐 D2）**：回收站从 rail 搬进侧栏底部之后，rail 下段
+ * 不再有 `role="tablist"` 的工具容器，贴底这一件事**回到铃铛这一枚**上 ——
+ * `:first-of-type` 按"同类型里的第一个 `<button>`"匹配，主标签住在
+ * `.ht-rail__tabs[role=tablist]` 里，所以这里选中的正是 `<nav>` 直接孩子里的第一枚
+ * 按钮（通知）。曾经有一段时期工具段是 `<nav>` 的直接子元素、这条因此选错过人，
+ * 现量结构：rail = `.ht-rail__tabs`（主标签 + 助手）→ 铃铛 → 帮助 → 同步。
  */
 .ht-rail__tab--tool:first-of-type {
   margin-top: auto;
-}
-
-/*
- * 工具段**自己**也要贴底（2026-10-04 产品负责人：「回收站那个 logo 应该放到帮助那上面，
- * 就是放到左下角」）。
- *
- * 🔴 上面那条 `:first-of-type` **选不到回收站**：它的父元素是 `.ht-rail__tabs`，
- * 而那里面第一个 `<button>` 是「任务」。`:first-of-type` 按"同类型里的第一个"匹配，
- * 于是那条规则实际只作用在 tablist **外面**的铃铛上 —— 回收站因此一直贴在
- * 上段列表的尾巴上，与下段之间裂着一整块空白。
- * 所以 `App.tsx` 给工具段的第一项另打一个类，这里按类贴底。
- */
-/*
- * 🔴 2026-10-25：贴底这件事**从按钮挪到了工具段的容器**上。
- * 工具段现在是一个 `role="tablist"` 容器（tab 必须在 tablist 里，见
- * `rail-trash-anchor.spec.ts` 的 ①），所以"第一枚贴底"改成"这一组贴底"。
- * 组件内部的排布与 rail 同一套（列 + 同间距），视觉不变。
- */
-.ht-rail__tools {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--ht-space-3);
-}
-
-.ht-rail__tab--tool-start {
-  /* 贴底已经由容器承担；这里刻意留空，不再给单枚按钮加 `margin-top: auto` —— */
-  /* 那会在"工具段有多枚"时把第一枚顶开，组内间距就乱了。 */
-  margin-top: 0;
 }
 
 .ht-rail {
