@@ -7,18 +7,21 @@
  * 「新面板强制使用共享契约」。
  *
  * 🔴 为什么门判的是**容器类名**而不是"有没有 import SettingsRow"：
- *   `packages/ui` 的 `SettingsRowModel` 今天是五档穷尽联合
- *   （`value` / `toggle` / `action` / `note` / `heading`）。而 web 设置面里
- *   最常被要的那一行 —— **输入框 + 按钮**（昵称、换邮箱、通行密钥改名、密码）
- *   **五档里哪一档都装不下**：`SettingsValueRow` 的值是 `readonly value: string`，
- *   没有可编辑插槽。所以那几格只能继续手写，直到有人给跨端契约加第六档
- *   （那要同时改 `packages/ui/src/settings/Settings.tsx` 与移动端 4 个屏幕的
- *   穷尽 switch，并在真机上验 —— 见计划里 G-4 的迁移那一半）。
+ *   契约里有几档行由 `model.ts` 自己回答，不写在这里（现量命令：
+ *   `grep -cE '^export interface Settings[A-Za-z]+Row extends SettingsRowCommon' packages/ui/src/settings/model.ts`）。
+ *   ⚠️ 这一段注释原来写的是"五档穷尽联合，输入框 + 按钮那一行哪一档都装不下，
+ *   所以那几格只能继续手写，直到有人加第六档"——**两半都被后来的实测否证**：
+ *     · "装不下"问错了问题。昵称 / 换邮箱 / 通行密钥改名 / 口令那几格是**字段**，
+ *       字段归 `FormField`（§1 那两档解剖），不归行模型；把它们塞进行模型才是错。
+ *     · 契约后来确实各补了一档，但不是为了那几格：`trailing` 装"一个对象 + 几行事实 + 尾随动作"
+ *       （一台登录设备、一枚通行密钥），`host` 装"两族按用户读到的顺序排在同一屏里"
+ *       （顺序与分组归契约，内容自己的解剖归它那一族）。
  *   ⇒ 本门**不**要求面板去 import 一个装不下它的组件（那会把人逼成硬塞），
- *     它要求的是：**别再长出第六套容器**。
+ *     它要求的是：**别再长出一套新的手搓容器**。哪一档装不下，就去给契约补一档并两端同改，
+ *     而不是在宿主里再搭一套行骨架。
  *
  * 判据（账本制，与 `check-settings-no-prose.mjs` 同一条纪律）：
- *   · 账本外**新文件**出现手写容器 ⇒ 🔴 红（第六套解剖一天都长不出来）；
+ *   · 账本外**新文件**出现手写容器 ⇒ 🔴 红（新的一套解剖一天都长不出来）；
  *   · 账内某文件读数**涨了** ⇒ 🔴 红；
  *   · 账内读数**掉了却没改账本** ⇒ 🔴 红（"它真的在缩"的唯一读数）。
  *
@@ -122,7 +125,7 @@ function main() {
     try {
       const reds = evaluate(scan(), readLedger());
       if (reds.length === 0) {
-        failure = 'self-test: ❌ 注入第六套容器后门仍绿 ⇒ 这把尺不能失败，没有价值';
+        failure = 'self-test: ❌ 注入一枚新的手写行容器后门仍绿 ⇒ 这把尺不能失败，没有价值';
       } else {
         console.log(`self-test: ✅ 变异臂红（注入一处 ht-settings__section 后门禁拒绝：${reds[0]}）`);
       }
