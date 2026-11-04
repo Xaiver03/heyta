@@ -406,8 +406,9 @@ build 完再跑它就是绿，别线再写一笔它就红。这不是谁做错�
 
 - ✅ **设备腿（这九条之外，22:34–22:40 戳补的）**：`pnpm verify:mobile-pin-order` 在真 iOS 模拟器 7/7、
   `pnpm --filter @heyta/desktop smoke -- --window` 在真 Electron 窗口 `rows=1 / colorBuckets=66`（图入库并看过）。
-  细节与"为什么必须在设备上量"（两端默认档位不同向）写在下面「还没被验证的」那一节，
-  ⚠️ 那里同时留着一格**没取到**的东西：iOS 那张屏幕图（黑帧，已删）。
+  细节与"为什么必须在设备上量"（两端默认档位不同向）写在下面「还没被验证的」那一节。
+  iOS 的屏幕图后来也取到了（`--display=primary`，两张已入库并看过），
+  那一节里同时更正了我先前对黑帧的错误归因。
 
 - 🔴 顺带抓到并修掉一个**只在键盘上成立**的缺陷：三个子菜单的触发器把 `role="menuitem"`
   挂在包裹用的 `div` 上，而共享层 Enter 做的是 `items[i].click()` —— 点一个 div 什么都
@@ -513,11 +514,22 @@ pnpm typecheck 2>&1 | grep "error TS"
   ① 顺序按无障碍树里的 **y 坐标**读（"在树里"证明不了"在前"，ScrollView 折叠线以下的节点仍在树里）；
   ② 置顶之后再开一次菜单，那一项自己要说「取消置顶」（写进去的是状态，不是一帧视觉）；
   ③ 手机里真 `ops` 表恰好 +3（两条建 + 一条置顶），且最新那条带 `pinnedAt`。
-  ⚠️ **图那一格没取到，别把它当成看过**：这台机器上 Simulator 没开窗口时
-  `xcrun simctl io … screenshot` 返回的是 `colorSpan=0` 的全黑帧（尺寸与退出码全部正常），
-  脚本现在用现成的 `scripts/screenshots/png-stats.mjs` 自判空白、**删掉黑图并明说没取到**，
-  所以它不会拿一张看不见的图冒充取证。候选解法（有窗口的渲染路径 / `apps/desktop` 的
-  `webContents.capturePage()`）写在脚本结尾那段提示里。
+  🔴 **图那一格原来报"取不到"，归因报错了，现在更正**：黑帧的原因**不是**"Simulator 没开窗口"，
+  而是 `simctl io … screenshot` 不带旗标时挑的是 `enumerate` 里那个
+  `com.apple.display.captureservice` 端口（**宿主的**显示捕获服务）。显式
+  `--display=primary`（真设备那一屏住在 `DisplayAdapter` 的 `Device Name: primary`）
+  就取到 1398×2034、色阶差 255 的真帧，两张已入库并逐张看过：
+  `apps/mobile/evidence/dida-pin-order-20261105/row-menu.png`（菜单里那枚「置顶」）与
+  `after-pin.png`（刚钉的甲条落在第一行）。⚠️ 顺带一条会误杀的尺：仓库现成的
+  `looksBlank()` 另一半是 `contentRatio < 0.01`，而**白底界面本来就 99% 是白的** ——
+  判"全黑"只按 `colorSpan`（黑帧亮度全同 ⇒ 0），脚本里就是这么改的。
+  🔴 补图这一趟还揪出**本装置自己的两处缺陷**（都不是产品）：
+  ① 归一化那一步用子串匹配按「取消」，撞上了「取消置顶」，于是**装置自己写了一条
+  `UPD_TASK {"pinnedAt":null}`**（现量：手机 ops 表 rowid 16）—— 现在所有 press 都带
+  `--exact`，且菜单没有「取消」那枚按钮（`"取消" --exact` found=False），关它走点遮罩；
+  ② 目标行的无障碍框报 y=455、高 74，看着整行都在，但**短按同一点什么都不打开**
+  （长按上一行立刻开）——真命中区比 AX 框低一档。所以长按改成"按下 → 回读菜单在不在 →
+  不在就滚一段再来"，与 journey 脚本对「添加」键那条纪律同形状。
 - ✅ **桌面壳那一腿也补了，而且图是真取到的**：`HEYTA_SMOKE_SHOT=<绝对路径> pnpm --filter
   @heyta/desktop smoke -- --window` 起真 Electron 44 窗口，读数 `{"ok":true,"rows":1,
   "bridge":true,"hiddenBlank":false,"colorBuckets":66}`，图已入库
