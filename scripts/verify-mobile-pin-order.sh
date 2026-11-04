@@ -146,9 +146,14 @@ shot() {  # <文件名>
   xcrun simctl io "$UDID" screenshot "$f" >/dev/null 2>&1
   local verdict
   verdict=$(node --input-type=module -e "
-    import {inspectPng, looksBlank} from '$REPO_ROOT/scripts/screenshots/png-stats.mjs';
+    import {inspectPng} from '$REPO_ROOT/scripts/screenshots/png-stats.mjs';
     const s = inspectPng('$f');
-    console.log(looksBlank(s) ? 'blank' : 'ok ' + s.colorSpan);
+    // 🔴 只按 colorSpan 判"全黑"，不用 looksBlank()：那把尺的另一半是
+    //    `contentRatio < 0.01`（非白像素太少），而**白底界面本来就 99% 是白的**。
+    //    现量（2026-11-04，桌面壳那张 `desktop-window.png`）：contentRatio=0.007
+    //    而 colorSpan=255、色桶 66 —— looksBlank 会把它误判成空白。
+    //    黑帧的形状是 colorSpan=0（亮度全同），这一半才是"全黑"的判据。
+    console.log(s.colorSpan < 16 ? 'blank' : 'ok ' + s.colorSpan);
   " 2>/dev/null)
   case "$verdict" in
     ok*) ok "证据图 $1 有内容（色阶差 ${verdict#ok }）" ;;

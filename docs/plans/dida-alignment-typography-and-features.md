@@ -513,6 +513,17 @@ pnpm typecheck 2>&1 | grep "error TS"
   脚本现在用现成的 `scripts/screenshots/png-stats.mjs` 自判空白、**删掉黑图并明说没取到**，
   所以它不会拿一张看不见的图冒充取证。候选解法（有窗口的渲染路径 / `apps/desktop` 的
   `webContents.capturePage()`）写在脚本结尾那段提示里。
+- ✅ **桌面壳那一腿也补了，而且图是真取到的**：`HEYTA_SMOKE_SHOT=<绝对路径> pnpm --filter
+  @heyta/desktop smoke -- --window` 起真 Electron 44 窗口，读数 `{"ok":true,"rows":1,
+  "bridge":true,"hiddenBlank":false,"colorBuckets":66}`，图已入库
+  `apps/web/evidence/dida-desktop-shell-20261104/desktop-window.png`（2200×1376，已看过：
+  共享 `TaskList` 画出的一行仍在）。桌面壳渲染的就是那份共享 model ⇒ 这是对 `sortTasks`
+  改动在第二端的"没画坏"证据，不是"多一端更保险"。
+  🔴 顺带量到一把尺的边界，记下来免得下次误杀：`png-stats.mjs` 的 `looksBlank()` 是
+  `contentRatio < 0.01` **或** `colorSpan < 16`，而**白底界面本来就 99% 是白的** ——
+  这张桌面图的 `contentRatio=0.007`（会被判空白）但 `colorSpan=255`、色桶 66（真有内容）。
+  ⇒ 判"全黑帧"只能按 `colorSpan`（黑帧是亮度全同 ⇒ 0）；设备脚本里已经改成这一半，
+  理由就写在那段注释旁边。
 - **窄屏 + 暗色那一档已补量**（⑦，390×844）：抽屉拉开后那两句说明各自**一行放得下**，
   判据取的是"不被裁（`scrollWidth ≤ clientWidth`）、不超过两行、整句落在这一列的横向范围里"，
   外加回收站那一行在抽屉里点得到（图 `dida-narrow-dark.png`，已看过）。
