@@ -158,6 +158,15 @@
 | `settings-row-grammar` 的 `settings-group-ai` 格**红**：`medianPitch 58`（判据 44–56），`rows=11`、`heights=[44]` 单档、右缘唯一；相邻行距是 53,58,58,58,58 ⇒ 超的是 `toggle` 那一族 | 控制臂：把 `ai-panels.css` 逐字退回本线上批之前（`git checkout 2a4bc0e20^ -- …`）重跑同一格，**读数一字不变的 58** ⇒ 与本线那批字号改动无因果（文件已按 blob `01e2ada6b…` 还原）。`primitives` 打印成 `["preference-row","toggle"]`，AI 旧行归 AI 那一屏 | AI 设置那一屏的负责人（判据阈值 44–56 不许动，要动的是行本身） |
 | 同一枚尺**量不到本线迁的两屏**：这一趟 profile / subscription / data / notifications / help 全 `rows=0`，`skeleton` 里是 `ht-settings__account-gate` ⇒ e2e 没登录，而那些屏的行都在登录之后才画 | spec 自己会打 `SETTINGS_SHAPE_SKIP`（出声但不补前置）。补登录腿要动 `settings-row-grammar.spec.ts` 的进入路径（`account-email-change-and-sessions.spec.ts` 那支已经有真登录的 stub 走法，可抄） | 谁下一次跑这枚尺，谁把登录前置补上；本线先用 `account-*` 那支完成了自己的看图 |
 
+**G-4 的最后一米为什么不是"顺手迁完"**：`ProfilePanel` 还剩头像行与邮箱行两处手写 `__row`
+（现量 `node scripts/check-settings-row-anatomy.mjs` 的账本里那一格）。它们**能**分别映射成
+`trailing` 与 `value`，但**顺序挡路**：昵称那一格是字段（走 `FormField`），夹在两行中间，
+而 `SettingsSection` 是"先 rows 后 children"—— 要把三格排回原顺序，要么
+**重排界面**（头像 / 邮箱 / 昵称 ≠ 现在的 头像 / 昵称 / 邮箱，那是产品可见的改动），
+要么**拆成两块容器**（分节线随之多一条，也是外观改动）。
+⇒ 这需要一个契约决定：`SettingsSection` 要不要支持"类型化行与宿主内容交错"。
+本线**不擅自重排**，先把这一格写成待决而不是假装做完。
+
 **还剩（这一格没做，理由不是"来不及"）**：
 `apps/mobile/src/screens/SessionsSection.tsx` 仍自己手搓同一形状（`Pressable` + 尾随按钮）。
 迁移它需要**设备腿取证**，而这一趟没有跑：Android 载体不在本机（见 `docs/agents/multi-end-build.md`），
