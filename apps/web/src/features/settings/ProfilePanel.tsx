@@ -442,7 +442,7 @@ export function ProfilePanel({
           }
         >
           {(fieldProps) => (
-            <div className="ht-settings__actions">
+            <div className="ht-input-field__fieldrow">
               <input
                 {...fieldProps}
                 type="text"

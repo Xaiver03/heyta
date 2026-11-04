@@ -110,6 +110,49 @@
   appearance: none;
 }
 
+/*
+ * 控件 + **紧跟它的那个动作**（昵称 + 保存、新地址 + 发起更换、口令 + 显示密码、
+ * 凭据改名 + 保存/取消）。
+ *
+ * 🔴 这不是第三种解剖：行仍然是"标签 + 控件"两列，这里只解决**控件格内部**怎么排。
+ *    为什么不能沿用宿主的 `.ht-settings__actions`：上面那条
+ *    `.ht-input-field__control :is(input…) { inline-size: 100% }` 会把输入框撑满整格，
+ *    于是按钮被挤到第二行 —— 2026-11-04 真浏览器截图实测到的就是这个（昵称那一格）。
+ *    与 `__pair` 的区别：`__pair` 的两个成员**都是控件**（数值 + 单位，4fr/6fr），
+ *    这里第二个成员是**动作**，宽度由内容决定，控件吃掉剩余宽度。
+ */
+.ht-input-field__fieldrow {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+}
+
+.ht-input-field__fieldrow > :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  flex: 1 1 auto;
+  inline-size: auto;
+  min-inline-size: 0;
+}
+
+.ht-input-field__fieldrow > .ht-btn {
+  flex: 0 0 auto;
+}
+
+/*
+ * 跟在字段后面的**动作行**：与上面的控件列同一起点。
+ * 不这么写的话按钮会落在**标签列**的左缘 —— 2026-11-04 真浏览器截图实测到的就是它：
+ * 「修改密码」在 x≈440，而它上面那两个输入框在 x≈590，同一屏两种起点。
+ * 起点由原语自己的两列算出来（label 列 + 列间距），不是抄一份像素值。
+ */
+.ht-input-field__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-2);
+  margin-inline-start: calc(var(--ht-layout-form-label-width) + var(--ht-space-4));
+}
+
 /* 一对并排框（数值 + 单位）：各自仍是同一条高度。 */
 .ht-input-field__pair {
   display: grid;

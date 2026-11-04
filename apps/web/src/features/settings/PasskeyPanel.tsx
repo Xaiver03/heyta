@@ -348,7 +348,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                       layout="inline"
                     >
                       {(fieldProps) => (
-                        <div className="ht-settings__actions">
+                        <div className="ht-input-field__fieldrow">
                           <input
                             {...fieldProps}
                             className="ht-input"
@@ -399,7 +399,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                       )}
                     </FormField>
                   ) : (
-                    <div className="ht-settings__actions">
+                    <div className="ht-settings__actions ht-settings__actions--centered">
                       {confirming ? (
                         <>
                           <button

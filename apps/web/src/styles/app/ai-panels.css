@@ -523,6 +523,17 @@ input[type="radio"] {
   gap: var(--ht-space-2);
 }
 
+/*
+ * 尾随动作在**多行那一格里垂直居中**（会话行 / 凭据行：设备名 + 两行时间戳 + 一枚按钮）。
+ * 🔴 这一条留在 web 侧而不是共享层：共享 `trailing` 档的行容器是 `alignItems: flex-start`
+ *   —— 那是给"标签 + `?` 气泡"那一族定的（气泡展开时不许把图标挪位，见 `Settings.tsx`
+ *   的 `actionHead` 注释），改成 center 会连带动到移动端两屏，而本机没有移动端的看图腿。
+ *   所以外壳用一条 modifier 把自己那一屏对齐好，共享层不动。
+ */
+.ht-settings__actions--centered {
+  align-self: center;
+}
+
 .ht-settings__feature {
   display: flex;
   flex-direction: column;

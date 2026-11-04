@@ -271,7 +271,7 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
                       </p>
                     ) : null,
                     actions: (
-                      <div className="ht-settings__actions">
+                      <div className="ht-settings__actions ht-settings__actions--centered">
                         <button
                           type="button"
                           className="ht-btn ht-btn--ghost"

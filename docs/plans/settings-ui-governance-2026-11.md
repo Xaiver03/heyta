@@ -121,13 +121,33 @@
 （后者跑的是**未改动**的 mobile 消费者）均 rc=0；`SettingsRow` 里的 `never` 穷尽自检保证
 新档没被渲染时是**编译期报错**，不是静默少画一行。
 
-**这五格迁移有一处看得见的影响，先记下来，不等看图来发现**：`trailing` 档把行交给共享列表渲染，
+**这五格迁移有一处看得见的影响**：`trailing` 档把行交给共享列表渲染，
 所以原来那一层 `.ht-settings__section`（`padding: space-3` = 16，且相邻两块之间有 `border-block-start` 细线，
 见 `ai-panels.css:261` 与 `sheets.css:183`）在**行**这一级没有了 ⇒ 设备/凭据两屏从"每张卡 16 内边距 + 卡间一条线"
 变成"一行接一行、行间距 `space.2`(8)"。方向与 `docs/agents/ux-principles.md` §1 那条
-「inline 档行距可压到 44+8」是同向的（原来那 16+16 让两行块距 ≈ 72，反而超出该档），
-但**这是一次外观变更，不是纯结构收敛** —— 结论要等一次真看图（1440 亮/暗）才算验收，
-在那之前不许写"外观未变"。
+「inline 档行距可压到 44+8」同向（原来那 16+16 让两行块距 ≈ 72，反而超出该档）。
+
+**看图腿已补（2026-11-04，真浏览器，不是断言级）**：
+`HEYTA_E2E_APP_PORT=4418 HEYTA_E2E_STUB_PORT=4419 pnpm --dir e2e exec playwright test tests/account-email-change-and-sessions.spec.ts`
+⇒ 7 passed，图落在受版本控制的 `apps/web/evidence/account-suite/`，逐张看过。
+**它抓到三处，全修了**（前两处是本线迁移带出来的，第三处是 `b503a62ac` 留下的）：
+
+| 截图里看到的 | 成因 | 处置 |
+|---|---|---|
+| 昵称那一格：输入框占满整格，「保存昵称」掉到**第二行** | 原语 `.ht-input-field__control :is(input) { inline-size: 100% }` 把控件撑满，而调用点用的是宿主的 `__actions`（还带 `flex-wrap: wrap`） | form.css 新增 `.ht-input-field__fieldrow`（控件吃剩余宽、动作按内容宽）。**不复用 `__pair`**：那一档的两个成员都是控件（4fr/6fr），这里第二个是动作 |
+| 会话/凭据行：右侧那枚按钮贴着**第一行**，而左边文字块有四行 | 共享行容器 `alignItems: flex-start`（那是给"标签 + `?` 气泡"那一族定的，改 center 会连带动到移动端两屏，而本机没有移动端看图腿） | web 侧加 `.ht-settings__actions--centered`（`align-self: center`），共享层不动 |
+| 「修改密码 / 忘记密码?」落在**标签列**左缘（x≈440），而它上面的输入框在 x≈590；后果说明那枚 `?` 单独占一行、没有归属 | 动作块不在字段网格里；而那句 `?` 的注释自己写着"按钮旁"，代码却把它排在段落之后（`b503a62ac` 起就在，本批只是被截图抓到） | form.css 新增 `.ht-input-field__actions`（起点由原语自己的两列算出：label 列 + 列间距），并把两枚后果 `?` 移进动作块 |
+
+修后读数：4 枚设置 spec **118/118**、`form-anatomy`/`design`/`settings-prose`/`ui-language`/`overlay`/`settings-row-anatomy` 全 rc=0、
+上面那支 e2e 7/7，两张关键图（`01-before-request` / `08-password-before-submit`）逐张重看确认。
+⚠️ **仍然没验的**：暗色档、375 窄档、以及移动端两屏 —— 这三格不许在这张表里被算成"已看图"。
+
+**看图时顺带撞到的两处，登记但本线不修**：
+
+| 现量 | 为什么不是本线的 | 谁能收 |
+|---|---|---|
+| `settings-row-grammar` 的 `settings-group-ai` 格**红**：`medianPitch 58`（判据 44–56），`rows=11`、`heights=[44]` 单档、右缘唯一；相邻行距是 53,58,58,58,58 ⇒ 超的是 `toggle` 那一族 | 控制臂：把 `ai-panels.css` 逐字退回本线上批之前（`git checkout 2a4bc0e20^ -- …`）重跑同一格，**读数一字不变的 58** ⇒ 与本线那批字号改动无因果（文件已按 blob `01e2ada6b…` 还原）。`primitives` 打印成 `["preference-row","toggle"]`，AI 旧行归 AI 那一屏 | AI 设置那一屏的负责人（判据阈值 44–56 不许动，要动的是行本身） |
+| 同一枚尺**量不到本线迁的两屏**：这一趟 profile / subscription / data / notifications / help 全 `rows=0`，`skeleton` 里是 `ht-settings__account-gate` ⇒ e2e 没登录，而那些屏的行都在登录之后才画 | spec 自己会打 `SETTINGS_SHAPE_SKIP`（出声但不补前置）。补登录腿要动 `settings-row-grammar.spec.ts` 的进入路径（`account-email-change-and-sessions.spec.ts` 那支已经有真登录的 stub 走法，可抄） | 谁下一次跑这枚尺，谁把登录前置补上；本线先用 `account-*` 那支完成了自己的看图 |
 
 **还剩（这一格没做，理由不是"来不及"）**：
 `apps/mobile/src/screens/SessionsSection.tsx` 仍自己手搓同一形状（`Pressable` + 尾随按钮）。
