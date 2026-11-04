@@ -385,3 +385,12 @@
    补了一枚：注入一句 68 字的内联说明 ⇒ 红并点名文件；**并且先要求未变异时门是绿的**，
    免得"环境本来就红"被读成"臂成功了"。探针第一版选了 39 字的文案，注入后仍绿 ——
    那不是尺没牙，是探针没够到 40 字阈值，这条也写在脚本注释里。
+
+6. **改共享契约要过两端消费者，不是只过 `packages/ui` 自己**。这一条是本轮补进计划的（原来没写）：
+   `trailing` / `host` 两档都是"web 用起来、mobile 同一份渲染器"，所以判据是三枚，缺一枚就是
+   只证了一端：
+   `pnpm --filter @heyta/ui typecheck` + `pnpm --filter @heyta/mobile typecheck`（后者跑的是**未改动**的
+   mobile 消费者，穷尽 switch 少一档就编译期红）+ `pnpm --filter @heyta/mobile test`
+   （现量 2026-11-04：`@heyta/ui` 57 个测试文件、`@heyta/mobile` 101 个测试文件、三枚 typecheck 全 rc=0）。
+   ⚠️ 移动端**像素级**那一半不在这里 —— 它只能由设备腿签（`scripts/verify-mobile-{account-email-sessions,ios-account-email-sessions}.sh`），
+   而这两枚要真模拟器；静态与单测过 ≠ 手机上好看，这一格不许被上面三枚冒充。
