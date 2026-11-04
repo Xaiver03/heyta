@@ -250,9 +250,9 @@ bash scripts/clean-artifacts.sh --apply            # 真删
 bash scripts/clean-artifacts.sh --json             # stdout 只留 JSON（给门禁读）
 bash scripts/clean-artifacts.sh --self-test        # 5 臂：dry-run 不删 / 该删删 / 保护项留 / 清完为 0 / 根形状
 pnpm check:disk-budget                             # 可回收 > 2048 MB 就红（HEYTA_ARTIFACT_BUDGET_MB 可调）
-node scripts/check-spinner-discipline.mjs          # G-5：设置面板 Loader2 必须带 ht-spin
-node scripts/check-font-size-discipline.mjs        # G-3 + G-2：消息类禁 2xs；danger 必须用语义色
-node scripts/check-settings-row-anatomy.mjs        # G-4：web 设置面不许长出第六套行解剖容器（账本制）
+pnpm check:spinner-discipline                      # G-5：设置面板 Loader2 必须带 ht-spin
+pnpm check:font-size-discipline                    # G-3 + G-2：消息类禁 2xs；danger 必须用语义色
+pnpm check:settings-row-anatomy                    # G-4：web 设置面不许长出第六套行解剖容器（账本制）
 ```
 
 ## 6.6 边缘配置：改站点之前先跑这一条
