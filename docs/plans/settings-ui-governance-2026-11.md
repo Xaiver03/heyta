@@ -101,6 +101,7 @@
 | PasswordPanel 口令格 | 手写 `__field` + `<label htmlFor>`，**且 `?` 套在 label 里面** | `FormField layout="inline"` + `labelTip` | `account-security.spec.tsx` 42/42 |
 | SessionsPanel 会话行 | 手写 `__section __credential` + `__credential-main` | `SettingsRowModel` 的**新增 `trailing` 档**（`SettingsSection` + `HeytaUiProvider`） | `account-security.spec.tsx` 42/42；行解剖账本 **53 → 50** |
 | PasskeyPanel 凭证行 | 同上那一套手搓容器（改名时整行换成输入框） | 同一 `trailing` 档：`label` 走 `passkey.name ?? undefined`（没名字**不画那一格**），`actions` 是"编辑中 = `FormField` / 否则 = 改名·删除按钮"的三元 | `passkey-panel.spec.tsx` 23/23（含 `passkey-row-*` 的 textContent 断言）；账本 **50 → 47** |
+| **mobile** `SessionsSection` 会话行（2026-11-05，授权改锚后） | 手搓 `Stack` + `Divider` + `HStack` 标签行 / 时间戳行 / 按钮行 | 同一 `trailing` 档；读失败那一句走 `host`（要保住 `selectable` 与"在列表上面"的位置） | `@heyta/mobile` 101 个测试文件全过、`account-security-wiring` 20/20、18 枚静态门 rc=0；⚠️ **真机像素那一枪仍欠**，现量与谁能补写在 BLOCKED B260 追记二 |
 
 最后一格顺带修掉一个真隐患：`SettingsInfoTip` 渲染的是 `<button>`，原来它落在
 `<label htmlFor={id}>` **内部** —— 点问号会顺带把焦点甩进口令框。`labelTip` 把它画成
@@ -215,13 +216,17 @@
 `control-semantics` / `tip-adjacency` / `design` / `overlay` 全 rc=0，
 `@heyta/ui` 与 `apps/web` typecheck rc=0。
 
-**还剩（这一格没做，理由不是"来不及"，也不是"欠一次设备腿"）**：
-`apps/mobile/src/screens/SessionsSection.tsx` 仍自己手搓同一形状（`Stack` + `Divider` +
-`HStack` 标签行 + 时间戳一行 + 按钮一行）。2026-11-04 复核把原因改了：**拦路的是别线一枚按源码文本切片的判据**
-（`apps/mobile/tests/account-security-wiring.spec.ts:152` 用 `indexOf('{session.current ? (')` 切三元），
-`trailing` 档的正确写法会把这个字面量消掉；三种绕行本线都排过并写进 **BLOCKED B260**，
-其中"靠文本相邻蒙过正向对照"那一种会把别人判据的牙悄悄磨掉，本线不做。
-设备腿那一半也确实还没有（现量 `xcrun simctl list devices booted` 那枚是别线的），两半都在 B260 里点名了谁能收。
+**mobile 那一格：已迁（2026-11-05，产品负责人授权改锚）**：
+`apps/mobile/src/screens/SessionsSection.tsx` 现在吃同一份契约 —— 每台设备 = `trailing`，
+读失败那一句 = `host`（保住 `selectable` 与"在列表上面"这个位置：`note` 档的文字由共享层画，没有这一层）。
+真机脚本的锚点一枚没动（`sessions-list` 走 `listTestID` 透传，`sessions-revoke` / `sessions-logout-all` /
+`sessions-sign-out` / `sessions-refresh` / `sessions-failure` 逐枚保留）。
+别线那枚判据从**切 JSX 三元**改锚到**切行模型字段**，判的还是同一件事（撤销出口只许出现在"不是这台"那一支）；
+变异臂：改成 web 那种"禁用按钮"形状 ⇒ 精确红，还原 ⇒ `account-security-wiring` 20/20、
+`@heyta/mobile` 101 个测试文件全过、18 枚相关静态门 rc=0。
+⚠️ **仍然欠的是本机真机那一枪**（模拟器被别线占、Android 载体不在本机、swap 9.9G/11.2G、负载在涨），
+现量与"谁能一步补上"写在 BLOCKED B260 追记二；同处还更正了本线自己写错的一句
+（"mobile 已有 11 枚渲染 spec"是读错了 —— 那 11 处命中全是散文，`render(` 计数为 0）。
 
 **顺带现量到一个门禁的边界**（不是本次引入的，但这次撞上了）：`check-ui-provider` 按**文件**近似
 （脚本自己写着"不覆盖①"）。变异实测：拆掉 `SessionsPanel.tsx` 里包 `<SettingsSection>` 的那层
@@ -247,7 +252,9 @@
 | 字段格手写 label + 手拼 id | ✅ 四格已迁 `FormField`（ProfilePanel / EmailChangePanel / PasskeyPanel / PasswordPanel） |
 | 对象行（设备 / 凭证）各写一套尾随动作骨架 | ✅ `SettingsRowModel` 加 `trailing` 档，web 的 SessionsPanel 已迁；mobile 的 `SessionsSection.tsx` 卡在别线一枚源码文本判据上（BLOCKED B260） |
 
-**优先级**: 门 ✅；迁移 ✅ 五格已落地（四格字段 + 一格行）。剩 mobile 那一格，欠的是**别人手里的判据口径 + 一次设备腿**，两样都不是本线能替的（B260）。
+**优先级**: 门 ✅；迁移 ✅ 六格已落地（四格字段 + web 一格行 + mobile 一格行，2026-11-05）。
+这一格剩下的**不是设计也不是判据**，只有本机真机那一枪（模拟器被别线占、Android 载体不在本机）——
+现量、可迁移的参照与"谁能一步补上"都在 BLOCKED B260 追记二。
 
 ---
 
@@ -353,7 +360,7 @@
 | W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
 | W1（本轮） | G-4 迁移那一半 | ✅ 四格字段迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令）+ 一格行迁 `trailing` 档（SessionsPanel）；账本逐次收缩，现量 `cat scripts/settings-row-anatomy-ledger.json` |
 | W2 | G-6 位置尺进链 | ✅ `check:tip-adjacency` 的定义与链上那一节已入库，同批把本线四枚同族尺的定义都带上 `--self-test` 臂（做法与卡点见 G-6 第三半）|
-| W2 | G-4 的 mobile 那一格 | 🔴 **不是欠看图腿，是欠别人一枚判据**（BLOCKED B260）：`apps/mobile/tests/account-security-wiring.spec.ts:152` 按**源码文本切三元**（`indexOf('{session.current ? (')`），而 `trailing` 档的正确写法（提示句进 `note`、按钮进 `actions`）会把这个字面量整块消掉。三种写法本线都排过：设计正确的 ⇒ 判据红；保住字面量的 ⇒ 二十多字提示被挤进右列，而本机没有能签字的移动端看图腿；靠文本相邻蒙过正向对照的 ⇒ 判据的牙被悄悄磨掉没人签字。归注册登录线（`b6581174f` 立的那四条），改完本线立刻迁。**这一格不需要产品决策**：web 那格「这台设备」是按钮禁用、mobile 是不画按钮，看着不一致，但 `actions` 按契约就是宿主渲染的那一格，G-4 要的是行骨架只有一份，不是两端动作一致（B260 追记 ①）|
+| W2 | G-4 的 mobile 那一格 | ✅ **已迁（2026-11-05，产品负责人授权改锚）**：`SessionsSection` 每台设备走 `trailing`、失败句走 `host`；别线那枚判据从**切 JSX 三元**改锚到**切行模型字段**，判的还是同一件事（变异臂：改成"禁用按钮"形状 ⇒ 精确红）。真机锚点 `sessions-list` / `sessions-revoke` / `sessions-logout-all` 一枚没动。⏳ **只剩本机真机那一枪**（现量与谁能补：BLOCKED B260 追记二）。原先那一行写的"三种写法都排过、归注册登录线改"仍成立，但其中"改成渲染后按 testID 判"那条出路是本线读错的（那 11 处 `@testing-library/react-native` 命中全是散文，`render(` 计数 0）—— 见追记二 ① |
 | W2 | 暗色两档的常驻看图腿 | ✅ 做成了**四象限一条用例**（亮/暗 × 1440/375，八张图 12–19，四把尺每格各量一遍；`account-email-change-and-sessions.spec.ts` 第 8 条）。原先那一行是三个批次三个场景拼出来的读数，四格量的不是同一件事。抓到并修掉确认复选框被画进标签列那一格。**这一行原来那句"设置面那几枚 e2e 一枚都不在链里"是假的** —— 链里 `check:ai-e2e` 跑整条默认套（现量 `pnpm --dir e2e exec playwright test --list` 的总数），新 spec 自动有人跑，不需要额外裁决 |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
