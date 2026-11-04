@@ -101,11 +101,14 @@ AI 端点的三行 `inline` 字段、保险库口令的六格 `stacked` 字段�
 | `pnpm check:tip-adjacency` | 每一枚 `?` 紧跟它所解释的标签/小标题（账本制） |
 | `pnpm check:settings-prose` | 说明文字不许内联（只许进 `?`），例外三族见 `docs/agents/design-system.md` |
 
-🔴 **已知的契约缺口（不是偷懒）**：`SettingsSection` 只支持"先 rows 后 children"，
-所以**类型化行与宿主字段不能交错**。`ProfilePanel` 的头像行 / 邮箱行因此还留在手写容器里
-（昵称字段夹在中间）。要收掉它只有三条路，每一条都会改变外观或契约：
-支持混排 / 重排三格顺序 / 多一块容器（分节线随之变）。这条待决在
-`docs/plans/settings-ui-governance-2026-11.md` G-4 那节，**别用"再写一套行"来绕它**。
+🔴 **交错那一格已经补上（2026-11-04）**：`SettingsRowModel` 多了一档 **`host`** ——
+"顺序与分组归契约，内容自己的解剖归它那一族"。`ProfilePanel` 的三格因此收完：
+头像 = `trailing`、昵称 = `host` 里的一格 `FormField`、邮箱 = `value`。
+现量（真浏览器 1440）：手写 `__row` 从 4 处降到 1 处（那一处在换邮箱那块里），
+行距从 ≈85px 收到与字段行同一档，三格控件右缘对齐。
+⚠️ `host` **不是**"什么都能塞"的逃生口：它只解决"一屏里两族按用户读到的顺序排在一起"，
+判断"这一格属于哪族"的口径没变（还是 §1 那两档 + §1b 那两族）。
+账本现量由 `node scripts/check-settings-row-anatomy.mjs` 自己打印。
 
 ---
 

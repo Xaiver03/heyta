@@ -297,12 +297,34 @@ export interface SettingsTrailingRow extends SettingsRowCommon {
   readonly leading?: ReactNode;
 }
 
+/**
+ * 宿主自己渲染的一格，**占一个位置**在有序行列表里。
+ *
+ * 🔴 为什么必须有这一档（2026-11-04，不是"方便"）：`SettingsSection` 原来只支持
+ *   "先 rows 后 children"，于是**类型化行与宿主内容不能交错**。`ProfilePanel` 的
+ *   头像行 / 昵称字段 / 邮箱行就是这个死局的现场：昵称是一格字段（走 `FormField`），
+ *   夹在两行中间 ⇒ 两行迁不进契约，只能继续手写 `__row`。
+ *   2026-11-04 真浏览器现量：同一屏里手写行行距 ≈85px、字段行控件右缘 1255、
+ *   手写行控件右缘 1267 —— 用户最初抱怨的"同一屏两种起点"就是这么来的。
+ *
+ * ⚠️ 它**不是**"什么都能塞"的逃生口：这一档只负责**顺序与分组归契约**，
+ *   内容自己的解剖仍由它所属的那族负责（字段就还是 `FormField`，见
+ *   `docs/agents/ux-principles.md` §1 / §1b）。判断"这一格该走哪族"的口径没变，
+ *   变的只是"一屏可以按用户读到的顺序把两族排在一起"。
+ */
+export interface SettingsHostRow extends SettingsRowCommon {
+  readonly kind: 'host';
+  /** 宿主渲染的内容。为 `null` / `undefined` 时这一整条不占位（见 `shouldRenderSettingsRow`）。 */
+  readonly node?: ReactNode;
+}
+
 /** 一行设置。**穷尽联合** —— 新增一种行类型时每个 `switch` 都会编译失败。 */
 export type SettingsRowModel =
   | SettingsValueRow
   | SettingsToggleRow
   | SettingsActionRow
   | SettingsTrailingRow
+  | SettingsHostRow
   | SettingsNoteRow
   | SettingsHeadingRow;
 
@@ -326,6 +348,9 @@ export function settingsRowKey(row: SettingsRowModel, index: number): string {
       // ⚠️ `label` 可缺省（设备名与 UA 都拿不到时**什么都不编**），所以这里必须有回落，
       // 否则会拼出 `trailing:undefined` —— 两行都缺名时它们会撞成同一个 React key。
       return `trailing:${row.label ?? `#${String(index)}`}`;
+    case 'host':
+      // 宿主内容没有可当 key 的语义字段 ⇒ 有 testID 就用它，否则按位置。
+      return `host:#${String(index)}`;
     case 'note':
       return `note:${row.text}`;
     case 'heading':
@@ -346,6 +371,10 @@ export function settingsRowKey(row: SettingsRowModel, index: number): string {
  * 某个 JSX 分支里，而那种分支**不报错、只会画错**。
  */
 export function shouldRenderSettingsRow(row: SettingsRowModel): boolean {
+  if (row.kind === 'host') {
+    // 空内容不占位：否则宿主传 `node={cond ? x : undefined}` 时会留出一个空行间距。
+    return row.node !== undefined && row.node !== null;
+  }
   if (row.kind !== 'toggle') return true;
   if (row.availability === undefined) return true;
   return isSettingActionable(row.availability);

@@ -61,6 +61,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
+import { HeytaUiProvider, SettingsSection } from '@heyta/ui';
 import { ICON_SIZE } from '@heyta/design-system';
 import { Loader2 } from 'lucide-react';
 import {
@@ -326,12 +327,29 @@ export function ProfilePanel({
         旧版这里挂着一枚「头像为什么要加密」，而那个前提已经被产品决策推翻 ——
         留着它只会继续告诉用户"改头像需要口令"。
       */}
-      <div className="ht-settings__row" data-testid="profile-avatar-row">
-        <div className="ht-settings__row-label">
-          <span className="ht-settings__item-label">{t('common.profile.avatar.label')}</span>
-        </div>
-        <div className="ht-settings__row-body">
-          <div className="ht-settings__avatar-line">
+      {/*
+        🔴 这三格现在走**共享契约**（治理计划 G-4 的最后一米）。
+        2026-11-04 真浏览器现量：原来手写 `__row` 那一族在这屏的行距 ≈85px、控件右缘 1267，
+        而夹在中间的昵称字段走 `FormField` 的网格（右缘 1255、控件 44 一档）——
+        用户抱怨的"同一屏两种起点"就是这么来的。现在**顺序与分组归 `SettingsSection`**，
+        每格内部的解剖仍归它自己那一族（字段 = `FormField`；口径见
+        `docs/agents/ux-principles.md` §1 / §1b）。
+      */}
+      <HeytaUiProvider>
+        <SettingsSection
+          rows={[
+            {
+              kind: 'trailing' as const,
+              testID: 'profile-avatar-row',
+              label: t('common.profile.avatar.label'),
+              labelTestID: 'profile-avatar-label',
+              /*
+                头像 + 两个按钮 + 两句回执**整体留在控件那一列**：
+                这一格换的是"这一行由谁排"，不换用户看到的布局。
+              */
+              actions: (
+                <div>
+                  <div className="ht-settings__avatar-line">
             <div className="ht-settings__avatar" data-testid="profile-avatar">
               {avatarUrl === undefined ? (
                 // 没有图就用邮箱首字母。⚠️ 拿不到邮箱时**不编一个字母**（与头像菜单同一条纪律，
@@ -413,23 +431,24 @@ export function ProfilePanel({
               {avatarReadMessage}
             </p>
           )}
-        </div>
-      </div>
-
-      {/*
-        🔴 这一行的字段部分走**共享字段解剖** `FormField`（2026-11-04，治理计划 G-4）。
-        之前这里是手写的 `<label htmlFor>` + `<input>` + 手拼的 `id="profile-nickname"`，
-        而 `FormField` 的契约明写「`htmlFor` / `id` 都从它来，全仓不许再手拼字符串 id」。
-        `layout="inline"` 是设置/属性面板那一档（标签在左），不是表单页的 `stacked` ——
-        这条取值规则住在 `FormField` 的 props 注释与 `docs/agents/ux-principles.md` §1，
-        **两档之外不许有第三档**。
-        外层 `__row--field` 只保留行的节奏（内边距 + 行间发丝线），两列交给字段自己。
-      */}
-      <div
-        className="ht-settings__row ht-settings__row--field"
-        data-testid="profile-nickname-row"
-      >
-        <FormField
+                </div>
+              ),
+            },
+            {
+              // 昵称是一格**字段**，不是对象行：它走 `FormField`，
+              // 只借 `host` 这一档回到自己在列表里的位置（顺序归契约，解剖归字段族）。
+              kind: 'host' as const,
+              node: (
+                <div data-testid="profile-nickname-row">
+                  {/*
+                    之前这里是手写的 `<label htmlFor>` + `<input>` + 手拼的 `id="profile-nickname"`，
+                    而 `FormField` 的契约明写「`htmlFor` / `id` 都从它来，全仓不许再手拼字符串 id」。
+                    `layout="inline"` 是设置/属性面板那一档（标签在左），不是表单页的 `stacked` ——
+                    口径住在 `FormField` 的 props 注释与 `docs/agents/ux-principles.md` §1，
+                    **两档之外不许有第三档**。
+                    现在连"这一行的节奏"也归契约：`__row--field` 那层手写容器删掉了。
+                  */}
+                  <FormField
           id="profile-nickname"
           label={t('common.profile.nickname.label')}
           layout="inline"
@@ -468,40 +487,44 @@ export function ProfilePanel({
               </button>
             </div>
           )}
-        </FormField>
-        {/* 输入框下面那句"最多 32 字"也是说明 → 挪进上面那枚 `?` 的正文。 */}
-        {tooLong ? (
-          <p className="ht-settings__danger" data-testid="profile-nickname-toolong">
-            {t('common.profile.nickname.toolong', {
-              max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
-              count: String(codePoints),
-            })}
-          </p>
-        ) : null}
-        <NoticeLine notice={nameNotice} testId="profile-nickname-notice" />
-      </div>
-
-      {/*
-        邮箱这一行**只显示值**（2026-10-31）。
-
-        🔴 它曾经挂着一枚 `?`，而那枚问号落在**值下面**一列的空位里 —— 同一屏里
-        头像/昵称的问号都在标签后面，只有这一枚换了锚点，于是它读起来像"邮箱地址
-        自己的注释"。而它的正文（"登录标识、换地址用下面那块"）在正下方的
-        「更换登录邮箱」里已经逐条展开，属于同一屏说两遍。
-        现在问号只出现在它解释的那个标签/小标题之后，值那一列不出现问号。
-      */}
-      {email === undefined ? null : (
-        <div className="ht-settings__row" data-testid="profile-email-row">
-          <div className="ht-settings__row-label">
-            <span className="ht-settings__item-label">{t('common.profile.email.label')}</span>
-          </div>
-          <div className="ht-settings__row-body">
-            <p className="ht-settings__value" data-testid="profile-email">
-              {email}
+          </FormField>
+          {/* 输入框下面那句"最多 32 字"也是说明 → 挪进上面那枚 `?` 的正文。 */}
+          {tooLong ? (
+            <p className="ht-settings__danger" data-testid="profile-nickname-toolong">
+              {t('common.profile.nickname.toolong', {
+                max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
+                count: String(codePoints),
+              })}
             </p>
-          </div>
-        </div>
-      )}
+          ) : null}
+          <NoticeLine notice={nameNotice} testId="profile-nickname-notice" />
+                </div>
+              ),
+            },
+            /*
+              邮箱这一行**只显示值**（2026-10-31）。
+
+              🔴 它曾经挂着一枚 `?`，而那枚问号落在**值下面**一列的空位里 —— 同一屏里
+              头像/昵称的问号都在标签后面，只有这一枚换了锚点，于是它读起来像"邮箱地址
+              自己的注释"。而它的正文（"登录标识、换地址用下面那块"）在正下方的
+              「更换登录邮箱」里已经逐条展开，属于同一屏说两遍。
+              现在问号只出现在它解释的那个标签/小标题之后，值那一列不出现问号。
+              ⚠️ 走契约的 `value` 档：拿不到邮箱时**整行不出现**（不是先渲染再藏值）。
+            */
+            ...(email === undefined
+              ? []
+              : [
+                  {
+                    kind: 'value' as const,
+                    testID: 'profile-email-row',
+                    label: t('common.profile.email.label'),
+                    value: email,
+                    valueTestID: 'profile-email',
+                  },
+                ]),
+          ]}
+        />
+      </HeytaUiProvider>
 
       {/*
         换绑登录邮箱（ADR-0063）。它挂在**邮箱那一行的正下面**而不是另开一节：
