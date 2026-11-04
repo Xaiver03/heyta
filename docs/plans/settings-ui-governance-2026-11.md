@@ -71,11 +71,11 @@
 
 | 读数 | 值 | 复量 |
 |---|---|---|
-| 手写行解剖的 web 设置文件 | 13 个 / 54 处 | `node scripts/check-settings-row-anatomy.mjs` |
-| 已用共享契约的 web 面板 | 2 个 | `grep -rln 'SettingsRowModel' apps/web/src/features/settings` |
-| 契约现有行档 | 5 档（`value`/`toggle`/`action`/`note`/`heading`） | `model.ts` 的 `SettingsRowModel` 联合 |
+| 手写行解剖的 web 设置文件 | 13 个（处数只由复量命令给） | `node scripts/check-settings-row-anatomy.mjs` |
+| 已用共享契约的 web 面板 | 3 个 | `grep -rln 'SettingsSection' apps/web/src/features/settings` |
+| 契约现有行档 | 6 档（`value`/`toggle`/`action`/`trailing`/`note`/`heading`） | `model.ts` 的 `SettingsRowModel` 联合 |
 
-#### 迁移那一半：方向已找对，三格已迁（2026-11-04 二次复核推翻本节上一稿）
+#### 迁移那一半：方向已找对，五格已迁（2026-11-04 二次复核推翻本节上一稿）
 
 上一稿写"迁面板不可行，因为契约装不下"—— 那是**只扫了 `SettingsRowModel` 一份契约**
 就下的结论。仓里另有一套**并列**的表单解剖，字段本来就该走它而不是走 rows：
@@ -99,6 +99,7 @@
 | EmailChangePanel 新地址 | 手写 label + 手拼 id | `FormField layout="inline"` | `account-security.spec.tsx` 42/42 |
 | PasskeyPanel 改名 | 上一轮我手加的 label + 手拼 id | `FormField layout="inline"` | `passkey-panel.spec.tsx` 全绿 |
 | PasswordPanel 口令格 | 手写 `__field` + `<label htmlFor>`，**且 `?` 套在 label 里面** | `FormField layout="inline"` + `labelTip` | `account-security.spec.tsx` 42/42 |
+| SessionsPanel 会话行 | 手写 `__section __credential` + `__credential-main` | `SettingsRowModel` 的**新增 `trailing` 档**（`SettingsSection` + `HeytaUiProvider`） | `account-security.spec.tsx` 42/42；行解剖账本 **53 → 50** |
 
 最后一格顺带修掉一个真隐患：`SettingsInfoTip` 渲染的是 `<button>`，原来它落在
 `<label htmlFor={id}>` **内部** —— 点问号会顺带把焦点甩进口令框。`labelTip` 把它画成
@@ -110,10 +111,29 @@
 只在给了 tip 时才多包一层 `__labelcell`，既有调用点（AI 端点那三行）DOM 逐字不变。
 该断言的牙也实测过：把 `?` 挪回值那一列 ⇒ `profile-panel.spec.tsx` 精确报红。
 
-**SessionsPanel 不在这张表里**：它没有字段。一行是「设备名 + 时间戳 + 撤销按钮」，
-属于 rows 那一族而不是 fields 那一族；要收敛得等 `SettingsRowModel` 长出"尾随动作"档。
+**`trailing` 档是这次给契约补的行档**（`packages/ui/src/settings/model.ts` + `Settings.tsx` 的 `TrailingLine`）：
+"一个对象（一台设备）带几行事实 + 一个只对得起它的尾随动作"这一族，原来五档都装不下 ——
+`action` 档让**整行**可点，会把"选中这行"与"撤销这台设备"混成同一个手势，而那两者代价完全不同。
+所以它是**新增的一档**，不是把 SessionsPanel 硬塞进 `action`。
 
-**还剩**：`SettingsRowModel` 的"尾随动作档"未加（SessionsPanel 那一族要用）。
+它是**纯追加**：`pnpm --filter @heyta/ui typecheck` 与 `pnpm --filter @heyta/mobile typecheck`
+（后者跑的是**未改动**的 mobile 消费者）均 rc=0；`SettingsRow` 里的 `never` 穷尽自检保证
+新档没被渲染时是**编译期报错**，不是静默少画一行。
+
+**还剩（这一格没做，理由不是"来不及"）**：
+`apps/mobile/src/screens/SessionsSection.tsx` 仍自己手搓同一形状（`Pressable` + 尾随按钮）。
+迁移它需要**设备腿取证**，而这一趟没有跑：Android 载体不在本机（见 `docs/agents/multi-end-build.md`），
+iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devices booted | grep -c Booted` 现量 1），
+按 `ui-acceptance` 的口径**不抢别人的设备、也不许没真看图就宣布"两端一致"**。
+契约已经就位，那一格现在只欠一次设备验证，不欠设计。
+
+**顺带现量到一个门禁的边界**（不是本次引入的，但这次撞上了）：`check-ui-provider` 按**文件**近似
+（脚本自己写着"不覆盖①"）。变异实测：拆掉 `SessionsPanel.tsx` 里包 `<SettingsSection>` 的那层
+`HeytaUiProvider` 后 `node scripts/check-ui-provider.mjs` **仍 rc=0**，红的是
+`tests/account-security.spec.tsx`（8 条抛 `useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用`）。
+⇒ 这一处守住 Provider 的是**测试**，不是那把尺；`packages/ui` 里"放在 Provider 之外会红"那句
+（`grep -c '会红.*指名文件与行号' packages/ui/src/index.ts` 现量）在**同文件另有 Provider 子树**时不成立，
+已在 settings 那一块改成带边界的写法；其余几块同句未逐枚复测，**没顺手改**（改一句判据口径要一枚一测）。
 
 #### 本节两处误判与一处我自己引入的缺陷（都已更正，原论证保留在 git 历史里）
 
@@ -127,10 +147,11 @@
 
 | 真问题 | 处置 |
 |---|---|
-| 13 个文件各写一套容器，可能长出第 6 套 | ✅ `check-settings-row-anatomy.mjs` 账本制冻结，新增即红，变异臂实测能红 |
-| 字段格手写 label + 手拼 id | ✅ 三格已迁 `FormField`（账本 54→53）；`PasswordField` 待迁 |
+| 13 个文件各写一套容器，可能长出第 6 套 | ✅ `check-settings-row-anatomy.mjs` 账本制冻结，新增即红，变异臂实测能红；账本逐格只减（`--update` 只许改小） |
+| 字段格手写 label + 手拼 id | ✅ 四格已迁 `FormField`（ProfilePanel / EmailChangePanel / PasskeyPanel / PasswordPanel） |
+| 对象行（设备 / 凭证）各写一套尾随动作骨架 | ✅ `SettingsRowModel` 加 `trailing` 档，web 的 SessionsPanel 已迁；mobile 的 `SessionsSection.tsx` 欠一次设备腿 |
 
-**优先级**: 门 ✅；迁移 ✅ 三格已落地，剩 `PasswordField` 与 rows 的尾随动作档。
+**优先级**: 门 ✅；迁移 ✅ 五格已落地（四格字段 + 一格行）。剩 mobile 那一格，欠的是设备验证而不是设计。
 
 ---
 
@@ -153,7 +174,8 @@
 需产品负责人拍板放宽」。回源码逐条量过之后，两句话都不成立：
 
 **1. 那条禁令本来就带三条例外，而且明写"删掉解释不算违规"。**
-真身在 `docs/agents/design-system.md:112-160`（不是任何一份抄件）：
+真身在 `docs/agents/design-system.md` 那一节「🔴 设置界面里**禁止**写说明文字」（定位：
+`grep -n "禁止.*写说明文字" docs/agents/design-system.md`；不复述行号 —— 那一句被引用时行号已经漂了）：
 
 | 例外 | 内容 | 现量 |
 |---|---|---|
@@ -179,9 +201,14 @@
 | 真因 | 落点 |
 |---|---|
 | 输入框无边框 + `flex:1` 铺满 ⇒ 占位文字是**唯一**"这里可输入"的线索（`EmailChangePanel.tsx:295-297` 自己记着这条实测） | 本轮已修：昵称格补 `__field` 宽度约束；`__hint` 字号 12→14 |
-| 同屏 13 个文件各写一套行解剖容器（54 处） | G-4：门已落地冻结新增（圆角那条经复核**不是**漂移，见 G-4 节表格） |
+| 同屏 13 个文件各写一套行解剖容器（处数只由 `node scripts/check-settings-row-anatomy.mjs` 给） | G-4：门已落地冻结新增（圆角那条经复核**不是**漂移，见 G-4 节表格） |
 
 **优先级**: ✅ 关闭（前提否证，无待决）
+
+**关闭之后又抓到一条同类缺陷（已改，2026-11-04）**：规则文件里"合法载体"那张表的 mobile 那一行
+写着「`InfoTip` ⚠️ 尚未建」。共享层那份 `SettingsInfoTip` 一直在被移动端调用
+（现量：`grep -rn "SettingsInfoTip" apps/mobile/src`）。禁令的**豁免与载体**是同一份口径的两半，
+载体那半写错会让人以为移动端可以内联说明 —— 已按现量改写，并在下面留了一句"别读这句话，读调用点"。
 
 ---
 
@@ -192,7 +219,8 @@
 | W1（本轮） | G-1 + G-2 落地为门禁 | ✅ G-1 账本清空、A4 硬拒；✅ G-2 静态 CSS 臂（`check-font-size-discipline.mjs`） |
 | W1（本轮） | G-3 + G-5 落地为门禁 | ✅ G-3 `check-font-size-discipline.mjs`；✅ G-5 `check-spinner-discipline.mjs`（均带变异臂实测能红） |
 | W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
-| W1（本轮） | G-4 迁移那一半 | ✅ 四格已迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令），账本 54→53；SessionsPanel 属 rows 族不在此表 |
+| W1（本轮） | G-4 迁移那一半 | ✅ 四格字段迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令）+ 一格行迁 `trailing` 档（SessionsPanel）；账本两次收缩（54→53→50） |
+| W2 | G-4 的 mobile 那一格 | ⏸ `apps/mobile/src/screens/SessionsSection.tsx` 改吃 `trailing` 档：契约已就位，欠一次设备腿（Android 载体在 linux-dev，iOS 那枚可能被别线占） |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
 ---
@@ -203,3 +231,10 @@
 1. 在违规输入下真的会红（AGENTS §6 第 2 条）
 2. 有变异臂（临时注入违规 → 门禁红 → 撤销 → 门禁绿）
 3. 写进 `docs/agents/commands.md` 的 `verify:*` 列表
+4. **接进 `pnpm check` 链** —— 这一条本轮补上，而且它是被仓里现成的尺抓出来的：
+   `pnpm check:gate-wiring` 在接链前 **rc=1**，逐条点名三枚门禁实现（覆盖 G-2/G-3/G-4/G-5 四项，
+   G-2 与 G-3 同住在 `check-font-size-discipline.mjs` 里）
+   「没有任何 package.json 定义引用它 ⇒ 0 次执行，而链照样绿」。
+   ⇒ 前 3 条只保证"这把尺能量"，第 4 条才保证"有人踩上去"。三枚现已各有
+   `pnpm check:{spinner-discipline,font-size-discipline,settings-row-anatomy}` 定义并进链
+   （G-1 那枚本来就接在 `check:control-semantics` 里），`check:gate-wiring` 现量 rc=0。
