@@ -248,6 +248,36 @@ iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devi
 （现量：`grep -rn "SettingsInfoTip" apps/mobile/src`）。禁令的**豁免与载体**是同一份口径的两半，
 载体那半写错会让人以为移动端可以内联说明 —— 已按现量改写，并在下面留了一句"别读这句话，读调用点"。
 
+### G-6 的第三半：口径的「位置」那一半原来没有尺（2026-11-04 补）
+
+禁令原文有两半：**不许内联**（`check:settings-prose` 早就管着）+ **一枚 `?` 必须紧跟它所解释的标签/小标题**
+（原来只有 `profile-panel.spec.tsx` 一枚断言，只管一屏）。后一半被违反时不会有任何测试变红，
+症状是屏幕上出现一枚**没有归属的孤零零问号** —— 看图腿在 `PasswordPanel` 抓到两枚（代码注释自己写着
+"按钮旁的 `?`"，代码却把它排在段落之后），已修。
+
+同族查全之后补了 `pnpm check:tip-adjacency`（账本制 + 变异臂）：
+
+| 读数 | 值 | 复量 |
+|---|---|---|
+| 调用点总数 | 33 | `node scripts/check-tip-adjacency.mjs --report` |
+| 存量违规（已进账本，只减不增） | 4 处 / 3 个文件 | `cat scripts/settings-tip-ledger.json` |
+| 三条臂都验过 | 新增即红（变异臂）、缩了不改账本也红（`WidgetPushPanel` 那枚改完就抓到）、`--update` 不许改大 | 见 `--self-test` |
+
+**为什么其中一枚值得改代码而不是登记**：`SettingsSection` 没有能把 `?` 挂到**分组标题**旁的口子
+（`title` 只收 string），宿主唯一的选择是把它当 children 排在整组之后 —— 那枚问号"孤零零"不是有人写错，
+是**契约缺格**。补了 `titleTip`（与上一批给 `FormField` 补的 `labelTip` 对应，纯追加：
+`@heyta/ui` / `@heyta/mobile` typecheck 均 rc=0，未传该 prop 的消费端一字不变），
+`WidgetPushPanel` 那枚随之回到标题旁，账本从 5 收到 4。剩下 4 处归 `CloseAccountPanel` /
+`InboundAutomationSettings` ×2 / `ProfileOverview` 各自那一屏，本线只登记不代改。
+
+⚠️ **这把尺的"进链"那一半暂时卡住**：`package.json` 里另一条线已经写进了
+`check:capture-shape`，而它指向的 `scripts/check-capture-shape.mjs` **还是未跟踪状态**
+（现量 `git status --short -- scripts/check-capture-shape.mjs` ⇒ `??`）。
+同一行 JSON 里两家的改动没法分开入库，所以本线的 `check:tip-adjacency` 定义与链上那一节
+**留在工作树**，等那一枚脚本落地后随任一笔一起入库 —— 本线不替别线提交未跟踪的实现文件，
+也不把别人那一节摘掉。在此之前这把尺是"写了但 0 次执行"那一类，**这条不一致是已知的、有前置条件的**，
+不是遗漏。
+
 ---
 
 ## 执行节奏

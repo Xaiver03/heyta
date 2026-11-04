@@ -159,8 +159,29 @@ React Native 的 `View` 默认 `flex: 0 0 auto`（与 CSS 的 `0 1 auto` **不�
 | 规则 | 为什么 | 判据 |
 |---|---|---|
 | **设置内容面不画节标题**。左栏已用 `aria-current="page"` 指出所在节；内容面的节名改挂 `<section aria-label>`，不再有 `<h2>` | 「个人资料」紧挨着「个人资料」= 同一份信息架构画了两遍，两行同名字并排像两个层级 | `apps/web/tests/settings-sheet-ia.spec.tsx`「内容面不重复侧栏已经指出的节标题」 |
-| **一枚 `?` 紧跟它所解释的标签或小标题**（同一段文字之后），**值那一列不许出现问号** | 同一屏里一半问号在标签后、一半在值下面，读起来像"这个值自己的注释" | `apps/web/tests/profile-panel.spec.tsx`「问号只挂在标签/小标题后面」 |
+| **一枚 `?` 紧跟它所解释的标签或小标题**（同一段文字之后），**值那一列不许出现问号** | 同一屏里一半问号在标签后、一半在值下面，读起来像"这个值自己的注释" | 全仓调用点：`pnpm check:tip-adjacency`（账本制）；单屏形状：`apps/web/tests/profile-panel.spec.tsx`「问号只挂在标签/小标题后面」 |
 | **同一事实只出现一次**（例：当前登录邮箱只在「邮箱」行，换邮箱块不再回显） | 两个同值字段挨着，用户要逐字比对才敢确认不是两个地址 | 同上「登录邮箱只显示一次」 |
+
+### `?` 的位置这一半，2026-11-04 起有尺了（`pnpm check:tip-adjacency`）
+
+上面那条口径原来**只有 `profile-panel.spec.tsx` 一枚断言**在管，而且只管个人资料那一屏 ——
+其余调用点违反它**不会有任何测试变红**，症状是屏幕上出现一枚**没有归属的孤零零问号**
+（真浏览器截图在 `PasswordPanel` 抓到两枚：代码注释自己写着"按钮旁的 `?`"，代码却把它排在段落之后）。
+
+尺认四种合法位置（`scripts/check-tip-adjacency.mjs` 的 `--report` 能把 33 处调用点逐条列出来）：
+
+| 合法形状 | 例子 |
+|---|---|
+| 标签/小标题/正文节点**内部**（`label` `legend` `h2` `h3` `h4` `span` `p` `dt` `summary`） | 各面板 `<h2>标题 <SettingsInfoTip/></h2>` |
+| 标题/标签那一格容器里（className 含 `__h3` / `ht-type-headline` / `ht-type-row-title` / `__help-line` / `__labelcell` / `__row-label` / `__actions`） | 动作块旁的那枚后果 `?` |
+| **紧跟**它所解释的那个标签/控件那个兄弟之后 | `.ht-settings__toggle` 那一行：`<label>…</label>` 之后一枚 `?` |
+| 作为 **prop** 交给原语（`labelTip={…}` / `tip={…}` / `SettingsSection.titleTip`） | 位置由原语保证，调用点不需要自己排 |
+
+> ⚠️ 两件事一起做才算闭环：① `SettingsSection` 原来**没有**能把 `?` 挂到分组标题旁边的口子，
+>    宿主只能把它当 children 排在整组之后 —— 那个缺口现在由 `titleTip` 补上（与 `FormField.labelTip` 对应）；
+>    ② 存量 4 处（`CloseAccountPanel` / `InboundAutomationSettings` ×2 / `ProfileOverview`）进账本
+>    `scripts/settings-tip-ledger.json`，**只减不增**：新增一枚即红，缩了不回来改账本也红。
+>    那 4 处归各自那一屏，本线不代改；改法是上面那张表里的某一种。
 
 ⚠️ 这三条约束的是**位置与重复**，不是"每行都要挂问号"：没有值得问的句子就不挂。
 删掉解释**不会**违反上面的禁令（禁令管的是"不许内联"，不是"必须有 `?`"）。

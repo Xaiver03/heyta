@@ -284,6 +284,18 @@ export interface SettingsSectionProps {
   /** 标题下面那一整句说明。省略则不渲染。 */
   readonly note?: string;
   /**
+   * 紧跟**分组标题**的那枚 `?`（说明文字的唯一合法载体之一）。
+   *
+   * 🔴 为什么要有这一格：口径写的是「一枚 `?` 紧跟它所解释的标签或小标题」，
+   *   而 `SettingsSection` 原来没有能把 `?` 挂到标题旁边的口子 ——
+   *   宿主只能把 `SettingsInfoTip` 当 children 排在整组之后，
+   *   屏幕上就是一枚**没有归属的孤零零问号**（`check:tip-adjacency` 现在登记着 5 处这种形状）。
+   *   `FormField` 那边同样的缺口是用 `labelTip` 补的，这里是它在分组标题上的对应物。
+   * ⚠️ 与 `labelTip` 同一条纪律：它是标题的**兄弟**，不是标题的后代（`SettingsInfoTip`
+   *   渲染按钮，塞进文字节点里会让读屏把整句标题念成按钮的名字）。
+   */
+  readonly titleTip?: React.ReactNode;
+  /**
    * 标题前的那个记号（图标），由**宿主**渲染。
    *
    * 🔴 这里刻意是**插槽**而不是 `icon: HeytaIconData`：两端的字形来源**不同源** ——
@@ -318,6 +330,7 @@ export interface SettingsSectionProps {
 export function SettingsSection({
   title,
   note,
+  titleTip,
   leading,
   rows,
   children,
@@ -335,7 +348,7 @@ export function SettingsSection({
 
   return (
     <View style={[styles.root, variant === 'card' ? styles.card : null]} testID={testID}>
-      {title === undefined && leading === undefined ? null : (
+      {title === undefined && leading === undefined && titleTip === undefined ? null : (
         <View style={styles.sectionHead}>
           {leading === undefined ? null : leading}
           {title === undefined ? null : (
@@ -343,6 +356,7 @@ export function SettingsSection({
               {title}
             </Text>
           )}
+          {titleTip === undefined ? null : titleTip}
         </View>
       )}
 

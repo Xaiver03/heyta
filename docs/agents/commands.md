@@ -253,6 +253,7 @@ pnpm check:disk-budget                             # 可回收 > 2048 MB 就红�
 pnpm check:spinner-discipline                      # G-5：设置面板 Loader2 必须带 ht-settings__busy
 pnpm check:font-size-discipline                    # G-3 + G-2：消息类禁 2xs；danger 必须用语义色
 pnpm check:settings-row-anatomy                    # G-4：web 设置面不许长出第六套行解剖容器（账本制）
+pnpm check:tip-adjacency                           # G-6：一枚 `?` 必须紧跟它所解释的标签/小标题（账本制，先跑变异臂）
 ```
 
 ## 6.6 边缘配置：改站点之前先跑这一条
