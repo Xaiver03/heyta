@@ -409,6 +409,28 @@ build 完再跑它就是绿，别线再写一笔它就红。这不是谁做错�
   不发生。症状是"鼠标能开、键盘开不了"，而 `check:menu-keyboard` 只看结构，看不见这一格。
   现在 `role` 落在真按钮上，判据是那条「键盘 Enter 能展开子菜单」。
 
+### 入库（本轮按主题拆的那几笔）
+
+⚠️ 这里**不写 SHA**（同一棵树上别线每隔几十秒提交一次，写死的号下一分钟就指错东西）。现量：
+`git log --oneline -12 --grep='置顶在 web\|行菜单四组\|面单底部工具条\|垃圾桶搬进侧栏\|阶段 2-4 的浏览器腿\|B258'`。
+
+| 主题 | 落库情况 |
+|---|---|
+| domain 置顶顺序（B5 的真缺陷） | 一笔，只含 `packages/domain/{src/task-order.ts,tests/task-order.spec.ts}` |
+| 行菜单四组动作 + 三处缺陷（B1–B5、键盘 Enter、零标签、草稿 Esc/焦点） | 一笔，含 `TaskRowMenu.tsx`、`task-row-menu.css`、`store.ts`、`task-row-menu.spec.tsx`，以及 `App.tsx` 里**只属于这一格的两枚 hunk**（`isPinned` 那枚 import + 行菜单的 props 接线）与 `zh-CN.ts` 的 `web.rowMenu.*` |
+| 面单工具条第三枚（C2） | 🔴 **内容入库了，但记在别线名下**：本线 staged 之后、`git commit` 之前那 8 秒，设置页治理那条线落了一笔裸 `git commit`，把 `TaskDetailCard.tsx`、`task-detail-card.spec.tsx` 与 `App.tsx` 那三枚 hunk 一起带走了。过程与教训写在 `BLOCKED.md` B258 ④（与 B257 是同一件事的两个面）|
+| 侧栏 D2/D3 | 一笔，含 shell 三枚、`view-tabs.ts`、`ProjectsPanel.tsx`、三枚 CSS、`{app-mount,language-switcher,tab-roving,projects-panel}.spec.tsx`、`e2e/tests/helpers.ts` 与跟着改口的四枚 e2e spec，`App.tsx` 只取五枚 D2 hunk（**没碰**别线那枚 `ht-sheet`）|
+| e2e 九条 + 本计划文档 | 一笔 |
+
+🔴 **这笔 rename 留了一格本线引起的红**（`BLOCKED.md` B258 ②）：`TOOL_VIEW_TABS` → `SIDEBAR_TOOL_TABS`
+之后，`apps/landing/tests/mockup-shell-shape.spec.tsx` 那枚**按源码文本对账**的 spec 在 HEAD 上
+找不到锚会 `throw`。修法（把锚改成新名）此刻在 landing 线未提交的那手里 —— 三条判据不齐，本线不代改，
+闭合条件与兜底都写在 B258。⚠️ 这条纪律值得留下：**改一个被文本对账引用的常量名，消费者不只在 TS 图里**，
+`pnpm typecheck` 全绿不代表没有断链。
+
+**刻意没入库的**：`packages/design-system/**`（阶段 1 排印密度那两枚 `TASK_ROW_SHAPE` 与四份生成的 token 件）——
+它们与本线的 D2/D3 不在同一格，且此刻和别线的 token 工作同片地；等那一族归口清楚再单独一笔。
+
 ### 别线的一处红（登记，不代改）
 
 🔴 **同一棵树上有人在写**（形状，不是状态）：本轮读到过 `apps/web/src/features/settings/SessionsPanel.tsx`
