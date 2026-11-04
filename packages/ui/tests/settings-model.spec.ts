@@ -99,14 +99,26 @@ describe('shouldRenderSettingsRow', () => {
     expect(shouldRenderSettingsRow(toggle())).toBe(true);
   });
 
-  it('其余四种行永远渲染 —— 这条判据只针对开关', () => {
+  it('除 `host` 之外其余各档永远渲染 —— 这条判据只针对开关', () => {
     const rows: readonly SettingsRowModel[] = [
       { kind: 'value', label: '待上传', value: '3' },
       { kind: 'action', label: '帮助中心', href: '/help' },
       { kind: 'note', text: '这是导出，还不是还原点' },
       { kind: 'heading', text: '怎么把卡片加上去' },
+      { kind: 'trailing', label: 'iPhone 12', actions: '退出这一台' },
     ];
-    expect(rows.map(shouldRenderSettingsRow)).toEqual([true, true, true, true]);
+    expect(rows.map(shouldRenderSettingsRow)).toEqual([true, true, true, true, true]);
+  });
+
+  /*
+    🔴 `host` 是本轮为「一屏里两族按读到的顺序排在一起」补的那一档，它**故意不是**恒渲染：
+    宿主没给内容时这一格不该占位（否则 `ProfilePanel` 里读不到邮箱时会多出一行空行）。
+    这一条判断在这里，不在 JSX 里 —— 否则它就变成 N 个分支，每个都可能忘。
+  */
+  it('`host` 没给内容 ⇒ 整行不占位；给了才画', () => {
+    expect(shouldRenderSettingsRow({ kind: 'host', node: undefined })).toBe(false);
+    expect(shouldRenderSettingsRow({ kind: 'host', node: null })).toBe(false);
+    expect(shouldRenderSettingsRow({ kind: 'host', node: '一格字段' })).toBe(true);
   });
 });
 
@@ -122,6 +134,18 @@ describe('settingsRowKey', () => {
       'value:上次同步',
     );
     expect(settingsRowKey({ kind: 'heading', text: '怎么安装' }, 0)).toBe('heading:怎么安装');
+  });
+
+  it('`trailing` 缺 label 时按位置回落 —— 两行都没名字不许撞成同一个 key', () => {
+    expect(settingsRowKey({ kind: 'trailing', actions: '退出这一台' }, 0)).toBe('trailing:#0');
+    expect(settingsRowKey({ kind: 'trailing', actions: '退出那一台' }, 1)).toBe('trailing:#1');
+  });
+
+  it('`host` 没有语义字段可当 key ⇒ 有 testID 用它，否则按位置', () => {
+    expect(settingsRowKey({ kind: 'host', node: '一格字段' }, 2)).toBe('host:#2');
+    expect(
+      settingsRowKey({ kind: 'host', node: '一格字段', testID: 'profile-nickname-row' }, 2),
+    ).toBe('profile-nickname-row');
   });
 
   it('同一个列表里两种行的 key 不会相撞（前缀区分了 kind）', () => {
