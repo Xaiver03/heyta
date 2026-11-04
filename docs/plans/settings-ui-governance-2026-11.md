@@ -72,7 +72,7 @@
 | 读数 | 值 | 复量 |
 |---|---|---|
 | 手写行解剖的 web 设置文件 | 13 个（处数只由复量命令给） | `node scripts/check-settings-row-anatomy.mjs` |
-| 已用共享契约的 web 面板 | 3 个 | `grep -rln 'SettingsSection' apps/web/src/features/settings` |
+| 已用共享契约的 web 面板 | 4 个 | `grep -rln 'SettingsSection' apps/web/src/features/settings` |
 | 契约现有行档 | 6 档（`value`/`toggle`/`action`/`trailing`/`note`/`heading`） | `model.ts` 的 `SettingsRowModel` 联合 |
 
 #### 迁移那一半：方向已找对，五格已迁（2026-11-04 二次复核推翻本节上一稿）
@@ -100,6 +100,7 @@
 | PasskeyPanel 改名 | 上一轮我手加的 label + 手拼 id | `FormField layout="inline"` | `passkey-panel.spec.tsx` 全绿 |
 | PasswordPanel 口令格 | 手写 `__field` + `<label htmlFor>`，**且 `?` 套在 label 里面** | `FormField layout="inline"` + `labelTip` | `account-security.spec.tsx` 42/42 |
 | SessionsPanel 会话行 | 手写 `__section __credential` + `__credential-main` | `SettingsRowModel` 的**新增 `trailing` 档**（`SettingsSection` + `HeytaUiProvider`） | `account-security.spec.tsx` 42/42；行解剖账本 **53 → 50** |
+| PasskeyPanel 凭证行 | 同上那一套手搓容器（改名时整行换成输入框） | 同一 `trailing` 档：`label` 走 `passkey.name ?? undefined`（没名字**不画那一格**），`actions` 是"编辑中 = `FormField` / 否则 = 改名·删除按钮"的三元 | `passkey-panel.spec.tsx` 23/23（含 `passkey-row-*` 的 textContent 断言）；账本 **50 → 47** |
 
 最后一格顺带修掉一个真隐患：`SettingsInfoTip` 渲染的是 `<button>`，原来它落在
 `<label htmlFor={id}>` **内部** —— 点问号会顺带把焦点甩进口令框。`labelTip` 把它画成
@@ -119,6 +120,14 @@
 它是**纯追加**：`pnpm --filter @heyta/ui typecheck` 与 `pnpm --filter @heyta/mobile typecheck`
 （后者跑的是**未改动**的 mobile 消费者）均 rc=0；`SettingsRow` 里的 `never` 穷尽自检保证
 新档没被渲染时是**编译期报错**，不是静默少画一行。
+
+**这五格迁移有一处看得见的影响，先记下来，不等看图来发现**：`trailing` 档把行交给共享列表渲染，
+所以原来那一层 `.ht-settings__section`（`padding: space-3` = 16，且相邻两块之间有 `border-block-start` 细线，
+见 `ai-panels.css:261` 与 `sheets.css:183`）在**行**这一级没有了 ⇒ 设备/凭据两屏从"每张卡 16 内边距 + 卡间一条线"
+变成"一行接一行、行间距 `space.2`(8)"。方向与 `docs/agents/ux-principles.md` §1 那条
+「inline 档行距可压到 44+8」是同向的（原来那 16+16 让两行块距 ≈ 72，反而超出该档），
+但**这是一次外观变更，不是纯结构收敛** —— 结论要等一次真看图（1440 亮/暗）才算验收，
+在那之前不许写"外观未变"。
 
 **还剩（这一格没做，理由不是"来不及"）**：
 `apps/mobile/src/screens/SessionsSection.tsx` 仍自己手搓同一形状（`Pressable` + 尾随按钮）。

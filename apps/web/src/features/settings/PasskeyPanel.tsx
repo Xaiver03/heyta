@@ -39,6 +39,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { HOSTED_PASSKEY_NAME_MAX_LENGTH, type HostedAuthFailureReason } from '@heyta/app-host';
+import { HeytaUiProvider, SettingsSection } from '@heyta/ui';
 import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
 import { useSyncStore } from '../sync/store.js';
@@ -301,36 +302,40 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
             </p>
           )}
 
-          {status.kind === 'loaded' &&
-            status.passkeys.map((passkey) => {
-              const deleting = deletingId === passkey.id;
-              const renaming = renamingId === passkey.id;
-              const confirming = confirmingId === passkey.id;
-              const editing = editingRowId === passkey.id;
-              return (
-                <section
-                  className="ht-settings__section ht-settings__credential"
-                  key={passkey.id}
-                  data-testid={`passkey-row-${passkey.id}`}
-                >
-                  <div className="ht-settings__credential-main">
-                    {passkey.name !== null && (
-                      <p className="ht-settings__item-label" data-testid={`passkey-name-${passkey.id}`}>
-                        {passkey.name}
+          {/*
+            🔴 凭证行走**共享那一个实现**（`SettingsRowModel` 的 `trailing` 档，
+            治理计划 G-4）。这一族与 SessionsPanel 的会话行是同一个形状：
+            **一个对象**（一枚凭据）+ 几行事实 + 只对得起那个对象的动作（改名 / 删除）。
+            为什么不是 `action` 档：`action` 让整行可点，会把"选中这行"与
+            "删除这枚凭据"混成同一个手势，而那两者代价完全不同。
+          */}
+          {status.kind === 'loaded' && status.passkeys.length > 0 && (
+            <HeytaUiProvider>
+              <SettingsSection
+                rows={status.passkeys.map((passkey) => {
+                  const deleting = deletingId === passkey.id;
+                  const renaming = renamingId === passkey.id;
+                  const confirming = confirmingId === passkey.id;
+                  const editing = editingRowId === passkey.id;
+                  return {
+                    kind: 'trailing' as const,
+                    testID: `passkey-row-${passkey.id}`,
+                    // 🔴 没名字时共享层**不画那一格**（不是画个空串、更不是编个默认名）。
+                    label: passkey.name === null ? undefined : passkey.name,
+                    labelTestID: `passkey-name-${passkey.id}`,
+                    meta: (
+                      <p className="ht-settings__credential-meta">
+                        {t('web.passkeys.createdAt', { date: shortDate(passkey.createdAt) })}
+                        {' · '}
+                        {passkey.lastUsedAt === null
+                          ? t('web.passkeys.neverUsed')
+                          : t('web.passkeys.lastUsedAt', {
+                              date: shortDate(passkey.lastUsedAt),
+                            })}
                       </p>
-                    )}
-                    <p className="ht-settings__credential-meta">
-                      {t('web.passkeys.createdAt', { date: shortDate(passkey.createdAt) })}
-                      {' · '}
-                      {passkey.lastUsedAt === null
-                        ? t('web.passkeys.neverUsed')
-                        : t('web.passkeys.lastUsedAt', {
-                            date: shortDate(passkey.lastUsedAt),
-                          })}
-                    </p>
-                  </div>
-
-                  {editing ? (
+                    ),
+                    actions:
+                      editing ? (
                     /*
                       🔴 走共享字段解剖 `FormField`（2026-11-04，治理计划 G-4）。
                       上一轮补可见 label 时我是手写 `<label htmlFor>` + 手拼 id 的，
@@ -460,11 +465,13 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                           </button>
                         </>
                       )}
-                    </div>
-                  )}
-                </section>
-              );
-            })}
+                      </div>
+                    ),
+                  };
+                })}
+              />
+            </HeytaUiProvider>
+          )}
 
           {justDeleted && (
             <p className="ht-settings__notice" role="status" data-testid="passkeys-deleted">
