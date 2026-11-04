@@ -402,7 +402,12 @@ build 完再跑它就是绿，别线再写一笔它就红。这不是谁做错�
 | 侧栏分组说明显示正确 | ✅ 单元层（有数据画 / 空数据不画）+ 浏览器腿 ③（有清单时标签那格只有空态文案、建完标签后两句都在）+ ⑤ 暗色下两句仍在原位 | `projects-panel.spec.tsx` 的「D3」、e2e ③⑤（图 `dida-sidebar-hints.png`）|
 | `pnpm check:design` | ✅ **现量绿**（`pnpm check:design` 退 0）。过程记在这里免得下一个会话重做归因：本轮曾红在两枚**已提交**的裸 `8px`（那条线的 `2a4bc0e20`），本线按"三条不齐"只登记不代改 → 登记进 `BLOCKED.md` B251 → **责任线随后自己收掉了**（走的是候选补丁之外的 `0.5em`，理由见 B252）。同族的另一枚 `check:row-single-source`（`.ht-spin` 那格 29 > 基线 28）在 2026-11-04 21:35 戳**复量已回到退 0**（那枚族被责任线收编进 `.ht-settings` 族，基线与现量同为 28）—— ⚠️ 这两个数只在那一秒成立，要现量自己跑 `pnpm check:design` 与 `pnpm check:row-single-source` | 自己跑 `pnpm check:design` 与 `pnpm check:row-single-source` |
 | `pnpm check:design-token-refs` | ✅ 绿 | 同上 |
-| Web 构建通过 | ✅ 绿（`pnpm --filter @heyta/web build` 退 0）。⚠️ 中间读到过一次红：别线在同一分钟里把 `SessionsPanel.tsx` 写成半截（`TS17008` 未闭合），几分钟后他们写完就自己好了 —— 所以这一格**必须自己重跑取现量**，别拿这里的话当数 | 同上，另加 `pnpm typecheck`（2026-11-04 21:34 戳整仓退 0） |
+| Web 构建通过 | ✅ 绿（`pnpm --filter @heyta/web build` 退 0，2026-11-04 22:40 戳）。⚠️ 中间读到过**两次**红，两种成因都记下来免得下次误归因：① 别线把 `SessionsPanel.tsx` 写成半截（`TS17008` 未闭合），几分钟后他们写完自己好了；② 22:39 那次红在 `CaptureComposer.tsx(154) TS2739 少 previewLead/previewEmpty`，**不是半写** —— 现量：那两枚键在 HEAD 与工作树**都是 0 命中**，要求来自 `packages/ui/dist` 的陈旧 `.d.ts`，一条 `pnpm --filter @heyta/ui build` 就回绿。⇒ 红在别人的件里时，先分清"源码半写"还是"产物陈旧"，后者不需要等谁 | 同上，另加 `pnpm typecheck`（2026-11-04 21:34 戳整仓退 0） |
+
+- ✅ **设备腿（这九条之外，22:34–22:40 戳补的）**：`pnpm verify:mobile-pin-order` 在真 iOS 模拟器 7/7、
+  `pnpm --filter @heyta/desktop smoke -- --window` 在真 Electron 窗口 `rows=1 / colorBuckets=66`（图入库并看过）。
+  细节与"为什么必须在设备上量"（两端默认档位不同向）写在下面「还没被验证的」那一节，
+  ⚠️ 那里同时留着一格**没取到**的东西：iOS 那张屏幕图（黑帧，已删）。
 
 - 🔴 顺带抓到并修掉一个**只在键盘上成立**的缺陷：三个子菜单的触发器把 `role="menuitem"`
   挂在包裹用的 `div` 上，而共享层 Enter 做的是 `items[i].click()` —— 点一个 div 什么都
