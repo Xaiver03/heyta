@@ -70,6 +70,11 @@ pnpm verify:mobile-autosync     # 🔴 自动同步：**全程不点任何同步
 pnpm verify:mobile-focus        # 专注（番茄钟）闭环
 pnpm verify:mobile-calendar     # 日历（判断的期望值来自宿主机的 Python，不是本仓库的日历代码）
 pnpm verify:mobile-repeat       # 重复任务（设规则 → 同步 → 勾选顺延 → 反向再从笔记本完成；六个预设含「每年」，第 15 步专测跨年那一档）
+pnpm verify:mobile-pin-order    # 🔴 置顶在真模拟器上真的把那条提到最前。读数只有两种：无障碍树里那两行的
+                                #   **y 坐标**（"存在"证明不了"在前"）与手机里真 ops 表的行数（恰好 +3）+
+                                #   最新一条带 `pinnedAt`。判据按**相对变化**读：移动端默认档是 `addedAt`
+                                #   （新的在上），与 web 的 `display` 档不同向，写死"先建的在上面"会假红。
+                                #   ⚠️ 与 `verify:mobile-organizer-confirm` 同档：**离线**、不起服务端。
 pnpm verify:mobile-organizer-confirm
                                 # 归档/移除确认框（3 处）在真模拟器上"会先问"。⚠️ 它**离线**：不起服务端，
                                 #   所以故意**没**登记进 `scripts/check-journey-coverage.mjs` 那张表 ——

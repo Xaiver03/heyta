@@ -174,6 +174,7 @@
     "check:vault-diagnostics": "node scripts/check-vault-diagnostics.mjs",
     "verify:mobile-quadrant-fill": "bash scripts/verify-mobile-quadrant-fill.sh",
     "verify:mobile-sort-sheet": "bash scripts/verify-mobile-sort-sheet.sh",
+    "verify:mobile-pin-order": "bash scripts/verify-mobile-pin-order.sh",
     "verify:mobile-task-row": "bash scripts/verify-mobile-task-row.sh",
     "verify:universal-slice": "bash scripts/verify-universal-slice.sh",
     "verify:multi-end": "bash scripts/verify-multi-end-sync.sh",

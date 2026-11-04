@@ -493,11 +493,26 @@ pnpm typecheck 2>&1 | grep "error TS"
   那一格，未打标 / 已移走的那一行自然不在列表里 —— 用例现在先回收集箱再读，
   理由写在那两条注释旁边。还有一格是**取证拍到过渡帧**：菜单刚点开就截图，那一片是半透明的
   入场动画；现在先 `waitForOverlaySettled` 再拍。
-- **没跑的**：整棵 `e2e/`（它会重写别的线未提交的入库截图，本线刻意不碰）；
-  桌面壳与移动端的**设备腿**（本轮改的 `sortTasks` 是跨端规则，两端单测各 100/56 个文件全绿，
-  但"手机上钉住的那条真的排在最前"这一格只有单元读数）；四端重装。
+- **没跑的**：整棵 `e2e/`（它会重写别的线未提交的入库截图，本线刻意不碰）；四端重装。
   取现量：`pnpm --filter @heyta/mobile test`、`pnpm --filter @heyta/ui test`、
   `pnpm --filter @heyta/domain test`。
+- ✅ **设备腿已经补上了（2026-11-04 22:34 戳）**：`pnpm verify:mobile-pin-order`
+  （新脚本 `scripts/verify-mobile-pin-order.sh`）在真 iOS 模拟器上跑通 7/7 ——
+  装的那个包由本线现建（`xcodebuild Release` 成功、归属章已写、"已安装的包比源码新"由装置自己判）。
+  🔴 **这一格必须在设备上量，不是因为"多一端更保险"**：`sortTasks` 是跨端的一份
+  （`packages/ui/src/task-list/model.ts` 调它，移动端任务列表也走那个共享 model），
+  而**两端的默认档位不是同一个方向** —— 移动端默认档 `addedAt`（新的在上，与搬共享层之前那句
+  `reverse()` 逐条等价，见 `apps/mobile/src/screens/TasksScreen.tsx` 那条注释），web 走 `display`。
+  上一版脚本把"先建的那条在上面"当前置，于是一跑就红 —— 那是**探针的假设**，不是产品缺陷；
+  现在判据读的是**相对变化**（长按此刻在下面那条 → 它跑到上面去），并配三条一起才算：
+  ① 顺序按无障碍树里的 **y 坐标**读（"在树里"证明不了"在前"，ScrollView 折叠线以下的节点仍在树里）；
+  ② 置顶之后再开一次菜单，那一项自己要说「取消置顶」（写进去的是状态，不是一帧视觉）；
+  ③ 手机里真 `ops` 表恰好 +3（两条建 + 一条置顶），且最新那条带 `pinnedAt`。
+  ⚠️ **图那一格没取到，别把它当成看过**：这台机器上 Simulator 没开窗口时
+  `xcrun simctl io … screenshot` 返回的是 `colorSpan=0` 的全黑帧（尺寸与退出码全部正常），
+  脚本现在用现成的 `scripts/screenshots/png-stats.mjs` 自判空白、**删掉黑图并明说没取到**，
+  所以它不会拿一张看不见的图冒充取证。候选解法（有窗口的渲染路径 / `apps/desktop` 的
+  `webContents.capturePage()`）写在脚本结尾那段提示里。
 - **窄屏 + 暗色那一档已补量**（⑦，390×844）：抽屉拉开后那两句说明各自**一行放得下**，
   判据取的是"不被裁（`scrollWidth ≤ clientWidth`）、不超过两行、整句落在这一列的横向范围里"，
   外加回收站那一行在抽屉里点得到（图 `dida-narrow-dark.png`，已看过）。
