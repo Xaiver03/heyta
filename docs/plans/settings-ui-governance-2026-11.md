@@ -295,13 +295,17 @@ iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devi
 没有断言被顺带改动。账本收到现在这个样子。
 剩下的都在 `InboundAutomationSettings.tsx`（自动收集那一屏），本线只登记不代改。
 
-⚠️ **这把尺的"进链"那一半暂时卡住**：`package.json` 里另一条线已经写进了
-`check:capture-shape`，而它指向的 `scripts/check-capture-shape.mjs` **还是未跟踪状态**
-（现量 `git status --short -- scripts/check-capture-shape.mjs` ⇒ `??`）。
-同一行 JSON 里两家的改动没法分开入库，所以本线的 `check:tip-adjacency` 定义与链上那一节
-**留在工作树**，等那一枚脚本落地后随任一笔一起入库 —— 本线不替别线提交未跟踪的实现文件，
-也不把别人那一节摘掉。在此之前这把尺是"写了但 0 次执行"那一类，**这条不一致是已知的、有前置条件的**，
-不是遗漏。
+**这把尺的"进链"那一半已落地（2026-11-04 收尾）**，卡点与解法记在这里，因为它不是"顺手改一下 JSON"：
+`package.json` 里另一条线写进了 `check:capture-shape`，而它指向的 `scripts/check-capture-shape.mjs`
+**当时仍未跟踪**（现量 `git status --short -- scripts/check-capture-shape.mjs`）。`check` 链是**一整行字符串**，
+两家的改动落在同一行里，直接入库等于替别线发布一枚指向不存在文件的命令。
+做法：把那两节（定义行 + 链上 `pnpm check:capture-shape &&`）**从待提交内容里摘掉 → 只入本线那几行 →
+立刻按锚点写回工作树**，别线那一节仍留在它自己的未提交状态里。
+摘掉时 `pnpm check:gate-wiring` 会红一枚 Ⓐ 阳性对照（未跟踪的实现文件没有定义引用它），
+那是工作树读数，不是 HEAD 读数 —— HEAD 里那两样都不存在，链自洽。
+⚠️ 同一趟里别线把 `verify:mobile-pin-order` 连同脚本一起入了库（`git log -1 -- package.json` 现量），
+所以摘的行要在提交前重新对一次 HEAD，否则会顺手 revert 别人刚入的行。
+本线不替别线提交未跟踪的实现文件，也不把别人**已入库**的那一节摘掉。
 
 ---
 
@@ -312,7 +316,8 @@ iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devi
 | W1（本轮） | G-1 + G-2 落地为门禁 | ✅ G-1 账本清空、A4 硬拒；✅ G-2 静态 CSS 臂（`check-font-size-discipline.mjs`） |
 | W1（本轮） | G-3 + G-5 落地为门禁 | ✅ G-3 `check-font-size-discipline.mjs`；✅ G-5 `check-spinner-discipline.mjs`（均带变异臂实测能红） |
 | W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
-| W1（本轮） | G-4 迁移那一半 | ✅ 四格字段迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令）+ 一格行迁 `trailing` 档（SessionsPanel）；账本两次收缩（54→53→50） |
+| W1（本轮） | G-4 迁移那一半 | ✅ 四格字段迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令）+ 一格行迁 `trailing` 档（SessionsPanel）；账本逐次收缩，现量 `cat scripts/settings-row-anatomy-ledger.json` |
+| W2 | G-6 位置尺进链 | ✅ `check:tip-adjacency` 的定义与链上那一节已入库，同批把本线四枚同族尺的定义都带上 `--self-test` 臂（做法与卡点见 G-6 第三半）|
 | W2 | G-4 的 mobile 那一格 | ⏸ `apps/mobile/src/screens/SessionsSection.tsx` 改吃 `trailing` 档：契约已就位，欠一次设备腿（Android 载体在 linux-dev，iOS 那枚可能被别线占） |
 | W2 | 暗色两档的常驻看图腿 | ⏸ 现量：`grep -c settings-row-grammar package.json` ⇒ 0 —— 设置面那几枚 e2e（`settings-row-grammar` / `settings-form-alignment` / `narrow-sweep`）**一枚都不在 `pnpm check` 链里**，`check:e2e-specs-parse` 只验"能不能解析"。所以再写一枚暗色 spec 也还是 0 次执行：先要定"由哪条 `check:*` 跑 e2e 全量/分片"，那是 e2e 射程的裁决，不是本线能顺手加的 |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
