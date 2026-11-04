@@ -49,7 +49,9 @@ function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 }
 
-function mount(): void {
+function mount(options: {
+  readonly onShowActions?: (taskId: string, anchor: { x: number; y: number }) => void;
+} = {}): void {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -62,7 +64,7 @@ function mount(): void {
       // `useI18n()`，所以这层包裹今天才第一次被需要。
       <I18nProvider locale="zh-CN">
         <HeytaUiProvider>
-          <TaskDetailCard />
+          <TaskDetailCard onShowActions={options.onShowActions} />
         </HeytaUiProvider>
       </I18nProvider>,
     );
@@ -115,6 +117,70 @@ afterEach(() => {
   root = undefined;
   container = undefined;
   selection.clear();
+});
+
+describe('底部工具条（滴答对齐 C2）：按钮说的事必须真做得到', () => {
+  it('🔴 「移动到」把焦点交给**清单下拉**，「备注」交给正文框（不是画个图标就完事）', async () => {
+    await useProjectStore.getState().addProject('工具条清单');
+    const id = await addTask('工具条判据', '备注正文');
+    selection.select('task', id);
+    mount();
+    const pane = container!.querySelector('[data-testid="task-pane"]')!;
+
+    act(() => {
+      pane.querySelector<HTMLButtonElement>('[data-testid="task-detail-goto-list"]')!.click();
+    });
+    expect(
+      document.activeElement?.getAttribute('data-testid'),
+      '点「移动到」之后焦点不在清单下拉上',
+    ).toBe('organize-project-select');
+
+    act(() => {
+      pane.querySelector<HTMLButtonElement>('[data-testid="task-detail-goto-note"]')!.click();
+    });
+    expect(
+      document.activeElement?.getAttribute('data-testid'),
+      '点「备注」之后焦点不在备注正文框上',
+    ).toBe('task-note-input');
+  });
+
+  /**
+   * 🔴 第三枚「更多」补的是**可达性**，不是装饰：行操作菜单（置顶 / 优先级 / 标签 /
+   * 移动到 / 删除）此前只有右键与 Shift+F10 两个入口，界面上没有任何可见把手
+   * —— 那一路历史上住在行尾那枚「⋯ 更多」里，行尾编辑器被收走时它没有跟着搬家。
+   * 宿主没接回调的落点仍然只画两枚：不许有按下去没反应的按钮。
+   */
+  it('🔴 宿主接了 `onShowActions` ⇒ 三枚，第三枚把**这一条的 id + 锚点**交出去', async () => {
+    const id = await addTask('三枚工具条', undefined);
+    selection.select('task', id);
+    const calls: [string, { x: number; y: number }][] = [];
+    mount({ onShowActions: (taskId, anchor) => calls.push([taskId, anchor]) });
+    const toolbar = container!.querySelector('[data-testid="task-detail-toolbar"]');
+    expect(toolbar, '底部工具条没画出来').not.toBeNull();
+    expect(toolbar!.querySelectorAll('button'), '接了回调就该有三枚（移动到 / 备注 / 更多）').toHaveLength(3);
+
+    act(() => {
+      toolbar!.querySelector<HTMLButtonElement>('[data-testid="task-detail-more"]')!.click();
+    });
+    expect(calls, '点「更多」什么都没发出去').toHaveLength(1);
+    expect(calls[0]![0], '打开的不是当前这一条的菜单').toBe(id);
+    expect(typeof calls[0]![1].x + typeof calls[0]![1].y, '锚点坐标没交给宿主').toBe('numbernumber');
+  });
+
+  it('🔴 没接回调 ⇒ 只画两枚；「文本格式」那一枚等 C1 富文本，不做假控件', async () => {
+    const id = await addTask('只有两枚', undefined);
+    selection.select('task', id);
+    mount();
+    const toolbar = container!.querySelector('[data-testid="task-detail-toolbar"]');
+    expect(
+      toolbar!.querySelectorAll('button'),
+      '没有可发的意图就不该多画一枚按下去没反应的按钮',
+    ).toHaveLength(2);
+    expect(
+      toolbar!.querySelector('[data-testid="task-detail-more"]'),
+      '没接 onShowActions 却画了「更多」',
+    ).toBeNull();
+  });
 });
 
 describe('选中某条任务 ⇒ 那一格是它的面单', () => {
@@ -244,10 +310,20 @@ describe('宿主的落点接线（读 App.tsx 的源码形状）', () => {
       /<NoteEditor(?![A-Za-z])/,
     );
     // 面单有两个落点（详情列 / 窄档对话框），两处都要把宿主的自动化格递进去。
-    expect(src, '面单没有渲染点').toMatch(/<TaskDetailCard automationSlot=\{automationSlotNode\} \/>/);
+    // 🔴 计数按**属性名**数，不按整行 JSX 的字面形状数：那一行今天换成了多行写法
+    // （第三个回调要传箭头函数），按字面匹配只会因为排版红 —— 而这条判据要抓的是
+    // "组件支持某格、宿主忘了接线"，与换行无关。
+    const count = (re: RegExp): number => (src.match(re) ?? []).length;
+    expect(count(/<TaskDetailCard\b/g), '面单没有渲染点').toBe(2);
     expect(
-      (src.match(/<TaskDetailCard automationSlot=\{automationSlotNode\} \/>/g) ?? []).length,
+      count(/automationSlot=\{automationSlotNode\}/g),
       '面单只画在一处 ⇒ 窄档（没有详情列）里所有字段都不可编辑',
+    ).toBe(2);
+    // C2 第三枚「更多」：动作菜单此前只有右键 / Shift+F10 两个入口，界面上没有可见把手。
+    // 两处落点都得接，漏一处的表现是"那一档里菜单打不开"。
+    expect(
+      count(/onShowActions=\{/g),
+      '面单的「更多」没接到宿主的菜单锚点 ⇒ 窄档里动作区仍然不可达',
     ).toBe(2);
   });
 

@@ -1758,6 +1758,16 @@ export function App(): React.JSX.Element {
     setRowMenu({ taskId, x: x ?? rect.left, y: y ?? rect.bottom });
   }, []);
 
+  /**
+   * 从**面单**打开这一条的动作菜单（C2 第三枚「更多」）。
+   *
+   * 与上面那条同一个状态、同一个菜单本体，只是锚点由调用方给（按钮自己的下沿）——
+   * 这里没有行元素可回溯：详情列与窄档对话框都可能在屏幕上看不到那一行。
+   */
+  const openRowMenuAt = useCallback((taskId: string, x: number, y: number) => {
+    setRowMenu({ taskId, x, y });
+  }, []);
+
   const handleTaskContextMenu = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       const hit = taskIdFromEventTarget(event.target);
@@ -3869,7 +3879,12 @@ export function App(): React.JSX.Element {
              因为同一枚布尔还决定行尾让不让位，拆开就会写成"行尾让位、栏里没人接"。
              🔴 备注编辑器的落点在**这一格**，所以行尾那颗备注 chip 在这一支成立时不渲染
              （`renderTaskTrailing` 里的 `noteInColumn`）—— 同一字段任何时刻只有一个所有者。 */
-          <TaskDetailCard automationSlot={automationSlotNode} />
+          <TaskDetailCard
+            automationSlot={automationSlotNode}
+            onShowActions={(taskId, anchor) => {
+              openRowMenuAt(taskId, anchor.x, anchor.y);
+            }}
+          />
         ) : contentView === 'tasks' ? (
           /* 兜底那一格是 AI 面（2026-10-04 拍板：无选中时默认显示 Chatbot；
              2026-10-06 第二刀才真的兑现它，判据 = `ai-row-layout.spec.ts` 的落点那一支）。
@@ -3968,7 +3983,12 @@ export function App(): React.JSX.Element {
               <X size={ICON_SIZE.sm} aria-hidden="true" />
             </button>
           </div>
-          <TaskDetailCard automationSlot={automationSlotNode} />
+          <TaskDetailCard
+            automationSlot={automationSlotNode}
+            onShowActions={(taskId, anchor) => {
+              openRowMenuAt(taskId, anchor.x, anchor.y);
+            }}
+          />
         </WebModalShell>
       ) : null}
 

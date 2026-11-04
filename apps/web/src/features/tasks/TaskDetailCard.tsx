@@ -61,9 +61,10 @@
  * 🔴 未选中 / 那条已在别处被删 ⇒ 返回 `null`，而不是留一只指向不存在 id 的输入框。
  */
 import { useRef, useState, type CSSProperties } from 'react';
-import { cssVar } from '@heyta/design-system';
+import { cssVar, ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import { Priority, type Task } from '@heyta/domain';
+import { FolderOpen, MoreHorizontal, Type } from 'lucide-react';
 
 import { useSelected } from '../../lib/selection.js';
 import { ShareCommentsSection } from '../share/ShareCommentsSection.js';
@@ -269,6 +270,7 @@ const statusLineStyle: CSSProperties = {
  */
 export function TaskDetailCard({
   automationSlot,
+  onShowActions,
 }: {
   /**
    * 「自动化」组里属于**宿主**的那一格（行操作 UX 重设计，2026-11）。
@@ -284,6 +286,20 @@ export function TaskDetailCard({
    * 行尾不再挂编辑器之后，它们的正确住址就是这里（审计 §4.6 早已把这一组留给它们）。
    */
   automationSlot?: React.ReactNode;
+  /**
+   * 底部工具条第三枚「更多」（C2，滴答对齐）：打开**这一条任务**的操作菜单。
+   *
+   * 🔴 为什么这一枚不是"可有可无的装饰"：行右键菜单那一路（置顶 / 优先级 / 标签 /
+   * 移动到 / 删除）此前**只有两个入口** —— 右键与 `Shift+F10`，界面上没有任何可见的
+   * 把手（历史上它住在行尾那枚「⋯ 更多」里，那一排随「撤掉行尾编辑器」一起被收走了，
+   * 动作区却没有跟着补一个家）。也就是说不用鼠标右键的人**看不见**这些操作。
+   * 面单是"这条任务"的统领面，第三枚就住在这里。
+   *
+   * ⚠️ 它**不写第二个动作实现**：只把视口锚点交给宿主，宿主调的还是同一个
+   * `setRowMenu` —— 菜单本体、关闭策略、危险档全在那一份里。
+   * 没接这个回调的落点（如测试夹具）就只画两枚，不画按下去没反应的按钮。
+   */
+  onShowActions?: (taskId: string, anchor: { readonly x: number; readonly y: number }) => void;
 } = {}): React.JSX.Element | null {
   const { t } = useI18n();
   const store = useTaskStore();
@@ -306,10 +322,28 @@ export function TaskDetailCard({
    * 标题和备注都还在栏里，用户读到的是"这条任务还在，只是我没选它"。
    */
   const task = picked !== undefined && picked.deletedAt === undefined ? picked : undefined;
+  /**
+   * 底部工具条（C2）要的**这一格**的根。
+   *
+   * 🔴 用 ref 而不是 `document.querySelector`：窄档的「任务详情」对话框与宽档的详情列
+   * **同时挂着两棵 `task-pane`**（`App.tsx` 两处渲染同一个组件），整篇文档去查会点到
+   * 另一棵里的那个控件 —— 症状是"按钮跳了，但跳到我没看的那一份"。
+   */
+  const paneRef = useRef<HTMLDivElement | null>(null);
   if (task === undefined) return null;
 
+  /** 把这一格里的某个控件滚到眼前并交还焦点（工具条两颗按钮干的就是这一件事）。 */
+  const focusInPane = (testId: string): void => {
+    const target = paneRef.current?.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
+    if (target === null || target === undefined) return;
+    // `?.()` 不是保险丝而是事实：jsdom 不实现 `scrollIntoView`，而这条判据要能在
+    // 单测里量到"焦点真的落在目标控件上"（浏览器里那一步照常生效）。
+    target.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    target.focus({ preventScroll: true });
+  };
+
   return (
-    <div className="ht-app__detail-task" data-testid="task-pane">
+    <div ref={paneRef} className="ht-app__detail-task" data-testid="task-pane">
       {/*
         标题（W7 起可改）。内容仍是**用户自己的字**，原样呈现、不翻译（与行内那颗
         chip 的预览同一个口径）；改名走 `store.renameTask` → `app-host` 的 `rename`
@@ -530,6 +564,68 @@ export function TaskDetailCard({
       </h3>
       <div data-testid="task-detail-comments">
         <ShareCommentsSection taskId={task.id} />
+      </div>
+
+      {/*
+        ══ 底部工具条（C2，滴答对齐 2026-11）═══════════════════════════════
+        一行快捷入口：收集箱（移动清单）、文本格式（备注富文本）、更多。
+        与滴答的详情面底部工具条同形 —— 把高频操作从分组里提到随手可点的位置。
+        🔴 三个按钮都是**快捷入口**，不是第二份编辑器：点击后聚焦到对应分组/字段，
+        真正的编辑仍在上面那四组里。
+      */}
+      {/*
+        底部工具条（C2，滴答对齐）。滴答那一排是「移动到 / 富文本 / 更多」。
+        这里画**三枚**，每枚做的都是它标签说的那件事：
+
+          · 「移动到」→ 把「组织」分组里那个清单下拉滚到眼前并聚焦（`organize-project-select`
+            就是改归属的那个控件，`onMoveToProject` 走 store → op-log）。
+          · 「备注」→ 聚焦备注框（`task-note-input`）。
+          · 「更多」→ 打开这一条的任务操作菜单（置顶 / 优先级 / 标签 / 移动到 / 删除）。
+
+        🔴 **「文本格式」没有画，这是裁决不是漏掉**：富文本是本计划 C1（选型 + 许可证门禁
+        都还没过），现在这块只是纯文本框 —— 画一枚格式按钮等于给用户一个按下去什么都不变
+        的控件。等 C1 落地再补第三枚的位置（那一枚才是它）。
+        ⚠️ 前两枚是**导航**（滚过去 + 交还焦点），不是第二次写入入口 —— 字段本身仍只有一处
+        可改，`check:row-single-source` 与详情列那套单源纪律管的是后者；第三枚也不写任何东西，
+        它只是把动作区的锚点交给宿主，动作本体还是 `TaskRowMenu` 那一份。
+      */}
+      <div className="ht-detail-toolbar" data-testid="task-detail-toolbar">
+        <button
+          type="button"
+          className="ht-detail-toolbar__btn"
+          aria-label={t('web.rowMenu.moveTo')}
+          data-testid="task-detail-goto-list"
+          onClick={() => {
+            focusInPane('organize-project-select');
+          }}
+        >
+          <FolderOpen size={ICON_SIZE.sm} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="ht-detail-toolbar__btn"
+          aria-label={t('web.note.toggle')}
+          data-testid="task-detail-goto-note"
+          onClick={() => {
+            focusInPane('task-note-input');
+          }}
+        >
+          <Type size={ICON_SIZE.sm} aria-hidden="true" />
+        </button>
+        {onShowActions ? (
+          <button
+            type="button"
+            className="ht-detail-toolbar__btn"
+            aria-label={t('web.rowMenu.label', { title: task.title })}
+            data-testid="task-detail-more"
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              onShowActions(task.id, { x: rect.left, y: rect.bottom });
+            }}
+          >
+            <MoreHorizontal size={ICON_SIZE.sm} aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
     </div>
   );
