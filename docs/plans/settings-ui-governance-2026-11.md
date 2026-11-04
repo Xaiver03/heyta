@@ -110,16 +110,39 @@
 
 变异臂已实测能红（往 `MemoryPanel` 注一处 `ht-settings__section` ⇒ 门拒绝）。
 
-#### 剩下那一半（迁移）怎么排
+#### 剩下那一半（迁移）：本趟**不做**，且理由是源码级的，不是"太大所以推后"
 
-1. 给 `model.ts` 加 `SettingsFieldRow`（label + 可编辑控件 + 尾随动作），带 `valueTestID`；
-2. 共享渲染器 + 移动端 4 个 switch 各实现一档；
-3. **在 linux-dev 上验安卓、在有 booted 模拟器的窗口验 iOS**（本机没有这两条腿）；
-4. 逐面板迁：ProfilePanel 昵称 → EmailChangePanel → PasskeyPanel 改名 → PasswordPanel；
-5. 每迁一格跑 `check:settings-prose` + `check:settings-row-anatomy`（读数应掉）+ typecheck，
-   并 `--update` 把账本改小。
+2026-11-04 复核把共享渲染器读完后，"把这四个面板迁到 `SettingsRow`"这句话
+**方向是反的** —— 现在这份共享契约画的不是产品负责人 2026-10-24 拍板的那一套。
 
-**优先级**: 门已落地 ✅；迁移待移动端验证腿可用。
+| 迁过去会发生什么 | 一边 | 另一边 |
+|---|---|---|
+| **丢掉两列对齐** | `sheets.css:246-252` `.ht-settings__row` = `grid-template-columns: minmax(5rem, 8rem) minmax(0, 1fr)` | `Settings.tsx:432` `ValueLine` = `<View style={styles.row}>`（flex 行，无标签列） |
+| **标签降一档** | `__item-label` = `--ht-font-weight-medium` + `foreground` | `Settings.tsx:433-435` = `text['row-meta']` + 强制 `color.foreground-muted` |
+| **邮箱被截断** | `sheets.css:300-304` `.ht-settings__value` 带 `overflow-wrap: anywhere`（长地址换行） | `Settings.tsx:438` 值那格 `numberOfLines={1}` |
+
+第一条最要命：`ProfilePanel.tsx:17-30` 的文件头记着，2026-10-24 那次重排是为了治
+「头像和昵称的**左边界各不相同**」，手段就是这**一列标签 + 一列控件**的网格。
+把网格换成 flex 行，等于把那条已批的决定原样退回去。
+
+⇒ **正确的收敛顺序**（下一趟要按这个做，不是按"迁面板"做）：
+
+1. 给 `packages/ui` 的契约加两样：
+   - `SettingsFieldRow`（label + 可编辑控件 + 尾随动作 + `valueTestID`）—— 解掉上面"五档无可编辑插槽"；
+   - 一个**排版档**选择（`layout: 'inline' | 'grid'`），把 `__row` 那套两列网格与
+     `__item` 那套 flex 行都表达出来 —— 而不是让调用方二选一地降级。
+   - 值那格不许 `numberOfLines={1}`，要能选换行（邮箱这类长值要能看全）。
+2. 移动端 4 个屏幕的穷尽 switch 各补新档（`ProfileScreen` / `SettingsScreen` /
+   `ProfileProgressSummary` / `ReminderDeliverySection`）—— 联合是穷尽的，漏一档编译就红，
+   这条是安全网。
+3. **运行时验证两条腿都得有**：Android 在 linux-dev（本机 0 台 AVD），iOS 要 booted 模拟器。
+   只 typecheck 过 ≠ 移动端画得对 —— 这正是 `model.ts` 文件头那条纪律防的事。
+4. 然后才逐面板迁，每迁一格跑 `check:settings-prose` + `check:settings-row-anatomy`
+   （读数应掉）+ typecheck + 界面验收，并 `--update` 把账本改小。
+
+**为什么不先把能迁的迁掉（比如 ProfilePanel 的邮箱行看着像 `value` 档）**：
+它形状上像，排版上不是同一件事（上面三条同时命中），迁完是一屏**可见的退步**，
+而账本读数会掉一格、看起来"治理有进展"。那是拿一个错的收敛换一个好读的数。
 
 ---
 
@@ -181,7 +204,7 @@
 | W1（本轮） | G-1 + G-2 落地为门禁 | ✅ G-1 账本清空、A4 硬拒；✅ G-2 静态 CSS 臂（`check-font-size-discipline.mjs`） |
 | W1（本轮） | G-3 + G-5 落地为门禁 | ✅ G-3 `check-font-size-discipline.mjs`；✅ G-5 `check-spinner-discipline.mjs`（均带变异臂实测能红） |
 | W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
-| 待移动端腿 | G-4 迁移那一半（加第 6 档 `SettingsFieldRow` + 迁 4 个面板） | 契约五档无可编辑插槽（逐档核过），加档要同时改移动端 4 个屏幕并在真机验；本机 AVD 0 台 |
+| 下一趟（顺序已改） | G-4 迁移那一半：**先给契约加 `field` 档 + `layout: inline/grid` 档**，再迁面板 | 共享渲染器画的不是 2026-10-24 拍板的那套两列网格（三条退步见 G-4 节）；且移动端运行时验证两条腿本机都没有 |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
 ---
