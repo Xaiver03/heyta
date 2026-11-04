@@ -77,6 +77,7 @@ import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 import { useAuthStore, type AuthStatus } from '../auth/store.js';
 import { useSyncStore } from '../sync/store.js';
+import { FormField } from '../../lib/form/FormField.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
 
 /**
@@ -180,52 +181,67 @@ function PasswordField(props: {
   const { t } = useI18n();
   const [revealed, setRevealed] = useState(defaultPasswordRevealed('desktop'));
   return (
-    <div className="ht-settings__field">
-      <label className="ht-settings__item-label" htmlFor={props.id}>
-        {props.label}
-        {props.tip === undefined ? null : (
+    /*
+      🔴 走共享字段解剖 `FormField`（2026-11-04，治理计划 G-4）。
+      之前这里是手写 `<div className="ht-settings__field">` + `<label htmlFor>` + 手拼 id。
+
+      ⚠️ 顺带修掉一个真隐患：那枚 `?` 原来**在 `<label htmlFor>` 里面**，
+      而 `SettingsInfoTip` 渲染的是 `<button>` —— 点问号会顺带把焦点甩进口令框。
+      `FormField.labelTip` 把它画成标签的**兄弟**，这个副作用就没了。
+    */
+    <FormField
+      id={props.id}
+      label={props.label}
+      layout="inline"
+      labelTip={
+        props.tip === undefined ? undefined : (
           <SettingsInfoTip testId={props.tip.testId} label={props.label} text={props.tip.text} />
-        )}
-      </label>
-      <div className="ht-settings__actions">
-        <input
-          ref={props.inputRef}
-          id={props.id}
-          className="ht-input"
-          type={revealed ? 'text' : 'password'}
-          // 🔴 **不写 maxLength**：NIST 禁止静默截断口令输入，超长交给服务端按码点判。
-          data-testid={props.testId}
-          value={props.value}
-          // 失败后不清空（ADR-0040 §3.7）：除了成功那一条，没有任何路径重置它。
-          onChange={(e) => {
-            props.onChange(e.target.value);
-          }}
-          autoComplete={props.autoComplete}
-          aria-invalid={props.invalid}
-        />
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
-          data-testid={props.revealTestId}
-          aria-pressed={revealed}
-          onClick={() => {
-            setRevealed((v) => !v);
-          }}
-        >
-          {revealed ? (
-            <EyeOff size={ICON_SIZE.xs} aria-hidden="true" />
-          ) : (
-            <Eye size={ICON_SIZE.xs} aria-hidden="true" />
-          )}{' '}
-          {/*
-            标签**固定**说"显示密码"，状态交给 `aria-pressed`（扁平开关的写法）：
-            一个跟着状态改字的按钮（"显示"↔"隐藏"）配上 pressed 会让读屏念出
-            "隐藏密码，已按下"这种自相矛盾的话。
-          */}
-          {t('common.auth.form.showPassword')}
-        </button>
-      </div>
-    </div>
+        )
+      }
+    >
+      {(fieldProps) => (
+        <div className="ht-settings__actions">
+          <input
+            {...fieldProps}
+            ref={props.inputRef}
+            className="ht-input"
+            type={revealed ? 'text' : 'password'}
+            // 🔴 **不写 maxLength**：NIST 禁止静默截断口令输入，超长交给服务端按码点判。
+            data-testid={props.testId}
+            value={props.value}
+            // 失败后不清空（ADR-0040 §3.7）：除了成功那一条，没有任何路径重置它。
+            onChange={(e) => {
+              props.onChange(e.target.value);
+            }}
+            autoComplete={props.autoComplete}
+            // 这一格的 invalid 由面板的焦点管理给（失败时落到"该改的那个框"），
+            // 不是 FormField 自己的 error prop —— 所以显式覆盖 fieldProps 的那一份。
+            aria-invalid={props.invalid}
+          />
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            data-testid={props.revealTestId}
+            aria-pressed={revealed}
+            onClick={() => {
+              setRevealed((v) => !v);
+            }}
+          >
+            {revealed ? (
+              <EyeOff size={ICON_SIZE.xs} aria-hidden="true" />
+            ) : (
+              <Eye size={ICON_SIZE.xs} aria-hidden="true" />
+            )}{' '}
+            {/*
+              标签**固定**说"显示密码"，状态交给 `aria-pressed`（扁平开关的写法）：
+              一个跟着状态改字的按钮（"显示"↔"隐藏"）配上 pressed 会让读屏念出
+              "隐藏密码，已按下"这种自相矛盾的话。
+            */}
+            {t('common.auth.form.showPassword')}
+          </button>
+        </div>
+      )}
+    </FormField>
   );
 }
 

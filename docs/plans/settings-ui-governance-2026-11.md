@@ -98,6 +98,11 @@
 | ProfilePanel 昵称 | 手写 `<label htmlFor>` + 手拼 `id="profile-nickname"` | `FormField layout="inline"`，`?` 走新增的 `labelTip` | `profile-panel.spec.tsx` 18/18；行解剖账本 **54 → 53** |
 | EmailChangePanel 新地址 | 手写 label + 手拼 id | `FormField layout="inline"` | `account-security.spec.tsx` 42/42 |
 | PasskeyPanel 改名 | 上一轮我手加的 label + 手拼 id | `FormField layout="inline"` | `passkey-panel.spec.tsx` 全绿 |
+| PasswordPanel 口令格 | 手写 `__field` + `<label htmlFor>`，**且 `?` 套在 label 里面** | `FormField layout="inline"` + `labelTip` | `account-security.spec.tsx` 42/42 |
+
+最后一格顺带修掉一个真隐患：`SettingsInfoTip` 渲染的是 `<button>`，原来它落在
+`<label htmlFor={id}>` **内部** —— 点问号会顺带把焦点甩进口令框。`labelTip` 把它画成
+标签的兄弟（读 `FormField.tsx:145-160` 可核：`labelCell` 与 `labelTip` 并列在 `__labelcell` 下）。
 
 `labelTip` 是这次给原语补的能力：解剖规则要求「一枚 `?` 紧跟它所解释的标签」，
 而 `FormField.label` 只吃 `string`。它是标签的**兄弟**而不是 `<label>` 后代 ——
@@ -108,8 +113,7 @@
 **SessionsPanel 不在这张表里**：它没有字段。一行是「设备名 + 时间戳 + 撤销按钮」，
 属于 rows 那一族而不是 fields 那一族；要收敛得等 `SettingsRowModel` 长出"尾随动作"档。
 
-**还剩**：`PasswordPanel` 的 `PasswordField`（同样手写 label + 手拼 id）可迁；
-`SettingsRowModel` 的"尾随动作档"未加。
+**还剩**：`SettingsRowModel` 的"尾随动作档"未加（SessionsPanel 那一族要用）。
 
 #### 本节两处误判与一处我自己引入的缺陷（都已更正，原论证保留在 git 历史里）
 
@@ -188,7 +192,7 @@
 | W1（本轮） | G-1 + G-2 落地为门禁 | ✅ G-1 账本清空、A4 硬拒；✅ G-2 静态 CSS 臂（`check-font-size-discipline.mjs`） |
 | W1（本轮） | G-3 + G-5 落地为门禁 | ✅ G-3 `check-font-size-discipline.mjs`；✅ G-5 `check-spinner-discipline.mjs`（均带变异臂实测能红） |
 | W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
-| W1（本轮） | G-4 迁移那一半 | ✅ 三格已迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名），账本 54→53；SessionsPanel 属 rows 族不在此表；剩 `PasswordField` |
+| W1（本轮） | G-4 迁移那一半 | ✅ 四格已迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令），账本 54→53；SessionsPanel 属 rows 族不在此表 |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
 ---
