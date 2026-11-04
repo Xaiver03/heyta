@@ -268,6 +268,11 @@ describe('🔴 非管理员 / 未登录在 /admin 上', () => {
 
     // 🔴 这一条是那次收窄的本体：不许"先看见后台、再自己找那枚按钮"。
     expect(el.querySelector('.ht-sheet__auth'), '未登录进来第一眼就该是登录界面').not.toBeNull();
+    // 这一面写清它**替谁**要凭据（负责人 2026-11-04：加上"管理后台"几个字）。
+    expect(el.querySelector<HTMLElement>('.ht-sheet__auth')!.textContent).toContain('管理后台');
+    // 🔴 而它还是同一份登录面，不是一块假牌子：口令登录那句副标题在场。
+    // 分叉一份"后台专用登录"的代价，就是这句会先消失。
+    expect(el.querySelector<HTMLElement>('.ht-sheet__auth')!.textContent).toContain('使用你的邮箱和登录密码继续');
     // 出路按钮此时**不画** —— 它只在他主动关掉登录面之后才回来（下一条）。
     expect(el.querySelector('[data-testid="admin-console-signin"]')).toBeNull();
     // 登录面在场本身不该发任何后台请求。

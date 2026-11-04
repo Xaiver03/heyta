@@ -114,6 +114,17 @@ export interface AuthPanelProps {
   allowAdvanced?: boolean;
   onClose: () => void;
   /**
+   * 这一面**替谁**要凭据 —— 管理后台那页把它自己的标题递进来（产品负责人 2026-11-04：
+   * 「做得跟用户登录界面差不多，加上管理后台几个字就行了」）。
+   *
+   * 🔴 是一枚**标签**，不是第二套登录实现：表单、动作、错误、限流、passkey 那整棵都还是
+   * 这一份组件。分叉一份"后台专用登录面"的代价是主应用改了口令规则而后台那份没改，
+   * 而同一个人用的是同一个账号。
+   *
+   * 不给 ⇒ 一切照旧（主应用、深链那几路都不用改调用点）。
+   */
+  brandLabel?: string;
+  /**
    * 登录成功。壳拿它把设置对话框里的令牌输入框也同步上 ——
    * 否则用户随后点"保存并同步"会用空的输入框把刚拿到的令牌覆盖掉。
    */
@@ -168,6 +179,7 @@ export function AuthPanel({
   allowAdvanced = false,
   onClose,
   onSignedIn,
+  brandLabel,
 }: AuthPanelProps): React.JSX.Element {
   const { t, locale } = useI18n();
   const status = useAuthStore((s) => s.status);
@@ -456,8 +468,8 @@ export function AuthPanel({
   const labels: AuthFormLabels & {
     readonly otherWaysToggle: { readonly open: string; readonly close: string };
   } = {
-    title: t('web.auth.title'),
-    titleText: t('web.auth.title'),
+    title: brandLabel ?? t('web.auth.title'),
+    titleText: brandLabel ?? t('web.auth.title'),
     subtitle: t('web.auth.subtitle'),
     close: t('web.auth.close'),
     email: t('web.auth.email.label'),
@@ -665,7 +677,7 @@ export function AuthPanel({
       role="dialog"
       aria-modal="true"
       tabIndex={-1}
-      aria-label={t('web.auth.title')}
+      aria-label={brandLabel ?? t('web.auth.title')}
     >
       <div className="ht-sheet__auth-dialog">
         <AuthPlanScene />
@@ -682,7 +694,14 @@ export function AuthPanel({
             <section className="ht-auth-central" data-testid="central-auth-panel" aria-labelledby="central-auth-title">
               {centralClose}
               <p className="ht-auth-central__eyebrow ht-type-caption">{t('web.auth.central.kicker')}</p>
-              <h2 id="central-auth-title" className="ht-type-section-title">{t('web.auth.central.title')}</h2>
+              {/*
+               * 🔴 eyebrow 那句「heyta 官方服务」**不顶掉**：它答的是"这次认证真的发去哪台
+               * 服务端"，是本仓明令要看得见的一格。后台那面要出现的"管理后台"几个字挂在
+               * 大标题这一层（`brandLabel`），两件事各说各的。
+               */}
+              <h2 id="central-auth-title" className="ht-type-section-title">
+                {brandLabel ?? t('web.auth.central.title')}
+              </h2>
               {deviceWaiting !== undefined ? (
                 <div className="ht-auth-central__device" data-testid="central-device-waiting">
                   <p className="ht-auth-central__body">{t('web.auth.central.device.waitingBody')}</p>

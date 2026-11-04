@@ -98,6 +98,14 @@ or Writable stream associated with the same file.
 | 还没同意联网 | 只说"正在加载"，同意面板在上层 | **不变**：这一格不摆登录面，因为 `fetch` 还被闸门挡着，摆出来就是一张点不通的表单 |
 
 ⚠️ 这一条仍然是**呈现**，不是安全措施：它挡不住手工构造的请求，那一直由 `requireAdmin` 管。
+
+同一次收窄里还带了一句「做得跟用户登录界面差不多，加上管理后台几个字就行了」。
+落地形状是**一枚标签，不是第二套登录**：`AuthPanel` 多一个可选 `brandLabel`，后台那面把本页标题
+那枚现成词条（`web.admin.console.title`＝「heyta 管理后台」）递进去，挂在两支的标题层
+（官方地址那一支是中央面板的 `h2`，自带端点那一支是共享表单的标题与对话框的 `aria-label`）。
+🔴 eyebrow 那句「heyta 官方服务」**不被品牌顶掉** —— 它答的是"这次认证发去哪台服务端"。
+判据另立一枚文件 `apps/web/tests/admin-login-brand.spec.tsx`（两支各一条正向 + 一条反向对照：
+主应用那面不传 `brandLabel` 时标题逐字照旧，界面上也不许出现"管理后台"）。
 判据在 `apps/web/tests/admin-console-route.spec.tsx`（快的一侧，含"关掉之后还剩出路"那一臂）
 与 `e2e/tests/admin-console-route.spec.ts` 的未登录那条（真浏览器 + 两张截图）。
 

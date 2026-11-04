@@ -667,6 +667,16 @@ test.describe('/admin 这个地址（真浏览器）', () => {
   });
 
   test('🔴 未登录：分区导航不画，**登录界面默认就在场**（ADR-0078 D4 + 2026-11-04 收窄）', async ({ page }) => {
+    // 官方那一支（线上那台就是这个形状）要中央配置回 `mode:'oidc'` 才挂得起来。
+    // 本地这台的 `/api` 是桩，不塞这一枚就落进「登录暂时不可用」那一格 ——
+    // 那是另一种形状，不是本用例判的东西。
+    await page.route('**/api/auth/central/config**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'v1' }),
+      });
+    });
     await pinChineseUi(page);
     await page.goto('/admin');
     await decidePrivacyConsent(page, 'accepted');
@@ -680,6 +690,13 @@ test.describe('/admin 这个地址（真浏览器）', () => {
     // 🔴 这一条是那次收窄的本体：同一份 AuthPanel（`features/auth` 的唯一实现）
     // **不需要先看见后台再自己找按钮**。
     await expect(page.locator('.ht-sheet__auth')).toBeVisible();
+    // 而这一面写清它**替谁**要凭据（负责人 2026-11-04：加上"管理后台"几个字）。
+    // 锚在中央面板的标题层，不锚整页 —— 整页那枚 h1 本来就是这几个字，锚整页会恒真。
+    const panel = page.getByTestId('central-auth-panel');
+    await expect(panel, '中央配置回 oidc 之后应挂官方那一支').toBeVisible();
+    await expect(panel.locator('h2')).toContainText('管理后台');
+    // 🔴 eyebrow 那句答的是"这次认证发去哪台服务端"，不许被品牌顶掉。
+    await expect(panel).toContainText('heyta 官方服务');
     // 出路按钮此时不画 —— 它只在登录面被主动关掉之后才回来。
     await expect(page.getByTestId('admin-console-signin')).toHaveCount(0);
 
