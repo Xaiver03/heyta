@@ -224,7 +224,7 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
 
       {state.kind === 'loading' && (
         <p className="ht-settings__hint" role="status" data-testid="email-change-loading">
-          <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />{' '}
+          <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />{' '}
           {/*
             ⚠️ 借用 `common.sessions.busy`（"正在处理…"）：`common.emailChange.busy`
             的字面是"正在**发起**…"，摆在**读取**那一句上是一句提前许诺（还没发起过任何东西）。
@@ -267,7 +267,7 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
               }}
             >
               {cancelling ? (
-                <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
               ) : (
                 <XCircle size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
@@ -335,7 +335,7 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
                 }}
               >
                 {requesting ? (
-                  <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                  <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
                 ) : (
                   <Mail size={ICON_SIZE.xs} aria-hidden="true" />
                 )}{' '}

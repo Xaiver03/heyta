@@ -379,7 +379,7 @@ export function ProfilePanel({
                 }}
               >
                 {avatarNotice.kind === 'busy' ? (
-                  <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                  <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
                 ) : null}{' '}
                 {t('common.profile.avatar.change')}
               </button>
@@ -395,7 +395,7 @@ export function ProfilePanel({
                   }}
                 >
                   {avatarNotice.kind === 'busy' ? (
-                    <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                    <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
                   ) : null}{' '}
                   {t('common.profile.avatar.remove')}
                 </button>

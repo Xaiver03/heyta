@@ -394,6 +394,35 @@ input[type="radio"] {
   line-height: var(--ht-line-height-normal);
 }
 
+/* ── 忙态标记 ─────────────────────────────────────────────
+ * Apple HIG §1：反馈必须在交互过程中连续给出。lucide 的 `Loader2` 是静态 SVG，
+ * 不自转 —— 必须挂 CSS 动画。
+ *
+ * 🔴 名字挂在 **`.ht-settings` 这一族**里而不是自成一族（原先叫 `.ht-spin`）：
+ *   `check:row-single-source` 的棘轮管的是"不许长出一个新的顶层前缀族"，
+ *   而这一枚动画今天 17 处调用**全在设置面板内**（现量
+ *   `grep -rn ht-settings__busy apps/web/src --include=*.tsx | wc -l`），
+ *   它不是一"族"视图，是一个已有族的成员。
+ * ⚠️ 语义名优先：叫 `busy`（这一行此刻在忙）而不是 `spin`（它长什么样）。
+ *
+ * tokens.css 已把 `--ht-duration-*` 在 reduced-motion 下压到 1ms；
+ * 一圈时长用 `--ht-duration-slow * 2` ≈ 600ms。
+ */
+.ht-settings__busy {
+  animation: ht-settings-busy-rotate calc(var(--ht-duration-slow) * 2) linear infinite;
+  transform-origin: center;
+}
+
+@keyframes ht-settings-busy-rotate {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-settings__busy {
+    animation: none;
+  }
+}
+
 .ht-settings__danger,
 .ht-settings__notice,
 .ht-settings__errors li {

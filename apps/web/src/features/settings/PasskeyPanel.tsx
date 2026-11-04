@@ -220,7 +220,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
               }}
             >
               {adding ? (
-                <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
               ) : (
                 <Plus size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
@@ -239,7 +239,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
               }}
             >
               {status.kind === 'loading' ? (
-                <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
               ) : (
                 <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
@@ -375,7 +375,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                             }}
                           >
                             {renaming ? (
-                              <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                              <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
                             ) : (
                               <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
                             )}{' '}
@@ -408,7 +408,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                             }}
                           >
                             {deleting ? (
-                              <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                              <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
                             ) : (
                               <Trash2 size={ICON_SIZE.xs} aria-hidden="true" />
                             )}{' '}
@@ -452,7 +452,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                             }}
                           >
                             {deleting ? (
-                              <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                              <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
                             ) : (
                               <Trash2 size={ICON_SIZE.xs} aria-hidden="true" />
                             )}{' '}

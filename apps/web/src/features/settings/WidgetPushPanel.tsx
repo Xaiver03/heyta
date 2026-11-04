@@ -224,7 +224,7 @@ export function WidgetPushPanel({ active = true }: { active?: boolean } = {}): R
     disabled: busy,
     busy,
     leading: busy ? (
-      <Loader2 aria-hidden="true" size={ICON_SIZE.sm} className="ht-spin" />
+      <Loader2 aria-hidden="true" size={ICON_SIZE.sm} className="ht-settings__busy" />
     ) : (
       <RefreshCw aria-hidden="true" size={ICON_SIZE.sm} />
     ),
