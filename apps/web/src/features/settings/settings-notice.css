@@ -3,7 +3,7 @@
   align-items: flex-start;
   gap: var(--ht-space-3);
   padding: var(--ht-space-3);
-  border-inline-start: 0;
+  border-inline-start: var(--ht-border-width-thick) solid var(--ht-color-border);
   border-radius: var(--ht-radius-sm);
   background: var(--ht-color-surface-raised);
   color: var(--ht-color-foreground);

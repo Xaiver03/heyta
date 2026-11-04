@@ -390,7 +390,7 @@ input[type="radio"] {
 .ht-settings__hint {
   margin: 0;
   color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-xs);
+  font-size: var(--ht-font-size-sm);
   line-height: var(--ht-line-height-normal);
 }
 
@@ -405,15 +405,14 @@ input[type="radio"] {
 
 .ht-settings__danger {
   padding: var(--ht-space-2);
-  border-left: 0;
-  color: var(--ht-color-foreground);
-  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-danger);
+  font-size: var(--ht-font-size-sm);
   background: var(--ht-color-surface-sunken);
 }
 
 .ht-settings__notice {
   color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-2xs);
+  font-size: var(--ht-font-size-xs);
 }
 
 .ht-settings__toggle {
@@ -472,7 +471,7 @@ input[type="radio"] {
   align-items: center;
   gap: var(--ht-space-1);
   color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-2xs);
+  font-size: var(--ht-font-size-xs);
 }
 
 /* 远端标签用警示色 + 图标 —— 不只靠颜色区分 */
@@ -631,7 +630,7 @@ input[type="radio"] {
 
 .ht-settings__cap-hint {
   color: var(--ht-color-foreground-subtle);
-  font-size: var(--ht-font-size-2xs);
+  font-size: var(--ht-font-size-xs);
 }
 
 /* ── AI 拆解 ───────────────────────────────────────────────── */

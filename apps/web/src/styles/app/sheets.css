@@ -15,6 +15,7 @@
   inset: 0;
   z-index: var(--ht-z-dropdown);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--ht-space-6);
   background: var(--ht-color-background);
   animation: ht-sheet-in var(--ht-duration-normal) var(--ht-ease-enter);
@@ -424,6 +425,7 @@
     margin-inline: calc(var(--ht-space-6) * -1);
     padding-inline: var(--ht-space-6);
     border-block-end: 0;
+    mask-image: linear-gradient(to right, transparent 0%, black 8px, black calc(100% - 8px), transparent 100%);
   }
 
   .ht-settings__nav-link {
@@ -485,6 +487,21 @@
     opacity: 1;
     transform: none;
   }
+}
+
+@keyframes ht-sheet-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--ht-space-2));
+  }
+}
+
+.ht-sheet--exiting {
+  animation: ht-sheet-out var(--ht-duration-exit) var(--ht-ease-exit) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

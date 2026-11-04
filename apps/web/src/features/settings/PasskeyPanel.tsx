@@ -44,6 +44,7 @@ import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus, RefreshCw, Trash2 }
 import { useSyncStore } from '../sync/store.js';
 import { usePasskeysStore } from './passkeysStore.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
+import { formatSettingsDate } from './format-settings-date.js';
 
 /**
  * 删除失败原因 → 词条 key。
@@ -127,12 +128,8 @@ function renameFailureKey(reason: HostedAuthFailureReason): MessageKey {
  * 🔴 刻意**不用** `Intl` / `toLocaleDateString`：日期在这里只回答"哪一天"，
  * 不参与本地化文案，而且 `Intl` 的输出随运行环境变，会让测试对时区/ICU 敏感。
  */
-function shortDate(iso: string): string {
-  return iso.slice(0, 10);
-}
-
 export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX.Element {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   // 令牌来自同步设置（登录成功后由认证 store 写进去）。
   const baseUrl = useSyncStore((s) => s.baseUrl);
@@ -213,7 +210,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
               }}
             >
               {adding ? (
-                <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
               ) : (
                 <Plus size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
@@ -232,7 +229,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
               }}
             >
               {status.kind === 'loading' ? (
-                <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
               ) : (
                 <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
@@ -313,30 +310,36 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                       </p>
                     )}
                     <p className="ht-settings__credential-meta">
-                      {t('web.passkeys.createdAt', { date: shortDate(passkey.createdAt) })}
+                      {t('web.passkeys.createdAt', { date: formatSettingsDate(passkey.createdAt, locale) })}
                       {' · '}
                       {passkey.lastUsedAt === null
                         ? t('web.passkeys.neverUsed')
                         : t('web.passkeys.lastUsedAt', {
-                            date: shortDate(passkey.lastUsedAt),
+                            date: formatSettingsDate(passkey.lastUsedAt, locale),
                           })}
                     </p>
                   </div>
 
                   {editing ? (
-                    <div className="ht-settings__actions">
-                      <input
-                        className="ht-input"
-                        type="text"
-                        data-testid={`passkey-name-input-${passkey.id}`}
-                        value={draftName}
-                        // 上限与服务端共用同一个常量：让用户打完 100 个字再被拒
-                        // 是一次没必要的往返（服务端仍是权威，见 zod 那边的 400）。
-                        maxLength={HOSTED_PASSKEY_NAME_MAX_LENGTH}
-                        placeholder={t('web.passkeys.renamePlaceholder')}
-                        disabled={renaming}
-                        onChange={(e) => setDraftName(e.target.value)}
-                      />
+                    <div className="ht-settings__field">
+                      <label
+                        className="ht-settings__item-label"
+                        htmlFor={`passkey-name-input-${passkey.id}`}
+                      >
+                        {t('web.passkeys.rename')}
+                      </label>
+                      <div className="ht-settings__actions">
+                        <input
+                          id={`passkey-name-input-${passkey.id}`}
+                          className="ht-input"
+                          type="text"
+                          data-testid={`passkey-name-input-${passkey.id}`}
+                          value={draftName}
+                          maxLength={HOSTED_PASSKEY_NAME_MAX_LENGTH}
+                          placeholder={t('web.passkeys.renamePlaceholder')}
+                          disabled={renaming}
+                          onChange={(e) => setDraftName(e.target.value)}
+                        />
                       <button
                         type="button"
                         className="ht-btn ht-btn--primary"
@@ -355,7 +358,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                         }}
                       >
                         {renaming ? (
-                          <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
+                          <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
                         ) : (
                           <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
                         )}{' '}
@@ -370,6 +373,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                       >
                         {t('web.passkeys.cancel')}
                       </button>
+                    </div>
                     </div>
                   ) : (
                     <div className="ht-settings__actions">
@@ -386,7 +390,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                             }}
                           >
                             {deleting ? (
-                              <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
+                              <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
                             ) : (
                               <Trash2 size={ICON_SIZE.xs} aria-hidden="true" />
                             )}{' '}
@@ -430,7 +434,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                             }}
                           >
                             {deleting ? (
-                              <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
+                              <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
                             ) : (
                               <Trash2 size={ICON_SIZE.xs} aria-hidden="true" />
                             )}{' '}

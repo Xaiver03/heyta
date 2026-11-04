@@ -50,7 +50,7 @@
 
 .ht-settings__credential-meta {
   color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-2xs);
+  font-size: var(--ht-font-size-xs);
 }
 
 .ht-settings__field {

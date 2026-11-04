@@ -843,7 +843,12 @@ export function App(): React.JSX.Element {
    */
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const sheetReturnFocus = useRef<HTMLElement | null>(null);
+  const [sheetExiting, setSheetExiting] = useState(false);
   const closeSecondarySurface = useCallback(() => {
+    setSheetExiting(true);
+  }, []);
+  const finishSheetExit = useCallback(() => {
+    setSheetExiting(false);
     setView(settingsBaseView);
     const back = sheetReturnFocus.current;
     sheetReturnFocus.current = null;
@@ -3355,8 +3360,10 @@ export function App(): React.JSX.Element {
               data-testid="settings-sheet"
               data-account-surface={secondaryAccountSurface}
               ref={sheetRef}
-              // 对话框的键盘起点：打开时焦点进容器（见上面的 effect）。
               tabIndex={-1}
+              onAnimationEnd={(e) => {
+                if (e.animationName === 'ht-sheet-out') finishSheetExit();
+              }}
             >
 
             <header className={`ht-settings__header${secondaryAccountSurface === 'settings' && settingsReturnSurface !== 'profile' ? ' ht-settings__header--compact' : ''}`}>
