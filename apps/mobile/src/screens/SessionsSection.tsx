@@ -43,9 +43,9 @@ import {
   type HostedAuthFailure,
 } from '@heyta/app-host';
 import { useI18n } from '@heyta/i18n';
-import { authFailureMessage, EmptyState } from '@heyta/ui';
+import { authFailureMessage, EmptyState, SettingsSection, type SettingsRowModel } from '@heyta/ui';
 
-import { Button, Card, Divider, HStack, Stack, Text } from '../ui/kit';
+import { Button, HStack, Text } from '../ui/kit';
 import { formatStamp } from '../lib/date';
 import { sessionDeviceLabel, type CopyMessage } from '../auth/account-security-copy';
 
@@ -173,25 +173,98 @@ export function SessionsSection({
   const unlabeled = t('mobile.security.passkeys.unnamed');
   const failureCopy = failure === null ? null : sessionFailureCopy(failure);
 
+  /*
+    🔴 这一屏的行骨架**归共享契约**（治理计划 G-4 的 mobile 那一格，2026-11-04）。
+    迁之前它自己手搓一套（`Stack` + `Divider` + `HStack` 标签行 + 时间戳行 + 按钮行），
+    而 web 同形那一格已经吃 `trailing` —— 两份骨架的差异不会让任何测试变红，
+    只会让"一行登录设备"在两端长成两种留白与两种层级。
+
+    档位选择：
+      · 每一台设备 = `trailing`（一个对象 + 几行事实 + 只对得起那个对象的尾随动作）。
+        不用 `action` 档：那让**整行**可点，会把"看这一行"与"销毁这台设备"混成同一个手势。
+      · 读失败那一句 = `host`（顺序与分组归契约，内容自己的解剖归它那一族）——
+        它要保住 `selectable`（用户会把这句复制去反馈）与"在列表**上面**"这个位置，
+        而 `note` 档的文字由共享层画，没有 `selectable` 这一层。
+      · 「这台设备」那个记号进 `meta`（与 web 同形），提示句进 `note`，撤销按钮进 `actions`。
+        ⚠️ `actions` 归宿主渲染：**这一端当前那一行不给撤销出口**（web 给的是禁用按钮），
+        两种都满足 ADR-0063 §2.5「两个动作分开措辞」，G-4 统一的是骨架不是这个选择。
+
+    🔴 真机脚本的锚点一个都不许动：`sessions-list`（`scroll_to_id`）、
+    `sessions-revoke`（`count_id` 数几台可撤）、`sessions-logout-all`、`sessions-sign-out`、
+    `sessions-refresh`、`sessions-failure`。列表容器靠 `listTestID` 透传，不是新造一层。
+  */
+  const rows: SettingsRowModel[] = [
+    ...(failureCopy === null
+      ? []
+      : ([
+          {
+            kind: 'host',
+            node: (
+              <View testID="sessions-failure">
+                <Text variant="row-meta" tone="danger" selectable>
+                  {t(failureCopy.key, failureCopy.vars)}
+                </Text>
+              </View>
+            ),
+          },
+        ] as SettingsRowModel[])),
+    ...(sessions ?? []).map(
+      (session): SettingsRowModel => {
+        const device = sessionDeviceLabel(session, unlabeled);
+        return {
+          kind: 'trailing',
+          testID: `session-row-${session.sessionId}`,
+          divider: true,
+          label: device,
+          meta: (
+            <>
+              {session.current ? (
+                <Text variant="caption" tone="primary">
+                  {t('common.sessions.thisDevice')}
+                </Text>
+              ) : null}
+              <HStack gap="default">
+                {/* `numeric-body`：时间戳必须等宽，否则两行的分钟数对不齐。 */}
+                <Text variant="numeric-body" tone="subtle">
+                  {`${t('common.sessions.signedInSince')} ${formatStamp(session.createdAt)}`}
+                </Text>
+                <Text variant="numeric-body" tone="subtle">
+                  {`${t('common.sessions.lastSeen')} ${formatStamp(session.lastSeenAt)}`}
+                </Text>
+              </HStack>
+            </>
+          ),
+          note: session.current ? (
+            <Text variant="caption" tone="subtle">
+              {t('common.sessions.currentHint')}
+            </Text>
+          ) : null,
+          actions: session.current ? null : (
+            <Button
+              label={t('common.sessions.revoke')}
+              accessibilityLabel={t('mobile.sessions.revoke.aria', { device })}
+              onPress={() => {
+                askRevoke(session, device);
+              }}
+              tone="ghost"
+              disabled={busy}
+              testID="sessions-revoke"
+            />
+          ),
+        };
+      },
+    ),
+  ];
+
   return (
-    <Card gap="loose">
-      <Stack gap="tight">
-        <Text variant="row-title" tone="default">
-          {t('common.sessions.title')}
-        </Text>
-        <Text variant="row-meta" tone="muted">
-          {t('common.sessions.intro')}
-        </Text>
-      </Stack>
-
-      {failureCopy === null ? null : (
-        <View testID="sessions-failure">
-          <Text variant="row-meta" tone="danger" selectable>
-            {t(failureCopy.key, failureCopy.vars)}
-          </Text>
-        </View>
-      )}
-
+    <SettingsSection
+      variant="card"
+      testID="sessions-card"
+      listTestID="sessions-list"
+      title={t('common.sessions.title')}
+      note={t('common.sessions.intro')}
+      rows={rows}
+    >
       {!hasSession ? (
         <Text variant="caption" tone="subtle">
           {t('mobile.sessions.needSession')}
@@ -203,55 +276,7 @@ export function SessionsSection({
       ) : sessions.length === 0 ? (
         // 共享空态的 `section` 档（与 `SecurityScreen` 的通行密钥卡片同一取舍）。
         <EmptyState size="section" title={t('common.sessions.empty')} />
-      ) : (
-        <Stack gap="loose" testID="sessions-list">
-          {sessions.map((session) => {
-            const device = sessionDeviceLabel(session, unlabeled);
-            return (
-              <Stack key={session.sessionId} gap="tight">
-                <Divider />
-                <HStack gap="default" align="center">
-                  <Text variant="row-meta" tone="default" grow>
-                    {device}
-                  </Text>
-                  {session.current ? (
-                    // 这是一枚**标记**，不是控件 —— 所以它是 `Text` 而不是 `Chip`：
-                    // `Chip` 带 `accessibilityRole="button"`，读屏用户会去按一个没有动作的东西。
-                    <Text variant="caption" tone="primary">
-                      {t('common.sessions.thisDevice')}
-                    </Text>
-                  ) : null}
-                </HStack>
-                <HStack gap="default">
-                  {/* `numeric-body`：时间戳必须等宽，否则两行的分钟数对不齐。 */}
-                  <Text variant="numeric-body" tone="subtle">
-                    {`${t('common.sessions.signedInSince')} ${formatStamp(session.createdAt)}`}
-                  </Text>
-                  <Text variant="numeric-body" tone="subtle">
-                    {`${t('common.sessions.lastSeen')} ${formatStamp(session.lastSeenAt)}`}
-                  </Text>
-                </HStack>
-                {session.current ? (
-                  <Text variant="caption" tone="subtle">
-                    {t('common.sessions.currentHint')}
-                  </Text>
-                ) : (
-                  <Button
-                    label={t('common.sessions.revoke')}
-                    accessibilityLabel={t('mobile.sessions.revoke.aria', { device })}
-                    onPress={() => {
-                      askRevoke(session, device);
-                    }}
-                    tone="ghost"
-                    disabled={busy}
-                    testID="sessions-revoke"
-                  />
-                )}
-              </Stack>
-            );
-          })}
-        </Stack>
-      )}
+      ) : null}
 
       {/*
         本轮之前签的令牌没有 `jti`，按枚撤销撤不动它们。
@@ -289,6 +314,6 @@ export function SessionsSection({
           testID="sessions-refresh"
         />
       ) : null}
-    </Card>
+    </SettingsSection>
   );
 }

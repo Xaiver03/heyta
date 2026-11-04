@@ -149,16 +149,30 @@ describe('登录设备：三件事各是一条路，不许合并', () => {
   it('`current` 那一行**没有**可点的撤销按钮', () => {
     // 服务端比的是自己验出来的 `jti`。在别的设备上把"退出登录"画在
     // "这台设备"那一行，用户点下去撤销的是**自己**正在用的那枚。
-    const branchStart = SESSIONS.indexOf('{session.current ? (');
-    const elseStart = SESSIONS.indexOf(') : (', branchStart);
-    expect(branchStart).toBeGreaterThanOrEqual(0);
-    expect(elseStart).toBeGreaterThan(branchStart);
-    const currentBranch = SESSIONS.slice(branchStart, elseStart);
-    expect(currentBranch).toContain('common.sessions.currentHint');
-    expect(currentBranch).not.toContain('sessions-revoke');
+    //
+    // 🔴 2026-11-05 改锚（设置页治理线 G-4 的 mobile 那一格迁进共享契约，产品负责人授权）：
+    //   原来切的是 **JSX 三元的字面量**（`indexOf('{session.current ? (')` 到 `indexOf(') : (')`）——
+    //   那是这一屏**自己手搓行骨架**时代的形状。行骨架归契约之后，同一个决定写在
+    //   **行模型的字段**上（`actions:` / `note:`），切 JSX 只会让判据读成"找不到锚点"。
+    //   锚换了，判的还是同一件事：**撤销出口只许出现在"不是这台"那一支**，
+    //   而那句"为什么这里没有出口"只许出现在"就是这台"那一支。
+    const guard = 'actions: session.current ?';
+    const start = SESSIONS.indexOf(guard);
+    expect(start, `撤销出口没有 current 判定（应写成 \`${guard} null : …\`）`).toBeGreaterThanOrEqual(0);
+    const branch = SESSIONS.slice(start, start + 600);
+    // 当前这一支必须是 `null`：画一枚**禁用着**的按钮同样算"这一行有出口"——
+    // 读屏用户会去按它，而按下去本来什么都不该发生。
+    expect(branch.startsWith(`${guard} null :`), `current 那一支不是 null：${branch.slice(0, 60)}`).toBe(true);
     // 正向对照：撤销按钮**确实**在 else 那一支里（否则上面那条"没有"是空的）。
-    const elseBranch = SESSIONS.slice(elseStart, elseStart + 600);
-    expect(elseBranch).toContain('sessions-revoke');
+    const elseStart = branch.indexOf(' : (');
+    expect(elseStart, '找不到 else 那一支').toBeGreaterThan(0);
+    expect(branch.slice(elseStart), '撤销按钮不在 else 那一支里').toContain('sessions-revoke');
+    // 那句解释必须与出口**同生同灭**：只有"就是这台"那一支才有它。
+    const noteStart = SESSIONS.indexOf('note: session.current ?');
+    expect(noteStart, '找不到 current 那句提示的判定').toBeGreaterThanOrEqual(0);
+    const note = SESSIONS.slice(noteStart, start);
+    expect(note).toContain('common.sessions.currentHint');
+    expect(note, '那句提示里不该有撤销出口').not.toContain('sessions-revoke');
   });
 
   it('「退出所有设备」成功之后**必须**走本机清理（手上那枚一起死了）', () => {
