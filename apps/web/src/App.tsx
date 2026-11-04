@@ -48,6 +48,7 @@ import {
   presentPreferenceIds,
   renderPreferenceHints,
   Quadrant,
+  isPinned,
   suppressedPreferenceIds,
   toLocalDate,
   filterTasks,
@@ -3895,6 +3896,38 @@ export function App(): React.JSX.Element {
           onClose={closeRowMenu}
           onOpenDetail={openTask}
           onDelete={deleteTaskWithReceipt}
+          onSetPriority={(id, priority) => useTaskStore.getState().setPriority(id, priority)}
+          currentPriority={rowMenuTask.priority}
+          onMoveToProject={(id, projectId) => useTaskStore.getState().moveToProject(id, projectId)}
+          projects={projects.projects.map((p) => ({ id: p.id, name: p.name }))}
+          currentProjectId={rowMenuTask.projectId}
+          onAddSubtask={(parentId) => {
+            // 行内输入框在「撤掉行尾编辑器」那一刀之后就没有了（字段编辑都收进面单），
+            // 所以这一项做的是"打开那条任务的面单"—— 子任务那一格就在里面，
+            // 焦点由面单自己给。⚠️ 不许把它读成"点了没反应"：目的地换了，动作是真的。
+            openTask(parentId);
+          }}
+          onSetTags={(id, tagIds) => useTaskStore.getState().setTags(id, tagIds)}
+          tags={projects.tags.map((tag) => ({ id: tag.id, name: tag.name }))}
+          onCreateTag={async (name) => {
+            // 重名不当错误处理，当"你要的就是它"：返回那条已有标签的 id，
+            // 菜单会把它并进这一组 —— 与侧栏创建对话框的判重同一条归一口径
+            // （trim + toLocaleLowerCase），两处各写一套迟早漂。
+            const trimmed = name.trim();
+            if (trimmed === '') return undefined;
+            const existing = projects.tags.find(
+              (tag) => tag.name.trim().toLocaleLowerCase() === trimmed.toLocaleLowerCase(),
+            );
+            if (existing !== undefined) return existing.id;
+            return projects.addTag(trimmed);
+          }}
+          currentTagIds={rowMenuTask.tagIds}
+          onSetPinned={(id, pinned) => {
+            void useTaskStore.getState().setPinned(id, pinned);
+          }}
+          // 🔴 当前态用领域层的 `isPinned()` 判 —— 宿主不许自己写 `pinnedAt === undefined`
+          // （那条禁令写在 `packages/domain/src/entities.ts` 的 `isPinned` 文件头）。
+          pinned={isPinned(rowMenuTask)}
         />
       ) : null}
 

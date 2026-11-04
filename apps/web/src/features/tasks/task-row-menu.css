@@ -161,3 +161,123 @@
   /* 徽标只是"这条任务的注脚"，不许把标题挤没（与 `TaskRow` 的 `minWidth: 30%` 同向）。 */
   max-inline-size: 40%;
 }
+
+/*
+ * 子菜单（优先级 / 移动到 / 标签）
+ * ================================
+ *
+ * 触发项带箭头指示，悬停时展开同级面板。面板定位由触发项的 `position: relative`
+ * 承接（不另起 `position: fixed` 层 —— 那会让键盘导航断掉）。
+ */
+.ht-row-menu__submenu-trigger {
+  position: relative;
+}
+
+.ht-row-menu__item--has-submenu {
+  justify-content: space-between;
+}
+
+/* 箭头指示符（用 CSS 画，不引入图标依赖） */
+.ht-row-menu__item--has-submenu::after {
+  content: '›';
+  margin-inline-start: var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-row-menu__submenu {
+  position: absolute;
+  /* 贴在触发项右侧，与主菜单同一高度起点 */
+  inset-inline-start: 100%;
+  inset-block-start: 0;
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 12rem;
+  padding: var(--ht-space-1);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-lg);
+  z-index: var(--ht-z-dropdown);
+}
+
+/*
+ * 「新建标签」那一格（B3 的另一半）：入口一行，点开之后就地换成草稿行，
+ * 不再弹第二层（这一格本来已经住在 `document.body` 的浮层里）。
+ * 输入框复用共享的 `.ht-input`（`controls.css`），这里只补两件浮层里才需要的：
+ * 在横排里占满剩余宽度、以及窄容器里不许把菜单撑破。
+ */
+.ht-row-menu__item--create {
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-row-menu__create {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  padding-block-start: var(--ht-space-1);
+}
+
+.ht-row-menu__create-input {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+/*
+ * 空名不给提交：`disabled` 之外还要一条"按下不响应"的样式，
+ * 因为键盘用户可以按 Enter 绕过按钮的 disabled 直接提交表单。
+ */
+.ht-row-menu__create-submit[disabled] {
+  color: var(--ht-color-foreground-subtle);
+  cursor: not-allowed;
+}
+
+/* 当前选中项的高亮（优先级 / 清单） */
+.ht-row-menu__item--active {
+  background: var(--ht-color-active);
+}
+
+.ht-row-menu__item--active:hover {
+  background: var(--ht-color-active);
+}
+
+/* 菜单项里的图标 */
+.ht-row-menu__icon {
+  flex: 0 0 auto;
+  margin-inline-end: var(--ht-space-2);
+}
+
+/*
+ * 详情面底部工具条（C2，滴答对齐 2026-11）
+ * =========================================
+ *
+ * 三个快捷入口按钮横排：收集箱（移动清单）、文本格式（备注）、更多。
+ * 贴在详情面底部，与上方内容用分隔线隔开。
+ */
+.ht-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-4);
+  padding-block-start: var(--ht-space-3);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.ht-detail-toolbar__btn {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-detail-toolbar__btn:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}

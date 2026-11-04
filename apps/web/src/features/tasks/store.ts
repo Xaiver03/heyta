@@ -113,6 +113,16 @@ interface TaskState {
    */
   renameTask: (id: string, title: string) => Promise<void>;
   setPriority: (id: string, priority: Priority) => Promise<void>;
+  /**
+   * 置顶 / 取消置顶（写 `Task.pinnedAt`，ADR-0083 §3.2）。
+   *
+   * 🔴 顺序**不在这里排**：这一层只把意图发出去。界面上的行序由领域的
+   * `sortTasks`（`packages/domain/src/task-order.ts`）决定，共享 `TaskList` 每组调一次。
+   * ⚠️ 2026-11-04 浏览器腿实测：那一档当时**不看** `pinnedAt`，于是 web 上点「置顶」
+   * 写进了字段、行却一行都不动（移动端不坏，因为它读的是 `listTasks()` 那份已排好的序）。
+   * 修在 `sortTasks` 里（那里是唯一那份），不在这里补排 —— 这里补就是第二套口径。
+   */
+  setPinned: (id: string, pinned: boolean) => Promise<void>;
   bulkSetPriorities: (entries: readonly { id: string; priority: Priority }[]) => Promise<void>;
   setImportant: (id: string, important: boolean) => Promise<void>;
   /**
@@ -364,6 +374,10 @@ export const useTaskStore = create<TaskState>((set) => ({
 
   setPriority: async (id, priority) => {
     await taskActions.setPriority(id, priority);
+  },
+
+  setPinned: async (id, pinned) => {
+    await taskActions.setPinned(id, pinned);
   },
 
   bulkSetPriorities: async (entries) => {
