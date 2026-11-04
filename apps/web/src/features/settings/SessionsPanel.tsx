@@ -150,7 +150,7 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
               }}
             >
               {state.kind === 'loading' || refreshing ? (
-                <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
               ) : (
                 <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
@@ -172,7 +172,7 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
               }}
             >
               {signingOutAll ? (
-                <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
               ) : (
                 <LogOut size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
@@ -285,7 +285,7 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
                           }}
                         >
                           {revoking ? (
-                            <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                            <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
                           ) : (
                             <LogOut size={ICON_SIZE.xs} aria-hidden="true" />
                           )}{' '}

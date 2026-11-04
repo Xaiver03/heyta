@@ -160,9 +160,9 @@ iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devi
 **目标**: 状态表征（busy/done/error）必须有视觉动效，不能只靠文字。
 
 **规则**:
-- 所有 `<Loader2>` 必须带 `className="ht-spin"`
+- 所有 `<Loader2>` 必须带 `className="ht-settings__busy"`（挂在 `.ht-settings` 这一族里，**不自成一族** —— 原先那枚 `.ht-spin` 被 `check:row-single-source` 的"前缀族只减不增"棘轮抓红，2026-11-04 收编）
 - 所有浮层/sheet 必须有对称的进出动画
-- 门禁：grep `<Loader2` 不带 `ht-spin` 即红
+- 门禁：grep `<Loader2` 不带 `ht-settings__busy` 即红
 
 **优先级**: 中（F-01 类缺陷的防回归）
 

@@ -437,7 +437,7 @@ export function PasswordPanel(): React.JSX.Element {
               }}
             >
               {busySet ? (
-                <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
               ) : (
                 <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
@@ -538,7 +538,7 @@ export function PasswordPanel(): React.JSX.Element {
               }}
             >
               {busyChange ? (
-                <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
               ) : (
                 <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
@@ -555,7 +555,7 @@ export function PasswordPanel(): React.JSX.Element {
                 }}
               >
                 {busyForgot ? (
-                  <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                  <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
                 ) : (
                   <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
                 )}{' '}
