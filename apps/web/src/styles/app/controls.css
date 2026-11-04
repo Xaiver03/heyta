@@ -34,7 +34,6 @@
   transition:
     background-color var(--ht-duration-fast) var(--ht-ease-standard),
     color var(--ht-duration-fast) var(--ht-ease-standard),
-    border-color var(--ht-duration-fast) var(--ht-ease-standard),
     transform var(--ht-duration-press) var(--ht-ease-standard);
 }
 
@@ -504,4 +503,25 @@
  */
 .ht-material__row-slot:has(> .ht-material__row-pop) {
   block-size: auto;
+}
+
+/* ── 忙态旋转指示器 ───────────────────────────────────────
+ * Apple HIG §1: 反馈必须在交互过程中连续给出。
+ * lucide 的 Loader2 是静态 SVG，不自转——必须挂 CSS 动画。
+ * tokens.css 已把 --ht-duration-* 在 reduced-motion 下压到 1ms，
+ * 这里用 --ht-duration-slow*2 ≈ 600ms 作为一圈时长。
+ */
+.ht-spin {
+  animation: ht-spin-rotate calc(var(--ht-duration-slow) * 2) linear infinite;
+  transform-origin: center;
+}
+
+@keyframes ht-spin-rotate {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-spin {
+    animation: none;
+  }
 }

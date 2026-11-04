@@ -61,6 +61,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
+import { ICON_SIZE } from '@heyta/design-system';
+import { Loader2 } from 'lucide-react';
 import {
   deleteAccountAvatar,
   getAccountProfile,
@@ -355,14 +357,29 @@ export function ProfilePanel({
                 if (file !== undefined) void onPickFile(file);
               }}
             />
+            {/*
+              🔴 头像行的两个按钮用 `ht-btn--ghost`（透明底），而昵称行的"保存"用
+              `ht-btn--primary`（实心底）。这是**有意为之**：
+                - 头像操作（换一张/删除）是**次要动作**，不是这行的主要目的
+                - 昵称保存是**主要动作**，用户填完昵称后最可能点的就是它
+              如果两行都用 primary，整屏会太"重"；都用 ghost，主要动作又不突出。
+              （ui-ux-pro-max §4 Style Selection: `primary-action` - "Each screen should
+              have only one primary CTA"）
+            */}
             <div className="ht-settings__actions">
               <button
                 type="button"
                 className="ht-btn ht-btn--ghost"
                 data-testid="profile-avatar-change"
-                disabled={!signedIn}
-                onClick={() => fileRef.current?.click()}
+                aria-disabled={!signedIn || avatarNotice.kind === 'busy'}
+                onClick={() => {
+                  if (!signedIn || avatarNotice.kind === 'busy') return;
+                  fileRef.current?.click();
+                }}
               >
+                {avatarNotice.kind === 'busy' ? (
+                  <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                ) : null}{' '}
                 {t('common.profile.avatar.change')}
               </button>
               {avatarUrl === undefined ? null : (
@@ -370,9 +387,15 @@ export function ProfilePanel({
                   type="button"
                   className="ht-btn ht-btn--ghost"
                   data-testid="profile-avatar-remove"
-                  disabled={!signedIn}
-                  onClick={() => void removeAvatar()}
+                  aria-disabled={!signedIn || avatarNotice.kind === 'busy'}
+                  onClick={() => {
+                    if (!signedIn || avatarNotice.kind === 'busy') return;
+                    void removeAvatar();
+                  }}
                 >
+                  {avatarNotice.kind === 'busy' ? (
+                    <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                  ) : null}{' '}
                   {t('common.profile.avatar.remove')}
                 </button>
               )}
@@ -404,30 +427,37 @@ export function ProfilePanel({
           />
         </div>
         <div className="ht-settings__row-body">
-          <div className="ht-settings__actions">
-            <input
-              id="profile-nickname"
-              type="text"
-              className="ht-input"
-              data-testid="profile-nickname-input"
-              disabled={!signedIn}
-              value={draft}
-              maxLength={ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS * 2}
-              placeholder={t('common.profile.nickname.placeholder')}
-              onChange={(event) => {
-                setDraft(event.target.value);
-                setNameNotice({ kind: 'idle' });
-              }}
-            />
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
-              data-testid="profile-nickname-save"
-              disabled={!signedIn}
-              onClick={() => void saveNickname()}
-            >
-              {t('common.profile.nickname.save')}
-            </button>
+          {/*
+            🔴 用 `.ht-settings__field` 约束输入框宽度（max 42rem），
+            与下方 EmailChangePanel 对齐。之前这里没有约束，输入框会铺满整行，
+            在宽屏上非常难看（ui-ux-pro-max §8 Forms & Feedback）。
+          */}
+          <div className="ht-settings__field">
+            <div className="ht-settings__actions">
+              <input
+                id="profile-nickname"
+                type="text"
+                className="ht-input"
+                data-testid="profile-nickname-input"
+                disabled={!signedIn}
+                value={draft}
+                maxLength={ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS * 2}
+                placeholder={t('common.profile.nickname.placeholder')}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  setNameNotice({ kind: 'idle' });
+                }}
+              />
+              <button
+                type="button"
+                className="ht-btn ht-btn--primary"
+                data-testid="profile-nickname-save"
+                disabled={!signedIn}
+                onClick={() => void saveNickname()}
+              >
+                {t('common.profile.nickname.save')}
+              </button>
+            </div>
           </div>
           {/* 输入框下面那句"最多 32 字"也是说明 → 挪进上面那枚 `?` 的正文。 */}
           {tooLong ? (
@@ -488,12 +518,24 @@ function NoticeLine({
   notice: Notice;
   testId: string;
 }): React.JSX.Element | null {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    if (notice.kind === 'done') {
+      setVisible(true);
+      const timer = setTimeout(() => setVisible(false), 4000);
+      return () => clearTimeout(timer);
+    }
+    if (notice.kind === 'error') setVisible(true);
+    return undefined;
+  }, [notice]);
+
   if (notice.kind === 'idle' || notice.kind === 'busy') return null;
+  if (notice.kind === 'done' && !visible) return null;
   return (
     <p
       className={notice.kind === 'error' ? 'ht-settings__danger' : 'ht-settings__notice'}
       data-testid={testId}
-      role="status"
+      role={notice.kind === 'error' ? 'alert' : 'status'}
     >
       {notice.text}
     </p>

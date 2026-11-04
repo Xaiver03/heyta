@@ -171,7 +171,7 @@ export function CloseAccountPanel(): React.JSX.Element | null {
             <div className="ht-settings__actions">
               <button
                 type="button"
-                className="ht-btn ht-btn--outline"
+                className="ht-btn ht-btn--secondary"
                 data-testid="close-account-open"
                 onClick={() => {
                   setConfirming(true);
@@ -196,17 +196,18 @@ export function CloseAccountPanel(): React.JSX.Element | null {
             </div>
           ) : null}
 
-          {done ? (
-            <p
-              className="ht-settings__hint"
-              role="status"
-              aria-live="polite"
-              data-testid="close-account-result"
-              data-disposition={done.disposition}
-            >
-              <AlertTriangle size={ICON_SIZE.sm} aria-hidden="true" /> {t(done.sentence)}
-            </p>
-          ) : null}
+          <div aria-live="polite" data-testid="close-account-live">
+            {done ? (
+              <p
+                className="ht-settings__danger"
+                role={done.disposition === 'not-closed' ? 'alert' : 'status'}
+                data-testid="close-account-result"
+                data-disposition={done.disposition}
+              >
+                <AlertTriangle size={ICON_SIZE.sm} aria-hidden="true" /> {t(done.sentence)}
+              </p>
+            ) : null}
+          </div>
         </div>
       )}
     </div>

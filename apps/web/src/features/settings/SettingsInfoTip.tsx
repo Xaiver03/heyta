@@ -28,7 +28,7 @@
  * tooltip / hover card —— 那一类的开合由指针位置与焦点决定，没有 scrim、
  * 没有"取消/确认"。所以这里不引 `closePolicyOf`，也不该被当成一个 dialog。
  */
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { CircleHelp } from 'lucide-react';
 
 import { ICON_SIZE } from '@heyta/design-system';
@@ -54,6 +54,7 @@ export function SettingsInfoTip({
   const id = useId();
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const open = hovered || focused;
 
   return (
@@ -64,8 +65,13 @@ export function SettingsInfoTip({
         aria-label={label}
         aria-describedby={id}
         data-testid={`${testId}-trigger`}
-        onPointerEnter={() => setHovered(true)}
-        onPointerLeave={() => setHovered(false)}
+        onPointerEnter={() => {
+          hoverTimer.current = setTimeout(() => setHovered(true), 300);
+        }}
+        onPointerLeave={() => {
+          if (hoverTimer.current !== undefined) clearTimeout(hoverTimer.current);
+          setHovered(false);
+        }}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onKeyDown={(event) => {

@@ -996,7 +996,7 @@ export function AiSettings({
                               <input
                                 type="checkbox"
                                 aria-label={t('web.ai.settings.capabilityAria', {
-                                  capability,
+                                  capability: capabilityLabel[capability],
                                   name: endpoint.label,
                                 })}
                                 checked={declared}
@@ -1088,7 +1088,6 @@ export function AiSettings({
                     className="ht-btn ht-btn--ghost"
                     disabled={added}
                     data-testid={`add-preset-${preset.id}`}
-                    title={copy.prerequisite}
                     onClick={() => addEndpoint({ ...preset.config, label: copy.label })}
                   >
                     <Plus size={ICON_SIZE.xs} aria-hidden="true" />
