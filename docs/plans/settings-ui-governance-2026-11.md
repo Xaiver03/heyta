@@ -269,15 +269,17 @@ iOS 那枚 booted 模拟器现在可能被别线占着（`xcrun simctl list devi
 | 读数 | 值 | 复量 |
 |---|---|---|
 | 调用点总数 | 33 | `node scripts/check-tip-adjacency.mjs --report` |
-| 存量违规（已进账本，只减不增） | 4 处 / 3 个文件 | `cat scripts/settings-tip-ledger.json` |
-| 三条臂都验过 | 新增即红（变异臂）、缩了不改账本也红（`WidgetPushPanel` 那枚改完就抓到）、`--update` 不许改大 | 见 `--self-test` |
+| 存量违规（已进账本，只减不增） | 现量看账本，别抄这里 | `cat scripts/settings-tip-ledger.json` |
+| 三条臂都验过 | 新增即红（变异臂）、缩了不改账本也红（`WidgetPushPanel` / `CloseAccountPanel` / `ProfileOverview` 三枚改完各抓到一次）、`--update` 不许改大 | 见 `--self-test` |
 
 **为什么其中一枚值得改代码而不是登记**：`SettingsSection` 没有能把 `?` 挂到**分组标题**旁的口子
 （`title` 只收 string），宿主唯一的选择是把它当 children 排在整组之后 —— 那枚问号"孤零零"不是有人写错，
 是**契约缺格**。补了 `titleTip`（与上一批给 `FormField` 补的 `labelTip` 对应，纯追加：
-`@heyta/ui` / `@heyta/mobile` typecheck 均 rc=0，未传该 prop 的消费端一字不变），
-`WidgetPushPanel` 那枚随之回到标题旁，账本从 5 收到 4。剩下 4 处归 `CloseAccountPanel` /
-`InboundAutomationSettings` ×2 / `ProfileOverview` 各自那一屏，本线只登记不代改。
+`@heyta/ui` / `@heyta/mobile` typecheck 均 rc=0，未传该 prop 的消费端一字不变）。
+另外两枚（`CloseAccountPanel` / `ProfileOverview`）本来就是"同屏三块面板都写在 `<h2>` 里、
+只有这两块例外"，照同族写法移进各自的节标题即可 —— 两个 testId 在三处测试面**零引用**，
+没有断言被顺带改动。账本收到现在这个样子。
+剩下的都在 `InboundAutomationSettings.tsx`（自动收集那一屏），本线只登记不代改。
 
 ⚠️ **这把尺的"进链"那一半暂时卡住**：`package.json` 里另一条线已经写进了
 `check:capture-shape`，而它指向的 `scripts/check-capture-shape.mjs` **还是未跟踪状态**
