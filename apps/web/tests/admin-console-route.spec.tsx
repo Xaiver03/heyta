@@ -245,6 +245,8 @@ describe('🔴 非管理员 / 未登录在 /admin 上', () => {
     expect(el.querySelectorAll('.ht-settings__console-navItem').length).toBe(0);
     // 403 也不给「登录」：那个人已经登录了，问题在权限（`canSignInFrom`）。
     expect(el.querySelector('[data-testid="admin-console-signin"]')).toBeNull();
+    // 🔴 也不许自动把登录面摆上来 —— 已经登录的人面前再要一次票，是一句谎。
+    expect(el.querySelector('.ht-sheet__auth'), '403 那一格不该自动出现登录面').toBeNull();
   });
 
   it('没有令牌 ⇒ 一个后台请求都不发，并说明"尚未登录"', async () => {
@@ -257,26 +259,41 @@ describe('🔴 非管理员 / 未登录在 /admin 上', () => {
     expect(el.textContent).toContain('尚未登录');
   });
 
-  it('🔴 未登录 ⇒ 不画分区导航，给一条能点的登录出路（ADR-0078 D3/D4）', async () => {
+  it('🔴 未登录 ⇒ 不画分区导航，且**登录界面默认就在场**（ADR-0078 D4 + 2026-11-04 同一位负责人收窄）', async () => {
     useSyncStore.setState({ token: undefined });
     const { el, seen } = await render(200);
 
     // 分区名是后台的结构信息，非管理员看不到。
     expect(el.querySelectorAll('.ht-settings__console-navItem').length).toBe(0);
 
+    // 🔴 这一条是那次收窄的本体：不许"先看见后台、再自己找那枚按钮"。
+    expect(el.querySelector('.ht-sheet__auth'), '未登录进来第一眼就该是登录界面').not.toBeNull();
+    // 出路按钮此时**不画** —— 它只在他主动关掉登录面之后才回来（下一条）。
+    expect(el.querySelector('[data-testid="admin-console-signin"]')).toBeNull();
+    // 登录面在场本身不该发任何后台请求。
+    expect(seen.filter((url) => url.includes('/api/admin'))).toHaveLength(0);
+  });
+
+  it('🔴 主动关掉登录面 ⇒ 退回「一句原因 + 一条出路」，而且那条出路还点得开', async () => {
+    useSyncStore.setState({ token: undefined });
+    const { el } = await render(200);
+
+    await act(async () => {
+      // 按 Esc 关，不锚某一支的关闭钮：官方地址那一支是 `central-auth-close`，
+      // 自带端点那一支是 RN `AuthForm` 的 `${testID}-close` —— 锚任何一枚都会在另一支里变 null。
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(el.querySelector('.ht-sheet__auth')).toBeNull();
     const button = el.querySelector<HTMLButtonElement>('[data-testid="admin-console-signin"]');
-    expect(button).not.toBeNull();
-    expect(button!.textContent).toContain('登录');
+    expect(button, '关掉了不能变成没门').not.toBeNull();
 
     await act(async () => {
       button!.click();
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
-
-    // 就地开的是**同一份** AuthPanel（`features/auth` 的唯一实现），不是跳回主应用。
     expect(el.querySelector('.ht-sheet__auth')).not.toBeNull();
-    // 打开登录面板本身不该发任何后台请求。
-    expect(seen.filter((url) => url.includes('/api/admin'))).toHaveLength(0);
   });
 
   it('登录入口只在「没有会话 / 会话过期」两格出现', () => {

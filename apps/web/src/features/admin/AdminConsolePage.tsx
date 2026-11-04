@@ -21,8 +21,9 @@
  * 所以这里按 `access` 给出原因，并把服务端那句原话念出来
  * （词条在 `web.admin.error.*`，界面不自己编一条更客气的说法）。
  *
- * 但**分区导航只对管理员画**（ADR-0078 D4，产品负责人 2026-10-30 拍板）：
- * 非管理员（含匿名）看到的是标题 + 原因 + 可选的一条出路，看不到后台有哪 11 个分区。
+ * 但**分区导航只对管理员画**（ADR-0078 D4，产品负责人 2026-10-30 拍板；
+ * 2026-11-04 同一位负责人把它再收窄一次，见下面「默认就在场」那一节）：
+ * 非管理员（含匿名）看不到后台有哪 11 个分区。
  *
  * ⚠️ 这些说明是**呈现**，不是安全措施：挡不住任何手工构造的请求，
  * 那本来由 `requireAdmin` 管。
@@ -33,12 +34,17 @@
  * 不初始化 op-log。它的数据全部是服务端 HTTP，而本地库是 OPFS 上的 SQLite ——
  * 主应用在另一张标签页里开着时，那条排他锁会让后台落进「无法初始化本地存储」。
  *
- * ## 未登录 / 会话过期 ⇒ 就地登录
+ * ## 未登录 / 会话过期 ⇒ 就地登录，而且**默认就在场**
  *
  * 这里挂的是**同一份** `AuthPanel`（`features/auth` 的唯一实现，自带 CSS 与
  * `HeytaUiProvider`），不是"跳回主应用 `?signin`"—— 那条路由本身要建本地库，
  * 会在本页刚绕开的那个锁上再撞一次。登录成功后重新 `probe()`（`clientOptions()`
  * 每次调用都现读令牌，所以那次重判一定用的是新会话）。
+ *
+ * 🔴 「先看到后台，再自己找那枚登录按钮」这一格已按产品负责人 2026-10-29 的话收窄：
+ * 没会话的人进来第一眼就是登录面。只有他**主动**把登录面关掉，才退回
+ * 「一句原因 + 一条出路」那一格（出路还是同一条，不是第二条）。
+ * 追记写在 [ADR-0078](../../../../docs/adr/0078-admin-console-boots-without-local-store.md) 的 D4。
  *
  * ## 探测由 `AdminPanel` 拥有，不在这里重复
  *
@@ -70,9 +76,14 @@ export function AdminConsolePage(): React.JSX.Element {
   const networkAllowed = useNetworkAllowed();
   const baseUrl = useSyncStore((s) => s.baseUrl);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [loginDismissed, setLoginDismissed] = useState(false);
 
   // 403 不给登录入口：那个人已经登录了，问题在权限（见 `canSignInFrom`）。
   const showSignIn = canSignInFrom(store.errorKey);
+  // 🔴 没登录就**先落在登录界面**，不要他先看见后台再自己找那枚按钮
+  // （产品负责人 2026-10-29 收窄 ADR-0078 D4 那格；追记写在那份 ADR 里）。
+  // 只有他主动把登录面关掉，才退回"一句原因 + 一条出路"那一格。
+  const forcedSignIn = networkAllowed && access !== 'admin' && showSignIn && !loginDismissed;
 
   return (
     <div className="ht-settings__console" data-testid="admin-console">
@@ -135,7 +146,7 @@ export function AdminConsolePage(): React.JSX.Element {
                       {t(store.errorKey as MessageKey)}
                     </p>
                   )}
-                  {showSignIn && (
+                  {showSignIn && !forcedSignIn && (
                     <button
                       type="button"
                       className="ht-settings__console-action"
@@ -156,13 +167,21 @@ export function AdminConsolePage(): React.JSX.Element {
         </main>
       </div>
 
-      {/* 未登录 / 会话过期就地登录：同一份 `AuthPanel`，不跳回主应用（见文件头）。 */}
-      {loginOpen && (
+      {/*
+       * 未登录 / 会话过期就地登录：同一份 `AuthPanel`，不跳回主应用（见文件头）。
+       * 🔴 `forcedSignIn` 那一半就是"先拦截"那一条：没会话时它**自己就在场**，
+       * 不等人去点；`loginOpen` 那一半是他关掉之后从「登录」那条出路重新打开的。
+       */}
+      {(forcedSignIn || loginOpen) && (
         <AuthPanel
           baseUrl={baseUrl}
-          onClose={() => setLoginOpen(false)}
+          onClose={() => {
+            setLoginOpen(false);
+            setLoginDismissed(true);
+          }}
           onSignedIn={() => {
             setLoginOpen(false);
+            setLoginDismissed(false);
             void store.probe();
           }}
         />

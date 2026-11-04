@@ -616,9 +616,9 @@ test.describe('/admin 这个地址（真浏览器）', () => {
     await expect(admin.getByTestId('admin-console')).toBeVisible();
     // 崩溃屏一句话都不许出现 —— 那正是本用例修掉的那一屏。
     await expect(admin.getByText('无法初始化本地存储')).toHaveCount(0);
-    // 没塞凭据 ⇒ 后台说"尚未登录"并给登录出路，而不是停在"加载中"。
+    // 没塞凭据 ⇒ 后台说"尚未登录"，并且**登录界面就在场**，而不是停在"加载中"。
     await expect(admin.getByTestId('admin-console-reason')).toContainText('尚未登录');
-    await expect(admin.getByTestId('admin-console-signin')).toBeVisible();
+    await expect(admin.locator('.ht-sheet__auth')).toBeVisible();
 
     await admin.screenshot({ path: `${EVIDENCE}/admin-route-two-tabs.png`, fullPage: true });
 
@@ -666,7 +666,7 @@ test.describe('/admin 这个地址（真浏览器）', () => {
     await admin.screenshot({ path: `${EVIDENCE}/admin-route-two-tabs-logged-in.png`, fullPage: true });
   });
 
-  test('🔴 未登录：分区导航不画，登录入口点开就是同一个 AuthPanel', async ({ page }) => {
+  test('🔴 未登录：分区导航不画，**登录界面默认就在场**（ADR-0078 D4 + 2026-11-04 收窄）', async ({ page }) => {
     await pinChineseUi(page);
     await page.goto('/admin');
     await decidePrivacyConsent(page, 'accepted');
@@ -677,10 +677,23 @@ test.describe('/admin 这个地址（真浏览器）', () => {
     await expect(page.locator('.ht-settings__console-navItem')).toHaveCount(0);
     await expect(page.getByTestId('admin-console-reason')).toContainText('尚未登录');
 
-    await page.getByTestId('admin-console-signin').click();
-    // 同一份 AuthPanel（`features/auth` 的唯一实现）就地打开。
+    // 🔴 这一条是那次收窄的本体：同一份 AuthPanel（`features/auth` 的唯一实现）
+    // **不需要先看见后台再自己找按钮**。
     await expect(page.locator('.ht-sheet__auth')).toBeVisible();
+    // 出路按钮此时不画 —— 它只在登录面被主动关掉之后才回来。
+    await expect(page.getByTestId('admin-console-signin')).toHaveCount(0);
 
     await page.screenshot({ path: `${EVIDENCE}/admin-route-anonymous-signin.png`, fullPage: true });
+
+    // 反向那一格：关掉之后必须还剩一条出路，且那条出路点开还是同一面。
+    // 按 Esc 关，不锚某一支才有的关闭钮（官方地址那一支与自带端点那一支的钮不是同一枚）。
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.ht-sheet__auth')).toHaveCount(0);
+    const wayBack = page.getByTestId('admin-console-signin');
+    await expect(wayBack, '关掉了不能变成没门').toBeVisible();
+    await wayBack.click();
+    await expect(page.locator('.ht-sheet__auth')).toBeVisible();
+
+    await page.screenshot({ path: `${EVIDENCE}/admin-route-anonymous-signin-dismissed.png`, fullPage: true });
   });
 });
