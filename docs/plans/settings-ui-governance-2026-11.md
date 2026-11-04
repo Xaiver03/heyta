@@ -153,9 +153,11 @@
 2. ~~"`settings-row-grammar` 这类 e2e 一枚都不在 `pnpm check` 链里，新建的暗色 spec 同样会 0 次执行"~~ ——
    这句是**按别名名字去 grep** 读出来的，而链里那枚 `check:ai-e2e` 跑的是 `pnpm --dir e2e run test`
    （默认 `playwright.config.ts`，`testDir: ./tests`）。现量：`pnpm --dir e2e exec playwright test --list`
-   ⇒ **510 条 / 134 个文件**，其中 `settings-row-grammar` 7 条、`settings-form-alignment` 2 条、
-   `narrow-sweep` 10 条、`theme-switch-contrast` 1 条、`account-email-change-and-sessions` 7 条
-   （逐枚复量：`pnpm --dir e2e exec playwright test --list | grep -c "› <文件名>"`）。
+   ⇒ 总数 **510 条 / 134 个文件**（本线那条四象限进去之后同一趟读到 512 —— **这个数每批都会动，要现量别抄这里**：
+   `pnpm --dir e2e exec playwright test --list | tail -1`），其中 `settings-row-grammar` 7 条、
+   `settings-form-alignment` 2 条、`narrow-sweep` 10 条、`theme-switch-contrast` 1 条、
+   `account-email-change-and-sessions` 7 条（本线那条进去后是 8 条）。
+   逐枚复量：`pnpm --dir e2e exec playwright test --list | grep -c "› <文件名>"`。
    **所以这一族不需要新的接线，也不需要谁裁决"哪条 check 跑 e2e"** —— 写新 spec 就自动有人跑。
    教训与 `docs/agents/` 那条"一把尺在某处读 0，只说明它扫的那套写法里没有"是同一件事：
    这次扫的是**别名名字**，而消费方是**整条 e2e 套**。
