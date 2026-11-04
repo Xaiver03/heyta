@@ -120,6 +120,23 @@ export function CloseAccountPanel(): React.JSX.Element | null {
     <div className="ht-settings" data-testid="close-account-panel">
       <h2 className="ht-settings__title ht-type-section-title">
         <ShieldX size={ICON_SIZE.sm} aria-hidden="true" /> {t('common.accountClosure.title')}
+        {/*
+          这两句原来是注销卡片顶上的两行小字（2026-10-24 禁令后进 `?`）。
+          它们说的是"会发生什么"，而卡片自己的标题已经点明这件事 ⇒ `?` 挂在**节标题**旁，
+          与 Passkey / Sessions / Password 三屏同一个写法（原来它排在卡片第一个孩子的位置，
+          屏幕上是一枚没有归属的问号）。
+        */}
+        <SettingsInfoTip
+          testId="tip-close-account"
+          label={t('common.accountClosure.lead')}
+          text={
+            <>
+              {t('common.accountClosure.lead')}
+              {' '}
+              {t('common.accountClosure.exportHint')}
+            </>
+          }
+        />
       </h2>
       {!signedIn ? (
         <SettingsAccountGate
@@ -128,22 +145,6 @@ export function CloseAccountPanel(): React.JSX.Element | null {
         />
       ) : (
         <div className="ht-settings__danger-card">
-          {/*
-            这两句原来是注销卡片顶上的两行小字（2026-10-24 禁令后进 `?`）。
-            它们说的是"会发生什么"，而卡片自己的标题已经点明这件事。
-          */}
-          <SettingsInfoTip
-            testId="tip-close-account"
-            label={t('common.accountClosure.lead')}
-            text={
-              <>
-                {t('common.accountClosure.lead')}
-                {' '}
-                {t('common.accountClosure.exportHint')}
-              </>
-            }
-          />
-
           {pending !== undefined && pending > 0 ? (
             <p className="ht-settings__danger" role="alert" data-testid="close-account-pending">
               <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />

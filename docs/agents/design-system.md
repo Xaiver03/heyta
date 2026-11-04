@@ -179,9 +179,9 @@ React Native 的 `View` 默认 `flex: 0 0 auto`（与 CSS 的 `0 1 auto` **不�
 
 > ⚠️ 两件事一起做才算闭环：① `SettingsSection` 原来**没有**能把 `?` 挂到分组标题旁边的口子，
 >    宿主只能把它当 children 排在整组之后 —— 那个缺口现在由 `titleTip` 补上（与 `FormField.labelTip` 对应）；
->    ② 存量 4 处（`CloseAccountPanel` / `InboundAutomationSettings` ×2 / `ProfileOverview`）进账本
->    `scripts/settings-tip-ledger.json`，**只减不增**：新增一枚即红，缩了不回来改账本也红。
->    那 4 处归各自那一屏，本线不代改；改法是上面那张表里的某一种。
+>    ② 存量（**处数只由 `cat scripts/settings-tip-ledger.json` 给**）进账本，**只减不增**：
+>    新增一枚即红，缩了不回来改账本也红。账本里剩的都是各自那一屏的格子，本线不代改。
+>    那几处合法的改法就是上面那张表里的某一种。
 
 ⚠️ 这三条约束的是**位置与重复**，不是"每行都要挂问号"：没有值得问的句子就不挂。
 删掉解释**不会**违反上面的禁令（禁令管的是"不许内联"，不是"必须有 `?`"）。

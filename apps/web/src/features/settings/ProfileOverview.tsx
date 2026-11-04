@@ -54,6 +54,15 @@ export function ProfileOverview({
         <div className="ht-settings__profile-identity-copy">
           <h2 className="ht-type-section-title" id="profile-center-identity-title">
             {identity.displayName ?? identity.email ?? t('web.profile.overview.local')}
+            {/*
+              这句解释的是这一节本身（"这台设备上的资料不会上传"），所以挂在节标题旁 ——
+              原来它排在状态行之后当独立一块，屏幕上是一枚没有归属的问号。
+            */}
+            <SettingsInfoTip
+              testId="tip-profile-local-only"
+              label={t('web.profile.overview.title')}
+              text={t('web.profile.overview.localOnly')}
+            />
           </h2>
           {identity.displayName && identity.email ? (
             <p className="ht-settings__profile-note" role="status">{identity.email}</p>
@@ -79,11 +88,6 @@ export function ProfileOverview({
               </button>
             </div>
           ) : null}
-          <SettingsInfoTip
-            testId="tip-profile-local-only"
-            label={t('web.profile.overview.title')}
-            text={t('web.profile.overview.localOnly')}
-          />
           {identity.avatarState === 'unreadable' ? (
             <p className="ht-settings__profile-note" role="status">
               {t('common.profile.avatar.unreadable')}
