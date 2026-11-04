@@ -42,6 +42,7 @@ import { emailChangeStage, type HostedAuthFailureReason } from '@heyta/app-host'
 import { ICON_SIZE } from '@heyta/design-system';
 
 import { useSyncStore } from '../sync/store.js';
+import { FormField } from '../../lib/form/FormField.js';
 import { useEmailChangeStore, type EmailChangeRequestFailure } from './emailChangeStore.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
 
@@ -281,55 +282,68 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
         过了冷却窗口才回到这张表 —— 那正是"可以重新发两封信"的时刻。
       */}
       {cooldownSecondsLeft === undefined ? (
-        <div className="ht-settings__field" data-testid="email-change-form">
-          <label className="ht-settings__item-label" htmlFor="email-change-new">
-            {t('common.emailChange.newLabel')}
-          </label>
-          <div className="ht-settings__actions">
-            <input
-              id="email-change-new"
-              className="ht-input"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              // 🔴 这台应用的输入框按现行控件风格**没有边框**，而 `.ht-input { flex: 1 }`
-              // 让这一格横向铺满整行 —— 空着的时候那一片就是白的。占位文字是唯一
-              // "这里可以输入"的线索（真浏览器截图实测出来的，见计划 §6.4）。
-              placeholder={t('common.emailChange.newPlaceholder')}
-              data-testid="email-change-new"
-              value={draft}
-              aria-invalid={localMissing}
-              onChange={(event) => {
-                setDraft(event.target.value);
-                setLocalMissing(false);
-                dismissNotices();
-              }}
-            />
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
-              data-testid="email-change-submit"
-              // 忙态用 guard（见 `emailChangeStore.request` 第一行），不用 disabled。
-              onClick={() => {
-                if (!activeRef.current) return;
-                if (draft.trim() === '') {
-                  setLocalMissing(true);
-                  return;
-                }
-                setLocalMissing(false);
-                dismissNotices();
-                void request(baseUrl, token, draft, locale);
-              }}
-            >
-              {requesting ? (
-                <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
-              ) : (
-                <Mail size={ICON_SIZE.xs} aria-hidden="true" />
-              )}{' '}
-              {requesting ? t('common.emailChange.busy') : t('common.emailChange.submit')}
-            </button>
-          </div>
-        </div>
+        /*
+          🔴 这一格走共享字段解剖 `FormField`（2026-11-04，治理计划 G-4）。
+          `layout="inline"` 是设置/属性面板那一档（`ux-principles.md` §1），
+          而 `id` / `htmlFor` 由 FormField 从 `id` prop 生成 —— 原来这里是手拼的
+          `id="email-change-new"` + `<label htmlFor>`，正是 `FormField` 注释里
+          「全仓不许再手拼字符串 id」点名的形状。
+          ⚠️ 缺的 `aria-required` / `aria-invalid` / `aria-describedby` 由 `fieldProps` 供，
+          不再靠调用方自己记得挂。
+        */
+        <FormField
+          id="email-change-new"
+          label={t('common.emailChange.newLabel')}
+          layout="inline"
+          testID="email-change-form"
+        >
+          {(fieldProps) => (
+            <div className="ht-settings__actions">
+              <input
+                {...fieldProps}
+                className="ht-input"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                // 🔴 这台应用的输入框按现行控件风格**没有边框**，而 `.ht-input { flex: 1 }`
+                // 让这一格横向铺满整行 —— 空着的时候那一片就是白的。占位文字是唯一
+                // "这里可以输入"的线索（真浏览器截图实测出来的，见计划 §6.4）。
+                placeholder={t('common.emailChange.newPlaceholder')}
+                data-testid="email-change-new"
+                value={draft}
+                aria-invalid={localMissing}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  setLocalMissing(false);
+                  dismissNotices();
+                }}
+              />
+              <button
+                type="button"
+                className="ht-btn ht-btn--primary"
+                data-testid="email-change-submit"
+                // 忙态用 guard（见 `emailChangeStore.request` 第一行），不用 disabled。
+                onClick={() => {
+                  if (!activeRef.current) return;
+                  if (draft.trim() === '') {
+                    setLocalMissing(true);
+                    return;
+                  }
+                  setLocalMissing(false);
+                  dismissNotices();
+                  void request(baseUrl, token, draft, locale);
+                }}
+              >
+                {requesting ? (
+                  <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                ) : (
+                  <Mail size={ICON_SIZE.xs} aria-hidden="true" />
+                )}{' '}
+                {requesting ? t('common.emailChange.busy') : t('common.emailChange.submit')}
+              </button>
+            </div>
+          )}
+        </FormField>
       ) : null}
 
       <div aria-live="polite" data-testid="email-change-live">
