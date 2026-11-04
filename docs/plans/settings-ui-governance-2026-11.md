@@ -353,7 +353,7 @@
 | W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
 | W1（本轮） | G-4 迁移那一半 | ✅ 四格字段迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令）+ 一格行迁 `trailing` 档（SessionsPanel）；账本逐次收缩，现量 `cat scripts/settings-row-anatomy-ledger.json` |
 | W2 | G-6 位置尺进链 | ✅ `check:tip-adjacency` 的定义与链上那一节已入库，同批把本线四枚同族尺的定义都带上 `--self-test` 臂（做法与卡点见 G-6 第三半）|
-| W2 | G-4 的 mobile 那一格 | 🔴 **不是欠看图腿，是欠别人一枚判据**（BLOCKED B260）：`apps/mobile/tests/account-security-wiring.spec.ts:152` 按**源码文本切三元**（`indexOf('{session.current ? (')`），而 `trailing` 档的正确写法（提示句进 `note`、按钮进 `actions`）会把这个字面量整块消掉。三种写法本线都排过：设计正确的 ⇒ 判据红；保住字面量的 ⇒ 二十多字提示被挤进右列，而本机没有能签字的移动端看图腿；靠文本相邻蒙过正向对照的 ⇒ 判据的牙被悄悄磨掉没人签字。归注册登录线（`b6581174f` 立的那四条），改完本线立刻迁 |
+| W2 | G-4 的 mobile 那一格 | 🔴 **不是欠看图腿，是欠别人一枚判据**（BLOCKED B260）：`apps/mobile/tests/account-security-wiring.spec.ts:152` 按**源码文本切三元**（`indexOf('{session.current ? (')`），而 `trailing` 档的正确写法（提示句进 `note`、按钮进 `actions`）会把这个字面量整块消掉。三种写法本线都排过：设计正确的 ⇒ 判据红；保住字面量的 ⇒ 二十多字提示被挤进右列，而本机没有能签字的移动端看图腿；靠文本相邻蒙过正向对照的 ⇒ 判据的牙被悄悄磨掉没人签字。归注册登录线（`b6581174f` 立的那四条），改完本线立刻迁。**这一格不需要产品决策**：web 那格「这台设备」是按钮禁用、mobile 是不画按钮，看着不一致，但 `actions` 按契约就是宿主渲染的那一格，G-4 要的是行骨架只有一份，不是两端动作一致（B260 追记 ①）|
 | W2 | 暗色两档的常驻看图腿 | ✅ 做成了**四象限一条用例**（亮/暗 × 1440/375，八张图 12–19，四把尺每格各量一遍；`account-email-change-and-sessions.spec.ts` 第 8 条）。原先那一行是三个批次三个场景拼出来的读数，四格量的不是同一件事。抓到并修掉确认复选框被画进标签列那一格。**这一行原来那句"设置面那几枚 e2e 一枚都不在链里"是假的** —— 链里 `check:ai-e2e` 跑整条默认套（现量 `pnpm --dir e2e exec playwright test --list` 的总数），新 spec 自动有人跑，不需要额外裁决 |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
