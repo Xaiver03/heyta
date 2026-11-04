@@ -379,8 +379,12 @@ export {
  * 取 token，所以用了它们的宿主必须挂在 `<HeytaUiProvider>` 之内。
  *
  * ✅ **已登记进 `scripts/check-ui-provider.mjs` 的 `PROVIDER_DEPENDENT`**
- * （2026-10-05 核实）。宿主把它们放在 `<HeytaUiProvider>` 之外
- * **会红**，而且报错会指名文件与行号。
+ * （2026-10-05 核实）。
+ * ⚠️ 但"放在 Provider 之外**会红**"这句**有边界**：那把尺按**文件**近似（它自己
+ * 写着"不覆盖①"）。2026-11-04 在 `SessionsPanel.tsx` 现量：拆掉包 `<SettingsSection>`
+ * 的那层 Provider 后 `node scripts/check-ui-provider.mjs` 仍 rc=0（同文件另有一处
+ * Provider 子树盖住了它），红的是 `tests/account-security.spec.tsx`（8 条）。
+ * ⇒ 宿主**自带那一层不能省**，这一处守住它的是测试，不是这把尺。
  *
  * ⚠️ **这一段曾经写着"尚未登记"，而那句后来变成了假话。** 它当时是实测为真的
  * （补登记尚未做），但补上之后**没有人回来改注释** —— 于是文件里留下了一条
@@ -404,6 +408,7 @@ export {
   type PendingUploadPresentation,
   type SettingAvailability,
   type SettingsActionRow,
+  type SettingsTrailingRow,
   type SettingsHeadingRow,
   type SettingsNoteRow,
   type SettingsRowModel,

@@ -88,14 +88,22 @@
  * 与 `ConflictResolutionView.tsx` 文件头记的同一个取舍。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 🔴 宿主必须把它包在 `<HeytaUiProvider>` 之内
+ * 🔴 宿主必须把它包在 `<HeytaUiProvider>` 之内 —— 但**别指望门禁替你守着这一条**
  *
- * ⚠️ 本组件**尚未登记进** `scripts/check-ui-provider.mjs` 的
- * `PROVIDER_DEPENDENT` 清单（那个脚本不在本刀白名单里）——
- * 需要补的两个符号是 **`SettingsSection`** 与 **`SettingsRow`**。
- * 补登记之前门禁不覆盖它：宿主拆掉 Provider **也不会红**，而运行时会抛
- * 「useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用。」
- * （第四刀补登记那一次的根因与后果写在那个脚本的注释里。）
+ * `SettingsSection` / `SettingsRow` **已登记进** `scripts/check-ui-provider.mjs`
+ * 的 `PROVIDER_DEPENDENT`（登记的是宿主写的 JSX 符号，不是文件名 `Settings.tsx`）。
+ *
+ * ⚠️ 2026-11-04 现量：把那层 Provider 从 `SessionsPanel.tsx` 拆掉后
+ * `node scripts/check-ui-provider.mjs` **仍 rc=0** —— 那个脚本按**文件**近似
+ * （它自己写着"不覆盖①"），同一文件里还有别的 Provider 子树就盖住了这一处。
+ * 同一次变异里 `npx vitest run tests/account-security.spec.tsx` 红了 8 条
+ * （`useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用`）。
+ * ⇒ **面板内自带这一层不是装饰**：独立挂载（单测、单面板预览）时它是唯一防线，
+ *    而现在守住它的是测试，不是那把尺。
+ *
+ * ⚠️ 这一段曾经写着"尚未登记，请补"。那句当时为真，补完之后没人回来改注释，
+ * 于是文件里留下一条与事实相反的指令 —— 本仓反复吃这个形状：**注释不是判据，
+ * 状态一变它就变成错误信息**。要核当前状态读 `PROVIDER_DEPENDENT` 本身。
  */
 
 import React, { useMemo, useState } from 'react';
@@ -114,6 +122,7 @@ import {
   settingsRowKey,
   shouldRenderSettingsRow,
   type SettingsActionRow,
+  type SettingsTrailingRow,
   type SettingsHeadingRow,
   type SettingsNoteRow,
   type SettingsRowModel,
@@ -384,6 +393,8 @@ export function SettingsRow({ row, styles, testID }: SettingsRowProps): React.JS
       return <ToggleLine row={row} styles={active} testID={testID} />;
     case 'action':
       return <ActionLine row={row} styles={active} testID={testID} />;
+    case 'trailing':
+      return <TrailingLine row={row} styles={active} testID={testID} />;
     case 'note':
       return <NoteLine row={row} styles={active} testID={testID} />;
     case 'heading':
@@ -464,6 +475,44 @@ function ValueLine({
     >
       {body}
     </Pressable>
+  );
+}
+
+/* ---- 尾随动作行 ------------------------------------------------------- */
+
+function TrailingLine({
+  row,
+  styles,
+  testID,
+}: {
+  readonly row: SettingsTrailingRow;
+  readonly styles: SettingsStyles;
+  readonly testID?: string | undefined;
+}): React.JSX.Element {
+  const tokens = useHeytaTokens();
+  const text = useHeytaText();
+
+  return (
+    <View testID={row.testID ?? testID} style={styles.row}>
+      <View style={styles.body}>
+        {row.label === undefined ? null : (
+          <View style={styles.actionHead} testID={row.labelTestID}>
+            {row.leading === undefined ? null : row.leading}
+            <Text style={[text['row-title'], styles.dynamic, { color: tokens['color.foreground'] }]}>
+              {row.label}
+            </Text>
+          </View>
+        )}
+        {row.meta ?? null}
+        {/*
+          🔴 `note` 直接画，**不进 `?`**：它是"这一行现在是什么状态"的反馈
+          （如"这台就是你现在用的设备，所以这里没有出口"），
+          而 `docs/agents/design-system.md` 的禁令例外①写的就是反馈那一族。
+        */}
+        {row.note ?? null}
+      </View>
+      {row.actions}
+    </View>
   );
 }
 

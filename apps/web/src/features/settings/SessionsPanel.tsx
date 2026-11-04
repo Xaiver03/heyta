@@ -40,7 +40,7 @@ import { SettingsInfoTip } from './SettingsInfoTip.js';
 import { AlertTriangle, CheckCircle2, Loader2, LogOut, RefreshCw } from 'lucide-react';
 
 import { useI18n, type Locale } from '@heyta/i18n';
-import { EmptyState, HeytaUiProvider } from '@heyta/ui';
+import { EmptyState, HeytaUiProvider, SettingsSection } from '@heyta/ui';
 import { ICON_SIZE } from '@heyta/design-system';
 import type { SessionSummary } from '@heyta/shared-schema';
 
@@ -217,65 +217,87 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
             </p>
           )}
 
-          {sessions?.map((session) => {
-            const label = rowLabel(session);
-            const revoking = revokingId === session.sessionId;
-            return (
-              <section
-                className="ht-settings__section ht-settings__credential"
-                key={session.sessionId}
-                data-testid={`session-row-${session.sessionId}`}
-              >
-                <div className="ht-settings__credential-main">
-                  {label === undefined ? null : (
-                    <p className="ht-settings__item-label" data-testid={`session-label-${session.sessionId}`}>
-                      {label}
-                    </p>
-                  )}
-                  {session.current && (
-                    <p
-                      className="ht-settings__item-label"
-                      data-testid={`session-current-${session.sessionId}`}
-                    >
-                      {t('common.sessions.thisDevice')}
-                    </p>
-                  )}
-                  <p className="ht-settings__credential-meta">
-                    {t('common.sessions.signedInSince')} {formatWhen(session.createdAt, locale)}
-                    {' · '}
-                    {t('common.sessions.lastSeen')} {formatWhen(session.lastSeenAt, locale)}
-                  </p>
-                  {/* 🔴 这台就是正在用的设备 ⇒ 撤销它的出口不在这里（文件头第 2 条）。 */}
-                  {session.current && (
-                    <p className="ht-settings__hint" role="status" data-testid={`session-hint-${session.sessionId}`}>
-                      {t('common.sessions.currentHint')}
-                    </p>
-                  )}
-                </div>
-                <div className="ht-settings__actions">
-                  <button
-                    type="button"
-                    className="ht-btn ht-btn--ghost"
-                    data-testid={`session-revoke-${session.sessionId}`}
-                    // 这一行的按钮禁用，**不影响**别的行；current 那一行永远禁用。
-                    disabled={session.current || revoking}
-                    onClick={() => {
-                      if (!activeRef.current) return;
-                      dismissNotices();
-                      void revoke(baseUrl, token, session.sessionId);
-                    }}
-                  >
-                    {revoking ? (
-                      <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
-                    ) : (
-                      <LogOut size={ICON_SIZE.xs} aria-hidden="true" />
-                    )}{' '}
-                    {revoking ? t('common.sessions.busy') : t('common.sessions.revoke')}
-                  </button>
-                </div>
-              </section>
-            );
-          })}
+          {/*
+            🔴 会话行走**共享那一个实现**（`SettingsRowModel` 的 `trailing` 档，
+            2026-11-04 治理计划 G-4）。之前 web 与移动端**各写一遍**这个形状
+            （web 用 `__section __credential` + `__credential-main`；
+            `apps/mobile/src/screens/SessionsSection.tsx` 自己手搓 Pressable）。
+
+            为什么是 `trailing` 而不是 `action`：`action` 档让**整行**可点，
+            语义是"这一行是一个入口"；而这一行是**一个对象**（一台设备）带着几行事实，
+            外加一个只对得起那个对象的撤销动作 —— 整行可点会把"选中这行"与
+            "撤销这台设备"混成同一个手势，而那两者代价完全不同。
+
+            ⚠️ `label` 缺省时共享层**不画那一格**（不是画个空串、更不是编一个
+            "未命名设备"），`labelTestID` 就是给这条判据锚点用的。
+          */}
+          {sessions !== undefined && sessions.length > 0 && (
+            <HeytaUiProvider>
+              <SettingsSection
+                rows={sessions.map((session) => {
+                  const label = rowLabel(session);
+                  const revoking = revokingId === session.sessionId;
+                  return {
+                    kind: 'trailing' as const,
+                    testID: `session-row-${session.sessionId}`,
+                    label,
+                    labelTestID: `session-label-${session.sessionId}`,
+                    meta: (
+                      <>
+                        {session.current ? (
+                          <p
+                            className="ht-settings__item-label"
+                            data-testid={`session-current-${session.sessionId}`}
+                          >
+                            {t('common.sessions.thisDevice')}
+                          </p>
+                        ) : null}
+                        <p className="ht-settings__credential-meta">
+                          {t('common.sessions.signedInSince')} {formatWhen(session.createdAt, locale)}
+                          {' · '}
+                          {t('common.sessions.lastSeen')} {formatWhen(session.lastSeenAt, locale)}
+                        </p>
+                      </>
+                    ),
+                    // 🔴 这台就是正在用的设备 ⇒ 撤销它的出口不在这里（文件头第 2 条）。
+                    // 这句是**反馈**不是说明，所以留在行内、不进 `?`。
+                    note: session.current ? (
+                      <p
+                        className="ht-settings__hint"
+                        role="status"
+                        data-testid={`session-hint-${session.sessionId}`}
+                      >
+                        {t('common.sessions.currentHint')}
+                      </p>
+                    ) : null,
+                    actions: (
+                      <div className="ht-settings__actions">
+                        <button
+                          type="button"
+                          className="ht-btn ht-btn--ghost"
+                          data-testid={`session-revoke-${session.sessionId}`}
+                          // 这一行的按钮禁用，**不影响**别的行；current 那一行永远禁用。
+                          disabled={session.current || revoking}
+                          onClick={() => {
+                            if (!activeRef.current) return;
+                            dismissNotices();
+                            void revoke(baseUrl, token, session.sessionId);
+                          }}
+                        >
+                          {revoking ? (
+                            <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                          ) : (
+                            <LogOut size={ICON_SIZE.xs} aria-hidden="true" />
+                          )}{' '}
+                          {revoking ? t('common.sessions.busy') : t('common.sessions.revoke')}
+                        </button>
+                      </div>
+                    ),
+                  };
+                })}
+              />
+            </HeytaUiProvider>
+          )}
 
           {justRevoked && (
             <p className="ht-settings__notice" role="status" data-testid="sessions-revoked">
