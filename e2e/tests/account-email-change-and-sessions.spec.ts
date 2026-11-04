@@ -610,16 +610,20 @@ test('🔴 反证：改密那条路由 500 时不许画成"已修改"（读失�
 });
 
 /*
-  暗色两档的常驻看图腿（治理计划 G-4 收尾，2026-11-04）。
+  四象限的常驻看图腿（治理计划 G-4 收尾，2026-11-04）。
 
-  为什么这一条存在：本批把头像 / 昵称 / 邮箱三格迁进共享契约，而看图腿此前只覆盖
-  **亮色**（`docs/plans/settings-ui-governance-2026-11.md` 四象限那行写着"暗色两档 = 没做像素级看图"）。
-  暗色此前本线的现量只有"没有新增颜色字面量"—— 那是**间接**证据，不等于"暗色下画得出来"。
+  为什么这一条存在：本批把头像 / 昵称 / 邮箱三格迁进共享契约，而计划里"四象限都看过"那句
+  原本是**三个不同批次、三个不同场景**拼出来的读数（1440 亮 = 上一批的账号套图，
+  375 亮 = `narrow-settings.png` 那个别的场景，暗色两档 = 没做）。
+  那一行还写着"暗色这一格的现量是没有新增颜色字面量"—— 那是**间接**证据，
+  否证不了"暗色下画不出来"，而暗色最典型的事故（文字与底同色）恰恰不动任何字面量。
 
-  🔴 它不只是拍图，两条能判红的断言：
-    · 暗色下文字必须**比底亮**（文字与底同色是暗色最容易出的事故，而它不会让任何一条亮色判据变红）；
-    · 三格行容器必须**同一个左缘与同一个宽度**，且整行不许超出面板右缘（窄档溢出就是这么露出来的）。
-  ⚠️ 图与亮色那十一张同目录、同纪律（受版本控制，`e2e/test-results/` 里不留东西）。
+  🔴 它不只是拍图，四把能判红的尺：
+    · 文字与底的**亮度差方向**必须对（暗色文字更亮、亮色文字更暗）；
+    · 三格行容器**同一个左缘与同一个宽度**（本批要消掉的就是"同一屏两种起点"）；
+    · 整行不许超出浮层右缘（窄档溢出就是这么露出来的）；
+    · 确认复选框的盒子不被拉伸、且与它那句话相邻（看图时抓到过一整列宽的分离）。
+  ⚠️ 图与账号套其余各张同目录、同纪律（受版本控制，`e2e/test-results/` 里不留东西）。
 */
 
 type Swatch = { readonly color: string; readonly bg: string };
@@ -639,7 +643,10 @@ function luminOf(cssColor: string): number {
   return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
 }
 
-test('暗色两档看图腿：迁进共享契约的三格在 1440 与 375 的暗色下画得出来、文字比底亮', async ({
+/** 四象限各两张图的编号：暗色那四张先入库（12–15），亮色补在 16–19。 */
+const SHOT_INDEX = { light: { 1440: 16, 375: 18 }, dark: { 1440: 12, 375: 14 } } as const;
+
+test('四象限看图腿：迁进共享契约的三格在亮/暗 × 1440/375 下都画得出来、文字与底有亮度差', async ({
   page,
 }) => {
   const problems = captureProblems(page);
@@ -684,105 +691,123 @@ test('暗色两档看图腿：迁进共享契约的三格在 1440 与 375 的暗
       };
     });
 
-  for (const width of [1440, 375]) {
-    await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
-    if (width === 1440) {
-      await boot(page, fx);
-      await closeSettingsSheet(page);
-      await switchTheme(page, 'dark');
-    }
-    await openSettingsSheet(page);
-    await waitForOverlaySettled(page, 'settings-sheet');
-    await selectSettingsSection(page, 'profile');
+  // 起跑一次，然后**四象限各量一遍**（亮/暗 × 1440/375）。
+  // 为什么四格都要自己量：这一族的几何断言与主题无关，但"文字比底亮 / 比底暗"这一条是分主题的，
+  // 而此前计划里的四象限是**三个不同批次、三个不同场景**拼出来的读数 —— 那不是"四格都看过"。
+  await boot(page, fx);
+  await closeSettingsSheet(page);
 
-    const panel = page.getByTestId('profile-panel');
-    await expect(panel, '暗色下这三格必须**存在**（不存在会被下面那条 unique 断言掩盖）').toHaveCount(1);
-    for (const id of ['profile-avatar-row', 'profile-nickname-row', 'profile-email-row']) {
-      await expect(page.getByTestId(id), `暗色窄档少了 ${id}`).toBeVisible();
-    }
-    const m = await measure();
-    // 🔴 三格同一左缘、同一宽度 —— 这正是本批要消掉的那件事，暗色/窄档不许把它换回来。
-    const lefts = new Set(m.rows.map((r) => Math.round(r.x)));
-    expect(lefts.size, `三格行容器左缘不唯一：${JSON.stringify(m.rows)}`).toBe(1);
-    const widths = new Set(m.rows.map((r) => Math.round(r.width)));
-    expect(widths.size, `三格行容器宽度不唯一：${JSON.stringify(m.rows)}`).toBe(1);
-    expect(m.overflow, '有行超出浮层右缘（窄档溢出）').toEqual([]);
-    // 暗色最典型的事故：文字与底同色。亮色判据抓不到它，所以这一句必须在这里判。
-    const textLum = luminOf(m.swatch.color);
-    const bgLum = luminOf(m.swatch.bg);
-    expect(textLum, `读不到文字颜色：${m.swatch.color}`).toBeGreaterThanOrEqual(0);
-    expect(bgLum, `读到底色：${m.swatch.bg}`).toBeGreaterThanOrEqual(0);
-    expect(
-      textLum - bgLum,
-      `暗色下文字不比底亮：color=${m.swatch.color} bg=${m.swatch.bg}`,
-    ).toBeGreaterThan(0.1);
-    await shot(page, panel, width === 1440 ? '12-profile-dark-1440' : '14-profile-dark-375');
-
-    await selectSettingsSection(page, 'account');
-    const sessions = page.getByTestId('sessions-panel');
-    await expect(sessions).toBeVisible();
-    await shot(page, sessions, width === 1440 ? '13-sessions-dark-1440' : '15-sessions-dark-375');
-
+  for (const theme of ['light', 'dark'] as const) {
     /*
-      🔴 两条**只有看图才会想到要量**的几何断言 —— 它们都是这一趟看图时抓到的形状，
-      不是先写规则再找证据：
-      · 注销账号那张卡里的确认复选框原来被套进 `.ht-settings__row`（两列网格，第一列
-        `minmax(5rem, 8rem)`），现量 1440 档复选框的盒子宽 **121px**、375 档 **270px**，
-        它要确认的那句话在第二列 —— 控件与标签隔了一整列宽。已改成 inline 流，这里钉住"相邻"。
-      · 换绑邮箱那一格在 375 档输入框与「发起更换」按钮**不许互相压住**（现量 1440 间隔 8px、
-        375 间隔 8px；placeholder 被输入框自己截断是正常的，压住才是事故）。
+      🔴 先读现在是哪一档，不同才切：`switchTheme` 的实现是**点那枚开关**再断言结果，
+      所以对着已经是亮色的界面调 `switchTheme(page,'light')` 会得到一次"切到暗色"的红
+      （本条第一趟就是这么红的：Expected "light" / Received "dark"）。
+      四象限要的是"这一档量过了"，不是"再点一次开关"。
     */
-    const ack = await page.evaluate(() => {
-      const box = document.querySelector<HTMLInputElement>('#close-account-ack');
-      if (box === null) return null;
-      let textX: number | null = null;
-      box.closest('label')?.childNodes.forEach((node) => {
-        if (node.nodeType === 3 && (node.textContent ?? '').trim() !== '') {
-          const range = document.createRange();
-          range.selectNodeContents(node);
-          const x = range.getBoundingClientRect().x;
-          if (textX === null || x < textX) textX = x;
-        }
+    const currentTheme = await page.locator('html').getAttribute('data-theme');
+    if (currentTheme !== theme) await switchTheme(page, theme);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    for (const width of [1440, 375]) {
+      const tag = `${theme}-${width}`;
+      const idx = SHOT_INDEX[theme][width];
+      await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
+      await openSettingsSheet(page);
+      await waitForOverlaySettled(page, 'settings-sheet');
+      await selectSettingsSection(page, 'profile');
+
+      const panel = page.getByTestId('profile-panel');
+      await expect(panel, `${tag} 下这三格必须**存在**（不存在会被下面那条 unique 断言掩盖）`).toHaveCount(1);
+      for (const id of ['profile-avatar-row', 'profile-nickname-row', 'profile-email-row']) {
+        await expect(page.getByTestId(id), `${tag} 少了 ${id}`).toBeVisible();
+      }
+      const m = await measure();
+      // 🔴 三格同一左缘、同一宽度 —— 这正是本批要消掉的那件事，任何一档都不许把它换回来。
+      const lefts = new Set(m.rows.map((r) => Math.round(r.x)));
+      expect(lefts.size, `${tag} 三格行容器左缘不唯一：${JSON.stringify(m.rows)}`).toBe(1);
+      const widths = new Set(m.rows.map((r) => Math.round(r.width)));
+      expect(widths.size, `${tag} 三格行容器宽度不唯一：${JSON.stringify(m.rows)}`).toBe(1);
+      expect(m.overflow, `${tag} 有行超出浮层右缘（窄档溢出）`).toEqual([]);
+      /*
+        文字与底的亮度差**必须指向正确方向**：暗色下文字更亮、亮色下文字更暗。
+        为什么两档都判而不只判暗色：这一条抓的是"文字与底同色"那一类事故，
+        而它两个方向都会出（暗色最典型，亮色下把 `foreground` 错绑成 `surface` 同样看不见）。
+      */
+      const textLum = luminOf(m.swatch.color);
+      const bgLum = luminOf(m.swatch.bg);
+      expect(textLum, `${tag} 读不到文字颜色：${m.swatch.color}`).toBeGreaterThanOrEqual(0);
+      expect(bgLum, `${tag} 读不到底色：${m.swatch.bg}`).toBeGreaterThanOrEqual(0);
+      const contrast = theme === 'dark' ? textLum - bgLum : bgLum - textLum;
+      expect(
+        contrast,
+        `${theme} 下文字与底没有足够的亮度差（color=${m.swatch.color} bg=${m.swatch.bg}）`,
+      ).toBeGreaterThan(0.1);
+      await shot(page, panel, `${idx}-profile-${tag}`);
+
+      await selectSettingsSection(page, 'account');
+      const sessions = page.getByTestId('sessions-panel');
+      await expect(sessions).toBeVisible();
+      await shot(page, sessions, `${idx + 1}-sessions-${tag}`);
+
+      /*
+        🔴 两条**只有看图才会想到要量**的几何断言 —— 它们都是这一趟看图时抓到的形状，
+        不是先写规则再找证据：
+        · 注销账号那张卡里的确认复选框原来被套进两列网格那一档（第一列 `minmax(5rem, 8rem)`），
+          现量 1440 档复选框的盒子宽 **121px**、375 档 **270px**，它要确认的那句话在第二列 ——
+          控件与标签隔了一整列宽。已改成 inline 流，这里钉住"相邻"。
+        · 换绑邮箱那一格输入框与「发起更换」按钮**不许互相压住**（现量 1440 与 375 都是间隔 8px；
+          placeholder 被输入框自己截断是正常的，压住才是事故）。
+      */
+      const ack = await page.evaluate(() => {
+        const box = document.querySelector<HTMLInputElement>('#close-account-ack');
+        if (box === null) return null;
+        let textX: number | null = null;
+        box.closest('label')?.childNodes.forEach((node) => {
+          if (node.nodeType === 3 && (node.textContent ?? '').trim() !== '') {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            const x = range.getBoundingClientRect().x;
+            if (textX === null || x < textX) textX = x;
+          }
+        });
+        const b = box.getBoundingClientRect();
+        return { width: Math.round(b.width), gap: textX === null ? null : Math.round(textX - b.right) };
       });
-      const b = box.getBoundingClientRect();
-      return { width: Math.round(b.width), gap: textX === null ? null : Math.round(textX - b.right) };
-    });
-    expect(ack, '注销账号的确认复选框找不到').not.toBeNull();
-    /*
-      🔴 两把尺子，缺一把都会漏：
-      · **盒子宽度**：原生复选框是固有尺寸的小方块。盒子被拉开（实测套进两列网格时是 121px，
-        375 档单列时 270px）就说明它被放进了**给文字用**的那一列 —— 屏幕上看到的是
-        "小方块孤零零在左边，句子在很远的右边"。
-      · **与正文的距离**：盒子右缘到那句话第一个字。
-      为什么不能只量距离：盒子被撑满整列时，右缘恰好贴着下一列，距离只有 19px（变异臂实测到的数），
-      看着像"挨着"，而真正的小方块离正文一百多像素。**只量距离会把这一族缺陷读成绿。**
-    */
-    expect(ack!.width, `确认复选框的盒子被拉到 ${ack!.width}px（原生复选框不该被拉伸）`).toBeLessThanOrEqual(24);
-    expect(ack!.gap, '确认复选框与它那句话之间找不到文字').not.toBeNull();
-    expect(ack!.gap!, `确认复选框与它的标签隔了 ${ack!.gap}px（>16 就是不挨着）`).toBeLessThanOrEqual(16);
+      expect(ack, `${tag} 注销账号的确认复选框找不到`).not.toBeNull();
+      /*
+        🔴 两把尺子，缺一把都会漏：
+        · **盒子宽度**：原生复选框是固有尺寸的小方块。盒子被拉开（变异臂实测 121px）就说明它被放进了
+          **给文字用**的那一列 —— 屏幕上看到的是"小方块孤零零在左边，句子在很远的右边"。
+        · **与正文的距离**：盒子右缘到那句话第一个字。
+        为什么不能只量距离：盒子被撑满整列时右缘恰好贴着下一列，距离只有 **19px**（变异臂实测到的数），
+        看着像"挨着"，而真正的小方块离正文一百多像素。**只量距离会把这一族缺陷读成绿。**
+      */
+      expect(ack!.width, `${tag} 确认复选框的盒子被拉到 ${ack!.width}px（原生复选框不该被拉伸）`).toBeLessThanOrEqual(24);
+      expect(ack!.gap, `${tag} 确认复选框与它那句话之间找不到文字`).not.toBeNull();
+      expect(ack!.gap!, `${tag} 确认复选框与它的标签隔了 ${ack!.gap}px（>16 就是不挨着）`).toBeLessThanOrEqual(16);
 
-    const fieldOverlap = await page.evaluate(() => {
-      const input = document.querySelector<HTMLElement>('[data-testid="email-change-new"]');
-      const button = document.querySelector<HTMLElement>('[data-testid="email-change-submit"]');
-      if (input === null || button === null) return null;
-      return Math.round(input.getBoundingClientRect().right - button.getBoundingClientRect().left);
-    });
-    expect(fieldOverlap, '换绑邮箱的输入框压到了「发起更换」按钮').not.toBeNull();
-    expect(fieldOverlap, `输入框右缘越过按钮左缘 ${fieldOverlap}px`).toBeLessThanOrEqual(0);
+      const fieldOverlap = await page.evaluate(() => {
+        const input = document.querySelector<HTMLElement>('[data-testid="email-change-new"]');
+        const button = document.querySelector<HTMLElement>('[data-testid="email-change-submit"]');
+        if (input === null || button === null) return null;
+        return Math.round(input.getBoundingClientRect().right - button.getBoundingClientRect().left);
+      });
+      expect(fieldOverlap, `${tag} 换绑邮箱的输入框压到了「发起更换」按钮`).not.toBeNull();
+      expect(fieldOverlap, `${tag} 输入框右缘越过按钮左缘 ${fieldOverlap}px`).toBeLessThanOrEqual(0);
 
-    /*
-      🔴 用 `.check()` 而不是只读几何：`e2e/selfhost-stack/selfhost-web.spec.ts:540` 走真入口注销时
-      用的就是这一发，而 `check()` 带 Playwright 的**可点击性判定**（被盖住 / 不可交互都会红），
-      单测里那句 `click('#close-account-ack')` 证不了这一层。
-      放在两张图之后 ⇒ 打勾会把「注销账号」那枚按钮放出来，不许它进受版本控制的截图。
-    */
-    const ackControl = page.locator('#close-account-ack');
-    await ackControl.check();
-    await expect(ackControl).toBeChecked();
-    await expect(page.getByTestId('close-account-open'), '打勾后必须放出那枚危险动作').toBeVisible();
-    await ackControl.uncheck();
+      /*
+        🔴 用 `.check()` 而不是只读几何：`e2e/selfhost-stack/selfhost-web.spec.ts:540` 走真入口注销时
+        用的就是这一发，而 `check()` 带 Playwright 的**可点击性判定**（被盖住 / 不可交互都会红），
+        单测里那句 `click('#close-account-ack')` 证不了这一层。
+        放在两张图之后 ⇒ 打勾会把「注销账号」那枚按钮放出来，不许它进受版本控制的截图。
+      */
+      const ackControl = page.locator('#close-account-ack');
+      await ackControl.check();
+      await expect(ackControl).toBeChecked();
+      await expect(page.getByTestId('close-account-open'), '打勾后必须放出那枚危险动作').toBeVisible();
+      await ackControl.uncheck();
 
-    await closeSettingsSheet(page);
+      await closeSettingsSheet(page);
+    }
   }
 
   assertNoProblems(problems);

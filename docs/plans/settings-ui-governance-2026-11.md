@@ -141,9 +141,10 @@
 修后读数：4 枚设置 spec **118/118**、`form-anatomy`/`design`/`settings-prose`/`ui-language`/`overlay`/`settings-row-anatomy` 全 rc=0、
 上面那支 e2e 7/7，两张关键图（`01-before-request` / `08-password-before-submit`）逐张重看确认。
 ⚠️ **四象限的现量分布（别把这行读成"都看过了"）**：
-1440 亮 = 真看过（上表那三处就是这么抓到的）；375 亮 = 真看过（`tests/narrow-settings.png`，
-横向导航条与行都正常，那枚 `0.5em` 遮罩淡出在窄屏导航左缘生效）；
-**暗色两档 = 2026-11-04 补看，看图腿已常驻**（见下一节）。
+**四格现在由同一条用例各量一遍**（`account-email-change-and-sessions.spec.ts` 的「四象限看图腿」，
+亮/暗 × 1440/375，八张图 12–19 全部受版本控制）。此前这一行是**三个不同批次、三个不同场景**
+拼出来的读数（1440 亮 = 上一批账号套图；375 亮 = `narrow-settings.png` 那个别的场景；暗色 = 没做），
+那种拼法的问题不是"漏了一格"，而是**四格量的不是同一件事** —— 现在四格用同一套尺子。
 
 **这一行原来还写着两句错的判断，都被现量否证**（留着是因为它们是同族教训，不是结论）：
 
@@ -159,16 +160,16 @@
    教训与 `docs/agents/` 那条"一把尺在某处读 0，只说明它扫的那套写法里没有"是同一件事：
    这次扫的是**别名名字**，而消费方是**整条 e2e 套**。
 
-**常驻暗色腿（2026-11-04 补，`account-email-change-and-sessions.spec.ts` 第 8 条）**：
-一条用例跑 1440 与 375 两档，暗色下把迁进共享契约的三格（`profile-avatar-row` /
-`profile-nickname-row` / `profile-email-row`）与会话面板各拍一张，落在受版本控制的
-`apps/web/evidence/account-suite/12…15-*.png`。判据不是只有图：
+**常驻四象限看图腿（2026-11-04 补，`account-email-change-and-sessions.spec.ts` 第 8 条）**：
+一条用例跑**亮/暗 × 1440/375 四格**，每格把迁进共享契约的三格（`profile-avatar-row` /
+`profile-nickname-row` / `profile-email-row`）与会话面板各拍一张，八张图（编号 12–19）落在受版本控制的
+`apps/web/evidence/account-suite/`。判据不是只有图：
 
 | 判据 | 为什么这条必须能红 | 现量 |
 |---|---|---|
 | 三格行容器**左缘唯一、宽度唯一** | 本批把三格交给同一个列表渲染；两列网格与 `FormField` 网格混用时左缘会散（1440 亮档那三处缺陷就是这么抓到的） | 两档都过 |
 | 行不许越过浮层右缘 | 窄档溢出只会出现在 375，亮色 1440 那趟看不见 | 两档都过 |
-| **暗色下文字比底亮**（WCAG 相对亮度差 >0.1） | 文字与底同色是暗色最典型的事故，而它**不动任何颜色字面量** ⇒ 上面那条"没有新增字面量"的间接证据抓不到 | 两档都过 |
+| 文字与底的**亮度差方向**要对（暗色文字更亮、亮色文字更暗，WCAG 相对亮度差 >0.1） | 这一条抓的是"文字与底同色"那一类事故，而它**不动任何颜色字面量** ⇒ 上面那条"没有新增字面量"的间接证据抓不到；两个方向都会出，所以两档都判 | 四格都过 |
 | 确认复选框**盒子不被拉伸**（≤24px）**且**与正文相邻（≤16px） | 看图时抓到：注销账号那句确认话被画在两列网格的第二列，复选框在 8rem 的标签列里 | 修后过；变异臂（把 label 挂回 `__row`）报 **121px** |
 | 那一格用 Playwright 的 `.check()` 打得动、打勾后放出危险动作 | 按 id 消费它的有两处外部读者：`e2e/selfhost-stack/selfhost-web.spec.ts:540`（真入口注销，用的就是 `.check()`）与 macOS 壳里的 JS 探针（`HeytaMacApp.swift:1994`，`getElementById` + `click()`）。单测那句 `click()` 证不了 `.check()` 带的**可点击性判定** | 过（放在两张图之后，打勾放出的按钮不进受版本控制的截图） |
 
@@ -351,7 +352,7 @@
 | W1（本轮） | G-4 迁移那一半 | ✅ 四格字段迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名 / PasswordPanel 口令）+ 一格行迁 `trailing` 档（SessionsPanel）；账本逐次收缩，现量 `cat scripts/settings-row-anatomy-ledger.json` |
 | W2 | G-6 位置尺进链 | ✅ `check:tip-adjacency` 的定义与链上那一节已入库，同批把本线四枚同族尺的定义都带上 `--self-test` 臂（做法与卡点见 G-6 第三半）|
 | W2 | G-4 的 mobile 那一格 | 🔴 **不是欠看图腿，是欠别人一枚判据**（BLOCKED B260）：`apps/mobile/tests/account-security-wiring.spec.ts:152` 按**源码文本切三元**（`indexOf('{session.current ? (')`），而 `trailing` 档的正确写法（提示句进 `note`、按钮进 `actions`）会把这个字面量整块消掉。三种写法本线都排过：设计正确的 ⇒ 判据红；保住字面量的 ⇒ 二十多字提示被挤进右列，而本机没有能签字的移动端看图腿；靠文本相邻蒙过正向对照的 ⇒ 判据的牙被悄悄磨掉没人签字。归注册登录线（`b6581174f` 立的那四条），改完本线立刻迁 |
-| W2 | 暗色两档的常驻看图腿 | ✅ 已建并真看过（`account-email-change-and-sessions.spec.ts` 第 8 条，1440 + 375 暗色，抓到并修掉确认复选框那一格）。**这一行原来那句"设置面那几枚 e2e 一枚都不在链里"是假的** —— 链里 `check:ai-e2e` 跑整条默认套（现量 `pnpm --dir e2e exec playwright test --list` 的总数），新 spec 自动有人跑，不需要额外裁决 |
+| W2 | 暗色两档的常驻看图腿 | ✅ 做成了**四象限一条用例**（亮/暗 × 1440/375，八张图 12–19，四把尺每格各量一遍；`account-email-change-and-sessions.spec.ts` 第 8 条）。原先那一行是三个批次三个场景拼出来的读数，四格量的不是同一件事。抓到并修掉确认复选框被画进标签列那一格。**这一行原来那句"设置面那几枚 e2e 一枚都不在链里"是假的** —— 链里 `check:ai-e2e` 跑整条默认套（现量 `pnpm --dir e2e exec playwright test --list` 的总数），新 spec 自动有人跑，不需要额外裁决 |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
 ---
