@@ -152,20 +152,28 @@ export function CloseAccountPanel(): React.JSX.Element | null {
             </p>
           ) : null}
 
+          {/*
+            🔴 这一格**不是**"标签在左 / 控件在右"的那一行（`__row` 那一档是两列网格，
+            第一列 `minmax(5rem, 8rem)`）。2026-11-04 暗色看图腿量到：把确认用的复选框套进那一档，
+            复选框被画在**标签列**里、盒子被撑到那一列的宽度，
+            而它要确认的那句话落在第二列 —— 控件与它的标签隔了一整列宽。
+            确认框与正文是**同一个控件**，走浏览器默认的 inline 流即可（与「自动收集」那一屏的
+            多选框同一写法）。行的上下留白由这张 danger 卡自己给。
+            这一条现在由 `e2e/tests/account-email-change-and-sessions.spec.ts` 的暗色看图腿钉住
+            （复选框右缘与正文左缘的距离 ≤16px；改回两列网格会立刻红）。
+          */}
           <label className="ht-settings__item-label" htmlFor="close-account-ack">
-            <span className="ht-settings__row">
-              <input
-                id="close-account-ack"
-                type="checkbox"
-                checked={acknowledged}
-                onChange={(e) => {
-                  setAcknowledged(e.target.checked);
-                  setConfirming(false);
-                  setDone(null);
-                }}
-              />
-              {t('common.accountClosure.confirmLocal')}
-            </span>
+            <input
+              id="close-account-ack"
+              type="checkbox"
+              checked={acknowledged}
+              onChange={(e) => {
+                setAcknowledged(e.target.checked);
+                setConfirming(false);
+                setDone(null);
+              }}
+            />
+            {t('common.accountClosure.confirmLocal')}
           </label>
 
           {acknowledged && !confirming ? (
