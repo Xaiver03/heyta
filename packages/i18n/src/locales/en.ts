@@ -77,13 +77,13 @@ export const en = {
   'common.sync.error.undecryptableOps': 'Some older data could not be decrypted with the current password (it may have been written under a different one) and was skipped - everything else synced',
   'common.sync.error.undecryptablePage': 'Nothing on this page could be decrypted with the current password, so syncing is paused and no history was skipped - this usually means the end-to-end encryption password does not match the data on the server. Check your password and sync again.',
   'common.sync.error.payloadModeMismatch': 'This account has end-to-end encryption turned off, but the server still holds encrypted history, so syncing is paused and nothing was skipped. Turn encryption back on in settings and finish the migration, or contact us.',
-  'common.sync.error.uploadRejected': 'Some changes were rejected by the server and are not in the cloud — retrying them has stopped. See sync details.',
+  'common.sync.error.uploadRejected': 'Some changes were rejected by the server and are not in the cloud. Retrying them has stopped. See sync details.',
   // reason === 'unauthorized': this device's access token was refused (401/403).
   // Same three things the Chinese sentence has to carry: why it stopped, that the
   // local data is fine, and that the fix is signing in again - not retrying sync.
   // Without the second one the first reaction is "did I lose my data?", and people
   // respond to that by wiping the local store.
-  'common.sync.error.unauthorized': 'This device’s sign-in credential is no longer valid (you may have signed out on another device, or changed your password), so syncing stopped — your local data is intact and still readable; it will continue syncing once you sign in again',
+  'common.sync.error.unauthorized': 'This device’s sign-in credential is no longer valid (you may have signed out on another device, or changed your password), so syncing stopped. Your local data is intact and still readable; it will continue syncing once you sign in again.',
   // reason === 'account-closed': the account itself was deleted (stable code
   // ACCOUNT_CLOSED). This sentence and the one above are a pair that MUST stay
   // apart - each promises the opposite about the local store. Merging them lies
@@ -94,7 +94,7 @@ export const en = {
   // erasure surfaces through the status' `message` and the console; this sentence
   // must not promise success on their behalf, and must not claim that backups or
   // other devices were handled.
-  'common.sync.error.accountClosed': 'This account has been closed and can no longer sign in, so syncing stopped — closing an account erases the local copy on this device. Contact the server operator if this is unexpected.',
+  'common.sync.error.accountClosed': 'This account has been closed and can no longer sign in, so syncing stopped. Closing an account erases the local copy on this device. Contact the server operator if this is unexpected.',
   // reason === 'consent-required': no consent yet, so not a single request was sent.
   // Do not fold this into "not configured" or "offline": those tell the user to fill in
   // an address or check the network, while the only useful action here is to decide.
@@ -715,6 +715,12 @@ export const en = {
   'web.rowMenu.label': 'Task actions: {title}',
   'web.rowMenu.open': 'Open details',
   'web.rowMenu.delete': 'Delete',
+  // 2026-11 TickTick alignment: right-click menu expansion
+  'web.rowMenu.priority': 'Priority',
+  'web.rowMenu.moveTo': 'Move to',
+  'web.rowMenu.addSubtask': 'Add subtask',
+  'web.rowMenu.tags': 'Tags',
+  'web.rowMenu.inbox': 'Inbox',
   // Shared with the mobile row menu — see the zh table for why not `mobile.rowMenu.*`.
   'web.rowMenu.pin': 'Pin',
   'web.rowMenu.unpin': 'Unpin',
@@ -1789,12 +1795,14 @@ export const en = {
   // ── Web · lists and tags ──────────────────────────────────
   'web.projects.ariaLabel': 'Lists and tags',
   'web.projects.heading': 'Lists',
+  'web.projects.headingHint': 'Lists hold your tasks and notes. They can nest and stack into folders.',
   'web.projects.newPlaceholder': 'New list',
   'web.projects.newLabel': 'New list name',
   'web.projects.addNew': 'Create a list',
   'web.projects.add': 'Add list',
   'web.projects.delete': 'Delete list "{name}"',
   'web.tags.heading': 'Tags',
+  'web.tags.headingHint': 'Tags mark tasks across lists. Pick one to see only the tasks carrying it.',
   'web.tags.newPlaceholder': 'New tag',
   'web.tags.newLabel': 'New tag name',
   'web.tags.addNew': 'Create a tag',
