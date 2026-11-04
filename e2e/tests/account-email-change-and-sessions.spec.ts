@@ -770,6 +770,18 @@ test('暗色两档看图腿：迁进共享契约的三格在 1440 与 375 的暗
     expect(fieldOverlap, '换绑邮箱的输入框压到了「发起更换」按钮').not.toBeNull();
     expect(fieldOverlap, `输入框右缘越过按钮左缘 ${fieldOverlap}px`).toBeLessThanOrEqual(0);
 
+    /*
+      🔴 用 `.check()` 而不是只读几何：`e2e/selfhost-stack/selfhost-web.spec.ts:540` 走真入口注销时
+      用的就是这一发，而 `check()` 带 Playwright 的**可点击性判定**（被盖住 / 不可交互都会红），
+      单测里那句 `click('#close-account-ack')` 证不了这一层。
+      放在两张图之后 ⇒ 打勾会把「注销账号」那枚按钮放出来，不许它进受版本控制的截图。
+    */
+    const ackControl = page.locator('#close-account-ack');
+    await ackControl.check();
+    await expect(ackControl).toBeChecked();
+    await expect(page.getByTestId('close-account-open'), '打勾后必须放出那枚危险动作').toBeVisible();
+    await ackControl.uncheck();
+
     await closeSettingsSheet(page);
   }
 
