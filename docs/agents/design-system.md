@@ -168,7 +168,8 @@ React Native 的 `View` 默认 `flex: 0 0 auto`（与 CSS 的 `0 1 auto` **不�
 其余调用点违反它**不会有任何测试变红**，症状是屏幕上出现一枚**没有归属的孤零零问号**
 （真浏览器截图在 `PasswordPanel` 抓到两枚：代码注释自己写着"按钮旁的 `?`"，代码却把它排在段落之后）。
 
-尺认四种合法位置（`scripts/check-tip-adjacency.mjs` 的 `--report` 能把 33 处调用点逐条列出来）：
+尺认四种合法位置（调用点总数由 `node scripts/check-tip-adjacency.mjs --report` 逐条列出来，
+2026-11-04 那一趟读到 33 枚 —— **这个数会随面板动，要现量**）：
 
 | 合法形状 | 例子 |
 |---|---|
