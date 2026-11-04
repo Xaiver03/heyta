@@ -175,6 +175,9 @@ export function AdminConsolePage(): React.JSX.Element {
       {(forcedSignIn || loginOpen) && (
         <AuthPanel
           baseUrl={baseUrl}
+          // 🔴 同一份登录实现，只换"这面替谁要凭据"那一层标签（负责人 2026-11-04：
+          // 跟用户登录界面差不多，加上管理后台几个字）。词条用的是这页标题那一枚，不新造。
+          brandLabel={t('web.admin.console.title')}
           onClose={() => {
             setLoginOpen(false);
             setLoginDismissed(true);
