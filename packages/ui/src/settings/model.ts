@@ -254,11 +254,55 @@ export interface SettingsHeadingRow extends SettingsRowCommon {
   readonly text: string;
 }
 
+/**
+ * 尾随动作行：左边一段"关于某个对象的信息"（标题 + 副行 + 说明），
+ * 右边**一枚宿主给的控件**（撤销 / 删除 / 退出…），它有自己的 testID。
+ *
+ * 🔴 为什么不是 `action` 档：`SettingsActionRow` 的 `onPress` 让**整行**可点，
+ * 语义是"这一行是一个入口"。而会话/设备列表那一行不是入口 —— 它是一个**对象**
+ * （一台设备）带着几行事实，外加一个只对得起那个对象的动作。整行可点会把
+ * "选中这行"与"撤销这台设备"混成同一个手势，而那两者代价完全不同。
+ *
+ * 🔴 为什么 `actions` 是**插槽**而不是 `onPress: () => void`：
+ *   · 两端要画的控件不同（web 是 `<button className="ht-btn">`，RN 是 `Pressable`），
+ *     而忙态图标、确认态、"这一台是当前设备所以没有出口"这些**行内差异**
+ *     都属于宿主（AGENTS §3.5 的 L3）。共享层拥有的是**行的解剖**，不是按钮的行为。
+ *   · 移动端 `SessionsSection` 与 web `SessionsPanel` 此前**各写一遍**这个形状，
+ *     正是本契约要消掉的那类重复。
+ *
+ * ⚠️ `label` 可缺省：设备名允许为空（UA 也拿不到时**什么都不编**），
+ *    这时这一行只剩副行与动作 —— 不许为了填满版面编一个"未命名设备"。
+ */
+export interface SettingsTrailingRow extends SettingsRowCommon {
+  readonly kind: 'trailing';
+  readonly label?: string;
+  /**
+   * 标签那一格自己的 testID（宿主断言读数时要它）。
+   *
+   * 🔴 理由与 `SettingsValueRow.valueTestID` 同一个，但这里更硬：web 的会话列表有一条
+   * 判据是「设备名与 UA 都拿不到时**标签元素必须不存在**」（不是渲染一个空串、
+   * 更不是编一个"未命名设备"）。共享层画的这一格若没有可锚定的 id，
+   * 那条判据就只能靠文本内容去猜。
+   * ⚠️ `meta` / `note` / `actions` 都是宿主自己渲染的节点，宿主在里面挂自己的 testID 即可，
+   *    所以契约只缺这一格。
+   */
+  readonly labelTestID?: string;
+  /** 标签下面那行小字（时间戳、元信息）。由宿主格式化好再给，共享层不碰日期。 */
+  readonly meta?: ReactNode;
+  /** 再下面那行说明。给了就画；它是**反馈**那一族，不进 `?`。 */
+  readonly note?: ReactNode;
+  /** 行右侧的控件区，由宿主渲染。 */
+  readonly actions: ReactNode;
+  /** 标签前面那个记号（图标），由宿主渲染。理由同 `SettingsActionRow.leading`。 */
+  readonly leading?: ReactNode;
+}
+
 /** 一行设置。**穷尽联合** —— 新增一种行类型时每个 `switch` 都会编译失败。 */
 export type SettingsRowModel =
   | SettingsValueRow
   | SettingsToggleRow
   | SettingsActionRow
+  | SettingsTrailingRow
   | SettingsNoteRow
   | SettingsHeadingRow;
 
@@ -278,6 +322,10 @@ export function settingsRowKey(row: SettingsRowModel, index: number): string {
       return `toggle:${row.label}`;
     case 'action':
       return `action:${row.label}`;
+    case 'trailing':
+      // ⚠️ `label` 可缺省（设备名与 UA 都拿不到时**什么都不编**），所以这里必须有回落，
+      // 否则会拼出 `trailing:undefined` —— 两行都缺名时它们会撞成同一个 React key。
+      return `trailing:${row.label ?? `#${String(index)}`}`;
     case 'note':
       return `note:${row.text}`;
     case 'heading':
