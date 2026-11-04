@@ -120,6 +120,26 @@
 
 ### H-3 日期时间三套口径 —— 同一页里三种写法，且都不可扫读
 
+> ## 🔴 本条复核更正（2026-11-04）：三个断言里两个是误读，据此落地的 HIGH-9 已回退
+>
+> 本条当时的处置（抽 `formatSettingsDate` 让 PasskeyPanel 走 locale 格式化）**是错的**，
+> 已随 `fix(settings): 撤销 HIGH-9…` 回退。逐条重判：
+>
+> | 本条的断言 | 复核结果 |
+> |---|---|
+> | 「PasskeyPanel 用裸 ISO 是不一致」 | ✗ **误读**。`PasskeyPanel.tsx:126-131` 的注释写着这是**刻意**的：日期在这里只回答"哪一天"，且 `Intl` 输出随运行环境变会让测试对时区/ICU 敏感。改完之后 `passkey-panel.spec.tsx` 两条当场红（`2026-01-02` → `1/2/26`）—— 第二条理由被**实测兑现**。 |
+> | 「PrivacyPanel 把 UTC 当本地时刻 = 事实错报」 | ✗ **误读**。`packages/app-host/src/privacy-consent.ts:155-167` 的文件头自己写着「⚠️ 代价必须说出口：这一行**不带时区信息**，`HH:mm` 是 **UTC** 时刻」，并给了理由（四壳必须逐字同一字符串；Hermes 的 `Intl` 是可选编译、拿不到直接抛 ⇒ 设置页整页打不开；AGENTS §7 第 19 条"墙上时钟不能裁决因果"）。`privacy-consent.spec.ts` 里还有一道**源码级判据**明令不许改成 `Intl`/`toLocaleString`。这是有记录、有代价声明、有门保护的决策，不是缺陷。 |
+> | 「SessionsPanel `year:'numeric'` 撑爆列宽」 | ⚠️ **未验证**。我没量过列宽就写进结论。 |
+> | 「三处都没有 `tabular-nums`」 | ✓ 这条成立，但属于打磨项，不值得为它推翻两条成文决策。 |
+>
+> **教训（写回记忆）**：本条的分母也数错了 —— `apps/web` 里实际有 **13 处**日期格式化
+> （不是三处），`SessionsPanel.tsx:55` 的注释自己就点名了 `ConflictDialog.formatTime` 与
+> `ReminderPanel.formatReminderWhen`。**"统一日期"这种跨壳断言必须先枚举全部分母，
+> 再逐格读它有没有成文理由**；否则就会像这里一样，把两条有记录、有门保护的决策
+> 当成不一致扫掉。
+
+**原始记录（保留不删）**：
+
 - **位置**：`PasskeyPanel.tsx:130-132` + `:316`/`:320`（`shortDate` = `iso.slice(0,10)`，无 locale）、`SessionsPanel.tsx:59-67` + `:244-247`（`toLocaleString(locale, { year:'numeric', … })`）、`app-host/privacy-consent.ts:165-167`（`formatPrivacyDecisionTime` = `${iso.slice(0,10)} ${iso.slice(11,16)}`）+ `PrivacyPanel.tsx:78-81`（**不传 locale**）
 - **违反规则**：§6 `number-tabular`、§10 `number-formatting`（locale 感知）、§3 `content-jumping`（非等宽数字导致宽度跳）、AGENTS §3.5 精神（同一判断不许两处各写一遍）
 - **现量**：

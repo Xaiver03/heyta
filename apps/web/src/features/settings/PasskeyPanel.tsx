@@ -42,9 +42,9 @@ import { HOSTED_PASSKEY_NAME_MAX_LENGTH, type HostedAuthFailureReason } from '@h
 import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
 import { useSyncStore } from '../sync/store.js';
+import { FormField } from '../../lib/form/FormField.js';
 import { usePasskeysStore } from './passkeysStore.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
-import { formatSettingsDate } from './format-settings-date.js';
 
 /**
  * 删除失败原因 → 词条 key。
@@ -127,9 +127,19 @@ function renameFailureKey(reason: HostedAuthFailureReason): MessageKey {
  *
  * 🔴 刻意**不用** `Intl` / `toLocaleDateString`：日期在这里只回答"哪一天"，
  * 不参与本地化文案，而且 `Intl` 的输出随运行环境变，会让测试对时区/ICU 敏感。
+ *
+ * ⚠️ 2026-11-04 治理审计 H-3 曾把这里判成"三套口径之一"并改成 locale 格式化，
+ *   结果 `passkey-panel.spec.tsx` 两条当场红（`2026-01-02` → `1/2/26`）——
+ *   也就是上面第二条理由**被实测兑现**了。H-3 里真正要修的缺陷不是这一格，
+ *   是 `PrivacyPanel` 把 UTC 时刻当本地时刻显示（事实错报），那一格另改。
+ *   这一格保持 ISO，且这条判断只住在这里（没有 ADR），别再被"统一"扫掉。
  */
+function shortDate(iso: string): string {
+  return iso.slice(0, 10);
+}
+
 export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX.Element {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
 
   // 令牌来自同步设置（登录成功后由认证 store 写进去）。
   const baseUrl = useSyncStore((s) => s.baseUrl);
@@ -310,71 +320,79 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                       </p>
                     )}
                     <p className="ht-settings__credential-meta">
-                      {t('web.passkeys.createdAt', { date: formatSettingsDate(passkey.createdAt, locale) })}
+                      {t('web.passkeys.createdAt', { date: shortDate(passkey.createdAt) })}
                       {' · '}
                       {passkey.lastUsedAt === null
                         ? t('web.passkeys.neverUsed')
                         : t('web.passkeys.lastUsedAt', {
-                            date: formatSettingsDate(passkey.lastUsedAt, locale),
+                            date: shortDate(passkey.lastUsedAt),
                           })}
                     </p>
                   </div>
 
                   {editing ? (
-                    <div className="ht-settings__field">
-                      <label
-                        className="ht-settings__item-label"
-                        htmlFor={`passkey-name-input-${passkey.id}`}
-                      >
-                        {t('web.passkeys.rename')}
-                      </label>
-                      <div className="ht-settings__actions">
-                        <input
-                          id={`passkey-name-input-${passkey.id}`}
-                          className="ht-input"
-                          type="text"
-                          data-testid={`passkey-name-input-${passkey.id}`}
-                          value={draftName}
-                          maxLength={HOSTED_PASSKEY_NAME_MAX_LENGTH}
-                          placeholder={t('web.passkeys.renamePlaceholder')}
-                          disabled={renaming}
-                          onChange={(e) => setDraftName(e.target.value)}
-                        />
-                      <button
-                        type="button"
-                        className="ht-btn ht-btn--primary"
-                        data-testid={`passkey-name-save-${passkey.id}`}
-                        disabled={renaming}
-                        onClick={() => {
-                          void (async () => {
-                            // 空串 = 去掉名字：归一化在服务端做，这里原样送出。
-                            await rename(baseUrl, token, passkey.id, draftName);
-                            // 🔴 **只在成功时**收起输入框。失败还收起就等于把
-                            // 用户刚打的字丢掉 —— 而失败正是他要改一改再存的时候。
-                            if (usePasskeysStore.getState().renameFailure === undefined) {
-                              setEditingRowId(undefined);
-                            }
-                          })();
-                        }}
-                      >
-                        {renaming ? (
-                          <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
-                        ) : (
-                          <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
-                        )}{' '}
-                        {t('web.passkeys.save')}
-                      </button>
-                      <button
-                        type="button"
-                        className="ht-btn ht-btn--ghost"
-                        data-testid={`passkey-name-cancel-${passkey.id}`}
-                        disabled={renaming}
-                        onClick={() => setEditingRowId(undefined)}
-                      >
-                        {t('web.passkeys.cancel')}
-                      </button>
-                    </div>
-                    </div>
+                    /*
+                      🔴 走共享字段解剖 `FormField`（2026-11-04，治理计划 G-4）。
+                      上一轮补可见 label 时我是手写 `<label htmlFor>` + 手拼 id 的，
+                      而 `FormField` 的契约明写「`htmlFor` / `id` 都从它来，全仓不许再手拼字符串 id」。
+                      `layout="inline"`：这是属性面板里改一个属性，不是表单页录入。
+                    */
+                    <FormField
+                      id={`passkey-name-input-${passkey.id}`}
+                      label={t('web.passkeys.rename')}
+                      layout="inline"
+                    >
+                      {(fieldProps) => (
+                        <div className="ht-settings__actions">
+                          <input
+                            {...fieldProps}
+                            className="ht-input"
+                            type="text"
+                            data-testid={`passkey-name-input-${passkey.id}`}
+                            value={draftName}
+                            // 上限与服务端共用同一个常量：让用户打完 100 个字再被拒
+                            // 是一次没必要的往返（服务端仍是权威，见 zod 那边的 400）。
+                            maxLength={HOSTED_PASSKEY_NAME_MAX_LENGTH}
+                            placeholder={t('web.passkeys.renamePlaceholder')}
+                            disabled={renaming}
+                            onChange={(e) => setDraftName(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="ht-btn ht-btn--primary"
+                            data-testid={`passkey-name-save-${passkey.id}`}
+                            disabled={renaming}
+                            onClick={() => {
+                              void (async () => {
+                                // 空串 = 去掉名字：归一化在服务端做，这里原样送出。
+                                await rename(baseUrl, token, passkey.id, draftName);
+                                // 🔴 **只在成功时**收起输入框。失败还收起就等于把
+                                // 用户刚打的字丢掉 —— 而失败正是他要改一改再存的时候。
+                                if (usePasskeysStore.getState().renameFailure === undefined) {
+                                  setEditingRowId(undefined);
+                                }
+                              })();
+                            }}
+                          >
+                            {renaming ? (
+                              <Loader2 size={ICON_SIZE.xs} className="ht-spin" aria-hidden="true" />
+                            ) : (
+                              <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
+                            )}{' '}
+                            {t('web.passkeys.save')}
+                          </button>
+                          <button
+                            type="button"
+                            className="ht-btn ht-btn--ghost"
+                            data-testid={`passkey-name-cancel-${passkey.id}`}
+                            disabled={renaming}
+                            onClick={() => setEditingRowId(undefined)}
+                          >
+                            {t('web.passkeys.cancel')}
+                          </button>
+                        </div>
+                      )}
+                    </FormField>
                   ) : (
                     <div className="ht-settings__actions">
                       {confirming ? (

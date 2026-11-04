@@ -75,99 +75,58 @@
 | 已用共享契约的 web 面板 | 2 个 | `grep -rln 'SettingsRowModel' apps/web/src/features/settings` |
 | 契约现有行档 | 5 档（`value`/`toggle`/`action`/`note`/`heading`） | `model.ts` 的 `SettingsRowModel` 联合 |
 
-#### 为什么"逐面板迁移"不能在本机这一趟做完（不是不想，是契约装不下）
+#### 迁移那一半：方向已找对，三格已迁（2026-11-04 二次复核推翻本节上一稿）
 
-计划点名要迁的四格 —— 昵称、换邮箱、通行密钥改名、密码 —— 核心行都是
-**「输入框 + 按钮」复合行**。逐档核过 `model.ts`：
+上一稿写"迁面板不可行，因为契约装不下"—— 那是**只扫了 `SettingsRowModel` 一份契约**
+就下的结论。仓里另有一套**并列**的表单解剖，字段本来就该走它而不是走 rows：
 
-| 档 | 有没有可编辑插槽 |
+| 层 | 位置 |
 |---|---|
-| `SettingsValueRow` | ✗ `readonly value: string`，只读 |
-| `SettingsToggleRow` | ✗ `checked` + `onToggle`，是开关不是输入 |
-| `SettingsActionRow` | ✗ `href` / `onPress`，是跳转不是输入 |
-| `SettingsNoteRow` | ✗ `text`，整句说明 |
-| `SettingsHeadingRow` | ✗ `text`，小标题 |
-| `SettingsRowCommon` | ✗ 只有 `testID` + `divider` |
+| 唯一那份判断 | `packages/ui/src/form/anatomy.ts`（`resolveFieldChrome` / `fieldDescribedById`），两端共用 |
+| web 渲染器 | `apps/web/src/lib/form/FormField.tsx` + `apps/web/src/styles/app/form.css` |
+| 门 | `pnpm check:form-anatomy`（R1 手写字段标签只减不增；R2 `.ht-input-field*` 只在 `form.css` 定义） |
+| 两档解剖 | `stacked`（表单页）/ `inline`（设置·属性面板），`docs/agents/ux-principles.md` §1：**两档之外不许有第三档** |
 
-全契约唯一的 `ReactNode` 插槽是三处 `leading`（标签**前面**的图标），
-**没有任何尾部或可编辑插槽**。⇒ 迁移要先给跨端契约加第 6 档。
+`FormField` 的 props 注释自己写着「缺省 stacked。**设置/属性面板显式写 inline**」和
+「`htmlFor` / `id` 都从它来，**全仓不许再手拼字符串 id**」—— 后者正是这几格原本的形状。
+所以"要不要迁"不是取向题，口径早就成文，不该回抛给产品。
 
-加一档要改的地方（2026-11-04 现量更正）：**只有 `packages/ui` 两处** ——
-`Settings.tsx:375 SettingsRow` 的分派 switch 与 `model.ts` 的 `settingsRowKey` switch
-（10 处 `case` 全在这两个文件里）。`apps/mobile` 那 4 个屏幕
-（`ProfileScreen` / `SettingsScreen` / `ProfileProgressSummary` / `ReminderDeliverySection`）
-只是 `import { SettingsSection } from '@heyta/ui'` 的**消费者**，没有自己的 switch
-⇒ 两端共用一份渲染器，代码量比本节上一稿估的小；
-但**移动端运行时验证在这台机上仍然没有腿**（就绪裁判现量：AVD 0 台、emulator-5554 不可达）。
+**已迁（每格都跑 `check:ui-language` + typecheck + 相关 spec）**：
 
-#### 本节已做完的那一半（也是计划 G-4 标题的意图："新面板强制使用"）
+| 格 | 之前 | 之后 | 验证 |
+|---|---|---|---|
+| ProfilePanel 昵称 | 手写 `<label htmlFor>` + 手拼 `id="profile-nickname"` | `FormField layout="inline"`，`?` 走新增的 `labelTip` | `profile-panel.spec.tsx` 18/18；行解剖账本 **54 → 53** |
+| EmailChangePanel 新地址 | 手写 label + 手拼 id | `FormField layout="inline"` | `account-security.spec.tsx` 42/42 |
+| PasskeyPanel 改名 | 上一轮我手加的 label + 手拼 id | `FormField layout="inline"` | `passkey-panel.spec.tsx` 全绿 |
 
-`scripts/check-settings-row-anatomy.mjs` —— 账本制，与 `check:settings-prose` 同一条纪律：
+`labelTip` 是这次给原语补的能力：解剖规则要求「一枚 `?` 紧跟它所解释的标签」，
+而 `FormField.label` 只吃 `string`。它是标签的**兄弟**而不是 `<label>` 后代 ——
+`SettingsInfoTip` 渲染 `<button>`，套进 label 会让点问号顺带把焦点甩进输入框。
+只在给了 tip 时才多包一层 `__labelcell`，既有调用点（AI 端点那三行）DOM 逐字不变。
+该断言的牙也实测过：把 `?` 挪回值那一列 ⇒ `profile-panel.spec.tsx` 精确报红。
 
-- 账本外**新文件**出现手写行解剖容器 ⇒ 🔴 红（第六套解剖长不出来）；
-- 账内读数**涨了** ⇒ 🔴 红；
-- 账内读数**掉了却没改账本** ⇒ 🔴 红。
+**SessionsPanel 不在这张表里**：它没有字段。一行是「设备名 + 时间戳 + 撤销按钮」，
+属于 rows 那一族而不是 fields 那一族；要收敛得等 `SettingsRowModel` 长出"尾随动作"档。
 
-判的是**容器类名**（`__row`/`__section`/`__credential`/`__account-gate`/`__danger-card`/
-`__order-card`/`__data-card`/`__list`），**不含** `__field`（宽度约束）与 `__item`（标签排版）——
-那两个不是"行解剖"，把它们算进来会让门去管布局细节而不是管"又长出一套行"。
+**还剩**：`PasswordPanel` 的 `PasswordField`（同样手写 label + 手拼 id）可迁；
+`SettingsRowModel` 的"尾随动作档"未加。
 
-变异臂已实测能红（往 `MemoryPanel` 注一处 `ht-settings__section` ⇒ 门拒绝）。
+#### 本节两处误判与一处我自己引入的缺陷（都已更正，原论证保留在 git 历史里）
 
-#### 剩下那一半（迁移）：本趟**不做**，且理由是源码级的，不是"太大所以推后"
+| 项 | 复核结论 |
+|---|---|
+| 「五档装不下输入框+按钮 ⇒ 迁移不可行」 | ✗ 问错了问题。字段走 `FormField`，不走 `SettingsRow`。 |
+| 「圆角 8/12 来回是漂移」 | ✗ 逐类现量：`__section`/`__field`/`__danger-card`/`__account-gate` 全是 `radius-md`(8)，只有 `__notice` 是 `radius-sm`(4)（行内提示条不是卡片）；外层面板卡 `lg`(12) 是 MASTER 成文分档。**不是漂移，不立项**。 |
+| HIGH-9「日期三套口径统一」 | ✗ **我引入的缺陷，已回退**。`PasskeyPanel` 的 ISO 与 `PrivacyPanel` 的 UTC 都是**有记录、有源码级门保护**的刻意决策（`privacy-consent.spec.ts` 明令不许改成 `Intl`/`toLocaleString`，理由含 Hermes 的 `Intl` 可选编译会直接抛 ⇒ 设置页整页打不开）；真实分母是 `apps/web` 里 **13 处**不是 3 处。改完 `passkey-panel.spec.tsx` 两条当场红，正是那条"测试会对时区/ICU 敏感"的理由被实测兑现。详见 `audit-ui-ux-pro-max-2026-11-04.md` H-3 的复核更正。 |
 
-2026-11-04 复核把共享渲染器读完后，"把这四个面板迁到 `SettingsRow`"这句话
-**方向是反的** —— 现在这份共享契约画的不是产品负责人 2026-10-24 拍板的那一套。
-
-| 迁过去会发生什么 | 一边 | 另一边 |
-|---|---|---|
-| **丢掉两列对齐** | `sheets.css:246-252` `.ht-settings__row` = `grid-template-columns: minmax(5rem, 8rem) minmax(0, 1fr)` | `Settings.tsx:432` `ValueLine` = `<View style={styles.row}>`（flex 行，无标签列） |
-| **标签降一档** | `__item-label` = `--ht-font-weight-medium` + `foreground` | `Settings.tsx:433-435` = `text['row-meta']` + 强制 `color.foreground-muted` |
-| **邮箱被截断** | `sheets.css:300-304` `.ht-settings__value` 带 `overflow-wrap: anywhere`（长地址换行） | `Settings.tsx:438` 值那格 `numberOfLines={1}` |
-
-第一条最要命：`ProfilePanel.tsx:17-30` 的文件头记着，2026-10-24 那次重排是为了治
-「头像和昵称的**左边界各不相同**」，手段就是这**一列标签 + 一列控件**的网格。
-把网格换成 flex 行，等于把那条已批的决定原样退回去。
-
-⇒ **本节的迁移那一半按原写法不做**，三条源码级理由（不是"太大所以推后"）：
-
-1. **契约自己把表单划给了 `children`，不是 rows。**
-   `Settings.tsx:290` 的 `SettingsSectionProps.children` 注释原话：
-   「宿主特有的内容（mobile 的语言胶囊、**web 的表单**…）」。
-   ⇒ "把表单面板迁成 `rows`"与契约的设计意图相反；照做是给共享层加一档它自己声明不需要东西。
-2. **已批的网格解剖在共享渲染器里表达不出来。**
-   `sheets.css:246-252` 用的是 CSS Grid `minmax(5rem, 8rem) minmax(0, 1fr)`；
-   而 `Settings.tsx:184 makeStyles` 是 RN `StyleSheet`（flex 模型，**没有 `minmax`**）。
-   用 `minWidth/maxWidth + flex` 只能**近似**，近似出来的就不是产品负责人 2026-10-24 拍板的那一列。
-   ⇒ 要么这一档只有 web 生效（"一份实现"当场失效），要么改的是已批排版。两者都不该由这趟替产品决定。
-3. **两端共用一份渲染器，移动端运行时验证这趟没有腿。**
-   （更正本节上一稿：10 处 switch **全在 `packages/ui`** —— `Settings.tsx` 的分派 + `model.ts` 的
-   `settingsRowKey`；`apps/mobile` 那 4 个屏幕只是 `import { SettingsSection } from '@heyta/ui'` 的**消费者**，
-   没有自己的 switch。所以加一档的代码量比上一稿估的小，但验证那一格没变：
-   本机 AVD 0 台、emulator-5554 不可达。）
-
-**逐格核过（不是"形状不像"的笼统判断）**——计划点名的四格，每一格都装不进现有五档：
-
-| 面板 | 那一行实际是什么 | 为什么五档装不下 |
-|---|---|---|
-| ProfilePanel 昵称 / 头像 | 输入框 + 保存按钮；头像圈 + 两枚按钮 | 无可编辑插槽，也无尾随按钮插槽 |
-| ProfilePanel 邮箱 | 标签 + 只读值 | 形状像 `value`，但迁完同时踩上面那三条排版退步（网格→flex、标签降 muted、值被 `numberOfLines` 截断） |
-| EmailChangePanel | 输入框 + 发起按钮 + 回执区 | 无可编辑插槽 |
-| PasskeyPanel | 名称 + 时间戳 meta + 改名/删除两枚按钮 + 行内编辑态 | 无尾随按钮组插槽，也没有"同一行切两种形态"的档 |
-| SessionsPanel | 最多四段纵排文本（标签 / "本机" / 时间戳 meta / `role="status"` hint）+ 一枚带自己 testID 的尾随撤销按钮 | `action` 档是"整行可点 + hint 进 `?`"：既没有尾随按钮插槽，又会把那句**反馈豁免的可见解释**藏进气泡 —— 那是把 `check:settings-prose` 例外①的东西挪进 `?`，方向与禁令相反 |
-
-⇒ "迁这 4 个面板"是**逐格验证过**才撤销的，不是一次笼统判断。剩下的收缩要靠
-"给契约加一档可编辑行 + 一档尾随动作"这件**跨端设计变更**，而那需要产品侧先确认
-两列网格是不是唯一要保留的解剖（还是 `__section` 堆叠式也算一种），以及两端运行时验证的窗口。
-
-**那"行解剖不统一"这个真问题归谁？** 归已经落地的门 + 设计系统层，不归"迁面板"：
+**那"行解剖不统一"这个真问题归谁？** 归已经落地的门 + 上面那张迁移表，不归"把 rows 硬塞字段"：
 
 | 真问题 | 处置 |
 |---|---|
-| 13 个文件各写一套容器，可能长出第 6 套 | ✅ `check-settings-row-anatomy.mjs` 账本制冻结（13 文件 / 54 处），新增即红，变异臂实测能红 |
-| 圆角在容器层来回 | **审计报重了**（2026-11-04 逐类现量）：`__section`/`__field`/`__danger-card`/`__account-gate` **全是 `radius-md`(8)**，只有 `__notice` 是 `radius-sm`(4)（行内提示条不是卡片）；外层面板卡 `lg`(12) 是 MASTER 成文分档。**不是漂移，不立项** |
+| 13 个文件各写一套容器，可能长出第 6 套 | ✅ `check-settings-row-anatomy.mjs` 账本制冻结，新增即红，变异臂实测能红 |
+| 字段格手写 label + 手拼 id | ✅ 三格已迁 `FormField`（账本 54→53）；`PasswordField` 待迁 |
 
-**优先级**: 门 ✅；"迁这 4 个面板" ⇒ **撤销该行动项**，理由如上三条，都是源码级的。
+**优先级**: 门 ✅；迁移 ✅ 三格已落地，剩 `PasswordField` 与 rows 的尾随动作档。
 
 ---
 
@@ -229,7 +188,7 @@
 | W1（本轮） | G-1 + G-2 落地为门禁 | ✅ G-1 账本清空、A4 硬拒；✅ G-2 静态 CSS 臂（`check-font-size-discipline.mjs`） |
 | W1（本轮） | G-3 + G-5 落地为门禁 | ✅ G-3 `check-font-size-discipline.mjs`；✅ G-5 `check-spinner-discipline.mjs`（均带变异臂实测能红） |
 | W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
-| — | G-4 迁移那一半（"迁这 4 个面板"） | **撤销该行动项**：契约把 web 表单划给 `children`（`Settings.tsx:290`）、已批的 `minmax` 网格在 RN StyleSheet 里表达不出来、迁完是可见退步。三条源码级理由见 G-4 节 |
+| W1（本轮） | G-4 迁移那一半 | ✅ 三格已迁 `FormField`（ProfilePanel 昵称 / EmailChangePanel / PasskeyPanel 改名），账本 54→53；SessionsPanel 属 rows 族不在此表；剩 `PasswordField` |
 | — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
 ---
