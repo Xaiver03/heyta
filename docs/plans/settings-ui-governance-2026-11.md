@@ -11,8 +11,12 @@
 
 1. **门禁按字面拼写设卡，换写法即绕过** —— `check:control-semantics` 点名了 `ht-btn--outline` 却没拒绝它
 2. **动效/状态表征被当可选装饰** —— 文字反馈做到了工业级诚实，但 spinner 不转、sheet 无退场
-3. **行语法未收敛** —— 同屏 ≥5 套"设置行解剖"，是 2026-10-24 重排的残留
-4. **产品禁令执行过头** —— "严禁说明文字只准问号"导致整屏可见引导≈0
+3. **行语法未收敛** —— 同屏 13 个文件各写一套行解剖容器（54 处），是 2026-10-24 重排的残留
+
+> ~~4. 产品禁令执行过头 —— "严禁说明文字只准问号"导致整屏可见引导≈0~~
+> **这一条在 G-6 复核中被现量否证**：禁令本就带三条例外，且明写"删掉解释不算违规"；
+> 可见消息实测 171 处，被禁的解释性内联说明是 0 处。根因是**审计子 agent 没回禁令原文就下结论**，
+> 不是产品决策问题。教训已落到记忆（skill 审计的负面结论要回真源核）。
 
 ---
 
@@ -59,24 +63,63 @@
 
 ### G-4 统一 SettingsRow 组件契约
 
-**目标**: 把同屏 ≥5 套行解剖收敛为一份 `SettingsRow` 组件，新面板强制使用。
+**2026-11-04 复核否证了本节的原前提**：原文写"先抽组件（不改行为）→ 逐面板迁移"，
+但 `SettingsRow` / `SettingsRowModel` **早就存在**（`packages/ui/src/settings/model.ts`），
+且 web 的 `WidgetPushPanel` / `WidgetJourneyPanel` 已经在用。所以"抽组件"这一格是已完成项，不是待做项。
 
-**设计**:
-```tsx
-interface SettingsRowProps {
-  label: string;
-  tooltip?: { text: string; testId: string };
-  children: React.ReactNode;
-  testId?: string;
-}
-```
+**现量**（复量命令随附）：
 
-**迁移路径**:
-1. 先抽组件（不改行为）
-2. 逐面板迁移（ProfilePanel → PasskeyPanel → SessionsPanel → ...）
-3. 每步跑 `check:ui-language` + typecheck
+| 读数 | 值 | 复量 |
+|---|---|---|
+| 手写行解剖的 web 设置文件 | 13 个 / 54 处 | `node scripts/check-settings-row-anatomy.mjs` |
+| 已用共享契约的 web 面板 | 2 个 | `grep -rln 'SettingsRowModel' apps/web/src/features/settings` |
+| 契约现有行档 | 5 档（`value`/`toggle`/`action`/`note`/`heading`） | `model.ts` 的 `SettingsRowModel` 联合 |
 
-**优先级**: 中（长期维护成本，但本轮不阻塞）
+#### 为什么"逐面板迁移"不能在本机这一趟做完（不是不想，是契约装不下）
+
+计划点名要迁的四格 —— 昵称、换邮箱、通行密钥改名、密码 —— 核心行都是
+**「输入框 + 按钮」复合行**。逐档核过 `model.ts`：
+
+| 档 | 有没有可编辑插槽 |
+|---|---|
+| `SettingsValueRow` | ✗ `readonly value: string`，只读 |
+| `SettingsToggleRow` | ✗ `checked` + `onToggle`，是开关不是输入 |
+| `SettingsActionRow` | ✗ `href` / `onPress`，是跳转不是输入 |
+| `SettingsNoteRow` | ✗ `text`，整句说明 |
+| `SettingsHeadingRow` | ✗ `text`，小标题 |
+| `SettingsRowCommon` | ✗ 只有 `testID` + `divider` |
+
+全契约唯一的 `ReactNode` 插槽是三处 `leading`（标签**前面**的图标），
+**没有任何尾部或可编辑插槽**。⇒ 迁移要先给跨端契约加第 6 档，那要同时改：
+`packages/ui/src/settings/Settings.tsx`（共享渲染器）+ 移动端 4 个屏幕的穷尽 switch
+（`ProfileScreen` / `SettingsScreen` / `ProfileProgressSummary` / `ReminderDeliverySection`，
+联合是穷尽的，漏一档编译就失败 —— 这是安全网不是障碍），
+而**移动端运行时验证在这台机上没有腿**（就绪裁判现量：AVD 0 台、emulator-5554 不可达）。
+
+#### 本节已做完的那一半（也是计划 G-4 标题的意图："新面板强制使用"）
+
+`scripts/check-settings-row-anatomy.mjs` —— 账本制，与 `check:settings-prose` 同一条纪律：
+
+- 账本外**新文件**出现手写行解剖容器 ⇒ 🔴 红（第六套解剖长不出来）；
+- 账内读数**涨了** ⇒ 🔴 红；
+- 账内读数**掉了却没改账本** ⇒ 🔴 红。
+
+判的是**容器类名**（`__row`/`__section`/`__credential`/`__account-gate`/`__danger-card`/
+`__order-card`/`__data-card`/`__list`），**不含** `__field`（宽度约束）与 `__item`（标签排版）——
+那两个不是"行解剖"，把它们算进来会让门去管布局细节而不是管"又长出一套行"。
+
+变异臂已实测能红（往 `MemoryPanel` 注一处 `ht-settings__section` ⇒ 门拒绝）。
+
+#### 剩下那一半（迁移）怎么排
+
+1. 给 `model.ts` 加 `SettingsFieldRow`（label + 可编辑控件 + 尾随动作），带 `valueTestID`；
+2. 共享渲染器 + 移动端 4 个 switch 各实现一档；
+3. **在 linux-dev 上验安卓、在有 booted 模拟器的窗口验 iOS**（本机没有这两条腿）；
+4. 逐面板迁：ProfilePanel 昵称 → EmailChangePanel → PasskeyPanel 改名 → PasswordPanel；
+5. 每迁一格跑 `check:settings-prose` + `check:settings-row-anatomy`（读数应掉）+ typecheck，
+   并 `--update` 把账本改小。
+
+**优先级**: 门已落地 ✅；迁移待移动端验证腿可用。
 
 ---
 
@@ -93,16 +136,41 @@ interface SettingsRowProps {
 
 ---
 
-### G-6 产品禁令校准
+### G-6 产品禁令校准 —— 原前提被现量否证，不需要人拍板
 
-**现状**: "严禁说明文字只准问号" 执行过头，整屏可见引导≈0。
+**原写法是错的**。本节原先记着「"严禁说明文字只准问号"执行过头，整屏可见引导≈0，
+需产品负责人拍板放宽」。回源码逐条量过之后，两句话都不成立：
 
-**建议**:
-- 每个面板允许 **1 条**可见引导句（如"留空则显示邮箱"）
-- 超过 1 条才进 `?`
-- 这条需要产品负责人拍板，不在工程侧自决
+**1. 那条禁令本来就带三条例外，而且明写"删掉解释不算违规"。**
+真身在 `docs/agents/design-system.md:112-160`（不是任何一份抄件）：
 
-**优先级**: 需产品决策
+| 例外 | 内容 | 现量 |
+|---|---|---|
+| ① 反馈 | 失败/成功/进行中/空态/读数（`role=alert`/`aria-live`/`__danger`） | 42 `__danger` + 106 `__hint` + 23 `__notice` = **171 处可见消息** |
+| ② 披露 | ADR-0054 §7 要求"对话之前就看得到"的出境披露 | `data-settings-disclosure` 3 处（`AiSettings.tsx:1270/1273/1276`） |
+| ③ 页面标题副句 | "我在哪一屏"的确认 | `App.tsx:3416`（`web.profile.overview.lead`） |
+
+规则文件原文：
+> ⚠️ 这三条约束的是**位置与重复**，不是"每行都要挂问号"：没有值得问的句子就不挂。
+> 删掉解释**不会**违反上面的禁令（禁令管的是"不许内联"，不是"必须有 `?`"）。
+
+**2. "可见引导≈0"是假读数。** 现量 171 处可见消息元素，全部走反馈/披露豁免。
+被禁的"解释性内联说明"是 **0 处**，且 `pnpm check:settings-prose` 的账本
+`scripts/settings-prose-ledger.json` 现量 `{ total: 0, files: {} }` —— 禁令已清到零，
+不是"执行过头"，是"按设计执行完了"。
+
+**⇒ 结论：没有需要产品拍板的格子。** 原节里那三条"建议"（每面板放 1 条引导句、
+超过 1 条才进气泡）是在**没有读禁令原文与其例外条款**的情况下提的，若照做会直接撞
+`check:settings-prose` 的"账本外新增 ⇒ 红"。
+
+**那用户实拍"这屏难看"归到哪？** 不归文案缺失，归两件已被本轮修掉/正要做的事：
+
+| 真因 | 落点 |
+|---|---|
+| 输入框无边框 + `flex:1` 铺满 ⇒ 占位文字是**唯一**"这里可输入"的线索（`EmailChangePanel.tsx:295-297` 自己记着这条实测） | 本轮已修：昵称格补 `__field` 宽度约束；`__hint` 字号 12→14 |
+| 同屏 13 个文件各写各的行解剖（圆角 8/12 来回、分隔方式不一） | G-4：门已落地防新增，迁移待移动端腿 |
+
+**优先级**: ✅ 关闭（前提否证，无待决）
 
 ---
 
@@ -110,10 +178,11 @@ interface SettingsRowProps {
 
 | 周次 | 做什么 | 状态 |
 |---|---|---|
-| W1（本轮） | G-1 + G-2 落地为门禁 | G-1 ✅（账本清空，A4 硬拒）；G-2 待 Playwright 臂 |
-| W1（本轮） | G-3 + G-5 落地为门禁 | G-3 ✅ `check-font-size-discipline.mjs`；G-5 ✅ `check-spinner-discipline.mjs` |
-| W3-W4 | G-4 SettingsRow 抽取 + ProfilePanel 迁移 | 待做（大型重构，不阻塞） |
-| 待产品拍 | G-6 禁令校准 | 需产品负责人决策 |
+| W1（本轮） | G-1 + G-2 落地为门禁 | ✅ G-1 账本清空、A4 硬拒；✅ G-2 静态 CSS 臂（`check-font-size-discipline.mjs`） |
+| W1（本轮） | G-3 + G-5 落地为门禁 | ✅ G-3 `check-font-size-discipline.mjs`；✅ G-5 `check-spinner-discipline.mjs`（均带变异臂实测能红） |
+| W1（本轮） | G-4「新面板强制使用」那一半 | ✅ `check-settings-row-anatomy.mjs` 账本制 + 变异臂能红 |
+| 待移动端腿 | G-4 迁移那一半（加第 6 档 `SettingsFieldRow` + 迁 4 个面板） | 契约五档无可编辑插槽（逐档核过），加档要同时改移动端 4 个屏幕并在真机验；本机 AVD 0 台 |
+| — | G-6 禁令校准 | ✅ 关闭：前提被现量否证，无需产品拍板（见该节） |
 
 ---
 
