@@ -140,7 +140,16 @@
 
 修后读数：4 枚设置 spec **118/118**、`form-anatomy`/`design`/`settings-prose`/`ui-language`/`overlay`/`settings-row-anatomy` 全 rc=0、
 上面那支 e2e 7/7，两张关键图（`01-before-request` / `08-password-before-submit`）逐张重看确认。
-⚠️ **仍然没验的**：暗色档、375 窄档、以及移动端两屏 —— 这三格不许在这张表里被算成"已看图"。
+⚠️ **四象限的现量分布（别把这行读成"都看过了"）**：
+1440 亮 = 真看过（上表那三处就是这么抓到的）；375 亮 = 真看过（`tests/narrow-settings.png`，
+横向导航条与行都正常，那枚 `0.5em` 遮罩淡出在窄屏导航左缘生效）；
+**暗色两档 = 没做像素级看图**。暗色这一格本线的现量是"没有新增任何颜色字面量"：
+`git diff f78a328a4^ HEAD -- …/form.css …/ai-panels.css` 的新增行里
+`grep -cE '#hex|rgb|rgba|[0-9]+px'` ⇒ **0**（只有 token 与 token 的 calc），
+`check:theme` 与 `check:design` 均 rc=0 ⇒ 暗色跟随 token 表，不是跟随这批几何改动。
+**常驻的暗色腿还没建**，而且它不是"再写一个 spec"就完：`settings-row-grammar` 这类 e2e
+**一枚都不在 `pnpm check` 链里**（现量：`grep -c settings-row-grammar package.json` ⇒ 0），
+新建的暗色 spec 同样会 0 次执行 —— 要先定"由哪条 `check:*` 跑它"，那是 e2e 射程的裁决。
 
 **看图时顺带撞到的两处，登记但本线不修**：
 
