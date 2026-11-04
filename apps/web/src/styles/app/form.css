@@ -41,6 +41,16 @@
   line-height: var(--ht-line-height-normal);
 }
 
+/* 标签 + 紧跟它的那枚 `?` 占同一格。
+   🔴 `?` 是标签的**兄弟**而不是 `<label>` 的后代：`SettingsInfoTip` 是 `<button>`，
+   套进 `<label>` 会让点问号顺带把焦点甩进输入框。 */
+.ht-input-field__labelcell {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
 /* 必填星号：只给视觉，读屏靠 `aria-required`（那一个才是判据）。 */
 .ht-input-field__required {
   margin-inline-start: var(--ht-space-1);

@@ -92,6 +92,17 @@ export interface FormFieldProps {
    * 但 `aria-label` 必须由调用方给到控件上 —— 本组件不会替你编一个名字。
    */
   leading?: ReactNode;
+  /**
+   * 紧跟标签那枚 `?`（`SettingsInfoTip`）。
+   *
+   * 🔴 它是**兄弟节点**而不是 `<label>` 的后代：`SettingsInfoTip` 渲染的是 `<button>`，
+   * 放进 `<label>` 里会让"点问号"顺带把焦点甩进输入框 —— 而那枚问号解释的是标签，
+   * 不是控件。`docs/agents/design-system.md`「一枚 `?` 紧跟它所解释的标签」要的就是这个位置。
+   *
+   * ⚠️ 只有给了它才多包一层 `__labelcell`：不给时 DOM 与原来逐字相同，
+   * 免得为了一个新能力把已有调用点（AI 端点那三行等）的锚点全改一遍。
+   */
+  labelTip?: ReactNode;
   /** 控件区。`field` 必须摊到真正的 `<input>` / `<select>` 上。 */
   children: (field: FormFieldControlProps) => ReactNode;
   testID?: string;
@@ -111,6 +122,7 @@ export function FormField({
   error,
   required = false,
   leading,
+  labelTip,
   children,
   testID,
 }: FormFieldProps): React.JSX.Element {
@@ -127,18 +139,28 @@ export function FormField({
       data-invalid={invalid ? '' : undefined}
       {...(testID === undefined ? {} : { 'data-testid': testID })}
     >
-      {usesLabelElement ? (
-        <label className="ht-input-field__label" htmlFor={id}>
-          {label}
-          {chrome.showRequiredMark ? (
-            <span className="ht-input-field__required" aria-hidden="true">
-              *
-            </span>
-          ) : null}
-        </label>
-      ) : (
-        <span className="ht-input-field__label">{leading}</span>
-      )}
+      {(() => {
+        const labelCell = usesLabelElement ? (
+          <label className="ht-input-field__label" htmlFor={id}>
+            {label}
+            {chrome.showRequiredMark ? (
+              <span className="ht-input-field__required" aria-hidden="true">
+                *
+              </span>
+            ) : null}
+          </label>
+        ) : (
+          <span className="ht-input-field__label">{leading}</span>
+        );
+        return labelTip === undefined ? (
+          labelCell
+        ) : (
+          <div className="ht-input-field__labelcell">
+            {labelCell}
+            {labelTip}
+          </div>
+        );
+      })()}
       <div className="ht-input-field__control">
         {children({
           id,
