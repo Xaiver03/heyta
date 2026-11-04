@@ -108,12 +108,12 @@ interface SettingsRowProps {
 
 ## 执行节奏
 
-| 周次 | 做什么 |
-|---|---|
-| W1（本轮） | G-1 + G-2 落地为门禁 |
-| W2 | G-3 + G-5 落地为门禁 |
-| W3-W4 | G-4 SettingsRow 抽取 + ProfilePanel 迁移 |
-| 待产品拍 | G-6 禁令校准 |
+| 周次 | 做什么 | 状态 |
+|---|---|---|
+| W1（本轮） | G-1 + G-2 落地为门禁 | G-1 ✅（账本清空，A4 硬拒）；G-2 待 Playwright 臂 |
+| W1（本轮） | G-3 + G-5 落地为门禁 | G-3 ✅ `check-font-size-discipline.mjs`；G-5 ✅ `check-spinner-discipline.mjs` |
+| W3-W4 | G-4 SettingsRow 抽取 + ProfilePanel 迁移 | 待做（大型重构，不阻塞） |
+| 待产品拍 | G-6 禁令校准 | 需产品负责人决策 |
 
 ---
 

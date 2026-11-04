@@ -125,14 +125,7 @@ const CONTROL_FAMILIES = ['ht-btn'];
  * A4 账本：**别线名下**的幻影类。
  * 每行都必须带「为什么现在不在这趟改」与翻案条件 —— 没有翻案条件的豁免行等于永久豁免。
  */
-const PHANTOM_LEDGER = [
-  {
-    variant: 'outline',
-    site: 'apps/web/src/features/settings/CloseAccountPanel.tsx',
-    reason: '注销账号那一格归注册登录标准套件线；本趟只改类名会连带改到那一屏的外观与重量顺序（改别人界面的外观不归本线代改）。',
-    reversal: '那条线自己把它定成四档之一（按危险动作的档位，这枚是行内档 `ht-btn--danger`），或本线 P7 设置面那一趟拿到他们的授权。',
-  },
-];
+const PHANTOM_LEDGER = [];
 
 /**
  * A6 账本：**已知还在换底**的功能 CSS 行。
@@ -521,12 +514,12 @@ function scan() {
 /* ── self-test ─────────────────────────────────────────── */
 
 /**
- * 夹具的使用点：必须**带着两本账的真身**（`outline` 那一处幻影使用、下面 `fixture()`
+ * 夹具的使用点：必须**带着两本账的真身**（下面 `fixture()`
  * 里的 sheets.css 两条）。否则 ① 那枚"合规夹具 ⇒ 零违规"会被"账本过期"三行污染，
  * 而 A4/A6 的过期臂就成了 fixture 与账本互相矛盾的产物，测不到真树。
  */
-const USED_BASE = ['primary', 'secondary', 'ghost', 'danger', 'commit', 'outline'];
-const LEDGER_SITE = 'apps/web/src/features/settings/CloseAccountPanel.tsx';
+const USED_BASE = ['primary', 'secondary', 'ghost', 'danger', 'commit'];
+const LEDGER_SITE = '';
 const SHEETS_FILE = 'apps/web/src/styles/app/sheets.css';
 const MOBILE_SHELL_FIXTURE = `export type ButtonTone = ControlTone;\nconst recipe = controlPaletteOf(tone, emphasis);`;
 
@@ -534,7 +527,7 @@ const SHEETS_GHOST_SEL = '.ht-settings .ht-btn--ghost:not(.ht-settings__inline-a
 
 function usedWith(extra, bare = []) {
   const variants = new Set([...USED_BASE, ...extra]);
-  const sitesByVariant = new Map([['outline', new Set([LEDGER_SITE])]]);
+  const sitesByVariant = new Map();
   for (const v of extra) sitesByVariant.set(v, new Set(['apps/web/src/features/x/Fixture.tsx']));
   return { variants, sitesByVariant, bare, mobileShell: MOBILE_SHELL_FIXTURE };
 }
@@ -607,7 +600,7 @@ async function selftest(real) {
 
   const ledgerStale = fixture();
   ledgerStale.used = {
-    variants: new Set(USED_BASE.filter((v) => v !== 'outline')),
+    variants: new Set(USED_BASE),
     sitesByVariant: new Map(),
     bare: [],
   };
