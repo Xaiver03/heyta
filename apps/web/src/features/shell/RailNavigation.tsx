@@ -51,7 +51,6 @@ const railCollisionDetection: CollisionDetection = (args) => {
 export type RailNavigationProps = {
   view: ViewKey;
   visibleMainTabs: readonly ViewTab[];
-  visibleToolTabs: readonly ViewTab[];
   syncEmail?: string;
   syncNeedsSignIn: boolean;
   growthEnabled: boolean;
@@ -213,7 +212,6 @@ export function RailNavigation(props: RailNavigationProps): React.JSX.Element {
 function DesktopRailNavigation({
   view,
   visibleMainTabs,
-  visibleToolTabs,
   syncEmail,
   syncNeedsSignIn,
   growthEnabled,
@@ -265,12 +263,13 @@ function DesktopRailNavigation({
 
   const railTabs = splitRailTabs(visibleMainTabs, view, preference);
 
-  // 🔴 这一组是**一个**标签组，尽管它在 DOM 里是两段（`role="tablist"` 里的主标签 + 助手，
-  //    和它外面的工具段）。Tab 停留点只能有一枚，顺序按渲染顺序数。
+  // 🔴 这一组是**一个**标签组，尽管它在 DOM 里是两段（`role="tablist"` 里的主标签 + 助手）。
+  //    Tab 停留点只能有一枚，顺序按渲染顺序数。
+  //    ⚠️ 2026-11-04：回收站搬进侧栏之后，rail 不再有第三段工具标签，
+  //    这一组只剩「主标签 + 助手」两段（`SIDEBAR_TOOL_TABS` 由 `App.tsx` 的侧栏渲染）。
   const railTabOrder: readonly string[] = [
     ...railTabs.primary.map((tab) => tab.key),
     ...(onOpenAssistant !== undefined ? [ASSISTANT_TAB_ID] : []),
-    ...visibleToolTabs.map((tab) => tab.key),
   ];
   const railRovingKey = rovingTabKey(railTabOrder, assistantActive ? ASSISTANT_TAB_ID : view);
 
@@ -520,17 +519,13 @@ function DesktopRailNavigation({
         </DragOverlay>, document.body)}
       </DndContext>
       {/*
-        🔴 工具段必须**自己是一个 `role="tablist"`**（2026-10-25）：
-        这些按钮是 `role="tab"`，而它们原来直接挂在 `<nav>` 下 ⇒ **tab 在 tablist 外面**，
-        那是无效的 ARIA 结构（`e2e/tests/rail-trash-anchor.spec.ts` 的 ① 就是钉这一条的，
-        它的注释里写着"为了贴着帮助把它挪出去"是这条判据要挡的改法）。
-        包一层 tablist 既保住结构，又保住"贴底"（`margin-top: auto` 挪到容器上）。
+        🔴 2026-11-04（滴答对齐 D2）：**rail 下段没有工具标签了**。回收站搬进侧栏底部
+        （`App.tsx` 渲染 `SIDEBAR_TOOL_TABS`），所以下段从这一步开始就是
+        铃铛 → 帮助 → 同步 —— 三枚都不是 `role="tab"`（帮助与同步是动作），
+        因此这里不再需要一个 `role="tablist"` 容器。
+        ⚠️ 别把它"顺手加回来"：同一目的地两个控件是产品负责人 2026-10-04 定收集箱那一行时
+        写进 `view-tabs.ts` 的判据（见 `PRIMARY_NAV` 文件头）。
       */}
-      {visibleToolTabs.length > 0 ? (
-        <div role="tablist" aria-label={t('web.shell.views.groupTools')} className="ht-rail__tools">
-          {visibleToolTabs.map((tab, index) => <button key={tab.key} type="button" role="tab" aria-selected={!assistantActive && view === tab.key} tabIndex={railRovingKey === tab.key ? 0 : -1} data-testid={`rail-view-${tab.key}`} className={`ht-rail__tab ht-rail__tab--tool${index === 0 ? ' ht-rail__tab--tool-start' : ''}${!assistantActive && view === tab.key ? ' ht-rail__tab--active' : ''}`} onClick={() => onNavigate(tab.key)}><tab.Icon size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t(tab.labelKey)}</span></button>)}
-        </div>
-      ) : null}
       <InboxBell />
       <button type="button" data-testid="rail-help" className="ht-rail__tab ht-rail__tab--tool" onClick={onOpenHelp}><CircleHelp size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t('web.shell.nav.help')}</span></button>
       <SyncBar />

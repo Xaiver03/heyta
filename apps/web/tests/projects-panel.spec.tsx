@@ -310,6 +310,36 @@ describe('E2 空态：一块空白不算空态', () => {
   });
 });
 
+/**
+ * D3 分组说明（2026-11-04 滴答对齐）。
+ *
+ * 滴答在侧栏的清单分组头下挂一句"这一格装的是什么"。这一句与上面那条空态判据
+ * 是**同一屏的两种处境**，所以两条必须合起来才不自相矛盾：
+ * 空着时空态那句话负责讲，有东西时这一句负责讲 —— 两处都讲就是同一句话在同一屏出现两遍。
+ */
+describe('D3 分组说明：标题下面那句"这一格装的是什么"', () => {
+  it('有清单、有标签时，两个分组头下各挂一句', () => {
+    seed();
+    const view = render();
+    expect(view.querySelector('[data-testid="projects-heading-hint"]')?.textContent).toContain(
+      '用清单收纳任务与便签',
+    );
+    expect(view.querySelector('[data-testid="tags-heading-hint"]')?.textContent).toContain(
+      '标签跨清单给任务打记号',
+    );
+  });
+
+  it('🔴 空列表时那两句**不出现** —— 空态已经讲了同一件事，说两遍是噪音', () => {
+    projectsState.projects = [];
+    projectsState.tags = [];
+    const view = render();
+    expect(view.querySelector('[data-testid="projects-heading-hint"]')).toBeNull();
+    expect(view.querySelector('[data-testid="tags-heading-hint"]')).toBeNull();
+    // 空态那两句仍在：这一格该说的话只有一份。
+    expect(view.textContent ?? '').toContain('还没有清单');
+  });
+});
+
 describe('E3 层级：组标题必须压得住它管辖的说明', () => {
   /**
    * 出处：产品负责人 2026-10-02 对着 macOS 壳的侧栏问的

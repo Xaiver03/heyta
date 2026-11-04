@@ -167,10 +167,12 @@ test.describe('激励体系：真浏览器契约', () => {
     ]);
     await page.keyboard.press('Escape');
 
-    // 工具段照旧是 tab（回收站）；「设置」照旧收在头像菜单，不在 tablist。
+    // 🔴 2026-11-04（滴答对齐 D2）：回收站**不再是 tab** —— 它搬进了侧栏底部那一组。
+    // 「设置」照旧收在头像菜单，不在 tablist。
     const allTabs = (await page.getByRole('tab').allTextContents()).map((t) => t.trim());
-    expect(allTabs).toContain('回收站');
+    expect(allTabs, '回收站搬进侧栏后，rail 的 tab 里不该再有它').not.toContain('回收站');
     expect(allTabs).not.toContain('设置');
+    await expect(page.getByTestId('sidebar-tool-trash')).toBeVisible();
   });
 
   /**
@@ -187,7 +189,7 @@ test.describe('激励体系：真浏览器契约', () => {
    * （`role="presentation"` 的整屏遮罩）。这两件事都**不碰模块默认值**，
    * 所以这条判据测的还是新装用户那一屏。
    */
-  test('🔴 默认 rail = 主段 4（任务/日历/习惯/搜索）+「更多」+ 回收站', async ({ page }) => {
+  test('🔴 默认 rail = 主段 4（任务/日历/习惯/搜索）+「更多」，回收站在侧栏底部', async ({ page }) => {
     await installMissingProducerShims(page);
     await pinChineseUi(page);
     await page.goto('/');
@@ -201,15 +203,17 @@ test.describe('激励体系：真浏览器契约', () => {
         .locator('button[role="tab"]:not([data-testid="rail-assistant"])')
         .allTextContents()
     ).map((t) => t.trim());
-    // 主段 = `splitRailTabs` 钉住的四枚；四象限/时间线在「更多」里；回收站是工具 tab。
+    // 主段 = `splitRailTabs` 钉住的四枚；四象限/时间线在「更多」里。
+    // 🔴 回收站不在这组里了（2026-11-04 滴答对齐 D2，搬进侧栏底部那一组）。
     // ⚠️ 「设置」在头像菜单里、「帮助」是动作（不在 tablist）—— 两个都不是 tab。
-    expect(labels, '默认 = 主段四枚 + 回收站（工具段）').toEqual([
+    expect(labels, '默认 = 主段四枚（工具段已搬出 rail）').toEqual([
       '任务',
       '日历',
       '习惯',
       '搜索',
-      '回收站',
     ]);
+    // 搬走要**落到位**：侧栏底部那一行在新装用户那一屏就在场。
+    await expect(page.getByTestId('sidebar-tool-trash')).toBeVisible();
 
     // 「更多」在场且恰好收默认启用的两枚低频视图（W1：两步可达，不是不可达）。
     await page.locator('.ht-rail__more button').click();

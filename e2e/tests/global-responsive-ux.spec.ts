@@ -67,6 +67,24 @@ async function navigateView(page: Page, id: string, label: string): Promise<void
     await direct.first().click();
     return;
   }
+  /*
+   * 🔴 2026-11-04（滴答对齐 D2）：回收站搬进**侧栏底部**，rail 的两套入口都不再有它，
+   * 所以它必须走自己那条真路径。两个前置都是产品的真实形状，不是替缺陷绕路：
+   *   ① 侧栏只在**任务视图**渲染 ⇒ 人在别的视图时先回「任务」；
+   *   ② 窄档那一列住在抽屉里（`task-scope-toggle`）⇒ 宽档那枚按钮 CSS 不显示，
+   *      所以按"看得见才点"取，两种视口都走得通。
+   */
+  if (id === 'trash') {
+    const row = page.getByTestId('sidebar-tool-trash');
+    if (!(await row.isVisible().catch(() => false))) {
+      await navigateView(page, 'tasks', '任务');
+      const toggle = page.getByTestId('task-scope-toggle');
+      if (await toggle.isVisible().catch(() => false)) await toggle.click();
+    }
+    await expect(row, '回收站应当能在侧栏底部点到').toBeVisible();
+    await row.click();
+    return;
+  }
   const tool = page.getByRole('tab', { name: label, exact: true });
   if (await tool.count() > 0 && await tool.first().isVisible().catch(() => false)) {
     await tool.first().click();

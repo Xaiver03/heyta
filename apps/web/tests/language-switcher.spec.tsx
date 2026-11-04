@@ -141,7 +141,13 @@ function shellText(el: HTMLElement): string {
   return [sidebar, tabs].map((node) => node.textContent ?? '').join(' ');
 }
 
-/** 工具段（回收站）是 rail 的独立区域，不属于上段 tablist。 */
+/**
+ * rail 下段（通知 / 帮助 / 同步）是 rail 的独立区域，不属于上段 tablist。
+ *
+ * ⚠️ 2026-11-04 起这里**没有回收站**了 —— 它搬进了侧栏底部（`SIDEBAR_TOOL_TABS`）。
+ * 这一枚锚要的是"设置浮层还开着时也一直在屏幕上"的那句文案，铃铛满足，回收站不满足
+ * （侧栏那一列只在任务视图存在）。回收站那一行的翻译在 278 行那一条单独量。
+ */
 function railToolText(el: HTMLElement): string {
   return [...el.querySelectorAll<HTMLElement>('.ht-rail__tab--tool')]
     .map((node) => node.textContent ?? '')
@@ -251,9 +257,11 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     expect(el.textContent).toContain('收集箱');
     // ⚠️ 2026-09-29：这里原本断言的是「设置」——那时它是 rail 上的一个 tab。
     // 现在设置收进了**头像菜单**（点开才出现），所以改用两个**一直在屏幕上**的：
-    // 「回收站」（rail 工具段的 tab）与「帮助」（rail 底部的**动作**，不在 tablist 里）。
+    // 「通知」（rail 下段的铃铛）与「帮助」（rail 底部的**动作**，不在 tablist 里）。
     // 意图没变：外壳里至少要有几块**不同的**文案一起被翻过去。
-    expect(el.textContent).toContain('回收站');
+    // ⚠️ 2026-11-04：原来这里用的是「回收站」，那一枚已搬进侧栏底部，而**设置开着时
+    // 侧栏不在 DOM 里** —— 拿它当锚会在"没渲染"上假红，所以换成铃铛。
+    expect(railToolText(el)).toContain('通知');
     expect(el.textContent).toContain('帮助');
     expect(el.textContent).toContain('收集箱是空的');
 
@@ -275,7 +283,10 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     // 三块**各自**都被断言到，避免"某一块没换语言"从缝里漏过去。
     expect(el.querySelector('.ht-sidebar')?.textContent).toContain('Today');
     expect(el.querySelector('[role="tablist"]')?.textContent).toContain('Tasks');
-    expect(railToolText(el)).toContain('Trash');
+    // 回收站那一行现在住**侧栏底部**（2026-11-04 D2），它跟着翻才有对照物。
+    expect(el.querySelector('.ht-sidebar__tools')?.textContent).toContain('Trash');
+    // 铃铛那句也一起翻（rail 下段）。
+    expect(railToolText(el)).toContain('Notifications');
     // 「帮助」在 tablist **外面**（它是动作）—— 单独断言，正好钉住这一点。
     expect(el.querySelector('[data-testid="rail-help"]')?.textContent).toContain('Help');
     expect(el.textContent).toContain('Your inbox is empty');
@@ -294,7 +305,7 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     });
     // 中文界面点中文项 —— 界面不该动，localStorage 也不该被写出一条"偏好"。
     // 锚用 rail 那一段（设置开着时范围列不在 DOM 里，拿它当锚会假红）。
-    expect(railToolText(el)).toContain('回收站');
+    expect(railToolText(el)).toContain('通知');
     expect(localStorage.getItem('heyta.locale')).toBeNull();
     expect(option(el, 'zh-CN').getAttribute('aria-current')).toBe('true');
   });
@@ -306,8 +317,8 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     });
     // 先钉住"第一下真的切过去了"，否则这条测试在"按钮完全没接线"时也会绿。
     // 锚用 rail（此刻还开着设置）。
-    expect(railToolText(el)).toContain('Trash');
-    expect(railToolText(el)).not.toContain('回收站');
+    expect(railToolText(el)).toContain('Notifications');
+    expect(railToolText(el)).not.toContain('通知');
 
     act(() => {
       option(el, 'zh-CN').click();
@@ -334,8 +345,8 @@ describe('🔴 刷新后保持：落盘 + <html lang>', () => {
     const again = await mountIntoSettings();
 
     expect(option(again, 'en').getAttribute('aria-current')).toBe('true');
-    // 设置已收进头像菜单；用一直在屏幕上的「回收站」代替（意图不变：语言落盘了）。
-    expect(again.textContent).toContain('Trash');
+    // 设置已收进头像菜单；用一直在屏幕上的「通知」铃铛代替（意图不变：语言落盘了）。
+    expect(again.textContent).toContain('Notifications');
     expect(document.documentElement.lang).toBe('en');
   });
 
@@ -354,7 +365,7 @@ describe('🔴 刷新后保持：落盘 + <html lang>', () => {
     expect(localStorage.getItem('heyta.locale')).toBe('zh-CN');
     expect(document.documentElement.lang).toBe('zh-CN');
     // 锚用 rail（设置还开着；范围列不在 DOM 里）。
-    expect(railToolText(el)).toContain('回收站');
+    expect(railToolText(el)).toContain('通知');
   });
 });
 
@@ -436,7 +447,7 @@ describe('🔴 <StrictMode>：首启推断不落盘，明确选择落盘', () =>
 
     const el = await mountIntoSettings(true);
     // 前提：首启是推断来的英文，且没落盘。（锚用 rail —— 设置还开着。）
-    expect(railToolText(el)).toContain('Trash');
+    expect(railToolText(el)).toContain('Notifications');
     expect(localStorage.getItem('heyta.locale')).toBeNull();
 
     act(() => {

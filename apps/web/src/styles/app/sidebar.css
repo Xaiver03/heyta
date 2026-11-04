@@ -3,7 +3,7 @@
 .ht-sidebar {
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-2);
+  gap: var(--ht-space-3);
   padding: var(--ht-space-4);
   background: var(--ht-color-surface);
   /* 工作区靠底色与留白分层，拖拽时才显示手柄。 */
@@ -210,6 +210,28 @@
   padding-inline: 0;
 }
 
+/* 分组头下那一句说明（滴答对齐 D3）：字号与颜色都从既有档位取，
+   不新开一级排印 —— 侧栏的层级只有「组名 / 行 / 说明」这三档。 */
+.ht-sidebar__organizer-hint {
+  margin: 0;
+  padding-inline: var(--ht-space-2);
+  padding-block-end: var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+}
+
+/*
+ * 侧栏底部「工具」那一组（滴答对齐 D2：回收站从 rail 搬到这里）。
+ *
+ * 🔴 `margin-top: auto` 是这一组**贴侧栏底部**的唯一机制：`.ht-sidebar__body`
+ * 是 flex 列，子项都写死 `flex: 0 0 auto`，所以留白只能由 auto 外边距吃。
+ * 清单很长时这一组被推到滚动区之下 —— 那是这一列本来就该有的行为，
+ * 不是"入口丢了"（`overflow-y: auto` 在那条规则上）。
+ */
+.ht-sidebar__tools {
+  margin-top: auto;
+  padding-block-start: var(--ht-space-2);
+}
+
 .ht-sidebar__organizer-add {
   display: inline-grid;
   place-items: center;
@@ -235,7 +257,7 @@
   gap: var(--ht-space-3);
   /* 44px 触控下限 —— 用 token 而不是写死，测试守着这个值 */
   min-block-size: var(--ht-touch-target-min);
-  padding: 0 var(--ht-space-3);
+  padding: 0 var(--ht-space-4);
   border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
   font-weight: var(--ht-font-weight-medium);

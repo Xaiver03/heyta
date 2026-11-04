@@ -18,7 +18,8 @@ export function CompactRailNavigation(props: RailNavigationProps): React.JSX.Ele
   const panel = useRef<HTMLDivElement>(null);
   const [bottom, setBottom] = useState(0);
   const primary = props.visibleMainTabs.filter(({ key }) => key === 'tasks' || key === 'calendar');
-  const overflow = [...props.visibleMainTabs.filter((tab) => !primary.includes(tab)), ...props.visibleToolTabs];
+  // 2026-11-04（滴答对齐 D2）：回收站搬进侧栏底部，rail 的工具段在这里已经没有可收的了。
+  const overflow = props.visibleMainTabs.filter((tab) => !primary.includes(tab));
   const activeInMore = !props.assistantActive && overflow.some(({ key }) => key === props.view);
 
   useLayoutEffect(() => {

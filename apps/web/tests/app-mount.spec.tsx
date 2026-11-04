@@ -978,7 +978,8 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
 
     const rail = container.querySelector('.ht-rail');
     expect(rail, '没有 rail').not.toBeNull();
-    // 🔴 **默认 7 个 `role=tab`** = 6 个视图（任务/搜索/日历/四象限/习惯/时间线）+ 1 个工具（回收站）。
+    // 🔴 **默认 6 个 `role=tab`** = 5 个视图（任务/搜索/日历/四象限/习惯/时间线里落到主段的那些）
+    // + 1 个 AI 入口。
     // 「搜索」是**常驻**的（不是功能模块，不给关）—— ⚠️ 它在 DOM 里排在那 5 个之后，
     // 所以下面只数个数；顺序由 e2e 的 `TABS` 逐字钉住。
     // 不是 10 —— 10 是"所有功能模块都打开"时才有的数量（见 `shell/modules.ts`）。
@@ -996,9 +997,10 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     // 把期望写死在这里，是成本最低、又能真正盖住"有人在 rail 上顺手加了个按钮"
     // 这一失效模式的做法。
     //
-    // 默认主段 = 4 个高频目的地（任务/日历/习惯/搜索）+ 单一 AI Agent 入口；
-    // 下段工具是「回收站」。Agent 是统一聊天入口，不再拆成工具/会话多个目的地。
+    // 默认主段 = 4 个高频目的地（任务/日历/习惯/搜索）+ 单一 AI Agent 入口。
+    // Agent 是统一聊天入口，不再拆成工具/会话多个目的地。
     // 低频的四象限 / 时间线进入「更多」，但仍必须保持可达。
+    // 🔴 回收站**不在 rail 上了**（2026-11-04 滴答对齐 D2，搬到侧栏底部，见下面那条）。
     const railLabels = [...rail!.querySelectorAll('button[role="tab"]')].map((b) =>
       (b.textContent ?? '').trim(),
     );
@@ -1008,7 +1010,6 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
       '习惯',
       '搜索',
       '对话助手',
-      '回收站',
     ]);
 
     const more = [...rail!.querySelectorAll('button')].find((button) =>
@@ -1061,6 +1062,30 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     for (const q of ['重要且紧急', '重要不紧急', '紧急不重要', '不重要不紧急']) {
       expect(text, `缺少象限「${q}」`).toContain(q);
     }
+  });
+
+  it('🔴 回收站在**侧栏底部**那一组（2026-11-04 滴答对齐 D2），点它切到回收站视图', async () => {
+    const { container } = await mountApp();
+    const sidebar = container.querySelector('.ht-sidebar');
+    const tools = sidebar?.querySelector('.ht-sidebar__tools');
+    expect(tools, '侧栏底部缺「工具」那一组').not.toBeNull();
+    const trash = tools!.querySelector<HTMLElement>('[data-testid="sidebar-tool-trash"]');
+    expect(trash, '侧栏底部没有回收站那一行').not.toBeNull();
+    expect((trash!.textContent ?? '').trim()).toBe('回收站');
+
+    // rail 上不许再有第二枚（同一目的地两个控件是 2026-10-04 定收集箱那行时写死的判据）。
+    expect(
+      container.querySelector('.ht-rail [data-testid="rail-view-trash"]'),
+      '回收站搬进侧栏后，rail 上不该再留着它',
+    ).toBeNull();
+
+    await act(async () => {
+      trash!.click();
+    });
+    expect(
+      container.querySelector('[data-testid="trash-board"]'),
+      '点了侧栏那一行却没进回收站视图',
+    ).not.toBeNull();
   });
 });
 
