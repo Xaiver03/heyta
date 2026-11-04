@@ -104,8 +104,11 @@ AI 端点的三行 `inline` 字段、保险库口令的六格 `stacked` 字段�
 🔴 **交错那一格已经补上（2026-11-04）**：`SettingsRowModel` 多了一档 **`host`** ——
 "顺序与分组归契约，内容自己的解剖归它那一族"。`ProfilePanel` 的三格因此收完：
 头像 = `trailing`、昵称 = `host` 里的一格 `FormField`、邮箱 = `value`。
-现量（真浏览器 1440）：手写 `__row` 从 4 处降到 1 处（那一处在换邮箱那块里），
-行距从 ≈85px 收到与字段行同一档，三格控件右缘对齐。
+现量（2026-11-04 复量，**别抄这一句，跑下面这条**）：`grep -c ht-settings__row apps/web/src/features/settings/*.tsx`
+⇒ 设置面那几屏**一枚都不剩**（当天早些时候这里写的"降到 1 处"是旧读数，被注销账号那一格的收口顶掉了）；
+仓里还剩的两处在 `App.tsx` 与 `features/shell/FeatureModulesPanel.tsx`，都不在设置面的行解剖账本射程里
+（`node scripts/check-settings-row-anatomy.mjs` 自己打印逐文件账本）。
+真浏览器 1440 那趟的几何读数：三格控件右缘对齐、行距与字段行同一档。
 ⚠️ `host` **不是**"什么都能塞"的逃生口：它只解决"一屏里两族按用户读到的顺序排在一起"，
 判断"这一格属于哪族"的口径没变（还是 §1 那两档 + §1b 那两族）。
 账本现量由 `node scripts/check-settings-row-anatomy.mjs` 自己打印。
