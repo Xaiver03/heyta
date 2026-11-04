@@ -308,7 +308,12 @@ describe('个人信息面板（R10）', () => {
         `「${name}」落在了值那一列 —— 问号只许跟在标签/小标题后面`,
       ).toBeNull();
       expect(
-        trigger.closest('.ht-settings__row-label, .ht-settings__h3'),
+        // 🔴 类名集合要认「共享字段解剖」那一档：昵称行 2026-11-04 迁到 `FormField` 之后，
+        //   标签那格容器从手写的 `.ht-settings__row-label` 变成 `.ht-input-field__labelcell`
+        //   （只在挂了 `?` 时才包这一层）。本条断言的是**结构关系**——问号紧跟标签，
+        //   不是某个类名；上面那条 `__row-body` 为 null 仍然守着反向形状（问号掉进值那一列）。
+        //   ⚠️ 只加这一格、不放松任何一条：把 `?` 挪回 `row-body` 依旧两向都红。
+        trigger.closest('.ht-settings__row-label, .ht-settings__h3, .ht-input-field__labelcell'),
         `「${name}」没有紧跟任何标签或小标题`,
       ).not.toBeNull();
     }

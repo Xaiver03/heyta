@@ -83,6 +83,7 @@ import {
 } from '@heyta/shared-schema';
 
 import { useSyncStore } from '../sync/store.js';
+import { FormField } from '../../lib/form/FormField.js';
 import { EmailChangePanel } from './EmailChangePanel.js';
 import { SettingsInfoTip } from './SettingsInfoTip.js';
 import { loadAvatarImage, type AvatarFileError } from './avatar-encode.js';
@@ -415,27 +416,35 @@ export function ProfilePanel({
         </div>
       </div>
 
-      <div className="ht-settings__row" data-testid="profile-nickname-row">
-        <div className="ht-settings__row-label">
-          <label className="ht-settings__item-label" htmlFor="profile-nickname">
-            {t('common.profile.nickname.label')}
-          </label>
-          <SettingsInfoTip
-            label={t('common.profile.nickname.whyLabel')}
-            text={t('common.profile.nickname.why')}
-            testId="profile-nickname-why"
-          />
-        </div>
-        <div className="ht-settings__row-body">
-          {/*
-            🔴 用 `.ht-settings__field` 约束输入框宽度（max 42rem），
-            与下方 EmailChangePanel 对齐。之前这里没有约束，输入框会铺满整行，
-            在宽屏上非常难看（ui-ux-pro-max §8 Forms & Feedback）。
-          */}
-          <div className="ht-settings__field">
+      {/*
+        🔴 这一行的字段部分走**共享字段解剖** `FormField`（2026-11-04，治理计划 G-4）。
+        之前这里是手写的 `<label htmlFor>` + `<input>` + 手拼的 `id="profile-nickname"`，
+        而 `FormField` 的契约明写「`htmlFor` / `id` 都从它来，全仓不许再手拼字符串 id」。
+        `layout="inline"` 是设置/属性面板那一档（标签在左），不是表单页的 `stacked` ——
+        这条取值规则住在 `FormField` 的 props 注释与 `docs/agents/ux-principles.md` §1，
+        **两档之外不许有第三档**。
+        外层 `__row--field` 只保留行的节奏（内边距 + 行间发丝线），两列交给字段自己。
+      */}
+      <div
+        className="ht-settings__row ht-settings__row--field"
+        data-testid="profile-nickname-row"
+      >
+        <FormField
+          id="profile-nickname"
+          label={t('common.profile.nickname.label')}
+          layout="inline"
+          labelTip={
+            <SettingsInfoTip
+              label={t('common.profile.nickname.whyLabel')}
+              text={t('common.profile.nickname.why')}
+              testId="profile-nickname-why"
+            />
+          }
+        >
+          {(fieldProps) => (
             <div className="ht-settings__actions">
               <input
-                id="profile-nickname"
+                {...fieldProps}
                 type="text"
                 className="ht-input"
                 data-testid="profile-nickname-input"
@@ -458,18 +467,18 @@ export function ProfilePanel({
                 {t('common.profile.nickname.save')}
               </button>
             </div>
-          </div>
-          {/* 输入框下面那句"最多 32 字"也是说明 → 挪进上面那枚 `?` 的正文。 */}
-          {tooLong ? (
-            <p className="ht-settings__danger" data-testid="profile-nickname-toolong">
-              {t('common.profile.nickname.toolong', {
-                max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
-                count: String(codePoints),
-              })}
-            </p>
-          ) : null}
-          <NoticeLine notice={nameNotice} testId="profile-nickname-notice" />
-        </div>
+          )}
+        </FormField>
+        {/* 输入框下面那句"最多 32 字"也是说明 → 挪进上面那枚 `?` 的正文。 */}
+        {tooLong ? (
+          <p className="ht-settings__danger" data-testid="profile-nickname-toolong">
+            {t('common.profile.nickname.toolong', {
+              max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
+              count: String(codePoints),
+            })}
+          </p>
+        ) : null}
+        <NoticeLine notice={nameNotice} testId="profile-nickname-notice" />
       </div>
 
       {/*

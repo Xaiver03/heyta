@@ -1,5 +1,5 @@
 {
- "total": 54,
+ "total": 53,
  "files": {
   "AiSettings.tsx": 8,
   "CloseAccountPanel.tsx": 2,
@@ -10,7 +10,7 @@
   "MemoryPanel.tsx": 5,
   "PasskeyPanel.tsx": 4,
   "PasswordPanel.tsx": 2,
-  "ProfilePanel.tsx": 10,
+  "ProfilePanel.tsx": 9,
   "SessionsPanel.tsx": 4,
   "SettingsAccountGate.tsx": 4,
   "TickTickImportPanel.tsx": 4

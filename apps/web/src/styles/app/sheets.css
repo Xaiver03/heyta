@@ -256,6 +256,19 @@
   border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
 }
 
+/* 行壳里装的是**共享字段解剖**（`FormField layout="inline"`）时的那一档。
+ *
+ * 🔴 这一格自己**不再**分两列：两列是字段解剖的事（标签列 + 控件列），
+ *   已经由那一层给出。这里只留行的节奏 —— 上下内边距与行间发丝线。
+ *   写成两列会变成"标签列套两层网格"，左右边界对不齐正是 2026-10-24 实拍要治的形状。
+ * ⚠️ 这条选择器**不许**提到 `.ht-input-field*` —— 那会被 `check:form-anatomy` 的 R2
+ *   判成"解剖的第二个定义处"（它的正则吃的是**选择器里的出现**，不只是声明块）。
+ *   所以这一档由调用方显式挂 `--field` 这个修饰类，而不是由 sheets.css 去认隔壁的类名。
+ */
+.ht-settings__row--field {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .ht-settings__row:first-child { padding-block-start: 0; }
 .ht-settings__row:last-child { padding-block-end: 0; }
 
