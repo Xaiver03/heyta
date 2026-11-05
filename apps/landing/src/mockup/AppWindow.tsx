@@ -69,6 +69,7 @@ import {
   SHELL_PRIMARY_NAV,
   SHELL_QUADRANT_NAV,
   SHELL_QUADRANT_SECTION_KEY,
+  SHELL_SIDEBAR_TOOLS,
   SHELL_VIEW_TABS,
   MOCKUP_PREVIEW_TABS,
   type MockView,
@@ -401,7 +402,8 @@ export function AppWindow({
               ) : null}
             </div>
             <div className="mk-rail__tools">
-              {interactive ? null : renderRailTab(SHELL_VIEW_TABS.find((tab) => tab.key === 'trash') ?? SHELL_VIEW_TABS[0]!)}
+              {/* 2026-11-04（滴答对齐 D2）：回收站从 rail 搬进侧栏底部，
+                  展厅的 rail 下段因此只剩「帮助 + 同步」两枚（与真应用同形）。 */}
               <div className="mk-rail__tab"><CircleHelp size={ICON_SIZE.sm} /><span>{t('web.shell.nav.help')}</span></div>
               <div className="mk-rail__sync"><RefreshCw size={ICON_SIZE.xs} /><span>{t('web.sync.status.synced')}</span></div>
             </div>
@@ -477,6 +479,25 @@ export function AppWindow({
                 </div>
               </div>
             ))}
+            {/*
+              侧栏底部那一组（真应用的 `SIDEBAR_TOOL_TABS` = 回收站）。
+              2026-11-04 滴答对齐 D2：它从 rail 下段搬到这里，展厅跟着搬。
+            */}
+            <div className="mk-nav mk-sidebar__tools">
+              {SHELL_SIDEBAR_TOOLS.map((tool) => {
+                const ToolIcon = SHELL_ICONS[tool.icon];
+                const viewKey = isMockView(tool.key) ? tool.key : null;
+                return (
+                  <NavItem
+                    key={tool.key}
+                    icon={<ToolIcon size={ICON_SIZE.sm} />}
+                    label={t(tool.labelKey)}
+                    active={viewKey !== null && activeView === viewKey}
+                    onClick={interactive && viewKey !== null ? () => navigate(viewKey) : undefined}
+                  />
+                );
+              })}
+            </div>
           </nav> : null}
 
           <main className="mk-main">

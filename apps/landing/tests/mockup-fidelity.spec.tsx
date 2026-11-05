@@ -231,12 +231,13 @@ describe('展厅复刻与应用一致', () => {
       zhCN['web.calendar.title'],
       zhCN['web.shell.views.habits'],
       zhCN['web.search.title'],
-      zhCN['web.trash.nav'],
     ]);
     // 🔴 原来这里写的是「视图 N + 2」—— 那两枚是页头上的「日期 / 倒计时」，
     // 它们 2026-09-30 就搬进 设置 → 显示 了。现在整窗口里只剩视图那一组：
     // 数量仍从登记处推导，写死的 +2 会把下一次"再搬一枚"读成"复刻少画了"。
-    expect(tabs).toHaveLength(5);
+    // ⚠️ 2026-11-04（滴答对齐 D2）：回收站从 rail 搬进侧栏底部 ⇒ 这一组少一枚，
+    // 它在侧栏那一条判据里被钉住（`mockup-shell-shape.spec.tsx` #5）。
+    expect(tabs).toHaveLength(4);
   });
 
   it('侧栏主导航把登记的每一项都画出来了，含「已完成」', () => {

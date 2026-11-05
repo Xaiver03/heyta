@@ -58,6 +58,7 @@ import {
   SHELL_PRIMARY_NAV,
   SHELL_QUADRANT_NAV,
   SHELL_QUADRANT_SECTION_KEY,
+  SHELL_SIDEBAR_TOOLS,
   SHELL_VIEW_TABS,
 } from '../src/mockup/app-shell-shape.js';
 import {
@@ -157,8 +158,6 @@ function appDefaultRail(): { keys: string[]; labelKeys: string[] } {
       ...src.slice(start, end).matchAll(/\{\s*key:\s*'([^']+)',\s*labelKey:\s*'([^']+)'/g),
     ].map((m) => ({ key: m[1] ?? '', labelKey: m[2] ?? '' }));
   })();
-  const tools = pairsOf('const TOOL_VIEW_TABS');
-
   // 模块的默认开关 —— 从 `modules.ts` 的 registry 里抠（key 与 defaultOn 配对，
   // 顺序在这份文件里是"先 key 后 defaultOn"）。
   const modulesSource = readFileSync(
@@ -174,8 +173,25 @@ function appDefaultRail(): { keys: string[]; labelKeys: string[] } {
   );
 
   const enabledModules = modules.filter((m) => defaults.get(m.key) === true);
-  const shown = [...alwaysOn, ...enabledModules, ...search, ...tools];
+  // ⚠️ 2026-11-04（滴答对齐 D2）：回收站从 rail 下段搬进**侧栏底部**，
+  // 所以它不再算进"默认 rail"，改由下面 `appSidebarTools()` 单独对账。
+  const shown = [...alwaysOn, ...enabledModules, ...search];
   return { keys: shown.map((p) => p.key), labelKeys: shown.map((p) => p.labelKey) };
+}
+
+/**
+ * 真应用**侧栏底部那一组**（`view-tabs.ts` 的 `SIDEBAR_TOOL_TABS`）的 `key` / `labelKey`。
+ *
+ * 🔴 它必须与 rail **分开**对账：混进 rail 那份，"搬走"这一步就会同时改两个事实源，
+ * 而那条判据本来就只认渲染出来的那一列。
+ */
+function appSidebarTools(): { keys: string[]; labelKeys: string[] } {
+  const tools = [
+    ...arrayBlock(viewTabsSource(), 'const SIDEBAR_TOOL_TABS').matchAll(
+      /\{\s*key:\s*'([^']+)',\s*labelKey:\s*'([^']+)'/g,
+    ),
+  ].map((match) => ({ key: match[1] ?? '', labelKey: match[2] ?? '' }));
+  return { keys: tools.map((p) => p.key), labelKeys: tools.map((p) => p.labelKey) };
 }
 
 /**
@@ -406,18 +422,35 @@ describe('#5 视图 tab：登记处 ⟷ 真应用 `VIEW_TABS`', () => {
       'habits',
       'timeline',
       'search',
-      'trash',
     ]);
     expect(SHELL_VIEW_TABS.map((tab) => tab.key)).toEqual(app.keys);
     expect(SHELL_VIEW_TABS.map((tab) => tab.labelKey)).toEqual(app.labelKeys);
   });
 
-  it('渲染出的默认 rail 是 7 项，标签逐字等于应用词条', () => {
+  it('🔴 回收站住**侧栏底部**那一组：登记的与真应用 `SIDEBAR_TOOL_TABS` 逐项同 key、同序，且渲染在侧栏里', () => {
+    const app = appSidebarTools();
+    expect(app.keys).toEqual(['trash']);
+    expect(SHELL_SIDEBAR_TOOLS.map((tab) => tab.key)).toEqual(app.keys);
+    expect(SHELL_SIDEBAR_TOOLS.map((tab) => tab.labelKey)).toEqual(app.labelKeys);
+
+    const view = renderMockup('tasks');
+    // rail 上不许还画着它（同一目的地两个控件），侧栏底部必须有。
+    expect(
+      view.querySelector('.mk-rail__tools [data-view-key="trash"]'),
+      '回收站搬进侧栏后，展厅的 rail 不该再画它',
+    ).toBeNull();
+    expect(
+      view.querySelector('.mk-sidebar__tools')?.textContent,
+      '展厅的侧栏底部没有回收站那一行',
+    ).toContain(zhCN['web.trash.nav']);
+  });
+
+  it('渲染出的默认 rail 是 6 项登记里的 4 项（低频进「更多」），标签逐字等于应用词条', () => {
     const view = renderMockup('tasks');
     const labels = [...view.querySelectorAll('.mk-rail__tab[data-view-key]')].map(
       (el) => el.textContent?.trim() ?? '',
     );
-    expect(labels).toHaveLength(5);
+    expect(labels).toHaveLength(4);
     // ⚠️ `web.shell.nav.quadrant`（视图 tab）与 `web.shell.nav.quadrantSection`（侧栏分区）
     // 中文逐字相同 —— 所以只比渲染出的文本抓不到"抄错 key"。文本相等 + key 对账两条一起才够。
     expect(labels).toEqual([
@@ -425,7 +458,6 @@ describe('#5 视图 tab：登记处 ⟷ 真应用 `VIEW_TABS`', () => {
       zhCN['web.calendar.title'],
       zhCN['web.shell.views.habits'],
       zhCN['web.search.title'],
-      zhCN['web.trash.nav'],
     ]);
     expect(SHELL_VIEW_TABS.map((tab) => zhCN[tab.labelKey])).toEqual(
       appDefaultRail().labelKeys.map((key) => zhCN[key as keyof typeof zhCN]),
