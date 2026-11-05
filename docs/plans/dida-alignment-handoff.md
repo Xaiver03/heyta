@@ -261,7 +261,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 
 | 门 / 腿 | 最后一次现量 |
 |---|---|
-| `pnpm check:design` / `check:design-token-refs` / `check:menu-keyboard` / `check:ui-language` / `check:docs` / `check:evidence-hygiene` | 2026-11-05 16:5x 全部退 0（阶段 1 入库前后各一趟） |
+| `pnpm check:design` / `check:design-token-refs` / `check:menu-keyboard` / `check:ui-language` / `check:docs` / `check:evidence-hygiene` | 2026-11-05 16:5x 全部退 0。⚠️ 其中 `check:evidence-hygiene` 那一戳**早于**设备图入库那笔（`907bd60e3`，20:1x），22:57 在提交**之后**复跑过一遍：rc=0，10 个 root / 10289 个文件 / 0 处违规，本线那两张图 358KB 与 392KB（单文件上限 25 MB） |
 | 🔴 `pnpm check:row-single-source` | 2026-11-05 16:53 **退 1**：`ht-*` 前缀族 29 > 基线 28。与本线无关 —— HEAD 与工作树的族清单**逐行相同**（两边都 29），28→29 那一跳在 `3d0d593f4`（收集框 S1–S5），多出来那一族是 `.ht-capture`。归因与两条出路写在 `BLOCKED.md` B263；本文 §4.4 那格说的 `.ht-spin` 已被 `7d3521391` 收掉，是旧的一戳 |
 | `pnpm check:tokens` / `check:md-tables` / `check:doc-citations` / `check:windows-xaml` / `check:native-bare` | 2026-11-05 16:5x 退 0（阶段 1 那六份生成件由 `generate:check` 逐字节对账，不是手写） |
 | 🔴 `pnpm check:arkts` | 本机 **rc=0，但它是"跳过"**：找不到 `es2abc` 时打一行 ⚠️ 警告后**正常退出**（现量：`pnpm check:arkts; echo $?` ⇒ 0；候选路径逐个 `[ -e ]` 全不存在，`/Applications/DevEco*` 无匹配）。⇒ **"这道门绿了"在本机不等于 `HeytaTokens.ets` 被编译验证过**——它是那种在本机会永远通过的判据，别把它读成通过。本线那笔只改了 `.ets` 里一个数字（56→60），语法风险小，但那是推理不是验证：那一半仍记**未判定**，要判定得在有 DevEco 的机器上跑，或用 `HEYTA_ES2ABC=<路径>` 指定编译器（这一类已登记成环境陷阱 **#656**）。 |
