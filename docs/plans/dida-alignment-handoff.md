@@ -142,7 +142,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | Android 设备腿 | **没跑**。构建与模拟器在 linux-dev（不在本机），需要先写/接一枚远端装置；参照收集框那条线的做法，别在本机起 Gradle |
 | 四端重装 | **没跑**（要在隔离检出里跑，见 [multi-end-build](../agents/multi-end-build.md)） |
 | 整棵 `e2e/` | **刻意没跑**：它会重写别线未入库的取证图 |
-| iOS 屏幕图 | 已取到（两张入库）。⚠️ 每跑一趟装置会在模拟器本地库里留 3 条 op（置顶是持久状态），目标行会逐趟下漂——脚本注释里写明并给了应对 |
+| iOS 屏幕图 | 已取到（两张入库，17:0x 那一趟换上并逐张与上一趟对比过）。⚠️ 每跑一趟装置会在模拟器本地库里留 3 条 op（置顶是持久状态），目标行会逐趟下漂——本趟现量 `ops 31 → 34`、侧栏角标 `22 → 24`；脚本注释里写明并给了应对（读数前先 `--scroll-into-view`，判据读相对 y） |
 | 暗色 | 只在 web 验过（e2e ⑤⑦）；移动端/桌面壳的暗色没有设备读数 |
 
 ### 4.4 跨树一致性（一格，等别人落库）
@@ -209,7 +209,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | `pnpm typecheck`（整仓） | 2026-11-05 17:01 退 0（阶段 1 入库之后重跑） |
 | web 单测（本线三枚 spec） | 2026-11-05 16:11 123 条全过；`packages/design-system` 546、`packages/ui` 894、landing `mockup-task-row` 6 + `mockup-quadrant-shape` 15、web `quadrant-row-parity` + `calendar-day-view` 23 同日全过 |
 | 浏览器腿 | 2026-11-05 16:39 11/11（本线两枚 spec，跑在新密度上） |
-| iOS 设备腿 | 2026-11-05 00:1x 两趟 9/9（第二趟长按一次命中）。⚠️ 本趟**没重跑**：设备面被别线占着（现量 `ps aux | grep verify-mobile-capture-android` 两枚在跑；`sysctl vm.swapusage` used 9.8G / 11.2G），空了再跑 `IOS_UDID=<现量取> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida bash scripts/verify-mobile-pin-order.sh` |
+| iOS 设备腿 | 2026-11-05 17:0x 又一趟 **9/9、退 0**，读数头上打的是 `git HEAD = 1062146c6`（阶段 1 入库之后那棵）。⚠️ 装置自己那行"这一读数属于哪一棵树"同时写着**装着的产物 mtime = 11-04 22:26** —— 它没重打包。这一格为什么仍然算数：本笔提交进 bundle 的运行时值就是那四枚 token，而它们 11-04 就在那棵工作树里（B261 现量过同一批 hunk），今天入库的只是提交动作与注释；要"从当前产物现建"那一档，得强制重打包再跑一趟。两张图已换上并**逐张与上一趟对比**：`row-menu.png` 同形（菜单五项 + 两行），`after-pin.png` 的差别是滚动位置与攒下的行（角标 22→24），不是产品变了。⚠️ 新的一趟里被钉住那条落在 **y=-29**（装置按 #655 的纪律"按下→回读→滚一段再来"，于是它跑到了容器上沿之外），所以那一格的判据是**相对 y 读数**，图只是旁证 —— 别拿这张图当"第一行看得见"的证据。 |
 | 桌面壳 | 同日 `--window` 一趟：`rows=1 / colorBuckets=66`，图入库并看过 |
 | 未跑 | 整棵 `e2e/`、四端重装、Android 设备腿（收集框线此刻正在跑那一枚） |
 
