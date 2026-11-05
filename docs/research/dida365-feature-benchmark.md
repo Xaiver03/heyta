@@ -406,3 +406,50 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 再用 P0-1（提醒）与 P0-2（Web 日历）打产品面的地基。
 完整排序、依赖与验收判据见
 [../plans/site-and-parity-alignment.md](../plans/site-and-parity-alignment.md)。
+
+---
+
+## 9. 勘误（2026-11-05，按本文 §0.2 第 1 条的规矩：新增本节，不改上面原文）
+
+> 上面那张矩阵是 **2026-09-28 的只读审计**，本文当时就没跑过任何测试。三十七天过去，
+> **下面这些行的 heyta 侧状态已经变了** —— 逐条给可复跑命令，不要求读者信这一栏。
+> 读法：**先看 §9，再看 §2**；§1 那张 A/B/C 分类表要按本节重读一遍再用。
+
+### 9.1 已经不再成立的行（原文保留，状态在此更正）
+
+| 行 | 原文说 | 今天 | 现量命令（自己跑，别抄这里） |
+|---|---|---|---|
+| 1.2 子任务 | ❌「无实体、无字段」 | 有：`parentId` + 顶级判定只有一份 | `grep -rn "parentIdOf" packages/domain/src/subtasks.ts` |
+| 1.4 按标签筛选 | ❌「无 tag 分支」 | 有：`{ kind: 'tag'; tagId }` | `grep -n "kind: 'tag'" packages/domain/src/task-filter.ts` |
+| 1.8 ③ 农历 | ❌「无农历」 | 有：农历换算与节日都在领域层 | `grep -rln "lunarToSolar\|FESTIVAL_IDS" packages/domain/src` |
+| 1.9 提醒 | ❌「未物化、全链路 0」 | 已物化并有界面（2026-10-02 移出未物化清单，理由写在源码注释里） | `grep -n "REMINDER" packages/op-log/src/state.ts`、`ls apps/web/src/features/reminders/` |
+| 1.10 附件 | ❌「全仓无 attachment 实体」 | 实体与领域函数都在；**web 详情面的入口这一格我没复核到位** | `grep -n "'ATTACHMENT'" packages/shared-schema/src/entity-types.ts` |
+| 1.11 评论 | ❌「无 comment 相关代码」 | 实体在，且任务详情面接了协作区评论 | `grep -n "COMMENT" packages/shared-schema/src/entity-types.ts`、`sed -n '550,570p' apps/web/src/features/tasks/TaskDetailCard.tsx` |
+| 1.13 回收站 | 🟡「只有 TASK」 | 四类：TASK / NOTE / PROJECT / HABIT | `grep -n "TRASH_KINDS =" -A1 packages/domain/src/trash-rows.ts` |
+| 1.14 排序 | 🟡「无排序开关」 | 有档位（display / addedAt / priority）；**手动拖拽那一半仍缺**（见 §9.2） | `grep -n "TASK_SORT_KEYS" packages/domain/src/task-order.ts` |
+| 2.4 Web 日历 | 🔴「web 完全没有日历视图」 | 有：`CalendarView.tsx` 等一组文件 | `ls apps/web/src/features/calendar/` |
+| 2.8 已完成 | 🔴「没有任何 UI 能把 filter 设成 completed」 | 有：侧栏那一行就在（本轮浏览器截图为证），常量与分支的归属写在 view-tabs 注释里 | `grep -n "completed" apps/web/src/features/shell/view-tabs.ts` |
+| 2.10 搜索 | ❌「全仓无搜索 UI」 | web 有搜索浮层（rail 是唯一入口，这条由 `apps/web/tests/app-mount.spec.tsx` 钉着），移动端有 `SearchScreen` | `grep -rln "search-overlay-surface" apps/web/src` |
+| 3.2 移动端习惯 | 🔴「移动端无习惯屏」 | 有 `HabitsScreen.tsx` | `ls apps/mobile/src/screens \| grep -i habit` |
+| 4.1 专注时长 | 🔴「不可自定义」 | web 有调用点：`FocusTimer.tsx:92` 调 `focus.setConfig(...)` | `grep -n "setConfig(" apps/web/src/features/focus/FocusTimer.tsx` |
+| §1「最刺眼的一条」chrono-node | 说 `roadmap.md:40` 描述了一个不存在的依赖 | 那一行**已经自我更正**（现文写着"此前写的是 chrono-node —— 那是错的"） | `sed -n '40p' docs/plans/roadmap.md` |
+
+### 9.2 今天仍然成立的缺口（这一栏是我 2026-11-05 现量过的，可以直接当待办分母）
+
+| 行 | 缺口 | 现量 |
+|---|---|---|
+| 2.6 看板 | 仍无看板视图：`apps/web/src/features/` 下没有这一族，命中的"看板"只是注释里列举覆盖面 | `ls apps/web/src/features/`、`grep -rn "看板" apps/web/src/App.tsx` |
+| 2.7 / D1 自定义筛选器 | `TaskFilter` 仍是**封闭联合**（all / today / next7Days / completed / quadrant / project / tag），没有用户自建查询 | `sed -n '51,60p' packages/domain/src/task-filter.ts` |
+| 1.8 ④ 完成后顺延 | `nextAfterCompletion` 在 `src` 里**零生产调用点**（只有定义与 dist 声明）⇒ 实际仍是固定排期 | `grep -rn "nextAfterCompletion(" --include='*.ts' packages/*/src apps/*/src \| grep -v "export function"` |
+| 1.14 手动拖拽排序 | `Task.order` 仍无写入路径 | `grep -rn "order:" packages/app-host/src/actions.ts`（空） |
+| C1 富文本备注 | 备注仍是纯文本 / Markdown 框，没有富文本编辑器（选型 + 许可证门禁未过，连带详情面底部工具条的「文本格式」那枚不画） | `docs/plans/dida-alignment-typography-and-features.md` 的 C1 / C2 两格 |
+
+### 9.3 这一栏**没有**复核（别把本节当成一次新的全量审计）
+
+1.1 备注输入框的可达性、1.6 `startDate` 归属哪个实体、1.7 全天标志、2.11 建单对话框那半步、
+3.1 / 3.3 习惯创建表单与计数/时长型界面、§2.5 之后的所有表（协作、分享、小组件、后台、
+平台与运营）。这些**沿用原文状态**，动手之前自己重跑一遍。
+
+> 🔴 本节自身的教训也记一笔（写进交接，不写进这里）：补设备取证图时我先撞回 #208
+> 早已写明的"截图默认端口"坑，又把"黑帧"错误归因成"Simulator 没开窗口"并写进了计划文档 ——
+> 根因是**动手前没 grep 陷阱账本**。见 [../plans/dida-alignment-handoff.md](../plans/dida-alignment-handoff.md) §六。
