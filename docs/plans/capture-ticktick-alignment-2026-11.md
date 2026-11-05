@@ -300,7 +300,7 @@ magick "$SRC" -crop 200x120+1400+250 +repage -resize 500% docs/research/dida-cap
 | T4 图标含义取证 | 🟡 **四枚已定三枚**（第三枚图上字面写着「+7」），只剩月牙那一枚等你 | 裁图与复现命令在 §7；两张放大图入库 `docs/research/dida-capture/date-popover-shortcut-*.png` |
 | CL 主链整趟读数 | ✅ **第一次整趟跑完**（§9.26） | 156 步里跳过 3 步会启动浏览器的（§9.3 第 7 条那条理由仍然成立），**ran=153 / failures=7**，逐枚 rc 在 `.run-logs/chain/2026-11-05-1939.log`。7 枚里 **2 枚是本线的，都已修**：`check:empty-state`（我的键名 `…aria.empty` 走进了那枚按 key 段判的尺 ⇒ 改键名，不动别人的判据）与 `check:l4` 里我那 2 处内联（搬进 `material.css` 的类，那文件自己就写着"抄成内联就是往回涨"）。其余 5 枚分别归 landing 的不可复现红、HEAD 上就红的 l4 基线（干净 HEAD worktree 现量 75>74）、`detail-pane-slot`、`linux-shell`、`shell-unicode`、`-r test`。⚠️ 修完 `check:l4` **仍红 1 处，那不是本线的**，这里不冒充已修绿 |
 | RK 入库 | ✅ **本线那几行单独提交，没推送**（§9.29） | 现量：`git log --oneline -1 -- docs/plans/capture-ticktick-alignment-2026-11.md`。共享工作树里 44 枚脏文件按 hunk 分归：design-system 的 token 产物**同时带着别线的 `size.row-min-height` 56→60**、`generated/typography.css` 那一行整条是别线的、`environment-traps.md` 里 #639–#643 是别线的 ⇒ 整文件提会把别线未签字的行以本线名义入库，漏掉产物又会让 `check:tokens` 在干净检出上红，所以走 hunk 级（`git apply --cached` 只留命中本线 token 的 hunk + `update-index --cacheinfo` 重建 traps）。HEAD 自洽性用 `git checkout-index` 那份树量过：`check:capture-shape`（19 臂 + 真扫描）与逐行装置（25 行）都 rc=0；`TasksScreen.tsx` 那 4 行没入库而共享件的 `quickPicks?` 是可选带 `?? []` 兜底 ⇒ 不因此坏。⚠️ 工作树里别线的行**一行未动**（`tokens.css` 仍是 `3.75rem`、`typography.ts` 的 `relaxed` 还在）。刻意未入库：T1 那枚 spike 的 spec 与图（本目标范围外） | ⚠️ **第八趟改口两处**：① 那一行说 `environment-traps.md` 里 #639–#643 是别线的——按正文核过不是：五条点名的全是本线工件（`capture-override-contract-arms.sh`、`docs/research/dida-capture/` 裁图、`verify-mobile-capture-android.sh`、设备腿归因），当时是按"它们在我这趟之前就是脏的"判的归属，那是**mtime 归属**不是**内容归属**，判错了；本趟把它们与 #651/#652 一起按本线入库。② 移动壳里那句"什么时候说哪句标题"的判断已挪回共享层（§9.35），所以这一笔的暂存面是 `packages/ui/{src/index.ts,src/capture/model.ts,tests/capture-model.spec.ts}` + 移动壳/移动测试/计划文档，`TasksScreen` 仍与别线混在同一枚文件里 ⇒ 继续行级暂存（`hash-object` + `update-index`），别线的 `apps/web/src/App.tsx`、landing、design-system 一律不取。
-| CL2 主链第五趟整趟读数 | ✅ **本线一枚都不红**（§9.32） | 现量：`node research/tools/capture-chain-rerun.mjs` ⇒ `ran=150 skipped=6 failures=5 别线图改写=0 消失=0`；5 枚红全归别线/HEAD 基线（`row-single-source`、`l4`、`detail-pane-slot`、`linux-shell`、`shell-unicode`），`check:capture-shape` 在链里 OK。⚠️ 这趟之前先越界一次：第四趟跑器少剥 `pnpm ` 前缀 ⇒ 跳过集合一枚没匹配 ⇒ 整条 e2e 被套跑完、重写 34 张别线图（14 张与 HEAD 不同），已按"起跑前它们是干净的"逐批 `git checkout --` 回退并用 md5 快照复对成零残留；跑器的另两次静默失效（改写排在跳过之后、`--filter` 少写 `run` 导致 rc=0 空跑）也都修成会红，三条一起记入陷阱 #650。包测试面单独补跑：唯一红是别线 `typography.ts` 的 `row-title` 行高（B261，不代改判据口径） |
+| CL2 主链整趟读数 | ✅ **本线一枚都不红**（§9.32 第五趟 / §9.36 第六趟） | 现量：`node research/tools/capture-chain-rerun.mjs` ⇒ 第六趟 `ran=151 failures=6 别线图改写=0 消失=0`，6 枚分别归到别线的 4 把静态尺 + `verify-mobile-pin-order.sh` 两把 + `apps/web` 那 16 条（7 个文件，清单里 `grep -ci capture` = 0）。第五趟与第六趟的**红集合相同**，差别只有 design-system 那枚排版测试已被别线入库转绿 |
 
 ---
 
@@ -2000,3 +2000,21 @@ device=sdk_gphone64_x86_64 / failed=0 / unjudged=1`。
 ⇒ 判断挪进共享层之后，设备侧的两件事仍然成立：**标题带画得出来**（那 55px 的带子在树上），
 而"带不带草稿"这一半只有 jsdom 那 7 枚行为用例守着 —— 打字通道在这台模拟器上不可靠这件事
 没有因为重构而改变，所以不假装它变了。
+
+---
+
+## 9.36 主链第六趟（§9.33 + §9.35 两笔之后）：本线一枚都不红，别线那 16 条红还是同一集合
+
+`node research/tools/capture-chain-rerun.mjs` ⇒ 现量 `ran=151 failures=6 别线图改写=0 消失=0`
+（日志 `.run-logs/chain/run-20261105T0948.log`；跑前先 `--dry-run` 人审过分类，
+三枚静态 `check:ai-*` 仍在要跑的集合里）。
+
+| 红的那一枚 | 归因（怎么量的） |
+|---|---|
+| `check:row-single-source` / `check:l4` / `check:detail-pane-slot` | 别线，与 §9.32 同一集合（`l4` 在干净 HEAD 上就红 75 > 74） |
+| `check:linux-shell` / `check:shell-unicode` | 别线同一枚文件 `scripts/verify-mobile-pin-order.sh`；现量方式：那两把尺的输出里**不出现本单任何文件名** |
+| `pnpm -r --filter '!@heyta/e2e' run test` | 单跑一趟取明细（`.run-logs/repo-tests-final8.log`）：唯一退非零的包是 `apps/web`，**16 红 / 2715 过**，7 个文件是 `ai-settings`(10) `settings-sheet-ia`(6) `search-overlay-ia`(6) `language-switcher`(6) `shell-more-and-settings`(2) `search-panel`(2) `app-mount`(2) —— **一个捕获线的文件都没有**；`grep -ci capture` 在这份失败清单上是 0。⚠️ 与 §9.5 D 那趟比，条数与文件集合**逐字相同**，所以这一趟没有把别线的红变成新的红；上一趟记的 `packages/design-system typography` 那一枚**已经不红了**（别线 20358bc6c 把排印密度入库了），这条改口按现量写 |
+
+本线在这一趟里的读数：`check:capture-shape` OK（链里）、`check:verify-script-copy` OK、
+`check:apk-freshness` OK、`check:mobile-e2e-labels` OK、`check:i18n-vars` OK、
+`packages/ui` 894 过、`apps/mobile` 全过（含接线套 11 条）。
