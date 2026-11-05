@@ -129,27 +129,6 @@ sys.exit(1)
 PY
 }
 
-# 读某个 testID 节点的**可见文字**（`text` 属性）。
-# 🔴 与 `desc_of` 不是一件事，而且这里必须用它：`capture-input` 的 content-desc 是
-#    那句固定标签「新任务标题」（`mobile.capture.addLabel`），**打字前后都不变** ——
-#    拿 `desc_of` 判"草稿进没进"会得到一句永远红的断言（2026-11-05 实测：字进去了，
-#    读回来的还是那句标签，于是下面两格一起被误判成"探针没打通"）。
-text_of() {
-  dump || return 2
-  python3 - "$LOCAL_XML" "$1" <<'PYTEXT'
-import sys, xml.etree.ElementTree as ET
-path, want = sys.argv[1], sys.argv[2]
-try: root = ET.parse(path).getroot()
-except Exception: sys.exit(2)
-def rid(n):
-    v = n.get('resource-id', ''); return v.rsplit('/', 1)[-1] if v else v
-for node in root.iter('node'):
-    if rid(node) == want:
-        print((node.get('text') or '').strip()); sys.exit(0)
-sys.exit(1)
-PYTEXT
-}
-
 # resource-id 优先，其次 content-desc/text —— 与网页端同一句"一个目的地一个控件"
 tap_id() {
   local f; f="$(by_id "$1")" || return 1
@@ -335,34 +314,45 @@ step "2.5 打一句草稿 —— 下一格要判「壳说的话里有没有这�
 #    而空格要写成 `%s` 才能穿过两层 shell —— 上一版用 `review notes` 时字根本没进去，
 #    读回来的是 placeholder「新任务标题」，把下面两格一起顶成假红（元规则一：先怀疑探针）。
 DRAFT="reviewnotes"
-# 🔴 `input text` 注入的是按键事件，而这一台模拟器上它**只进已经起了软键盘的那枚输入框**：
-#    `focused=true` 而 `mInputShown=false` 时整串静默丢弃（实测：`dumpsys input_method`
-#    读到 false 的三次都没进，第二次点中之后 mInputShown=true，字当场就进去了）。
-#    所以这里判的是那个前提，而不是"多 sleep 两秒碰运气"，并把每一轮的
-#    `mInputShown` 与读回来的可见文字都打出来 —— 否则"没进"与"探针没打通"长得一样。
+# 🔴 **前置信号用「添加」那枚按钮的 `enabled`，不用输入框的 `text`。**
+#    实测（2026-11-05，同一枚 APK、同一个状态）：打字进去之后 `capture-input` 的
+#    `text` 仍然是那句提示语，而按「添加」却建出了一条标题就是所打字串的任务 ——
+#    也就是说 `text` 在这一层会**说谎**（值在 React 状态里、在原生编辑器里，就是不在可及性树上）。
+#    共享层有一条在册契约"标题为空时禁用提交"，它落成 Android 的 `enabled=false`，
+#    于是"草稿进没进"有一个不会说谎的读法：`enabled` 从 false 翻成 true。
+#    ⚠️ 打字通道本身在这台模拟器上仍然时好时坏（`input text` / `keyboard text` / 逐字符
+#    `keyevent` 三种形式实测都有不进的趟），所以这里**按 `enabled` 重试**，
+#    并把每一轮的 `enabled` 读数打出来；始终翻不过来就响亮记"未判定"（不算过也不算红）。
+submit_enabled() { by_id capture-submit >/dev/null 2>&1 || return 2; dump || return 2; python3 - "$LOCAL_XML" <<'PY'
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.argv[1]).getroot()
+def rid(n):
+    v = n.get('resource-id', ''); return v.rsplit('/', 1)[-1] if v else v
+n = next((n for n in root.iter('node') if rid(n) == 'capture-submit'), None)
+print('' if n is None else n.get('enabled', ''))
+PY
+}
 DRAFT_OK=""
-TXT=""
-for _r in 1 2 3; do
-  tap_id capture-input >/dev/null 2>&1 || { bad "点不到输入框"; FAILED=$((FAILED+1)); break; }
+TAP_BROKE=""
+EN=""
+for _r in 1 2 3 4 5; do
+  tap_id capture-input >/dev/null 2>&1 || { TAP_BROKE=1; bad "第 ${_r} 轮取不到输入框（载体/树读不到）"; FAILED=$((FAILED+1)); break; }
   sleep 2
-  SHOWN=$(rsh "adb shell dumpsys input_method" 2>/dev/null | grep -m1 -oE 'mInputShown=(true|false)' || true)
   rsh "adb shell input text $DRAFT" >/dev/null 2>&1; sleep 2
-  TXT=$(text_of capture-input || true)
-  info "第 ${_r} 轮：${SHOWN:-mInputShown 读不到}，打完读到「${TXT}」"
-  if printf '%s' "$TXT" | grep -q "$DRAFT"; then DRAFT_OK=1; break; fi
+  EN=$(submit_enabled || true)
+  info "第 ${_r} 轮：capture-submit enabled=${EN:-读不到}"
+  if [ "$EN" = "true" ]; then DRAFT_OK=1; break; fi
 done
 if [ -n "$DRAFT_OK" ]; then
-  ok "草稿进得了输入框（${SHOWN}）：「${TXT}」"
-else
-  # 🔴 这一格**不算红、也不算过**：`input text` / `input keyboard text` / 逐字符 `keyevent`
-  #    三种注入形式在这一台模拟器上时好时坏（同一枚 APK、同一个状态：最早一次手动
-  #    `'probe1'` 进得去，随后三轮 `mInputShown=true` 都不进）。把不稳定的通道钉成判据，
-  #    得到的是一枚会随机红的尺 —— 那种尺的结局就是被人跳过（元规则二）。
-  #    这一格改记 **未判定**，并打进总结与 `provenance.txt`。此刻替它说话的是**源码臂**，
-  #    不是行为判据：`apps/mobile/tests/capture-capsule-wiring.spec.ts` ⑤/⑥ 与
-  #    `check:capture-shape` 里那两臂（计划 §9.34 如实记这一格的强度到哪一步）。
+  ok "草稿进得去（enabled 从 false 翻成 true，第 ${_r} 轮）——「标题为空时禁用提交」那条契约同时在真机上被量到"
+elif [ -n "$TAP_BROKE" ]; then
+  # 🔴 这一格**没被判定**，而且原因不是打字：连输入框都取不到 = 载体/树读不到。
+  #    把它写成"打字通道没打通"会把一次网络故障记成产品事实（元规则一）。
   UNJUDGED=$((UNJUDGED + 1))
-  info "④b-2 **未判定**：打字通道这一趟没打通（三轮读数都已在上面打出）⇒ 这一格没有被证明，也不算过"
+  info "④b-2 **未判定**：第 ${_r} 轮就取不到输入框（载体或树读不到，非打字通道）⇒ 这一格没有被证明"
+else
+  UNJUDGED=$((UNJUDGED + 1))
+  info "④b-2 **未判定**：${_r} 轮都没把 enabled 翻成 true（打字通道这一趟没打通）⇒ 这一格没有被证明"
 fi
 
 step "3. 判据 ④ —— 点胶囊，面板就地展开"
