@@ -101,6 +101,28 @@ cd e2e && pnpm exec playwright test tests/dida-alignment-detail-sidebar.spec.ts 
 node -e "console.log(require('./package.json').scripts.check.split(' && ').length)"   # 链步数是活数
 ```
 
+⚠️ **"树被别人改动过没有"这一问，别用提交计数回答**（2026-11-05 实测：`git log <revs> -- <路径>`
+会**往回走整条历史**，打出老提交，读到的不是它声称的东西）。要判"我量过的那批文件现在还在不在
+同一版"，用 blob 差额这一把：
+
+```bash
+git diff --name-only <我测完那一笔> HEAD -- \
+  packages/design-system packages/ui/src apps/web/src/features/tasks apps/web/tests \
+  apps/landing/src apps/landing/tests e2e/tests design-system/heyta
+# 空 = 九条验收的消费者文件与当前 HEAD 逐字节同一 ⇒ 那批读数仍指当前产物，不必重跑
+```
+
+2026-11-05 21:37 现量：以 `592ca4ed9`（20:1x 那趟复量之后那笔）为起点，差额**为空**；
+其间落地的 `30166c7ca` / `a3590d851` / `8ecf8a726` 三笔分别是 capture 的装置脚本、
+证据目录回收与 capture 文档，都不在这批路径里。
+
+🔴 **这把尺的牙验过**（一条永远为空的检查比没有检查更坏）：同一命令把起点换成阶段 1
+入库前那笔 `29214d5b7` ⇒ 列出 **18 枚**文件（本线那 16 枚，加 capture 的
+`packages/ui/src/capture/model.ts`、`packages/ui/src/index.ts`）。
+⚠️ 读"空"的时候记住：这批路径**包含别线的文件**，所以空 = **谁都没动**，
+不是"只有本线没动"；要单独判本线那批，把路径表换成 `20358bc6c` 那笔的文件清单
+（现量 `git show --stat 20358bc6c`）。
+
 设备腿（有已启动的模拟器才跑；先 `xcrun simctl list devices | grep Booted` 取 UDID）：
 
 ```bash
