@@ -1482,6 +1482,11 @@ git status --porcelain apps/web/evidence | grep '^ M' | wc -l   ⇒ 14
    把这些值抄成内联就是往回涨」——我那枚新壳正好是往回涨。
    ⇒ 新增 `.ht-capture-due-popover` / `__scroll` 两条类（取值逐条等于搬走前，一个没改），
    组件里两处 `style={{…}}` 删干净，随之失效的 `cssVar` import 也删（删之前先数过调用为 0）。
+   🔴 **2026-11-06 这两条类改了名**（滴答对齐线执行 B267）：现名 `.ht-material--popover` /
+   `.ht-material__popover-scroll`。原因不是外观，是 `check:row-single-source` 的 `ht-*` 前缀族棘轮被
+   `.ht-capture` 这个**新族根**净抬了一枚（29 > 基线 28），而这枚浮层本来就同时挂着 `.ht-material`
+   （`material.css` 第 16 行那个共享"抬升面"族）——所以正确落点是回它自己的族，而不是把基线抬上去。
+   **取值一字未动**；本节下面凡是按旧类名做锚的地方，按新名找。
    链里那趟读到 77，现在 **75**——比本线进来之前还少 2 处，但**仍高于基线 74 的那 1 处不是本线的**
    （HEAD worktree 现量就是 75）。⚠️ 所以 `check:l4` 现在还是红的，本线不冒充"已修绿"。
 2. **键名**：`capture.capsule.aria.empty` → `capture.capsule.aria.unset`，7 处（zh/en 各 2、
@@ -1638,6 +1643,7 @@ RIG_RC=0 ｜ 22 格 ✅ ｜ 0 枚 ❌ ｜ 日志 .run-logs/android-capture/rig-k
 | 读数每次打印 | `[出口可达] <档>：内层可视 / 内容 / 溢出 / overflow-y` —— 不打出来，"分支没走到"的绿和真绿长得一样 |
 
 **牙**：把 `material.css` 里那枚 `.ht-capture-due-popover__scroll { overflow-y: auto }` 改成 `hidden`
+（⚠️ 2026-11-06 起这枚类叫 `.ht-material__popover-scroll`，见上面 S3 那格的改名说明；臂本身照旧，改的就是这一条）
 ⇒ 整批 `rc=1`，红话是 `面板内容溢出 128px，而 overflow-y=hidden ⇒ 底部那几条出口滚不到`，
 且只红 375 两档、1440 两档不动（它们溢出 0，分支本来就不该走）。还原走 `.mut-bak`，
 `cmp` 过后删备份，重跑 `rc=0`。⚠️ 失败趟在 `e2e/test-results/` 落了 4 枚本 spec 的产物，已清干净。
@@ -1705,6 +1711,11 @@ RIG_RC=0 ｜ 22 格 ✅ ｜ 0 枚 ❌ ｜ 日志 .run-logs/android-capture/rig-k
 **刻意没入库的两件**：`e2e/tests/capture-inline-highlight-spike.spec.ts` 与
 `apps/web/evidence/capture-inline-highlight-spike-20261105/` —— 就地高亮（T1）在本目标范围外，
 那枚 spike 的产物留着等 T1 一起判，不混进这一笔。
+🔴 **这一句已过时：那两件于 2026-11-06 00:3x 入库（`7a3ef475d`）**，理由是本文 §9.14 把那份 spec 当
+"覆盖层这一法实测过"的**出处**在引用 —— 文档引用一个不在库里的文件就是断链（与陷阱 #584 同族：
+台账那条"现量命令"复跑读不回它说的那个数）。入库前单跑过它：
+`pnpm exec playwright test tests/capture-inline-highlight-spike.spec.ts` ⇒ 6 passed / rc=0；它仍没接进链，
+不碰被交付的组件。
 
 ## 9.30 日历落点那一支的"出口够得着"是**恒真断言** —— 打牙打出来的，不是想出来的
 
