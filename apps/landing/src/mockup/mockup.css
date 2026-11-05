@@ -228,6 +228,11 @@
   border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border);
 }
 
+/* 侧栏底部那一组（回收站，2026-11-04 滴答对齐 D2 从 rail 搬来）：贴这一列的底。 */
+.mk-sidebar__tools {
+  margin-top: auto;
+}
+
 .mk-nav {
   display: flex;
   flex-direction: column;

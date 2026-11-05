@@ -149,9 +149,9 @@ export const SHELL_QUADRANT_NAV: readonly ShellQuadrantNavItem[] = [
 ];
 
 /**
- * Landing 复现的默认 rail 目的地：**7 项**。对应 `App.tsx` 的默认开启模块与工具。
+ * Landing 复现的默认 rail 目的地：**6 项**。对应 `App.tsx` 的默认开启模块与常驻入口。
  *
- * 这份登记包含默认用户可达的任务、日历、四象限、习惯、时间线、搜索与回收站；
+ * 这份登记包含默认用户可达的任务、日历、四象限、习惯、时间线与搜索；
  * rail 会按 Web 的规则把其中低频目的地收进「更多」，而不是在主栏平铺全部项目。
  * 关闭的番茄钟、成长、便签等模块不进入默认登记，避免 Landing 承诺新装用户看不到的入口。
  *
@@ -161,6 +161,9 @@ export const SHELL_QUADRANT_NAV: readonly ShellQuadrantNavItem[] = [
  * 画"全部 9 个"反而是另一个方向的不实 —— 承诺了默认拿不到的东西。
  * ⚠️ 对账判据（`tests/mockup-shell-shape.spec.tsx` #5）会读
  * `apps/web/src/features/shell/modules.ts` 的 `defaultOn` 一起算，别只改这一边。
+ *
+ * ⚠️ **2026-11-04（滴答对齐 D2）：回收站不在这份登记里了** —— 真应用把它从 rail
+ * 下段搬进**侧栏底部**，展厅跟着搬，登记落在下面的 `SHELL_SIDEBAR_TOOLS`。
  */
 export const SHELL_VIEW_TABS: readonly ShellViewTab[] = [
   // 上段「去哪看」：任务 + **默认开启的模块**。
@@ -171,11 +174,20 @@ export const SHELL_VIEW_TABS: readonly ShellViewTab[] = [
   { key: 'timeline', labelKey: 'web.shell.views.timeline', icon: 'chart-gantt' },
   // 「搜索」在滴答的 rail 上段**最后一个**（它常驻，不给关）。
   { key: 'search', labelKey: 'web.search.title', icon: 'search' },
-  // 下段「工具」：贴底。
   //
   // ⚠️ **没有 `settings`** —— 2026-09-29 按滴答的 IA，设置收进了**顶部的头像菜单**
   //（rail 是每天点几十次的地方，设置是低频的）。展厅画的既然是"新装用户看到的
   // 那一屏"，就不该把它画成一个 rail 按钮。
+];
+
+/**
+ * 侧栏底部那一组（真源的 `SIDEBAR_TOOL_TABS`）：**只有回收站**。
+ *
+ * 🔴 2026-11-04 起它不住 rail 而住侧栏，展厅跟着搬 —— 判据在
+ * `tests/mockup-shell-shape.spec.tsx` 的 #5：那份对账把这一组**单独**与
+ * `view-tabs.ts` 的 `SIDEBAR_TOOL_TABS` 比，不再算进 rail。
+ */
+export const SHELL_SIDEBAR_TOOLS: readonly ShellViewTab[] = [
   { key: 'trash', labelKey: 'web.trash.nav', icon: 'trash' },
 ];
 
