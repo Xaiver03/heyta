@@ -297,6 +297,7 @@ magick "$SRC" -crop 200x120+1400+250 +repage -resize 500% docs/research/dida-cap
 | T1 web 就地高亮（识别短语在输入框里着色） | 🟡 **可行性已实测，且测出它自己的判据缺一格**（§9.14）—— 仍未开始实现，也不在本目标的 S1–S5 里 | spike `e2e/tests/capture-inline-highlight-spike.spec.ts` 6 条全过：短档 ≤1px、33 字差 1.75px（≈0.053px/字，非整数 letter-spacing 累积）、`scrollLeft>0` ✅、`caret-color` 独立于 `color` ✅、**原生 `<input>` 无任何 caret 几何 API**（原型链全扫 0 命中）⇒ §3.5 那句"光标位置不偏"在 web 上无法自动验，只能看图。亮/暗两张在 `apps/web/evidence/capture-inline-highlight-spike-20261105/` |
 | T4 图标含义取证 | 🟡 **四枚已定三枚**（第三枚图上字面写着「+7」），只剩月牙那一枚等你 | 裁图与复现命令在 §7；两张放大图入库 `docs/research/dida-capture/date-popover-shortcut-*.png` |
 | CL 主链整趟读数 | ✅ **第一次整趟跑完**（§9.26） | 156 步里跳过 3 步会启动浏览器的（§9.3 第 7 条那条理由仍然成立），**ran=153 / failures=7**，逐枚 rc 在 `.run-logs/chain/2026-11-05-1939.log`。7 枚里 **2 枚是本线的，都已修**：`check:empty-state`（我的键名 `…aria.empty` 走进了那枚按 key 段判的尺 ⇒ 改键名，不动别人的判据）与 `check:l4` 里我那 2 处内联（搬进 `material.css` 的类，那文件自己就写着"抄成内联就是往回涨"）。其余 5 枚分别归 landing 的不可复现红、HEAD 上就红的 l4 基线（干净 HEAD worktree 现量 75>74）、`detail-pane-slot`、`linux-shell`、`shell-unicode`、`-r test`。⚠️ 修完 `check:l4` **仍红 1 处，那不是本线的**，这里不冒充已修绿 |
+| RK 入库 | ✅ **本线那几行单独提交，没推送**（§9.29） | 现量：`git log --oneline -1 -- docs/plans/capture-ticktick-alignment-2026-11.md`。共享工作树里 44 枚脏文件按 hunk 分归：design-system 的 token 产物**同时带着别线的 `size.row-min-height` 56→60**、`generated/typography.css` 那一行整条是别线的、`environment-traps.md` 里 #639–#643 是别线的 ⇒ 整文件提会把别线未签字的行以本线名义入库，漏掉产物又会让 `check:tokens` 在干净检出上红，所以走 hunk 级（`git apply --cached` 只留命中本线 token 的 hunk + `update-index --cacheinfo` 重建 traps）。HEAD 自洽性用 `git checkout-index` 那份树量过：`check:capture-shape`（19 臂 + 真扫描）与逐行装置（25 行）都 rc=0；`TasksScreen.tsx` 那 4 行没入库而共享件的 `quickPicks?` 是可选带 `?? []` 兜底 ⇒ 不因此坏。⚠️ 工作树里别线的行**一行未动**（`tokens.css` 仍是 `3.75rem`、`typography.ts` 的 `relaxed` 还在）。刻意未入库：T1 那枚 spike 的 spec 与图（本目标范围外） |
 
 ---
 
@@ -1663,3 +1664,41 @@ RIG_RC=0 ｜ 22 格 ✅ ｜ 0 枚 ❌ ｜ 日志 .run-logs/android-capture/rig-k
   mtime 停在昨天 21:25–22:56（现量：`stat -f '%Sm %N' -t '%H:%M:%S' apps/web/evidence/settings-form-alignment/*.png`），
   本趟 04:2x–04:3x 没改写它们 —— 上一趟我犯过的那条（§9.25）这次没有重犯。
 
+
+## 9.29 入库：本线那几行单独提，别线未提交的行留在工作树里
+
+负责人说"开始跑吧"之后，入库这一步按**可回退**处理（本地提交，**没有推送**）。
+现量：`git log --oneline -1 -- docs/plans/capture-ticktick-alignment-2026-11.md`。
+
+**为什么不能整文件提**（这不是"怕麻烦"，是量出来的）：
+`pnpm --filter @heyta/design-system generate` 写出的产物把**两条线的未提交值混在同一份文件里** ——
+`tokens.json` / `HeytaTokens.{ets,swift,xaml}` / `tokens.native.ts` 里同时有
+本线的 `size.capture-panel-max-width: 768` 和别线的 `size.row-min-height` 56→60，
+`generated/typography.css` 那一行 `line-height: var(--ht-line-height-relaxed)` **整条是别线的**。
+整文件提 ⇒ 把别线没签字的行以本线的名义入库；漏掉产物 ⇒ HEAD 的产物配不上 HEAD 的
+`tokens.ts`，`check:tokens` 在干净检出上会红。**两头都不能要，所以走 hunk 级。**
+
+做法（每步都留了可复核的形状）：
+1. 逐个数归属：`git diff -U0 -- <file> | grep '^+[^+]'` 把 44 枚脏文件分成
+   "整份本线"（`package.json`、i18n 两份、`BLOCKED.md` 那条 B261、`ui-acceptance.md`、
+   traps 索引那 5 行、`ui/index.ts`、`material.css`、landing 两份 capture 件、
+   `check-overlay.mjs`、`DueEditor.tsx`、`CalendarCapturePopover.tsx`、`due-display.spec.tsx` 等）、
+   "整份别线"（`App.tsx`、`TasksScreen.tsx`、`task-row-shape.ts`、`typography.ts`、
+   `generated/typography.css`、landing 壳形状那 5 份）、"混着"（design-system 那 7 份 + `environment-traps.md`）。
+2. 混着的按 hunk 剔：只保留新增行命中 `capture-panel-max-width|CapturePanelMaxWidth|捕获日期面板` 的 hunk
+   再 `git apply --cached`（`tokens.css` 2 枚留 1、`tokens.native.ts` 5 枚留 3、其余各 2 枚留 1）。
+3. `environment-traps.md` 用"HEAD + 本线那五条"重建 blob 后 `git update-index --cacheinfo`
+   —— 别线的 #639–#643 不进本提交（现量：`git show :docs/reference/environment-traps.md | grep -oE '^6[0-9]{2}\. '`）。
+4. **工作树全程未动**：提交后 `grep -oE '\-\-ht-size-row-min-height: [0-9a-z.]+' packages/design-system/src/tokens.css`
+   仍是 `3.75rem`，`typography.ts` 里 `line-height.relaxed` 还在 ⇒ 别线的行没被本提交吃掉。
+
+**HEAD 自洽性不是推的，是量的**：`git checkout-index --prefix=/tmp/staged-tree/ -a` 把索引那份树materialize出来，
+在里面跑 `node scripts/check-capture-shape.mjs --self-test`（19 臂 rc=0）与真扫描（rc=0）、
+`bash research/tools/mutation-rigs/capture-migration-row-arms.sh`（25 行逐行对上）⇒ 全绿，临时树用完即删。
+另核过一个真实风险：`TasksScreen.tsx` 那 4 行没入库，而共享件的
+`quickPicks?: readonly DatePickerQuickPick[]` 是**可选**且 `?? []` 兜底
+（现量：`grep -n 'quickPicks' packages/ui/src/capture/CaptureComposer.tsx`）⇒ HEAD 的移动端不因此坏。
+
+**刻意没入库的两件**：`e2e/tests/capture-inline-highlight-spike.spec.ts` 与
+`apps/web/evidence/capture-inline-highlight-spike-20261105/` —— 就地高亮（T1）在本目标范围外，
+那枚 spike 的产物留着等 T1 一起判，不混进这一笔。
