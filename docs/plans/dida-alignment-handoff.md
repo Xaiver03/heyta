@@ -141,6 +141,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | 格 | 状态 | 卡在谁 |
 |---|---|---|
 | 阶段 1 排印密度（`TASK_ROW_SHAPE.bodyPaddingBlock` / `listGap` + 生成的 token 件） | ✅ **已入库**（2026-11-05 16:5x 一笔 16 枚文件） | 本线。逐 hunk 核过 `packages/design-system/**` 每一处都能追溯到 A1/A2 那四枚值或它们的生成件；`mockup.css` 只取本线那四处镜像，`.mk-sidebar__tools` 那枚留在 landing 手里。分归办法与读数在 `BLOCKED.md` B262 |
+| 阶段 1 的**值判据**（不是实现） | 🔴 **缺口，已登记** | 设计系统线 / 产品。四枚值里只有 `row-title` leading 被 `typography.spec.ts` 钉住；行最小高 60 与 A2 那两枚槽位**没有任何断言钉值** ⇒ "token + 四处镜像"协同回退全仓不会红。现量与出路（钉不变量而不是钉值，先例是 `typography.spec.ts:39/76` 那两枚关系断言）写在 `BLOCKED.md` B264；本线不替别人拍判据口径 |
 | C1 富文本编辑器 | 未做 | 先过两道门：编辑器选型 + 许可证（AGENTS §3.1/§3.2）。连带详情面「文本格式」那枚按钮一直不画 |
 | D1 自定义筛选器 / 智能清单 | 未做 | 产品边界先定义（`TaskFilter` 现在是封闭联合，用户自建查询没有落点） |
 | C3 评论 | 已由协作线以 W4 落地（详情面协作区） | 不欠；但"非共享清单要不要评论"这条口径归产品 |

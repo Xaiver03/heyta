@@ -261,9 +261,9 @@
 
 | 项 | 状态 | 判据 / 现量 |
 |---|---|---|
-| A1 `--ht-size-row-min-height` 56→60 | ✅ 已入库 | `check:tokens` 现量"生成产物与 `tokens.css` 一致（8 个文件，225 个 token）"；下游按 `var()` 读，没有文本锚点 |
-| A1 `row-title` leading `normal`→`relaxed` | ✅ 已入库 | `packages/design-system/tests/typography.spec.ts` 那格期望值由 24 **改签成 28**（值变更就是这一格的内容，不是为了让测试变绿）；镜像由 `apps/landing/tests/mockup-task-row.spec.tsx` 按源码文本对账 |
-| A2 `bodyPaddingBlock` `space.2`→`space.3` / `listGap` `space.1`→`space.2` | ✅ 已入库 | `packages/ui/tests/task-row-density.spec.ts` 逐档读槽位（跟随 token，不钉数）；`mockup-quadrant-shape.spec.tsx:479` 钉 `.mk-quad__list` 的 `gap` == `TASK_ROW_SHAPE.listGap` |
+| A1 `--ht-size-row-min-height` 56→60 | ✅ 已入库 | ⚠️ **没有任何断言钉住这个值**（现量：`grep -rn "row-min-height\|3\.75" packages/design-system/tests/*.ts` 为空）。守它的只有 `check:tokens`（生成产物与 `tokens.css` 逐字节一致）与 `check:design-token-refs`（引用可解析）——**一致性，不是值** |
+| A1 `row-title` leading `normal`→`relaxed` | ✅ 已入库 | `packages/design-system/tests/typography.spec.ts` 断 `lineHeight === 28`（这一格**真钉得住**：改值它就红，今天就是这么被顶出来的）；镜像由 `apps/landing/tests/mockup-task-row.spec.tsx` 按源码文本对账 |
+| A2 `bodyPaddingBlock` `space.2`→`space.3` / `listGap` `space.1`→`space.2` | ✅ 已入库 | ⚠️ 同样**没有值判据**：`packages/ui/tests/task-row-density.spec.ts` 的期望值是 `toEqual({bodyPaddingBlock: TASK_ROW_SHAPE.bodyPaddingBlock …})` 现取的（全文件零 token/px 字面量，现量 `grep -nE "'space\.[0-9]'"` 为空）——它守的是**组件有没有走表**（那几枚 `toContain('spec.bodyPaddingBlock')` 文本锚），不是表里填了哪枚 token；`mockup-quadrant-shape.spec.tsx:479` 比的是 CSS 与 token **是否同名**，两边一起改它照样绿 |
 | A3 侧栏密度（`.ht-nav__item` padding、`.ht-sidebar` gap） | ✅ 现量已经是目标值，本笔**没动** | 按**精确选择器块**取（先前那发 `grep -n "ht-nav__item" -A8` 是前缀匹配，会一并命中 `.ht-sidebar__x`，仪器太松）：`sidebar.css:3` 的 `.ht-sidebar {` 块内 `gap: var(--ht-space-3)`（第 6 行），`sidebar.css:254` 的 `.ht-nav__item {` 块内 `padding: 0 var(--ht-space-4)`（第 260 行）。复现：`awk '/^\.ht-sidebar \{/{f=1} f{print} f&&/\}/{exit}' apps/web/src/styles/app/sidebar.css` |
 | A4 验证 | 三道门 + 构建 + 两枚浏览器腿都过；图看过，**但没和滴答并排比过** | 见下面最后一条 |
 
@@ -290,6 +290,18 @@
   **混树恰好红在 4 枚镜像配对臂** —— 这就是"分不清就只提交源文件"那条前置会留下的断链形状，
   与 `SIDEBAR_TOOL_TABS` 那次（B258）同一类，只是这回在入库前被量住了。夹具跑完即删；
   重建办法就是上面那三行 `git archive`＋按 spec 谓词复算，别在仓里留第二把尺。
+- 🔴 **这一格量出来一处真实缺口（本线自己的验收面，不是别线的）**：阶段 1 四枚值里，
+  **只有 A1 的 leading 有值判据**（`typography.spec.ts` 钉 28 —— 今天就是它把这笔改动顶出来的）。
+  行最小高 60 与 A2 那两枚槽位**没有任何断言钉值**：density spec 现取 token、landing spec 只比"两边同名"。
+  ⇒ **一次"token + 四处镜像"的协同回退，全仓没有一枚断言会红**，只有 `check:tokens` 会保证产物跟着改。
+  本线**没有**擅自补这把尺，两个理由：① 补不补等于判定"行密度是契约还是可调旋钮"，
+  那是设计系统线 / 产品的判据口径；② 仓里已有同一条告诫——`docs/plans/calendar-profile-handoff.md:5425`
+  写的就是"**判据钉形状不钉值**"这一类尺的问题（现量：`grep -rn "钉形状" docs/plans/*.md`）。
+  ⚠️ 我第一版在这里引了一句"收集框线那句『旧判据钉形状不钉不变量 ⇒ 每次对齐都被顶回去』"——
+  **那句话在本仓 grep 不到**，它来自我的项目记忆而不是出处，属于"把记忆当证据"，已换成仓里真有的那句。
+  要补的话，出路是**钉不变量而不是钉值**：例如"行高 ≥ 标题行高 + 上下内间距"这类关系断言
+  （`typography.spec.ts` 里"行高严格大于字号""字号比 ≥ 1.33"就是这个形状的先例），
+  这样下次调密度它不会挡路，而协同回退会红。这一格留给设计系统线拍。
 - **A4 能签的一半与不能签的一半**：能签的是"新密度下没画坏"——浏览器腿 11/11（含 ⑦ 390 窄屏 + 暗色），
   2026-11-05 20:0x 在含别线 `e33523e7e`（把判断从壳挪回共享层）的 HEAD 上**复量过一遍**，仍 11/11；
   本趟重跑后**看过 ① 逾期那一格那张**（1440 亮色：任务行、侧栏、分组说明、回收站都在位、没被裁）；
