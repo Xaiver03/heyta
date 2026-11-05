@@ -221,7 +221,7 @@ enum HeytaTokens {
     static let screenSectionGap: Double = 24  // px
     static let screenBottomInset: Double = 88  // px
     static let sizeCheckbox: Double = 22  // px
-    static let sizeRowMinHeight: Double = 56  // px
+    static let sizeRowMinHeight: Double = 60  // px
     static let sizeSwipeAction: Double = 72  // px
     static let sizeAvatarSm: Double = 24  // px
     static let sizeAvatarMd: Double = 32  // px

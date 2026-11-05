@@ -124,10 +124,10 @@ export interface TaskRowDensitySpec {
  *
  * | 档位 | 用途 | minHeight | bodyPaddingBlock | showMeta | showTrailing | title |
  * |---|---|---|---|---|---|---|
- * | `comfortable` | 列表（默认） | `size.row-min-height`（56） | `space.2`（8） | ✅ | ✅ | `row-title` |
+ * | `comfortable` | 列表（默认） | `size.row-min-height`（60） | `space.3`（12） | ✅ | ✅ | `row-title` |
  * | `compact` | 四象限卡 | `touch-target.min`（44） | `space.1`（4） | ✅ | ✅ | `row-title` |
  * | `minimal` | 日历格 / 时间线泳道 | 无下限 | `space.1`（4） | ❌ | ❌ | `row-title` |
- * | `detail` | 详情面板内容层那一行 | `size.row-min-height`（56） | `space.2`（8） | ✅ | ✅ | **`detail-title`** |
+ * | `detail` | 详情面板内容层那一行 | `size.row-min-height`（60） | `space.3`（12） | ✅ | ✅ | **`detail-title`** |
  *
  * ⚠️ 上面这段"三档"是旧话，第四档 `detail` 于 2026-11-03 加入（表里已列全）。
  * 判"某档有没有偷偷多改东西"的尺不是这段注释，是

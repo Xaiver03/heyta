@@ -22,15 +22,17 @@ import type { TextStyleName } from '../src/typography.js';
 const STYLE_NAMES = Object.keys(TEXT_STYLES) as TextStyleName[];
 
 describe('语义文字样式：值正确性', () => {
-  it('row-title = 16px / 500 / 行高 24 / 字距 -0.176', () => {
-    // 全应用最高频的样式。行高必须是绝对点值（1.5 倍数 × 16），
+  it('row-title = 16px / 500 / 行高 28 / 字距 -0.176', () => {
+    // 全应用最高频的样式。行高必须是绝对点值（1.75 倍数 × 16），
     // 字距必须是点值（-0.011 em × 16）。
     // 🔴 2026-11-02 字重 400 → 500：16:14 的标题/元信息比是 1.14，读不出层级，
     // 字重是唯一不改行高就能拉开层级的杠杆。改回去等于把那次修复撤销。
+    // 🔴 2026-11-04 滴答对齐阶段 1：leading normal(1.5) → relaxed(1.75)，24 → 28。
+    // 1.5 × 16 = 24 与汉字字高同高，换行时上下两行粘连；滴答那一档实测在 28 上下。
     const s = resolveTextStyle('row-title', lightTokens);
     expect(s.fontSize).toBe(16);
     expect(s.fontWeight).toBe('500');
-    expect(s.lineHeight).toBe(24);
+    expect(s.lineHeight).toBe(28);
     expect(s.letterSpacing).toBeCloseTo(-0.176, 3);
   });
 

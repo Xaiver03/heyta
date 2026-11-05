@@ -35,7 +35,7 @@
 .ht-type-row-title {
   font-size: var(--ht-font-size-base);
   font-weight: var(--ht-font-weight-medium);
-  line-height: var(--ht-line-height-normal);
+  line-height: var(--ht-line-height-relaxed);
   letter-spacing: var(--ht-tracking-body);
 }
 

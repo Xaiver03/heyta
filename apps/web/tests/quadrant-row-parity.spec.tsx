@@ -195,7 +195,7 @@ describe('四象限卡里的行 = 列表里的行', () => {
    *
    *   (a) **它比的是 RNW 的原子 class 名，不是计算样式。** 实测两档的 class
    *       确实不同（`r-minHeight-peo1c` vs `r-minHeight-10gryf7`），且那些 class
-   *       携带真实差异（44px vs 56px、paddingBlock 4px vs 8px）—— 所以它**不是空断言**；
+   *       携带真实差异（44px vs 60px、paddingBlock 4px vs 12px）—— 所以它**不是空断言**；
    *       但**被改坏的 class 名同样会让它通过**。
    *   (b) **它不校验方向与幅度。** `compact` 哪天变得比 `comfortable` **更高**，
    *       这条照样绿。真正的方向由 `density.ts` 的 `DENSITY_SPEC` 决定，
