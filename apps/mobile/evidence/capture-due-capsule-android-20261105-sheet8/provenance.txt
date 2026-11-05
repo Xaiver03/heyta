@@ -1,0 +1,8 @@
+head=3766d79017c8d47dd061ae355e51fc2f5af1c3b7
+input_digest=c4cc1d5e6b101195cccb582e558db47870a9df67ef9db5cabde5622ffb0f3f7e
+started_utc=2026-11-05T07:11:53Z
+finished_utc=2026-11-05T07:20:03Z
+apk_sha256=b4d96effbd1728de24239595896fa5fc6c5683d53fa59e0556ac51ac50063fb1
+device=sdk_gphone64_x86_64
+failed=0
+unjudged=1

@@ -3358,6 +3358,10 @@ export const zhCN = {
   'mobile.capture.capsule.aria.unset': '选择截止日期',
   'mobile.capture.capsule.aria.value': '截止日期 {value}，点按修改',
   'mobile.capture.panel.title': '选择截止日期',
+  // 🔴 底部面板是模态：它起来之后背景（含收集框那一行）既被壳盖住、也不在可及性树里。
+  // 标题必须说出**正在改哪句话**，否则"选了哪一天"有了答案而"给哪条"没人回答。
+  // 空草稿时宿主回上一格那句（那句是静态标题，不需要变量）。
+  'mobile.capture.panel.titleWithDraft': '给「{draft}」选截止日期',
   'mobile.capture.panel.dueItems': '文字里读到的日期',
   'mobile.capture.panel.timeAria': '这条新任务的截止时刻（留空表示全天）',
   'mobile.capture.panel.time.otherTime': '其它时间',

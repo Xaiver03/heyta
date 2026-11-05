@@ -457,7 +457,19 @@ export function BottomSheet({
          * 理由见 `sheet-drag.ts` 文件头（move 阶段抢走 responder 会让 × 点不动）。
          */
         headerDrag: { flex: 1 },
-        title: { flex: 1, color: tokens['color.foreground'] },
+        /**
+         * 🔴 这里**不许**写 `flex: 1`。
+         *
+         * `headerDrag` 是一条自动高度的列容器（它的 `flex: 1` 管的是**宽度**，因为在
+         * `header` 那一条 row 里），而 Yoga 对"自动高度容器里 `flex: 1` 的孩子"给的是
+         * `basis 0 + 剩余空间 0` ⇒ 标题量出来 0 高，整条 header 什么都不画。
+         * 2026-11-05 Android 设备腿现量：`…-sheet` 的直接孩子是 handle 与 ScrollView，
+         * 中间那层 header **不在可及性树上**（零面积会被 uiautomator 剔掉），截图上
+         * 把手下面直接是内容。
+         * ⚠️ 浏览器那侧的 CSS 引擎不塌（auto 高度按内容撑），所以 web 全绿、jsdom 全绿，
+         * **只有设备看得见这一格** —— 与 §9.6 那三处退化同一族。
+         */
+        title: { color: tokens['color.foreground'] },
         closeButton: {
           minWidth: tokens['touch-target.min'],
           minHeight: tokens['touch-target.min'],
