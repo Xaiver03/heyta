@@ -62,6 +62,7 @@ const PANEL = 'packages/ui/src/capture/CaptureDuePanel.tsx';
 const GATE = 'scripts/check-capture-shape.mjs';
 const RIG = 'scripts/verify-mobile-capture-android.sh';
 const E2E = 'e2e/tests/capture-due-capsule.spec.ts';
+const MSCREEN = 'apps/mobile/src/screens/TasksScreen.tsx';
 const MODEL = 'packages/ui/tests/capture-model.spec.ts';
 const POP = 'apps/web/src/features/capture/CaptureDuePopover.tsx';
 const SB = 'scripts/check-surface-budget.mjs';
@@ -122,6 +123,15 @@ const rows = [
     () => r(E2E).includes('面板滚动区可视底边'),
     () => !r(E2E).includes('scrollIntoViewIfNeeded'),
     () => !r(E2E).includes('滚过之后仍然不在视口里')],
+  // ↓ 11-05 第六趟：S3 那句 "mobile BottomSheet" 真接上了（§9.33）。
+  //    第三枚钉的是宿主那段接线，第四枚钉共享件那道"没外壳就强制 inline"的守卫，
+  //    第五枚是**反向钉子**：旧那条"移动端不许自带外壳"的红话不许回来（它已被 §9.33 改判）。
+  ['28 移动端底部面板接线在场、出口段守卫两处、旧那条"移动端不许带外壳"已撤（§9.33）',
+    () => r(GATE).includes('function checkMobileSheet'),
+    () => r(GATE).includes('...checkMobileSheet(read(PANEL), read(SHARED), read(MOBILE_SCREEN)'),
+    () => r(MSCREEN).includes('duePanelOutlet="footer"'),
+    () => r(SH).includes("renderDuePanel === undefined ? 'inline' : duePanelOutlet"),
+    () => !r(GATE).includes('移动端开始自带外壳')],
 ];
 
 let bad = 0;

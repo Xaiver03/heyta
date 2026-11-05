@@ -61,3 +61,49 @@ describe('移动端：宿主该给的三样都给了', () => {
     }
   });
 });
+
+/**
+ * 🔴 移动端日期面板走底部面板那一档（目标原话点名的 `mobile BottomSheet`）。
+ *
+ * 上一轮这一格是"接上、量完、撤掉"（§9.6），撤的理由是三处退化。这一版按**成因**分别处理，
+ * 所以这里钉的是"三个成因各有一枚会红的钉子"，不是"外壳换了"：
+ *  · 出口掉到折叠线以下 ⇒ 出口段必须放进 `footer`（`ScrollView` 之外的兄弟节点）；
+ *  · 盖住输入行 ⇒ 档位是 `medium`，不是铺满；
+ *  · 语义档位 ⇒ `overlay="popover"`（表里那档无 ×、点外面/返回键收起），
+ *    用 `'bottom-sheet'` 会多画一枚 × 并把 Esc 判成 deny。
+ * 再加一条**互斥**钉子：出口在共享件里恰好两处、且都被 `outlet === 'inline'` 管着 ——
+ * 分置模式下两处都画 = 同一目的地两个控件；一处都不画 = 非整半点填不进去。
+ */
+describe('移动端：日期面板的底部面板档位', () => {
+  const screen = stripComments(read('apps/mobile/src/screens/TasksScreen.tsx'));
+  const panel = stripComments(read('packages/ui/src/capture/CaptureDuePanel.tsx'));
+
+  it('① 出口段交给宿主的 footer，档位是 medium，语义是 popover', () => {
+    /*
+     * 🔴 必须**锚在 `renderDuePanel` 那一段里**。同一个文件里还有别的底部面板，
+     *    它们也写着 `detents={['medium']}` —— 拿全文 `toContain` 去问，是别人的段落替我的作答
+     *    （第一版就是这样，把档位改成 `large` 它照样绿）。
+     */
+    const at = screen.indexOf('duePanelOutlet="footer"');
+    expect(at, '宿主没把 duePanelOutlet 交给共享件').toBeGreaterThan(-1);
+    const sheet = screen.slice(at, at + 1200);
+    expect(sheet).toMatch(/renderDuePanel=\{\(slot\) => \(\s*<BottomSheet[\s\S]{0,900}?footer=\{slot\.footerContent\}/);
+    expect(sheet).toMatch(/detents=\{\['medium'\]\}/);
+    expect(sheet).toMatch(/overlay="popover"/);
+  });
+
+  it('② 关闭措辞从词条来（宿主不许自己写一句"关闭"）', () => {
+    expect(screen).toContain("t('mobile.capture.panel.sheetClose')");
+  });
+
+  it('③ 宿主没有第二份面板：出口只许由共享件决定画几处', () => {
+    expect(screen, '宿主自己渲染面板 = 出口可能被画两遍或一遍都没有').not.toContain('CaptureDuePanel');
+  });
+
+  it('④ 共享件里出口恰好两处，且都被 inline 判定管着（分置时一处都不画在体内）', () => {
+    const guarded = panel.match(/outlet === 'inline' \?/g) ?? [];
+    expect(guarded.length, '出口分支的数量变了 ⇒ 分置模式下可能两处都画或都不画，回去重看 §9.33').toBe(2);
+    expect(panel.match(/testID="capture-time-row"/g) ?? []).toHaveLength(1);
+    expect(panel.match(/testID="capture-time-mode"/g) ?? []).toHaveLength(1);
+  });
+});

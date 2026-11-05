@@ -82,7 +82,13 @@ import type { CaptureExclusion, LocalDate, LocalTime } from '@heyta/domain';
 import { Calendar, ChevronDown, Plus, RotateCcw, X } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
-import { CaptureDuePanel, type CaptureDuePanelLabels } from './CaptureDuePanel.js';
+import {
+  CaptureDuePanel,
+  CaptureDuePanelOutlet,
+  type CaptureDuePanelLabels,
+  type CaptureDuePanelOutletPlacement,
+  type CaptureDuePanelState,
+} from './CaptureDuePanel.js';
 import type { DatePickerQuickPick } from '../date-picker/DatePicker.js';
 import {
   captureCanSubmit,
@@ -168,6 +174,15 @@ export interface CapturePanelSlot {
   readonly open: boolean;
   /** 共享的 `CaptureDuePanel`，宿主把它放进自己的外壳里。 */
   readonly content: React.ReactNode;
+  /**
+   * 出口段（日期视图的「时刻 …」行 / 时刻视图的「其它时间 ↔ 列表」切换）。
+   *
+   * 🔴 **只有把 `duePanelOutlet` 设成 `'footer'` 的宿主才会拿到它**，而且那时
+   * `content` 里已经不含这一段 —— 两边永远只有一处画出口，不会重复也不会双双消失
+   * （这条由 `check:capture-shape` 钉着）。默认 `'inline'` 时本字段是 `undefined`，
+   * web 两档外壳一行都不用改。
+   */
+  readonly footerContent?: React.ReactNode;
   readonly onClose: () => void;
 }
 
@@ -233,6 +248,13 @@ export interface CaptureComposerProps {
    * web 主列表与移动端新建面板都传了各自的外壳。
    */
   readonly renderDuePanel?: ((slot: CapturePanelSlot) => React.ReactNode) | undefined;
+  /**
+   * 面板出口段画在哪儿：`'inline'`（默认，画在面板体里）或 `'footer'`（单独给宿主，
+   * 由宿主放进滚动区之外）。这是**外壳几何**的差别，不是措辞或判断的差别 ——
+   * 移动端的底部面板只有 `footer` 永远可见，出口留在滚动内容里就等于
+   * "非整半点填不进去"；web 两档没有这个问题，所以一行都不用改。
+   */
+  readonly duePanelOutlet?: CaptureDuePanelOutletPlacement;
   /**
    * 面板里那四枚快捷项（今天 / 明天 / 本周末 / 下周一）。
    *
@@ -417,6 +439,7 @@ export function CaptureComposer({
   testID,
   projectPicker,
   renderDuePanel,
+  duePanelOutlet = 'inline',
   quickPicks,
 }: CaptureComposerProps): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -429,6 +452,15 @@ export function CaptureComposer({
   /** 面板里点出来的截止值。绑在"被消费的那段字"上，那段字一变它就作废（`model.ts` §二·五）。 */
   const [override, setOverride] = useState<CaptureOverride | undefined>(undefined);
   const [panelOpen, setPanelOpen] = useState(false);
+  /*
+   * 🔴 面板的子视图状态住在这里，**不住在面板里** —— 不是为了"更纯"。
+   * 出口段要能画在面板体之外（移动端底部面板的 `footer` 是唯一永远可见的位置），
+   * 而"点出口 ⇒ 面板体切子视图"这件事只有两边读同一份状态才成立。
+   * 留在面板里时，把那段 JSX 复制给宿主就会造出第二份状态：footer 点了，面板不动。
+   */
+  const [panelView, setPanelView] = useState<'date' | 'time'>('date');
+  const [panelManual, setPanelManual] = useState(false);
+  const [panelTimeDraft, setPanelTimeDraft] = useState('');
 
   /** 原生端自己控制焦点（见 `autoFocus` 的说明）；web 不需要。 */
   const inputRef = useRef<TextInput>(null);
@@ -474,7 +506,7 @@ export function CaptureComposer({
     setDraft('');
     setIgnored([]);
     setOverride(undefined);
-    setPanelOpen(false);
+    closePanel();
   }
 
   /** 面板里点出一格 = 成对写一次覆盖（签名当场钉住，见 `model.ts` §二·五）。 */
@@ -507,6 +539,34 @@ export function CaptureComposer({
     //（`captureDue` 里那一处判定）。在这里再清一次就是给同一条规则写第二个出口。
   }
 
+  /** 面板体与出口段共用的受控状态（同一份，两边不会各切各的）。 */
+  const panelState: CaptureDuePanelState = {
+    view: panelView,
+    manual: panelManual,
+    timeDraft: panelTimeDraft,
+    onViewChange: setPanelView,
+    onManualChange: setPanelManual,
+    onTimeDraftChange: setPanelTimeDraft,
+  };
+
+  /**
+   * 关掉面板就退回日期视图。原来这一条是"面板卸载"白送的（状态住在面板里，一卸载就没了）；
+   * 状态上移之后必须自己写，否则下次打开还停在时刻列表上 —— 那是把一处行为悄悄改掉。
+   */
+  function closePanel(): void {
+    setPanelOpen(false);
+    setPanelView('date');
+    setPanelManual(false);
+    setPanelTimeDraft('');
+  }
+
+  /*
+   * 🔴 没有外壳就没有 footer 可放 ⇒ 这一档强制回 `'inline'`。
+   * 让 `'footer' + 无外壳` 这种组合存在，等于允许"出口哪儿都没画"这种形状活着出去。
+   */
+  const effectiveOutlet: CaptureDuePanelOutletPlacement =
+    renderDuePanel === undefined ? 'inline' : duePanelOutlet;
+
   const panelContent = (
     <CaptureDuePanel
       due={due}
@@ -518,8 +578,21 @@ export function CaptureComposer({
       onPick={pick}
       onClear={clearDue}
       onToggle={toggleIgnore}
+      state={panelState}
+      outlet={effectiveOutlet}
     />
   );
+
+  /** 分置模式下的出口段；`'inline'` 时是 `undefined`，宿主那边一行都不用改。 */
+  const outletContent = effectiveOutlet === 'footer' ? (
+    <CaptureDuePanelOutlet
+      due={due}
+      today={today(renderNow)}
+      labels={labels}
+      state={panelState}
+      onPick={pick}
+    />
+  ) : undefined;
 
   return (
     <View style={styles.wrap} testID={testID}>
@@ -597,9 +670,8 @@ export function CaptureComposer({
           : renderDuePanel({
               open: true,
               content: panelContent,
-              onClose: () => {
-                setPanelOpen(false);
-              },
+              footerContent: outletContent,
+              onClose: closePanel,
             })
         : null}
 
