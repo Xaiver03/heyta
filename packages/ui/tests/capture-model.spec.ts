@@ -31,6 +31,7 @@ import {
   captureChipRemainingDays,
   captureChipTimeLabel,
   capturePriorityLabelKey,
+  captureDuePanelTitle,
   captureRowChips,
   parseCaptureDraft,
   shouldResetCaptureIgnore,
@@ -713,5 +714,31 @@ describe('J. S2 决策的前提：框下那一行的独占内容只有优先级'
     expect(ignoredChip, '已忽略的那条要还在芯片集合里').toBeDefined();
     // 它落在面板那一组里 ⇒ 于是**不**是那一行的独占内容（§9.10 差集的这一半）
     expect(panelDueKeys('明天交周报', [{ field: 'dueDate', raw: '明天' }]).has(ignoredChip!.key)).toBe(true);
+  });
+});
+
+describe('外壳标题该说什么（`captureDuePanelTitle`）—— 判断在共享层，措辞由宿主给', () => {
+  const LABELS = {
+    staticTitle: '选择截止日期',
+    withDraft: (draft: string) => `给「${draft}」选截止日期`,
+  };
+  // 分母是这条判断的全部形状：空、纯空白、有内容（前后带空白）、内容本身像空白词。
+  const cases: readonly (readonly [string, string, string])[] = [
+    ['', '选择截止日期', '没打字不许塞一对空引号进标题'],
+    ['   ', '选择截止日期', '纯空白算没打字'],
+    ['\n\t ', '选择截止日期', '换行与制表同样是空白'],
+    ['明天交周报', '给「明天交周报」选截止日期', '整句原文进标题，不截不猜'],
+    ['  review notes ', '给「review notes」选截止日期', '两端空白去掉，中间保留'],
+    ['明天', '给「明天」选截止日期', '只打了一个日期词也是"正在改的那句话"'],
+  ];
+  it.each(cases)('%s ⇒ %s（%s）', (subject, want, why) => {
+    expect(captureDuePanelTitle(LABELS, subject), why).toBe(want);
+  });
+  it('反向钉子：标题里不许出现「未设置」这类审计腔，也不许出现空引号「」', () => {
+    for (const subject of ['', '  ', '\n', 'x']) {
+      const title = captureDuePanelTitle(LABELS, subject);
+      expect(title).not.toContain('未设置');
+      expect(title).not.toContain('「」');
+    }
   });
 });

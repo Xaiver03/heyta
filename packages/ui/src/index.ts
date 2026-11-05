@@ -583,6 +583,7 @@ export {
   captureChipKey,
   captureChipRemainingDays,
   capturePriorityLabelKey,
+  captureDuePanelTitle,
   captureSelectedProject,
   parseCaptureDraft,
   shouldResetCaptureIgnore,

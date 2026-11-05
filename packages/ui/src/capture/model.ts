@@ -577,3 +577,21 @@ const CAPTURE_PRIORITY_LABEL_KEY: Record<Priority, CapturePriorityLabelKey> = {
 export function capturePriorityLabelKey(priority: Priority | undefined): CapturePriorityLabelKey {
   return CAPTURE_PRIORITY_LABEL_KEY[priority ?? Priority.None];
 }
+
+/**
+ * 面板外壳的标题该说什么。
+ *
+ * 🔴 这条判断**不许住在壳里**（AGENTS §3.5：`apps/*` 里任何一行"决定业务上该怎么做"
+ * 都是提取得不够）。移动端那一层是模态：壳起来后输入行既被盖住也不在可及性树里，
+ * 标题是"正在给哪句话设截止"唯一的出口；而"没打字就别塞一句话进标题"是判断，
+ * 不是措辞 —— 措辞由宿主给（`staticTitle` / `withDraft` 两个都是它自己的词条）。
+ *
+ * 空格算"没打字"：`"   "` 拼进标题会得到一对空引号，读屏念出来是"给「」选截止日期"。
+ */
+export function captureDuePanelTitle(
+  labels: { readonly staticTitle: string; readonly withDraft: (draft: string) => string },
+  subject: string,
+): string {
+  const trimmed = subject.trim();
+  return trimmed === '' ? labels.staticTitle : labels.withDraft(trimmed);
+}
