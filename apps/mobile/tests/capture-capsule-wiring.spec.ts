@@ -118,8 +118,13 @@ describe('移动端：日期面板的底部面板档位', () => {
     expect(at, '宿主没把 duePanelOutlet 交给共享件').toBeGreaterThan(-1);
     const sheet = screen.slice(at, at + 1200);
     expect(sheet, '标题没取 slot.subject ⇒ 壳起来后没人说得出在改哪句话').toMatch(/title=\{dueSheetTitle\(slot\.subject\)\}/);
-    expect(screen).toContain("t('mobile.capture.panel.titleWithDraft', { draft: trimmed })");
-    expect(screen).toMatch(/trimmed === ''\s*\?\s*labels\.panel\.title/u);
+    // 🔴 壳里只许有**措辞**：那两个词条各是一句怎么说，而"什么时候说哪句"是判断，
+    //    必须交回共享层 `captureDuePanelTitle`（AGENTS §3.5）。所以这里钉的是
+    //    "宿主把措辞交给共享判断"这个形状，而不是宿主自己写的那个三元表达式。
+    expect(screen).toContain('captureDuePanelTitle(');
+    expect(screen).toContain("withDraft: (draft) => t('mobile.capture.panel.titleWithDraft', { draft })");
+    expect(screen).toContain('staticTitle: labels.panel.title');
+    expect(screen, '判断被抄回壳里 = 两端各写一份，迟早漂').not.toMatch(/trimmed === ''\s*\?/u);
   });
 
   it('⑥ 共享件把草稿交给槽位（宿主拿不到输入框，也不许自己去猜）', () => {

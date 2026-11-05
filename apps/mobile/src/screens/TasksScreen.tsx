@@ -85,7 +85,7 @@ import {
 import { readSyncConfig } from '../sync/config';
 import { useToday } from '../lib/use-today';
 // 🔴 日期措辞已上移到共享层（见 `lib/date.ts` 文件头）：日历要在四端共用。
-import { formatDayTitleText } from '@heyta/ui';
+import { captureDuePanelTitle, formatDayTitleText } from '@heyta/ui';
 import { describeRecurrenceText } from '../lib/recurrence-display';
 import { quadrantBoardLabels } from '../lib/quadrant-display';
 import { useText, useTheme, useTokens } from '../theme';
@@ -190,19 +190,20 @@ function Composer({
   const labels = useCaptureLabels();
   const projectLabels = useCaptureProjectLabels();
   /**
-   * 底部面板的标题要说**正在给哪句话**选截止日期。
+   * 底部面板的标题要说**正在给哪句话**选截止日期（这一层是模态，起来之后收集框那一行
+   * 既被壳盖住也不在可及性树里，标题是唯一还能说话的地方 —— §9.6 当初就因为它撤过壳）。
    *
-   * 🔴 为什么不能只写静态那句：这一层是模态（`accessibilityViewIsModal`），起来之后
-   * 收集框那一行既被壳盖住、也不在可及性树里 —— 标题是它唯一还能说话的地方。
-   * 这正是 §9.6 当初撤掉壳的那条不变量，这次把它做进标题而不是退回就地展开。
-   * 没打字时回到静态那句（那句不需要变量，读屏也不会念出一对空引号）。
+   * 🔴 这里只许有**措辞**：什么时候说静态那句、什么时候说带草稿那句，是判断，
+   *    住在共享层 `captureDuePanelTitle`（AGENTS §3.5：壳里不许有决定业务语义的一行）。
    */
-  function dueSheetTitle(subject: string): string {
-    const trimmed = subject.trim();
-    return trimmed === ''
-      ? labels.panel.title
-      : t('mobile.capture.panel.titleWithDraft', { draft: trimmed });
-  }
+  const dueSheetTitle = (subject: string): string =>
+    captureDuePanelTitle(
+      {
+        staticTitle: labels.panel.title,
+        withDraft: (draft) => t('mobile.capture.panel.titleWithDraft', { draft }),
+      },
+      subject,
+    );
   /**
    * 这一趟新建要落进哪一份清单；`null` = 收集箱。
    *
