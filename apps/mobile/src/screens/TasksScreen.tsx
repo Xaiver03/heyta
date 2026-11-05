@@ -69,6 +69,7 @@ import {
   type CaptureSubmitPlan,
 } from '@heyta/ui';
 import { useCaptureLabels, useCaptureProjectLabels } from '../lib/capture-labels';
+import { quickDatePicks } from '../lib/quick-dates';
 import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import {
   createAttachmentActions,
@@ -204,6 +205,8 @@ function Composer({
       },
       subject,
     );
+  /** 冻结的"今天"（与列表其余部分同一个时钟），快捷四档由它推。 */
+  const todayLocal = useToday();
   /**
    * 这一趟新建要落进哪一份清单；`null` = 收集箱。
    *
@@ -325,6 +328,7 @@ function Composer({
               onSubmit={submit}
               autoFocus
               testID="mobile-capture"
+              quickPicks={quickDatePicks(todayLocal.today, t)}
               /*
                * 🔴 日期面板在移动端走**底部面板**，出口段放进 `footer`。
                * 上一轮量到三处退化，成因各不相同（§9.6）：出口掉在折叠线以下、
