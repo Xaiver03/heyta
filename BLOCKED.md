@@ -13444,3 +13444,13 @@ B258 ② 那条纪律（改文本对账的常量名，消费者不只在 TS 图�
 
 ⑤ 本条只动 `BLOCKED.md` 一枚（纯追加，写后 `git diff --numstat` 只有这一枚、只有加行）。
 B263 的正文不重写（它是那一戳的读数），本条给它补射程。
+
+🔎 **B264 追记（2026-11-05 23:3x，本线自己那格的分母重枚）**：原句"四枚值只有 leading 有值判据 / 协同回退全仓不会红"
+当时的尺只扫 `packages/design-system/tests/*.ts`、`packages/ui/tests/task-row-density.spec.ts` 与两枚 landing spec ——
+那是"这把尺扫的那套写法里没有"，不是全集。本轮把面扩到**全仓** `*.spec.ts` / `*.spec.tsx` / `*.mjs`
+（`grep -rn … packages apps/web/tests apps/landing/tests apps/mobile e2e scripts`，剔 `dist`／`evidence`），
+枚数分别 `bodyPaddingBlock` 5 / `listGap` 2 / `row-min-height` 1 / `TASK_ROW_SHAPE` 14，逐枚判性质后**结论没翻**：
+命中的是类型声明、`toEqual` 现取 token 自己、`toContain('spec.bodyPaddingBlock')` 文本锚、`expectVar` 同名比对。
+两处最像值判据的查到实现，都不钉值：日历现在线那条是**相对断言**（`rowHeight = top / (时+分/60)`，注释自己写着"不是某个像素值"）；
+象限 parity 比的是两档 class 名**互不相同**（`expect(defaultRow).not.toBe(compactRow)`，它自己的边界说明 (a)(b) 就承认不校验方向与幅度）。
+⇒ 从这一戳起，那句"协同回退不会红"是**带分母**成立的，不再只是三枚窄 grep 的读数。要拍"补不补不变量"那一格仍归设计系统线，本追记不改判据。
