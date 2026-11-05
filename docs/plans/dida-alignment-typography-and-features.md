@@ -250,10 +250,39 @@
 
 ---
 
-## 执行状态（阶段 2-4，2026-11-04 落）
+## 执行状态（阶段 1-4，2026-11-04 起落）
 
 **这一节是现量，不是承诺。** 每条写"改在哪 + 哪条判据钉住它 + 没做到的是什么"；
 数字一律给取数命令，不抄读数。
+
+### 阶段 1（排印密度）—— 2026-11-05 入库
+
+| 项 | 状态 | 判据 / 现量 |
+|---|---|---|
+| A1 `--ht-size-row-min-height` 56→60 | ✅ 已入库 | `check:tokens` 现量"生成产物与 `tokens.css` 一致（8 个文件，225 个 token）"；下游按 `var()` 读，没有文本锚点 |
+| A1 `row-title` leading `normal`→`relaxed` | ✅ 已入库 | `packages/design-system/tests/typography.spec.ts` 那格期望值由 24 **改签成 28**（值变更就是这一格的内容，不是为了让测试变绿）；镜像由 `apps/landing/tests/mockup-task-row.spec.tsx` 按源码文本对账 |
+| A2 `bodyPaddingBlock` `space.2`→`space.3` / `listGap` `space.1`→`space.2` | ✅ 已入库 | `packages/ui/tests/task-row-density.spec.ts` 逐档读槽位（跟随 token，不钉数）；`mockup-quadrant-shape.spec.tsx:479` 钉 `.mk-quad__list` 的 `gap` == `TASK_ROW_SHAPE.listGap` |
+| A3 侧栏密度（`.ht-nav__item` padding、`.ht-sidebar` gap） | ✅ 现量已经是目标值，本笔**没动** | `grep -n "ht-nav__item" -A8 apps/web/src/styles/app/sidebar.css` ⇒ `padding: 0 var(--ht-space-4)`；同文件 `.ht-sidebar` ⇒ `gap: var(--ht-space-3)` |
+| A4 验证 | 三道门 + 构建 + 两枚浏览器腿都过；图看过，**但没和滴答并排比过** | 见下面最后一条 |
+
+- 🔴 **这一格欠了一整天，欠的不是代码**：改动 11-04 就写完了，但 `packages/design-system/**`
+  与别线的 token 工作同片地，落库前分不清哪几行是谁的手。今天逐 hunk 核完（分归办法写在
+  `BLOCKED.md` B262 ④），确认这批 diff 里每一处都能追溯到 A1/A2 那四枚值或它们的生成件；
+  收集框线在 `3d0d593f4` 的 RK 那笔里也是把它们判成"别线未签字的手"刻意排除的，两边读的是同一批行。
+- **别线替本线登记的那格现在才闭合**：`BLOCKED.md` B261 是收集框线量到 `typography.spec.ts`
+  红在**本线未提交**的行高改动上，按"判据口径不代改"原样递回来 —— 本线签了（24 → 28，
+  测试名里那个数字一起改）。
+- ⚠️ **这次改动连带抬高了日历的小时轴**：`CalendarDayBoard` 的行高**就是** `size.row-min-height`
+  （那份复用是有意写死的，理由在它文件头），于是 24 行从 1344px 变 1440px；移动端 `FocusScreen`
+  与日历格同理跟随。这不是缺陷，但它是"改一枚共享 token 会走到哪"的现量答案。
+- ⚠️ **被这次改动否证的那五处旧口径一起改了**（不改就是第二份自相矛盾的抄件）：`typography.ts`
+  文件头那句"不改行高"、`density.ts` 规格表的（56）（8）、`CalendarDayBoard.tsx` 的 `24 × 56 = 1344px`、
+  `quadrant-row-parity.spec.tsx` 与 `calendar-day-view.spec.tsx` 的注释、`MASTER.md` §13 的 `row-title` 行。
+  🔴 **同表 `row-meta` 仍写 `14 / 400 / 21` 而代码是 12px** —— 那是 11-02 字重/字号那一刀的漏改抄件，
+  归设计系统线，本线不代改（B262 ②）。
+- **A4 能签的一半与不能签的一半**：能签的是"新密度下没画坏"——浏览器腿 11/11（含 ⑦ 390 窄屏 + 暗色），
+  `e2e/test-results/dida-*.png` 那批按新密度重跑的图逐张看过（任务行、侧栏、分组说明都在位、没被裁）。
+  **没签的是**"和滴答并排比观感"那一半：那需要滴答的截图做参照，本轮没做，别把它读成已对齐。
 
 ### 阶段 2（右键菜单）
 
@@ -451,6 +480,10 @@ build 完再跑它就是绿，别线再写一笔它就红。这不是谁做错�
 **刻意没入库的**：`packages/design-system/**`（阶段 1 排印密度那两枚 `TASK_ROW_SHAPE` 与四份生成的 token 件）——
 它们与本线的 D2/D3 不在同一格，且此刻和别线的 token 工作同片地；等那一族归口清楚再单独一笔。
 
+✅ **那一笔已于 2026-11-05 落下**（上面「阶段 1」那一格）：逐 hunk 核过这批 diff 的每一处都能追溯到
+A1/A2 那四枚值或它们的生成件，连 `mockup.css` 的四处镜像一起走（`git apply --cached` 只取本线那四处，
+`.mk-sidebar__tools` 那枚与 landing 在飞的那一手成套、留在工作树未动）。分归办法与读数在 `BLOCKED.md` B262。
+
 ### 别线的一处红（登记，不代改）
 
 🔴 **同一棵树上有人在写**（形状，不是状态）：本轮读到过 `apps/web/src/features/settings/SessionsPanel.tsx`
@@ -569,9 +602,14 @@ pnpm typecheck 2>&1 | grep "error TS"
   `check:row-single-source` 的断言 B 红在"`ht-*` 前缀族 29 > 基线 28"，多出来的那一族是
   `.ht-spin`，由 `2a4bc0e20` 引入（HEAD 上就红，与本线无关 —— 本线动过的三个样式文件
   族集合与 HEAD 逐字相同）。这一条**不在本轮那九条验收里**，登记是为了下一个会话不重做归因。
+  🔴 **2026-11-05 更正这一格的归因**：`.ht-spin` 那族已由设置页治理线自己收编进 `.ht-settings__busy`
+  （`7d3521391`，族数回到 28），但**今天这道门还是红的** —— 多出来那一族换成了 `.ht-capture`，
+  由 `3d0d593f4`（收集框 S1–S5）带回。归因可复现，别再重做一遍：HEAD 与工作树的族清单逐行相同
+  （两边都 29），沿 `git log -20 --format=%H -- apps/web/src/styles` 逐笔放量，只有那一跳是 28→29。
+  证据与两条出路写在 `BLOCKED.md` B263（登记不代改：基线常量是 M3 视图统一那条线的判据口径）。
 - 阶段 5（C1 富文本 / C3 评论 / D1 过滤器）本轮明确**未动**，仍按原文需要单独排期。
 
 ---
 
 **创建时间**：2026-11-04
-**最后更新**：2026-11-04
+**最后更新**：2026-11-05

@@ -26,7 +26,9 @@
 ### Q2 · 现在停在哪？
 
 - 阶段 2–4（这份任务书的范围）**做完并入库**，九条验收都有本轮现量。
-- 这份计划的**阶段 1（排印密度）改完了但没入库** —— 那几枚文件与别线的 token 工作同片地。
+- 这份计划的**阶段 1（排印密度）已于 2026-11-05 入库** —— 一笔 16 枚文件：四枚值 + 六份生成件 +
+  `typography.spec.ts` 那格改签的期望值 + `mockup.css` 四处镜像 + 五处被这次改动否证的旧口径。
+  当年"与别线 token 工作同片地"那一格是靠**逐 hunk 核归属**收的，办法与读数写在 `BLOCKED.md` B262。
 - 这份计划的**阶段 5（三个大功能）没做**：C1 富文本、D1 自定义筛选器；C3 评论已被另一条线
   以 W4 落地（不是这份计划做的）。
 - "和滴答全面对齐"这件事**不成立**，分母见 §四。
@@ -114,7 +116,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 
 | 格 | 状态 | 卡在谁 |
 |---|---|---|
-| 阶段 1 排印密度（`TASK_ROW_SHAPE.bodyPaddingBlock` / `listGap` + 生成的 token 件） | 改完，**未入库** | 本线。`packages/design-system/**` 与别线 token 工作同片地，落库前要先确认那几枚生成件不是别人未提交的手 |
+| 阶段 1 排印密度（`TASK_ROW_SHAPE.bodyPaddingBlock` / `listGap` + 生成的 token 件） | ✅ **已入库**（2026-11-05 16:5x 一笔 16 枚文件） | 本线。逐 hunk 核过 `packages/design-system/**` 每一处都能追溯到 A1/A2 那四枚值或它们的生成件；`mockup.css` 只取本线那四处镜像，`.mk-sidebar__tools` 那枚留在 landing 手里。分归办法与读数在 `BLOCKED.md` B262 |
 | C1 富文本编辑器 | 未做 | 先过两道门：编辑器选型 + 许可证（AGENTS §3.1/§3.2）。连带详情面「文本格式」那枚按钮一直不画 |
 | D1 自定义筛选器 / 智能清单 | 未做 | 产品边界先定义（`TaskFilter` 现在是封闭联合，用户自建查询没有落点） |
 | C3 评论 | 已由协作线以 W4 落地（详情面协作区） | 不欠；但"非共享清单要不要评论"这条口径归产品 |
@@ -156,9 +158,14 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 ## 五、下一步（按顺序，每步都带动手前的前置）
 
 1. **先跑 §三 那组现量**，确认树没被别人改动过、九条仍然成立。
-2. **把阶段 1 那两枚排印改动入库**（已改完，只差一笔提交）。
+2. ✅ **把阶段 1 那两枚排印改动入库**（2026-11-05 16:5x 做完，下一位从第 3 步接）。
    前置：`git diff -- packages/design-system/src/task-row-shape.ts` 逐行确认是本线的手，
    生成件（`generated/*`、`typography.*`）里哪些属于别线未提交的工作 —— 分不清就只提交源文件。
+   ⚠️ 实际做法比这条前置多走了一步：`packages/design-system/**` 整片**都是**本线的手（逐 hunk 核过），
+   真正同片地的是 `apps/landing/src/mockup/mockup.css` —— 那里 5 枚 hunk 有 4 枚是阶段 1 的镜像
+   （被两枚按源码文本对账的 landing spec 钉住，不提会让 HEAD 红），第 5 枚 `.mk-sidebar__tools`
+   与 landing 在飞的 `AppWindow.tsx` + `mockup-shell-shape.spec.tsx` 成套 ⇒ 用
+   `git apply --cached` 只取四处，暂存与提交压进同一条命令。
 3. **打「完成后顺延」**（`nextAfterCompletion` 接进生产路径）。
    前置：先读 [ADR](../adr/) 里重复语义那一格与 `packages/domain/src/recurrence.ts` 的注释；
    这一格是"数据 + 调用点"，不依赖选型，成本最低、用户可感知。
@@ -194,14 +201,17 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 
 | 门 / 腿 | 最后一次现量 |
 |---|---|
-| `pnpm check:design` / `check:design-token-refs` / `check:menu-keyboard` / `check:row-single-source` / `check:ui-language` / `check:docs` / `check:evidence-hygiene` | 2026-11-04 22:39–23:4x 全部退 0 |
-| `pnpm --filter @heyta/web build` | 2026-11-04 22:40 退 0（先补了一次 `@heyta/ui` 的产物） |
-| `pnpm typecheck`（整仓） | 2026-11-04 21:34 退 0 —— ⚠️ 之后别线又提交过东西，接手要重跑 |
-| web 单测（本线三枚 spec） | 2026-11-04 22:41 全过；`packages/domain` 1188、`packages/ui` 867 同日全过 |
-| 浏览器腿 | 同日 11/11（本线两枚 spec） |
-| iOS 设备腿 | 2026-11-05 00:1x 两趟 9/9（第二趟长按一次命中） |
+| `pnpm check:design` / `check:design-token-refs` / `check:menu-keyboard` / `check:ui-language` / `check:docs` / `check:evidence-hygiene` | 2026-11-05 16:5x 全部退 0（阶段 1 入库前后各一趟） |
+| 🔴 `pnpm check:row-single-source` | 2026-11-05 16:53 **退 1**：`ht-*` 前缀族 29 > 基线 28。与本线无关 —— HEAD 与工作树的族清单**逐行相同**（两边都 29），28→29 那一跳在 `3d0d593f4`（收集框 S1–S5），多出来那一族是 `.ht-capture`。归因与两条出路写在 `BLOCKED.md` B263；本文 §4.4 那格说的 `.ht-spin` 已被 `7d3521391` 收掉，是旧的一戳 |
+| `pnpm check:tokens` / `check:md-tables` / `check:doc-citations` / `check:windows-xaml` / `check:native-bare` | 2026-11-05 16:5x 退 0（阶段 1 那六份生成件由 `generate:check` 逐字节对账，不是手写） |
+| `pnpm check:arkts` | 本机跑不了（缺 DevEco SDK 的 `es2abc`）⇒ `.ets` 那一半登记为**未判定**，别读成通过 |
+| `pnpm --filter @heyta/web build` | 2026-11-05 16:09 退 0 |
+| `pnpm typecheck`（整仓） | 2026-11-05 17:01 退 0（阶段 1 入库之后重跑） |
+| web 单测（本线三枚 spec） | 2026-11-05 16:11 123 条全过；`packages/design-system` 546、`packages/ui` 894、landing `mockup-task-row` 6 + `mockup-quadrant-shape` 15、web `quadrant-row-parity` + `calendar-day-view` 23 同日全过 |
+| 浏览器腿 | 2026-11-05 16:39 11/11（本线两枚 spec，跑在新密度上） |
+| iOS 设备腿 | 2026-11-05 00:1x 两趟 9/9（第二趟长按一次命中）。⚠️ 本趟**没重跑**：设备面被别线占着（现量 `ps aux | grep verify-mobile-capture-android` 两枚在跑；`sysctl vm.swapusage` used 9.8G / 11.2G），空了再跑 `IOS_UDID=<现量取> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida bash scripts/verify-mobile-pin-order.sh` |
 | 桌面壳 | 同日 `--window` 一趟：`rows=1 / colorBuckets=66`，图入库并看过 |
-| 未跑 | 整棵 `e2e/`、四端重装、Android 设备腿 |
+| 未跑 | 整棵 `e2e/`、四端重装、Android 设备腿（收集框线此刻正在跑那一枚） |
 
 ---
 
