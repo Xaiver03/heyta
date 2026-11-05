@@ -386,17 +386,15 @@ export function TaskRowMenu({
                 >
                   <Flag
                     size={ICON_SIZE.sm}
-                    className="ht-row-menu__icon"
-                    style={{
-                      color:
-                        p === Priority.High
-                          ? 'var(--ht-color-priority-high)'
-                          : p === Priority.Medium
-                          ? 'var(--ht-color-priority-medium)'
+                    className={`ht-row-menu__icon ht-row-menu__icon--${
+                      p === Priority.High
+                        ? 'high'
+                        : p === Priority.Medium
+                          ? 'medium'
                           : p === Priority.Low
-                          ? 'var(--ht-color-priority-low)'
-                          : 'var(--ht-color-foreground-subtle)',
-                    }}
+                            ? 'low'
+                            : 'none'
+                    }`}
                   />
                   {t(p === Priority.None ? 'mobile.priority.none' : p === Priority.High ? 'mobile.priority.high' : p === Priority.Medium ? 'mobile.priority.medium' : 'mobile.priority.low')}
                 </button>
