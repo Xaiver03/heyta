@@ -517,21 +517,31 @@ build 完再跑它就是绿，别线再写一笔它就红。这不是谁做错�
 | domain 置顶顺序（B5 的真缺陷） | 一笔，只含 `packages/domain/{src/task-order.ts,tests/task-order.spec.ts}` |
 | 行菜单四组动作 + 三处缺陷（B1–B5、键盘 Enter、零标签、草稿 Esc/焦点） | 一笔，含 `TaskRowMenu.tsx`、`task-row-menu.css`、`store.ts`、`task-row-menu.spec.tsx`，以及 `App.tsx` 里**只属于这一格的两枚 hunk**（`isPinned` 那枚 import + 行菜单的 props 接线）与 `zh-CN.ts` 的 `web.rowMenu.*` |
 | 面单工具条第三枚（C2） | 🔴 **内容入库了，但记在别线名下**：本线 staged 之后、`git commit` 之前那 8 秒，设置页治理那条线落了一笔裸 `git commit`，把 `TaskDetailCard.tsx`、`task-detail-card.spec.tsx` 与 `App.tsx` 那三枚 hunk 一起带走了。过程与教训写在 `BLOCKED.md` B258 ④（与 B257 是同一件事的两个面）|
-| 侧栏 D2/D3 | 一笔，含 shell 三枚、`view-tabs.ts`、`ProjectsPanel.tsx`、三枚 CSS、`{app-mount,language-switcher,tab-roving,projects-panel}.spec.tsx`、`e2e/tests/helpers.ts` 与跟着改口的四枚 e2e spec，`App.tsx` 只取五枚 D2 hunk（**没碰**别线那枚 `ht-sheet`）|
+| 侧栏 D2/D3 | 一笔，含 shell 三枚、`view-tabs.ts`、`ProjectsPanel.tsx`、三枚 CSS、`{app-mount,language-switcher,tab-roving,projects-panel}.spec.tsx`、`e2e/tests/helpers.ts` 与跟着改口的四枚 e2e spec，`App.tsx` 只取五枚 D2 hunk（**没碰**别线那枚 `ht-sheet`）。⚠️ 这一笔**没带展厅那一手**（landing 那五枚），当时误记成"别线在飞"；2026-11-05 另起一笔入库，判据与证据见 B265 |
 | e2e 九条 + 本计划文档 | 一笔 |
 
 🔴 **这笔 rename 留了一格本线引起的红**（`BLOCKED.md` B258 ②）：`TOOL_VIEW_TABS` → `SIDEBAR_TOOL_TABS`
 之后，`apps/landing/tests/mockup-shell-shape.spec.tsx` 那枚**按源码文本对账**的 spec 在 HEAD 上
-找不到锚会 `throw`。修法（把锚改成新名）此刻在 landing 线未提交的那手里 —— 三条判据不齐，本线不代改，
-闭合条件与兜底都写在 B258。⚠️ 这条纪律值得留下：**改一个被文本对账引用的常量名，消费者不只在 TS 图里**，
-`pnpm typecheck` 全绿不代表没有断链。
+找不到锚会 `throw`。**修法就是本线 D2 的展厅侧那五枚文件**（本文「展厅（landing mockup）跟着搬」那一格
+本来就把这一格登记在本线名下），
+11-04 12:46–12:51 写好后一直没入库，而本线把它误记成"landing 线在飞的那一手"、一次都没复量就等到 2026-11-05 23:2x。
+2026-11-05 23:2x 逐枚通读那五枚 diff 后确认成套、判据只增不减，已一笔入库收掉这格红
+（现量：`git show HEAD:apps/landing/tests/mockup-shell-shape.spec.tsx | grep -c "pairsOf('const TOOL_VIEW_TABS')"` ⇒ 0，
+同一份 HEAD 里新锚 `const SIDEBAR_TOOL_TABS` ⇒ 1）。过程与三条重判证据见 `BLOCKED.md` B265。
+⚠️ 这条纪律值得留下：**改一个被文本对账引用的常量名，消费者不只在 TS 图里**，`pnpm typecheck` 全绿不代表没有断链。
+🧭 另一条更该留下的：把一处红挂到"某条别线在飞"之前，要量的是**那几枚文件的 mtime 与那格主题的归属**，
+不是"我记得有个 landing 线"——当归属句与本文另一格自相矛盾时，矛盾本身就是"该重判"的信号。
 
 **刻意没入库的**：`packages/design-system/**`（阶段 1 排印密度那两枚 `TASK_ROW_SHAPE` 与四份生成的 token 件）——
 它们与本线的 D2/D3 不在同一格，且此刻和别线的 token 工作同片地；等那一族归口清楚再单独一笔。
 
 ✅ **那一笔已于 2026-11-05 落下**（上面「阶段 1」那一格）：逐 hunk 核过这批 diff 的每一处都能追溯到
-A1/A2 那四枚值或它们的生成件，连 `mockup.css` 的四处镜像一起走（`git apply --cached` 只取本线那四处，
-`.mk-sidebar__tools` 那枚与 landing 在飞的那一手成套、留在工作树未动）。分归办法与读数在 `BLOCKED.md` B262。
+A1/A2 那四枚值或它们的生成件，连 `mockup.css` 的四处镜像一起走（`git apply --cached` 只取本线那四处）。
+分归办法与读数在 `BLOCKED.md` B262。
+⚠️ 那一笔当时把 `mockup.css` 里 `.mk-sidebar__tools { margin-top: auto }` 那 5 行**留在工作树**，
+理由写的是"与 landing 在飞的那一手成套"——那个判断只有一半对：**成套是对的**（它确实与 D2 展厅侧那
+五枚文件一手），**"landing 在飞"是错的**（那一手是本线的，且写完后 34.5 小时零写入）。
+成套所以不拆走是对的，误判归属所以白等了一天。五枚文件已于同日另一笔单独入库，见上一格与 `BLOCKED.md` B265。
 
 ### 别线的一处红（登记，不代改）
 

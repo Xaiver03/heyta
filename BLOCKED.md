@@ -13370,3 +13370,41 @@ landing `mockup-task-row` 6 + `mockup-quadrant-shape` 15、web 本线三枚 123 
 归设计系统线拍；本线不动别人的判据口径，也不替它落库。
 
 ⑤ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。
+
+## B265 · B258 ② 那句"修法在 landing 线未提交的那手里"判错了对象 —— 它是**本线 D2 的展厅侧**，五枚文件在工作树躺了 34.5 小时没入库（2026-11-05 23:2x，滴答对齐线，已闭合）
+
+写前先 `date`（本机 2026-11-05 23:21），写前 `git diff --numstat -- BLOCKED.md` 为空（纯追加）。
+起因：本轮按规矩问"我这把尺的输入变了没"，HEAD 自 20 分钟前没动，于是改量**工作树**——
+`git status` 里躺着 `apps/landing/` 五枚脏文件，而本文 B258 ② 与计划都写着"修法等 landing 线"。
+
+① **那格红是真的，而且到刚才为止还开着**（三条现量，全是 grep 不是推断）：
+- `git show HEAD:apps/landing/tests/mockup-shell-shape.spec.tsx | grep -c "pairsOf('const TOOL_VIEW_TABS')"` ⇒ **1**（旧锚还在用）；
+- `git show HEAD:apps/web/src/features/shell/view-tabs.ts` ⇒ `const TOOL_VIEW_TABS` **0 处** / `const SIDEBAR_TOOL_TABS` **1 处**（本线 D2 那笔把它更名了）；
+- 判据的实现：`arrayBlock()` 里 `if (start < 0) throw new Error('源码里找不到 … —— 判据锚点已失效')`
+  ⇒ 找不到锚**必然 throw**，不是跳过。⇒ `apps/landing/tests/mockup-shell-shape.spec.tsx` 在 HEAD 上必红，
+  而它属于 `pnpm -r test` 那一档，任何全链跑者都会撞上。
+
+② **"别线在飞"这个读数是怎么判错的**（三条，任一条都够翻案）：
+- **时间**：五枚文件 mtime 全落在 11-04 **12:46–12:51** 这一个 5 分钟窗口，到刚才**零写入 34.5 小时**；
+  其间隔壁线在同棵树上落过多笔（本线 D2 自己是同日 **22:12** 才提的）——"在飞"的形状是持续写入，不是静止一天半。
+- **内容**：逐枚通读 84 行新增，全部是 D2 那一格，注释里逐字写着「2026-11-04（滴答对齐 D2）：回收站从 rail 搬进侧栏底部，展厅跟着搬」。
+- **自相矛盾**：计划「阶段 4」那一节**早就把展厅这一格登记在本线 D2 名下**（那一格标题就是"展厅（landing mockup）跟着搬"），
+  而 B258 ② 把同一件事记成"在 landing 线手里"。⇒ 两份说法只能有一份对，**这种矛盾本身就是"该重判"的信号**，不用等新证据。
+
+③ **判据是只增不减**（这是敢动的实质依据，不是"看起来无害"）：`mockup-shell-shape.spec.tsx` 新增一枚
+专门断言「回收站住侧栏底部那一组：登记的与真应用 `SIDEBAR_TOOL_TABS` 逐项同 key、同序，且渲染在侧栏里」，
+其中含反向臂 `expect(view.querySelector('.mk-rail__tools [data-view-key="trash"]')).toBeNull()`（同一目的地不许两个控件）。
+`mockup-fidelity.spec.tsx` 那枚 `toHaveLength(5)→4` 是**搬走之后必然要跟的数**，被搬的那一枚由上面那条新断言接住。
+
+④ **验证读数**（逐个抓 rc，未串管道尾巴）：landing vitest 整包 **24 files passed** / `pnpm --filter @heyta/landing typecheck` rc=0 /
+`check:design` `check:design-token-refs` `check:tokens` `check:font-size-discipline` 各 rc=0。
+`check:row-single-source` 仍 **rc=1**，与 B263 同一枚 `.ht-capture`（红话仍是 `ht-*` 前缀族 29 > 基线 28，族清单逐字同上一戳）——本笔没碰 `app.css`，没新增也没消掉它。
+
+⑤ **入库**：`41852b75c`，五枚文件用 pathspec 形式、暂存与提交压进同一条命令（B257/B258 那条纪律）。
+提交后 `git status --short apps/landing` ⇒ 0 行；HEAD 侧同一把尺重读：旧锚 **0** / 新锚 **1** / `mockup.css` 的
+`.mk-sidebar__tools { margin-top: auto }` 已在 HEAD 里 ⇒ 断链收掉。
+
+⑥ **可复用的规矩（下次照这两条量，别再凭印象挂"别人在飞"）**：
+把一处红登记成"等某条线"之前，先量两样——**那几枚文件的 mtime 窗口对现在隔了多久**，
+和**那格主题在计划里的归属那一格写的是谁**；两个都指回本线，就是自己的债，当场收，别押给别人、也别让它过夜。
+B258 ② 那条纪律（改文本对账的常量名，消费者不只在 TS 图里）仍然有效，本笔是它的**执行**那一半。
