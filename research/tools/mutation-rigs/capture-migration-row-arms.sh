@@ -106,6 +106,12 @@ const rows = [
     () => r(POP).includes('data-testid="capture-due-scroll"'),
     () => r(E2E).indexOf('-2-panel`)') > r(E2E).indexOf('面板里月历只有'),
     () => r(E2E).indexOf('-2-panel`)') < r(E2E).indexOf('scrollIntoViewIfNeeded()')],
+  // ↓ 11-05 第五趟后半：就地展开那一支的出口判据（§9.30）。
+  //    第三枚是**反向钉子**：那条恒真的旧写法（scrollIntoView 之后问 toBeInViewport）不许回来。
+  ['26 就地展开这一支的出口判据量的是"没滚之前的状态"，旧那条恒真写法已删（§9.30）',
+    () => r(E2E).includes('出口可达·就地展开'),
+    () => r(E2E).includes('用户既看不见也滚不到'),
+    () => !r(E2E).includes('撤销出口被外层编辑器的限高裁到够不着')],
 ];
 
 let bad = 0;
