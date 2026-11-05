@@ -332,19 +332,37 @@ n = next((n for n in root.iter('node') if rid(n) == 'capture-submit'), None)
 print('' if n is None else n.get('enabled', ''))
 PY
 }
+# 🔴 三种注入形式**轮着试**，而不是同一形式重试五次：
+#    实测这一台模拟器上 `input text` 有时进、有时整串丢；`input keyboard text` 与
+#    逐字符 `keyevent` 也各有成功的趟。哪个进了由 `enabled` 那把尺判，不由形式自己声明。
+type_keyevent_word() { # 只覆盖 a-z（本格的草稿就是这几个字母）
+  local c code out=""
+  for (( i=0; i<${#1}; i++ )); do
+    c="${1:i:1}"
+    code=$(printf '%d' "'$c")            # 小写字母的 ASCII
+    out="$out $(( code - 97 + 29 ))"     # a→KEYCODE_A(29) … z→54
+  done
+  for code in $out; do rsh "adb shell input keyevent $code" >/dev/null 2>&1; done
+}
 DRAFT_OK=""
+DRAFT_FORM=""
 TAP_BROKE=""
 EN=""
-for _r in 1 2 3 4 5; do
+for _r in 1 2 3 4 5 6; do
   tap_id capture-input >/dev/null 2>&1 || { TAP_BROKE=1; bad "第 ${_r} 轮取不到输入框（载体/树读不到）"; FAILED=$((FAILED+1)); break; }
   sleep 2
-  rsh "adb shell input text $DRAFT" >/dev/null 2>&1; sleep 2
+  case $(( _r % 3 )) in
+    1) rsh "adb shell input text $DRAFT" >/dev/null 2>&1; FORM="input text" ;;
+    2) rsh "adb shell input keyboard text \"$DRAFT\"" >/dev/null 2>&1; FORM="input keyboard text" ;;
+    0) type_keyevent_word "$DRAFT"; FORM="逐字符 keyevent" ;;
+  esac
+  sleep 2
   EN=$(submit_enabled || true)
-  info "第 ${_r} 轮：capture-submit enabled=${EN:-读不到}"
-  if [ "$EN" = "true" ]; then DRAFT_OK=1; break; fi
+  info "第 ${_r} 轮（${FORM}）：capture-submit enabled=${EN:-读不到}"
+  if [ "$EN" = "true" ]; then DRAFT_OK=1; DRAFT_FORM="$FORM"; break; fi
 done
 if [ -n "$DRAFT_OK" ]; then
-  ok "草稿进得去（enabled 从 false 翻成 true，第 ${_r} 轮）——「标题为空时禁用提交」那条契约同时在真机上被量到"
+  ok "草稿进得去（${DRAFT_FORM}，第 ${_r} 轮把 enabled 从 false 翻成 true）——「标题为空时禁用提交」那条契约同时在真机上被量到"
 elif [ -n "$TAP_BROKE" ]; then
   # 🔴 这一格**没被判定**，而且原因不是打字：连输入框都取不到 = 载体/树读不到。
   #    把它写成"打字通道没打通"会把一次网络故障记成产品事实（元规则一）。
@@ -352,7 +370,7 @@ elif [ -n "$TAP_BROKE" ]; then
   info "④b-2 **未判定**：第 ${_r} 轮就取不到输入框（载体或树读不到，非打字通道）⇒ 这一格没有被证明"
 else
   UNJUDGED=$((UNJUDGED + 1))
-  info "④b-2 **未判定**：${_r} 轮都没把 enabled 翻成 true（打字通道这一趟没打通）⇒ 这一格没有被证明"
+  info "④b-2 **未判定**：${_r} 轮把三种注入形式都试过，enabled 仍是 false ⇒ 这一格没有被证明"
 fi
 
 step "3. 判据 ④ —— 点胶囊，面板就地展开"
