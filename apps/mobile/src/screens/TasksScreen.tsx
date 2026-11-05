@@ -62,6 +62,7 @@ import { useI18n } from '@heyta/i18n';
 // 在这一刀之前移动端只有一个纯标题输入框 —— 同一句话在两端建出不同的任务。
 import {
   CaptureComposer,
+  BottomSheet,
   priorityColorToken,
   receiptTimingOf,
   type CaptureProjectOption,
@@ -309,6 +310,36 @@ function Composer({
               onSubmit={submit}
               autoFocus
               testID="mobile-capture"
+              /*
+               * 🔴 日期面板在移动端走**底部面板**，出口段放进 `footer`。
+               * 上一轮量到三处退化，成因各不相同（§9.6）：出口掉在折叠线以下、
+               * 读不到胶囊、输入行被盖住。这一版按成因分别处理：
+               *  · `footer` 是 `ScrollView` 之外的兄弟节点 ⇒ 「时刻 / 其它时间」那行永远可见，
+               *    不再靠滚；状态由共享层持有（`CaptureComposer` 里那三枚），所以点 footer
+               *    面板体一定跟着切子视图；
+               *  · `detents={['medium']}` ⇒ 面板升起到半屏，输入行与胶囊仍露在上面，
+               *    用户看得见自己正在改哪一句；
+               *  · `overlay="popover"` 是**语义档位**：表里那一档 `scrim/escape/systemBack = dismiss`
+               *    且 `explicitCloseButton = false` —— 点外面或返回键收起、没有 ×，与滴答一致；
+               *    用 `'bottom-sheet'` 会多画一枚 × 并把 Esc 判成 deny。
+               * ⚠️ 打开这一层时背景会从可及性树里掉出去（RN 模态的正确行为），
+               *    所以设备腿改成两阶段读：开层时在 sheet 自己的树里判断，收起后再回读胶囊。
+               */
+              duePanelOutlet="footer"
+              renderDuePanel={(slot) => (
+                <BottomSheet
+                  visible={slot.open}
+                  overlay="popover"
+                  detents={['medium']}
+                  title={labels.panel.title}
+                  labels={{ close: t('mobile.capture.panel.sheetClose') }}
+                  footer={slot.footerContent}
+                  onDismiss={slot.onClose}
+                  testID="mobile-capture-due-sheet"
+                >
+                  {slot.content}
+                </BottomSheet>
+              )}
               projectPicker={{
                 options: projects,
                 destinationId: projectId,

@@ -29,7 +29,7 @@
  * 本文件不 import `@heyta/i18n`，只用 RN 原语。
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { LocalDate, LocalTime } from '@heyta/domain';
@@ -67,6 +67,30 @@ export interface CaptureDuePanelLabels {
   };
 }
 
+/** 面板的两个子视图。`time` 那一档的出口行换成「其它时间 / 列表」那枚切换。 */
+export type CaptureDuePanelView = 'date' | 'time';
+
+/**
+ * 出口段画在哪里。
+ *
+ * 🔴 这不是外观开关，是**外壳几何**的差别：web 的锚定浮层与日历那个就地展开层，
+ * 出口段就画在面板体内（跟着内容一起滚）；移动端的底部面板里，`ScrollView` 之外的
+ * `footer` 才永远可见，所以那一端要把出口段分出去单独画。
+ * 两种放法**共用同一份状态**（`view` / `manual` / `timeDraft` 由 `CaptureComposer` 持有），
+ * 所以点 footer 里那行，面板体一定跟着切子视图 —— 状态留在面板里是做不到的。
+ */
+export type CaptureDuePanelOutletPlacement = 'inline' | 'footer';
+
+/** 面板体与出口段共用的受控状态（判断全在共享层，宿主只决定画在哪）。 */
+export interface CaptureDuePanelState {
+  readonly view: CaptureDuePanelView;
+  readonly manual: boolean;
+  readonly timeDraft: string;
+  readonly onViewChange: (view: CaptureDuePanelView) => void;
+  readonly onManualChange: (manual: boolean) => void;
+  readonly onTimeDraftChange: (draft: string) => void;
+}
+
 export interface CaptureDuePanelProps {
   readonly due: CaptureDue;
   readonly now: number;
@@ -78,6 +102,10 @@ export interface CaptureDuePanelProps {
   readonly onClear: () => void;
   readonly onToggle: (chip: CaptureChip) => void;
   readonly testID?: string;
+  /** 受控的子视图状态。提到宿主侧不是为了"更纯"，是为了让 footer 那棵子树读得到同一份。 */
+  readonly state: CaptureDuePanelState;
+  /** 默认 `inline`：出口段画在面板体里（web 两档都是这一种）。 */
+  readonly outlet?: CaptureDuePanelOutletPlacement;
 }
 
 function makeStyles(tokens: HeytaNativeTokens) {
@@ -153,6 +181,73 @@ function makeStyles(tokens: HeytaNativeTokens) {
   });
 }
 
+/** 出口段的入参：它只需要"当前是哪一天/哪一个时刻"和那份受控状态。 */
+export interface CaptureDuePanelOutletProps {
+  readonly due: CaptureDue;
+  readonly labels: CaptureComposerLabels & { readonly panel: CaptureDuePanelLabels };
+  readonly state: CaptureDuePanelState;
+  readonly onPick: (date: LocalDate, time: LocalTime | undefined) => void;
+  readonly today: LocalDate;
+}
+
+/**
+ * 面板的**出口段**：日期视图里是「时刻 …」那一行，时刻视图里是「其它时间 / 列表」那枚切换。
+ * 它们是同一件事的两个面 —— "从当前这一档去下一档"，所以放在一处定义，
+ * 免得宿主复制 JSX 之后两份各自漂移。
+ *
+ * 🔴 状态由 `CaptureComposer` 持有，这一段才可能和面板体**分置两处**：
+ * 移动端的底部面板里只有 `ScrollView` 之外的 `footer` 永远可见，出口画在滚动内容里
+ * 就等于"非整半点填不进去"（§9.6 设备腿量到的那一处）。分置之后两边读的是同一份，
+ * 点 footer 那行，面板体一定跟着切子视图。
+ */
+export function CaptureDuePanelOutlet({
+  due,
+  labels,
+  state,
+  onPick,
+  today,
+}: CaptureDuePanelOutletProps): React.JSX.Element {
+  const tokens = useHeytaTokens();
+  const text = useHeytaText();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
+  const { view, manual, onViewChange, onManualChange, onTimeDraftChange } = state;
+
+  if (view === 'time') {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          onManualChange(!manual);
+          onTimeDraftChange(due.time ?? '');
+        }}
+        testID="capture-time-mode"
+      >
+        <Text style={[text.caption, styles.timeValue]}>
+          {manual ? labels.panel.time.backToList : labels.panel.time.otherTime}
+        </Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={labels.panel.time.rowAria}
+      onPress={() => {
+        onViewChange('time');
+        onTimeDraftChange(due.time ?? '');
+      }}
+      style={styles.timeRow}
+      testID="capture-time-row"
+    >
+      <Text style={[text.caption, styles.groupTitle]}>{labels.panel.time.timeLabel}</Text>
+      <Text style={[text.caption, styles.timeValue]} testID="capture-time-value">
+        {due.date === undefined ? labels.panel.time.allDay : (due.time ?? labels.panel.time.allDay)}
+      </Text>
+    </Pressable>
+  );
+}
+
 export function CaptureDuePanel({
   due,
   now,
@@ -164,19 +259,19 @@ export function CaptureDuePanel({
   onClear,
   onToggle,
   testID,
+  state,
+  outlet = 'inline',
 }: CaptureDuePanelProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
-  const [view, setView] = useState<'date' | 'time'>('date');
-  const [manual, setManual] = useState(false);
-  const [draft, setDraft] = useState<string>(due.time ?? '');
+  const { view, manual, timeDraft: draft, onViewChange, onManualChange, onTimeDraftChange } = state;
 
   // 🔴 草稿与已提交值可以不一致（框里是「16:」，外面还是上一个时刻）。
   // 提交规则只有 `timeDraftToValue` 这一处，与 `DatePicker` 共用。
   const commitDraft = (value: string): void => {
-    setDraft(value);
+    onTimeDraftChange(value);
     const next = timeDraftToValue(value, due.time);
     if (next === due.time && value !== (due.time ?? '')) return;
     // 🔴 没日期时敲出一个时刻 = 「今天这个时刻」，不是"敲了没反应"。
@@ -201,8 +296,8 @@ export function CaptureDuePanel({
             //    由英文档那条 e2e 抓到：读屏用户在一枚写着「返回」的按钮上听到"选择时刻"。
             accessibilityLabel={labels.panel.time.backToDay}
             onPress={() => {
-              setView('date');
-              setManual(false);
+              onViewChange('date');
+              onManualChange(false);
             }}
             testID="capture-time-back"
           >
@@ -215,7 +310,7 @@ export function CaptureDuePanel({
             value={draft}
             onChangeText={commitDraft}
             onBlur={() => {
-              setDraft(due.time ?? '');
+              onTimeDraftChange(due.time ?? '');
             }}
             maxLength={'HH:MM'.length}
             keyboardType="numbers-and-punctuation"
@@ -262,18 +357,9 @@ export function CaptureDuePanel({
           </View>
         )}
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            setManual((value) => !value);
-            setDraft(due.time ?? '');
-          }}
-          testID="capture-time-mode"
-        >
-          <Text style={[text.caption, styles.timeValue]}>
-            {manual ? labels.panel.time.backToList : labels.panel.time.otherTime}
-          </Text>
-        </Pressable>
+        {outlet === 'inline' ? (
+          <CaptureDuePanelOutlet due={due} today={today} labels={labels} state={state} onPick={onPick} />
+        ) : null}
       </View>
     );
   }
@@ -296,21 +382,9 @@ export function CaptureDuePanel({
         }}
       />
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={labels.panel.time.rowAria}
-        onPress={() => {
-          setView('time');
-          setDraft(due.time ?? '');
-        }}
-        style={styles.timeRow}
-        testID="capture-time-row"
-      >
-        <Text style={[text.caption, styles.groupTitle]}>{labels.panel.time.timeLabel}</Text>
-        <Text style={[text.caption, styles.timeValue]} testID="capture-time-value">
-          {due.date === undefined ? labels.panel.time.allDay : (due.time ?? labels.panel.time.allDay)}
-        </Text>
-      </Pressable>
+      {outlet === 'inline' ? (
+        <CaptureDuePanelOutlet due={due} today={today} labels={labels} state={state} onPick={onPick} />
+      ) : null}
 
       {dueChips.length === 0 ? null : (
         <View style={styles.items} accessibilityLabel={labels.panel.dueItems} testID="capture-due-items">

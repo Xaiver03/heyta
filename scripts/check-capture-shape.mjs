@@ -20,8 +20,9 @@
  *   5. 空态胶囊不许出现「未设置」这类审计腔；
  *   6. 两端都关掉了「实际标题」那一行（曾经 web 关、mobile 留，还被脚本钉成验收）。
  *   7. 框下那一行不许按平台分叉（web 有交代而移动端没有 = §9.2 的 5c 那种事故）；
- *   8. 外壳那一档的两条腿都在：web 收件箱走锚定浮层，日历落点与**整个移动端**走
- *      就地展开 —— 移动端不传外壳，所以那一支是它唯一的面板路径。
+ *   8. 外壳那一档的三条腿都在（2026-11-05 改判，见 §9.33）：web 收件箱走锚定浮层、
+ *      web 日历落点走就地展开、**移动端走底部面板** —— 少了任何一条，
+ *      那一档的面板就静默消失或退回死按钮。
  *   9. 时刻子视图里**不许有"没选日子就什么都不做"的守卫**：第四枚死按钮，
  *      2026-11-05 由移动端设备腿量到（收集箱里空标题点 48 格，全静默）。
  *  10. 面板必须**复用那枚现有的** DatePicker（不是复制一份捕获私货），
@@ -29,6 +30,9 @@
  *  11. 面板那一组（`dueChips`）的成员谓词必须是"截止两类、不按 action 过滤"：
  *      §9.10 那个"框下那一行的独占内容只有优先级"的差集现量，面板半边由它定义；
  *      谓词一漂，`capture-model.spec.ts` J 族（抄的是同一个口径）就变成自证。
+ *  12. 面板的**出口段只许画一处**：`outlet === 'inline'` 守卫必须恰好两枚（日期视图、
+ *      时刻视图各一），且共享件必须有"宿主没外壳就强制回 inline"那道守卫 ——
+ *      移动端把出口段放进 sheet 的 `footer` 之后，这两条决定它是画两遍还是凭空消失。
  *
  * 每条都有 selftest 臂：先在**违规源码**上红一次，再挂进 `pnpm check` 链。
  */
@@ -107,6 +111,39 @@ function checkPanelDueGroup(shared) {
   return problems;
 }
 
+/**
+ * 移动端那一档的**底部面板**接线（目标原话点名的 `mobile BottomSheet`）。
+ *
+ * 🔴 为什么必须由源码尺钉：这一格的三处退化各有各的成因（§9.6），而每一处修好之后
+ * 都只在一个地方成立 —— 出口在 `footer`、档位是 `medium`、语义是 `'popover'`。
+ * 少任何一条，界面仍然"合法"：出口掉回折叠线以下 = 非整半点填不进去；
+ * 档位铺满 = 用户看不见自己正在改哪一句；用 `'bottom-sheet'` = 多画一枚 ×、
+ * 且 Esc 被判成 deny。而移动端跑不了 Playwright，行为只能等真机 ——
+ * 所以先由这把尺保证**接线形状**不许悄悄退回去。
+ */
+function checkMobileSheet(panel, composer, mobileScreen) {
+  const s = code(mobileScreen);
+  const p = code(panel);
+  const c = code(composer);
+  const problems = [];
+  for (const [needle, why] of [
+    ['duePanelOutlet="footer"', '共享件不知道要把出口段交给宿主 ⇒ 出口只能画在滚动内容里，折叠线以下'],
+    ['footer={slot.footerContent}', 'slot 的出口段没进 sheet 的 footer（footer 是 ScrollView 之外的兄弟节点，这是它唯一永远可见的位置）'],
+    ['overlay="popover"', '语义档位退回 bottom-sheet ⇒ 多画一枚 ×，且 Esc 被表判成 deny'],
+    ["detents={['medium']}", '档位退回铺满 ⇒ 输入行与胶囊被盖住，用户看不见自己正在设置哪一句'],
+  ]) {
+    if (!s.includes(needle)) problems.push(`apps/mobile/src/screens/TasksScreen.tsx: ${needle} 不在了 —— ${why}`);
+  }
+  const guarded = (p.match(/outlet === 'inline' \?/g) ?? []).length;
+  if (guarded !== 2) {
+    problems.push(`${PANEL}: 出口段的 \`outlet === 'inline'\` 守卫是 ${String(guarded)} 处（应为 2：日期视图与时刻视图各一处）—— 分置模式下可能两处都画（同一目的地两个控件）或都不画（填不进非整半点）`);
+  }
+  if (!c.includes("renderDuePanel === undefined ? 'inline' : duePanelOutlet")) {
+    problems.push('共享件少了"没有外壳就强制回 inline"那道守卫 ⇒ footer 模式下没人接出口段，出口会凭空消失');
+  }
+  return problems;
+}
+
 function checkComposeRow(shared) {
   const s = code(shared);
   const problems = [];
@@ -128,29 +165,28 @@ function checkComposeRow(shared) {
 }
 
 /**
- * 外壳那一档的两条腿：web 收件箱 = 锚定浮层；日历落点与**整个移动端** = 就地展开。
+ * 外壳那一档的三条腿（2026-11-05 改判，见计划 §3.3 与 §9.33）：
+ * web 收件箱 = 锚定浮层；web 日历落点 = 就地展开；**移动端 = 底部面板**。
  *
- * 🔴 为什么这一支必须由源码尺子钉住：移动端从头到尾不传 `renderDuePanel`，
- * 它唯一的面板路径就是共享件里 `renderDuePanel === undefined ? panelContent` 那一支。
- * 把它写成 `null`，web 收件箱照样绿（它走浮层），只有移动端与日历落点**静默**变成死按钮 ——
- * 而 `packages/ui` 刻意不引 DOM 测试栈、移动端跑不了 Playwright，
- * 所以行为判据只能长在 `apps/web/tests/capture-composer.spec.tsx` 的
- * 「不给外壳那一档」那族里，本函数钉的是**这一支不许消失**。
+ * 🔴 这一支为什么仍必须由源码尺钉住：`renderDuePanel === undefined ? panelContent` 那一支
+ * 现在只剩**日历落点**一个消费者。把它写成 `null`，web 收件箱与移动端都照样绿
+ * （它们各有外壳），只有日历落点**静默**变成死按钮 —— 而 `packages/ui` 刻意不引 DOM 测试栈，
+ * 行为判据只能长在 `apps/web/tests/capture-composer.spec.tsx` 的「不给外壳那一档」那族里，
+ * 本函数钉的是**这一支不许消失**。
+ * ⚠️ 旧版这里还钉着"移动端不许自带外壳"（§3.3 的原话），目标原话点的是 `mobile BottomSheet`，
+ *    所以那条已按改判撤掉，移动端的形状改由 `checkMobileSheet` 钉。
  */
-function checkShellTier(shared, webHost, mobileScreen) {
+function checkShellTier(shared, webHost) {
   const s = code(shared);
   const problems = [];
-  const arm = s.match(/renderDuePanel === undefined\s*\?\s*([\s\S]{1,40})/);
-  if (arm === null) {
-    problems.push(`${SHARED}: 「没给外壳」那一档不再是三元左支 —— 两端外壳分工的写法漂了`);
-  } else if (!/^panelContent\b/.test(arm[1].trim())) {
-    problems.push(`${SHARED}: 没给外壳时不再画 panelContent —— 移动端与日历落点的面板会静默消失`);
+  // needle 必须**带着 panelContent 一起匹配**：共享件里现在有第二处
+  // `renderDuePanel === undefined`（那道"没外壳就强制 inline"的守卫），
+  // 只取第一枚匹配会把守卫那行当成三元左支 ⇒ 假红（本次实测撞到过一次）。
+  if (!/renderDuePanel === undefined\s*\?[\s\S]{0,24}?panelContent/.test(s)) {
+    problems.push(`${SHARED}: 没给外壳时不再画 panelContent —— 日历落点的面板会静默消失`);
   }
   if (!/inlineDuePanel === true \? undefined : renderDuePanel/.test(code(webHost))) {
     problems.push(`${WEB_HOST}: 收件箱/日历两档不再由这一句选外壳 —— 锚定浮层与就地展开的分档漂了`);
-  }
-  if (code(mobileScreen).includes('renderDuePanel')) {
-    problems.push(`${MOBILE_SCREEN}: 移动端开始自带外壳 —— 与计划 §3.3「两端都没用嵌套 BottomSheet」分叉，先改计划再改码`);
   }
   return problems;
 }
@@ -344,12 +380,8 @@ function selfTest() {
       expectRed: true,
     },
     {
-      name: '没给外壳那一档被写成 null（移动端与日历落点的面板静默消失）',
-      problems: checkShellTier(
-        shared.replace('? panelContent', '? null'),
-        read(WEB_HOST),
-        read(MOBILE_SCREEN),
-      ),
+      name: '没给外壳那一档被写成 null（日历落点的面板静默消失）',
+      problems: checkShellTier(shared.replace('? panelContent', '? null'), read(WEB_HOST)),
       expectRed: true,
     },
     {
@@ -357,16 +389,35 @@ function selfTest() {
       problems: checkShellTier(
         shared,
         read(WEB_HOST).replace('props.inlineDuePanel === true ? undefined : renderDuePanel', 'renderDuePanel'),
+      ),
+      expectRed: true,
+    },
+    {
+      // 2026-11-05 改判：移动端**应当**自带外壳（目标原话 `mobile BottomSheet`），
+      // 所以这一臂从"移动端不许传外壳"换成"外壳必须按 §9.33 那三样接"。
+      name: '移动端的底部面板没接出口段（非整半点又回到填不进去）',
+      problems: checkMobileSheet(
+        read(PANEL),
+        read(SHARED),
+        read(MOBILE_SCREEN).replace('footer={slot.footerContent}', 'footer={undefined}'),
+      ),
+      expectRed: true,
+    },
+    {
+      name: '出口段的 inline 守卫被拆掉（分置模式下会被画两遍）',
+      problems: checkMobileSheet(
+        read(PANEL).replace("outlet === 'inline' ? (\n        <CaptureDuePanelOutlet", '(true ? (\n        <CaptureDuePanelOutlet'),
+        read(SHARED),
         read(MOBILE_SCREEN),
       ),
       expectRed: true,
     },
     {
-      name: '移动端自己传了外壳（与计划 §3.3 那格定的分档分叉）',
-      problems: checkShellTier(
-        shared,
-        read(WEB_HOST),
-        read(MOBILE_SCREEN).replace('<CaptureComposer\n', '<CaptureComposer renderDuePanel={null}\n'),
+      name: '共享件少了"没有外壳就强制 inline"那道守卫',
+      problems: checkMobileSheet(
+        read(PANEL),
+        read(SHARED).replace("renderDuePanel === undefined ? 'inline' : duePanelOutlet", 'duePanelOutlet'),
+        read(MOBILE_SCREEN),
       ),
       expectRed: true,
     },
@@ -487,9 +538,10 @@ function allProblems() {
   return [
     ...checkRowSource(read(SHARED), read(MODEL)),
     ...checkComposeRow(read(SHARED)),
-    ...checkShellTier(read(SHARED), read(WEB_HOST), read(MOBILE_SCREEN)),
+    ...checkShellTier(read(SHARED), read(WEB_HOST)),
     ...checkRowNotPlatformSplit(read(SHARED)),
     ...checkPanelDueGroup(read(SHARED)),
+    ...checkMobileSheet(read(PANEL), read(SHARED), read(MOBILE_SCREEN)),
     ...checkDatePickerIsTheSharedOne(read(PANEL), read(SHARED), read(DATE_PICKER_OTHER_CONSUMER)),
     ...checkTimeView(read(PANEL)),
     ...checkClearReturnsText(read(SHARED), read(MODEL)),

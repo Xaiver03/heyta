@@ -3109,6 +3109,9 @@ export const en = {
   'mobile.capture.panel.time.otherTime': 'Other time',
   'mobile.capture.panel.time.backToList': 'List',
   'mobile.capture.panel.time.backToDay': 'Back',
+  // Accessibility name for closing the bottom sheet. The `popover` tier draws no ×,
+  // so this string is reached only by screen readers and the escape affordance.
+  'mobile.capture.panel.sheetClose': 'Close date picker',
   'mobile.capture.panel.time.rowAria': 'Choose a time',
   'mobile.capture.project.title': 'Which list to add to',
   'mobile.capture.project.inbox': 'Inbox',

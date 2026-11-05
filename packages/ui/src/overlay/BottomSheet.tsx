@@ -76,10 +76,19 @@ import {
 } from './sheet-detents.js';
 import { isSheetDragRegion, type SheetDragRegion } from './sheet-drag.js';
 
-/** 这一层原语覆盖的类别：几何是"贴底升起"的那几类。 */
+/**
+ * 这一层原语覆盖的类别。
+ *
+ * 🔴 这个联合说的是**几何**（"贴底升起"的那几类外壳），不是语义档位；
+ * 语义档位来自 `ClosedOverlay`，由关闭策略表判。`'popover'` 在 2026-11-05 加进来，
+ * 因为捕获的日期选取器正是"贴底升起的几何 + 轻量层的语义"：
+ * 表里那一档是 `scrim/escape/systemBack = dismiss`、`explicitCloseButton = false`
+ * —— 点外面或返回键收起、没有 ×，与滴答那层一致；而 `'bottom-sheet'` 那一档会
+ * 多画一枚 × 并把 Esc 判成 deny，用在选取器上是错的。
+ */
 export type BottomSheetClass = Extract<
   ClosedOverlay,
-  'bottom-sheet' | 'drawer' | 'modal-readonly' | 'modal-dirty-form' | 'modal-forced-read'
+  'bottom-sheet' | 'popover' | 'drawer' | 'modal-readonly' | 'modal-dirty-form' | 'modal-forced-read'
 >;
 
 /** 一次"想关"的来源 —— 宿主据此决定问法（背景 / 返回键 / 下拉的措辞不一样）。 */

@@ -3363,6 +3363,8 @@ export const zhCN = {
   'mobile.capture.panel.time.otherTime': '其它时间',
   'mobile.capture.panel.time.backToList': '列表',
   'mobile.capture.panel.time.backToDay': '返回',
+  // 底部面板的无障碍关闭名。`popover` 那一档不画 ×，所以这句只被读屏与 Esc 用得到。
+  'mobile.capture.panel.sheetClose': '关闭日期选择',
   'mobile.capture.panel.time.rowAria': '选择时刻',
   'mobile.capture.project.title': '新建落进哪一份清单',
   'mobile.capture.project.inbox': '收集箱',
