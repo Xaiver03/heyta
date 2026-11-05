@@ -3373,7 +3373,7 @@ export function App(): React.JSX.Element {
           */}
           {view === 'settings' && (
             <div
-              className="ht-sheet"
+              className={`ht-sheet${sheetExiting ? ' ht-sheet--exiting' : ''}`}
               role="dialog"
               aria-modal="false"
               aria-label={
