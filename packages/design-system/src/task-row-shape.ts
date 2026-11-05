@@ -47,7 +47,7 @@ export const TASK_ROW_SHAPE = {
   /** 行内主要元素之间的间距。 */
   gap: 'space.1',
   /** 列表里**行与行之间**的间距（属于列表容器，与行的内部几何同一处登记）。 */
-  listGap: 'space.1',
+  listGap: 'space.2',
   /** 勾选框的视觉尺寸（**不是**触控区，见下）。 */
   checkboxSize: 'size.checkbox',
   /** 勾选框圆角。 */
@@ -63,7 +63,7 @@ export const TASK_ROW_SHAPE = {
    */
   touchTarget: 'touch-target.min',
   /** 标题行（文字块）的上下内间距。 */
-  bodyPaddingBlock: 'space.2',
+  bodyPaddingBlock: 'space.3',
   /** 标题下方元信息行的间距。 */
   metaGap: 'space.2',
 } as const satisfies Record<string, TokenName>;

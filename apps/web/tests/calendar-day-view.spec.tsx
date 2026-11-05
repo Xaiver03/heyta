@@ -428,7 +428,7 @@ describe('现在线', () => {
 
     const line = q('calendar-board-day-now-line');
     expect(line, '看今天时没有现在线').not.toBeNull();
-    // 位置由 `HOURS_IN_DAY` 那一行的行高推导（56 = `size.row-min-height`）。
+    // 位置由 `HOURS_IN_DAY` 那一行的行高推导（60 = `size.row-min-height`）。
     // 断言的是"落在当前小时这一格内"，不是某个像素值 —— 抄像素值的话改了行高照样绿。
     const top = Number.parseFloat(line!.style.top);
     const now = new Date(useTaskStore.getState().now);

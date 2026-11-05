@@ -551,7 +551,7 @@ button.mk-nav__item:focus-visible {
 .mk-tasklist {
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-1);
+  gap: var(--ht-space-2);
 }
 
 /* 宿主外壳。**不是"行"** —— 与 mobile 的 `<Screen>` 自带 gutter 同一类决策。
@@ -605,7 +605,7 @@ button.mk-task__check {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding-block: var(--ht-space-2);
+  padding-block: var(--ht-space-3);
   gap: var(--ht-space-1);
   min-inline-size: 0;
 }
@@ -644,7 +644,7 @@ button.mk-task__body:focus-visible {
 .mk-task__title {
   font-size: var(--ht-font-size-base);
   font-weight: var(--ht-font-weight-medium);
-  line-height: var(--ht-line-height-normal);
+  line-height: var(--ht-line-height-relaxed);
   letter-spacing: var(--ht-tracking-body);
   min-inline-size: 0;
   overflow: hidden;
@@ -766,7 +766,7 @@ button.mk-task__body:focus-visible {
   margin-block-start: var(--ht-space-2);
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-1);
+  gap: var(--ht-space-2);
 }
 
 /* ⚠️ 保真度差距（如实记账）：真实现每一格直接渲染共享 `TaskList` 的行

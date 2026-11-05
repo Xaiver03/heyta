@@ -137,13 +137,14 @@ export const TEXT_STYLES = {
    * 单靠字号拉不开，就只能用**字重**拉：这是最高频样式唯一能同时压住元信息、
    * 又不改变行高的杠杆（`row-meta` 同步降到 12，见下）。
    *
-   * ⚠️ 不改行高：`line-height.normal`（1.5）在 16px 上是 24，两行标题不挤。
-   *   收紧到 `tight`（1.25 → 20）会让换行标题的行距小于字高，汉字会粘在一起。
+   * 🔴 **2026-11-04 滴答对齐阶段 1：行高 `normal`(1.5) → `relaxed`(1.75)，16px 上 24 → 28。**
+   *   这里原来写的是"不改行高"，那句已被现量否证：24 与汉字字高同高，换行的两行标题
+   *   上下沿粘连，滴答那一档在 28 上下。仍然不许收紧到 `tight`（1.25 → 20，比字高还小）。
    */
   'row-title': {
     size: 'font-size.base',
     weight: 'font-weight.medium',
-    leading: 'line-height.normal',
+    leading: 'line-height.relaxed',
     tracking: 'tracking.body',
   },
   /**
