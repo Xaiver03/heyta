@@ -300,6 +300,7 @@ magick "$SRC" -crop 200x120+1400+250 +repage -resize 500% docs/research/dida-cap
 | T4 图标含义取证 | 🟡 **四枚已定三枚**（第三枚图上字面写着「+7」），只剩月牙那一枚等你 | 裁图与复现命令在 §7；两张放大图入库 `docs/research/dida-capture/date-popover-shortcut-*.png` |
 | CL 主链整趟读数 | ✅ **第一次整趟跑完**（§9.26） | 156 步里跳过 3 步会启动浏览器的（§9.3 第 7 条那条理由仍然成立），**ran=153 / failures=7**，逐枚 rc 在 `.run-logs/chain/2026-11-05-1939.log`。7 枚里 **2 枚是本线的，都已修**：`check:empty-state`（我的键名 `…aria.empty` 走进了那枚按 key 段判的尺 ⇒ 改键名，不动别人的判据）与 `check:l4` 里我那 2 处内联（搬进 `material.css` 的类，那文件自己就写着"抄成内联就是往回涨"）。其余 5 枚分别归 landing 的不可复现红、HEAD 上就红的 l4 基线（干净 HEAD worktree 现量 75>74）、`detail-pane-slot`、`linux-shell`、`shell-unicode`、`-r test`。⚠️ 修完 `check:l4` **仍红 1 处，那不是本线的**，这里不冒充已修绿 |
 | RK 入库 | ✅ **本线那几行单独提交，没推送**（§9.29） | 现量：`git log --oneline -1 -- docs/plans/capture-ticktick-alignment-2026-11.md`。共享工作树里 44 枚脏文件按 hunk 分归：design-system 的 token 产物**同时带着别线的 `size.row-min-height` 56→60**、`generated/typography.css` 那一行整条是别线的、`environment-traps.md` 里 #639–#643 是别线的 ⇒ 整文件提会把别线未签字的行以本线名义入库，漏掉产物又会让 `check:tokens` 在干净检出上红，所以走 hunk 级（`git apply --cached` 只留命中本线 token 的 hunk + `update-index --cacheinfo` 重建 traps）。HEAD 自洽性用 `git checkout-index` 那份树量过：`check:capture-shape`（19 臂 + 真扫描）与逐行装置（25 行）都 rc=0；`TasksScreen.tsx` 那 4 行没入库而共享件的 `quickPicks?` 是可选带 `?? []` 兜底 ⇒ 不因此坏。⚠️ 工作树里别线的行**一行未动**（`tokens.css` 仍是 `3.75rem`、`typography.ts` 的 `relaxed` 还在）。刻意未入库：T1 那枚 spike 的 spec 与图（本目标范围外） |
+| CL2 主链第五趟整趟读数 | ✅ **本线一枚都不红**（§9.32） | 现量：`node research/tools/capture-chain-rerun.mjs` ⇒ `ran=150 skipped=6 failures=5 别线图改写=0 消失=0`；5 枚红全归别线/HEAD 基线（`row-single-source`、`l4`、`detail-pane-slot`、`linux-shell`、`shell-unicode`），`check:capture-shape` 在链里 OK。⚠️ 这趟之前先越界一次：第四趟跑器少剥 `pnpm ` 前缀 ⇒ 跳过集合一枚没匹配 ⇒ 整条 e2e 被套跑完、重写 34 张别线图（14 张与 HEAD 不同），已按"起跑前它们是干净的"逐批 `git checkout --` 回退并用 md5 快照复对成零残留；跑器的另两次静默失效（改写排在跳过之后、`--filter` 少写 `run` 导致 rc=0 空跑）也都修成会红，三条一起记入陷阱 #650。包测试面单独补跑：唯一红是别线 `typography.ts` 的 `row-title` 行高（B261，不代改判据口径） |
 
 ---
 
@@ -1781,3 +1782,50 @@ RIG_RC=0 ｜ 22 格 ✅ ｜ 0 枚 ❌ ｜ 日志 .run-logs/android-capture/rig-k
 装置加**行 27**（第二枚是整支的反向钉子：剥掉注释后这份 spec 里一次 `scrollIntoViewIfNeeded` 都不许有）。
 ⚠️ 加行 27 时行 25 的第四枚谓词自己暴露了一个假红风险：它钉的 needle 在滚动被清零后 `indexOf` 会回 `-1`，
 已换成"图排在 `[出口可达]` 读数之前"这个仍然表达原意图的形状。
+
+## 9.32 主链第五趟：先越界一次、修好跑器、再拿到"别线图改写 = 0"的读数
+
+这趟是目标里"每步跑相关门禁"第一次在**本线四笔提交之后**整趟跑。过程里我自己的跑器犯了三次静默失效，
+全部记入环境陷阱 **#650**，这里只留结果与归因。
+
+### 越界与修复（如实）
+
+第四趟跑器没剥步骤串的 `pnpm ` 前缀 ⇒ `SKIP.has(step)` 对每一枚都是 false ⇒ **一枚都没跳**，
+整条 e2e 被套跑了 4 分 16 秒，重写别线 **34 张**取证图（`account-suite` 19 + `admin-console` 15），
+其中 **14 张内容与 HEAD 不同**。发现方式不是跑器报的（它的核对排在**最后**），是 `ps` 里看见
+vite@4318 + headless chromium。回退前先确认这两批在起跑前**不在脏清单里**（01:36 那份只有
+`settings-form-alignment` 三张脏），所以 `git checkout --` 是安全的；回退后拿 01:54 那份 md5 快照
+复对 ⇒ **别线零残留**（剩下的 2 行差异只是那份快照没排除我自己的 spike 图）。
+
+### 第五趟读数（跑器修好后）
+
+`node research/tools/capture-chain-rerun.mjs`（现量：`ran=150 skipped=6 failures=5 别线图改写=0 消失=0`，
+日志 `.run-logs/chain/2026-11-05-1010.log`）：
+
+| 红的那一枚 | 归因 |
+|---|---|
+| `check:row-single-source` | 别线（任务行单一事实源那格） |
+| `check:l4` | 别线 + HEAD 基线（§9.26 已在干净 HEAD worktree 量过 75 > 74） |
+| `check:detail-pane-slot` | 别线（详情列槽） |
+| `check:linux-shell` | 别线（`verify-mobile-pin-order.sh`） |
+| `check:shell-unicode` | 别线（同一枚文件；⚠️ 真名是 `check-shell-unicode-vars.mjs`，我先前那次 rc=1 是自己把脚本名敲错，已纠正） |
+
+⇒ **本线一枚都不红**，`check:capture-shape` 在链里是 `OK`（第 62 行）。
+
+### 跑器自己的另外两次静默失效（都已修成会红）
+
+1. **改写排在跳过判定之后** ⇒ `-r test` 被整枚跳掉，`ran=150` 里其实**一枚包测试都没跑**。
+   修法：先改写再判跳；装置加"零执行必须红"的守卫。
+2. **选择器写法打空**：`pnpm -r --filter '!@heyta/e2e' test` 回 `No projects matched the filters` 且 **rc=0**；
+   补上 `run` 这个词才真跑（`Scope: 21 of 22 workspace projects`）。同一枚 `--filter` 配 `exec pwd`
+   能选到 22 个包 ⇒ "换一种写法试一次就下结论"也会骗人。
+
+补跑结果（`pnpm -r --filter '!@heyta/e2e' run test`，rc=1）：唯一红是
+`packages/design-system tests/typography.spec.ts > row-title = 16px / 500 / 行高 24 / 字距 …`
+—— 别线未提交的 `typography.ts`（`line-height.normal → relaxed`），**已登记 B261，不代改判据口径**。
+
+### 装置落库
+
+`.run-logs/` 是 gitignore 的，所以这枚跑器挪进版本库：`research/tools/capture-chain-rerun.mjs`，
+带 `--dry-run`（只打印分类，先人审再跑）。现量：`node research/tools/capture-chain-rerun.mjs --dry-run`
+⇒ `链 156 步：将跑 151，跳过 5` + `✅ 三枚静态 check:ai-* 门仍在要跑的集合里`。
