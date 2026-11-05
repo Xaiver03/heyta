@@ -78,7 +78,7 @@
 | 🔴 置顶在 web 上不生效（真缺陷） | `packages/domain/src/task-order.ts`（唯一那份展示顺序所有者）；判据 `packages/domain/tests/task-order.spec.ts`，做过变异验证 |
 | C2 工具条三枚 | `apps/web/src/features/tasks/TaskDetailCard.tsx` + `App.tsx` 两处落点接线 |
 | C4 逾期红色 | 渲染点是共享 `packages/ui/src/task-list/TaskBadges.tsx`（**不是**原文写的 `DueBadge.tsx`，那一格在 web 没有渲染点）；裁决记录在计划文档 C4 那一格 |
-| D2 回收站搬侧栏 | `view-tabs.ts`（常量更名 `SIDEBAR_TOOL_TABS`）、`App.tsx`、`sidebar.css`、`RailNavigation.tsx`（rail 工具段整段删） |
+| D2 回收站搬侧栏 | `view-tabs.ts`（常量更名 `SIDEBAR_TOOL_TABS`）、`App.tsx`、`sidebar.css`、`RailNavigation.tsx`（rail 工具段整段删）。🔴 展厅那一手（`apps/landing/` 五枚：`app-shell-shape.ts` 拆 `SHELL_SIDEBAR_TOOLS`、`AppWindow.tsx` 侧栏底部那一组、`mockup.css` 的 `.mk-sidebar__tools`、两枚 landing spec）当时**没跟着那一笔**，2026-11-05 23:2x 另起一笔入库，判据与证据见 `BLOCKED.md` B265 |
 | D3 分组说明 | `ProjectsPanel.tsx` + `sidebar.css`；空态那格让位给空态文案 |
 | 浏览器腿 9 条 | `e2e/tests/dida-alignment-detail-sidebar.spec.ts`（8 张图逐张看过） |
 | 设备腿 iOS | `scripts/verify-mobile-pin-order.sh`（`pnpm verify:mobile-pin-order`），9/9，两张图入库 |
@@ -192,25 +192,26 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | iOS 屏幕图 | 已取到（两张入库，17:0x 那一趟换上并逐张与上一趟对比过）。⚠️ 每跑一趟装置会在模拟器本地库里留 3 条 op（置顶是持久状态），目标行会逐趟下漂——本趟现量 `ops 31 → 34`、侧栏角标 `22 → 24`；脚本注释里写明并给了应对（读数前先 `--scroll-into-view`，判据读相对 y） |
 | 暗色 | 只在 web 验过（e2e ⑤⑦）；移动端/桌面壳的暗色没有设备读数 |
 
-### 4.4 跨树一致性（一格，等别人落库）
+### 4.4 跨树一致性（✅ 2026-11-05 23:2x 闭合，过程见 B265）
 
 本线那次常量更名（`TOOL_VIEW_TABS` → `SIDEBAR_TOOL_TABS`）让
 `apps/landing/tests/mockup-shell-shape.spec.tsx` 那枚**按源码文本对账**的判据在 HEAD 上锚点失效；
-修法在 landing 线未提交的那手里。归属与闭合条件写在 `BLOCKED.md` 的 B258（号只增，现量
-`grep -oE '^🔴 \*\*B[0-9]+' BLOCKED.md | tail -3` 取末号）。**别线在飞的件不代改**，
-但它落库之前，`pnpm typecheck` 全绿不代表那枚 spec 能跑。
+失败形状是**红不是假绿**：`pairsOf` 走 `arrayBlock`，而 `arrayBlock` 找不到锚就
+`throw new Error('源码里找不到 … —— 判据锚点已失效')`。⇒ `pnpm typecheck` 全绿不代表那枚 spec 能跑，
+这条纪律保留。
 
-🔴 **2026-11-05 20:37 把这格从"声称"改成现量**（此前它只是继承 B258 的说法）：
+🔴 **这一格原本登记成"等 landing 线落库"，那个归属判错了**：修法是**本线 D2 的展厅侧那五枚文件**
+（`app-shell-shape.ts` / `AppWindow.tsx` / `mockup.css` / 两枚 landing spec），11-04 12:46–12:51 写完后
+一直躺在工作树里，而计划本文另一格早就把它登记在本线名下 —— 两份说法自相矛盾就是该重判的信号。
+三条重判证据、判据只增不减的核对、以及"别把红押到别人身上"的规矩都在 `BLOCKED.md` **B265**（本线 B 号最高就是它）。
+取末号要用**标题形状**那把尺：`grep -oE '^## B[0-9]+' BLOCKED.md | tail -1` ⇒ `B265`。
+⚠️ 本节先前写的 `grep -oE '^🔴 \*\*B[0-9]+' … | tail -3` 会**停在 B260** —— 那个形状匹配的是正文里的
+内联标记（48 处），不是分节标题（228 处），后面的条目压根不在它的写法里；照它读就会以为台账落后三格。
+与陷阱 #657 同族：**尺扫不到的那种写法 ≠ 不存在**。
 
-- HEAD 版那枚 spec 第 **160** 行仍是 `const tools = pairsOf('const TOOL_VIEW_TABS')`；
-- HEAD 版 `apps/web/src/features/shell/view-tabs.ts` 只有第 **272** 行的
-  `export const SIDEBAR_TOOL_TABS`（`TOOL_VIEW_TABS` 这个名在 HEAD 上不存在）；
-- 失败形状查过了，是**红不是假绿**：`pairsOf`（HEAD 版第 135 行）走 `arrayBlock`，
-  而 `arrayBlock` 第 **103** 行 `if (start < 0) throw new Error('源码里找不到 … —— 判据锚点已失效')`。
-- 他们工作树那一版**已经把锚换成新名**（`SIDEBAR_TOOL_TABS`，第 190/430 行），实测
-  `pnpm exec vitest run tests/mockup-shell-shape.spec.tsx` ⇒ **22/22 过**——⚠️ 但那枚文件是 `M`
-  （未提交），所以**这 22/22 不能拿来判 HEAD**；判 HEAD 只能读 HEAD 的两个 blob。
-  ⇒ 这一格仍未闭合，但差的就是他们一笔提交；本线依旧不代改。
+入库后的现量（本笔之后重读，别抄这行）：
+`git show HEAD:apps/landing/tests/mockup-shell-shape.spec.tsx | grep -c "pairsOf('const TOOL_VIEW_TABS')"` ⇒ 0，
+同一份里 `const SIDEBAR_TOOL_TABS` ⇒ 1，`git status --short apps/landing` ⇒ 空。
 
 ---
 
@@ -223,8 +224,9 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
    ⚠️ 实际做法比这条前置多走了一步：`packages/design-system/**` 整片**都是**本线的手（逐 hunk 核过），
    真正同片地的是 `apps/landing/src/mockup/mockup.css` —— 那里 5 枚 hunk 有 4 枚是阶段 1 的镜像
    （被两枚按源码文本对账的 landing spec 钉住，不提会让 HEAD 红），第 5 枚 `.mk-sidebar__tools`
-   与 landing 在飞的 `AppWindow.tsx` + `mockup-shell-shape.spec.tsx` 成套 ⇒ 用
-   `git apply --cached` 只取四处，暂存与提交压进同一条命令。
+   与 D2 展厅那一手成套 ⇒ 用 `git apply --cached` 只取四处，暂存与提交压进同一条命令。
+   🔴 当时把成套那一手写成"与 landing **在飞**的那一手成套"，**归属判错了**：那一手是本线 D2 自己的，
+   写完 34.5 小时零写入。成套所以不拆走是对的，误判归属所以白等了一天 —— 判据、证据与规矩见 `BLOCKED.md` B265 与 §4.4。
 3. **打「完成后顺延」**（`nextAfterCompletion` 接进生产路径）。
    前置：先读 [ADR](../adr/) 里重复语义那一格与 `packages/domain/src/recurrence.ts` 的注释；
    这一格是"数据 + 调用点"，不依赖选型，成本最低、用户可感知。
@@ -253,6 +255,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | 在共享工作树里"先 staged 再隔几条命令才 commit" | 本线的 C2 三枚 hunk 就这样被别线一笔裸 `git commit` 顺走，内容没丢但归属记错。暂存与提交压进同一条命令，纯本线文件用 pathspec 形式 `git commit -m … -- <路径>`（另一侧的记录见 `BLOCKED.md` B257） |
 | 把"分不清就只提交源文件"当安全默认 | 那正好会留下 **HEAD 断链**：`mockup-quadrant-shape.spec.tsx` 与 `mockup-task-row.spec.tsx` 是拿 token 名去 `mockup.css` 里找 `var()` 的，只提 token 不提四处镜像 ⇒ 干净检出上那两枚 spec 必红（与 `SIDEBAR_TOOL_TABS` 那次 B258 同一类）。这次先在**干净检出**上量了三臂再决定：HEAD 10/10 绿 / 入库前 10/10 红 / 混树（新 token + 旧镜像）恰好红在 4 枚配对臂。⚠️ "必红"这句的出处是那两枚 spec **自己的谓词**，不是本线复算的那把尺：`expectVar` 是 `expect(value).toBe('var(--ht-…)')` 逐字符比 var 名，`ruleBody` 找不到规则就 `throw`（现量位置 `apps/landing/tests/mockup-quadrant-shape.spec.tsx:193` 与 `mockup-task-row.spec.tsx:82`）。办法写在计划「阶段 1」那一节 |
 | 看到红在别人的文件里就说是"别人写到一半" | 本线读到过两次：一次真是半写，一次是 `packages/ui/dist` 的陈旧 `.d.ts` —— 后者一条 `pnpm --filter @heyta/ui build` 就回绿，不需要等谁 |
+| 凭"我记得有条 landing 线"把一处红登记成"等别人落库" | B258 ② 就这么白等了一次都没复量，而 HEAD 那格红从本线 D2 那笔（现量 `git log -1 --format=%ad --date=iso 8cbedf563`）一直开到 2026-11-05 23:2x，且它就在 `pnpm -r test` 的路上。登记前先量两样：**那几枚文件的 mtime 窗口离现在多久**（11-04 12:46–12:51 之后一整天零写入，那不是"在飞"）；**计划里那一格的归属写的是谁**（本文「展厅（landing mockup）跟着搬」那一格早就把它记在本线名下）。两份说法自相矛盾时，**矛盾本身就是该重判的信号**，不必等新证据。证据与规矩见 `BLOCKED.md` B265 |
 | 改一个被**按源码文本对账**的常量名，只看 typecheck | typecheck/build 全绿仍会留断链（§4.4）。改名要 `grep` 文本锚点的消费者 |
 | 跑整棵 `e2e/` 或 `pnpm test -- <文件>` | 会重写别线未入库的取证图；单文件过滤要用 `pnpm exec playwright test <文件>`，别拿 `--` 当过滤器 |
 
@@ -271,6 +274,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | `pnpm --filter @heyta/web build` | 2026-11-05 16:09 退 0 |
 | `pnpm typecheck`（整仓） | 2026-11-05 17:01 退 0（阶段 1 入库之后重跑） |
 | web 单测（本线三枚 spec） | 2026-11-05 20:08 在 HEAD=`907bd60e3`（**含收集框那笔把判断挪回共享层的 `e33523e7e`**）重跑 123/123；同日 16:11 那一戳也是 123/123。`packages/design-system` 546、`packages/ui` 894、landing `mockup-task-row` 6 + `mockup-quadrant-shape` 15、web `quadrant-row-parity` + `calendar-day-view` 23 同日全过 |
+| landing 腿（D2 展厅那一手入库前后） | 2026-11-05 23:2x。入库**前**：HEAD 那枚 `mockup-shell-shape.spec.tsx` 用旧锚 `pairsOf('const TOOL_VIEW_TABS')`（1 处）而 HEAD 的 `view-tabs.ts` 只有 `SIDEBAR_TOOL_TABS`（旧名 0 处）⇒ `arrayBlock` 必 `throw`，**这一格在 HEAD 上是红的**，从本线 D2 那笔（`8cbedf563`，11-04 22:12）一直开到本笔入库。入库**后**（`41852b75c`）：旧锚 0 / 新锚 1、`git status --short apps/landing` 空；`pnpm exec vitest run`（apps/landing 整包）**24 files passed**、`pnpm --filter @heyta/landing typecheck` rc=0、`check:design` / `design-token-refs` / `tokens` / `font-size-discipline` 各 rc=0（逐个抓，未串尾巴）。`check:row-single-source` 仍 rc=1，红话仍是 `.ht-capture` 那枚（29>28，族清单逐字同 B263 那一戳），本笔没碰 `app.css` |
 | 浏览器腿 | 2026-11-05 20:09 同一棵 HEAD 重跑 **11/11**（跑前先补了一次 `@heyta/ui` 产物）。🔴 **这句的机理本线写反过一次，现更正**：第一版写的是"陈旧 `dist` 会造一次**假红**"——不对。现量：`apps/web/vite.config.ts:17` 自己写着"Vite 解析到它的真实路径 `packages/ui/dist/`"，而 e2e 的 webServer 就是 `pnpm --filter @heyta/web exec vite`（`e2e/playwright.config.ts:147`）⇒ **浏览器腿吃的是 `dist`**，所以陈旧 `dist` 的后果是**默默测到旧的共享代码**（假绿 / 测错产物），不是红。`.d.ts` 那一类陈旧会让 **typecheck/构建**红（§六 第 220 行记的就是那一侧），两件事别再混成一句。⚠️ 本线这趟**只写了 `e2e/test-results/`**（现量：那批图 mtime 落在本趟窗口内），`apps/*/evidence` 里别线已入库的图一枚没碰 —— 当时工作树里那批 `M`/`D` 的 capture 证据图 mtime 是 17:06，是收集框线自己跑主链那一趟留下的；**20:59 他们把 `D` 那批自己收走了**（`a3590d851`：`sheet8` 回收，7 枚文件），`M` 那批仍在他们工作树里（现量：`git status --short apps/web/evidence/capture-due-capsule-20261104` 只剩 `M`）。本线一行没碰，这句只留作归因证据，不是本线的债 |
 | iOS 设备腿 | 2026-11-05 17:0x 又一趟 **9/9、退 0**，读数头上打的是 `git HEAD = 1062146c6`（阶段 1 入库之后那棵）。⚠️ 装置自己那行"这一读数属于哪一棵树"同时写着**装着的产物 mtime = 11-04 22:26** —— 它没重打包。这一格为什么仍然算数：本笔提交进 bundle 的运行时值就是那四枚 token，而它们 11-04 就在那棵工作树里（B261 现量过同一批 hunk），今天入库的只是提交动作与注释；要"从当前产物现建"那一档，得强制重打包再跑一趟。两张图已换上并**逐张与上一趟对比**：`row-menu.png` 同形（菜单五项 + 两行），`after-pin.png` 的差别是滚动位置与攒下的行（角标 22→24），不是产品变了。⚠️ 新的一趟里被钉住那条落在 **y=-29**（装置按 #655 的纪律"按下→回读→滚一段再来"，于是它跑到了容器上沿之外），所以那一格的判据是**相对 y 读数**，图只是旁证 —— 别拿这张图当"第一行看得见"的证据。 |
 | 桌面壳 | 同日 `--window` 一趟：`rows=1 / colorBuckets=66`，图入库并看过 |
