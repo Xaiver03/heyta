@@ -183,6 +183,15 @@ export interface CapturePanelSlot {
    * web 两档外壳一行都不用改。
    */
   readonly footerContent?: React.ReactNode;
+  /**
+   * 此刻输入框里的那句话（原文，含被识别出的片段）。
+   *
+   * 🔴 为什么必须由共享层给：外壳是**模态**的宿主（移动端 `BottomSheet`）起来后，
+   * 背景整棵从可及性树里掉出去、屏幕上也被壳盖住 —— 用户看不见自己正在给哪句话设截止。
+   * 那一条是不变量（§9.6 当初就因为它撤过壳），而"说出来"这件事只有拿着原文的共享层能做：
+   * 宿主拿不到草稿，也不该自己去猜。`''` = 还没打字，那时标题回到静态那句。
+   */
+  readonly subject: string;
   readonly onClose: () => void;
 }
 
@@ -671,6 +680,7 @@ export function CaptureComposer({
               open: true,
               content: panelContent,
               footerContent: outletContent,
+              subject: draft,
               onClose: closePanel,
             })
         : null}

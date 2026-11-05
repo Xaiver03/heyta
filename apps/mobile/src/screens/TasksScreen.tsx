@@ -190,6 +190,20 @@ function Composer({
   const labels = useCaptureLabels();
   const projectLabels = useCaptureProjectLabels();
   /**
+   * 底部面板的标题要说**正在给哪句话**选截止日期。
+   *
+   * 🔴 为什么不能只写静态那句：这一层是模态（`accessibilityViewIsModal`），起来之后
+   * 收集框那一行既被壳盖住、也不在可及性树里 —— 标题是它唯一还能说话的地方。
+   * 这正是 §9.6 当初撤掉壳的那条不变量，这次把它做进标题而不是退回就地展开。
+   * 没打字时回到静态那句（那句不需要变量，读屏也不会念出一对空引号）。
+   */
+  function dueSheetTitle(subject: string): string {
+    const trimmed = subject.trim();
+    return trimmed === ''
+      ? labels.panel.title
+      : t('mobile.capture.panel.titleWithDraft', { draft: trimmed });
+  }
+  /**
    * 这一趟新建要落进哪一份清单；`null` = 收集箱。
    *
    * 🔴 它**住在面板里**而不是宿主：关闭即该回到默认落点（`presented` 那个 effect
@@ -331,7 +345,7 @@ function Composer({
                   visible={slot.open}
                   overlay="popover"
                   detents={['medium']}
-                  title={labels.panel.title}
+                  title={dueSheetTitle(slot.subject)}
                   labels={{ close: t('mobile.capture.panel.sheetClose') }}
                   footer={slot.footerContent}
                   onDismiss={slot.onClose}

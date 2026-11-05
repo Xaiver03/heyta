@@ -106,4 +106,25 @@ describe('移动端：日期面板的底部面板档位', () => {
     expect(panel.match(/testID="capture-time-row"/g) ?? []).toHaveLength(1);
     expect(panel.match(/testID="capture-time-mode"/g) ?? []).toHaveLength(1);
   });
+
+  it('⑤ 标题由**此刻那句话**推：宿主不许把静态那句硬写死', () => {
+    /*
+     * 🔴 这一格守的是模态里唯一还能动人的不变量：壳起来后输入行既被盖住也不在可及性树上，
+     *    标题是"我在改哪句话"的唯一出口。判的是**接线**（标题取自 slot.subject、走带变量的
+     *    词条、没打字时回静态那句），画没画出来由设备腿 ④b 两格量（Yoga 会把它量成 0 高，
+     *    而 web/jsdom 两侧看不见那一格）。
+     */
+    const at = screen.indexOf('duePanelOutlet="footer"');
+    expect(at, '宿主没把 duePanelOutlet 交给共享件').toBeGreaterThan(-1);
+    const sheet = screen.slice(at, at + 1200);
+    expect(sheet, '标题没取 slot.subject ⇒ 壳起来后没人说得出在改哪句话').toMatch(/title=\{dueSheetTitle\(slot\.subject\)\}/);
+    expect(screen).toContain("t('mobile.capture.panel.titleWithDraft', { draft: trimmed })");
+    expect(screen).toMatch(/trimmed === ''\s*\?\s*labels\.panel\.title/u);
+  });
+
+  it('⑥ 共享件把草稿交给槽位（宿主拿不到输入框，也不许自己去猜）', () => {
+    const shared = stripComments(read('packages/ui/src/capture/CaptureComposer.tsx'));
+    expect(shared).toMatch(/readonly subject: string;/u);
+    expect(shared, '槽位没带 subject ⇒ 移动端那一档的标题只能写死成静态那句').toMatch(/subject: draft,/u);
+  });
 });

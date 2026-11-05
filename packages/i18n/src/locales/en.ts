@@ -3104,6 +3104,9 @@ export const en = {
   'mobile.capture.capsule.aria.unset': 'Choose a due date',
   'mobile.capture.capsule.aria.value': 'Due {value}, tap to change',
   'mobile.capture.panel.title': 'Choose a due date',
+  // The bottom sheet is modal: once it is up the composer row is both covered and out of
+  // the accessibility tree, so the title has to say which sentence is being dated.
+  'mobile.capture.panel.titleWithDraft': 'Due date for “{draft}”',
   'mobile.capture.panel.dueItems': 'Dates read from what you typed',
   'mobile.capture.panel.timeAria': 'Due time for this new task (leave empty for all day)',
   'mobile.capture.panel.time.otherTime': 'Other time',

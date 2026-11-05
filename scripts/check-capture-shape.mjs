@@ -33,6 +33,10 @@
  *  12. 面板的**出口段只许画一处**：`outlet === 'inline'` 守卫必须恰好两枚（日期视图、
  *      时刻视图各一），且共享件必须有"宿主没外壳就强制回 inline"那道守卫 ——
  *      移动端把出口段放进 sheet 的 `footer` 之后，这两条决定它是画两遍还是凭空消失。
+ *  13. 移动端那一层是**模态**：壳起来后输入行既被盖住也不在可及性树上，所以
+ *      槽位必须把**此刻那句话**交给宿主（`subject: draft`），宿主必须用它推标题。
+ *      ⚠️ 这里只钉接线；"标题画没画得出来"由设备腿 ④b 量 —— Yoga 在自动高度的列容器里
+ *      会把 `flex: 1` 的孩子量成 0 高，而 web/jsdom 两侧对这一格完全无感（§9.34）。
  *
  * 每条都有 selftest 臂：先在**违规源码**上红一次，再挂进 `pnpm check` 链。
  */
@@ -130,9 +134,17 @@ function checkMobileSheet(panel, composer, mobileScreen) {
     ['duePanelOutlet="footer"', '共享件不知道要把出口段交给宿主 ⇒ 出口只能画在滚动内容里，折叠线以下'],
     ['footer={slot.footerContent}', 'slot 的出口段没进 sheet 的 footer（footer 是 ScrollView 之外的兄弟节点，这是它唯一永远可见的位置）'],
     ['overlay="popover"', '语义档位退回 bottom-sheet ⇒ 多画一枚 ×，且 Esc 被表判成 deny'],
-    ["detents={['medium']}", '档位退回铺满 ⇒ 输入行与胶囊被盖住，用户看不见自己正在设置哪一句'],
+    ["detents={['medium']}", '档位退回铺满 ⇒ 面板自己那几行被折掉，非整半点那一档要滚很久才够得着'],
+    // 🔴 这一格是 §9.6 撤壳那条不变量的现形：模态起来后输入行既被盖住也不在可及性树上，
+    //    **标题是唯一还能说话的地方**。它只钉"接线"（标题取自 slot.subject），
+    //    "标题画没画得出来"不在这儿钉 —— 那一格由设备腿 ④b 量（Yoga 在自动高度的列容器里
+    //    会把 `flex: 1` 的孩子量成 0 高，而 web/jsdom 两侧看不见）。
+    ['title={dueSheetTitle(slot.subject)}', '壳的标题退回静态那句 ⇒ 用户看不见自己正在给哪句话设截止'],
   ]) {
     if (!s.includes(needle)) problems.push(`apps/mobile/src/screens/TasksScreen.tsx: ${needle} 不在了 —— ${why}`);
+  }
+  if (!c.includes('subject: draft,')) {
+    problems.push(`${SHARED}: 槽位不再把草稿交给宿主 ⇒ 上面那格标题只能写死，壳里没人说得出在改哪句话`);
   }
   const guarded = (p.match(/outlet === 'inline' \?/g) ?? []).length;
   if (guarded !== 2) {
@@ -417,6 +429,26 @@ function selfTest() {
       problems: checkMobileSheet(
         read(PANEL),
         read(SHARED).replace("renderDuePanel === undefined ? 'inline' : duePanelOutlet", 'duePanelOutlet'),
+        read(MOBILE_SCREEN),
+      ),
+      expectRed: true,
+    },
+    {
+      // 模态起来后输入行既被盖住也不在树上：标题退回静态那句 = 壳里没人说得出在改哪句话。
+      name: '壳的标题退回静态那句（用户看不见自己在改哪句话）',
+      problems: checkMobileSheet(
+        read(PANEL),
+        read(SHARED),
+        read(MOBILE_SCREEN).replace('title={dueSheetTitle(slot.subject)}', 'title={labels.panel.title}'),
+      ),
+      expectRed: true,
+    },
+    {
+      // 上面那格的**另一半**：宿主接了标题，但共享件不再把草稿交出来 ⇒ 标题只能写死。
+      name: '槽位不再带草稿（宿主拿不到那句话）',
+      problems: checkMobileSheet(
+        read(PANEL),
+        read(SHARED).replace('subject: draft,', ''),
         read(MOBILE_SCREEN),
       ),
       expectRed: true,

@@ -284,10 +284,10 @@ magick "$SRC" -crop 200x120+1400+250 +repage -resize 500% docs/research/dida-cap
 |---|---|---|
 | S1 覆盖态纯函数 + 胶囊分档 | ✅ 落地 | `pnpm --filter @heyta/ui typecheck` rc=0；`packages/ui/tests/capture-model.spec.ts` **63 条**全过（G 组 14 + H 组 3 + **I 组 4 格交叉**，§9.19）；**§3.4 五条规则逐条有变异臂（6 枚 = 5 条 + 1 条额外约束）**，装置与逐条手法见 §9.8，在新套件上重跑 rc=0。⚠️ **这句在 §9.21 之前是多算了一条的**：那枚装置当时翻的是 1–4 条 + 一条不在 §3.4 里的额外约束，第 5 条（同字段第二条仍"未采用"）**没有臂**；现已补齐并改名，见 §9.21。⚠️ "穷尽"分两层：单条规则的牙在 §9.8 / §9.21，`exclude × override` 那组交叉格在 §9.19 —— 后者补之前**一条都没渲染过** |
 | S2 输入行三件套 / 那一行改成条件挂载 / **「实际标题」那一行彻底删除** | ✅ 落地（⚠️ "删掉框下芯片行"这半句**已改判**，不是没做：见 §9.13） | 三件套：`check:capture-shape` 臂① + jsdom「输入行只有三件」；那一行现在**只在胶囊说不出来的句子下才挂** —— 「今天下午八点给张教授发PPT」实测 `chips=0`（用例「框下**一行都不挂**」钉住（现量：`grep -n "一行都不挂" apps/web/tests/capture-composer.spec.tsx`）），`apps/web/tests/capture-composer.spec.tsx` 全过（条数**别在这里抄**，现量：`cd apps/web && pnpm vitest run tests/capture-composer.spec.tsx 2>&1 | grep 'Tests '`；本趟末次读数 49 过）、`apps/landing` 全过（现量：`cd apps/landing && pnpm vitest run 2>&1 | grep 'Tests '`）。差集现量（§9.10）：那一行的独占内容只有优先级一枚；把它整体删掉会让 `!1` 变成"被消费而界面没说"，撞 `capture.ts` 不变量 2。**彻底删除的前置 = T1 就地高亮**，而 T1 不在 S1–S5 里（§9.13 记这条依赖）。⚠️ 那句"差集现量"**其实是推论不是实测**（§9.27 抓到）：这一格的地基现在由三枚会红的钉子撑着 —— `capture-model.spec.ts` J 组的 `Record<CaptureField, boolean>` 类型钉子 + 两格在场断言（现量：`cd packages/ui && pnpm vitest run tests/capture-model.spec.ts 2>&1 | grep 'Tests '`），和面板谓词那半边的 `check:capture-shape` `checkPanelDueGroup` 臂 |
-| S3 胶囊 + 弹层 | ✅ 落地（web 锚定浮层 / 日历落点与**整个移动端**就地展开；"组装**现有** DatePicker"这句 11-05 之前只是散文，现已有臂，§9.24） | web：`e2e/tests/capture-due-capsule.spec.ts` 全过（条数别抄，现量：`cd e2e && pnpm exec playwright test tests/capture-due-capsule.spec.ts --reporter=line 2>&1 | tail -1`；本趟末次读数 **7 passed**，每帧含时刻列表腿 + 英文档 + 日历落点 + 「没写日期点时刻」）；⚠️ **几何那几条也撞过**：把弹层硬推 2000px 出视口 ⇒ `面板底边出了视口` 红 16 次，除"日历落点"（不吃这个外壳）外全红（§9.11）；与 `calendar-capture`(3) + `dirty-form-guard`(6) + `task-priority-checkbox`(3) 同跑 12 条全过——⚠️ 共享件今天改过两次（S3c/S3d），这句在 11-05 03:36 **在当前产物上重跑过**，仍 12 passed；那一趟顺手重写并随后还原了 11 张兄弟线的取证图，事故与归因写在 §9.25。移动：`scripts/verify-mobile-capture-android.sh` rc=0（21 格，两趟）。⚠️ 那一版**没有量过"时刻那一格点不点得动"** —— 第四趟补上这一格之后当场红，见 S3c 与 §9.16 |
-| S3m 移动端外壳那一档（目标原话 = `BottomSheet`） | 🔴 **接上、量完、撤掉**（§9.6） | 装壳那一版 APK sha256 `a26bf97360eeb796…`：`mobile-capture-due-sheet` 在树上 ✅，但 `capture-time-row` rc=1、`desc_of capture-due-capsule` rc=1、头部多一枚 `popover` 档不该给的 ×。撤壳那一版 `d23a438e2145b87d…`：设备腿回到 rc=0、21 格，且装置现在会把外壳档位打成读数。**这处偏差不算已解决，归你拍**（§9.6 末三条边界） |
+| S3 胶囊 + 弹层 | ✅ 落地（web 锚定浮层 / 日历落点就地展开；**整个移动端自 11-05 第八趟走 `BottomSheet`**，见 S3m 与 §9.33/§9.34；"组装**现有** DatePicker"这句 11-05 之前只是散文，现已有臂，§9.24） | web：`e2e/tests/capture-due-capsule.spec.ts` 全过（条数别抄，现量：`cd e2e && pnpm exec playwright test tests/capture-due-capsule.spec.ts --reporter=line 2>&1 | tail -1`；本趟末次读数 **7 passed**，每帧含时刻列表腿 + 英文档 + 日历落点 + 「没写日期点时刻」）；⚠️ **几何那几条也撞过**：把弹层硬推 2000px 出视口 ⇒ `面板底边出了视口` 红 16 次，除"日历落点"（不吃这个外壳）外全红（§9.11）；与 `calendar-capture`(3) + `dirty-form-guard`(6) + `task-priority-checkbox`(3) 同跑 12 条全过——⚠️ 共享件今天改过两次（S3c/S3d），这句在 11-05 03:36 **在当前产物上重跑过**，仍 12 passed；那一趟顺手重写并随后还原了 11 张兄弟线的取证图，事故与归因写在 §9.25。移动：`scripts/verify-mobile-capture-android.sh` rc=0（21 格，两趟）。⚠️ 那一版**没有量过"时刻那一格点不点得动"** —— 第四趟补上这一格之后当场红，见 S3c 与 §9.16 |
+| S3m 移动端外壳那一档（目标原话 = `BottomSheet`） | ✅ **第八趟接回来并量完**（§9.33 / §9.34） | §9.6 撤壳的三条依据里，两条**有了机制**、一条**本来就不是退化**：出口段搬进 sheet 的 `footer`（`ScrollView` 的兄弟，永远可见）解掉"时刻行掉折叠线以下"；"外层胶囊读不到"是 `accessibilityViewIsModal` 的正确行为 ⇒ 判据换成**两阶段读**（⑥a 判面板自己那行、⑥b 收起后判胶囊）；× 那一档由 `overlay="popover"` 拿掉（表里 popover 不画 ×、Esc/返回键可收）。⚠️ 这一趟看图**新抓到两处只有真机看得见的缺陷**并都修完：sheet 标题被 Yoga 量成 0 高（`flex: 1` 在自动高度列容器里，陷阱 #652）、壳起来后用户看不见自己正在改哪句话 ⇒ 槽位新增 `subject`，标题说「给「那句话」选截止日期」。🔴 有一格**未判定**：打字通道在这台模拟器上不稳定（三种注入形式实测时好时坏），"标题带着草稿原文"那一格因此记 `unjudged`，替它说话的只是源码臂（`capture-capsule-wiring.spec.ts` ⑤/⑥ + `check:capture-shape` 两臂），不是行为判据 |
 | S4 判据族搬迁 + 新尺 | ✅ 落地 | `pnpm check:capture-shape` = selftest（臂数由它自己打印，现量：`node scripts/check-capture-shape.mjs --self-test` ⇒ 那行 `✅ …自检：N 臂`）+ 真扫描，rc=0；已接进主 `check` 链（现量：`node -e "const c=require('./package.json').scripts.check; console.log(c.includes('check:capture-shape'), c.indexOf('check:focus-single-source') < c.indexOf('check:capture-shape'))"` ⇒ `true true`）。⚠️ **"接进链"核过两遍才成立**：链里那枚定义确实每次都会跑臂，但我第一版把 flag 拼成 `--selftest`（本仓 62 枚带臂的尺都用 `--self-test`），于是这枚尺在债表 `audit-gate-selftest-consumers.mjs` 上**整个不存在**（总数 62 / 跑臂 39 → 修后 63 / 40），见 §9.23；§5 表 **13 行**，且这 13 行**逐行有读数**、尺子自己做过变异红 —— 命令与结果都在 §9.7。⚠️ 第 15 臂是 11-05 第四趟补的（时刻 slot 死按钮，§9.16）—— **在此之前没有任何尺会拦"没选日子时 48 格全静默"**。⚠️ 那把"逐行核对"的尺原先是一段要人抄 25 行的 heredoc，现已落成装置：`bash research/tools/mutation-rigs/capture-migration-row-arms.sh`（§5 的 13 行 + 各趟新增的判据族 = 逐行对上，**行数由它自己打印**；§9.27 那趟末次 `✅ 24 行`，§9.28 那趟 `✅ 25 行`，`--selftest` 现在跑**两枚**变异，见 §9.7 末节 / §9.22 / §9.24）。⚠️ 那一趟之后又逐条问了遍"这条谓词会被摘掉吗"：行 12 原先钉的是单字母 `K`（那文件里 6 行含 K ⇒ **空转**），已改钉臂标签 + 变异键，`--selftest` 也加成**两枚**变异（改用例名 / 摘 K 臂），21 行 rc=0 —— 见 §9.22 |
-| S5 两端接线 + 看图 | ✅ **两端都做完**（移动设备腿在第二趟补上，见 §9.5 B） | web：图数**别在这里抄**（现量：`ls apps/web/evidence/capture-due-capsule-20261104/*.png | wc -l` ⇒ 本趟末次 24 张 = 亮/暗 × 1440/375 各 5 帧 + 「没写日期点时刻」1 张 + 英文档 2 帧 + 日历落点 1 张 + 其余分档帧），四个组合在上限落地后**逐张重看过**（读数在 §9.17 末，那里也记了我先把这句写空了一次）并据此修掉 §9.2 那四条；⚠️ 第三趟补看 1440 暗 / 375 暗 时核出"不被底部栏压住"那半条**原本会静默空跑**，已加窄档在场断言并验过它能红（§9.9）。移动：`verify-mobile-capture-android.sh` rc=0（21 格 ✅、连跑两趟、4 张图逐张看过）在 `apps/mobile/evidence/capture-due-capsule-android-20261105/`；jsdom 侧 `capture-capsule-wiring.spec.ts` 5 条 + 「不给外壳那一档」3 条（都做过变异红）。⚠️ **这一行的"21 格 ✅"是修 S3c/S3d 之前的产物**：当时那 21 格里没有"时刻点不点得动"，也没有"面板不许齐边"。当前产物的设备腿读数是 **rc=0、22 格 ✅**（最新一枚在 `apps/mobile/evidence/capture-due-capsule-android-20261105-keyrename/`，APK `29438d88…`；上一枚 `…-panelwidth/`，APK `a1306080…`——两枚都是 22 格 ✅，见 §9.26 末），web 侧是 **7 条 e2e**（`…/capture-due-capsule-20261104/`，含 `no-date-time-today` 那张）—— 见 S3c / S3d 与 §9.16 / §9.17。⚠️ §9.27 那趟动过 `packages/ui` 与 `scripts/` 之后，这四帧**重锚过一次**（§9.28）：看图量到 375 档日期视图的「时刻」出口落在折叠线上只露半行 —— 定性为可滚、非缺陷（`溢出 128px / overflow-y=auto`，滚完整条进视口），但那格以前**没有尺**，现在有了（溢出必须可滚 + 滚完必须整条可见，变异 `overflow-y: hidden` 只红 375 两档）。⚠️ 同一趟我先拿 md5 造出一枚假缺陷（"图拍到半布局"），被 `magick compare -metric AE` = 1 否证 ⇒ 陷阱 #647，拍图顺序仍改了、理由换成"图只能作为已过判据的形状的证据" |
+| S5 两端接线 + 看图 | ✅ **两端都做完**（移动设备腿在第二趟补上，见 §9.5 B） | web：图数**别在这里抄**（现量：`ls apps/web/evidence/capture-due-capsule-20261104/*.png | wc -l` ⇒ 本趟末次 24 张 = 亮/暗 × 1440/375 各 5 帧 + 「没写日期点时刻」1 张 + 英文档 2 帧 + 日历落点 1 张 + 其余分档帧），四个组合在上限落地后**逐张重看过**（读数在 §9.17 末，那里也记了我先把这句写空了一次）并据此修掉 §9.2 那四条；⚠️ 第三趟补看 1440 暗 / 375 暗 时核出"不被底部栏压住"那半条**原本会静默空跑**，已加窄档在场断言并验过它能红（§9.9）。移动：`verify-mobile-capture-android.sh` rc=0（21 格 ✅、连跑两趟、4 张图逐张看过）在 `apps/mobile/evidence/capture-due-capsule-android-20261105/`；jsdom 侧 `capture-capsule-wiring.spec.ts` 5 条 + 「不给外壳那一档」3 条（都做过变异红）。⚠️ **这一行的"21 格 ✅"是修 S3c/S3d 之前的产物**：当时那 21 格里没有"时刻点不点得动"，也没有"面板不许齐边"。当前产物的设备腿读数是 **rc=0、22 格 ✅**（最新一枚在 `apps/mobile/evidence/capture-due-capsule-android-20261105-keyrename/`，APK `29438d88…`；上一枚 `…-panelwidth/`，APK `a1306080…`——两枚都是 22 格 ✅，见 §9.26 末），web 侧是 **7 条 e2e**（`…/capture-due-capsule-20261104/`，含 `no-date-time-today` 那张）—— 见 S3c / S3d 与 §9.16 / §9.17。⚠️ §9.27 那趟动过 `packages/ui` 与 `scripts/` 之后，这四帧**重锚过一次**（§9.28）：看图量到 375 档日期视图的「时刻」出口落在折叠线上只露半行 —— 定性为可滚、非缺陷（`溢出 128px / overflow-y=auto`，滚完整条进视口），但那格以前**没有尺**，现在有了（溢出必须可滚 + 滚完必须整条可见，变异 `overflow-y: hidden` 只红 375 两档）。⚠️ 同一趟我先拿 md5 造出一枚假缺陷（"图拍到半布局"），被 `magick compare -metric AE` = 1 否证 ⇒ 陷阱 #647，拍图顺序仍改了、理由换成"图只能作为已过判据的形状的证据" | ⚠️ **第八趟之后两端都重锚过**（§9.33/§9.34）：web 侧现量 `cd e2e && pnpm exec playwright test tests/capture-due-capsule.spec.ts --reporter=line 2>&1 | tail -1` ⇒ **7 passed**（日志 `.run-logs/web-e2e-final.log`；那一趟只重写本单 `apps/web/evidence/capture-due-capsule-20261104/` 五张，别线那三张脏图未被触碰 —— 跑前后各量一次 `git status --short -- apps/web/evidence`），375 亮档那张重看过：输入行三件 + 胶囊带「今天 20:00」 + 面板里快捷五档 + 月历 + 「时刻」出口压在折叠线上（可滚，判据在）；移动侧 `verify-mobile-capture-android.sh` **rc=0、28 格 ✅、1 格未判定**，出处件 `apps/mobile/evidence/capture-due-capsule-android-20261105-sheet8/provenance.txt`
 | S5b 就地展开那一支（日历落点）的出口可达性 | 🔴 **原本是恒真断言，已重做**（§9.30） | 第一版照抄 §9.28 的写法（`scrollIntoViewIfNeeded` → `toBeInViewport`），跑出来绿 —— 而 `overflow: hidden` 只挡用户不挡程序，Playwright 自己会滚 ⇒ 那两条从写下起永不为红。**发现方式不是推理，是打牙**：给共享面板加 `paddingTop: 700`，浏览器回读 `computed paddingTop=700px`（变异生效），行底仍是 `820.328125`（与基线逐位相同）。改成量"没滚之前"后现量：两个出口底边 1036 / 980，编辑器可视底 888（内容 688 > 可视 528）⇒ **这一支的出口本来就都在折叠线以下**，合格的原因是 `overflow-y=auto`（用户滚得到），不是"一开始就看得见"。牙：外层那枚 `auto` 改 `hidden` ⇒ rc=1，红话带 148px 差额。装置行 26（第三枚是反向钉子：旧写法不许回来）；方法记入陷阱 #649 |
 | S5c 同一族在本 spec 里剩下的三处 + 分母数完 | ✅ **一起换掉**（§9.31） | ⑤.2 / ⑤.5 / ⑥.5 三处原本都是"工具滚完再问位置"的恒真形状，现改成**未滚动状态 + 容器级**（滚动区可视底边不许压在底部导航顶边下面 —— 正是 §9.9 那个缺陷的形状）。牙：把 `place()` 里 `railTop` 改成"忘记导航"⇒ 375 两档 rc=1，红话 `可视底边 685 压在导航顶边 660 下面`。未滚动读数：窄档时刻出口在可视区以下 24px，合格理由是 `overflow-y=auto`。`grep` 全仓 40 处逐处问过"是不是拿滚动当可达性证据"：`search-overlay`（先钉 `y>900` 前置）、`auth-consent`（前面没滚）、`shell-sidebar-height`（作者注释已写明这个坑）都不是这一族，其余是为点到/为截图而滚 ⇒ **这一族只有本线这几处，不向别线登记**。装置行 27（含整支反向钉子：剥注释后 `scrollIntoViewIfNeeded` 必须为 0）|
 | S6 提醒/重复进弹层（扩 `NewTaskFields`） | ⬜ 未开始 | 前提已量：`actions.ts:90-118` 无 `repeatRule`、无 reminder |
@@ -1829,3 +1829,119 @@ vite@4318 + headless chromium。回退前先确认这两批在起跑前**不在�
 `.run-logs/` 是 gitignore 的，所以这枚跑器挪进版本库：`research/tools/capture-chain-rerun.mjs`，
 带 `--dry-run`（只打印分类，先人审再跑）。现量：`node research/tools/capture-chain-rerun.mjs --dry-run`
 ⇒ `链 156 步：将跑 151，跳过 5` + `✅ 三枚静态 check:ai-* 门仍在要跑的集合里`。
+
+---
+
+## 9.33 第八趟：把 §9.6 撤掉的移动端那一档**接回来**，靠的是把状态提上去，不是把理由换一句
+
+目标原话点的是「mobile BottomSheet」。§9.6 那一趟接上之后**当场撤掉**，依据是三处退化读数
+（时刻行掉进 sheet 的折叠线以下 / 外层胶囊不在可及性树里 / 头部多一枚 ×）。
+这一趟再接回来，不是因为那三处被"讲通了"，是因为其中两处**有了机制**、第三处**本来就不是退化**：
+
+| §9.6 量到的那格 | 这一趟怎么处理 | 处理得住不住，由谁判 |
+|---|---|---|
+| `capture-time-row` 不在树上（出口画在滚动内容里，滚到折叠线以下） | 🔴 把面板的**视图状态从 `CaptureDuePanel` 提到 `CaptureComposer`**（`panelView` / `panelManual` / `panelTimeDraft`），出口段单独导出成 `CaptureDuePanelOutlet`，宿主把它放进 `BottomSheet` 的 `footer` —— `footer` 是 `ScrollView` 的**兄弟**，永远可见 | 设备腿 4/5 节：footer 里那行在树上、点得动（§9.34） |
+| 外层胶囊 `desc_of` rc=1 | 这不是缺陷：`accessibilityViewIsModal` 的正确行为就是模态起来后背景**不进**可及性树。判据跟着改成**两阶段读**（面板内即时反馈 + 收起后胶囊念回值） | 设备腿 ⑥a/⑥b 两格，缺一格就不算"点一格 ⇒ 值进胶囊" |
+| 头部多一枚 × | 外壳档位从 `'bottom-sheet'` 换成 **`overlay="popover"`**：关闭策略表里 popover 那档是 `scrim/escape/systemBack = dismiss`、`explicitCloseButton = false` —— 与滴答那层一致（点外面/返回键收起、没有 ×） | `check:capture-shape` 那一枚 `checkMobileSheet`（臂数现量见下） |
+
+### 落点（四处，判断仍在共享层）
+
+- `packages/ui/src/capture/CaptureDuePanel.tsx` — 新增导出的 `CaptureDuePanelOutlet` 与
+  `CaptureDuePanelState` / `CaptureDuePanelView` / `CaptureDuePanelOutletPlacement`；
+  面板体不再自己 `useState`，两个身体分支各由 `{outlet === 'inline' ? <Outlet/> : null}` 守住
+  （守卫数量是**数得出来的**：`grep -c "outlet === 'inline' ?"` ⇒ 2）。
+- `packages/ui/src/capture/CaptureComposer.tsx` — 持状态、`closePanel()` 一处重置三格（提交路径也走它），
+  导出 `footerContent` 给宿主；🔴 **没有外壳就强制回 `'inline'`**
+  （`effectiveOutlet`），否则 `'footer' + 无外壳` 这种"出口哪儿都没画"的形状能活着出去。
+- `packages/ui/src/overlay/BottomSheet.tsx` — `BottomSheetClass` 联合里加 `'popover'`：
+  这个联合说的是**几何**（贴底升起），语义档位来自关闭策略表，两件事不许混。
+- `apps/mobile/src/screens/TasksScreen.tsx` — `duePanelOutlet="footer"` +
+  `renderDuePanel` 装 `BottomSheet`（`detents={['medium']}`、`testID="mobile-capture-due-sheet"`）。
+
+### 这一趟**不是**§9.6 的重复：那条"不许自带外壳"的臂改了判据
+
+§9.6 的 ③ 写的是「`check:capture-shape` 里那枚'移动端不许自带外壳'的臂**留着**，它现在钉的是这一趟的结论」。
+这一趟把它换成 **`checkMobileSheet`**：它钉的不再是"没有壳"，而是**有壳必须是哪一档**
+（`overlay="popover"`、出口进 `footer`、宿主不许自己复制一份 `CaptureDuePanel`）。
+⇒ §9.6 那句结论对本单 §0 那条根因（判据钉住旧形状）是**它自己犯过一次**的错，这里如实改口，
+不是把旧结论悄悄留着。旧结论里仍然成立的那半（"换了壳 must 现形"）由设备腿第 3 步的外壳档位读数继续守着。
+
+### 非设备腿的读数（这一趟改之前/之后各量一次）
+
+- `apps/mobile/tests/capture-capsule-wiring.spec.ts`：现量
+  `pnpm --filter @heyta/mobile run test -- tests/capture-capsule-wiring.spec.ts 2>&1 | tail -3`
+  ⇒ 本趟末次 **9 passed**（新增的「日期面板的底部面板档位」4 条都在里面）。
+  ⚠️ 第 ① 条**第一版是恒真的**：`detents={['medium']}` 在 `TasksScreen` 里别的那枚 sheet 也写着，
+  整文件 grep 一句就绿了。修法是把断言**锚进 `renderDuePanel` 那一片**，再拿"换成 `large`"打牙
+  （1 failed）—— 陷阱 #631 那一族在本单的第 N 次现身。
+- `scripts/check-capture-shape.mjs` 自测臂数：现量 `node scripts/check-capture-shape.mjs --selftest 2>&1 | tail -2`
+  ⇒ 本趟末次 **21 臂**（含 `checkMobileSheet` 与 `checkPanelDueGroup`）。
+- §5 迁移表逐行装置：现量 `grep -cE "^\s+\['[0-9]+ " research/tools/mutation-rigs/capture-migration-row-arms.sh`
+  ⇒ 本趟末次 **28 行**，`bash … --selftest` 全绿（零残留）。
+- **未判定那一格，连判它的断言一起登记**：壳起来后用户**还看不看得见自己正在改哪句话**
+  （§9.6 的 ①/② 那半条）。这一格设备腿量不到（可及性树把背景整个剔掉，"看不见"和"读不到"
+  在树上同形），判它的是 §9.34 里 `02-panel-inline.png` / `03c-sheet-dismissed.png` **两张图**：
+  图里输入行被壳盖住 ⇒ 这一格按"贴着输入行"那条契约算**没做到**，按 §7 交回取向题；
+  图里输入行仍露着 ⇒ 这一格结掉。不猜，等看图。
+
+---
+
+## 9.34 第八趟设备腿：看图抓到两处**只有真机看得见**的缺陷，以及探针自己犯的三次错
+
+这趟是 §9.33 那版接线（出口段进 footer）第一次在真机上量。载体 `linux-dev` 上的
+无头模拟器（`sdk_gphone64_x86_64`，1080x2340），APK 由 `run-gradle.mjs` 远端构建、
+按 sha256 逐字对账后安装。**出处件由装置自己落盘**（`provenance.txt`：head / input_digest /
+started / finished / apk_sha256 / device / failed），共享工作树里 HEAD 之外还混着别线未提交的行，
+只记 SHA 回答不了"这读数是哪一棵树跑出来的"。
+
+### 抓到的两处（都是看图看出来的，不是推理出来的）
+
+| 症状（截图 + 树） | 真因 | 修法 | 修完的读数 |
+|---|---|---|---|
+| sheet 把手下面**直接是内容**，标题那一条是空白；树里 `…-sheet` 的直接孩子只有 handle 与 ScrollView，**中间那层 header 不在树上** | `BottomSheet` 的 `title: { flex: 1 }` 住在"自动高度的列容器"（`headerDrag`）里，Yoga 给的是 `basis 0 + 剩余空间 0` ⇒ 0 高，零面积节点 uiautomator 不收。词条在、prop 传得对、web/jsdom 两侧**全绿** | 宽度方向的 `flex` 留在容器上，文字那层不带 `flex`（陷阱 **#652**） | `✅ 壳的标题带画得出来：[44,1089][1036,1144]…带内节点=1` —— 读数从"读不到"变成"读到 55px 高的一条"，**是同一条判据在改前改后的两个读数**，不是新加的尺 |
+| 壳起来后背景只剩任务列表：**用户看不见自己正在给哪句话设截止**（§9.6 当初就因为它撤过壳） | 模态的正确行为（`accessibilityViewIsModal`）+ 几何上输入行被壳盖住。这一格不能靠"少用模态"绕开，因为目标原话点的是 `mobile BottomSheet` | 槽位新增 `subject`（共享层把**此刻输入框里那句话**交出来），宿主用它推标题：`给「{draft}」选截止日期`，空草稿回静态那句。判断仍在共享层，宿主只说话 | 见下"最终读数" |
+
+### 探针自己犯的三次错（每一次都伪装成产品红）
+
+1. **载体路径中途劣化**：`linux-dev` 与 `linux-dev-lan` 两枚别名在同一次跑里先后超时，
+   `linux-dev-oob` 仍通（`hostname` 现量 `Xaiver-linux`）。那一趟报"认得出「只用本机」但点不到"
+   —— 按钮坐标现量在视口内（`[551,1716][981,1837]`，clickable=true），**红的是 ssh 不是产品**。
+   ⇒ 后续腿显式 `ANDROID_HOST=linux-dev-oob`。
+2. **读错属性**：`desc_of capture-input` 读回来的是那句固定标签「新任务标题」
+   （`mobile.capture.addLabel`，content-desc），打字前后都不变 ⇒ "草稿没进去"是一句**永远红**的
+   断言，还连带把下一格判成"前提不成立"（陷阱 **#651**）。⇒ 装置补 `text_of()`：判值读 `text`，
+   判可及名读 `content-desc`。
+3. **前提没判**：修好读法后仍三轮不进。现量是 `focused=true` 而 `mInputShown=false`，
+   第二次点中之后 `mInputShown=true`，字当场进去 ⇒ 这台模拟器上 `input text` 只认**已起软键盘**的
+   输入框。⇒ 判据改成每轮先打 `mInputShown` 读数再打字，读数逐轮打出来，
+   这样"没进"与"探针没打通"不再同形。
+
+### 最终读数（一趟跑到什么记什么）
+
+见本节末的 `§9.34a`（跑完即填，不在此预填数字）。
+
+### §9.34a 最终读数（同一枚 APK、同一趟）
+
+`ANDROID_HOST=linux-dev-oob APK=…/app-release.apk OUT_DIR=apps/mobile/evidence/capture-due-capsule-android-20261105-sheet8`
+⇒ 现量：`grep -c "✅" .run-logs/device-leg-final.log` = **28 格 ✅**、`grep -c "❌"` = **0**、`EXIT=0`，
+另有 **1 格未判定**（打字通道，见上）。出处件（`provenance.txt`，装置自己落盘）：
+`head=3766d79017c8… / input_digest=c4cc1d5e6b10… / apk_sha256=b4d96effbd1728de… /
+device=sdk_gphone64_x86_64 / failed=0 / unjudged=1`。
+
+那一趟里与这一格有关的两行原文（照抄，不重写）：
+
+```
+✅ 壳的标题带画得出来：[44,1089][1036,1144]|DRAFT_NO|STATIC_YES|'选择截止日期'|带内节点=1
+· 标题那句话那一格**没判**：2.5 的草稿没进去（前提不成立，不算过也不算红）
+```
+
+⚠️ **两趟读数的对照就是"这把尺有没有牙"的证明**：改 `BottomSheet` 之前，同一格读到的是
+`NONE`（`…-sheet` 的直接孩子只有 handle 与 ScrollView，header 整层不在树上）；
+改完读到的是那条 55px 高的带子。这不是新加了一把尺，是同一条判据在改前改后的两个读数。
+
+非设备腿的读数（同一趟）：`packages/ui` **887 passed**（现量 `pnpm --filter @heyta/ui run test`）、
+`apps/mobile` 接线套 **11 passed**（新增 ⑤/⑥ 两格）、`check:capture-shape` rc=0 且自测 **23 臂**
+（新增两臂：标题退回静态那句 / 槽位不再带草稿，都验过会在违规源码上红）、
+`check:verify-script-copy` rc=0、`check:docs` + `check:md-tables` rc=0。
+🔴 仍红的非本单项不变：`check:shell-unicode` 与 `check:linux-shell` 红在别线的
+`verify-mobile-pin-order.sh`（现量：那把尺的输出里不出现本单文件名）。
