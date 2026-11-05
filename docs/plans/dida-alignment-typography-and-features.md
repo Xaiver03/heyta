@@ -280,11 +280,24 @@
 
 | 项 | 状态 | 判据 / 现量 |
 |---|---|---|
-| A1 `--ht-size-row-min-height` 56→60 | ✅ 已入库 | ⚠️ **没有任何断言钉住这个值**（现量：`grep -rn "row-min-height\|3\.75" packages/design-system/tests/*.ts` 为空）。守它的只有 `check:tokens`（生成产物与 `tokens.css` 逐字节一致）与 `check:design-token-refs`（引用可解析）——**一致性，不是值** |
+| A1 `--ht-size-row-min-height` 56→60 | ✅ 已入库 | ⚠️ **没有任何断言钉住这个值**（现量：`grep -rn "row-min-height\|3\.75" packages/design-system/tests/*.ts` 为空）。守它的只有 `check:tokens`（生成产物与 `tokens.css` 逐字节一致）与 `check:design-token-refs`（引用可解析）——**一致性，不是值**（这枚尺的射程在下面那条 🔎 追记里已扩到全仓重枚，结论没翻） |
 | A1 `row-title` leading `normal`→`relaxed` | ✅ 已入库 | `packages/design-system/tests/typography.spec.ts` 断 `lineHeight === 28`（这一格**真钉得住**：改值它就红，今天就是这么被顶出来的）；镜像由 `apps/landing/tests/mockup-task-row.spec.tsx` 按源码文本对账 |
 | A2 `bodyPaddingBlock` `space.2`→`space.3` / `listGap` `space.1`→`space.2` | ✅ 已入库 | ⚠️ 同样**没有值判据**：`packages/ui/tests/task-row-density.spec.ts` 的期望值是 `toEqual({bodyPaddingBlock: TASK_ROW_SHAPE.bodyPaddingBlock …})` 现取的（全文件零 token/px 字面量，现量 `grep -nE "'space\.[0-9]'"` 为空）——它守的是**组件有没有走表**（那几枚 `toContain('spec.bodyPaddingBlock')` 文本锚），不是表里填了哪枚 token；`mockup-quadrant-shape.spec.tsx:479` 比的是 CSS 与 token **是否同名**，两边一起改它照样绿 |
 | A3 侧栏密度（`.ht-nav__item` padding、`.ht-sidebar` gap） | ✅ 现量已经是目标值，本笔**没动** | 按**精确选择器块**取（先前那发 `grep -n "ht-nav__item" -A8` 是前缀匹配，会一并命中 `.ht-sidebar__x`，仪器太松）：`sidebar.css:3` 的 `.ht-sidebar {` 块内 `gap: var(--ht-space-3)`（第 6 行），`sidebar.css:254` 的 `.ht-nav__item {` 块内 `padding: 0 var(--ht-space-4)`（第 260 行）。复现：`awk '/^\.ht-sidebar \{/{f=1} f{print} f&&/\}/{exit}' apps/web/src/styles/app/sidebar.css` |
 | A4 验证 | 三道门 + 构建 + 两枚浏览器腿都过；图看过，**但没和滴答并排比过** | 见下面最后一条 |
+
+- 🔎 **2026-11-05 23:3x 把上面两行"没有值判据"的分母从 `packages/*/tests` 扩到全仓重枚一遍**（那两行原本的尺只扫了
+  design-system 的测试目录，属于"尺扫的那套写法里没有"，不是全集）。新分母 = 所有 `*.spec.ts` / `*.spec.tsx` / `*.mjs`
+  里出现 `bodyPaddingBlock` / `listGap` / `row-min-height` / `TASK_ROW_SHAPE` 的地方，现量枚数分别 5 / 2 / 1 / 14
+  （命令：`grep -rn --include='*.spec.ts' --include='*.spec.tsx' --include='*.mjs' -E 'bodyPaddingBlock|listGap|row-min-height' packages apps/web/tests apps/landing/tests apps/mobile e2e scripts | grep -vE '/(dist|dist-types|evidence)/'`）。
+  逐枚判过性质，**结论没翻**：命中的是类型声明、`toEqual` 里现取 token 自己、`toContain('spec.bodyPaddingBlock')` 文本锚、
+  以及 `expectVar` 的**同名比对**。两处最像"值判据"的已查到实现，都不钉值：
+  ① `apps/web/tests/calendar-day-view.spec.tsx` 的现在线那条是**相对断言**（`rowHeight = top / (时+分/60)`，
+  再验落在当前小时那一格内），注释明写"断言的是落在这一格内，不是某个像素值"⇒ 回退行高它照样绿；
+  ② `apps/web/tests/quadrant-row-parity.spec.tsx` 比的是两档渲染出的 class 名**互不相同**（`expect(defaultRow).not.toBe(compactRow)`），
+  它自己那段边界说明 (a)(b) 就承认"不校验方向与幅度"⇒ 协同回退也不会红。
+  ⇒ 全仓唯一钉住值的仍是 `typography.spec.ts` 的 `lineHeight === 28` 那一枚；`BLOCKED.md` B264 那句"协同回退全仓不会红"
+  现在是**带着这个分母**成立的，不再只是三枚窄 grep 的读数。
 
 - 🔴 **这一格欠了一整天，欠的不是代码**：改动 11-04 就写完了，但 `packages/design-system/**`
   与别线的 token 工作同片地，落库前分不清哪几行是谁的手。今天逐 hunk 核完（分归办法写在
