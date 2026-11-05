@@ -221,6 +221,8 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | 🔴 [account-standard-suite.md](plans/account-standard-suite.md) | **注册登录标准套件（本单权威台账）**：换绑邮箱 / 忘记密码 / 改密 / 会话管理与逐个登出 / 注销对齐，逐趟验收读数在 §6（末节号现量 `grep -oE '^### 6\.[0-9]+' docs/plans/account-standard-suite.md \| tail -1`）。裁决层是 [ADR-0063](adr/0063-email-rebinding-and-per-session-revocation.md) |
 | [account-standard-suite-handoff.md](plans/account-standard-suite-handoff.md) | **交接：注册登录标准套件** —— 只记「现在停在哪、下一步按什么顺序做」：设备腿是收口条件、载体与跑法、已排除的死胡同 |
 | [product-ux-optimization-handoff.md](plans/product-ux-optimization-handoff.md) | **交接：产品体验线（本轮 UX Goal）** —— 五步各自交到哪一格、四端重装跑在哪棵树上、还欠的四格各在谁手里（每格一条复现命令）、本轮实测过的六条死胡同 |
+| [dida-alignment-handoff.md](plans/dida-alignment-handoff.md) | **交接：滴答对齐（排印 / 行操作 / 详情面 / 侧栏）** —— 阶段 2–4 已入库、九条验收与设备腿的现量位置；**三层分母各自还欠什么**（阶段 1 排印没入库、阶段 5 的 C1/D1 没做、对滴答今天仍成立的五格缺口、Android 腿与四端重装没跑）、七条死过的手（含 #208 那条我这次没先查就撞回去的）、每步动手前的前置 |
+| [dida-alignment-reflection.md](plans/dida-alignment-reflection.md) | **复盘：滴答对齐线** —— 八条被证据推翻的判断（错误归因含"仓里 #208 早写明却仍自行试一遍""清理步骤按子串撞上「取消置顶」写出真 op""把 AX 框当命中区""红在别人件里默认是半写、其实是产物陈旧""汇报完成时没自带分母"），每条带证据与下次开头指令 |
 | [account-standard-suite-reflection.md](plans/account-standard-suite-reflection.md) | **复盘：注册登录标准套件** —— 纠正表（修改内容/错误归因/证据/下次开头指令建议）＋可长期记忆候选 |
 | 🔎 [seo-program.md](plans/seo-program.md) | **落地站点的 SEO 台账**（2026-10-19 立项）：§1 实测基线（76 条 sitemap 全 200、头部契约、**正文 0 字节**、站长平台**一个都没接**）· §2 已落地项（整站**软 404 → 诚实 404** 的线上读数表、`og:locale:alternate`、三个页面的 meta 标题、三类"仓库里已在说谎的话"）· §3 **明确不做**的八件事逐条附理由（结构化数据四条否决 / `lastmod` / 价格不进 head / IndexNow）· 🔴 §4 **证据强度声明**（`web_search` 401 + 我自己复现了 Bing CN 分词退化 ⇒ 关键词部分**不能当结论**）· §5 关键词方向与三个**缺页** · §6 要人拍的五件事 · §7 未闭合读数 |
 
