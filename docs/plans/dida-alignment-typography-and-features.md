@@ -264,7 +264,7 @@
 | A1 `--ht-size-row-min-height` 56→60 | ✅ 已入库 | `check:tokens` 现量"生成产物与 `tokens.css` 一致（8 个文件，225 个 token）"；下游按 `var()` 读，没有文本锚点 |
 | A1 `row-title` leading `normal`→`relaxed` | ✅ 已入库 | `packages/design-system/tests/typography.spec.ts` 那格期望值由 24 **改签成 28**（值变更就是这一格的内容，不是为了让测试变绿）；镜像由 `apps/landing/tests/mockup-task-row.spec.tsx` 按源码文本对账 |
 | A2 `bodyPaddingBlock` `space.2`→`space.3` / `listGap` `space.1`→`space.2` | ✅ 已入库 | `packages/ui/tests/task-row-density.spec.ts` 逐档读槽位（跟随 token，不钉数）；`mockup-quadrant-shape.spec.tsx:479` 钉 `.mk-quad__list` 的 `gap` == `TASK_ROW_SHAPE.listGap` |
-| A3 侧栏密度（`.ht-nav__item` padding、`.ht-sidebar` gap） | ✅ 现量已经是目标值，本笔**没动** | `grep -n "ht-nav__item" -A8 apps/web/src/styles/app/sidebar.css` ⇒ `padding: 0 var(--ht-space-4)`；同文件 `.ht-sidebar` ⇒ `gap: var(--ht-space-3)` |
+| A3 侧栏密度（`.ht-nav__item` padding、`.ht-sidebar` gap） | ✅ 现量已经是目标值，本笔**没动** | 按**精确选择器块**取（先前那发 `grep -n "ht-nav__item" -A8` 是前缀匹配，会一并命中 `.ht-sidebar__x`，仪器太松）：`sidebar.css:3` 的 `.ht-sidebar {` 块内 `gap: var(--ht-space-3)`（第 6 行），`sidebar.css:254` 的 `.ht-nav__item {` 块内 `padding: 0 var(--ht-space-4)`（第 260 行）。复现：`awk '/^\.ht-sidebar \{/{f=1} f{print} f&&/\}/{exit}' apps/web/src/styles/app/sidebar.css` |
 | A4 验证 | 三道门 + 构建 + 两枚浏览器腿都过；图看过，**但没和滴答并排比过** | 见下面最后一条 |
 
 - 🔴 **这一格欠了一整天，欠的不是代码**：改动 11-04 就写完了，但 `packages/design-system/**`
