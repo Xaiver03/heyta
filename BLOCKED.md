@@ -13454,3 +13454,39 @@ B263 的正文不重写（它是那一戳的读数），本条给它补射程。
 两处最像值判据的查到实现，都不钉值：日历现在线那条是**相对断言**（`rowHeight = top / (时+分/60)`，注释自己写着"不是某个像素值"）；
 象限 parity 比的是两档 class 名**互不相同**（`expect(defaultRow).not.toBe(compactRow)`，它自己的边界说明 (a)(b) 就承认不校验方向与幅度）。
 ⇒ 从这一戳起，那句"协同回退不会红"是**带分母**成立的，不再只是三枚窄 grep 的读数。要拍"补不补不变量"那一格仍归设计系统线，本追记不改判据。
+
+## B267 · `.ht-capture` 那枚净增**已消掉**：收编进 `.ht-material` 族，不抬基线（2026-11-06 00:3x，滴答对齐线执行，用户已授权拍板）
+
+写前先 `date`（本机 2026-11-06 00:3x），写前 `git diff --numstat -- BLOCKED.md` 为空。
+B263/B266 那两格到本笔为止闭合。**选"消掉净增"而不是"抬基线"的理由**在门自己写的方向里：
+`scripts/check-row-single-source.mjs` 第 329 行那句"把 `.ht-search` 收编回共享层之后，这个常量应当跟着下调"
+—— 棘轮的意图是单调下降，抬常量就是把豁免固化。
+
+① **改法**（取值一字未动，几何仍由 `place()` 负责）：`apps/web/src/styles/app/material.css` 里
+`.ht-capture-due-popover` → `.ht-material--popover`、`.ht-capture-due-popover__scroll` → `.ht-material__popover-scroll`；
+`apps/web/src/features/capture/CaptureDuePopover.tsx:129` 那枚元素**本来就同时挂着 `.ht-material`**（第 16 行那个
+共享"抬升面"族），所以这不是新造归属，是把一个已经有归属的东西写回它自己的族。特异性仍是"同排、后者赢"，
+描边那条照旧成立。
+② **现量闭合读数**：`pnpm check:row-single-source` ⇒ **rc=0**，红话位现在是
+`✅ ht-* 前缀族 28 个，恰在基线 28（未新增）`；代码层残留 `grep -rn 'ht-capture-due' apps packages e2e scripts` ⇒ **0 处**。
+同戳 `check:design` / `design-token-refs` / `tokens` / `surface-budget` / `overlay` 各 rc=0。
+③ **两条被这改动影响的文档**（都只加带日期的指针，没重写别人的推理）：收集框计划的 1483 与 1640 行
+（那行里的类名是那枚 spike/变异臂的锚，改了名就得跟着标一句"现在叫 Y"），以及本文 B263/B266 的现状。
+
+## B268 · `check:l4-no-style` 那 +1 **是本线造成的，而且公开在 `origin/main` 上**；已按 L4 自己的规矩消掉，不是抬基线（2026-11-06 00:4x，滴答对齐线自报并修）
+
+① **这格先前被记错过方向**：收集框计划写"`l4` 在干净 HEAD 上就红 75 > 74"，读起来像别线/环境的账。
+用门自己当预言机（它支持 `HEYTA_CHECK_ROOT`，把候选树拷进临时根跑，不碰共享工作树）逐笔测：
+`df8abb7f5^` ⇒ **74**、`df8abb7f5` ⇒ **75**、`origin/main` ⇒ **75**。
+⇒ +1 出自**本线 11-04 那笔行菜单四组动作**（`Priority → var(--ht-color-priority-*)` 那串三元写进了 JSX 的
+`style={{…}}`），并且随那次推送上了已推送的那棵 ⇒ 是**公开欠账**。
+② **修法**按脚本自己那句"不要为了变绿直接把 baseline 调高……让总数降回基线以下"：
+语义映射落回 CSS（`task-row-menu.css` 的 `ht-row-menu__icon--{high,medium,low,none}` 四枚修饰类），
+并补一条能失败的判据把颜色钉到具体档（门只数总数，抓不到是哪一行）：
+`apps/web/tests/task-row-menu.spec.tsx`「旗标颜色走 ht-row-menu__icon--{档} 修饰类，元素上不残留内联 style」。
+牙：TSX 改回内联 ⇒ 该条 FAIL / rc=1，从 `.mut-bak` 逐字节还原后恢复绿（sha 前后一致）。
+③ 现量闭合读数：`pnpm check:l4` ⇒ **rc=0**（web 74=基线 74、mobile 52=基线 52）、
+`pnpm --filter @heyta/web typecheck` rc=0、该 spec vitest rc=0。
+④ **留下的一条规矩**（这才是这格真正的价值）：一道"只数总数"的棘轮报红时，**别接受"归因不明"**——
+它有 `HEYTA_CHECK_ROOT` 这种按笔复算的通道，落到具体那一行通常只要几分钟。归成"别线的账"过夜，
+它就变成所有人都以为别人会修的红。
