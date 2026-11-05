@@ -110,7 +110,16 @@ git diff --name-only <我测完那一笔> HEAD -- \
   packages/design-system packages/ui/src apps/web/src/features/tasks apps/web/tests \
   apps/landing/src apps/landing/tests e2e/tests design-system/heyta
 # 空 = 九条验收的消费者文件与当前 HEAD 逐字节同一 ⇒ 那批读数仍指当前产物，不必重跑
+
+# 🔴 先跑分母守卫（陷阱 #658）：上面任何一条若不被版本库跟踪，那条 diff 就恒读 0 = 空转的尺
+for p in packages/design-system packages/ui/src apps/web/src/features/tasks apps/web/tests \
+         apps/landing/src apps/landing/tests e2e/tests design-system/heyta; do
+  [ "$(git ls-files "$p" | wc -l)" -gt 0 ] || echo "🔴 空尺: $p"
+done
 ```
+
+2026-11-05 23:4x 现量这八条的分母：**37 / 118 / 16 / 233 / 74 / 27 / 146 / 3**（被跟踪枚数，合计 654）⇒ 无空尺，
+这条命令读 0 才真的是"没变"。
 
 2026-11-05 21:37 现量：以 `592ca4ed9`（20:1x 那趟复量之后那笔）为起点，差额**为空**；
 其间落地的 `30166c7ca` / `a3590d851` / `8ecf8a726` 三笔分别是 capture 的装置脚本、
