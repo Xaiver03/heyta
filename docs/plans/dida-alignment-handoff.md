@@ -215,6 +215,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | 相信 AX 框就是能点的区域 | RN 列表被下沿裁切的行，AX 读数完整、短按同一点毫无反应。见 #655：按下 → 回读 → 滚一段再来 |
 | 拿"先建的在上面"当移动端顺序前置 | 移动端默认档是 `addedAt`（新的在上），web 走 `display`。判据要读**相对变化** |
 | 在共享工作树里"先 staged 再隔几条命令才 commit" | 本线的 C2 三枚 hunk 就这样被别线一笔裸 `git commit` 顺走，内容没丢但归属记错。暂存与提交压进同一条命令，纯本线文件用 pathspec 形式 `git commit -m … -- <路径>`（另一侧的记录见 `BLOCKED.md` B257） |
+| 把"分不清就只提交源文件"当安全默认 | 那正好会留下 **HEAD 断链**：`mockup-quadrant-shape.spec.tsx` 与 `mockup-task-row.spec.tsx` 是拿 token 名去 `mockup.css` 里找 `var()` 的，只提 token 不提四处镜像 ⇒ 干净检出上那两枚 spec 必红（与 `SIDEBAR_TOOL_TABS` 那次 B258 同一类）。这次先在**干净检出**上量了三臂再决定：HEAD 10/10 绿 / 入库前 10/10 红 / 混树（新 token + 旧镜像）恰好红在 4 枚配对臂。办法写在计划「阶段 1」那一节 |
 | 看到红在别人的文件里就说是"别人写到一半" | 本线读到过两次：一次真是半写，一次是 `packages/ui/dist` 的陈旧 `.d.ts` —— 后者一条 `pnpm --filter @heyta/ui build` 就回绿，不需要等谁 |
 | 改一个被**按源码文本对账**的常量名，只看 typecheck | typecheck/build 全绿仍会留断链（§4.4）。改名要 `grep` 文本锚点的消费者 |
 | 跑整棵 `e2e/` 或 `pnpm test -- <文件>` | 会重写别线未入库的取证图；单文件过滤要用 `pnpm exec playwright test <文件>`，别拿 `--` 当过滤器 |
