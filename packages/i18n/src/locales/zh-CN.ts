@@ -2913,8 +2913,20 @@ export const zhCN = {
   // 时刻芯片**自带日期**时念「今天 15:00」（滴答清单同款：一条芯片就说清哪天几点）。
   // 只有时刻、日期来自另一条芯片时才念裸 `HH:MM`（`captureChipTimeLabel`）。
   'web.capture.value.dayTime': '{day} {time}',
-  'web.capture.previewLead': '实际标题：',
-  'web.capture.previewEmpty': '（空）',
+  // 2026-11-04 收集框对齐滴答清单：截止那一格从"框下方一行芯片"改成"输入行里一枚胶囊"。
+  // 🔴 空态那句必须是**一整句**（"选择截止日期"），不是把值拼进前缀 —— 拼出来的
+  // 句子在词表里查不到，换语言就散架（与 `web.capture.project.*` 同一条纪律）。
+  'web.capture.capsule.aria.unset': '选择截止日期',
+  'web.capture.capsule.aria.value': '截止日期 {value}，点按修改',
+  'web.capture.panel.title': '选择截止日期',
+  'web.capture.panel.dueItems': '文字里读到的日期',
+  // 捕获面板里没有"哪一条任务"可指名，所以这句不能复用 `common.due.timeAria`（它带 {title}）。
+  'web.capture.panel.timeAria': '这条新任务的截止时刻（留空表示全天）',
+  // 时刻子视图：列表是默认，自由输入是显式出口，两者**不同时在场**（同一目的地只许一个控件）。
+  'web.capture.panel.time.otherTime': '其它时间',
+  'web.capture.panel.time.backToList': '列表',
+  'web.capture.panel.time.backToDay': '返回',
+  'web.capture.panel.time.rowAria': '选择时刻',
   'web.ai.mention.aria': '选择要引用的任务',
   'web.ai.attach.label': '附一张图',
   'web.ai.attach.busy': '正在压…',
@@ -3341,8 +3353,17 @@ export const zhCN = {
   'mobile.capture.restoreAria': '恢复识别：{raw}',
   'mobile.capture.ignoreAria': '忽略识别：{raw}',
   'mobile.capture.unused': '未采用，仍在标题中',
-  'mobile.capture.previewLead': '实际标题：',
-  'mobile.capture.previewEmpty': '（空）',
+  // 与 web 同一格的同一句话（胶囊 + 面板）。🔴 两端各一份 key 是**刻意的**：
+  // 措辞属于各端，判断（三档、哪段字被消费）在 `@heyta/ui`，见 `capture/model.ts`。
+  'mobile.capture.capsule.aria.unset': '选择截止日期',
+  'mobile.capture.capsule.aria.value': '截止日期 {value}，点按修改',
+  'mobile.capture.panel.title': '选择截止日期',
+  'mobile.capture.panel.dueItems': '文字里读到的日期',
+  'mobile.capture.panel.timeAria': '这条新任务的截止时刻（留空表示全天）',
+  'mobile.capture.panel.time.otherTime': '其它时间',
+  'mobile.capture.panel.time.backToList': '列表',
+  'mobile.capture.panel.time.backToDay': '返回',
+  'mobile.capture.panel.time.rowAria': '选择时刻',
   'mobile.capture.project.title': '新建落进哪一份清单',
   'mobile.capture.project.inbox': '收集箱',
   'mobile.capture.project.current': '新建落进「{name}」',

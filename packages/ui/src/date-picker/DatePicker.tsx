@@ -32,11 +32,12 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import {
   addMonths,
   monthGrid,
-  parseLocalTime,
   startOfMonth,
   type LocalDate,
   type LocalTime,
 } from '@heyta/domain';
+
+import { timeDraftToValue } from './steps.js';
 
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 
@@ -146,12 +147,11 @@ export function DatePicker({
   const editTimeText = (text: string): void => {
     setTimeDraft(text);
     if (time === undefined) return;
-    if (text.trim() === '') {
-      time.onChange(undefined);
-      return;
-    }
-    const parsed = parseLocalTime(text);
-    if (parsed !== undefined) time.onChange(parsed);
+    // 🔴 提交规则在 `./steps.ts`（node 单测跑穿的那一份），不在这里重抄：
+    // 空 = 回到全天，没到 `HH:MM` 的形状 = 保持已提交的值不动。
+    const next = timeDraftToValue(text, time.value);
+    if (next === time.value && text !== (time.value ?? '')) return;
+    time.onChange(next);
   };
 
   /**

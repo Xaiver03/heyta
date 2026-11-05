@@ -74,6 +74,35 @@
   box-shadow: var(--ht-shadow-lg);
 }
 
+/*
+ * 收集框日期胶囊的**锚定浮层**（本线 `CaptureDuePopover.tsx`，计划 S3）。
+ *
+ * 🔴 为什么这两条写在 CSS 里而不是留在组件里：本文件上面那段 H11 的注释已经把规矩
+ *    写死了 —— `check:l4` 的内联棘轮只许降不许升，把 token 值抄成内联 `style` 就是往回涨。
+ *    第一版这一枚壳确实是两处内联（`position/zIndex/padding/border/radius/shadow/bg`
+ *    与内层的 `overflowY/maxInlineSize`），2026-11-05 跑主链时 `check:l4` 当场点名这个文件。
+ *
+ * ⚠️ 取值与搬走前逐条相同，一个都没改：`place()` 只负责 `top`/`left` 两笔（那是几何，
+ *    不是样式字面量），余下这些是外观与层级，全部走设计系统变量。
+ *    `.ht-material` 在前（第 16 行）给了 `border: 0`，这一条在后，同特异性下后者赢 ——
+ *    所以浮层有描边这件事仍然成立（暗色档靠它把面板与画布分开，e2e 逐张看过）。
+ */
+.ht-capture-due-popover {
+  position: fixed;
+  z-index: var(--ht-z-popover);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
+  background-color: var(--ht-color-surface);
+}
+
+/* 内层这一层**只负责滚动**：外层那块是卡片，内层承接 `place()` 算出来的限高。 */
+.ht-capture-due-popover__scroll {
+  overflow-y: auto;
+  max-inline-size: 100%;
+}
+
 @keyframes ht-material-in {
   from {
     opacity: 0;

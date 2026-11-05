@@ -219,6 +219,13 @@ export const TOKEN_GROUPS = {
     'fab',
     'chip-height',
     'chip-padding-x',
+    /**
+     * 捕获日期面板的最大宽（四端一份实现，裸数字没有约束力）。
+     *
+     * 🔴 2026-11-05 实测：标题里没有日期词时，时刻列表的 max-content 宽过视口，
+     * 面板与视口两侧齐边 ⇒ 它不再是贴着胶囊的那块面板。
+     */
+    'capture-panel-max-width',
     'divider-inset',
     'badge-min-width',
     'badge-height',

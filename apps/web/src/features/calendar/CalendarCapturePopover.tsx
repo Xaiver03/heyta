@@ -104,7 +104,13 @@ export function CalendarCapturePopover({ date, title, onClose }: {
             <X size={ICON_SIZE.sm} aria-hidden="true" />
           </button>
         </div>
-        <CaptureComposer anchorDate={date} />
+        {/*
+          🔴 `inlineDuePanel`：这一层自己已经是浮层，日期面板必须**就地展开**。
+          Portal 出去的第二层不在这棵子树里 ⇒ 下面那个 `dismiss` 会把"点月历里的一天"
+          读成"点了外面"，于是弹出「放弃这次的修改？」—— 用户点的是日子，不是出口。
+          判据：`e2e/tests/capture-due-capsule.spec.ts` 的「日历落点」那一条。
+        */}
+        <CaptureComposer anchorDate={date} inlineDuePanel />
       </div>
       {guard}
     </>, document.body,

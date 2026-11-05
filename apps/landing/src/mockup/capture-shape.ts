@@ -97,11 +97,12 @@ export const MOCK_CAPTURE_CLASS = {
  * ⚠️ 不是 `landing.mock.*`：宿主 `features/capture/CaptureComposer.tsx` 注入的
  * 就是这两条，中文逐字相同 —— 那正是最舒服的漂移藏身处（抄错 key 看不出来）。
  *
- * 共享组件一共要 13 条 `web.capture.*` 文案（`labels` 的每一项），
- * 另外 11 条（`addLabel` / `matchesAria` / `rejected` / `unused` / `previewLead` /
- * `previewEmpty` / `restoreAria` / `ignoreAria` / `priority.*`）属于**芯片与预览**
- * 这两个本复刻件不画的状态，登记在真实现那边由 `packages/ui/tests` 与
- * `apps/web/tests` 管。
+ * 共享组件要的那些 `web.capture.*` 文案里，另外几条（`addLabel` / `matchesAria` /
+ * `rejected` / `unused` / `restoreAria` / `ignoreAria` / `priority.*` / `capsule*` / `panel.*`）
+ * 属于**芯片、胶囊与面板**这些本复刻件不画的状态，登记在真实现那边由
+ * `packages/ui/tests` 与 `apps/web/tests` 管。
+ * ⚠️ 这里曾经还列着 `previewLead` / `previewEmpty` —— 「实际标题」那一行连同
+ * 两条词条在 2026-11-04 一起删了，别再抄回来。
  */
 export const MOCK_CAPTURE_KEYS = {
   placeholder: 'web.capture.placeholder',
@@ -116,9 +117,14 @@ export function mockCaptureAddClass(canSubmit: boolean): string {
 }
 
 /**
- * 真实现里守着"有识别才渲染"的那两个条件（判据按源码文本核对）。
+ * 真实现里守着"有识别才渲染"的那**一个**条件（判据按源码文本核对）。
  *
  * ⚠️ 登记成常量而不是写在 spec 里：它是**真实现的行为**，复刻的空态等价性
  * 完全建立在它之上 —— 放在这里，改动它的人会先看到这段注释。
+ *
+ * 🔴 2026-11-04 收集框对齐滴答清单：这一处从 `chips.length > 0` 变成 `rowChips.length > 0`，
+ * 而且**只剩这一处** —— 原来第二处守的是「实际标题：」那一行预览，它被产品负责人否掉后
+ * 先降级成 `showPreview` 开关（两端都关），本轮把 prop 与渲染一起删了。
+ * 复刻件不画识别行，所以空态等价性仍然成立：识别为空 ⇒ 两边都什么都不画。
  */
-export const MOCK_CAPTURE_LIVE_GUARD = 'chips.length > 0';
+export const MOCK_CAPTURE_LIVE_GUARD = 'rowChips.length > 0';

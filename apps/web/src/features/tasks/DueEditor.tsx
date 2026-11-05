@@ -100,8 +100,13 @@ export function panelTopFor(
   return Math.max(PANEL_EDGE, viewportHeight - DUE_PANEL_HEIGHT_ESTIMATE - PANEL_EDGE);
 }
 
-/** 快捷项 key → 本端措辞。日期数学在 domain，这里只管说话。 */
-const QUICK_PICK_LABEL_KEYS: Record<string, MessageKey> = {
+/**
+ * 快捷项 key → 本端措辞。日期数学在 domain，这里只管说话。
+ * 🔴 `export` 是给捕获框的面板用的（`features/capture/CaptureComposer.tsx`）：
+ * 同一份 `quickDuePickDates` 输出在两端两处各写一遍措辞映射，
+ * 就会有一处先改（"本周末"改成"这周日"）而另一处不动 —— 那是一条没人报错的漂移。
+ */
+export const QUICK_PICK_LABEL_KEYS: Record<string, MessageKey> = {
   today: 'web.due.today',
   tomorrow: 'web.due.tomorrow',
   weekend: 'web.due.weekend',

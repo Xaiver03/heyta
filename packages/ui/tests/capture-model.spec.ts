@@ -13,18 +13,25 @@
  * 本模型的价值就是"把领域层的输出投影正确"，手捏数据会把投影与解析的接缝测丢。
  */
 
-import { Priority, dueDateToEpoch, localDateTimeToEpoch, parseCapture } from '@heyta/domain';
+import { Priority, dueDateToEpoch, localDateTimeToEpoch, parseCapture, type CaptureExclusion, type CaptureField } from '@heyta/domain';
 import { describe, expect, it } from 'vitest';
 
 import {
   captureCanSubmit,
+  captureCapsuleShowsWord,
+  captureDue,
+  captureFragmentSignature,
+  captureOverrideValid,
   captureSelectedProject,
+  clearCaptureDue,
+  makeCaptureOverride,
   withCaptureProject,
   captureChipAction,
   captureChipKey,
   captureChipRemainingDays,
   captureChipTimeLabel,
   capturePriorityLabelKey,
+  captureRowChips,
   parseCaptureDraft,
   shouldResetCaptureIgnore,
   toAiCaptureSubmitPlan,
@@ -408,5 +415,303 @@ describe('H. 落点：那一行此刻该念谁的名字（`captureSelectedProjec
 
   it('宿主没给选择器（web 的内联捕获器）⇒ `undefined`，不炸', () => {
     expect(captureSelectedProject(undefined)).toBeUndefined();
+  });
+});
+
+/* ========================================================================
+ * G. 手工覆盖（日期胶囊）—— 计划 §3.4 五条契约逐条钉
+ *   1 打字产出的解析值 = 胶囊默认值
+ *   2 点面板 = 覆盖，但**不删字**
+ *   3 清除 = 覆盖清空 **且原文回到标题**
+ *   4 覆盖绑在"被消费的片段"上，片段变了就作废
+ *   5 优先级不参与覆盖
+ * ====================================================================== */
+
+describe('G. 手工覆盖：胶囊的值从哪来（覆盖 → 解析 → 锚点 → 没有）', () => {
+  /** 与 `parsed()` 同一个 `NOW`，但忽略清单允许 `dueTime`。 */
+  function g(input: string, exclude: readonly CaptureExclusion[] = []) {
+    return parseCapture(input, { now: NOW, exclude });
+  }
+  function ymd(plan: CaptureSubmitPlan | undefined): [number, number, number, number] {
+    const d = new Date(plan!.dueDate!);
+    return [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours()];
+  }
+
+  it('契约 1｜没覆盖时，胶囊读到的就是打字解析出来的值', () => {
+    const q = g('今天下午八点交周报');
+    expect(captureDue(q, undefined)).toEqual({
+      date: q.dueDate,
+      time: q.dueTime,
+      source: 'parsed',
+    });
+  });
+
+  it('🔴 签名只数**被消费的日期/时刻**：不含优先级，也不含未采纳的那条', () => {
+    const sig = captureFragmentSignature(g('今天下午八点交周报 !1')).split('|');
+    expect(sig).toHaveLength(2);
+    expect(sig.some((s) => s.startsWith('dueDate@'))).toBe(true);
+    expect(sig.some((s) => s.startsWith('dueTime@'))).toBe(true);
+    expect(sig.join(' ')).not.toContain('priority');
+    // 「今天 明天」里第二条未采纳 —— 它还在标题里，没有东西被拿走，不许进签名
+    expect(captureFragmentSignature(g('今天 明天 交周报')).split('|')).toHaveLength(1);
+  });
+
+  it('契约 2｜点面板 = 覆盖解析值，但那段字**仍然被消费**（标题里没有它）', () => {
+    const q = g('明天交周报');
+    const ov = makeCaptureOverride('2026-10-08', undefined, captureFragmentSignature(q));
+    expect(captureDue(q, ov)).toEqual({ date: '2026-10-08', time: undefined, source: 'override' });
+    const plan = toCaptureSubmitPlan(q, undefined, ov);
+    expect(plan!.title, '覆盖不许把字送回标题 —— 那是清除的语义').toBe('交周报');
+    expect(ymd(plan)).toEqual([2026, 10, 8, 0]);
+  });
+
+  it('🔴 契约 3｜清除 = 覆盖清空 **且被消费的那段字回到标题**', () => {
+    const q = g('明天交周报');
+    const cleared = clearCaptureDue(q, []);
+    expect(cleared.override).toBeUndefined();
+    const after = g('明天交周报', cleared.exclusions);
+    expect(after.title).toBe('明天交周报');
+    expect(after.dueDate).toBeUndefined();
+    const plan = toCaptureSubmitPlan(after, undefined, cleared.override);
+    expect(plan!.title).toBe('明天交周报');
+    expect(Object.prototype.hasOwnProperty.call(plan, 'dueDate')).toBe(false);
+  });
+
+  it('🔴 清除把日期与时刻**一起**放开（漏一个就留下"字没了、值也没了"）', () => {
+    const q = g('今天下午八点交周报');
+    const { exclusions } = clearCaptureDue(q, []);
+    expect(exclusions.map((e) => e.field).sort()).toEqual(['dueDate', 'dueTime']);
+    expect(g('今天下午八点交周报', exclusions).title).toBe('今天下午八点交周报');
+  });
+
+  it('清除**不重复追加**已登记的忽略（否则恢复要两击）', () => {
+    const q = g('明天交周报');
+    const once = clearCaptureDue(q, []);
+    // 🔴 先证"它真的登记了东西"：少了这一行，一次"什么都不追加"的退化实现
+    // 也能让下面那条相等断言绿（变异取证实测过：那次红的是别的两臂）。
+    expect(once.exclusions).toEqual([{ field: 'dueDate', raw: '明天' }]);
+    expect(clearCaptureDue(q, once.exclusions).exclusions).toEqual(once.exclusions);
+  });
+
+  it('契约 4｜重打了日期短语 ⇒ 签名变 ⇒ 覆盖作废 ⇒ 打字产出的值接管', () => {
+    const ov = makeCaptureOverride(
+      '2026-10-08',
+      undefined,
+      captureFragmentSignature(g('明天交周报')),
+    );
+    const due = captureDue(g('下周一交周报'), ov);
+    expect(due.source).toBe('parsed');
+    expect(due.date).toBe(g('下周一交周报').dueDate);
+  });
+
+  it('⚠️ 契约 4 的对称代价（登记成决策，不是事故）：删掉那段日期文字 ⇒ 手工选的日期一起作废', () => {
+    const ov = makeCaptureOverride(
+      '2026-10-08',
+      undefined,
+      captureFragmentSignature(g('明天交周报')),
+    );
+    // 此刻没有任何被消费的文字要交代，而留一条"来源看不见"的日期更难解释。
+    expect(captureDue(g('交周报'), ov)).toEqual({
+      date: undefined,
+      time: undefined,
+      source: 'none',
+    });
+  });
+
+  it('锚点那一档：没打字、没覆盖 ⇒ 来源是 anchor，且**不带时刻**', () => {
+    expect(captureDue(g('交周报'), undefined, '2026-10-08')).toEqual({
+      date: '2026-10-08',
+      time: undefined,
+      source: 'anchor',
+    });
+  });
+
+  it('覆盖赢锚点（用户在面板里点了那一天，锚点只是兜底）', () => {
+    const q = g('交周报');
+    const ov = makeCaptureOverride('2026-10-12', undefined, captureFragmentSignature(q));
+    expect(captureDue(q, ov, '2026-10-08').date).toBe('2026-10-12');
+  });
+
+  it('🔴 输入里只有裸时刻（没被采纳）⇒ 手工选日期**不把它捎上**', () => {
+    const q = g('16:00 交周报');
+    const ov = makeCaptureOverride(
+      '2026-10-08',
+      captureDue(q, undefined).time,
+      captureFragmentSignature(q),
+    );
+    const plan = toCaptureSubmitPlan(q, undefined, ov);
+    expect(ymd(plan)).toEqual([2026, 10, 8, 0]);
+    expect(plan!.title, '裸时刻没被采纳，必须还留在标题里').toBe('16:00 交周报');
+  });
+
+  it('契约 5｜覆盖只管截止，优先级仍走解析', () => {
+    const q = g('明天交周报 !1');
+    const ov = makeCaptureOverride('2026-10-08', undefined, captureFragmentSignature(q));
+    expect(toCaptureSubmitPlan(q, undefined, ov)?.priority).toBe(Priority.High);
+  });
+
+  it('不传 override ⇒ 换算仍走 parsed 那一对（既有调用方零行为变化）', () => {
+    const q = g('今天下午八点交周报');
+    expect(toCaptureSubmitPlan(q)?.dueDate).toBe(dueDateToEpoch(q.dueDate!, q.dueTime));
+  });
+
+  it('captureOverrideValid 只认签名相等（覆盖态没有第三种"半有效"）', () => {
+    const ov = makeCaptureOverride('2026-10-08', undefined, 'a');
+    expect(captureOverrideValid(ov, 'a')).toBe(true);
+    expect(captureOverrideValid(ov, 'b')).toBe(false);
+    expect(captureOverrideValid(undefined, 'a')).toBe(false);
+  });
+});
+
+/* ========================================================================
+ * H. 胶囊的分档：什么时候说相对词、什么时候必须说日期
+ *   （2026-11-04 由 e2e 抓到：日历落点里点「下周一」，胶囊念的是「还剩 5 天」)
+ * ====================================================================== */
+
+describe('H. captureCapsuleShowsWord：哪一天不能省', () => {
+  it('今天 / 明天 / 后天 ⇒ 说相对词（这三个词比日期亲切，也没有歧义）', () => {
+    expect(captureCapsuleShowsWord(0)).toBe(true);
+    expect(captureCapsuleShowsWord(1)).toBe(true);
+    expect(captureCapsuleShowsWord(2)).toBe(true);
+  });
+
+  it('🔴 逾期仍然说相对词（「已逾期 3 天」比一个过去的日期更有用）', () => {
+    expect(captureCapsuleShowsWord(-1)).toBe(true);
+    expect(captureCapsuleShowsWord(-30)).toBe(true);
+  });
+
+  it('🔴 第 3 天起必须说日期 —— 「还剩 5 天」省掉的正是唯一致命的信息', () => {
+    expect(captureCapsuleShowsWord(3)).toBe(false);
+    expect(captureCapsuleShowsWord(5)).toBe(false);
+    expect(captureCapsuleShowsWord(365)).toBe(false);
+  });
+});
+
+/**
+ * 🔴 I. 五条契约的**组合格**：句子被"忽略过"或"未采纳过"之后，覆盖还按不按契约走。
+ *
+ * 上面 G 组把五条契约各自钉了一遍，但每一例的输入都是**干净的句子** ——
+ * 而真实操作顺序里最常见的是"先把那段字点掉，再手工选一天"。
+ * 这一族补的就是这个交叉：`exclude` 与 `override` **同时在场**（现量：补之前
+ * `grep -c "exclude.*override\|override.*exclude"` 在 G 组里 0 命中）。
+ *
+ * 为什么值得单独一族：签名 `captureFragmentSignature` 只数**被消费**的那几条，
+ * 所以"忽略过"的句子签名会是**空串**。空串是不是一个合法的绑定对象，
+ * 决定的是"用户点掉那段字之后还能不能手工选日子"——
+ * 那是一件能悄悄坏掉而五条契约各自都不会红的事。
+ */
+describe('I. 覆盖 × 忽略 / 未采纳：五条契约的交叉格', () => {
+  function x(input: string, exclude: readonly CaptureExclusion[] = []) {
+    return parseCapture(input, { now: NOW, exclude });
+  }
+  /**
+   * ⚠️ 必须用**本地**读法（与 G 组那个 `ymd` 同一口径）。
+   * 走 `toISOString()` 会把本地零点换算成 UTC 时刻，东八区那档直接差一天 ——
+   * 一条"跨过一次时区就红"的断言是测试自己埋的定时炸弹，不是产品缺陷。
+   */
+  function day(epoch: number): [number, number] {
+    const d = new Date(epoch);
+    return [d.getMonth() + 1, d.getDate()];
+  }
+
+  it('🔴 先点掉「明天」再手工选 10-08 ⇒ 覆盖仍生效（空签名也绑得住），那段字原样留在标题里', () => {
+    const q = x('明天交周报', [{ field: 'dueDate', raw: '明天' }]);
+    // 前置：这段句子里**没有**被消费的日期了 —— 签名是空串，不是"没签名"
+    expect(captureFragmentSignature(q)).toBe('');
+    expect(q.dueDate, '忽略过的那条不该还产出日期').toBeUndefined();
+
+    const ov = makeCaptureOverride('2026-10-08', undefined, captureFragmentSignature(q));
+    expect(captureOverrideValid(ov, captureFragmentSignature(q)), '空签名不该让手工选择作废').toBe(true);
+    expect(captureDue(q, ov)).toEqual({ date: '2026-10-08', time: undefined, source: 'override' });
+
+    const plan = toCaptureSubmitPlan(q, undefined, ov);
+    expect(plan!.title, '字是用户自己点掉的，手工选日子不许把它塞回去，也不许把它吞掉').toBe('明天交周报');
+    expect(day(plan!.dueDate!)).toEqual([10, 8]);
+  });
+
+  it('🔴 点掉之后又打出新的日期短语 ⇒ 签名从空串变成有值 ⇒ 那次手工作废（契约 4 在忽略过的句子上同样成立）', () => {
+    const ov = makeCaptureOverride('2026-10-08', undefined, '');
+    const q = x('下周一交周报', [{ field: 'dueDate', raw: '明天' }]);
+    expect(captureFragmentSignature(q), '这句里「下周一」是被消费的，签名不该还是空串').not.toBe('');
+    expect(captureDue(q, ov).source).toBe('parsed');
+    expect(captureDue(q, ov).date).toBe(q.dueDate);
+  });
+
+  it('🔴 同字段第二条未采纳 + 手工覆盖 ⇒ 覆盖赢，第二条仍在标题里（不变量 3 与契约 2 同时成立）', () => {
+    const q = x('今天 明天 交周报');
+    const ov = makeCaptureOverride('2026-10-08', '21:00', captureFragmentSignature(q));
+    expect(captureDue(q, ov)).toEqual({ date: '2026-10-08', time: '21:00', source: 'override' });
+    const plan = toCaptureSubmitPlan(q, undefined, ov);
+    expect(plan!.title, '未采纳的那条不许因为用户手工选过日子就被吞掉').toContain('明天');
+    // 第一条（「今天」）是**被消费**的那条：它该从标题里拿走，值由覆盖说（不变量 3 的另一半）。
+    expect(plan!.title).not.toContain('今天');
+    expect(day(plan!.dueDate!)).toEqual([10, 8]);
+  });
+
+  it('🔴 点掉「!1」再手工选日子 ⇒ 优先级仍不许从覆盖里冒出来（契约 5 在忽略过的句子上同样成立）', () => {
+    const q = x('明天交周报 !1', [{ field: 'priority', raw: '!1' }]);
+    const ov = makeCaptureOverride('2026-10-08', undefined, captureFragmentSignature(q));
+    const plan = toCaptureSubmitPlan(q, undefined, ov);
+    expect(plan!.priority, '覆盖只管截止；用户已经点掉的优先级不许回来').toBeUndefined();
+    expect(plan!.title).toContain('!1');
+    expect(day(plan!.dueDate!)).toEqual([10, 8]);
+  });
+});
+
+/**
+ * 🔴 J. S2 那半句"删掉框下芯片行"的**前提**，钉成测试而不是留在计划里当一个数。
+ *
+ * 计划 §9.10 / §9.13 拍的是"那一行改成条件挂载"，理由是"那一行的独占内容只有优先级"。
+ * 那句话一旦漂了，决策的依据就漂了。
+ *
+ * ⚠️ 但我第一版把这一族写成了**六个句子各测一遍差集**，那是一把永远红不了的尺：
+ * 面板那一组和那一行都是按 `chip.field` 过滤**同一个** `toCaptureChips()` 返回值，
+ * 而 `CaptureField` 只有 `dueDate | dueTime | priority` 三个成员 ⇒
+ * 差集**按构造**只可能是 priority，跟句子里写了什么无关。 §9.10 那四行读数
+ * 看着像"逐句实测"，其实是这一条类型的推论 —— 实测没有增加任何信息。
+ *
+ * 所以这一族只留**三枚会红的钉子**，各自封住推论的一个前提：
+ *   ① 类型钉子 `COVERED_BY_PANEL`：`CaptureField` 多一个成员（比如以后加 `tag`），
+ *      `Record<CaptureField, …>` 当场编译不过，逼回来重答"面板收不收它"；
+ *   ② 优先级确实还在**那一行**被说出来（它没有别的家）—— 见「反向半边」那条；
+ *   ③ 未采用 / 已忽略确实**在面板里也有**（所以那一行对它俩是重复，不是承重墙）；
+ *   面板那半边的谓词本身由 `scripts/check-capture-shape.mjs` 的 `checkPanelDueGroup`
+ *   钉住 —— 这一族的 ① 只保证"字段清单没变"，保证不了"面板没改口径"。
+ */
+describe('J. S2 决策的前提：框下那一行的独占内容只有优先级', () => {
+  /**
+   * 每个识别字段"面板那一组收不收"。**这一张表就是 §9.10 那个差集的全部前提**：
+   * 它写成 `Record<CaptureField, boolean>`，于是解析器多认一类字段时这里必须表态，
+   * 不表态就编译不过（`pnpm typecheck` 红），而不是让那条散文结论继续吃旧读数。
+   */
+  const COVERED_BY_PANEL: Record<CaptureField, boolean> = {
+    dueDate: true,
+    dueTime: true,
+    priority: false,
+  };
+
+  /** 面板里"文字里读到的日期"那一组：口径就是上面那张表（生产侧同一判断见 `CaptureComposer.tsx` 的 `dueChips`）。 */
+  const panelDueKeys = (input: string, exclude: readonly CaptureExclusion[] = []) =>
+    new Set(
+      toCaptureChips(parseCapture(input, { now: NOW, exclude }))
+        .filter((chip) => COVERED_BY_PANEL[chip.field])
+        .map((chip) => chip.key),
+    );
+
+  it('🔴 反向半边：优先级确实是那一行**唯一**还独占的东西（不是"恰好这批句子里没有"）', () => {
+    const parsed2 = parseCapture('明天交周报 !1', { now: NOW });
+    const unique = captureRowChips(parsed2).filter((chip) => !panelDueKeys('明天交周报 !1').has(chip.key));
+    expect(unique.map((chip) => `${chip.field}:${chip.action}`), '优先级必须仍在那一行里被说出来').toEqual(['priority:ignore']);
+    expect(Object.keys(COVERED_BY_PANEL).filter((f) => !COVERED_BY_PANEL[f as CaptureField]), '独占的就是这一类，别扩').toEqual(['priority']);
+  });
+
+  it('🔴 截止类的"未采用 / 已忽略"两档**不再**是那一行的独占内容（它们的面板那一组里有）', () => {
+    const unused = parseCapture('今天 明天 交周报', { now: NOW });
+    expect(captureRowChips(unused).some((chip) => chip.action === 'unused'), '未采用的那条仍要在界面上可见').toBe(true);
+    const ignored = parseCapture('明天交周报', { now: NOW, exclude: [{ field: 'dueDate', raw: '明天' }] });
+    const ignoredChip = toCaptureChips(ignored).find((chip) => chip.action === 'restore');
+    expect(ignoredChip, '已忽略的那条要还在芯片集合里').toBeDefined();
+    // 它落在面板那一组里 ⇒ 于是**不**是那一行的独占内容（§9.10 差集的这一半）
+    expect(panelDueKeys('明天交周报', [{ field: 'dueDate', raw: '明天' }]).has(ignoredChip!.key)).toBe(true);
   });
 });

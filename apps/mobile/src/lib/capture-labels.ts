@@ -28,15 +28,20 @@
 import { useMemo } from 'react';
 
 import { useI18n } from '@heyta/i18n';
+import { diffDays, today } from '@heyta/domain';
 import {
   captureChipRemainingDays,
   captureChipTimeLabel,
+  captureCapsuleShowsWord,
   capturePriorityLabelKey,
+  type CaptureCapsuleKind,
   type CaptureComposerLabels,
+  type CaptureDue,
   type CaptureProjectPicker,
 } from '@heyta/ui';
 
 import type { Translate } from '../i18n/translate';
+import { datePickerLabels } from './date-picker-labels';
 import { remainingText } from './due-display';
 
 /**
@@ -53,8 +58,6 @@ export function captureLabels(t: Translate): CaptureComposerLabels {
     matchesAria: t('mobile.capture.matchesAria'),
     rejected: t('mobile.capture.rejected'),
     unused: t('mobile.capture.unused'),
-    previewLead: t('mobile.capture.previewLead'),
-    previewEmpty: t('mobile.capture.previewEmpty'),
     restoreAria: (raw) => t('mobile.capture.restoreAria', { raw }),
     ignoreAria: (raw) => t('mobile.capture.ignoreAria', { raw }),
     valueLabel: (chip, now) => {
@@ -81,6 +84,49 @@ export function captureLabels(t: Translate): CaptureComposerLabels {
         });
       }
       return t(capturePriorityLabelKey(chip.priority));
+    },
+    /**
+     * 胶囊上的字。三档由共享层判（`captureCapsuleKind`），这里只说话。
+     *
+     * 🔴 `empty` 返回**空串**（那时只画图标），与 web 那一份逐字同规则 ——
+     * 两端在这里分叉的话，"没选日期"在两台设备上会长成两种样子。
+     */
+    capsule: (due: CaptureDue, kind: CaptureCapsuleKind, now: number) => {
+      if (kind === 'empty' || due.date === undefined) return '';
+      const days = diffDays(today(now), due.date);
+      // 🔴 与 web 同一处分档（`captureCapsuleShowsWord` 在共享层）：近三天说相对词，
+      // 更远必须说哪一天。日期那句复用详情面那一份 `mobile.datePicker.dayLabel`，
+      // 不在这里另造一种"月日"的说法。
+      const day = captureCapsuleShowsWord(days)
+        ? remainingText(days, t)
+        : t('mobile.datePicker.dayLabel', {
+            month: Number(due.date.slice(5, 7)),
+            day: Number(due.date.slice(8, 10)),
+          });
+      return kind === 'day-time' && due.time !== undefined
+        ? t('mobile.capture.value.dayTime', { day, time: due.time })
+        : day;
+    },
+    capsuleAria: (text) =>
+      text === ''
+        ? t('mobile.capture.capsule.aria.unset')
+        : t('mobile.capture.capsule.aria.value', { value: text }),
+    panel: {
+      title: t('mobile.capture.panel.title'),
+      dueItems: t('mobile.capture.panel.dueItems'),
+      // 🔴 月历那份措辞复用详情面那一份 `datePickerLabels`（同一个 `DatePicker`、
+      // 同一套说法），不是再抄一遍。
+      datePicker: datePickerLabels(t),
+      time: {
+        timeLabel: t('common.due.timeLabel'),
+        allDay: t('common.due.allDay'),
+        placeholder: t('common.due.timePlaceholder'),
+        aria: t('mobile.capture.panel.timeAria'),
+        otherTime: t('mobile.capture.panel.time.otherTime'),
+        backToList: t('mobile.capture.panel.time.backToList'),
+        backToDay: t('mobile.capture.panel.time.backToDay'),
+        rowAria: t('mobile.capture.panel.time.rowAria'),
+      },
     },
   };
 }

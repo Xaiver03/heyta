@@ -57,25 +57,39 @@
  *    **在这个仓库里，`grep` 的命中必须先区分"代码"与"描述代码的文字"。**
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { useI18n } from '@heyta/i18n';
 
-import type { LocalDate } from '@heyta/domain';
+import {
+  diffDays,
+  quickDuePickDates,
+  today,
+  type LocalDate,
+} from '@heyta/domain';
 
 import {
   CaptureComposer as SharedCaptureComposer,
   HeytaUiProvider,
+  WEEKDAY_MESSAGE_KEYS,
   captureChipRemainingDays,
   captureChipTimeLabel,
+  captureCapsuleShowsWord,
   capturePriorityLabelKey,
+  formatMonthTitleText,
+  type CaptureCapsuleKind,
   type CaptureComposerLabels,
+  type CaptureDue,
+  type CapturePanelSlot,
   type CaptureSubmitPlan,
+  type DatePickerQuickPick,
 } from '@heyta/ui';
 
 import { formatDayTitleText } from '@heyta/ui';
 
 import { dateWithRemaining } from '../ai/locale-punctuation.js';
+import { QUICK_PICK_LABEL_KEYS } from '../tasks/DueEditor.js';
+import { CaptureDuePopover } from './CaptureDuePopover.js';
 import { useTaskStore } from '../tasks/store.js';
 import { remainingText } from '../../lib/due-display.js';
 
@@ -107,6 +121,15 @@ export interface CaptureComposerProps {
    *   就是在做这件事，别把它改成通用 placeholder。
    */
   anchorDate?: LocalDate | undefined;
+  /**
+   * 日期面板**就地展开**（不套锚定浮层）。
+   *
+   * 🔴 给"已经在一个浮层里"的落点用 —— 现在只有一枚：日历那个捕获编辑器。
+   * 在那里再 Portal 一层，外层编辑器的"点了外面就收"会把点月历读成点外面，
+   * 于是用户点的是日子，界面弹出的是「放弃这次的修改？」。
+   * 判据：`e2e/tests/capture-due-capsule.spec.ts` 的「日历落点」那一条。
+   */
+  inlineDuePanel?: boolean;
 }
 
 /** 落点：清单 id + 它在界面上的名字（用户自己的字，不翻译）。 */
@@ -144,8 +167,6 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
       matchesAria: t('web.capture.matches.aria'),
       rejected: t('web.capture.rejected'),
       unused: t('web.capture.unused'),
-      previewLead: t('web.capture.previewLead'),
-      previewEmpty: t('web.capture.previewEmpty'),
       restoreAria: (raw) => t('web.capture.restoreAria', { raw }),
       ignoreAria: (raw) => t('web.capture.ignoreAria', { raw }),
       valueLabel: (chip, now) => {
@@ -175,8 +196,77 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         }
         return t(capturePriorityLabelKey(chip.priority));
       },
+      /**
+       * 胶囊上的字。**三档由共享层判**（`captureCapsuleKind`），这里只说话。
+       *
+       * 🔴 `empty` 那一档返回**空串** —— 那时只画图标。写「未设置」是本仓明令
+       * 禁止的审计腔（`web.tasks.detail.unset` 那一键不许流到这里）。
+       * 「今天 / 明天 / 还剩 N 天」这套说法复用 `remainingText`，
+       * 与列表行右侧那枚日期徽标**同一个出处** —— 同一件事在同一个屏幕上不许有两种叫法。
+       */
+      capsule: (due: CaptureDue, kind: CaptureCapsuleKind, now: number) => {
+        if (kind === 'empty' || due.date === undefined) return '';
+        const days = diffDays(today(now), due.date);
+        // 🔴 近三天说相对词，更远必须说**哪一天**：「还剩 5 天」省掉的正是这里
+        // 唯一不能错的信息（分档判断在共享层 `captureCapsuleShowsWord`）。
+        const day = captureCapsuleShowsWord(days)
+          ? remainingText(days, t)
+          : t('web.due.dayLabel', {
+              month: Number(due.date.slice(5, 7)),
+              day: Number(due.date.slice(8, 10)),
+            });
+        return kind === 'day-time' && due.time !== undefined
+          ? t('web.capture.value.dayTime', { day, time: due.time })
+          : day;
+      },
+      capsuleAria: (text) =>
+        text === '' ? t('web.capture.capsule.aria.unset') : t('web.capture.capsule.aria.value', { value: text }),
+      panel: {
+        title: t('web.capture.panel.title'),
+        dueItems: t('web.capture.panel.dueItems'),
+        // 🔴 月历那一份措辞**复用 `web.due.*`**，与详情面/行尾编辑器同一出处：
+        // 同一个 `DatePicker` 在两个落点说两种话，界面上就是两个不同的产品。
+        datePicker: {
+          weekdays: WEEKDAY_MESSAGE_KEYS.map((key) => t(key)),
+          monthTitle: (month) => formatMonthTitleText(month, t),
+          clear: t('web.due.clear'),
+          prevMonth: t('web.due.prevMonth'),
+          nextMonth: t('web.due.nextMonth'),
+          dayLabel: (month, day) => t('web.due.dayLabel', { month, day }),
+        },
+        time: {
+          timeLabel: t('common.due.timeLabel'),
+          allDay: t('common.due.allDay'),
+          placeholder: t('common.due.timePlaceholder'),
+          // 这里没有"哪一条任务"可指名（任务还没建），所以不能用带 {title} 的 `common.due.timeAria`。
+          aria: t('web.capture.panel.timeAria'),
+          otherTime: t('web.capture.panel.time.otherTime'),
+          backToList: t('web.capture.panel.time.backToList'),
+          backToDay: t('web.capture.panel.time.backToDay'),
+          rowAria: t('web.capture.panel.time.rowAria'),
+        },
+      },
     }),
     [t, locale, destination, props.anchorDate],
+  );
+
+  /** 快捷四档：数学在 `@heyta/domain`，措辞与行尾那个编辑器共用同一张映射表。 */
+  const quickPicks = useMemo<readonly DatePickerQuickPick[]>(
+    () =>
+      quickDuePickDates(today(Date.now())).map((pick) => ({
+        key: pick.key,
+        label: t(QUICK_PICK_LABEL_KEYS[pick.key]!),
+        date: pick.date,
+      })),
+    [t],
+  );
+
+  /** 外壳：锚定浮层（Portal + fixed）。面板本体是共享的，这里只决定它画在哪儿。 */
+  const renderDuePanel = useCallback(
+    (slot: CapturePanelSlot) => (
+      <CaptureDuePopover content={slot.content} onClose={slot.onClose} title={t('web.capture.panel.title')} />
+    ),
+    [t],
   );
 
   /**
@@ -211,7 +301,8 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         labels={labels}
         onSubmit={onSubmit}
         anchorDate={anchorDate}
-        showPreview={false}
+        quickPicks={quickPicks}
+        renderDuePanel={props.inlineDuePanel === true ? undefined : renderDuePanel}
       />
     </HeytaUiProvider>
   );
