@@ -249,6 +249,32 @@
 }
 
 /*
+ * 优先级旗标的颜色走**修饰类**，不走 JSX 里的 `style={{…}}`。
+ *
+ * 🔴 为什么这格值得单独写下来：`check:l4-no-style` 的断言 C 按"含 `style={{` 的行数"只减不增，
+ *    而本组件的 TSX 里早就有一句说明这条规矩；2026-11-04 那笔加旗标时还是漏了一处
+ *    （`df8abb7f5`），把 web 侧抬到 **75 > 基线 74**，并且跟着那次推送上了 `origin/main` ——
+ *    也就是说这条红是**公开的**，不是某棵本地树上的。
+ *    "优先级 → 色"本来就是一张语义映射表，落在 CSS 里才是它的家；留在 JSX 里既踩棘轮，
+ *    也让下一次"再加一档优先级"要改两处（TSX 的三元与色值）。
+ */
+.ht-row-menu__icon--high {
+  color: var(--ht-color-priority-high);
+}
+
+.ht-row-menu__icon--medium {
+  color: var(--ht-color-priority-medium);
+}
+
+.ht-row-menu__icon--low {
+  color: var(--ht-color-priority-low);
+}
+
+.ht-row-menu__icon--none {
+  color: var(--ht-color-foreground-subtle);
+}
+
+/*
  * 详情面底部工具条（C2，滴答对齐 2026-11）
  * =========================================
  *

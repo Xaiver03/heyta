@@ -156,6 +156,42 @@ describe('B1-B4 菜单项把意图发出去（不是只画出来）', () => {
     expect(onSetPriority).toHaveBeenCalledWith('t-1', Priority.High);
   });
 
+  /**
+   * 🔴 旗标颜色必须是**修饰类**，不是 JSX 里的 `style={{…}}`。
+   *
+   * 为什么这条判据存在：`check:l4-no-style` 的断言 C 按"含 `style={{` 的行数"只减不增，
+   * 而 2026-11-04 那笔（`df8abb7f5`）就是在这一处写了内联样式，把 web 侧抬到 75 > 基线 74，
+   * 并随那次推送上了 `origin/main`。门只数总数，抓不到"是哪一行"；这一条把它钉到具体的档与类名上，
+   * 下次有人图省事写回内联，红的是这里，而不是那道要人自己找文件的棘轮。
+   *
+   * 两半都要：类名对（颜色真走 token）+ 元素上没有 `style` 属性（不许回潮）。
+   */
+  it('旗标颜色走 ht-row-menu__icon--{档} 修饰类，元素上不残留内联 style', () => {
+    mount({ wire: { onSetPriority: vi.fn(), currentPriority: Priority.None } });
+    click(menu().querySelector<HTMLElement>('[data-testid="task-row-menu-priority"]')!);
+    const expectByPriority = new Map<Priority, string>([
+      [Priority.None, 'ht-row-menu__icon--none'],
+      [Priority.Low, 'ht-row-menu__icon--low'],
+      [Priority.Medium, 'ht-row-menu__icon--medium'],
+      [Priority.High, 'ht-row-menu__icon--high'],
+    ]);
+    for (const [value, modifier] of expectByPriority) {
+      const icon = menu().querySelector<HTMLElement>(
+        `[data-testid="task-row-menu-priority-${String(value)}"] .ht-row-menu__icon`,
+      );
+      expect(icon, `第 ${String(value)} 档里没有那枚旗标`).not.toBeNull();
+      // ⚠️ 旗标是 SVG：它的 `className` 是 `SVGAnimatedString`（`{baseVal, animVal}`），
+      //    不是字符串 —— 直接 `expect(el.className).toContain(...)` 会拿对象去比，永远不成立。
+      //    取属性本身。
+      const cls = icon!.getAttribute('class') ?? '';
+      expect(cls, `第 ${String(value)} 档的旗标没挂上 ${modifier}`).toContain(modifier);
+      expect(
+        icon!.getAttribute('style'),
+        `第 ${String(value)} 档的旗标又回到内联 style 了 —— 那是 l4 棘轮数的那一行`,
+      ).toBeNull();
+    }
+  });
+
   it('B4 移动到：给的是「收集箱」+ 每条清单，点清单发的是那个 id', () => {
     const onMoveToProject = vi.fn();
     mount({
