@@ -207,8 +207,8 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | `pnpm check:arkts` | 本机跑不了（缺 DevEco SDK 的 `es2abc`）⇒ `.ets` 那一半登记为**未判定**，别读成通过 |
 | `pnpm --filter @heyta/web build` | 2026-11-05 16:09 退 0 |
 | `pnpm typecheck`（整仓） | 2026-11-05 17:01 退 0（阶段 1 入库之后重跑） |
-| web 单测（本线三枚 spec） | 2026-11-05 16:11 123 条全过；`packages/design-system` 546、`packages/ui` 894、landing `mockup-task-row` 6 + `mockup-quadrant-shape` 15、web `quadrant-row-parity` + `calendar-day-view` 23 同日全过 |
-| 浏览器腿 | 2026-11-05 16:39 11/11（本线两枚 spec，跑在新密度上） |
+| web 单测（本线三枚 spec） | 2026-11-05 20:08 在 HEAD=`907bd60e3`（**含收集框那笔把判断挪回共享层的 `e33523e7e`**）重跑 123/123；同日 16:11 那一戳也是 123/123。`packages/design-system` 546、`packages/ui` 894、landing `mockup-task-row` 6 + `mockup-quadrant-shape` 15、web `quadrant-row-parity` + `calendar-day-view` 23 同日全过 |
+| 浏览器腿 | 2026-11-05 20:09 同一棵 HEAD 重跑 **11/11**（跑前先补了一次 `@heyta/ui` 产物 —— 别线刚改过 `packages/ui/src`，陈旧 `dist` 会造假红）。⚠️ 本线这趟**只写了 `e2e/test-results/`**（现量：那批图 mtime 落在本趟窗口内），`apps/*/evidence` 里别线已入库的图一枚没碰 —— 工作树里那批 `M`/`D` 的 capture 证据图 mtime 是 17:06，是收集框线自己跑主链那一趟留下的 |
 | iOS 设备腿 | 2026-11-05 17:0x 又一趟 **9/9、退 0**，读数头上打的是 `git HEAD = 1062146c6`（阶段 1 入库之后那棵）。⚠️ 装置自己那行"这一读数属于哪一棵树"同时写着**装着的产物 mtime = 11-04 22:26** —— 它没重打包。这一格为什么仍然算数：本笔提交进 bundle 的运行时值就是那四枚 token，而它们 11-04 就在那棵工作树里（B261 现量过同一批 hunk），今天入库的只是提交动作与注释；要"从当前产物现建"那一档，得强制重打包再跑一趟。两张图已换上并**逐张与上一趟对比**：`row-menu.png` 同形（菜单五项 + 两行），`after-pin.png` 的差别是滚动位置与攒下的行（角标 22→24），不是产品变了。⚠️ 新的一趟里被钉住那条落在 **y=-29**（装置按 #655 的纪律"按下→回读→滚一段再来"，于是它跑到了容器上沿之外），所以那一格的判据是**相对 y 读数**，图只是旁证 —— 别拿这张图当"第一行看得见"的证据。 |
 | 桌面壳 | 同日 `--window` 一趟：`rows=1 / colorBuckets=66`，图入库并看过 |
 | 未跑 | 整棵 `e2e/`、四端重装、Android 设备腿（收集框线此刻正在跑那一枚） |
