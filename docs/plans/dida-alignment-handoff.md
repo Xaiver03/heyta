@@ -178,6 +178,18 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 `grep -oE '^🔴 \*\*B[0-9]+' BLOCKED.md | tail -3` 取末号）。**别线在飞的件不代改**，
 但它落库之前，`pnpm typecheck` 全绿不代表那枚 spec 能跑。
 
+🔴 **2026-11-05 20:37 把这格从"声称"改成现量**（此前它只是继承 B258 的说法）：
+
+- HEAD 版那枚 spec 第 **160** 行仍是 `const tools = pairsOf('const TOOL_VIEW_TABS')`；
+- HEAD 版 `apps/web/src/features/shell/view-tabs.ts` 只有第 **272** 行的
+  `export const SIDEBAR_TOOL_TABS`（`TOOL_VIEW_TABS` 这个名在 HEAD 上不存在）；
+- 失败形状查过了，是**红不是假绿**：`pairsOf`（HEAD 版第 135 行）走 `arrayBlock`，
+  而 `arrayBlock` 第 **103** 行 `if (start < 0) throw new Error('源码里找不到 … —— 判据锚点已失效')`。
+- 他们工作树那一版**已经把锚换成新名**（`SIDEBAR_TOOL_TABS`，第 190/430 行），实测
+  `pnpm exec vitest run tests/mockup-shell-shape.spec.tsx` ⇒ **22/22 过**——⚠️ 但那枚文件是 `M`
+  （未提交），所以**这 22/22 不能拿来判 HEAD**；判 HEAD 只能读 HEAD 的两个 blob。
+  ⇒ 这一格仍未闭合，但差的就是他们一笔提交；本线依旧不代改。
+
 ---
 
 ## 五、下一步（按顺序，每步都带动手前的前置）
