@@ -13364,10 +13364,23 @@ landing `mockup-task-row` 6 + `mockup-quadrant-shape` 15、web 本线三枚 123 
 也没法判断它是不是某一天的瞬时读数。所以正确动作是：换成仓里可复核的那一行，并保留"记忆里有这句"
 这个事实本身——两者不冲突，缺的是把它们分开标。
 
-④ **要补的话，出路是钉不变量而不是钉值**：`typography.spec.ts` 里就有两枚这个形状的先例——
-第 76 行"行高严格大于字号"、第 39 行"row-title : row-meta 字号比 ≥ 1.33"。同形状可用在行几何上
-（例如"行最小高 ≥ 标题行高 + 上下内间距"），这样下次调密度它不挡路，而协同回退会红。
-归设计系统线拍；本线不动别人的判据口径，也不替它落库。
+④ **要补的话，出路是钉不变量而不是钉值**：`typography.spec.ts` 里就有两枚这个形状的先例
+（按形状 grep 取，别抄行号：`grep -n '严格大于\|1\.33' packages/design-system/tests/typography.spec.ts`）。同形状可用在行几何上
+（"行最小高 ≥ 两行标题 + 余量"、"标题行高 + 上下内间距 ≤ 行最小高"、"行间距 < 行内边距"）。
+🔴 **本句原写"这样下次调密度它不挡路，而协同回退会红"——后半说过头了，2026-11-06 就地更正**：
+关系判据拦得住的是**改一处忘另一处**（本仓真发生过，就是 B261 那半改），拦不住**四枚成套退回旧密度**——
+56 / 24 / 8 / 4 自己也是自洽的，三条关系全部成立。**这一句是量出来的，不是推理**：
+2026-11-06 把四枚值成套退回旧密度（`generated/tokens.native.ts` 的 60→56、`typography.ts` 的
+`row-title.leading` relaxed→normal、`task-row-shape.ts` 的 `bodyPaddingBlock` space.3→space.2 与
+`listGap` space.2→space.1；⚠️ 那发 perl 是全局替换，顺手也把 `detail-title` 的 leading 改了——
+关系判据不读那一枚，所以本臂的结论不受影响，但如实记），
+新那支 `task-row-density-relations.spec.ts` ⇒ **3 tests passed / rc=0**（不红），
+同一态下 `typography.spec.ts` ⇒ **rc=1**，红话就是 `row-title = 16px / 500 / 行高 28 / 字距 -0.176`。
+⇒ 拦成套回退的只有值判据；三处变异全部从 `.mut-bak` 逐字节还原，还原后两枚 spec rc=0、`check:tokens` rc=0。"要不要把密度冻成契约"因此仍是产品/设计系统线的判断，没有因为补了不变量而自动解决。
+✅ **2026-11-06 已按用户授权落地**：`packages/design-system/tests/task-row-density-relations.spec.ts`
+三枚关系臂（绿），牙也验过——把 `size.row-min-height` 从 60 改成 48 ⇒ ① ② 红、③ 不红；
+把 `bodyPaddingBlock` 降到 `space.1` ⇒ ③ 红；两处都从 `.mut-bak` 逐字节还原，`check:tokens` 仍 rc=0。
+（当时归设计系统线拍的那半——"要不要再钉一枚值判据"——仍然开着，本线没替它拍。）
 
 ⑤ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。
 
