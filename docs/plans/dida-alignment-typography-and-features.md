@@ -153,7 +153,18 @@
 
 - [ ] 富文本编辑器基本功能可用（C1 完成后）—— **C1 没做**：选型 + 许可证两道门（AGENTS §3.1/§3.2）还没过，按 §五.4 的顺序先调研再动界面
 - [x] 底部工具条按钮响应正确（C2 完成后）—— `task-detail-card.spec.tsx`「底部工具条（滴答对齐 C2）：按钮说的事必须真做得到」+ 浏览器腿 ②
-- [ ] 评论可添加/显示/删除（C3 完成后）—— 评论由**协作线以 W4 落地**（详情面协作区），不是这份计划做的，本线**没有为它量过任何判据**，所以这一格不由本线勾
+- [ ] 评论可添加/显示/删除（C3 完成后）—— 评论由**协作线以 W4 落地**（详情面协作区），不是这份计划做的，本线**没有为它量过任何判据**，所以这一格不由本线勾。
+  ⚠️ 但**不勾 ≠ 产品没有评论**，别让人读错（2026-11-05 23:3x 现量，只是读现状、不是本线的判据）：
+  添加与显示**已经在**——`apps/web/src/features/tasks/TaskDetailCard.tsx` 里 `data-testid="task-detail-comments"`
+  那一格渲染 `ShareCommentsSection`（同文件 `onSubmit` 走 `CommentThread`），移动端在 `apps/mobile/src/screens/ShareSpaceScreen.tsx`；
+  现量 `grep -rn 'task-detail-comments' apps/web/src/features/tasks/TaskDetailCard.tsx` 有命中即可。
+  **缺的是删除那一半**：共享组件 `packages/ui/src/sync/CommentThread.tsx` 里删除类字样 0 命中，
+  按 `comment[._-]?(delete|remove)` 与 `deleteComment` 两种形状在全仓搜，只命中一处**守卫**
+  （`packages/app-host/src/comment-actions.ts` 里 `comment.deletedAt !== undefined` 就跳过）——
+  ⚠️ 这句的射程是这两种写法，不是"全仓没有任何形式的评论删除"；`state.ts` 只把 `COMMENT` 映射到 `comments` 集合，
+  软删走的是通用 `deletedAt` 那一支（`state.ts` 有 `addFieldVersion('deletedAt', …)`），而评论自己也有这一列
+  （`packages/domain/src/comments.ts` 的 `deletedAt?: number`，ADR-0048 四态语义的落点）。
+  ⇒ 所以我判的是**评论上没有人给它写入口**，不是"这条通道不存在"。这一格仍归协作线勾，本线只把读数留在这里。
 - [x] 逾期日期红色显示（C4 完成后）—— 浏览器腿 ①（计算色 = `--ht-color-danger` 且带图标）与 ⑤（暗色同一格还在原位）
 
 ---
