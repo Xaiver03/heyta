@@ -13268,3 +13268,63 @@ row-title = 16px / 500 / 行高 24 / 字距 -0.176` ⇒ `expected 28 to be 24`�
 `check:tokens` / `check:design-token-refs` / `check:token-minting` / `check:token-hashing` 全 rc=0。
 
 ⑤ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。
+
+## B262 · B261 那一格由排印线自己签字收掉：`row-title` 行高 24→28 与阶段 1 那四枚值一起入库（2026-11-05，滴答对齐线）
+
+写前先 `date`（本机 2026-11-05 16:58）。
+
+① **B261 ③ 要的那一步本线做了，而且签的是排印决定不是断言**：`row-title` 的 leading 从
+`normal`(1.5) 换成 `relaxed`(1.75) 是计划 A1 那一格的原意（1.5 × 16 = 24 与汉字字高同高，换行的两行
+标题上下粘连；滴答那一档在 28 上下）。所以 `packages/design-system/tests/typography.spec.ts` 的期望值
+改成 28，测试名里那个数字一起改 —— 名字带值而不改，下次读的人会以为 24 仍是契约。
+
+② **入库范围**（一笔 16 枚文件，现量 `git show --stat HEAD`）：源三枚（`tokens.css` 56→60 /
+`typography.ts` leading / `task-row-shape.ts` 的 `bodyPaddingBlock` 与 `listGap`）+ 生成件六枚 +
+那枚 spec + 被这次改动否证的五处旧口径（`typography.ts` 文件头那句"不改行高"、`density.ts` 规格表的
+（56）（8）、`CalendarDayBoard.tsx` 的 `24 × 56 = 1344px`、`quadrant-row-parity.spec.tsx` 与
+`calendar-day-view.spec.tsx` 的注释）+ `design-system/heyta/MASTER.md` §13 的 `row-title` 那一行。
+⚠️ `MASTER.md` 那一格**只补了 `row-title` 一行**：同表 `row-meta` 仍写 `14 / 400 / 21`，而代码是 12px
+（`typography.spec.ts` 现量钉着 `meta.fontSize = 12`）—— 那是 11-02 字重/字号那一刀的漏改抄件，
+归设计系统线，本线不代改。
+
+③ **B261 ② 那格副作用确认无害并一起入库**：`generated/typography.css` 由 `generate` 追平源码，
+本线按同一批提交，`check:tokens` 现在 rc=0（现量 `✅ 生成产物与 tokens.css 一致（8 个文件，225 个 token）`）。
+
+④ **hunk 级分归**（B261 只看到 design-system，这里补 landing 那一半）：`apps/landing/src/mockup/mockup.css`
+未提交的 5 枚 hunk 里，四处是阶段 1 的镜像（`.mk-tasklist` / `.mk-task__body` / `.mk-task__title` /
+`.mk-quad__list`）——`mockup-quadrant-shape.spec.tsx:479` 与 `mockup-task-row.spec.tsx` 是**按源码文本对账**的，
+只提 token 不提镜像会让 HEAD 红（同一形状本线在 `SIDEBAR_TOOL_TABS` 那次已经踩过一次）。第五处
+`.mk-sidebar__tools { margin-top: auto }` 与 landing 在飞的 `AppWindow.tsx` + `mockup-shell-shape.spec.tsx`
+成套（HEAD 上没有任何消费者，现量 `git grep -n "mk-sidebar__tools" HEAD -- apps/landing` 为空）⇒
+用 `git apply --cached` 只取四处，那一枚留在工作树未动。
+
+⑤ **读数**：`packages/design-system` **546/546**（B261 那一戳是 1 红 / 545）、`@heyta/ui` 894/894、
+landing `mockup-task-row` 6 + `mockup-quadrant-shape` 15、web 本线三枚 123 + 改注释那两枚 23、
+浏览器腿 `dida-alignment-detail-sidebar` + `sidebar-trash-anchor` 11/11；`check:design` /
+`check:design-token-refs` / `check:tokens` / `check:md-tables` / `check:doc-citations` /
+`check:windows-xaml` / `check:native-bare` rc=0。`check:arkts` 本机跑不了（缺 DevEco SDK 的 `es2abc`），
+`.ets` 里只变了一个数字，那一格登记为**未判定**。
+
+⑥ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。
+
+## B263 · `check:row-single-source` 断言 B 又回到 29 > 基线 28，多出来那一族换成了 `.ht-capture`（2026-11-05，滴答对齐线登记，不代改）
+
+① **现量**：`pnpm check:row-single-source` 退 1，读数 `ht-* 前缀族 29 个，超过基线 28（多了 1 个）`。
+
+② **可复现归因**（别重做）：HEAD 与工作树的族清单**逐行相同**（两边都 29；把
+`git ls-tree -r --name-only HEAD -- apps/web/src/styles` 那批 blob 与 `apps/web/src/styles/**.css`
+各用门禁自己的正则 `/^\.ht-[a-z]+/` 取集合相减，差集为空）⇒ 这枚红与任何未提交的手无关，
+也不是本线这两枚排印改动带进来的（本线动过的文件里一枚样式族都没有）。沿
+`git log -20 --format=%H -- apps/web/src/styles` 逐笔回放族数，28→29 那一跳落在
+`3d0d593f4`（收集框 S1–S5，11-05 09:31），那一笔前后的差集只有一族：`.ht-capture`。
+
+③ **与 B251 ⑥b / ①b 的关系**：⑥b 说的 `.ht-spin` 已被 `7d3521391` 收编进 `.ht-settings__busy`
+（放量到那一笔族数回到 28），所以"仍在"是那一戳的读数；今天的 +1 是**新的一族、另一格责任**。
+
+④ **归谁**：收集框线（此刻仍在飞：`packages/ui/src/capture/model.ts`、`packages/ui/src/index.ts`、
+`packages/ui/tests/capture-model.spec.ts` 未提交）。两条出路都在他们手里，本线都不代改：
+要么把 `.ht-capture` 收编进拥有者族（`①b` 那格刚做过一次同形状的收编，有先例），
+要么按 `check:row-single-source` 文件头那句"先消掉净增，再改这个常量"抬基线 ——
+而基线是 M3 视图统一那条线的判据口径，本线不碰。
+
+⑤ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。
