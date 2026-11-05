@@ -164,9 +164,44 @@ const scannedLines = bodies.reduce((sum, b) => sum + b.text.split('\n').length, 
 const innerCode = stripComments(inner);
 const tagsInRegion = [...innerCode.matchAll(/<([A-Za-z][A-Za-z0-9.]*)/g)].map((m) => m[1]);
 const handWritten = tagsInRegion.filter((t) => /^[a-z]/.test(t));
-const outsideTags = innerCode
+/**
+ * 把一个 JSX 片段里**所有**表达式容器（`{…}`，含任意层嵌套）连内容一起摘掉。
+ *
+ * 🔴 为什么原来那条 `.replace(/\{[^{}]*\}/g, '')` 不够，而且它造的是**假红**：
+ *    那个正则只吃一层花括号。槽里合法的"挑哪一枚生产者"写法是这样的：
+ *        {assistantWorkspace ? aiPanels : contentView === 'focus' ? (
+ *          <FocusDetailPane onShowActions={(taskId, anchor) => { … }} />
+ *        ) : null}
+ *    —— 内层还有 `{(taskId, anchor) => { … }}`，一层剥完剩一堆**标识符**，
+ *    再被当成"槽里写了裸文本"报出来。实测这条把好好的装配处判红（本仓正卡在这一条上），
+ *    而报出来的那串 `assistantWorkspace  aiPanels  contentView  'focus'` 全是三元里的变量名。
+ *    一条会被"表达式写得深不深"改变的判据量的不是代码。
+ *
+ * 顺序也要反过来：**先摘表达式，再摘标签**。箭头函数里的 `=>` 含 `>`，
+ * 先跑 `/<[^>]*>/` 会把表达式中间的 `>` 当成标签结尾，把后面本该整段消失的内容留在场上。
+ *
+ * 引号与模板串里的 `{`/`}` 不参与配对（不然 `t('a}b')` 会把配对数错，这条判据从此随机失灵）。
+ */
+const stripExpressionSpans = (t) => {
+  let out = '';
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < t.length; i += 1) {
+    const ch = t[i];
+    if (quote !== null) {
+      if (ch === '\\') { i += 1; continue; }
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+    if (ch === '{') { depth += 1; continue; }
+    if (ch === '}') { if (depth > 0) depth -= 1; continue; }
+    if (depth === 0) out += ch;
+  }
+  return out;
+};
+const outsideTags = stripExpressionSpans(innerCode)
   .replace(/<[^>]*>/g, '')
-  .replace(/\{[^{}]*\}/g, '')
   .replace(/[{}()?:;=<>]/g, '')
   .trim();
 const strayText = outsideTags.length > 0 && !/^\s*$/.test(outsideTags) ? [outsideTags.slice(0, 60)] : [];
