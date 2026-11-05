@@ -13067,7 +13067,11 @@ react-native-web / 共享包依赖。实测单文件 26 条用例：
 656. 🔴 **门禁"跳过并退 0"会被读成"这一半验过了"**：本机没装 DevEco 时 `pnpm check:arkts`
    打一行 ⚠️「跳过 ArkTS 编译验证：找不到 es2abc」，然后**退出 0**（现量：
    `pnpm check:arkts > /tmp/x 2>&1; echo $?` ⇒ 0；它列的三个候选 `es2abc` 路径逐个 `[ -e ]` 全不存在，
-   `/Applications/DevEco*` 无匹配）。⇒ 链里这道门绿**不等于**
+   `/Applications/DevEco*` 无匹配）。
+   **为什么说它"恒"通过——读实现而不是读我的结论**：`design-system/heyta/check-arkts-compile.mjs`
+   第 51 行 `const es2abc = CANDIDATES.find((p) => existsSync(p))`，第 53 行 `if (!es2abc) {` 一路到
+   第 **62** 行 `process.exit(0)` —— 这是**在任何编译动作之前的早退**，第 68 行那枚 `exit(1)`
+   在本机走不到。所以这道门在这台机器上对**任何输入**都退 0，不是"这次恰好绿"。⇒ 链里这道门绿**不等于**
    `packages/design-system/generated/HeytaTokens.ets` 被编译器验证过——这正是 AGENTS §6 第 2 条
    点名的"一条永远通过的判据比没有判据更糟"在本仓的具体一枚。
    **怎么认出这一类**：退 0 不够，还要在输出里找「跳过 / skip / 未启用 / 装了…会自动启用」这类词，
