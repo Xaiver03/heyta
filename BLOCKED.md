@@ -13302,8 +13302,11 @@ row-title = 16px / 500 / 行高 24 / 字距 -0.176` ⇒ `expected 28 to be 24`�
 landing `mockup-task-row` 6 + `mockup-quadrant-shape` 15、web 本线三枚 123 + 改注释那两枚 23、
 浏览器腿 `dida-alignment-detail-sidebar` + `sidebar-trash-anchor` 11/11；`check:design` /
 `check:design-token-refs` / `check:tokens` / `check:md-tables` / `check:doc-citations` /
-`check:windows-xaml` / `check:native-bare` rc=0。`check:arkts` 本机跑不了（缺 DevEco SDK 的 `es2abc`），
-`.ets` 里只变了一个数字，那一格登记为**未判定**。
+`check:windows-xaml` / `check:native-bare` rc=0。⚠️ `check:arkts` 这句本线第一版写成"本机跑不了"，
+现量更正：它**退 0**——找不到 `es2abc` 时只打一行 ⚠️ 警告就跳过（候选路径逐个 `[ -e ]` 全不存在，
+`/Applications/DevEco*` 无匹配）。所以它**不是红**，而是**在本机恒通过的判据**：它的绿**不等于**
+`HeytaTokens.ets` 被编译验证过。`.ets` 里只变了一个数字，那一格仍登记为**未判定**，
+要判定得在有 DevEco 的机器上跑或用 `HEYTA_ES2ABC` 指定编译器。
 
 ⑥ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。
 
