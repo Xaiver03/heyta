@@ -401,20 +401,47 @@ test.describe('收集框：输入行里的日期胶囊与它点开的面板', ()
     await expect(editor.getByTestId('capture-due-panel'), '日历落点里日期面板没有就地展开').toBeVisible();
     await expect(page.getByTestId('capture-due-popover'), '日历落点里不该再有一枚锚定浮层').toHaveCount(0);
 
-    // ①.5 逐条撤销的出口**够得着**：滚进视野后在视口里，且不被外层编辑器的底边裁掉。
-    const toggle = editor
-      .getByTestId('capture-due-panel')
-      .locator('[data-testid^="capture-due-item-toggle-"]')
-      .first();
-    await expect(toggle, '面板里没有出现逐条撤销出口').toBeVisible();
-    await toggle.scrollIntoViewIfNeeded();
-    await expect(toggle, '撤销出口被外层编辑器的限高裁到够不着').toBeInViewport();
-    const editorBox = (await editor.boundingBox())!;
-    const toggleBox = (await toggle.boundingBox())!;
-    expect(
-      toggleBox.y + toggleBox.height,
-      '撤销出口伸出外层编辑器底边 ⇒ 就地展开这一档没有内部滚动，内容会被裁掉',
-    ).toBeLessThanOrEqual(editorBox.y + editorBox.height + 1);
+    /*
+     * ①.5 / ①.6 出口**够不够得着** —— 判的是**没有滚之前的状态**。
+     *
+     * 🔴 这两条的第一版写的是 `scrollIntoViewIfNeeded()` + `toBeInViewport()`，
+     *    那是一条**恒真**断言：`overflow: hidden` 的容器仍然可以被**程序**滚动，
+     *    于是 Playwright 自己会把元素滚进来，判据永远绿。
+     *    怎么发现的：给面板顶部加 700px 内边距（浏览器回读 `computed paddingTop=700px`，
+     *    确认真的生效），行底仍然是 `820.328125` —— 数字纹丝不动不是"本来就看得见"，
+     *    是"被工具滚进来了"。
+     *
+     * 现在按 §9.28 锚定浮层那一支的同一种形状判：先量**原始**状态；
+     * 只有当它落在可视底边以下时，才要求容器**用户滚得动**（`overflow-y ∈ {auto, scroll}`）。
+     * `hidden` + 落在外面 = 裁住且滚不到 = 红。
+     */
+    const editorView = await editor.evaluate((el) => ({
+      clientBottom: el.getBoundingClientRect().bottom,
+      clientHeight: el.clientHeight,
+      scrollHeight: el.scrollHeight,
+      overflowY: getComputedStyle(el).overflowY,
+    }));
+    const outlets = [
+      ['逐条撤销', editor.getByTestId('capture-due-panel').locator('[data-testid^="capture-due-item-toggle-"]').first()] as const,
+      ['时刻', editor.getByTestId('capture-due-panel').getByTestId('capture-time-row')] as const,
+    ];
+    for (const [label, node] of outlets) {
+      await expect(node, `日历落点的面板里没有「${label}」出口`).toBeVisible();
+      const box = (await node.boundingBox())!;
+      console.info(
+        `[出口可达·就地展开] ${label}：底边 ${String(box.y + box.height)} / 编辑器可视底 `
+        + `${String(editorView.clientBottom)} / 内容 ${String(editorView.scrollHeight)}px`
+        + ` 可视 ${String(editorView.clientHeight)}px / overflow-y=${editorView.overflowY}`,
+      );
+      if (box.y + box.height > editorView.clientBottom + 1) {
+        expect(
+          ['auto', 'scroll'],
+          `「${label}」出口落在编辑器可视区以下 `
+          + `${String(Math.round(box.y + box.height - editorView.clientBottom))}px，`
+          + `而 overflow-y=${editorView.overflowY} ⇒ 用户既看不见也滚不到`,
+        ).toContain(editorView.overflowY);
+      }
+    }
 
     // ② 点一格日子 ⇒ 值进胶囊，而且**不许弹出「放弃这次的修改？」**。
     //    枚数先量：面板里"下周一"这枚快捷项只许有一枚（同一目的地两个控件是本仓判过的形状）。
