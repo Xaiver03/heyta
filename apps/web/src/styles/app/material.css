@@ -86,8 +86,15 @@
  *    不是样式字面量），余下这些是外观与层级，全部走设计系统变量。
  *    `.ht-material` 在前（第 16 行）给了 `border: 0`，这一条在后，同特异性下后者赢 ——
  *    所以浮层有描边这件事仍然成立（暗色档靠它把面板与画布分开，e2e 逐张看过）。
+ *
+ * 🔴 2026-11-06 改过名，而**这不是外观改动**：原名 `.ht-capture-due-popover` / `__scroll` 给
+ *    `check:row-single-source` 的前缀族棘轮净添了一枚新族根（`.ht-capture`，29 > 基线 28）。
+ *    这枚浮层本来就同时挂着 `.ht-material`（共享的"抬升面"族，本文件第 16 行就是它），
+ *    所以正确的落点是这个族的 modifier/element 写法，而不是再造一个根。
+ *    棘轮的设计意图是**单调下降**（脚本第 329 行那句"收编回共享层之后常量应当跟着下调"），
+ *    因此这里选"消掉净增"而不是"抬基线"。取值一字未动，几何仍由 `place()` 负责。
  */
-.ht-capture-due-popover {
+.ht-material--popover {
   position: fixed;
   z-index: var(--ht-z-popover);
   padding: var(--ht-space-3);
@@ -98,7 +105,7 @@
 }
 
 /* 内层这一层**只负责滚动**：外层那块是卡片，内层承接 `place()` 算出来的限高。 */
-.ht-capture-due-popover__scroll {
+.ht-material__popover-scroll {
   overflow-y: auto;
   max-inline-size: 100%;
 }

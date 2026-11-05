@@ -126,7 +126,7 @@ export function CaptureDuePopover({
   return createPortal(
     <div
       ref={panelRef}
-      className="ht-material ht-capture-due-popover"
+      className="ht-material ht-material--popover"
       data-testid="capture-due-popover"
       role="dialog"
       aria-label={title}
@@ -136,7 +136,7 @@ export function CaptureDuePopover({
         内层承接 `place()` 算出来的限高。少了它，视口不够高时内容溢出，
         面板底边那几条出口就压在底部导航下面 —— 375 档实测踩过（看图抓到的，不是断言抓到的）。
       */}
-      <div className="ht-capture-due-popover__scroll" data-testid="capture-due-scroll">{content}</div>
+      <div className="ht-material__popover-scroll" data-testid="capture-due-scroll">{content}</div>
     </div>,
     document.body,
   );
