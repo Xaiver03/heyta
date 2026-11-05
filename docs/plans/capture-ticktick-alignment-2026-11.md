@@ -470,13 +470,13 @@ magick "$SRC" -crop 200x120+1400+250 +repage -resize 500% docs/research/dida-cap
 
 `grep -rn renderDuePanel packages/ui/tests apps/web/tests apps/mobile/tests` 现量 **0 命中**（补之前）。
 共享件里那三元是 `renderDuePanel === undefined ? panelContent : renderDuePanel({...})`
-（`packages/ui/src/capture/CaptureComposer.tsx:594-604`）：
+（现量位置会漂，按形状取：`grep -n "renderDuePanel === undefined" packages/ui/src/capture/CaptureComposer.tsx`）：
 
 | 消费者 | 走哪一支 | 补之前有没有判据 |
 |---|---|---|
 | web 收件箱 | 浮层（`CaptureDuePopover`） | ✅ jsdom + e2e 两层 |
 | web 日历落点 | **就地展开** | 只有 e2e 那条日历腿（浏览器层） |
-| **整个移动端** | **就地展开**（它从不传外壳） | ❌ 一层都没有 |
+| **整个移动端** | **就地展开**（这一行是当时形状；11-05 第八趟起它传 `BottomSheet`，见 §9.33/§9.34） | ❌ 一层都没有 → 现有设备腿 28 格 ✅ |
 
 ⇒ 把那一支改成 `null`，web 收件箱全绿、单测全绿，只有移动端与日历落点的胶囊
 静默变成死按钮。这不是假想：`packages/ui` 的文件头**明写**它不引 DOM 测试栈、
