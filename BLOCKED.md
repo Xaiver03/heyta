@@ -13328,3 +13328,37 @@ landing `mockup-task-row` 6 + `mockup-quadrant-shape` 15、web 本线三枚 123 
 而基线是 M3 视图统一那条线的判据口径，本线不碰。
 
 ⑤ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。
+
+## B264 · 阶段 1 那四枚排印值里只有 leading 有值判据；行高 60 与 A2 两枚槽位**协同回退全仓不会红**（2026-11-05，滴答对齐线登记，等设计系统线 / 产品拍口径）
+
+写前先 `date`（本机 2026-11-05 20:25）。起因：本线把九条验收复量完之后，接着问了一句
+**"我自己写的那两行判据，红得起来吗"**——量出来的答案是否。
+
+① **现量**（全是 grep，不是推断）：
+
+- `grep -rn "row-min-height\|3\.75" packages/design-system/tests/*.ts` ⇒ **空**；
+  全仓唯一一处 `toBe(60)` 在 `apps/web/tests/timeline-schedule.spec.tsx:98`，是时长断言，与行高无关。
+- `grep -nE "'space\.[0-9]'" packages/ui/tests/task-row-density.spec.ts` ⇒ **空**；它的期望对象写成
+  `toEqual({ bodyPaddingBlock: TASK_ROW_SHAPE.bodyPaddingBlock … })`，即**现取 token**。所以这枚 spec
+  守的是"组件有没有走表"（那几枚 `toContain('spec.bodyPaddingBlock')` 文本锚），**不是表里填了哪枚 token**。
+- `apps/landing/tests/mockup-quadrant-shape.spec.tsx:479` 比的是 CSS 里的 var 名与
+  `TASK_ROW_SHAPE.listGap` **是否同名** ⇒ 两边一起改，它照样绿。
+- 唯一真钉住值的是 `packages/design-system/tests/typography.spec.ts` 的 `lineHeight === 28`
+  ——今天这笔改动就是被它顶出来的（改值前那一发是 1 红 / 545 过，见 B261 与本线 `20358bc6c`）。
+
+② **缺口的准确形状**：一次"token + 四处 `mockup.css` 镜像"的**协同回退**，全仓没有一枚断言会红；
+只有 `check:tokens` 会保证生成产物跟着 `tokens.css` 走——那是**一致性**，不是**值**。
+
+③ **本线没有擅自补尺，理由两条**：补不补等于判定"行密度是契约还是可调旋钮"，那是设计系统线 /
+产品的**判据口径**；仓里也已有同一条告诫（`docs/plans/calendar-profile-handoff.md:5425`
+"**判据钉形状不钉值**"）。⚠️ 顺带自曝一处：本线第一版把这句引成"收集框线那句『旧判据钉形状
+不钉不变量 ⇒ 每次对齐都被顶回去』"，而**那句话在本仓 grep 不到**（现量
+`grep -rn "钉形状\|不钉不变量" docs/plans/*.md` 只命中日历线那一行与本线自己新写的两行）——
+它是我的项目记忆，不是出处。已当场换成仓里真有的那句，计划同一格里也写明了这次复发。
+
+④ **要补的话，出路是钉不变量而不是钉值**：`typography.spec.ts` 里就有两枚这个形状的先例——
+第 76 行"行高严格大于字号"、第 39 行"row-title : row-meta 字号比 ≥ 1.33"。同形状可用在行几何上
+（例如"行最小高 ≥ 标题行高 + 上下内间距"），这样下次调密度它不挡路，而协同回退会红。
+归设计系统线拍；本线不动别人的判据口径，也不替它落库。
+
+⑤ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。
