@@ -229,6 +229,7 @@ enum HeytaTokens {
     static let sizeFab: Double = 56  // px
     static let sizeChipHeight: Double = 28  // px
     static let sizeChipPaddingX: Double = 10  // px
+    static let sizeCapturePanelMaxWidth: Double = 768  // px
     static let sizeDividerInset: Double = 52  // px
     static let sizeBadgeMinWidth: Double = 18  // px
     static let sizeBadgeHeight: Double = 18  // px

@@ -174,10 +174,14 @@ describe('CaptureComposer：日期芯片里的剩余时间是当前语言', () =
     // ⚠️ M3 第八刀（capture）把芯片换成了共享 `@heyta/ui` 的 `CaptureComposer`，
     //    所以这里按 `testID` 寻址（RNW → `data-testid`），不再用旧的
     //    `.ht-capture__value` 类名 —— 类名随 DOM 实现一起删掉了。
-    const value = el.querySelector('[data-testid="capture-chip-value"]');
-    // 芯片里的"原样输入"是中文（那是用户自己打的字，本来就该原样显示）；
-    // 但**解析结果**那半边必须是英文 —— 这里两者分得开，正是本测试要的。
+    // 🔴 2026-11-04 收集框对齐滴答清单：生效中的截止**不再出现在框下那一行**，
+    //    它由输入行里的胶囊说。判据的意图一个字没变（"解析结果那半边必须是
+    //    当前语言"），只是读的地方换了 —— 这正是那条纪律要防的事：
+    //    **按旧形状认对象的尺，认的是一件已经不存在的东西。**
+    const value = el.querySelector('[data-testid="capture-due-capsule-value"]');
     expect(value?.textContent).toMatch(/Tomorrow/);
     expect(value?.textContent).not.toMatch(CJK);
+    // 反向：那一行此刻确实不该再有截止芯片（否则就是同一件事说了两遍）。
+    expect(el.querySelector('[data-testid="capture-chip-value"]')).toBeNull();
   });
 });

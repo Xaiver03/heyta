@@ -137,15 +137,24 @@ else
   else
     bad "没有识别出优先级芯片 —— 共享捕获件可能没真的挂上"; screen_txt
   fi
-  # 🔴 预览：`mobile.capture.previewLead` → 「实际标题：」
-  #    ⚠️ 必须用 `has_sub`（子串）而不是 `has_text`（整节点精确匹配）：
-  #    预览节点是**一句拼起来的**（`实际标题： cap-e2e-…`），精确匹配永远查不到 ——
-  #    实测就把一条本来成立的断言报成了"没有预览"，而产品其实是对的。
-  if [ "$(has_sub "实际标题")" = "1" ]; then
-    ok "出现「实际标题」预览"
+  # 🔴 日期胶囊：2026-11-04 起，截止那一格由**输入行里的胶囊**说，
+  #    框下方不再另起一行复述"将会创建成什么"（那一行连同 `showPreview` 开关已删干净）。
+  #    这句没打字时胶囊是空态，`accessibilityLabel` = `mobile.capture.capsule.aria.empty`
+  #    → Android 上的 content-desc。它证明的是"胶囊真的长在输入行里"。
+  if [ "$(has_desc "选择截止日期")" = "1" ]; then
+    ok "输入行里有日期胶囊"
   else
-    bad "没有「实际标题」预览"; screen_txt
+    bad "输入行里没有日期胶囊 —— 共享捕获件可能没真的挂上"; screen_txt
   fi
+  # ⚠️ 这里**原来还有一条反向钉子** `has_sub "实际标题"`（期望查不到），2026-11-04 撤掉，
+  #    两个理由都成立：
+  #    ① `check:verify-script-copy` 要求脚本里每个界面串都在词条表里，而那句文案
+  #       （`mobile.capture.previewLead`）本轮已随预览行一起删除 ⇒ 这个 needle 指着
+  #       一句界面上不可能再出现的话，**是在拿一个死字符串当判据**（这条红由那把尺抓到）；
+  #    ② 它本来也测错了东西：预览行真回来时未必还念「实际标题」这四个字。
+  #    "那一行不许回来"现在由三处**源码级**钉子管，都能红：
+  #    `apps/mobile/tests/capture-capsule-wiring.spec.ts`、
+  #    `apps/web/tests/capture-composer.spec.tsx`、`scripts/check-capture-shape.mjs`。
 fi
 
 # ⚠️ 标题里**不许**出现反引号：`step "… \`!1\`"` 会让 bash 把 `!1` 当命令执行

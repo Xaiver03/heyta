@@ -1466,3 +1466,40 @@ export {
   type MenuAction,
   type MenuKeyInput,
 } from './control/menu.js';
+
+/**
+ * 收集框对齐滴答清单（2026-11-04 单）新增的出口。
+ * 🔴 本块是**追加**的（`index.ts` 是多写者共享文件，只许在末尾加）。
+ *
+ * 覆盖态与胶囊那几条判断必须转出：宿主要拿它装配措辞（`capsule`），
+ * 而判据（`check:capture-shape`）要能指到**同一处**定义 —— 宿主自己再判一次
+ * 就会得到"胶囊说 8 号、建出来是明天"那种两端分叉。
+ */
+export {
+  captureCapsuleKind,
+  captureDue,
+  captureFragmentSignature,
+  captureRowChips,
+  captureOverrideValid,
+  clearCaptureDue,
+  makeCaptureOverride,
+  type CaptureCapsuleKind,
+  type CaptureDue,
+  type CaptureDueSource,
+  type CaptureOverride,
+} from './capture/model.js';
+export {
+  CaptureDuePanel,
+  type CaptureDuePanelLabels,
+  type CaptureDuePanelProps,
+} from './capture/CaptureDuePanel.js';
+export { type CapturePanelSlot } from './capture/CaptureComposer.js';
+
+/**
+ * 时刻步进与草稿提交（2026-11-04 收集框对齐批）。
+ * 🔴 单独转出是因为这两条规则**必须能被 node 单测跑穿**：
+ * `DatePicker.tsx` 与 `CaptureDuePanel.tsx` 都 import RN 原语，node 解析不了，
+ * 规则写在它们里面就等于没有判据的规则。
+ */
+export { timeDraftToValue, timeStepSlots } from './date-picker/steps.js';
+export { captureCapsuleShowsWord } from './capture/model.js';

@@ -77,20 +77,32 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
-import type { CaptureExclusion, LocalDate } from '@heyta/domain';
-import { Plus, RotateCcw, X } from 'lucide';
+import { today } from '@heyta/domain';
+import type { CaptureExclusion, LocalDate, LocalTime } from '@heyta/domain';
+import { Calendar, ChevronDown, Plus, RotateCcw, X } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
+import { CaptureDuePanel, type CaptureDuePanelLabels } from './CaptureDuePanel.js';
+import type { DatePickerQuickPick } from '../date-picker/DatePicker.js';
 import {
   captureCanSubmit,
+  captureCapsuleKind,
+  captureDue,
+  captureFragmentSignature,
+  captureRowChips,
   captureSelectedProject,
+  clearCaptureDue,
+  makeCaptureOverride,
   parseCaptureDraft,
   shouldResetCaptureIgnore,
   toCaptureChips,
   toCaptureSubmitPlan,
   toggleCaptureIgnore,
   withCaptureProject,
+  type CaptureCapsuleKind,
   type CaptureChip,
+  type CaptureDue,
+  type CaptureOverride,
   type CaptureProjectPicker,
   type CaptureSubmitPlan,
 } from './model.js';
@@ -113,10 +125,6 @@ export interface CaptureComposerLabels {
   readonly rejected: string;
   /** 未被采纳（还在标题里）的那条旁边的说明。 */
   readonly unused: string;
-  /** "实际标题："这一句。 */
-  readonly previewLead: string;
-  /** 标题为空时显示什么（例如"（空）"）。 */
-  readonly previewEmpty: string;
   /** 恢复识别的无障碍名。**一整句**，不要用前缀拼 raw。 */
   readonly restoreAria: (raw: string) => string;
   /** 忽略识别的无障碍名。 */
@@ -130,6 +138,37 @@ export interface CaptureComposerLabels {
    * 天数由 `./model.ts` 的 `captureChipRemainingDays` 算。
    */
   readonly valueLabel: (chip: CaptureChip, now: number) => string;
+  /**
+   * 日期胶囊上的字。**三档由共享层判**（{@link captureCapsuleKind}），
+   * 宿主只管说话。
+   *
+   * 🔴 `kind === 'empty'` 必须返回**空串** —— 那时只画图标。写「未设置」是本仓
+   * 明令禁止的审计腔，而写一句灰字提示会让"没选日期"与"选了但看不见"
+   * 在截图上不可分辨（`docs/agents/ux-principles.md`）。
+   */
+  readonly capsule: (due: CaptureDue, kind: CaptureCapsuleKind, now: number) => string;
+  /**
+   * 胶囊的无障碍名。**一整句**，带上当前的值 —— `accessibilityLabel` 会盖掉
+   * 按钮里的可见文字，所以值不在这里说就读屏听不到。空串那档宿主要说
+   * "选择截止日期"，不是把空串原样交回去。
+   */
+  readonly capsuleAria: (text: string) => string;
+  /** 胶囊点开的那块面板的措辞。 */
+  readonly panel: CaptureDuePanelLabels;
+}
+
+/**
+ * 宿主拿到的面板挂载位。
+ *
+ * 🔴 共享层**不判外壳**：web 要锚定浮层，移动端要么 `BottomSheet` 要么就地展开，
+ * 而"就地展开"这一档（日历那个已经浮着的捕获层）连宿主都不需要写 ——
+ * `renderDuePanel` 不传就是它。判断（哪一天、几点、哪段字被消费）全在共享层。
+ */
+export interface CapturePanelSlot {
+  readonly open: boolean;
+  /** 共享的 `CaptureDuePanel`，宿主把它放进自己的外壳里。 */
+  readonly content: React.ReactNode;
+  readonly onClose: () => void;
 }
 
 export interface CaptureComposerProps {
@@ -145,15 +184,6 @@ export interface CaptureComposerProps {
    *   悄悄改变一条任务的落点，是"界面没说谎但用户以为没说"那一类缺陷。
    */
   readonly anchorDate?: LocalDate | undefined;
-  /**
-   * 是否渲染「实际标题：…」那一行（默认 `true`）。
-   *
-   * 🔴 2026-11-03 由产品负责人裁决在 **web 任务列关掉**：原话「不要写什么实际标题
-   * 是什么东西，没有必要」—— 对照滴答清单，它的输入行里只留原文 + 一枚日期胶囊，
-   * 不另起一行复述"将会创建成什么"。
-   * 共享层保留这个能力（移动端仍用它做识别回执），所以是**可选关闭**而不是删除。
-   */
-  readonly showPreview?: boolean;
   /**
    * 时间源（epoch ms）。默认 `Date.now()`（每次渲染取一次）。
    * 显式传入才能让"跨零点/今天是几号"可复现（与 `parseCapture` 同一约定）。
@@ -195,6 +225,22 @@ export interface CaptureComposerProps {
    * 传了会变成两处说同一件事）。
    */
   readonly projectPicker?: CaptureProjectPicker | undefined;
+  /**
+   * 日期胶囊点开的那块面板**由宿主装外壳**。
+   *
+   * 🔴 不传 = **就地展开**（面板画在输入行下方，跟着文档流）。
+   * 这是给"已经在一个浮层里"的落点用的（日历那个捕获浮层），不是"还没接"的占位档：
+   * web 主列表与移动端新建面板都传了各自的外壳。
+   */
+  readonly renderDuePanel?: ((slot: CapturePanelSlot) => React.ReactNode) | undefined;
+  /**
+   * 面板里那四枚快捷项（今天 / 明天 / 本周末 / 下周一）。
+   *
+   * 日期数学在 `@heyta/domain#quickDuePickDates`，**措辞**只能由宿主给
+   * （共享层不 import i18n）。不传就是没有快捷项，月历照常 —— 日历那个
+   * 已经锚在某一格上的落点确实不需要再问一次"要不要今天"。
+   */
+  readonly quickPicks?: readonly DatePickerQuickPick[];
 }
 
 /** 取一份 token 表，建出这套样式。**一个裸尺度值都没有**（`check:design` 会拦）。 */
@@ -237,6 +283,29 @@ function makeStyles(tokens: HeytaNativeTokens) {
     },
     addText: {
       color: tokens['color.on-primary'],
+    },
+    /**
+     * 日期胶囊：**长在输入行内部右侧**，与输入框同一个高度档（一档一个高度，
+     * `docs/agents/ux-principles.md` §1）。它常驻，不随聚焦长出 ——
+     * "没选日期"与"选了但看不见"必须在截图上分辨得出来。
+     */
+    capsule: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: tokens['space.1'],
+      minHeight: tokens['touch-target.min'],
+      paddingHorizontal: tokens['size.field-padding-x'],
+      borderRadius: tokens['radius.md'],
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
+      backgroundColor: 'transparent',
+    },
+    /** 有值时换主色描边与主色字：空态只画图标，不靠底色说话。 */
+    capsuleOn: {
+      borderColor: tokens['color.primary'],
+    },
+    capsuleText: {
+      color: tokens['color.primary'],
     },
     /** 芯片行：可换行，与 web 迁移前的 `flex-wrap` 一致。 */
     chips: {
@@ -336,12 +405,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       height: tokens['icon.sm'],
       borderRadius: tokens['radius.full'],
     },
-    preview: {
-      color: tokens['color.foreground-subtle'],
-    },
-    previewTitle: {
-      color: tokens['color.foreground'],
-    },
   });
 }
 
@@ -349,11 +412,12 @@ export function CaptureComposer({
   labels,
   onSubmit,
   anchorDate,
-  showPreview = true,
   now,
   autoFocus,
   testID,
   projectPicker,
+  renderDuePanel,
+  quickPicks,
 }: CaptureComposerProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -362,6 +426,9 @@ export function CaptureComposer({
   const [draft, setDraft] = useState('');
   /** 用户显式忽略的识别。**是"这段字是标题的一部分"，不是"删掉这几个字"。** */
   const [ignored, setIgnored] = useState<readonly CaptureExclusion[]>([]);
+  /** 面板里点出来的截止值。绑在"被消费的那段字"上，那段字一变它就作废（`model.ts` §二·五）。 */
+  const [override, setOverride] = useState<CaptureOverride | undefined>(undefined);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   /** 原生端自己控制焦点（见 `autoFocus` 的说明）；web 不需要。 */
   const inputRef = useRef<TextInput>(null);
@@ -387,14 +454,44 @@ export function CaptureComposer({
   const renderNow = now ?? Date.now();
   const parsed = useMemo(() => parseCaptureDraft(draft, ignored, now), [draft, ignored, now]);
   const chips = useMemo(() => toCaptureChips(parsed), [parsed]);
+  /** 框下方那一行：胶囊已经说出来的那条不在这里说第二遍。 */
+  const rowChips = useMemo(() => captureRowChips(parsed), [parsed]);
+  /** 面板里逐条可撤的那些：截止类目**全部**进这里（生效中的也要能单独取消）。 */
+  const dueChips = useMemo(
+    () => chips.filter((chip) => chip.field === 'dueDate' || chip.field === 'dueTime'),
+    [chips],
+  );
+  const signature = useMemo(() => captureFragmentSignature(parsed), [parsed]);
+  const due = useMemo(() => captureDue(parsed, override, anchorDate), [parsed, override, anchorDate]);
+  const capsuleKind = captureCapsuleKind(due);
+  const capsuleText = labels.capsule(due, capsuleKind, renderNow);
   const canSubmit = captureCanSubmit(parsed);
 
   function submit(): void {
-    const plan = toCaptureSubmitPlan(parsed, anchorDate);
+    const plan = toCaptureSubmitPlan(parsed, anchorDate, override);
     if (plan === undefined) return;
     void onSubmit(withCaptureProject(plan, captureSelectedProject(projectPicker)?.id));
     setDraft('');
     setIgnored([]);
+    setOverride(undefined);
+    setPanelOpen(false);
+  }
+
+  /** 面板里点出一格 = 成对写一次覆盖（签名当场钉住，见 `model.ts` §二·五）。 */
+  function pick(date: LocalDate, time: LocalTime | undefined): void {
+    setOverride(makeCaptureOverride(date, time, signature));
+  }
+
+  /**
+   * 面板里的`清除`：覆盖清空 **并且把被消费的那段字送回标题**。
+   *
+   * 🔴 少了后半句就是"字被吞了而界面没说"，那是 `capture.ts` 文件头第 1 条不变量。
+   * 走的是既有的忽略清单，不是第二套状态。
+   */
+  function clearDue(): void {
+    const next = clearCaptureDue(parsed, ignored);
+    setOverride(next.override);
+    setIgnored(next.exclusions);
   }
 
   /** 忽略 / 恢复一条识别。只动"忽略清单"，**绝不动输入框里的字**。 */
@@ -406,7 +503,23 @@ export function CaptureComposer({
   function onDraftChange(value: string): void {
     setDraft(value);
     if (shouldResetCaptureIgnore(ignored)) setIgnored([]);
+    // ⚠️ 这里**不**清 `override`：它绑在片段签名上，签名一 mismatch 就自己失效
+    //（`captureDue` 里那一处判定）。在这里再清一次就是给同一条规则写第二个出口。
   }
+
+  const panelContent = (
+    <CaptureDuePanel
+      due={due}
+      now={renderNow}
+      today={today(renderNow)}
+      quickPicks={quickPicks ?? []}
+      dueChips={dueChips}
+      labels={labels}
+      onPick={pick}
+      onClear={clearDue}
+      onToggle={toggleIgnore}
+    />
+  );
 
   return (
     <View style={styles.wrap} testID={testID}>
@@ -426,6 +539,37 @@ export function CaptureComposer({
           {...(autoFocus === undefined || managesFocusItself ? {} : { autoFocus })}
           testID="capture-input"
         />
+        {/*
+          🔴 日期胶囊：**这条新任务会落在哪一天几点**，由这一枚说。
+          它常驻（不随聚焦长出）—— 藏起来会让"没选日期"和"选了但看不见"在截图上
+          不可分辨，而这是这条线上唯一致命的错法（猜错哪一天）。
+          空态只画图标，不写「未设置」（`labels.capsule` 那一格的理由）。
+        */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={labels.capsuleAria(capsuleText)}
+          onPress={() => {
+            setPanelOpen((open) => !open);
+          }}
+          style={[styles.capsule, capsuleKind === 'empty' ? null : styles.capsuleOn]}
+          testID="capture-due-capsule"
+        >
+          <HeytaIcon
+            data={Calendar}
+            size={tokens['icon.sm']}
+            color={capsuleKind === 'empty' ? tokens['color.foreground-subtle'] : tokens['color.primary']}
+          />
+          {capsuleText === '' ? null : (
+            <Text style={[text.caption, styles.capsuleText]} testID="capture-due-capsule-value">
+              {capsuleText}
+            </Text>
+          )}
+          <HeytaIcon
+            data={ChevronDown}
+            size={tokens['icon.xs']}
+            color={tokens['color.foreground-subtle']}
+          />
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={labels.add}
@@ -443,17 +587,33 @@ export function CaptureComposer({
         </Pressable>
       </View>
 
+      {/*
+        面板：宿主给了外壳就用外壳（web 的锚定浮层），没给就**就地展开**
+        —— 那一档的真实消费者是日历里那个已经浮着的捕获层，不是"还没接"。
+      */}
+      {panelOpen
+        ? renderDuePanel === undefined
+          ? panelContent
+          : renderDuePanel({
+              open: true,
+              content: panelContent,
+              onClose: () => {
+                setPanelOpen(false);
+              },
+            })
+        : null}
+
       {projectPicker === undefined ? null : (
         <CaptureProjectPickerRow picker={projectPicker} />
       )}
 
-      {chips.length > 0 ? (
+      {rowChips.length > 0 ? (
         <View
           style={styles.chips}
           accessibilityLabel={labels.matchesAria}
           testID="capture-matches"
         >
-          {chips.map((chip, index) => {
+          {rowChips.map((chip, index) => {
             const off = chip.action !== 'ignore';
             return (
               <View
@@ -521,16 +681,6 @@ export function CaptureComposer({
           })}
         </View>
       ) : null}
-
-      {showPreview && chips.length > 0 ? (
-        <Text style={[text.caption, styles.preview]} testID="capture-preview">
-          {labels.previewLead}{' '}
-          <Text style={styles.previewTitle}>
-            {parsed.title === '' ? labels.previewEmpty : parsed.title}
-          </Text>
-        </Text>
-      ) : null}
-
     </View>
   );
 }

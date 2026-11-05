@@ -241,21 +241,28 @@ describe('真实现的锚点还在，而且捕获只剩一份实现', () => {
       'labels.add',
       'labels.rejected',
       'labels.unused',
-      'labels.previewLead',
+      // 🔴 2026-11-04：`labels.previewLead` 随「实际标题」那一行一起退役，换成胶囊那一格。
+      // 这一列的意义是"复刻件不画的那些状态，真实现确实还在渲染"—— 载体换了，意图没换。
+      'labels.capsule',
       'labels.matchesAria',
     ]) {
       expect(composer, `共享 CaptureComposer 少了 ${anchor}`).toContain(anchor);
     }
   });
 
-  it('🔴 空态守卫：芯片与预览两块都由 `chips.length > 0` 守着', () => {
+  it('🔴 空态守卫：识别行为空时**什么都不画**（只剩这一处守卫）', () => {
     const composer = captureComposerSource();
     const guards = composer.split(MOCK_CAPTURE_LIVE_GUARD).length - 1;
     expect(
       guards,
-      `共享层不再用 \`${MOCK_CAPTURE_LIVE_GUARD}\` 守芯片/预览 —— ` +
+      `共享层不再用 \`${MOCK_CAPTURE_LIVE_GUARD}\` 守识别行 —— ` +
         '复刻件画的是空输入框，这个前提一变，空态就不再等价',
-    ).toBe(2);
+    ).toBe(1);
+    // 反向钉子：原来第二处守卫守的是「实际标题：」那一行预览。它被产品负责人否掉之后
+    // 先降级成 `showPreview` 开关（两端都关），2026-11-04 把 prop 与渲染一起删了 ——
+    // **留着"配置了但没人读"的开关就是本仓最忌讳的那个形状**。
+    expect(composer, '「实际标题」那一行不许回来').not.toContain('capture-preview');
+    expect(composer, '零消费者的 showPreview 开关不许回来').not.toContain('showPreview');
   });
 
   it('web 宿主只剩接线：文案走 `web.capture.*`，写库走 `addTask`，芯片骨架不在它这儿', () => {
@@ -370,7 +377,9 @@ describe('登记处 ⟷ 渲染 ⟷ AppWindow 三处一致', () => {
     const row = view.querySelector(`.${MOCK_CAPTURE_CLASS.row}`);
     expect(row, '渲染结果里没有捕获输入行 —— 判据锚点已失效').not.toBeNull();
     expect(row?.children, '空输入框下这一行只应有「输入框 + 按钮」两个元素').toHaveLength(2);
-    expect(row?.textContent ?? '').not.toContain(zhCN['web.capture.previewLead']);
+    // 🔴 逐字面量而不是逐 key：`web.capture.previewLead` 这条词条已经随预览行一起删了，
+    // 而"这里不许出现那行复述"这件事不该依赖一条词条存在与否来证明。
+    expect(row?.textContent ?? '').not.toContain('实际标题');
     expect(row?.textContent ?? '').not.toContain(zhCN['web.capture.unused']);
   });
 

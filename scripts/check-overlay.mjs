@@ -155,6 +155,14 @@ const MODAL_LEDGER = {
   'apps/web/src/features/ai/AiToolRun.tsx': { ariaModal: 0, dialogRole: 3 },
   'apps/web/src/features/ai/AssistantPanel.tsx': { ariaModal: 0, dialogRole: 1 },
   'apps/web/src/features/auth/AuthPanel.tsx': { ariaModal: 1, dialogRole: 1 },
+  /*
+   * 🔴 2026-11-04 收集框对齐滴答清单：日期面板的 web 外壳。
+   * 它与 `CalendarCapturePopover` 同族 —— **非模态**（`aria-modal` 0），
+   * 滚动锁 / 焦点陷阱**刻意没有**：它不阻塞外面，点外面与 Esc 都收走。
+   * 关闭策略不在这里判，来自那张表的 `popover` 那一档
+   * （`CaptureDuePopover.tsx` 里 `closePolicyOf('popover')` 现取）。
+   */
+  'apps/web/src/features/capture/CaptureDuePopover.tsx': { ariaModal: 0, dialogRole: 1 },
   'apps/web/src/features/calendar/CalendarCapturePopover.tsx': { ariaModal: 0, dialogRole: 1 },
   'apps/web/src/features/inbox/InboxBell.tsx': { ariaModal: 0, dialogRole: 1 },
   'apps/web/src/features/shell/CompactRailNavigation.tsx': { ariaModal: 0, dialogRole: 1 },

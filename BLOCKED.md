@@ -13233,3 +13233,38 @@ traps 里也有对应那条；本条补的是**它今天仍然成立**这个读�
 🔴 **B260 追记（2026-11-04 23:2x，设置页治理本线 · 读了 web 那格的最终形状之后，两件事被收紧，一件事被排除）**：写前先 `date`（本机 23:21）。① **排除一个我以为需要产品拍板的分歧**：web 迁完后「这台设备」那一行是**按钮画出来但禁用**（`actions` 恒给 `<button disabled={session.current}>`）+ 提示句进 `note`；mobile 现在是**不画那枚按钮**只给提示句。我一度把这当成"两端行为不一致，要先裁决"。不是：`SettingsTrailingRow.actions` 按契约就是**宿主自己渲染的那一格**，两端的出口长什么样本来就归宿主。所以这一格**不需要产品决策**，G-4 要的是行骨架只有一份，不是要求两端的动作一致。② **收紧"能不能不碰别人判据就把这格迁了"**：把四种写法都摆了一遍。设计正确的两种（提示句进 `note`、按钮进 `actions` 的三元或恒给禁用按钮）都不再出现 `{session.current ? (` 这个字面量 —— 因为对象字面量里的三元前面没有 JSX 表达式的那层 `{`，`indexOf` 直接落空，四条断言里第一条就红。③ **唯一能让四条全绿的写法**是把提示句和按钮塞进**同一个 JSX 三元**放进 `actions`（`{session.current ? (<Text 提示/>) : (<Button 撤销/>)}`）—— 它字面量在、正向对照也真在 else 支里，**但代价是把那句二十多字的反馈画进右列**：共享行的 `styles.row` 是 `flexDirection:'row'` + 左列 `flexShrink:1`，右列拿到的是剩余宽度，375pt 上左列还有设备名与两行时间戳。这一种不是"不能写"，是**写出来就比 web 那一屏差**，而本机没有能给它签字的移动端看图腿（现量：`adb devices` 空、`~/Library/Android/sdk` 不存在 ⇒ Android 载体不在本机；`xcrun simctl list devices booted` 那枚是别线的）。④ **所以本条的结论比原文更窄也更硬**：拦路的不是设计、不是产品口径，就是**一枚按源码文本切片的判据 + 一次本线拿不到的设备腿**。前者归注册登录线（改成渲染后按 `sessions-revoke` 这个 testID 判"当前那行没有可点的撤销按钮"，正向对照改成"另一行有"——`apps/mobile/tests` 已有 11 枚 spec 用 `@testing-library/react-native`，不是新能力），后者要么等那枚 booted 设备空出来，要么按 `docs/agents/multi-end-build.md` 走 linux-dev。⑤ **本线留下的可立即执行件**：迁移后的目标形状就是 web 那一格（`packages/ui` 的 `trailing` 档 + `label`/`meta`/`note`/`actions` 四格），本线不再另立一套；`note` 里那句反馈是"反馈那一族"，按 `design-system.md` 例外①不进 `?`。⑥ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。
 
 🔴 **B260 追记二（2026-11-05 00:0x，设置页治理本线 · 产品负责人授权后这一格已落地；先把本线自己写错的一句改掉）**：写前先 `date`（本机 00:02）。① **B260 原文 ④ 里那句"apps/mobile/tests 已有 11 枚 spec 用 `@testing-library/react-native` 这套渲染测试，不是新能力"是本线读错了**，现量：`grep -l "@testing-library/react-native" apps/mobile/tests/*.ts` 确实命中 11 个文件，但这 11 个文件里 `render(` 出现 **0 次** —— 那些命中全是**散文**，是各文件头在解释"为什么本壳没有 RN 组件测试栈"（`auth-screen-password.spec.ts:21` 写着：引它要先过 AGENTS §3.1 + §3.2 两道门，行为由 `pnpm verify:mobile-auth` 在真机验）。所以"改成渲染后按 testID 判"这条路**本身不成立**，我把它当现成能力递出去了，这条按 `docs/agents/` 那条"grep 命中 ≠ 用法"重犯一次。② **实际采用的改锚**（授权范围内，判据的意思一字未改）：从**切 JSX 三元字面量**换成**切行模型字段** —— `actions: session.current ? null : (…)` 当前一支必须是 `null`、按钮必须在 else 一支、`note:` 那句提示必须只在 current 一支且不含出口。③ **牙验过**：把它改成 web 那格的"画一枚禁用按钮"形状 ⇒ 精确红「撤销出口没有 current 判定」；还原 ⇒ `account-security-wiring` 20/20、`@heyta/mobile` 101 个测试文件全过、typecheck rc=0、18 枚相关静态门全 rc=0。④ **仍然欠的那一半是像素**：移动端设备腿现在跑不了（现量 `xcrun simctl list devices booted` ⇒ 1 枚且是别线刚用它跑完设备腿的那枚；`adb devices` 空、`~/Library/Android/sdk` 不存在；`vm.swapusage` used 9.9G/11.2G；`uptime` 1 分钟负载 16.35 > 5 分钟 12.05 ⇒ 在涨不在落）。可迁移的证据只到这一层：同一份 `styles.row`、同样的字段形状、同样 375 宽，web 那侧已由四象限腿真看过（`apps/web/evidence/account-suite/19-sessions-light-375.png`），且移动端当前那一行**不给**按钮 ⇒ 比 web 那张更不挤；共享渲染器在 mobile 是 6 块屏 / 8 处 `variant="card"` 的现役路径。这一格因此**不是"没验证"**，是"验证到静态 + 同形参照，独缺本机真机那一枪"。⑤ **谁能补上**：任一有空闲模拟器的人跑 `bash scripts/verify-mobile-ios-account-email-sessions.sh`（Android 那份 `verify-mobile-account-email-sessions.sh` 的载体不在本机）；它按 `sessions-list` / `sessions-revoke` / `sessions-logout-all` 定位，这些锚点本线一枚都没改。⑥ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。
+
+## B261 · `typography.spec.ts` 那枚 `row-title` 行高红在**别线未提交的 `typography.ts`** 上；本线的 `generate` 把这格改动扫进了共享产物（2026-11-05，收集框对齐线登记，不代改）
+
+写前先 `date`（本机 2026-11-05 02:48）。起因：本线为捕获面板新增一枚 token
+（`size.capture-panel-max-width`），按 `docs/agents/design-system.md` 的规矩要跑
+`pnpm --filter @heyta/design-system generate` 重生成产物。跑完顺手复验，量到：
+
+① **红的那条不是本线的**：`packages/design-system/tests/typography.spec.ts > 语义文字样式：值正确性 >
+row-title = 16px / 500 / 行高 24 / 字距 -0.176` ⇒ `expected 28 to be 24`。
+现量成因：工作树里**别线未提交**的改动把 `typography.ts` 的 `row-title` 行高从
+`line-height.normal` 换成 `relaxed`（`git diff -- packages/design-system/src/typography.ts` 现量 1+/1-），
+同一批还有 `task-row-shape.ts` 的 `listGap: space.1→space.2`、`bodyPaddingBlock: space.2→space.3`。
+**本线一行都没碰这两份文件**，也没动那枚 spec（按 §8 那条"别线在飞的活只等/问"）。
+
+② **本线确实产生了一次跨线副作用，登记在这里**：`generate` 是**全量**重生成，它把上面那格
+未提交的行高改动一并写进了 `packages/design-system/generated/typography.css`
+（现量：`git diff -- packages/design-system/generated/typography.css` 那一行
+`line-height: var(--ht-line-height-normal)` → `relaxed`）。
+⇒ 副作用方向是"产物追上源码"，不是本线注入新值；且它修好了一格**先前就存在**的漂移
+（源码已改、产物未重生成 ⇒ `check:tokens` 本该红）。现在 `check:tokens` rc=0（现量：
+`✅ 生成产物与 tokens.css 一致（8 个文件，225 个 token）`）。
+⚠️ 反过来说：**别线那格排版改动现在已经被打进产物**，如果他们原本打算连 spec 一起改完再重生成，
+现在这半程已经替他们走完了；回退方式是 `git checkout -- packages/design-system/generated/typography.css`，
+但那会让 `check:tokens` 重新红，所以本线没撤。
+
+③ **谁能一步收掉**：改 `typography.ts` 那条线（看措辞是任务行排印那一族）自己把
+`typography.spec.ts` 的期望值改成新行高，或把 `row-title` 换回 `normal`。
+本线不代改的理由是**判据口径**：那枚断言写的是"row-title 的行高是多少"，
+把它从 24 改成 28 等于替别人签字一条排印决定。
+
+④ **本线留下的读数**：`packages/design-system` 整套 = **1 红 / 545 过**（红的就是上面那枚）；
+`apps/web` 本线相关 `capture-composer` + `due-date-edit` = 64 过；
+`check:tokens` / `check:design-token-refs` / `check:token-minting` / `check:token-hashing` 全 rc=0。
+
+⑤ **本条只动 `BLOCKED.md` 一枚**（纯追加：写前 `git diff --numstat -- BLOCKED.md` 为空）。

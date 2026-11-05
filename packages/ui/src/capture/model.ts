@@ -219,6 +219,168 @@ export function toggleCaptureIgnore(
 }
 
 /* ========================================================================
+ * 二·五、手工覆盖 —— 日期胶囊的"用户点了面板"那一档
+ * ====================================================================== */
+
+/**
+ * 用户在胶囊面板里**点出来**的截止值。
+ *
+ * 🔴 它**成对存**（日期 + 时刻一起），不是两个独立可空字段：没有日期就没有
+ * "几点"可言（领域层那条 `dueTimeNeedsDate` 是同一个事实的另一面），
+ * 而"只有时刻没有日期"这个状态在界面上无法解释、在数据上无法落库。
+ * 面板每次写入都从 {@link captureDue} 的当前值出发改一格，所以成对是自然结果。
+ *
+ * 🔴 `boundTo` 是**被消费的那段文字的签名**（{@link captureFragmentSignature}）。
+ * 覆盖只在签名仍然相等时有效 —— 这条不是偷懒，是不变量的推论：
+ * 一段被从标题里拿掉的文字**必须**对得上胶囊里的值，否则就是"删了字却没交代"。
+ * 用户重打了日期短语 ⇒ 签名变 ⇒ 覆盖作废 ⇒ 打字产出的解析值接管（计划 §3.4 第 4 条）。
+ * ⚠️ 对称的代价，登记成决策而不是事故：**把那段日期文字删掉，手工选的日期也一起消失**
+ * —— 此刻没有任何被消费的文字要交代，而留一条"来源看不见"的日期更难解释。
+ */
+export interface CaptureOverride {
+  readonly date: LocalDate;
+  readonly time: LocalTime | undefined;
+  readonly boundTo: string;
+}
+
+/** 胶囊此刻读到的值**是从哪来的**。宿主据此措辞，门禁据此判"有没有第三处来源"。 */
+export type CaptureDueSource = 'override' | 'parsed' | 'anchor' | 'none';
+
+export interface CaptureDue {
+  readonly date: LocalDate | undefined;
+  readonly time: LocalTime | undefined;
+  readonly source: CaptureDueSource;
+}
+
+/**
+ * 被消费的日期/时刻片段签名。
+ *
+ * 只数 `applied && !rejected` 的两类字段：优先级不参与（胶囊只说截止），
+ * 未采纳的那条也不参与（它还在标题里，没有东西被拿走）。
+ * 用 `field@start:raw` 而不是只 `raw`：同一段字在输入里挪了位置，
+ * 用户重打的意义就是"我改主意了"，签名必须跟着变。
+ */
+export function captureFragmentSignature(parsed: CaptureParse): string {
+  return parsed.matches
+    .filter((match) => (match.field === 'dueDate' || match.field === 'dueTime') && match.applied && !match.rejected)
+    .map((match) => `${match.field}@${String(match.start)}:${match.raw}`)
+    .join('|');
+}
+
+/** 覆盖还绑不绑得住当前那段文字。 */
+export function captureOverrideValid(
+  override: CaptureOverride | undefined,
+  signature: string,
+): override is CaptureOverride {
+  return override !== undefined && override.boundTo === signature;
+}
+
+/** 面板写入一格：成对写，签名当场钉住。 */
+export function makeCaptureOverride(
+  date: LocalDate,
+  time: LocalTime | undefined,
+  signature: string,
+): CaptureOverride {
+  return { date, time, boundTo: signature };
+}
+
+/**
+ * 胶囊此刻该读到什么。**优先级只有一处定义**：
+ * 仍然有效的覆盖 → 打字解析出来的 → 宿主锚点 → 没有。
+ *
+ * 🔴 锚点排在解析之后、且**只有前两者都没值**时才出现 —— 与
+ * {@link toCaptureSubmitPlan} 原来那条"输入赢、锚点兜底"逐字同序。
+ * 两处各写一份顺序，就会得到"胶囊念着 8 号、建出来是明天"。
+ */
+export function captureDue(
+  parsed: CaptureParse,
+  override: CaptureOverride | undefined,
+  anchor?: LocalDate,
+): CaptureDue {
+  const signature = captureFragmentSignature(parsed);
+  if (captureOverrideValid(override, signature)) {
+    return { date: override.date, time: override.time, source: 'override' };
+  }
+  if (parsed.dueDate !== undefined) {
+    return { date: parsed.dueDate, time: parsed.dueTime, source: 'parsed' };
+  }
+  if (anchor !== undefined) return { date: anchor, time: undefined, source: 'anchor' };
+  return { date: undefined, time: undefined, source: 'none' };
+}
+
+/**
+ * 面板里的`清除`：覆盖清空，**并且把被消费的那段文字送回标题**。
+ *
+ * 🔴 少了后半句就是本仓最忌讳的那件事 —— 字被吞了，而界面上没有任何东西说它被吞了。
+ * 复用既有的忽略清单（`field + raw`），**不新建第二套"未消费"状态**：
+ * 与点掉一枚识别项的取消按钮是同一条路，只是这里一次把日期与时刻都放开。
+ * 已经登记过的不重复追加（同 raw 追加两次会让恢复变成两击）。
+ */
+export function clearCaptureDue(
+  parsed: CaptureParse,
+  exclusions: readonly CaptureExclusion[],
+): { override: undefined; exclusions: CaptureExclusion[] } {
+  const next = [...exclusions];
+  for (const match of parsed.matches) {
+    if ((match.field !== 'dueDate' && match.field !== 'dueTime') || !match.applied || match.rejected) continue;
+    if (next.some((e) => e.field === match.field && e.raw === match.raw)) continue;
+    next.push({ field: match.field, raw: match.raw });
+  }
+  return { override: undefined, exclusions: next };
+}
+
+/**
+ * 框下方那一行**还该出现哪些识别项**。
+ *
+ * 🔴 规则只有一句：**胶囊已经说出来的那条，不许在行里说第二遍。**
+ * 截止类目（日期 / 时刻）里处于"生效中"的那条由日期胶囊承担，于是
+ * 「今天下午八点交周报」这一整句在界面上只剩输入行 + 一枚胶囊 —— 那正是
+ * 产品负责人第四次点名要的形状。
+ *
+ * 但那一行不许整条删掉，理由**只有一条**：优先级条除了这里没有别的地方在说它
+ * （胶囊只管截止）。`unused`（同字段第二条）与 `restore`（用户已忽略）那两档
+ * 面板那一组**也**在渲染，所以它们在这一行里是重复，不是承重墙 ——
+ * 别把"这一行还留着它们"读成"删不掉"：这是第一版犯过的过度陈述，
+ * 现量与由此改判的那条决策在
+ * `docs/plans/capture-ticktick-alignment-2026-11.md` §9.10 / §9.13。
+ * 彻底删掉这一行的前置是输入框就地高亮（同计划 §3.5），不在本单范围内。
+ */
+export function captureRowChips(parsed: CaptureParse): CaptureChip[] {
+  return toCaptureChips(parsed).filter((chip) => {
+    const isDue = chip.field === 'dueDate' || chip.field === 'dueTime';
+    return !(isDue && chip.action === 'ignore');
+  });
+}
+
+/**
+ * 胶囊该说几种话之一。**判断在这里，措辞在宿主**（与 {@link CaptureChip} 同一分工）。
+ *
+ * ⚠️ `empty` 那一档宿主**必须返回空串**并由组件只画图标 —— 写「未设置」是本仓
+ * 明令禁止的审计腔（`docs/agents/ux-principles.md`），而画一条灰字提示会让
+ * "没选日期"与"选了但看不见"在截图上不可分辨。
+ */
+export type CaptureCapsuleKind = 'day-time' | 'day' | 'empty';
+
+export function captureCapsuleKind(due: CaptureDue): CaptureCapsuleKind {
+  if (due.date === undefined) return 'empty';
+  return due.time === undefined ? 'day' : 'day-time';
+}
+
+/**
+ * 胶囊那一格**该说相对词还是说日期**。
+ *
+ * 🔴 这条分档是产品语义，不是措辞，所以它住在这里而不是各端宿主里：
+ * 「还剩 5 天」回答了"还有几天"，却省掉了**哪一天** —— 而"猜错了哪一天"是这个字段
+ * 唯一致命的错法（`capture.ts` 文件头与时刻芯片那条注释说的是同一件事）。
+ * 近三天（含逾期）相对词更有用，更远就必须落到日期上。
+ *
+ * ⚠️ 2026-11-04 由 e2e 用例抓到：日历落点里点「下周一」，胶囊念的是「还剩 5 天」。
+ */
+export function captureCapsuleShowsWord(days: number): boolean {
+  return days <= 2;
+}
+
+/* ========================================================================
  * 三、提交计划（本地日期 → Task 约定）
  * ====================================================================== */
 
@@ -318,23 +480,26 @@ export function captureSelectedProject(
  *   **输入里写出来的日期赢，锚点只是兜底**。反过来（锚点赢）会得到
  *   "在日历上选了 8 号，于是'明天'永远说不进去" —— 那等于把这一格
  *   变成了一个吞掉日期语义的开关。所以顺序是
- *   `解析出的 → 锚点 → 不带这个字段`。
+ *   `覆盖 → 解析出的 → 锚点 → 不带这个字段`（{@link captureDue} 是唯一一处定义）。
+ *
+ * ⚠️ `override` 是**可选第三参**，不是新的必传项：所有既有调用方（含日历锚点、
+ * 移动端面板）不传它时行为与改动前逐字相同。
  */
 export function toCaptureSubmitPlan(
   parsed: CaptureParse,
   anchor?: LocalDate,
+  override?: CaptureOverride,
 ): CaptureSubmitPlan | undefined {
   if (!captureCanSubmit(parsed)) return undefined;
-  const dueDate = parsed.dueDate ?? anchor;
+  const due = captureDue(parsed, override, anchor);
   return {
     title: parsed.title,
     /*
-     * `parsed.dueTime` 与 `parsed.dueDate` 是**成对**的：领域层保证没有日期
-     * 就不可能有采纳到的时刻（`parseCapture` 里那条 `dueTimeNeedsDate`）。
-     * 所以这里不需要再判"锚点补的日期能不能配解析出的时刻"——那种组合
-     * 根本到不了这一行。（写成三元判断会是给一条不存在的分支上锁。）
+     * 时刻与日期**成对**来自同一次 {@link captureDue} 解析，所以这里不需要
+     * 再判"锚点补的日期能不能配解析出的时刻"——`captureDue` 在 `source === 'anchor'`
+     * 那一档就把 `time` 写成了 `undefined`。（写成三元判断会是给一条不存在的分支上锁。）
      */
-    ...(dueDate !== undefined ? { dueDate: dueDateToEpoch(dueDate, parsed.dueTime) } : {}),
+    ...(due.date !== undefined ? { dueDate: dueDateToEpoch(due.date, due.time) } : {}),
     ...(parsed.priority !== undefined ? { priority: parsed.priority } : {}),
   };
 }

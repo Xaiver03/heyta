@@ -213,6 +213,7 @@ export interface HeytaNativeTokens {
   readonly 'size.fab': number;
   readonly 'size.chip-height': number;
   readonly 'size.chip-padding-x': number;
+  readonly 'size.capture-panel-max-width': number;
   readonly 'size.divider-inset': number;
   readonly 'size.badge-min-width': number;
   readonly 'size.badge-height': number;
@@ -444,6 +445,7 @@ export const lightTokens: HeytaNativeTokens = {
   'size.fab': 56,
   'size.chip-height': 28,
   'size.chip-padding-x': 10,
+  'size.capture-panel-max-width': 768,
   'size.divider-inset': 52,
   'size.badge-min-width': 18,
   'size.badge-height': 18,
@@ -671,6 +673,7 @@ export const darkTokens: HeytaNativeTokens = {
   'size.fab': 56,
   'size.chip-height': 28,
   'size.chip-padding-x': 10,
+  'size.capture-panel-max-width': 768,
   'size.divider-inset': 52,
   'size.badge-min-width': 18,
   'size.badge-height': 18,

@@ -226,6 +226,7 @@ export const HEYTA_SIZE_AVATAR_LG: number = 40;  // px
 export const HEYTA_SIZE_FAB: number = 56;  // px
 export const HEYTA_SIZE_CHIP_HEIGHT: number = 28;  // px
 export const HEYTA_SIZE_CHIP_PADDING_X: number = 10;  // px
+export const HEYTA_SIZE_CAPTURE_PANEL_MAX_WIDTH: number = 768;  // px
 export const HEYTA_SIZE_DIVIDER_INSET: number = 52;  // px
 export const HEYTA_SIZE_BADGE_MIN_WIDTH: number = 18;  // px
 export const HEYTA_SIZE_BADGE_HEIGHT: number = 18;  // px
