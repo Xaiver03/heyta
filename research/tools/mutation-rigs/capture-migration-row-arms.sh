@@ -105,13 +105,23 @@ const rows = [
     () => r(E2E).includes("getByTestId('capture-due-scroll')"),
     () => r(POP).includes('data-testid="capture-due-scroll"'),
     () => r(E2E).indexOf('-2-panel`)') > r(E2E).indexOf('面板里月历只有'),
-    () => r(E2E).indexOf('-2-panel`)') < r(E2E).indexOf('scrollIntoViewIfNeeded()')],
+    // ⚠️ 第四枚原来钉的是"图排在 scrollIntoViewIfNeeded 之前"；§9.31 把整支的工具滚动清零了
+    //    ⇒ 那个 needle 在剥注释后的文本里根本不存在（`indexOf` 回 -1，判据会假红）。
+    //    换成仍然表达同一意图的形状：**图必须在"出口可达"那组读数之前**。
+    () => r(E2E).indexOf('-2-panel`)') < r(E2E).indexOf('出口可达]')],
   // ↓ 11-05 第五趟后半：就地展开那一支的出口判据（§9.30）。
   //    第三枚是**反向钉子**：那条恒真的旧写法（scrollIntoView 之后问 toBeInViewport）不许回来。
   ['26 就地展开这一支的出口判据量的是"没滚之前的状态"，旧那条恒真写法已删（§9.30）',
     () => r(E2E).includes('出口可达·就地展开'),
     () => r(E2E).includes('用户既看不见也滚不到'),
     () => !r(E2E).includes('撤销出口被外层编辑器的限高裁到够不着')],
+  // ↓ 11-05 第五趟收尾：把 §9.30 那一族在**本 spec 里剩下的三处**一起换掉（§9.31）。
+  //    第二枚是整支的反向钉子：剥掉注释后，这份 spec 里**一次程序滚动都不许有** ——
+  //    可达性要么量没滚之前的状态，要么量容器，不能靠工具自己滚。
+  ['27 本 spec 的可达性判据全部换成"未滚动状态 + 容器级"，工具滚动整支清零（§9.31）',
+    () => r(E2E).includes('面板滚动区可视底边'),
+    () => !r(E2E).includes('scrollIntoViewIfNeeded'),
+    () => !r(E2E).includes('滚过之后仍然不在视口里')],
 ];
 
 let bad = 0;
