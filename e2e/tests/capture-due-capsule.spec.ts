@@ -147,31 +147,34 @@ async function shootFrame(page: Page, name: string, narrow: boolean): Promise<vo
     overflowY: getComputedStyle(el).overflowY,
   }));
   // 读数打出来：这一格的意义全在"分支走到没有"——不打出来，绿的用例和恒假的用例长得一样。
+  const rawRowBox = (await timeRow.boundingBox())!;
+  const outletDelta = rawRowBox.y + rawRowBox.height - scrollBox.clientBottom;
   console.info(
     `[出口可达] ${name}：内层可视 ${String(scrollBox.clientHeight)}px / 内容 ${String(scrollBox.scrollHeight)}px`
-    + ` ⇒ 溢出 ${String(scrollBox.scrollHeight - scrollBox.clientHeight)}px，overflow-y=${scrollBox.overflowY}`,
+    + ` ⇒ 溢出 ${String(scrollBox.scrollHeight - scrollBox.clientHeight)}px，overflow-y=${scrollBox.overflowY}`
+    + ` / 「时刻」出口${outletDelta > 1 ? `在可视区以下 ${String(Math.round(outletDelta))}px` : '本来就在可视区内'}`,
   );
-  if (scrollBox.scrollHeight > scrollBox.clientHeight) {
+  /*
+   * 🔴 这里**不滚动**。`scrollIntoViewIfNeeded()` 是程序滚动，`overflow: hidden`
+   *    挡得住用户、挡不住它 —— 所以"滚过之后再问在不在可视区"是恒真的（§9.30 记的
+   *    就是这一族，本行第一版正是那个形状）。用户能不能够到，只取决于两件事：
+   *    出口此刻在不在可视区内；不在的话，这块区域**用户自己滚不滚得动**。
+   */
+  if (outletDelta > 1) {
     expect(
       ['auto', 'scroll'],
-      `面板内容溢出 ${String(scrollBox.scrollHeight - scrollBox.clientHeight)}px，`
-      + `而 overflow-y=${scrollBox.overflowY} ⇒ 底部那几条出口滚不到`,
+      `「时刻」出口落在面板可视区以下 ${String(Math.round(outletDelta))}px，`
+      + `而 overflow-y=${scrollBox.overflowY} ⇒ 用户既看不见也滚不到`,
     ).toContain(scrollBox.overflowY);
-    await timeRow.scrollIntoViewIfNeeded();
   }
-  const rowBox = (await timeRow.boundingBox())!;
-  expect(
-    rowBox.y + rowBox.height,
-    `「时刻」出口没整条落进可视区（可视底边 ${String(scrollBox.clientBottom)}，`
-    + `行底 ${String(rowBox.y + rowBox.height)}，溢出 ${String(scrollBox.scrollHeight - scrollBox.clientHeight)}px）`,
-  ).toBeLessThanOrEqual(scrollBox.clientBottom + 1);
 
   // ⑤.5 🔴 **面板里的每一条撤销出口都要点得到**。
   //
   // 这条是看图看出来的，不是断言抓出来的：375×720 那一帧，面板外壳"没越视口"，
   // 而底边「文字里读到的日期」那两条的 × 压在底部导航（`.ht-compact-rail`）下面 ——
   // 上一版只量了外壳，于是几何全绿、用户点不到。
-  // 现在的契约是"**能滚到，滚到之后既在视口内、也不被底部栏压住**"。
+  // 现在的契约是**容器级**的那条：面板那块可滚区域的可视底边不许压在底部导航上面
+  //（滚到底还露在导航上面 ⇒ 每一条出口都够得着）。逐条"滚过再量位置"是恒真的，已删，见 §9.30。
   const rail = page.locator('.ht-compact-rail');
   const railCount = await rail.count();
   // 🔴 窄档**必须有**底部导航，否则下面那两条"不许被压住"会因 `railBox === null`
@@ -184,21 +187,23 @@ async function shootFrame(page: Page, name: string, narrow: boolean): Promise<vo
     ).toBeGreaterThan(0);
   }
   const railBox = railCount > 0 ? await rail.first().boundingBox() : null;
+  /*
+   * 🔴 这一格量的是**容器**：面板那块可滚区域的可视底边，不许压在底部导航上面。
+   *    第一版逐条 `scrollIntoViewIfNeeded()` 再量元素位置 —— 同一个恒真形状（§9.30）：
+   *    工具会滚，元素就能被摆进可视带，判据永远绿。而用户真正依赖的是
+   *    **滚到底之后那块区域还露不露在导航上面**：露着，任何一条出口都滚得到；
+   *    压着，滚到底也还是在导航底下。这一条量容器，工具滚不动它。
+   */
+  if (railBox !== null) {
+    expect(
+      scrollBox.clientBottom,
+      `面板滚动区可视底边 ${String(Math.round(scrollBox.clientBottom))} 压在底部导航（顶边 `
+      + `${String(Math.round(railBox.y))}）下面 ⇒ 滚到底那几条出口仍在导航底下，用户点不到`,
+    ).toBeLessThanOrEqual(railBox.y + 1);
+  }
   const toggles = panel.locator('[data-testid^="capture-due-item-toggle-"]');
   const toggleCount = await toggles.count();
   expect(toggleCount, '面板里没有逐条撤销出口 ⇒ 不变量"每条都能单独取消"没有出口').toBeGreaterThan(0);
-  for (let i = 0; i < toggleCount; i += 1) {
-    const node = toggles.nth(i);
-    await node.scrollIntoViewIfNeeded();
-    await expect(node, `第 ${String(i + 1)} 条撤销出口滚过之后仍然不在视口里`).toBeInViewport();
-    if (railBox !== null) {
-      const box = (await node.boundingBox())!;
-      expect(
-        box.y + box.height,
-        `第 ${String(i + 1)} 条撤销出口压在底部导航下面 ⇒ 用户在界面上点不到它`,
-      ).toBeLessThanOrEqual(railBox.y + 1);
-    }
-  }
 
   // ⑥ 在面板里改一天 = 覆盖，而**覆盖不许把用户写的字吞掉**。
   await picker.getByRole('button', { name: '明天' }).click();
@@ -218,12 +223,9 @@ async function shootFrame(page: Page, name: string, narrow: boolean): Promise<vo
   await page.screenshot({ path: SHOT(`${name}-4-time-list`) });
 
   const slot = panel.getByTestId('capture-time-slot-21:00');
-  await slot.scrollIntoViewIfNeeded();
-  await expect(slot, '21:00 这一格滚过之后仍然不在视口里').toBeInViewport();
-  if (railBox !== null) {
-    const slotBox = (await slot.boundingBox())!;
-    expect(slotBox.y + slotBox.height, '21:00 压在底部导航下面 ⇒ 点不到').toBeLessThanOrEqual(railBox.y + 1);
-  }
+  await expect(slot, '时刻列表里没有 21:00 这一格').toBeVisible();
+  // 可达性由上面那枚**容器级**判据负责（滚动区可视底边不许压在底部导航下面）；
+  // 这里只判行为：点一格 ⇒ 值进胶囊。⚠️ 别再写回"滚过之后在不在视口里"——恒真（§9.30）。
   await slot.click();
   await expect(capsule).toContainText('21:00');
 
