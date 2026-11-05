@@ -108,6 +108,30 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
   bash scripts/verify-mobile-pin-order.sh
 ```
 
+### 九条验收逐条对上今天的读数（2026-11-05 20:0x，HEAD 已含别线 `e33523e7e`）
+
+用例名是从文件里读出来的，不是复述的。⚠️ 两枚浏览器腿 11/11 与三枚单测 123/123 是 20:0x **同一趟**
+（HEAD 已含别线 `e33523e7e`）；iOS 设备腿 9/9 是 17:0x 那一趟，戳在 `HEAD=1062146c6`，
+比这棵树早两笔 —— 别把三行读成同一次测量。
+
+| 格 | 判据（用例名 + 位置） | 本趟 |
+|---|---|---|
+| B1 优先级四档 | `apps/web/tests/task-row-menu.spec.tsx`「B1 优先级：展开四档，点「高」发的是 onSetPriority(taskId, High) 并收走菜单」+ 浏览器腿 ⑥ | ✅ |
+| B2 添加子任务 | 同文件「B2 添加子任务：点它把父任务的 id 交给宿主，并收走菜单」 | ✅ |
+| B3 标签（含就地新建） | 同文件「B3 标签：点一条发的是**整组**」「🔴 B3 取消：已经在组里的那一条再点一次…」「🔴 一条标签都没有、但宿主接了 `onCreateTag` ⇒ 「标签」这一行仍在」「🔴 草稿里按 Esc：退回「新建标签」那一枚，菜单**不被一起关掉**」+ 浏览器腿 ⑧ | ✅ |
+| B4 移动到 | 同文件「B4 移动到：给的是「收集箱」+ 每条清单，点清单发的是那个 id」+ 浏览器腿 ④（`Shift+F10` → 走到「移动到」→ Enter 换归属） | ✅ |
+| B5 置顶 | 同文件「置顶这一项（B5…）」三条（含「🔴 已置顶的那条给「取消置顶」—— 是开关不是单向按钮」）+ `packages/domain/tests/task-order.spec.ts`（做过变异验证）+ 浏览器腿 ⑥ + iOS 设备腿 9/9 | ✅ |
+| 🔴 键盘 Enter 打不开子菜单（真缺陷） | 同文件「🔴 键盘 Enter 能展开子菜单（触发器必须是真菜单项，不是包一层的 div）」+ `pnpm check:menu-keyboard` | ✅（门今天退 0） |
+| C2 工具条三枚 | `apps/web/tests/task-detail-card.spec.tsx`「底部工具条（滴答对齐 C2）：按钮说的事必须真做得到」+ 浏览器腿 ② | ✅ |
+| C4 逾期红色 | 浏览器腿 ①（计算色 = `--ht-color-danger` 且带日历/计时图标）与 ⑤（暗色同一格还在原位） | ✅ |
+| D2 回收站搬侧栏 | `e2e/tests/sidebar-trash-anchor.spec.ts` 两枚（宽屏：那一行在侧栏最下方且 rail 上没有第二枚；窄屏：抽屉里点得到且真的切视图）+ 腿 ⑤⑦ | ✅ |
+| D3 分组头下说明 | `apps/web/tests/projects-panel.spec.tsx`「D3 分组说明：标题下面那句"这一格装的是什么"」+ 空态那格「零清单零标签时，两块各给一句标题 + 一句说明」+ 浏览器腿 ③ | ✅ |
+
+⚠️ 这张表只回答"九条今天还成立吗"。它**不**等于"和滴答对齐了"——分母在
+[dida365-feature-benchmark.md](../research/dida365-feature-benchmark.md) **§9.2**（只读那一节），
+2026-11-05 现量五条仍缺：无看板、`TaskFilter` 是封闭联合、`nextAfterCompletion` 零生产调用点、
+`Task.order` 无写入路径、C1 富文本没做。
+
 ---
 
 ## 四、还欠什么、卡在谁
