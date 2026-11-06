@@ -1650,6 +1650,37 @@ export function TaskDetailSheet({
             </Text>
           )}
           {/*
+            「完成后顺延」（2026-11-06，滴答对齐 §五 第 3 步的移动端半边）。
+
+            为什么是一枚可切换的 chip 而不是一个 Switch：本屏**没有**开关控件的先例
+            （`grep -rn onValueChange apps/mobile/src` 为零），新引入一种控制形状要连带
+            定 track/thumb 的语义色，那是设计系统的口径；而这一格与上面的预设是同一类东西
+            —— "对这条重复规则的一个选择"，用同一排 chip 的形状说同一档事实。
+            没有规则时不画（与 web 那一格同规矩：按下去不会有任何变化的行不留）。
+          */}
+          {repeat !== undefined && (
+            <>
+              <View style={styles.chipRow}>
+                <Chip
+                  label={t('mobile.detail.repeat.afterCompletion')}
+                  selected={task.repeatAfterCompletion === true}
+                  testID="task-detail-repeat-after-completion"
+                  onPress={() => {
+                    run(
+                      actions.setRepeatAfterCompletion(
+                        task.id,
+                        task.repeatAfterCompletion !== true,
+                      ),
+                    );
+                  }}
+                />
+              </View>
+              <Text variant="row-meta" tone="muted">
+                {t('mobile.detail.repeat.afterCompletionHint')}
+              </Text>
+            </>
+          )}
+          {/*
             自定义 RRULE（B2-3 的移动端尾巴）。
 
             🔴 在此之前**移动端只能选预设** —— 用户想要"每两周"就得去网页上设，

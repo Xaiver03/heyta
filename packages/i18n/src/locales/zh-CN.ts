@@ -2022,6 +2022,8 @@ export const zhCN = {
   'web.repeat.customPlaceholder': '例如 FREQ=WEEKLY;INTERVAL=2;BYDAY=MO',
   'web.repeat.customAria': '给任务「{title}」输入自定义重复规则',
   'web.repeat.apply': '应用',
+  'web.repeat.afterCompletion': '完成后顺延',
+  'web.repeat.afterCompletionHint': '错过的那几次不再补回，下一次从完成那一天往后算。',
   'web.repeat.error.empty': '请先输入一条规则。',
   'web.repeat.error.invalid': '这不是一条合法的 RRULE（需要 FREQ=…）。',
 
@@ -3501,6 +3503,8 @@ export const zhCN = {
   'mobile.detail.field.repeat': '重复',
   'mobile.detail.repeat.none': '不重复',
   'mobile.detail.repeat.current': '当前：{rule}',
+  'mobile.detail.repeat.afterCompletion': '完成后顺延',
+  'mobile.detail.repeat.afterCompletionHint': '错过的那几次不再补回，下一次从完成那一天往后算。',
   'mobile.detail.repeat.daily': '每天',
   'mobile.detail.repeat.weekly': '每周',
   'mobile.detail.repeat.weekdays': '工作日',

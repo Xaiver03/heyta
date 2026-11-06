@@ -43,6 +43,7 @@ import {
   isLive,
   isValidRecurrenceRule,
   trashedIn,
+  nextAfterCompletion,
   nextOccurrence,
   parseLocalDate,
   startOfDay,
@@ -417,6 +418,17 @@ export interface TaskActions {
   setRepeat(entityId: string, rule: string | undefined): Promise<void>;
 
   /**
+   * 开/关这条任务的「完成后顺延」档（落在 `Task.repeatAfterCompletion`）。
+   *
+   * 一个用户意图 = 一个 op（§3.4）：换节奏是 `setRepeat`，改"从哪一天往后推"是这一枚，
+   * 两者不许合成一个动作 —— 界面上它们也是两处不同的控件。
+   *
+   * 关掉时写 `null` 而不是 `false`：这样"从未设过"与"设过又关掉"在数据上同形，
+   * 历史任务不需要一个迁移去解释，读取侧一律 `=== true` 才算开。
+   */
+  setRepeatAfterCompletion(entityId: string, on: boolean): Promise<void>;
+
+  /**
    * 取某个任务的重复规则；没有规则（或规则串已损坏）时返回 `undefined`。
    *
    * 视图层要靠它决定"要不要画那个重复图标"，也要靠它显示 `describeRecurrence`。
@@ -503,10 +515,13 @@ export function createTaskActions(
    * 恰恰是下周还要做的。上游 `nextAfterCompletion` 的注释把这层说得很清楚：
    * 重复的是一条**实例**，不是那条任务本身。
    *
-   * ⚠️ **推进的基准是"当前到期日"，不是"完成时刻"。**
-   * 用完成时刻的话：一条 9/14(周一) 的任务在 9/13(周日) 被提前勾掉，
-   * "下一个 9/14 之后的周一"仍然是 9/14 —— 到期日纹丝不动，用户会以为勾选没生效。
-   * 所以固定排期一律从当前到期日往后推，"每周一"永远落在周一。
+   * ⚠️ **推进的基准分两档**（2026-11-06 起；默认那一档的规矩一字未改）：
+   *  · **固定排期（默认，也是所有历史任务的样子）**：从**当前到期日**往后推。
+   *    用完成时刻的话：一条 9/14(周一) 的任务在 9/13(周日) 被提前勾掉，
+   *    "下一个 9/14 之后的周一"仍然是 9/14 —— 到期日纹丝不动，用户会以为勾选没生效。
+   *    所以固定排期一律从当前到期日往后推，"每周一"永远落在周一。
+   *  · **完成后顺延（`Task.repeatAfterCompletion === true`）**：从**完成那一天**往后推。
+   *    这一档要的就是"错过两周不把那两个周期还回来"，因此它**故意**不承担上面那条不漂移的保证。
    *
    * 规则已经走到尽头（`UNTIL`/`COUNT` 用尽 → `nextOccurrence` 返回 `undefined`）时
    * **退回普通完成**：这一次是最后一件，之后就没有了。
@@ -549,8 +564,14 @@ export function createTaskActions(
       return;
     }
 
-    const from = dueLocalDateOf(task) ?? repeat.dtstart;
-    const next = nextOccurrence(repeat.rule, repeat.dtstart, from);
+    // 🔴 两档的差别**只在基准**，规则串与锚点都不动（见 `Task.repeatAfterCompletion`）：
+    //   · 完成后顺延 ⇒ 从"完成那一天"往后找下一次（错过两周不会把那两个周期还回来）；
+    //   · 固定排期（默认、含字段为 `undefined` 的历史任务）⇒ 从当前到期日往后推，节奏不漂。
+    const afterCompletion = task.repeatAfterCompletion === true;
+    const from = afterCompletion ? today(now()) : dueLocalDateOf(task) ?? repeat.dtstart;
+    const next = afterCompletion
+      ? nextAfterCompletion(repeat.rule, repeat.dtstart, from)
+      : nextOccurrence(repeat.rule, repeat.dtstart, from);
     if (next === undefined) {
       await update(entityId, withWidgetReceipt(task, receipt, { completedAt: now() }));
       return;
@@ -1101,6 +1122,13 @@ export function createTaskActions(
         repeatDtstart: anchor,
         ...(task.dueDate === undefined ? { dueDate: startOfDay(now()) } : {}),
       });
+    },
+
+    async setRepeatAfterCompletion(entityId, on) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      // 关掉写成 null，见接口上那段注释：让"没设过"和"设过又关掉"同形。
+      await update(entityId, { repeatAfterCompletion: on ? true : null });
     },
 
     repeatOf(entityId) {

@@ -1863,6 +1863,8 @@ export const en = {
   'web.repeat.customPlaceholder': 'e.g. FREQ=WEEKLY;INTERVAL=2;BYDAY=MO',
   'web.repeat.customAria': 'Enter a custom repeat rule for task "{title}"',
   'web.repeat.apply': 'Apply',
+  'web.repeat.afterCompletion': 'Roll forward after completion',
+  'web.repeat.afterCompletionHint': 'Skipped occurrences do not come back. The next due date counts from the day you finish the task.',
   'web.repeat.error.empty': 'Enter a rule first.',
   'web.repeat.error.invalid': 'That is not a valid RRULE (it needs FREQ=…).',
 
@@ -3245,6 +3247,8 @@ export const en = {
   'mobile.detail.field.repeat': 'Repeat',
   'mobile.detail.repeat.none': 'Does not repeat',
   'mobile.detail.repeat.current': 'Current: {rule}',
+  'mobile.detail.repeat.afterCompletion': 'Roll forward after completion',
+  'mobile.detail.repeat.afterCompletionHint': 'Skipped occurrences do not come back. The next due date counts from the day you finish the task.',
   'mobile.detail.repeat.daily': 'Daily',
   'mobile.detail.repeat.weekly': 'Weekly',
   'mobile.detail.repeat.weekdays': 'Weekdays',

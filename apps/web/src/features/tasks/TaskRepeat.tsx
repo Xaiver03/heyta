@@ -65,6 +65,23 @@ const PRESET_LABEL_KEYS: Record<RepeatPresetId, MessageKey> = {
   yearly: 'web.repeat.yearly',
 };
 
+/**
+ * 「完成后顺延」那一行的排版。模块级常量，不是 JSX 里的 `style={{…}}` 字面量
+ * （后者会被 `scripts/check-l4-no-style.mjs` 的棘轮计进数，而本文件已经欠着一枚）。
+ */
+const afterCompletionRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: cssVar('space.2'),
+  fontSize: cssVar('font-size.sm'),
+};
+
+const afterCompletionHintStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: cssVar('font-size.xs'),
+  color: cssVar('color.foreground-muted'),
+};
+
 /** 自定义输入的两种失败。用**结构化枚举**而不是文案，文案由词条表给。 */
 type CustomError = 'empty' | 'invalid';
 
@@ -163,11 +180,19 @@ export function RepeatChip({ task, now }: { task: Task; now: number }): React.JS
 export function RepeatField({
   task,
   onSetRepeat,
+  onSetAfterCompletion,
   now,
 }: {
   task: Task;
   /** 传 `undefined` 表示取消重复。 */
   onSetRepeat: (rule: string | undefined) => void;
+  /**
+   * 开 / 关「完成后顺延」（契约见 `TaskActions.setRepeatAfterCompletion`）。
+   *
+   * 🔴 必传而不是可选：这一格与"换节奏"是**两个意图、两个 op**（§3.4），
+   * 可选参数会让某个落点悄悄漏掉它 —— 漏掉的症状是"界面画了勾，勾了什么也没发生"。
+   */
+  onSetAfterCompletion: (on: boolean) => void;
   /** 用于算锚点（`dueDate` 缺省时按"今天"算）。 */
   now: number;
 }): React.JSX.Element {
@@ -284,6 +309,32 @@ export function RepeatField({
           逐字同一条路 —— 这里只挪了**住址**，没动**行为**。
           这枚 `<details>` 不带 `open` 属性 = 默认收起；`data-testid` 供判据
           钉"默认不可见、展开后可见"这一档。 */}
+      {/*
+        「完成后顺延」只在**已经有规则**时出现：没有规则就没有"下一次"，
+        画出来是一枚按下去不会有任何变化的勾（同 `B3 标签` 那格定的规矩）。
+      */}
+      {current === undefined ? null : (
+        <label
+          data-testid="task-repeat-after-completion-row"
+          style={afterCompletionRowStyle}
+          htmlFor="task-repeat-after-completion"
+        >
+          <input
+            id="task-repeat-after-completion"
+            type="checkbox"
+            data-testid="task-repeat-after-completion"
+            checked={task.repeatAfterCompletion === true}
+            onChange={(event) => {
+              onSetAfterCompletion(event.target.checked);
+            }}
+          />
+          <span>
+            {t('web.repeat.afterCompletion')}
+            <span style={afterCompletionHintStyle}>{t('web.repeat.afterCompletionHint')}</span>
+          </span>
+        </label>
+      )}
+
       <details data-testid="task-repeat-advanced">
         <summary style={advancedSummaryStyle}>{t('web.tasks.detail.advanced')}</summary>
         <div style={advancedBodyStyle}>
@@ -343,10 +394,12 @@ export function RepeatField({
 export function TaskRepeat({
   task,
   onSetRepeat,
+  onSetAfterCompletion,
   now,
 }: {
   task: Task;
   onSetRepeat: (rule: string | undefined) => void;
+  onSetAfterCompletion: (on: boolean) => void;
   now: number;
 }): React.JSX.Element {
   const { t } = useI18n();
@@ -386,7 +439,12 @@ export function TaskRepeat({
             boxShadow: cssVar('shadow.lg'),
           }}
         >
-          <RepeatField task={task} onSetRepeat={onSetRepeat} now={now} />
+          <RepeatField
+            task={task}
+            onSetRepeat={onSetRepeat}
+            onSetAfterCompletion={onSetAfterCompletion}
+            now={now}
+          />
         </div>
       </details>
     </span>

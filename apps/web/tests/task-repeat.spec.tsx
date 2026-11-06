@@ -23,6 +23,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { Recurrence } from '@heyta/domain';
 import { emptyState } from '@heyta/op-log';
 import { I18nProvider } from '@heyta/i18n';
 import { IndexedDbAdapter, IndexedDbOpLogStore } from '@heyta/storage';
@@ -118,6 +119,9 @@ async function mountFor(taskId: string): Promise<HTMLDivElement> {
           onSetRepeat={(rule) => {
             // 攥住 promise（见 `pendingWrite` 的说明），不要 `void` 掉。
             pendingWrite = useTaskStore.getState().setRepeat(taskId, rule);
+          }}
+          onSetAfterCompletion={(on) => {
+            pendingWrite = useTaskStore.getState().setRepeatAfterCompletion(taskId, on);
           }}
         />
       </I18nProvider>,
@@ -285,5 +289,64 @@ describe('🔴 接线：重复控件的入口真的接进了整棵树', () => {
       container.querySelector(`[data-testid="task-trailing-${taskId}"] [data-testid="task-repeat-summary"]`),
       '重复的编辑器又回到行尾了 —— 行上只许留只读徽标',
     ).toBeNull();
+  });
+});
+
+/**
+ * 🔴 「完成后顺延」那一格（2026-11-06，滴答对齐 §五 第 3 步的界面半边）。
+ *
+ * 盯三件事：① 没有规则时**不许画**这一行（按下去不会有任何变化的行不留 ——
+ * 与行菜单那格"宿主没接就不画"是同一条规矩）；② 勾与不勾**真的写进 store**
+ * （不是只改本地 state 的假控件）；③ 这一格只发**一个 op** 且不碰规则串
+ * （§3.4：改基准与换节奏是两个意图，不许合成一次写入）。
+ */
+describe('完成后顺延那一格', () => {
+  const row = (): HTMLElement | null =>
+    container!.querySelector('[data-testid="task-repeat-after-completion-row"]');
+  const box = (): HTMLInputElement | null =>
+    container!.querySelector('[data-testid="task-repeat-after-completion"]');
+
+  /** 先把规则设上再挂载：这里挂的是快照 props，挂载之后再设规则不会重渲染。 */
+  async function weeklyTask(): Promise<string> {
+    const id = await seedTask('每周一的会');
+    await useTaskStore.getState().setRepeat(id, Recurrence.weekly(['MO']));
+    return id;
+  }
+
+  it('没有规则 ⇒ 这一行不画', async () => {
+    const id = await seedTask('不重复的任务');
+    await mountFor(id);
+    expect(row()).toBeNull();
+  });
+
+  it('有规则 ⇒ 画出来；勾上真的写进 store', async () => {
+    const id = await weeklyTask();
+    await mountFor(id);
+    expect(box(), '有规则时这一格没画出来').not.toBeNull();
+    expect(box()!.checked).toBe(false);
+
+    await act(async () => {
+      box()!.click();
+      await pendingWrite;
+    });
+    expect(useTaskStore.getState().entities.tasks[id]!.repeatAfterCompletion).toBe(true);
+  });
+
+  it('再勾一次 ⇒ 回到默认档，且只发一个 op、不碰规则串', async () => {
+    const id = await weeklyTask();
+    await useTaskStore.getState().setRepeatAfterCompletion(id, true);
+    await mountFor(id);
+    expect(box()!.checked).toBe(true);
+
+    const opsBefore = (await allOps()).filter((op) => op.entityId === id).length;
+    await act(async () => {
+      box()!.click();
+      await pendingWrite;
+    });
+    const after = useTaskStore.getState().entities.tasks[id]!;
+    expect(after.repeatAfterCompletion === true).toBe(false);
+    expect((await allOps()).filter((op) => op.entityId === id).length - opsBefore).toBe(1);
+    expect(after.repeatRule).toBe(Recurrence.weekly(['MO']));
+    expect(after.repeatDtstart).toBeDefined();
   });
 });

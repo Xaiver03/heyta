@@ -459,3 +459,90 @@ describe('🔴 完成重复任务时，它的提醒跟着新的截止走', () =>
     expect(id).toBe(reminderIdOf(taskId, noonOf(MONDAY) - THIRTY_MIN));
   });
 });
+
+/**
+ * 🔴 「完成后顺延」这一档（2026-11-06 补，滴答对齐 §五 第 3 步）。
+ *
+ * 这一组只盯一件事：**推进的基准换不换得对**。台架刻意把时钟钉在
+ * `2026-09-28`（周一）而任务的到期日还停在 `2026-09-14` —— 也就是"错过两周之后才勾"。
+ * 两档在这个场景里的答案是**两个不同的日期**，所以这不是把实现抄进测试：
+ *   · 固定排期（默认 / 历史数据）⇒ `2026-09-21`：被跳过的那一周会还回来，节奏不漂；
+ *   · 完成后顺延 ⇒ `2026-10-05`：从今天往后找下一次，已经过去的两个周期不还。
+ *
+ * ⚠️ 断言一律取**日期级**（`toLocalDate(dueDate)`），与本文件既有那几条同口径 ——
+ *   完成时把时刻归零是既有的、且被明记"不归本档修"的行为，钉到毫秒会把一个产品决定
+ *   悄悄焊死在这里。
+ */
+describe('完成后顺延 vs 固定排期（Task.repeatAfterCompletion）', () => {
+  /** 2026-09-28 也是周一：任务已经错过两周。 */
+  const MISSED_BY_TWO_WEEKS = '2026-09-28';
+  /** 从"完成那一天"往后推的下一个周一。 */
+  const MONDAY_AFTER_COMPLETION = '2026-10-05';
+
+  beforeEach(() => {
+    clock = noonOf(MISSED_BY_TWO_WEEKS);
+  });
+
+  /** 建一条每周一的会，锚点钉在 9/14。 */
+  async function weeklyMondayTask(): Promise<string> {
+    const id = await actions.create('每周一的会', { dueDate: parseLocalDate(MONDAY).getTime() });
+    await actions.setRepeat(id, EVERY_MONDAY);
+    return id;
+  }
+
+  /**
+   * 顺延之后的到期日（日期级）。
+   *
+   * `Task.dueDate` 在类型上是可选的，所以这里先把它变成一条**能失败**的断言，
+   * 而不是拿 `!` 硬铸 —— 真没有到期日时，红话要直接说出这一点。
+   */
+  const dueOf = (id: string): string => {
+    const due = actions.findTask(id)!.dueDate;
+    expect(due, '这条任务没有到期日，谈不上"推进到下一次"').toBeDefined();
+    return toLocalDate(due as number);
+  };
+
+  it('没设过这一档 ⇒ 从当前到期日推（被跳过的那一周会还回来）', async () => {
+    const id = await weeklyMondayTask();
+    expect(actions.findTask(id)!.repeatAfterCompletion).toBeUndefined();
+
+    await actions.setCompleted(id, true);
+    expect(dueOf(id)).toBe(NEXT_MONDAY);
+  });
+
+  it('开了这一档 ⇒ 从完成那一天推，错过两周不把那两个周期还回来', async () => {
+    const id = await weeklyMondayTask();
+    await actions.setRepeatAfterCompletion(id, true);
+    expect(actions.findTask(id)!.repeatAfterCompletion).toBe(true);
+
+    await actions.setCompleted(id, true);
+    expect(dueOf(id)).toBe(MONDAY_AFTER_COMPLETION);
+    // 与默认档**不是同一个答案**，这条才有信息量（同一天两档同果就是恒真判据）。
+    expect(dueOf(id)).not.toBe(NEXT_MONDAY);
+  });
+
+  it('关掉这一档之后行为回到固定排期（存的形状与"从未设过"同形）', async () => {
+    const id = await weeklyMondayTask();
+    await actions.setRepeatAfterCompletion(id, true);
+    await actions.setRepeatAfterCompletion(id, false);
+    // 关成 `null` 还是留 `undefined` 归 op-log 的字段写入决定；**契约是"不为 true 即默认档"**。
+    expect(actions.findTask(id)!.repeatAfterCompletion === true).toBe(false);
+
+    await actions.setCompleted(id, true);
+    expect(dueOf(id)).toBe(NEXT_MONDAY);
+  });
+
+  it('🔴 设这一档只发一个 op（§3.4），且它不碰规则与锚点', async () => {
+    const id = await weeklyMondayTask();
+    const before = await engine.getOpsForEntity('TASK', id);
+    const ruleBefore = actions.findTask(id)!.repeatRule;
+    const anchorBefore = actions.findTask(id)!.repeatDtstart;
+
+    await actions.setRepeatAfterCompletion(id, true);
+
+    const after = await engine.getOpsForEntity('TASK', id);
+    expect(after.length - before.length).toBe(1);
+    expect(actions.findTask(id)!.repeatRule).toBe(ruleBefore);
+    expect(actions.findTask(id)!.repeatDtstart).toBe(anchorBefore);
+  });
+});
