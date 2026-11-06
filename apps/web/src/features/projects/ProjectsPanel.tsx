@@ -195,8 +195,15 @@ export function ProjectsPanel({
    * 口径走共享层同一个 `open*Counts`，与清单那节不会漂。
    */
   const tagCounts = useMemo(
-    () => openTagCounts(Object.values(tasks.entities.tasks)),
-    [tasks.entities.tasks],
+    /*
+      🔴 第三个参数是**标签表**，给了它才会解析合并别名（`Tag.mergedInto`）。
+      不给的话：把 A 合并进 B 之后，只挂着 A 的任务不会算进 B 的计数 ——
+      侧栏那个数字偏低，而界面上它们明明带着 B。
+    */
+    // ⚠️ 传的是**任务 store 里那张按 id 索引的标签表**（`entities.tags`），不是 `projects.tags` 那个数组 ——
+    // `resolveTagIds` 要的是 `Record<string, Tag>`。两份数据同源，形状不同。
+    () => openTagCounts(Object.values(tasks.entities.tasks), tasks.entities.tags),
+    [tasks.entities.tasks, tasks.entities.tags],
   );
   /**
    * 删除确认里那句"它挂在几条任务上"（W4b）。
@@ -207,8 +214,8 @@ export function ProjectsPanel({
    * （`@heyta/ui#liveTaskCountsByTag`），移动端拿的是同一个函数。
    */
   const tagRemoveImpact = useMemo(
-    () => liveTaskCountsByTag(Object.values(tasks.entities.tasks)),
-    [tasks.entities.tasks],
+    () => liveTaskCountsByTag(Object.values(tasks.entities.tasks), tasks.entities.tags),
+    [tasks.entities.tasks, tasks.entities.tags],
   );
 
   /**

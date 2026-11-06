@@ -75,7 +75,7 @@
  *    `archivedCount > 0` 时才画出来 —— 没有已归档清单时不占一行。
  */
 
-import { isArchived, isLive, type Project, type Tag, type Task } from '@heyta/domain';
+import { isArchived, isLive, resolveTagIds, type Project, type Tag, type Task } from '@heyta/domain';
 
 /* ========================================================================
  * 一、行模型
@@ -361,11 +361,22 @@ export function toTagItems(tags: readonly Tag[]): OrganizerItem[] {
  * 返回普通对象而不是 `Map`：理由同 `openTaskCounts`（取不到就是 `undefined`，
  * 那正是"计数位静默消失"的形状）。
  */
-export function openTagCounts(tasks: readonly Task[]): Record<string, number> {
+export function openTagCounts(
+  tasks: readonly Task[],
+  tags?: Readonly<Record<string, Tag>>,
+): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const task of tasks) {
     if (task.deletedAt !== undefined || task.completedAt !== undefined) continue;
-    for (const tagId of task.tagIds ?? []) {
+    /*
+      🔴 **给了 `tags` 就必须走解析**（标签合并的读侧别名，`domain/tags.ts`）：
+      合并只写一行标签（`Tag.mergedInto`），**不重写任务的 `tagIds`**。直接按原始 id 数，
+      侧栏那个数字会**偏低** —— 只挂着被合并掉的旧 id 的任务一条都不算给目标标签，
+      而界面上它们明明带着目标标签（用户会说"这个标签明明有 5 个任务，这里写 3"）。
+      不给 `tags` 时保持旧行为（按 id 精确匹配）：那是"这一端还没接线"的既有语义。
+    */
+    const ids = tags === undefined ? (task.tagIds ?? []) : resolveTagIds(task.tagIds, tags);
+    for (const tagId of ids) {
       counts[tagId] = (counts[tagId] ?? 0) + 1;
     }
   }
@@ -392,11 +403,16 @@ export function openTagCounts(tasks: readonly Task[]): Record<string, number> {
  * ⚠️ 数字是**摘掉标签**的条数，不是"会被删除的任务"条数（任务一条都不删）。
  * 措辞由词条承担，见 `common.organizer.remove.impact`。
  */
-export function liveTaskCountsByTag(tasks: readonly Task[]): Record<string, number> {
+export function liveTaskCountsByTag(
+  tasks: readonly Task[],
+  tags?: Readonly<Record<string, Tag>>,
+): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const task of tasks) {
     if (!isLive(task)) continue;
-    for (const tagId of task.tagIds ?? []) {
+    // 同上：给了 `tags` 就走解析，否则"删 A 影响 N 条任务"那句会把被合并过的任务漏掉。
+    const ids = tags === undefined ? (task.tagIds ?? []) : resolveTagIds(task.tagIds, tags);
+    for (const tagId of ids) {
       counts[tagId] = (counts[tagId] ?? 0) + 1;
     }
   }

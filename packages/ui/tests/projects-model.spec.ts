@@ -182,6 +182,36 @@ describe('标签计数：口径与清单那节必须一致，一条任务给它�
   });
 });
 
+/**
+ * 🔴 标签合并的**读侧别名**：合并只写一行标签（`Tag.mergedInto`），不重写任务的 `tagIds`。
+ * 所以"这个标签下有几条"必须经 `resolveTagIds` 才算得对 —— 否则侧栏那个数字**偏低**，
+ * 而界面上那些任务明明带着目标标签。这条钉的是"给了 `tags` 就必须解析"。
+ */
+describe('标签计数：合并别名必须解析（否则侧栏数字偏低）', () => {
+  const tags: Record<string, Tag> = {
+    a: { id: 'a', name: '旧名', mergedInto: 'b', createdAt: NOW, updatedAt: NOW } as Tag,
+    b: { id: 'b', name: '新名', createdAt: NOW, updatedAt: NOW } as Tag,
+  };
+  const tasks = [
+    task({ id: 't1', tagIds: ['a'] }), // 只挂着被合并掉的旧 id
+    task({ id: 't2', tagIds: ['b'] }),
+    task({ id: 't3', tagIds: ['a', 'b'] }), // 两个 id 解析成同一个 ⇒ 只算一次
+  ];
+
+  it('给了 tags：三条都算给 b，a 一个都不算（它已经不是有效标签）', () => {
+    expect(openTagCounts(tasks, tags)).toEqual({ b: 3 });
+  });
+
+  it('不给 tags：保持"按 id 精确匹配"的旧语义（这一端还没接线时的行为）', () => {
+    expect(openTagCounts(tasks)).toEqual({ a: 2, b: 2 });
+  });
+
+  it('删除影响面同一个口径：合并过的任务也算在目标标签上（含已完成）', () => {
+    const both = [...tasks, task({ id: 't4', tagIds: ['a'], completedAt: NOW })];
+    expect(liveTaskCountsByTag(both, tags)).toEqual({ b: 4 });
+  });
+});
+
 describe('标签：不因直觉加 archived 过滤', () => {
   it('toTagItems 原样投影 id / name', () => {
     expect(toTagItems([tag('g1', '紧急'), tag('g2', '等回复')])).toEqual([
