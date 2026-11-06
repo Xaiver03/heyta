@@ -1,19 +1,23 @@
-# 滴答清单 macOS 端逆向取证（REA）—— 只取「决定」，不取「表达」
+# 滴答清单桌面端逆向取证（macOS 已成型 / Windows 待交接）—— 只取「决定」，不取「表达」
 
 > 立项：2026-11-06。授权口径：产品负责人要求「下载 GitHub 上很火的 REA，看一下能不能逆向本地的滴答清单；
-> 只看看有没有可以参考的地方，**不照抄**」。
+> 只看看有没有可以参考的地方，**不照抄**」。第二轮追加：「UX 我也是要学习的……我在 Windows 上也安装了这个，
+> 也逆向一下，把获取到的参考关键信息**全都**写在文档当中」。
 >
-> 本文只回答两件事：**① 能不能逆向**、**② 逆向出来的东西里，哪些是可以学的决定、哪些是碰不得的表达**。
+> 本文只回答三件事：**① 能不能逆向**、**② 逆向出来的东西里哪些是可以学的决定、哪些是碰不得的表达**、
+> **③ Windows 端现在到哪一步、缺什么才能继续**。
 > 它不是功能对标表（那是 [`dida365-feature-benchmark`](dida365-feature-benchmark.md) 的活），
 > 也不是实施计划：本文**不提**任何工单，任何一条要落地都得先过自己的 ADR。
 
 ---
 
-## 0. 三句话结论
+## 0. 四句话结论
 
 1. **能逆向，而且已经拿到了「法律上最安全、工程上最有用」的那一层** —— 包结构、界面清单、文案规模、**完整数据模型**、接口与权限。全部是静态观察，一行代码没执行、一个账号没登录。
 2. **滴答 macOS 端是原生 Swift + Objective-C 框架群，不是 Electron。** 所以「扒 `app.asar` 看 JS」那条最省事的路**对它无效**；REA 的 Electron/JS 分析路径用不上，用上的是它的 Apple bundle / nib / Mach-O 静态面。
 3. **真正值得参考的是它数据模型里的几个「决定」**（每个视图一张独立的手动排序表、重复任务实例物化 + fetch flag、专注会话单独一条同步通道、第三方日历建成五表链），**不是界面细节**。界面细节（文案、图标、字体、截图、逐像素布局）恰恰是著作权与商标保护得最实的那一层 —— 那也是唯一不能碰的一层。
+4. **Windows 端这一轮没做完，卡在「拿不到安装后的文件」**：官方包是 **Inno Setup 的固态压缩**（24.1 MB，`FileVersion 8.2.5.0`），本机**没有 `innoextract` 可用**（brew / conda 的目录都是 root 所有，装不进去；我甚至用 ghcr 上的 Homebrew bottle 手工重定位了 `innoextract 1.9`，**卡在它依赖的 `libboost_system-mt` 在 boost 1.90 里已经不存在**）。解这个包只需一条命令，但**需要你在 Windows 那台机器上把目录放到 SHARE 盘**（§6.1 给了原样可粘的 PowerShell）。在此之前，Windows 端的**能力清单已经从 macOS 端 + 官方分发口径**里推出来了一大半，**UX 层（字号/窗宽/控件高度/语义色）这一轮反而从 macOS 的 436 个 nib 里读出来了**（§3.6）。
+
 
 ---
 
@@ -27,6 +31,7 @@
 | 为什么不在仓内 | 它是一次性取证工具，不是产品依赖。按 [`hard-constraints`](../agents/hard-constraints.md) §3.1–3.2，进仓的第三方组件要过「2021 年后仍在维护 + 许可证白名单」两道门并登记；取证工具走「不进仓」这条更省的路，也就没有登记义务 |
 | 环境事实 | 本机 Node **22.22.0**，低于 REA 要求的 22.23.4 ⇒ `npm` 报 `EBADENGINE` 但命令可跑；**需要 Node ≥24.15 的 SQLite 快照子命令不可用**（本次也用不上，见 §6） |
 | 网络 | 本机**直连 github.com 不通**（`Failed to connect after 75s`），走系统代理 `127.0.0.1:7890` 克隆成功；npm registry 直连可用 |
+| 第二轮追加工具 | `7z`（p7zip 17.05，本机已有）判 Windows 包形态；`innoextract` **没装上**（§2.2 三条路全断）；`/tmp/rea-lab/cli/node_modules/.bin/asar`（REA 依赖里自带）准备解 Windows 载荷 |
 
 ### 1.1 合规边界（写死，不随任务漂）
 
@@ -74,6 +79,32 @@
 | `TTCoreDataPod` | 旧 CoreData 遗留（9.6 MB，仍在链上） |
 
 > 工程取向的推论（**未核实**，仅作对照）：它把**同步/冲突**放在跨端共享的 Kotlin 层，把 UI 与本地库留在原生 —— 与 heyta「共享层放业务语义、宿主壳只放平台差异」是同一条思路，只是它用的是 Kotlin Multiplatform，heyta 用的是 TS 包。
+
+### 2.2 Windows 包的读数（这一轮能拿到的部分）
+
+官方分发端点全部实测（`https://ticktick.com/static/getApp/download?type=<t>`，2026-11-06）：
+
+| `type` | 返回 | 大小 | 是什么 |
+|---|---|---:|---|
+| `win64` | `application/octet-stream` | **24 130 416 B** | **PE32 installer**，`Inno Setup`，`FileVersion 8.2.5.0`，`CompanyName: Appest.com`，`ProductName: TickTick` |
+| `mac` | `application/x-apple-diskimage` | 81 822 109 B | macOS DMG |
+| `linux` / `linux64` / `appimage` / `deb` / `rpm` / `tar` / `win32` / `mac_arm64` | `application/vnd.android.package-archive` | 8 343 906 B | **全是同一个 APK** ⇒ 这些 `type` 不存在，服务端**兜底返回 Android 包** |
+
+三条从这张表直接得出的结论：
+
+1. **它没有 Linux 端** —— 任何 Linux 关键字都回落到 APK。heyta 若把 Linux 当差异化（本地优先 + 自托管天然适配 Linux 桌面），这是一个**它结构上不会跟的空档**。
+2. **Windows 包只有 Inno Setup 这一种形态**，没有 `.msi` / `.appx` / 便携 zip。这意味着要在 Windows 上做「无安装取证」只能装完再拷目录（§6.1）。
+3. `win64` 名义是 64 位，但**外层 stub 是 PE32（x86）**——Inno 的壳向来是 32 位，载荷才是 64 位，这不代表应用是 32 位（**未核实**载荷位数）。
+
+**为什么这一轮没解出载荷**：Inno Setup 把全部文件压成一个**固态 LZMA 流**存在 `.idata`；`7z` 只能拆 PE 段（拆出 `inno/.idata` 等 26 个文件，但那是压缩流不是文件树）。正解是 `innoextract`，而本机三条路都断了：
+
+| 路 | 结果 |
+|---|---|
+| `brew install innoextract` | ❌ `/opt/homebrew/*` 全部 root 所有，brew 拒绝写入 |
+| `conda create -c conda-forge innoextract` | ❌ conda 缓存目录权限错 |
+| 手工下 ghcr 上的 Homebrew bottle（`f6d11bb`/`d812cb1` 的 arm64 层，198 KB） | 🟡 下到了、`install_name_tool` 也重定位了，但**卡在 `libboost_system-mt.dylib`** —— bottle 是 2020 年对着 boost 1.73 编的，本机 boost 是 **1.90**，`libboost_system` 在 1.90 里已无 dylib（纯 header）。补一个假 dylib 或从源码重编都要几十分钟，**性价比不划算**，于是停手 |
+
+> 也就是说：**不是「解不开」，是「本机装不上解包器」**。你给我文件，我在 10 秒内解开（§6.1）。
 
 ---
 
@@ -157,6 +188,87 @@ USER · USERDOCUMENT · USERSETTINGS
 - Entitlements：`app-sandbox`、app group、`aps-environment=production`、`applesignin`、`associated-domains`（6 个 applink）、`personal-information.calendars`、`print`、`files.user-selected.read-write`、`network.client`。
 - **它没有** `files.downloads` 之类的宽权限 —— 导出走用户选择文件；这一条与 heyta 的本地优先并不冲突，但说明「沙盒内也能做完整导出」。
 
+### 3.6 UX 层读数（从 436 个 nib 里量出来的，这一节是「UX 要学」的正面回答）
+
+> 全部来自 nib 里存的 `NSFont.NSSize` / `NSWindowTemplate.NSWindowRect` / `NSView.NSFrame` / `NSColor.NSColorName`。
+> **这是它的实际用量分布，不是它的规范文档** —— 恰恰因为这样才可信：一个人不会把「本该用的字号」写进 nib，只会用。
+
+#### ① 字号：真正在用的只有 5 档
+
+| 字号 | 出现次数 | 读法 |
+|---:|---:|---|
+| **13** | **348** | 正文基准（macOS 系统默认 = 13，它没跟风缩小） |
+| **11** | **146** | 次要信息（第 2 档） |
+| 12 | 108 | 第 3 档（多在侧栏/表头） |
+| 16 | 82 | 区块标题 |
+| 14 | 71 | 正文加强 |
+| 10 / 15 / 18 / 20 / 22 / 24 | 27 / 5 / 10 / 16 / 2 / 14 | 边缘档（徽标、面板标题、大数字） |
+| 25 / 26 / 28 / 30 / 32 / 90 | 共 16 | 极少数（引导页大字、空态插画位） |
+
+**取值**：11 / 12 / 13 / 14 / 16 这五档覆盖了 **755 / 850 ≈ 89%** 的全部字号使用。它**没有**做 8/9/15/17/18 那一长串 —— 这是一个**五档的紧凑字阶**，基准 = 系统正文 13。
+**对 heyta**：我们的 `typography.ts` 里档位更多（含 `relaxed/normal/tight` 三套行高）。可以拿这条当证据问一句：**"我们真的需要比五档更多吗？"** —— 但**别抄它的 13/11/12 数值**，macOS 系统正文就是 13，那是平台常数不是它的设计。
+
+#### ② 字体：只换字重，不换字族
+
+`NSName` 命中：`.AppleSystemUIFont` 761 / `…Medium` 57 / `…Demi` 14 / `…Bold` 10 / `HelveticaNeue` 8（旧遗留）。
+**取值**：它把「层级」交给**系统字体的四个字重**，字族只有系统一个（外加一处 2013 年的 Helvetica 残留）。
+**对 heyta**：`packages/design-system` 若打算引入第二、第三字族，这条是反证 —— **一个平台字体 + 字重就够了**，多字族带来的收益要先证明。
+
+#### ③ 窗口尺寸：一个主窗 + 一个设置窗 + **一个「对话框宽度」**
+
+| 宽度 | 窗数 | 典型 |
+|---:|---:|---|
+| **440** | **12** | **对话框标准宽**（提醒/优先级/重复/账户/模板…） |
+| 300 / 416 / 420 / 472 / 479 / 480 / 483 / 508 / 512 | 各 1–2 | 小窗变体（确认框、颜色选择、成员列表） |
+| 560 / 620 / 642 | 1 / 1 / 2 | 中窗（登录 642×484） |
+| 700 | 1 | 引导/多步表单 |
+| **800×680** | 1 | **设置**（独立窗口，不是 sheet） |
+| 840×600 | 1 | 详情窗（`TTTaskDetailWindowController`） |
+| **1080×808** | 1 | **主窗**（`TTMainWindowController`） |
+
+**取值**：**12 个对话框共用 440 宽**。这是很强的一条设计纪律：**弹窗只有一个宽度**，高度随内容。heyta 的 `--ht-dialog-*` 目前是几个不同宽度（需现量核对），这条值得对账。
+另外两个可读的事实：**设置是独立窗口（800×680）而不是 sheet**；**任务详情也可能是独立窗口（840×600）而不是右侧栏** —— 这与 §4 里「详情面该用 split 还是 sheet」的老争论直接相关（macOS 端它选了**独立窗**，web 端它用右栏，两端不一致）。
+
+#### ④ 控件高度：24 / 28 / 30 / 32 四档 + 36 的输入框
+
+| 类 | 众数（出现次数） |
+|---|---|
+| `TTThemeButton`（自绘按钮，657 个） | **24**（221）、30（99）、16（70）、28（67）、32（40） |
+| `NSButton` | 32（14）、24（7）、48（5） |
+| `TTBorderedTextField` | **36**（22）、32（6） |
+| `TTBorderlessPopUpButton` | **20**（22） |
+| `NSView`（行容器） | **40**（51）、56（42）、24（35）、36（27）、48（20） |
+
+**取值**：**行高 40 与 56 两档**（40 = 单行紧凑，56 = 带副标题/双行）；**按钮 24 是绝对主力**（小尺寸工具条按钮）；**输入框 36**；**无边框下拉 20**。
+**对 heyta**：我们的 `ux-principles.md` 里写「控件高度一档」（`--ht-control-h` 一类），这条给了一个**反例读法**：它在**不同位置**用了 24/28/30/32 四档 —— 但那四档是**不同语义**（工具条图标钮 / 行内按钮 / 对话框主按钮 / 强调按钮），不是「随手不同」。真正要问的是：**heyta 的「一档」是不是把四种语义压成了一档。**
+
+#### ⑤ 颜色：96% 用语义名，几乎不写 hex
+
+| 语义色 | 次数 | | 语义色 | 次数 |
+|---|---:|---|---|---:|
+| `labelColor` | 285 | | `headerTextColor` | 76 |
+| `textBackgroundColor` | 250 | | `headerColor` | 75 |
+| `controlColor` | 115 | | `gridColor` | 60 |
+| `controlBackgroundColor` | 112 | | `selectedTextBackgroundColor` | 18 |
+| `controlTextColor` | 105 | | `linkColor` | 18 |
+
+**取值**：**一个 hex 都没在 nib 里出现**（nib 只存 `NSColorName` 这类语义引用）。它把「什么颜色」完全交给系统语义色 + 自己的主题层。
+**对 heyta**：这正是 `design-system.md` 那条「组件禁止裸值、用语义名不用外观名」的**外部佐证** —— 而且它做到的是**连设计稿层面都不写色值**。我们的 `check:design` 抓裸 hex 是对的方向，这条给了一个「成熟产品真按这个做」的样本。
+
+#### ⑥ 图标：12 / 14 / 16 / 18 / 20 五档，主力 18
+
+`NSImageView` 边长众数：**18**（56）、14（38）、12（31）、16（25）、20（25）、24（18）。
+**取值**：**18 是行内图标主力**，16 是次主力，12/14 是极小的状态点，20/24 是工具条。**没有 13/15/17 这种非偶数值**。
+
+#### ⑦ 空态：`TTTaskListEmptyHolderView` 30 个，高度众数 450
+
+**取值**：空态容器**占满列表区**（450pt 高），不是「一行小字居中」。
+**对 heyta**：`ux-principles` 里空态那一条可以拿这个当对照 —— **空态是「占据列表区的一块」而不是「列表里的一行」**。
+
+> ⚠️ **这一节的用法边界**：以上数字是**它的表达参数**（具体 px 与字号），**不能直接搬**。能搬的只有**形状**：
+> 「字阶要窄（≤5 档）」「对话框只有一个宽度」「按钮高度按语义分档而不是按页面分」「颜色只走语义」「空态占满容器」。
+> 具体数值请从 `packages/design-system/src/tokens.css` 自己推 —— 我们的基准字号/间距与 macOS 系统默认不必相同。
+
 ---
 
 ## 4. 可参考的七条（每条：它怎么做 → 证据 → heyta 现状 → 该学什么）
@@ -231,8 +343,12 @@ USER · USERDOCUMENT · USERSETTINGS
 | **Swift 反编译（看业务逻辑）** | REA 的 `inspect` / `decompile` 需要 Ghidra 12.1（+ JDK 21）或 Hopper；本机都没有 | 装 Ghidra（≈400 MB）或 Hopper（付费）；fat 二进制还需先 `lipo -thin arm64` | 装 Ghidra 约 10 分钟；反编译 Swift 的可读性差（Swift 泛型/协议 witness 表会糊成一团），**投入产出比低** |
 | **KMP 共享层（同步/冲突算法）** | 符号已剥，只能看字符串关键词 | 只能反编译 `KotlinMultiplatformAll`（≈9.7 MB Kotlin/Native 产物） | 可读性更差；不建议 |
 | **云端协议语义** | 只有 38 条路径名 | 需要抓包（MITM），**本次刻意不做**（要装证书、要过它的证书固定风险） | 越界：属「分析其服务」，不在「分析我本机的副本」范围内 |
+| **🔴 Windows 端的安装后文件** | 只有官方安装包（Inno 固态压缩），**载荷解不开**（§2.2）；我**也看不到你那台 Windows 机器** | **§7.1 的 PowerShell**：把 `%LOCALAPPDATA%\Programs\TickTick\resources` 拷到 SHARE 盘（你已经在用那块 exFAT 盘摆渡文件） | **一分钟**。回来之后 `asar extract` 10 秒；若是 Electron，渲染层等于全开 |
 
-**结论：想再往下走一步，性价比最高的是「本地库」而不是「反编译」。** 库能给的是真实 schema + 迁移代数 + 索引选择；反编译给的是「它怎么写的」，而那个东西本来就该由 heyta 自己决定。
+**两条结论**：
+
+1. **macOS 侧想再往下走，性价比最高的是「本地库」而不是「反编译」** —— 库给的是真实 schema + 迁移代数 + 索引选择；反编译给的是「它怎么写的」，而那个东西本来就该由我们自己决定。
+2. **Windows 侧现在的唯一瓶颈是「文件没到我手上」，不是技术难度**：是 Electron ⇒ 渲染层（CSS 变量、组件结构、快捷键、i18n、托盘菜单）一次全开；不是 Electron（WebView2 / Tauri / C++）⇒ 也能拿到原生资源与配置，再决定值不值得反编译。
 
 ---
 
@@ -268,6 +384,40 @@ strings -a /tmp/TT-arm64 | grep -oE '_TtC[0-9]+[A-Za-z0-9_]+' | sort -u | wc -l 
 
 # 6) 权限与签名
 codesign -d --entitlements :- /Applications/TickTick.app
+
+# 7) Windows 包：能下、能判形态、解不开载荷
+curl -sL "https://ticktick.com/static/getApp/download?type=win64" -o /tmp/TickTick-win64.exe   # 24 130 416 B
+file /tmp/TickTick-win64.exe        # PE32 executable (GUI) Intel 80386, for MS Windows
+7z l /tmp/TickTick-win64.exe | tail -5   # Comment: This installation was built with Inno Setup.
+7z x -y -o/tmp/inno /tmp/TickTick-win64.exe   # 只拆出 PE 段；.idata 是固态压缩流，不是文件树
+# 真正解包要 innoextract —— 本机三条路都断（brew/conda 目录 root 所有；bottle 卡在 libboost_system-mt）
+```
+
+### 7.1 交接命令（Windows 那台机器上跑，**原样可粘**）
+
+```powershell
+# 在 Windows 上开 PowerShell（不需要管理员），把安装目录整份放到 SHARE 盘
+$d = "$env:LOCALAPPDATA\Programs\TickTick"
+if (-not (Test-Path $d)) { $d = "$env:ProgramFiles\TickTick" }
+Write-Host "install dir = $d"
+
+# SHARE 盘符自己换（资源管理器里看，通常是 E: / F:）
+$dst = "E:\ticktick-win"
+New-Item -ItemType Directory -Force -Path $dst | Out-Null
+
+Copy-Item "$d\resources" -Destination $dst -Recurse -Force
+Copy-Item "$d\*.exe","$d\*.dll","$d\*.json" -Destination $dst -Force -ErrorAction SilentlyContinue
+
+# 交回来的是什么形状，一句话自证
+Test-Path "$dst\resources\app.asar"     # True ⇒ Electron，全部 UX 都在里面
+Get-ChildItem $dst -Recurse | Measure-Object Length -Sum | Select Count,Sum
+```
+
+拿到之后本机一条命令就够（`/tmp/rea-lab/cli/node_modules/.bin/asar` 已经装好了）：
+
+```bash
+npx --no-install asar extract /Volumes/SHARE/ticktick-win/resources/app.asar /tmp/rea-lab/win-app
+# 然后就能读：package.json（Electron 版本）· 渲染层 CSS（设计变量）· 菜单/托盘/快捷键定义 · i18n
 ```
 
 ---
@@ -279,11 +429,16 @@ codesign -d --entitlements :- /Applications/TickTick.app
 2. **未核实**：v2 是否已停用。38 条路径里 v2 占 32 条、v4 只有 6 条（全是日历），不能据此说「v2 还活着」。
 3. **未核实**：`KotlinMultiplatformAll` 是否真的承载同步与冲突解决。只有 `SYNC`/`Patch`/`Clock`/`Conflict` 的字符串计数，没有符号，「有字符串」不等于「有实现」。
 4. **未核实**：本地库的真实 schema（表名是**迁移 DDL 的累积**，实际库可能还有运行时 `ALTER`）。这一条只能靠 §6 的 FDA 路线补。
-5. **本次没有做的事**：抓包、登录其账号、读它的用户数据、执行它的任何代码路径。以上四条都是**刻意的边界**，不是能力不足。
+5. **未核实（Windows，最高优先级）**：**它到底是不是 Electron。** 现在的判断全是「Inno 装了 24 MB、Appest 同一主体、版本号 8.2.5」这类间接证据，**一条直接证据都没有** —— 拿到 `resources/` 一秒钟就能定案（有 `app.asar` 就是）。在定案之前，**不要**把「Windows 也是 Electron」写进任何计划。
+6. **未核实（Windows）**：载荷位数（32/64）、WebView 内核版本、托盘/快捷键注册方式、它是否复用 macOS 同一套业务逻辑（`KotlinMultiplatform` 在 Windows 上是 JVM 还是 Kotlin/Native）。这四条都要等文件。
+7. **本次没有做的事**：抓包、登录其账号、读它的用户数据、执行它的任何代码路径、接触你那台 Windows 机器。以上五条都是**刻意的边界**，不是能力不足。
 
 ---
 
 ## 9. 一句话给下一位
 
 > 逆向这件事的价值不在「看到它怎么写的」，而在**「发现它被迫回答过的问题，而我们还没回答」**。
-> 本文能直接用的只有 §4 那七条问题清单；其余全是**它的表达**，看一眼就够了。
+> 本文能直接用的只有 §4 那七条问题清单 + §3.6 那七条形状；其余全是**它的表达**，看一眼就够了。
+>
+> **Windows 侧现在只差一件事**：把 `%LOCALAPPDATA%\Programs\TickTick\resources` 放到 SHARE 盘（§7.1 那条 PowerShell 原样可粘）。
+> 在那之前，**别**基于「它也是 Electron」写任何计划 —— 那是 §8 第 5 条明写的未核实项。
