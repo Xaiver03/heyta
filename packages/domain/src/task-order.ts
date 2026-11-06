@@ -48,14 +48,12 @@ import { dueLocalDateOf } from './date.js';
  *   Hermes / V8 / JSC 上的 ICU 数据并不保证一致 —— 同一份数据在手机上和桌面壳上
  *   排出两个顺序，正是这个文件存在的理由（见上面那次「两份排序并存」事故）。
  *   按标题找东西的那叫**搜索**，不叫排序。
- * - **没有「手动拖拽」**。它需要一个持久化的 `order` 字段（每次拖动 = 一条 op），
- *   而 `Task` 今天没有。加持久化字段是**不可逆层**的动作（AGENTS §3.3），
- *   不该为了一个界面偏好顺手做。
+ * - **「手动拖拽」走 `Task.order`**（每次拖动 = 一条 op，字段已存在、可选）。
  */
-export type TaskSortKey = 'display' | 'addedAt' | 'priority';
+export type TaskSortKey = 'display' | 'addedAt' | 'priority' | 'manual';
 
 /** 供界面渲染选项 —— 菜单顺序就是这里的顺序，**不许各写第二份**。 */
-export const TASK_SORT_KEYS: readonly TaskSortKey[] = ['display', 'addedAt', 'priority'];
+export const TASK_SORT_KEYS: readonly TaskSortKey[] = ['display', 'addedAt', 'priority', 'manual'];
 
 /**
  * 同一档口径内部的比较。返回 0 = 这一档分不出先后，由外层用**原序**兜底。
@@ -104,6 +102,12 @@ function compareBySortKey(key: TaskSortKey, a: Task, b: Task): number {
       // **高的在前**。`undefined` 与 `None` 同义（0），自然落到最后 ——
       // 不给「没设优先级」发明中间档，那会让它插进 Low 与 Medium 之间。
       return (b.priority ?? Priority.None) - (a.priority ?? Priority.None);
+    case 'manual': {
+      const aOrd = a.order ?? Number.MAX_SAFE_INTEGER;
+      const bOrd = b.order ?? Number.MAX_SAFE_INTEGER;
+      if (aOrd !== bOrd) return aOrd - bOrd;
+      return 0;
+    }
   }
 }
 

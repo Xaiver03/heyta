@@ -272,6 +272,8 @@ export interface TaskActions {
    * 不许由各宿主在渲染时自己排。
    */
   setPinned(entityId: string, pinned: boolean): Promise<void>;
+  /** 手动拖拽排序：写 `Task.order`（一次拖动 = 一条 op）。 */
+  setOrder(entityId: string, order: number): Promise<void>;
   /**
    * 放弃 / 恢复（写 `Task.abandonedAt`，任务的第五个独立状态，
    * 见 [ADR-0083](../../../docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md) §3.1）。
@@ -856,6 +858,13 @@ export function createTaskActions(
       if ((task.pinnedAt !== undefined) === pinned) return;
       // null 而不是 undefined —— 见文件头第 2 条（`undefined` = 不改，`null` = 清除）。
       await update(entityId, { pinnedAt: pinned ? now() : null });
+    },
+
+    async setOrder(entityId, order) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      if (task.order === order) return;
+      await update(entityId, { order });
     },
 
     async setAbandoned(entityId, abandoned) {
