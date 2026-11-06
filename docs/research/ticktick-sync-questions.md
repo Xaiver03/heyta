@@ -17,7 +17,8 @@
 2. **传输编排在原生层，但 Kotlin 层不是「只有词汇」。** TickTickKit 的二进制里保留了内嵌源码路径：`TTSyncManager.swift`、`TTSyncService.swift`、`TTBatchSyncHandler.swift` 及其逐实体子类——**push/pull/游标在这一层**。Kotlin 侧 macOS 切片确实只剩 `KMAConstantsSyncType` / `KMAConstantsSyncStatus` / `KMADeletedStatus` 这类**枚举字面**（`KMAConstants*` 现量 **53** 个，`grep -oE 'KMA[A-Za-z]*[Ss]ync[A-Za-z]*'` 只回三条 `KMAConstants*`）；
    🔴 **但 Windows 那颗 DLL 没剥净符号**，`kfun:` 读数里 Kotlin 层有 `modifyrepeat.sync.entity.*`（同步实体模型）、`modifyrepeat.helper.editor.*`（重复任务三种改法的处理器）、`core.date.recurrence.TickRRule`、`task.diff.DiffMatchPatch`——**业务规则与数据模型在共享层，只是 macOS 切片看不见**（§2.11）。
    上一轮 Teardown §7 说「KMP 层承载同步/冲突，未核实」：本轮的修正是**一半对**——承载的是规则与模型，不承载传输。
-3. **它把「什么变了」拆得比「谁赢了」细得多。** 变更种类有 13 个 `SYNC_TYPE_*` 常量，任务侧还有四个**按维度**的批处理处理器（指派 / 顺序 / 父子 / 所属清单）；字段侧保留了一整族 `*Changed` 布尔键。但**裁决**那一侧，可见的只有 `ZLASTMODIFIEDDATE` + `ZETAG` 和一个取值不可见的 `DEFAULT_CONFLICT_STRATEGY`。
+3. **它把「什么变了」拆得比「谁赢了」细得多，而且「谁赢了」这件事它根本不打算让用户看见。** 变更种类有 13 个 `SYNC_TYPE_*` 常量，任务侧还有四个**按维度**的批处理处理器（指派 / 顺序 / 父子 / 所属清单）；字段侧保留了一整族 `*Changed` 布尔键。裁决那一侧，二进制里可见的只有 `ZLASTMODIFIEDDATE` + `ZETAG` 和一个取值不可见的 `DEFAULT_CONFLICT_STRATEGY`；
+   **但"裁决不了怎么办"这一问本轮有了答案，而且答案不在二进制里**：41 个语言目录、143,939 条界面文案里 `conflict` **0 命中**，对"同步出事"的公开口径是「检测到本地有未同步的异常数据 → 清理」「清除并重启会**永久删除未同步的任务数据**」——**兜底是丢弃，不是给你挑一边**（§2.13、Q10）。
 4. **专注、习惯、计时、课表、倒数日、项目模板、回收站各自有独立的 SyncManager；专注还多一张自己的操作表和一个 WebSocket helper。** 这是本轮最强的「独立通道」证据（§2.6–§2.7）。
 5. **账号隔离靠 `ZACCOUNTID` 列，不靠分库。** 52/58 张表带它；同步代码里有一整族「account changed after X」守卫，还有一句 `big sync: cancelled stale account sync`。**它把「同步途中账号被换掉」当成一类必须显式处理的故障**（§2.9）。
 6. **heyta 在 16 个问题里答了 9 个、答了但语义不同 5 个、没答 2 个（逐行相加 = 16，见 §4）。** 没答的两条是「每个视图能不能独立手排」与「多账号切换时本地库怎么隔离」；另有一条**实现了却从未被 ADR 论证**的语义（重复任务的「完成即推进」）。⚠️ 这些**不是缺陷**，是**尚未拍过的产品决定** —— 本文不给工单，只把问题摆到能被拍板的位置。
@@ -405,12 +406,16 @@ diff-match-patch 的补丁参数读成"它有服务端增量补丁协议"、把 
 | 读数 | 分母 | 结果 | 能推到什么 |
 |---|---|---|---|
 | 含 `conflict` 的文案 | **41 个语言目录、143,939 条**（全语言） | **0 条** | 它**从不**把"冲突"作为一件事说给用户听 |
-| zh-Hans 含「冲突」 | 3,485 条 | **0 条** | 同上，中文侧一致 |
-| zh-Hans 含「覆盖」 | 3,485 条 | 1 条，且是**模板**「保存为模板，覆盖原模板」 | "覆盖"这个词它**只用在模板上**，没用在同步上 |
-| zh-Hans 含「合并」 | 3,485 条 | 5 条：标签合并、任务合并（`New merged task`） | **又一处假朋友**：这些是**产品功能**，不是同步合并 |
-| zh-Hans 含「未同步」 | 3,485 条 | 4 条 | 👇 这一族才是它对"同步出事"的真实口径 |
+| zh-Hans 含「冲突」 | **3,516** 条 | **0 条** | 同上，中文侧一致 |
+| zh-Hans 含「覆盖」 | 3,516 条 | 1 条，且是**模板**「保存为模板，覆盖原模板」 | "覆盖"这个词它**只用在模板上**，没用在同步上 |
+| zh-Hans 含「合并」 | 3,516 条 | 5 条：标签合并、任务合并（`New merged task`） | **又一处假朋友**：这些是**产品功能**，不是同步合并 |
+| zh-Hans 含「未同步」 | 3,516 条 | **4** 条 | 👇 这一族才是它对"同步出事"的真实口径 |
 
-那 4 条「未同步」里最值钱的两句（**强**，因为是原文）：
+⚠️ **3,516 这个分母绑的是 §7 ⑩ 那条命令的正则**（键 ≤120、值 ≤300）。把长度上限去掉会得到 **3,550 条 / 「未同步」5 条**——
+多出来那条是键名超过 120 的长英文键（`…would permanently delete all tasks that are not synchronized yet.`）。
+**两种都不是漏扫**，但引用"4 条"或"5 条"必须连正则一起引用。
+
+那几条里最值钱的三句（**强**，因为是原文）：
 
 - `clear_data_or_send_feedback_email`：「点击"清除并重启应用"可以修复一些未知错误，
   但会**永久删除未同步的任务数据**。」
@@ -423,8 +428,11 @@ diff-match-patch 的补丁参数读成"它有服务端增量补丁协议"、把 
 
 ⚠️ **这条推到哪为止**：文案**不能**证明服务端没有裁决规则（§6 第 4 条照旧开着），
 也不能证明用户永远不会丢数据——它只证明**这件事没有面向用户的出口**。
-反过来看 heyta：`ConflictDialog.tsx` / `ConflictSheet.tsx` 是**两个平台的真界面**，
-i18n 里"冲突"是一族条目而不是一句 —— 这是两边**最直白的一处产品差异**，
+反过来看 heyta：`apps/web/src/features/sync/ConflictDialog.tsx` 与
+`apps/mobile/src/screens/ConflictSheet.tsx` 是**两个平台的真界面**（本轮 `ls` 各量到一次），
+且 `packages/i18n/src/locales/zh-CN.ts` 里「冲突」有 25 处、另有一整节
+`// ── Web · 冲突解决界面 ──`（现量：`grep -c '冲突' packages/i18n/src/locales/zh-CN.ts`）——
+**"冲突"在我们这是一族词条，在它那里是不存在的词**。这是两边**最直白的一处产品差异**，
 而它在本轮之前只是被"裁决算法不可见"这句话挡住了，看不见形状。
 
 ⚠️ 局限：本轮只扫了 `*/Localizable.strings`，**没有**扫 `.nib` 里的硬编码字符串与
@@ -616,8 +624,14 @@ i18n 里"冲突"是一族条目而不是一句 —— 这是两边**最直白的
 
 #### Q10 冲突时谁赢，由什么裁决？裁决不了怎么办？
 
-- **它的答案**：**不可见，只到"有一个默认策略"这一层**。`DEFAULT_CONFLICT_STRATEGY` 存在（强），
-  取值/执行方/兜底路径全部不可见（推测区）。
+- **它的答案**：**裁决算法不可见，但"裁决不了怎么办"本轮有了答案**。
+  `DEFAULT_CONFLICT_STRATEGY` 存在（强），取值/执行方仍不可见（推测区）。
+  🔴 **可"兜底那一问"已经能答**：41 个语言目录 / 143,939 条文案里 `conflict` **0 命中**、
+  zh-Hans 里「冲突」**0 命中**（§2.13），而对"同步出事"的可见口径是
+  「检测到本地有未同步的异常数据，请先清理」与「清除并重启…会永久删除未同步的任务数据」
+  ⇒ **它的兜底是丢弃，不是让用户挑** —— 这条给强，因为读的是它自己写给用户的话。
+  ⚠️ 边界：这不等于"服务端没有裁决"（§6 第 4 条照旧开着），也不等于"用户从不丢数据"，
+  只等于**这件事没有面向用户的出口**。
 - **heyta 现状**：**四层，逐层可指**：
   1. 向量关系分类（`packages/sync-core/src/conflict-classification.ts:15`）；
   2. 自动 LWW：`packages/sync-core/src/conflict-resolution.ts:395` `planLwwConflictResolutions`，
@@ -731,7 +745,7 @@ i18n 里"冲突"是一族条目而不是一句 —— 这是两边**最直白的
 | Q7 | 多账号本地库怎么隔离 | 中偏强 | **没答** | `storage/src/op-log-store.ts:29` |
 | Q8 | 同步途中换账号 | 强 | 答了 | `app-host/src/host.ts:516` |
 | Q9 | 按实体还是按字段合并 | 中 | 答了（更细） | `op-log/src/state.ts:589` |
-| Q10 | 冲突谁赢、裁决不了怎么办 | 推测 | 答了 | `sync-core/src/conflict-resolution.ts:395` |
+| Q10 | 冲突谁赢、裁决不了怎么办 | 推测（裁决）/ **强**（兜底=丢弃，文案层） | 答了 | `sync-core/src/conflict-resolution.ts:395` |
 | Q11 | 同毫秒并发谁赢 | 不可见 | 答了 | `sync-core/src/conflict-resolution.ts:381` |
 | Q12 | 首同步靠什么不重放历史 | 强 | 答了 | `storage/src/op-log-store.ts:57` |
 | Q13 | 墓碑怎么传播 | 强 | 答了（多两态） | `ADR-0048` + `ADR-0083` |
@@ -776,9 +790,14 @@ i18n 里"冲突"是一族条目而不是一句 —— 这是两边**最直白的
 2. **它最值得学的一件是「在途账号切换」的显式化。** 9 条阶段守卫 + 一句
    `cancelled stale account sync`，把一个**只在竞态里出现**的故障变成了**可读日志的一等事件**。
    heyta 有 scopeKey 与 vault 栅栏，但**同步任务本身没有"账号已变"的守卫**（§3 Q8 的 ⚠️）。
-3. **heyta 最值得守住的一件是「人兜底」。** 它的裁决算法在本轮证据里完全不可见，
-   而 heyta 有 `manual` 档 + 两个平台的真界面（`ConflictDialog` / `ConflictSheet`）。
-   这条一旦为了"自动化"被砍掉，就等于把"分不出来"变成"静默选一边"。
+3. **heyta 最值得守住的一件是「人兜底」，本轮它有了量化对照。** 它的裁决算法在本轮证据里仍然不可见，
+   但"要不要给用户这个出口"已经看得见：**41 语言 / 143,939 条文案，`conflict` 0 命中**（§2.13），
+   而对"同步出事"的公开口径是「清理未同步的异常数据」与「清除并重启会永久删除未同步的任务数据」——
+   **丢弃，不挑**。heyta 反过来：`packages/i18n/src/locales/zh-CN.ts` 里「冲突」25 处、
+   有专门的「Web · 冲突解决界面」一节（现量：`grep -c '冲突' packages/i18n/src/locales/zh-CN.ts` → 25），两个平台各有真界面
+   （`ConflictDialog.tsx` / `ConflictSheet.tsx`）。
+   这条一旦为了"自动化"被砍掉，就等于把"分不出来"变成"静默选一边"——**那不是变成一个更好的产品，
+   是变成它**。
 4. **Q9 那条两套粒度的张力，是本轮唯一发现的"内部形状问题"**：
    冲突分类按实体、物化按字段。它不是缺陷，但**没有一份文档同时描述这两层**，
    所以下次有人改 `conflict-resolution.ts` 时**看不到重放侧的字段前沿**。这属于纯文档缺口。
@@ -805,7 +824,7 @@ i18n 里"冲突"是一族条目而不是一句 —— 这是两边**最直白的
 | 1 | 主同步通道的端点（是 `api/v2/batch` 还是 `api/v3/batch`，是否按实体家族） | 可见字面里**没有** `/sync`、`/delta`；`api/v2/batch` 24 次 / `api/v3/batch` 4 次**是字面**，但没有一处说明它承载哪个实体族 | §2.10 的"没有看到"、§2.6 各通道的真实边界 |
 | 2 | 请求/响应体字段名与嵌套 | 需要抓包。⚠️ **本轮范围缩小但没关闭**：`sync.entity.RecurringTask` 的属性名可读（§2.11.1），但该包**没有 `$serializer` codegen** ⇒ 它是领域模型不是线上 DTO，**不能当载荷字段用** | §2.4 的 `*Changed` 族归属（中）、§2.11.1 的强度上限 |
 | 3 | `ZSYNCSTATUS` 的整数↔`SYNC_*` 映射 | 需要运行时或反编译 | §2.2 的"状态机"细节 |
-| 4 | 冲突的实际裁决方（客户端 / 服务端 / 协商） | `DEFAULT_CONFLICT_STRATEGY` 只有名字 | **§2.5 全格** |
+| 4 | 冲突的实际裁决方（客户端 / 服务端 / 协商） | `DEFAULT_CONFLICT_STRATEGY` 只有名字。⚠️ 本轮新增一条**边界外的硬读数**：41 语言 / 143,939 条文案里 `conflict` **0 命中**（§2.13）⇒ **"有没有面向用户的冲突出口"已经能答（没有）**，但**裁决算法本身仍不可见**，两件事别混 | **§2.5 全格**、§2.13、Q10 |
 | 5 | `ZCLIENTID` 是否参与裁决 | 同上 | Q11 |
 | 6 | `TTFocusSyncWebsocketHelper` 推什么（信号 / 内容） | 需要抓包 | §2.6 专注通道的实时程度 |
 | 7 | 是否按账号分**库文件** | 磁盘被 TCC 拒绝（`Operation not permitted`），本轮**没有绕过** | Q7 从"中偏强"降不到"强" |
@@ -814,6 +833,8 @@ i18n 里"冲突"是一族条目而不是一句 —— 这是两边**最直白的
 | 10 | Kotlin 层到底承载了什么 | 上一版写"Kotlin 层没有同步引擎"，靠的是 macOS 切片里**没有 `KMASync*` 类名**——那是**否定证据 + 剥了符号的二进制**。本轮 Windows 切片读出 5691 条 `kfun:`，`modifyrepeat.sync.entity` / `.helper.editor` / `core.date.recurrence` 都在里面 ⇒ **这一条已被部分否证**：共享层承载**规则与模型**，不承载传输。仍未核的是它**承载到哪一层** | §2.1 整格、§2.11 |
 | 11 | `modifyrepeat.*` 是**共享代码**还是 Windows 专属 | 只有 Windows 一份符号可读（macOS `kfun:` 命中 0）；而同一包里确有 `TaskServiceWin#…` 这类**明确带 Win 后缀**的函数 ⇒ 无法从符号判断包归属 | §2.11 全节的"跨壳一致"含义 |
 | 12 | 函数名背后的**调用路径与顺序** | 全程只做 `strings`，**没有读过任何一条函数体**。`reCalculateRepeatCount` 存在，不等于它在每条改规则的路径上都被调用 | §2.11.2、Q1 的"本轮补" |
+| 13 | 文案层"0 处冲突"能不能扩成"全应用 0 处" | 本轮只扫 `*/Localizable.strings`（41 语言 / 143,939 条），**没扫** `.nib` 内嵌字符串与 `Base.lproj` | §2.13 的适用范围、Q10 的"没有面向用户的冲突出口" |
+| 14 | `only_this_recurrence` / `future_recurrences` 这两档**在同步里到底改了什么** | 文案与类名都在，但**没有载荷证据**：改"仅此周期"时上传的是母任务还是两条任务，看不到 | §2.11.2 的两条"中"、Q1 |
 
 ### 6.1 本轮**没有**做的事（写死，防止被后续引用成"已做"）
 
@@ -905,6 +926,34 @@ strings -a /Applications/TickTick.app/Contents/Frameworks/TickTickKit.framework/
 # ⑨ 假朋友自查（§2.12）：把 Conflict / delta 的**整条字面**打出来，别只看计数
 strings -a /Applications/TickTick.app/Contents/Frameworks/KotlinMultiplatformAll.framework/Versions/A/KotlinMultiplatformAll \
   | grep -iE 'conflict|delta' | sort -u
+
+# ⑩ 文案层（§2.13 与 Q10 的那句"0 命中"的出处）
+#    ⚠️ .strings 是 **UTF-16LE**，直接 grep 读不到；两种编码都要试一次。
+#    ⚠️ "条目数"取决于正则允许的多长键/值：本文统一用 `{0,120}` / `{0,300}`，
+#       读数是 41 语言 / **143,939** 条 / `conflict` **0**；zh-Hans 单语言 **3,516** 条、「冲突」**0**。
+#       换成 `{0,90}`/`{0,160}` 会得到 3,485——差的是被长度窗口截掉的长文案，不是漏扫。
+python3 - <<'PY'
+import re, glob
+files = glob.glob('/Applications/TickTick.app/Contents/Resources/*.lproj/Localizable.strings')
+tot = conf = zh = zhconf = 0
+for f in files:
+    raw = open(f, 'rb').read()
+    for enc in ('utf-16-le', 'utf-8'):          # .strings 两种都有，试到能解为止
+        try:
+            s = raw.decode(enc)
+        except Exception:
+            continue
+        break
+    for k, v in re.findall(r'"([^"]{0,120})"\s*=\s*"([^"]{0,300})"', s):
+        tot += 1
+        if re.search('conflict', k + v, re.I):
+            conf += 1
+        if 'zh-Hans' in f:
+            zh += 1
+            if '冲突' in k + v:
+                zhconf += 1
+print(f'lproj={len(files)} entries={tot} conflict_hits={conf} zh-Hans={zh} zh_冲突={zhconf}')
+PY
 ```
 
 ⚠️ **读数会随版本漂移**：本轮对象是 8.2.03。上面每条都带"数什么"，

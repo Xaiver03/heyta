@@ -71,6 +71,8 @@
 | 它走**状态同步**不是事件溯源：`ZSYNCSTATUS` 覆盖 36/58 表、**58 表里没有全量 oplog** | [P4](ticktick-sync-questions.md) §2.3 |
 | 专注是**唯一操作队列**形状（`ZOID`+`ZOTYPE` 只在 `ZTTFOCUSSYNCOPERATION`）；重复实例按 `FETCHBEGINDATE/END` **闭区间水位懒物化** | [P4](ticktick-sync-questions.md) §2.4/§2.5；主文档 §4.2/§4.3 |
 | heyta 对账 16 问：**答了 9 / 语义不同 5 / 没答 2** | [P4](ticktick-sync-questions.md) §4 |
+| 🔴 **它从不把「冲突」说给用户听**：41 个语言、143 939 条文案里 `conflict` **0 命中**；中文「冲突」0、「覆盖」只用在模板、「未同步」才是它对同步出事的口径 | [P4](ticktick-sync-questions.md) §5.3 |
+| Kotlin 层**不是只有词汇**：Windows 那颗 DLL 没剥净符号，有 `modifyrepeat.sync.entity.*` 一族 ⇒ 承载**规则与模型**，不承载**传输** | [P4](ticktick-sync-questions.md) §1.2 |
 
 ### 2.5 键盘与入口
 
