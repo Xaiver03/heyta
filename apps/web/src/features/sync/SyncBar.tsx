@@ -96,7 +96,7 @@ export function SyncBar({ compactLabel = false }: { compactLabel?: boolean } = {
   // replacing it with a generic sign-in label hides the action the user needs
   // to understand or resolve the current state. Only an idle, unconfigured
   // rail needs the compact sign-in prompt.
-  const statusText = shareAttention
+  const baseStatusText = shareAttention
     ? t(
         shareConflicts.length === 1 ? 'web.sync.shareAttentionOne' : 'web.sync.shareAttention',
         { count: shareConflicts.length },
@@ -104,6 +104,24 @@ export function SyncBar({ compactLabel = false }: { compactLabel?: boolean } = {
     : !signedIn && sync.status.kind === 'idle'
       ? t('common.sync.signIn')
       : describeSyncStatus(sync.status, t);
+  /**
+   * R7：**"有没有东西没上去"必须在这一枚上说得出**。
+   *
+   * 状态词表（已同步/同步中/离线/冲突）回答的是"和服务器连得怎么样"，
+   * 而用户真正会丢东西的那一格是"本机还有几条没上传" —— 它们在离线时是
+   * **两件事**：状态是 `offline`、待上传可能是 3。只报前者，用户会以为
+   * "等网络恢复就好了"，而那 3 条里可能有他刚做完就关掉的动作。
+   *
+   * 挂在这里而不是新造一枚角标：rail 只有 48px，新角标会挤掉状态点；
+   * 而这句进 `aria-label` 与 live region，**读屏与 hover 都能拿到**。
+   */
+  const pendingSuffix = sync.pendingUpload !== undefined && sync.pendingUpload > 0
+    ? ` · ${t(
+        sync.pendingUpload === 1 ? 'web.sync.rail.pendingOne' : 'web.sync.rail.pending',
+        { count: sync.pendingUpload },
+      )}`
+    : '';
+  const statusText = `${baseStatusText}${pendingSuffix}`;
   const severity = shareAttention ? 'attention' : baseSeverity;
   const Glyph = GLYPH_COMPONENTS[shareAttention ? 'alert' : syncStatusGlyph(sync.status)];
   /**

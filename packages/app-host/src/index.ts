@@ -317,6 +317,24 @@ export {
 } from './local-erasure.js';
 
 /**
+ * 本机库归属（ADR-0084）：库是谁的、登出前要不要确认、销毁走哪条路。
+ */
+export {
+  LocalLibraryOwnedByAnotherAccountError,
+  LocalLibraryOwnerUnreadableError,
+  assertLibraryOwner,
+  claimLibraryOwner,
+  planLibraryPurge,
+  purgeLocalLibrary,
+  readLibraryOwner,
+  type ClaimLibraryResult,
+  type LibraryIdentity,
+  type LibraryOwner,
+  type LibraryPurgePlan,
+  type LibraryPurgeResult,
+} from './library-owner.js';
+
+/**
  * 注销账号那条**主动**路径（批次 E3）：服务端级联硬删 + 本机销毁，
  * 以及"服务端没删成就不许清本机"这条顺序。见 `account-closure.ts` 文件头。
  */

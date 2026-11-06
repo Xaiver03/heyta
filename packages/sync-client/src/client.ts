@@ -651,6 +651,17 @@ export type SyncClientOptions = SyncEncryptionOptions & {
   markHistoryIncomplete?: () => Promise<void>;
 
   /**
+   * 同步**成功**之后把时刻落库（R7「上次同步」的唯一持久来源）。
+   *
+   * 🔴 为什么必须落库而不是只留在壳的内存里：刷新页面 / 重开应用之后
+   * 「上次同步」会变成空白，而用户看到的是一句"从没同步过" —— 那比不显示更糟。
+   *
+   * 写失败**不让同步失败**：同步已经把数据搬完了，这个时间戳只是给人看的；
+   * 为它把一次成功的同步报成错误，是拿事实去换一个装饰。
+   */
+  recordSyncedAt?: (at: number) => Promise<void> | void;
+
+  /**
    * 冲突判定为"本地胜出"时，把这条改动**重新派发**成一条新 op。
    *
    * 为什么要重新派发而不是改旧 op 的时钟：op 是**不可变**的。
@@ -980,7 +991,14 @@ export class SyncClient {
         });
       }
 
-      return report({ kind: 'synced', at: this.now() });
+      const syncedAt = this.now();
+      // 只写"给人看的事实"：写失败不影响这次同步的结论（见选项上的注释）。
+      try {
+        await this.options.recordSyncedAt?.(syncedAt);
+      } catch {
+        // 时间戳落库失败不改变"数据同步完成了"这件事。
+      }
+      return report({ kind: 'synced', at: syncedAt });
     } catch (error: unknown) {
       /**
        * 🔴 整页解不开要**有分类地**上报，不能落进 `'unexpected'`。

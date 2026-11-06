@@ -53,6 +53,15 @@ import {
   type FullStatePayload,
   type MaterializedState,
 } from './state.js';
+import {
+  buildHistoryEntry,
+  checkInverseStillValid,
+  historyTargetOf,
+  HISTORY_LIMIT,
+  type HistoryEntry,
+  type HistoryState,
+  type UndoOutcome,
+} from './history.js';
 
 /** 一次本地意图 → 一条 op。 */
 export interface OpIntent {
@@ -140,6 +149,20 @@ function cloneOperation<T extends Operation<string>>(op: T): T {
   return cloneBoundaryValue(op);
 }
 
+/**
+ * 栈里最近一条**真的能撤**的条目。
+ *
+ * 不能只看 `length > 0`：栈顶可能是一条批量/快照写入（`inverse === undefined`），
+ * 那样 `canUndo` 会亮着、按下去却什么也不发生 —— 一个必然被点穿的假按钮。
+ */
+function lastUndoable(stack: HistoryEntry[]): HistoryEntry | undefined {
+  for (let index = stack.length - 1; index >= 0; index -= 1) {
+    const entry = stack[index];
+    if (entry !== undefined && entry.inverse !== undefined) return entry;
+  }
+  return undefined;
+}
+
 export class OpLogEngine {
   private state: MaterializedState;
   /** 本地向量时钟。每次本地写入递增自己的分量。 */
@@ -156,6 +179,15 @@ export class OpLogEngine {
   private appliedSeq = 0;
   private checkpointSeq = 0;
   private mutationQueue: Promise<unknown> = Promise.resolve();
+  /**
+   * 会话内撤销/重做栈。
+   *
+   * 🔴 **内存，不落盘。** 撤销是"刚才那一下"的便利，不是审计日志；
+   * 重启之后靠回收站（墓碑）兜底。把它落盘会引入一个新的、需要清理的持久面，
+   * 而它的价值只覆盖本次会话。
+   */
+  private undoStack: HistoryEntry[] = [];
+  private redoStack: HistoryEntry[] = [];
 
   private serialize<T>(work: () => Promise<T>): Promise<T> {
     const result = this.mutationQueue.then(work);
@@ -242,7 +274,12 @@ export class OpLogEngine {
         state: serializeMaterializedState(this.state),
         repairBaseServerSeq: await this.options.store.getLastServerSeq(),
       };
-      return this.dispatchLocked({ entityType: 'ALL', entityId: '*', opType: OpType.Repair, payload });
+      return this.dispatchLocked(
+        { entityType: 'ALL', entityId: '*', opType: OpType.Repair, payload },
+        undefined,
+        // 维护快照不是用户意图：不进撤销栈（进了就会把整库回滚当成一次撤销）。
+        false,
+      );
     });
   }
 
@@ -456,7 +493,89 @@ export class OpLogEngine {
     });
   }
 
-  private async dispatchLocked(intent: OpIntent, validate?: (state: MaterializedState) => void): Promise<DispatchResult> {
+  // ── 撤销 / 重做（会话内） ─────────────────────────────────
+
+  /**
+   * 撤销最近一次**可撤销**的本地写入。
+   *
+   * 走的是与普通写入完全相同的串行队列：撤销不是"改内存"，它是**一条新的 op**。
+   * 因此它也进 op-log、也进上传队列、也参与向量时钟 —— 别的设备会看到"撤销"
+   * 这个事实，而不是本地状态与日志对不上。
+   */
+  undo(): Promise<UndoOutcome> {
+    return this.serialize(() => this.stepHistory('undo'));
+  }
+
+  /** 重做最近一次被撤销的写入（撤销的撤销 = 再写一条反向 op）。 */
+  redo(): Promise<UndoOutcome> {
+    return this.serialize(() => this.stepHistory('redo'));
+  }
+
+  /**
+   * 栈的只读快照。界面用它决定 ⌘Z 是否可用、以及那句"刚刚做了什么"。
+   *
+   * ⚠️ 不可撤销的条目（批量/快照）**不参与** canUndo 判定：把它们算成"可撤销"
+   * 会让按钮亮着而按下去什么也不发生。
+   */
+  historyState(): HistoryState {
+    const undo = lastUndoable(this.undoStack);
+    const redo = lastUndoable(this.redoStack);
+    return {
+      canUndo: undo !== undefined,
+      canRedo: redo !== undefined,
+      ...(undo !== undefined ? { undo: historyTargetOf(undo.intent, undo.timestamp) } : {}),
+      ...(redo !== undefined ? { redo: historyTargetOf(redo.intent, redo.timestamp) } : {}),
+    };
+  }
+
+  /** 清空历史（账号切换 / 库销毁 / 测试收尾）。**不动 op-log 本身。** */
+  clearHistory(): void {
+    this.undoStack = [];
+    this.redoStack = [];
+  }
+
+  private async stepHistory(direction: 'undo' | 'redo'): Promise<UndoOutcome> {
+    const source = direction === 'undo' ? this.undoStack : this.redoStack;
+    const destination = direction === 'undo' ? this.redoStack : this.undoStack;
+    let skipped: HistoryEntry['reason'];
+
+    while (source.length > 0) {
+      const entry = source[source.length - 1]!;
+      if (entry.inverse === undefined) {
+        // 不可撤销的条目直接跳过：用户按 ⌘Z 的意思是"撤回上一次能撤的"，
+        // 不是"停在这条不能撤的记录上"。
+        skipped = entry.reason;
+        source.pop();
+        continue;
+      }
+      const stale = checkInverseStillValid(this.state, entry);
+      if (stale !== undefined) {
+        // 条目**留在栈上**：这条被别的设备改过，但用户可能先解决冲突再来撤。
+        return { status: 'stale', reason: stale };
+      }
+      const before = this.state;
+      source.pop();
+      const result = await this.dispatchLocked(entry.inverse, undefined, false);
+      const applied = result.ops[0]!;
+      // 反向 op 自己也是一条可撤销的写入 —— 这就是重做。
+      const counterpart = buildHistoryEntry(before, entry.inverse, applied);
+      destination.push(counterpart);
+      if (destination.length > HISTORY_LIMIT) destination.shift();
+      return { status: 'applied', opId: applied.id, target: historyTargetOf(entry.intent, entry.timestamp) };
+    }
+
+    return skipped === undefined ? { status: 'empty' } : { status: 'unsupported', reason: skipped };
+  }
+
+  private async dispatchLocked(
+    intent: OpIntent,
+    validate?: (state: MaterializedState) => void,
+    /**
+     * `false` = 这条 op 不是"用户刚做的一件事"（维护快照、撤销自己派发的反向 op）。
+     * 这类 op **不进**历史栈：撤销栈里出现一条"撤销"会让 ⌘Z 变成俄罗斯套娃。
+     */
+    recordHistory = true,
+  ): Promise<DispatchResult> {
     intent = cloneIntent(intent);
     // Ingress-only validation.  The reducer itself must remain able to replay
     // historical operations written before the canonical reminder owner
@@ -499,6 +618,8 @@ export class OpLogEngine {
     // history, so sharing one mutable payload would reintroduce the same leak.
     const nextState = applyOperation(this.state, cloneOperation(op));
     validate?.(this.state);
+    // 反向意图必须从**应用这条 op 之前**的状态里取旧值。
+    const historyEntry = recordHistory ? buildHistoryEntry(this.state, intent, op) : undefined;
 
     // 1. 落盘（原子、单调 seq）
     const persistedOp = cloneOperation(op);
@@ -524,6 +645,17 @@ export class OpLogEngine {
 
     this.appliedSeq = seqs[0]!;
     await this.maybeCheckpoint(this.appliedSeq);
+
+    /**
+     * 🔴 历史只在**落盘且应用都成功之后**才记。反过来（先记后写）的后果是：
+     * 写入失败时栈里留了一条"你以为你能撤"的记录，而它对应的 op 不存在。
+     * 新动作发生时**清空 redo** —— 这是撤销栈的常规语义：分叉之后旧的重做路径失效。
+     */
+    if (historyEntry !== undefined) {
+      this.undoStack.push(historyEntry);
+      if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
+      this.redoStack = [];
+    }
 
     return { ops: [cloneOperation(op)], seqs };
   }

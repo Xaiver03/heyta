@@ -210,6 +210,16 @@ if (mode === 'shell') {
   initOpLog()
     .then(() => {
       /**
+       * A 包（R1/R7）的启动读数：本机库归属 + 上次同步 + 待上传。
+       *
+       * 🔴 必须在 `initOpLog()` 之后（这三个都要 `requireStore()`），
+       * 且**不阻塞渲染**：它们是"这台机器上是什么情况"的读数，不是功能前提。
+       * 归属不符时 `verifyLibraryOwner` 会自己撤凭据并立起那条冲突提示。
+       */
+      void useSyncStore.getState().verifyLibraryOwner();
+      void useSyncStore.getState().hydrateLastSyncedAt();
+      void useSyncStore.getState().refreshPendingUpload();
+      /**
        * W3：小组件生命周期（收点击 + 推数据）。
        *
        * 🔴 **必须在 `initOpLog()` 之后**：它第一步就是 drain 组件点击、

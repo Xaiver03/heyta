@@ -206,6 +206,17 @@ export const META_KEYS = {
   /** 最后成功同步的时间。 */
   LAST_SYNCED_AT: 'lastSyncedAt',
   /**
+   * 这个本地库**属于哪个账号**（ADR-0084）。
+   *
+   * 值是 JSON：`{accountId, serverOrigin, boundAt}`。没有这个键 = 匿名库
+   * （纯本地使用，尚未被任何账号认领）。
+   *
+   * 🔴 它不是加密材料、也不参与同步：它是**本机**关于"这些 op 是谁的"的声明。
+   * 放 META 而不是加在每条 op 上，是因为隔离的判据是"另一账号读不到"，
+   * 而不是"每条 op 自带归属"—— 后者要给每条读路径都加过滤，漏一处就跨账号可见。
+   */
+  LOCAL_LIBRARY_OWNER: 'localLibraryOwnerV1',
+  /**
    * 服务端已确认的因果前沿。
    *
    * 这是同步恢复所需的独立簿记，不能复用 materialized checkpoint：

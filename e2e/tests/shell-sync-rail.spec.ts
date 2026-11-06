@@ -255,6 +255,40 @@ test.describe('同步入口在 rail 底部（H9，web 端）', () => {
     ).toHaveCount(1);
   });
 
+  test('S5 R7 数据状态三行：待上传 / 上次成功同步 / 本地优先，人眼读得懂', async ({ page }) => {
+    await seedSignedIn(page);
+    await openApp(page, APP_ZH);
+    await openSettingsView(page);
+    await selectSettingsSection(page, 'sync');
+
+    const panel = page.getByTestId('sync-settings-panel');
+    await expect(panel, '设置浮层里没有「同步」那一节').toBeVisible();
+    await panel.scrollIntoViewIfNeeded();
+
+    const pending = panel.getByTestId('sync-pending-count');
+    const lastSynced = panel.getByTestId('sync-last-synced');
+    const localFirst = panel.getByTestId('sync-local-first');
+    await expect(pending, '没有「待上传」那一行 ⇒ 用户看不出有没有东西没上去').toBeVisible();
+    await expect(lastSynced, '没有「上次成功同步」那一行').toBeVisible();
+    await expect(localFirst, '没有「本地优先」那句解释').toBeVisible();
+
+    // 全新安装 + 未同步过：这两行必须说事实，而不是留空或说"已同步"。
+    await expect(pending).toHaveText(/本机的改动都已经上传|正在读取本机待上传的改动/);
+    await expect(lastSynced).toHaveText(/还没有成功同步过/);
+    await expect(localFirst).toHaveText(/先写在这台设备上/);
+
+    const panelBox = await panel.boundingBox();
+    expect(panelBox, '量不到「同步」那一节的盒子').not.toBeNull();
+    const viewportSize = page.viewportSize();
+    expect(
+      panelBox!.y >= 0 && panelBox!.y < (viewportSize?.height ?? 0),
+      `截图时那一节的顶边在 y=${String(Math.round(panelBox!.y))}，不在视口里 ⇒ 那张图拍的不是它`,
+    ).toBe(true);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('settings-data-status') });
+  });
+
   test('S4 🔴 同步设置只有一处，而那一处住在设置浮层里', async ({ page }) => {
     await openApp(page, APP_ZH);
 

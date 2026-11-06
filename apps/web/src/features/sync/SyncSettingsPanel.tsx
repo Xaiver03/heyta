@@ -136,6 +136,26 @@ export function SyncSettingsPanel({
               testID="sync-status-bar"
             />
           </HeytaUiProvider> : <p className="sync-settings__section-hint">{t('common.sync.signIn')}</p>}
+          {/*
+            R7「我的数据到哪了」：待上传条数 + 上次成功同步，两个都是**本地读数**
+            （零网络）。不加卡片、不加图表 —— 这一节回答的是"我现在安全吗"，
+            不是"同步有多快"。
+          */}
+          <p className="sync-settings__section-hint" data-testid="sync-pending-count">
+            {sync.pendingUpload === undefined
+              ? t('web.settings.syncUx.pendingUnknown')
+              : sync.pendingUpload === 0
+                ? t('web.settings.syncUx.pendingNone')
+                : t('web.settings.syncUx.pendingCount', { count: sync.pendingUpload })}
+          </p>
+          <p className="sync-settings__section-hint" data-testid="sync-last-synced">
+            {sync.lastSyncedAt === undefined
+              ? t('web.settings.syncUx.lastSyncedNever')
+              : t('web.settings.syncUx.lastSynced', { at: new Date(sync.lastSyncedAt).toLocaleString() })}
+          </p>
+          <p className="sync-settings__section-hint" data-testid="sync-local-first">
+            {t('web.settings.syncUx.localFirst')}
+          </p>
           {signedIn && sync.status.kind === 'error' ? (
             <SettingsNotice
               title={t('web.settings.syncUx.errorTitle')}

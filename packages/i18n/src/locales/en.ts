@@ -679,6 +679,12 @@ export const en = {
   // by one. That is a fact about the list, not a failure.
   'common.sessions.legacyHint': 'Some devices signed in before this feature existed — only "Sign out everywhere" can end those.',
   'common.signOut.pending': 'This device is signed out, but the token on the server could not be revoked yet.',
+  // Local-library erasure failed (ADR-0084): the data is still on this device.
+  'common.libraryOwner.conflictTitle': 'This device holds data for another account',
+  'common.libraryOwner.conflictBody': 'This device stores data for {accountId}. Clear it before signing in with another account.',
+  'common.libraryOwner.clear': 'Clear this device',
+  'common.libraryOwner.clearing': 'Clearing…',
+  'common.signOut.eraseFailed': 'This device is signed out, but task data on it could not be cleared. Sign out again, or clear the browsing data for this site.',
   'common.signOut.retry': 'Try revoking it again',
 
   'web.settings.display.title': 'Display',
@@ -872,6 +878,16 @@ export const en = {
   'web.sync.password.strong': 'never',
   'web.sync.password.tail': ' saved to disk; it lives only in this session. Data protected by an encrypted data key can be unlocked below with its passphrase or saved recovery code. Unmigrated legacy data still needs its original passphrase. Resetting your sign-in password does not decrypt data.',
   'web.settings.syncUx.statusTitle': 'Sync status',
+  // R7: local readings (no network).
+  // R7: the rail's "not uploaded yet" count, same fact as the settings rows.
+  'web.sync.rail.pendingOne': '1 change not uploaded',
+  'web.sync.rail.pending': '{count} changes not uploaded',
+  'web.settings.syncUx.pendingUnknown': 'Reading changes waiting on this device…',
+  'web.settings.syncUx.pendingNone': 'Everything on this device has been uploaded.',
+  'web.settings.syncUx.pendingCount': '{count} changes have not been uploaded yet.',
+  'web.settings.syncUx.lastSyncedNever': 'No successful sync yet.',
+  'web.settings.syncUx.lastSynced': 'Last successful sync: {at}',
+  'web.settings.syncUx.localFirst': 'Data is written on this device first, then synced to your server. It keeps working offline.',
   'web.settings.syncUx.statusHint': 'Check the connection state first, then change the server or account credentials.',
   'web.settings.syncUx.errorTitle': 'Sync needs attention',
   'web.settings.syncUx.accountTitle': 'Server and account',
@@ -3621,6 +3637,10 @@ export const en = {
   'mobile.vault.logoutCleanupFailed': 'The encrypted key could not be removed from this device. Credentials are cleared; retry removal before using this account again.',
   'mobile.vault.retryCleanup': 'Retry encrypted key cleanup',
   'mobile.widgetCleanup.failed': 'You are signed out, but widgets on this device have not been cleared yet. Please retry.',
+  // Local-library erasure failed (ADR-0084): user data is still on this device.
+  'mobile.libraryErase.failed': 'You are signed out, but this device still holds task data that could not be cleared. Please retry, or clear the app data.',
+  'mobile.libraryErase.retry': 'Retry clearing device data',
+  'mobile.libraryErase.retrying': 'Retrying…',
   'mobile.widgetCleanup.retry': 'Retry clearing widgets',
   'mobile.widgetCleanup.retrying': 'Retrying…',
   'mobile.profile.footnote': 'Credentials are kept in memory only and must be re-entered after the app fully exits.',

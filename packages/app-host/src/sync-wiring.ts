@@ -47,7 +47,7 @@
  */
 
 import type { OpLogEngine } from '@heyta/op-log';
-import type { OpLogStore } from '@heyta/storage';
+import { META_KEYS, type OpLogStore } from '@heyta/storage';
 import { eraseLocalData } from './local-erasure.js';
 import { HEYTA_APP_VERSION } from './app-version.generated.js';
 import type { EntityType } from '@heyta/shared-schema';
@@ -132,6 +132,8 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
     // 游标走 OpLogStore 接口，不碰 adapter：键名与事务语义只由存储层决定。
     getLastServerSeq: () => store.getLastServerSeq(),
     setLastServerSeq: (seq) => store.setLastServerSeq(seq),
+    // R7「上次同步」：唯一写点。壳只读，不自己记（否则刷新就变空白）。
+    recordSyncedAt: (at) => store.setMetaValue(META_KEYS.LAST_SYNCED_AT, at),
     // 待上传队列直接来自**存储的上传状态索引**，不是内存列表 ——
     // 内存列表崩溃后就丢了，而「哪些还没上传」正是崩溃后最需要的信息。
     getLocalOps: () => engine.getPendingUpload(),

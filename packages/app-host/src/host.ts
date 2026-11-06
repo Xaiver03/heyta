@@ -31,7 +31,14 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { OpLogEngine, type MaterializedState, type OpIntent, type CheckedDispatchBuilder } from '@heyta/op-log';
+import {
+  OpLogEngine,
+  type CheckedDispatchBuilder,
+  type HistoryState,
+  type MaterializedState,
+  type OpIntent,
+  type UndoOutcome,
+} from '@heyta/op-log';
 import {
   DbOpLogStore,
   INDEXEDDB_SCHEMA,
@@ -51,6 +58,17 @@ import type { Operation } from '@heyta/sync-core';
 import type { VaultKeyMigrationResponse } from '@heyta/shared-schema';
 import { randomId } from './ids.js';
 import { hasLocalEraser, registerLocalEraser } from './local-erasure.js';
+import {
+  assertLibraryOwner,
+  claimLibraryOwner,
+  planLibraryPurge,
+  purgeLocalLibrary,
+  readLibraryOwner,
+  type ClaimLibraryResult,
+  type LibraryOwner,
+  type LibraryPurgePlan,
+  type LibraryPurgeResult,
+} from './library-owner.js';
 import { createSyncClient } from './sync-wiring.js';
 import { readRemotePayloadMode, type HostPayloadMode } from './payload-mode-client.js';
 import { disableVaultPayloadEncryption, enableVaultPayloadEncryption } from './payload-mode-migration.js';
@@ -121,6 +139,16 @@ const inboundAccountId = (value: string): string => /^\d+$/.test(value) ? `user-
  * `getToken: async () => get().token` 这样的**活取值器**。这里把同一个解法
  * 提到宿主层，好让原生宿主也能用同一条路。
  */
+/** 「我的数据现在是什么状态」的本地读数（R7）。 */
+export interface HostDataStatus {
+  /** 还没上传到服务端的本地 op 条数（`pending` 队列；`rejected` 不在内）。 */
+  readonly pendingUpload: number;
+  /** 最后一次**成功**同步的本地毫秒时刻；从没成功过就是 `undefined`。 */
+  readonly lastSyncedAt?: number;
+  /** 本机库归属（ADR-0084）；匿名库是 `undefined`。 */
+  readonly owner?: LibraryOwner;
+}
+
 export interface SyncConfig {
   serverUrl: string;
   token?: string;
@@ -305,6 +333,41 @@ export interface AppHost {
 
   /** 待上传队列长度（离线队列是否清空，同步后应该为 0）。 */
   pendingUploadCount(): Promise<number>;
+
+  /**
+   * 「我的数据现在是什么状态」的**本地读数**（R7）：零网络、零副作用。
+   *
+   * `pendingUpload` 是"还没上去的条数"（本地索引计数）；`lastSyncedAt` 来自
+   * META 的 `LAST_SYNCED_AT`（断网时它停在最后一次成功，这正是要给人看的事实）。
+   */
+  dataStatus(): Promise<HostDataStatus>;
+
+  /** 撤销最近一次本地写入（反向 op；会话内）。 */
+  undo(): Promise<UndoOutcome>;
+  /** 重做最近一次被撤销的写入。 */
+  redo(): Promise<UndoOutcome>;
+  /** 撤销栈的只读快照（按钮可用性与"刚才做了什么"）。 */
+  historyState(): HistoryState;
+
+  /**
+   * 本机库的归属（ADR-0084）。`undefined` = 匿名库（纯本地使用，没被账号认领过）。
+   *
+   * 界面用它回答「这台机器上的数据属于谁」—— 一个本地优先产品必须能回答的问题。
+   */
+  libraryOwner(): Promise<LibraryOwner | undefined>;
+
+  /**
+   * 认领/确认本机库归属。`mismatch` 时**没有副作用**，由调用方去问用户。
+   *
+   * 需要已配置 `accountId`；没有身份时返回 `'anonymous'`（不写归属）。
+   */
+  claimLibrary(): Promise<ClaimLibraryResult | 'anonymous'>;
+
+  /** 登出前的销毁前事实：有没有东西还没上传、要不要用户确认。 */
+  libraryPurgePlan(): Promise<LibraryPurgePlan>;
+
+  /** 销毁本机库（登出 = 这台设备上不再留这个账号的数据）。 */
+  purgeLibrary(): Promise<LibraryPurgeResult>;
 
   /** Register a durable inbound worker bound to this account/device. */
   registerInboundWorker(input: { userId: string; databaseEpoch: string }): Promise<AutomationWorkerCredential>;
@@ -499,6 +562,45 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
       ...(options.password !== undefined ? { password: options.password } : {}),
       ...(options.accountId !== undefined ? { accountId: options.accountId } : {}),
     };
+  };
+
+  /* ── 本机库归属（ADR-0084） ─────────────────────────────── */
+
+  /** 当前认证会话的身份；`undefined` = 匿名/本地模式（没有"换账号"语义）。 */
+  const currentAccountIdentity = (): { accountId: string; serverOrigin: string } | undefined => {
+    const config = readSyncConfig();
+    const accountId = config.accountId?.trim();
+    if (accountId === undefined || accountId === '') return undefined;
+    if (config.serverUrl.trim() === '') return undefined;
+    let serverOrigin: string;
+    try {
+      serverOrigin = new URL(config.serverUrl).origin;
+    } catch {
+      return undefined;
+    }
+    return { accountId, serverOrigin };
+  };
+
+  /**
+   * 上一次判定过的身份。命中缓存就**不再读 META** —— 每次本地写入都去查一次归属
+   * 会让"建一条任务"多一次异步读；而归属在会话内不会变（变了 key 就对不上）。
+   */
+  let ownerGuardKey: string | undefined;
+  let ownerGuardOwner: LibraryOwner | undefined;
+
+  /**
+   * 写路径与同步路径的**共同闸门**：库不是这个账号的就拒绝。
+   *
+   * 🔴 为什么写路径也要拦：拒绝同步只挡住"数据出去/进来"，挡不住 B 把新任务写进
+   * A 的库里 —— 等 A 回来就会看到一堆不属于自己的东西。两种方向都要 fail closed。
+   */
+  const requireLibraryOwner = async (): Promise<void> => {
+    const identity = currentAccountIdentity();
+    if (identity === undefined) return;
+    const key = `${identity.accountId}\u0000${identity.serverOrigin}`;
+    if (ownerGuardKey === key && ownerGuardOwner !== undefined) return;
+    ownerGuardOwner = await assertLibraryOwner(store, identity);
+    ownerGuardKey = key;
   };
 
   const readVaultSession = async (): Promise<VaultKeySession | undefined> => {
@@ -950,10 +1052,12 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     },
 
     async dispatch(intent: OpIntent): Promise<void> {
+      await requireLibraryOwner();
       await engine.dispatch(intent);
     },
 
-    dispatchChecked<T>(build: CheckedDispatchBuilder<T>): Promise<T> {
+    async dispatchChecked<T>(build: CheckedDispatchBuilder<T>): Promise<T> {
+      await requireLibraryOwner();
       return engine.dispatchChecked(build);
     },
 
@@ -961,6 +1065,8 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
 
     async sync(): Promise<SyncStatus> {
       return withVaultExclusive(async () => {
+        // 归属不符 ⇒ 一个请求都不发（连"未配置"都不算：这是明确的拒绝）。
+        await requireLibraryOwner();
         const client = buildSyncClient(await refreshPayloadMode());
         if (client === undefined) return notConfigured();
         return client.sync();
@@ -972,6 +1078,7 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
       choice: 'keep-local' | 'keep-remote',
     ): Promise<SyncStatus> {
       return withVaultExclusive(async () => {
+        await requireLibraryOwner();
         const client = buildSyncClient(await refreshPayloadMode());
         if (client === undefined) return notConfigured();
         return client.resolveConflict(conflict, choice);
@@ -986,6 +1093,62 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
      */
     async pendingUploadCount(): Promise<number> {
       return engine.countPendingUpload();
+    },
+
+    async dataStatus(): Promise<HostDataStatus> {
+      const [pendingUpload, lastSyncedAt, owner] = await Promise.all([
+        engine.countPendingUpload(),
+        store.getMetaValue(META_KEYS.LAST_SYNCED_AT),
+        readLibraryOwner(store),
+      ]);
+      return {
+        pendingUpload,
+        ...(typeof lastSyncedAt === 'number' ? { lastSyncedAt } : {}),
+        ...(owner !== undefined ? { owner } : {}),
+      };
+    },
+
+    undo(): Promise<UndoOutcome> {
+      return engine.undo();
+    },
+
+    redo(): Promise<UndoOutcome> {
+      return engine.redo();
+    },
+
+    historyState(): HistoryState {
+      return engine.historyState();
+    },
+
+    async libraryOwner(): Promise<LibraryOwner | undefined> {
+      return readLibraryOwner(store);
+    },
+
+    async claimLibrary(): Promise<ClaimLibraryResult | 'anonymous'> {
+      const identity = currentAccountIdentity();
+      if (identity === undefined) return 'anonymous';
+      const result = await claimLibraryOwner(store, identity);
+      // 认领成功就把缓存点亮，省掉下一次写入前的那次读。
+      if (result !== 'mismatch') {
+        ownerGuardKey = `${identity.accountId}\u0000${identity.serverOrigin}`;
+        ownerGuardOwner = await readLibraryOwner(store);
+      }
+      return result;
+    },
+
+    async libraryPurgePlan(): Promise<LibraryPurgePlan> {
+      return planLibraryPurge(store);
+    },
+
+    async purgeLibrary(): Promise<LibraryPurgeResult> {
+      const result = await purgeLocalLibrary();
+      // 库已经不在（或正在被销毁）⇒ 归属缓存必须作废：留着它会让下一次写入
+      // 以为"还是那个账号的库"，而那个库已经不存在了。
+      if (result.status === 'purged') {
+        ownerGuardKey = undefined;
+        ownerGuardOwner = undefined;
+      }
+      return result;
     },
 
     async registerInboundWorker(input): Promise<AutomationWorkerCredential> {

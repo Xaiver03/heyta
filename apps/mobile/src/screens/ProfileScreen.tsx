@@ -54,6 +54,7 @@ import {
   fetchAccountNotifications,
   getAccountProfile,
   planDisplayNameWrite,
+  purgeLocalLibrary,
   resolveAccountAvatarImage,
   updateAccountDisplayName,
   uploadAccountAvatar,
@@ -136,6 +137,12 @@ export function ProfileScreen(): React.JSX.Element {
   /** 小组件清理失败必须留在界面上，直到一次显式重试成功。 */
   const [widgetCleanupPending, setWidgetCleanupPending] = useState(false);
   const [widgetCleanupRetrying, setWidgetCleanupRetrying] = useState(false);
+  /**
+   * 本机库销毁没做干净（ADR-0084）。与"小组件没清掉"分开：这是**用户数据**，
+   * 不是装饰；合成一条会让"数据还在"被读成"小卡片没刷新"。
+   */
+  const [libraryErasePending, setLibraryErasePending] = useState(false);
+  const [libraryEraseRetrying, setLibraryEraseRetrying] = useState(false);
   const form = useSyncCredentialForm(setVaultCleanupPending);
 
   // 🔴 冲突界面的可见性只是**界面状态**，不进 store。
@@ -246,6 +253,21 @@ export function ProfileScreen(): React.JSX.Element {
     }
 
     void (async () => {
+      // 退出登录 = 本机不再留这个账号的数据（ADR-0084）。**先销毁库**，
+      // 再清钥匙与凭据：库还在的时候才有东西可销毁；反过来（先清配置/关 host）
+      // 就只剩一个"文件还在、但没人承认它"的状态。
+      //
+      // ⚠️ 不能省这一步：`clearMobileVaultSession` 只清凭据与原生钥匙，
+      // 它**一个 op-log 字节都不动** —— 那正是 R1 那条信任断崖。
+      try {
+        const purge = await purgeLocalLibrary();
+        setLibraryErasePending(purge.status === 'incomplete');
+      } catch (error: unknown) {
+        // 抛错 = 销毁器坏了，不能当成"清过了"。
+        setLibraryErasePending(true);
+        console.warn('[library] 退出登录时销毁本机数据失败', error);
+      }
+
       // This shared helper fences remembered unlock, invalidates the already
       // open host, clears live credentials synchronously, and removes the
       // native root key. Device revocation uses the same sequence.
@@ -293,6 +315,23 @@ export function ProfileScreen(): React.JSX.Element {
         setWidgetCleanupRetrying(false);
       });
   }, [widgetCleanupPending, widgetCleanupRetrying]);
+
+  const retryLibraryErase = useCallback((): void => {
+    if (!libraryErasePending || libraryEraseRetrying) return;
+    setLibraryEraseRetrying(true);
+    void purgeLocalLibrary()
+      .then((result) => {
+        // 重试成功（或发现已经没东西可清）才摘掉那句话。
+        setLibraryErasePending(result.status === 'incomplete' || result.status === 'no-eraser');
+      })
+      .catch((error: unknown) => {
+        setLibraryErasePending(true);
+        console.warn('[library] 重试销毁本机数据失败', error);
+      })
+      .finally(() => {
+        setLibraryEraseRetrying(false);
+      });
+  }, [libraryErasePending, libraryEraseRetrying]);
 
   const retryVaultCleanup = useCallback((): void => {
     const scope = vaultCleanupPending;
@@ -1699,6 +1738,9 @@ export function ProfileScreen(): React.JSX.Element {
         widgetCleanupPending={widgetCleanupPending}
         widgetCleanupRetrying={widgetCleanupRetrying}
         onRetryWidgetCleanup={retryWidgetCleanup}
+        libraryErasePending={libraryErasePending}
+        libraryEraseRetrying={libraryEraseRetrying}
+        onRetryLibraryErase={retryLibraryErase}
       />
     </Screen>
   );

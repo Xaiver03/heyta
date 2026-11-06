@@ -15,6 +15,7 @@ import { create } from 'zustand';
 
 import { publishWidgetPlaceholders } from '../../pwa/publish.js';
 
+import { META_KEYS } from '@heyta/storage';
 import {
   applyRemoteOps,
   currentState,
@@ -36,6 +37,8 @@ import {
 // 🔴 接线只有一份。见下方 `buildClient` 的说明。
 import {
   CENTRAL_COOKIE_SESSION_MARKER,
+  claimLibraryOwner,
+  readLibraryOwner,
   createCentralCookieFetch,
   getCentralAuthConfig,
   getCentralAuthSession,
@@ -78,6 +81,11 @@ interface SyncStoreState {
   centralBindingConflict?: Exclude<CentralBindingResult, 'bound'>;
   centralBindingTarget?: { origin: string; subject: string };
   centralAccountSwitching: boolean;
+  /**
+   * 本机库属于另一个账号（ADR-0084）。**不是**同步错误：这是"这台机器上的数据
+   * 不是当前登录者的"，处置办法只有一条 —— 清除本机数据。
+   */
+  libraryOwnerConflict?: { accountId: string; serverOrigin: string };
   csrfToken?: string;
   /**
    * 账号邮箱（头像的首字母靠它）。
@@ -92,6 +100,12 @@ interface SyncStoreState {
   password?: string;
   /** 上次同步时间。 */
   lastSyncedAt?: number;
+  /**
+   * 还没上传的改动条数（R7）。三态：`undefined` = 还没读到，`0` = 全都上去了。
+   * 🔴 与移动端同一套语义（`resolvePendingUploadPresentation`），别压成布尔：
+   * "还没读"和"没有待上传"是两句不同的话。
+   */
+  pendingUpload?: number;
   /**
    * 冲突对话框是否打开。
    *
@@ -164,6 +178,13 @@ interface SyncStoreState {
   beginCentralAccountSwitch: () => void;
   finishCentralAccountSwitch: () => void;
   clearCredentials: () => void;
+  /** 登录/启动时确认本机库归属；`mismatch` 会**先撤掉凭据**再记冲突。 */
+  verifyLibraryOwner: () => Promise<'ok' | 'anonymous' | 'mismatch'>;
+  /** 重算「待上传 N 项」；本地计数，不发请求。 */
+  refreshPendingUpload: () => Promise<void>;
+  /** 从 META 读回上次成功同步的时间（刷新之后仍然在）。 */
+  hydrateLastSyncedAt: () => Promise<void>;
+  clearLibraryOwnerConflict: () => void;
   syncNow: () => Promise<SyncStatus>;
   /**
    * 按**当前**凭据启动实时通道。幂等。
@@ -648,8 +669,11 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // 置成 `checking`，于是新连接不会在"还没问到答案"的窗口里建立起来）。
     // 答案回来后由 `legalRecheck.subscribe()` 重建，不需要这里等它。
     syncLegalRecheckCredentials({ token, baseUrl });
-    // 🔴 登录之后才**开始**实时连接 —— 这是"实时同步"对用户真正生效的那一刻。
-    restartRealtime(get);
+    // ADR-0084：登录之后先问一句"这个库是不是你的"，再开始实时连接。
+    // 顺序有意义：实时通道一建立就会拉数据，而归属不符时连一次都不该拉。
+    void get().verifyLibraryOwner().then((result) => {
+      if (result !== 'mismatch') restartRealtime(get);
+    });
   },
 
   applyCentralAuth: (baseUrl, email, accountId, csrfToken) => {
@@ -672,7 +696,9 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // the non-secret endpoint/label in local storage for a useful cold start.
     clearStoredCredentials();
     syncLegalRecheckCredentials({ token: CENTRAL_COOKIE_SESSION_MARKER, baseUrl });
-    restartRealtime(get);
+    void get().verifyLibraryOwner().then((result) => {
+      if (result !== 'mismatch') restartRealtime(get);
+    });
   },
 
   resumeCentralSession: async () => {
@@ -800,7 +826,70 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     });
   },
 
+  refreshPendingUpload: async () => {
+    if (!hasEngine()) return;
+    try {
+      set({ pendingUpload: await requireEngine().countPendingUpload() });
+    } catch {
+      // 计数读失败不改变任何数据；保留上一次的值，不谎报 0。
+    }
+  },
+
+  hydrateLastSyncedAt: async () => {
+    if (!hasEngine()) return;
+    try {
+      const value = await requireStore().getMetaValue(META_KEYS.LAST_SYNCED_AT);
+      if (typeof value === 'number') set({ lastSyncedAt: value });
+    } catch {
+      // 读不到就是"不知道"，界面那一行会显示"还没有成功同步过"以外的未知态。
+    }
+  },
+
+  verifyLibraryOwner: async () => {
+    const { accountId, baseUrl } = get();
+    if (accountId === undefined || accountId.trim() === '' || baseUrl.trim() === '') return 'anonymous';
+    let serverOrigin: string;
+    try {
+      serverOrigin = new URL(baseUrl).origin;
+    } catch {
+      return 'anonymous';
+    }
+    // 引擎还没起来时无从判定：**不阻断开机**（本地优先，离线也要能用），
+    // 但下一次同步会再问一次。
+    if (!hasEngine()) return 'anonymous';
+    const claim = await claimLibraryOwner(requireStore(), { accountId, serverOrigin });
+    if (claim === 'mismatch') {
+      const owner = await readLibraryOwner(requireStore());
+      // 先撤凭据：留着新账号的令牌，界面会以新账号的身份继续画旧账号的数据，
+      // 而下一次上传就等于把 A 的数据交给 B。
+      get().clearCredentials();
+      set({
+        libraryOwnerConflict: owner === undefined
+          ? undefined
+          : { accountId: owner.accountId, serverOrigin: owner.serverOrigin },
+        status: { kind: 'idle' },
+      });
+      return 'mismatch';
+    }
+    if (get().libraryOwnerConflict !== undefined) set({ libraryOwnerConflict: undefined });
+    return 'ok';
+  },
+
+  clearLibraryOwnerConflict: () => {
+    set({ libraryOwnerConflict: undefined });
+  },
+
   syncNow: async () => {
+    /**
+     * 🔴 归属不符 ⇒ **一个请求都不发**。
+     *
+     * 这条闸比"同步失败"更靠前：把 A 的 op 用 B 的令牌传上去，等于把 A 的数据
+     * 交给 B 的账号（本地优先 + E2EE 的产品里，这是最严重的一种越权）。
+     * 这里返回 `idle`（"什么都没做"是事实），界面由那条专门的冲突提示负责说话 ——
+     * 不编一个新的失败原因去污染同步状态词表。
+     */
+    if (await get().verifyLibraryOwner() === 'mismatch') return { kind: 'idle' };
+
     const c = buildClient(get, set);
     if (c === undefined) {
       const s: SyncStatus = {
@@ -833,6 +922,8 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // 不知道需要自己去点一下
     if (status.kind === 'conflict') set({ conflictDialogOpen: true });
     if (status.kind === 'synced') set({ lastSyncedAt: status.at });
+    // R7：同步之后（无论成败）重算"还有多少没上去" —— 成败都会改变这个数。
+    void get().refreshPendingUpload();
     return status;
   },
 

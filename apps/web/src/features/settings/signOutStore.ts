@@ -37,7 +37,7 @@
 
 import { create } from 'zustand';
 
-import { logoutCurrentDevice, logoutEveryDevice, planSignOut } from '@heyta/app-host';
+import { logoutCurrentDevice, logoutEveryDevice, planSignOut, purgeLocalLibrary } from '@heyta/app-host';
 
 import { useSyncStore } from '../sync/store.js';
 
@@ -50,7 +50,15 @@ export interface SignOutCredentials {
   token: string;
 }
 
-export type SignOutNotice = 'idle' | 'pending-revocation' | 'signed-out-everywhere';
+export type SignOutNotice =
+  | 'idle'
+  | 'pending-revocation'
+  | 'signed-out-everywhere'
+  /**
+   * 本机库没销毁干净（ADR-0084）。**必须单独一档**：把它并进"撤销没做成"，
+   * 用户会以为问题在服务器上，而真正的事实是"这台机器上还有你的数据"。
+   */
+  | 'local-erase-failed';
 
 export interface SignOutStoreState {
   /** 撤销还没做成时留在内存里的那组凭据（它只为"再试一次"而存在）。 */
@@ -120,8 +128,45 @@ export const useSignOutStore = create<SignOutStoreState>((set, get) => {
     // 次序第 1 条：本机清理**先于**网络。
     useSyncStore.getState().clearCredentials();
 
+    /**
+     * 🔴 **本机库销毁＝退出登录的一部分**（ADR-0084）。
+     *
+     * 在这之前这条路径只清凭据与小组件，op-log 一个字节都不动 —— 于是换账号之后
+     * 上一个账号的任务还在本机侧栏里。销毁与撤销**并行开始**：销毁是数据边界，
+     * 不能等一次可能挂住的网络请求；重载则等撤销有结论（那句话才留得住）。
+     */
+    const purge = purgeLocalLibrary().catch((error: unknown) => {
+      // eslint-disable-next-line no-console -- 不可逆的数据事件，必须留下可见痕迹。
+      console.error('[heyta] 退出登录时销毁本机数据失败', error);
+      return { status: 'incomplete' as const, reports: [] };
+    });
+
+    const finish = async (): Promise<void> => {
+      const result = await purge;
+      if (result.status === 'purged') {
+        // 内存里的引擎/适配器已经销毁：不重载会把一个死库继续画在屏幕上，
+        // 下一次写入则会撞上"已销毁的 adapter"。重载是唯一诚实的收尾。
+        try {
+          window.location.reload();
+        } catch {
+          // 测试环境没有导航：只把状态留在下面那条 notice 上。
+          set({ notice: 'local-erase-failed' });
+        }
+        return;
+      }
+      if (result.status === 'no-eraser') {
+        // 这个进程里没有任何宿主注册过库（Web 在 `main.tsx` 启动时一定注册）。
+        // 没有库就没有可销毁的字节 —— 不把"这里本来就没有东西"报成清理失败。
+        return;
+      }
+      if (result.status === 'incomplete') {
+        set({ notice: 'local-erase-failed' });
+      }
+    };
+
     if (credentials === undefined) {
       set({ pending: undefined, notice: 'idle', running: undefined });
+      await finish();
       return;
     }
 
@@ -135,6 +180,7 @@ export const useSignOutStore = create<SignOutStoreState>((set, get) => {
       // 实话 + 一个出口（`common.signOut.retry`）。吞掉它就等于让"退出登录"
       // 在断网时**看起来成功了** —— 那正是本轮要修的那句话。
       set({ running: undefined, notice: 'pending-revocation' });
+      await finish();
       return;
     }
 
@@ -145,6 +191,7 @@ export const useSignOutStore = create<SignOutStoreState>((set, get) => {
       // 「退出所有设备」不一样：用户在别的设备上看不见，必须有一句确认。
       notice: scope === 'all' ? 'signed-out-everywhere' : 'idle',
     });
+    await finish();
   };
 
   return {

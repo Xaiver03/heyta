@@ -17,9 +17,11 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 面板已经落到未登录态、没有别的地方可以放它）。
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { RotateCw } from 'lucide-react';
+
+import { purgeLocalLibrary } from '@heyta/app-host';
 
 import { useI18n } from '@heyta/i18n';
 
@@ -31,6 +33,8 @@ export function SignOutNotice(): React.JSX.Element | null {
   const { t } = useI18n();
 
   const notice = useSignOutStore((s) => s.notice);
+  const ownerConflict = useSyncStore((s) => s.libraryOwnerConflict);
+  const [clearing, setClearing] = useState(false);
   const running = useSignOutStore((s) => s.running);
   const retry = useSignOutStore((s) => s.retryPendingRevocation);
   const clearDoneNotice = useSignOutStore((s) => s.clearDoneNotice);
@@ -48,6 +52,47 @@ export function SignOutNotice(): React.JSX.Element | null {
     if (token === undefined || token.trim() === '') return;
     clearDoneNotice();
   }, [notice, token, clearDoneNotice]);
+
+  /**
+   * 🔴 本机库属于另一个账号（ADR-0084）：这是**阻断性**的事实，必须排在
+   * "退出登录还差什么"之前 —— 数据在这台机器上不属于当前登录者，
+   * 其它任何一句"差不多没事了"都会把用户带偏。
+   *
+   * 唯一的出口是清除本机数据：留两个账号的明文在这台机器上，正是这条需求要断的事。
+   */
+  if (ownerConflict !== undefined) {
+    const clearDevice = async (): Promise<void> => {
+      if (clearing) return;
+      setClearing(true);
+      const result = await purgeLocalLibrary();
+      if (result.status === 'purged' || result.status === 'nothing-to-erase') {
+        window.location.reload();
+        return;
+      }
+      setClearing(false);
+    };
+    return (
+      <SettingsNotice
+        tone="danger"
+        live
+        title={t('common.libraryOwner.conflictTitle')}
+        testId="library-owner-conflict"
+        actions={
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            data-testid="library-owner-clear"
+            disabled={clearing}
+            onClick={() => { void clearDevice(); }}
+          >
+            {clearing ? t('common.libraryOwner.clearing') : t('common.libraryOwner.clear')}
+          </button>
+        }
+      >
+        {t('common.libraryOwner.conflictBody', { accountId: ownerConflict.accountId })}
+      </SettingsNotice>
+    );
+  }
 
   if (notice === 'pending-revocation') {
     return (
@@ -70,6 +115,22 @@ export function SignOutNotice(): React.JSX.Element | null {
             <RotateCw size={ICON_SIZE.xs} aria-hidden="true" /> {t('common.signOut.retry')}
           </button>
         }
+      />
+    );
+  }
+
+  if (notice === 'local-erase-failed') {
+    /**
+     * 🔴 这一句与"服务器上那一枚还没撤"是**两件事**：那个问题在云上，
+     * 这个问题在**这台机器上**（用户的明文还留着）。合成一句会让用户
+     * 去检查网络，而真正该做的是"再清一次 / 清除应用数据"。
+     */
+    return (
+      <SettingsNotice
+        tone="danger"
+        live
+        title={t('common.signOut.eraseFailed')}
+        testId="sign-out-erase-failed"
       />
     );
   }

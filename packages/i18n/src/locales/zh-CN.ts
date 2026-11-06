@@ -779,6 +779,12 @@ export const zhCN = {
   // 🔴 断网时点了"退出登录"该说什么：本机凭据照样清（把那枚令牌留在本机是更坏的结果），
   // 但服务器上的那一枚还活着必须说出来，并给一个重试入口 —— 吞掉它等于让"退出"看起来成功了。
   'common.signOut.pending': '这台设备已经退出，但服务器上的那一枚登录暂时没能撤销。',
+  // 本机库没销毁干净（ADR-0084）：数据还在这台机器上。
+  'common.libraryOwner.conflictTitle': '这台设备上的数据属于另一个账号',
+  'common.libraryOwner.conflictBody': '本机保存的是 {accountId} 的数据，不能直接登录新账号。清除本机数据之后才能继续。',
+  'common.libraryOwner.clear': '清除本机数据',
+  'common.libraryOwner.clearing': '正在清除…',
+  'common.signOut.eraseFailed': '这台设备已退出，但本机的任务数据没有清除干净。请重新退出一次，或清除本站的浏览数据。',
   'common.signOut.retry': '重新尝试撤销',
 
   'web.settings.display.title': '显示',
@@ -967,6 +973,16 @@ export const zhCN = {
   'web.sync.password.strong': '不会',
   'web.sync.password.tail': '被保存到磁盘，只存在于本次会话。已设置加密数据钥匙的数据，可在下方使用口令或已保存的恢复码解锁；尚未迁移的旧格式数据仍需要原口令。重置登录密码不能解密数据。',
   'web.settings.syncUx.statusTitle': '同步状态',
+  // R7：本地读数（零网络），措辞只说事实，不给"很快就好"的承诺。
+  // R7：rail 上那句"还有几条没传"，与设置里那三行是同一件事的两个可见面。
+  'web.sync.rail.pendingOne': '1 项还没上传',
+  'web.sync.rail.pending': '{count} 项还没上传',
+  'web.settings.syncUx.pendingUnknown': '正在读取本机待上传的改动…',
+  'web.settings.syncUx.pendingNone': '本机的改动都已经上传。',
+  'web.settings.syncUx.pendingCount': '还有 {count} 项改动没上传。',
+  'web.settings.syncUx.lastSyncedNever': '还没有成功同步过。',
+  'web.settings.syncUx.lastSynced': '上次成功同步：{at}',
+  'web.settings.syncUx.localFirst': '数据先写在这台设备上，再同步到你的服务器；断网也能继续用。',
   'web.settings.syncUx.statusHint': '先确认连接状态，再修改服务端或账号凭据。',
   'web.settings.syncUx.errorTitle': '同步需要处理',
   'web.settings.syncUx.accountTitle': '服务端与账号',
@@ -3917,6 +3933,10 @@ export const zhCN = {
   'mobile.vault.logoutCleanupFailed': '加密钥匙未能从这台设备清除。凭据已清掉；请先重试清理，再使用这个账号。',
   'mobile.vault.retryCleanup': '重试清除加密钥匙',
   'mobile.widgetCleanup.failed': '已退出登录，但这台设备上的小组件还没有清除。请重试。',
+  // 本机库销毁失败（ADR-0084）：这是**用户数据**还留在这台机器上，不是小卡片没刷新。
+  'mobile.libraryErase.failed': '已退出登录，但这台设备上的任务数据还没有清除干净。请重试，或清除应用数据。',
+  'mobile.libraryErase.retry': '重试清除本机数据',
+  'mobile.libraryErase.retrying': '正在重试…',
   'mobile.widgetCleanup.retry': '重试清除小组件',
   'mobile.widgetCleanup.retrying': '正在重试…',
   // 🔴 这句是**面向用户的陈述**，说错了就是应用在骗人 —— 迁移时可以"只搬不改"，

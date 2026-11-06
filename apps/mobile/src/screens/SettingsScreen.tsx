@@ -183,6 +183,9 @@ export function SettingsScreen({
   widgetCleanupPending,
   widgetCleanupRetrying,
   onRetryWidgetCleanup,
+  libraryErasePending,
+  libraryEraseRetrying,
+  onRetryLibraryErase,
   profileEditor,
   dataActions,
   securityActions,
@@ -206,6 +209,10 @@ export function SettingsScreen({
   widgetCleanupPending?: boolean;
   widgetCleanupRetrying?: boolean;
   onRetryWidgetCleanup?: () => void;
+  /** 本机库销毁没做干净（ADR-0084）—— 与小组件清理是两件事，分开呈现。 */
+  libraryErasePending?: boolean;
+  libraryEraseRetrying?: boolean;
+  onRetryLibraryErase?: () => void;
   /** 资料编辑器由 ProfileScreen 持有；设置面只提供唯一入口，不复制表单。 */
   profileEditor?: React.ReactNode;
   /** 数据管理入口由父屏提供，避免在设置面复制整屏路由状态。 */
@@ -780,6 +787,24 @@ export function SettingsScreen({
             <Button label={t('mobile.vault.retryCleanup')} onPress={onRetryVaultCleanup} tone="ghost" />
           </Stack>
         </Card>
+      ) : null}
+      {libraryErasePending && onRetryLibraryErase !== undefined ? (
+        <View testID="library-erase-pending">
+          <Card>
+            <Stack>
+              <Text variant="caption" tone="danger">
+                {t('mobile.libraryErase.failed')}
+              </Text>
+              <Button
+                label={libraryEraseRetrying ? t('mobile.libraryErase.retrying') : t('mobile.libraryErase.retry')}
+                onPress={onRetryLibraryErase}
+                tone="ghost"
+                disabled={libraryEraseRetrying}
+                loading={libraryEraseRetrying}
+              />
+            </Stack>
+          </Card>
+        </View>
       ) : null}
       {widgetCleanupPending && onRetryWidgetCleanup !== undefined ? (
         <View testID="widget-cleanup-pending">
