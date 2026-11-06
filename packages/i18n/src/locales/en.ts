@@ -809,6 +809,15 @@ export const en = {
   'web.trash.confirm.cancel': 'Cancel',
   // The action layer refuses some operations (e.g. restoring a purged item). Saying nothing is the "button does nothing" bug.
   'web.trash.error': 'That did not work: {reason}',
+  'web.filter.namePlaceholder': 'View name',
+  'web.filter.kindLabel': 'Filter type',
+  'web.filter.kind.all': 'All',
+  'web.filter.kind.today': 'Today',
+  'web.filter.kind.next7Days': 'Next 7 days',
+  'web.filter.kind.completed': 'Completed',
+  'web.filter.save': 'Save view',
+  'web.filter.remove': 'Remove view',
+  'web.filter.sidebar': 'Saved views',
   // Empty states: every list needs one, and it must say what to do next -
   // a blank screen makes users think the app is broken.
   'web.shell.empty.all.title': 'Your inbox is empty',

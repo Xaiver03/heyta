@@ -84,10 +84,7 @@ export function NoteField({
     <>
       <div className="ht-compose">
         <textarea
-          // `data-testid` 是键盘光标那一族的落点锚（工单 W1b 第 3 条腿：在选中那一行上按
-          // Enter，焦点进这只正文框，见 `lib/keyboard-cursor.ts` 的 `enterTarget`）。
           data-testid="task-note-input"
-          // 🔴 非受控 + key：外部改动能刷进来，用户打字时不会被重置（见文件头第 4 条）。
           key={task.note ?? ''}
           defaultValue={task.note ?? ''}
           rows={3}
@@ -96,16 +93,11 @@ export function NoteField({
           onBlur={(e) => {
             const next = e.target.value;
             const trimmed = next.trim() === '' ? undefined : next;
-            // 没变就不写 —— 否则"点开又点走"会给每个任务白写一条 op。
             if (trimmed === (task.note === undefined || task.note === '' ? undefined : task.note)) {
               return;
             }
             onSetNote(trimmed);
           }}
-          // 🔴 复用 `.ht-input`（输入框）的背景 / 边框 / 圆角 / 字号，只覆盖
-          // textarea 特有的两处：竖向内边距（单行框是 `padding: 0`，多行会顶格）
-          // 与只允许竖向拖拽。字体与文字颜色不用管 —— `reset.css` 已给
-          // `input, textarea { font: inherit; color: inherit }`。
           className="ht-input"
           style={{
             padding: cssVar('space.2'),
@@ -113,13 +105,6 @@ export function NoteField({
           }}
         />
       </div>
-      {/*
-        🔴 这里**曾经**有一句 `web.note.hint`：「离开输入框时自动保存」。
-        2026-11-02 删掉 —— 做事面上不挂说明文字（产品负责人的禁令，见
-        `docs/agents/overlay-feedback.md` 与 `check:surface-budget` 的"主界面不许有
-        `__hint` 类说明容器"那一臂）。自动保存是行为，行为不需要一句标签来证明自己；
-        而它占的那一行在每次打开备注时都在。
-      */}
     </>
   );
 }

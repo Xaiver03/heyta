@@ -904,6 +904,16 @@ export const zhCN = {
   'web.trash.confirm.cancel': '取消',
   // 动作层拒绝时必须说出来（例如"已被彻底删除，无法恢复"）—— 咽掉它就是"点了没反应"。
   'web.trash.error': '这次操作没有成功：{reason}',
+  // ── D1 已存视图 ─────────────────────────────────────────────
+  'web.filter.namePlaceholder': '视图名称',
+  'web.filter.kindLabel': '筛选类型',
+  'web.filter.kind.all': '全部',
+  'web.filter.kind.today': '今天',
+  'web.filter.kind.next7Days': '最近 7 天',
+  'web.filter.kind.completed': '已完成',
+  'web.filter.save': '保存视图',
+  'web.filter.remove': '删除视图',
+  'web.filter.sidebar': '已存视图',
   // 空状态：任何列表都必须有空状态，而且要说**下一步做什么** ——
   // 留白屏会让用户以为应用坏了。`all` 同时是兜底（新的 filter.kind 不留白）。
   'web.shell.empty.all.title': '收集箱是空的',

@@ -70,6 +70,7 @@ import { useSelected } from '../../lib/selection.js';
 import { ShareCommentsSection } from '../share/ShareCommentsSection.js';
 import { text } from '../../lib/text.js';
 import { NoteField } from './NoteEditor.js';
+import { renderNoteMarkdown } from './markdown-render.js';
 import { RepeatField } from './TaskRepeat.js';
 import { SubtaskField } from './SubtaskPicker.js';
 import { DueField } from './DueEditor.js';
@@ -388,6 +389,14 @@ export function TaskDetailCard({
         （两处问的是同一件事，各起一条词条迟早漂成两种说法）。
       */}
       <h3 style={blockLabelStyle}>{t('web.note.toggle')}</h3>
+
+      {task.note && task.note.trim() !== '' ? (
+        <div
+          className="ht-note-preview"
+          data-testid="task-note-rendered"
+          dangerouslySetInnerHTML={{ __html: renderNoteMarkdown(task.note) }}
+        />
+      ) : null}
 
       {/*
         🔴 `key={task.id}`：`NoteField` 里那只输入框是**非受控**的（`defaultValue` +
