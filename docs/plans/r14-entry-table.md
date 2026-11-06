@@ -80,37 +80,37 @@
 
 | 动作 | 作用域 | 应有层级 | 当前入口 | 第二入口 | 类型 | 处置 |
 |---|---|---|---|---|---|---|
-| 新建任务 `create` | 全局 | 视图 | apps/web/src/App.tsx:3167（CaptureComposer destination={） | apps/web/src/features/calendar/CalendarHeaderToolbar.tsx:154（calendar-capture-toggle） | 直接 | 保留 — 视图层：每个视图自己的采集面（探针 A）；全局只该留一个快捷键，而 web 今天只有 ⌘K 一个全局键（探针 A 把"全局新建键位"标为未核实） |
-| 切换视图 `switchView` | 全局 | 全局 | apps/web/src/features/shell/RailNavigation.tsx:111（rail-view-${tab.key}） | apps/web/src/App.tsx:2072（goToView(） · apps/web/src/App.tsx:2287（toLowerCase() !== 'k'） | 直接 | 保留 — rail 是主入口；⌘K 与深链是第二条输入通路（C3 口径：同一入口的不同输入） |
-| 全局搜索 `search` | 全局 | 全局 | apps/web/src/App.tsx:2287（toLowerCase() !== 'k'） | apps/web/src/features/shell/RailNavigation.tsx:111（rail-view-${tab.key}） | 直接 | 保留 — J6 的镜像：⌘K 是 rail「搜索」tab 的键盘镜像，不是第二个落点 |
-| 设日期 `dueDate` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:431（&lt;DueField） | apps/web/src/features/quadrant/QuadrantBoard.tsx:338（setQuadrantDrop） · apps/web/src/App.tsx:3418（onScheduleTask） | 直接,隐式 | 收敛 — 两处**隐式**入口（四象限拖放 / 时间线拖放）会顺带写 dueDate —— 用户不觉得自己在改日期，见 `r14-entry-duplication.md` §3 第 3 条 |
-| 删除单条 `delete` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:800（data-testid="task-row-menu-delete"） | apps/web/src/features/tasks/TaskDetailCard.tsx:632（task-detail-more）— **同一入口的第二条输入通路**：它 `onShowActions` 打开的是**同一张 `TaskRowMenu`**，不是第二个入口（取证 §1.2 C3「入口 ≠ 输入通路」） | 直接 | 保留 — 判过：入口数 1，通路数 2 |
-| 设优先级 `priority` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:519（void store.setPriority） | apps/web/src/features/tasks/TaskRowMenu.tsx:504（data-testid="task-row-menu-priority"） | 直接 | 收敛 — 同一字段两个**落点**（面单 select / 行菜单子菜单）⇒ R1 的债；取证与建议见 `r14-entry-duplication.md` §3 第 2 条 |
-| 完成单条 `complete` | 单条 | 对象 | packages/ui/src/task-list/TaskRow.tsx:362（task-toggle-${row.id}） | apps/web/src/App.tsx:3231（onToggleTask={） · apps/web/src/features/calendar/CalendarView.tsx:263（onToggleTask={onToggleTask}） · apps/web/src/features/quadrant/QuadrantBoard.tsx:433（onToggleTask={(taskId)） | 直接 | 保留 — 共享行组件一枚勾选框，5 处视图各自接线（探针 B）；批量完成另立一行 |
-| 放弃任务 `abandon` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:775（data-testid="task-row-menu-abandon"） | — | 直接 | 新增 — A1 的修法：补这一处之前 web 零入口 |
+| 新建任务 `create` | 全局 | 视图 | apps/web/src/App.tsx:3242（CaptureComposer destination={） | apps/web/src/features/calendar/CalendarHeaderToolbar.tsx:154（calendar-capture-toggle） | 直接 | 保留 — 视图层：每个视图自己的采集面（探针 A）；全局只该留一个快捷键，而 web 今天只有 ⌘K 一个全局键（探针 A 把"全局新建键位"标为未核实） |
+| 切换视图 `switchView` | 全局 | 全局 | apps/web/src/features/shell/RailNavigation.tsx:111（rail-view-${tab.key}） | apps/web/src/App.tsx:2130（goToView(） · apps/web/src/App.tsx:2345（toLowerCase() !== 'k'） | 直接 | 保留 — rail 是主入口；⌘K 与深链是第二条输入通路（C3 口径：同一入口的不同输入） |
+| 全局搜索 `search` | 全局 | 全局 | apps/web/src/App.tsx:2345（toLowerCase() !== 'k'） | apps/web/src/features/shell/RailNavigation.tsx:111（rail-view-${tab.key}） | 直接 | 保留 — J6 的镜像：⌘K 是 rail「搜索」tab 的键盘镜像，不是第二个落点 |
+| 设日期 `dueDate` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:431（&lt;DueField） | apps/web/src/features/quadrant/QuadrantBoard.tsx:338（setQuadrantDrop） · apps/web/src/App.tsx:3507（onScheduleTask） | 直接,隐式 | 收敛 — 两处**隐式**入口（四象限拖放 / 时间线拖放）会顺带写 dueDate —— 用户不觉得自己在改日期，见 `r14-entry-duplication.md` §3 第 3 条 |
+| 删除单条 `delete` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:528（data-testid="task-row-menu-delete"） | apps/web/src/features/tasks/TaskDetailCard.tsx:632（task-detail-more）— **同一入口的第二条输入通路**：它 `onShowActions` 打开的是**同一张 `TaskRowMenu`**，不是第二个入口（取证 §1.2 C3「入口 ≠ 输入通路」） | 直接 | 保留 — 判过：入口数 1，通路数 2 |
+| 设优先级 `priority` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:519（void store.setPriority） | — | 直接 | 保留 — **R1 收敛已落地（B 包，2026-11-06）**：行菜单那枚子菜单（`task-row-menu-priority`）已删，`ROW_ACTION_IDS` 11 → 9。判据=面单里 `store.setPriority(` 恰好 1 处（`apps/web/tests/task-row-menu.spec.tsx` 的 R1 正面判据） |
+| 完成单条 `complete` | 单条 | 对象 | packages/ui/src/task-list/TaskRow.tsx:362（task-toggle-${row.id}） | apps/web/src/App.tsx:3312（onToggleTask={） · apps/web/src/features/calendar/CalendarView.tsx:263（onToggleTask={onToggleTask}） · apps/web/src/features/quadrant/QuadrantBoard.tsx:433（onToggleTask={(taskId)） | 直接 | 保留 — 共享行组件一枚勾选框，5 处视图各自接线（探针 B）；批量完成另立一行 |
+| 放弃任务 `abandon` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:503（data-testid="task-row-menu-abandon"） | — | 直接 | 新增 — A1 的修法：补这一处之前 web 零入口 |
 | 取消放弃 `unabandon` | 单条 | 对象 | 未落地 | — | 缺入口 | 未落地 — web 没有「已放弃」视图，恢复入口无处可挂 —— 等 B 包那一档（边界，不是遗漏） |
-| 打开详情 `open` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:455（data-testid="task-row-menu-open"） | apps/web/src/App.tsx:3227（onOpenTask={openTask}） | 直接 | 保留 — 点行与右键是两条输入通路，落点同一个（`openTask`） |
-| 置顶 `pin` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:484（data-testid="task-row-menu-pin"） | — | 直接 | 保留 — 与 `unpin` **同一个槽位的两副面孔**（一个控件、两个 id），宿主按当前态只给一副 |
-| 取消置顶 `unpin` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:484（data-testid="task-row-menu-pin"） | — | 直接 | 保留 — 同上：与 `pin` 共用一个控件 |
-| 移动清单 `moveToProject` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:473（void store.moveToProject） | apps/web/src/features/tasks/TaskRowMenu.tsx:560（data-testid="task-row-menu-move"） | 直接 | 收敛 — 字段层两个落点 ⇒ R1 的债；批量移清单另立一行（作用域不同） |
-| 加子标签 `tags` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:476（void store.setTags） | apps/web/src/features/tasks/TaskRowMenu.tsx:645（data-testid="task-row-menu-tags"） | 直接 | 收敛 — 同上 |
-| 加子任务 `addSubtask` | 单条 | 对象 | apps/web/src/features/tasks/TaskDetailCard.tsx:488（&lt;SubtaskField） | apps/web/src/features/tasks/TaskRowMenu.tsx:619（data-testid="task-row-menu-add-subtask"） | 直接,导航型 | 保留 — 🔴 行菜单那一枚是**导航型**：它只 `openTask`，不建任务（抽查已复核，见 §4） |
+| 打开详情 `open` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:410（data-testid="task-row-menu-open"） | apps/web/src/App.tsx:3308（onOpenTask={openTask}） | 直接 | 保留 — 点行与右键是两条输入通路，落点同一个（`openTask`） |
+| 置顶 `pin` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:439（data-testid="task-row-menu-pin"） | — | 直接 | 保留 — 与 `unpin` **同一个槽位的两副面孔**（一个控件、两个 id），宿主按当前态只给一副 |
+| 取消置顶 `unpin` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:439（data-testid="task-row-menu-pin"） | — | 直接 | 保留 — 同上：与 `pin` 共用一个控件 |
+| 移动清单 `moveToProject` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:473（void store.moveToProject） | — | 直接 | 保留 — **R1 收敛已落地（B 包，2026-11-06）**：行菜单那枚子菜单（`task-row-menu-move`）已删；批量移清单仍另立一行（作用域不同：多条 → 对象层） |
+| 加子标签 `tags` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:476（void store.setTags） | — | 直接 | 保留 — **R1 收敛已落地（B 包，2026-11-06）**：行菜单那枚子菜单（`task-row-menu-tags`）与它的「新建标签」草稿一并删掉。标签的**管理**动作另立一行（`manageTags`）—— 那与「给一条任务加标签」是不同作用域 |
+| 加子任务 `addSubtask` | 单条 | 对象 | apps/web/src/features/tasks/TaskDetailCard.tsx:488（&lt;SubtaskField） | apps/web/src/features/tasks/TaskRowMenu.tsx:458（data-testid="task-row-menu-add-subtask"） | 直接,导航型 | 保留 — 🔴 行菜单那一枚是**导航型**：它只 `openTask`，不建任务（抽查已复核，见 §4） |
 | 跳到字段（面单工具条） `gotoField` | 单条 | 对象 | apps/web/src/features/tasks/TaskDetailCard.tsx:609（data-testid="task-detail-goto-list"） | — | 导航型 | 保留 — 导航型：只把焦点交给那一格（`focusInPane`），**不写任何东西**；同族还有 `task-detail-goto-note` |
 | 加提醒 `reminder` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:452（&lt;ReminderField） | — | 直接 | 保留 — 行上无徽标能看见"这条有提醒"（A3 的已知边界） |
 | 设重复 `repeat` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:545（&lt;RepeatField） | — | 直接 | 保留 |
 | 写备注 `note` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:410（void store.setNote） | — | 直接 | 保留 — 面单收起时行尾那颗 chip 是同一落点的第二条通路（`noteInColumn` 的反向） |
 | 改标题 `title` | 单值 | 字段 | apps/web/src/features/tasks/TaskDetailCard.tsx:362（void store.renameTask） | — | 直接 | 保留 |
-| 进入多选 `select` | 全局 | 视图 | apps/web/src/App.tsx:3002（testID="task-select-open"） | — | 直接 | 保留 — web 的多选是**视图层**的一档（页头 `⋯` 里进入、批量条接管），所以行菜单里不重复一枚 |
-| 排序 `sort` | 全局 | 视图 | apps/web/src/App.tsx:2994（task-sort-${key}） | — | 直接 | 保留 — 视图属性，与选中无关（J3）；空列表也在 |
-| 共享清单 `share` | 全局 | 视图 | apps/web/src/App.tsx:3063（testID="share-open-button"） | — | 直接 | 保留 — 条件：只停在自己的清单且同步已配置 |
-| 助手 `assistant` | 全局 | 视图 | apps/web/src/features/shell/RailNavigation.tsx:471（rail-assistant） | apps/web/src/App.tsx:3016（testID="assistant-open"） | 直接 | 保留 — 第二处只在详情列收起时出现（互斥条件成立，B6） |
-| 详情栏开关 `detailPaneToggle` | 全局 | 视图 | apps/web/src/App.tsx:3078（data-testid="detail-pane-toggle"） | — | 直接 | 收敛 — B5 的修法：`⋯` 里那枚「展开详情栏」已删，收起态只剩页头这一枚（见 §5） |
-| 开设置 `settings` | 全局 | 全局 | apps/web/src/features/shell/AccountMenu.tsx:359（web.shell.account.settings） | apps/web/src/App.tsx:2571（onOpenSettings={） | 直接 | 保留 — 头像菜单是主入口；AI / 同步 / 帮助 / 深链各自只带锚点跳转（探针 B） |
-| 批量完成 `bulkComplete` | 多条 | 对象 | apps/web/src/App.tsx:2812（data-testid="bulk-complete"） | — | 直接 | 保留 — 只完成、不能取消 —— 与单条完成是**不同语义**，登记为债（`r14-entry-duplication.md` §2） |
-| 批量删除 `bulkDelete` | 多条 | 对象 | apps/web/src/App.tsx:2866（data-testid="bulk-delete"） | — | 直接 | 保留 |
-| 批量移清单 `bulkMove` | 多条 | 对象 | apps/web/src/App.tsx:2829（web.shell.bulk.move） | — | 直接 | 保留 |
-| 退出多选 `bulkExit` | 全局 | 视图 | apps/web/src/App.tsx:2875（data-testid="bulk-exit"） | — | 直接 | 保留 |
-| 改主题 `theme` | 全局 | 全局 | apps/web/src/App.tsx:3794（data-testid="theme-toggle"） | — | 直接 | 保留 — 在设置 → 显示里（全局层的载体是"开设置"那一处）；`rememberThemeChoice` 是唯一记账点 |
+| 进入多选 `select` | 全局 | 视图 | apps/web/src/App.tsx:3077（testID="task-select-open"） | — | 直接 | 保留 — web 的多选是**视图层**的一档（页头 `⋯` 里进入、批量条接管），所以行菜单里不重复一枚 |
+| 排序 `sort` | 全局 | 视图 | apps/web/src/App.tsx:3052（task-sort-${key}） | — | 直接 | 保留 — 视图属性，与选中无关（J3）；空列表也在 |
+| 共享清单 `share` | 全局 | 视图 | apps/web/src/App.tsx:3138（testID="share-open-button"） | — | 直接 | 保留 — 条件：只停在自己的清单且同步已配置 |
+| 助手 `assistant` | 全局 | 视图 | apps/web/src/features/shell/RailNavigation.tsx:471（rail-assistant） | apps/web/src/App.tsx:3091（testID="assistant-open"） | 直接 | 保留 — 第二处只在详情列收起时出现（互斥条件成立，B6） |
+| 详情栏开关 `detailPaneToggle` | 全局 | 视图 | apps/web/src/App.tsx:3153（data-testid="detail-pane-toggle"） | — | 直接 | 收敛 — B5 的修法：`⋯` 里那枚「展开详情栏」已删，收起态只剩页头这一枚（见 §5） |
+| 开设置 `settings` | 全局 | 全局 | apps/web/src/features/shell/AccountMenu.tsx:359（web.shell.account.settings） | apps/web/src/App.tsx:2629（onOpenSettings={） | 直接 | 保留 — 头像菜单是主入口；AI / 同步 / 帮助 / 深链各自只带锚点跳转（探针 B） |
+| 批量完成 `bulkComplete` | 多条 | 对象 | apps/web/src/App.tsx:2870（data-testid="bulk-complete"） | — | 直接 | 保留 — 只完成、不能取消 —— 与单条完成是**不同语义**，登记为债（`r14-entry-duplication.md` §2） |
+| 批量删除 `bulkDelete` | 多条 | 对象 | apps/web/src/App.tsx:2924（data-testid="bulk-delete"） | — | 直接 | 保留 |
+| 批量移清单 `bulkMove` | 多条 | 对象 | apps/web/src/App.tsx:2887（web.shell.bulk.move） | — | 直接 | 保留 |
+| 退出多选 `bulkExit` | 全局 | 视图 | apps/web/src/App.tsx:2933（data-testid="bulk-exit"） | — | 直接 | 保留 |
+| 改主题 `theme` | 全局 | 全局 | apps/web/src/App.tsx:3883（data-testid="theme-toggle"） | — | 直接 | 保留 — 在设置 → 显示里（全局层的载体是"开设置"那一处）；`rememberThemeChoice` 是唯一记账点 |
 | 开专注 `focusStart` | 全局 | 视图 | apps/web/src/features/focus/FocusTimer.tsx:269（onStart={） | — | 直接 | 保留 |
 | 加习惯 `habitCreate` | 全局 | 视图 | apps/web/src/features/habits/HabitsView.tsx:311（habits-add-open） | — | 直接 | 保留 |
 | 归档清单 `archiveProject` | 单条 | 对象 | apps/web/src/features/projects/ProjectsPanel.tsx:354（onArchive） | — | 直接 | 保留 — 侧栏组织器那一层（`archive: { button … }`） |
@@ -118,6 +118,9 @@
 | 导出 `export` | 全局 | 全局 | apps/web/src/features/settings/ExportPanel.tsx:111（data-testid="export-json"） | — | 直接 | 保留 |
 | 加附件 `attachment` | 单条 | 对象 | 未落地 | — | 缺入口 | 未落地 — `grep -rn attach apps/web/src/features/tasks` = 0；附件只在 AI 面板（`features/ai/ImageAttach.tsx`）里存在，不是任务附件 |
 | 清空回收站 `emptyTrash` | 多条 | 对象 | 未落地 | — | 缺入口 | 未落地 — web 只有**逐条**彻底删除（`features/trash/TrashView.tsx` 的 `run(id, kind, "purge")`），没有批量清空 |
+| 跳过这一次 `skipOccurrence` | 单条 | 对象 | apps/web/src/features/tasks/TaskRowMenu.tsx:477（data-testid="task-row-menu-skip-occurrence"） | — | 直接 | 新增 — B 包 R3。只在**有生效重复规则**时出现（`repeating`，判据在领域层 `repeatOf`）。代价低于删除：一条普通单实体 `UPD`，⌘Z 可撤销 ⇒ 不进危险组（J5） |
+| 手动拖拽排序 `reorder` | 全局 | 视图 | apps/web/src/features/tasks/ManualSortDnd.tsx:137（data-testid="task-reorder-handle"） | — | 直接 | 新增 — B 包 R4①。作用域=全局（顺序与"选中哪一条"无关，J3）⇒ 视图层。只在「手动拖拽」档位出现（那一档由 `⋯` 的 `task-sort-manual` 选，**那是档位不是入口**）；一次拖动 = **一条** op（`planManualReorder` 的 `move`） |
+| 管理标签 `manageTags` | 全局 | 视图 | apps/web/src/App.tsx:3069（testID="manage-tags-open"） | — | 直接 | 新增 — B 包 R8。全局作用域、落在视图层（J1 允许 `全局 → 全局 \| 视图`）；粒度是"一次操作"不是"一屏"，所以不新开 `ViewKey`（那会连带选中立场 / 键盘光标 / rail 期望表三处登记） |
 
 ---
 

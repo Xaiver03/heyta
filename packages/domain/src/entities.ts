@@ -420,6 +420,27 @@ export interface Task extends EntityBase {
    * 🔴 必填字段会在 hydration 时炸而 TS 与构建都不会报（AGENTS.md §3.3）—— 所以它是可选的。
    */
   repeatAfterCompletion?: boolean;
+  /**
+   * 「跳过这一次」的日期集合（`YYYY-MM-DD` 本地日期 —— 与 `LocalDate` **同一个格式**，
+   * 不是时间戳、也不是 ISO 带时分秒的串）。
+   *
+   * 🔴 **它是重复规则的排除集（RFC 5545 的 `EXDATE`），不是"又一个字段"。**
+   * 语义只有一句：**集合里的日期，这条规则不再产生那一次出现**，其它次一个字都不动。
+   * 求值侧的唯一落点是 `recurrence.ts` —— `occurrencesInRange` / `nextOccurrence` /
+   * `firstOccurrences` / `nextAfterCompletion` / `occursOn` 全部收 `exDates` 选项。
+   *
+   * 🔴 **不物化实例、不 bump schema。**
+   * 我们没有"每次出现一个任务实体"这一层（一条 `Task` = 一个重复任务，到期日就是
+   * "当前那一次"）。所以"跳过这一次"只有两条路，而只有一条是对的：
+   *   · ✅ 记进这个集合 + 把到期日推进到下一次（**一条 op**、可撤销）；
+   *   · ❌ 为这一次额外物化一条任务 —— 凭空造实体、跨端要处理"哪一条才是真的"、
+   *     规则一删这些孤儿实例无处安放。
+   * 可选字段（`?`）：AGENTS.md §3.3 —— 必填字段会在 hydration 时炸，而 TS 与构建都不报。
+   *
+   * 运行时默认值 = **空集**（`undefined` 与 `[]` 同义：一次都没跳过）。
+   * 读的时候别各端自己写 `task.exDates ?? []`：那样"没跳过"会有第二份定义。
+   */
+  exDates?: LocalDate[];
   /** 排序键（在清单内的位置）。 */
   order?: number;
 }
@@ -453,6 +474,25 @@ export interface Project extends EntityBase {
 export interface Tag extends EntityBase {
   name: string;
   color?: string;
+  /**
+   * 「这条标签被合并进了哪一条」—— 合并的**唯一落点**。
+   *
+   * 🔴 **合并 = 一条 op**：`{ deletedAt, mergedInto: <目标标签 id> }`。不重写任何任务的
+   * `tagIds`，所以两台设备并发合并时冲突面只有**一行**（LWW 决胜），而不是 N 条任务各打一架。
+   *
+   * 代价与纪律（缺一不可）：
+   *   · **原始数据不变**：被合并掉的 id **仍然留在** `task.tagIds` 里（有测试钉住这件事）。
+   *   · 因此"有效标签"必须经 `tags.ts` 的 `resolveTagIds()` / `resolveTags()` 得到，
+   *     **它是唯一入口**。任何地方自己写 `tagIds.includes(...)` 判断标签归属都会漏掉别名
+   *     —— 漏掉的表现不是报错，是"合并之后我的任务不见了"。
+   *   · 链 `A→B→C` 解析到 `C`；环 `A→B→A` 必须被检测（返回 `undefined` = 这条链坏了，
+   *     而不是无限循环，也不是把 A 当成活的）。
+   *   · 解析**只读**：不许在解析里写回数据（那会把一次读变成 N 条 op）。
+   *   · 撤销 = 清掉这一个字段（一条 op 的逆）⇒ 所有任务重新显示 A。
+   *
+   * 可选字段（`?`）：AGENTS.md §3.3 —— 必填字段会在 hydration 时炸，而 TS 与构建都不报。
+   */
+  mergedInto?: string;
 }
 
 // ─────────────────────────────────────────────────────────────

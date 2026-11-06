@@ -132,6 +132,19 @@ interface TaskState {
    * 无处落地。本层只转交，语义（幂等：状态没变就不写 op）在动作层。
    */
   setAbandoned: (id: string, abandoned: boolean) => Promise<void>;
+  /**
+   * R3「跳过这一次」：把当前这一次跳过去（到期日推进到下一次，规则不动）。
+   *
+   * 🔴 只转发。判据（有没有下一次、写哪几个字段）在 `TaskActions.skipOccurrence`；
+   * 本层不许预读 `repeatRule` 再自己判断一次 —— 那会变成两套"这条能不能跳"的裁决。
+   */
+  skipOccurrence: (id: string) => Promise<void>;
+  /**
+   * R4①：手动排序写 `Task.order`。**一次拖动 = 一条 op** ——
+   * 所以它只收**一条**（不是数组）：收数组就等于默许"一次拖拽写 N 条"，
+   * 而那是 §3.4 明令要拦的形状（顺序是连续量，批量写会整片覆盖）。
+   */
+  setOrder: (id: string, order: number) => Promise<void>;
   bulkSetPriorities: (entries: readonly { id: string; priority: Priority }[]) => Promise<void>;
   setImportant: (id: string, important: boolean) => Promise<void>;
   /**
@@ -400,6 +413,16 @@ export const useTaskStore = create<TaskState>((set) => ({
     await taskActions.setAbandoned(id, abandoned);
   },
 
+  skipOccurrence: async (id) => {
+    // 抛错（不是重复任务 / 规则已走到尽头）由动作层给一句人话，本层原样冒出去。
+    await taskActions.skipOccurrence(id);
+  },
+
+  setOrder: async (id, order) => {
+    // 值域校验（不许落进"未排序"的合成键区间）在 `TaskActions.setOrder` 里。
+    await taskActions.setOrder(id, order);
+  },
+
   bulkSetPriorities: async (entries) => {
     await taskActions.bulkSetPriorities(entries);
   },
@@ -490,6 +513,12 @@ export function selectVisibleTasks(state: TaskState): Task[] {
    */
   const filtered = filterTasks(Object.values(state.entities.tasks), state.filter, {
     now: state.now,
+    /**
+     * 🔴 `tags` 必须传（B 包 R8）：标签筛选那一支靠它把"被合并掉的标签"解析成目标标签。
+     * 不传 ⇒ **按 B 筛不到只挂着 A 的任务**，而界面上它们明明带着 B 的标签
+     *（症状是"合并之后我的任务不见了"，且不报错）。
+     */
+    tags: state.entities.tags,
   });
   /**
    * 🔴 2026-10-01：这里**不再"先筛再搜"** —— 列表只按 `filter` 出，

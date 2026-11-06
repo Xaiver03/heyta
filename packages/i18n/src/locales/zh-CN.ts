@@ -840,6 +840,9 @@ export const zhCN = {
   // ⚠️ 「取消放弃」而不是「恢复」：后者在本仓是回收站那一格的动词
   //   （`ADR-0048` 的 restore），两个态共用一个词会让人分不清从哪儿回来。
   'web.rowMenu.unabandon': '取消放弃',
+  // B 包 R3：重复任务「跳过这一次」。**只对重复任务出现**，所以它读起来是
+  // 「这一次」而不是「这一天」—— 用户心里那把尺子是"这一轮做不做"，不是日期。
+  'web.rowMenu.skipOccurrence': '跳过这一次',
   'web.rowMenu.select': '多选',
   // `popconfirm` 那一档的后果句（带子任务时才出现）。事实依据：删除只给父任务写墓碑，
   // `@heyta/domain` 的 `buildTaskTree` 会把"父已删除"的子任务**提到顶层**显示。
@@ -866,6 +869,10 @@ export const zhCN = {
   'web.tasks.group.undated': '无截止时间',
   'web.tasks.group.postpone': '顺延',
   'web.tasks.group.postponeAria': '把这 {count} 条逾期任务顺延到今天',
+  // B 包 R4①：手动拖拽档位下，行尾那枚拖拽手柄的无障碍名。
+  // 🔴 不带任务名：手柄是**行的一部分**，读屏已经把标题念过了；
+  //    再念一遍会让"这条任务"这四个字在每一行出现两次。
+  'web.tasks.reorder.handle': '拖动调整顺序',
   // ── 任务详情列的四分组（审计 §4.6：「详情列功能太全、层级不够」）──────────
   // 固定四组：基本信息（标题/备注）→ 时间（截止/提醒）→ 组织（清单/标签/子任务/优先级）
   // → 自动化（重复）。优先级归「组织」而非「时间」的裁决理由写在 `TaskDetailCard` 里。
@@ -1991,6 +1998,24 @@ export const zhCN = {
   'web.tags.addNew': '新建标签',
   'web.tags.add': '添加标签',
   'web.tags.delete': '删除标签「{name}」',
+  // ── B 包 R8：标签管理页（合并 / 批量 / 改名）──────────────
+  // 入口在任务视图页头的 `⋯`（视图层），落点是一张浮层 —— 层级依据见
+  // `docs/plans/r14-entry-table.md`：作用域=全局、代价=可撤销（合并有撤销）⇒ 不进危险区。
+  'web.tags.manage.open': '管理标签',
+  'web.tags.manage.title': '管理标签',
+  'web.tags.manage.hint': '勾选两个以上标签可以把它们合并成一个：任务会转到目标标签上，其余标签被删掉。',
+  'web.tags.manage.select': '选择标签「{name}」',
+  'web.tags.manage.usage': '{count} 条任务',
+  'web.tags.manage.renameLabel': '新名称',
+  'web.tags.manage.mergeLabel': '合并进「{name}」',
+  'web.tags.manage.mergeConfirmTitle': '确定合并吗？',
+  'web.tags.manage.mergeConfirmImpact': '{count} 条任务会改挂到「{target}」，{sources} 会被删掉。',
+  'web.tags.manage.mergeConfirmSubmit': '确认合并',
+  'web.tags.manage.mergeConfirmCancel': '先不合并',
+  'web.tags.manage.bulkDelete': '删除选中的 {count} 个标签',
+  'web.tags.manage.selected': '已选 {count} 个',
+  'web.tags.manage.close': '关闭标签管理',
+  'web.tags.manage.needTwo': '至少选两个标签才能合并',
 
   // ── Web · 任务行上的「整理」（清单归属 + 标签）──────────────
   // ⚠️ 与面板里的「新清单名称」「新标签名称」**刻意不同名**：同名会让无障碍树里

@@ -38,8 +38,9 @@ import {
   startLocalDateOf,
   toLocalDate,
 } from './date.js';
-import { Quadrant, isAbandoned, isLive, type Task } from './entities.js';
+import { Quadrant, isAbandoned, isLive, type Tag, type Task } from './entities.js';
 import { bucketByQuadrant } from './quadrant.js';
+import { resolveTagIds, taskHasTag } from './tags.js';
 
 /**
  * 一条任务筛选。
@@ -71,6 +72,16 @@ export const NEXT_SEVEN_DAYS = 7;
 /** 筛选需要的环境。`now` 显式传入，不在函数里读时钟 —— 见本文件头。 */
 export interface FilterContext {
   readonly now: number;
+  /**
+   * 标签登记表（`entities.tags`）。**给了它，标签筛选才会解析合并别名。**
+   *
+   * 🔴 为什么是可选而不是必填：这是**加参数**而不是改语义，而不给它的老调用方
+   * （`apps/desktop` 的渲染进程、`apps/mobile` 的标签屏）今天仍然按 id 精确匹配 ——
+   * 那是它们**今天的行为**，不是新的错。给了它就走 `resolveTagIds`（`tags.ts`），
+   * 于是"按 B 筛"能筛到"只挂着被合并掉的 A"的任务。
+   * 缺口与清单见 `docs/plans/package-b-2026-11.md`：**web 已给，其余两端未给**。
+   */
+  readonly tags?: Readonly<Record<string, Tag>>;
 }
 
 /** 未删除的任务（**含已放弃**）。显示侧要的是下面那个 `visibleTasks`，不是这一个。 */
@@ -168,7 +179,23 @@ export function filterTasks(
     case 'project':
       return visible.filter((t) => !isCompleted(t) && t.projectId === filter.projectId);
     case 'tag':
-      return visible.filter((t) => !isCompleted(t) && (t.tagIds?.includes(filter.tagId) ?? false));
+      /**
+       * 🔴 **这一格是合并别名最致命的一处**（`docs/plans/package-b-2026-11.md` R8）。
+       *
+       * 合并只写一行标签（`Tag.mergedInto`），**不重写任务的 `tagIds`**。所以
+       * "按 B 筛"必须走 `resolveTagIds` —— 否则只挂着被合并掉的 A 的任务
+       * **一条都筛不出来**，而界面上它们明明带着 B 的标签。
+       * 症状是"合并之后我的任务不见了"，而且不会报错。
+       *
+       * `context.tags` 缺席时退化成按 id 精确匹配：那是桌面/移动端**今天**的行为，
+       * 已在计划文档里登记为缺口（不是这次的静默降级）。
+       */
+      return visible.filter((t) =>
+        !isCompleted(t) &&
+        (context.tags === undefined
+          ? (t.tagIds?.includes(filter.tagId) ?? false)
+          : taskHasTag(t, filter.tagId, context.tags)),
+      );
   }
 }
 
@@ -353,15 +380,25 @@ export function isScopeEmpty(scope: TaskScope): boolean {
  * 落在范围内的任务（**含已完成**，见上面第 2 条）。
  *
  * 仍然先过 `visibleTasks` 那一道：墓碑不该在任何视图里出现，已放弃的也不该。
+ *
+ * 🔴 `tags` 传入时标签那一支走 `resolveTagIds`（合并别名），否则按 id 精确匹配。
+ * 理由与 `filterTasks` 的 `case 'tag'` 完全一样 —— 日历的"按标签限定范围"
+ * 漏了别名，表现就是"合并之后日历里少了任务"。
  */
-export function scopeTasks(tasks: readonly Task[], scope: TaskScope): Task[] {
+export function scopeTasks(
+  tasks: readonly Task[],
+  scope: TaskScope,
+  tags?: Readonly<Record<string, Tag>>,
+): Task[] {
   const visible = visibleTasks(tasks);
   if (isScopeEmpty(scope)) return visible;
   const projects = new Set(scope.projectIds);
-  const tags = new Set(scope.tagIds);
+  const wanted = new Set(scope.tagIds);
   return visible.filter(
     (task) =>
       (task.projectId !== undefined && projects.has(task.projectId)) ||
-      (task.tagIds ?? []).some((id) => tags.has(id)),
+      (tags === undefined
+        ? (task.tagIds ?? []).some((id) => wanted.has(id))
+        : resolveTagIds(task.tagIds, tags).some((id) => wanted.has(id))),
   );
 }

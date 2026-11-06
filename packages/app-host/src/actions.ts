@@ -45,6 +45,8 @@ import {
   trashedIn,
   nextAfterCompletion,
   nextOccurrence,
+  normalizeExDates,
+  withExDate,
   parseLocalDate,
   startOfDay,
   toLocalDate,
@@ -437,7 +439,28 @@ export interface TaskActions {
    * 规则串损坏时返回 `undefined` 而不是把坏串透出去：`occurrencesInRange`
    * 遇到非法规则会**抛错**，而 "这一条任务的规则坏了" 不该让整个日期视图白屏。
    */
-  repeatOf(entityId: string): { rule: string; dtstart: string } | undefined;
+  repeatOf(entityId: string): { rule: string; dtstart: string; exDates: string[] } | undefined;
+
+  /**
+   * 「跳过这一次」（`docs/plans/package-b-2026-11.md` R3）。
+   *
+   * 语义：**当前那一次不做了，但规则不变** —— 把这一天记进 `Task.exDates`
+   *（求值侧唯一的排除集，见 `recurrence.ts`），并把到期日推进到**下一次没被跳过**的出现。
+   *
+   * 🔴 **一条 op**：`{ exDates, dueDate, dueDateLocal }` 原子生效 ——
+   * 只写 `exDates` 不推进日期，任务会在原处不动（用户点了像没反应）；
+   * 只推进日期不记 `exDates`，那么"跳过"这件事在数据里根本没发生（规则一改就回来）。
+   * 两件事必须同一条 op，否则中间态是一次静默的错误。
+   *
+   * 🔴 **可撤销**：它是普通单实体 `UPD`（不带宽带标记），所以
+   * `packages/op-log/src/history.ts` 的 `undo()` 能算出反向意图。
+   * 这也是这里**不**顺带重排提醒的原因（那要带 `heytaTaskRepeatCompletion` 标记，
+   * 而那条 op 会被历史栈判成 `batch` 而不可撤销）—— 代价与取舍写在计划文档里。
+   *
+   * 抛错的三种情况都**不写任何 op**：任务不存在、不是重复任务、
+   * 规则已经走到尽头（`COUNT`/`UNTIL` 用尽 —— 没有"下一次"可跳）。
+   */
+  skipOccurrence(entityId: string): Promise<{ skipped: string; next: string }>;
 
   /** 未删除的任务，按创建时间排序（同刻按 id 字典序，保证跨端顺序一致）。 */
   listTasks(): Task[];
@@ -500,12 +523,16 @@ export function createTaskActions(
    * 而"某一条任务的规则坏了"不该让整个日期视图白屏。坏规则在读取侧退化成"不重复"，
    * 数据仍在 op-log 里，用户可以把规则重设一遍。
    */
-  const repeatOf = (task: Task | undefined): { rule: string; dtstart: string } | undefined => {
+  const repeatOf = (
+    task: Task | undefined,
+  ): { rule: string; dtstart: string; exDates: string[] } | undefined => {
     if (task === undefined) return undefined;
     const { repeatRule, repeatDtstart } = task;
     if (repeatRule === undefined || repeatDtstart === undefined) return undefined;
     if (!isValidRecurrenceRule(repeatRule)) return undefined;
-    return { rule: repeatRule, dtstart: repeatDtstart };
+    // `exDates` 走 `normalizeExDates`（去重 + 升序 + 截上限）：读取侧拿到的一定是
+    // 规范形，调用方不必再猜"这里面的顺序算不算语义"。
+    return { rule: repeatRule, dtstart: repeatDtstart, exDates: normalizeExDates(task.exDates) };
   };
 
   /**
@@ -571,9 +598,11 @@ export function createTaskActions(
     //   · 固定排期（默认、含字段为 `undefined` 的历史任务）⇒ 从当前到期日往后推，节奏不漂。
     const afterCompletion = task.repeatAfterCompletion === true;
     const from = afterCompletion ? today(now()) : dueLocalDateOf(task) ?? repeat.dtstart;
+    // 「跳过这一次」的排除集也要喂进去：否则"跳掉那一天之后再勾完成"会把
+    // 被跳过的那一次**又还回来**（用户跳过两次就永远在这个日期上打转）。
     const next = afterCompletion
-      ? nextAfterCompletion(repeat.rule, repeat.dtstart, from)
-      : nextOccurrence(repeat.rule, repeat.dtstart, from);
+      ? nextAfterCompletion(repeat.rule, repeat.dtstart, from, { exDates: repeat.exDates })
+      : nextOccurrence(repeat.rule, repeat.dtstart, from, { exDates: repeat.exDates });
     if (next === undefined) {
       await update(entityId, withWidgetReceipt(task, receipt, { completedAt: now() }));
       return;
@@ -863,6 +892,24 @@ export function createTaskActions(
     async setOrder(entityId, order) {
       const task = taskOf(entityId);
       if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      /**
+       * 写入侧只拦一件事：**必须是有限数**。
+       *
+       * 🔴 这里**不**设上界，理由是第一版设错了、实测被打红：
+       * 手动档的排序键是 `order ?? (MANUAL_ORDER_FALLBACK_BASE + createdAt)`
+       * （`task-order.ts`），而"把一条任务拖到两条**从没排过序**的任务之间"时
+       * `planManualReorder` 算出的中值**就落在 1e12 以上的那一段**（合成键 ≈ 2.7e12）。
+       * 把它当"非法区间"拦掉，等于让最常见的首次拖动直接被拒。
+       *
+       * 那一段的性质要说清（别再按"禁区"理解）：
+       *   · **`≥ 1e12` 不是保留区**，它只是"没排过序的任务的合成键"落在那一段；
+       *   · "显式 `order` 一律排在未排序之前"只在**导入的小整数**（滴答的 `Order`）下成立；
+       *     一旦用户在合成段里拖过，写进去的中值就是显式值，语义仍然正确
+       *     （它就是那两条邻居之间的一个数）；
+       *   · 所以唯一需要守的是 `Number.isFinite` —— 写进 `NaN`/`Infinity` 会让比较器
+       *     整个失效（`a - b` 变 NaN ⇒ 排序退化成原序，且不报错）。
+       */
+      if (!Number.isFinite(order)) throw new Error(`排序位置必须是有限数（收到 ${String(order)}）`);
       if (task.order === order) return;
       await update(entityId, { order });
     },
@@ -1138,6 +1185,33 @@ export function createTaskActions(
       if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
       // 关掉写成 null，见接口上那段注释：让"没设过"和"设过又关掉"同形。
       await update(entityId, { repeatAfterCompletion: on ? true : null });
+    },
+
+    async skipOccurrence(entityId) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      const repeat = repeatOf(task);
+      if (repeat === undefined) throw new Error('这条任务没有重复规则，没有"这一次"可以跳过');
+
+      // 「这一次」= 当前到期日；没有到期日就退到规则锚点（正常数据不会缺，
+      // 但坏数据不该在这里抛一个让人看不懂的错）。
+      const skipped = dueLocalDateOf(task) ?? repeat.dtstart;
+      const exDates = withExDate(repeat.exDates, skipped);
+      const next = nextOccurrence(repeat.rule, repeat.dtstart, skipped, { exDates });
+      if (next === undefined) {
+        // 规则用尽（`COUNT`/`UNTIL`）：没有"下一次"。此时**不写 op** ——
+        // 写一条"把这个日期记进 exDates 但日期不动"的 op 只会留下一个静默的死角。
+        throw new Error('这条重复已经走到最后一次，没有下一次可以跳过去');
+      }
+
+      await update(entityId, {
+        exDates,
+        dueDate: parseLocalDate(next).getTime(),
+        // 与 `completeTask` 同一条：老数据没有 `dueDateLocal` 就**不新造**它，
+        // 否则"一条任务从哪天开始带本地日期"会变成一次没有理由的数据变更。
+        ...(task.dueDateLocal !== undefined ? { dueDateLocal: next } : {}),
+      });
+      return { skipped, next };
     },
 
     repeatOf(entityId) {

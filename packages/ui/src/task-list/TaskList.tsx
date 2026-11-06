@@ -177,6 +177,19 @@ interface TaskListSharedProps {
    * 的 `flattenSections`），现在它传档名。
    */
   readonly sort?: TaskSortKey;
+  /**
+   * **行外面再包一层**（宿主注入的节点，共享层不解释它）。
+   *
+   * 存在的唯一理由：**拖放库是 DOM 库**（`@dnd-kit/core` 要一个真实 DOM 节点），
+   * 而共享层只许用 RN 原语 —— 于是"整行可拖"需要宿主拿到"行外面那个节点"。
+   * 不给这个插槽，宿主只能把拖拽手柄塞进 `renderTrailing`（行的**兄弟**插槽），
+   * 结果就是"行拖不动、只有一个小手柄能拖"（四象限那一次的历史，见
+   * `quadrant/QuadrantBoard.tsx` 文件头第 2 条）。
+   *
+   * 🔴 共享层**不认识**这个节点里是什么：它只把 `node` 放进去。
+   * 省略 ⇒ 逐字节与抽取前相同（移动端与四象限都不传）。
+   */
+  readonly renderRowWrapper?: (row: TaskRowModel, node: React.ReactNode) => React.ReactNode;
 }
 
 /** 平铺形态：一批任务，**共享层负责排序**。 */
@@ -231,6 +244,7 @@ export function TaskList<TMeta = undefined>({
   emptyComponent,
   testID,
   density,
+  renderRowWrapper,
 }: TaskListProps<TMeta>): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -297,7 +311,7 @@ export function TaskList<TMeta = undefined>({
        * 勾选框尺寸 / 行高 / 间距 —— 那些属于行，不属于列表。
        */
       const row = item.row;
-      return (
+      const node = (
         <TaskRow
           row={row}
           {...(density === undefined ? {} : { density: density })}
@@ -314,8 +328,10 @@ export function TaskList<TMeta = undefined>({
           {...(renderTrailing === undefined ? {} : { renderTrailing })}
         />
       );
+      // 省略插槽 ⇒ 原样返回那一枚行（移动端/四象限的行为逐字节不变）。
+      return renderRowWrapper === undefined ? node : <>{renderRowWrapper(row, node)}</>;
     },
-    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density, selectedTaskIds, selectionMode],
+    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density, selectedTaskIds, selectionMode, renderRowWrapper],
   );
 
   const keyExtractor = useCallback((item: Item) => item.key, []);

@@ -58,7 +58,7 @@ import { cssVar, ICON_SIZE } from '@heyta/design-system';
 
 import { FormField } from '../../lib/form/FormField.js';
 import { useI18n } from '@heyta/i18n';
-import type { Task } from '@heyta/domain';
+import { indexTags, resolveTagIds, resolveTags, type Task } from '@heyta/domain';
 import { ChevronDown, SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
 
 import { selectChildProjects, selectTopLevelProjects, useProjectStore } from '../projects/store.js';
@@ -88,7 +88,12 @@ const chipStyle: React.CSSProperties = {
  */
 export function TagChips({ task }: { task: Task }): React.JSX.Element | null {
   const projectState = useProjectStore();
-  const assignedTags = projectState.tags.filter((tag) => task.tagIds?.includes(tag.id) ?? false);
+  /**
+   * 🔴 走 `resolveTags`（B 包 R8）：标签合并之后 `task.tagIds` 里**仍然留着**被合并掉的 id，
+   * 只有解析才能把它变成"用户真正看到的那几个标签"。直接 `filter(tags, includes)` 会让
+   * 合并掉的那条 chip 静默消失（而目标标签也不出现）—— 不报错，只是少了一个。
+   */
+  const assignedTags = resolveTags(task.tagIds, indexTags(projectState.tags));
   if (assignedTags.length === 0) return null;
 
   return (
@@ -127,6 +132,8 @@ export function OrganizerField({
 }): React.JSX.Element {
   const { t } = useI18n();
   const projectState = useProjectStore();
+  /** 有效标签（别名已解析）—— 勾选状态与"下一组"都基于它，见下面那条注释。 */
+  const effectiveTagIds = resolveTagIds(task.tagIds, indexTags(projectState.tags));
 
   const tops = selectTopLevelProjects(projectState);
 
@@ -270,7 +277,7 @@ export function OrganizerField({
             {t('web.organize.tagsLegend')}
           </legend>
           {projectState.tags.map((tag) => {
-            const checked = task.tagIds?.includes(tag.id) ?? false;
+            const checked = effectiveTagIds.includes(tag.id);
             return (
               <label
                 key={tag.id}
@@ -281,12 +288,13 @@ export function OrganizerField({
                   checked={checked}
                   aria-label={t('web.organize.tagToggle', { name: tag.name, title: task.title })}
                   onChange={() => {
-                    const current = task.tagIds ?? [];
-                    // 去重与"空数组写 null"由 `app-host` 的 `setTags` 决定。
+                    // 🔴 用**有效**标签算下一组：这样一次勾选会把别名顺手"化实"
+                    //（载荷里写的是目标标签的 id），而下一次读不再依赖解析。
+                    // 去重与"空数组写 null"仍由 `app-host` 的 `setTags` 决定。
                     onSetTags(
                       checked
-                        ? current.filter((id) => id !== tag.id)
-                        : [...current, tag.id],
+                        ? effectiveTagIds.filter((id) => id !== tag.id)
+                        : [...effectiveTagIds, tag.id],
                     );
                   }}
                 />

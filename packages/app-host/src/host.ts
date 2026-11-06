@@ -141,8 +141,20 @@ const inboundAccountId = (value: string): string => /^\d+$/.test(value) ? `user-
  */
 /** 「我的数据现在是什么状态」的本地读数（R7）。 */
 export interface HostDataStatus {
-  /** 还没上传到服务端的本地 op 条数（`pending` 队列；`rejected` 不在内）。 */
+  /**
+   * 还在**待上传队列**里的本地 op 条数（`uploadStatus === 'pending'`）。
+   *
+   * 🔴 **它不是"没到服务端"的全部**：服务端永久拒绝的 op 会被 `markRejected`
+   * 移出这个队列（改成 `'rejected'`），所以"我的改动在不在云上"这个问题
+   * 的正确读数是 `pendingUpload + rejectedUpload`。两个数都留在这里，
+   * 界面按自己的口径取（当前 web 那一句「N 项还没上传」取的是两者之和）。
+   */
   readonly pendingUpload: number;
+  /**
+   * 服务端**永久拒绝**、已移出待上传队列的本地 op 条数
+   * （`uploadStatus === 'rejected'`；这些数据没上云，也不会自动补传）。
+   */
+  readonly rejectedUpload: number;
   /** 最后一次**成功**同步的本地毫秒时刻；从没成功过就是 `undefined`。 */
   readonly lastSyncedAt?: number;
   /** 本机库归属（ADR-0084）；匿名库是 `undefined`。 */
@@ -1096,13 +1108,18 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     },
 
     async dataStatus(): Promise<HostDataStatus> {
-      const [pendingUpload, lastSyncedAt, owner] = await Promise.all([
+      const [pendingUpload, rejectedUpload, lastSyncedAt, owner] = await Promise.all([
         engine.countPendingUpload(),
+        // 服务端永久拒绝的那一档：它已被移出 pending 队列，所以**必须单独读**。
+        // 只报 pending 会让"一次上传被永久拒绝"看起来像"待上传数少了"，
+        // 而实际上一条都没上去（A 包验收记录 §三 第 4 条）。
+        store.countRejectedUpload(),
         store.getMetaValue(META_KEYS.LAST_SYNCED_AT),
         readLibraryOwner(store),
       ]);
       return {
         pendingUpload,
+        rejectedUpload,
         ...(typeof lastSyncedAt === 'number' ? { lastSyncedAt } : {}),
         ...(owner !== undefined ? { owner } : {}),
       };

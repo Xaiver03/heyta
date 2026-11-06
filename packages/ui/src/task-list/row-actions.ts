@@ -48,20 +48,31 @@ import type { ReactNode } from 'react';
  * 语义依据：`docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md` §3.1（放弃是
  * 第五态、与完成互不推导）与 §3.2（置顶只有 `pinnedAt` 一个字段）。
  *
- * ⚠️ `priority` / `moveToProject` / `tags` 是**字段值**的子菜单，`addSubtask` 是结构动作：
- * 按 J1（作用域决定层）它们"应该"住在字段层，留在行菜单是照抄参照产品的做法
- * （`docs/research/ticktick-ux-ia-and-entry-paths.md` §3.2 #2/#4）。
- * 代价是同一个字段出现两个落点，那是 R1 的债，登记在入口表里（处置=收敛），
- * 不在这一份里再发明第二套排序。
+ * ⚠️ **`priority` / `moveToProject` / `tags` 已从这一份里删掉（B 包 R1 收敛，2026-11-06）。**
+ * 它们都是**单值字段**，按 J1（作用域决定层）住在**字段层**（`TaskDetailCard`）；
+ * 留在行菜单是同一个字段的**第二个编辑落点**，而入口表把这三行的处置写成 `收敛`
+ * 就是这笔债。删掉之后：
+ *   · 字段仍在面单里可改（能力没有减少）；
+ *   · 行菜单不再与面单争夺"这个字段在哪儿改"；
+ *   · `ROW_ACTION_IDS` 因此从 11 个 id 变成 9 个（`skipOccurrence` 加了 1 个）。
+ * 判据：`apps/web/tests/task-row-menu.spec.tsx` 的「面单是这三个字段的唯一编辑落点」那一组。
+ *
+ * ⚠️ `addSubtask` 留下了：它是**结构动作**（建一条新任务），不是字段值 ——
+ * 而且它在行菜单里是**导航型**（只 `openTask`），不是第二个建任务的落点。
  */
 export const ROW_ACTION_IDS = [
   'open',
   'pin',
   'unpin',
-  'priority',
-  'moveToProject',
   'addSubtask',
-  'tags',
+  /*
+    R3「跳过这一次」（B 包，2026-11-06）：**只对重复任务**有意义。
+    它的位置在这里而不是在"重复"那个字段格里，理由是**代价**（J5）：
+    跳过会推进到期日（改变"这条任务出现在哪一天"），那是对象层的动作；
+    而"改规则"才是字段层。宿主**只在**有重复规则时才提供它
+    （没有规则 ⇒ `hostContentOf` 返回 `null`），所以词表里有、菜单里按条件出现。
+  */
+  'skipOccurrence',
   'abandon',
   'unabandon',
   'select',

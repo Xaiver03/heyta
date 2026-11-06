@@ -24,6 +24,7 @@ import {
   Users,
   X,
   CircleHelp,
+  Tag,
   CreditCard,
   Bell,
   Palette,
@@ -121,6 +122,17 @@ import { SubtaskBadge } from './features/tasks/SubtaskPicker.js';
 // 行操作 UX 重设计（2026-11）：行尾不再挂「⋯ 更多」那一排编辑器，
 // 行操作的主入口是**右键上下文菜单**（`TaskRowMenu`），可发现入口是**点行 → 详情**。
 import { TaskRowMenu } from './features/tasks/TaskRowMenu.js';
+/*
+  R4① 手动排序的拖放外壳（Web 独有：dnd-kit 要真实 DOM 节点）。
+  🔴 一次拖动 = 一条 op 的判据**不在它里面**，在领域的 `planManualReorder`；
+  它只负责"指针落在第几行"这件 UI 事实。
+*/
+import { TagsManager } from './features/tags/TagsManager.js';
+import {
+  ManualSortWrapper,
+  ReorderHandle,
+  makeManualSortRowWrapper,
+} from './features/tasks/ManualSortDnd.js';
 import { FilterPanel } from './features/tasks/FilterPanel.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
@@ -494,7 +506,10 @@ export function App(): React.JSX.Element {
    */
   const navCounts = useMemo(() => {
     const tasks = Object.values(store.entities.tasks);
-    const count = (filter: TaskFilter): number => filterTasks(tasks, filter, { now: store.now }).length;
+    const count = (filter: TaskFilter): number =>
+      // `tags` 与列表那一侧传的是同一份（`filterTasks` 的标签支靠它解析合并别名）；
+      // 只给列表不给计数，侧栏就会出现"标签写 3、点进去 5"的读数。
+      filterTasks(tasks, filter, { now: store.now, tags: store.entities.tags }).length;
     return {
       today: count({ kind: 'today' }),
       next7Days: count({ kind: 'next7Days' }),
@@ -561,6 +576,13 @@ export function App(): React.JSX.Element {
    * 页头右侧只剩「图标按钮 + ⋯」，加功能不再改变页头形状。
    */
   const [taskMenuOpen, setTaskMenuOpen] = useState(false);
+  /**
+   * R8 标签管理浮层（B 包）。**视图层的一枚入口**，而作用域是全局
+   * （它改的是标签表，与"当前选中哪一条"无关）—— 入口表的 `manageTags` 那一行。
+   * 它不做成新的 `ViewKey`：那会连带三处登记（选中立场 / 键盘光标 / rail 期望表），
+   * 而这一面的粒度是"一次操作"，不是"一屏"。
+   */
+  const [tagsManagerOpen, setTagsManagerOpen] = useState(false);
   const taskMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -729,6 +751,20 @@ export function App(): React.JSX.Element {
   const effectiveTaskSort = useMemo(
     () => (projectSortId === undefined ? taskSort : loadProjectTaskSort(projectSortId) ?? taskSort),
     [projectSortId, projectSortRevision, taskSort],
+  );
+  /**
+   * R4①：**当前是不是「手动拖拽」档**。
+   *
+   * ⚠️ 它只决定"要不要建拖放范围"，**不写任何数据** —— 切到这一档时 op-log 条数
+   * 不变（判据见 `docs/plans/package-b-2026-11.md`：`display → manual → display` 来回切 = 0 条）。
+   * 没排过序的任务靠领域层的合成键（`MANUAL_ORDER_FALLBACK_BASE + createdAt`）排序，
+   * 所以**不需要"切档时归位"那一轮 N 条写入**。
+   */
+  const manualSortActive = effectiveTaskSort === 'manual';
+  /** 行外面那一层（只有手动档才需要；其余档位传 `undefined` ⇒ 共享层原样返回行）。 */
+  const manualRowWrapper = useMemo(
+    () => (manualSortActive ? makeManualSortRowWrapper() : undefined),
+    [manualSortActive],
   );
   const changeTaskSort = useCallback((next: TaskSortKey) => {
     const currentFilter = useTaskStore.getState().filter;
@@ -1654,10 +1690,18 @@ export function App(): React.JSX.Element {
           <TagChips task={task} />
           <RepeatChip task={task} now={store.now} />
           <ReminderBadge task={task} />
+          {/*
+            手动排序档位下多一枚拖拽手柄（R4①）。
+            🔴 它**自带"在不在拖放范围里"的判断**（`ReorderHandle` 没有上下文就返回
+            `null`），所以这里不必再传一个 `manual` 布尔 —— 少一个"两处判断不一致"的机会。
+            徽标那一列是只读的，手柄是这一格里唯一可交互的东西，且它只在
+            「手动拖拽」那一档出现（其它档位拖拽没有意义：顺序不由用户决定）。
+          */}
+          <ReorderHandle label={t('web.tasks.reorder.handle')} />
         </span>
       );
     },
-    [store.now],
+    [store.now, t],
   );
 
   /**
@@ -1867,6 +1911,20 @@ export function App(): React.JSX.Element {
 
   /** 菜单上那一条任务（有的数据层面已被删掉 ⇒ 菜单自己收走）。 */
   const rowMenuTask = rowMenu === null ? undefined : store.entities.tasks[rowMenu.taskId];
+  /**
+   * 菜单上那一条的**重复规则**（R3「跳过这一次」要不要出现）。
+   *
+   * 🔴 判据在领域层的 `repeatOf`：它对坏规则串返回 `undefined`（退化成"不重复"），
+   * 所以壳里**不读** `repeatRule` 再判一次合法性 —— 那就是第二套裁决。
+   * 这里直接读物化状态里的字段做"有没有规则"的存在性判断，交给
+   * `TaskActions.repeatOf` 的同一套规则：`repeatRule` 与 `repeatDtstart` 必须成对。
+   */
+  const rowMenuRepeat =
+    rowMenuTask === undefined ||
+    rowMenuTask.repeatRule === undefined ||
+    rowMenuTask.repeatDtstart === undefined
+      ? undefined
+      : rowMenuTask.repeatRule;
   useEffect(() => {
     if (rowMenu !== null && rowMenuTask === undefined) setRowMenu(null);
   }, [rowMenu, rowMenuTask]);
@@ -2998,6 +3056,23 @@ export function App(): React.JSX.Element {
                     </MenuItem>
                   ))}
                   <MenuSeparator />
+                  {/*
+                    R8 标签管理（B 包）。**视图层入口、全局作用域** ——
+                    「作用域决定层」允许全局动作落在视图层（入口表 J1：
+                    `全局 → 全局 | 视图`），而它的粒度是"一次操作"而不是"一屏"，
+                    所以不做成新的 `ViewKey`（那会连带三处登记，见 `view-tabs.ts`）。
+                    它与 `sort` / `select` 同居 `⋯`：这一枚管的是**列表之外**的
+                    对象（标签表），但入口收在同一个"视图设置"面里，用户不必记住
+                    "标签在哪儿管"。
+                  */}
+                  <MenuItem
+                    testID="manage-tags-open"
+                    icon={<Tag size={ICON_SIZE.sm} aria-hidden="true" />}
+                    onSelect={() => { setTagsManagerOpen(true); }}
+                  >
+                    {t('web.tags.manage.open')}
+                  </MenuItem>
+                  <MenuSeparator />
                   <MenuItem
                     testID="task-select-open"
                     icon={<ListChecks size={ICON_SIZE.sm} aria-hidden="true" />}
@@ -3221,9 +3296,15 @@ export function App(): React.JSX.Element {
             </div>
           ) : dateGroups === undefined ? (
             <HeytaUiProvider>
+              <ManualSortWrapper
+                manual={manualSortActive}
+                tasks={visible}
+                onSetOrder={(id, order) => useTaskStore.getState().setOrder(id, order)}
+              >
               <TaskList
                 tasks={visible}
                 sort={effectiveTaskSort}
+                {...(manualRowWrapper === undefined ? {} : { renderRowWrapper: manualRowWrapper })}
                 onOpenTask={openTask}
                 activeTaskId={selectedTaskId}
                 selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined}
@@ -3240,6 +3321,7 @@ export function App(): React.JSX.Element {
                 renderTrailing={renderTaskTrailing}
                 testID="task-list"
               />
+              </ManualSortWrapper>
             </HeytaUiProvider>
           ) : (
             <div data-testid="task-list">
@@ -3293,9 +3375,15 @@ export function App(): React.JSX.Element {
                         testID={`task-group-${key}-head`}
                       />
                       {!collapsedGroups.has(key) && (
+                        <ManualSortWrapper
+                          manual={manualSortActive}
+                          tasks={group.tasks}
+                          onSetOrder={(id, order) => useTaskStore.getState().setOrder(id, order)}
+                        >
                         <TaskList
                           tasks={group.tasks}
                           sort={effectiveTaskSort}
+                          {...(manualRowWrapper === undefined ? {} : { renderRowWrapper: manualRowWrapper })}
                           onOpenTask={openTask}
                           activeTaskId={selectedTaskId}
                           selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined}
@@ -3312,6 +3400,7 @@ export function App(): React.JSX.Element {
                           renderTrailing={renderTaskTrailing}
                           testID={`task-list-${key}`}
                         />
+                        </ManualSortWrapper>
                       )}
                     </HeytaUiProvider>
                   </section>
@@ -3991,6 +4080,17 @@ export function App(): React.JSX.Element {
         都排在**全局决策层之外**（与 `ConflictDialog` 同级），因为它们不是视图内容 ——
         任务视图切走时菜单必须已经不在了（`rowMenuTask` 那条 effect 会把失效的收走）。
       */}
+      {/*
+        R8 标签管理浮层。挂在**全局决策层之外**（与行菜单同级）：
+        它不是视图内容 —— 切视图时它不该跟着留在内容区里。
+      */}
+      <TagsManager
+        open={tagsManagerOpen}
+        onClose={() => {
+          setTagsManagerOpen(false);
+        }}
+      />
+
       {rowMenu !== null && rowMenuTask !== undefined ? (
         <TaskRowMenu
           taskId={rowMenu.taskId}
@@ -4000,32 +4100,20 @@ export function App(): React.JSX.Element {
           onClose={closeRowMenu}
           onOpenDetail={openTask}
           onDelete={deleteTaskWithReceipt}
-          onSetPriority={(id, priority) => useTaskStore.getState().setPriority(id, priority)}
-          currentPriority={rowMenuTask.priority}
-          onMoveToProject={(id, projectId) => useTaskStore.getState().moveToProject(id, projectId)}
-          projects={projects.projects.map((p) => ({ id: p.id, name: p.name }))}
-          currentProjectId={rowMenuTask.projectId}
+          /*
+            🔴 B 包 R1 收敛（2026-11-06）：行菜单里的「优先级 / 移动到 / 标签」三个子菜单
+            已经**删掉** —— 它们是同一个**单值字段**的第二个编辑落点，而字段层
+            （`TaskDetailCard` 的 `PriorityField` / `OrganizerField`）是它应该住的地方
+            （J1「作用域决定层」）。所以这一段的九条接线一并去掉：
+            能力没有减少（面单里都在），减少的是"这个字段到底在哪儿改"的歧义。
+            判据：`apps/web/tests/task-row-menu.spec.tsx` 的「面单是唯一编辑落点」那一组。
+          */
           onAddSubtask={(parentId) => {
             // 行内输入框在「撤掉行尾编辑器」那一刀之后就没有了（字段编辑都收进面单），
             // 所以这一项做的是"打开那条任务的面单"—— 子任务那一格就在里面，
             // 焦点由面单自己给。⚠️ 不许把它读成"点了没反应"：目的地换了，动作是真的。
             openTask(parentId);
           }}
-          onSetTags={(id, tagIds) => useTaskStore.getState().setTags(id, tagIds)}
-          tags={projects.tags.map((tag) => ({ id: tag.id, name: tag.name }))}
-          onCreateTag={async (name) => {
-            // 重名不当错误处理，当"你要的就是它"：返回那条已有标签的 id，
-            // 菜单会把它并进这一组 —— 与侧栏创建对话框的判重同一条归一口径
-            // （trim + toLocaleLowerCase），两处各写一套迟早漂。
-            const trimmed = name.trim();
-            if (trimmed === '') return undefined;
-            const existing = projects.tags.find(
-              (tag) => tag.name.trim().toLocaleLowerCase() === trimmed.toLocaleLowerCase(),
-            );
-            if (existing !== undefined) return existing.id;
-            return projects.addTag(trimmed);
-          }}
-          currentTagIds={rowMenuTask.tagIds}
           onSetPinned={(id, pinned) => {
             void useTaskStore.getState().setPinned(id, pinned);
           }}
@@ -4051,6 +4139,18 @@ export function App(): React.JSX.Element {
           }}
           // 与 `pinned` 同一条纪律：当前态由领域层的 `isAbandoned()` 算，本层不读字段。
           abandoned={isAbandoned(rowMenuTask)}
+          /*
+            R3「跳过这一次」（B 包）：**对象层**、代价低于删除 —— 它是一条普通
+            单实体 `UPD`，⌘Z 能把它撤回来（判据 `packages/app-host/tests/skip-occurrence.spec.ts`
+            的 `undo()` 那一条），所以不进危险组。
+
+            只在**有生效规则**时才给这一项：`repeating` 由领域层的 `repeatOf` 判
+            （坏规则串会被它退化成"不重复"，壳里不再自己读 `repeatRule`）。
+          */
+          onSkipOccurrence={(id) => {
+            void useTaskStore.getState().skipOccurrence(id);
+          }}
+          repeating={rowMenuRepeat !== undefined}
         />
       ) : null}
 

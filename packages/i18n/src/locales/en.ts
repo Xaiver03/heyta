@@ -735,6 +735,8 @@ export const en = {
   'web.rowMenu.abandon': 'Abandon',
   // 'Un-abandon' rather than 'Restore': the latter is already the trash verb (ADR-0048).
   'web.rowMenu.unabandon': 'Un-abandon',
+  // B package R3: "skip this occurrence" for repeating tasks (only shown when a rule exists).
+  'web.rowMenu.skipOccurrence': 'Skip this occurrence',
   'web.rowMenu.select': 'Select multiple',
   // The `popconfirm` tier's consequence line (only shown when the task has subtasks).
   // Factual basis: delete only tombstones the parent; `@heyta/domain`'s `buildTaskTree`
@@ -763,6 +765,8 @@ export const en = {
   'web.tasks.group.undated': 'No due date',
   'web.tasks.group.postpone': 'Postpone',
   'web.tasks.group.postponeAria': 'Postpone these {count} overdue tasks to today',
+  // B package R4 (1): accessible name for the drag handle in manual-order mode.
+  'web.tasks.reorder.handle': 'Drag to reorder',
 
   // Task detail column's four fixed groups (audit §4.6: "the detail column does
   // everything, with no hierarchy"). Basic (title/note) → Time (due/reminders) →
@@ -1835,6 +1839,22 @@ export const en = {
   'web.tags.addNew': 'Create a tag',
   'web.tags.add': 'Add tag',
   'web.tags.delete': 'Delete tag "{name}"',
+  // ── B package R8: tag manager (merge / bulk / rename) ─────
+  'web.tags.manage.open': 'Manage tags',
+  'web.tags.manage.title': 'Manage tags',
+  'web.tags.manage.hint': 'Select two or more tags to merge them into one: tasks move to the target tag and the others are deleted.',
+  'web.tags.manage.select': 'Select tag "{name}"',
+  'web.tags.manage.usage': '{count} tasks',
+  'web.tags.manage.renameLabel': 'New name',
+  'web.tags.manage.mergeLabel': 'Merge into "{name}"',
+  'web.tags.manage.mergeConfirmTitle': 'Merge these tags?',
+  'web.tags.manage.mergeConfirmImpact': '{count} tasks move to "{target}", and {sources} is deleted.',
+  'web.tags.manage.mergeConfirmSubmit': 'Merge',
+  'web.tags.manage.mergeConfirmCancel': 'Not now',
+  'web.tags.manage.bulkDelete': 'Delete selected tags ({count})',
+  'web.tags.manage.selected': '{count} selected',
+  'web.tags.manage.close': 'Close tag manager',
+  'web.tags.manage.needTwo': 'Select at least two tags to merge',
 
   // ── Web · per-row "organize" (list + tags) ────────────────
   'web.overlay.discard.title': 'Discard these changes?',

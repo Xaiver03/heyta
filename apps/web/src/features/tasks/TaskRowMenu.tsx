@@ -87,7 +87,7 @@ import {
 import { ICON_SIZE } from '@heyta/design-system';
 import { useMenuKeyboard } from '../../lib/menu/useMenuKeyboard.js';
 import { useI18n } from '@heyta/i18n';
-import { Archive, ArchiveRestore, Flag, FolderOpen, Plus, Tag, ListPlus, Pin, PinOff } from 'lucide-react';
+import { Archive, ArchiveRestore, CalendarOff, Flag, FolderOpen, Plus, Tag, ListPlus, Pin, PinOff } from 'lucide-react';
 
 import './task-row-menu.css';
 
@@ -107,30 +107,8 @@ export interface TaskRowMenuProps {
   readonly onOpenDetail: (taskId: string) => void;
   /** 真的执行删除。撤销回执由宿主给（`resolveDangerTier` 判成 `undo` 的那一档）。 */
   readonly onDelete: (taskId: string) => void;
-  /** 设置优先级。 */
-  readonly onSetPriority?: (taskId: string, priority: Priority) => void;
-  /** 当前优先级（用于高亮当前项）。 */
-  readonly currentPriority?: Priority;
-  /** 移动到清单。 */
-  readonly onMoveToProject?: (taskId: string, projectId: string | undefined) => void;
-  /** 可用清单列表（用于"移动到"子菜单）。 */
-  readonly projects?: ReadonlyArray<{ id: string; name: string }>;
-  /** 当前清单 ID（用于高亮当前项）。 */
-  readonly currentProjectId?: string;
   /** 添加子任务（B2）。点击后宿主负责展开行内输入框。 */
   readonly onAddSubtask?: (parentId: string) => void;
-  /** 设置标签（B3）。 */
-  readonly onSetTags?: (taskId: string, tagIds: string[]) => void;
-  /** 可用标签列表（用于"标签"子菜单）。 */
-  readonly tags?: ReadonlyArray<{ id: string; name: string }>;
-  /** 当前标签 ID 列表（用于高亮已选项）。 */
-  readonly currentTagIds?: ReadonlyArray<string>;
-  /**
-   * 新建标签（B3 的另一半）。宿主负责"重名就当选中那条已有的"这件事 ——
-   * 判重需要的是**全量标签**，那份名册在宿主手里，不在这一层复制一份。
-   * 返回的 id 由本层直接并进那一组，所以用户看到的是一步到位：起名 → 勾上。
-   */
-  readonly onCreateTag?: (name: string) => Promise<string | undefined>;
   /**
    * 置顶 / 取消置顶（B5）。写的是 `Task.pinnedAt`，一次点击 = 一条 op；
    * 🔴 顺序**不在界面排** —— 置顶只改同分组内的次序那条判断住在 `@heyta/app-host`。
@@ -155,6 +133,16 @@ export interface TaskRowMenuProps {
    */
   readonly onSetAbandoned?: (taskId: string, abandoned: boolean) => void;
   /**
+   * R3「跳过这一次」：把当前这一次跳过去（到期日推进到下一次，规则不动）。
+   *
+   * 🔴 **只有重复任务才有"这一次"** —— 所以宿主用一个单独的布尔
+   * （`repeating`）说明"这条有规则"，而不是让本组件去读 `repeatRule`
+   * （规则串的合法性判据在领域层，壳里不该再判一次）。
+   */
+  readonly onSkipOccurrence?: (taskId: string) => void;
+  /** 这条任务有没有生效的重复规则。`false` / 省略 ⇒ 那一项不出现。 */
+  readonly repeating?: boolean;
+  /**
    * 这一条现在是不是已放弃态。由宿主用领域层 `isAbandoned()` 算好传进来 ——
    * 与 `pinned` 同一条纪律：本层不读 `abandonedAt` 选文案。
    */
@@ -169,33 +157,17 @@ export function TaskRowMenu({
   onClose,
   onOpenDetail,
   onDelete,
-  onSetPriority,
-  currentPriority,
-  onMoveToProject,
-  projects,
-  currentProjectId,
   onAddSubtask,
-  onSetTags,
-  tags,
-  currentTagIds,
   onSetPinned,
   pinned = false,
   onSetAbandoned,
+  onSkipOccurrence,
+  repeating = false,
   abandoned = false,
-  onCreateTag,
 }: TaskRowMenuProps): React.JSX.Element {
   const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
   const [confirming, setConfirming] = useState(false);
-  const [showPrioritySubmenu, setShowPrioritySubmenu] = useState(false);
-  const [showProjectSubmenu, setShowProjectSubmenu] = useState(false);
-  const [showTagsSubmenu, setShowTagsSubmenu] = useState(false);
-  /**
-   * 「新建标签」那格草稿（`null` = 没展开）。它不是"顺手加个输入框"：
-   * 一旦展开，菜单的键盘归属就要让给它 —— 见下面 `nestedOpen` 那一格。
-   */
-  const [tagDraft, setTagDraft] = useState<string | null>(null);
-  const tagDraftRef = useRef<HTMLInputElement | null>(null);
 
   /**
    * 档位：**只描述事实，判定交给 `resolveDangerTier`**。
@@ -251,20 +223,6 @@ export function TaskRowMenu({
   useEffect(() => {
     panelRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
   }, []);
-
-  /**
-   * 草稿**刚展开**时把焦点交进去：用户刚点的就是那一行，不该再让他多按一次 Tab。
-   *
-   * 🔴 依赖必须是"草稿开没开"这一个布尔，不是 `tagDraft` 本身：按一个字就改一次值 ⇒
-   * 每次按键都重新 `focus()` ⇒ 浏览器把聚焦的元素**滚进视野** ⇒ 触发下面那条
-   * `scroll` 监听 ⇒ 整层菜单被关掉。症状是"名字打不进去，按第一个字母菜单就没了"
-   * （浏览器腿 ⑧ 量到的就是这条链）。
-   */
-  const draftOpen = tagDraft !== null;
-  useEffect(() => {
-    if (!draftOpen) return;
-    tagDraftRef.current?.focus();
-  }, [draftOpen]);
 
   /** 点外面收走。`mousedown` 而不是 `click`：与 `WebModalShell` 同一条理由。 */
   useEffect(() => {
@@ -326,7 +284,8 @@ export function TaskRowMenu({
     // 🔴 草稿框展开时把整把键盘让给它：打字不是"类型查找"，方向键也不该把焦点
     // 从输入框里抢走。用的就是共享层为"菜单里再开一层"准备的那一格（`nestedOpen`），
     // 不在这里另写一份按键解释。
-    nestedOpen: tagDraft !== null,
+    // 菜单里没有第二层输入框了（标签子菜单已按 R1 收敛到面单），所以这里是 `false`。
+    nestedOpen: false,
     // 焦点进入由上面那条既有 `useEffect` 负责（它按"第一枚"取，与共享常量同值）。
     focusOnOpen: false,
     // 焦点归还由宿主做（它才知道是哪一行触发的菜单），见文件头那段说明。
@@ -371,17 +330,6 @@ export function TaskRowMenu({
         return pinned && onSetPinned !== undefined
           ? { label: t('web.rowMenu.unpin'), icon: <PinOff size={ICON_SIZE.sm} className="ht-row-menu__icon" /> }
           : null;
-      case 'priority':
-        return onSetPriority === undefined
-          ? null
-          : { label: t('web.rowMenu.priority'), icon: <Flag size={ICON_SIZE.sm} className="ht-row-menu__icon" /> };
-      case 'moveToProject':
-        return onMoveToProject === undefined || (projects?.length ?? 0) === 0
-          ? null
-          : {
-              label: t('web.rowMenu.moveTo'),
-              icon: <FolderOpen size={ICON_SIZE.sm} className="ht-row-menu__icon" />,
-            };
       case 'addSubtask':
         return onAddSubtask === undefined
           ? null
@@ -389,12 +337,19 @@ export function TaskRowMenu({
               label: t('web.rowMenu.addSubtask'),
               icon: <ListPlus size={ICON_SIZE.sm} className="ht-row-menu__icon" />,
             };
-      case 'tags':
-        // 判据**不是**"有标签才画"：一条标签都没有、但宿主接了 `onCreateTag` 时必须画 ——
-        // 否则新用户从行菜单里永远建不出第一条标签（浏览器腿 ⑧ 量到的）。
-        return onSetTags === undefined || ((tags?.length ?? 0) === 0 && onCreateTag === undefined)
-          ? null
-          : { label: t('web.rowMenu.tags'), icon: <Tag size={ICON_SIZE.sm} className="ht-row-menu__icon" /> };
+      case 'skipOccurrence':
+        /**
+         * 只在**有生效规则**且宿主接了回调时才出现。
+         * 判据不是"有没有下一次"（那要跑一次求值，而求值在领域层）——
+         * 规则走到尽头时动作会拒绝并给一句人话，比这里悄悄少一项更好：
+         * "我明明有重复任务，为什么菜单里没有跳过"是没法回答的。
+         */
+        return repeating && onSkipOccurrence !== undefined
+          ? {
+              label: t('web.rowMenu.skipOccurrence'),
+              icon: <CalendarOff size={ICON_SIZE.sm} className="ht-row-menu__icon" />,
+            }
+          : null;
       case 'abandon':
         return abandoned || onSetAbandoned === undefined
           ? null
@@ -492,122 +447,6 @@ export function TaskRowMenu({
           </button>
         );
 
-      /* 优先级子菜单 */
-      case 'priority':
-        return (
-          <div className="ht-row-menu__submenu-trigger">
-            <button
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              className="ht-row-menu__item ht-row-menu__item--has-submenu"
-              data-testid="task-row-menu-priority"
-              aria-haspopup="menu"
-              aria-expanded={showPrioritySubmenu}
-              onClick={() => {
-                setShowPrioritySubmenu(!showPrioritySubmenu);
-                setShowProjectSubmenu(false);
-                setShowTagsSubmenu(false);
-              }}
-            >
-              {action.icon}
-              {action.label}
-            </button>
-            {showPrioritySubmenu && (
-              <div className="ht-row-menu__submenu" role="menu">
-                {([Priority.None, Priority.High, Priority.Medium, Priority.Low] as Priority[]).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    role="menuitem"
-                    tabIndex={-1}
-                    className={`ht-row-menu__item ${currentPriority === p ? 'ht-row-menu__item--active' : ''}`}
-                    data-testid={`task-row-menu-priority-${String(p)}`}
-                    onClick={() => {
-                      onSetPriority?.(taskId, p);
-                      onClose();
-                    }}
-                  >
-                    <Flag
-                      size={ICON_SIZE.sm}
-                      className={`ht-row-menu__icon ht-row-menu__icon--${
-                        p === Priority.High
-                          ? 'high'
-                          : p === Priority.Medium
-                            ? 'medium'
-                            : p === Priority.Low
-                              ? 'low'
-                              : 'none'
-                      }`}
-                    />
-                    {t(p === Priority.None ? 'mobile.priority.none' : p === Priority.High ? 'mobile.priority.high' : p === Priority.Medium ? 'mobile.priority.medium' : 'mobile.priority.low')}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-
-      /* 移动到子菜单 */
-      case 'moveToProject':
-        return (
-          <div className="ht-row-menu__submenu-trigger">
-            <button
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              className="ht-row-menu__item ht-row-menu__item--has-submenu"
-              data-testid="task-row-menu-move"
-              aria-haspopup="menu"
-              aria-expanded={showProjectSubmenu}
-              onClick={() => {
-                setShowProjectSubmenu(!showProjectSubmenu);
-                setShowPrioritySubmenu(false);
-                setShowTagsSubmenu(false);
-              }}
-            >
-              {action.icon}
-              {action.label}
-            </button>
-            {showProjectSubmenu && (
-              <div className="ht-row-menu__submenu" role="menu">
-                {/* 收集箱（无清单） */}
-                <button
-                  type="button"
-                  role="menuitem"
-                  tabIndex={-1}
-                  className={`ht-row-menu__item ${!currentProjectId ? 'ht-row-menu__item--active' : ''}`}
-                  data-testid="task-row-menu-project-inbox"
-                  onClick={() => {
-                    onMoveToProject?.(taskId, undefined);
-                    onClose();
-                  }}
-                >
-                  <FolderOpen size={ICON_SIZE.sm} className="ht-row-menu__icon" />
-                  {t('web.rowMenu.inbox')}
-                </button>
-                {(projects ?? []).map((project) => (
-                  <button
-                    key={project.id}
-                    type="button"
-                    role="menuitem"
-                    tabIndex={-1}
-                    className={`ht-row-menu__item ${currentProjectId === project.id ? 'ht-row-menu__item--active' : ''}`}
-                    data-testid={`task-row-menu-project-${project.id}`}
-                    onClick={() => {
-                      onMoveToProject?.(taskId, project.id);
-                      onClose();
-                    }}
-                  >
-                    <FolderOpen size={ICON_SIZE.sm} className="ht-row-menu__icon" />
-                    {project.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-
       /* B2: 添加子任务 */
       case 'addSubtask':
         return (
@@ -627,134 +466,23 @@ export function TaskRowMenu({
           </button>
         );
 
-      /*
-        B3: 标签子菜单。
-        🔴 渲染条件**不是"有标签才画"**：原文承诺的是"显示已有标签 **+ 新建**"，
-        而"一条标签都还没有"恰恰是最需要新建的那一刻 —— 上一版按 `tags.length > 0` 整行收掉，
-        结果是新用户从行菜单里**永远建不出第一条标签**（浏览器腿 ⑧ 量到的）。
-        现在按"有得挑，或有得建"来判（判在 `hostContentOf('tags')`）：两者都没有才不画。
-      */
-      case 'tags':
+      /* R3「跳过这一次」：对象层、代价低于删除（一条普通 UPD，⌘Z 能撤回来）。 */
+      case 'skipOccurrence':
         return (
-          <div className="ht-row-menu__submenu-trigger">
-            <button
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              className="ht-row-menu__item ht-row-menu__item--has-submenu"
-              data-testid="task-row-menu-tags"
-              aria-haspopup="menu"
-              aria-expanded={showTagsSubmenu}
-              onClick={() => {
-                setShowTagsSubmenu(!showTagsSubmenu);
-                setShowPrioritySubmenu(false);
-                setShowProjectSubmenu(false);
-              }}
-            >
-              {action.icon}
-              {action.label}
-            </button>
-            {showTagsSubmenu && (
-              <div className="ht-row-menu__submenu" role="menu">
-                {(tags ?? []).map((tag) => {
-                  const isSelected = currentTagIds?.includes(tag.id) ?? false;
-                  return (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      role="menuitem"
-                      tabIndex={-1}
-                      className={`ht-row-menu__item ${isSelected ? 'ht-row-menu__item--active' : ''}`}
-                      data-testid={`task-row-menu-tag-${tag.id}`}
-                      aria-pressed={isSelected}
-                      onClick={() => {
-                        const next = isSelected
-                          ? (currentTagIds ?? []).filter((id) => id !== tag.id)
-                          : [...(currentTagIds ?? []), tag.id];
-                        onSetTags?.(taskId, next);
-                        // 不关闭主菜单，让用户可以连续选多个标签
-                      }}
-                    >
-                      <Tag size={ICON_SIZE.sm} className="ht-row-menu__icon" />
-                      {tag.name}
-                    </button>
-                  );
-                })}
-
-                {/*
-                  新建（B3 的另一半）。草稿态与"列表 + 一行入口"在同一格里换，
-                  不弹第二层：这一格已经在 `document.body` 的浮层里了。
-                  空名不给提交（`disabled` + `submit` 里再挡一次：回车那条路绕得过 disabled）。
-                */}
-                {onCreateTag ? (
-                  tagDraft === null ? (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      tabIndex={-1}
-                      className="ht-row-menu__item ht-row-menu__item--create"
-                      data-testid="task-row-menu-new-tag"
-                      onClick={() => {
-                        setTagDraft('');
-                      }}
-                    >
-                      <Plus size={ICON_SIZE.sm} className="ht-row-menu__icon" />
-                      {t('web.tags.addNew')}
-                    </button>
-                  ) : (
-                    <form
-                      className="ht-row-menu__create"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        const name = tagDraft.trim();
-                        if (name === '' || onCreateTag === undefined) return;
-                        void onCreateTag(name).then((created) => {
-                          if (created === undefined) return;
-                          onSetTags?.(taskId, [...(currentTagIds ?? []), created]);
-                          setTagDraft(null);
-                          onClose();
-                        });
-                      }}
-                    >
-                      <input
-                        ref={tagDraftRef}
-                        className="ht-input ht-row-menu__create-input"
-                        type="text"
-                        value={tagDraft}
-                        aria-label={t('web.tags.newLabel')}
-                        placeholder={t('web.tags.newPlaceholder')}
-                        data-testid="task-row-menu-new-tag-input"
-                        onChange={(event) => {
-                          setTagDraft(event.target.value);
-                        }}
-                        onKeyDown={(event) => {
-                          /*
-                           * 🔴 草稿态的 Esc：**退掉草稿，菜单留着**（一次 Esc 只退一层）。
-                           * 上一版这里什么都没有 —— 共享层因为 `nestedOpen` 为真把整把键盘
-                           * 让给了草稿，而草稿自己又不接，于是 Esc 成了**死键**：
-                           * 用户改主意按 Esc，屏幕上什么都没发生（菜单和输入框都还在原地）。
-                           * `stopPropagation` 是防"以后有人把这层的 Esc 又接到宿主上"时两层各退一次。
-                           */
-                          if (event.key === 'Escape') {
-                            event.stopPropagation();
-                            setTagDraft(null);
-                          }
-                        }}
-                      />
-                      <button
-                        type="submit"
-                        className="ht-row-menu__item ht-row-menu__create-submit"
-                        data-testid="task-row-menu-new-tag-submit"
-                        disabled={tagDraft.trim() === ''}
-                      >
-                        {t('web.categories.create.tag.submit')}
-                      </button>
-                    </form>
-                  )
-                ) : null}
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            className="ht-row-menu__item"
+            data-testid="task-row-menu-skip-occurrence"
+            onClick={() => {
+              onSkipOccurrence?.(taskId);
+              onClose();
+            }}
+          >
+            {action.icon}
+            {action.label}
+          </button>
         );
 
       /*

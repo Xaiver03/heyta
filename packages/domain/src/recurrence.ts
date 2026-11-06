@@ -104,6 +104,28 @@ function fromIcalTime(time: ICAL.Time): LocalDate {
 export interface RecurrenceRangeOptions {
   /** 求值上限，防止无限规则把界面卡死。 */
   maxIterations?: number;
+  /**
+   * 「跳过这一次」的日期集（`Task.exDates`，格式同 `LocalDate`）。
+   *
+   * 🔴 **只在求值结果上做减法，不改变规则本身。** 集合里的日期**不出现**，
+   * 其它日期一次都不受影响 —— 这是本选项唯一的行为契约，也是
+   * `docs/plans/package-b-2026-11.md` 判据 R3-①的判据面。
+   *
+   * ⚠️ 它与 `maxIterations` 的交互是**故意的**：上限数的是**规则的产出**，
+   * 不是"过滤之后的条数"。否则一条"跳过了 900 次"的规则会为了让出 2 个结果
+   * 迭代到超时/爆栈。
+   */
+  exDates?: readonly LocalDate[];
+}
+
+/**
+ * `exDates` → `Set`，只做一次。
+ *
+ * `undefined` / 空数组都返回 `undefined`（= 没有排除项），这样热路径上
+ * 每次迭代只多一次 `undefined` 判断，而不是一次 `Set.has`。
+ */
+function exDateSetOf(exDates: readonly LocalDate[] | undefined): Set<LocalDate> | undefined {
+  return exDates === undefined || exDates.length === 0 ? undefined : new Set(exDates);
 }
 
 /**
@@ -133,6 +155,7 @@ export function occurrencesInRange(
   }
 
   const maxIterations = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
+  const exDates = exDateSetOf(options.exDates);
   const out: LocalDate[] = [];
 
   // 🔴 **迭代本身也会抛错，不只是解析。**
@@ -155,7 +178,8 @@ export function occurrencesInRange(
 
       // 迭代器是升序的 —— 越过上界就可以停了
       if (date > to) break;
-      if (date >= from) out.push(date);
+      // 「跳过这一次」：只对这一条日期做减法，窗口的其它日期照旧。
+      if (date >= from && exDates?.has(date) !== true) out.push(date);
     }
   } catch {
     // 把已经算出来的部分返回，而不是整体丢弃
@@ -186,6 +210,7 @@ export function nextOccurrence(
   }
 
   const maxIterations = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
+  const exDates = exDateSetOf(options.exDates);
 
   try {
     const iterator = recur.iterator(toIcalTime(dtstart));
@@ -193,7 +218,10 @@ export function nextOccurrence(
       const next = iterator.next();
       if (next === null) return undefined;
       const date = fromIcalTime(next);
-      if (date > after) return date;
+      // 🔴 「跳过这一次」在这里是**继续往后找**，不是返回 undefined。
+      // 返回 undefined 会被上层读成"规则走到尽头了" ⇒ 任务退回普通完成、
+      // 重复规则被当成用完 —— 用户只是跳了一次，却把整条重复弄丢了。
+      if (date > after && exDates?.has(date) !== true) return date;
     }
   } catch {
     return undefined;
@@ -214,7 +242,16 @@ export function firstOccurrences(
   options: RecurrenceRangeOptions = {},
 ): LocalDate[] {
   if (count <= 0) return [];
-  const capped = Math.min(count, options.maxIterations ?? DEFAULT_MAX_ITERATIONS);
+  /**
+   * 🔴 上限数的是**规则的产出**，`count` 数的是**过滤之后的条数**。
+   *
+   * 加了 `exDates` 之后这两个量不再相等（跳过的那些不占 `count`）。
+   * 所以这里给迭代留 `count + exDates.length` 的额度：最多需要跳过
+   * `exDates.length` 次才能凑够 `count` 条 —— 这是**充分**的，不是估的。
+   */
+  const budget = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
+  const iterations = Math.min(count + (options.exDates?.length ?? 0), budget);
+  const exDates = exDateSetOf(options.exDates);
 
   let recur: ICAL.Recur;
   try {
@@ -226,10 +263,13 @@ export function firstOccurrences(
   const out: LocalDate[] = [];
   try {
     const iterator = recur.iterator(toIcalTime(dtstart));
-    for (let i = 0; i < capped; i += 1) {
+    for (let i = 0; i < iterations && out.length < count; i += 1) {
       const next = iterator.next();
       if (next === null) break;
-      out.push(fromIcalTime(next));
+      const date = fromIcalTime(next);
+      // 「跳过这一次」：预览里也不该出现被跳过的那一次。
+      if (exDates?.has(date) === true) continue;
+      out.push(date);
     }
   } catch {
     // 见 occurrencesInRange 的说明：迭代会抛错，用户输入不该炸掉界面
@@ -276,6 +316,54 @@ export function occursOn(
     maxIterations: options.maxIterations ?? Math.max(DEFAULT_MAX_ITERATIONS, diffDays(date, dtstart) + 10),
   });
   return hits.includes(date);
+}
+
+/**
+ * 「跳过这一次」的日期集合：**唯一的读写入口**
+ * ==============================================
+ *
+ * `Task.exDates` 是一个 `LocalDate[]`，而"加一天""撤一天""去重""排序"这些琐事
+ * 如果各端各写一遍，就会出现"web 去重、mobile 不去重"的不一致 —— 它不会有任何
+ * 测试变红，只会让同一个集合在两台设备上乱了序，而 `exDates` 的顺序**不应该**
+ * 有任何语义（它是个集合）。所以顺序只由这里决定：**升序、去重**。
+ *
+ * 🔴 **上限 `MAX_EX_DATES`。** 一天的重复规则跳一年就是 365 条，这个字段会跟着
+ * op 的一辈子同步下去。超限时**丢最旧的那一端**（保留最近的 `MAX_EX_DATES` 条）：
+ * 近期的跳过才是用户还在意的；而"把整条字段撑到几 KB"是每个端都要付的代价。
+ */
+export const MAX_EX_DATES = 200;
+
+/** 规范化：去重 + 升序 + 丢掉空串/非法格式 + 截到 `MAX_EX_DATES`（保留最近的）。 */
+export function normalizeExDates(exDates: readonly LocalDate[] | undefined): LocalDate[] {
+  if (exDates === undefined || exDates.length === 0) return [];
+  const unique = [...new Set(exDates.filter((date) => /^\d{4}-\d{2}-\d{2}$/u.test(date)))];
+  unique.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return unique.length > MAX_EX_DATES ? unique.slice(unique.length - MAX_EX_DATES) : unique;
+}
+
+/**
+ * 加一天（幂等：已经在集合里就原样返回**同一个内容**，不产生"空写"）。
+ *
+ * ⚠️ 返回新数组而不是就地改：调用方要把它当 op 载荷，就地改会让
+ * "写进去的那一份"和"内存里那一份"变成同一个对象（op-log 的克隆能兜住，
+ * 但那是它的责任，不是这里的）。
+ */
+export function withExDate(exDates: readonly LocalDate[] | undefined, date: LocalDate): LocalDate[] {
+  const current = normalizeExDates(exDates);
+  if (current.includes(date)) return current;
+  return normalizeExDates([...current, date]);
+}
+
+/** 撤回一次跳过（撤销"跳过这一次"时用；不在集合里就原样返回）。 */
+export function withoutExDate(exDates: readonly LocalDate[] | undefined, date: LocalDate): LocalDate[] {
+  const current = normalizeExDates(exDates);
+  if (!current.includes(date)) return current;
+  return current.filter((item) => item !== date);
+}
+
+/** 这个日期是不是被跳过的（界面拿它决定"跳过"那枚按钮该不该显示）。 */
+export function isExDate(exDates: readonly LocalDate[] | undefined, date: LocalDate): boolean {
+  return exDates?.includes(date) ?? false;
 }
 
 /**

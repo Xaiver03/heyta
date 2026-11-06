@@ -89,6 +89,18 @@ export {
   type ProjectActionsOptions,
 } from './project-actions.js';
 
+/**
+ * 标签管理（合并 / 批量删）—— B 包 R8 新增的那一部分。
+ * 改名仍走 `createProjectActions().renameTag`（**不在这里再实现一份**）。
+ */
+export {
+  canonicalMergeTarget,
+  createTagManagementActions,
+  type TagManagementActions,
+  type TagManagementOptions,
+  type TagMergeImpact,
+} from './tag-actions.js';
+
 export {
   createHabitActions,
   habitLogId,

@@ -1,0 +1,44 @@
+/**
+ * 手动拖拽排序的行与手柄（B 包 R4①）
+ * =====================================
+ *
+ * 🔴 **为什么这两条不是内联样式，而是这个文件里的一个类。**
+ *
+ * `cursor` 与 `touch-action` 是**静态 CSS**：它们一个字符都不随帧变化。
+ * 而 `features/**` 的内联样式是"只减不增"的棘轮账本（`check:l4`，陷阱 #671 记的那个缝）——
+ * 把它写进 `style={{…}}` 就等于把一条本该被账本看见的样式挪到账本之外，
+ * 那是**改记法**，不是去掉样式。
+ *
+ * 真正必须内联的只有 dnd-kit 给的**动态几何**（逐帧 `transform` / `transition`），
+ * 那一部分留在 `ManualSortDnd.tsx` 的 `rowStyle` 里。
+ *
+ * ⚠️ **类名是 `.ht-row__drag-handle`：族名取 `__` 之前那一截 ⇒ `.ht-row`。**
+ *（BEM 的 `__` 之后是**元素名**，不在族名里。这条门禁的判据是
+ *  `^/^\.ht-[a-z]+/`，所以 `.ht-row__drag-handle` 记到的族就是 `.ht-row`。）
+ * `.ht-row` 是**既有族**（在那 33 个账内族里）—— 这才是本条通过的原因。
+ *
+ * 踩过三次，全记下来，免得下一个人再花一遍时间：
+ *   · `.ht-drag-handle` —— 族名 `ht-drag`，**新开一族** ⇒ `check:row-single-source`
+ *     34 > 33 红；
+ *   · `.ht-task__drag-handle` —— 族名 `ht-task`，而**全仓没有 `.ht-task` 这个账内族**
+ *     （`ht-task*` 只出现在 `packages/ui` 的 className 上，没有任何 CSS 在**行首**声明过它）
+ *     ⇒ 同样 34 红；
+ *   · `.ht-btn--drag` —— 族名 `ht-btn` 活着，但 `check:control-semantics` 要求每一档
+ *     `.ht-btn--X` 都在**中央 CSS** 的变体表里登记（否则"画出来就是裸按钮"），
+ *     而中央 CSS 不在本包白名单里；而且 `cursor`/`touch-action` 是**交互机制**，
+ *     不是"按钮的一种外观"，塞进那张外观表本身也是错的。
+ * ⇒ 挂在既有 `.ht-row` 族下、且**不是** `.ht-btn--` 变体：两条门禁都不碰，语义也对
+ *  （它就是行上的一个附件控件）。
+ */
+
+.ht-row__drag-handle {
+  /* 抓得住的手感：不是装饰，它告诉用户"这一格可以拖"。 */
+  cursor: grab;
+  /* 🔴 触屏上必须关掉默认手势：否则纵向拖动会被浏览器读成页面滚动
+     （症状是"鼠标能拖、手指拖不动"，而桌面验收完全看不出来）。 */
+  touch-action: none;
+}
+
+.ht-row__drag-handle[data-dragging='true'] {
+  cursor: grabbing;
+}
