@@ -113,7 +113,7 @@
 | 改主题 `theme` | 全局 | 全局 | apps/web/src/App.tsx:3883（data-testid="theme-toggle"） | — | 直接 | 保留 — 在设置 → 显示里（全局层的载体是"开设置"那一处）；`rememberThemeChoice` 是唯一记账点 |
 | 开专注 `focusStart` | 全局 | 视图 | apps/web/src/features/focus/FocusTimer.tsx:269（onStart={） | — | 直接 | 保留 |
 | 加习惯 `habitCreate` | 全局 | 视图 | apps/web/src/features/habits/HabitsView.tsx:311（habits-add-open） | — | 直接 | 保留 |
-| 归档清单 `archiveProject` | 单条 | 对象 | apps/web/src/features/projects/ProjectsPanel.tsx:354（onArchive） | — | 直接 | 保留 — 侧栏组织器那一层（`archive: { button … }`） |
+| 归档清单 `archiveProject` | 单条 | 对象 | apps/web/src/features/projects/ProjectsPanel.tsx:361（onArchive） | — | 直接 | 保留 — 侧栏组织器那一层（`archive: { button … }`） |
 | 导入 `import` | 全局 | 全局 | apps/web/src/features/settings/ImportPanel.tsx:116（data-testid="import-run"） | — | 直接 | 保留 — 设置 → 数据；与「滴答导入」是两个面板 |
 | 导出 `export` | 全局 | 全局 | apps/web/src/features/settings/ExportPanel.tsx:111（data-testid="export-json"） | — | 直接 | 保留 |
 | 加附件 `attachment` | 单条 | 对象 | 未落地 | — | 缺入口 | 未落地 — `grep -rn attach apps/web/src/features/tasks` = 0；附件只在 AI 面板（`features/ai/ImageAttach.tsx`）里存在，不是任务附件 |
