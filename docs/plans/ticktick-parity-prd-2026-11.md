@@ -102,7 +102,7 @@
 
 > 产品负责人 2026-11-06：「重点看它的**设置界面**和**我的界面**，这些东西非常重要，因为这是个**个性化**的东西。」
 > 取证规模：macOS **50 个** `*Preference*`/`*Settings*`/`*Theme*` nib；Windows **35 个 `views_config_*` + 11 个 `views_setting_*` + 15 个 `views_theme_*`**。
-> 详细取证见 [`ticktick-settings-and-personalization.md`](../research/ticktick-settings-and-personalization.md)。
+> 详细取证见 `docs/research/ticktick-settings-and-personalization.md`（**正在写**，落盘后这里改回链接）。
 
 **它的个性化不是一个开关，是八个维度**（两端同名可对照）：
 
