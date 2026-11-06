@@ -540,6 +540,9 @@ export function TaskDetailCard({
         onSetRepeat={(rule) => {
           void store.setRepeat(task.id, rule);
         }}
+        onSetAfterCompletion={(on) => {
+          void store.setRepeatAfterCompletion(task.id, on);
+        }}
       />
 
       {/*

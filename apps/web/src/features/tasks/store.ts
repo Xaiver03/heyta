@@ -173,6 +173,11 @@ interface TaskState {
    */
   setRepeat: (id: string, rule: string | undefined) => Promise<void>;
   /**
+   * 开 / 关「完成后顺延」。**另一个意图、另一个 op**（§3.4），所以不与 `setRepeat` 合并；
+   * 契约与"关掉写成 null"的理由在 `TaskActions.setRepeatAfterCompletion`。
+   */
+  setRepeatAfterCompletion: (id: string, on: boolean) => Promise<void>;
+  /**
    * 记录用户对一次 AI 建议的处置（采用 / 改后采用 / 拒绝）。
    *
    * 🔴 走 op-log，因此**跨设备同步** —— 换台设备 AI 不必重新学一遍。
@@ -446,6 +451,10 @@ export const useTaskStore = create<TaskState>((set) => ({
 
   setRepeat: async (id, rule) => {
     await taskActions.setRepeat(id, rule);
+  },
+
+  setRepeatAfterCompletion: async (id, on) => {
+    await taskActions.setRepeatAfterCompletion(id, on);
   },
 
   setFilter: (filter) => set({ filter }),
