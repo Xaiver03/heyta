@@ -497,6 +497,7 @@ SHARE 盘摆渡仍然可用，但**不再是唯一路径**。
 | detail | 17 | | | | | | |
 
 **取值**：与 macOS 的 nib 清单**同构但粒度更细** —— Windows 把「打印」「Markdown」「widget」也拆成独立 view 组（macOS 那边这些在代码里）。**日历（37）与专注（31）在两端都是最重的两块**。
+⚠️ **一处真不对称**：639 个 BAML 里**没有任何 `trash` / `recycle` / `deleted` 命名的 view**，而 macOS 的菜单里有 `Trash` —— **回收站在 Windows 侧要么换了名字、要么真的没有**，两端的这一格只能标未核实（P0 与 P7 都记了）。
 `resource/` 下另有 144 个主题与资源字典：`colorresource`、`fontresource/*`、`icons_light` / `icons_dark` / **`icons_pink`**、`pomoicons`、`sideBar`。
 
 ### 9.4 设计系统：三层，且跟前端那套**不一样**
@@ -565,7 +566,8 @@ Double72Add6    Double72Add8    Double80Add6   Double92Add8
 
 ### 9.7 还没做的（下一轮）
 
-- **BAML → XAML**：现在拿到的是**结构、键名、色板、字号规则**，**还没有具体控件尺寸/间距/圆角**。要在 Windows 上用 `System.Windows.Baml2006.Baml2006Reader` + `XamlXmlWriter` 转 639 份（脚本属下一轮）。
+- ✅ **BAML → XAML 已完成**（P0，`scripts/ticktick/baml-to-xaml.ps1`）：639 个转出 **638 个**，唯一失败是任务行 `views/tasklist/item/subtasklistitem.baml`（目标类 `ListItemContent` 的静态构造抛 `NullReferenceException`，换 session 复跑同样失败，原始 BAML 留档 `.raw`）。产物在 `/tmp/rea-lab/win/xaml/`。
+  **剩下的缺口不是转换，是 deferred**：145 个资源字典的正文是延迟块，具名 token 的数值读不到（见 9.4 那两条口径）。
 - **`KotlinMultiplatformAll.dll`**：仍是 native 且符号剥离，结论与 macOS 侧一致（只看到 `SYNC`/`Patch`/`Clock`/`Conflict` 的字符串）。
 - **Windows 本地库**：`sqlite-net` 的库文件在 `%APPDATA%` / `%LOCALAPPDATA%` 下，**这次没取**（要先跑起来才有数据）。它的表结构是下一个高价值目标 —— 能直接和 macOS 那 58 张表对账。
 
