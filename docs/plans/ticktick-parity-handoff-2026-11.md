@@ -6,17 +6,20 @@
 
 ---
 
-## 0. 一页现状（2026-11-06 20:5x）
+## 0. 一页现状（2026-11-06 24:5x 更新）
 
 | 类别 | 状态 |
 |---|---|
 | **取证** | ✅ 十条线全部入库：主干 619 行 + P0–P10 九份分册 + 四份决策备忘 |
 | **PRD** | ✅ R1–R14 已分档（P0 四条 / P1 六条 / P2 五条 / 明确不做五条） |
-| **在飞（三个分包，同一工作树）** | **A**（多账号+撤销+同步可见）：`packages/op-log` · `packages/storage` · `packages/sync-client` · `packages/app-host` · 各壳 `host.ts` · 已出 `docs/adr/0084`（未跟踪）<br>**C-①**（R6 唤出）：`apps/desktop/src` + `renderer` + `tests`（`quick-add.html` / `bridge.ts` / `global-summon` 已出现）<br>**D-①**（R9 暗色 token）：`packages/design-system/src/tokens.css`（+147 行） |
-| **待派** | **E**（入口契约）· **B**（任务闭环）· **C-②**（明天视图+设置树）· **D-②**（四态+附件+主题骨架） |
-| **远端** | linux-dev 已恢复；qoder 正在跑三单（入口表 20 行 / 入口重复审计 / Windows 设置界面抽条目） |
+| **已落库（六个提交）** | **E** `a7d19e36c` 入口账本 + `check:entry-table`（38 行 / 11 规则 / 9 臂）· **A** `6828dd820` 归属+撤销+同步可见 · **D-①** `cd5f79563` 暗色族 · **C-①** `9062659c0` 全局唤出 · **`8b07f9ced`** 清 manual/kanban 欠下的 5 红 + layering · **`5bfdd1b0d`** traps #665/#666 |
+| **在飞（两个分包）** | **B**（R3 exDates + R4① 手排接通 + R8 标签管理页）· **证据补齐**（R7 待上传>0 真浏览器 / 归属红条 / `rejected` 计数 / R5「≤3 层」现量） |
+| **待派** | **C-②**（明天视图 + R13a 设置树与「我的」页）· **D-②**（四态 + 附件）—— 等 B 落地，理由见 §1 第 4 条 |
+| **远端** | linux-dev 在线；qoder 已停用（五单只成两单，纯文本处理才用） |
 
-⚠️ **工作树里现在有 35 个未提交改动，属于三个在飞分包。** 总包（我）只 `git add` 明确路径，**从不 `git add -A`** —— 理由见 [§7 #664](../reference/environment-traps.md)。
+**已清的既有红**：`check:docs`（ADR-0084 两个链接改对 + A 两份计划入库）、`check:layering`（`saved-filters.ts` 的 `crypto.randomUUID()` → `randomId()`）、`check:row-single-source`（`.ht-accountmenu` 收进 `.ht-rail` 族 ⇒ 族数 29→28，**净增 0，没抬基线**）。
+
+⚠️ 工作树里只剩总包自己那笔 `ht-rail` 收族，未提交。规矩不变：只 `git add` 明确路径，**从不 `git add -A`** —— 理由见 [§7 #664](../reference/environment-traps.md)。
 
 ---
 
@@ -33,6 +36,10 @@ W3  C-②（明天视图 + R13a 设置树与「我的」页）
 W3  ∥ D-②（四态 + 附件）
 W4  R7 同步可见收口 + 全量回归（四端重装）
 ```
+
+> ✅ **2026-11-06 24:5x 进度**：W1 全部完成（E / A / C-① / D-① 各自落库，见 §0）；
+> W2 的 **B 在飞**（R3+R4①+R8 一个包）；W3 的 C-②/D-② 等 B；W4 未开。
+> 顺序本身没变，变的只是进度 —— 第 4 条理由（`task-filter.ts` 17 个消费者）仍然是 C-②/D-② 必须排在 B 之后的原因。
 
 ### 为什么这么排（四条理由，按权重）
 
@@ -83,21 +90,23 @@ W4  R7 同步可见收口 + 全量回归（四端重装）
 
 ---
 
-## 5. 现在的风险清单
+## 5. 现在的风险清单（2026-11-06 24:5x 更新）
 
 | 风险 | 现状 | 处置 |
 |---|---|---|
-| `check:docs` **红** | 全来自 `docs/adr/0084`（A 的在飞草稿）把两个 ADR 文件名猜成标题 | 等 A 修；或用 `0003-multi-platform-strategy.md` / `0048-deletion-four-states-and-the-no-physical-erase-boundary.md` 替它改两行 |
-| 三个分包同树改代码 | 35 个未提交文件，路径基本不重叠 | 总包只 add 明确路径；分包各自 commit 前先 `git status` 确认 |
+| ~~`check:docs` 红~~ | ✅ **已清**：ADR-0084 两处链接改成真文件名（`0003-multi-platform-strategy.md` / `0048-deletion-four-states-and-the-no-physical-erase-boundary.md`），A 的两份计划也 `git add` 进去了 —— 门禁红的一半成因是"链接指向未跟踪文件" | — |
+| ~~`check:layering` 红~~ | ✅ **已清**：`saved-filters.ts:35` 的 `crypto.randomUUID()` → `randomId()` | — |
+| ~~`check:row-single-source` 红~~ | ✅ **已清**：`.ht-accountmenu` 收进 `.ht-rail` 族（`ht-rail__account*`），族数 29→28。**没有抬基线**（AGENTS §6 第 3 条：不许为绿而改判据） | e2e 侧两条（`account-menu.spec.ts` 类名断言、`glass-materials.spec.ts` 面板选择器）已同步改名，**待真浏览器复跑** |
+| **分包同树改代码** | 两个分包在飞，路径已按 §2 切开 | 总包只 add 明确路径；**不许 `git add -A`**（#664） |
+| **A 包四条证据边界** | 正在补（待上传>0 真浏览器 / 归属红条 / `rejected` 计数 / 移动端设备腿） | 证据补齐分包在跑；移动端设备腿可能要真机，允许它报"造不出来"而不是造 |
 | 取证原料只在 `/tmp` | 不可提交、换机即失 | 需要时重跑（各分册都带复现命令） |
-| 远端 qoder 的产出未经复核 | 三单在跑 | 回来后**逐条复核**再入库（Flash 档会编） |
+| ~~远端 qoder~~ | 🔴 **已停用**：五单只成两单（`124` 超时 / `143` 被杀），且产出需逐条复核 | 只把**纯文本处理**丢给它；需要它审计的活改为本机分包 |
 
 ---
 
-## 6. 下一步（谁做什么）
+## 6. 下一步（谁做什么，2026-11-06 24:5x）
 
-1. **总包**：等 qoder 三单回来 → 复核 → 入口表落成 `docs/plans/r14-entry-table.md`；
-2. **E 分包**：按入口表修四个缺陷 + 写五条规则的检查草案；
-3. **A 分包**：继续，交付时**必须**把 `docs/adr/0084` 的两处链接改对；
-4. **B 分包**：等 A 说"回滚接口可用"再开；
-5. **C-②/D-②**：等 B 落地。
+1. **在飞**：**B**（R3/R4①/R8，串行内部）· **证据补齐**（A 四条边界 + R5「≤3 层」现量）；
+2. **总包**：`ht-rail` 收族那笔 → 等 e2e 可跑时补真浏览器复跑 → 入库；
+3. **B 落地后**：**C-②**（R10 明天视图 + R13a 设置树与「我的」页）与 **D-②**（R11 四态 + R5 附件）**并行发** —— 它们抢 `task-filter.ts`（17 个消费者）与 `packages/ui` 的前提是"B 已经把这两处改稳"，顺序不能反；
+4. **最后一个必做项**：`pnpm reinstall:all` 四端重装（[`multi-end-build.md`](../agents/multi-end-build.md) §6.1.1）—— 这一轮改了 desktop 主进程、tokens、domain 写路径，**不重装等于没交付**。

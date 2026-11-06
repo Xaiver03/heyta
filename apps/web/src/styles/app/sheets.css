@@ -1120,7 +1120,7 @@
 /* 独立设置窗口里**没有头像可点**，账号菜单不该出现。
    现状（2026-10-25 实测截图）：它会展开并盖住分类栏前三项，看起来像"设置坏了"。
    窗口里唯一的账号入口是「账号与安全」那一节本身。 */
-.ht-app[data-settings-standalone] .ht-accountmenu__panel {
+.ht-app[data-settings-standalone] .ht-rail__account__panel {
   display: none;
 }
 

@@ -276,7 +276,7 @@ export function AccountMenu({
       role="menuitem"
       tabIndex={-1}
       data-testid={testId}
-      className={`ht-accountmenu__item${tone === undefined ? '' : ` ht-accountmenu__item--${tone}`}`}
+      className={`ht-rail__account__item${tone === undefined ? '' : ` ht-rail__account__item--${tone}`}`}
       onClick={() => {
         close();
         onClick();
@@ -288,11 +288,11 @@ export function AccountMenu({
   );
 
   return (
-    <div className="ht-accountmenu" ref={wrapRef}>
+    <div className="ht-rail__account" ref={wrapRef}>
       <button
         type="button"
         ref={avatarRef}
-        className="ht-accountmenu__avatar"
+        className="ht-rail__account__avatar"
         data-testid={`${testID}-avatar`}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -326,14 +326,14 @@ export function AccountMenu({
           role="menu"
           ref={panelRef}
           aria-label={t('web.shell.account.aria')}
-          className="ht-accountmenu__panel ht-material"
+          className="ht-rail__account__panel ht-material"
           data-testid={`${testID}-panel`}
           style={pos === undefined ? { visibility: 'hidden' } : { top: pos.top, left: pos.left }}
           onKeyDown={onMenuKeyDown}
         >
           {/* 不知道账号时**不编一个** —— 那行只在真有邮箱时出现。 */}
           {email === undefined ? null : (
-            <div className="ht-accountmenu__who" data-testid={`${testID}-email`}>
+            <div className="ht-rail__account__who" data-testid={`${testID}-email`}>
               {email}
             </div>
           )}

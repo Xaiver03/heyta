@@ -43,7 +43,7 @@
  *    关掉设置浮层时焦点按既有设计回到头像（`App.tsx:473-479`），而头像那颗按钮
  *    自己写着"键盘用户打开菜单最自然的一下是 ↓"（`AccountMenu.tsx:299`）——
  *    于是同一次 ↓ **既弹出账号菜单、又把底下那栏的选中挪走**。
- *    账号菜单展开时同理：它的面板是 `.ht-accountmenu__panel` + `role="menu"`
+ *    账号菜单展开时同理：它的面板是 `.ht-rail__account__panel` + `role="menu"`
  *    （`AccountMenu.tsx:313-320`），**不是** `.ht-sheet` 也不是 `role="dialog"`，
  *    上面第 2 条挡不住它。
  *    裁决是**焦点归谁、键就归谁**：方向键落在那类控件上时列表光标让开。
@@ -172,7 +172,7 @@ function isOverlayOpen(): boolean {
  * 用 `closest` 而不是 `target === trigger`：菜单展开时焦点在**菜单项**上，
  * 那是 `[role="menu"]` 的后代（`AccountMenu.tsx:313`）。
  * ⚠️ 这条与第 2 条闸门**不重叠**：账号菜单的面板既不是 `.ht-sheet` 也不是
- * `role="dialog"`（它是 `.ht-accountmenu__panel`），只靠 `isOverlayOpen` 挡不住。
+ * `role="dialog"`（它是 `.ht-rail__account__panel`），只靠 `isOverlayOpen` 挡不住。
  */
 function targetOwnsArrowKeys(target: EventTarget | null): boolean {
   return (

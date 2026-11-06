@@ -124,7 +124,7 @@ test('已登录：身份区是邮箱，退出登录在最底且是危险色', as
   // 退出登录：最后一项 + 危险样式。
   const items = panel.getByRole('menuitem');
   await expect(items.last()).toHaveAttribute('data-testid', 'account-menu-signout');
-  await expect(page.getByTestId('account-menu-signout')).toHaveClass(/ht-accountmenu__item--danger/);
+  await expect(page.getByTestId('account-menu-signout')).toHaveClass(/ht-rail__account__item--danger/);
 
   await panelProbe(page);
   await page.screenshot({ path: 'test-results/account-menu-signed-in.png' });

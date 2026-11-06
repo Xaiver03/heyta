@@ -136,7 +136,7 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
     // 它有明确的可见文案，不是一个只有图标的按钮 —— 图标按钮不算"看得见"
     expect(first.textContent?.trim().length ?? 0).toBeGreaterThan(0);
     // 主操作要**看得出来是主操作**（与「设置 / 统计」同样的分量 = 入口被埋掉一半）
-    expect(first.className).toContain('ht-accountmenu__item--primary');
+    expect(first.className).toContain('ht-rail__account__item--primary');
   });
 
   it('🔴 再点一次就打开注册/登录表单（合计 2 次点击，这就是"前置"的全部含义）', async () => {
@@ -176,7 +176,7 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
     const last = items[items.length - 1]!;
     expect(last.getAttribute('data-testid')).toBe('account-menu-signout');
     // 危险动作：颜色要说清这件事（见 app.css 的 `--danger` 规则）
-    expect(last.className).toContain('ht-accountmenu__item--danger');
+    expect(last.className).toContain('ht-rail__account__item--danger');
   });
 
   it('键盘可达：↓ 打开菜单并把焦点落在第一项，Esc 关掉并把焦点还给头像', async () => {

@@ -87,7 +87,7 @@ const SURFACES: Surface[] = [
     name: 'account-menu',
     open: async (page) => {
       await page.getByTestId('account-menu-avatar').click();
-      return page.locator('.ht-accountmenu__panel');
+      return page.locator('.ht-rail__account__panel');
     },
     close: async (page) => {
       await page.keyboard.press('Escape');

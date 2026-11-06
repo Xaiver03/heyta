@@ -440,7 +440,7 @@
      加上 rail 自身的左右内边距（`--ht-space-2` × 2 = 16px）= 60px，取整到 4rem。
      名字并没有消失 —— 它在 hover / 键盘聚焦时以一条 `position: fixed` 的标签出现
      （`.ht-rail__label`，见 `app.css`：rail 是 `overflow-y: auto` 的裁剪容器，
-     absolute 会被切掉，这与 `.ht-inbox__panel` / `.ht-accountmenu__panel` 同一个理由）。
+     absolute 会被切掉，这与 `.ht-inbox__panel` / `.ht-rail__account__panel` 同一个理由）。
      ⚠️ 改窄会连带移动**两条从它算出坐标的浮层**（`.ht-inbox__panel` 的 left、
      `.ht-rail__label` 的 left）—— 它们都读这个变量，所以不需要跟着改。
      头像菜单不在内：它用 `getBoundingClientRect` 实测锚点（塌缩态 rail 不在左边，

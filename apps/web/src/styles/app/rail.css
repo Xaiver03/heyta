@@ -57,7 +57,7 @@
    滴答的 rail 顶部只有头像；而 48px 的内容宽度也放不下「heyta」。
    品牌仍然出现在落地页、设置里的 AI 文案、通知标题与移动端欢迎页。 */
 
-.ht-accountmenu {
+.ht-rail__account {
   position: relative;
   /* 头像 + 登录账号 **一行**（见 AccountMenu.tsx 内注释：竖叠曾把 rail 顶
      的品牌名吊到半空）。面板仍是 absolute，不受布局方式影响。 */
@@ -66,7 +66,7 @@
   gap: var(--ht-space-2);
 }
 
-.ht-accountmenu__avatar {
+.ht-rail__account__avatar {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -84,13 +84,13 @@
   font-weight: var(--ht-font-weight-semibold);
 }
 
-.ht-accountmenu__avatar:hover {
+.ht-rail__account__avatar:hover {
   color: var(--ht-color-foreground);
 }
 
 /* 🔴 2026-09-30 撤掉了「头像旁的登录 pill」。
    身份入口只能有一个（产品负责人："应该是点击头像出来注册、登录吧？"）——
-   它现在是菜单里的第一项（`.ht-accountmenu__item--primary`），
+   它现在是菜单里的第一项（`.ht-rail__account__item--primary`），
    不再是头像旁边第二个长得像账号入口的控件。 */
 
 /* ── macOS 壳（hiddenTitleBar）模式 ───────────────────────
@@ -114,7 +114,7 @@
  * （≤768px，rail 变底部导航 + `overflow-y: hidden`）更是整块看不见。
  * 坐标由组件实测锚点后写在 inline style 上（向上/向下弹都在那里判定），
  * 这里只管外观。 */
-.ht-accountmenu__panel {
+.ht-rail__account__panel {
   position: fixed;
   /* 🔴 **必须高于 `.ht-sheet`**（设置浮层，同样是浮层但只占 `dropdown` 档）。
      以前两者同为 `dropdown` 也能用，靠的是**几何运气**：rail 宽 176px 时，
@@ -137,7 +137,7 @@
   box-shadow: var(--ht-shadow-lg);
 }
 
-.ht-accountmenu__who {
+.ht-rail__account__who {
   padding: var(--ht-space-2);
   color: var(--ht-color-foreground-subtle);
   font-family: var(--ht-font-sans);
@@ -146,7 +146,7 @@
   overflow-wrap: anywhere;
 }
 
-.ht-accountmenu__item {
+.ht-rail__account__item {
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
@@ -162,14 +162,14 @@
   text-align: left;
 }
 
-.ht-accountmenu__item:hover {
+.ht-rail__account__item:hover {
   background: var(--ht-color-surface-sunken);
 }
 
 /* 退出登录是这一组里唯一**会清掉本机凭据**的动作 —— 颜色要说清这件事。
    它永远在最后一项（见 `AccountMenu.tsx` 文件头：破坏性动作在最底、
    且未登录时**根本不渲染**）。 */
-.ht-accountmenu__item--danger {
+.ht-rail__account__item--danger {
   color: var(--ht-color-danger);
 }
 
@@ -177,13 +177,13 @@
    与其余无损导航项区分开。它仍然是一个菜单项（不是大按钮）：
    SaaSUI 的账号面调研要求身份入口在菜单里**一眼可辨**，而不是与
    「个人中心 / 应用设置」同样的视觉分量。 */
-.ht-accountmenu__item--primary {
+.ht-rail__account__item--primary {
   background: var(--ht-color-primary-subtle);
   color: var(--ht-color-primary);
   font-weight: var(--ht-font-weight-semibold);
 }
 
-.ht-accountmenu__item--primary:hover {
+.ht-rail__account__item--primary:hover {
   background: var(--ht-color-primary-subtle-hover);
 }
 

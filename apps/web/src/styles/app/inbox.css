@@ -5,7 +5,7 @@
  * 🔴 面板是 `position: fixed`，**不是** absolute。
  *
  * `nav.ht-rail` 有 `overflow-y: auto`，也就是一个裁剪容器 —— 它的子元素
- * 只要超出边界就会被切掉（`.ht-accountmenu__panel` 曾经是 absolute 的，
+ * 只要超出边界就会被切掉（`.ht-rail__account__panel` 曾经是 absolute 的，
  * 比 rail 还宽 16px，右侧**一直**在被切；2026-09-30 已改为 fixed + 实测锚点）。
  *
  * 这个面板宽 24rem，absolute 会被切掉一大半；所以改成 fixed —— 定位由 CSS

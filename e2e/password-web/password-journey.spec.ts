@@ -109,7 +109,7 @@ const field = (dialog: Locator, id: string) => dialog.getByTestId(`auth-form-${i
 /**
  * 断言"这一面真的处于登录态，而且登录的是这个账号"。
  *
- * 🔴 身份区**不是** `menuitem`（`AccountMenu.tsx:314` 是一个 `div.ht-accountmenu__who`
+ * 🔴 身份区**不是** `menuitem`（`AccountMenu.tsx:314` 是一个 `div.ht-rail__account__who`
  * 带 `data-testid="account-menu-email"`）。2026-09-30 的身份入口唯一化把已登录态定成
  * 「身份区（不可点）+ 设置 + 成长 + 退出登录」—— 不可点的东西没有 menuitem 角色，
  * 所以 `getByRole('menuitem').filter({ hasText: email })` 是一条**永远红**的判据，

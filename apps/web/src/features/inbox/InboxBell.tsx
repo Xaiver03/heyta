@@ -28,7 +28,7 @@ import { onTabRovingKeyDown } from '../../lib/tab-roving.js';
  *    也就是一个裁剪容器；`position: absolute` 的面板会被它切掉右侧。
  *    这里的面板宽得多，所以改用 fixed —— 锚点由 CSS 从
  *    `--ht-layout-rail-width` 算出来，不靠 JS 量尺寸。
- *    （`.ht-accountmenu__panel` 曾经就是这样被切 16px；2026-09-30 它也改成了
+ *    （`.ht-rail__account__panel` 曾经就是这样被切 16px；2026-09-30 它也改成了
  *    fixed，但锚点是实测的 —— 那个菜单在塌缩态要向上弹，算不出固定坐标。）
  *
  * 3. **文案全部走词条表**，且不出现 `JSON` / `null` 这类被禁的词。
