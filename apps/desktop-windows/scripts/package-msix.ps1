@@ -261,6 +261,14 @@ $facts += ('  packager session elevated = ' + $elevated)
 if ($elevated) {
   Import-Certificate -FilePath $cerPath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
   $facts += '  cert trusted in LocalMachine\TrustedPeople'
+  Start-Sleep -Seconds 1
+  $thumb = (Get-PfxCertificate $cerPath -ErrorAction SilentlyContinue).Thumbprint
+  if (-not $thumb) { $thumb = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 $cerPath).Thumbprint }
+  $found = Get-ChildItem 'Cert:\LocalMachine\TrustedPeople' | Where-Object { $_.Thumbprint -eq $thumb }
+  if (-not $found) {
+    $facts += '  WARNING: cert thumbprint not found in TrustedPeople after import -- retrying'
+    Import-Certificate -FilePath $cerPath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' -ErrorAction Stop | Out-Null
+  }
 } else {
   $facts += '  WARNING: not elevated -- skipped; the cert must already be trusted for the install to work'
 }

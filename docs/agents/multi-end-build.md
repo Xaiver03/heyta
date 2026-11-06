@@ -103,6 +103,16 @@ pnpm reinstall:mobile           # 只 android + ios
   脚本、或**复用同一个父目录**（让保留策略有东西可清）；别用 `rm -rf ~/heyta-*` 一把梭 ——
   那个父目录里还有并行 lane 的工作区（`heyta-carriers/` 这类），删了等于毁掉在途工作。
 
+- 🔴 **每轮开工先确认三枚载体前置**（2026-11-06 实测，不满足就红）：
+
+  | 端 | 前置 | 确认命令 | 不满足时的解法 |
+  |---|---|---|---|
+  | android | linux-dev 可达 + 模拟器 booted | `ssh linux-dev 'adb devices' \| grep emulator` | `bash scripts/android-carrier-device.sh up`（起 AVD，幂等） |
+  | windows | windows-pc 可达 + 交互式桌面会话活着 | `ssh windows-pc 'echo OK'` | 确认 RDP/物理登录在位（`schtasks /it` 需要桌面 session） |
+  | ios | 有 booted 模拟器 + CocoaPods 沙盒同步 | `xcrun simctl list devices \| grep Booted` | 重装脚本自己跑 `pod install`；截图空白先原样重跑一次（ScreenCaptureKit 一过性失败，陷阱 #655） |
+
+  **不满足时重装脚本会响亮报红并点名是哪一枚**——不会静默跳过。
+
 - **事实源（环境 / 版本 / 产物 / 状态）**：[`docs/reference/build-matrix.md`](../../docs/reference/build-matrix.md)
 - **操作步骤（怎么打、怎么验、坑）**：[`docs/runbooks/multi-platform-build.md`](../../docs/runbooks/multi-platform-build.md)
 - 🔴 **门禁绿 ≠ 能打包。** `pnpm check` 不做平台打包；本仓库已三次踩到"测试全绿但打不出包"

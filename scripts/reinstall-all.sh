@@ -872,7 +872,7 @@ if printf '%s' "$WANT" | grep -q "ios"; then
           xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
           sleep 10
           IOS_SHOT="$RT/heyta-reinstall-ios.png"
-          xcrun simctl io "$UDID" screenshot "$IOS_SHOT" >/dev/null 2>&1
+          xcrun simctl io "$UDID" screenshot --display=primary "$IOS_SHOT" >/dev/null 2>&1
           if [ -s "$IOS_SHOT" ] && shot_ok_logged "$IOS_SHOT"; then
             echo "  截图证据：$IOS_SHOT"
             RESULT_ios=OK
