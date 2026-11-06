@@ -256,8 +256,16 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
    ⚠️ 这一格拦路的三件事也都量过了：备注源格式要拍（拍成 Markdown ⇒ `Task.notes?: string` 零字段变更）、
    移动端四家候选都没有 RN 渲染器（只能拍"web 可编辑 / 移动端只读"）、
    以及 **AI 拆解会把备注逐字发出去**（`ai-breakdown.ts` 那句「已有备注：」+ 披露字段 `note`）。
-5. **D1 自定义筛选器**：先要产品边界（用户能存什么查询、跨不跨端、E2EE 下服务端能不能筛）。
+5. ✅ **D1 自定义筛选器**：先要产品边界（用户能存什么查询、跨不跨端、E2EE 下服务端能不能筛）。
    前置：本地优先 + E2EE 意味着服务端看不到明文，"云端智能清单"这类做法直接不成立。
+   —— **2026-11-06 11:0x 这份边界已由本线拍定**（用户授权拍板执行），四条边界 + 五刀实施切法写在
+   [dida-alignment-typography-and-features.md](dida-alignment-typography-and-features.md) 的 **D1** 那节。
+   三条前置事实都现量过：`TaskFilter` 是判别联合（7 档）⇒ 能存的只能是它的一个值；
+   `server/prisma/schema.prisma` 的 `payload Json` + `isPayloadEncrypted` ⇒ 服务端筛不成立（原话兑现）；
+   全仓 `savedFilter|SavedView|smartList|customFilter` **0 命中** ⇒ 从零加、无存量要平移。
+   ⚠️ 拍的是**边界**，不是界面：这一格仍欠实现，但它已经**不欠任何决定**（不需要新依赖、不需要 schema 变更、不需要 ADR）。
+   🔴 翻案条件写死在那节第 2 条：一旦"把视图分享给协作者"进入范围，v1 那个"本地不同步"就是错的，
+   必须升实体 + 走 ADR —— 那一趟不许沿用本条。
 6. **补 Android 设备腿**（在 linux-dev 上），并把 iOS 那枚装置的读数纳入四端重装那一趟。
 7. 每做完一步：跑对应门禁 + 把状态写回
    [dida-alignment-typography-and-features.md](dida-alignment-typography-and-features.md) 的「执行状态」，
