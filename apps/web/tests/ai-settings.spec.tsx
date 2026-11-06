@@ -585,7 +585,58 @@ describe('🔴🔴 能力声明 —— 界面必须能声明，否则功能永�
     ];
     const el = render({ initial: s, secrets: createSessionSecretStore() });
     for (const cap of ['structured_output', 'long_context', 'vision', 'tool_calling']) {
-      expect(el.querySelector(`[aria-label="本机 的能力 ${cap}"]`), cap).toBeTruthy();
+      expect(el.querySelector(`[data-testid="endpoint-capability-e1-${cap}"]`), cap).toBeTruthy();
+    }
+  });
+
+  it('🔴 能力勾选的无障碍名是**给人听的词**，不是裸枚举值', () => {
+    // 这条钉的是"为什么那行 `aria-label` 从 `long_context` 换成了本地化标签"：
+    // 读屏用户念到的是下划线开头的枚举值，而界面上写的是「长上下文」。
+    // 判据锚在**形状**（非空 / 不含裸 id / 四条互不相同），所以以后改文案它不会挡路，
+    // 而"把枚举值塞回无障碍名"这类回退会红。
+    const caps = ['structured_output', 'long_context', 'vision', 'tool_calling'];
+    const s = defaultAiSettings();
+    s.routing.enabled = true;
+    s.routing.endpoints = [
+      { id: 'e1', label: '本机', endpoint: 'http://localhost:11434/v1', model: 'm' },
+    ];
+    const el = render({ initial: s, secrets: createSessionSecretStore() });
+    const names = caps.map((cap) => {
+      const input = el.querySelector<HTMLInputElement>(`[data-testid="endpoint-capability-e1-${cap}"]`);
+      expect(input, `${cap} 的勾选框没画出来`).not.toBeNull();
+      const name = input!.getAttribute('aria-label') ?? '';
+      expect(name, `${cap} 没有无障碍名`).not.toBe('');
+      expect(name.includes(cap), `${cap} 的无障碍名里出现了裸枚举值`).toBe(false);
+      return name;
+    });
+    expect(new Set(names).size, '四条能力的无障碍名撞成同一个').toBe(caps.length);
+  });
+
+  it('🔴 端点 id 未知时的「前缀 + 能力后缀」选择器唯一命中（替两条跑不了的腿验）', () => {
+    // 依赖这两条写法的是 `tests/journey-ai-memory.integration.spec.tsx`
+    // （要 `HEYTA_AI_LIVE_CONFIG` + 真模型，平时整条被 skip）与
+    // `e2e/tests/helpers.ts`（要起浏览器）。它们都拿不到运行时生成的端点 id，
+    // 只能按「`endpoint-capability-` 前缀 + `-<capability>` 后缀」选 ——
+    // 那条腿平时不跑，所以这里用**会跑的**这一条把同一个选择器形状钉住：
+    // 两个端点、每行内恰好一枚、全局枚数等于端点数（不多不少 = 没有别的件撞这个形状）。
+    const s = defaultAiSettings();
+    s.routing.enabled = true;
+    s.routing.endpoints = [
+      { id: 'custom-1', label: '本机', endpoint: 'http://localhost:11434/v1', model: 'm' },
+      { id: 'custom-2', label: '远端', endpoint: 'https://example.test/v1', model: 'm' },
+    ];
+    const el = render({ initial: s, secrets: createSessionSecretStore() });
+    for (const cap of ['structured_output', 'long_context', 'vision', 'tool_calling']) {
+      const all = el.querySelectorAll(`[data-testid^="endpoint-capability-"][data-testid$="-${cap}"]`);
+      expect(all.length, `${cap}：全局命中数不等于端点数`).toBe(2);
+      for (const id of ['custom-1', 'custom-2']) {
+        const row = el.querySelector(`[data-testid="endpoint-${id}"]`);
+        expect(row, `端点行 endpoint-${id} 没画出来`).not.toBeNull();
+        expect(
+          row!.querySelectorAll(`[data-testid^="endpoint-capability-"][data-testid$="-${cap}"]`).length,
+          `${cap}：端点 ${id} 那一行里不是恰好一枚`,
+        ).toBe(1);
+      }
     }
   });
 
@@ -608,7 +659,7 @@ describe('🔴🔴 能力声明 —— 界面必须能声明，否则功能永�
       { id: 'e1', label: '本机', endpoint: 'http://localhost:11434/v1', model: 'm' },
     ];
     const el = render({ initial: s, secrets: createSessionSecretStore() });
-    const label = el.querySelector('[aria-label="本机 的能力 long_context"]')?.closest('label');
+    const label = el.querySelector('[data-testid="endpoint-capability-e1-long_context"]')?.closest('label');
     expect(label?.textContent).toContain('拆解任务');
   });
 
@@ -619,7 +670,7 @@ describe('🔴🔴 能力声明 —— 界面必须能声明，否则功能永�
       { id: 'e1', label: '本机', endpoint: 'http://localhost:11434/v1', model: 'm' },
     ];
     const el = render({ initial: s, secrets: createSessionSecretStore() });
-    toggle(el.querySelector('[aria-label="本机 的能力 long_context"]'));
+    toggle(el.querySelector('[data-testid="endpoint-capability-e1-long_context"]'));
     const saved = loadAiSettings();
     // 存储里必须出现 long_context —— 否则"界面能勾、实际没用"
     expect(saved.routing.endpoints[0]?.capabilities).toContain('long_context');
@@ -638,7 +689,7 @@ describe('🔴🔴 能力声明 —— 界面必须能声明，否则功能永�
       },
     ];
     const el = render({ initial: s, secrets: createSessionSecretStore() });
-    toggle(el.querySelector('[aria-label="本机 的能力 long_context"]'));
+    toggle(el.querySelector('[data-testid="endpoint-capability-e1-long_context"]'));
     const saved = loadAiSettings();
     expect(saved.routing.endpoints[0]?.capabilities).not.toContain('long_context');
     expect(saved.routing.endpoints[0]?.capabilities).toContain('structured_output');
@@ -658,10 +709,10 @@ describe('🔴🔴 能力声明 —— 界面必须能声明，否则功能永�
     ];
     const el = render({ initial: s, secrets: createSessionSecretStore() });
     expect(
-      (el.querySelector('[aria-label="本机 的能力 long_context"]') as HTMLInputElement).checked,
+      (el.querySelector('[data-testid="endpoint-capability-e1-long_context"]') as HTMLInputElement).checked,
     ).toBe(true);
     expect(
-      (el.querySelector('[aria-label="本机 的能力 vision"]') as HTMLInputElement).checked,
+      (el.querySelector('[data-testid="endpoint-capability-e1-vision"]') as HTMLInputElement).checked,
     ).toBe(false);
   });
 });
