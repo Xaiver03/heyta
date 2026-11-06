@@ -22,6 +22,10 @@
 - 回收站从 rail 底段搬进**侧栏底部**，与「已完成」并列；清单/标签分组头下各有一句说明。
 - 上面这些不只 web：跨端那份顺序所有者（领域层 `sortTasks`）修好之后，
   **真 iOS 模拟器**上"长按 → 置顶 → 那条跑到最前"已经量到，**真 Electron 窗口**也画得出任务行。
+- 🔴 **2026-11-06 新加的一件用户可感知的功能**：重复任务多一档「**完成后顺延**」。
+  不勾 = 原来那档（固定排期，从当前到期日往下推）；勾上 = 从**完成那一天**推，
+  完成前已经错过的周期不再补回来。web 在重复编辑器里一枚复选框，手机端在面单里一枚 chip，
+  两处都只在"这条已经有重复规则"时才画。取舍要讲清楚：开了这档就不再有"提前勾也不挪节奏"那条保证。
 
 ### Q2 · 现在停在哪？
 
@@ -29,14 +33,26 @@
 - 这份计划的**阶段 1（排印密度）已于 2026-11-05 入库** —— 一笔 16 枚文件：四枚值 + 六份生成件 +
   `typography.spec.ts` 那格改签的期望值 + `mockup.css` 四处镜像 + 五处被这次改动否证的旧口径。
   当年"与别线 token 工作同片地"那一格是靠**逐 hunk 核归属**收的，办法与读数写在 `BLOCKED.md` B262。
-- 这份计划的**阶段 5（三个大功能）没做**：C1 富文本、D1 自定义筛选器；C3 评论已被另一条线
-  以 W4 落地（不是这份计划做的）。
+- 这份计划的**阶段 5（三个大功能）界面都没做**，但**前置那两格已经拍完**（2026-11-06）：
+  C1 富文本过了选型 + 许可证两道门并落了裁决（编辑器 TipTap、备注源格式定成 Markdown、移动端只读渲染），
+  D1 自定义筛选器的产品边界拍定（能存什么 / 跨不跨端 / 谁能改 / 判据 + 五刀切法）；
+  C3 评论已被另一条线以 W4 落地（不是这份计划做的）。
+  ⚠️ 三种"没做完"不许混成一句：**C1 / D1 欠实现，C3 欠的仍是口径**（非共享清单要不要评论归产品）。
 - "和滴答全面对齐"这件事**不成立**，分母见 §四。
-- 所有提交都在本地，**没有 push**。
+- ✅ **本线全部提交已 push 到 GitHub**（2026-11-06，`origin/main` 与本地同一笔）。
+  ⚠️ 两件仍要如实讲：① `main` 的**上游分支还指着 gitee**，而 gitee 收不进 push ⇒
+  **裸 `git push` 必失败**，要显式 `git push origin main`（改上游要动 git config，本线没擅自做）；
+  ② 那 66 笔里有一批是**别线在飞的未入库工作**，按用户授权分组代收的，归属逐笔记在 `BLOCKED.md`
+  （B265 / B267 / B268 / B271 / B272 / B273 那几格）—— 代收不等于代判，那些件的口径仍归原线。
 
 ### Q3 · 下一步做什么？
 
-按 §五 的顺序。第一条不是写代码，是先跑 §三 那组现量。
+先跑 §三 那组现量（本仓所有"绿"都只对那一秒成立），然后**从 §五 第 6 步接**：
+第 2–5 步（阶段 1 入库、完成后顺延、C1 两道门、D1 边界）都已在 2026-11-05 – 11-06 做完并推送。
+第 6 步是 Android 设备腿（载具在 linux-dev，**需要先新写一枚远端装置**，别在本机起 Gradle）；
+第 7 步是每步之后的固定动作（跑对应门禁 + 把状态写回计划的「执行状态」）。
+⚠️ 如果下一位想做的是"把 C1 或 D1 做成界面"，那**不是** §五 的排队列，是 §四 4.1 那两行——
+两格的前置决定都已拍完，可以直接开工，按各自那节写好的切法一刀一验。
 
 ### Q4 · 做的这些对产品有什么意义？
 
@@ -83,6 +99,12 @@
 | 浏览器腿 9 条 | `e2e/tests/dida-alignment-detail-sidebar.spec.ts`（8 张图逐张看过） |
 | 设备腿 iOS | `scripts/verify-mobile-pin-order.sh`（`pnpm verify:mobile-pin-order`），9/9，两张图入库 |
 | 设备腿桌面壳 | `HEYTA_SMOKE_SHOT=<绝对路径> pnpm --filter @heyta/desktop smoke -- --window` |
+| ✅ 「完成后顺延」（§五 第 3 步，2026-11-06） | 字段 `packages/domain/src/entities.ts` + 动作与两档基准 `packages/app-host/src/actions.ts`；界面 `apps/web/src/features/tasks/TaskRepeat.tsx`（复选框）与 `apps/mobile/src/screens/TaskDetailSheet.tsx`（chip）；四臂行为判据 `packages/app-host/tests/repeat-actions.spec.ts`（把分支钉死成"永远固定排期"实测只红那一臂），取舍与复跑口径在 benchmark **§9.5** |
+| ✅ 主链 web 全量单测 16 枚红 → **0** | 两处真缺陷分开修：浮层退场收尾不再押在 `animationend` 上（`apps/web/src/App.tsx`，闭合 11 枚，含"系统关掉动画"与"搜索浮层根本不是那个节点"两类真实场景）；能力勾选框补稳定 `data-testid` + 两臂不变量判据（`apps/web/src/features/settings/AiSettings.tsx`，闭合 5 枚，另修掉 `e2e/tests/helpers.ts` 那处只有超时的坏法）。归属更正与牙都在 `BLOCKED.md` **B271** |
+| ✅ 阶段 1 那三枚没值判据的密度参数 | 补的是**关系**判据不是值判据：`packages/design-system/tests/task-row-density-relations.spec.ts` 三枚不变量（行最小高 ≥ 2×leading + `space.1`；leading + 2×padding ≤ 行最小高；listGap < bodyPaddingBlock）。⚠️ 它挡得住"协同回退"，挡不住一次同时改高三枚值的调密度 —— 那句话写在这个 spec 的头注释里，别读成"密度已是契约" |
+| ✅ 陷阱正文↔索引覆盖门（新门，已进链） | `scripts/check-traps-index-coverage.mjs`（`pnpm check:traps-index-coverage`）：判可达性不判条数，`--self-test` 三臂有牙。第一次跑量出 33 枚漏登记，已按条目原文补完；全程在 `BLOCKED.md` **B273** |
+| ✅ iOS 设备腿从**当前产物**现建重跑 | `xcodebuild Release` + `simctl install`（新鲜度按 `reinstall-all.sh` 那把尺量过、归属章已写），装置 9/9 退 0，两张图 `apps/mobile/evidence/dida-pin-order-20261106/` 逐张看过。代价与配方在 `BLOCKED.md` **B272**、陷阱 **#660** |
+| ✅ C1 / D1 的前置拍定 | 裁决写在 [dida-alignment-typography-and-features.md](dida-alignment-typography-and-features.md) 的 C1 与 D1 两节；C1 的读数表在 benchmark **§9.6** |
 
 ---
 
@@ -132,6 +154,32 @@ done
 不是"只有本线没动"；要单独判本线那批，把路径表换成 `20358bc6c` 那笔的文件清单
 （现量 `git show --stat 20358bc6c`）。
 
+🔎 **2026-11-06 那批读数各有自己的输入面，上面那八条路径覆盖不到它们**（别拿那把尺外推）。
+判「今天这些读数还指不指当前产物」用这一把，起点取本线收口那一笔（现量 `git log --oneline -1`）：
+
+```bash
+git diff --name-only <本线收口那一笔> HEAD -- \
+  packages/domain/src/entities.ts packages/app-host/src/actions.ts packages/app-host/tests \
+  packages/i18n/src/locales apps/web/src/features/tasks apps/web/src/features/settings \
+  apps/web/src/App.tsx apps/web/tests apps/mobile/src/screens apps/mobile/tests \
+  e2e/tests/helpers.ts scripts/check-traps-index-coverage.mjs \
+  docs/reference/environment-traps.md docs/agents/environment-traps-index.md
+# 空 = 「完成后顺延」四臂、主链 0 红、能力勾选两臂、陷阱索引门这四组读数的消费者与 HEAD 逐字节同一
+
+for p in packages/domain/src/entities.ts packages/app-host/src/actions.ts packages/app-host/tests \
+         packages/i18n/src/locales apps/web/src/features/tasks apps/web/src/features/settings \
+         apps/web/src/App.tsx apps/web/tests apps/mobile/src/screens apps/mobile/tests \
+         e2e/tests/helpers.ts scripts/check-traps-index-coverage.mjs \
+         docs/reference/environment-traps.md docs/agents/environment-traps-index.md; do
+  [ "$(git ls-files "$p" | wc -l)" -gt 0 ] || echo "🔴 空尺: $p"; done
+```
+
+2026-11-06 10:5x 现量这十四条的分母：**1 / 1 / 127 / 2 / 16 / 45 / 1 / 233 / 38 / 104 / 1 / 1 / 1 / 1**
+（合计 572，枚枚非空 ⇒ 上面那条 diff 读 0 才真的是"没变"，这是 #658 要求的前置）。
+⚠️ 这一把**不覆盖**九条验收那批（那批仍用上面那八条），也不覆盖 iOS 设备腿 —— 设备腿的输入面是
+**装着的产物**，要用新鲜度关系判而不是 git 判：`stat -f '%m' "$(xcrun simctl get_app_container <udid> com.heyta app)/main.jsbundle"`
+对最新源码 mtime（今天这趟的两个数与算法都记在 `BLOCKED.md` B272 ①）。
+
 设备腿（有已启动的模拟器才跑；先 `xcrun simctl list devices | grep Booted` 取 UDID）：
 
 ```bash
@@ -172,9 +220,9 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | 格 | 状态 | 卡在谁 |
 |---|---|---|
 | 阶段 1 排印密度（`TASK_ROW_SHAPE.bodyPaddingBlock` / `listGap` + 生成的 token 件） | ✅ **已入库**（2026-11-05 16:5x 一笔 16 枚文件） | 本线。逐 hunk 核过 `packages/design-system/**` 每一处都能追溯到 A1/A2 那四枚值或它们的生成件；`mockup.css` 只取本线那四处镜像，`.mk-sidebar__tools` 那枚留在 landing 手里。分归办法与读数在 `BLOCKED.md` B262 |
-| 阶段 1 的**值判据**（不是实现） | 🔴 **缺口，已登记** | 设计系统线 / 产品。四枚值里只有 `row-title` leading 被 `typography.spec.ts` 钉住；行最小高 60 与 A2 那两枚槽位**没有任何断言钉值** ⇒ "token + 四处镜像"协同回退全仓不会红。现量与出路（钉不变量而不是钉值，先例是 `typography.spec.ts:39/76` 那两枚关系断言）写在 `BLOCKED.md` B264；本线不替别人拍判据口径 |
-| C1 富文本编辑器 | 未做 | 先过两道门：编辑器选型 + 许可证（AGENTS §3.1/§3.2）。连带详情面「文本格式」那枚按钮一直不画 |
-| D1 自定义筛选器 / 智能清单 | 未做 | 产品边界先定义（`TaskFilter` 现在是封闭联合，用户自建查询没有落点） |
+| 阶段 1 的**值判据**（不是实现） | 🟡 **一半闭合**：已补 `packages/design-system/tests/task-row-density-relations.spec.ts` 三枚**关系**判据（行最小高 ≥ 2×leading + `space.1`；leading + 2×padding ≤ 行最小高；listGap < bodyPaddingBlock）⇒ "token + 四处镜像"协同回退现在会红。⚠️ 关系判据**挡不住**一次同时抬高三枚值的调密度 | 剩那一半归**设计系统线 / 产品**：那要不要挡，是"行密度算契约还是算可调旋钮"那一问，本线不替别人拍；原话与分母仍在 `BLOCKED.md` B264 |
+| C1 富文本编辑器 | 🔴 **界面仍未做**，✅ **前置两道门已过并落裁决**（2026-11-06，§五 第 4 步要的就是这一半）：过门 TipTap / Lexical / Slate / ProseMirror / Editor.js / markdown-it，§3.2 拦下 CKEditor 5（GPL）与 TinyMCE（LGPL），§3.1 拦下 Quill、Draft 那条与 `tiptap-markdown`。裁决 = TipTap + **备注源格式定成 Markdown** + 移动端只读渲染；读数表在 benchmark **§9.6**，理由与四步切法在计划 C1 那节。连带详情面「文本格式」那枚按钮**继续按裁决不画** | 本线（实现）。已不欠任何决定：不需要新依赖、不需要 schema 变更、不需要 ADR |
+| D1 自定义筛选器 / 智能清单 | 🔴 **界面仍未做**，✅ **产品边界已拍**（2026-11-06，§五 第 5 步）：能存什么 = `TaskFilter` 联合的一个值（不做自由构造器）；跨不跨端 = v1 本地不同步，**翻案条件写死**（视图一旦要分享给协作者必须升实体 + 走 ADR）；谁能改 = 本地 ⇒ 不产生 op；判据 = 同数组同 filter ⇒ 四端同一 id 集合。全文在计划 D1 那节 | 本线（实现）。同一批翻案条件命中时改归**协作线 + ADR**，那一趟不许沿用"本地不同步" |
 | C3 评论 | 已由协作线以 W4 落地（详情面协作区） | 不欠；但"非共享清单要不要评论"这条口径归产品 |
 
 ### 4.2 对滴答的真实缺口（2026-11-05 现量，逐条带命令）
@@ -187,9 +235,9 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 |---|---|
 | 看板视图 | `ls apps/web/src/features/`（没有这一族；命中的"看板"只是注释里列举覆盖面） |
 | 自定义筛选器 | `sed -n '51,60p' packages/domain/src/task-filter.ts`（封闭联合） |
-| 重复的「完成后顺延」 | `grep -rn "nextAfterCompletion(" --include='*.ts' packages/*/src apps/*/src \| grep -v "export function"`（零生产调用点 ⇒ 实际是固定排期） |
+| 重复的「完成后顺延」 | ✅ **这一格 2026-11-06 已翻面**（不再是缺口）：`grep -rn "nextAfterCompletion(" --include='*.ts' packages/*/src apps/*/src \| grep -v "export function"` 现在读 **1 处生产调用点**（原先读 0 ⇒ 那正是当年判"仍是固定排期"的依据）。取舍与复跑口径在 benchmark **§9.5** |
 | 手动拖拽排序 | `grep -rn "order:" packages/app-host/src/actions.ts`（空 ⇒ `Task.order` 是死字段） |
-| 富文本备注 | 见 4.1 的 C1 |
+| 富文本备注 | 见 4.1 的 C1：门禁半已闭合（benchmark **§9.6**），欠的只剩实现 |
 
 ### 4.3 验收面欠的（不是功能，是证据）
 
@@ -290,6 +338,11 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | 凭"我记得有条 landing 线"把一处红登记成"等别人落库" | B258 ② 就这么白等了一次都没复量，而 HEAD 那格红从本线 D2 那笔（现量 `git log -1 --format=%ad --date=iso 8cbedf563`）一直开到 2026-11-05 23:2x，且它就在 `pnpm -r test` 的路上。登记前先量两样：**那几枚文件的 mtime 窗口离现在多久**（11-04 12:46–12:51 之后一整天零写入，那不是"在飞"）；**计划里那一格的归属写的是谁**（本文「展厅（landing mockup）跟着搬」那一格早就把它记在本线名下）。两份说法自相矛盾时，**矛盾本身就是该重判的信号**，不必等新证据。证据与规矩见 `BLOCKED.md` B265 |
 | 改一个被**按源码文本对账**的常量名，只看 typecheck | typecheck/build 全绿仍会留断链（§4.4）。改名要 `grep` 文本锚点的消费者 |
 | 跑整棵 `e2e/` 或 `pnpm test -- <文件>` | 会重写别线未入库的取证图；单文件过滤要用 `pnpm exec playwright test <文件>`，别拿 `--` 当过滤器 |
+| 接手台账里「这 N 枚红归 X 那一手」这句就直接去修 X | **2026-11-06 实测**：B257 ② 把 16 枚全记成 `sheetExiting` 那一手，修完之后还剩 **5 枚** —— 第二成因（11-04 那笔 a11y 改名留下三份没跟改的消费者，第三份在 e2e helper）因此白挂了两天，没人去找。**归因纪律**：拿到"N 枚归 X"先修 X，再**重数剩几枚**，剩的非零就说明那句登记是错的；拆法与读数在 `BLOCKED.md` B271，机制入陷阱 **#661** |
+| 筛表格行时用「这一行含某个中文词」排除表头 | 单元格正文里恰好出现那个词的数据行会被一起排掉。本线拿它量覆盖率，把 **33 枚**虚报成 **214 枚**，还当场把它写成了结论。**规矩**：筛行只按**形状**（第一列是否以数字开头），表头与数据行的区别是形状不是字。见陷阱 **#659** |
+| 把「摘掉分支实测会红」这句先写进文档、再去补跑 | 2026-11-06 那一格写的时候确实还没跑（前一晚还发生过变异残留事故 B270）。**规矩**：写"实测"两个字之前当场跑一次，并把**红的臂名**原样抄回文档；还原 + 哈希核对 + 删 `.mut-bak` 压进同一条命令，`2>/dev/null` 吞掉的失败正是那类事故的成因 |
+| 走重装路线时裸 `simctl uninstall` 就当"装了新产物" | 它会把装置依赖的**已 onboarding 热状态**一起带走 ⇒ 设备腿连红两趟，症状长得像产品坏了（FAB 点不到、Composer 不开）。首启两层门的配方本来就在 `scripts/verify-mobile-ai.sh:1225–1260`，**动手前没 grep 它**。见陷阱 **#660**、`BLOCKED.md` B272 |
+| 把后台任务通知里的 `exit code 0` 当装置的码 | 那串命令末尾接的是 `echo ... | tee`，通知报的是包装命令的退出码。今天两趟设备腿真码分别是 `1 / 1 / 0`，都只写在日志里那一行 `PIN_ORDER_RC=`。**规矩**：装置的真实码要打进它自己的日志并由脚本自己打印（#179 / #197 同族） |
 
 ---
 
