@@ -175,6 +175,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 
 | 文档 | 内容 |
 |---|---|
+| 📋 **[ticktick-parity-prd-2026-11.md](plans/ticktick-parity-prd-2026-11.md)** | **产品需求对齐清单（滴答对标，2026-11-06）**：把十六条取证线的结论收成**可排期的需求**，并按「不做会不会丢信任 / 会不会放大差异化 / 会不会变成更差的滴答」三条判据分档。**P0 三条全是漏气**（多账号本地库隔离 · 撤销历史栈 · 重复任务「跳过这一次」）；**P1 四条**里有一条是护城河（**同步状态可见** —— 滴答 143 939 条文案里 `conflict` 零命中，它从不把冲突告诉用户，而我们是本地优先）；**P2 五条**打磨；**明确不做四条**（聚合型协作 / `assigneeUserId` 孤儿字段先删 / 白噪音 / 应用锁）。每条带**能红的验收判据**，并给出**四个长任务分包**（A 数据可信 → B 任务闭环 → C 入口可达 → D 视觉与状态）与"为什么并在一起" |
 | [roadmap.md](plans/roadmap.md) | ⭐ **总路线图**：阶段划分、P0 完成情况、组件决策、风险 |
 | 🔴 ⭐ **[multi-end-unified-strategy.md](plans/multi-end-unified-strategy.md)** | **当前唯一的权威主计划**（2026-09-28）：主战场重定义（**移动端 + macOS + Windows**，Web 降为次要）· **UI 单源**（RN 全端 + 内容岛）· 滴答清单对标 · 旧资产清理清单 · 落地判据与门禁。**找"当前状态"先看它**；计划层的完整索引见 [plans/README.md](plans/README.md) |
 | [multi-platform-adaptation.md](plans/multi-platform-adaptation.md) | 🔴 **M0 共享层补完 → M1 垂直切片验证（成败点）→ M3 逐特性迁移 UI** 的判据与门禁 G1–G5 仍有效（净行数必须持续为负）；**M2 的桌面路线已由主计划 §3.3 修订**。依据 [融合调研](research/multi-platform-ui-fusion.md) |
