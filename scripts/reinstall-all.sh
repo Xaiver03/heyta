@@ -869,6 +869,7 @@ if printf '%s' "$WANT" | grep -q "ios"; then
           echo "  🔴 已装的包比源码旧 —— 装的是旧代码"
         fi
         if [ "$FRESH" = "1" ]; then
+          xcrun simctl terminate "$UDID" "$(xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | awk '/UIKitApplication/{print $3}' | sed 's/.*\///;s/:.*//' | head -1)" >/dev/null 2>&1 || true
           xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
           sleep 10
           IOS_SHOT="$RT/heyta-reinstall-ios.png"
