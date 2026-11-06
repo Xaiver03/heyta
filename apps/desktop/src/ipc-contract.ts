@@ -21,7 +21,28 @@ import type { NodeHost } from '@heyta/node-host';
 import type { DesktopReminderStatus } from './reminder-notify.js';
 
 /** IPC 频道名。带前缀避免与将来其它通道撞车。 */
-export const DESKTOP_CHANNELS = { request: 'heyta:host:request' } as const;
+export const DESKTOP_CHANNELS = {
+  /** 渲染进程 → 主进程：一次数据请求（下面 `DesktopRequest` 那份白名单）。 */
+  request: 'heyta:host:request',
+  /**
+   * 主进程 → 渲染进程：一句"界面该重新看一眼了"。
+   *
+   * 🔴 这条频道**只许发命令、不许带载荷**：方向与另一条相反（主进程主动推），
+   * 一旦允许携带数据，渲染进程就会开始相信"推来的内容"而不去读库 ——
+   * 而库才是权威（同一个理由见 `renderer/main.tsx` 每次写后重读那段）。
+   */
+  command: 'heyta:shell:command',
+} as const;
+
+/**
+ * 主进程推给渲染进程的命令。
+ *
+ * ⚠️ 「今天该显示哪些任务」这个判断**不在这里也不在壳里**：`showToday` 只表达意图，
+ * 筛选由渲染进程调 `@heyta/domain` 的 `filterTasks` 完成。
+ * 这条命令若能带条件（`{ kind: 'showToday', date: … }`），业务判断就从壳里漏出来了
+ * —— 所以它是判别联合而不是对象，且**新增字段要先过 §3.5 那道问**。
+ */
+export type DesktopCommand = { kind: 'reloadTasks' } | { kind: 'showToday' };
 
 /**
  * `addTask` 的第二个参数类型**从共享接口派生**，不自己写一遍。

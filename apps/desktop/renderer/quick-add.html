@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      CSP 与 `index.html` 逐字相同 —— 这一页同样是渲染进程，同样能碰到本地库
+      （经 IPC 递给主进程），所以安全边界不能因为"只是个输入框"就放宽。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'"
+    />
+    <title>快速添加</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./quick-add.tsx"></script>
+  </body>
+</html>

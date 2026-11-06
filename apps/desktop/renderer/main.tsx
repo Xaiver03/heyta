@@ -18,10 +18,11 @@
  * 等真要出英文时再谈，而不是现在就为它引入一个会带进第二份 React 的依赖。
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import type { Task } from '@heyta/domain';
+import { filterTasks, type TaskFilter } from '@heyta/domain';
 import { HeytaUiProvider, TaskList } from '@heyta/ui';
 
 /**
@@ -35,23 +36,11 @@ import { HeytaUiProvider, TaskList } from '@heyta/ui';
  */
 import '@heyta/design-system/tokens.css';
 
-import type { DesktopRequest } from '../src/ipc-contract';
-
 /**
- * preload 暴露的桥（`window.heytaDesktop`）。
- *
- * 类型**派生自 `DesktopRequest`**，不自己抄一遍方法名 —— 抄一遍的话，
- * 契约改了这里不会报错，只会在运行时静默失败。
+ * `window.heytaDesktop` 的形状在 `bridge.ts` 里声明（两个渲染页共用一份，
+ * 抄两遍的话改一边不会报错 —— 而 `declare global` 是**全局增强**，
+ * 只要那个文件在编译单元里就生效，所以这里不需要 import 它）。
  */
-interface DesktopBridge {
-  request(request: DesktopRequest): Promise<unknown>;
-}
-
-declare global {
-  interface Window {
-    readonly heytaDesktop: DesktopBridge;
-  }
-}
 
 /**
  * 任务形状**直接用 `@heyta/domain` 的 `Task`**，不在这里 `Pick` 一个窄版本。
@@ -69,6 +58,10 @@ const L = {
   add: '添加一条示例任务',
   loading: '正在读取本地库…',
   empty: '还没有任务。',
+  emptyToday: '今天没有到期的任务。',
+  viewAll: '全部',
+  viewToday: '今天',
+  viewCurrent: '当前视图：',
   toggleOn: (title: string): string => `完成：${title}`,
   toggleOff: (title: string): string => `取消完成：${title}`,
 } as const;
@@ -77,6 +70,15 @@ function App(): React.JSX.Element {
   const [tasks, setTasks] = useState<readonly DesktopTask[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
+  /**
+   * 当前视图那一档。默认「全部」= 本切片一直以来的行为。
+   *
+   * 🔴 这一档**不是这里定义的**：`TaskFilter` 与"什么算今天"全在
+   * `packages/domain/src/task-filter.ts`，这一页只调 `filterTasks`。
+   * 托盘里那条「今天」推来的是一条**意图**（`{kind:'showToday'}`），
+   * 不是筛选条件，所以壳里一行判断都没长出来（AGENTS.md §3.5）。
+   */
+  const [filter, setFilter] = useState<TaskFilter>({ kind: 'all' });
 
   /**
    * 读一次库。
@@ -98,6 +100,27 @@ function App(): React.JSX.Element {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  /**
+   * 订阅主进程推来的命令（托盘「今天」、快速添加落库后的"重新读一次"）。
+   *
+   * ⚠️ 命令**不带数据**，所以这里收到之后仍然要自己去读库 ——
+   * 见上面那条"库才是权威"的纪律。
+   */
+  useEffect(() => {
+    window.heytaDesktop.onCommand((command) => {
+      if (command.kind === 'showToday') setFilter({ kind: 'today' });
+      else if (command.kind === 'reloadTasks') void reload();
+    });
+  }, [reload]);
+
+  /**
+   * 筛选后的行。`now` 显式传给共享筛选（那个文件头的纪律：判断层不自己读时钟）。
+   */
+  const rows = useMemo(
+    () => (tasks === null ? null : filterTasks(tasks, filter, { now: Date.now() })),
+    [tasks, filter],
+  );
 
   const onToggleTask = useCallback(
     (id: string): void => {
@@ -168,15 +191,56 @@ function App(): React.JSX.Element {
         </p>
       ) : null}
 
+      {/*
+        视图那一档。存在的理由是托盘那条「今天」需要一个**看得见的落点**：
+        只有命令没有界面标记的话，用户按完不知道自己在哪一档，也就回不去。
+        🔴 两档都调同一个 `filterTasks`，所以"今天"这一档的判据与 web/手机端同源。
+      */}
+      <div
+        data-testid="desktop-view-row"
+        style={{ marginTop: 'var(--ht-space-4)', display: 'flex', gap: 'var(--ht-space-2)' }}
+      >
+        <button
+          type="button"
+          data-testid="desktop-view-all"
+          aria-pressed={filter.kind === 'all'}
+          onClick={() => setFilter({ kind: 'all' })}
+        >
+          {L.viewAll}
+        </button>
+        <button
+          type="button"
+          data-testid="desktop-view-today"
+          aria-pressed={filter.kind === 'today'}
+          onClick={() => setFilter({ kind: 'today' })}
+        >
+          {L.viewToday}
+        </button>
+      </div>
+
+      {/*
+        🔴 这一行是**必需的**，不是装饰：这一页的按钮是浏览器默认样式，
+        `aria-pressed` 在这里**画不出任何可见差别**，用户按了「今天」之后
+        看不出自己在哪一档、也就不知道按哪颗回去。界面要如实说话。
+        （共享组件里有专门的选中态，那是设计系统那一档的事，不在这条分包里造第二套。）
+      */}
+      <p
+        data-testid="desktop-view-label"
+        style={{ margin: 'var(--ht-space-2) 0 0', color: 'var(--ht-color-foreground-muted)' }}
+      >
+        {L.viewCurrent}
+        {filter.kind === 'today' ? L.viewToday : L.viewAll}
+      </p>
+
       {tasks === null ? (
         <p data-testid="desktop-loading">{L.loading}</p>
       ) : (
         <TaskList
           testID="desktop-task-list"
-          tasks={tasks}
+          tasks={rows ?? []}
           onToggleTask={onToggleTask}
           busyTaskId={busyTaskId}
-          emptyMessage={L.empty}
+          emptyMessage={filter.kind === 'today' ? L.emptyToday : L.empty}
           labels={{
             toggleOn: (row) => L.toggleOn(row.title),
             toggleOff: (row) => L.toggleOff(row.title),

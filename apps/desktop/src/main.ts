@@ -22,9 +22,11 @@ import { openDesktopHost } from './host.js';
 import {
   DESKTOP_CHANNELS,
   handleDesktopRequest,
+  type DesktopCommand,
   type DesktopReminderAccess,
   type DesktopRequest,
 } from './ipc-contract.js';
+import { armGlobalSummon, type SummonHandle } from './global-summon.js';
 import {
   REMINDER_NOTIFICATION_LABELS,
   createDeliveryLedger,
@@ -121,6 +123,162 @@ function resolveWebRoot(): string {
 }
 
 let settingsWindow: BrowserWindow | null = null;
+
+/**
+ * 快速添加面板（R6）。与设置窗同一族：**第二个窗口，不是主窗口的另一种形态**。
+ *
+ * 🔴 它可以完全独立于主窗口存在：输入落库走的是同一条 IPC 契约
+ * （`addTask` ⇒ `host.addTask` ⇒ `createTaskActions().create` ⇒ op-log），
+ * 而宿主是主进程的单例，主窗口开没开跟它能不能写没有关系。
+ * 这正是判据②要钉的东西：**不打开主窗也能落库**。
+ */
+let quickAddWindow: BrowserWindow | null = null;
+
+/** 全局热键与托盘的句柄；`before-quit` 里必须 dispose，否则退出后键位仍被这台机器占着。 */
+let summon: SummonHandle | null = null;
+
+/**
+ * 主窗口**还没准备好**时收到的命令，等它准备好再补发。
+ *
+ * 🔴 两个"还没准备好"都要接住，而不只是第一个：
+ *   1. 窗口根本不在了（macOS 上关窗不退应用，之后从托盘按「今天」）；
+ *   2. 窗口刚建出来、页面**还在加载** —— `showToday()` 是先 `showMainWindow()`
+ *      （那里可能新建窗口）再发命令，此时 `mainWindow` 已经非空，
+ *      但页面的监听器要等 preload 跑完才挂上。**提前发出去的那一句不会排队，
+ *      也不会报错，就是没人听见**，症状正是"点今天没反应，再点一次才有"。
+ * ⚠️ 是队列不是单格：`reloadTasks` 与 `showToday` 可能连着到，
+ *    留一条的话后到的会把先到的顶掉，于是"快速添加完之后视图丢了"。
+ */
+let pendingCommands: DesktopCommand[] = [];
+
+/**
+ * 把一条命令递给主窗口的渲染进程；它没准备好就先排队。
+ *
+ * ⚠️ 只发命令，不发数据 —— 理由写在 `ipc-contract.ts` 的 `DesktopCommand` 上。
+ */
+function sendToMainWindow(command: DesktopCommand): void {
+  if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) {
+    mainWindow.webContents.send(DESKTOP_CHANNELS.command, command);
+    return;
+  }
+  pendingCommands.push(command);
+}
+
+/** 页面加载完成后把欠下的命令补发出去（`createWindow` 里挂在 `did-finish-load`）。 */
+function flushPendingCommands(window: BrowserWindow): void {
+  if (pendingCommands.length === 0 || window.isDestroyed()) return;
+  const queued = pendingCommands;
+  pendingCommands = [];
+  for (const command of queued) window.webContents.send(DESKTOP_CHANNELS.command, command);
+}
+
+/**
+ * 唤出主窗口。
+ *
+ * 🔴 分两种现场，而且**这条分叉不能省**：
+ *   · 窗口还在（macOS 上被热键藏起来的那一种）⇒ `show()` + `focus()`，
+ *     这是判据①里"窗口拿到焦点"那一步；
+ *   · 窗口不在了（关窗后只剩托盘）⇒ 重建，`ready-to-show` 里本来就会 `show()`。
+ * 自动化（`NO_FOCUS`）一律走 `showInactive()`：判据③要的正是"唤出过程不抢前台"。
+ */
+function showMainWindow(): void {
+  if (mainWindow === null || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (NO_FOCUS) mainWindow.showInactive();
+  else mainWindow.show();
+  if (!NO_FOCUS) mainWindow.focus();
+}
+
+function hideMainWindow(): void {
+  if (mainWindow === null || mainWindow.isDestroyed()) return;
+  mainWindow.hide();
+}
+
+/**
+ * 显示/隐藏那一条热键的落点。
+ *
+ * 判据只看"可见"这一件事，不看焦点：窗口在前台但没焦点时按热键，
+ * 用户的意图是"收起来"，此时要求焦点相等会把这条键变成"必须点一下才算聚焦"。
+ */
+function toggleMainWindow(): void {
+  if (mainWindow !== null && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+    hideMainWindow();
+    return;
+  }
+  showMainWindow();
+}
+
+/**
+ * 「今天」：唤出主窗口，并让界面切到今天那一档。
+ *
+ * 🔴 这里**不筛任务**。哪些任务算今天，判据在 `packages/domain/src/task-filter.ts`
+ * （`filterTasks(…, { kind: 'today' }, …)`），由渲染进程去调它（AGENTS.md §3.5）。
+ * 壳只说"界面请显示今天那一档"。
+ */
+function showToday(): void {
+  showMainWindow();
+  sendToMainWindow({ kind: 'showToday' });
+}
+
+/**
+ * 打开（或唤回）快速添加面板。
+ *
+ * 三条与设置窗同样的纪律：不抢前台时只出现不聚焦、关掉不销毁实例、
+ * 产物缺席要在窗口里说清楚缺什么（白窗排查在这两个壳上各花过一轮）。
+ */
+function createQuickAddWindow(): void {
+  if (quickAddWindow !== null && !quickAddWindow.isDestroyed()) {
+    if (NO_FOCUS) quickAddWindow.showInactive();
+    else {
+      quickAddWindow.show();
+      quickAddWindow.focus();
+    }
+    return;
+  }
+
+  const window = new BrowserWindow({
+    width: 460,
+    height: 132,
+    show: false,
+    focusable: !NO_FOCUS,
+    // 面板是"伸手就写一句"的东西：不带菜单栏、不可缩放、不进任务栏的窗口列表。
+    frame: false,
+    resizable: false,
+    skipTaskbar: true,
+    title: '快速添加',
+    webPreferences: {
+      // 与主窗口同一组安全边界，不放宽任何一项（理由见 createWindow）。
+      preload: join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  window.once('ready-to-show', () => {
+    if (NO_FOCUS) window.showInactive();
+    else window.show();
+  });
+
+  /**
+   * 🔴 加载的是**本壳自己的**渲染产物 `renderer-dist/quick-add.html`，
+   * 不是 `apps/web` 那份共享 UI 产物。
+   *
+   * 理由是同一句：`heyta://` 那个 origin 上跑的是**页侧自带引擎**的完整应用，
+   * 同一个库里开第二个引擎等于两套向量时钟各写各的（`HeytaMacApp.swift:1053-1055`
+   * 记的就是这一族事故）。面板要的只是"一句话进库"，而那条路主进程已经有一份
+   * —— 走 IPC，不开第二个引擎。
+   */
+  void window.loadFile(join(__dirname, '..', 'renderer-dist', 'quick-add.html'));
+
+  quickAddWindow = window;
+  window.on('closed', () => {
+    if (quickAddWindow === window) quickAddWindow = null;
+  });
+}
 
 /**
  * 打开（或唤回）独立设置窗口。
@@ -325,6 +483,15 @@ function createWindow(): BrowserWindow {
   });
 
   mainWindow = window;
+
+  /**
+   * 补发那些比页面准备好更早到的命令。
+   *
+   * 🔴 要等 `did-finish-load`：命令是**推**给页面的，而页面的监听器在 preload
+   * 之后才挂上 —— 提前发的那一句不会排队、不会报错，就是没人听见。
+   */
+  window.webContents.once('did-finish-load', () => flushPendingCommands(window));
+
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null;
   });
@@ -362,12 +529,42 @@ if (!app.requestSingleInstanceLock()) {
       ipcMain.handle(DESKTOP_CHANNELS.request, async (_event, request: DesktopRequest) => {
         const opened = await bootHost();
         armReminders(opened);
-        return handleDesktopRequest(opened, request, reminderAccess ?? undefined);
+        const result = await handleDesktopRequest(opened, request, reminderAccess ?? undefined);
+        /**
+         * 快速添加面板写下的一条任务，主窗口那份列表**看不见** —— 它只在挂载时
+         * 读过一次库（`renderer/main.tsx` 那条"每次写后重读"管得住的是**同一页上**
+         * 发生的写）。所以这里推一句"重新读一次"。
+         *
+         * ⚠️ 推的是命令不是内容：界面仍然自己从库里读，库才是权威。
+         * 🔴 只有 `addTask` 会新增一行，所以只在它之后推；面板里没有改名/完成
+         *    那类入口，每条请求都推等于让界面白读一遍库。
+         */
+        if (request.method === 'addTask') sendToMainWindow({ kind: 'reloadTasks' });
+        return result;
       });
 
       registerWebProtocol();
 
       createWindow();
+
+      /**
+       * 全局热键 + 托盘（R6）。
+       *
+       * 🔴 挂在 `createWindow()` **之后**、`whenReady` 之内：
+       * `globalShortcut` 与 `Tray` 都要求 app 已就绪，早一步是 Electron 明确拒绝的；
+       * 而它必须在任何取证开关之前 —— 判据①要的"把注册注掉这条必须红"
+       * 指的是这一行，不是某个环境变量。
+       */
+      summon = armGlobalSummon(
+        {
+          toggleMainWindow,
+          openQuickAdd: createQuickAddWindow,
+          showToday,
+          showMainWindow,
+          quit: () => app.quit(),
+        },
+        { userDataDir: app.getPath('userData') },
+      );
 
       /**
        * 取证开关（与 macOS / Windows 同名同义）：`HEYTA_OPEN_SETTINGS=1` 启动即开设置窗口。
@@ -377,7 +574,16 @@ if (!app.requestSingleInstanceLock()) {
 
       // macOS：点 Dock 图标且没有窗口时重开一个（平台惯例，不是业务逻辑）。
       app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+        if (mainWindow === null || mainWindow.isDestroyed()) {
+          createWindow();
+          return;
+        }
+        /**
+         * 窗口**还在但被热键藏起来了**这一档，2026-11-06 随 R6 一起补：
+         * 只判"有没有窗口"的话，藏起来的窗口会让 Dock 图标**点了没反应** ——
+         * 而那正是本仓最不允许可见的失效（"看起来像应用卡住了"）。
+         */
+        if (!mainWindow.isVisible()) showMainWindow();
       });
     },
     (error: unknown) => {
@@ -401,6 +607,17 @@ app.on('before-quit', () => {
   if (stopReminderLoop !== null) stopReminderLoop();
   stopReminderLoop = null;
   reminderAccess = null;
+  /**
+   * 🔴 全局热键与托盘**必须**在这里撤，而且要在关宿主之前。
+   *
+   * 不撤的代价不是"难看"而是**占着键位不放**：`globalShortcut` 注册的是系统级
+   * 快捷键，进程退出后 Electron 会回收，但**托盘图标与热键在退出过程中还在**，
+   * 而这一路里宿主还要写最后一次 op。顺序反过来只会让人怀疑是哪一步卡住了退出。
+   */
+  if (summon !== null) {
+    summon.dispose();
+    summon = null;
+  }
   host?.close();
   host = null;
 });

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
 
 import { rnwOptimizeDeps, rnwResolve } from '../../scripts/vite-rnw-resolve.mjs';
 
@@ -36,6 +37,21 @@ export default defineConfig({
   build: {
     outDir: '../renderer-dist',
     emptyOutDir: true,
+    /**
+     * 两个页面入口：主界面与快速添加面板。
+     *
+     * 🔴 Vite 默认**只**打包 `root` 下的 `index.html`。少了这一项的话，
+     * `quick-add.html` 不会被构建，而症状不是报错 —— 是主进程
+     * `loadFile('renderer-dist/quick-add.html')` 打开一个**不存在的文件**，
+     * 窗口照样开、里面全白（本仓在 `file://` 路径上吃过两次同一个症状，
+     * 见 `src/main.ts` 里 `app.getAppPath()` 那一段）。
+     */
+    rollupOptions: {
+      input: {
+        index: fileURLToPath(new URL('./renderer/index.html', import.meta.url)),
+        'quick-add': fileURLToPath(new URL('./renderer/quick-add.html', import.meta.url)),
+      },
+    },
     /**
      * 关掉 sourcemap：这是要随应用分发出去的产物，
      * 而且渲染进程的调试靠 DevTools 直接看源码映射即可，不必随包带。
