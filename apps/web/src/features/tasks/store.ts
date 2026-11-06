@@ -123,6 +123,15 @@ interface TaskState {
    * 修在 `sortTasks` 里（那里是唯一那份），不在这里补排 —— 这里补就是第二套口径。
    */
   setPinned: (id: string, pinned: boolean) => Promise<void>;
+  /**
+   * 放弃 / 恢复（写 `Task.abandonedAt`，任务的第五个独立状态，ADR-0083 §3.1）。
+   *
+   * 🔴 这一格补的是**零入口**（R14 · A1）：`TaskActions.setAbandoned` 与移动端的
+   * 调用点从 ADR-0083 起就在（`packages/app-host/src/actions.ts:870`），
+   * 而 Web 侧连一个 store 方法都没有 —— 于是共享词汇表里的 `abandon` 在 Web 上
+   * 无处落地。本层只转交，语义（幂等：状态没变就不写 op）在动作层。
+   */
+  setAbandoned: (id: string, abandoned: boolean) => Promise<void>;
   bulkSetPriorities: (entries: readonly { id: string; priority: Priority }[]) => Promise<void>;
   setImportant: (id: string, important: boolean) => Promise<void>;
   /**
@@ -383,6 +392,12 @@ export const useTaskStore = create<TaskState>((set) => ({
 
   setPinned: async (id, pinned) => {
     await taskActions.setPinned(id, pinned);
+  },
+
+  setAbandoned: async (id, abandoned) => {
+    // 幂等边界（"已经是这个状态"不写 op）在 `TaskActions.setAbandoned` 里，
+    // 与置顶同一条分工：本层不预读状态、也不吞错。
+    await taskActions.setAbandoned(id, abandoned);
   },
 
   bulkSetPriorities: async (entries) => {

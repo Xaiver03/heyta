@@ -29,22 +29,47 @@ import { isUndoableDeletion, resolveDangerTier, type DangerTier } from '@heyta/d
 import type { ReactNode } from 'react';
 
 /**
- * 一项行动作的**语义名**，不是文案。
+ * 行动作菜单的**唯一词汇表**（顺序即菜单顺序）。
+ *
+ * 2026-11-06（R14 入口契约 · C2）：**这份清单是唯一的**。此前 Web 的行菜单
+ * （`apps/web/src/features/tasks/TaskRowMenu.tsx`）自己另写了一份 7 个 id，
+ * 与这里的 7 个只**交集 3 个** —— 于是同一个"删除"两端各叫各的、
+ * "放弃"在 Web 上干脆没有词。两套词汇表不会有任何测试变红（各自内部自洽），
+ * 而它会稳定地长出"同一动作两个入口、一端没入口"。
+ *
+ * 🔴 各端**只渲染，不发明**：宿主遍历 `ROW_ACTION_IDS`、为每一项给内容
+ * （词条 / 图标 / 执行），顺序与分组由 `groupRowActions()` 给。
+ * 新增一个行动作 = 先在这里加 id（并按 `docs/plans/r14-entry-table.md` 登记层级），
+ * 而不是先在某个壳里加一枚按钮。
  *
  * ⚠️ `pin` / `unpin` / `abandon` / `unabandon` 是**同一个槽位的两副面孔**
  * （已置顶就给 `unpin`，已放弃就给 `unabandon`）：宿主按当前状态只给其中一副，
  * 于是共享层不需要知道"这条到底置没置顶"，少一份判断。
  * 语义依据：`docs/adr/0083-task-abandonment-fifth-state-and-share-boundary.md` §3.1（放弃是
  * 第五态、与完成互不推导）与 §3.2（置顶只有 `pinnedAt` 一个字段）。
+ *
+ * ⚠️ `priority` / `moveToProject` / `tags` 是**字段值**的子菜单，`addSubtask` 是结构动作：
+ * 按 J1（作用域决定层）它们"应该"住在字段层，留在行菜单是照抄参照产品的做法
+ * （`docs/research/ticktick-ux-ia-and-entry-paths.md` §3.2 #2/#4）。
+ * 代价是同一个字段出现两个落点，那是 R1 的债，登记在入口表里（处置=收敛），
+ * 不在这一份里再发明第二套排序。
  */
-export type RowActionId =
-  | 'open'
-  | 'pin'
-  | 'unpin'
-  | 'abandon'
-  | 'unabandon'
-  | 'select'
-  | 'delete';
+export const ROW_ACTION_IDS = [
+  'open',
+  'pin',
+  'unpin',
+  'priority',
+  'moveToProject',
+  'addSubtask',
+  'tags',
+  'abandon',
+  'unabandon',
+  'select',
+  'delete',
+] as const;
+
+/** 一项行动作的**语义名**，不是文案。取值域 = `ROW_ACTION_IDS`。 */
+export type RowActionId = (typeof ROW_ACTION_IDS)[number];
 
 /** 一项动作 = 语义 id + 宿主注入的内容。 */
 export interface RowAction {
@@ -70,27 +95,19 @@ export interface RowAction {
 const DANGEROUS_ROW_ACTION_IDS: readonly RowActionId[] = ['delete'];
 
 /**
- * 一级菜单的固定顺序（分隔线以上）。
- *
- * ⚠️ `select`（进入批量选择）排最后、`delete` 归危险组：
+ * ⚠️ `select`（进入批量选择）排在 `delete` 之前、`delete` 归危险组：
  * 长按原本就是"进入多选"的手势（`mobile.tasks.gestureHint` 钉过它），
  * 手势改派给上下文菜单之后，**那条效率路径不许丢**，只能搬进菜单里成为一项。
+ *
+ * 🔴 顺序**不再另写一份**：以前这里有一个 6 项数组，而 id 集合有 7 个 ——
+ * 多出来那一个会静默排到末尾。现在顺序就是 `ROW_ACTION_IDS`。
  */
-const ROW_ACTION_ORDER: readonly RowActionId[] = [
-  'open',
-  'pin',
-  'unpin',
-  'abandon',
-  'unabandon',
-  'select',
-];
-
 export function isDangerousRowAction(id: RowActionId): boolean {
   return DANGEROUS_ROW_ACTION_IDS.includes(id);
 }
 
 /**
- * 分组：**安全项在前、危险项在后**，各组内部按 `ROW_ACTION_ORDER` 排。
+ * 分组：**安全项在前、危险项在后**，各组内部按 `ROW_ACTION_IDS` 的顺序排。
  * 顺序由这一枚给出，各落点（菜单 / 滑动条）不再自己排一遍。
  */
 export function groupRowActions(actions: readonly RowAction[]): {
@@ -98,9 +115,9 @@ export function groupRowActions(actions: readonly RowAction[]): {
   readonly danger: readonly RowAction[];
 } {
   const rank = (id: RowActionId): number => {
-    const index = ROW_ACTION_ORDER.indexOf(id);
+    const index = ROW_ACTION_IDS.indexOf(id);
     // 没登记过的 id 排在已知项之后（不该发生，但它不该让界面乱序成不可用）。
-    return index === -1 ? ROW_ACTION_ORDER.length : index;
+    return index === -1 ? ROW_ACTION_IDS.length : index;
   };
   const byRank = (a: RowAction, b: RowAction): number => rank(a.id) - rank(b.id);
   return {

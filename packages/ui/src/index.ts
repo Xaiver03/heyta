@@ -1375,6 +1375,9 @@ export {
   type RowAction,
   type RowActionId,
   type TaskRowSwipeSpec,
+  /* 🔴 行动作菜单的**唯一词汇表**（2026-11-06 R14 · C2）：各端遍历它来渲染，
+     不再各自维护一份 id 列表。判据 `docs/plans/r14-entry-table.mjs` 的第 7 条。 */
+  ROW_ACTION_IDS,
   deleteNeedsConfirm,
   deleteTierForTask,
   groupRowActions,

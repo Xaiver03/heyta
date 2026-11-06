@@ -48,6 +48,7 @@ import {
   presentPreferenceIds,
   renderPreferenceHints,
   Quadrant,
+  isAbandoned,
   isPinned,
   suppressedPreferenceIds,
   toLocalDate,
@@ -3023,18 +3024,31 @@ export function App(): React.JSX.Element {
                     </MenuItem>
                   ) : null}
                   {/*
-                    详情列收起之后，**展开它的入口在 `⋯` 里**（页头那枚图标让位给助手）。
-                    页头因此在每一档都只有「一枚图标 + 一枚 ⋯」。
+                    🔴 详情列的开关**只有页头那一枚**（2026-11-06，R14 · B5）。
+
+                    这里原来还有一枚「展开详情栏」（testid 前缀 `detail-pane-`、以
+                    `open` 结尾的那一枚），条件才判 `!detailColumnShown` ——
+                    于是**收起态下两枚同时在场**：页头那枚
+                    （它只判 `canToggleDetailPane`）和这一枚，用户点哪个都展开，
+                    而没有任何一条门禁会红。
+
+                    更糟的是上面那段注释写的是"页头那枚图标让位给助手"—— **代码没让位**，
+                    注释替一个不存在的实现做了担保。R14 的取证把这一格记为真缺陷
+                    （`docs/research/ticktick-ux-ia-and-entry-paths.md` §5.2 B5）。
+
+                    二选一的裁决：**留页头那枚，删这一枚**。理由是三条事实，不是偏好：
+                    1. 页头那枚是**开关**（`aria-pressed` + 名字随状态翻转），两态都可达；
+                       这一枚只能"展开"，删掉页头那枚会让「收起」变成不可达 —— 那是把
+                       一个重复换成一次功能缺失。
+                    2. `check-surface-budget.mjs` 的页头预算写的就是「`⋯` + 一枚结构开关」，
+                       页头那枚正是被预算量的那一件；这一枚住在菜单里，预算看不见它。
+                    3. 入口表的规则（R14 · R2「入口账本只减不增」）：重复要**减**，
+                       而减掉的应该是那个**能力更弱**的落点。
+
+                    判据在 `docs/plans/r14-entry-table.mjs` 的第 8 条（B5 那一格）：
+                    **剥掉注释之后**，`⋯` 里不许再有任何以 `detail-pane` 开头的 `MenuItem`，
+                    而页头那枚 `data-testid` 必须恰好一枚。把这一枚加回来，读数立刻红。
                   */}
-                  {!detailColumnShown && canToggleDetailPane ? (
-                    <MenuItem
-                      testID="detail-pane-open"
-                      icon={<PanelRightOpen size={ICON_SIZE.sm} aria-hidden="true" />}
-                      onSelect={() => { toggleDetailPane(); }}
-                    >
-                      {t('web.shell.detailPane.expand')}
-                    </MenuItem>
-                  ) : null}
                   {/*
                     共享清单入口（ADR-0062 W4）从页头搬到这里。
 
@@ -4018,6 +4032,25 @@ export function App(): React.JSX.Element {
           // 🔴 当前态用领域层的 `isPinned()` 判 —— 宿主不许自己写 `pinnedAt === undefined`
           // （那条禁令写在 `packages/domain/src/entities.ts` 的 `isPinned` 文件头）。
           pinned={isPinned(rowMenuTask)}
+          /*
+            A1（2026-11-06）：**放弃任务**在 Web 上的第一处、也是唯一一处入口。
+
+            补这一格之前：共享词汇表有 `abandon` / `unabandon`
+            （`packages/ui/src/task-list/row-actions.ts`）、移动端的行菜单一直在用
+            （`apps/mobile/src/screens/TasksScreen.tsx` 的 `actions.setAbandoned`），
+            而 `grep -rn abandon apps/web/src` 是 **0** —— Web 用户手里只有"删除"，
+            那是另一档代价（J5：删除不可撤销、放弃可恢复）。
+
+            落点选**行菜单**（对象层，J2）而不是详情面：改的是"这一条任务本身的状态"，
+            与置顶同层同频；详情面已经够长，再塞一枚会让"字段层"混进状态动作。
+            执行走 `TaskActions.setAbandoned`（`packages/app-host/src/actions.ts:870`），
+            与移动端**同一个 action**，不是另写一条 op。
+          */
+          onSetAbandoned={(id, abandoned) => {
+            void useTaskStore.getState().setAbandoned(id, abandoned);
+          }}
+          // 与 `pinned` 同一条纪律：当前态由领域层的 `isAbandoned()` 算，本层不读字段。
+          abandoned={isAbandoned(rowMenuTask)}
         />
       ) : null}
 
