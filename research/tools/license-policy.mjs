@@ -43,6 +43,10 @@ export const REVIEWED_OTHER = {
   'CC-BY-4.0':
     'caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；' +
     'CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。',
+  'PSF-2.0':
+    'argparse@3.0.4：markdown-it 的传递依赖（仅用于其 CLI 入口），' +
+    'PSF-2.0 是 Python 软件基金会许可证，语义等同 BSD-2-Clause（宽松、仅要求保留版权声明），' +
+    '不在禁止名单内。',
 };
 
 /**

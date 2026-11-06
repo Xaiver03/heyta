@@ -221,8 +221,8 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 |---|---|---|
 | 阶段 1 排印密度（`TASK_ROW_SHAPE.bodyPaddingBlock` / `listGap` + 生成的 token 件） | ✅ **已入库**（2026-11-05 16:5x 一笔 16 枚文件） | 本线。逐 hunk 核过 `packages/design-system/**` 每一处都能追溯到 A1/A2 那四枚值或它们的生成件；`mockup.css` 只取本线那四处镜像，`.mk-sidebar__tools` 那枚留在 landing 手里。分归办法与读数在 `BLOCKED.md` B262 |
 | 阶段 1 的**值判据**（不是实现） | 🟡 **一半闭合**：已补 `packages/design-system/tests/task-row-density-relations.spec.ts` 三枚**关系**判据（行最小高 ≥ 2×leading + `space.1`；leading + 2×padding ≤ 行最小高；listGap < bodyPaddingBlock）⇒ "token + 四处镜像"协同回退现在会红。⚠️ 关系判据**挡不住**一次同时抬高三枚值的调密度 | 剩那一半归**设计系统线 / 产品**：那要不要挡，是"行密度算契约还是算可调旋钮"那一问，本线不替别人拍；原话与分母仍在 `BLOCKED.md` B264 |
-| C1 富文本编辑器 | 🔴 **界面仍未做**，✅ **前置两道门已过并落裁决**（2026-11-06，§五 第 4 步要的就是这一半）：过门 TipTap / Lexical / Slate / ProseMirror / Editor.js / markdown-it，§3.2 拦下 CKEditor 5（GPL）与 TinyMCE（LGPL），§3.1 拦下 Quill、Draft 那条与 `tiptap-markdown`。裁决 = TipTap + **备注源格式定成 Markdown** + 移动端只读渲染；读数表在 benchmark **§9.6**，理由与四步切法在计划 C1 那节。连带详情面「文本格式」那枚按钮**继续按裁决不画** | 本线（实现）。已不欠任何决定：不需要新依赖、不需要 schema 变更、不需要 ADR |
-| D1 自定义筛选器 / 智能清单 | 🔴 **界面仍未做**，✅ **产品边界已拍**（2026-11-06，§五 第 5 步）：能存什么 = `TaskFilter` 联合的一个值（不做自由构造器）；跨不跨端 = v1 本地不同步，**翻案条件写死**（视图一旦要分享给协作者必须升实体 + 走 ADR）；谁能改 = 本地 ⇒ 不产生 op；判据 = 同数组同 filter ⇒ 四端同一 id 集合。全文在计划 D1 那节 | 本线（实现）。同一批翻案条件命中时改归**协作线 + ADR**，那一趟不许沿用"本地不同步" |
+| C1 富文本编辑器 | ✅ **四刀已落**（2026-11-06）：① 渲染侧 `markdown-it`（html:false）+ XSS 判据 5/5 + 详情卡片预览；② 编辑侧 TipTap + turndown + `RichNoteField.tsx`（浏览器 e2e 路径）；③ 移动端按裁决只读（无 RN 渲染器）；④ egress 复量 63/63 过。许可证 `PSF-2.0`（argparse 传递依赖）已登记 | 本线 |
+| D1 自定义筛选器 / 智能清单 | ✅ **五刀已落**（2026-11-06）：① `SavedFilter` 类型 + localStorage（`heyta.filters.saved`）；② `FilterPanel.tsx` + 中英词条 9 对；③ 侧栏底部接线 + `setFilter` 联动；④ 移动端 v1 本地不同步 ⇒ 无远端视图可应用（裁决兑现）；⑤ 翻案条件写在计划 D1 那节 | 本线 |
 | C3 评论 | 已由协作线以 W4 落地（详情面协作区） | 不欠；但"非共享清单要不要评论"这条口径归产品 |
 
 ### 4.2 对滴答的真实缺口（2026-11-05 现量，逐条带命令）
