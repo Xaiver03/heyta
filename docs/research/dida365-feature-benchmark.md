@@ -470,3 +470,24 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 > 🔴 本节自身的教训也记一笔（写进交接，不写进这里）：补设备取证图时我先撞回 #208
 > 早已写明的"截图默认端口"坑，又把"黑帧"错误归因成"Simulator 没开窗口"并写进了计划文档 ——
 > 根因是**动手前没 grep 陷阱账本**。见 [../plans/dida-alignment-handoff.md](../plans/dida-alignment-handoff.md) §六。
+
+### 9.5 §9.2 有一格已经翻面（2026-11-06，滴答对齐线；按 §0.2 的规矩只加本节）
+
+**1.8 ④ 完成后顺延** 不再是缺口了。当天 00:5x 起：
+
+- 领域/动作层：`Task.repeatAfterCompletion`（可选布尔，缺省即历史形状）+
+  `TaskActions.setRepeatAfterCompletion`，`completeTask` 按这一枚分两档取基准
+  （固定排期从**当前到期日**推、完成后顺延从**完成那一天**推）。
+  行为判据在 `packages/app-host/tests/repeat-actions.spec.ts` 末组四臂：
+  同一场景（错过两周才勾）两档给出**两个不同日期**（9-21 vs 10-05），
+  并且"这一格只发一个 op、不碰规则串"也钉住了。
+- 界面：web 重复编辑器多一枚复选框（`task-repeat-after-completion`），移动端面单同一格做成
+  可切换 chip（`task-detail-repeat-after-completion`，本屏没有 Switch 先例所以不新造控制形状）。
+- 复跑口径（别抄这里的数）：
+  `grep -rn "nextAfterCompletion(" --include='*.ts' packages/*/src apps/*/src | grep -v "export function"` ⇒ 生产调用点 **1 处**
+  （原来这一条读 0，是 §9.2 判"仍是固定排期"的依据）；
+  `grep -c 'repeatAfterCompletion' packages/domain/src/entities.ts packages/app-host/src/actions.ts` ⇒ 两份都非零。
+- ⚠️ 与"固定排期"那条保证的**取舍要讲清楚**：开了这一档，就**不再**有"提前勾掉也不会把节奏挪走"
+  那条性质 —— 这是这一档的定义，不是缺陷（详见 `TaskActions.completeTask` 那段注释与 `Task.repeatAfterCompletion` 的字段注释）。
+
+其余四格（看板、自定义筛选器、手动拖拽排序、C1 富文本）本轮复量后**仍是缺口**，见 §9.4。
