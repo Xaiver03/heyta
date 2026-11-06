@@ -17,6 +17,7 @@
 **P0 三条全部是「漏气」而不是「缺功能」**：多账号会把上一个账号的数据留在本机、撤销只有 5 秒回执、重复任务没有「跳过这一次」的出口。
 **P1 四条里有一条是护城河（同步状态可见）**，其余三条是"零件都在、线没接"。
 **P2 五条是打磨，可以排队。**
+**另加 R13「设置与个性化」**（产品负责人点名）：它是一个**八维系统**，不是几个开关 —— 已按 IA 与视觉拆进 C/D 两包（见 §1 P1 末）。
 **明确不做四条**，其中 `assigneeUserId?` 孤儿字段要**先删**再谈协作。
 
 ---
@@ -97,6 +98,40 @@
 | **验收判据** | ① 断网改 3 条 → 界面明示"3 条待同步"，联网后归零；② 制造一次冲突 → 用户看得到**哪一条、谁赢、能不能改判**；③ 判据能红：把状态源断开，①②必须失败 |
 | **代价** | 中（数据都有，缺的是"翻译给人听"） |
 
+### P1 · 另加一条：R13 设置与个性化（**新增，产品负责人点名**）
+
+> 产品负责人 2026-11-06：「重点看它的**设置界面**和**我的界面**，这些东西非常重要，因为这是个**个性化**的东西。」
+> 取证规模：macOS **50 个** `*Preference*`/`*Settings*`/`*Theme*` nib；Windows **35 个 `views_config_*` + 11 个 `views_setting_*` + 15 个 `views_theme_*`**。
+> 详细取证见 [`ticktick-settings-and-personalization.md`](../research/ticktick-settings-and-personalization.md)。
+
+**它的个性化不是一个开关，是八个维度**（两端同名可对照）：
+
+| 维度 | 它的做法（证据） | heyta 现状 |
+|---|---|---|
+| ① 主题 | 预设网格 `prothemegrid` / 纯色 `purecolorgrid` / 深色 `darkcolorgrid` / **自定义** `customthemedialog` + `CustomThemeEditViewController`；文案里有「专属主题」「自定义主题」「颜色主题」 | 只有明暗（`data-theme` 27 处） |
+| ② 界面风格 | `interfacestylewindow` / `AppStylePickerViewController` | 无 |
+| ③ 字体族 + 字号 | `fontfamilysetpanel` / `fontsizesetpanel`（三档 + delta 表）；5 套族包 | 无设置（`font-size` 是 CSS 声明，不是用户开关） |
+| ④ 显示密度与内容 | `displaysettingspanel` / `numdisplaysetpanel` / `completelinedisplaysetpanel` / `projectlistcolorvissetpanel` | 无 |
+| ⑤ 应用图标 | `appiconitem` + `AppIconPreferences*`，含「会员专享应用图标」 | `appIcon` 全仓 **1** 处 |
+| ⑥ 自动深浅 | `autodarksettingwindow`；文案「跟随系统」「自动切换」 | 部分（需核） |
+| ⑦ 便签 / 倒数日样式 | `stickynoteconfig`、`TaskStickyThemePickerViewController`、`CountdownStylePickerViewController`；便签相关文案 28 条（含默认间距、默认大小、按便签打开） | 无 |
+| ⑧ 快捷键 | `shortcutsconfig` + `hotkeycontrol`（可配置，非只读） | 只有 ⌘, 一个 |
+
+**还有一条最"我的"但最便宜**：**行着色** —— 文案 `list_color` / `colored_by_list` / `colored_by_tag` / `show_or_hide_list_colors` ⇒ 任务行可以按**清单色**或**标签色**着色，且可整体关掉。heyta 全仓 `colored_by|listColor` **命中 0**。
+
+**R13 怎么进排期（不新增分包，拆成两半）**：
+
+| 子项 | 内容 | 并入 | 理由 |
+|---|---|---|---|
+| **R13a** | 设置树骨架（分区导航 + 一个入口）+ 「我的」页（账户 / 会员 / 统计 / 引导一块） | **C 包**（入口与可达） | 它解决的是 **IA 与入口**，不碰设计系统；而且 heyta 现有 `apps/web/src/features/settings` 已堆到 **45 个文件**，说明缺的是"结构"不是"功能" |
+| **R13b** | 主题系统（预设/纯色/自定义/自动深浅）+ 字体与密度 + **行着色** + 应用图标 | **D 包**（视觉与状态） | 它全部落在 `tokens.css` 与设计系统，与 R9 暗色 token 同源，**必须同一个人做**才不会打架 |
+
+**验收判据（R13，每条要能红）**：
+① 选一个预设主题 → 刷新/换端后仍生效，且**只改 token 不改组件**；把主题持久化注掉，必须失败。
+② 自定义主题改一个色 → 生成的新 token 集能通过 `check:design`（不允许裸值），且对比度达标（给读数）。
+③ 行着色切「按清单 / 按标签 / 关」三态，列表颜色随之变；注掉读取点必须失败。
+④ 设置树：任意一个设置项都能从**一个**入口两级内到达（给一张路径表），没有"只在某个按钮里藏着"的项。
+
 ### P2 · 打磨，可以排队
 
 | 编号 | 需求 | 证据 / 说明 |
@@ -137,8 +172,8 @@
 |---|---|---|---|
 | **A · 数据可信** | R1 + R2 + R7 | 都在回答同一个用户问题：「**我的数据在不在、对不对、丢没丢**」。共用 op-log 与状态源 | `check:reachability` · 回放无副作用 · 撤销/隔离的"能红"判据 |
 | **B · 任务操作闭环** | R3 + R4(①) + R8 | 都动 `domain` + **op 写路径**，且都要"一次操作 = 一条 op"这条纪律 | `check:layering` · schema 不 bump · 单 op 断言 |
-| **C · 入口与可达** | R6 + R12 + R10 | 都在**入口层**（壳 / 快捷键 / 视图 key），不碰数据语义 | `ui-acceptance`（不抢前台）· 三端壳各自验收 |
-| **D · 视觉与状态** | R9 + R11 + R5 | 都在**呈现层**，共用设计系统与四态规范 | `check:design` · `check:ui-language` · 截图人看 |
+| **C · 入口与可达** | R6 + R12 + R10 + **R13a 设置树与「我的」页** | 都在**入口/IA 层**，不碰数据语义 | `ui-acceptance`（不抢前台）· 设置路径表 |
+| **D · 视觉与状态** | R9 + R11 + R5 + **R13b 主题/字体/行着色** | 都在**呈现层**，共用设计系统与四态规范；R13b 与 R9 同源（都动 tokens），必须同一个人 | `check:design` · `check:ui-language` · 截图人看 |
 
 **顺序**：`A → B → C → D`。理由：A 是信任（越早越好）；B 依赖 A 的 op 基础设施（撤销要能回滚写路径）；C/D 可以并行但排在后面，因为它们**不改数据语义**，返工成本低。
 
