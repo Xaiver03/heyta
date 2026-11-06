@@ -6,7 +6,11 @@
  * 判据出处：`docs/research/dida-view-unification.md` §5（门禁表）与 §8.4（怎么验收）。
  *
  *   §8.4 判据 2：「复选框 + 标题 + 截止」的 JSX **全仓只出现在 `packages/ui`**
- *   §8.4 判据 3：`app.css` 顶层 `ht-*` 前缀族数量**只许下降**（不给新增）
+ *   §8.4 判据 3：web 顶层 `ht-*` 前缀族数量**只许下降**（不给新增）。
+ *   ⚠️ 2026-11-06 起扫描范围是 `styles/app*` **加** `features` 目录下所有 `.css` ——
+ *   后者此前整批在账本外（5 个族），见下方 `HT_FAMILY_BASELINE` 那段。
+ *   （写注释时注意：glob 里的 `星星斜杠` 会**提前闭合块注释**，那会让整份脚本从第一行坏掉 ——
+ *   本仓陷阱账本里已有这一条，2026-11-06 我改这段时又踩了一次。）
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 为什么需要这一道（不是风格检查）
@@ -86,7 +90,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  *
  * §8.4 判据 3 的命令是
- *   `grep -oE '^\.ht-[a-z]+' apps/web/src/styles/app.css | sort -u | wc -l`
+ *   `grep -rhoE '^\.ht-[a-z]+' apps/web/src/styles apps/web/src/features --include=*.css | sort -u | wc -l`
  * 当前实测 **31**（§5/§8.4 正文写的 30 是更早的数字，M3 期间涨了一个）。
  * 本脚本把它写成具名常量 `HT_FAMILY_BASELINE`，实现成"基线 + 不许超过"。
  *
@@ -338,7 +342,16 @@ for (const root of SCAN_ROOTS) {
  * `.ht-capture*` 共 15 条死规则 —— 它们零 TSX 引用，由执行 agent 发现、父 agent 执行
  * （`app.css` 不在执行者白名单）。⚠️ `.ht-compose` **不是**死的（`features/tasks/NoteEditor.tsx` 在用），
  * 已保留。 */
-const HT_FAMILY_BASELINE = 28;
+/**
+ * 🔴 **2026-11-06：28 → 33，这不是"抬基线让门禁变绿"，是把尺补到它自称的范围。**
+ *
+ * 旧扫描范围只有 `styles/app*`，而 `features/**` 下早有一批与组件同址的本地样式
+ * （`settings/*.css` / `tasks/task-row-menu.css` / `auth/auth-dialog.css` …）。
+ * 补全扫描后实测 **33**——也就是说**门禁绿着的时候，现实就已经是 33 了**，
+ * 只是那 5 个族（`.ht-auth` / `.ht-capture` / `.ht-detail` / `.ht-inbound` / `.ht-row`）
+ * 从来没进过账本。基数从"少报的读数"改成"真的读数"，棘轮方向不变：**只减不增**。
+ */
+const HT_FAMILY_BASELINE = 33;
 
 const APP_CSS = join('apps', 'web', 'src', 'styles', 'app.css');
 
@@ -348,7 +361,7 @@ function collectHtFamilies() {
     return {
       error:
         `找不到 ${APP_CSS}。\n` +
-        `      ⇒ 判据 3 锚在"app.css 的顶层 ht-* 族"上；文件改名/搬家之后本检查\n` +
+        `      ⇒ 判据 3 锚在"web 顶层 ht-* 族"上（styles/app* + features 下所有 css）；聚合器改名/搬家之后本检查\n` +
         `        必须**报错**，而不是"0 ≤ 基线，✅"（那正是一个永远通过的门禁）。`,
     };
   }
@@ -360,6 +373,31 @@ function collectHtFamilies() {
       if (name.endsWith('.css')) cssFiles.push(join(modulesDir, name));
     }
   }
+  // 🔴 2026-11-06 补：**样式文件已经不只住在 `styles/` 了。**
+  // `features/**` 下有一批与组件同址的本地样式（`settings/*.css` / `tasks/task-row-menu.css` /
+  // `auth/auth-dialog.css` …）。旧口径只扫 `styles/app*`，于是那批文件里声明的族
+  // **一个都没进账本** —— 现量有 5 个（`.ht-auth` / `.ht-capture` / `.ht-detail` /
+  // `.ht-inbound` / `.ht-row`），读数因此比现实小 5。
+  // 这与 traps #671 同种病（量到的范围比自称的窄），只是这次错在**目录**而不是**写法**。
+  const featuresRoot = join(ROOT, 'apps', 'web', 'src', 'features');
+  const collectCss = (dir) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const abs = join(dir, e.name);
+      if (e.isDirectory()) {
+        collectCss(abs);
+      } else if (e.isFile() && e.name.endsWith('.css')) {
+        cssFiles.push(abs);
+      }
+    }
+  };
+  collectCss(featuresRoot);
+
   const lines = cssFiles.flatMap((f) => readFileSync(f, 'utf8').split('\n'));
   const families = new Set();
   for (const line of lines) {
@@ -429,7 +467,7 @@ if (sharedRowCount === 0) {
 
 console.log('');
 console.log('─'.repeat(72));
-console.log('断言 B：apps/web/src/styles/app.css 的顶层 ht-* 前缀族只减不增');
+console.log('断言 B：apps/web 顶层 ht-* 前缀族只减不增（扫描 styles/app* + features 下所有 css 两处）');
 console.log('─'.repeat(72));
 
 const ht = collectHtFamilies();
