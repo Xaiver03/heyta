@@ -475,7 +475,7 @@ SHARE 盘摆渡仍然可用，但**不再是唯一路径**。
 | 主程序 | `TickTick.exe` **36.3 MB**，PE **x86_64**，**托管 .NET**（REA `rea-dotnet-static` 读到 metadata `v4.0.30319`） |
 | UI 栈 | **WPF**（`TickTick.exe.config` 引用 `System.Configuration.*, Version=4.0.0.0`；引用 `PresentationFramework` / `PresentationCore` / `WindowsBase`）+ `CommunityToolkit.Mvvm` |
 | 界面产物 | **639 个 BAML**（`ui/` 目录实有 **1296** 个文件 = 639 baml + 598 png + 32 ico + 12 jpg + 9 json + 4 ttf + 2 cur；「639」只对 `.baml` 成立） |
-| 数据层 | **`sqlite-net`**（`SQLite` 命名空间的 `Table`/`Column` 特性；该 DLL 内 123 个 TypeDef）+ `TickTickDao.dll` + `sqlite3.dll` |
+| 数据层 | **`sqlite-net`**（类即表、属性即列，反射建表）+ `TickTickDao.dll` + `sqlite3.dll`。⚠️ **业务实体不在 `TickTickModels.dll`**（那 123 个 TypeDef = sqlite-net 本体 28 + DTO/基类 31 + 编译器生成 63），而在 **`TickTick.exe` 的 `ticktick_WPF.Models`**（292 类型 / 83 个派生 `BaseModel`），26 张表名出现在手写 SQL 字面量里（P3 实测） |
 | 共享逻辑 | **`KotlinMultiplatformAll.dll` 6.75 MB**（x86_64 native）—— 与 macOS 的 `KotlinMultiplatformAll.framework` **同名同源** |
 | 内嵌浏览器 | **WebView2**（`Microsoft.Web.WebView2.Core/Wpf.dll` + `WebView2Loader.dll`）⇒ 局部富内容走 Chromium |
 | 其它关键件 | `SmartDateDLL.dll`（自然语言日期）、`NHunspell`/`Hunspellx64`（拼写）、`Ical.Net`（iCal）、`NodaTime`（时区）、`NHotkey.Wpf`（**全局热键**）、`NAudio`、`QRCoder`、`Mapster`、`Newtonsoft.Json`、`Bugsnag`、`ICSharpCode.AvalonEdit` + **40 份 `.xshd`**（代码高亮） |
@@ -531,6 +531,16 @@ Double72Add6    Double72Add8    Double80Add6   Double92Add8
 **读法**：`9_12_13` = 同一字号在三档下的取值；`11Add1` = 基准 11、该档 +1。也就是**一套 key + 三张 delta 表**，切字号时布局不重排。
 **这条可以直接借**：heyta 若要做「字体大小」设置，**delta 表比三套完整字号便宜得多**。
 
+⚠️ **三条口径，不写清就会读错**（P0 / P1 两支线实测）：
+
+1. **WPF 的尺寸单位是 DIP（1/96 英寸，1 DIP = 0.75 pt），不是 pt。** `FontSize="14"` ≈ 10.5pt。
+   🔴 这条救回了一个会读错的结论：**两端控件高度用的是同一组整数（24/28/30/32 + 36），但物理量不等** —— macOS 24 **pt** 比 Windows 24 **DIP（=18pt）大 33%**；窗口也是**都用 440**，而 440pt 与 440DIP（=330pt）差一整档。**数字巧合 ≠ 尺寸相同。**
+2. **具名 token 的数值要分两条路径说**（我第一版混成了一条）：
+   - **XAML 路径读不到**：`colorresource` / `fontresource/*` / `icons_*` 这 145 个资源字典的正文是 **`DeferrableContent` 延迟块**，转 XAML 后只剩 `<!--deferred-stream:NB-->`。
+   - **原始 BAML 字节读得到**（P1 做的）：double 以「ASCII 数字 + `0x51`」存放，它给出 `+0/+2/+4` 与 `Font10=10/11/14`，并用两条自校验对齐：`Font` 9 键在值索引 21 处 delta=0.0、`Height` 32 键在索引 30 处 delta=0.0、`21+9=30` 严丝合缝（错位一格会让两条同时偏 ±1）。
+   - **强度定级：中等**（实现观察非官方格式；BAML 版本一变即作废，退回键名层）。`color_#HEX` 那 167 个键**键名即色值**，不受延迟块影响。
+3. **能读的字面量**（639 BAML → 638 XAML，仅 1 个失败）：`FontSize` 共 **791 处** = **14×235 · 12×194 · 13×152 · 16×77 · 11×38** · 20×16 · 9×15 · 18×14 —— 与 macOS 同样收敛到 {11,12,13,14,16}，但**第一大档是 14**（macOS 是 13）。
+
 #### ③ 字体族：5 套包，跟图标/配色并列成主题的一部分
 
 `fontfamily` 资源：`normal` / `yahei`（微软雅黑）/ `sourcehansans`（思源黑体）/ `yozai`（悠哉字体）/ `975maru`（975 丸ゴシック）；
@@ -554,6 +564,9 @@ Double72Add6    Double72Add8    Double80Add6   Double92Add8
 
 **两个可迁移的判断**：
 
+0. 🔴 **先纠正一个流行读法**：「语义共享、UI 各写」在**数据层实际是「语义共享、存储各写」**（P3 实测）—— 专注会话两端 **8 对字段零同名**（`ZSTARTDATE` ↔ `StartTime`…）、排序 mac 7 表 vs win 3 表、连 `children` 一族也只有 Windows 拼错成 `Chidlren`。
+   ⇒ **它自己两端就没有一份共享 schema**，所以「照它的表结构设计」**没有可抄对象**；反过来说，heyta 把实体清单收在 `shared-schema` 一处，是**比它更强**的做法。
+
 1. **UI 各写、语义共享**：两端 UI 技术零重叠（nib vs BAML），但**数据模型与同步核心是同一份 Kotlin**。这正是 heyta 的多端策略 —— 这是一个「真这么干也能行」的外部实证。
 2. **平台强制项会撕开设计系统**：同一套设计，macOS 走语义色、Windows 走字面色板。说明「跨端一套 token」不能靠自觉，得靠**门禁**（heyta 的 `check:design` 就是干这个的）。
 
@@ -569,7 +582,8 @@ Double72Add6    Double72Add8    Double80Add6   Double92Add8
 - ✅ **BAML → XAML 已完成**（P0，`scripts/ticktick/baml-to-xaml.ps1`）：639 个转出 **638 个**，唯一失败是任务行 `views/tasklist/item/subtasklistitem.baml`（目标类 `ListItemContent` 的静态构造抛 `NullReferenceException`，换 session 复跑同样失败，原始 BAML 留档 `.raw`）。产物在 `/tmp/rea-lab/win/xaml/`。
   **剩下的缺口不是转换，是 deferred**：145 个资源字典的正文是延迟块，具名 token 的数值读不到（见 9.4 那两条口径）。
 - **`KotlinMultiplatformAll.dll`**：仍是 native 且符号剥离，结论与 macOS 侧一致（只看到 `SYNC`/`Patch`/`Clock`/`Conflict` 的字符串）。
-- **Windows 本地库**：`sqlite-net` 的库文件在 `%APPDATA%` / `%LOCALAPPDATA%` 下，**这次没取**（要先跑起来才有数据）。它的表结构是下一个高价值目标 —— 能直接和 macOS 那 58 张表对账。
+- **Windows 本地库**：`sqlite-net` 的库文件在 `%APPDATA%` / `%LOCALAPPDATA%` 下，**这次没取**（要先跑起来才有数据）。
+  ⚠️ 而且**没有可读 DDL**：`CREATE TABLE` / `INSERT INTO` 字面量各 **0** 条 ⇒ 建表全靠反射，**类即表、属性即列**；`[Ignore]` 有 **111** 处 ⇒ **属性集 ≠ 列集**，别拿属性数当列数。`[Table]` 只有 2 处，且那 2 个类**共表** ⇒「类名即表名」是默认不是常量。
 
 ---
 
