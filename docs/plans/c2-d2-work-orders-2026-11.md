@@ -113,4 +113,11 @@ D-② 另加 `check:tokens` / `check:theme` / `check:text-color` / `check:design
 1. **`pnpm reinstall:all` 四端重装** —— 这一轮动了 desktop 主进程、tokens、domain 写路径，不重装等于没交付；
 2. **A 包的移动端设备腿**（`verify:mobile-ios-account-erasure`，要真模拟器 + 真服务端，需一台安静的机器）；
 3. **`rejected` 行的永不清除**（"待上传"单调不减）—— 需要"丢弃被拒 op / 按服务端状态重建"的语义，本轮只计数不解；
-4. R5「≤3 层」的现量读数（证据补齐分包在做；口径用取证那份的 J1–J6，别自己发明）。
+4. R5「≤3 层」的现量读数（证据补齐分包在做；口径用取证那份的 J1–J6，别自己发明）；
+5. 🔴 **看板重建在 `TaskRow` 上（B 落地之后的第一单，不是 D-② 的活，也别现在插）** ——
+   见 [`BLOCKED.md`](../../BLOCKED.md) B274。它一次修掉四笔：`check:l4` 的 4 处内联样式、
+   `check:selection-single-source` 里 `kanban` 的立场（届时从 `row-actions-only` 升成 `selects`）、
+   键盘光标（`kanban-card-*` 换成 `task-item-*`）、以及"看板没有属于自己的样式族"那一格 ——
+   **`ht-*` 族数修完仍须是 28**。为什么不能现在做：它要动 `packages/ui/src/task-list/**`，
+   而 B 包正在改那里（traps #664）。为什么不能只搬 CSS：那会新开 `.ht-kanban` 族（28→29），
+   而抬 `check:l4` 基线是改判据口径（AGENTS §6 第 3 条）—— 两条都是"让门禁变绿"，不是"消掉净增"。
