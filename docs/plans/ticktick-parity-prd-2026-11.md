@@ -140,9 +140,9 @@
 |---|---|---|
 | 个性化维度 | **8 个，全部有证据** | **完整 0 / 半有 4 / 没有 4** |
 | 主题 | 28 张预览 + 61 调色板 + **5 个系列** + 自定义 | **2 个值**（`light`/`dark`，`theme.ts:9`） |
-| 设置面板组件 | 50 个（macOS nib）+ 148 个含 config/setting 的 BAML | **18 个** |
+| 设置面板组件 | **49 个**（macOS 设置类）+ **148 个**含 config/setting/theme 的 BAML | **18 个**（17 Panel/Settings + LanguageSwitcher） |
 | 设置分组 | 一个纵向菜单（项数未核实） | **7 组**（`SETTINGS_NAV_ITEMS`，`App.tsx:297`） |
-| 「个人设置」字段 | Windows `SettingsModel` **128 列** + `UserPreferenceModel` 21 子配置 + `CommonSettings` 32 列 | 18 个面板 |
+| 「个人设置」字段 | Windows `SettingsModel` **128 列** + `UserPreferenceModel` **21 子配置** + `CommonSettings` 32 列 + `PomoLocalSetting` 26；macOS `ZTTUSERSETTINGS` 22 列（15 标量 + 7 BLOB） | 客户端持久化键 **24 个**，其中外观类只有 **2 个** |
 
 **它自己给出的一条分类判据（值得直接采纳）**：
 
