@@ -419,6 +419,7 @@ export const en = {
   'web.shell.nav.scopeAria': 'Scope of the current view',
   'web.shell.nav.inbox': 'Inbox',
   'web.shell.nav.today': 'Today',
+  'web.shell.nav.tomorrow': 'Tomorrow',
   // 与 zh 同一条：那个 7 与 `@heyta/domain` 的 `NEXT_SEVEN_DAYS` 同源。
   // ⚠️ 「7 天」= 含今天的**七个日历日**，不含逾期，不含无截止时间。
   'web.shell.nav.next7Days': 'Next 7 Days',

@@ -512,9 +512,10 @@ export function App(): React.JSX.Element {
       filterTasks(tasks, filter, { now: store.now, tags: store.entities.tags }).length;
     return {
       today: count({ kind: 'today' }),
+      tomorrow: count({ kind: 'tomorrow' }),
       next7Days: count({ kind: 'next7Days' }),
       completed: count({ kind: 'completed' }),
-    } as Record<'today' | 'next7Days' | 'completed', number>;
+    } as Record<'today' | 'tomorrow' | 'next7Days' | 'completed', number>;
   }, [store.entities.tasks, store.now]);
 
   /**
@@ -1982,6 +1983,7 @@ export function App(): React.JSX.Element {
     if (view === 'tasks') {
       if (f.kind === 'all') return t('web.shell.nav.inbox');
       if (f.kind === 'today') return t('web.shell.nav.today');
+      if (f.kind === 'tomorrow') return t('web.shell.nav.tomorrow');
       // 「最近 7 天」的标题就是那一行侧栏的名字 —— 它是**一条智能清单**，
       // 不是"某个日期的任务"，所以标题不需要跟着具体日期变。
       if (f.kind === 'next7Days') return t('web.shell.nav.next7Days');
@@ -2695,7 +2697,9 @@ export function App(): React.JSX.Element {
                   count={
                     entry.filter.kind === 'today'
                       ? navCounts.today
-                      : entry.filter.kind === 'next7Days'
+                      : entry.filter.kind === 'tomorrow'
+                        ? navCounts.tomorrow
+                        : entry.filter.kind === 'next7Days'
                         ? navCounts.next7Days
                         : entry.filter.kind === 'completed'
                           ? navCounts.completed

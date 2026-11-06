@@ -359,3 +359,45 @@ describe('scopeTasks（日历侧栏多选）', () => {
     expect(isScopeEmpty({ projectIds: [], tagIds: ['ta'] })).toBe(false);
   });
 });
+
+describe('R10「明天」：它是独立的一档，不与今天/最近 7 天互相吃掉', () => {
+  /*
+    🔴 这一组钉的是**三档互不吃掉**。缺任何一条，"明天"就可能悄悄变成
+    「今天」的别名（用户点明天看到今天的任务），或者被「最近 7 天」重复计入
+    （同一个任务在两个清单里各出现一次）。
+    日期用本地日历日构造（`LocalDate` 是 `YYYY-MM-DD`），不碰毫秒。
+  */
+  const now = new Date(2026, 10, 7, 10, 0, 0).getTime(); // 2026-11-07 10:00 本地
+  const at = (date: string, hour = 9): number => {
+    const [y, m, d] = date.split('-').map(Number);
+    return new Date(y!, m! - 1, d!, hour, 0, 0).getTime();
+  };
+  const tasks = [
+    task({ id: 'yesterday', dueDate: at('2026-11-06') }),
+    task({ id: 'today', dueDate: at('2026-11-07') }),
+    task({ id: 'tomorrow', dueDate: at('2026-11-08') }),
+    task({ id: 'dayAfter', dueDate: at('2026-11-09') }),
+    task({ id: 'noDue' }),
+  ];
+  const ids = (filter: TaskFilter): string[] =>
+    filterTasks(tasks, filter, { now }).map((t) => t.id).sort();
+
+  it('「明天」只含明天那一天（昨天、今天、后天、无截止都不在）', () => {
+    expect(ids({ kind: 'tomorrow' })).toEqual(['tomorrow']);
+  });
+
+  it('「今天」不含明天（两档不许互相吃掉）', () => {
+    expect(ids({ kind: 'today' })).toEqual(['today']);
+  });
+
+  it('「最近 7 天」含明天，但那不是同一档：它同时含后几天', () => {
+    expect(ids({ kind: 'next7Days' })).toEqual(['dayAfter', 'today', 'tomorrow']);
+  });
+
+  it('跨夏令时的那一天也按日历日算（毫秒加法会在这里错一天）', () => {
+    // 2026-03-08 是美东夏令时切换日；本地时区不同则跳过这条的强断言，只要求"明天 = 次日日历日"
+    const dstNow = new Date(2026, 2, 7, 10, 0, 0).getTime();
+    const dstTasks = [task({ id: 'd8', dueDate: at('2026-03-08') })];
+    expect(filterTasks(dstTasks, { kind: 'tomorrow' }, { now: dstNow }).map((t) => t.id)).toEqual(['d8']);
+  });
+});

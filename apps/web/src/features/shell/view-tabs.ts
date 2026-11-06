@@ -99,6 +99,14 @@ export const PRIMARY_NAV: NavEntry[] = [
    * 这一组只剩「今天」与「最近 7 天」两条都属"按日期看的未完成"；
    * 看全部（收集箱）走 rail 的「任务」，理由见上面 `PRIMARY_NAV` 的文件头。
    */
+  /**
+   * 「明天」（R10，2026-11-07）。
+   *
+   * 位置在「今天」与「最近 7 天」之间：**按时间远近排**（今天 → 明天 → 最近 7 天）。
+   * 它也不是「最近 7 天」的快捷方式 —— 那个窗口含今天，这个只含明天那一天，
+   * **两者互不吃掉**（判据：`domain/tests/task-filter.spec.ts` 与 `tests/nav-tomorrow.spec.tsx`）。
+   */
+  { filter: { kind: 'tomorrow' }, labelKey: 'web.shell.nav.tomorrow', icon: CalendarDays },
   { filter: { kind: 'next7Days' }, labelKey: 'web.shell.nav.next7Days', icon: CalendarRange },
   /**
    * 「已完成」。

@@ -482,6 +482,7 @@ export const zhCN = {
   'web.shell.nav.scopeAria': '当前视图的范围',
   'web.shell.nav.inbox': '收集箱',
   'web.shell.nav.today': '今天',
+  'web.shell.nav.tomorrow': '明天',
   /**
    * 「最近 7 天」—— 滴答那三个智能清单里的中间一个。
    *

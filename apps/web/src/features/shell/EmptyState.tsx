@@ -82,6 +82,7 @@ export function isActive(current: TaskFilter, target: TaskFilter): boolean {
       return target.kind === 'tag' && current.tagId === target.tagId;
     case 'all':
     case 'today':
+    case 'tomorrow':
     case 'next7Days':
     case 'completed':
       return true;

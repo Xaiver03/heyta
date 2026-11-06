@@ -52,6 +52,14 @@ import { resolveTagIds, taskHasTag } from './tags.js';
 export type TaskFilter =
   | { kind: 'all' }
   | { kind: 'today' }
+  /**
+   * 「明天」（R10，2026-11-07）。
+   *
+   * 🔴 它**不是** `today` 的别名，也不是 `next7Days` 的子集：三者互不吃掉。
+   * 缺这一档时「每天早上过一遍明天」这条主路径只能翻今天列表往下扫
+   * （界面地图 §2 把「明天」判成 P0 缺口，理由正是**功能在、路径不在**）。
+   */
+  | { kind: 'tomorrow' }
   | { kind: 'next7Days' }
   | { kind: 'completed' }
   | { kind: 'quadrant'; quadrant: Quadrant }
@@ -150,6 +158,16 @@ export function filterTasks(
       return visible.filter(
         (t) => !isCompleted(t) && dueLocalDate(t) === today,
       );
+    }
+    case 'tomorrow': {
+      /*
+        🔴 **按本地日历日算，不用 `now + DAY_MS`。** 与 `next7Days` 同一条纪律：
+        毫秒加法在夏令时那一天会跨到错误的日子（23/25 小时），而症状是
+        "某个任务在「明天」里消失了"，一年只出现两次。
+        `LocalDate` 是 `YYYY-MM-DD`，`addDays` 走的是日历运算，不是毫秒。
+      */
+      const tomorrow = addDays(toLocalDate(context.now), 1);
+      return visible.filter((t) => !isCompleted(t) && dueLocalDate(t) === tomorrow);
     }
     case 'next7Days': {
       /**
