@@ -42,17 +42,51 @@
   --ht-slate-900: #0f172a;
   --ht-slate-950: #020617;
 
-  /* 语义色阶 */
+  /*
+    暗色中性面（ink）—— 暗色的表面与边框专用**一族**，不是 slate 的补档。
+    ============================================================
+    暗色的面**带蓝调**（暗色块原注释已在说这件事），而原色阶里一个这样的值都没有：
+    界面实际用的 7 个面/框色此前是直接抄在暗色块里的 7 枚 hex。
+    这里把它们升格为一族，**取值一个字符没改**，只是从此有了名字。
+
+    ⚠️ 档号只表**本族内的明度次序**（950 最深 → 400 最浅），**不与 slate/blue 的
+    同号档可比**：这一族整体比 slate 更暗也更蓝，硬套 Tailwind 的档号间距会让
+    相邻两个值挤进同一档，那一档就同时在判两件事了。
+    与 `paper-*`（R15）同理，**刻意稀疏**：只登记界面真用到的 7 档，
+    要第 8 档先按规则 3 说清它服务哪一个面。
+  */
+  --ht-ink-950: #080e1a;
+  --ht-ink-900: #0d1526;
+  --ht-ink-800: #101a2e;
+  --ht-ink-700: #131e33;
+  --ht-ink-600: #16203a;
+  --ht-ink-500: #1e2b45;
+  --ht-ink-400: #2b3b5c;
+
+  /*
+    语义色阶
+    300/400 是暗色的**提亮档**（R9）：暗色不是亮色反相，状态色要整体提亮才读得清，
+    而这一族此前只登记了 50/600/700，暗色块没有可指的名字，于是自己抄了 8 枚 hex。
+    取值与 Tailwind 同名档一致（本仓原色阶一直是它的子集，见文件头色系说明）。
+  */
   --ht-red-50: #fef2f2;
+  --ht-red-300: #fca5a5;
+  --ht-red-400: #f87171;
   --ht-red-600: #dc2626;
   --ht-red-700: #b91c1c;
   --ht-amber-50: #fffbeb;
+  --ht-amber-300: #fcd34d;
+  --ht-amber-400: #fbbf24;
   --ht-amber-600: #d97706;
   --ht-amber-700: #b45309;
   --ht-emerald-50: #ecfdf5;
+  --ht-emerald-300: #6ee7b7;
+  --ht-emerald-400: #34d399;
   --ht-emerald-600: #059669;
   --ht-emerald-700: #047857;
   --ht-sky-50: #f0f9ff;
+  --ht-sky-300: #7dd3fc;
+  --ht-sky-400: #38bdf8;
   --ht-sky-600: #0284c7;
   --ht-sky-700: #0369a1;
 
@@ -62,13 +96,25 @@
     算出来的：两两在正常视觉、红色盲、绿色盲三种条件下都要能分开，
     且各自与 surface 的对比度 ≥ 3:1。**改任何一个值都要重跑那个测试** ——
     它们是一组，单独调一个几乎一定会撞到另一个。
+
+    🔴 下面每一枚**亮色档旁边的那一枚是同一槽位在暗色下的取值**（R9 补的阶）：
+    那个测试亮暗两边都算，所以改这一族里任何一枚都要连暗色那一枚一起重跑。
+    槽位 1 与 3 的暗色档复用上面语义色阶的 `red-400` / `emerald-400`
+    （暗色下 danger/success 与这两个槽位**同值但不同语义**，所以各自回指原色阶、
+    不互相引用 —— 理由见暗色块与 docs/plans/r9-dark-token-semantics.md）。
   */
   --ht-red-800: #991b1b;
+  --ht-orange-400: #fb923c;
   --ht-orange-600: #ea580c;
   --ht-green-600: #16a34a;
+  --ht-teal-200: #99f6e4;
   --ht-teal-600: #0d9488;
+  --ht-cyan-400: #22d3ee;
   --ht-cyan-700: #0e7490;
+  --ht-indigo-500: #6366f1;
+  --ht-fuchsia-400: #e879f9;
   --ht-fuchsia-700: #a21caf;
+  --ht-pink-400: #f472b6;
   --ht-pink-700: #be185d;
 
   /*
@@ -693,6 +739,14 @@
    4. 暗色主题 —— 覆盖同名语义变量
    遵循规范：暗色不是亮色反相，而是降饱和 + 提亮前景。
    组件因为只消费语义变量，这里不需要任何组件改动。
+
+   🔴 这一块的**写法**必须与上面的亮色语义块同形状（R9）：每一枚要么
+   `var(--ht-<原色阶>)`，要么 `var(--ht-color-<语义>)`（仅当亮色侧两边同档），
+   唯一的字面量例外是**半透明**：`rgb(<已登记原色阶的三元组> / <alpha>)` ——
+   `var()` 表达不了不透明度，`color-mix()` 生成器与对比度解析器都还不认
+   （改造前置条件见 docs/plans/r9-dark-token-semantics.md §4）。
+   ⚠️ 这条现在**只有注释在管**：`check:design` 的扫描面不含本文件，
+   写回 hex 不会让任何一道门禁变红。窄许可的具体补丁在同文档 §6。
    ──────────────────────────────────────────────────────────── */
 [data-theme='dark'] {
   --ht-color-calendar-day-off: var(--ht-color-primary);
@@ -705,10 +759,10 @@
   --ht-color-on-primary: var(--ht-slate-950);
 
   --ht-color-background: var(--ht-slate-950);
-  --ht-color-surface: #0d1526;
-  --ht-color-surface-subtle: #101a2e;
-  --ht-color-surface-raised: #131e33;
-  --ht-color-surface-sunken: #080e1a;
+  --ht-color-surface: var(--ht-ink-900);
+  --ht-color-surface-subtle: var(--ht-ink-800);
+  --ht-color-surface-raised: var(--ht-ink-700);
+  --ht-color-surface-sunken: var(--ht-ink-950);
   --ht-color-overlay: rgb(2 6 23 / 0.7);
 
   --ht-color-foreground: var(--ht-slate-100);
@@ -719,24 +773,24 @@
   --ht-color-foreground-subtle: var(--ht-slate-400);
   --ht-color-foreground-inverse: var(--ht-slate-950);
 
-  --ht-color-border: #1e2b45;
-  --ht-color-border-strong: #2b3b5c;
-  --ht-color-border-subtle: #16203a;
+  --ht-color-border: var(--ht-ink-500);
+  --ht-color-border-strong: var(--ht-ink-400);
+  --ht-color-border-subtle: var(--ht-ink-600);
 
   --ht-color-ring: var(--ht-blue-400);
   --ht-color-hover: rgb(148 163 184 / 0.12);
   --ht-color-active: rgb(148 163 184 / 0.2);
-  --ht-color-disabled-bg: #16203a;
+  --ht-color-disabled-bg: var(--ht-ink-600);
   --ht-color-disabled-fg: var(--ht-slate-600);
 
-  --ht-color-success: #34d399;
-  --ht-color-success-strong: #6ee7b7;
+  --ht-color-success: var(--ht-emerald-400);
+  --ht-color-success-strong: var(--ht-emerald-300);
   --ht-color-success-subtle: rgb(5 150 105 / 0.16);
-  --ht-color-warning: #fbbf24;
-  --ht-color-warning-strong: #fcd34d;
+  --ht-color-warning: var(--ht-amber-400);
+  --ht-color-warning-strong: var(--ht-amber-300);
   --ht-color-warning-subtle: rgb(217 119 6 / 0.16);
-  --ht-color-danger: #f87171;
-  --ht-color-danger-strong: #fca5a5;
+  --ht-color-danger: var(--ht-red-400);
+  --ht-color-danger-strong: var(--ht-red-300);
   --ht-color-danger-subtle: rgb(220 38 38 / 0.16);
   /*
      🔴 暗色档**不能跟着亮色档写 `--ht-white`**：暗色的 danger 是 `#f87171`
@@ -746,15 +800,20 @@
      也是 `AA_PAIRS` 里那条 `on-danger on danger` 配对真正在管的两个值。
   */
   --ht-color-on-danger: var(--ht-slate-950);
-  --ht-color-info: #38bdf8;
-  --ht-color-info-strong: #7dd3fc;
+  --ht-color-info: var(--ht-sky-400);
+  --ht-color-info-strong: var(--ht-sky-300);
   --ht-color-info-subtle: rgb(2 132 199 / 0.16);
 
-  --ht-color-quadrant-1: #f87171;
+  /* Q1 与 danger、Q2 与 primary 在**亮色侧就是同一个原色阶**（red-600 / blue-600），
+     即"同一个语义答案抄了两遍"⇒ 暗色侧写成对语义层的引用，同值不再靠手抄维持。
+     ⚠️ 反过来，凡亮色侧两边**不同档**的（Q3=amber-700 vs warning=amber-600）
+     一律各回原色阶、不许互相引用 —— 那种同值是暗色下的巧合，不是契约。
+     判据与逐枚对账见 docs/plans/r9-dark-token-semantics.md。 */
+  --ht-color-quadrant-1: var(--ht-color-danger);
   --ht-color-quadrant-1-subtle: rgb(220 38 38 / 0.16);
   --ht-color-quadrant-2: var(--ht-blue-400);
   --ht-color-quadrant-2-subtle: rgb(37 99 235 / 0.16);
-  --ht-color-quadrant-3: #fbbf24;
+  --ht-color-quadrant-3: var(--ht-amber-400);
   --ht-color-quadrant-3-subtle: rgb(217 119 6 / 0.16);
   --ht-color-quadrant-4: var(--ht-slate-400);
   --ht-color-quadrant-4-subtle: rgb(148 163 184 / 0.14);
@@ -762,31 +821,45 @@
   /*
     分类色槽位（暗色）。
     🔴 **不是亮色值的"变亮"**，而是重新解了一次同一组约束：
-    每个槽位与亮色**同色系**（用户的"3 号是绿的"在两种主题下都成立），
-    但明度整体抬高，且两两可区分度由测试实算保证。
-  */
-  --ht-color-category-1: #f87171;
-  --ht-color-category-2: #fb923c;
-  --ht-color-category-3: #34d399;
-  --ht-color-category-4: #99f6e4;
-  --ht-color-category-5: #22d3ee;
-  --ht-color-category-6: #6366f1;
-  --ht-color-category-7: #e879f9;
-  --ht-color-category-8: #f472b6;
+    明度整体抬高，且两两可区分度由测试实算保证（那个测试亮暗两边都算）。
 
-  --ht-color-priority-high: #f87171;
-  --ht-color-priority-medium: #fbbf24;
-  --ht-color-priority-low: #38bdf8;
+    ⚠️ "每个槽位与亮色**同色系**"这句此前是**不成立**的，补阶后才看得清差在哪：
+    6 枚严格同族（1=red、2=orange、4=teal、5=cyan、7=fuchsia、8=pink），
+    **3 号跨到 emerald**（亮色 `green-600` → 暗色 `emerald-400`）、
+    **6 号跨到 indigo**（亮色 `blue-700` → 暗色 `indigo-500`）。
+    本轮**不改值**：改值=改像素，且这一组要重解色盲分离约束，是另一张工单的事
+    （登记在 docs/plans/r9-dark-token-semantics.md §5）。
+    名字写对不掩盖问题 —— 写 `var(--ht-emerald-400)` 之后，这两处跨族是**源文件里
+    读得出来的事实**，而不是藏在两枚 hex 后面等下一个人重新发现。
+  */
+  --ht-color-category-1: var(--ht-red-400);
+  --ht-color-category-2: var(--ht-orange-400);
+  --ht-color-category-3: var(--ht-emerald-400);
+  --ht-color-category-4: var(--ht-teal-200);
+  --ht-color-category-5: var(--ht-cyan-400);
+  --ht-color-category-6: var(--ht-indigo-500);
+  --ht-color-category-7: var(--ht-fuchsia-400);
+  --ht-color-category-8: var(--ht-pink-400);
+
+  /* 高/中与 danger、低与 info 同亮色原色阶（red-600 / sky-600）⇒ 走语义层引用；
+     中与 warning **不同档**（亮色 amber-700 vs amber-600）⇒ 只回指原色阶。 */
+  --ht-color-priority-high: var(--ht-color-danger);
+  --ht-color-priority-medium: var(--ht-amber-400);
+  --ht-color-priority-low: var(--ht-color-info);
   --ht-color-priority-none: var(--ht-slate-500);
 
-  --ht-color-heat-0: #16203a;
-  --ht-color-heat-1: #1e3a8a;
-  --ht-color-heat-2: #1d4ed8;
+  /* 热力图 0 档与 border-subtle / disabled-bg 同值**是巧合不是同一件事**：
+     一个是"没有记录"、一个是"分隔线"、一个是"禁用底"，所以三枚各自回指
+     同一个原色阶（亮色侧也是各自指 slate-100），不互相引用。 */
+  --ht-color-heat-0: var(--ht-ink-600);
+  --ht-color-heat-1: var(--ht-blue-900);
+  --ht-color-heat-2: var(--ht-blue-700);
   --ht-color-heat-3: var(--ht-blue-500);
   --ht-color-heat-4: var(--ht-blue-300);
 
   --ht-color-focus-work: var(--ht-blue-400);
-  --ht-color-focus-break: #34d399;
+  /* 与 success 同亮色原色阶（emerald-600）⇒ 走语义层引用。 */
+  --ht-color-focus-break: var(--ht-color-success);
 
   --ht-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --ht-shadow-md: 0 2px 8px rgb(0 0 0 / 0.5);
