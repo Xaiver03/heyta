@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { localDateSchema } from './local-date.js';
+
 /**
  * One narrowly-scoped cross-entity operation for completing a repeating task.
  *
@@ -15,8 +17,39 @@ const receipt = z.string().min(1).max(256);
 
 const taskPatch = z.object({
   dueDate: epoch,
+  /**
+   * 本地日期（全天）投影 —— **可选，且与 `dueDate` 必须指向同一天**。
+   *
+   * 🔴 它此前不在这里，而生产侧（`packages/app-host/src/actions.ts` 的完成发射）
+   * 在任务带 `dueDateLocal` 时会把它一起塞进 `task` 补丁里 ⇒
+   * **`.strict()` 把它当未知键拒掉 ⇒ 任何"带本地日期的重复任务"一勾完成就抛
+   * `Invalid or unsupported task repeat completion`。** 那不是防守，是功能断了。
+   *
+   * 为什么是可选而不是必填：绝大多数任务只有 `dueDate`（带时刻）。
+   * 为什么与 `dueDate` 成对出现：`dueDateLocal` 是"日期投影"，单独给它没有意义
+   * （`taskBatchItemSchema` 的 `superRefine` 是同一条不变量，两处一并遵守）。
+   */
+  dueDateLocal: localDateSchema.optional(),
   widgetCompletionReceipts: z.array(receipt).max(100).optional(),
-}).strict();
+}).strict().superRefine((patch, ctx) => {
+  if (patch.dueDateLocal === undefined) return;
+  /**
+   * 「同一天」的判据**只能宽到一天**，因为**服务端没有设备时区**：
+   * `dueDate` 是设备本地零点的毫秒，而 UTC±14 之间任意一个小时区，
+   * 其"某一天的本地零点"与"那一天的 UTC 零点"最多差 14 小时。
+   * 所以判"两者相差不超过 24 小时"，挡住的是**错配一整个周期**这一类（唯一的现实失败形态：
+   * 补丁里的 `dueDateLocal` 来自上一次计算，而 `dueDate` 已经推进了）。
+   * ⚠️ 别把它升级成"UTC 日期逐字相等" —— 那会在 UTC+14 与 UTC-12 上误杀正确数据。
+   */
+  const projectedMs = Date.parse(`${patch.dueDateLocal}T00:00:00.000Z`);
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+  if (Number.isNaN(projectedMs) || Math.abs(patch.dueDate - projectedMs) > ONE_DAY) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'dueDateLocal must fall on the same day as dueDate',
+    });
+  }
+});
 
 const reminderPatch = z.object({
   id: identity,

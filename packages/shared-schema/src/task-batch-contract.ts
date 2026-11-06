@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { localDateSchema as localDate } from './local-date.js';
+
 /** Shared scheduling bounds. Domain/UI must consume these same values. */
 export const TASK_MIN_DURATION_MINUTES = 5;
 export const TASK_MAX_DURATION_MINUTES = 480;
@@ -10,11 +12,6 @@ export const TASK_BATCH_MAX_NOTE_LENGTH = 10_000;
 const identity = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/)
   .refine((value) => value !== 'constructor' && value !== 'prototype');
 const epoch = z.number().int().min(-8_640_000_000_000_000).max(8_640_000_000_000_000);
-const localDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
-  const [year, month, day] = value.split('-').map(Number);
-  const parsed = new Date(Date.UTC(year!, month! - 1, day!));
-  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() + 1 === month && parsed.getUTCDate() === day;
-});
 const revision = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 
 export const taskAutomationSourceSchema = z.object({
