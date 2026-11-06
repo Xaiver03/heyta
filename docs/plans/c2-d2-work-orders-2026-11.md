@@ -123,7 +123,14 @@ D-② 另加 `check:tokens` / `check:theme` / `check:text-color` / `check:design
 ## 5. 之后还剩什么（写给下一个人）
 
 1. **`pnpm reinstall:all` 四端重装** —— 这一轮动了 desktop 主进程、tokens、domain 写路径，不重装等于没交付；
-2. **A 包的移动端设备腿**（`verify:mobile-ios-account-erasure`，要真模拟器 + 真服务端，需一台安静的机器）；
+2. **A 包的移动端设备腿**（`pnpm verify:mobile-ios-account-erasure`）。2026-11-06 核出的**前置条件**（省下一次摸索）：
+   - 🔴 **模拟器名不是默认值**：脚本默认 `IOS_DEVICE_NAME="iPhone 17 Pro"`，而这台机器上 heyta 那台叫
+     **`iPhone Duo heyta`**（iOS 27.1）⇒ 必须显式传：`IOS_DEVICE_NAME="iPhone Duo heyta"`；
+   - **产物新鲜度是硬闸门**（`exit 3`）：设备上的 bundle 比源码旧就直接拒跑。所以要先
+     `IOS_DEVICE_NAME="iPhone Duo heyta" bash scripts/reinstall-all.sh --only ios`；
+   - **真服务端**：脚本会探 `$HOST_SERVER/health`（或 `/api/health`），没有可达服务端就不判；
+   - **一台安静的机器**：这不是洁癖 —— 本仓陷阱 #634 实测过，这机器负载高时 `apps/web` 的 5s 用例会**批量假红**，
+     而设备腿跑起来正是重负载。别在别的包跑测试时开它。
 3. **`rejected` 行的永不清除**（"待上传"单调不减）—— 需要"丢弃被拒 op / 按服务端状态重建"的语义，本轮只计数不解；
 4. R5「≤3 层」的现量读数（证据补齐分包在做；口径用取证那份的 J1–J6，别自己发明）；
 5. 🔴 **看板重建在 `TaskRow` 上（B 落地之后的第一单，不是 D-② 的活，也别现在插）** ——
