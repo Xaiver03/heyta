@@ -332,6 +332,7 @@ export function createWorkerOpLogSession<TOperation extends Operation<string> = 
     findPendingUpload: () =>
       call('findPendingUpload', []) as ReturnType<OpLogStore<TOperation>['findPendingUpload']>,
     countPendingUpload: () => call('countPendingUpload', []) as Promise<number>,
+    countRejectedUpload: () => call('countRejectedUpload', []) as Promise<number>,
     markUploaded: (serverSeqsByOpId) =>
       call('markUploaded', [serverSeqsByOpId]) as Promise<number>,
     discardPendingUpload: (opIds) => call('discardPendingUpload', [opIds]) as Promise<number>,

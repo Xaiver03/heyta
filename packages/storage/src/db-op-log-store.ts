@@ -457,6 +457,24 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
   }
 
   /**
+   * 「服务端永久拒绝」的条数 —— 与 {@link countPendingUpload} 同一个索引的另一档。
+   *
+   * 🔴 为什么必须有它，而不是让界面拿 `countPendingUpload()` 当"没上传"：
+   * `markRejected` 会把 op **移出** pending 队列（改成 `'rejected'`），所以只看
+   * pending 时，一次永久拒绝会让那个读数**下降** —— 界面上是「3 项没上传」
+   * 变成「2 项没上传」，而实际上一分数据都没多上去。
+   * 没上传 = `pending + rejected`，两个数必须都读得到。
+   *
+   * ⚠️ 与上面那条注释的偏差（刻意写清楚，不改别人的话）：`countFromIndex` 在
+   * SQLite 后端是**先取整行再数长度**（`sqlite/sqlite-adapter.ts` 的
+   * `countFromIndex = fetchIndexRecords(...).length`），所以这里省掉的是全表扫描、
+   * 不是整行物化。
+   */
+  async countRejectedUpload(): Promise<number> {
+    return this.db.countFromIndex(STORES.OPS, OP_INDEXES.PENDING_UPLOAD, 'rejected');
+  }
+
+  /**
    * 标记 op 已上传，并记录服务端分配的 seq。
    *
    * ⚠️ 必须同时把 `op.seq` 写成服务端序号：下次上传时

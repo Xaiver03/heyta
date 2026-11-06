@@ -20,6 +20,7 @@ import {
   applyRemoteOps,
   currentState,
   hasEngine,
+  onEngineChange,
   requireEngine,
   requireStore,
 } from '../../lib/oplog.js';
@@ -104,8 +105,26 @@ interface SyncStoreState {
    * 还没上传的改动条数（R7）。三态：`undefined` = 还没读到，`0` = 全都上去了。
    * 🔴 与移动端同一套语义（`resolvePendingUploadPresentation`），别压成布尔：
    * "还没读"和"没有待上传"是两句不同的话。
+   *
+   * 🔴 **它数的是"没到服务端"，不是"还在队列里"** ——
+   * `pending`（下次还会重传）**加上** `rejected`（服务端永久拒绝，已移出队列）。
+   * 只数 pending 的话，一次永久拒绝会让这个读数**下降**：界面从「3 项没上传」
+   * 变成「2 项没上传」，而实际上一分数据都没多上去。这就是 A 包验收记录
+   * §三 第 4 条登记的那个缺口（`rejected` 没有计数）。
+   *
+   * 所以：`refreshPendingUpload()` 取两数之和写进这里；`rejectedUpload` 单独留一份
+   * 备查（`markRejected` 之后 pending 会减、rejected 会涨，和是守恒的）。
    */
   pendingUpload?: number;
+  /**
+   * 上面那个和里，有多少是**服务端永久拒绝**的（`uploadStatus === 'rejected'`）。
+   *
+   * 单独留一份的理由：它们对用户的含义与 `pending` 不同 ——
+   * pending 是"等网络"，rejected 是"等也没用"。当前界面按产品口径只显示那个和
+   * （"N 项还没上传"），不另造一句"其中 M 项被拒"；这份读数留着给那句话用，
+   * 也留给判据对账（和 = pending + rejected）。
+   */
+  rejectedUpload?: number;
   /**
    * 冲突对话框是否打开。
    *
@@ -829,7 +848,22 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   refreshPendingUpload: async () => {
     if (!hasEngine()) return;
     try {
-      set({ pendingUpload: await requireEngine().countPendingUpload() });
+      /*
+        🔴 **"没到服务端" = `pending + rejected`，不是一个 `pending`。**
+        `markRejected` 把服务端永久拒绝的 op **移出** pending 队列，所以只数
+        pending 时那个读数会在"一次上传被永久拒绝"之后**下降** ——
+        界面从「3 项没上传」变成「2 项没上传」，而一分数据都没多上去。
+        两个数分开读（`@heyta/storage` 的 `countPendingUpload` /
+        `countRejectedUpload` 走同一个 `by_uploadStatus` 索引的两档），
+        和才是用户要的那个数。
+        判据：`e2e/tests/sync-pending-rejected.spec.ts`（真浏览器 + 真拒绝路径）。
+      */
+      const store = requireStore();
+      const [pending, rejected] = await Promise.all([
+        store.countPendingUpload(),
+        store.countRejectedUpload(),
+      ]);
+      set({ pendingUpload: pending + rejected, rejectedUpload: rejected });
     } catch {
       // 计数读失败不改变任何数据；保留上一次的值，不谎报 0。
     }
@@ -970,6 +1004,28 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     retry?.stop();
   },
 }));
+
+/**
+ * 「还有几条没上传」必须在**本地写入之后**立刻变，而不是等到下一次同步或刷新。
+ *
+ * 计划 §4.2 的原话是"挂 `onEngineChange`"；在此之前只有两处刷新点：启动
+ * （`main.tsx`）与同步结束（上面 `syncNow` 的尾巴）。于是"刚写完 3 条、还没同步"
+ * 这一态在界面上**根本看不到** —— rail 那句「N 项还没上传」要等一次同步才出现，
+ * 而那次同步如果成功，N 就已经归零了。**唯一能被看见的时刻永远不会到来。**
+ *
+ * 🔴 **一次微任务合并，不是每条都读**：`notify()` 在一次同步里会连着触发很多次
+ * （每条远端 op 应用后都发一次），而每次刷新是两条索引计数查询。
+ * 合并只决定"这一拍要不要再读"，不影响读到的值 —— 读到的永远是当下最新的库。
+ */
+let pendingRefreshQueued = false;
+onEngineChange(() => {
+  if (pendingRefreshQueued) return;
+  pendingRefreshQueued = true;
+  queueMicrotask(() => {
+    pendingRefreshQueued = false;
+    void useSyncStore.getState().refreshPendingUpload();
+  });
+});
 
 /**
  * ⚠️ 「状态 → 语义色」的映射**已经不在这里**。

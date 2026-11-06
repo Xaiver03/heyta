@@ -54,6 +54,59 @@ export function makeOp(over: Partial<Operation<string>> = {}): Operation<string>
 const ids = (rows: StoredOperation<Operation<string>>[]): string[] =>
   rows.map((r) => r.op[OP_FIELDS.OP_ID] as unknown as string);
 
+/**
+ * 把探针**下沉到 driver**：数"有多少行离开了存储层"（P1-10b 用）。
+ *
+ * 🔴 为什么必须下沉：`DbAdapter` 上那两个物化方法（`getAll` / `getAllFromIndex`）不是
+ * 行离开存储层的**唯一**出口 —— SQLite 的 `countFromIndex` 走
+ * `fetchIndexRecords` → `driver.all`，全程绕开它们。钉在适配器层的探针
+ * 看不见这条路，于是"计数不读回行"会在最该红的地方恒绿。
+ *
+ * ⚠️ `db` 上没有 driver（适配器在 Worker / 宿主另一侧，例如 Worker 桥接那一支）
+ * 时返回 `undefined` —— 调用方必须**跳过并打印**，不能把它读成"通过"。
+ * 这里刻意从 `db` 上取，而不是给 `DbAdapter` 加一个"只给测试用的钩子"：
+ * 那会让判据变成实现的一部分（同一个理由：别给 `countFromIndex` 加 `{countOnly:true}`）。
+ */
+function driverRowProbe(
+  db: DbAdapter,
+): { rows: () => number; reset: () => void; restore: () => void } | undefined {
+  // 运行时形状：SqliteAdapter 持有 `private driver`（TS 的 private 只是编译期约定）。
+  const holder = db as unknown as { driver?: Record<string, unknown> };
+  const driver = holder.driver;
+  if (driver === undefined || typeof driver['all'] !== 'function') return undefined;
+
+  let rows = 0;
+  const restores: (() => void)[] = [];
+
+  for (const key of ['all', 'get'] as const) {
+    const original = driver[key];
+    if (typeof original !== 'function') continue;
+    const hadOwn = Object.prototype.hasOwnProperty.call(driver, key);
+    const originalFn = original as (...args: unknown[]) => unknown;
+    driver[key] = function patched(this: unknown, ...args: unknown[]): unknown {
+      const value = originalFn.apply(this, args);
+      if (Array.isArray(value)) rows += value.length;
+      else if (value !== undefined && value !== null) rows += 1;
+      return value;
+    };
+    restores.push(() => {
+      // 原型方法就删掉自有的那份（回落原型），自有属性就放回去。
+      if (hadOwn) driver[key] = original;
+      else delete driver[key];
+    });
+  }
+
+  return {
+    rows: () => rows,
+    reset: () => {
+      rows = 0;
+    },
+    restore: () => {
+      for (const restore of restores) restore();
+    },
+  };
+}
+
 export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreContractOptions): void {
   describe(`OpLogStore 契约 —— ${name}`, () => {
     const withStore = async (
@@ -480,6 +533,61 @@ export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreCont
       });
     });
 
+    /**
+     * 🔴 A 包验收记录 §三 第 4 条那个缺口的存储层判据：
+     * **"没上传" = `pending + rejected`，而两个数必须都读得到。**
+     *
+     * 为什么这条必须存在（而不是"界面自己减一下"）：`markRejected` 把 op 移出
+     * pending 队列，所以只看 `countPendingUpload()` 时，一次永久拒绝会让读数
+     * **下降** —— 界面上「3 项没上传」变成「2 项没上传」，而一分数据都没多上去。
+     *
+     * 能红的注入（本轮实测过）：把 `countRejectedUpload()` 实现里的 `'rejected'`
+     * 改回 `'pending'` ⇒ 下面第一条断言读到 3 而不是 0、第二条读到 0 而不是 1。
+     * ⚠️ 换成"恒返回 0"也会红在同一条上 —— 但**只有**在真有 rejected 行时才红，
+     * 所以下面刻意先断言空库为 0、再造一条，两个方向都量。
+     */
+    it('🔴 countRejectedUpload 数的是 rejected 那一档，且与原队列此消彼长', async () => {
+      await withStore(async (store) => {
+        // ① 空库：0（"没有"与"数不出来"在这一格上同形，所以必须接着往下量）
+        expect(await store.countRejectedUpload()).toBe(0);
+
+        const ops = [makeOp(), makeOp(), makeOp()];
+        await store.appendLocal(ops);
+        expect(await store.countPendingUpload()).toBe(3);
+        expect(await store.countRejectedUpload()).toBe(0);
+
+        // ② 永久拒绝一条 ⇒ 从 pending 那一档**搬到** rejected 那一档
+        expect(await store.markRejected([ops[1]!.id])).toBe(1);
+        expect(await store.countPendingUpload()).toBe(2);
+        expect(
+          await store.countRejectedUpload(),
+          'markRejected 之后 rejected 数没涨 ⇒ 界面上"没上传"会凭空少一条',
+        ).toBe(1);
+        // ③ 两个数之和 == 真正"没到服务端"的条数（界面那句 N 的口径）。
+        // 🔴 这里刻意写 **3** 而不是 2：本机产生 3 条、服务端一条都没接受过，
+        // 所以"没上传"必须是 3。而 `countPendingUpload()` 此刻只会说 **2** ——
+        // 那个差额就是这条方法存在的全部理由。
+        expect(
+          (await store.countPendingUpload()) + (await store.countRejectedUpload()),
+          '没上传 = pending + rejected，这个和必须等于本机产生、服务端没接受的全部 op',
+        ).toBe(3);
+        expect(
+          await store.countPendingUpload(),
+          'pending 单项在这一格会**少报一条** —— 这正是 A 包验收记录 §三 第 4 条那个缺口',
+        ).toBe(2);
+
+        // ④ 拒绝 ≠ 上传：标成 rejected 的行**不会**让"已上传"看起来多一条
+        const all = await store.getAllOps();
+        expect(all.filter((o) => o.uploadStatus === 'uploaded')).toHaveLength(0);
+
+        // ⑤ 再拒绝一条：单调累加（本轮**不**解"rejected 永久堆积"那个问题，
+        //    但那个事实必须在这里可见 —— 见计划 §6 的残余登记）
+        expect(await store.markRejected([ops[2]!.id])).toBe(1);
+        expect(await store.countRejectedUpload()).toBe(2);
+        expect(await store.countPendingUpload()).toBe(1);
+      });
+    });
+
     // ── 归档 ───────────────────────────────────────────────
 
     it('archiveUpTo 把老 op 移入归档，但日志仍可读', async () => {
@@ -700,6 +808,87 @@ export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreCont
           `归档了 ${String(archived)} 条却数不出差额 ⇒ 总数没算 ARCHIVE`,
         ).toBeLessThan(counted);
         expect(counted - hotOnly).toBe(archived);
+      });
+    });
+
+    /**
+     * 🔴 P1-10b：上面那条判据的探针**钉错了层**，这一条把它下沉到 driver。
+     *
+     * ## 洞在哪（实测，不是推测）
+     *
+     * P1-10 那条 spy 的是 `db.getAll` / `db.getAllFromIndex` —— 两个**物化**方法。
+     * 而计数走的是**第三个**接口方法 `db.countFromIndex`；SQLite 那边它是
+     * `fetchIndexRecords(...).length`，而 `fetchIndexRecords` 执行的是
+     * `SELECT * FROM "ops" WHERE "ix1_0" = ?` 再由 `driver.all` 把**每一行**取回来映射。
+     * ⇒ 真正的物化发生在 `countFromIndex` **内部**、经由 **driver**，
+     * **全程不经过那两个 spy**。于是"计数期间 materializedRows === 0"在 SQLite 后端上
+     * 照样成立，而 SQLite 现在正是"取回命中行再数长度"的实现。
+     *
+     * 一句话：**探针只能看见它自己钉住的那一个方法**。判据绿着，
+     * 于是"这条代价已经修好了"这个误会没人会怀疑 —— 这与 #667（注释里的断言没人核）
+     * 是同一族的下一代：**断言钉在接口层，而病灶在接口下面那一层**。
+     *
+     * ## 这条判据量什么（形状，不是"有没有调用某个方法"）
+     *
+     * 包住 driver 的 `all` / `get`，数**离开存储层的行数**：按索引键的一次查询
+     * 至多带回**命中**的那些行；而全表扫描（或"先 SELECT * 再 filter"）会把
+     * 整张表带回来。夹具刻意让两者**量级可分**：3 条 pending + 20 条已上传。
+     *
+     * ⚠️ 这条判据**不要求 SQLite 现在就做到 0 行**（那是审计文档 P1-11 的债：
+     * `countFromIndex` 取整行而不是 `SELECT COUNT(*)`）。它要求的是
+     * **行数被索引键界住**，所以它今天绿、而实现一旦退回全表扫描就红。
+     * 能红的注入（本轮实测）：把 SQLite 的 `countFromIndex` 改成
+     * `fetchRecords(driver, plan, undefined)` 再按索引列过滤 ⇒ 下面第一条当场红。
+     *
+     * ⚠️ Worker 桥接那一支的适配器在 Worker 里，`db` 上拿不到 driver
+     * ⇒ 这一腿**跳过并打印**（跳过是打印出来的，不是安静地过）。
+     */
+    it('🔴 计数由索引键界住，不是回表扫描（P1-10b，driver 层现量）', async () => {
+      await withStore(async (store, db) => {
+        // 夹具：3 条待上传 + 20 条"已上传"（导入的行一律 uploaded）。
+        // 全表 23 行，命中 3 行 —— 两个量级在这里分开。
+        await store.appendLocal([makeOp(), makeOp(), makeOp()]);
+        await store.appendImported(Array.from({ length: 20 }, () => makeOp()));
+        expect(await store.countAllOps()).toBe(23);
+        expect(await store.countPendingUpload()).toBe(3);
+
+        const probe = driverRowProbe(db);
+        if (probe === undefined) {
+          console.info(
+            '[P1-10b] 这一支在 `db` 上拿不到 driver（适配器在 Worker/宿主另一侧）'
+            + ' ⇒ driver 层这一腿**跳过**，读数不可用（登记，不静默通过）',
+          );
+          return;
+        }
+
+        let rowsForPending: number;
+        let rowsForRejected: number;
+        try {
+          probe.reset();
+          expect(await store.countPendingUpload()).toBe(3);
+          rowsForPending = probe.rows();
+
+          probe.reset();
+          expect(await store.countRejectedUpload()).toBe(0);
+          rowsForRejected = probe.rows();
+        } finally {
+          probe.restore();
+        }
+
+        console.info(
+          `[P1-10b] ${name}：全表 23 行 / 命中 3 行 ⇒ `
+          + `countPendingUpload 取回 ${String(rowsForPending)} 行，`
+          + `countRejectedUpload（命中 0）取回 ${String(rowsForRejected)} 行`,
+        );
+
+        expect(
+          rowsForPending,
+          '计数把整张表都取回来了 ⇒ 那是全表扫描，不是按索引键取命中行（P1-10 的病灶换了一层又回来了）',
+        ).toBeLessThanOrEqual(3);
+        expect(
+          rowsForRejected,
+          '命中 0 条却取回了行 ⇒ 这一路没走索引键，量到的不是"命中的那些行"',
+        ).toBe(0);
       });
     });
   });

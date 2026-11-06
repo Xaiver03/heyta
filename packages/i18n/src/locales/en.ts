@@ -684,7 +684,7 @@ export const en = {
   'common.libraryOwner.conflictBody': 'This device stores data for {accountId}. Clear it before signing in with another account.',
   'common.libraryOwner.clear': 'Clear this device',
   'common.libraryOwner.clearing': 'Clearing…',
-  'common.signOut.eraseFailed': 'This device is signed out, but task data on it could not be cleared. Sign out again, or clear the browsing data for this site.',
+  'common.signOut.eraseFailed': 'You\'re signed out, but this device\'s task data was not fully erased. Try “Clear this device” below again; if that still fails, clear this site\'s browsing data.',
   'common.signOut.retry': 'Try revoking it again',
 
   'web.settings.display.title': 'Display',

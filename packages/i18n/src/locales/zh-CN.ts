@@ -784,7 +784,7 @@ export const zhCN = {
   'common.libraryOwner.conflictBody': '本机保存的是 {accountId} 的数据，不能直接登录新账号。清除本机数据之后才能继续。',
   'common.libraryOwner.clear': '清除本机数据',
   'common.libraryOwner.clearing': '正在清除…',
-  'common.signOut.eraseFailed': '这台设备已退出，但本机的任务数据没有清除干净。请重新退出一次，或清除本站的浏览数据。',
+  'common.signOut.eraseFailed': '这台设备已退出，但本机的任务数据没有清除干净。点下面的「清除本机数据」再试一次；若仍不行，再清除本站的浏览数据。',
   'common.signOut.retry': '重新尝试撤销',
 
   'web.settings.display.title': '显示',

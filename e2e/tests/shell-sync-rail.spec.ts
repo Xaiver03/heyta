@@ -31,11 +31,14 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  addTask,
   closeSettingsSheet,
   openApp,
   openSettingsView,
   parkCursor,
   selectSettingsSection,
+  stubLegalRecheck,
+  stubPublicFacts,
 } from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
@@ -51,6 +54,49 @@ async function boxOf(page: Page, locator: ReturnType<Page['locator']>, what: str
 }
 
 /**
+ * 拍「rail 那一枚 hover 出来的那句话」。
+ *
+ * 🔴 **为什么不能直接拍 rail 的静止态**（2026-11 实测，总包看图抓出来的）：
+ * 48px 的 rail 在静止态**只画图标**，那句「· N 项还没上传」进的是
+ * `aria-label` + `role="status"` live region + **hover 才 opacity:1 的 `.ht-rail__label`**
+ * （`SyncBar.tsx:118-124` + `inbox.css` 的 `.ht-rail__label`）。
+ * 而**截图拍不到 `aria-label`** ⇒ 一张静止态的 rail 图只证明"它看起来和以前一样"，
+ * 而不是"它说得出 N 项没上传"。那种图比没有图更糟：下一个人会以为这件事被验过了。
+ *
+ * 所以这里做三件事，缺一不可：
+ *   1. `hover()` 让标签真的画出来；
+ *   2. 断言那句文字**在标签里**，且标签的**计算 opacity 真的到了 1**（不是"在 DOM 里"——
+ *      opacity:0 在 Playwright 眼里也算 visible，只看 `toBeVisible()` 会被骗）；
+ *   3. `clip` 按**标签自己的盒子**算，保证那句话在成图里，而不是被裁在框外。
+ *
+ * ⚠️ 由此也记一笔既成事实：**这枚按钮在静止态看不见字，不是缺陷**（48px 放不下第二行文字）。
+ * 别把这张图读成"静止态也看得见"。
+ */
+async function shootRailTooltip(page: Page, name: string, mustContain: RegExp): Promise<void> {
+  const action = page.getByTestId('sync-rail-action');
+  const label = page.locator('.ht-rail__sync .ht-rail__label');
+  await action.hover();
+  await expect(label, 'hover 之后 rail 那句标签的文字不对').toHaveText(mustContain);
+  await expect
+    .poll(
+      async () => label.evaluate((el) => getComputedStyle(el).opacity),
+      { message: 'hover 之后标签的 opacity 没到 1 ⇒ 图里那句话其实没画出来' },
+    )
+    .toBe('1');
+  const box = await boxOf(page, label, 'rail 那句 hover 标签');
+  const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
+  const left = 0;
+  const top = Math.max(0, Math.floor(box.y) - 16);
+  const width = Math.min(viewport.width - left, Math.ceil(box.x + box.width) + 16);
+  const height = Math.min(viewport.height - top, Math.ceil(box.height) + 32);
+  await page.screenshot({
+    path: SHOT(name),
+    clip: { x: left, y: top, width, height },
+    scale: 'device',
+  });
+}
+
+/**
  * 给这一页塞一份**已登录**的同步凭据。
  *
  * 🔴 2026-10-25：`SyncSettingsPanel` 里那枚共享状态条是 `signedIn ? … : "登录后…"` 的
@@ -60,13 +106,13 @@ async function boxOf(page: Page, locator: ReturnType<Page['locator']>, what: str
  * ⚠️ 这不是"为了让判据变绿造环境"：未登录那一支的文案另有判据（S1/S2 与设置里的入口），
  * 这里要的是"登录之后状态条在不在那一节里"。
  */
-async function seedSignedIn(page: Page): Promise<void> {
-  await page.addInitScript((server: string) => {
+async function seedSignedIn(page: Page, server = 'http://sync.rail.e2e.test'): Promise<void> {
+  await page.addInitScript((origin: string) => {
     localStorage.setItem(
       'heyta.sync.credentials',
-      JSON.stringify({ baseUrl: server, token: 'e2e-shell-sync-token', email: 'sync-rail@example.test' }),
+      JSON.stringify({ baseUrl: origin, token: 'e2e-shell-sync-token', email: 'sync-rail@example.test' }),
     );
-  }, 'http://sync.rail.e2e.test');
+  }, server);
 }
 
 test.describe('同步入口在 rail 底部（H9，web 端）', () => {
@@ -323,5 +369,251 @@ test.describe('同步入口在 rail 底部（H9，web 端）', () => {
       page.getByTestId('sync-settings-panel'),
       '关掉设置之后那一节还在 DOM 里 ⇒ 它其实不是设置的一部分',
     ).toHaveCount(0);
+  });
+
+  /**
+   * ── S6：**待上传 > 0** 那一态（A 包验收记录 §三 第 1 条的缺口①）──────────────
+   *
+   * A 包当时只有 jsdom；这一条把它搬到真浏览器上，并且**真造出 3 条未上传改动**
+   * （不是往 store 里塞一个数字 —— 那只能证明渲染分支，证明不了计数真的来自库）。
+   *
+   * 为什么它以前"看不见"：`refreshPendingUpload()` 只挂在启动与同步结束两处，
+   * 于是"刚写完 3 条、还没同步"这一态在界面上根本没有刷新点。
+   * 补的那一刀在 `features/sync/store.ts` 末尾（`onEngineChange` + 一次微任务合并）。
+   *
+   * 🔴 判据怎么才会红（本轮实测）：把 `refreshPendingUpload` 里的和换回常量 0
+   * （或只数 pending ⇒ 这一态仍是 3，所以那一刀要配 S7 才红；S6 单独红要靠把
+   * `onEngineChange` 那一段注掉 ⇒ rail 与设置两处都退回"都已经上传"）。
+   */
+  test('S6 🔴 待上传 > 0：rail 与 设置→同步 两处都说得出「3 项还没上传」', async ({ page }) => {
+    await seedSignedIn(page);
+    // `local-only` 就够：这一态的全部读数都是**本地**的（不联网也必须有）。
+    await openApp(page, APP_ZH);
+
+    // 真造 3 条未上传改动：每条 `addTask` = 一次本地写入 = 一条 `pending` op。
+    for (const title of ['待上传证据甲', '待上传证据乙', '待上传证据丙']) {
+      await addTask(page, title);
+    }
+
+    const action = page.getByTestId('sync-rail-action');
+    // 整句状态后面挂「· 3 项还没上传」——读屏与 hover 是同一句。
+    await expect(action, 'rail 那一枚没说出现在有 3 条改动没上传').toHaveAttribute(
+      'aria-label',
+      /· 3 项还没上传/,
+    );
+    await expect(
+      page.getByTestId('sync-rail').locator('[role="status"]'),
+      'live region 与 aria-label 是两件事，这句也得在',
+    ).toHaveText(/3 项还没上传/);
+
+    /*
+      🔴 rail 的证据**必须是 hover 态**（见 `shootRailTooltip` 那段说明）：
+      静止态那枚只画图标，图里读不到「3 项还没上传」。
+    */
+    const viewport = page.viewportSize();
+    const vh = viewport?.height ?? 720;
+    await shootRailTooltip(page, 'rail-pending-3-hover', /3 项还没上传/);
+    await parkCursor(page);
+
+    // 第二处读数：设置 → 同步 那一行。
+    await openSettingsView(page);
+    await selectSettingsSection(page, 'sync');
+    const panel = page.getByTestId('sync-settings-panel');
+    await expect(panel).toBeVisible();
+    await panel.scrollIntoViewIfNeeded();
+    await expect(
+      page.getByTestId('sync-pending-count'),
+      '设置里那一行没说"还有 3 项改动没上传" ⇒ 与 rail 的读数分了家',
+    ).toHaveText(/还有 3 项改动没上传/);
+    await expect(page.getByTestId('sync-pending-count')).toHaveText(/3/);
+    // 反向：这一刻它**不许**说"都已经上传"。
+    await expect(page.getByTestId('sync-pending-count')).not.toHaveText(/都已经上传/);
+
+    const panelBox = await panel.boundingBox();
+    expect(panelBox, '量不到「同步」那一节的盒子').not.toBeNull();
+    expect(
+      panelBox!.y >= 0 && panelBox!.y < vh,
+      `截图时那一节的顶边在 y=${String(Math.round(panelBox!.y))}，不在视口里 ⇒ 那张图拍的不是它`,
+    ).toBe(true);
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('settings-pending-3') });
+  });
+
+  /**
+   * ⚠️ S7 **从上面那个 describe 里拆出来**，因为它是本文件里唯一一条
+   * "要让请求真的打到假服务端上"的用例，而它需要一个额外的上下文选项。
+   * 拆出来之后 S1–S6 的运行环境**一个字都没变**。
+   */
+});
+
+test.describe('S7 · 服务端永久拒绝（需要接管全部出站请求）', () => {
+  /**
+   * 🔴 **必须关掉 Service Worker。**
+   *
+   * 第一趟实测（2026-11-07）：`page.route` 注册得好好的，而同步却读到
+   * `HTTP 503` —— 因为生产构建里注册了 PWA 的 Service Worker，
+   * 而 **SW 的请求不经过 `page.route`**：它自己 `fetch` 出去、自己决定回什么。
+   * 也就是说"注入的成功/失败"根本没落到被测的那条路径上，
+   * 红的原因和被测的东西无关（这是环境陷阱 #191 那一族：
+   * **注入必须先证明目标请求真的命中了屏障**）。
+   *
+   * 关掉 SW 之后请求才真正走 `page.route`；而"请求到了假服务端"这件事
+   * 由用例里的 `posted` 数组**数出来**（`posted.length >= 3`），
+   * 不是靠"我注册了 handler"这句自述。
+   */
+  test.use({ serviceWorkers: 'block' });
+
+  /**
+   * ── S7：**服务端永久拒绝**的改动仍然算「没到服务端」（A 包 §三 第 4 条的缺口）──
+   *
+   * ## "假"的只有服务端的响应体，不是产品行为
+   *
+   * 与 `inbox.spec.ts` / `account-email-change-and-sessions.spec.ts` 同一条纪律：
+   * 真 DOM、真 op-log（这里是真 SQLite + Worker 桥）、真 `fetch`、真 store。
+   * 唯一造出来的是「服务端对每条 op 回 `accepted:false` + `INVALID_CLIENT_ID`」。
+   *
+   * ⇒ `markRejected` 走的是**真路径**（`client.ts` 的硬拒绝分支 → `engine.markRejected`
+   * → 存储层把 `uploadStatus` 写成 `'rejected'`），不是往库里塞一个假状态。
+   *
+   * ## 这条判据在量什么
+   *
+   * 3 条改动被**永久拒绝**之后：
+   *   · `pending` 变 0（它们被移出队列，否则每次同步都会重传再被拒）；
+   *   · `rejected` 变 3（数据没上云，也不会自动补传）；
+   *   · 界面那句「N 项还没上传」必须是 **3**，不是 0。
+   *
+   * 🔴 判据怎么才会红（本轮实测）：把 `refreshPendingUpload` 里的
+   * `pending + rejected` 换回只数 `pending` ⇒ 这一条当场红在
+   * 「本机的改动都已经上传。」上 —— 而那一刻**一分数据都没上去**。
+   * 阳性对照（证明拒绝真的发生了，而不是"3 条还在队列里所以也是 3"）：
+   * 同一屏的状态条必须说出「被服务端拒绝」那句。
+   */
+  test('S7 🔴 被服务端永久拒绝的改动，仍然计进「N 项还没上传」', async ({ page }) => {
+    const SERVER = 'http://sync.reject.e2e.test';
+    const posted: string[] = [];
+
+    await seedSignedIn(page, SERVER);
+    // 补签 / 公共事实 / 权益探测 / 载荷模式：**开机就会打**的四条，与本主题无关，
+    // 但不登记它们会在这里失败（而失败看着像"同步坏了"）。
+    await stubLegalRecheck(page, SERVER);
+    await stubPublicFacts(page, SERVER);
+    await page.route(`${SERVER}/api/sync/status**`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ latestSeq: 0 }),
+      });
+    });
+    await page.route(`${SERVER}/api/sync/payload-mode**`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ mode: 'e2ee' }),
+      });
+    });
+
+    /*
+      🔴 上传端点：**逐条拒绝**，而整体仍回 200。
+      这正是服务端的真实形状（`client.ts` 的注释：「HTTP 200 **不代表** op 被接受」），
+      也是"只看 res.ok 就会报已同步而数据一条没上云"那个缺陷的载体。
+      `INVALID_CLIENT_ID` 在 `PERMANENT_REJECTION_CODES` 里 ⇒ 走 `markRejected`。
+    */
+    await page.route(`${SERVER}/api/sync/ops**`, async (route) => {
+      const req = route.request();
+      if (req.method() === 'GET') {
+        // 下载段：一页空的、没有更多。
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ops: [], hasMore: false, latestSeq: 0 }),
+        });
+        return;
+      }
+      const body = JSON.parse(req.postData() ?? '{}') as { ops?: { id: string }[] };
+      const ops = body.ops ?? [];
+      posted.push(...ops.map((op) => op.id));
+      /*
+        🔴 **只拒前两条，最后一条不出现在 `results` 里**（⇒ 它留在待上传队列）。
+        这样界面上那个 3 才是 **1 条 pending + 2 条 rejected** ——
+        一个"只数 pending"的实现会读到 **1**（而不是 3），
+        一个"只数 rejected"的实现会读到 2。两个错法都在这条判据的射程里。
+        ⚠️ 全拒（第一版就是这么写的，0 + 3）只能证明"rejected 被算进来了"，
+        不能证明"它和 pending 相加" —— 这才是总包点名要的那一格。
+      */
+      const keepsPending = ops.length > 0 ? ops[ops.length - 1]!.id : undefined;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          latestSeq: 0,
+          newOps: [],
+          hasMorePiggyback: false,
+          results: ops
+            .filter((op) => op.id !== keepsPending)
+            .map((op) => ({
+              opId: op.id,
+              accepted: false,
+              errorCode: 'INVALID_CLIENT_ID',
+              error: 'e2e：这条 op 不属于本机（判据要的是"永久拒绝"这一分支）',
+            })),
+        }),
+      });
+    });
+    // 实时通道：塞了凭据后应用会去连，接管掉即可（本用例不验实时同步）。
+    await page.routeWebSocket(`ws://sync.reject.e2e.test/api/sync/ws*`, () => {
+      /* 保持连接打开即可 */
+    });
+
+    // `accepted`：同步要真的出门（`local-only` 下一个字节都不发，闸门根本不放行）。
+    await openApp(page, APP_ZH, 'accepted');
+
+    for (const title of ['被拒证据甲', '被拒证据乙', '被拒证据丙']) {
+      await addTask(page, title);
+    }
+    await expect(
+      page.getByTestId('sync-rail-action'),
+      '同步之前就该看到 3 项（这一半是 S6 的读数，这里当前置）',
+    ).toHaveAttribute('aria-label', /· 3 项还没上传/);
+
+    // 真同步一次：设置 → 同步 → 填 E2EE 口令 → 保存并同步。
+    await openSettingsView(page);
+    await selectSettingsSection(page, 'sync');
+    await page.locator('#sync-password').fill('e2e-reject-passphrase');
+    await page.getByTestId('sync-unlock-and-sync').click();
+
+    // ① 阳性对照：拒绝**真的**发生了（否则下面那个 3 可能只是"还在队列里"）。
+    const error = page.getByTestId('sync-status-error');
+    await expect(error, '没出现"被服务端拒绝"那条 ⇒ 这一条没有量到拒绝分支').toBeVisible();
+    await expect(error).toHaveText(/被服务端拒绝/);
+    expect(posted.length, '上传请求里一条 op 都没有 ⇒ 同步根本没走到上传段').toBeGreaterThanOrEqual(3);
+
+    // ② 判据本体：**1 条还在队列 + 2 条被永久拒绝 = 3**，那句 N 必须还是 3。
+    //    ⚠️ 读数带上口径：`N = pending + rejected`。只数 pending 会说 1，只数 rejected 会说 2
+    //    —— 两个错法都被这一条挡着（夹具的构造见上面 `keepsPending`）。
+    const pendingLine = page.getByTestId('sync-pending-count');
+    await expect(
+      pendingLine,
+      '被永久拒绝之后那句读数是"1 / 2 / 都已经上传" ⇒ 界面在说假话（1 条还在队列 + 2 条被拒 = 3）',
+    ).toHaveText(/还有 3 项改动没上传/);
+    await expect(pendingLine).not.toHaveText(/都已经上传/);
+
+    // ③ 这一张**趁设置还开着**拍。
+    // 🔴 第一版是在关掉设置之后再 `openSettingsView()` 一次去补拍，结果那一趟
+    //    renderer 直接崩了（`locator.click: Target crashed`，在第二次打开设置的
+    //    分组按钮上）。崩的原因与被测的判据无关（重复挂载一大片面板 + 4.5 MB 的包），
+    //    但"一条会崩的用例"不是证据 ⇒ 改成一次打开、两个位置各拍一张。
+    const panel = page.getByTestId('sync-settings-panel');
+    await panel.scrollIntoViewIfNeeded();
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('settings-pending-rejected-3') });
+
+    // ④ rail 那一枚同一句（两处读数不许分家），同 `shootRailTooltip` 的理由拍 hover 态。
+    await closeSettingsSheet(page);
+    await expect(page.getByTestId('sync-rail-action')).toHaveAttribute(
+      'aria-label',
+      /· 3 项还没上传/,
+    );
+    await shootRailTooltip(page, 'rail-pending-rejected-3-hover', /3 项还没上传/);
+    await parkCursor(page);
   });
 });

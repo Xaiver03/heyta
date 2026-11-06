@@ -197,6 +197,53 @@ export interface OpLogStore<
    */
   countPendingUpload(): Promise<number>;
 
+  /**
+   * 「服务端**永久拒绝**」的本地 op 条数 —— 界面那句「N 项还没上传」的**另一半**。
+   *
+   * 🔴 为什么它与 {@link countPendingUpload} 是两个方法、而不是一个"没上传数"：
+   *   · `pending` = 还在队列里，下次同步会重传；
+   *   · `rejected` = 服务端说它**永远不会被接受**，已经移出队列（`markRejected`），
+   *     **重试一万次也还是拒绝**。
+   * 两者对用户的含义不同（一个"等网络"，一个"得做点什么"），但对"我的改动在不在云上"
+   * 是**同一个答案**：都没上去。所以界面上的 N = 两者之和，而这里分开读，
+   * 让界面在需要时仍能说出"其中 M 项被服务器拒绝"。
+   *
+   * 🔴 **只数 `pending` 的那个计数是会说谎的**：一次上传被永久拒绝之后，
+   * `countPendingUpload()` 会减 1（因为它被移出队列了），于是界面从「3 项没上传」
+   * 变成「2 项没上传」—— 读数在**下降**，而实际上一分数据都没多上去。
+   * 这正是 A 包验收记录 §三 第 4 条登记的缺口。
+   *
+   * ⚠️ 口径与实现代价（诚实版，按**真实**形状写）：两者都走 `by_uploadStatus` 索引，
+   * 而 SQLite 后端的 `countFromIndex` 是 **`fetchIndexRecords(...).length`**
+   * （`sqlite/sqlite-adapter.ts` 的 `countFromIndex`）—— 先把命中的整行取回来再数长度。
+   * 所以"走索引"省掉的是**全表扫描**，**不是整行物化**。
+   * 上面 `countPendingUpload` 那段注释写"不物化行"，对 SQLite 后端**不成立**；
+   * 那是既有注释的偏差（本方法不改它，改了会让人以为代价被修掉），本条按真实形状写。
+   *
+   * 🔴 这条代价**有判据盯着，而且它在 SQLite 后端上会红**：
+   * `tests/contract/op-log-store.contract.ts` 的 P1-10b（"计数由索引键界住，不是回表扫描"）
+   * 把探针**下沉到 driver**，数离开存储层的行数；一旦计数退回全表扫描
+   * （实测注入：先 `fetchRecords(...)` 取整表再返回命中数 ⇒ 读数由 3 行变 26 行）它当场红。
+   * ⚠️ P1-10 那条旧判据钉的是 `db.getAll` / `db.getAllFromIndex` **两个方法**，
+   * 而 `countFromIndex` 走 `driver.all`、绕开它们 ⇒ 旧判据在 SQLite 后端上恒绿。
+   * 省掉"取整行"这件事本身是审计文档 P1-11 的债，**不在这里声称已修**。
+   *
+   * 🔴 索引名与列名**不要**从 IndexedDB 那一侧照抄（那里叫 `by_uploadStatus` / `uploadStatus`）：
+   * SQLite 侧的列是**合成列** `ix<ordinal>_<i>`（`sqlite-adapter.ts` 的 `buildStorePlan`），
+   * 索引名是 `${table}__i${index.columns[0]}`（同文件的 `createSchema`），
+   * 单列索引 + 键值查询真的落到 `WHERE "<合成列>" = ?`（同文件的 `fetchIndexRecords`）。
+   * 对 `ops` 这张表，`by_uploadStatus` 在 `INDEXEDDB_SCHEMA` 里是**第 2 个索引**
+   * ⇒ 合成列 `ix1_0`、真实索引名 `ops__iix1_0`。
+   * 两侧都**没有** `WHERE` 条件（IndexedDB 没有"部分索引"这种东西），
+   * 所以 `'rejected'` 这一档数得出来 —— 这一条是本方法的**全部前提**，
+   * 判据在 `tests/contract/op-log-store.contract.ts`（空库 0 → 拒一条变 1）。
+   *
+   * 另外：被拒的行不会因归档从这张表里消失 —— `createSyncCheckpoint()` 在有 rejected
+   * 行时会直接抛错（`packages/op-log/src/engine.ts`），而没有 checkpoint 就 `archiveUpTo`
+   * 拒绝归档。所以它们会一直留在 `ops`（这也是"数会单调不减"的成因，见计划 §6 残余）。
+   */
+  countRejectedUpload(): Promise<number>;
+
   /** 标记 op 已上传，并回写服务端分配的 seq。返回更新条数。 */
   markUploaded(serverSeqsByOpId: ReadonlyMap<string, number>): Promise<number>;
 

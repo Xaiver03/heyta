@@ -124,13 +124,64 @@ export function SignOutNotice(): React.JSX.Element | null {
      * 🔴 这一句与"服务器上那一枚还没撤"是**两件事**：那个问题在云上，
      * 这个问题在**这台机器上**（用户的明文还留着）。合成一句会让用户
      * 去检查网络，而真正该做的是"再清一次 / 清除应用数据"。
+     *
+     * 🔴 **2026-11-07 补一个动作（原来这一支一个按钮都没有）。**
+     *
+     * 事实链：`common.signOut.eraseFailed` 的句子是「请**重新退出一次**，或清除本站的浏览数据」，
+     * 而用户**此刻已经退出去了** —— 让他为了重试一次清理再去点「退出登录」是绕路，
+     * 而且退出的入口在退出后已经变成「登录」。所以那一句指的两条路里，
+     * 一条已经不存在、另一条要用户去动浏览器设置。
+     *
+     * 这条缺陷是**看图看出来的**：A 包验收记录写的是"红条 + 重试"，
+     * 而那张图上**没有按钮** —— 文案说有、界面没有。处置与证据见
+     * `e2e/tests/signout-owner-notice.spec.ts` 的第二条（含"注掉 onClick 会红"的判据）。
+     *
+     * ⚠️ 文案**复用** `common.libraryOwner.clear`（「清除本机数据」/`Clear this device`）：
+     * 它调的确实是同一个 `purgeLocalLibrary()`，而这一档**不加新词条**
+     * （`packages/i18n` 是另一个包正在写的单对象字面量，两边同时加键会静默吃掉一方 —— 见报告）。
      */
+    const clearAgain = async (): Promise<void> => {
+      if (clearing) return;
+      setClearing(true);
+      /*
+        🔴 **必须兜住异常与"没有回话"两种情况**，否则按钮会永久停在「正在清除…」上：
+        第一版写完跑真浏览器就撞到了 —— 销毁路径抛错时这枚按钮变灰然后**再也不回来**，
+        而用户看到的是一个既不能说成功、也不能再试的按钮（比没有按钮更糟）。
+        这里只做两件事：异常 → 按钮回到可点；成功 → 重载。
+        ⚠️ 数据层不在这里重试第二次（那是 `@heyta/app-host` 的事），壳只负责"别把用户锁住"。
+      */
+      try {
+        const result = await purgeLocalLibrary();
+        if (result.status === 'purged' || result.status === 'nothing-to-erase') {
+          window.location.reload();
+          return;
+        }
+      } catch (error: unknown) {
+        // eslint-disable-next-line no-console -- 不可逆的数据事件，必须留下可见痕迹。
+        console.error('[heyta] 「再清一次」失败', error);
+      }
+      // 还是没清干净 ⇒ 红条留着，按钮回到可点状态（用户可以在关掉占着库的标签页之后再点一次）。
+      setClearing(false);
+    };
     return (
       <SettingsNotice
         tone="danger"
         live
         title={t('common.signOut.eraseFailed')}
         testId="sign-out-erase-failed"
+        actions={
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            data-testid="sign-out-erase-retry"
+            disabled={clearing}
+            onClick={() => {
+              void clearAgain();
+            }}
+          >
+            {clearing ? t('common.libraryOwner.clearing') : t('common.libraryOwner.clear')}
+          </button>
+        }
       />
     );
   }
