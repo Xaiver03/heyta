@@ -119,6 +119,7 @@
 | 「具名 token 数值一律未核实」 | 分两条路：XAML 读不到、**原始 BAML 字节读得到**（中等强度，带自校验） | P1 |
 | 「空态占位 30 个、高度恒 450」 | **44 个**；450 那 24 个全在同一个 nib；真实宿主里**与容器同框** | P7 |
 | 「Windows 没有回收站」 | 回收站是**模式不是 view**（两端同构，复用列表承载） | P7 |
+| 「heyta 连排序字段都没有」 | **`Task.order?` 已存在**（`entities.ts:423-424`）、`manual` 排序键已在读；缺的是**写路径与界面**，不是字段 | qoder·per-view-sort |
 
 ---
 
@@ -138,7 +139,7 @@
 **待产品拍板（3 条）**
 
 1. **「屏」的粒度**：按窗口数补（滴答 Windows 153 窗 / macOS 35）还是按视图 key 补（heyta 12 个）？—— 不裁决，[P2](ticktick-surface-matrix.md) 那 11 格「半有」只能挂着；按窗口数补会多出约 150 个窗。
-2. **每视图独立手排**：heyta **连字段都没有**（`entities.ts:348-356` 明禁），没有任何 ADR 回答过（[P4](ticktick-sync-questions.md) Q6）。
+2. **每视图独立手排**：heyta **字段已有、写路径没有**（`Task.order?` 在 `entities.ts:423-424`，`manual` 键在读；`entities.ts:348-356` 禁的是另两个字段名），没有 ADR 回答过（[P4](ticktick-sync-questions.md) Q6 原话已过期，见 [决策备忘](decisions/decision-per-view-sort.md)）。
 3. **多账号本地库隔离**：三壳库名写死、`packages/storage/src` 里 `accountId` 命中 0、退出登录不清 op-log ⇒ 换账号后上一个账号的任务还在本地（[P4](ticktick-sync-questions.md) Q7）。
 
 **未核实（高频被引用的 4 条）**
@@ -149,6 +150,18 @@
 - 主任务列表的空态（macOS 占位无子视图 / Windows `EmptyView` 被引用 10 处但**全包没有 `emptyview.xaml`**）（[P7](ticktick-states-and-feedback.md) U1）。
 
 ---
+
+## 5.1 决策备忘（远端 qoder 跑出，本机验收后入库）
+
+| 文件 | 回答什么 | 状态 |
+|---|---|---|
+| [decision-surface-granularity.md](decisions/decision-surface-granularity.md) | 屏按窗口数补还是按视图 key 补 | 待拍板 |
+| [decision-per-view-sort.md](decisions/decision-per-view-sort.md) | 要不要 per-view 手排（**并纠正了「连字段都没有」**） | 待拍板 |
+| [p2-half-cells-evidence.md](decisions/p2-half-cells-evidence.md) | P2 那 11 格「半有」逐格取证 | 证据已备 |
+| [dark-theme-token-audit.md](decisions/dark-theme-token-audit.md) | 暗色 46 枚字面值逐个列出 + 三类修法 | 证据已备 |
+| ⚠️ 多账号隔离 | 远端那条**跑失败了**（exit 1），无产出 | **缺** |
+
+> 这批由 `linux-dev` 上的 qoder CLI 并行产出，**本机逐条复核后才入库**；其中 per-view 那份直接推翻了我的一处结论（见 §3 台账最后一行）。
 
 ## 6. 引用纪律（写死）
 

@@ -293,7 +293,10 @@ USER · USERDOCUMENT · USERSETTINGS
 ### 4.1 每个视图一张独立的手动排序表 —— 而不是一条 `sortOrder` 字段
 
 - **它**：7 张排序表（pinned / priority / dueDate / tag / project / 通用）。同一个任务在不同视图里有**不同的位置**。
-- **heyta 现状**：不只是「缺口」—— **连字段都没有**。`entities.ts:348-356` 明文禁止 `isPinned` / `sortOrder`，全仓只有 `pinnedAt` 两档；`sortOrder` 的命中只有那两处注释、零实现。⇒ 「要不要 per-view 手排」**没有任何 ADR 回答过**（P4 的 Q6，属待产品拍板项）。
+- **heyta 现状**：🔴 **这条我先前写错了，已订正**。原稿写「连字段都没有」——**错**。真状态是「**半接线**」：
+  `Task.order?: number` **字段存在**（`entities.ts:423-424`）、排序键 `manual` 存在（`task-order.ts:51`，读点 `:106`、`subtasks.ts:120`）、导入侧也读滴答的 `Order` 列（`ticktick-import.ts:703`）；
+  缺的是**写路径**（拖动不写 op）与**界面可达**（没有拖拽入口）。另外 `entities.ts:348-356` 禁止的是 `isPinned`/`sortOrder` 这两个**别的**字段名，不是 `order`。
+  ⇒ 「要不要 per-view 手排」仍**没有 ADR 回答过**，但它不是"从零建" —— 成本比原估低一档（见 [`decisions/decision-per-view-sort.md`](decisions/decision-per-view-sort.md)）。
 - **该学的是决定**：排序是 **`(视图, 视图实例)` 的二维属性**，不是实体属性。但**不要**学它 7 张同构表的形状 —— 泛化成一张 `(scope, scopeId)` 排序表在关系库里更省，也不会随视图增加而加表。**形状照搬 = 抄；把约束想清楚 = 学。**
 
 ### 4.2 重复任务：物化实例 + 「已取用」标记
