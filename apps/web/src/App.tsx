@@ -398,6 +398,16 @@ function SettingsSectionNav({ active, onSelect }: {
   );
 }
 
+/**
+ * 退场收尾的有界兜底，相对**计算样式里那条退场动画的时长**的余量（毫秒）。
+ *
+ * 时长本身不许出现在这里 —— 它只住在 `tokens.css`（`duration.exit`），
+ * 下面读的是 `getComputedStyle(...).animationDuration`。这个常量只回答另一个
+ * 问题："动画声明了却没跑完"最坏再多等一拍才允许放弃等待。同形状的先例与
+ * 它治的症状在 `apps/web/src/boot-splash.ts` 的文件头。
+ */
+const SHEET_EXIT_SLACK_MS = 120;
+
 export function App(): React.JSX.Element {
   const { t, locale } = useI18n();
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
@@ -865,6 +875,43 @@ export function App(): React.JSX.Element {
       .querySelector<HTMLElement>('[data-testid="account-menu-avatar"]')
       ?.focus({ preventScroll: true });
   }, [settingsBaseView]);
+
+  /**
+   * 🔴 退场的**收尾由状态机保证，不押在"动画会结束"上**。
+   *
+   * `closeSecondarySurface()` 是 Esc / ✕ / 点 scrim / ⌘K 共用的唯一出口，而它只把
+   * 界面推进退场态；原来把它等回来的信号是设置那个节点的 `animationend`。
+   * 押在那上面，有三类真实场景浮层**永远关不掉且不报错**：
+   *   ① 系统关掉动画：`sheets.css` 在 `prefers-reduced-motion` 下给 `.ht-sheet`
+   *      写 `animation: none`，那条规则与 `.ht-sheet--exiting` 同特异度且**排在它后面**
+   *      ⇒ 后者被覆盖，事件一次都不来；
+   *   ② 窗口不在前台：动画被创建却停在 `currentTime === 0` —— 2026-10-05 在
+   *      WKWebView 上为启动遮罩实测到同一症状，出处与理由见 `boot-splash.ts`；
+   *   ③ **搜索浮层压根不是那个节点**：它画的是 `.ht-search-overlay`，`sheetRef.current`
+   *      在这条路上是 null ⇒ 从 rail 打开搜索后，Esc、⌘K、点 scrim 三种关法都收不了尾。
+   *
+   * 所以按**读得到的东西**分档，而不是按引擎猜：读不到一条正在跑的退场动画
+   * （或页面不在前台）就直接收尾 —— 宁可没有淡出，也不能把界面盖住；读得到就等它，
+   * 但等一条由计算样式推导出来的**有界**时间，`onAnimationEnd` 先到就照常由它收。
+   */
+  useEffect(() => {
+    if (!sheetExiting) return;
+    const node = sheetRef.current;
+    const style = node === null ? null : getComputedStyle(node);
+    const seconds = Number.parseFloat(style?.animationDuration ?? '');
+    const waitsForAnimation =
+      style !== null &&
+      style.animationName !== '' &&
+      style.animationName !== 'none' &&
+      Number.isFinite(seconds) &&
+      document.visibilityState === 'visible';
+    if (!waitsForAnimation) {
+      finishSheetExit();
+      return;
+    }
+    const timer = window.setTimeout(finishSheetExit, seconds * 1000 + SHEET_EXIT_SLACK_MS);
+    return () => window.clearTimeout(timer);
+  }, [sheetExiting, finishSheetExit]);
 
   /**
    * 打开次级浮层（设置 / 搜索）时：**记住触发器**；设置那边再把焦点送进浮层。
