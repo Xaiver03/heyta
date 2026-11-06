@@ -442,7 +442,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 | 2.7 / D1 自定义筛选器 | `TaskFilter` 仍是**封闭联合**（all / today / next7Days / completed / quadrant / project / tag），没有用户自建查询 | `sed -n '51,60p' packages/domain/src/task-filter.ts` |
 | 1.8 ④ 完成后顺延 | `nextAfterCompletion` 在 `src` 里**零生产调用点**（只有定义与 dist 声明）⇒ 实际仍是固定排期 | `grep -rn "nextAfterCompletion(" --include='*.ts' packages/*/src apps/*/src \| grep -v "export function"` |
 | 1.14 手动拖拽排序 | `Task.order` 仍无写入路径 | `grep -rn "order:" packages/app-host/src/actions.ts`（空） |
-| C1 富文本备注 | 备注仍是纯文本 / Markdown 框，没有富文本编辑器（选型 + 许可证门禁未过，连带详情面底部工具条的「文本格式」那枚不画） | `docs/plans/dida-alignment-typography-and-features.md` 的 C1 / C2 两格 |
+| C1 富文本备注 | 备注仍是纯文本 / Markdown 框，没有富文本编辑器（选型 + 许可证门禁未过，连带详情面底部工具条的「文本格式」那枚不画）<br>🔴 **2026-11-06 更正这半句**：门禁那两道**已经过了**（逐家 `npm view` 现量，读数与裁决见本文 **§9.6** 与计划 C1 那节）；这一格仍是缺口，但拦路的不再是许可，而是"备注源格式 + 移动端没有富文本渲染器 + 拆解会把备注逐字发出去"这三条落点约束 | `docs/plans/dida-alignment-typography-and-features.md` 的 C1 / C2 两格 |
 
 ### 9.3 这一栏**没有**复核（别把本节当成一次新的全量审计）
 
@@ -491,3 +491,37 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
   那条性质 —— 这是这一档的定义，不是缺陷（详见 `TaskActions.completeTask` 那段注释与 `Task.repeatAfterCompletion` 的字段注释）。
 
 其余四格（看板、自定义筛选器、手动拖拽排序、C1 富文本）本轮复量后**仍是缺口**，见 §9.4。
+
+### 9.6 C1 那两道门过完了（2026-11-06 10:4x，滴答对齐线；按 §0.2 的规矩只加本节）
+
+§9.2 的 C1 行原先写"选型 + 许可证门禁未过"。这一格按交接文档 §五 第 4 步做完了它**该做的那一半**
+（调研，不是界面）。取数办法一句话，下一个人自己跑，别抄这里的数：
+
+```bash
+for p in @tiptap/core lexical slate prosemirror-state @editorjs/editorjs quill ckeditor5 react-draft-wysiwyg tiptap-markdown markdown-it; do
+  npm view "$p" version license time.modified
+done
+```
+
+| 候选 | 许可证（§3.2 白名单：MIT / Apache-2.0 / BSD / ISC / MPL-2.0 / 0BSD / Unlicense / CC0） | 最后一次发版（§3.1 要"仍在持续更新"） | 结论 |
+|---|---|---|---|
+| `@tiptap/core` | MIT | 2026-11-05 | ✅ 过门，**本格选它** |
+| `lexical` | MIT | 2026-10-28 | ✅ 过门（备选） |
+| `slate` | MIT | 2026-10-26 | ✅ 过门（备选） |
+| `prosemirror-state` | MIT | 2025-10-23 | ✅ 过门（底座，不是完整编辑器） |
+| `@editorjs/editorjs` | Apache-2.0 | 2026-09-17 | ✅ 过门，但输出是自己的 block JSON ⇒ 与 Markdown/HTML 都不互通，排除 |
+| `quill` | BSD-3-Clause（在白名单内） | **2024-11-30** | 🔴 §3.1 拦下：两年没发版 ⇒ 与本仓否掉 `rrule.js`（停在 2023）、`cal-heatmap`（停在 2024）同一档 |
+| `ckeditor5` | `SEE LICENSE IN LICENSE.md`（核心 GPL-2.0+） | 2026-11-04 | 🔴 §3.2 拦下：GPL 在禁止名单，且白名单外默认失败 |
+| TinyMCE | LGPL-2.1+ | — | 🔴 §3.2 拦下：LGPL 在禁止名单 |
+| `react-draft-wysiwyg` | MIT | **2022-07-17**（Draft.js 已被上游归档） | 🔴 §3.1 拦下 |
+| `tiptap-markdown`（Markdown 往返扩展） | MIT | **2025-09-08** | 🔴 §3.1 拦下（14 个月没发版）⇒ 往返那层不许拿它当现成件，见计划 C1 第 3 条 |
+| `markdown-it`（只走渲染侧） | MIT | 2026-10-16 | ✅ 过门，但它一进场就带来一枚必须 `html: false` 的 XSS 判据 |
+
+**这一格现在的阻塞项不再是许可，是三条落点约束**（都指得到现量，写在计划 C1 那节）：
+① 备注源格式要拍（拍成 Markdown：`Task.notes?: string` 一个字段都不用动，且仓里 Markdown 已是导出那一路的事实格式）；
+② 移动端没有富文本渲染器 —— 四家候选在 RN 上都跑不了，`TaskDetailSheet.tsx` 的备注是 `multiline` TextInput，
+⇒ "跨端都能编辑"不是选型能解决的事，只能拍成"web 可编辑、移动端只读渲染"；
+③ 🔴 **AI 拆解会把备注逐字发出去**：`packages/app-host/src/ai-breakdown.ts` 把 `source.note` 原样拼进
+「已有备注：」并登记披露字段 `note` ⇒ 存 HTML 等于把标签发给上游，这条要在动工那趟复量。
+
+⇒ 对标滴答的 C1 那一格：**门禁半 = 已闭合（本节）**，**界面半 = 仍未做**，两种"没做完"不许混成一句。

@@ -245,8 +245,17 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
    （现量 `grep -rln 'nextAfterCompletion\|完成后顺延' docs/adr/` ⇒ 空），真正约束这次改动的是
    `packages/domain/src/recurrence.ts` 与 `TaskActions.completeTask` 那两段注释——"锚点钉一次不动"这条**没被破坏**，
    两档只换基准。原先那句"这一格是数据 + 调用点，不依赖选型，成本最低、用户可感知"也兑现了。
-4. **C1 富文本**：先做选型 + 许可证两道门的调研，**不要先写界面**。
+4. ✅ **C1 富文本**：先做选型 + 许可证两道门的调研，**不要先写界面**。
    前置：AGENTS §3.1（2021 年后仍在维护）、§3.2（许可证白名单），过了才谈落点。
+   —— **2026-11-06 10:4x 这一步的"该做的那一半"做完了**（用户授权本线拍板）：逐家 `npm view` 现量过两道门，
+   过门的是 TipTap / Lexical / Slate / ProseMirror / Editor.js / markdown-it，被许可拦下 CKEditor 5（GPL）与
+   TinyMCE（LGPL），被维护性拦下 Quill（2024-11 起）、Draft 那条（2022-07）与 `tiptap-markdown`（2025-09）。
+   裁决与理由写在 [dida-alignment-typography-and-features.md](dida-alignment-typography-and-features.md) 的 **C1** 那节，
+   读数表在 [dida365-feature-benchmark.md](../research/dida365-feature-benchmark.md) **§9.6**。
+   🔴 **界面一行没写**（这一步的原话就是"不要先写界面"），下一位从第 5 步接；真要开工按 C1 那节那四刀切。
+   ⚠️ 这一格拦路的三件事也都量过了：备注源格式要拍（拍成 Markdown ⇒ `Task.notes?: string` 零字段变更）、
+   移动端四家候选都没有 RN 渲染器（只能拍"web 可编辑 / 移动端只读"）、
+   以及 **AI 拆解会把备注逐字发出去**（`ai-breakdown.ts` 那句「已有备注：」+ 披露字段 `note`）。
 5. **D1 自定义筛选器**：先要产品边界（用户能存什么查询、跨不跨端、E2EE 下服务端能不能筛）。
    前置：本地优先 + E2EE 意味着服务端看不到明文，"云端智能清单"这类做法直接不成立。
 6. **补 Android 设备腿**（在 linux-dev 上），并把 iOS 那枚装置的读数纳入四端重装那一趟。
