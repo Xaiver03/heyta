@@ -712,6 +712,34 @@ pnpm typecheck 2>&1 | grep "error TS"
   🔴 23:2x 复量后补两维（读数在 B266）：这枚红**只在未推送那棵树上**（`git show origin/main:apps/web/src/styles/app/material.css` 里 `^\.ht-capture` 读 0），
   而它的**动作两边互指**——本线写"归收集框线"，他们台账把这道门写成"别线"，所以它不会自己闭合。
 - 阶段 5（C1 富文本 / C3 评论 / D1 过滤器）本轮明确**未动**，仍按原文需要单独排期。
+- ✅ **交接文档 §五 第 3 步「完成后顺延」已于 2026-11-06 00:5x 落地**（用户授权本线按工程/产品最佳实践拍板执行）：
+  `Task.repeatAfterCompletion`（可选布尔，缺省=固定排期，历史数据同形）+ `TaskActions.setRepeatAfterCompletion`
+  + `completeTask` 按这一枚分两档取基准；web 复选框与移动端面单 chip 两个落点各一条判据。
+  行为判据四臂在 `packages/app-host/tests/repeat-actions.spec.ts`（同一场景两档两个答案：9-21 vs 10-05；
+  且钉"只发一个 op、不碰规则串"），摘掉分支实测会红（2026-11-06 09:5x 现量：把 `afterCompletion` 钉死成 `false`
+  ⇒ 只红「开了这一档 ⇒ 从完成那一天推，错过两周不把那两个周期还回来」那一臂，`expected 2026-09-21 to be 2026-10-05`；
+  还原按 sha256 核对）。**取舍**：开了这档就不再有"提前勾也不挪节奏"那条保证，
+  这是该档的定义而非缺陷。复跑口径与逐条读数写在 benchmark **§9.5**。
+- ✅ **主链 web 全量单测从 16 枚红回到 0**（2026-11-06 10:2x，两笔修复 `17e8063e0` / `812a2a119`）。
+  🔴 这里顺带更正本线台账的一处归属：`BLOCKED.md` B257 ② 曾把 16 枚全记成 `sheetExiting` 那一手没接完 ——
+  实测是 **11 枚**那一手（退场收尾原来押在 `animationend` 上，而 reduced-motion 下 `sheets.css` 把 `.ht-sheet` 的
+  `animation` 设成 `none`、窗口不在前台时动画停在 `currentTime 0`、而搜索浮层压根不是那个节点 ⇒ 三种关法都收不了尾），
+  剩 **5 枚**是 `2a4bc0e20`（11-04 13:09）把能力勾选框的 `aria-label` 从裸枚举值换成本地化标签之后，
+  **三份**没跟着改的消费者（web 单测 5 处、平时被 skip 的 journey 腿 2 处、`e2e/tests/helpers.ts` 1 处）。
+  修复按"稳定钩子 + 不变量"落：勾选框加 `data-testid=endpoint-capability-<id>-<capability>`，另补两臂 ——
+  无障碍名不许是裸枚举值（把裸值塞回去只红这一臂）、端点 id 未知时那个"前缀 + 能力后缀"选择器逐行唯一命中
+  （替两条平时跑不到的腿验同一个形状）。全程记在 **B271**。
+  ⚠️ 这一格留一个仓级口径没拍：JS 侧"拿界面文案当选择器"没有任何判据（`check:locator-labels` 的射程只有
+  `scripts/qa/*.py` 那九份），本线只补了这次撞到的那两臂，没有顺手造一把大尺。
+- ✅ **iOS 设备腿那一格"没重打包"判掉**（2026-11-06 10:2x）：从当前 HEAD 现建 `.app`，新鲜度按
+  `reinstall-all.sh` 那把尺量过（`main.jsbundle` mtime 晚于最新源码），归属章已写，装置 **9/9 退 0**，
+  两张图（`apps/mobile/evidence/dida-pin-order-20261106/`）逐张人眼看过。
+  ⚠️ 代价记在 **B272**：`simctl uninstall` 把装置依赖的**已 onboarding 热状态**一起清掉，连红两趟红在载体不在产品，
+  而首启那两层门的做法本来就在册（`scripts/verify-mobile-ai.sh:1225–1260`）—— 动手前没 grep 它。
+- ✅ **陷阱正文↔索引之间新增一道门并已进链**（`pnpm check:traps-index-coverage`，2026-11-06 10:3x）：
+  第一次跑量出 33 枚条目在索引里没有任何入口，六行登记照着条目原文补完；判据是**可达性不是条数**
+  （AGENTS §5 明文不许在索引里写条数），`--self-test` 三臂当场验过牙。造这把尺的过程自己踩的那枚坑
+  （按内容里的词筛表格行 ⇒ 33 枚虚报成 214 枚）入正文 **#659**。全程记在 **B273**。
 - ✅ 对标滴答的**待办分母**（benchmark §9.2 那五格）已于 2026-11-05 23:2x 用它们自己给的命令逐条复量，
   五格结论全是"缺口仍在"，读数与复量办法写在 [dida365-feature-benchmark.md](../research/dida365-feature-benchmark.md) **§9.4**
   ⇒ 本轮没有任何一格因为别人的提交翻成"已具备"，阶段 5 那一档不用重开、也不必重新论证范围。
