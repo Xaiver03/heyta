@@ -1127,6 +1127,19 @@ const VIEW_STANCES = [
     because: '设置是浮层，底下那一栏还挂着 —— 所以它没有自己的选中语义可交代。',
   },
   {
+    view: 'kanban',
+    stance: 'row-actions-only',
+    locus: 'apps/web/src/features/kanban/KanbanView.tsx',
+    needle: '      <span>{task.title}</span>',
+    because:
+      '卡片行上**一个动作都没有**：只渲染标题，没有 click-to-open（`KanbanCard` 的 props 里连一个 open 回调都不存在；' +
+      '传进来的 `onMove` 还是空实现 `() => {}`），它唯一的交互是 `@dnd-kit` 的指针拖拽改归属。' +
+      '所以这一面没有"在看哪一条"这回事，登记 row-actions-only。' +
+      '🔴 **这不是设计，是缺**：卡片点开落在哪儿还没定（详情列在窄档根本不在）。补它要同时定这一格，' +
+      '不能只加一个 onClick 就宣布"支持了"。它同时是 `check:l4` 那 4 处内联样式与' +
+      '看板没有自己样式族这两笔债的同一根：看板没有复用 `packages/ui` 的 TaskRow，而是自己写了一张卡。',
+  },
+  {
     view: 'rail:project',
     stance: 'filters',
     entity: 'project',
