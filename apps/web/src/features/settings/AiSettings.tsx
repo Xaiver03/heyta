@@ -995,6 +995,10 @@ export function AiSettings({
                             <label key={capability} className="ht-settings__cap">
                               <input
                                 type="checkbox"
+                                // 🔴 验收钩子与无障碍名**分开的两件事**：`aria-label` 是给读屏
+                                // 用户的句子（11-04 起是本地化标签，不是 `long_context` 这种裸枚举值），
+                                // 而判据要锚在一个不随文案走的稳定标识上。
+                                data-testid={`endpoint-capability-${endpoint.id}-${capability}`}
                                 aria-label={t('web.ai.settings.capabilityAria', {
                                   capability: capabilityLabel[capability],
                                   name: endpoint.label,

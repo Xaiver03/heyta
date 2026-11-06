@@ -861,8 +861,13 @@ export async function configureEndpoint(page: Page, setup: EndpointSetup): Promi
   );
 
   // ── 能力声明（不勾就没有，见 AiSettings 文件头）──────────────────────
+  // 🔴 锚 `data-testid` 而不是 `aria-label`：那行的无障碍名 11-04 起是**本地化的句子**
+  //（`本机 的能力 长上下文`），而这里的 `capability` 是枚举值 —— 拿界面文案当钩子，
+  // 文案一改这条 e2e 腿就选不中任何东西（且只会表现为超时）。
   for (const capability of setup.capabilities) {
-    await row.locator(`[aria-label$="的能力 ${capability}"]`).check();
+    await row
+      .locator(`[data-testid^="endpoint-capability-"][data-testid$="-${capability}"]`)
+      .check();
   }
 
   // ── 逐功能路由 ──────────────────────────────────────────────────────

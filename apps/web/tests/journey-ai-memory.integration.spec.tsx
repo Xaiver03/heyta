@@ -339,8 +339,10 @@ describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到�
     // 端点反而**不再满足 breakdown**。
     // 设置界面会用「能力缺口」提示这件事（所以用户是被告知的），
     // 真实用户照着提示补勾即可 —— 这里就照做。
-    click(item?.querySelector('[aria-label$="的能力 structured_output"]'));
-    click(item?.querySelector('[aria-label$="的能力 long_context"]'));
+    // ⚠️ 选择器锚 `data-testid` 而不是 `aria-label`：后者 11-04 起是**本地化的句子**
+    //（`本机 的能力 长上下文`），拿界面文案当钩子的消费方会跟着界面一起漂。
+    click(item?.querySelector('[data-testid^="endpoint-capability-"][data-testid$="-structured_output"]'));
+    click(item?.querySelector('[data-testid^="endpoint-capability-"][data-testid$="-long_context"]'));
     await flush();
 
     // 把端点路由到「拆解」功能（出厂不预置任何路由）
