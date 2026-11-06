@@ -1,4 +1,4 @@
-# 滴答清单桌面端逆向取证（macOS 已成型 / Windows 待交接）—— 只取「决定」，不取「表达」
+# 滴答清单桌面端逆向取证（macOS + Windows 均已实测）—— 只取「决定」，不取「表达」
 
 > 立项：2026-11-06。授权口径：产品负责人要求「下载 GitHub 上很火的 REA，看一下能不能逆向本地的滴答清单；
 > 只看看有没有可以参考的地方，**不照抄**」。第二轮追加：「UX 我也是要学习的……我在 Windows 上也安装了这个，
@@ -16,7 +16,7 @@
 1. **能逆向，而且已经拿到了「法律上最安全、工程上最有用」的那一层** —— 包结构、界面清单、文案规模、**完整数据模型**、接口与权限。全部是静态观察，一行代码没执行、一个账号没登录。
 2. **滴答 macOS 端是原生 Swift + Objective-C 框架群，不是 Electron。** 所以「扒 `app.asar` 看 JS」那条最省事的路**对它无效**；REA 的 Electron/JS 分析路径用不上，用上的是它的 Apple bundle / nib / Mach-O 静态面。
 3. **真正值得参考的是它数据模型里的几个「决定」**（每个视图一张独立的手动排序表、重复任务实例物化 + fetch flag、专注会话单独一条同步通道、第三方日历建成五表链），**不是界面细节**。界面细节（文案、图标、字体、截图、逐像素布局）恰恰是著作权与商标保护得最实的那一层 —— 那也是唯一不能碰的一层。
-4. **Windows 端这一轮没做完，卡在「拿不到安装后的文件」**：官方包是 **Inno Setup 的固态压缩**（24.1 MB，`FileVersion 8.2.5.0`），本机**没有 `innoextract` 可用**（brew / conda 的目录都是 root 所有，装不进去；我甚至用 ghcr 上的 Homebrew bottle 手工重定位了 `innoextract 1.9`，**卡在它依赖的 `libboost_system-mt` 在 boost 1.90 里已经不存在**）。解这个包只需一条命令，但**需要你在 Windows 那台机器上把目录放到 SHARE 盘**（§6.1 给了原样可粘的 PowerShell）。在此之前，Windows 端的**能力清单已经从 macOS 端 + 官方分发口径**里推出来了一大半，**UX 层（字号/窗宽/控件高度/语义色）这一轮反而从 macOS 的 436 个 nib 里读出来了**（§3.6）。
+4. **Windows 端已经拿到了，而且推翻了「它大概是 Electron」这个假设**：它是 **.NET Framework 4.x + WPF**（`TickTick.exe` 36.3 MB 托管程序、639 个 BAML、`sqlite-net`、内嵌 WebView2），与 macOS 共享同一份 `KotlinMultiplatformAll`（`.dll` ↔ `.framework`）。取回路径是 **SSH**（`~/.ssh/config` 里本来就有 `windows-pc`），不需要你摆渡 U 盘。**上一轮我判断「拿不到」是错的** —— 错在没先读 `~/.ssh/config`（详见 §9.1 与 §7 #662）。
 
 
 ---
@@ -31,7 +31,7 @@
 | 为什么不在仓内 | 它是一次性取证工具，不是产品依赖。按 [`hard-constraints`](../agents/hard-constraints.md) §3.1–3.2，进仓的第三方组件要过「2021 年后仍在维护 + 许可证白名单」两道门并登记；取证工具走「不进仓」这条更省的路，也就没有登记义务 |
 | 环境事实 | 本机 Node **22.22.0**，低于 REA 要求的 22.23.4 ⇒ `npm` 报 `EBADENGINE` 但命令可跑；**需要 Node ≥24.15 的 SQLite 快照子命令不可用**（本次也用不上，见 §6） |
 | 网络 | 本机**直连 github.com 不通**（`Failed to connect after 75s`），走系统代理 `127.0.0.1:7890` 克隆成功；npm registry 直连可用 |
-| 第二轮追加工具 | `7z`（p7zip 17.05，本机已有）判 Windows 包形态；`innoextract` **没装上**（§2.2 三条路全断）；`/tmp/rea-lab/cli/node_modules/.bin/asar`（REA 依赖里自带）准备解 Windows 载荷 |
+| 第二轮追加工具 | `7z`（判 Windows 包形态）· `ssh`（**真正的取数通道**，见 §9.1）· 远端 PowerShell `System.Resources.ResourceReader`（枚举 WPF 的 1296 条资源）· `dnfile`（本机读 .NET metadata，`pip install --target`）|
 
 ### 1.1 合规边界（写死，不随任务漂）
 
@@ -96,15 +96,15 @@
 2. **Windows 包只有 Inno Setup 这一种形态**，没有 `.msi` / `.appx` / 便携 zip。这意味着要在 Windows 上做「无安装取证」只能装完再拷目录（§6.1）。
 3. `win64` 名义是 64 位，但**外层 stub 是 PE32（x86）**——Inno 的壳向来是 32 位，载荷才是 64 位，这不代表应用是 32 位（**未核实**载荷位数）。
 
-**为什么这一轮没解出载荷**：Inno Setup 把全部文件压成一个**固态 LZMA 流**存在 `.idata`；`7z` 只能拆 PE 段（拆出 `inno/.idata` 等 26 个文件，但那是压缩流不是文件树）。正解是 `innoextract`，而本机三条路都断了：
+**载荷一开始没解出来（这段留档，因为它是「先假设 Electron」的代价）**：Inno Setup 把全部文件压成一个**固态 LZMA 流**存在 `.idata`；`7z` 只能拆 PE 段（拆出 `inno/.idata` 等 26 个文件，但那是压缩流不是文件树）。正解是 `innoextract`，而本机三条路都断了：
 
 | 路 | 结果 |
 |---|---|
 | `brew install innoextract` | ❌ `/opt/homebrew/*` 全部 root 所有，brew 拒绝写入 |
 | `conda create -c conda-forge innoextract` | ❌ conda 缓存目录权限错 |
-| 手工下 ghcr 上的 Homebrew bottle（`f6d11bb`/`d812cb1` 的 arm64 层，198 KB） | 🟡 下到了、`install_name_tool` 也重定位了，但**卡在 `libboost_system-mt.dylib`** —— bottle 是 2020 年对着 boost 1.73 编的，本机 boost 是 **1.90**，`libboost_system` 在 1.90 里已无 dylib（纯 header）。补一个假 dylib 或从源码重编都要几十分钟，**性价比不划算**，于是停手 |
+| 手工下 ghcr 上的 Homebrew bottle（arm64 层，198 KB）+ `install_name_tool` 重定位 | 🟡 下到了、重定位了，**卡在 `libboost_system-mt.dylib`**（bottle 是 2020 年对 boost 1.73 编的，本机 boost 1.90 已无此 dylib） |
 
-> 也就是说：**不是「解不开」，是「本机装不上解包器」**。你给我文件，我在 10 秒内解开（§6.1）。
+**但这条路最后没用上**：真正的解法是**根本不下载安装包，直接去那台 Windows 上取已安装的文件**（§9.1）—— 而且取回来的东西证明「解 Inno 包」本身也是白费劲，因为**它不是 Electron，没有 `app.asar`**。
 
 ---
 
@@ -343,7 +343,7 @@ USER · USERDOCUMENT · USERSETTINGS
 | **Swift 反编译（看业务逻辑）** | REA 的 `inspect` / `decompile` 需要 Ghidra 12.1（+ JDK 21）或 Hopper；本机都没有 | 装 Ghidra（≈400 MB）或 Hopper（付费）；fat 二进制还需先 `lipo -thin arm64` | 装 Ghidra 约 10 分钟；反编译 Swift 的可读性差（Swift 泛型/协议 witness 表会糊成一团），**投入产出比低** |
 | **KMP 共享层（同步/冲突算法）** | 符号已剥，只能看字符串关键词 | 只能反编译 `KotlinMultiplatformAll`（≈9.7 MB Kotlin/Native 产物） | 可读性更差；不建议 |
 | **云端协议语义** | 只有 38 条路径名 | 需要抓包（MITM），**本次刻意不做**（要装证书、要过它的证书固定风险） | 越界：属「分析其服务」，不在「分析我本机的副本」范围内 |
-| **🔴 Windows 端的安装后文件** | 只有官方安装包（Inno 固态压缩），**载荷解不开**（§2.2）；我**也看不到你那台 Windows 机器** | **§7.1 的 PowerShell**：把 `%LOCALAPPDATA%\Programs\TickTick\resources` 拷到 SHARE 盘（你已经在用那块 exFAT 盘摆渡文件） | **一分钟**。回来之后 `asar extract` 10 秒；若是 Electron，渲染层等于全开 |
+| **Windows 端的 BAML → XAML（精确数值）** | 现在拿到的是结构/键名/色板/字号规则，**还没有具体控件尺寸与间距** | 在 Windows 上用 `System.Windows.Baml2006.Baml2006Reader` + `XamlXmlWriter` 把 639 个 BAML 转成 XAML 文本（脚本属下一轮，§9.7） | 半小时类的工作量；`KotlinMultiplatformAll.dll` 仍是 native 符号剥离，反编译性价比低 |
 
 **两条结论**：
 
@@ -393,32 +393,26 @@ file /tmp/TickTick-win64.exe        # PE32 executable (GUI) Intel 80386, for MS 
 # 真正解包要 innoextract —— 本机三条路都断（brew/conda 目录 root 所有；bottle 卡在 libboost_system-mt）
 ```
 
-### 7.1 交接命令（Windows 那台机器上跑，**原样可粘**）
-
-```powershell
-# 在 Windows 上开 PowerShell（不需要管理员），把安装目录整份放到 SHARE 盘
-$d = "$env:LOCALAPPDATA\Programs\TickTick"
-if (-not (Test-Path $d)) { $d = "$env:ProgramFiles\TickTick" }
-Write-Host "install dir = $d"
-
-# SHARE 盘符自己换（资源管理器里看，通常是 E: / F:）
-$dst = "E:\ticktick-win"
-New-Item -ItemType Directory -Force -Path $dst | Out-Null
-
-Copy-Item "$d\resources" -Destination $dst -Recurse -Force
-Copy-Item "$d\*.exe","$d\*.dll","$d\*.json" -Destination $dst -Force -ErrorAction SilentlyContinue
-
-# 交回来的是什么形状，一句话自证
-Test-Path "$dst\resources\app.asar"     # True ⇒ Electron，全部 UX 都在里面
-Get-ChildItem $dst -Recurse | Measure-Object Length -Sum | Select Count,Sum
-```
-
-拿到之后本机一条命令就够（`/tmp/rea-lab/cli/node_modules/.bin/asar` 已经装好了）：
+### 7.1 取 Windows 端（**已跑通**，用 SSH，不用 U 盘摆渡）
 
 ```bash
-npx --no-install asar extract /Volumes/SHARE/ticktick-win/resources/app.asar /tmp/rea-lab/win-app
-# 然后就能读：package.json（Electron 版本）· 渲染层 CSS（设计变量）· 菜单/托盘/快捷键定义 · i18n
+# 别名本来就在 ~/.ssh/config 里：Host windows-pc → 10.111.127.237 / User 41478 / id_ed25519
+ssh -o BatchMode=yes windows-pc "echo OK"                    # 密钥免密，一次就通
+
+# 1) 在 Windows 上找安装目录（注册表里没有卸载项，只能搜盘）
+ssh windows-pc 'powershell -NoProfile -EncodedCommand <b64>'  # Get-ChildItem -Filter TickTick.exe -Recurse -Depth 3
+
+# 2) 打包再拉回（用 tar.exe；Compress-Archive 在同一目录上失败过一次）
+ssh windows-pc 'tar.exe -czf %TEMP%\tt.tgz -C "C:\Program Files (x86)\滴答清单" .'
+scp windows-pc:"C:/Users/41478/AppData/Local/Temp/tt.tgz" ./
+
+# 3) 界面资源（不是 app.asar！是 .NET 资源 TickTick.g.resources，1296 条）
+ssh windows-pc 'powershell -NoProfile -EncodedCommand <b64>'  # ResourceReader 逐条导出 639 BAML + 630 图片
+scp windows-pc:"C:/Users/41478/AppData/Local/Temp/ttbaml.tgz" ./
 ```
+
+⚠️ 远端 PowerShell 一律 `-EncodedCommand`（UTF-16LE base64）：中文/引号直接进命令行会被吞，报出来的还是「找不到命令」这种误导性错误（与 §7 #603 同族）。
+SHARE 盘摆渡仍然可用，但**不再是唯一路径**。
 
 ---
 
@@ -429,16 +423,139 @@ npx --no-install asar extract /Volumes/SHARE/ticktick-win/resources/app.asar /tm
 2. **未核实**：v2 是否已停用。38 条路径里 v2 占 32 条、v4 只有 6 条（全是日历），不能据此说「v2 还活着」。
 3. **未核实**：`KotlinMultiplatformAll` 是否真的承载同步与冲突解决。只有 `SYNC`/`Patch`/`Clock`/`Conflict` 的字符串计数，没有符号，「有字符串」不等于「有实现」。
 4. **未核实**：本地库的真实 schema（表名是**迁移 DDL 的累积**，实际库可能还有运行时 `ALTER`）。这一条只能靠 §6 的 FDA 路线补。
-5. **未核实（Windows，最高优先级）**：**它到底是不是 Electron。** 现在的判断全是「Inno 装了 24 MB、Appest 同一主体、版本号 8.2.5」这类间接证据，**一条直接证据都没有** —— 拿到 `resources/` 一秒钟就能定案（有 `app.asar` 就是）。在定案之前，**不要**把「Windows 也是 Electron」写进任何计划。
+5. ✅ **已核实（Windows，原第 5 条）**：**它不是 Electron。** 是 .NET Framework 4.x + WPF（`TickTick.exe` 托管、639 BAML、`sqlite-net`、WebView2）。上一版把它列成「最高优先级未核实」，现在结案；推翻过程与代价写在 §9.1（教训：**先读 `~/.ssh/config`，再假设「拿不到」**）。
 6. **未核实（Windows）**：载荷位数（32/64）、WebView 内核版本、托盘/快捷键注册方式、它是否复用 macOS 同一套业务逻辑（`KotlinMultiplatform` 在 Windows 上是 JVM 还是 Kotlin/Native）。这四条都要等文件。
 7. **本次没有做的事**：抓包、登录其账号、读它的用户数据、执行它的任何代码路径、接触你那台 Windows 机器。以上五条都是**刻意的边界**，不是能力不足。
 
 ---
 
-## 9. 一句话给下一位
+## 9. Windows 端实测：**WPF/.NET，不是 Electron**
+
+> 这一节推翻本文上一版的两条判断：①「Windows 大概也是 Electron」（旧 §8 第 5 条）；②「文件拿不到，需要你摆渡」（旧 §6 那行）。
+> 真相：它跟 macOS 一样是**原生**的，只是原生在另一套栈上 —— **.NET Framework 4.x + WPF**。而那台机器**一直就写在本机的 SSH 配置里**。
+
+### 9.1 怎么拿到的（这条路径本身要记住）
+
+| 步 | 事实 / 命令 |
+|---|---|
+| 入口本来就有 | `~/.ssh/config` 里 **`Host windows-pc`** → `10.111.127.237`，`User 41478`，`IdentityFile ~/.ssh/id_ed25519`（另有 `windows-pc-lan` → `192.168.1.2`） |
+| 一次就通 | `ssh -o BatchMode=yes windows-pc "echo OK"` → `OK`（**密钥免密**） |
+| 装在哪 | 注册表**查不到** TickTick 卸载项（`DisplayName -like '*Tick*'` 空）⇒ 只能搜盘：`C:\Program Files (x86)\滴答清单`（**8.2.5.0**，73 MB），另有一份 `D:\Program Files\滴答清单` 是 **6.0.0.1 旧残留** |
+| 取回 | 远端 `tar.exe -czf %TEMP%\tt.tgz -C "<安装目录>" .`（31.5 MB）→ `scp` → 本机解开 73 MB |
+| 界面资源 | **不是 `app.asar`**，是 **`TickTick.g.resources`**（.NET 资源，23.1 MB / **1296 条**）。远端 PowerShell 用 `System.Resources.ResourceReader` 逐条导出（**639 个 BAML** + 630 张图片），11 MB 拉回 |
+
+> 🔴 **两粒代价，都记进 §7 #662**：①远端 PowerShell 里的中文与引号会被吞 ⇒ 一律 `-EncodedCommand`（UTF-16LE base64），否则报的是「找不到命令」这种误导性错误；②**先假设「Electron」让我白花了一轮**（下了安装包、试了三条 innoextract 路），而 `resources/app.asar` 在这条路上**根本不存在**。
+
+### 9.2 它是什么（证据表）
+
+| 维度 | 实测 |
+|---|---|
+| 版本 / 路径 | **8.2.5.0**，`C:\Program Files (x86)\滴答清单`，73 MB |
+| 主程序 | `TickTick.exe` **36.3 MB**，PE **x86_64**，**托管 .NET**（REA `rea-dotnet-static` 读到 metadata `v4.0.30319`） |
+| UI 栈 | **WPF**（`TickTick.exe.config` 引用 `System.Configuration.*, Version=4.0.0.0`；引用 `PresentationFramework` / `PresentationCore` / `WindowsBase`）+ `CommunityToolkit.Mvvm` |
+| 界面产物 | **639 个 BAML**，外加 630 张 PNG/ICO |
+| 数据层 | **`sqlite-net`**（`SQLite` 命名空间的 `Table`/`Column` 特性；该 DLL 内 123 个 TypeDef）+ `TickTickDao.dll` + `sqlite3.dll` |
+| 共享逻辑 | **`KotlinMultiplatformAll.dll` 6.75 MB**（x86_64 native）—— 与 macOS 的 `KotlinMultiplatformAll.framework` **同名同源** |
+| 内嵌浏览器 | **WebView2**（`Microsoft.Web.WebView2.Core/Wpf.dll` + `WebView2Loader.dll`）⇒ 局部富内容走 Chromium |
+| 其它关键件 | `SmartDateDLL.dll`（自然语言日期）、`NHunspell`/`Hunspellx64`（拼写）、`Ical.Net`（iCal）、`NodaTime`（时区）、`NHotkey.Wpf`（**全局热键**）、`NAudio`、`QRCoder`、`Mapster`、`Newtonsoft.Json`、`Bugsnag`、`ICSharpCode.AvalonEdit` + **40 份 `.xshd`**（代码高亮） |
+| 🔴 卫生问题 | 一起发了**调试版 CRT**：`msvcp140d.dll` / `vcruntime140d.dll` / `vcruntime140_1d.dll` / `ucrtbased.dll`（Debug 运行时不进安装包：体积 + 依赖调试环境） |
+
+### 9.3 界面清单：491 个 view、17 个能力域
+
+`views/` 下 491 个 BAML，按二级目录（前 20）：
+
+| 目录 | 数 | 目录 | 数 | 目录 | 数 | 目录 | 数 |
+|---|---:|---|---:|---|---:|---|---:|
+| calendar | 37 | upgrade | 15 | project | 11 | setting | 10 |
+| config | 35 | theme | 15 | filter | 11 | timeline | 9 |
+| misc | 34 | tag | 15 | ai | 11 | quickadd | 8 |
+| pomo | 31 | print | 14 | | | tasklist | 7 |
+| time | 25 | widget | 13 | | | kanban | 6 |
+| habit | 23 | markdown | 12 | | | | |
+| countdown | 18 | search | 11 | | | | |
+| detail | 17 | | | | | | |
+
+**取值**：与 macOS 的 nib 清单**同构但粒度更细** —— Windows 把「打印」「Markdown」「widget」也拆成独立 view 组（macOS 那边这些在代码里）。**日历（37）与专注（31）在两端都是最重的两块**。
+`resource/` 下另有 144 个主题与资源字典：`colorresource`、`fontresource/*`、`icons_light` / `icons_dark` / **`icons_pink`**、`pomoicons`、`sideBar`。
+
+### 9.4 设计系统：三层，且跟前端那套**不一样**
+
+#### ① 颜色：216 个键，其中 **168 个是 `color_#HEX`**
+
+`resource/colorresource.baml` 的键名（原样）：
+
+```
+white_02 white_03 … white_95            （25 个：白 + 透明度刻度）
+black_02 black_03 … black_95            （23 个：黑 + 透明度刻度）
+color_#001968 color_#00ABFA …           （168 个：字面色值）
+```
+
+**这是本节最值得看的一条**：它**没有语义 token 层**（没有 `text_primary` / `bg_surface` 这种名字），色值本身就是身份；`color_#XXXXXX` 这种命名一眼是**设计稿导出工具**生成的 —— 它把设计稿色板**整包**搬进资源字典。
+
+后果（**推断，未核实**）：换肤只能**整包换一套字典**，做不到按语义局部替换 —— 这也解释了为什么它要维护 `icons_light` / `icons_dark` / `icons_pink` 三套图标：**主题是整包的**。
+
+> ⚠️ 与 §3.6 ⑤ 对账：macOS 的 nib 里 96% 是**系统语义色**。两端策略**相反**，但别急着判「macOS 更好」—— AppKit 的 `NSColor` 本来就只有语义色可选，它只是顺着平台的便宜路走。**同一个产品在两个平台各走各的便宜路，正是跨端设计系统最容易碎的地方。**
+
+#### ② 字号：**三档可调 + 每档 delta**，不是一套固定 pt
+
+`resource/fontresource/` 有 `font_normal` / `font_middle` / `font_large` 三份，键名形如：
+
+```
+Double9_12_13   Double8_12_13   Double11Add1   Double11Add2
+Double10Add3    Double20Add2    Double52Add6   Double60Add6
+Double72Add6    Double72Add8    Double80Add6   Double92Add8
+```
+
+**读法**：`9_12_13` = 同一字号在三档下的取值；`11Add1` = 基准 11、该档 +1。也就是**一套 key + 三张 delta 表**，切字号时布局不重排。
+**这条可以直接借**：heyta 若要做「字体大小」设置，**delta 表比三套完整字号便宜得多**。
+
+#### ③ 字体族：5 套包，跟图标/配色并列成主题的一部分
+
+`fontfamily` 资源：`normal` / `yahei`（微软雅黑）/ `sourcehansans`（思源黑体）/ `yozai`（悠哉字体）/ `975maru`（975 丸ゴシック）；
+`TTF/` 里另带 BeVietnamPro / CrimsonText / GoogleSans / **Inter** / Manrope。
+**取值**：它把「字体风格」当**主题**（与图标、配色一起换），而不是给用户一个 font-family 下拉。
+
+### 9.5 两端对照（同一产品，两套栈）
+
+| 维度 | macOS 8.2.03 | Windows 8.2.5 |
+|---|---|---|
+| UI 栈 | AppKit（Swift + ObjC 框架群） | **WPF（.NET Framework 4.x）** |
+| 界面产物 | 436 nib | **639 BAML**（1296 条资源） |
+| 本地库 | GRDB（SQLite） | **sqlite-net**（SQLite） |
+| 共享逻辑 | `KotlinMultiplatformAll.framework` | `KotlinMultiplatformAll.dll`（**同名同源**） |
+| 自然语言日期 | `nlp_macOS` | `SmartDateDLL.dll` |
+| 全局热键 | MASShortcut | NHotkey.Wpf |
+| 富文本 / 代码 | Highlightr | WebView2 + AvalonEdit + `.xshd` |
+| 颜色策略 | 系统语义色 | **字面色板（168 个 `color_#`）** |
+| 字号策略 | 固定 5 档 | **三档可调 + delta** |
+| 安装包 | MAS（沙盒 + app group） | Inno Setup，**无沙盒** |
+
+**两个可迁移的判断**：
+
+1. **UI 各写、语义共享**：两端 UI 技术零重叠（nib vs BAML），但**数据模型与同步核心是同一份 Kotlin**。这正是 heyta 的多端策略 —— 这是一个「真这么干也能行」的外部实证。
+2. **平台强制项会撕开设计系统**：同一套设计，macOS 走语义色、Windows 走字面色板。说明「跨端一套 token」不能靠自觉，得靠**门禁**（heyta 的 `check:design` 就是干这个的）。
+
+### 9.6 本节新增的可参考项（接 §4 的编号）
+
+- **4.8 字号做「delta 表」而不是「三套字号」**：一处 key + 每档增量，切档不重排（证据 9.4②）。
+- **4.9 主题 = 色 + 字 + 图标 三件套整包换**：`icons_light/dark/pink` + 5 套字体族同属一层资源（证据 9.3 / 9.4③）。heyta 的 skin 若只换色，换出来的主题会「半新半旧」。
+- **4.10 反面教材：色板字面命名 ⇒ 换肤退化成整包替换**（证据 9.4①）—— 直接支持仓规「语义名不用外观名」。
+- **4.11 反面教材：调试 CRT 进了安装包**（`msvcp140d` 一族，证据 9.2）—— 交付清单里值得加一条「产物内无 `*d.dll`」。
+
+### 9.7 还没做的（下一轮）
+
+- **BAML → XAML**：现在拿到的是**结构、键名、色板、字号规则**，**还没有具体控件尺寸/间距/圆角**。要在 Windows 上用 `System.Windows.Baml2006.Baml2006Reader` + `XamlXmlWriter` 转 639 份（脚本属下一轮）。
+- **`KotlinMultiplatformAll.dll`**：仍是 native 且符号剥离，结论与 macOS 侧一致（只看到 `SYNC`/`Patch`/`Clock`/`Conflict` 的字符串）。
+- **Windows 本地库**：`sqlite-net` 的库文件在 `%APPDATA%` / `%LOCALAPPDATA%` 下，**这次没取**（要先跑起来才有数据）。它的表结构是下一个高价值目标 —— 能直接和 macOS 那 58 张表对账。
+
+---
+
+## 10. 一句话给下一位
 
 > 逆向这件事的价值不在「看到它怎么写的」，而在**「发现它被迫回答过的问题，而我们还没回答」**。
 > 本文能直接用的只有 §4 那七条问题清单 + §3.6 那七条形状；其余全是**它的表达**，看一眼就够了。
 >
-> **Windows 侧现在只差一件事**：把 `%LOCALAPPDATA%\Programs\TickTick\resources` 放到 SHARE 盘（§7.1 那条 PowerShell 原样可粘）。
-> 在那之前，**别**基于「它也是 Electron」写任何计划 —— 那是 §8 第 5 条明写的未核实项。
+> **Windows 侧已经通了**：它是 WPF/.NET（§9），不是 Electron；取数走 SSH（`~/.ssh/config` 里的 `windows-pc`），不用摆渡。
+> 下一轮只有两件事值得做：**BAML → XAML**（拿精确尺寸/间距）与 **Windows 本地库的表结构与 macOS 58 张表对账**。
+>
+> ⚠️ 还有一条给人看的：**「另一台机器」先读 `~/.ssh/config`，再谈权限、再扫网络**（§7 #662）。本文上一轮把「我看不到你的 Windows」归因成「缺权限」，是错的。
