@@ -20,6 +20,14 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 vi.mock('../src/lib/oplog.js', () => ({
+  /*
+    `onEngineChange` 是 `lib/oplog.ts:121` 的既有导出。2026-11-06 起
+    `features/sync/store.ts` 在模块顶层就调它（"引擎一变就刷待上传条数"），
+    于是**任何 import 到 store 的图**都会在替身里要求这一枚 ——
+    缺了它这一整份 spec 会在 import 阶段就死（`No "onEngineChange" export is defined`），
+    而不是某条断言红。替身只需要"能挂能摘"，不需要真的回调。
+  */
+  onEngineChange: () => () => {},
   hasEngine: () => true,
   requireEngine: () => ({ getClientId: () => 'device-test' }),
   // 由 `bindings` 控制"这台设备绑了哪几份清单"（= 清单行绑定那一支闸门）。
