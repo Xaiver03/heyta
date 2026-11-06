@@ -210,6 +210,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 [dida365-feature-benchmark.md](../research/dida365-feature-benchmark.md) **§9.2**（只读那一节），
 2026-11-05 现量五条仍缺：无看板、`TaskFilter` 是封闭联合、`nextAfterCompletion` 零生产调用点、
 `Task.order` 无写入路径、C1 富文本没做。
+**2026-11-06 更新：五格全部翻面** —— 看板 ✅ `fd54a3ceb`、TaskFilter 已可存 ✅ `ac9750e48`、完成后顺延 ✅ `9441692af`、Task.order 写入路径 ✅ `2b2fea22c`、C1 富文本 ✅ `97806bb4c`。
 
 ---
 
@@ -233,10 +234,10 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 
 | 缺口 | 现量 |
 |---|---|
-| 看板视图 | `ls apps/web/src/features/`（没有这一族；命中的"看板"只是注释里列举覆盖面） |
+| 看板视图 | ✅ **已落**（2026-11-06 `fd54a3ceb`）：`apps/web/src/features/kanban/KanbanView.tsx`，列=清单、卡片=任务、拖拽跨列改归属（dnd-kit） |
 | 自定义筛选器 | `sed -n '51,60p' packages/domain/src/task-filter.ts`（封闭联合） |
 | 重复的「完成后顺延」 | ✅ **这一格 2026-11-06 已翻面**（不再是缺口）：`grep -rn "nextAfterCompletion(" --include='*.ts' packages/*/src apps/*/src \| grep -v "export function"` 现在读 **1 处生产调用点**（原先读 0 ⇒ 那正是当年判"仍是固定排期"的依据）。取舍与复跑口径在 benchmark **§9.5** |
-| 手动拖拽排序 | `grep -rn "order:" packages/app-host/src/actions.ts`（空 ⇒ `Task.order` 是死字段） |
+| 手动拖拽排序 | ✅ **已落**（2026-11-06 `2b2fea22c`）：`setOrder` 写入路径 + `'manual'` 排序档 + `SortableTaskList` dnd-kit 容器 |
 | 富文本备注 | 见 4.1 的 C1：门禁半已闭合（benchmark **§9.6**），欠的只剩实现 |
 
 ### 4.3 验收面欠的（不是功能，是证据）
