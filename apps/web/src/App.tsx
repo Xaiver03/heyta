@@ -120,6 +120,7 @@ import { SubtaskBadge } from './features/tasks/SubtaskPicker.js';
 // 行操作 UX 重设计（2026-11）：行尾不再挂「⋯ 更多」那一排编辑器，
 // 行操作的主入口是**右键上下文菜单**（`TaskRowMenu`），可发现入口是**点行 → 详情**。
 import { TaskRowMenu } from './features/tasks/TaskRowMenu.js';
+import { FilterPanel } from './features/tasks/FilterPanel.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
@@ -2699,6 +2700,12 @@ export function App(): React.JSX.Element {
                   <span>{t(tab.labelKey)}</span>
                 </button>
               ))}
+            </div>
+            {/* D1 ③ 已存视图：侧栏底部入口，与回收站同一形状。 */}
+            <div className="ht-nav ht-sidebar__filters" role="group" aria-label={t('web.filter.sidebar')}>
+              <FilterPanel
+                onApplyFilter={(filter) => useTaskStore.getState().setFilter(filter)}
+              />
             </div>
           </div>
           {/* 右边缘的拖拽手柄（绝对定位在这一列上，不占布局）。 */}
