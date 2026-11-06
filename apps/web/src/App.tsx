@@ -180,6 +180,7 @@ import { ShareFeature } from './features/share/ShareFeature.js';
 import { ShareNotificationSettings } from './features/share/ShareNotificationSettings.js';
 import { loadProjectTaskSort, saveProjectTaskSort } from './features/projects/project-sort-pref.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
+import { KanbanView } from './features/kanban/KanbanView.js';
 import { HabitDetailCard } from './features/habits/HabitDetailCard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
 import { GrowthView } from './features/motivation/GrowthView.js';
@@ -3363,6 +3364,13 @@ export function App(): React.JSX.Element {
            */}
           {contentView === 'quadrant' && (
             <QuadrantBoard onOpenTask={openTask} activeTaskId={selectedTaskId} />
+          )}
+          {contentView === 'kanban' && (
+            <KanbanView
+              tasks={Object.values(store.entities.tasks)}
+              projects={projects.projects}
+              onMoveTask={(taskId, projectId) => { void store.moveToProject(taskId, projectId); }}
+            />
           )}
           {contentView === 'habits' && <HabitsView paneInColumn={detailColumnShown} />}
           {/**

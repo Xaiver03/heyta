@@ -14,6 +14,7 @@ import {
   Check,
   CheckCircle2,
   CircleDot,
+  Columns3,
   Inbox,
   Hourglass,
   Move,
@@ -129,6 +130,7 @@ export type ViewKey =
   | 'search'
   | 'calendar'
   | 'quadrant'
+  | 'kanban'
   | 'habits'
   | 'focus'
   | 'timeline'
@@ -235,6 +237,7 @@ export const MODULE_VIEW_TABS: readonly ViewTab[] = [
   // 实测过一次：只把 `Icon` 换成 `Move` 并把对象拆成多行，那条对账就报"rail 少一项"，
   // 而 key、顺序、词条一个字都没动。
   { key: 'quadrant', labelKey: 'web.shell.nav.quadrant', Icon: Move },
+  { key: 'kanban', labelKey: 'web.shell.nav.kanban', Icon: Columns3 },
   { key: 'habits', labelKey: 'web.shell.views.habits', Icon: Check },
   { key: 'timeline', labelKey: 'web.shell.views.timeline', Icon: ChartGantt },
   { key: 'focus', labelKey: 'web.shell.views.focus', Icon: Sun },

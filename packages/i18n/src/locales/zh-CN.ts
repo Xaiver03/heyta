@@ -493,6 +493,7 @@ export const zhCN = {
   'web.shell.nav.next7Days': '最近 7 天',
   'web.shell.nav.completed': '已完成',
   'web.shell.nav.quadrant': '四象限',
+  'web.shell.nav.kanban': '看板',
   'web.shell.nav.project': '清单',
   'web.shell.nav.tag': '标签',
   /**

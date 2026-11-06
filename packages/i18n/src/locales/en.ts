@@ -424,6 +424,7 @@ export const en = {
   'web.shell.nav.next7Days': 'Next 7 Days',
   'web.shell.nav.completed': 'Completed',
   'web.shell.nav.quadrant': 'Quadrants',
+  'web.shell.nav.kanban': 'Board',
   'web.shell.nav.project': 'List',
   'web.shell.nav.tag': 'Tag',
   // Same discipline as zh: the options come from the domain's `TASK_SORT_KEYS`, and
