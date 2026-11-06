@@ -56,7 +56,7 @@
 | 编译产物 | **436 个 nib**（430 个直接躺在 `Contents/Resources`，另 6 个在 `Base.lproj` / `zh-Hans.lproj` / Widget / TickTickKit 里） | `find -name "*.nib"` |
 | 本地化 | **3 528 条键值**（en / zh-Hans 各 3 528，**键集完全相同**，实测差集两侧均为 0） | 解析 `Localizable.strings` |
 | 本地库 | **58 张 `CREATE TABLE`**（56 张业务表 + `Z_PRIMARYKEY` + `grdb_migrations`），DDL **以字符串形式嵌在二进制里** | `strings -a TTGRDBPod` |
-| 接口 | **38 条** `/api/…` 路径（v1×1 / **v2×32** / v4×6） | `strings -a` 主二进制 |
+| 接口 | **主二进制 38 条 + TickTickKit 60 条 = 98 条** `/api/…`，两处**零重叠**（v1×1 / v2×32 / v4×6 只是主二进制那一半） | `strings -a` 两个二进制 |
 | 沙盒 | `app-sandbox` + app group `75TY9UT8AY.com.TickTick.task.mac` + **APS 推送** + associated domains（`dida365.com` / `ticktick.com`） | `codesign -d --entitlements` |
 
 ### 2.1 依赖指纹（能说明它的工程取向）
@@ -78,7 +78,8 @@
 | `nlp_macOS` | 本地自然语言（日期解析那类） |
 | `TTCoreDataPod` | 旧 CoreData 遗留（9.6 MB，仍在链上） |
 
-> 工程取向的推论（**未核实**，仅作对照）：它把**同步/冲突**放在跨端共享的 Kotlin 层，把 UI 与本地库留在原生 —— 与 heyta「共享层放业务语义、宿主壳只放平台差异」是同一条思路，只是它用的是 Kotlin Multiplatform，heyta 用的是 TS 包。
+> 🔴 **修正（2026-11-06，P4 支线复核后推翻本句原稿）**：原稿写「它把同步/冲突放在跨端共享的 Kotlin 层」——**这是错的**。`TickTickKit.framework` 里保留了内嵌源码路径 `TTSyncManager.swift` / `TTSyncService.swift` / `TTBatchSyncHandler.swift`，还有逐实体子类（Task/Project/ProjectGroup/Tag/Filter）与四个**任务维度**处理器（Assignee/Order/Parent/ProjectUpdated）；反过来 Kotlin 切片里 1024 个 `KMA*` 类名**没有任何 `KMASync*` 引擎类**，只有 `KMAConstantsSyncType` / `SyncStatus` / `KanbanSyncStatus` / `KMADeletedStatus` 这类**词汇与枚举**。
+> **正确说法**：**同步编排在原生层，Kotlin 共享的是枚举、状态词表与规则常量。** 这对 heyta 的启示反而更强 —— 「共享语义」不等于「共享引擎」。
 
 ### 2.2 Windows 包的读数（这一轮能拿到的部分）
 
@@ -112,7 +113,7 @@
 
 ### 3.1 菜单 = 顶层 IA（最干净的一份证据）
 
-`Contents/Resources/Base.lproj/MainMenu.nib` 解出 9 个菜单、**62 个非分隔菜单项**，`List` 菜单直接列出了它的**全部顶层视图**：
+`Contents/Resources/Base.lproj/MainMenu.nib` 解出 9 个 `NSMenu` 对象、**62 个非分隔菜单项**。⚠️ 这个 62 常被读错，**口径是 7 + 55**：7 = 菜单栏自身那一行的条目（应用名 / File / Edit / List / Task / Window / Help），55 = 叶子项（TickTick 8 + File 3 + Edit 10 + Task 11 + List 13 + Window 6 + Speech 2 + Help 2）。`List` 菜单直接列出了它的**全部顶层视图**：
 
 ```
 Pomodoro · All · Assignee · Calendar · Completed · Habit · Inbox
@@ -191,7 +192,8 @@ USER · USERDOCUMENT · USERSETTINGS
 
 ### 3.5 接口与权限
 
-- **38 条** `/api/…` 路径，重心在 **v2（32 条）**，v4 只剩日历相关的 6 条 —— 说明它有一轮大的 v2→v4 迁移还没迁完（**未核实**是否已停用 v2）。
+- **两处合计 98 条** `/api/…`：主二进制 38 条（v2×32、v4×6）+ **`TickTickKit.framework` 60 条**，两者**零重叠**。Kit 那 60 条里有整个专注面（`/api/v2/pomodoro` 一族 7 条）与回收站（`/trash/restore`、`/trash/empty`），还有按家族批量（`habits/batch`、`habitCheckins/batch`、`countdown/batch`）。
+- 🔴 **可见字面里没有任何 `/sync` 或 `/delta`** —— 主同步通道的端点在静态层**不可见**；能看到的批量路径是 `api/v2/<family>/batch`（**不带前导斜杠** ⇒ 基址是运行时拼的）。所以「它怎么同步」不能靠 grep 路径回答（另见 §8 第 3 条）。
 - 直读到的域名：`dida365.com` / `ticktick.com` / `pull.*`（更新） / `help.*` / `api.twitter.com` / `graph.qq.com` / `open.weixin.qq.com` / `accounts.google.com` / `slack.com`。**还有 `future-test.365dida.com` / `future-dev.365dida.com` 这类测试域留在壳里** —— 这是它的卫生问题，heyta 别学。
 - Entitlements：`app-sandbox`、app group、`aps-environment=production`、`applesignin`、`associated-domains`（6 个 applink）、`personal-information.calendars`、`print`、`files.user-selected.read-write`、`network.client`。
 - **它没有** `files.downloads` 之类的宽权限 —— 导出走用户选择文件；这一条与 heyta 的本地优先并不冲突，但说明「沙盒内也能做完整导出」。
@@ -286,19 +288,19 @@ USER · USERDOCUMENT · USERSETTINGS
 ### 4.1 每个视图一张独立的手动排序表 —— 而不是一条 `sortOrder` 字段
 
 - **它**：7 张排序表（pinned / priority / dueDate / tag / project / 通用）。同一个任务在不同视图里有**不同的位置**。
-- **heyta 现状**：手动排序是已知缺口（对标文档里「手动排序」是明列的那一类）。
+- **heyta 现状**：不只是「缺口」—— **连字段都没有**。`entities.ts:348-356` 明文禁止 `isPinned` / `sortOrder`，全仓只有 `pinnedAt` 两档；`sortOrder` 的命中只有那两处注释、零实现。⇒ 「要不要 per-view 手排」**没有任何 ADR 回答过**（P4 的 Q6，属待产品拍板项）。
 - **该学的是决定**：排序是 **`(视图, 视图实例)` 的二维属性**，不是实体属性。但**不要**学它 7 张同构表的形状 —— 泛化成一张 `(scope, scopeId)` 排序表在关系库里更省，也不会随视图增加而加表。**形状照搬 = 抄；把约束想清楚 = 学。**
 
 ### 4.2 重复任务：物化实例 + 「已取用」标记
 
-- **它**：`REPEATINSTANCE`（实例）+ `REPEATINSTANCEFETCHFLAG`（取用标记）。
+- **它**：`REPEATINSTANCE`（实例）+ `REPEATINSTANCEFETCHFLAG`。⚠️ 后者**不是布尔**：它的列是 `FETCHBEGINDATE` + `FETCHENDDATE`，是一段**闭区间水位** ⇒ 重复实例是**按视窗懒物化**的（看过哪一段就物化哪一段）。而 `ZTTREPEATINSTANCE` 只有时间列 ⇒ **内容仍属母任务**，实例只是「时间占位」。
 - **heyta 现状**：op-log + 读时展开（不物化）。
 - **取舍**：物化省「读时算」，但要回答「改了 RRULE 之后历史实例算谁的」；读时展开省「回填」，但要回答「跨时区/跳过规则下的稳定 id」。`FETCHFLAG` 说明它选的是**物化**，并且用标记解决「哪些已经落到任务表」。
 - **该学的是**：这是个**必须写进 ADR 的二选一**，且两种都要回答「规则变更后的历史归属」。不要因为看到它物化就跟着物化 —— heyta 的 op-log 语义下物化会让回放产生副作用，那是 [`hard-constraints`](../agents/hard-constraints.md) §3.4 明令禁止的形状。
 
 ### 4.3 专注会话单独一条同步通道
 
-- **它**：`FOCUSSYNCOPERATION` 独立成表，没有并进 `TASK` 的同步字段。
+- **它**：`FOCUSSYNCOPERATION` 独立成表，没有并进 `TASK` 的同步字段。更精确的读数：全库 `ZOP` 出现在 **5 张表**，但 `ZOID` + `ZOTYPE` **只在 `ZTTFOCUSSYNCOPERATION`** ⇒ **专注是唯一的「操作队列」形状**，其余是「行状态位」（`ZSYNCSTATUS` 覆盖 36/58 表、`ZACCOUNTID` 52/58、`ZCHECKPOINT` 只在 `ZTTUSER`）。58 张表里**没有任何全量 oplog 表** —— 它走的是状态同步，不是事件溯源。
 - **heyta 现状**：`FocusActions` 只有 `log` / `listSessions`（详情面那条缺口）。
 - **该学的是**：**写入频次不同的实体，同步通道要分开**。番茄钟是「高频、短小、单调递增」，与任务的「低频、大对象、需合并」不是同一类负载。混在一条通道里，任务同步会被番茄记录拖慢。
 
@@ -393,6 +395,17 @@ strings -a /tmp/TT-arm64 | grep -oE '_TtC[0-9]+[A-Za-z0-9_]+' | sort -u | wc -l 
 # 6) 权限与签名
 codesign -d --entitlements :- /Applications/TickTick.app
 
+# 6.5) 菜单键的启发式交叉复核（P5 支线；`menu.json` 的生成脚本没落盘）
+#      在 nib 值段里取 0x81 头 + 可打印字符，得到 12 个互不相同的键，与 menu.json 的 12 个不同键一致。
+#      ⚠️ 这是启发式，不是官方解析 —— 只用来独立验数，别当格式规范引用。
+python3 -c "import re;d=open('/Applications/TickTick.app/Contents/Resources/Base.lproj/MainMenu.nib','rb').read();print(sorted({m.group(1).decode() for m in re.finditer(rb'\x81([\x20-\x7e])',d)}))"
+# 输出: [',', 'Z', 'a', 'c', 'f', 'h', 'm', 'q', 'v', 'w', 'x', 'z']   （h 驻留只存 1 条 ⇒ 记录 12 ≠ 有键项 13）
+
+# 6.6) Kit 那一半 API（与主二进制零重叠）
+TK=/Applications/TickTick.app/Contents/Frameworks/TickTickKit.framework/Versions/A/TickTickKit
+strings -a "$TK" | grep -oE '/api/v[0-9]/[a-zA-Z0-9/_.-]{2,60}' | sort -u | wc -l    # 60
+strings -a "$TK" | grep -oE 'TT(Sync|Focus|Trash)[A-Za-z]+\.swift' | sort -u        # 同步编排在原生层
+
 # 7) Windows 包：能下、能判形态、解不开载荷
 curl -sL "https://ticktick.com/static/getApp/download?type=win64" -o /tmp/TickTick-win64.exe   # 24 130 416 B
 file /tmp/TickTick-win64.exe        # PE32 executable (GUI) Intel 80386, for MS Windows
@@ -429,7 +442,7 @@ SHARE 盘摆渡仍然可用，但**不再是唯一路径**。
 0. **🔴 勘误（本文第一稿写错、已订正，留原句）**：第一稿写的是「`research/dida365-feature-benchmark.md` 在仓内不存在，索引与文件系统漂移」。**这是错的**：那份文件住在 **`docs/research/`**，而且 `docs/README.md` 里的 `research/xxx.md` 是**相对 `docs/` 解析**的（`check:docs` 的 `resolve(dir, target)` 就是这个口径）。错因是我拿 `ls research/`（仓库根那个目录）去对链接，**没先确认解析基准**。教训与仓内 #208 一族同形：**先问"这个路径从哪一层算起"，再判缺不缺。** 这条勘误本身也是证据：§7 的 `check:docs` 是能红的，别靠眼睛判链接。
 1. **未核实**：`Starscream`（WebSocket）承载的是什么（实时同步？协作光标？推送兜底？）—— 只有框架在链上，没有行为证据。
 2. **未核实**：v2 是否已停用。38 条路径里 v2 占 32 条、v4 只有 6 条（全是日历），不能据此说「v2 还活着」。
-3. **未核实**：`KotlinMultiplatformAll` 是否真的承载同步与冲突解决。只有 `SYNC`/`Patch`/`Clock`/`Conflict` 的字符串计数，没有符号，「有字符串」不等于「有实现」。
+3. ✅ **已否证（原第 3 条）**：`KotlinMultiplatformAll` **不承载**同步引擎。`TickTickKit` 里内嵌了 `TTSyncManager.swift` / `TTSyncService.swift` / `TTBatchSyncHandler.swift` + 逐实体、逐维度子类；而 Kotlin 那 1024 个 `KMA*` 类名里**没有任何 `KMASync*`**（只有 `KMAConstantsSyncType` 一类词汇）。⇒ 同步编排在**原生层**，Kotlin 共享的是枚举与规则。原稿那句推断已按此改写（见 §2.1）。
 4. **未核实**：本地库的真实 schema（表名是**迁移 DDL 的累积**，实际库可能还有运行时 `ALTER`）。这一条只能靠 §6 的 FDA 路线补。
 5. ✅ **已核实（Windows，原第 5 条）**：**它不是 Electron。** 是 .NET Framework 4.x + WPF（`TickTick.exe` 托管、639 BAML、`sqlite-net`、WebView2）。上一版把它列成「最高优先级未核实」，现在结案；推翻过程与代价写在 §9.1（教训：**先读 `~/.ssh/config`，再假设「拿不到」**）。
 6. **未核实（Windows）**：载荷位数（32/64）、WebView 内核版本、托盘/快捷键注册方式、它是否复用 macOS 同一套业务逻辑（`KotlinMultiplatform` 在 Windows 上是 JVM 还是 Kotlin/Native）。这四条都要等文件。
@@ -450,7 +463,7 @@ SHARE 盘摆渡仍然可用，但**不再是唯一路径**。
 | 一次就通 | `ssh -o BatchMode=yes windows-pc "echo OK"` → `OK`（**密钥免密**） |
 | 装在哪 | 注册表**查不到** TickTick 卸载项（`DisplayName -like '*Tick*'` 空）⇒ 只能搜盘：`C:\Program Files (x86)\滴答清单`（**8.2.5.0**，73 MB），另有一份 `D:\Program Files\滴答清单` 是 **6.0.0.1 旧残留** |
 | 取回 | 远端 `tar.exe -czf %TEMP%\tt.tgz -C "<安装目录>" .`（31.5 MB）→ `scp` → 本机解开 73 MB |
-| 界面资源 | **不是 `app.asar`**，是 **`TickTick.g.resources`**（.NET 资源，23.1 MB / **1296 条**）。远端 PowerShell 用 `System.Resources.ResourceReader` 逐条导出（**639 个 BAML** + 630 张图片），11 MB 拉回 |
+| 界面资源 | **不是 `app.asar`**，是 **`TickTick.g.resources`**（.NET 资源，23.1 MB / **1296 条**）。远端 PowerShell 用 `System.Resources.ResourceReader` 逐条导出（**1296 条 = 639 baml + 657 图片/其它**），11 MB 拉回 |
 
 > 🔴 **两粒代价，都记进 §7 #662**：①远端 PowerShell 里的中文与引号会被吞 ⇒ 一律 `-EncodedCommand`（UTF-16LE base64），否则报的是「找不到命令」这种误导性错误；②**先假设「Electron」让我白花了一轮**（下了安装包、试了三条 innoextract 路），而 `resources/app.asar` 在这条路上**根本不存在**。
 
@@ -461,7 +474,7 @@ SHARE 盘摆渡仍然可用，但**不再是唯一路径**。
 | 版本 / 路径 | **8.2.5.0**，`C:\Program Files (x86)\滴答清单`，73 MB |
 | 主程序 | `TickTick.exe` **36.3 MB**，PE **x86_64**，**托管 .NET**（REA `rea-dotnet-static` 读到 metadata `v4.0.30319`） |
 | UI 栈 | **WPF**（`TickTick.exe.config` 引用 `System.Configuration.*, Version=4.0.0.0`；引用 `PresentationFramework` / `PresentationCore` / `WindowsBase`）+ `CommunityToolkit.Mvvm` |
-| 界面产物 | **639 个 BAML**，外加 630 张 PNG/ICO |
+| 界面产物 | **639 个 BAML**（`ui/` 目录实有 **1296** 个文件 = 639 baml + 598 png + 32 ico + 12 jpg + 9 json + 4 ttf + 2 cur；「639」只对 `.baml` 成立） |
 | 数据层 | **`sqlite-net`**（`SQLite` 命名空间的 `Table`/`Column` 特性；该 DLL 内 123 个 TypeDef）+ `TickTickDao.dll` + `sqlite3.dll` |
 | 共享逻辑 | **`KotlinMultiplatformAll.dll` 6.75 MB**（x86_64 native）—— 与 macOS 的 `KotlinMultiplatformAll.framework` **同名同源** |
 | 内嵌浏览器 | **WebView2**（`Microsoft.Web.WebView2.Core/Wpf.dll` + `WebView2Loader.dll`）⇒ 局部富内容走 Chromium |
@@ -488,14 +501,14 @@ SHARE 盘摆渡仍然可用，但**不再是唯一路径**。
 
 ### 9.4 设计系统：三层，且跟前端那套**不一样**
 
-#### ① 颜色：216 个键，其中 **168 个是 `color_#HEX`**
+#### ① 颜色：**215 个键**，其中 **167 个是 `color_#HEX`**
 
 `resource/colorresource.baml` 的键名（原样）：
 
 ```
 white_02 white_03 … white_95            （25 个：白 + 透明度刻度）
 black_02 black_03 … black_95            （23 个：黑 + 透明度刻度）
-color_#001968 color_#00ABFA …           （168 个：字面色值）
+color_#001968 color_#00ABFA …           （167 个：字面色值；`colors.txt` 里 168 行是因为有 1 枚键重复）
 ```
 
 **这是本节最值得看的一条**：它**没有语义 token 层**（没有 `text_primary` / `bg_surface` 这种名字），色值本身就是身份；`color_#XXXXXX` 这种命名一眼是**设计稿导出工具**生成的 —— 它把设计稿色板**整包**搬进资源字典。
