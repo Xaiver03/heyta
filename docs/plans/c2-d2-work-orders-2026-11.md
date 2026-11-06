@@ -40,8 +40,13 @@
 行为默认值（周起始 / 默认提醒 / 默认清单 / 默认时长 / 智能识别）走 op。
 判据：改主题 ⇒ op-log 条数不变（注成 `dispatch` 就红）。
 
-🔴 落地前第一件事：按 ADR-0085 第 4 条**建 `docs/reference/client-persistence-keys.md`**，
-外观类与行为类分两列 —— 现在这份清单**不存在**（`docs/reference/` 下零登记表），而 R13b 会一次加很多键。
+✅ **登记表已经建好了**：[`docs/reference/client-persistence-keys.md`](../reference/client-persistence-keys.md)
+（四档：表达 / 视图状态 / 本机数据 / 基础设施，现量 21 个键对上源码），
+并由 `pnpm check:persistence-keys` 盯着 —— **加一个键不登记就红**（三条断言 + 三条自检臂）。
+
+🔴 所以 D-② 的动作是**往里加行**，不是新建：R13b 每加一个外观键（主题预设 / 字体 / 密度 / 行着色依据 / 应用图标），
+就按 A 档登记一行；**别**塞进 C 档（C 是"本机数据"，塞进去等于把外观当数据）。
+⚠️ 门禁只认**字面量**键名（拼出来的扫不到）—— 新键必须写成 `'heyta.x.y'` 这种字面量。
 
 ---
 
