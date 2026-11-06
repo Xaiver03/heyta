@@ -519,6 +519,7 @@ export const zhCN = {
   'web.shell.sort.display': '默认（按截止时间）',
   'web.shell.sort.addedAt': '按添加时间',
   'web.shell.sort.priority': '按优先级',
+  'web.shell.sort.manual': '手动拖拽',
   'web.shell.bulk.select': '选择任务',
   'web.shell.bulk.cancel': '退出选择',
   'web.shell.bulk.selected': '已选 {count} 项',

@@ -439,6 +439,7 @@ export const en = {
   'web.shell.sort.display': 'Default (due date)',
   'web.shell.sort.addedAt': 'Date added',
   'web.shell.sort.priority': 'Priority',
+  'web.shell.sort.manual': 'Manual',
   'web.shell.bulk.select': 'Select tasks',
   'web.shell.bulk.cancel': 'Exit selection',
   'web.shell.bulk.selected': '{count} selected',

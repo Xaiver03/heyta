@@ -398,6 +398,7 @@ export const SORT_LABEL: Record<TaskSortKey, MessageKey> = {
   display: 'web.shell.sort.display',
   addedAt: 'web.shell.sort.addedAt',
   priority: 'web.shell.sort.priority',
+  manual: 'web.shell.sort.manual',
 };
 
 /**
