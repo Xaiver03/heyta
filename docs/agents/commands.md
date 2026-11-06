@@ -159,6 +159,14 @@ pnpm check                      # 全部门禁 + **全量单元测试**：类型
                                 #    （`check:gate-wiring` 钉的是"定义过的门禁必须真的在链里"，不是位序。）
                                 # 🔴 末尾的 `pnpm -r test` 是后补的：在此之前 `check` **不跑任何单元测试**，
                                 #    于是 `apps/web` 的测试套件红了很久都没有任何东西会失败（原因见下）。
+pnpm check:traps-index-coverage # 环境陷阱「正文 ↔ 索引」的**可达性**对账：正文里每一枚编号都要能在
+                                #   `docs/agents/environment-traps-index.md` 的号段表里被读到（落在某行第一列
+                                #   声明的号段区间里，或被某行「代表条目」点名），读不到就红。
+                                #   判的是可达性**不是条数** —— AGENTS §5 与索引本节开头都明文不许在索引里写
+                                #   条数（写过一次"83 条"，六天后就漂）。已在 `pnpm check` 链里；
+                                #   `--self-test` 三臂（真实=绿、删一行号段登记=红、区间收窄到不含自己那枚=红）。
+                                #   2026-11-06 第一次跑量出 **33 枚**没入口的号（横跨四条并行线八天）；
+                                #   造这把尺的过程本身又踩出一枚新坑，见 §7 #659。
 pnpm check:checkout-tier-gates  # 收银台两道新闸门（②′ "这台实例交付得了吗"、④′ "不许把已付费的能力判小"）
                                 #   的**变异验证**：逐臂把 `server/src/billing/checkout.routes.ts` 改坏，
                                 #   要求 `server/tests/billing-checkout.routes.spec.ts` 里**具名**用例变红。
