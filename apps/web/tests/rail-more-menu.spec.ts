@@ -35,7 +35,19 @@ describe('rail 主段与更多入口', () => {
     };
     const result = splitRailTabs(tabs, 'timeline', preference);
     expect(result.primary.map((tab) => tab.key)).toEqual(['tasks', 'search', 'notes', 'calendar']);
-    expect(result.overflow.map((tab) => tab.key)).toEqual(['quadrant', 'habits', 'timeline', 'focus', 'growth', 'countdown']);
+    // 偏好里没提到的模块**按声明顺序**跟在后面（`view-tabs.ts:349` 那条"新启用的模块
+    // 进入更多，不擅自加入用户编排的常驻区"）—— 所以 `kanban` 出现在这里不是巧合，
+    // 它的位置就是它在 `MODULE_VIEW_TABS` 里的位置（quadrant 之后、habits 之前），
+    // 但因为它不在 preference.overflow 里，只能被那条兜底追加进来，排在偏好那三项之后。
+    expect(result.overflow.map((tab) => tab.key)).toEqual([
+      'quadrant',
+      'habits',
+      'timeline',
+      'kanban',
+      'focus',
+      'growth',
+      'countdown',
+    ]);
   });
 
   it('任务与搜索始终留在主段，重复或关闭的 key 不会重新出现', () => {
@@ -46,7 +58,14 @@ describe('rail 主段与更多入口', () => {
     };
     const result = splitRailTabs(tabs, 'tasks', preference);
     expect(result.primary.map((tab) => tab.key)).toEqual(['quadrant', 'calendar', 'tasks', 'search']);
-    expect(result.overflow.map((tab) => tab.key)).toEqual(['habits', 'timeline', 'focus', 'growth', 'countdown']);
+    expect(result.overflow.map((tab) => tab.key)).toEqual([
+      'habits',
+      'kanban',
+      'timeline',
+      'focus',
+      'growth',
+      'countdown',
+    ]);
     expect(result.primary.map((tab) => tab.key)).not.toContain('notes');
   });
   it('主动固定超过四个入口不会挤走任何已固定视图', () => {

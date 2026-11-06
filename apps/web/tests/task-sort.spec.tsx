@@ -156,7 +156,7 @@ describe('任务列表的排序控件', () => {
    * 新形状钉的是同一件**用户能做的事**：从页头找到排序、看懂每一档、看见当前是哪一档。
    * 换掉的是形状（收进 `⋯` 的单选组），减掉的是"页头上多一枚常驻下拉"。
    */
-  it('🔴 排序从页头 `⋯` 可达：三档都在、都是可见文字、当前档位有 aria-checked', async () => {
+  it('🔴 排序从页头 `⋯` 可达：四档都在、都是可见文字、当前档位有 aria-checked', async () => {
     await seedThree();
     const el = await mountApp();
 
@@ -170,19 +170,31 @@ describe('任务列表的排序控件', () => {
     expect(menu.textContent, '分组标题必须渲染在屏上（只挂 aria-label 不算）').toContain('排序');
 
     const items = [...menu.querySelectorAll<HTMLElement>('[data-testid^="task-sort-"]')];
+    /**
+     * 🔴 **四档，不是三档。**
+     *
+     * 2026-11-06：领域层把「手动拖拽」（`manual`，走已存在的 `Task.order`）
+     * 加进 `TASK_SORT_KEYS`，而这条断言还钉在 3 档上 —— 于是它红了 5 条 web 用例里的 2 条。
+     * 要说清的是：**这不叫"用例过时"**。它当时确实在钉"排序只有三档"，
+     * 而加一档排序本来就应该有痕迹 —— 菜单多一枚、`aria-checked` 多一格、
+     * 用户多一个可选档位。改这里不是为了让门禁绿，是把"四档"这件事记下来。
+     */
     expect(items.map((item) => item.textContent)).toEqual([
       '默认（按截止时间）',
       '按添加时间',
       '按优先级',
+      '手动拖拽',
     ]);
     // 单选语义：当前档位必须报出来，否则"我现在按什么排"无处可读。
     expect(items.map((item) => item.getAttribute('role'))).toEqual([
       'menuitemradio',
       'menuitemradio',
       'menuitemradio',
+      'menuitemradio',
     ]);
     expect(items.map((item) => item.getAttribute('aria-checked'))).toEqual([
       'true',
+      'false',
       'false',
       'false',
     ]);
@@ -219,6 +231,24 @@ describe('任务列表的排序控件', () => {
     seen.add(byPriority.join('|'));
     seen.add(byAdded.join('|'));
     expect(seen.size, '三档必须是三个不同的顺序 —— 相同就说明某个 key 根本没生效').toBe(3);
+
+    /**
+     * 🔴 「手动拖拽」**故意不进上面那张表**，这不是漏了。
+     *
+     * 这一档比的是 `Task.order`，而这批种子任务一个 `order` 都没写 ⇒
+     * 比较器对每一对都返回 0（`task-order.ts` 的 `case 'manual'`）⇒ 外层按**原序**兜底。
+     * 所以"四档排出四个不同顺序"是个**不存在**的判据：真写成 `toBe(4)` 它恒红。
+     *
+     * 能钉的是相反的那件事：**没写过 order 时手动档退回原序，而不是乱序/按 id 序**。
+     * 用户第一次看到「手动拖拽」时库里一条都没拖过，此时列表必须还是原来那个样子 ——
+     * 换个档位就把列表打乱，会让人以为拖拽数据丢了。
+     */
+    await pickSort(el, 'manual');
+    expect(rowOrder(el), '没写过 order ⇒ 手动档退回原序（与 display 同），不是乱序').toEqual([
+      '完成：甲',
+      '完成：乙',
+      '完成：丙',
+    ]);
   });
 
   it('🔴 重挂之后还是选的那一档（设备本地持久化，不是内存态）', async () => {
@@ -269,13 +299,13 @@ describe('任务列表的排序控件', () => {
    * 而「选择任务」在空列表里**被禁用而不是消失**（禁用态仍然说明"有这个能力"，
    * 消失则让用户以为产品没有这个功能）。
    */
-  it('空列表：`⋯` 仍然在、排序三档仍可选，而「选择任务」是禁用而不是消失', async () => {
+  it('空列表：`⋯` 仍然在、排序四档仍可选，而「选择任务」是禁用而不是消失', async () => {
     const el = await mountApp();
     const menu = await openMenu(el);
     expect(
       [...menu.querySelectorAll('[data-testid^="task-sort-"]')],
       '排序是视图属性，不该随数据条数消失',
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     const selectItem = menu.querySelector<HTMLButtonElement>('[data-testid="task-select-open"]');
     expect(selectItem, '没有任务时入口应当还在（说明能力存在）').not.toBeNull();
     expect(selectItem!.disabled, '没有任务时选不出东西 ⇒ 禁用').toBe(true);

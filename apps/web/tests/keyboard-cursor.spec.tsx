@@ -117,9 +117,13 @@ function cursorTableKeys(): string[] {
 /**
  * 表外的视图 = ViewKey 全集 ∖ 表里的键。
  * `ACCOUNTED_OUT` 是"这些缺席都被交代过"的名单 —— 理由本体留在 `keyboard-cursor.ts:71`
- * 那段注释里（那里逐条现量了六条），这里**不重抄**，只登记谁被交代过。
+ * 那段注释里（那里逐条现量过），这里**不重抄**，只登记谁被交代过。
+ *
+ * ⚠️ 加一个视图 = 同时要在这两处之一表态：能走就进 `CURSOR_VIEWS`，不能走就进这份名单
+ * **并且**在 `keyboard-cursor.ts` 那段注释里写清"为什么不能走、要做成能走的前置是什么"。
+ * 只把名字加进本数组而不写理由，等于把"缺席都有理由"这条口径降级成"缺席有个名字"。
  */
-const ACCOUNTED_OUT = ['calendar', 'countdown', 'focus', 'growth', 'search', 'settings', 'trash'];
+const ACCOUNTED_OUT = ['calendar', 'countdown', 'focus', 'growth', 'kanban', 'search', 'settings', 'trash'];
 
 function outOfTableViews(): string[] {
   const table = cursorTableKeys();

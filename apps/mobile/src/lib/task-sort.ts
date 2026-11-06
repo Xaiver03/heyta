@@ -53,6 +53,10 @@ const SORT_LABEL_KEY: Record<TaskSortKey, MessageKey> = {
   display: 'web.shell.sort.display',
   addedAt: 'web.shell.sort.addedAt',
   priority: 'web.shell.sort.priority',
+  // `manual` 在 domain 的 TASK_SORT_KEYS 里已经存在（R4 第一步），
+  // 移动端这张表漏了它 —— 漏的后果正是这段注释说的"编译期报缺键"，
+  // 而它红了之后整条移动端类型检查都过不去，所以这里补齐（词条与 web 共用一份）。
+  manual: 'web.shell.sort.manual',
 };
 
 /**

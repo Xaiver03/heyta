@@ -5,6 +5,7 @@
  * 跨不跨端 = v1 本地不同步；谁能改 = 本地 ⇒ 不产生 op。
  */
 
+import { randomId } from '@heyta/app-host';
 import type { TaskFilter } from '@heyta/domain';
 
 export interface SavedFilter {
@@ -32,7 +33,7 @@ export function saveSavedFilters(filters: SavedFilter[]): void {
 
 export function addSavedFilter(name: string, filter: TaskFilter): SavedFilter[] {
   const list = loadSavedFilters();
-  const entry: SavedFilter = { id: crypto.randomUUID(), name, filter };
+  const entry: SavedFilter = { id: randomId(), name, filter };
   const next = [...list, entry];
   saveSavedFilters(next);
   return next;
