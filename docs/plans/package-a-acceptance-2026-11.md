@@ -9,7 +9,7 @@
 
 | # | 之前 | 现在 | 证据 |
 |---|---|---|---|
-| 1 | 账号 A 退出登录后，A 的任务还在本机侧栏里；换 B 登录还能看到 | 退出登录 = **这台设备上不再留 A 的数据**；销毁没清干净时顶部出现红条「本机的任务数据没有清除干净」+ 重试 | `signOutStore` 先起 `purgeLocalLibrary()`；`library-owner.spec.ts` 用**真实 SQLite 文件**断言销毁后 `existsSync(dbPath) === false`、重开是空库 |
+| 1 | 账号 A 退出登录后，A 的任务还在本机侧栏里；换 B 登录还能看到 | 退出登录 = **这台设备上不再留 A 的数据**；销毁没清干净时顶部出现红条「本机的任务数据没有清除干净」+ **「清除本机数据」（再清一次）** | `signOutStore` 先起 `purgeLocalLibrary()`；`library-owner.spec.ts` 用**真实 SQLite 文件**断言销毁后 `existsSync(dbPath) === false`、重开是空库。🔴 **2026-11-07 更正**：原文写的是"红条 + 重试"，而那一档当时**一个按钮都没有**（重试按钮 `sign-out-retry` 属于另一支 `pending-revocation`＝云端那枚没撤销）。现在补了 `sign-out-erase-retry`（成功 ⇒ 重载；仍 `incomplete` ⇒ 红条留着、按钮可再点），判据是 `e2e/tests/signout-owner-notice.spec.ts` 第 2 条，截图 `apps/web/evidence/signout-owner-notice/2-signout-erase-failed.png`。**两个"重试"是两个不同分支，别再合成一句** |
 | 2 | 登录到一台属于别人的设备时，界面照常显示上一个人的数据，还能把数据传上去 | 登录/启动时先问「这个库是不是你的」：不是就**撤掉新凭据**、不发任何同步请求，顶部出现「这台设备上的数据属于另一个账号」+ 唯一出口「清除本机数据」 | `verifyLibraryOwner()`；`syncNow` 在 mismatch 时直接返回 `idle`（零请求）；`library-owner.spec.ts` 断言 B 的 `dispatch`/`sync` 都抛可判别错误且 A 的数据没被改 |
 | 3 | ⌘Z 是空操作（只有 5 秒回执） | 删错清单/改错字段可以撤销与重做；**别人改过这条**时拒绝撤销并说「没撤成」，不会拿旧值覆盖新改动 | `op-log` 的 `undo()/redo()/historyState()`；`history.spec.ts` 9 条，含 stale 拒绝与"一次撤销只落一条 op" |
 | 4 | 设置 → 同步只说"已同步/同步中"，看不出有没有东西没上去；刷新后"上次同步"变空白 | ①设置 → 同步 多三行本地读数：**还有 N 项改动没上传 / 上次成功同步：… / 数据先写在本机，再同步到你的服务器**（`N=0`、`还没读`、`没成功同步过` 各是各的句子）；②rail 那一枚的整句状态后面挂「· N 项还没上传」（读屏与 hover 同一句） | `SyncSettingsPanel` 三行 + `sync-data-status.spec.tsx` **5 条**（含 rail 一条）；真浏览器证据见 §三 |

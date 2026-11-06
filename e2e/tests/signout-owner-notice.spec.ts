@@ -242,20 +242,6 @@ test.describe('A 包两条阻断性提示（真浏览器）', () => {
       Object.defineProperty(window, 'localStorage', desc);
     });
     /*
-      🔴 **重载必须由产品发起，不能由探针自己导航来"制造"它。**
-      第一版这里写的是「点一下 → `waitForLoadState` → `openApp()` 再断言红条不在」，
-      结果**按钮被注掉 onClick 也照样绿**：`openApp()` 自己会 `goto()`，一次导航就把
-      内存里的 notice 冲回 idle —— 探针替产品把这一步做完了。
-      所以这里**只等**产品自己那次 `window.location.reload()`（没有它就一直等到超时）。
-    */
-    const [reloaded] = await Promise.all([
-      page
-        .waitForEvent('load', { timeout: 15_000 })
-        .then(() => true)
-        .catch(() => false),
-      clearAgain.click(),
-    ]);
-    /*
       🔴 **成功那一路的判据 = 产品自己重载了，且红条随之消失。**
 
       实测（2026-11-07）：把 localStorage 的原生描述符还原之后点「再清一次」，
@@ -264,6 +250,14 @@ test.describe('A 包两条阻断性提示（真浏览器）', () => {
       那是**探针替产品把人导航走了**：把 onClick 注掉之后它照样绿（`openApp` 自己会 goto）。
       现在只等**产品发起的那一次 load**，没有它就一直等到超时。
     */
+    /*
+      🔴 `unrouteAll` 必须在点之前：产品自己那次 `window.location.reload()` 会**打断在途的
+      `page.route` 处理器**，而 `shims.ts:127` 里的 `response.text()` 此时已经 disposed
+      ⇒ 整条用例死在 `apiResponse.text: Response has been disposed`，看起来像产品没重载。
+      实测（2026-11-06）：不解除路由时 2/2 都红；解除后绿。
+      `behavior: 'ignoreErrors'` 是给"已经无人等待的处理"用的，不是放宽判据。
+    */
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
     const [reloaded] = await Promise.all([
       page
         .waitForEvent('load', { timeout: 15_000 })
