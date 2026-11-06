@@ -50,8 +50,15 @@ R13 要落八个个性化维度（主题 / 界面风格 / 字体族与字号 / �
    （[`ticktick-settings-and-personalization.md`](../research/ticktick-settings-and-personalization.md)），
    **不是我在本条里重新点过的**。我自己现量过一次字面量（`grep -rhoE "'heyta\.[A-Za-z0-9._]+'" apps/web/src apps/mobile/src packages/*/src`）
    得 **21** 个 —— 这是**字面量下界**，不是键总数（有些键是拼出来的），所以两个数不能互相顶替。
-   🔴 **而且今天仓里没有这份清单**（`docs/reference/` 下没有任何键登记表）。所以这条规矩现在是**悬空的**：
-   谁先加第一个外观键，谁负责建 `docs/reference/client-persistence-keys.md` 并把两类分开列 —— 别只加到代码里。
+   ✅ **这份清单已经存在**：[`docs/reference/client-persistence-keys.md`](../reference/client-persistence-keys.md)
+   （四档 = 表达 / 视图状态 / 本机数据 / 基础设施；现量 **21 个键**逐个对上了源码）。
+   它由 `pnpm check:persistence-keys` 盯着：源码里出现一个没登记的键 ⇒ 红；表里有源码没有的鬼键 ⇒ 红；
+   同一个键登记两档 ⇒ 红（`--self-test` 三条臂）。
+   ⚠️ 它的**射程只到字面量**（拼出来的键扫不到），所以规矩是"新键必须写成字面量"，那一句写在文档 §1 与 §4 末。
+   ⚠️ 顺带纠正一个口径：正文里"外观类只有 2 个"（P9 取证）与现量不符 ——
+   按本 ADR 的档位判，**A 表达类有 5 个**（`theme` / `locale` / `dueDisplay` / `detailPane` / `shell.rail`），
+   另有 **2 个视图状态**（`taskSort` / `projectTaskSort`，也不是 op）。
+   两个数不冲突：取证那份数的是"主题与字体"这两项，我数的是"表达类键"。**引用时连口径一起搬。**
 5. **`data-theme` 这类 DOM 钩子不算持久化**：它是渲染结果的形状，不是用户偏好。
 
 ## 四、后果
