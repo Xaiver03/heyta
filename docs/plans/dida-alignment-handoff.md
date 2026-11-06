@@ -243,7 +243,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 
 | 格 | 状态 |
 |---|---|
-| Android 设备腿 | **没跑**。构建与模拟器在 linux-dev（不在本机），需要先写/接一枚远端装置；参照收集框那条线的做法，别在本机起 Gradle |
+| Android 设备腿 | ✅ **已跑**（2026-11-06 18:0x）。装置 `scripts/verify-mobile-pin-order-android.sh`，载体 linux-dev 远端模拟器（sdk_gphone64_x86_64, 1080×2340），APK 从当前 HEAD 现建。4/4 判据过（y 坐标顺序 + 菜单反向 + 截图）；op-log 那一格因 run-as 不可用降级跳过。两张图 `apps/mobile/evidence/dida-pin-order-android-20261106/` 逐张看过 |
 | 四端重装 | **没跑**（要在隔离检出里跑，见 [multi-end-build](../agents/multi-end-build.md)） |
 | 整棵 `e2e/` | **刻意没跑**：它会重写别线未入库的取证图 |
 | iOS 屏幕图 | 已取到（两张入库，17:0x 那一趟换上并逐张与上一趟对比过）。⚠️ 每跑一趟装置会在模拟器本地库里留 3 条 op（置顶是持久状态），目标行会逐趟下漂——本趟现量 `ops 31 → 34`、侧栏角标 `22 → 24`；脚本注释里写明并给了应对（读数前先 `--scroll-into-view`，判据读相对 y） |
@@ -314,7 +314,7 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
    ⚠️ 拍的是**边界**，不是界面：这一格仍欠实现，但它已经**不欠任何决定**（不需要新依赖、不需要 schema 变更、不需要 ADR）。
    🔴 翻案条件写死在那节第 2 条：一旦"把视图分享给协作者"进入范围，v1 那个"本地不同步"就是错的，
    必须升实体 + 走 ADR —— 那一趟不许沿用本条。
-6. **补 Android 设备腿**（在 linux-dev 上），并把 iOS 那枚装置的读数纳入四端重装那一趟。
+6. ✅ **补 Android 设备腿**（2026-11-06 18:0x 完成）。装置 `scripts/verify-mobile-pin-order-android.sh`（远端 linux-dev，`rsh` + `uiautomator dump` 形状，参照 `verify-mobile-capture-android.sh`）。APK 从当前 HEAD 经 `pnpm build:android`（→ `run-gradle.mjs` → linux-dev）现建，sha256 对账后 `adb install`；首启两屏（隐私面板 + 欢迎页）自动过；IME 禁用防拼音转写。判据 4/4（y 顺序翻转 + 菜单反向「取消置顶」+ 两张截图）；op-log 那一格因模拟器非 userdebug（`run-as` 不可用）降级跳过。下一位从第 7 步接。
 7. 每做完一步：跑对应门禁 + 把状态写回
    [dida-alignment-typography-and-features.md](dida-alignment-typography-and-features.md) 的「执行状态」，
    别只改本文。
@@ -371,7 +371,8 @@ IOS_UDID=<现量取的那个> HEYTA_IOS_DERIVED=/tmp/heyta-ios-release-dida \
 | ✅ `pnpm check:traps-index-coverage` | 2026-11-06 10:3x 新增，**已进 `pnpm check` 链**（`check:gate-wiring` 认它，`docs/agents/commands.md` 已登记）。第一次跑量出正文 644 枚编号里 **33 枚**在索引里没有入口（`#463–#466、#470、#495、#497–#504、#537–#541、#544–#548、#552–#557、#561–#563`，横跨 2026-10-18 – 10-26 四条并行线）；六行登记按条目原文补完后读数 `正文 645 枚 / 索引 88 行，全部可达`。判据是**可达性不是条数**（AGENTS §5 明文不许在索引里写条数）。`--self-test` 三臂当场验过牙：真实=退 0、删一行号段登记=退 1（红集合 `#1–#19`）、区间收窄到不含自己那枚=退 1。造这把尺的过程自己踩的那枚坑入正文 **#659**（按内容里的词筛表格行 ⇒ 33 枚虚报成 214 枚）。全程见 **B273** |
 | 桌面壳 | 同日 `--window` 一趟：`rows=1 / colorBuckets=66`，图入库并看过 |
 | 输入零漂移复量（23:3x 那一趟） | 上面那双腿的读数指的是 `907bd60e3` 那棵，现在 HEAD 已经不是它 ⇒ 本行专门回答"那批读数还指不指同一件东西"。尺：`git diff --name-only 907bd60e3 HEAD -- apps/web/src/features/tasks packages/domain/src/task-order.ts apps/web/src/features/shell packages/design-system packages/ui/src/task-list packages/ui/src/calendar e2e/tests/dida-alignment-detail-sidebar.spec.ts apps/web/src/features/capture` ⇒ **0 枚**；同一把尺去掉 pathspec 读 **30 枚**（分布在 `apps/mobile` 14、`apps/landing` 5、docs 6、`apps/web` 3…）⇒ **不是 pathspec 坏了，是那 30 枚没有一枚落在验收输入里** ⇒ 九条验收的读数仍指同一棵树，不必重跑。现量另取一发模拟器状态：`xcrun simctl list devices \| grep Booted` ⇒ 这一戳**有一枚 booted**（`iPhone Duo heyta`，早先那趟是没有 booted 才不跑的），但它装着的 `Heyta.app` mtime 仍是 **11-04 22:26**（与 17:0x 那趟装置自己打的"产物没重打包"同一条），所以那一格**未判定的成因是"没重打包"，不是"没有模拟器"** —— 补跑同一条装置只会把两张已入库证据图重写一遍、判据不变。要真收那一格得走隔离检出的重装路线（见 `docs/agents/multi-end-build.md`），那是比本行更大的一步，没在这里顺手做<br>✅ **2026-11-06 10:2x：那一格"未判定的成因是没重打包"已经判掉** —— 现建产物、现跑装置，读数与代价都记在上面那行"iOS 设备腿"与 `BLOCKED.md` B272。 |
-| 未跑 | 整棵 `e2e/`、四端重装、Android 设备腿（22:5x 那一戳收集框线正在跑 Android 那一枚；这一格是否仍归他们要现量 `git log --oneline -5 -- apps/mobile` 与 `xcrun simctl list devices \| grep Booted` 之外的 adb 侧，别拿本行当现状）<br>⚠️ 2026-11-06 10:3x 更新：整棵 `e2e/` **仍未跑**（明令禁跑；本线只改了 `e2e/tests/helpers.ts` 里那一枚选择器，那一格按代码读数登记）；iOS 设备腿已从"没重打包"那一档里拿出来；四端重装与 Android 设备腿仍不在本线这趟。 |
+| Android 设备腿 | ✅ **2026-11-06 18:0x 跑通**。装置 `scripts/verify-mobile-pin-order-android.sh`，载体 linux-dev（sdk_gphone64_x86_64, 1080×2340），APK 从 HEAD `00eb2939e` 经 `pnpm build:android` 现建（sha256 `27c2e44caefb74da…`）。判据 4/4：y 顺序翻转（1196→970 / 970→1196）、菜单反向「取消置顶」、两张截图逐张人眼看过（`row-menu.png` 底部菜单五项齐全 + pinB 在上 pinA 在下；`after-pin.png` pinA 翻到最前）。op-log 那一格因模拟器非 userdebug（`run-as com.heyta` 不可用）降级跳过，界面判据已闭合"写进去的是状态不是一帧视觉"。证据 `apps/mobile/evidence/dida-pin-order-android-20261106/`（含 `provenance.txt`） |
+| 未跑 | 整棵 `e2e/`、四端重装<br>⚠️ 2026-11-06 10:3x 更新：整棵 `e2e/` **仍未跑**（明令禁跑；本线只改了 `e2e/tests/helpers.ts` 里那一枚选择器，那一格按代码读数登记）；iOS 设备腿已从"没重打包"那一档里拿出来；四端重装仍不在本线这趟。 |
 
 ---
 

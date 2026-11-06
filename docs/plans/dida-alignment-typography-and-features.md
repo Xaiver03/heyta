@@ -115,7 +115,7 @@
 - [x] 右键菜单在任务行上正常弹出 —— 浏览器腿 ⑥（鼠标右键：优先级 / 标签 / 子任务 / 置顶四项点得动）
 - [x] 每项操作后任务状态正确更新 —— `task-row-menu.spec.tsx`「B1-B4 菜单项把意图发出去（不是只画出来）」那一组 + 腿 ⑥ 的"行上读得出来"
 - [x] 键盘导航（上下箭头 + Enter）可用 —— 腿 ④ 全程键盘 + 同文件「🔴 键盘 Enter 能展开子菜单」+ `pnpm check:menu-keyboard`
-- [x] 触屏长按弹出菜单（如已实现）—— iOS 真模拟器设备腿（`scripts/verify-mobile-pin-order`）长按开菜单那一格；⚠️ **Android 那一端没量**（构建与模拟器在 linux-dev，远端装置还没接）
+- [x] 触屏长按弹出菜单（如已实现）—— iOS 真模拟器设备腿（`scripts/verify-mobile-pin-order`）+ Android 远端模拟器设备腿（`scripts/verify-mobile-pin-order-android.sh`，linux-dev，2026-11-06 18:0x 跑通 4/4）
 
 ---
 
@@ -821,6 +821,7 @@ pnpm typecheck 2>&1 | grep "error TS"
   两张图（`apps/mobile/evidence/dida-pin-order-20261106/`）逐张人眼看过。
   ⚠️ 代价记在 **B272**：`simctl uninstall` 把装置依赖的**已 onboarding 热状态**一起清掉，连红两趟红在载体不在产品，
   而首启那两层门的做法本来就在册（`scripts/verify-mobile-ai.sh:1225–1260`）—— 动手前没 grep 它。
+- ✅ **Android 设备腿补上**（2026-11-06 18:0x）：新装置 `scripts/verify-mobile-pin-order-android.sh`（远端 linux-dev，`rsh` + `uiautomator dump` 形状，参照 `verify-mobile-capture-android.sh`）。APK 从 HEAD `00eb2939e` 经 `pnpm build:android`（→ `run-gradle.mjs` → linux-dev Gradle）现建，sha256 对账后 `adb install`；首启两屏（隐私面板 + 欢迎页）自动过、IME 禁用防拼音转写。判据 **4/4 退 0**（y 顺序翻转 1196→970 / 970→1196、菜单反向"取消置顶"、两张截图逐张人眼看过）；op-log 那一格因模拟器非 userdebug（`run-as` 不可用）降级跳过，界面判据已闭合"写进去的是状态不是一帧视觉"。证据 `apps/mobile/evidence/dida-pin-order-android-20261106/`（含 `provenance.txt`）。
 - ✅ **陷阱正文↔索引之间新增一道门并已进链**（`pnpm check:traps-index-coverage`，2026-11-06 10:3x）：
   第一次跑量出 33 枚条目在索引里没有任何入口，六行登记照着条目原文补完；判据是**可达性不是条数**
   （AGENTS §5 明文不许在索引里写条数），`--self-test` 三臂当场验过牙。造这把尺的过程自己踩的那枚坑
