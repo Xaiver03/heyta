@@ -270,10 +270,15 @@ USER · USERDOCUMENT · USERSETTINGS
 `NSImageView` 边长众数：**18**（56）、14（38）、12（31）、16（25）、20（25）、24（18）。
 **取值**：**18 是行内图标主力**，16 是次主力，12/14 是极小的状态点，20/24 是工具条。**没有 13/15/17 这种非偶数值**。
 
-#### ⑦ 空态：`TTTaskListEmptyHolderView` 30 个，高度众数 450
+#### ⑦ 空态：**占位与列表是同一矩形里的两层**（🔴 本节第一版读错了，已订正）
 
-**取值**：空态容器**占满列表区**（450pt 高），不是「一行小字居中」。
-**对 heyta**：`ux-principles` 里空态那一条可以拿这个当对照 —— **空态是「占据列表区的一块」而不是「列表里的一行」**。
+**第一版写的**（留原句）：「`TTTaskListEmptyHolderView` 30 个，高度众数 450 ⇒ 空态占满列表区」。
+**P7 复核后推翻**：节点 **44 个**；`{{0,215},{720,450}}` 确实是众数（**24 次**），但那 24 个**全在同一个 nib** `TTEmptyHolderWindowController.nib`（560×680 窗口 + 24 个占位 + 27 个 outlet，最可能是**空态样本库**，机制未核实）。
+**真实宿主里，占位的高度 = 宿主自己的高度**：`TTKanbanViewController` 625×655（与同 nib 的 `TTKanbanCollectionView` **精确相等**）、`TTSearchViewController` 560×376（与根视图精确相等）、`TTTaskListViewController` 596×744。
+
+**取值**：空态的**几何不是「固定一块」，是「与列表同框」** —— 容器自己决定，占位跟着长。
+**对 heyta**：`ux-principles` 里那条「空态占一片」方向没错，但**判据不能写成「高度 = 450 那种固定值」**，要写成「**与容器同框**」（即：空态层与列表层共享同一个矩形）。
+⚠️ 顺带：这个订正也说明**「某个视图类出现 N 次」这种计数，只有在「按 nib 文档分组」之后才有意义** —— 我的初版是按节点数直接报的，而 24/44 全落在一个文档里。
 
 > ⚠️ **这一节的用法边界**：以上数字是**它的表达参数**（具体 px 与字号），**不能直接搬**。能搬的只有**形状**：
 > 「字阶要窄（≤5 档）」「对话框只有一个宽度」「按钮高度按语义分档而不是按页面分」「颜色只走语义」「空态占满容器」。
@@ -497,7 +502,10 @@ SHARE 盘摆渡仍然可用，但**不再是唯一路径**。
 | detail | 17 | | | | | | |
 
 **取值**：与 macOS 的 nib 清单**同构但粒度更细** —— Windows 把「打印」「Markdown」「widget」也拆成独立 view 组（macOS 那边这些在代码里）。**日历（37）与专注（31）在两端都是最重的两块**。
-⚠️ **一处真不对称**：639 个 BAML 里**没有任何 `trash` / `recycle` / `deleted` 命名的 view**，而 macOS 的菜单里有 `Trash` —— **回收站在 Windows 侧要么换了名字、要么真的没有**，两端的这一格只能标未核实（P0 与 P7 都记了）。
+⚠️ **一处真不对称，但它不是「没有」**（P7 复核）：639 个 BAML 里确实**没有** `trash` / `recycle` / `deleted` 命名的 **view**，但**回收站是「模式」不是 view**，两端同构：
+- Windows：`TaskDetailTrashGrid`（44 DIP）/ `TrashRestoreGrid` / `DeleteFromTrashMouseUp` / `BatchDeleteFromTrashButton` —— 它是**任务详情底栏的状态分支**；
+- macOS：`TTTaskDetailBottomActionView` 有 outlet `deleteForeverButton`，`TTTaskListViewController` 有 `emptyTrashButtonClicked:` —— **复用任务列表承载**。
+⇒ 所以「按 view 名找回收站」必然找不到，**这条不能再被引用成「Windows 没有回收站」**。
 `resource/` 下另有 144 个主题与资源字典：`colorresource`、`fontresource/*`、`icons_light` / `icons_dark` / **`icons_pink`**、`pomoicons`、`sideBar`。
 
 ### 9.4 设计系统：三层，且跟前端那套**不一样**
