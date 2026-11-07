@@ -1527,3 +1527,32 @@ export { type CapturePanelSlot } from './capture/CaptureComposer.js';
  */
 export { timeDraftToValue, timeStepSlots } from './date-picker/steps.js';
 export { captureCapsuleShowsWord } from './capture/model.js';
+
+/**
+ * 附件（工单 #9 的 web 移植，2026-11-05）。
+ * 🔴 本块是**追加**的（`index.ts` 是多写者共享文件，只许在末尾加）。
+ *
+ * 为什么这三样要出共享层：附件在此之前只有**移动端**有界面
+ * （`apps/mobile/src/screens/TaskDetailSheet.tsx` 的附件区），web 侧引用数为 0。
+ * 领域判断（过滤 / 顺序 / 档位 / 拒绝原因）与写路径（`app-host` 的
+ * `createAttachmentActions`）早就在一处，缺的正好是中间那一层 ——
+ * 于是"同一份附件在两个端上被画成两个样子"没有任何东西拦得住
+ * （`1024 KB` / `1.0 MB` 是同一批字节的两种写法，而没人会为此报错）。
+ *
+ * `attachmentSizeLabelOf` 单独转出是因为"缺体积时整行不画"这一格**必须能被
+ * node 单测跑穿**：`AttachmentList.tsx` 与 `EmptyState.tsx` 都 import RN 原语，
+ * node 解析不了（与 `date-picker/steps.js` 那两条同一条理由）。
+ */
+export {
+  AttachmentList,
+  type AttachmentListLabels,
+  type AttachmentListProps,
+} from './attachments/AttachmentList.js';
+export {
+  attachmentFailureReasonOf,
+  attachmentSizeLabelOf,
+  formatAttachmentSize,
+  type AttachmentFailureReason,
+  type AttachmentItem,
+  type AttachmentSizeLabels,
+} from './attachments/model.js';
