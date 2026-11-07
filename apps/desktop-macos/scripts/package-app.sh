@@ -391,7 +391,11 @@ else
   elif [ "$notary_rc" -eq 124 ]; then
     echo "  🔴 公证在 ${NOTARY_TIMEOUT}s 内没有返回（Apple 侧未回话）。包本身已签名可用，但**没通过公证**，不装订票据。"
   else
-    echo "  🔴 公证失败（上面的输出是 Apple 的原话，rc=$notary_rc）。包本身已签名可用，但**没通过公证**。"
+    # ⚠️ `${notary_rc}` 必须带花括号：`$notary_rc）` 里那个全角「）」会被 bash（`set -u` 下）
+    #    的变量名扫描按字节吃进去，报 `notary_rc<0xEF…>: unbound variable` ——
+    #    看起来像变量没赋值，实际是**行内没加花括号**。本机最小复现见
+    #    `docs/reference/environment-traps.md` #676（同样的形状在 `set -u` 下到处都会炸）。
+    echo "  🔴 公证失败（上面的输出是 Apple 的原话，rc=${notary_rc}）。包本身已签名可用，但**没通过公证**。"
   fi
 fi
 
