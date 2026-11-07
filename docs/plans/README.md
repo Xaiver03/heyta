@@ -21,6 +21,7 @@
 | **R11 第 6 步：空态档位账本门禁** | [`r11-state-tiers-gate-2026-11.md`](r11-state-tiers-gate-2026-11.md) | 🔴 **状态只在正文**——账本制四条判据（档位与账本不符 / 未登记站点 / 账比现实长 / 自检臂）；只登空态，加载与错误等铺开再登 |
 | **空态档位账本（`check:state-tiers`）** | [`r11-state-tiers-ledger.md`](r11-state-tiers-ledger.md) | 🔴 **状态只在正文**——30 行账本，脚本认档位、文档认理由；**`card` 档现在 0 个消费者**（5 处本该是卡片档仍在借 `page`，登记为现量），移动端八屏全 `page` —— 这两条是后续单的输入 |
 | **交接：2026-11-07 P2 对标那一轮** | [`session-handoff-2026-11-07-p2.md`](session-handoff-2026-11-07-p2.md) | 🔴 **零上下文可读**：关了哪 10 格、**现在卡在哪**（3000 端口被非 heyta 进程占着；负载 10/26/39 不适合跑设备腿）、下一步顺序、四条踩出来的纪律 |
+| **交付卡点（四端重装 / 设备腿）** | [`delivery-blocked-2026-11-07.md`](delivery-blocked-2026-11-07.md) | 🔴 **未交付**：三处卡点全是沙盒边界（`prisma generate` 的 utime、SwiftPM 缓存写入、模拟器上没装过 App）；已解的两处（pod install 的 `nil` 根因 / pnpm 装不上先删整棵树）**恢复顺序**写在正文 §3 |
 | **当前状态 / 下一步做什么** | [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) | 🔴 **唯一权威主计划**。它同时取代了 roadmap §5 与 4 份多端计划的路线部分 |
 | **E2EE 可选 + 钥匙由设备持有**（[ADR-0080](../adr/0080-e2ee-is-optional-with-device-held-key.md)） | [`e2ee-optional-and-device-held-key.md`](e2ee-optional-and-device-held-key.md) | 🔴 **状态只在正文，本行不复述**。默认加密与卖点不变，动的是"用户能关掉（关闭 = 整库解密重传）"与"口令只在加设备 / 恢复 / 轮换时出现"；服务端闸门要按账号模式**互斥拒收**。七刀 S0–S7，S0/S1 零行为变化可先落 |
 | **本轮 goal：产品 UI / UX / IA / 审美优化** | [`product-ux-optimization.md`](product-ux-optimization.md) | 🔴 **状态只在正文，本行不复述**（现量：读该文件开头那行状态）——这一格原先钉着「进行中（2026-10-07）」，而正文早已走到「已公开分发第五批测试版」；抄一次就漂一次。当前认证、助手执行、全局响应式与四端最新产物收尾仍逐项跟踪 |
