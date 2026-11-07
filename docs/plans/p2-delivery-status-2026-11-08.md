@@ -12,7 +12,7 @@
 | **macOS** | ✅ | 窗口 2412×1552、webview 内容占比 **100.0%**、主蓝命中 842；安装对账 9 chunk 同一次构建 | ⚠️ **公证没过**（Apple 侧 connectTimeout），而脚本在这一档**仍判 ✅** ⇒ 那一行不等于公证通过 |
 | **Windows** | ✅ | 远端 `windows-pc` 打包+自签+`Add-AppxPackage`+启动截图；取证 5 条全在位（`ADD_APPX=OK` / `INSTALLED_VERSION=1.0.0.0` / `INSTALL_LOCATION=…WindowsApps\…` / `PAYLOAD_PRI` / `PAYLOAD_XBF=3`） | 签名姿态门禁 rc=0（自签主体 `CN=heyta local build` 自报本地构建） |
 | **iOS** | ✅ 装包 | `iPhone Duo heyta` 上已是当前产物；重装判据过（内容占比 53.5%） | 设备腿（注销销毁）❌ 卡在产品缺陷，见 §3 |
-| **Android** | ❌ | `adb devices` 空 / `~/.android/avd` 空 / `emulator -list-avds` 无输出 | **这台机器上一台 AVD 都没有**。不是"没在线"，是**没建过**；要建需 system image + AVD + 首启，数 GB |
+| **Android** | ✅ | release APK **80 M** 重打 → 模拟器**全新安装** → `am start -W` 拉前台 `com.heyta/.MainActivity` → 窗口 **1080×2400**、内容占比 **48.8%**、主蓝命中 **4011** | 本轮先补了"这台机器上一台 AVD 都没有"：装 `system-images;android-35;google_apis;arm64-v8a`（3.8 G）+ `avdmanager create avd -n heyta-api35` + 无窗启动。⚠️ **签名是 `CN=Android Debug`**（公开 keystore）⇒ 可验不可上架，与 iOS/Windows 侧那两档同一性质 |
 
 ## 2. 源码侧
 
