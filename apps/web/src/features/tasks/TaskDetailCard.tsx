@@ -60,13 +60,31 @@
  *
  * 🔴 未选中 / 那条已在别处被删 ⇒ 返回 `null`，而不是留一只指向不存在 id 的输入框。
  */
-import { useRef, useState, type CSSProperties } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { cssVar, ICON_SIZE } from '@heyta/design-system';
-import { useI18n } from '@heyta/i18n';
-import { Priority, type Task } from '@heyta/domain';
+import { useI18n, type MessageKey } from '@heyta/i18n';
+import {
+  Priority,
+  aliveAttachmentsForTask,
+  requiresModalCommitment,
+  resolveDangerTier,
+  type Task,
+} from '@heyta/domain';
+import { createAttachmentActions, createAttachmentBlobPort, type ActionContext } from '@heyta/app-host';
+import { MAX_ATTACHMENT_BYTES } from '@heyta/shared-schema';
+import {
+  AttachmentList,
+  EmptyState,
+  attachmentFailureReasonOf,
+  type AttachmentFailureReason,
+  type AttachmentListLabels,
+} from '@heyta/ui';
 import { FolderOpen, MoreHorizontal, Type } from 'lucide-react';
 
 import { useSelected } from '../../lib/selection.js';
+import { currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.js';
+import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
+import { useSyncStore } from '../sync/store.js';
 import { ShareCommentsSection } from '../share/ShareCommentsSection.js';
 import { text } from '../../lib/text.js';
 import { NoteField } from './NoteEditor.js';
@@ -79,8 +97,8 @@ import { ReminderField } from '../reminders/ReminderPanel.js';
 import { useTaskStore } from './store.js';
 
 /*
-  这个是**模块级常量**而不是 `style={{…}}` 字面量：后者会被
-  `scripts/check-l4-no-style.mjs` 按出现次数计进棘轮（web 上限 104，余量 6）。
+  这个是**模块级常量**而不是行内样式字面量：后者会被
+  `scripts/check-l4-no-style.mjs` 按出现次数计进棘轮（现量读数以脚本自己打印的为准）。
   文字档位整条从 `TEXT_STYLES` 取（AGENTS §5：不许只挑字号）。
   本单**不新起 `ht-*` 族** —— `check:row-single-source` 的那枚棘轮余量为 0（28 = 基线 28），
   所以栏内边距走既有的 `.ht-app__detail-task`、标题走既有的 `.ht-app__detail-heading`。
@@ -254,6 +272,401 @@ const statusLineStyle: CSSProperties = {
   color: cssVar('color.foreground-muted'),
   marginBottom: cssVar('space.1'),
 };
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * 附件（工单 #9 的 web 移植，2026-11-05）
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * 移动端先做完了（`apps/mobile/src/screens/TaskDetailSheet.tsx` 的附件区），
+ * web 侧此前是**零引用**：`grep -rn "attachments" apps/web/src packages/ui/src`
+ * 只命中一个无关文件。这一格就是把那一份抬上共享层之后的接线，
+ * 不是第二份实现。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 分工（AGENTS §3.5：`apps/*` 不许有一行在决定"业务上该怎么做"）
+ *
+ *   | 这件事 | 谁定 |
+ *   |---|---|
+ *   | 哪些附件算活着的、按什么序 | `@heyta/domain` 的 `aliveAttachmentsForTask` |
+ *   | 字节数该显示成哪一档、怎么舍入 | `@heyta/domain` 的 `attachmentSizeIn` |
+ *   | 先传字节还是先发 op、缺端口怎么拒 | `@heyta/app-host` 的 `createAttachmentActions` |
+ *   | 一行长什么样、空态画什么、按钮在哪 | `@heyta/ui` 的 `AttachmentList` |
+ *   | 文案、上传通道的来源、确认框 | **本文件**（这三件都是宿主的事） |
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 上传通道按**调用时刻**读服务端地址与令牌
+ *
+ * 与移动端 `TasksScreen.tsx` 同一条：`baseUrl` 用 getter、令牌用函数。
+ * 写成"建 port 时抓一份快照"的表现是"在设置页换了服务端，附件仍然往旧服务器传"
+ * 和"重新登录后令牌已轮换，上传一路 401" —— 两种都不会有人报错，
+ * 只会让用户以为附件功能坏了。
+ *
+ * ⚠️ 没配服务端 / 没登录时 `createAttachmentBlobPort` 的三个方法**一个请求都不发**、
+ * 直接回 `rejected`；本格据此说的是"附件没能加进来"，不是"上传失败"那种猜方向的提示。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 为什么动作上下文写在这里，而不是复用 `features/tasks/store.ts` 的那一份
+ *
+ * 那一份带着 `withActionFailure`（失败要记进 store 的 `error`），而它**没有导出**
+ * （`actionContext` 是模块私有）。这里的形状与 `features/share/comment-actions.ts` 的
+ * `ctx` 逐字相同，`store.ts` 自己的注释也写了"两个 store 各写一份
+ * `{dispatch, getState}` 是可以接受的，因为它只是两个函数引用，不含任何判断"。
+ * ⇒ 一旦它开始包含判断（比如"离线时排队"），就该抽走，而不是在这里复制第二遍。
+ */
+const attachmentContext: ActionContext = {
+  dispatch: (intent) => dispatchIntent(intent),
+  dispatchChecked: (build) => dispatchChecked(build),
+  getState: currentState,
+};
+
+/**
+ * 附件动作集（**模块级一份**）。
+ *
+ * ⚠️ 与移动端同一个理由：它不是组件状态，重建一次只是再包一层闭包；
+ * 而"每次渲染新建一个"会让 `useMemo` 的依赖永远在变。
+ */
+const attachmentActions = createAttachmentActions(attachmentContext, {
+  blobs: createAttachmentBlobPort(
+    {
+      get baseUrl(): string {
+        return useSyncStore.getState().baseUrl;
+      },
+    },
+    () => useSyncStore.getState().token,
+  ),
+});
+
+/** 单文件上限的 MB 读数（错误句里的 `{max}`）。与词条同一个来源：`MAX_ATTACHMENT_BYTES`。 */
+const MAX_ATTACHMENT_MB = String(Math.floor(MAX_ATTACHMENT_BYTES / (1024 * 1024)));
+
+/**
+ * 失败原因 → 那句话。
+ *
+ * 🔴 **穷尽表**：`Record<AttachmentFailureReason, MessageKey>`（不是 `Record<string, …>`），
+ * 以后动作层多一种原因却忘了配文案，这里直接编译不过 —— 而运行时会静默落回统称。
+ *
+ * 每一格都要说不同的话：`no-channel` 是这台设备的事实（换台电脑才行）、
+ * `too-large` 要换一个文件、`quota-exceeded` 要清理已有内容、`network` 可以原样再试、
+ * `read-failed` 是文件本身读不出来 —— 合成一句"上传失败"就会让一半的用户去做一件
+ * 没用的事（移动端 `TaskDetailSheet.tsx` 的 `UPLOAD_ERROR_KEYS` 记着同一条）。
+ *
+ * ⚠️ `rejected` 这一格是**统称**：认不出原因时才该走到它，而那时最像的那一条
+ * 往往是错的（本仓库在密码锁那一栏踩过这个坑）。
+ */
+const ATTACHMENT_ERROR_KEYS: Record<AttachmentFailureReason, MessageKey> = {
+  'too-large': 'mobile.detail.attachments.error.too-large',
+  'quota-exceeded': 'mobile.detail.attachments.error.quota-exceeded',
+  network: 'mobile.detail.attachments.error.network',
+  'no-channel': 'mobile.detail.attachments.error.no-channel',
+  'read-failed': 'mobile.detail.attachments.error.read-failed',
+  rejected: 'mobile.detail.attachments.error.rejected',
+};
+const ATTACHMENT_FALLBACK_KEY: MessageKey = ATTACHMENT_ERROR_KEYS.rejected;
+
+/**
+ * 取错的**原因**只问共享层那一枚（`attachmentFailureReasonOf`）。
+ *
+ * 🔴 这里原来用的是 `rejectionReasonOf`（`@heyta/ui` 的 subtasks 那一枚），实测它
+ * **读不出这条链上两个最要紧的原因**：正则 `/（([a-z_]+)）/` 不认连字符，而
+ * `too-large` / `quota-exceeded` 都带连字符 ⇒ 两者一起降级成统称，
+ * "换个文件"与"去清理空间"变成同一句话。判据在
+ * `packages/ui/tests/attachments-model.spec.ts`（那一条用真消息喂它）。
+ */
+function attachmentFailureKey(cause: unknown): MessageKey {
+  const reason = attachmentFailureReasonOf(cause);
+  return reason === undefined ? ATTACHMENT_FALLBACK_KEY : ATTACHMENT_ERROR_KEYS[reason];
+}
+
+/**
+ * 读文件的结果联合（与移动端 `readPickedDocument` 同一个形状）。
+ *
+ * ⚠️ 读失败**不抛**：它与"上传被拒"是两句不同的话（"这个文件没能读出来，换一个试试"
+ * vs 额度满 / 太大 / 断网），而 `rejectionReasonOf` 只认小写+下划线的 reason
+ * （`read-failed` 里的连字符过不了那个词表）—— 硬塞进去就会静默降级成统称。
+ */
+type FileReadResult = { readonly ok: true; readonly dataBase64: string } | { readonly ok: false };
+
+/**
+ * 浏览器里把一份文件读成 base64。
+ *
+ * 🔴 用 `FileReader` 而不是 `file.arrayBuffer()`：后者在 jsdom（本仓 web 单测与
+ * 契约测试跑的那个环境）里**不存在**（实测 `typeof file.arrayBuffer === 'undefined'`），
+ * 写成它会让"加附件"这条路在测试里永远走不通 —— 而它恰恰是判据 ① 的唯一入口。
+ * `FileReader` 四个端（含 jsdom）都有，代价只是多切一次 `data:` 前缀。
+ *
+ * 🔴 切法是 `indexOf(',')` 而**不是** `split(',')[1]`：`data:<mime>;base64,<payload>`
+ * 里 mime 段自己可能带逗号（`data:text/plain;charset=utf-8,`），而 payload 段是纯
+ * base64、不含逗号 —— 所以"第一个逗号之后"才是那条边界。少切一次就把前缀当字节传上去，
+ * 服务端算出来的 `byteCount` 会莫名多出十几个字节。
+ */
+function readFileBase64(file: File): Promise<FileReadResult> {
+  return new Promise<FileReadResult>((resolve) => {
+    const reader = new FileReader();
+    reader.onerror = () => {
+      resolve({ ok: false });
+    };
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        resolve({ ok: false });
+        return;
+      }
+      const comma = result.indexOf(',');
+      resolve(comma < 0 ? { ok: false } : { ok: true, dataBase64: result.slice(comma + 1) });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * 移除一个附件的**危险档**。
+ *
+ * 🔴 判据走共享层那一枚（`resolveDangerTier`），不在这里拍：
+ * `docs/agents/overlay-feedback.md` §2 的锚是"做错了要花多少代价恢复"。
+ *   · `undoAvailable: false` —— **不手填**：`isUndoableDeletion` 的定义域里没有
+ *     `attachment`（四类只有 task/note/list/habit），而这条通道上**也没有读端点**
+ *     （见 `packages/shared-schema/src/attachment-http-contract.ts` 的 `ATTACHMENT_ROUTES`：
+ *     `GET` 是被明确排除的，理由写在那一段），所以"撤销"这件事根本无从谈起；
+ *   · `destroysIrrecoverableResource: true` —— 字节在那一步就还给服务端了，
+ *     回收站里也没有它的位置（`DEL` 留下的是元数据墓碑，**不是可恢复的文件**）。
+ * ⇒ `alert`：模态确认，`requiresModalCommitment` 为真。
+ *
+ * ⚠️ 与移动端的差别**只在手段**：那边是按钮两态（"再点一次确认移除"），
+ * 因为 RN 端除 `Alert.alert` 外没有共享模态壳，而原生框已被 `check:overlay` 的 R1 记账。
+ * 两端**结果一致**（都问过），手段不同（`check:dirty-form-policy` 那一节的口径）。
+ */
+const REMOVE_ATTACHMENT_TIER = resolveDangerTier({
+  affectedCount: 1,
+  undoAvailable: false,
+  destroysIrrecoverableResource: true,
+});
+
+/**
+ * 附件那一格的错误行。
+ *
+ * ⚠️ 模块级常量而不是行内样式字面量：后者会被 `check-l4-no-style.mjs`
+ * 按出现次数计进棘轮（基线以脚本里那张表为准）。文字档位整条从 `TEXT_STYLES` 取。
+ */
+const attachmentErrorStyle: CSSProperties = {
+  ...text('caption'),
+  color: cssVar('color.danger'),
+  marginTop: cssVar('space.1'),
+};
+
+/**
+ * 附件那一格（列表 / 添加 / 移除）。
+ *
+ * 🔴 **`key={task.id}` 由调用点给**：这一格有本地状态（在途、失败句、待确认的那一条），
+ * ↑↓ 换选中时不换 key 会把上一条任务的失败句与"正要删的那一行"带过来
+ * —— 与备注 / 截止 / 子任务那几格同一条纪律（"有本地 state 才要 key"）。
+ *
+ * 🔴 附件表**直接读物化状态**，不维护第二份本地列表：动作层发的是 op，
+ * 引擎通知 → store 换表 → 这里重算。这样"另一台设备加进来的附件"与本机加的一样会出现，
+ * 而"只活在本端 state 里"的那种实现根本不会有这个能力。
+ * 过滤与顺序仍问领域层（`aliveAttachmentsForTask`），本文件不写 `filter`。
+ */
+function AttachmentField({ task }: { task: Task }): React.JSX.Element {
+  const { t } = useI18n();
+  /**
+   * 订阅附件表。**依赖里那个变量就是订阅本身** —— 它在 body 里只被"表变了"这件事用到，
+   * 而真正的过滤/排序在下一行交给领域层。
+   */
+  const attachmentsTable = useTaskStore((state) => state.entities.attachments);
+  const rows = useMemo(
+    () => aliveAttachmentsForTask(Object.values(attachmentsTable), task.id),
+    [attachmentsTable, task.id],
+  );
+
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<MessageKey | undefined>(undefined);
+  const [pendingRemove, setPendingRemove] = useState<{ readonly id: string; readonly fileName: string } | undefined>(
+    undefined,
+  );
+  /** 选文件的入口。`<input type="file">` 是浏览器给的那一个，不画第二枚按钮。 */
+  const fileInput = useRef<HTMLInputElement | null>(null);
+
+  const remove = (id: string): void => {
+    setFailure(undefined);
+    setBusy(true);
+    void attachmentActions
+      .removeAttachment(id)
+      .catch((cause: unknown) => {
+        setFailure(attachmentFailureKey(cause));
+      })
+      .finally(() => {
+        setBusy(false);
+      });
+  };
+
+  /**
+   * 从选中的那一份文件走完整条链：读字节 → 传字节 → 发 op。
+   *
+   * 🔴 `targetId` 在选完之后立刻定下来：这一格可以在不卸载的情况下换到另一条任务，
+   * 用 `task.id` 收尾会把附件挂到**当时正在显示的那条**上，而不是用户选文件时看的那条
+   * （移动端 `runAddAttachment` 记着同一条）。
+   */
+  const submitPicked = (input: HTMLInputElement): void => {
+    const file = input.files?.[0];
+    /**
+     * 🔴 先清空 `value`：不清的话"选同一个文件第二次"不会再触发 `change`
+     * （浏览器认为值没变），症状是"点了没反应"。
+     */
+    input.value = '';
+    if (file === undefined || busy) return;
+    const targetId = task.id;
+    setFailure(undefined);
+    setBusy(true);
+    const run = async (): Promise<void> => {
+      try {
+        const read = await readFileBase64(file);
+        if (!read.ok) {
+          setFailure('mobile.detail.attachments.error.read-failed');
+          return;
+        }
+        await attachmentActions.addAttachment(targetId, {
+          fileName: file.name,
+          // 空 MIME 不传：`contentType` 缺席 = 未知，界面降级为通用文件图标
+          // （`isImageAttachment` 对缺 MIME 一律按"不是图片"）。
+          ...(file.type === '' ? {} : { contentType: file.type }),
+          dataBase64: read.dataBase64,
+        });
+      } catch (cause: unknown) {
+        setFailure(attachmentFailureKey(cause));
+      } finally {
+        setBusy(false);
+      }
+    };
+    void run();
+  };
+
+  const labels: AttachmentListLabels = {
+    /**
+     * 空态**整块**交给共享 `EmptyState`（`check:empty-state` 的唯一修法：
+     * "新的空态不许在视图里手写"）。`line` 档：它是"这一格没有内容"的一行辅助字，
+     * 不是页面级空态 —— 页面档会把详情面撑出一块居中留白。
+     */
+    empty: <EmptyState size="line" testID="task-attachments-empty" title={t('mobile.detail.attachments.empty')} />,
+    add: t('mobile.detail.attachments.add'),
+    uploading: t('mobile.detail.attachments.uploading'),
+    remove: t('mobile.detail.attachments.remove'),
+    size: {
+      // 档位（bytes / kb / mb）与舍入**不在这里判**：`attachmentSizeIn` 在领域层，
+      // 这里只把那一档交回给词条念出来（单位词是文案）。
+      bytes: (n) => t('mobile.detail.attachments.size.bytes', { n }),
+      kb: (n) => t('mobile.detail.attachments.size.kb', { n }),
+      mb: (n) => t('mobile.detail.attachments.size.mb', { n }),
+    },
+  };
+
+  return (
+    <>
+      {/*
+        ══ 附件 ══════════════════════════════════════════════════════════
+        放在**内容层**、紧跟「自动化」组之后、「协作区」之前：附件是这条任务身上
+        挂的材料，不是它的属性 —— 四分组（基本 / 时间 / 组织 / 自动化）是审计 §4.6
+        钉死的**任务属性**分组，附件挤进任何一组都会让那四组的语义变形。
+        ⇒ 与评论同一条口径：标题视觉同款（同一枚 `groupHeaderStyle`）但**不冒充分组**
+        （不挂 `data-testid="task-detail-group"`，`task-detail-groups.spec.tsx` 数的正是它）。
+
+        ⚠️ 这一格此前在 web 上**根本不存在**（引用数为 0），所以它不是"从行尾搬进来"，
+        没有"行里撤掉那半"要配套。
+      */}
+      {/*
+        🔴 区块头**只写「附件」**，不叠「{n} 个附件」那一句（移动端叠了，见下）。
+
+        `mobile.detail.attachments.count` 的模板是 `{n} 个附件`，而它旁边就是标题
+        「附件」—— 两块相邻连读成「**附件 1 个附件**」，那是同一句话说了两遍
+        （移动端那一格是这个形状；本单照搬过一次，真浏览器截图里读起来是坏的）。
+        列表本身就把数量和内容一起说清了，所以 web 这一格不画那个数字。
+        要"标题 + 只出数字"需要一条新词条（`{n}` 而不是 `{n} 个附件`），
+        而 `packages/i18n` 是本单的黑名单 —— 所以正确的动作是**少画一句**，
+        而不是在 web 侧拼一串自有文案。
+      */}
+      <h3 style={groupHeaderStyle} data-testid="task-detail-attachments">
+        {t('mobile.detail.attachments.title')}
+      </h3>
+
+      <AttachmentList
+        items={rows}
+        labels={labels}
+        busy={busy}
+        onAdd={() => {
+          setFailure(undefined);
+          fileInput.current?.click();
+        }}
+        onRemove={(id) => {
+          /**
+           * 🔴 这一下**不删**，只打开确认框（危险档见 `REMOVE_ATTACHMENT_TIER`）。
+           * 文件名一起记下来：确认框要复述对象，而删掉之后列表里已经没有它了。
+           */
+          const row = rows.find((item) => item.id === id);
+          if (row === undefined) return;
+          setPendingRemove({ id: row.id, fileName: row.fileName });
+        }}
+        testID="task-attachments"
+      />
+
+      {/*
+        选文件的入口本身不可见：`<input type="file">` 的原生外观在四个端上是四种样子，
+        而共享组件已经画好了那一枚「添加附件」。`hidden` 而不是 `display:none` 样式
+        —— 后者要新增一条 CSS 类，而本文件不新起 `ht-*` 族（`check:row-single-source` 的棘轮余量为 0）。
+      */}
+      <input
+        ref={fileInput}
+        type="file"
+        hidden
+        data-testid="task-attachment-file-input"
+        onChange={(event) => {
+          submitPicked(event.currentTarget);
+        }}
+      />
+
+      {failure === undefined ? null : (
+        <p role="alert" style={attachmentErrorStyle} data-testid="task-attachment-error">
+          {t(failure, { max: MAX_ATTACHMENT_MB })}
+        </p>
+      )}
+
+      {/*
+        移除确认。复用 Web 既有那一枚危险确认件（`lib/dialog/DangerConfirmDialog.tsx`
+        —— 共享 `DangerDialog` 的外壳在真实浏览器里那一层不挂载，见 §7 第 606 条），
+        不自绘第二层，也不引原生框（`check:overlay` 的 R1 记账着那七处）。
+
+        ⚠️ 文案全部**借用既有词条**，本单不许改 `packages/i18n`：
+        · 标题 = 动作名（「移除」）—— 没有「移除「{文件名}」？」那条词条，
+          而新起一条就是第二份文案；
+        · 正文 = **文件名本身**（用户自己的字，不翻译）——
+          范围那一格要说的是"删的是哪一个"，文件名就是它。
+        🔴 **已知缺口（如实记）**：缺一条"移除之后要重新添加这个文件、回收站里也没有它"
+        的词条。i18n 是黑名单，所以本单没有补；确认框因此只有"动作 + 对象"，
+        少一句后果。补词条是 i18n 那条线的活，不是在这里用第二句兜。
+      */}
+      {pendingRemove === undefined ? null : (
+        <DangerConfirmDialog
+          testId="task-attachment-remove-confirm"
+          labelledBy="task-attachment-remove-confirm-title"
+          modalCommitment={requiresModalCommitment(REMOVE_ATTACHMENT_TIER)}
+          cancelLabel={t('web.rowMenu.cancel')}
+          // 🔴 主按钮复述**动词**（「移除」），不是「确定」。
+          confirmLabel={t('mobile.detail.attachments.remove')}
+          onCancel={() => {
+            setPendingRemove(undefined);
+          }}
+          onConfirm={() => {
+            // 先关确认框再写：写失败（例如这条附件已被别处删掉）不该把确认框
+            // 永远卡在屏幕上 —— 失败由上面那一行 `role="alert"` 说给用户。
+            const target = pendingRemove;
+            setPendingRemove(undefined);
+            remove(target.id);
+          }}
+        >
+          <h2 id="task-attachment-remove-confirm-title">{t('mobile.detail.attachments.remove')}</h2>
+          <p data-testid="task-attachment-remove-confirm-name">{pendingRemove.fileName}</p>
+        </DangerConfirmDialog>
+      )}
+    </>
+  );
+}
 
 /**
  * 详情列里的任务面单。
@@ -561,6 +974,18 @@ export function TaskDetailCard({
       {automationSlot === undefined ? null : (
         <div data-testid="task-detail-automation-slot">{automationSlot}</div>
       )}
+
+      {/*
+        ══ 附件（工单 #9 的 web 移植）═══════════════════════════════════════
+        🔴 **这一行就是"它真的挂在详情面上"的全部证据**：去掉它，附件区从界面上消失
+        而数据仍在（`apps/web/tests/task-detail-attachments.spec.tsx` 的判据 ② 钉着
+        "去掉挂载点 ⇒ 判据 ① 必须失败"）。
+        `key={task.id}`：这一格有本地状态（在途 / 失败句 / 待确认的那一条），
+        ↑↓ 换选中时不换 key 会把上一条的失败句带过来 —— 与备注 / 截止 / 子任务同一格纪律。
+        四个 `attachment*` 的接线全在这个组件里（动作集、上传通道、确认档），
+        宿主（`App.tsx`）一个字都不用知道 —— 与 `ReminderField` 同一条边界。
+      */}
+      <AttachmentField key={`attachments-${task.id}`} task={task} />
 
       {/*
         ══ 协作区：评论（W4）═══════════════════════════════════════════
