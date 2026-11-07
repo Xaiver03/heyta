@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { HeytaUiProvider, StateIllustration } from '@heyta/ui';
+import { HeytaUiProvider, StateIllustration, toEmptyStateViewModel } from '@heyta/ui';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import type { TaskFilter } from '../tasks/store.js';
 
@@ -50,13 +50,51 @@ export function EmptyState({ filter }: { filter: TaskFilter }): React.JSX.Elemen
   };
   const msg = messages[filter.kind] ?? messages['all']!;
 
+  /**
+   * 🔴 **判断走共享模型，markup 归本端**（R11 的 (B) 方案）。
+   *
+   * 原来这里没有"判断"可复用：`t(key)` 拿到什么就画什么。共享层
+   * `packages/ui/src/empty-state/model.ts` 的 `toEmptyStateViewModel` 才是
+   * 那份**唯一**的判断（空串归一成省略、档位决定要不要图形、`title` 必填），
+   * 而"把结果摆成 `<div class="ht-empty">` 三件套"是本端渲染器的事。
+   *
+   * 这与 `ux-principles.md` §1 立过的范式同形：**判断只有一份，渲染器有两个**
+   * （`packages/ui/src/form/anatomy.ts` 与各端 `FormField` / `kit.TextField`）。
+   *
+   * ⚠️ 为什么不直接把 `packages/ui` 的 `EmptyState` 组件挂进来：那会换掉整棵 DOM
+   * （`<div class="ht-empty">` → `section[role=region]` + RNW 原子类、`<p>` →
+   * `<div dir=auto>`、标题字重 500→600、提示 14→12、插画 testID 换名）。
+   * 2026-11 实测 6 条差异，逐条记在 `docs/plans/r11-states-audit-2026-11.md` §7.1。
+   * 用 6 条视觉回归换一个"组件同一个"的符号统一不划算 —— 判断我们已经拿全了。
+   *
+   * ⚠️ `size` 只能是 `page`：它是唯一**允许**图形的档，而这一屏现状就画
+   * `StateIllustration variant="tasks"`。改成 `card`/`section`/`line` 会让
+   * `view.illustration` 变成 `undefined` ⇒ 插画那一段消失 ⇒ DOM 变
+   * （这条正是 `apps/web/tests/shell-empty-state-dom.spec.tsx` 的反向臂）。
+   */
+  const view = toEmptyStateViewModel({
+    title: t(msg.titleKey),
+    hint: t(msg.hintKey),
+    illustration: 'tasks',
+    size: 'page',
+  });
+
   return (
     <div className="ht-empty" data-testid="empty-state">
-      <HeytaUiProvider>
-        <StateIllustration variant="tasks" />
-      </HeytaUiProvider>
-      <p className="ht-empty__title">{t(msg.titleKey)}</p>
-      <p className="ht-empty__hint">{t(msg.hintKey)}</p>
+      {/* 条件包在 Provider **外面**：`HeytaUiProvider` 只挂 context、不产 DOM
+          （`theme.tsx:308-310` 三个 Provider 直接返回 children），
+          但"没有插画"时连这一层都不该出现（少一层就少一次 theme 解析）。 */}
+      {view.illustration === undefined ? null : (
+        <HeytaUiProvider>
+          {/* 🔴 用 `view.illustration`，不把 `'tasks'` 再写一遍：写死的那版会让
+              "模型给的是 habits、界面还画 tasks"成为一种**不会报错**的漂移 ——
+              正是本仓反复罚的"参数传了却被静默丢弃"。 */}
+          <StateIllustration variant={view.illustration} />
+        </HeytaUiProvider>
+      )}
+      <p className="ht-empty__title">{view.title}</p>
+      {/* `hint` 可省略 —— 模型把空串/纯空白归一成 `undefined`，那一行就不画。 */}
+      {view.hint === undefined ? null : <p className="ht-empty__hint">{view.hint}</p>}
     </div>
   );
 }

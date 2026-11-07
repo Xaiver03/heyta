@@ -441,3 +441,32 @@ node -e "…keys(apps/mobile/package.json)…" | grep -E "test-renderer|testing-
 不能由执行者在实现里悄悄改判据。
 
 **本文件只登记实测，不替它拍板。** 在拍板之前，两处包装件**保持原样**。
+
+### 7.5 已拍板并落地（2026-11）：走 (B)
+
+**(A) 否掉、(B) 批准。** 理由不是"省事"：`(A)` 的收益（判断只有一份）在 `(B)` 里
+已经**拿全了**，而它的代价是 19 个屏重验 + 6 条可见差异。用视觉回归换一个
+"组件同一个"的符号统一，不划算。
+
+落地的是三件事，**互相依赖、同一条提交**：
+
+| 改了什么 | 判据 |
+|---|---|
+| `apps/web/src/features/shell/EmptyState.tsx`：markup 一字不动，`filter → 文案 key` 的映射保留，中间那段"算槽位"换成 `toEmptyStateViewModel(...)`（`size:'page'`） | `apps/web/tests/shell-empty-state-dom.spec.tsx` —— 8 个 filter 分支的 **outerHTML 逐字节**等于**改动前**捕获的黄金串（结构来自改前探针，文案直接写 `zh-CN.ts:935-944` 的字面量，不从 `t()` 读）。反向臂：`size` 改 `card` ⇒ **9 failed / 1 passed** |
+| `apps/mobile/src/ui/kit.tsx`：同上（自有几何 32/8 保留） | `apps/mobile/tests/empty-state-consumes-model.spec.ts` —— 源码形状三钉（import / 真调用 / `size:'page'`）+ **三支配对臂**（注释掉调用、只在注释里出现、`size` 改 `section` 各自必须让谓词翻转）。这一端**没有渲染器**，所以是形状判据，不是黄金树 |
+| `scripts/check-empty-state.mjs`：① 两条 `becomesAt` 改成"消费 `toEmptyStateViewModel`（保留自有 markup）"；② 那句假建议（"四个槽位已一一对应"）改成实测的三处差异；③ **新增断言 D** + `--self-test` 四支臂 | `node scripts/check-empty-state.mjs` ⇒ rc=0，断言 D 打印 `2 个文件 / 2 处调用`；`--self-test` ⇒ 4 支臂全绿 |
+
+🔴 **断言 D 是这一单的重点**：没有它，"必须消费模型"就只是一句注释 ——
+下一班人删掉那次调用、把归一化手写回本地，**别的断言一条都不会红**，
+而两份判断重新分叉。它先**掩码注释**再判（否则注释写得越详细、判据越绿），
+并要求 `import` 与**真调用**两条同时成立（死导入与抄一份副本都能骗过其中一条）。
+
+⚠️ **两处现在的身份变了**：它们不再是"待还的债"，是**永久的两个渲染器**。
+`check:empty-state` 打印的"待转发 2 处"这个**数字不会变成 0**，变的是它的含义
+（从"欠账"变成"围栏"）。**别把"数字没降"读成"这一单没做事"。**
+
+⚠️ **归一化的行为边界（逐站点核过，0 处 DOM 变化）**：模型会把空串/纯空白归一成
+"省略那一行"，而 9 个 mobile 调用点 + 5 个 web 分支传的全是 `t(key)`；
+`translateIn` 在缺词条时**抛错**而不是返回 `''`（`packages/i18n/src/catalog.ts:53-55`），
+且 `zh-CN` 侧那 11 个键的现量值都是非空正文。⇒ 只有"某个语言里把一条词条翻成
+纯空白"才会让某一屏少一行，而那是**翻译 bug**，不是 DOM 回归。

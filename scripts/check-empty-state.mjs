@@ -652,7 +652,22 @@ const SHARED_EXPORT_ANCHOR = /empty-state\/EmptyState\.js/;
 const FORBIDDEN_SHARED_IMPORT = /from\s+['"]@heyta\/i18n(?:\/[^'"]*)?['"]/;
 
 /**
- * 🔴 两端的 `EmptyState` 定义 —— **债，不是许可**。登记为"待转发"。
+ * 🔴 两端的 `EmptyState` 定义 —— **永久的两渲染器，不是待还的债**（2026-11 改判）。
+ *
+ * ## 改判的依据（`docs/plans/r11-states-audit-2026-11.md` §7，实测）
+ *
+ * 原先这里写着"收编后应变成薄转发 —— 把函数体换成 `<EmptyState …/>`"。
+ * **那条路实测走不通**：换成共享组件会改整棵 DOM（web 6 条差异：根标签
+ * `div→section[role=region]`、类名体系、标题字重 500→600、提示字号 14→12、
+ * 插画 testID 换名、多一层 `justifyContent`；mobile 的几何不属于任何一档）。
+ * 用视觉回归换"组件同一个"的符号统一，不划算。
+ *
+ * ⇒ 改判成 **(B)：判断走共享模型，markup 归各端**（`toEmptyStateViewModel`）。
+ * 这与 `ux-principles.md` §1「判断只有一份，渲染器有两个」同形。
+ * **于是这两处不是"待转发"，是永久的两个渲染器** —— 它们会一直留在本表里，
+ * 而本表的语义从"债"变成"围栏"：这两处只许消费模型，不许再手写判断。
+ *
+ * 🔴 而"只许消费模型"不能只写在注释里（那是君子协定）：**断言 D** 钉它。
  *
  * 这是本次门禁改动里唯一看起来"变宽"的一项：从"只许 2 处定义"变成
  * "2 处宿主定义 + 1 处共享定义"。**它不是放宽**，理由是三条，每条都可查：
@@ -682,15 +697,33 @@ const PENDING_THIN_FORWARD = [
     // 待转发登记跟着搬家。
     file: 'apps/web/src/features/shell/EmptyState.tsx',
     host: 'web 壳',
-    /** 收编后这一处应当只剩：从 `@heyta/ui` 导入 `EmptyState` + 把 4 个槽位传进去。 */
-    becomesAt: '把 `ht-empty` 三件套换成 `<EmptyState …/>`（`web.shell.empty.*` 仍在宿主侧取）',
-    why: '它现在是 L3 外壳里的完整实现（含 filter → 文案 key 的映射）。那段映射属于宿主，骨架不属于。',
+    /**
+     * 🔴 2026-11 改判（实测 `docs/plans/r11-states-audit-2026-11.md` §7.1）：
+     * 这一处**不会**变成 `<EmptyState …/>`。换组件会改 6 条 DOM/视觉
+     * （`<div class="ht-empty">` → `section[role=region]`、`<p>` → `<div dir=auto>`、
+     * 标题字重 500→600、提示 14→12、插画 testID 换名），而收益（判断只有一份）
+     * 在消费模型里已经拿全了。
+     */
+    becomesAt:
+      '消费 `toEmptyStateViewModel`（**保留自有 markup**），档位 `size: \'page\'`',
+    why:
+      'L3 外壳：`filter → 文案 key` 的映射属于宿主，`<div class="ht-empty">` 三件套是' +
+      '本端渲染器；夹在中间那份"算槽位"的判断必须来自共享模型。',
   },
   {
     file: 'apps/mobile/src/ui/kit.tsx',
     host: 'mobile kit',
-    becomesAt: '把函数体换成 `<EmptyState …/>`（或直接 re-export 共享实现）',
-    why: '它是 mobile 自己的 kit 组件，四个槽位与共享层已经一一对应 —— 收编成本最低的一处。',
+    /**
+     * 🔴 2026-11 改判（实测 §7.2）：**"四个槽位已一一对应"这句是错的**，
+     * 现量三处对不上 —— `paddingHorizontal` space.8(32) vs page 的 space.6(24)、
+     * `gap` space.2(8) vs space.3(12)、`icon` 收 `IconName` 而共享件收 `HeytaIconData`。
+     * 所以"函数体直接换"会一次改 9 个调用点的留白与图形。
+     */
+    becomesAt:
+      '消费 `toEmptyStateViewModel`（**保留自有 markup**），档位 `size: \'page\'`',
+    why:
+      'mobile kit：自有几何（32/8）不属于任何一档，这是**已知且接受**的（档位只驱动' +
+      '槽位判断，几何归各端）；但"算槽位"必须来自共享模型。',
   },
 ];
 const PENDING_THIN_FORWARD_FILES = PENDING_THIN_FORWARD.map((entry) => entry.file);
@@ -726,6 +759,158 @@ const readIfExists = (rel) => {
   const abs = join(ROOT, rel);
   return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
 };
+
+/**
+ * 「两渲染器必须消费同一份判断」的机械判据（断言 D）的零件。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 为什么要它存在
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * 2026-11 的改判把这两处从"待还的债"变成"**永久**的两个渲染器"（见上方长注释）。
+ * 于是"它们必须消费共享模型"这句话就成了本门禁唯一护着的东西 ——
+ * **而注释不是判据**：下一班人把 `toEmptyStateViewModel(` 那一行删掉、
+ * 把归一化手写回本地，界面未必立刻坏，两份判断却重新开始分叉，而本脚本
+ * 照样全绿。那正是"规则不落进可调用函数就等于没有规则"的又一次。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 为什么要先掩码注释
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `kit.tsx` 里那段"`toEmptyStateViewModel` 是唯一判断"的**说明**会命中纯文本
+ * 匹配。不掩码的话，**注释写得越详细，判据越绿** —— 而"判据因为看不见东西
+ * 而变绿"是本仓反复罚过的形状（`check-danger-confirm.mjs` 的候选集塌陷）。
+ * 掩码之后仍要求 `(`：名字后面没有实参括号的不算调用。
+ *
+ * ⚠️ `import` 与 `调用` 是**两条**，缺一不可：只 import 不用（死导入）与
+ * 只用不 import（抄了份副本自己实现）都能骗过其中一条。
+ */
+const stripComments = (text) =>
+  text.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/(^|[^:])\/\/[^\n]*/gu, '$1');
+
+const MODEL_IMPORT = /import\s*\{[^}]*\btoEmptyStateViewModel\b[^}]*\}\s*from\s*'@heyta\/ui'/u;
+const MODEL_CALL = /\btoEmptyStateViewModel\s*\(/u;
+
+/**
+ * @param {{file: string, label: string, source: string | null}[]} entries
+ * @returns {{violations: string[], consumers: number, total: number}}
+ */
+function modelConsumptionViolations(entries) {
+  const violations = [];
+  let consumers = 0;
+  for (const entry of entries) {
+    if (entry.source === null) {
+      violations.push(`${entry.file}（${entry.label}）**不存在** —— 登记的渲染器找不到，不能静默跳过`);
+      continue;
+    }
+    const code = stripComments(entry.source);
+    const missing = [];
+    if (!MODEL_IMPORT.test(code)) missing.push('从 `@heyta/ui` import `toEmptyStateViewModel`');
+    if (!MODEL_CALL.test(code)) missing.push('真的**调用** `toEmptyStateViewModel(`');
+    if (missing.length > 0) {
+      violations.push(`${entry.file}（${entry.label}）没有消费共享模型：缺 ${missing.join(' / ')}`);
+      continue;
+    }
+    consumers += 1;
+  }
+  return { violations, consumers, total: entries.length };
+}
+
+const modelEntries = () =>
+  PENDING_THIN_FORWARD.map((entry) => ({
+    file: entry.file,
+    label: entry.host,
+    source: readIfExists(entry.file),
+  }));
+
+/* ========================================================================
+ * `--self-test`：断言 D 的自检臂（四支，缺一不可）
+ * ======================================================================
+ *
+ * 纪律同 `check-danger-confirm.mjs`：**不能失败的判据没有价值**，
+ * 而"能失败"这件事本身要有读数。四支的分工：
+ *
+ *   ① 真源（当前两个文件）            ⇒ 0 违规，且 consumers === total（分母不塌）
+ *   ② 把**调用**注释掉（只留 import）  ⇒ 精确红，并点名该文件
+ *   ③ 只在**注释**里写 `toEmptyStateViewModel(` ⇒ 仍然红（证明掩码生效，
+ *      而不是"纯文本 grep 到就算消费"）
+ *   ④ 文件不存在（source === null）    ⇒ 红（证明它不静默跳过 —— 范围缺口
+ *      不会报错，只会静默失效）
+ *
+ * ⚠️ ②③ 用的是**同一份真源的派生物**，只翻"调用"这一位：配对臂的候选集必须
+ * 完全相同、只差那一枚布尔，否则测的是夹具不是判据（`check-dirty-form-policy`
+ * 的臂 ② 第一版就是这么写错的）。
+ */
+if (process.argv.includes('--self-test')) {
+  const real = modelEntries();
+  const base = real[0];
+
+  const arms = [];
+
+  {
+    const r = modelConsumptionViolations(real);
+    arms.push({
+      id: '① 真源',
+      ok: r.violations.length === 0 && r.consumers === r.total && r.total > 0,
+      detail: `违规 ${String(r.violations.length)} / 消费 ${String(r.consumers)} / 分母 ${String(r.total)}`,
+    });
+  }
+
+  {
+    // 把 `const view = toEmptyStateViewModel(` 那一行注释掉 —— **只删调用，不删 import**。
+    const mutated = base.source.replace(/(\n\s*)(const\s+\w+\s*=\s*toEmptyStateViewModel\s*\()/u, '$1// $2');
+    const r = modelConsumptionViolations([{ ...base, source: mutated }]);
+    arms.push({
+      id: '② 调用被注释掉',
+      ok:
+        mutated !== base.source &&
+        r.violations.length === 1 &&
+        r.violations[0].includes(base.file) &&
+        r.violations[0].includes('调用'),
+      detail: `违规 ${String(r.violations.length)}：${r.violations[0] ?? '（无）'}`,
+    });
+  }
+
+  {
+    // 把**代码里**的调用改名（留着 import 也不行），只在注释里写那串字样。
+    const stripped = stripComments(base.source).replace(/\btoEmptyStateViewModel\s*\(/u, 'noop(');
+    const mutated = `${stripped}\n// 我们把 toEmptyStateViewModel( 删掉了\n`;
+    const r = modelConsumptionViolations([{ ...base, source: mutated }]);
+    arms.push({
+      id: '③ 只出现在注释里',
+      ok: r.violations.length === 1 && r.violations[0].includes(base.file),
+      detail: `违规 ${String(r.violations.length)}（掩码后仍应红）`,
+    });
+  }
+
+  {
+    const r = modelConsumptionViolations([{ ...base, source: null }]);
+    arms.push({
+      id: '④ 文件不存在',
+      ok: r.violations.length === 1 && r.violations[0].includes('不存在'),
+      detail: `违规 ${String(r.violations.length)}（不许静默跳过）`,
+    });
+  }
+
+  let selfFailed = false;
+  console.log('─'.repeat(72));
+  console.log('--self-test：断言 D 的四支自检臂');
+  console.log('─'.repeat(72));
+  for (const arm of arms) {
+    if (arm.ok) console.log(`✅ ${arm.id} —— ${arm.detail}`);
+    else {
+      selfFailed = true;
+      console.error(`🔴 ${arm.id} —— ${arm.detail}`);
+    }
+  }
+  console.log('');
+  if (selfFailed) {
+    console.error('🔴 自检臂未通过：断言 D 的"能红"不成立。\n');
+    process.exit(1);
+  }
+  console.log(`✅ --self-test：${String(arms.length)} 支臂全部符合预期。\n`);
+  process.exit(0);
+}
 
 /* ========================================================================
  * 断言 A：唯一实现的锚点
@@ -991,7 +1176,7 @@ if (assertionCErrors.length > 0) {
 } else {
   console.log(`✅ 权威定义唯一：${AUTHORITATIVE_DEFINITION}`);
   console.log(`   ✅ 已从 ${SHARED_ENTRY} 导出；未 import \`@heyta/i18n\`；走 token。`);
-  console.log(`   📌 登记在册的待转发（${String(PENDING_THIN_FORWARD.length)} 处，是**债**不是许可）：`);
+  console.log(`   📌 登记在册的两渲染器（${String(PENDING_THIN_FORWARD.length)} 处，**永久**；只许消费模型）：`);
   for (const entry of PENDING_THIN_FORWARD) {
     console.log(`      [${entry.host}] ${entry.file}`);
   }
@@ -1005,17 +1190,59 @@ if (assertionCErrors.length > 0) {
    */
   const debtSites = Object.values(EMPTY_SITES).reduce((n, files) => n + files.length, 0);
   console.log(
-    `\n   ⏭️  **下一步（不在本轮范围）**：把上面 ${String(PENDING_THIN_FORWARD.length)} 处收成薄转发，\n` +
-      `      并把断言 B 账上的 ${String(debtSites)} 个手写站点逐个换成共享组件。收编的正确顺序：\n` +
-      `        1. mobile kit（${forwardFile('mobile kit')}）：四个槽位已一一对应，函数体直接换；\n` +
-      `        2. web 壳（${forwardFile('web 壳')}）：保留 filter → 文案 key 的映射（那是宿主语义），\n` +
-      `           只把 \`ht-empty\` 三件套换成 <EmptyState/>；\n` +
-      `        3. 账上的站点按 EMPTY_SITES 的分组逐个消掉，每消一个就从登记表删一行。\n` +
-      `      ⚠️ 每收编一处都**必须**把该站点原有的 \`data-testid\` 传给 \`testID\` ——\n` +
-      `         否则 e2e 的定位钩子与断言 B 的登记项会**同时**静默消失。\n` +
-      `      ⚠️ 本轮**刻意不动** \`apps/**\`：那会让账上的站点同时需要迁移，\n` +
-      `         而且会与并行改 apps 的分支撞车。`,
+    `\n   ⏭️  **这两个不还了，它们是永久的两个渲染器**（2026-11 改判，见断言 A 上方的长注释与\n` +
+      `      \`docs/plans/r11-states-audit-2026-11.md\` §7 的实测）：\n` +
+      `        1. mobile kit（${forwardFile('mobile kit')}）：几何 32/8 不属于任何一档（已知且接受），\n` +
+      `           但"算槽位"必须来自 \`toEmptyStateViewModel\`；\n` +
+      `        2. web 壳（${forwardFile('web 壳')}）：\`<div class="ht-empty">\` 三件套是本端渲染器，\n` +
+      `           换组件会改 6 条 DOM/视觉（标题 500→600、提示 14→12、插画 testID 换名…）。\n` +
+      `      🔴 **不要**再照旧注释去"把函数体换成 <EmptyState/>" —— 那条路实测会改视觉。\n` +
+      `      ✅ 该做的是：断言 B 账上的 ${String(debtSites)} 个手写站点逐个**消费同一个模型**，\n` +
+      `         每收一个就从登记表删一行（那才是会变短的那本账）。\n` +
+      `      ⚠️ 收编时**必须**把该站点原有的 \`data-testid\` 保留 —— 否则 e2e 的定位钩子\n` +
+      `         与断言 B 的登记项会**同时**静默消失。`,
   );
+}
+
+/* ========================================================================
+ * 断言 D：两处"永久渲染器"必须**消费**共享模型（不能只靠注释里的君子协定）
+ * ======================================================================
+ *
+ * 2026-11 改判之后（见断言 A 上方的长注释），这两处**不再变成薄转发**，
+ * 而是"保留自有 markup、把'算槽位'交给 `toEmptyStateViewModel`"。
+ * 于是唯一会失效的东西是一条**没有实现**的约定 —— 除非它被钉住。
+ *
+ * 这条断言挡的形状（每一种都**不会**让别的断言红）：
+ *   · 删掉那次调用，把"空串归一成省略""title 必填"手写回本地 ⇒ 两份判断重新分叉；
+ *   · 只 `import` 不用（死导入）⇒ 看着像消费了；
+ *   · 在**注释**里写一句"我们消费 toEmptyStateViewModel(" ⇒ 纯文本匹配会放过它。
+ *
+ * 判据：每个登记文件去掉注释后，必须同时有 `import { … toEmptyStateViewModel … }
+ * from '@heyta/ui'` 与一次真调用 `toEmptyStateViewModel(`。
+ * 自检：`node scripts/check-empty-state.mjs --self-test`（四支臂，见上）。
+ */
+console.log('');
+console.log('─'.repeat(72));
+console.log('断言 D：两处永久渲染器必须**消费**共享模型（toEmptyStateViewModel）');
+console.log('─'.repeat(72));
+
+{
+  const report = modelConsumptionViolations(modelEntries());
+  if (report.violations.length > 0) {
+    failed = true;
+    console.error(`🔴 有 ${String(report.violations.length)} 处没有消费共享模型：\n`);
+    for (const v of report.violations) console.error(`   · ${v}`);
+    console.error(
+      `\n   ⇒ "判断只有一份，渲染器有两个"（ux-principles.md §1）：markup 归各端，\n` +
+        `      **算槽位**必须来自 \`packages/ui/src/empty-state/model.ts\`。\n` +
+        `      ⚠️ 注释里提到它**不算**消费 —— 本断言先掩码注释再判。\n`,
+    );
+  } else {
+    console.log(
+      `✅ 两处渲染器都消费共享模型（${String(report.total)} 个文件 / ` +
+        `${String(report.consumers)} 处调用，分母不为 0）。`,
+    );
+  }
 }
 
 console.log('');
@@ -1023,4 +1250,4 @@ if (failed) {
   console.error('🔴 「空态只有一个」门禁未通过。\n');
   process.exit(1);
 }
-console.log('✅ 空态：三道断言都通过。\n');
+console.log('✅ 空态：四道断言都通过。\n');

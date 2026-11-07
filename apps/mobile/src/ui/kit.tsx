@@ -51,6 +51,7 @@ import { useI18n } from '@heyta/i18n';
 import {
   StateIllustration,
   resolveFieldChrome,
+  toEmptyStateViewModel,
   type StateIllustrationVariant,
 } from '@heyta/ui';
 import { useText, useTheme, useTokens } from '../theme';
@@ -966,6 +967,36 @@ export function EmptyState({
   testID?: string;
 }): React.JSX.Element {
   const t = useTokens();
+  /**
+   * 🔴 **判断走共享模型，markup 归本端**（R11 的 (B) 方案）。
+   *
+   * `toEmptyStateViewModel` 是"空态该画什么"的唯一判断（`title` 必填、空串
+   * 归一成省略、档位决定要不要图形）；`<View>/<Text variant=…>` 这一套是
+   * 本端的渲染器。与 `ux-principles.md` §1「判断只有一份，渲染器有两个」同形。
+   *
+   * ⚠️ **`size` 只能传 `page`**：它是唯一**允许**图形的档，而 kit 现状就画
+   * 插画/图标。传 `section`/`line` 会让 `view.illustration` 变 `undefined`
+   * ⇒ 图形那一段消失 ⇒ 9 个调用点的 DOM 变。
+   *
+   * ⚠️ **kit 的几何不属于任何一档**（`paddingHorizontal: space.8`=32、
+   * `gap: space.2`=8，而 `page` 是 24/12）—— 这是**已知且接受**的：档位只驱动
+   * 槽位判断，几何归各端渲染器。实测记在
+   * `docs/plans/r11-states-audit-2026-11.md` §7.2。别把它"顺手对齐"到 24/12：
+   * 那会一次改 9 屏的留白，且**没有任何判据会红**。
+   *
+   * ⚠️ **图标槽位仍由本端判"有没有"**：kit 收 `IconName`（名字），共享模型收
+   * `HeytaIconData`（字形数据），两套词汇表不同（§7.2 第 4 条）。模型能判的
+   * "这一档允不允许画图形"已经通过 `size` 传入；"具体画哪个字形"属于渲染器，
+   * 所以下面那支 `icon !== undefined` 是**有意留下**的，不是漏收。
+   */
+  const view = toEmptyStateViewModel({
+    title,
+    hint,
+    ...(detail === undefined ? {} : { detail }),
+    ...(illustration === undefined ? {} : { illustration }),
+    detailTone,
+    size: 'page',
+  });
   return (
     <View
       testID={testID}
@@ -977,27 +1008,30 @@ export function EmptyState({
         gap: t['space.2'],
       }}
     >
-      {illustration !== undefined ? (
-        <StateIllustration variant={illustration} />
+      {view.illustration !== undefined ? (
+        <StateIllustration variant={view.illustration} />
       ) : icon !== undefined ? (
         <Icon name={icon} size="xl" color={t['color.foreground-subtle']} strokeWidth={1.5} />
       ) : null}
       <Text variant="section-title" tone="muted" style={{ textAlign: 'center' }}>
-        {title}
+        {view.title}
       </Text>
-      <Text variant="row-meta" tone="subtle" style={{ textAlign: 'center' }}>
-        {hint}
-      </Text>
-      {detail !== undefined ? (
+      {/* `hint` 可省略 —— 模型把空串/纯空白归一成 `undefined`，那一行就不画。 */}
+      {view.hint === undefined ? null : (
+        <Text variant="row-meta" tone="subtle" style={{ textAlign: 'center' }}>
+          {view.hint}
+        </Text>
+      )}
+      {view.detail === undefined ? null : (
         <Text
           variant="caption"
-          tone={detailTone}
-          selectable={detailTone === 'danger'}
+          tone={view.detailTone}
+          selectable={view.detailTone === 'danger'}
           style={{ textAlign: 'center' }}
         >
-          {detail}
+          {view.detail}
         </Text>
-      ) : null}
+      )}
     </View>
   );
 }
