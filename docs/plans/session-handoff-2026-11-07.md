@@ -2,6 +2,7 @@
 
 > 这份文档的目标：**一个没有上下文的人，读完能接着干**。
 > 事实与推测分开写；每条"没做完"都带**入口**（文件 / 命令 / 提交号），不带"我以为"。
+> 配套：**反思索引** [`session-reflection-2026-11-07.md`](session-reflection-2026-11-07.md)（20 条被纠正的判断 + 三条稳定模式）。
 > 上游：[PRD](ticktick-parity-prd-2026-11.md) · [交接（滴答对标线，逐包状态）](ticktick-parity-handoff-2026-11.md) ·
 > [取证总目录（十条线 + 勘误台账）](../research/ticktick-teardown-index.md) · [入口账本（41 行）](r14-entry-table.md)
 

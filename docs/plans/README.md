@@ -12,6 +12,7 @@
 |---|---|---|
 | **统一中央认证** | [unified-central-auth.md](unified-central-auth.md) | 官方中央身份、自托管可选；状态与验证唯一入口 |
 | **本轮 goal：全量落账 + 分支合并 + 代码质量审计** | [`goal-landing-and-quality-audit.md`](archive/goal-landing-and-quality-audit.md) | ✅ 已完成（2026-10-03）。82 个提交推送远端、`feat/countdown-anniversary` 合并进 main（四处冲突的产品裁决 + 陷阱编号重排 #137–140→#161–164）、验证矩阵全实跑（隔离 worktree build/typecheck/九道门禁/单测）。含 2 处已修类型潜伤、3 条登记发现，与本轮自己两次「管道吞退出码」假绿的照实记录 |
+| **本次会话反思（2026-11-07）** | [`session-reflection-2026-11-07.md`](session-reflection-2026-11-07.md) | 🪞 **被证据纠正过的判断索引**：20 条，四列（改了什么 / 归因三档 / 证据 / 下次开头指令）。分三类：事实读错 9 条、判断失误 8 条、流程失误 3 条；末尾归纳三条稳定模式。不收「下次更仔细」类，也不收没发生过纠正的判断 |
 | **本次会话交接（2026-11-07）** | [`session-handoff-2026-11-07.md`](session-handoff-2026-11-07.md) | 🔴 **零上下文可读**：14 笔已入库提交、**未完成的用户需求逐条**（两包待发 / 看板 B274 / 移动端设备腿 / 四端重装）、**逆向覆盖率**（已闭环十条线 + 本轮新答两条 + 仍未判定三条）、验证命令、以及 8 条这一轮踩出来的坑 |
 | **当前状态 / 下一步做什么** | [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) | 🔴 **唯一权威主计划**。它同时取代了 roadmap §5 与 4 份多端计划的路线部分 |
 | **E2EE 可选 + 钥匙由设备持有**（[ADR-0080](../adr/0080-e2ee-is-optional-with-device-held-key.md)） | [`e2ee-optional-and-device-held-key.md`](e2ee-optional-and-device-held-key.md) | 🔴 **状态只在正文，本行不复述**。默认加密与卖点不变，动的是"用户能关掉（关闭 = 整库解密重传）"与"口令只在加设备 / 恢复 / 轮换时出现"；服务端闸门要按账号模式**互斥拒收**。七刀 S0–S7，S0/S1 零行为变化可先落 |
