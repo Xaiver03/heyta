@@ -347,3 +347,97 @@ grep -rn 'role="alert"' apps/web/src/features --include=*.tsx | wc -l           
    `AuthForm.tsx:711` 与 `CommentThread.tsx:94` 没进表 —— 前者是认证面板的"不是成员"终态、
    后者是评论区，两者都不在 R11 射程的十个 feature 里，所以只登记、不判定。
 6. **没核 Windows / 桌面壳**。`apps/desktop-windows/**` 有别人在飞，且窗口态的"空"与 web 不同源。
+
+---
+
+## 7. 转发可行性实测：**两份包装件都做不了「DOM 逐字节不变」的转发**（2026-11 实测）
+
+`check-empty-state.mjs` 的 `PENDING_THIN_FORWARD` 挂着两处"待转发"
+（`features/shell/EmptyState.tsx`、`apps/mobile/src/ui/kit.tsx`），
+`becomesAt` 写的是"把函数体换成 `<EmptyState …/>`"。
+
+🔴 **这条被实测否证：换成共享组件必然改 DOM，而且两处是两种不同的不可能。**
+下面是探针读数（`apps/web/tests/` 临时 spec，渲染后取 `outerHTML`，剥掉 `data:` URI；跑完即删）。
+> 复现方式：渲染 `<ShellEmptyState filter={{kind:'all'}} />` 与
+> `<HeytaUiProvider><EmptyState title={…} hint={…} illustration="tasks" testID="empty-state"/></HeytaUiProvider>`，
+> 各取 `firstElementChild.outerHTML`。两次都**一定不同**（下面 6 条差异）。
+
+### 7.1 web 壳：现状 ≈ `page` 档，但**渲染技术**不同（`<div>/<p>` → `section[role=region]/<div dir=auto>`）
+
+| 维度 | 现状（`shell/EmptyState.tsx:57-61`） | 共享 `page` 档 | 差异 |
+|---|---|---|---|
+| 根标签 | `<div class="ht-empty">` | `<section role="region" class="css-view-…">` | **标签变了 + 多一个 `role`**（`a11yRole:'summary'` → RNW 映射成 `section[role=region]`） |
+| 根样式来源 | `controls.css:356` 的 `.ht-empty` | RNW 原子类 `r-paddingBlock/r-paddingInline/r-gap` | 类名体系**整体不同**，`ht-empty` 一族在转发后全仓归零 |
+| 纵向/横向留白 | `padding: space.16(64) space.6(24)` | `paddingVertical: space.16(64)` + `paddingHorizontal: space.6(24)` | ✅ **数值相同** |
+| 行距 | `gap: space.3(12)` | `gap: space.3(12)` | ✅ 相同 |
+| 居中方式 | `align-items:center` + `text-align:center` + 继承 `color: foreground-subtle` | `alignItems:center` + `justifyContent:center`，每行 `<Text>` 自带色与对齐 | 多了 `justifyContent`；`text-align/color` 从**继承**变成**逐行声明** |
+| 标题 | `<p class="ht-empty__title">` = 16px / **500** / muted | `<div dir="auto" …>` = 16px / **600** / muted + `line-height:20px` + `letter-spacing:-0.304px` | 🔴 **字重 500 → 600（视觉变化）** |
+| 提示 | `<p class="ht-empty__hint">` = 14px（`font-size-sm`）/ 继承 subtle | `<div dir="auto" …>` = **12px** / `r-color-1s7ct43` | 🔴 **字号 14 → 12（视觉变化）** |
+| 插画 testID | `state-illustration-tasks`（`StateIllustration` 自带） | `empty-state-illustration`（`${testID}-illustration` 派生） | 🔴 定位钩子换名 |
+
+⇒ **6 条差异，其中 2 条是肉眼可见的字号/字重变化，1 条会打断 e2e 定位钩子。**
+"保留那层包裹、只换内部本体"也救不了：外层 `.ht-empty` 已有 `padding: 64/24`，
+再套一个自带 `paddingVertical:64 / paddingHorizontal:24` 的 `page` 档 = **双层留白**，更糟。
+
+### 7.2 mobile kit：现状**对不上四档中的任何一档**
+
+| 维度 | kit（`apps/mobile/src/ui/kit.tsx:975-981`） | 共享 `page` 档 | 差异 |
+|---|---|---|---|
+| paddingVertical | `space.16`（64） | `space.16`（64） | ✅ |
+| paddingHorizontal | **`space.8`（32）** | **`space.6`（24）** | 🔴 差 8pt |
+| gap | **`space.2`（8）** | **`space.3`（12）** | 🔴 差 4pt |
+| hint | **必填**，无条件渲染 | 可选，空白归一成 `undefined`（整行不画） | 传空串的站点会**少一行** |
+| 图标 | 收 `IconName`（名字） | 收 `HeytaIconData`（数据） | 需要一张**名字→数据**的映射表；`kit` 的 `Icon` 有，但没导出 |
+
+⇒ 它不是 `page`（横向留白与行距都不同），也不是 `card`/`section`/`line`。
+按工单口径「现状与四档都对不上 ⇒ 停下报告」，**这一处停**。
+
+🔴 **顺带证伪了门禁自己的一句建议。** `node scripts/check-empty-state.mjs` 在"下一步"里逐字写着：
+
+> `1. mobile kit（apps/mobile/src/ui/kit.tsx）：四个槽位已一一对应，函数体直接换；`
+
+**"四个槽位已一一对应"是假的**，现量三处对不上（`paddingHorizontal` space.8↔space.6、
+`gap` space.2↔space.3、`icon` 收 `IconName` 而共享件收 `HeytaIconData`）。
+这句建议比它的锚点更容易被照抄 —— 锚点失效会红，**建议错了不会红**。
+（另一处 `2. web 壳 …只把 ht-empty 三件套换成 <EmptyState/>` 同样不成立，见 §7.1。）
+
+⇒ 这两句建议要么修正，要么删掉，否则下一个人会照着它做出一次视觉回归。
+**本次不改脚本**（改判据/建议是规则改动，见 §7.4 末段），只在此登记。
+
+且调用点 **18 处**（`grep -rn "<EmptyState" apps/mobile/src --include=*.tsx | grep -v ui/kit | wc -l`），
+一次改 18 屏的横向留白与行距，是纯视觉改动，无判据可依。
+
+### 7.3 第二条硬阻塞：mobile 侧**写不出**「黄金树」判据
+
+`apps/mobile` 的依赖里**没有任何渲染器**：
+
+```
+node -e "…keys(apps/mobile/package.json)…" | grep -E "test-renderer|testing-library"   # 0 命中
+```
+
+`react-test-renderer` 与 `@testing-library/react-native` 都不在册，而本仓「不引入新第三方依赖」
+要过可维护性 + 许可证两道门（`hard-constraints.md` §3.1/§3.2）。⇒
+工单要求的「mobile 侧同样落一个黄金树 spec」**在现有依赖面内不可完成**，
+不是"没时间做"，是"要做得先加一个依赖"。
+
+### 7.4 结论：三条路，只有一条满足「DOM 逐字节不变」
+
+| 路 | DOM 是否逐字节不变 | 是否消除"第二份实现" | 是否能让 `PENDING_THIN_FORWARD` 归零 | 代价 |
+|---|---|---|---|---|
+| **(A) 换组件**（`becomesAt` 写的那个） | ❌ 不可能（§7.1 / §7.2） | ✅ | ✅ | 改 web 1 屏 + mobile 18 屏的视觉；断 e2e 钩子；必须重新验收 |
+| **(B) 只转发"判断"**：包装件保留自己的 markup，改调 `toEmptyStateViewModel` | ✅ **构造上必然相同**（markup 一个字没动） | ✅ 判断只留一份（归一/空串/档位都由模型给） | ❌ 包装件仍是本地实现，断言 C 的两处账要留着 | 少：两处 `function EmptyState` 各多一行 import + 把 title/hint 换成 `view.title/view.hint` |
+| **(C) 不改** | ✅ | ❌ 判断仍两份 | ❌ | 债继续挂着（现状） |
+
+🔴 **(B) 是唯一同时满足「DOM 不变」与「判断只有一份」的路**，也正是
+[`ux-principles.md` §1](ux-principles.md) 已经立过的范式：
+**判断只有一份，渲染器有两个**（`packages/ui/src/form/anatomy.ts` 被两端渲染器各消费一次）。
+`EmptyState.tsx` 里的 `toEmptyStateViewModel` 本来就是按这个形状写的
+（"组件只做把输出摆到 RN 原语上这一层，不带分支"，见 `model.ts` 文件头）。
+
+⚠️ 但 **(B) 会让 `check:empty-state` 的断言 C 永远留两行** —— 那两行登记得很清楚：
+它们是"待转发"，不是"许可"。要不要把 `becomesAt` 从"换成 `<EmptyState/>`"改成
+"换成消费 `toEmptyStateViewModel`"，**是一个规则改动，不是一次重构**，
+按本仓纪律它得由产品/架构拍板并写进 `check-empty-state.mjs` 的文件头，
+不能由执行者在实现里悄悄改判据。
+
+**本文件只登记实测，不替它拍板。** 在拍板之前，两处包装件**保持原样**。
