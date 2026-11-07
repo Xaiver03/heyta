@@ -42,7 +42,7 @@ describe('外观偏好是设备属性（ADR-0085 判据 1）', () => {
   it('改预设 / 切明暗 ⇒ DOM 变了，但实体条数与 op 一个不动', async () => {
     (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
     __resetOpLogForTests();
-    await initOpLog({ databaseName: 'theme-prefs-test' });
+    await initOpLog('theme-prefs-test');
     const before = counts();
 
     rememberThemePreset('warm');
