@@ -48,7 +48,7 @@
 
 - R11：`ErrorState` / `Skeleton` 已入库并接上第一个消费者；档位账本门禁（30 行）已入库。
   **但 32 个容器只接了 1 处**，`card` 档 0 个消费者 —— 如实登记在
-  [`r11-error-and-loading-2026-11-11.md`](r11-error-and-loading-2026-11-11.md) 与
+  [`r11-error-and-loading-2026-11.md`](r11-error-and-loading-2026-11.md) 与
   [`r11-state-tiers-ledger.md`](r11-state-tiers-ledger.md) §3。
 - 三笔挂账：**全部关闭**（provider 登记 / 幽灵门禁 `check-tag-resolution` 补齐且带自检臂 /
   移动端两条永不命中的键）。
