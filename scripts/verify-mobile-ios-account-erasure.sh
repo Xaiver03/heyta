@@ -866,10 +866,15 @@ fill_three_credentials "$TOKEN" \
 #    这一段把**事实**（本机库归属表）打出来，供人对照；判红留给下一趟做，
 #    因为此刻还没有一条"归属不符 ⇒ 界面必须说这一句"的判据。
 #    需要 store 内省：见 `docs/plans/delivery-blocked-2026-11-07.md`。
-echo "   归属取证（本机库 meta 表里的 owner 行）："
-sqlite3 "${DATA_CONTAINER}/Library/${DB_NAME}" \
-  "SELECT key, substr(value,1,120) FROM meta WHERE key LIKE '%library%' OR key LIKE '%owner%';" \
-  2>/dev/null | sed 's/^/     /' || echo "     （读不到 meta 表）"
+# 🔴 meta 表的形状：`("pk0", "data")`，**键在 `pk0`、值是一整个 JSON**（`{"key":..,"value":..}`）。
+#    第一版按 `key`/`value` 两列写，于是 `no such column: key` 被 `2>/dev/null` 吞掉 ⇒
+#    取证段**静默空转**（这正是本仓库那条"一条永远通过的判据比没有判据更糟"）。
+#    这里把整张表打出来（只有几行），键名与值一起看。
+echo "   归属取证（本机库 meta 表全量 —— owner 那一行就是归属；缺这一行 = 还没认领过）："
+sqlite3 "${DATA_CONTAINER}/Library/${DB_NAME}" "SELECT pk0, data FROM meta;" 2>&1 | sed 's/^/     /'
+echo "   当前登录身份（探针已知的那一半）："
+echo "     serverOrigin=$(printf '%s' "$HOST_SERVER")  email=$(cat /tmp/heyta_mobile_email.txt 2>/dev/null)"
+echo "     ⚠️ accountId 不在这里打印：它只由登录会话返回，探针拿不到（这是它读不到归属的原因之一）"
 
 step "3. 界面上建一条便签（让库里真的有用户字节）"
 # 🔴 **必须先建便签、再同步**（2026-11-07 实测的先后）。
