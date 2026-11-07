@@ -115,10 +115,32 @@ EVIDENCE="$HEYTA_REPO_ROOT/apps/mobile/evidence"
 SHIM="$(cd "$(dirname "$0")" && pwd)/tools/ios-ax-shim.py"
 LOAD1=$(sysctl -n vm.loadavg 2>/dev/null | tr -d '{} ')
 
-# 🔴 设置面那一行的可点名是**标题 + 副标题拼起来**的（`ProfileScreen.tsx:612-614`
-#    把 `mobile.profile.entry.settings` 与 `.settings.hint` 一起交给无障碍层）。
-#    两个半边各自都是词条表的值；拼串本身不是 ⇒ 所以拼在这里，注释指回真源。
-SETTINGS_ROW="设置, 同步凭据、桌面小组件与语言"
+# 🔴 设置面那一行的可点名 = **`mobile.profile.entry.settings` 这一条词条的值**，
+#    不带副标题。
+#
+#    原来这里写的是 `设置, 同步凭据、桌面小组件与语言`，并在注释里说
+#    「ProfileScreen 把 label 与 hint 一起交给无障碍层」。**两件事都过期了**：
+#    ① `.settings.hint` 那一侧的文案现在在词条表里是「个人资料、偏好、同步与安全」；
+#    ② 更要紧的一处：`SettingsRowModel` 的 `SettingsRow` 只把 `label` 交给
+#       `accessibilityLabel`（`packages/ui/src/settings/Settings.tsx:171`），
+#       **`hint` 根本不进可达名**。所以拼串那一步从一开始就不成立。
+#
+#    症状是这条验收**在真机上永远进不去设置面**（`found=False`、
+#    `scrollRc=element-left-tree`），而它报的是"滚不进可见区"——
+#    读起来像设备/滚动坏了，实际是点名写错了。2026-11-07 在
+#    `iPhone Duo heyta` 上实测：查 `设置` ⇒ `{"found":"True","visible":"True"}`；
+#    查那两个拼串 ⇒ `found=False`。
+#
+#    ⇒ **只写词条值本身**。搬这个值时要跟着改的是这里，且只有这里。
+SETTINGS_ROW="设置"
+# 上面那条走进去要经过的两层（理由见 `open_settings_sheet` 里那段注释）。
+# 🔴 两个都是**词条表的值**：`mobile.settings.section.data` 与
+#    `mobile.profile.sync.advancedOpen`。搬词条时这两行要跟着改。
+SETTINGS_SYNC_GROUP="数据与同步"
+SETTINGS_SELFHOST="使用自托管服务器"
+# 配置态下同一枚展开按钮改叫这个（`mobile.profile.sync.advancedTitle` = 自托管同步）。
+# 两个都试、先试未配置那个 —— 见 `open_settings_sheet` 里那段读数。
+SETTINGS_SELFHOST_CONFIGURED="自托管同步"
 
 # ── 设备侧与容器侧的读法 ────────────────────────────────────────────────────
 ax() { python3 "$SHIM" "$@" --udid "$UDID" --idb "$IDB_BIN" --companion "$IDB_COMPANION" --json; }
@@ -590,11 +612,56 @@ open_settings_sheet() {  # 打开设置面并等「服务器地址」输入框�
   ax "$SETTINGS_ROW" --pressable --press --json >/dev/null 2>&1
   sleep 2.5
   local i
+  # 🔴 两跳，不是一跳：2026-11 起移动端设置是**两层**的 ——「设置」打开的是分组总览
+  #    （订阅 / 数据与同步 / 提醒与通知 / 外观与语言 / 功能与 AI / 关于与帮助），
+  #    服务器与令牌住在「数据与同步」里；而它们又默认收在
+  #    「使用自托管服务器」那一枚展开按钮下面（默认走官方托管，不填地址）。
+  #
+  #    旧版这里只等「服务器地址」12 秒，于是**在任何一层没展开时都报**
+  #    「设置面没打开」—— 那句话把"分组还没进""表单还没展开""设置真没开"
+  #    三种情况说成同一件，而其中只有第三种是它想指的。2026-11-07 在
+  #    `iPhone Duo heyta` 上把三层的可达名逐层读了出来（总览 11 个元素 /
+  #    数据与同步 17 个 / 展开后两枚 AXTextField 都在树上），按实读改。
+  if [ "$(jget "$(ax "$SETTINGS_SYNC_GROUP" --pressable --list --json)" found)" = "True" ]; then
+    ax "$SETTINGS_SYNC_GROUP" --pressable --press --json >/dev/null 2>&1
+    sleep 2
+  fi
+  # 🔴 **已配置之后，这一页变了两处**（2026-11-07 实测，同一趟运行里量到的）：
+  #    ① 凭据表单收起来了 —— `SettingsScreen.tsx:661` 在 `form.configured` 为真时
+  #       渲染 `syncStatus`（状态 + 立即同步）而**不**渲染配置表单；
+  #    ② 「使用自托管服务器」那一枚展开按钮的**名字也换了**（配置态它叫
+  #       「自托管同步」，见同一屏的读数），所以按旧名字找不到它。
+  #    ⇒ 这里改成：只有在「服务器地址」**确实不在树上**时，才去点那枚展开按钮，
+  #      并且两枚名字都试。判据仍然是"最后能不能拿到那个输入框"，
+  #      不按"点没点到"—— 点了没生效必须走到下面那句 bad。
+  #
+  #    🔴 还有一个**量程陷阱**（2026-11-07 同一趟里撞到）：那一行在没展开时**也不是
+  #       `AXTextField`** —— 它是一条 `AXStaticText`（y≈867，高 18）。所以"用
+  #       `--role AXTextField` 找不到"**不能**当成"它不在"，按那个信号去点展开按钮，
+  #       会在已展开的页面上再点一次把它**收起来**，然后老老实实报"输入框不在树上"。
+  #       ⇒ 探针一律**不限定 role**：能找到就算在；找不到再点展开（两枚名字都试）。
+  #
+  #    🔴 但探针还有第二层坑（2026-11-07 同一趟里紧接着撞到）：「服务器地址」这个名字
+  #       **在收起态下也命中** —— 它是一条 `AXStaticText` 说明行的标题
+  #       （实测：收起时树上有 `服务器地址 | StaticText`，展开后变成**两条**，
+  #       `StaticText` + `TextField`）。所以"找得到名字"根本不能证明表单展开了，
+  #       按那个信号跳过展开 ⇒ `--set` 打在说明行上 ⇒ 回读长度 0、判红。
+  #       ⇒ 判据改钉 **`--role AXTextField`**（只有真展开才有那个 TextField）。
+  if [ "$(jget "$(ax "服务器地址" --role AXTextField --list --json)" found)" != "True" ]; then
+    local open_lbl
+    for open_lbl in "$SETTINGS_SELFHOST" "$SETTINGS_SELFHOST_CONFIGURED"; do
+      if [ "$(jget "$(ax "$open_lbl" --list --json)" found)" = "True" ]; then
+        ax "$open_lbl" --pressable --press --json >/dev/null 2>&1
+        sleep 2
+        break
+      fi
+    done
+  fi
   for i in $(seq 1 12); do
     [ "$(jget "$(ax "服务器地址" --role AXTextField --list --json)" found)" = "True" ] && return 0
     sleep 1
   done
-  bad "设置面没打开（12 秒内「服务器地址」输入框不在树上）—— 判据不能建在没打开的面上"
+  bad "设置面没走到「服务器地址」（12 秒内那枚输入框不在树上；分组=${SETTINGS_SYNC_GROUP} / 展开=${SETTINGS_SELFHOST} 都点过了）—— 判据不能建在没打开的面上"
   return 1
 }
 
@@ -633,6 +700,9 @@ fill_field() {  # <标签> <值> [secure]
       #    症状长得像"界面写不进去"。这个形状兄弟 rig `verify-mobile-ios.sh` 的 `set_field`
       #    早就踩过并写下了 —— 这里是把它的配方搬过来，不是再造一遍。
       #    判据仍然按"回读逐字相同"，**不按 rc**（兄弟实测：`set-value` rc=0 而回读为空）。
+      # 🔴 这里**必须限定 `--role AXTextField`**：同名的说明行是 `AXStaticText`，
+      #    不限定 role 时 `--set` 会打在那条说明上（回读长度 0、看着像"写不进去"）。
+      #    理由与读数见 `open_settings_sheet` 里那段。
       out=$(ax "$lbl" --role AXTextField --set "$val")
       back=$(jget "$out" detail)
       if [ "$back" = "$val" ]; then
@@ -669,6 +739,9 @@ fill_three_credentials() {  # <令牌>
   dismiss_ios_save_password
   # 终态断言：三个字段**同时**还在 —— 「后一步把前一步清空」是实测踩过的形状，
   # 逐字段各自的局部断言抓不住它。
+  # 🔴 这一处**保留 `--role`**：走到这里时三个格子刚被 `fill_field` 成功写过，
+  #    那说明它们是活的输入框。这里要判的正是"它们还在不在**作为输入框**"——
+  #    去掉 role 会让"字段变成一行静态文本"也算通过，那正是它想抓的退化。
   local miss=""
   [ "$(jget "$(ax "服务器地址" --role AXTextField --list --json)" found)" = "True" ] || miss="${miss} 服务器地址"
   [ "$(jget "$(ax "访问令牌" --role AXTextField --list --json)" found)" = "True" ] || miss="${miss} 访问令牌"
@@ -754,17 +827,57 @@ fill_three_credentials "$TOKEN" \
 
 # ── 3. 造一条本机数据，让"销毁"有东西可销 ──────────────────────────────────
 step "3. 界面上建一条便签（让库里真的有用户字节）"
-sync_now
-sleep 8
-# 🔴 便签输入框住在**「我的」这一页**，不在「任务」页：Android 那侧同一个动作是
-#    `verify-mobile-notes.sh:299-303`（点「我的」→ `scroll_to_desc "写点什么…"`）。
-#    10-05 09:00 实测：这里原先点的是「任务」⇒ 整页没有便签输入框，
-#    症状长得像"界面写不进去 / 探针坏了"，实际是**走错了页**。
-#    `sync_now` 结束时人已经在「我的」（它就是从那页按的「立即同步」），所以这里
-#    只要把页面**滚到**那个框，不要再换页。
+# 🔴 **必须先建便签、再同步**（2026-11-07 实测的先后）。
+#
+#    原来这里是 `sync_now` 在前、建便签在后。看起来无所谓，实际必然失败：
+#    `sync_now` 点的「立即同步」住在**设置面 → 数据与同步**里
+#    （`SettingsScreen.tsx:661`：`form.configured || advancedSync` 为真时才渲染
+#     `syncStatus` 那一块，而它含那枚按钮）。第一次同步之前**还没有任何 op**，
+#    `form.configured` 为假、`advancedSync` 也已收起 ⇒ **按钮根本不在树上**。
+#
+#    这条因果是量出来的，不是推的：同一趟运行里
+#      建便签之前 ⇒ `立即同步` found=False
+#      建完便签之后 ⇒ `立即同步` found=True
+#    而旧顺序下探针会先空转 90+90 秒，再报一句
+#    「这一次同步没被触发，后面的读数不作数」—— 那句话把"按钮还没生成"
+#    说成了"同步没被触发"，方向完全相反。
+#
+#    ⇒ 顺序改成：建便签 → 同步 → 后面所有读数。这也正是判据 A 想要的形状：
+#      **先让库里真的有用户字节**，再谈"注销把它们销毁了"。
+# 🔴 便签输入框不在「任务」页（10-05 09:00 实测：点错页 ⇒ 整页没有输入框，
+#    症状长得像"界面写不进去 / 探针坏了"），也不在「我的」的**首屏**上 ——
+#    它在「我的 → 便签」这个二级管理页里（见下面那段 2026-11-07 的读数）。
+#    `sync_now` 结束时人已经在「我的」，所以这里还要再往下一跳。
 dismiss_ios_save_password || true
-ax "写点什么…" --scroll-into-view --list --json >/dev/null 2>&1
+# 🔴 便签输入框**不在「我的」页面上**，它在「我的 → 便签」这个**二级管理页**里
+#    （`ProfileScreen.tsx:1133` 的 `managementPage === 'profile:notes'` 分支）。
+#    2026-11 起「我的」页把 清单/标签/便签 收成三行入口，所以这里要多一跳。
+#
+#    这一格 2026-11-07 在 `iPhone Duo heyta` 上逐层读出来：点「便签」后
+#    `describe-all` 才出现 `写点什么…`（AXUniqueId=`notes-input`）与
+#    `添加便签`（`notes-submit`）。在此之前它们**不在树上**，而旧脚本报的是
+#    "找不到便签输入框 —— 没有本机数据时判据 A 只能退化"，
+#    读起来像"这一屏没有输入框"，实际是**还没进那一页**。
+#
+#    先滚到那一行再点（它在首屏之外，y≈900 时读不到就会 `element-left-tree`），
+#    点完再等输入框真的出现 —— 用 `idb_wait_label`，不靠固定 sleep 猜。
+#
+#    🔴 还有一处 2026-11-07 才量出来的**时序**：`ax … --scroll-into-view --press` 是
+#       **一次调用里先滚再点**。同一趟里"滚 + 点"合并发出去时，那一行在点击落地前
+#       已经被滚过了 ⇒ 点空；分开两次（先滚、再点）就连中。所以这里拆成两步，
+#       并且点完要**验证真的进了那一页**（等 `写点什么…` 出现），不靠固定 sleep 赌。
+dismiss_ios_save_password || true
+ax "便签" --pressable --scroll-into-view --list --json >/dev/null 2>&1
+sleep 1
+ax "便签" --pressable --press --json >/dev/null 2>&1
 sleep 2
+if ! idb_wait_label "写点什么…" 20; then
+  bad "进不了「我的 → 便签」那一页（滚+点分开做过，20 秒内「写点什么…」仍不在树上）—— 便签这段的前置不成立"
+  xcrun simctl io "$UDID" screenshot "$EVIDENCE/ios-account-erasure-2-no-notes-page.png" >/dev/null 2>&1
+  summary "iOS 注销销毁" "" 1
+fi
+ax "写点什么…" --scroll-into-view --list --json >/dev/null 2>&1
+sleep 1
 idb_dump
 XY=$(idb_field_center "写点什么…" 2>/dev/null)
 if [ -z "$XY" ]; then
@@ -812,6 +925,13 @@ else
   xcrun simctl io "$UDID" screenshot "$EVIDENCE/ios-account-erasure-2b-no-note-row.png" >/dev/null 2>&1
   summary "iOS 注销销毁" "" 1
 fi
+# 🔴 便签是在**二级页**里建的，而下一段（`sync_now`）要按的「立即同步」在「我的」那一页。
+#    不返回的话它会在便签页里找一枚永远不存在的按钮 —— 那就是 90+90 秒空转的另一种成因。
+ax "返回" --pressable --press --json >/dev/null 2>&1
+sleep 2
+# 便签落库之后库里才有 op ⇒ 「立即同步」这时才在设置面里出现（理由见本段开头那段读数）。
+sync_now
+sleep 8
 
 step "4. 判据 A：注销**之前**本机库必须在盘上、且有 op 行（前提证明，不是过场）"
 DATA_CONTAINER=$(xcrun simctl get_app_container "$UDID" "$BID" data 2>/dev/null)
