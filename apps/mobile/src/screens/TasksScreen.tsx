@@ -775,6 +775,28 @@ export function TasksScreen({
    * 详情页的「标签」多选靠它渲染可选项。
    */
   const [tags, setTags] = useState<Tag[]>([]);
+  /**
+   * **全部**标签（含墓碑）的 `id → 实体` 表，**只给解析用**（标签合并的读侧别名）。
+   *
+   * 🔴 它与上面那个 `tags` 数组是**两个不同的东西**，不是重复：
+   *
+   * | | `tags`（数组） | 这里（记录） |
+   * |---|---|---|
+   * | 来源 | `projectActions.listTags()` = `aliveOf(tags)` | `engine.getState().tags` = 物化状态**原样** |
+   * | 含被合并掉的标签 | ❌（合并把它写成墓碑） | ✅ |
+   * | 用途 | 标签选择器里**能勾的选项** | `filterTasks` 的 `context.tags` |
+   *
+   * 🔴 合并只写标签那一行（`{deletedAt, mergedInto}`），**不重写任务的 `tagIds`**
+   * （见 `packages/domain/src/tags.ts` 文件头）。所以"按 B 筛"必须能把 `A` 解析成 `B`
+   * —— 而 `A` 在 `listTags()` 里**已经不在了**。拿那份存活数组当解析表，
+   * `followTagAlias` 会找不到 `tags[A]` ⇒ 任务的有效标签**直接变成空**，
+   * 只挂着 `A` 的任务从任何标签视图里消失，**且不报错**。
+   *
+   * 症状对照（现量在 `apps/mobile/tests/task-tag-alias-filter.spec.ts`）：
+   * 用 `listTags()` 当解析表 ⇒ 合并后按 B 筛到 **0** 条；
+   * 用这张原表 ⇒ 筛到"只挂 A 的 N 条 + 原本挂 B 的"。
+   */
+  const [tagEntities, setTagEntities] = useState<Record<string, Tag>>({});
 
   const refresh = useCallback(() => {
     if (!actions) return;
@@ -810,7 +832,14 @@ export function TasksScreen({
       setProjects(projectActions.listProjects());
       setTags(projectActions.listTags());
     }
-  }, [actions, projectActions, noteActions]);
+    /*
+      🔴 解析表从这里取，**不是**从上面那份 `listTags()` 取 —— 理由见 `tagEntities`
+      的声明处：合并过的标签只在物化状态里，在存活投影里已经被滤掉了。
+      ⚠️ 拷一份（`{ ...state.tags }`）而不是存引用：物化状态是**原地变**的，
+      存引用会让"表变了但引用没变"这件事看起来像没变（下次替换刷新路径时尤其危险）。
+    */
+    if (host !== null) setTagEntities({ ...host.engine.getState().tags });
+  }, [actions, projectActions, noteActions, host]);
 
   // 同步或删除后，选择集合只保留当前仍存在的任务，避免工具栏显示幽灵数量。
   useEffect(() => {
@@ -1042,10 +1071,19 @@ export function TasksScreen({
     // 🔴 **先按标签筛，再分节** —— 顺序不能反：分节会把已完成分到单独一组，
     // 而 `{kind:'tag'}` 的语义是"只看未完成"（与 Web 侧栏一致），
     // 反过来的话标签视图里会冒出一个"已完成"分组，两端就不一样了。
+    //
+    // 🔴 **`tags` 必须传**（标签合并的读侧别名，`packages/domain/src/tags.ts`）：
+    //    合并只写标签那一行，**不重写任务的 `tagIds`**。不传 ⇒ 这一支退回
+    //    "按 id 精确匹配" ⇒ 只挂着被合并掉的 A 的任务在按 B 筛时**一条都筛不到**
+    //    （症状："合并之后我的任务不见了"，不报错）。判据：
+    //    `apps/mobile/tests/task-tag-alias-filter.spec.ts`（同一份数据，
+    //    传 = N + 原有 / 不传 = 只有原有）。
+    // ⚠️ 传的是 `tagEntities`（物化状态原表，含墓碑），**不是** `tags`（存活投影）
+    //    —— 后者没有别名那一行，传了等于没传。两表的差别写在 `tagEntities` 声明处。
     const scoped =
       tagFilter === undefined
         ? tasks
-        : filterTasks(tasks, { kind: 'tag', tagId: tagFilter }, { now });
+        : filterTasks(tasks, { kind: 'tag', tagId: tagFilter }, { now, tags: tagEntities });
     // 🔴 **先筛标签、再搜、最后分节** —— 顺序与 Web 一致。
     //    搜索是在当前筛选之上**收窄**，不替代它；反过来在任何一种筛选下
     //    都会得到不同结果，而用户只会读成"搜索有时候不准"。
@@ -1069,7 +1107,7 @@ export function TasksScreen({
     // （`sectionTasks`），而"已过期 / 今天 / 收集箱 / 已完成"这个**顺序**是本屏的
     // 语义，共享层刻意不重排它。
     return { overdue, dueToday, inbox, completed };
-  }, [tasks, now, tagFilter, query]);
+  }, [tasks, now, tagFilter, query, tagEntities]);
 
   /**
    * 待办数。**这是全应用唯一的待办口径** —— 屏幕上的摘要文字与标签栏角标

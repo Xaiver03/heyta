@@ -231,6 +231,34 @@ export interface NodeHost {
   listTags(): Tag[];
 
   /**
+   * **全量**标签表（含墓碑与被合并掉的那一行）—— 标签合并的**读侧别名**表。
+   *
+   * 🔴 它和 {@link listTags} **不是同一条通道的两种写法**，用途完全相反：
+   *
+   * | | `listTags()` | 这里 |
+   * |---|---|---|
+   * | 集合 | 未删除（`aliveOf`） | 物化状态**原表**（含 `deletedAt` / `mergedInto`） |
+   * | 用途 | "有哪些标签可选 / 同步过来没有" | 把任务的原始 `tagIds` 解析成**有效**标签 |
+   *
+   * 为什么必须单独开一条：合并只写标签那一行（`{deletedAt, mergedInto}`），
+   * **不重写任务的 `tagIds`**（见 `packages/domain/src/tags.ts` 文件头）。
+   * 所以任何"按有效标签筛 / 显示标签名"的读侧都必须能看见**被合并掉的那一行** ——
+   * 而 `listTags()` 里它已经被滤掉了。拿存活表当解析表时，
+   * `resolveTagId(A, 存活表)` 返回 `undefined`（`followTagAlias` 找不到 `tags[A]`），
+   * 结果是任务的**有效标签变成空数组**：只挂着 `A` 的任务从"按 B 筛"里**消失**，
+   * 且不报错。
+   *
+   * 🔴 **不能拿 `listTags()` 改语义来满足这条**：标签选择器要的就是"能勾的选项"，
+   * 把墓碑塞进去会让界面上出现一个用户已经合并掉、点了也没用的标签。
+   * 两条通道各说各的事实。
+   *
+   * 顺序按 `(createdAt, id)`（确定性，与 `listTags()` 同一条纪律）。
+   * 本壳只透传物化状态，**不判断**哪条算有效 —— 解析在 `@heyta/domain` 的
+   * `resolveTagIds` 里，一处。
+   */
+  listTagAliasTable(): Tag[];
+
+  /**
    * 便签的无头写入口（建 / 软删除）。
    *
    * 🔴 存在的理由不是"CLI 想多两个命令"：回收站的判据要**四类各有一条本机新建又删除的行**
@@ -405,6 +433,16 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     listProjects: () => projectActions.listProjects(),
     listHabits: () => habitActions.listHabits(),
     listTags: () => projectActions.listTags(),
+    /**
+     * 🔴 数据源是**物化状态原表**，刻意**不走** `projectActions.listTags()`
+     * （那是 `aliveOf` 存活投影，别名那一行已经被滤掉 —— 拿它当解析表会把
+     * 只挂着被合并 id 的任务的有效标签解析成空数组）。理由与取舍见
+     * {@link NodeHost.listTagAliasTable}。
+     */
+    listTagAliasTable: () =>
+      Object.values(app.engine.getState().tags).sort(
+        (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
+      ),
 
     createNote: (content) => noteActions.createNote(content),
     removeNote: (entityId) => noteActions.removeNote(entityId),

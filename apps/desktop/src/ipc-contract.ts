@@ -61,6 +61,21 @@ export type DesktopRequest =
   | { method: 'listTasks' }
   | { method: 'listProjects' }
   | { method: 'listTags' }
+  /**
+   * **全量**标签表（含墓碑与 `mergedInto`）—— 标签合并的**读侧别名**表。
+   *
+   * 🔴 名字刻意不叫 `listTags`：它和上面那条返回的东西**不一样**，用途相反。
+   * `listTags` = "有哪些标签可选"（只回存活）；这条 = "把任务的原始 `tagIds`
+   * 解析成有效标签"（必须含被合并掉的那一行 —— 合并只写标签那一行，
+   * 不重写任务的 `tagIds`）。
+   *
+   * ⚠️ 渲染进程**不许**用它渲染可选项：墓碑出现在选择器里，用户会点一个
+   * 已经合并掉、点了也没用的标签。两条通道各说各的事实，别合并。
+   *
+   * 只读、无参数、不产生 op —— 它就是把 {@link NodeHost.listTagAliasTable}
+   * 原样递过去（`ipc-contract.ts` 文件头"白名单显式 switch"那条纪律）。
+   */
+  | { method: 'listTagAliasTable' }
   | { method: 'sync' }
   | { method: 'pendingUploadCount' }
   /**
@@ -124,6 +139,9 @@ export async function handleDesktopRequest(
       return host.listProjects();
     case 'listTags':
       return host.listTags();
+    // 纯增量：与上面那条并存，不改它的语义（理由见 `DesktopRequest` 里那段注释）。
+    case 'listTagAliasTable':
+      return host.listTagAliasTable();
     case 'sync':
       return host.sync();
     case 'pendingUploadCount':
