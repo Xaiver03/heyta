@@ -64,6 +64,8 @@
 | `packages/ui` | 921 passed |
 | iOS 重装（`reinstall:all --only ios`） | ✅ 已清旧包、重打、重装、有当前产物判据（`heyta-reinstall-ios.png` 内容占比 53.5%） |
 | **macOS 重装（`reinstall:all --only mac`）** | ✅ 已清旧包、重打、卸旧、装新、有当前产物判据（窗口 2412×1552、webview 内容占比 **100.0%**、主蓝命中 842） |
+| **Windows 重装（`reinstall:all --only windows`）** | ✅ 远端 `windows-pc` 打包 + 签名 + `Add-AppxPackage` + 启动截图，**取证 5 条全在位**：`MSIX_EXISTS=True` / `ADD_APPX=OK` / `INSTALLED_VERSION=1.0.0.0` / `INSTALL_LOCATION=C:\Program Files\WindowsApps\…` / `PAYLOAD_PRI=True` `PAYLOAD_XBF=3` `PAYLOAD_WEBDIST=True`。签名姿态门禁 rc=0（主体 `CN=heyta local build` 自报本地构建、清单 Publisher 与签名证书同一变量） |
+| **Android 重装** | ❌ **跑不了**：`adb devices` 空列表、`~/.android/avd` 为空、`emulator -list-avds` 无输出 ⇒ 这台机器上**一台 AVD 都没有**。不是代码问题，也不是"没在线"——是**没建过** |
 | macOS **公证** | ⚠️ **没通过**：`Error: HTTPClientError.connectTimeout`（Apple 侧超时）。包本身**已签名可用**，只是没装订票据。⚠️ 脚本在这一档**仍然整体 rc=0**，所以"✅ mac"那一行**不等于**公证通过 —— 单独读打包日志的 ⑥ 段 |
 | iOS 设备腿 | ❌ 停在判据 A 之后的同步（§3） |
 
