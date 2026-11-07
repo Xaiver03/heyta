@@ -77,6 +77,22 @@
 （复现命令：`PORT=3100 bash scripts/verify-mobile-ios-account-erasure.sh`，
 `IOS_UDID` / `DEVICE_NAME` 见文件头；服务端审计事件与 `/api/sync/status` 是两个独立信源。）
 
+## 4.6 第三个独立信源：**当场再复现一次**（不重装、不改代码）
+
+用一条只读探针（`/tmp/probe-payload-shape.sh`）在**不重装、不改代码**的前提下再点一次
+「立即同步」：
+
+```
+立即同步 found=True
+审计事件计数：跑之前 11 → 跑之后 12      ← 又是一次 PLAINTEXT_REQUIRED
+最近三条审计：…"PLAINTEXT_REQUIRED","userId":404
+该账号 latestSeq：0
+该账号 payloadMode：{"mode":"readable"}
+```
+
+⇒ 服务端一句话(`readable`)、服务端门禁一句话(`PLAINTEXT_REQUIRED` ×3)、
+客户端上传形状(每次 +1)三个信源同时成立。**这不是时序、不是负载、不是探针。**
+
 ## 5. 现在的判据（能红）
 
 把上面 §1 那三步连起来跑，**服务端 `latestSeq` 必须 > 0**；
