@@ -80,6 +80,67 @@ describe('宿主按载荷模式选客户端（ADR-0080）', () => {
     expect(ops[0]!.isPayloadEncrypted).toBe(false);
   });
 
+  /**
+   * 🔴 **同一件事，但 config 由运行时活取值器给、且没有 `accountId`。**
+   *
+   * 这条的存在理由是 2026-11-08 在真设备上量到的那个缺陷：
+   * 上面那条用例传的是**静态** `accountId`，于是 `buildSyncClient` 走
+   * `config.accountId !== undefined` 那一支、能看见 `payloadMode === 'plain'`。
+   * 而移动端用的是 `getSyncConfig: readSyncConfig`（运行时活配置），
+   * 它的 `accountId` **只由登录会话写入**（`apps/mobile/src/auth/session.ts:65`）——
+   * 手填服务器地址 + 令牌那条路**一个 op 都存不进 accountId**。
+   * 于是一路走到 `buildSyncClient` 的**第三支**（没有 accountId 的那条），
+   * 那里 `getPassword: () => config.password` ⇒ 有口令就 vault 加密 ⇒
+   * 服务端 `PLAINTEXT_REQUIRED`、`latestSeq` 恒 0。
+   *
+   * 这条判据**今晚是红的**（见 `docs/plans/mobile-plaintext-sync-gap-2026-11-08.md`），
+   * 而且它不是"改测试"能变绿的：它断言的是线上真的出现明文，与上面那条同一条标准。
+   */
+  it('readable 账号 + 活配置 + 没有 accountId ⇒ 仍必须发明文（2026-11-08 真设备上红）', async () => {
+    const uploads: Array<Record<string, unknown>> = [];
+    const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/sync/payload-mode')) return json({ mode: 'readable' });
+      if (url.includes('/api/sync/key-package')) {
+        return new Response(JSON.stringify({ code: 'key_package_not_found' }), { status: 404 });
+      }
+      if (init?.method === 'POST') {
+        uploads.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return json({ results: [], latestSeq: 0 });
+      }
+      return json({ ops: [], hasMore: false, latestSeq: 0, serverTime: Date.now() });
+    }) as unknown as typeof fetch;
+
+    // 与移动端**逐字相同**的接线：活配置、有口令、**没有 accountId**。
+    const liveConfig = {
+      serverUrl: 'https://sync.example.test',
+      token: 'token',
+      password: 'a-passphrase-the-user-typed',
+    };
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      getSyncConfig: () => liveConfig,
+      fetchImpl,
+    });
+
+    await host.dispatch({
+      entityType: 'TASK',
+      entityId: 'task-1',
+      opType: OpType.Create,
+      payload: { title: '买牛奶' },
+    });
+    await host.sync();
+
+    expect(uploads.length, '应该真的发出了上传').toBe(1);
+    const ops = uploads[0]!.ops as Array<Record<string, unknown>>;
+    expect(
+      ops[0]!.isPayloadEncrypted,
+      '账号是 readable，上传就必须显式标 false —— 否则服务端会以 PLAINTEXT_REQUIRED 拒掉每一条',
+    ).toBe(false);
+    expect(ops[0]!.payload).toBe(JSON.stringify({ title: '买牛奶' }));
+  });
+
   it('未解锁时拒绝关闭加密（没有钥匙就没有能解密的路径）', async () => {
     const live = await withServer('e2ee', []);
 
