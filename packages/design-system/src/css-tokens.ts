@@ -100,6 +100,30 @@ export function extractVars(css: string, theme?: string): Map<string, string> {
 }
 
 /**
+ * 基准 + 明暗层 + **一个表面色系预设**的合并结果（R13b）。
+ *
+ * 存在的理由与 `extractVars` 一样：预设块与 `[data-theme='dark']` 同特异性、
+ * 靠文件顺序取胜 —— 要验证"暖纸的暗版对文字仍然够亮"，必须把三层按真实层叠顺序
+ * 合起来算，而不是分别看两个 Map。
+ *
+ * 选择器形状与 `tokens.css` 里那两组块一字对应：
+ *   - 亮版预设：`[data-theme-preset='<preset>']`
+ *   - 暗版预设：`[data-theme='dark'][data-theme-preset='<preset>']`
+ */
+export function extractPresetVars(css: string, preset: string, theme?: string): Map<string, string> {
+  const out = extractVars(css, theme);
+  const wanted =
+    theme === 'dark'
+      ? `[data-theme='dark'][data-theme-preset='${preset}']`
+      : `[data-theme-preset='${preset}']`;
+  for (const [selector, body] of topLevelBlocks(css)) {
+    if (selector !== wanted) continue;
+    for (const [name, value] of varsIn(body)) out.set(name, value);
+  }
+  return out;
+}
+
+/**
  * 只抽取某个主题块**显式写出**的变量（不合并基准）。
  *
  * 与 extractVars(css, theme) 的区别：

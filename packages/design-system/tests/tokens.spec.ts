@@ -28,6 +28,7 @@ import { describe, expect, it } from 'vitest';
 import {
   contrast,
   colorOf,
+  extractPresetVars,
   extractVars,
   normalizeColor,
   parseColor,
@@ -403,5 +404,67 @@ describe('非颜色 token 的尺度合理性', () => {
     const raw = resolveVar(vars.get('--ht-touch-target-min')!, vars);
     const px = Number(raw.replace('rem', '')) * 16;
     expect(px, `触控目标 ${px}px 低于 44px 硬下限`).toBeGreaterThanOrEqual(44);
+  });
+});
+
+/**
+ * 主题预设（R13b，2026-11-07）
+ * ===========================
+ *
+ * 预设只换**表面色系**，因此判据只有一条：**换了表面，文字仍然可读**。
+ * 这条必须逐预设 × 逐明暗算真对比度 —— 只看"变量名在不在"是没用的
+ * （暗版预设与 `[data-theme='dark']` 同特异性、靠文件顺序取胜，写反了照样"变量都在"）。
+ */
+describe('主题预设：表面换了，文字仍可读', () => {
+  const PRESETS = ['warm', 'mist'] as const;
+
+  // 这两组配对是"文字压在表面上"的全部组合里最容易崩的那几条：
+  // 三级文字最浅、页面底与浮层两端都算。
+  const TEXT_ON_SURFACE = [
+    { fg: 'color.foreground', bg: 'color.background', min: 4.5, why: '正文（页面底）' },
+    { fg: 'color.foreground', bg: 'color.surface', min: 4.5, why: '正文（面）' },
+    { fg: 'color.foreground', bg: 'color.surface-raised', min: 4.5, why: '正文（浮层）' },
+    { fg: 'color.foreground-muted', bg: 'color.surface', min: 4.5, why: '二级文字（面）' },
+    { fg: 'color.foreground-muted', bg: 'color.background', min: 4.5, why: '二级文字（页面底）' },
+    { fg: 'color.foreground-subtle', bg: 'color.surface', min: 4.5, why: '三级文字（面）' },
+    { fg: 'color.foreground-subtle', bg: 'color.background', min: 4.5, why: '三级文字（页面底）' },
+    { fg: 'color.foreground-subtle', bg: 'color.surface-raised', min: 4.5, why: '三级文字（浮层）' },
+  ];
+
+  for (const preset of PRESETS) {
+    for (const theme of ['light', 'dark'] as const) {
+      it.each(TEXT_ON_SURFACE)(
+        `${preset}/${theme}：$fg on $bg ≥ $min:1（$why）`,
+        ({ fg, bg, min }) => {
+          const vars = extractPresetVars(CSS, preset, theme);
+          const ratio = contrast(colorOf(fg, vars), colorOf(bg, vars));
+          expect(
+            Number(ratio.toFixed(2)),
+            `${preset}/${theme} ${fg} on ${bg} 实测 ${ratio.toFixed(2)}:1，要求 ≥ ${min}:1`,
+          ).toBeGreaterThanOrEqual(min);
+        },
+      );
+    }
+  }
+
+  it('每个预设都必须有暗版覆盖（否则暗色下用的是另一套表面，而没人知道）', () => {
+    for (const preset of PRESETS) {
+      const lightSurface = extractPresetVars(CSS, preset, 'light').get('--ht-color-surface');
+      const darkSurface = extractPresetVars(CSS, preset, 'dark').get('--ht-color-surface');
+      expect(lightSurface, `${preset} 亮版缺 surface`).toBeDefined();
+      expect(darkSurface, `${preset} 暗版缺 surface`).toBeDefined();
+      // 亮暗两版的表面不能是同一个值 —— 那是"忘了写暗版"的典型症状。
+      expect(resolveVar(lightSurface!, extractPresetVars(CSS, preset, 'light'))).not.toBe(
+        resolveVar(darkSurface!, extractPresetVars(CSS, preset, 'dark')),
+      );
+    }
+  });
+
+  it('预设不动语义色（primary 在各预设下同值）—— 主题是表面，不是意义', () => {
+    for (const preset of PRESETS) {
+      const base = extractVars(CSS, 'light').get('--ht-color-primary');
+      const withPreset = extractPresetVars(CSS, preset, 'light').get('--ht-color-primary');
+      expect(withPreset, `${preset} 擅自改了 primary`).toBe(base);
+    }
   });
 });

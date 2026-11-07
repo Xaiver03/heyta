@@ -702,6 +702,13 @@ export const en = {
   // The two notes are not decoration: once these live in Settings, the screen has to
   // say what each row does — the header used to buy that by always being visible.
   'web.settings.display.langNote': 'Which language this app shows its interface in. It does not change your system language.',
+  'web.settings.display.autoThemeTitle': 'Follow system',
+  'web.settings.display.autoThemeOn': 'Follow system (on)',
+  'web.settings.display.autoThemeOff': 'Follow system (off)',
+  'web.settings.display.themePresetTitle': 'Surface palette',
+  'web.settings.display.themePreset.default': 'Blue',
+  'web.settings.display.themePreset.warm': 'Warm paper',
+  'web.settings.display.themePreset.mist': 'Mist',
   'web.settings.display.themeTitle': 'Appearance',
   'web.settings.display.themeLight': 'Light',
   'web.settings.display.themeDark': 'Dark',

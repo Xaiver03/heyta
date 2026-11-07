@@ -50,7 +50,8 @@ grep -rnoE "'heyta\.[A-Za-z0-9._]+'" apps/web/src apps/mobile/src packages/*/src
 
 | 键 | 写在哪 | 谁读 | 备注 |
 |---|---|---|---|
-| `heyta.theme` | `apps/web/src/lib/theme.ts:15` | `theme.ts` / `App.tsx` 的 `data-theme` | 明暗。R13b 会扩成"预设 / 纯色 / 自定义 / 自动深浅"，**扩的时候仍在这一档** |
+| `heyta.theme` | `apps/web/src/lib/theme.ts` | `App.tsx` 的 `data-theme` | **显式**明暗选择（`light` / `dark`）。R13b 起三态：**「跟随系统」= 删掉这个键**（与"从没选过"同形），不存 `system` |
+| `heyta.themePreset` | `apps/web/src/lib/theme.ts` | `App.tsx` 的 `data-theme-preset` | R13b 表面色系预设（`warm` / `mist`）。`default` 不存键、也不写属性 —— 基准那套 token 一个像素都不变 |
 | `heyta.locale` | `apps/web/src/lib/locale.ts:30` | i18n provider | 界面语言 |
 | `heyta.dueDisplay` | `apps/web/src/features/tasks/due-display-pref.ts:18` | 任务行 / 面单的截止显示 | 截止时间的**显示格式**（不是日期值） |
 | `heyta.detailPane` | `apps/web/src/features/shell/detail-pane-pref.ts:24` | 详情栏开合 | 布局状态 |

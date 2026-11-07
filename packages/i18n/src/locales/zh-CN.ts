@@ -805,6 +805,13 @@ export const zhCN = {
   // 两条说明都不是装饰：搬进设置之后，"这一格管什么"只能靠界面自己说清楚。
   // 尤其语言那一格 —— 它过去在页头，靠"永远看得见"来免解释。
   'web.settings.display.langNote': '界面用哪一种语言显示。只改这个应用，不改系统的语言。',
+  'web.settings.display.autoThemeTitle': '跟随系统',
+  'web.settings.display.autoThemeOn': '跟随系统（已开）',
+  'web.settings.display.autoThemeOff': '跟随系统（已关）',
+  'web.settings.display.themePresetTitle': '表面配色',
+  'web.settings.display.themePreset.default': '蓝白',
+  'web.settings.display.themePreset.warm': '暖纸',
+  'web.settings.display.themePreset.mist': '雾青',
   'web.settings.display.themeTitle': '外观',
   'web.settings.display.themeLight': '浅色',
   'web.settings.display.themeDark': '深色',

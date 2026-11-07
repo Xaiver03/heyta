@@ -882,6 +882,74 @@
 }
 
 /* ────────────────────────────────────────────────────────────
+   4b. 主题预设（表面色系）— R13b / ADR-0085
+   ────────────────────────────────────────────────────────────
+   主题 = **表面色系**，明暗 = 前三节那两套语义值。
+   两者正交：同一个预设既有亮版也有暗版，所以这里只覆盖「表面色」那一小组，
+   不动语义色（primary / danger / 四象限…）—— 那些是**意义**，不是外观。
+
+   🔴 每一枚都必须是 `var(--ht-<原色阶>)`：组件零改动、`check:design` 不认裸值、
+      对账件 `tokens.spec.ts` 会拿它去算对比度。
+
+   ⚠️ 选择器特异性与 `[data-theme='dark']` 相同（0,1,0），而 `:root` 是 (0,1,0) 的
+      更低一档（(0,0,0)）⇒ 本块覆盖基准。**必须放在 `[data-theme='dark']` **之后**：
+      暗版预设块（下面第二组）要与它同特异性争同名变量，靠"后来者胜"。
+   ──────────────────────────────────────────────────────────── */
+/* 暖纸：把中性面从冷石板换成暖纸（#fbfaf7），配蓝依然成立（冷蓝 on 暖纸） */
+[data-theme-preset='warm'] {
+  --ht-color-background: var(--ht-paper-50);
+  --ht-color-surface: var(--ht-paper-50);
+  --ht-color-surface-raised: var(--ht-white);
+  --ht-color-surface-subtle: var(--ht-paper-50);
+  --ht-color-surface-sunken: var(--ht-paper-200);
+  --ht-color-border: var(--ht-paper-200);
+  --ht-color-border-strong: var(--ht-paper-600);
+  --ht-color-foreground: var(--ht-paper-900);
+  --ht-color-foreground-muted: var(--ht-paper-600);
+  --ht-color-foreground-subtle: var(--ht-paper-600);
+}
+
+/* 雾青：冷调偏青（teal-200 做边框），面用石板灰两档、页面底只比面深一档。
+   🔴 第一版把 background 写成 slate-200，实测三级文字压上去只有 **3.86:1**
+   （面那档 4.34）—— 表面越深，浅灰字越不够。现在 background 用 slate-100、
+   surface 用白，两档都过 4.5；青只留在边框上，它不承担文字对比度。 */
+[data-theme-preset='mist'] {
+  /* 页面底与面同白：差一档浅灰（s-100）会让三级文字从 4.87 掉到 **4.34** ——
+     "看起来只是浅了一点点"恰好是跨过 4.5 的那一点点。层次用边框与 raised 表达。 */
+  --ht-color-background: var(--ht-white);
+  --ht-color-surface: var(--ht-white);
+  --ht-color-surface-raised: var(--ht-white);
+  --ht-color-surface-subtle: var(--ht-slate-100);
+  --ht-color-surface-sunken: var(--ht-slate-200);
+  --ht-color-border: var(--ht-teal-200);
+  --ht-color-border-strong: var(--ht-slate-500);
+}
+
+/* ── 预设的暗版：与 `[data-theme='dark']` 同特异性，必须出现在它之后 ── */
+[data-theme='dark'][data-theme-preset='warm'] {
+  --ht-color-background: var(--ht-paper-900);
+  --ht-color-surface: var(--ht-paper-900);
+  --ht-color-surface-raised: var(--ht-paper-900);
+  --ht-color-surface-subtle: var(--ht-paper-900);
+  --ht-color-surface-sunken: var(--ht-ink-950);
+  --ht-color-border: var(--ht-paper-600);
+  --ht-color-border-strong: var(--ht-paper-200);
+  --ht-color-foreground: var(--ht-paper-50);
+  --ht-color-foreground-muted: var(--ht-paper-200);
+  --ht-color-foreground-subtle: var(--ht-paper-200);
+}
+
+[data-theme='dark'][data-theme-preset='mist'] {
+  --ht-color-background: var(--ht-ink-950);
+  --ht-color-surface: var(--ht-ink-900);
+  --ht-color-surface-raised: var(--ht-ink-800);
+  --ht-color-surface-subtle: var(--ht-ink-900);
+  --ht-color-surface-sunken: var(--ht-ink-950);
+  --ht-color-border: var(--ht-teal-600);
+  --ht-color-border-strong: var(--ht-slate-400);
+}
+
+/* ────────────────────────────────────────────────────────────
    5. 全局基线
    ──────────────────────────────────────────────────────────── */
 :root {

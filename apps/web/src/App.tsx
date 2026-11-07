@@ -17,6 +17,7 @@ import {
   ListChecks,
   MoreHorizontal,
   PanelLeft,
+  Monitor,
   Moon,
   PanelRightClose,
   PanelRightOpen,
@@ -253,7 +254,18 @@ import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
 import { onEngineChange, readRecentOps } from './lib/oplog.js';
 import { useSelectionKeyboardCursor } from './lib/keyboard-cursor.js';
 import { pruneSelectionFromEntities, selection, useSelected } from './lib/selection.js';
-import { applyTheme, rememberThemeChoice, resolveInitialTheme, type Theme } from './lib/theme.js';
+import {
+  applyTheme,
+  applyThemePreset,
+  rememberThemeMode,
+  rememberThemePreset,
+  resolveInitialThemeMode,
+  resolveInitialThemePreset,
+  resolvedThemeOf,
+  THEME_PRESETS,
+  type ThemeMode,
+  type ThemePreset,
+} from './lib/theme.js';
 
 import './styles/app.css';
 
@@ -425,7 +437,12 @@ const SHEET_EXIT_SLACK_MS = 120;
 
 export function App(): React.JSX.Element {
   const { t, locale } = useI18n();
-  const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
+  /**
+   * 明暗是**三态**（亮 / 暗 / 跟随系统），预设是表面色系（R13b）。
+   * 两者都是设备属性（ADR-0085）：写本机、零 op。
+   */
+  const [themeMode, setThemeMode] = useState<ThemeMode>(resolveInitialThemeMode);
+  const [themePreset, setThemePreset] = useState<ThemePreset>(resolveInitialThemePreset);
   const store = useTaskStore();
   const projects = useProjectStore();
   /**
@@ -1605,10 +1622,42 @@ export function App(): React.JSX.Element {
     pruneSelectionFromEntities(store.entities);
   }, [store.entities]);
 
+  /**
+   * 「跟随系统」要**真的跟**：`prefers-color-scheme` 变了就重解析。
+   * 只解析一次的话，用户开着应用过夜、系统入夜切暗色，界面纹丝不动 ——
+   * 那正是"选了跟随系统却不跟随"的症状，而它没有报错。
+   */
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
+    typeof window !== 'undefined' &&
+    (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false),
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const query = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (query === undefined) return undefined;
+    const onChange = (event: MediaQueryListEvent): void => setSystemPrefersDark(event.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+
+  /**
+   * 最终明暗 = 三态解析的结果。`system` 时看 `systemPrefersDark`（已订阅），
+   * 而不是每次渲染现问 `matchMedia` —— 后者不会触发重渲染，界面就停在旧值上。
+   */
+  const theme = useMemo(
+    () => (themeMode === 'system' ? (systemPrefersDark ? 'dark' : 'light') : themeMode),
+    [themeMode, systemPrefersDark],
+  );
+
   // 主题应用到 <html data-theme>，tokens.css 的暗色覆盖挂在那里
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  // 预设应用到 <html data-theme-preset>，tokens.css 的预设块挂在那里（只换表面色系）
+  useEffect(() => {
+    applyThemePreset(themePreset);
+  }, [themePreset]);
 
   /**
    * 🔴 **同一套开关也要交给共享层**（`packages/ui` 的 RN 组件不吃 CSS 变量）。
@@ -3887,12 +3936,12 @@ export function App(): React.JSX.Element {
                 aria-label={theme === 'light' ? t('common.a11y.toDarkTheme') : t('common.a11y.toLightTheme')}
                 data-testid="theme-toggle"
                 onClick={() => {
-                  const next: Theme = theme === 'light' ? 'dark' : 'light';
+                  const next: ThemeMode = themeMode === 'light' ? 'dark' : 'light';
                   // 🔴 这是**唯一**记账的地方：启动时的那次 `applyTheme` 只改 DOM。
                   // 否则"用户没做过选择"与"用户选了亮色"在存储里长得一模一样，
                   // 系统偏好从此再也进不来（`lib/theme.ts` 里记着症状）。
-                  rememberThemeChoice(next);
-                  setTheme(next);
+                  rememberThemeMode(next);
+                  setThemeMode(next);
                 }}
               >
                 {theme === 'light' ? <Sun size={ICON_SIZE.md} aria-hidden="true" /> : <Moon size={ICON_SIZE.md} aria-hidden="true" />}
@@ -3900,6 +3949,62 @@ export function App(): React.JSX.Element {
                   {theme === 'light' ? t('web.settings.display.themeLight') : t('web.settings.display.themeDark')}
                 </span>
               </button>
+              </div>
+              {/*
+                自动深浅（R13b）：三态。`system` 是**删键**而不是存一个 'system'
+                —— 与"从没选过"同形，两者行为本来就一样（见 `lib/theme.ts`）。
+              */}
+              <div className="ht-settings__preference-row">
+                <h3 className="ht-settings__h3 ht-type-row-title">
+                  {t('web.settings.display.autoThemeTitle')}
+                </h3>
+                <button
+                  type="button"
+                  className="ht-settings__theme-toggle ht-type-row-title"
+                  aria-pressed={themeMode === 'system'}
+                  data-testid="theme-auto-toggle"
+                  onClick={() => {
+                    const next: ThemeMode = themeMode === 'system' ? resolvedThemeOf('system') : 'system';
+                    rememberThemeMode(next);
+                    setThemeMode(next);
+                  }}
+                >
+                  <Monitor size={ICON_SIZE.md} aria-hidden="true" />
+                  <span>
+                    {themeMode === 'system'
+                      ? t('web.settings.display.autoThemeOn')
+                      : t('web.settings.display.autoThemeOff')}
+                  </span>
+                </button>
+              </div>
+              {/*
+                表面色系预设（R13b）：只换表面，不动语义色。
+                选项来自 `THEME_PRESETS`（`lib/theme.ts`）—— 加一个预设要同时改
+                tokens.css 两组块、那个数组、`tokens.spec.ts` 的 PRESETS、这里的文案。
+              */}
+              <div className="ht-settings__preference-row">
+                <h3 className="ht-settings__h3 ht-type-row-title">
+                  {t('web.settings.display.themePresetTitle')}
+                </h3>
+                <div className="ht-settings__preset-grid" role="radiogroup" aria-label={t('web.settings.display.themePresetTitle')}>
+                  {THEME_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      role="radio"
+                      aria-checked={themePreset === preset}
+                      className="ht-settings__preset-option"
+                      data-testid={`theme-preset-${preset}`}
+                      onClick={() => {
+                        rememberThemePreset(preset);
+                        setThemePreset(preset);
+                      }}
+                    >
+                      <span className={`ht-settings__preset-swatch ht-settings__preset-swatch--${preset}`} aria-hidden="true" />
+                      <span>{t(`web.settings.display.themePreset.${preset}` as const)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </section>
             </section>
