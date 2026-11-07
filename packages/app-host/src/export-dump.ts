@@ -34,7 +34,14 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { dueLocalDateOf, localTimeOf, type LocalTime, type Priority, type Task } from '@heyta/domain';
+import {
+  dueLocalDateOf,
+  localTimeOf,
+  resolveTagIds,
+  type LocalTime,
+  type Priority,
+  type Task,
+} from '@heyta/domain';
 import { bucketFor, type MaterializedState } from '@heyta/op-log';
 import { CURRENT_SCHEMA_VERSION, ENTITY_TYPES } from '@heyta/shared-schema';
 import type { Operation } from '@heyta/sync-core';
@@ -303,7 +310,24 @@ export function buildTaskExportRows(state: MaterializedState): ExportTaskRow[] {
 
 function toExportTaskRow(task: Task, state: MaterializedState): ExportTaskRow {
   const project = task.projectId === undefined ? undefined : state.projects[task.projectId];
-  const tagNames = (task.tagIds ?? [])
+  /**
+   * 🔴 **标签名必须走唯一解析入口**（`packages/domain/src/tags.ts`）。
+   *
+   * 合并只写标签那一行（`{deletedAt, mergedInto}`），**不重写任务的 `tagIds`** ——
+   * 所以 `task.tagIds` 里可能留着一条已经被合并掉的 id。直接
+   * `state.tags[id]?.name` 取到的是**那个旧标签的名字**：清单上于是出现一个
+   * 用户已经"合并掉、在标签列表里再也看不到"的标签名。
+   * `state.tags` 是**全量表**（含墓碑），所以这条路径**不会报错、也不会变空** ——
+   * 它只是安静地写错一个名字，这正是本文件开头那条纪律要防的"静默有误"。
+   *
+   * 走 `resolveTagIds` 之后：`A→B` ⇒ 取到 `B` 的名字；已删除且无别名 ⇒ 丢掉
+   * （给人看的清单里不该出现一条解析不出的标签）。
+   *
+   * ⚠️ **只在这一条（给人看的）路径上解析**。完整保真那一份
+   * （`buildExportDocument`）按设计**原样**导出实体，包括 `tagIds` 里的旧 id
+   * 与标签墓碑 —— 那正是"能还原"的前提，两条路径的差别由测试钉住。
+   */
+  const tagNames = resolveTagIds(task.tagIds, state.tags)
     .map((id) => state.tags[id]?.name)
     .filter((name): name is string => name !== undefined)
     .sort();

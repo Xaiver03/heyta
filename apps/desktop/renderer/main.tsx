@@ -22,7 +22,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import type { Task } from '@heyta/domain';
-import { filterTasks, type TaskFilter } from '@heyta/domain';
+import { filterTasks, indexTags, type Tag, type TaskFilter } from '@heyta/domain';
 import { HeytaUiProvider, TaskList } from '@heyta/ui';
 
 /**
@@ -79,6 +79,15 @@ function App(): React.JSX.Element {
    * 不是筛选条件，所以壳里一行判断都没长出来（AGENTS.md §3.5）。
    */
   const [filter, setFilter] = useState<TaskFilter>({ kind: 'all' });
+  /**
+   * 标签解析表：`id → Tag` 的**全量**表（含被合并掉的墓碑行）。
+   *
+   * 🔴 它不是"可选标签列表"（桌面端没有选择器），而是 `filterTasks` 的
+   * `context.tags`：合并只写标签那一行，`task.tagIds` 里仍留着旧 id，
+   * 所以"这条任务有哪些标签"只有 `@heyta/domain` 的 `resolveTagIds` 能回答。
+   * 取数走 `listTagAliasTable`（不是 `listTags`），理由在 `reload` 里。
+   */
+  const [tagTable, setTagTable] = useState<Record<string, Tag>>({});
 
   /**
    * 读一次库。
@@ -89,8 +98,24 @@ function App(): React.JSX.Element {
    */
   const reload = useCallback(async (): Promise<void> => {
     try {
-      const rows = (await window.heytaDesktop.request({ method: 'listTasks' })) as DesktopTask[];
-      setTasks(rows);
+      /*
+        🔴 两条读一起取：任务 + **全量标签表**。
+        标签表不是给"选择器"用的（桌面端目前没有标签选择器），它是
+        `filterTasks` 的 `context.tags`：合并只写标签那一行，不重写任务的
+        `tagIds`，所以"可见标签"必须由 `@heyta/domain` 的 `resolveTagIds` 算。
+
+        ⚠️ 读的是 `listTagAliasTable`（**含墓碑/别名**），**不是** `listTags`
+        （只回存活）。后者里没有别名那一行，拿它当解析表会让只挂着被合并 id 的
+        任务的**有效标签变成空数组** —— 按目标标签筛时它们整体消失，且不报错。
+        两条通道的名字刻意不同，别互换。判据见
+        `apps/desktop/tests/tag-alias-filter.spec.ts`。
+      */
+      const [rows, tagRows] = await Promise.all([
+        window.heytaDesktop.request({ method: 'listTasks' }),
+        window.heytaDesktop.request({ method: 'listTagAliasTable' }),
+      ]);
+      setTasks(rows as DesktopTask[]);
+      setTagTable(indexTags(tagRows as Tag[]));
       setError(null);
     } catch (cause) {
       setError(String(cause));
@@ -116,10 +141,18 @@ function App(): React.JSX.Element {
 
   /**
    * 筛选后的行。`now` 显式传给共享筛选（那个文件头的纪律：判断层不自己读时钟）。
+   *
+   * 🔴 **`tags` 必须传**（标签合并的读侧别名）：合并只写标签那一行
+   * （`Tag.mergedInto`），**不重写任务的 `tagIds`**，所以不传时那一支退回
+   * "按 id 精确匹配" —— 只挂着被合并掉的 A 的任务在按 B 筛时**一条都筛不到**
+   * （症状："合并之后我的任务不见了"，不报错）。
    */
   const rows = useMemo(
-    () => (tasks === null ? null : filterTasks(tasks, filter, { now: Date.now() })),
-    [tasks, filter],
+    () =>
+      tasks === null
+        ? null
+        : filterTasks(tasks, filter, { now: Date.now(), tags: tagTable }),
+    [tasks, filter, tagTable],
   );
 
   const onToggleTask = useCallback(

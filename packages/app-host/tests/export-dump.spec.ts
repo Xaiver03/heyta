@@ -316,6 +316,59 @@ describe('buildTaskExportRows / renderTasksMarkdown（人能直接看的那一�
   });
 });
 
+describe('标签合并之后：给人看的清单写**有效**标签名，完整保真那份原样', () => {
+  /**
+   * 合并只写标签那一行（`{deletedAt, mergedInto}`），**不重写任务的 `tagIds`**
+   * （`packages/domain/src/tags.ts` 文件头）。所以导出这一层有两个不同的正确答案：
+   *
+   *   · 给人看的清单（`buildTaskExportRows`）：写**有效**标签名 = B 的名字
+   *     —— 用户已经把 A 合并掉了，清单里再出现 A 就是"一个列表里看不到的标签名"；
+   *   · 完整保真（`buildExportDocument`）：**原样**留 `tagIds: ['tag-a']` 与两张
+   *     标签（含 A 的墓碑）—— 那正是"能还原"的前提。
+   *
+   * 🔴 判据是**两个方向**：把 `resolveTagIds` 从 `toExportTaskRow` 里去掉 ⇒ 第一条红
+   * （清单里冒出「旧标签」）；把解析误加进 `buildExportDocument` 的实体导出 ⇒
+   * 第二条红（还原不回去）。
+   */
+  const seed = (): Operation<string>[] => [
+    makeOp({ entityType: 'TAG', entityId: 't-old', payload: { name: '旧标签' } }),
+    makeOp({ entityType: 'TAG', entityId: 't-new', payload: { name: '新标签' } }),
+    makeOp({
+      entityType: 'TASK',
+      entityId: 'task-merged',
+      payload: { title: '合并后仍只挂旧 id 的任务', tagIds: ['t-old'] },
+    }),
+    // 合并 = 一条 TAG op，载荷逐字对齐 `app-host/src/tag-actions.ts`。
+    makeOp({
+      entityType: 'TAG',
+      entityId: 't-old',
+      opType: OpType.Update,
+      payload: { deletedAt: 1_700_000_000_000, mergedInto: 't-new' },
+    }),
+  ];
+
+  it('`buildTaskExportRows` 写的是「新标签」（不是「旧标签」）', () => {
+    const rows = buildTaskExportRows(stateFrom(seed()));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.tagNames).toEqual(['新标签']);
+    expect(rows[0]?.tagNames).not.toContain('旧标签');
+  });
+
+  it('`buildExportDocument` 仍原样导出 `tagIds` 与标签墓碑（还原靠它）', () => {
+    const ops = seed();
+    const state = stateFrom(ops);
+    const doc = buildExportDocument({ state, ops, exportedAt: EXPORTED_AT });
+
+    const tasks = doc.entities['TASK'] as Array<Record<string, unknown>>;
+    expect(tasks.map((task) => task['tagIds'])).toEqual([['t-old']]);
+
+    const tags = doc.entities['TAG'] as Array<Record<string, unknown>>;
+    expect(tags.map((tag) => tag['name']).sort()).toEqual(['新标签', '旧标签']);
+    // 墓碑（合并的落点）必须在完整保真里 —— 否则"撤销合并"在还原之后就没了依据。
+    expect(tags.find((tag) => tag['id'] === 't-old')?.['mergedInto']).toBe('t-new');
+  });
+});
+
 describe('exportFileName', () => {
   it('给 json / md 两个格式稳定命名', () => {
     const at = Date.UTC(2026, 0, 2, 3, 4, 5);
