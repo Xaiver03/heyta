@@ -58,6 +58,7 @@ import { pick } from '@react-native-documents/picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  resolveTagIds,
   Priority,
   attachmentSizeIn,
   buildTaskTree,
@@ -230,6 +231,7 @@ export function TaskDetailSheet({
   actions,
   projects,
   tags,
+  tagEntities,
   projectActions,
   tasks,
   onChanged,
@@ -252,6 +254,16 @@ export function TaskDetailSheet({
    * 不是"加载失败" —— 所以下面渲染的是一句指路文案，而不是什么都不画。
    */
   tags: Tag[];
+  /**
+   * **全部**标签（含被合并掉的墓碑）的 `id → 实体` 表，**只给解析用**。
+   *
+   * 🔴 与上面的 `tags` 是两个东西（那份是 `aliveOf` = 只剩存活）：
+   * 合并只写标签那一行（`{deletedAt, mergedInto}`），**不重写任务的 `tagIds`**，
+   * 所以"这条任务实际带着哪些标签"只有 `resolveTagIds(task.tagIds, tagEntities)` 能回答。
+   * 拿 `tags` 那份存活数组去 `includes(tag.id)` ⇒ 只挂着被合并标签的任务，
+   * 详情面会显示"无标签"，**且不报错**。
+   */
+  tagEntities: Record<string, Tag>;
   /** 要新建清单时需要它。为 `null` 时「新建清单」不出现（宿主还没打开）。 */
   projectActions: ProjectActions | null;
   /**
@@ -961,9 +973,15 @@ export function TaskDetailSheet({
   const parentValue =
     tasks.find((candidate) => candidate.id === task.parentId)?.title ??
     t('mobile.detail.parent.topLevel');
-  const assignedTagNames = tags
-    .filter((tag) => task.tagIds?.includes(tag.id) ?? false)
-    .map((tag) => tag.name);
+  /*
+    🔴 用**解析后的有效标签**判，不是 `task.tagIds.includes` —— 后者会把
+    "A 合并进 B"之后只挂着 A 的任务读成"无标签"（见 props 里 `tagEntities` 的注释）。
+    顺序跟 `resolveTagIds` 走（它是"第一次出现"的顺序，用户加标签的顺序有意义）。
+  */
+  const effectiveTagIds = resolveTagIds(task.tagIds, tagEntities);
+  const assignedTagNames = effectiveTagIds
+    .map((id) => tags.find((tag) => tag.id === id)?.name)
+    .filter((name): name is string => name !== undefined);
   const tagValue = assignedTagNames.length === 0
     ? t('mobile.detail.value.none')
     : t(assignedTagNames.length === 1 ? 'mobile.detail.value.tagsOne' : 'mobile.detail.value.tags', {
@@ -2015,7 +2033,7 @@ export function TaskDetailSheet({
           ) : (
             <View style={styles.chipRow}>
               {tags.map((tag) => {
-                const assigned = task.tagIds?.includes(tag.id) ?? false;
+                const assigned = effectiveTagIds.includes(tag.id);
                 return (
                   <Chip
                     key={tag.id}

@@ -278,7 +278,8 @@
     "remote:typecheck": "node scripts/remote-web-build.mjs --run \"pnpm typecheck\"",
     "check:entry-table": "node scripts/check-entry-table.mjs --self-test && node scripts/check-entry-table.mjs",
     "check:persistence-keys": "node scripts/check-persistence-keys.mjs --self-test && node scripts/check-persistence-keys.mjs",
-    "check:ratchet-ceilings": "node scripts/check-ratchet-ceilings.mjs"
+    "check:ratchet-ceilings": "node scripts/check-ratchet-ceilings.mjs",
+    "check:tag-resolution": "node scripts/check-tag-resolution.mjs --self-test && node scripts/check-tag-resolution.mjs"
   },
   "devDependencies": {
     "@heyta/shared-schema": "workspace:*",

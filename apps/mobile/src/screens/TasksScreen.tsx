@@ -1853,6 +1853,7 @@ export function TasksScreen({
           actions={actions}
           projects={projects}
           tags={tags}
+          tagEntities={tagEntities}
           projectActions={projectActions}
           tasks={tasks}
           onChanged={refresh}
