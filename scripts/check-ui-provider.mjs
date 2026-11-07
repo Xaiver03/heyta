@@ -168,6 +168,20 @@ const PROVIDER_DEPENDENT = [
   'SyncStatusBar',
   'ConflictResolutionView',
   /**
+   * R11 / R5 的两枚新组件（2026-11-07）：`TaskBoard`（看板容器）、
+   * `AttachmentList`（附件区）、`ErrorState`、`Skeleton`。
+   *
+   * 它们全都透过 `useHeytaTokens` / `useHeytaText` 取 token（`ErrorState` 与
+   * `Skeleton` 是本轮新建的 `packages/ui/src/feedback/`），所以宿主把它们放在
+   * `<HeytaUiProvider>` 之外会**运行时抛错**——在补登记之前，那不会让任何门禁变红：
+   * 本脚本的消费者扫描只覆盖 `apps/*`，而宿主侧写的是组件 JSX。
+   * 这就是上面 `SyncStatusBar` 那段注释讲的同一个洞，别再踩一次。
+   */
+  'TaskBoard',
+  'AttachmentList',
+  'ErrorState',
+  'Skeleton',
+  /**
    * M3 第五刀（settings）：`SettingsSection` / `SettingsRow` 同样透过
    * `useHeytaTokens` / `useHeytaText` 取 token。
    *

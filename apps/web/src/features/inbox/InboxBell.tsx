@@ -51,7 +51,7 @@ import {
   type ReferralActivatedPayload,
 } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { EmptyState, HeytaUiProvider } from '@heyta/ui';
+import { EmptyState, ErrorState, HeytaUiProvider, Skeleton } from '@heyta/ui';
 import { Bell, CheckCheck, X } from 'lucide-react';
 
 import type { AccountNotificationItem, CampaignItem } from '@heyta/app-host';
@@ -165,18 +165,18 @@ function LoadNotice({
     );
   }
 
+  /*
+    🔴 **读失败走共享 `ErrorState`，不是自己写一行红字**（R11）。
+    它与空态刻意不同形：带 `role="alert"`、没有页面档那 64px 留白、
+    且重试是一枚**具名**按钮。原来这行自己的 `<div>` 与下面那个 `EmptyState`
+    在视觉上都是"一句话"，用户分不出"没有通知"和"没读到通知"。
+  */
   return (
-    <div className="ht-inbox__notice" data-testid={`${testID}-unavailable`}>
-      <span>{t('web.inbox.error')}</span>
-      <button
-        type="button"
-        className="ht-inbox__action ht-type-caption"
-        data-testid={`${testID}-retry`}
-        onClick={onRetry}
-      >
-        {t('web.inbox.retry')}
-      </button>
-    </div>
+    <ErrorState
+      labels={{ title: t('web.inbox.error'), retryLabel: t('web.inbox.retry') }}
+      onRetry={onRetry}
+      testID={`${testID}-unavailable`}
+    />
   );
 }
 
@@ -200,11 +200,14 @@ function NotificationsTab({
   }
 
   if (state === null && loading) {
-    return (
-      <p className="ht-inbox__notice" data-testid={`${testID}-loading`}>
-        {t('web.inbox.loading')}
-      </p>
-    );
+    /*
+      🔴 **条数未知 ⇒ 骨架**（R11，PRD 那条切分的一半）。原来这里是一句纯文字，
+      而"条数未知"正是骨架的判据：还不知道有几条要画，所以画"若干条等宽占位"。
+      条数**已知**时不该用它 —— 那种情况是"这几条有了，正在刷新"，
+      交给行内转圈（`TaskRow` 的 `busy`），两者不是一件事。
+      判据：`apps/web/tests/inbox-skeleton.spec.tsx`（骨架在 且 空态不在）。
+    */
+    return <Skeleton rows={3} testID={`${testID}-skeleton`} />;
   }
 
   const rows = toRenderable(notifications);
@@ -258,11 +261,8 @@ function ActivityTab({
   }
 
   if (state === null && loading) {
-    return (
-      <p className="ht-inbox__notice" data-testid={`${testID}-activity-loading`}>
-        {t('web.inbox.loading')}
-      </p>
-    );
+    // 同上：条数未知 ⇒ 骨架。两个 tab 用同一条判据，只是 testID 不同。
+    return <Skeleton rows={2} testID={`${testID}-activity-skeleton`} />;
   }
 
   const invite = campaigns.find((c) => c.kind === 'invite' && c.invite !== undefined);

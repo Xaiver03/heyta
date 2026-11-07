@@ -334,7 +334,9 @@ describe('读不到时的两种提示必须分开', () => {
     await settle();
 
     expect(testId('inbox-unavailable')).not.toBeNull();
-    expect(testId('inbox-retry')).not.toBeNull();
+    // R11 起失败态走共享 `ErrorState`，重试按钮的 testID 多一层后缀
+    // （`${testID}-retry`）—— 判据不变：**有**一枚具名重试按钮。
+    expect(testId('inbox-unavailable-retry')).not.toBeNull();
     // 🔴 列表**不该被清空** —— 清空会让"这次没读到"看起来像"你没有通知"。
     expect(useInboxStore.getState().notifications).toHaveLength(3);
   });
