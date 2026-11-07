@@ -15,6 +15,10 @@
  * 而 `EmptyState.tsx` 里剩下的代码刻意没有分支。
  */
 
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
 
@@ -102,7 +106,7 @@ describe('toEmptyStateViewModel —— 根节点 role 是固定的 summary', () 
   });
 });
 
-describe('toEmptyStateViewModel —— size 三档', () => {
+describe('toEmptyStateViewModel —— size 四档', () => {
   it('省略 = page，且现有站点该拿到的还拿到（图标不被这一档误伤）', () => {
     const v = toEmptyStateViewModel({ title: 'x', icon: ICON });
     expect(v.size).toBe('page');
@@ -152,10 +156,10 @@ describe('toEmptyStateViewModel —— size 三档', () => {
     expect(() => toEmptyStateViewModel({ title: '   ', size: 'line' })).toThrow(/title/);
   });
 
-  it('三档只差图标/插画/居中，其余槽位的归一逐字相同（含 detailRole 与 a11yRole）', () => {
+  it('四档只差图标/插画/居中，其余槽位的归一逐字相同（含 detailRole 与 a11yRole）', () => {
     const slots = { title: 'x', hint: '  ', detail: '', icon: ICON, illustration: 'tasks' } as const;
     const page = toEmptyStateViewModel({ ...slots });
-    for (const size of ['section', 'line'] as const) {
+    for (const size of ['section', 'line', 'card'] as const) {
       const v = toEmptyStateViewModel({ ...slots, size });
       expect([v.hint, v.detail, v.detailTone, v.detailRole, v.a11yRole, v.locale]).toEqual([
         page.hint,
@@ -197,6 +201,141 @@ describe('toEmptyStateViewModel —— size 三档', () => {
       illustration: 'notes',
     });
     expect(v.illustration).toBeUndefined();
+  });
+});
+
+/**
+ * `card` 档（R11 的第四档）——「居中但紧凑」的那一格。
+ *
+ * 它要替换的站点是**住在别人卡片里**的那一批：24rem 的下拉面板、月历格、
+ * 日档那条"带"、任务详情里的排程预览、看板列、四象限格。
+ * 它们借 `page` 时会连 `space.16`×2（128px）的页面级留白一起借过去，
+ * 于是"没有内容"被画成一整块空白 —— 而那种错**没有任何断言会红**。
+ *
+ * 这个 describe 分两半：
+ *   · 前半钉**模型**（size / 图标 / 插画 / 其余槽位归一）；
+ *   · 后半钉**组件的源码形状**（`rootCard` 的留白、`rootStyle` 的四支）。
+ *     后者是因为 `packages/ui` 的测试跑在 node 环境、加载不了 RN 渲染树
+ *     （`vitest.config.ts` 文件头），"有没有 128px 留白"在模型里量不到 ——
+ *     而"把 card 注成 page"最可能的写法**恰好**是把 `rootStyle` 改回兜底。
+ */
+describe('toEmptyStateViewModel —— card 档（居中但紧凑）', () => {
+  it('🔴 size:"card" 就是 card —— 注成 "page" 的第一秒就红', () => {
+    expect(toEmptyStateViewModel({ title: 'x', size: 'card' }).size).toBe('card');
+  });
+
+  it('card 是"居中"那一支：与 page 同轴，与 section/line 不同轴', () => {
+    // 模型不直接给 align，但"居中"这一支在组件里由 size 决定；
+    // 这里钉的是**档本身**没有被折叠进 section/line（那会让它左对齐）。
+    const card = toEmptyStateViewModel({ title: 'x', size: 'card' });
+    expect(['page', 'card']).toContain(card.size);
+  });
+
+  it('card 不画图形：图标与插画都归一成 undefined（32 的字形会把紧凑版撑回 page 的高度）', () => {
+    const v = toEmptyStateViewModel({
+      title: '还没有通知',
+      icon: ICON,
+      illustration: 'notes',
+      size: 'card',
+    });
+    expect(v.icon).toBeUndefined();
+    // ③ 与 section 同行为：传了 illustration 也不渲染。
+    expect(v.illustration).toBeUndefined();
+  });
+
+  it('card 不豁免 title 必填 —— 空白空态仍然当场响', () => {
+    expect(() => toEmptyStateViewModel({ title: '   ', size: 'card' })).toThrow(/title/);
+  });
+
+  it('card 的 hint 可选（紧凑版也只有一句时是合法形态）', () => {
+    expect(toEmptyStateViewModel({ title: 'x', size: 'card' }).hint).toBeUndefined();
+    expect(toEmptyStateViewModel({ title: 'x', hint: '  ', size: 'card' }).hint).toBeUndefined();
+  });
+
+  /**
+   * ② 默认仍是 `page`，现有站点**一个像素都不变**。
+   *
+   * 这里不用快照：快照把"现在是什么"腌进文件，改一个无关字段就整块重写，
+   * 评审看不到"到底哪一格动了"。改成**逐字段列全**的深比较 ——
+   * 任何一格变了，diff 直接指向那一行。
+   */
+  it('不传 size ⇒ 与加这一档之前**逐字段相同**（默认 page，其余槽位一个都不许动）', () => {
+    expect(
+      toEmptyStateViewModel({ title: '没有任务', icon: ICON, hint: '点右上角新建', detail: 'x' }),
+    ).toStrictEqual({
+      icon: ICON,
+      title: '没有任务',
+      hint: '点右上角新建',
+      detail: 'x',
+      detailTone: 'danger',
+      size: 'page',
+      illustration: undefined,
+      illustrationMotion: 'enter',
+      action: undefined,
+      locale: 'zh-CN',
+      detailRole: 'alert',
+      a11yRole: 'summary',
+    });
+  });
+});
+
+describe('EmptyState.tsx 的源码形状 —— card 档的"无页面级留白"只能在这里量', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const FILE = resolve(here, '../src/empty-state/EmptyState.tsx');
+
+  /**
+   * 🔴 去掉注释再判 —— 与 `settings-hint-through-tip.spec.ts` 同一条纪律。
+   *
+   * `rootCard` 的注释里**必须**能写"别抄 `page` 那 128px 留白"，
+   * 而那句话里就会出现 token 名。不掩码的话，照纪律写注释的人会得到一条
+   * **假红**，而假红的终局永远是"有人来放宽这条判据"（本仓反复吃过的形状）。
+   */
+  const stripComments = (text: string): string =>
+    text.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/(^|[^:])\/\/[^\n]*/gu, '$1');
+
+  const source = stripComments(readFileSync(FILE, 'utf8'));
+
+  /** 取 `key: { … }` 那一块（按花括号配平，不靠正则的贪婪/懒惰去猜）。 */
+  const styleBlock = (key: string): string => {
+    const at = source.indexOf(`${key}: {`);
+    expect(at, `EmptyState.tsx 里找不到样式键 ${key} —— 判据的锚点失效了`).toBeGreaterThan(-1);
+    let depth = 0;
+    for (let i = source.indexOf('{', at); i < source.length; i += 1) {
+      if (source[i] === '{') depth += 1;
+      else if (source[i] === '}') {
+        depth -= 1;
+        if (depth === 0) return source.slice(at, i + 1);
+      }
+    }
+    throw new Error(`${key} 的花括号没有闭合`);
+  };
+
+  it('锚点：page 档确实拿着那 128px 留白（不然下面那条"card 没有"就是空断言）', () => {
+    expect(styleBlock('root')).toContain("tokens['space.16']");
+  });
+
+  it('① card 档一级上下留白都不给 —— 衬 `space.16` 就是又借了页面档的留白', () => {
+    const card = styleBlock('rootCard');
+    expect(card).not.toContain("tokens['space.16']");
+    // 只保留行距；外框 padding 归所在卡片。
+    expect(card).toContain("tokens['space.2']");
+    // 居中这一条要继承（它是"居中但紧凑"）。
+    expect(card).toContain("alignItems: 'center'");
+  });
+
+  it('① rootStyle 必须是**显式四支**，不许"落到兜底"—— 兜底就是 styles.root（带 128px）', () => {
+    const at = source.indexOf('const rootStyle =');
+    expect(at, 'rootStyle 不见了').toBeGreaterThan(-1);
+    const end = source.indexOf(';', at);
+    const expr = source.slice(at, end);
+
+    // 四支齐全。
+    expect(expr).toContain("size === 'page'");
+    expect(expr).toContain("size === 'card'");
+    expect(expr).toContain("size === 'section'");
+    expect(expr).toContain('styles.rootCard');
+    // 🔴 最后不得收在 `styles.root` 上：那是把"没写到的档"都当成页面档。
+    expect(expr.trimEnd()).not.toMatch(/:\s*styles\.root\s*$/u);
   });
 });
 

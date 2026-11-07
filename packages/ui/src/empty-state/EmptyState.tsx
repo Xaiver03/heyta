@@ -130,6 +130,19 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
         //    `section` 档那行 `row-title` + `foreground` 的标题权重 ——
         //    占位行比重还高的话，它就在跟自己的分组标签争重心（层级倒置）。
         rootLine: { gap: tokens['space.1'] },
+        // 🔴 `card` 档：**居中但紧凑**。它是 `page` 的紧凑版，所以
+        //    **只继承"居中"这一条，一级上下留白都不继承** ——
+        //    `page` 的 `paddingVertical: space.16`（64px）×2 在 24rem 的下拉面板、
+        //    月历格、日档那条"带"里会把"没有内容"画成一整块空白。
+        //    外框的内边距归**所在卡片**（这一档的契约就是"留白由容器给"），
+        //    这里只保留 `space.2` 的行距。
+        //    ⚠️ 与 `section`/`line` 同一条：不画图标、不画插画 ——
+        //    那条判断在 `model.ts` 的 `GRAPHICS_SIZES` 里，不在这里写 `if`。
+        rootCard: {
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: tokens['space.2'],
+        },
         // 区块档的标题必须和下一步提示拉开层级：标题是事实，提示是行动。
         // 使用语义 `row-title`（base + semibold）并配 foreground，避免空态退化成
         // 两行同权重的灰色说明文字；页面档仍使用 section-title + muted。
@@ -141,8 +154,20 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
   );
 
   const size = view.size;
+  // 🔴 四档各自的根节点，**任何一档都不许"落到兜底分支"**：
+  //    `styles.root` 带 `space.16` 的页面级留白，非 `page` 档掉进去
+  //    都会把紧凑的容器撑成一块空白（`card` 就是这么被错用的）。
+  //    所以这里写成显式的四支、不写 `: styles.root` 这种兜底 ——
+  //    新增第五档时 TS 不会报错（联合类型变宽不是错），但
+  //    `packages/ui/tests/empty-state-model.spec.ts` 的源码形状判据会拦住它。
   const rootStyle =
-    size === 'line' ? styles.rootLine : size === 'section' ? styles.rootSection : styles.root;
+    size === 'page'
+      ? styles.root
+      : size === 'card'
+        ? styles.rootCard
+        : size === 'section'
+          ? styles.rootSection
+          : styles.rootLine;
 
   return (
     <View style={rootStyle} accessibilityRole={view.a11yRole} testID={testID}>
@@ -177,7 +202,11 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
             ? [text['row-meta'], styles.titleLine]
             : size === 'section'
               ? [text['row-title'], styles.titleSection]
-              : [text['section-title'], styles.centered, styles.title]
+              : size === 'card'
+                ? // `card` 是 `page` 的紧凑版：标题降一档（`section-title` → `row-title`），
+                  // 颜色仍用 `page` 那枚 muted —— 不另立一套层级主张。
+                  [text['row-title'], styles.centered, styles.title]
+                : [text['section-title'], styles.centered, styles.title]
         }
       >
         {view.title}
@@ -187,7 +216,7 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
       {view.hint === undefined ? null : (
         <Text
           style={
-            size === 'page'
+            size === 'page' || size === 'card'
               ? [text['row-meta'], styles.centered, styles.hint]
               : [text['row-meta'], styles.hint]
           }
@@ -213,7 +242,9 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
           selectable={view.detailTone === 'danger'}
           style={[
             text.caption,
-            size === 'page' ? styles.centered : undefined,
+            // `card` 与 `page` 都是居中的（它们是同一条轴线上的两档），
+            // `section` / `line` 左对齐。
+            size === 'page' || size === 'card' ? styles.centered : undefined,
             view.detailTone === 'danger' ? styles.detailDanger : styles.detailSubtle,
           ]}
         >

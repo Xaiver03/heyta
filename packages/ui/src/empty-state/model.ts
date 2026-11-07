@@ -77,9 +77,32 @@ export type EmptyStateDetailTone = 'danger' | 'subtle';
  *    所以既能读成"这个分组没有内容"，又不跟标签争重心。
  *    它同样不画图标/插画，理由与 `section` 一致。
  *
+ * 🔴 `card` 档是四档里最后补上的一格（R11）：**居中但紧凑**。
+ *    它解的是另一个死结 —— `page` 是"整块内容区空了"，而**住进别人给的卡片里**
+ *    的那块空态借 `page` 时，会连 `space.16`×2（128px）的页面级留白一起借过去：
+ *    24rem 的下拉面板里，"没有通知"被画成一整块空白；月历格、日档那条"带"、
+ *    任务详情里的排程预览、看板列、四象限格都是同一个形状。
+ *    所以 `card` 与前两档的区别是**两条**，不是一条：
+ *      · 留白：**一级都不给**（上下由所在卡片负责），只保留 `space.2` 的行距；
+ *      · 图形：不画插画、不画大图标（与 `section`/`line` 同）；
+ *      · 标题：`row-title`（比 `page` 的 `section-title` 小一档），
+ *        颜色沿用 `page` 的 `foreground-muted` —— 它是 `page` 的紧凑版，
+ *        不另立一套层级主张。
+ *
  * ⚠️ 默认 `page` —— 现有站点一个像素都不变。
  */
-export type EmptyStateSize = 'page' | 'section' | 'line';
+export type EmptyStateSize = 'page' | 'section' | 'line' | 'card';
+
+/**
+ * 画"图形"（插画或大图标）的档 —— **只有 `page`**。
+ *
+ * 🔴 写成显式集合，而不是 `size !== 'page'` 那种否定式：否定式会给
+ * **将来新增的档**默默一个"没有图形"的默认值，而"参数传了却被静默丢弃"
+ * 正是本文件反复要消掉的那类错（见 `nonBlank` 与 `icon = []` 两条）。
+ * 加第五档时，这里不跟着加 ⇒ 新档就是"没有图形"，那是**有意的默认**；
+ * 想给它图形，就必须来改这张表。
+ */
+const GRAPHICS_SIZES: ReadonlySet<EmptyStateSize> = new Set(['page']);
 
 /**
  * 四个槽位。
@@ -203,17 +226,19 @@ export function toEmptyStateViewModel(slots: EmptyStateSlots): EmptyStateViewMod
   const size: EmptyStateSize = slots.size ?? 'page';
   const locale = slots.locale ?? 'zh-CN';
 
-  // 🔴 `section` / `line` 档**不放图标**，这条判断做在这里而不是组件里写 `if`：
-  //    区块级空态住在卡片内部，卡片自己已经有一行标题；再摆一个 `icon.xl`(32)
-  //    的字形会和区块标题争视觉重心 —— 而调用方传了 `icon` 却什么都没画，
-  //    是最难归因的那类"参数被静默丢弃"。所以这里把它明确成 `undefined`，
-  //    组件只负责"有图标就画、没有就不画"。
-  //    `line` 档更不用说是**一行字**，图标会把行高顶坏。
+  // 🔴 除 `page` 之外的档（`section` / `line` / `card`）**不放图标**，这条判断做在这里
+  //    而不是组件里写 `if`：区块级空态住在卡片内部，卡片自己已经有一行标题；
+  //    再摆一个 `icon.xl`(32) 的字形会和区块标题争视觉重心 —— 而调用方传了
+  //    `icon` 却什么都没画，是最难归因的那类"参数被静默丢弃"。所以这里把它
+  //    明确成 `undefined`，组件只负责"有图标就画、没有就不画"。
+  //    `line` 档更不用说是**一行字**，图标会把行高顶坏；`card` 档同理
+  //    （它只有 `space.2` 的行距，32 的字形会把紧凑版撑回 `page` 的高度）。
   // 语义微场景已经包含自己的 Lucide 主图形，不能再把旧的通用 icon
   // 叠在上面；否则一个空态会出现两个视觉重心。没有 illustration 时才保留
   // 旧 icon，保证既有调用方的页面形状不变。
-  const visibleIcon = size !== 'page' || slots.illustration !== undefined ? undefined : icon;
-  const illustration = size === 'page' ? slots.illustration : undefined;
+  const drawsGraphics = GRAPHICS_SIZES.has(size);
+  const visibleIcon = !drawsGraphics || slots.illustration !== undefined ? undefined : icon;
+  const illustration = drawsGraphics ? slots.illustration : undefined;
 
   const hint = nonBlank(slots.hint);
   const detail = nonBlank(slots.detail);
