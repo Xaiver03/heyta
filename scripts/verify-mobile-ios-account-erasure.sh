@@ -141,6 +141,8 @@ SETTINGS_SELFHOST="使用自托管服务器"
 # 配置态下同一枚展开按钮改叫这个（`mobile.profile.sync.advancedTitle` = 自托管同步）。
 # 两个都试、先试未配置那个 —— 见 `open_settings_sheet` 里那段读数。
 SETTINGS_SELFHOST_CONFIGURED="自托管同步"
+# 便签板上那枚「收集箱」落点 chip 的无障碍名（`mobile.capture.project.inboxAria`）。
+NOTES_INBOX_CHIP="落点选为收集箱"
 
 # ── 设备侧与容器侧的读法 ────────────────────────────────────────────────────
 ax() { python3 "$SHIM" "$@" --udid "$UDID" --idb "$IDB_BIN" --companion "$IDB_COMPANION" --json; }
@@ -722,7 +724,18 @@ fill_field() {  # <标签> <值> [secure]
 close_settings_sheet() {
   local i
   for i in $(seq 1 6); do
-    [ "$(jget "$(ax "关闭" --list --json)" found)" != "True" ] && { ok "设置面已关（第 ${i} 次检查）"; return 0; }
+    if [ "$(jget "$(ax "关闭" --list --json)" found)" != "True" ]; then
+      ok "设置面已关（第 ${i} 次检查）"
+      # 🔴 **关完必须自己导航回「我的」，不能指望"人应该还停在那儿"。**
+      #    2026-11-07 实测的病：设置面里还有一层导航（设置 → 数据与同步 是二级）。
+      #    从**二级**关掉之后，下面那一页可能落在别的 tab 或别的二级页上；
+      #    而下一段的 `idb_wait_label "立即同步"` 只在屏幕上找标签、不换页，
+      #    于是空转之后报「这一次同步没被触发」—— 真因是探针停在错的位置。
+      #    `ax "我的"` 是底部标签，无论停在哪一页都在树上；按下它把归属钉死。
+      ax "我的" --pressable --press --json >/dev/null 2>&1
+      sleep 2
+      return 0
+    fi
     ax_press "关闭"
     sleep 2
   done
@@ -797,7 +810,17 @@ sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…�
   #    把状态块让到 y≈552，实测让位之后那一发请求就到了服务端。
   ax "账号" --scroll-into-view --list --json >/dev/null 2>&1
   SIG0=$(sync_signature)
-  ax_press "立即同步"
+  # 🔴 按这一下之后要**读它的返回**，不能 `ax_press` 一把丢了（它内部 `>/dev/null`）。
+  #    2026-11-07 实测：这一下完全可能空点（坐标还在旧位置上，或那枚控件已被上一次同步
+  #    换成别的形状），而"没按到"与"按了但没同步成"在日志里长得一模一样 ——
+  #    后者会把排查引向同步链路，前者只要重按一次。
+  SYNC_PRESS=$(ax "立即同步" --pressable --press --json)
+  if [ "$(jget "$SYNC_PRESS" result)" != "success" ]; then
+    echo "     [sync] 第一下没落地（result=$(jget "$SYNC_PRESS" result) found=$(jget "$SYNC_PRESS" found)）⇒ 重新滚到可见区再按一次"
+    ax "账号" --scroll-into-view --list --json >/dev/null 2>&1
+    SYNC_PRESS=$(ax "立即同步" --pressable --press --json)
+    echo "     [sync] 第二下：result=$(jget "$SYNC_PRESS" result)"
+  fi
   ACKED=0
   for _ in $(seq 1 12); do
     sleep 1
@@ -826,6 +849,28 @@ fill_three_credentials "$TOKEN" \
   || { xcrun simctl io "$UDID" screenshot "$EVIDENCE/ios-account-erasure-1-credential-fill.png" >/dev/null 2>&1; summary "iOS 注销销毁" "" 1; }
 
 # ── 3. 造一条本机数据，让"销毁"有东西可销 ──────────────────────────────────
+# ── 2.5 归属对账（取证，不判红 —— 它量的是"为什么这条链路没发出去"） ────────
+#
+# 🔴 2026-11-08 实测：填完三个凭据、关了设置面、按了「立即同步」之后，
+#    服务端上游一条 op 都没收到（`/api/sync/status` 的 `latestSeq` 一直是 0，
+#    日志里也没有任何该账号的 PLAINTEXT_REQUIRED / E2EE_REQUIRED 审计事件）。
+#    也就是说**请求根本没发出去**，而界面上只说失败、不给分档原因。
+#
+#    读代码能看到两段形状不同的实现（这一段只是把它们摆出来，不改产品）：
+#      · `packages/app-host/src/host.ts:609` 的 `requireLibraryOwner()` 在身份不符时
+#        **抛** `LocalLibraryOwnedByAnotherAccountError`；
+#      · `apps/mobile/src/sync/store.ts:196` 的调用方只在 `try` 里接 `host.sync()`，
+#        抛出来的错误落进 catch ⇒ `reason:'unexpected'` —— 那是**不分档**的那一支。
+#    于是"本机库归属对不上"和"网络抖动"在界面上长得一样，而处置完全不同。
+#
+#    这一段把**事实**（本机库归属表）打出来，供人对照；判红留给下一趟做，
+#    因为此刻还没有一条"归属不符 ⇒ 界面必须说这一句"的判据。
+#    需要 store 内省：见 `docs/plans/delivery-blocked-2026-11-07.md`。
+echo "   归属取证（本机库 meta 表里的 owner 行）："
+sqlite3 "${DATA_CONTAINER}/Library/${DB_NAME}" \
+  "SELECT key, substr(value,1,120) FROM meta WHERE key LIKE '%library%' OR key LIKE '%owner%';" \
+  2>/dev/null | sed 's/^/     /' || echo "     （读不到 meta 表）"
+
 step "3. 界面上建一条便签（让库里真的有用户字节）"
 # 🔴 **必须先建便签、再同步**（2026-11-07 实测的先后）。
 #
@@ -867,15 +912,70 @@ dismiss_ios_save_password || true
 #       已经被滚过了 ⇒ 点空；分开两次（先滚、再点）就连中。所以这里拆成两步，
 #       并且点完要**验证真的进了那一页**（等 `写点什么…` 出现），不靠固定 sleep 赌。
 dismiss_ios_save_password || true
-ax "便签" --pressable --scroll-into-view --list --json >/dev/null 2>&1
-sleep 1
-ax "便签" --pressable --press --json >/dev/null 2>&1
-sleep 2
-if ! idb_wait_label "写点什么…" 20; then
+# 🔴 滚完还会**再滚回去**：实测（2026-11-08）`--scroll-into-view` 连拖 10 下之后
+#    `visible` 仍是 `False`，而紧接着的 `--press` 报 `success` 却没进页面 ——
+#    因为 press 会**重新取一次树**，取完之后再做可见性判断，那时列表已经被
+#    回弹到顶部。⇒ 必须**在同一份树快照里**"滚到位并按下"，否则"滚"和"点"
+#    隔着一层会动的视图，永远有概率点空。
+#    这里用 `--scroll-into-view --press`（shim 的同一个调用内完成），并且
+#    **失败就重试三次**：这个失效是概率性的，单发不可靠；而三发都不成
+#    仍然走下面的 bad（不当成通过）。
+#
+#    🔴 而 shim 的 `--scroll-into-view` **在这块屏上滚不动它**（2026-11-08 实测）：
+#       它连拖 10 下之后 `visible` 仍是 `False`、`y` 仍是 900 —— 换成一条**裸 swipe**
+#       `ui swipe 200 520 200 200` 一次就把那一行从 y=900 拖到 443。
+#       所以这里用裸 swipe 自己滚，不指望 shim 的自动滚动：
+#       先量到当前 y，按差值决定拖多少，最多试三次，每拖一次重读坐标。
+scroll_notes_row() {
+  local r y step
+  for _try in 1 2 3; do
+    r=$(ax "便签" --pressable --list --json)
+    y=$(jget "$r" y)
+    [ -z "$y" ] && return 1
+    # 折叠线取可视区高度 − 120（与 shim 同一条经验值）；y 已经在上方就直接算到位。
+    if [ "$y" -lt 520 ]; then return 0; fi
+    step=$(( (y - 300) < 200 ? 200 : (y - 300) ))
+    [ "$step" -gt 400 ] && step=400
+    # 🔴 起点必须落在**真正空白**的地方。x=200 在 y≈520 处会压到「同步失败 / 同步请求失败…」
+    #    那块文字，而它是 `StaticText` —— HID 的拖拽被那里吃掉，页面**一动不动**
+    #    （实测：同一趟里 x=200 拖三下 y 不变，x=340 拖三下 y 从 900 → 416）。
+    #    x=340 落在正文右侧的空白带上，y=560 在状态块右侧 —— 两者都不在任何交互叶子里。
+    idb_ui swipe 340 560 340 $(( 560 - step )) --duration 1.0 >/dev/null 2>&1
+    sleep 1.5
+  done
+  return 0
+}
+scroll_notes_row
+for _try in 1 2 3; do
+  ax "便签" --pressable --press --json >/dev/null 2>&1
+  sleep 2
+  if idb_wait_label "写点什么…" 6; then NOTES_IN=1; break; fi
+  echo "     [notes] 第 ${_try} 次没能进「我的 → 便签」⇒ 重新滚一次再点"
+  scroll_notes_row
+done
+if [ "$NOTES_IN" = "0" ]; then
   bad "进不了「我的 → 便签」那一页（滚+点分开做过，20 秒内「写点什么…」仍不在树上）—— 便签这段的前置不成立"
   xcrun simctl io "$UDID" screenshot "$EVIDENCE/ios-account-erasure-2-no-notes-page.png" >/dev/null 2>&1
   summary "iOS 注销销毁" "" 1
 fi
+
+# 🔴 **落点必须显式选「收集箱」**（2026-11-08 实测的根因）。
+#
+#    便签板上方那枚 `CaptureProjectPickerRow` 的「收集箱」chip 选中值是 `null`，但它是一枚
+#    **要点一下才算选中**的控件（`CaptureComposer.tsx:811`）。不点它，宿主手里的
+#    `newNoteProjectId` 就是它自己的初值，而界面上的「新建落进收集箱」只是一句**描述**、
+#    不是当前状态 —— 于是便签建出来了、界面上也读得到，而同步出去的那条 op 带着什么归属
+#    没有任何一处会告诉你。这一趟实测到的就是这种形状。
+#
+#    点不到就响亮判红："落点不明"比"便签没建出来"更难查，不能让它静默过去。
+if [ "$(jget "$(ax "$NOTES_INBOX_CHIP" --pressable --list --json)" found)" = "True" ]; then
+  ax "$NOTES_INBOX_CHIP" --pressable --press --json >/dev/null 2>&1
+  sleep 1
+else
+  bad "便签板上找不到「收集箱」落点（${NOTES_INBOX_CHIP}）—— 落点不明时同步会带一条归属不明的 op 出去，本趟不作数"
+  summary "iOS 注销销毁" "" 1
+fi
+NOTES_IN=0
 ax "写点什么…" --scroll-into-view --list --json >/dev/null 2>&1
 sleep 1
 idb_dump
@@ -930,8 +1030,23 @@ fi
 ax "返回" --pressable --press --json >/dev/null 2>&1
 sleep 2
 # 便签落库之后库里才有 op ⇒ 「立即同步」这时才在设置面里出现（理由见本段开头那段读数）。
-sync_now
+# 🔴 这一发**必须验**：它没成的话，屏幕上会一直挂着上一次的「同步请求失败」，
+#    而后面每一步都不会再问一次"到底同步成功过没有" —— 上一趟就是这样
+#    带着一句 HTTP 400 一路走到判据 B 的。
+if ! sync_now; then
+  bad "便签之后的第一次同步没能按下去（见上面 [sync] 那几行）—— 后面所有读数都不作数"
+  summary "iOS 注销销毁" "" 1
+fi
 sleep 8
+# 配对腿前置：**真的同步成一次**。这条是判据 A 的基线（"曾经配好过"），
+# 不是可选的过场 —— 没有它，"库还在"只是"没人碰过它"。
+if text_on_screen "已是最新"; then
+  ok "同步成立：界面上读得到「已是最新」"
+else
+  bad "同步之后没读到「已是最新」⇒ 这一趟没真的同步，判据 A/B 的基线不成立
+      （屏幕上此刻的读数见下面 step 5 的签名）"
+  summary "iOS 注销销毁" "" 1
+fi
 
 step "4. 判据 A：注销**之前**本机库必须在盘上、且有 op 行（前提证明，不是过场）"
 DATA_CONTAINER=$(xcrun simctl get_app_container "$UDID" "$BID" data 2>/dev/null)

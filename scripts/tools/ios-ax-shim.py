@@ -390,17 +390,45 @@ KEYBOARD_ACCESSORY_HEIGHT = 56
 KEYBOARD_ACCESSORY_MIN_WIDTH_RATIO = 0.5
 
 
+# 自动滚动最多拖几下。
+# 🔴 从 10 提到 20（2026-11-08）：15 行的「我的」页里「便签」在 y=900，而可视区滚动区
+#    只有约 300px 的有效行程 ⇒ 每拖一下只能上移 ~180px，10 下**不够**。
+#    数一下就知道它必然是假的：`(900 - 558) / 180 ≈ 2`，但那 2 下是**乐观值** ——
+#    实测 10 下之后 y 仍是 900（这页在 iOS 27 上每拖一下只动一点点）。
+#    上限调到 20 之后留着"滚不动就报 no-room / 仍 visible=False"这条出口，
+#    所以调大上限不会让"真滚不动"的情况静默通过。
+AUTO_SCROLL_MAX_SWIPES = 20
+
+
 def screen_size(nodes):
-    """设备逻辑分辨率 (宽, 高)。取自 `Application` 节点的 frame。
+    """设备逻辑分辨率 (宽, 高)。
 
     找不到时返回 (None, None) —— **不要猜一个默认值**：猜错会让
     "元素是否在屏幕内"整条判据静默失效，而它正是"点得到 vs 点不到"的依据。
+
+    🔴 **第一版取的是 `Application` 节点的 frame，而那是错的**（2026-11-08 实测）：
+    在这台设备上它的 frame 是 **386×678**，而同一时刻
+    `simctl io screenshot` 是 1398×2034 ⇒ 逻辑尺寸 **466×678**。
+    也就是说 `Application` 报的是**可视内容区**（去掉右侧折叠屏第二块 + 侧边安全区），
+    不是屏幕。后果是一个**假红**：`立即同步` 中心 (75,703) 被判
+    `tap-outside-screen`（因为 703 ≥ 678），而那枚按钮离屏幕底边还有 100 多点
+    —— 探针把"够得着"报成"够不着"，而这句话决定红的是产品还是尺子。
+
+    ⇒ 改成**取全部节点 frame 的包围盒**：屏是坐标系的边界，屏幕上任何东西都落在里面。
+    包围盒只会**大于或等于**真实屏（多出来的部分来自屏外元素），因此
+    "越界"这条判据只会**变宽松**，不会开始制造假红 —— 而它要挡的那类事故
+    （点落在屏外、`tap` 返回 success 却没人收到）依然挡得住。
     """
+    xs, ys = [], []
     for n in nodes:
-        if (n.get("type") or "") == "Application":
-            _x, _y, w, h = frame_of(n)
-            return w, h
-    return None, None
+        _x, _y, w, h = frame_of(n)
+        if w <= 0 or h <= 0:
+            continue
+        xs.append(_x + w)
+        ys.append(_y + h)
+    if not xs or not ys:
+        return None, None
+    return max(xs), max(ys)
 
 
 def screen_width(nodes):
@@ -604,7 +632,21 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
         out["scrollRc"] = "tree-empty"
         return out
     w, h = screen_size(nodes)
-    vis_limit = (h - 120) if h else 700
+    # 🔴 `h` 现在是**屏幕**高度（见 `screen_size` 那段：包围盒，不是 `Application` 的
+    #    386×678 可视区），而折叠线必须按**可视区**算 —— 屏底那 120 是 Tab 栏与安全区。
+    #    用 678−120=558 当折叠线：在 466×678 这块可视区里，「便签」那一行在 y=900，
+    #    不滚到 558 以上"看起来"就永远不可见 —— 而它是可滚到的。
+    #    第一版用 `Application` 帧时这里恰好是对的；改 `screen_size` 之后**必须**回退到
+    #    可视区高度，否则同一次改动会把"越界判据"修好、把"滚动判据"弄坏
+    #    （两次都在真机上量到了：先是 `tap-outside-screen` 假红，再是 `visible=False` 卡住）。
+    viewport_h = None
+    for _n in nodes:
+        if (_n.get("type") or "") == "Application":
+            _vx, _vy, _vw, _vh = frame_of(_n)
+            if _vh > 0:
+                viewport_h = _vh
+            break
+    vis_limit = ((viewport_h or h) - 120) if (viewport_h or h) else 700
     if h:
         # 无底部 Tab 的详情页仍需从屏底空白区起手；h-100 会把起点放在
         # 日期网格最后一行之上，手势落不到 ScrollView 的可拖拽区域。
@@ -631,7 +673,7 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
     out["detail"] = within_error(nodes or [], within) or id_channel_warning(nodes or [], label)
     swipes = 0
     recoveries = 0
-    while node is not None and swipes < 10:
+    while node is not None and swipes < AUTO_SCROLL_MAX_SWIPES:
         x, y, ww, hh = frame_of(node)
         if hh > 0 and y >= 0 and (y + hh // 2) < vis_limit and y + hh > 0:
             out.update({"found": "True", "x": str(x), "y": str(y),
