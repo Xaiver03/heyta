@@ -18,6 +18,8 @@
 | **R13a · 设置树「个性化」+ 我的页两锚点** | [`r13a-settings-tree-2026-11.md`](r13a-settings-tree-2026-11.md) | 🔴 **状态只在正文**——组 id 不动只换名；「我的」页最后两位是版本/退出；**「行为默认值」这一轮不建组**（0 项可放，理由与证据在正文 §3）。71 项全表在[测绘](r13a-settings-map-2026-11.md) |
 | **R13b · 外观：表面色系预设 + 自动深浅** | [`r13b-appearance-presets-2026-11.md`](r13b-appearance-presets-2026-11.md) | 🔴 **状态只在正文**——预设只换表面色系（`data-theme-preset`），明暗三态且「跟随系统」= 删键；**零 op**；逐预设 × 逐明暗算真实对比度。已知不一致：RN 共享组件还没吃预设（正文 §5.3） |
 | **R11 收口：错误层与加载档** | [`r11-error-and-loading-2026-11.md`](r11-error-and-loading-2026-11.md) | 🔴 **状态只在正文**——新建共享 `ErrorState` / `Skeleton` 并接上第一个消费者（InboxBell）；32 个容器里只接了这一处，**第 6 步的档位账本门禁没做**（所以「用错档」仍不可判，见正文 §4.2） |
+| **R11 第 6 步：空态档位账本门禁** | [`r11-state-tiers-gate-2026-11.md`](r11-state-tiers-gate-2026-11.md) | 🔴 **状态只在正文**——账本制四条判据（档位与账本不符 / 未登记站点 / 账比现实长 / 自检臂）；只登空态，加载与错误等铺开再登 |
+| **空态档位账本（`check:state-tiers`）** | [`r11-state-tiers-ledger.md`](r11-state-tiers-ledger.md) | 🔴 **状态只在正文**——30 行账本，脚本认档位、文档认理由；**`card` 档现在 0 个消费者**（5 处本该是卡片档仍在借 `page`，登记为现量），移动端八屏全 `page` —— 这两条是后续单的输入 |
 | **当前状态 / 下一步做什么** | [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) | 🔴 **唯一权威主计划**。它同时取代了 roadmap §5 与 4 份多端计划的路线部分 |
 | **E2EE 可选 + 钥匙由设备持有**（[ADR-0080](../adr/0080-e2ee-is-optional-with-device-held-key.md)） | [`e2ee-optional-and-device-held-key.md`](e2ee-optional-and-device-held-key.md) | 🔴 **状态只在正文，本行不复述**。默认加密与卖点不变，动的是"用户能关掉（关闭 = 整库解密重传）"与"口令只在加设备 / 恢复 / 轮换时出现"；服务端闸门要按账号模式**互斥拒收**。七刀 S0–S7，S0/S1 零行为变化可先落 |
 | **本轮 goal：产品 UI / UX / IA / 审美优化** | [`product-ux-optimization.md`](product-ux-optimization.md) | 🔴 **状态只在正文，本行不复述**（现量：读该文件开头那行状态）——这一格原先钉着「进行中（2026-10-07）」，而正文早已走到「已公开分发第五批测试版」；抄一次就漂一次。当前认证、助手执行、全局响应式与四端最新产物收尾仍逐项跟踪 |
