@@ -61,7 +61,6 @@ export type RailNavigationProps = {
   onOpenProfile: () => void;
   onOpenProfileCenter: () => void;
   onOpenGrowth: () => void;
-  onSignOut: () => void;
   onOpenHelp: () => void;
   onOpenAssistant?: () => void;
   assistantActive?: boolean;
@@ -222,7 +221,6 @@ function DesktopRailNavigation({
   onOpenProfile,
   onOpenProfileCenter,
   onOpenGrowth,
-  onSignOut,
   onOpenHelp,
   onOpenAssistant,
   assistantActive = false,
@@ -454,7 +452,7 @@ function DesktopRailNavigation({
       }}
     >
       <div className="ht-rail__top">
-      <AccountMenu email={syncEmail} showSignIn={syncNeedsSignIn} onSignIn={onSignIn} onOpenSettings={onOpenSettings} onOpenProfile={onOpenProfile} onOpenProfileCenter={onOpenProfileCenter} onOpenGrowth={onOpenGrowth} growthEnabled={growthEnabled} onSignOut={onSignOut} />
+      <AccountMenu email={syncEmail} showSignIn={syncNeedsSignIn} onSignIn={onSignIn} onOpenSettings={onOpenSettings} onOpenProfile={onOpenProfile} onOpenProfileCenter={onOpenProfileCenter} onOpenGrowth={onOpenGrowth} growthEnabled={growthEnabled} />
       </div>
       <DndContext sensors={sensors} collisionDetection={railCollisionDetection} onDragEnd={onDragEnd}
         onDragStart={({ active }) => setDraggedKey(String(active.id) as ViewKey)}

@@ -6,8 +6,9 @@
  * 只有一条事实链，也不会因为再造一个页面而产生第二套统计口径。
  */
 import { useMemo } from 'react';
-import { ArrowRight, LockKeyhole, Settings2, UserRoundPen } from 'lucide-react';
+import { ArrowRight, LockKeyhole, LogOut, Settings2, UserRoundPen } from 'lucide-react';
 
+import { HEYTA_APP_VERSION } from '@heyta/app-host';
 import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 
@@ -22,11 +23,17 @@ export function ProfileOverview({
   onEditProfile,
   onOpenSettings,
   onOpenGrowth,
+  onSignOut,
   growthEnabled = false,
 }: {
   onEditProfile: () => void;
   onOpenSettings: () => void;
   onOpenGrowth: () => void;
+  /**
+   * 退出登录。R13a 定的主入口在这里（我的页最后一位）；头像菜单那条已删。
+   * 不传就不渲染 —— 独立设置窗口之类没有账号面的宿主不该出现这个按钮。
+   */
+  onSignOut?: (() => void) | undefined;
   /** A disabled module must not expose a deep link into its view. */
   growthEnabled?: boolean;
 }): React.JSX.Element {
@@ -182,6 +189,37 @@ export function ProfileOverview({
           {t('web.profile.overview.settings')}
         </button>
       </nav>
+
+      {/*
+        🔴 最后两位是「版本 / 退出」（R13a）。它们是"找得到"的锚点：不管上面长了多少内容，
+        这两块永远在最后。版本号读 `@heyta/app-host` 的生成物（真源是根 package.json，
+        `check:app-version` 盯着），**不许在这里写死**；也**不做**「检查更新」按钮 ——
+        `web.about.updateNote` 明写这个版本没有该按钮。
+      */}
+      <section className="ht-settings__profile-section" aria-labelledby="profile-center-version-title">
+        <div className="ht-settings__profile-section-heading">
+          <h2 className="ht-type-section-title" id="profile-center-version-title">
+            {t('web.profile.overview.version')}
+          </h2>
+        </div>
+        <p className="ht-settings__profile-note" data-testid="profile-center-version">
+          {`heyta ${HEYTA_APP_VERSION}`}
+        </p>
+      </section>
+
+      {signedIn && onSignOut !== undefined ? (
+        <div className="ht-settings__profile-actions">
+          <button
+            type="button"
+            className="ht-btn ht-btn--danger"
+            data-testid="profile-center-signout"
+            onClick={onSignOut}
+          >
+            <LogOut size={ICON_SIZE.sm} aria-hidden="true" />
+            {t('web.shell.account.signOut')}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

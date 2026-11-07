@@ -15,7 +15,7 @@
  *   2. **点一次**打开身份菜单 → 「登录 / 注册」是**第一项**（强调样式）；
  *   3. **再点一次**打开认证面板 —— 合计 2 次点击，远好过改动前的
  *      「齿轮 → 同步设置 → 按钮」三步；
- *   4. 未登录时菜单里**不出现「退出登录」**（那是已登录才存在的动作）；
+ *   4. 菜单里**从不出现「退出登录」** —— R13a 起它在「我的」页底部（唯一主入口）；
  *   5. 已登录时菜单里**不出现「登录 / 注册」**（不给已登录的人看"去登录"）。
  *
  * 🔴 它防的回归：入口**退回设置深处**（改回同步设置对话框里 / 藏到设置页），
@@ -165,18 +165,23 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
     expect(document.querySelector('[data-testid="account-menu-signout"]')).toBeNull();
   });
 
-  it('已登录时不再显示登录入口，但「退出登录」出现且在最底', async () => {
+  it('已登录时不再显示登录入口；「退出登录」已搬到我的页（菜单里不再有）', async () => {
     useSyncStore.setState({ baseUrl: 'https://sync.example', token: 'JWT', email: 'me@example.com' });
     const el = await render();
 
     openAccountMenu(el);
 
     expect(document.querySelector('[data-testid="sync-signin-entry"]')).toBeNull();
+    // R13a（2026-11-07）：一个动作一个主入口 —— 退出登录搬去「我的」页底部。
+    expect(document.querySelector('[data-testid="account-menu-signout"]')).toBeNull();
     const items = Array.from(document.querySelectorAll('[role="menuitem"]'));
-    const last = items[items.length - 1]!;
-    expect(last.getAttribute('data-testid')).toBe('account-menu-signout');
-    // 危险动作：颜色要说清这件事（见 app.css 的 `--danger` 规则）
-    expect(last.className).toContain('ht-rail__account__item--danger');
+    expect(items[items.length - 1]!.getAttribute('data-testid')).toBe('account-menu-settings');
+
+    // 它没有消失，只是换了地方；而且危险色要跟着走（见 app.css 的 `--danger` 规则）。
+    click(document.querySelector('[data-testid="account-menu-profile-center"]')!);
+    const signOut = el.querySelector('[data-testid="profile-center-signout"]');
+    expect(signOut).not.toBeNull();
+    expect(signOut!.className).toContain('ht-btn--danger');
   });
 
   it('键盘可达：↓ 打开菜单并把焦点落在第一项，Esc 关掉并把焦点还给头像', async () => {

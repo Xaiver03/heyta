@@ -5,7 +5,11 @@
  * 挂**完整 App**，走真实头像 —— 与 `signin-entry.spec.tsx` 同一条纪律：
  * 自己拼一份 AccountMenu 的接线，测到的是夹具而不是产品。
  *
- * 未登录提供个人中心、应用设置、登录账号；已登录提供个人中心、应用设置、退出登录。
+ * 未登录提供个人中心、应用设置、登录账号；已登录只提供个人中心、应用设置。
+ *
+ * 🔴 **「退出登录」不在这张菜单里**（R13a，2026-11-07）：它搬到「我的」页底部做
+ * **唯一主入口**，菜单里那条已删。判据在下面两处：菜单里 `account-menu-signout`
+ * 必须为 null；个人中心底部必须有 `profile-center-signout` 与 `profile-center-version`。
  * 资料编辑只从个人中心进入设置资料，成长不作为头像菜单动作。
  *
  * ⚠️ `fetch` 一律 stub：面板挂载会去读资料，这里不关心它读到什么
@@ -19,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetAuthForTests } from '../src/features/auth/store.js';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 import { emptyState } from '@heyta/op-log';
+import { HEYTA_APP_VERSION } from '@heyta/app-host';
 import { privacyConsentActions } from '../src/features/privacy/consent-gate.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
@@ -115,7 +120,7 @@ describe('身份菜单的统一账号 IA', () => {
     expect(document.querySelector('[data-testid="account-menu-signout"]')).toBeNull();
   });
 
-  it('已登录时只显示个人中心、应用设置、退出登录，编辑不再直达', async () => {
+  it('已登录时只显示个人中心、应用设置（退出登录已搬到我的页），编辑不再直达', async () => {
     signIn();
     const el = await render();
     click(el.querySelector('[data-testid=' + '"account-menu-avatar"]')!);
@@ -123,7 +128,32 @@ describe('身份菜单的统一账号 IA', () => {
     const items = Array.from(document.querySelectorAll('[role="menuitem"]')).map(
       (n) => n.getAttribute('data-testid') ?? '',
     );
-    expect(items).toEqual(['account-menu-profile-center', 'account-menu-settings', 'account-menu-signout']);
+    expect(items).toEqual(['account-menu-profile-center', 'account-menu-settings']);
+    // 一个动作一个主入口：菜单里不再有退出登录。
+    expect(document.querySelector('[data-testid="account-menu-signout"]')).toBeNull();
+  });
+});
+
+describe('「我的」页最后两位：版本与退出（R13a）', () => {
+  it('已登录时底部有版本行与退出登录，版本号来自唯一真源', async () => {
+    signIn();
+    const el = await render();
+    click(el.querySelector('[data-testid="account-menu-avatar"]')!);
+    click(document.querySelector('[data-testid="account-menu-profile-center"]')!);
+
+    const version = el.querySelector('[data-testid="profile-center-version"]');
+    expect(version).not.toBeNull();
+    // 版本号必须等于生成物里的常量 —— 写死一个字符串就会红。
+    expect(version!.textContent).toContain(HEYTA_APP_VERSION);
+    expect(el.querySelector('[data-testid="profile-center-signout"]')).not.toBeNull();
+  });
+
+  it('未登录时「我的」页不出现退出登录（语义上不存在，不是暂时没用）', async () => {
+    const el = await render();
+    click(el.querySelector('[data-testid="account-menu-avatar"]')!);
+    click(document.querySelector('[data-testid="account-menu-profile-center"]')!);
+    expect(el.querySelector('[data-testid="profile-center-version"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="profile-center-signout"]')).toBeNull();
   });
 });
 

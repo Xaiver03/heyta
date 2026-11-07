@@ -63,7 +63,7 @@ export function CompactRailNavigation(props: RailNavigationProps): React.JSX.Ele
   return <>
     <nav className="ht-rail ht-compact-rail" aria-label={t('web.shell.nav.aria')}>
       <div className="ht-rail__top">
-        <AccountMenu email={props.syncEmail} showSignIn={props.syncNeedsSignIn} onSignIn={props.onSignIn} onOpenSettings={props.onOpenSettings} onOpenProfile={props.onOpenProfile} onOpenProfileCenter={props.onOpenProfileCenter} onOpenGrowth={props.onOpenGrowth} growthEnabled={props.growthEnabled} onSignOut={props.onSignOut} />
+        <AccountMenu email={props.syncEmail} showSignIn={props.syncNeedsSignIn} onSignIn={props.onSignIn} onOpenSettings={props.onOpenSettings} onOpenProfile={props.onOpenProfile} onOpenProfileCenter={props.onOpenProfileCenter} onOpenGrowth={props.onOpenGrowth} growthEnabled={props.growthEnabled} />
       </div>
       {primary.map((tab) => <button key={tab.key} type="button" data-testid={`rail-view-${tab.key}`} aria-current={!props.assistantActive && props.view === tab.key ? 'page' : undefined} className="ht-rail__tab" onClick={() => navigate(tab.key)}>
         <tab.Icon size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t(tab.labelKey)}</span>

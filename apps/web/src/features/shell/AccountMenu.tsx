@@ -10,7 +10,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  *
  * 产品负责人 2026-09-29 给的做法（滴答截图实测）：rail 上段只放"去哪看"，
  * 而**账号相关的一律收进头像**。理由与「功能模块」是同一个：
- * rail 是**每天点几十次**的地方，而"登录账号/个人中心/应用设置/退出登录"是低频的 ——
+ * rail 是**每天点几十次**的地方，而"登录账号/个人中心/应用设置"是低频的 ——
  * 它们占着 rail 的每一屏，换来的只是每次扫读时多几个要跳过的词。
  *
  * ## 🔴 2026-09-30 修正：身份入口**只能有一个**，而且登录账号在菜单里
@@ -33,9 +33,19 @@ import { ICON_SIZE } from '@heyta/design-system';
  *   │ [→] 登录账号      │  ← 主操作  │ user@example.com │  ← 身份区
  *   │     个人中心      │            │     个人中心      │
  *   │     应用设置      │            │     应用设置      │
- *   └──────────────────┘            │     退出登录      │  ← 危险、最底
- *                                   └──────────────────┘
+ *   └──────────────────┘            └──────────────────┘
  * ```
+ *
+ * ## 🔴 2026-11-07 修正：「退出登录」搬去「我的」页底部
+ *
+ * R13a 定的形状是「我的」页**身份第一、版本/退出最后**，而 E 包的规则是
+ * **一个动作一个主入口**。退出登录因此有了唯一主入口：我的页底部。
+ * 头像菜单里那一条**删掉**（不是改名）—— 菜单里本来就有「个人中心」，
+ * 它才是"打开我的页"的入口，再加一条同义项等于同一个动作两个入口。
+ *
+ * 代价如实记：退出从 1 次点击变成 2 次（头像 → 我的页 → 退出）。
+ * 换来的是"危险动作只有一个出口"，以及下面那条外部依据不再被违反一半
+ * （原先"退出在最显眼的位置"与"危险动作放明确分隔的 danger zone"其实互相打架）。
  *
  * 依据（外部调研，2026-09-30）：
  * - UsabilityGeek《The UX Logout Lapse》：把账号管理动作收进头像菜单是**每日使用**
@@ -78,7 +88,7 @@ import { useI18n } from '@heyta/i18n';
 import { avatarInitialFromEmail } from '@heyta/shared-schema';
 import { MENU_FOCUS_INDEX_ON_OPEN, placeAnchoredPanel } from '@heyta/ui';
 import { useMenuKeyboard } from '../../lib/menu/useMenuKeyboard.js';
-import { CircleUser, LogIn, LogOut, Settings, UserRound } from 'lucide-react';
+import { CircleUser, LogIn, Settings, UserRound } from 'lucide-react';
 
 /**
  * 读一个 token 的像素值。
@@ -102,7 +112,6 @@ export function AccountMenu({
   onOpenProfileCenter,
   onOpenGrowth,
   growthEnabled = false,
-  onSignOut,
   testID = 'account-menu',
 }: {
   /** 账号邮箱。`undefined` = 不知道（见文件头第 1 条）。 */
@@ -136,7 +145,6 @@ export function AccountMenu({
    * 而菜单里留一条能进去的入口就是绕过那条开关（rail 上那条已经按开关过滤了）。
    */
   growthEnabled?: boolean;
-  onSignOut: () => void;
   testID?: string;
 }): React.JSX.Element {
   /**
@@ -357,11 +365,6 @@ export function AccountMenu({
                 `${testID}-profile-center`,
               )}
           {item(t('web.shell.account.settings'), Settings, onOpenSettings, `${testID}-settings`)}
-          {/* 🔴 退出登录只在**已登录**时出现，且永远在最底、危险色。
-              未登录时它不是"暂时没用"，而是**语义上不存在**。 */}
-          {showSignIn
-            ? null
-            : item(t('web.shell.account.signOut'), LogOut, onSignOut, `${testID}-signout`, 'danger')}
         </div>,
         document.body,
       ) : null}

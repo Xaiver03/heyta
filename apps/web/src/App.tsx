@@ -324,7 +324,7 @@ const SETTINGS_NAV_ITEMS = [
      系统授权 + 提醒方式 + 打扰偏好 + 桌面小组件 —— 全是"它什么时候、用什么方式找我"。 */
   { id: 'settings-group-notifications', labelKey: 'mobile.settings.section.notifications', icon: Bell },
   /* G5 外观与语言：日期/倒计时显示、详情栏默认、语言、主题 —— 组名终于与内容一致。 */
-  { id: 'settings-group-appearance', labelKey: 'mobile.settings.section.appearance', icon: Palette },
+  { id: 'settings-group-appearance', labelKey: 'mobile.settings.section.personalization', icon: Palette },
   /* G6 功能与 AI：功能模块开关（"这个应用长什么样"）+ AI 的三道闸与端点（"开哪些能力"）。 */
   { id: 'settings-group-ai', labelKey: 'mobile.settings.section.features', icon: Sparkles },
   /* G7 关于与帮助：帮助/更新/价格/反馈/备案号。 */
@@ -2651,16 +2651,6 @@ export function App(): React.JSX.Element {
           setSettingsFocus(undefined);
           setView('growth');
         }}
-        onSignOut={() => {
-          /*
-            🔴 「退出登录」今天真的会撤销手上这一枚（ADR-0063）。在这一行之前它只做
-            **本机那半件事** —— 凭据从这台设备上删了，而那枚 JWT 在服务端**还能用一整年**，
-            于是共享电脑上"我已经退出了"是一句界面在说谎。
-            次序（本机清理排在网络之前）、失败后的那句实话、以及"重试那一次绝不清凭据"
-            全部住在 `signOutStore` —— 这里只转交这一次点击，不复制那份判断。
-          */
-          void useSignOutStore.getState().signOutCurrentDevice();
-        }}
         onOpenHelp={() => {
           setSecondaryAccountSurface('settings');
           setSettingsReturnSurface(undefined);
@@ -3615,6 +3605,14 @@ export function App(): React.JSX.Element {
             {secondaryAccountSurface === 'profile' ? (
               <ProfileOverview
                 growthEnabled={enabledModules.has('growth')}
+                onSignOut={() => {
+                  /*
+                    🔴 「退出登录」的主入口在这里（R13a：我的页最后一位）。头像菜单里那条已删
+                    —— 一个动作一个主入口。判断本体仍住在 `signOutStore`：本机清理排在网络之前、
+                    失败后的那句实话、"重试那一次绝不清凭据"，这里只转交这一次点击。
+                  */
+                  void useSignOutStore.getState().signOutCurrentDevice();
+                }}
                 onEditProfile={() => {
                   setSecondaryAccountSurface('settings');
                   setSettingsReturnSurface('profile');
@@ -3787,13 +3785,16 @@ export function App(): React.JSX.Element {
               <WidgetPushPanel active={activeSettingsSection === 'settings-group-notifications'} />
             </section>
             {/*
-              G5 外观与语言：「它长什么样、怎么念」。
+              G5 个性化（R13a 改名）：「让它看起来像我」。
 
-              🔴 组名改前叫「任务与显示」，而它装着主题、语言、日期显示方式、详情栏默认
-              —— 一条都不"任务"。现在组名与内容终于一致（移动端同一组用同一条词条
-              `mobile.settings.section.appearance`，两端一字不差）。
+              🔴 组 id 仍是 `settings-group-appearance` —— 深链 `?settings=` 只认组 id，
+              改 id 就是断链；改的只是显示名。按 ADR-0085 的分层，这一组装的全是
+              **表达类**（主题 / 语言 / 截止显示 / 详情栏默认），全部写本机、零 op。
+              ⚠️ 「行为默认值」那一区**这一轮没有建**：ADR 点名的五项（周起始 / 默认提醒 /
+              默认清单 / 默认时长 / 智能识别）全仓一个都不存在，建了就是一个空组。
+              登记在 `docs/plans/r13a-settings-tree-2026-11.md`。
             */}
-            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-appearance'} id="settings-group-appearance" aria-label={t('mobile.settings.section.appearance')}>
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-appearance'} id="settings-group-appearance" aria-label={t('mobile.settings.section.personalization')}>
             {/*
               🔴 **显示偏好**（2026-09-30 从任务页头搬进来）：「日期 | 倒计时」
               两个词悬在页头上，用户不知道它是什么、影响什么 —— 它其实是

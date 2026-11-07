@@ -15,6 +15,8 @@
  * 任何"这个平台要怎么建任务"的代码出现在 `apps/` 里，都是分层的失败。
  */
 
+export { HEYTA_APP_VERSION } from './app-version.generated.js';
+
 export {
   openAppHost,
   openOpLogStore,

@@ -221,7 +221,6 @@ async function renderRail(view: ViewKey = 'tasks', assistantActive = false): Pro
       onOpenProfile={vi.fn()}
       onOpenProfileCenter={vi.fn()}
       onOpenGrowth={vi.fn()}
-      onSignOut={vi.fn()}
       onOpenHelp={vi.fn()}
       onOpenAssistant={vi.fn()}
       assistantActive={assistantActive}
