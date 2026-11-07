@@ -144,12 +144,26 @@
 2. **每视图独立手排**：heyta **字段已有、写路径没有**（`Task.order?` 在 `entities.ts:423-424`，`manual` 键在读；`entities.ts:348-356` 禁的是另两个字段名），没有 ADR 回答过（[P4](ticktick-sync-questions.md) Q6 原话已过期，见 [决策备忘](decisions/decision-per-view-sort.md)）。
 3. **多账号本地库隔离**：三壳库名写死、`packages/storage/src` 里 `accountId` 命中 0、退出登录不清 op-log ⇒ 换账号后上一个账号的任务还在本地（[P4](ticktick-sync-questions.md) Q7）。
 
-**未核实（高频被引用的 4 条）**
+**未核实（原 4 条，2026-11-07 已逐条重答 → 现剩 3 条）**
 
-- Windows 顶层导航是否与 macOS 那 13 项同构（BAML 读不到文案）—— 影响「明天」P0 的强度（[P2](ticktick-surface-matrix.md) §4）。
-- `KotlinMultiplatformAll` 的同步语义（native、符号剥离，只有字符串）。
-- Windows 本地库的表结构（要它跑起来才有数据；且**无可读 DDL**）。
-- 主任务列表的空态（macOS 占位无子视图 / Windows `EmptyView` 被引用 10 处但**全包没有 `emptyview.xaml`**）（[P7](ticktick-states-and-feedback.md) U1）。
+> 🔴 **"BAML 读不到文案"这个理由已经过期**：638/639 已转成可读 XAML
+> （[`ticktick-baml-xaml-pipeline.md`](ticktick-baml-xaml-pipeline.md)）。重答见
+> [`ticktick-windows-inventory-2026-11.md`](ticktick-windows-inventory-2026-11.md)。
+
+- ✅ **改判：Windows 顶层导航与 macOS 的 13 项不同构**（问错了）。Windows = **一个主窗宿主 7 个视图区**
+  （清单/日历/专注/习惯/四象限/倒数日/AI，由 `mainwindow.xaml` 的 7 组 `*BorderClip` 证）
+  **+ 一条图标型左菜单条**（`tabbar/leftmenubar.xaml`，工具项贴底：同步/通知/帮助/更多）。
+  逐项对表这件事**本身不成立**，界面地图 §4 那一格应改成这个结论。
+- ⛔ **`KotlinMultiplatformAll` 的同步语义**（native、符号剥离，只有字符串）—— **仍未判定**，本轮无新证据。
+- ⛔ **Windows 本地库的表结构**（`sqlite-net` 反射、无可读 DDL；要它跑起来才有库）—— **仍未判定**。
+  P3 那 43 行是从**模型类**推的，不是从 DDL 读的。
+- ✅ **主任务列表的空态**：Windows **没有** `EmptyView` 这个控件，空态由
+  `views/misc/emptyimage.xaml` + `resource/emptyicons.xaml` + 各模块自己的空控件组成
+  （`project/emptyprojectcontrol.xaml` 是唯一具名的一个）。⇒ P7 U1 那格从"缺文件"改判为"控件模型不同"。
+- 🔵 **新增一条卡点（比"读不到"精确）**：46 个 `stringresource/*.xaml` 全是
+  `<ResourceDictionary DeferrableContent="<!--deferred-stream:NNNNB-->" />` ⇒
+  **转换器只解了 BAML 主树、没解 deferred 资源流**。文案全在那里面。
+  下一步是**可执行**的：在 `baml-to-xaml.ps1` 里对 `DeferrableContent` 复用同一套解析器。
 
 ---
 
