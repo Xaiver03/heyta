@@ -29,6 +29,7 @@
 | **⚖️ 需要裁决的三件事** | [`decisions-needed-2026-11-08.md`](decisions-needed-2026-11-08.md) | ① 移动端 readable 账号同步不出去（阻塞四端交付，三个选项 + 建议）② 本地库与上传是否必须同模式 ③ R13b 剩下四维做不做。每格一句话可拍板 |
 | **📊 P2 交付现量（2026-11-08）** | [`p2-delivery-status-2026-11-08.md`](p2-delivery-status-2026-11-08.md) | **一张表**：三端重装 ✅（Android 这台机器没有 AVD）、源码侧 18 道门禁 rc=0、唯一阻塞是移动端明文账号同步（4 次复现，含最安静负载 6.0）、R13b 只完成了一部分 |
 | **行着色三态：落点测绘** | [`row-color-three-states-scope-2026-11-08.md`](row-color-three-states-scope-2026-11-08.md) | 数据已有（清单/标签都有可选 `color`），但**行上一个颜色入口都没有**；「关」必须真的是关（行里不存在那个节点，不是 opacity:0）；含工作量与风险 |
+| **🤝 交接 · 2026-11-08** | [`session-handoff-2026-11-08.md`](session-handoff-2026-11-08.md) | **先读这一份**：关了哪 11 格、没关的 3 格各自卡在什么决定上、三个待裁决、以及接着跑的四条命令（含三条今晚踩过的环境坑） |
 | **当前状态 / 下一步做什么** | [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) | 🔴 **唯一权威主计划**。它同时取代了 roadmap §5 与 4 份多端计划的路线部分 |
 | **E2EE 可选 + 钥匙由设备持有**（[ADR-0080](../adr/0080-e2ee-is-optional-with-device-held-key.md)） | [`e2ee-optional-and-device-held-key.md`](e2ee-optional-and-device-held-key.md) | 🔴 **状态只在正文，本行不复述**。默认加密与卖点不变，动的是"用户能关掉（关闭 = 整库解密重传）"与"口令只在加设备 / 恢复 / 轮换时出现"；服务端闸门要按账号模式**互斥拒收**。七刀 S0–S7，S0/S1 零行为变化可先落 |
 | **本轮 goal：产品 UI / UX / IA / 审美优化** | [`product-ux-optimization.md`](product-ux-optimization.md) | 🔴 **状态只在正文，本行不复述**（现量：读该文件开头那行状态）——这一格原先钉着「进行中（2026-10-07）」，而正文早已走到「已公开分发第五批测试版」；抄一次就漂一次。当前认证、助手执行、全局响应式与四端最新产物收尾仍逐项跟踪 |
