@@ -23,6 +23,7 @@
 | **交接：2026-11-07 P2 对标那一轮** | [`session-handoff-2026-11-07-p2.md`](session-handoff-2026-11-07-p2.md) | 🔴 **零上下文可读**：关了哪 10 格、**现在卡在哪**（3000 端口被非 heyta 进程占着；负载 10/26/39 不适合跑设备腿）、下一步顺序、四条踩出来的纪律 |
 | **交付卡点（四端重装 / 设备腿）** | [`delivery-blocked-2026-11-07.md`](delivery-blocked-2026-11-07.md) | 🔴 **未交付**：三处卡点全是沙盒边界（`prisma generate` 的 utime、SwiftPM 缓存写入、模拟器上没装过 App）；已解的两处（pod install 的 `nil` 根因 / pnpm 装不上先删整棵树）**恢复顺序**写在正文 §3 |
 | **iOS 设备腿 · 2026-11-07/08** | [`ios-device-leg-session-2026-11-08.md`](ios-device-leg-session-2026-11-08.md) | 🔴 **未通过**——修掉 8 个探针缺陷（每条带实测），跑到判据 D/E；**卡在一个产品缺口**：本机库归属不符被当成 `unexpected` 抛出，服务端一条 op 都没收到（正文 §3 有待裁决的两条路） |
+| **🔴 移动端明文账号同步是坏的** | [`mobile-plaintext-sync-gap-2026-11-08.md`](mobile-plaintext-sync-gap-2026-11-08.md) | **产品缺陷**（非探针）：服务端说 readable、客户端仍发 `isPayloadEncrypted: true` 的密文 ⇒ `PLAINTEXT_REQUIRED`、`latestSeq` 恒 0。因果链三个落点 + 两个待裁决问题 + 能红的判据都在正文 |
 | **当前状态 / 下一步做什么** | [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) | 🔴 **唯一权威主计划**。它同时取代了 roadmap §5 与 4 份多端计划的路线部分 |
 | **E2EE 可选 + 钥匙由设备持有**（[ADR-0080](../adr/0080-e2ee-is-optional-with-device-held-key.md)） | [`e2ee-optional-and-device-held-key.md`](e2ee-optional-and-device-held-key.md) | 🔴 **状态只在正文，本行不复述**。默认加密与卖点不变，动的是"用户能关掉（关闭 = 整库解密重传）"与"口令只在加设备 / 恢复 / 轮换时出现"；服务端闸门要按账号模式**互斥拒收**。七刀 S0–S7，S0/S1 零行为变化可先落 |
 | **本轮 goal：产品 UI / UX / IA / 审美优化** | [`product-ux-optimization.md`](product-ux-optimization.md) | 🔴 **状态只在正文，本行不复述**（现量：读该文件开头那行状态）——这一格原先钉着「进行中（2026-10-07）」，而正文早已走到「已公开分发第五批测试版」；抄一次就漂一次。当前认证、助手执行、全局响应式与四端最新产物收尾仍逐项跟踪 |
