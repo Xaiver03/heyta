@@ -25,6 +25,26 @@ export {
   type TaskGroupHeadProps,
 } from './task-list/TaskGroupHead.js';
 export { TaskBadges, type TaskBadgesProps } from './task-list/TaskBadges.js';
+/**
+ * 看板容器（B274 的收口：看板重建在共享 `TaskRow` 上）。
+ *
+ * 🔴 它住在共享层而不是 `apps/web` 的一个新 css 族里：列的形状是**看板这个视图的机制**，
+ * 不是某个壳的皮肤；写进 web 的 `.ht-kanban*` 会让 `check:row-single-source` 的
+ * 前缀族 33 → 34（那是判据口径，不许为一个新视图抬）。`TaskGroupHead` 当年从
+ * web CSS 升进共享层用的是同一条理由。
+ *
+ * ⚠️ 它调 `useHeytaTokens` / `useHeytaText` ⇒ 宿主必须挂在 `HeytaUiProvider` 之内。
+ * 它**尚未**登记进 `scripts/check-ui-provider.mjs` 的 `PROVIDER_DEPENDENT`
+ * （那一行落在另一条线正在改的同一张表上），缺口由
+ * `apps/web/tests/kanban-row-parity.spec.tsx` 的行为判据兜着 —— 见组件文件头。
+ */
+export {
+  TaskBoard,
+  TaskBoardColumnDropLayer,
+  type TaskBoardColumn,
+  type TaskBoardLabels,
+  type TaskBoardProps,
+} from './task-list/TaskBoard.js';
 export {
   flattenSections,
   sortTasksForDisplay,

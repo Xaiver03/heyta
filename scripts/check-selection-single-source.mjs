@@ -506,6 +506,12 @@ const ROW_ID_EXEMPT = [
   ['apps/web/src/features/habits/HabitDetailCard.tsx', 'busyId', 'in-flight'],
   ['apps/web/src/features/habits/HabitDetailCard.tsx', 'renamingId', 'inline-rename'],
   ['apps/web/src/features/quadrant/QuadrantBoard.tsx', 'activeId', 'dragging'],
+  // 看板重建（B274 收口）带来的两处：都是**一次拖拽会话**里的瞬态，不是"在看哪一条"。
+  // 选中那一格归共享 `useSelected('task')`（同一文件里就摆着），这两处只决定
+  // "播报什么 / 哪一列的边框高亮" —— 与四象限的 `activeId` 同一个类别（dragging），
+  // 只是看板需要两个读数（正在拖谁、悬停在哪一列），所以是两行而不是一行。
+  ['apps/web/src/features/kanban/KanbanView.tsx', 'draggingId', 'dragging'],
+  ['apps/web/src/features/kanban/KanbanView.tsx', 'overColumnId', 'dragging'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'confirmingId', 'confirm-gate'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'editingRowId', 'inline-rename'],
   // 后台退款那两枚按钮是**两步式批准**：第一下记下"待批准的是哪一条"，第二下（确认框里那枚）才发请求。
@@ -731,6 +737,10 @@ const RELAYS = [
   'apps/web/src/features/quadrant/QuadrantBoard.tsx',
   'apps/web/src/features/timeline/TimelinePanel.tsx',
   'packages/ui/src/quadrant/QuadrantBoard.tsx',
+  // 看板容器（B274 收口）：它声明 `activeTaskId` 但**自己不画痕迹** ——
+  // 原样转给每一列的 `TaskList`，痕迹由 `TaskRow` 的 `active` / `aria-current` 发。
+  // 与上面那枚共享四象限逐条同形（那一条也是 relay）。
+  'packages/ui/src/task-list/TaskBoard.tsx',
 ];
 
 /** 该豁免的面，**带它成立所依赖的那件可测事实**。事实变了就必须重新读这一面。 */
@@ -1128,16 +1138,18 @@ const VIEW_STANCES = [
   },
   {
     view: 'kanban',
-    stance: 'row-actions-only',
+    stance: 'selects',
+    kinds: ['task'],
     locus: 'apps/web/src/features/kanban/KanbanView.tsx',
-    needle: '      <span>{task.title}</span>',
+    needle: "const selectedTaskId = useSelected('task');",
     because:
-      '卡片行上**一个动作都没有**：只渲染标题，没有 click-to-open（`KanbanCard` 的 props 里连一个 open 回调都不存在；' +
-      '传进来的 `onMove` 还是空实现 `() => {}`），它唯一的交互是 `@dnd-kit` 的指针拖拽改归属。' +
-      '所以这一面没有"在看哪一条"这回事，登记 row-actions-only。' +
-      '🔴 **这不是设计，是缺**：卡片点开落在哪儿还没定（详情列在窄档根本不在）。补它要同时定这一格，' +
-      '不能只加一个 onClick 就宣布"支持了"。它同时是 `check:l4` 那 4 处内联样式与' +
-      '看板没有自己样式族这两笔债的同一根：看板没有复用 `packages/ui` 的 TaskRow，而是自己写了一张卡。',
+      '🔴 2026-11 由 row-actions-only **升成 selects**（B274 的收口）：看板的行现在由共享 ' +
+      '`TaskList` 渲染，于是它有了一枚真的"在看哪一条"—— `useSelected(\'task\')` 读同一枚共享选中、' +
+      '行的 `active` 高亮与 `aria-current` 由 `TaskRow` 画，点行写 `selection.select(\'task\', id)`。' +
+      '同一批任务的第四种投影，接的是同一个值（与列表/四象限/时间线同一个出口）。' +
+      '⚠️ 登记时的**已知边界**（写在这里免得下一个人以为漏了）：web 的详情列今天只对 ' +
+      '`tasks`/`quadrant`/`timeline` 三族接住面单（`App.tsx` 的 `taskPaneWillShow`），所以看板里' +
+      '选中一条**只画高亮、不出面单** —— 补那一格是 `App.tsx` 里的一行，那一行不在本单白名单。',
   },
   {
     view: 'rail:project',
