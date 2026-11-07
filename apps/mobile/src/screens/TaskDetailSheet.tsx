@@ -95,6 +95,7 @@ import {
   ReminderList,
   SHEET_DETENTS,
   TaskRow,
+  attachmentFailureReasonOf,
   formatDuration,
   priorityColorToken,
   rejectionReasonOf,
@@ -104,6 +105,7 @@ import {
   taskActivityFieldMessageKeys,
   taskActivityKindMessageKey,
   toTaskRow,
+  type AttachmentFailureReason,
   type SheetDetent,
   type TaskRowLabels,
 } from '@heyta/ui';
@@ -160,18 +162,21 @@ const PICK_ERROR_KEYS: Record<AttachmentPickError, MessageKey> = {
 };
 
 /**
- * 上传被拒的 reason → 那句话。
+ * 上传失败 → 词条。
  *
- * `rejectionReasonOf` 从动作层抛上来的 `（reason）` 括号里取词，词表与
- * `attachment-http.ts` 的 `AttachmentUploadResult.reason` 同源。
- * 认不出来的 reason 落回那句统称 —— **不是**落回"上传失败"里最像的那一条：
- * 猜错方向的提示比一句笼统的话更害人（本仓库在密码锁那一栏踩过这个坑）。
+ * 🔴 **这张表的 key 来自共享解析器的词表，不是这里自己列的**（`AttachmentFailureReason`）。
+ * 2026-11-07 之前这里配的是 `rejectionReasonOf`，而那一枚的正则是
+ * `/（([a-z_]+)）/` —— 只认下划线，认不出 `too-large` / `quota-exceeded`
+ * 这两个带连字符的原因 ⇒ 那两条**永远不会命中**，用户只会看到统称。
+ * （同一条盲区在 web 侧由 `attachmentFailureReasonOf` 修掉；这里是它的移动端那一半。）
  */
-const UPLOAD_ERROR_KEYS: Record<string, MessageKey> = {
+const UPLOAD_ERROR_KEYS: Record<AttachmentFailureReason, MessageKey> = {
   'too-large': 'mobile.detail.attachments.error.too-large',
   'quota-exceeded': 'mobile.detail.attachments.error.quota-exceeded',
   network: 'mobile.detail.attachments.error.network',
   'no-channel': 'mobile.detail.attachments.error.no-channel',
+  rejected: 'mobile.detail.attachments.error.rejected',
+  'read-failed': 'mobile.detail.attachments.error.read-failed',
 };
 const UPLOAD_FALLBACK_KEY: MessageKey = 'mobile.detail.attachments.error.rejected';
 
@@ -791,7 +796,10 @@ export function TaskDetailSheet({
       .catch((cause: unknown): void => {
         // 系统选择器里按取消是**正常路径**，不是一句错误（头像那一条同一个处理）。
         if ((cause as { code?: string }).code === 'OPERATION_CANCELED') return;
-        setAttachmentError(t(UPLOAD_ERROR_KEYS[rejectionReasonOf(cause) ?? ''] ?? UPLOAD_FALLBACK_KEY, { max: maxMb }));
+        const reason = attachmentFailureReasonOf(cause);
+        const key: MessageKey =
+          reason === undefined ? UPLOAD_FALLBACK_KEY : UPLOAD_ERROR_KEYS[reason];
+        setAttachmentError(t(key, { max: maxMb }));
       })
       .finally(() => {
         setAttachmentBusy(false);
@@ -833,7 +841,11 @@ export function TaskDetailSheet({
           onChanged();
         })
         .catch((cause: unknown) => {
-          setAttachmentError(t(UPLOAD_ERROR_KEYS[rejectionReasonOf(cause) ?? ''] ?? UPLOAD_FALLBACK_KEY));
+          const reason = attachmentFailureReasonOf(cause);
+          const key: MessageKey =
+            reason === undefined ? UPLOAD_FALLBACK_KEY : UPLOAD_ERROR_KEYS[reason];
+          // 移除失败时没有"文件多大"这件事，所以不传 max（词条里也不含它）。
+          setAttachmentError(t(key));
         })
         .finally(() => {
           setAttachmentBusy(false);

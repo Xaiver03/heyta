@@ -115,6 +115,16 @@ describe('这台设备没通道时说的是哪句话', () => {
   });
 
   it('认不出的 reason 落回那句统称，而不是猜一条最像的', () => {
-    expect(screen).toMatch(/UPLOAD_ERROR_KEYS\[[^\]]+\] \?\? UPLOAD_FALLBACK_KEY/u);
+    /*
+      ⚠️ 2026-11-07：这条判据**换了解析器**（`rejectionReasonOf` 的正则只认下划线，
+      认不出 `too-large` / `quota-exceeded` ⇒ 那两条永远不命中）。现在的形状是
+      `reason === undefined ? FALLBACK : KEYS[reason]` —— 判据不变（认不出 ⇒ 统称），
+      变的只是这句话写在哪。所以这里断言的是**新的那一句**，而不是把它删掉。
+    */
+    expect(screen).toMatch(
+      /reason === undefined \? UPLOAD_FALLBACK_KEY : UPLOAD_ERROR_KEYS\[reason\]/u,
+    );
+    // 反向：不许再出现"配了那张表却永远不命中"的旧写法。
+    expect(screen).not.toMatch(/rejectionReasonOf\(cause\) \?\? ''/u);
   });
 });
