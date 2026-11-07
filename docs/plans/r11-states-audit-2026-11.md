@@ -429,7 +429,7 @@ node -e "…keys(apps/mobile/package.json)…" | grep -E "test-renderer|testing-
 | **(C) 不改** | ✅ | ❌ 判断仍两份 | ❌ | 债继续挂着（现状） |
 
 🔴 **(B) 是唯一同时满足「DOM 不变」与「判断只有一份」的路**，也正是
-[`ux-principles.md` §1](ux-principles.md) 已经立过的范式：
+[`ux-principles.md` §1](../agents/ux-principles.md) 已经立过的范式：
 **判断只有一份，渲染器有两个**（`packages/ui/src/form/anatomy.ts` 被两端渲染器各消费一次）。
 `EmptyState.tsx` 里的 `toEmptyStateViewModel` 本来就是按这个形状写的
 （"组件只做把输出摆到 RN 原语上这一层，不带分支"，见 `model.ts` 文件头）。
