@@ -36,6 +36,22 @@
       包装器把这些节点改写成真实属性节点（`_PositionalParameters` -> `Path`），
       语义等价（`{Binding Foo}` == `Path="Foo"`），并记录改写次数。
 
+    第三处补丁：ResourceDictionary 的 deferred 资源流
+      BAML 把 ResourceDictionary 的内容整体写成一段「延迟段」：主树里只有
+        StartMember(DeferrableContent) -> Value(MemoryStream) -> EndMember
+      于是 <ResourceDictionary> 转出来是空的，文案全在那颗载荷里（46 份
+      resource/stringresource/* 逐份如此）。
+      载荷**不是**一份可直接读的 BAML 文档 —— 它开头是一张 10 字节/条的偏移表
+      （`26 09 <id:2><offset:4><pad:2>`，offset 相对表尾），直接喂 Baml2006Reader
+      会报 `找到了未知的 BAML 记录 Unknown`（实测）。所以走 WPF 自己的延迟加载器：
+      `XamlServices.Load(Baml2006Reader)` 拿到 ResourceDictionary 之后访问
+      Count/Keys，WPF 就把延迟段展开成真实条目；再把这些条目排成节点流，仍然经过
+      **同一个** BamlValueStringifier 与 XamlXmlWriter 写成 ResourceDictionary 的
+      子节点（`<sys:String x:Key="...">`、`<x:Array Type="sys:String">`）。
+      闸门（-ExpandDeferred）：只展开「整份字典的值都是字符串」的文案字典。
+      颜色/图标/字体字典（Color/Brush/Path/DrawingImage…）保持占位符不动 ——
+      它们不是文案，且展开会把 resource/stringresource/ 之外的产物一起改掉。
+
     安全性：
       `Assembly.LoadFrom` TickTick.exe 只为拿托管资源流（GetManifestResourceStream）
       和让 XamlSchemaContext 反射到自定义控件类型。载入程序集本身不执行 TickTick 代码；
@@ -56,6 +72,12 @@
 
 .PARAMETER Only
     只转匹配的资源名（通配符，对完整资源名匹配）。省略=全转。
+
+.PARAMETER ExpandDeferred
+    `strings`（默认）：把「根对象是 ResourceDictionary 且载荷展开后全是字符串」的
+    deferred 资源流展开成子节点（46 份 resource/stringresource/* 靠这条才出文案）。
+    `none`：保持旧行为，只会留下 `<!--deferred-stream:NNNNB-->` 占位符。
+    非文案字典（颜色/图标/字体）无论哪种模式都不展开。
 
 .PARAMETER Survey
     只做「值节点类型普查」，不写 XAML。用来复核本文档与注释里引用的类型计数。
@@ -93,6 +115,8 @@ param(
     [string]   $OutDir       = (Join-Path $env:TEMP 'ttxaml'),
     [string]   $ResourceName = 'TickTick.g.resources',
     [string[]] $Only,
+    [ValidateSet('none', 'strings')]
+    [string]   $ExpandDeferred = 'strings',
     [switch]   $Survey,
     [switch]   $NoApplication
 )
@@ -551,6 +575,92 @@ if ($Survey) {
     return
 }
 
+# --- 步骤 7b：deferred 资源流展开 ---------------------------------------------------
+# 契约：传入「根对象是 ResourceDictionary 且 DeferrableContent 挂在根上」的整份 BAML 字节，
+# 返回 @{ Ok; Xml; Strings; Arrays; ArrayItems; Nulls; Skipped; Reason }。
+# Ok=$true   -> Xml 是展开后的 ResourceDictionary 文本（子节点已排好）
+# Skipped    -> 非文案字典（颜色/图标/字体），调用方保持占位符不动
+# 抛异常     -> 真失败，调用方按 FAIL 记账（不许静默）
+function Expand-DeferredResourceDictionary {
+    [CmdletBinding()]
+    param(
+        [System.IO.MemoryStream] $Mem,
+        [string]                 $Mode
+    )
+
+    $r = [pscustomobject]@{
+        Ok = $false; Xml = $null; Strings = 0; Arrays = 0; ArrayItems = 0
+        Nulls = 0; Skipped = $false; Reason = ''
+    }
+
+    if ($Mode -ne 'strings') { $r.Skipped = $true; $r.Reason = 'mode=off'; return $r }
+
+    # 1) 让 WPF 自己的延迟加载器展开：访问 Count/Keys 才会真的读延迟段。
+    #    这一步只实例化 ResourceDictionary 本身，不构造任何 Window/UserControl
+    #    （调用点已用「根元素就是 ResourceDictionary」的闸门保证）。
+    $Mem.Position = 0
+    $dict = [System.Xaml.XamlServices]::Load(
+        (New-Object System.Windows.Baml2006.Baml2006Reader($Mem)))
+    if (-not ($dict -is [System.Windows.ResourceDictionary])) {
+        $r.Skipped = $true; $r.Reason = 'root=' + $dict.GetType().Name; return $r
+    }
+
+    $keys = @($dict.Keys)
+    $nStr = 0; $nArr = 0; $nArrItems = 0; $nNull = 0; $textish = $true
+    foreach ($k in $keys) {
+        $v = $dict[$k]
+        if ($v -is [string])        { $nStr++ }
+        elseif ($v -is [string[]])  { $nArr++; $nArrItems += $v.Length }
+        elseif ($null -eq $v)       { $nNull++ }
+        else                        { $textish = $false; break }
+    }
+    $r.Strings = $nStr; $r.Arrays = $nArr; $r.ArrayItems = $nArrItems; $r.Nulls = $nNull
+    if (-not $textish) { $r.Skipped = $true; $r.Reason = 'non-text-dictionary'; return $r }
+
+    # 2) 条目 -> XAML 文本。转义/引号交给 XmlWriter，不手拼字符串。
+    $presentationNs = 'http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+    $xamlNs         = 'http://schemas.microsoft.com/winfx/2006/xaml'
+    $clrSystemNs    = 'clr-namespace:System;assembly=mscorlib'
+
+    $sb = New-Object System.Text.StringBuilder
+    $ws = New-Object System.Xml.XmlWriterSettings
+    $ws.OmitXmlDeclaration = $true
+    $ws.ConformanceLevel   = [System.Xml.ConformanceLevel]::Fragment
+    $writer = [System.Xml.XmlWriter]::Create($sb, $ws)
+    try {
+        $writer.WriteStartElement('ResourceDictionary', $presentationNs)
+        $writer.WriteAttributeString('xmlns', 'x',   $null, $xamlNs)
+        $writer.WriteAttributeString('xmlns', 'sys', $null, $clrSystemNs)
+        foreach ($k in $keys) {
+            $v = $dict[$k]
+            if ($v -is [string]) {
+                $writer.WriteStartElement('String', $clrSystemNs)
+                $writer.WriteAttributeString('Key', $xamlNs, [string]$k)
+                $writer.WriteValue($v)
+                $writer.WriteEndElement()
+            }
+            elseif ($v -is [string[]]) {
+                $writer.WriteStartElement('Array', $xamlNs)
+                $writer.WriteAttributeString('Key', $xamlNs, [string]$k)
+                $writer.WriteAttributeString('Type', 'sys:String')
+                foreach ($s in $v) {
+                    $writer.WriteStartElement('String', $clrSystemNs)
+                    $writer.WriteValue($s)
+                    $writer.WriteEndElement()
+                }
+                $writer.WriteEndElement()
+            }
+            # null 值没有文案可写：计进 Nulls，不伪装成空串
+        }
+        $writer.WriteEndElement()
+        $writer.Flush()
+    } finally { $writer.Dispose() }
+
+    $r.Xml = $sb.ToString()
+    $r.Ok  = $true
+    return $r
+}
+
 # --- 步骤 8：批量转换 ---------------------------------------------------------------
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 # 幂等：只清本脚本自己的产物
@@ -561,6 +671,9 @@ Get-ChildItem -LiteralPath $OutDir -Recurse -File -ErrorAction SilentlyContinue 
 $Manifest   = New-Object System.Collections.Generic.List[string]
 $Failures   = New-Object System.Collections.Generic.List[string]
 $FailedKeys = New-Object System.Collections.Generic.List[string]
+$DeferredRows = New-Object System.Collections.Generic.List[string]
+$script:DeferredExpanded = 0
+$script:DeferredSkipped  = 0
 [BamlValueStringifier]::PositionalRewrites = 0
 $i = 0
 foreach ($key in $Keys) {
@@ -589,7 +702,53 @@ foreach ($key in $Keys) {
         $xw.Close()
         $xml = $sw.ToString()
 
-        # 8d. 内部占位符 -> XML 注释（合法、不伪装成可用值、字节数仍可复现）
+        # 8d. deferred 资源流：主树只在根元素上留了 @@TT-DEFERRED-STREAM: 占位符时展开成子节点。
+        #     闸门故意钉得很窄（根元素就是 ResourceDictionary 且载荷挂在它自己身上），
+        #     所以 views/* 里那些嵌套 ResourceDictionary 一律不碰 —— 那些文档的根是
+        #     Window/UserControl，为了取延迟段去实例化它们会真的跑 TickTick 的构造函数。
+        $deferredInfo = $null
+        if ($ExpandDeferred -ne 'none') {
+            $declEnd  = $xml.IndexOf('?>')
+            $rootPart = if ($declEnd -ge 0) { $xml.Substring($declEnd + 2).TrimStart() } else { $xml.TrimStart() }
+            $markPos  = $rootPart.IndexOf('@@TT-DEFERRED-STREAM:')
+            $selfClose = $rootPart.IndexOf('/>')
+            if ($rootPart.StartsWith('<ResourceDictionary') -and
+                $markPos -gt 0 -and $selfClose -gt $markPos) {
+                $payloadBytes = 0
+                $payloadMatch = [regex]::Match($rootPart, '@@TT-DEFERRED-STREAM:(\d+)@@')
+                if ($payloadMatch.Success) { $payloadBytes = [int]$payloadMatch.Groups[1].Value }
+
+                $mem2 = New-Object System.IO.MemoryStream
+                try {
+                    $bytes = $mem.ToArray()
+                    $mem2.Write($bytes, 0, $bytes.Length)
+                    $mem2.Position = 0
+                    $deferredInfo = Expand-DeferredResourceDictionary `
+                        -Mem $mem2 -Mode $ExpandDeferred
+                } finally { $mem2.Dispose() }
+
+                if ($deferredInfo.Ok) {
+                    # 展开结果再走一遍同一套 reader -> stringifier -> writer，
+                    # 让命名空间/转义/单行格式与其它 638 份保持一致。
+                    $sr = New-Object System.IO.StringReader($deferredInfo.Xml)
+                    $xr = New-Object System.Xaml.XamlXmlReader($sr, $reader.SchemaContext)
+                    $sw2 = New-Object System.IO.StringWriter
+                    $xw2 = New-Object System.Xaml.XamlXmlWriter($sw2, $reader.SchemaContext)
+                    [System.Xaml.XamlServices]::Transform((New-Object BamlValueStringifier($xr)), $xw2)
+                    $xw2.Close()
+                    $xml = $sw2.ToString()
+                }
+                $deferredStatus = if ($deferredInfo.Ok) { 'expanded' } elseif ($deferredInfo.Skipped) { 'skipped' } else { 'failed' }
+                $DeferredRows.Add(("{0}`t{1}`t{2}`t{3}`t{4}`t{5}`t{6}`t{7}" -f `
+                    $key, $deferredStatus, $payloadBytes, $deferredInfo.Strings,
+                    $deferredInfo.Arrays, $deferredInfo.ArrayItems, $deferredInfo.Nulls,
+                    $deferredInfo.Reason))
+                if ($deferredInfo.Ok)      { $script:DeferredExpanded++ }
+                elseif ($deferredInfo.Skipped) { $script:DeferredSkipped++ }
+            }
+        }
+
+        # 8e. 内部占位符 -> XML 注释（合法、不伪装成可用值、字节数仍可复现）
         $evaluator = [System.Text.RegularExpressions.MatchEvaluator] {
             param($m)
             "<!--deferred-$($m.Groups[1].Value.ToLower()):$($m.Groups[2].Value)B-->"
@@ -597,7 +756,7 @@ foreach ($key in $Keys) {
         $xml = [regex]::Replace($xml, '@@TT-DEFERRED-(BINARY|STREAM):(\d+)@@', $evaluator)
         $xml = $xml.Replace('@@TT-DEFERRED-NODELIST@@', '<!--deferred-nodelist-->')
 
-        # 8e. 落盘：UTF-8 无 BOM
+        # 8f. 落盘：UTF-8 无 BOM
         [System.IO.File]::WriteAllText($dst, $xml, (New-Object System.Text.UTF8Encoding($false)))
         $Manifest.Add(("{0}`tOK`t{1}`t{2}`t{3}" -f $key, $bamlBytes, [System.Text.Encoding]::UTF8.GetByteCount($xml), $rel))
         if ($i % 100 -eq 0) { Write-Output "      已处理 $i / $($Keys.Count)" }
@@ -634,11 +793,18 @@ $FailPath = Join-Path $OutDir 'convert-failures.tsv'
     (@("baml`texception`treason") + $Failures),
     (New-Object System.Text.UTF8Encoding($false)))
 
+# deferred 资源流的逐份账本：既记展开成功的条数，也记「为什么不展开」
+$DeferredPath = Join-Path $OutDir 'convert-deferred.tsv'
+[System.IO.File]::WriteAllLines($DeferredPath,
+    (@("baml`tstatus`tpayload_bytes`tstrings`tarrays`tarray_items`tnulls`treason") + $DeferredRows),
+    (New-Object System.Text.UTF8Encoding($false)))
+
 $okCount = $Manifest.Count - $Failures.Count
-Write-Output "[9/9] 完成 OK=$okCount FAIL=$($Failures.Count) TOTAL=$($Keys.Count) POSITIONAL_REWRITES=$([BamlValueStringifier]::PositionalRewrites) NS_DEDUPES=$([BamlValueStringifier]::NamespaceDedupes)"
+Write-Output "[9/9] 完成 OK=$okCount FAIL=$($Failures.Count) TOTAL=$($Keys.Count) POSITIONAL_REWRITES=$([BamlValueStringifier]::PositionalRewrites) NS_DEDUPES=$([BamlValueStringifier]::NamespaceDedupes) DEFERRED_EXPANDED=$($script:DeferredExpanded) DEFERRED_SKIPPED=$($script:DeferredSkipped)"
 Write-Output "      XAML:   $OutDir"
 Write-Output "      清单:   $ManifestPath"
 Write-Output "      失败表: $FailPath"
+Write-Output "      deferred: $DeferredPath"
 foreach ($k in $FailedKeys) { Write-Output "      FAILED: $k" }
 
 if ($script:WpfApp) { $script:WpfApp.Shutdown() }

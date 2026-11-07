@@ -564,6 +564,9 @@ $t = $asm.GetType('ticktick_WPF.Views.TaskList.Item.ListItemContent')
 
 ### 6.1 资源字典的正文读不出来（影响最大的一条）
 
+> ✅ **2026-11-07 已解开**：46 份 `stringresource` 全部展开（每份 24–3 539 条）。
+> 本节与 §6.1 末尾那个"没打通"的结论**已被 §10 取代**，连带纠正了三处事实 —— 引用本节前先读 §10。
+
 `resource/` 下 145 个文件转换后的 XAML **小于 400 字节**，正文不是 XAML，而是
 BAML 的**延迟二进制块**：
 
@@ -661,3 +664,78 @@ files=638 elements=21111 files_with_numeric_Height=371
   「解 `DeferrableContent`」的通道，或用 `colors.txt` 那条已有的线。
 - 本文件**未在 `docs/README.md` 登记**：那份文件按任务边界不许我改，
   登记留给文档 owner。
+
+---
+
+## 10. 2026-11-07 补记：deferred 资源流已解开（含三处纠正）
+
+`scripts/ticktick/baml-to-xaml.ps1` 现在会展开**全文案**的延迟字典。新增开关
+`-ExpandDeferred none|strings`（默认 `strings`），闸门与账本都在脚本里。
+
+### 10.1 实测：载荷**不是**一颗 BAML 文档
+
+§6.1 末尾那句"可以用 `DeferredBinaryDeserializerExtension.ProvideValue()` 解 / 递归喂
+`Baml2006Reader`"**在技术上不成立**：
+
+- 主树只有 5 个节点：`StartObject(ResourceDictionary)` → `StartMember(DeferrableContent)`
+  → `Value(MemoryStream)` → `EndMember` → `EndObject`（+ 3 个 xmlns）。
+- 载荷首字节 `26 09 00 00 00 00 00 00 00 00 26 09 01 00 0e 00 …`：一张**10 字节/条的偏移表**
+  （`26 09` + `id:2` + `offset:4` + `pad:2`，offset 相对表尾），表后才是一条条记录。
+- 直接 `new Baml2006Reader(载荷)` 立刻报 `找到了未知的 BAML 记录 Unknown` —— 它没有文档头/记录头。
+
+**实际走的路径**：`XamlServices.Load(Baml2006Reader(整份 BAML))` 拿到 `ResourceDictionary`
+之后访问 `Count`/`Keys`，WPF 自己的延迟加载器就会把延迟段展开成真实条目；再把这些条目经
+`XmlWriter` 排成节点流，**仍然过同一个** `BamlValueStringifier → XamlXmlWriter` 写成子节点。
+"递归走同一套 stringifier→writer"保住了，被否掉的只有"载荷本身能当 BAML 流读"这一句。
+
+### 10.2 三处纠正
+
+| # | 原说法 | 现量 |
+|---|---|---|
+| 1 | 「deferred 只该出现在 `stringresource` 里」（本文件 §6.1 与验收判据都这么写） | ❌ 改造前就有 **365 份**产物带占位符：46 份根字典 + **319 份嵌在 view 里的 `ResourceDictionary`**。判据 ②（592 份逐字节一致）本身没错，错的是这条**解释** |
+| 2 | 「416 个 deferred-stream / 269 个 deferred-nodelist」 | 那是旧快照的计数；现量按文件数是 365 份，按载荷计 46×文案 + 104×非文案 + 370×嵌套 |
+| 3 | 「`resource/colorresource`、`fontresource` 等正文读不出来」 | 仍成立，但**原因不同**：不是"解不开"，是**闸门故意不展开**（见 10.3） |
+
+### 10.3 闸门：只展开"整份字典的值都是字符串"的
+
+实测 **150 份** BAML 的根对象是 `ResourceDictionary` 且带延迟载荷：
+
+| 类 | 份数 | 处置 |
+|---|---|---|
+| 值全是 `String`/`String[]` | **46**（正好是 `resource/stringresource/`，0 份泄漏到别处） | 展开 |
+| 颜色/主题/字体/图标/样式（`Color`/`SolidColorBrush`/`Path`/`DrawingImage`/`Style`/`FontFamily`…） | **104**（载荷 2 379 922 B） | `status=skipped, reason=non-text-dictionary`，逐条落 `convert-deferred.tsv` |
+| 嵌在 view 里的 `ResourceDictionary` | **370 个占位符 / 319 份文件**（2 524 592 B） | 不展开：根对象是 `Window`/`UserControl`，要拿到它的延迟段必须 `XamlServices.Load` 整份文档 = **真的执行窗口构造函数**（实测抛异常）。脚本一贯"不创建窗口、不跑它的代码"，不拿这条换 |
+
+### 10.4 读数（可复算）
+
+- **46/46 份 > 0 条**：最少 24、最多 3 539；`zh-cn` 3 539 = `en-us` 3 539。
+- **43 个语言码 = 152 126 条目**（含 86 个 `x:Array`、1 591 个数组项）⇒ 折算
+  `<x:String>` **152 040** 个；另 `string.d.{en-us,zh-cn,zh-tw}` 3 份 ×24 条 ⇒
+  **全套 46 份 = 152 198 条目 / 152 112 个 `<x:String>`**。
+- **回归**：`BASELINE=638 / NEW=638 / SAME=592 / CHANGED=46 / MISSING=0 / EXTRA=0 /
+  CHANGED_OUTSIDE_STRINGRESOURCE=0`。
+- 两个反证：`-ExpandDeferred none` 重转 3 份 ⇒ 与基线逐字节相同；非文案字典（color/font/icons_dark）
+  ⇒ 与基线逐字节相同。
+- 汇总行新增 `DEFERRED_EXPANDED=46 DEFERRED_SKIPPED=104`，`OK/FAIL/TOTAL` 三个数的位置不变。
+
+### 10.5 口径（不许相加）
+
+| | macOS 那份 | Windows 这份 |
+|---|---|---|
+| 载体 | `.app` 内 `*/Localizable.strings` | `TickTick.exe` 内 `TickTick.g.resources` 的 `.baml` → deferred 字典 |
+| 单位 | key=value 对 | BAML 字典条目（含格式串 `{0}`、含 `String[]`） |
+| 语言数 | 41 个语言目录 | 43 个语言码（+3 份 `string.d.*`） |
+| 总量 | **143 939** | 43 码 **152 126**（+72） |
+
+两个平台、两种容器、两把尺：**既不互补也不可相加，也不能互相校验**。
+
+### 10.6 仍然解不出来的（逐条可查）
+
+1. 370 个嵌套占位符（10.3 第三行）。
+2. 104 份非文案字典 —— 要挖颜色/图标 token 时是**另一个开关**，且一定会改动
+   `resource/stringresource/` 之外的产物 ⇒ 到时要么重做基线，要么对表时把 `resource/**` 整体排除。
+3. 2 个 null 值条目（`stringresource.ru` / `vi` 各 1 个）—— 记在 `nulls` 列，**不伪装成空串**。
+4. 两个既有怪癖（不是本次引入）：产物 XML 声明写 `encoding="utf-16"` 而字节是 UTF-8 无 BOM
+   （按文本读即可）；`-Only` 子集产物不能与整包基线对表（**改造前的原脚本同样如此**）。
+5. 8 组仅大小写不同的键（`Ok`/`OK` 之类，取自语料）：ordinal 比较下 0 重复，但下游若用
+   大小写不敏感的 key 查表会把它们并掉。
