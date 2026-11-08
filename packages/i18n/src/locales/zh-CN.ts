@@ -794,7 +794,7 @@ export const zhCN = {
   'common.signOut.pending': '这台设备已经退出，但服务器上的那一枚登录暂时没能撤销。',
   // 本机库没销毁干净（ADR-0084）：数据还在这台机器上。
   'common.libraryOwner.conflictTitle': '这台设备上的数据属于另一个账号',
-  'common.libraryOwner.conflictBody': '本机保存的是 {accountId} 的数据，不能直接登录新账号。清除本机数据之后才能继续。',
+  'common.libraryOwner.conflictBody': '本机是 {accountId} 的数据，清除后才能登录新账号。',
   'common.libraryOwner.clear': '清除本机数据',
   'common.libraryOwner.clearing': '正在清除…',
   'common.signOut.eraseFailed': '这台设备已退出，但本机的任务数据没有清除干净。点下面的「清除本机数据」再试一次；若仍不行，再清除本站的浏览数据。',

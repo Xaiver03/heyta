@@ -93,10 +93,12 @@ export function EncryptionModeSection({
         简洁 ≠ 隐瞒）。但它**不是**劝阻：只陈述代价，不写"为了安全建议您…"。
         按 `hard-constraints` §3.7.2，这一格属于**必须**出现的披露。
 
-        ⚠️ 用 `role="note"` 而不是 status：它不是状态变化，是常驻说明。
+        ⚠️ 用 `role="status"`：它是**当前模式的状态句**（"托管 AI 已不可用"随模式变），
+        而且 `check:settings-prose` 只豁免带 role 的载体 —— `role="note"` 不在豁免表里，
+        那一版会把这一行判成"账本外的内联说明"。
         整段只有一句 + 一个链接 —— 详细机制归 `/docs`（J1 重信息进文档中心）。
       */}
-      <p className="ht-settings__hint" role="note" data-testid="encryption-mode-tradeoff">
+      <p className="ht-settings__hint" role="status" data-testid="encryption-mode-tradeoff">
         {t(
           mode === 'e2ee'
             ? 'web.sync.encryption.tradeoffOn'

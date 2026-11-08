@@ -691,7 +691,7 @@ export const en = {
   'common.signOut.pending': 'This device is signed out, but the token on the server could not be revoked yet.',
   // Local-library erasure failed (ADR-0084): the data is still on this device.
   'common.libraryOwner.conflictTitle': 'This device holds data for another account',
-  'common.libraryOwner.conflictBody': 'This device stores data for {accountId}. Clear it before signing in with another account.',
+  'common.libraryOwner.conflictBody': 'This device belongs to {accountId}. Clear it to sign in.',
   'common.libraryOwner.clear': 'Clear this device',
   'common.libraryOwner.clearing': 'Clearing…',
   'common.signOut.eraseFailed': 'You\'re signed out, but this device\'s task data was not fully erased. Try “Clear this device” below again; if that still fails, clear this site\'s browsing data.',
