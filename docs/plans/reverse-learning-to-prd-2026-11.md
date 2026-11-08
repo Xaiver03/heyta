@@ -35,7 +35,7 @@
 
 | # | 位置 | 它说 | 事实 | 现量依据 |
 |---|---|---|---|---|
-| **A1** | `AGENTS.md:20` | 「端到端加密：服务端从设计上就看不到用户明文」 | 🔴 **新账号默认 `readable`，服务端读得到明文** | `sync-mode-contract.ts:50`：`DEFAULT_SYNC_PAYLOAD_MODE = 'readable'` |
+| **A1** | `AGENTS.md:20` | 「端到端加密：服务端从设计上就看不到用户明文」 | 🔴 **新账号默认 `readable`，服务端读得到明文** | `sync-mode-contract.ts:50`：`DEFAULT_SYNC_PAYLOAD_MODE = 'readable'` | <!-- privacy-blocker-ok: 本行是台账在**引用并证伪**这句过期断言，不是在断言它；§0.1/ADR-0081 已定这条口径作废 -->
 | **A2** | `docs/agents/key-decisions.md:16` | 「**默认值**与卖点不变」 | ADR-0081 改的**正是默认值**；同文件 `:17` 又写「绝对句必须改掉」，自相矛盾 | ADR-0081 §一、§六 |
 | **A3** | `docs/research/dida365-feature-benchmark.md` §5 #1 | 「端到端加密同步：服务端强制密文 ingress」 | ADR-0081 之后 `readable` 账号**就是收明文的** | 同上；该文件 §9 勘误**未覆盖**此条 |
 | **A4** | `tokens.css:420` 与 `:439` | 「44px 是可访问性**硬下限**」 | Web 语境下 WCAG 2.2 **AA 门槛是 24px**；44 是 **AAA（2.5.5）**，也是 Apple 的**默认**值（不是最小值） | [业界规范基线](../research/industry-ux-baseline-2026-11.md) §②；Apple HIG 原表 iOS 默认 44 / 最小 28 |
