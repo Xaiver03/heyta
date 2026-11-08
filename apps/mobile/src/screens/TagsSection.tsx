@@ -56,7 +56,7 @@ import {
 } from '@heyta/app-host';
 import { OrganizerList, liveTaskCountsByTag, toOrganizerNodes, toTagItems } from '@heyta/ui';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { useMobileSync } from '../sync/store';
 import { Button, Card, SectionHeader, Text, TextField } from '../ui/kit';
 
@@ -70,7 +70,9 @@ export function TagsSection(): React.JSX.Element {
    */
   const { dataRevision } = useMobileSync();
 
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost();
   const [tags, setTags] = useState<Tag[]>([]);
   /**
    * 只为算**删除确认里那句影响面**（"它挂在几条任务上"，W4b）。
@@ -83,16 +85,7 @@ export function TagsSection(): React.JSX.Element {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    void openTaskHost().then((opened) => {
-      if (alive) setHost(opened);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   const actions = useMemo<ProjectActions | null>(
     () => (host ? createProjectActions(host) : null),
     [host],

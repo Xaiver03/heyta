@@ -50,7 +50,7 @@ import {
 } from '@heyta/app-host';
 import { CaptureProjectPickerRow, NotesBoard, type CaptureProjectOption } from '@heyta/ui';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { notesBoardLabels } from '../lib/notes-display';
 import { useCaptureProjectLabels } from '../lib/capture-labels';
 import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
@@ -68,7 +68,10 @@ export function NotesSection(): React.JSX.Element {
    */
   const { dataRevision } = useMobileSync();
 
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取；原来的一次性 effect 在换代后会让本屏永久拿着已作废的
+  // adapter（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost({ onError: (message) => setError(message) });
   const [notes, setNotes] = useState<Note[]>([]);
   /** 见文件头决定 3：失败原因原样显示，不静默吞。 */
   const [error, setError] = useState<string | null>(null);
@@ -89,21 +92,7 @@ export function NotesSection(): React.JSX.Element {
    */
   const editingId = useSelected('note');
 
-  useEffect(() => {
-    let alive = true;
-    void openTaskHost()
-      .then((opened) => {
-        // 卸载后 `setState` 是无声的脏写入（切标签很快时必然发生）。
-        if (alive) setHost(opened);
-      })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   // 与 TasksScreen 同一条规则：动作集从宿主派生，不在界面里新造。
   const actions = useMemo<NoteActions | null>(() => (host ? createNoteActions(host) : null), [host]);
 

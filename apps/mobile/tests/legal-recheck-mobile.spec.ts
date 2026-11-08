@@ -79,6 +79,7 @@ vi.mock('../src/prefs/device-prefs', () => ({
 const host = vi.hoisted(() => ({ syncCalls: 0, resolveCalls: 0 }));
 
 vi.mock('../src/db/open-host', () => ({
+  subscribeTaskHostEpoch: () => () => {}, getTaskHostEpoch: () => 0,
   openTaskHost: async () => ({
     engine: { getClientId: () => 'device-under-test' },
     sync: async () => {

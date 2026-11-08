@@ -8,7 +8,7 @@
  * user enables remembered unlock.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { SettingsInfoTip } from '@heyta/ui';
 import { Alert, View } from 'react-native';
 import {
@@ -28,7 +28,12 @@ import { useI18n, type MessageKey } from '@heyta/i18n';
 
 import { Button, Card, Checkbox, SectionHeader, Stack, Text, TextField } from '../ui/kit';
 import { readSyncConfig } from '../sync/config';
-import { openTaskHost } from '../db/open-host';
+import {
+  getOpenTaskHostIfReady,
+  getTaskHostEpoch,
+  openTaskHost,
+  subscribeTaskHostEpoch,
+} from '../db/open-host';
 import { clearMobileVaultSession } from '../lib/vault-session-cleanup';
 import {
   clearDeviceRevocationGuidance,
@@ -89,10 +94,33 @@ export function VaultSettingsSection({
 } = {}): React.JSX.Element {
   const { t } = useI18n();
   const [session, setSession] = useState<VaultKeySession>();
-  const [host, setHost] = useState<AppHost>();
+  /**
+   * 🔴 宿主**不进 state**：它是"当前这一代的连接"，不是本屏的数据。
+   *
+   * 原来这里是 `useState<AppHost>()` + 在 effect 里 `setHost(nextHost)`。作废
+   * （本机数据被销毁）之后 state 里那份就成了死实例，而下面三处 `host ?? await
+   * openTaskHost()` 的兜底**只在 undefined 时生效** —— 死实例不是 undefined，
+   * 于是照旧拿它去读 vault 会话。
+   * 现在改成渲染时现读当前代，`hostEpoch` 负责换代时重渲染。
+   */
+  const host = getOpenTaskHostIfReady();
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageKey>();
+
+  /**
+   * 🔴 宿主换代（本机数据被销毁）之后这一屏必须重取宿主。
+   *
+   * 它的 `host` 是从 `openTaskHost()` 存下来的那份快照，而下面那个 effect 只在
+   * `accountId / scope / serverUrl` 变的时候重跑。作废恰好发生在这三个都不变的时刻
+   * （远端注销信号、或本地擦除后立即回到这一屏），于是本屏会拿着已销毁的 adapter
+   * 去读 vault 会话 —— 崩在 `AdapterDestroyedError` 上，而用户看到的是"加密设置打不开"。
+   */
+  const hostEpoch = useSyncExternalStore(
+    subscribeTaskHostEpoch,
+    getTaskHostEpoch,
+    getTaskHostEpoch,
+  );
   const [passphrase, setPassphrase] = useState('');
   const [newPassphrase, setNewPassphrase] = useState('');
   // Legacy password is a migration-only bridge. It is deliberately separate
@@ -133,7 +161,6 @@ export function VaultSettingsSection({
   useEffect(() => {
     let cancelled = false;
     setSession(undefined);
-    setHost(undefined);
     setPending(undefined);
     setPendingAction(undefined);
     setError(undefined);
@@ -147,7 +174,6 @@ export function VaultSettingsSection({
     void openTaskHost()
       .then(async (nextHost) => {
         if (cancelled) return;
-        setHost(nextHost);
         const next = await nextHost.getVaultSession();
         if (cancelled || next === undefined) return;
         setSession(next);
@@ -187,7 +213,7 @@ export function VaultSettingsSection({
     return () => {
       cancelled = true;
     };
-  }, [accountId, scope, serverUrl]);
+  }, [accountId, scope, serverUrl, hostEpoch]);
 
   useEffect(() => {
     let cancelled = false;

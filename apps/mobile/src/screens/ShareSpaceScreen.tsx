@@ -75,7 +75,7 @@ import {
 } from '@heyta/ui';
 import { useI18n } from '@heyta/i18n';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import {
   clearMobileShareLog,
   devicePrefKv,
@@ -117,7 +117,9 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
   const { dataRevision } = useMobileSync();
 
   const [view, setView] = useState<'space' | 'join'>('space');
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost();
   const [admin, setAdmin] = useState<MobileShareAdmin | undefined>(undefined);
   const [adminTried, setAdminTried] = useState(false);
   const [needsUnlock, setNeedsUnlock] = useState(false);
@@ -157,20 +159,7 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
   const [prefsSaveFailed, setPrefsSaveFailed] = useState(false);
   const [consentSaveFailed, setConsentSaveFailed] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    void openTaskHost()
-      .then((next) => {
-        if (alive) setHost(next);
-      })
-      .catch(() => {
-        if (alive) setHost(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   useEffect(() => {
     let alive = true;
     void prepareMobileShareAdmin()

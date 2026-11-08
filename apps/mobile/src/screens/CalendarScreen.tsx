@@ -72,7 +72,7 @@ import {
 } from '@heyta/ui';
 import { useToday } from '../lib/use-today';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { useMobileSync } from '../sync/store';
 import { Screen, Text } from '../ui/kit';
 
@@ -90,7 +90,10 @@ import { Screen, Text } from '../ui/kit';
 
 export function CalendarScreen(): React.JSX.Element {
   const { t } = useI18n();
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取；原来的一次性 effect 在换代后会让本屏永久拿着已作废的
+  // adapter（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost({ onError: (message) => setError(message) });
   const [tasks, setTasks] = useState<Task[]>([]);
   /**
    * 倒数日（W6）：日历的**第二个日期数据源**。
@@ -138,21 +141,7 @@ export function CalendarScreen(): React.JSX.Element {
     prevToday.current = today;
   }, [today, selected]);
 
-  useEffect(() => {
-    let alive = true;
-    // 🔴 驱动是工厂不是实例：`SqliteAdapter` 会在 close 后靠它重开。
-    void openTaskHost()
-      .then((h) => {
-        if (alive) setHost(h);
-      })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   const actions = useMemo<TaskActions | null>(
     () => (host ? createTaskActions(host) : null),
     [host],

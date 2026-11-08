@@ -86,7 +86,7 @@ import {
   toOrganizerTree,
 } from '@heyta/ui';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { useMobileSync } from '../sync/store';
 import { Button, Card, SectionHeader, Text, TextField } from '../ui/kit';
 
@@ -104,7 +104,9 @@ export function ListsSection(): React.JSX.Element {
    */
   const { dataRevision } = useMobileSync();
 
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost();
   const [projects, setProjects] = useState<Project[]>([]);
   /**
    * 只为算**删除确认里那两句影响面**（"里面有几条任务" / "底下还有几条子清单"）。
@@ -131,18 +133,7 @@ export function ListsSection(): React.JSX.Element {
    */
   const [folderError, setFolderError] = useState('');
 
-  useEffect(() => {
-    let alive = true;
-    void openTaskHost().then((opened) => {
-      // 🔴 卸载后 `setState` 是无声的脏写入：面板关掉时若正好开完库，
-      // 状态会落在一个已经不存在的组件上。`alive` 是这一行存在的全部理由。
-      if (alive) setHost(opened);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   // 与 `TasksScreen` 同一条规则：动作集从宿主派生，不在界面里新造。
   const actions = useMemo<ProjectActions | null>(
     () => (host ? createProjectActions(host) : null),

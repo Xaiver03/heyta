@@ -212,7 +212,20 @@ describe('注册表里那个 `screen` 字符串：那张屏真的存在、真的
         true,
       );
       const code = stripComments(readFileSync(file, 'utf8'));
-      expect(code, `${entry.screen} 没有打开宿主 ⇒ 那一屏读到的是空的`).toContain('openTaskHost()');
+      /**
+       * 🔴 判据从"字面含 `openTaskHost()`"放宽成"含两种取宿主写法之一"，
+       * 而**不是**放宽成"随便怎样都行"：
+       *
+       * 2026-11-08 崩溃审计 §H.4 之后，屏幕一律经 `useTaskHost()` 取宿主
+       * （原因是空依赖 effect 里的 `openTaskHost()` 拿的是**快照**，
+       * 本机数据被销毁、宿主换代之后那一屏永久对着已作废的 adapter）。
+       * 所以这里同时接受两种 —— 但**一个都不许没有**：
+       * 把某张屏写成"还没有内容"的占位组件时，这一条照样红，判别力没丢。
+       */
+      expect(
+        code,
+        `${entry.screen} 既没有 useTaskHost() 也没有 openTaskHost() ⇒ 那一屏读到的是空的`,
+      ).toMatch(/useTaskHost\(|openTaskHost\(\)/);
       expect(
         code,
         `${entry.screen} 没有接 onBack ⇒ 进去了出不来（本壳没有导航库，返回只靠这一条线）`,

@@ -59,7 +59,7 @@ import type {
 import { categorySlotToken, EventBoard } from '@heyta/ui';
 import { useI18n } from '@heyta/i18n';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { useCardExporter } from '../lib/card-export';
 import { eventBoardLabels, exportFailureText } from '../lib/countdown-display';
 import { datePickerLabels } from '../lib/date-picker-labels';
@@ -83,7 +83,10 @@ export function CountdownScreen({ onBack }: { onBack: () => void }): React.JSX.E
    */
   const { dataRevision } = useMobileSync();
 
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取；原来的一次性 effect 在换代后会让本屏永久拿着已作废的
+  // adapter（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost({ onError: (message) => setError(message) });
   /** 打开宿主失败（磁盘 / 驱动）与**写入失败**（动作层抛的校验原因）共用一个通道：
    *  两者都必须让用户看见，"点了没反应"是这一屏最坏的失效。 */
   const [error, setError] = useState<string | null>(null);
@@ -92,21 +95,7 @@ export function CountdownScreen({ onBack }: { onBack: () => void }): React.JSX.E
   const [view, setView] = useState<BoardView>('active');
   const [filter, setFilter] = useState<CountdownFilter>('all');
 
-  useEffect(() => {
-    let alive = true;
-    // 🔴 驱动是工厂不是实例：`SqliteAdapter` 会在 close 后靠它重开（见 `db/open-host.ts`）。
-    void openTaskHost()
-      .then((next) => {
-        if (alive) setHost(next);
-      })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   // 与 TasksScreen / HabitsScreen 同一条规则：动作集从宿主派生，不在界面里新造。
   const actions = useMemo<EventActions | null>(() => (host ? createEventActions(host) : null), [host]);
 

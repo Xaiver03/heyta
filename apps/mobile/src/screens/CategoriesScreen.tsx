@@ -56,7 +56,7 @@ import type { CategorySlot } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { CategoryReportView } from '@heyta/ui';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { categoryReportLabels } from '../lib/category-display';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
@@ -74,26 +74,16 @@ export function CategoriesScreen(): React.JSX.Element {
    */
   const { dataRevision } = useMobileSync();
 
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取；原来的一次性 effect 在换代后会让本屏永久拿着已作废的
+  // adapter（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost({ onError: (message) => setError(message) });
   const [error, setError] = useState<string | undefined>(undefined);
   const [report, setReport] = useState<CategoryReport | null>(null);
   /** 当前展开着色槽的那一行（key）。同时只展开一行：一屏里全是色板会盖住读数。 */
   const [openKey, setOpenKey] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    openTaskHost()
-      .then((next) => {
-        if (alive) setHost(next);
-      })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   const projectActions = useMemo(() => (host ? createProjectActions(host) : null), [host]);
   const habitActions = useMemo(() => (host ? createHabitActions(host) : null), [host]);
 

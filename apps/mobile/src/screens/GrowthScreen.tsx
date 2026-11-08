@@ -93,7 +93,7 @@ import { toLocalDate, type LocalDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { GrowthBoard, type MotivationSectionId } from '@heyta/ui';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { growthBoardLabels } from '../lib/growth-display';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
@@ -115,27 +115,17 @@ export function GrowthScreen({
    */
   const { dataRevision } = useMobileSync();
 
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取；原来的一次性 effect 在换代后会让本屏永久拿着已作废的
+  // adapter（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost({ onError: (message) => setError(message) });
   const [tables, setTables] = useState<MotivationTables | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
   const [busyHabitId, setBusyHabitId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | undefined>(undefined);
   const habitActionBusy = useRef(false);
 
-  useEffect(() => {
-    let alive = true;
-    openTaskHost()
-      .then((next) => {
-        if (alive) setHost(next);
-      })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   const refresh = useCallback(() => {
     if (!host) return;
     // ⚠️ `getState()` 是**同步**的（读的是已物化的内存状态）。

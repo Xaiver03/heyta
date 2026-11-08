@@ -26,6 +26,7 @@ const slot = vi.hoisted(() => ({
 vi.mock('../src/db/open-host', () => ({
   getOpenTaskHostIfReady: () => slot.host,
   openTaskHost: vi.fn(),
+  subscribeTaskHostEpoch: () => () => {}, getTaskHostEpoch: () => 0,
 }));
 // 装配点在本用例里只当**观察窗**：attach 的顺序（undefined 必须在重建之前）
 // 就是"先摘后建"的可观测形状；路由行为由另一份 spec 用真件钉。

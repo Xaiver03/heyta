@@ -77,7 +77,6 @@ import {
   createNoteActions,
   createProjectActions,
   createTaskActions,
-  type AppHost,
   type AttachmentActions,
   type NoteActions,
   type ProjectActions,
@@ -144,7 +143,7 @@ type SectionMeta = {
   readonly title: string;
   readonly tone?: 'muted' | 'danger' | 'primary';
 };
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { useMobileSync } from '../sync/store';
 import { useMobileNavigation } from '../nav/navigation';
 
@@ -563,9 +562,11 @@ export function TasksScreen({
   // 否则英文界面上会漏出「每周一、三」。
   const { t, locale } = useI18n();
   const navigation = useMobileNavigation();
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取。此前是 `useState` + `useEffect(..., [])` 的一次性快照，
+  // 换代之后本屏永久拿着已作废的 adapter（崩溃审计 §H.4 第 2 层）。
+  const { host, error } = useTaskHost();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   /**
    * 打开详情的任务 id —— 读**全壳那一份**选中态（`lib/selection.ts` →
@@ -704,20 +705,8 @@ export function TasksScreen({
   // 同步完成 → `dataRevision` 变 → 下面的 effect 重读物化状态。
   const { dataRevision } = useMobileSync();
 
-  useEffect(() => {
-    let alive = true;
-    // 🔴 驱动是工厂不是实例：`SqliteAdapter` 会在 close 后靠它重开。
-    void openTaskHost()
-      .then((h) => {
-        if (alive) setHost(h);
-      })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // 取宿主那一段原来在这里（`useEffect(..., [])` + `openTaskHost()`），已上移成
+  // `useTaskHost()` —— 宿主换代时它会自己重跑，本屏不再持一次性快照。
 
   const actions = useMemo<TaskActions | null>(() => (host ? createTaskActions(host) : null), [host]);
   /**

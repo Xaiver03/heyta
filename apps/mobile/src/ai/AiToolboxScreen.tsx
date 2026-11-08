@@ -44,7 +44,7 @@ import { useI18n, type MessageKey } from '@heyta/i18n';
 
 import { Button, Card, HStack, Screen, Stack, Text, TextField } from '../ui/kit';
 import { useTokens } from '../theme';
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { readSyncConfig } from '../sync/config';
 import { AiDisclosureBlock } from './disclosure';
 import { getAiSettings, saveAiSettings, useAiSettings, aiSecrets } from './settings-store';
@@ -71,17 +71,13 @@ export function AiToolboxScreen({
   const { t, locale } = useI18n();
   const tokens = useTokens();
   const [tab, setTab] = useState<TabKey>('breakdown');
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取；原来的一次性 effect 在换代后会让本屏永久拿着已作废的
+  // adapter（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost({ onError: (message) => setHostError(message) });
   const [hostError, setHostError] = useState<string | undefined>();
 
-  useEffect(() => {
-    let alive = true;
-    openTaskHost()
-      .then((next) => { if (alive) setHost(next); })
-      .catch((error: unknown) => { if (alive) setHostError(error instanceof Error ? error.message : String(error)); });
-    return () => { alive = false; };
-  }, []);
-
+  
   const tabs: Array<{ key: TabKey; labelKey: MessageKey }> = [
     { key: 'breakdown', labelKey: 'mobile.ai.toolbox.tab.breakdown' },
     { key: 'prioritize', labelKey: 'mobile.ai.toolbox.tab.prioritize' },

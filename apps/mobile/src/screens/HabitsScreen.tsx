@@ -82,7 +82,7 @@ import type {
 import { useI18n } from '@heyta/i18n';
 import { HabitBoard, HabitProgressList, HabitTrendBoard } from '@heyta/ui';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import {
   habitBoardLabels,
   habitListLabels,
@@ -111,7 +111,10 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
    */
   const { dataRevision } = useMobileSync();
 
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取；原来的一次性 effect 在换代后会让本屏永久拿着已作废的
+  // adapter（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost({ onError: (message) => setError(message) });
   const [error, setError] = useState<string | null>(null);
   /**
    * 🔴 「新建失败」曾经写进上面那个 `error` —— 于是**一次建不成会把整屏换成错误页**，
@@ -145,21 +148,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
 
-  useEffect(() => {
-    let alive = true;
-    // 🔴 驱动是工厂不是实例：`SqliteAdapter` 会在 close 后靠它重开。
-    void openTaskHost()
-      .then((next) => {
-        if (alive) setHost(next);
-      })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   const actions = useMemo<HabitActions | null>(() => (host ? createHabitActions(host) : null), [host]);
 
   const refresh = useCallback(() => {

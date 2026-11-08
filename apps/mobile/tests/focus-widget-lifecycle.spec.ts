@@ -22,7 +22,11 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('../src/db/open-host', () => {
   const host = { dispatch: platform.dispatch } as unknown as AppHost;
-  return { openTaskHost: async () => host, getOpenTaskHostIfReady: () => host };
+  return {
+    openTaskHost: async () => host,
+    getOpenTaskHostIfReady: () => host,
+    subscribeTaskHostEpoch: () => () => {}, getTaskHostEpoch: () => 0,
+  };
 });
 vi.mock('../src/widgets/widget-bridge', () => ({
   sealWidgetSnapshot: platform.seal,

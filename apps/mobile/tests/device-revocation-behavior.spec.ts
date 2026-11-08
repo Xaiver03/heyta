@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 vi.mock('../src/db/open-host', () => ({
   invalidateTaskHostVaultSession: vi.fn(),
+  subscribeTaskHostEpoch: () => () => {}, getTaskHostEpoch: () => 0,
 }));
 
 import { createDeviceRevocationGuidanceStore } from '../src/lib/device-revocation-guidance';

@@ -52,7 +52,7 @@ import { useI18n } from '@heyta/i18n';
 import { createNoteActions, type AppHost, type NoteActions } from '@heyta/app-host';
 import { SearchPanel, type SearchPanelLabels } from '@heyta/ui';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { searchPanelLabels } from '../lib/search-display';
 import { pruneSelectionAgainst } from '../lib/selection';
 import { useMobileSync } from '../sync/store';
@@ -129,7 +129,7 @@ export function SearchScreen({
 
   const [query, setQuery] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
-  const [noteActions, setNoteActions] = useState<NoteActions | null>(null);
+
   /** 见 `NotesSection` 决定 3：失败原因原样显示，不静默吞。 */
   const [error, setError] = useState<string | null>(null);
 
@@ -138,19 +138,18 @@ export function SearchScreen({
   //    "同步完了也搜不到"，而且没有任何报错。
   const { dataRevision } = useMobileSync();
 
-  useEffect(() => {
-    let alive = true;
-    void openTaskHost()
-      .then((opened: AppHost) => {
-        if (alive) setNoteActions(createNoteActions(opened));
-      })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  /**
+   * 🔴 本屏存的是 `noteActions` —— 它**绑在宿主实例上**，所以同样是快照。
+   *
+   * 原来是空依赖 effect 取一次 `openTaskHost()`；本机数据被销毁（主动注销 /
+   * 别的设备注销）之后，`noteActions` 指向的仍是那个 adapter 已销毁的宿主，
+   * 于是搜索一执行就 `AdapterDestroyedError`。改走钩子后随换代自动重建。
+   */
+  const { host: searchHost } = useTaskHost({ onError: (message) => setError(message) });
+  const noteActions = useMemo<NoteActions | null>(
+    () => (searchHost === null ? null : createNoteActions(searchHost)),
+    [searchHost],
+  );
 
   useEffect(() => {
     if (noteActions === null) return;

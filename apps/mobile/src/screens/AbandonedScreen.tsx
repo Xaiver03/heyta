@@ -33,7 +33,7 @@ import { useI18n } from '@heyta/i18n';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { formatStamp } from '../lib/date';
 import { useMobileSync } from '../sync/store';
 import { Button, EmptyState, HStack, Screen, Stack, Text } from '../ui/kit';
@@ -49,27 +49,15 @@ export function AbandonedScreen({ onBack }: { onBack: () => void }): React.JSX.E
    */
   const { dataRevision } = useMobileSync();
 
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取；原来的一次性 effect 在换代后会让本屏永久拿着已作废的
+  // adapter（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost({ onError: (message) => setError(message) });
   const [items, setItems] = useState<Task[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    let alive = true;
-    openTaskHost()
-      .then((next) => {
-        if (alive) setHost(next);
-      })
-      .catch((cause: unknown) => {
-        // 打不开本地库要说出来。静默的空列表会被读成"没有被放弃的任务" ——
-        // 那是把一次故障念成一条关于用户数据的结论。
-        if (alive) setError(cause instanceof Error ? cause.message : String(cause));
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   const taskActions = useMemo<TaskActions | null>(
     () => (host === null ? null : createTaskActions(host)),
     [host],

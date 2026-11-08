@@ -39,6 +39,51 @@ let resolvedHost: AppHost | undefined;
 let hostEpoch = 0;
 
 /**
+ * 宿主换代（`hostEpoch`）的订阅者。
+ *
+ * 🔴 为什么需要它（崩溃审计 2026-11-08 · §H.4 第 2 层，U16 那条 P0 的另一半）：
+ * 单例的**作废**已经被 `resetTaskHostCache()` 处理了，但"作废"这件事只有清变量的
+ * 那一方知道。19 个屏幕各自 `useState<AppHost>` + `useEffect(..., [])` 只取一次，
+ * 拿到的是**快照**。擦除之后它们继续拿着那个 adapter 已被 `destroy()` 的实例，
+ * 任何写入落到 `AdapterDestroyedError` —— 而且**不会自己好**，因为那个 effect
+ * 的依赖数组是空的，永远不会再跑第二次。
+ *
+ * 所以这里提供的是"**换代可被观察**"这一件事本身，而不是逐个屏幕打补丁：
+ * 屏幕通过 `useTaskHost()` 订阅它，换代即重新取宿主。
+ * 判据见 `apps/mobile/tests/task-host-generation.spec.ts`。
+ */
+const epochListeners = new Set<() => void>();
+
+/** 换代通知。**不允许**任何一个订阅者抛错把其余订阅者挡在门外。 */
+function emitEpochChange(): void {
+  for (const listener of [...epochListeners]) {
+    try {
+      listener();
+    } catch {
+      // 订阅者是界面回调；它自己坏了不等于"换代"这件事没发生。
+    }
+  }
+}
+
+/** `useSyncExternalStore` 的 `subscribe`：返回退订函数。 */
+export function subscribeTaskHostEpoch(listener: () => void): () => void {
+  epochListeners.add(listener);
+  return () => {
+    epochListeners.delete(listener);
+  };
+}
+
+/**
+ * `useSyncExternalStore` 的 `getSnapshot`。
+ *
+ * 🔴 必须返回**原始值**（number），不能返回对象 —— 每次 `getSnapshot` 返回一个新对象
+ * 会让 React 认为快照一直在变，直接进入无限重渲染。
+ */
+export function getTaskHostEpoch(): number {
+  return hostEpoch;
+}
+
+/**
  * 在宿主外面包一层：**每次写入之后喊一声"写了"**，自动同步据此把改动推出去，
  * 小组件据此重发快照。
  *
@@ -217,4 +262,9 @@ export function resetTaskHostCache(): void {
   // 🔴 路由装配也要跟着换代：不摘的话，下一次 `dispatchIntent` 还会写进
   // 那个已按口径 B 拒绝读写的旧 adapter（症状是"写入静默成功、新库里看不见"）。
   bindMobileOplogBase(undefined);
+
+  // 🔴 **最后一步**才通知：订阅者收到通知后会立刻重新 `openTaskHost()`，
+  // 此刻 `pending` / `resolvedHost` / 共享路由装配都必须已经清干净，
+  // 否则它们拿到的是刚被作废的那一份（通知变成"提前通知"就没意义了）。
+  emitEpochChange();
 }

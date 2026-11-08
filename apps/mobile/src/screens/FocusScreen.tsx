@@ -30,7 +30,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { type FocusSessionKind, type Task } from '@heyta/domain';
@@ -41,7 +41,12 @@ import { focusOverview, type AppHost } from '@heyta/app-host';
 import { useText, useTokens } from '../theme';
 import { Button, Card, Chip, Screen, SectionHeader, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
-import { getOpenTaskHostIfReady, openTaskHost } from '../db/open-host';
+import {
+  getOpenTaskHostIfReady,
+  getTaskHostEpoch,
+  openTaskHost,
+  subscribeTaskHostEpoch,
+} from '../db/open-host';
 import { readFocusTaskSource } from '../lib/focus-task-source';
 import { useMobileSync } from '../sync/store';
 import { onLocalWrite } from '../sync/write-signal';
@@ -159,7 +164,14 @@ export function FocusScreen(): React.JSX.Element {
   const timer = useFocusTimer();
   const { state } = timer;
 
-  const [host, setHost] = useState<AppHost | null>(null);
+  /**
+   * 🔴 宿主**不进 state**。
+   *
+   * 它是"当前这一代的连接"，不是本屏的数据。存进 `useState` 就等于存了一个快照：
+   * 换代（本机数据被销毁）之后它还是旧那一份，而 `setHost` 只在 `refresh()` 里被调 ——
+   * 那条路正是"用户点进来才刷新"，于是本屏会拿着已作废的 adapter 去算专注概览。
+   * 现在改成渲染时经 `getOpenTaskHostIfReady()` 现读，`hostEpoch` 负责在换代时重渲染。
+   */
   /** 全部未删除任务 —— 用来**显示**已关联任务的名字。 */
   const [tasks, setTasks] = useState<Task[]>([]);
   /** 未完成任务 —— 只用它填选择列表。 */
@@ -170,10 +182,24 @@ export function FocusScreen(): React.JSX.Element {
 
   const refresh = useCallback(() => {
     const source = readFocusTaskSource(getOpenTaskHostIfReady);
-    setHost(source.host);
     setTasks(source.tasks);
     setPendingTasks(source.pendingTasks);
   }, []);
+
+  /**
+   * 🔴 宿主换代（本机数据被销毁）之后必须重取。
+   *
+   * 本屏与其它屏不同：它的 `host` 不是从 `openTaskHost()` 的返回值存下来的，
+   * 而是 `refresh()` 里经 `readFocusTaskSource(getOpenTaskHostIfReady)` 现读的。
+   * 所以"换代"这件事必须变成一个**依赖项**，否则那个 effect 一辈子只跑一次 ——
+   * 擦除之后 `getOpenTaskHostIfReady()` 长期是 `undefined`，本屏停在空数据上，
+   * 而用户看到的是一句"没有专注记录"（假的事实，不是错误）。
+   */
+  const hostEpoch = useSyncExternalStore(
+    subscribeTaskHostEpoch,
+    getTaskHostEpoch,
+    getTaskHostEpoch,
+  );
 
   useEffect(() => {
     let alive = true;
@@ -187,7 +213,7 @@ export function FocusScreen(): React.JSX.Element {
     return () => {
       alive = false;
     };
-  }, [refresh]);
+  }, [refresh, hostEpoch]);
 
   useEffect(() => {
     refresh();
@@ -215,10 +241,11 @@ export function FocusScreen(): React.JSX.Element {
    * 记录"进得来，后者让"刚落盘的那一轮"立刻可见 —— 少了任何一个，
    * 数字会停在旧值上，看起来像记录没保存。
    */
-  const overview = useMemo(
-    () => (host === null ? null : focusOverview(host, timer.now)),
-    [host, timer.now, timer.savedAt, dataRevision],
-  );
+  const overview = useMemo(() => {
+    // 现读当前这一代；`hostEpoch` 变了就会重新算（由此前的 `[host, …]` 依赖换成它）。
+    const current = getOpenTaskHostIfReady();
+    return current === undefined ? null : focusOverview(current, timer.now);
+  }, [hostEpoch, timer.now, timer.savedAt, dataRevision]);
 
   /**
    * 已关联的任务。

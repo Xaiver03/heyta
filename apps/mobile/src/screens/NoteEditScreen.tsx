@@ -40,7 +40,7 @@ import { useI18n } from '@heyta/i18n';
 import { createNoteActions, type AppHost, type NoteActions } from '@heyta/app-host';
 import { NoteEditor, type NoteEditorLabels } from '@heyta/ui';
 
-import { openTaskHost } from '../db/open-host';
+import { useTaskHost } from '../db/use-task-host';
 import { useMobileSync } from '../sync/store';
 import { useTheme } from '../theme';
 import { Screen, Text } from '../ui/kit';
@@ -64,7 +64,10 @@ export function NoteEditScreen({
    */
   const { dataRevision } = useMobileSync();
 
-  const [host, setHost] = useState<AppHost | null>(null);
+  // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
+  // 这个钩子自动重取；原来的一次性 effect 在换代后会让本屏永久拿着已作废的
+  // adapter（崩溃审计 §H.4 第 2 层）。
+  const { host } = useTaskHost({ onError: (message) => setError(message) });
   /**
    * `null` = **还没读到**（宿主还在开），空数组 / 读到了但没找到 = 这条便签不在了。
    * 两个状态必须分开：合成一个的话，首帧会闪一句"这条便签已经不在了"，
@@ -75,20 +78,7 @@ export function NoteEditScreen({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    void openTaskHost()
-      .then((opened) => {
-        if (alive) setHost(opened);
-      })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+  
   // 与 `NotesSection` 同一条规则：动作集从宿主派生，不在界面里新造。
   const actions = useMemo<NoteActions | null>(() => (host ? createNoteActions(host) : null), [host]);
 

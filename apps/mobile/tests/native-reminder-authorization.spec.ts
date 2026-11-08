@@ -8,7 +8,11 @@ const native = vi.hoisted(() => ({
   permission: 'default' as 'default' | 'granted' | 'denied',
   request: vi.fn(), schedule: vi.fn(), open: vi.fn(),
 }));
-vi.mock('../src/db/open-host', () => ({ openTaskHost: native.open }));
+vi.mock('../src/db/open-host', () => ({
+  openTaskHost: native.open,
+  // 宿主换代订阅：这些用例不触发换代，给静态空实现即可（useTaskHost 依赖它们存在）。
+  subscribeTaskHostEpoch: () => () => {}, getTaskHostEpoch: () => 0,
+}));
 vi.mock('../src/lib/reminder-native', () => ({
   requestReminderAuthorization: native.request,
   reminderAuthorizationStatus: async () => native.permission,
