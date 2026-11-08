@@ -496,9 +496,9 @@ timer = setTimeout(() => {
 
 | 面 | 项 | 为什么没动 |
 |---|---|---|
-| mobile | `resetTaskHostCache` 作废单例却不 close，32 屏以 `[]` 依赖永久持着死 host（P0） | 要引入"宿主换代可订阅"通道（`useSyncExternalStore`），改动面覆盖 32 个屏 |
-| macOS | `ScriptHost.call()` 用全局 `__done/__r/__e` 做落定协议 + 嵌套 RunLoop，**重入即静默错值**（P0） | 要改成 per-call 令牌或 Promise 落定，牵动整个桥的协议 |
-| Windows | `HeytaWindows`（WinUI 工程）未在本机编译（只有 `.Core` 通过） | macOS 上缺 Windows SDK；需在 Windows 载体上验 |
+| ~~mobile~~ | ~~`resetTaskHostCache` 作废单例却不 close，32 屏以 `[]` 依赖永久持着死 host（P0）~~ | ✅ **已修**（§H.8）：`useSyncExternalStore` 通道 + 21 个屏迁移；**设备侧端到端仍未验** |
+| macOS | `ScriptHost.call()` 用全局 `__done/__r/__e` 做落定协议 + 嵌套 RunLoop，**重入即静默错值**（P0） | **仍未动**：本机 `swift build` 被沙箱挡住，盲改会整端不可用 |
+| ~~Windows~~ | ~~`HeytaWindows`（WinUI 工程）未在本机编译（只有 `.Core` 通过）~~ | ✅ **已验**（§H.8）：`windows-pc` 上 0 警告 0 错误，冒烟 39 条 ✅；**窗口未真的打开过** |
 | desktop | `quitting` 只写不读；IPC 参数零运行时校验；`second-instance` 未判 `isDestroyed` | P1，改动分散 |
 | server/billing | 9 条 P1，其中 3 条在**钱**的路径上：① `reconcile.ts` 的对账前缀与 adapter 写入前缀不一致 ⇒ `findUnsettledPaidOrders` **永远 0 候选**，日清日志打印 "settled 0 of 0" 看起来健康；② `expireStaleOrders` **无生产调用方** ⇒ 放弃支付的订单永久占着优惠券名额；③ 退款回调丢掉 `paidAmountMinor` ⇒ 部分退款按全额回收权益 | 需要产品/财务确认口径，不是纯代码修 |
 | 各包 | 约 60 条 P1（storage worker 桥、sync-client 并发守卫、ai SSE 无界缓冲、share 密钥竞态…） | 本报告已逐条给出 file:line |
@@ -518,6 +518,13 @@ timer = setTimeout(() => {
 | tsc | web / mobile / desktop / node-host / op-log / storage / sync-client / app-host / server / i18n 全 rc=0 |
 | `dotnet build Heyta.Windows.Core` | ✅ 0 warnings 0 errors |
 | 门禁 | `check:ui-language` ✅ / `check:layering` ✅ / `check:design-token-refs` ✅ / `check:safe-error-fallbacks` ✅ |
+
+> 🔴 **更正（2026-11-08 晚）**：此前这里还写着 `check:crosslang-contract` ✅ —— **那是错的**。
+> 这枚门禁自 `395c7db86`（2026-11-07）起**每次都是红的**，而原因与被测代码无关：
+> Jint 里没有 `console`（契约打印「这一腿跳过」时直接 ReferenceError）；
+> 补上之后又露出第二层 —— `vitest-shim.ts` 没实现那条断言用的 `toBeLessThanOrEqual`。
+> 已修（`be53f4843`），现量「断言 69 条，通过 69 条，失败 0 条」。
+> 记这一笔的理由：**一条恒红的门禁和一条恒绿的门禁一样没有价值**。
 
 > ⚠️ 一条**偶发**：`server` 的 `.pglite` 用例里
 > `the wrong passphrase refuses with exit 2…` 在一次并行跑里红过、重跑绿。
@@ -558,3 +565,132 @@ timer = setTimeout(() => {
 > 成本高于这条防御本身。所以**没有写一条假装覆盖它的测试** ——
 > "删掉实现测试还是绿的"比没有测试更糟：它会让人以为有保护。
 > 这条的上限依据是**代码形状**，不是一条会失败的用例。
+
+---
+
+## H.8 第五批：把「本机没法验」的那几格搬到远程载体上（2026-11-08 夜）
+
+前四批里有一批结论是**我这边验不了**：Windows 壳要 Windows SDK、Android 要在真
+模拟器上跑、而本机既不许起模拟器（`check:android-build-host` 的规则）也没装 Windows SDK。
+这一批把它们挪到两台载体机上做，**并因此撞出四个新的缺陷** —— 后一件比前一件更值。
+
+### H.8.1 载体与规则
+
+| 载体 | 用途 | 现量 |
+|---|---|---|
+| `windows-pc`（ZeroTier `10.111.127.237`） | Windows 桌面壳 | .NET **10.0.401**；`api.nuget.org` 200；`github.com` 超时（所以源码走 scp 不 clone） |
+| `linux-dev`（`Xaiver-linux`） | **Android 构建 + 模拟器＋设备侧验收** | 12 核 / 15 GB / `/dev/kvm` 可用 / 699 GB 空闲 |
+
+> 🔴 规则已更新过（`scripts/run-gradle.mjs:29-33`）：2026-10-04 曾拍板「Android 一律
+> `ssh windows-pc`」，**2026-10-28 改口为「整个安卓迁移到 Linux dev」**。
+> 所以"在 linux-dev 上构建 + 起模拟器"是既定路线，不是绕开规则。
+> 本机仍然**不起**任何模拟器与 Gradle 构建。
+
+### H.8.2 Windows 壳：从「从未编译过」到 0 警告 0 错误
+
+判据与读数（全文与日志见 `apps/desktop-windows/evidence/crash-audit-2026-11-08-winui-build.md`）：
+
+| 判据 | 读数 |
+|---|---|
+| `Heyta.Windows.Core` | ✅ 产出 `Heyta.Windows.Core.dll` |
+| **`HeytaWindows`（WinUI 3）** | ✅ 产出 `HeytaWindows.dll`，`0 个警告 0 个错误` |
+| 无头跨语言冒烟（真 bundle + 真落盘） | ✅ **39 条 ✅**，末行「跨语言那一层 + 落盘 全部通过」 |
+
+⚠️ 两个必须记下来的坑：
+
+1. **`WindowsAppSDKSelfContained` 必须配 RID**。裸跑 `dotnet build` 报
+   `WindowsAppSDKSelfContained requires a supported Windows architecture` ——
+   csproj 里 `<Platforms>x64;arm64</Platforms>` 只是声明可用平台，不提供默认值。
+   要 `-r win-x64`。**这是构建参数，不是代码缺陷**。
+2. **`bridge-bundle/native-bridge.js` 不被 git 跟踪**（`.gitignore:151`），
+   而 csproj 有 `RequireBridgeBundle` 会在缺它时构建期报错 ⇒ 传源码子集时必须单独带上它。
+
+### H.8.3 移动端：宿主换代可订阅（§H.4 第 2 层，P0 主体）
+
+19 个屏原来各自 `useState<AppHost>` + `useEffect(…, [])`，拿的是**快照**；
+本机数据被销毁（主动注销，或**别的设备注销后同步读到信号** —— 后一条路根本不导航）之后，
+`resetTaskHostCache()` 作废单例并 `close()` 掉 adapter，屏幕却永久攥着那个死实例 ⇒
+下一次读/写 `AdapterDestroyedError`，且**不会自己好**。
+
+修法（`f0edf7cca`）：`open-host.ts` 暴露 `subscribeTaskHostEpoch` / `getTaskHostEpoch`，
+`resetTaskHostCache()` 在**清干净之后**通知；新增 `src/db/use-task-host.ts`；
+21 个屏迁移（其中 `FocusScreen` / `VaultSettingsSection` 改成**渲染时现读当前代**，
+宿主不进 state；`SearchScreen` 里绑在宿主上的 `noteActions` 改为随宿主派生）。
+
+> ⚠️ 为什么不用「稳定的代理对象」：`getState()` 是**同步**的，代理在"新宿主还没打开"
+> 那一帧没有同步答案 —— 只能抛，或**静默把旧库的数据给用户看**。后者更糟。
+
+**判据**（`apps/mobile/tests/task-host-generation.spec.ts`，9 条）+ **三枚变异臂**，
+每枚都实测**恰好**红在预期位置：
+
+| 变异 | 结果 |
+|---|---|
+| M1 摘掉 `emitEpochChange()` | 「reset 必须真的通知订阅者」「一个订阅者抛错不许挡住其余订阅者」**2 条红** |
+| M2 把 `useState<AppHost>` 写回任一屏 | 写法门禁第 1 条**红**（报出具体文件名） |
+| M3 在空依赖 effect 里调 `openTaskHost()` | 写法门禁第 2 条**红** |
+
+写法门禁**先剥注释再判**：这些文件的注释里会*引用*旧写法，
+一条会因为说明文字而变红的门禁很快会被绕过而不是被遵守。
+
+### H.8.4 🔴 这一批真正值钱的产出：**为跑验证而暴露的四个新缺陷**
+
+| # | 缺陷 | 为什么此前一直看不见 | 修法 |
+|---|---|---|---|
+| 21 | `ExportImportFailureReason` 新增 `'too-large'` 后，web 的 `REASON_KEYS` 与 mobile 的 `RESTORE_FAILURE_KEYS` **两处 `Record` 穷举都没补** | **类型检查打在过期的 `dist/*.d.ts` 上**。`app-host` 重新构建之后才红 —— 「测试全绿 ≠ 这是当前产物」 | 补 4 条词条 + 2 处映射（`f64db2f43`），**不给 Record 加 default** |
+| 22 | HEAD 引用了一个**未被跟踪**的文件：`main.tsx` 里 `desktop-chrome`（并行会话的半成品），干净克隆上 `tsc -b` 直接 `TS2307` | 我提交 `main.tsx` 时把别人工作树里的两行接线一起带进去了；而 `git add <file>` 看不见依赖是不是 `??` | 把那份**已通过 10 条测试**的实现一并提交（`ae590bbd1`）。删掉接线等于抹掉别人的成果，所以没那么做 |
+| 23 | `apps/mobile/src/App.tsx` 用 `.js` 后缀导入新文件，**Metro 打包解析不到** | **只有 release 会红**：debug APK 不打包 JS，`tsc` 与 1336 条单测都会尝试 `.tsx` 而通过 | 改成无扩展名（与同文件其余导入一致，`b50f14ce9`） |
+| 24 | `check:crosslang-contract` **自 2026-11-07 起恒红**（Jint 无 `console`；shim 缺 `toBeLessThanOrEqual`） | 恒红的门禁没人看。而我在 §H.5 里还把它记成 ✅ —— **那句是错的，已在该节更正** | 在**装置**侧补齐能力（`be53f4843`），不是改契约 |
+
+四条里第 21、23 两条有同一个形状：**只有"按当前产物重新跑一遍"才会红**。
+第 22 条是并发协作那条老规则的又一次现形。
+
+### H.8.5 回归读数（第五批结束）
+
+| 面 | 结果 |
+|---|---|
+| `apps/mobile` | **1336 passed** / 106 files（新增 9） |
+| `apps/web` | **2840 passed** / 242 files（2 files / 13 tests skipped） |
+| tsc | mobile `rc=0`；web `tsc -b` `rc=0` |
+| `pnpm check:crosslang-contract` | **69/69**（此前恒红） |
+| 门禁 | `ui-language` / `layering` / `design-token-refs` / `safe-error-fallbacks` / `docs` / `android-build-host` 全 ✅ |
+| `dotnet build HeytaWindows -r win-x64` | ✅ 0 warnings 0 errors |
+| `assembleRelease` | ✅ `app-release.apk` **69,816,704 字节**（此前红过两次） |
+
+### H.8.6 Android 运行时：真模拟器上的五条判据
+
+全文见 `apps/mobile/evidence/crash-audit-2026-11-08-android-release.md`。真 release 包
+（JS 已打进 APK，**不依赖 Metro**），两台 headless 模拟器（zh-CN / en）。
+
+| # | 判据 | 读数 |
+|---|---|---|
+| A | 两台都装得上起得来 | pid `26369`（5554）/ `4180`（5556） |
+| B | UI 真的渲染（不是白屏/红屏） | 中文与英文两套界面截图均为真内容 |
+| C | 5 个 tab 全走一遍不崩 | **pid 全程未变**；`FATAL EXCEPTION` 0，`AdapterDestroyedError` 0 |
+| D | 经钩子取到的宿主**能写** | 新建任务后「1 项待办」、收集箱 1、tab 徽标 1 |
+| E | 写入**真的落盘** | `adb root` 后 `sqlite3 … "select count(*) from ops;"` → **1**；库文件 **73,728 字节** |
+
+⚠️ **关于 E 的取证诚实说明**：`tasks-zh.png` 与 `persist-after-restart.png` 的
+sha256 **完全相同**，所以这两张截图**不构成**"重启后数据还在"的证据
+（同一张静止界面重启前后必然一样）。真正的证据是两条互相独立的读数：
+`force-stop` 后 `pidof` 为空、重启后 pid 变为 `26581`；以及**文件级**的 `ops` = 1 行。
+
+### H.8.7 这一批**仍未证明**的事（不许含糊）
+
+| 项 | 为什么还没验 |
+|---|---|
+| **「本机数据被销毁 → 屏幕恢复」的设备侧端到端** | 两个擦除入口都要真服务端。仓库既有的 `scripts/verify-mobile-account-erasure.sh` 要求 `$HOST_SERVER` **已经在跑**（不通时它自己说「环境未就绪，不是产品失败」）。本轮没起 Fastify + Prisma + PostgreSQL。⇒ 换代恢复目前由那 9 条判据 + 3 枚变异守着，**设备侧那一格待验** |
+| **WinUI 窗口真的打开** | 全程 SSH，没在 Windows 上登录桌面去点它。只到「编得过 + 无头冒烟过」。`MainWindow.xaml.cs` 那处 `RunChromeMetricsSafelyAsync` 是否真挡住 `COMException`，仍未验 |
+| **MSIX 打包** | 另一条腿（`scripts/package-msix.ps1`），需要签名与 packaged 形态 |
+| **规模压测** | 只 2 台设备。内存实测已到边界（15 GB、13 GB 已用、swap 19 GB 在用），第三台 AVD 因端口冲突先死了一次，之后没有再试 |
+| **macOS `ScriptHost.call()` 重入** | 本机 `swift build` 被沙箱挡住，无法编译 ⇒ 无法验证。两处 P0（Swift / C# 镜像）仍然开着 |
+| 4 个原生壳的其余项、约 60 条 P1 | 见 §H.4 / §C，未动 |
+
+### H.8.8 一句话结论
+
+这一批把 §H.4 里**两格「本机没法验」**（Windows 壳 / 移动端宿主换代）变成了有读数的
+**已验证 / 已修**，代价是暴露出 **4 个新缺陷**（两个"只有按当前产物重跑才会红"、
+一个并发协作污染、一个恒红门禁）。
+仍未验的三格（注销端到端、WinUI 窗口、MSIX）都是我**如实标出来**的，不是省略。
+
+🔴 重复开篇那句：**这不构成"零崩溃"的证明。** 静态审计 + 有限运行时验证
+能给的是"这一类缺陷已被消除，且判据能在它复发时变红"，不是"它不存在了"。
