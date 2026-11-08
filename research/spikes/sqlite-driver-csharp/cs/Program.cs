@@ -43,6 +43,10 @@ var engine = new Engine(options => options
 using (var host = new HostSqliteDriver(dbPath, dbDir))
 {
     engine.SetValue("host", host);
+    // 🔴 契约里会打「这一腿跳过」这类说明（如 P1-10b 在拿不到 driver 时）。
+    //    不注入 `console` 的症状是**整条断言红在 `console is not defined` 上** ——
+    //    而它想表达的其实是"跳过并打印"。跳过必须是打印出来的，不是安静的，也不是崩的。
+    engine.SetValue("console", new HostConsole());
 
     engine.Execute(File.ReadAllText(bundlePath));
     if (engine.GetValue("HeytaStorage").IsUndefined())
@@ -461,4 +465,23 @@ internal sealed class HostSqliteDriver : IDisposable
         }
         return command;
     }
+}
+
+/// <summary>
+/// 给 Jint 里那份 TS 契约用的 `console`。
+///
+/// 存在的唯一理由：契约在"拿不到 driver"这类情形下会 `console.info` 一句
+/// 跳过原因。Jint 是裸引擎，没有 `console` ⇒ 那一句会变成 ReferenceError，
+/// 把一条**本该跳过**的断言变成"失败"，而失败原因与被测代码毫无关系。
+/// 只实现契约真正用到的几档，输出走 stderr（stdout 留给结构化读数）。
+/// </summary>
+internal sealed class HostConsole
+{
+    public void log(string message) => Console.Error.WriteLine(message);
+
+    public void info(string message) => Console.Error.WriteLine(message);
+
+    public void warn(string message) => Console.Error.WriteLine(message);
+
+    public void error(string message) => Console.Error.WriteLine(message);
 }

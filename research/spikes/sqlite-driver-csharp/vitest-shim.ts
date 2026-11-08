@@ -10,7 +10,8 @@
  * 覆盖面是按**实测**选的，不是猜的：两个契约文件里用到的 API 只有
  *   `describe` / `it` / `expect`，
  * 匹配器只有 `toBe` / `toEqual` / `toHaveLength` / `toBeDefined` /
- * `toBeUndefined` / `toBeGreaterThan` / `toBeGreaterThanOrEqual` / `toBeLessThan` / `.not` / `resolves.toMatchObject(...)`,
+ * `toBeUndefined` / `toBeGreaterThan` / `toBeGreaterThanOrEqual` / `toBeLessThan` /
+ * `toBeLessThanOrEqual` / `.not` / `resolves.toMatchObject(...)`,
  * `expect.any(...)`，外加 `rejects.toThrow(...)`。
  * **没有任何生命周期钩子**（无 beforeEach/afterEach），所以替身不需要它们。
  *
@@ -233,6 +234,20 @@ export function expect(actual: unknown): Record<string, unknown> {
     toBeLessThan(expected: number) {
       if (typeof actual !== 'number' || !(actual < expected)) {
         fail(`toBeLessThan 失败：期望 < ${expected}，实得 ${show(actual)}`);
+      }
+    },
+    /**
+     * 🔴 后加的一条，原因是**门禁恒红**（不是"顺手补齐"）。
+     *
+     * `op-log-store.contract.ts` 的 P1-10b 那条断言用的正是 `toBeLessThanOrEqual`，
+     * 而 shim 只实现了 `<` 与 `>=`。于是这条门禁自 2026-11-07（395c7db86）起
+     * 每次都红在 `Property 'toBeLessThanOrEqual' of object is not a function` ——
+     * 一条**永远红**的判据和一条**永远不会红**的判据同样没有价值：
+     * 它既不证明契约成立，也让人习惯性忽略这条门禁的输出。
+     */
+    toBeLessThanOrEqual(expected: number) {
+      if (typeof actual !== 'number' || !(actual <= expected)) {
+        fail(`toBeLessThanOrEqual 失败：期望 <= ${expected}，实得 ${show(actual)}`);
       }
     },
     toMatchObject(expected: unknown) {
