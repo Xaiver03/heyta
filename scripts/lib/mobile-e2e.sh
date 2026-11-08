@@ -1671,8 +1671,20 @@ configure_sync_credentials() {
   disable_ime; sleep 2
   # 🔴 按无障碍名点，不按坐标：这台机器上的分辨率不一定是 1080×2340，
   #    写死的 (945,2253) 在别的分辨率上落在空白处。
-  MINE_XY=$(xy_desc "我的")
-  if [ -z "$MINE_XY" ]; then bad "标签栏上没有「我的」"; return 1; fi
+  # 🔴 **见到为止**，不要单次判定。`dump()` 在高负载 / 刚装完包的冷启上是会**抓空**的
+  #    （本文件 `settle_for` 那段记的就是这个形状），而单次 `xy_desc` 读空会被记成
+  #    「标签栏上没有『我的』」—— 把**探针抓空**报成**产品少了一个 tab**。
+  #    实测：2026-11-08 同一台模拟器、同一个包，三趟里有趟次在这里红，而手动点同一个
+  #    tab 立刻就有反应。所以这里重试 6 次（约 12 秒），仍然空才判红。
+  MINE_XY=""
+  local _n=0
+  while [ "$_n" -lt 6 ]; do
+    MINE_XY=$(xy_desc "我的")
+    [ -n "$MINE_XY" ] && break
+    sleep 2
+    _n=$((_n + 1))
+  done
+  if [ -z "$MINE_XY" ]; then bad "标签栏上没有「我的」（重试 6 次仍读不到 —— 先怀疑 dump 抓空，再怀疑界面）"; return 1; fi
   $ADB shell input tap $MINE_XY; sleep 3
   # 🔴 凭据表单在「设置」Modal 的「同步与隐私」组里，不在「我的」滚动流上（设置 IA
   #    收进 `SettingsScreen` 那一刀搬进去的，之后又加了目录层）。旧写法直接在

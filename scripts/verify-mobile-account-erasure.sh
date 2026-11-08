@@ -358,19 +358,40 @@ xy_by_rid() {
 # 所以"填进去没有"只能在关掉之后**重新打开看一眼**才算 —— 不看就等于
 # 把"令牌没换成假串"这种失效伪装成"401 之后库还在"（判据 B 的 ✅ 就是假的）。
 assert_ui_token_is() { # <期望的令牌值>
-  local xy
+  local xy actual
   go_profile || return 1
+  # 🔴 **必须重新走一遍「进设置组」的导航**，不能在设置目录首屏上找那串令牌。
+  #
+  # 【2026-11-08 实测的错报形状】原来这里只点开设置入口就 `has_text`，
+  # 于是每一趟都读不到 → 它把**"我没走对导航"**报成**"令牌没换进去"**，
+  # 并据此把 B/C/D 全部判作废（三趟全红，红在同一处）。
+  #
+  # 真正的结构是：凭据表单在「设置 → 数据与同步（`data`）」组里，而且
+  # `advancedSync` 为真才渲染（未展开时组内只有「使用自托管服务器」那一行）。
+  # `configure_sync_credentials` 是怎么进去的，这里就怎么进去 —— 复用
+  # `open_settings_section data`，不另写一套（两套一定会漂）。
+  open_settings_section data || return 1
   dump
-  xy=$(xy_by_rid "profile-entry-settings")
-  if [ -z "$xy" ]; then bad "重新打开设置时取不到入口坐标（节点在但被裁出视口？）"; screen_txt; return 1; fi
-  $ADB shell input tap $xy; sleep 3
+  if [ -z "$(xy_edit_sane "访问令牌")" ]; then
+    xy=$(scroll_to_text "使用自托管服务器")
+    if [ -n "$xy" ]; then $ADB shell input tap $xy; sleep 2; dump; fi
+  fi
+  xy=$(scroll_to_edit "访问令牌")
+  if [ -z "$xy" ]; then
+    bad "回读时进不到凭据表单（滚 5 次也没有「访问令牌」这个输入框）—— 这是导航前提，不是产品失败"
+    screen_txt
+    back_and_keep_app
+    return 1
+  fi
   dump
-  if [ "$(has_text "$1")" = "1" ]; then
+  # 读**输入框的值**，不读"页面上有没有这串字"：后者会被别处的展示文本蒙对。
+  actual=$(edit_value "访问令牌")
+  if [ "$actual" = "$1" ]; then
     ok "前提成立：界面上的访问令牌已是本轮要用的那一串"
     back_and_keep_app
     return 0
   fi
-  bad "🔴 界面上的访问令牌**不是** '$1' —— 换令牌这一步没落到界面上，后面所有'B/C/D'的读数都不作数"
+  bad "🔴 界面上的访问令牌不是 '$1'（实际读到 '${actual}'）—— 换令牌这一步没落到界面上，后面所有'B/C/D'的读数都不作数"
   screen_txt
   back_and_keep_app
   return 1
