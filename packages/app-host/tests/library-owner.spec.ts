@@ -212,8 +212,29 @@ describe('宿主：归属闸门 + 登出销毁（存储层判据）', () => {
       }).catch((e: unknown) => e);
       expect(writeError).toBeInstanceOf(LocalLibraryOwnedByAnotherAccountError);
 
-      const syncError = await other.sync().catch((e: unknown) => e);
-      expect(syncError).toBeInstanceOf(LocalLibraryOwnedByAnotherAccountError);
+      /**
+       * 🔴 **同步不再"抛"，而是"分档返回"**（2026-11-08 改）。
+       *
+       * 原来这里断言 `sync()` 抛 `LocalLibraryOwnedByAnotherAccountError`。
+       * 那个形状本身是对的（拒绝就是拒绝），但**下游把它归成了 `'unexpected'`**：
+       * 壳只把 `host.sync()` 包在 `try` 里，抛出来的错误一律变成
+       * `{reason:'unexpected', retryable:true}`。两个后果都实测过：
+       *   1. 「本机库属于别的账号」与「网络抖了」在界面上**长得一样**；
+       *   2. `retryable:true` 让重试调度器永远退避重试一个永远不会成功的请求。
+       *
+       * ⇒ 现在由**宿主**把它翻成 `'library-owner-mismatch'`（`retryable:false`），
+       * 壳只管照着渲染。判据从"抛的是哪个类"收紧成"返回的是哪个原因、能不能重试" ——
+       * **比原来更严**：原来只证明"拒绝了"，现在还钉住"拒绝被正确地分档"。
+       *
+       * 写入那一条**仍然抛**（`dispatch` 的契约是"拒绝就抛"，上面那行没动）：
+       * 同步是一次可重试的操作，写入是一次调用，两者的错误契约本来就不同。
+       */
+      const syncStatus = await other.sync();
+      expect(syncStatus).toEqual({
+        kind: 'error',
+        reason: 'library-owner-mismatch',
+        retryable: false,
+      });
 
       // 判据是"存储层查不到"：这条写入没有发生，A 那个任务还在且没被改。
       expect(Object.keys(other.getState().tasks)).toEqual(['t1']);

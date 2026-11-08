@@ -77,6 +77,7 @@ export const en = {
   'common.sync.error.undecryptableOps': 'Some older data could not be decrypted with the current password (it may have been written under a different one) and was skipped - everything else synced',
   'common.sync.error.undecryptablePage': 'Nothing on this page could be decrypted with the current password, so syncing is paused and no history was skipped - this usually means the end-to-end encryption password does not match the data on the server. Check your password and sync again.',
   'common.sync.error.payloadModeMismatch': 'This account has end-to-end encryption turned off, but the server still holds encrypted history, so syncing is paused and nothing was skipped. Turn encryption back on in settings and finish the migration, or contact us.',
+  'common.sync.error.libraryOwnerMismatch': 'This device holds another account\'s data, so sync stopped. Nothing local was changed.',
   'common.sync.error.uploadRejected': 'Some changes were rejected by the server and are not in the cloud. Retrying them has stopped. See sync details.',
   // reason === 'unauthorized': this device's access token was refused (401/403).
   // Same three things the Chinese sentence has to carry: why it stopped, that the
@@ -462,6 +463,14 @@ export const en = {
   'web.feedback.undo.lists': 'Undo deleting {count} lists',
   'web.feedback.undo.habit': 'Undo deleting habit "{title}"',
   'web.feedback.undo.habits': 'Undo deleting {count} habits',
+  'web.feedback.history.staleMissing': 'That item is gone — it cannot be undone',
+  'web.feedback.history.staleChanged': 'Another device changed this — take a look before undoing',
+  'web.feedback.history.skipBatch': 'Batch actions cannot be undone in one step',
+  'web.feedback.history.skipSnapshot': 'A full restore cannot be undone',
+  'web.feedback.history.skipMultiEntity': 'This step changed several items — it cannot be undone in one step',
+  'web.feedback.history.skipUnmodeled': 'This kind of data does not support undo yet',
+  'web.feedback.history.skipPayload': 'This data shape has no computable undo',
+  'web.feedback.history.skipOp': 'This step has no defined undo',
   'web.shell.bulk.error': 'Batch action did not finish: {message}',
   'web.shell.search.placeholder': 'Search tasks',
   'web.shell.search.aria': 'Search tasks (title and note)',

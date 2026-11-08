@@ -378,6 +378,21 @@ export type SyncFailureReason =
    */
   | 'upload-rejected'
   /**
+   * 本机库属于**另一个账号**，这次同步被拒绝（一个请求都没发）。
+   *
+   * 🔴 它原来落进 `'unexpected'`：`packages/app-host/src/host.ts` 的
+   * `requireLibraryOwner()` 在归属不符时是 **`throw`**，而壳只把 `host.sync()`
+   * 包在 `try` 里 ⇒ 抛出来的错误变成 `reason:'unexpected'`（`retryable: true`）。
+   * 后果有两层：
+   *   1. 界面上「归属不符」与「网络抖动」**长得一模一样**，而处置完全相反
+   *      （前者要销毁/重建本机库，后者等一会儿再试）；
+   *   2. `retryable: true` 会让重试调度器**一直退避重试**一个永远不会成功的请求。
+   *
+   * 与 `'unauthorized'` 分成两个原因：那句叫用户"重新登录"，而这里的动作是
+   * "这台设备上的库不是这个账号的" —— 登录多少次都不会变。
+   */
+  | 'library-owner-mismatch'
+  /**
    * 服务端**拒绝了这枚访问令牌**（401 / 403）。
    *
    * 🔴 为什么必须单独一种原因，而不是落进 `'unexpected'`：

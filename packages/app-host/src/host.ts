@@ -63,6 +63,7 @@ import {
   claimLibraryOwner,
   planLibraryPurge,
   purgeLocalLibrary,
+  LocalLibraryOwnedByAnotherAccountError,
   readLibraryOwner,
   type ClaimLibraryResult,
   type LibraryOwner,
@@ -740,8 +741,19 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
    */
   const refreshPayloadMode = async (): Promise<HostPayloadMode> => {
     const config = readSyncConfig();
-    const accountId = config.accountId?.trim();
-    if (accountId === undefined || accountId === '' || config.token === undefined) {
+    /**
+     * 🔴 只要求**令牌**（问"我是哪种账号"是一次带鉴权的请求），**不要求 `accountId`**。
+     *
+     * 这一行原来把 `accountId` 也当成前置，于是"手填地址 + 令牌"那条路
+     * （`accountId` 只有登录会话才写得进）在这里就直接回落 `'e2ee'` ——
+     * 连问都不问服务端。下游 `buildSyncClient` 于是按 vault 加密发，
+     * 服务端以 `PLAINTEXT_REQUIRED` 拒掉每一条，`latestSeq` 恒 0。
+     * 真机现量与三个独立信源见 `docs/plans/mobile-plaintext-sync-gap-2026-11-08.md`。
+     *
+     * `accountId` 是**本机库归属**用的（ADR-0084），不是"账号模式"的前置条件；
+     * 把它俩绑在一起，就是把"我不知道自己属于谁"误当成"我是加密账号"。
+     */
+    if (config.token === undefined || config.token === '') {
       return 'e2ee';
     }
     return readRemotePayloadMode({
@@ -781,26 +793,48 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     // 但地址与令牌缺一不可 —— 没有它们连请求都发不出去。
     if (config.serverUrl === '' || config.token === undefined) return undefined;
 
+    /**
+     * 🔴 **账号模式决定写什么形状 —— 与"这台设备有没有 `accountId`"无关。**
+     *
+     * 这一条是 2026-11-08 在真机上量出来的缺陷的修法
+     * （`docs/plans/mobile-plaintext-sync-gap-2026-11-08.md`）：
+     * 原来 `payloadMode === 'plain'` 的判断**嵌在 `accountId !== undefined` 里面**，
+     * 于是"手填服务器地址 + 令牌"那条路（`accountId` 只有登录会话才写得进）
+     * 一路走到第三支，那里 `getPassword: () => config.password` ⇒ **有口令就 vault 加密**
+     * ⇒ 服务端每次都以 `PLAINTEXT_REQUIRED` 拒掉、`latestSeq` 恒 0，而界面只说"同步失败"。
+     *
+     * 判据：`packages/app-host/tests/payload-mode-host.spec.ts` 的
+     * 「readable 账号 + 活配置 + 没有 accountId ⇒ 仍必须发明文」（修之前是红的）。
+     *
+     * ⚠️ 为什么以**服务端**为准而不是以"用户填了口令"为准：
+     * 账号的 `payload_mode` 是服务端权威的（ADR-0080 §S1），两个方向都拒错配；
+     * 用户填了口令只说明"他想要加密"，而"这个账号是不是加密账号"不是本机能定的。
+     * 冲突时**按服务端写**、并在界面上如实说明（见 `sync` 那一支的分档），
+     * 而不是发一个注定被拒的形状然后报"同步失败"。
+     */
+    const inboundAuth = config.accountId !== undefined && config.accountId.trim() !== ''
+      ? (options.getInboundUploadAuthorization ?? createInboundUploadAuthorization({
+          userId: config.accountId, secrets: inboundWorkerSecrets, journal: inboundCommitJournal,
+        }))
+      : options.getInboundUploadAuthorization;
+
+    if (payloadMode === 'plain') {
+      return createSyncClient({
+        engine,
+        store,
+        baseUrl: config.serverUrl,
+        getToken: async () => readSyncConfig().token,
+        getPassword: async () => undefined,
+        encryptionMode: 'plain',
+        applyRemote: async (ops) => {
+          await engine.applyRemote(ops);
+        },
+        ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        ...(inboundAuth !== undefined ? { getInboundUploadAuthorization: inboundAuth } : {}),
+      });
+    }
+
     if (config.accountId !== undefined && config.accountId.trim() !== '') {
-      // 🔴 账号模式决定写什么形状：readable 账号写密文会被服务端 400 拒掉，
-      // 而那是**用户主动关掉加密**之后必然发生的事 —— 静默失败最难查。
-      if (payloadMode === 'plain') {
-        return createSyncClient({
-          engine,
-          store,
-          baseUrl: config.serverUrl,
-          getToken: async () => readSyncConfig().token,
-          getPassword: async () => undefined,
-          encryptionMode: 'plain',
-          applyRemote: async (ops) => {
-            await engine.applyRemote(ops);
-          },
-          ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
-          getInboundUploadAuthorization: options.getInboundUploadAuthorization ?? createInboundUploadAuthorization({
-            userId: config.accountId, secrets: inboundWorkerSecrets, journal: inboundCommitJournal,
-          }),
-        });
-      }
       return createSyncClient({
         engine,
         store,
@@ -1078,7 +1112,24 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     async sync(): Promise<SyncStatus> {
       return withVaultExclusive(async () => {
         // 归属不符 ⇒ 一个请求都不发（连"未配置"都不算：这是明确的拒绝）。
-        await requireLibraryOwner();
+        //
+        // 🔴 **必须在这里翻成分档，不能让它抛出去**（2026-11-08）：
+        // 抛出去之后壳的 `catch` 会把它归成 `'unexpected'`（`retryable: true`），
+        // 于是「本机库不属于这个账号」在界面上与「网络抖了」同形，
+        // 而且重试调度器会永远退避重试一个永远不会成功的请求。
+        // 判据：`packages/app-host/tests/library-owner-sync-reason.spec.ts`。
+        try {
+          await requireLibraryOwner();
+        } catch (error: unknown) {
+          if (error instanceof LocalLibraryOwnedByAnotherAccountError) {
+            return {
+              kind: 'error',
+              reason: 'library-owner-mismatch',
+              retryable: false,
+            };
+          }
+          throw error;
+        }
         const client = buildSyncClient(await refreshPayloadMode());
         if (client === undefined) return notConfigured();
         return client.sync();

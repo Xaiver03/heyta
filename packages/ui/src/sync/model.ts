@@ -252,6 +252,7 @@ export type SyncFailureMessageKey =
   | 'common.sync.error.undecryptablePage'
   | 'common.sync.error.payloadModeMismatch'
   | 'common.sync.error.uploadRejected'
+  | 'common.sync.error.libraryOwnerMismatch'
   | 'common.sync.error.unauthorized'
   | 'common.sync.error.accountClosed'
   | 'common.sync.error.consentRequired'
@@ -268,6 +269,9 @@ const SYNC_FAILURE_MESSAGE_KEY: Record<string, SyncFailureMessageKey> = {
   // 🔴 明文账号读到密文行：动作是"把加密开回来并完成迁移"，不是"核对口令"。
   'payload-mode-mismatch': 'common.sync.error.payloadModeMismatch',
   'upload-rejected': 'common.sync.error.uploadRejected',
+  // 🔴 本机库属于另一个账号：动作是"处理这台设备上的库"，**不是**"重新登录"
+  // （登录多少次都不会变），也**不是**"等网络好了再试"（它不可重试）。
+  'library-owner-mismatch': 'common.sync.error.libraryOwnerMismatch',
   // 令牌被服务端拒了：句子必须同时说"为什么停下"和"本地数据没事"，
   // 否则用户的第一反应是删库重装 —— 而那才是真的会丢东西的动作。
   'unauthorized': 'common.sync.error.unauthorized',

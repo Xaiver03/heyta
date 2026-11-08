@@ -93,6 +93,7 @@ export const zhCN = {
   'common.sync.error.undecryptableOps': '有部分历史数据用当前口令解不开（可能是在另一个口令下写入的），已跳过 —— 其余数据已同步',
   'common.sync.error.undecryptablePage': '这一页数据全部用当前口令解不开，同步已暂停，没有跳过任何历史 —— 多半是端到端加密口令与服务器上的数据不匹配，请核对口令后重新同步',
   'common.sync.error.payloadModeMismatch': '这个账号已经关掉了端到端加密，服务器上却还留着加密的历史数据 —— 同步已暂停，没有跳过任何内容。请在设置里重新开启端到端加密并完成迁移，或联系我们。',
+  'common.sync.error.libraryOwnerMismatch': '这台设备上的数据属于另一个账号，已停止同步。本地数据没有被改动。',
   'common.sync.error.uploadRejected': '有改动被服务端拒绝了，它们不在云端 —— 已停止重传，请查看同步详情',
   /**
    * `reason === 'unauthorized'`：这枚访问令牌被服务端拒了（401/403）。
@@ -544,6 +545,17 @@ export const zhCN = {
   'web.feedback.undo.lists': '撤销删除 {count} 个清单',
   'web.feedback.undo.habit': '撤销删除习惯「{title}」',
   'web.feedback.undo.habits': '撤销删除 {count} 个习惯',
+  // 🔴 R19（2026-11-08）：⌘Z / ⇧⌘Z 的失败说明。**只在没做成时出现**，
+  // 成功不弹任何东西（界面本身已经变回去了）。理由必须逐类具名 ——
+  // 合成一句"撤销失败"等于让用户不知道下一步该干什么。
+  'web.feedback.history.staleMissing': '那条已经不在了，撤不回',
+  'web.feedback.history.staleChanged': '这条已被其他设备改过，先看一眼再撤',
+  'web.feedback.history.skipBatch': '批量操作不能一键撤销',
+  'web.feedback.history.skipSnapshot': '整库还原不能撤销',
+  'web.feedback.history.skipMultiEntity': '这一步同时改了好几条，无法一键撤销',
+  'web.feedback.history.skipUnmodeled': '这类数据还不支持撤销',
+  'web.feedback.history.skipPayload': '这种数据形态算不出撤销',
+  'web.feedback.history.skipOp': '这一步没有定义撤销',
   'web.shell.bulk.error': '批量操作未完成：{message}',
   'web.shell.search.placeholder': '搜索任务',
   'web.shell.search.aria': '搜索任务（标题与备注）',
