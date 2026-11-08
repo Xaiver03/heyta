@@ -1,0 +1,571 @@
+{
+  "audited_repo": "heyta (monorepo, pnpm workspace)",
+  "generated_at": "2026-11-08T06:33:33.366Z",
+  "supersedes": "audit_plan.json @ 2026-11-08T05:18Z（21 单元版；其中 U02/U05/U09/U10/U12/U13/U14/U15/U17/U20/U21 实测超 400KB，按 handoff §4 与本轮实测再切）",
+  "exclusion_rules": [
+    "node_modules/**, **/dist/**, **/build/**, **/obj/**, **/bin/**, **/.build/**, **/target/**, Pods/**, .expo, .venv",
+    "**/generated/**, **/*.generated.ts, **/*.d.ts（生成代码与纯类型）",
+    "**/*.spec.ts(x), **/*.test.ts(x), **/*.stories.ts(x), __tests__/, __mocks__/（测试代码不在运行时崩溃审计面）",
+    "packages/x/**, packages/y/**（空目录）",
+    "apps/desktop-linux/**（C/GTK 壳，沿用上一轮排除决定，见报告 A 节）",
+    "packages/i18n/src/locales/**（987KB 纯翻译数据）, packages/legal/src/documents/**（687KB 纯法律文本）——运行时只是字符串 lookup，未深审，见 coverage",
+    "apps/web/src/styles/**, apps/landing/src/styles/**（纯 CSS）",
+    "research/**, scripts/**, docs/**, e2e/**, .run-logs/**, evidence/**（非运行时产物）",
+    "packages/sync-core 与 server/ 为 vendored(MIT) 但经 heyta 深度改造：审计只读、不改上游"
+  ],
+  "size_measurement": ".audit-crash/unit-sizes.json + .audit-crash/finalize_plan.mjs（可重跑）",
+  "units": [
+    {
+      "unit_id": "U01a-sqlite",
+      "paths": "packages/storage/src/sqlite/**",
+      "kb": 95,
+      "tech_stack": "TS / node:sqlite / sqlite-wasm",
+      "entry_points": "sqlite/*",
+      "cross_unit_dependencies": [
+        "U02a",
+        "U16a"
+      ]
+    },
+    {
+      "unit_id": "U01b-idb-memory",
+      "paths": "packages/storage/src/{indexeddb,memory}/** + 顶层*.ts",
+      "kb": 131,
+      "tech_stack": "TS / IndexedDB",
+      "entry_points": "index.ts, stores.ts, op-log-store.ts",
+      "cross_unit_dependencies": [
+        "U02a",
+        "U12a"
+      ]
+    },
+    {
+      "unit_id": "U02a-oplog-schema",
+      "paths": "packages/op-log/src/** + packages/shared-schema/src/**",
+      "kb": 246,
+      "tech_stack": "TS / zod",
+      "entry_points": "op-log/src/engine.ts",
+      "cross_unit_dependencies": [
+        "U01a",
+        "U03"
+      ]
+    },
+    {
+      "unit_id": "U02b-domain-1",
+      "paths": "packages/domain/src/activity-categories.ts, packages/domain/src/activity.ts, packages/domain/src/ai-feedback.ts, packages/domain/src/assistant-turn.ts, packages/domain/src/attachments.ts, packages/domain/src/capture.ts, packages/domain/src/comments.ts, packages/domain/src/countdown.ts, packages/domain/src/danger-tier.ts, packages/domain/src/date.ts, packages/domain/src/entities.ts, packages/domain/src/events.ts, packages/domain/src/feature-modules.ts, packages/domain/src/focus.ts, packages/domain/src/habit-backfill.ts, packages/domain/src/habit-icons.ts, packages/domain/src/habit-resilience.ts, packages/domain/src/habit-review.ts, packages/domain/src/habit-streak.ts, packages/domain/src/habit-year.ts, packages/domain/src/holidays.ts, packages/domain/src/identity-tags.ts, packages/domain/src/index.ts, packages/domain/src/lunar.ts, packages/domain/src/memory.ts, packages/domain/src/mention-tasks.ts",
+      "kb": 351,
+      "tech_stack": "TS / domain 语义",
+      "entry_points": "entities.ts 及各自文件",
+      "cross_unit_dependencies": [
+        "U02a"
+      ]
+    },
+    {
+      "unit_id": "U02c-domain-2",
+      "paths": "packages/domain/src/mentions.ts, packages/domain/src/milestones.ts, packages/domain/src/notes.ts, packages/domain/src/preference-corrections.ts, packages/domain/src/preference-evidence.ts, packages/domain/src/preference-hints.ts, packages/domain/src/preferences.ts, packages/domain/src/project-hierarchy.ts, packages/domain/src/quadrant.ts, packages/domain/src/quick-due-picks.ts, packages/domain/src/recall.ts, packages/domain/src/recurrence.ts, packages/domain/src/reminders.ts, packages/domain/src/search.ts, packages/domain/src/subscription.ts, packages/domain/src/subtasks.ts, packages/domain/src/tags.ts, packages/domain/src/task-activity.ts, packages/domain/src/task-filter.ts, packages/domain/src/task-order.ts, packages/domain/src/ticktick-format.ts, packages/domain/src/ticktick-import.ts, packages/domain/src/timeline-position.ts, packages/domain/src/timeline.ts, packages/domain/src/today-progress.ts, packages/domain/src/trash-rows.ts, packages/domain/src/weekly-review.ts",
+      "kb": 345,
+      "tech_stack": "TS / domain 语义",
+      "entry_points": "entities.ts 及各自文件",
+      "cross_unit_dependencies": [
+        "U02a"
+      ]
+    },
+    {
+      "unit_id": "U03-sync-core",
+      "paths": "packages/sync-core/src/**",
+      "kb": 212,
+      "tech_stack": "TS (vendored MIT, heyta-modified)",
+      "entry_points": "conflict-resolution.ts, remote-apply.ts, replay-coordinator.ts, encryption.ts",
+      "cross_unit_dependencies": [
+        "U02a",
+        "U08a"
+      ]
+    },
+    {
+      "unit_id": "U04a-sync-client",
+      "paths": "packages/sync-client/src/**",
+      "kb": 148,
+      "tech_stack": "TS / fetch",
+      "entry_points": "client.ts",
+      "cross_unit_dependencies": [
+        "U03",
+        "U12a"
+      ]
+    },
+    {
+      "unit_id": "U04b-ai",
+      "paths": "packages/ai/src/**",
+      "kb": 236,
+      "tech_stack": "TS / fetch / SSE",
+      "entry_points": "stream.ts, provider.ts, routing.ts",
+      "cross_unit_dependencies": [
+        "U05a",
+        "U14b"
+      ]
+    },
+    {
+      "unit_id": "U05a-apphost-1",
+      "paths": "packages/app-host/src/account-closure.ts, packages/app-host/src/account-security.ts, packages/app-host/src/actions.ts, packages/app-host/src/admin-client.ts, packages/app-host/src/ai-assistant.ts, packages/app-host/src/ai-breakdown.ts, packages/app-host/src/ai-duration.ts, packages/app-host/src/ai-failure-fallback.ts, packages/app-host/src/ai-feedback-actions.ts, packages/app-host/src/ai-managed-transport.ts, packages/app-host/src/ai-output-language.ts, packages/app-host/src/ai-prioritize.ts, packages/app-host/src/ai-route-target.ts, packages/app-host/src/ai-settings-shared.ts, packages/app-host/src/ai-settings-store.ts, packages/app-host/src/ai-tool-call.ts, packages/app-host/src/ai-tool-run.ts, packages/app-host/src/ai-tool-selection.ts, packages/app-host/src/announcement-client.ts, packages/app-host/src/assistant-local-history.ts, packages/app-host/src/assistant-local-transcript.ts",
+      "kb": 324,
+      "tech_stack": "TS / app-host",
+      "entry_points": "host.ts, actions.ts, local-api-host.ts",
+      "cross_unit_dependencies": [
+        "U02a",
+        "U04a",
+        "U07"
+      ]
+    },
+    {
+      "unit_id": "U05b-apphost-2",
+      "paths": "packages/app-host/src/assistant-session-actions.ts, packages/app-host/src/attachment-actions.ts, packages/app-host/src/attachment-http.ts, packages/app-host/src/calendar-anchor.ts, packages/app-host/src/category-report.ts, packages/app-host/src/central-auth.ts, packages/app-host/src/checkout.ts, packages/app-host/src/comment-actions.ts, packages/app-host/src/conflict-routing.ts, packages/app-host/src/device-management.ts, packages/app-host/src/duration-note.ts, packages/app-host/src/endpoint-url.ts, packages/app-host/src/entitlement.ts, packages/app-host/src/event-actions.ts, packages/app-host/src/export-dump.ts, packages/app-host/src/focus-actions.ts, packages/app-host/src/focus-overview.ts, packages/app-host/src/habit-actions.ts, packages/app-host/src/habit-export.ts, packages/app-host/src/host-storage-erasure.ts, packages/app-host/src/host.ts",
+      "kb": 262,
+      "tech_stack": "TS / app-host",
+      "entry_points": "host.ts, actions.ts, local-api-host.ts",
+      "cross_unit_dependencies": [
+        "U02a",
+        "U04a",
+        "U07"
+      ]
+    },
+    {
+      "unit_id": "U05c-apphost-3",
+      "paths": "packages/app-host/src/hosted-auth.ts, packages/app-host/src/ids.ts, packages/app-host/src/import-dump.ts, packages/app-host/src/inbound-draft-review.ts, packages/app-host/src/inbound-entitlement-remote.ts, packages/app-host/src/inbound-entitlement-tickets.ts, packages/app-host/src/inbound-host-options.ts, packages/app-host/src/inbound-installation-store.ts, packages/app-host/src/inbound-key-store.ts, packages/app-host/src/inbound-process.ts, packages/app-host/src/inbound-recipient-remote.ts, packages/app-host/src/inbound-rules-remote.ts, packages/app-host/src/inbound-runner.ts, packages/app-host/src/inbound-secret-store.ts, packages/app-host/src/inbound-session-keepalive.ts, packages/app-host/src/inbound-worker-loop.ts, packages/app-host/src/inbound-worker.ts, packages/app-host/src/inbox.ts, packages/app-host/src/index.ts, packages/app-host/src/legal-links.ts, packages/app-host/src/legal-recheck.ts, packages/app-host/src/library-owner.ts, packages/app-host/src/local-api-host.ts, packages/app-host/src/local-erasure.ts",
+      "kb": 369,
+      "tech_stack": "TS / app-host",
+      "entry_points": "host.ts, actions.ts, local-api-host.ts",
+      "cross_unit_dependencies": [
+        "U02a",
+        "U04a",
+        "U07"
+      ]
+    },
+    {
+      "unit_id": "U06a-vault-share",
+      "paths": "packages/app-host/src/{vault-*,share-*}.ts",
+      "kb": 253,
+      "tech_stack": "TS / 加密共享",
+      "entry_points": "vault-session.ts, share-client.ts",
+      "cross_unit_dependencies": [
+        "U03",
+        "U08a"
+      ]
+    },
+    {
+      "unit_id": "U06b-apphost-mz",
+      "paths": "packages/app-host/src 其余 M–Z 文件",
+      "kb": 244,
+      "tech_stack": "TS / native bridge / reminder / sync wiring",
+      "entry_points": "native-bridge.ts, sync-wiring.ts, reminder-scheduler.ts",
+      "cross_unit_dependencies": [
+        "U03",
+        "U16a",
+        "U20a"
+      ]
+    },
+    {
+      "unit_id": "U07-localapi-inbound",
+      "paths": "packages/{local-api,inbound-core,widget-core}/src/**",
+      "kb": 305,
+      "tech_stack": "TS / JSON-RPC / webhook",
+      "entry_points": "local-api/server.ts, mcp.ts; inbound-core/webhook.ts, parser.ts",
+      "cross_unit_dependencies": [
+        "U06b",
+        "U11"
+      ]
+    },
+    {
+      "unit_id": "U08a-sync-routes",
+      "paths": "server/src/sync 顶层（不含 services/）",
+      "kb": 240,
+      "tech_stack": "TS / Fastify / Prisma",
+      "entry_points": "sync.routes.ts, sync.service.ts, op-replay.ts",
+      "cross_unit_dependencies": [
+        "U03",
+        "U10a"
+      ]
+    },
+    {
+      "unit_id": "U08b-sync-services",
+      "paths": "server/src/sync/services/** + cleanup.ts",
+      "kb": 241,
+      "tech_stack": "TS / Fastify / Prisma",
+      "entry_points": "services/*",
+      "cross_unit_dependencies": [
+        "U08a"
+      ]
+    },
+    {
+      "unit_id": "U09a-billing",
+      "paths": "server/src/billing/**",
+      "kb": 357,
+      "tech_stack": "TS / Fastify / 支付适配",
+      "entry_points": "webhook.routes.ts, checkout.routes.ts, wechat.adapter.ts",
+      "cross_unit_dependencies": [
+        "U10a"
+      ]
+    },
+    {
+      "unit_id": "U09b-auth-account-admin",
+      "paths": "server/src/{central-auth,password,account,admin}/**",
+      "kb": 374,
+      "tech_stack": "TS / Fastify / Prisma",
+      "entry_points": "central-auth/*, admin/*",
+      "cross_unit_dependencies": [
+        "U10a"
+      ]
+    },
+    {
+      "unit_id": "U10a-server-core",
+      "paths": "server/src/api-error.ts, server/src/auth-cache.ts, server/src/auth-tokens.ts, server/src/config.ts, server/src/db.ts, server/src/email-allowlist.ts, server/src/index.ts, server/src/logger.ts, server/src/middleware.ts, server/src/request-locale.ts, server/src/server.ts, server/src/test-routes.ts, server/src/web-app.ts",
+      "kb": 129,
+      "tech_stack": "TS / Fastify 启动与中间件",
+      "entry_points": "server.ts, index.ts, config.ts",
+      "cross_unit_dependencies": [
+        "U08a",
+        "U09a"
+      ]
+    },
+    {
+      "unit_id": "U10b-server-api-auth",
+      "paths": "server/src/api.ts, server/src/auth.ts, server/src/design-html.ts, server/src/email.ts, server/src/entitlement.ts, server/src/legal-consent.ts, server/src/legal-recheck.ts, server/src/pages.ts, server/src/passkey.ts",
+      "kb": 338,
+      "tech_stack": "TS / Fastify 路由与鉴权",
+      "entry_points": "api.ts, auth.ts, passkey.ts",
+      "cross_unit_dependencies": [
+        "U10a"
+      ]
+    },
+    {
+      "unit_id": "U10c-automation-ai-push",
+      "paths": "server/src/{automation,ai,push}/**",
+      "kb": 287,
+      "tech_stack": "TS / Fastify / SSE / webpush",
+      "entry_points": "automation/*, ai/*, push/*",
+      "cross_unit_dependencies": [
+        "U10b",
+        "U04b"
+      ]
+    },
+    {
+      "unit_id": "U10d-server-misc",
+      "paths": "server/src/{shares,activity,holidays,attachments,announcements,util}/**",
+      "kb": 127,
+      "tech_stack": "TS / Fastify",
+      "entry_points": "shares/*, activity/*",
+      "cross_unit_dependencies": [
+        "U10b"
+      ]
+    },
+    {
+      "unit_id": "U11-nodehost-desktop",
+      "paths": "apps/node-host/src/** + apps/desktop/{src,renderer}/**",
+      "kb": 281,
+      "tech_stack": "TS / Electron / node:sqlite",
+      "entry_points": "node-host/cli.ts, desktop/main.ts, preload.ts",
+      "cross_unit_dependencies": [
+        "U05a",
+        "U07"
+      ]
+    },
+    {
+      "unit_id": "U12a-web-shell-1",
+      "paths": "apps/web/src/App.tsx, apps/web/src/boot-splash.ts, apps/web/src/dev/shell-host.tsx, apps/web/src/dev/universal-slice.tsx, apps/web/src/lib/auth-deep-link.ts, apps/web/src/lib/auth-endpoint.ts, apps/web/src/lib/breakpoints.ts, apps/web/src/lib/category-colors.ts, apps/web/src/lib/central-account-binding.ts, apps/web/src/lib/central-fetch.ts, apps/web/src/lib/dialog/DangerConfirmDialog.tsx, apps/web/src/lib/dialog/WebModalShell.tsx, apps/web/src/lib/dialog/useModalFocusIsolation.ts, apps/web/src/lib/due-display.ts, apps/web/src/lib/editable-target.ts, apps/web/src/lib/feedback/UndoReceipt.tsx, apps/web/src/lib/feedback/history-notice.ts, apps/web/src/lib/feedback/undo-receipt.ts, apps/web/src/lib/focus-config.ts, apps/web/src/lib/form/FormField.tsx, apps/web/src/lib/form/useDirtyDismissGuard.tsx, apps/web/src/lib/keyboard-cursor.ts, apps/web/src/lib/local-data-destruction.ts, apps/web/src/lib/locale-account.ts, apps/web/src/lib/locale-host.tsx, apps/web/src/lib/locale-preference.tsx",
+      "kb": 380,
+      "tech_stack": "TS / React / Vite / PWA",
+      "entry_points": "main.tsx, App.tsx, pwa/sw.ts",
+      "cross_unit_dependencies": [
+        "U01b",
+        "U05a"
+      ]
+    },
+    {
+      "unit_id": "U12b-web-shell-2",
+      "paths": "apps/web/src/lib/locale.ts, apps/web/src/lib/menu/AnchoredMenu.tsx, apps/web/src/lib/menu/useMenuKeyboard.ts, apps/web/src/lib/native-widgets.ts, apps/web/src/lib/oplog.ts, apps/web/src/lib/selection.ts, apps/web/src/lib/settings-deep-link.ts, apps/web/src/lib/share-signal-sink.ts, apps/web/src/lib/site-url.ts, apps/web/src/lib/startup-mode.ts, apps/web/src/lib/tab-roving.ts, apps/web/src/lib/text.ts, apps/web/src/lib/theme.ts, apps/web/src/lib/use-modal-dismiss.ts, apps/web/src/lib/vault-root-cache.ts, apps/web/src/lib/vault-root-keychain.ts, apps/web/src/lib/vault-root-preference.ts, apps/web/src/lib/vault-session.ts, apps/web/src/main.tsx, apps/web/src/pwa/lifecycle.ts, apps/web/src/pwa/publish.ts, apps/web/src/pwa/push-subscribe.ts, apps/web/src/pwa/register.ts, apps/web/src/pwa/sw-core.ts, apps/web/src/pwa/sw.ts, apps/web/src/pwa/widget-drain.ts, apps/web/src/pwa/widget-install.ts, apps/web/src/worker/storage.worker.ts",
+      "kb": 244,
+      "tech_stack": "TS / React / Vite / PWA",
+      "entry_points": "main.tsx, App.tsx, pwa/sw.ts",
+      "cross_unit_dependencies": [
+        "U01b",
+        "U05a"
+      ]
+    },
+    {
+      "unit_id": "U13a-web-settings",
+      "paths": "apps/web/src/features/settings/**",
+      "kb": 425,
+      "tech_stack": "TS / React",
+      "entry_points": "settings/*",
+      "cross_unit_dependencies": [
+        "U12a"
+      ]
+    },
+    {
+      "unit_id": "U13b-web-ai-auth",
+      "paths": "apps/web/src/features/ai/** + apps/web/src/features/auth/**",
+      "kb": 379,
+      "tech_stack": "TS / React",
+      "entry_points": "ai/*, auth/*",
+      "cross_unit_dependencies": [
+        "U12a"
+      ]
+    },
+    {
+      "unit_id": "U13c-web-tasks-shell",
+      "paths": "apps/web/src/features/tasks/** + apps/web/src/features/shell/**",
+      "kb": 359,
+      "tech_stack": "TS / React",
+      "entry_points": "tasks/*, shell/*",
+      "cross_unit_dependencies": [
+        "U12a"
+      ]
+    },
+    {
+      "unit_id": "U13d-web-sync-admin",
+      "paths": "apps/web/src/features/sync/** + apps/web/src/features/admin/**",
+      "kb": 297,
+      "tech_stack": "TS / React",
+      "entry_points": "sync/*, admin/*",
+      "cross_unit_dependencies": [
+        "U12a"
+      ]
+    },
+    {
+      "unit_id": "U13e-web-share-misc",
+      "paths": "apps/web/src/features/share/** + apps/web/src/features/subscription/** + apps/web/src/features/privacy/** + apps/web/src/features/capture/** + apps/web/src/features/trash/** + apps/web/src/features/notes/** + apps/web/src/features/kanban/** + apps/web/src/features/legal-recheck/** + apps/web/src/features/tags/** + apps/web/src/features/timeline/** + apps/web/src/features/announcements/**",
+      "kb": 313,
+      "tech_stack": "TS / React",
+      "entry_points": "share/*, capture/*, trash/*",
+      "cross_unit_dependencies": [
+        "U12a"
+      ]
+    },
+    {
+      "unit_id": "U13f-web-habits-cal",
+      "paths": "apps/web/src/features/habits/** + apps/web/src/features/calendar/** + apps/web/src/features/reminders/** + apps/web/src/features/projects/** + apps/web/src/features/inbox/**",
+      "kb": 340,
+      "tech_stack": "TS / React",
+      "entry_points": "habits/*, calendar/*",
+      "cross_unit_dependencies": [
+        "U12a"
+      ]
+    },
+    {
+      "unit_id": "U13g-web-small-features",
+      "paths": "apps/web/src/features/focus/** + apps/web/src/features/categories/** + apps/web/src/features/quadrant/** + apps/web/src/features/countdown/** + apps/web/src/features/motivation/**",
+      "kb": 139,
+      "tech_stack": "TS / React",
+      "entry_points": "focus/*, countdown/*",
+      "cross_unit_dependencies": [
+        "U12a"
+      ]
+    },
+    {
+      "unit_id": "U15a-ui-auth-sync",
+      "paths": "packages/ui/src/auth/** + packages/ui/src/sync/**",
+      "kb": 310,
+      "tech_stack": "TS / React Native + react-native-web",
+      "entry_points": "auth/*",
+      "cross_unit_dependencies": [
+        "U02b"
+      ]
+    },
+    {
+      "unit_id": "U15b-ui-task-list",
+      "paths": "packages/ui/src/task-list/** + packages/ui/src/categories/** + packages/ui/src/subtasks/** + packages/ui/src/trash/** + packages/ui/src/form/** + packages/ui/src/icon/** + packages/ui/src/material/** + packages/ui/src/control/**",
+      "kb": 216,
+      "tech_stack": "TS / React Native + react-native-web",
+      "entry_points": "task-list/*",
+      "cross_unit_dependencies": [
+        "U02b"
+      ]
+    },
+    {
+      "unit_id": "U15c-ui-habits-focus",
+      "paths": "packages/ui/src/habits/** + packages/ui/src/focus/** + packages/ui/src/reminders/** + packages/ui/src/quadrant/**",
+      "kb": 215,
+      "tech_stack": "TS / React Native + react-native-web",
+      "entry_points": "habits/*",
+      "cross_unit_dependencies": [
+        "U02b"
+      ]
+    },
+    {
+      "unit_id": "U15d-ui-calendar-countdown",
+      "paths": "packages/ui/src/calendar/** + packages/ui/src/date-picker/** + packages/ui/src/countdown/**",
+      "kb": 225,
+      "tech_stack": "TS / React Native + react-native-web",
+      "entry_points": "calendar/*",
+      "cross_unit_dependencies": [
+        "U02b"
+      ]
+    },
+    {
+      "unit_id": "U15e-ui-motivation-projects",
+      "paths": "packages/ui/src/motivation/** + packages/ui/src/projects/** + packages/ui/src/notes/**",
+      "kb": 228,
+      "tech_stack": "TS / React Native + react-native-web",
+      "entry_points": "motivation/*",
+      "cross_unit_dependencies": [
+        "U02b"
+      ]
+    },
+    {
+      "unit_id": "U15f-ui-capture-search",
+      "paths": "packages/ui/src/capture/** + packages/ui/src/search/** + packages/ui/src/timeline/** + packages/ui/src/attachments/**",
+      "kb": 208,
+      "tech_stack": "TS / React Native + react-native-web",
+      "entry_points": "capture/*",
+      "cross_unit_dependencies": [
+        "U02b"
+      ]
+    },
+    {
+      "unit_id": "U15g-ui-overlay-feedback",
+      "paths": "packages/ui/src/overlay/** + packages/ui/src/feedback/** + packages/ui/src/empty-state/**",
+      "kb": 143,
+      "tech_stack": "TS / React Native + react-native-web",
+      "entry_points": "overlay/*",
+      "cross_unit_dependencies": [
+        "U02b"
+      ]
+    },
+    {
+      "unit_id": "U15h-ui-ai-settings",
+      "paths": "packages/ui/src/ai/** + packages/ui/src/settings/**",
+      "kb": 85,
+      "tech_stack": "TS / React Native + react-native-web",
+      "entry_points": "ai/*",
+      "cross_unit_dependencies": [
+        "U02b"
+      ]
+    },
+    {
+      "unit_id": "U16a-mobile-shell",
+      "paths": "apps/mobile/src/{App.tsx,theme.tsx,db,nav,prefs,privacy,i18n,legal-recheck,ui}/** + index.js + metro.config.js",
+      "kb": 255,
+      "tech_stack": "TS / RN 0.84 / op-sqlite",
+      "entry_points": "App.tsx, db/*, sync/*",
+      "cross_unit_dependencies": [
+        "U01a",
+        "U05a"
+      ]
+    },
+    {
+      "unit_id": "U17a-mobile-screens-1",
+      "paths": "apps/mobile/src/screens/AbandonedScreen.tsx, apps/mobile/src/screens/AccountClosureScreen.tsx, apps/mobile/src/screens/AuthScreen.tsx, apps/mobile/src/screens/CalendarScreen.tsx, apps/mobile/src/screens/CategoriesScreen.tsx, apps/mobile/src/screens/ConflictSheet.tsx, apps/mobile/src/screens/CountdownScreen.tsx, apps/mobile/src/screens/EmailChangeSection.tsx, apps/mobile/src/screens/EntitlementSection.tsx, apps/mobile/src/screens/ExportScreen.tsx, apps/mobile/src/screens/FocusScreen.tsx, apps/mobile/src/screens/GrowthScreen.tsx, apps/mobile/src/screens/HabitsScreen.tsx, apps/mobile/src/screens/JoinShareScreen.tsx, apps/mobile/src/screens/LegalReconfirmSheet.tsx, apps/mobile/src/screens/ListsSection.tsx, apps/mobile/src/screens/NoteEditScreen.tsx, apps/mobile/src/screens/NotesSection.tsx",
+      "kb": 283,
+      "tech_stack": "TS / React Native",
+      "entry_points": "screens/*",
+      "cross_unit_dependencies": [
+        "U16a"
+      ]
+    },
+    {
+      "unit_id": "U17b-mobile-screens-2",
+      "paths": "apps/mobile/src/screens/NotificationsScreen.tsx, apps/mobile/src/screens/PrivacyConsentSheet.tsx, apps/mobile/src/screens/ProfileProgressSummary.tsx, apps/mobile/src/screens/ProfileScreen.tsx, apps/mobile/src/screens/QuadrantScreen.tsx, apps/mobile/src/screens/ReminderDeliverySection.tsx, apps/mobile/src/screens/RenewSection.tsx, apps/mobile/src/screens/SearchScreen.tsx, apps/mobile/src/screens/SecurityScreen.tsx, apps/mobile/src/screens/SessionsSection.tsx, apps/mobile/src/screens/SettingsScreen.tsx, apps/mobile/src/screens/ShareSpaceScreen.tsx, apps/mobile/src/screens/SubscriptionSection.tsx, apps/mobile/src/screens/TagsSection.tsx",
+      "kb": 291,
+      "tech_stack": "TS / React Native",
+      "entry_points": "screens/*",
+      "cross_unit_dependencies": [
+        "U16a"
+      ]
+    },
+    {
+      "unit_id": "U17c-mobile-screens-3",
+      "paths": "apps/mobile/src/screens/TaskDetailSheet.tsx, apps/mobile/src/screens/TasksScreen.tsx, apps/mobile/src/screens/TimelineScreen.tsx, apps/mobile/src/screens/TrashScreen.tsx, apps/mobile/src/screens/VaultSettingsSection.tsx, apps/mobile/src/screens/WelcomeScreen.tsx",
+      "kb": 254,
+      "tech_stack": "TS / React Native",
+      "entry_points": "screens/*",
+      "cross_unit_dependencies": [
+        "U16a"
+      ]
+    },
+    {
+      "unit_id": "U17d-mobile-lib",
+      "paths": "apps/mobile/src/lib/**",
+      "kb": 250,
+      "tech_stack": "TS / RN 工具与状态",
+      "entry_points": "lib/*",
+      "cross_unit_dependencies": [
+        "U16a"
+      ]
+    },
+    {
+      "unit_id": "U17e-mobile-features",
+      "paths": "apps/mobile/src/{ai,share,inbound,auth,widgets}/**",
+      "kb": 265,
+      "tech_stack": "TS / RN",
+      "entry_points": "ai/*, share/*, widgets/*",
+      "cross_unit_dependencies": [
+        "U16a",
+        "U04b"
+      ]
+    },
+    {
+      "unit_id": "U18-native-macos",
+      "paths": "apps/desktop-macos/Sources/**",
+      "kb": 262,
+      "tech_stack": "Swift / JavaScriptCore / libsqlite3 / WKWebView",
+      "entry_points": "HeytaMacApp.swift, HeytaShellCore/*",
+      "cross_unit_dependencies": [
+        "U11"
+      ]
+    },
+    {
+      "unit_id": "U19-native-windows",
+      "paths": "apps/desktop-windows/{Heyta.Windows.Core,HeytaWindows}/**",
+      "kb": 140,
+      "tech_stack": "C# / WinUI 3",
+      "entry_points": "HeytaWindows/*.xaml.cs",
+      "cross_unit_dependencies": [
+        "U11"
+      ]
+    },
+    {
+      "unit_id": "U20a-native-ios",
+      "paths": "apps/mobile/ios/{Heyta,HeytaWidgetCore,HeytaWidgetExtension}/**（跳过 Pods/build）",
+      "kb": 377,
+      "tech_stack": "Swift / WidgetKit",
+      "entry_points": "WidgetBridge, WidgetStore",
+      "cross_unit_dependencies": [
+        "U16a"
+      ]
+    },
+    {
+      "unit_id": "U20b-native-android-harmony",
+      "paths": "apps/mobile/android/app/src/main/java/** + apps/mobile/harmony/entry/src/main/ets/**",
+      "kb": 308,
+      "tech_stack": "Kotlin / ArkTS",
+      "entry_points": "MainActivity, EntryAbility.ets, widget/*",
+      "cross_unit_dependencies": [
+        "U16a"
+      ]
+    },
+    {
+      "unit_id": "U21a-landing-site",
+      "paths": "apps/landing/src/{site,pages}/** + 顶层文件",
+      "kb": 252,
+      "tech_stack": "TS / Vite 静态站",
+      "entry_points": "main.tsx, site/*, pages/*",
+      "cross_unit_dependencies": []
+    },
+    {
+      "unit_id": "U21b-landing-components",
+      "paths": "apps/landing/src/{components,lib,mockup}/**",
+      "kb": 239,
+      "tech_stack": "TS / React",
+      "entry_points": "components/*",
+      "cross_unit_dependencies": [
+        "U21a"
+      ]
+    },
+    {
+      "unit_id": "U21c-design-system",
+      "paths": "packages/design-system/src/**（不含 generated）",
+      "kb": 127,
+      "tech_stack": "TS / tokens 运行时解析",
+      "entry_points": "index.ts",
+      "cross_unit_dependencies": [
+        "U15a"
+      ]
+    }
+  ]
+}

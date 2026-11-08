@@ -1548,6 +1548,58 @@ describe('离线重试调度', () => {
       vi.useRealTimers();
     }
   });
+
+  /**
+   * 【崩溃审计 2026-11-08 · B.4】`run()` 违约抛错时不得变成未处理 rejection。
+   *
+   * 原来这里是 `void run().then(...)`，**没有 `.catch()`**。`void` 把 `.then`
+   * 产出的 promise 直接丢掉，于是 `run()` 一拒绝就是一条 unhandled rejection：
+   *
+   *   - Node 22 默认 `--unhandled-rejections=throw` ⇒ **进程终止**
+   *     （node-host 与两个桌面壳的同步都跑在 Node 里，这是真的会闪退）；
+   *   - 浏览器里 rejection 静默消失，但退避链**就此断掉** ——
+   *     用户看到"离线"，而应用再也不会自己重试。
+   *
+   * 修法是把一次意外的 reject 当**可重试失败**继续调度。所以本用例断言两件事：
+   *   1. 没有任何未处理 rejection 逃出去；
+   *   2. 拒绝之后重试链**还在跑**（不是停摆）。
+   *
+   * 把 `.catch(() => { schedule(); })` 删掉 ⇒ 本条在"unhandled rejection"上变红。
+   */
+  it('🔴 run() 抛错时不得产生未处理 rejection，且重试链要继续跑', async () => {
+    vi.useFakeTimers();
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      let calls = 0;
+      const run = vi.fn(async (): Promise<SyncStatus> => {
+        calls += 1;
+        // 头两次违约抛错（模拟适配器已销毁 / 存储抛错），第三次才正常返回。
+        if (calls <= 2) throw new Error('适配器已销毁');
+        return { kind: 'synced', at: 1 };
+      });
+
+      const s = createRetryScheduler(run, { baseDelayMs: 10, maxDelayMs: 50 });
+      s.start();
+
+      // 推进足够长的时间，让前两次拒绝 + 退避都发生完。
+      await vi.advanceTimersByTimeAsync(2000);
+      // 让微任务队列排空，unhandledRejection 才会派发。
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(unhandled).toHaveLength(0);
+      // 关键：拒绝之后链还在跑 —— 第三次被调到了，并且成功后停止。
+      expect(calls).toBeGreaterThanOrEqual(3);
+      s.stop();
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      vi.useRealTimers();
+    }
+  });
 });
 
 

@@ -2031,16 +2031,41 @@ export function createRetryScheduler(
     const delay = Math.min(base * 2 ** attempt, max);
     attempt += 1;
     timer = setTimeout(() => {
-      void run().then((status) => {
-        // 成功或不可重试 → 停止；
-        // 离线/可重试错误 → 继续退避
-        if (status.kind === 'synced') {
-          attempt = 0;
-          return;
-        }
-        if (status.kind === 'error' && !status.retryable) return;
-        schedule();
-      });
+      /**
+       * 🔴 `void` + `.then()` 而没有 `.catch()` 是一条**未处理 rejection**。
+       *
+       * 【为什么（崩溃审计 2026-11-08 · B.4）】
+       *
+       * `run()` 的契约是"返回 SyncStatus、不抛" —— 但那是**当前实现**的契约，
+       * 不是类型上的保证（返回类型是 `Promise<SyncStatus>`，一个抛出的 promise
+       * 同样满足它）。此前这里是 `void run().then(...)`：一旦 `run()` 拒绝，
+       * `.then` 产出的那条 promise 就是 rejected，而 `void` 把它直接丢掉。
+       *
+       * 两种宿主的后果不同，但都不好：
+       *   - Node 22 默认 `--unhandled-rejections=throw` ⇒ **进程终止**
+       *     （node-host 与两个桌面壳的同步都跑在 Node 里）；
+       *   - 浏览器里 rejection 静默消失，但退避链**就此断掉** ——
+       *     用户看到"离线"，而应用再也不会自己重试，直到下一次手动同步。
+       *
+       * 修法不是"包一层 try/catch 然后忽略"，而是**把它当成一次可重试的失败**：
+       * 记一次退避并继续调度，这样一次意外的 reject 不会永久停掉重试链。
+       */
+      void run()
+        .then((status) => {
+          // 成功或不可重试 → 停止；
+          // 离线/可重试错误 → 继续退避
+          if (status.kind === 'synced') {
+            attempt = 0;
+            return;
+          }
+          if (status.kind === 'error' && !status.retryable) return;
+          schedule();
+        })
+        .catch(() => {
+          // run() 违约抛了（例如适配器已销毁、存储抛错）。
+          // 当作一次可重试失败：继续退避，而不是让重试链永久停摆。
+          schedule();
+        });
     }, delay);
   };
 

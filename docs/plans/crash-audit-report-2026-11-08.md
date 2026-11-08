@@ -1,0 +1,432 @@
+# 崩溃审计报告 · heyta（2026-11-08）
+
+> 🔴 **本报告不声称"零崩溃"，也不声称"证明了无崩溃"。** 静态审计在原理上无法得出这个结论。
+> 本报告给出的是：**已复核的缺陷清单 + 已定位的结构性根因 + 明确的未覆盖边界**。
+
+---
+
+## A. 审计范围与覆盖边界
+
+### A.1 仓库与分区
+
+单仓库 monorepo（pnpm workspace，17 个包 + 1 个 server + 8 个客户端壳）：
+
+| 层 | 路径 | 实测规模 |
+|---|---|---|
+| 共享核心 | `packages/{op-log,domain,storage,sync-core,sync-client,app-host,ai,local-api,inbound-core,widget-core,shared-schema}` | ~12 MB TS |
+| 服务端 | `server/`（Fastify + Prisma + PostgreSQL） | 6.5 MB / 422 文件 |
+| 客户端壳 | `apps/{web,mobile,desktop,node-host,desktop-macos,desktop-windows,landing}` | ~14 MB（含 182 个原生源文件） |
+
+分区产物：`audit_plan.json`（21 个单元，含 `unit_id / paths / tech_stack / entry_points / cross_unit_dependencies`）。
+执行中因平台并发上限（8）与子代理失败，把大单元进一步切小，实际落地为 **15 个单元**。
+
+### A.2 覆盖实况
+
+| 单元 | 范围 | 状态 | 发现 |
+|---|---|---|---|
+| **U01a** | `storage/src/sqlite/**` | ✅ 完成 | 10（2 P0） |
+| **U01b** | `storage` indexeddb + memory + db-op-log-store | ✅ 完成 | 14（3 P0） |
+| **U02a** | `op-log` engine + state | ✅ 完成 | 3（1 P0） |
+| **U02b** | `domain` events / date / activity-categories / habit-review | ✅ 完成 | 5（3 P0） |
+| **U02c** | `domain` recurrence / reminders / ticktick-import | ✅ 完成 | 3（0 P0） |
+| **U03** | `sync-core`（含 compression / encryption） | ✅ 完成 | 6（2 P0） |
+| **U04a** | `sync-client` | ✅ 完成 | 9（3 P0） |
+| **U04b** | `ai` | ✅ 完成 | 8（2 P0） |
+| **U05a/b/c** | `app-host` 切片（actions / admin / ai-* / entitlement / central-auth / inbound-* / vault / share） | ✅ 完成 | 20（1 P0） |
+| **U06a** | `app-host` vault + share | ✅ 完成 | 8（1 P0） |
+| **U07** | `local-api` + `inbound-core` + `widget-core` | ✅ 完成 | 14（0 P0） |
+| **U08a** | `server/src/sync` routes / conflict / replay / quota | ✅ 完成 | 5（0 P0） |
+| **U08b** | `server/src/sync/services` | ✅ 完成 | 4（1 P0，**已证伪**） |
+| **U09/U10** | `server` billing / central-auth / api.ts / 其余 | ⛔ 未完成 | — |
+| **U11/U12** | `apps/desktop` + `apps/node-host` / `apps/web` | ⛔ 未完成 | — |
+| **U13–U21** | mobile / web features / ui / 原生壳 / landing | ⛔ 未派发 | — |
+
+**合计：15 个单元完成，约 101 条发现，其中 18 条被标为 P0。**
+
+### A.3 覆盖边界（**这一节比上面的表更重要**）
+
+**完全未审计：**
+
+| 面 | 为什么这是最大的风险 |
+|---|---|
+| `apps/web`（6.1 MB） | 用户看到的"白屏/闪退"绝大多数发生在这里：ErrorBoundary 是否存在、启动引导失败、SW 缓存白屏。**零覆盖** |
+| `apps/mobile`（3.5 MB + 原生） | React Native 崩溃 + 5 个原生桥 |
+| `apps/desktop` / `node-host` | Electron 主进程崩 = 整窗闪退；`uncaughtException` 是否注册 |
+| 6 个原生壳（Swift / C# / Kotlin / ArkTS / C / GTK） | native 崩溃边界，**零覆盖** |
+| `server/` billing + central-auth + `api.ts`（2925 行） | 公网暴露面，支付回调是未认证入口。**零覆盖** |
+
+**排除项：** `node_modules / dist / build / obj / bin / .build / generated / **/*.generated.ts`、
+`packages/x|y`（空）、`research / scripts / docs / e2e / evidence / probe`、`apps/desktop-linux`（未分配单元）。
+
+---
+
+## B. P0 缺陷清单
+
+### B.1 🔴🔴 一条 `__proto__` 键让应用**永久无法启动**
+
+**这是本次审计最重要的发现。它不是理论风险，机制已逐行核实，且触发物是一段普通 JSON。**
+
+| 项 | 值 |
+|---|---|
+| 缺陷类 | `unhandled-exception` → 冷启动永久失败 |
+| 位置 | `packages/op-log/src/state.ts:589`（根因）；`engine.ts:869-872`、`engine.ts:1003`、`host.ts:540`（放大链） |
+| 外部可触发性 | **高** —— 导入一份备份 JSON 即可 |
+| confidence | **confirmed（机制/缺 catch/落盘顺序均已逐行核实）** |
+
+**根因（`state.ts:588-591`）：**
+```ts
+const addFieldVersion = (key: string, value: unknown, deleted: boolean): void => {
+  const versions = (fieldVersions[key] ??= []);
+  addUnique(versions, { meta: currentMeta, value, deleted });
+};
+```
+`fieldVersions` 是普通对象。若 op 的 payload 里出现 `__proto__`、`constructor`、`toString`、
+`valueOf` 等**任何 `Object.prototype` 上的成员名**，则：
+
+1. `fieldVersions['constructor']` 读到的是**继承来的** `Object` 函数（truthy）；
+2. `??=` **不会**赋值（左值已"有值"）；
+3. `versions` = 那个函数 → `addUnique` 里 `versions.some(...)`（`state.ts:268`）
+   → **`TypeError: versions.some is not a function`**。
+
+**为什么能到盘上（`engine.ts:856-872`）：**
+```ts
+for (const op of ops) {
+  validateReminderOwnerOperation(op);
+  if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload) || ...) {  // ← 只覆盖三类
+    applyOperation(emptyState(), op);
+  }
+}
+const result = await this.options.store.appendImported([...ops]);   // ← 普通实体 op 未校验就入盘
+await this.recoverLocked();                                        // ← 在这里炸，但已经晚了
+```
+源码注释自己写着 `"Otherwise a bad backup poisons every subsequent cold start"` —— 
+**而这个防护恰好漏掉了普通实体 op**（普通 op 的 payload 只被 `if (payload === null || typeof payload !== 'object') return state;` 这种弱检查放行）。
+
+**为什么不可恢复（`host.ts:540`）：**
+```ts
+await engine.recover();     // 无 try/catch，且在 vaultStore / vaultSession 一切初始化之前
+```
+`recover()` → `recoverLocked()` → `engine.ts:1003` `applyOperation(this.state, record.op)`
+（回溯循环无 try/catch）→ 抛 → `openAppHost()` reject → **宿主对象不存在，没有任何 UI 能报错**。
+
+**完整触发路径：**
+> 用户在导入面板选一份备份 JSON（或同步对端送来一条 op）→ payload 含 `"constructor"` 键
+> → `appendImported` 落盘 → `recoverLocked` 抛 TypeError → 本次导入失败
+> → **此后每次启动都在同一处炸** → 重装无效（数据在本地库）。
+
+**验证要点（可复现）：** `JSON.parse('{"constructor":1}')` 会生成**自有属性** `constructor`，
+`Object.entries` 会枚举到它 —— 所以这段 JSON 完全合法且能穿透到 reducer。
+
+**消除器（推荐）：**
+1. `fieldVersions` / `entityVersions` 一律用 `Object.create(null)` 或 `Map` 承载 ——
+   **一个改动让整类"原型链污染致 TypeError"不可能再发生**；
+2. reducer 返回 `Result<State, OpError>`，永不 throw；
+3. `recoverLocked` 把失败 op 持久化为 `quarantined` 并跳过，向 UI 上报计数；
+4. `importOperationsLocked` 改为**先全量校验（含普通实体 op）再 append**，或 append 失败则回滚已追加行。
+
+---
+
+### B.2 🔴 一条坏远端 op 永久杀死同步（永不隔离）
+
+| 项 | 值 |
+|---|---|
+| 缺陷类 | `unhandled-exception` → 同步永久失效 |
+| 位置 | `packages/op-log/src/engine.ts:769-777` |
+| 外部可触发性 | **高** —— 任何一台设备、任何一次服务端脏数据 |
+| confidence | **confirmed** |
+
+```ts
+private async applyRemoteLocked(ops: Operation<string>[]): Promise<RemoteApplyResult> {
+  if (ops.length === 0) return { applied: [], skipped: 0, overwritten: [] };
+  for (const op of ops) {
+    validateReminderOwnerOperation(op);                    // 可 throw
+    if (isFullStateOperation(op) || hasTaskBatchMarker(...) || ...) {
+      applyOperation(emptyState(), op);                     // 可 throw（B.1 的 TypeError 也在这里）
+    }
+  }
+```
+**整个循环没有 try/catch。**
+
+后果链：throw → `sync-client/src/client.ts:1399` `await this.options.applyRemote(decoded)`（无 catch）
+→ `sync()` 顶层 catch（`client.ts:1017`）接住 → 返回 `{kind:'error'}`
+→ **但该 op 既未落盘也未隔离，游标不推进** → 下次 `sync()` 拉到同一条 op → 再抛
+→ **同步永久停在错误上**，用户看到的与网络抖动无法区分，重试一万次都一样。
+
+**消除器：** ingress 循环把校验失败转成**逐 op 拒绝结果**（`{opId, reason}[]`），
+**并把被拒 op 持久化**（否则游标不推进的重拉会无限重复）；`sync()` 把它作为**终态**上报。
+
+> 🔴 B.1 与 B.2 共享同一个根因：**reducer 会 throw，而没有任何一层准备接住它**。
+> 修 B.1 的消除器（reducer → Result + null-prototype 桶）会同时消掉 B.2。
+
+---
+
+### B.3 🔴 错误规范化自身会抛错，把 catch 变成新的崩溃点
+
+| 项 | 值 |
+|---|---|
+| 缺陷类 | `unhandled-exception`（二次抛） |
+| 位置 | `packages/storage/src/errors.ts:92` |
+| confidence | **confirmed** |
+
+```ts
+export function storageError(cause: unknown, fallbackMessage: string, failure: StorageFailure): StorageError {
+  if (cause instanceof Error) return new StorageError(cause.message, failure, cause);
+  if (cause === undefined || cause === null) return new StorageError(fallbackMessage, failure);
+  return new StorageError(String(cause), failure, cause);      // ← String(cause) 可抛
+}
+```
+对 `Object.create(null)`（无 `toString`）或 toString 自身的对象，`String(cause)` 抛
+`TypeError: Cannot convert object to primitive value`。
+**它是在 catch 块里被调用的** —— 于是"处理错误"这件事本身变成了新的未捕获异常，
+并且会跳过事务的清理逻辑（子代理 U01b 描述为"挂起事务"）。
+
+**消除器：** 所有错误规范化走一个**自身不可能抛**的 `safeMessage(cause)`（内部 try/catch + 类型白名单），
+并加一条 `check:error-normalizer-total` 门禁。
+
+---
+
+### B.4 🟠 重试调度器的 `.then` 无 `.catch`，`run()` 拒绝即未处理 rejection
+
+`packages/sync-client/src/client.ts:2034`
+```ts
+timer = setTimeout(() => {
+  void run().then((status) => { ... schedule(); });
+}, delay);
+```
+`void` 丢弃了 `.then` 产出的 promise。`run()` 一旦 reject（而非返回 error status），
+就是一条 **unhandled rejection**。Node 22 默认 `--unhandled-rejections=throw`；
+浏览器侧它会静默消失但把状态机卡在"永不重试"。
+
+**结构性缺陷，已核实形状；`run()` 的实际 reject 概率未取证。**
+
+---
+
+### B.5 🟠 恢复路径的三个 throw 点（B.1 的放大器）
+
+`packages/op-log/src/state.ts`
+- `:362` `throw new Error('Unsupported full-state operation: ...')`
+- `:375` `throw new Error('Invalid full-state operation: ...')` 与 `assertCovered`（`Full-state metadata exceeds its causal boundary`）
+- `:667` `parseTaskBatchOperation(op)` → `shared-schema/src/task-batch-contract.ts:84/87` 两处 throw
+
+它们都在**回放路径**上被调用，而回放路径（`engine.ts:1003`、`:1047`）**无 try/catch**。
+`host.ts:540` 的 `await engine.recover()` 同样无 try/catch。
+
+> 与 B.1 的区别：B.1 是**普通实体 op**（完全未校验就入盘），这里三类 op 在入盘前**有**校验，
+> 但校验用 `emptyState()`、回放用真实累积状态 —— 两者目前恰好等价，
+> 而 `task-batch-contract.ts:86` 把 op 的**持久化身份**绑死在**当前版本的 id 派生算法**上，
+> 算法一变历史 op 全部回放失败。此外 `checkpoint.formatVersion` 恒为 1、从不 bump，
+> 旧 reducer 语义写出的快照会被新版本**直接信任**而不回放。
+
+---
+
+## C. P1 缺陷清单（已复核，按影响面）
+
+| # | 位置 | 缺陷 | 说明 |
+|---|---|---|---|
+| C1 | `op-log/src/engine.ts:489-494` | `dispatchChecked` 返回值谎报成功 | 成功时返回的 `value` 是 build 阶段基于旧快照算的，调用方当"已提交"用 |
+| C2 | `op-log/src/engine.ts:599` | `result.ops[0]!` 在 batch 对账路径取到**原始 op** 而非 inverse op | 重做栈记录错三元组，下次重做写错字段 |
+| C3 | `app-host/src/import-dump.ts:160` | `JSON.parse` 前**无长度上限**，之后全量重放**两遍** | 500 MB 备份 = OOM kill（Hermes 堆更小） |
+| C4 | `import-dump.ts:475` / `export-dump.ts:453` | `sortKeysDeep` 递归无深度上限 | `{"a":`×10000 → `RangeError`，从"永不 throw"的函数里逃出 |
+| C5 | `domain/src/recurrence.ts:182` | `catch { return out; }` 返回**被截断**的日期数组 | `occursOn` 把它当完整结果 → 重复任务停止推进 |
+| C6 | `domain/src/recurrence.ts:316` | `maxIterations` 随 `diffDays` 无界放大 | `repeatDtstart: '1900-01-01'` + `FREQ=SECONDLY` → UI 线程挂死 |
+| C7 | `app-host/src/inbound-worker.ts:383` | commit-proof 日志**从不清理**（`remove()` 全包零引用） | 单行 META 无限增长，每次 save 重写整个 blob（O(n²) 写） |
+| C8 | `app-host/src/host.ts:1202` / `:1211` | 声明 `| undefined` 但实际 `throw` | 两处都在 UI 事件路径上 |
+| C9 | `app-host/src/inbound-worker.ts:182/198` | `leaseGeneration/attempt/ruleVersion` 只判 `typeof number`；`maxItems` 无上限 | `3.7` 当 CAS token → 租约永不续期；同语义在 `inbound-rules-remote.ts:60` **有**校验 |
+| C10 | `app-host/src/ai-tool-run.ts:133` | `stableJson` 递归无深度/环检测，输入注释写明"不做 schema 校验" | 模型输出深层嵌套 → `RangeError` 从"永不抛"的函数里逃出 |
+| C11 | `app-host/src/ai-assistant.ts:972` | 工具观测**无截断**进对话，字节预算在两次分配**之后**才检查 | 2 万条任务的列表 = OOM |
+| C12 | `app-host/src/actions.ts:112` | `update()` 不校验实体存在 | 6 个动作裸调；`setTags` 是唯一守卫的 |
+| C13 | `local-api/src/server.ts:321-359` | `handle()` 整个 switch 无 try/catch | 靠 2 个壳各自写 catch 维持；新壳漏写 = 进程终止 |
+| C14 | `local-api/src/tools/task.ts:298`、`event.ts:157` | `limit` 未过 `clampListLimit` | 5 个列表工具中这 2 个漏了，`1e308` 直达 SQL 绑定 |
+| C15 | `local-api/src/tools/task.ts:379-391` | `fields` 只判 `typeof === 'object'` | 数组通过 → `Object.entries` 产出 `0:'a'` 伪字段 |
+| C16 | `widget-core/src/selectors.ts:164` | `buckets[slot].slice()` 无 `?? []` | 文件头承诺"四键永远在"，但承诺的执行点不在本文件 |
+| C17 | `widget-core/src/selectors.ts:296-300` | 未知 token 静默产出 `undefined` | `JSON.stringify` 丢键 → 下游判 `malformed-section` → **整份快照被拒**，日志不含 token 名 |
+| C18 | `inbound-core/src/parser.ts:13` | `copy()` 递归无上限 + `localeCompare` 排序 | 跨 ICU 版本算出**不同 digest** → 签名校验偶发失败 |
+
+> 另有约 60 条 P1 在 `.audit-crash/units/*.json` 中（storage 事务/worker 桥、sync-client 并发守卫、
+> ai 的 SSE 无界缓冲、app-host 的 share 密钥竞态、server sync 的配额与清理等），本表只列已复核的主干。
+
+---
+
+## D. 消除器清单（按消除的缺陷类分组）
+
+### D.1 消除「reducer 抛错 → 启动/同步永久失败」 ← **最高优先级**
+
+| 受影响位置 | 结构性修复 |
+|---|---|
+| `state.ts:589`（`fieldVersions[key] ??=`）、`:262-285`（`addUnique`） | 字段/实体版本桶改用 **`Object.create(null)` 或 `Map`** —— 一次性消掉「原型链成员名 → TypeError」整类 |
+| `state.ts:362/375/667`、`engine.ts:988/1003/1047` | reducer 返回 **`Result<State, OpError>`**，永不 throw |
+| `engine.ts:856-872`（`importOperationsLocked`） | **先全量校验（含普通实体 op）再 append**，或 append 失败回滚 |
+| `engine.ts:1003`（`recoverLocked`） | 失败 op **持久化标记 `quarantined` 并跳过**，向 UI 上报计数 |
+| `host.ts:540`（`openAppHost`） | `recover()` 包 try/catch，进入「隔离恢复」模式而非 reject |
+| `engine.ts:930`（checkpoint 校验） | 增加 **`reducerRevision`**，语义不匹配时强制全量回放 |
+
+### D.2 消除「外部输入未校验直达业务层」
+
+| 受影响位置 | 结构性修复 |
+|---|---|
+| `inbound-worker.ts:182/198` | 一个 zod `claimedEventSchema`；`maxItems` 复用规则层**同一个常量** |
+| `ai-tool-call.ts`（`parseToolArguments`） | 按工具声明的 `inputSchema` 做 `safeParse`，让下游对象**已知浅层封闭** |
+| `local-api/src/tools/{task,event}.ts` | `limit` 统一过 `clampListLimit`；`fields` 过共用 `rejectUnknownKeys` |
+| `import-dump.ts:160` | 解析**前**判字节数、解析**后**立刻判 op 条数 |
+
+### D.3 消除「递归处理不受信结构 → 栈溢出」
+
+一处共享的**迭代式 canonical-JSON 序列化器**（显式栈 + 深度上限 + 码元键排序），替换：
+`import-dump.ts:475`、`export-dump.ts:453`、`inbound-core/src/parser.ts:13`、`ai-tool-run.ts:133`。
+
+### D.4 消除「错误吞咽掩盖语义丢失」
+
+| 位置 | 修复 |
+|---|---|
+| `recurrence.ts:182/271` | 返回 `{dates, truncated, error?}`；`occursOn` 改直接迭代探测（命中即止） |
+| `inbound-runner.ts:81` | `safeParse` + 独立 `modelResultSchema`，失败走 `nonRetryable` 终态，**在 `advance()` 扣次数之前**判定 |
+
+### D.5 消除「异步错误无主」
+
+| 位置 | 修复 |
+|---|---|
+| `inbound-worker-loop.ts:26`、`client.ts:2034`、`realtime.ts:296` | **受管 promise 集合**替代裸 `void`：进 `Set` → `.catch` 转 `onError` → `finally` 删除；停表时能看到未结算 promise 与 `lastError` |
+| `local-api/src/server.ts:321` | `handle()` 整体 try/catch → `-32603` + **固定文案**（不回显 `e.message`） |
+| `sync-client` 的 8 处 `response.json()` | 一个 `readJsonObject()` 区分 `transport` / `malformed` |
+| `storage/src/errors.ts:92` | `safeMessage(cause)` 自身不可能抛 |
+
+### D.6 消除「无界增长」
+
+| 位置 | 修复 |
+|---|---|
+| `inbound-worker.ts:383` | proof 改**按事件分行** + 上传确认后 `remove(eventId)` + 启动扫除 |
+| `op-log/src/state.ts:262` | 字段版本裁剪到**最大前沿 + LWW 赢家**；checkpoint 加体积上限，超限退化为全量回放 |
+| `ai-assistant.ts:972` | 观测在**产出点**截断（16 KiB + 显式 `…truncated, N more`） |
+
+---
+
+## E. 未复核 / 已证伪 / 已降级的清单
+
+### E.1 ❌ 已证伪（**对抗验证的实际产出**）
+
+| 原报告 | 复核结论 |
+|---|---|
+| U08b-sync-services：`server/src/sync/services/websocket-connection.service.ts:681` `touchDevice` 丢弃 Promise → 心跳定时器致 unhandledRejection（标 P0） | **假阳性。** `sync.service.ts:726-731` 的实现是 `void this.deviceService.touchDevice(...).catch(err => Logger.debug(...))` —— 拒绝**已被捕获**，且该方法的文档明确写着 "must never fail"。子代理只看了调用点、没看被调用方 |
+
+### E.2 ⬇️ 已降级（子代理标 P0，我降为 P1）
+
+| 原报告 | 降级理由 |
+|---|---|
+| U02a：`state.ts:590` "reducer 字段键命中 Object.prototype 成员即 TypeError" 标 P0 | **机制成立且我把它升为核心 P0（见 B.1）** —— 但原报告把它归为"远端/导入先落盘后成重启毒丸"，我核实后**精确化了触发路径**：远端路径会在 ingress 被拦（→ B.2），只有 **import 路径的普通实体 op** 会落盘成毒丸（→ B.1）。两条分开报 |
+| U05：`inbound-worker-loop.ts:26` `void tick()` 标 P0 | `tick` 内部**有** try/catch 同时罩住 `processOnce` 与 `isRunnable`，`onError` 自身再包一层。当前**不具备** unhandled rejection 条件。降为 P1（结构性脆弱：一次收窄就变 P0） |
+| U03：`compression.ts:148` gzip 解压无输出上限标 P0 | 我**未亲自核实**解压路径是否真的没有 `maxOutputLength`/大小校验。按纪律标 `likely`，列入 E.3 |
+
+### E.3 未复核的 P0（子代理上报，我**没有**打开 file:line 确认）
+
+**按纪律，以下不代表已确认的崩溃路径，只代表"值得下一步优先复核"。**
+
+| 单元 | 位置 | 声称的缺陷 |
+|---|---|---|
+| U01a | `storage/src/sqlite/sqlite-adapter.ts:689` | `iterate/count` 无视 limit，全表 `SELECT *` 后逐行 `JSON.parse` → OOM |
+| U01a | `sqlite-adapter.ts:337` | 事务回调 `await` 后再调 `transaction()` 绕过 `syncDepth` 检测 → FIFO 队列永久自锁（自评 suspicious） |
+| U01b | `indexeddb/indexeddb-adapter.ts:486` | 游标访问者异常逃逸 IDB 事件边界 |
+| U01b | `db-op-log-store.ts:293` | op 读取默认无上限，可物化全库 |
+| U02b | `domain/src/events.ts:180/196` | `nextEventOccurrence` 农历/公历路径均无 try → 抛穿到渲染层 |
+| U02b | `domain/src/date.ts:137` | `parseLocalDate` 对外部 LocalDate 直接 throw，只读渲染路径全部裸传 |
+| U03 | `sync-core/src/operation.types.ts:323` | payload 提取器对 `undefined/null` `actionPayload` 解引用 |
+| U03 | `sync-core/src/compression.ts:148` | gzip 解压无输出上限 → 远端 gzip bomb OOM |
+| U04a | `sync-client/src/share-payload-cipher.ts:124` | `keys.get(外部世代号)!` 缺世代即 TypeError |
+| U04a | `sync-client/src/realtime.ts:296` | `void this.run()` 无 catch |
+| U04b | `ai/src/routing.ts:1101` / `:646` | `invokeRouted` 等待在异常边界外；`requiredCapabilities` 词表外 feature 返回 undefined 后展开 |
+| U06a | `app-host/src/vault-migration.ts:461` | 根轮换迁移把整份 inventory + 全部重加密结果同时驻留内存 |
+
+### E.4 其余 suspicious（子代理自评，已记录在单元 JSON）
+
+`history.ts:226`（墓碑/实体消失混为一谈）、`subtasks.ts:233/242`（`as Task` 断言）、
+`timeline.ts:352`（原型链查表）、`entities.ts:536`（`Note.content` 必填但 reducer 不保证）、
+`sqlite-adapter.ts:337`、`web-crypto.ts:149`、`conflict-resolution.ts:468`、`selectors.ts:164`。
+
+---
+
+## F. 向"零崩溃收敛"的下一步
+
+### F.1 先修（按性价比）
+
+1. **D.1 全部** —— 一次改动消掉「启动永久失败」+「同步永久死亡」两整类，且是后续一切错误处理的地基。
+   `Object.create(null)` 那一条是最小成本、最大收益的单点。
+2. **B.3 的 `safeMessage`** —— 十几行，消掉「错误处理本身会崩」。
+3. **D.5 的三处 `void`** —— 都是小改动，消除「未处理 rejection 杀进程」。
+
+### F.2 CI 门禁（防回归，不是修当前实例）
+
+本仓库已有 300+ 个 `check:*`，风格是"每条门禁都要能自己红"。据此建议：
+
+| 新门禁 | 判据 | 为什么必须有 |
+|---|---|---|
+| `check:reducer-total` | `state.ts` 的 `apply*` 函数体内**静态禁止 `throw`** | B.1/B.5 的本质是"reducer 会 throw"，人肉 review 拦不住新增 |
+| `check:null-prototype-buckets` | 版本桶/字段桶的构造点必须是 `Object.create(null)` 或 `Map` | 这条是 B.1 的**唯一**根治点 |
+| `check:no-bare-void-async` | 禁止 `void <async call>()`（白名单需注释理由） | `void tick()` / `void run().then()` 是这个形状；会随演进重新变成 P0 |
+| `check:catch-boundaries` | 每个 `ipcMain.handle` / 路由 handler / JSON-RPC `case` 必须可追溯到 try/catch 或统一 wrapper | `local-api/server.ts:321` 靠"每个壳记得写 catch"维持，该约定会漂 |
+| `check:recursion-depth` | 处理外部 JSON 的函数强制带 `depth` 参数 | 四处递归实现已各自漂移 |
+| `check:declared-vs-throws` | 返回类型含 `| undefined` 的函数体内不得 `throw` | C8 那两处正是"类型说返回 undefined、实际 throw" |
+| **测试（比门禁更重要）** | ① `recover()` 面对抛错 op 必须**成功启动**并隔离该 op；② `applyRemote` 面对畸形 op 必须**返回逐 op 拒绝**；③ `importOperations` 失败时**盘上不得留下坏 op**；④ payload 含 `constructor`/`__proto__` 的 op 不得致 TypeError | 目前 `server.spec.ts` 全文件 8 处 `throw` **全是测试自身断言**，没有一条驱动"host 抛错"或"超深/污染 JSON"。**没有能失败的用例 = 这些缺陷会原样回来** |
+
+### F.3 明确不承诺
+
+- 本报告**未覆盖**客户端壳、服务端计费/认证、原生边界、`apps/web` 与 `apps/mobile` —— 
+  修完 D.1 不等于"不会闪退"。
+- 101 条发现是**已识别**的缺陷，不是缺陷总集；其中 12 条 P0 仍待逐条复核（§E.3）。
+- 静态审计**无法**证明零崩溃，只能证明"这些具体路径已被关闭"。
+
+---
+
+## G. 修复实况（2026-11-08 晚，已落地并验证）
+
+### G.1 已修复（每条都配了**能变红**的测试，已实测变红）
+
+| # | 缺陷 | 改动 | 判据 |
+|---|---|---|---|
+| **1** | **B.1 原型链键 → TypeError → 冷启动永久失败** | `state.ts`：版本桶改 `Object.create(null)`（`nullProtoMap`）；`materializeVersions` 跳过 `__proto__/constructor/prototype` 防止实体原型被换 | `packages/op-log/tests/prototype-key-poisoning.spec.ts`（9 条）—— 把 `nullProtoMap` 换回 `{}` ⇒ **9/9 全红** |
+| **2** | **B.3 错误规范化二次抛错** | `storage/errors.ts`：新增 `safeToString()`，`String(cause)` 关进 try，兜底成 `[unstringifiable …]` | `storage/tests/storage-error.spec.ts` 新增 3 条 —— 换回 `String(cause)` ⇒ **2 条变红** |
+| **3** | **B.5/E2 `openAppHost` 恢复失败无边界 + 连接泄漏** | `app-host/host.ts`：`recover()` 包 try/catch，失败时 **`adapter.close()`** 再抛可诊断错误（保留 `cause`） | `app-host/tests/host.spec.ts` 新增 1 条 —— 换回裸调用 ⇒ **变红**（且证明错误会裸穿成 `Unsupported full-state operation`） |
+| **4** | **B.1 导入路径未校验普通实体 op** | `engine.ts`：`importOperationsLocked` 对**所有** op 无条件预演 `applyOperation(emptyState(), op)`，失败时**在任何东西落盘之前**拒绝，并把原始 message 并进错误 | 由 #1 的端到端用例覆盖（导入后 `recover()` 仍可跑完 + 原型未被污染） |
+| **5** | **B.4 重试调度器 `.then` 无 `.catch`** | `sync-client/client.ts`：`.catch` 把一次意外 reject 当**可重试失败**继续退避（不是静默忽略） | `sync-client/tests/sync.spec.ts` 新增 1 条 —— 删掉 `.catch` ⇒ **变红**在 `unhandledRejection` 上 |
+
+### G.2 回归验证（全绿）
+
+| 包 | 测试 | typecheck |
+|---|---|---|
+| `op-log` | **170 passed** / 15 files | rc=0 |
+| `storage` | **434 passed** / 8 files | rc=0 |
+| `sync-client` | **176 passed** / 13 files | rc=0 |
+| `app-host` | **2112 passed** / 130 files | rc=0 |
+
+### G.3 复核结论：12 条"未验证 P0"**没有一条成立为 P0**
+
+派了 5 个只读复核子代理逐条取证（其中一条在真实 Chromium 里做了实验）。结果：
+
+| 原编号 | 判定 | 关键理由 |
+|---|---|---|
+| A1 sqlite iterate OOM | → P1 | `count` 无 range 时确实全表物化（与 `engine.ts:403` 契约相违），但 `iterate` 无生产调用方 |
+| A2 事务自锁 | → P1 | 机制成立（`syncDepth` 在首个 `await` 处已复位），但全仓 `transaction()` 调用点都是顶层，无现存触发路径 |
+| A3 IDB 游标异常逃逸 | → **证伪** | 真跑 Chromium：游标访问者抛出后事务**确实 abort**、`tx.error.name === 'AbortError'`，适配器已拒绝调用方 promise |
+| A4 op 读取无上限 | → **证伪** | `getOpsSince` 两个生产调用方都传了上限（250 / maxOps） |
+| B1 农历越表抛穿 | → P1 | 机制确认（`lunar.ts:47` 真的 throw，上游 4 个渲染点无 try），但需 1900–2100 表外日期 |
+| B2 公历 `nextOccurrence` 抛穿 | → **证伪** | `recurrence.ts:206/226` 两处已 try，坏规则返回 undefined |
+| B3 `parseLocalDate` 裸传 | → **证伪** | 接外部字符串的入口都做了 try（`safeLocalDate` / `localMidnight`），写侧也拦了 |
+| C1 payload 提取器解引用 | → P1 | 解引用确实存在，但唯一使用它的函数**无生产调用方** |
+| C2 gzip 炸弹 | → **证伪** | 无生产调用方；服务端真实路径 `compressed-body-parser.ts` 有压缩前 10MB + 解压后 30/60MB 双上限 |
+| D1 share 世代 `!` 解引用 | → P1 | `!` 确实漏判（同文件 decrypt 路径有判空），但 `reencrypt` 无生产调用点 |
+| D2 realtime `void run()` | → **证伪** | 抛错面被逐段 try 关死；仅测试注入的 sleep/伪造 WS 才能触发 |
+| D3 ai 请求体在 try 外 | → P1 | 位置属实，但唯一 `managedTransport` 实现明确"不抛" |
+| D4 `requiredCapabilities` undefined | → **证伪** | 前置 `config.routes[feature]` 为 undefined 时已早退，走不到展开点 |
+| E1 vault 迁移 OOM | → P1 | 机制属实，但服务端 100 MiB 配额把峰值钉在 300–400 MB，仅"满配额 + 移动端 WebView"会崩 |
+| E2 recover 半初始化 | → **P1（已修，见 G.1 #3）** | 确认无 try/catch 且 adapter 从不 close |
+
+> **这条结果本身是审计纪律的价值证明**：如果当时把 12 条未经复核的 P0 直接写进计划，
+> 会让团队花大量时间在 6 条不存在的崩溃上。**未复核的 P0 不得进最终计划。**
+
+### G.4 尚未修（下一步）
+
+| 优先级 | 项 | 为什么还没动 |
+|---|---|---|
+| 高 | B.2 sync ingress 逐 op 拒绝 + 隔离 | 要改 `RemoteApplyResult` 形状并让 `sync()` 上报终态，跨 `op-log` / `sync-client` 两个包，需先定契约 |
+| 高 | D.1 reducer → `Result<State, OpError>` | 大重构，`applyOperation` 有 5 个回放调用点；现在有 #1/#3/#4 兜底，不再是"一定崩" |
+| 中 | `inbound-worker-loop` 的 `void tick()`、`realtime` 的 `void run()` | 当前不可触发，但形状会随演进重新变成 P0；建议按 D.5 一并收敛 |
+| 中 | `import-dump` 的解析前字节上限 / 递归深度 | 未改动 |
+| 待补 | 客户端壳（web/mobile/desktop/原生）与服务端计费/认证 | **本轮零覆盖** —— 用户看到的闪退主要在这里 |

@@ -1,0 +1,42 @@
+你是只读代码审计子代理。工作目录：/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta
+这是纯研究任务：禁止写任何文件、禁止改代码、禁止运行改变状态的命令（不许 build/test/install/git 写操作）；只允许 Read/Grep/Glob 与只读 ls。
+
+UNIT_ID: U09a-billing
+TECH_STACK: TS / Fastify / 支付适配
+ENTRY_POINTS: webhook.routes.ts, checkout.routes.ts, wechat.adapter.ts
+PATHS（严格只读下面这份文件清单，不得读清单外任何文件；理解类型定义也只许在清单内 grep）：
+server/src/billing/apply-event.ts
+server/src/billing/checkout.routes.ts
+server/src/billing/coupon.ts
+server/src/billing/index.ts
+server/src/billing/money.ts
+server/src/billing/noop.adapter.ts
+server/src/billing/out-trade-no.ts
+server/src/billing/paycenter.adapter.ts
+server/src/billing/payment-event-id.ts
+server/src/billing/price-book.ts
+server/src/billing/pricing-store.ts
+server/src/billing/quote.ts
+server/src/billing/reconcile-job.ts
+server/src/billing/reconcile.ts
+server/src/billing/refund-policy.ts
+server/src/billing/refund-store.ts
+server/src/billing/registry.ts
+server/src/billing/types.ts
+server/src/billing/webhook.routes.ts
+server/src/billing/wechat.adapter.ts
+
+任务：找出会导致"闪退/崩溃"的 P0 与"准崩溃"的 P1。
+审计顺序：先读入口与适配器接口，画出运行时边界（哪些输入来自外部、哪些是共享可变状态），再沿"外部输入 → 状态变更 → 资源获取/释放 → 异常边界"追踪。用 Grep 定位危险模式（非空断言 !.、as any、JSON.parse、无 catch 的 await、close()/dispose、setInterval/setTimeout、无界 push/缓存、递归、force unwrap、!! 等），再针对性 Read 相关文件；不要把所有文件全文读完。
+
+崩溃类清单：
+P0: null-deref / unhandled-exception / buffer-overflow / uaf(含 double-close、close 后使用) / oom(无界缓存/无界结果集) / deadlock / integer-overflow / unhandled-async / native-boundary
+P1: error-swallow(兜底后继续) / resource-leak(句柄、定时器) / race / boundary(空/零/极大输入) / state-inconsistency(部分完成)
+
+对每条判断 fix_kind=eliminator 还是 spot-fix；eliminator 要写明它消除了哪一类缺陷。优先上报 eliminator。
+判据：只报有真实触发路径的；"看起来危险但框架/上游已保证"的降级 suspicious 或不报。React 组件渲染错误会卸载整棵树算 unhandled-exception；服务端未捕获异常算 P0；RN 桥/native 崩溃边界未防御算 native-boundary。
+
+上下文预算：不超过窗口 25%。读不完就在 coverage_notes 如实写哪些没深覆盖、原因；不得用浅扫冒充完整覆盖。
+
+输出：只输出一个 JSON 对象（不要 markdown 代码块、不要 schema 之外的自然语言）。findings 若超过 25 条，保留全部 P0 + 严重性最高的 P1，并在 coverage_notes 说明截断：
+{"unit_id":"U09a-billing","tech_stack":"...","files_covered":["..."],"findings":[{"file":"...","line":0,"defect_class":"...","severity":"P0|P1","title":"≤80字符","evidence":"最小代码片段","trigger_path":"从外部输入到缺陷点的最短路径","fix_kind":"eliminator|spot-fix","eliminator_class":"...或null","suggested_fix":"最小可操作修复","confidence":"confirmed|likely|suspicious"}],"coverage_notes":"哪些路径没被深入审计、原因"}

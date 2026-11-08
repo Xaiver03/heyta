@@ -151,4 +151,54 @@ describe('storageError()：包装时不改变 message', () => {
   it('name 是 StorageError，方便日志里一眼认出来', () => {
     expect(storageError(new Error('x'), 'y', { kind: 'open-failed' }).name).toBe('StorageError');
   });
+
+  /**
+   * 【崩溃审计 2026-11-08 · B.3】`String(cause)` 自己会抛。
+   *
+   * 这两条用例防的是一类特别阴的失败：**错误规范化本身抛错**。
+   * 它被调用在 `catch` 块里，所以一旦抛出，就不是"多了一层错误"，
+   * 而是"处理已知失败"变成了**新的未捕获异常** —— 事务的清理逻辑被跳过、
+   * 事务被挂住，而调用方已经认定这里不会再抛。
+   *
+   * 修复前：`Object.create(null)` 那条会 `TypeError: Cannot convert object to primitive value`，
+   * 于是这两条**当场变红**。修复后走 `safeToString()` 的类型名兜底。
+   */
+  it('🔴 cause 是不可字符串化的对象（无原型）时不得抛 —— 兜底成可读标记', () => {
+    // Object.create(null) 没有 toString，`String()` 对它就是 TypeError。
+    const hostile = Object.create(null) as object;
+
+    let wrapped: StorageError | undefined;
+    expect(() => {
+      wrapped = storageError(hostile, '兜底', { kind: 'request-failed' });
+    }).not.toThrow();
+
+    // 不能是空串 —— 错误屏显示空白比显示标记更难排查。
+    expect(wrapped?.message).not.toBe('');
+    expect(wrapped?.message).toContain('unstringifiable');
+    // cause 仍然保留原对象（诊断价值）。
+    expect(wrapped?.cause).toBe(hostile);
+  });
+
+  it('🔴 cause 的 toString 自己抛错时不得抛 —— 兜底成可读标记', () => {
+    const hostile = {
+      toString(): string {
+        throw new Error('toString 故意炸');
+      },
+      [Symbol.toPrimitive](): never {
+        throw new Error('toPrimitive 故意炸');
+      },
+    };
+
+    let wrapped: StorageError | undefined;
+    expect(() => {
+      wrapped = storageError(hostile, '兜底', { kind: 'request-failed' });
+    }).not.toThrow();
+    expect(wrapped?.message).toContain('unstringifiable');
+  });
+
+  it('安全兜底不得改变正常路径的 message 逐字内容', () => {
+    // 修 B.3 只碰了"非 Error 且 String() 会抛"那一小格；
+    // 正常对象的 String() 结果必须逐字不变，否则等于顺手改了既有行为。
+    expect(storageError({ a: 1 }, '兜底', { kind: 'request-failed' }).message).toBe('[object Object]');
+  });
 });

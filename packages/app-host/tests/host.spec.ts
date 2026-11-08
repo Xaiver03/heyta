@@ -547,3 +547,71 @@ describe('运行时可变同步凭据', () => {
     expect(status.kind).toBe('error');
   });
 });
+
+/**
+ * 【崩溃审计 2026-11-08 · B.1 / E2】`recover()` 失败必须是**可诊断的失败**，
+ * 而不是裸穿的 TypeError，也不能把库连接留着不关。
+ *
+ * 这条测的是 `openAppHost` 里那圈 try/catch 的两个承诺：
+ *
+ *   1. **关连接**：失败时 adapter 必须 `close()`。否则移动端的 `open-host.ts`
+ *      会把 `pending` 置 null 允许重试，第二次在**同一个库文件**上再开一条连接
+ *      —— 正是本文件 99–105 行注释警告的"多连接同一库 ⇒ 向量时钟互相覆盖"。
+ *   2. **可诊断**：错误消息要说人话（"本地数据库恢复失败"），并且 `cause` 保留
+ *      原始的 reducer 报错，供"详情"展开。
+ *
+ * 触发手法刻意选了**真实路径**：绕过引擎、直接用 `store.appendImported()`
+ * 往盘上写一条当前 reducer 不认识的 full-state op。这正是"旧版本写了一个
+ * 新版本解析不了的东西"的形状 —— 而它此前会让应用**永久无法启动**。
+ */
+describe('openAppHost：recover 失败时的止血（B.1/E2）', () => {
+  it('🔴 恢复失败时报可诊断错误、关掉连接，且第二次打开不会多开一条连接', async () => {
+    // ① 先直接往盘上塞一条 reducer 认不出的 full-state op（绕过一切校验）。
+    const seedAdapter = new SqliteAdapter({
+      schema: INDEXEDDB_SCHEMA,
+      driverFactory: driverFor(dbPath),
+    });
+    await seedAdapter.init();
+    const seedStore = new DbOpLogStore<Operation<string>>(seedAdapter);
+    await seedStore.appendImported([
+      {
+        id: 'poison-fullstate',
+        actionType: 'REPAIR_ALL',
+        opType: 'REPAIR',
+        entityType: 'ALL',
+        payload: { not: 'a valid full state' },
+        clientId: 'old-version',
+        vectorClock: { 'old-version': 1 },
+        timestamp: 1_700_000_000_000,
+        schemaVersion: 1,
+      } as unknown as Operation<string>,
+    ]);
+    seedAdapter.close();
+
+    // ② 现在按正常路径启动 —— 恢复必然在这条 op 上抛。
+    let captured: unknown;
+    try {
+      await openAppHost({
+        driverFactory: driverFor(dbPath),
+        dbPath,
+        serverUrl: '',
+      });
+    } catch (error: unknown) {
+      captured = error;
+    }
+
+    expect(captured).toBeInstanceOf(Error);
+    const message = (captured as Error).message;
+    // 说人话，而不是 "Unsupported full-state operation"
+    expect(message).toContain('本地数据库恢复失败');
+    // 原始 reducer 报错必须留在 cause 里（诊断价值）
+    expect((captured as Error).cause).toBeInstanceOf(Error);
+    expect(((captured as Error).cause as Error).message).toMatch(/full-state|Invalid|Unsupported/i);
+
+    // ③ 关键：连接已被关掉，所以下一次打开能拿到一条干净连接并同样失败
+    //    （若没关，这里会是"多连接同一库"）。两次都碎在同一个地方 = 稳定复现。
+    await expect(
+      openAppHost({ driverFactory: driverFor(dbPath), dbPath, serverUrl: '' }),
+    ).rejects.toThrow('本地数据库恢复失败');
+  });
+});

@@ -850,13 +850,50 @@ export class OpLogEngine {
 
   private async importOperationsLocked(ops: readonly Operation<string>[]): Promise<ImportOpsResult> {
     if (ops.length === 0) return { imported: 0, skipped: 0 };
-    // Imported snapshots follow the same pre-persistence validation as remote
-    // snapshots. Otherwise a bad backup poisons every subsequent cold start.
+    /**
+     * 🔴 入盘前**逐条预演一遍整个 reducer**，一条都不许跳。
+     *
+     * 【为什么（崩溃审计 2026-11-08 · B.1）】
+     *
+     * 这里原来的 `if (isFullStateOperation(...) || hasTaskBatchMarker(...) ...)`
+     * 只校验了 full-state / task-batch / priority-batch / repeat-completion **四类**，
+     * 普通实体 op（CRT/UPD/DEL）**完全跳过**就直接进了 `appendImported`。
+     *
+     * 而 reducer 对普通实体 op 也会抛：`applyOperationToEntity` 里字段版本桶
+     * 曾用普通对象承载，payload 出现 `Object.prototype` 成员名
+     * （`constructor` / `__proto__` / `toString` …）时
+     * `fieldVersions[key] ??= []` 会取到继承来的 `Object` 函数，
+     * 随即 `versions.some is not a function` —— 一个**同步 TypeError**。
+     *
+     * 后果链正是上面注释警告的那件事，只是原来的防护漏了这一类：
+     * 坏 op **先落盘** → `recoverLocked()` 才抛 → 本次导入失败 →
+     * **此后每次冷启动都在同一处抛，重装都无效**（数据在本地库里）。
+     *
+     * 所以这里改成无条件预演：`applyOperation(emptyState(), op)` 对所有
+     * op 类型都跑一遍。这条预演是**状态无关**的（三条 throw 的判据分别看
+     * payload 形状、因果边界、batch 身份，都不依赖累积状态），因此在空状态上
+     * 能过 ⇒ 在回放时也能过；在空状态上就抛 ⇒ 现在就地拦下，不落盘。
+     *
+     * 性能上可以接受：导入是用户显式发起的一次性动作，预演只是把
+     * `recoverLocked()` 本来就要做的回放提前跑一遍前面那一段。
+     */
     for (const op of ops) {
       validateReminderOwnerOperation(op);
-      if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload) || hasTaskPriorityBatchMarker(op.payload) ||
-          hasTaskRepeatCompletionMarker(op.payload)) {
+      try {
         applyOperation(emptyState(), op);
+      } catch (cause) {
+        // 指名道姓地失败：调用方要能告诉用户"备份里哪一条坏了"，
+        // 而不是拿到一句 TypeError。
+        //
+        // 🔴 原始 message **必须**原样带上（不吞）：`applyOperation` 内部抛的是
+        // 有诊断价值的句子（如 `Task repeat completion missing task scope`），
+        // 外层调用方与既有测试都按它断言。包装只加前缀，不改原文。
+        const original = cause instanceof Error ? cause.message : String(cause);
+        throw new Error(
+          `导入被拒绝：操作 ${op.id}（${op.entityType}/${op.opType}）无法被当前版本的 reducer 解析` +
+            `（${original}）。这条操作没有被写入本地库 —— 拒绝整份导入是为了避免它污染之后的每一次冷启动。`,
+          { cause },
+        );
       }
     }
 

@@ -299,16 +299,48 @@ function legacyEntityVersions(existing: InternalEntity | undefined): OperationMe
   return [];
 }
 
+/**
+ * 🔴 字段版本桶**必须**是 null-prototype 对象，不能是 `{}`。
+ *
+ * 【为什么（崩溃审计 2026-11-08 · B.1）】
+ *
+ * 取版本桶的那一句是 `const versions = (fieldVersions[key] ??= []);`。
+ * 如果 `fieldVersions` 是普通对象，那么当 payload 里出现**任何
+ * `Object.prototype` 成员名**（`constructor` / `__proto__` / `toString` /
+ * `valueOf` / `hasOwnProperty` …）时：
+ *
+ *   1. `fieldVersions['constructor']` 读到的是**继承来的** `Object` 函数（truthy）；
+ *   2. `??=` 因此**不赋值**（左值已经"有值"）；
+ *   3. `versions` 就是那个函数 → `addUnique()` 里的 `versions.some(...)`
+ *      → `TypeError: versions.some is not a function`。
+ *
+ * 这是**同步抛**且**状态无关**（空状态上也炸），而回放/恢复路径没有任何一层接住它：
+ * `openAppHost()` → `recover()` → `recoverLocked()` → `applyOperation()`。
+ * 更要紧的是**导入路径**：`importOperationsLocked` 的入盘前校验只覆盖
+ * full-state / batch 三类，普通实体 op 会**先落盘**，之后 `recoverLocked()` 才抛
+ * ⇒ 坏 op 留在盘上 ⇒ **此后每次冷启动都在同一处抛，重装都无效**。
+ *
+ * `Object.create(null)` 让 `fieldVersions['constructor']` 是 `undefined`，
+ * `??= []` 正常生效 —— 一次性消掉"原型链成员名 → TypeError"这一整类。
+ *
+ * 判据：`packages/op-log/tests/prototype-key-poisoning.spec.ts`（把这里换回 `{}` 即变红）。
+ */
+function nullProtoMap<T>(): Record<string, T> {
+  return Object.create(null) as Record<string, T>;
+}
+
 function legacyFieldVersions(existing: InternalEntity | undefined): Record<string, FieldVersion[]> {
   if (existing?.[FIELD_VERSIONS] !== undefined) {
-    return Object.fromEntries(
-      Object.entries(existing[FIELD_VERSIONS]).map(([key, versions]) => [key, [...versions]]),
-    );
+    const result = nullProtoMap<FieldVersion[]>();
+    for (const [key, versions] of Object.entries(existing[FIELD_VERSIONS])) {
+      result[key] = [...versions];
+    }
+    return result;
   }
   const entityVersions = legacyEntityVersions(existing);
   const fallback = entityVersions[0];
-  if (existing === undefined || fallback === undefined) return {};
-  const result: Record<string, FieldVersion[]> = {};
+  if (existing === undefined || fallback === undefined) return nullProtoMap<FieldVersion[]>();
+  const result = nullProtoMap<FieldVersion[]>();
   for (const key of Object.keys(existing)) {
     if (key.startsWith('_') || key === 'id' || key === 'updatedAt') continue;
     result[key] = [{ meta: fallback, value: existing[key], deleted: false }];
@@ -326,6 +358,17 @@ function cloneWithMetadata(
   return clone;
 }
 
+/**
+ * 这几个键**永远不许**通过 `next[key] = value` 写进实体：
+ * `next['__proto__'] = obj` 会走 Object.prototype 的 setter，把实体的原型换掉；
+ * `constructor` / `prototype` 则会让 `entity.constructor` 不再指向构造函数，
+ * 之后任何 `instanceof` / `constructor.name` 判断都会静默错。
+ *
+ * 没有任何实体字段合法地叫这些名字，所以跳过它们不会丢数据 ——
+ * 只丢掉"payload 里塞了一个想污染原型的键"这一种情况。
+ */
+const PROTOTYPE_POLLUTING_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
+
 function materializeVersions(
   entityId: string,
   entityVersions: OperationMeta[],
@@ -334,6 +377,7 @@ function materializeVersions(
 ): InternalEntity {
   const next: InternalEntity = { id: entityId };
   for (const [key, versions] of Object.entries(fieldVersions)) {
+    if (PROTOTYPE_POLLUTING_KEYS.has(key)) continue;
     const winner = selectVersion(versions);
     if (winner !== undefined && !winner.deleted) next[key] = winner.value;
   }

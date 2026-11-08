@@ -537,7 +537,48 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     clientId,
     ...(options.now !== undefined ? { now: options.now } : {}),
   });
-  await engine.recover();
+
+  /**
+   * 🔴 恢复失败必须**先把库关掉再抛**，不能让它裸穿出去。
+   *
+   * 【为什么（崩溃审计 2026-11-08 · B.1/B.5/E2）】
+   *
+   * `engine.recover()` 是真实 I/O：`readObservedClock` / `readCheckpoint` /
+   * `findPendingApply` / `getAllOps` 都会走到盘上；而且**回放路径本身会抛** ——
+   * `applyOperation` 在 `state.ts` 有三处同步 `throw`（不支持的 full-state、
+   * 因果边界越界、非法的 task batch），reducer 对 `Object.prototype` 成员名
+   * 还有过原型链污染导致的 TypeError（已修，见 `nullProtoMap`）。
+   *
+   * 它此前是**裸调用**，于是失败时这一串后果同时发生：
+   *
+   *   1. `openAppHost()` reject ⇒ 宿主对象不存在 ⇒ **没有任何 UI 能报错**；
+   *   2. 但第 503 行打开的 adapter **已经拿到连接**，且因为作用域退出而
+   *      **永远不会 `close()`** —— 移动端的 `open-host.ts` 会把 `pending` 置 null
+   *      允许重试，于是第二次在**同一个库文件**上再开一条连接。
+   *      这正是本文件 99–105 行注释警告的那件事：多连接同一库 ⇒
+   *      向量时钟互相覆盖 ⇒ 数据损坏。
+   *
+   * 所以这里做两件事，缺一不可：**关掉连接**（防多连接），**包成可判别的错误**
+   * （让壳能说"本地数据读不出来"而不是抛一句 TypeError）。
+   *
+   * ⚠️ `close()` 的契约是"后续操作透明重开"，所以它**不是** `destroy()` ——
+   * 我们只释放连接，一条用户数据都不删。重试会得到一条干净的新连接。
+   */
+  try {
+    await engine.recover();
+  } catch (cause) {
+    try {
+      adapter.close();
+    } catch {
+      // 连 close() 都失败时，原始失败信息更有价值 —— 不要让它被这里盖掉。
+    }
+    throw new Error(
+      '本地数据库恢复失败：读不出已存在的操作日志。' +
+        '这通常意味着本地库被写坏，或某个版本的写入无法被当前版本解析。' +
+        '请先导出备份后再尝试修复；如果反复出现，请带着这个错误报告。',
+      { cause },
+    );
+  }
 
   const vaultStore = createVaultKeyPackageStore(adapter);
   const vaultMigrationJournal = createVaultMigrationJournal(adapter);

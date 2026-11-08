@@ -1,0 +1,430 @@
+{
+  "candidates": [
+    {
+      "unit": "U01a-sqlite",
+      "files": 7,
+      "kb": 95
+    },
+    {
+      "unit": "U01b-idb-memory",
+      "files": 10,
+      "kb": 131
+    },
+    {
+      "unit": "U02-oplog-domain",
+      "files": 84,
+      "kb": 942
+    },
+    {
+      "unit": "U03a-conflict-replay",
+      "files": 11,
+      "kb": 72
+    },
+    {
+      "unit": "U03b-encryption-keys",
+      "files": 11,
+      "kb": 96
+    },
+    {
+      "unit": "U03c-planning-misc",
+      "files": 10,
+      "kb": 45
+    },
+    {
+      "unit": "U04a-sync-client",
+      "files": 7,
+      "kb": 148
+    },
+    {
+      "unit": "U04b-ai",
+      "files": 15,
+      "kb": 236
+    },
+    {
+      "unit": "U05-apphost-a-l",
+      "files": 66,
+      "kb": 955
+    },
+    {
+      "unit": "U06a-vault-share",
+      "files": 20,
+      "kb": 253
+    },
+    {
+      "unit": "U06b-native-sync",
+      "files": 14,
+      "kb": 161
+    },
+    {
+      "unit": "U06c-apphost-rest",
+      "files": 10,
+      "kb": 83
+    },
+    {
+      "unit": "U07-localapi-inbound",
+      "files": 27,
+      "kb": 305
+    },
+    {
+      "unit": "U08a-sync-routes",
+      "files": 18,
+      "kb": 240
+    },
+    {
+      "unit": "U08b-sync-services",
+      "files": 14,
+      "kb": 241
+    },
+    {
+      "unit": "U09-server-billing-auth",
+      "files": 53,
+      "kb": 731
+    },
+    {
+      "unit": "U11-nodehost-desktop",
+      "files": 27,
+      "kb": 281
+    },
+    {
+      "unit": "U12-web-shell",
+      "files": 78,
+      "kb": 961
+    },
+    {
+      "unit": "U15-ui-shared",
+      "files": 121,
+      "kb": 1629
+    },
+    {
+      "unit": "U16-mobile-shell",
+      "files": 32,
+      "kb": 255
+    },
+    {
+      "unit": "U17-mobile-features",
+      "files": 121,
+      "kb": 1343
+    },
+    {
+      "unit": "U18-native-macos",
+      "files": 15,
+      "kb": 262
+    },
+    {
+      "unit": "U19-native-windows",
+      "files": 16,
+      "kb": 140
+    },
+    {
+      "unit": "U20-native-mobile",
+      "files": 103,
+      "kb": 685
+    },
+    {
+      "unit": "U21-landing-legal",
+      "files": 110,
+      "kb": 2522
+    }
+  ],
+  "webFeatures": [
+    {
+      "unit": "webfeature:settings",
+      "files": 45,
+      "kb": 438
+    },
+    {
+      "unit": "webfeature:ai",
+      "files": 25,
+      "kb": 239
+    },
+    {
+      "unit": "webfeature:tasks",
+      "files": 26,
+      "kb": 239
+    },
+    {
+      "unit": "webfeature:auth",
+      "files": 10,
+      "kb": 158
+    },
+    {
+      "unit": "webfeature:admin",
+      "files": 5,
+      "kb": 150
+    },
+    {
+      "unit": "webfeature:sync",
+      "files": 11,
+      "kb": 149
+    },
+    {
+      "unit": "webfeature:shell",
+      "files": 18,
+      "kb": 133
+    },
+    {
+      "unit": "webfeature:share",
+      "files": 18,
+      "kb": 121
+    },
+    {
+      "unit": "webfeature:habits",
+      "files": 10,
+      "kb": 112
+    },
+    {
+      "unit": "webfeature:calendar",
+      "files": 11,
+      "kb": 89
+    },
+    {
+      "unit": "webfeature:reminders",
+      "files": 8,
+      "kb": 68
+    },
+    {
+      "unit": "webfeature:projects",
+      "files": 3,
+      "kb": 38
+    },
+    {
+      "unit": "webfeature:subscription",
+      "files": 4,
+      "kb": 36
+    },
+    {
+      "unit": "webfeature:inbox",
+      "files": 3,
+      "kb": 33
+    },
+    {
+      "unit": "webfeature:motivation",
+      "files": 4,
+      "kb": 32
+    },
+    {
+      "unit": "webfeature:privacy",
+      "files": 6,
+      "kb": 32
+    },
+    {
+      "unit": "webfeature:focus",
+      "files": 3,
+      "kb": 31
+    },
+    {
+      "unit": "webfeature:categories",
+      "files": 5,
+      "kb": 28
+    },
+    {
+      "unit": "webfeature:quadrant",
+      "files": 2,
+      "kb": 28
+    },
+    {
+      "unit": "webfeature:countdown",
+      "files": 3,
+      "kb": 25
+    },
+    {
+      "unit": "webfeature:capture",
+      "files": 2,
+      "kb": 22
+    },
+    {
+      "unit": "webfeature:trash",
+      "files": 2,
+      "kb": 20
+    },
+    {
+      "unit": "webfeature:notes",
+      "files": 3,
+      "kb": 18
+    },
+    {
+      "unit": "webfeature:kanban",
+      "files": 1,
+      "kb": 17
+    },
+    {
+      "unit": "webfeature:legal-recheck",
+      "files": 3,
+      "kb": 16
+    },
+    {
+      "unit": "webfeature:tags",
+      "files": 2,
+      "kb": 16
+    },
+    {
+      "unit": "webfeature:timeline",
+      "files": 2,
+      "kb": 8
+    },
+    {
+      "unit": "webfeature:announcements",
+      "files": 2,
+      "kb": 6
+    }
+  ],
+  "serverDirs": [
+    {
+      "unit": "serverdir:sync",
+      "files": 31,
+      "kb": 469
+    },
+    {
+      "unit": "serverdir:billing",
+      "files": 20,
+      "kb": 357
+    },
+    {
+      "unit": "serverdir:automation",
+      "files": 10,
+      "kb": 155
+    },
+    {
+      "unit": "serverdir:admin",
+      "files": 4,
+      "kb": 102
+    },
+    {
+      "unit": "serverdir:password",
+      "files": 7,
+      "kb": 94
+    },
+    {
+      "unit": "serverdir:central-auth",
+      "files": 13,
+      "kb": 93
+    },
+    {
+      "unit": "serverdir:account",
+      "files": 9,
+      "kb": 85
+    },
+    {
+      "unit": "serverdir:ai",
+      "files": 4,
+      "kb": 76
+    },
+    {
+      "unit": "serverdir:push",
+      "files": 6,
+      "kb": 57
+    },
+    {
+      "unit": "serverdir:shares",
+      "files": 2,
+      "kb": 54
+    },
+    {
+      "unit": "serverdir:activity",
+      "files": 3,
+      "kb": 28
+    },
+    {
+      "unit": "serverdir:holidays",
+      "files": 3,
+      "kb": 24
+    },
+    {
+      "unit": "serverdir:attachments",
+      "files": 1,
+      "kb": 10
+    },
+    {
+      "unit": "serverdir:announcements",
+      "files": 2,
+      "kb": 8
+    },
+    {
+      "unit": "serverdir:util",
+      "files": 2,
+      "kb": 2
+    }
+  ],
+  "mobileDirs": [
+    {
+      "unit": "mobiledir:screens",
+      "files": 38,
+      "kb": 828
+    },
+    {
+      "unit": "mobiledir:lib",
+      "files": 44,
+      "kb": 250
+    },
+    {
+      "unit": "mobiledir:ai",
+      "files": 11,
+      "kb": 119
+    },
+    {
+      "unit": "mobiledir:ui",
+      "files": 7,
+      "kb": 91
+    },
+    {
+      "unit": "mobiledir:sync",
+      "files": 8,
+      "kb": 69
+    },
+    {
+      "unit": "mobiledir:share",
+      "files": 10,
+      "kb": 57
+    },
+    {
+      "unit": "mobiledir:widgets",
+      "files": 9,
+      "kb": 51
+    },
+    {
+      "unit": "mobiledir:auth",
+      "files": 5,
+      "kb": 26
+    },
+    {
+      "unit": "mobiledir:nav",
+      "files": 4,
+      "kb": 19
+    },
+    {
+      "unit": "mobiledir:db",
+      "files": 2,
+      "kb": 16
+    },
+    {
+      "unit": "mobiledir:privacy",
+      "files": 3,
+      "kb": 15
+    },
+    {
+      "unit": "mobiledir:inbound",
+      "files": 4,
+      "kb": 11
+    },
+    {
+      "unit": "mobiledir:legal-recheck",
+      "files": 2,
+      "kb": 10
+    },
+    {
+      "unit": "mobiledir:i18n",
+      "files": 3,
+      "kb": 8
+    },
+    {
+      "unit": "mobiledir:prefs",
+      "files": 1,
+      "kb": 7
+    }
+  ],
+  "serverTopFiles": {
+    "unit": "server-top-files",
+    "files": 22,
+    "kb": 468
+  }
+}

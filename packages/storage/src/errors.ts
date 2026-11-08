@@ -73,11 +73,48 @@ export class StorageError extends Error {
 }
 
 /**
+ * `String(value)` 的**永不抛**版本。
+ *
+ * 【为什么需要（崩溃审计 2026-11-08 · B.3）】
+ *
+ * 下面 `storageError()` 的最后一条分支是 `String(cause)`。它看起来无害，
+ * 但 `String()` 会调用值的 `toString` / `Symbol.toPrimitive`，而这两者都可能抛：
+ *
+ *   - `Object.create(null)` 没有 `toString` ⇒ `TypeError: Cannot convert object to primitive value`
+ *   - 一个 `toString` 自己写错的宿主对象（驱动、DOM 事件、Proxy）⇒ 抛它自己的错
+ *
+ * 致命之处在于**这个函数是在 `catch` 块里被调用的**：错误规范化本身抛错，
+ * 就等于把"处理已知失败"变成了一次**新的未捕获异常** —— 而调用方（事务体的统一 catch）
+ * 已经认定"这里不会再抛了"，于是事务的清理逻辑被跳过、事务被挂住。
+ *
+ * 所以这里必须把 `String()` 关进 try 里，并给一个**类型名兜底**而不是空串 ——
+ * 空串会让错误屏显示一片空白，比显示 `[object: object]` 更难排查。
+ *
+ * 判据：`tests/storage-error.spec.ts` 的「不可字符串化的 cause」两条用例。
+ */
+function safeToString(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    // `String()` 抛了 —— 至少给一个能看出"这是个对象/函数"的标记，而不是空串。
+    try {
+      if (typeof value === 'object' && value !== null) {
+        const name = Object.prototype.toString.call(value);
+        return `[unstringifiable ${name}]`;
+      }
+    } catch {
+      // `Object.prototype.toString.call` 理论上不抛，但 Proxy 的 get 陷阱可以。
+    }
+    return `[unstringifiable ${typeof value}]`;
+  }
+}
+
+/**
  * 把驱动给的东西包成 `StorageError`，**`message` 与 `request.error ?? new Error(兜底)` 逐字相同**：
  *
  * - `cause` 是 `Error` → 用**它自己的** `message`（浏览器/驱动给的细节优先，与改造前一致）
  * - `cause` 缺席（`undefined`/`null`）→ 用 `fallbackMessage`
- * - 其它（理论上不会发生）→ `String(cause)`
+ * - 其它（理论上不会发生）→ `safeToString(cause)`（**永不抛**，见上面的说明）
  *
  * ⚠️ 唯一的行为差异：改造前非 `Error` 的 `cause` 会被**原样**当作 rejection 值抛出去，
  * 现在一律包成 `StorageError`。调用方拿到的始终是 `Error`，这是更严的形状。
@@ -89,7 +126,7 @@ export function storageError(
 ): StorageError {
   if (cause instanceof Error) return new StorageError(cause.message, failure, cause);
   if (cause === undefined || cause === null) return new StorageError(fallbackMessage, failure);
-  return new StorageError(String(cause), failure, cause);
+  return new StorageError(safeToString(cause), failure, cause);
 }
 /**
  * 已经是 `StorageError` 就**原样返回**，否则包一层。
