@@ -266,3 +266,7 @@ apps/web/evidence/web-ui-sweep-latest/
 
 # 并行会话的有界等待/临时脚本（本机脚手架，不入库）
 .scratch-*/
+.arms-*/
+
+# 软著材料（含主体证件、运行截图与申请表信息）
+docs/operations/software-copyright/
