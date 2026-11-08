@@ -2556,7 +2556,6 @@ export const zhCN = {
   // 用户为了"让 AI 帮我看看今天有什么"就得去开一个他并不想给别的进程的口子。
   // 两档都汇到同一个判据 `isToolGranted()` —— 授权只有一份，变的是谁来勾。
   'web.ai.assistant.title': '对话助手',
-  'web.ai.assistant.hint': '只读档只查询不写入；执行档会自动完成低风险写入，高风险改动仍会先请你确认。',
   'web.ai.assistant.tier.readOnly.label': '只读',
   'web.ai.assistant.tier.readOnly.note': '只查询和回答，不会写入数据。',
   'web.ai.assistant.tier.readAndPropose.label': '执行',

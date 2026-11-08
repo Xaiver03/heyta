@@ -1246,11 +1246,15 @@ export function AiSettings({
           <section className="ht-settings__section" data-testid="ai-assistant-section">
             <h3 className="ht-settings__h3 ht-type-row-title">
               {t('web.ai.assistant.title')}
-              <SettingsInfoTip
-                testId="tip-ai-assistant"
-                label={t('web.ai.assistant.title')}
-                text={t('web.ai.assistant.hint')}
-              />
+              {/*
+                🔴 **2026-11-08 删掉了一枚问号**，理由是它与前三类都不同：
+                它的正文「只读档只查询不写入；执行档会自动完成低风险写入…」
+                描述的是 **ADR-0082 已经删掉的那个权限档**（该 ADR 标题原文：
+                "内置助手**不设权限档**：删掉 `assistantTier`（只读 / 执行）"）。
+                所以这不是"多余的说明"，而是**在解释一个不存在的控件**。
+                ⇒ 处置是**删**（连同它描述的对象），不是"改写"也不是"保留"。
+                这条与 §1.2 那三类靶子并列，是本轮新识别出的第四类。
+              */}
             </h3>
 
             {/*

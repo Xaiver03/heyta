@@ -2375,7 +2375,6 @@ export const en = {
   'web.ai.settings.revoke': 'Revoke',
   // Conversational assistant (ADR-0045): the second authorization front.
   'web.ai.assistant.title': 'Chat assistant',
-  'web.ai.assistant.hint': 'Read only never writes. Execute mode applies low-risk writes automatically and asks before high-risk changes.',
   'web.ai.assistant.tier.readOnly.label': 'Read only',
   'web.ai.assistant.tier.readOnly.note': 'Looks things up and answers, but never writes data.',
   'web.ai.assistant.tier.readAndPropose.label': 'Execute',
