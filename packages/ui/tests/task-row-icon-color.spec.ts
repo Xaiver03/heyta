@@ -26,8 +26,8 @@ const SRC = readFileSync(join(process.cwd(), 'src/task-list/TaskRow.tsx'), 'utf8
 const CODE = stripComments(SRC);
 
 describe('行首清单图标：着色只发生在这里', () => {
-  it('「关」= 节点不存在：整枚节点挂在 `iconColor === undefined ? null : …` 上', () => {
-    expect(CODE).toMatch(/iconColor === undefined \? null :/);
+  it('「关」= 节点不存在：整枚节点挂在 `iconColorToken === undefined ? null : …` 上', () => {
+    expect(CODE).toMatch(/iconColorToken === undefined \? null :/);
   });
 
   it('不许用 opacity:0 / 透明色冒充"关"（那是假关：读屏仍念得到、布局仍占位）', () => {
@@ -39,7 +39,7 @@ describe('行首清单图标：着色只发生在这里', () => {
   });
 
   it('颜色由宿主给（共享层不查实体表，与 EmptyState 同一条边界）', () => {
-    expect(CODE).toMatch(/readonly iconColor\?: string \| undefined/);
+    expect(CODE).toMatch(/readonly iconColorToken\?: CategoryColorToken \| undefined/);
     // 反向臂：共享层里不许出现项目/标签实体查询。
     expect(CODE).not.toMatch(/getState\(\)\.projects/);
     expect(CODE).not.toMatch(/resolveTagIds/);
