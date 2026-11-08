@@ -30,7 +30,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const platform = vi.hoisted(() => ({
   opened: [] as Array<Record<string, unknown>>,
@@ -84,7 +84,20 @@ const {
   getOpenTaskHostIfReady,
 } = await import('../src/db/open-host');
 
-afterEach(() => {
+/**
+ * 换代通知被推到下一个宏任务（理由见 `open-host.ts` 那段「为什么不能同步发」）。
+ * ⚠️ 它同时意味着**计时器会跨用例串味**：上一条 `resetTaskHostCache()` 排的那一发，
+ * 会在下一条 flush 时落到下一条刚订阅的 listener 上（实测：期望 1 次、实得 2 次）。
+ * 所以前后都要排空。
+ */
+const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+beforeEach(async () => {
+  await flush();
+});
+
+afterEach(async () => {
+  await flush();
   platform.failNext = false;
 });
 
@@ -95,23 +108,39 @@ describe('宿主换代协议', () => {
     expect(getTaskHostEpoch()).toBe(before + 1);
   });
 
-  it('reset 必须真的通知订阅者', () => {
+  it('reset 必须真的通知订阅者（延后一个宏任务）', async () => {
     const listener = vi.fn();
     const off = subscribeTaskHostEpoch(listener);
     resetTaskHostCache();
+    await flush();
     expect(listener).toHaveBeenCalledTimes(1);
     off();
   });
 
-  it('退订之后不再收到通知', () => {
+  it('🔴 通知必须是**延后**的，不能在同一 tick 里发', async () => {
+    // 【为什么单独钉这一条】它防的是一个已经被真机量到的回归：
+    // 同步发通知 ⇒ 仍挂载的 4 张 tab 在同一 tick 重开宿主 ⇒ 与 `adapter.destroy()`
+    // 的收尾撞上 ⇒ 注销后第一屏报「打开本地数据库失败」（ técnica 见 open-host.ts 注释）。
+    // 库本身是好的（integrity ok / ops=0 / 重启正常），所以**任何只测数据的判据都看不见它**。
+    const listener = vi.fn();
+    const off = subscribeTaskHostEpoch(listener);
+    resetTaskHostCache();
+    expect(listener, '同步发通知了：teardown 还没退栈就重开，真机上会报「打开本地数据库失败」').not.toHaveBeenCalled();
+    await flush();
+    expect(listener).toHaveBeenCalledTimes(1);
+    off();
+  });
+
+  it('退订之后不再收到通知', async () => {
     const listener = vi.fn();
     const off = subscribeTaskHostEpoch(listener);
     off();
     resetTaskHostCache();
+    await flush();
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('一个订阅者抛错不许挡住其余订阅者', () => {
+  it('一个订阅者抛错不许挡住其余订阅者', async () => {
     const good = vi.fn();
     const offBad = subscribeTaskHostEpoch(() => {
       throw new Error('界面自己坏了');
@@ -119,6 +148,7 @@ describe('宿主换代协议', () => {
     const offGood = subscribeTaskHostEpoch(good);
     // 换代本身不许因为某个界面坏了而失败。
     expect(() => resetTaskHostCache()).not.toThrow();
+    await flush();
     expect(good).toHaveBeenCalledTimes(1);
     offBad();
     offGood();

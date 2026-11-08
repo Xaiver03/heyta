@@ -263,8 +263,17 @@ export function resetTaskHostCache(): void {
   // 那个已按口径 B 拒绝读写的旧 adapter（症状是"写入静默成功、新库里看不见"）。
   bindMobileOplogBase(undefined);
 
-  // 🔴 **最后一步**才通知：订阅者收到通知后会立刻重新 `openTaskHost()`，
-  // 此刻 `pending` / `resolvedHost` / 共享路由装配都必须已经清干净，
-  // 否则它们拿到的是刚被作废的那一份（通知变成"提前通知"就没意义了）。
-  emitEpochChange();
+  // 🔴 **最后一步**才通知，且**推到下一个宏任务**：订阅者收到通知就会重新
+  // `openTaskHost()`，而这条路径紧接着一次**真的删库**（`adapter.destroy()` 刚返回）。
+  //
+  // 【为什么不能同步发（2026-11-08 真机实测）】同步发的时候，四张仍挂载的 tab
+  // 在同一 tick 里重开宿主，与销毁的收尾（原生 `close()` / 文件删除的后半段）撞上，
+  // 症状是**注销之后第一屏报「打开本地数据库失败」**：
+  //
+  //     技术细节：本地数据库恢复失败：读不出已存在的操作日志…
+  //
+  // 而同一台设备上：库的 `pragma integrity_check` = ok、`ops`/`state` 都是 0 行、
+  // **杀进程重开一切正常**（「还没有任务」）。⇒ 那是**瞬时竞态**，不是数据损坏，
+  // 更不能让它变成用户看到的那一屏。让 teardown 先退栈即可。
+  setTimeout(emitEpochChange, 0);
 }
