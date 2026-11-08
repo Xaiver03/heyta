@@ -90,6 +90,8 @@
     "check:shell-erasure-parity": "node scripts/check-shell-erasure-parity.mjs",
     "check:docs-voice": "node scripts/check-docs-voice.mjs",
     "check:privacy-as-blocker": "node scripts/check-privacy-as-blocker.mjs --self-test && node scripts/check-privacy-as-blocker.mjs",
+    "check:field-single-source": "node scripts/check-field-single-source.mjs --self-test && node scripts/check-field-single-source.mjs",
+    "check:global-mirror": "node scripts/check-global-mirror.mjs --self-test && node scripts/check-global-mirror.mjs",
     "check:detail-pane-status-table": "node scripts/check-detail-pane-status-table.mjs",
     "check:detail-pane-c1-coverage": "node scripts/check-detail-pane-c1-coverage.mjs",
     "check:detail-pane-evidence-refs": "node scripts/check-detail-pane-evidence-refs.mjs",
