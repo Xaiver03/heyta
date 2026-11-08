@@ -119,7 +119,19 @@ heyta_e2e_assert_client_budget() {
     echo "   ⚠️ 读不到账号邮箱，跳过 client 预算检查"
     return 0
   fi
-  count=$(psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+  # 🔴 连接参数**不许硬印**：原来写死 `-U rocalight -d heyta_mobile_smoke`，那是 macOS
+  #    主检出的登录用户。2026-11-08 把「设备侧验收」搬到 `linux-dev`
+  #    （`scripts/run-gradle.mjs:29-33` 记的那次改口）之后，那台载体的用户是 `xaiver`
+  #    ⇒ 这一发查不到任何东西、`count` 成空串 ⇒ 下面那条判据把**环境问题**报成
+  #    「账号 client 预算不足 —— 换号后重跑」，而真因是用户名不对。
+  #    口径与 `lib/mobile-e2e.sh:57-61` / `verify-mobile-due-time.sh:791-795` 一致
+  #    （变量可覆盖、默认取当前登录者、库名同源），现有跑法行为不变。
+  local pg_db pg_user pg_host pg_port
+  pg_db="${HEYTA_E2E_DB:-heyta_mobile_smoke}"
+  pg_user="${HEYTA_E2E_DB_USER:-$(whoami)}"
+  pg_host="${HEYTA_E2E_DB_HOST:-127.0.0.1}"
+  pg_port="${HEYTA_E2E_DB_PORT:-5432}"
+  count=$(psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" -tAc \
     "SELECT count(DISTINCT o.client_id) FROM operations o
        JOIN users u ON u.id = o.user_id WHERE u.email = '$email';" 2>/dev/null | tr -d ' ')
 
