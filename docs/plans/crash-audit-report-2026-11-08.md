@@ -522,3 +522,22 @@ timer = setTimeout(() => {
 > ⚠️ 一条**偶发**：`server` 的 `.pglite` 用例里
 > `the wrong passphrase refuses with exit 2…` 在一次并行跑里红过、重跑绿。
 > 未定位是否为 flake —— 不要因为"第二次绿了"就当它没问题。
+
+### H.6 第三批：钱的路径（server/billing，3 条静默错误）
+
+这三条都**不崩溃**，但都属于"看起来一切正常、实际什么都没做"的失效 ——
+比崩溃更难发现，因为它们留下了健康的日志。
+
+| # | 缺陷 | 修法 | 判据 |
+|---|---|---|---|
+| 18 | **对账永远 0 候选**：`paycenter.adapter.ts` 自己拼 `payment.succeeded:<out_trade_no>`，而 `reconcile.ts` 按 `PAYMENT_SUCCEEDED_EVENT_PREFIX`（`payment_succeeded:`）关联（`payment_events` 表上**没有** `out_trade_no` 列）⇒ `findUnsettledPaidOrders` 永久 0 候选，日清日志打印 "settled 0 of 0" | 成功事件改走唯一拼装点 `buildPaymentEventId()`（`payment-event-id.ts` 的文件头**正是**在警告这件事）；退款/退款失败仍带类型+状态前缀 | `billing-paycenter-adapter.spec.ts` 里那条断言改为 `${PAYMENT_SUCCEEDED_EVENT_PREFIX}SS-ORDER-1` —— 把 adapter 与 reconcile 钉在一起，改任何一边都红 |
+| 19 | **优惠券名额永久泄漏**：`expireStaleOrders` **无生产调用方**（只有 `.pglite.spec` 调它），而它自己的注释写着"这是一个**必须真的在跑**的后台任务" | 接进 `sync/cleanup.ts` 的定时（与 `runBillingReconciliation` 同一处），**无条件打日志含 0**（跑了但扫到 0 与根本没跑，从日志上必须能分开） | server 全量 3188 |
+| 20 | **部分退款被按整单回收**：`webhook.routes.ts` 只传 outRefundNo/status/providerRefundId，`paycenter.adapter.ts` 算好的退款金额在接线处**被丢掉** ⇒ 下游无法判定"是不是全退" | 三层透传（`RefundNotice.refundedAmountMinor` → `ApplyRefundResultInput` → `refund-store`），并加**检测告警**（金额 ≠ 冻结金额 ⇒ `Logger.warn`）。**不改会计行为** —— 回收口径是产品/财务决定，需要单独 ADR | `billing-paycenter-adapter.spec.ts` 断言 `refundedAmountMinor: 30` |
+
+> 🔴 第 20 条刻意只做到"让缺口可见"：`refund-store.ts` 里那段
+> "回收量必须等于当初授予的量，不许调用方凭手感改天数"是**刻意的设计**，
+> 凭猜去改部分退款的会计口径，比留着可见的告警更危险。
+
+另：`apps/mobile/src/db/open-host.ts` 的 `resetTaskHostCache` 现在会**先 `close()` 旧宿主**
+再作废它（此前只清模块变量 ⇒ 原生句柄泄漏到进程退出）。
+"32 个屏幕仍拿着死宿主"那一层需要一条宿主换代订阅通道，未做（见 §H.4）。

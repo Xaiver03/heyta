@@ -180,11 +180,40 @@ export function invalidateTaskHostVaultSession(): void {
   resolvedHost?.invalidateVaultSession();
 }
 
-/** 仅供测试与"重开数据库"这类显式场景使用。 */
+/**
+ * 仅供测试与"重开数据库"这类显式场景使用。
+ *
+ * 🔴 **必须先把旧宿主关掉再作废它**（崩溃审计 2026-11-08 · U16 第 2 条 P0）。
+ *
+ * 此前这里只清三个模块级变量，既不给旧 host 发信号、也不关它。后果有两层：
+ *
+ *   1. **原生句柄泄漏**：`resolvedHost` 一旦被置 `undefined`，JS 侧就再也没有
+ *      引用去 `close()` 它了 —— SQLite 连接与 OPFS 同步访问句柄会一直开着，
+ *      直到进程退出。而注销账号之后紧接着要做的正是"重新建库"。
+ *   2. **已挂载的屏幕仍拿着死宿主**：32 处 `useEffect(..., [])` 只取一次 host，
+ *      它们继续拿着那个 adapter 已被销毁的实例，任何写入落到
+ *      `AdapterDestroyedError`。
+ *
+ * 这一轮只修第 1 层（contained，且是纯泄漏）。第 2 层需要一条
+ * "宿主换代可订阅"的通道（`useSyncExternalStore` + `resolvedHost` 做快照），
+ * 要把 32 个屏幕都改成通过钩子取 host —— 那是独立一轮的改动，已记在
+ * `docs/plans/crash-audit-report-2026-11-08.md` §H.4。
+ *
+ * ⚠️ `close()` 允许抛（例如宿主已经因为别的原因半死）—— 吞掉它：
+ * 这条路径的契约是"作废并放手"，不是"报告关闭失败"。
+ */
 export function resetTaskHostCache(): void {
+  const previous = resolvedHost;
   hostEpoch += 1;
   pending = null;
   resolvedHost = undefined;
+  if (previous !== undefined) {
+    try {
+      previous.close();
+    } catch {
+      // 宿主已经处于不可用状态；我们已经放手，剩下的交给 GC 与进程退出。
+    }
+  }
   // 🔴 路由装配也要跟着换代：不摘的话，下一次 `dispatchIntent` 还会写进
   // 那个已按口径 B 拒绝读写的旧 adapter（症状是"写入静默成功、新库里看不见"）。
   bindMobileOplogBase(undefined);

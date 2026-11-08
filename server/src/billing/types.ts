@@ -198,6 +198,28 @@ export interface RefundNotice {
   readonly providerRefundId: string | null;
   /** 通道说这笔退款现在是什么状态。 */
   readonly status: ProviderRefundStatus;
+  /**
+   * 通道这次**实际退回**的金额（最小单位整数）。
+   *
+   * 🔴 为什么必须带下来（崩溃审计 2026-11-08 · U09 #3）：
+   * 回收权益那一段的策略是"**一单一次、按当初授予的量全额回收**"
+   * （`refund-store.ts` 的 `retractEntitlementInTx`，理由写在那里：回收量必须等于
+   * 当初授予的量，不许调用方凭手感改天数）。这条策略成立的前提是
+   * **每一笔退款都是整单全退** —— 而 `requestRefund` 冻结的 `amount_minor`
+   * 也正是整单金额。
+   *
+   * 但如果通道侧发生了**部分退款**（外部操作、通道侧手工退、或未来开的部分退），
+   * 全额回收就是错的：用户拿回了一部分钱，却被扣掉整段权益。
+   * 而这个字段此前**根本没有传下来** —— 接线处把 `paidAmountMinor` 丢掉了
+   * （`webhook.routes.ts` 只传 outRefundNo/status/providerRefundId），
+   * 于是"这到底是不是全额"在整条链路上**不可判定**。
+   *
+   * ⚠️ 传下来**不改变会计行为**：本字段目前只用于**检测并告警**
+   * （见 `refund-store.ts` 的 `amount-mismatch-suspected`）。
+   * 真正的"部分退款该怎么回收"是产品/财务口径问题，需要单独的 ADR ——
+   * 在它定下来之前，正确的做法是让缺口**可见**，而不是悄悄按全额扣。
+   */
+  readonly refundedAmountMinor?: number | null;
 }
 
 /**

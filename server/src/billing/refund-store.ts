@@ -45,6 +45,7 @@
  * 并且只在"这一行之外已经没有别的已付订单"时才让整行失效
  * （`retractGrantedPeriod` 的两条规则）。
  */
+import { Logger } from '../logger';
 import { randomBytes } from 'node:crypto';
 
 import type { SqlExecutor, SqlRunner } from './pricing-store';
@@ -477,6 +478,14 @@ export interface ApplyRefundResultInput {
   readonly outRefundNo: string;
   readonly status: ProviderRefundStatus;
   readonly providerRefundId: string | null;
+  /**
+   * 通道这次实际退回的金额（最小单位整数）。
+   *
+   * `null`/缺席 = 通知里没带 → **不可判定是否全退**（不是"全退"，也不是"部分退"）。
+   * 见 `RefundNotice.refundedAmountMinor` 的长注释：本字段只用于检测与告警，
+   * **不改变回收量** —— 回收口径是产品/财务决定，需要单独 ADR。
+   */
+  readonly refundedAmountMinor?: number | null;
   readonly now: number;
 }
 
@@ -546,6 +555,36 @@ export const applyRefundResultInTransaction = async (
         refundId: parsed.id,
         currentPeriodEnd: asNumber(after[0]?.current_period_end),
       };
+    }
+
+    /**
+     * 🔴 部分退款**检测**（崩溃审计 2026-11-08 · U09 #3）。
+     *
+     * 这一段**不改变任何会计行为** —— 回收量仍是"当初授予的量"（见
+     * `retractEntitlementInTx` 的注释：那是刻意的，不许调用方凭手感改天数）。
+     *
+     * 它只做一件事：把"这到底是不是整单全退"这个**此前在整条链路上不可判定**的问题
+     * 说出口。此前 `webhook.routes.ts` 把通道给的金额丢掉了，于是部分退款与全额退款
+     * 在下游长得一模一样，全额回收了部分退款也不会有人知道。
+     *
+     * 判据的三种情形：
+     *   · 通知没带金额（`null`/`undefined`）⇒ 不可判定，不告警（不制造噪声）；
+     *   · 带金额且**小于**这一行的 `amountMinor` ⇒ 部分退款 ⇒ **告警**；
+     *   · 带金额且相等 ⇒ 全退，正常路径。
+     * 金额**大于**已冻结金额也告警：那说明通道侧的数据与我们的退款行不一致，
+     * 无论原因是什么都不该安静地按全额扣。
+     *
+     * ⚠️ 只告警不拒收：拒收会让通知重投，而重投同样不做对的事（策略本身没变）；
+     * 先让人看见，再定策略。
+     */
+    const reported = input.refundedAmountMinor ?? null;
+    if (reported !== null && Number.isFinite(reported) && reported !== parsed.amountMinor) {
+      Logger.warn('退款金额与退款行不一致 —— 疑似部分退款，权益仍按整单回收（待定口径）', {
+        refundId: parsed.id,
+        outRefundNo: parsed.outRefundNo,
+        frozenAmountMinor: parsed.amountMinor,
+        reportedAmountMinor: reported,
+      });
     }
 
     // abnormal / closed / processing：只推进状态，**绝不**动权益。

@@ -26,6 +26,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { Currency } from './money';
 import { DEFAULT_PRICE_BOOK, grantsForSku, projectPrices } from './price-book';
+import { buildPaymentEventId } from './payment-event-id';
 import type {
   BillingAdapter,
   CheckoutResult,
@@ -521,6 +522,12 @@ export const createPaycenterBillingAdapter = (
               // 所以给 null 不会把发起退款时存下的那个值抹掉。
               providerRefundId: null,
               status,
+              // 🔴 把"这次实际退了多少"传下去（此前在接线处被丢掉）。
+              // 不改变会计，只让"部分退款"这种形状在下游**可判定**。
+              refundedAmountMinor:
+                typeof event.refunded_amount === 'string' && event.refunded_amount.trim() !== ''
+                  ? Number(event.refunded_amount)
+                  : null,
             },
           },
         };
@@ -540,8 +547,27 @@ export const createPaycenterBillingAdapter = (
 
       const normalized: NormalizedPaymentEvent = {
         provider: PAYCENTER_PROVIDER,
-        // 🔴 重投必须得到同一个值：用 (事件类型, 本仓单号) 组合，而不是投递次数。
-        providerEventId: `${event.event_type}:${event.external_order_id}`,
+        /**
+         * 🔴 重投必须得到同一个值；**并且成功事件必须用唯一的拼装点**。
+         *
+         * 这里原来是 `${event.event_type}:${event.external_order_id}` —— 对
+         * `payment.succeeded` 会拼出 `payment.succeeded:hy-…`，而
+         * `reconcile.ts` 按 `payment_succeeded:` 前缀把 `payment_events` 行
+         * 关联回 `checkout_orders`（`payment_events` 表上**没有** `out_trade_no` 列）。
+         * 两者对不上，于是 `findUnsettledPaidOrders` **永远 0 候选**，
+         * 日清日志打印 "settled 0 of 0" —— 看起来健康，实际一次都没对过账。
+         *
+         * `payment-event-id.ts` 的文件头**正是**在警告这件事
+         * （"只改一处而不同步另一处，对账会静默地一条候选都找不到"）。
+         * 所以成功事件必须走 `buildPaymentEventId()`，不许自己拼字面量。
+         *
+         * 其余事件（退款成功 / 退款失败）仍然带类型前缀与状态：
+         * 它们的幂等域是"这一类退款"，而对账只关心成功支付。
+         */
+        providerEventId:
+          event.event_type === EVENT_PAYMENT_SUCCEEDED
+            ? buildPaymentEventId(event.external_order_id)
+            : `${event.event_type}:${event.external_order_id}`,
         eventType: event.event_type,
         occurredAt: typeof event.paid_at === 'string' ? Date.parse(event.paid_at) : now(),
         // 中心收的是**一次性支付**（与微信直连同形）：没有订阅对象。

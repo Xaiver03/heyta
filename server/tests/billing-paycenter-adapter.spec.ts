@@ -11,6 +11,7 @@ import {
   toProviderRefundStatus,
 } from '../src/billing/paycenter.adapter';
 import type { NormalizedPaymentEvent, OneTimeGrant } from '../src/billing/types';
+import { PAYMENT_SUCCEEDED_EVENT_PREFIX } from '../src/billing/payment-event-id';
 
 const SECRET = '0123456789abcdef0123456789abcdef';
 const CLIENT = 'heyta';
@@ -423,6 +424,10 @@ describe('payment.refunded', () => {
       outRefundNo: 'heyta-refund-77',
       providerRefundId: null,
       status: 'success',
+      // 🔴 金额必须**带出来**（崩溃审计 2026-11-08 · U09 #3）。
+      // 此前它在接线处被丢掉，于是"这次到底退了多少"在整条链路上不可判定 ——
+      // 部分退款与全额退款在下游长得一模一样，全额回收了部分退款也没人知道。
+      refundedAmountMinor: 30,
     });
     // 🔴 带授予 ⇒ webhook 路由会再授予一次，而这是撤销
     expect(r.event.oneTimeGrant).toBeNull();
@@ -478,7 +483,19 @@ describe('payment.refunded', () => {
     const pay = await verify(eventBody());
     if (!refund.ok || !pay.ok) throw new Error('两条都应通过');
     expect(refund.event.providerEventId).toBe('payment.refunded:SS-ORDER-1:success');
-    expect(pay.event.providerEventId).toBe('payment.succeeded:SS-ORDER-1');
+    /**
+     * 🔴 支付成功事件必须用**唯一拼装点**的前缀（崩溃审计 2026-11-08 · U09 #1）。
+     *
+     * 这里原来断言的是 `'payment.succeeded:SS-ORDER-1'` —— 也就是把 bug 当成了期望值。
+     * `reconcile.ts` 按 `PAYMENT_SUCCEEDED_EVENT_PREFIX`（`payment_succeeded:`）
+     * 把 `payment_events` 行关联回 `checkout_orders`（那张表上**没有** `out_trade_no` 列），
+     * 两者对不上 ⇒ `findUnsettledPaidOrders` **永远 0 候选** ⇒
+     * 日清日志打印 "settled 0 of 0"，看起来健康，实际一次都没对过账。
+     *
+     * `payment-event-id.ts` 的文件头**正是**在警告这件事。
+     * 下面的断言把两个模块钉在一起：改任何一边都会红。
+     */
+    expect(pay.event.providerEventId).toBe(`${PAYMENT_SUCCEEDED_EVENT_PREFIX}SS-ORDER-1`);
     expect(refund.event.providerEventId).not.toBe(pay.event.providerEventId);
   });
 });

@@ -2,6 +2,8 @@ import { getSyncService } from './sync.service';
 import { Logger } from '../logger';
 import { purgeExpiredAiUsageCounters } from '../ai/metering';
 import { runBillingReconciliation } from '../billing/reconcile-job';
+import { createPrismaSqlExecutor, expireStaleOrders } from '../billing/pricing-store';
+import { prisma } from '../db';
 import { DEFAULT_SYNC_CONFIG, MS_PER_DAY } from './sync.types';
 import { MIN_CHECKPOINT_SAFE_APP_VERSION } from './checkpoint-gate';
 import { vaultKeyMigrationService } from './services/vault-key-migration.service';
@@ -159,6 +161,27 @@ const runDailyCleanup = async (): Promise<void> => {
     }
   } catch (error) {
     Logger.error(`Cleanup [billing-reconcile] failed: ${error}`);
+  }
+
+  // 7b. Release coupon quota from abandoned checkouts and expire stale orders.
+  //
+  // 🔴 `expireStaleOrders` 此前**没有生产调用方**（崩溃审计 2026-11-08 · U09 #2）。
+  // 它自己的注释写着"这是一个**必须真的在跑**的后台任务，不是可选的优化"，
+  // 而实际上只有 `.pglite.spec` 调它。后果不是崩溃，是**静默的预算泄漏**：
+  // `coupon_redemptions` 的 `reserved` 行永久占着 `maxRedemptions` 名额，
+  // 于是"限量 N 张"的券在 N 个人点开收银台后**再也领不到** ——
+  // 而那 N 个人可能一个都没付钱。
+  //
+  // 与 billing-reconcile 同一位置、同一取数方式（都写在 cleanup 的定时里），
+  // 同样**无条件打日志含 0**：跑了但扫到 0 与根本没跑，从日志上必须能分开。
+  try {
+    const swept = await expireStaleOrders(createPrismaSqlExecutor(prisma), { now: Date.now() });
+    Logger.info(
+      `Cleanup [coupon-expiry]: released ${swept.redemptions} redemption(s), ` +
+        `expired ${swept.orders} order(s)`,
+    );
+  } catch (error) {
+    Logger.error(`Cleanup [coupon-expiry] failed: ${error}`);
   }
 
   // 8. Expire managed-AI usage counters. This is the **only** thing that makes

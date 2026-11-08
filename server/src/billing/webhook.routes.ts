@@ -429,6 +429,9 @@ export const webhookRoutes = async (
               outRefundNo: event.refundNotice.outRefundNo,
               status: event.refundNotice.status,
               providerRefundId: event.refundNotice.providerRefundId,
+              // 🔴 金额必须透传（此前在这里被丢掉），否则下游无法判断
+              // "这是不是整单全退" —— 见 RefundNotice.refundedAmountMinor 的注释。
+              refundedAmountMinor: event.refundNotice.refundedAmountMinor ?? null,
               now: now(),
             });
           } else {
