@@ -447,7 +447,16 @@ if [ -z "$SRC_MTIME" ]; then
   exit 3
 fi
 if [ "$NEWEST" -lt "$SRC_MTIME" ]; then
+  # 🔴 失败消息必须**点名那一枚文件**（2026-11-08）：原来只说"bundle 比源码旧"，
+  #    于是一旦并行会话正在改 i18n 之类的**打包内源码**，每次重打都会立刻再变旧，
+  #    而读日志的人只能靠手工 `find | stat | sort` 才找得到是谁 —— 我为此白跑了三趟。
+  #    现在把 `NEWEST_SRC` 与两个 mtime 一起打出来，一眼就能判"这是并发改动的竞态"
+  #    还是"我真的忘了重打"。
   echo "   ❌ 设备上装的是旧产物（bundle 比源码旧）⇒ 量的不是当前代码。先 pnpm reinstall:mobile。exit 3"
+  echo "      取证的三个数：bundle=${JS_MTIME} app=${APP_MTIME} 源码最新=${SRC_MTIME}"
+  echo "      最新那枚：${NEWEST_SRC:-未取到}"
+  echo "      ⚠️ 若那枚文件是**并行会话刚改的**（不是本次任务的改动），这一趟是竞态而不是缺陷："
+  echo "         等它落定后重打一次即可；判据本身没问题（它挡的正是'拿旧产物报读数'）。"
   exit 3
 fi
 
@@ -770,10 +779,32 @@ fill_three_credentials() {  # <令牌>
   close_settings_sheet
 }
 
-sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…」，所以先等它回到空闲名
+# 走到「立即同步」所在的那一面。
+#
+# 🔴 **它在设置面里，不在「我的」页上**（2026-11-08 又一处）：
+#    `ProfileScreen.tsx:1321` 把 `syncStatus` 那一块**只**作为 `syncStatus` prop 交给
+#    `SettingsScreen`（`:1718`），而 `SettingsScreen.tsx:661` 又只在
+#    `form.configured || advancedSync` 为真时才渲染它。所以「立即同步」住在
+#    **设置面 → 数据与同步**，而不是「我的」首屏。
+#
+#    旧版 `sync_now` 只按一下「我的」然后等 90 秒 —— 等一枚**不在那一页上**的按钮，
+#    必然空转，最后报「这一次同步没被触发」（方向完全相反）。
+#    这条与前面几处同族：**探针停在错的页上**，报出来的话却指向产品。
+open_sync_section() {
   dismiss_keyboard
   ax "我的" --pressable --press --json >/dev/null 2>&1
-  sleep 3
+  sleep 2
+  ax "设置" --pressable --press --json >/dev/null 2>&1
+  sleep 2
+  if [ "$(jget "$(ax "$SETTINGS_SYNC_GROUP" --pressable --list --json)" found)" = "True" ]; then
+    ax "$SETTINGS_SYNC_GROUP" --pressable --press --json >/dev/null 2>&1
+    sleep 2
+  fi
+}
+
+sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…」，所以先等它回到空闲名
+  dismiss_keyboard
+  open_sync_section
   # 🔴 10-05 08:55 实测：「保存密码？」是**填完 secure 框之后**才弹的，
   #    所以填写步里那次 dismiss 挡不住它 —— 弹窗立着时**底部两个标签都不在树上**
   #    （`dismiss_ios_save_password` 就靠这条判"这是系统弹窗态"，摘完回读 任务/我的 又都在）。
@@ -790,8 +821,7 @@ sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…�
     #    回读是「任务=True 我的=True」（两个标签回到树上），而截图显示界面停在**任务页**。
     #    所以第二轮若就这么等，等的是"任务页上永远不会出现的标签" ⇒ 必然再空转 90 秒，
     #    最后判一条长得像"同步没被触发"的红（真因是探针停在错的页上）。
-    ax "我的" --pressable --press --json >/dev/null 2>&1
-    sleep 3
+    open_sync_section
     if idb_wait_label "立即同步" 90; then
       echo "     第二轮等到 ⇒ 弹窗腿成立（第一轮那一下确实是被系统弹窗吃掉的）"
     else
@@ -808,7 +838,11 @@ sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…�
   #    出现了逐字相同的「这个账号已经注销，无法再次登录，同步已停止」）。
   #    `--scroll-into-view "账号"`（页面首行；整块在折叠线上方时 shim 会真的向下拖）
   #    把状态块让到 y≈552，实测让位之后那一发请求就到了服务端。
-  ax "账号" --scroll-into-view --list --json >/dev/null 2>&1
+  # ⚠️ 原来这里滚的是「账号」（「我的」页首行）。2026-11-08 起 `sync_now` 会**先进设置面**，
+  #    那一页没有「账号」这个锚点 —— 滚动会静默 no-op，而「立即同步」在设置面里本来
+  #    就在可视区内（实测 y≈681 / 屏高 678 边缘，shim 的 `tap-outside-screen` 会挡）。
+  #    所以这里改成滚**目标本身**：把「立即同步」拖进安全区再按。
+  ax "立即同步" --pressable --scroll-into-view --list --json >/dev/null 2>&1
   SIG0=$(sync_signature)
   # 🔴 按这一下之后要**读它的返回**，不能 `ax_press` 一把丢了（它内部 `>/dev/null`）。
   #    2026-11-07 实测：这一下完全可能空点（坐标还在旧位置上，或那枚控件已被上一次同步
@@ -817,7 +851,7 @@ sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…�
   SYNC_PRESS=$(ax "立即同步" --pressable --press --json)
   if [ "$(jget "$SYNC_PRESS" result)" != "success" ]; then
     echo "     [sync] 第一下没落地（result=$(jget "$SYNC_PRESS" result) found=$(jget "$SYNC_PRESS" found)）⇒ 重新滚到可见区再按一次"
-    ax "账号" --scroll-into-view --list --json >/dev/null 2>&1
+    ax "立即同步" --pressable --scroll-into-view --list --json >/dev/null 2>&1
     SYNC_PRESS=$(ax "立即同步" --pressable --press --json)
     echo "     [sync] 第二下：result=$(jget "$SYNC_PRESS" result)"
   fi
