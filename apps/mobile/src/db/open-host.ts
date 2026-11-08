@@ -15,6 +15,8 @@
  */
 
 import { openAppHost, type AppHost } from '@heyta/app-host';
+// 换代窗口里读路由要返回**空态**：擦除之后数据本来就没了，这不是「降级」，是事实。
+import { emptyState } from '@heyta/op-log';
 import { readSyncConfig } from '../sync/config';
 import { consentFetch } from '../privacy/consent-gate';
 import { emitLocalWrite } from '../sync/write-signal';
@@ -150,13 +152,19 @@ function withWriteSignal(host: AppHost): AppHost {
   bindMobileOplogBase({
     dispatch: async (intent) => (await hostForRouter()).dispatch(intent),
     dispatchChecked: async (build) => (await hostForRouter()).dispatchChecked(build),
-    // 同步接口没有"等"这个选项：拿不到就照旧抛，这句文案是既有契约的一部分。
-    getState: () => {
-      if (currentRawHost === undefined) {
-        throw new Error('移动端宿主尚未打开，写路由无处可落。请先 await openTaskHost()。');
-      }
-      return currentRawHost.getState();
-    },
+    /**
+     * 同步读：窗口里**返回空态**，不抛。
+     *
+     * 🔴 为什么空态是对的（而不是「降级」或「凑合」）：这条窗口只在**本机明文刚被销毁**
+     * 之后出现，那一刻「这台设备上没有任何数据」本身就是事实 —— `emptyState()` 说的正是它。
+     * 反过来两个选项都不行：抛错会让用户看到一整屏「这个界面出错了」（2026-11-08 真机实测）；
+     * 返回上一次的快照等于**数据已销毁还把旧数据再显示一遍**，直接违背清除承诺。
+     *
+     * `emptyState()` 与 `host.getState()` 返回的是**同一个类型**（`MaterializedState`，
+     * 见 `packages/op-log/src/state.ts:115` 与 `packages/app-host/src/host.ts:1532`），
+     * 所以这不是新造一种形状，就是用它本来那个空态。
+     */
+    getState: () => currentRawHost?.getState() ?? emptyState(),
   });
 
   return {

@@ -30,6 +30,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { emptyState } from '@heyta/op-log';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const platform = vi.hoisted(() => ({
@@ -203,12 +204,22 @@ describe('宿主换代协议', () => {
     expect(router.bound, '擦除把路由摘掉了 ⇒ 新宿主就绪前任何一次写都会报「写路由无处可落」')
       .toBeTruthy();
 
-    // ② 写**不许抛**。修复前 `router.bound` 是 `undefined`（被摘掉）⇒ 这里会
-    //    抛 TypeError / 「写路由无处可落」，正是真机上那一屏。
     const base = router.bound as {
       dispatch: (intent: unknown) => Promise<void>;
       getState: () => { generation?: number };
     };
+    // ② **同步读**在窗口里不许抛。真机上那一屏「这个界面出错了 / 写路由无处可落」
+    //    就是它抛出来的 —— 而那一刻"这台设备上没有数据"本身就是事实，正确答案是空态。
+    //    ⚠️ 必须排在 `dispatch` 之前：dispatch 会把新一代开出来，窗口就没了。
+    expect(() => base.getState(), '窗口里同步读抛了 ⇒ 真机上就是一整屏「这个界面出错了」').not.toThrow();
+    // 与**规范空态**逐字比对（`MaterializedState` 的各表是映射不是数组，
+    // 所以按形状去断言"tasks 是空数组"会写错 —— 第一版就这么写错了）。
+    expect(base.getState(), '窗口里读到的不是规范空态 ⇒ 要么还在抛，要么把旧数据漏了出来').toEqual(
+      emptyState(),
+    );
+
+    // ③ 异步写**不许抛**。修复前 `router.bound` 是 `undefined`（被摘掉）⇒ 这里会
+    //    抛 TypeError / 「写路由无处可落」。
     await expect(base.dispatch({ type: 'noop' })).resolves.toBeUndefined();
 
     // ③ 而且必须落到**新一代**：`dispatch` 里那次 `await openTaskHost()` 应当把新宿主开出来。
