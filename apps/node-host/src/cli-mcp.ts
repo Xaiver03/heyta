@@ -147,5 +147,22 @@ async function main(): Promise<void> {
 
 // ⚠️ 只有直接被运行时才执行（被 import 时不执行）。
 if (process.argv[1] !== undefined && process.argv[1].endsWith('cli-mcp.js')) {
-  void main();
+  /**
+   * 🔴 入口必须兜住（崩溃审计 2026-11-08 · U11 第 7 条 P0）。
+   *
+   * `main()` 里 `await openNodeHost(...)` 在 try 之外：库打不开、缺少 token、
+   * 或 `startMcpStdioServer` 抛错时，拒绝无人接 ⇒ **进程直接终止并打印原始栈**。
+   * 兄弟入口 `cli.ts` 是写了 `.catch` 的（那里会打一句人话 + exit 1），
+   * 这个入口漏了 —— 同一个产品两种退出体验，而 MCP 客户端只看到 "server gone"。
+   */
+  void main().catch((error: unknown) => {
+    try {
+      process.stderr.write(
+        `[heyta-mcp] 启动失败：${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    } catch {
+      // stderr 也已关闭。
+    }
+    process.exit(1);
+  });
 }

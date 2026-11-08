@@ -870,6 +870,9 @@ export const en = {
   'web.error.storage.hint': 'Your browser may have disabled its local database (common in private mode). Turn off private mode or try another browser.',
   'web.error.storage.blockedHint': 'Another tab is holding the old version open. Close the other windows or tabs of this app, then reload.',
   'web.error.storage.bugHint': 'This looks like a problem in heyta rather than something you did. Restart and try again; if it keeps happening, send us the details below.',
+  'web.error.crash.title': 'This screen ran into a problem',
+  'web.error.crash.hint': 'This is a heyta bug, not something you did wrong. Try the retry button below; if it keeps happening, please send us the technical details.',
+  'web.error.crash.retry': 'Retry',
   'web.error.details': 'Technical details',
 
   // ── Web · sync bar ────────────────────────────────────────

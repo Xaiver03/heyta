@@ -40,6 +40,64 @@ let host: NodeHost | null = null;
 let quitting = false;
 
 /**
+ * 🔴 **进程级错误边界**（崩溃审计 2026-11-08 · U11 第 2 条 P0）。
+ *
+ * 审计时全仓 grep `process.on('uncaughtException'|'unhandledRejection')` 就这一处
+ * 都没有。Electron 主进程里一条未捕获异常 = 整个应用消失，
+ * 而用户看到的是"窗口闪了一下就没了"—— 连日志都没有。
+ *
+ * 取舍：**记下来再退出**，不试图继续跑。一个已经处于未知状态的主进程
+ * 继续服务，会让"未知状态"扩散到数据库（这个应用唯一不可再生的东西）。
+ */
+process.on('uncaughtException', (error: unknown) => {
+  reportFatal('uncaughtException', error);
+  app.exit(1);
+});
+process.on('unhandledRejection', (reason: unknown) => {
+  reportFatal('unhandledRejection', reason);
+  app.exit(1);
+});
+
+/** 把致命错误写进 stderr —— 这是 GUI 应用里唯一一定能留下的痕迹。 */
+function reportFatal(kind: string, error: unknown): void {
+  try {
+    const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    process.stderr.write(`[heyta] 主进程致命错误（${kind}）：${message}\n`);
+  } catch {
+    // stderr 都写不了（管道已关）：无能为力。
+  }
+}
+
+/**
+ * 🔴 所有窗口装载都走这里（崩溃审计 U11 第 1 条 P0）。
+ *
+ * `loadFile` / `loadURL` 返回的 Promise 在产物缺失、路径错、或协议未注册时
+ * **会 reject**。此前四处都是 `void window.loadFile(...)` —— `void` 丢掉 promise，
+ * 拒绝就变成主进程的未捕获异常（装上前面的处理器之后是"立刻退出"，
+ * 装上之前是"闪退且无痕迹"）。
+ *
+ * 这里把失败变成**窗口内的一句可读说明**：白窗至少能诊断，
+ * 而"闪退"什么都留不下。
+ */
+function guardedLoad(window: BrowserWindow, label: string, load: () => Promise<void>): void {
+  void load().catch((error: unknown) => {
+    reportFatal(`装载 ${label} 失败`, error);
+    if (window.isDestroyed()) return;
+    const message = error instanceof Error ? error.message : String(error);
+    // 用 data: URL 而不是继续 loadFile —— 后者的失败模式正是我们要说明的那件事。
+    void window.webContents
+      .loadURL(
+        `data:text/html;charset=utf-8,${encodeURIComponent(
+          `<meta charset="utf-8"><body style="font-family:system-ui;padding:2rem">` +
+            `<h1>界面没能加载</h1><p>这通常是安装包不完整。</p>` +
+            `<pre style="white-space:pre-wrap">${message}</pre></body>`,
+        )}`,
+      )
+      .catch(() => undefined);
+  });
+}
+
+/**
  * 当前主窗口。只在 `second-instance` 里用来把已有窗口拉回前台。
  */
 let mainWindow: BrowserWindow | null = null;
@@ -74,9 +132,40 @@ function armReminders(host: NodeHost): void {
   };
 }
 
+/**
+ * 🔴 **单飞**：用共享 promise 记忆化，而不是"可空变量当锁"（崩溃审计 U11 第 3 条 P0）。
+ *
+ * 原来写的是 `host ??= await openDesktopHost(...)`。`??=` 只在**赋值那一刻**判断，
+ * 而 `await` 把它劈成了两段：渲染进程启动时的
+ * `Promise.all([listTasks, listTagAliasTable])`（`renderer/main.tsx:113-116`）
+ * 会让两个 IPC 回调在**同一个 tick** 都读到 `host === null`，于是各自
+ * `openDesktopHost` → **同一个 `heyta.sqlite` 被打开两次**（两个 OpLogEngine、
+ * 两条 SQLite 连接），后到的覆盖 `host`，先到的那份永不 `close()` 且仍持有写连接。
+ *
+ * 这正是本文件 `before-quit` 注释里警告的"两个 writer 悄悄写同一份数据"。
+ *
+ * 修法：把"正在打开"这件事本身变成一个可共享的 promise。失败时清掉，
+ * 让下一次是**真重试**而不是拿到一个已拒绝的缓存。
+ *
+ * ⚠️ 退出中（`quitting`）必须拒绝：否则迟到的 IPC 会在 `before-quit` 之后
+ * 重新开库、重挂提醒定时器（见 `quitting` 的用法）。
+ */
+let hostOpening: Promise<NodeHost> | null = null;
+
 async function bootHost(): Promise<NodeHost> {
-  host ??= await openDesktopHost({ userDataDir: app.getPath('userData') });
-  return host;
+  if (quitting) throw new Error('应用正在退出，不再打开数据库');
+  if (host !== null) return host;
+  hostOpening ??= openDesktopHost({ userDataDir: app.getPath('userData') })
+    .then((opened) => {
+      host = opened;
+      return opened;
+    })
+    .catch((error: unknown) => {
+      // 失败即失效：让下一次调用是一次真重试，而不是复用一个已拒绝的 promise。
+      hostOpening = null;
+      throw error;
+    });
+  return hostOpening;
 }
 
 /**
@@ -272,7 +361,9 @@ function createQuickAddWindow(): void {
    * 记的就是这一族事故）。面板要的只是"一句话进库"，而那条路主进程已经有一份
    * —— 走 IPC，不开第二个引擎。
    */
-  void window.loadFile(join(__dirname, '..', 'renderer-dist', 'quick-add.html'));
+  guardedLoad(window, '快速添加', () =>
+    window.loadFile(join(__dirname, '..', 'renderer-dist', 'quick-add.html')),
+  );
 
   quickAddWindow = window;
   window.on('closed', () => {
@@ -322,7 +413,9 @@ function createSettingsWindow(): BrowserWindow {
       settings: settingsSectionFromEnv(),
       standalone: '1',
     });
-    void window.loadURL(`${SCHEME}://app/index.html?${query.toString()}`);
+    guardedLoad(window, '主界面', () =>
+      window.loadURL(`${SCHEME}://app/index.html?${query.toString()}`),
+    );
   } else {
     // 产物缺席：标题与正文都说清楚"缺什么、该跑哪条命令"，而不是一个白窗口。
     window.setTitle('设置（未找到 web-dist）');
@@ -465,7 +558,9 @@ function createWindow(): BrowserWindow {
    * `Resources/` 去，于是又变回"白窗口、无报错"。
    * 这个差异只在打包后才出现，开发时怎么试都是好的 —— 所以现在就用对的写法。
    */
-  void window.loadFile(join(__dirname, '..', 'renderer-dist', 'index.html'));
+  guardedLoad(window, '主界面', () =>
+    window.loadFile(join(__dirname, '..', 'renderer-dist', 'index.html')),
+  );
 
   /**
    * ⌘, / Ctrl+, ⇒ 独立设置窗口。

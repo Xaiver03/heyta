@@ -243,8 +243,19 @@ async function openStorage(
    */
   const session = createWorkerOpLogSession<Operation<string>>(worker);
 
-  /** 等交握：`clientId` 由**库**给出，不能拿一个还没定的值去建向量时钟。 */
-  const { clientId } = await session.ready;
+  /**
+   * 等交握：`clientId` 由**库**给出，不能拿一个还没定的值去建向量时钟。
+   * 🔴 用 `awaitWorkerReady` 而不是裸 `await session.ready` —— 后者没有上界，
+   * worker 起不来时整个启动链永久挂死（见该函数的注释）。
+   */
+  let clientId: string;
+  try {
+    ({ clientId } = await awaitWorkerReady(session, worker, '初始化本地存储'));
+  } catch (error) {
+    // worker 已经不可用：terminate 掉，别留一个半死的线程。
+    worker.terminate();
+    throw error;
+  }
 
   await migrateLegacyIndexedDb(session.store, dbName);
 
@@ -449,9 +460,60 @@ async function importIntoEmptyTarget(
  * 🔴 **崩溃恢复在接受任何新写入之前完成。** 顺序不可换：
  * 否则那些"已落盘未应用"的 op 会占着 seq 却永不生效 —— 静默丢数据。
  */
+/**
+ * 等 worker 交握，但**有上界**（崩溃审计 2026-11-08 · U12 第 4 条 P0）。
+ *
+ * `createWorkerOpLogSession(...).ready` 只在 worker 正常回一条 ready 消息时 resolve。
+ * 而 worker **起不来**是完全现实的一档：本文件 357-367 行记录了 Linux WebKitGTK 6.0
+ * 下 `type:'module'` worker 构造即失败的实测；构造失败时 `error` 事件不会让
+ * `ready` reject ⇒ 那条 promise **永不 settle** ⇒ `initOpLog` 永不返回 ⇒
+ * `main.tsx` 的 `.then`/`.catch` 都不执行 ⇒ root 永不渲染 ⇒
+ * 首屏遮罩永久盖着，应用永远打不开。
+ *
+ * 同一份代码在迁移子路径（`migrateLegacyOpfsSqlite`）里**已经**补了这道
+ * `Promise.race + worker 'error'` —— 主路径没有。这里把它提出来给两处共用，
+ * 顺带补上 worker 静默死亡（既不 error 也不 ready）的**超时**档。
+ *
+ * 失败时调用方必须 `worker.terminate()`（本函数不持有生命周期）。
+ */
+async function awaitWorkerReady(
+  session: { ready: Promise<{ clientId: string }> },
+  worker: Worker,
+  label: string,
+): Promise<{ clientId: string }> {
+  let onError: ((event: ErrorEvent) => void) | undefined;
+  const failed = new Promise<never>((_, reject) => {
+    onError = (event: ErrorEvent): void => {
+      reject(new Error(`${label}：存储 worker 起不来（${event.message || '无 message'}）`));
+    };
+    worker.addEventListener('error', onError, { once: true });
+  });
+  const timedOut = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(`${label}：存储 worker 在 ${String(WORKER_READY_TIMEOUT_MS)}ms 内没有完成交握`));
+    }, WORKER_READY_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([session.ready, failed, timedOut]);
+  } finally {
+    if (onError !== undefined) worker.removeEventListener('error', onError);
+  }
+}
+
+/** worker 交握的绝对上界（毫秒）。首次建库实测在秒级，15s 只可能是卡死。 */
+const WORKER_READY_TIMEOUT_MS = 15_000;
+
 export function initOpLog(dbName = 'heyta'): Promise<void> {
   if (initPromise !== undefined) return initPromise;
 
+  /**
+   * 🔴 失败即失效（崩溃审计 2026-11-08 · U12 第 7 条 P1）。
+   *
+   * 此前这个缓存**连拒绝态一起缓存**：第一次初始化失败后，此后任何一次调用
+   * 都拿到同一个已拒绝的 promise。于是用户即使把问题解掉
+   * （关掉占着 OPFS 锁的另一个标签页、腾出配额），也只能**整页刷新** ——
+   * 而错误屏此前连"重试"按钮都没有。两处一起修才闭环。
+   */
   initPromise = (async () => {
     const backend = resolveStorageBackend();
     const opened = await openStorage(dbName);
@@ -476,6 +538,24 @@ export function initOpLog(dbName = 'heyta'): Promise<void> {
     await engine.recover();
     notify();
   })();
+
+  /**
+   * 🔴 失败即让缓存失效（`initPromise = undefined`），下一次调用是一次**真重试**。
+   *
+   * 只在失败时清：成功之后必须保持缓存（否则每次调用都重新建库）。
+   * 注意这里是**再挂一个** catch 而不是把 IIFE 包起来 —— 因为 `initPromise`
+   * 必须是那个原始 promise（调用方要 await 它），而清理是副作用。
+   *
+   * 清理之后必须**重新抛**，否则失败会被这个 catch 吞掉、`initOpLog` 变成
+   * "静默成功"，错误屏就不会出现 —— 那是比不重试更糟的形态。
+   */
+  initPromise = initPromise.catch((error: unknown) => {
+    initPromise = undefined;
+    // 半初始化的 store/engine 不能留着：下一次重试要从干净的起点开始。
+    opLogStore = undefined;
+    engine = undefined;
+    throw error;
+  });
 
   return initPromise;
 }

@@ -973,6 +973,9 @@ export const zhCN = {
   // 而来源给的结构化原因就在 `StorageError.failure.kind` 里（见 packages/storage/src/errors.ts）。
   'web.error.storage.blockedHint': '被其它标签页挡住了：关掉这个应用的其它窗口或标签页，再刷新重试。',
   'web.error.storage.bugHint': '这看起来是 heyta 自己的问题，不是你操作错了。重启应用再试；一直这样的话，请把下面的详情发给我们。',
+  'web.error.crash.title': '这个界面出错了',
+  'web.error.crash.hint': '这是 heyta 自己的问题，不是你操作错了。可以先点下面的重试；一直这样的话，请把技术详情发给我们。',
+  'web.error.crash.retry': '重试',
   'web.error.details': '技术详情',
 
   // ── Web · 同步条 ──────────────────────────────────────────

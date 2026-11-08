@@ -33,6 +33,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppState, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ErrorBoundary } from './ui/error-boundary.js';
 import { I18nProvider, useI18n, type Locale } from '@heyta/i18n';
 import { ThemeProvider, useTheme, useTokens } from './theme';
 import { LocalePreferenceProvider } from './i18n/locale-preference';
@@ -348,8 +349,20 @@ function LocaleHost(): React.JSX.Element {
  */
 export function Root(): React.JSX.Element {
   return (
-    <SafeAreaProvider>
-      <LocaleHost />
-    </SafeAreaProvider>
+    /**
+     * 🔴 顶层错误边界（崩溃审计 2026-11-08 · U16 第 1 条 P0）。
+     *
+     * 在此之前整棵树**没有任何边界**：任意屏在 render / 生命周期抛错，
+     * React 就卸载整棵树，而 RN release 构建没有红屏 —— 用户看到纯白屏、
+     * 只能杀进程。38 个屏共用这一个根，所以这是全局放大面。
+     *
+     * 放在**最外层**（连 SafeAreaProvider 都包进去）：SafeAreaProvider、
+     * LocaleHost、Provider 链本身也可能是崩掉的那一环。
+     */
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <LocaleHost />
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

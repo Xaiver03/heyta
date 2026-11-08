@@ -430,3 +430,95 @@ timer = setTimeout(() => {
 | 中 | `inbound-worker-loop` 的 `void tick()`、`realtime` 的 `void run()` | 当前不可触发，但形状会随演进重新变成 P0；建议按 D.5 一并收敛 |
 | 中 | `import-dump` 的解析前字节上限 / 递归深度 | 未改动 |
 | 待补 | 客户端壳（web/mobile/desktop/原生）与服务端计费/认证 | **本轮零覆盖** —— 用户看到的闪退主要在这里 |
+
+---
+
+## H. 第二轮修复（2026-11-08 晚 · 补齐零覆盖面）
+
+这一轮先把**零覆盖的五个面**审完（web / mobile / desktop+node-host / server / 原生壳），
+再按"确认能杀进程 × 修复代价低"修。
+
+### H.1 新增审计（5 个单元，全部完整返回）
+
+| 单元 | 面 | 发现 | 其中 P0 |
+|---|---|---|---|
+| **U12** | `apps/web` + PWA | 13 | 6 |
+| **U16** | `apps/mobile`（38 屏） | 13 | 2 |
+| **U11** | `apps/desktop` + `apps/node-host` | 15 | 7 |
+| **U10** | `server` 启动/配置/错误边界/auth | 9 | 1 |
+| **U09** | `server` billing / central-auth / password / account / admin | 9 | **0** |
+| **U18** | 4 个原生壳（Swift / C# / Kotlin / ArkTS） | 15 | 3 |
+
+**U09 结论值得单独记**：支付回调这个**未认证公网入口**的防御是合格的 ——
+`parseAs:'buffer'`、验签在 `JSON.parse` **之前**、`!ok` 一律 401 且不落
+`PaymentEvent`、不存原文 payload、120/min 限流。**没有找到可触发的 P0。**
+
+### H.2 这一轮修掉的（每条都有能变红的判据）
+
+| # | 缺陷 | 位置 | 判据 |
+|---|---|---|---|
+| 1 | **Web 零 ErrorBoundary**：任意组件抛错整树卸载 → 纯白屏 | 新增 `apps/web/src/lib/error-boundary.tsx`，四条渲染出口全部包住 | `apps/web/tests/crash-barriers.spec.ts`（8 条） |
+| 2 | **Web 零全局错误钩子**：`void` 掉的 promise、事件处理器、定时器抛错全部无声消失 | 新增 `apps/web/src/lib/fatal-hooks.ts`，在 `createRoot` **之前**安装 | 同上 |
+| 3 | **两条 `?shell=` / `?slice=` 动态 import 无 catch** → root 永不渲染 → 品牌帧永久覆盖（正是安装包入口） | `main.tsx` 补 `.catch(renderFatal)` | 同上（源码级判据） |
+| 4 | **`session.ready` 无超时** → worker 起不来则启动永久挂死 | `oplog.ts` 提取 `awaitWorkerReady`（race：ready / error / 15s 超时） | — |
+| 5 | **splash 退场无上界** → 任何"root 永远为空"都变成永久品牌帧 | `boot-splash.ts` 加 12s 绝对上界 | — |
+| 6 | **`deleteDatabase` 无 `onblocked`/无超时** → 注销 UI 永久挂起 | `local-data-destruction.ts` 补 `onblocked` + 8s 上界（如实报 blocked） | — |
+| 7 | **`initPromise` 缓存拒绝态** → 失败后同页面无法重试 | `oplog.ts` 失败即 `initPromise = undefined` + 清半初始化 store/engine | — |
+| 8 | **`ErrorScreen` 无重试入口** | 加 `onRetry` + 词条 | — |
+| 9 | **移动端零 ErrorBoundary**：38 屏共用根，一处抛错整应用白屏 | 新增 `apps/mobile/src/ui/error-boundary.tsx`，`Root` 最外层包住 | 类型/构建 |
+| 10 | **Electron 主进程零 `uncaughtException`/`unhandledRejection`**；4 处 `void window.loadFile/loadURL` | `apps/desktop/src/main.ts`：进程级处理器 + `guardedLoad`（失败落到窗口内可读页） | desktop tsc |
+| 11 | **`bootHost` 用可空变量当锁** → 并发首请求开两个库连接（两个 writer 写同一份数据） | 改共享 promise 记忆化 + 失败清缓存 + `quitting` 守卫 | desktop tsc |
+| 12 | **MCP stdio 无 EPIPE 兜底**；`onEnd` 的 async IIFE 无 catch；`cli-mcp` 入口 `void main()` 无 catch | `mcp-stdio-server.ts` + `cli-mcp.ts`：stream `'error'` 监听 + 写调用 try + 入口 catch | node-host 213 tests |
+| 13 | **日志流无 `'error'` 监听** → 磁盘满/权限丢失 = 整个服务停掉（`LOG_TO_FILE` 部署） | `server/src/logger.ts`：`error` 监听 + 降级到 console + `safeStringify`（循环引用/BigInt） | server 3188 tests |
+| 14 | **Android 小组件系统广播回调无 try** → KeyStore 失效（改锁屏密码）即「应用已停止运行」 | `WidgetClicks.onUpdate` 收口 + `WidgetAead.existing/delete` 归一成 null/静默 | — |
+| 15 | **WinUI `async void` 事件处理器** → `ExecuteScriptAsync` 在 WebView 销毁时崩进程 | `MainWindow.xaml.cs`：`RunChromeMetricsSafelyAsync` 包装 | `dotnet build Heyta.Windows.Core` ✅ |
+| 16 | **C# 门面 `Deserialize(...)!`** → 门面回 `"null"` 时裸 NRE | `AppApi.cs`：`DeserializeRequired` 带原始载荷的显式异常 | 同上 ✅ |
+| 17 | **macOS 提醒回执恒 `false`** → 已投出的通知被当没投出 ⇒ **用户收到重复通知** | `ShellReminderBridge.swift`：返回真字典而非元组 | — |
+
+### H.3 ❌ 尝试过但**回退**的改动（B.2）
+
+把 `applyRemoteLocked` 的入盘前校验改成"逐 op 隔离 + `rejected[]` 跳过"。
+
+- **诊断是对的**：一条坏远端 op 让整批 reject → `sync()` 只把它转成
+  `{kind:'error'}` → 游标不推进 → 下次重拉同一条 → 永久失败。
+- **修法被既有决定否决**：`packages/op-log` 的 **10 条用例当场变红**
+  （`full-state-recovery` / `task-batch` / `engine`），它们明确断言这条路径
+  必须 reject —— 那是 `ADR-0016` fail-closed 的判据。
+  被跳过的若是 full-state / batch op，代价不是"少一条数据"，而是
+  **可能丢掉整份库**。
+- **已完整回退**（引擎 + sync-client + app-host 三处接线 + 结果类型），
+  并把"别再改回去"写成判据：`packages/op-log/tests/apply-remote-fail-closed.spec.ts`（5 条）。
+
+> 要真正解决"永久焊死"，缺的不是 try/catch，而是一份**隔离协议**
+> （隔离表放哪、谁批准跳过、用户怎么知道、坏 op 怎么导出）—— ADR 级问题。
+
+### H.4 第二轮**未修**（已确认但代价大 / 需决策）
+
+| 面 | 项 | 为什么没动 |
+|---|---|---|
+| mobile | `resetTaskHostCache` 作废单例却不 close，32 屏以 `[]` 依赖永久持着死 host（P0） | 要引入"宿主换代可订阅"通道（`useSyncExternalStore`），改动面覆盖 32 个屏 |
+| macOS | `ScriptHost.call()` 用全局 `__done/__r/__e` 做落定协议 + 嵌套 RunLoop，**重入即静默错值**（P0） | 要改成 per-call 令牌或 Promise 落定，牵动整个桥的协议 |
+| Windows | `HeytaWindows`（WinUI 工程）未在本机编译（只有 `.Core` 通过） | macOS 上缺 Windows SDK；需在 Windows 载体上验 |
+| desktop | `quitting` 只写不读；IPC 参数零运行时校验；`second-instance` 未判 `isDestroyed` | P1，改动分散 |
+| server/billing | 9 条 P1，其中 3 条在**钱**的路径上：① `reconcile.ts` 的对账前缀与 adapter 写入前缀不一致 ⇒ `findUnsettledPaidOrders` **永远 0 候选**，日清日志打印 "settled 0 of 0" 看起来健康；② `expireStaleOrders` **无生产调用方** ⇒ 放弃支付的订单永久占着优惠券名额；③ 退款回调丢掉 `paidAmountMinor` ⇒ 部分退款按全额回收权益 | 需要产品/财务确认口径，不是纯代码修 |
+| 各包 | 约 60 条 P1（storage worker 桥、sync-client 并发守卫、ai SSE 无界缓冲、share 密钥竞态…） | 本报告已逐条给出 file:line |
+
+### H.5 回归验证（第二轮结束时的现量）
+
+| 面 | 结果 |
+|---|---|
+| `apps/web` | **2840 passed** / 242 files |
+| `apps/mobile` | **1327 passed** / 105 files |
+| `apps/node-host` | **213 passed** / 14 files |
+| `packages/op-log` | **175 passed** / 16 files |
+| `packages/storage` | **434 passed** / 8 files |
+| `packages/sync-client` | **176 passed** / 13 files |
+| `packages/app-host` | **2112 passed** / 130 files |
+| `server` | **3188 passed** / 183 files（含 .pglite 集成） |
+| tsc | web / mobile / desktop / node-host / op-log / storage / sync-client / app-host / server / i18n 全 rc=0 |
+| `dotnet build Heyta.Windows.Core` | ✅ 0 warnings 0 errors |
+| 门禁 | `check:ui-language` ✅ / `check:layering` ✅ / `check:design-token-refs` ✅ / `check:safe-error-fallbacks` ✅ |
+
+> ⚠️ 一条**偶发**：`server` 的 `.pglite` 用例里
+> `the wrong passphrase refuses with exit 2…` 在一次并行跑里红过、重跑绿。
+> 未定位是否为 flake —— 不要因为"第二次绿了"就当它没问题。

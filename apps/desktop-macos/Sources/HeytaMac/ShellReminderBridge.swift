@@ -100,7 +100,15 @@ final class ShellReminderBridge: NSObject, WKScriptMessageHandlerWithReply {
             replyOffMain({ port in
                 let status = port.authorizationStatus()
                 let delivered = port.show(requestJson)
-                return (status: status, delivered: delivered)
+                // 🔴 必须返回**真字典**，不能返回 Swift 元组。
+                //
+                // 下面用 `pair as? [String: Any]` 取字段，而元组 boxed 成 Any 之后
+                // **永远**转不成字典 ⇒ 恒走 else 分支 ⇒ JS 收到 `false`。
+                // 契约里 false = "没投出去，下一轮再试"，于是：
+                //   · 已投出的通知不会被记进 firedAt ⇒ **用户收到重复通知**；
+                //   · REMINDER_SHOW 的取证行一次也不会落。
+                // （崩溃审计 2026-11-08 · U18 第 5 条）
+                return ["status": status, "delivered": delivered] as [String: Any]
             }, { [weak self] pair, _ in
                 if let dict = pair as? [String: Any] {
                     self?.onFact?("REMINDER_SHOW=permission=\(dict["status"] ?? "?") delivered=\(dict["delivered"] ?? "?")")

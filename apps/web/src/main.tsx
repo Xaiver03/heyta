@@ -36,10 +36,15 @@ import { installCentralSessionRecheck } from './features/sync/central-session-re
 import { askLegalRecheck } from './features/legal-recheck/gate.js';
 import { ErrorScreen } from './features/shell/ErrorScreen.js';
 import { storageHintKey } from './features/shell/error-hint.js';
+// 🔴 桌面壳标题栏融合：首帧前给 <html> 打平台标记（mac/windows/linux）。
+//   仅在原生壳内生效（`isNativeShellHost` 把关），浏览器 / PWA / 移动端 DOM 零变化。
+import { bootstrapDesktopChrome } from './features/shell/desktop-chrome.js';
 import { startPublicFacts } from './features/calendar/public-facts.js';
 import { armWebShareSession } from './features/share/share-session.js';
 import { initOpLog } from './features/tasks/store.js';
 import { LocaleHost } from './lib/locale-host.js';
+import { ErrorBoundary } from './lib/error-boundary.js';
+import { installFatalErrorHooks } from './lib/fatal-hooks.js';
 import { eraseWebLocalData } from './lib/local-data-destruction.js';
 import { startupMode } from './lib/startup-mode.js';
 import { applyTheme, resolveInitialTheme } from './lib/theme.js';
@@ -117,7 +122,59 @@ if (container === null) {
   throw new Error('找不到 #root 挂载点');
 }
 
+/**
+ * 🔴 桌面壳标题栏融合的**首帧前**标记。
+ *
+ * 放在所有渲染分支之前：无论在原生壳里走哪一条入口（`?shell=` / `?slice=` / 主应用 /
+ * 管理后台），标记都先就位。浏览器 / PWA 里 `isNativeShellHost` 为假 ⇒ 整段不进入，
+ * 不往 `<html>` 加任何类 ⇒ 布局与移动端完全一致。
+ */
+bootstrapDesktopChrome();
+
+/**
+ * 🔴 全局错误钩子必须**先于 createRoot** 装上（崩溃审计 U12 第 2 条 P0）。
+ *
+ * 在此之前全仓没有任何 `error` / `unhandledrejection` 监听，于是
+ * `void somePromise()` 的失败、事件处理器抛错、定时器抛错**全部无声消失** ——
+ * 既没有错误屏，也没有日志。React 的错误边界**接不住**这三类，
+ * 所以这是与 ErrorBoundary 互补的第二道防线（见 lib/fatal-hooks.ts）。
+ */
+installFatalErrorHooks();
+
 const root = createRoot(container);
+
+/**
+ * 渲染"启动失败"屏 —— 所有**渲染出口**的失败都必须走这里。
+ *
+ * 为什么单独抽出来：`main.tsx` 有四条渲染出口（`?shell=1` / `?slice=1` /
+ * 管理后台 / 主应用），此前每条都自己决定失败时怎么办，而其中两条**根本没管**
+ * —— 表现是首屏遮罩永久盖着（崩溃审计 U12 第 3/5 条）。
+ *
+ * ⚠️ 它自己也必须不可能抛：错误屏渲染失败时退回一段最小可读文本，
+ * 否则"处理失败"会变成"白屏"，正是要消灭的那件事。
+ */
+function renderFatal(error: unknown, label: string): void {
+  const message = error instanceof Error ? error.message : String(error);
+  try {
+    console.error(`[heyta] ${label}`, error);
+  } catch {
+    // console 被禁用
+  }
+  try {
+    root.render(
+      <StrictMode>
+        <ErrorScreen titleKey="web.error.crash.title" message={message} hintKey="web.error.crash.hint" />
+      </StrictMode>,
+    );
+  } catch {
+    // 连 React 都渲染不了 —— 用最原始的方式让用户看到字，而不是纯白。
+    try {
+      if (container !== null) container.textContent = `heyta 启动失败：${message}`;
+    } catch {
+      // 到这一步已无可为。
+    }
+  }
+}
 
 /**
  * 🔴 首屏遮罩的退场接线 —— 必须在**任何** `root.render()` 之前挂上。
@@ -155,21 +212,38 @@ if (mode === 'shell') {
    * 这个入口回答"壳能不能把它自己的数据交过来"（M2-B）。
    * 详见 `dev/shell-host.tsx`。
    */
-  import('./dev/shell-host.js').then(({ ShellHost }) => {
-    root.render(
-      <StrictMode>
-        <ShellHost />
-      </StrictMode>,
-    );
-  });
+  void import('./dev/shell-host.js')
+    .then(({ ShellHost }) => {
+      root.render(
+        <StrictMode>
+          <ErrorBoundary>
+            <ShellHost />
+          </ErrorBoundary>
+        </StrictMode>,
+      );
+    })
+    .catch((error: unknown) => {
+      // 🔴 chunk 404 / 离线 / 模块求值抛错都必须落到错误屏（崩溃审计 U12 第 3 条 P0）。
+      // 修复前这条 promise 的拒绝无人接 ⇒ root.render 从未执行 ⇒
+      // `#root` 永远为空 ⇒ boot-splash 的 MutationObserver 永不触发 ⇒
+      // **品牌帧永久覆盖**（而 `?shell=1` 正是安装包加载的入口）。
+      renderFatal(error, '?shell=1 入口加载失败');
+    });
 } else if (mode === 'slice') {
-  import('./dev/universal-slice.js').then(({ UniversalSlice }) => {
-    root.render(
-      <StrictMode>
-        <UniversalSlice />
-      </StrictMode>,
-    );
-  });
+  void import('./dev/universal-slice.js')
+    .then(({ UniversalSlice }) => {
+      root.render(
+        <StrictMode>
+          <ErrorBoundary>
+            <UniversalSlice />
+          </ErrorBoundary>
+        </StrictMode>,
+      );
+    })
+    .catch((error: unknown) => {
+      // 同上：`?slice=1` 的加载失败也不能让首屏遮罩永远盖着。
+      renderFatal(error, '?slice=1 入口加载失败');
+    });
 } else if (mode === 'console') {
   /**
    * 🔴 管理后台页（`/admin`）**不建本地库**（ADR-0078）。
@@ -194,9 +268,11 @@ if (mode === 'shell') {
   armFirstLaunchConsent();
   root.render(
     <StrictMode>
-      <LocaleHost>
-        <AdminConsolePage />
-      </LocaleHost>
+      <ErrorBoundary>
+        <LocaleHost>
+          <AdminConsolePage />
+        </LocaleHost>
+      </ErrorBoundary>
     </StrictMode>,
   );
 } else {
@@ -304,9 +380,11 @@ if (mode === 'shell') {
 
       root.render(
         <StrictMode>
-          <LocaleHost>
-            <App />
-          </LocaleHost>
+          <ErrorBoundary>
+            <LocaleHost>
+              <App />
+            </LocaleHost>
+          </ErrorBoundary>
         </StrictMode>,
       );
     })

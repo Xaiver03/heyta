@@ -100,21 +100,55 @@ function report(
   };
 }
 
+/** `deleteDatabase` 的绝对上界（毫秒）。理由见函数内 `onblocked` 那段。 */
+const DELETE_DATABASE_TIMEOUT_MS = 8_000;
+
 /** 裸 `deleteDatabase`（用于不由我们的适配器管的那两个库）。 */
 function deleteDatabase(name: string): Promise<DbDestroyReport> {
   return new Promise<DbDestroyReport>((resolve) => {
+    /** `onblocked` 是否被触发过 —— 用来把超时失败说得更准确。 */
+    let blocked = false;
+    /**
+     * 绝对上界。取值 8s：`deleteDatabase` 正常是毫秒级，8s 只可能在
+     * 被别的连接挡住时走到（实测的挂死形态）。
+     */
+    const timer = setTimeout(() => {
+      resolve(
+        report(name, false, {
+          reason: blocked ? 'indexeddb-delete-blocked' : 'indexeddb-delete-timeout',
+        }),
+      );
+    }, DELETE_DATABASE_TIMEOUT_MS);
+    const settle = (value: DbDestroyReport): void => {
+      clearTimeout(timer);
+      resolve(value);
+    };
     try {
       const request = indexedDB.deleteDatabase(name);
-      request.onsuccess = () => resolve(report(name, true));
+      request.onsuccess = () => settle(report(name, true));
       request.onerror = () =>
-        resolve(
+        settle(
           report(name, false, {
             reason: `indexeddb-delete-failed: ${String(request.error?.message ?? 'unknown-error')}`,
           }),
         );
-      // onblocked：与适配器同一取舍 —— 等，不假装成功。
+      /**
+       * 🔴 `onblocked` **必须**处理（崩溃审计 2026-11-08 · U12 第 6 条 P0）。
+       *
+       * 此前这里只有一句注释说"等，不假装成功"，而**没有任何代码**：
+       * 另一个标签页还持有这个库时，`deleteDatabase` 只触发 `blocked`，
+       * `onsuccess` 与 `onerror` 都不来 ⇒ 这个 Promise **永不 settle** ⇒
+       * `eraseWebLocalData` 的 `await` 挂死 ⇒ 注销/清库界面永久停在"进行中"。
+       *
+       * 修法不是"假装成功"（那会让注销报告说谎），而是**有界地失败**：
+       * 等一个上限，超时就如实报 `blocked`，让 reports 与
+       * `containerRemoved=false` 说出真实情况。
+       */
+      request.onblocked = () => {
+        blocked = true;
+      };
     } catch (error) {
-      resolve(
+      settle(
         report(name, false, { reason: `indexeddb-delete-failed: ${(error as Error).message}` }),
       );
     }

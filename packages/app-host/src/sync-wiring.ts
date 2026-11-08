@@ -90,6 +90,7 @@ export type SyncWiringOptions = SyncEncryptionOptions & {
    * 🔴 **必须注入**，因为应用之后往往还要做宿主特有的事（Web 上是通知 UI 重渲染）。
    * 详见文件头的说明。
    */
+  /** 应用远端 op。契约是 fail-closed（见 sync-client 同名选项的注释）。 */
   applyRemote: (ops: Operation<string>[]) => Promise<void>;
   /** 网络实现。原生宿主用它注入证书固定等平台能力。 */
   fetchImpl?: typeof fetch;

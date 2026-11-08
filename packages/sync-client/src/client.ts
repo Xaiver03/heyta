@@ -654,7 +654,14 @@ export type SyncClientOptions = SyncEncryptionOptions & {
    */
   markUploaded: (serverSeqsByOpId: ReadonlyMap<string, number>) => Promise<void>;
 
-  /** 把解密后的远程 op 交给 op-log 引擎。 */
+  /**
+   * 把解密后的远程 op 交给 op-log 引擎。
+   *
+   * ⚠️ **契约是 fail-closed**：解析不了就 reject，不"跳过一条继续跑"。
+   * 这是 `ADR-0016` 的决定，由 `packages/op-log` 的 10 条用例守护。
+   * 崩溃审计（2026-11-08）试过改成"逐 op 隔离 + `rejected[]`"，
+   * 因与那条决定冲突而**回退** —— 详见报告 §G.4，不要重试同一改法。
+   */
   applyRemote: (ops: Operation<string>[]) => Promise<void>;
 
   /**
@@ -664,6 +671,7 @@ export type SyncClientOptions = SyncEncryptionOptions & {
   mergeRemoteClock?: (clock: Record<string, number>) => Promise<void> | void;
   /** Persist skipped history before committing a cursor beyond it. */
   markHistoryIncomplete?: () => Promise<void>;
+
 
   /**
    * 同步**成功**之后把时刻落库（R7「上次同步」的唯一持久来源）。
@@ -823,6 +831,7 @@ export class SyncClient {
    * 否则一次口令手滑之后，界面会永远挂着"有数据解不开"。
    */
   private unreadableOps: UnreadableOp[] = [];
+
 
   /**
    * 本次同步里被服务端**永久拒绝**的 op（已随之移出待上传队列）。

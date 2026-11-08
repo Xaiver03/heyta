@@ -1,6 +1,7 @@
 package com.heytamobile.widget
 
 import android.security.keystore.KeyGenParameterSpec
+import android.util.Log
 import android.security.keystore.KeyProperties
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -8,6 +9,9 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
+
+/** 日志标签（只用一处，避免各处写不同字符串）。 */
+private const val TAG = "HeytaWidgetKey"
 
 /**
  * 一次 AES-256-GCM 的**能力**，而不是一把密钥。
@@ -199,11 +203,28 @@ object WidgetDeviceKeyStore {
         return generator.generateKey()
     }
 
-    /** 只读地看一眼有没有 —— **不要**用它来做"没有就生成"的判断（那是 [getOrCreate] 的事）。*/
+    /**
+     * 只读地看一眼有没有 —— **不要**用它来做"没有就生成"的判断（那是 [getOrCreate] 的事）。
+     *
+     * 🔴 `KeyStore` 全是可抛 API（`KeyStoreException` / `IOException` /
+     * `UnrecoverableKeyException`），而本函数处在**系统广播的同步调用链**上
+     * （`AppWidgetProvider.onUpdate` → `WidgetRefresh` → 这里）。
+     * 不吞的话，一次"改锁屏密码导致旧密钥失效"就会把「刷新卡片」变成「应用崩溃」
+     * —— 崩溃审计 2026-11-08 · U18 第 2 条 P0。
+     *
+     * 语义不变：读不到密钥**本来**就是一种正常状态（渲染层按 null → 占位符处理）。
+     * 这里只是让"读不到"不再以异常的形式逃出去。
+     */
     fun existing(): SecretKey? {
-        val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
-        if (!store.containsAlias(ALIAS)) return null
-        return (store.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
+        return try {
+            val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
+            if (!store.containsAlias(ALIAS)) return null
+            (store.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
+        } catch (error: Throwable) {
+            // 密钥库不可用 ⇒ 当作"没有密钥"。不要降级成生成新密钥（那会静默让旧快照永久解不开）。
+            Log.w(TAG, "读取小组件密钥失败，按『没有密钥』处理", error)
+            null
+        }
     }
 
     /**
@@ -214,8 +235,14 @@ object WidgetDeviceKeyStore {
      * 于是此前写下的快照**永久解不开**（这是对的：登出就该如此）。
      */
     fun delete() {
-        val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
-        if (store.containsAlias(ALIAS)) store.deleteEntry(ALIAS)
+        try {
+            val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
+            if (store.containsAlias(ALIAS)) store.deleteEntry(ALIAS)
+        } catch (error: Throwable) {
+            // 登出流程另有 `WidgetStore.clearAll()` 兜底清快照，所以这里失败
+            // 不应该让「注销账号」整个失败 —— 更不该崩溃。
+            Log.w(TAG, "删除小组件密钥失败（随后会清快照兜底）", error)
+        }
     }
 }
 

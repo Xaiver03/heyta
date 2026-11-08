@@ -34,9 +34,20 @@ export interface ErrorScreenProps {
   message: string;
   /** 可选的处理建议词条 key。 */
   hintKey?: MessageKey;
+  /**
+   * 可选的"重试"动作。
+   *
+   * 为什么需要它（崩溃审计 2026-11-08 · U12 第 7 条）：此前这一屏**没有**任何
+   * 恢复入口，而 `initOpLog` 又把被拒绝的 `initPromise` 缓存住了 ——
+   * 于是用户即使把问题解掉（关掉另一个标签页），也只能整页刷新。
+   * 有重试之后，"重试"这个动作才有地方落地。
+   *
+   * 不传 = 不渲染按钮（保持既有调用点行为不变）。
+   */
+  onRetry?: () => void;
 }
 
-export function ErrorScreen({ titleKey, message, hintKey }: ErrorScreenProps) {
+export function ErrorScreen({ titleKey, message, hintKey, onRetry }: ErrorScreenProps) {
   const { t } = useI18n();
 
   return (
@@ -80,6 +91,27 @@ export function ErrorScreen({ titleKey, message, hintKey }: ErrorScreenProps) {
         >
           {t(hintKey)}
         </p>
+      )}
+      {onRetry !== undefined && (
+        <button
+          type="button"
+          data-testid="error-retry"
+          onClick={onRetry}
+          style={{
+            marginTop: cssVar('space.2'),
+            paddingInline: cssVar('space.4'),
+            paddingBlock: cssVar('space.2'),
+            borderRadius: cssVar('radius.md'),
+            border: `1px solid ${cssVar('color.border')}`,
+            background: cssVar('color.surface'),
+            color: cssVar('color.foreground'),
+            fontFamily: cssVar('font.sans'),
+            fontSize: cssVar('font-size.base'),
+            cursor: 'pointer',
+          }}
+        >
+          {t('web.error.crash.retry')}
+        </button>
       )}
       {/*
         🔴 原始错误文本降级成"技术详情"，**不再是主文案**。

@@ -88,6 +88,9 @@ export function startMcpStdioServer(options: McpStdioOptions): McpStdioServer {
     throw new Error('MCP stdio 无法启动：没有访问 token。');
   }
 
+  // 🔴 输出流的 error 监听必须**尽早**挂上 —— 晚于任何一次写就没意义了。
+  attachGuards();
+
   const handle = createLocalApiHandler({ host, getConfig });
 
   // 🔴 不用 readline：它默认按 \n 切分，正好是 MCP stdio 的帧格式，
@@ -103,14 +106,58 @@ export function startMcpStdioServer(options: McpStdioOptions): McpStdioServer {
     resolveDone = resolve;
   });
 
-  /** 写一行协议消息。**这是本文件唯一往 stdout 写东西的地方。** */
+  /**
+   * 写一行协议消息。**这是本文件唯一往 stdout 写东西的地方。**
+   *
+   * 🔴 所有 stdout / stderr 写入必须**永不抛出**（崩溃审计 2026-11-08 · U11 第 6 条 P0）。
+   *
+   * MCP 客户端被 kill、管道关闭之后，服务端仍会回最后一条响应 ——
+   * `process.stdout` 的 `'error'`（EPIPE）事件此前**没有监听**，
+   * 按 Node 语义会抛成 uncaughtException，进程带栈退出，客户端只看到 "server gone"。
+   *
+   * 三件事一起做才算闭环：**监听 stream 的 error**（见 `attachGuards`）+
+   * **写调用本身包 try** + 诊断流与协议流分开兜。
+   */
   function writeMessage(payload: unknown): void {
     if (closed) return;
-    output.write(`${JSON.stringify(payload)}\n`);
+    try {
+      output.write(`${JSON.stringify(payload)}\n`);
+    } catch {
+      // 管道已断：这条响应送不到了，正常收摊。
+      finish();
+    }
   }
 
   function log(line: string): void {
-    diagnostics.write(`[heyta-mcp] ${line}\n`);
+    // 诊断写失败绝不能影响协议通道，更不能让进程崩（见 writeMessage）。
+    try {
+      diagnostics.write(`[heyta-mcp] ${line}\n`);
+    } catch {
+      // 丢弃这一行诊断。
+    }
+  }
+
+  /**
+   * 给两条输出流挂 `'error'` 监听。
+   *
+   * 🔴 为什么这是必须的而不是可选的：Node 的 `stream.write()` 在管道断开时
+   * **异步**发 `'error'`（EPIPE）。一个没有监听者的 `'error'` 事件
+   * 会被 EventEmitter 抛成未捕获异常 —— 也就是说**即使每次 write 都包了 try，
+   * 进程照样会死**。两处必须一起做。
+   */
+  function attachGuards(): void {
+    const swallow = (): void => {
+      // 输出通道没了：协议已经无法继续，安静收摊。
+      finish();
+    };
+    try {
+      output.on('error', swallow);
+      diagnostics.on('error', () => {
+        // 诊断流断了不影响协议：忽略。
+      });
+    } catch {
+      // 极端环境里 stream 可能不是 EventEmitter：退化为只有 try 保护。
+    }
   }
 
   async function handleLine(line: string): Promise<void> {
@@ -199,12 +246,24 @@ export function startMcpStdioServer(options: McpStdioOptions): McpStdioServer {
 
   const onEnd = (): void => {
     // EOF：把最后一行（可能没有换行结尾）处理掉，然后结束。
+    //
+    // 🔴 这条异步链**必须**有 catch（崩溃审计 U11 第 5 条 P0）。
+    // `handleLine` 可能抛、`finish()` 里的写也可能失败。原来的写法是
+    // `void (async () => ...)()` —— 拒绝无人接 ⇒ 未捕获拒绝 ⇒ MCP 子进程带栈退出。
+    // 而 `drain()` 那条路径是写了 `.catch` 的（不对称本身就是线索）。
     void (async () => {
       if (buffer.trim() !== '') {
         await handleLine(buffer);
       }
       finish();
-    })();
+    })().catch(() => {
+      // 收尾阶段出错就到此为止 —— 已经要退出了，唯一要做的是把 closed 置上。
+      try {
+        finish();
+      } catch {
+        // finish 自己也失败：进程即将结束。
+      }
+    });
   };
 
   function finish(): void {

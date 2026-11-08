@@ -46,6 +46,12 @@ const LEAVING_CLASS = 'heyta-boot--leaving';
 const SPLASH_REMOVAL_SLACK_MS = 120;
 
 /**
+ * 首屏遮罩的**绝对**退场上界（毫秒）。与动画时长、渲染结果都无关。
+ * 理由见 `armBootSplashDismiss` 末尾那段注释。
+ */
+const SPLASH_HARD_TIMEOUT_MS = 12_000;
+
+/**
  * 让首屏遮罩在应用**第一次画出内容**时退场。
  *
  * 必须在 `createRoot(container)` 之后、任何 `root.render()` 之前调用 ——
@@ -130,4 +136,37 @@ export function armBootSplashDismiss(appRoot: HTMLElement | null): void {
     leave();
   });
   observer.observe(appRoot, { childList: true });
+
+  /**
+   * 🔴 绝对上界：**与渲染结果无关**的那道兜底（崩溃审计 2026-11-08 · U12 第 5 条 P0）。
+   *
+   * 上面整套退场逻辑的前提是"`#root` 迟早会有子节点"。而这个前提可能在
+   * 三种情况下**永不成立**，且它们都不是理论风险：
+   *
+   *   1. `initOpLog()` 的主路径 `await session.ready` 没有超时
+   *      （worker 起不来时那条 promise 永不 settle —— 该文件自己记录过
+   *      Linux WebKitGTK 6.0 下 `type:'module'` worker 构造即失败的实测）；
+   *   2. `?shell=1` / `?slice=1` 的动态 import 失败（已在 `main.tsx` 补 catch，
+   *      但补之前就是这条把界面永久焊死）；
+   *   3. 模块求值期抛错，`armBootSplashDismiss` 根本没被执行。
+   *
+   * 前两种现在各有自己的处理，但**兜底不能依赖"别处已经修好了"** ——
+   * 这条上界保证：即使以后又出现一条新的"root 永远为空"路径，
+   * 用户最坏也只是看到一张空白页，而不是"品牌帧 + 什么都没发生"
+   * （后者在截图判据上还全是绿的：那块底板就是主蓝）。
+   *
+   * 取值 12s：比任何正常冷启动都宽裕（实测首次建库在秒级），
+   * 又不至于让用户以为死机。
+   */
+  window.setTimeout(() => {
+    observer.disconnect();
+    try {
+      console.error('[heyta] 首屏在超时内未被应用接管 —— 这通常意味着启动链卡死或渲染失败');
+    } catch {
+      // console 被禁用
+    }
+    // 调 `leave()` 而不是内部的 `remove()`：`remove` 是 `leave` 里的作用域，
+    // 而 `leave` 自己已经处理了"动画不跑/窗口不可见"那两档 —— 走它才是同一条路径。
+    leave();
+  }, SPLASH_HARD_TIMEOUT_MS);
 }

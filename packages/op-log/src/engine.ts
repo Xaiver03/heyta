@@ -768,6 +768,32 @@ export class OpLogEngine {
 
   private async applyRemoteLocked(ops: Operation<string>[]): Promise<RemoteApplyResult> {
     if (ops.length === 0) return { applied: [], skipped: 0, overwritten: [] };
+
+    /**
+     * 🔴 **fail-closed 是刻意决定，不是遗漏** —— 不要改成"逐 op 跳过"。
+     *
+     * 我在崩溃审计（2026-11-08）里一度把这里改成逐 op try/catch +
+     * `rejected[]` 跳过，理由是"一条坏远端 op 会把同步通道永久焊死"
+     * （游标不推进 ⇒ 每次重拉同一条 ⇒ 每次再抛）。那个诊断是真的，
+     * **但修法被仓库的既有决定否决了**：
+     *
+     *   1. `ADR-0016` 的 fail-closed —— 整页解不开/校验不过时**不推进游标**、
+     *      一条都不应用。跳过一条 full-state / batch op 的代价不是"少一条数据"，
+     *      而是**可能丢掉整份库**（那样的 op 恰恰是承载全量快照的那一类）。
+     *   2. `tests/full-state-recovery.spec.ts`、`tests/task-batch.spec.ts`
+     *      等 10 条用例**明确断言**这条路径必须 reject —— 它们是这个决定的判据，
+     *      不是过时的实现细节。
+     *
+     * 所以这里保持原样。要真正解决"永久焊死"，缺的不是一个 try/catch，
+     * 而是一份**隔离协议**（隔离表放哪、谁批准跳过、跳过之后怎么让用户知道
+     * 且能导出坏 op 供排查），那是 ADR 级别的问题 —— 已记在
+     * `docs/plans/crash-audit-report-2026-11-08.md` §G.4。
+     *
+     * ⚠️ 已修的相邻问题（不要再被误认为没修）：普通实体 op 的**原型链键**
+     * 曾让 reducer 在工作区静默抛 TypeError —— 那是 `nullProtoMap` 关掉的；
+     * 而 `openAppHost` 现在会在恢复失败时**关连接并抛可诊断错误**，
+     * 不会留下"库已打开、宿主没建成"的半状态。
+     */
     for (const op of ops) {
       validateReminderOwnerOperation(op);
       if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload) || hasTaskPriorityBatchMarker(op.payload) ||

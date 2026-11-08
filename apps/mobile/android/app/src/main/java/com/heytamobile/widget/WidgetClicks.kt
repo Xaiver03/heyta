@@ -6,7 +6,11 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import com.heytamobile.MainActivity
+
+/** 日志标签（只用一处，避免各处写不同字符串）。 */
+private const val TAG = "HeytaWidgetClicks"
 
 /**
  * 四款组件共用的点击路径
@@ -123,7 +127,16 @@ abstract class BaseWidgetProvider : AppWidgetProvider() {
     ) {
         // ⚠️ 刻意用"重画全部实例"而不是逐个 id：`updateAppWidget(ComponentName, views)`
         // 一次覆盖所有实例，少一处"漏掉某个实例"的可能。
-        WidgetRefresh.pushAll(context)
+        //
+        // 🔴 系统回调入口必须收口（崩溃审计 2026-11-08 · U18 第 1 条 P0）。
+        // 这里是**系统进程**调进来的同步入口：抛出去不是"这一次没画成"，
+        // 而是「Heyta 已停止运行」—— 广播也没了，用户只看到一个停不掉的弹窗。
+        // 四个 provider 都继承本类，所以**一处修全覆盖**。
+        try {
+            WidgetRefresh.pushAll(context)
+        } catch (error: Throwable) {
+            Log.w(TAG, "刷新小组件失败（已忽略，不影响应用）", error)
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {

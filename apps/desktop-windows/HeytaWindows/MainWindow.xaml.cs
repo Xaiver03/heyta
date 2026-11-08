@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -256,6 +257,27 @@ public sealed partial class MainWindow : Window
         })();
         """;
 
+    /// <summary>
+    /// <see cref="SyncWindowChromeMetricsAsync"/> 的**永不抛出**包装。
+    ///
+    /// 存在的唯一理由：它被 `async void` 的事件处理器调用，而 `async void`
+    /// 里逃出的异常会直接终止进程（见调用点的注释）。
+    /// 只吞"控件已经没了"这一类已知异常，其余仍然写进调试输出，避免把真 bug 也一起吞掉。
+    /// </summary>
+    private async Task RunChromeMetricsSafelyAsync()
+    {
+        try
+        {
+            await SyncWindowChromeMetricsAsync();
+        }
+        catch (Exception error) when (
+            error is ObjectDisposedException or InvalidOperationException or COMException)
+        {
+            // 窗口/WebView 已销毁或正在重载 —— 这一次的尺寸同步作废，等下一次事件。
+            Debug.WriteLine($"[heyta] 窗外框尺寸同步被跳过：{error.GetType().Name}");
+        }
+    }
+
     private async Task SyncWindowChromeMetricsAsync()
     {
         if (!AppWindowTitleBar.IsCustomizationSupported() || SharedUi.CoreWebView2 is null) return;
@@ -432,8 +454,19 @@ public sealed partial class MainWindow : Window
             if (AppWindowTitleBar.IsCustomizationSupported())
             {
                 await SharedUi.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(WindowChromeShim);
-                SharedUi.CoreWebView2.NavigationCompleted += async (_, _) => await SyncWindowChromeMetricsAsync();
-                SharedUi.SizeChanged += async (_, _) => await SyncWindowChromeMetricsAsync();
+                // 🔴 事件处理器是 `async void`：里面抛出的异常**没有人能接住**，
+                // 直接变成进程级崩溃（WinUI 默认没有 UnhandledException 订阅）。
+                //
+                // 而 `SyncWindowChromeMetricsAsync` 会 `await ExecuteScriptAsync` ——
+                // 页面重载、渲染进程崩溃、窗口关闭都发生在 await 期间，
+                // 于是 ObjectDisposedException / InvalidOperationException / COMException
+                // 完全可能出现。SizeChanged 还是**高频**事件（拖动窗口就触发）。
+                //
+                // 它只做"同步窗外框尺寸"这一件无副作用的事，失败就该静默重试，
+                // 不该让整个应用消失。（崩溃审计 2026-11-08 · U18 第 3 条 P0）
+                SharedUi.CoreWebView2.NavigationCompleted += async (_, _) =>
+                    await RunChromeMetricsSafelyAsync();
+                SharedUi.SizeChanged += async (_, _) => await RunChromeMetricsSafelyAsync();
             }
 
             /**

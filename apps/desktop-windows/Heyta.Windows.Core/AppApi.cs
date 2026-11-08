@@ -40,10 +40,38 @@ public sealed class AppApi : IDisposable
         _host = new ScriptHost(bundlePath, dbPath);
     }
 
+    /// <summary>
+    /// `ScriptHost.Call` 的结果反序列化，**null 一律显式失败**。
+    ///
+    /// 🔴 为什么不能再用 `Deserialize(...)!`（崩溃审计 2026-11-08 · U18 第 7 条）：
+    /// `ScriptHost.Call` 在 JS 结果是 `undefined`/`null` 时返回字符串 `"null"`
+    /// （`ScriptHost.cs` 的落定协议如此）。`JsonSerializer.Deserialize<ClientIdEnvelope>("null")`
+    /// **合法地**返回 `null`，而 `!` 只是压掉编译器的可空警告 —— 下一行 `.ClientId`
+    /// 立刻 NullReferenceException。
+    ///
+    /// 后果不只是"崩"：它把一句可诊断的"门面返回了 null"降级成一句 NRE，
+    /// 而调用方（`MainWindow.xaml.cs`）只能把它包成"存储宿主转发失败"。
+    /// 这里改成带原始载荷的显式异常，日志里就能直接看出是哪一次调用没返回值。
+    /// </summary>
+    private static T DeserializeRequired<T>(string raw, string method)
+    {
+        T? parsed = JsonSerializer.Deserialize<T>(raw, Options);
+        if (parsed is null)
+        {
+            throw new InvalidOperationException(
+                $"门面 {method} 返回了 null（原始载荷：{Truncate(raw)}）。这通常意味着 JS 侧抛错但未被转成错误回执。");
+        }
+        return parsed;
+    }
+
+    /// <summary>截断超长载荷，避免把整份 JSON 灌进异常消息。</summary>
+    private static string Truncate(string value) =>
+        value.Length <= 200 ? value : value[..200] + "…";
+
     /// <summary>打开应用宿主，返回设备 clientId。幂等。</summary>
     public string Open(string dbPath) =>
-        JsonSerializer.Deserialize<ClientIdEnvelope>(
-            _host.Call("open", JsonSerializer.Serialize(new { dbPath })), Options)!.ClientId;
+        DeserializeRequired<ClientIdEnvelope>(
+            _host.Call("open", JsonSerializer.Serialize(new { dbPath })), "open").ClientId;
 
     /// <summary>
     /// 🔴 **完整任务实体的原样 JSON**（不经 C# 建模）。
@@ -58,11 +86,11 @@ public sealed class AppApi : IDisposable
     public string ListTaskEntitiesJson() => _host.Call("listTaskEntities");
 
     public IReadOnlyList<TaskView> ListTasks() =>
-        JsonSerializer.Deserialize<TaskListEnvelope>(_host.Call("listTasks"), Options)!.Tasks;
+        DeserializeRequired<TaskListEnvelope>(_host.Call("listTasks"), "listTasks").Tasks;
 
     public string AddTask(string title) =>
-        JsonSerializer.Deserialize<IdEnvelope>(
-            _host.Call("addTask", JsonSerializer.Serialize(new { title })), Options)!.Id;
+        DeserializeRequired<IdEnvelope>(
+            _host.Call("addTask", JsonSerializer.Serialize(new { title })), "addTask").Id;
 
     public void SetTaskDone(string id, bool done) =>
         _host.Call("setTaskDone", JsonSerializer.Serialize(new { id, done }));
@@ -78,9 +106,9 @@ public sealed class AppApi : IDisposable
     /// （向量时钟与 appliedOpIds 漂移），所以壳在 `app` 模式下只调这一个。
     /// </summary>
     public string OpenOpLog() =>
-        JsonSerializer.Deserialize<ClientIdEnvelope>(
-            _host.Call("openOpLog", JsonSerializer.Serialize(new { dbPath = string.Empty })), Options)!
-            .ClientId;
+        DeserializeRequired<ClientIdEnvelope>(
+            _host.Call("openOpLog", JsonSerializer.Serialize(new { dbPath = string.Empty })),
+            "openOpLog").ClientId;
 
     /// <summary>
     /// 把页侧发来的**一条消息**转给 TS，拿回**要发回去的那些消息**。
@@ -91,9 +119,9 @@ public sealed class AppApi : IDisposable
     /// 于是它**不必认识任何协议字段**（不解析、不改写、不建模）。
     /// </summary>
     public IReadOnlyList<string> HandleHostMessage(string messageJson) =>
-        JsonSerializer.Deserialize<OutboundEnvelope>(
-            _host.Call("handleHostMessage", JsonSerializer.Serialize(new { messageJson })), Options)!
-            .OutboundJson;
+        DeserializeRequired<OutboundEnvelope>(
+            _host.Call("handleHostMessage", JsonSerializer.Serialize(new { messageJson })),
+            "handleHostMessage").OutboundJson;
 
     public void Dispose() => _host.Dispose();
 }
