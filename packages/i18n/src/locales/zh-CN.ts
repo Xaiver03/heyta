@@ -675,7 +675,6 @@ export const zhCN = {
   // 每一节的"这一页管什么"不再有词条（2026-10-31）：内容面不再画节标题，
   // 而侧栏标签已经把"你在哪一节"说完了。见 `App.tsx` 的 `isSettingsSectionId` 下那段注释。
   'web.settings.dataUx.backupTitle': '备份与还原',
-  'web.settings.dataUx.backupLead': '保留一份完整的本地备份，也可以将它还原到一台空设备。',
   'web.settings.dataUx.migrationTitle': '从其他应用迁移',
   'web.settings.dataUx.migrationLead': '先查看预览，再把滴答清单 CSV 合并到现有的 heyta 数据中。',
   'web.profile.overview.title': '个人中心',

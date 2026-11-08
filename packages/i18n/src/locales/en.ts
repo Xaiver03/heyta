@@ -579,7 +579,6 @@ export const en = {
   'web.settings.nav.account': 'Account and security',
   'web.settings.nav.help': 'About and help',
   'web.settings.dataUx.backupTitle': 'Backup and restore',
-  'web.settings.dataUx.backupLead': 'Keep a full local backup, or restore one onto an empty device.',
   'web.settings.dataUx.migrationTitle': 'Move from another app',
   'web.settings.dataUx.migrationLead': 'Bring a TickTick CSV into your existing heyta data after reviewing the preview.',
   'web.profile.overview.title': 'Profile',

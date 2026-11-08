@@ -29,12 +29,14 @@ export function DataSettingsPanel({ active = true }: { active?: boolean }): Reac
             <h3 className="ht-settings__data-card-title ht-type-headline">
               <Database size={ICON_SIZE.sm} aria-hidden="true" />
               {t('web.settings.dataUx.backupTitle')}
-              {/* 说明进 `?`（2026-10-24 禁令）。 */}
-              <SettingsInfoTip
-                testId="tip-data-backup"
-                label={t('web.settings.dataUx.backupTitle')}
-                text={t('web.settings.dataUx.backupLead')}
-              />
+              {/*
+                🔴 **2026-11-08 删掉了一枚问号**（J2）。它的正文是
+                「保留一份完整的本地备份，也可以将它还原到一台空设备。」
+                —— 而这一屏里**紧接着就是导出/导入那一排按钮**，各自写着干什么。
+                这是 J2 的第三类靶子：**复述分区功能**（分区的动作已经自解释了）。
+                ⚠️ 与「迁移」那张卡不同：那张的气泡写的是**步骤**（"先查看预览，再合并"），
+                是用户真的要知道的操作顺序，所以保留。
+              */}
             </h3>
 
           </div>
