@@ -682,7 +682,7 @@ export const zhCN = {
   'web.profile.overview.back': '返回个人中心',
   'web.profile.overview.lead': '查看你的身份、近期状态和成长进度。',
   'web.profile.overview.identity': '我的身份',
-  'web.profile.overview.localOnly': '数据先保存在本机，服务器只负责同步加密内容。',
+  'web.profile.overview.localOnly': '数据先保存在本机；开启端到端加密后，服务器只经手密文。',
   'web.profile.overview.signedIn': '同步账号',
   'web.profile.overview.local': '仅在本机使用',
   'web.profile.overview.edit': '编辑个人资料',
@@ -995,7 +995,7 @@ export const zhCN = {
   'web.sync.settings.close': '关闭同步设置',
   // H9 第 3 刀：这一节说明"同步到底把什么送出去"。原来的「关闭同步设置」随着
   // 那层同级浮层一起删掉了 —— 一节设置没有"关闭"这个动作，退出设置就有出口。
-  'web.settings.sync.note': '任务先保存在本机。登录 heyta 后可在设备间自动同步，服务端只接收加密的任务数据。',
+  'web.settings.sync.note': '任务先保存在本机。登录 heyta 后可在设备间自动同步；默认明文传输（服务器可读），开启端到端加密后只经手密文。',
   'web.sync.serverUrl.label': '服务端地址',
   'web.sync.token.label': '访问令牌',
   'web.sync.password.label': '端到端加密口令',
@@ -1588,7 +1588,7 @@ export const zhCN = {
   'web.widgetPush.reason.unregisterHttp': '服务器没有注销这条订阅（服务器返回 {status}）。',
   'web.widgetPush.reason.probeHttp': '没能问出这台服务器开没开推送（服务器返回 {status}）。',
   'web.widgetPush.reason.unexpected': '出了没预料到的问题：{detail}',
-  'web.widgetPush.note.privacy': '推送内容只有一句“有更新了”，不含你的任何任务内容 —— 服务端没有你的密钥，解密只在这台设备上发生。',
+  'web.widgetPush.note.privacy': '推送内容只有一句“有更新了”，不含你的任何任务内容。提示由这台设备生成，不经过服务器。',
   'web.widgetPush.note.windowsOnly': '这个开关只影响 Windows 上的小组件。手机端的小组件由系统自己按计划刷新。',
   'web.passkeys.error.add': '没能添加这条通行密钥，请重试。',
   'web.passkeys.error.passkeyUnsupported': '这台设备或浏览器不支持通行密钥。',

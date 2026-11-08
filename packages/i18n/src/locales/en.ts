@@ -586,7 +586,7 @@ export const en = {
   'web.profile.overview.back': 'Back to profile',
   'web.profile.overview.lead': 'See who you are, what you have done lately, and what is next.',
   'web.profile.overview.identity': 'Your identity',
-  'web.profile.overview.localOnly': 'Data stays on this device first; the server only syncs encrypted content.',
+  'web.profile.overview.localOnly': 'Data stays on this device first; with end-to-end encryption on, the server only handles ciphertext.',
   'web.profile.overview.signedIn': 'Sync account',
   'web.profile.overview.local': 'Using this device only',
   'web.profile.overview.edit': 'Edit profile',
@@ -893,7 +893,7 @@ export const en = {
   // Cut 3 of ticket H9: this section says what sync actually sends out.
   // "Close sync settings" went away with that sibling overlay — a settings
   // section has no "close" action; leaving settings is the exit.
-  'web.settings.sync.note': 'Tasks stay on this device first. Sign in to heyta to sync automatically across devices; the server only receives encrypted task data.',
+  'web.settings.sync.note': 'Tasks stay on this device first. Sign in to heyta to sync across devices; by default the payload is readable by the server, and with end-to-end encryption on it only handles ciphertext.',
   'web.sync.serverUrl.label': 'Server URL',
   'web.sync.token.label': 'Access token',
   'web.sync.password.label': 'End-to-end encryption passphrase',
@@ -1441,7 +1441,7 @@ export const en = {
   'web.widgetPush.reason.unregisterHttp': 'The server did not remove this subscription (server replied {status}).',
   'web.widgetPush.reason.probeHttp': 'Could not tell whether this server has push enabled (server replied {status}).',
   'web.widgetPush.reason.unexpected': 'Something unexpected happened: {detail}',
-  'web.widgetPush.note.privacy': 'The push payload only says "something changed" and contains none of your tasks — the server has no key, so decryption only happens on this device.',
+  'web.widgetPush.note.privacy': 'The push payload only says "something changed" and contains none of your tasks. The notice is produced on this device and does not pass through the server.',
   'web.widgetPush.note.windowsOnly': 'This switch only affects the Windows widget. Phone widgets refresh on the system schedule.',
   'web.passkeys.error.add': 'That passkey could not be added - try again.',
   'web.passkeys.error.passkeyUnsupported': 'This device or browser does not support passkeys.',
