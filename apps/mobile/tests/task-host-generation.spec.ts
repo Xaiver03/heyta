@@ -34,6 +34,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const platform = vi.hoisted(() => ({
   opened: [] as Array<Record<string, unknown>>,
+  dispatched: [] as number[],
   failNext: false,
 }));
 
@@ -43,13 +44,22 @@ vi.mock('@heyta/app-host', () => ({
       platform.failNext = false;
       throw new Error('open failed');
     }
+    const generation = platform.opened.length + 1;
     const host = {
+      generation,
       closed: false,
-      getState: () => ({ tasks: [] }),
-      dispatch: async () => undefined,
+      getState: () => ({ tasks: [], generation }),
+      dispatch: async () => {
+        // 🔴 关闭之后再写就**抛** —— 这就是真实 adapter 销毁后的行为。
+        //    它让"路由绑在旧实例上"这件事**可观测**：真机上那一屏错误就是它的用户形态。
+        if ((host as { closed: boolean }).closed) {
+          throw new Error('AdapterDestroyedError: 这一代宿主已经销毁');
+        }
+        platform.dispatched.push(generation);
+      },
       dispatchChecked: async () => undefined,
       close() {
-        (this as { closed: boolean }).closed = true;
+        (host as { closed: boolean }).closed = true;
       },
     };
     platform.opened.push(host);
@@ -68,8 +78,15 @@ vi.mock('../src/lib/vault-secure-storage', () => ({
   isVaultRootAutoUnlockDisabled: async () => false,
   loadVaultRootKey: async () => undefined,
 }));
+/**
+ * 捕获 `bindMobileOplogBase(...)` 收到的那个对象 —— 本文件要验的正是
+ * **擦除之后路由还是不是可用的、且落没落到新一代**。
+ */
+const router = vi.hoisted(() => ({ bound: undefined as unknown }));
 vi.mock('../src/share/wiring', () => ({
-  bindMobileOplogBase: () => {},
+  bindMobileOplogBase: (next: unknown) => {
+    router.bound = next;
+  },
   currentState: () => ({ tasks: [] }),
   dispatchChecked: async () => undefined,
   dispatchIntent: async () => undefined,
@@ -161,7 +178,51 @@ describe('宿主换代协议', () => {
     expect(getOpenTaskHostIfReady()).toBeUndefined();
     const second = await openTaskHost();
     expect(second).not.toBe(first);
-    expect((first as unknown as { closed: boolean }).closed).toBe(true);
+    // ⚠️ 断言**原始**宿主，不断言 `openTaskHost()` 的返回值：
+    //    后者是 `withWriteSignal(host)` 的 `{...host}` 展开，`closed` 是按值抄过去的布尔，
+    //    永远不会跟着变（第一版就这么写错，红在"expected false to be true"）。
+    expect((platform.opened[0] as { closed: boolean }).closed).toBe(true);
+  });
+
+  it('🔴 擦除之后共享写路由**仍然可用**，并落到新一代宿主上', async () => {
+    // 【真机依据（2026-11-08 · §H.9.9）】远端擦除之后，任务屏是一整屏
+    // 「这个界面出错了 / 移动端宿主尚未打开，写路由无处可落」，
+    // 而且**变异版与修复版表现一致** ⇒ 它独立于"屏幕持有旧实例"。
+    // 根因：`resetTaskHostCache()` 会把路由 `bindMobileOplogBase(undefined)` 摘掉，
+    // 新宿主就绪之前那段窗口里任何一次写都落进守卫。
+    const first = await openTaskHost();
+    // ⚠️ 用**相对**计数，不用绝对值：`platform.opened` 是跨用例累加的模块状态。
+    const rawFirst = platform.opened[platform.opened.length - 1] as { closed: boolean };
+    const openedBeforeReset = platform.opened.length;
+    expect(router.bound, '打开宿主后必须装配路由').toBeTruthy();
+
+    resetTaskHostCache();
+    await flush();
+
+    // ① 路由不许被摘成空 —— 摘掉就是那个窗口。
+    expect(router.bound, '擦除把路由摘掉了 ⇒ 新宿主就绪前任何一次写都会报「写路由无处可落」')
+      .toBeTruthy();
+
+    // ② 写**不许抛**。修复前 `router.bound` 是 `undefined`（被摘掉）⇒ 这里会
+    //    抛 TypeError / 「写路由无处可落」，正是真机上那一屏。
+    const base = router.bound as {
+      dispatch: (intent: unknown) => Promise<void>;
+      getState: () => { generation?: number };
+    };
+    await expect(base.dispatch({ type: 'noop' })).resolves.toBeUndefined();
+
+    // ③ 而且必须落到**新一代**：`dispatch` 里那次 `await openTaskHost()` 应当把新宿主开出来。
+    //    ⚠️ 不能靠 `getState().generation` 判 —— 那个 `getState` 已经被写信号包装层
+    //    换成 `shareAwareState`（本文件 mock 掉的），读不到原始宿主的字段。
+    //    可观测的事实是平台侧"又开了一代"，以及那新一代没被关掉。
+    expect(
+      platform.opened.length,
+      'dispatch 没有把新一代宿主开出来 ⇒ 它还在用旧那一代',
+    ).toBe(openedBeforeReset + 1);
+    expect((platform.opened[platform.opened.length - 1] as { closed: boolean }).closed).toBe(false);
+
+    // ④ 前提：旧那一代确实被关掉了（否则上面两条可能是因为"旧宿主还活着"才通过的）。
+    expect(rawFirst.closed, '旧那一代没被关掉 ⇒ 这条判据的对照不成立').toBe(true);
   });
 
   it('打开失败不吞：错误会浮到调用方（钩子据此回灌界面的错误态）', async () => {

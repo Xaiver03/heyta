@@ -103,10 +103,33 @@ export function getTaskHostEpoch(): number {
  */
 function withWriteSignal(host: AppHost): AppHost {
   const widgetSource = hostPublishSource(host);
+  /**
+   * 🔴 共享写路由按「**当前这一代**」装配，不装配某个实例的快照。
+   *
+   * 【为什么（2026-11-08 真机配对实测 · §H.9.9）】原来这里绑的是 `host.dispatch`
+   * 这些**闭在实例上**的函数，而 `resetTaskHostCache()` 会在作废时把整个路由
+   * `bindMobileOplogBase(undefined)` 摘掉、等新宿主开好再重新装上。中间那段窗口里
+   * 任何一次写都落进 `requireBase()` 的守卫：
+   *
+   *     移动端宿主尚未打开，写路由无处可落。请先 await openTaskHost()。
+   *
+   * 真机上它的用户可见形态是一整屏「这个界面出错了 / 重试」，而且**变异版与修复版
+   * 表现完全一致** ⇒ 是独立于"持有旧实例"的第二条通路。
+   *
+   * 改法：`dispatch` 先 `await openTaskHost()` 再落到当前宿主 —— 它本来就是 async，
+   * 这个等待不会把同步接口变成异步；`getState` 是同步的，只能现读，拿不到就照旧抛
+   * （同步读没有"等"这个选项）。
+   */
   bindMobileOplogBase({
-    dispatch: (intent) => host.dispatch(intent),
-    dispatchChecked: (build) => host.dispatchChecked(build),
-    getState: () => host.getState(),
+    dispatch: async (intent) => (await openTaskHost()).dispatch(intent),
+    dispatchChecked: async (build) => (await openTaskHost()).dispatchChecked(build),
+    getState: () => {
+      const current = getOpenTaskHostIfReady();
+      if (current === undefined) {
+        throw new Error('移动端宿主尚未打开，写路由无处可落。请先 await openTaskHost()。');
+      }
+      return current.getState();
+    },
   });
 
   return {
@@ -259,9 +282,13 @@ export function resetTaskHostCache(): void {
       // 宿主已经处于不可用状态；我们已经放手，剩下的交给 GC 与进程退出。
     }
   }
-  // 🔴 路由装配也要跟着换代：不摘的话，下一次 `dispatchIntent` 还会写进
-  // 那个已按口径 B 拒绝读写的旧 adapter（症状是"写入静默成功、新库里看不见"）。
-  bindMobileOplogBase(undefined);
+  // 🔴 这里**不再** `bindMobileOplogBase(undefined)` 了。
+  //
+  // 原来摘掉它防的是"下一次 `dispatchIntent` 还写进那个已按口径 B 拒绝读写的旧 adapter"。
+  // 但摘掉之后、新宿主开好之前是一段**必然空**的窗口，窗口里的任何一次写都会抛
+  // 「写路由无处可落」，真机上是一整屏错误（§H.9.9）。现在路由改成按"当前这一代"
+  // 解析（见 `withWriteSignal` 里那段），它自己就不会再落到旧 adapter 上 ——
+  // 那个顾虑消失了，而摘掉反而亲手造出这个窗口。
 
   // 🔴 **最后一步**才通知，且**推到下一个宏任务**：订阅者收到通知就会重新
   // `openTaskHost()`，而这条路径紧接着一次**真的删库**（`adapter.destroy()` 刚返回）。
