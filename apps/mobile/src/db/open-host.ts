@@ -36,6 +36,16 @@ const DB_NAME = 'heyta.sqlite';
 
 let pending: Promise<AppHost> | null = null;
 let resolvedHost: AppHost | undefined;
+/**
+ * 当前这一代的**原始**宿主（`withWriteSignal` 包装之前的那一份）。
+ *
+ * 🔴 共享写路由只许拿这个，不许拿 `openTaskHost()` 的返回值：
+ *    后者是包装过的，它的 `getState` 是 `shareAwareState` —— 再交给路由就会绕回
+ *    `currentState()` 形成**共享读路由递归**（真机上那一屏写的正是这句话）。
+ *    但路由又必须按"当前这一代"解析（否则擦除后有个必然报错的空窗），
+ *    所以这里保留原始句柄，并跟着换代置空。
+ */
+let currentRawHost: AppHost | undefined;
 let hostEpoch = 0;
 
 /**
@@ -101,6 +111,22 @@ export function getTaskHostEpoch(): number {
  * 晚绑定装配。**没装共享通道时逐字等于原来的 `dispatch`** ——
  * `shareAwareDispatchIntent` 的未装配分支就是 `host.dispatch(intent)`。
  */
+/**
+ * 给共享写路由用：拿到**当前这一代**的原始宿主。
+ *
+ * 换代窗口里 `currentRawHost` 是空的（作废时被置空），此时**等**一次重开 ——
+ * `dispatch` / `dispatchChecked` 本来就是 async，这个等待不会把同步接口变异步。
+ * 修复前这里是一个必然报错的窗口：真机上表现为「移动端宿主尚未打开，写路由无处可落」。
+ */
+async function hostForRouter(): Promise<AppHost> {
+  if (currentRawHost !== undefined) return currentRawHost;
+  await openTaskHost();
+  if (currentRawHost === undefined) {
+    throw new Error('移动端宿主尚未打开，写路由无处可落。请先 await openTaskHost()。');
+  }
+  return currentRawHost;
+}
+
 function withWriteSignal(host: AppHost): AppHost {
   const widgetSource = hostPublishSource(host);
   /**
@@ -120,15 +146,16 @@ function withWriteSignal(host: AppHost): AppHost {
    * 这个等待不会把同步接口变成异步；`getState` 是同步的，只能现读，拿不到就照旧抛
    * （同步读没有"等"这个选项）。
    */
+  currentRawHost = host;
   bindMobileOplogBase({
-    dispatch: async (intent) => (await openTaskHost()).dispatch(intent),
-    dispatchChecked: async (build) => (await openTaskHost()).dispatchChecked(build),
+    dispatch: async (intent) => (await hostForRouter()).dispatch(intent),
+    dispatchChecked: async (build) => (await hostForRouter()).dispatchChecked(build),
+    // 同步接口没有"等"这个选项：拿不到就照旧抛，这句文案是既有契约的一部分。
     getState: () => {
-      const current = getOpenTaskHostIfReady();
-      if (current === undefined) {
+      if (currentRawHost === undefined) {
         throw new Error('移动端宿主尚未打开，写路由无处可落。请先 await openTaskHost()。');
       }
-      return current.getState();
+      return currentRawHost.getState();
     },
   });
 
@@ -282,6 +309,9 @@ export function resetTaskHostCache(): void {
       // 宿主已经处于不可用状态；我们已经放手，剩下的交给 GC 与进程退出。
     }
   }
+  // 🔴 原始宿主跟着换代置空：路由下一次解析时会等重开，而不是落到已销毁的实例上。
+  currentRawHost = undefined;
+
   // 🔴 这里**不再** `bindMobileOplogBase(undefined)` 了。
   //
   // 原来摘掉它防的是"下一次 `dispatchIntent` 还写进那个已按口径 B 拒绝读写的旧 adapter"。
