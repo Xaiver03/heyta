@@ -32,8 +32,6 @@ $pubDir  = Join-Path $build 'publish'
 $stage   = Join-Path $build 'stage'
 $msix    = Join-Path $build 'heyta.msix'
 $cerPath = Join-Path $build 'heyta-selfsigned.cer'
-$pfxPath = Join-Path $build 'heyta-selfsigned.pfx'
-$pfxPass = 'heyta-msix-local'
 $manifestOut = Join-Path $build 'facts.txt'
 $facts = @()
 
@@ -237,43 +235,51 @@ if (-not (Test-Path $msix)) { $facts += 'RESULT=PACK_FAILED'; $facts | Set-Conte
 $facts += ('  msix = ' + (Get-Item $msix).Length + ' bytes')
 
 # ---- 5. self-signed cert + signtool ----------------------------------------
-$facts += '=== 5. sign (self-signed) ==='
-Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -eq $publisher } | Remove-Item -Force -EA SilentlyContinue
+$facts += '=== 5. sign (self-signed, machine store for SSH) ==='
+$elevated = (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $elevated) {
+  $facts += 'RESULT=SIGN_FAILED (machine certificate store requires an elevated packager session)'
+  $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1
+}
+Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.Subject -eq $publisher } | Remove-Item -Force -EA SilentlyContinue
 $cert = New-SelfSignedCertificate -Type Custom -Subject $publisher `
   -KeyUsage DigitalSignature -FriendlyName 'heyta msix local' `
-  -CertStoreLocation 'Cert:\CurrentUser\My' `
-  -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
+  -CertStoreLocation 'Cert:\LocalMachine\My' -KeyExportPolicy Exportable `
+  -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}') -ErrorAction Stop
 $facts += ('  thumbprint = ' + $cert.Thumbprint)
-Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
-$sec = ConvertTo-SecureString -String $pfxPass -Force -AsPlainText
-Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $sec | Out-Null
+Export-Certificate -Cert $cert -FilePath $cerPath -ErrorAction Stop | Out-Null
 
 $signtool = 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe'
-$sign = & $signtool sign /fd SHA256 /a /f $pfxPath /p $pfxPass $msix 2>&1
+$sign = & $signtool sign /fd SHA256 /sm /sha1 $cert.Thumbprint $msix 2>&1
+$signExit = $LASTEXITCODE
 $sign | Select-Object -Last 3 | ForEach-Object { $facts += ('  ' + $_) }
+$facts += ('  signtool sign exit = ' + $signExit)
+if ($signExit -ne 0) {
+  $facts += 'RESULT=SIGN_FAILED'
+  $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1
+}
 
 # ---- 6. trust the cert ------------------------------------------------------
 # Must happen BEFORE `signtool verify /pa`, otherwise the check reports a
 # meaningless non-zero exit code purely because the chain is not trusted yet.
 $facts += '=== 6. trust the self-signed cert ==='
-$elevated = (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 $facts += ('  packager session elevated = ' + $elevated)
-if ($elevated) {
-  Import-Certificate -FilePath $cerPath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
-  $facts += '  cert trusted in LocalMachine\TrustedPeople'
-  Start-Sleep -Seconds 1
-  $thumb = (Get-PfxCertificate $cerPath -ErrorAction SilentlyContinue).Thumbprint
-  if (-not $thumb) { $thumb = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 $cerPath).Thumbprint }
-  $found = Get-ChildItem 'Cert:\LocalMachine\TrustedPeople' | Where-Object { $_.Thumbprint -eq $thumb }
-  if (-not $found) {
-    $facts += '  WARNING: cert thumbprint not found in TrustedPeople after import -- retrying'
-    Import-Certificate -FilePath $cerPath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' -ErrorAction Stop | Out-Null
-  }
-} else {
-  $facts += '  WARNING: not elevated -- skipped; the cert must already be trusted for the install to work'
+Import-Certificate -FilePath $cerPath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' -ErrorAction Stop | Out-Null
+$thumb = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 $cerPath).Thumbprint
+$found = Get-ChildItem 'Cert:\LocalMachine\TrustedPeople' | Where-Object { $_.Thumbprint -eq $thumb }
+if (-not $found) {
+  $facts += 'RESULT=CERT_TRUST_FAILED'
+  $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1
 }
+$facts += ('  cert trusted in LocalMachine\TrustedPeople: ' + $thumb)
 $verify = & $signtool verify /pa /v $msix 2>&1
-$facts += ('  signtool verify exit = ' + $LASTEXITCODE)
+$verifyExit = $LASTEXITCODE
+$facts += ('  signtool verify exit = ' + $verifyExit)
+if ($verifyExit -ne 0) {
+  $verify | ForEach-Object { $facts += ('  ' + $_) }
+  $facts += 'RESULT=SIGN_VERIFY_FAILED'
+  $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1
+}
 
 # ---- 7. install + launch + capture, in the interactive session ---------------
 # AppX deployment is PER-USER. Running Add-AppxPackage from the elevated session

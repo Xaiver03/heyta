@@ -101,6 +101,18 @@ export function signingPostureProblems(source) {
     }
   }
 
+  const createBlock = /\$cert\s*=\s*New-SelfSignedCertificate[\s\S]*?(?=\n\$facts)/.exec(source)?.[0] ?? '';
+  const machineStore = /-CertStoreLocation\s+'Cert:\\LocalMachine\\My'/.test(createBlock);
+  const machineSign = /\$signtool\s+sign\b[^\n]*\s\/sm\b[^\n]*\s\/sha1\s+\$cert\.Thumbprint/.test(source);
+  const signExitGuard = /\$signExit\s*=\s*\$LASTEXITCODE[\s\S]*?if\s*\(\$signExit\s+-ne\s+0\)[\s\S]*?RESULT=SIGN_FAILED/.test(source);
+  reading.machineStoreSigning = machineStore && machineSign && signExitGuard;
+  if (!reading.machineStoreSigning) {
+    problems.push(
+      'SSH 会话必须使用机器店证书（Cert:\\LocalMachine\\My）并通过 signtool /sm /sha1 签名，' +
+        '且签名退出码非零时必须 RESULT=SIGN_FAILED；否则 CurrentUser 的 NTE_PERM 会继续伪装成安装时未签名。',
+    );
+  }
+
   return { problems, reading };
 }
 
@@ -134,14 +146,19 @@ function main() {
 function fixture(over = {}) {
   const publisher = over.publisher ?? 'CN=heyta local build';
   const manifest = over.manifestPublisher ?? '$publisher';
-  const body = over.noDelete
-    ? `$cert = New-SelfSignedCertificate -Type Custom -Subject $publisher\n`
-    : `Get-ChildItem Cert:\\CurrentUser\\My | Where-Object { $_.Subject -eq $publisher } | Remove-Item -Force\n` +
-      `$cert = New-SelfSignedCertificate -Type Custom -Subject $publisher\n`;
+  const remove = over.noDelete ? '' :
+    `Get-ChildItem Cert:\\LocalMachine\\My | Where-Object { $_.Subject -eq $publisher } | Remove-Item -Force\n`;
+  const create = `$cert = New-SelfSignedCertificate -Type Custom -Subject $publisher` +
+    (over.noMachineStore ? '\n' : ` -CertStoreLocation 'Cert:\\LocalMachine\\My'\n`);
+  const sign = over.noMachineStore ? '' :
+    `$facts += ('  thumbprint = ' + $cert.Thumbprint)\n` +
+    `$sign = & $signtool sign /fd SHA256 /sm /sha1 $cert.Thumbprint $msix 2>&1\n` +
+    `$signExit = $LASTEXITCODE\n` +
+    `if ($signExit -ne 0) { $facts += 'RESULT=SIGN_FAILED'; exit 1 }\n`;
   return (
     `$publisher    = '${publisher}'\n` +
     `<Identity Name="heyta" Publisher="${manifest}" Version="1.0.0.0" />\n` +
-    body
+    remove + create + sign
   );
 }
 
@@ -161,6 +178,11 @@ function selfTest() {
     [
       'D 有新建但没删（中间形态）⇒ 报，提示回来更新',
       () => signingPostureProblems(fixture({ noDelete: true })).problems.length,
+      1,
+    ],
+    [
+      'F 🔴 回到 CurrentUser 机器签名链 ⇒ 报（SSH 的 NTE_PERM）',
+      () => signingPostureProblems(fixture({ noMachineStore: true })).problems.length,
       1,
     ],
     [
