@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 
 import { CATEGORY_SLOT_TOKEN_BY_SLOT } from '@heyta/design-system';
+import type { Project, Tag } from '@heyta/domain';
 import type { TaskRow } from '@heyta/ui';
 
 import {
@@ -36,17 +37,23 @@ function rowOf(source: Partial<Record<string, unknown>>): TaskRow {
   } as unknown as TaskRow;
 }
 
-const TAGS = {
-  b: { id: 'b', name: 'B', color: '2' },
+/** 实体最小形状：`createdAt`/`updatedAt` 是必填，其余按需。 */
+const project = (id: string, color: string): Project =>
+  ({ id, name: id, color, createdAt: 0, updatedAt: 0 }) as Project;
+const tag = (id: string, extra: Partial<Tag> = {}): Tag =>
+  ({ id, name: id, createdAt: 0, updatedAt: 0, ...extra }) as Tag;
+
+const TAGS: Record<string, Tag> = {
+  b: tag('b', { color: '2' }),
   // A 合并进了 B（墓碑），而任务的 tagIds 里**仍然留着 A**。
-  a: { id: 'a', name: 'A', mergedInto: 'b', deletedAt: 1 },
+  a: tag('a', { mergedInto: 'b', deletedAt: 1 }),
 };
 
 describe('行着色：三态解析', () => {
   it('off ⇒ 不着色（共享层据此**不渲染**节点）', () => {
     const row = rowOf({ projectId: 'p1' });
     expect(
-      rowIconColorToken(row, 'off', { projects: { p1: { id: 'p1', name: 'P', color: '1' } }, tags: {} }),
+      rowIconColorToken(row, 'off', { projects: { p1: project('p1', '1') }, tags: {} }),
     ).toBeUndefined();
   });
 
@@ -54,7 +61,7 @@ describe('行着色：三态解析', () => {
     const row = rowOf({ projectId: 'p1' });
     expect(
       rowIconColorToken(row, 'project', {
-        projects: { p1: { id: 'p1', name: 'P', color: '3' } },
+        projects: { p1: project('p1', '3') },
         tags: {},
       }),
     ).toBe(CATEGORY_SLOT_TOKEN_BY_SLOT[3]);
@@ -77,7 +84,7 @@ describe('行着色：三态解析', () => {
     // 只给 B（存活表里没有 A）⇒ A 解析不出来 ⇒ 不着色。
     // 这不是"另一个正确答案"，而是"用错表时的读数"，钉在这里防回归。
     expect(
-      rowIconColorToken(row, 'tag', { projects: {}, tags: { b: TAGS.b } }),
+      rowIconColorToken(row, 'tag', { projects: {}, tags: { b: TAGS['b']! } }),
     ).toBeUndefined();
   });
 });
