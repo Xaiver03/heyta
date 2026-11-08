@@ -80,6 +80,28 @@ html.heyta-windows-shell .ht-app__detail:not([hidden]) {
   padding-block-start: var(--ht-shell-caption-height, var(--ht-space-8));
 }
 
+/* ── 桌面壳标题栏融合的**共享**条件样式（macOS / Windows 同源） ──────────────
+ * 选择器挂在 `html.heyta-shell`：这个基类由 desktop-chrome.ts 在原生壳内、首帧前
+ * 打上（macOS 壳也补 `heyta-shell--macos`，Windows 壳补 `heyta-shell--windows`）。
+ * 浏览器 / PWA / 移动端没有这个类 ⇒ 下列规则一律不生效，DOM 与布局零变化。
+ */
+
+/* 顶栏空白处是可拖拽区：禁止选中文字，避免拖拽时误选。具体拖拽由原生壳实现
+   （macOS `isMovableByWindowBackground` / Windows `AppWindow.SetDragRectangles`），
+   这里只负责"拖拽带不该被当成文本选区"。 */
+html.heyta-shell .ht-header,
+html.heyta-shell .ht-rail__top {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 窗口失焦时顶栏变暗，呼应系统非活跃态。活跃态由 desktop-chrome.ts 的
+   focus / blur 监听切 `heyta-shell--active`。 */
+html.heyta-shell:not(.heyta-shell--active) .ht-header,
+html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
+  opacity: 0.72;
+}
+
 /*
  * 有范围的视图（目前只有 `tasks`）—— 多一列。
  *

@@ -98,13 +98,15 @@
  * 壳用 `.windowStyle(.hiddenTitleBar)` 后，红绿灯**浮在应用自己的底色上**
  * （2026-09-29 产品负责人："那个关闭缩小条应该跟滴答清单保持一致，
  * 完全融入应用壳，而不是很突兀的一个东西"）。它们落在**左上角 rail 顶部**，
- * 所以壳模式下 rail 顶部让出一行（32px = space.8）。
+ * 所以壳模式下 rail 顶部让出一行。
  *
- * 类由壳注入（WebView 加载完成后 `documentElement.classList.add('heyta-shell')`）；
+ * ⚠️ 让位高度用**可校准 token** `--ht-shell-caption-height`（回退 `--ht-space-8` = 32px）：
+ * 标题栏高度随 macOS 版本变化，壳可在实机校准后注入该变量；不注入时退回 32px 兜底。
+ * 类由壳注入（`heyta-shell`，现由 desktop-chrome.ts 在首帧前补 `heyta-shell--macos`）；
  * 浏览器 / PWA 里没有这个类，布局不变。
  */
 .heyta-shell .ht-rail__top {
-  padding-top: var(--ht-space-8);
+  padding-top: var(--ht-shell-caption-height, var(--ht-space-8));
 }
 
 /* 账号菜单面板。
