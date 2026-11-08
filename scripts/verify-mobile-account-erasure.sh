@@ -445,6 +445,25 @@ if [ -z "$TOKEN" ]; then bad "create-user 没走通：$RESP"; summary "移动端
 configure_sync_credentials
 
 step "2. 造本机数据（真 UI 建一条便签），并同步出去"
+# 🔴 **先导航到「便签」那一屏，再找输入框。**
+#
+# 此前这里直接 `scroll_to_desc "写点什么…"`，于是每一趟都报
+# 「找不到便签输入框」—— 而真相是**导航没到位**：`configure_sync_credentials`
+# 的最后一步是 `close_settings_sheet`，它把界面留在「我的」，而「写点什么…」
+# 在「我的 → 便签」里。`scroll_to_desc` 只会在**当前那一屏**上滚，不会换屏。
+#
+# 这条错报的形状值得记：它打印的是「找不到控件」，读的人会去怀疑文案改了、
+# 或者控件被删了，而实际只是上一步停在了另一屏。2026-11-08 在 `linux-dev`
+# 上实测：同一台设备手动点 我的 → 便签 之后，这一步是通的。
+MINE_XY=$(xy_desc "我的")
+if [ -n "$MINE_XY" ]; then $ADB shell input tap $MINE_XY; sleep 2.5; fi
+NOTES_XY=$(scroll_to_text "便签")
+if [ -z "$NOTES_XY" ]; then
+  bad "进不到「便签」那一屏（我的 → 便签）—— 这是导航前提，不是产品失败"
+  screen_txt
+  summary "移动端注销销毁" "" 1
+fi
+$ADB shell input tap $NOTES_XY; sleep 2.5
 XY=$(scroll_to_desc "写点什么…")
 if [ -z "$XY" ]; then bad "找不到便签输入框"; screen_txt; summary "移动端注销销毁" "" 1; fi
 $ADB shell input tap $XY; sleep 1.2
