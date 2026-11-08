@@ -33,7 +33,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppState, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ErrorBoundary } from './ui/error-boundary.js';
+import { ErrorBoundary } from './ui/error-boundary';
 import { I18nProvider, useI18n, type Locale } from '@heyta/i18n';
 import { ThemeProvider, useTheme, useTokens } from './theme';
 import { LocalePreferenceProvider } from './i18n/locale-preference';
