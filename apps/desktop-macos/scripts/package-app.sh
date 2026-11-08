@@ -338,8 +338,12 @@ if [ "${HEYTA_SKIP_NOTARIZE:-}" = "1" ]; then
   echo "     公证不是它的组成部分 ⇒ 本趟**不主张**「这个包已通过公证」，那句要等不带这个变量的一趟。"
 elif [ "$SIGN_KIND" != "developer-id" ]; then
   echo "  ⏭ 跳过：不是 Developer ID 签名，公证必然被拒"
+  NOTARY_STATE=skipped-not-developer-id
+  [ -n "${NOTARY_STATE_FILE:-}" ] && printf '%s\n' "$NOTARY_STATE" > "$NOTARY_STATE_FILE"
 elif [ -z "$KEY_FILE" ]; then
   echo "  ⏭ 跳过：找不到 ASC API key（试过 ~/Library/Private/AppStoreConnect、~/Desktop、~/.appstoreconnect/private_keys）"
+  NOTARY_STATE=skipped-no-key
+  [ -n "${NOTARY_STATE_FILE:-}" ] && printf '%s\n' "$NOTARY_STATE" > "$NOTARY_STATE_FILE"
 else
   echo "  用 key：$(basename "$KEY_FILE")（内容不打印）"
   # 🔴 `--wait` 原来**没有上限**：Apple 侧不回话时整段永久挂住。2026-10-04 05:1x 实测另一条会话的
@@ -384,18 +388,36 @@ else
   rm -f "$NOTARY_LOG"
   # ⚠️ 输出走临时文件而不是管道：`set -o pipefail` 下管道能保住退出码，但**区分不了**
   #    "Apple 拒绝"与"到点没回话"（124），而这两种要说的话不一样。
+  # 🔴 **两档状态，不是一个布尔**（2026-11-08）：照 `check:windows-signing-posture` 的形状，
+  #    "包可用"与"公证通过"是**两件事**，各自有各自的读数：
+  #
+  #      NOTARY_STATE=stapled   Apple 收了、票据装订了 ⇒ 分发出去不会弹"无法验证开发者"
+  #      NOTARY_STATE=failed    Apple 拒了（有原话）
+  #      NOTARY_STATE=timeout   Apple 侧没回话（超时）—— **不等于失败，也不等于通过**
+  #      NOTARY_STATE=skipped   HEYTA_NOTARY_TIMEOUT=0 之外显式跳过（今天没有这条路径）
+  #
+  #    这个值写进 `NOTARY_STATE_FILE`，由 `reinstall-all.sh` 的 mac 段**单独读**。
+  #    为什么必须分开：2026-11-07/08 那两趟里公证一直是 `connectTimeout`，
+  #    而重装汇总仍打 `✅ mac` —— 那句读起来像"公证也过了"，实际没有。
+  #    判据：`scripts/check-macos-notary-posture.mjs`（注入即红）。
   if [ "$notary_rc" -eq 0 ]; then
     echo "  ✅ 公证通过，开始装订票据"
+    NOTARY_STATE=stapled
     xcrun stapler staple "$DMG" 2>&1 | tail -2 | awk '{print "  " $0}'
     xcrun stapler validate "$DMG" 2>&1 | tail -2 | awk '{print "  " $0}'
   elif [ "$notary_rc" -eq 124 ]; then
+    NOTARY_STATE=timeout
     echo "  🔴 公证在 ${NOTARY_TIMEOUT}s 内没有返回（Apple 侧未回话）。包本身已签名可用，但**没通过公证**，不装订票据。"
   else
+    NOTARY_STATE=failed
     # ⚠️ `${notary_rc}` 必须带花括号：`$notary_rc）` 里那个全角「）」会被 bash（`set -u` 下）
     #    的变量名扫描按字节吃进去，报 `notary_rc<0xEF…>: unbound variable` ——
     #    看起来像变量没赋值，实际是**行内没加花括号**。本机最小复现见
     #    `docs/reference/environment-traps.md` #676（同样的形状在 `set -u` 下到处都会炸）。
     echo "  🔴 公证失败（上面的输出是 Apple 的原话，rc=${notary_rc}）。包本身已签名可用，但**没通过公证**。"
+  fi
+  if [ -n "${NOTARY_STATE_FILE:-}" ]; then
+    printf '%s\n' "${NOTARY_STATE:-skipped}" > "$NOTARY_STATE_FILE"
   fi
 fi
 

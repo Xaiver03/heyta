@@ -479,8 +479,23 @@ if printf '%s' "$WANT" | grep -q "mac"; then
     echo "  清空前该目录不存在（首次运行）"
   fi
   rm -rf "$MAC_OUT"                                   # 清掉旧安装包
-  if bash apps/desktop-macos/scripts/package-app.sh "$MAC_OUT" > $RT/heyta-reinstall-mac.log 2>&1; then
+  # 🔴 **公证状态单独一条**（2026-11-08）：`✅ mac` 只说"包打出来了、装上了、截图非空白"，
+  #    它**不**代表公证通过。两件事分开打，判据见 `scripts/check-macos-notary-posture.mjs`。
+  #    2026-11-07/08 那两趟公证一直是 `connectTimeout`，而汇总仍打 `✅ mac` ——
+  #    那句话读起来像"公证也过了"。
+  MAC_NOTARY_STATE_FILE="$RT/heyta-macos-notary-state.txt"
+  rm -f "$MAC_NOTARY_STATE_FILE"
+  if NOTARY_STATE_FILE="$MAC_NOTARY_STATE_FILE" \
+      bash apps/desktop-macos/scripts/package-app.sh "$MAC_OUT" > $RT/heyta-reinstall-mac.log 2>&1; then
     echo "  ✅ 打包完成（.app + .dmg，含打包即启动的自截屏验证；日志 $RT/heyta-reinstall-mac.log）"
+    MAC_NOTARY_STATE="$(cat "$MAC_NOTARY_STATE_FILE" 2>/dev/null || echo 'unknown')"
+    case "$MAC_NOTARY_STATE" in
+      stapled) echo "  ✅ 公证：已通过并装订票据（分发不会弹"无法验证开发者"）" ;;
+      timeout) echo "  ⚠️ 公证：**超时**（Apple 侧未回话）—— 包已签名可用，但**没通过公证**，不装订票据" ;;
+      failed)  echo "  🔴 公证：**被拒**（打包日志第 ⑥ 段有 Apple 的原话）—— 包已签名可用，但没通过公证" ;;
+      skipped-*) echo "  ⏭ 公证：跳过（${MAC_NOTARY_STATE#skipped-}）" ;;
+      *) echo "  ⚠️ 公证：状态读不到（${MAC_NOTARY_STATE}）—— 不按"通过"记" ;;
+    esac
     rm -rf "$INSTALLED_APP"                           # 卸旧：不留"上一次的包"
     if cp -R "$MAC_OUT/Heyta.app" "$INSTALLED_APP"; then
       echo "  ✅ 已安装到 $INSTALLED_APP"
@@ -869,12 +884,21 @@ if printf '%s' "$WANT" | grep -q "ios"; then
           echo "  🔴 已装的包比源码旧 —— 装的是旧代码"
         fi
         if [ "$FRESH" = "1" ]; then
-          xcrun simctl terminate "$UDID" "$(xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | awk '/UIKitApplication/{print $3}' | sed 's/.*\///;s/:.*//' | head -1)" >/dev/null 2>&1 || true
-          xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
+          # The simulator is selected explicitly; do not terminate another project's app.
+          IOS_LAUNCH_OUT="$(xcrun simctl launch "$UDID" "$BID" 2>&1)"
+          IOS_LAUNCH_RC=$?
+          printf '  simctl launch: %s\n' "$IOS_LAUNCH_OUT"
           sleep 10
           IOS_SHOT="$RT/heyta-reinstall-ios.png"
           xcrun simctl io "$UDID" screenshot --display=primary "$IOS_SHOT" >/dev/null 2>&1
-          if [ -s "$IOS_SHOT" ] && shot_ok_logged "$IOS_SHOT"; then
+          IOS_PID="$(printf '%s\n' "$IOS_LAUNCH_OUT" | sed -nE 's/.*: ([0-9]+)$/\1/p')"
+          IOS_RUNNING=0
+          if [ -n "$IOS_PID" ]; then
+            xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -q "UIKitApplication:${BID}.*PID=${IOS_PID}\|^${IOS_PID}[[:space:]].*UIKitApplication:${BID}" && IOS_RUNNING=1
+          fi
+          if [ "$IOS_LAUNCH_RC" -ne 0 ] || [ "$IOS_RUNNING" != 1 ]; then
+            echo "  🔴 heyta 没有保持运行（launch rc=${IOS_LAUNCH_RC}, pid=${IOS_PID:-缺}）—— 不拿别的应用截图判绿"
+          elif [ -s "$IOS_SHOT" ] && shot_ok_logged "$IOS_SHOT"; then
             echo "  截图证据：$IOS_SHOT"
             RESULT_ios=OK
           else
