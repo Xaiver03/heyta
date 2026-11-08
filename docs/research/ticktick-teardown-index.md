@@ -30,6 +30,7 @@
 | P8 | [ticktick-expression-boundary.md](ticktick-expression-boundary.md) | 282 | 表达层边界的三步判定 + 资产归属表 + 门禁缺口 | ⚠️ **未认领产物**，见 §4 |
 | P9 | [ticktick-settings-and-personalization.md](ticktick-settings-and-personalization.md) | 558 | 设置树 18 分区 + **个性化 8 维**（heyta 完整 0 / 半有 4 / 无 4） | ✅ 已入库 |
 | P10 | [ticktick-ux-ia-and-entry-paths.md](ticktick-ux-ia-and-entry-paths.md) | 592 | **入口四层 + 「作用域定层、代价定深度」规则** + 三条链路读数 + 5 条可判红规则 | ✅ 已入库 |
+| P11 | [ticktick-craft-anything-probe-2026-11-08.md](ticktick-craft-anything-probe-2026-11-08.md) | — | **方法论对照**：craft-anything（302 工具 + Evidence/Unknown 契约）vs REA；含扩展框架归属新发现 | ✅ 已入库 |
 
 ---
 
