@@ -105,6 +105,8 @@ interface FailureMessage {
  * 这里编译期就红，不会变成一个静默的"未知错误"。
  */
 const RESTORE_FAILURE_KEYS: Record<ExportImportFailureReason, MessageKey> = {
+  // 字节上界在 `JSON.parse` **之前**就拒绝（崩溃审计第四批）。
+  'too-large': 'mobile.restore.error.tooLarge',
   'invalid-json': 'mobile.restore.error.invalidJson',
   'invalid-document': 'mobile.restore.error.invalidDocument',
   'unsupported-format-version': 'mobile.restore.error.formatVersion',

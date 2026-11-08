@@ -2861,6 +2861,7 @@ export const en = {
   'web.import.failed': 'The restore did not finish. Please try again.',
   // Rejection reasons. Structured `reason` → catalogue entry, same discipline as
   // the AI failure states (packages return a reason; the shell picks the entry).
+  'web.import.reason.tooLarge': 'This file is too large; it was refused before reading (to avoid exhausting memory).',
   'web.import.reason.invalidJson': 'This file is not valid JSON.',
   'web.import.reason.invalidDocument': 'This file is not a complete heyta export.',
   'web.import.reason.wrongApplication': 'This file was not exported by heyta.',
@@ -3906,6 +3907,7 @@ export const en = {
   'mobile.restore.confirm': 'Confirm restore',
   'mobile.restore.previewCounts': 'Tasks {tasks} · Lists {projects} · Tags {tags} — {entities} records total (incl. {deleted} tombstones), {ops} ops',
   'mobile.restore.done': 'Restore succeeded: wrote {ops} ops, {entities} records. They live on this device only — the operations inside a backup carry the signature of the device that made them, and the server rejects a second device signing on its behalf, so they never reach your other devices. Anything you write here from now on syncs normally.',
+  'mobile.restore.error.tooLarge': 'This file is too large; it was refused before reading (to avoid exhausting memory)',
   'mobile.restore.error.invalidJson': 'This is not valid JSON text',
   'mobile.restore.error.invalidDocument': 'This is not a heyta backup file',
   'mobile.restore.error.formatVersion': 'Backup version not supported: {detail}',

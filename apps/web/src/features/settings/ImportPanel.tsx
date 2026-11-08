@@ -44,6 +44,9 @@ import { SettingsFilePicker } from './SettingsFilePicker.js';
  * 落进兜底文案 —— 用户看到"还原失败"，而真正的原因没人说。
  */
 const REASON_KEYS: Record<ExportImportFailureReason, MessageKey> = {
+  // 崩溃审计第四批新增：字节上界在 `JSON.parse` **之前**就拒绝，
+  // 否则移动端会先被 OOM 杀掉（这条当时漏在这里，靠 `Record` 穷举才被发现）。
+  'too-large': 'web.import.reason.tooLarge',
   'invalid-json': 'web.import.reason.invalidJson',
   'invalid-document': 'web.import.reason.invalidDocument',
   'wrong-application': 'web.import.reason.wrongApplication',

@@ -3096,6 +3096,7 @@ export const zhCN = {
   'web.import.failed': '还原没有完成，请重试。',
   // 拒绝原因。结构化 `reason` → 词条，与 AI 失败态同一条纪律
   //（packages 只回 reason，壳取词条；不把文案写进 packages）。
+  'web.import.reason.tooLarge': '这个文件太大了，已拒绝读取（避免占满内存把应用拖垮）。',
   'web.import.reason.invalidJson': '这个文件不是合法 JSON。',
   'web.import.reason.invalidDocument': '这个文件不是一份完整的 heyta 导出。',
   'web.import.reason.wrongApplication': '这个文件不是 heyta 导出的。',
@@ -4237,6 +4238,7 @@ export const zhCN = {
   'mobile.restore.confirm': '确认还原',
   'mobile.restore.previewCounts': '任务 {tasks} · 清单 {projects} · 标签 {tags} —— 共 {entities} 条（含墓碑 {deleted}），{ops} 条操作日志',
   'mobile.restore.done': '还原成功：写入 {ops} 条操作，共 {entities} 条数据。这批数据只在这台设备上 —— 备份里的操作带着原设备的身份，服务端不认第二个设备的署名，所以它们不会同步到你的其他设备；你之后在这台上新写的照常同步。',
+  'mobile.restore.error.tooLarge': '这个文件太大了，已拒绝读取（避免占满内存把应用拖垮）',
   'mobile.restore.error.invalidJson': '这不是有效的 JSON 文本',
   'mobile.restore.error.invalidDocument': '这不是 heyta 的备份文件',
   'mobile.restore.error.formatVersion': '备份版本不受支持：{detail}',
