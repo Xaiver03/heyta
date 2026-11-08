@@ -43,7 +43,10 @@
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View, type DimensionValue } from 'react-native';
 import { TASK_ROW_SHAPE, TASK_ROW_TEXT } from '@heyta/design-system';
+import { CheckCircle2 } from 'lucide';
+import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
+import type { CategoryColorToken } from '../categories/model.js';
 import { resolveTaskRowDensity, type TaskRowDensity } from './density.js';
 import type { TaskRow as TaskRowModel } from './model.js';
 import { priorityColorToken } from './priority-color.js';
@@ -142,6 +145,17 @@ export interface TaskRowProps {
   readonly selected?: boolean;
   /** 选择态把行首勾选框切换为批量选择控件。 */
   readonly selectionMode?: boolean;
+  /**
+   * 行首那枚「清单图标」该用什么颜色（**产品拍板：只有清单图标着色**，2026-11-08）。
+   *
+   * 🔴 **缺席 = 关**，而"关"是**不渲染那个节点**，不是 `opacity: 0`、也不是透明色。
+   * 判据（`packages/ui/tests/task-row-icon-color.spec.ts`）：不传 ⇒ 树里没有那枚节点。
+   *
+   * 为什么是宿主给**颜色**而不是给清单/标签：
+   * 共享层不查实体表（与 `EmptyState` 同一条边界：不拖 store、不拖 i18n）。
+   * 宿主按「按清单 / 按标签 / 关」三态解析好，这里只负责画或不画。
+   */
+  readonly iconColorToken?: CategoryColorToken | undefined;
 }
 
 export function TaskRow({
@@ -158,6 +172,7 @@ export function TaskRow({
   active = false,
   selected = false,
   selectionMode = false,
+  iconColorToken,
 }: TaskRowProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -202,6 +217,14 @@ export function TaskRow({
          * （实测计算样式 `flex-shrink: 0`，见计划 §2.1 结论 1）。加上去是一行
          * **不起作用的修法** —— 它不解决任何问题，还会让人以为解决了。
          */
+        // 行首那枚「清单图标」的槽位。尺寸与勾选框同一档（`checkboxSize`），
+        // 这样"关"与"开"不会让整行高度跳一下 —— 那个跳变本身就是一种视觉噪音。
+        iconSlot: {
+          width: tokens[TASK_ROW_SHAPE.checkboxSize],
+          height: tokens[TASK_ROW_SHAPE.checkboxSize],
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
         checkboxHit: {
           width: tokens[TASK_ROW_SHAPE.touchTarget],
           height: tokens[TASK_ROW_SHAPE.touchTarget],
@@ -372,6 +395,23 @@ export function TaskRow({
           {(selectionMode ? selected : row.done) ? <Text style={[text[TASK_ROW_TEXT.check], styles.tick]}>✓</Text> : null}
         </View>
       </Pressable>
+
+      {/*
+        🔴 行首的「清单图标」——**产品拍板：着色只发生在这里**（不做行左侧色条、不做整行淡底）。
+        `iconColorToken` 缺席时**整枚节点不渲染**（不是 opacity:0、不是透明色）：
+        「关」这一档的判据就是"树里没有它"，因为把元素画成透明仍然会被读屏念到、
+        并且仍然占住布局。
+      */}
+      {iconColorToken === undefined ? null : (
+        <View style={styles.iconSlot} testID={`task-row-icon-${row.id}`} aria-hidden>
+          <HeytaIcon
+            data={CheckCircle2}
+            size={tokens['icon.xs']}
+            color={tokens[iconColorToken]}
+            strokeWidth={2}
+          />
+        </View>
+      )}
 
       {/*
         🔴 没有 `onOpenTask` 时，行体**不是**可点的。

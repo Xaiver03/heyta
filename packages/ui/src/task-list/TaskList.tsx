@@ -66,6 +66,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { TASK_ROW_SHAPE } from '@heyta/design-system';
+import type { CategoryColorToken } from '../categories/model.js';
 import type { Task, TaskSortKey } from '@heyta/domain';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import type { TaskRowDensity } from './density.js';
@@ -118,6 +119,14 @@ interface TaskListSharedProps {
   readonly renderMeta?: (row: TaskRowModel) => React.ReactNode;
   /** 行尾的动作（比如删除按钮）。 */
   readonly renderTrailing?: (row: TaskRowModel) => React.ReactNode;
+  /**
+   * 行首那枚「清单图标」的颜色（产品拍板：**只有清单图标着色**）。
+   *
+   * 🔴 **不传 = 关**，而"关"是**不渲染那枚节点**（判据在 `TaskRow` 那一侧）。
+   * 传的是**函数**而不是颜色表：共享层不查实体表，宿主按三态
+   * （按清单 / 按标签 / 关）自己解析好 —— 与 `renderMeta` 同一条边界。
+   */
+  readonly iconColorOf?: (row: TaskRowModel) => CategoryColorToken | undefined;
   /** 正在处理中的行 id —— 用于置灰该行，避免连点发出两条变更。 */
   readonly busyTaskId?: string | null;
   /**
@@ -245,6 +254,7 @@ export function TaskList<TMeta = undefined>({
   testID,
   density,
   renderRowWrapper,
+  iconColorOf,
 }: TaskListProps<TMeta>): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -326,12 +336,13 @@ export function TaskList<TMeta = undefined>({
           {...(labels === undefined ? {} : { labels })}
           {...(renderMeta === undefined ? {} : { renderMeta })}
           {...(renderTrailing === undefined ? {} : { renderTrailing })}
+          {...(iconColorOf === undefined ? {} : { iconColorToken: iconColorOf(row) })}
         />
       );
       // 省略插槽 ⇒ 原样返回那一枚行（移动端/四象限的行为逐字节不变）。
       return renderRowWrapper === undefined ? node : <>{renderRowWrapper(row, node)}</>;
     },
-    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density, selectedTaskIds, selectionMode, renderRowWrapper],
+    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density, selectedTaskIds, selectionMode, renderRowWrapper, iconColorOf],
   );
 
   const keyExtractor = useCallback((item: Item) => item.key, []);

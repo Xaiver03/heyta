@@ -51,6 +51,7 @@ grep -rnoE "'heyta\.[A-Za-z0-9._]+'" apps/web/src apps/mobile/src packages/*/src
 | 键 | 写在哪 | 谁读 | 备注 |
 |---|---|---|---|
 | `heyta.theme` | `apps/web/src/lib/theme.ts` | `App.tsx` 的 `data-theme` | **显式**明暗选择（`light` / `dark`）。R13b 起三态：**「跟随系统」= 删掉这个键**（与"从没选过"同形），不存 `system` |
+| `heyta.rowColor` | `apps/web/src/features/tasks/row-color-pref.ts` | `App.tsx` 的 `iconColorOf` | 行着色三态（`project` / `tag` / `off`）。产品拍板：**只有清单图标着色**（不做色条、不做淡底）；`off` = **不渲染那枚节点**（不是 opacity:0）。**零 op**：改它只写本机 |
 | `heyta.themePreset` | `apps/web/src/lib/theme.ts` | `App.tsx` 的 `data-theme-preset` | R13b 表面色系预设（`warm` / `mist`）。`default` 不存键、也不写属性 —— 基准那套 token 一个像素都不变 |
 | `heyta.locale` | `apps/web/src/lib/locale.ts:30` | i18n provider | 界面语言 |
 | `heyta.dueDisplay` | `apps/web/src/features/tasks/due-display-pref.ts:18` | 任务行 / 面单的截止显示 | 截止时间的**显示格式**（不是日期值） |

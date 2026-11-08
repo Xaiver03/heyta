@@ -255,6 +255,12 @@ import { onEngineChange, readRecentOps } from './lib/oplog.js';
 import { useSelectionKeyboardCursor } from './lib/keyboard-cursor.js';
 import { pruneSelectionFromEntities, selection, useSelected } from './lib/selection.js';
 import {
+  loadRowColorMode,
+  saveRowColorMode,
+  type RowColorMode,
+} from './features/tasks/row-color-pref.js';
+import { rowIconColorToken } from './features/tasks/row-color.js';
+import {
   applyTheme,
   applyThemePreset,
   rememberThemeMode,
@@ -443,6 +449,11 @@ export function App(): React.JSX.Element {
    */
   const [themeMode, setThemeMode] = useState<ThemeMode>(resolveInitialThemeMode);
   const [themePreset, setThemePreset] = useState<ThemePreset>(resolveInitialThemePreset);
+  /**
+   * 行着色三态（**只有清单图标着色**，产品拍板 2026-11-08）。
+   * 设备属性（ADR-0085）：写本机、**零 op** —— 改它不产生任何一条 op。
+   */
+  const [rowColorMode, setRowColorMode] = useState<RowColorMode>(loadRowColorMode);
   const store = useTaskStore();
   const projects = useProjectStore();
   /**
@@ -1658,6 +1669,25 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     applyThemePreset(themePreset);
   }, [themePreset]);
+
+  /**
+   * 行首那枚「清单图标」的颜色（产品拍板：**只有清单图标着色**）。
+   *
+   * 🔴 三档的解析在 `features/tasks/row-color.ts`，这里只把两张**实体表**递进去：
+   * 清单表来自 `useProjectStore`，标签表**必须含墓碑**（解析别名要它，
+   * 见 `packages/domain/src/tags.ts` 文件头 —— 用存活表会让"合并之后标签色没了"，
+   * 而它不报错）。
+   *
+   * `off` 档返回 `undefined` ⇒ 共享层**不渲染**那枚节点（这就是"关"）。
+   */
+  const rowIconColorOf = useMemo(() => {
+    if (rowColorMode === 'off') return undefined;
+    const projectById: Record<string, (typeof projects.projects)[number]> = {};
+    for (const project of projects.projects) projectById[project.id] = project;
+    const tagById = store.entities.tags;
+    return (row: Parameters<typeof rowIconColorToken>[0]): ReturnType<typeof rowIconColorToken> =>
+      rowIconColorToken(row, rowColorMode, { projects: projectById, tags: tagById });
+  }, [rowColorMode, projects.projects, store.entities.tags]);
 
   /**
    * 🔴 **同一套开关也要交给共享层**（`packages/ui` 的 RN 组件不吃 CSS 变量）。
@@ -3362,6 +3392,7 @@ export function App(): React.JSX.Element {
                 labels={taskRowLabels}
                 renderMeta={renderTaskMeta}
                 renderTrailing={renderTaskTrailing}
+                {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })}
                 testID="task-list"
               />
               </ManualSortWrapper>
@@ -3441,6 +3472,7 @@ export function App(): React.JSX.Element {
                           labels={taskRowLabels}
                           renderMeta={renderTaskMeta}
                           renderTrailing={renderTaskTrailing}
+                          {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })}
                           testID={`task-list-${key}`}
                         />
                         </ManualSortWrapper>
@@ -4002,6 +4034,39 @@ export function App(): React.JSX.Element {
                     >
                       <span className={`ht-settings__preset-swatch ht-settings__preset-swatch--${preset}`} aria-hidden="true" />
                       <span>{t(`web.settings.display.themePreset.${preset}` as const)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/*
+                行着色三态（**只有清单图标着色**，产品拍板 2026-11-08）。
+                🔴 第三档「关」是**不渲染那枚图标节点**，不是把它画成透明 ——
+                判据在 `packages/ui/tests/task-row-icon-color.spec.ts`。
+              */}
+              <div className="ht-settings__preference-row">
+                <h3 className="ht-settings__h3 ht-type-row-title">
+                  {t('web.settings.display.rowColorTitle')}
+                </h3>
+                <div
+                  className="ht-settings__preset-grid"
+                  role="radiogroup"
+                  aria-label={t('web.settings.display.rowColorTitle')}
+                >
+                  {(['project', 'tag', 'off'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={rowColorMode === mode}
+                      className="ht-settings__preset-option"
+                      data-testid={`row-color-${mode}`}
+                      onClick={() => {
+                        // 只有这一处记账（与主题开关同一条纪律：启动时那次不写盘）。
+                        saveRowColorMode(mode);
+                        setRowColorMode(mode);
+                      }}
+                    >
+                      <span>{t(`web.settings.display.rowColor.${mode}` as const)}</span>
                     </button>
                   ))}
                 </div>
