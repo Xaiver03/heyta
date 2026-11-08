@@ -13,6 +13,7 @@
  */
 
 import { OpLogEngine, type MaterializedState, type OpIntent, type CheckedDispatchBuilder } from '@heyta/op-log';
+import type { HistoryEntry, HistoryState, UndoOutcome } from '@heyta/op-log';
 import {
   createOpLogWirePort,
   createWorkerOpLogSession,
@@ -652,6 +653,108 @@ export async function dispatchChecked<T>(build: CheckedDispatchBuilder<T>): Prom
 export async function applyRemoteOps(ops: Operation<string>[]): Promise<void> {
   await requireEngine().applyRemote(ops);
   notify();
+}
+
+/* ───────────────────── R19 撤销：⌘Z 必须活过刷新 ───────────────────── */
+
+/**
+ * 撤销栈的会话快照（`sessionStorage`）。
+ *
+ * ## 为什么是 `sessionStorage` 而不是 `localStorage`
+ *
+ * 撤销是**这一次会话的便利**，不是审计日志（`HISTORY_LIMIT` 的注释也这么写）。
+ * 放进 `localStorage` 会让"昨天那次编辑"在明天还能撤 —— 那不是用户按 ⌘Z 的意思，
+ * 而反向 op 打的是**今天**的库。`sessionStorage` 天然按标签页隔离、关窗即清，
+ * 形状与"会话内"这个语义对得上。
+ *
+ * ## 为什么存得下
+ *
+ * 每条只有 `{opId, intent, inverse, timestamp}`，全是普通对象；上限 100 条，
+ * 一条任务改动的 JSON 约几百字节 ⇒ 单次快照远低于 5 MB 配额。
+ * 配额溢出/隐私模式时**静默降级为"刷新后不可撤"**（try/catch）——
+ * 丢掉撤销历史比让整个应用崩掉好。
+ */
+const HISTORY_SESSION_KEY = 'heyta.undo-history.v1';
+
+/** 引擎不持有 dbName，快照必须自己绑库：换库后旧栈一律作废。 */
+type HistorySnapshot = {
+  readonly dbName: string;
+  readonly undo: HistoryEntry[];
+  readonly redo: HistoryEntry[];
+};
+
+function readSnapshot(): HistorySnapshot | undefined {
+  try {
+    const raw = globalThis.sessionStorage?.getItem(HISTORY_SESSION_KEY);
+    if (raw === null || raw === undefined) return undefined;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return undefined;
+    const snap = parsed as Partial<HistorySnapshot>;
+    if (typeof snap.dbName !== 'string' || !Array.isArray(snap.undo) || !Array.isArray(snap.redo)) {
+      return undefined;
+    }
+    return { dbName: snap.dbName, undo: snap.undo, redo: snap.redo };
+  } catch {
+    // 旧版本写的形状 / 配额错 / 隐私模式没有 sessionStorage ⇒ 当作"没有历史"。
+    return undefined;
+  }
+}
+
+/** 把当前栈写回会话。**每次撤销/重做之后都要调** —— 否则刷新后栈停在旧位置。 */
+export function persistHistory(dbName = 'heyta'): void {
+  if (engine === undefined) return;
+  try {
+    const { undo, redo } = engine.exportHistory();
+    const snap: HistorySnapshot = { dbName, undo, redo };
+    globalThis.sessionStorage?.setItem(HISTORY_SESSION_KEY, JSON.stringify(snap));
+  } catch {
+    /* 见上：降级为"刷新后不可撤"，不影响本次会话。 */
+  }
+}
+
+/**
+ * 初始化之后把会话里的栈装回引擎。
+ *
+ * 🔴 **`dbName` 不匹配就不装** —— 换库（切账号、销毁重建）之后旧栈里的反向 op
+ * 指向的是另一个库的实体，装回去只会得到一串 `stale`，而用户会以为"撤销坏了"。
+ */
+export function restoreHistoryFromSession(dbName = 'heyta'): void {
+  const snap = readSnapshot();
+  if (snap === undefined) return;
+  if (snap.dbName !== dbName) {
+    clearPersistedHistory();
+    return;
+  }
+  requireEngine().restoreHistory(snap);
+}
+
+export function clearPersistedHistory(): void {
+  try {
+    globalThis.sessionStorage?.removeItem(HISTORY_SESSION_KEY);
+  } catch {
+    /* 没有 sessionStorage 就没有要清的东西。 */
+  }
+}
+
+/** 撤销最近一次写入，并把结果栈写回会话。 */
+export async function undoLast(): Promise<UndoOutcome> {
+  const outcome = await requireEngine().undo();
+  persistHistory();
+  notify();
+  return outcome;
+}
+
+/** 重做最近一次被撤销的写入。 */
+export async function redoLast(): Promise<UndoOutcome> {
+  const outcome = await requireEngine().redo();
+  persistHistory();
+  notify();
+  return outcome;
+}
+
+/** ⌘Z 是否可用（按钮与快捷键共用同一个读数）。 */
+export function currentHistoryState(): HistoryState {
+  return requireEngine().historyState();
 }
 
 /**

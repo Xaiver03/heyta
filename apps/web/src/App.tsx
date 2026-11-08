@@ -251,7 +251,9 @@ import { FocusDetailPane } from './features/focus/FocusDetailPane.js';
 import { FocusTimer } from './features/focus/FocusTimer.js';
 import { TrashView } from './features/trash/TrashView.js';
 import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
-import { onEngineChange, readRecentOps } from './lib/oplog.js';
+import { onEngineChange, readRecentOps, redoLast, undoLast } from './lib/oplog.js';
+import { historyNoticeFor } from './lib/feedback/history-notice.js';
+import { isEditableTarget } from './lib/editable-target.js';
 import { useSelectionKeyboardCursor } from './lib/keyboard-cursor.js';
 import { pruneSelectionFromEntities, selection, useSelected } from './lib/selection.js';
 import {
@@ -622,6 +624,14 @@ export function App(): React.JSX.Element {
   );
   const [bulkError, setBulkError] = useState<string | undefined>(undefined);
   /**
+   * ⌘Z / ⇧⌘Z 没做成时那一句（R19）。
+   *
+   * 只放 **key**，不放翻译好的字符串：语言一换它要跟着换，而
+   * `historyNoticeFor()` 已经决定了"这一档该说哪句/什么都不说"。
+   * 成功与空栈都不会进这里（见 `lib/feedback/history-notice.ts` 的三条产品决定）。
+   */
+  const [historyNotice, setHistoryNotice] = useState<MessageKey | undefined>(undefined);
+  /**
    * 删除之后那一条**可撤销回执**（全局 UX 线 P3）。
    *
    * 🔴 时长、能不能暂停、失败留不留 —— 都不在这一格，归 `@heyta/ui` 的
@@ -683,6 +693,68 @@ export function App(): React.JSX.Element {
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [bulkSelecting, clearBulkSelection]);
+
+  /**
+   * ⌘Z / ⇧⌘Z：撤销与重做（R19）。
+   *
+   * ## 为什么这件事值得做
+   *
+   * 撤销 = 反向 op，是 op-log 架构**免费送**的能力（引擎早就有 `undo()`），
+   * 而 web 壳此前只把它做成"删除后 5 秒回执"。用户按 ⌘Z 没有任何反应 ——
+   * 一个到手的能力只送了一半。
+   *
+   * ## 三条约束（每一条都是"不做就会坏"的那种）
+   *
+   * 1. **挂捕获阶段**（§7 第 80 条）：RNW 输入框在 keydown 上无条件
+   *    `stopPropagation()`，挂冒泡阶段的话这条快捷键**从来按不通**，而单测全绿。
+   * 2. **在可编辑目标里让路**：输入框里的 ⌘Z 是**文本撤销**，抢过来会把用户
+   *    刚打的字整段撤掉（而浏览器原生撤销栈也一起乱了）。判据是
+   *    `isEditableTarget()`，不是"焦点在不在 App 里"。
+   * 3. **成功不弹、空栈不弹**（见 `history-notice.ts`）：这一条决定的是
+   *    用户会不会觉得"按了一下弹个东西"很烦。
+   *
+   * ⚠️ `preventDefault()` 只在**真的要处理时**调：空栈时也不吞掉事件，
+   *    否则输入框之外的浏览器默认行为（比如某些平台的"重开标签页撤销"）会被莫名拦掉。
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // ⌘Z（macOS）/ Ctrl+Z（Windows·Linux）。⇧ 变体是重做，也收 ⌘Y。
+      const modifier = event.metaKey || event.ctrlKey;
+      if (!modifier || event.altKey) return;
+      const key = event.key.toLowerCase();
+      const isUndo = key === 'z' && !event.shiftKey;
+      const isRedo = (key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey);
+      if (!isUndo && !isRedo) return;
+      if (isEditableTarget(event.target)) return;
+
+      event.preventDefault();
+      const run = isRedo ? redoLast : undoLast;
+      void run()
+        .then((outcome) => {
+          setHistoryNotice(historyNoticeFor(outcome));
+        })
+        .catch(() => {
+          /**
+           * 引擎没就绪 / 存储写不进去 —— **保持沉默**。
+           *
+           * 现有词表没有一句对得上这个症状：`skip*` 那六句说的是"这一类本来就不能撤"，
+           * 而这里是"能撤、但这次没写进去"。借一句贴上去是**说错话**，比不说更糟
+           * （同 `TaskActionFailureCode` 的取舍：上游分不出原因时，界面不要假装分出来了）。
+           *
+           * 真要给它配文案，得先在引擎侧把这几种失败分开 —— 那是另一件事。
+           */
+        });
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, []);
+
+  /** 那一条失败说明自己消失（4s），不需要用户手动关。 */
+  useEffect(() => {
+    if (historyNotice === undefined) return;
+    const timer = window.setTimeout(() => { setHistoryNotice(undefined); }, 4000);
+    return () => { window.clearTimeout(timer); };
+  }, [historyNotice]);
 
   const runBulkAction = useCallback(
     async (kind: 'complete' | 'delete' | 'move', projectId?: string) => {
@@ -3015,6 +3087,16 @@ export function App(): React.JSX.Element {
             ) : null}
             {bulkError === undefined ? null : (
               <span className="ht-settings__danger" role="alert">{t('web.shell.bulk.error', { message: bulkError })}</span>
+            )}
+            {/*
+              ⌘Z 没做成的那一句（R19）。**只有失败才出现**，4 秒自己消失。
+              用 `role="status"` 而不是 `alert`：它是"这一步没生效"的信息，
+              不是在打断用户（`alert` 会强读，适合"已经出事了"那一档）。
+            */}
+            {historyNotice === undefined ? null : (
+              <span className="ht-settings__danger" role="status" data-testid="history-notice">
+                {t(historyNotice)}
+              </span>
             )}
             {undoAction === undefined ? null : (
               <UndoReceipt

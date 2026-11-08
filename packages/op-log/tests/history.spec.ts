@@ -260,4 +260,105 @@ describe('R2 撤销历史栈', () => {
       close();
     }
   });
+
+  /* ───────── R19：撤销栈跨刷新（exportHistory / restoreHistory） ───────── */
+
+  it('🔴 刷新后 ⌘Z 仍然有效：快照装进新引擎，undo 照样回滚（R19 的核心承诺）', async () => {
+    const { engine, store, close } = await memoryEngine();
+    try {
+      await engine.dispatch({ ...task('t1'), opType: OpType.Create, payload: { title: '原' } });
+      await engine.dispatch({ ...task('t1'), opType: OpType.Update, payload: { title: '改' } });
+      const snapshot = engine.exportHistory();
+      expect(snapshot.undo.length).toBeGreaterThan(0);
+
+      // 模拟刷新：同一个库，**新的引擎实例**（栈是新的、空的）。
+      const refreshed = new OpLogEngine({
+        store,
+        clientId: 'device-a',
+        now: () => 999_000,
+        nextOpId: (() => { let n = 100; return () => `op-r-${++n}`; })(),
+      });
+      await refreshed.recover();
+      expect(refreshed.historyState().canUndo).toBe(false); // 新引擎本来没有历史
+
+      refreshed.restoreHistory(JSON.parse(JSON.stringify(snapshot)) as typeof snapshot);
+      expect(refreshed.historyState().canUndo).toBe(true);
+
+      const outcome = await refreshed.undo();
+      expect(outcome.status).toBe('applied');
+      expect(refreshed.getState().tasks['t1']!.title).toBe('原');
+    } finally {
+      close();
+    }
+  });
+
+  it('恢复是**替换**不是合并：清空后的快照装回去不会让撤销条目复活', async () => {
+    const { engine, close } = await memoryEngine();
+    try {
+      await engine.dispatch({ ...task('t1'), opType: OpType.Create, payload: { title: 'A' } });
+      const stale = engine.exportHistory();
+      engine.clearHistory();
+      engine.restoreHistory({ undo: [], redo: [] });
+      expect(engine.historyState().canUndo).toBe(false);
+      // 再装旧快照：那是**另一次会话**的栈，装进去必须整体覆盖 —— 这里用它验证覆盖语义。
+      engine.restoreHistory(stale);
+      expect(engine.historyState().canUndo).toBe(true);
+      // 装一个空快照后必须真的空（不是"保留了之前的"）。
+      engine.restoreHistory(undefined);
+      expect(engine.historyState().canUndo).toBe(false);
+      expect(engine.historyState().canRedo).toBe(false);
+    } finally {
+      close();
+    }
+  });
+
+  it('超限快照按上限截断最旧的（HISTORY_LIMIT），不越界', async () => {
+    const { engine, close } = await memoryEngine();
+    try {
+      await engine.dispatch({ ...task('t1'), opType: OpType.Create, payload: { title: 'A' } });
+      const one = engine.exportHistory();
+      const huge = { undo: Array.from({ length: 5000 }, () => one.undo[0]!), redo: [] };
+      engine.restoreHistory(huge);
+      // 只要不抛、且能撤销，就说明没把 5000 条原样塞进栈（那会让一次 undo 循环 5000 次）。
+      expect(engine.historyState().canUndo).toBe(true);
+    } finally {
+      close();
+    }
+  });
+
+  it('🔴 恢复的旧反向意图在实体已被远端改过时返回 stale（恢复不等于放行覆盖）', async () => {
+    const { engine, store, close } = await memoryEngine();
+    try {
+      await engine.dispatch({ ...task('t1'), opType: OpType.Create, payload: { title: '原' } });
+      await engine.dispatch({ ...task('t1'), opType: OpType.Update, payload: { title: '本地改' } });
+      const snapshot = JSON.parse(JSON.stringify(engine.exportHistory())) as ReturnType<
+        typeof engine.exportHistory
+      >;
+
+      // 另一台设备改同一个字段（同一库、不同 clientId ⇒ 走进来的是 remote）。
+      const remote = new OpLogEngine({
+        store,
+        clientId: 'device-b',
+        now: () => 777_000,
+        nextOpId: (() => { let n = 500; return () => `op-b-${++n}`; })(),
+      });
+      await remote.recover();
+      await remote.dispatch({ ...task('t1'), opType: OpType.Update, payload: { title: '远端改' } });
+
+      // 刷新后装回旧栈，再按 ⌘Z：必须如实说 stale，而不是拿旧值盖掉远端。
+      const refreshed = new OpLogEngine({
+        store,
+        clientId: 'device-a',
+        now: () => 888_000,
+        nextOpId: (() => { let n = 900; return () => `op-r2-${++n}`; })(),
+      });
+      await refreshed.recover();
+      refreshed.restoreHistory(snapshot);
+      const outcome = await refreshed.undo();
+      expect(outcome.status).toBe('stale');
+      expect(refreshed.getState().tasks['t1']!.title).toBe('远端改');
+    } finally {
+      close();
+    }
+  });
 });

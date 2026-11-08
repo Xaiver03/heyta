@@ -61,6 +61,7 @@ import {
   dispatchChecked,
   initOpLog as initShared,
   onEngineChange,
+  restoreHistoryFromSession,
 } from '../../lib/oplog.js';
 
 /**
@@ -229,6 +230,17 @@ interface TaskState {
 export function initOpLog(dbName = 'heyta'): Promise<void> {
   const p = initShared(dbName);
   return p.then(() => {
+    /**
+     * R19：把会话里的撤销栈装回来 —— **⌘Z 必须活过刷新**。
+     *
+     * 放在这里而不是界面里，因为它是"引擎刚就绪"这件事的下一步，与 `entities`
+     * 第一次读数同一时刻。`dbName` 一起传下去，换库后旧栈自动作废
+     * （旧栈里的反向 op 指向另一个库的实体，装回去只会得到一串 `stale`，
+     * 而用户会以为撤销坏了）。
+     *
+     * ⚠️ 必须在 `initShared()` 之后：`restoreHistoryFromSession` 要 `requireEngine()`。
+     */
+    restoreHistoryFromSession(dbName);
     useTaskStore.setState({ entities: currentState(), ready: true });
   });
 }

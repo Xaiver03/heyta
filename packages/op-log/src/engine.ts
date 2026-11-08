@@ -534,6 +534,46 @@ export class OpLogEngine {
     this.redoStack = [];
   }
 
+  /**
+   * 撤销栈的可序列化快照（R19：让 ⌘Z 活过刷新）。
+   *
+   * ## 为什么这件事是安全的
+   *
+   * 栈里每一条只有 `{opId, intent, inverse, timestamp}`，全都是普通对象 ——
+   * `intent` / `inverse` 就是 `dispatchIntent()` 收到的那个结构，本来就是数据。
+   * **它不是审计日志**：`HISTORY_LIMIT` 仍然只保留最近的 100 条。
+   *
+   * ## 为什么恢复不会撤回"别人改过的"东西
+   *
+   * 恢复的条目在真正撤销时仍要过 `checkInverseStillValid`：
+   * 实体没了 / 被别的设备改过 ⇒ 返回 `stale`，条目**留在栈上**并如实告诉用户。
+   * 所以"刷新前算出的反向意图"在刷新后变旧，是**被检查覆盖**的情形，不是漏洞。
+   *
+   * ⚠️ 调用方负责把快照和**同一个库**绑在一起（账号切换、库销毁后不许再恢复）——
+   * 引擎不知道 `dbName`，也不想在这一层猜。
+   */
+  exportHistory(): { undo: HistoryEntry[]; redo: HistoryEntry[] } {
+    return { undo: [...this.undoStack], redo: [...this.redoStack] };
+  }
+
+  /**
+   * 用 {@link exportHistory} 的快照替换当前栈。
+   *
+   * 🔴 只替换，**不合并**：合并会让"刷新前撤销过的条目"在刷新后重新出现，
+   * 用户会看到一条已经被自己撤掉的记录又冒上来。旧快照的识别交给调用方的 schema 版本。
+   */
+  restoreHistory(snapshot: { undo?: HistoryEntry[]; redo?: HistoryEntry[] } | undefined): void {
+    this.undoStack = snapshot?.undo ? [...snapshot.undo] : [];
+    this.redoStack = snapshot?.redo ? [...snapshot.redo] : [];
+    // 恢复的快照可能比上限长（旧版本写的），按上限截掉最旧的。
+    if (this.undoStack.length > HISTORY_LIMIT) {
+      this.undoStack = this.undoStack.slice(-HISTORY_LIMIT);
+    }
+    if (this.redoStack.length > HISTORY_LIMIT) {
+      this.redoStack = this.redoStack.slice(-HISTORY_LIMIT);
+    }
+  }
+
   private async stepHistory(direction: 'undo' | 'redo'): Promise<UndoOutcome> {
     const source = direction === 'undo' ? this.undoStack : this.redoStack;
     const destination = direction === 'undo' ? this.redoStack : this.undoStack;
