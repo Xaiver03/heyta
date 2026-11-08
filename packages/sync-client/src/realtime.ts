@@ -293,7 +293,23 @@ class RealtimeClientImpl implements RealtimeClient {
   connect(): void {
     if (this.disposed || this.running) return;
     this.running = true;
-    void this.run();
+    /**
+     * 🔴 `run()` 的抛错面**目前**已被逐段关死（getToken / buildRealtimeUrl /
+     * new Impl 各有一层 try，sleep 永不 reject），所以今天不会产生未处理拒绝。
+     *
+     * 但 `void this.run()` 的形状本身就是隐患（崩溃审计 2026-11-08 · U04）：
+     * 那几条 try 是**实现细节**，任何一次"顺手简化"都会让一条
+     * `void` 掉的 promise 变成 unhandled rejection —— 在 Node 宿主里等于进程终止。
+     *
+     * 所以这里补一层结构性兜底：即使 `run` 将来违约抛出，也只记录、
+     * 不外抛。`finally` 里已经复位 `running`，所以重连不会被卡死。
+     */
+    void this.run().catch((error: unknown) => {
+      // 这里**不发日志**：本类没有注入 logger（它刻意只依赖注入的几个回调）。
+      // 静默是正确的取舍 —— `run` 的 try 已经在上报真正的失败，
+      // 走到这里说明那是"连兜底都没盖住"的形状，而它不该再有副作用。
+      void error;
+    });
   }
 
   dispose(): void {

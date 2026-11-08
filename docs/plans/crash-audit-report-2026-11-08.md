@@ -541,3 +541,20 @@ timer = setTimeout(() => {
 另：`apps/mobile/src/db/open-host.ts` 的 `resetTaskHostCache` 现在会**先 `close()` 旧宿主**
 再作废它（此前只清模块变量 ⇒ 原生句柄泄漏到进程退出）。
 "32 个屏幕仍拿着死宿主"那一层需要一条宿主换代订阅通道，未做（见 §H.4）。
+
+### H.7 第四批：资源上界与 `void` 收敛（目标项 ② ③）
+
+| # | 缺陷 | 修法 | 判据 |
+|---|---|---|---|
+| 21 | **`JSON.parse` 前无大小上限**：2 GB 的"备份文件"会先读进内存再解析 ⇒ 移动端 OOM 杀进程 | `import-dump.ts` 加 `MAX_EXPORT_BYTES`（64 MiB），**解析之前**判，超限明确 `too-large` | `tests/import-dump-limits.spec.ts` —— 喂一段**非法 JSON** 的超长文本：先解析会报 `invalid-json`，先判大小才报 `too-large`。删掉那句 ⇒ **变红** |
+| 22 | **解析后立刻判 op 条数**：原有的 `counts.totalOps === opLog.length` 自洽校验是在数组**已存在**之后，拦不住分配 | 加 `MAX_EXPORT_OPS`（50 万），在逐 op 循环之前 | 同上 |
+| 23 | **递归规范化会爆栈**：`sortKeysDeep` 无深度上限，`{'a':`×10000 是合法 JSON | 加 `MAX_CANONICAL_DEPTH`（32）；超限时 `canonical()` 返回 `undefined`（不可比较）⇒ 调用方判"不一致"，**失败形状仍是布尔返回值**而不是异常 | ⚠️ **无区分性判据**（见下） |
+| 24 | `inbound-worker-loop` 的裸 `void tick()`：当前 `tick` 内部有 try/catch 罩住一切，但"收窄那个 catch"是合理重构 ⇒ 立刻变 unhandled rejection | 收敛到 `runTick()`（第二层 `.catch` 转 `onError`），启动与 `setInterval` 都走它 | app-host 2116 |
+| 25 | `realtime` 的 `void this.run()`：抛错面目前被逐段 try 关死，但那是**实现细节** | 补 `.catch`（静默 —— 该类刻意不依赖 logger）；`finally` 已复位 `running`，重连不会被卡死 | sync-client 176 |
+
+> 🔴 **第 23 条如实标注"未覆盖"**：试过 5000 层与 20000 层两版判据都**不区分**
+> （前者 Node 栈跑得完；后者 `stateMatchesDocument` 在到达 `canonical()` 之前就因
+> "计数对不上"返回了 false）。要真测它得构造一份**自洽的深层物化状态**，
+> 成本高于这条防御本身。所以**没有写一条假装覆盖它的测试** ——
+> "删掉实现测试还是绿的"比没有测试更糟：它会让人以为有保护。
+> 这条的上限依据是**代码形状**，不是一条会失败的用例。

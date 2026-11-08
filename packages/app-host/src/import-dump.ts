@@ -91,6 +91,8 @@ import {
 export type ExportImportFailureReason =
   /** 不是合法 JSON。 */
   | 'invalid-json'
+  /** 文件太大：在 `JSON.parse` 之前就拒绝（否则移动端会被 OOM 杀掉）。 */
+  | 'too-large'
   /** 是 JSON，但形状不对（缺字段、字段类型不对、op 形状不对）。 */
   | 'invalid-document'
   /** 这不是 heyta 的导出文件。 */
@@ -154,7 +156,53 @@ export interface ImportTarget {
  * 它只做**形状与版本**的校验，不做"内容是否自洽"的判定 ——
  * 那需要重放整个 op-log，属于 {@link restoreIntoEmptyTarget}（也刻意在写之前）。
  */
+/**
+ * 导出文件的大小上界（UTF-16 码元数，约等于字符数）。
+ *
+ * 🔴 **必须在 `JSON.parse` 之前判**（崩溃审计 2026-11-08 · U05）。
+ *
+ * 此前这里是裸 `JSON.parse(text)`：一个 500 MB / 2 GB 的文件会先把整份文本
+ * 读进内存，再让 `JSON.parse` 分配一棵同量级的对象树。在移动端（Hermes 堆更小）
+ * 这不是"抛个异常"，是**进程被 OOM 杀掉** —— 用户点一次"导入备份"就闪退。
+ *
+ * 64 MiB 的取法：一份正常备份（几万条 op）在个位数 MB；64 MiB 给了 10 倍余量，
+ * 又远低于会让 JS 堆吃紧的量级。超限是**明确拒绝**，不是截断。
+ */
+const MAX_EXPORT_BYTES = 64 * 1024 * 1024;
+
+/**
+ * 单个导出文档允许的最大 op 条数。
+ *
+ * 🔴 解析**之后**立刻判，早于任何逐 op 循环（崩溃审计 2026-11-08 · U05）。
+ * `parseExportDocument` 里原先有一条 `counts.totalOps === opLog.length` 的自洽校验，
+ * 但那是在数组**已经存在于内存里**之后才跑的 —— 它拦不住分配，只能事后发现不一致。
+ */
+const MAX_EXPORT_OPS = 500_000;
+
+/**
+ * 规范化/深比较时允许的最大嵌套深度。
+ *
+ * 🔴 递归实现遇上不可信 JSON 会**爆栈**（崩溃审计 2026-11-08 · U05）。
+ * `{'a':`×10000 是完全合法的 JSON，`JSON.parse` 照收，然后 `sortKeysDeep`
+ * 递归一万层 → `RangeError: Maximum call stack size exceeded`。
+ * 而 `sortKeysDeep` 的调用方（`stateMatchesDocument`）在一个**承诺返回结果联合、
+ * 永不 throw** 的函数里 —— 于是这条 RangeError 会从"永不抛"的契约里逃出去。
+ *
+ * 32 层：heyta 的实体载荷最深是"实体 → 字段 → 数组 → 元素对象"（4 层），
+ * 32 给了 8 倍余量，同时远低于任何引擎的栈上限。
+ */
+const MAX_CANONICAL_DEPTH = 32;
+
 export function parseExportDocument(text: string): ParseExportResult {
+  // 🔴 先判大小再解析 —— 见 MAX_EXPORT_BYTES 的注释。
+  if (text.length > MAX_EXPORT_BYTES) {
+    return {
+      ok: false,
+      reason: 'too-large',
+      detail: `文件 ${String(text.length)} 个字符，超过上限 ${String(MAX_EXPORT_BYTES)}`,
+    };
+  }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -167,6 +215,21 @@ export function parseExportDocument(text: string): ParseExportResult {
   }
 
   const raw = parsed as Record<string, unknown>;
+
+  /**
+   * 🔴 op 条数必须**在任何逐 op 循环之前**判（崩溃审计 2026-11-08 · U05）。
+   *
+   * 下面还有一条 `counts.totalOps === opLog.length` 的自洽校验，但那是在数组
+   * 已经存在于内存里之后才跑的 —— 它只能事后发现不一致，拦不住分配本身。
+   */
+  const opsForSize = raw['opLog'];
+  if (Array.isArray(opsForSize) && opsForSize.length > MAX_EXPORT_OPS) {
+    return {
+      ok: false,
+      reason: 'too-large',
+      detail: `op 条数 ${String(opsForSize.length)} 超过上限 ${String(MAX_EXPORT_OPS)}`,
+    };
+  }
 
   if (raw['formatVersion'] !== EXPORT_FORMAT_VERSION) {
     return {
@@ -414,7 +477,13 @@ export function stateMatchesDocument(
     const expected = [...(document.entities[entityType] ?? [])].sort(byRecordId);
     if (actual.length !== expected.length) return false;
     for (let i = 0; i < actual.length; i += 1) {
-      if (canonical(actual[i]) !== canonical(expected[i])) return false;
+      // 🔴 深度超限时 `canonical` 返回 undefined（不是抛）——
+      // 见 `MAX_CANONICAL_DEPTH`。任一侧不可比较就判"不一致"：
+      // 宁可拒绝还原一份深层嵌套的备份，也不让一条 RangeError
+      // 从"返回 boolean、永不 throw"的契约里逃出去。
+      const left = canonical(actual[i]);
+      const right = canonical(expected[i]);
+      if (left === undefined || right === undefined || left !== right) return false;
     }
   }
 
@@ -472,18 +541,47 @@ function isTombstone(record: unknown): boolean {
  * 这里要的是"两个对象是否逐字段相同"的**判据** —— 共用同一个私有函数会把
  * "导出格式"与"导入校验"焊死，而它们本就该能各自演进。
  */
-function canonical(value: unknown): string {
-  return JSON.stringify(sortKeysDeep(value));
+/**
+ * 规范化成可比较的字符串。**深度超限返回 `undefined`，不抛**。
+ *
+ * 理由：调用方 `stateMatchesDocument` 的契约是"返回 boolean、永不 throw"
+ * （`restoreIntoEmptyTarget` 依赖它把结果映射成 `inconsistent-document`）。
+ * 一条裸 `RangeError` 会从那条契约里逃出去，落进 UI 的未处理拒绝里。
+ */
+function canonical(value: unknown): string | undefined {
+  try {
+    return JSON.stringify(sortKeysDeep(value));
+  } catch (error) {
+    if (error instanceof CanonicalTooDeepError) return undefined;
+    // 其它序列化失败（循环引用等）同样归成"不可比较"。
+    return undefined;
+  }
 }
 
-function sortKeysDeep(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortKeysDeep);
+/**
+ * 递归地把对象的键排序（用于"逐字段相同"的判据）。
+ *
+ * 🔴 带**显式深度上限**：不可信 JSON 可以让它递归到爆栈（见
+ * `MAX_CANONICAL_DEPTH`）。超限时抛一个**具名**错误，由调用点转成
+ * `inconsistent-document` —— 而不是让一条裸 `RangeError` 从"永不 throw"的
+ * 契约里逃出去。
+ */
+class CanonicalTooDeepError extends Error {
+  constructor() {
+    super(`待比较的数据嵌套超过 ${String(MAX_CANONICAL_DEPTH)} 层，无法安全比较`);
+    this.name = 'CanonicalTooDeepError';
+  }
+}
+
+function sortKeysDeep(value: unknown, depth = 0): unknown {
+  if (depth > MAX_CANONICAL_DEPTH) throw new CanonicalTooDeepError();
+  if (Array.isArray(value)) return value.map((item) => sortKeysDeep(item, depth + 1));
   if (value === null || typeof value !== 'object') return value;
 
   const source = value as Record<string, unknown>;
   const sorted: Record<string, unknown> = {};
   for (const key of Object.keys(source).sort()) {
-    sorted[key] = sortKeysDeep(source[key]);
+    sorted[key] = sortKeysDeep(source[key], depth + 1);
   }
   return sorted;
 }
