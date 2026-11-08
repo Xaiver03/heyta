@@ -254,4 +254,61 @@ describe('第二个轴：钥匙放在哪（ADR-0080 §5.5）', () => {
     expect(hint).toContain('不改变');
     expect(hint).toContain('谁能读');
   });
+
+  /* ───────── R15：真实取舍必须在设置页说出来（不藏、也不劝） ───────── */
+
+  it('🔴 两种模式都说出「开加密 ⇒ 托管 AI 用不了」这条真实取舍，且**各说各的**', () => {
+    /**
+     * 🔴 为什么必须断言"两句话不同"：
+     * 第一版只断言两边都含 `托管 AI` —— 而 `tradeoffOn` 自己也含这三个字，
+     * 于是把三元的两支都写成 `tradeoffOn`（= 加密关着却显示"用不了"），
+     * **测试照样全绿**。实测过：那条变异没红，说明这一格根本没被钉住。
+     * 现在两支各有一个**只在那一支出现**的片段：关=「现在托管」/ 开=「开启后」。
+     * ⚠️ 别用「用不了」当判据 —— `tradeoffOff` 里也有这四个字（"开启加密后它就用不了"），
+     * 拿它断言等于没断言。这是第二次踩同一个坑（第一次是「托管 AI」）。
+     */
+    mount({ mode: 'plain' });
+    const plain = q('encryption-mode-tradeoff')?.textContent ?? '';
+    expect(plain).toContain('现在托管');
+
+    act(() => {
+      root.render(
+        <I18nProvider locale="zh-CN">
+          <EncryptionModeSection mode="e2ee" onDisable={vi.fn()} />
+        </I18nProvider>,
+      );
+    });
+    const e2ee = q('encryption-mode-tradeoff')?.textContent ?? '';
+    expect(e2ee).toContain('开启后');
+    // 第三重：两句不许是同一句（回潮时这一条最先红）
+    expect(plain).not.toBe(e2ee);
+  });
+
+  it('取舍那一行只有一句 + 一个「了解更多」，详细机制归文档中心（J1）', () => {
+    mount({ mode: 'e2ee' });
+    const line = q('encryption-mode-tradeoff');
+    expect(line).not.toBeNull();
+    // 一个链接，且指向帮助中心（不是内部弹窗）
+    const links = line!.querySelectorAll('a');
+    expect(links).toHaveLength(1);
+    expect(links[0]!.getAttribute('href')).toContain('/docs');
+    // 句子里不许出现第二段解释（"换行三次"就是说明文回来了）
+    expect((line!.textContent ?? '').split('。').filter((x) => x.trim() !== '').length).toBeLessThanOrEqual(2);
+  });
+
+  it('🔴 披露句不是劝阻：不出现「为了安全/建议您/请勿」这类劝说词', () => {
+    for (const mode of ['plain', 'e2ee'] as const) {
+      act(() => {
+        root.render(
+          <I18nProvider locale="zh-CN">
+            <EncryptionModeSection mode={mode} onDisable={vi.fn()} />
+          </I18nProvider>,
+        );
+      });
+      const text = q('encryption-mode-tradeoff')?.textContent ?? '';
+      expect(text).not.toContain('为了安全');
+      expect(text).not.toContain('建议您');
+      expect(text).not.toContain('请勿');
+    }
+  });
 });

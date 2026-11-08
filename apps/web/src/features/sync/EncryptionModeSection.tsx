@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useI18n } from '@heyta/i18n';
 
 import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
+import { siteLink } from '../../lib/site-url.js';
 import { FormField } from '../../lib/form/FormField.js';
 import { SettingsInfoTip } from '../settings/SettingsInfoTip.js';
 
@@ -81,6 +82,34 @@ export function EncryptionModeSection({
       <h3 className="ht-settings__h3">{t('web.sync.encryption.title')}</h3>
       <p className="ht-settings__hint" role="status" data-testid="encryption-mode-status">
         {t(mode === 'e2ee' ? 'web.sync.encryption.on' : 'web.sync.encryption.off')}
+      </p>
+
+      {/*
+        R15：**开启/关闭各自动到什么**，一行说完，剩下的去文档中心。
+
+        🔴 为什么必须有这一行：托管 AI 需要读到内容才能代用户处理，所以它与 E2EE
+        **在定义上不能共存**（ADR-0013 / ADR-0054）。这是真实的取舍 ——
+        藏起来等于"买了两个功能只能用一个是骗人"（`product-principles` §1 J1 的另一面：
+        简洁 ≠ 隐瞒）。但它**不是**劝阻：只陈述代价，不写"为了安全建议您…"。
+        按 `hard-constraints` §3.7.2，这一格属于**必须**出现的披露。
+
+        ⚠️ 用 `role="note"` 而不是 status：它不是状态变化，是常驻说明。
+        整段只有一句 + 一个链接 —— 详细机制归 `/docs`（J1 重信息进文档中心）。
+      */}
+      <p className="ht-settings__hint" role="note" data-testid="encryption-mode-tradeoff">
+        {t(
+          mode === 'e2ee'
+            ? 'web.sync.encryption.tradeoffOn'
+            : 'web.sync.encryption.tradeoffOff',
+        )}{' '}
+        <a
+          className="ht-settings__link"
+          href={siteLink('/docs#sync')}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {t('web.sync.encryption.learnMore')}
+        </a>
       </p>
 
       {busy ? (
