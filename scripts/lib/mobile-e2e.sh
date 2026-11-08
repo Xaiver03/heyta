@@ -1679,6 +1679,11 @@ configure_sync_credentials() {
   MINE_XY=""
   local _n=0
   while [ "$_n" -lt 6 ]; do
+    # 🔴 **每一轮都要先 `dump`。** `xy_desc` 读的是 `$UI_XML`（上一次 `dump` 的落盘），
+    #    它自己不抓屏。这一行缺失时的失效形状极难认：文件是上一屏的、
+    #    于是重试 6 次读的是**同一个陈旧文件**，看起来像"标签栏真的没有『我的』"。
+    #    2026-11-08 实测：同一时刻直接 dump，标签栏上 `desc="我的"` 明明在。
+    dump
     MINE_XY=$(xy_desc "我的")
     [ -n "$MINE_XY" ] && break
     sleep 2
