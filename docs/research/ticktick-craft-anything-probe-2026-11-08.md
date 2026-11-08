@@ -280,4 +280,8 @@ otool -l /Applications/TickTick.app/Contents/PlugIns/TickTick.Intents.Extension.
 > 还没查清的是什么、谁能推翻它」——并且不让你把没有证据的话写成结论。**
 
 后者恰好是本仓用**散文纪律**在做的事（口径 / 强中推测 / 推翻台账 / 未核实清单）。
-要不要把它固化成 skill，见下一轮讨论。
+
+**已固化成 skill**（2026-11-09）：`reverse-engineering-teardown`
+（`~/.skill-catalog/personal/reverse-engineering-teardown/`，经 6 个 agent 目录软链共享）。
+本文 §3 的三个契约与 §5 的四条判据是它的主要输入；§4.2 那条 `absent ≠ 缺失` 成了它的
+「读数陷阱」首条。
