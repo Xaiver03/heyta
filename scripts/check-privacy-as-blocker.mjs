@@ -24,8 +24,8 @@
  *
  * | 规则 | 判据（禁写形状） | 为什么它必然是一条否决理由 |
  * |---|---|---|
- * | **R1 隐私否决** | 同一句里同时出现「隐私/加密/E2EE/服务端可读」**和**「不做/禁止/不得/不能/放弃/拒绝」，且**没有**「代价/披露/告知/默认」这类限定词 | 裸的"因为隐私所以不做"就是把约束当禁令 |
- * | **R2 自备方案** | 同一句里同时出现「自己部署/自备/自己配 Key/自带 Key」**和**「方案/默认/就是」 | §3.7 明写"绝对禁止把用户自己部署当 C 端方案" |
+ * | **R1 隐私否决** | **有序三段**：`因为/出于/考虑到` →「隐私/合规/自托管/E2EE/出境」→「不做/放弃/暂不提供」；且同句带功能客体，且**没有**「代价/披露/默认/可选」这类限定词 | 裸的"因为隐私所以不做"就是把约束当禁令。⚠️ `加密/明文/密钥` **刻意不在**隐私侧词表：它们在本仓多指传输与加密工程，算进去会判红正确句子（实测 22 处误报，收窄后 0） |
+ * | **R2 自备方案** | 同一句里同时出现「自己部署/自备/自己配 Key/自带 Key」**和**「当作方案/就是方案/就是默认」 | §3.7 明写"绝对禁止把用户自己部署当 C 端方案" |
  * | **R3 死句清单** | 全仓不得再出现 `从设计上就看不到…明文` 这类已被 ADR-0081 推翻的绝对句 | 它不是判断问题，是**事实已变**（`DEFAULT_SYNC_PAYLOAD_MODE = 'readable'`） |
  *
  * ## 射程（诚实登记，别当成全覆盖）
@@ -39,14 +39,29 @@
  * ## 用法
  *
  * ```
- * node scripts/check-privacy-as-blocker.mjs              # 判一次
- * node scripts/check-privacy-as-blocker.mjs --self-test  # 三条臂，每条都真的能红
+ * node scripts/check-privacy-as-blocker.mjs                 # 判一次
+ * node scripts/check-privacy-as-blocker.mjs --self-test      # 11 条臂，每条都真的能红
+ * node scripts/check-privacy-as-blocker.mjs --root <dir>     # 拿候选树试（变异注入用，不动工作树）
  * ```
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
-const ROOT = process.env.HEYTA_CHECK_ROOT ?? process.cwd();
+/**
+ * 扫描根。三个入口，**同一套判据**（只解析出 ROOT 一处，`check()` 全程只用它）：
+ * · `--root <dir>` 优先（变异注入与夹具：拿一份候选树试，不动工作树）；
+ * · 其次 `HEYTA_CHECK_ROOT`（旧入口，保留以免既有调用点失效）；
+ * · 最后 `cwd`（`pnpm` 与 CI 都从仓库根跑）。
+ *
+ * 🔴 第一版只在文件头写了 `--root`，实现却只认环境变量 —— 于是变异测试
+ * **扫的是真仓库**，输出却读起来像"候选树通过"。那正是本仓最贵的一类假绿：
+ * 探针没对准被测对象（环境陷阱 #191 同族）。已修。
+ */
+const ARGV_ROOT = (() => {
+  const i = process.argv.indexOf('--root');
+  return i >= 0 ? process.argv[i + 1] : undefined;
+})();
+const ROOT = ARGV_ROOT ? resolve(ARGV_ROOT) : (process.env.HEYTA_CHECK_ROOT ?? process.cwd());
 
 /** 扫的目录（相对仓库根）。 */
 const SCOPES = ['docs/agents', 'docs/adr', 'docs/plans'];
@@ -131,7 +146,7 @@ const BYO_SIDE = /自己部署|自备|自己配\s*Key|自带\s*Key|自行提供\
  * R2 的框架词：必须**明说这是方案**。只写「默认是自备」是配置事实（ADR-0006 的供给模式），
  * 不是把自部署推给 C 端 —— 那一格正是 §3.7 允许的「我们托管 + 可选自备」。
  */
-const BYO_FRAME = /就是\s*方案|就是\s*默认|作为\s*方案|当成\s*方案|当\s*方案|属于\s*方案/;
+const BYO_FRAME = /就是\s*方案|就是\s*默认|作为\s*方案|当成\s*方案|当作\s*方案|当\s*方案|属于\s*方案/;
 
 /** R3 死句：ADR-0081 已推翻的绝对句（含它的各种语序变体）。 */
 const DEAD_SENTENCES = [
@@ -151,7 +166,7 @@ const DEAD_SENTENCES = [
  * 把它们判红，等于在惩罚写对的人。规则要求"不许拿隐私当否决理由"，
  * **不是**要求"不许提到隐私"。
  */
-const COUNTER_FRAME = /不是\s*["「『“]?\s*隐私|而非隐私|不因为隐私|不是为了隐私|不是出于隐私/;
+const COUNTER_FRAME = /不是\s*["「『“]?\s*隐私|而非隐私|不因为隐私|不是因为隐私|并非因为隐私|不是为了隐私|不是出于隐私/;
 
 /**
  * 引号区间：`「…」`/`『…』`/`“…”`/`"…"` 里面的内容是在**转述**别人的话。
@@ -287,12 +302,15 @@ export function check(root = ROOT) {
 
       for (let i = 0; i < lines.length; i += 1) {
         const raw = lines[i] ?? '';
+        // 定义节本身就允许出现禁写形状（它在定义"什么不许写"）。
+        // 🔴 顺序要紧：先判定义节、再判行内豁免。反过来的话，§3.7 **讲解**
+        //    `privacy-blocker-ok:` 用法的那一行会被算成一次豁免，
+        //    计数从 2 变成 3 —— 一个纯记账错误，但它会让人以为有人在偷偷加白名单。
+        if (inRanges(i, defRanges)) continue;
         if (raw.includes(OK_MARK)) {
           exempt += 1;
           continue;
         }
-        // 定义节本身就允许出现禁写形状（它在定义"什么不许写"）。
-        if (inRanges(i, defRanges)) continue;
 
         // 🔴 判据只有 `judgeLine` 一份实现，主扫描与自检共用 —— 见它的注释。
         //    R1 / R2 / R3 三条都在里面，不要在这里再抄一遍（抄了就会漂）。
@@ -340,9 +358,9 @@ function selfTest(root) {
 
   // 臂 2：R1 但带"代价"限定词 ⇒ 必须绿（这是允许的写法）
   expectGreen(
-    '臂 2 R1 豁免（写了代价的披露句）',
+    '臂 2 R1 豁免（带代价限定词 ⇒ 绿；去掉"代价"就红）',
     'docs/plans/__selftest.md',
-    '出于隐私考虑，这个功能默认开启，代价是内容以明文存在服务端。\n',
+    '出于隐私考虑这个功能先不开，代价是要多输一次口令。\n',
   );
 
   // 臂 3：R2 自备方案
@@ -383,7 +401,52 @@ function selfTest(root) {
     ].join('\n'),
   );
 
-  console.log('\n【自检】5 条臂 + 2 条阳性对照\n');
+  // 臂 7：**引号豁免** —— 引用那句死句是为了否证它，不是在断言它。
+  // 真实现量：`plans/reverse-learning-to-prd-2026-11.md` 与
+  // `plans/ui-review-fill-zh-timeline.md` 各有一行是「立场原文是"…看不到用户明文"」，
+  // 它们把旧承诺钉在证据表里。判红它们等于惩罚留证据的人。
+  expectGreen(
+    '臂 7 引号豁免（引用旧承诺以便否证它 ⇒ 绿）',
+    'docs/plans/__selftest.md',
+    '立场原文是"服务端从设计上就看不到用户明文"，而实测证明新账号默认 `readable`。\n',
+  );
+
+  // 臂 8：**反对隐私优先**的句子必须绿。这是本规则被**执行**的样子，不是违规。
+  // 真实现量：ADR-0044 §5 与 plans/countdown-anniversary.md 各一句
+  // 「决定性依据不是"隐私优先"，是实测」。
+  expectGreen(
+    '臂 8 反驳式因果（"不是因为隐私而拒绝…而是因为…" ⇒ 绿）',
+    'docs/plans/__selftest.md',
+    '这不是因为隐私而暂不提供跨设备共享，而是 op-log 收不回已发出的副本。\n',
+  );
+
+  // 臂 9：**明文 = 传输工程**，不是隐私立场。放宽词表后必须绿。
+  // 真实现量：ADR-0010 §3「拒绝远端明文 HTTP」、ADR-0080「宁可不同步也不明文上传」、
+  // plans/unified-central-auth.md「补上拒绝明文/带凭据 URL 的反例」。
+  expectGreen(
+    '臂 9 明文 ≠ 隐私立场（"因为明文传输所以拒绝该同步通道" ⇒ 绿）',
+    'docs/plans/__selftest.md',
+    '因为明文传输，所以这个同步通道不提供。\n',
+  );
+
+  // 臂 10：**规则自身的写法必须绿** —— §3.7 原文就是「绝对禁止把用户自己部署模型当作方案」，
+  // 它同时含「自己部署」与「方案」。不豁免它，规则会把自己判红（实测 2 处）。
+  expectGreen(
+    '臂 10 规则自身（"绝对禁止把用户自己部署当作方案" ⇒ 绿）',
+    'docs/plans/__selftest.md',
+    '🔴 绝对禁止把用户自己部署一套模型当作方案；C 端默认就是我们托管。\n',
+  );
+
+  // 臂 11：R3 的引号豁免不能把**真的断言**也放过 —— 这是臂 7 的反向对照。
+  // 没有它就等于：只要句子里出现一对引号，死句就永远安全。那是一条能被绕过的门禁。
+  expectRed(
+    '臂 11 引号不能当免死金牌（引号外的断言仍要红）',
+    'R3',
+    'docs/plans/__selftest.md',
+    '服务端**零改动**：这条口径问的是本机说什么，而服务端从设计上就看不到明文。\n',
+  );
+
+  console.log('\n【自检】6 条真违规臂 + 1 条反向对照 + 4 条豁免臂\n');
   let bad = 0;
   for (const a of arms) {
     if (a.ok) console.log(`  ✅ ${a.name} → 按预期${a.rule === '—' ? '全绿' : `红在 ${a.rule}`}`);
