@@ -88,6 +88,8 @@
 | 2 | 字号 13px | §3.2：需 `TEXT_STYLES` 加语义档 + **删一个现有档**（候选 `xl`）+ 逐屏截图 |
 | 3 | RN preset 轴 | §4.1：给 `resolveHeytaUiTheme()` 加 preset 轴，**不许抄 CSS** |
 | 4 | `label` 与 `text` 同词条（3 处） | 可访问名等于正文，读屏会念两遍 —— 小毛病，已记录 |
+| 5 | **站点文案里同一条过期说法** | `site.docs.privacy.s3p3` / `s4p1` 仍写"只读档不能写、执行档…"（ADR-0082 已删权限档）。它们是**活文案**，有 `check:docs-voice` 等自己的门禁，不能照设置页的办法删 —— 需先读 landing 那侧判据 |
+| 6 | `web.ai.assistant.hint` 已删、`web.ai.chat.hint` 已删（**死词条**：只在 dist 类型声明里，无活消费者） | — |
 
 ## 2. 产品决策参照滴答清单（参照，不是照抄）
 

@@ -2568,7 +2568,6 @@ export const zhCN = {
   'web.ai.assistant.mcpSplit': '这里只管内置助手。「本机 API」下面那些开关管的是外部程序能不能调用工具，两边互不影响。',
   // ── 对话助手界面（W12 / ADR-0045）──────────────────────────────────
   'web.ai.chat.title': '对话助手',
-  'web.ai.chat.hint': '用一句话使唤它：查任务、建任务、改任务。执行档会自动完成低风险写入，高风险改动会先请你确认。',
   'web.ai.chat.tierLabel': '助手权限',
   'web.ai.chat.suggestion.today': '看看今天有什么任务',
   'web.ai.chat.suggestion.today.label': '今天有什么',

@@ -2387,7 +2387,6 @@ export const en = {
   'web.ai.assistant.mcpSplit': 'This covers the built-in assistant only. The switches under On-device API control whether external programs may call tools; the two are independent.',
   // Chat assistant UI (W12 / ADR-0045)
   'web.ai.chat.title': 'Chat assistant',
-  'web.ai.chat.hint': 'Ask it to look things up or make a change. Read-only never writes; Execute mode applies low-risk writes automatically and asks before high-risk changes.',
   'web.ai.chat.tierLabel': 'Assistant access',
   'web.ai.chat.suggestion.today': 'What do I need to do today?',
   'web.ai.chat.suggestion.today.label': 'Today',

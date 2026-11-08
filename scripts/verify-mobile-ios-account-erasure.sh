@@ -612,16 +612,30 @@ fi
 
 open_settings_sheet() {  # 打开设置面并等「服务器地址」输入框进树
   dismiss_keyboard
-  ax "我的" --pressable --scroll-into-view >/dev/null 2>&1
-  ax_press "我的"; sleep 3
-  local r
-  r=$(ax "$SETTINGS_ROW" --pressable --scroll-into-view)
-  if [ "$(jget "$r" visible)" != "True" ]; then
-    bad "「设置」入口滚不进可见区（found=$(jget "$r" found) scrollRc=$(jget "$r" scrollRc)）—— 兜底路径无法继续"
-    return 1
+  # 🔴 **幂等**（2026-11-08）：这个函数会在同一次运行里被调用多次（步骤 2 填凭据、
+  #    步骤 5 换坏令牌、步骤 6 换回真令牌），而上一段可能**还停在设置面里**
+  #    （`sync_now` 现在就是走进设置面按的同步）。
+  #    不判这一下的话，第二次会去「我的」页找「设置」那一行 —— 而它被**设置面盖着**，
+  #    `--scroll-into-view` 报 `element-left-tree`，症状是
+  #    「「设置」入口滚不进可见区」，读起来像入口坏了，实际是"它已经在里面了"。
+  if [ "$(jget "$(ax "关闭" --list --json)" found)" = "True" ]; then
+    # 已经在设置面里：只需确认停在「数据与同步」那一节。
+    if [ "$(jget "$(ax "$SETTINGS_SYNC_GROUP" --pressable --list --json)" found)" = "True" ]; then
+      ax "$SETTINGS_SYNC_GROUP" --pressable --press --json >/dev/null 2>&1
+      sleep 2
+    fi
+  else
+    ax "我的" --pressable --scroll-into-view >/dev/null 2>&1
+    ax_press "我的"; sleep 3
+    local r
+    r=$(ax "$SETTINGS_ROW" --pressable --scroll-into-view)
+    if [ "$(jget "$r" visible)" != "True" ]; then
+      bad "「设置」入口滚不进可见区（found=$(jget "$r" found) scrollRc=$(jget "$r" scrollRc)）—— 兜底路径无法继续"
+      return 1
+    fi
+    ax "$SETTINGS_ROW" --pressable --press --json >/dev/null 2>&1
+    sleep 2.5
   fi
-  ax "$SETTINGS_ROW" --pressable --press --json >/dev/null 2>&1
-  sleep 2.5
   local i
   # 🔴 两跳，不是一跳：2026-11 起移动端设置是**两层**的 ——「设置」打开的是分组总览
   #    （订阅 / 数据与同步 / 提醒与通知 / 外观与语言 / 功能与 AI / 关于与帮助），
