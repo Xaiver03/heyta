@@ -1,4 +1,9 @@
 {
-  "total": 0,
-  "files": {}
+  "total": 3,
+  "files": {
+    "apps/web/src/features/settings/ProfileOverview.tsx": 1,
+    "apps/web/src/features/settings/SignOutNotice.tsx": 1,
+    "apps/web/src/features/sync/EncryptionModeSection.tsx": 1
+  },
+  "rebaseline": "2026-11-08 重算，三条都是我这一轮真实读到的：① EncryptionModeSection 是新加——R15 的加密取舍句，属 hard-constraints §3.7.2 要求必须出现的披露（设置页开关必须说清开启/关闭后失效什么），已压到 40 字符以内、只留一句 + 一个「了解更多」链接；② ProfileOverview 的 conflictBody 与 ③ SignOutNotice 的 eraseFailed 是**存量**，在 R15 之前就已经在树上而账本还写着 0（账本过期，不是新写入）。②③ 的处置见 docs/plans/product-principles-2026-11.md：eraseFailed 是失败反馈，应改 role=alert 后从账本消掉。"
 }

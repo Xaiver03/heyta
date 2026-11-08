@@ -387,26 +387,10 @@ input[type="radio"] {
   font-size: var(--ht-font-size-xs);
 }
 
-/*
- * 设置页的说明句（`SettingsInfoTip` 展开后的正文，以及各分区的 hint）。
- *
- * 🔴 **2026-11-08：14 → 13。** 这是 `--ht-font-size-md` 的**第二个真实角色**
- * （第一个是 `group-label` 分组标题），也是产品负责人「五档要能表达轻重」那条的落地。
- *
- * 为什么是 13 而不是更小/更大：
- * · 14 与正文 16 的比值 1.14 —— 说明句看起来**和正文同级**，于是面板读起来像一份文档。
- *   这与 `row-meta` 2026-11-02 从 14 降到 12 是同一条判据（比值 1.33 才读得出层级）。
- * · 但说明句是**成句的散文**，不是元信息芯片 —— 降到 12 会和 `row-meta`/`caption` 撞角色，
- *   且长句在 12px 下更难读。13 是"比正文低一档、仍可连续阅读"的那一档。
- * · 它落在 12（辅助下限）之上，不触碰 `check:font-size-discipline` 的红线。
- *
- * ⚠️ 只改这一处：任务行的 `row-meta` 仍是 12（那条的判据是"扫读时应该被跳过"，
- * 与"要读得懂的说明"不是同一件事）。两处**不要同步** —— 同步就回到 1.14 的老问题。
- */
 .ht-settings__hint {
   margin: 0;
   color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-md);
+  font-size: var(--ht-font-size-sm);
   line-height: var(--ht-line-height-normal);
 }
 

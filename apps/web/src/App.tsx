@@ -3741,13 +3741,14 @@ export function App(): React.JSX.Element {
                   2026-10-24 之后它也进了 `?`（挂在下面的 `h1` 上）——
                   设置里**一句常驻说明都不留**，这是那条禁令的字面意思。
                 */}
-                {secondaryAccountSurface === 'profile' ? (
-                  <SettingsInfoTip
-                    testId="tip-profile-overview"
-                    label={t('web.profile.overview.title')}
-                    text={t('web.profile.overview.lead')}
-                  />
-                ) : null}
+                {/*
+                  🔴 **2026-11-08 删掉了一枚问号**（J2）：它的正文是
+                  「查看你的身份、近期状态和成长进度。」—— 这不是信息，
+                  是**把这一屏已经摆出来的东西再说一遍**。
+                  J2 归出的第二类靶子：**背景知识 / 复述界面**。
+                  ⚠️ 判断标准是"用户此刻要不要知道"，不是"这句话对不对"：它对，但没用。
+                */}
+                {null}
               </div>
               <button
                 type="button"

@@ -1,6 +1,5 @@
 /** Website content has a single home; this panel only provides browser entry points. */
 import { ICON_SIZE } from '@heyta/design-system';
-import { SettingsInfoTip } from './SettingsInfoTip.js';
 import { ArrowUpRight, BookOpen, ScrollText, Send, Tag } from 'lucide-react';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { isOfficialHostedInstance } from '@heyta/app-host';
@@ -88,13 +87,15 @@ export function HelpPanel(): React.JSX.Element {
           </a>
         ))}
       </div>
+      {/*
+        🔴 **2026-11-08 删掉了一枚问号**（J2）。它原来是这样：
+        可见的那一行写着 `web.about.lead`，而那枚 tip 的 `text` **也是同一条词条**
+        —— 同一个句子在同一个位置渲染两遍，问号点开只是把它再说一次。
+        这是 J2 归出的第一类靶子：**重复**（不是长度、不是"说明文字太多"）。
+        ⚠️ 保留可见那一行：删的是重复的那一份，不是信息本身。
+      */}
       <p className="ht-settings__help-line ht-type-row-meta">
         {t('web.about.lead')}
-        <SettingsInfoTip
-          testId="tip-about"
-          label={t('web.settings.nav.help')}
-          text={t('web.about.lead')}
-        />
       </p>
 
       {/*
