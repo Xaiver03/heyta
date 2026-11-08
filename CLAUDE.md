@@ -12,11 +12,28 @@ agent 会照着过期的那份执行，而且没人知道哪份是对的。
 
 ---
 
+## 🔴 唯一例外：这一条必须在这里再写一遍
+
+**[`AGENTS.md` §0.1](AGENTS.md#01--判做不做的只有用户价值最高优先级先于本文件其余一切)：
+判"做不做"的只有用户价值。隐私、合规、自托管、授权档位、入口预算都是约束，不是设计禁令。**
+
+- 默认形态就是**云端托管、默认公开、默认明文**；自托管是给少数人的**加值通道**，
+  不是所有人的前置条件。
+- 🔴 **绝对禁止**把「让每个 C 端用户自己部署模型 / 自己配 Key」当作方案。
+- 任何"这个功能做不了 / 要加开关 / 要先加密 / 要等合规定论"，理由只落在上面这一侧 ⇒ **结论作废，重来**。
+
+之所以破例复制这一条：它是唯一一条**被反复违反过多次**的规则 —— 写在子文件里不够，
+读不到它的那次恰好就是它被违反的那次。细则（五类被禁的否定理由 + 三条自检）见
+[`docs/agents/hard-constraints.md`](docs/agents/hard-constraints.md) §3.7，门禁 `pnpm check:privacy-as-blocker`。
+
+---
+
 ## 如果你只想快速上手
 
 | 我要… | 去哪 |
 |---|---|
 | 知道这个项目是什么 | [`AGENTS.md` §1](AGENTS.md) |
+| **判断一个功能能不能做（含"隐私不允许"这类理由）** | **[`AGENTS.md` §0.1](AGENTS.md) → [`hard-constraints.md`](docs/agents/hard-constraints.md) §3.7** |
 | 知道某段代码能不能改 | [`AGENTS.md` §2 仓库地图](AGENTS.md) → [`docs/agents/repo-map.md`](docs/agents/repo-map.md) |
 | 引入一个新依赖 | [`docs/agents/hard-constraints.md`](docs/agents/hard-constraints.md) §3.1–3.2（两道门：可维护性 + 许可证） |
 | 改数据库迁移 | [`docs/agents/db-migrations.md`](docs/agents/db-migrations.md) —— **别直接跑 `prisma migrate deploy`** |

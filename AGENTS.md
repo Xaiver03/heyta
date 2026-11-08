@@ -10,6 +10,25 @@
 
 **heyta 还在开发阶段、不可能有用户，所以"会破坏已有安装／老客户端／存量数据"不作为判断依据，但这也**不**等于可以不讲理由 —— 论证仍要指向真问题。**
 
+### 0.1 🔴 判"做不做"的只有用户价值（**最高优先级，先于本文件其余一切**）
+
+**隐私、合规、自托管、授权档位、入口预算，都是约束，不是设计禁令。** 它们决定**怎么做**
+（默认值、怎么标注、披露写什么），**不决定做不做**。
+
+- 默认形态就是**云端托管、默认公开、默认明文**。需要更强的用户走自托管 ——
+  那是对少数人的**加值通道**，不是对所有人的前置条件。
+- 🔴 **绝对禁止**把「让每个 C 端用户自己部署模型 / 自己配 Key」当作方案。C 端默认就是我们托管。
+- 任何"这个功能做不了 / 要加开关 / 要先加密 / 要等合规定论"，理由落在上面这一侧 ⇒ **结论作废，重来**。
+- 约束唯一被允许的效果是让用户**知情**，不是让我们**少做**。
+
+> 产品负责人 2026-11-02（同一个错重复过多次后）：「不要那么把那个用户需求、什么隐私需求
+> 当做什么阻碍产品发展的、阻碍产品需求的、阻碍产品实现的一个因素…… 默认就是走云端托管的，
+> 默认就是公开的，没问题啊。」
+
+**细则（五类被禁的否定理由 + 三条自检 + 允许的写法）在
+[`hard-constraints.md`](docs/agents/hard-constraints.md) §3.7，动手设计任何功能前先读。**
+门禁：`pnpm check:privacy-as-blocker`。
+
 ---
 
 ## 1. 这个项目是什么
@@ -17,7 +36,9 @@
 heyta 是一个**本地优先**的任务管理应用，目标是做一个功能上对标滴答清单、但可以自建/自托管的替代品。
 
 - **本地优先**：数据先落本地，云端只是同步通道，**不是事实源**。
-- **端到端加密**：服务端从设计上就看不到用户明文。
+- **端到端加密是可选能力，不是默认值**：默认 `readable`（服务端可读，我们因此能帮用户找回），
+  用户在设置里显式开启后服务端才只经手密文。🔴 **不要写"服务端从设计上就看不到明文"** ——
+  那是 [ADR-0081](docs/adr/0081-encryption-is-opt-in-not-default.md) 已推翻的说法（见 §0.1）。
 - **同步模型**：op-log（事件溯源），**不是 CRDT**。向量时钟判并发，LWW 加 `clientId` 确定性打破平局。
 
 > 🔴 **本文件是入口与索引，不是全部规则。** 详细规则按**作用域**拆到
@@ -79,7 +100,7 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 | 文件 | 负责什么 | 什么时候读 |
 |---|---|---|
 | [`docs/agents/repo-map.md`](docs/agents/repo-map.md) | **仓库地图**：逐目录内容 + 能不能改 + 各端现状 | 动手前定位代码 |
-| [`docs/agents/hard-constraints.md`](docs/agents/hard-constraints.md) | **硬性约束**：可维护性门槛 / 许可证 / schema / op-log / 宿主边界 | 加依赖、改协议、碰 `apps/*` |
+| [`docs/agents/hard-constraints.md`](docs/agents/hard-constraints.md) | **硬性约束**：可维护性门槛 / 许可证 / schema / op-log / 宿主边界 / **§3.7 隐私与合规不得当设计禁令** | 加依赖、改协议、碰 `apps/*`、**判任何「这个功能能不能做」之前** |
 | [`docs/agents/db-migrations.md`](docs/agents/db-migrations.md) | **数据库迁移纪律**：CONCURRENTLY 形状 / 锁超时 / 校验器 | 任何迁移改动 |
 | [`docs/agents/design-system.md`](docs/agents/design-system.md) | **设计系统**：三条硬规则 / 文字层级 / 对比度 / 常见错 | 写任何 UI |
 | [`docs/agents/overlay-feedback.md`](docs/agents/overlay-feedback.md) | **浮层与反馈**：提需求的四要素 / 危险四档 / 关闭策略表 / 债务账本门禁 | 写任何浮层、确认框、操作回执 |
@@ -89,7 +110,7 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 | [`docs/agents/ux-principles.md`](docs/agents/ux-principles.md) | **界面结构原则（解剖）**：控件高度一档 / 一行一容器 / 动作区常驻 / 配置收起；每条带可判红的判据 | 写任何表单、对话框、设置页 |
 | [`docs/agents/entry-layers.md`](docs/agents/entry-layers.md) | **入口分层**：一个动作该从哪一层出来（全局 / 视图 / 对象 / 字段）+ 六条可判红的放置规则 | 加任何按钮、菜单项、快捷键、设置项之前 |
 | [`docs/agents/environment-traps-index.md`](docs/agents/environment-traps-index.md) | **环境陷阱索引**：号段 → 主题；三条元规则 | 排查"本地过、容器不过" |
-| [`docs/agents/workflow-rules.md`](docs/agents/workflow-rules.md) | **工作流 25 条**：对账 / 安全判据 / 同步语义 / 提醒回执 / iOS 验收纪律 | 做任何实质改动 |
+| [`docs/agents/workflow-rules.md`](docs/agents/workflow-rules.md) | **工作流 26 条**：对账 / 安全判据 / 同步语义 / 提醒回执 / iOS 验收纪律 / **§26 隐私合规不当否决理由** | 做任何实质改动 |
 | [`docs/agents/progress-log.md`](docs/agents/progress-log.md) | **当前进度**：阶段表 / 并行轨道 / 已知边界 | 知道做到哪了、下一步做什么 |
 | [`docs/agents/key-decisions.md`](docs/agents/key-decisions.md) | **已定的关键决策**：ADR 摘要 + 每条的红线 | 改架构、改产品边界前 |
 | [`docs/agents/history-a-2026-10-03.md`](docs/agents/history-a-2026-10-03.md) | **历史交付记录 · 上半**（2026-10-03 倒数纪念日批次二）：逐批交付与判据 | 考古、找"这事以前怎么做的" |
@@ -167,7 +188,7 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 
 ## 6. 工作流（入口）
 
-**25 条工作流纪律的全文在 [`docs/agents/workflow-rules.md`](docs/agents/workflow-rules.md)。**
+**26 条工作流纪律的全文在 [`docs/agents/workflow-rules.md`](docs/agents/workflow-rules.md)。**
 最常被违反的四条先列在这里：
 
 1. **改代码前先读相关的 ADR 与计划**：决策不可逆层（`packages/shared-schema`、线协议、迁移）时尤其。

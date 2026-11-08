@@ -1,5 +1,5 @@
 <!-- 由 heyta/AGENTS.md 按作用域拆分而来（2026-10-12）。内容零删除。
-     本文件是「工作流 25 条」的完整规则（原文 §8 工作流）。返回入口：[`AGENTS.md`](../../AGENTS.md)。
+     本文件是「工作流 26 条」的完整规则（原文 §8 工作流）。返回入口：[`AGENTS.md`](../../AGENTS.md)。
      原始单体文件备份：`AGENTS.md.bak-full-2026-10-12`。 -->
 
 ## 8. 工作流
@@ -31,6 +31,7 @@
 23. **iOS 重启补算必须分开观察 OS 投递与应用回执**：系统 delivered 可能晚于首次启动和首次只读 probe；边界脚本要轮询本轮 occurrence 的 delivered，再重新启动生产 RN 进程执行 reconcile，最后以真 SQLite 的 `firedAt + firedForTriggerAt` 收口。probe 进程不能写业务 op，也不能用 ledger 的 posted/receipts 代替同步事实。
 24. **只读 iOS probe 结束前不能假定生产 App 已重新启动**：probe 为了延迟写快照会暂时保持进程存活；在 delivered 快照后必须先 `simctl terminate` 该 bundle，再显式启动生产 RN，避免 iOS 复用 probe 进程而跳过 startup reconcile。
 25. **iOS AX 按压必须做几何安全检查**：AX 报告 `success` 只代表 HID tap 被设备接受，不代表目标控件收到事件。shim 在发 tap 前必须拒绝屏外坐标和与底部 tab 栏重叠的非 tab 控件，返回 `tap-outside-screen` 或 `tap-blocked-by-tab-bar`；调用方随后必须重新滚动并回读新 bounds。保存、登录、解锁等长表单按钮不得复用滚动前的坐标。`scripts/tools/ios-ax-shim.test.py` 的几何回归必须保持为门禁输入，不能把一次误切 tab 当产品成功。
+26. 🔴 **隐私、合规、自托管不得当功能否决理由**（最高优先级，规则全文在 [`hard-constraints.md`](hard-constraints.md) §3.7）：写任何需求分析、方案、`BLOCKED.md` 条目、"没做到"清单之前先过一遍 —— 结论若是"这个功能做不了 / 要加开关 / 要先加密 / 要等合规定论 / 让用户自己部署"，而理由只有隐私、合规、自托管、授权档位或入口预算，**结论作废**。默认形态是云端托管、默认公开、默认明文；自托管是给少数人的加值通道，不是所有人的前置条件。写"没做到"时，**只允许写工程与外部依赖的事实**（凭据没到位、上游没开放、哪个 commit 未定），**不允许把"涉及隐私所以先不做"写成一条没做到**。判据：`pnpm check:privacy-as-blocker`。
 
 ### 不要擅自做的事
 
