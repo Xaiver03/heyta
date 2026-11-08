@@ -263,13 +263,15 @@ describe('第二个轴：钥匙放在哪（ADR-0080 §5.5）', () => {
      * 第一版只断言两边都含 `托管 AI` —— 而 `tradeoffOn` 自己也含这三个字，
      * 于是把三元的两支都写成 `tradeoffOn`（= 加密关着却显示"用不了"），
      * **测试照样全绿**。实测过：那条变异没红，说明这一格根本没被钉住。
-     * 现在两支各有一个**只在那一支出现**的片段：关=「现在托管」/ 开=「开启后」。
+     * 现在两支各有一个**只在那一支出现**的片段：关=「要读到内容」/ 开=「已不可用」。
+     * ⚠️ 这是第三次调这两个片段 —— 前两次（「托管 AI」「用不了」）都因为两句里都有而失效。
+     * 教训：**判据片段必须只在被测的那一支出现**，而且要随文案一起改。
      * ⚠️ 别用「用不了」当判据 —— `tradeoffOff` 里也有这四个字（"开启加密后它就用不了"），
      * 拿它断言等于没断言。这是第二次踩同一个坑（第一次是「托管 AI」）。
      */
     mount({ mode: 'plain' });
     const plain = q('encryption-mode-tradeoff')?.textContent ?? '';
-    expect(plain).toContain('现在托管');
+    expect(plain).toContain('要读到内容');
 
     act(() => {
       root.render(
@@ -279,7 +281,7 @@ describe('第二个轴：钥匙放在哪（ADR-0080 §5.5）', () => {
       );
     });
     const e2ee = q('encryption-mode-tradeoff')?.textContent ?? '';
-    expect(e2ee).toContain('开启后');
+    expect(e2ee).toContain('已不可用');
     // 第三重：两句不许是同一句（回潮时这一条最先红）
     expect(plain).not.toBe(e2ee);
   });
