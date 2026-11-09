@@ -104,7 +104,13 @@
 ⚠️ 同一事实错误在 `packages/legal/src/documents/personal-info-list.ts` 里还有一份，
 **没动**（对外披露文案走 `check:legal-*`），已登记在 product-principles §1.3 #7。
 
-### ② 字号 13px（目标 2，**被仓库自己的规则挡下**）
+### ② 字号 13px（目标 2，✅ **2026-11-09 已做**；下面是当时被挡下的经过）
+
+> **结论先写**：13px 现在有第二个角色（设置页说明句/读数行，`md`），全局仍是 6 档、
+> `xl` 一个字没动。做法不是"加一档"，而是**先让 `base` 从手写 CSS 退出**（三处标题改吃
+> `ht-type-row-title` / `ht-type-headline`）+ 删掉一条零消费者的死规则（`.ht-settings__cardTitle`）。
+> 读数与截图证据见 [`product-principles §3.2`](product-principles-2026-11.md) 末节。
+
 
 试过一次，三道门禁逐条打回，已全部回退（`9cbcbdcd3`）：
 

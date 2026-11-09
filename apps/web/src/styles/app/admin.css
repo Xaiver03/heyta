@@ -300,8 +300,7 @@
 
 .ht-settings__admin-h4 {
   margin: 0;
-  font-size: var(--ht-font-size-base);
-  font-weight: var(--ht-font-weight-semibold);
+  /* 字号/字重/行高/字距四条整条来自 `.ht-type-headline`（JSX 成对）。 */
 }
 
 .ht-settings__admin-h5 {

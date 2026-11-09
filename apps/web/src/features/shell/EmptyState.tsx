@@ -92,7 +92,8 @@ export function EmptyState({ filter }: { filter: TaskFilter }): React.JSX.Elemen
           <StateIllustration variant={view.illustration} />
         </HeytaUiProvider>
       )}
-      <p className="ht-empty__title">{view.title}</p>
+      {/* 排版四件套整条来自语义档（2026-11-09，见 ai-panels.css 的 `ht-settings__hint` 那条注释）。 */}
+      <p className="ht-empty__title ht-type-row-title">{view.title}</p>
       {/* `hint` 可省略 —— 模型把空串/纯空白归一成 `undefined`，那一行就不画。 */}
       {view.hint === undefined ? null : <p className="ht-empty__hint">{view.hint}</p>}
     </div>

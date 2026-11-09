@@ -368,8 +368,7 @@
 }
 
 .ht-empty__title {
-  font-size: var(--ht-font-size-base);
-  font-weight: var(--ht-font-weight-medium);
+  /* 字号/字重/行高/字距整条来自 `.ht-type-row-title`（JSX 成对）。 */
   color: var(--ht-color-foreground-muted);
 }
 

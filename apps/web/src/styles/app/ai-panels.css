@@ -374,13 +374,6 @@ input[type="radio"] {
   gap: var(--ht-space-1);
 }
 
-.ht-settings__cardTitle {
-  color: var(--ht-color-foreground);
-  font-family: var(--ht-font-sans);
-  font-size: var(--ht-font-size-base);
-  font-weight: var(--ht-font-weight-medium);
-}
-
 .ht-settings__cardNote {
   color: var(--ht-color-foreground-muted);
   font-family: var(--ht-font-sans);
@@ -390,7 +383,19 @@ input[type="radio"] {
 .ht-settings__hint {
   margin: 0;
   color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-sm);
+  /*
+   * 🔴 2026-11-09：`sm`(14) → `md`(13)。这是 13px 的**第二个角色**
+   * （第一个是 `group-label` 分组标题）：设置页的**说明句/读数行**。
+   *
+   * 为什么是它：§3.1 说得很清楚 —— 缺的不是档位，是**角色**。
+   * 这一档句子是"次级正文"（比元信息 `row-meta`/`caption` 的 12 更该读，
+   * 比正文 16 更该退），之前只能借 14（偏大），于是设置页一屏读起来像说明书。
+   *
+   * 腾出这一档的代价：同文件的 `.ht-settings__cardTitle`（`base` 16/medium）
+   * **全仓零消费者**（`grep -rl ht-settings__cardTitle apps/web/src --include=*.tsx` = 0），
+   * 删掉那条死规则后本文件仍是 5 档（2xs/xs/sm/md/lg），全局 6 档不变（xl 未动）。
+   */
+  font-size: var(--ht-font-size-md);
   line-height: var(--ht-line-height-normal);
 }
 

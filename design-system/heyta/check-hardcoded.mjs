@@ -412,8 +412,6 @@ const PAIRED_TYPOGRAPHY_ALLOW = [
   { file: 'apps/web/src/styles/app.css', combo: 'xl+semibold', why: '页标题（AGENTS §5 层级表）：移动 screen-title 是 30/700，不等值' },
   { file: 'apps/web/src/styles/app.css', combo: 'sm+medium', why: '按钮/导航项/Tab 的桌面基准：档位表无 sm 档' },
   { file: 'apps/web/src/styles/app.css', combo: 'sm+semibold', why: '卡片内小标题（sm 级）：档位表无 sm 档' },
-  { file: 'apps/web/src/styles/app.css', combo: 'base+medium', why: '空态标题/卡片标题：档位表无 base+medium（numeric-body 带 tabular 语义不合）' },
-  { file: 'apps/web/src/styles/app.css', combo: 'base+semibold', why: '管理台 h4：与 headline 同值，元素是 CSS 类不是 JSX，暂留' },
   { file: 'apps/web/src/styles/app.css', combo: 'lg+semibold', why: '管理台统计值：语义上是数字档（numeric-display 为 4xl，不等值）' },
   { file: 'apps/web/src/styles/app.css', combo: 'xs+medium', why: 'ht-viewtab：全仓当前零消费者（疑似 IA 重构遗留），迁移无 JSX 可配' },
 ];

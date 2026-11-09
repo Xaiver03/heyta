@@ -32,6 +32,19 @@
  * `data-testid="state-illustration-tasks"` 在其中 —— 这枚 testID **编码了 variant**
  * （`tasks`），换插画就会跟着变。
  *
+ * ## 2026-11-09：黄金里**人工改动一处**（不是重新生成）
+ *
+ * `<p class="ht-empty__title">` → `<p class="ht-empty__title ht-type-row-title">`。
+ * 同一次改动把 `controls.css` 里那条规则的字号/字重两行删掉了（只剩颜色），
+ * 排版四件套整条改由语义档承担 —— 起因是 13px 要在设置页拿第二个角色，
+ * 全局档位上限 6 得先让出一档（`base` 全仓不再出现在手写 CSS 里，三处标题改吃语义档）。
+ *
+ * 🔴 为什么这条改动是**人工**改的：这份黄金的职责是"markup 有没有被顺手换掉"。
+ * 用 `--update` 式重新生成会让它退化成"跑一遍看现在是什么"，那正是文件头反对的做法。
+ * 所以这里是逐字改一处、并在此处写明理由 —— 下一个人看到 diff 能判断这是有意的，
+ * 而不是"有人又把结构换了"。
+ * ⚠️ 字重仍是 500（`row-title` 是 medium）：文件头列的那条"标题字重 500→600"仍然不许发生。
+ *
  * ## 反向臂（这条 spec 会不会红）
  *
  * 把 `shell/EmptyState.tsx` 里 `size: 'page'` 改成 `'card'` ⇒ `view.illustration`
@@ -83,7 +96,7 @@ const goldenHtml = (title: string, hint: string): string =>
   '<img alt="" draggable="false" class="css-accessibilityImage-9pa8cd" src=DATA>' +
   '</div>' +
   '</div>' +
-  `<p class="ht-empty__title">${title}</p>` +
+  `<p class="ht-empty__title ht-type-row-title">${title}</p>` +
   `<p class="ht-empty__hint">${hint}</p>` +
   '</div>';
 
@@ -167,7 +180,7 @@ describe('shell/EmptyState 的黄金 DOM（markup 逐字节不变）', () => {
   it('`.ht-empty` 一族仍然是这一屏的骨架（根节点与两枚 <p>）', async () => {
     const html = await renderHtml(<EmptyState filter={{ kind: 'all' } as never} />);
     expect(html.startsWith('<div class="ht-empty" data-testid="empty-state">')).toBe(true);
-    expect(html).toContain('<p class="ht-empty__title">');
+    expect(html).toContain('<p class="ht-empty__title ht-type-row-title">');
     expect(html).toContain('<p class="ht-empty__hint">');
   });
 });

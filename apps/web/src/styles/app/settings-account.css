@@ -33,8 +33,7 @@
 .ht-settings__account-gate-title {
   margin: 0 0 var(--ht-space-1);
   color: var(--ht-color-foreground);
-  font-size: var(--ht-font-size-base);
-  font-weight: var(--ht-font-weight-semibold);
+  /* 字号/字重/行高/字距整条来自 `.ht-type-headline`（JSX 成对）。 */
 }
 
 .ht-settings__credential {

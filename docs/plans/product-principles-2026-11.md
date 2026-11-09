@@ -204,7 +204,7 @@
 **因此真正的缺口是**：不是"缺档位"（五档齐），也不是"没人用"（8 处在用），
 而是 **13px 只有一个语义角色**，撑不起用户说的"信息轻重"。要补的是**角色**，不是新 token。
 
-### 3.2 决策：**暂不做**。它被两条已有的量化规则挡住了（不是不想做）
+### 3.2 当时的决策：**暂不做**（2026-11-09 已做 —— 见本节末「换了一条不属于『加档』的路」）
 
 我按"给 13px 补第二个角色（设置页说明句 14 → 13）"实施过一次，**被三道门禁逐条打回**，
 已全部回退。这不是"遇到阻力"，是**仓库里早就写好的预算**在起作用 —— 记清楚，下一个人不用再试一遍：
@@ -221,8 +221,30 @@
 且与 `lg`(18) 只差 2px，正是那条规则嫌的"相邻两档只差 1–2px"；
 ③ 逐屏看截图（`ui-acceptance` 的硬规定），因为这是视觉回归。
 
-⚠️ **本轮没做的原因就写在这**：②③ 都超出"顺手接线"的范围，而①是 D 包（视觉）的活。
+⚠️ **当时没做的原因就写在这**：②③ 都超出"顺手接线"的范围，而①是 D 包（视觉）的活。
 **"五档值得采用"这个方向没有被否掉** —— 被否掉的是"用一行 CSS 实现它"这个做法。
+（2026-11-09 的做法见本节末：不动 20/24/30/36，让 `base` 退出手写 CSS 腾出那一格。）
+
+#### ✅ 2026-11-09 已做（换了一条不属于"加档"的路）
+
+原决策"暂不做"成立的前提是：**要让 13px 进设置页说明句，就得在 `ai-panels.css` 里多一档，
+而那个文件已在 5 档上限**。这一轮走的是另一条：
+
+| 步 | 做了什么 | 读数 |
+|---|---|---|
+| 1 | `.ht-settings__cardTitle`（`base` 16/medium）**全仓零消费者**（`grep -rl … --include=*.tsx` = 0）⇒ 删掉这条死规则，`ai-panels.css` 腾出一档 | 5 档 → 5 档（换了内容） |
+| 2 | `.ht-settings__hint` 字号 `sm`(14) → `md`(13) —— **13px 的第二个角色：设置页说明句/读数行** | 实测 `getComputedStyle` = **13px** / 行高 19.5 |
+| 3 | 全局档位上限还差一格：`base` 从**手写 CSS** 里彻底退场 —— `.ht-empty__title`、`.ht-settings__account-gate-title`、`.ht-settings__admin-h4` 三处改吃语义档（`ht-type-row-title` / `ht-type-headline`），CSS 里只留颜色与间距 | 全局 6 档：`2xs/xs/sm/md/lg/xl`（**xl 未动**，符合"不动 20/24/30/36 display 档"） |
+| 4 | `check-hardcoded.mjs` 的 `PAIRED_TYPOGRAPHY_ALLOW` 删掉两条已失效的组合（`base+medium` / `base+semibold`）——那张表只许变小 | 门禁 rc=0 |
+
+**证据**：真跑真图（`pnpm --filter @heyta/web dev` + Playwright 1440×900@2x）——
+设置「功能与 AI」改前/改后各一张、收件箱空态一张；`getComputedStyle` 实测
+`.ht-settings__hint` = **13px/19.5**、`.ht-empty__title` = **16px/500/28**（与 `row-title` 一致）。
+黄金 DOM `shell-empty-state-dom.spec.tsx` 的人工改动写明了理由（不是重新生成）。
+
+门禁与测试：`check:surface-budget` rc=0（全局 6 档、单文件 ≤5）· `check:design` rc=0 ·
+`check:font-size-discipline` / `tokens` / `docs` / `ui-language` / `ux-coverage` / `settings-prose` 全 rc=0 ·
+web 测试 **2844 passed**（241 文件）。
 
 🔴 **并且要记住 13px 现在的真实状态**（§3.1）：它**不是"没用过"**，
 它承担 `group-label`（分组标题，8 处）。所以更准确的说法不是"给 13px 一个角色"，

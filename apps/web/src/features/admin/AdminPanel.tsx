@@ -411,7 +411,7 @@ export function AdminPanel({
 
           {detail !== null && (
             <div className="ht-settings__admin-detail" data-testid="admin-user-detail">
-              <h4 className="ht-settings__admin-h4">{detail.user.email}</h4>
+              <h4 className="ht-settings__admin-h4 ht-type-headline">{detail.user.email}</h4>
               <p className="ht-settings__hint">
                 {t('web.admin.user.created')}: {formatTime(detail.user.createdAt)} ·{' '}
                 {t('web.admin.user.storage')}: {formatBytes(detail.user.storageUsedBytes)} /{' '}
