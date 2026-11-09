@@ -2506,8 +2506,7 @@ export const zhCN = {
   // ⚠️ 这句里不许出现 `**`（JSX 不解析 markdown，`ai-settings.spec.tsx` 有一条测试专门钉它），
   //    也不许出现「没有」（同文件用 `not.toContain('没有')` 挡"我们不提供托管 AI"的回潮 ——
   //    那条判据粗，所以文案绕开它；想动文案先弄清那条测试为什么在那）。
-  'web.ai.settings.managed.offer': '暂不在这里开放',
-  'web.ai.settings.managed.rest': '云端 AI 服务（服务端那一半已经做完：额度计量、境内供应商白名单、保留策略、解除禁售，见 ADR-0054；但这个版本的界面还没挂上那个开关，所以这里点不动）。在那之前，需要你自己接一个端点（本机或远端）。托管模式的性质不一样：用它的请求，你的任务内容会',
+  'web.ai.settings.managed.lead': '走托管时，你的任务内容会',
   'web.ai.settings.managed.strongPlain': '以明文到达 heyta 的服务器',
   'web.ai.settings.managed.mid': '，所以它',
   'web.ai.settings.managed.strongNot': '不是',

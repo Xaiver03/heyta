@@ -193,6 +193,7 @@ export {
   endpointCapabilities,
   invokeRouted,
   isAvailable,
+  normalizeRouteOrder,
   recordOutcome,
   requiredCapabilities,
   resolveRoute,

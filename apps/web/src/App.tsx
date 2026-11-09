@@ -68,7 +68,7 @@ import {
  * 这里只负责把结果交给 `store.setNote`。壳不做业务判断 —— 见 AGENTS.md §3.5。
  */
 import { writeDurationIntoNote } from '@heyta/app-host';
-import { withManagedEndpoint } from '@heyta/ai';
+import { normalizeRouteOrder, withManagedEndpoint } from '@heyta/ai';
 
 /**
  * 🔴 任务行的**机制**现在来自共享层（M3 第一刀）。
@@ -953,7 +953,7 @@ export function App(): React.JSX.Element {
    * 自备档逐字不受影响。
    */
   const aiRouting = useMemo(
-    () => withManagedEndpoint(aiSettings.routing, syncBaseUrl),
+    () => withManagedEndpoint(normalizeRouteOrder(aiSettings.routing), syncBaseUrl),
     [aiSettings.routing, syncBaseUrl],
   );
   /**

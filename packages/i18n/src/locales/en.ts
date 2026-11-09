@@ -2327,8 +2327,7 @@ export const en = {
   // half is done (metering, domestic allowlist, retention decision, sales ban lifted);
   // what is missing is a switch in this build of the app. Saying "still in development"
   // now understates work that shipped.
-  'web.ai.settings.managed.offer': 'is not on offer here yet',
-  'web.ai.settings.managed.rest': 'a cloud AI service (the server half is done - quota metering, the domestic provider allowlist, the retention decision, the sales ban lifted; see ADR-0054 - but this build of the app does not carry the switch yet, so there is nothing to turn on here). Until then you need to connect an endpoint yourself (on-device or remote). The hosted mode is different in kind: with it, your task content reaches the heyta servers ',
+  'web.ai.settings.managed.lead': 'On the hosted path your task content ',
   'web.ai.settings.managed.strongPlain': 'in plaintext',
   'web.ai.settings.managed.mid': ', so it is ',
   'web.ai.settings.managed.strongNot': 'not',

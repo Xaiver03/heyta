@@ -616,6 +616,48 @@ function routingMode(config: AiRoutingConfig): AiSupplyMode {
   return config.mode === 'managed' ? 'managed' : 'own';
 }
 
+/**
+ * 把每个功能的**候选链按端点列表顺序归一**。
+ *
+ * ## 为什么必须有这一步（2026-11-09）
+ *
+ * 界面里"功能 × 端点"是一排勾选（`toggleRoute`）：点谁就 `[...current, 谁]`，
+ * 也就是**按点击先后**排。而端点列表按 `config.endpoints` 的顺序渲染，
+ * `resolveRoute` 又严格按 `routes[feature]` 的顺序尝试。
+ * 于是"先点靠后的端点"会让**尝试顺序与用户看到的列表顺序相反** ——
+ * 而设置页那枚说明气泡写的是「列表顺序就是尝试顺序（靠前的先试）」。
+ *
+ * 两条出路：把说明改成"按点选先后"（要求用户记住点击历史，违反 J3），
+ * 或者让数据服从那句承诺。选后者：**顺序只有一处定义 —— 端点列表**。
+ *
+ * ## 边界
+ * · **稳定排序**：秩相同（端点列表里没有这个 id，例如端点已被删但 routes 还留着）
+ *   的按原相对次序排在末尾，不丢、不吞。
+ * · 纯函数、不改入参：返回新对象，`routes` 里每条链也是新数组。
+ * · 幂等：已经归一的配置再归一是同一个形状（判据用它做幂等断言）。
+ */
+export function normalizeRouteOrder(config: AiRoutingConfig): AiRoutingConfig {
+  const rank = new Map(config.endpoints.map((endpoint, index) => [endpoint.id, index]));
+  const routes: Partial<Record<AiFeature, readonly AiRouteTarget[]>> = {};
+  for (const [feature, targets] of Object.entries(config.routes) as [
+    AiFeature,
+    readonly AiRouteTarget[] | undefined,
+  ][]) {
+    if (targets === undefined) continue;
+    routes[feature] = targets
+      .map((target, index) => ({ target, index, rank: rank.get(target.endpointId) }))
+      .sort((a, b) => {
+        // 没有秩的排最后；两个都没有秩时按原序（稳定，不依赖 sort 实现）。
+        if (a.rank === undefined && b.rank === undefined) return a.index - b.index;
+        if (a.rank === undefined) return 1;
+        if (b.rank === undefined) return -1;
+        return a.rank - b.rank || a.index - b.index;
+      })
+      .map((entry) => entry.target);
+  }
+  return { ...config, routes };
+}
+
 export function resolveRoute(
   config: AiRoutingConfig,
   feature: AiFeature,

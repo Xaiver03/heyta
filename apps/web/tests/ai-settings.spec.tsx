@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AI_ENDPOINT_PRESETS } from '@heyta/ai';
 import { I18nProvider } from '@heyta/i18n';
 
-import { AI_SETTINGS_STORAGE_KEY, defaultAiSettings, loadAiSettings, saveAiSettings, createSessionSecretStore } from '../src/features/settings/aiStore.js';
+import { AI_SETTINGS_STORAGE_KEY, defaultAiSettings, loadAiSettings, saveAiSettings, createSessionSecretStore, type PersistedAiSettings } from '../src/features/settings/aiStore.js';
 
 const { AiSettings, capabilityGaps } = await import('../src/features/settings/AiSettings.js');
 
@@ -1128,14 +1128,23 @@ describe('🔴🔴 必须说清"我们只提供两种供给方式中的哪一种
    * 要求的东西一条没少：说过什么、不许说什么、有没有粗体。
    * 🔴 气泡正文**常驻 DOM**（`aria-describedby` 指向隐藏内容），所以"没打开"也能测到。
    */
-  it('🔴🔴 说清托管 AI **会来、但这一版界面点不动**（曾经写"我们不做"，后写"仍在开发中"）', () => {
+  /*
+   * 🔴🔴 2026-11-09：这条判据**反转**了。它原来断言气泡里写着「暂不在这里开放」，
+   * 前提是"这一版界面还没挂上那个开关"。那个前提已经不成立 ——
+   * 同一屏有了「这些请求发给谁」的两个单选（`data-testid="ai-supply-mode"`，
+   * 托管档可点、无 `disabled`），端点列表在托管档下还会显示 `withManagedEndpoint()`
+   * 合成的那一条。于是「这里点不动」本身成了假话（J2 §1.2 第四类靶子）。
+   *
+   * 现在这条判据钉的是**相反方向**：气泡里**不许**再出现那两句，
+   * 而托管档**确实可选**（行为断言在下面单独一条）。
+   */
+  it('🔴🔴 托管档已可选 ⇒ 气泡不许再说「暂不在这里开放 / 点不动」', () => {
     const el = render({ initial: enabled(), secrets: createSessionSecretStore() });
     const note = el.querySelector('[data-testid="tip-managed-ai"]');
     expect(note).toBeTruthy();
-    expect(note?.textContent).toContain('暂不在这里开放');
-    // 🔴 第二条才是这一版的重点：ADR-0054 之后服务端那一半已经落地，
-    //   "仍在开发中"就从"谨慎"变成了**把做完的事说成没做完**的假话。
-    //   这条断言的存在意义是：下一次有人想图省事把理由写回"还在开发"，这里会红。
+    expect(note?.textContent).not.toContain('暂不在这里开放');
+    expect(note?.textContent).not.toContain('点不动');
+    // ADR-0054 之后服务端那一半已落地，"仍在开发中"是把做完的事说成没做完的假话。
     expect(note?.textContent).not.toContain('仍在开发');
   });
 
@@ -1160,6 +1169,59 @@ describe('🔴🔴 必须说清"我们只提供两种供给方式中的哪一种
     expect(text).not.toContain('**');
     // 而且确实用了 <strong>（搬进气泡时类型从 string 放宽到 ReactNode，就是为了保住这个）
     expect(el.querySelector('[data-testid="tip-managed-ai"] strong')).toBeTruthy();
+  });
+
+  it('🔴 托管档在同屏**可选**（"这里点不动"已经不成立）', () => {
+    let latest: PersistedAiSettings | undefined;
+    const base = enabled();
+    // 先落在自备档，这样点「托管」一定会触发一次 change（已选中的 radio 点了不触发）。
+    const el = render({
+      initial: { ...base, routing: { ...base.routing, mode: 'own' } },
+      secrets: createSessionSecretStore(),
+      onChange: (next) => {
+        latest = next;
+      },
+    });
+    const radios = Array.from(el.querySelectorAll<HTMLInputElement>('input[name="ai-supply-mode"]'));
+    expect(radios).toHaveLength(2);
+    const managed = radios.find((radio) => radio.closest('label')?.textContent?.includes('托管') === true);
+    expect(managed).toBeTruthy();
+    // 🔴 这两条钉的是"这一版界面点不动"已成假话：单选在、且没被禁用。
+    expect(managed?.disabled).toBe(false);
+    click(managed);
+    expect(latest?.routing.mode).toBe('managed');
+  });
+
+  it('🔴🔴 尝试顺序 = **端点列表顺序**，不是点选先后（气泡里那句写着"靠前的先试"）', () => {
+    let latest: PersistedAiSettings | undefined;
+    const base = defaultAiSettings();
+    const el = render({
+      initial: {
+        ...base,
+        routing: {
+          ...base.routing,
+          enabled: true,
+          allowRemote: true,
+          endpoints: [
+            { id: 'aaa', label: 'A', endpoint: 'http://127.0.0.1:11434', model: 'm' },
+            { id: 'bbb', label: 'B', endpoint: 'http://127.0.0.1:11435', model: 'm' },
+          ],
+        },
+      },
+      secrets: createSessionSecretStore(),
+      onChange: (next) => {
+        latest = next;
+      },
+    });
+    const chipsOf = () => el.querySelectorAll<HTMLButtonElement>('[data-testid="feature-prioritize"] button');
+    expect(chipsOf()).toHaveLength(2);
+
+    // 先点**靠后**的那个端点 —— 若不做归一，routes 会变成 [B, A]，与列表顺序相反。
+    click(chipsOf()[1]);
+    expect(latest?.routing.routes.prioritize?.map((t) => t.endpointId)).toEqual(['bbb']);
+
+    click(chipsOf()[0]);
+    expect(latest?.routing.routes.prioritize?.map((t) => t.endpointId)).toEqual(['aaa', 'bbb']);
   });
 
   it('🔴 AI 总开关关着时不显示（那是"还没启用"，不是"缺功能"）', () => {

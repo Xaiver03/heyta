@@ -33,6 +33,7 @@ import {
   endpointHealthDisclosure,
   fromHealthSnapshot,
   isAvailable,
+  normalizeRouteOrder,
   requiresEgressConsent,
   type AiRoutingConfig,
   type AiCapability,
@@ -444,10 +445,20 @@ export function AiSettings({
    * 现在不再靠注释，只留一个地方能算出它。
    */
   function updateRouting(next: AiRoutingConfig): void {
+    /*
+     * 🔴 **候选链的顺序只有一处定义：端点列表**（2026-11-09）。
+     *
+     * `toggleRoute` 是"点谁就往后 append"，而端点列表按 `routing.endpoints` 渲染、
+     * 尝试按 `routes[feature]` 顺序 —— 先点靠后的端点，实际尝试顺序就与列表相反，
+     * 而这屏那枚说明气泡写着「列表顺序就是尝试顺序（靠前的先试）」，于是它成了假话。
+     * 处置选了"让数据服从那句承诺"而不是改文案：改文案等于要求用户记住点击历史（违反 J3）。
+     * 归一是纯函数、幂等，`resolveRoute` 与渲染都吃这一份。
+     */
+    const ordered = normalizeRouteOrder(next);
     update({
       ...settings,
-      routing: next,
-      consents: recomputeConsents(settings.consents, next),
+      routing: ordered,
+      consents: recomputeConsents(settings.consents, ordered),
     });
   }
 
@@ -845,8 +856,7 @@ export function AiSettings({
                 label={t('common.tip.label')}
                 text={
                   <>
-                    {t('common.brand')} <strong>{t('web.ai.settings.managed.offer')}</strong>
-                    {t('web.ai.settings.managed.rest')}
+                    {t('web.ai.settings.managed.lead')}
                     <strong>{t('web.ai.settings.managed.strongPlain')}</strong>
                     {t('web.ai.settings.managed.mid')}
                     <strong>{t('web.ai.settings.managed.strongNot')}</strong>
