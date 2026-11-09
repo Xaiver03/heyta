@@ -114,6 +114,27 @@
 ② 把「这里点不动」塞回 `managed.tail` ⇒ 托管那条测试红；
 ③ 把 `normalizeRouteOrder` 摘掉 ⇒ 顺序测试红。三条都还原后重跑全绿。
 
+### 1.2.3 全仓账本：44 处各自的"为什么留着"（2026-11-09）
+
+口径：`grep -rn "<SettingsInfoTip" apps/web/src --include=*.tsx`（现量 **44**）。
+行号会漂，所以**按 `testId` 登记**（那是稳定的）；"还剩多少"由上面那条命令现量，别抄数字。
+
+按"留着它是因为用户**现在必须知道**什么"分组 —— 一个人读这份表就能复核每一条：
+
+| 留下的理由 | 成员（`testId`） |
+|---|---|
+| **披露**（§3.7.2「做了什么 + 代价是什么」：明文/密文、发给谁、留存、撤销后果） | `tip-ai-supply`、`tip-managed-ai`、`tip-ai-key-notice`、`tip-local-api-token`、`tip-inbound`、`tip-inbound-credential-${rule.id}`、`tip-inbound-draft-${eventId}`、`tip-sync`、`tip-sync-encryption`、`tip-sync-password`、`tip-sync-account`、`tip-vault`、`tip-vault-devices`、`tip-vault-recovery`、`tip-vault-legacy`、`tip-encryption-placement`、`tip-profile-local-only`、`tip-widget-push`、`tip-close-account`、`tip-subscription-status` |
+| **顺序 / 步骤**（用户要按这个次序做） | `tip-data-migration`（先预览再合并）、`tip-email-change`（新旧邮箱各点一次）、`tip-inbound-test-send-once`（试发只在签发那一次可用） |
+| **输入格式 / 取值范围**（不写就填错） | `tip-inbound-draft-${eventId}`（日期格式与时区）、`tip-sync-token`（令牌从哪来） |
+| **不可逆 / 破坏性动作的代价** | `tip-password`、`tip-password-set-consequence`、`tip-password-consequence`、`tip-memory-off`（关掉之后 AI 拿不到什么） |
+| **选择依据**（这个选择会决定什么，控件本身看不出来） | `tip-ai-features`（点选顺序 = 尝试顺序）、`tip-local-api`（默认关 + 逐工具授权）、`tip-export-json` / `tip-export-markdown`（含什么/不含什么）、`tip-subscription-plans` / `tip-plan-${id}`（一次性 30 天、叠加、不自动扣款）、`tip-subscription-pricing`（自托管永久免费）、`tip-widget-push`（只影响 Windows） |
+| **语义澄清**（两个东西容易混，混了会做错事） | `profile-nickname-why`（昵称 ≠ 登录标识）、`tip-memory-gap`（标了优先级却没投入 ⇒ 落差怎么算的）、`tip-profile-achievements`（中断不清零）、`tip-detail-pane`（窄窗自动收起，去哪找回来） |
+| **原语**（一处调用点承载多个消费者，逐个在各自调用处判过） | `tip-${id}`（AiSettings 的 `Toggle`）、`props.tip.testId`（PasswordPanel 的 `PasswordField`）、`${testId ?? 'notice'}`（`SettingsNotice`） |
+
+⚠️ **判定不是"看着有用就留"**：每一条都先过 §1.2 的四类靶子——
+`重复`/`复述界面`/`复述分区功能` ⇒ 删；`在解释一个不存在的东西` ⇒ 连对象一起删；
+只有落到上表某一格（或 §3.7.2 的披露）才留。本轮据此删了 1 枚、改了 8 处（见 §1.2.2）。
+
 ### 1.3 剩余工作（下一轮直接照这张单子做）
 
 | # | 事 | 起点 |
