@@ -107,6 +107,13 @@ React Native 的 `View` 默认 `flex: 0 0 auto`（与 CSS 的 `0 1 auto` **不�
   ⇒ **仍然禁止**：hover 位移、给浮层以外的东西加 `shadow-lg`、用阴影代替边框。
 - ❌ **不测暗色主题就交付** —— 暗色不是亮色的反相，必须**实际切换查看**。
 - ❌ **数字不加 `.tabular-nums`** —— 番茄钟计时与统计数字的宽度会跳动。
+- ⚠️ **兜底界面的裸值不是违规，但也只有两处**（2026-11-09 立账）：崩溃兜底屏与
+  「产物缺失」兜底页**设计上就不能取 token**（崩溃时 `ThemeProvider` 可能正是崩掉的那一环；
+  `data:` URL 兜底页此时连样式表都没加载）。它们登记在
+  `design-system/heyta/check-hardcoded.mjs` 的 `FALLBACK_FILE_ALLOW`，**带 count 只许变小**：
+  多一处 ⇒ 红（不放行）、少一处 ⇒ 也红（要求改小）。自检：
+  `node design-system/heyta/check-hardcoded.mjs --self-test`（三条臂：基线绿 / 多一处红 / 少一处红）。
+  🔴 **不要**为了多写一处裸值去改那两个 count —— 那和"往豁免表里加路径让判据变绿"是同一件事。
 
 ---
 

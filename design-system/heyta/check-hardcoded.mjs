@@ -25,12 +25,106 @@
  *   node design-system/heyta/check-hardcoded.mjs --verbose
  */
 
-import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join, dirname, resolve, relative, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const verbose = process.argv.includes('--verbose');
+
+/**
+ * 兜底界面的**唯一**豁免（2026-11-09，账本制）
+ * ==========================================
+ *
+ * 这个门禁原先把两处**设计上就不能用 token** 的代码判成红，共 17 处：
+ * 崩溃兜底屏与「产物缺失」兜底页。它们不是懒，是**取 token 会二次崩溃**：
+ *
+ * · `apps/mobile/src/ui/error-boundary.tsx` —— 崩溃时 `ThemeProvider` 可能正是
+ *   崩掉的那一环；`useTokens()` 再抛一次，用户看到的就是白屏而不是这段文字。
+ *   文件里本来就写着这条理由（样式块上方那段注释）。
+ * · `apps/desktop/src/main.ts` 的 `guardedLoad` 兜底页 —— 它走 `data:` URL，
+ *   因为**连 `index.html` 都没加载成功**；app 的样式表此刻不存在，内联样式是
+ *   唯一能让那行「界面没能加载」显示出来的方式。
+ *
+ * 🔴 为什么是**带上限的账本**而不是"豁免整个文件"：整文件豁免会把未来的新增
+ *   一起放过（那正是本仓反复吃过的亏——范围缺口不报错，只静默失效）。
+ *   所以每条都带 `count`，且**只许变小**：
+ *     · 实际数 > count ⇒ 变成违规报出来（新写的裸值当天就进不来）；
+ *     · 实际数 < count ⇒ 也红，叫你把账本改小（否则账本会永远停在第一天）。
+ *   `--self-test` 三条臂分别验证：现状绿 / 多一处红 / 少一处红。
+ */
+const FALLBACK_FILE_ALLOW = [
+  {
+    file: 'apps/mobile/src/ui/error-boundary.tsx',
+    count: 16,
+    why: '崩溃兜底屏：崩溃时 ThemeProvider 可能正是崩掉的那一环，取 token 会二次崩溃',
+  },
+  {
+    file: 'apps/desktop/src/main.ts',
+    count: 1,
+    why: '产物缺失时的 data: URL 兜底页：app 样式表根本没加载，内联样式是唯一能显示的方式',
+  },
+];
+
+if (process.argv.includes('--self-test')) selfTest();
+
+function runGate() {
+  const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], { encoding: 'utf8' });
+  return { rc: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+}
+
+/**
+ * 三条臂。**先要求未变异时是绿的**，否则"环境本来就红"会被读成"臂成功了"。
+ * ⚠️ 还原一律从**当前工作树那份字节**（不是 `git show HEAD:` —— 那会抹掉未入库的改动），
+ *   且 `finally` 里只还原、不退出（`process.exit` 放进 finally 会跳过 finally 自身）。
+ */
+function selfTest() {
+  const target = join(ROOT, 'apps/mobile/src/ui/error-boundary.tsx');
+  const original = readFileSync(target, 'utf8');
+  const rel = relative(ROOT, target);
+  const arms = [];
+
+  try {
+    const base = runGate();
+    arms.push({ name: '基线（未变异）绿', ok: base.rc === 0, detail: `rc=${String(base.rc)}` });
+    if (!arms[0].ok) {
+      console.log(base.out);
+      throw new Error('基线就是红的：先修好，再谈这门禁有没有牙');
+    }
+
+    // 臂 2：往兜底屏多写一处裸值 ⇒ 必须红，且点名那个文件
+    writeFileSync(target, `${original}\nconst injected = { padding: 99 };\n`);
+    const over = runGate();
+    arms.push({
+      name: '多一处 ⇒ 红',
+      ok: over.rc === 1 && over.out.includes(rel),
+      detail: `rc=${String(over.rc)} 点名=${String(over.out.includes(rel))}`,
+    });
+
+    // 臂 3：从兜底屏里拿掉一处（16 → 15）⇒ 必须红，并提示把账本改小
+    writeFileSync(target, original.replace("color: '#777777'", 'color: undefined'));
+    const under = runGate();
+    arms.push({
+      name: '少一处 ⇒ 红（账本要改小）',
+      ok: under.rc === 1 && under.out.includes('账本该改成'),
+      detail: `rc=${String(under.rc)} 提示=${String(under.out.includes('账本该改成'))}`,
+    });
+  } finally {
+    writeFileSync(target, original);
+  }
+  const restored = readFileSync(target, 'utf8') === original;
+  arms.push({ name: '还原（字节一致）', ok: restored, detail: `一致=${String(restored)}` });
+
+  const failed = arms.filter((a) => !a.ok);
+  for (const a of arms) console.log(`${a.ok ? '✅' : '🔴'} ${a.name}（${a.detail}）`);
+  if (failed.length > 0) {
+    console.log('\n🔴 自检失败：这门禁的豁免可能把不该放过的放过了。');
+    process.exit(1);
+  }
+  console.log('\n✅ 自检通过：豁免只吃账本里那 17 处，多一处红、少一处也红。');
+  process.exit(0);
+}
 
 /**
  * 扫描范围。
@@ -414,23 +508,60 @@ for (const file of files) {
   });
 }
 
+/**
+ * 兜底界面账本的折算（2026-11-09）。
+ *
+ * 只有「实测 ≤ 账本」的那一档才放行；**超过 ⇒ 一处都不放行** —— 那说明这个文件
+ * 又长了新的裸值，此时最该做的是让人看见它，而不是猜"多出来的是哪一处"。
+ * 「实测 < 账本」⇒ 红并要求把账本改小（账本只许变小，否则它会停在第一天）。
+ */
+const exempt = new Set();
+const ledgerProblems = [];
+for (const entry of FALLBACK_FILE_ALLOW) {
+  const hit = problems.filter((p) => p.file === entry.file);
+  if (hit.length > entry.count) {
+    ledgerProblems.push(
+      `🔴 ${entry.file}：账本记 ${entry.count} 处，实测 ${hit.length} 处 —— **新增的那几处不放行**。\n` +
+        `     豁免理由只覆盖既有的兜底样式（${entry.why}），新写的裸值请用 token，或先证明它同样处在"取 token 会二次崩溃"的位置。`,
+    );
+    continue;
+  }
+  for (const p of hit) exempt.add(p);
+  if (hit.length < entry.count) {
+    ledgerProblems.push(
+      `🔴 ${entry.file}：账本记 ${entry.count} 处，实测只剩 ${hit.length} 处 —— **账本该改成 ${hit.length}**（本表只许变小）。`,
+    );
+  }
+}
+const remaining = problems.filter((p) => !exempt.has(p));
+
 console.log(
   `\n扫描 ${checked} 个源文件（${SCAN_ROOTS.map((r) => r.label).join(' + ')}），检查 ${CHECKS.length} 类硬编码。`,
 );
 
 if (verbose) {
   console.log(`跳过 ${files.length - checked} 个 token 定义文件。`);
+  for (const entry of FALLBACK_FILE_ALLOW) {
+    const hit = problems.filter((p) => p.file === entry.file).length;
+    console.log(`兜底账本 ${entry.file}：${String(hit)}/${String(entry.count)}（实测/账本）`);
+  }
 }
 
-if (problems.length) {
+if (ledgerProblems.length > 0) {
+  console.log('');
+  for (const line of ledgerProblems) console.log(`   ${line}`);
+  console.log('');
+}
+
+if (remaining.length) {
   // 按文件分组，便于修
   const byFile = new Map();
-  for (const p of problems) {
+  for (const p of remaining) {
     if (!byFile.has(p.file)) byFile.set(p.file, []);
     byFile.get(p.file).push(p);
   }
 
-  console.log(`\n🔴 ${problems.length} 处硬编码设计变量：\n`);
+  console.log(`\n🔴 ${remaining.length} 处硬编码设计变量：\n`);
   for (const [file, list] of byFile) {
     console.log(`   ${file}`);
     for (const p of list.slice(0, 8)) {
@@ -457,5 +588,8 @@ if (pairedProblems.length > 0) {
    加行 = 档位表外的第二套排版又繁殖了一个）。`);
   process.exit(1);
 }
+
+// 账本自身的失配（涨了 / 该改小）也是一条红 —— 否则"账本只许变小"只是注释。
+if (ledgerProblems.length > 0) process.exit(1);
 
 console.log('\n✅ 无硬编码设计变量。\n');
