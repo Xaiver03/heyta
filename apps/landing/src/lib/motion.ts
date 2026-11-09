@@ -11,6 +11,12 @@
  * **制造第二个权威** —— 哪天设计系统把响应从 0.4 调成 0.35，
  * 落地页会静默地留在旧手感上，而且没有任何一处会报错。
  *
+ * 🔴 **参数（读 CSS 变量）与换算公式（`toSpringPhysics`）现在都来自
+ * `@heyta/design-system`。** 本文件只保留"读 token → 装配成 Motion 的形状"
+ * 这一层。装机理由见 `toSpringOptions` 的注释：那条换算公式此前在本文件与
+ * `packages/ui/src/overlay/spring-physics.ts` 各有一份逐字相同的抄件，
+ * 靠各自的测试钉同一条恒等式 —— 那是第二个权威，已收敛回设计系统。
+ *
  * 换算关系（Apple → Motion）：
  *   Motion 的 `bounce` 就是「1 − 阻尼比」：ζ=1.0 → bounce 0（不过冲），
  *   ζ=0.8 → bounce 0.2（轻微过冲）。这正是 Apple 的语义。
@@ -24,23 +30,8 @@
  */
 
 import { useMemo } from 'react';
+import { toSpringPhysics, type SpringPhysics } from '@heyta/design-system';
 import { useReducedMotion, type Transition, type Variants } from 'motion/react';
-
-/**
- * 二阶系统的三个参数。
- *
- * 🔴 刻意**不用** Motion 的 `SpringOptions` 当返回类型：那个类型三个字段都是
- * 可选的（`number | undefined`），于是任何消费方都得处理 `undefined`，
- * 而本函数**保证**三个都返回。用这个精确类型，测试里 `Math.sqrt(stiffness)`
- * 不需要断言、也不需要 `?? 0`。
- *
- * 它在结构上可赋给 `SpringOptions`，所以 `useSpring` 照样接受。
- */
-export interface SpringPhysics {
-  mass: number;
-  stiffness: number;
-  damping: number;
-}
 
 /** 从 `<html>` 的计算样式读一个数值型 token。 */
 function readNumberToken(name: string, fallback: number): number {
@@ -53,29 +44,31 @@ function readNumberToken(name: string, fallback: number): number {
 /**
  * 把 Apple 的「阻尼比 ζ + 响应」换算成 Motion 的物理三件套。
  *
- * 为什么需要两条通道：Motion 有两个不同的入口 ——
- *   - `transition={{ type: 'spring', bounce, duration }}`（声明式，tween 风格的配置）
- *   - `useSpring(value, { stiffness, damping, mass })`（命令式，跟踪一个 MotionValue）
+ * 🔴 **这是 `@heyta/design-system` 的 `toSpringPhysics()` 的别名 —— 本文件不含公式。**
+ *
+ * 为什么不在这里保留一条自己的式子：`packages/ui`（RN 侧）要用**同一组
+ * token** 喂 `Animated.spring`，它需要的是同一个换算。两份逐字相同的实现
+ * 就是第二个权威 —— 设计系统改公式时只有一份会跟着动，而**没有任何一处会报错**。
+ * 换算公式与弹簧参数同源（都在 `tokens.css` §3c 定义），所以它住在
+ * `packages/design-system`，两边都 import 它。
+ *
+ * 为什么还需要这个别名，而不是让调用方直接写 `toSpringPhysics`：
+ * 本模块的消费方（`useMotionPreset` / 测试）面对的是 **Motion 的语境**，
+ * 这个名字与 `MotionPreset.uiSpring` 一起读更贴近调用点；别名也让
+ * 上面那个 `SpringPhysics` 类型在这个文件里是可命名的。
+ *
+ * 为什么需要 `stiffness/damping/mass` 这条通道：Motion 有两个不同的入口 ——
+ *   - `transition={{ type: 'spring', bounce, duration }}`（声明式）
+ *   - `useSpring(value, { stiffness, damping, mass })`（命令式，跟踪 MotionValue）
  * 后者**不接受** `bounce`/`duration`。如果只提供前一种，写倾斜跟随时就得
  * 自己拍一组 stiffness/damping —— 那又变成"第二个权威"了。
  *
- * 换算（质量取 1，单位化）：
- *   ω₀ = 2π / response        —— 响应就是无阻尼周期
- *   stiffness = ω₀²
- *   damping   = 2ζω₀
- * 这是标准的二阶系统参数化，不是拟合出来的经验值。
- *
- * 导出是为了让 `tests/motion.spec.ts` 能直接验证这个换算 ——
+ * 导出是为了让 `tests/motion.spec.ts` 能直接验证这条换算 ——
  * 它是一条**数学恒等式**（临界阻尼时 `damping === 2√stiffness`），
  * 值得用测试钉住，而不是靠读代码相信它。
  */
 export function toSpringOptions(dampingRatio: number, response: number): SpringPhysics {
-  const omega = (2 * Math.PI) / response;
-  return {
-    mass: 1,
-    stiffness: omega * omega,
-    damping: 2 * dampingRatio * omega,
-  };
+  return toSpringPhysics(dampingRatio, response);
 }
 
 export interface MotionPreset {

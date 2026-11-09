@@ -14,7 +14,7 @@
  * 也带进来；否则 `BottomSheet` 只能像 2026-11-05 之前那样写一组裸的
  * `320 / 32 / 0.7` —— 那正是"token 定义了却没人消费、两套物理模型并存"。
  *
- * ## 🔴 换算是一条数学恒等式，不是拟合值
+ * ## 🔴 换算的**唯一实现**在 `@heyta/design-system`
  *
  * 二阶系统的标准参数化（质量单位化到 1）：
  *
@@ -22,14 +22,19 @@
  *   stiffness = ω₀²
  *   damping   = 2ζω₀
  *
- * 与 `apps/landing/src/lib/motion.ts` 的 `toSpringOptions()` **同一组式子** ——
- * 这不是巧合：两者的目标是同一个物理系统，只是落地到不同的动画 API。
- * 把它抄成两份会立刻制造第二个权威（设计系统调参时只有一份会跟着动），
- * 但 `apps/landing` 是 Web 应用、`packages/ui` 是共享层，两者的依赖方向
- * （见 `packages/ui/src/index.ts` 文件头的边界）不允许共享层反向 import 应用。
- * 因此这里保留同一组式子，并用**同一条恒等式**把它钉住
- * （`packages/ui/tests/overlay-spring-physics.spec.ts`）：
- * 临界阻尼时必然有 `damping === 2√stiffness`，这在数学上只能有一种写法。
+ * 这组式子与参数**同源**，因此住在定义 token 的 `packages/design-system` 里
+ * （`toSpringPhysics()`）。本文件**不再自带公式** —— 它只负责 RN 侧的那一层：
+ * 把 token 读数按**语义档**（move / sheet / rotation）映射成 RN 要的形状。
+ *
+ * ⚠️ 这段历史值得记着：该换算曾经在 `apps/landing/src/lib/motion.ts`
+ * 与本文件里**各有一次逐字相同的实现**，两边用同一条恒等式各自钉住。
+ * 那不是"共享"，是**第二个权威** —— 设计系统改公式时两处都要动，
+ * 而漏掉任何一处都**不会报错**。现已收敛：`toSpringConfig` 直接转发
+ * `toSpringPhysics`，landing 那一份也改为 import 它。
+ *
+ * 🔴 注意这里的边界：**"哪一档配哪个 token" 留在本文件**，不下沉 ——
+ * 那是 RN 组件的消费约定（landing 直接读 CSS 变量，不用语义档）。
+ * 共享的只有那个数学映射。
  *
  * ## 为什么 mass 固定为 1，而不是沿用原来的 0.7
  *
@@ -61,6 +66,8 @@
  * 不是"刻意的特调"，而是对 `response-sheet` 的一次粗略近似。
  */
 
+import { toSpringPhysics } from '@heyta/design-system';
+
 /**
  * 从 token 组名拼出的弹簧语义档。
  *
@@ -70,7 +77,13 @@
  */
 export type SpringPreset = 'move' | 'sheet' | 'rotation';
 
-/** RN `Animated.spring` 需要的三个参数。`mass` 恒为 1（见文件头）。 */
+/**
+ * RN `Animated.spring` 需要的三个参数。`mass` 恒为 1（见文件头）。
+ *
+ * 它与 `@heyta/design-system` 的 `SpringPhysics` **结构相同**，但这里保留一个
+ * 自己的名字：RN 的类型面已经导出 `SpringConfig`，改名是破坏性的；而两者
+ * 结构相同意味着 `toSpringPhysics()` 的返回值可以直接赋回来（无需转换）。
+ */
 export interface SpringConfig {
   readonly stiffness: number;
   readonly damping: number;
@@ -110,15 +123,15 @@ const PRESET_SOURCE = {
 /**
  * 把 Apple 的「阻尼比 ζ + 响应」换算成 RN 的物理三件套。
  *
+ * 🔴 **转发到 `@heyta/design-system` 的 `toSpringPhysics()` —— 本文件不再有公式。**
+ * 这里保留这个名字与形状，是因为它是 `@heyta/ui` 的既有导出面
+ * （`src/index.ts` 转出、`BottomSheet` 与测试都在用）；它现在与落地页
+ * 消费的是**同一份**实现，而不是同一条恒等式的第二份抄件。
+ *
  * 导出是为了让测试能直接验证这条恒等式，而不是靠读代码相信它。
  */
 export function toSpringConfig(dampingRatio: number, response: number): SpringConfig {
-  const omega = (2 * Math.PI) / response;
-  return {
-    mass: 1,
-    stiffness: omega * omega,
-    damping: 2 * dampingRatio * omega,
-  };
+  return toSpringPhysics(dampingRatio, response);
 }
 
 /**

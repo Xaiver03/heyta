@@ -116,3 +116,20 @@ export { extractVars, extractReducedMotion, resolveAllVars } from './css-tokens.
 // "落地页的 DOM 复刻件"能从**同一份**形状派生，而不是各抄一组字号与间距。
 // 动机与那次实测漂移（勾选框 20 vs 22px、标题 sm vs base）见该文件头。
 export { TASK_ROW_SHAPE, TASK_ROW_TEXT } from './task-row-shape.js';
+
+/**
+ * Apple 弹簧参数（`motion.spring-*`）→ 二阶系统物理三件套。
+ *
+ * 🔴 与 token **同源**：`tokens.css` §3c 定义的是「阻尼比 ζ + 响应」，
+ * 而 Web 的 Motion 与 RN 的 `Animated.spring` 都只认 `stiffness/damping/mass`，
+ * 中间这一层换算就该住在这里 —— 否则每个消费方都要抄一份式子（第二个权威）。
+ *
+ * 它**曾经**有两份逐字相同的实现（`apps/landing/src/lib/motion.ts` 的
+ * `toSpringOptions` 与 `packages/ui/src/overlay/spring-physics.ts` 的
+ * `toSpringConfig`），两边靠各自的测试钉同一条恒等式，但设计系统改公式时
+ * **不会有任何一处报错**。现已收敛到这里，两份都改为 import。
+ *
+ * ⚠️ 这里只有**数学映射**，没有语义档位：`packages/ui` 的 `SpringPreset`
+ * （move / sheet / rotation）是 RN 侧的消费约定，不在此处。
+ */
+export { toSpringPhysics, type SpringPhysics } from './spring-physics.js';
