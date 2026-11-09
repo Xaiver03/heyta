@@ -1332,6 +1332,12 @@ export {
 } from './ai/reveal.js';
 export { useStreamReveal, type UseStreamRevealOptions } from './ai/use-stream-reveal.js';
 
+/* 流式光标：回答还在生成时闪的那一根竖条。
+   🔴 它承载"还在生成"这条信息，所以 reducedMotion 下**留着但不闪**
+   （降级降的是动作，不是信息）—— 藏掉它会让"它还在想"与"它卡住了"
+   在画面上重新变得无法区分。 */
+export { StreamCaret, STREAM_CARET_STATIC_OPACITY, type StreamCaretProps } from './ai/StreamCaret.js';
+
 /* 流式跟随：**什么时候该自动滚到底、什么时候不该**。
    🔴 判定与执行分开：本模块只判"该不该跟"，怎么滚由调用方做 ——
    DOM 是 scrollTop/scrollHeight/clientHeight，RN 是 onScroll 的三个字段，
