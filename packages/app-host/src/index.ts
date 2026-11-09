@@ -1098,6 +1098,20 @@ export { createInboundRecipientKeyStore, type InboundRecipientKeyScope } from '.
 export { createVaultWrappedAutomationWorkerStore, createInboundCommitJournal } from './inbound-secret-store.js';
 export { generateInboundKeyPair, inboundPublicKey } from '@heyta/inbound-core';
 
+/**
+ * 进行中一轮的归约（`AssistantTurnEvent` → 屏上看得见的「这一刻」）。
+ *
+ * 🔴 下沉到这里而不是留在 `apps/web`：移动端接流式时**也要同一个函数**
+ * （`AGENTS.md` §3.5 —— `apps/*` 不许有决定"业务上该怎么做"的一行），
+ * 而抄第二份必然分叉。逐条理由在 `assistant-live.ts` 文件头。
+ */
+export {
+  EMPTY_LIVE,
+  reduceAssistantLive,
+  type LiveRow,
+  type LiveTurn,
+} from './assistant-live.js';
+
 /** 跨端本地会话历史：宿主只注入存储，不另造恢复与账号隔离规则。 */
 export type { ChatItem, WithoutId } from './assistant-local-transcript.js';
 export {

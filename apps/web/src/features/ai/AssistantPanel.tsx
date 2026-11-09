@@ -83,16 +83,20 @@ import {
   type SecretStore,
 } from '@heyta/ai';
 import {
+  EMPTY_LIVE,
   assistantEgressFields,
   assistantNeedsEgressDisclosure,
   assistantGrants,
   confirmAiToolProposal,
   planAssistantEgress,
+  reduceAssistantLive,
   requestAssistantTurn,
   type AssistantFailureReason,
   type AssistantMessage,
   type AssistantStep,
   type AssistantTurnEvent,
+  type LiveRow,
+  type LiveTurn,
 } from '@heyta/app-host';
 import { webManagedTransport } from './managed-transport.js';
 import type { LocalApiHost } from '@heyta/local-api';
@@ -192,61 +196,10 @@ export interface AssistantPanelProps {
 type AssistantPhase = 'idle' | 'disclose' | 'running';
 
 /**
- * 一轮进行中的**一行过程**（对应 `AssistantTurnEvent` 的 tool-started / -finished）。
- *
- * `ok === undefined` = 还在跑。这一格是**界面自己的**状态，不进历史：
- * 历史里那一轮最终会落成 `AssistantStep[]`（见 `ChatItem` 的 assistant 分支）。
+ * `LiveRow` / `LiveTurn` / `EMPTY_LIVE` / `reduceAssistantLive` 现在住在
+ * `@heyta/app-host` 的 `assistant-live.ts` —— 移动端接流式时也要同一个函数，
+ * 而业务语义只许有一份（`AGENTS.md` §3.5）。签名与行为逐字未变。
  */
-interface LiveRow {
-  readonly tool: string;
-  readonly kind: 'read' | 'write';
-  readonly ok: boolean | undefined;
-  readonly note?: string;
-}
-
-/** 一轮进行中的可见状态。它只活在 `usePanelEphemeral` 里，**不落盘**。 */
-interface LiveTurn {
-  readonly text: string;
-  readonly reasoning: string;
-  readonly rows: readonly LiveRow[];
-}
-
-const EMPTY_LIVE: LiveTurn = { text: '', reasoning: '', rows: [] };
-
-/**
- * 事件 → 进行中的可见状态。**纯函数**，因为它有两条必须能被单独钉住的规则：
- *
- *   1. 文本/思考是**增量拼接**，不是替换（替换的症状是屏幕上只剩最后一个字）；
- *   2. `tool-finished` 收掉的是**同名且还在跑**的那一行，而不是"最后一行" ——
- *      事件与渲染是两条异步路径，按位置配会在并发（或重挂载）时配错行。
- */
-export function reduceAssistantLive(
-  live: LiveTurn | undefined,
-  event: AssistantTurnEvent,
-): LiveTurn {
-  const base = live ?? EMPTY_LIVE;
-  if (event.type === 'text') return { ...base, text: base.text + event.delta };
-  if (event.type === 'reasoning') return { ...base, reasoning: base.reasoning + event.delta };
-  if (event.type === 'tool-started') {
-    return { ...base, rows: [...base.rows, { tool: event.tool, kind: event.kind, ok: undefined }] };
-  }
-  const settled: LiveRow = {
-    tool: event.tool,
-    kind: event.kind,
-    ok: event.ok,
-    ...(event.note === undefined ? {} : { note: event.note }),
-  };
-  const rows = [...base.rows];
-  for (let index = rows.length - 1; index >= 0; index -= 1) {
-    const row = rows[index];
-    if (row === undefined || row.ok !== undefined || row.tool !== event.tool) continue;
-    rows[index] = settled;
-    return { ...base, rows };
-  }
-  // 没找到对应行（事件比这一轮的状态活得更久，例如面板刚重挂载过）：
-  // 补一行「已经结束」的，而不是丢掉 —— 丢掉会让用户看不到刚发生的那一步。
-  return { ...base, rows: [...rows, settled] };
-}
 
 interface AssistantEphemeralShape {
   draft: string;

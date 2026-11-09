@@ -25,12 +25,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { I18nProvider, en, zhCN } from '@heyta/i18n';
 import { HeytaUiProvider } from '@heyta/ui';
-import { planAssistantEgress } from '@heyta/app-host';
+import { planAssistantEgress, reduceAssistantLive } from '@heyta/app-host';
 import type { AiRoutingConfig } from '@heyta/ai';
 import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
 
 import { PanelEphemeralProvider } from '../src/features/ai/panel-ephemeral.js';
-import { AssistantPanel, reduceAssistantLive } from '../src/features/ai/AssistantPanel.js';
+import { AssistantPanel } from '../src/features/ai/AssistantPanel.js';
 
 const ROUTING: AiRoutingConfig = {
   enabled: true,
