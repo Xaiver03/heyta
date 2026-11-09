@@ -86,6 +86,29 @@ const SKIP_PATHS = ['research/upstream', 'research/standalone', 'research/parts'
 const UNTRACKED_LINK_OK = new Map([
   ['docs/operations/icp-app-filing.values.local.md', '真实填报值含证件号与手机号，刻意不进仓库（.gitignore 的 *.local.md）'],
   ['.agents/skills/tencent-cloud-icp-app-filing/', '指向仓库外（另一个项目）的本机 skill 软链，.gitignore 逐条拦在库外；提交进去对所有克隆者都是死链'],
+  /*
+   * 🔴 2026-11-09 起，**证据目录整体不入库**（`e760da75`）：六个 evidence 目录
+   * 当时是 824 MB / 6678 个文件、占 tracked 内容 90%，直接把远端配额撑爆
+   * （gitee 1024 MB 上限，实测 1473 MB 被拒收）。那次提交明确写了代价：
+   * 「证据不再随克隆分发，门禁若依赖这些目录，在干净克隆上会读不到」。
+   *
+   * （本注释里别写 `星号斜杠` 那种路径，它会提前把块注释关掉 —— 我踩过。）
+   *
+   * 而这把尺正是那种门禁：282 处链接在一夜之间从「目标已跟踪」变成「本机有、仓库没有」。
+   * 三条出路里，②（改成纯文字）会让证据引用失去可点性、且要改 282 处；
+   * ①（重新入库）与 `e760da75` 的结论直接冲突。所以走 ③：**按目录登记**，
+   * 理由是真的 —— 它们确实只活在本机，且这是**有意的**。
+   *
+   * ⚠️ 范围刻意停在六个目录，**不要**放宽到 `apps/` 或 `docs/`：
+   *   那等于把「本机有、仓库没有」这一半检查关掉。新出现的、不在这六个目录里的
+   *   未跟踪目标，仍然一律判红。
+   */
+  ['apps/mobile/evidence/', '验证据：2026-11-09 e760da75 起刻意不入库（占 tracked 90%），只活在本机；干净检出上必然缺失'],
+  ['apps/web/evidence/', '验证据：2026-11-09 e760da75 起刻意不入库（占 tracked 90%），只活在本机；干净检出上必然缺失'],
+  ['apps/landing/evidence/', '验证据：2026-11-09 e760da75 起刻意不入库（占 tracked 90%），只活在本机；干净检出上必然缺失'],
+  ['apps/desktop-macos/evidence/', '验证据：2026-11-09 e760da75 起刻意不入库（占 tracked 90%），只活在本机；干净检出上必然缺失'],
+  ['apps/desktop-windows/evidence/', '验证据：2026-11-09 e760da75 起刻意不入库（占 tracked 90%），只活在本机；干净检出上必然缺失'],
+  ['docs/research/evidence/', '验证据：2026-11-09 e760da75 起刻意不入库（占 tracked 90%），只活在本机；干净检出上必然缺失'],
 ]);
 
 /** 命中豁免则返回**被命中的那条登记** `[pattern, reason]`，否则 `undefined`。 */
@@ -597,6 +620,18 @@ function assertSelfTest() {
   // 那是误报，而误报的代价是别人开始忽略这条门禁。
   eq('上游克隆本机恰好存在 ⇒ 跳过（不是 local-only）', L({ inSkipPath: true }), 'skip');
   eq('上游克隆本机也没有 ⇒ 同样跳过', L({ exists: false, inSkipPath: true }), 'skip');
+
+  // (7) **证据目录豁免的形状**（2026-11-09，`e760da75` 把证据整体取消跟踪之后）。
+  //     登记表是前缀匹配，写宽一格就等于把"本机有、仓库没有"这一半检查关掉 ——
+  //     所以这里钉**三条**：六目录之内放行、目录之外不放行、宽到 `apps/` 也**不**放行。
+  eq('证据目录内的未跟踪目标 ⇒ 放行（登记过的那六目录）',
+    matchUntrackedOk('apps/web/evidence/ux-closeout/release-2026-10-08/release.json') !== undefined, true);
+  eq('证据目录之外 ⇒ 不放行（新出现的未跟踪目标仍要红）',
+    matchUntrackedOk('apps/web/src/styles/app.css') !== undefined, false);
+  eq('豁免不许宽到 apps/ 整层',
+    matchUntrackedOk('apps/web/dist/index.html') !== undefined, false);
+  eq('六目录里最深的那个也在射程内（docs/research/evidence）',
+    matchUntrackedOk('docs/research/evidence/inbound-automation-review/x.png') !== undefined, true);
 
   return problems;
 }
