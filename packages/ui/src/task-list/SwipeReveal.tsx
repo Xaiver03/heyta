@@ -104,6 +104,8 @@ export function SwipeReveal({
   const theme = useHeytaUiTheme();
   const tokens = useHeytaTokens();
   const text = useHeytaText();
+  /** token 的 RN 视图（缓动就在这一组里，见 `theme.tsx` 的 `HeytaUiNativeAccessors`）。 */
+  const native = theme.native;
 
   /** 露出来的总宽 = 动作数 × `size.swipe-action`（这一格本来就是为它准备的 token）。 */
   const revealWidth = actions.length * tokens['size.swipe-action'];
@@ -137,19 +139,41 @@ export function SwipeReveal({
         offsetPx.current = target;
         return;
       }
+      // 🔴 曲线走 token，和 `StateIllustration` 同一条取法（`native.easing(key)`）。
+      //
+      // ⚠️ **此处曾经误以为取不到**：上一版注释写着"设计变量里的 `--ht-ease-exit`
+      // 一族是给 CSS 的，RN 侧没有对应刻度，自造一组数字等于在 token 表外新建一份
+      // 裁决"，于是直接写了 `Easing.out(Easing.cubic)`。但那句话与事实不符 ——
+      // `theme.tsx` 的 `native.easing(key)` 早就把 `cubic-bezier(...)` 解析成了
+      // RN 能吃的四元组（`parseCubicBezier`，`HeytaUiNativeAccessors.easing` 的
+      // 合法 key 就是 `ease.standard` / `ease.enter` / `ease.exit` / `ease.spring`）。
+      // 结论没变（不该自造数字），但**正确做法是走 token，不是退回一个内置曲线**。
+      //
+      // 选 `ease.exit`（`cubic-bezier(0.4, 0, 1, 1)`）而不是 `ease.enter`：
+      // `animateTo` 的两个调用点都是**把这一行收回去** —— `closeNow()`（点收口按钮 /
+      // 松手没过半程 / 手势被系统收回）和 `onPanResponderTerminate`。
+      // 只有 `onPanResponderRelease` 里"松手且过了半程"那一支是开出来，
+      // 而它走的也是同一个函数、无法在这里区分方向。以**多数语义**取"退出"更诚实，
+      // 且两端都不突兀：`ease.exit` 起步快、收尾慢，收回时会**先跟手再落定**，
+      // 正合"松手后归位"的读感。若将来要把"开出来"单独区分开，
+      // 应把 key 作为参数传进来，而不是在这里凭偏移量猜。
+      const easing = native.easing('ease.exit');
       Animated.timing(offset, {
         toValue: target,
-        // 时长走 token（`duration.fast`），不自定义毫秒数；曲线是标准缓出，
-        // 设计变量里的 `--ht-ease-exit` 一族是给 CSS 的，RN 侧没有对应刻度，
-        // 自造一组数字等于在 token 表外新建一份裁决。
+        // 时长走 token（`duration.fast`），不自定义毫秒数。
         duration: tokens['duration.fast'],
-        easing: Easing.out(Easing.cubic),
+        // 回退到 `Easing.linear` 而不是再写一条内置曲线（与 `StateIllustration` 同一条）：
+        // 解析不出来说明 token 被改成了 RN 不认的形状，那是**配置缺陷**，
+        // 此时最该做的是别掩盖它。线性在这一格并不突兀 ——
+        // 位移只有 `size.swipe-action` 这个量级、`duration.fast` 又短，
+        // 用户看到的是"收回去"，不是"弹一下"。
+        easing: easing === null ? Easing.linear : Easing.bezier(...easing),
         // 与 `BottomSheet` 同一条理由：RNW 上 native driver 不是同一套实现，
         // 而位移只在松手那一次，不是每帧重排。
         useNativeDriver: false,
       }).start();
     },
-    [offset, theme.reducedMotion, tokens],
+    [native, offset, theme.reducedMotion, tokens],
   );
 
   const closeNow = useCallback((): void => {
