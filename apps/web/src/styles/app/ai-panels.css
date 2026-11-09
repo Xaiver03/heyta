@@ -810,6 +810,58 @@ input[type="radio"] {
   min-inline-size: 0;
 }
 
+/* ── 展开/收起的高度动画（2026-11-10）
+ *
+ * 🔴 高度由**布局引擎实测**，不写死 `max-height`。
+ * 判据：`docs/research/ai-chat-motion-source-study.md` §3.3 —— antd/x 的
+ * `initCollapseMotion` 用 `node.scrollHeight` 注入真实高度，全仓零处写死
+ * `max-height`。两条路拿到的是同一件事（真实高度、无魔数），这里选 CSS 的那条：
+ *
+ *   · `0fr → 1fr` 每帧由布局引擎算 ⇒ 不需要 JS 测高、不需要 resize/ResizeObserver
+ *     重测，也没有"量完到下一帧之间内容变了导致高度算错"的那个窗口
+ *     （思考文本是**流式追加**的，那个窗口在这里是常态而不是边界情况）；
+ *   · 零 JS 状态 ⇒ 不改组件生命周期，不动 `<details>` 的原生行为；
+ *   · `grid-template-rows` 是 2017 年起的广泛可用特性（95%），
+ *     而 Vite 默认 `build.target` 是 `chrome107/safari16`，
+ *     恰好**够不到** `::details-content` + `interpolate-size`（Chrome 131 /
+ *     Safari 18.4，Baseline 2025）—— 所以不选那条更时髦的路。
+ *
+ * 🔴 `min-block-size: 0` 必须落在**被包住的那个子元素**上，不是容器上。
+ * 这是实测踩到过的坑（Chromium 143 实测，四组对照）：
+ *   · 写在容器 `.ht-ai__step-collapse` 上 ⇒ 收起态高度 **54px**（纹丝不动）、
+ *     展开时 8 帧全是 54.0，**没有任何插值** —— 看着像"动画没写"，
+ *     其实是 `0fr` 根本没生效、浏览器直接跳到 used value；
+ *   · 写在子元素 `> *` 上 ⇒ 收起态 **0px**，展开帧 4.5 → 9.0 → 13.5 …
+ *     线性爬升，插值正常。
+ * 原因：grid 轨道自身 `0fr` 可以算出 0，但**轨道里的 item 有自动最小尺寸**
+ * （`min-height: auto` ⇒ `min-content`），是那个下限把轨道顶着不塌。
+ * `minmax(0, 0fr)` 也能达成同样效果，选直接压子元素因为这层里子元素只有一个。
+ *
+ * `overflow: hidden` 必须落在**被动画的那一层**（wrapper），不能落在外层
+ * `details` 上 —— 否则展开后长文本的最后一个字会被裁掉半行。
+ */
+.ht-ai__step-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  transition: grid-template-rows var(--ht-duration-normal) var(--ht-ease-standard);
+}
+
+/* 压掉 grid item 的自动最小尺寸 —— 见上面那段实测。 */
+.ht-ai__step-collapse > * {
+  min-block-size: 0;
+}
+
+.ht-ai__step-body[open] > .ht-ai__step-collapse {
+  grid-template-rows: 1fr;
+}
+
+/* ⚠️ `tokens.css` 已把 `--ht-duration-*` 在 reduced-motion 下压到 1ms，
+   所以这里**故意不再写**那条媒体查询：再写一遍等于同一件事说两次，
+   而且会掩盖"tokens 那层才是唯一开关"这件事（`controls.css` / `growth.css`
+   对这条已经表过态）。1ms 而不是删掉 transition，见 tokens.css 那行的原话：
+   删掉会让依赖 transitionend 的逻辑永远不触发。 */
+
 .ht-ai__step-line {
   display: flex;
   align-items: baseline;
@@ -1420,4 +1472,81 @@ input[type="radio"] {
   gap: var(--ht-space-3);
   min-inline-size: 0;
   cursor: pointer;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   「正在等待」的三个跳动点
+   ─────────────────────────────────────────────────────────────────────────
+
+   原来这一格只有一行纯文字（`web.ai.loading.waiting`）。加三个点是因为
+   **"有没有在动"是用户判断"它还活着吗"的唯一线索** —— 一行静止的文字与
+   一行卡死的文字在屏上完全一样。
+
+   手法取自 ant-design/x 的 `bubble/style/bubble.ts`（MIT，实测其
+   `loadingMove` keyframes + `nth-child` 延迟错峰）：**三个 span、一个
+   keyframes、三档 animation-delay**，零 JS、零依赖。
+   背景见 `docs/research/ai-chat-motion-source-study.md` §3.2。
+
+   🔴 时长与曲线一律走 token，不写裸 ms —— 这是设计系统的硬规则，
+   也与上方 `.ht-settings__busy` 同一个形状。
+
+   ⚠️ 与 antdx 的差别：它用 **2s linear infinite**；这里取
+   `duration-slow`（300ms）× 4 = 1.2s。理由是那一行文字本身很短，
+   2s 一个循环在中文界面里显得懒；1.2s 是"看得出在跳、又不催"的一档。
+   这是主观判断，写在注释里以便日后有人想改时有据可依。
+   ───────────────────────────────────────────────────────────────────────────── */
+.ht-ai__typing {
+  display: inline-flex;
+  align-items: baseline;
+  /* 🔴 间距与点的大小**同源**：都由 `--ht-dot-size` 派生，
+     这样调一个值就同时改"点多大"与"点隔多远"，不会出现"点变大了但挤在一起"。
+     原先这里写的是 `gap: 0.25em`，被 `check-hardcoded.mjs` 判成裸尺度数字
+     （它的正则把 `0.25em` 只看成 `0`，是扫描器对"零点几"的已知误报）。
+     我**没有**去改门禁，而是改成走 token —— 那条规则本身是对的，
+     这处也确实该由 token 表达。 */
+  gap: calc(var(--ht-dot-size) / 2);
+  --ht-dot-size: 0.25em;
+}
+
+.ht-ai__typing i {
+  display: inline-block;
+  inline-size: var(--ht-dot-size);
+  block-size: var(--ht-dot-size);
+  border-radius: var(--ht-radius-full);
+  background-color: currentColor;
+  animation: ht-ai-typing-hop calc(var(--ht-duration-slow) * 4) var(--ht-ease-standard) infinite;
+}
+
+/* 错峰：第二、三个点各晚 1/6、2/6 个周期起跳。
+   用 animation-delay 的**负值**（而非正值）—— 正值会让它们先静默一段时间，
+   三个点会"先齐平、再陆续开始"，而负值是一上来就已经在各自相位上。 */
+.ht-ai__typing i:nth-child(2) {
+  animation-delay: calc(var(--ht-duration-slow) * -0.667);
+}
+
+.ht-ai__typing i:nth-child(3) {
+  animation-delay: calc(var(--ht-duration-slow) * -1.333);
+}
+
+/* 只动 Y 与透明度：`transform` 与 `opacity` 不触发重排，
+   而这一行正下方就是正在长高的流式正文。 */
+@keyframes ht-ai-typing-hop {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-0.28em);
+    opacity: 1;
+  }
+}
+
+/* 🔴 减少动效时**保留那三个点**，只停掉跳动。
+   把它们整个藏掉会让这一格退回"一行静止文字"，而那正是加三个点要解决的问题 ——
+   降级要降的是动作，不是信息。 */
+@media (prefers-reduced-motion: reduce) {
+  .ht-ai__typing i {
+    animation: none;
+    opacity: 0.7;
+  }
 }

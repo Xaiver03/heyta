@@ -1165,6 +1165,23 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
       {phase === 'running' && (live === undefined || live.text === '') && (
         <p className="ht-ai__note" data-testid="ai-assistant-waiting">
           {t('web.ai.loading.waiting')}
+          {/*
+            🔴 三个点是**装饰**，所以整块标 `aria-hidden`。
+
+            理由："有没有在动"对看得见的用户是"它还活着吗"的唯一线索
+            （一行静止文字与一行卡死文字在屏上完全一样），但读屏用户拿不到
+            这个线索、也不需要它 —— 对他们来说那几个点是三个没有名字的空元素，
+            念出来只会是噪音。文案本身（"正在等待…"）才是给读屏的信息。
+
+            ⚠️ 因此 `.ht-ai__typing` 的 `<i>` **不承载任何语义**：
+            没有内容、没有 testid、不参与断言。判据挂在文案那一行
+            （`ai-assistant-waiting`，已有测试在用）。
+          */}
+          <span className="ht-ai__typing" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
         </p>
       )}
 
@@ -1270,6 +1287,25 @@ function TraceRows(props: {
  *
  * 模型想什么不是答案：把它和正文混在一起，用户会把推测当成结论读。
  * 展开能看全，收起时那半句足够判断"它有没有在瞎想"。
+ *
+ * ── 展开/收起的高度动画（2026-11-10）
+ *
+ * 🔴 用具名 `grid-template-rows: 0fr → 1fr`，**不是** `max-height`。
+ * 判据在 `docs/research/ai-chat-motion-source-study.md` §3.3：antd/x 的
+ * `initCollapseMotion` 用 `node.scrollHeight` **实测**高度，全仓找不到一处
+ * 写死的 `max-height` —— 因为写死必然二选一：要么小到裁掉长的思考，
+ * 要么大到让短思考的收起动作有半秒钟"已经在动但看不见在动"的假死期。
+ * `0fr → 1fr` 拿到的是同一个东西（真实高度、无魔数），但由布局引擎在每帧算，
+ * 不需要 JS 测高、不需要监听 resize、也没有"测完到下一帧之间内容变了"的窗口。
+ *
+ * 结构上只加了一层 `.ht-ai__step-collapse` 包住正文：
+ *   · `<details>/<summary>` **原样保留** —— 键盘（Enter/Space）、读屏的
+ *     展开语义与其状态播报、以及浏览器自带的"页内查找自动展开"全都靠它；
+ *     换成 `<div>` + `onClick` 是实打实的**倒退**，不做。
+ *   · 那层 wrapper 是纯布局容器（`<div>`，无 tabindex、无 role、无事件），
+ *     不进无障碍树、不参与 tab 顺序 ⇒ 可访问性与改动前逐字相同。
+ *   · 🔴 原来那个 `<p class="ht-ai__note">` 仍在这层里、仍是唯一的文本节点，
+ *     所以 `data-testid="ai-chat-reasoning"` 的文本内容断言一字不变。
  */
 function ReasoningRow(props: { text: string; t: I18nValue['t'] }): React.JSX.Element {
   const firstLine = props.text.split('\n')[0] ?? '';
@@ -1279,7 +1315,9 @@ function ReasoningRow(props: { text: string; t: I18nValue['t'] }): React.JSX.Ele
         <span className="ht-ai__step-verb">{props.t('web.ai.chat.step.thinking')}</span>
         <span className="ht-ai__step-detail">{firstLine}</span>
       </summary>
-      <p className="ht-ai__note">{props.text}</p>
+      <div className="ht-ai__step-collapse">
+        <p className="ht-ai__note">{props.text}</p>
+      </div>
     </details>
   );
 }
