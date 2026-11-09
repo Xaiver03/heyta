@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Context7 实时文档检索（本机安装版）
+#   context7 search "<库名>"
+#   context7 docs <库ID> "<单主题问题>"
+# 端点 https://mcp.context7.com/mcp（免 API Key，限流较低）
+# 需要代理：https_proxy=http://127.0.0.1:65411
+set -euo pipefail
+export https_proxy="${https_proxy:-http://127.0.0.1:65411}"
+export http_proxy="${http_proxy:-http://127.0.0.1:65411}"
+exec python3 "$(dirname "$0")/context7.py" "$@"
