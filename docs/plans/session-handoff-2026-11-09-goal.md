@@ -96,7 +96,10 @@
 [`product-principles §1.2.1`](product-principles-2026-11.md)：2 保留 / 1 只删半句）。
 其中 `keyNotice` 的第三个分句「桌面端会把密钥存进系统钥匙串」是**假话**，已删（依据写在
 `AiSettings.tsx` 那条注释里：桌面 GUI 载的就是 `apps/web/dist`，密钥只在内存）。
-⇒ 下一个最密的文件：`InboundAutomationSettings.tsx`（3 处）、`PasswordPanel.tsx`（3 处）。
+⇒ 下一个最密的文件：`InboundAutomationSettings.tsx`（**4 处**）、`PasswordPanel.tsx`（**4 处**）。
+⚠️ 口径是 `grep -n "<SettingsInfoTip" <文件>`。这个「处」是**JSX 调用点**，不是渲染实例：
+`AiSettings.tsx:1623` 那处在通用 `Toggle` 里，它对每个传了 `tip` 的开关各渲染一枚。
+所以 45 这个数别再往下拆成「用户能看到多少枚问号」—— 那是另一个量，没人量过。
 
 ⚠️ 同一事实错误在 `packages/legal/src/documents/personal-info-list.ts` 里还有一份，
 **没动**（对外披露文案走 `check:legal-*`），已登记在 product-principles §1.3 #7。
