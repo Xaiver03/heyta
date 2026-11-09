@@ -416,13 +416,33 @@ function makeStreamingResponse(
  *    替换 `consentFetch`（或并列导出），保证请求仍过闸门；
  * 2. `apps/mobile/src/ai/chat-controller.ts` 把它的 `routed` 里补上
  *    `fetchImpl: streamingFetch`（`routing.ts:760` 有这个注入缝）；
- * 3. 同处补 `onEvent`，并把事件喂进一个与 web 版同形的 `LiveTurn`
- *    （web 的 `reduceAssistantLive` 是纯函数，可考虑下沉到 `@heyta/app-host`
- *    两端共用，而不是在移动端抄一份 —— 抄一份就是 AGENTS.md 说的"五份披露"那类事故）。
+ * 3. ~~同处补 `onEvent`~~ —— ✅ **已完成**（2026-11-10）。
+ *    `onEvent` 已接、`live` 已加进 `ChatSnapshot`、`AssistantScreen` 已渲染它。
+ *    事件归约用的 `reduceAssistantLive` 也**已下沉到 `@heyta/app-host`**
+ *    （commit `e4f32e0d`），移动端直接 import，没有抄第二份。
+ *    ⇒ **剩下的只有第 2 步**：把 `fetchImpl` 接上，`live` 才会真的有值。
+ *    在它接上之前，第 3 步是"接好了但通常拿不到数据"的状态 ——
+ *    因为 RN 的 `fetch` 响应没有可读 body，`routing.ts` 会退回整份读取。
  *
- * 🔴 为什么先不接：XHR 的增量行为**只能真机验证**
+ * 🔴 为什么第 2 步先不接：XHR 的增量行为**只能真机验证**
  * （`readyState 3` 何时给数据、`responseText` 是否真的累积、HTTP/2 下会不会被缓冲）。
  * 先接上再让用户在真机上发现问题，比"没做"更糟 —— 那会把一个未验证的
  * 行为当成已交付的能力。
+ */
+/**
+ * 接线状态标记 —— **不是开关**，是给后来者的一句话状态。
+ *
+ * 🔴 它的值是 `true`（仍待真机验证），不是"功能关着"的意思。
+ * 之所以做成常量而不是注释：`grep` 得到它，而注释会被挖走。
+ *
+ * 现状（2026-11-10）：
+ *   · ✅ `onEvent` 已接（`chat-controller.ts`），`live` 已在状态与界面上；
+ *   · ✅ `reduceAssistantLive` 已下沉到 `@heyta/app-host`（`e4f32e0d`）；
+ *   · ⏳ **只差第 2 步**：把 `fetchImpl` 换成 `createGatedStreamingFetch(...)`。
+ *
+ * ⚠️ 在那一刻到来之前，移动端的流式**不会真的生效**：
+ * RN 的 `fetch` 响应没有可读 body，`routing.ts` 会退回整份读取，
+ * `live` 恒为 `undefined`，界面走的还是"整段回来再显示"。
+ * 这是**故意的**：退化方向是"能出结果"，而不是"接上流然后卡住"。
  */
 export const STREAMING_WIRING_PENDING_DEVICE_VERIFICATION = true as const;
