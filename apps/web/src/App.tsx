@@ -1774,11 +1774,38 @@ export function App(): React.JSX.Element {
    * 这里在**根上**解析一次并传下去，嵌套的 25 层 Provider 会继承它
    * （见 `packages/ui/src/theme.tsx`）。
    *
-   * ⚠️ `reducedMotion` 刻意不传（取 `false`）：与改前逐层解析时的实际取值一致，
-   * web 的动效偏好由 `tokens.css` 的 `@media (prefers-reduced-motion)` 负责；
-   * 要让 RN 层也响应它，得单独接 `matchMedia` 并订阅变化，那是另一件事。
+   * ⚠️ `reducedMotion` 原先**刻意不传**（取 `false`），理由是"web 的动效偏好由
+   * `tokens.css` 的 `@media (prefers-reduced-motion)` 负责"。
+   * 那句话对 **CSS 动画**成立，对 **JS 驱动的动画不成立** ——
+   * 媒体查询管不到 `requestAnimationFrame` 里的逐帧推进。
+   * 2026-11-10 加流式揭示动效（`packages/ui/src/ai/reveal.ts`）时这条取舍失效了：
+   * 不接上它，开了"减少动态效果"的用户**照样**会看到逐字动画 ——
+   * 而那正是这个无障碍开关要阻止的事。
+   * ⇒ 现在按与 `systemPrefersDark` 完全相同的形状订阅（含会话中途改设置）。
    */
-  const uiTheme = useMemo(() => resolveHeytaUiTheme({ scheme: theme }), [theme]);
+  const [systemPrefersReducedMotion, setSystemPrefersReducedMotion] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false),
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const query = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (query === undefined) return undefined;
+    const onChange = (event: MediaQueryListEvent): void =>
+      setSystemPrefersReducedMotion(event.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+
+  const uiTheme = useMemo(
+    () =>
+      resolveHeytaUiTheme({
+        scheme: theme,
+        reducedMotion: systemPrefersReducedMotion,
+      }),
+    [theme, systemPrefersReducedMotion],
+  );
 
   // 「今天」视图需要 now 保持新鲜，否则跨过午夜后它不会更新
   useEffect(() => {

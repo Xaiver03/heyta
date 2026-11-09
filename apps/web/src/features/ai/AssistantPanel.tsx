@@ -100,7 +100,15 @@ import type { LocalApiHost } from '@heyta/local-api';
 import { AiDisclosureHost } from './AiDisclosureHost.js';
 import { AiPanelHeadHost } from './AiPanelHeadHost.js';
 import { AiPanelHost } from './AiPanelHost.js';
-import { AiGeneratedLabel, EmptyState, HeytaUiProvider } from '@heyta/ui';
+import {
+  AiGeneratedLabel,
+  applyScrollIntent,
+  EmptyState,
+  HeytaUiProvider,
+  shouldFollowOnContentChange,
+  useHeytaUiTheme,
+  useStreamReveal,
+} from '@heyta/ui';
 import { assistantFailureCopy } from './ai-failure-copy.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import { FailureSettingsAction } from './RouteUnavailable.js';
@@ -159,6 +167,23 @@ export interface AssistantPanelProps {
    * 配额满时写失败。两者都不许把面板带崩。
    */
   historyStorage?: HistoryStorage | null;
+  /**
+   * 是否给流式回答播**逐字揭示**动效。默认 `true`；注入**只为测试**。
+   *
+   * 🔴 为什么要做成 prop 而不是自动判环境：
+   * 本文件的组件测试断言的是**数据契约** —— "流到某一刻屏上的文本等于已到达的
+   * 文本"（见 `tests/ai-assistant-panel.spec.tsx` 的
+   * 「工具行在跑的时候就出现；文本逐字进同一个气泡」）。若揭示引擎在那些用例里
+   * 自动播放，断言就会去考"动画播到第几帧"，把数据契约测成时序契约 ——
+   * 那是把测试变脆，不是把功能测严。
+   *
+   * 引擎本身的行为由 `packages/ui/tests/ai-reveal.spec.ts` 用**假时钟**单独测穿
+   * （推进、追赶、代际重置、降级各一条），所以关掉这里的播放**不减少任何判据**。
+   *
+   * ⚠️ 真实用户路径上它恒为 `true`；e2e（`check:ai-e2e`）走的是真实浏览器，
+   * 那里动效照常播放 —— 想验证动效本身，判据在 e2e 或 `ai-reveal.spec.ts`。
+   */
+  revealStream?: boolean;
 }
 
 /** 界面上的一条消息（类型定义在 `assistant-transcript.ts`，落盘层共用它）。 */
@@ -276,6 +301,30 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   }));
   const ephemeral = usePanelEphemeral('assistant', session.account, initialSession);
   const { draft, phase, confirmationErrors, items, live, disclosed, controls } = ephemeral.value;
+
+  /**
+   * 流式逐字揭示（见 `packages/ui/src/ai/reveal.ts` 的文件头）。
+   *
+   * 🔴 三条边界，每一条都有理由：
+   *
+   * 1. **数据层不动**：`live.text` 仍是"到达即完整"的那个值，历史、测试、
+   *    可访问性都以它为准。这里只算**该显示什么**。
+   * 2. **`reducedMotion` 时整体关闭**：减少动效的用户要的是"内容照常出现、
+   *    只是别动"，不是"内容慢慢挤出来"。关掉后 hook 立即返回完整文本。
+   *    ⚠️ 这个值来自 `useHeytaUiTheme()`，而 web 的根 Provider 原先**恒为 false**
+   *    （理由写在 `App.tsx` 的 `resolveHeytaUiTheme` 那里）—— 2026-11-10 起
+   *    根上按 `prefers-reduced-motion` 真实订阅，CSS 媒体查询管不到 JS 动画，
+   *    所以这一条不是可选项。
+   * 3. **`props.revealStream`**：测试关掉它，理由见 props 定义处的注释。
+   *
+   * ⚠️ hook 必须**无条件调用**（React 规则），所以 `enabled` 是算出来传进去的，
+   * 不是 `if (…) useStreamReveal(…)`。
+   */
+  const { reducedMotion } = useHeytaUiTheme();
+  const revealedText = useStreamReveal(live?.text ?? '', {
+    enabled: (props.revealStream ?? true) && !reducedMotion,
+  });
+
   const setItems = (next: readonly ChatItem[] | ((previous: readonly ChatItem[]) => readonly ChatItem[])): void => {
     ephemeral.write(session.account, (previous) => ({
       items: typeof next === 'function' ? next(previous.items) : next,
@@ -287,9 +336,38 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   const historyCloseRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
+  /**
+   * 是否跟随最新内容（流式期间自动滚到底）。
+   *
+   * 🔴 它**不是** `useState`：跟随状态每收到一个 scroll 事件就要读一次，
+   * 而绝大多数事件不改变它（用户在同一位置反复滚）。用 `useState` 会让
+   * 每次 scroll 都可能触发一次重渲染，而重渲染又会改变依赖数组、
+   * 让下面的滚动 effect 重跑 —— 那正是"滚动时卡顿"的经典成因。
+   *
+   * 用 ref 存状态、只在**真的变化**时（`changed`）才同步到 state 触发滚动。
+   */
+  const followRef = useRef(true);
   useEffect(() => {
     const conversation = conversationRef.current;
     if (conversation === null) return;
+
+    /**
+     * 🔴 用户滚动 → 更新跟随状态。
+     *
+     * 判据在 `@heyta/ui` 的 `applyScrollIntent`（纯函数、两端共用、有独立测试）：
+     * 用户滚到离底部 24px 以内 ⇒ 恢复跟随；明确滚上去 ⇒ 停止跟随。
+     * 这条挡的是"用户往上翻历史时被流式内容拽回底部"。
+     */
+    const onScroll = (): void => {
+      const decision = applyScrollIntent(followRef.current, {
+        offset: conversation.scrollTop,
+        contentHeight: conversation.scrollHeight,
+        viewportHeight: conversation.clientHeight,
+      });
+      followRef.current = decision.follow;
+    };
+    conversation.addEventListener('scroll', onScroll, { passive: true });
+
     const disclosure = phase === 'disclose'
       ? conversation.querySelector<HTMLElement>('[data-testid="ai-assistant-disclosure"]')
       : null;
@@ -301,15 +379,45 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         ? conversation.scrollHeight
         : conversation.scrollTop + disclosure.getBoundingClientRect().top - conversation.getBoundingClientRect().top;
     };
-    revealLatest();
+    /**
+     * 🔴 只在"该跟随"时滚。
+     *
+     * 披露块是**强制的**（必须让用户看到才知道要发什么），所以即使他刚滚上去
+     * 也照样对齐 —— 那是流程要求，不是内容更新。
+     * 其余情况一律看 `followRef.current`。
+     */
+    if (disclosure !== null || shouldFollowOnContentChange(followRef.current)) {
+      revealLatest();
+    }
     disclosure?.querySelector<HTMLButtonElement>('[data-testid="ai-assistant-disclosure-close"]')?.focus({ preventScroll: true });
     // Settings temporarily hide this surface. Re-establish the disclosure's
     // position when it becomes measurable again, including after a resize.
-    if (disclosure === null || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(revealLatest);
-    observer.observe(conversation);
-    return () => observer.disconnect();
-  }, [items.length, phase]);
+    //
+    // ⚠️ 这里**不能**用 `if (disclosure === null) return;` 提前返回 ——
+    // 上面挂了 scroll 监听，提前返回会让它永远摘不掉（每渲染一次多挂一个）。
+    // 下面这段用 `observer` 可空 + 统一的清理函数收口。
+    let observer: ResizeObserver | null = null;
+    if (disclosure !== null && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(revealLatest);
+      observer.observe(conversation);
+    }
+    return () => {
+      conversation.removeEventListener('scroll', onScroll);
+      observer?.disconnect();
+    };
+    /**
+     * 🔴 依赖数组里有 `live?.text` 与 `revealedText`，这是**流式跟随**的关键。
+     *
+     * 改之前这里是 `[items.length, phase]` —— 两者都只在"一轮开始/结束"时变，
+     * 于是**流式期间新到的字一个都不会触发滚动**：回答长过一屏之后，
+     * 用户只能眼看着文字在屏幕外继续生成（实测缺口，见
+     * `docs/research/ai-chat-motion-source-study.md` §1.6）。
+     *
+     * 用 `revealedText` 而不是只用 `live?.text`：前者每个揭示帧都在变，
+     * 于是滚动能跟着**显示出来的内容**走，而不是等整段到达才跳一次。
+     * 两者都列是因为降级路径（揭示关闭）下只有 `live?.text` 会变。
+     */
+  }, [items.length, phase, live?.text, revealedText]);
   useEffect(() => {
     if (historyOpen) historyCloseRef.current?.focus();
   }, [historyOpen]);
@@ -967,9 +1075,24 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
             >
               {live.reasoning !== '' && <ReasoningRow text={live.reasoning} t={t} />}
               <TraceRows rows={live.rows} t={t} live />
-              {live.text !== '' && (
+              {/*
+                🔴 显示的是 `revealedText`（逐字揭示的进度），**判断**用的是
+                `live.text`（已到达的内容）。两者分开是刻意的：
+
+                  · 显示要慢 —— 那是动效；
+                  · 判断要快 —— "该不该挂法定标识"不该等动画追上。
+
+                ⚠️ 但标识本身必须等**至少有一个字画出来**才挂：一个只有
+                "AI 生成合成内容"悬浮在空气泡里的瞬间，比晚 30ms 挂上更难看。
+                所以条件是 `revealedText !== ''`，而不是 `live.text !== ''`。
+                代价说清楚：从流开始到第一个字画出（最长 ~5ms，
+                见 `REVEAL_DEFAULTS.maxCharIntervalMs`）这一瞬，屏上是空的 ——
+                那与"还没开始回话"在视觉上无从区分，也正是 `ai-assistant-waiting`
+                那一行还在的原因（它的条件用的是 `live.text`）。
+              */}
+              {revealedText !== '' && (
                 <>
-                  <span data-testid="ai-chat-live-text">{live.text}</span>
+                  <span data-testid="ai-chat-live-text">{revealedText}</span>
                   {/*
                     🔴 法定标识在**流式的每一刻**都要在：这段字是模型生成的，
                     而"它生成完了没有"不是用户能判断的事。只在收尾才挂上，

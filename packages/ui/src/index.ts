@@ -1313,6 +1313,41 @@ export {
   type AiGeneratedLabelStyle,
 } from './ai/generated-label-style.js';
 
+/* 流式揭示：把「已到达的完整文本」按节奏逐字显示。
+   🔴 引擎（`reveal.ts`）是**纯逻辑 + 注入时钟**，不依赖 React、不依赖 RN 或 DOM，
+   所以它能在 node 里用假时钟测穿（见 `tests/ai-reveal.spec.ts`）。
+   本包是单份代码跑 web + RN，动效必须两边都能用 —— 这是它不被写成
+   CSS 动画或 `Animated` 直接调用的原因（判据见
+   `docs/research/ai-chat-motion-source-study.md` §4.2）。
+   ⚠️ `useStreamReveal` 只做"该显示什么"，**不回写数据层** ——
+   `live.text` 仍是到达即完整的那个值，测试与历史都以它为准。 */
+export {
+  advanceReveal,
+  createReveal,
+  REVEAL_DEFAULTS,
+  type Reveal,
+  type RevealClock,
+  type RevealOptions,
+  type RevealStep,
+} from './ai/reveal.js';
+export { useStreamReveal, type UseStreamRevealOptions } from './ai/use-stream-reveal.js';
+
+/* 流式跟随：**什么时候该自动滚到底、什么时候不该**。
+   🔴 判定与执行分开：本模块只判"该不该跟"，怎么滚由调用方做 ——
+   DOM 是 scrollTop/scrollHeight/clientHeight，RN 是 onScroll 的三个字段，
+   而 `packages/ui` 是单份代码跑两端，判定逻辑必须与滚动容器无关。
+   背景见 `docs/research/ai-chat-motion-source-study.md` §2.3（assistant-ui 为
+   同一件事写了 544 行状态机；我们只取跨平台的那部分判断）。 */
+export {
+  applyScrollIntent,
+  distanceFromBottom,
+  FOLLOW_THRESHOLD_PX,
+  isNearBottom,
+  shouldFollowOnContentChange,
+  type FollowDecision,
+  type ScrollGeometry,
+} from './ai/follow-scroll.js';
+
 /* 清单删除确认的第二句后果的取数：删一条**文件夹**时，它底下的子清单会整支
    从侧栏消失（`toOrganizerTree` 的已知取舍，见 `./projects/model.ts` 那里的注释）。
    🔴 确认框的**第一句**（里面还有几条活任务）不在本包转出 —— 那是

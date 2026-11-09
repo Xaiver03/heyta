@@ -182,6 +182,22 @@ async function render(props: {
           host={props.host}
           {...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl })}
           {...(props.historyStorage === undefined ? {} : { historyStorage: props.historyStorage })}
+          /*
+            🔴 本文件测的是**数据契约**，不是动效：断言形如"流到某一刻，
+            屏上的文本等于已到达的文本"。开启逐字揭示后，屏上的文本会滞后于
+            已到达的文本，于是这些断言会变成在考"动画播到第几帧" ——
+            那是把数据契约测成时序契约，把测试变脆，而不是把功能测严。
+
+            引擎本身由 `packages/ui/tests/ai-reveal.spec.ts` 用**假时钟**单独测穿
+            （自适应追赶、代际重置、降级、上限封顶各一条，且每条都做过变异验证
+            确认能失败），所以关掉这里的播放**不减少任何判据**。
+
+            ⚠️ jsdom 的 `requestAnimationFrame` 约 16ms 才回调，而本文件的
+            `settle()` 只等 `setTimeout(0)` × 8（合计约 0ms）—— 就算不改这个开关，
+            动画在这里也几乎推不动，那会让断言的结果取决于"恰好跑了几帧"，
+            是最难查的一类不稳定。
+          */
+          revealStream={false}
         />
         </HeytaUiProvider>
       </PanelEphemeralProvider>
