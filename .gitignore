@@ -95,7 +95,10 @@ live-site-results/
 # ⚠️ 它旁边那个 `e2e/lang-shots-evidence/` **不忽略**，那是刻意的两件事：
 # `-results` 是"每次跑都不一样"的调试残留，而 `e2e/lang-shots-evidence/` 里是
 # AGENTS §6.2 规定一要求的那批**改前/改后取证图**（文件名带 before/after 前缀，
-# 改前那一趟跑完就再也复现不出来），与 `apps/desktop-macos/evidence/` 同类。
+# 改前那一趟跑完就再也复现不出来）。
+# ⚠️ 它原先写「与 apps/desktop-macos/evidence/ 同类」，而 2026-11-09 起
+#    那批 apps/*/evidence/ 不再入库（见文件末尾那一段）⇒ 这条类比已不成立，
+#    现在就只剩 e2e/lang-shots-evidence/ 自己还是入库的。
 lang-shots-results/
 # `live-signin-entry.spec.ts` 的专属取证目录（同上一条理由：不跟共享目录挤，
 # 否则别的套件跑一轮就把人还没看的图删了）。
@@ -270,3 +273,22 @@ apps/web/evidence/web-ui-sweep-latest/
 
 # 软著材料（含主体证件、运行截图与申请表信息）
 docs/operations/software-copyright/
+
+# ── 验收证据图：2026-11-09 起不再入库 ────────────────────────────────────────
+# 🔴 现量（同日）：这些目录合计 824 MB / 6678 个文件，占 tracked 内容 90%
+#    （代码 + 文档只有 93 MB）。后果不是「脏」，是仓库实质变成截图归档：
+#    克隆慢、远端配额被撑爆（gitee 1024 MB 上限，实测 1473 MB 打头）、
+#    而且每轮重拍都产生一批没人看得懂的二进制 diff。
+#
+#    政策来源：产品负责人 2026-11-09「直接放在 Git ignore 就行了」。
+#    历史里那 824 MB 已于同日用 git filter-repo 清出（提交数与代码历史不变）。
+#    清前快照：~/heyta-rewrite-backup-20261109-093552/（.git 整包 + 证据清单）。
+#
+# ⚠️ 代价要认：证据因此不再随克隆分发。需要长期留档的取证图应另存
+#    （单独仓 / CI artifact / 本机归档），不要再靠 git 历史承载。
+# ⚠️ 门禁若依赖 apps/*/evidence/ 下的文件，在干净克隆上会读不到 ——
+#    真出现那种红，改的是那条判据的载体，不是把它加回本文件的例外。
+apps/*/evidence/
+docs/research/evidence/
+docs/research/spikes/*/evidence/
+e2e/apps/*/evidence/
