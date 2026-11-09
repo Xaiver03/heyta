@@ -827,15 +827,21 @@ input[type="radio"] {
  *     Safari 18.4，Baseline 2025）—— 所以不选那条更时髦的路。
  *
  * 🔴 `min-block-size: 0` 必须落在**被包住的那个子元素**上，不是容器上。
- * 这是实测踩到过的坑（Chromium 143 实测，四组对照）：
- *   · 写在容器 `.ht-ai__step-collapse` 上 ⇒ 收起态高度 **54px**（纹丝不动）、
- *     展开时 8 帧全是 54.0，**没有任何插值** —— 看着像"动画没写"，
- *     其实是 `0fr` 根本没生效、浏览器直接跳到 used value；
+ * 这是实测踩到过的坑（Chromium 143，四组对照）：
+ *   · 写在容器 `.ht-ai__step-collapse` 上 ⇒ 收起态高度 **54px**（纹丝不动）；
  *   · 写在子元素 `> *` 上 ⇒ 收起态 **0px**，展开帧 4.5 → 9.0 → 13.5 …
- *     线性爬升，插值正常。
- * 原因：grid 轨道自身 `0fr` 可以算出 0，但**轨道里的 item 有自动最小尺寸**
+ * 原因：grid 轨道自身 `0fr` 能算出 0，但**轨道里的 item 有自动最小尺寸**
  * （`min-height: auto` ⇒ `min-content`），是那个下限把轨道顶着不塌。
- * `minmax(0, 0fr)` 也能达成同样效果，选直接压子元素因为这层里子元素只有一个。
+ *
+ * 🔴 触发**不用** `details[open]`，用 `.ht-ai__step-collapse--open`。
+ * 实测（Chromium 143，两臂同页面只改触发方式）：
+ *   · `details:not([open]) … { grid-template-rows: 0fr }` ⇒ 收起帧
+ *     `140 140 140 …` 全程不动，**收起是瞬跳**；
+ *   · 元素自己的 class ⇒ 收起帧 `72 66 60 54 48 42 36 30`，正常插值。
+ * 因为 `[open]` 一摘掉，UA 样式就**同步**把子树移出渲染（原生方案要
+ * `content-visibility … allow-discrete` 正是为了对付这个，而它够不到
+ * 我们的 `chrome107/safari16` 目标）⇒ 子树不参与布局 ⇒ 过渡被整个跳过。
+ * 组件侧因此让 `details` 常驻 `open`，把这个 class 当"视觉收起"的表达。
  *
  * `overflow: hidden` 必须落在**被动画的那一层**（wrapper），不能落在外层
  * `details` 上 —— 否则展开后长文本的最后一个字会被裁掉半行。
@@ -852,7 +858,7 @@ input[type="radio"] {
   min-block-size: 0;
 }
 
-.ht-ai__step-body[open] > .ht-ai__step-collapse {
+.ht-ai__step-collapse--open {
   grid-template-rows: 1fr;
 }
 

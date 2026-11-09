@@ -1290,32 +1290,90 @@ function TraceRows(props: {
  *
  * ── 展开/收起的高度动画（2026-11-10）
  *
- * 🔴 用具名 `grid-template-rows: 0fr → 1fr`，**不是** `max-height`。
- * 判据在 `docs/research/ai-chat-motion-source-study.md` §3.3：antd/x 的
- * `initCollapseMotion` 用 `node.scrollHeight` **实测**高度，全仓找不到一处
- * 写死的 `max-height` —— 因为写死必然二选一：要么小到裁掉长的思考，
- * 要么大到让短思考的收起动作有半秒钟"已经在动但看不见在动"的假死期。
- * `0fr → 1fr` 拿到的是同一个东西（真实高度、无魔数），但由布局引擎在每帧算，
- * 不需要 JS 测高、不需要监听 resize、也没有"测完到下一帧之间内容变了"的窗口。
+ * 🔴 高度由**布局引擎实测**，不写死 `max-height`。
+ * 判据：`docs/research/ai-chat-motion-source-study.md` §3.3 —— antd/x 的
+ * `initCollapseMotion` 用 `node.scrollHeight` 注入真实高度，全仓零处写死
+ * `max-height`。两条路拿到的是同一件事（真实高度、无魔数），这里选 CSS 的那条：
+ *
+ *   · `0fr → 1fr` 每帧由布局引擎算 ⇒ 不需要 JS 测高、不需要 resize/ResizeObserver
+ *     重测，也没有"量完到下一帧之间内容变了导致高度算错"的那个窗口
+ *     （思考文本是**流式追加**的，那个窗口在这里是常态而不是边界情况）；
+ *   · `grid-template-rows` 是 2017 年起的广泛可用特性，而 Vite 默认
+ *     `build.target` 是 `chrome107/safari16`，恰好**够不到**原生那条路
+ *     （`::details-content` + `interpolate-size` + `allow-discrete`：
+ *     Chrome 131 / Safari 18.4，Baseline 2025）。
+ *
+ * 🔴 为什么必须自己接管开合（不能只靠 CSS 的 `[open]`）—— 全部逐帧实测
+ *
+ *   最直觉的写法 `details[open] > .c { grid-template-rows: 1fr }` 实测
+ *   **只有展开会动、收起是瞬跳**（Chromium 143，纯 DOM 两臂对照）：
+ *
+ *     · 靠 `[open]` 触发：收起帧 `72 72 72 72 … 72`，终值仍是 72 ❌
+ *     · 靠元素自己的 class 触发：收起帧 `72 68 64 60 … 0` ✅
+ *
+ *   原因：`[open]` 一摘掉，UA 样式就**同步**把整棵子树移出渲染
+ *   （这正是原生方案要 `content-visibility … allow-discrete` 的原因，
+ *   而它够不到我们的 `chrome107/safari16` 目标）。
+ *   子树不参与布局 ⇒ 没有可插值的端点 ⇒ 过渡被整个跳过。
+ *   补充实测：即使在 `toggle` 回调里**同步**加 class（那一刻量到子树还在、
+ *   高度仍是 72），后续帧也照样纹丝不动 —— 说明 UA 在派发 `toggle` 前
+ *   就已经把子树判出渲染了，来不及救。
+ *
+ *   ⇒ 所以 `<details>` 常驻 `open`，由我们自己接管开合。
+ *
+ * 🔴 接管点选在 `summary` 的 `click`，**不是** `toggle`：实测（Chromium 143）
+ *   一次点击会派发**两发** `toggle`（`open:true` 然后 `open:false`），
+ *   而且"收起态"与"浏览器内部的 open"永远对不上，靠 `toggle` 推断用户意图
+ *   会出现"点一次之后每次都当成展开"的死结（试过 4 种闸门写法，全部卡住）。
+ *
+ *   `preventDefault()` 掉 `summary` 的 click 就干净了，而且**键盘不丢**：
+ *   实测 `Enter` 与 `Space` 在 `summary` 上都会合成一次 `click`
+ *   （事件序列 `keydown:Enter → click`、`keydown:" " → click`）⇒
+ *   一个 `onClick` 同时覆盖鼠标、触摸、键盘与读屏激活。
+ *
+ * 🔴 代价与补偿（说清楚，不藏）：
+ *   · 因为不再真的切换 `open`，读屏靠 `open` 判断的展开状态会失真 ⇒
+ *     显式挂 `aria-expanded={!collapsed}` 把它补回来。
+ *   · `summary` 在无障碍树里本来就是 button 角色（不是靠 `open` 才有语义），
+ *     所以"这是一个可展开的控件"这一点没有丢。
+ *   · 缺 JS 时：`open` 常驻 ⇒ 正文直接可见（最差退回"不折叠"，
+ *     而不是"点不开"），比改动前更不容易坏。
  *
  * 结构上只加了一层 `.ht-ai__step-collapse` 包住正文：
- *   · `<details>/<summary>` **原样保留** —— 键盘（Enter/Space）、读屏的
- *     展开语义与其状态播报、以及浏览器自带的"页内查找自动展开"全都靠它；
- *     换成 `<div>` + `onClick` 是实打实的**倒退**，不做。
  *   · 那层 wrapper 是纯布局容器（`<div>`，无 tabindex、无 role、无事件），
- *     不进无障碍树、不参与 tab 顺序 ⇒ 可访问性与改动前逐字相同。
+ *     不进无障碍树、不参与 tab 顺序；
  *   · 🔴 原来那个 `<p class="ht-ai__note">` 仍在这层里、仍是唯一的文本节点，
  *     所以 `data-testid="ai-chat-reasoning"` 的文本内容断言一字不变。
  */
 function ReasoningRow(props: { text: string; t: I18nValue['t'] }): React.JSX.Element {
   const firstLine = props.text.split('\n')[0] ?? '';
+  /** true = 视觉收起（默认收起：只露第一行，见上面那段说明）。 */
+  const [collapsed, setCollapsed] = useState(true);
   return (
-    <details className="ht-ai__step-body" data-testid="ai-chat-reasoning">
-      <summary className="ht-ai__step-line">
+    <details
+      className="ht-ai__step-body"
+      data-testid="ai-chat-reasoning"
+      // 🔴 常驻 open：别让 UA 把子树摘出渲染，否则收起没有过渡可言。
+      open
+    >
+      <summary
+        className="ht-ai__step-line"
+        // 视觉状态既然由我们持有，就把展开状态显式告诉读屏。
+        aria-expanded={!collapsed}
+        onClick={(event) => {
+          // 拦掉原生开合（它会同步隐藏子树）；键盘的 Enter/Space 也会走这里。
+          event.preventDefault();
+          setCollapsed((prev) => !prev);
+        }}
+      >
         <span className="ht-ai__step-verb">{props.t('web.ai.chat.step.thinking')}</span>
         <span className="ht-ai__step-detail">{firstLine}</span>
       </summary>
-      <div className="ht-ai__step-collapse">
+      <div
+        className={
+          collapsed ? 'ht-ai__step-collapse' : 'ht-ai__step-collapse ht-ai__step-collapse--open'
+        }
+      >
         <p className="ht-ai__note">{props.text}</p>
       </div>
     </details>
