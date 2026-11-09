@@ -191,7 +191,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 | 10.2 | 全量导出（JSON / CSV / ICS） | ✅ | 🟡 | JSON（含墓碑 + 完整 op-log + 可核对 counts）与 Markdown — `packages/app-host/src/export-dump.ts:224`；入口 web `ExportPanel.tsx`、mobile `ExportScreen.tsx`、CLI `apps/node-host/src/cli.ts:380` | **无 CSV、无 ICS**；导入只支持**还原到空库**（`import-dump.ts:266-273` 硬闸：目标非空直接拒绝 —— **这是有意的产品结论，不是排期**） |
 | 10.3 | 本地优先 | — | ✅ | 同 6.5 | — |
 | 10.4 | 自建服务器（Docker） | ❌（它不提供） | 🟡 | `server/docker-compose.yml`（app + Postgres + Caddy，**不需要 Redis / S3**）；`Dockerfile`；`scripts/deploy.sh`；[../runbooks/deployment.md](../runbooks/deployment.md) | **不是「一键」**：必须手写 `.env`，`JWT_SECRET` / `POSTGRES_PASSWORD` **无默认值**；镜像默认本地构建 `supersync:local`，**仓库里没有已发布的 heyta 镜像**；启动默认不跑迁移 |
-| 10.5 | 端到端加密 | ❌（它不做） | ✅ | `packages/sync-core/src/encryption.ts`（Argon2id + AES-GCM）；客户端加密并置 `isPayloadEncrypted`；服务端**强制密文** ingress → 400 `E2EE_REQUIRED`（`server/src/sync/sync.routes.payload.ts:47-48`） | **只有 op payload 加密**；元数据（entityType / entityId / vectorClock / timestamp / clientId）服务端明文可见。**宣传时不能说"服务端什么都看不到"** |
+| 10.5 | 端到端加密 | ❌（它不做） | ✅（**可选，默认关**） | `packages/sync-core/src/encryption.ts`（Argon2id + AES-GCM）；客户端加密并置 `isPayloadEncrypted`；服务端**按账号模式**校验 ingress —— `e2ee` 账号要密文（拒则 400 `E2EE_REQUIRED`），`readable`（**新账号默认**）要明文（`payloadGateViolation('readable', …)`；`server/src/sync/sync.routes.payload.ts`，ADR-0080/0081） | **只有 op payload 加密**；元数据（entityType / entityId / vectorClock / timestamp / clientId）服务端明文可见。**宣传时不能说"服务端什么都看不到"**，也不能说"服务端只收密文"（那只是 `e2ee` 账号那一列） |
 
 ### 2.11 明确不做（反需求）
 
@@ -292,7 +292,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 
 | # | 能力 | 证据 | 为什么值钱 |
 |---|---|---|---|
-| 1 | **端到端加密同步** | 服务端**强制密文** ingress，明文一律 400 `E2EE_REQUIRED` | 滴答做不到（它的服务端要读明文做提醒 / 统计 / 搜索） |
+| 1 | **端到端加密同步**（可选，**默认关**） | 账号级模式：`e2ee` 账号服务端只收密文（否则 400 `E2EE_REQUIRED`）；`readable`（默认）收明文 —— `payloadGateViolation()`，ADR-0080/0081 | 滴答做不到「**你可以选**让它读不到」（它的服务端要读明文做提醒 / 统计 / 搜索）。⚠️ 不许写成「我们服务端看不到明文」：默认档就是可读的 |
 | 2 | **自建服务器，永久免费** | `docker compose` 三件套，不需要 Redis / S3 | 滴答**只提供 SaaS**；这是"数据在你自己机器上"的硬保证 |
 | 3 | **不按功能收费** | [ADR-0020](../adr/0020-ai-subscription-two-tiers.md) §3.2 + `check-pricing-consistency.mjs` 强制 | 滴答免费档 9 个清单 / 99 个任务；我们**没有功能闸门** |
 | 4 | **本机 API + MCP server** | `packages/local-api`，**22 个工具**（读 10 / 写 12；⚠️ 2026-10-03 现量，同日曾先后记成 6 与 9；🔴 **10-04 现量 26 个（读 12 / 写 14）** —— 批次二补了 `EVENT` 那一组，这个数由 `node scripts/gen-ai-capability-manifest.mjs --check` 打印，别手抄），默认关、只监听回环、逐工具授权 | 滴答 2026-04 才上 MCP；我们的**默认关 + 逐工具授权**更严 |

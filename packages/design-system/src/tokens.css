@@ -417,7 +417,13 @@
   --ht-icon-lg: 1.5rem;   /* 24px — 基准 */
   --ht-icon-xl: 2rem;     /* 32px */
 
-  /* 触控目标：44px 是可访问性硬下限，不许调小。 */
+  /* 触控目标：**我们取 44px**。
+     🔴 2026-11-09 更正：这里原来写「44px 是可访问性**硬下限**」—— 那句话**不成立**。
+     WCAG 2.2 的 **AA** 门槛（2.5.8 Target Size Minimum）是 **24px**；44px 是
+     **AAA**（2.5.5）的尺寸，同时也是 Apple HIG 的**默认**值（它的"最小"是 28pt）。
+     所以 44 是**我们的产品选择**（照 Apple 默认、取 AAA 那一档），不是规范逼出来的下限。
+     依据与两组读数：[research/industry-ux-baseline-2026-11.md](../../docs/research/industry-ux-baseline-2026-11.md) §②。
+     ⚠️ 调小它要**同时**改这条注释与那份基线里的对照表 —— 别只改一边，否则两份一定漂。 */
   --ht-touch-target-min: 2.75rem; /* 44px */
 
   /* 焦点环宽度。2px 是"看得见但不喧宾夺主"的经验值；
@@ -436,7 +442,8 @@
   /* 视图导航（rail）宽度。
      🔴 **纯图标**（2026-09-30 产品负责人：「只显示 icon，hover 显示真名」，照滴答清单）。
      所以这个值不再由"最长的标签「四象限」"推导，而是由**触控目标**推导：
-     图标按钮要保持 44px 的方形命中区（`--ht-touch-target-min`，可访问性硬下限），
+     图标按钮要保持 44px 的方形命中区（`--ht-touch-target-min`，**我们的取值**：
+     AAA 那一档、也是 Apple 的默认值；AA 门槛只有 24px），
      加上 rail 自身的左右内边距（`--ht-space-2` × 2 = 16px）= 60px，取整到 4rem。
      名字并没有消失 —— 它在 hover / 键盘聚焦时以一条 `position: fixed` 的标签出现
      （`.ht-rail__label`，见 `app.css`：rail 是 `overflow-y: auto` 的裁剪容器，

@@ -253,7 +253,12 @@
 差异化要成立，得是"对手结构上做不了或不愿做"，而不是"忘了做"。这里有一条结构性的：
 
 - SRS 的算法优势来自**逐条复习历史**。云端 SRS 的护城河就是别人愿意交出的数据量（墨墨自述 1900 亿条）。
-- heyta 从设计上**看不到用户明文**（AGENTS §1；服务端只存密文这条在验收里被反复钉住，见 [§7 第 52 条](../reference/environment-traps.md)）⇒ 我们**永远拿不到**那份护城河。
+- 🔴 2026-11-09 勘误：这里原来写「heyta 从设计上**看不到用户明文**」—— 那句话已被
+  [ADR-0081](../adr/0081-encryption-is-opt-in-not-default.md) 推翻：**新账号默认 `readable`，服务端读得到明文**，
+  只有开了 E2EE 的账号才是「服务端只经手密文」。所以准确的说法是：**默认档我们读得到，但我们不做聚合/训练**；
+  开了 E2EE 的账号连读都读不到 ⇒ 那份「别人交出的数据量」护城河无论如何都攒不起来。
+  （判据：`packages/…/sync-mode-contract.ts` 的 `DEFAULT_SYNC_PAYLOAD_MODE = 'readable'`；
+  `payloadGateViolation()` 按账号模式判 ingress。）
 - 但反过来：**设备端本地优化是可行的**（`fsrs-rs` 官方就带 Optimizer 与 Scheduler），而且它是**唯一一条不需要用户信任服务器**的路径。Anki 有本地优化但界面是 2006 年的；SiYuan 有闪卡但没有任务；待办产品有任务但没有复习。
 - 且它**不碰出境**：不需要 AI、不需要网络请求 ⇒ 不触发 ADR-0006/0013 那条互斥，也不进 `hosted-ai-monthly` 的计量（[ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 那条"计量存在之前不得售卖"与它无关）。
 
