@@ -75,6 +75,7 @@ import {
   type SheetDetent,
 } from './sheet-detents.js';
 import { isSheetDragRegion, type SheetDragRegion } from './sheet-drag.js';
+import { springFor } from './spring-physics.js';
 
 /**
  * 这一层原语覆盖的类别。
@@ -277,9 +278,26 @@ export function BottomSheet({
           // 🔴 不用 native driver：RNW 上 `useNativeDriver` 不是同一套实现，
           // 而这一层两端共用。面板吸附不是每秒 60 次的连续动画，JS 线程够用。
           useNativeDriver: false,
-          stiffness: 320,
-          damping: 32,
-          mass: 0.7,
+          // 🔴 物理参数**不是写死的**，由设计系统的弹簧 token 换算得到。
+          //
+          // `tokens.css` §3c 用 Apple 的「阻尼比 + 响应」定义了这一仓的弹簧，
+          // 并注明"这一组故意不是时长"。RN 的 `Animated.spring` 只认物理三件套，
+          // 因此中间必须有一层换算（`spring-physics.ts`）。
+          //
+          // 这里读 `sheet` 档（`response-sheet`）—— 面板吸附正是"抽屉/底部面板"。
+          // 实测它与原来那组硬编码 `320/32/0.7` 的差异只有 2%（`response`
+          // 0.294s → 0.300s，收敛 0.592s → 0.600s），两者都是临界阻尼不过冲，
+          // 所以这是一次**校准到设计系统**，不是改手感。
+          //
+          // 之前写死 320/32/0.7 的代价：token 调参时这一处会静默留在旧手感上，
+          // 而且没有任何一处会报错 —— 那正是"token 定义了却没人消费"。
+          ...springFor('sheet', {
+            dampingDefault: tokens['motion.spring-damping-default'],
+            dampingMomentum: tokens['motion.spring-damping-momentum'],
+            responseMove: tokens['motion.spring-response-move'],
+            responseSheet: tokens['motion.spring-response-sheet'],
+            responseRotation: tokens['motion.spring-response-rotation'],
+          }),
         });
     animation.start();
     return () => {

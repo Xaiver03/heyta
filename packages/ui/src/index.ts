@@ -1382,6 +1382,17 @@ export {
   isSheetDragRegion,
   type SheetDragRegion,
 } from './overlay/sheet-drag.js';
+/* Apple 的「阻尼比 + 响应」→ RN `Animated.spring` 的物理三件套。
+   `tokens.css` §3c 用前者定义弹簧，而 RN 只认后者，换算必须有一处**唯一**的家
+   （`spring-physics.ts` 文件头记着它为什么不能写在组件里，以及与
+   `apps/landing` 那一份是同一条恒等式而不是巧合）。 */
+export {
+  springFor,
+  toSpringConfig,
+  type SpringConfig,
+  type SpringPreset,
+  type SpringTokens,
+} from './overlay/spring-physics.js';
 export {
   BottomSheet,
   type BottomSheetClass,
