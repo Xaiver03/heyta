@@ -262,8 +262,13 @@ describe('#1 主导航：登记处 ⟷ 真应用 `PRIMARY_NAV`', () => {
     // ⚠️ 「收集箱」在 2026-10-04 被删（产品负责人：与页头标题重复 = 同一目的地两个入口）。
     // 这条字面清单是**解析器的阳性对照**：它证明上面那串真读出了东西，
     // 而不是在 `PRIMARY_NAV` 改名/挪位置之后恒返回空集。
+    //
+    // ⚠️ 「明天」2026-11-07 由 `69fa5352`（R10）加进来，位置在「今天」与「最近 7 天」之间
+    //（**按时间远近排**，不是"最近 7 天的快捷方式"）。这条清单当时没跟，
+    // 于是本文件红了 —— 阳性对照红说明的是**真源变了**，不是判据坏了。
     expect(appKeys).toEqual([
       'web.shell.nav.today',
+      'web.shell.nav.tomorrow',
       'web.shell.nav.next7Days',
       'web.shell.nav.completed',
     ]);
@@ -568,14 +573,18 @@ describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () =
       'bulk-repeat-warning',
       'bulk-delete',
       'bulk-exit',
+      // ⌘Z 撤销回执（R19，`5bc42d31`）：全局的，住在这一段里，
+      // 但**只有失败才出现**、4 秒自己消失。
+      'history-notice',
       'bulk-undo',
       // 页头唯一的功能入口
       'task-menu-open',
       'task-menu',
+      // R8 标签管理（B 包 `e69f08f5`）：住在 `⋯` 里
+      'manage-tags-open',
       'task-select-open',
       // 下面两枚住在 `⋯` 里（详情列收起时才渲染）：助手回退 + 展开详情列
       'assistant-open',
-      'detail-pane-open',
       'share-open-button',
       // 结构性开关
       'detail-pane-toggle',

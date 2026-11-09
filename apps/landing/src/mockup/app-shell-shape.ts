@@ -115,10 +115,17 @@ export interface ShellPanelSection {
 }
 
 /**
- * 侧栏主导航：**3 项**。`App.tsx` 的 `PRIMARY_NAV` ——
- * 今天 / 最近 7 天 / 已完成。「已完成」曾经漏掉，是 §2 #1 的漂移；
- * 「最近 7 天」是**同一种漂移的第二次**（真应用 2026-10-01 加了它，登记处没跟上，
- * 于是 `pnpm -r test` 在 `mockup-shell-shape` 上红了整整一天）。
+ * 侧栏主导航：**4 项**。对应 `apps/web/src/features/shell/view-tabs.ts` 的 `PRIMARY_NAV` ——
+ * 今天 / 明天 / 最近 7 天 / 已完成。
+ *
+ * 🔴 **这一段就是漂移史本身，读它就是读这个文件为什么存在。**
+ * 「已完成」曾经漏掉，是 §2 #1 的漂移；「最近 7 天」是**同一种漂移的第二次**
+ * （真应用 2026-10-01 加了它，登记处没跟上，于是 `pnpm -r test` 在
+ * `mockup-shell-shape` 上红了整整一天）；「明天」是**第三次**
+ * （真应用 2026-11-07 由 `69fa5352` 引入，同样没跟，同样红）。
+ *
+ * ⚠️ **条数不写死在这里也没用** —— 上一版这里写的是"3 项"，而判据读的是数组本身，
+ * 所以那句散文漂了**没有任何门禁会红**。要改这一组，就同时改这一段的数字。
  *
  * 🔴 「收集箱」这一项在 2026-10-04 被**删掉**（不是这里漏画）：产品负责人
  * 「已经有一个收集箱的标题了，为什么还要个收集箱？在信息架构上面是重复的」。
@@ -127,6 +134,10 @@ export interface ShellPanelSection {
  */
 export const SHELL_PRIMARY_NAV: readonly ShellPrimaryNavItem[] = [
   { labelKey: 'web.shell.nav.today', icon: 'sun' },
+  // 「明天」（R10，2026-11-07，`69fa5352`）。位置在「今天」与「最近 7 天」之间：
+  // 真应用 `view-tabs.ts` 的 `PRIMARY_NAV` 就是这么排的（**按时间远近**）。
+  // 它不是「最近 7 天」的快捷方式 —— 那个窗口含今天，这个只含明天那一天。
+  { labelKey: 'web.shell.nav.tomorrow', icon: 'calendar-days' },
   { labelKey: 'web.shell.nav.next7Days', icon: 'calendar-range' },
   { labelKey: 'web.shell.nav.completed', icon: 'check-circle' },
 ];
@@ -272,7 +283,16 @@ export const SHELL_HEADER_ACTIONS: readonly ShellHeaderAction[] = [
     id: 'bulk-toolbar',
     kind: 'bulk-toolbar',
     labelKey: 'web.shell.bulk.select',
-    anchors: ['bulk-toolbar', 'bulk-complete', 'bulk-repeat-warning', 'bulk-undo', 'bulk-delete', 'bulk-exit', 'task-select-open'],
+    /**
+     * `history-notice`（R19 ⌘Z 撤销栈，`5bc42d31`）住在这一段里，紧挨 `bulk-undo`。
+     *
+     * 它**不是**批量模式的一部分：批量栏只在模式态渲染，而 `history-notice` 是
+     * 全局的撤销回执（"⌘Z 没做成"那一句、4 秒自己消失、只有失败才出现）。
+     * 两者只是**在页头同一段 DOM 里相邻**，而登记处记的正是"这一段里有哪些锚点"。
+     * ⚠️ 因此 `mockedInLanding: false` 只盖住批量栏本身 —— 见本项的 `kind`，
+     * 展厅画的是"选择任务"那条，回执是瞬态，静态图上没有它的位置。
+     */
+    anchors: ['bulk-toolbar', 'bulk-complete', 'bulk-repeat-warning', 'bulk-undo', 'history-notice', 'bulk-delete', 'bulk-exit', 'task-select-open'],
     onlyForView: 'tasks',
     /**
      * 🔴 不在展厅画：它是**模式**，不是默认态控件。
@@ -293,7 +313,9 @@ export const SHELL_HEADER_ACTIONS: readonly ShellHeaderAction[] = [
     id: 'task-menu',
     kind: 'overflow-menu',
     labelKey: 'web.shell.overflow.label',
-    anchors: ['task-menu-open', 'task-menu'],
+    // `manage-tags-open`（R8 标签管理，B 包 `e69f08f5`）住在 `⋯` 里 —— 与排序、
+    // 「选择任务」同居一个"视图设置"面。它**不是**页头的独立控件，所以归这一项。
+    anchors: ['task-menu-open', 'task-menu', 'manage-tags-open'],
     // 产品那边是 `view === 'tasks'`（**不是** `visible.length > 0`）—— 空列表里 `⋯` 也在。
     onlyForView: 'tasks',
   },
@@ -328,9 +350,20 @@ export const SHELL_HEADER_ACTIONS: readonly ShellHeaderAction[] = [
     // 图上画的是"展开"那一态：复刻是静态图，详情列在图里没有画出来，
     // 所以按钮的自带名说的是"点下去会怎样"（与产品同一条语义）。
     labelKey: 'web.shell.detailPane.expand',
-    // 详情列**收起之后**展开它的入口在 `⋯` 里（`detail-pane-open`）——
-    // 页头那枚图标让位给助手回退，于是页头每一档只有「一枚图标 + 一枚 ⋯」。
-    anchors: ['detail-pane-toggle', 'detail-pane-open'],
+    /**
+     * 🔴 **只有一枚**：`detail-pane-toggle`（R14 · B5，2026-11-06，`829272f8`）。
+     *
+     * 这里曾经还登记着 `detail-pane-open`（`⋯` 里那枚"展开详情栏"）。**它已被删除** ——
+     * 那一格是真缺陷：收起态下页头那枚与 `⋯` 里那枚**同时在场**，点哪个都展开，
+     * 而没有任何门禁会红。裁决留页头这枚（它是开关，`aria-pressed` + 名字随状态翻转，
+     * 两态都可达；只有"展开"的那枚删掉页头那枚会让「收起」不可达）。
+     *
+     * ⚠️ 上面这段曾经的注释写的是"详情列收起之后展开它的入口在 `⋯` 里" ——
+     * **那是 2026-11-06 之前的事实**，改完没跟，于是注释替一个不存在的实现做了担保。
+     * 这正是本文件存在的理由：登记的锚点会漂，写在注释里的事实同样会漂，
+     * 而只有**锚点集合**（下面这行）有判据在守。
+     */
+    anchors: ['detail-pane-toggle'],
   },
 ];
 
