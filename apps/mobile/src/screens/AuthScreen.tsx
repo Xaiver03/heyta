@@ -223,7 +223,7 @@ export function AuthScreen({
 }: AuthScreenProps): React.JSX.Element {
   const { t, locale } = useI18n();
   const tokens = useTokens();
-  const { reducedMotion } = useTheme();
+  const { reducedMotion, native } = useTheme();
   const insets = useSafeAreaInsets();
 
   /**
@@ -294,13 +294,27 @@ export function AuthScreen({
       entry.setValue(1);
       return;
     }
+    // 🔴 曲线走 token，和 `StateIllustration` 同一条取法（`native.easing(key)`），
+    // 不再硬编码 `Easing.out(Easing.cubic)`。
+    //
+    // 选 `ease.enter`（`cubic-bezier(0, 0, 0.2, 1)`，token 里标着"ease-out：进入"）：
+    // 这一格是**进入**语义 —— 内容从 `opacity 0` 淡入、同时从 `space.3` 上浮到 0，
+    // 只发生一次、终点恒为进度 1（上面那段注释已钉住"没有循环、没有呼吸"）。
+    // 形状上也最贴合原来的 `Easing.out(Easing.cubic)`：两者都是"起步快、收尾慢"的
+    // ease-out 族，换成 `ease.exit`（`cubic-bezier(0.4, 0, 1, 1)`，ease-in）会变成
+    // "起步慢、收尾急"，与"内容进场"的读感相反。
+    const easing = native.easing('ease.enter');
     Animated.timing(entry, {
       toValue: 1,
       duration: entryDuration,
-      easing: Easing.out(Easing.cubic),
+      // 回退到 `Easing.linear` 而不是再写一条内置曲线（与 `SwipeReveal` /
+      // `StateIllustration` 同一条）：解析不出来说明 token 被改成了 RN 不认的形状，
+      // 那是**配置缺陷**，此时最该做的是别掩盖它。这一格位移只有 `space.3`、
+      // 时长 `duration.normal` 又短，线性并不突兀。
+      easing: easing === null ? Easing.linear : Easing.bezier(...easing),
       useNativeDriver: true,
     }).start();
-  }, [entry, entryDuration, reducedMotion]);
+  }, [entry, entryDuration, native, reducedMotion]);
 
   const entryStyle = {
     opacity: entry,

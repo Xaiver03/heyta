@@ -147,7 +147,7 @@ export function WelcomeScreen({
 }: WelcomeScreenProps): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
-  const { reducedMotion } = useTheme();
+  const { reducedMotion, native } = useTheme();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const insets = useSafeAreaInsets();
 
@@ -176,6 +176,17 @@ export function WelcomeScreen({
    */
   const opacities = useRef(SLIDES.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))).current;
   useEffect(() => {
+    // 🔴 曲线走 token，和 `StateIllustration` / `SwipeReveal` 同一条取法
+    // （`native.easing(key)`），不再硬编码 `Easing.inOut(Easing.quad)`。
+    //
+    // 选 `ease.standard`（`cubic-bezier(0.2, 0, 0.2, 1)`）：这一格是**对称**动作 ——
+    // 循环里对每一层都跑一遍，`i === slide` 的那层 0→1、其余层 1→0，
+    // 同一时刻既有"淡入"又有"淡出"，没有单向的进/出语义可挑，
+    // 而 `ease.standard` 正是 token 表里为"两向都说得通"准备的那条。
+    // 形状上也最贴合原来的 `Easing.inOut(Easing.quad)`：两者都是两端缓、
+    // 中间快的 ease-in-out 族；换 `ease.enter`（ease-out）或 `ease.exit`（ease-in）
+    // 都会把一次对称交叉淡入变成偏斜的。
+    const easing = native.easing('ease.standard');
     SLIDES.forEach((_, i) => {
       const to = i === slide ? 1 : 0;
       if (reducedMotion) {
@@ -185,11 +196,13 @@ export function WelcomeScreen({
       Animated.timing(opacities[i] as Animated.Value, {
         toValue: to,
         duration: fade,
-        easing: Easing.inOut(Easing.quad),
+        // 回退到 `Easing.linear`（与 `SwipeReveal` / `StateIllustration` 同一条）：
+        // 解析不出来 = token 被改成 RN 不认的形状，属**配置缺陷**，不该在调用点掩盖。
+        easing: easing === null ? Easing.linear : Easing.bezier(...easing),
         useNativeDriver: true,
       }).start();
     });
-  }, [fade, opacities, reducedMotion, slide]);
+  }, [fade, native, opacities, reducedMotion, slide]);
 
   /*
     🔴 **不要加无限循环的装饰动画**（2026-10-26 实测）。
@@ -209,13 +222,24 @@ export function WelcomeScreen({
       rise.setValue(authOpen ? 1 : 0);
       return;
     }
+    // 🔴 曲线走 token，与上面两处同一条取法。
+    //
+    // 选 `ease.enter`（`cubic-bezier(0, 0, 0.2, 1)`，token 里标着"ease-out：进入"）：
+    // 同一个 `Animated.Value` 两个方向都跑（`authOpen ? 1 : 0`），但**升起面板**
+    // 才是用户盯着看的那一次，收起是它的反动作 —— 以"进入"这个主语义取值，
+    // 与 `AuthScreen` 的入场淡入同一口径。
+    // 形状上它也正是原来 `Easing.out(Easing.cubic)` 的同族（起步快、收尾慢）；
+    // ⚠️ 收起时它会表现为"起步快"（原来的 cubic 同样如此），所以这次替换
+    // **没有引入新的不对称**，只是数值略有差别。
+    const easing = native.easing('ease.enter');
     Animated.timing(rise, {
       toValue: authOpen ? 1 : 0,
       duration: panelDuration,
-      easing: Easing.out(Easing.cubic),
+      // 回退到 `Easing.linear`，理由同上（token 形状不可解析 = 配置缺陷，不掩盖）。
+      easing: easing === null ? Easing.linear : Easing.bezier(...easing),
       useNativeDriver: true,
     }).start();
-  }, [authOpen, panelDuration, reducedMotion, rise]);
+  }, [authOpen, native, panelDuration, reducedMotion, rise]);
 
   return (
     <View style={styles.root}>
