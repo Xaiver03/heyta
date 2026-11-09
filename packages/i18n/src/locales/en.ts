@@ -2563,7 +2563,9 @@ export const en = {
   'web.memory.evidence.feedbackKeepRatioPartial': 'Based on {adopted} accepted suggestions, you usually keep about {percent}% of the items',
 
   'web.memory.offShort': 'Memory is off',
-  'web.memory.off': 'Memory is off - heyta does not infer your preferences, and AI receives nothing about who you are. AI features still work as usual.',
+  // ⚠️ 2026-11-09: dropped the leading "Memory is off - ". It repeated, word for word,
+  // the visible text rendered by the same <p> (J2 §1.2 duplicate target).
+  'web.memory.off': 'heyta never infers your preferences, and the AI receives nothing about who you are. AI features keep working as usual.',
   'web.memory.known.title': 'What I have learned about you',
   'web.memory.known.empty': 'I do not know you well yet. After a while, habits I summarise from your own data will show up here.',
   'web.memory.withheld.title': 'Not known yet',
@@ -2713,7 +2715,6 @@ export const en = {
   'web.ai.settings.endpointDisabled.note': 'A disabled endpoint is skipped by routing; its configuration and key are kept.',
   'web.ai.settings.endpointDisabled.tag': 'Disabled',
   'web.memory.forgotten.title': 'You have forgotten',
-  'web.memory.forgotten.note': 'I will not use this one again.',
   'web.memory.forget': 'Forget',
   'web.memory.forgetAria': 'Forget "{name}"',
   'web.memory.restore': 'Restore',

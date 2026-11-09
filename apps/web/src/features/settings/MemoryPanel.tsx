@@ -339,11 +339,14 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
                   <span className="ht-settings__toggle-label">
                     {preferenceLabelText(f.id, t)}
                   </span>
-                  <SettingsInfoTip
-                    testId={`tip-memory-forgotten-${f.id}`}
-                    label={preferenceLabelText(f.id, t)}
-                    text={t('web.memory.forgotten.note')}
-                  />
+                  {/*
+                    🔴 2026-11-09（J2 §1.2 第三类靶子：复述界面）删掉一枚 `?`：
+                    它的正文只有「我不会再用这一条。」—— 而这一格的**分组标题是
+                    「你已忘记」、右侧就是「恢复」按钮**，两处已经把同一件事说完；
+                    更糟的是它是**列表内每项一枚**：N 条偏好 = N 枚零信息问号。
+                    处置：删（不是改文案）。判据是"这条说明去掉之后用户还缺什么" ——
+                    答案是"什么都不缺"。
+                  */}
                 </span>
                 <button
                   type="button"

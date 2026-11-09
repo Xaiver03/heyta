@@ -2747,7 +2747,10 @@ export const zhCN = {
   'web.memory.evidence.feedbackKeepRatioTrimmed': '基于 {adopted} 次采纳，你通常只留下 {percent}% —— AI 给得太多了',
   'web.memory.evidence.feedbackKeepRatioPartial': '基于 {adopted} 次采纳，你通常留下约 {percent}% 的拆解项',
 
-  'web.memory.off': '记忆已关闭 —— heyta 不会推断你的偏好，AI 也收不到任何与「你是谁」有关的信息。 AI 功能本身照常可用。',
+  // ⚠️ 2026-11-09：删掉开头的「记忆已关闭 —— 」。它与**同一 `<p>` 里的可见文字**
+  // 是逐字重复（J2 §1.2 第一类靶子：同一句在同一位置渲染两遍）。现在这句只承担额外信息，
+  // 可见那句 `offShort` 仍由 `<p>` 直接渲染。
+  'web.memory.off': 'heyta 不会推断你的偏好，AI 也收不到任何与「你是谁」有关的信息。AI 功能本身照常可用。',
   'web.memory.offShort': '记忆已关闭',
   'web.memory.known.title': '我了解到的你',
   'web.memory.known.empty': '我还不太了解你。用一段时间之后，这里会出现我从你自己数据里总结出的习惯。',
@@ -2943,7 +2946,6 @@ export const zhCN = {
   'web.ai.settings.endpointDisabled.note': '停用后路由不会再选它，配置和密钥都保留。',
   'web.ai.settings.endpointDisabled.tag': '已停用',
   'web.memory.forgotten.title': '你已忘记',
-  'web.memory.forgotten.note': '我不会再用这一条。',
   'web.memory.forget': '忘掉',
   'web.memory.forgetAria': '忘掉「{name}」',
   'web.memory.restore': '恢复',

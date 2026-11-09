@@ -46,7 +46,13 @@ type Tone = 'ok' | 'warn' | 'muted' | 'unknown';
 interface StatusView {
   readonly tone: Tone;
   readonly title: string;
-  readonly hint: string;
+  /**
+   * "这代表什么"那一句。**可缺省**（2026-11-09）——
+   * `restricted` 那两支的"这代表什么"**就是**「到期不删任何数据」，
+   * 而渲染处又无条件再拼一句同一词条 ⇒ 同一个气泡里同一句话印两遍（J2 §1.2 第一类靶子）。
+   * 缺省表示"没有额外的解释"，那两处只由渲染处那句 `localData` 承担。
+   */
+  readonly hint?: string;
 }
 
 export function SubscriptionPanel({ active = true }: { active?: boolean }): React.JSX.Element {
@@ -90,8 +96,12 @@ export function SubscriptionPanel({ active = true }: { active?: boolean }): Reac
                 label={t('web.subscription.status.title')}
                 text={
                   <>
-                    {view.hint}
-                    {' '}
+                    {view.hint === undefined ? null : (
+                      <>
+                        {view.hint}
+                        {' '}
+                      </>
+                    )}
                     {t('web.subscription.status.localData')}
                   </>
                 }
@@ -194,7 +204,6 @@ function statusView(input: {
           until === undefined
             ? t('web.subscription.status.refused')
             : t('web.subscription.status.expired', { time: date(until) }),
-        hint: t('web.subscription.status.localData'),
       };
     }
     return {
@@ -203,7 +212,6 @@ function statusView(input: {
         until === undefined
           ? t('web.subscription.status.refused')
           : `${t('web.subscription.status.refused')} · ${t('web.subscription.status.until', { time: date(until) })}`,
-      hint: t('web.subscription.status.localData'),
     };
   }
 

@@ -91,14 +91,33 @@
 | `tip-ai-key-notice` | `web.ai.settings.keyNotice`：浏览器无钥匙串/关掉刷新要重输 + ~~桌面端存系统钥匙串~~ | **第四类：删掉第三个分句** | 那句话是**假话**，且在它自己所处的界面上就假：桌面 GUI 载的就是 `apps/web/dist`（`apps/desktop/src/main.ts` 的 `resolveWebRoot()`，ADR-0037），`apps/web/src/App.tsx` 恒用 `createSessionSecretStore()`（内存 `Map`）；全仓唯一有钥匙串的壳只给 E2EE vault root 注入桥（`vault-root-keychain.ts`），AI 密钥没有桥。`ADR-0010 §3.6` 的平台表把钥匙串指向 `apps/node-host`（**CLI 宿主**）—— 这句当初是从 CLI 那一行抄过来的。前两句保留（关掉要重输 = 现在必须知道的后果，`ai-settings.spec.tsx:452` 也钉着） |
 | `tip-local-api-token` | `web.ai.settings.localApi.token.hint`：token 防的是本机其他程序、不是网络攻击；没有它任何程序能读走全部任务 | **保留** | 四类里没有一类成立：不是重复（`validateLocalApiConfig` 的报错句只在"打开但没填"那一刻出现在另一处）、不是复述控件、不是在解释不存在的东西（token 闸还在，威胁模型仍真）。而它是这一格**唯一**说"这个令牌在防谁"的句子，用户正要往里贴一枚凭据 ⇒ 属"现在必须知道" |
 
-⇒ 现量不变：说明气泡调用点仍 **45**（`grep -rho "<SettingsInfoTip" apps/web/src`）。
+⇒ 现量：说明气泡调用点仍 **45**（`grep -rho "<SettingsInfoTip" apps/web/src`）。
 `AiSettings.tsx` 8 枚至此**全部判完**，不再有"待判"。
+
+### 1.2.2 全仓 45 枚扫完一遍（2026-11-09 续）：删 1 枚 + 改 4 处
+
+口径：`grep -rn "<SettingsInfoTip" apps/web/src --include=*.tsx` 逐条读正文（含经 prop 传的 4 处），
+按 §1.2 四类靶子判。**复述分区功能这一类现量 0** —— 前几轮已清空；剩下的"复述"都在长句首句、
+同句后半段带代价或顺序，故归保留。
+
+| 处置 | 对象 | 属于哪类 | 依据 |
+|---|---|---|---|
+| **删**（整枚） | `MemoryPanel` 的 `tip-memory-forgotten-${id}` | 复述界面 | 正文只有「我不会再用这一条。」，而分组标题「你已忘记」+ 右侧「恢复」按钮已经说完；且它是**列表内每项一枚**：N 条偏好 = N 枚零信息问号 |
+| 删半句 | `web.ai.settings.managed.offer/rest` → 合并为 `managed.lead` | 第四类（过期陈述） | 「还会来 / 这个版本界面还没挂上开关 / 这里点不动」已被同屏证据推翻：托管单选可点、pending 提示、合成端点都在；只留 §3.7.2 那句明文披露 |
+| 去重 | `web.memory.off` 删掉开头的「记忆已关闭 —— 」 | 重复 | 与同一 `<p>` 里渲染的 `offShort` 逐字重复 |
+| 去重 | `SubscriptionPanel` 的 `statusView()` 两支 | 重复 | `hint` 被设成 `localData`，渲染处又无条件拼同一词条 ⇒ 同一气泡里同一句印两遍 |
+| 改（非删） | `web.ai.settings.features.hint` 那句「列表顺序就是尝试顺序」 | 第四类（**假话**） | 实际是点选顺序（`toggleRoute` append）⇒ 选了改**行为**：新增 `normalizeRouteOrder()` 让数据服从那句承诺（改文案等于要求用户记住点击历史，违反 J3） |
+
+现量：说明气泡调用点 **45 → 44**。三条判据能红的实证：
+① 把 `hint: localData` 加回 ⇒ 新测试数到 2 次 ⇒ 红；
+② 把「这里点不动」塞回 `managed.tail` ⇒ 托管那条测试红；
+③ 把 `normalizeRouteOrder` 摘掉 ⇒ 顺序测试红。三条都还原后重跑全绿。
 
 ### 1.3 剩余工作（下一轮直接照这张单子做）
 
 | # | 事 | 起点 |
 |---|---|---|
-| 1 | 继续 J2：剩 **45** 处（`AiSettings.tsx` 8 处已判完，见 §1.2.1） | 下一个最密的文件：`InboundAutomationSettings.tsx` **4 处** / `PasswordPanel.tsx` **4 处**（口径 `grep -n "<SettingsInfoTip" <文件>`；后者 2 处 `label` = `text`，见 #4） |
+| 1 | 继续 J2：全仓 45 枚已扫过一遍（§1.2.2），现量 **44** 处。"保留"不是没判，是判过 | 下一批候选：`PasskeyPanel`（"这里列出…"首句）、`SessionsPanel`（同形）、`ProfileOverview` 的 `achievementsHint`；三处 `label` = `text` 见 #4，两处 `?` 锚点错位见 `check:tip-adjacency` 账本 |
 | 2 | 字号 13px | §3.2：需 `TEXT_STYLES` 加语义档 + **删一个现有档**（候选 `xl`）+ 逐屏截图 |
 | 3 | RN preset 轴 | §4.1：给 `resolveHeytaUiTheme()` 加 preset 轴，**不许抄 CSS** |
 | 4 | `label` 与 `text` 同词条（3 处） | 可访问名等于正文，读屏会念两遍 —— 小毛病，已记录 |
