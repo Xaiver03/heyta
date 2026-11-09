@@ -55,7 +55,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  * （`check:layering` 的 `no-model-endpoint-in-apps` 会拦下试图在这里 fetch 的代码）。
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, Maximize2, Minimize2, Send, X } from 'lucide-react';
 
 import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
@@ -1212,6 +1212,67 @@ function traceVerb(row: LiveRow, t: I18nValue['t']): string {
 }
 
 /**
+ * 「一行 + 一个可展开的正文」的**开合行为**（`ReasoningRow` 与 `TraceRows` 共用）。
+ *
+ * ── 为什么抽出来，而不是第二份手抄（2026-11-10）
+ *
+ * 本仓有**实测事故**记在案：`packages/ui/src/ai/model.ts` 的文件头写着
+ * 「同一个组件被抄 5 份，其中第 5 份漂移了 —— 漏了回退链与 E2EE 警告，
+ * **而没有任何测试会红**」。这里的开合行为恰好是那种"抄第二份时最容易漏一条"的东西：
+ * 它由**四个**必须同时在位的细节组成（`open` 常驻、`preventDefault`、
+ * `aria-expanded`、键盘的 Enter/Space），漏掉任何一个都不会有测试变红，
+ * 而症状是"点了没反应"或"读屏读不出展开状态"。
+ *
+ * 🔴 但**只共享行为，不共享 class**：两处的语义与归属不同（思考行是**一个**展开器，
+ * 步骤行是**列表里的一行**、且存在"没有 note 就完全不套 `<details>`"的第三态）。
+ * 套同一套 class 会让改一处的视觉必然波及另一处 —— 所以 class 由调用方传进来。
+ *
+ * ── 键盘：`Enter` 与 `Space` **不一样**（逐帧实测，与 `d4160864` 的说法不同）
+ *
+ * Chromium 156 实测，`<summary>` 上的真实按键事件序列（已核对 `document.activeElement`
+ * 与事件 `target`，排除"焦点没进去"的假阴性）：
+ *
+ * | 按键 | 实测事件序列 |
+ * |---|---|
+ * | `Enter` | `keydown:Enter@summary → keyup:Enter` —— 🔴 **没有 click** |
+ * | `Space` | `keydown:Space@summary → keyup:Space → click@summary` |
+ *
+ * ⇒ `d4160864` 注释里"Enter 与 Space 都会合成一次 click"对 **Space 成立、对 Enter 不成立**。
+ * 只挂 `onClick` 会让**键盘 Enter 完全失去开合能力**（鼠标、触摸、读屏、Space 都还在，
+ * 所以这个缺口很不容易被手工发现）。因此这里**显式补 `Enter` 的 `keydown` 分支**。
+ *
+ * ⚠️ `Space` 只走 `click` 那一支（不额外处理 `keydown`）：否则一次 Space 会开合两次、
+ * 视觉上等于没动 —— 这是"补键盘"时最容易引入的回归。
+ */
+function useRowCollapse(): {
+  /** true = 视觉收起。 */
+  collapsed: boolean;
+  /** 挂到 `summary` 的 `onClick`。 */
+  onSummaryClick: (event: React.MouseEvent<HTMLElement>) => void;
+  /** 挂到 `summary` 的 `onKeyDown`（只补 Enter，见上面那张实测表）。 */
+  onSummaryKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
+} {
+  const [collapsed, setCollapsed] = useState(true);
+  const toggle = useCallback(() => {
+    setCollapsed((prev) => !prev);
+  }, []);
+  return {
+    collapsed,
+    onSummaryClick: (event) => {
+      // 拦掉原生开合（它会**同步**把子树移出渲染，收起就没有可插值的端点）。
+      event.preventDefault();
+      toggle();
+    },
+    onSummaryKeyDown: (event) => {
+      // 🔴 只处理 Enter：Space 已经由浏览器合成 `click` 走上去了。
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      toggle();
+    },
+  };
+}
+
+/**
  * 过程开关里的一段：一行一步，**默认收起**。
  *
  * 🔴 收起的理由不是"省地方"，是**默认视图要说的是"我在做什么"，不是"我读了什么"**：
@@ -1219,7 +1280,64 @@ function traceVerb(row: LiveRow, t: I18nValue['t']): string {
  *
  * ⚠️ 没有 `note` 的行**不套 `<details>`**：一个点了什么都看不到的展开器
  * 比没有更糟（用户会以为界面坏了）。
+ *
+ * ── 高度动画（2026-11-10，与 `ReasoningRow` 同一套做法）
+ *
+ * `grid-template-rows: 0fr → 1fr`，由布局引擎每帧算真实高度 ⇒
+ * 不写死 `max-height`、不需要 JS 测高。逐帧实测见 `ai-panels.css`
+ * `.ht-ai__trace-collapse` 上面那段。
+ *
+ * 🔴 这里额外多一个理由：**流式期间 `note` 是整行被替换的**。
+ * `reduceAssistantLive` 的 `tool-finished` 换掉同名那一行的对象，而下标不变 ⇒
+ * React 按 `key={tool#index}` 复用同一个 DOM 节点。若用 JS 测高（`scrollHeight`
+ * 注入 `max-height`），一次替换就落进"量完到下一帧之间内容变了"的窗口。
+ * 实测「已展开的行 + note 整段替换」：高度 `17px → 238px`、
+ * `scrollHeight === clientHeight`（不裁字）、class 不变（不自己弹回）。
+ *
+ * ⚠️ 状态放在**每行自己的组件**里（不是 `TraceRows` 里的一份）：一份状态会让
+ * 点任意一行时**所有行一起开合**。
  */
+function TraceRow(props: { row: LiveRow; t: I18nValue['t'] }): React.JSX.Element {
+  const { row, t } = props;
+  const label = `${traceVerb(row, t)} · ${row.tool}`;
+  const { collapsed, onSummaryClick, onSummaryKeyDown } = useRowCollapse();
+
+  // 没有 note ⇒ 不套 `<details>`（见上面那段说明），也就不用持有任何状态。
+  if (row.note === undefined) {
+    return (
+      <p className="ht-ai__step-line" data-testid={`ai-chat-step-${row.tool}`}>
+        {label}
+      </p>
+    );
+  }
+
+  return (
+    <details
+      className="ht-ai__step-body"
+      // 🔴 常驻 open：`[open]` 一摘掉 UA 就同步把子树移出渲染，收起会变成瞬跳。
+      open
+    >
+      <summary
+        className="ht-ai__step-line"
+        data-testid={`ai-chat-step-${row.tool}`}
+        // 视觉状态由我们持有 ⇒ 显式把展开状态告诉读屏。
+        aria-expanded={!collapsed}
+        onClick={onSummaryClick}
+        onKeyDown={onSummaryKeyDown}
+      >
+        {label}
+      </summary>
+      <div
+        className={
+          collapsed ? 'ht-ai__trace-collapse' : 'ht-ai__trace-collapse ht-ai__trace-collapse--open'
+        }
+      >
+        <p className="ht-ai__note">{row.note}</p>
+      </div>
+    </details>
+  );
+}
+
 function TraceRows(props: {
   rows: readonly LiveRow[];
   t: I18nValue['t'];
@@ -1232,25 +1350,11 @@ function TraceRows(props: {
       className="ht-ai__steps"
       data-testid={props.live === true ? 'ai-chat-live-steps' : 'ai-chat-steps'}
     >
-      {props.rows.map((row, index) => {
-        const label = `${traceVerb(row, t)} · ${row.tool}`;
-        return (
-          <li key={`${row.tool}#${String(index)}`} className="ht-ai__step">
-            {row.note === undefined ? (
-              <p className="ht-ai__step-line" data-testid={`ai-chat-step-${row.tool}`}>
-                {label}
-              </p>
-            ) : (
-              <details className="ht-ai__step-body">
-                <summary className="ht-ai__step-line" data-testid={`ai-chat-step-${row.tool}`}>
-                  {label}
-                </summary>
-                <p className="ht-ai__note">{row.note}</p>
-              </details>
-            )}
-          </li>
-        );
-      })}
+      {props.rows.map((row, index) => (
+        <li key={`${row.tool}#${String(index)}`} className="ht-ai__step">
+          <TraceRow row={row} t={t} />
+        </li>
+      ))}
     </ul>
   );
 }
@@ -1320,8 +1424,8 @@ function TraceRows(props: {
  */
 function ReasoningRow(props: { text: string; t: I18nValue['t'] }): React.JSX.Element {
   const firstLine = props.text.split('\n')[0] ?? '';
-  /** true = 视觉收起（默认收起：只露第一行，见上面那段说明）。 */
-  const [collapsed, setCollapsed] = useState(true);
+  // 开合行为与步骤行**同一份实现**（含 Enter 的补丁），只有 class 不同。
+  const { collapsed, onSummaryClick, onSummaryKeyDown } = useRowCollapse();
   return (
     <details
       className="ht-ai__step-body"
@@ -1333,11 +1437,8 @@ function ReasoningRow(props: { text: string; t: I18nValue['t'] }): React.JSX.Ele
         className="ht-ai__step-line"
         // 视觉状态既然由我们持有，就把展开状态显式告诉读屏。
         aria-expanded={!collapsed}
-        onClick={(event) => {
-          // 拦掉原生开合（它会同步隐藏子树）；键盘的 Enter/Space 也会走这里。
-          event.preventDefault();
-          setCollapsed((prev) => !prev);
-        }}
+        onClick={onSummaryClick}
+        onKeyDown={onSummaryKeyDown}
       >
         <span className="ht-ai__step-verb">{props.t('web.ai.chat.step.thinking')}</span>
         <span className="ht-ai__step-detail">{firstLine}</span>

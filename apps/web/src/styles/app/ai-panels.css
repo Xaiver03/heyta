@@ -843,6 +843,10 @@ input[type="radio"] {
  * 我们的 `chrome107/safari16` 目标）⇒ 子树不参与布局 ⇒ 过渡被整个跳过。
  * 组件侧因此让 `details` 常驻 `open`，把这个 class 当"视觉收起"的表达。
  *
+ * ⚠️ 本条只作用于**思考那一行**（`.ht-ai__step-collapse` 由 `ReasoningRow` 使用）。
+ * 工具步骤行用的是下面一段的 `.ht-ai__trace-collapse` —— 同一套做法、**不同的 class**，
+ * 理由见那一段的开头。
+ *
  * `overflow: hidden` 必须落在**被动画的那一层**（wrapper），不能落在外层
  * `details` 上 —— 否则展开后长文本的最后一个字会被裁掉半行。
  */
@@ -859,6 +863,49 @@ input[type="radio"] {
 }
 
 .ht-ai__step-collapse--open {
+  grid-template-rows: 1fr;
+}
+
+/* ── 工具步骤行的高度动画（2026-11-10）
+ *
+ * 🔴 与上面 `.ht-ai__step-collapse`（思考那一行）**是同一套做法，但故意是另一个
+ * class**。理由不是"能省一行"，是这两处的**语义不同、归属不同**：
+ *
+ *   · 思考行是**一个**展开器，包着一整段思考文本；
+ *   · 步骤行是**列表里的一行**，数量随工具调用增长，而且有"没有 note 就不套
+ *     `<details>`"的第三态（见 `TraceRows` 的注释）。
+ *
+ * 共用一个 class 会让"改其中一处的视觉"必然波及另一处 —— 而它们连触发时机
+ * 都不一样（思考文本流式追加、步骤行按事件增删）。所以这里**共用行为、不共用名字**：
+ * 两条规则的每一行都出自同一份逐帧实测（见上面那段），但谁都不在对方的
+ * 选择器列表里。
+ *
+ * 🔴 两个坑与思考行完全一致，逐字实测过（Chromium 156，本文件对应的结构
+ * `ul > li > details > summary + wrapper`）：
+ *   1. `min-block-size: 0` 必须落在子元素上（写在容器上收起态恒为 16px 不插值）；
+ *   2. 触发**不能**用 `details[open]` —— 收起帧实测 `16 16 16 … 16` 全程不动；
+ *      用元素自己的 class 才是 `16 14.91 11.98 … 0`。
+ *
+ * 🔴 与思考行的一个**真实差异**：思考行在流式期间文本不断增长，而步骤行的
+ * `note` 是**整行被替换**（`tool-finished` 换掉同名那一行的对象，下标不变 ⇒
+ * React 复用同一个 DOM 节点）。实测「已展开的行 + note 整段替换」：
+ * 高度 `17px → 238px`、`scrollHeight === clientHeight`（不裁字）、
+ * class 保持不变（不会自己弹回收起）。这正是 `0fr/1fr` 相对 JS 测高的价值 ——
+ * 高度每帧由布局引擎重算，没有"量完到下一帧内容又变了"的窗口。
+ */
+.ht-ai__trace-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  transition: grid-template-rows var(--ht-duration-normal) var(--ht-ease-standard);
+}
+
+/* 压掉 grid item 的自动最小尺寸 —— 与 `.ht-ai__step-collapse > *` 同一条判据。 */
+.ht-ai__trace-collapse > * {
+  min-block-size: 0;
+}
+
+.ht-ai__trace-collapse--open {
   grid-template-rows: 1fr;
 }
 
