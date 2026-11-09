@@ -2500,7 +2500,10 @@ export const en = {
   'web.ai.settings.localApi.tool.updateEvent': 'Update countdown',
   // Moved here from `WEB_KEY_STORAGE_NOTICE` in `aiStore.ts`. It must sit next
   // to the key inputs: otherwise "I have to type it again" looks like a bug.
-  'web.ai.settings.keyNotice': 'There is no system keychain in the browser, so keys are kept only in the memory of this tab. You will need to enter them again after closing or refreshing the page. Desktop keeps keys in the system keychain.',
+  // ⚠️ 2026-11-09: dropped the trailing "Desktop keeps keys in the system keychain."
+  // It was false — the desktop GUI loads this same `apps/web/dist`, whose secret
+  // store is memory-only (see the note in `AiSettings.tsx`).
+  'web.ai.settings.keyNotice': 'There is no system keychain in the browser, so keys are kept only in the memory of this tab. You will need to enter them again after closing or refreshing the page.',
   'web.ai.settings.keyNoticeShort': 'The key lives only in this session',
   'web.ai.settings.reset': 'Reset to defaults (everything off)',
   // "Reset to defaults" is destructive (endpoints / routing / per-feature export

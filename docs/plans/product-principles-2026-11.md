@@ -80,16 +80,31 @@
 ⚠️ **判据不在长短**：`迁移` 那枚气泡保留，因为写的是**步骤**（"先查看预览，再合并"），
 用户要记住一个顺序。**要不要用户记住顺序**才是分界线，字数是噪音。
 
+### 1.2.1 `AiSettings.tsx` 最后 3 枚逐条判（2026-11-09）
+
+`AiSettings.tsx` 原有 8 枚，前 5 枚已判（其中 1 枚以第四类删掉）。
+剩下 3 枚按 §1.2 过一遍，**结论是 2 保留 / 1 只删半句**：
+
+| 气泡 | 正文 | 判定 | 依据（可复核） |
+|---|---|---|---|
+| `tip-ai-supply` | `web.ai.settings.supply.note`：地址来自「同步」/换服务器跟着换/不用在这里改 + **走托管时内容在我们服务器上解开明文** | **保留** | 后半截是 §3.7.2 **要求必须出现**的披露，不许删。前半截不是"复述界面"：托管端点由 `withManagedEndpoint()` 每次合成，而它在端点列表里**长得可以改**（`routing.endpoints` 含合成的那条，改完下次合成会被覆盖）⇒ "不用在这里改"是**防坑**，不是背景知识 |
+| `tip-ai-key-notice` | `web.ai.settings.keyNotice`：浏览器无钥匙串/关掉刷新要重输 + ~~桌面端存系统钥匙串~~ | **第四类：删掉第三个分句** | 那句话是**假话**，且在它自己所处的界面上就假：桌面 GUI 载的就是 `apps/web/dist`（`apps/desktop/src/main.ts` 的 `resolveWebRoot()`，ADR-0037），`apps/web/src/App.tsx` 恒用 `createSessionSecretStore()`（内存 `Map`）；全仓唯一有钥匙串的壳只给 E2EE vault root 注入桥（`vault-root-keychain.ts`），AI 密钥没有桥。`ADR-0010 §3.6` 的平台表把钥匙串指向 `apps/node-host`（**CLI 宿主**）—— 这句当初是从 CLI 那一行抄过来的。前两句保留（关掉要重输 = 现在必须知道的后果，`ai-settings.spec.tsx:452` 也钉着） |
+| `tip-local-api-token` | `web.ai.settings.localApi.token.hint`：token 防的是本机其他程序、不是网络攻击；没有它任何程序能读走全部任务 | **保留** | 四类里没有一类成立：不是重复（`validateLocalApiConfig` 的报错句只在"打开但没填"那一刻出现在另一处）、不是复述控件、不是在解释不存在的东西（token 闸还在，威胁模型仍真）。而它是这一格**唯一**说"这个令牌在防谁"的句子，用户正要往里贴一枚凭据 ⇒ 属"现在必须知道" |
+
+⇒ 现量不变：说明气泡调用点仍 **45**（`grep -rho "<SettingsInfoTip" apps/web/src`）。
+`AiSettings.tsx` 8 枚至此**全部判完**，不再有"待判"。
+
 ### 1.3 剩余工作（下一轮直接照这张单子做）
 
 | # | 事 | 起点 |
 |---|---|---|
-| 1 | 继续 J2：剩 **46** 处，按 §1.2 三类靶子逐条过 | 先看 `AiSettings.tsx`（8 处，最密） |
+| 1 | 继续 J2：剩 **45** 处（`AiSettings.tsx` 8 处已判完，见 §1.2.1） | 下一个最密的文件：`InboundAutomationSettings.tsx` / `PasswordPanel.tsx`（各 3 处，后者 2 处的 `label` = `text` 见 #4） |
 | 2 | 字号 13px | §3.2：需 `TEXT_STYLES` 加语义档 + **删一个现有档**（候选 `xl`）+ 逐屏截图 |
 | 3 | RN preset 轴 | §4.1：给 `resolveHeytaUiTheme()` 加 preset 轴，**不许抄 CSS** |
 | 4 | `label` 与 `text` 同词条（3 处） | 可访问名等于正文，读屏会念两遍 —— 小毛病，已记录 |
 | 5 | ~~站点文案里同一条过期说法~~ **已判：不做**，理由见下 | `site.docs.privacy.s3p3` / `s4p1` 仍写"只读档不能写、执行档…"（ADR-0082 已删权限档）。**这是对外隐私披露文案**，改它要过 `check:legal-*` 那套口径复核 —— **措辞不由 agent 自主决定**。⚠️ 注意这不是"因为合规所以不做功能"（§0.1 禁止的那种）：产品侧的风险闸门**早就实现了**，过期的只是**一句话**。区别在于：功能归产品，**已发布的对外承诺归法务口径** |
 | 6 | `web.ai.assistant.hint` 已删、`web.ai.chat.hint` 已删（**死词条**：只在 dist 类型声明里，无活消费者） | — |
+| 7 | 🔴 **待法务口径复核**：`packages/legal/src/documents/personal-info-list.ts` 里同一句「on desktop and CLI hosts the secret lives in the system keychain」 | 与 §1.2.1 第二行**同一个事实错误**（桌面 GUI 载的是 web 产物，密钥只在内存）。**不在本轮改动范围**：那是对外披露文案，走 `check:legal-*`。改动方向建议：限定成「CLI 宿主」，或等桌面 GUI 真的接上钥匙串再说 |
 
 ## 2. 产品决策参照滴答清单（参照，不是照抄）
 

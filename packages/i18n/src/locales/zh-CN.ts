@@ -2683,7 +2683,10 @@ export const zhCN = {
   'web.ai.settings.localApi.tool.updateEvent': '修改倒数日',
   // 从 `features/settings/aiStore.ts` 的 `WEB_KEY_STORAGE_NOTICE` 搬来。
   // 🔴 它必须显示在密钥输入框旁边：不说明的话，"下次打开要重输"会被当成 bug。
-  'web.ai.settings.keyNotice': '浏览器里没有系统钥匙串，密钥只保存在这个标签页的内存中。关掉或刷新页面后需要重新输入。桌面端会把密钥存进系统钥匙串。',
+  // ⚠️ 2026-11-09：删掉原来最后一句「桌面端会把密钥存进系统钥匙串。」—— 它是假话，
+  // 依据见 `AiSettings.tsx` 那条注释（桌面 GUI 载的就是 `apps/web/dist`）。
+  // 留着前两句，它们正是这条提示存在的理由，也是 `ai-settings.spec.tsx` 钉的东西。
+  'web.ai.settings.keyNotice': '浏览器里没有系统钥匙串，密钥只保存在这个标签页的内存中。关掉或刷新页面后需要重新输入。',
   'web.ai.settings.keyNoticeShort': '密钥只保存在这次会话里',
   'web.ai.settings.reset': '恢复默认（全部关闭）',
   // 「恢复默认」是破坏性动作（清端点/路由/出境授权/本机密钥/记忆开关），

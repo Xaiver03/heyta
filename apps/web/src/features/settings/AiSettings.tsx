@@ -1502,8 +1502,24 @@ export function AiSettings({
           用的是同一个键 ⇒ 屏幕上只剩「🔒 + ?」，正文一个字没有（产品负责人：
           "那么多排版混乱、不知所指的 icon"）。现在分两层：
             · 可见的一句**短标签**（这行到底在说什么）；
-            · 展开才给的长句（为什么、桌面端如何）。
+            · 展开才给的长句（为什么）。
           `check:settings-prose` 的规则是"长句不许内联"，短标签不触犯它。
+
+          🔴 2026-11-09（J2 §1.2 第四类靶子：**在解释一个不存在的东西**）：
+          长句原来还有第三截「桌面端会把密钥存进系统钥匙串。」—— 那是**假话**，
+          这条提示显示在桌面 GUI 上时它也不成立：
+            · `apps/desktop/src/main.ts` 的 `resolveWebRoot()` 指向 `apps/web/dist`
+              （`ADR-0037` 桌面 UI 回落 webview），所以桌面 GUI 跑的就是这份 web 代码；
+            · `apps/web/src/App.tsx` 恒用 `createSessionSecretStore()`（内存 `Map`），
+              没有平台分支；
+            · 全仓唯一有钥匙串的壳（macOS，`ShellVaultKeychainBridge.swift`）只给
+              E2EE 的 vault root 注入桥（`vault-root-keychain.ts`），AI 密钥没有桥。
+          `ADR-0010 §3.6` 那张平台表把钥匙串实现指向 `apps/node-host`（**CLI 宿主**），
+          不是这个界面所在的壳 —— 这句话当初是把 CLI 那一行抄到了桌面 GUI 头上。
+          ⇒ 处置：**删掉那半句**（不是改写、也不是保留）。`SecretStore` 端口没变，
+          真要给桌面 GUI 接钥匙串时，这句再加回来 —— 那时它是真话。
+          ⚠️ `packages/legal` 的 `personal-info-list.ts` 里同一说法（"desktop and CLI
+          hosts … system keychain"）本轮**没动**：那是对外披露文案，走 `check:legal-*` 口径复核。
         */}
         <span>{t('web.ai.settings.keyNoticeShort')}</span>
         <SettingsInfoTip

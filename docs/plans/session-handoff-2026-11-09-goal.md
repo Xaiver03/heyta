@@ -70,7 +70,7 @@
 |---|---|---|
 | 说明气泡调用点 | **45** | `grep -rho "<SettingsInfoTip" apps/web/src --include=*.tsx \| wc -l` |
 | 设置页内联说明账本 | **1**（`ProfileOverview` 版本号那一行） | `node scripts/check-settings-no-prose.mjs` |
-| 17 条门禁 | 全部 rc=0 | 见 §5 命令块 |
+| 17 条门禁 | 🔴 **2026-11-09 09:3x 复核：`check:design` 是红的**，其余 15 条 rc=0（§5 那张块里数得出 16 条，不是 17 条） | 见 §5 命令块。红的实测：`pnpm check:design` → `🔴 17 处硬编码设计变量`，分布在 `apps/mobile/src/ui/error-boundary.tsx`（绝大多数）+ `apps/desktop/src/main.ts:91`（`padding:2rem`）。**不是本轮改出来的**：那两个文件我一个字没动，`git log` 显示 `b7f6628ef`（2026-11-08 19:27）就带进来了 |
 | 六字段编辑器落点 | 各 1（`project` 另有 1 条通路=看板拖拽） | `node scripts/check-field-single-source.mjs` |
 | 全局动作 | 5 个 / 镜像 2 / 例外 3 | `node scripts/check-global-mirror.mjs` |
 | 撤销测试 | 引擎 14 · 通知 5 · 目标判定 6 | 见 §5 |
@@ -92,8 +92,14 @@
 | 🔴 §3.7.2 要求必须出现的**披露** | **不许删** |
 | 用户要记住的**顺序**（"先预览再合并"） | 保留 |
 
-**下一条从哪里开始**：`apps/web/src/features/settings/AiSettings.tsx`，还剩 3 处
-（`supply.note` 是**披露**，按上表不许删；`keyNotice`、`localApi.token.hint` 待判）。
+**下一条从哪里开始**：`AiSettings.tsx` 那 8 枚**已全部判完**（末 3 枚的逐条结论在
+[`product-principles §1.2.1`](product-principles-2026-11.md)：2 保留 / 1 只删半句）。
+其中 `keyNotice` 的第三个分句「桌面端会把密钥存进系统钥匙串」是**假话**，已删（依据写在
+`AiSettings.tsx` 那条注释里：桌面 GUI 载的就是 `apps/web/dist`，密钥只在内存）。
+⇒ 下一个最密的文件：`InboundAutomationSettings.tsx`（3 处）、`PasswordPanel.tsx`（3 处）。
+
+⚠️ 同一事实错误在 `packages/legal/src/documents/personal-info-list.ts` 里还有一份，
+**没动**（对外披露文案走 `check:legal-*`），已登记在 product-principles §1.3 #7。
 
 ### ② 字号 13px（目标 2，**被仓库自己的规则挡下**）
 
@@ -147,6 +153,10 @@
    从 cwd 往上找 `pnpm-workspace.yaml`。
 7. 🔴 **对外披露文案（`site.docs.privacy.*`）不归 agent 改** —— 要走 `check:legal-*` 那套口径复核。
    这条**不是** §0.1 禁止的"拿合规当借口"：功能早就做了，过期的只是一句话。
+8. 🔴 **别引用别人写的"门禁全绿"，自己跑一遍。** 本文件 §2 原写着「17 条门禁 全部 rc=0」，
+   2026-11-09 09:3x 复跑发现 **`check:design` 是红的**（17 处硬编码，`b7f6628ef` 带进来的，
+   且那个提交比"全绿"那次读数还早 14 小时）。抄读数 = 抄一份会腐烂的结论；
+   这正是本仓元规则「写下来的东西必须有重新校验它的机制」的又一个实例。
 
 ---
 
@@ -182,16 +192,22 @@ ADR-0082 已删 `assistantTier`；`@heyta/ui` 主题轴没有 preset。
 
 **推测（未验证，动手前先复核）**：
 - 删掉 `xl` 能同时满足"单文件 ≤5、全局 ≤6"——**没试过**，只是按 §3.2 的算法推的。
-- `supply.note` 属"必须保留的披露"——按 §3.7.2 判的，但它是 102 字符，
-  可能要跟 `check:settings-prose` 的 40 字上限再谈一次。
+- ~~`supply.note` 属"必须保留的披露"——按 §3.7.2 判的，但它是 102 字符，
+  可能要跟 `check:settings-prose` 的 40 字上限再谈一次。~~ **2026-11-09 已复核，疑虑解除**：
+  那把尺只数 `ht-settings__hint` / `__note` / `__lead` 三种容器与 `SettingsSection note=` /
+  移动端 `hint:`，**`SettingsInfoTip` 的正文根本不在射程内**（见 `scripts/check-settings-no-prose.mjs`
+  文件头「什么算说明文字」）。所以 `supply.note` 交不交这 40 字上限，**不是问题**。
 - 站点 `site.docs.privacy.*` 改口径的具体归口人 —— 只知道要走 `check:legal-*`。
+  （2026-11-09 追加：`packages/legal/src/documents/personal-info-list.ts` 也有同一句待复核。）
 
 ---
 
 ## §7 下一轮的建议顺序
 
-1. **`AiSettings.tsx` 剩 3 处**（目标 1）。每条按 §1.2 四类靶子判"要不要用户记住什么"。
+1. ~~`AiSettings.tsx` 剩 3 处~~ **已完成 2026-11-09**（详见 `product-principles §1.2.1`）。
+   下一步 J2 去 `InboundAutomationSettings.tsx` / `PasswordPanel.tsx`（各 3 处）。
 2. **字号**（目标 2）：先只做"删 `xl`"这一半，确认 `surface-budget` 回绿，再谈加档。
 3. **RN preset 轴**（目标 8）：先读 `ADR-0085` + `check:theme` 的单源判据，再动 `resolveHeytaUiTheme()`。
 
 ⚠️ 不要再开第四件事。这一轮的教训是：一次只做一条能判准的，比铺开五条有效。
+⚠️ 但 `check:design` 现在红着（§2）—— 它不算本条线的账，可**也别在任何交付话里写"门禁全绿"**。
