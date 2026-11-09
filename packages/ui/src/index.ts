@@ -225,6 +225,7 @@ export {
 export {
   HeytaUiProvider,
   resolveHeytaUiTheme,
+  PRESET_NAMES,
   useHeytaText,
   useHeytaTokens,
   useHeytaUiTheme,

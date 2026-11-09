@@ -124,6 +124,33 @@ export function extractPresetVars(css: string, preset: string, theme?: string): 
 }
 
 /**
+ * 只抽取**某个预设块显式写出**的变量（不合并基准）。
+ *
+ * 与 `extractPresetVars` 的分工，和 `extractThemeVars` 与 `extractVars` 的分工一模一样：
+ *   - `extractPresetVars(css, p, t)`      → 基准 + 预设的**合并**结果（用来解析 var() 链、算对比度）
+ *   - `extractPresetOverridesVars(css…)`  → 仅预设块里写出的那些（用来决定"哪几个 token 要进 RN 预设表"）
+ *
+ * 用合并表去判"要不要进预设表"的话，**每个** token 都会被判成有覆盖 ——
+ * RN 侧于是得到一张与基准表一样大的"预设表"，也就等于没有预设。
+ */
+export function extractPresetOverridesVars(
+  css: string,
+  preset: string,
+  theme?: string,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const wanted =
+    theme === 'dark'
+      ? `[data-theme='dark'][data-theme-preset='${preset}']`
+      : `[data-theme-preset='${preset}']`;
+  for (const [selector, body] of topLevelBlocks(css)) {
+    if (selector !== wanted) continue;
+    for (const [name, value] of varsIn(body)) out.set(name, value);
+  }
+  return out;
+}
+
+/**
  * 只抽取某个主题块**显式写出**的变量（不合并基准）。
  *
  * 与 extractVars(css, theme) 的区别：

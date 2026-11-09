@@ -254,8 +254,22 @@
 
 **但如果要做移动端预设**，工作不是"抄一段 CSS"，而是给 `resolveHeytaUiTheme()` 加一条
 **preset 轴**（token 表要能按 preset 取不同表面色，且要进 `check:theme` 的单源判据）。
-🔴 这正是本轮**没有做**的那一件：它是一个真实的接线工作，不是顺手改 ——
-而"顺手把 CSS 抄进 RN"会造出**第二份表面色表**，`check:theme` 会红，且两份一定漂。
+✅ **2026-11-09 已做**（没有抄 CSS，而是让生成器从同一份 `tokens.css` 多发射一张表）：
+
+| 步 | 落在哪 | 说明 |
+|---|---|---|
+| 1 | `packages/design-system/src/css-tokens.ts` | 新增 `extractPresetOverridesVars()`：只取预设块**显式写出**的变量（与 `extractThemeVars` 同一分工）。用合并表去判"要不要进预设表"会把每个 token 都算成有覆盖 ⇒ 产出一张与基准等大的假预设表 |
+| 2 | `packages/design-system/src/generate.ts` | `buildPresetTokens()` 从 CSS 生成**稀疏**覆盖；`toNativeTS()` 发射 `PresetName` / `PRESET_NAMES` / `presetTokens`（亮暗各一份，值**已按各自主题解析**） |
+| 3 | `packages/design-system/src/native.ts` | `tokensForTheme(theme, preset?)` = 基准 → 预设合并；`resolveNativeTokens({preset})` 透传 |
+| 4 | `packages/ui/src/theme.tsx` | `HeytaUiTheme.preset` + `resolveHeytaUiTheme({preset})`；`PRESET_NAMES` 从共享层导出（宿主别手抄列表） |
+
+判据（`packages/design-system/tests/preset-native.spec.ts`，16 条）：
+① **同源**：产物每个值逐字节等于 CSS 预设块解析值；
+② **稀疏**：键集合 == CSS 里写出的 token，且 < 全量 registry 的 1/4；
+③ **正交**：预设 × 明暗四组合各自生效（暗版不是"亮版套暗色"）、`primary/danger/success/warning` 不动、覆盖表里只有 `color.*`。
+两次变异实证：把稀疏抽取换成合并抽取 ⇒ 生成器 rc=1 且点名
+`tokens.css 的预设 warm/light 写了 --ht-blue-50，但它不在 token registry 里`；
+手改生成物里一个 hex ⇒「warm/light：产物值 == CSS 解析值」当场红，重新生成后 16 passed。
 
 ---
 

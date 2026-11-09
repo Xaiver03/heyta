@@ -56,6 +56,7 @@ import {
   TEXT_STYLES,
   type CubicBezier,
   type HeytaNativeTokens,
+  type PresetName,
   type RnShadow,
   type RnTextStyle,
   type TextStyleName,
@@ -91,6 +92,14 @@ export interface HeytaUiNativeAccessors {
 /** 共享组件能用到的一切样式来源。 */
 export interface HeytaUiTheme {
   readonly theme: ThemeName;
+  /**
+   * 表面预设。`undefined` = 基准表面色（web 的 `data-theme-preset` 没设时那一档）。
+   *
+   * 🔴 为什么它是一个**独立轴**而不并进 `theme`：明暗是"环境"，预设是"外观选择"，
+   * 两者正交（四种组合都要成立）。值来自 `tokens.css`，经生成器进 `presetTokens`，
+   * 所以这里没有第二份表面色表 —— 那会被 `check:theme` 判红。
+   */
+  readonly preset: PresetName | undefined;
   readonly reducedMotion: boolean;
   /**
    * 系统是否开了「减少透明度」（ADR-0042 §4：材质要能退让）。
@@ -110,6 +119,13 @@ export interface HeytaUiTheme {
   /** token 的 RN 视图（见 `HeytaUiNativeAccessors`）。 */
   readonly native: HeytaUiNativeAccessors;
 }
+
+/**
+ * 预设名的**唯一**来源是 `tokens.css`（生成器发射成 `PRESET_NAMES`）。
+ * 宿主要做"外观选择"的列表 UI 时用它，**不要**再手抄一份 `['warm','mist']` ——
+ * 抄一份就会漂，而漂了的症状只是"多出一个点了没反应的选项"。
+ */
+export { PRESET_NAMES } from '@heyta/design-system';
 
 const ThemeContext = createContext<HeytaUiTheme | null>(null);
 
@@ -241,6 +257,11 @@ export function resolveHeytaUiTheme(options?: {
   reducedTransparency?: boolean;
   /** 宿主已打包的字体名清单。省略 = 全用系统字体。 */
   packagedFonts?: readonly string[];
+  /**
+   * 表面预设（`warm` / `mist`）。省略 = 基准表面色。
+   * 与 `scheme` 正交：同一个预设亮暗各一套覆盖（生成时已分别解析）。
+   */
+  preset?: PresetName;
 }): HeytaUiTheme {
   // 🔴 `resolveThemeName` 负责把 `null` / `'unspecified'` 归一成 `'light'`。
   // 直接拿 scheme 当索引会得到 undefined，而 RN 拿到 undefined 颜色
@@ -248,9 +269,10 @@ export function resolveHeytaUiTheme(options?: {
   const theme = resolveThemeName(options?.scheme ?? null);
   const reducedMotion = options?.reducedMotion ?? false;
   const reducedTransparency = options?.reducedTransparency ?? readReducedTransparencyOnce();
-  const tokens = resolveNativeTokens({ theme, reducedMotion, reducedTransparency });
+  const tokens = resolveNativeTokens({ theme, preset: options?.preset, reducedMotion, reducedTransparency });
   return {
     theme,
+    preset: options?.preset,
     reducedMotion,
     reducedTransparency,
     tokens,

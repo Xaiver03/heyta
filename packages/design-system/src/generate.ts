@@ -26,6 +26,8 @@
  */
 
 import {
+  extractPresetOverridesVars,
+  extractPresetVars,
   extractReducedMotion,
   extractReducedTransparency,
   extractThemeVars,
@@ -353,6 +355,72 @@ export function buildNativeTokens(css: string): NativeToken[] {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 主题预设（R13b 的 RN 侧，2026-11-09）
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 预设名。**必须与 `tokens.css` 里 `[data-theme-preset='…']` 的选择器一字对应** ——
+ * 对不上时 `buildPresetTokens()` 会生成空表，下面那条约等判据会当场红。
+ */
+export const PRESET_NAMES = ['warm', 'mist'] as const;
+export type PresetName = (typeof PRESET_NAMES)[number];
+
+export interface PresetTokenTables {
+  readonly [preset: string]: {
+    readonly light: Record<string, string | number>;
+    readonly dark: Record<string, string | number>;
+  };
+}
+
+/**
+ * 按**同一个 `tokens.css`** 生成预设覆盖表（RN 侧消费）。
+ *
+ * 🔴 为什么必须从 CSS 生成，而不是在 RN 里抄一份表面色：
+ * 抄一份就是**第二份表面色表**，两份一定漂；而 `check:theme`（单源门禁）要防的
+ * 正是这件事。这里只做"同一份 CSS 的另一种发射形态"，与 `lightTokens`/`darkTokens`
+ * 完全同源。
+ *
+ * 只发射**预设块显式写出**的 token（`extractPresetOverridesVars`）：
+ * 用合并表去判会把每个 token 都算成"有覆盖"，产出一张与基准表等大的假预设表。
+ */
+export function buildPresetTokens(css: string): PresetTokenTables {
+  const { light, dark } = parseTokensCss(css);
+  const byCssName = new Map(
+    allTokenNames().map((token) => [
+      cssVarName(token),
+      { token, group: token.slice(0, token.indexOf('.')) },
+    ]),
+  );
+  const out: Record<string, { light: Record<string, string | number>; dark: Record<string, string | number> }> = {};
+
+  for (const preset of PRESET_NAMES) {
+    const tables: { light: Record<string, string | number>; dark: Record<string, string | number> } = {
+      light: {},
+      dark: {},
+    };
+    for (const theme of ['light', 'dark'] as const) {
+      const overrides = extractPresetOverridesVars(css, preset, theme);
+      const merged = extractPresetVars(css, preset, theme);
+      const base = theme === 'dark' ? dark : light;
+      for (const cssName of overrides.keys()) {
+        const token = byCssName.get(cssName);
+        // 预设块里出现非 token 的东西（例如纯文档性变量）⇒ 直接报错，别静默丢：
+        // "少了几个颜色而没人知道" 的症状是某块面板在移动端偷偷用回基准色。
+        if (token === undefined) {
+          throw new Error(
+            `tokens.css 的预设 ${preset}/${theme} 写了 ${cssName}，但它不在 token registry 里`,
+          );
+        }
+        const resolved = collapse(resolveAllVars(merged.get(cssName) ?? base.get(cssName) ?? '', merged));
+        tables[theme][token.token] = convertValue(token.group, resolved).value;
+      }
+    }
+    out[preset] = tables;
+  }
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────
 // 命名约定
 // ─────────────────────────────────────────────────────────────
 
@@ -648,7 +716,10 @@ export function toJson(tokens: readonly NativeToken[]): string {
  * 这里**不重新解析 CSS**，只消费 buildNativeTokens 的结果 —— 与 Swift/ArkTS
  * 产物同源，因此三端不可能漂移出不同的值。
  */
-export function toNativeTS(tokens: readonly NativeToken[]): string {
+export function toNativeTS(
+  tokens: readonly NativeToken[],
+  presets: PresetTokenTables = {},
+): string {
   assertUniqueNames(tokens);
 
   const tsType = (t: NativeToken): string => (t.kind === 'number' ? 'number' : 'string');
@@ -721,6 +792,44 @@ export function toNativeTS(tokens: readonly NativeToken[]): string {
 
   lines.push(`export const THEME_NAMES: readonly ThemeName[] = ['light', 'dark'];`);
   lines.push('');
+
+  /**
+   * 主题预设（R13b 的 RN 侧）。**稀疏**覆盖：只含 CSS 预设块里真的写了的 token，
+   * 合并方式是 `{ ...lightTokens, ...presetTokens[p].light }`。
+   *
+   * 🔴 这张表与上面的 `lightTokens`/`darkTokens` **同一个来源**（`tokens.css`），
+   * 所以不存在"RN 侧抄了一份表面色"这件事 —— 那正是 `check:theme` 要防的第二份表。
+   */
+  const presetNames = Object.keys(presets);
+  if (presetNames.length > 0) {
+    lines.push(
+      `export type PresetName = ${presetNames.map((p) => `'${p}'`).join(' | ')};`,
+    );
+    lines.push(
+      `export const PRESET_NAMES: readonly PresetName[] = [${presetNames.map((p) => `'${p}'`).join(', ')}];`,
+    );
+    lines.push('');
+    lines.push('/** 每个预设在亮/暗两主题下的**稀疏**覆盖（与 `tokens.css` 的预设块同源）。 */');
+    lines.push('export const presetTokens: {');
+    lines.push('  readonly [P in PresetName]: {');
+    lines.push('    readonly light: Partial<HeytaNativeTokens>;');
+    lines.push('    readonly dark: Partial<HeytaNativeTokens>;');
+    lines.push('  };');
+    lines.push('} = {');
+    for (const preset of presetNames) {
+      lines.push(`  ${preset}: {`);
+      for (const theme of ['light', 'dark'] as const) {
+        lines.push(`    ${theme}: {`);
+        for (const [key, value] of Object.entries(presets[preset][theme])) {
+          lines.push(`      '${key}': ${literal(value)},`);
+        }
+        lines.push('    },');
+      }
+      lines.push('  },');
+    }
+    lines.push('};');
+    lines.push('');
+  }
 
   return lines.join('\n');
 }
@@ -914,7 +1023,7 @@ export function generateAll(css: string): GeneratedBundle {
     swift: toSwift(tokens),
     arkts: toArkTS(tokens),
     json: toJson(tokens),
-    native: toNativeTS(tokens),
+    native: toNativeTS(tokens, buildPresetTokens(css)),
     typographyCss: toTypographyCss(),
     xaml: toXaml(tokens),
     gtkCss,

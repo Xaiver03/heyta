@@ -117,6 +117,23 @@ React Native 的 `View` 默认 `flex: 0 0 auto`（与 CSS 的 `0 1 auto` **不�
 
 ---
 
+### 🔴 表面预设（warm / mist）：一份 CSS，两种发射形态（2026-11-09）
+
+预设只换**表面色系**（不含语义色 primary/danger/success/warning），所以它必须**只有一处定义**：
+`tokens.css` 的 `[data-theme-preset='…']` 块。web 靠 `applyThemePreset()` 写 `<html>` 的
+`data-theme-preset` 消费它；RN 侧走**生成器**：
+
+1. `buildPresetTokens()` 用 `extractPresetOverridesVars()` 只取块里**显式写出**的变量
+   （用合并表去判会把每个 token 都算成"有覆盖" ⇒ 一张与基准等大的假预设表）；
+2. 发射成 `generated/tokens.native.ts` 的 `presetTokens`（亮/暗各一份，值已按各自主题解析）；
+3. `tokensForTheme(theme, preset)` 合并 → `resolveHeytaUiTheme({ preset })` → `useHeytaTokens()`。
+
+🔴 **不许**在 RN/移动端手抄一份表面色 —— 那就是第二份表，`check:theme` 会红，两份一定漂。
+判据：`packages/design-system/tests/preset-native.spec.ts`（同源 / 稀疏 / 正交三组，16 条）。
+⚠️ 生成物改动必须走 `pnpm --filter @heyta/design-system run generate`，`run generate --check` 会比对漂移。
+
+---
+
 ## 🔴 设置界面里**禁止**写说明文字（2026-10-24，产品负责人下的禁令）
 
 原话（第二次说的时候已经很生气，所以这条是**禁令**，不是建议）：

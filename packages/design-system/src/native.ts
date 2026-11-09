@@ -21,16 +21,28 @@
 import {
   darkTokens,
   lightTokens,
+  presetTokens,
   reducedMotionTokens,
   reducedTransparencyLightTokens,
   reducedTransparencyDarkTokens,
+  PRESET_NAMES,
   THEME_NAMES,
   type HeytaNativeTokens,
+  type PresetName,
   type ThemeName,
 } from './generated/tokens.native.js';
 
-export { darkTokens, lightTokens, reducedMotionTokens, reducedTransparencyLightTokens, reducedTransparencyDarkTokens, THEME_NAMES };
-export type { HeytaNativeTokens, ThemeName };
+export {
+  darkTokens,
+  lightTokens,
+  presetTokens,
+  reducedMotionTokens,
+  reducedTransparencyLightTokens,
+  reducedTransparencyDarkTokens,
+  PRESET_NAMES,
+  THEME_NAMES,
+};
+export type { HeytaNativeTokens, PresetName, ThemeName };
 
 /**
  * RN `useColorScheme()` / `Appearance.getColorScheme()` 的返回形态。
@@ -53,13 +65,31 @@ export function resolveThemeName(scheme: ColorSchemeLike): ThemeName {
   return scheme === 'dark' ? 'dark' : 'light';
 }
 
-/** 取某一主题的**完整** token 表。 */
-export function tokensForTheme(theme: ThemeName): HeytaNativeTokens {
-  return theme === 'dark' ? darkTokens : lightTokens;
+/**
+ * 取某一主题的**完整** token 表。
+ *
+ * `preset` 省略（`undefined`）时就是基准表面色（wire 上的 "default"）。
+ * 预设是**稀疏覆盖**，合并方向与 CSS 的三层顺序一致：
+ *   基准(亮/暗) → 预设(亮) → 预设(暗，仅暗色)
+ * 注意暗色下 preset 的覆盖**已经**是针对暗色解析过的值（生成器分别展开），
+ * 所以这里不需要再做一次"暗色里再挑暗值"。
+ */
+export function tokensForTheme(theme: ThemeName, preset?: PresetName): HeytaNativeTokens {
+  const base = theme === 'dark' ? darkTokens : lightTokens;
+  if (preset === undefined) return base;
+  return { ...base, ...presetTokens[preset][theme] };
 }
 
 export interface ResolveOptions {
   theme: ThemeName;
+  /**
+   * 表面预设（`warm` / `mist`）。省略 = 基准表面色。
+   *
+   * 🔴 它是**外观轴**，与 `theme`（明暗）正交、与 `reducedMotion`（可及性偏号）正交。
+   * 值来自 `tokens.css` 的预设块（经生成器发射成 `presetTokens`），
+   * 所以 RN 侧不存在"另抄一份表面色"这件事 —— 那会被 `check:theme` 判红。
+   */
+  preset?: PresetName;
   /** 系统是否开启「减少动效」。 */
   reducedMotion?: boolean;
   /**
@@ -77,8 +107,7 @@ export interface ResolveOptions {
  * 覆盖层只含少数 token，其余原样保留。
  */
 export function resolveNativeTokens(options: ResolveOptions): HeytaNativeTokens {
-  const base = tokensForTheme(options.theme);
-  let tokens = base;
+  let tokens = tokensForTheme(options.theme, options.preset);
   if (options.reducedMotion) {
     tokens = { ...tokens, ...reducedMotionTokens };
   }

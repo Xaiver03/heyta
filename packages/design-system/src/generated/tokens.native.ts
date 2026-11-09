@@ -751,3 +751,61 @@ export const reducedTransparencyDarkTokens: Partial<HeytaNativeTokens> = {
 };
 
 export const THEME_NAMES: readonly ThemeName[] = ['light', 'dark'];
+
+export type PresetName = 'warm' | 'mist';
+export const PRESET_NAMES: readonly PresetName[] = ['warm', 'mist'];
+
+/** 每个预设在亮/暗两主题下的**稀疏**覆盖（与 `tokens.css` 的预设块同源）。 */
+export const presetTokens: {
+  readonly [P in PresetName]: {
+    readonly light: Partial<HeytaNativeTokens>;
+    readonly dark: Partial<HeytaNativeTokens>;
+  };
+} = {
+  warm: {
+    light: {
+      'color.background': "#fbfaf7",
+      'color.surface': "#fbfaf7",
+      'color.surface-raised': "#ffffff",
+      'color.surface-subtle': "#fbfaf7",
+      'color.surface-sunken': "#d8d6d1",
+      'color.border': "#d8d6d1",
+      'color.border-strong': "#5b5b5b",
+      'color.foreground': "#1a1a1a",
+      'color.foreground-muted': "#5b5b5b",
+      'color.foreground-subtle': "#5b5b5b",
+    },
+    dark: {
+      'color.background': "#1a1a1a",
+      'color.surface': "#1a1a1a",
+      'color.surface-raised': "#1a1a1a",
+      'color.surface-subtle': "#1a1a1a",
+      'color.surface-sunken': "#080e1a",
+      'color.border': "#5b5b5b",
+      'color.border-strong': "#d8d6d1",
+      'color.foreground': "#fbfaf7",
+      'color.foreground-muted': "#d8d6d1",
+      'color.foreground-subtle': "#d8d6d1",
+    },
+  },
+  mist: {
+    light: {
+      'color.background': "#ffffff",
+      'color.surface': "#ffffff",
+      'color.surface-raised': "#ffffff",
+      'color.surface-subtle': "#f1f5f9",
+      'color.surface-sunken': "#e2e8f0",
+      'color.border': "#99f6e4",
+      'color.border-strong': "#64748b",
+    },
+    dark: {
+      'color.background': "#080e1a",
+      'color.surface': "#0d1526",
+      'color.surface-raised': "#101a2e",
+      'color.surface-subtle': "#0d1526",
+      'color.surface-sunken': "#080e1a",
+      'color.border': "#0d9488",
+      'color.border-strong': "#94a3b8",
+    },
+  },
+};

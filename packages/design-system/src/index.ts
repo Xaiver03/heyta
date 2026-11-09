@@ -41,8 +41,10 @@ export type { TokenGroup, TokenName } from './tokens.js';
 // 加一套显式的主题解析。数据来自同一份 tokens.css，与 Web/Swift/ArkTS 同源。
 export {
   THEME_NAMES,
+  PRESET_NAMES,
   lightTokens,
   darkTokens,
+  presetTokens,
   reducedMotionTokens,
   reducedTransparencyLightTokens,
   reducedTransparencyDarkTokens,
@@ -50,7 +52,7 @@ export {
   tokensForTheme,
   resolveNativeTokens,
 } from './native.js';
-export type { HeytaNativeTokens, ThemeName, ColorSchemeLike } from './native.js';
+export type { HeytaNativeTokens, PresetName, ThemeName, ColorSchemeLike } from './native.js';
 
 // CSS → RN 的值归一化。
 // tokens.css 是唯一事实源，但**有一部分值只在 CSS 里合法**（字体栈 /
