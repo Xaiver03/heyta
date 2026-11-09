@@ -106,6 +106,7 @@
 | 删半句 | `web.ai.settings.managed.offer/rest` → 合并为 `managed.lead` | 第四类（过期陈述） | 「还会来 / 这个版本界面还没挂上开关 / 这里点不动」已被同屏证据推翻：托管单选可点、pending 提示、合成端点都在；只留 §3.7.2 那句明文披露 |
 | 去重 | `web.memory.off` 删掉开头的「记忆已关闭 —— 」 | 重复 | 与同一 `<p>` 里渲染的 `offShort` 逐字重复 |
 | 去重 | `SubscriptionPanel` 的 `statusView()` 两支 | 重复 | `hint` 被设成 `localData`，渲染处又无条件拼同一词条 ⇒ 同一气泡里同一句印两遍 |
+| 删半句 | `common.sessions.intro`、`web.passkeys.lead` | 复述界面 | 都以「这里列出…」开头 —— 复述的正是同一枚 `?` 紧跟的那行标题（「登录设备」/「通行密钥」）。留下的半句是**后果**（退出后要重登 / 删一条不影响其它设备）。英文那两版本来就没有这半句 |
 | 改（非删） | `web.ai.settings.features.hint` 那句「列表顺序就是尝试顺序」 | 第四类（**假话**） | 实际是点选顺序（`toggleRoute` append）⇒ 选了改**行为**：新增 `normalizeRouteOrder()` 让数据服从那句承诺（改文案等于要求用户记住点击历史，违反 J3） |
 
 现量：说明气泡调用点 **45 → 44**。三条判据能红的实证：

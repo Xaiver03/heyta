@@ -774,7 +774,10 @@ export const zhCN = {
   'common.emailChange.loadFailed': '没能读到当前的换绑状态。邮箱地址没有任何改动，可以稍后再刷新一次。',
   // ── 登录设备（一枚访问令牌 = 一台设备）。两个壳共用这一组。──
   'common.sessions.title': '登录设备',
-  'common.sessions.intro': '这里列出当前还能用你的账号登录的设备。退出哪一台，它的下一次请求就要重新登录。',
+  // ⚠️ 2026-11-09：删掉开头的「这里列出当前还能用你的账号登录的设备。」——
+  // 它复述的正是同一枚 `?` 紧跟的那行标题（`common.sessions.title` = 「登录设备」）。
+  // 留下的是**后果**：退出之后会发生什么。英文那版本来就没有这半句（两版原先就不一致）。
+  'common.sessions.intro': '退出任意一台，它的下一次请求就要重新登录。',
   'common.sessions.empty': '除了这台，没有别的设备登录着。',
   'common.sessions.thisDevice': '这台设备',
   'common.sessions.currentHint': '这一台就是你正在用的设备，退出请用「退出登录」。',
@@ -1369,7 +1372,8 @@ export const zhCN = {
   // ── Web · 通行密钥自助管理 ─────────────────────────────────
   // 服务端此前只有注册 / 登录 / 恢复，用户没有任何"看我自己的凭据 / 删一条"的入口。
   'web.passkeys.title': '通行密钥',
-  'web.passkeys.lead': '这里列出你这个账号在服务端注册的通行密钥。删除一条不会影响其它设备上的凭据。',
+  // ⚠️ 2026-11-09：同上，删掉「这里列出…」那半句（它复述的是标题「通行密钥」）。
+  'web.passkeys.lead': '删除一条不会影响其它设备上的凭据。',
   'web.passkeys.add': '添加一条通行密钥',
   'web.passkeys.adding': '正在添加…',
   'web.passkeys.waitingForPrompt': '请在弹出的系统窗口中完成通行密钥的创建。',
