@@ -187,6 +187,10 @@ export function AssistantScreen({
   const plan = planAssistantEgress();
   const configured = isAiConfiguredOnThisDevice(settings);
 
+  /**
+   * 进行中那一轮的**已完成部分**（`items`）与 `renderItems` 的映射。
+   * 流式未完成的那一段由下面的 `liveItems` 追加 —— 两者拼起来才是屏幕上该有的顺序。
+   */
   const renderItems = snapshot.items.map<ChatTranscriptItem>((entry) => {
     const privacyBlocked = entry.role === 'error' && entry.message.includes('privacy-consent-not-granted');
     const detail =
@@ -250,6 +254,44 @@ export function AssistantScreen({
     };
   });
 
+  /**
+   * 进行中那一轮（流式）—— **列表里的最后一项**，不是另一个区块。
+   *
+   * 🔴 它在屏幕上必须与最终那条回答占**同一个位置**，否则一轮结束时
+   * 会先"跳走"再"出现"，而用户刚读完的正是被跳走的那段。
+   * （web 版 `AssistantPanel.tsx` 的 `ai-chat-live` 是同一条判断。）
+   *
+   * ⚠️ 拼进 `items` 数组而不是改 `ChatTranscript`：后者要适配一个新的
+   * "进行中"状态，而它现在只认 `role`。追加一项的代价小得多，
+   * 且顺序天然正确（列表末尾 = 最新）。
+   *
+   * ⚠️ 移动端**目前多半拿不到流式**：RN 的 `fetch` 响应没有可读 body，
+   * `routing.ts` 会退回整份读取，于是 `live` 一直是 `undefined`、
+   * 这里什么都不加（界面走的还是老路）。真正让它有值需要
+   * `streaming-fetch.ts` 那条 XHR 通道接上 —— 见那里的"未接线"说明。
+   */
+  const liveItems: ChatTranscriptItem[] =
+    snapshot.live !== undefined && snapshot.live.text !== ''
+      ? [
+          {
+            id: 'live',
+            role: 'assistant',
+            text: snapshot.live.text,
+            /**
+             * 🔴 过程行（工具调用）也显示出来，与 web 的 `TraceRows` 同一语义：
+             * "过程可见"（ADR-0045）说的是用户能看到它查了什么。
+             * 只给条数而不给内容的话，这一项就与最终那条重复了。
+             */
+            detail:
+              snapshot.live.rows.length > 0
+                ? snapshot.live.rows
+                    .map((row) => `${row.tool}${row.ok === false ? ' ✗' : ''}`)
+                    .join(' · ')
+                : undefined,
+          },
+        ]
+      : [];
+
   if (hostError !== undefined) {
     return (
       <Screen title={t('mobile.ai.title')} titleLeading={<AssistantMark size={tokens['icon.md']} color={tokens['color.foreground']} />} actions={[{ icon: 'action.back', label: t('mobile.ai.back'), onPress: onBack }]}>
@@ -305,7 +347,7 @@ export function AssistantScreen({
           ) : null}
           <ScrollView ref={transcriptRef} style={{ flex: 1 }} contentContainerStyle={{ gap: tokens['space.3'], paddingVertical: tokens['space.3'] }} keyboardShouldPersistTaps="handled" testID="assistant-transcript">
             <ChatTranscript
-              items={renderItems}
+              items={[...renderItems, ...liveItems]}
               generatedLabel={t('common.ai.generatedLabel')}
               empty={
                 <Stack gap="tight">

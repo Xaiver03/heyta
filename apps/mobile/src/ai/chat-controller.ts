@@ -14,7 +14,10 @@ import {
   type ManagedTransport,
   type WithoutId,
   clearAssistantHistory,
+  EMPTY_LIVE,
   loadAssistantHistory,
+  reduceAssistantLive,
+  type LiveTurn,
   saveAssistantHistory,
   scopeAssistantHistoryStorage,
 } from '@heyta/app-host';
@@ -67,6 +70,17 @@ export interface ChatSnapshot {
   readonly expandedEntry: number | undefined;
   readonly items: readonly ChatItem[];
   readonly proposalErrors: Readonly<Record<number, string>>;
+  /**
+   * 这一轮**进行中**的过程（流式）。`undefined` = 没有在跑的一轮。
+   *
+   * 🔴 **不落盘**（与 `items` 不同）：它描述的是"此刻正在显示什么"，
+   * 而不是"发生过什么"。重挂载/重启后恢复一份半截的 live 会让界面
+   * 显示一段永远不会再长大的文本 —— 那比不显示更糟。
+   *
+   * ⚠️ 加了流式之后才有值；移动端此前是"整段回来再显示"，
+   * 所以这个字段在旧快照里恒为 `undefined`（`loadAccount` 里给的初值）。
+   */
+  readonly live: LiveTurn | undefined;
 }
 
 export interface ChatController {
@@ -306,7 +320,11 @@ class MobileChatController implements ChatController {
     const host = runtime.host;
     this.sendInFlight = true;
     const epoch = this.accountEpoch;
-    this.update({ phase: 'running' });
+    /**
+     * 🔴 开跑就先清空 live：上一轮的残留过程行留在屏上会让用户
+     * 以为"这一轮已经在调工具了"，而其实一个字节都还没发。
+     */
+    this.update({ phase: 'running', live: EMPTY_LIVE });
     this.executionNumber += 1;
     try {
       const outcome = await requestAssistantTurn(
@@ -320,6 +338,25 @@ class MobileChatController implements ChatController {
           executionId: `${this.executionPrefix}:${String(this.executionNumber)}`,
           history,
           now: routeTime,
+          /**
+           * 🔴 流式事件 → `live`。**给了这个才有流**（`routing.ts:770` 的
+           * "显式要"契约：没给就一个字节的 `stream` 都不带）。
+           *
+           * ⚠️ 给了它也**不保证**真的有流：RN 的 `fetch` 响应没有可读 body，
+           * `isEventStream` 会判 false 并**退回整份读取**（见 `routing.ts:1290`
+           * 那段注释的三条判据）。所以：
+           *   · 有流时 → 逐字，`live` 被填上；
+           *   · 没流时 → 整段回来，`live` 一直是空的，界面走的还是老路。
+           * 这条退化方向是**故意的**：能出结果，而不是"接上流然后卡住"。
+           *
+           * 与 web 版同一道闸门（`AssistantPanel.tsx` 的 onEvent）：
+           * 过了 `epoch` 或换了账号之后到的片段**一个都不许画出来** ——
+           * 它属于上一段对话，而界面上已经是另一段。
+           */
+          onEvent: (event) => {
+            if (epoch !== this.accountEpoch) return;
+            this.update({ live: reduceAssistantLive(this.state.live, event) });
+          },
           routed: {
             secretStore: runtime.secretStore,
             managedTransport: runtime.managedTransport,
@@ -345,7 +382,14 @@ class MobileChatController implements ChatController {
       });
     } finally {
       this.sendInFlight = false;
-      if (epoch === this.accountEpoch) this.update({ phase: 'idle' });
+      /**
+       * 🔴 收尾必须清空 `live`，而且要清在 `finally` 里 ——
+       * 失败分支（catch）同样会走到这里。留在屏上的后果是：
+       * 一次失败的提问后面挂着"正在调用工具…"那几行，
+       * 而那一轮永远不会再前进；`phase` 已经是 idle，用户只看到
+       * 一堆不动的过程行，没有任何东西告诉他"这一轮结束了"。
+       */
+      if (epoch === this.accountEpoch) this.update({ phase: 'idle', live: undefined });
     }
   }
 
@@ -404,6 +448,10 @@ class MobileChatController implements ChatController {
       expandedEntry: undefined,
       items: restored?.items ?? [],
       proposalErrors: {},
+      // ⚠️ 恢复时**永远**是 undefined：见 ChatSnapshot.live 的注释。
+      // 别在这里写 `restored?.live` —— 那字段根本没落盘，读出来是 undefined，
+      // 但写成那样会让后来者以为它落过盘。
+      live: undefined,
     };
   }
 

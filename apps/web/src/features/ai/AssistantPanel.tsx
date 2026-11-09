@@ -110,6 +110,7 @@ import {
   EmptyState,
   HeytaUiProvider,
   shouldFollowOnContentChange,
+  StreamCaret,
   useHeytaUiTheme,
   useStreamReveal,
 } from '@heyta/ui';
@@ -273,7 +274,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
    * ⚠️ hook 必须**无条件调用**（React 规则），所以 `enabled` 是算出来传进去的，
    * 不是 `if (…) useStreamReveal(…)`。
    */
-  const { reducedMotion } = useHeytaUiTheme();
+  const { reducedMotion, tokens } = useHeytaUiTheme();
   const revealedText = useStreamReveal(live?.text ?? '', {
     enabled: (props.revealStream ?? true) && !reducedMotion,
   });
@@ -1046,6 +1047,25 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
               {revealedText !== '' && (
                 <>
                   <span data-testid="ai-chat-live-text">{revealedText}</span>
+                  {/*
+                    🔴 光标只在**流还没结束**时出现。
+                    结束了还留着会让用户以为还在生成 —— 那比没有光标更糟。
+
+                    ⚠️ 判据用 `live.text`（已到达的内容与目标是否相等）而不是
+                    `revealedText`：揭示才追平的那一瞬内容其实早到了，
+                    此时该收的是"还在生成"这个**事实**，不是"动画演完了"。
+                    两者在正常速度下只差几十毫秒，但语义必须选对。
+
+                    字号传 `font-size.sm`（14）—— 与 `.ht-ai__panel` 的
+                    `font-size: var(--ht-font-size-sm)` 同档，
+                    两边必须一致，否则光标会比它旁边的字高或矮。
+                  */}
+                  {live !== undefined && revealedText !== live.text && (
+                    <StreamCaret
+                      testID="ai-chat-caret"
+                      fontSize={tokens['font-size.sm']}
+                    />
+                  )}
                   {/*
                     🔴 法定标识在**流式的每一刻**都要在：这段字是模型生成的，
                     而"它生成完了没有"不是用户能判断的事。只在收尾才挂上，
