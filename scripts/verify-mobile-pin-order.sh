@@ -239,7 +239,18 @@ PHONE_DB=$(phone_db)
 [ -n "$PHONE_DB" ] && [ -f "$PHONE_DB" ] || { bad "取不到手机里的真 SQLite（$PHONE_DB）"; summary "iOS 置顶顺序"; }
 APP_BIN="${HEYTA_IOS_DERIVED:-/tmp/heyta-ios-release}/Build/Products/Release-iphonesimulator/Heyta.app"
 printf '   git HEAD      : %s\n' "$(cd "$(dirname "$0")/.." && git rev-parse --short HEAD)"
-printf '   装着的产物     : %s（mtime %s）\n' "$APP_BIN" "$(stat -f '%Sm' "$APP_BIN" 2>/dev/null || echo 不存在)"
+# 🔴 mtime 要一条**两边都认**的取法（2026-11-10，F-13）。
+#    原先写死 `stat -f '%Sm'`（BSD 形状）：GNU 上它把 `-f` 读成"terse 格式"并**打出另一回事**，
+#    而这里带 `2>/dev/null || echo 不存在` ⇒ 症状是**静默显示一个错的 mtime**，
+#    不是报错（§7 第 364 条记的就是这一族：管道里 rc=0 + 非空垃圾 ⇒ 兜底永不执行）。
+#    与 `scripts/upload-dist.sh` 的 `file_size()` 同一形状：GNU 在前，BSD 兜底。
+mtime_of() { # <file> -> mtime 或「不存在」
+  local v
+  v=$(stat -c '%y' "$1" 2>/dev/null) || v=""
+  [ -n "$v" ] || v=$(stat -f '%Sm' "$1" 2>/dev/null) || v=""
+  printf '%s' "${v:-不存在}"
+}
+printf '   装着的产物     : %s（mtime %s）\n' "$APP_BIN" "$(mtime_of "$APP_BIN")"
 printf '   手机 ops 行数  : %s\n' "$(apps_count)"
 ok "设备 $UDID / 库 $PHONE_DB 都在"
 
