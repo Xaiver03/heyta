@@ -1,0 +1,5 @@
+=== 发布前基线 2026-11-10T02:05:53Z ===
+远端 /var/www/heyta-app/index.html md5: 4fbb456056f4ee52bc4a87b78b1fa338
+远端 /var/www/heyta-landing/index.html md5: cdd06b262df66bf3f799dc770433b9d2
+远端 mtime: 2026-11-04 22:35:03.000000000 +0800
+线上 app 资源: /app/assets/index-BIOQrZO7.js

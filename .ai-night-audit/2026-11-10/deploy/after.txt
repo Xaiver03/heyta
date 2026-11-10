@@ -1,0 +1,7 @@
+=== 发布后验证 2026-11-10T02:09:16Z ===
+远端 app index.html md5: 63784f145c255dd9e16c151673201d6f
+远端 landing index.html md5: c403bf0009a28edcd1e5cd2a3150d99f
+本地 app index.html md5: 63784f145c255dd9e16c151673201d6f
+本地 landing index.html md5: c403bf0009a28edcd1e5cd2a3150d99f
+线上 app 资源: /app/assets/index-C6oAAyG6.js
+线上 landing 资源: /assets/main-uqJxVeyF.js
