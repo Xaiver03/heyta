@@ -340,10 +340,15 @@ export function AssistantScreen({
    * "进行中"状态，而它现在只认 `role`。追加一项的代价小得多，
    * 且顺序天然正确（列表末尾 = 最新）。
    *
-   * ⚠️ 移动端**目前多半拿不到流式**：RN 的 `fetch` 响应没有可读 body，
-   * `routing.ts` 会退回整份读取，于是 `live` 一直是 `undefined`、
-   * 这里什么都不加（界面走的还是老路）。真正让它有值需要
-   * `streaming-fetch.ts` 那条 XHR 通道接上 —— 见那里的"未接线"说明。
+   * 🔴 2026-11-10 起移动端**真的**拿得到流式：`streamingFetch`
+   * （`createGatedStreamingFetch(privacyConsent)`）已接进 `ChatRuntime`，
+   * 由 `chat-controller` 传给 `routing` 的 `routed.fetchImpl`。
+   * 判据见 `apps/mobile/tests/ai-streaming-wiring.spec.ts`。
+   *
+   * ⚠️ 但仍**不保证**每次都有流：端点回的若不是 `text/event-stream`，
+   * `routing.ts` 会退回整份读取，此时 `live` 恒为 `undefined`、
+   * 这里什么都不加（界面走老路）。那条退化方向是故意的 ——
+   * 用户最差拿到一份完整回答，只是没有逐字。
    */
   const liveItems: ChatTranscriptItem[] =
     snapshot.live !== undefined && snapshot.live.text !== ''
@@ -361,16 +366,33 @@ export function AssistantScreen({
              */
             streaming: true,
             /**
-             * 🔴 过程行（工具调用）也显示出来，与 web 的 `TraceRows` 同一语义：
-             * "过程可见"（ADR-0045）说的是用户能看到它查了什么。
-             * 只给条数而不给内容的话，这一项就与最终那条重复了。
+             * 🔴 过程**两样都要露出来**，与 web 端同一个语义（"过程可见"，ADR-0045）：
+             *
+             *   · **思考片段**（`reasoning`）—— 模型正在想什么。有些模型
+             *     （DeepSeek/Qwen）会把它单独发回来。之前移动端把它整段丢掉了，
+             *     于是同一个回答在 web 上能看见"它在想什么"、在移动端看不见。
+             *   · **工具过程行**（`rows`）—— 它查了什么。只给条数而不给内容的话，
+             *     这一项就与最终那条重复了。
+             *
+             * ⚠️ 合成**一个** detail 而不是并列两块：移动端屏幕窄，
+             * 而 `ChatTranscriptItem` 只有一个副文本位。web 端有独立的
+             * `ReasoningRow` + `TraceRows` 两块、各自可折叠 ——
+             * 那是宽屏才放得下的形状，窄屏上两块折叠头会互相挤。
+             * ⚠️ 这里**不做折叠**：进行中的过程本来就该一眼看到底，
+             * 折叠是"回看历史"时才需要的动作，而这一项在流结束时就消失了。
              */
-            detail:
-              snapshot.live.rows.length > 0
-                ? snapshot.live.rows
+            detail: (() => {
+              const parts: string[] = [];
+              if (snapshot.live.reasoning !== '') parts.push(snapshot.live.reasoning);
+              if (snapshot.live.rows.length > 0) {
+                parts.push(
+                  snapshot.live.rows
                     .map((row) => `${row.tool}${row.ok === false ? ' ✗' : ''}`)
-                    .join(' · ')
-                : undefined,
+                    .join(' · '),
+                );
+              }
+              return parts.length > 0 ? parts.join('\n') : undefined;
+            })(),
           },
         ]
       : [];
