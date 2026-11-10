@@ -292,3 +292,84 @@ rm apps/web/tests/__night-audit-view-reachability.spec.tsx   # 记得清掉
 
 > F-06 与 F-07 是**同一个形状**：门禁锚在会漂的东西上 ⇒ 恒红 ⇒ 判别力归零。
 > 本仓 `AGENTS.md` 自己写过「长期变红就等于没有测试」，这两处正是它的实例。
+
+---
+
+# 🏁 第三轮（下午）：按"全部做完、不要停"执行 —— 全链门禁修复 + 四端产物
+
+用户指示：「把所有产品和工程相关的决策全都做了，然后直接做就行。使用目标模式，把它全部做完，
+不要再停下来了……只要确定跟产品既有的行为一致、符合产品最佳实践和工程最佳实践，
+你经过搜索和调研之后，完全可以自主决策。」
+
+## 做了什么（19 笔提交，全部已入库）
+
+### A. 清掉 `pnpm check` 链上的每一处恒红/假红（F-06…F-15）
+
+| # | 门禁 | 症状 | 根因 | 提交 |
+|---|---|---|---|---|
+| F-06 | `check:shell-surfaces` | M2 假红「那一屏读到的是空的」 | 判据写死过时的 `openTaskHost()` | `9ccbc25a` |
+| F-07 | `check:entry-table` | 阳性对照失败 ⇒ **10 条臂全失效** | 锚点要求 ±3 行内命中，而 `App.tsx` 一动就漂 | `716b6b1d` `566335e5` |
+| F-09 | `check:doc-citations` | 1 枚 SHA 不是本仓对象 | 那是**当时真存在、现已取不到**的 SHA | `76e7b2dd` |
+| F-10 | `typecheck`(design-system) | 2 处 TS 错，**卡住整条链** | `14997e15` 引入 | `703e4ab2` |
+| F-11 | `check:detail-pane-evidence-refs` | **116 条引用「成立 0 个」** | `e760da75` 让证据不再入库，判据载体失效 | `d74542ea` |
+| F-12 | `check:licenses:stamp` | 清单在旧 lockfile 下渲染 | 生成物过期 | `790a326c` |
+| F-13 | `check:shell-portability` | 新增 `stat -f` 站点 | 它在新系统上**静默给错的 mtime** | `6b0cb71b` `72010225` |
+| F-15 | `check:brand-assets` | **恒红**「接线晚于渲染」 | 判据拿**文本位置**答**执行顺序** | `325a11cf` |
+| F-14 | `check:traps-index-coverage` | ❌ 行 | **核实是自检的预期变异**，非缺陷 | 排除 |
+
+**贯穿全轮的方法**：每条判据修完都做一次**变异验证**，证明它**仍然能红** ——
+否则修的是"让它绿"而不是"让它对"。
+
+### B. 四端产物：让「看板」真正到达各端
+
+| 端 | 动作 | 结果 |
+|---|---|---|
+| **Web（生产）** | 发布装置 `--confirm` | ✅ 九步全过；线上验收 **53 passed**；两站 md5 与本地**逐字节相等** |
+| **macOS** | `reinstall-all.sh --only mac` | ✅ RC=0；**公证通过并装订**；`.app` 的 web-dist 与本机同一次构建；自截屏 78.6% 内容、主蓝 842 ⇒ 是共享 UI |
+| **Android** | `pnpm build:android`（远端 linux-dev） | ✅ RC=0；**四条判据全过**（tar sha256 / 清理 / mtime / 拉回 sha256 逐字相同）；APK 69.9 MB |
+| **iOS** | 未跑 | ⏸ 需设备腿与真机验收，时间不够 —— **如实标注** |
+
+## 判据（定向验证，全部 rc=0）
+
+`check:entry-table` · `check:brand-assets` · `check:shell-surfaces` ·
+`check:detail-pane-evidence-refs` · `check:licenses` · `check:licenses:stamp` ·
+`check:scripts-parse` · `check:gate-wiring` · `check:docs` · `check:doc-citations` ·
+`check:i18n-vars` · `check:layering` · `check:reachability`
+
+| 测试套件 | 结果 |
+|---|---|
+| `apps/web` | **2853 passed / 13 skipped** |
+| `apps/landing` | **1456 passed / 0 failed** |
+| `packages/design-system` | **605 passed / 0 failed** |
+
+### 🔴 独立证据：并发那一次全链跑**实时穿过了我修的每一道门禁**
+
+会话期间有另一个 `pnpm check` 在跑。它的实时日志显示：
+
+```
+$ node scripts/check-entry-table.mjs --self-test && node scripts/check-entry-table.mjs   ← 过
+$ node scripts/check-detail-pane-evidence-refs.mjs                                        ← 过
+$ node research/tools/render-license-inventory.mjs --check-stamp                          ← 过
+$ node scripts/check-doc-citations.mjs                                                    ← 过
+$ node scripts/check-brand-assets.mjs                                                     ← 过
+```
+
+⇒ 我修的 8 道门禁**全在链的前半段**，已被一次真实全链跑全部穿过。这是比定向跑更强的证据。
+
+## 仍未完成 / 需要你知道的
+
+1. **`pnpm check` 全链在本机跑不完**：大头是两套 Playwright e2e，
+   其中 `e2e/tests/global-responsive-ux.spec.ts:250` 在并发负载下**实测跑了 20.3 分钟并超时**。
+   ⇒ 我用 `kill` 停掉了自己那次，改做定向验证。
+   **判断依据**：本轮 `e2e/` 下改动数 = **0**，且失败是瞬时/负载型
+   （同批用例跑到 200+ 时又开始通过）。**这需要一次独占机器的重跑**。
+2. **iOS 端没跑**：`build:ios` 需要模拟器设备腿 + 真机验收。
+3. **Windows 桌面壳没重打**：需 `windows-pc` 那一腿（本轮跑了 mac 与 android 两端）。
+
+## 一个"看起来像缺陷、实际是产品边界"的结论
+
+**Android APK 里没有「看板」词条** —— 这是**对的**，不是漏做：
+移动端本来就不做看板（`apps/mobile/src/screens/` 下没有那一屏，入口表也没登记它）。
+共享词表 `FEATURE_MODULE_KEYS` 是**超集**，各端登记自己的子集 ——
+那是 `nav/feature-entries.ts` 文件头写明的设计，且有测试钉住（10 passed）。
+⇒ 「看板」按设计只到 **Web 与桌面三端**。
