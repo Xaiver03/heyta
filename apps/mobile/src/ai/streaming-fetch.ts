@@ -408,41 +408,44 @@ function makeStreamingResponse(
 }
 
 /**
- * ⚠️ **未接线**：生产路径要接的就是这一步，而它需要一次真机确认。
+ * ✅ **已接线**（2026-11-10，commit `a3a31516`）。
  *
- * 接法（三层，一行都不能省）：
+ * 三层现在都在位：
  *
- * 1. `apps/mobile/index.js` 里用 `createGatedStreamingFetch(privacyConsent)`
- *    替换 `consentFetch`（或并列导出），保证请求仍过闸门；
- * 2. `apps/mobile/src/ai/chat-controller.ts` 把它的 `routed` 里补上
- *    `fetchImpl: streamingFetch`（`routing.ts:760` 有这个注入缝）；
- * 3. ~~同处补 `onEvent`~~ —— ✅ **已完成**（2026-11-10）。
- *    `onEvent` 已接、`live` 已加进 `ChatSnapshot`、`AssistantScreen` 已渲染它。
- *    事件归约用的 `reduceAssistantLive` 也**已下沉到 `@heyta/app-host`**
- *    （commit `e4f32e0d`），移动端直接 import，没有抄第二份。
- *    ⇒ **剩下的只有第 2 步**：把 `fetchImpl` 接上，`live` 才会真的有值。
- *    在它接上之前，第 3 步是"接好了但通常拿不到数据"的状态 ——
- *    因为 RN 的 `fetch` 响应没有可读 body，`routing.ts` 会退回整份读取。
+ * 1. `AssistantScreen.tsx` 组装 `createGatedStreamingFetch(privacyConsent)`
+ *    （闸门在 XHR 传输**外面**，顺序是硬约束）；
+ * 2. `chat-controller.ts` 把它传进 `routed.fetchImpl`
+ *    （`routing.ts:837` 的注入缝）。**条件展开**：没给时那个键根本不出现；
+ * 3. `onEvent` 接 `live`，`AssistantScreen` 渲染它（含光标与过程可见）。
+ *    事件归约用共享层的 `reduceAssistantLive`（`@heyta/app-host`），没有抄第二份。
  *
- * 🔴 为什么第 2 步先不接：XHR 的增量行为**只能真机验证**
- * （`readyState 3` 何时给数据、`responseText` 是否真的累积、HTTP/2 下会不会被缓冲）。
- * 先接上再让用户在真机上发现问题，比"没做"更糟 —— 那会把一个未验证的
- * 行为当成已交付的能力。
- */
-/**
- * 接线状态标记 —— **不是开关**，是给后来者的一句话状态。
+ * ## 判据（不需要真机）
  *
- * 🔴 它的值是 `true`（仍待真机验证），不是"功能关着"的意思。
- * 之所以做成常量而不是注释：`grep` 得到它，而注释会被挖走。
+ * `apps/mobile/tests/ai-streaming-wiring.spec.ts` 钉的是"链路上每个环都在"：
+ * 注入的 fetch 出现在 `routed.fetchImpl` 上、没给时键不存在、
+ * 未同意时一个 XHR 都不创建。三条都做过变异验证。
  *
- * 现状（2026-11-10）：
- *   · ✅ `onEvent` 已接（`chat-controller.ts`），`live` 已在状态与界面上；
- *   · ✅ `reduceAssistantLive` 已下沉到 `@heyta/app-host`（`e4f32e0d`）；
- *   · ⏳ **只差第 2 步**：把 `fetchImpl` 换成 `createGatedStreamingFetch(...)`。
+ * ## 🔴 上一轮我把"没设备"当成了"无法验证"—— 那条判断是错的
  *
- * ⚠️ 在那一刻到来之前，移动端的流式**不会真的生效**：
- * RN 的 `fetch` 响应没有可读 body，`routing.ts` 会退回整份读取，
- * `live` 恒为 `undefined`，界面走的还是"整段回来再显示"。
- * 这是**故意的**：退化方向是"能出结果"，而不是"接上流然后卡住"。
+ * 形状正确性的判据就在 RN 0.84.1 的
+ * `Libraries/Network/XMLHttpRequest.js` 里，可读、可引：
+ *
+ *   · `:557-558` 增量事件默认**关闭**，只有挂了 `onreadystatechange` 或
+ *     `onprogress` 才开 ⇒ 我方实现挂的正是 `onreadystatechange` ⇒ **会被开启**；
+ *   · `:621` 那个 `incrementalEvents` 标志确实传给原生 `sendRequest`；
+ *   · `:375-386` `__didReceiveIncrementalData` 做的是
+ *     `this._response += responseText` ⇒ `responseText` **是累积的**
+ *     ⇒ `diffAccumulated` 是必需的，不做差分一定重复。
+ *
+ * 所以"没设备"只影响**手感**（节奏快慢），不影响**形状对不对**。
+ * 把两者混为一谈，会让一个可验证的东西停在"未验证"里。
+ *
+ * ## 仍未验证的部分（诚实标注）
+ *
+ * · **真机手感**：200ms 排空、5ms/字这两个参数是在 web 上调的，
+ *   移动端屏幕与刷新率不同，值是"能用的起点"而非"调优结果"。
+ * · **HTTP/2 下的缓冲行为**：若中间有代理缓存整份响应，
+ *   增量事件可能一次到齐 —— 那样表现就是"整段出现"，不会报错。
+ *   它是**退化**，不是故障。
  */
 export const STREAMING_WIRING_PENDING_DEVICE_VERIFICATION = true as const;
