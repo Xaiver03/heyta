@@ -4,12 +4,12 @@
 > 重新生成：`node research/tools/render-license-inventory.mjs`
 > 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。
 > 去重口径：`包名@版本`（同名多版本分别登记）。
-> lockfile 指纹：`6e609a8bdb17637d`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
-> 渲染输入集：pnpm store 去重后 **967** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
+> lockfile 指纹：`e840b7bf9faef8b9`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
+> 渲染输入集：pnpm store 去重后 **1030** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
 
-生成时间：2026-10-19
+生成时间：2026-11-10
 
-**总计 967 个包** —— 宽松许可 966，受限 0，无许可证 0，白名单外已登记 1。
+**总计 1030 个包** —— 宽松许可 1028，受限 0，无许可证 0，白名单外已登记 2。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -24,11 +24,13 @@
 
 | 包 | 版本 | 许可证 |
 |---|---|---|
+| `argparse` | 3.0.4 | PSF-2.0 |
 | `caniuse-lite` | 1.0.30001812 | CC-BY-4.0 |
 
+- **PSF-2.0**（`argparse@3.0.4`）：argparse@3.0.4：markdown-it 的传递依赖（仅用于其 CLI 入口），PSF-2.0 是 Python 软件基金会许可证，语义等同 BSD-2-Clause（宽松、仅要求保留版权声明），不在禁止名单内。
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（967 个）
+### 📋 全部依赖（1030 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -194,6 +196,9 @@
 | `@fastify/send` | 4.1.1 | MIT |
 | `@fastify/static` | 10.1.4 | MIT |
 | `@fastify/websocket` | 11.3.1 | MIT |
+| `@floating-ui/core` | 1.8.0 | MIT |
+| `@floating-ui/dom` | 1.8.0 | MIT |
+| `@floating-ui/utils` | 0.2.12 | MIT |
 | `@hapi/hoek` | 9.3.0 | BSD-3-Clause |
 | `@hapi/topo` | 5.1.0 | BSD-3-Clause |
 | `@hexagon/base64` | 1.1.28 | MIT |
@@ -216,6 +221,7 @@
 | `@levischuck/tiny-cbor` | 0.2.11 | MIT |
 | `@lukeed/ms` | 2.0.2 | MIT |
 | `@malept/cross-spawn-promise` | 2.0.0 | Apache-2.0 |
+| `@mixmark-io/domino` | 2.2.0 | BSD-2-Clause |
 | `@noble/ciphers` | 2.4.0 | MIT |
 | `@noble/curves` | 2.4.0 | MIT |
 | `@noble/hashes` | 2.4.0 | MIT |
@@ -292,6 +298,34 @@
 | `@sinonjs/fake-timers` | 10.3.0 | BSD-3-Clause |
 | `@sqlite.org/sqlite-wasm` | 3.53.4-build1 | Apache-2.0 |
 | `@standard-schema/spec` | 1.1.0 | MIT |
+| `@tiptap/core` | 3.33.0 | MIT |
+| `@tiptap/extension-blockquote` | 3.33.0 | MIT |
+| `@tiptap/extension-bold` | 3.33.0 | MIT |
+| `@tiptap/extension-bubble-menu` | 3.33.0 | MIT |
+| `@tiptap/extension-bullet-list` | 3.33.0 | MIT |
+| `@tiptap/extension-code` | 3.33.0 | MIT |
+| `@tiptap/extension-code-block` | 3.33.0 | MIT |
+| `@tiptap/extension-document` | 3.33.0 | MIT |
+| `@tiptap/extension-dropcursor` | 3.33.0 | MIT |
+| `@tiptap/extension-floating-menu` | 3.33.0 | MIT |
+| `@tiptap/extension-gapcursor` | 3.33.0 | MIT |
+| `@tiptap/extension-hard-break` | 3.33.0 | MIT |
+| `@tiptap/extension-heading` | 3.33.0 | MIT |
+| `@tiptap/extension-horizontal-rule` | 3.33.0 | MIT |
+| `@tiptap/extension-italic` | 3.33.0 | MIT |
+| `@tiptap/extension-link` | 3.33.0 | MIT |
+| `@tiptap/extension-list` | 3.33.0 | MIT |
+| `@tiptap/extension-list-item` | 3.33.0 | MIT |
+| `@tiptap/extension-list-keymap` | 3.33.0 | MIT |
+| `@tiptap/extension-ordered-list` | 3.33.0 | MIT |
+| `@tiptap/extension-paragraph` | 3.33.0 | MIT |
+| `@tiptap/extension-strike` | 3.33.0 | MIT |
+| `@tiptap/extension-text` | 3.33.0 | MIT |
+| `@tiptap/extension-underline` | 3.33.0 | MIT |
+| `@tiptap/extensions` | 3.33.0 | MIT |
+| `@tiptap/pm` | 3.33.0 | MIT |
+| `@tiptap/react` | 3.33.0 | MIT |
+| `@tiptap/starter-kit` | 3.33.0 | MIT |
 | `@tsconfig/node10` | 1.0.13 | MIT |
 | `@tsconfig/node12` | 1.0.11 | MIT |
 | `@tsconfig/node14` | 1.0.3 | MIT |
@@ -311,6 +345,9 @@
 | `@types/istanbul-lib-report` | 3.0.3 | MIT |
 | `@types/istanbul-reports` | 3.0.4 | MIT |
 | `@types/jsonwebtoken` | 9.0.10 | MIT |
+| `@types/linkify-it` | 5.0.0 | MIT |
+| `@types/markdown-it` | 14.2.0 | MIT |
+| `@types/mdurl` | 2.0.0 | MIT |
 | `@types/methods` | 1.1.4 | MIT |
 | `@types/ms` | 2.1.0 | MIT |
 | `@types/node` | 20.19.43 | MIT |
@@ -323,6 +360,8 @@
 | `@types/superagent` | 8.1.11 | MIT |
 | `@types/supertest` | 7.2.1 | MIT |
 | `@types/three` | 0.186.0 | MIT |
+| `@types/turndown` | 5.0.6 | MIT |
+| `@types/use-sync-external-store` | 0.0.6 | MIT |
 | `@types/webxr` | 0.5.24 | MIT |
 | `@types/ws` | 8.18.1 | MIT |
 | `@types/yargs` | 17.0.35 | MIT |
@@ -364,6 +403,7 @@
 | `arg` | 4.1.3 | MIT |
 | `argparse` | 1.0.10 | MIT |
 | `argparse` | 2.0.1 | Python-2.0 |
+| `argparse` | 3.0.4 | PSF-2.0 |
 | `asap` | 2.0.6 | MIT |
 | `asn1js` | 3.0.10 | BSD-3-Clause |
 | `assertion-error` | 2.0.1 | MIT |
@@ -522,6 +562,7 @@
 | `fast-base64-decode` | 1.0.0 | MIT |
 | `fast-decode-uri-component` | 1.0.1 | MIT |
 | `fast-deep-equal` | 3.1.3 | MIT |
+| `fast-equals` | 5.4.5 | MIT |
 | `fast-glob` | 3.3.3 | MIT |
 | `fast-json-stable-stringify` | 2.1.0 | MIT |
 | `fast-json-stringify` | 7.0.1 | MIT |
@@ -656,6 +697,8 @@
 | `lightningcss-darwin-arm64` | 1.33.0 | MPL-2.0 |
 | `lilconfig` | 3.1.3 | MIT |
 | `lines-and-columns` | 1.2.4 | MIT |
+| `linkify-it` | 6.1.0 | MIT |
+| `linkifyjs` | 4.4.0 | MIT |
 | `load-tsconfig` | 0.2.5 | MIT |
 | `locate-path` | 5.0.0 | MIT |
 | `locate-path` | 6.0.0 | MIT |
@@ -681,10 +724,12 @@
 | `magic-string` | 1.4.2 | MIT |
 | `make-error` | 1.3.6 | ISC |
 | `makeerror` | 1.0.12 | BSD-3-Clause |
+| `markdown-it` | 15.0.3 | MIT |
 | `marky` | 1.3.0 | Apache-2.0 |
 | `math-intrinsics` | 1.1.0 | MIT |
 | `mdn-data` | 2.0.14 | CC0-1.0 |
 | `mdn-data` | 2.27.1 | CC0-1.0 |
+| `mdurl` | 2.1.0 | MIT |
 | `media-typer` | 0.3.0 | MIT |
 | `memoize-one` | 5.2.1 | MIT |
 | `memoize-one` | 6.0.0 | MIT |
@@ -756,6 +801,7 @@
 | `open` | 6.4.0 | MIT |
 | `openid-client` | 6.8.8 | MIT |
 | `ora` | 5.4.1 | MIT |
+| `orderedmap` | 2.1.1 | MIT |
 | `p-limit` | 2.3.0 | MIT |
 | `p-limit` | 3.1.0 | MIT |
 | `p-locate` | 4.1.0 | MIT |
@@ -796,8 +842,22 @@
 | `promise` | 8.3.0 | MIT |
 | `promise-retry` | 2.0.1 | MIT |
 | `prompts` | 2.4.2 | MIT |
+| `prosemirror-changeset` | 2.4.6 | MIT |
+| `prosemirror-commands` | 1.7.2 | MIT |
+| `prosemirror-dropcursor` | 1.8.4 | MIT |
+| `prosemirror-gapcursor` | 1.4.1 | MIT |
+| `prosemirror-history` | 1.5.1 | MIT |
+| `prosemirror-inputrules` | 1.5.1 | MIT |
+| `prosemirror-keymap` | 1.2.3 | MIT |
+| `prosemirror-model` | 1.25.12 | MIT |
+| `prosemirror-schema-list` | 1.6.0 | MIT |
+| `prosemirror-state` | 1.4.4 | MIT |
+| `prosemirror-tables` | 1.8.5 | MIT |
+| `prosemirror-transform` | 1.12.5 | MIT |
+| `prosemirror-view` | 1.42.9 | MIT |
 | `pstree.remy` | 1.1.8 | MIT |
 | `punycode` | 2.3.1 | MIT |
+| `punycode.js` | 2.3.1 | MIT |
 | `pvtsutils` | 1.3.6 | MIT |
 | `pvutils` | 1.2.0 | MIT |
 | `qs` | 6.16.0 | BSD-3-Clause |
@@ -844,6 +904,7 @@
 | `rimraf` | 3.0.2 | ISC |
 | `rolldown` | 1.2.11 | MIT |
 | `rollup` | 4.63.5 | MIT |
+| `rope-sequence` | 1.3.4 | MIT |
 | `run-parallel` | 1.2.0 | MIT |
 | `safe-buffer` | 5.2.1 | MIT |
 | `safe-regex2` | 5.1.1 | MIT |
@@ -938,11 +999,13 @@
 | `tslib` | 1.14.1 | 0BSD |
 | `tsup` | 8.5.1 | MIT |
 | `tsyringe` | 4.10.0 | MIT |
+| `turndown` | 7.2.5 | MIT |
 | `type-detect` | 4.0.8 | MIT |
 | `type-fest` | 0.7.1 | (MIT OR CC0-1.0) |
 | `type-is` | 1.6.18 | MIT |
 | `typescript` | 5.9.3 | Apache-2.0 |
 | `ua-parser-js` | 1.0.41 | MIT |
+| `uc.micro` | 3.0.0 | MIT |
 | `ufo` | 1.6.4 | MIT |
 | `undefsafe` | 2.0.5 | MIT |
 | `undici` | 7.30.0 | MIT |
@@ -955,6 +1018,7 @@
 | `universalify` | 0.1.2 | MIT |
 | `unpipe` | 1.0.0 | MIT |
 | `update-browserslist-db` | 1.3.3 | MIT |
+| `use-sync-external-store` | 1.7.0 | MIT |
 | `util-deprecate` | 1.0.2 | MIT |
 | `utils-merge` | 1.0.1 | MIT |
 | `uuidv7` | 1.2.1 | Apache-2.0 |
@@ -965,6 +1029,7 @@
 | `vitest` | 4.1.11 | MIT |
 | `vitest` | 5.0.1 | MIT |
 | `vlq` | 1.0.1 | MIT |
+| `w3c-keyname` | 2.2.8 | MIT |
 | `w3c-xmlserializer` | 5.0.0 | MIT |
 | `walker` | 1.0.8 | Apache-2.0 |
 | `wcwidth` | 1.0.1 | MIT |
