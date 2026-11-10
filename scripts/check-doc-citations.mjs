@@ -199,6 +199,24 @@ function findPathProblems(docPath, text) {
 // ── git show HEAD: 的锚 ───────────────────────────────────────
 const ANCHOR_ALL = /\b[0-9a-f]{7,40}\b/g;
 
+/**
+ * 🔴 **不可达 SHA 的显式标记**（2026-11-10）。
+ *
+ * 有些文档必须保留一个**当时真的存在、但已经取不到**的提交号：
+ * `docs/research/performance-hotpaths-audit.md` 记的是"某一个瞬时的 HEAD 上这道门禁
+ * 是 6 处红"，那个 SHA 来自一次**只存在于工作树/被 amend 掉**的状态，
+ * 任何 ref 都指不到它。**把它删掉或改写成别的 SHA 是篡改历史** ——
+ * 那正是那份文档反复警告的"一个时刻的快照被当成属性"。
+ *
+ * 所以给它一个**要写出来的标记**：在同一行里带上 `(不可达)`，
+ * 本判据就把这一行的锚**跳过**（不是整行跳过：同一行里的**路径**仍然要存在）。
+ *
+ * ⚠️ 为什么是"显式标记"而不是"取不到就放过"：后者等于**删掉这条判据** ——
+ * 打错一个字符的 SHA 会被静默当成"历史遗留"。加了标记，写的人必须**为它做一次判断**
+ * （同本文件 `PATH_ALLOWLIST` 与 `license-inventory.mjs` 的 `REVIEWED_OTHER` 同一手法）。
+ */
+const UNREACHABLE_MARK = '(不可达)';
+
 function isCommit(sha) {
   try {
     execFileSync('git', ['-C', root, 'cat-file', '-t', `${sha}^{commit}`], {
@@ -250,6 +268,8 @@ function findShaProblems(docPath, text) {
      */
     const reportsReading = /= \d|→ \d|\d+ 行|第 \d+|行数?\s*\d|：\s*\d/.test(line);
     if (!reportsReading) return;
+    // 显式标记「不可达」的行跳过锚校验（见 UNREACHABLE_MARK 的定义与理由）。
+    if (line.includes(UNREACHABLE_MARK)) return;
     const anchors = line.match(ANCHOR_ALL) ?? [];
     if (anchors.length === 0) {
       problems.push(`${docPath}:${String(index + 1)} 用「git show HEAD:」取证却没写锚定的 SHA`);

@@ -525,3 +525,56 @@ done
 「已有备注：」并登记披露字段 `note` ⇒ 存 HTML 等于把标签发给上游，这条要在动工那趟复量。
 
 ⇒ 对标滴答的 C1 那一格：**门禁半 = 已闭合（本节）**，**界面半 = 仍未做**，两种"没做完"不许混成一句。
+
+### 9.7 看板那一格翻面了 —— 而且它翻面之后**还差一步才真的可用**（2026-11-10，夜间审计线；按 §0.2 的规矩只加本节）
+
+**§9.2 / §9.4 / §2.6 里"看板仍是缺口"的说法不再成立。** 现量：
+
+```bash
+ls apps/web/src/features/ | grep -ci 'board\|kanban'      # ⇒ 2（kanban 那一族在了）
+grep -rn "看板" apps/web/src/App.tsx | head               # ⇒ 不再只是注释
+```
+
+#### 但这一格要**分三层**判，混成一句就会得出错误结论
+
+| 层 | 现量 | 口径 |
+|---|---|---|
+| **代码在不在** | ✅ `apps/web/src/features/kanban/KanbanView.tsx`（`26c10b97` 引入，2026-11 重建交回共享 `TaskRow`） | 与滴答**免费档就有**看板对齐 |
+| **接线通不通** | ✅ `App.tsx` 有 `contentView === 'kanban'` 渲染分支；共享 `TaskBoard` 出列的形状 | |
+| **用户到不到得了** | ❌ **曾经两条入口全断**（见下），2026-11-10 修复后才 ✅ | ← **这一层才是"产品有没有这个功能"** |
+
+🔴 **"代码在"与"用户到得了"是两件事，而这一格此前正是被前者说服了的**：
+
+- 路径 A（默认 rail）：`visibleMainTabs` 要求 `enabledModules.has('kanban')`，
+  而 `ShellModuleKey` = `FeatureModuleKey` 是**闭集**，`kanban` 不在里面 ⇒ `has()` **恒 false**；
+- 路径 B（用户手动固定）：`rail-pref.isViewKey` 的白名单里**也没有它**
+  ⇒ 手写进 `localStorage['heyta.shell.rail']` 也会被 `readKeys()` 过滤掉。
+
+⇒ `KanbanView`（113 行）+ 跨列拖拽改归属**对全体用户不可用**，而因为视图是纯前端，
+**不会以任何数据异常的形式暴露**。修复见 `9ccbc25a`（登记进 `FEATURE_MODULE_KEYS` +
+`SHELL_MODULES`，`defaultOn: true`）。
+
+#### 复跑口径（别抄本节结论，照跑）
+
+```bash
+# 一行判"有没有进不去视图"：每个 ViewKey 至少要有一条到达路径
+cd apps/web && npx vitest run tests/view-reachability.spec.tsx
+
+# 现量口径：这三处必须同时为非空
+grep -c "key: 'kanban'" apps/web/src/features/shell/modules.ts        # ⇒ 1
+grep -c "'kanban'" packages/domain/src/feature-modules.ts             # ⇒ 1
+grep -c "kanban:" apps/web/src/features/shell/rail-pref.ts            # ⇒ 1
+```
+
+#### 给下一个人
+
+这一格的教训**不是**"忘了登记一个 key"，而是
+**"已建模 / 已实现 ≠ 可达"这条口径此前只对数据实体有判据，对视图没有**：
+`scripts/check-reachability.mjs` 的脚本头自己写明它只管**实体**。
+所以 `tests/view-reachability.spec.tsx`（本次新增）补的是那个盲区 ——
+它的阳性对照喂人造 key，证明判据**能红**。
+
+另一条同类教训在**门禁自己身上**：落地页那条"登记处 ⟷ 真应用双向等集"判据
+把「**没登记** `defaultOn`」与「`defaultOn: false`（产品决定默认关）」混为一谈，
+于是"两边都不含 kanban"照样绿。⇒ 已改成 `undefined` 大声抛错。
+**一个把"缺失"读成"没有"的判据，比没有判据更危险** —— 它给出的是"已检查过"的错觉。
