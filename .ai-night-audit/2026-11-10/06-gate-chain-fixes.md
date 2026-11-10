@@ -100,3 +100,45 @@ APK 的 `assets/index.android.bundle` 里**没有**「看板」词条 —— 这
 且有 `apps/mobile/tests/feature-entries.spec.ts` 钉住（现量 10 passed）。
 
 ⇒ 「看板」按设计只到 Web 与桌面三端。这是**产品边界**，不是漏做。
+
+---
+
+## 最强的一条证据：并发那一次全链跑，实时穿过了我修的每一道门禁
+
+会话期间另有一个 `pnpm check` 在跑（不是我的）。它的实时日志显示我修的**全部**门禁依次通过：
+
+```
+$ node scripts/check-entry-table.mjs --self-test && node scripts/check-entry-table.mjs   ← 过
+$ node scripts/check-detail-pane-evidence-refs.mjs                                        ← 过
+$ node research/tools/render-license-inventory.mjs --check-stamp                          ← 过
+$ node scripts/check-doc-citations.mjs                                                    ← 过
+$ node scripts/check-brand-assets.mjs                                                     ← 过
+$ node scripts/check-shell-surfaces.mjs                                                   ← 过
+$ node scripts/check-linux-shell.mjs（含 shell-portability 的 ⓪ 组）                        ← 过
+```
+
+它一直跑到链的**很后段**（`check-vault-diagnostics`，在 e2e 之后）才停，
+而停因与我的改动无关：
+
+```
+Error: Diagnostic probe did not produce a test report;
+       check the test lock/browser availability
+```
+
+那正是脚本自己写在错误里的归因 —— **Playwright worker / 浏览器争用**
+（两条全链同时跑）。该脚本我从未改动（`git log` 最后改动是 `559c5b2a`，早于本轮）。
+
+⇒ **我修的 8 道门禁全部已被一次真实全链跑穿过**，这比定向跑更强。
+
+## 生产最后的现量复核
+
+| 项 | 值 |
+|---|---|
+| `https://heyta.waytofuture.cn/` `/app/` `/health` | 全 **200** |
+| 线上 `index.html` 引用的 bundle | `index-C6oAAyG6.js` |
+| 该 bundle 里的看板词条 | `web.shell.nav.kanban`（中英）、`web.shell.modules.kanban.label` / `.note` 四枚全在 ✅ |
+
+⚠️ **本地 `apps/web/dist` 与线上不一致是正常的**：我在跑 `check:shell-surfaces` 前用过
+一次不带 `HEYTA_WEB_BASE=/app/` 的 `pnpm --filter @heyta/web build`（那一步是 W5 新鲜度所需）。
+**线上那份是发布装置用 `--base=/app/` 构建并 rsync 上去的**，两边各自的引用形状都对。
+判断"线上对不对"要看**线上引用的那份 bundle 的内容**（上面已验），不是比 `index.html` 的 md5。
