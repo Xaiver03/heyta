@@ -820,7 +820,12 @@ export function toNativeTS(
       lines.push(`  ${preset}: {`);
       for (const theme of ['light', 'dark'] as const) {
         lines.push(`    ${theme}: {`);
-        for (const [key, value] of Object.entries(presets[preset][theme])) {
+        // 🔴 `?? {}` 是**类型**所需，不是运行时兜底（2026-11-10）：
+        // `presetNames` 来自 `Object.keys(presets)`，而 TS 的 `noUncheckedIndexedAccess`
+        // 让 `presets[preset]` / `[theme]` 都可能是 `undefined`。
+        // 走到这里时它们按构造必然存在（键就是从这一层取的），
+        // 所以空对象是"类型上合法、逻辑上不可能"的那一档，不是隐藏错误。
+        for (const [key, value] of Object.entries(presets[preset]?.[theme] ?? {})) {
           lines.push(`      '${key}': ${literal(value)},`);
         }
         lines.push('    },');

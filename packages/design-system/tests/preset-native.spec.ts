@@ -33,7 +33,7 @@ import { extractPresetOverridesVars, extractPresetVars, normalizeColor, resolveV
 import { generateAll } from '../src/generate.js';
 import { buildNativeTokens, PRESET_NAMES } from '../src/generate.js';
 import { tokensForTheme } from '../src/native.js';
-import { allTokenNames, cssVarName } from '../src/tokens.js';
+import { allTokenNames, cssVarName, type TokenName } from '../src/tokens.js';
 import { presetTokens } from '../src/generated/tokens.native.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -66,7 +66,13 @@ describe('预设表是**稀疏**的（不是基准表的副本）', () => {
       it(`${preset}/${theme}：键集合 == CSS 预设块写出的 token`, () => {
         const explicit = extractPresetOverridesVars(CSS, preset, theme);
         const expected = new Set(
-          [...explicit.keys()].map((cssName) => TOKEN_OF_CSS.get(cssName)).filter((t): t is string => t !== undefined),
+          // 🔴 谓词必须写 `TokenName` 而不是 `string`（2026-11-10）：
+          // `TOKEN_OF_CSS` 是 `Map<string, TokenName>`（值来自 `allTokenNames(): TokenName[]`），
+          // 所以 `.get()` 的类型是 `TokenName | undefined`。写成 `t is string` 会被 TS 拒
+          //（TS2677：谓词类型必须可赋给参数类型）—— 那不是狭窄，是**放宽**。
+          [...explicit.keys()]
+            .map((cssName) => TOKEN_OF_CSS.get(cssName))
+            .filter((t): t is TokenName => t !== undefined),
         );
         expect(Object.keys(presetTokens[preset][theme]).sort()).toEqual([...expected].sort());
         // 而且它必须远小于全量 registry —— 否则"预设"就退化成"第二份基准表"。
