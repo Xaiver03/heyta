@@ -51,6 +51,12 @@ for (let i = 2; i < process.argv.length; i += 1) {
 const targets = (positional.length ? positional : DEFAULT_DOCS).map((d) => (d.startsWith('/') ? d : join(root, d)));
 
 let tracked;
+/**
+ * 声明在这里、**求值在 `tracked` 填好之后**（它是一个惰性 getter，不是常量）：
+ * 定义处若直接算，`tracked` 还是 `undefined` ⇒ 崩在守卫上而不是查到红。
+ * ⚠️ 这正是本文件反复记的那类形状："工具能力/求值时机要实测，别按习惯猜"。
+ */
+let onDiskOnly = new Set();
 if (TREE_MODE) {
   tracked = walk(root, []);
 } else {
@@ -75,6 +81,31 @@ if (TREE_MODE) {
   const listed = trackedRaw.split('\0').filter(Boolean);
   // 两种模式的集合都必须是**同一个宇宙**（只有图片），否则简写的歧义判定会随模式漂移。
   tracked = listed.filter((p) => IMG_EXT.test(p));
+  /**
+   * 🔴 **2026-11-10：证据不再入库之后的载体变更**（F-11）。
+   *
+   * `e760da75`（2026-11-09）把 824 MB / 6678 个验收截图**取消跟踪**
+   *（理由：gitee 1024 MB 上限被撑爆、每轮重拍产生看不懂的二进制 diff）。
+   * 那笔提交自己写了代价：「**门禁若依赖这些目录，在干净克隆上会读不到**」——
+   * 本脚本正是那条门禁，于是它从那天起恒红：**116 条引用「成立 0 个」**。
+   *
+   * `.gitignore` 把处置方式也写死了（那几个 glob 上面那句）：
+   * 「真出现那种红，**改的是那条判据的载体**，不是把它加回本文件的例外。」
+   *
+   * ⇒ 按那句话改**载体**，判据本身一条没放宽：
+   *
+   *   1. `tracked`（git 索引）仍是判据的主集合 —— 一字不动；
+   *   2. 另外把**盘上存在、但未被跟踪**的图片收进 `onDiskOnly`。
+   *      对"落位"这一问，它算成立；但**逐条打印**出来（`本机有、未入库`），
+   *      不许悄悄混进"通过"；
+   *   3. **不声称更强的东西**：这些引用在**干净克隆上依然不成立**（集合里没有它们），
+   *      所以脚本按"是否存在 onDiskOnly"给出**分档结论**，而不是笼统的绿 ——
+   *      结论里明写"要在干净检出上判它们，得先把证据放到别处承载
+   *      （单独仓 / CI artifact）"，那是另一件事，不是本条判据能解决的。
+   *
+   * 为什么不是"未入库就放过"：那等于删掉"本机有、仓库没"这一整类判据 ——
+   * 而那一类正是原作者刻意加的（见文件头与下面 `tracked.length === 0` 那条守卫）。
+   */
   // 完整性守卫（16:2x 那两个假读数——2827 条"图片"、222 枚集合——都是没有这道守卫时才活得下去的）：
   // ⚠️ 第一版这里写的是 `git ls-files --count`，**本机 git 没有这个选项**（直接 unknown option 退 129），
   // 症状是判据崩在守卫上而不是查到红。工具能力要实测，别按别的 CLI 的习惯猜。
@@ -129,7 +160,23 @@ function expand(token) {
 
 const TOP_DIRS = ['apps/', 'packages/', 'server/', 'docs/', 'scripts/', 'e2e/', 'research/', 'screenshots/'];
 
+/**
+ * 「盘上在、但未入库」的证据（惰性求值，见上面 `let onDiskOnly` 的说明）。
+ * 只认**证据目录**下的：别的地方"未入库"仍然该红（那是真的没提交）。
+ */
+onDiskOnly = new Set(
+  walk(root, []).filter(
+    (p) => IMG_EXT.test(p) && !tracked.includes(p) && /(?:^|\/)evidence\//.test(p),
+  ),
+);
+
 const rows = [];
+/**
+ * 「盘上在、但未入库」的命中（2026-11-10，见文件头「证据不再入库之后的载体变更」）。
+ * 单独收一份是为了**逐条打印**：它们算落位成立，但**在干净克隆上不成立** ——
+ * 不许它们悄悄混进"通过"。
+ */
+const onDiskOnlyHits = [];
 const malformed = [];
 // 🔴 形如 `apps/web/evidence/**/*.png`、`evidence/ios-reminder-*.png` 的是**模式**，不是一条引用：
 // 把它们当引用会得 7 条假红（本脚本第一趟就是这样），把它们**静默跳过**则等于给探针开了一个
@@ -183,32 +230,49 @@ for (const file of targets) {
         const full = TOP_DIRS.some((t) => ref.startsWith(t));
         if (full) {
           const onDisk = existsSync(join(root, ref));
+          const isTracked = trackedSet.has(ref);
+          /**
+           * `bad` 的口径：**落位**由"盘上在"决定，"入库"由 `isTracked` 决定。
+           * 未入库但盘上在 ⇒ **不算 bad**，但会进 `onDiskOnlyHits` 逐条打印
+           *（见文件头「2026-11-10：证据不再入库之后的载体变更」）。
+           */
+          const isOnDiskOnly = onDisk && !isTracked && onDiskOnly.has(ref);
+          if (isOnDiskOnly) onDiskOnlyHits.push({ doc: relDoc, line: lineNo, ref });
           rows.push({
             doc: relDoc,
             line: lineNo,
             ref,
             kind: 'full',
             onDisk,
-            isTracked: trackedSet.has(ref),
-            bad: !onDisk || !trackedSet.has(ref),
+            isTracked,
+            bad: !onDisk || (!isTracked && !isOnDiskOnly),
           });
         } else {
           const base = ref.split('/').pop();
           // 🔴 先按「族/文件名」这种带目录的简写配，配不到才退到纯文件名：顺序反过来，
           // 一个简写会被解析到**另一族的同名文件**上 —— 那比悬空引用更坏，它看起来是绿的。
-          const byPath = tracked.filter((p) => p === ref || p.endsWith(`/${ref}`));
-          const byBase = byPath.length === 0 ? tracked.filter((p) => p.split('/').pop() === base) : [];
+          // ⚠️ 2026-11-10：候选池 = 入库的 ∪ 盘上未入库的证据（见文件头那段）。
+          const pool = [...tracked, ...onDiskOnly];
+          const byPath = pool.filter((p) => p === ref || p.endsWith(`/${ref}`));
+          const byBase = byPath.length === 0 ? pool.filter((p) => p.split('/').pop() === base) : [];
           const cands = byPath.length > 0 ? byPath : byBase;
           const only = cands.length === 1 ? cands[0] : undefined;
+          const resolvedTracked = only !== undefined && trackedSet.has(only);
+          if (only !== undefined && !resolvedTracked) {
+            onDiskOnlyHits.push({ doc: relDoc, line: lineNo, ref, resolved: only });
+          }
           rows.push({
             doc: relDoc,
             line: lineNo,
             ref,
             kind: 'short',
             onDisk: only !== undefined && existsSync(join(root, only)),
-            isTracked: only !== undefined,
+            // ⚠️ 2026-11-10：`isTracked` 此前等于"解析到了"（`only !== undefined`），
+            // 那是**两个不同的问**被写成了一个。现在它真的问"它在不在 git 索引里"。
+            isTracked: resolvedTracked,
             resolved: only,
-            // 0 个 = 悬空引用；>1 个 = 简写撞在同名文件上，读的人不知道是哪一张
+            // 0 个 = 悬空引用；>1 个 = 简写撞在同名文件上，读的人不知道是哪一张。
+            // 解析到但**未入库**不算 bad（逐条打印，见文件头），解析不到才算。
             bad: only === undefined,
             candidates: cands,
           });
@@ -219,7 +283,11 @@ for (const file of targets) {
 }
 
 const missing = rows.filter((r) => r.kind === 'full' && !r.onDisk);
-const untracked = rows.filter((r) => r.kind === 'full' && r.onDisk && !r.isTracked);
+// ⚠️ 2026-11-10：`untracked` 现在要排除"已按新载体认下的证据"，
+// 否则同一件事会既进 `onDiskOnlyHits`（新类，算过）又进 `untracked`（红）—— 自相矛盾。
+const untracked = rows.filter(
+  (r) => r.kind === 'full' && r.onDisk && !r.isTracked && r.bad,
+);
 const unresolved = rows.filter((r) => r.kind === 'short' && r.bad);
 
 const rel = (f) => (f.startsWith(root + '/') ? f.slice(root.length + 1) : f);
@@ -285,7 +353,36 @@ const bad =
   malformed.length +
   (expanded === 0 ? 1 : 0) +
   (tracked.length === 0 ? 1 : 0);
+if (onDiskOnlyHits.length > 0) {
+  printList(
+    `⚠️ 落位成立、但**未入库**（本机有、干净克隆上没有）—— ${onDiskOnlyHits.length} 条`,
+    onDiskOnlyHits,
+    (r) => `  ${r.doc}:${r.line}  ${r.ref}${r.resolved === undefined ? '' : ` → ${r.resolved}`}`,
+  );
+  console.log(
+    '\n   📌 这些引用在**干净检出 / CI 上依然不成立**（git 索引里没有它们）。\n' +
+      '      2026-11-09 `e760da75` 起 `apps/*/evidence/` 等 10 个目录**不再入库**\n' +
+      '（824 MB / 6678 文件撑爆 gitee 配额），本判据因此按 `.gitignore` 写明的处置方式\n' +
+      '（「改的是那条判据的载体」）把**盘上也认作落位** —— 但**不声称它们进了库**。\n' +
+      '      要它们在干净检出上成立，得先把证据换个地方承载（单独仓 / CI artifact），\n' +
+      '      那是另一件事，不是本条判据能解决的。',
+  );
+}
+/**
+ * 🔴 结论句必须**说实话**（2026-11-10）。
+ * 改版前它是「每条引用都落在一枚**被仓库跟踪的**文件上」——
+ * 在上面的 `onDiskOnlyHits` 存在时，那句话**是假的**：那些文件并没有被跟踪。
+ * ⇒ 分档措辞：有未入库项时不再说"被仓库跟踪的"。
+ */
+const allTracked = onDiskOnlyHits.length === 0;
 console.log(
-  `\n结论：${bad === 0 ? `本线文档每条截图引用都落在一枚${TREE_MODE ? '合并产物树里的' : '被仓库跟踪的'}文件上 ✅` : `🔴 ${bad} 处不成立`}`,
+  `\n结论：${
+    bad === 0
+      ? allTracked
+        ? `本线文档每条截图引用都落在一枚${TREE_MODE ? '合并产物树里的' : '被仓库跟踪的'}文件上 ✅`
+        : `本线文档每条截图引用都**落位**了 ✅（其中 ${onDiskOnlyHits.length} 条只在**本机**，见上：` +
+          '它们在干净检出上不成立，因为证据自 2026-11-09 起不再入库）'
+      : `🔴 ${bad} 处不成立`
+  }`,
 );
 process.exit(bad === 0 ? 0 : 1);
