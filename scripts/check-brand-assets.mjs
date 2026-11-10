@@ -182,16 +182,72 @@ function stripComments(text) {
   return text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/^\s*\/\/.*$/gm, '');
 }
 
+/**
+ * 🔴 **2026-11-10（F-15）：判据从"第一个文本命中"改成"第一个模块作用域里的调用"。**
+ *
+ * 原实现拿 `code.indexOf('root.render(')` —— 那是**任何**文本命中，
+ * 包括**函数体里**的那些。而 `main.tsx` 有一条正常且必要的结构：
+ * 崩溃兜底 `renderFatal()`（`function renderFatal(...)`）里就有一次 `root.render(`，
+ * 它**定义在** `armBootSplashDismiss()` 之前、**执行在**它之后（只在崩溃时才走）。
+ * ⇒ 判据把"定义在前"读成"调用在前"，于是**恒红**并报一句假的
+ * 「接线晚于渲染」—— 而 `armBootSplashDismiss(container)` 在第 189 行、
+ * 三条**模块作用域**的渲染出口全在它下面。
+ *
+ * ⚠️ 这是本文件第二次栽在同一类上（见上面 `stripComments` 的注释：
+ * 第一版命中的是判据自己写的注释）。**两次的形状是同一个**：
+ * 判据拿"文本位置"去回答"执行顺序"。文本位置答不了那个问题。
+ *
+ * 口径：跳过**函数体里**的 `root.render(`，取模块作用域里最先出现的那一处。
+ * 判"在不在函数体里"用的是**缩进相对基线**：`main.tsx` 的模块作用域语句一律顶格
+ * （`armBootSplashDismiss(container);` 实测就是第 0 列），而模块作用域里的
+ * `if` / `try` 分支体缩进 ≥ 2。函数体里的那些缩进更深。
+ *
+ * ⚠️ 这不是解析器，是一把**够用且可判**的尺 —— 下面那条阳性对照钉住它真能失败。
+ */
+function firstModuleScopeRender(code) {
+  const lines = code.split('\n');
+  const found = [];
+  /**
+   * 🔴 偏移必须**按行累加**算（`code.indexOf(lines[i])` 会错）。
+   * 实测踩到：`main.tsx` 里有两行 `root.render(` 缩进不同、内容不同，
+   * 但 `indexOf('      root.render(')` 命中的是第一处同名行 ⇒ 三处报同一个偏移
+   * （3182/3184 这种"看着合理其实是别人的位置"的读数就是这么来的）。
+   * 这类"读数看起来对、其实指错地方"的错比崩掉更难发现 —— 本仓 §7 一整族都是它。
+   */
+  let offset = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = /^(\s*)root\.render\(/.exec(lines[i]);
+    if (m !== null) found.push({ indent: m[1].length, index: offset });
+    offset += lines[i].length + 1; // +1 = 被 split 吃掉的那个 '\n'
+  }
+  if (found.length === 0) return -1;
+  /**
+   * 模块作用域的渲染出口住在本文件**最浅的缩进**那一档
+   * （实测：`root.render(` 的缩进是 4 / 6 / 6 / **2** / 6 / 6 ——
+   * 那个 2 就是模块作用域里 `if` 分支体内的出口；4 与 6 全在函数体里）。
+   * ⇒ 先取最小缩进，再取其中最靠前的那一处。
+   *
+   * ⚠️ "最浅"而不是"第一处"：第一处恰好就是 `renderFatal()` 函数体里的那个，
+   * 而它**定义在** arm 之前、**执行在** arm 之后 —— 拿它当对照物就是恒红。
+   */
+  const minIndent = Math.min(...found.map((f) => f.indent));
+  const first = found.filter((f) => f.indent === minIndent).sort((a, b) => a.index - b.index)[0];
+  return first === undefined ? -1 : first.index;
+}
+
 check(
   'web：接线早于任何一次 root.render',
   'apps/web/src/main.tsx',
   (t) => {
     const code = stripComments(t);
     const arm = code.indexOf('armBootSplashDismiss(');
-    const firstRender = code.indexOf('root.render(');
+    const firstRender = firstModuleScopeRender(code);
     if (arm === -1) return '找不到调用点';
     if (firstRender === -1) return '找不到 root.render —— 这条判据的对照物没了';
-    return arm < firstRender || `调用在第 ${arm} 字节、第一次 render 在第 ${firstRender} 字节：晚于渲染会漏掉早挂载的分支`;
+    return (
+      arm < firstRender ||
+      `调用在第 ${arm} 字节、第一次模块作用域 render 在第 ${firstRender} 字节：晚于渲染会漏掉早挂载的分支`
+    );
   },
 );
 
