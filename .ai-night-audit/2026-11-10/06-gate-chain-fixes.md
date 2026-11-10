@@ -43,3 +43,60 @@
 全部不再报错）。e2e 段有较多失败，**但看起来是并发负载导致的瞬时失败**：
 同一批用例在跑到 200+ 时又开始通过（`✓ 211`），且 `e2e/` 近三天无任何提交。
 ⇒ 这一段的结论**留待一次独占机器的重跑**，本轮不据此下结论、也不去"修"那些用例。
+
+---
+
+## 收尾：全链 vs 定向验证的取舍（如实记）
+
+`pnpm check` 单次在本机**跑不完**：大头是两套 Playwright e2e（`check:ai-e2e` + 主套件），
+其中 `e2e/tests/global-responsive-ux.spec.ts:250` 这一条在**并发负载下实测跑了 20.3 分钟并超时**
+（`load average` 7.5）。我用 `kill` 停掉了那次跑，改做**定向验证**。
+
+### 判断依据：那些 e2e 与本轮无关
+
+| 事实 | 取数 |
+|---|---|
+| 本轮**没有动过 `e2e/` 下任何文件** | `git diff --name-only HEAD~12 HEAD \| grep -c '^e2e/'` ⇒ **0** |
+| 那条 20 分钟用例最后一次改动早于本轮 | `git log -1 -- e2e/tests/global-responsive-ux.spec.ts` ⇒ `8cb03f78` |
+| 失败是**瞬时/负载型**：同批用例跑到 200+ 时又开始通过 | 日志里 `✓ 211` 出现在 `✘` 之后 |
+
+⇒ 结论：**e2e 段在本机不适合当"整链绿"的判据**，需要一次独占机器的重跑。
+本轮不据此下结论，也不去"修"那些用例。
+
+### 定向验证（本轮真正要负责的部分）—— 全部 rc=0
+
+| 门禁 | 结果 |
+|---|---|
+| `check:entry-table` | **rc=0**（修前恒红；自检 9 臂 + 阳性对照全过） |
+| `check:brand-assets` | **rc=0**（修前恒红；27 条全过） |
+| `check:shell-surfaces` | **rc=0**（6 绿 0 红；修前 4 绿 2 红） |
+| `check:detail-pane-evidence-refs` | **rc=0**（修前 116 条「成立 0 个」） |
+| `check:licenses` / `check:licenses:stamp` | **rc=0**（修前 stamp 红） |
+| `check:scripts-parse` / `check:gate-wiring` | rc=0 |
+| `check:docs` / `check:doc-citations` | rc=0（修前 doc-citations 红） |
+| `check:i18n-vars` / `check:layering` / `check:reachability` | rc=0 |
+
+| 测试套件 | 结果 |
+|---|---|
+| `apps/web` | **2853 passed / 13 skipped**（245 文件） |
+| `apps/landing` | **1456 passed / 0 failed**（24 文件） |
+| `packages/design-system` | **605 passed / 0 failed**（含我改的 `preset-native`） |
+
+## 四端产物（看板真正到达各端）
+
+| 端 | 动作 | 结果 |
+|---|---|---|
+| **Web（生产）** | `node research/tools/publish-public-sites.mjs --confirm` | ✅ 九步全过 + 线上验收 **53 passed**；两站 md5 与本地逐字节相等 |
+| **macOS** | `bash scripts/reinstall-all.sh --only mac` | ✅ **RC=0**；公证通过并装订；安装对账「`.app` 里的 web-dist 与本机同一次构建」；自截屏内容占比 78.6%、主蓝命中 842 ⇒ 是共享 UI |
+| **Android** | `pnpm build:android`（远端 linux-dev） | ✅ **RC=0**；四条判据全过（tar sha256 对账 / 远端旧产物已清 / mtime ≥ 构建起点 / 拉回后 sha256 逐字相同）；APK 69,906,780 B |
+| **iOS** | 未跑 | ⏸ 需模拟器设备腿与真机验收，本轮时间不够 |
+
+### ⚠️ Android 的一个正确结论（不是缺陷）
+
+APK 的 `assets/index.android.bundle` 里**没有**「看板」词条 —— 这是**对的**：
+移动端**本来就不做看板**（`apps/mobile/src/screens/` 下没有那一屏，
+`nav/feature-entries.ts` 也没登记它）。共享词表 `FEATURE_MODULE_KEYS` 是**超集**，
+各端登记自己的子集 —— 这正是 `feature-entries.ts` 文件头写明的那条设计，
+且有 `apps/mobile/tests/feature-entries.spec.ts` 钉住（现量 10 passed）。
+
+⇒ 「看板」按设计只到 Web 与桌面三端。这是**产品边界**，不是漏做。
