@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { AssistantMark } from '@heyta/ui';
+import { applyScrollIntent, AssistantMark, shouldFollowOnContentChange } from '@heyta/ui';
 import { inferPreferences, renderPreferenceHints } from '@heyta/domain';
 import {
   assistantEgressFields,
@@ -201,9 +201,34 @@ export function AssistantScreen({
     controller.configure(runtime);
   }, [controller, runtime]);
 
+  /**
+   * 是否跟随最新内容（流式期间自动滚到底）。
+   *
+   * 🔴 用 ref 而不是 state：每收到一个 scroll 事件都要读它，而绝大多数事件
+   * 不改变它。用 state 会让每次滚动都可能触发重渲染 —— 那正是"滚动时卡顿"
+   * 的经典成因。判据在 `@heyta/ui` 的 `shouldFollowOnContentChange`
+   * （纯函数、两端共用、有独立测试）。
+   */
+  const followRef = useRef(true);
+
+  /**
+   * 🔴 依赖数组里有 `live?.text`：这是**流式跟随**的关键。
+   *
+   * 改之前是 `[snapshot.items.length, snapshot.phase]` —— 两者都只在
+   * "一轮开始/结束"时变，于是**流式期间新到的字一个都不会触发滚动**：
+   * 回答长过一屏之后，用户只能眼看着文字在屏幕外继续生成。
+   * 这与 web 端 `AssistantPanel.tsx` 修的是**同一个缺口**。
+   *
+   * ⚠️ 用 `live?.text` 而不是 `live`（对象）：后者每个事件都是新对象，
+   * 会让 effect 每片都跑一次；而 effect 里要做的只是"滚到底"，
+   * 文本没变就不必滚。
+   */
+  const liveText = snapshot.live?.text;
   useEffect(() => {
-    if (snapshot.items.length > 0) transcriptRef.current?.scrollToEnd({ animated: true });
-  }, [snapshot.items.length, snapshot.phase]);
+    if (snapshot.items.length === 0 && (liveText === undefined || liveText === '')) return;
+    if (!shouldFollowOnContentChange(followRef.current)) return;
+    transcriptRef.current?.scrollToEnd({ animated: true });
+  }, [snapshot.items.length, snapshot.phase, liveText]);
 
   useEffect(() => {
     if (!visible) return undefined;
@@ -395,7 +420,35 @@ export function AssistantScreen({
               <Button label={t('web.ai.chat.newSession')} tone="ghost" disabled={snapshot.phase !== 'idle'} onPress={() => controller.newSession()} />
             </Card>
           ) : null}
-          <ScrollView ref={transcriptRef} style={{ flex: 1 }} contentContainerStyle={{ gap: tokens['space.3'], paddingVertical: tokens['space.3'] }} keyboardShouldPersistTaps="handled" testID="assistant-transcript">
+          <ScrollView
+            ref={transcriptRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ gap: tokens['space.3'], paddingVertical: tokens['space.3'] }}
+            keyboardShouldPersistTaps="handled"
+            testID="assistant-transcript"
+            /**
+             * 🔴 用户滚离底部 ⇒ 停止跟随。
+             *
+             * 这条挡的是"用户往上翻历史时被流式内容拽回底部" —— 那是最容易
+             * 被误当成"它就爱跳"的一类缺陷，而代码里只有一句看起来无害的
+             * "滚到底"。
+             *
+             * 判据复用共享层的 `applyScrollIntent`（纯函数、有独立测试），
+             * 两端同一套规则。RN 与 DOM 的几何字段不同，所以这里做一次映射：
+             *   DOM: scrollTop / scrollHeight / clientHeight
+             *   RN : contentOffset.y / contentSize.height / layoutMeasurement.height
+             */
+            onScroll={(event) => {
+              const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+              const decision = applyScrollIntent(followRef.current, {
+                offset: contentOffset.y,
+                contentHeight: contentSize.height,
+                viewportHeight: layoutMeasurement.height,
+              });
+              followRef.current = decision.follow;
+            }}
+            scrollEventThrottle={16}
+          >
             <ChatTranscript
               items={[...renderItems, ...liveItems]}
               generatedLabel={t('common.ai.generatedLabel')}
