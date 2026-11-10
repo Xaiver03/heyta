@@ -36,6 +36,8 @@ import { useMobileNavigation } from '../nav/navigation';
 import { readSyncConfig } from '../sync/config';
 import { AiDisclosureBlock } from './disclosure';
 import { ASSISTANT_FAILURE_KEY, AI_CAUSE_KEY, AI_FEATURE_LABEL_KEY, SERVER_CODE_KEY } from './copy';
+import { privacyConsent } from '../privacy/consent-gate';
+import { createGatedStreamingFetch } from './streaming-fetch';
 import { ChatComposer } from './chat-composer';
 import {
   createChatController,
@@ -59,6 +61,49 @@ const managedTransport = createManagedTransport({
   getServerUrl: () => readSyncConfig()?.serverUrl,
   getToken: async () => readSyncConfig()?.token,
 });
+
+/**
+ * **流式**传输 —— 让助手的回答逐字出现，而不是整段蹦出来。
+ *
+ * ## 为什么需要单独一个 fetch
+ *
+ * RN 的 `fetch` 由 XHR 实现、**整份收完才返回**，响应上没有可读 `body`；
+ * 而 `packages/ai` 判"能不能按 SSE 读"的第三条正是它（`routing.ts:1290`）。
+ * 于是移动端一直只能"整段回来再显示"。
+ *
+ * 这个实现用 RN 内置 `XMLHttpRequest` 在 `readyState === 3` 时读**累积**的
+ * `responseText`，切成增量后包成 `routing.ts` 认得的形状。
+ *
+ * ## 🔴 为什么必须包闸门、且组装在这里
+ *
+ * `createGatedStreamingFetch(privacyConsent, …)` 把
+ * `createConsentGatedFetch`（`privacy-consent.ts:311`，"没有同意，一个字节都
+ * 不出这台设备"）套在 XHR 传输的**外面**。顺序是硬约束 ——
+ * 自己 `new XMLHttpRequest()` 而不套闸门就是一处隐私破口。
+ *
+ * 组装放在壳里（与 `managedTransport` 同一形状），控制器只消费注入进来的
+ * `streamingFetch`。理由有两条：① `check:layering` 要求"决定业务上怎么做"
+ * 的东西只在 `packages/*`；② 注入进来才测得动。
+ *
+ * ## 为什么敢接（判据不是"应该没问题"）
+ *
+ * RN 0.84.1 的 `Libraries/Network/XMLHttpRequest.js` 里读出来的三条：
+ *   · `:557-558` 增量事件默认**关闭**，只有挂了 `onreadystatechange` 或
+ *     `onprogress` 才开 —— 我们的实现挂了 `onreadystatechange` ⇒ **会被开启**；
+ *   · `:621` 那个标志确实传给原生 `sendRequest`；
+ *   · `:375-386` `__didReceiveIncrementalData` 做的是 `this._response += responseText`
+ *     ⇒ `responseText` **是累积的** ⇒ 我们那份 `diffAccumulated` 是必需的，
+ *     不做差分一定重复。
+ *
+ * ## 退化方向（这条是产品要求，不是可选项）
+ *
+ * 任何一步不合预期都退回"整段显示"而**不是报错**：
+ *   · XHR 不可用（某些测试环境）⇒ 非流式；
+ *   · `content-type` 不是 `text/event-stream` ⇒ 按整份读；
+ *   · 拿到的不是"旧文本 + 新增"的超集 ⇒ 放弃增量，按整份读。
+ * 用户最差拿到的是一份完整回答，只是没有逐字。
+ */
+const streamingFetch = createGatedStreamingFetch(privacyConsent);
 
 /**
  * **发送那一刻**现算的路由配置（见 `ChatRuntime.resolveRouting` 的注释）。
@@ -140,6 +185,11 @@ export function AssistantScreen({
       host: toolHost,
       secretStore: aiSecrets,
       managedTransport,
+      /**
+       * 🔴 接上流式 ⇒ 助手的回答逐字出现。见模块顶部 `streamingFetch` 的注释
+       * （含"为什么敢接"的三条 RN 源码判据与退化方向）。
+       */
+      streamingFetch,
       // 🔴 现算的那一份（不是 `settings.routing`）—— 见模块顶部 `resolveRouting` 的注释。
       resolveRouting,
       localize: (key, vars) => t(key as MessageKey, vars),

@@ -57,6 +57,25 @@ export interface ChatRuntime {
    */
   readonly resolveRouting: () => AiRoutingConfig;
   readonly onHealth: (health: HealthMap) => void;
+  /**
+   * 流式传输（XHR 读增量，且**套在隐私闸门之内**）。
+   *
+   * 🔴 为什么需要它：RN 的 `fetch` 由 XHR 实现、整份收完才返回，响应上
+   * **没有可读 `body`** —— 而 `packages/ai` 判"能不能按 SSE 读"的第三条
+   * 正是这个（`routing.ts:1290`）。所以移动端一直只能"整段回来再显示"。
+   * 这个 fetch 把响应换成可增量读的形状，逐字揭示才有数据。
+   *
+   * 🔴 它**必须**是 `createGatedStreamingFetch(privacyConsent)` 的产物：
+   * 一个自己 `new XMLHttpRequest()` 的实现会绕过
+   * `src/privacy/consent-gate.ts` 那道"没有同意，一个字节都不出这台设备"。
+   * 注入进来（而不是在这里 import）是为了：① 让测试能塞假实现；
+   * ② 与 `managedTransport` 同一条路数 —— 壳负责组装，控制器只消费。
+   *
+   * ⚠️ **可选**：`undefined` 时 `routing.ts` 用全局 `fetch`，行为与接线前
+   * 完全一致（没有逐字，但能出结果）。这条退化路径是刻意的 ——
+   * 见下方 `routed` 里那处展开。
+   */
+  readonly streamingFetch?: typeof fetch;
 }
 
 export interface ChatSnapshot {
@@ -362,6 +381,24 @@ class MobileChatController implements ChatController {
             managedTransport: runtime.managedTransport,
             now: () => routeTime,
             healthSeed: fromHealthSnapshot(runtime.settings.health, routeTime),
+            /**
+             * 🔴 流式传输 —— `routing.ts:837` 的 `deps.fetchImpl ?? globalThis.fetch`
+             * 就是这道缝。有了它，`onEvent` 收到的片段才可能是**真·逐片**的。
+             *
+             * ⚠️ 条件展开（不是 `fetchImpl: runtime.streamingFetch`）：
+             * 传 `undefined` 与不传在类型上都合法，但展开式让"没接线"这条路
+             * 在 `routed` 对象里**根本不出现**，于是 `routing.ts` 走它原本的
+             * `?? globalThis.fetch`。少一个 `undefined` 字段，就少一处
+             * "这里为什么是 undefined"的追问。
+             *
+             * 🔴 它出问题时**不会**让人拿不到回答：`createGatedStreamingFetch`
+             * 在任何一步不合预期（XHR 不可用、content-type 不是 SSE、闸门拒绝）
+             * 时都退回整份读取或抛闸门错误 —— 与接线前的行为一致，
+             * 只是没有逐字。见 `streaming-fetch.ts` 文件头。
+             */
+            ...(runtime.streamingFetch === undefined
+              ? {}
+              : { fetchImpl: runtime.streamingFetch }),
           },
         },
       );
