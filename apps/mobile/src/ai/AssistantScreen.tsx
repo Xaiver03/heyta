@@ -353,6 +353,14 @@ export function AssistantScreen({
             role: 'assistant',
             text: snapshot.live.text,
             /**
+             * 🔴 标成"还在生成" ⇒ 正文末尾画光标。
+             *
+             * 判据用 `live` 存在（它在 `finally` 里被清成 undefined），
+             * 而不是"文本长度有没有变" —— 那需要在渲染体里记住上一帧，
+             * 而这里已经有更准的信号：**live 还在 = 这一轮还没结束**。
+             */
+            streaming: true,
+            /**
              * 🔴 过程行（工具调用）也显示出来，与 web 的 `TraceRows` 同一语义：
              * "过程可见"（ADR-0045）说的是用户能看到它查了什么。
              * 只给条数而不给内容的话，这一项就与最终那条重复了。

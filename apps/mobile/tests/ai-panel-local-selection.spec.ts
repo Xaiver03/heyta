@@ -38,7 +38,22 @@ describe('移动端单一 Chatbot 的入口边界', () => {
 
   it('记录组件在助手回答与提案两类消息上画显式标识，用户与错误消息上不画', () => {
     const transcript = stripComments(read('apps/mobile/src/ai/chat-transcript.tsx'));
-    expect(transcript).toContain("import { AiGeneratedLabel } from '@heyta/ui'");
+    /**
+     * 🔴 判据是"标识来自**共享层那一份**"，不是那一行的字面。
+     *
+     * 原写法是 `toContain("import { AiGeneratedLabel } from '@heyta/ui'")` ——
+     * 精确到整行。2026-11-10 给同一个文件加流式光标（`StreamCaret`，也来自
+     * `@heyta/ui`）时，import 变成 `{ AiGeneratedLabel, StreamCaret }`，
+     * 这条就误报了：**它想守的"用的是共享层那份"依然成立**，
+     * 只是同一行多导了一个同源组件。
+     *
+     * 改成从「这一行」匹配到「从 `@heyta/ui` 导入的名单里含 AiGeneratedLabel」。
+     * 这样它仍能抓住真正要防的事（在本地抄一份 `AiGeneratedLabel`、
+     * 或从别处 import 一个同名组件），而不会因为多一个同源 import 就红。
+     */
+    expect(transcript).toMatch(
+      /import\s*\{[^}]*\bAiGeneratedLabel\b[^}]*\}\s*from\s*'@heyta\/ui'/,
+    );
     expect(transcript).toMatch(
       /item\.role === 'assistant' \|\| item\.role === 'proposal'/,
     );
