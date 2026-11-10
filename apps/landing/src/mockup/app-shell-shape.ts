@@ -56,6 +56,7 @@ export type ShellNavIconId =
   | 'sun'
   | 'check-circle'
   | 'circle-dot'
+  | 'columns'
   | 'check'
   | 'chart-gantt'
   | 'trending-up'
@@ -71,6 +72,8 @@ export type ShellViewKey =
   /* 搜索：rail 上段最后一个（滴答的 IA 里它常驻）。 */
   | 'search'
   | 'quadrant'
+  /* 看板：2026-11-10 进默认 rail（`SHELL_MODULES` 登记 + `defaultOn: true`）。 */
+  | 'kanban'
   | 'habits'
   | 'focus'
   | 'timeline'
@@ -168,19 +171,25 @@ export const SHELL_QUADRANT_NAV: readonly ShellQuadrantNavItem[] = [
  *
  * 🔴 **2026-09-29：这里是「默认 rail」而不是"全部视图"。**
  * 产品负责人要求"左侧按钮尽可能地减少"，于是加了**功能模块开关**：
- * 关掉的模块**根本不进 DOM**，所以新装用户看到的就是下面这 6 个。
+ * 关掉的模块**根本不进 DOM**，所以新装用户看到的就是下面这 7 个。
  * 画"全部 9 个"反而是另一个方向的不实 —— 承诺了默认拿不到的东西。
  * ⚠️ 对账判据（`tests/mockup-shell-shape.spec.tsx` #5）会读
  * `apps/web/src/features/shell/modules.ts` 的 `defaultOn` 一起算，别只改这一边。
  *
  * ⚠️ **2026-11-04（滴答对齐 D2）：回收站不在这份登记里了** —— 真应用把它从 rail
  * 下段搬进**侧栏底部**，展厅跟着搬，登记落在下面的 `SHELL_SIDEBAR_TOOLS`。
+ *
+ * ⚠️ **2026-11-10：「看板」进这一组了**（`kanban` 登记进 `SHELL_MODULES`，`defaultOn: true`）。
+ * 在那之前它**卡在一个没人看得见的洞里**：`MODULE_VIEW_TABS` 里早就登记了它、
+ * `App.tsx` 里也接了渲染分支，但 `enabledModules.has('kanban')` 恒 false ⇒
+ * **用户永远打不开看板**。修法与取证见 `.ai-night-audit/2026-11-10/03-findings.md` F-01。
  */
 export const SHELL_VIEW_TABS: readonly ShellViewTab[] = [
   // 上段「去哪看」：任务 + **默认开启的模块**。
   { key: 'tasks', labelKey: 'web.shell.nav.tasks', icon: 'inbox' },
   { key: 'calendar', labelKey: 'web.calendar.title', icon: 'calendar-days' },
   { key: 'quadrant', labelKey: 'web.shell.nav.quadrant', icon: 'circle-dot' },
+  { key: 'kanban', labelKey: 'web.shell.nav.kanban', icon: 'columns' },
   { key: 'habits', labelKey: 'web.shell.views.habits', icon: 'check' },
   { key: 'timeline', labelKey: 'web.shell.views.timeline', icon: 'chart-gantt' },
   // 「搜索」在滴答的 rail 上段**最后一个**（它常驻，不给关）。

@@ -627,6 +627,8 @@ export const zhCN = {
   'web.shell.modules.calendar.note': '按日期看哪天有什么事。',
   'web.shell.modules.quadrant.label': '四象限',
   'web.shell.modules.quadrant.note': '按重要与紧急把任务分到四格。',
+  'web.shell.modules.kanban.label': '看板',
+  'web.shell.modules.kanban.note': '按清单分列，拖动卡片换清单。',
   'web.shell.modules.habits.label': '习惯打卡',
   'web.shell.modules.habits.note': '养成习惯，让自律成为日常。',
   'web.shell.modules.timeline.label': '时间线',

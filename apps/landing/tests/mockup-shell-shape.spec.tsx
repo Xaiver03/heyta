@@ -172,6 +172,29 @@ function appDefaultRail(): { keys: string[]; labelKeys: string[] } {
     ].map((match) => [match[1] ?? '', match[2] === 'true']),
   );
 
+  /**
+   * 🔴 **F-03**（2026-11-10）：`undefined` 与 `false` 是两件事，不许一起当"默认关"。
+   *
+   * 曾经这里写的是 `modules.filter((m) => defaults.get(m.key) === true)` ——
+   * 于是**任何"在 `MODULE_VIEW_TABS` 里、但没登记进 `SHELL_MODULES`"的视图**
+   * 都会被静默丢掉。丢掉之后，下面那条"登记处 ⟷ 真应用默认 rail **双向等集**"
+   * 的判据**两边都不含它** ⇒ 照绿。
+   *
+   * 实测代价：`kanban` 就这么漏了（它不在 `FEATURE_MODULE_KEYS` 里、
+   * 也没登记进 `SHELL_MODULES`），于是"看板视图没有任何入口可达"这个真缺陷
+   * 在这条判据上**看不出任何异常**。见 `.ai-night-audit/2026-11-10/03-findings.md` F-01/F-03。
+   *
+   * 分辨口径：查不到 = **登记缺失**（要吵）；查到 `false` = **产品决定默认关**（安静）。
+   */
+  const missingRegistration = modules.filter((m) => !defaults.has(m.key)).map((m) => m.key);
+  if (missingRegistration.length > 0) {
+    throw new Error(
+      `MODULE_VIEW_TABS 里这些视图没登记进 SHELL_MODULES（modules.ts）⇒ ` +
+        `enabledModules.has() 恒 false ⇒ 不可达：${missingRegistration.join(', ')}。\n` +
+        '要么把它们登记进 SHELL_MODULES（并明确 defaultOn），要么从 MODULE_VIEW_TABS 摘掉。',
+    );
+  }
+
   const enabledModules = modules.filter((m) => defaults.get(m.key) === true);
   // ⚠️ 2026-11-04（滴答对齐 D2）：回收站从 rail 下段搬进**侧栏底部**，
   // 所以它不再算进"默认 rail"，改由下面 `appSidebarTools()` 单独对账。
@@ -416,14 +439,19 @@ describe('#5 视图 tab：登记处 ⟷ 真应用 `VIEW_TABS`', () => {
   it('真应用的**默认 rail** 与登记处逐项同 key、同序', () => {
     const app = appDefaultRail();
     // 🔴 **默认 rail**（新装用户看到的）= 任务 + 默认开启的模块 + 工具。
-    // 不再是全部 9 个 —— 番茄钟/成长/便签默认关，**不在 DOM 里**。
+    // 不再是全部 9 个 —— 番茄钟/成长/便签/倒数日默认关，**不在 DOM 里**。
     // ⚠️ **不含 `settings`**：它在 `VIEW_TABS` 里（供 `labelKey` 查表）但**不在 rail 上**
     // —— 设置收进了顶部的头像菜单。所以"在 VIEW_TABS 里"与"在 rail 上"是两回事，
     // 判据必须按**实际渲染的那几个**算。
+    //
+    // ⚠️ 2026-11-10：`kanban` 进这一组（它登记进 `SHELL_MODULES`、`defaultOn: true`）。
+    // 在那之前它**两条入口全断**（既不在共享词表、也不在 rail-pref 白名单）——
+    // 见 `.ai-night-audit/2026-11-10/03-findings.md` F-01。
     expect(app.keys).toEqual([
       'tasks',
       'calendar',
       'quadrant',
+      'kanban',
       'habits',
       'timeline',
       'search',

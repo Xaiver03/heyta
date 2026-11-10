@@ -125,7 +125,13 @@
  *   G4 web：把 `web.shell.views.countdown` 再抄一份到别的组件里        → W4 红
  *   G5 web：`apps/web/dist` 里那个 testID 改掉 / dist 不存在           → W5 红
  *   G6 mobile：`feature-entries.ts` 里 `countdown` 拼成 `count-down`   → M1 红
- *   G7 mobile：`CountdownScreen.tsx` 里的 `openTaskHost()` 注释掉      → M2 红
+ *   G7 mobile：`CountdownScreen.tsx` 里**两种取宿主写法都**拿掉
+ *       （`useTaskHost(` 与 `openTaskHost()`）                              → M2 红
+ *       ⚠️ 2026-11-10（F-06）：本臂原来的写法是"把 `openTaskHost()` 注释掉"。
+ *          那条自检前提在 2026-11-08 崩溃审计 §H.4 之后就不成立了 ——
+ *          屏幕改成经 `useTaskHost()` 取宿主，于是"按原臂做一次"变成**恒红**
+ *          （它测的不再是"判据能失败"，而是"判据认了一个过时的函数名"）。
+ *          现在两种写法都算"打开了宿主"，所以臂也改成两种都拿掉。
  *   G8 桌面：`package-app.sh` 那条 `cp -R "$WEB_DIST" ...` 删掉        → D1 红
  *   G9 桌面：`MainWindow.xaml.cs` 的 `web-dist` 探测改成常量 `true`    → D2 红
  *   G10 台账：删掉 Linux 那一行                                        → 覆盖完整性红
@@ -816,7 +822,23 @@ for (const face of FACES) {
     detail.push(`🔴 M2 那张屏不存在：apps/mobile/src/screens/${face.mobileScreen}.tsx`);
   } else {
     const code = stripComments(readFileSync(screenFile, 'utf8'));
-    const reads = code.includes('openTaskHost()');
+    /**
+     * 🔴 **F-06**（2026-11-10）：判据从"字面含 `openTaskHost()`"放宽成
+     * "含两种取宿主写法之一"，与 `apps/mobile/tests/feature-entries.spec.ts`
+     * 那条**同源判据**取齐。
+     *
+     * 2026-11-08 崩溃审计 §H.4 之后，屏幕一律经 `useTaskHost()` 取宿主
+     * （理由：空依赖 effect 里的 `openTaskHost()` 拿的是**快照**，
+     * 本机数据被销毁、宿主换代之后那一屏永久对着已作废的 adapter）。
+     * 那次改动**同时更新了 `feature-entries.spec.ts`，却漏了本文件** ——
+     * 于是本门禁在 `CountdownScreen` 上一路报红："那一屏读到的是空的（占位）"，
+     * 而**那句诊断是假的**：它读的是物化状态、接的是 `createEventActions(host)`。
+     *
+     * ⚠️ 放宽的**不是判别力**：两种写法**一个都不许没有** ——
+     * 把某张屏写成占位组件时这一条照样红。只是不再把"用了新写法"误判成"没接"。
+     * 分辨判据：**它拿不拿得到宿主**，不是**它用哪个函数名拿**。
+     */
+    const reads = /useTaskHost\(|openTaskHost\(\)/.test(code);
     const back = /\bonBack\b/.test(code);
     const testID = code.includes(face.mobileTestID) || code.includes('Countdown');
     if (!reads || !back) {
@@ -824,7 +846,7 @@ for (const face of FACES) {
       if (!reads) detail.push(`🔴 M2 ${face.mobileScreen} 没打开宿主 ⇒ 那一屏读到的是空的（占位）`);
       if (!back) detail.push(`🔴 M2 ${face.mobileScreen} 没有 onBack ⇒ 进去了出不来`);
     } else {
-      detail.push(`M2 ${face.mobileScreen} 读物化状态（openTaskHost）且有 onBack${testID ? '' : '（无 testID 提示）'}`);
+      detail.push(`M2 ${face.mobileScreen} 读物化状态（useTaskHost / openTaskHost）且有 onBack${testID ? '' : '（无 testID 提示）'}`);
     }
   }
 

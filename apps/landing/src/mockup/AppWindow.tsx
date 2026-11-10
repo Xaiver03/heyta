@@ -41,6 +41,9 @@ import {
   CheckCircle2,
   CircleDot,
   CircleHelp,
+  // 看板（2026-11-10）。与真应用 `view-tabs.ts:248` 的 `Columns3` 同一枚 ——
+  // R12 纪律：16px 下读得出形状（三根竖条），比语义更准的图标优先。
+  Columns3,
   Folder,
   MoreHorizontal,
   RefreshCw,
@@ -104,6 +107,7 @@ const SHELL_ICONS: Record<ShellNavIconId, LucideIcon> = {
   sun: Sun,
   'check-circle': CheckCircle2,
   'circle-dot': CircleDot,
+  columns: Columns3,
   check: Check,
   'chart-gantt': ChartGantt,
   'trending-up': TrendingUp,

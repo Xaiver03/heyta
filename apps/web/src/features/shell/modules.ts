@@ -87,6 +87,28 @@ export const SHELL_MODULES: readonly ShellModule[] = [
     defaultOn: true,
   },
   {
+    /**
+     * 看板（2026-11-10）。
+     *
+     * 🔴 它**默认开**，与「日历 / 四象限 / 习惯 / 时间线」同档 —— 判据是文件头那条口径：
+     * **"任务类"默认开**（改变"怎么看任务"），"额外玩法"默认关。
+     * 看板正是"同一批任务换一个维度看"（列=清单、卡片=任务、拖拽跨列改归属），
+     * 属于前者；而滴答清单也是**免费档就带**它
+     *（`docs/research/dida365-feature-benchmark.md` §2.6）。
+     *
+     * ⚠️ 这一项此前**不存在**，而 `MODULE_VIEW_TABS` 里早就登记了 `kanban`
+     * ⇒ `enabledModules.has('kanban')` 恒 false ⇒ **用户永远打不开看板**。
+     * 更糟的是它不会被任何判据发现：`mockup-shell-shape.spec.tsx` 的默认 rail
+     * 推导把"查不到 defaultOn"与"defaultOn: false"一起当"不该出现"，
+     * 于是那条"双向等集"判据**两边都不含它**，照样绿。
+     * 两处都已修：这里的登记项 + 那条判据的"登记缺失"出口（F-03）。
+     */
+    key: 'kanban',
+    labelKey: 'web.shell.modules.kanban.label',
+    noteKey: 'web.shell.modules.kanban.note',
+    defaultOn: true,
+  },
+  {
     key: 'habits',
     labelKey: 'web.shell.modules.habits.label',
     noteKey: 'web.shell.modules.habits.note',

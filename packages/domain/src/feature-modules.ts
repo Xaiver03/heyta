@@ -55,6 +55,13 @@
 export const FEATURE_MODULE_KEYS = [
   'calendar',
   'quadrant',
+  // 🔴 `kanban`（2026-11-10）：看板视图本来**没有任何入口可达** ——
+  // 它定义在 web 的 `MODULE_VIEW_TABS` 里、`App.tsx` 里也接了渲染分支，
+  // 但 `visibleMainTabs` 要求 `enabledModules.has('kanban')`，而它当时
+  // **不在这份词表里** ⇒ `has()` 恒 false；`rail-pref.isViewKey` 的白名单
+  // 里也没有它 ⇒ 用户手动固定也进不去。两条路都断。
+  // 取证见 `.ai-night-audit/2026-11-10/03-findings.md` F-01。
+  'kanban',
   'habits',
   'timeline',
   'focus',

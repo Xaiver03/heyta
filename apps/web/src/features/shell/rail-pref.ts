@@ -15,10 +15,41 @@ export interface RailPreference {
 
 const STORAGE_KEY = 'heyta.shell.rail';
 
+/**
+ * rail 布局里**认得的** view key。
+ *
+ * 🔴 **F-04**（2026-11-10）：这份名单曾经是**手抄**的 12 个字面量，
+ * 与 `view-tabs.ts` 的 `ViewKey` 联合类型**没有任何对账** ——
+ * `ViewKey` 加了成员而这里没跟，那个视图就**静默地不可固定**
+ *（存进 localStorage 也会被下面的 `readKeys()` 过滤掉），
+ * 而不会有任何判据变红。
+ *
+ * 实测代价：`kanban` 就是这么漏的（它与"不在 `FEATURE_MODULE_KEYS` 里"
+ * 一起构成两条入口全断，见 `.ai-night-audit/2026-11-10/03-findings.md` F-01）。
+ *
+ * ⚠️ 为什么**仍然**要有一份运行时名单、而不直接用类型：这个函数判的是
+ * **从 localStorage 读回来的 `unknown`** —— 用户可以手改、旧版本可能写进过
+ * 已删除的 key。类型在运行时不存在，所以名单必须在。
+ * 但这份名单现在是 `Record<ViewKey, true>`，**少一个 key 就是编译错误**。
+ */
+export const RAIL_VIEW_KEYS: Readonly<Record<ViewKey, true>> = {
+  tasks: true,
+  search: true,
+  calendar: true,
+  quadrant: true,
+  kanban: true,
+  habits: true,
+  focus: true,
+  timeline: true,
+  growth: true,
+  notes: true,
+  countdown: true,
+  trash: true,
+  settings: true,
+};
+
 function isViewKey(value: unknown): value is ViewKey {
-  return typeof value === 'string' && [
-    'tasks', 'search', 'calendar', 'quadrant', 'habits', 'focus', 'timeline', 'growth', 'notes', 'countdown', 'trash', 'settings',
-  ].includes(value);
+  return typeof value === 'string' && Object.hasOwn(RAIL_VIEW_KEYS, value);
 }
 
 function readKeys(value: unknown): ViewKey[] {

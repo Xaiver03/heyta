@@ -999,8 +999,13 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     //
     // 默认主段 = 4 个高频目的地（任务/日历/习惯/搜索）+ 单一 AI Agent 入口。
     // Agent 是统一聊天入口，不再拆成工具/会话多个目的地。
-    // 低频的四象限 / 时间线进入「更多」，但仍必须保持可达。
+    // 低频的**看板 / 四象限 / 时间线**进入「更多」，但仍必须保持可达。
     // 🔴 回收站**不在 rail 上了**（2026-11-04 滴答对齐 D2，搬到侧栏底部，见下面那条）。
+    //
+    // ⚠️ 2026-11-10：`看板` 进这一组，顺序 = 它在 `MODULE_VIEW_TABS` 里的声明序
+    //（quadrant → kanban → timeline）。它此前不在 `SHELL_MODULES` 里 ⇒
+    // `enabledModules.has('kanban')` 恒 false ⇒ **两条入口全断、用户永远打不开**
+    //（见 `.ai-night-audit/2026-11-10/03-findings.md` F-01）。
     const railLabels = [...rail!.querySelectorAll('button[role="tab"]')].map((b) =>
       (b.textContent ?? '').trim(),
     );
@@ -1022,7 +1027,7 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     const overflowLabels = [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map((button) =>
       (button.textContent ?? '').trim(),
     );
-    expect(overflowLabels, '低频视图必须在「更多」里可达').toEqual(['四象限', '时间线']);
+    expect(overflowLabels, '低频视图必须在「更多」里可达').toEqual(['四象限', '看板', '时间线']);
 
     const header = container.querySelector('.ht-header');
     expect(header, '没有 header').not.toBeNull();

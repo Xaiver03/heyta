@@ -543,6 +543,8 @@ export const en = {
   'web.shell.modules.calendar.note': 'See what is due on which day.',
   'web.shell.modules.quadrant.label': 'Quadrants',
   'web.shell.modules.quadrant.note': 'Sort tasks into four boxes by importance and urgency.',
+  'web.shell.modules.kanban.label': 'Board',
+  'web.shell.modules.kanban.note': 'One column per list — drag a card to move it.',
   'web.shell.modules.habits.label': 'Habits',
   'web.shell.modules.habits.note': 'Build habits and make discipline routine.',
   'web.shell.modules.timeline.label': 'Timeline',
