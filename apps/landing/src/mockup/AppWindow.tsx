@@ -281,6 +281,12 @@ export function AppWindow({
       calendar: fromTab('calendar', 'web.calendar.title'),
       search: fromTab('search', 'web.search.title'),
       quadrant: fromTab('quadrant', 'web.shell.nav.quadrant'),
+      // 看板（2026-11-10）。⚠️ 这一条正是上面那段警告说的那一发：
+      // `SHELL_VIEW_TABS` 加了 `kanban` 之后，本 Record 少这一项 ⇒
+      // **`tsc -b` 直接报 "Property 'kanban' is missing"**，构建失败。
+      // 它被 `pnpm --filter @heyta/landing build` 挡住（发布装置的 2/9 步），
+      // 而 `tsc --noEmit -p tsconfig.spec.json` **看不见**它 —— 两个 tsconfig 覆盖面不同。
+      kanban: fromTab('kanban', 'web.shell.nav.kanban'),
       habits: fromTab('habits', 'web.shell.views.habits'),
       focus: fromTab('focus', 'web.shell.views.focus'),
       timeline: fromTab('timeline', 'web.shell.views.timeline'),
