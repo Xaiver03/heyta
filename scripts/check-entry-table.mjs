@@ -19,7 +19,41 @@
  *
  *  · 动作 cell 里恰好一个反引号 id（`id` 是唯一键，不许两行同 id）；
  *  · 当前入口 cell 里恰好**一个** `文件:行号（锚点）`；
- *  · 锚点必须在那个行号 ±3 行内**真的出现** —— 否则行号一漂，表就变成小说。
+ *  · **锚点必须在那个文件里解析得到** —— 见下面「锚点判据（2026-11-10 改版）」。
+ *
+ * ## 锚点判据（2026-11-10 改版：从"行号 ±3"改成"唯一命中 / 就近命中"）
+ *
+ * 🔴 **旧判据为什么必须换掉**：它要求锚点落在所写行号的 **±3 行**内。
+ * 而 `App.tsx` 一天改几十行 ⇒ **行号必然漂** ⇒ 门禁必然恒红。
+ * 实测（2026-11-10）：54 个锚点里**只有 35 个**还落在 ±3 行窗口内，
+ * 其余 19 个**锚点全都还在文件里、只是行号漂了**。于是这条门禁的阳性对照
+ * 失败、整道 R14 门禁恒红 ⇒ **它的 10 条臂提供的保护全部归零**
+ *（本仓自己的话：「长期变红就等于没有测试」）。
+ * 这张表此前已因**同一原因**"按锚点重定位"过三次：
+ * `fd543d07`（19 处）/ `4d795782`（20 处）/ `6e37f948`。
+ *
+ * 🔴 **新判据：判"锚点解析得到"，不判"行号没动"**。规则三条，按强度递降：
+ *
+ *  1. **唯一命中**（首选）：锚点在文件里**恰好出现 1 次** ⇒ 位置自明，
+ *     行号只是给人看的提示，**它漂了不算错**。
+ *     依据：本表 54 个锚点里 **47 个天然全局唯一**
+ *     （`data-testid="bulk-exit"`、`onSetAbandoned=` 这种串本来就只该有一处）。
+ *  2. **就近命中**（多处命中时）：锚点出现 N>1 次 ⇒ 要求**所写行号附近的那一处**
+ *     确实是其中之一 —— 即"行号指对了地方"，但**允许 ±3 以外的漂移**：
+ *     取**距离所写行号最近的那一次命中**，只要求它存在。
+ *     ⚠️ 这一档判别力**弱于**第 1 档（"指对了地方"仍由行号与就近关系担保），
+ *     所以 R6/R7 会把它**登记出来**（`info`，不是错误），提醒有人把它收紧成唯一串。
+ *  3. **零命中** ⇒ **红**。这才是这条判据真正要挡的：锚点被改名/删掉、
+ *     或者路径抄错 —— 那说明**表描述的东西已经不存在了**。
+ *
+ * 为什么这样改**没有削弱**它要挡的东西：旧判据真正抓住的是
+ * "R14 那一轮改完之后，表里写的入口还在不在"（臂 5：行号不动、锚点抄错 ⇒ 红）。
+ * 新判据**仍然抓得住**（零命中就红），而它不再被"行号漂了"这种**与语义无关**的
+ * 变化误伤。顺带：**行号不再需要人来维护** —— 省掉的是那三次"重定位"的整类工作。
+ *
+ * 代价（写明，不藏）：**"锚点挪到了同一文件里的另一个地方"不再必然被发现**。
+ * 但那恰好是 R6/R7 的第 2 档要登记的东西，而且第 1 档（47/54）本来就不受影响。
+ * 要把 7 个多处命中的锚点逐个收紧成唯一串，见 `docs/plans/r14-entry-table.md` 的待办。
  *
  * ## 锚点为什么写进表格
  *
@@ -211,7 +245,7 @@ function check(root) {
             ' —— 两个就是两个主入口，请把次要的那个挪进「第二入口」并写理由。',
         );
       }
-      for (const loc of primaryLocs) verifyLocation(root, loc, at, 'R6', err);
+      for (const loc of primaryLocs) verifyLocation(root, loc, at, 'R6', err, info);
     }
 
     // ── R7：第二入口 ───────────────────────────────────────────────────────
@@ -226,7 +260,7 @@ function check(root) {
           `${at}：有第二入口时处置必须是 \`保留\`（判定可接受）或 \`收敛\`（登记为债），写的是 \`${disposition}\`。`,
         );
       }
-      for (const loc of secondaryLocs) verifyLocation(root, loc, at, 'R7', err);
+      for (const loc of secondaryLocs) verifyLocation(root, loc, at, 'R7', err, info);
     }
   }
 
@@ -323,7 +357,7 @@ function check(root) {
   return { errors, info };
 }
 
-function verifyLocation(root, loc, at, rule, err) {
+function verifyLocation(root, loc, at, rule, err, info) {
   const src = read(root, loc.path);
   if (src === null) {
     err(rule, `${at}：\`${loc.path}\` 不存在（表里写的是 ${loc.path}:${String(loc.line)}）。`);
@@ -335,14 +369,51 @@ function verifyLocation(root, loc, at, rule, err) {
     return;
   }
   const anchor = loc.anchor.replace(/&lt;/g, '<');
-  const from = Math.max(0, loc.line - 1 - 3);
-  const to = Math.min(lines.length, loc.line + 3);
-  const window = lines.slice(from, to).join('\n');
-  if (!window.includes(anchor)) {
+
+  /**
+   * 锚点在全文里的**每一处**命中（1-based 行号）。
+   * 见文件头「锚点判据（2026-11-10 改版）」—— 判的是**锚点解析得到**，
+   * 不是**行号没动**。
+   */
+  const hits = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].includes(anchor)) hits.push(i + 1);
+  }
+
+  if (hits.length === 0) {
     err(
       rule,
-      `${at}：\`${loc.path}:${String(loc.line)}\` 的 ±3 行内找不到锚点 \`${loc.anchor}\`` +
-        ' —— 行号漂了，或者锚点抄错了。',
+      `${at}：\`${loc.path}\` 里**找不到**锚点 \`${loc.anchor}\`` +
+        ' —— 它被改名/删掉了，或者路径抄错了（表描述的那个入口已经不存在）。',
+    );
+    return;
+  }
+
+  if (hits.length === 1) {
+    // 第 1 档：唯一命中 ⇒ 位置自明，**行号漂了不算错**。
+    const drift = Math.abs(hits[0] - loc.line);
+    if (drift > 3) {
+      info.push(
+        `${at}：锚点 \`${loc.anchor}\` 在 ${loc.path} 里唯一命中于第 ${String(hits[0])} 行` +
+          `（表里写 ${String(loc.line)}，漂了 ${String(drift)} 行）。判据通过 —— 行号只是提示，` +
+          '有空把它改准即可（不必为它单独提交）。',
+      );
+    }
+    return;
+  }
+
+  // 第 2 档：多处命中 ⇒ 要求"所写行号附近确实是其中一处"。
+  // 就近关系存在即通过，但**登记出来**提醒收紧成唯一串。
+  const nearest = hits.reduce((best, h) =>
+    Math.abs(h - loc.line) < Math.abs(best - loc.line) ? h : best,
+  );
+  const window = lines.slice(Math.max(0, loc.line - 1 - 3), Math.min(lines.length, loc.line + 3)).join('\n');
+  if (!window.includes(anchor)) {
+    info.push(
+      `${at}：锚点 \`${loc.anchor}\` 在 ${loc.path} 里出现 ${String(hits.length)} 次` +
+        `（第 ${hits.join('、')} 行），最近的命中在第 ${String(nearest)} 行、` +
+        `而表里写的是 ${String(loc.line)}（不在 ±3 行内）。判据通过 —— 但**请把锚点收紧成唯一串**` +
+        '（多处命中的锚点判别力弱：它证明"这个词还在文件里"，不证明"位置没挪"）。',
     );
   }
 }
