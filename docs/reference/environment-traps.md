@@ -13676,3 +13676,79 @@ react-native-web / 共享包依赖。实测单文件 26 条用例：
     **判据（可复跑）**：在 `summary` 上监听 `click` 与 `keydown`，
     分别按 `Enter` 与 `Space`，看 `click` 是否到达。**不要靠推理** ——
     这条陷阱的全部代价就是一次"想当然"。
+
+681. 🔴 **历史里的旧对象，`git rm --cached` / 强推**都清不掉 —— 而"再看一眼体积"会以为没生效**（2026-11-13 实测）
+
+    **现量**：gitee 的 push 被服务端按体积拒（`Repo size: 1583.887MB, exceeds quota 1024MB`，
+    且提示 `You only have 3 push opportunities`）。逐刀量下来是**三笔独立**的东西：
+
+    | # | 来源 | 体积 | 当时有没有门禁守着 |
+    |---|---|---|---|
+    | 1 | `.pnpm-store/` + `.npm-cache/` + `apps/<端>/evidence/` 的历史残留 | 1265 MB | `check:repo-cache-paths` 守 `HEAD`，**守不住历史** |
+    | 2 | 少数大文档被反复全文重写（`docs/plans/` 840 MB / 3163 版、`BLOCKED.md` 390 MB / 477 版） | ~2000 MB | **完全没有** |
+    | 3 | 一枚本地备份分支独占的对象（指向已废弃的 gitee 分叉线） | 899.7 MB | **完全没有** |
+
+    最终三处读数：本地 pack 从 **983 MiB → 116 MiB**（提交数 5167 不变、
+    4830 个文件的 blob 哈希与清理前**逐一致**）。
+
+    **为什么难发现（三处会骗人的中间结论）**：
+
+    ① **`git rm --cached` 只摘指针。** 第 1 笔当初就是这样处理的（提交信息写着
+       "取消跟踪 445 MB 包缓存"），文件从 `HEAD` 消失、`git status` 一片干净 ——
+       **对象仍在历史里全仓可达**，体积一分没少。`git add -f` 今天还能再塞一次。
+
+    ② **强推之后远端会更大。** 清理本地后强推，gitee 报的体积**从 1464 MB 涨到 1583 MB**。
+       原因是服务端保留旧对象，而每次强推只是再叠一层。**"本地干净了"与"远端干净了"是两件事**，
+       中间隔着一次服务端 GC（gitee 是网页设置里的按钮，GitHub 没有公开 API）。
+
+    ③ 🔴 **最贵的一课：凶手是自己建的备份分支。** 排查时先怀疑缓存、再怀疑文档，
+       都没找到 983 MiB 的去向 —— 因为 `git count-objects` 的 `in-pack` 是 64608，
+       而 `main` 可达只有 43300，差的 21308 个对象**全部合法可达**（无悬空对象），
+       所以 `git gc` 一个字节都收不回来。真正的原因是：
+       **每一枚指向旧历史的 ref 都把那一整条历史钉成"可达"** —— 我那枚
+       `backup/gitee-main-before-overwrite-*` 独自钉住 20222 个对象 / 899.7 MB。
+       判据是现算的：`comm -23 <(rev-list --objects <ref>) <(rev-list --objects main)`。
+
+    **规矩**：
+    ① 清历史垃圾用 `git filter-repo`，**不是** `git rm --cached`；
+    ② **本地与远端是两笔账**，强推不会让服务端变小，别拿推送后的报数当"清理失败"；
+    ③ **建备份分支前先算它独占多少对象**，并给它一个到期日 —— 备份是好事，
+       但**没人守的备份会变成体积黑洞**，而它每一轮都在为配额付账；
+    ④ 清理后核判据要**对内容哈希**（`ls-tree -r` 的 blob sha），不能只对提交数 ——
+       重写历史时提交数可以不变而内容已经错了。
+
+    **判据（可复跑）**：
+
+    ```sh
+    git count-objects -vH | grep size-pack          # 总量
+    # 哪个本地 ref 独自钉住了一大坨：
+    git rev-list --objects main | awk '{print $1}' | sort -u > /tmp/m.txt
+    git rev-list --objects <ref>  | awk '{print $1}' | sort -u > /tmp/r.txt
+    comm -23 /tmp/r.txt /tmp/m.txt | wc -l          # 独占对象数
+    ```
+
+    已落门禁 `pnpm check:repo-size`（预算 300 MB + 单 ref 独占 200 MB 两条判据，
+    `--self-test` 四臂）。**它只报警、不自动删** —— 备份分支可能是别的会话正在用的救生索。
+
+682. 🔴 **`filter-repo` 的 `--paths-from-file` 会移除 `origin`，且旧起点会让射程闸崩**（2026-11-13 实测）
+
+    **现量**：跑完 `git filter-repo --invert-paths --paths-from-file …` 后：
+
+    ① **`origin` remote 被自动删掉**（它的标准行为，防误推）。下一次 push 前必须
+       `git remote add origin <url>` 补回来 —— 否则会以为"推送莫名其妙失效了"。
+
+    ② **pre-push 的字节臂当场崩**（`brc: unbound variable`）。两个独立缺陷叠在一起：
+
+       - 脚本第 45 行写的是 `"…退 $brc＝这一臂…"` —— `$brc` **紧跟全角字符**，
+         在 `set -u` 下某些 locale 会把多字节首字节当作变量名的一部分，去找
+         `brc\xef` 这个不存在的变量 ⇒ 崩。**同一个形状在第 21、49 行还有两处**
+         （`${BAR}。`、`${brc}）`），只是这次没触发。修法是加花括号 `${brc}`。
+       - 更根本的那条：历史重写后 `remote_sha` 是**旧世界的 sha**，本地已不存在 ⇒
+         `$remote_sha..$local_sha` 取不出 ⇒ 按 fail-closed 判"这一臂没跑成"而拦死。
+         **语义上这时该扫全历史**（所有提交都是首次公开，射程只会更宽）。
+         已修：远端旧值不在本地时回退到 `$local_sha` 全历史射程，**且不影响正常增量**
+         （远端旧值可见时仍走精确增量 —— 实测正常推送只扫 1 笔，没被放大）。
+
+    **判据（可复跑）**：拿 `remote_sha` 填一个本地不存在的 sha，喂给
+    `pre-push-bytearm`，看它是**回退并扫全历史**，还是崩/拦；再拿一个本地存在的
+    父提交填进去，看它是否仍只扫那 1 笔。
