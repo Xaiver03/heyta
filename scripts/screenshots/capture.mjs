@@ -164,7 +164,7 @@ async function openViewControl(page, target, locale) {
     .or(page.getByRole('button', { name: target.readyText, exact: false }))
     .first();
   try {
-    await direct.waitFor({ state: 'attached', timeout: 1_500 });
+    await direct.waitFor({ state: 'attached', timeout: 5_000 });
     return { control: direct, viaMenu: false };
   } catch {
     const moreLabel = locale === 'en' ? 'More' : '更多';
@@ -187,7 +187,15 @@ async function openViewControl(page, target, locale) {
     // “不可点击”；这里调用的仍是同一枚真实按钮的 click handler，不写 React 状态，
     // 也不绕过随后对菜单项和 aria-selected 的回读。
     await more.evaluate((element) => element.click());
-    const menuItem = page.getByRole('menuitem', { name: target.readyText, exact: false }).first();
+    // 🔴 菜单项的"形状"有两套，和选中态一样：
+    //    · 桌面「更多」弹出层用的是 `role="menuitem"`
+    //    · **窄屏抽屉（`CompactRailNavigation`）里的目的地是普通 `<button>`**，
+    //      带 `data-testid="rail-view-{view}"`，没有 menuitem role
+    // 2026-11-14 实测：只找 menuitem 会让 MW02/MW03 在 5s 上超时。
+    const byTestId = target.view ? page.getByTestId(`rail-view-${target.view}`) : null;
+    const menuItem = byTestId !== null && (await byTestId.count()) > 0
+      ? byTestId.first()
+      : page.getByRole('menuitem', { name: target.readyText, exact: false }).first();
     await menuItem.waitFor({ state: 'attached', timeout: 5_000 });
     return { control: menuItem, viaMenu: true };
   }
@@ -200,14 +208,46 @@ async function openViewControl(page, target, locale) {
 async function enableTargetModules(page, target) {
   const modules = target.enableModules ?? [];
   if (modules.length === 0) return;
+  // 🔴 先关遮挡物，再点头像。
+  //
+  // 2026-11-14 实测：`--only W04` 卡在 `getByTestId('account-menu-settings')`
+  // 30 秒超时 —— 因为首启同意闸门（`position: fixed` 的遮罩）还盖在头像上，
+  // `force: true` 点的是遮罩，菜单根本没开。`dismissOverlays` 原来只排在
+  // `openViewControl` 之后，于是"需要先开模块"的那两个目标永远走不到导航那一步。
+  // ⇒ 遮罩必须在**任何点击之前**清掉，不是只在导航之前。
+  await dismissOverlays(page, target.dismissTexts ?? []);
   const avatar = page.getByTestId('account-menu-avatar');
   await avatar.waitFor({ state: 'attached', timeout: 20_000 });
   await avatar.click({ force: true });
-  await page.getByTestId('account-menu-settings').click({ force: true });
+  const settingsItem = page.getByTestId('account-menu-settings');
+  await settingsItem.waitFor({ state: 'attached', timeout: 20_000 });
+  await settingsItem.click({ force: true });
   for (const key of modules) {
     const toggle = page.getByTestId(`feature-modules-${key}`);
     await toggle.waitFor({ state: 'attached', timeout: 20_000 });
-    if (!(await toggle.isChecked())) await toggle.check({ force: true });
+    if (!(await toggle.isChecked())) {
+      // 🔴 这个开关是 `<input role="switch" type="checkbox">`，**视觉隐藏**（外观由
+      // 包着它的 label 画）。Playwright 的 `check({force:true})` 仍会在
+      // "Element is not visible" 上失败（2026-11-14 实测），所以走元素自身的
+      // `click()` —— 它触发的仍是产品自己的 onChange，**不是**注入状态；
+      // 随后回读 `isChecked()` 确认真的打开了，读不到就抛。
+      await toggle.evaluate((el) => el.click());
+      await page.waitForTimeout(250);
+      if (!(await toggle.isChecked())) {
+        throw new Error(`模块开关「${key}」点了但没打开 —— 截图会拍到一个没有该模块的界面`);
+      }
+    }
+  }
+  // 勾完要**离开设置页**：设置是一个 view，留着它会让随后的截图落在设置面上
+  // （症状就是"产物空白、contentRatio 很低"）。用 rail 的「任务」切回去 ——
+  // 那是产品自己的路径，不是改 React 状态。
+  const backToTasks = page
+    .getByRole('tab', { name: '任务', exact: false })
+    .or(page.getByRole('button', { name: '任务', exact: false }))
+    .first();
+  if (await backToTasks.count()) {
+    await backToTasks.click({ force: true }).catch(() => {});
+    await page.waitForTimeout(400);
   }
 }
 
@@ -282,6 +322,20 @@ async function applySeed(page, site, target) {
     );
   }
   await settings.click({ force: true });
+
+  // 🔴 设置是「左栏分组 + 内容区**一次只显示一组**」。`import-panel` 住在
+  //    「数据与同步」组里，而打开设置默认落在「账号」组 ⇒ 它虽然 attached，
+  //    但不可见，`import-run` 的 click 会一直卡在 "waiting for element to be
+  //    visible, enabled and stable"（2026-11-14 实测 W07 就是这里超时 30s）。
+  //    所以先走产品自己的导航切组，再操作 —— 不改 hidden，不注入状态。
+  const dataSection = page
+    .getByRole('tab', { name: '数据与同步', exact: false })
+    .or(page.getByRole('button', { name: '数据与同步', exact: false }))
+    .first();
+  if (await dataSection.count()) {
+    await dataSection.click({ force: true }).catch(() => {});
+    await page.waitForTimeout(300);
+  }
 
   await page.getByTestId('import-panel').waitFor({ state: 'attached', timeout: 20_000 });
   await page.getByTestId('import-file').setInputFiles(absPath);
@@ -432,14 +486,28 @@ for (const job of jobs) {
       // 回读：该 tab 必须真的变成选中态。等不到就报错，绝不含糊地往下截。
       // 菜单项点击后会关闭菜单，并把当前视图提升回 rail；因此菜单路径要从
       // 新渲染的 tab 读取 aria-selected，而不是从已卸载的 menuitem 读取。
+        // 菜单路径要从**新渲染的 tab** 读选中态，而不是从已卸载的 menuitem 读。
+        // 窄屏抽屉里没有 `role=tab`（见上面 `rail-view-{view}` 那段），所以按 testid 优先。
         const selectedControl = opened.viaMenu
-        ? page.getByRole('tab', { name: target.readyText, exact: false }).first()
+        ? (target.view !== undefined
+            ? page.getByTestId(`rail-view-${target.view}`).first()
+            : page.getByRole('tab', { name: target.readyText, exact: false }).first())
         : control;
         const deadline = Date.now() + 5_000;
         let selected = false;
         while (Date.now() < deadline) {
+          // 🔴 两种选中态都要认：
+          //    · 桌面 rail（`RailNavigation`）的 tab 用 `aria-selected`
+          //    · **窄屏抽屉（`CompactRailNavigation`）用的是 `aria-current="page"`**
+          //      （它的 tab 是普通 `<button>`，不是 `role=tab`）
+          // 2026-11-14 实测：只读 `aria-selected` 会让 MW01 永远判"没切换"，
+          // 而点击其实成功了 —— 报错还会把人引向"有遮挡物"的错误方向。
           if ((await selectedControl.getAttribute('aria-selected')) === 'true') {
           selected = true;
+            break;
+          }
+          if ((await selectedControl.getAttribute('aria-current')) === 'page') {
+            selected = true;
             break;
           }
           await page.waitForTimeout(100);
