@@ -3393,7 +3393,7 @@ export const en = {
   'mobile.detail.project.newPlaceholder': 'List name',
   // 与 zh 同一批：空态是 web 侧栏与移动端共用的一句话，前缀必须是 `common.`。
   'common.organizer.lists.empty': 'No lists yet',
-  'common.organizer.lists.empty.hint': 'Use the + above to create a list.',
+  'common.organizer.lists.empty.hint': 'Use the + button to create a list.',
   'mobile.lists.nameLabel': 'List name',
   'mobile.lists.newPlaceholder': 'Name your new list',
   'mobile.lists.add': 'New list',
@@ -3446,7 +3446,7 @@ export const en = {
   'common.habits.amount.minus': 'Decrease {name} by 1',
   'mobile.profile.section.tags': 'Tags',
   'common.organizer.tags.empty': 'No tags yet',
-  'common.organizer.tags.empty.hint': 'Use the + above to create a tag.',
+  'common.organizer.tags.empty.hint': 'Use the + button to create a tag.',
   'mobile.tags.nameLabel': 'Tag name',
   'mobile.tags.newPlaceholder': 'Name your new tag',
   'mobile.tags.add': 'New tag',

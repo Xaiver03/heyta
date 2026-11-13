@@ -3690,7 +3690,7 @@ export const zhCN = {
   // 它原来叫 `mobile.lists.*`，于是 web 那边要么另写一份、要么不接线 ——
   // 两个结果都不对（web 侧栏空清单时**什么都不显示**就是后者）。
   'common.organizer.lists.empty': '还没有清单',
-  'common.organizer.lists.empty.hint': '点右侧 + 新建清单。',
+  'common.organizer.lists.empty.hint': '点「+」新建清单。',
   'mobile.lists.nameLabel': '清单名称',
   'mobile.lists.newPlaceholder': '给新清单起个名字',
   'mobile.lists.add': '新建清单',
@@ -3754,7 +3754,7 @@ export const zhCN = {
   // 清单回答"它属于哪个容器"（一个），标签回答"它还跟什么有关"（多个）。
   'mobile.profile.section.tags': '标签',
   'common.organizer.tags.empty': '还没有标签',
-  'common.organizer.tags.empty.hint': '点右侧 + 新建标签。',
+  'common.organizer.tags.empty.hint': '点「+」新建标签。',
   'mobile.tags.nameLabel': '标签名称',
   'mobile.tags.newPlaceholder': '给新标签起个名字',
   'mobile.tags.add': '新建标签',

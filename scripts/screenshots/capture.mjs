@@ -88,7 +88,13 @@ if (appStore) {
   }
 }
 
-if (only) jobs = jobs.filter((job) => job.target.id === only);
+if (only) {
+  // 支持 `--only W01,W02` —— 单值写法照旧（`--only W01` 是 job.target.id 的精确匹配）。
+  // 为什么要有这个：web 的 11 张图分两批（桌面 8 + 移动 3），逐个调用会把
+  // `manifest.json` 覆盖成"最后一张"，于是"拍了 11 张、索引只记 1 张"。
+  const wanted = new Set(only.split(',').map((id) => id.trim()).filter(Boolean));
+  jobs = jobs.filter((job) => wanted.has(job.target.id));
+}
 if (jobs.length === 0) {
   console.error('没有匹配的目标');
   process.exit(1);
@@ -98,7 +104,20 @@ for (const site of Object.values(SITES)) assertSafeUrl(site.baseUrl);
 
 console.log(`准备截 ${jobs.length} 张\n`);
 
-const browser = await chromium.launch();
+/**
+ * 浏览器来源：默认用 Playwright 自带的 chromium；设 `HEYTA_SHOT_CHANNEL=chrome`
+ * 则改用**本机已安装的 Chrome**（`channel`）。
+ *
+ * 🔴 为什么要这个开关：Playwright 的浏览器缓存默认落在 `~/Library/Caches/ms-playwright`，
+ * 而受限环境（文件沙箱 / CI 只给 workspace 写权限）下 `mkdir` 那一步会 EPERM，
+ * `npx playwright install` 直接失败。此时**不该让"截图"这件事整体不可用** ——
+ * 系统 Chrome 是同一引擎，尺寸与 `deviceScaleFactor` 由 context 决定，产物口径不变。
+ * 判据：`HEYTA_SHOT_CHANNEL=chrome node scripts/screenshots/capture.mjs --only W01`
+ * 能出图，且 `screenshot:verify` 对它照样判尺寸。
+ */
+const browser = await chromium.launch(
+  process.env.HEYTA_SHOT_CHANNEL ? { channel: process.env.HEYTA_SHOT_CHANNEL } : {},
+);
 const written = [];
 const failed = [];
 
@@ -382,12 +401,18 @@ for (const job of jobs) {
         await openSettingsView(page);
       } else {
         const opened = await openViewControl(page, target, locale);
-        const control = opened.control;      // ⚠️ 只等 `attached`，**不等 `visible`**：实测移动视口（390px）下标签栏被压成
-        //    8px 宽，从"四象限"往后的标签**整段溢出到屏幕外**
-      //    （四象限 x=312..392 已越界、习惯 x=396..464 完全在屏外）。
-      //    它们有盒子、`isVisible()` 也返回 true，但 `waitFor({state:'visible'})`
-      //    会因为布局竞态等不到 —— MW01/MW03 过、MW02 挂。
-      //    这也是**一个真实的移动端布局缺陷**，交 UI 那条线修。
+        const control = opened.control;      // ⚠️ 只等 `attached`，**不等 `visible`**。
+        //    2026-10 当时记的是：「实测移动视口（390px）下标签栏被压成 8px 宽，
+        //    从"四象限"往后的标签整段溢出到屏幕外（四象限 x=312..392 已越界、
+        //    习惯 x=396..464 完全在屏外）……这也是一个真实的移动端布局缺陷，交 UI 那条线修。」
+        //    🔴 **2026-11-14 复量：那条观察已不成立** —— 窄屏导航改成了抽屉
+        //    （`CompactRailNavigation`），隐藏时整列宽高为 0，**没有溢出**。
+        //    读数（`node scripts/.probe-mobile-rail.mjs`，390×844）：
+        //    `total=19 · overflowRight=0 · overflowLeft=0`；那 12 个 `w=0` 的是
+        //    抽屉收起时的隐藏节点，不是被压扁的标签。
+        //    ⇒ 保留原句是为了让人看到"这条警告存在过"，**不要照它去改布局**。
+        //    现在仍然只等 `attached` 的理由只剩一条：隐藏节点 `isVisible()` 为 false，
+        //    而点击前会先 `dismissOverlays` + `scrollIntoViewIfNeeded` 把它带出来。
         await control.waitFor({ state: 'attached', timeout: 20_000 });
       // 🔴 导航**之前**清一次遮挡物（理由见 `dismissOverlays` 的注释：
       //    遮罩盖住 rail 时，`force: true` 点的是遮罩，视图不切）。

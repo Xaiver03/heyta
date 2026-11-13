@@ -1,7 +1,7 @@
 # screenshots/ —— 截图产物（**不是产品现状**）
 
-> ⚠️ **本目录里没有一张图能代表"今天的界面"。** 它们是一次次 `pnpm screenshot:capture`
-> 跑出来的**历史产物**，跨越了至少三代 shell。引用前先读下面的时间表。
+> ⚠️ **本目录里没有一张图能代表"今天的界面"**，除非它的拍摄日就是今天。
+> 它们是一次次 `pnpm screenshot:capture` 跑出来的**历史产物**，跨越了至少三代 shell。
 >
 > 想说明"产品现在长什么样" ⇒ 用 `docs/operations/software-copyright/evidence/screenshots/`
 > （2026-11-08 拍，1920×1080，每张带断言），或**重新拍**（见下）。
@@ -13,7 +13,7 @@
 ```bash
 pnpm screenshot:list        # 列出全部目标（不启动浏览器）
 pnpm screenshot:capture     # 拍 web + landing（需要应用在 localhost 跑起来）
-pnpm screenshot:capture -- --only W01
+pnpm screenshot:capture -- --only W01,W02   # 多个 id 用逗号（单值写法照旧）
 pnpm screenshot:app-store   # 拍 App Store 三尺寸
 pnpm screenshot:verify      # 校验产物尺寸与空白
 ```
@@ -21,6 +21,18 @@ pnpm screenshot:verify      # 校验产物尺寸与空白
 - 目标注册表：`scripts/screenshots/targets.mjs`（**唯一事实源**）
 - 拍摄实现：`scripts/screenshots/capture.mjs`
 - 就绪判据是 `readyText`（真实词条），不是 `sleep` —— 所以**改文案会让重拍失败**，那是设计如此。
+
+### 🔴 浏览器从哪来
+
+默认用 Playwright 自带的 chromium。**受限环境**（文件沙箱 / CI 只给 workspace 写权限）下
+`npx playwright install` 会在 `mkdir ~/Library/Caches/ms-playwright` 这一步 EPERM，此时：
+
+```bash
+HEYTA_SHOT_CHANNEL=chrome pnpm screenshot:capture
+```
+
+用**本机已装的 Chrome**（同一引擎，尺寸与 `deviceScaleFactor` 由 context 决定，产物口径不变）。
+这一条是 2026-11-14 加的，判据是 `--only W01` 能出图且 `screenshot:verify` 照样判尺寸。
 
 ---
 
@@ -34,22 +46,42 @@ pnpm screenshot:verify      # 校验产物尺寸与空白
 | **B** | 2026-09-29 起 | tab 挪进侧栏；rail 上段 = 4 项 + 「更多」 |
 | **C** | 2026-11-02 起 | 页头五组控件收进一枚 `⋯`；任务行动作收进详情面 |
 
-| 文件 | 拍摄日 | 代 | 还能用吗 |
+### 现量（2026-11-14 重拍后）
+
+| 文件 | 拍摄日 | 代 | 能引用吗 |
 |---|---|---|---|
-| `web-desktop/W03-习惯.png` | 2026-09-28 | **A** | ❌ 画的是已废弃的顶部 tab 形态 |
-| `web-mobile/MW01-移动端任务.png` | 2026-09-28 | **A** | ❌ 同上，且当次布局有溢出（「AI 工具调用」被挤成竖排） |
-| `web-mobile/MW03-移动端习惯.png` | 2026-09-28 | **A** | ❌ |
-| `web-desktop/W02-四象限.png` | 2026-10-06 | B | ⚠️ 结构对，但四象限后来有改动 |
-| `web-desktop/W04-番茄钟.png` | 2026-10-06 | B | ⚠️ |
-| `web-desktop/W05-时间线.png` | 2026-10-06 | B | ⚠️ |
-| `web-desktop/W07-回收站.png` | 2026-10-06 | B | ⚠️ |
-| `web-mobile/MW02-移动端四象限.png` | 2026-10-06 | B | ⚠️ |
-| `web-desktop/W01-任务.png` | 2026-11-02 | **C 前夜** | ❌ 任务行还挂着 9 个动作、页头 3 个控件 —— 这两样都在 11-02 当天被收走 |
-| `web-desktop/W06-成长.png` | 2026-11-02 | C | ✅ 结构可用 |
-| `web-desktop/W08-设置.png` | 2026-11-09 | C | ✅ 结构可用（但内容密度只有 8.6%，见 `manifest.json`） |
-| `web-desktop/*-en-*.png` | 2026-10-01 / 10-10 | B | ⚠️ 英文版，结构同 B 代 |
+| `web-desktop/W01-任务.png` | **2026-11-14** | C | ✅ |
+| `web-desktop/W02-四象限.png` | **2026-11-14** | C | ✅ |
+| `web-desktop/W03-习惯.png` | **2026-11-14** | C | ✅（原 09-28 那张 A 代图已被覆盖） |
+| `web-desktop/W05-时间线.png` | **2026-11-14** | C | ✅ |
+| `web-desktop/W08-设置.png` | **2026-11-14** | C | ✅ |
+| `web-desktop/W04-番茄钟.png` | 2026-10-06 | B | ❌ 见「重拍阻塞」① |
+| `web-desktop/W06-成长.png` | 2026-11-02 | C 前夜 | ❌ 见「重拍阻塞」① |
+| `web-desktop/W07-回收站.png` | 2026-10-06 | B | ❌ 见「重拍阻塞」② |
+| `web-mobile/MW01-移动端任务.png` | 2026-09-28 | **A** | ❌ 见「重拍阻塞」③ |
+| `web-mobile/MW02-移动端四象限.png` | 2026-10-06 | B | ❌ 见「重拍阻塞」③ |
+| `web-mobile/MW03-移动端习惯.png` | 2026-09-28 | **A** | ❌ 见「重拍阻塞」③ |
+| `web-desktop/*-en-*.png` | 2026-10-01 / 10-10 | B | ❌ 未重拍（英文版走同一套 `readyText`，改 `locale` 即可） |
+| `app-store/**` | 2026-10-06 | B | 🔴 **iOS 提审前必须重拍** |
 | `landing/L0*.png` | 2026-10-05 | — | ⚠️ 官网自有版本节奏，与 shell 无关 |
-| `app-store/**` | 2026-10-06 | B | 🔴 **iOS 提审前必须重拍** —— 展示 B 代界面等于展示一个两个月前、中间改过两次的产品 |
+
+### 重拍阻塞（可复现，别当成"以后再说"）
+
+① **W04 / W06（需要开模块）**：`enableTargetModules()` 走「头像 → 设置 → 勾
+`feature-modules-{key}`」打开番茄钟/成长，**但勾完没有退出设置页**，随后截到的是设置面 ⇒
+产物空白（`contentRatio` 低）。修法：勾完 `Escape` 或点 rail 切回任务视图，再走正常的
+`openViewControl`。
+
+② **W07（回收站）**：夹具走产品自己的「从备份还原」通道，卡在
+`getByTestId('import-run')` 一直不可点（30s 超时）。这条需要先弄清还原面板在那一步
+等什么（选文件？预检？），不是放宽超时能解决的。
+
+③ **MW01–MW03（390 宽）**：窄屏导航已改成**抽屉**（`CompactRailNavigation`），
+`role=tab` 命中的是抽屉收起时的隐藏节点（宽高 0），`force: true` 点击不生效，
+回读 `aria-selected` 永远不是 `true`。修法：窄屏先点开抽屉触发按钮，再点目标。
+⚠️ 顺带记一条**已被证伪的旧观察**：脚本注释里曾写"390px 下标签栏溢出屏幕外"，
+2026-11-14 用 `node scripts/screenshots/probe-mobile-rail.mjs` 复量是
+`total=19 · overflowRight=0 · overflowLeft=0` —— **不成立**，别再照它改布局。
 
 ---
 
@@ -58,9 +90,9 @@ pnpm screenshot:verify      # 校验产物尺寸与空白
 它是**最后一次** `screenshot:capture` 的运行记录（`capturedAt` + 那一次的产物），
 **不是本目录的清单**。
 
-- 现量：`targets: 1`、只登记 `W08-设置.png` ⇒ 最后一次跑的是 `--only W08`。
-- 所以"manifest 里没有某张图" ≠ "那张图不存在"；反过来"manifest 说 11-02"也
-  ≠ "那张图是 11-02 拍的"（`W08` 的 mtime 是 11-09）。
+- 现量：`targets: 1`、只登记 `W01-任务.png` ⇒ 最后一次跑的是 `--only W01`。
+- 所以"manifest 里没有某张图" ≠ "那张图不存在"；反过来"manifest 说某天"也
+  ≠ "目录里每张都是那天拍的"。
 
 要看全目录的时效，读上面那张表，不要读 manifest。
 
