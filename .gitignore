@@ -114,6 +114,19 @@ blob-report/
 e2e/.playwright/
 e2e/.cache/
 
+# 🔴 Playwright 的**浏览器二进制**缓存目录（`PLAYWRIGHT_BROWSERS_PATH` 指到仓根时产生）。
+#
+# 为什么单列一条、且必须挡在仓根：它长在**仓库根目录**，形状是一个带 `.links/` 的目录。
+# 当前实测只有 1 个 link 文件 / 4 KB —— 但一旦真把 Chromium/Firefox/WebKit 装进来，
+# 就是**每枚 ~150-300 MB、三个引擎合计 1 GB 上下**（与 `~/.cache/ms-playwright` 同级）。
+# 而它**没有被任何既有规则挡住**：`playwright-report/`、`e2e/.playwright/` 都只管报告与
+# 运行态，`node_modules` 也不涵盖它 ⇒ 一次 `git add -A` 就会把 1 GB 二进制提交进历史，
+# 而那种错误事后请不出去（要重写历史 + 双端强推，见陷阱 #681）。
+#
+# 这正是 2026-11-13 那趟 gitee 超配额（1698 MB / 1024 MB）之后立的规矩：
+# **凡是"跑一次就长出来、且能按 lockfile 重建"的目录，一律先挡住，不等它长大**。
+.playwright-browsers/
+
 
 #
 # Python 字节码缓存（`research/tools/*.py` 跑一次就会长出来）
