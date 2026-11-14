@@ -3581,6 +3581,11 @@ export const en = {
   // Mirrors the zh side: shown only when the server **explicitly** says entitled / denied.
   'mobile.profile.entitlement.entitled': 'Hosted sync is on',
   'mobile.profile.section.language': 'Language',
+  'mobile.profile.section.appearance': 'Appearance',
+  'mobile.profile.theme.hint': 'This device only — it does not follow your account.',
+  'mobile.profile.theme.system': 'Match system',
+  'mobile.profile.theme.light': 'Light',
+  'mobile.profile.theme.dark': 'Dark',
   'mobile.profile.section.lists': 'Lists',
   // The auth entry sits in the top card of this screen so it is one tap away;
   // the bottom bar stays at five tabs (spec §2-A8).

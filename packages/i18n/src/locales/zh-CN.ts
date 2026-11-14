@@ -3911,6 +3911,12 @@ export const zhCN = {
   // （`entitled` / `denied`），未配置与探测失败一律不显示 —— 见 `EntitlementSection.tsx`。
   'mobile.profile.entitlement.entitled': '官方托管同步已开启',
   'mobile.profile.section.language': '语言',
+  // 手动主题（2026-11-14）。三档：跟随系统 / 浅色 / 深色。
+  'mobile.profile.section.appearance': '外观',
+  'mobile.profile.theme.hint': '只影响这台设备，不跟着账号同步。',
+  'mobile.profile.theme.system': '跟随系统',
+  'mobile.profile.theme.light': '浅色',
+  'mobile.profile.theme.dark': '深色',
   'mobile.profile.section.lists': '清单',
   // 🔴 认证入口在这一屏的**顶部卡片**（一级可见）—— 规范 §3.1 的「前置」落点。
   //    底部标签必须保持 5 个（规范 §2-A8），所以它是入口卡片，不是第 6 个 tab。

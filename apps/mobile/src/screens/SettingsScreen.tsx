@@ -52,6 +52,7 @@ import {
   Button,
   Card,
   Chip,
+  ChoiceRows,
   IconButton,
   SectionHeader,
   Stack,
@@ -59,6 +60,7 @@ import {
   TextField,
 } from '../ui/kit';
 import { Icon } from '../ui/icons';
+import { useThemePreference } from '../prefs/theme-preference';
 import { useLocalePreference } from '../i18n/locale-preference';
 import { useTokens } from '../theme';
 import { useMobileNavigation } from '../nav/navigation';
@@ -233,6 +235,7 @@ export function SettingsScreen({
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const insets = useSafeAreaInsets();
   const { locale, setLocale } = useLocalePreference();
+  const { scheme, setScheme } = useThemePreference();
   const navigation = useMobileNavigation();
 
   /**
@@ -693,6 +696,39 @@ export function SettingsScreen({
   /** G5 外观与语言。 */
   const renderAppearance = (): React.JSX.Element => (
     <>
+      {/*
+        🔴 「外观」这一段是 2026-11-14 补的。此前这一页只有语言，组名却叫
+        「外观与语言」—— 名不副实，更早一次修法是把它改名成「语言」。
+        但那只是绕开：用户在深色系统上想用浅色时**没有出路**。
+        现在 `HeytaUiProvider` 有了 `schemeOverride`，组名可以光明正大改回「外观」。
+
+        三档而不是两档：少了「跟随系统」就只能二选一，而"用户改系统设置时
+        还得回来再改一次"是没必要的负担。
+      */}
+      <SettingsSection
+        variant="card"
+        testID="settings-theme"
+        title={t('mobile.profile.section.appearance')}
+        note={t('mobile.profile.theme.hint')}
+        leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
+      >
+        <ChoiceRows
+          /*
+           * 🔴 **不传 `groupLabel`**：外层 `SettingsSection` 的 `title` 已经是「外观」，
+           * 再给一条组标签就是同一句话说两遍（真机量到标题 y=408、组标签 y=594）。
+           * `groupLabel` 的用途是"同一张面板里多组单选时区分它们"——
+           * 这里只有一组。
+           */
+          value={scheme}
+          onChange={setScheme}
+          options={[
+            { key: 'system', label: t('mobile.profile.theme.system') },
+            { key: 'light', label: t('mobile.profile.theme.light') },
+            { key: 'dark', label: t('mobile.profile.theme.dark') },
+          ]}
+          testID="settings-theme-choice"
+        />
+      </SettingsSection>
       <SettingsSection
         variant="card"
         testID="profile-language"

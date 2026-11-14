@@ -38,6 +38,7 @@ import { I18nProvider, useI18n, type Locale } from '@heyta/i18n';
 import { ThemeProvider, useTheme, useTokens } from './theme';
 import { LocalePreferenceProvider } from './i18n/locale-preference';
 import { resolveDeviceLocale } from './i18n/locale';
+import { ThemePreferenceProvider, useThemeSchemeState } from './prefs/theme-preference';
 import { TabBar } from './nav/TabBar';
 import { NavigationProvider, useMobileNavigation } from './nav/navigation';
 import { TasksScreen } from './screens/TasksScreen';
@@ -316,12 +317,23 @@ export default function App(): React.JSX.Element {
  */
 function LocaleHost(): React.JSX.Element {
   const [locale, setLocale] = useState<Locale>(resolveDeviceLocale);
+  /*
+   * 🔴 手动主题（2026-11-14）。`ThemeProvider` 从今天起接受 `schemeOverride`：
+   * 之前移动端只能跟随系统，而设置面的组名曾叫「外观与语言」—— 名不副实。
+   * 现在组名可以改回「外观」，因为底下真的有那三档了。
+   *
+   * 状态放在这一层（而不是设置页里）：换主题要重绘**整棵树**，
+   * 状态在屏幕里的话，切走再切回来就丢了。
+   */
+  const { scheme, setScheme } = useThemeSchemeState();
   return (
     <I18nProvider locale={locale}>
-      <ThemeProvider locale={locale}>
+      <ThemeProvider locale={locale} schemeOverride={scheme === 'system' ? null : scheme}>
+      <ThemePreferenceProvider scheme={scheme} setScheme={setScheme}>
       <LocalePreferenceProvider locale={locale} setLocale={setLocale}>
         <App />
       </LocalePreferenceProvider>
+      </ThemePreferenceProvider>
       </ThemeProvider>
     </I18nProvider>
   );

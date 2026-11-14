@@ -291,6 +291,18 @@ export function useHeytaUiLocale(): 'zh-CN' | 'en' {
 
 export interface HeytaUiProviderProps {
   readonly locale?: 'zh-CN' | 'en';
+  /**
+   * 强制浅色/深色，覆盖系统配色。`null` / 省略 = 跟随系统。
+   *
+   * 🔴 为什么是**一个 prop**而不是让宿主自己 `resolveHeytaUiTheme` 再传 `value`：
+   * 那等于让每个端重新解析一遍主题（`reduceMotion` / `reducedTransparency` /
+   * 字体都要自己接），而 `check:theme` 明令禁止第二张 token 表。
+   * 这里只换"输入里的 scheme 那一格"，解析仍然只有一份。
+   *
+   * 移动端 2026-11-14 起用它接手动主题（`apps/mobile/src/prefs/theme-preference.tsx`）；
+   * web 有自己的 `data-theme` 开关，不传这个 prop。
+   */
+  readonly schemeOverride?: 'light' | 'dark' | null | undefined;
   /** 宿主自己解析好的主题值（有应用级主题开关的端才需要传）。省略则自动解析。 */
   readonly value?: HeytaUiTheme;
   /** 宿主已打包的字体名清单，透传给 `native.fontSans` / `native.fontMono`。 */
@@ -302,9 +314,12 @@ export function HeytaUiProvider({
   locale,
   value,
   packagedFonts,
+  schemeOverride,
   children,
 }: HeytaUiProviderProps): React.JSX.Element {
-  const scheme = useColorScheme();
+  const systemScheme = useColorScheme();
+  // hooks 无条件调用，所以先取系统值再决定用哪个 —— 条件式 hook 是"有时才崩"的典型。
+  const scheme = schemeOverride ?? systemScheme;
   const reducedMotion = useReducedMotion();
   const reducedTransparency = useReducedTransparency();
   // 🔴 **继承外层**：一个宿主里嵌套挂多层 Provider 是既成事实（apps/web 有 25 处
