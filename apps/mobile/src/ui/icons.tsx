@@ -65,6 +65,7 @@ import {
   Smartphone,
   Square,
   SquareCheck,
+  Wrench,
   StickyNote,
   Tag,
   Target,
@@ -183,6 +184,12 @@ const ICONS = {
    * 注释写着"图标注册表里没有一枚 `action.disclose`……登记为欠账"。
    * 现在补上，账号卡就能画出"这里能进"。
    */
+  /**
+   * AI 工具箱。原来它和「AI 助手」共用 `AssistantMark` ——
+   * 两行名字都以「AI」开头、图标又一样，读起来是同一件事。
+   * 图标在这类列表里是**唯一的区分线索**，撞图标等于丢线索。
+   */
+  'action.toolbox': Wrench,
   'action.disclose': ChevronRight,
   'action.next-month': ChevronRight,
   // 🔴 「返回」与「上一月」是**不同语义**，所以用不同字形：`ArrowLeft` 是

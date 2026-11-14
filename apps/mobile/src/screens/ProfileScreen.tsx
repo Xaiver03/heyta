@@ -1067,7 +1067,12 @@ export function ProfileScreen(): React.JSX.Element {
       kind: 'action',
       testID: 'profile-entry-ai-toolbox',
       label: t('mobile.ai.toolbox.entry'),
-      leading: <AssistantMark size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />,
+      /*
+       * 🔴 2026-11-15：原来与上一行共用 `AssistantMark` ——
+       * 两行名字都以「AI」开头、图标一模一样，在「全部功能」页里读起来是同一件事。
+       * 图标在这类列表里是**唯一的区分线索**（同「设置目录」那一屏的教训）。
+       */
+      leading: <Icon name="action.toolbox" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => setToolboxOpen(true),
     },
     {
