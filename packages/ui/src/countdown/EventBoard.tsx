@@ -244,6 +244,24 @@ function makeStyles(tokens: HeytaNativeTokens) {
     chipText: { color: tokens['color.foreground'] },
     input: {
       flex: 1,
+      /*
+       * 🔴 2026-11-15：加 `minWidth`，让这一行在**窄屏**上真的换行。
+       *
+       * 容器早有 `flexWrap: 'wrap'`，但 `flex: 1` 的元素永远不会触发换行 ——
+       * 它会一路压缩，于是 360dp 上输入框只剩 ~150dp 宽，用中文起名字挤成一团
+       * （真机实测那一行：输入框 153dp + 「选日期」+「添加」）。
+       *
+       * 用百分比而不是像素：设计系统不许裸 px，而 45% 在宽屏（web 那侧）
+       * 仍然与两个按钮排在同一行，只有窄屏才会把按钮挤到下一行。
+       */
+      /*
+       * `flexBasis: '100%'` = 输入框**独占一行**，两个按钮（选日期 / 添加）排到下一行。
+       *
+       * 试过 `minWidth: '60%'`：确实会换行，但换出来的样子是
+       * 「输入框 + 选日期」一行、「添加」孤零零一行 —— 右边一大片空。
+       * 一行放不下三个，就该**按职责分两行**：先填名字，再选日期并提交。
+       */
+      flexBasis: '100%',
       minHeight: tokens['size.field-height'],
       paddingHorizontal: tokens['size.field-padding-x'],
       borderRadius: tokens['radius.md'],
