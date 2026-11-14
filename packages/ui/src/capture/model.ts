@@ -392,6 +392,15 @@ export function captureCapsuleShowsWord(days: number): boolean {
  */
 export interface CaptureSubmitPlan {
   readonly title: string;
+  /**
+   * 补充说明（可选）。
+   *
+   * 🔴 只在宿主传了 `descriptionInput` 时才会非空 —— 这一行是**挑着给的**：
+   * 移动端的新建面板是"一屏只干一件事"的弹层，多一行不挤；
+   * web 的捕获条内联在列表顶部，多一行会把整个列表往下推。
+   * 两端形状不同是**载体的差别**，不是两个产品。
+   */
+  readonly description?: string;
   readonly dueDate?: number;
   readonly priority?: Priority;
   /**

@@ -327,6 +327,13 @@ function Composer({
               labels={labels}
               onSubmit={submit}
               autoFocus
+              /*
+               * 🔴 只有移动端开第二行（补充说明）。
+               * 这里是一屏只干一件事的弹层，标题 + 描述两行正好；
+               * web 的捕获条内联在列表顶部，多一行会把整个列表往下推。
+               * 形状不同是载体的差别 —— 见 `CaptureComposerProps.descriptionInput`。
+               */
+              descriptionInput
               testID="mobile-capture"
               quickPicks={quickDatePicks(todayLocal.today, t)}
               /*
@@ -2029,6 +2036,9 @@ export function TasksScreen({
             ...(plan.priority === undefined ? {} : { priority: plan.priority }),
             // 用户选了哪一份就交给哪一份；没选就**不交这个键**（= 收集箱）。
             ...(plan.projectId === undefined ? {} : { projectId: plan.projectId }),
+            // 第二行的内容进 `note`（= `Task.note`，任务详情里那个「编辑备注」）。
+            // 🔴 字段名是 `note` 单数，写错成 `notes` 会静默失效（`NewTaskFields` 头部记过）。
+            ...(plan.description === undefined ? {} : { note: plan.description }),
           });
           refresh();
         }}

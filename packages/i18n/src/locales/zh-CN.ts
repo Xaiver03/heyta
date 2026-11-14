@@ -3453,6 +3453,8 @@ export const zhCN = {
   'mobile.capture.placeholder': '添加任务（可写「明天」「下周三」）',
   'mobile.capture.addLabel': '新任务标题',
   'mobile.capture.add': '添加',
+  // 第二行（补充说明）的占位。只有移动端的新建面板开这一行（见 CaptureComposer 的 descriptionInput）。
+  'mobile.capture.descriptionPlaceholder': '补充说明（可选）',
   'mobile.capture.matchesAria': '识别出的字段',
   'mobile.capture.rejected': '已忽略（当作标题文字）',
   'mobile.capture.restoreAria': '恢复识别：{raw}',

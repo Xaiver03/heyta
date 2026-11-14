@@ -3183,6 +3183,7 @@ export const en = {
   'mobile.capture.placeholder': 'Add a task (try "tomorrow", "next Wed")',
   'mobile.capture.addLabel': 'New task title',
   'mobile.capture.add': 'Add',
+  'mobile.capture.descriptionPlaceholder': 'Description (optional)',
   'mobile.capture.matchesAria': 'Recognised fields',
   'mobile.capture.rejected': 'Ignored (kept as title text)',
   'mobile.capture.restoreAria': 'Restore recognition: {raw}',

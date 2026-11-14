@@ -53,6 +53,7 @@ import { remainingText } from './due-display';
 export function captureLabels(t: Translate): CaptureComposerLabels {
   return {
     placeholder: t('mobile.capture.placeholder'),
+    descriptionPlaceholder: t('mobile.capture.descriptionPlaceholder'),
     addLabel: t('mobile.capture.addLabel'),
     add: t('mobile.capture.add'),
     matchesAria: t('mobile.capture.matchesAria'),

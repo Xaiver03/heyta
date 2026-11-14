@@ -121,6 +121,11 @@ import {
  */
 export interface CaptureComposerLabels {
   readonly placeholder: string;
+  /**
+   * 第二行的占位（只在 `descriptionInput` 时用）。不给就画空串 ——
+   * 空串会让那一行变成"没有提示的输入框"，所以开了 `descriptionInput` 的宿主必须给。
+   */
+  readonly descriptionPlaceholder?: string | undefined;
   /** 输入框的无障碍名（`<input aria-label>`）。 */
   readonly addLabel: string;
   /** 提交按钮上的字。 */
@@ -286,11 +291,37 @@ export interface CaptureComposerProps {
    * 识别芯片按回车"。
    */
   readonly fillRequest?: { readonly text: string; readonly nonce: number } | undefined;
+  /**
+   * 画不画**第二行**（补充说明）。
+   *
+   * 🔴 默认 `false`，且这是个**挑着给**的能力，不是"没做完的默认值"：
+   * 移动端的新建面板是一屏只干一件事的弹层，标题 + 描述两行正好；
+   * web 的捕获条内联在列表顶部，多一行会把整个列表往下推、把"记一条"变成"填个表"。
+   * 形状不同是**载体的差别**，不是两个产品。
+   */
+  readonly descriptionInput?: boolean | undefined;
 }
 
 /** 取一份 token 表，建出这套样式。**一个裸尺度值都没有**（`check:design` 会拦）。 */
 function makeStyles(tokens: HeytaNativeTokens) {
   return StyleSheet.create({
+    /** 标题行 + 描述行 = 一组（组内 4dp，与"标签→控件"同档）。 */
+    titleGroup: {
+      gap: tokens['space.1'],
+    },
+    /**
+     * 第二行（补充说明）。**与标题同档 44dp、同一块无边界输入面**，
+     * 只是弱一档色 —— 它是"补充"，不是"第二个必填"。
+     */
+    descriptionInput: {
+      minHeight: tokens['touch-target.min'],
+      paddingHorizontal: tokens['size.field-padding-x'],
+      borderWidth: 0,
+      borderRadius: tokens['radius.md'],
+      backgroundColor: tokens['color.surface'],
+      color: tokens['color.foreground-muted'],
+      textAlignVertical: 'center',
+    },
     wrap: {
       /**
        * 🔴 这里曾是 `space.2`（8dp），而 `projectWrap` 也是 8dp ⇒
@@ -487,12 +518,15 @@ export function CaptureComposer({
   duePanelOutlet = 'inline',
   quickPicks,
   fillRequest,
+  descriptionInput = false,
 }: CaptureComposerProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   const [draft, setDraft] = useState('');
+  /** 第二行。只在 `descriptionInput` 时被渲染与提交，否则恒为空串。 */
+  const [descriptionDraft, setDescriptionDraft] = useState('');
   /** 用户显式忽略的识别。**是"这段字是标题的一部分"，不是"删掉这几个字"。** */
   const [ignored, setIgnored] = useState<readonly CaptureExclusion[]>([]);
   /** 面板里点出来的截止值。绑在"被消费的那段字"上，那段字一变它就作废（`model.ts` §二·五）。 */
@@ -566,8 +600,19 @@ export function CaptureComposer({
   function submit(): void {
     const plan = toCaptureSubmitPlan(parsed, anchorDate, override);
     if (plan === undefined) return;
-    void onSubmit(withCaptureProject(plan, captureSelectedProject(projectPicker)?.id));
+    /*
+     * 🔴 描述是**独立的一行**，不参与 `parseCapture` 的任何识别：
+     * 标题里写「明天」会被解析成日期（那是这个组件的卖点），
+     * 而描述里写「明天」只是"明天"两个字 —— 两者语义不同，
+     * 所以它最后拼进 plan，不并进 `draft`。
+     * 空串不写（省略与显式空在动作层同一条约定，见 `CaptureSubmitPlan.projectId`）。
+     */
+    const trimmedDescription = descriptionDraft.trim();
+    const withDescription =
+      trimmedDescription === '' ? plan : { ...plan, description: trimmedDescription };
+    void onSubmit(withCaptureProject(withDescription, captureSelectedProject(projectPicker)?.id));
     setDraft('');
+    setDescriptionDraft('');
     setIgnored([]);
     setOverride(undefined);
     closePanel();
@@ -660,6 +705,15 @@ export function CaptureComposer({
 
   return (
     <View style={styles.wrap} testID={testID}>
+      {/*
+        🔴 标题行与描述行是**同一组**（都是"这条任务叫什么 / 补一句"），
+        所以它们之间用 `titleGroup` 的 4dp，而不是 `wrap` 的 12dp。
+        真机量过未分组时的样子：标题底 842 → 描述 878（12dp），
+        描述底 1010 → 落点标签 1046（也是 12dp）—— **两个 12dp 相等**，
+        于是"描述属于标题"和"描述属于落点那一段"在视觉上不可分辨。
+        分组后是 4 / 12 / 4 三档，层次回来了。
+      */}
+      <View style={styles.titleGroup}>
       <View style={styles.compose}>
         <TextInput
           ref={inputRef}
@@ -722,6 +776,21 @@ export function CaptureComposer({
           <HeytaIcon data={Plus} size={tokens['icon.sm']} color={tokens['color.on-primary']} />
           <Text style={[text['row-meta'], styles.addText]}>{labels.add}</Text>
         </Pressable>
+      </View>
+
+      {descriptionInput ? (
+        <TextInput
+          style={[text['row-meta'], styles.descriptionInput]}
+          value={descriptionDraft}
+          placeholder={labels.descriptionPlaceholder ?? ''}
+          placeholderTextColor={tokens['color.foreground-subtle']}
+          accessibilityLabel={labels.descriptionPlaceholder ?? ''}
+          onChangeText={setDescriptionDraft}
+          returnKeyType="done"
+          onSubmitEditing={submit}
+          testID="capture-description"
+        />
+      ) : null}
       </View>
 
       {/*
