@@ -45,6 +45,7 @@ import {
   SettingsInfoTip,
   SettingsSection,
   resolveSettingAvailability,
+  shouldRenderSettingsRow,
   type SettingsRowModel,
 } from '@heyta/ui';
 import { formatPrivacyDecisionTime, type PrivacyConsentRecord } from '@heyta/app-host';
@@ -700,7 +701,20 @@ export function SettingsScreen({
   const renderNotifications = (): React.JSX.Element => (
     <>
       <ReminderDeliverySection />
-      {shouldShowWidgetJourney(widgetBridgeAvailable) ? (
+      {/*
+        🔴 2026-11-14：`&& widgetRows.some(shouldRenderSettingsRow)`。
+        
+        这一组瘦身之后只剩**一个开关**（其余都进了组标题的「?」）。那个开关在
+        `hideTitles === null`（还没从原生读到）时会被 `shouldRenderSettingsRow`
+        过滤掉 —— 截图里因此出现了一张**空白卡片**：有组标题、有问号、里面什么都没有。
+        
+        ⚠️ 不能改 `shouldRenderSettingsRow` 让它渲染灰开关 ——
+        `settings-model.spec.ts` 钉着「灰着的开关比没有更坏」，那条是对的
+        （灰开关会让人以为"功能存在但暂时坏了"，而真相是"这台设备没有"）。
+        
+        正确的修在**调用点**：过滤后一行都不剩，就不画这张卡（连组标题）。
+      */}
+      {shouldShowWidgetJourney(widgetBridgeAvailable) && widgetRows.some(shouldRenderSettingsRow) ? (
         <>
           {/*
             🔴 2026-11-14：与上面那一组一致，组标题移到卡片**外**。
