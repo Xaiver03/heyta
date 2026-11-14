@@ -77,10 +77,14 @@ export function sharesWord(a, b) {
   return false;
 }
 
-/** 抽 `<X ... title={t('k')}>` 里的 key。 */
-function keysOf(source, tagName, attr) {
+/** 抽 `<X ... title={t('k')}>` 里的 key（带出现位置）。 */
+function keysWithPos(source, tagName, attr) {
   const re = new RegExp(`<${tagName}\\b[^>]*?${attr}=\\{t\\('([^']+)'\\)\\}`, 'gs');
-  return [...source.matchAll(re)].map((m) => m[1]);
+  return [...source.matchAll(re)].map((m) => ({ key: m[1], at: m.index }));
+}
+
+function keysOf(source, tagName, attr) {
+  return keysWithPos(source, tagName, attr).map((x) => x.key);
 }
 
 /** 抽 `<TextField label={t('a')} ... placeholder={t('b')}>` 这种成对。 */
@@ -110,6 +114,29 @@ export function findCollisions({ source, messages }) {
       if (a !== undefined && a === b) {
         out.push(`顶栏与组标题同名「${a}」（${sk} / ${ck}）`);
       }
+    }
+  }
+
+  /*
+   * ①b **同一文件里两个组标题同名**。
+   *
+   * 这条是"找尺自己漏什么"时补上的：上一版只比「顶栏 vs 组标题」，
+   * 但一屏里出现两个一模一样的组标题，同样是同一句话说了两遍。
+   */
+  /*
+   * ⚠️ **互斥分支不算同屏**。`ProfileProgressSummary` 里两处 `近期状态`
+   * 分别在 `snapshot === null` 与正常渲染两个 `return` 分支里 —— 屏幕上只会出现一个。
+   * 所以两处之间隔着 `return` 时跳过（这是对"同屏"的近似判据，够用）。
+   */
+  const seen = new Map();
+  for (const { key: ck, at } of keysWithPos(source, 'SectionHeader', 'title')) {
+    const text = messages.get(ck);
+    if (text === undefined) continue;
+    const prev = seen.get(text);
+    if (prev !== undefined && !source.slice(prev.at, at).includes('return')) {
+      out.push(`同一文件里两个组标题同名「${text}」（${prev.key} / ${ck}）`);
+    } else {
+      seen.set(text, { key: ck, at });
     }
   }
 
@@ -189,7 +216,31 @@ function main() {
       console.error('🔴 self-test C 失败：合规样本被误报');
       process.exit(1);
     }
-    console.log('✅ self-test：顶栏撞组标题、字段撞占位符都判红；合规放行（3 臂）');
+    // D：同一文件里两个组标题同名（同一分支，真的会同屏）
+    const d = findCollisions({
+      source: `<><SectionHeader title={t('k.a')} /><SectionHeader title={t('k.b')} /></>`,
+      messages: new Map([
+        ['k.a', '近期状态'],
+        ['k.b', '近期状态'],
+      ]),
+    });
+    if (d.length === 0) {
+      console.error('🔴 self-test D 失败：同文件双组标题没被报红');
+      process.exit(1);
+    }
+    // E：两处隔着 `return`（互斥分支）⇒ 不算同屏，不许报红
+    const e = findCollisions({
+      source: `if (x) { return <SectionHeader title={t('k.a')} />; } return <SectionHeader title={t('k.b')} />;`,
+      messages: new Map([
+        ['k.a', '近期状态'],
+        ['k.b', '近期状态'],
+      ]),
+    });
+    if (e.length !== 0) {
+      console.error('🔴 self-test E 失败：互斥分支被误报');
+      process.exit(1);
+    }
+    console.log('✅ self-test：顶栏撞组标题、字段撞占位符、同文件双组标题都判红；互斥分支与合规放行（5 臂）');
     return;
   }
 

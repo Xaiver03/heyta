@@ -67,6 +67,19 @@ const ROOT_SCREENS = new Set([
 /** 不参与判据的路径：营销页的假界面、共享层的同名组件。 */
 const SKIP = [/^apps\/landing\//, /^packages\/ui\/src\/task-list\//];
 
+/**
+ * 剥掉注释再扫。
+ *
+ * 🔴 2026-11-15 踩到：我在 `ListsSection` 的注释里写了"这一屏的顶栏已经写着
+ * 「清单」（`<Screen title=…>`）"作为解释，门禁把这段**注释**当成了真的标签，
+ * 报"二级页没有 action.back"。
+ *
+ * 扫源码的尺必须先剥注释 —— 否则任何在注释里举例的人都会撞上它。
+ */
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
 function collect() {
   const out = [];
   const visit = (d) => {
@@ -213,7 +226,7 @@ function main() {
   for (const f of collect()) {
     const rel = f.replace(/^\.\//, '');
     if (SKIP.some((re) => re.test(rel))) continue;
-    problems.push(...findViolations({ rel, source: readFileSync(f, 'utf8') }));
+    problems.push(...findViolations({ rel, source: stripComments(readFileSync(f, 'utf8')) }));
   }
 
   if (problems.length === 0) {
