@@ -39,6 +39,7 @@ import {
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
 import { Button, Card, Stack, Text } from '../ui/kit';
+import { TYPE_ROLE } from '@heyta/design-system';
 import { useTokens, useText } from '../theme';
 import { readSyncConfig } from '../sync/config';
 import { privacyConsent } from '../privacy/consent-gate';
@@ -119,6 +120,7 @@ export function RenewSection({
 } = {}): React.JSX.Element | null {
   const { t } = useI18n();
   const tokens = useTokens();
+  const text = useText();
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -179,7 +181,15 @@ export function RenewSection({
 
   return (
     <Card>
-      <Text variant="row-title">{t('mobile.entitlement.renew.tierTitle')}</Text>
+      {/*
+        🔴 2026-11-14：`row-title`(16px) → `group-label`(13px 灰)。
+        看图才发现的：「买哪一档」与卡片里的档名「官方托管」同样大 ——
+        一个是**这一组的标题**、一个是**组里的项**，同级就读不出"这两张卡是它的子项"。
+        组标题按 `TYPE_ROLE['section-heading']` 那一档走（13px semibold muted）。
+      */}
+      <Text style={[text[TYPE_ROLE['section-heading']], { color: tokens['color.foreground-muted'] }]}>
+        {t('mobile.entitlement.renew.tierTitle')}
+      </Text>
       <Text variant="row-meta" tone="subtle">
         {t('mobile.subscription.plans.hint')}
       </Text>
@@ -226,7 +236,18 @@ export function RenewSection({
         }
         onPress={() => void onRenew()}
         loading={pending}
-        tone="secondary"
+        /*
+         * 🔴 2026-11-14：`tone="secondary"` → `tone="primary"`。
+         *
+         * 看图才发现这枚按钮是**浅灰底**——一片白卡里最不显眼的那一块，
+         * 而它是这一页**唯一的主动作**（选完档就是为了按它）。
+         * 次要色在这里表达的意思是"可选可不选"，与事实相反。
+         *
+         * ⚠️ 删掉 `tone="secondary"` 是不够的：`Button` 的默认 tone 就是
+         * `DEFAULT_CONTROL_TONE = 'secondary'`（`packages/ui/src/control/states.ts:241`）。
+         * 要主色必须**显式写** `primary`。第一次改漏了这一点，重装后才看出来没变。
+         */
+        tone="primary"
       />
       {outcome?.kind === 'failed' ? (
         <Text variant="row-meta" tone="danger">

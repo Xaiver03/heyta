@@ -3571,6 +3571,7 @@ export const en = {
   'mobile.settings.section.data': 'Data & sync',
   'mobile.settings.section.security': 'Account security',
   'mobile.settings.directory.title': 'Preferences and account',
+  'mobile.settings.dataActions.title': 'Data management',
   'mobile.settings.directory.hint': 'Choose what to adjust.',
   'mobile.settings.title': 'Settings',
   'mobile.settings.close': 'Close',

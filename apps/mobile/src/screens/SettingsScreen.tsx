@@ -900,6 +900,13 @@ export function SettingsScreen({
         return (
           <>
             {renderSync()}
+            {/*
+              🔴 2026-11-14 补组标题。这一页三组、上面两组都有 `SectionHeader`
+              （「同步」「隐私同意」），唯独第三组没有 —— 一屏三组两组带名，
+              读起来像漏了一个。而且这三行（回收站 / 已放弃 / 备份与迁移）
+              与上面的"同步""隐私同意"确实是不同类别，需要名字。
+            */}
+            <SectionHeader title={t('mobile.settings.dataActions.title')} />
             <SettingsSection
               variant="card"
               testID="settings-data-actions"

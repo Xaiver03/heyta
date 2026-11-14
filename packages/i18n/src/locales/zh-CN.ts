@@ -3904,6 +3904,9 @@ export const zhCN = {
   'mobile.settings.section.data': '数据与同步',
   'mobile.settings.section.security': '账号安全',
   'mobile.settings.directory.title': '偏好与账号',
+  // 「数据与同步」页第三组的组标题。2026-11-14 前这一组**没有标题**，
+  // 而它上面两组都有 —— 一屏三组、两组带名、一组无名，读起来像漏了一个。
+  'mobile.settings.dataActions.title': '数据管理',
   'mobile.settings.directory.hint': '选择要调整的内容。',
   'mobile.settings.title': '设置',
   'mobile.settings.close': '关闭',
