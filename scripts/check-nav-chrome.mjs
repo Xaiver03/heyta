@@ -123,11 +123,20 @@ export function findScreenTags(source) {
  */
 function expandSpreads(tag, source) {
   let expanded = tag;
-  const re = /\.\.\.([A-Za-z_$][\w$]*)/g;
-  let m;
-  while ((m = re.exec(tag)) !== null) {
-    const name = m[1];
-    const def = source.match(new RegExp(`const ${name} = \\{([\\s\\S]*?)\\n  \\};`));
+  /*
+   * 两种"动作被变量带走"的写法都要展开，否则会误报：
+   *   ① `<Screen {...header}>`            —— spread 一个对象
+   *   ② `actions={[backAction]}`          —— 数组里放一个变量
+   * ② 是 `ShareSpaceScreen` 撞出来的：它明明有返回，但门禁只认字面量 `action.back`。
+   * **误报的尺会被下一个人关掉。**
+   */
+  const names = new Set();
+  for (const m of tag.matchAll(/\.\.\.([A-Za-z_$][\w$]*)/g)) names.add(m[1]);
+  for (const m of tag.matchAll(/actions=\{\[([^\]]*)\]\}/g)) {
+    for (const id of m[1].matchAll(/([A-Za-z_$][\w$]*)/g)) names.add(id[1]);
+  }
+  for (const name of names) {
+    const def = source.match(new RegExp(`const ${name}\\s*=\\s*\\{([\\s\\S]*?)\\n  \\};`));
     if (def) expanded += ` ${def[1]}`;
   }
   return expanded;

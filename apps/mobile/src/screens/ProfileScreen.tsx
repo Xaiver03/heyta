@@ -1543,11 +1543,10 @@ export function ProfileScreen(): React.JSX.Element {
         同一个目的地两枚控件（§3.1 的重复入口），而且那个按钮说的是"编辑"、
         点下去却是"账号组"，名字和后果不一致。现在只剩卡片这一处。
 
-        ⚠️ 少了 §5.2 说的**右箭头**：`SettingsRow` 的 `action` 行没有 trailing 槽，
-        而移动端的图标注册表里也没有一枚 `action.disclose`（语义名）——
-        借 `action.next-month`（ChevronRight）会把"翻月"和"进下一层"混成一个字形，
-        那正是 `ui/icons.tsx` 里那条注释禁止的事。两处都不在本轮可改范围，
-        所以这一版用"整卡可点 + 无障碍 role=button"表达可进，箭头登记为欠账。
+        §5.2 要求的**右箭头**此前是欠账：当时图标注册表里没有 `action.disclose`
+        （语义名），而借 `action.next-month` 会把"翻月"和"进下一层"混成一个字形。
+        🔴 2026-11-15 补上了 `action.disclose`，这张卡现在画得出"这里能进" ——
+        与「提醒与通知」那三行是同一类修复：**能点但看不出来 = 等于不能点**。
       */}
       <Pressable
         testID="profile-account-value"
@@ -1564,6 +1563,7 @@ export function ProfileScreen(): React.JSX.Element {
             <Text variant="row-title" grow>
               {savedName ?? signedInEmail ?? t('mobile.profile.account.offline')}
             </Text>
+            <Icon name="action.disclose" size="sm" color={tokens['color.foreground-subtle']} />
           </HStack>
           {savedName && signedInEmail ? <Text variant="caption" tone="subtle">{signedInEmail}</Text> : null}
         </Card>

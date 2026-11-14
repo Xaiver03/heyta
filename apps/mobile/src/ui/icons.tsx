@@ -174,6 +174,16 @@ const ICONS = {
 
   // 通用
   'action.prev-month': ChevronLeft,
+  /**
+   * 「点进去还有一层」。与 `action.next-month`（翻到下个月）**必须分开** ——
+   * 同一个字形（ChevronRight）承载两个语义会让用户读错：
+   * 一个说"时间往后"，一个说"层级往下"。
+   *
+   * 🔴 2026-11-15 补：`ProfileScreen` 的账号卡一直缺这枚箭头，
+   * 注释写着"图标注册表里没有一枚 `action.disclose`……登记为欠账"。
+   * 现在补上，账号卡就能画出"这里能进"。
+   */
+  'action.disclose': ChevronRight,
   'action.next-month': ChevronRight,
   // 🔴 「返回」与「上一月」是**不同语义**，所以用不同字形：`ArrowLeft` 是
   // 进出层级的通用返回，`ChevronLeft` 是月历的翻页。两者在成长屏与日历屏
