@@ -205,6 +205,14 @@ pnpm check:breakpoints          # **响应式断点的一把尺**（2026-10-26�
                                 #   `docs/agents/design-system.md` §响应式断点；`--self-test` 17 臂，
                                 #   含「迁移前那 9 种值必须红」那一条。
 pnpm check:design               # 只跑设计变量硬编码检查
+pnpm check:tap-targets          # **触控目标 ≥44dp**（2026-11-14）。读 `apps/mobile/evidence/ux-parity-*/`
+                                #   里归档的 `uiautomator dump`，量每个 `clickable` 节点的实际 bounds
+                                #   （density 480 ⇒ ÷3 = dp）。**没有证据时退出 2**（「没跑」不是「通过」），
+                                #   有违规退出 1。它为什么不能静态扫源码：同一类错有三种根因
+                                #   （取了标签胶囊的 28px / 漏 minHeight / 写了高度没写宽度），
+                                #   而高度可能写在 style 对象里、也可能靠 hitSlop 补。
+                                #   产证据：`scripts/capture-ux-parity.sh heyta <模块>`；
+                                #   读数表：`scripts/ux-parity-metrics.py --md`。
 pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:ui-language          # 界面文案必须全是中文（见 §5）
 pnpm check:android-widget-copy-parity
