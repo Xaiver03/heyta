@@ -1342,7 +1342,19 @@ export function TaskDetailSheet({
           accessibilityRole="button"
           accessibilityLabel={t('mobile.detail.edit.note')}
           testID="task-detail-note-text"
-          style={({ pressed }) => (pressed && !reducedMotion ? styles.pressed : undefined)}
+          /**
+           * 🔴 `minHeight` 必须有。这是**空备注时的那一行占位**（「写点什么」），
+           * 此前没有任何高度约束 ⇒ 真机实测 `[48,2012][1108,2096]` = **84px = 28dp**，
+           * 而同屏其它可点行（切换清单 / 优先级 / 展开全部 / 添加子任务）都是
+           * 132px = 44dp。同一屏出现两档可点高度，且这一档低于触控下限。
+           *
+           * 备注**有内容**时不受影响：那时文字自身撑高（`contentNote` 的最高三行），
+           * `minHeight` 只是给"空态占位"补一个下限。
+           */
+          style={({ pressed }) => [
+            { minHeight: tokens['touch-target.min'], justifyContent: 'center' },
+            pressed && !reducedMotion ? styles.pressed : undefined,
+          ]}
         >
           <Text
             variant="row-title"
