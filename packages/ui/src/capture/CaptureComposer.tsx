@@ -272,6 +272,20 @@ export interface CaptureComposerProps {
    * 已经锚在某一格上的落点确实不需要再问一次"要不要今天"。
    */
   readonly quickPicks?: readonly DatePickerQuickPick[];
+  /**
+   * **一次性填充请求**（2026-11-14，首启引导用）。
+   *
+   * `nonce` 变化 ⇒ 把 `text` 灌进输入框、清空上一份识别与面板选择、聚焦。
+   * 语义与 `settingsRequested` 那类"取到即清"的意图一致：它**不是状态**，
+   * 是一次性动作 —— 父层重渲染（同一个 nonce）不会重放，否则会把用户已经
+   * 改过的字冲掉。
+   *
+   * 🔴 为什么不让引导直接建任务：`@heyta/domain#parseCapture` 的文件头第 2 条
+   * 要求**调用方必须把 `matches` 展示给用户确认**。直接落库等于跳过那一步，
+   * 把"误报"变成静默的数据改写。所以这条路只能是"灌进输入框，让用户看着
+   * 识别芯片按回车"。
+   */
+  readonly fillRequest?: { readonly text: string; readonly nonce: number } | undefined;
 }
 
 /** 取一份 token 表，建出这套样式。**一个裸尺度值都没有**（`check:design` 会拦）。 */
@@ -450,6 +464,7 @@ export function CaptureComposer({
   renderDuePanel,
   duePanelOutlet = 'inline',
   quickPicks,
+  fillRequest,
 }: CaptureComposerProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -485,6 +500,24 @@ export function CaptureComposer({
       inputRef.current?.blur();
     };
   }, [managesFocusItself]);
+
+  /**
+   * 一次性填充（首启引导的示例 chip）。**只认 `nonce`** ——
+   * 同一个请求被父层重渲染时不该重灌，否则会把用户已经改过的字冲掉。
+   *
+   * 换字必须把"上一段字"的派生态一起作废（忽略项 / 面板选择 / 面板开合）：
+   * 留着它们就会出现"新文本 + 旧忽略项"这种界面说不清的状态。
+   */
+  const fillNonce = fillRequest?.nonce;
+  useEffect(() => {
+    if (fillNonce === undefined || fillRequest === undefined) return;
+    setDraft(fillRequest.text);
+    setIgnored([]);
+    setOverride(undefined);
+    setPanelOpen(false);
+    inputRef.current?.focus?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只认 nonce，理由见上
+  }, [fillNonce]);
 
   /**
    * 同一次渲染里的"现在"。

@@ -866,6 +866,14 @@ export const en = {
   'web.shell.empty.completed.hint': 'Try completing a task',
   'web.shell.empty.quadrant.title': 'This quadrant is empty',
   'web.shell.empty.quadrant.hint': 'Mark a task important and give it a due date',
+  // First-run guidance (desktop / web): only when the inbox is empty and the user
+  // has not dismissed it. Deliberately NOT a multi-step tour — see the zh-CN comment.
+  'web.firstRun.title': 'Get it out of your head',
+  'web.firstRun.hint': 'One line is enough — dates are picked up automatically.',
+  'web.firstRun.example1': 'Email the client tomorrow at 3pm',
+  'web.firstRun.example2': 'Submit the weekly report next Wednesday',
+  'web.firstRun.example3': 'Tidy the desk today',
+  'web.firstRun.skip': 'I\'ll write my own',
 
   // ── Web · error screen ────────────────────────────────────
   'web.error.storage.title': 'Could not initialize local storage',

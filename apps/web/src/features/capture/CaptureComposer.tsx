@@ -130,6 +130,16 @@ export interface CaptureComposerProps {
    * 判据：`e2e/tests/capture-due-capsule.spec.ts` 的「日历落点」那一条。
    */
   inlineDuePanel?: boolean;
+  /**
+   * **一次性填充请求**（首启引导的示例 chip）。
+   *
+   * 本文件只是透传 —— 语义在共享层 `CaptureComposerProps.fillRequest`：
+   * `nonce` 变化即把 `text` 灌进输入框，同一个 `nonce` 不重放。
+   *
+   * 🔴 为什么引导走这条路而不是直接建任务：`@heyta/domain#parseCapture`
+   * 要求调用方把 `matches` 展示给用户确认，直接落库会把误报变成静默改写。
+   */
+  fillRequest?: { readonly text: string; readonly nonce: number } | undefined;
 }
 
 /** 落点：清单 id + 它在界面上的名字（用户自己的字，不翻译）。 */
@@ -302,6 +312,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         onSubmit={onSubmit}
         anchorDate={anchorDate}
         quickPicks={quickPicks}
+        fillRequest={props.fillRequest}
         renderDuePanel={props.inlineDuePanel === true ? undefined : renderDuePanel}
       />
     </HeytaUiProvider>

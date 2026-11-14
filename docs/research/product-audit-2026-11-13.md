@@ -159,6 +159,33 @@
 **这也意味着 §5「如果只能做五件事」里的第 4、5 件（设置页分组收敛、侧栏动作显隐统一）应当撤销** ——
 它们改的是已拍板的设计。真正该做的只剩：素材重拍、首启引导、首次购买、空态文案。
 
+### 4.5 F5 已落地：首启引导做成了「空态引导」而不是「全屏欢迎」（2026-11-14）
+
+F5 原文是"web / 桌面壳无欢迎页"。实现时**没有**照搬移动端的全屏 `WelcomeScreen`，理由与出处：
+
+| 结论 | 出处 |
+|---|---|
+| **不做多步巡览**（"Multi-step tutorial upfront"、"Modal blocking content" 是明确的反模式） | [kode-cli · user-experience](https://github.com/shareai-lab/kode-cli/blob/2b8a532ce9a7d4ca287306eceed446373fb79002/skills/vibe-coding/references/domains/user-experience.md) |
+| "六张促销幻灯片 + 每张点 Next + 落在空 dashboard" = **weak implementation** | [uxpatternsguide · onboarding](https://uxpatternsguide.com/patterns/onboarding/) |
+| **Max screens: 3-5 (fewer is better)**、"every screen must earn the right to exist" | [aidevops · onboarding](https://github.com/marcusquinn/aidevops/blob/50a655a8315a8029042a9df8c61d8c8ebc2559a1/.agents/mobile-app-dev/onboarding.md) |
+| **First win in 60 seconds**、空态要给"第一个真实动作"而不是说明 | [tour-kit · empty states](https://github.com/domidex01/tour-kit/blob/main/apps/docs/content/blog/empty-states-that-convert-onboarding-design-patterns.mdx)、[UX Polish Checklist](https://github.com/rshankras/claude-code-apple-skills/blob/f9589828e222113d49c7bff417c33038802856ff/skills/release-review/ux-polish-checklist.md) |
+
+落地形态：**收集箱空态里的三条示例 + 一个出口**，不新增路由 / 浮层 / 菜单项。
+
+- 点示例 ⇒ **把字灌进输入框**（不是建任务）。因为 `@heyta/domain#parseCapture` 的文件头第 2 条
+  要求"调用方必须把 `matches` 展示给用户确认"，直接落库会把误报变成静默改写。
+  实测点第一条后日期胶囊立刻显示「明天 15:00」。
+- 出口文案是「先自己写」而不是「跳过」—— 这是选择，不是拒绝。
+- 状态两态（没看过 / 看过），存 `localStorage`，不进 op-log、不跨设备同步。
+
+判据：
+- 单元 `apps/web/tests/first-run-guide.spec.tsx`（8 条；变异验证：把 `onFillDraft(t(key))` 改成 `onFillDraft(key)` ⇒ 精确红 1 条）
+- 真浏览器 `scripts/probe-first-run.mjs` **11/11 通过**（含"刷新后仍是空收集箱也不再出现"这条落盘判据）
+- 常驻 e2e `e2e/tests/first-run-guide.spec.ts` 已写，但**未跑**：本机装不了 Playwright 浏览器（`~/Library/Caches/ms-playwright` 在沙箱外，EPERM），而 runner 不支持 `channel: chrome`。
+
+⚠️ **它证不到什么**：没有做 A/B、没有埋点、不知道它是否真的提升了留存。它是"把首次成功那一步铺平"，
+不是"证明留存变好"。
+
 ---
 
 ## 5. 如果只能做五件事

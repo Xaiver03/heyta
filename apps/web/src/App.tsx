@@ -115,6 +115,7 @@ import {
   saveDetailPane,
   type DetailPanePref,
 } from './features/shell/detail-pane-pref.js';
+import { loadFirstRunSeen, markFirstRunSeen } from './features/shell/first-run-pref.js';
 import { TagChips } from './features/tasks/TaskOrganizer.js';
 import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
 import { RepeatChip } from './features/tasks/TaskRepeat.js';
@@ -1428,6 +1429,15 @@ export function App(): React.JSX.Element {
    * 因为"三条路径"最容易写成"其实只有同一个 onClick 调了三遍"。
    */
   const [detailPane, setDetailPaneState] = useState<DetailPanePref>(loadDetailPane);
+  /**
+   * 首启引导（2026-11-14）。
+   *
+   * 两态：「没看过 / 看过」+ 一次性填充请求。`nonce` 用 `Date.now()` 而不是自增：
+   * 它只需要"与上一次不同"，不需要可预测 —— 而自增要在组件里多存一个计数器，
+   * 反而多一处可能被重置的状态。
+   */
+  const [firstRunSeen, setFirstRunSeen] = useState<boolean>(() => loadFirstRunSeen());
+  const [firstRunFill, setFirstRunFill] = useState<{ readonly text: string; readonly nonce: number } | undefined>(undefined);
   const setDetailPane = useCallback((value: DetailPanePref) => {
     setDetailPaneState(value);
     saveDetailPane(value);
@@ -3421,7 +3431,7 @@ export function App(): React.JSX.Element {
               于是这个输入框回到滴答那种形状：**你写什么，规则就当场读什么**，
               底下不再挂任何 AI 按钮。
             */
-            <CaptureComposer destination={captureDestination} />
+            <CaptureComposer destination={captureDestination} fillRequest={firstRunFill} />
           )}
 
           {/*
@@ -3474,7 +3484,32 @@ export function App(): React.JSX.Element {
               **空 inbox 会被判成白屏** —— 一个只在用户什么都没做时才红的假红。
             */
             <div data-testid="task-list">
-              <EmptyState filter={store.filter} />
+              <EmptyState
+                filter={store.filter}
+                firstRun={
+                  !firstRunSeen && store.filter.kind === 'all'
+                    ? {
+                        /*
+                         * 点一条示例 = **把字灌进输入框**，不是建任务。
+                         * `parseCapture` 要求调用方把 `matches` 给用户确认（见它的文件头第 2 条），
+                         * 直接落库会把误报变成静默改写。
+                         *
+                         * 点完就标记"看过"：引导要教的那件事已经发生（用户知道可以这么写），
+                         * 而输入框里那行字和下面的识别芯片会继续教。
+                         */
+                        onFillDraft: (text) => {
+                          markFirstRunSeen();
+                          setFirstRunSeen(true);
+                          setFirstRunFill({ text, nonce: Date.now() });
+                        },
+                        onDismiss: () => {
+                          markFirstRunSeen();
+                          setFirstRunSeen(true);
+                        },
+                      }
+                    : undefined
+                }
+              />
             </div>
           ) : dateGroups === undefined ? (
             <HeytaUiProvider>

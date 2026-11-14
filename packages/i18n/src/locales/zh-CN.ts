@@ -969,6 +969,18 @@ export const zhCN = {
   'web.shell.empty.completed.hint': '完成一个任务试试',
   'web.shell.empty.quadrant.title': '这个象限是空的',
   'web.shell.empty.quadrant.hint': '给任务标记重要程度与截止时间',
+  // 首启引导（桌面 / web）：只在「收集箱为空 + 没跳过过」时出现，落在空态里。
+  // 🔴 刻意**不做**多步巡览 —— 三个独立来源都把它列为反模式（"multi-step tutorial
+  //    upfront" / "modal blocking content"）。这里只有"做一件真事"这一条路：
+  //    点一条示例 ⇒ 灌进输入框 ⇒ 用户看着识别芯片按回车。取舍见
+  //    docs/research/product-audit-2026-11-13.md §4.3 与 screenshots/README.md 同批说明。
+  'web.firstRun.title': '把脑子里的事先倒出来',
+  'web.firstRun.hint': '写一句就行 —— 日期会自己认出来。',
+  'web.firstRun.example1': '明天下午3点 给客户回邮件',
+  'web.firstRun.example2': '下周三 交周报',
+  'web.firstRun.example3': '今天 整理桌面',
+  // 「先自己写」而不是「跳过」：这是**选择**，不是拒绝。跳过之后永不出现。
+  'web.firstRun.skip': '先自己写',
 
   // ── Web · 崩溃屏（ErrorScreen）────────────────────────────
   'web.error.storage.title': '无法初始化本地存储',

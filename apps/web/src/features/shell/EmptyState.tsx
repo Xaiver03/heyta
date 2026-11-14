@@ -15,7 +15,37 @@ import type { TaskFilter } from '../tasks/store.js';
  * 规则：**任何列表都必须有空状态**，且要给出下一步动作。
  * 留白屏会让用户以为应用坏了。
  */
-export function EmptyState({ filter }: { filter: TaskFilter }): React.JSX.Element {
+/**
+ * 首启引导的三条示例（**顺序就是展示顺序**）。
+ *
+ * 🔴 写成 `as const` 的字面量数组，不用模板拼 `web.firstRun.example${i}`：
+ * `MessageKey` 是字面量联合，拼出来的字符串 TS 认不出，会退化成 `string`
+ * 而让 `t()` 的约束失效 —— 那正是"改词条名而没人发现"的入口。
+ * 三条都在 `@heyta/domain#parseCapture` 的规则表里能真解析出日期
+ * （2026-11-14 实测：`明天下午3点` ⇒ 15:00、`下周三` ⇒ 11-18、`今天` ⇒ 当天）。
+ */
+const FIRST_RUN_EXAMPLES = [
+  'web.firstRun.example1',
+  'web.firstRun.example2',
+  'web.firstRun.example3',
+] as const;
+
+export function EmptyState({
+  filter,
+  firstRun,
+}: {
+  filter: TaskFilter;
+  /**
+   * 首启引导（只在「收集箱为空 + 没看过」时由宿主给 true）。
+   *
+   * 给了它，空态就用引导自己的标题/说明**替换**默认那两句，而不是再叠两行 ——
+   * 一屏两层标题（「收集箱是空的」+「把脑子里的事先倒出来」）是同一件事说两遍。
+   */
+  firstRun?: {
+    readonly onFillDraft: (text: string) => void;
+    readonly onDismiss: () => void;
+  };
+}): React.JSX.Element {
   const { t } = useI18n();
   /**
    * 空态文案。
@@ -73,8 +103,8 @@ export function EmptyState({ filter }: { filter: TaskFilter }): React.JSX.Elemen
    * （这条正是 `apps/web/tests/shell-empty-state-dom.spec.tsx` 的反向臂）。
    */
   const view = toEmptyStateViewModel({
-    title: t(msg.titleKey),
-    hint: t(msg.hintKey),
+    title: t(firstRun === undefined ? msg.titleKey : 'web.firstRun.title'),
+    hint: t(firstRun === undefined ? msg.hintKey : 'web.firstRun.hint'),
     illustration: 'tasks',
     size: 'page',
   });
@@ -96,6 +126,42 @@ export function EmptyState({ filter }: { filter: TaskFilter }): React.JSX.Elemen
       <p className="ht-empty__title ht-type-row-title">{view.title}</p>
       {/* `hint` 可省略 —— 模型把空串/纯空白归一成 `undefined`，那一行就不画。 */}
       {view.hint === undefined ? null : <p className="ht-empty__hint">{view.hint}</p>}
+      {/*
+        首启引导：三条示例 + 一个出口。
+        🔴 它们**不是"建任务"的按钮** —— 点一条只把字灌进输入框（`onFillDraft`），
+        用户还要看着识别芯片按回车。`parseCapture` 的文件头第 2 条要求
+        "调用方必须把 matches 展示给用户确认"，直接落库会把误报变成静默改写。
+      */}
+      {firstRun === undefined ? null : (
+        <div className="ht-firstrun" data-testid="first-run">
+          <div className="ht-firstrun__examples">
+            {FIRST_RUN_EXAMPLES.map((key) => (
+              <button
+                key={key}
+                type="button"
+                className="ht-btn ht-btn--secondary ht-firstrun__example"
+                data-testid={`first-run-example-${key.slice(-1)}`}
+                onClick={() => { firstRun.onFillDraft(t(key)); }}
+              >
+                {t(key)}
+              </button>
+            ))}
+          </div>
+          {/*
+            「先自己写」而不是「跳过」：这是**选择**，不是拒绝。
+            它是 `inline` 重量的 ghost 按钮 —— 空态里已有三条示例是主路径，
+            出口不该和它们抢注意力（`ux-principles` §1：同屏一个主任务）。
+          */}
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost ht-firstrun__skip"
+            data-testid="first-run-dismiss"
+            onClick={firstRun.onDismiss}
+          >
+            {t('web.firstRun.skip')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

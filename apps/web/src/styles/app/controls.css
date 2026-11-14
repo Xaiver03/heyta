@@ -376,6 +376,33 @@
   font-size: var(--ht-font-size-sm);
 }
 
+/* ── 首启引导（空态里的三条示例 + 一个出口）─────────────────────
+   只在「收集箱为空 + 没看过」时渲染，落在空态里而不是浮层里：
+   三个来源都把"多步巡览 / 模态挡内容"列为反模式（见 EmptyState.tsx 的注释）。
+   这里只管**布局**，外观走 `.ht-btn--secondary` / `.ht-btn--ghost` ——
+   `check:control-semantics` 第 3 条禁止功能 CSS 重声明控件外观。 */
+
+.ht-firstrun {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-3);
+  margin-block-start: var(--ht-space-2);
+}
+
+.ht-firstrun__examples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--ht-space-2);
+  /* 三条示例最长的一条也不该把空态撑出横向滚动（窄窗 375 实测会换行）。 */
+  max-inline-size: 100%;
+}
+
+.ht-firstrun__skip {
+  font-size: var(--ht-font-size-sm);
+}
+
 /* ── 响应式：移动端塌缩成单栏 ───────────────────────── */
 
 /* ── 窄屏塌缩：完整规则在模块列表**末尾**的 narrow.css 媒体块 ─────────────

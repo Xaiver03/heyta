@@ -149,6 +149,21 @@ async function dismissOverlays(page, texts) {
       await page.waitForTimeout(150);
     }
   }
+  /*
+   * 首启引导（2026-11-14）：它住在收集箱空态里，是**一次性**的。
+   *
+   * 为什么截图要把它清掉：W01 的 `readyText` 是「任务」，这张图要展示的是
+   * **任务视图本身**，不是"新用户第一眼"。留着它，同一批素材里 W01 是引导、
+   * W02/W03 是功能，读起来像两张不同产品的图。
+   *
+   * ⚠️ 它是**产品行为**，不是遮挡物：真实用户点「先自己写」它就不再出现，
+   * 这里走的是同一个按钮，没有注入 localStorage、也没有改 React 状态。
+   */
+  const firstRunSkip = page.getByTestId('first-run-dismiss');
+  if (await firstRunSkip.count() && await firstRunSkip.first().isVisible().catch(() => false)) {
+    await firstRunSkip.first().click({ force: true }).catch(() => {});
+    await page.waitForTimeout(150);
+  }
 }
 
 /**
