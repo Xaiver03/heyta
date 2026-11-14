@@ -99,6 +99,86 @@ try {
   // 此刻收集箱仍是空的 ⇒ "不出现"只可能来自落盘标记，不可能来自"空态没渲染"。
   check('刷新后（仍是空收集箱）不再出现 —— 标记真的落了盘', (await p2.getByTestId('first-run').count()) === 0);
   await ctx2.close();
+
+  // ── ③ 暗色：引导在深色主题下画得出来，且示例按钮不是"白底压白字" ──────────
+  const ctxDark = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    colorScheme: 'dark',
+  });
+  const pDark = await ctxDark.newPage();
+  await pDark.goto(BASE, { waitUntil: 'domcontentloaded' });
+  await pDark.waitForTimeout(3500);
+  const loDark = pDark.getByRole('button', { name: '只用本机' });
+  if (await loDark.count()) { await loDark.first().click().catch(() => {}); await pDark.waitForTimeout(1200); }
+  check('暗色下引导出现', (await pDark.getByTestId('first-run').count()) > 0);
+  const contrast = await pDark.evaluate(() => {
+    const btn = document.querySelector('[data-testid="first-run-example-1"]');
+    if (!btn) return null;
+    const s = getComputedStyle(btn);
+    const parse = (c) => {
+      const m = c.match(/rgba?\(([^)]+)\)/);
+      if (!m) return null;
+      const [r, g, b] = m[1].split(',').map((x) => parseFloat(x));
+      return { r, g, b };
+    };
+    const fg = parse(s.color);
+    const bg = parse(s.backgroundColor);
+    if (!fg || !bg) return null;
+    const lum = ({ r, g, b }) => {
+      const f = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    const a = lum(fg) + 0.05;
+    const b2 = lum(bg) + 0.05;
+    return Math.round((Math.max(a, b2) / Math.min(a, b2)) * 100) / 100;
+  });
+  check('暗色下示例按钮文字对比度 ≥ 4.5:1', contrast !== null && contrast >= 4.5, `ratio=${String(contrast)}`);
+  await ctxDark.close();
+
+  // ── ④ 键盘可达：Tab 能走到示例，Enter 能触发（不靠鼠标） ──────────────
+  const ctxKb = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pKb = await ctxKb.newPage();
+  await pKb.goto(BASE, { waitUntil: 'domcontentloaded' });
+  await pKb.waitForTimeout(3500);
+  const loKb = pKb.getByRole('button', { name: '只用本机' });
+  if (await loKb.count()) { await loKb.first().click().catch(() => {}); await pKb.waitForTimeout(1200); }
+
+  let reached = false;
+  for (let i = 0; i < 40; i += 1) {
+    await pKb.keyboard.press('Tab');
+    const id = await pKb.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? '');
+    if (id === 'first-run-example-1') { reached = true; break; }
+  }
+  check('键盘 Tab 能走到第一条示例', reached);
+
+  /*
+   * ⑤ 读屏可读：示例按钮的**可及名**就是它的文字，不是空按钮。
+   * ⚠️ 这一步必须排在 Enter **之前** —— Enter 会触发 onFillDraft ⇒ markSeen ⇒
+   *    引导卸载，之后 `[data-testid^="first-run-example-"]` 一个都查不到，
+   *    读起来像"按钮没有可及名"，实际是"按钮已经不在了"。
+   */
+  const names = await pKb.evaluate(() => {
+    const out = [];
+    for (const el of document.querySelectorAll('[data-testid^="first-run-example-"]')) {
+      out.push((el.getAttribute('aria-label') ?? el.textContent ?? '').trim());
+    }
+    return out;
+  });
+  check(
+    '示例按钮的可及名非空且是完整一句',
+    names.length === 3 && names.every((n) => n.length >= 6),
+    JSON.stringify(names),
+  );
+
+  if (reached) {
+    await pKb.keyboard.press('Enter');
+    await pKb.waitForTimeout(400);
+    check(
+      '键盘 Enter 触发填充（不靠鼠标）',
+      (await pKb.getByTestId('capture-input').inputValue()) === '明天下午3点 给客户回邮件',
+    );
+  }
+  await ctxKb.close();
 } finally {
   await browser.close();
 }
