@@ -110,7 +110,23 @@ def analyse(path: str) -> dict:
         x0, y0, x1, y1 = box
         if y1 - y0 <= 0 or clip_excluded(y0, y1):
             continue
-        texts.append((y0, x0, y1 - y0, text))
+        texts.append((y0, x0, y1 - y0, text, x1, y1))
+    texts.sort()
+    # 🔴 **排除被别的节点包含的节点**：uiautomator 的树里一个"行"常同时出现
+    # 三层（容器 / 可点行 / 里面的文字），三层 y 各不相同，于是"相邻间隙"
+    # 里混进了嵌套差（task-detail 的 19/20/24 就是这么来的）。
+    # 口径：如果一个节点的 bounds 完全被另一个**更晚出现**的节点包含，就只留后者。
+    outer = []
+    for t in texts:
+        y0, x0, h, txt, x1, y1 = t
+        contained = any(
+            o[0] <= y0 and o[1] <= x0 and o[4] >= x1 and o[5] >= y1
+            for o in texts
+            if o is not t and (o[5] - o[0]) > (y1 - y0)
+        )
+        if not contained:
+            outer.append(t)
+    texts = [(t[0], t[1], t[2], t[3]) for t in outer]
     texts.sort()
 
     # ① 「小标题 + 紧跟一串更大的同 x 文本」= 组标题（高度比 < 1 是层级的硬伤）

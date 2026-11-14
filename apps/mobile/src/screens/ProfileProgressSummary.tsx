@@ -5,6 +5,7 @@
  * 选择器，完整里程碑与热力图仍然只在 GrowthScreen 展开。
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { View } from 'react-native';
 import { useI18n } from '@heyta/i18n';
 import { milestonesFromState, weeklyReviewFromState, type MotivationTables } from '@heyta/app-host';
 import { SettingsRow, settingsRowKey, type SettingsRowModel } from '@heyta/ui';
@@ -13,6 +14,7 @@ import { openTaskHost } from '../db/open-host';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { onLocalWrite } from '../sync/write-signal';
+import { SPACING_ROLE } from '@heyta/design-system';
 import { Button, Card, SectionHeader, Stack, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { useTokens } from '../theme';
@@ -118,8 +120,19 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
 
   return (
     <>
-      <SectionHeader title={t('mobile.profile.section.progress')} />
-      <Card>
+      {/*
+        🔴 组标题与它管辖的卡片要**成组**（4dp），不能交给 `Screen` 的 gap(16dp)。
+        真机实测（`heyta-profile.xml`）：「近期状态」→ 第一行是 **32dp** ——
+        16（Screen gap）+ 16（另一层）= 32，组标题浮在两组中间，
+        而它本该"属于下面那一组"。
+
+        `SPACING_ROLE['label-to-control']` 表达的就是这个关系。
+        ⚠️ 只有这一个屏到此为止；其余 35 处 `SectionHeader` 的调用点还在
+        `Screen` gap 之下 —— 逐个收敛是下一轮的事，这一轮先把实测超标的那一处修掉。
+      */}
+      <View style={{ gap: tokens[SPACING_ROLE['label-to-control']] }}>
+        <SectionHeader title={t('mobile.profile.section.progress')} />
+        <Card>
         {rows.map((row, index) => (
           <SettingsRow key={settingsRowKey(row, index)} row={row} />
         ))}
@@ -131,7 +144,8 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
             <Button label={t('mobile.profile.progress.retry')} onPress={retry} tone="secondary" />
           </Stack>
         ) : null}
-      </Card>
+        </Card>
+      </View>
     </>
   );
 }
