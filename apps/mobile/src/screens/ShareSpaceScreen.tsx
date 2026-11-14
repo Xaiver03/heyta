@@ -699,6 +699,23 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
 
       {selected === undefined ? (
         <>
+          {/*
+            🔴 2026-11-15：**两边都空时只出一张卡**。
+            
+            看图才发现的：这一屏首屏是两张结构相同的卡，第一张写「还没有共享出去的清单」、
+            第二张写「没有可共享的清单」—— 同一屏说两遍"没有"，占掉近半屏。
+            
+            只有一边为空时仍分成两张：那时它们是不同的信息
+            （"别人没共享给我"与"我没有可以共享出去的"确实是两件事）。
+          */}
+          {sharedRows.length === 0 && shareable.length === 0 ? (
+            <Card>
+              <Text variant="row-meta" tone="subtle" testID="share-space-both-empty">
+                {t('mobile.share.space.bothEmpty')}
+              </Text>
+            </Card>
+          ) : (
+          <>
           <Card>
             <Text variant="row-title" tone="default">{t('mobile.share.space.sharedTitle')}</Text>
             {sharedRows.length === 0 ? (
@@ -743,6 +760,8 @@ export default function ShareSpaceScreen({ onBack }: { onBack: () => void }): Re
               </Stack>
             )}
           </Card>
+          </>
+          )}
 
           <Button label={t('web.share.join.button')} tone="primary" testID="share-join-entry" onPress={() => setView('join')} />
 

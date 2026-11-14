@@ -6186,6 +6186,17 @@ export const zhCN = {
   'mobile.share.space.shareableTitle': '可共享的清单',
   'mobile.share.space.noneYet': '还没有共享出去的清单',
   'mobile.share.space.shareableEmpty': '没有可共享的清单',
+  /*
+   * 🔴 2026-11-15：两边都空时用这一句，替掉「还没有共享出去的清单」+「没有可共享的清单」
+   * 两张卡各说一遍"没有"。同一屏说两遍同一件事，用户读到的信息量只有一半。
+   * 只有**一边**为空时仍用各自那句 —— 那时它们是不同的信息（"没有别人共享给我的"
+   * 与"没有我可以共享出去的"确实是两件事）。
+   */
+  /*
+   * ⚠️ 第一版我写的是"在「可共享的清单」里挑一份" —— 而合并之后**那张卡已经不显示了**。
+   * 文案引用了一个屏幕上不存在的东西。改成只指向真正还在的东西（下面那颗按钮）。
+   */
+  'mobile.share.space.bothEmpty': '还没有共享清单。点下面的按钮，加入别人共享给你的。',
   'mobile.share.space.commentsTitle': '评论区',
   'mobile.share.space.noTasks': '这条共享清单里还没有任务',
   'mobile.share.space.pickTask': '选一条任务看它的评论',
