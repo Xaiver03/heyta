@@ -3410,7 +3410,7 @@ export const en = {
   'common.organizer.lists.empty': 'No lists yet',
   'common.organizer.lists.empty.hint': 'Type a name to create one.',
   'mobile.lists.nameLabel': 'List name',
-  'mobile.lists.newPlaceholder': 'Name your new list',
+  'mobile.lists.newPlaceholder': 'e.g. Work, Home, Reading',
   'mobile.lists.add': 'New list',
   'mobile.lists.removeHint': 'Deleting a list does not delete its tasks — they go back to the Inbox.',
   'mobile.lists.remove': 'Delete list "{name}"',

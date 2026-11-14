@@ -231,7 +231,16 @@ export function ListsSection(): React.JSX.Element {
 
   return (
     <>
-      <SectionHeader title={t('mobile.profile.section.lists')} />
+      {/*
+        🔴 2026-11-15：**去掉这个组标题**。
+        
+        这一屏的顶栏已经写着「清单」（`<Screen title=…>`），组标题再写一遍「清单」——
+        同一屏同一个词出现两次，而它没有任何分组作用（这屏只有一组）。
+        
+        `SettingsScreen` 的设置目录那一屏我在第 3 轮做过同样的事：
+        「组标题只用来分隔多组，单组页面不需要它」。
+      */}
+      {null}
       <Card>
         {/*
           🔴 行骨架来自共享 `OrganizerList` —— 本文件**不许**自己画一行。

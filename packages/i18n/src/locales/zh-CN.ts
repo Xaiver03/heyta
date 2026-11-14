@@ -3720,7 +3720,12 @@ export const zhCN = {
   // 移动端用户会去找一个不存在的按钮。改成两端都为真的说法。
   'common.organizer.lists.empty.hint': '输入名称就能新建清单。',
   'mobile.lists.nameLabel': '清单名称',
-  'mobile.lists.newPlaceholder': '给新清单起个名字',
+  /*
+   * 🔴 2026-11-15：原来 "给新清单起个名字" —— 而它上面的 label 是 "清单名称"。
+   * 同一张卡里"清单"出现两次，占位符的第一句是纯重复。
+   * 占位符的职责是**举例子**（同「习惯」页那次修复）。
+   */
+  'mobile.lists.newPlaceholder': '例如「工作」「家里」「读书」',
   'mobile.lists.add': '新建清单',
   // 删除清单**不删里面的任务**（见 `project-actions.ts` 文件头第 2 条）。
   // 这句话必须写在界面上：不说的话，用户会以为删除等于连任务一起删掉，
