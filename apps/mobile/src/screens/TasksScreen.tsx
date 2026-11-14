@@ -1466,14 +1466,24 @@ export function TasksScreen({
         */}
         <View style={{ paddingTop: tokens['space.2'], gap: tokens['space.1'] }}>
           <Text variant="section-title">{formatDayTitleText(toLocalDate(now), t)}</Text>
-          <Text variant="row-meta" tone="muted">
-            {nothing
-              ? t('mobile.tasks.summary.empty')
-              : t('mobile.tasks.summary.counts', {
-                  pending,
-                  completed: groups.completed.length,
-                })}
-          </Text>
+          {/*
+            🔴 2026-11-15：空态时**不画这行副标题**。
+            
+            看图才发现的：空态屏上同时出现两句同义的话 ——
+            这里一句「还没有任务」，中间空态组件一句「今天还没有安排」+「点右下角的加号」。
+            同一屏说两遍，而且第二句还带着用户该做什么。
+            
+            判据：**空态组件已经承担了"这一屏为什么空 + 我该做什么"**，
+            副标题在那种状态下没有新信息，只制造重复。
+          */}
+          {nothing ? null : (
+            <Text variant="row-meta" tone="muted">
+              {t('mobile.tasks.summary.counts', {
+                pending,
+                completed: groups.completed.length,
+              })}
+            </Text>
+          )}
         </View>
         {/*
           列表内过滤框：**按需展开**，不常驻。
