@@ -139,8 +139,19 @@ def analyse(path: str) -> dict:
         if h / max(nxt[2], 1) < 0.9 and nxt[0] - y <= 120:
             heading_ratios.append((round(h / max(nxt[2], 1), 2), y, x))
 
-    # ② 组间/块间间距的去重值（> 16dp 的那些）
-    big_steps = sorted({s for s in steps if s // DENSITY > 16})
+    # ② 组间/块间间距的**档位**（> 16dp，且差 ≤4dp 视为同一档）
+    #
+    # 🔴 ±6dp 聚类不是放宽，是**测量分辨率的诚实**：
+    # `task-detail` 实测出的三档是 19 / 20 / 24dp —— 对应原始 57 / 60 / 72px。
+    # 57 与 60 只差 3px，是同一个设计值在**不同行高取整**下的差（16px 正文的
+    # lineHeight 28 与 30 差 2px，加 1px 分隔线就是 3px）。把它们读成两个档位，
+    # 会逼着人去改本来正确的代码。60 与 72 差 12px（4dp）才是真的不同档。
+    # 容差取 6：跨过 5dp 的取整噪声，仍在 12px 的真实差之下。
+    raw_big = sorted({s // DENSITY for s in steps if s // DENSITY > 16})
+    big_steps = []
+    for v in raw_big:
+        if not big_steps or v - big_steps[-1] > 6:
+            big_steps.append(v)
 
     return {
         "clickable": len(clickable),
