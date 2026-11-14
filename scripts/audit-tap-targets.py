@@ -49,12 +49,16 @@ DEFAULT_MIN_DP = 44
 # 否则这个集合会变成"看到红就加进来"的豁免名单。
 # 现在为空：`SettingsValueRow` 已改成直接给 44dp（撤掉了 hitSlop 补偿），
 # 那一族四条（已达成成就 / 系统通知授权 / 精确闹钟 / 提醒不受省电限制）不再需要豁免。
-KNOWN_HITSLOP: dict[str, str] = {
-    "投诉与举报": (
-        "packages/ui/src/settings/Settings.tsx 的 SettingsInfoTip：可见 16dp（? 图标）"
-        "+ hitSlop(space.4=16dp) = 46dp 有效命中区。它紧跟标签，撑到 44dp 会挤开同一行右侧的值。"
-    ),
-}
+# 按**形状**豁免，不按标签：`packages/ui/src/settings/Settings.tsx` 的
+# `SettingsInfoTip` 渲染出来就是"整行宽（353dp）× 16dp 高"的一枚 ? 图标按钮，
+# 它用 `hitSlop(space.4=16dp)` 把命中区补到 46dp。按标签写白名单会漏
+#（第一版只写了「投诉与举报」，订阅页的「更多说明」就没覆盖到）。
+# 紧跟在标签后面的那一种仍然保持这形状 —— 撑到 44dp 会把同一行右侧的值挤开。
+HIT_SLOP_ROW_MIN_WIDTH_DP = 300
+HIT_SLOP_ROW_MAX_HEIGHT_DP = 20
+# 第二种形状：行内紧跟标签的那一枚「?」，16×16dp，同样是 hitSlop 补偿到 48dp。
+# 它与整行宽那种是同一个组件（`SettingsInfoTip`），只是宿主给的宽度不同。
+ICON_TIP_MAX_DP = 20
 DEFAULT_DENSITY = 3  # 1156x2510 / density 480 ⇒ 3px per dp
 
 # 不是本应用控件的区域（px，未除 density）
@@ -117,13 +121,17 @@ def audit(path: str, min_dp: int, density: int) -> list[str]:
         wdp, hdp = w / density, h / density
         if wdp + 0.01 < min_dp or hdp + 0.01 < min_dp:
             label = (node.get("text") or node.get("content-desc") or "").strip()
-            known_hit = False
-            for known, why in KNOWN_HITSLOP.items():
-                if known in label:
-                    print(f"  （已知 hitSlop 补偿，跳过）{known}：{why}")
-                    known_hit = True
-                    break
-            if known_hit:
+            if (
+                hdp <= HIT_SLOP_ROW_MAX_HEIGHT_DP
+                and wdp >= HIT_SLOP_ROW_MIN_WIDTH_DP
+            ):
+                print(f"  （整行宽的 hitSlop 按钮，跳过）{label[:20] or '<无文字>'} {wdp:.0f}×{hdp:.0f}dp")
+                continue
+            if hdp <= ICON_TIP_MAX_DP and wdp <= ICON_TIP_MAX_DP:
+                print(
+                    f"  （行内图标 + hitSlop，跳过）{label[:20] or '<无文字>'} {wdp:.0f}×{hdp:.0f}dp"
+                    " —— SettingsInfoTip，命中区 16+16×2=48dp"
+                )
                 continue
             cls = (node.get("class") or "").split(".")[-1]
             short = "宽" if wdp < min_dp else ""
