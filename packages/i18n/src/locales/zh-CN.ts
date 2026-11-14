@@ -1696,6 +1696,7 @@ export const zhCN = {
   'web.habits.goal.summaryExactly': '恰好 {target}{unit}',
   'web.habits.goal.target': '数值',
   'web.habits.goal.unit': '单位',
+  'web.habits.goal.targetPlaceholder': '例如 8',
   'web.habits.goal.unitPlaceholder': '杯 / 页 / 分钟',
   'web.habits.goal.atLeast': '至少',
   // 口径那一行的**标签**。此前它复用 `goal.atLeast`（"至少"）⇒
@@ -3790,7 +3791,8 @@ export const zhCN = {
   // 同 `lists.empty.hint`：web 有那枚 +，移动端没有（移动端是输入框 + 按钮）。
   'common.organizer.tags.empty.hint': '输入名称就能新建标签。',
   'mobile.tags.nameLabel': '标签名称',
-  'mobile.tags.newPlaceholder': '给新标签起个名字',
+  /* 字段名是「标签名称」—— 占位符不该再复述「标签」。 */
+  'mobile.tags.newPlaceholder': '例如「重要」「等待」「参考」',
   'mobile.tags.add': '新建标签',
   // 与清单那条同理，但这里更微妙：用户看到"这个标签在 5 个任务上用着"时，
   // 会以为删除等于动那 5 个任务。不说清楚就会**不敢删**。
@@ -4431,7 +4433,8 @@ export const zhCN = {
   'mobile.export.shareHint': '导出内容会交给系统分享面板，由你选择保存或发送到哪里。',
   'mobile.import.pasteLabel': '粘贴 CSV 文本',
   'mobile.import.label': '导入滴答清单',
-  'mobile.import.pastePlaceholder': '在这里长按粘贴滴答清单导出的 CSV',
+  /* 字段名是「粘贴 CSV 文本」—— 占位符不该再复述「粘贴」「CSV」。 */
+  'mobile.import.pastePlaceholder': '从滴答清单导出的文件里选中全部文字',
   'mobile.import.preview': '预览',
   'mobile.import.pasteNotFile': '粘贴滴答清单导出的 CSV；先预览，确认后才会添加到任务清单。',
   'mobile.export.shareTitle': 'heyta 导出',
@@ -5407,7 +5410,8 @@ export const zhCN = {
   'web.share.join.title': '加入共享清单',
   'web.share.join.subtitle': '粘贴邀请凭证或链接。接受后清单会出现在侧栏，内容对双方之外的人（包括服务器）始终加密。',
   'web.share.join.tokenLabel': '邀请凭证或链接',
-  'web.share.join.tokenPlaceholder': '粘贴你收到的凭证或链接',
+  /* 字段名是「邀请凭证或链接」—— 占位符改成说明它的**形状**。 */
+  'web.share.join.tokenPlaceholder': '例如一串 32 位字符，或对方发来的那一串字符',
   'web.share.join.nameLabel': '清单名称（仅本机显示）',
   'web.share.join.namePlaceholder': '例如：家庭装修',
   'web.share.join.submit': '加入',

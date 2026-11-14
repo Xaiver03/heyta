@@ -109,7 +109,11 @@ export function HabitGoalSlot({
             value={draftTarget}
             onChangeText={setDraftTarget}
             keyboard="number-pad"
-            placeholder={t('web.habits.goal.target')}
+            /*
+             * 🔴 2026-11-15：原来 label 与 placeholder **是同一个 key** ——
+             * 同一个词在输入框上方和框里各印一次，`check:title-collision` 判红。
+             */
+            placeholder={t('web.habits.goal.targetPlaceholder')}
             testID={`habit-goal-target-${habit.id}`}
           />
           <TextField
