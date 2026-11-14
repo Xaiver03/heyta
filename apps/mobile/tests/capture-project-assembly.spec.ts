@@ -26,8 +26,15 @@ describe('① 共享层：两条提交路都带落点', () => {
   const code = stripComments(read('packages/ui/src/capture/CaptureComposer.tsx'));
 
   it('规则解析那一路（submit）过 withCaptureProject', () => {
+    /*
+     * 🔴 匹配到 `withCaptureProject(` 为止，**不锁第一个实参的名字**。
+     * 这里守的是"提交必须过 withCaptureProject"这条行为，不是"中间变量叫 plan"。
+     * 2026-11-14 加描述那一行时，中间变量从 `plan` 变成了 `withDescription`
+     * （`plan` + 描述拼出来的新对象），断言就红了 —— 而行为一点没变。
+     * 锁变量名的断言会在每次重构时假红一次，然后被人改成 `.*` 之后再也不红。
+     */
     expect(code).toMatch(
-      /onSubmit\(withCaptureProject\(plan, captureSelectedProject\(projectPicker\)\?\.id\)\)/,
+      /onSubmit\(withCaptureProject\(\s*\w+,\s*captureSelectedProject\(projectPicker\)\?\.id\)\)/,
     );
   });
 
