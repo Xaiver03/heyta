@@ -292,7 +292,17 @@ export interface CaptureComposerProps {
 function makeStyles(tokens: HeytaNativeTokens) {
   return StyleSheet.create({
     wrap: {
-      gap: tokens['space.2'],
+      /**
+       * 🔴 这里曾是 `space.2`（8dp），而 `projectWrap` 也是 8dp ⇒
+       * 「标题输入 → 快捷胶囊 → 落点标签 → 落点胶囊」四段的间距**完全一样**。
+       * 真机实测（新建面板）：输入行底 1010 → 落点标签 1034（24px=8dp）→
+       * 落点胶囊 1112（也是 24px=8dp）。眼睛读不出"标签属于它下面那枚胶囊"。
+       *
+       * 段落之间拉到 12dp，标签→控件收到 4dp（`projectWrap`），
+       * 两档之比 3:1 —— 这是 `docs/agents/ux-principles.md` §6b 第三条要求的
+       * "标签离它控制的东西更近"。
+       */
+      gap: tokens['space.3'],
     },
     /** 输入行：输入框吃掉剩余宽度，按钮贴右。 */
     compose: {
@@ -363,14 +373,25 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: tokens['space.1'],
-      minHeight: tokens['size.chip-height'],
+      /**
+       * 🔴 这里曾是 `size.chip-height`（28px）—— 那是"**标签胶囊**"的高度，
+       * 用来画一枚**可点的选项**就低于触控下限。真机实测：新建面板里那枚
+       * 「收集箱」落点按钮矩形 `[48,1160][223,1244]` ⇒ **28dp 高**，
+       * 而同屏的标题输入框是 44dp（`touch-target.min`）。
+       *
+       * 它同时犯了两条：① 触控目标不足；② 同一张表单里出现了两档控件高度。
+       * 取值改用 `touch-target.min`，与输入框同档 —— 这也让 web 端的 chip 一起变高，
+       * 但 web 的输入框本来就是 44，一致性优先于"胶囊看起来更小"。
+       */
+      minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.chip-padding-x'],
       borderRadius: tokens['radius.full'],
       backgroundColor: tokens['color.primary-subtle'],
     },
     /** 标题独占一行，芯片在它下面成组 —— 芯片是换行排的，标题混进去会像第一枚芯片。 */
     projectWrap: {
-      gap: tokens['space.2'],
+      /** 标签**属于**它下面那一排胶囊 ⇒ 比段落间距更近（§6b 第三条）。 */
+      gap: tokens['space.1'],
     },
     projectRow: {
       flexDirection: 'row',
@@ -382,7 +403,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
       color: tokens['color.foreground-subtle'],
     },
     projectChip: {
-      minHeight: tokens['size.chip-height'],
+      /** 同上：可点 ⇒ 触控下限，不用"标签胶囊"那一档。 */
+      minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.chip-padding-x'],
       borderRadius: tokens['radius.full'],
       borderWidth: tokens['border-width.thin'],
