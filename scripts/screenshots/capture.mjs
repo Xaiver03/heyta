@@ -503,27 +503,57 @@ for (const job of jobs) {
       // 新渲染的 tab 读取 aria-selected，而不是从已卸载的 menuitem 读取。
         // 菜单路径要从**新渲染的 tab** 读选中态，而不是从已卸载的 menuitem 读。
         // 窄屏抽屉里没有 `role=tab`（见上面 `rail-view-{view}` 那段），所以按 testid 优先。
-        const selectedControl = opened.viaMenu
-        ? (target.view !== undefined
-            ? page.getByTestId(`rail-view-${target.view}`).first()
-            : page.getByRole('tab', { name: target.readyText, exact: false }).first())
-        : control;
         const deadline = Date.now() + 5_000;
         let selected = false;
         while (Date.now() < deadline) {
+          // 🔴 每轮**重新查**，不复用点击前拿到的那个 locator。
+          //
+          // 2026-11-14 实测（W07 回收站）：点下去视图真的切了，但那次点击触发了
+          // 侧栏重渲染，旧 locator 指向的节点被卸载 ⇒ `getAttribute` 一直重试到
+          // 30 秒超时，报的还是"回收站"这个名字，读起来像"没切换"。
+          // 重查一次就能读到新节点的选中态。
+          const fresh = opened.viaMenu
+            ? (target.view !== undefined
+                ? page.getByTestId(`rail-view-${target.view}`).first()
+                : page.getByRole('tab', { name: target.readyText, exact: false }).first())
+            : page
+                .getByRole('tab', { name: target.readyText, exact: false })
+                .or(page.getByRole('button', { name: target.readyText, exact: false }))
+                .first();
           // 🔴 两种选中态都要认：
           //    · 桌面 rail（`RailNavigation`）的 tab 用 `aria-selected`
-          //    · **窄屏抽屉（`CompactRailNavigation`）用的是 `aria-current="page"`**
-          //      （它的 tab 是普通 `<button>`，不是 `role=tab`）
-          // 2026-11-14 实测：只读 `aria-selected` 会让 MW01 永远判"没切换"，
+          //    · **窄屏抽屉（`CompactRailNavigation`）与侧栏 `NavButton` 用的是
+          //      `aria-current="page"`**（它们是普通 `<button>`，不是 `role=tab`）
+          // 2026-11-14 实测：只读 `aria-selected` 会让 MW01 / W07 永远判"没切换"，
           // 而点击其实成功了 —— 报错还会把人引向"有遮挡物"的错误方向。
-          if ((await selectedControl.getAttribute('aria-selected')) === 'true') {
-          selected = true;
-            break;
-          }
-          if ((await selectedControl.getAttribute('aria-current')) === 'page') {
-            selected = true;
-            break;
+          if ((await fresh.count()) > 0) {
+            const sel = await fresh.getAttribute('aria-selected').catch(() => null);
+            const cur = await fresh.getAttribute('aria-current').catch(() => null);
+            if (sel === 'true' || cur === 'page') {
+              selected = true;
+              break;
+            }
+          } else {
+            /*
+             * 🔴 控件本身没了的时候，用**页面标题**回读。
+             *
+             * 2026-11-14 实测（W07 回收站）：它住在**侧栏底部**（`SIDEBAR_TOOL_TABS`
+             * → `NavButton`），而**侧栏只在任务视图渲染** —— 点下去视图真的切到回收站，
+             * 侧栏连同那枚按钮一起被卸载 ⇒ 控件回读永远拿不到，报出来却是
+             * "aria-selected 没变成 true，视图没有真的切换"，把人引向错误方向。
+             *
+             * 标题是从 `view` 派生的（`App.tsx` 的 `<h1 class="ht-header__title">`），
+             * 所以它同样能证"视图真的切了"，而且不依赖导航控件还在不在。
+             */
+            const heading = await page
+              .locator('.ht-header__title')
+              .first()
+              .textContent()
+              .catch(() => null);
+            if (heading !== null && heading.trim() === target.readyText) {
+              selected = true;
+              break;
+            }
           }
           await page.waitForTimeout(100);
         }
