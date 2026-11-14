@@ -485,7 +485,18 @@ export function TaskDetailSheet({
         gap: tokens['space.2'],
       },
       /** 属性行（收起态那一行）：标签在左、值在右（§1 的 `inline` 解剖）。 */
+      /**
+       * 属性行（图标 + 值 + 尾部按钮）。
+       *
+       * 🔴 2026-11-14 补 `flexDirection: 'row'`。这一格此前**只有 `alignItems: 'center'`**
+       * 而没有方向 —— RN 的默认方向是 `column`，于是它渲染成
+       * 「图标在上 / 文字居中 / 箭头在下」的**竖排**。
+       *
+       * 看图才发现的：整屏其它内容都在 x=48 左对齐，唯独「未设截止」那一组
+       * 在屏幕正中。它不是被刻意居中的，是**少写了一行**。
+       */
       propRow: {
+        flexDirection: 'row' as const,
         alignItems: 'center' as const,
         gap: tokens['space.2'],
         minHeight: tokens['touch-target.min'],
@@ -1356,6 +1367,16 @@ export function TaskDetailSheet({
             pressed && !reducedMotion ? styles.pressed : undefined,
           ]}
         >
+          {/*
+            🔴 2026-11-14 加标签。看图才发现的：空备注时那句「写点什么」还算自解释，
+            但**有内容之后**它就孤零零一行黑字 —— 「hellonote」既不像标题也不像说明，
+            用户读不出"这是这条任务的备注"。
+            `mobile.detail.field.note`（「备注」）本来就在编辑态用着，这一格只是
+            把同一个词放到收起态，不造第二个名字。
+          */}
+          <Text variant="caption" tone="subtle">
+            {t('mobile.detail.field.note')}
+          </Text>
           <Text
             variant="row-title"
             tone={note.trim() === '' ? 'subtle' : 'muted'}
