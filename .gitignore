@@ -305,3 +305,18 @@ apps/*/evidence/
 docs/research/evidence/
 docs/research/spikes/*/evidence/
 e2e/apps/*/evidence/
+
+# ── 上面那条的**唯一**例外：证据目录自己的 README ─────────────────────────────
+# README 不是证据，是「证据 ↔ 文档」的关联表：哪个子目录为哪条结论作证、
+# 什么时候该删、删了怎么恢复。它必须随克隆分发，否则下一个人进来还是只看到
+# 一坨没有出处的截图 —— 那正是 2026-11-14 产品负责人说的「现有的目录根本没有用起来」。
+#
+# ⚠️ 写法必须是这三段式：`apps/*/evidence/` 忽略的是**目录**，而 git 不会进被忽略的
+#    目录里找例外；先 `!` 放行目录、再用 `dir/*` 忽略内容、最后单独 `!` 放行 README。
+#    只写 `!apps/mobile/evidence/README.md` 是无效的（2026-11-14 实测 check-ignore 仍判忽略）。
+!apps/mobile/evidence/
+apps/mobile/evidence/*
+!apps/mobile/evidence/README.md
+!apps/web/evidence/
+apps/web/evidence/*
+!apps/web/evidence/README.md

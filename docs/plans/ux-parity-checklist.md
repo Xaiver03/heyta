@@ -95,6 +95,8 @@
 
 ## 4. 已关闭项与证据
 
+> 真机原图与 `uiautomator dump` 在 [`apps/mobile/evidence/ux-parity-20261114/`](../../apps/mobile/evidence/ux-parity-20261114/)（png + xml 成对，bounds ÷3 = dp；口径与留删规则见 [证据目录说明](../../apps/mobile/evidence/README.md)）。
+
 | 日期 | 项 | 改了什么 | 判据 |
 |---|---|---|---|
 | 11-14 | M1 任务列表 | 三样并列入口（搜索框 + 2 胶囊，实测 256px ≈ 85dp）收进 `⋯`；首行列表 y 1017 → 705 | 真机 bounds |
