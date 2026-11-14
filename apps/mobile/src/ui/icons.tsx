@@ -251,8 +251,15 @@ export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'tab';
 
 export interface IconProps {
   name: IconName;
-  /** 默认 `md`。标签栏用 `tab`。 */
-  size?: IconSize;
+  /**
+   * 默认 `md`。标签栏用 `tab`。
+   *
+   * 🔴 也接受 **token 全名**（`'icon.sm'`）：形状契约
+   * （`packages/design-system/src/choice-row-shape.ts` 这类）登记的是
+   * `TokenName`，让调用方自己把 `'icon.sm'` 拆成 `'sm'` 会在每个调用点
+   * 复制一次那条规则，而复制必然漂移。
+   */
+  size?: IconSize | `icon.${IconSize}`;
   /** 描边色。不传则用 `color.foreground`。 */
   color?: string;
   /** 描边宽度。Lucide 默认 2；标签栏用 2 更清楚，正文旁用 1.75 更轻。 */
@@ -269,7 +276,10 @@ export function Icon({
   const Glyph = ICONS[name];
   // 标签栏图标用 nav 组的 token（它与 11px 字标签同居，视觉尺寸是配套的），
   // 其余用 icon 组。
-  const px = size === 'tab' ? t['nav.tab-icon-size'] : t[`icon.${size}`];
+  // `tab` 不属于 `icon.*` 那一族（它有自己与 11px 字标签配套的尺寸）。
+  const px = size === 'tab'
+    ? t['nav.tab-icon-size']
+    : t[(size.startsWith('icon.') ? size : `icon.${size}`) as `icon.${Exclude<IconSize, 'tab'>}`];
 
   return (
     <Glyph

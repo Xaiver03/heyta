@@ -116,6 +116,7 @@ export { extractVars, extractReducedMotion, resolveAllVars } from './css-tokens.
 // "落地页的 DOM 复刻件"能从**同一份**形状派生，而不是各抄一组字号与间距。
 // 动机与那次实测漂移（勾选框 20 vs 22px、标题 sm vs base）见该文件头。
 export { TASK_ROW_SHAPE, TASK_ROW_TEXT } from './task-row-shape.js';
+export { CHOICE_ROW_SHAPE, CHOICE_ROW_TEXT } from './choice-row-shape.js';
 
 /**
  * Apple 弹簧参数（`motion.spring-*`）→ 二阶系统物理三件套。

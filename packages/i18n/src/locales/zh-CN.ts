@@ -3501,6 +3501,7 @@ export const zhCN = {
   'mobile.tasks.viewOptions.title': '视图选项',
   'mobile.tasks.viewOptions.open': '视图选项：{view}',
   'mobile.tasks.viewOptions.close': '关闭视图选项',
+  'mobile.tasks.viewOptions.viewGroup': '视图',
   'mobile.tasks.viewOptions.dueMode': '日期显示',
   'mobile.detail.schedule.open': '展开排期',
   'mobile.detail.schedule.close': '收起排期',

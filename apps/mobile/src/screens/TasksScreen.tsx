@@ -37,6 +37,7 @@ import {
   type QuadrantTaskPatch,
 } from '@heyta/domain';
 import type { Project, Tag, Task, TaskSortKey } from '@heyta/domain';
+import { CHOICE_ROW_SHAPE } from '@heyta/design-system';
 // `formatDayTitleText` 在壳里把领域层给的 `LocalDate` 说成当前语言：
 // **"某一天的标题"的日期语义（`isoWeekday`、`parseLocalDate`）仍只有领域层一份**，
 // 壳里只负责措辞（见 `apps/mobile/src/lib/date.ts` 文件头）。
@@ -91,6 +92,7 @@ import { quadrantBoardLabels } from '../lib/quadrant-display';
 import { useText, useTheme, useTokens } from '../theme';
 import {
   Button,
+  ChoiceRows,
   EmptyState,
   Fab,
   IconButton,
@@ -417,6 +419,29 @@ function TaskViewOptions({
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
 
+  /**
+   * 🔴 三组**同构**：都是 `ChoiceRows`（一个组标签 + 若干等高行 + 右侧选中记号）。
+   *
+   * 这里此前是三组三种形态 —— 视图/日期显示是圆形 Chip，排序是四条通栏
+   * `Button` 且选中那一项换成 `tone="primary"`（一条蓝底横杠）。同一张面板里
+   * 行高一致（44）但**左缘、行宽、选中记号、对齐轴全不一样**，
+   * 而 `check:design` 只看"值是不是 token"，读不出来。
+   * 事故记录与形状契约：`packages/design-system/src/choice-row-shape.ts`。
+   */
+  const viewOptions = [
+    { key: 'list' as const, label: t('mobile.tasks.view.list') },
+    { key: 'quadrant' as const, label: t('mobile.tasks.view.quadrant') },
+    { key: 'timeline' as const, label: t('mobile.tasks.view.timeline') },
+  ];
+  const dueOptions = [
+    { key: 'date' as const, label: t('mobile.tasks.mode.date') },
+    { key: 'countdown' as const, label: t('mobile.tasks.mode.countdown') },
+  ];
+  const sortOptions = TASK_SORT_OPTIONS.map((option) => ({
+    key: option,
+    label: taskSortName(t, option),
+  }));
+
   return (
     <Modal
       visible={visible}
@@ -447,8 +472,8 @@ function TaskViewOptions({
           borderTopRightRadius: tokens['radius.xl'],
           paddingTop: tokens['space.4'],
           paddingHorizontal: tokens['screen.gutter'],
-          paddingBottom: insets.bottom + tokens['space.8'],
-          gap: tokens['space.2'],
+          paddingBottom: insets.bottom + tokens['space.6'],
+          gap: tokens['space.4'],
           maxHeight: '90%',
         }}
       >
@@ -467,69 +492,49 @@ function TaskViewOptions({
             onPress={onClose}
           />
         </View>
-        <ScrollView contentContainerStyle={{ gap: tokens['space.2'] }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
-            <Chip
-              label={t('mobile.tasks.view.list')}
-              selected={view === 'list'}
-              onPress={() => {
-                onSelectView('list');
-                onClose();
-              }}
-            />
-            <Chip
-              label={t('mobile.tasks.view.quadrant')}
-              selected={view === 'quadrant'}
-              onPress={() => {
-                onSelectView('quadrant');
-                onClose();
-              }}
-            />
-            <Chip
-              label={t('mobile.tasks.view.timeline')}
-              selected={view === 'timeline'}
-              onPress={() => {
-                onSelectView('timeline');
-                onClose();
-              }}
-            />
-          </View>
+
+        <ScrollView
+          contentContainerStyle={{
+            // 🔴 组与组之间是**唯一**表达"换了一件事"的手段，
+            // 所以它必须比组内（0）和标签→行（4）都大。
+            gap: tokens[CHOICE_ROW_SHAPE.groupGap],
+            paddingBottom: tokens['space.4'],
+          }}
+        >
+          <ChoiceRows
+            groupLabel={t('mobile.tasks.viewOptions.viewGroup')}
+            options={viewOptions}
+            value={view}
+            onChange={(next) => {
+              onSelectView(next);
+              onClose();
+            }}
+            testID="view-options-view"
+          />
 
           {view === 'timeline' ? null : (
-            <>
-              <Text variant="caption" tone="muted">{t('mobile.tasks.viewOptions.dueMode')}</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
-                <Chip
-                  label={t('mobile.tasks.mode.date')}
-                  selected={dueMode === 'date'}
-                  onPress={() => onSelectDueMode('date')}
-                />
-                <Chip
-                  label={t('mobile.tasks.mode.countdown')}
-                  selected={dueMode === 'countdown'}
-                  onPress={() => onSelectDueMode('countdown')}
-                />
-              </View>
-            </>
+            <ChoiceRows
+              groupLabel={t('mobile.tasks.viewOptions.dueMode')}
+              options={dueOptions}
+              value={dueMode}
+              onChange={onSelectDueMode}
+              testID="view-options-due"
+            />
           )}
 
           {view === 'list' ? (
-            <View style={{ gap: tokens['space.2'] }}>
-              <Text variant="caption" tone="muted">{t('mobile.tasks.sort.choose')}</Text>
-              {TASK_SORT_OPTIONS.map((option) => (
-                <Button
-                  key={option}
-                  icon="action.sort"
-                  label={taskSortName(t, option)}
-                  tone={option === currentSort ? 'primary' : 'ghost'}
-                  onPress={() => {
-                    onSelectSort(option);
-                    onClose();
-                  }}
-                />
-              ))}
-            </View>
+            <ChoiceRows
+              groupLabel={t('mobile.tasks.sort.choose')}
+              options={sortOptions}
+              value={currentSort}
+              onChange={(next) => {
+                onSelectSort(next);
+                onClose();
+              }}
+              testID="view-options-sort"
+            />
           ) : null}
+
           <Text variant="caption" tone="muted">{t('mobile.tasks.gestureHint')}</Text>
         </ScrollView>
       </View>

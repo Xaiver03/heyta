@@ -3228,6 +3228,7 @@ export const en = {
   'mobile.tasks.viewOptions.title': 'View options',
   'mobile.tasks.viewOptions.open': 'View options: {view}',
   'mobile.tasks.viewOptions.close': 'Close view options',
+  'mobile.tasks.viewOptions.viewGroup': 'View',
   'mobile.tasks.viewOptions.dueMode': 'Date display',
   'mobile.detail.schedule.open': 'Show scheduling',
   'mobile.detail.schedule.close': 'Hide scheduling',

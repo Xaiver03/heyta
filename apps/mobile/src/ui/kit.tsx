@@ -46,7 +46,11 @@ import {
   type ControlEmphasis,
   type ControlTone,
 } from '@heyta/ui';
-import type { TextStyleName } from '@heyta/design-system';
+import {
+  CHOICE_ROW_SHAPE,
+  CHOICE_ROW_TEXT,
+  type TextStyleName,
+} from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import {
   StateIllustration,
@@ -1293,5 +1297,107 @@ export function Chip({
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+/**
+ * 单选行列表（从 N 个里选 1 个）
+ * ================================
+ *
+ * 🔴 **本文件里"选一个"只有这一个实现。** 想加第二种形态之前先读
+ * `packages/design-system/src/choice-row-shape.ts` 顶部的事故记录：
+ * 同一张面板里同时长出了圆形 Chip 与"选中就换 `tone` 的通栏 Button"，
+ * 两组的左缘、行高、选中记号全都不一样，而三层门禁没有一层看得见。
+ *
+ * 形态（每一格都来自 `CHOICE_ROW_SHAPE` 契约，不是这里现编的）：
+ *
+ *   ┌ 16dp ─────────────────────────────── 16dp ┐
+ *   │ 组标签（group-label）                      │
+ *   │ 选项文字 ……………………………………… ✓（选中才有）│  ← 行高 touch-target.min
+ *   │ 选项文字 ………………………………………          │
+ *   └────────────────────────────────────────────┘
+ *
+ * 🔴 **选中态只许改"颜色 + 右侧记号"，不许改行高、底色、对齐、控件类型。**
+ * 判据是 `scripts/check-selection-form.mjs`（选中态换形态 ⇒ 红）。
+ *
+ * ## 为什么行高是 44 而不是 60
+ *
+ * 60（`size.row-min-height`）是任务行：勾选框 + 标题 + 元信息，可能换行。
+ * 单选行只有一行文字，44 是触控下限。用 60 会让 4 个选项吃掉半屏 ——
+ * 「每屏都要滚」本身就是这一类排版问题的另一半。
+ */
+export function ChoiceRows<T extends string>({
+  groupLabel,
+  options,
+  value,
+  onChange,
+  disabled = false,
+  testID,
+}: {
+  /** 组标签（「视图」「日期显示」「排序方式」）。**同一张面板里要么都有、要么都没有。** */
+  groupLabel?: string;
+  options: readonly { readonly key: T; readonly label: string }[];
+  value: T;
+  onChange: (next: T) => void;
+  disabled?: boolean;
+  testID?: string;
+}): React.JSX.Element {
+  const t = useTokens();
+
+  return (
+    <View
+      testID={testID}
+      style={{
+        // 组标签属于它下面那一组，所以贴得近；组与组的间隔由**容器**给（groupGap）。
+        gap: t[CHOICE_ROW_SHAPE.labelGap],
+      }}
+    >
+      {groupLabel !== undefined ? (
+        <Text variant={CHOICE_ROW_TEXT.groupLabel} tone="muted">
+          {groupLabel}
+        </Text>
+      ) : null}
+      <View
+        accessibilityRole="radiogroup"
+        style={{ gap: t[CHOICE_ROW_SHAPE.rowGap] }}
+      >
+        {options.map((option) => {
+          const selected = option.key === value;
+          return (
+            <Pressable
+              key={option.key}
+              onPress={() => onChange(option.key)}
+              disabled={disabled}
+              accessibilityRole="radio"
+              accessibilityState={{ selected, disabled }}
+              accessibilityLabel={option.label}
+              style={({ pressed }) => ({
+                minHeight: t[CHOICE_ROW_SHAPE.minHeight],
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: t[CHOICE_ROW_SHAPE.inlineGap],
+                paddingHorizontal: t[CHOICE_ROW_SHAPE.rowInset],
+                borderRadius: t['radius.sm'],
+                backgroundColor: pressed ? t['color.surface-sunken'] : 'transparent',
+                opacity: disabled ? t['state.disabled-opacity'] : 1,
+              })}
+            >
+              <Text
+                variant={CHOICE_ROW_TEXT.option}
+                style={{
+                  flex: 1,
+                  color: selected ? t['color.primary'] : t['color.foreground'],
+                }}
+              >
+                {option.label}
+              </Text>
+              {selected ? (
+                <Icon name="task.done" size={CHOICE_ROW_SHAPE.markerSize} color={t['color.primary']} />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
