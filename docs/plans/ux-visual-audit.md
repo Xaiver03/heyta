@@ -152,3 +152,38 @@ iOS 的设置页组标题**没有图标** —— 组标题是纯文字索引，�
 
 - 组标题与紧随其后的第一行的 **x 差**；
 - 组标题与其管辖行的 **字号比**（需要从源码取档位，dump 不给字号）。
+
+
+---
+
+## 五、2026-11-14 第二轮：把「随手选」变成「有表」
+
+第一轮修了组标题的三处错（档位/颜色/左缘）。但那只解决"这一处"，
+下一次有人新建一个分组标题，还会犯同样的错 —— 因为**没有一张"位置 → 档位"的表**。
+
+### 加了什么（`888ca606`）
+
+| 新东西 | 位置 | 守什么 |
+|---|---|---|
+| `TYPE_ROLE` / `TYPE_ROLE_PENDING` | `packages/design-system/src/type-roles.ts` | 每个**位置**只对应一个文字档；分成"已契约化"与"待迁移"两张表，迁移一个锁一个 |
+| `SPACING_ROLE` | `packages/design-system/src/spacing-roles.ts` | 六种**关系**各一档：组内 0 / 标签→控件 4 / 行间 8 / 块间 12 / 组间 24 / 区块 32 |
+| `spacing-roles.spec.ts` | 同上 | 三档互不相等 + 相邻比值 ≥ 2 + 组内是 0 + 单调不减 |
+| `check:type-roles` | `scripts/check-type-roles.mjs` | 孤儿角色 ⇒ 红；三个位置组件绕过表 ⇒ 红；**`--self-test` 两臂** |
+| metrics 两列 | `scripts/ux-parity-metrics.py` | **大间距种数**、**组标题高度比**（这两条量不出层级就抓不到这次的错） |
+
+### Skill 筛选（用户要求"搜罗各种好用的 Skill"）
+
+| Skill | 结论 | 依据 |
+|---|---|---|
+| `apple-design` | **采用** | §15 Typography（层级靠 weight+size+leading 成组、tracking/leading 随字号反向）、§16 Craft/Simplicity（每个间距都要能辩护） |
+| `ui-ux-pro-max` | **采用** | `--domain web` 的 Native 段：触控间距 ≥8dp、正文 ≥14–16pt、一致模数比例 |
+| `design-taste-frontend` | **不采用** | 它自己写着 "Out of scope: Native mobile (use Apple HIG / Material directly)"；三条拨盘是给 landing 的 |
+
+### 下一轮的清单（metrics 现量）
+
+| 界面 | 大间距种数 | 问题 |
+|---|---|---|
+| `task-detail` | **5** | 折叠区/内容区/子任务区/附件区各用不同 padding |
+| `ai-toolbox` / `calendar-month` / `capture-panel` / `countdown` | 3 | 组内块间与组间用了不同的自定值 |
+
+收敛判据：每屏大间距 ≤ 2 种（块间 12 + 组间 24），且都从 `SPACING_ROLE` 取。
