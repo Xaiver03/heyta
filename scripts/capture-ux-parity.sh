@@ -31,6 +31,26 @@ module="${2:?用法: capture-ux-parity.sh <ticktick|heyta> <module>}"
 mkdir -p "$OUT"
 name="$side-$module"
 
+# 🔴 前台校验：这一条是血的教训。2026-11-14 一次 `back` 按多了把应用退回桌面，
+# 我看都没看就拍了，于是 `heyta-profile.png/xml` 变成了**手机桌面**的截图
+#（里面是「微信」「相机」「冷宫」这些 app 图标）。污染的证据比没有证据更糟：
+# 下一次拿它算读数，算出来的是桌面的行高。
+case "$side" in
+  heyta)    want="com.heyta" ;;
+  ticktick) want="ticktick" ;;
+  *)        want="" ;;
+esac
+if [ -n "$want" ]; then
+  fg=$(adb shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | sed 's/.*u0 //;s/}.*//')
+  case "$fg" in
+    *"$want"*) : ;;
+    *)
+      echo "拒绝保存：前台是 $fg，不是 $want（$side）" >&2
+      exit 4
+      ;;
+  esac
+fi
+
 adb shell screencap -p "/sdcard/uxcap.png" >/dev/null
 adb pull "/sdcard/uxcap.png" "$OUT/$name.png" >/dev/null 2>&1
 adb shell uiautomator dump "/sdcard/uxcap.xml" >/dev/null 2>&1

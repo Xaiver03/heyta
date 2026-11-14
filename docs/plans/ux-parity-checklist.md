@@ -115,6 +115,23 @@ settings-directory / settings-language / settings-security / ai-settings / ai-to
 按「不抢前台」的纪律停在这里 —— 这些项需要手机空闲时再取读数。
 用 `scripts/capture-ux-parity.sh` 补拍即可，命令与口径已固化。
 
+## 3f. 本轮收尾读数（2026-11-14 19:15）
+
+- 证据：**28 个界面**（png + xml 成对，4.7 MB）。
+- `scripts/audit-tap-targets.py` 全量：**0 处低于 44dp**（1 条白名单，写了理由）。
+- 两端单测：`@heyta/ui` 968 通过 / `@heyta/mobile` 1355 通过。
+- 本轮修掉的七处「可点却不够大 / 形态不对」：
+
+| # | 位置 | 改前 | 改后 | 根因 |
+|---|---|---|---|---|
+| 1 | 新建面板落点胶囊 | 28dp | 44dp | `size.chip-height`（标签档）拿来画按钮 |
+| 2 | 任务详情空备注行 | 28dp | 44dp | 漏 `minHeight` |
+| 3 | 日历视图 tab | 35dp **宽** | 44dp | 写了高度没写宽度 |
+| 4 | 倒数日筛选胶囊 ×6 | 42×28dp | 44×44dp | 同 1 |
+| 5 | 设置值行 ×4 | 21dp（hitSlop 补） | 44dp | 只补命中没补视觉与聚焦框 |
+| 6 | 「?」说明图标 | 30dp 命中 | 46dp | hitSlop 给少了 |
+| 7 | 通行密钥 5 枚 / 详情 3 枚「按钮」 | Chip 伪装 | `Button` | 动作与选项混成一个控件 |
+
 ## 4. 已关闭项与证据
 
 > 真机原图与 `uiautomator dump` 在 [`apps/mobile/evidence/ux-parity-20261114/`](../../apps/mobile/evidence/ux-parity-20261114/)（png + xml 成对，bounds ÷3 = dp；口径与留删规则见 [证据目录说明](../../apps/mobile/evidence/README.md)）。

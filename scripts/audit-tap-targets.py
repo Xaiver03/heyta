@@ -62,6 +62,10 @@ STATUS_BAR_BOTTOM = 100
 SYSTEM_GESTURE_TOP = 2450
 SCREEN_WIDTH = 1156
 SCREEN_HEIGHT = 2510
+# 底部标签栏的顶边。内容滚到底时，最后一行会被它遮住一半 —— dump 记的仍是
+# **可见**高度（实测「功能与 AI」321×22dp，底边正好 2258）。那不是控件太小，
+# 是它没滚进视口，跳过。写死的道理与 SCREEN_HEIGHT 一样：本机分辨率固定。
+TAB_BAR_TOP = 2258
 
 
 def parse_args() -> argparse.Namespace:
@@ -105,6 +109,9 @@ def audit(path: str, min_dp: int, density: int) -> list[str]:
         # 第一版没这条，于是「AI 设置」页底部两个预设 Chip（真实 44dp、一半在屏外）
         # 被误报成 29dp —— 一条会误报的尺会被下一个人直接关掉，比没有更糟。
         if y1 >= SCREEN_HEIGHT - 2 or y0 <= 2:
+            continue
+        # 被底部标签栏裁掉的行同理：可见部分矮，不代表控件矮。
+        if abs(y1 - TAB_BAR_TOP) <= 3:
             continue
 
         wdp, hdp = w / density, h / density
