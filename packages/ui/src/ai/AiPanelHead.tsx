@@ -32,6 +32,7 @@
  */
 
 import React from 'react';
+import { TYPE_ROLE } from '@heyta/design-system';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { X } from 'lucide';
 
@@ -97,14 +98,14 @@ export function AiPanelHead(props: AiPanelHeadProps): React.JSX.Element {
     <View style={styles.head} {...(props.testID === undefined ? {} : { testID: props.testID })}>
       <View style={styles.group}>
         {lead}
-        <Text style={[text['panel-title'], { color: tokens['color.foreground'], flexShrink: 1 }]}>
+        <Text style={[text[TYPE_ROLE['panel-title']], { color: tokens['color.foreground'], flexShrink: 1 }]}>
           {title}
         </Text>
       </View>
       {tag === undefined && !closeVisible ? null : (
         <View style={styles.group}>
           {tag === undefined ? null : (
-            <Text style={[text['panel-title'], styles.tag]} testID={tag.testID}>
+            <Text style={[text[TYPE_ROLE['panel-title']], styles.tag]} testID={tag.testID}>
               {tag.text}
             </Text>
           )}

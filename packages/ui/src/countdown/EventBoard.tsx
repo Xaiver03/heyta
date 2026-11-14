@@ -57,6 +57,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { TYPE_ROLE } from '@heyta/design-system';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { CategorySlot, CountdownEvent, CountdownEventKind, LocalDate } from '@heyta/domain';
 import { CATEGORY_SLOTS } from '@heyta/domain';
@@ -883,7 +884,7 @@ function CardEditor({
 
   return (
     <View style={styles.stack} testID={`event-editor-${card.id}`}>
-      <Text style={[text['panel-title'], { color: tokens['color.foreground-muted'] }]}>
+      <Text style={[text[TYPE_ROLE['panel-title']], { color: tokens['color.foreground-muted'] }]}>
         {labels.fieldTitle}
       </Text>
       <TextInput
@@ -952,7 +953,7 @@ function CardEditor({
         />
       ) : null}
 
-      <Text style={[text['panel-title'], { color: tokens['color.foreground-muted'] }]}>
+      <Text style={[text[TYPE_ROLE['panel-title']], { color: tokens['color.foreground-muted'] }]}>
         {labels.fieldKind}
       </Text>
       <View style={styles.row}>
@@ -989,7 +990,7 @@ function CardEditor({
         </Pressable>
       </View>
 
-      <Text style={[text['panel-title'], { color: tokens['color.foreground-muted'] }]}>
+      <Text style={[text[TYPE_ROLE['panel-title']], { color: tokens['color.foreground-muted'] }]}>
         {labels.fieldTemplate}
       </Text>
       <View style={styles.row}>

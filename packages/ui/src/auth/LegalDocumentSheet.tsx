@@ -13,6 +13,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { TYPE_ROLE } from '@heyta/design-system';
 import {
   Modal,
   Platform,
@@ -362,7 +363,7 @@ export function LegalDocumentSheet({
         >
           <View style={styles.header}>
             <View style={styles.headingBlock}>
-              <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 1 } : {})} style={[text['screen-title'], styles.title]}>{document.title[locale]}</Text>
+              <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 1 } : {})} style={[text[TYPE_ROLE['screen-title']], styles.title]}>{document.title[locale]}</Text>
             </View>
             <Pressable
               accessibilityRole="button"

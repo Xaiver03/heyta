@@ -63,32 +63,34 @@ export const TYPE_ROLE = {
 
   /** 行主文字（任务标题、设置项名字、单选行选项）。全应用最高频。 */
   'row-title': 'row-title',
+
+  /** 屏幕大标题。一屏只应有一个（法务文档那类整屏阅读页）。 */
+  'screen-title': 'screen-title',
+
+  /** 面板标题（底部面板、搜索面板的分组标题、AI 面板头）。 */
+  'panel-title': 'panel-title',
 } as const satisfies Record<string, TextStyleName>;
 
 /**
- * 待迁移的角色 —— **还没有消费点**，所以不进孤儿检查。
+ * 内容类型 → 文字档（与上面的「位置」是**两类**，不要混）
  *
- * 🔴 为什么分两张表：定义了却没人用的角色会腐烂，下一个人才不知道该用哪个
- * （这正是 2026-11-14 那次事故的形状）。但也**不能**为了门禁绿就把它们删掉 ——
- * 它们是已经想清楚的职分，只是还没把调用点迁过来。
+ * 🔴 为什么分成两张表：`row-meta` 出现在几十处，每一处都是"这一行右侧的元信息"——
+ * 它是**内容类型**，不是"页面的某个位置"。把它塞进 `TYPE_ROLE` 会让表混杂两种语义，
+ * 而混着的表最后没人看（这正是那次事故的形状）。
  *
- * 迁移规则：把某处的 `variant="row-meta"` 换成
- * `variant={TYPE_ROLE['row-meta']}` 之后，**把它从这张表移进 `TYPE_ROLE`**。
- * 门禁 `check:type-roles` 只对 `TYPE_ROLE` 查孤儿，所以迁移一个、锁一个。
+ * 两张表**都查孤儿**：定义了没人用就腐烂，不管它属于哪一类。
+ *
+ * ⚠️ `detail-title`（20px medium）在 `typography.ts` 里定义了却**一个消费点都没有**
+ * （详情页标题走的是 `TextField`，自带样式）。它是死档，已从这张表移出。
+ * 删不删 `typography.ts` 那一档是另一件事（要扫全仓），先在这里登记。
  */
-export const TYPE_ROLE_PENDING = {
-  /** 屏幕大标题。一屏只应有一个。 */
-  'screen-title': 'screen-title',
+export const TYPE_ROLE_CONTENT = {
   /** 行元信息（日期、计数、次要说明）。比行主文字小且弱。 */
   'row-meta': 'row-meta',
   /** 读数（`0/17`、`25:00`、统计数字）。等宽，不能因为位数变化而跳动。 */
   value: 'numeric-body',
   /** 说明 / 脚注（组下面那句"只影响这台设备"）。 */
   note: 'caption',
-  /** 面板标题（底部面板、对话框的标题）。 */
-  'panel-title': 'panel-title',
-  /** 详情页大标题（打开一条任务时那个可编辑的标题）。 */
-  'detail-title': 'detail-title',
 } as const satisfies Record<string, TextStyleName>;
 
 export type TypeRole = keyof typeof TYPE_ROLE;
@@ -102,9 +104,9 @@ export type TypeRole = keyof typeof TYPE_ROLE;
  */
 export const TYPE_ROLE_NAMES = Object.keys(TYPE_ROLE) as readonly TypeRole[];
 
-/** `TYPE_ROLE_PENDING` 的角色名（迁移时用；不进孤儿检查）。 */
-export const TYPE_ROLE_PENDING_NAMES = Object.keys(
-  TYPE_ROLE_PENDING,
-) as readonly (keyof typeof TYPE_ROLE_PENDING)[];
+/** `TYPE_ROLE_CONTENT` 的内容类型名。 */
+export const TYPE_ROLE_CONTENT_NAMES = Object.keys(
+  TYPE_ROLE_CONTENT,
+) as readonly (keyof typeof TYPE_ROLE_CONTENT)[];
 
-export type PendingTypeRole = keyof typeof TYPE_ROLE_PENDING;
+export type ContentTypeRole = keyof typeof TYPE_ROLE_CONTENT;

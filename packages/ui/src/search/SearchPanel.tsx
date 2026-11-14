@@ -59,6 +59,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import type { Note, Task } from '@heyta/domain';
 import { CornerDownRight, Folder, Search, StickyNote, Tag } from 'lucide';
 
+import { TYPE_ROLE } from '@heyta/design-system';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 
 import { EmptyState } from '../empty-state/EmptyState.js';
@@ -218,7 +219,7 @@ export function SearchPanel({
           {tasks.length > 0 ? (
             <View style={styles.section}>
               <View style={styles.sectionHead}>
-                <Text style={[text['panel-title'], styles.sectionTitle]}>{labels.tasksSection}</Text>
+                <Text style={[text[TYPE_ROLE['panel-title']], styles.sectionTitle]}>{labels.tasksSection}</Text>
                 <Text style={[text['caption'], styles.sectionCount]}>{labels.count(tasks.length)}</Text>
               </View>
               <TaskList
@@ -236,7 +237,7 @@ export function SearchPanel({
           {noteRows.length > 0 ? (
             <View style={styles.section}>
               <View style={styles.sectionHead}>
-                <Text style={[text['panel-title'], styles.sectionTitle]}>
+                <Text style={[text[TYPE_ROLE['panel-title']], styles.sectionTitle]}>
                   {labels.notesSection}
                 </Text>
                 <Text style={[text['caption'], styles.sectionCount]}>{labels.count(noteRows.length)}</Text>
@@ -272,7 +273,7 @@ export function SearchPanel({
           {quick.length > 0 ? (
             <View style={styles.section}>
               <View style={styles.sectionHead}>
-                <Text style={[text['panel-title'], styles.sectionTitle]}>{labels.quickSection}</Text>
+                <Text style={[text[TYPE_ROLE['panel-title']], styles.sectionTitle]}>{labels.quickSection}</Text>
               </View>
               {quick.map((action) => (
                 <Pressable

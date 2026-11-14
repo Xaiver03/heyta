@@ -85,11 +85,17 @@ def analyse(path: str) -> dict:
     clickable.sort()
     heights = sorted({h for _, h, _ in clickable if h >= 60})
     steps: list[int] = []
-    prev = None
-    for y, _, _ in clickable:
-        if prev is not None and 60 <= y - prev <= 400:
-            steps.append(y - prev)
-        prev = y
+    prev = None  # (y, h)
+    for y, h, _ in clickable:
+        if prev is not None:
+            # 🔴 量的是**间隙**（y 差 − 前一行的高度），不是"行起点差"。
+            # 第一版直接记 `y - prevY`，于是 52dp 里含了 44dp 行高 ——
+            # 读出来的"大间距 52/57/66"其实是"行高 + 间距"的组合，
+            # 按它去收敛会把行高当成间距调。口径错了，后面全错。
+            gap = y - (prev[0] + prev[1])
+            if 0 <= gap <= 400:
+                steps.append(gap)
+        prev = (y, h)
 
     # ── 排版读数（2026-11-14 加）────────────────────────────────────
     # 这三条是因为"组标题比内容还小、还更靠右"那一类错**一条结构判据都抓不到**。
