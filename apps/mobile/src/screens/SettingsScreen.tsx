@@ -932,7 +932,17 @@ export function SettingsScreen({
           <SettingsSection
             variant="card"
             testID="settings-directory"
-            title={t('mobile.settings.directory.title')}
+            /*
+             * 🔴 2026-11-14 **去掉组标题「偏好与账号」**。
+             *
+             * 看图才注意到的：那一组下面六行是「订阅 / 数据与同步 / 提醒与通知 /
+             * 外观与语言 / 功能与 AI / 关于与帮助」—— 只有「订阅」勉强算账号相关，
+             * 其余五组既不是"偏好"也不在"账号"里。组标题盖不住它的内容，
+             * 读起来像一句放错位置的分类名。
+             *
+             * 而且这一屏**就是设置**，顶栏已经写着「设置」。iOS 设置页的第一组
+             * 也没有组标题 —— 组标题只用来分隔"多组"，单组页面不需要它。
+             */
             rows={sectionRows}
           />
         );
