@@ -173,7 +173,16 @@ export function SettingsInfoTip({
            react-native-web **整个丢掉** —— 同一个组件在 web 上失去"已展开"状态，
            而原生两端照常，且没有任何测试会红。`aria-expanded` 保留是给 DOM 那一侧。 */
         aria-expanded={open}
-        hitSlop={tokens['space.2']}
+        /**
+         * 🔴 从 `space.2`(8dp) 改成 `space.4`(16dp)：图标 `icon.sm` 是 14dp，
+         * 8dp 的 hitSlop 只把命中区补到 **30dp**（真机 dump 里那个节点是 16×16dp）。
+         * 16dp ⇒ 14 + 32 = **46dp**，过 44 的下限。
+         *
+         * 这里坚持用 `hitSlop` 而不是给它 `minHeight: 44`：它是一枚紧跟在标签后面的
+         * 「?」，撑到 44dp 会在每一行里多占 30dp 宽，把标签与右侧的值挤开。
+         * 这类"视觉很小、命中要够"的控件正是 `hitSlop` 的用途。
+         */
+        hitSlop={tokens['space.4']}
         onPress={() => setOpen((previous) => !previous)}
       >
         <HeytaIcon data={CircleHelp} size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />
@@ -492,7 +501,19 @@ function ValueLine({
         // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
         // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
       aria-checked={row.tone === 'default'}
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+      /**
+       * 🔴 加了 `minHeight` 之后 `hitSlop` 可以撤了 —— 两者本来是替代关系。
+       *
+       * 此前这一族（「已达成成就」「系统通知授权」「精确闹钟」「提醒不受省电限制」）
+       * 的可见高度是 **321×21dp**（真机 bounds `[96,678][1060,741]`），靠
+       * `hitSlop(12/12)` 补到 45dp 才可点。两个问题：
+       *   ① 视觉上它只是一行灰字，用户不知道能点（hitSlop 不改变看得见的东西）；
+       *   ② 无障碍聚焦框只有 21dp，读屏用户得到的是一枚"很扁的开关"。
+       *
+       * 现在直接给 44dp：这一族是"点它进下一层"的**可点值行**，本来就该长得像一行按钮。
+       * `onPress === undefined` 的纯读数行不走这里，仍然保持紧凑（21dp）。
+       */
+      style={{ minHeight: tokens['touch-target.min'], justifyContent: 'center' }}
     >
       {body}
     </Pressable>

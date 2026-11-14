@@ -181,9 +181,19 @@ export function TagsSection(): React.JSX.Element {
           testID="mobile-tags-list"
         />
       </Card>
-      <Text variant="caption" tone="subtle">
-        {t('mobile.tags.removeHint')}
-      </Text>
+      {/*
+        🔴 这句说明**只在有标签时**才成立。
+        空态时屏幕上原本是：「还没有标签 / 点「+」新建标签。/ 删除标签不会删掉任何任务…」
+        —— 用户一个标签都没有，却先被告知"删标签的后果"。同一类错在
+        「外观与语言」页也犯过（账号脚注渲染在语言页上），都是"不属于这一屏的内容出现在这一屏"。
+
+        它也不是防护（真正拦一下的是 `confirmRemove`），所以少显示一次没有损失。
+      */}
+      {tags.length === 0 ? null : (
+        <Text variant="caption" tone="subtle">
+          {t('mobile.tags.removeHint')}
+        </Text>
+      )}
 
       <TextField
         label={t('mobile.tags.nameLabel')}

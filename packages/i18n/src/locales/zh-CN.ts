@@ -3708,7 +3708,10 @@ export const zhCN = {
   // 它原来叫 `mobile.lists.*`，于是 web 那边要么另写一份、要么不接线 ——
   // 两个结果都不对（web 侧栏空清单时**什么都不显示**就是后者）。
   'common.organizer.lists.empty': '还没有清单',
-  'common.organizer.lists.empty.hint': '点「+」新建清单。',
+  // 🔴 不能说「点「+」新建清单」：**web 有那枚 +，移动端没有**（移动端是
+  // 下面一个输入框 + 一枚「新建清单」按钮）。同一句文案两端复用，只有一端成立，
+  // 移动端用户会去找一个不存在的按钮。改成两端都为真的说法。
+  'common.organizer.lists.empty.hint': '输入名称就能新建清单。',
   'mobile.lists.nameLabel': '清单名称',
   'mobile.lists.newPlaceholder': '给新清单起个名字',
   'mobile.lists.add': '新建清单',
@@ -3772,7 +3775,8 @@ export const zhCN = {
   // 清单回答"它属于哪个容器"（一个），标签回答"它还跟什么有关"（多个）。
   'mobile.profile.section.tags': '标签',
   'common.organizer.tags.empty': '还没有标签',
-  'common.organizer.tags.empty.hint': '点「+」新建标签。',
+  // 同 `lists.empty.hint`：web 有那枚 +，移动端没有（移动端是输入框 + 按钮）。
+  'common.organizer.tags.empty.hint': '输入名称就能新建标签。',
   'mobile.tags.nameLabel': '标签名称',
   'mobile.tags.newPlaceholder': '给新标签起个名字',
   'mobile.tags.add': '新建标签',

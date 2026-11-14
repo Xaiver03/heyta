@@ -19,11 +19,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-mode="text"
+mode="any"
 require=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --desc) mode="desc"; shift ;;
+    --text) mode="text"; shift ;;
     --require) require="$2"; shift 2 ;;
     *) break ;;
   esac
@@ -43,7 +44,15 @@ best = None
 for node in root.iter():
     text = node.get('text') or ''
     desc = node.get('content-desc') or ''
-    hay = desc if mode == 'desc' else text
+    # 默认**两者都查**：同一个入口在有的屏上只有 text（列表行），有的屏上只有
+    # content-desc（图标按钮，如「打开搜索」）。只查一种就会「找不到」，
+    # 而那个「找不到」看起来像界面变了，实际是我查错了字段。
+    if mode == 'desc':
+        hay = desc
+    elif mode == 'text':
+        hay = text
+    else:
+        hay = text + '\x00' + desc
     if needle not in hay:
         continue
     box = list(map(int, re.findall(r'\d+', node.get('bounds') or '')))

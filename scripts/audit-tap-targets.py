@@ -47,11 +47,12 @@ DEFAULT_MIN_DP = 44
 # 🔴 已知用 `hitSlop` 补偿的可点行（dump 的 bounds **不含** hitSlop，所以静态看会偏小）。
 # 每次加一条都要写清"为什么这样补是够的"，不许只写个名字了事 ——
 # 否则这个集合会变成"看到红就加进来"的豁免名单。
-KNOWN_HITSLOP = {
-    "已达成成就": (
-        "packages/ui/src/settings/Settings.tsx 的 SettingsValueRow："
-        "可见 21dp + hitSlop(top/bottom 12) = 45dp 有效命中区。"
-        "它是一行**读数**（进成长），不是主按钮 —— 视觉保持紧凑、触控靠 hitSlop 补，是有意的取舍。"
+# 现在为空：`SettingsValueRow` 已改成直接给 44dp（撤掉了 hitSlop 补偿），
+# 那一族四条（已达成成就 / 系统通知授权 / 精确闹钟 / 提醒不受省电限制）不再需要豁免。
+KNOWN_HITSLOP: dict[str, str] = {
+    "投诉与举报": (
+        "packages/ui/src/settings/Settings.tsx 的 SettingsInfoTip：可见 16dp（? 图标）"
+        "+ hitSlop(space.4=16dp) = 46dp 有效命中区。它紧跟标签，撑到 44dp 会挤开同一行右侧的值。"
     ),
 }
 DEFAULT_DENSITY = 3  # 1156x2510 / density 480 ⇒ 3px per dp
