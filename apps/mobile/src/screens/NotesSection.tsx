@@ -168,7 +168,15 @@ export function NotesSection(): React.JSX.Element {
 
   return (
     <>
-      <SectionHeader title={t('notes.title')} />
+      {/*
+        🔴 2026-11-15：**去掉这个组标题**。顶栏已经写着「便签」（在 `ProfileScreen`
+        的 `managementPage` 分支里，`titleKey = 'notes.title'`），组标题再写一遍同一个词。
+        
+        ⚠️ `check:title-collision` 抓不到这一处：顶栏在 `ProfileScreen.tsx`、
+        组标题在 `NotesSection.tsx`，而那条尺只比对**同一个文件**里的两个标题
+        （同文件才保证同屏）。跨文件的情况靠人工 —— 这条记在尺的文件头里了。
+      */}
+      {null}
       <Card>
         {/*
           🔴 内容校验的权威是 `createNoteActions`（空内容抛错、超长拒绝）。
