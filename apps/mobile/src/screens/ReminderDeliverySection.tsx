@@ -19,9 +19,10 @@
 import React, { useMemo } from 'react';
 import { Platform } from 'react-native';
 import { useI18n } from '@heyta/i18n';
-import { SettingsSection, type SettingsRowModel } from '@heyta/ui';
+import { SettingsInfoTip, SettingsSection, type SettingsRowModel } from '@heyta/ui';
 
 import { Icon } from '../ui/icons';
+import { SectionHeader } from '../ui/kit';
 import { useTokens } from '../theme';
 import {
   deliveryRows,
@@ -46,6 +47,12 @@ export function ReminderDeliverySection(): React.JSX.Element | null {
       label: t(row.labelKey),
       value: t(row.valueKey),
       tone: row.warning ? 'warning' : 'default',
+      /*
+       * 🔴 `discloses: true` —— 点下去是**把系统那一格摊开**，不是切换开关。
+       * 没有它，这三行（系统通知授权 / 精确闹钟 / 提醒不受省电限制）在截图里
+       * 就是三行灰字，产品负责人的原话是"都没有操作的地方"。
+       */
+      discloses: true,
       onPress: () => { open(row.id); },
     })),
     ...(landing === null
@@ -67,13 +74,43 @@ export function ReminderDeliverySection(): React.JSX.Element | null {
     产品负责人的禁令只允许这种形态：正文摆在行里不行，点开才看到才行。
   */
   return (
-    <SettingsSection
-      variant="card"
-      testID="reminder-delivery-section"
-      title={t('reminder.settings.section')}
-      note={t('reminder.settings.note')}
-      leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
-      rows={models}
-    />
+    <>
+      {/*
+        🔴 2026-11-14：组标题从卡片**里面**挪到**外面**。
+        
+        看图才发现的：「提醒与通知」这一屏两组（提醒送达 / 桌面小组件）的标题都在卡片内，
+        而「数据与同步」那一屏两组（同步 / 隐私同意）的标题都在卡片外 —— 同一个 app、
+        同一个组件家族，两种位置。
+        
+        组标题是**索引**，索引在卡片外（它与卡片平级，不是卡片的内容）。
+        `leading` 也一并去掉 —— 组标题不配图标（同一轮第 1 屏已经定过）。
+      */}
+      <SectionHeader
+        title={t('reminder.settings.section')}
+        tip={
+          <SettingsInfoTip
+            text={t('reminder.settings.note')}
+            label={t('reminder.settings.section')}
+          />
+        }
+      />
+      <SettingsSection
+        variant="card"
+        testID="reminder-delivery-section"
+        /*
+         * 🔴 2026-11-14：`note=`（正文）→ `titleTip=`（「?」）。
+         *
+         * 产品负责人：「说明性文字不应该直接平铺出来呀。」
+         * 那段 81 字（"这三个开关都在你的系统里，heyta 改不了……"）原来整段摊在
+         * 卡片顶部，吃掉了这一屏近三分之一的纵向空间，而且它是**操作指引**
+         * （怎么点、点开会发生什么），不是"现在是什么状态"。
+         *
+         * 仓库里早有这条纪律：`check-settings-no-prose` 认的载体就是「?」。
+         * 这一格之前留着正文，因为它写的是"为什么我改不了"这一类**解释**，
+         * 但读的人要的是"我该干什么" —— 两种都不是正文该放的地方。
+         */
+        rows={models}
+      />
+    </>
   );
 }

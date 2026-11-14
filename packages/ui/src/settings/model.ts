@@ -166,6 +166,19 @@ export interface SettingsValueRow extends SettingsRowCommon {
   readonly value: string;
   readonly tone?: SettingsRowTone;
   readonly onPress?: () => void;
+  /**
+   * 这一行点下去是**进下一层**（跳系统设置、进详情），而不是"切换开关"。
+   *
+   * 🔴 2026-11-14 加。产品负责人看着「提醒与通知」那一屏说：
+   * 「怎么仅说明啊？都没有操作的地方……根本就没有可改的地方。」
+   *
+   * 那三行（系统通知授权 / 精确闹钟 / 提醒不受省电限制）**其实有 `onPress`**，
+   * 点下去会把系统那一格摊开 —— 但视觉上它们只是三行灰字，没有任何"可点"的信号；
+   * 无障碍语义还写着 `role="switch"`（把"进下一层"说成了"开关"）。
+   *
+   * 功能在、入口不可见 = 等于没有。`discloses: true` 让渲染层给 role=button + chevron。
+   */
+  readonly discloses?: boolean;
   /** 值那一格自己的 testID（宿主断言读数时要它）。 */
   readonly valueTestID?: string;
 }

@@ -400,10 +400,20 @@ export function Screen({
 export function SectionHeader({
   title,
   count,
+  tip,
   tone = 'muted',
 }: {
   title: string;
   count?: number;
+  /**
+   * 标题右侧的「?」。**必须挂在标题这一行**，不能塞进卡片。
+   *
+   * 🔴 2026-11-14 加：把「提醒送达」那段 81 字说明从正文收进「?」之后，
+   * `?` 落到了卡片左上角 —— 一个没有归属的孤立问号（`check:tip-adjacency`
+   * 登记的就是这个形状）。问号的意义是"解释**旁边这个东西**"，
+   * 旁边没有东西，它就只是装饰。
+   */
+  tip?: React.ReactNode;
   tone?: 'muted' | 'danger' | 'primary';
 }): React.JSX.Element {
   const t = useTokens();
@@ -431,6 +441,7 @@ export function SectionHeader({
       <Text variant={TYPE_ROLE['section-heading']} style={{ color, flex: 1 }}>
         {title}
       </Text>
+      {tip === undefined ? null : tip}
       {count !== undefined ? (
         <Text variant="numeric-body" tone="subtle">
           {String(count)}

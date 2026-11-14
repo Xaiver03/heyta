@@ -505,13 +505,24 @@ function ValueLine({
       <Text style={[text['row-meta'], styles.dynamic, { color: tokens['color.foreground-muted'] }]}>
         {row.label}
       </Text>
-      <Text
-        testID={row.valueTestID}
-        numberOfLines={1}
-        style={[text['numeric-body'], styles.dynamic, { color: toneColor(tokens, row.tone ?? 'default') }]}
-      >
-        {row.value}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
+        <Text
+          testID={row.valueTestID}
+          numberOfLines={1}
+          style={[text['numeric-body'], styles.dynamic, { color: toneColor(tokens, row.tone ?? 'default') }]}
+        >
+          {row.value}
+        </Text>
+        {/*
+          🔴 2026-11-14：`discloses` 的行给一枚 chevron。
+          它是"点进去还有一层"的唯一视觉信号 —— 没有它，这一行和旁边的纯读数
+          长得一模一样（`heyta-settings-notifications` 那三行就是这样被读成
+          "只有说明"的）。
+        */}
+        {row.discloses === true ? (
+          <Text style={{ color: tokens['color.foreground-subtle'] }}>›</Text>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -545,11 +556,19 @@ function ValueLine({
       // 🔴 整行可点，而且它是**一个开关**：读屏要能念出"开/关"。
       //    点的是行而不是行里那个小方框 —— 44pt 触控区那条理由见
       //    `model.ts` 的 `SettingsValueRow`。
-      accessibilityRole="switch"
+      /*
+       * 🔴 2026-11-14：`switch` → `discloses ? 'button' : 'switch'`。
+       *
+       * 产品负责人看着「提醒与通知」那一屏说「都没有操作的地方」——
+       * 那三行（系统通知授权 / 精确闹钟 / 提醒不受省电限制）点下去是**进下一层**
+       * （把系统那一格摊开），却被标成了 `switch`。读屏用户听到的是"开关"，
+       * 视觉用户看到的是一行灰字 —— 两种人都不知道它能点。
+       */
+      accessibilityRole={row.discloses === true ? 'button' : 'switch'}
         // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
         // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
         // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
-      aria-checked={row.tone === 'default'}
+      aria-checked={row.discloses === true ? undefined : row.tone === 'default'}
       /**
        * 🔴 加了 `minHeight` 之后 `hitSlop` 可以撤了 —— 两者本来是替代关系。
        *

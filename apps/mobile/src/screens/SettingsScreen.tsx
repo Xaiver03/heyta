@@ -42,6 +42,7 @@ import { LOCALES, useI18n } from '@heyta/i18n';
 import { isOfficialHostedInstance } from '@heyta/app-host';
 import { OPERATOR, operatorFilingLine } from '@heyta/legal';
 import {
+  SettingsInfoTip,
   SettingsSection,
   resolveSettingAvailability,
   type SettingsRowModel,
@@ -418,18 +419,28 @@ export function SettingsScreen({
         ? 'common.privacy.settings.accepted'
         : 'common.privacy.settings.localOnly';
 
+  /**
+   * 桌面小组件那一组。
+   *
+   * ## 🔴 2026-11-14：从「一条长教程」瘦身成「一个开关 + 一个问号」
+   *
+   * 改前这一组有 7 行：两条介绍、一个「如何添加」标题、三步操作、「系统不允许…」、
+   * 最后才是那个**唯一真正的设置**（隐藏标题的开关）。也就是说：用户来这一屏
+   * 多半是来改那个开关的，但他要先划过 6 行说明才看得见它。
+   *
+   * 两条公开规范在这一格上指的是同一个方向：
+   *   · Apple HIG「Offering help」：*"If a feature requires more than three actions,
+   *     it's probably too complicated for a tip"* —— 多步任务走**独立教学**，不塞设置页。
+   *   · Material「Settings」：*"Settings should not contain information about the app"*，
+   *     且 *"Settings that require longer explanations may add a description on a
+   *     second screen"* —— 设置行只显示**当前状态**，不写描述。
+   *
+   * 所以：设置页留开关 + 一枚挂在组标题上的「?」；教程进「?」。
+   * ⚠️ 没有把它搬去「关于与帮助」那个屏 —— 那会是一次真实的路由跳转，
+   * 而这一屏的教程是"就地要用的"（用户正在桌面上找小组件），跳走再跳回来
+   * 比点开一个气泡更贵。
+   */
   const widgetRows: readonly SettingsRowModel[] = [
-    { kind: 'note', text: t('mobile.widgetJourney.intro') },
-    { kind: 'note', text: WIDGET_CARD_KEYS.map((key) => t(key)).join(' · ') },
-    { kind: 'heading', text: t('mobile.widgetJourney.howTo'), divider: true },
-    ...WIDGET_ADD_STEPS.map((key, index) => ({
-      kind: 'note' as const,
-      // ⚠️ `testID` 用词条 key 而不是下标：插入步骤时不会让 React 复用错的行。
-      testID: `widget-step-${key}`,
-      index: index + 1,
-      text: t(key),
-    })),
-    { kind: 'note', text: t('mobile.widgetJourney.cannotAutoAdd'), divider: true },
     {
       kind: 'toggle',
       testID: 'widget-privacy-toggle',
@@ -690,14 +701,35 @@ export function SettingsScreen({
     <>
       <ReminderDeliverySection />
       {shouldShowWidgetJourney(widgetBridgeAvailable) ? (
-        <SettingsSection
-          variant="card"
-          testID="widget-journey"
-          title={t('mobile.widgetJourney.sectionTitle')}
-          /* 「添加后打开一次就会填充」是**点开才知道**的操作指引 ⇒ 「?」，不摆成正文行。 */
-          note={t('mobile.widgetJourney.openOnce')}
-          rows={widgetRows}
-        />
+        <>
+          {/*
+            🔴 2026-11-14：与上面那一组一致，组标题移到卡片**外**。
+            同一屏两组必须同一个位置 —— 上一组（提醒送达）这一轮刚挪出来，
+            这一组如果留在卡片内，那一屏就有两种组标题位置。
+          */}
+          <SectionHeader
+            title={t('mobile.widgetJourney.sectionTitle')}
+            tip={
+              <SettingsInfoTip
+                text={[
+                  t('mobile.widgetJourney.intro'),
+                  WIDGET_CARD_KEYS.map((key) => t(key)).join(' · '),
+                  `${t('mobile.widgetJourney.howTo')}：${WIDGET_ADD_STEPS.map(
+                    (key, index) => `${String(index + 1)}. ${t(key)}`,
+                  ).join(' ')}`,
+                  t('mobile.widgetJourney.cannotAutoAdd'),
+                  t('mobile.widgetJourney.openOnce'),
+                ].join('\n')}
+                label={t('mobile.widgetJourney.sectionTitle')}
+              />
+            }
+          />
+          <SettingsSection
+            variant="card"
+            testID="widget-journey"
+            rows={widgetRows}
+          />
+        </>
       ) : null}
     </>
   );
