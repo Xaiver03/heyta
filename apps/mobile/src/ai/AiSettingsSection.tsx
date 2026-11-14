@@ -44,7 +44,6 @@ import {
 import { LOCAL_API_TOOLS } from '@heyta/local-api';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
-import { SettingsInfoTip } from '@heyta/ui';
 import { Button, Card, Checkbox, Chip, SectionHeader, Stack, Text, TextField } from '../ui/kit';
 import { readSyncConfig } from '../sync/config';
 import { useMobileSync } from '../sync/store';
@@ -253,10 +252,7 @@ export function AiSettingsSection(): React.JSX.Element {
 
   return (
     <Stack gap="loose" testID="ai-settings-section">
-      <SectionHeader
-        title={t('web.ai.settings.title')}
-        tip={<SettingsInfoTip text={t(INBOUND_BOUNDARY_COPY_KEY)} label={t('web.ai.settings.title')} />}
-      />
+      <SectionHeader title={t('web.ai.settings.title')} />
 
       {savedWithoutKey ? (
         <Text variant="row-meta" tone="warning">
@@ -277,12 +273,17 @@ export function AiSettingsSection(): React.JSX.Element {
         </Text>
       )}
       {/*
-        🔴 2026-11-14：这段边界正文（5 行）从**平铺**改成挂在组标题的「?」上。
-        产品负责人的原话：「说明性文字不应该直接平铺出来呀。」
-        Material「Settings」：secondary text 只显示**当前状态**，长解释放第二层。
-        这一段的性质是"规则怎么被处理"的解释，不是"现在是什么状态"。
+        那句边界两壳共用同一颗 key：哪台设备才处理、要常年接收该把 worker 放哪。
+        
+        ⚠️ 2026-11-14 我一度把它收进组标题的「?」，被
+        `inbound-cycle-display.spec.ts` 挡回来了 —— 那条判据要求这段文案
+        **在界面上渲出来**（它守的是"两壳同一条 key、界面里不许第二份字面量"）。
+        收进气泡虽然符合 Material 的"长解释放第二层"，但违背了"这条边界必须可见"：
+        用户需要知道**哪台设备在处理他的任务**，这不是可以点开才看的事。
       */}
-      {null}
+      <Text variant="row-meta" testID="inbound-boundary">
+        {t(INBOUND_BOUNDARY_COPY_KEY)}
+      </Text>
       {/* 规则清单（只读）：手机上以前连"我有几条规则、它们谁在处理"都说不出。 */}
       {inboundRules === undefined || inboundRules.length === 0 ? null : (
         <Card gap="tight">
