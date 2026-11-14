@@ -3563,6 +3563,7 @@ export const en = {
   'mobile.settings.section.appearance': 'Appearance & Language',
   'mobile.settings.section.personalization': 'Personalization',
   'mobile.settings.section.features': 'Features & AI',
+  'mobile.profile.entry.features': 'All features',
   'mobile.settings.section.about': 'About & help',
   'mobile.settings.section.profile': 'Profile',
   'mobile.settings.section.general': 'General',

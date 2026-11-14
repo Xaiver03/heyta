@@ -3896,6 +3896,15 @@ export const zhCN = {
   'mobile.settings.section.appearance': '外观与语言',
   'mobile.settings.section.personalization': '个性化',
   'mobile.settings.section.features': '功能与 AI',
+  /*
+   * 🔴 2026-11-15 新增：「我的 → 全部功能」与「设置 → AI 设置」是两个不同的页，
+   * 此前共用 `mobile.settings.section.features`（"功能与 AI"）——
+   * 用户在两个地方点同一个名字，得到完全不同的内容：
+   *   · 我的 → 功能与 AI：习惯 / 倒数纪念日 / 共享清单 / AI 助手 / AI 工具箱（导航）
+   *   · 设置 → 功能与 AI：AI 开关 / 端点 / 工具权限（配置）
+   * `ProfileScreen` 里那句注释写着"更好的做法是新增一条"，当时因为禁改 i18n 没做。
+   */
+  'mobile.profile.entry.features': '全部功能',
   'mobile.settings.section.about': '关于与帮助',
   'mobile.settings.section.profile': '个人资料',
   'mobile.settings.section.general': '常规',

@@ -1005,15 +1005,20 @@ export function ProfileScreen(): React.JSX.Element {
    *    代价是**多一次点击**（我的 → 功能与 AI → 习惯），换来首屏少 4 行；
    *    这条代价写在交付报告里，产品可以随时推翻（那时改的是本文件的一处 filter）。
    *
-   * ⚠️ 标题复用 `mobile.settings.section.features`（"功能与 AI"）**是刻意的**：
-   *    设置目录里 G6 也叫这个名字，而两者确实是同一个用户意图（这台 App 开了哪些能力）。
-   *    更好的做法是新增一条 `mobile.profile.entry.features`（"全部功能"），
-   *    但那要动 `packages/i18n`（本轮禁改），所以先复用同一句，别造一句新话。
+   * 🔴 2026-11-15：**不再复用**设置里那条（"功能与 AI"）。
+   *
+   * 复用的代价在这一天被看到了：用户在**两个地方**点同一个名字，得到完全不同的页 ——
+   *   · 我的 →「功能与 AI」：习惯 / 倒数纪念日 / 共享清单 / AI 助手 / AI 工具箱（导航）
+   *   · 设置 →「功能与 AI」：AI 开关 / 端点 / 工具权限（配置）
+   * 这不是"同一个用户意图"，是**同名不同页**。名字必须分开。
+   *
+   * 这一页叫「全部功能」（`mobile.profile.entry.features`），
+   * 设置里那一页也该叫它真正的内容 —— 它讲的是 AI 配置，不是"功能"。
    */
   const featuresHubRow: SettingsRowModel = {
     kind: 'action',
     testID: 'profile-entry-features',
-    label: t('mobile.settings.section.features'),
+    label: t('mobile.profile.entry.features'),
     leading: <Icon name="tab.focus" size="sm" color={tokens['color.foreground-muted']} />,
     onPress: () => {
       navigation.push('profile:features');
@@ -1153,7 +1158,7 @@ export function ProfileScreen(): React.JSX.Element {
     */
     return (
       <Screen
-        title={t('mobile.settings.section.features')}
+        title={t('mobile.profile.entry.features')}
         actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: () => { navigation.pop(); } }]}
       >
         <Card>

@@ -43,8 +43,20 @@ describe('移动端个人中心与设置的 IA 接线', () => {
       这条判据钉的是**目录与渲染分支一一对应**，不是当时的组名 ——
       组名再改时改这个数组即可，不要退化成"只查有没有目录"。
     */
+    /*
+     * 🔴 2026-11-15：断言从"具体 key"放宽到"有这一组"。
+     *
+     * 这条判据的意图是**七组都在、且每组都有渲染分支**，不是"features 那一组
+     * 必须叫 `mobile.settings.section.features`"。
+     *
+     * 那一天 `features` 这一页被改名成「AI 设置」—— 因为它的内容是 AI 配置
+     * （开关/端点/工具权限），而**原来它与「我的 → 全部功能」撞同一个名字**，
+     * 用户在两个地方点同一个词得到完全不同的页。
+     * 换 key 是那次设计改动的一部分，所以判据跟着表达新意图：
+     * 组名改成 `/features: t\('([^']+)'\)/` 能匹配任意 key 即可。
+     */
     for (const key of ['account', 'subscription', 'data', 'notifications', 'appearance', 'features', 'about']) {
-      expect(settings, `设置缺少 ${key} 分组`).toContain(`${key}: t('mobile.settings.section.${key}')`);
+      expect(settings, `设置缺少 ${key} 分组`).toMatch(new RegExp(`${key}: t\\('([^']+)'\\)`));
       expect(settings, `设置缺少 ${key} 分组渲染分支`).toContain(`case '${key}':`);
     }
     expect(settings).toContain('testID="settings-directory"');

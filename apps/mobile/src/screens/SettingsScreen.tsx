@@ -478,7 +478,13 @@ export function SettingsScreen({
     data: t('mobile.settings.section.data'),
     notifications: t('mobile.settings.section.notifications'),
     appearance: t('mobile.settings.section.appearance'),
-    features: t('mobile.settings.section.features'),
+    /*
+     * 🔴 2026-11-15：这一页的内容是 **AI 配置**（总开关 / 端点 / 工具权限），
+     * 叫「功能与 AI」既不准确、又与「我的 → 全部功能」撞名。
+     * 复用 `web.ai.settings.title`（"AI 设置"）—— 那一页自己的组标题就是这句，
+     * 顶栏与组标题本来就该一致。
+     */
+    features: t('web.ai.settings.title'),
     about: t('mobile.settings.section.about'),
   };
 
