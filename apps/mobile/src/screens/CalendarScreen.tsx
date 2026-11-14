@@ -377,6 +377,20 @@ export function CalendarScreen(): React.JSX.Element {
       <CalendarBoard
         tasks={tasks}
         today={today}
+        /**
+         * 🔴 「回到今天」原来**在页脚**（日历网格下面），因为移动端没传 `onToday`，
+         * 共享板就走 `onToday === undefined` 那条分支，把它画在 `footerRow` 里。
+         * 后果：月网格六行 264dp + 表头之后，那颗按钮落在**首屏之外** ——
+         * 真机 dump（`heyta-calendar-month.xml`）48 个可点行里根本没有它。
+         * 也就是说"回今天"这个能力**在移动端等于不存在**，只能反向连点箭头。
+         *
+         * 传了之后共享板把它挪进工具栏（`‹ 2026年11月 › 今天`，与 web 同一个组件），
+         * 页脚那颗按注释里的规则自动撤 —— 不会出现两个入口。
+         * `pickDay` 已经在里面处理了 cursor，不需要在这里再算一遍。
+         */
+        onToday={() => {
+          pickDay(today);
+        }}
         cursor={cursor}
         selected={selected}
         // 🔴 不直接给 `setCursor` / `setSelected`：游标的归一化、日档里"选中跟着游标走"、
