@@ -3498,6 +3498,11 @@ export const zhCN = {
   'mobile.tasks.tagFilter.all': '全部',
   'mobile.tasks.mode.countdown': '倒计时',
   // 同一页上的两种视图。**不是两个 tab** —— 见 ADR-0015 §4。
+  'mobile.tasks.more.open': '其它操作',
+  'mobile.tasks.more.label': '这一屏的设置',
+  'mobile.tasks.more.view': '视图',
+  'mobile.tasks.more.sort': '排序',
+  'mobile.tasks.more.filter': '在当前列表里筛选',
   'mobile.tasks.viewOptions.title': '视图选项',
   'mobile.tasks.viewOptions.open': '视图选项：{view}',
   'mobile.tasks.viewOptions.close': '关闭视图选项',

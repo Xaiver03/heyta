@@ -1336,7 +1336,12 @@ export function ChoiceRows<T extends string>({
 }: {
   /** 组标签（「视图」「日期显示」「排序方式」）。**同一张面板里要么都有、要么都没有。** */
   groupLabel?: string;
-  options: readonly { readonly key: T; readonly label: string }[];
+  /**
+   * 选项。`color` 是**文字色**（例如优先级那四档各有自己的色槽）——
+   * 它不改变行高、不换底色：颜色的唯一职责是"这一项属于哪个类别"，
+   * 选中记号仍然是右侧的勾（§6b：选中态只许改颜色 + 记号）。
+   */
+  options: readonly { readonly key: T; readonly label: string; readonly color?: string }[];
   value: T;
   onChange: (next: T) => void;
   disabled?: boolean;
@@ -1386,7 +1391,10 @@ export function ChoiceRows<T extends string>({
                 variant={CHOICE_ROW_TEXT.option}
                 style={{
                   flex: 1,
-                  color: selected ? t['color.primary'] : t['color.foreground'],
+                  // 选中优先级最高：它表达"当前是哪一档"。
+                  // 有 `color` 的选项（优先级）在未选中时用自己的色槽，
+                  // 选中时仍然让位给主色 —— 两个颜色通道同时说话，用户读不出哪个是选中。
+                  color: selected ? t['color.primary'] : (option.color ?? t['color.foreground']),
                 }}
               >
                 {option.label}

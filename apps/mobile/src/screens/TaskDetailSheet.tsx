@@ -130,7 +130,7 @@ import { DatePicker } from '@heyta/ui';
 import { datePickerLabels, datePickerTimeLabels } from '../lib/date-picker-labels';
 import { quickDatePicks } from '../lib/quick-dates';
 import { Icon } from '../ui/icons';
-import { Button, Chip, HStack, IconButton, Stack, Text, TextField } from '../ui/kit';
+import { Button, Chip, ChoiceRows, HStack, IconButton, Stack, Text, TextField } from '../ui/kit';
 
 /**
  * 重复预设 → 词条 key。
@@ -1435,18 +1435,21 @@ export function TaskDetailSheet({
           />
         </HStack>
       ) : (
-        <View style={styles.chipRow}>
-          <Chip
-            label={t('mobile.detail.subtasks.add')}
-            selected={false}
-            icon="task.add"
-            testID="task-detail-add-subtask"
-            onPress={() => {
-              setSubtaskError('');
-              setNewSubtaskOpen(true);
-            }}
-          />
-        </View>
+        /*
+          🔴 这是**动作**，不是选项。此前用一枚 `selected={false}` 的 Chip 画它，
+          于是屏幕上一个永远选不中的"选项"—— 那一格是假的。
+          动作一律走 `Button`（与清单组的「新建清单」、附件组的「添加附件」同一档）。
+        */
+        <Button
+          label={t('mobile.detail.subtasks.add')}
+          icon="task.add"
+          tone="ghost"
+          testID="task-detail-add-subtask"
+          onPress={() => {
+            setSubtaskError('');
+            setNewSubtaskOpen(true);
+          }}
+        />
       )}
 
       {subtaskError !== '' ? (
@@ -1525,15 +1528,13 @@ export function TaskDetailSheet({
             </Text>
           ) : null}
 
-          <View style={styles.chipRow}>
-            <Chip
-              label={addAttachmentLabel}
-              selected={false}
-              icon="task.add"
-              testID="task-detail-add-attachment"
-              onPress={runAddAttachment}
-            />
-          </View>
+          <Button
+            label={addAttachmentLabel}
+            icon="task.add"
+            tone="ghost"
+            testID="task-detail-add-attachment"
+            onPress={runAddAttachment}
+          />
 
           {attachmentError !== '' ? (
             <Text variant="row-meta" tone="danger" testID="task-detail-attachment-error">
@@ -1634,44 +1635,50 @@ export function TaskDetailSheet({
         testID="task-detail-section-repeat"
       >
         <Stack gap="default">
-          <View style={styles.chipRow}>
-            <Chip
-              label={t('mobile.detail.repeat.none')}
-              selected={repeat === undefined}
-              onPress={() => {
+          {/*
+            🔴 展开态是纵向单选行（与优先级同一形态）。
+
+            「不重复」是**选项**，不是"关闭"按钮 —— 它和五个预设是同一件事的六个答案，
+            所以排在同一列里，右侧同一个勾。"自定义规则"是**只读的一档**
+            （当前规则不属于任何预设时出现），它也在候选列里，但点它等于"清除" ——
+            这一格是真的特例，注释写明：它没有对应的 `onSelect` 语义，
+            因为"选自定义"不是一个动作，用户要去下面的 RRULE 输入框改。
+          */}
+          <ChoiceRows
+            options={[
+              { key: 'none', label: t('mobile.detail.repeat.none') },
+              ...REPEAT_PRESET_IDS.map((id) => ({ key: id, label: t(REPEAT_LABEL_KEYS[id]) })),
+              ...(customRule !== undefined
+                ? [{ key: 'custom', label: describeRecurrenceText(customRule, t, locale) }]
+                : []),
+            ]}
+            value={
+              repeat === undefined
+                ? 'none'
+                : activePreset !== undefined
+                  ? activePreset
+                  : 'custom'
+            }
+            onChange={(next) => {
+              if (next === 'none') {
                 run(actions.setRepeat(task.id, undefined));
-              }}
-            />
-            {REPEAT_PRESET_IDS.map((id) => (
-              <Chip
-                key={id}
-                label={t(REPEAT_LABEL_KEYS[id])}
-                selected={activePreset === id}
-                onPress={() => {
-                  const rule = repeatPresetRule(id, repeatAnchor);
-                  // 锚点非法时 `repeatPresetRule` 返回 undefined。
-                  // 这里**什么都不做**而不是发一条垃圾规则：一条
-                  // `BYDAY=undefined` 能通过 `isValidRecurrenceRule`
-                  // （FREQ 还在），但一次都不命中 —— 静默的空规则最难查。
-                  if (rule === undefined) return;
-                  run(actions.setRepeat(task.id, rule));
-                }}
-              />
-            ))}
-            {/* 不属于任何预设的规则（例如另一台设备设的"每两周"）。
-                **必须显示出来**，否则面板看上去像"这条任务不重复"，
-                而用户一点「每天」就把那条规则悄悄换掉了。 */}
-            {customRule !== undefined && (
-              <Chip
-                label={describeRecurrenceText(customRule, t, locale)}
-                selected
-                icon="task.repeat"
-                onPress={() => {
-                  run(actions.setRepeat(task.id, undefined));
-                }}
-              />
-            )}
-          </View>
+                return;
+              }
+              // 自定义那一档点下去什么都不改：它的规则只能由下面的 RRULE 输入框改。
+              if (next === 'custom') return;
+              // 上面已经把 `'none'` 与 `'custom'` 两档挡掉了，剩下的一定是预设 id；
+              // 收窄写成显式断言而不是 `as never`，是为了让类型错的时候这里先红。
+              const presetId = next as (typeof REPEAT_PRESET_IDS)[number];
+              const rule = repeatPresetRule(presetId, repeatAnchor);
+              // 锚点非法时 `repeatPresetRule` 返回 undefined。
+              // 这里**什么都不做**而不是发一条垃圾规则：一条
+              // `BYDAY=undefined` 能通过 `isValidRecurrenceRule`
+              // （FREQ 还在），但一次都不命中 —— 静默的空规则最难查。
+              if (rule === undefined) return;
+              run(actions.setRepeat(task.id, rule));
+            }}
+            testID="task-detail-repeat-choices"
+          />
           {repeat !== undefined && (
             <Text variant="row-meta" tone="muted">
               {t('mobile.detail.repeat.current', {
@@ -1782,25 +1789,25 @@ export function TaskDetailSheet({
           <Text variant="row-meta" tone="muted">
             {t('mobile.detail.schedule.duration')}
           </Text>
-          <View style={styles.chipRow}>
-            <Chip
-              label={t('mobile.detail.schedule.none')}
-              selected={task.durationMinutes === undefined}
-              onPress={() => {
-                run(actions.setSchedule(task.id, { durationMinutes: undefined }));
-              }}
-            />
-            {DURATION_CHIPS.map((minutes) => (
-              <Chip
-                key={minutes}
-                label={durationChipLabel(minutes)}
-                selected={task.durationMinutes === minutes}
-                onPress={() => {
-                  run(actions.setSchedule(task.id, { durationMinutes: minutes }));
-                }}
-              />
-            ))}
-          </View>
+          <ChoiceRows
+            options={[
+              { key: 'none', label: t('mobile.detail.schedule.none') },
+              ...DURATION_CHIPS.map((minutes) => ({
+                key: String(minutes),
+                label: durationChipLabel(minutes),
+              })),
+            ]}
+            value={task.durationMinutes === undefined ? 'none' : String(task.durationMinutes)}
+            onChange={(next) => {
+              run(
+                actions.setSchedule(
+                  task.id,
+                  { durationMinutes: next === 'none' ? undefined : Number(next) },
+                ),
+              );
+            }}
+            testID="task-detail-duration-choices"
+          />
         </Stack>
       </DetailSection>
 
@@ -1813,19 +1820,30 @@ export function TaskDetailSheet({
         }}
         testID="task-detail-section-priority"
       >
-        <View style={styles.chipRow}>
-          {PRIORITY_ORDER.map((p) => (
-            <Chip
-              key={String(p)}
-              label={priorityLabel(p, t)}
-              selected={(task.priority ?? Priority.None) === p}
-              color={tokens[priorityColorToken(p)]}
-              onPress={() => {
-                run(actions.setPriority(task.id, p));
-              }}
-            />
-          ))}
-        </View>
+        {/*
+          🔴 展开态是**纵向单选行**（`ChoiceRows`），不是一排 wrap 的 chip。
+
+          理由来自这一屏的**收起态**：`DetailSection` 收起时是"标签在左、值在右"的
+          一行（就是滴答那种属性行）。用户点开它，期待的是"把这个值换成另一个"，
+          也就是**同一件事的候选列表** —— 纵向一列、右侧打勾、当前的在上。
+          wrap 的 chip 说的是另一种话（"这些标签里挑几个"），而且一屏五组都这样，
+          每组都换行、左缘每行都齐、选中靠反底色，读起来是一片圆角块。
+
+          ⚠️ 颜色只做**文字色**（优先级四档各有色槽），选中记号仍然是勾：
+          底色反转 + 色槽色同时出现时，用户读不出哪个是"当前"。
+        */}
+        <ChoiceRows
+          options={PRIORITY_ORDER.map((p) => ({
+            key: String(p),
+            label: priorityLabel(p, t),
+            color: tokens[priorityColorToken(p)],
+          }))}
+          value={String(task.priority ?? Priority.None)}
+          onChange={(next) => {
+            run(actions.setPriority(task.id, Number(next) as Priority));
+          }}
+          testID="task-detail-priority-choices"
+        />
       </DetailSection>
 
       {/* 四象限的第一个轴。
@@ -1875,40 +1893,38 @@ export function TaskDetailSheet({
         testID="task-detail-section-project"
       >
         <Stack gap="default">
-          <View style={styles.chipRow}>
-            {/* 🔴 「收集箱」是**未归类**的显示名，不是一条真清单：
-                它对应 `projectId === undefined`，任何 PROJECT 实体里都没有它。
-                所以它是一个**选项**，但永远不参与增删改。 */}
-            <Chip
-              label={t('mobile.detail.project.inbox')}
-              selected={task.projectId === undefined}
+          {/*
+            🔴 「收集箱」是**未归类**的显示名，不是一条真清单：
+            它对应 `projectId === undefined`，任何 PROJECT 实体里都没有它。
+            所以它是一个**选项**，但永远不参与增删改。
+
+            🔴 「新建清单」从这个组里**移出去了**：它是一个**动作**，不是第 N+1 个选项。
+            混在候选列里会被读成"选了这个清单"，而且它此前靠 `selected={false}`
+            假装成选项 —— 那一格是这一组唯一的假数据。
+          */}
+          <ChoiceRows
+            options={[
+              { key: 'inbox', label: t('mobile.detail.project.inbox') },
+              ...projects.map((project) => ({ key: project.id, label: project.name })),
+            ]}
+            value={task.projectId === undefined ? 'inbox' : task.projectId}
+            onChange={(next) => {
+              // 清除传 `undefined`，由 app-host 写成 `null`
+              // （见 `TaskActions.moveToProject`）。
+              run(actions.moveToProject(task.id, next === 'inbox' ? undefined : next));
+            }}
+            testID="task-detail-project-choices"
+          />
+          {projectActions !== null && !newListOpen && (
+            <Button
+              label={t('mobile.detail.project.create')}
+              icon="task.add"
+              tone="ghost"
               onPress={() => {
-                // 清除传 `undefined`，由 app-host 写成 `null`
-                // （见 `TaskActions.moveToProject`）。
-                run(actions.moveToProject(task.id, undefined));
+                setNewListOpen(true);
               }}
             />
-            {projects.map((project) => (
-              <Chip
-                key={project.id}
-                label={project.name}
-                selected={task.projectId === project.id}
-                onPress={() => {
-                  run(actions.moveToProject(task.id, project.id));
-                }}
-              />
-            ))}
-            {projectActions !== null && !newListOpen && (
-              <Chip
-                label={t('mobile.detail.project.create')}
-                selected={false}
-                icon="task.add"
-                onPress={() => {
-                  setNewListOpen(true);
-                }}
-              />
-            )}
-          </View>
+          )}
 
           {/* 行内新建：**建完立刻把这任务放进去**。
               分两步（先去「我的」页建、再回来选）会让"边整理边建清单"
@@ -1975,31 +1991,23 @@ export function TaskDetailSheet({
         testID="task-detail-section-parent"
       >
         <Stack gap="default">
-          <View style={styles.chipRow}>
-            <Chip
-              label={t('mobile.detail.parent.topLevel')}
-              selected={task.parentId === undefined}
-              onPress={() => {
-                runSetParent(undefined);
-              }}
-            />
-            {/* 🔴 候选**预先过滤**：用领域层的 `canSetParent`，不是"id 不等于自己"。
-                后者会漏掉"后代"这一整类 ⇒ 用户能选出**造出环**的组合，
-                而环的后果是树构建/折叠/计数**无限递归**。 */}
-            {tasks
-              .filter((t2) => t2.deletedAt === undefined)
-              .filter((t2) => canSetParent(tasks, task.id, t2.id))
-              .map((t2) => (
-                <Chip
-                  key={t2.id}
-                  label={t2.title}
-                  selected={task.parentId === t2.id}
-                  onPress={() => {
-                    runSetParent(t2.id);
-                  }}
-                />
-              ))}
-          </View>
+          {/* 🔴 候选**预先过滤**：用领域层的 `canSetParent`，不是"id 不等于自己"。
+              后者会漏掉"后代"这一整类 ⇒ 用户能选出**造出环**的组合，
+              而环的后果是树构建/折叠/计数**无限递归**。 */}
+          <ChoiceRows
+            options={[
+              { key: 'top', label: t('mobile.detail.parent.topLevel') },
+              ...tasks
+                .filter((t2) => t2.deletedAt === undefined)
+                .filter((t2) => canSetParent(tasks, task.id, t2.id))
+                .map((t2) => ({ key: t2.id, label: t2.title })),
+            ]}
+            value={task.parentId === undefined ? 'top' : task.parentId}
+            onChange={(next) => {
+              runSetParent(next === 'top' ? undefined : next);
+            }}
+            testID="task-detail-parent-choices"
+          />
           {parentError !== '' && (
             <Text variant="row-meta" tone="danger">
               {parentError}

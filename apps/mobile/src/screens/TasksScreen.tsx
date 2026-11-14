@@ -37,7 +37,6 @@ import {
   type QuadrantTaskPatch,
 } from '@heyta/domain';
 import type { Project, Tag, Task, TaskSortKey } from '@heyta/domain';
-import { CHOICE_ROW_SHAPE } from '@heyta/design-system';
 // `formatDayTitleText` 在壳里把领域层给的 `LocalDate` 说成当前语言：
 // **"某一天的标题"的日期语义（`isoWeekday`、`parseLocalDate`）仍只有领域层一份**，
 // 壳里只负责措辞（见 `apps/mobile/src/lib/date.ts` 文件头）。
@@ -92,7 +91,6 @@ import { quadrantBoardLabels } from '../lib/quadrant-display';
 import { useText, useTheme, useTokens } from '../theme';
 import {
   Button,
-  ChoiceRows,
   EmptyState,
   Fab,
   IconButton,
@@ -102,6 +100,7 @@ import {
   Text,
 } from '../ui/kit';
 import { Icon, type IconName } from '../ui/icons';
+import { TopBarMenu } from '../ui/top-bar-menu';
 /**
  * 🔴 任务行的**机制**现在来自共享层（M1-4）。
  *
@@ -396,151 +395,6 @@ function Composer({
  * 使用原来的 state 与设备偏好写入口，所以这里只改变信息密度，不改变能力或
  * 持久化语义。
  */
-function TaskViewOptions({
-  visible,
-  view,
-  dueMode,
-  currentSort,
-  onSelectView,
-  onSelectDueMode,
-  onSelectSort,
-  onClose,
-}: {
-  visible: boolean;
-  view: 'list' | 'quadrant' | 'timeline';
-  dueMode: DueDisplayMode;
-  currentSort: TaskSortKey;
-  onSelectView: (next: 'list' | 'quadrant' | 'timeline') => void;
-  onSelectDueMode: (next: DueDisplayMode) => void;
-  onSelectSort: (next: TaskSortKey) => void;
-  onClose: () => void;
-}): React.JSX.Element {
-  const tokens = useTokens();
-  const { t } = useI18n();
-  const insets = useSafeAreaInsets();
-
-  /**
-   * 🔴 三组**同构**：都是 `ChoiceRows`（一个组标签 + 若干等高行 + 右侧选中记号）。
-   *
-   * 这里此前是三组三种形态 —— 视图/日期显示是圆形 Chip，排序是四条通栏
-   * `Button` 且选中那一项换成 `tone="primary"`（一条蓝底横杠）。同一张面板里
-   * 行高一致（44）但**左缘、行宽、选中记号、对齐轴全不一样**，
-   * 而 `check:design` 只看"值是不是 token"，读不出来。
-   * 事故记录与形状契约：`packages/design-system/src/choice-row-shape.ts`。
-   */
-  const viewOptions = [
-    { key: 'list' as const, label: t('mobile.tasks.view.list') },
-    { key: 'quadrant' as const, label: t('mobile.tasks.view.quadrant') },
-    { key: 'timeline' as const, label: t('mobile.tasks.view.timeline') },
-  ];
-  const dueOptions = [
-    { key: 'date' as const, label: t('mobile.tasks.mode.date') },
-    { key: 'countdown' as const, label: t('mobile.tasks.mode.countdown') },
-  ];
-  const sortOptions = TASK_SORT_OPTIONS.map((option) => ({
-    key: option,
-    label: taskSortName(t, option),
-  }));
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <Pressable
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: tokens['material.scrim'],
-        }}
-        onPress={onClose}
-        accessible={false}
-        importantForAccessibility="no"
-        accessibilityElementsHidden
-      />
-      <View
-        style={{
-          marginTop: 'auto',
-          backgroundColor: tokens['color.surface'],
-          borderTopLeftRadius: tokens['radius.xl'],
-          borderTopRightRadius: tokens['radius.xl'],
-          paddingTop: tokens['space.4'],
-          paddingHorizontal: tokens['screen.gutter'],
-          paddingBottom: insets.bottom + tokens['space.6'],
-          gap: tokens['space.4'],
-          maxHeight: '90%',
-        }}
-      >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <Text variant="section-title">{t('mobile.tasks.viewOptions.title')}</Text>
-          <IconButton
-            icon="action.close"
-            label={t('mobile.tasks.viewOptions.close')}
-            color={tokens['color.foreground-muted']}
-            onPress={onClose}
-          />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={{
-            // 🔴 组与组之间是**唯一**表达"换了一件事"的手段，
-            // 所以它必须比组内（0）和标签→行（4）都大。
-            gap: tokens[CHOICE_ROW_SHAPE.groupGap],
-            paddingBottom: tokens['space.4'],
-          }}
-        >
-          <ChoiceRows
-            groupLabel={t('mobile.tasks.viewOptions.viewGroup')}
-            options={viewOptions}
-            value={view}
-            onChange={(next) => {
-              onSelectView(next);
-              onClose();
-            }}
-            testID="view-options-view"
-          />
-
-          {view === 'timeline' ? null : (
-            <ChoiceRows
-              groupLabel={t('mobile.tasks.viewOptions.dueMode')}
-              options={dueOptions}
-              value={dueMode}
-              onChange={onSelectDueMode}
-              testID="view-options-due"
-            />
-          )}
-
-          {view === 'list' ? (
-            <ChoiceRows
-              groupLabel={t('mobile.tasks.sort.choose')}
-              options={sortOptions}
-              value={currentSort}
-              onChange={(next) => {
-                onSelectSort(next);
-                onClose();
-              }}
-              testID="view-options-sort"
-            />
-          ) : null}
-
-          <Text variant="caption" tone="muted">{t('mobile.tasks.gestureHint')}</Text>
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────
 // 屏幕
@@ -638,7 +492,6 @@ export function TasksScreen({
    */
   const [taskSort, setTaskSort] = useState<TaskSortKey>(readTaskSort);
   /** 首屏只展示当前视图与多选入口，其余呈现选项按需打开。 */
-  const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   /** 移动端批量选择态：长按一条任务进入，之后点行只切换选择，不打开详情。 */
   const [bulkSelecting, setBulkSelecting] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<ReadonlySet<string>>(new Set());
@@ -698,6 +551,23 @@ export function TasksScreen({
    * 同一件能力两端读同一批 key，就不可能出现「网页能搜备注、手机不能」这种分歧。
    */
   const [query, setQuery] = useState('');
+  /**
+   * 顶栏 `⋯` 那枚菜单。
+   *
+   * 🔴 它收的是**边界清楚的一件事**：作用于「这一屏」的设置（视图、多选、过滤），
+   * 而不是某一项任务的动作（那些归长按菜单 `RowActionMenu`）。
+   * 两套菜单并存不是重复：触发点不同（顶栏 vs 行）、作用域不同。
+   */
+  const [moreOpen, setMoreOpen] = useState(false);
+  /**
+   * 列表内过滤框的展开态。
+   *
+   * 过滤框此前**常驻**在内容区顶部（44dp + 上下 8dp），而它是偶发动作。
+   * 现在从 `⋯` 里"在当前列表搜索"打开，收起态不占位。
+   * ⚠️ 已有查询时**强制展开**：否则收起之后用户看不见筛选还在生效，
+   * 得到"怎么少了几条"的困惑（与标签筛选行必须常驻同一条理由）。
+   */
+  const [searchBarOpen, setSearchBarOpen] = useState(false);
   // 🔴 "现在"由 `useToday` 提供：**回到前台**与**跨过本地零点**时会刷新。
   //
   // 原来是 `useMemo(() => Date.now(), [])` —— 它把"跨零点"这件真事一起冻住了：
@@ -876,6 +746,23 @@ export function TasksScreen({
   }, []);
 
   /**
+   * 切视图的**唯一**入口（菜单里的三项都走它）。
+   *
+   * 🔴 时间线没有选中语义：带着隐藏的多选目标和一个销毁性工具栏切进去，
+   * 用户会看到"我没选任何东西，但工具栏说选了 3 条"。所以切走之前清掉。
+   * 这条判断此前写在菜单项的 `onSelectView` 里，现在跟着能力一起搬到这里 ——
+   * 换入口不换判断（否则第一个从菜单切视图的人就会踩到）。
+   */
+  const applyView = useCallback(
+    (next: 'list' | 'quadrant' | 'timeline') => {
+      if (next === 'timeline') clearBulkSelection();
+      setView(next);
+    },
+    [clearBulkSelection, setView],
+  );
+
+
+  /**
    * Android 返回键按用户当前正在处理的层级消费：短时浮层、多选态、详情，
    * 最后才交给根导航。TaskScreen 在 Shell 里常驻挂载，所以必须同时按当前
    * tab 过滤；否则隐藏的任务页会抢走其它 tab 的返回键。
@@ -885,10 +772,6 @@ export function TasksScreen({
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (bulkMoveOpen) {
         setBulkMoveOpen(false);
-        return true;
-      }
-      if (viewOptionsOpen) {
-        setViewOptionsOpen(false);
         return true;
       }
       if (searchOpen) {
@@ -927,7 +810,6 @@ export function TasksScreen({
     quadrantMoveError,
     quadrantMoveUndo,
     searchOpen,
-    viewOptionsOpen,
   ]);
 
   const enterBulkSelection = useCallback((id: string) => {
@@ -1587,87 +1469,62 @@ export function TasksScreen({
           </Text>
         </View>
         {/*
-          搜索框。
+          列表内过滤框：**按需展开**，不常驻。
 
-          🔴 **它此前不存在** —— 而 Web 有。同一件能力两端不一致，正是 M1/M2 要避免的。
-          判据在 `packages/domain/src/search.ts`（与 Web 共用），这里只负责把字读出来。
-
-          ⚠️ 放**标题之下、视图切换之上**：它是"在当前这一屏里找东西"，
-          所以属于内容区（跟着滚），不属于顶栏。
+          引用上的判据：它过滤的是"当前这一屏里已经有的东西"，
+          属于偶发动作；常驻会让用户在还没有任务时就先看见一排控制手段。
+          已有查询时强制展开（见 `searchBarOpen` 的注释）。
         */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: tokens['space.2'],
-            paddingTop: tokens['space.2'],
-          }}
-        >
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t('web.shell.search.placeholder')}
-            accessibilityLabel={t('web.shell.search.aria')}
-            placeholderTextColor={tokens['color.foreground-subtle']}
-            returnKeyType="search"
-            // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条 CSS 字体栈
-            // 交给 RN，字体解析失败且**不报错**（已实测）。
-            style={[
-              text['row-meta'],
-              {
-                flex: 1,
-                minHeight: tokens['touch-target.min'],
-                paddingHorizontal: tokens['space.3'],
-                borderRadius: tokens['radius.md'],
-                backgroundColor: tokens['color.surface-sunken'],
-                color: tokens['color.foreground'],
-                fontFamily: native.fontSans,
-              },
-            ]}
-          />
-          {query !== '' ? (
+        {searchBarOpen || query !== '' ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: tokens['space.2'],
+              paddingTop: tokens['space.2'],
+            }}
+          >
+            <TextInput
+              autoFocus
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('web.shell.search.placeholder')}
+              accessibilityLabel={t('web.shell.search.aria')}
+              placeholderTextColor={tokens['color.foreground-subtle']}
+              returnKeyType="search"
+              style={[
+                text['row-meta'],
+                {
+                  flex: 1,
+                  minHeight: tokens['touch-target.min'],
+                  paddingHorizontal: tokens['space.3'],
+                  borderRadius: tokens['radius.md'],
+                  backgroundColor: tokens['color.surface-sunken'],
+                  color: tokens['color.foreground'],
+                  fontFamily: native.fontSans,
+                },
+              ]}
+            />
             <Chip
               label={t('web.shell.search.clear')}
               onPress={() => {
                 setQuery('');
+                setSearchBarOpen(false);
               }}
             />
-          ) : null}
-        </View>
+          </View>
+        ) : null}
 
-        {/* 首屏只保留当前视图入口与明确的多选入口；其余选项按需打开。 */}
-        <View style={{ flexDirection: 'row', gap: tokens['space.2'], paddingTop: tokens['space.2'] }}>
-          <Button
-            label={
-              view === 'list'
-                ? t('mobile.tasks.view.list')
-                : view === 'quadrant'
-                  ? t('mobile.tasks.view.quadrant')
-                  : t('mobile.tasks.view.timeline')
-            }
-            icon="action.more"
-            tone="ghost"
-            accessibilityLabel={t('mobile.tasks.viewOptions.open', {
-              view:
-                view === 'list'
-                  ? t('mobile.tasks.view.list')
-                  : view === 'quadrant'
-                    ? t('mobile.tasks.view.quadrant')
-                    : t('mobile.tasks.view.timeline'),
-            })}
-            onPress={() => setViewOptionsOpen(true)}
-          />
-          {bulkSelecting || view === 'timeline' ? null : (
-            <Chip
-              label={t('web.shell.bulk.select')}
-              onPress={() => {
-                setBulkSelecting(true);
-                setSelectedTaskIds(new Set());
-                setBulkError(null);
-              }}
-            />
-          )}
-        </View>
+        {/*
+          🔴 这一格以前是**三样东西平铺**：整宽搜索框 + 「视图选项」胶囊 +
+          「选择任务」胶囊，合计 256px ≈ 85dp（真机读数）。它们现在都在顶栏 `⋯` 里。
+
+          留下的判据是「这一屏在说什么」：日期 + 任务清单。控制手段不该排在内容之前 ——
+          滴答同一屏的对应位置是空的（顶栏 ← 标题 ⋯，下面直接是列表）。
+
+          ⚠️ 标签筛选行**没有**跟着收进去：它是"当前列表被切了一刀"的**状态**，
+          收进菜单会让筛选生效时主屏看不出被筛过（那比多一行更糟）。
+        */}
 
       {/*
           标签筛选行。
@@ -1724,6 +1581,18 @@ export function TasksScreen({
           // 放在「同步」之前 = 靠左，因为它是日常动作、同步是偶发动作。
           { icon: 'action.search', label: t('mobile.search.open'), onPress: () => setSearchOpen(true) },
           { icon: 'action.sync', label: t('mobile.common.sync'), onPress: refresh },
+          /*
+           * 🔴 第三枚是「其它」菜单，**不是**第四种功能入口。
+           *
+           * 这一格此前是三样东西平铺在内容区顶部：整宽搜索框、「视图选项」胶囊、
+           * 「选择任务」胶囊 —— 合计 256px ≈ 85dp，全都在"控制手段"上，
+           * 而用户打开这一屏是来看任务的。滴答同屏的对应位置是**空的**
+           *（顶栏只有 ← 标题 ⋯，下面直接是列表）。
+           *
+           * 收进这里的判据不是"少放几个按钮"，是**入口分层**：
+           * 作用在「这一屏」上的设置归顶栏，作用在「某一项」上的动作归那一项。
+           */
+          { icon: 'action.more', label: t('mobile.tasks.more.open'), onPress: () => setMoreOpen(true) },
         ]}
       >
         {view === 'list' ? null : taskControls}
@@ -1965,21 +1834,80 @@ export function TasksScreen({
         }} />
         </View>
       )}
-      <TaskViewOptions
-        visible={viewOptionsOpen}
-        view={view}
-        dueMode={dueMode}
-        currentSort={taskSort}
-        onSelectView={(next) => {
-          // Timeline has no selection affordance: do not carry hidden targets
-          // and a destructive bulk toolbar into that view.
-          if (next === 'timeline') clearBulkSelection();
-          setView(next);
-        }}
-        onSelectDueMode={setDueMode}
-        onSelectSort={chooseTaskSort}
-        onClose={() => setViewOptionsOpen(false)}
+      {/*
+        顶栏 `⋯`：**这一屏的全部入口，一层看全**。
+
+        🔴 这里不做"点开再弹一个面板"：那会得到两层菜单、两种形态，
+        而且排序 / 日期显示藏在第二层——用户点开只看见 3 项，会以为菜单就这么多
+        （产品负责人 2026-11-14：「根本就不对，也不全」）。
+        多值项在右边给「当前值 ›」，点进去是**同一个浮层**换成第二层。
+
+        分组（学滴答）：`视图 / 日期显示 / 排序` 一组是"怎么看这个列表"，
+        `筛选 / 批量选择` 一组是"动这个列表"。组间一条线。
+      */}
+      <TopBarMenu
+        visible={moreOpen}
+        label={t('mobile.tasks.more.label')}
+        footer={t('mobile.tasks.gestureHint')}
+        onClose={() => setMoreOpen(false)}
+        items={[
+          {
+            id: 'view',
+            label: t('mobile.tasks.more.view'),
+            value:
+              view === 'list'
+                ? t('mobile.tasks.view.list')
+                : view === 'quadrant'
+                  ? t('mobile.tasks.view.quadrant')
+                  : t('mobile.tasks.view.timeline'),
+            children: [
+              { key: 'list', label: t('mobile.tasks.view.list'), selected: view === 'list', onSelect: () => applyView('list') },
+              { key: 'quadrant', label: t('mobile.tasks.view.quadrant'), selected: view === 'quadrant', onSelect: () => applyView('quadrant') },
+              { key: 'timeline', label: t('mobile.tasks.view.timeline'), selected: view === 'timeline', onSelect: () => applyView('timeline') },
+            ],
+          },
+          {
+            id: 'due',
+            label: t('mobile.tasks.viewOptions.dueMode'),
+            value: dueMode === 'date' ? t('mobile.tasks.mode.date') : t('mobile.tasks.mode.countdown'),
+            children: [
+              { key: 'date', label: t('mobile.tasks.mode.date'), selected: dueMode === 'date', onSelect: () => setDueMode('date') },
+              { key: 'countdown', label: t('mobile.tasks.mode.countdown'), selected: dueMode === 'countdown', onSelect: () => setDueMode('countdown') },
+            ],
+          },
+          {
+            id: 'sort',
+            label: t('mobile.tasks.more.sort'),
+            value: taskSortName(t, taskSort),
+            groupEnd: true,
+            children: TASK_SORT_OPTIONS.map((option) => ({
+              key: option,
+              label: taskSortName(t, option),
+              selected: option === taskSort,
+              onSelect: () => chooseTaskSort(option),
+            })),
+          },
+          {
+            id: 'filter',
+            label: t('mobile.tasks.more.filter'),
+            onPress: () => setSearchBarOpen(true),
+          },
+          ...(bulkSelecting || view === 'timeline'
+            ? []
+            : [
+                {
+                  id: 'select',
+                  label: t('web.shell.bulk.select'),
+                  onPress: () => {
+                    setBulkSelecting(true);
+                    setSelectedTaskIds(new Set());
+                    setBulkError(null);
+                  },
+                },
+              ]),
+        ]}
       />
+
       <Modal
         visible={quadrantMoveTask !== undefined}
         transparent
