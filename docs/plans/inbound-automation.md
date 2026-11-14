@@ -5987,7 +5987,12 @@ AC-6 那次缺陷藏了一整天，起因是那趟整串把 `AC6-browser` 剔掉
   改表/改谓词都归负责人；本线不动。
 
 **①「push 与 ref」这一格的现量（只交事实，推送动作归负责人）**：
-- 远端两枚，都是 **SSH 形状**（URL 里不含任何凭据）：`gitee git@gitee.com:dengxiadeng/heyta.git`、`origin git@github.com:Xaiver03/heyta.git`。
+- 远端两枚，都是 **SSH 形状**（URL 里不含任何凭据）：`gitee git@gitee.com:dengxiadeng/heyta-clean.git`、`origin git@github.com:Xaiver03/heyta.git`。
+  🔴 **2026-11-14 更新**：gitee 那枚已从 `dengxiadeng/heyta` 换成 `dengxiadeng/heyta-clean`。
+  旧仓在清完历史后**仍报 1698 MB**（服务端保留全部陈旧对象、不做自动 GC），最终从
+  `You only have 3 push opportunities` 掉成 `pre-receive hook declined`，彻底推不动；
+  旧仓已删（删前核实：0 issue / 0 PR / 0 release / 0 tag / 0 milestone，且其 `main` 是当时
+  `HEAD` 的祖先 ⇒ **零 git 内容损失**），新仓是 116 MiB 的干净镜像。详见陷阱 #681 / #683。
 - **`main` 跟踪的上游是 `gitee/main`**（`git status -sb` 首行 `## main...gitee/main [ahead 653]`）。
 - 与两个远端的分叉（**对本地跟踪引用量的，未 fetch ⇒ 远端真实状态可能更靠前**）：`origin` ahead **67** / behind **0**；`gitee` ahead **653** / behind **0**。
 - ⇒ 一句现成的动作（等你点头才跑）：`git push origin main`，之后可选 `git branch --set-upstream-to=origin/main`（把上游从 gitee 挪到 GitHub）。

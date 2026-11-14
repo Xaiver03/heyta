@@ -45,7 +45,12 @@
  * 备份分支"或"文档历史再翻一倍"会立刻红。
  *
  * `HEYTA_REPO_PACK_BUDGET_MB` 覆盖预算；`HEYTA_REPO_REF_UNIQUE_MB` 覆盖单 ref 阈值
- * （默认 200 MB —— 比正常分支的独占量高一个量级，只有真·历史黑洞才够得着）。
+ * （默认 **100 MB** —— 实测全仓最重的非 main ref 也只独占 17.6 MB（`refs/archive`），
+ * 所以 100 MB 是"高出一个量级"的界，真·历史黑洞一眼够得着；而那个把仓库顶到 1.37 GiB
+ * 的备份分支独占 **899.7 MB**，超它九倍。`HEYTA_REPO_REF_UNIQUE_MB` 可覆盖）。
+ * 扫描范围含 `refs/heads`、`refs/archive`、`refs/tmp`、`refs/backup`、`refs/tags` ——
+ * 🔴 **tags 必须在内**：一枚指着重写前历史的 tag 同样会把那一整条历史钉成可达，
+ * 而它比分支更隐蔽（没人会去 `git branch` 里看它）。
  *
  * ## 用法
  *
@@ -57,7 +62,7 @@
 import { spawnSync } from 'node:child_process';
 
 const DEFAULT_PACK_BUDGET_MB = 300;
-const DEFAULT_REF_UNIQUE_MB = 200;
+const DEFAULT_REF_UNIQUE_MB = 100;
 
 const argOf = (flag, fallback) => {
   const i = process.argv.indexOf(flag);
@@ -118,7 +123,7 @@ const findHeavyRefs = (repo, thresholdMb) => {
   if (!mainRev.ok) return { ok: false, reason: `取 main 可达对象失败：${mainRev.reason}` };
   const mainSet = new Set(mainRev.stdout.split('\n').map((l) => l.split(' ')[0]).filter(Boolean));
 
-  const refs = git(repo, ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/archive', 'refs/tmp', 'refs/backup']);
+  const refs = git(repo, ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/archive', 'refs/tmp', 'refs/backup', 'refs/tags']);
   if (!refs.ok) return { ok: false, reason: `取 ref 清单失败：${refs.reason}` };
 
   const heavy = [];
