@@ -1324,7 +1324,7 @@ export function ProfileScreen(): React.JSX.Element {
         这里留的是**状态的呈现与手动重试** —— 用户看的是结果，
         改配置去设置面，两件事不再挤在一段滚动流里。
       */}
-      <SectionHeader icon="action.sync" title={t('mobile.profile.section.status')} />
+      <SectionHeader title={t('mobile.profile.section.status')} />
       <Card>
         <View style={{ gap: tokens['space.3'] }}>
           <StatusRow
@@ -1694,7 +1694,7 @@ export function ProfileScreen(): React.JSX.Element {
 
       {/* 清单 / 标签 / 便签管理（⑥）。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
-      <SectionHeader icon="task.project" title={t('mobile.profile.tools')} />
+      <SectionHeader title={t('mobile.profile.tools')} />
       <Card>
         <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', leading: <Icon name="task.project" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:lists'); } }} />
         <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', leading: <Icon name="task.tag" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:tags'); } }} />

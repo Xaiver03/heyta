@@ -281,20 +281,20 @@ export function GrowthScreen({
         case 'share':
           return (
             <>
-              <SectionHeader icon="growth.share" title={t('web.growth.share.title')} />
+              <SectionHeader title={t('web.growth.share.title')} />
               <Text variant="row-meta" tone="subtle">
                 {t('web.growth.share.note')}
               </Text>
             </>
           );
         case 'today':
-          return <SectionHeader icon="group.today" title={t('mobile.growth.today.title')} />;
+          return <SectionHeader title={t('mobile.growth.today.title')} />;
         case 'week':
-          return <SectionHeader icon="growth.week" title={t('mobile.growth.week.title')} />;
+          return <SectionHeader title={t('mobile.growth.week.title')} />;
         case 'streaks':
           return (
             <>
-              <SectionHeader icon="focus.streak" title={t('mobile.growth.streak.title')} />
+              <SectionHeader title={t('mobile.growth.streak.title')} />
               <Text variant="row-meta" tone="subtle">
                 {t('mobile.growth.streak.note')}
               </Text>
@@ -303,7 +303,7 @@ export function GrowthScreen({
         case 'milestones':
           return (
             <>
-              <SectionHeader icon="growth.milestones" title={t('mobile.growth.milestones.title')} />
+              <SectionHeader title={t('mobile.growth.milestones.title')} />
               <Text variant="row-meta" tone="subtle">
                 {t('mobile.growth.milestones.note')}
               </Text>
@@ -312,7 +312,7 @@ export function GrowthScreen({
         case 'tags':
           return (
             <>
-              <SectionHeader icon="growth.identity" title={t('mobile.growth.tags.title')} />
+              <SectionHeader title={t('mobile.growth.tags.title')} />
               <Text variant="row-meta" tone="subtle">
                 {t('mobile.growth.tags.note')}
               </Text>

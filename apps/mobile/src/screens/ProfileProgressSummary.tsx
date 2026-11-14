@@ -67,7 +67,7 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
   if (snapshot === null) {
     return (
       <>
-        <SectionHeader icon="growth.week" title={t('mobile.profile.section.progress')} />
+        <SectionHeader title={t('mobile.profile.section.progress')} />
         <Card>
           <Stack>
             <Text variant="caption" tone="subtle">
@@ -118,7 +118,7 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
 
   return (
     <>
-      <SectionHeader icon="growth.week" title={t('mobile.profile.section.progress')} />
+      <SectionHeader title={t('mobile.profile.section.progress')} />
       <Card>
         {rows.map((row, index) => (
           <SettingsRow key={settingsRowKey(row, index)} row={row} />

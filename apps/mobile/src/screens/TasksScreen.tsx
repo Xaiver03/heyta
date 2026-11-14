@@ -1698,7 +1698,6 @@ export function TasksScreen({
               renderSectionHeader={(section) => (
                 <View style={{ paddingTop: tokens['space.3'] }}>
                   <SectionHeader
-                    icon={section.meta.icon}
                     title={section.meta.title}
                     count={section.tasks.length}
                     tone={section.meta.tone}

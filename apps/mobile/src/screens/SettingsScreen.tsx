@@ -526,7 +526,7 @@ export function SettingsScreen({
 
   const renderPrivacy = (): React.JSX.Element => (
     <Stack gap="loose" testID="privacy-consent-section">
-      <SectionHeader icon="privacy.consent" title={t('common.privacy.settings.title')} />
+      <SectionHeader title={t('common.privacy.settings.title')} />
       <Card>
         <Stack>
           <Text variant="row-title">
@@ -569,7 +569,7 @@ export function SettingsScreen({
 
   const renderSyncConfiguration = (): React.JSX.Element => (
     <>
-      <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
+      <SectionHeader title={t('mobile.profile.section.sync')} />
       <Card>
         {advancedSync ? (
           <View ref={syncFormRef} style={styles.gap4}>
@@ -686,7 +686,6 @@ export function SettingsScreen({
           title={t('mobile.widgetJourney.sectionTitle')}
           /* 「添加后打开一次就会填充」是**点开才知道**的操作指引 ⇒ 「?」，不摆成正文行。 */
           note={t('mobile.widgetJourney.openOnce')}
-          leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
           rows={widgetRows}
         />
       ) : null}
@@ -710,7 +709,6 @@ export function SettingsScreen({
         testID="settings-theme"
         title={t('mobile.profile.section.appearance')}
         note={t('mobile.profile.theme.hint')}
-        leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
       >
         <ChoiceRows
           /*
@@ -734,7 +732,6 @@ export function SettingsScreen({
         testID="profile-language"
         title={t('mobile.profile.section.language')}
         note={t('mobile.profile.language.hint')}
-        leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
       >
         <View style={styles.chipRow}>
           {LOCALES.map((code) => (
@@ -756,7 +753,6 @@ export function SettingsScreen({
       variant="card"
       testID="settings-feedback"
       title={t('mobile.settings.feedback.section')}
-      leading={<Icon name="action.more" size="sm" color={tokens['color.foreground-muted']} />}
       rows={
         [
           {
@@ -806,7 +802,6 @@ export function SettingsScreen({
           variant="card"
           testID="settings-security-actions"
           title={sectionLabels.account}
-          leading={<Icon name="privacy.consent" size="sm" color={tokens['color.foreground-muted']} />}
           rows={securityActions}
         />
       ) : null}

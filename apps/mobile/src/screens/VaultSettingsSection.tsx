@@ -386,7 +386,7 @@ export function VaultSettingsSection({
 
   return (
     <Stack gap="loose" testID="mobile-vault-settings">
-      <SectionHeader icon="privacy.consent" title={t('mobile.vault.title')} />
+      <SectionHeader title={t('mobile.vault.title')} />
       <Text variant="caption" tone="subtle">
         {t('mobile.vault.description')}
       </Text>

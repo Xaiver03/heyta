@@ -329,7 +329,7 @@ export function FocusScreen(): React.JSX.Element {
         </View>
       ) : null}
 
-      <SectionHeader icon="focus.link" title={t('mobile.focus.linkedTask')} />
+      <SectionHeader title={t('mobile.focus.linkedTask')} />
       <Card>
         {linkedTask !== undefined ? (
           <View style={{ gap: tokens['space.2'] }}>
@@ -368,7 +368,7 @@ export function FocusScreen(): React.JSX.Element {
         )}
       </Card>
 
-      <SectionHeader icon="focus.stats" title={t('mobile.common.today')} />
+      <SectionHeader title={t('mobile.common.today')} />
       {overview === null ? null : (
         <Card>
           <StatRow

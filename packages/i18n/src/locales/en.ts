@@ -3560,7 +3560,7 @@ export const en = {
   //    own face). The entry row lives on Profile; the content lives in the sheet.
   'mobile.settings.section.account': 'Account',
   'mobile.settings.section.notifications': 'Reminders & notifications',
-  'mobile.settings.section.appearance': 'Language',
+  'mobile.settings.section.appearance': 'Appearance & Language',
   'mobile.settings.section.personalization': 'Personalization',
   'mobile.settings.section.features': 'Features & AI',
   'mobile.settings.section.about': 'About & help',

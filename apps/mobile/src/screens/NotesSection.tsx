@@ -168,7 +168,7 @@ export function NotesSection(): React.JSX.Element {
 
   return (
     <>
-      <SectionHeader icon="note.sticky" title={t('notes.title')} />
+      <SectionHeader title={t('notes.title')} />
       <Card>
         {/*
           🔴 内容校验的权威是 `createNoteActions`（空内容抛错、超长拒绝）。

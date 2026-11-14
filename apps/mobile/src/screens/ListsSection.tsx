@@ -231,7 +231,7 @@ export function ListsSection(): React.JSX.Element {
 
   return (
     <>
-      <SectionHeader icon="task.project" title={t('mobile.profile.section.lists')} />
+      <SectionHeader title={t('mobile.profile.section.lists')} />
       <Card>
         {/*
           🔴 行骨架来自共享 `OrganizerList` —— 本文件**不许**自己画一行。

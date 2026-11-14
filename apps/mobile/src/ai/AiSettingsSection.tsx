@@ -252,7 +252,7 @@ export function AiSettingsSection(): React.JSX.Element {
 
   return (
     <Stack gap="loose" testID="ai-settings-section">
-      <SectionHeader icon="action.more" title={t('web.ai.settings.title')} />
+      <SectionHeader title={t('web.ai.settings.title')} />
 
       {savedWithoutKey ? (
         <Text variant="row-meta" tone="warning">

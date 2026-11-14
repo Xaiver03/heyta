@@ -374,13 +374,32 @@ export function Screen({
  * 用图标 + 文字 + 计数。**计数用 `numeric-body`**，等宽 ——
  * 否则任务数从 9 变 10 时整行会横向抖动。
  */
+/**
+ * 分组标题（「近期状态」「整理与记录」…）。
+ *
+ * ## 🔴 2026-11-14：去掉图标、换回 `group-label`、收紧间距
+ *
+ * 改前（真机 `heyta-profile.xml`）：
+ *   · 组标题「近期状态」在 **x=120**，而它管辖的行在 **x=96** —— 被前面那枚图标
+ *     推右了 24dp（`icon.sm` 16 + `space.2` 8）。**组标题比它管的东西更靠右。**
+ *   · 文字档是 `section-title`（16px semibold），与行文字 `row-title`（16px）
+ *     **同字号同颜色**，只差一档字重 ⇒ 看起来是一行"加粗的正文"，不是分组。
+ *
+ * 改后：不吃图标、用 `group-label`（13px semibold `muted`）、与行同一条左缘。
+ *
+ * 为什么组标题该比行**小**：这是 iOS 设置页的做法，而 heyta 里
+ * `group-label` 那一档的注释早论证过 —— 中文没有大小写线索，
+ * 「小字 + 大写 + 宽字距」那套眉标写法不成立，**必须靠字重与弱色赢**。
+ * 于是"组标题比内容小一档"不是失误，是这条纪律的既定形状。
+ *
+ * ⚠️ 组标题**不放图标**：图标是"行"的属性（这一行是什么类的东西），
+ *    组标题是索引（这里开始新的一组）。给索引配图标会让它读起来像一行。
+ */
 export function SectionHeader({
-  icon,
   title,
   count,
   tone = 'muted',
 }: {
-  icon: IconName;
   title: string;
   count?: number;
   tone?: 'muted' | 'danger' | 'primary';
@@ -397,13 +416,17 @@ export function SectionHeader({
     <View
       style={{
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'baseline',
         gap: t['space.2'],
-        paddingTop: t['space.2'],
+        /*
+         * 上方 24dp（分隔上一组），下方由调用方的 Stack gap 给 8dp（紧贴它管的第一行）。
+         * 改前是 `space.2`(8dp) —— 与"组内间距"同值，于是"上一组结束了"和
+         * "这一组内部换了一行"看起来一样。
+         */
+        paddingTop: t['space.6'],
       }}
     >
-      <Icon name={icon} size="sm" color={color} strokeWidth={2} />
-      <Text variant="section-title" style={{ color, flex: 1 }}>
+      <Text variant="group-label" style={{ color, flex: 1 }}>
         {title}
       </Text>
       {count !== undefined ? (

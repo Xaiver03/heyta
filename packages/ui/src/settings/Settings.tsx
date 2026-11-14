@@ -314,6 +314,12 @@ export interface SettingsSectionProps {
    * 另一端就只能**不画图标** —— 那是为了统一而降级，不是统一。
    * 记号长什么样本来就是外壳差异（L3），所以由宿主给组件。
    */
+  /**
+   * @deprecated 2026-11-14 起 `SettingsSection` **不再渲染组标题前的图标**。
+   * 组标题是索引，图标是行的属性；带图标会把标题推右 24~72dp，
+   * 比它管辖的行还靠右（「我的」页实测 120 vs 96）。这个参数留着只为
+   * 让调用点一次性删干净，**不要再传**。
+   */
   readonly leading?: React.ReactNode;
   /** 类型化的行。与 `children` 可以同时给（顺序：rows → children）。 */
   readonly rows?: readonly SettingsRowModel[];
@@ -357,11 +363,28 @@ export function SettingsSection({
 
   return (
     <View style={[styles.root, variant === 'card' ? styles.card : null]} testID={testID}>
-      {title === undefined && leading === undefined && titleTip === undefined ? null : (
+      {/*
+        🔴 2026-11-14：组标题从 `section-title`(16px semibold **主文字色**) 换成
+        `group-label`(13px semibold **muted**)。
+
+        改前真机实测（`heyta-settings-language.xml`）：
+          「外观」组标题 16px semibold，颜色 = `foreground`
+          「跟随系统」选项 16px medium，颜色 = `foreground`
+        **同字号、同颜色、只差一档字重** ⇒ 组标题读起来是一行加粗的正文，
+        不是分组的名字。用户原话：「标题还没有下面的字大」。
+
+        组标题该比行小一档、该是灰的 —— iOS 设置页就是这个形状，
+        也是 `group-label` 那一档存在的理由（它的注释论证过：中文没有
+        大小写线索，"小字+大写+宽字距"的眉标写法不成立，必须靠字重+弱色赢）。
+
+        `leading` 也一并撤掉：组标题是**索引**，不是"一个带图标的行"。
+        带了图标它就被推右 24~72dp，比它管辖的行还靠右
+        （「我的」页实测 120 vs 96）。
+      */}
+      {title === undefined && titleTip === undefined ? null : (
         <View style={styles.sectionHead}>
-          {leading === undefined ? null : leading}
           {title === undefined ? null : (
-            <Text style={[text['section-title'], styles.dynamic, { color: tokens['color.foreground'] }]}>
+            <Text style={[text['group-label'], styles.dynamic, { color: tokens['color.foreground-muted'] }]}>
               {title}
             </Text>
           )}

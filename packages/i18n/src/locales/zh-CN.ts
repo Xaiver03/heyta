@@ -3889,7 +3889,11 @@ export const zhCN = {
   // 但目录里显示的是下面这七条 —— 每一组回答"我要做的那件事属于哪一类"。
   'mobile.settings.section.account': '账号',
   'mobile.settings.section.notifications': '提醒与通知',
-  'mobile.settings.section.appearance': '语言',
+  // 🔴 这一格是**页面标题**（顶栏那行）。2026-11-14 之前叫「语言」，而那一页现在
+  // 已经有两组：「外观」（三档手动主题）+「语言」。标题与内容对不上 ——
+  // 用户的原话：「不知道为什么上面又写着『外观』」。
+  // 页面标题要覆盖它的**全部内容**，所以按组名的上级来命名。
+  'mobile.settings.section.appearance': '外观与语言',
   'mobile.settings.section.personalization': '个性化',
   'mobile.settings.section.features': '功能与 AI',
   'mobile.settings.section.about': '关于与帮助',

@@ -132,7 +132,7 @@ export function TagsSection(): React.JSX.Element {
 
   return (
     <>
-      <SectionHeader icon="task.tag" title={t('mobile.profile.section.tags')} />
+      <SectionHeader title={t('mobile.profile.section.tags')} />
       <Card>
         {/*
           🔴 与清单**同一个组件**（`kind` 只影响 React key 前缀与测试 id）。
