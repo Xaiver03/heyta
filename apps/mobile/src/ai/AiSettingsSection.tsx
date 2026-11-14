@@ -20,7 +20,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { Switch, View } from 'react-native';
 
 import {
   AI_ENDPOINT_PRESETS,
@@ -44,6 +44,7 @@ import {
 import { LOCAL_API_TOOLS } from '@heyta/local-api';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
+import { SettingsInfoTip } from '@heyta/ui';
 import { Button, Card, Checkbox, Chip, SectionHeader, Stack, Text, TextField } from '../ui/kit';
 import { readSyncConfig } from '../sync/config';
 import { useMobileSync } from '../sync/store';
@@ -252,7 +253,10 @@ export function AiSettingsSection(): React.JSX.Element {
 
   return (
     <Stack gap="loose" testID="ai-settings-section">
-      <SectionHeader title={t('web.ai.settings.title')} />
+      <SectionHeader
+        title={t('web.ai.settings.title')}
+        tip={<SettingsInfoTip text={t(INBOUND_BOUNDARY_COPY_KEY)} label={t('web.ai.settings.title')} />}
+      />
 
       {savedWithoutKey ? (
         <Text variant="row-meta" tone="warning">
@@ -272,10 +276,13 @@ export function AiSettingsSection(): React.JSX.Element {
           {t(INBOUND_CYCLE_COPY_KEY[inboundCycle.state])}
         </Text>
       )}
-      {/* 那句边界两壳共用同一颗 key：哪台设备才处理、要常年接收该把 worker 放哪。 */}
-      <Text variant="row-meta" testID="inbound-boundary">
-        {t(INBOUND_BOUNDARY_COPY_KEY)}
-      </Text>
+      {/*
+        🔴 2026-11-14：这段边界正文（5 行）从**平铺**改成挂在组标题的「?」上。
+        产品负责人的原话：「说明性文字不应该直接平铺出来呀。」
+        Material「Settings」：secondary text 只显示**当前状态**，长解释放第二层。
+        这一段的性质是"规则怎么被处理"的解释，不是"现在是什么状态"。
+      */}
+      {null}
       {/* 规则清单（只读）：手机上以前连"我有几条规则、它们谁在处理"都说不出。 */}
       {inboundRules === undefined || inboundRules.length === 0 ? null : (
         <Card gap="tight">
@@ -653,15 +660,33 @@ function GateRow({
   testID: string;
 }): React.JSX.Element {
   const tokens = useTokens();
+  /*
+   * 🔴 2026-11-14：`Checkbox`（空心圆）→ RN 原生 `Switch`。
+   *
+   * 看图才发现的：这一屏四个"开关"画成**四个空心圆**。圆在 UI 惯例里表示
+   * **单选组**（这一组里选一个），而这里是四个**彼此独立**的开关。
+   * 于是用户读到的是"这四个里只能选一个"，且看不出当前是开还是关。
+   *
+   * 这是 `ux-principles` §6b 的又一次违反：同一个"开/关"语义，
+   * 设置页用开关、这里用复选框。
+   *
+   * 用 RN 内置 `Switch`：零新依赖，两端都是平台标准外观（Android 上就是 Material 开关）。
+   */
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: tokens['space.2'] }} testID={testID}>
-      <Checkbox checked={on} label={label} onToggle={onToggle} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.3'] }} testID={testID}>
       <Stack gap="tight" style={{ flex: 1 }}>
         <Text variant="row-title">{label}</Text>
         <Text variant="caption" tone="subtle">
           {note}
         </Text>
       </Stack>
+      <Switch
+        value={on}
+        onValueChange={onToggle}
+        trackColor={{ false: tokens['color.border'], true: tokens['color.primary'] }}
+        thumbColor={tokens['color.surface']}
+        accessibilityLabel={label}
+      />
     </View>
   );
 }
