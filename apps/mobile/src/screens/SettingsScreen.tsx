@@ -880,11 +880,18 @@ export function SettingsScreen({
         return renderAbout();
       case undefined:
         return (
+          /*
+            🔴 这里**没有** `note`：此前挂的是「选择要调整的内容。」——
+            用户已经点了「设置」，这句话不提供任何他不知道的信息，只吃掉 54px 首屏。
+            实测（真机 bounds）：它占 y 492–546，把这 6 行的起点从 570 推到 606。
+
+            判据：**页头说明只有在说出"用户不知道的事"时才留**。
+            滴答的设置首页页头没有任何说明文字（9 行直接从会员卡下方开始）。
+          */
           <SettingsSection
             variant="card"
             testID="settings-directory"
             title={t('mobile.settings.directory.title')}
-            note={t('mobile.settings.directory.hint')}
             rows={sectionRows}
           />
         );
