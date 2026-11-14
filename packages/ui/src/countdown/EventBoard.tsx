@@ -220,7 +220,19 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: tokens['space.2'],
     },
     chip: {
-      minHeight: tokens['size.chip-height'],
+      /**
+       * 🔴 这里曾是 `size.chip-height`（28px）—— 那是"标签胶囊"的高度。
+       * 拿它画**可点的筛选胶囊**就低于触控下限：真机实测（倒数纪念日页）
+       * 六枚（全部/倒数日/纪念日/生日/节日/已归档）全是
+       * `[48,384][175,468]` = **127×84px = 42×28dp**，
+       * 而同屏的「已归档」开关与输入行都是 44dp。
+       *
+       * 同一个错在 `capture/CaptureComposer.tsx` 也犯过一次（落点胶囊 28dp），
+       * 两处都改成 `touch-target.min` —— 可点 ⇒ 44，标签胶囊才用 28。
+       */
+      minHeight: tokens['touch-target.min'],
+      /** 宽度也要下限：两字标签（生日/节日）实测只有 42dp 宽。 */
+      minWidth: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.chip-padding-x'],
       borderRadius: tokens['radius.full'],
       alignItems: 'center',
