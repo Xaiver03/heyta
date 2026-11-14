@@ -32,6 +32,7 @@ import {
   ChartColumn,
   Check,
   Copy,
+  Crown,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -42,6 +43,7 @@ import {
   Flag,
   Flame,
   Folder,
+  Info,
   Inbox,
   Link2,
   ListTodo,
@@ -197,6 +199,16 @@ const ICONS = {
    * 🔴 用 `Ellipsis`（三个点）而不是 `Plus`：这一组**不新增任何东西**，它只是
    * 把主路之外还剩的路摆出来。`Plus` 会读成"点这里加一条"。
    */
+  /**
+   * 订阅 / 权益。**不再借 `action.more`（省略号）** ——
+   * 2026-11-14 看图才发现「订阅」那一行前面是一枚「⋯」。
+   * 省略号在 UI 里唯一的含义是"还有更多"，把它当"订阅"用是**没有语义**。
+   */
+  'action.subscription': Crown,
+  /** 外观与语言（显示相关）。此前借的是齿轮，而齿轮在设置语境里是"设置"本身。 */
+  'action.display': Monitor,
+  /** 关于 / 帮助。同一个错：「关于与帮助」也曾借 `action.more`。 */
+  'action.info': Info,
   'action.more': Ellipsis,
   'action.expand': ChevronDown,
   'action.collapse': ChevronUp,

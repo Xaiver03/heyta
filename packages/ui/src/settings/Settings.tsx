@@ -516,7 +516,26 @@ function ValueLine({
   );
 
   if (row.onPress === undefined) {
-    return <View testID={row.testID ?? testID}>{body}</View>;
+    /*
+     * 🔴 2026-11-14：纯读数行也吃 `touch-target.min`。
+     *
+     * 看图才发现的：「近期状态」卡里三行本该等距，实际前两行（不可点）紧凑、
+     * 第三行（可点，点进成长）44dp —— 同一张卡里两种行高。
+     *
+     * 那次"紧凑"是有理由的（纯读数不该假装是个可点行），但它牺牲的东西更贵：
+     * **同一组里的行必须等距**。`apple-design` 的 Craft 一节说的就是这件事 ——
+     * 一组东西的节奏由这一组里最常见的间距决定，不允许某一行按自己的内容高度走。
+     *
+     * 代价是纯读数的列表会长一点。这是对的取舍：列表的整齐 > 单行的紧凑。
+     */
+    return (
+      <View
+        testID={row.testID ?? testID}
+        style={{ minHeight: tokens['touch-target.min'], justifyContent: 'center' }}
+      >
+        {body}
+      </View>
+    );
   }
 
   return (
@@ -689,7 +708,28 @@ function ActionLine({
         {row.leading === undefined ? null : row.leading}
         <Text
           {...linkProps(row.href)}
-          style={[text.headline, styles.dynamic, { color: tokens['color.primary'] }]}
+          style={[
+            text.headline,
+            styles.dynamic,
+            /*
+             * 🔴 2026-11-14：从"一律主色"改成"**只有真链接才是主色**"。
+             *
+             * 看图之前我一直以为这一列没问题。截图里「订阅」「设置」「通知」
+             * 「功能与 AI」**四行全是蓝色**，加上蓝色的「注册 / 登录」按钮和
+             * 蓝色的底栏选中项 —— 一屏六处蓝。蓝色在 iOS / Material 里是
+             * "主要动作"的意思，给了一切可点项之后，那一屏就没有主次了。
+             *
+             * 判据不是"我觉得"：`row.href` 是**外部链接**（`linkProps` 只在它存在时
+             * 挂 <a> 语义），那种确实该蓝；而「设置」「通知」是**内部导航**，
+             * iOS 设置页里它们就是黑字 + 图标 + chevron。
+             */
+            {
+              color:
+                row.href === undefined
+                  ? tokens['color.foreground']
+                  : tokens['color.primary'],
+            },
+          ]}
         >
           {row.label}
         </Text>

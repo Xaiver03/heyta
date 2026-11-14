@@ -479,12 +479,22 @@ export function SettingsScreen({
    */
   const sectionIcons: Record<SettingsSectionKey, React.ComponentProps<typeof Icon>['name']> = {
     account: 'tab.profile',
-    subscription: 'action.share',
+    /*
+     * 🔴 2026-11-14 看图改的：`subscription` 原来借 `action.share`（分享图标）、
+     * `about` 借 `action.more`（省略号）、`appearance` 借齿轮 ——
+     * 三个都**没有语义**：
+     *   · 分享 ≠ 订阅（一个是把东西给别人，一个是买权益）
+     *   · 省略号 ≠ 关于（"⋯" 在 UI 里唯一的意思是"还有更多"）
+     *   · 齿轮 ≠ 外观（齿轮是"设置"本身，而这一页就是设置）
+     * 图标和标题是这一屏**唯一的分组线索**（标题只有 2–4 个字），
+     * 借一个不相关的字形，用户就少了半条线索。
+     */
+    subscription: 'action.subscription',
     data: 'action.sync',
     notifications: 'task.reminder',
-    appearance: 'action.settings',
+    appearance: 'action.display',
     features: 'tab.focus',
-    about: 'action.more',
+    about: 'action.info',
   };
 
   const sectionRows: readonly SettingsRowModel[] = (

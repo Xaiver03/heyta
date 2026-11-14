@@ -983,7 +983,7 @@ export function ProfileScreen(): React.JSX.Element {
     kind: 'action',
     testID: 'profile-entry-subscription',
     label: t('mobile.settings.section.subscription'),
-    leading: <Icon name="action.more" size="sm" color={tokens['color.foreground-muted']} />,
+    leading: <Icon name="action.subscription" size="sm" color={tokens['color.foreground-muted']} />,
     onPress: () => {
       setSettingsSection('subscription');
       navigation.push('settings');
@@ -1612,14 +1612,35 @@ export function ProfileScreen(): React.JSX.Element {
       )}
 
       {/*
-        ── ② 配置入口：订阅 / 设置 ────────────────────────────────────────
-        🔴 设置**紧跟在账号卡之后**（`profile-settings-ia.spec.ts` 钉着这个位置）：
-        它是这一屏唯一的高频配置入口。订阅与它同一张卡 —— 订阅原来独占一个
-        `SectionHeader` + `Card`（§3.7 批评的正是"一个商业入口独占一块"）。
+        ── ② 设置与更多：**四行一张卡**，紧跟账号区 ────────────────────────
+        🔴 2026-11-14 合并。此前「订阅 / 设置」与「通知 / 功能与 AI」是**两张卡**，
+        中间隔着「近期状态」和「同步」—— 同一类东西（都是"去另一张屏"的导航行）
+        在这一屏上被拆成两段，用户要扫两遍才知道"设置在哪"。
+        对照 `settings-directory` 那一屏（六行一张卡，扫一眼就完）—— 那是健康的形状。
+
+        🔴 位置：**紧跟账号区、在数据之前**。`profile-settings-ia.spec.ts` 钉着
+        "设置入口在账号卡之后"，那条判据是对的 —— 设置是这一屏最高频的动作，
+        不该被「近期状态」「同步」挤到屏幕下半部分。所以合并的是"拆散"，
+        不是"往后挪"。
+      */}
+      {/*
+        ── ⑤ 设置与更多：**四行一张卡** ──────────────────────────────────
+        🔴 2026-11-14 合并。此前「订阅 / 设置」与「通知 / 功能与 AI」是**两张卡**，
+        中间隔着「近期状态」和「同步」—— 于是同一类东西（都是"去另一张屏"的导航行）
+        在这一屏上被拆成两段。
+
+        真机截图里的直接后果：用户扫视时要把这一屏读两遍才知道"设置在哪"。
+        对照 `settings-directory` 那一屏（六行一张卡，扫一眼就完）—— 那是健康的形状。
+
+        ⚠️ 顺序不是随手排的：`设置` 紧跟在账号卡之后那条纪律
+        （`profile-settings-ia.spec.ts` 钉着）现在由**这一整块紧跟账号区**来兑现，
+        块内第一行是订阅、第二行是设置 —— 设置仍然是"账号之后第一个非商业入口"。
       */}
       <Card>
         <SettingsRow row={subscriptionRow} />
         <SettingsRow row={settingsRow} />
+        <SettingsRow row={notificationsRow} />
+        <SettingsRow row={featuresHubRow} />
       </Card>
 
       {/*
@@ -1679,18 +1700,6 @@ export function ProfileScreen(): React.JSX.Element {
           {t('mobile.profile.sync.slowKdf')}
         </Text>
       ) : null}
-
-      {/*
-        ── ⑤ 通知与功能 ──────────────────────────────────────────────────
-        通知：§5.5 要求它在「我的」有一行（移动端没有 web 那种顶栏铃铛位），
-        而且徽标是共享动态"打扰到了"的唯一回执 —— 所以它留在首屏，只是从
-        "入口列"挪进了这一块，视觉上不再与功能域并列。
-        功能与 AI：5 个功能域的枢纽（理由见 `featuresHubRow` 上方）。
-      */}
-      <Card>
-        <SettingsRow row={notificationsRow} />
-        <SettingsRow row={featuresHubRow} />
-      </Card>
 
       {/* 清单 / 标签 / 便签管理（⑥）。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
