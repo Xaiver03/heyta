@@ -121,6 +121,13 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: tokens['touch-target.min'],
+      /**
+       * 🔴 `minWidth` 不是可选项。这里只有 `paddingHorizontal`（12dp）+ 单字（14dp）
+       * ⇒ 实测每个 tab 只有 **105px = 35dp 宽**（真机 bounds `[63,375][168,507]`），
+       * 低于 `touch-target.min` 的 44dp。四个 tab 并排时，"月/周/日/年"里最容易点错。
+       * 高度一直是对的（132px = 44dp），只有宽度被漏掉了 —— 一条只写了一半的判据。
+       */
+      minWidth: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.sm'],
     },
