@@ -49,6 +49,8 @@ import {
 import {
   CHOICE_ROW_SHAPE,
   CHOICE_ROW_TEXT,
+  SPACING_ROLE,
+  TYPE_ROLE,
   type TextStyleName,
 } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
@@ -423,10 +425,10 @@ export function SectionHeader({
          * 改前是 `space.2`(8dp) —— 与"组内间距"同值，于是"上一组结束了"和
          * "这一组内部换了一行"看起来一样。
          */
-        paddingTop: t['space.6'],
+        paddingTop: t[SPACING_ROLE['group-gap']],
       }}
     >
-      <Text variant="group-label" style={{ color, flex: 1 }}>
+      <Text variant={TYPE_ROLE['section-heading']} style={{ color, flex: 1 }}>
         {title}
       </Text>
       {count !== undefined ? (

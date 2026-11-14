@@ -74,6 +74,10 @@ export type { RnShadow, CubicBezier } from './native-values.js';
 // 不说四个数字 —— 否则同一段文字在不同界面必然漂移，且没有任何一处会报错。
 // 它只**组合**已有 token，不引入新取值，因此不构成第二个事实源。
 export { TEXT_STYLES, resolveTextStyle, resolveAllTextStyles } from './typography.js';
+export { TYPE_ROLE, TYPE_ROLE_NAMES, TYPE_ROLE_PENDING, TYPE_ROLE_PENDING_NAMES } from './type-roles.js';
+export type { TypeRole } from './type-roles.js';
+export { SPACING_ROLE, SPACING_ROLE_ORDER } from './spacing-roles.js';
+export type { SpacingRole } from './spacing-roles.js';
 
 // 图标尺寸的数值形态（lucide 的 size prop 需要 SVG 属性数字，CSS 变量帮不上）。
 // 视图住在 L0 内部（宿主直接拿表建视图被 check:theme 的 R3 禁止）。

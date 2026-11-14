@@ -91,12 +91,43 @@ def analyse(path: str) -> dict:
             steps.append(y - prev)
         prev = y
 
+    # ── 排版读数（2026-11-14 加）────────────────────────────────────
+    # 这三条是因为"组标题比内容还小、还更靠右"那一类错**一条结构判据都抓不到**。
+    # 口径：只看带文字节点（clickable 与否无关），按 y 排。
+    texts = []
+    root2 = ET.parse(path).getroot()
+    for node in root2.iter():
+        text = (node.get("text") or node.get("content-desc") or "").strip()
+        box = list(map(int, re.findall(r"\d+", node.get("bounds") or "")))
+        if not text or len(box) != 4:
+            continue
+        x0, y0, x1, y1 = box
+        if y1 - y0 <= 0 or clip_excluded(y0, y1):
+            continue
+        texts.append((y0, x0, y1 - y0, text))
+    texts.sort()
+
+    # ① 「小标题 + 紧跟一串更大的同 x 文本」= 组标题（高度比 < 1 是层级的硬伤）
+    heading_ratios = []
+    for i, (y, x, h, _t) in enumerate(texts[:-1]):
+        nxt = texts[i + 1]
+        if nxt[1] != x:
+            continue
+        # 组标题比紧随其后的那一条明显小（< 0.9 倍高度）
+        if h / max(nxt[2], 1) < 0.9 and nxt[0] - y <= 120:
+            heading_ratios.append((round(h / max(nxt[2], 1), 2), y, x))
+
+    # ② 组间/块间间距的去重值（> 16dp 的那些）
+    big_steps = sorted({s for s in steps if s // DENSITY > 16})
+
     return {
         "clickable": len(clickable),
         "heights": heights,
         "steps": sorted(set(steps)),
         "lefts": len(lefts),
         "min_target": (min_w, min_h),
+        "heading_ratios": heading_ratios,
+        "big_steps": big_steps,
     }
 
 
@@ -116,15 +147,19 @@ def main() -> int:
         return 2
 
     if args.md:
-        print("| 界面 | 可点行 | 行高档位 (px=dp) | 相邻行距 (px=dp) | 文字左缘 | 最小触控 (px) |")
-        print("|---|---|---|---|---|---|")
+        print("| 界面 | 可点行 | 行高档位 (px=dp) | 相邻行距 (px=dp) | 文字左缘 | 大间距种数 | 组标题高度比 |")
+        print("|---|---|---|---|---|---|---|")
         for f in files:
             name = os.path.basename(f)[:-4]
             m = analyse(f)
             hs = " / ".join(fmt_px(h) for h in m["heights"][:5]) or "—"
             ss = " / ".join(fmt_px(s) for s in m["steps"][:5]) or "—"
-            mw, mh = m["min_target"] if m["min_target"] else (0, 0)
-            print(f"| `{name}` | {m['clickable']} | {hs} | {ss} | {m['lefts']} | {mw}×{mh} |")
+            hr = m["heading_ratios"]
+            hr_s = " / ".join(f"{r[0]}@y{r[1]}" for r in hr[:3]) if hr else "—"
+            print(
+                f"| `{name}` | {m['clickable']} | {hs} | {ss} | {m['lefts']} "
+                f"| {len(m['big_steps'])} | {hr_s} |"
+            )
         return 0
 
     for f in files:

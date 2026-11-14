@@ -117,6 +117,7 @@ import {
 import { Check, CircleHelp } from 'lucide';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import { HeytaIcon } from '../icon/Icon.js';
+import { TYPE_ROLE } from '@heyta/design-system';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import {
   settingsRowKey,
@@ -384,7 +385,13 @@ export function SettingsSection({
       {title === undefined && titleTip === undefined ? null : (
         <View style={styles.sectionHead}>
           {title === undefined ? null : (
-            <Text style={[text['group-label'], styles.dynamic, { color: tokens['color.foreground-muted'] }]}>
+            <Text
+              style={[
+                text[TYPE_ROLE['section-heading']],
+                styles.dynamic,
+                { color: tokens['color.foreground-muted'] },
+              ]}
+            >
               {title}
             </Text>
           )}

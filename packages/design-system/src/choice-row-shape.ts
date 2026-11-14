@@ -42,6 +42,7 @@
  */
 
 import type { TokenName } from './tokens.js';
+import { TYPE_ROLE } from './type-roles.js';
 import type { TextStyleName } from './typography.js';
 
 /** 单选行的**空间**几何。每一项都是 `tokens.css` 里真实存在的 token 名。 */
@@ -77,8 +78,11 @@ export const CHOICE_ROW_SHAPE = {
 
 /** 单选行里每一段文字用哪条**语义文字样式**（`typography.ts` 的 `TEXT_STYLES`）。 */
 export const CHOICE_ROW_TEXT = {
-  /** 组标签（「视图」「日期显示」「排序方式」）。 */
-  groupLabel: 'group-label',
-  /** 行文字。与任务标题同一档：用户在扫读"我要哪一个"。 */
-  option: 'row-title',
+  /**
+   * 组标签（「视图」「日期显示」「排序方式」）。
+   * 从 `TYPE_ROLE` 取，不另写字符串 —— 见 `type-roles.ts` 文件头那次事故。
+   */
+  groupLabel: TYPE_ROLE['section-heading'],
+  /** 行文字。与任务行主文字同一档：用户在扫读"我要哪一个"。 */
+  option: TYPE_ROLE['row-title'],
 } as const satisfies Record<string, TextStyleName>;
