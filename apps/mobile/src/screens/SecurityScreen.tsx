@@ -79,7 +79,7 @@ import {
   type HostedPasskeySummary,
 } from '@heyta/app-host';
 
-import { Button, Card, Chip, Divider, HStack, Screen, Stack, Text, TextField } from '../ui/kit';
+import { Button, Card, Divider, HStack, Screen, Stack, Text, TextField } from '../ui/kit';
 import { describePasskeyError, resolvePasskeyProvider } from '../auth/passkey-host';
 import { SessionsSection } from './SessionsSection';
 import { useTokens } from '../theme';
@@ -569,6 +569,20 @@ export function SecurityScreen({
                         )}
                       </Text>
                     </HStack>
+                    {/*
+                      🔴 这四个是**动作**，此前全部用 `Chip` + `selected={true/false}` 字面量画：
+                      「重命名」「取消」「删除」写成 `selected={false}`（永远选不中的假选项），
+                      「保存」「确认删除」写成 `selected={true}`（把"这是主操作"说成"这个已选中"）。
+
+                      屏幕上的后果：一排圆角片，有的亮有的暗，但它们既不互斥也不是选项 ——
+                      用户读不出"哪个是按钮、哪个是当前状态"。而 `selected` 字面量本身就是
+                      铁证：真选项的 `selected` 一定是**表达式**（`selected={x === 'list'}`），
+                      写死 `true`/`false` 的只可能是拿 Chip 当按钮用。
+                      判据：`pnpm check:action-vs-choice`（同一条，全仓）。
+
+                      改法与任务详情页那三枚一致：动作走 `Button`，
+                      主要动作 `primary`、次要 `secondary`、破坏性 `danger`。
+                    */}
                     {isRenaming ? (
                       <Stack>
                         <TextField
@@ -577,16 +591,16 @@ export function SecurityScreen({
                           onChangeText={setRenameDraft}
                         />
                         <HStack>
-                          <Chip
+                          <Button
                             label={t('mobile.security.passkeys.renameSave')}
-                            selected={true}
+                            tone="primary"
                             onPress={() => {
                               void submitRename(passkey.id);
                             }}
                           />
-                          <Chip
+                          <Button
                             label={t('mobile.security.passkeys.renameCancel')}
-                            selected={false}
+                            tone="secondary"
                             onPress={() => {
                               setRenamingId(null);
                               setRenameDraft('');
@@ -596,26 +610,26 @@ export function SecurityScreen({
                       </Stack>
                     ) : (
                       <HStack>
-                        <Chip
+                        <Button
                           label={t('mobile.security.passkeys.rename')}
-                          selected={false}
+                          tone="secondary"
                           onPress={() => {
                             setRenamingId(passkey.id);
                             setRenameDraft(passkey.name ?? '');
                           }}
                         />
                         {isConfirming ? (
-                          <Chip
+                          <Button
                             label={t('mobile.security.passkeys.deleteConfirm')}
-                            selected={true}
+                            tone="danger"
                             onPress={() => {
                               void submitDelete(passkey.id);
                             }}
                           />
                         ) : (
-                          <Chip
+                          <Button
                             label={t('mobile.security.passkeys.delete')}
-                            selected={false}
+                            tone="secondary"
                             onPress={() => {
                               askDelete(passkey.id, label);
                             }}

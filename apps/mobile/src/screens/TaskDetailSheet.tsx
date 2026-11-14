@@ -2068,17 +2068,16 @@ export function TaskDetailSheet({
               按钮文案复用 `mobile.tags.add` —— 「我的」页那枚同名按钮说的是同一件事，
               两处同一个叫法，不造第二个名字。 */}
           {projectActions !== null && !newTagOpen ? (
-            <View style={styles.chipRow}>
-              <Chip
-                label={t('mobile.tags.add')}
-                selected={false}
-                icon="task.add"
-                testID="task-detail-add-tag"
-                onPress={() => {
-                  setNewTagOpen(true);
-                }}
-              />
-            </View>
+            /* 动作，不是选项（与「新建清单」「添加子任务」「添加附件」同一档）。 */
+            <Button
+              label={t('mobile.tags.add')}
+              icon="task.add"
+              tone="ghost"
+              testID="task-detail-add-tag"
+              onPress={() => {
+                setNewTagOpen(true);
+              }}
+            />
           ) : null}
 
           {newTagOpen && projectActions !== null ? (
