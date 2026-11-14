@@ -2,6 +2,11 @@
      本文件是「设计系统（UI 代码必读）」的完整规则（原文 §5 设计系统）。返回入口：[`AGENTS.md`](../../AGENTS.md)。
      原始单体文件备份：`AGENTS.md.bak-full-2026-10-12`。 -->
 
+> 🔴 **分页 / 配速 / 配色这三套跨屏体系单独成篇**：
+> [`design-体系-分页配速配色.md`](design-体系-分页配速配色.md)。
+> 本文件讲"组件怎么写"，那份讲"屏与屏怎么连、一屏该有多少东西、颜色用在哪"。
+> 三条硬伤与对应判据在那份里（含 29 屏实测读数）。
+
 ## 5. 设计系统（UI 代码必读）
 
 **唯一事实源：[`packages/design-system/src/tokens.css`](../../packages/design-system/src/tokens.css)。**

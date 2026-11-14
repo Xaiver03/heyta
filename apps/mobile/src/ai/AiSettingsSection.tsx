@@ -611,6 +611,22 @@ export function AiSettingsSection(): React.JSX.Element {
           🔴 逐工具**默认全关**（ADR-0011 §3.1）。这里出现"全部打开"的按钮就是违规 ——
           一次点击放开 26 个工具，等于把逐工具授权这件事作废。
         */}
+        {/*
+          🔴 2026-11-14 看图重写。这一列原来长这样：12 个**空心圆** + 12 个英文
+          snake_case 工具名 + 12 遍重复的「会改数据」。
+          
+          三个问题，按严重度：
+          1. **空心圆 = 单选组的语义**，而这是 12 个彼此独立的开关 —— 与上一处
+             `GateRow` 同一个错（§6b：同一语义两种控件）。
+          2. **「会改数据」印了 12 遍**。它是对**这一整组**的说明，不是每一行的属性。
+             重复 12 次之后，有用的信息（哪个工具能改数据）反而读不出来 ——
+             读者的眼睛会自动跳过重复的尾巴。
+          3. 工具名是给用户看的，`set_task_estimate` 这种标识符对谁都不可读；
+             但改名要 12 条新文案，不在这一屏的范围内，登记待办。
+        */}
+        <Text variant="caption" tone="subtle">
+          {t('web.ai.settings.localApi.kind.write')}
+        </Text>
         {LOCAL_API_TOOLS.map((tool) => {
           const on = settings.localApi.grants?.[tool.name] === true;
           return (
@@ -618,11 +634,12 @@ export function AiSettingsSection(): React.JSX.Element {
               key={tool.name}
               style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}
             >
-              <Checkbox
-                checked={on}
-                label={tool.name}
-                testID={`ai-tool-grant-${tool.name}`}
-                onToggle={() => {
+              <Text variant="row-meta" grow numberOfLines={2}>
+                {tool.name}
+              </Text>
+              <Switch
+                value={on}
+                onValueChange={() => {
                   const wrote = saveAiSettings({
                     ...settings,
                     localApi: {
@@ -632,12 +649,11 @@ export function AiSettingsSection(): React.JSX.Element {
                   });
                   setSavedWithoutKey(!wrote);
                 }}
+                trackColor={{ false: tokens['color.border'], true: tokens['color.primary'] }}
+                thumbColor={tokens['color.surface']}
+                accessibilityLabel={tool.name}
+                testID={`ai-tool-grant-${tool.name}`}
               />
-              <Text variant="row-meta" grow numberOfLines={2}>
-                {tool.name}
-                {'  '}
-                {t(tool.kind === 'read' ? 'web.ai.settings.localApi.kind.read' : 'web.ai.settings.localApi.kind.write')}
-              </Text>
             </View>
           );
         })}
