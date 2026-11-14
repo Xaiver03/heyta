@@ -102,6 +102,19 @@
 - 现量（17 个界面）：**0 处违规**（1 处走白名单：`SettingsValueRow` 用 hitSlop 补到 45dp）。
 - 这一轮靠它抓出三处同类：新建面板落点胶囊 28dp、详情空备注 28dp、日历 tab 35dp。
 
+## 3e. 本轮实机进度（2026-11-14 18:20）
+
+已拍并审计 **17 个界面**（`ux-parity-20261114/`）：tasks / tasks-more-menu / tasks-more-view /
+task-detail / calendar-month / calendar-week / quadrant / focus / stats / habits / profile /
+settings-directory / settings-language / settings-security / ai-settings / ai-toolbox / features-hub。
+
+`scripts/audit-tap-targets.py` 跑下来 **0 处违规**。
+
+**未拍（M9–M15 + 设置三页）**：实机操作期间设备被其他应用占用（前台反复变成
+`com.tencent.mm` 小程序与通知栏），每次盲点都会打断正在用手机的人。
+按「不抢前台」的纪律停在这里 —— 这些项需要手机空闲时再取读数。
+用 `scripts/capture-ux-parity.sh` 补拍即可，命令与口径已固化。
+
 ## 4. 已关闭项与证据
 
 > 真机原图与 `uiautomator dump` 在 [`apps/mobile/evidence/ux-parity-20261114/`](../../apps/mobile/evidence/ux-parity-20261114/)（png + xml 成对，bounds ÷3 = dp；口径与留删规则见 [证据目录说明](../../apps/mobile/evidence/README.md)）。
