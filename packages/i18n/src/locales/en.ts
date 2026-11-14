@@ -1531,7 +1531,7 @@ export const en = {
   'web.focus.detail.aborted': 'Ended early',
 
   // ── Web · habits ──────────────────────────────────────────
-  'web.habits.addPlaceholder': 'New habit, for example "Drink water"',
+  'web.habits.addPlaceholder': 'e.g. "Drink water", "Sleep by 11", "Read 10 pages"',
   'web.habits.goal.aria': 'Edit the goal for "{name}"',
   'web.habits.goal.summaryAtLeast': 'At least {target}{unit}',
   'web.habits.goal.summaryAtMost': 'At most {target}{unit}',

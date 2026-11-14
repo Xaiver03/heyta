@@ -1684,7 +1684,12 @@ export const zhCN = {
   'web.focus.detail.aborted': '中途放弃',
 
   // ── Web · 习惯 ────────────────────────────────────────────
-  'web.habits.addPlaceholder': '新习惯，例如「喝水」',
+  /*
+   * 🔴 2026-11-15：原来 "新习惯，例如「喝水」" —— 而它上面的 label 是
+   * "新习惯名称"。同一张卡里"新习惯"出现两次，占位符的第一句是纯重复。
+   * 占位符的职责是**举例子**，不是重复字段名。
+   */
+  'web.habits.addPlaceholder': '例如「喝水」「早睡」「每天读 10 页」',
   'web.habits.goal.aria': '编辑「{name}」的目标',
   'web.habits.goal.summaryAtLeast': '至少 {target}{unit}',
   'web.habits.goal.summaryAtMost': '最多 {target}{unit}',
