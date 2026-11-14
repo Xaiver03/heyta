@@ -3559,7 +3559,7 @@ export const en = {
   //    own face). The entry row lives on Profile; the content lives in the sheet.
   'mobile.settings.section.account': 'Account',
   'mobile.settings.section.notifications': 'Reminders & notifications',
-  'mobile.settings.section.appearance': 'Appearance & language',
+  'mobile.settings.section.appearance': 'Language',
   'mobile.settings.section.personalization': 'Personalization',
   'mobile.settings.section.features': 'Features & AI',
   'mobile.settings.section.about': 'About & help',
@@ -3613,7 +3613,7 @@ export const en = {
   'mobile.profile.sync.advancedOpen': 'Use a self-hosted server',
   'mobile.profile.sync.advancedClose': 'Back to heyta hosted sync',
   // Stated plainly: a choice that silently resets on restart looks like a bug.
-  'mobile.profile.language.hint': 'This device remembers your choice, and it still applies after you reopen the app. Your home-screen widgets read the same preference.',
+  'mobile.profile.language.hint': 'This device remembers your choice, and it still applies after you reopen the app.',
   'mobile.profile.serverUrl.label': 'Server address',
   'mobile.profile.serverUrl.hint': 'On an emulator use 10.0.2.2 (pointing at this computer); on a real device use your LAN address.',
   'mobile.profile.transport.plaintext': 'Plaintext connection, and the target does not look like a local network. The access token travels the network in the clear and can be intercepted. Task contents are still end-to-end encrypted, but use https:// on the public internet.',

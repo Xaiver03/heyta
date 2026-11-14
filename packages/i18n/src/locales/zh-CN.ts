@@ -3883,7 +3883,7 @@ export const zhCN = {
   // 但目录里显示的是下面这七条 —— 每一组回答"我要做的那件事属于哪一类"。
   'mobile.settings.section.account': '账号',
   'mobile.settings.section.notifications': '提醒与通知',
-  'mobile.settings.section.appearance': '外观与语言',
+  'mobile.settings.section.appearance': '语言',
   'mobile.settings.section.personalization': '个性化',
   'mobile.settings.section.features': '功能与 AI',
   'mobile.settings.section.about': '关于与帮助',
@@ -3942,7 +3942,7 @@ export const zhCN = {
   'mobile.profile.sync.advancedClose': '返回 heyta 官方同步',
   // ⚠️ 必须明说"重开会回到设备语言"：不说的话用户会以为选择被记住了，
   // 下次打开发现变回英文/中文时，会以为是自己点错了。
-  'mobile.profile.language.hint': '这台设备会记住你的选择，重开应用仍然用它；系统小组件读同一份偏好。',
+  'mobile.profile.language.hint': '这台设备会记住你的选择，重开应用仍然用它。',
   'mobile.profile.serverUrl.label': '服务器地址',
   'mobile.profile.serverUrl.hint': '模拟器填 10.0.2.2（指向这台电脑）；真机填局域网地址。',
   'mobile.profile.transport.plaintext': '明文连接，且目标不像是本机网段。访问令牌会以明文经过网络、可能被截获。任务内容按你设置的载荷模式处理（默认明文），公网请务必改用 https://。',

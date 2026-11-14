@@ -711,9 +711,6 @@ export function SettingsScreen({
           ))}
         </View>
       </SettingsSection>
-      <Text variant="caption" tone="subtle">
-        {t('mobile.profile.footnote')}
-      </Text>
     </>
   );
 
