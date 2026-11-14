@@ -789,16 +789,27 @@ export function SettingsScreen({
         title={t('mobile.profile.section.language')}
         note={t('mobile.profile.language.hint')}
       >
-        <View style={styles.chipRow}>
-          {LOCALES.map((code) => (
-            <Chip
-              key={code}
-              label={code === 'zh-CN' ? t('common.lang.zh') : t('common.lang.en')}
-              selected={locale === code}
-              onPress={() => setLocale(code)}
-            />
-          ))}
-        </View>
+        {/*
+          🔴 2026-11-14：`Chip` 组 → `ChoiceRows`。
+          
+          看图才发现的：**同一屏两种控件表达同一种语义** ——
+          上面「外观」是三行 + 右侧勾（`ChoiceRows`），下面「语言」是两枚胶囊
+          （`Chip selected`）。两者都是"从 N 个里选 1 个"。
+          
+          这是 `ux-principles` §6b 的原话：**一个面板里，同一语义只允许一种控件**。
+          两种控件会让用户以为它们不是一回事（"胶囊像是标签筛选，行像是开关"）。
+          
+          语言只有 2 项时胶囊看着更省地方 —— 但省下的那点高度不值这个歧义。
+        */}
+        <ChoiceRows
+          value={locale}
+          onChange={setLocale}
+          options={LOCALES.map((code) => ({
+            key: code,
+            label: code === 'zh-CN' ? t('common.lang.zh') : t('common.lang.en'),
+          }))}
+          testID="profile-language-choice"
+        />
       </SettingsSection>
     </>
   );
