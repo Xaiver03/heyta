@@ -101,3 +101,10 @@ export type TypeRole = keyof typeof TYPE_ROLE;
  * **在排版意图上真的不同**（不只是字号不同）？答不出来就别加。
  */
 export const TYPE_ROLE_NAMES = Object.keys(TYPE_ROLE) as readonly TypeRole[];
+
+/** `TYPE_ROLE_PENDING` 的角色名（迁移时用；不进孤儿检查）。 */
+export const TYPE_ROLE_PENDING_NAMES = Object.keys(
+  TYPE_ROLE_PENDING,
+) as readonly (keyof typeof TYPE_ROLE_PENDING)[];
+
+export type PendingTypeRole = keyof typeof TYPE_ROLE_PENDING;

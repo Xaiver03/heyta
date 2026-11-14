@@ -1695,14 +1695,19 @@ export function TasksScreen({
               renderMeta={renderTaskMeta}
               // 🔴 行尾不常驻动作（§3.2）：那一枚删除改成"左滑才露出"（§3.4 第二入口）。
               swipeActions={bulkSelecting ? undefined : renderTaskTrailingActions}
+              /*
+               * 🔴 这里原来外面还套了一层 `paddingTop: space.3`(12dp)。
+               * `SectionHeader` 自己已经给 `SPACING_ROLE['group-gap']`(24dp) ——
+               * 12 + 24 = 36，而「我的」页那十种间距就是这么做出来的：
+               * 三处各自有理由的 padding 相加，结果没有任何一档是刻意定的。
+               * 去掉外层，让组间距只有一个来源。
+               */
               renderSectionHeader={(section) => (
-                <View style={{ paddingTop: tokens['space.3'] }}>
-                  <SectionHeader
-                    title={section.meta.title}
-                    count={section.tasks.length}
-                    tone={section.meta.tone}
-                  />
-                </View>
+                <SectionHeader
+                  title={section.meta.title}
+                  count={section.tasks.length}
+                  tone={section.meta.tone}
+                />
               )}
             />
           </View>
