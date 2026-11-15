@@ -235,9 +235,9 @@ function DayCell({
    * 🔴 2026-11-15：选中（非今天）是**浅蓝底**，所以它的数字用主色，不能用白字。
    * 今天仍是主色实心圆 + 白字（唯一强标记）；两者同时成立时按今天那一支走。
    */
-  const numberColor = isToday
+  const numberColor = isSelected
     ? tokens['color.on-primary']
-    : isSelected
+    : isToday
       ? tokens['color.primary']
       : tone === 'danger'
       ? tokens['color.danger']
@@ -326,7 +326,15 @@ function DayCell({
         minWidth: tokens['space.6'],
         paddingHorizontal: tokens['space.1'],
         borderRadius: tokens['radius.full'],
-        backgroundColor: isToday ? tokens['color.primary'] : isSelected ? tokens['color.primary-subtle'] : 'transparent',
+        /**
+         * 🔴 2026-11-15（对照滴答实测后改）：选中 = **实心主色圆**，今天（未选中）= 主色字。
+         *
+         * 上一版是"今天实心 / 选中浅蓝"，真机对照滴答的周条：它选中的那一天就是
+         * 一颗实心蓝圆（白字），与 hepta 的"今天"同形。日历里**哪个是被选中的**
+         * 是比"哪天是今天"更强的当前位置信号，所以实心圆给选中；
+         * 今天退为主色数字（不抢选中那颗圆）。
+         */
+        backgroundColor: isSelected ? tokens['color.primary'] : 'transparent',
       }]}>{day}</Text>
       {markerView === undefined ? null : (
         <Text
