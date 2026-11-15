@@ -149,3 +149,29 @@ export function springFor(
   const zeta = options?.momentum === true ? tokens.dampingMomentum : tokens[source.damping];
   return toSpringConfig(zeta, tokens[source.response]);
 }
+
+/**
+ * 从 `useHeytaTokens()` 的扁平表里取五个弹簧读数。
+ *
+ * 🔴 这个形状此前在 `BottomSheet.tsx` 里**内联了一遍五行**。第二个消费方
+ * （`TaskRow` 的勾选、`Pressable` 的按压）出现时，那五行就会被抄第三、第四遍 ——
+ * 抄错一个 key 的表现不是报错，而是**那处悄悄退回默认手感**。
+ *
+ * 用一个结构化参数而不是 `HeytaTokens` 整体：本文件不 import 宿主的 token 类型
+ * （见上面 `SpringTokens` 的注释），只认这几个 key。
+ */
+export function springTokensOf(tokens: {
+  readonly 'motion.spring-damping-default': number;
+  readonly 'motion.spring-damping-momentum': number;
+  readonly 'motion.spring-response-move': number;
+  readonly 'motion.spring-response-sheet': number;
+  readonly 'motion.spring-response-rotation': number;
+}): SpringTokens {
+  return {
+    dampingDefault: tokens['motion.spring-damping-default'],
+    dampingMomentum: tokens['motion.spring-damping-momentum'],
+    responseMove: tokens['motion.spring-response-move'],
+    responseSheet: tokens['motion.spring-response-sheet'],
+    responseRotation: tokens['motion.spring-response-rotation'],
+  };
+}

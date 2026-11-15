@@ -22,7 +22,14 @@
  */
 
 import { useCallback, useState } from 'react';
-import { HeytaUiProvider, TaskBadges, TaskList, useHeytaTokens } from '@heyta/ui';
+import {
+  HeytaUiProvider,
+  SettingsSection,
+  TaskBadges,
+  TaskList,
+  useHeytaTokens,
+  type SettingsRowModel,
+} from '@heyta/ui';
 import type { TaskRow } from '@heyta/ui';
 import type { Task } from '@heyta/domain';
 
@@ -46,6 +53,53 @@ const SEED: readonly Task[] = [
 ];
 
 export function UniversalSlice(): React.JSX.Element {
+  /**
+   * `?slice=1&view=settings` 渲染设置切片，其余情况仍然是任务切片。
+   *
+   * 🔴 为什么要有这一支：`SettingsSection` 的开关动效（方框弹性 + 底色渐变）
+   * 与任务勾选共用同一套判定（`control/checkbox-motion.ts`），但**共用判定
+   * 不等于共用渲染** —— 前者是 `Animated.View` 的透明度叠层，后者是方框 scale。
+   * 只验证任务那一条，等于没验证设置页那一条。
+   *
+   * 默认分支的行为一个字没变，所以 `verify-universal-slice.browser.mjs`
+   * 的既有断言（行数 / 顺序 / 勾 / 点击换位）不受影响。
+   */
+  const view = new URLSearchParams(window.location.search).get('view');
+  if (view === 'settings') return <SettingsSlice />;
+  return <TaskSlice />;
+}
+
+function SettingsSlice(): React.JSX.Element {
+  const [first, setFirst] = useState(false);
+  const [second, setSecond] = useState(true);
+
+  const rows: readonly SettingsRowModel[] = [
+    {
+      kind: 'toggle',
+      label: '连点看弹性（从关到开）',
+      checked: first,
+      onToggle: () => setFirst((value) => !value),
+      testID: 'slice-toggle-off',
+    },
+    {
+      kind: 'toggle',
+      label: '连点看弹性（从开到关）',
+      checked: second,
+      onToggle: () => setSecond((value) => !value),
+      testID: 'slice-toggle-on',
+    },
+  ];
+
+  return (
+    <div style={{ padding: 'var(--ht-space-8)' }}>
+      <HeytaUiProvider>
+        <SettingsSection title="动效验证" rows={rows} testID="slice-settings" />
+      </HeytaUiProvider>
+    </div>
+  );
+}
+
+function TaskSlice(): React.JSX.Element {
   const [tasks, setTasks] = useState<readonly Task[]>(SEED);
 
   /**

@@ -40,12 +40,14 @@
  * `labels` / `renderMeta` / `renderTrailing` 注入。
  */
 
-import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View, type DimensionValue } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View, type DimensionValue } from 'react-native';
 import { TASK_ROW_SHAPE, TASK_ROW_TEXT } from '@heyta/design-system';
 import { CheckCircle2 } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
-import { useHeytaText, useHeytaTokens } from '../theme.js';
+import { useHeytaText, useHeytaUiTheme } from '../theme.js';
+import { checkboxSpring, planCheckboxMotion } from '../control/checkbox-motion.js';
+import { springTokensOf } from '../overlay/spring-physics.js';
 import type { CategoryColorToken } from '../categories/model.js';
 import { resolveTaskRowDensity, type TaskRowDensity } from './density.js';
 import type { TaskRow as TaskRowModel } from './model.js';
@@ -174,7 +176,9 @@ export function TaskRow({
   selectionMode = false,
   iconColorToken,
 }: TaskRowProps): React.JSX.Element {
-  const tokens = useHeytaTokens();
+  // `reducedMotion` 与 tokens 来自同一个 context —— 这里换成 `useHeytaUiTheme`
+  // 而不是多调一次 `useHeytaTokens`，避免两个 hook 各读一次 Provider。
+  const { tokens, reducedMotion } = useHeytaUiTheme();
   const text = useHeytaText();
 
   /**
@@ -182,6 +186,70 @@ export function TaskRow({
    * `DENSITY_SPEC`；下面的 JSX 与样式**只读 `spec`，不读 `density`**。
    */
   const spec = resolveTaskRowDensity(density);
+
+  /**
+   * 勾选状态。三处 JSX（`aria-checked` / 方框底色 / 勾）必须读**同一个**值 ——
+   * 此前那个 `selectionMode ? selected : row.done` 在文件里抄了三遍，
+   * 任何一处漏改都会表现成"看着勾上了，读屏说没勾"。
+   */
+  const checked = selectionMode ? selected : row.done;
+
+  /**
+   * 勾选动效：**判定在纯函数里**（`control/checkbox-motion.ts`，有 node 测试），
+   * 这里只负责把判定摆到 `Animated` 上。
+   *
+   * 🔴 弹簧走 `springFor('move')`，不在这里写 `stiffness: 246` 一类数字 ——
+   * 那会让设计系统调参时这一处静默留在旧手感上。
+   */
+  const springs = useMemo(() => springTokensOf(tokens), [tokens]);
+  const spring = useMemo(() => checkboxSpring(springs), [springs]);
+
+  const boxScale = useRef(new Animated.Value(1)).current;
+  const tickScale = useRef(new Animated.Value(1)).current;
+  const tickOpacity = useRef(new Animated.Value(checked ? 1 : 0)).current;
+  const previousChecked = useRef(checked);
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
+
+  useEffect(() => {
+    const plan = planCheckboxMotion(previousChecked.current, checked, mounted.current, reducedMotion);
+    previousChecked.current = checked;
+
+    // "不播"不等于"什么都不做"：值仍要同步到终态，否则从减动效切回普通模式、
+    // 或从已完成行复用到未完成行时，会停在上一行的动画中间值上。
+    if (plan.kind === 'none') {
+      boxScale.setValue(1);
+      tickScale.setValue(1);
+      tickOpacity.setValue(checked ? 1 : 0);
+      return;
+    }
+
+    if (plan.kind === 'check') {
+      boxScale.setValue(plan.fromScale);
+      tickScale.setValue(plan.fromScale);
+      tickOpacity.setValue(plan.tickFrom);
+      Animated.parallel([
+        Animated.spring(boxScale, { toValue: plan.toScale, ...spring, useNativeDriver: true }),
+        Animated.spring(tickScale, { toValue: 1, ...spring, useNativeDriver: true }),
+        Animated.timing(tickOpacity, {
+          toValue: plan.tickTo,
+          duration: tokens['duration.fast'],
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+
+    // 撤销：不缩放，只让勾淡出（"勾完有仪式，撤销没有"）。
+    Animated.timing(tickOpacity, {
+      toValue: plan.tickTo,
+      duration: tokens['duration.fast'],
+      useNativeDriver: true,
+    }).start();
+  }, [checked, reducedMotion, spring, tokens, boxScale, tickScale, tickOpacity]);
 
   const styles = useMemo(
     () =>
@@ -376,7 +444,7 @@ export function TaskRow({
         // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
         // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
         // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
-        aria-checked={selectionMode ? selected : row.done}
+        aria-checked={checked}
         aria-busy={busy}
         accessibilityLabel={toggleLabel}
         disabled={busy}
@@ -384,16 +452,33 @@ export function TaskRow({
         style={styles.checkboxHit}
         testID={selectionMode ? `bulk-select-${row.id}` : `task-toggle-${row.id}`}
       >
-        <View
+        {/*
+          🔴 勾**常驻挂载**、用 opacity 控制可见，而不是条件渲染。
+          条件渲染的问题不是性能，是**取消时看不到淡出** —— 元素在动画开始前
+          就已经从树里没了，`uncheck` 那一支的 timing 永远跑在一个不存在的节点上。
+          方框加 `aria-hidden`：状态由外面那个 `Pressable` 的 `aria-checked`
+          表达，读屏不需要再念一遍"✓"。
+        */}
+        <Animated.View
           style={[
             styles.box,
             { borderColor: priorityBorderColor },
-            (selectionMode ? selected : row.done) ? styles.boxDone : null,
+            checked ? styles.boxDone : null,
+            { transform: [{ scale: boxScale }] },
           ]}
           testID={`task-box-${row.id}`}
+          aria-hidden={true}
         >
-          {(selectionMode ? selected : row.done) ? <Text style={[text[TASK_ROW_TEXT.check], styles.tick]}>✓</Text> : null}
-        </View>
+          <Animated.Text
+            style={[
+              text[TASK_ROW_TEXT.check],
+              styles.tick,
+              { opacity: tickOpacity, transform: [{ scale: tickScale }] },
+            ]}
+          >
+            ✓
+          </Animated.Text>
+        </Animated.View>
       </Pressable>
 
       {/*

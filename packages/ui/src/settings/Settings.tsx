@@ -106,8 +106,9 @@
  * 状态一变它就变成错误信息**。要核当前状态读 `PROVIDER_DEPENDENT` 本身。
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Pressable,
   StyleSheet,
   Text,
@@ -118,7 +119,9 @@ import { Check, CircleHelp } from 'lucide';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import { HeytaIcon } from '../icon/Icon.js';
 import { TYPE_ROLE } from '@heyta/design-system';
-import { useHeytaText, useHeytaTokens } from '../theme.js';
+import { useHeytaText, useHeytaTokens, useHeytaUiTheme } from '../theme.js';
+import { checkboxSpring, planCheckboxMotion } from '../control/checkbox-motion.js';
+import { springTokensOf } from '../overlay/spring-physics.js';
 import {
   settingsRowKey,
   shouldRenderSettingsRow,
@@ -637,9 +640,69 @@ function ToggleLine({
   readonly styles: SettingsStyles;
   readonly testID?: string | undefined;
 }): React.JSX.Element {
-  const tokens = useHeytaTokens();
+  const { tokens, reducedMotion } = useHeytaUiTheme();
   const text = useHeytaText();
   const disabled = row.disabled === true;
+
+  /**
+   * 开关的动效。**判定复用勾选那一套纯函数**（`control/checkbox-motion.ts`）——
+   * 设置页的"开关"在本仓一直是一个方框 + 勾，不是 iOS 那种滑块，
+   * 所以它和任务勾选是同一种交互，不该有第二套判定。
+   *
+   * 🔴 笔记那条给的是「拉伸 1.35 + 底色 280ms」：
+   *   - **拉伸不做**。它会让 20px 的方框在 1.35× 时压到相邻的行文字，
+   *     而"果冻"语汇与临界阻尼的克制是两种人格。
+   *   - **底色渐变保留**，但落进既有档位：`duration.normal`(200ms)，
+   *     不是笔记的 280ms —— 280 不在五档里，改设计系统时它不会跟着动。
+   */
+  const springs = useMemo(() => springTokensOf(tokens), [tokens]);
+  const spring = useMemo(() => checkboxSpring(springs), [springs]);
+
+  const fill = useRef(new Animated.Value(row.checked ? 1 : 0)).current;
+  const pop = useRef(new Animated.Value(1)).current;
+  const tick = useRef(new Animated.Value(row.checked ? 1 : 0)).current;
+  const tickScale = useRef(new Animated.Value(1)).current;
+  const previousChecked = useRef(row.checked);
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
+
+  useEffect(() => {
+    const plan = planCheckboxMotion(previousChecked.current, row.checked, mounted.current, reducedMotion);
+    previousChecked.current = row.checked;
+
+    if (plan.kind === 'none') {
+      fill.setValue(row.checked ? 1 : 0);
+      pop.setValue(1);
+      tick.setValue(row.checked ? 1 : 0);
+      tickScale.setValue(1);
+      return;
+    }
+
+    if (plan.kind === 'check') {
+      pop.setValue(plan.fromScale);
+      tickScale.setValue(plan.fromScale);
+      tick.setValue(plan.tickFrom);
+      Animated.parallel([
+        Animated.spring(pop, { toValue: 1, ...spring, useNativeDriver: true }),
+        Animated.spring(tickScale, { toValue: 1, ...spring, useNativeDriver: true }),
+        Animated.timing(fill, {
+          toValue: 1,
+          duration: tokens['duration.normal'],
+          useNativeDriver: true,
+        }),
+        Animated.timing(tick, { toValue: 1, duration: tokens['duration.fast'], useNativeDriver: true }),
+      ]).start();
+      return;
+    }
+
+    Animated.parallel([
+      Animated.timing(fill, { toValue: 0, duration: tokens['duration.normal'], useNativeDriver: true }),
+      Animated.timing(tick, { toValue: 0, duration: tokens['duration.fast'], useNativeDriver: true }),
+    ]).start();
+  }, [row.checked, reducedMotion, spring, tokens, fill, pop, tick, tickScale]);
 
   return (
     <Pressable
@@ -675,18 +738,23 @@ function ToggleLine({
           🔴 它**不只用颜色**区分开/关 —— 色觉障碍用户靠这个字形读状态
           （与移动端原来那个 `✓` 同一个意图，只是换成了共享的字形）。
         */}
-        <View
-          style={[
-            styles.marker,
-            {
-              backgroundColor: row.checked ? tokens['color.primary'] : 'transparent',
-            },
-          ]}
-        >
-          {row.checked ? (
+        {/*
+          🔴 底色用一个**叠在主色上的绝对定位层**来淡入，而不是给
+          `backgroundColor` 做颜色插值：颜色插值必须 `useNativeDriver: false`
+          （每帧回 JS），而这个开关在设置页里可能一屏十几个。opacity/scale
+          全走 native driver，代价低一个量级。
+        */}
+        <Animated.View style={[styles.marker, { transform: [{ scale: pop }] }]}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: tokens['color.primary'], borderRadius: tokens['radius.sm'], opacity: fill },
+            ]}
+          />
+          <Animated.View style={{ opacity: tick, transform: [{ scale: tickScale }] }}>
             <HeytaIcon data={Check} size={tokens['icon.xs']} color={tokens['color.on-primary']} />
-          ) : null}
-        </View>
+          </Animated.View>
+        </Animated.View>
       </View>
     </Pressable>
   );

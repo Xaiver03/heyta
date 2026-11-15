@@ -1444,11 +1444,21 @@ export {
    `apps/landing` 那一份是同一条恒等式而不是巧合）。 */
 export {
   springFor,
+  springTokensOf,
   toSpringConfig,
   type SpringConfig,
   type SpringPreset,
   type SpringTokens,
 } from './overlay/spring-physics.js';
+/* 勾选动效的判定表（`planCheckboxMotion`）。**逻辑在纯函数里**，组件只负责
+   把结果摆到 `Animated` 上 —— 判据见 `tests/checkbox-motion.spec.ts`。 */
+export {
+  CHECK_FROM_SCALE,
+  CHECKBOX_SPRING_PRESET,
+  checkboxSpring,
+  planCheckboxMotion,
+  type CheckboxMotion,
+} from './control/checkbox-motion.js';
 export {
   BottomSheet,
   type BottomSheetClass,

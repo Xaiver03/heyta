@@ -183,7 +183,13 @@ describe('W5 行组件真的用上了它', () => {
     // 批量选择线（2026-10-06）把覆盖条件扩成 `(selectionMode ? selected : row.done)`
     // —— 选择态的勾选框与完成态同用主色。判据钉的语义不变：**逐行色必须能被
     // boxDone 覆盖**，needle 随表达式更新。
-    const doneIndex = row.indexOf('(selectionMode ? selected : row.done) ? styles.boxDone : null');
+    //
+    // 2026-11-15：那个三元表达式被抽成 `checked`（勾选动效要读同一个值，
+    // 原先它在 `aria-checked` / 方框底色 / 勾三处各抄一遍）。needle 再跟着更新一次，
+    // 并**补一条**钉住 `checked` 的来源 —— 否则"覆盖条件"可以靠把 `checked`
+    // 定义成别的值来绕开，而位置断言照样绿。
+    const doneIndex = row.indexOf('checked ? styles.boxDone : null');
+    expect(row).toContain('const checked = selectionMode ? selected : row.done;');
     expect(boxIndex).toBeGreaterThan(-1);
     expect(priorityIndex, '行里没有逐行的描边色声明').toBeGreaterThan(boxIndex);
     expect(doneIndex, '完成态的覆盖被摘掉了').toBeGreaterThan(priorityIndex);
