@@ -85,11 +85,15 @@ describe('P10：不许新增 tab', () => {
 
 describe('文案复用既有词条（零新增同义键）', () => {
   it('两段用的还是 `mobile.lists.*` / `mobile.tags.*`，空态那一族用 `common.organizer.*`', () => {
+    /*
+     * 🔴 2026-11-15：`common.organizer.{lists,tags}.empty.hint` 两枚**已从断言里去掉** ——
+     * 那两句（「输入名称就能新建清单。/标签。」）是操作指导，两段都不再传 `emptyHint`
+     * （输入框就在同一屏下面）。断言不该再要求一个不存在的引用。
+     */
     const lists = readScreen('ListsSection.tsx');
     for (const key of [
       'mobile.lists.remove',
       'common.organizer.lists.empty',
-      'common.organizer.lists.empty.hint',
       'mobile.lists.removeHint',
       'mobile.lists.nameLabel',
       'mobile.lists.newPlaceholder',
@@ -102,7 +106,6 @@ describe('文案复用既有词条（零新增同义键）', () => {
     for (const key of [
       'mobile.tags.remove',
       'common.organizer.tags.empty',
-      'common.organizer.tags.empty.hint',
       'mobile.tags.removeHint',
       'mobile.tags.nameLabel',
       'mobile.tags.newPlaceholder',

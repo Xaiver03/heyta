@@ -167,7 +167,9 @@ export function TagsSection(): React.JSX.Element {
               cancel: t('common.organizer.confirm.cancel'),
             },
             empty: t('common.organizer.tags.empty'),
-            emptyHint: t('common.organizer.tags.empty.hint'),
+            /* 🔴 2026-11-15：同 `ListsSection` —— 不传 `emptyHint`（「输入名称就能新建标签。」
+               是在教用户怎么看界面；输入框就在同一屏下面）。 */
+            emptyHint: undefined,
           }}
           onRename={(item, next) => {
             if (actions === null) return;

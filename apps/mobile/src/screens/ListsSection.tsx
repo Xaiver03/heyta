@@ -301,7 +301,16 @@ export function ListsSection(): React.JSX.Element {
               cancel: t('common.organizer.confirm.notArchive'),
             },
             empty: t('common.organizer.lists.empty'),
-            emptyHint: t('common.organizer.lists.empty.hint'),
+            /*
+             * 🔴 2026-11-15：**不传 `emptyHint`。**
+             *
+             * 它原来是「输入名称就能新建清单。」—— 说的是"输入框在下面、填了就能建"，
+             * 而输入框**就在同一屏下面**，读者看得见。
+             *
+             * 与「日历」「四象限」「共享清单」空态同一条判据：空态只说"现在是空的"，
+             * 不教用户怎么看界面。
+             */
+            emptyHint: undefined,
           }}
           /*
             ✅ 「移入文件夹」走的是共享层**已有**的 `renderItemExtra` 行尾插槽
