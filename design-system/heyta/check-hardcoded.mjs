@@ -54,6 +54,30 @@ const verbose = process.argv.includes('--verbose');
  *     · 实际数 < count ⇒ 也红，叫你把账本改小（否则账本会永远停在第一天）。
  *   `--self-test` 三条臂分别验证：现状绿 / 多一处红 / 少一处红。
  */
+/**
+ * 对照实验目录的豁免（2026-11-15）
+ * =================================================
+ *
+ * `apps/landing/src/lab/` 是**动效参数试验台**：它的左侧一栏就是"笔记给的
+ * 裸参数"（450ms、2.4×、0.28、stiffness 260），右侧一栏才是 token 版。
+ *
+ * 🔴 这两栏**必须不一样**，否则实验失去意义 —— 把左侧的裸值改成 token，
+ * 等于"把被测物掉包成对照组"，读者无法判断差异来自参数还是来自读法。
+ *
+ * 所以这不是"忘了用 token"，是**这些数字就是被观测的对象**。约束只落在
+ * 右侧（已全部走 token，且它的样式表在 `lab.css` 里）。
+ *
+ * ⚠️ 边界：这个目录只许放 dev-only 的试验台（不进生产构建、不进 sitemap）。
+ * 把产品组件挪进来逃过门禁，是**滥用** —— 它不在 `pages.ts` 注册表里，
+ * 也不该被任何 `apps/*` 的生产入口 import。
+ */
+const EXPERIMENT_DIR_ALLOW = [
+  {
+    dir: 'apps/landing/src/lab/',
+    why: '动效试验台：左侧一栏的裸参数是被观测对象，改成 token 就没有对照组了',
+  },
+];
+
 const FALLBACK_FILE_ALLOW = [
   {
     file: 'apps/mobile/src/ui/error-boundary.tsx',
@@ -531,7 +555,9 @@ for (const entry of FALLBACK_FILE_ALLOW) {
     );
   }
 }
-const remaining = problems.filter((p) => !exempt.has(p));
+// 对照实验目录整体豁免（理由见 EXPERIMENT_DIR_ALLOW）。
+const inExperimentDir = (file) => EXPERIMENT_DIR_ALLOW.some((entry) => file.startsWith(entry.dir));
+const remaining = problems.filter((p) => !exempt.has(p) && !inExperimentDir(p.file));
 
 console.log(
   `\n扫描 ${checked} 个源文件（${SCAN_ROOTS.map((r) => r.label).join(' + ')}），检查 ${CHECKS.length} 类硬编码。`,
