@@ -3270,6 +3270,7 @@ export const en = {
   'mobile.calendar.monthTitle': '{month}/{year}',
   'mobile.calendar.dayTitle': '{weekday}, {month}/{day}',
   'mobile.calendar.dayEmpty': 'Nothing is due on this day.',
+  'mobile.calendar.dayCount': '{count}',
   'mobile.calendar.backToToday': 'Back to today',
   'mobile.calendar.footnote': 'Tasks without a due date are not on the calendar; they live in the Inbox on the Tasks tab.',
   'mobile.calendar.a11y.dayWithTasks': '{date}, {count} tasks',

@@ -663,6 +663,13 @@ export interface CalendarBoardLabels {
   /** 选中的那天没有任何任务。 */
   readonly dayEmpty: string;
   /**
+   * 日期行右侧那个数字的单位（「3 项」）。
+   *
+   * 🔴 2026-11-15：原来是裸数字 `{dayTasks.length + dayEvents.length}`，
+   * 真机上就是「11月15日 星期日 …… 0」—— 没单位没标签，读者要猜它是什么。
+   */
+  readonly dayCount: (count: number) => string;
+  /**
    * 页脚那句"这一页看不到什么"。
    *
    * 🔴 它不是装饰：**没设截止时间的任务不会出现在日历上**，

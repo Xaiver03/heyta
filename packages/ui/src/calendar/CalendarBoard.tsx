@@ -722,11 +722,23 @@ export function CalendarBoard({
         <Text style={[text['section-title'], styles.dayTitle]} testID={`${testID}-day-title`}>
           {labels.dayTitle(selected)}
         </Text>
-        <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
-          {/* 这一天**有几条**，两个源都算：只数任务的话，格子里那条倒数日
-              在这个数字上就凭空消失了（而下面已经给它留了行）。 */}
-          {dayTasks.length + dayEvents.length}
-        </Text>
+        {/*
+          🔴 2026-11-15：**空的时候不画这个数字**。
+
+          原来它无条件画一个裸数字（真机上就是「11月15日 星期日 …… 0」）：
+          没有单位、没有标签，读者要猜它是任务数还是别的；而空态那行
+          「这一天没有到期的任务。」已经在同一屏说了同一件事 —— 数字是重复的，
+          而且是最难读的那种重复（一个 0 单独浮在右边）。
+
+          有内容时才画，并带上单位「项」。
+        */}
+        {dayTasks.length + dayEvents.length === 0 ? null : (
+          <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
+            {/* 这一天**有几条**，两个源都算：只数任务的话，格子里那条倒数日
+                在这个数字上就凭空消失了（而下面已经给它留了行）。 */}
+            {labels.dayCount(dayTasks.length + dayEvents.length)}
+          </Text>
+        )}
       </View>
 
       <View

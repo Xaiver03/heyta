@@ -300,6 +300,7 @@ export function CalendarScreen(): React.JSX.Element {
       hourLabel: (hour: number) => calendarHourMark(hour),
       backToToday: t('mobile.calendar.backToToday'),
       dayEmpty: t('mobile.calendar.dayEmpty'),
+      dayCount: (count: number) => t('mobile.calendar.dayCount', { count }),
       footnote: t('mobile.calendar.footnote'),
       taskRow: {
         toggleOn: (row: { title: string }) => t('mobile.calendar.a11y.markDone', { title: row.title }),

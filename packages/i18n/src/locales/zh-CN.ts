@@ -3556,6 +3556,8 @@ export const zhCN = {
   'mobile.calendar.monthTitle': '{year}年{month}月',
   'mobile.calendar.dayTitle': '{month}月{day}日 星期{weekday}',
   'mobile.calendar.dayEmpty': '这一天没有到期的任务。',
+  /* 日期行右侧那个数字的单位。原来它是裸数字，没有标签。 */
+  'mobile.calendar.dayCount': '{count} 项',
   'mobile.calendar.backToToday': '回到今天',
   'mobile.calendar.footnote': '未设截止时间的任务不在日历上，它们在「任务」页的收集箱里。',
   'mobile.calendar.a11y.dayWithTasks': '{date}，{count} 个任务',
