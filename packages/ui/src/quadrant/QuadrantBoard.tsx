@@ -226,8 +226,13 @@ function makeStyles(tokens: HeytaNativeTokens) {
      * 只改共享层在两端都还是空转。
      */
     board: {
-      gap: tokens['space.3'],
-      padding: tokens['space.4'],
+      /* 🔴 四格拼成一个整体的外轮廓：圆角在这里裁一次，内部不再各自圆角。 */
+      borderRadius: tokens['radius.lg'],
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: tokens['color.border'],
+      gap: 0,
+      padding: 0,
       flexGrow: 1,
       flexShrink: 0,
 
@@ -236,7 +241,9 @@ function makeStyles(tokens: HeytaNativeTokens) {
     /** 两行等分板子的剩余高度；同样"只长不缩"（理由见 `board`）。 */
     row: {
       flexDirection: 'row',
-      gap: tokens['space.3'],
+      /* 🔴 2026-11-15：**去掉格间 gap** —— 四象限要拼成一个十字，不是四张独立的卡。
+         间距由 `board` 的分隔线承担（见 `cell` 的边框）。 */
+      gap: 0,
       flexGrow: 1,
       flexShrink: 0,
       flexBasis: 'auto',
@@ -251,7 +258,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
      * 面板按内容高度排布、由宿主滚动。这不是例外，是同一条"只长不缩"的结果。
      */
     stack: {
-      gap: tokens['space.3'],
+      gap: 0,
       flexGrow: 1,
       flexShrink: 0,
       flexBasis: 'auto',
@@ -261,7 +268,17 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'column',
       minHeight: tokens['layout.quadrant-min-height'],
       padding: tokens['space.3'],
-      borderRadius: tokens['radius.lg'],
+      /*
+       * 🔴 2026-11-15：**格自己不带圆角**，圆角由外层 `board` 裁一次。
+       *
+       * 四张各自圆角的卡并排 ⇒ 读起来是"四张卡"；四块拼在一起、只有外轮廓圆
+       * ⇒ 读起来是"一个被十字切开的矩阵"。后者才是象限图。
+       */
+      borderRadius: 0,
+      /* 格间用一根细线分隔（只画右/下，避免格子之间双线）。 */
+      borderRightWidth: StyleSheet.hairlineWidth,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface'],
     },
     /** 拖拽悬停：换语义底色，不动几何（动几何会让整格抖一下）。 */
