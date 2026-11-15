@@ -391,7 +391,15 @@ export function ListsSection(): React.JSX.Element {
       />
       <Button
         label={t('mobile.lists.add')}
-        tone="secondary"
+        /*
+         * 🔴 2026-11-15：`secondary` → `primary`。
+         *
+         * 「填名字 → 新建」是这一屏**唯一的主动作**，而习惯页同一个动作是 `primary`
+         * （蓝色）。同一件事两个分量，用户读不出"这一屏该先做什么"。
+         * 判据见 `docs/agents/design-体系-分页配速配色.md` §五 规则一：
+         * **按钮分量由动作性质决定，不由屏决定**；`primary` 每屏至多一枚。
+         */
+        tone="primary"
         icon="task.add"
         loading={busy}
         // 设备级验收的锚点（`Button` 落在 `Pressable` 上才进 AX 树，前提见 traps #575）。
