@@ -111,6 +111,18 @@ export function AiToolboxScreen({
         ) : (
           <DurationPanel host={host} locale={outputLocale} onOpenSettings={onOpenSettings} />
         )}
+        {/*
+          🔴 2026-11-15：「打开 AI 设置」从**卡片里**搬到**卡片外**。
+
+          它是"跳出这一屏"的配置入口，原来画在卡片内容区底部、与「让 AI 处理」同列，
+          读起来像卡片自己的一个动作。配置入口不属于这一屏的任务流。
+
+          顶栏右侧被返回箭头占了（移动端 `action.back` 在右边），
+          所以放在卡片与底部留白之间，明确它是屏级出口。
+        */}
+        {onOpenSettings !== undefined ? (
+          <Button label={t('mobile.ai.toolbox.openSettings')} tone="ghost" onPress={onOpenSettings} />
+        ) : null}
         <View style={{ height: tokens['space.6'] }} />
       </Stack>
     </Screen>
@@ -202,7 +214,6 @@ function BreakdownPanel({ host, locale, onOpenSettings }: { host: AppHost; local
             </HStack>
           </Stack>
         ) : null}
-        {onOpenSettings !== undefined ? <Button label={t('mobile.ai.toolbox.openSettings')} tone="ghost" onPress={onOpenSettings} /> : null}
       </Stack>
     </Card>
   );
