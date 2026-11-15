@@ -24,7 +24,7 @@
  * 现在 `Text` 直接消费 `useText()` 的语义样式，本文件不再自己推导排版。
  */
 
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -341,6 +341,63 @@ export function Screen({
   chrome?: 'page' | 'board' | 'immersive';
 }): React.JSX.Element {
   const t = useTokens();
+
+  /**
+   * 🔴 2026-11-15：**顶栏的出现时机**。
+   *
+   * 到这一轮为止，三档 chrome 只决定了"内容铺不铺满、顶栏放几枚"，
+   * 顶栏本身**永远挂在上面**：列表滚到第二屏，标题还把一行高度占着。
+   * 产品负责人原话：「我觉得我们顶层的顶部导航栏……出现的时机根本没有出现出来」。
+   *
+   * 形状：向下滚过一屏后收起、向上滚立刻回来。三条阈值都读 token / 只判方向：
+   *   · 位移超过 `space.3`（12dp）才算"在滚"，避免手抖把栏切来切去；
+   *   · 已离开顶部一段（`space.3`）才开始收 —— 顶部那 12dp 内永远看得见标题；
+   *   · 回到 `y <= 0` 无条件展开（滚到顶还藏着栏就是丢导航）。
+   *
+   * ⚠️ 只在**没有 `fixedControls`** 时启用：那一块是批量选择等常驻控件，
+   * 它要跟着顶栏一起移动才算对，而那条布局这一轮没做（登记在台账）。
+   */
+  /**
+   * 🔴 2026-11-15：收起**不再只在 `board` 档**。
+   *
+   * 第一次只给 board 时，真机日志（`[uxtest]`）打出 `collapses=true` 但 `y` 最大只有
+   * 47px —— 日历这种"内容刚好一屏多一点"的页面本来就滚不到 `barHeight`，
+   * 于是看上去永远是"没生效"。而产品负责人要的是**所有会长滚动的屏**都收起顶栏。
+   * 所以：除 `immersive`（它本来就不画栏）外，凡是有 `scroll`、且没有常驻控件
+   *（`fixedControls`，如批量选择条）的屏都接这条。
+   */
+  const collapses = chrome !== 'immersive' && fixedControls === undefined && scroll;
+  /**
+   * 🔴 顶栏的出现时机：滚过一段收起、往回滚立刻回来。
+   *
+   * 实现走**高度收缩**（`height: 0` + `overflow: hidden`），不走 `translateY` 绝对定位：
+   *   · 绝对定位要自己留 `paddingTop`，还会盖住内容（真机实测：分段控件被栏压掉一半）；
+   *   · `Animated.event` + `useNativeDriver` 那一版**在真机上直接崩溃**（退回桌面，
+   *     无 JS 日志）⇒ 这条路不再试。
+   *
+   * 判据仍是三条：位移过 `space.3` 才算"在滚"、已离开顶部过 `space.3` 才收、
+   * 回到顶部无条件展开（滚到顶还藏着栏就是丢导航）。
+   */
+  const [barHidden, setBarHidden] = React.useState(false);
+  const lastY = useRef(0);
+  const onScrollY = useCallback(
+    (y: number) => {
+      if (!collapses) return;
+      const dy = y - lastY.current;
+      lastY.current = y;
+      /**
+       * 🔴 `dy` 是**每帧增量**（16ms 一次），不是"这一段的位移"。
+       * 拿 `space.3`（12dp）当方向阈值时，每帧只有 10px 左右 ⇒ 永远不满足
+       *（真机日志：`y` 从 15 涨到 47，`dy` 始终 < 36）。方向判据必须用**符号**：
+       * 向下哪怕 1px 就是"在往下滚"，向上就展开；另外用 `space.3` 守"别在顶部那一段就收"。
+       */
+      if (y <= 0) setBarHidden(false);
+      else if (dy > 0.5 && y > t['space.3']) setBarHidden(true);
+      else if (dy < -0.5) setBarHidden(false);
+    },
+    [collapses, t],
+  );
+
   const body = (
     /**
      * 🔴 `flexGrow: 1` 是**共享层那条"铺满"契约在这端的落地**（R2 / 类 C）。
@@ -361,9 +418,15 @@ export function Screen({
     </View>
   );
 
+  const appBar = <AppBar title={title} actions={actions} titleLeading={titleLeading} />;
+
   return (
     <View style={{ flex: 1, backgroundColor: t['color.background'] }}>
-      <AppBar title={title} actions={actions} titleLeading={titleLeading} />
+      {collapses ? (
+        <View style={{ height: barHidden ? 0 : undefined, overflow: 'hidden' }}>{appBar}</View>
+      ) : (
+        appBar
+      )}
       {fixedControls ? (
         <View style={{ paddingHorizontal: t['screen.gutter'], paddingTop: t['space.2'] }}>
           {fixedControls}
@@ -373,6 +436,14 @@ export function Screen({
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingTop: t['space.4'], flexGrow: 1 }}
+          onScroll={
+            collapses
+              ? (e) => {
+                  onScrollY(e.nativeEvent.contentOffset.y);
+                }
+              : undefined
+          }
+          scrollEventThrottle={collapses ? 16 : undefined}
           keyboardShouldPersistTaps="handled"
         >
           {body}

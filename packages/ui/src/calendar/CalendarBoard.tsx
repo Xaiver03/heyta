@@ -875,7 +875,21 @@ export function CalendarBoard({
       {/* 如实说明这一页看不到什么 —— 否则"任务没设截止时间"会被读成"任务丢了"。
           见 `groupTasksByDueDate` 的说明。 */}
       <Text
-        style={[text['row-meta'], { color: tokens['color.foreground-subtle'] }]}
+        style={[
+          text['row-meta'],
+          {
+            color: tokens['color.foreground-subtle'],
+            /**
+             * 🔴 2026-11-15：脚注自己留左右边距。
+             *
+             * 日历那一屏是 `chrome="board"`（内容铺满，`Screen` 不再给 16dp gutter），
+             * 而脚注是**一句长文**，不是网格——铺满之后它右端直接溢出屏幕
+             *（真机：「…在「任务」页的收集箱里。」的末字被裁）。
+             * 边距写在这里而不是宿主：web 那端也没有别的层会给它。
+             */
+            paddingHorizontal: tokens['space.4'],
+          },
+        ]}
         testID={`${testID}-footnote`}
       >
         {labels.footnote}

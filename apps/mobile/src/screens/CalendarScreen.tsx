@@ -354,7 +354,12 @@ export function CalendarScreen(): React.JSX.Element {
   );
 
   return (
-    <Screen title={t('mobile.calendar.title')}>
+    /*
+      🔴 2026-11-15：日历是**看板**（chrome="board"）—— 内容铺满、顶栏随滚动收起。
+      档位切换器与月历网格是同一件事（"我在看哪一段时间"），所以它们一起铺满；
+      只有底部那句说明（脚注）留在 16dp 轴线上。
+    */
+    <Screen title={t('mobile.calendar.title')} chrome="board">
       {error !== null ? (
         <Text variant="row-meta" tone="danger">
           {error}
