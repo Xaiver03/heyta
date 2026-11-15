@@ -117,9 +117,21 @@ export function TrashBoard({
 
   return (
     <View style={styles.root} testID={testID}>
-      <Text style={[text['row-meta'], { color: tokens['color.foreground-subtle'] }]}>
-        {labels.intro}
-      </Text>
+      {/*
+        🔴 2026-11-15：**空态时不画这段 intro**。
+        
+        看图才发现的：空态屏上两段话在数同一批东西 ——
+        intro「这里放着已删除的**任务、便签、清单和习惯**。恢复后它会回到原来的位置。」
+        空态 hint「删掉的**任务、便签、清单和习惯**会先放到这里」
+        
+        intro 里有价值的是**后半句**（"恢复后回到原来的位置"），那是操作说明；
+        而空态时没有东西可恢复。所以空态只留 hint，有内容时才显示 intro。
+      */}
+      {items.length === 0 ? null : (
+        <Text style={[text['row-meta'], { color: tokens['color.foreground-subtle'] }]}>
+          {labels.intro}
+        </Text>
+      )}
 
       {items.length === 0 ? (
         // 空态走**共享那一个实现**（`check:empty-state` 的判据 3）。
