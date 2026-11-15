@@ -869,7 +869,17 @@ export function AuthScreen({
               <View style={layout.stack3}>
                 <View style={layout.stack1}>
                   <Text variant="section-title">{t('mobile.auth.title')}</Text>
-                  <Text variant="caption" tone="muted">{t('mobile.auth.central.intro')}</Text>
+                  {/*
+                    🔴 2026-11-15：删掉这里那行说明（原来渲染 `mobile.auth.central.intro`：
+                    「使用统一身份登录 heyta；登录完成后，再用本机的端到端加密口令启用同步。」）。
+
+                    这个文件自己在 `labels` 上方就抄着产品负责人 2026-10-26 的原话：
+                    「去掉所有说明文字，现在严禁有任何说明文字，除了必要的。」
+
+                    那行说的是**这个产品怎么运作**（统一身份 + 口令 + 同步是三件事怎么串起来），
+                    不是"你现在该做什么"。它属于文档，不属于登录框上方 ——
+                    而 `AuthForm` 那条分支早就按同一条判据删干净了，只有 `centralMode` 这一支漏着。
+                  */}
                 </View>
                 {/* 状态区。失败用 danger，中性提示用 muted —— 两者**不能同色**，
                     否则"链接已发出"和"登录失败"在视觉上分不出来。 */}
