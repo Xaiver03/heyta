@@ -66,13 +66,22 @@ describe('移动端个人中心与设置的 IA 接线', () => {
     expect(settings).toContain('setSection(undefined)');
   });
 
-  it('设置入口位于账号卡之后，资料编辑入口进入账号分组', () => {
+  it('近期状态紧跟账号、位于各功能入口之前，资料编辑入口进入账号分组', () => {
     const home = between(profile, 'return (\n    <Screen', '<SettingsScreen');
     const accountEnd = home.indexOf("<SettingsRow row={settingsRow} />");
     const growthSummary = home.indexOf('<ProfileProgressSummary');
 
     expect(accountEnd).toBeGreaterThan(-1);
-    expect(growthSummary).toBeGreaterThan(accountEnd);
+    /**
+     * 🔴 2026-11-15 方向反了：原来是 `growthSummary > accountEnd`（近期状态在
+     * 功能入口**之后**）。产品负责人明确要求「近期状态应该放到最上面，而不是放在这里」，
+     * 参照滴答清单的「我的」页：**账号 → 数据概览 → 功能入口**。
+     *
+     * 这条断言钉住的是**顺序**，产品要求变了它就该跟着变 ——
+     * 不是为了让它变绿而改，是因为它描述的那件事已经按新要求改了。
+     */
+    expect(growthSummary).toBeGreaterThan(-1);
+    expect(growthSummary).toBeLessThan(accountEnd);
     expect(profile).toContain("testID: 'profile-entry-settings'");
     expect(profile).toContain("navigation.push('settings');");
     expect(profile).toContain("setSettingsSection('account');");

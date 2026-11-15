@@ -1655,24 +1655,28 @@ export function ProfileScreen(): React.JSX.Element {
         （`profile-settings-ia.spec.ts` 钉着）现在由**这一整块紧跟账号区**来兑现，
         块内第一行是订阅、第二行是设置 —— 设置仍然是"账号之后第一个非商业入口"。
       */}
-      <Card>
-        <SettingsRow row={subscriptionRow} />
-        <SettingsRow row={settingsRow} />
-        <SettingsRow row={notificationsRow} />
-        <SettingsRow row={featuresHubRow} />
-      </Card>
-
       {/*
-        ── ③ 近期状态（由 `ProfileProgressSummary` 画）────────────────────
-        🔴 4 行：本周任务 / 专注 / 成就 + 「查看完整成长」。成长**只在这里**——
-        原来「我的」上有两处到同一张屏（`profile-progress-growth` 与
-        `profile-entry-growth`），§5.3 明写"收进近期状态卡内，删掉重复那一行"。
+        ── ② 近期状态（**紧跟账号**，在功能入口之前）──────────────────────
+        🔴 2026-11-15 产品负责人：「近期状态应该放到最上面，而不是放在这里」。
+        原来它在「订阅 / 设置 / 通知 / 全部功能」那一卡**后面**，用户先看完六个入口
+        才看见"我这周做了什么"。参照滴答清单的「我的」页：**头像 → 数据概览 → 功能入口**。
+
+        4 行：本周任务 / 专注 / 成就 + 「查看完整成长」。成长**只在这里** ——
+        原来「我的」上有两处到同一张屏，§5.3 明写"收进近期状态卡内，删掉重复那一行"。
       */}
       <ProfileProgressSummary
         onOpenGrowth={() => {
           navigation.push(featureRouteKey('growth'));
         }}
       />
+
+      {/* ── ③ 功能入口 ─────────────────────────────────────────────── */}
+      <Card>
+        <SettingsRow row={subscriptionRow} />
+        <SettingsRow row={settingsRow} />
+        <SettingsRow row={notificationsRow} />
+        <SettingsRow row={featuresHubRow} />
+      </Card>
 
       {/*
         ── ④ 同步：**一行**（§5.2）────────────────────────────────────────
