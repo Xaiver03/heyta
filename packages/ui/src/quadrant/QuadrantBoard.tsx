@@ -230,6 +230,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
       padding: tokens['space.4'],
       flexGrow: 1,
       flexShrink: 0,
+
       flexBasis: 'auto',
     },
     /** 两行等分板子的剩余高度；同样"只长不缩"（理由见 `board`）。 */
