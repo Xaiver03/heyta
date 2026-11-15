@@ -200,6 +200,17 @@ interface TaskListSharedProps {
    * 省略 ⇒ 逐字节与抽取前相同（移动端与四象限都不传）。
    */
   readonly renderRowWrapper?: (row: TaskRowModel, node: React.ReactNode) => React.ReactNode;
+  /**
+   * 整张列表画成**一张白卡**（移动端任务页用，对齐滴答的"分组卡"观感）。
+   *
+   * 🔴 2026-11-15：滴答的任务是"白卡 + 卡内行"，我们是"灰底平铺 + 8dp 空隙"。
+   * 真机对比时最刺眼的差别不是行高（那个已压到 compact），而是**没有卡**：
+   * 行直接落在页面底色上，看起来像一张表格而不是清单。
+   *
+   * 只在显式传 true 时生效 —— web 的列表已经住在自己的容器里，再加一层卡
+   * 就是卡套卡（与"列表不自带水平内边距"同一个道理）。
+   */
+  readonly listCard?: boolean;
 }
 
 /** 平铺形态：一批任务，**共享层负责排序**。 */
@@ -256,6 +267,7 @@ export function TaskList<TMeta = undefined>({
   density,
   renderRowWrapper,
   iconColorOf,
+  listCard = false,
 }: TaskListProps<TMeta>): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -299,9 +311,24 @@ export function TaskList<TMeta = undefined>({
          * 页面边距属于**宿主**：它才知道自己有没有被别的容器包着。
          * 列表只管行与行之间的节奏。
          */
-        list: { gap: tokens[TASK_ROW_SHAPE.listGap] },
+        list: {
+          /**
+           * 🔴 卡片模式下 `gap` 必须是 0：行间那 8dp 会让**页面底色从缝里漏出来**，
+           * 一张白卡被切成七段（真机截图：每行之间一道灰色断口）。
+           * 分隔的职责交给行自己的上下内边距，卡是一整块。
+           */
+          gap: listCard ? 0 : tokens[TASK_ROW_SHAPE.listGap],
+          ...(listCard
+            ? {
+                backgroundColor: tokens['color.surface'],
+                borderRadius: tokens['radius.lg'],
+                overflow: 'hidden' as const,
+                paddingHorizontal: tokens['space.2'],
+              }
+            : {}),
+        },
       }),
-    [tokens],
+    [listCard, tokens],
   );
 
   const renderItem = useCallback(

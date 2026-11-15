@@ -1733,6 +1733,8 @@ export function TasksScreen({
                * `bodyPaddingBlock: space.1`），只是移动端列表一直吃默认的 `comfortable`。
                */
               density="compact"
+              // 白卡列表（对齐滴答的"卡 + 卡内行"观感，见 `TaskList` 的 `listCard`）。
+              listCard
               onToggleTask={handleTaskToggle}
               onOpenTask={handleTaskOpen}
               // 🔴 手势改派（§3.4）：非批量态 = 长按开**上下文菜单**；
