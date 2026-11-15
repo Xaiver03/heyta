@@ -36,10 +36,10 @@ import { Pressable, View } from 'react-native';
 import { type FocusSessionKind, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { FocusPanel, focusLogFailureMessageKey } from '@heyta/ui';
-import { focusOverview, type AppHost } from '@heyta/app-host';
+import { focusOverview, type AppHost, type FocusOverview } from '@heyta/app-host';
 
 import { useText, useTokens } from '../theme';
-import { Button, Card, Chip, Screen, SectionHeader, Text } from '../ui/kit';
+import { Button, Card, Chip, HStack, Screen, SectionHeader, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import {
   getOpenTaskHostIfReady,
@@ -174,6 +174,8 @@ export function FocusScreen(): React.JSX.Element {
    */
   /** 全部未删除任务 —— 用来**显示**已关联任务的名字。 */
   const [tasks, setTasks] = useState<Task[]>([]);
+  /** 专注概览（「今天」那两格）。由 `refresh()` 在宿主就绪后写入，见那里的注释。 */
+  const [overview, setOverview] = useState<FocusOverview | null>(null);
   /** 未完成任务 —— 只用它填选择列表。 */
   const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -184,6 +186,22 @@ export function FocusScreen(): React.JSX.Element {
     const source = readFocusTaskSource(getOpenTaskHostIfReady);
     setTasks(source.tasks);
     setPendingTasks(source.pendingTasks);
+    /**
+     * 🔴 2026-11-15：**长期活在 `useMemo` 里的 overview 是这个 bug 的根**。
+     *
+     * `openTaskHost()` 成功之后只做 `resolvedHost = host`，**不 bump `hostEpoch`**
+     * （`db/open-host.ts:269` 附近）。而 overview 的 memo 依赖的是
+     * `[hostEpoch, timer.now, timer.savedAt, dataRevision]` —— 冷启动首帧
+     * 宿主还没打开 ⇒ `getOpenTaskHostIfReady()` 是 `undefined` ⇒ 记下 `null`；
+     * 之后宿主打开，四个依赖一个都没变 ⇒ **memo 永远不再算**。
+     *
+     * 真机症状：专注页「今天」只剩一个标题，下面什么都没有（`overview === null`），
+     * 而同一屏的「关联任务」列表已经有数据（那条路走的是 `setTasks`，不是 memo）。
+     * 跟着 `refresh()` 一起算，宿主一就绪这张卡就会出现。
+     */
+    const current = getOpenTaskHostIfReady();
+    setOverview(current === undefined ? null : focusOverview(current, Date.now()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -241,11 +259,6 @@ export function FocusScreen(): React.JSX.Element {
    * 记录"进得来，后者让"刚落盘的那一轮"立刻可见 —— 少了任何一个，
    * 数字会停在旧值上，看起来像记录没保存。
    */
-  const overview = useMemo(() => {
-    // 现读当前这一代；`hostEpoch` 变了就会重新算（由此前的 `[host, …]` 依赖换成它）。
-    const current = getOpenTaskHostIfReady();
-    return current === undefined ? null : focusOverview(current, timer.now);
-  }, [hostEpoch, timer.now, timer.savedAt, dataRevision]);
 
   /**
    * 已关联的任务。
@@ -330,6 +343,18 @@ export function FocusScreen(): React.JSX.Element {
       ) : null}
 
       <SectionHeader title={t('mobile.focus.linkedTask')} />
+      {/*
+        🔴 2026-11-15：**没有待办任务时不画那张卡**。
+        原来无论如何都包一层 `Card`，于是"现在没有待办任务"这句话住在一张
+        高 88dp 的白底卡片正中 —— 产品负责人原话「关联任务下面有个框，整个框
+        非常高，却只放了一个很简单的文字，这个空状态就很丑很丑」。
+        空态本来就是一句提示，不需要容器；有内容时卡片仍然在。
+      */}
+      {linkedTask === undefined && pendingTasks.length === 0 ? (
+        <Text variant="row-meta" tone="subtle">
+          {t('mobile.focus.noPending')}
+        </Text>
+      ) : (
       <Card>
         {linkedTask !== undefined ? (
           <View style={{ gap: tokens['space.2'] }}>
@@ -367,24 +392,34 @@ export function FocusScreen(): React.JSX.Element {
           </View>
         )}
       </Card>
+      )}
 
       <SectionHeader title={t('mobile.common.today')} />
       {overview === null ? null : (
         <Card>
-          <StatRow
-            label={t('mobile.focus.stats.completed')}
-            value={t('mobile.focus.stats.completedValue', { count: overview.todayCount })}
-          />
-          <StatRow
-            label={t('mobile.focus.stats.focusDuration')}
-            value={formatFocusDurationText(overview.todayFocusMs, t)}
-          />
+          {/*
+            🔴 2026-11-15：两行「标签 ……… 值」改成**两格横排**。
+            产品负责人看这一屏：「关联任务下面有个框，整个框非常高，却只放了一个
+            很简单的文字」。原来 Card 里是两枚 `StatRow`（各 24dp）＋ 上下 padding，
+            一块 120dp 的白底上只有两行 14px 小字 —— 高度全花在留白上。
+            横排两格把数字放到 `headline` 档（同步「我的」页的近期状态卡）：
+            同样的信息，一张卡里一眼读完，纵向空间反而更省。
+          */}
+          <HStack gap="default">
+            <View style={{ flex: 1, alignItems: 'center', gap: tokens['space.1'] }} testID="focus-today-completed">
+              <Text variant="headline">{t('mobile.focus.stats.completedValue', { count: overview.todayCount })}</Text>
+              <Text variant="caption" tone="subtle">{t('mobile.focus.stats.completed')}</Text>
+            </View>
+            <View style={{ flex: 1, alignItems: 'center', gap: tokens['space.1'] }} testID="focus-today-duration">
+              <Text variant="headline">{formatFocusDurationText(overview.todayFocusMs, t)}</Text>
+              <Text variant="caption" tone="subtle">{t('mobile.focus.stats.focusDuration')}</Text>
+            </View>
+          </HStack>
           {/* 放弃次数只在真的发生过时才显示 —— 一行常年的「0 次」不传达任何信息。 */}
           {overview.todayAbortedCount > 0 ? (
-            <StatRow
-              label={t('mobile.focus.stats.aborted')}
-              value={t('mobile.focus.stats.abortedValue', { count: overview.todayAbortedCount })}
-            />
+            <Text variant="caption" tone="subtle">
+              {`${t('mobile.focus.stats.aborted')} ${t('mobile.focus.stats.abortedValue', { count: overview.todayAbortedCount })}`}
+            </Text>
           ) : null}
         </Card>
       )}

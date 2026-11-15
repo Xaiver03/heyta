@@ -3050,7 +3050,7 @@ export const en = {
   // ── Mobile · time by category ──────────────────────────────
   // Verbatim the same as `web.categories.*` (except where the interaction differs).
   'mobile.categories.title': 'Time by category',
-  'mobile.categories.note': 'Focus and check-in time per list and habit over the last 12 weeks. You decide what each color means; this page does not judge it.',
+  'mobile.categories.note': 'Focus and check-in time per list and habit over the last 12 weeks. You decide what each color means; no ranking.',
   'mobile.categories.empty': 'No categorised time records yet.',
   'mobile.categories.empty.hint': 'Organise tasks into lists, or record time on habits, and this page fills in.',
   'mobile.categories.range': '{start} to {end}',

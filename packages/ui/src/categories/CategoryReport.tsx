@@ -337,7 +337,19 @@ export function CategoryReportView({
           illustration="calendar"
           title={labels.emptyTitle ?? labels.empty}
           hint={labels.emptyHint}
-          size="section"
+          /*
+            🔴 2026-11-15：`section` → `card`。
+            `section` 档在空态模型里**丢弃插画**（`GRAPHICS_SIZES` 不含它），
+            于是整屏只剩三段文字：顶上一句说明、空态标题、一句提示 ——
+            产品负责人原话「统计面板 全都是一些文字，还是做得非常烂」。
+            `card` 是 `page` 的紧凑版：带 `StateIllustration`、居中，不撑满整屏。
+          */
+          /*
+            🔴 只有 `page` 档在空态模型里带插画（`GRAPHICS_SIZES = new Set(['page'])`）——
+            上一版写 `card` 时插画仍然被丢掉，真机看到的还是三段文字。
+            这一屏的空态就是**整页没有内容**，`page` 档的居中 + 插画正合它。
+          */
+          size="page"
           testID={testID === undefined ? undefined : `${testID}-empty`}
         />
       ) : (

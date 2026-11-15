@@ -1315,7 +1315,18 @@ export function Chip({
 }): React.JSX.Element {
   const t = useTokens();
 
-  const fg = selected ? t[tone === 'quiet' ? 'color.primary' : 'color.on-primary'] : t['color.foreground'];
+  /**
+   * 🔴 2026-11-15：选中态从**实心主色块**改成浅底 + 主色字。
+   *
+   * 产品负责人看专注屏的类型选择（专注 / 短休息 / 长休息）：选中那一枚是
+   * 一整块 `color.primary`，与旁边的「开始专注」主按钮同色同重 —— 一屏两枚
+   * "主按钮"，而它们一个是状态、一个是动作。日历档位那一组是同一个毛病
+   *（`CalendarViewTabs` 同步改了）。
+   *
+   * 规则统一成一条：**选中 = 浅底 + 主色字；实心主色只给主操作。**
+   * 同一屏里的 `TaskChoice` 选中行本来就是这个形状（`primary-subtle` 底）。
+   */
+  const fg = selected ? t['color.primary'] : t['color.foreground'];
 
   return (
     <Pressable
@@ -1336,7 +1347,7 @@ export function Chip({
         backgroundColor: tone === 'quiet'
           ? (pressed ? t['color.surface-sunken'] : 'transparent')
           : selected
-          ? t['color.primary']
+          ? t['color.primary-subtle']
           : pressed
             ? t['color.surface-sunken']
             : t['color.surface'],

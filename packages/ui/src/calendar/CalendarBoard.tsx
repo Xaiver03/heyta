@@ -231,9 +231,15 @@ function DayCell({
    * 后者在 3 条任务条都画出来之后反而更准：一格里有红条也有黑条时，
    * 点色说不清这一天整体是什么状态，数字色说的清。
    */
-  const numberColor = isSelected || isToday
+  /**
+   * 🔴 2026-11-15：选中（非今天）是**浅蓝底**，所以它的数字用主色，不能用白字。
+   * 今天仍是主色实心圆 + 白字（唯一强标记）；两者同时成立时按今天那一支走。
+   */
+  const numberColor = isToday
     ? tokens['color.on-primary']
-    : tone === 'danger'
+    : isSelected
+      ? tokens['color.primary']
+      : tone === 'danger'
       ? tokens['color.danger']
       : inMonth
         ? tone === 'subtle'
@@ -288,10 +294,27 @@ function DayCell({
         {
           minHeight: tokens['touch-target.min'],
           gap: tokens['space.1'],
-          borderTopWidth: tokens['border-width.thin'],
-          borderStartWidth: tokens['border-width.thin'],
-          borderColor: tokens['color.border'],
-          backgroundColor: isSelected ? tokens['color.primary-subtle'] : 'transparent',
+          /**
+           * 🔴 2026-11-15：去掉格子自己的 `borderTopWidth` / `borderStartWidth`。
+           *
+           * 真机截图里整张月历是**一张 Excel 表**：横线竖线都是 `color.border`，
+           * 28 个格子各带两条边，和日期数字抢注意力；外层的卡片边框还在，
+           * 于是"框套框"。产品负责人的原话是「日历排版…非常难看」。
+           *
+           * 现在只留卡片外框：格子靠位置与留白分列，选中那一格用浅底 + 圆角。
+           * 与 Web 共用同一份实现（那边也一起去掉，两端不会长出两种网格）。
+           */
+          /**
+           * 🔴 2026-11-15：选中底色**从格子移到数字本身**。
+           *
+           * 第一版去掉网格线后仍是"整格浅蓝"：270×100px 的一块浅蓝铺满列宽，
+           * 与旁边那颗蓝圆数字叠成「圆中方」，看起来像被选中的是一整列。
+           * 滴答的选中日是**数字那一圈**。所以：
+           *   · 今天          → 主色实心圆 + 白字（唯一强标记）
+           *   · 选中（非今天）→ 浅蓝圆 + 主色字
+           *   · 今天且选中     → 主色实心圆（同一支，不叠两层）
+           */
+          borderRadius: tokens['radius.sm'],
         },
       ]}
     >
@@ -303,7 +326,7 @@ function DayCell({
         minWidth: tokens['space.6'],
         paddingHorizontal: tokens['space.1'],
         borderRadius: tokens['radius.full'],
-        backgroundColor: isSelected || isToday ? tokens['color.primary'] : 'transparent',
+        backgroundColor: isToday ? tokens['color.primary'] : isSelected ? tokens['color.primary-subtle'] : 'transparent',
       }]}>{day}</Text>
       {markerView === undefined ? null : (
         <Text

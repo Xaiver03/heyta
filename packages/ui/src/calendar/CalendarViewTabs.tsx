@@ -143,14 +143,25 @@ function makeStyles(tokens: HeytaNativeTokens) {
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.sm'],
     },
+    /**
+     * 🔴 2026-11-15：选中态从**实心主色块**改成浅底 + 主色字。
+     *
+     * 真机截图（日历档位）：四个 tab 各占 1/4 屏宽、44dp 高，选中那一格是一整块
+     * `color.primary` 深蓝，看起来像一枚 270×44 的主按钮，而不是"当前看的是月视图"。
+     * 实心主色在本仓的语义是**主操作**（`Button tone="primary"`）—— 档位切换是状态，
+     * 不是操作。同屏因此出现"一个巨大的主按钮 + 三个灰字"，主次读反了。
+     *
+     * 浅底（`primary-subtle`）＋主色字把"选中"表达成**状态**：
+     * 与 `TaskChoice` 的选中行、`Chip` 的选中态同一条规则。
+     */
     tabActive: {
-      backgroundColor: tokens['color.primary'],
+      backgroundColor: tokens['color.primary-subtle'],
     },
     label: {
       color: tokens['color.foreground-muted'],
     },
     labelActive: {
-      color: tokens['color.on-primary'],
+      color: tokens['color.primary'],
     },
   });
 }
