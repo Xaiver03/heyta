@@ -311,6 +311,7 @@ export function Screen({
   scroll = true,
   fixedControls,
   bottomInset = true,
+  chrome = 'page',
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
@@ -321,6 +322,23 @@ export function Screen({
   fixedControls?: React.ReactNode;
   /** 固定输入区由调用方管理底部留白，避免重复预留滚动空间。 */
   bottomInset?: boolean;
+  /**
+   * 这一屏属于哪一档 **chrome（外壳）**。
+   *
+   * 🔴 2026-11-15 立的抽象。此前每一屏都在自己决定"要不要 gutter、顶栏放几枚
+   * 按钮"，于是同一件事有 N 份答案：表单页 16dp 边距 + 三枚顶栏动作，看板页也
+   * 照抄同一套 —— 四象限四周各留一圈白（真机对照滴答：人家的格子直接顶到边缘）。
+   * 现在只有三档，选一档由视图**是什么**决定，不由作者口味决定：
+   *
+   * - `page`（默认）：内容页 / 表单页。左右 16dp gutter，顶栏 1–3 枚**高频**动作。
+   * - `board`：看板（四象限 / 时间线 / 日历）。内容**铺满**宽度；顶栏只留
+   *   全局搜索与「更多」，低频动作（手动同步、排序…）进「更多」菜单。
+   * - `immersive`：全屏消费内容（专注计时、阅读）。顶栏默认不画；退出靠返回手势。
+   *   ⚠️ 本档**尚未有实现**，先在类型里占位，避免到时候又加第四个名字。
+   *
+   * 判据：`pnpm check:nav-chrome` 会按这一档校验"顶栏动作是否超过预算"。
+   */
+  chrome?: 'page' | 'board' | 'immersive';
 }): React.JSX.Element {
   const t = useTokens();
   const body = (
@@ -337,7 +355,7 @@ export function Screen({
      * 最后一个子节点之后（`justifyContent` 默认 `flex-start`）—— 所以这不是
      * "给所有屏加了一条高度约束"，只是把"母层给不给确定高度"这一环补上。
      */
-    <View style={{ paddingHorizontal: t['screen.gutter'], gap: t['space.4'], flexGrow: 1, ...(scroll ? {} : { flex: 1, minHeight: 0 }) }}>
+    <View style={{ paddingHorizontal: chrome === 'board' ? 0 : t['screen.gutter'], gap: t['space.4'], flexGrow: 1, ...(scroll ? {} : { flex: 1, minHeight: 0 }) }}>
       {children}
       {bottomInset ? <View style={{ height: t['screen.bottom-inset'] }} /> : null}
     </View>

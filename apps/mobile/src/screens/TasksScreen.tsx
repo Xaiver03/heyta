@@ -1607,12 +1607,20 @@ export function TasksScreen({
         // 也在它的 ListHeaderComponent 内，避免 ScrollView + FlatList 竞争手势。
         // 四象限/时间线仍使用屏幕级滚动。
         scroll={view !== 'list'}
+        // 四象限 / 时间线是看板：内容铺满宽度、顶栏只留高频动作（见 `Screen` 的 chrome 注释）。
+        chrome={view === 'list' ? 'page' : 'board'}
         fixedControls={bulkSelecting || bulkUndoIds !== null ? bulkControls : undefined}
         actions={[
           // 🔴 全局搜索的**唯一**入口（产品负责人 2026-10-01：一个应用只有一个搜索入口）。
-          // 放在「同步」之前 = 靠左，因为它是日常动作、同步是偶发动作。
           { icon: 'action.search', label: t('mobile.search.open'), onPress: () => setSearchOpen(true) },
-          { icon: 'action.sync', label: t('mobile.common.sync'), onPress: refresh },
+          /*
+           * 🔴 2026-11-15：把手动「同步」从这里撤下来，收进「⋯」菜单。
+           *
+           * 产品负责人这一轮问的是「顶部那几个东西里，低频按钮有没有必要一直
+           * 留在那个地方」。同步是**偶发动作**（自动同步一直在跑），它占着顶栏
+           * 一个 44dp 的位置，与"搜索"同权 —— 而搜索是每屏都可能用的。
+           * 撤下来之后顶栏只剩「搜索 + 更多」两枚，与滴答同屏的密度一致。
+           */
           /*
            * 🔴 第三枚是「其它」菜单，**不是**第四种功能入口。
            *
@@ -1627,7 +1635,15 @@ export function TasksScreen({
           { icon: 'action.more', label: t('mobile.tasks.more.open'), onPress: () => setMoreOpen(true) },
         ]}
       >
-        {view === 'list' ? null : taskControls}
+        {/*
+          🔴 2026-11-15：看板视图（`chrome="board"`）下 `Screen` 不再给左右 gutter，
+          而「11月15日 星期日 / 1 项待办」这组文字**不是看板本体** ——
+          铺满的是矩阵，文字仍要站在 16dp 那条轴线上（真机实测：不包这一层，
+          日期标题会贴到屏幕左边、`11` 被裁掉）。
+        */}
+        {view === 'list' ? null : (
+          <View style={{ paddingHorizontal: tokens['screen.gutter'] }}>{taskControls}</View>
+        )}
 
         {view === 'quadrant' ? (
           /*
@@ -1927,6 +1943,18 @@ export function TasksScreen({
             id: 'filter',
             label: t('mobile.tasks.more.filter'),
             onPress: () => setSearchBarOpen(true),
+          },
+          /*
+           * 手动同步从顶栏撤下来之后落在这里。它不是导航，也不是某一项任务的
+           * 动作，而是"这一屏现在去拉一次" —— 与筛选同层。
+           */
+          {
+            id: 'sync',
+            label: t('mobile.common.sync'),
+            onPress: () => {
+              setMoreOpen(false);
+              refresh();
+            },
           },
           ...(bulkSelecting || view === 'timeline'
             ? []

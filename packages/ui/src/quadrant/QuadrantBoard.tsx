@@ -241,9 +241,18 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: 0,
       padding: 0,
       flexGrow: 1,
+      /* 只长不缩：内容多时不许把四格压到 `minHeight` 以下。 */
       flexShrink: 0,
-
-      flexBasis: 'auto',
+      /*
+       * 🔴 2026-11-15：`flexBasis: 'auto'` → `0`。
+       *
+       * `auto` 让高度先由内容决定，`flexGrow` 只在**还有剩余空间**时才分配；
+       * 而 ScrollView 的内容列一旦被内容撑到视口高，就不再有"剩余"可分 ——
+       * 真机结果：四象限铺满左右，但矩阵下方空出一整块（约 110dp）。
+       * 改 0 之后矩阵从"内容高"起算、由 `flexGrow` 吃掉父层剩余高度；
+       * `flexShrink: 0` 仍然保证它不会被压扁。
+       */
+      flexBasis: 0,
     },
     /** 两行等分板子的剩余高度；同样"只长不缩"（理由见 `board`）。 */
     /** 四格拼成的那个矩形：圆角与裁切都在这一层（轴标签在它外面，不受影响）。 */
