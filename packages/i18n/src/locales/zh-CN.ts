@@ -3978,7 +3978,17 @@ export const zhCN = {
   'mobile.profile.progress.retry': '重新读取',
   'mobile.profile.account.signIn': '注册 / 登录',
   'mobile.profile.account.switchAccount': '切换账号',
-  'mobile.profile.account.signInHint': '用邮箱或通行密钥登录；登录后自动接上同步，不必手抄令牌。',
+  /*
+   * 🔴 2026-11-15：缩短。
+   *
+   * 原来是「用邮箱或通行密钥登录；登录后自动接上同步，不必手抄令牌。」——
+   * 它被**账号头部的第二行**用（`ProfileScreen.tsx:1627`），而那是
+   * 「还没登录」下面的一行说明：真机上折成两行、比上面的标题还长，
+   * 把整个头部撑高了一倍。
+   *
+   * 头部第二行只该回答"登录换来什么"，一句说完。
+   */
+  'mobile.profile.account.signInHint': '登录后任务会在设备间同步',
   'mobile.profile.account.signedInLabel': '当前账号',
   'mobile.profile.account.signedInHint': '已拿到访问令牌。要换账号或补一条凭据，重新登录一次即可。',
   'mobile.profile.nickname.hint': '点按这一行即可修改昵称。',

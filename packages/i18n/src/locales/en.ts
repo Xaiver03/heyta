@@ -3607,7 +3607,7 @@ export const en = {
   'mobile.profile.progress.retry': 'Reload activity',
   'mobile.profile.account.signIn': 'Sign in or register',
   'mobile.profile.account.switchAccount': 'Switch account',
-  'mobile.profile.account.signInHint': 'Sign in with an email link or a passkey; sync is wired up for you so you never copy a token by hand.',
+  'mobile.profile.account.signInHint': 'Sign in to sync tasks across devices',
   'mobile.profile.account.signedInLabel': 'Current account',
   'mobile.profile.account.signedInHint': 'An access token is already in place. Sign in again to switch accounts or add another credential.',
   'mobile.profile.nickname.hint': 'Tap this row to change your nickname.',
