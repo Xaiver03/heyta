@@ -3973,6 +3973,9 @@ export const zhCN = {
   // 🔴 这一句必须与"图不行"分开：iOS 侧还没有读图通道，说"这张图解不开"会把人
   // 支去换照片，而换多少张都一样。真相是这台设备暂时没有这条通道。
   'mobile.profile.avatar.noChannel': '这台设备还不能读取本机里的图片，请先在网页版更换头像；换好之后这里会显示同一张。',
+  /* 账号头部的第二行说明。未登录时告诉用户"登录能换来什么"，而不是让他猜。 */
+  'mobile.profile.account.signInHint': '登录后任务会在设备间自动同步',
+  'mobile.profile.account.signedInHint': '已登录',
   'mobile.profile.account.offline': '还没登录',
   // ⚠️ 表单搬进设置面之后，"下面那一段"不再成立 —— 指路要说**现在**的位置，
   // 否则用户在「我的」上找一圈找不到表单，会以为功能没了。

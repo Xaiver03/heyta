@@ -1562,40 +1562,80 @@ export function ProfileScreen(): React.JSX.Element {
         🔴 2026-11-15 补上了 `action.disclose`，这张卡现在画得出"这里能进" ——
         与「提醒与通知」那三行是同一类修复：**能点但看不出来 = 等于不能点**。
       */}
+      {/*
+        🔴 2026-11-15：**账号区改成滴答那种居中头像头部**，并且把原来紧跟其后的
+        那枚「注册 / 登录」整行蓝按钮**并进这一块**。
+
+        产品负责人两次指同一处：
+        · 「我的页面排版明显不对，包括信息层级也不对。注册登录应该放在哪里？个人头像应该放在哪些地方？」
+        · 「滴答清单的个人界面、我的界面，做得比我们好太多。」
+
+        原来的毛病有三个：
+        1. 头像只在**已登录**时出现，未登录就是一行小字 —— 冷启动第一屏没有"这是谁"的位置；
+        2. 紧接着一个**整行蓝色按钮**，同一件事（去登录）出现两处、两种形态；
+        3. 头像左对齐、文字左对齐，而滴答是**居中一块**。
+
+        改成一个整块可点的头部：头像（未登录是灰圈人形）→ 称呼 → 第二行说明。
+        点它：已登录进「账号与安全」设置，未登录直接进登录流程 —— 冷启动入口没有丢，
+        只是从"一枚重按钮"变成了"整块可点"。
+      */}
       <Pressable
         testID="profile-account-value"
         accessibilityRole="button"
-        accessibilityLabel={t('mobile.profile.edit')}
+        accessibilityLabel={accountHasCredential ? t('mobile.profile.edit') : t('mobile.profile.account.signIn')}
         onPress={() => {
-          setSettingsSection('account');
-          navigation.push('settings');
+          if (accountHasCredential) {
+            setSettingsSection('account');
+            navigation.push('settings');
+          } else {
+            openAuth();
+          }
         }}
       >
         <Card>
-          <HStack gap="default" align="center">
-            {signedInEmail === undefined ? null : <AvatarBadge dataUri={avatarImage} email={signedInEmail} />}
-            <Text variant="row-title" grow>
+          <View
+            style={{
+              alignItems: 'center',
+              gap: tokens['space.2'],
+              paddingVertical: tokens['space.3'],
+            }}
+          >
+            {signedInEmail === undefined ? (
+              <View
+                style={{
+                  width: tokens['size.avatar-lg'],
+                  height: tokens['size.avatar-lg'],
+                  borderRadius: tokens['size.avatar-lg'] / 2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: tokens['color.surface-sunken'],
+                }}
+              >
+                <Icon name="tab.profile" size="lg" color={tokens['color.foreground-subtle']} />
+              </View>
+            ) : (
+              <AvatarBadge dataUri={avatarImage} email={signedInEmail} />
+            )}
+            <Text variant="row-title" style={{ textAlign: 'center' }}>
               {savedName ?? signedInEmail ?? t('mobile.profile.account.offline')}
             </Text>
-            <Icon name="action.disclose" size="sm" color={tokens['color.foreground-subtle']} />
-          </HStack>
-          {savedName && signedInEmail ? <Text variant="caption" tone="subtle">{signedInEmail}</Text> : null}
+            <Text variant="caption" tone="subtle" style={{ textAlign: 'center' }}>
+              {savedName && signedInEmail
+                ? signedInEmail
+                : accountHasCredential
+                  ? t('mobile.profile.account.signedInHint')
+                  : t('mobile.profile.account.signInHint')}
+            </Text>
+          </View>
         </Card>
       </Pressable>
       {/*
-        注册 / 登录（W3 · 规范 §3.1 的「前置」）。
-        🔴 保留为一枚**按钮**而不是一行入口：未登录时设置里那一组整块不渲染
-        （`account` 组要 `profileEditor` 才出现），所以这里是冷启动唯一的一击入口。
+        切换账号仍是一枚按钮（已登录时才有意义）—— 登录本身已经在上面那个头部的
+        点击里了，这里不再重复一枚「注册 / 登录」。
       */}
-      <Button
-        label={
-          accountHasCredential
-            ? t('mobile.profile.account.switchAccount')
-            : t('mobile.profile.account.signIn')
-        }
-        onPress={openAuth}
-        tone={accountHasCredential ? 'secondary' : 'primary'}
-      />
+      {accountHasCredential ? (
+        <Button label={t('mobile.profile.account.switchAccount')} onPress={openAuth} tone="secondary" />
+      ) : null}
       {/*
         🔴 这两条实话**必须**由常驻的本屏来说，而不是由「账号与安全」那屏：
         退出之后那屏就关掉了，而"服务器上那一枚还没撤成"恰恰是在那之后

@@ -3610,6 +3610,8 @@ export const en = {
   'mobile.profile.account.signedInHint': 'An access token is already in place. Sign in again to switch accounts or add another credential.',
   'mobile.profile.nickname.hint': 'Tap this row to change your nickname.',
   'mobile.profile.avatar.noChannel': 'This device cannot read images from local storage yet. Change your avatar on the web app for now; the same image will show up here.',
+  'mobile.profile.account.signInHint': 'Sign in to sync tasks across devices',
+  'mobile.profile.account.signedInHint': 'Signed in',
   'mobile.profile.account.offline': 'Not signed in',
   // The form moved into the Settings sheet: pointing "below" would send the user
   // hunting through Profile for something that is no longer there.
