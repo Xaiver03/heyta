@@ -859,9 +859,6 @@ export function AuthScreen({
                   disabled={busy}
                   loading={action === 'save'}
                 />
-                <Pressable accessibilityRole="button" onPress={onBack} testID="mobile-central-auth-back">
-                  <Text variant="caption" tone="primary">{t('mobile.auth.back')}</Text>
-                </Pressable>
               </View>
             </Card>
           ) : centralMode ? (
@@ -939,9 +936,6 @@ export function AuthScreen({
                     <Text variant="caption" tone="primary">{t('mobile.auth.selfHost.open')}</Text>
                   </Pressable>
                 ) : null}
-                <Pressable accessibilityRole="button" onPress={onBack}>
-                  <Text variant="caption" tone="primary">{t('mobile.auth.back')}</Text>
-                </Pressable>
               </View>
             </Card>
           ) : (
@@ -991,6 +985,24 @@ export function AuthScreen({
             />
           )}
         </Animated.View>
+
+        {/*
+          🔴 2026-11-15：**页级出口不放在卡片里。**
+
+          「返回」原来是各分支卡片里的最后一行，而且**三支各一份**（口令一步、统一身份、表单）。
+          它要离开的是**这一屏**，不是卡里的某个动作。放在卡里有三个后果：
+          · 它跟着卡片走，卡长了要滚到底才看得见；
+          · 三支各写一遍，改一处漏两处（这次就是：`AuthForm` 那支的返回在它自己的
+            组件里，另外两支各抄了一份）；
+          · 主色预算被它占掉一格 —— 这一屏已经有「服务条款」「隐私政策」「使用统一身份登录」
+            三处 `tone="primary"`，再加它就是四处，预算是 ≤2。
+
+          所以只留这一个，挂在三支之外；颜色降到 `muted`（它是一次**退路**，
+          不该和主按钮抢注意力）。
+        */}
+        <Pressable accessibilityRole="button" onPress={onBack} testID="mobile-central-auth-back">
+          <Text variant="caption" tone="muted">{t('mobile.auth.back')}</Text>
+        </Pressable>
       </ScrollView>
 
       {openLegalDocument !== null ? (() => {
