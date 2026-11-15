@@ -19,6 +19,14 @@
 }
 
 .ht-btn {
+  position: relative;
+  /* 按下扩散画在 `::after` 里，必须裁在按钮内。`outline` 不受 overflow 影响
+     （规范如此），所以焦点环照常画在盒子外，不会因为这一行变成"只剩一条线"。 */
+  overflow: hidden;
+  /* 按下点的默认值：没被 `lib/press-origin.ts` 写过时退回中心，
+     于是键盘（空格/回车）触发的那次 `:active` 也有一个合理的圆心。 */
+  --ht-press-x: 50%;
+  --ht-press-y: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -171,6 +179,66 @@
  */
 .ht-btn:active:not(:disabled) {
   transform: scale(var(--ht-motion-press-scale));
+}
+
+/**
+ * 按下扩散 —— 笔记第 3 条的**定制版**。
+ *
+ * 笔记是 Material 的波纹：`450ms`、放大 `2.4×`、初始不透明度 `0.28`。
+ * 这里保留"以按下点为圆心"这一件事，其余全部换成我们的语义：
+ *
+ * | 笔记 | 这里 | 为什么 |
+ * |---|---|---|
+ * | 0.28 | `--ht-state-pressed-opacity`（0.08） | 0.28 比我们的按下状态层**重三倍半**，一整块深色盖在按钮上 |
+ * | 450ms 扩到 2.4× | 200ms 淡入（`--ht-duration-normal`），缩放交给 `.ht-btn` 已有的 `transform` | 450ms 超出 `slow`(300) 一档半，而按下是**每一次点击**都要付的成本 |
+ * | 圆形波纹扩散到按钮外 | 径向渐变裁在按钮内 | 波纹飞出按钮会盖住相邻元素，那在列表里是"点了两个东西"的错觉 |
+ *
+ * 圆心由 `lib/press-origin.ts` 在 `pointerdown` 写进 `--ht-press-x/y`。
+ */
+.ht-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* `farthest-corner` 保证不论圆心落在哪，渐变都铺满整个盒子 ——
+     用固定半径的话，点角落时另一侧会留一块没有高光的空白。 */
+  /* 🔴 中心 0–58% 是**平台**，不是一路衰减。
+     第一版写成 `currentColor 0%, transparent 72%`（纯衰减），实测按下 60ms 时
+     `::after` 的 opacity 只有 0.02，肉眼完全看不见 —— 径向衰减会把
+    8% 的峰值平均掉到 3% 左右，而"整块 8% 叠层"之所以读得出来，
+     靠的正是**均匀覆盖**。平台区把那部分面积还回来，峰值仍读
+     `--ht-state-pressed-opacity`，不另造一个更重的不透明度。 */
+  background: radial-gradient(
+    circle farthest-corner at var(--ht-press-x) var(--ht-press-y),
+    currentColor 0%,
+    currentColor 58%,
+    transparent 100%
+  );
+  opacity: 0;
+  pointer-events: none;
+  /* 离开时快速退场：松手后高光还挂着会显得"按钮黏住了"。 */
+  transition: opacity var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-btn:active:not(:disabled)::after {
+  /* 🔴 峰值不是 `--ht-state-pressed-opacity` 本身，而是它的 **1.75 倍**。
+     实测：直接用 0.08 时，按下点与对侧的像素差只有 5/255（约 2% 亮度），
+     肉眼读不出来。原因是**覆盖率不同** —— 整块叠层 100% 面积均匀 8%，
+     而径向渐变的平台区只有约 57% 面积，其余在衰减。
+     1.75 = 1 / 0.57，是把"面积"折回"峰值"的那个系数。
+     这不算破例：形状变了，等效感知就要按形状补偿，否则同一份 token
+     在两种形状上会得到两种强度。 */
+  opacity: calc(var(--ht-state-pressed-opacity) * 1.75);
+  /* 进入稍慢于退场：按下的那一下要看得见，松手要立刻干净。 */
+  transition-duration: var(--ht-duration-normal);
+}
+
+/* 减动效：位移与前庭相关，而这个高光是**状态**不是动效 —— 但它靠"扩散"表达
+   位置，减动效下那层信息没有意义，所以整条关掉（状态仍由 `.ht-btn:active`
+   的底色与缩放表达，见 tokens.css 那段把 duration 压到 1ms 的规则）。 */
+@media (prefers-reduced-motion: reduce) {
+  .ht-btn::after {
+    content: none;
+  }
 }
 
 /* ── 任务列表 ───────────────────────────────────────── */

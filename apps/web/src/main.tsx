@@ -45,6 +45,7 @@ import { initOpLog } from './features/tasks/store.js';
 import { LocaleHost } from './lib/locale-host.js';
 import { ErrorBoundary } from './lib/error-boundary.js';
 import { installFatalErrorHooks } from './lib/fatal-hooks.js';
+import { installPressOrigin } from './lib/press-origin.js';
 import { eraseWebLocalData } from './lib/local-data-destruction.js';
 import { startupMode } from './lib/startup-mode.js';
 import { applyTheme, resolveInitialTheme } from './lib/theme.js';
@@ -130,6 +131,14 @@ if (container === null) {
  * 不往 `<html>` 加任何类 ⇒ 布局与移动端完全一致。
  */
 bootstrapDesktopChrome();
+
+/**
+ * 按下扩散的原点（`lib/press-origin.ts`）。
+ *
+ * 与 `bootstrapDesktopChrome` 同一条位置理由：四条渲染出口**共用**这一个装配点，
+ * 所以切片页（`?slice=1`）也会装上 —— 那正是它能被 Playwright 验到的原因。
+ */
+installPressOrigin();
 
 /**
  * 🔴 全局错误钩子必须**先于 createRoot** 装上（崩溃审计 U12 第 2 条 P0）。
