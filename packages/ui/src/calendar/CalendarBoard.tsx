@@ -748,7 +748,17 @@ export function CalendarBoard({
         {dayTasks.length === 0 && dayEvents.length === 0 ? (
           // 🔴 空态走**共享那一个实现**（`check:empty-state` 的判据 3：
           // 新的空态不许在视图里手写）。这里只是把宿主的文案转交进去。
-          <EmptyState title={labels.dayEmpty} testID={`${testID}-day-empty`} />
+          /*
+           * 🔴 2026-11-15：`size="line"` —— **空的那天不该占一张大卡**。
+           *
+           * 原来走默认档（`page`）：一张约 600px 高的白卡，中间一行字
+           * 「这一天没有到期的任务。」，把月历下面整屏都吃掉了。
+           * 而月历本身才是这一屏的主体 —— 空一天是**常态**，不是页面级空态。
+           *
+           * `line` 档就是为这一格准备的：一行辅助文字（`row-meta` + `foreground-subtle`），
+           * 不画图标、不画插画（`model.ts` 的注释写明"除 `page` 外不放图标"）。
+           */
+          <EmptyState size="line" title={labels.dayEmpty} testID={`${testID}-day-empty`} />
         ) : (
           <>
             {dayTasks.length === 0 ? null : (
