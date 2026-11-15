@@ -1715,10 +1715,20 @@ export function TasksScreen({
               pushTaskRoute();
               selection.select('task', id);
             }}
-            // 🔴 手势改派（§3.4）：非批量态 = 长按开**上下文菜单**；
-            //    进了批量态之后长按恢复成勾选/取消勾选（那条效率路径本身
-            //    搬进了菜单里的「多选」一项，见 `handleRowAction` 的 `select`）。
-            onLongPressTask={bulkSelecting ? toggleBulkSelection : openRowMenu}
+            /*
+             * 🔴 2026-11-15：四象限里**长按 = 移动到别的象限**（一步），不再是行菜单。
+             *
+             * 理由与手势分工：这一档里用户对一行的最高频意图就是"它该放哪一格"；
+             * 原来要「长按 → 菜单 → 移动到… → 选一格」三步，而 `⋯` 那枚
+             *（`renderQuadrantTrailing`）另外也是"移动"。长按直接进象限选择，
+             * 与滴答"拖到别的格子"是同一个意图，只是用点选代替拖动。
+             *
+             * ⚠️ 代价：四象限里没有行菜单了（删除/置顶等入口仍在列表视图）。
+             * 批量态下长按仍然是勾选/取消勾选，那条效率路径没有丢。
+             */
+            onLongPressTask={
+              bulkSelecting ? toggleBulkSelection : (id) => { setQuadrantMoveTaskId(id); }
+            }
             selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined}
             selectionMode={bulkSelecting}
           />
