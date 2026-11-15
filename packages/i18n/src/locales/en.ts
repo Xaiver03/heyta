@@ -5780,7 +5780,7 @@ export const en = {
   'mobile.share.space.shareableTitle': 'Lists you can share',
   'mobile.share.space.noneYet': 'Nothing has been shared from this device yet',
   'mobile.share.space.shareableEmpty': 'No lists available to share',
-  'mobile.share.space.bothEmpty': 'No shared lists yet. Use the button below to join a list someone shared with you.',
+  'mobile.share.space.bothEmpty': 'No shared lists yet.',
   'mobile.share.space.commentsTitle': 'Comments',
   'mobile.share.space.noTasks': 'No tasks in this shared list yet',
   'mobile.share.space.pickTask': 'Pick a task to view its comments',
