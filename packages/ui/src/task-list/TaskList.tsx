@@ -299,22 +299,9 @@ export function TaskList<TMeta = undefined>({
          * 列表只管行与行之间的节奏。
          */
         list: { gap: tokens[TASK_ROW_SHAPE.listGap] },
-        /**
-         * 🔴 2026-11-15：空态的上下留白**按密度分档**。
-         *
-         * 原来固定 `space.8`（32dp × 2 = 64dp）+ 一行字 ⇒ 实测一格空态约 **108dp**。
-         * 页面级列表里这个留白是对的（空态该占一块视觉重量），
-         * 但四象限的格子只有 1/4 屏，四格各吃 108dp，一屏只看得到两个半格
-         * —— 而那里每个格子都写同一句「这里还没有任务」。
-         *
-         * `compact` 是"格内"密度，空态跟着收紧到 `space.3`（12dp）。
-         */
-        empty: {
-          paddingVertical: density === 'compact' ? tokens['space.3'] : tokens['space.8'],
-          alignItems: 'center',
-        },
+        empty: { paddingVertical: tokens['space.8'], alignItems: 'center' },
       }),
-    [tokens, density],
+    [tokens],
   );
 
   const renderItem = useCallback(

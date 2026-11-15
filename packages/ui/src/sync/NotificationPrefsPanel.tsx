@@ -94,7 +94,19 @@ export function NotificationPrefsPanel(props: NotificationPrefsPanelProps) {
     <View testID="notification-prefs-panel">
       <Text style={text['section-title']}>{labels.sectionTitle}</Text>
 
-      <Text style={text['group-label']}>{labels.activitiesTitle}</Text>
+      {/*
+        🔴 2026-11-15：删掉这里那行 `labels.activitiesTitle`（「活动通知」）。
+
+        它与上面那行「共享通知」是**两个紧挨着的标题**，而且都渲染成粗体
+        （`section-title` / `group-label` 在 14–16sp 之间，视觉上几乎同权）——
+        真机上读者看到的是「共享通知 / 活动通知 / 三行开关」，
+        中间那层"子组"下面**只有一组**，分不出它分的是什么。
+
+        `group-label` 的用途是"同一张面板里多组单选时区分它们"。
+        这里只有 `activities` 一组，所以它是多余的一层。
+        （判据与 `SettingsScreen` 里那处 `ChoiceRows` 的注释同一条：
+        "外层 title 已经是「外观」，再给一条组标签就是同一句话说两遍"。）
+      */}
 
       {ACTIVITIES.map(({ kind, key }) => {
         const checked = isActivityEnabled(prefs, kind);
