@@ -4,19 +4,23 @@ import { describe, expect, it } from 'vitest';
 const source = readFileSync(new URL('../src/screens/ProfileProgressSummary.tsx', import.meta.url), 'utf8');
 
 describe('移动端个人中心的成长摘要', () => {
-  it('数值行使用共享的稳定 key，避免 value 行回落到重复的 kind', () => {
-    expect(source).toContain('settingsRowKey');
-    expect(source).toMatch(/rows\.map\(\(row, index\) =>/u);
-    expect(source).toMatch(/key=\{settingsRowKey\(row, index\)\}/u);
-    expect(source).not.toContain('key={row.testID ?? row.kind}');
+  it('三格横排，每格用 testID 作 key', () => {
+    /**
+     * 🔴 2026-11-15 结构变了：竖排三行 `SettingsRow` → 横排三格（照滴答的数据概览）。
+     * 原来这两条断言钉的是 `settingsRowKey` 那条"稳定 key"规矩 ——
+     * 那是**为了避免 value 行回落到重复的 kind**，而横排三格已经不用 `SettingsRow`，
+     * 那个问题不存在了。现在钉的是"每格有唯一 testID 作 key"。
+     */
+    expect(source).toMatch(/cells\.map\(\(cell\) =>/u);
+    expect(source).toMatch(/key=\{cell\.testID\}/u);
   });
 
   it('摘要只投影共享的本周回顾与里程碑事实源', () => {
     expect(source).toMatch(/weeklyReviewFromState\(tables, now\)/u);
     expect(source).toMatch(/milestonesFromState\(tables\)/u);
-    expect(source).toContain("valueTestID: 'profile-progress-tasks'");
-    expect(source).toContain("valueTestID: 'profile-progress-focus'");
-    expect(source).toContain("valueTestID: 'profile-progress-achievements'");
+    /* 锚点全部保留（三条 `verify-mobile-*` 靠它们定位），只是从 `valueTestID` 改成 `testID`。 */
+    expect(source).toContain("testID: 'profile-progress-tasks'");
+    expect(source).toContain("testID: 'profile-progress-focus'");
     expect(source).toContain("testID: 'profile-progress-growth'");
   });
 

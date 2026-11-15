@@ -8,14 +8,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useI18n } from '@heyta/i18n';
 import { milestonesFromState, weeklyReviewFromState, type MotivationTables } from '@heyta/app-host';
-import { SettingsRow, settingsRowKey, type SettingsRowModel } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { onLocalWrite } from '../sync/write-signal';
 import { SPACING_ROLE } from '@heyta/design-system';
-import { Button, Card, SectionHeader, Stack, Text } from '../ui/kit';
+import { Pressable } from 'react-native';
+import { Button, Card, HStack, SectionHeader, Stack, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { useTokens } from '../theme';
 
@@ -86,33 +86,35 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
     );
   }
 
-  const rows: readonly SettingsRowModel[] = [
+  /**
+   * 🔴 2026-11-15：**竖排三行 → 横排三格**（照滴答清单的数据概览）。
+   *
+   * 原来三条是 `SettingsRow`（每行 56dp 高，标签在左、数字在右），
+   * 三条占 170dp，而用户真正想看的只是三个数字。
+   * 滴答的「我的」页是**横排三格**：数字在上（大）、标签在下（小），整块约 80dp。
+   *
+   * 锚点全部保留（`profile-progress-tasks` / `-focus` / `-growth`）——
+   * `verify-mobile-*` 与三条源码判据靠它们定位。
+   */
+  const cells: readonly {
+    label: string;
+    value: string;
+    testID: string;
+    onPress?: () => void;
+  }[] = [
     {
-      kind: 'value',
       label: t('mobile.profile.progress.tasks'),
       value: String(snapshot.week.tasksCompleted),
-      valueTestID: 'profile-progress-tasks',
+      testID: 'profile-progress-tasks',
     },
     {
-      kind: 'value',
       label: t('mobile.profile.progress.focus'),
       value: String(snapshot.week.focusMinutes),
-      valueTestID: 'profile-progress-focus',
+      testID: 'profile-progress-focus',
     },
-    /*
-      🔴 2026-10-27（IA 迁移的第 2 批：12 → 11 行）：**成就那一行自己就是成长入口**。
-      原来它下面还有一行「查看完整成长」，两行去同一张屏 —— 那是 §3.1 说的重复入口。
-      现在把跳转挂在成就行上（`kind: 'action'` + 值仍然显示），少一行、功能不减。
-    */
     {
-      // `kind: 'value'` 本身就支持 `onPress`（见 `SettingsValueRow`）——
-      // 于是"读数"和"进成长"合在一行，不必再多一行「查看完整成长」。
-      kind: 'value',
       label: t('mobile.profile.progress.achievements'),
       value: `${String(snapshot.reached)}/${String(snapshot.total)}`,
-      valueTestID: 'profile-progress-achievements',
-      // ⚠️ 锚点必须留在**这一行**上：`verify-mobile-*` 与 3 条源码判据都用它
-      //    定位"成长入口"，换成别的 id 等于把它们的输入悄悄抽掉。
       testID: 'profile-progress-growth',
       onPress: onOpenGrowth,
     },
@@ -133,9 +135,22 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
       <View style={{ gap: tokens[SPACING_ROLE['label-to-control']] }}>
         <SectionHeader title={t('mobile.profile.section.progress')} />
         <Card>
-        {rows.map((row, index) => (
-          <SettingsRow key={settingsRowKey(row, index)} row={row} />
-        ))}
+        <HStack gap="default">
+          {cells.map((cell) => (
+            <Pressable
+              key={cell.testID}
+              testID={cell.testID}
+              onPress={cell.onPress}
+              accessibilityRole={cell.onPress === undefined ? 'summary' : 'button'}
+              style={{ flex: 1, alignItems: 'center' }}
+            >
+              <Text variant="headline">{cell.value}</Text>
+              <Text variant="caption" tone="subtle">
+                {cell.label}
+              </Text>
+            </Pressable>
+          ))}
+        </HStack>
         {readState === 'error' ? (
           <Stack>
             <Text variant="caption" tone="subtle">

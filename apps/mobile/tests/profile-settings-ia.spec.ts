@@ -191,11 +191,15 @@ describe('移动端个人中心与设置的 IA 接线', () => {
       expect(home, `首屏少了 ${row} 那一行`).toContain(`<SettingsRow row={${row}} />`);
     }
 
-    // 另外 3 行由 `ProfileProgressSummary` 画（本周任务 / 专注 / 成就+成长入口）。
+    /**
+     * 🔴 2026-11-15：近期状态由「竖排三行 `SettingsRow`」改成「横排三格」。
+     * 所以这里不再数 `kind: 'value'`（那三行已经不存在了），改数 `cells` 里的三格。
+     * 三个指标本身没变：本周任务 / 专注 / 成就+成长入口。
+     */
     const progress = stripComments(
       readFileSync(new URL('../src/screens/ProfileProgressSummary.tsx', import.meta.url), 'utf8'),
     );
-    expect(progress.match(/kind: 'value'/g), '近期状态卡的值行不再是 3 行').toHaveLength(3);
+    expect(progress.match(/testID: 'profile-progress-(tasks|focus|growth)'/g), '近期状态的三格变了').toHaveLength(3);
     // 成就不再是纯读数：它必须能进成长页（否则成长入口就没了）。
     // 从"成就那一行的标签"往后找 onPress：整张卡里第一个 `kind: 'value'` 是本周任务，
     // 拿它当起点会把距离拉到 200 字以外（那会让这条判据在**正确**的实现上假红）。
