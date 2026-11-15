@@ -3713,7 +3713,16 @@ export const zhCN = {
   // 用户要看的是"还剩几件"，而 `check:ui-language` 也拒绝一条不含汉字的中文词条
   // —— 那种形状通常是"拿别的语言占位"漏进来的，这里不借那个豁免。
   'mobile.detail.subtasks.progress': '已完成 {done}/{total}',
-  'mobile.detail.subtasks.empty': '还没有子任务，点下面的「添加子任务」建一条。',
+  /*
+   * 🔴 2026-11-15：去掉后半句的操作指导。
+   *
+   * 原文「还没有子任务，点下面的「添加子任务」建一条。」——
+   * 「添加子任务」按钮**就在这句下面**，读者看得见。
+   *
+   * 与「日历」「四象限」「共享清单」「清单/标签」空态同一条判据：
+   * 空态只说"现在是空的"，不教用户怎么看界面。
+   */
+  'mobile.detail.subtasks.empty': '还没有子任务。',
   'mobile.detail.subtasks.add': '添加子任务',
   'mobile.detail.subtasks.newPlaceholder': '子任务标题',
   // 行体的无障碍名要说清"点它会怎样"：面板语境里它不是"打开详情"，
@@ -3835,7 +3844,8 @@ export const zhCN = {
   // 指向一个本页已经不缺的入口，等于把用户支走到另一屏去办本页能办的事。
   // 按钮文案复用 `mobile.tags.add`（那句「新建标签」在「我的」页也在用，
   // 两处同一个名字才不会出现"同一件事两个叫法"）。
-  'mobile.detail.tags.empty': '还没有标签，点下面的「新建标签」建一个。',
+  /* 🔴 2026-11-15：同 `subtasks.empty` —— 去掉操作指导，按钮就在这句下面。 */
+  'mobile.detail.tags.empty': '还没有标签。',
   'mobile.detail.important.on': '标记为重要',
   'mobile.detail.important.off': '取消重要',
   'mobile.detail.markIncomplete': '标记为未完成',

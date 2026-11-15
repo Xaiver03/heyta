@@ -1316,3 +1316,71 @@ apps/mobile      1355 passed (1355)
 
 **判据**：用 `keyevent 4` 返回之前，先确认当前页之下还有一层（任一子页都行）；
 对 tab 根页用返回键等于退出 App。
+
+---
+
+## 三十、把「形态」抽象成产品层级（2026-11-15，接产品负责人指令）
+
+### 指令
+
+> 「做这个事情的时候，你需要并行把产品层级的东西抽象出来。它不仅适用于 iPad，
+> 其他移动端也可能适配，甚至 macOS 端、Windows 端也可能适配。」
+
+### 我上一轮犯的错
+
+改四象限时，我给 `QuadrantScreen` **写死了 `twoColumns`**。
+
+那不是规则，是硬编码：**iPad、macOS、Windows 上同一个视图该几列，没有任何一处说了算**，
+每加一个端就要再抄一遍判断，而且各端会漂。
+
+### 抽象出来的东西
+
+**`packages/ui/src/layout/form-factor.ts`** —— 一套判断，四端共用。
+
+| 导出 | 作用 |
+|---|---|
+| `COLUMN_BASE_WIDTH = 360` | 一列内容的**可读**基准宽（取手机竖屏视口） |
+| `formFactorOf(width)` | 由可用宽推出形态档：`compact` / `regular` / `expanded` |
+| `maxColumnsOf(档)` | 该档最多几列（这是**上限**，视图仍可自己收窄） |
+| `TWO_COLUMN_MIN_WIDTH = 300` | 两块并排还读不读得出字的下限 |
+| `canPairColumns(width)` | 这块宽度够不够并排两列 |
+
+### 两条判据（这才是"抽象"的实质）
+
+**① 不比"窗口多宽"，比"能放下几列基准宽"。**
+
+像素断点（`min-width: 768px`）在不同设备上是不同的物理尺度 ——
+手机横屏 768、iPad 竖屏 768、Mac 窗口 768 是三件不同的事。按列数比就统一了。
+
+**② 两种判断不能混用。**
+
+- `formFactorOf` 回答"**这个端是什么档**"—— 通用，用于设置页、列表这类"宽了就多排"的视图。
+- `canPairColumns` 回答"**这块够不够并排两块**"—— 用于四象限这种**默认就该并排**的视图。
+
+四象限用前者会退回单列（`compact` 档 → 1 列），那是错的：
+艾森豪威尔矩阵**默认就是 2×2**，判断应该是"窄到读不出字才退回单列"，不是"宽了才并排"。
+
+### 各端怎么接（统一形状）
+
+```ts
+const [availableWidth, setAvailableWidth] = useState(0);
+<View onLayout={(e) => setAvailableWidth(e.nativeEvent.layout.width)}>
+  <SomeBoard wide={canPairColumns(availableWidth)} />
+</View>
+```
+
+- **移动端**：`onLayout`（RN 通用，iOS/Android 都行）
+- **web / 桌面**：容器 `clientWidth` → ResizeObserver，喂同一个函数
+- 🔴 **不要传 `Dimensions.get('window').width`** —— 那是物理屏宽，桌面上永远"够大"，
+  本项目实测过（`QuadrantBoard.tsx` props 注释里有那次读数）
+
+### 已经接上的 / 还没接的
+
+| 视图 | 状态 |
+|---|---|
+| 四象限 | ✅ 已接 `canPairColumns` + `onLayout` |
+| 日历月格 / 年视图 | ⏸ 有自己的列数推算（`CalendarYearBoard` 按侧栏最小宽算），**没有走这套** |
+| 设置页、清单列表 | ⏸ 目前单列，多端适配时接 `formFactorOf` |
+
+**这套抽象只有"有第二个视图真的用它"时才算立住。** 现在只有一个使用者，
+所以它目前的价值是**规则被写下来、可被下一端复用**，不是"已经解决了多端适配"。

@@ -157,9 +157,16 @@ describe('详情面板的子任务区（就地新建 / 列表 / 计数）', () =
     );
   });
 
-  it('🔴 空态文案里「」点名的那个按钮，真的就叫那个名字', () => {
-    // 「点下面的『新建标签』」而按钮写着别的字，是**只有真机才会暴露**的缺陷：
-    // 读屏用户与看界面的人拿到两个不同的指路，而类型检查与样式门禁都不会红。
+  it('🔴 空态文案不指路；若指路，「」点名的按钮必须真的叫那个名字', () => {
+    /*
+     * 🔴 2026-11-15：这个断言原来**要求**两条空态文案里必须出现「…」指路的按钮名。
+     *
+     * 现在两处都不指路了（按钮就在空态下面，读者看得见）—— 判据因此反过来：
+     * **允许不指路；一旦指路，点到的名字必须与真实按钮一致。**
+     *
+     * 它防的缺陷没变：文案说「点下面的『X』」而按钮写着别的字，只有真机才暴露，
+     * 类型检查与样式门禁都不会红。
+     */
     const zh = readFileSync(join(REPO, 'packages/i18n/src/locales/zh-CN.ts'), 'utf8');
     const value = (key: string): string =>
       new RegExp(`'${key}':\\s*'([^']*)'`).exec(zh)?.[1] ?? '';
@@ -169,11 +176,8 @@ describe('详情面板的子任务区（就地新建 / 列表 / 计数）', () =
       ['mobile.detail.subtasks.empty', 'mobile.detail.subtasks.add'],
     ] as const) {
       const named = /「([^」]+)」/.exec(value(emptyKey))?.[1];
-      expect(named, `${emptyKey} 里没有「…」这句指路`).toBeDefined();
-      expect(value(buttonKey), `${buttonKey} 缺失`).not.toBe('');
-      expect(named, `${emptyKey} 指的名字与按钮文案「${value(buttonKey)}」不同名`).toBe(
-        value(buttonKey),
-      );
+      if (named === undefined) continue; // 不指路 —— 允许
+      expect(named, `${emptyKey} 指的按钮名与 ${buttonKey} 不一致`).toBe(value(buttonKey));
     }
   });
 

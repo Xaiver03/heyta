@@ -476,6 +476,21 @@ export {
   type QuadrantColorToken,
 } from './quadrant/model.js';
 
+/*
+ * ── 产品层级：形态档（form factor）─────────────────────────────
+ *
+ * 一套判断，四个端共用：各端只报**可用宽度**，档位与列数由规则推导。
+ * 由头与实测见 `./layout/form-factor.js` 的文件头注释。
+ */
+export {
+  canPairColumns,
+  COLUMN_BASE_WIDTH,
+  formFactorOf,
+  maxColumnsOf,
+  TWO_COLUMN_MIN_WIDTH,
+  type FormFactor,
+} from './layout/form-factor.js';
+
 /**
  * ── M3 §4.2 补缺：**`TaskRow` 的 `density` 档位**（本轮新增） ──
  *

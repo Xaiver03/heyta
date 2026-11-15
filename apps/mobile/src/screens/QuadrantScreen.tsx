@@ -56,10 +56,16 @@
  * 该脚本的 `PROVIDER_DEPENDENT` 里），拆掉根 Provider 会真的红。
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { View, type LayoutChangeEvent } from 'react-native';
 import type { Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { QuadrantBoard, type TaskListLabels, type TaskRow as SharedTaskRow } from '@heyta/ui';
+import {
+  canPairColumns,
+  QuadrantBoard,
+  type TaskListLabels,
+  type TaskRow as SharedTaskRow,
+} from '@heyta/ui';
 
 import { quadrantBoardLabels } from '../lib/quadrant-display';
 
@@ -105,26 +111,39 @@ export function QuadrantScreen({
   selectionMode = false,
   activeTaskId,
 }: QuadrantScreenProps): React.JSX.Element {
+  /*
+   * 🔴 2026-11-15：**报可用宽度，不猜设备。**
+   *
+   * `onLayout` 给的是这一块实际拿到的宽（已扣掉安全区与父容器 padding），
+   * 所以同一份代码在手机、iPad 分屏、Mac 窗口上都拿得到真值。
+   * 不用 `Dimensions.get('window')` —— 那是物理屏宽，桌面上永远"够大"（本项目实测过）。
+   */
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const twoColumns = canPairColumns(availableWidth);
+
   const { t } = useI18n();
   const boardLabels = useMemo(() => quadrantBoardLabels(t), [t]);
 
   return (
-    <QuadrantBoard
+    <View
+      style={{ flex: 1 }}
+      onLayout={(e: LayoutChangeEvent) => {
+        setAvailableWidth(e.nativeEvent.layout.width);
+      }}
+    >
+      <QuadrantBoard
       /*
-       * 🔴 2026-11-15：**手机上也要 2×2，不是单列。**
+       * 🔴 2026-11-15：**四象限的列数由「形态档」推导，不是各端写死。**
        *
        * 产品负责人原话：「四象限是不是像坐标系一样的感觉？你为什么没有弄成那样子呢？」
+       * 他同时指出：**这套东西不该只服务手机** —— iPad、macOS、Windows 都要用同一套判断。
        *
-       * 他说得对。原来这里没传 `twoColumns`，默认单列 —— 四个象限竖着排，
-       * 读起来像"四个列表"，而不是"重要 × 紧急 两条轴切出来的四块"。
-       * **艾森豪威尔矩阵的全部意义就在四个格子并置对比**；拆成一列，
-       * 对比关系就没了，退化成一个分了四段的待办列表。
-       *
-       * 360dp 宽两列，每格约 165dp —— 「马上做」+「重要且紧急」两行字放得下。
-       * 这顺带也让每格高度减半，之前反复调不动的"格子太高"一并解决：
-       * 那不是高度问题，是**形态**问题。
+       * 所以这里不写 `twoColumns` 常量，而是报"我这块可用多宽"，
+       * 由 `formFactorOf` 推导档位：任何端只要报宽度，就自动拿到对的一档。
+       * 手机上 360dp 落在 `compact`，正好两列；窄窗口 300dp 会退回单列
+       * （宁可不并置，也不让格子挤成 150dp 以下读不出字）。
        */
-      twoColumns
+      twoColumns={twoColumns}
       tasks={tasks}
       now={now}
       labels={boardLabels}
@@ -139,6 +158,7 @@ export function QuadrantScreen({
       renderTrailing={renderTrailing}
       busyTaskId={busyTaskId}
       testID="quadrant-board"
-    />
+      />
+    </View>
   );
 }

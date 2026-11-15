@@ -3388,7 +3388,7 @@ export const en = {
   // 与 zh 同一批：子任务属于**内容层**（常驻可见），不是折叠层里的一列配置。
   'mobile.detail.field.subtasks': 'Subtasks',
   'mobile.detail.subtasks.progress': 'Done {done}/{total}',
-  'mobile.detail.subtasks.empty': 'No subtasks yet — add one below.',
+  'mobile.detail.subtasks.empty': 'No subtasks yet.',
   'mobile.detail.subtasks.add': 'Add subtask',
   'mobile.detail.subtasks.newPlaceholder': 'Subtask title',
   'mobile.detail.subtasks.open': 'Open subtask “{title}”',
@@ -3474,7 +3474,7 @@ export const en = {
   'mobile.tags.remove': 'Delete tag "{name}"',
   'mobile.detail.field.tags': 'Tags',
   // 与 zh 同一条更正：这一屏现在能就地建标签，指路要指着界面上真的那个按钮。
-  'mobile.detail.tags.empty': 'No tags yet — create one below.',
+  'mobile.detail.tags.empty': 'No tags yet.',
   'mobile.detail.important.on': 'Mark as important',
   'mobile.detail.important.off': 'Remove important',
   'mobile.detail.markIncomplete': 'Mark as not done',
