@@ -53,6 +53,7 @@ import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { Habit, HabitIcon, HabitLog } from '@heyta/domain';
 import { habitIconOf, parseCategorySlot } from '@heyta/domain';
 import { Check, Flame, TrendingUp } from 'lucide';
+import { EmptyState } from '../empty-state/EmptyState.js';
 import { categorySlotToken } from '../categories/model.js';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
@@ -251,10 +252,20 @@ export function HabitProgressList({
   // 就找不到这一列。
   if (rows.length === 0) {
     return (
+      /*
+       * 🔴 2026-11-15：**手写的那行灰字换成共享 `EmptyState`。**
+       *
+       * 原来自已画了一个 `<Text caption muted>`，而本文件自己的注释
+       * （`:137-139`）就写着「"没有习惯"这句话**不许**在视图里手写 ——
+       * 共享层渲染它，宿主只给文案」，并引了 `check-empty-state` 断言 B。
+       *
+       * 也就是说：**判据写在这里，实现没照做，而门禁没抓到**。
+       * 真机上这一行是卡片外的孤立灰字，与全站其它空态（居中、有图标档位）不是一套。
+       *
+       * 用 `size="line"`：这一列空的时候只是一行说明，不该占一张大卡。
+       */
       <View testID={testID} accessible accessibilityLabel={labels.list}>
-        <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
-          {labels.empty}
-        </Text>
+        <EmptyState size="line" title={labels.empty} />
       </View>
     );
   }
