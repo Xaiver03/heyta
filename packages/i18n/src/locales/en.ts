@@ -2660,7 +2660,7 @@ export const en = {
   'web.subscription.renew.fail.network': 'Could not reach the server; the order was not created.',
   'web.subscription.renew.fail.unknown': 'Order failed ({code}).',
   'mobile.settings.section.subscription': 'Subscription',
-  'mobile.subscription.lead': 'Hosted sync: current status, plan choice and checkout. Self-hosting the app itself stays free.',
+  'mobile.subscription.lead': 'The app itself is free forever when self-hosted.',
   'mobile.subscription.plans.hint': 'One-time purchase of 30 days, stacked after your current end date. No automatic charging.',
   'mobile.subscription.footnote': 'A subscription only pays for us running the sync server. Expiring deletes nothing: tasks, lists and settings stay on this device.',
   'mobile.subscription.renew.subscribe': 'Subscribe to this plan',
