@@ -421,7 +421,20 @@ export function QuadrantBoard({
                     busyTaskId={busyTaskId}
                     fallbackTitle={fallbackTitle}
                     density="compact"
-                    emptyMessage={labels.empty(card.quadrant)}
+                    /*
+                     * 🔴 2026-11-15：**空格子不画那句「这里还没有任务」**。
+                     *
+                     * 四个象限空着时，同一句话会在四张卡里各写一遍，每遍占一格
+                     * 约 108dp —— 一屏只看得见两格半。而格子的标题
+                     * （「马上做 / 重要且紧急」）已经说清这一格是什么、里面有没有东西
+                     * 是"看得到的"——空着就是空着，不需要四行一样的字去说明。
+                     *
+                     * 这是这一屏真正的解法：前面我试过改 `minHeight`、改 `flexGrow`
+                     * （三层）、改 `empty` 的 padding，**全都没动** —— 因为撑高的是
+                     * `TaskList` 内部那个带 `flex: 1` 的容器。去掉文本，那一层就没有内容
+                     * 可撑，格子回到标题行的高度。
+                     */
+                    emptyMessage={undefined}
                   />
                 </View>
 
