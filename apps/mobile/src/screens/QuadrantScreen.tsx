@@ -56,9 +56,9 @@
  * 该脚本的 `PROVIDER_DEPENDENT` 里），拆掉根 Provider 会真的红。
  */
 
-import React, { useMemo, useState } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
-import type { Task } from '@heyta/domain';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { PanResponder, Pressable, View, type LayoutChangeEvent } from 'react-native';
+import { Quadrant, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   canPairColumns,
@@ -68,6 +68,8 @@ import {
 } from '@heyta/ui';
 
 import { quadrantBoardLabels } from '../lib/quadrant-display';
+import { Icon } from '../ui/icons';
+import { useTokens } from '../theme';
 
 export interface QuadrantScreenProps {
   /** 全部任务。已完成 / 已删除由领域层分桶时排除，这里不再判一次。 */
@@ -91,6 +93,13 @@ export interface QuadrantScreenProps {
   readonly onOpenTask: (taskId: string) => void;
   /** 与任务列表相同的长按批量选择快捷入口。 */
   readonly onLongPressTask?: (taskId: string) => void;
+  /**
+   * 拖拽落点（拖行尾握把到某一格）。与「长按 → 弹层选一格」走同一个 action。
+   * 不给时行尾不挂拖拽握把。
+   */
+  readonly onDropTask?: (taskId: string, target: Quadrant) => void;
+  /** 点握把本身 = 打开「移动到其他象限」弹层（不给时握把不可点）。 */
+  readonly onOpenMoveMenu?: (taskId: string) => void;
   readonly selectedTaskIds?: ReadonlySet<string>;
   readonly selectionMode?: boolean;
   /** 选中的那一条 ⇒ 高亮。传的是宿主的**全局选中**，不是本屏自己记的 id。 */
@@ -107,6 +116,8 @@ export function QuadrantScreen({
   onToggleTask,
   onOpenTask,
   onLongPressTask,
+  onDropTask,
+  onOpenMoveMenu,
   selectedTaskIds,
   selectionMode = false,
   activeTaskId,
@@ -128,16 +139,83 @@ export function QuadrantScreen({
    */
   const [availableHeight, setAvailableHeight] = useState(0);
   const twoColumns = canPairColumns(availableWidth);
+  const tokens = useTokens();
+
+  /**
+   * 🔴 2026-11-15：**真拖拽**（按住行尾握把拖到别的格子）。
+   *
+   * 两次尝试的结论：
+   *   1. 把 `panHandlers` 挂在包住 `⋯` 的普通 View 上 —— 真机**拖不动**：
+   *      `IconButton` 的 `Pressable` 先拿到了 responder，移动事件不再上浮。
+   *   2. 改成 `onStartShouldSetPanResponderCapture`（捕获阶段抢先）：
+   *      握把在手势一开始就归我们，**点击与拖动由此分工** ——
+   *      没位移就松手 = 点（自己调 `onOpenMoveMenu`），位移过 `space.3` = 拖。
+   *
+   * 这就是为什么握把不直接用 `IconButton`：它必须是"能被 capture 的容器 + 自己判点击"。
+   */
+  const boardRef = useRef<View>(null);
+  const boardRect = useRef({ x: 0, y: 0, width: 0, height: 0 });
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [hover, setHover] = useState<Quadrant | null>(null);
+
+  const measureBoard = useCallback(() => {
+    boardRef.current?.measureInWindow((x, y, width, height) => {
+      boardRect.current = { x, y, width, height };
+    });
+  }, []);
+
+  const quadrantAt = useCallback((px: number, py: number): Quadrant | null => {
+    const r = boardRect.current;
+    if (r.width <= 0 || r.height <= 0) return null;
+    if (px < r.x || px > r.x + r.width || py < r.y || py > r.y + r.height) return null;
+    const right = px > r.x + r.width / 2;
+    const bottom = py > r.y + r.height / 2;
+    if (!right && !bottom) return Quadrant.UrgentImportant;
+    if (right && !bottom) return Quadrant.ImportantNotUrgent;
+    if (!right && bottom) return Quadrant.UrgentNotImportant;
+    return Quadrant.Neither;
+  }, []);
+
+  const handleFor = useCallback(
+    (taskId: string) =>
+      PanResponder.create({
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
+        onPanResponderGrant: () => {
+          measureBoard();
+          setDraggingTaskId(taskId);
+        },
+        onPanResponderMove: (_e, g) => {
+          if (Math.abs(g.dx) + Math.abs(g.dy) <= tokens['space.3']) return;
+          setHover(quadrantAt(g.moveX, g.moveY));
+        },
+        onPanResponderRelease: (_e, g) => {
+          const moved = Math.abs(g.dx) + Math.abs(g.dy) > tokens['space.3'];
+          const target = quadrantAt(g.moveX, g.moveY);
+          if (!moved) onOpenMoveMenu?.(taskId);
+          else if (target !== null) onDropTask?.(taskId, target);
+          setDraggingTaskId(null);
+          setHover(null);
+        },
+        onPanResponderTerminate: () => {
+          setDraggingTaskId(null);
+          setHover(null);
+        },
+      }).panHandlers,
+    [measureBoard, onDropTask, onOpenMoveMenu, quadrantAt, tokens],
+  );
 
   const { t } = useI18n();
   const boardLabels = useMemo(() => quadrantBoardLabels(t), [t]);
 
   return (
     <View
+      ref={boardRef}
       style={{ flex: 1 }}
       onLayout={(e: LayoutChangeEvent) => {
         setAvailableWidth(e.nativeEvent.layout.width);
         setAvailableHeight(e.nativeEvent.layout.height);
+        measureBoard();
       }}
     >
       <QuadrantBoard
@@ -165,7 +243,28 @@ export function QuadrantScreen({
       activeTaskId={activeTaskId}
       taskLabels={labels}
       renderMeta={renderMeta}
-      renderTrailing={renderTrailing}
+      {...(hover === null ? {} : { highlightedQuadrant: hover })}
+      renderTrailing={
+        onDropTask === undefined || onOpenMoveMenu === undefined
+          ? renderTrailing
+          : (row) => (
+              <View
+                {...handleFor(row.id)}
+                style={{
+                  minWidth: tokens['touch-target.min'],
+                  minHeight: tokens['touch-target.min'],
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: draggingTaskId === row.id ? tokens['state.disabled-opacity'] : 1,
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('web.quadrant.moveTask', { title: row.title })}
+                testID={`quadrant-drag-handle-${row.id}`}
+              >
+                <Icon name="action.more" size="sm" color={tokens['color.foreground-subtle']} />
+              </View>
+            )
+      }
       busyTaskId={busyTaskId}
       testID="quadrant-board"
       />

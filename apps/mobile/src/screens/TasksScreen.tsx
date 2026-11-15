@@ -1744,6 +1744,17 @@ export function TasksScreen({
             onLongPressTask={
               bulkSelecting ? toggleBulkSelection : (id) => { setQuadrantMoveTaskId(id); }
             }
+            /*
+             * 真拖拽：按住行尾握把拖到某一格。与「长按 → 弹层选一格」共用
+             * `performQuadrantMove`（撤销回执、错误文案、忙态都在那一处），
+             * 所以这是同一条写入路径的两种输入方式。
+             */
+            onDropTask={
+              bulkSelecting ? undefined : (id, target) => { void performQuadrantMove(id, target); }
+            }
+            onOpenMoveMenu={
+              bulkSelecting ? undefined : (id) => { setQuadrantMoveTaskId(id); }
+            }
             selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined}
             selectionMode={bulkSelecting}
           />
