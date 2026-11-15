@@ -211,6 +211,17 @@ interface TaskListSharedProps {
    * 就是卡套卡（与"列表不自带水平内边距"同一个道理）。
    */
   readonly listCard?: boolean;
+  /**
+   * 滚动位置回调（可选）。宿主用它驱动"顶栏随滚动收起"。
+   *
+   * 🔴 为什么要这一个口：任务列表的滚动宿主是 `FlatList` **自己**
+   *（`TasksScreen` 在列表档传 `scroll={false}`，`Screen` 的 ScrollView 根本没参与），
+   * 所以 `Screen` 那套"监听自己的滚动"在这里永远收不到事件 ——
+   * 顶栏在任务列表上永远不会收起（真机反复验证过）。
+   *
+   * 只回吐 offset，不在这里判断方向/阈值：那是宿主的外壳策略。
+   */
+  readonly onScrollOffset?: (offsetY: number) => void;
 }
 
 /** 平铺形态：一批任务，**共享层负责排序**。 */
@@ -268,6 +279,7 @@ export function TaskList<TMeta = undefined>({
   renderRowWrapper,
   iconColorOf,
   listCard = false,
+  onScrollOffset,
 }: TaskListProps<TMeta>): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -398,6 +410,14 @@ export function TaskList<TMeta = undefined>({
       ListHeaderComponent={listHeaderComponent}
       ListEmptyComponent={emptyComponent ?? empty}
       contentContainerStyle={styles.list}
+      {...(onScrollOffset === undefined
+        ? {}
+        : {
+            onScroll: (e) => {
+              onScrollOffset(e.nativeEvent.contentOffset.y);
+            },
+            scrollEventThrottle: 16,
+          })}
       testID={testID}
     />
   );

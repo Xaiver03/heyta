@@ -312,6 +312,7 @@ export function Screen({
   fixedControls,
   bottomInset = true,
   chrome = 'page',
+  barCollapsed,
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
@@ -339,6 +340,11 @@ export function Screen({
    * 判据：`pnpm check:nav-chrome` 会按这一档校验"顶栏动作是否超过预算"。
    */
   chrome?: 'page' | 'board' | 'immersive';
+  /**
+   * 顶栏是否收起（**受控**）。宿主自己监听滚动时（如 `FlatList` 屏）传这一格，
+   * 内部那条 `onScroll` 就不再生效 —— 两条同时驱动会让栏在两帧之间来回跳。
+   */
+  barCollapsed?: boolean;
 }): React.JSX.Element {
   const t = useTokens();
 
@@ -366,7 +372,16 @@ export function Screen({
    * 所以：除 `immersive`（它本来就不画栏）外，凡是有 `scroll`、且没有常驻控件
    *（`fixedControls`，如批量选择条）的屏都接这条。
    */
-  const collapses = chrome !== 'immersive' && fixedControls === undefined && scroll;
+  /**
+   * 🔴 三档 chrome 只决定默认行为；**宿主受控时（`barCollapsed !== undefined`）一律接**。
+   *
+   * 列表档是 `scroll={false}`（滚动宿主是 `FlatList`），若还按 `scroll` 判，
+   * `collapses` 恒为 false ⇒ 顶栏的高度包装根本不渲染 ⇒ 宿主怎么传都收不起来
+   *（真机验证过：列表滚了、栏没动）。
+   */
+  const collapses =
+    barCollapsed !== undefined ||
+    (chrome !== 'immersive' && fixedControls === undefined && scroll);
   /**
    * 🔴 顶栏的出现时机：滚过一段收起、往回滚立刻回来。
    *
@@ -378,7 +393,8 @@ export function Screen({
    * 判据仍是三条：位移过 `space.3` 才算"在滚"、已离开顶部过 `space.3` 才收、
    * 回到顶部无条件展开（滚到顶还藏着栏就是丢导航）。
    */
-  const [barHidden, setBarHidden] = React.useState(false);
+  const [barHiddenState, setBarHidden] = React.useState(false);
+  const barHidden = barCollapsed ?? barHiddenState;
   const lastY = useRef(0);
   const onScrollY = useCallback(
     (y: number) => {

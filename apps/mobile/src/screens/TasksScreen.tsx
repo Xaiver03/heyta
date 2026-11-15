@@ -567,6 +567,20 @@ export function TasksScreen({
    */
   const [moreOpen, setMoreOpen] = useState(false);
   /**
+   * 🔴 顶栏收起在**列表档**由这里驱动：列表的滚动宿主是 `FlatList` 自己
+   *（`Screen` 在 list 档拿到的是 `scroll={false}`），所以必须由列表回吐 offset，
+   * 再由 `Screen` 的 `barCollapsed` 受控 —— 见 `TaskList.onScrollOffset` 的注释。
+   */
+  const [barCollapsed, setBarCollapsed] = useState(false);
+  const lastScrollY = useRef(0);
+  const onListScroll = useCallback((y: number) => {
+    const dy = y - lastScrollY.current;
+    lastScrollY.current = y;
+    if (y <= 0) setBarCollapsed(false);
+    else if (dy > 0.5) setBarCollapsed(true);
+    else if (dy < -0.5) setBarCollapsed(false);
+  }, []);
+  /**
    * 列表内过滤框的展开态。
    *
    * 过滤框此前**常驻**在内容区顶部（44dp + 上下 8dp），而它是偶发动作。
@@ -1609,6 +1623,8 @@ export function TasksScreen({
         scroll={view !== 'list'}
         // 四象限 / 时间线是看板：内容铺满宽度、顶栏只留高频动作（见 `Screen` 的 chrome 注释）。
         chrome={view === 'list' ? 'page' : 'board'}
+        // 列表档：由 FlatList 回吐的滚动驱动（见 `onListScroll`）。
+        barCollapsed={view === 'list' ? barCollapsed : undefined}
         fixedControls={bulkSelecting || bulkUndoIds !== null ? bulkControls : undefined}
         actions={[
           // 🔴 全局搜索的**唯一**入口（产品负责人 2026-10-01：一个应用只有一个搜索入口）。
@@ -1735,6 +1751,8 @@ export function TasksScreen({
               density="compact"
               // 白卡列表（对齐滴答的"卡 + 卡内行"观感，见 `TaskList` 的 `listCard`）。
               listCard
+              // 列表是 FlatList 自己滚 —— 顶栏收起靠这一条回吐，见 `onListScroll`。
+              onScrollOffset={onListScroll}
               onToggleTask={handleTaskToggle}
               onOpenTask={handleTaskOpen}
               // 🔴 手势改派（§3.4）：非批量态 = 长按开**上下文菜单**；
