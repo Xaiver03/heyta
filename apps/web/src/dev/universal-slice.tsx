@@ -113,7 +113,7 @@ function SettingsSlice(): React.JSX.Element {
         <button type="button" className="ht-btn ht-btn--primary" data-testid="slice-press-btn">
           按下看扩散
         </button>
-        <button type="button" className="ht-btn" data-testid="slice-press-btn-plain">
+        <button type="button" className="ht-btn ht-btn--secondary" data-testid="slice-press-btn-plain">
           无色调按钮
         </button>
       </div>
