@@ -17,8 +17,23 @@ import { lightTokens } from '../src/native.js';
 import { CHOICE_ROW_SHAPE, CHOICE_ROW_TEXT } from '../src/choice-row-shape.js';
 import { TEXT_STYLES } from '../src/typography.js';
 
-const px = (tokenName: string): number =>
-  (lightTokens as Record<string, number>)[tokenName];
+/**
+ * 按 token 名取数值。
+ *
+ * 🔴 两处类型修正（2026-11-15）：
+ * 1. `HeytaNativeTokens` 没有字符串索引签名，直接 `as Record<string, number>`
+ *    是不合法的转换（TS2352），必须先过 `unknown`。
+ * 2. `noUncheckedIndexedAccess` 下索引结果是 `number | undefined`。原来的写法
+ *    把 `undefined` 静默交给后面的 `toBeLessThan` —— 那时失败信息会是
+ *    "expected undefined to be less than …"，指向比较表达式，而根因是**token 名写错了**。
+ *    改成显式抛错，把根因留在出错的那一行。
+ */
+const px = (tokenName: string): number => {
+  const table = lightTokens as unknown as Record<string, number>;
+  const value = table[tokenName];
+  if (value === undefined) throw new Error(`token 不存在：${tokenName}`);
+  return value;
+};
 
 describe('CHOICE_ROW_SHAPE', () => {
   it('三个间距是三档互不相等的值，且从小到大是 组内 < 标签 < 组间', () => {
