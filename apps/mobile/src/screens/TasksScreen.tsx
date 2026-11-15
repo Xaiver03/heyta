@@ -866,17 +866,21 @@ export function TasksScreen({
     [actions, clearBulkSelection, refresh, selectedTaskIds],
   );
 
-  const moveTaskToQuadrant = useCallback(
-    async (target: Quadrant): Promise<void> => {
+  /**
+   * 🔴 2026-11-15：taskId **显式传入**，不再只读 `quadrantMoveTaskId`。
+   *
+   * 拖拽落点时，`setQuadrantMoveTaskId` 还没提交（同一帧），读状态会拿到上一行 ——
+   * 拖 A 结果移动了 B 是那种"能跑、但结果是错的"的失效。
+   */
+  const performQuadrantMove = useCallback(
+    async (taskId: string, target: Quadrant): Promise<void> => {
       if (quadrantMoveBusyRef.current) return;
-      const taskId = quadrantMoveTaskId;
-      const task = taskId === null ? undefined : tasks.find((item) => item.id === taskId);
+      const task = tasks.find((item) => item.id === taskId);
       if (task === undefined || actions === null) return;
 
       quadrantMoveBusyRef.current = true;
       const plan = planQuadrantDrop(task, target, { now });
       const undoPlan = planQuadrantDropUndo(task, plan);
-      setQuadrantMoveTaskId(null);
       setQuadrantMoveError(null);
       setBusyId(task.id);
       try {
@@ -898,7 +902,18 @@ export function TasksScreen({
         setBusyId(null);
       }
     },
-    [actions, now, quadrantMoveTaskId, quadrantMoveBusyRef, refresh, t, tasks],
+    [actions, now, quadrantMoveBusyRef, refresh, t, tasks],
+  );
+
+  /** 弹层里选了一格 —— 它读的是"当前被选中的那条"。 */
+  const moveQuadrantTaskChosen = useCallback(
+    async (target: Quadrant): Promise<void> => {
+      if (quadrantMoveTaskId === null) return;
+      const id = quadrantMoveTaskId;
+      setQuadrantMoveTaskId(null);
+      await performQuadrantMove(id, target);
+    },
+    [performQuadrantMove, quadrantMoveTaskId],
   );
 
   const undoQuadrantMove = useCallback(async (): Promise<void> => {
@@ -2083,7 +2098,7 @@ export function TasksScreen({
               label={quadrantLabels.title(target)}
               icon="action.more"
               disabled={quadrantMoveCurrent === target || busyId === quadrantMoveTask?.id}
-              onPress={() => void moveTaskToQuadrant(target)}
+              onPress={() => void moveQuadrantTaskChosen(target)}
             />
           ))}
           <Button
