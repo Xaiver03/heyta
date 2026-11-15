@@ -45,7 +45,7 @@ import {
 import { useI18n } from '@heyta/i18n';
 import { authFailureMessage, EmptyState, SettingsSection, type SettingsRowModel } from '@heyta/ui';
 
-import { Button, HStack, Text } from '../ui/kit';
+import { Button, Text } from '../ui/kit';
 import { formatStamp } from '../lib/date';
 import { sessionDeviceLabel, type CopyMessage } from '../auth/account-security-copy';
 
@@ -223,15 +223,41 @@ export function SessionsSection({
                   {t('common.sessions.thisDevice')}
                 </Text>
               ) : null}
-              <HStack gap="default">
-                {/* `numeric-body`：时间戳必须等宽，否则两行的分钟数对不齐。 */}
-                <Text variant="numeric-body" tone="subtle">
-                  {`${t('common.sessions.signedInSince')} ${formatStamp(session.createdAt)}`}
-                </Text>
-                <Text variant="numeric-body" tone="subtle">
-                  {`${t('common.sessions.lastSeen')} ${formatStamp(session.lastSeenAt)}`}
-                </Text>
-              </HStack>
+              {/*
+                🔴 2026-11-15：两个时间戳此前放在同一个 `HStack` 里。
+                真机实测（1080×2280）第一台设备的「这次登录开始于 11-15 17:22
+                上次用到 11-15 17:27」横向溢出，右侧被屏边裁掉 —— 两段中文标签
+                加两个时间戳的宽度超过一行，而 `HStack` 不换行。
+                改成一枚时间戳一行：同一份信息，两行都读得完，
+                也顺带让 `numeric-body` 的等宽对齐真正生效（原来两段挤在一起看不出对齐）。
+              */}
+              <Text variant="numeric-body" tone="subtle">
+                {`${t('common.sessions.signedInSince')} ${formatStamp(session.createdAt)}`}
+              </Text>
+              <Text variant="numeric-body" tone="subtle">
+                {`${t('common.sessions.lastSeen')} ${formatStamp(session.lastSeenAt)}`}
+              </Text>
+              {/*
+                🔴 2026-11-15：撤销按钮原先在 `trailing` 行的**右侧**（`actions`），
+                它把 device 列的宽度压到约 200dp —— 真机实测「这次登录开始于 11-15 18:20」
+                会被折断成两行（「这次登录开始于 11-15」+「18:20」）。
+                现在把它放进内容流里（时间戳下方）：设备列拿回整行宽度，
+                动作仍然只属于这一台设备，只是不再和它的时间抢同一行的横向空间。
+              */}
+              {session.current ? null : (
+                <Button
+                  label={t('common.sessions.revoke')}
+                  accessibilityLabel={t('mobile.sessions.revoke.aria', { device })}
+                  onPress={() => {
+                    askRevoke(session, device);
+                  }}
+                  tone="ghost"
+                  disabled={busy}
+                  // 左对齐：动作属于这一台设备，不是这张卡的区块级按钮。
+                  style={{ alignSelf: 'flex-start' }}
+                  testID="sessions-revoke"
+                />
+              )}
             </>
           ),
           note: session.current ? (
@@ -239,18 +265,7 @@ export function SessionsSection({
               {t('common.sessions.currentHint')}
             </Text>
           ) : null,
-          actions: session.current ? null : (
-            <Button
-              label={t('common.sessions.revoke')}
-              accessibilityLabel={t('mobile.sessions.revoke.aria', { device })}
-              onPress={() => {
-                askRevoke(session, device);
-              }}
-              tone="ghost"
-              disabled={busy}
-              testID="sessions-revoke"
-            />
-          ),
+          actions: null,
         };
       },
     ),

@@ -521,6 +521,7 @@ export function Checkbox({
   onToggle,
   busy,
   label,
+  caption,
   testID,
 }: {
   checked: boolean;
@@ -535,6 +536,15 @@ export function Checkbox({
    * 根本不知道勾的是哪一条。
    */
   label?: string;
+  /**
+   * 可见的说明文字（勾选框右侧）。
+   *
+   * 🔴 2026-11-15 加：`label` 只进无障碍树，界面里**不画**。当一枚复选框
+   * 旁边没有任何字时（「创建加密数据钥匙」卡里那枚"记住解锁"），
+   * 用户看到的是一个不知道勾什么的白圈 —— 那是形状缺陷，不是无障碍问题。
+   * 传了 `caption` 就把文字画出来，整行可点；不传则保持原来 44×44 的纯方框。
+   */
+  caption?: string;
 }): React.JSX.Element {
   const t = useTokens();
   const { reducedMotion } = useTheme();
@@ -556,10 +566,11 @@ export function Checkbox({
       accessibilityLabel={label ?? defaultLabel}
       hitSlop={t['gesture.hit-slop']}
       style={({ pressed }) => ({
-        width: t['touch-target.min'],
-        height: t['touch-target.min'],
-        alignItems: 'center',
-        justifyContent: 'center',
+        ...(caption === undefined
+          ? { width: t['touch-target.min'], height: t['touch-target.min'] }
+          : { flexDirection: 'row' as const, alignItems: 'center' as const, gap: t['space.3'] }),
+        alignItems: caption === undefined ? 'center' : undefined,
+        justifyContent: caption === undefined ? 'center' : undefined,
         // 按下时整块轻微缩放 —— Apple 的 press 反馈。
         transform: [{ scale: pressed && !reducedMotion ? t['motion.press-scale'] : 1 }],
       })}
@@ -578,6 +589,11 @@ export function Checkbox({
       >
         {checked ? <Icon name="task.done" size="xs" color={t['color.on-primary']} strokeWidth={3} /> : null}
       </View>
+      {caption === undefined ? null : (
+        <Text variant="row-meta" tone="default">
+          {caption}
+        </Text>
+      )}
     </Pressable>
   );
 }

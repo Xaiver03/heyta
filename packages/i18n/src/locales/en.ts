@@ -3833,7 +3833,7 @@ export const en = {
   // leaves at least one number on screen that did not shrink.
   'mobile.growth.streak.title': 'Streaks',
   'mobile.growth.streak.note': 'Longest and total never go down — a break is not a loss.',
-  'mobile.growth.streak.empty': 'No habits yet. Create one in Profile → Habits to start tracking.',
+  'mobile.growth.streak.empty': 'No habits yet. Create one to start tracking.',
   'mobile.growth.streak.current': 'Current streak (days)',
   'mobile.growth.streak.longest': 'Longest: {days}',
   'mobile.growth.streak.total': 'Total: {count}',

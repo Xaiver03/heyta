@@ -156,21 +156,23 @@ describe('登录设备：三件事各是一条路，不许合并', () => {
     //   **行模型的字段**上（`actions:` / `note:`），切 JSX 只会让判据读成"找不到锚点"。
     //   锚换了，判的还是同一件事：**撤销出口只许出现在"不是这台"那一支**，
     //   而那句"为什么这里没有出口"只许出现在"就是这台"那一支。
-    const guard = 'actions: session.current ?';
+    //
+    // 🔴 2026-11-15 二次改锚：`actions:` 这一格已不再承载按钮 —— 真机上它与设备名
+    //   抢同一行横向空间，把「这次登录开始于 11-15 18:20」折成两行、第三台被裁。
+    //   按钮移进 `meta` 的内容流（时间戳下方），设备列拿回整行宽度。
+    //   判据不变：**current 那一支 `null`、else 那一支才有 `sessions-revoke`**。
+    const guard = 'session.current ? null :';
     const start = SESSIONS.indexOf(guard);
-    expect(start, `撤销出口没有 current 判定（应写成 \`${guard} null : …\`）`).toBeGreaterThanOrEqual(0);
-    const branch = SESSIONS.slice(start, start + 600);
-    // 当前这一支必须是 `null`：画一枚**禁用着**的按钮同样算"这一行有出口"——
-    // 读屏用户会去按它，而按下去本来什么都不该发生。
-    expect(branch.startsWith(`${guard} null :`), `current 那一支不是 null：${branch.slice(0, 60)}`).toBe(true);
-    // 正向对照：撤销按钮**确实**在 else 那一支里（否则上面那条"没有"是空的）。
-    const elseStart = branch.indexOf(' : (');
-    expect(elseStart, '找不到 else 那一支').toBeGreaterThan(0);
+    expect(start, `撤销出口没有 current 判定（应写成 \`${guard} …\`）`).toBeGreaterThanOrEqual(0);
+    const branch = SESSIONS.slice(start, start + 700);
+    // 正向对照：撤销按钮**确实**在 null 的反面那一支里（否则上面那条"没有"是空的）。
+    const elseStart = branch.indexOf('null : (');
+    expect(elseStart, '找不到 else 那一支').toBeGreaterThanOrEqual(0);
     expect(branch.slice(elseStart), '撤销按钮不在 else 那一支里').toContain('sessions-revoke');
     // 那句解释必须与出口**同生同灭**：只有"就是这台"那一支才有它。
     const noteStart = SESSIONS.indexOf('note: session.current ?');
     expect(noteStart, '找不到 current 那句提示的判定').toBeGreaterThanOrEqual(0);
-    const note = SESSIONS.slice(noteStart, start);
+    const note = SESSIONS.slice(noteStart, noteStart + 300);
     expect(note).toContain('common.sessions.currentHint');
     expect(note, '那句提示里不该有撤销出口').not.toContain('sessions-revoke');
   });

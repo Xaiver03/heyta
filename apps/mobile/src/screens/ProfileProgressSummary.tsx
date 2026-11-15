@@ -145,9 +145,20 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
               style={{ flex: 1, alignItems: 'center' }}
             >
               <Text variant="headline">{cell.value}</Text>
-              <Text variant="caption" tone="subtle">
-                {cell.label}
-              </Text>
+              {/*
+                🔴 2026-11-15：第三格（已达成成就）是成长屏的入口，但它和同排
+                两个纯读数格长得**一模一样** —— 真机上看不出这一格能点。
+                给可点的格子在标签后补一枚 chevron（14dp，克制到不抢数字），
+                让"哪一格通向下一层"在视觉上可判。不可点的格保持原样。
+              */}
+              <HStack gap="tight" align="center">
+                <Text variant="caption" tone="subtle">
+                  {cell.label}
+                </Text>
+                {cell.onPress === undefined ? null : (
+                  <Icon name="action.disclose" size="xs" color={tokens['color.foreground-subtle']} />
+                )}
+              </HStack>
             </Pressable>
           ))}
         </HStack>

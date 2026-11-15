@@ -527,17 +527,6 @@ export function SecurityScreen({
           {enrollDone ? (
             <Text variant="row-meta" tone="default">{t('mobile.security.passkeys.enrollDone')}</Text>
           ) : null}
-          <Button
-            label={enrolling ? t('mobile.security.passkeys.enrollBusy') : t('mobile.security.passkeys.enroll')}
-            onPress={() => {
-              void submitEnroll();
-            }}
-            tone="secondary"
-            icon="privacy.consent"
-            loading={enrolling}
-            disabled={!ready || enrolling}
-            testID="security-enroll-passkey"
-          />
           {passkeys === null ? (
             <Text variant="caption" tone="subtle">
               {t('mobile.security.passkeys.loading')}
@@ -643,6 +632,22 @@ export function SecurityScreen({
             </Stack>
           )}
 
+          {/*
+            🔴 2026-11-15：添加按钮原先在**状态行前面** —— 用户先看到「添加一条通行密钥」，
+            再看到「还没有通行密钥」，顺序是"动作 → 状态"。倒过来才读得通：
+            先说现状（没有 / 列表），再给动作。
+          */}
+          <Button
+            label={enrolling ? t('mobile.security.passkeys.enrollBusy') : t('mobile.security.passkeys.enroll')}
+            onPress={() => {
+              void submitEnroll();
+            }}
+            tone="secondary"
+            icon="privacy.consent"
+            loading={enrolling}
+            disabled={!ready || enrolling}
+            testID="security-enroll-passkey"
+          />
           {/* 找回通行密钥：一封邮件，落点是服务端渲染的凭据页，**不在本屏完成**。 */}
           <Divider />
           <SettingsRow

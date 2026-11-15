@@ -4232,7 +4232,7 @@ export const zhCN = {
   // 连续性（L2）。最长与累计只增不减，中断之后屏幕上一定有数字没变小。
   'mobile.growth.streak.title': '连续',
   'mobile.growth.streak.note': '最长与累计只增不减——中断不等于失去。',
-  'mobile.growth.streak.empty': '还没有习惯。到「我的 → 习惯」创建一个，开始记录。',
+  'mobile.growth.streak.empty': '还没有习惯。建一个，从今天开始记录。',
   'mobile.growth.streak.current': '当前连续（天）',
   'mobile.growth.streak.longest': '最长 {days} 天',
   'mobile.growth.streak.total': '累计 {count} 天',
@@ -4440,7 +4440,7 @@ export const zhCN = {
   'mobile.emailChange.statusFailed': '没读到这张更换现在等到哪一边。邮箱地址**没有被改动**，可以重试。',
   'mobile.emailChange.refresh': '重新读取状态',
   'mobile.emailChange.busy': '正在取消…',
-  'mobile.emailChange.inboxHint': '发起之后，请在**新旧两个收件箱**里各点一次那两条链接。这一步只负责发起。',
+  'mobile.emailChange.inboxHint': '发起之后，请在新旧两个收件箱里各点一次那两条链接。这一步只负责发起。',
   'mobile.emailChange.needSession': '要先登录才能更换登录邮箱。',
   // 🔴 `emailChangeStage()` 返回 `invalid` 的那一档：服务端说这张请求还活着，
   // 却两边都不等。说"等另一边"与说"已经改好了"**都是假话**，只能老实报状态不对。

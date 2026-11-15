@@ -26,7 +26,7 @@ import {
 import { decodeBase64, encodeBase64 } from '@heyta/sync-core';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
-import { Button, Card, Checkbox, SectionHeader, Stack, Text, TextField } from '../ui/kit';
+import { Button, Card, Checkbox, HStack, SectionHeader, Stack, Text, TextField } from '../ui/kit';
 import { readSyncConfig } from '../sync/config';
 import {
   getOpenTaskHostIfReady,
@@ -400,11 +400,13 @@ export function VaultSettingsSection({
       {scope !== undefined && serverUrl !== undefined && token !== undefined ? (
         <Card>
           <Stack>
-            <Text variant="row-title">{t('mobile.vault.devicesTitle')}</Text>
-            <SettingsInfoTip
-              text={t('mobile.vault.devicesDescription')}
-              label={t('mobile.vault.devicesTitle')}
-            />
+            <HStack align="center" gap="tight">
+              <Text variant="row-title">{t('mobile.vault.devicesTitle')}</Text>
+              <SettingsInfoTip
+                text={t('mobile.vault.devicesDescription')}
+                label={t('mobile.vault.devicesTitle')}
+              />
+            </HStack>
             {devicesLoading ? <Text variant="caption" tone="subtle">{t('mobile.vault.devicesLoading')}</Text> : null}
             {deviceError !== undefined ? <Text variant="caption" tone="danger">{t(deviceError)}</Text> : null}
             {!devicesLoading && deviceError === undefined && devices.length === 0 ? <Text variant="caption" tone="subtle">{t('mobile.vault.devicesEmpty')}</Text> : null}
@@ -438,6 +440,7 @@ export function VaultSettingsSection({
               checked={rememberUnlock}
               onToggle={toggleRemember}
               label={t('mobile.vault.remember')}
+              caption={t('mobile.vault.remember')}
             />
             <Button
               label={t('mobile.vault.create')}
@@ -484,6 +487,7 @@ export function VaultSettingsSection({
               checked={rememberUnlock}
               onToggle={toggleRemember}
               label={t('mobile.vault.remember')}
+              caption={t('mobile.vault.remember')}
             />
           </Stack>
         </Card>
@@ -605,6 +609,7 @@ export function VaultSettingsSection({
               checked={rememberUnlock}
               onToggle={toggleRemember}
               label={t('mobile.vault.remember')}
+              caption={t('mobile.vault.remember')}
             />
             <TextField
               label={t('mobile.vault.newPassphrase')}
