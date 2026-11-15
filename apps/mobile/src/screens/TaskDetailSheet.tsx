@@ -2230,6 +2230,18 @@ function DetailSection({
   const styles = useMemo(
     () => ({
       row: {
+        /**
+         * 🔴 2026-11-15 补 `flexDirection: 'row'`。
+         *
+         * 与上一轮修过的 `propRow` 是**同一处错**、同一个文件：这一格也只写了
+         * `alignItems: 'center'`，而 RN 的默认方向是 `column` ⇒ 渲染成
+         * 「箭头一行 / 属性名一行 / 值一行」的竖排居中。
+         *
+         * 真机后果：详情面板里「重要 / 清单 / 上级任务 / 标签 / 重复 / 排期 / 优先级」
+         * 七格全部居中堆叠，整屏其余内容都在 x=48 左对齐 —— 一组里七个不一样的居中对齐。
+         * 上一轮只看了「未设截止」那一行（`propRow`），没往下滚到这一组。
+         */
+        flexDirection: 'row' as const,
         alignItems: 'center' as const,
         gap: tokens['space.2'],
         minHeight: tokens['touch-target.min'],
