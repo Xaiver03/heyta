@@ -834,3 +834,47 @@ account → subscription → data → notifications → appearance → ai → ab
 
 滴答的设置项**没有说明文字**，但它的设置项也**没有"只影响本机"这类跨设备语义**
 （它的主题是跟着账号走的）。**我们这里必须写**，因为我们的默认是"不跟账号走"。
+
+---
+
+## 十九、纠正一条我自己写错的记录：「方框 vs 开关」
+
+我在 §九 与多轮口述里写过一条形状问题：
+
+> `NotificationPrefsPanel`（方形标记 vs Switch）
+
+**这条是错的。查证过程：**
+
+1. `grep -rn "Switch" packages/ui/src apps/mobile/src --include=*.tsx` → **零命中**；
+2. 唯一带 `accessibilityRole="switch"` 的是 `settings/Settings.tsx:649`（`SettingsSwitchRow`）；
+3. 而它画的东西（`:671-690`）是：
+
+```tsx
+{/* 状态标记：一个方框 + 选中时的对钩。 */}
+<View style={[styles.marker, { backgroundColor: checked ? primary : 'transparent' }]}>
+  {checked ? <HeytaIcon data={Check} ... /> : null}
+</View>
+```
+
+**它也是方框 + 对钩** —— 全仓**根本没有"开关"这种视觉**。
+
+所以「共享通知」三行（`NotificationPrefsPanel`，`role="checkbox"` + 方框）
+与设置里的开关行（`SettingsSwitchRow`，`role="switch"` + 同样方框）**视觉上是同一套**，
+只是**无障碍角色不同**（`checkbox` vs `switch`）。
+
+### 这一条的教训
+
+**我把"role 不同"当成了"视觉不同"**，然后在文档里写成一条待修形状，
+还连着几轮把它当遗留项挂着 —— 每一轮都在"下一轮要改它"里出现。
+
+**判据**：报一条形状问题之前，至少要看到**两边的渲染代码**，
+不能只看 `accessibilityRole` 这种语义属性就断言外观不同。
+
+### 剩下的真问题只有一个（角色不一致）
+
+同一个方框，一处念「复选框」一处念「开关」。对读屏用户是两种操作预期：
+复选框是"选中/不选中"，开关是"开/关"。
+
+**这条要不要统一，取决于产品的语义**：共享通知的三个是"要不要收这类通知"（开关语义），
+设置里的是"要不要启用"（也是开关）。**按语义该统一成 `switch`。**
+但那已经不是视觉问题，属无障碍。**登记，不在本轮视觉审查范围内动。**
