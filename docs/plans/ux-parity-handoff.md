@@ -251,3 +251,91 @@ done
 **提交信息里引用的 PNG 不在仓库里**。要看图得在设备上重截，或找本地那份目录。
 
 新会话如果要继续记图，建议先把落点改到**受跟踪**的目录（或明确接受"图不入库、只留路径"）。
+
+---
+
+## 11. 登录后四屏的环境配方（2026-11-15 实测跑通的部分）
+
+> 这一段是**给下一个会话直接照抄的**，不是设计说明。
+> 目的：让「登录后四屏」从"不可达"变成"几步可达"。
+
+### 11.1 本机已经有 PostgreSQL，不需要 Docker
+
+```bash
+nc -z 127.0.0.1 5432 && echo "postgres 在跑"   # 实测：在跑（brew postgresql@15）
+```
+
+### 11.2 建一个专用库并跑迁移（**实测全过**）
+
+```bash
+createdb heyta_ux_screens_20261115
+cd server
+DATABASE_URL="postgresql://$(whoami)@127.0.0.1:5432/heyta_ux_screens_20261115?schema=public" \
+  timeout 600 sh scripts/migrate-deploy.sh
+# 实测输出：All migrations have been successfully applied.
+```
+
+### 11.3 构建并启动服务端（**实测 /health = 200**）
+
+```bash
+pnpm --filter @heyta/sync-server build
+
+cd server
+DATABASE_URL="postgresql://$(whoami)@127.0.0.1:5432/heyta_ux_screens_20261115?schema=public" \
+PORT=3111 \
+PUBLIC_URL="http://192.168.1.9:3111" \
+JWT_SECRET="ux-screens-20261115-jwt-secret-at-least-32-chars" \
+PASSWORD_PEPPER="ux-screens-20261115-pepper-at-least-32" \
+CORS_ORIGINS="http://192.168.1.9:3111" \
+node dist/src/index.js > /tmp/ux-server.log 2>&1 &
+
+curl -s -o /dev/null -w "health=%{http_code}\n" http://192.168.1.9:3111/health   # 要 200
+```
+
+- 🔴 `JWT_SECRET` **必须 ≥32 字符**，否则进程直接抛错退出（`auth.js:72`）。
+- 🔴 路由是 `/health`、`/live`，**不是** `/api/health`（后者 404）。
+- 🔴 `PUBLIC_URL` 必须填**设备能访问到的局域网 IP**（本例 `192.168.1.9`），不是 `127.0.0.1`。
+
+### 11.4 设备侧进入路径（**实测走通到「输入 6 位验证码」这一步**）
+
+```
+底部「我的」→「设置」→「数据与同步」→「注册 / 登录」→「使用自建服务端」
+→「高级选项」→「服务端地址」填 http://192.168.1.9:3111
+→ 填邮箱 / 登录密码 / 再次输入密码 → 勾选同意 →「发送验证码」
+```
+
+⚠️ **坐标会随键盘弹起而整体上移**，`y` 不能复用。每步先：
+
+```bash
+adb -s VWIZYDP7TWTOY9SO shell uiautomator dump /sdcard/q.xml
+adb -s VWIZYDP7TWTOY9SO pull /sdcard/q.xml /tmp/q.xml
+# 然后按 class 含 EditText / clickable / text 精确取中心点
+```
+
+⚠️ 点「发送验证码」前**必须确认「再次输入密码」已填**（表单切模式会清空它）；
+不填也能点，但服务端不会建出密码，表现为**之后登录报「邮箱或密码不正确」**。
+
+### 11.5 取验证码（不用登录 Ethereal）
+
+服务端没配 SMTP 时会自动回落到 Ethereal，并在日志里打 `Preview URL`：
+
+```bash
+grep -oE "https://ethereal.email/message/[A-Za-z0-9.]+" /tmp/ux-server.log | tail -1
+```
+
+那个 URL **是公开可读的**（页面自己写着 "This is a public message view"），
+用 `web_fetch` 打开就能在正文里读到 `注册验证码：XXXXXX`（实测拿到 `260925`）。
+验证码 **10 分钟有效、最多 5 次**；每封新邮件的 URL 都不同，以最后一条为准。
+
+### 11.6 两个实测的坑
+
+| 坑 | 事实 |
+|---|---|
+| `REQUIRE_EMAIL_VERIFICATION=false` | 本轮**没能让它生效**（进程仍发验证码）。没有查清原因；要走"不验证直接注册"就得再查一次。**但 11.5 那条路已经够用**，不必依赖它 |
+| 半成品账号 | 只填邮箱+密码、没走完验证码时，`users` 行会建出来但 `password_hash` 为空 ⇒ 之后登录报「邮箱或密码不正确」。排查：`psql -d heyta_ux_screens_20261115 -tAc "select email,is_verified,password_hash is not null from users;"`。修：`delete from users where email like '%xxx%';` 重来 |
+
+### 11.7 本轮留下的状态
+
+- 服务端**已停**（会话结束时随进程退出），设库 `heyta_ux_screens_20261115` **保留**，迁移已全过。
+- 该库里**没有**测试账号（半成品已删干净）。
+- 所以下一会话只需从 **11.3** 起（服务端）+ **11.4** 起（注册）两步走完，就能进那四屏。
