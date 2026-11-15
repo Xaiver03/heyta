@@ -110,7 +110,17 @@ function makeStyles(tokens: HeytaNativeTokens) {
   return StyleSheet.create({
     row: {
       flexDirection: 'row',
-      alignSelf: 'flex-start',
+      /** 四个 tab 均分宽度但**不**拉伸高度（`flex: 1` 会让选中块撑满整条）。 */
+      alignItems: 'center',
+      /*
+       * 🔴 2026-11-15：`flex-start` → `stretch`，并让四个 tab 均分整行。
+       *
+       * 原来是 `alignSelf: 'flex-start'` —— 整组只占内容宽，挤在左边，
+       * 右边留出一大片空白（真机截图里四个 tab 只占屏宽的一半）。
+       * 而它下面紧跟着的月历网格是**整宽**的，两个块的左边界一样、右边界差半屏，
+       * 视觉上像"上面那块没画完"。
+       */
+      alignSelf: 'stretch',
       gap: tokens['space.1'],
       padding: tokens['space.1'],
       borderRadius: tokens['radius.md'],
@@ -128,6 +138,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
        * 高度一直是对的（132px = 44dp），只有宽度被漏掉了 —— 一条只写了一半的判据。
        */
       minWidth: tokens['touch-target.min'],
+      /** 四个 tab 均分整行（`row` 已 `stretch`），与下面的月历网格同宽。 */
+      flex: 1,
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.sm'],
     },

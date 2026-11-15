@@ -1623,7 +1623,7 @@ export function ProfileScreen(): React.JSX.Element {
               {savedName && signedInEmail
                 ? signedInEmail
                 : accountHasCredential
-                  ? t('mobile.profile.account.signedInHint')
+                  ? t('mobile.profile.account.headerSignedIn')
                   : t('mobile.profile.account.signInHint')}
             </Text>
           </View>
