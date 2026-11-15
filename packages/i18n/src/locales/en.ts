@@ -3263,7 +3263,7 @@ export const en = {
   'mobile.tasks.a11y.open': 'Open task: {title}',
   'mobile.tasks.a11y.openRepeat': 'Open task: {title}, repeats: {repeat}',
   'mobile.tasks.a11y.delete': 'Delete task: {title}',
-  'mobile.tasks.gestureHint': 'Long-press a task for its action menu (including multi-select); swipe to delete; in Quadrants, use More to move it.',
+  'mobile.tasks.gestureHint': 'Long-press to multi-select; use More in the quadrant view to move tasks.',
 
   // ── Mobile · calendar ─────────────────────────────────────
   'mobile.calendar.title': 'Calendar',

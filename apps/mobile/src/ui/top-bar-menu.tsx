@@ -223,6 +223,19 @@ export function TopBarMenu({
                 <Text
                   variant="caption"
                   tone="muted"
+                  /*
+                   * 🔴 2026-11-15：这个组件的注释写着「只放一行，超过一行就不该是 footer」——
+                   * 而传进来的 `mobile.tasks.gestureHint` 在 360dp 上是**三行**，
+                   * 占掉面板近三分之一。
+                   *
+                   * 想加 `numberOfLines={1}` 截断，但 kit 的 `Text` 是**属性白名单**，
+                   * 不接受它（TS 直接报错）。所以约定只能靠文案本身保证：
+                   * 那句已经压成一句（见 zh-CN 的注释）。
+                   *
+                   * ⚠️ 也就是说「footer 只放一行」这条**没有机械保证** ——
+                   * 下一个人往里塞长句就会重演这次。真要保证，得给 `Text` 开这个属性，
+                   * 那是改共享层契约，不在这一屏的范围。
+                   */
                   style={{
                     paddingHorizontal: t['space.4'],
                     paddingVertical: t['space.2'],
