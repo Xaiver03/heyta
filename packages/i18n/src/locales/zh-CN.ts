@@ -3324,7 +3324,17 @@ export const zhCN = {
   //    两端说同一件事就不该有两种说法，将来合并命名空间时这是一次纯改名。
   'mobile.categories.title': '分类时长',
   'mobile.categories.note': '按清单与习惯各自统计近 12 周的专注与打卡时间。颜色由你自己赋义，这一页不做任何评价。',
-  'mobile.categories.empty': '还没有可以归类的时间记录。用清单组织任务、或用习惯记下时长，这里就会长出内容。',
+  /*
+   * 🔴 2026-11-15：拆成两句。
+   *
+   * 原来整句（"还没有可以归类的时间记录。用清单组织任务、或用习惯记下时长，这里就会长出内容。"）
+   * 被当成 `EmptyState` 的 **title** 渲染 —— 真机上这一屏**正文比顶栏标题还大**，
+   * 因为 title 走的是比 caption 高一档的字号。
+   *
+   * 一句长解释不该占标题位：标题说"空"，说明说"为什么空 / 怎么变有"。
+   */
+  'mobile.categories.empty': '还没有可以归类的时间记录。',
+  'mobile.categories.empty.hint': '用清单组织任务、或用习惯记下时长，这里就会长出内容。',
   'mobile.categories.range': '{start} 至 {end}',
   'mobile.categories.kind.project': '清单',
   'mobile.categories.kind.habit': '习惯',
