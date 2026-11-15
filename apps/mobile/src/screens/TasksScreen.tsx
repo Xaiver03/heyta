@@ -1722,6 +1722,17 @@ export function TasksScreen({
               // 漏传不会报错，只会退回"宿主给的顺序"（即 createdAt 升序），
               // 于是新建的任务又掉到屏幕外。那条回归由 mobile 的测试钉着。
               sort={taskSort}
+              /*
+               * 🔴 2026-11-15：移动端列表用 `compact` 密度，对齐滴答的 44dp 行距。
+               *
+               * 真机现量（同屏 1080×2280）：
+               *   · 滴答任务行 **132px = 44dp**（标题文字 57px，行内单行）
+               *   · 我们当时 **204px = 68dp**（打开任务那块 [192,643]-[1032,811] = 56dp，
+               *     `listGap` 再叠 8dp）—— 每行高出 55%
+               * 密度表本来就有 `compact` 档（`minHeight: touch-target.min`、
+               * `bodyPaddingBlock: space.1`），只是移动端列表一直吃默认的 `comfortable`。
+               */
+              density="compact"
               onToggleTask={handleTaskToggle}
               onOpenTask={handleTaskOpen}
               // 🔴 手势改派（§3.4）：非批量态 = 长按开**上下文菜单**；
