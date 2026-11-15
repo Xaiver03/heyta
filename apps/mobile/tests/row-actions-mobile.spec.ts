@@ -52,8 +52,21 @@ describe('手势改派：长按 = 上下文菜单，批量态恢复成勾选', (
     expect(text, '长按还挂在"进入多选"上 ⇒ 上下文菜单没接上').not.toMatch(
       /onLongPressTask=\{enterBulkSelection\}/,
     );
-    const reassigned = text.match(/onLongPressTask=\{bulkSelecting \? toggleBulkSelection : openRowMenu\}/g) ?? [];
-    expect(reassigned, '长按改派只出现在一处 ⇒ 另一档的长按还是旧手势').toHaveLength(2);
+    /*
+     * 🔴 两档的长按**改派到不同目标**（2026-11-15 起）：
+     *   · 列表档 → `openRowMenu`（行菜单）
+     *   · 四象限 → `setQuadrantMoveTaskId`（直接弹「移动到其他象限」）
+     *
+     * 判据仍然是那一句：长按**不再**直接进多选，且两档都改派到了东西
+     *（只改一档会让另一档停在旧手势上）。这里按"两档各自的目标"分别钉，
+     * 不再要求两处字符串相同 —— 那会让"两档应该不同"这件事被误判成回归。
+     */
+    expect(text, '列表档的长按没有改派到行菜单').toMatch(
+      /bulkSelecting \? toggleBulkSelection : openRowMenu/,
+    );
+    expect(text, '四象限的长按没有改派到"移动象限"').toMatch(
+      /bulkSelecting \? toggleBulkSelection : \(id\) => \{\s*setQuadrantMoveTaskId\(id\);\s*\}\s*\}/,
+    );
   });
 
   it('🔴 「进入批量选择」没被丢掉：它是菜单里的一项，并且真的调 `enterBulkSelection`', () => {
