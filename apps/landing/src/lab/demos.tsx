@@ -75,12 +75,28 @@ const SWITCH_TRAVEL_PX = 24;
  * 按下缩、松手弹回。
  *
  * 🔴 笔记版与设计系统版的差别**全在阻尼**：两版的缩放深度也不同
- * （0.94 / 0.97），但真正决定读感的是 28.4% 过冲 ——
+ * （0.94 / 当前 `--ht-motion-press-scale`），但真正决定读感的是 28.4% 过冲 ——
  * 按下时元素会越过 0.94 继续缩一点再回来。这就是"颤"。
  */
+/**
+ * 读一个数值型 token。
+ *
+ * 🔴 右边这一栏**不许写死 0.97**：它是"设计系统版"，而设计系统的取值在
+ * `tokens.css` 里。写死之后，`--ht-motion-press-scale` 改过（2026-11-15 从
+ * 0.97 改到 0.95），这一页会继续展示旧值 —— 一个说自己是"对照"却照着旧尺子
+ * 量的页面，比没有这一页更坏。
+ */
+function readScaleToken(name: string, fallback: number): number {
+  if (typeof window === 'undefined') return fallback;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) ? value : fallback;
+}
+
 export function PressDemo(): React.JSX.Element {
   const note = NOTE_SPRINGS.press!;
   const ds = noteSpringToDesignSystem(note).dampingRatio;
+  const pressScale = readScaleToken('--ht-motion-press-scale', 0.95);
 
   const rawScale = useSpring(1, springOptionsFor(note));
   const tunedScale = useSpring(1, springOptionsFor({ stiffness: 246.74, damping: 31.42 }));
@@ -99,12 +115,12 @@ export function PressDemo(): React.JSX.Element {
           按下我
         </motion.button>
       </Pane>
-      <Pane tone="tuned" label="设计系统 · press-scale 0.97 · ζ=1.00">
+      <Pane tone="tuned" label={`设计系统 · press-scale ${pressScale} · ζ=1.00`}>
         <motion.button
           type="button"
           className="lab-btn"
           style={{ scale: tunedScale }}
-          onPointerDown={() => tunedScale.set(0.97)}
+          onPointerDown={() => tunedScale.set(pressScale)}
           onPointerUp={() => tunedScale.set(1)}
           onPointerLeave={() => tunedScale.set(1)}
         >

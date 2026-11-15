@@ -14,7 +14,7 @@
  *
  * ## 为什么用百分比而不是 px
  *
- * 按钮在 `transform: scale(0.97)` 时宽高会变，px 坐标会在按下与缩放的
+ * 按钮在 `transform: scale(var(--ht-motion-press-scale))` 时宽高会变，px 坐标会在按下与缩放的
  * 同一帧里对不上；百分比相对盒子永远成立。另外百分比不引入单位问题，
  * 也就不用为它开一个 token（见 `docs/agents/design-system.md` 的禁止裸值）。
  *

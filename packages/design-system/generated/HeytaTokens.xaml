@@ -215,7 +215,7 @@
     <x:Double x:Key="HeytaMotionSpringResponseMove">0.4</x:Double>
     <x:Double x:Key="HeytaMotionSpringResponseSheet">0.3</x:Double>
     <x:Double x:Key="HeytaMotionSpringResponseRotation">0.4</x:Double>
-    <x:Double x:Key="HeytaMotionPressScale">0.97</x:Double>
+    <x:Double x:Key="HeytaMotionPressScale">0.95</x:Double>
     <x:Double x:Key="HeytaMotionDecelerationRate">0.998</x:Double>
     <x:Double x:Key="HeytaMotionRubberBandConstant">0.55</x:Double>
     <x:Double x:Key="HeytaGestureHysteresis">10</x:Double>

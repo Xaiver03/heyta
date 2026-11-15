@@ -62,7 +62,7 @@ function expectRealToken(resolved: string | undefined, label: string): void {
  * "这个名字在真表里有值"，不判类型。
  *
  * 🔴 为什么单独一枚：`state.*` / `motion.*` / `duration.*` 这三组在原生表里是**数**
- *（`state.disabled-opacity` 实测 0.38、`motion.press-scale` 0.97），只有颜色是串。
+ *（`state.disabled-opacity` 实测 0.38、`motion.press-scale` 0.95），只有颜色是串。
  * 拿 `typeof === 'string'` 去量它们会**假红** —— 而一条假红的判据教人关掉整块。
  */
 function expectTokenExists(resolved: unknown, label: string): void {

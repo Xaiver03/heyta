@@ -251,7 +251,7 @@ enum HeytaTokens {
     static let motionSpringResponseMove: Double = 0.4
     static let motionSpringResponseSheet: Double = 0.3
     static let motionSpringResponseRotation: Double = 0.4
-    static let motionPressScale: Double = 0.97
+    static let motionPressScale: Double = 0.95
     static let motionDecelerationRate: Double = 0.998
     static let motionRubberBandConstant: Double = 0.55
     static let gestureHysteresis: Double = 10  // px
