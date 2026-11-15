@@ -50,6 +50,7 @@ import {
   // 待办口径也只有一份 —— "哪几组算待办"是产品说法，不是某一屏的选择。
   pendingCount,
   toLocalDate,
+  dueDateToEpoch,
   // 「它下面还有 N 条子任务」那句后果的取数口径（§3.3）：**建树只有一份**，
   // 删除父任务后被提到顶层的子任务就是这一枚数出来的（`promotedFromDeletedParent`）。
   buildTaskTree,
@@ -1171,6 +1172,15 @@ export function TasksScreen({
           // 手势改派给菜单之后，这条既有效率路径搬进菜单成为一项 —— **没有丢**。
           enterBulkSelection(id);
           return;
+        case 'dueToday': {
+          /*
+           * 「今天」= 设到期日到今天（**不改时间**：这一条只排日期，不替用户定几点）。
+           * `dueDateToEpoch(today)` 与捕获面板用的是同一个换算，
+           * `today` 来自 `useToday()`（跨本地零点会刷新），所以不会把"昨天"写进去。
+           */
+          runFor(id, actions.setDueDate(id, dueDateToEpoch(today), today));
+          return;
+        }
         case 'delete':
           runFor(id, actions.remove(id));
           // 单条删除也给撤销回执（R2 的语义；窗口时长读共享表 `receiptTimingOf('undo')`，
@@ -1179,7 +1189,7 @@ export function TasksScreen({
           return;
       }
     },
-    [actions, enterBulkSelection, pushTaskRoute, runFor],
+    [actions, enterBulkSelection, pushTaskRoute, runFor, today],
   );
 
   /**
@@ -1282,6 +1292,19 @@ export function TasksScreen({
         // 滑动条只露「删除」一枚：§3.4 写的是"滑动是列表删除的第一惯例"，
         // 把菜单那五项再排一遍就变成第二个行尾编辑器（§3.1 要打的那个形状）。
         actions: [
+          /*
+           * 🔴 2026-11-15：左滑**第一枚改成「今天」**，删除退到第二枚。
+           *
+           * 滴答实测：左滑滑出的是「日期」并弹出快捷排期（今天 / 明天 / 下周一 /
+           * 选择日期 / 跳过此周期 / 清除日期）。我们原来左滑第一枚就是红色「删除」——
+           * 把**破坏性动作**放在误触率最高的位置上，而"排到今天"才是列表里最高频的动作。
+           */
+          {
+            id: 'dueToday',
+            label: t('web.rowMenu.dueToday'),
+            // ⚠️ 这一枚底色是**浅色**（非危险项），图标要用主色；白色只在红底删除块上成立。
+            icon: <Icon name="task.due" size="sm" color={tokens['color.primary']} />,
+          },
           {
             id: 'delete',
             label: t('web.rowMenu.delete'),

@@ -744,6 +744,7 @@ export const en = {
   // identical "Task actions" leaves a screen-reader user unable to tell which row.
   'web.rowMenu.label': 'Task actions: {title}',
   'web.rowMenu.open': 'Open details',
+  'web.rowMenu.dueToday': 'Today',
   'web.rowMenu.delete': 'Delete',
   // 2026-11 TickTick alignment: right-click menu expansion
   'web.rowMenu.priority': 'Priority',

@@ -851,6 +851,7 @@ export const zhCN = {
   // ⚠️ `label` 必须带标题：屏幕上同时有多行，读屏念一串"任务操作"分不出是哪一条。
   'web.rowMenu.label': '任务操作：{title}',
   'web.rowMenu.open': '打开详情',
+  'web.rowMenu.dueToday': '今天',
   'web.rowMenu.delete': '删除',
   // ↓ 2026-11 滴答对齐：右键菜单扩充（优先级 / 移动 / 子任务 / 标签）
   'web.rowMenu.priority': '优先级',

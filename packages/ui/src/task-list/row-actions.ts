@@ -62,6 +62,12 @@ import type { ReactNode } from 'react';
  */
 export const ROW_ACTION_IDS = [
   'open',
+  /*
+    🔴 2026-11-15：`dueToday` = 「把到期日设成今天」。
+    它进这张表是因为**左滑第一枚**要用它（滴答的左滑就是"排期"），
+    而滑动条的顺序由这张表决定 —— 顺序不在这里登记，就会变成各处自己排。
+  */
+  'dueToday',
   'pin',
   'unpin',
   'addSubtask',

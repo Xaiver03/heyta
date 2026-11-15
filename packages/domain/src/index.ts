@@ -47,6 +47,8 @@ export * from './identity-tags.js';
 export * from './focus.js';
 export * from './recurrence.js';
 export * from './capture.js';
+// 2026-11-15：任务行「今天」快捷要用它算到期 epoch（与捕获面板同一个换算）。
+export { dueDateToEpoch } from './capture.js';
 export * from './countdown.js';
 export * from './memory.js';
 export * from './preferences.js';

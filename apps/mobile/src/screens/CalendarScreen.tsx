@@ -43,8 +43,9 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PanResponder, View } from 'react-native';
 
-import { startOfMonth, toLocalDate, type CountdownEvent, type LocalDate, type Task } from '@heyta/domain';
+import { addDays, addMonths, startOfMonth, toLocalDate, type CountdownEvent, type LocalDate, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   createEventActions,
@@ -75,6 +76,7 @@ import { useToday } from '../lib/use-today';
 import { useTaskHost } from '../db/use-task-host';
 import { useMobileSync } from '../sync/store';
 import { Screen, Text } from '../ui/kit';
+import { useTokens } from '../theme';
 
 /**
  * 这一屏**真的能切过去**的档位 = 共享层那份 `CALENDAR_VIEW_ORDER`（R17 起这里不再写一份）。
@@ -353,6 +355,44 @@ export function CalendarScreen(): React.JSX.Element {
     [t],
   );
 
+  /**
+   * 🔴 2026-11-15：**左右滑切换周期**（产品负责人：手势要纳入 UX）。
+   *
+   * 形状与滴答一致：在网格上左滑去下一段、右滑回上一段，按当前档位步进
+   *（月 ±1 月 / 周 ±7 天 / 日 ±1 天 / 年 ±1 年）。
+   *
+   * 与"点日期格"的仲裁：只有**横向位移压过纵向 1.5 倍、且过 `space.8`（32dp）**
+   * 才认成滑动；否则交还给内部的 `Pressable`。松手时不足 `space.8` 视为点击，
+   * 不做任何跳转 —— 手指抖一下不该翻月。
+   */
+  const tokens = useTokens();
+  const shiftPeriod = useCallback(
+    (direction: 1 | -1) => {
+      const next =
+        view === 'month'
+          ? addMonths(cursor, direction)
+          : view === 'week'
+            ? addDays(cursor, 7 * direction)
+            : view === 'day'
+              ? addDays(cursor, direction)
+              : addMonths(cursor, 12 * direction);
+      stepCursor(next);
+    },
+    [cursor, stepCursor, view],
+  );
+  const swipe = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_e, g) =>
+          Math.abs(g.dx) > tokens['space.8'] && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+        onPanResponderRelease: (_e, g) => {
+          if (Math.abs(g.dx) < tokens['space.8']) return;
+          shiftPeriod(g.dx < 0 ? 1 : -1);
+        },
+      }),
+    [shiftPeriod, tokens],
+  );
+
   return (
     /*
       🔴 2026-11-15：日历是**看板**（chrome="board"）—— 内容铺满、顶栏随滚动收起。
@@ -380,6 +420,7 @@ export function CalendarScreen(): React.JSX.Element {
         testID="calendar-view-tabs"
       />
 
+      <View {...swipe.panHandlers}>
       <CalendarBoard
         tasks={tasks}
         today={today}
@@ -418,6 +459,7 @@ export function CalendarScreen(): React.JSX.Element {
         eventLabels={eventLabels}
         testID="calendar-board"
       />
+      </View>
     </Screen>
   );
 }
