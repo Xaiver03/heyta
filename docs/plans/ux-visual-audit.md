@@ -878,3 +878,47 @@ account → subscription → data → notifications → appearance → ai → ab
 **这条要不要统一，取决于产品的语义**：共享通知的三个是"要不要收这类通知"（开关语义），
 设置里的是"要不要启用"（也是开关）。**按语义该统一成 `switch`。**
 但那已经不是视觉问题，属无障碍。**登记，不在本轮视觉审查范围内动。**
+
+---
+
+## 二十、`check:empty-state` 的盲区查清了（不是"门禁坏了"，是规则只认几个名字）
+
+### 断言 B 是什么
+
+它不是"禁止手写空态"，而是**债务账**：手写空态站点冻结在登记表上，**只减不增**，
+每一项都是债、不是许可（`scripts/check-empty-state.mjs:978-1005`）。
+
+所以 `HabitProgressList` 那处**不是门禁坏了** —— 它压根没被识别成一个站点。
+
+### 四个 marker，漏在第四个
+
+| # | kind | 匹配什么 |
+|---|---|---|
+| 1 | 骨架类 | `ht-empty`（web 类名） |
+| 2 | 空槽位类 | `__empty` |
+| 3 | 空态 testid | `[^"']*empty` 的 testid，**但落在共享 `EmptyState` 范围内的不算** |
+| 4 | 直接渲染空态词条 | `t('…empty…')` 这种**直接调 i18n** 的 |
+| 5 | 空态文案 prop | `emptyText` / `emptyHint` / `emptyMessage` |
+
+`HabitProgressList` 写的是 `<Text>{labels.empty}</Text>` —— **文案是通过自定义 prop 名
+`labels` 传进来的**，既不是 `t()` 直接调用，也不叫 `emptyText/emptyHint/emptyMessage`。
+
+**四个 marker 一个都匹配不上。** 这就是漏检的全部原因。
+
+### 为什么不顺手补一条规则
+
+补 `/\blabels\.\w*empty/` 会立刻**误报**：`TaskList` 的 `labels` 里也有 `empty` 字样，
+而它把文案**交给内部渲染**（那处同样是手写的，是另一笔债，不是"传 prop"这件事错）。
+
+**门禁该拦的是"手写了一份空态"，不是"有一个叫 empty 的 prop"。**
+按名字匹配这条路已经走到头了 —— 要真判，得看"这一处最终有没有渲染 `EmptyState`"，
+那是另一个量级的分析。
+
+### 所以记下来，不改脚本
+
+**已知未覆盖的形状**：文案经自定义 prop 传入、视图自己画 `<Text>`。
+已知实例：`TaskList`（`styles.empty` + `<Text caption>`）。
+
+**这两处现在都还在**（`HabitProgressList` 这一轮改掉了，`TaskList` 没动）。
+下一步要么把 `TaskList` 也换掉，要么接受它是一笔在册的债 —— 但那要先能把它**登记**进去，
+而现在登记不进去。
