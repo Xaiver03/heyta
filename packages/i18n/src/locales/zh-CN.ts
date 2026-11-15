@@ -3546,6 +3546,10 @@ export const zhCN = {
   'mobile.tasks.view.timeline': '时间线',
   // 四象限分组。与 `web.quadrant.q1..q4` 同义，但按壳分命名空间 ——
   // 与 `landing.quadrant.q1..q4` 的存在是同一个理由：文案各壳可独立演进。
+  /* 🔴 2026-11-15：四象限 2×2 时画在十字边界上的两条轴。
+     纵轴（左边界）＝重要程度，横轴（上边界）＝紧急程度 —— 这是艾森豪威尔矩阵的定义。 */
+  'mobile.tasks.quadrant.axis.vertical': '重要',
+  'mobile.tasks.quadrant.axis.horizontal': '紧急',
   'mobile.tasks.quadrant.empty': '这里还没有任务',
   'mobile.tasks.group.overdue': '已过期',
   'mobile.tasks.group.inbox': '收集箱',

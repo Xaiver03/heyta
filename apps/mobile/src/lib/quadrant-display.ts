@@ -87,6 +87,10 @@ export function quadrantBoardLabels(t: I18nValue['t']): QuadrantBoardLabels {
     cellA11y: ({ title, hint }) => t('web.quadrant.a11y.cell', { title, hint }),
     /** 空格不是"什么都没有"，它说的是"这一类现在没有要处理的事"（见文件头第 1 条）。 */
     empty: () => t('mobile.tasks.quadrant.empty'),
+    axis: {
+      vertical: t('mobile.tasks.quadrant.axis.vertical'),
+      horizontal: t('mobile.tasks.quadrant.axis.horizontal'),
+    },
   };
 }
 

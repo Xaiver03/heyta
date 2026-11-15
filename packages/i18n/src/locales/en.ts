@@ -3247,6 +3247,8 @@ export const en = {
   // **reused** from web — same precedent as `lib/quadrant-display.ts` reusing
   // `web.quadrant.*`.
   'mobile.tasks.view.timeline': 'Timeline',
+  'mobile.tasks.quadrant.axis.vertical': 'Important',
+  'mobile.tasks.quadrant.axis.horizontal': 'Urgent',
   'mobile.tasks.quadrant.empty': 'Nothing here yet',
   'mobile.tasks.group.overdue': 'Overdue',
   'mobile.tasks.group.inbox': 'Inbox',

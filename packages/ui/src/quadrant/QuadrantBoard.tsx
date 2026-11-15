@@ -112,6 +112,11 @@ export interface QuadrantBoardLabels {
   readonly empty: (quadrant: Quadrant) => string;
   /** 矩阵底部那一句说明（拖放会改截止时间这件事必须说出来）。省略就不渲染。 */
   readonly footnote?: string;
+  /**
+   * 🔴 2×2 时画在十字边界上的两条轴标签。省略就不画轴（退化成无轴网格）。
+   * `vertical` 画在左边界（纵轴），`horizontal` 画在上边界（横轴）。
+   */
+  readonly axis?: { readonly vertical?: string; readonly horizontal?: string };
 }
 
 export interface QuadrantBoardProps {
@@ -226,9 +231,11 @@ function makeStyles(tokens: HeytaNativeTokens) {
      * 只改共享层在两端都还是空转。
      */
     board: {
-      /* 🔴 四格拼成一个整体的外轮廓：圆角在这里裁一次，内部不再各自圆角。 */
-      borderRadius: tokens['radius.lg'],
-      overflow: 'hidden',
+      /* 给左侧纵轴标签留位置（它贴在矩阵外沿，不留位会被屏幕边缘裁掉）。 */
+      paddingLeft: tokens['space.4'],
+      paddingTop: tokens['space.4'],
+      /* 🔴 四格拼成一个整体的外轮廓。**不在这里裁** —— 轴标签要画到边界外侧，
+         放在裁切容器里会被剪掉（实测：上一版轴标签完全不显示）。裁切在内层做。 */
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: tokens['color.border'],
       gap: 0,
@@ -239,6 +246,14 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexBasis: 'auto',
     },
     /** 两行等分板子的剩余高度；同样"只长不缩"（理由见 `board`）。 */
+    /** 四格拼成的那个矩形：圆角与裁切都在这一层（轴标签在它外面，不受影响）。 */
+    matrix: {
+      borderRadius: tokens['radius.lg'],
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: tokens['color.border'],
+      flexGrow: 1,
+    },
     row: {
       flexDirection: 'row',
       /* 🔴 2026-11-15：**去掉格间 gap** —— 四象限要拼成一个十字，不是四张独立的卡。
@@ -262,6 +277,23 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexGrow: 1,
       flexShrink: 0,
       flexBasis: 'auto',
+    },
+    /*
+     * 轴标签：`position: absolute` 贴在矩阵外沿，`pointerEvents` 由默认值接管
+     * （文字本身不可点，不影响下方的格子）。
+     */
+    axisVertical: {
+      position: 'absolute',
+      left: 0,
+      top: '40%',
+      fontSize: tokens['font-size.xs'],
+      transform: [{ rotate: '-90deg' }],
+    },
+    axisHorizontal: {
+      position: 'absolute',
+      top: 0,
+      left: '38%',
+      fontSize: tokens['font-size.xs'],
     },
     cell: {
       flex: 1,
@@ -387,10 +419,36 @@ export function QuadrantBoard({
    */
   const rows = twoColumns ? [cards.slice(0, 2), cards.slice(2, 4)] : [cards];
 
+  /*
+   * 🔴 2026-11-15：**坐标系要有轴。**
+   *
+   * 拼成十字之后，四块能看出"被切开了"，但**看不出是被哪两条轴切的** ——
+   * 读者只能从每格的副标题「重要且紧急」倒推。轴标签把这件事写在边界上：
+   * 横轴是「紧急」（左→右 = 紧急→不紧急），纵轴是「重要」（上→下 = 重要→不重要）。
+   *
+   * 只在 2×2 时画：单列下没有"轴"可言（四格是四段，不是四块）。
+   */
+  const axis = twoColumns ? labels.axis : undefined;
+
   const footnote = labels.footnote;
 
   return (
     <View style={styles.board} testID={testID}>
+      {/*
+        🔴 轴标签画在**边界外侧**，不占格内空间：格子只有 165dp 宽，
+        放进去会把标题挤掉。这里用绝对定位贴在左/上边缘。
+      */}
+      {axis?.vertical === undefined ? null : (
+        <Text style={[styles.axisVertical, { color: tokens['color.foreground-subtle'] }]}>
+          {axis.vertical}
+        </Text>
+      )}
+      {axis?.horizontal === undefined ? null : (
+        <Text style={[styles.axisHorizontal, { color: tokens['color.foreground-subtle'] }]}>
+          {axis.horizontal}
+        </Text>
+      )}
+      <View style={styles.matrix}>
       {rows.map((row, rowIndex) => (
         <View key={`row-${rowIndex}`} style={twoColumns ? styles.row : styles.stack}>
           {row.map((card) => {
@@ -464,6 +522,7 @@ export function QuadrantBoard({
           })}
         </View>
       ))}
+      </View>
 
       {footnote === undefined ? null : (
         <Text style={[text.caption, styles.footnote]}>{footnote}</Text>
