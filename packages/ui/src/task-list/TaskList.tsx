@@ -66,6 +66,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { TASK_ROW_SHAPE } from '@heyta/design-system';
+import { EmptyState } from '../empty-state/EmptyState.js';
 import type { CategoryColorToken } from '../categories/model.js';
 import type { Task, TaskSortKey } from '@heyta/domain';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
@@ -299,7 +300,6 @@ export function TaskList<TMeta = undefined>({
          * 列表只管行与行之间的节奏。
          */
         list: { gap: tokens[TASK_ROW_SHAPE.listGap] },
-        empty: { paddingVertical: tokens['space.8'], alignItems: 'center' },
       }),
     [tokens],
   );
@@ -349,14 +349,18 @@ export function TaskList<TMeta = undefined>({
 
   const empty = useMemo(
     () =>
-      emptyMessage === undefined ? null : (
-        <View style={styles.empty}>
-          <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
-            {emptyMessage}
-          </Text>
-        </View>
-      ),
-    [emptyMessage, styles.empty, text.caption, tokens],
+      /*
+       * 🔴 2026-11-15：**手写的那行灰字换成共享 `EmptyState`。**
+       *
+       * 这里原来自己画 `<Text caption muted>`，是 `check:empty-state` 的
+       * 已知未覆盖形状（文案经自定义 prop 传入 ⇒ 四个 marker 全不匹配，见 §二十）。
+       * 也就是说它一直是笔**没登记上**的债，而不是被允许的写法。
+       *
+       * `emptyMessage` 这个简写保留（调用方多），但它内部改成走共享实现 ——
+       * 从此空态的样式只在 `EmptyState` 一处定义。
+       */
+      emptyMessage === undefined ? null : <EmptyState size="line" title={emptyMessage} />,
+    [emptyMessage],
   );
 
   return (
