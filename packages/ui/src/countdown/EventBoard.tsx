@@ -239,6 +239,18 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    /*
+     * 🔴 2026-11-15：未选中的胶囊补一个底色。
+     *
+     * 原来只有 `chipOn`（选中=蓝底），未选中**什么背景都没有** ——
+     * 真机上「全部」是一个蓝圆点，旁边「倒数日 / 纪念日 / 生日 / 节日」
+     * 看起来就是**四个普通词**，读者不会知道它们能点、更不会知道它们是一组。
+     *
+     * 补 `surface-sunken`（比卡片底浅一层的灰）而不是描边：
+     * 描边会在这一屏多出四条线（与卡片边框、分割线抢层级），
+     * 而底色只是"这块是可点的"这一层信息，够了。
+     */
+    chipIdle: { backgroundColor: tokens['color.surface-sunken'] },
     chipOn: { backgroundColor: tokens['color.primary'] },
     chipTextOn: { color: tokens['color.on-primary'] },
     chipText: { color: tokens['color.foreground'] },
@@ -405,7 +417,7 @@ export function EventBoard({
               onPress={() => {
                 onFilterChange(option);
               }}
-              style={[styles.chip, on ? styles.chipOn : null]}
+              style={[styles.chip, on ? styles.chipOn : styles.chipIdle]}
               testID={`event-filter-${option}`}
             >
               <Text style={[text['tab-label'], on ? styles.chipTextOn : styles.chipText]}>
@@ -988,7 +1000,7 @@ function CardEditor({
             onPress={() => {
               setKind((current) => (current === option ? null : option));
             }}
-            style={[styles.chip, kind === option ? styles.chipOn : null]}
+            style={[styles.chip, kind === option ? styles.chipOn : styles.chipIdle]}
             testID={`event-editor-kind-${option}-${card.id}`}
           >
             <Text style={[text['tab-label'], kind === option ? styles.chipTextOn : styles.chipText]}>
