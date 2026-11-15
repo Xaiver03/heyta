@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/gen-entries.mjs && vite",
+    "lab": "vite src/lab --port 5190 --strictPort",
     "build": "node scripts/gen-entries.mjs && tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
