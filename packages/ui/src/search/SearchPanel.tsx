@@ -106,6 +106,15 @@ export interface SearchPanelLabels {
 export interface SearchPanelProps {
   readonly query: string;
   readonly onQueryChange: (q: string) => void;
+  /**
+   * 卡片**内部底部**的附加内容（移动端用来放「取消」）。
+   *
+   * 🔴 2026-11-15：移动端的「取消」原本画在卡片**外面**（`SearchScreen` 的
+   * `styles.actions`），因为它放右上角会与顶栏的同步图标撞。但放在卡片外之后，
+   * 它落在遮罩底下的任务页那一片区域上 —— 视觉上像那一页的按钮，不像搜索层的。
+   * 收进卡片底部，它才明确属于这一层。
+   */
+  readonly footer?: React.ReactNode;
   /** **已经过滤好的**任务（宿主用 `searchTasks`）。 */
   readonly tasks: readonly Task[];
   /** **已经过滤好的**便签（宿主用 `searchNotes`）。 */
@@ -147,6 +156,7 @@ export function SearchPanel({
   onOpenNote,
   busyTaskId,
   labels,
+  footer,
   testID = 'search-overlay',
 }: SearchPanelProps): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -318,6 +328,9 @@ export function SearchPanel({
           <Text style={[text['caption'], styles.keyChip]}>{labels.keyHints.close}</Text>
         </View>
       ) : null}
+
+      {/* 宿主给的出口（移动端放「取消」）—— 在卡片**内部**，才明确属于这一层。 */}
+      {footer === undefined ? null : footer}
     </View>
   );
 }

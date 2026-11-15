@@ -229,6 +229,21 @@ export function SearchScreen({
           onOpenNote={onOpenNote}
           labels={labels}
           testID="mobile-search-panel"
+          /*
+           * 🔴 2026-11-15：出口从卡片**外面**移进卡片**里面**。
+           * 放外面时它落在遮罩底下的任务页那一片上 —— 视觉上像那一页的按钮。
+           * 放右上角会与顶栏同步图标撞（第一版的实测见下面那段注释）。
+           */
+          footer={
+            <View style={styles.actions}>
+              <Button
+                tone="ghost"
+                label={t('mobile.common.cancel')}
+                accessibilityLabel={t('mobile.search.close')}
+                onPress={close}
+              />
+            </View>
+          }
         />
         {/**
          * 出口放在卡片**下方**，不是右上角。
@@ -242,16 +257,6 @@ export function SearchScreen({
          * ⚠️ 无障碍名仍是「关闭搜索」而不是「取消」：读屏里"取消"不说明取消了什么，
          * 而这一层唯一可取消的事就是这次搜索。
          */}
-        <View
-          style={styles.actions}
-        >
-          <Button
-            tone="ghost"
-            label={t('mobile.common.cancel')}
-            accessibilityLabel={t('mobile.search.close')}
-            onPress={close}
-          />
-        </View>
       </View>
     </Modal>
   );
