@@ -1210,6 +1210,15 @@ export function ProfileScreen(): React.JSX.Element {
           void fetchInboxUnread();
         }}
         onUnreadCountChange={setInboxUnread}
+        /*
+         * 「未配置」空态的出口：关掉通知中心，进设置的「数据与同步」组
+         * （登录与服务器都在那一组）。
+         */
+        onOpenSignIn={() => {
+          setNotificationsOpen(false);
+          setSettingsSection('data');
+          navigation.push('settings');
+        }}
       />
     );
   }

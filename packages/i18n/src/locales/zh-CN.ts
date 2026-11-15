@@ -4277,7 +4277,9 @@ export const zhCN = {
   'mobile.inbox.badge.aria': '{count} 条未读',
   'mobile.inbox.tab.notifications': '通知',
   'mobile.inbox.tab.activity': '活动',
-  'mobile.inbox.unconfigured': '配置服务器并登录后，这里会显示账号通知。',
+  'mobile.inbox.unconfigured': '登录后这里会显示账号通知',
+  /* 未配置空态的出口。原来那一行只说了条件（"配置服务器并登录后…"），没给动作。 */
+  'mobile.inbox.goSignIn': '去登录',
   'mobile.inbox.error': '读不到通知 —— 检查网络后重试。',
   'mobile.inbox.retry': '重试',
   'mobile.inbox.loading': '正在加载…',

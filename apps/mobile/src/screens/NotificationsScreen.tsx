@@ -64,11 +64,19 @@ type LoadState = 'ready' | 'unconfigured' | 'unavailable' | null;
 export function NotificationsScreen({
   onBack,
   onUnreadCountChange,
+  onOpenSignIn,
 }: {
   /** 返回「我的」。宿主在返回时会重读一次未读数刷新入口徽标。 */
   onBack: () => void;
   /** 每次读到可信的未读数都上报（含"自动已读后归零"）—— 入口徽标的唯一数据源。 */
   onUnreadCountChange: (count: number) => void;
+  /**
+   * 「未配置」空态的去处（登录/服务器设置）。
+   *
+   * 🔴 2026-11-15：原来这个状态只有一行灰字「配置服务器并登录后，这里会显示账号通知」——
+   * **说了要登录，却没给登录的入口**。用户读完不知道下一步去哪。
+   */
+  onOpenSignIn: () => void;
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
@@ -191,10 +199,24 @@ export function NotificationsScreen({
     onRetry: () => void,
   ): React.JSX.Element | null => {
     if (state === 'unconfigured') {
+      /*
+       * 🔴 2026-11-15：从"一行灰字"改成 `EmptyState` + 出口。
+       *
+       * 这一屏其他三个空态（通知 / 活动 / 共享动态）都走 `EmptyState`，
+       * 只有"未配置"是一行裸文字 —— 而且它**只说条件、不给动作**：
+       * "配置服务器并登录后…" 读者会问"那我去哪配置"。
+       */
       return (
-        <Text variant="row-meta" tone="subtle">
-          {t('mobile.inbox.unconfigured')}
-        </Text>
+        <Stack>
+          <EmptyState title={t('mobile.inbox.unconfigured')} testID="inbox-unconfigured" />
+          {/* `EmptyState` 的 slots 里没有按钮位，所以出口画在它下面。 */}
+          <Button
+            label={t('mobile.inbox.goSignIn')}
+            tone="secondary"
+            onPress={onOpenSignIn}
+            testID="inbox-unconfigured-signin"
+          />
+        </Stack>
       );
     }
     if (state === 'unavailable') {
