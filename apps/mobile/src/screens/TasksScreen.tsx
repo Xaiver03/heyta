@@ -1221,7 +1221,22 @@ export function TasksScreen({
           // 自己 `projects.find(...)`，那会让"什么算有归属"变成两处。
           // 第三个参数是"收集箱"这个词 —— 宿主只交名词，要不要显示由共享层决定
           // （`@heyta/ui` 的依赖里没有 `@heyta/i18n`，见该包 package.json）。
-          list={listNameFor(projects, task.projectId, t('mobile.detail.project.inbox'))}
+          /*
+           * 🔴 2026-11-15：**无归属的任务不画清单名**。
+           *
+           * `listNameFor(projects, undefined, '收集箱')` 在"没有归属"时返回的就是
+           * 「收集箱」这个词（`packages/ui/src/projects/model.ts:331`）。
+           * 于是收集箱分组里每条任务都显示「📁 收集箱」—— 而分组标题**已经是**
+           * 「收集箱」，读者看到的是「收集箱 / 收集箱」。
+           *
+           * 无归属任务只会出现在收集箱分组里（那是唯一收它的地方），
+           * 所以这里按 `projectId === undefined` 判断就够，不需要额外的分组上下文。
+           */
+          list={
+            task.projectId === undefined
+              ? null
+              : listNameFor(projects, task.projectId, t('mobile.detail.project.inbox'))
+          }
           due={due === null ? null : { text: due.text, overdue: due.overdue }}
           priority={
             badge === null
