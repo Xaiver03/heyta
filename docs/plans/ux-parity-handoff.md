@@ -409,3 +409,49 @@ dump 失败时退回截图：截图 1080×2280，按 `x*1080/920`、`y*2280/1990
 | 全局顶栏：Modal 内返回在左、整页返回在右 | 20 屏都是这个形状；统一要一次改所有子屏，属结构改动 |
 | 会话行的设备名显示 `okhttp/4.9.2` / `curl/8.7.1` | 服务端 `deviceName` 列**没有任何登录路由接收**（`server/src/account/access-sessions.ts:63`），客户端只能回退显示 UA。要修得先定"客户端上报什么设备名" |
 | 「重新登录后需要重新输入加密口令」这类状态提示 | 属信息表达，不是排版 |
+
+### 11.10 改共享包之后必须重建它的 dist（2026-11-15 第二次踩）
+
+`packages/{i18n,ui}` 的 `main` / `exports` 都指向各自的 `dist/`。移动端打包读的是**产物**，
+不是 `src/`。所以改完 `packages/ui` 的样式或 `packages/i18n` 的词条，**先重建再打 APK**：
+
+```bash
+pnpm --filter @heyta/i18n build
+pnpm --filter @heyta/ui build
+HEYTA_ANDROID_HOST=linux-dev-lan pnpm --filter @heyta/mobile build:android
+```
+
+实测代价（两次）：① 改完 i18n 词条直接打 APK，界面里仍是带 Markdown 星号的旧文案；
+② 改完 `CalendarViewTabs` / `CalendarBoard` 的样式直接打 APK，装机后日历**一点没变** ——
+看起来像"改了没效果"，实际是 dist 还是 20 分钟前那份。
+
+判据：`ls -l packages/ui/dist/index.js` 的 mtime 要晚于你最后一次改 `packages/ui/src`。
+
+### 11.11 `@heyta/ui` 的单测全绿 ≠ 真机用的是新代码
+
+同一件事的另一面：`vitest` 读 `src/`，真机读 `dist/`。**两处必须分别验证**：
+单测绿只说明源码对；装机复看才说明用户看到的是新代码。
+
+---
+
+## 13. 第三轮：统计 / 专注 / 日历 / 任务详情（2026-11-15 晚）
+
+### 13.1 改了什么
+
+| 屏 | 问题 | 改法 |
+|---|---|---|
+| 任务详情 | 「重要 / 清单 / 上级任务 / 标签 / 重复 / 排期 / 优先级」七格竖排居中（`DetailSection` 也缺 `flexDirection`） | 补 `flexDirection: 'row'`，七格恢复「⌄ 属性名 ……… 值」 |
+| 统计 | 空态只有三段文字 | 空态改 `page` 档（唯一带插画的档位）+ 说明压短 |
+| 专注 | ①「今天」两行小字、卡高字少 ②冷启动后整块不出现 | ①两格横排大数字 ②`overview` 从 `useMemo` 挪进 `refresh()`（见台账 §34.2） |
+| 日历 | 档位选中=整块深蓝；月历有 Excel 式网格线；选中日=整格浅蓝 | 浅底主色字；去网格；选中改日期圆 |
+| 全站 | `Chip` 选中=实心主色 | 统一为浅底 + 主色字 |
+
+### 13.2 不能做的事
+
+**滴答清单（`com.ticktick.task` v8.0.9.1）在这台设备上是未登录态**，只有登录引导页，
+没有游客模式 —— 进不去它的专注 / 统计 / 日历页做逐屏对照。
+本轮只能对照它的登录页设计语言。**要真对照，需要账号**（见台账 §34.3）。
+
+### 13.3 判据
+
+`packages/ui` 987 passed、`apps/mobile` 1355 passed、八道门禁全绿。
