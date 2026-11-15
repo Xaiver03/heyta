@@ -80,6 +80,18 @@ export function useCalendarLabels(): CalendarBoardLabels {
       // 🔴 周次列（滴答式"31周"）：ISO 周数由领域 `isoWeek` 算，这里只措辞。
       weekNumber: (d: LocalDate) => t('web.calendar.weekShort', { n: isoWeek(d) }),
       dayEmpty: t('web.calendar.dayEmpty'),
+      /**
+       * 日视图右侧那一枚"这一天有几条"的计数。
+       *
+       * 🔴 词条目前只登记在 `mobile.calendar.dayCount`（同一个句子，先被移动端用到）。
+       * 这里复用它而不是在 web 侧再写一份 `{count} 项` —— 两处各写一次，
+       * 换一种语言时就会有一处留在旧措辞上。收敛到 `common.` 是独立的一件事。
+       *
+       * 补这条的起因：`CalendarBoard` 新增了 `labels.dayCount`（2026-11-15 13:38
+       * 的 `bacef25d`），web 侧没跟上 —— 而 `tsc -b` 当时被增量缓存挡着没报，
+       * 于是"完整构建"从那一刻起就是红的，只是没人跑过。
+       */
+      dayCount: (count: number) => t('mobile.calendar.dayCount', { count }),
       footnote: t('web.calendar.footnote'),
       taskRow: {
         toggleOn: (row: { title: string }) => t('web.shell.tasks.complete', { title: row.title }),
