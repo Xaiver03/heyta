@@ -119,6 +119,14 @@ export function QuadrantScreen({
    * 不用 `Dimensions.get('window')` —— 那是物理屏宽，桌面上永远"够大"（本项目实测过）。
    */
   const [availableWidth, setAvailableWidth] = useState(0);
+  /**
+   * 🔴 2026-11-15：**把这一块可用高度量出来，交给板子当 `minHeight`**。
+   *
+   * 板子自己声明了 `flexGrow: 1`，但它住在 `Screen` 的滚动内容列里 ——
+   * 那一列的高度由内容决定，`flexGrow` 拿不到"剩余空间"，于是矩阵只有内容那么高，
+   * 下方空出一大块（真机约 110dp）。量一次高度传下去比继续和 flex 链较劲可靠。
+   */
+  const [availableHeight, setAvailableHeight] = useState(0);
   const twoColumns = canPairColumns(availableWidth);
 
   const { t } = useI18n();
@@ -129,9 +137,11 @@ export function QuadrantScreen({
       style={{ flex: 1 }}
       onLayout={(e: LayoutChangeEvent) => {
         setAvailableWidth(e.nativeEvent.layout.width);
+        setAvailableHeight(e.nativeEvent.layout.height);
       }}
     >
       <QuadrantBoard
+      {...(availableHeight > 0 ? { minHeight: availableHeight } : {})}
       /*
        * 🔴 2026-11-15：**四象限的列数由「形态档」推导，不是各端写死。**
        *

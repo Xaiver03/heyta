@@ -121,6 +121,15 @@ export interface QuadrantBoardLabels {
 
 export interface QuadrantBoardProps {
   /** 全部任务。**已完成与已删除的由领域层排除**，共享层不再判一次。 */
+  /**
+   * 板子的最小高度（px）。宿主量出来传进来。
+   *
+   * 🔴 移动端的四象限住在滚动内容列里，`flexGrow` 拿不到剩余空间 ⇒ 矩阵只有
+   * 内容那么高、下方空一截（真机约 110dp）。宿主 `onLayout` 量一次可用高度，
+   * 由这里落地成 `minHeight` —— 只长不缩，内容多时仍然由父层滚动。
+   */
+  readonly minHeight?: number;
+  /** 全部任务。**已完成与已删除的由领域层排除**，共享层不再判一次。 */
   readonly tasks: readonly Task[];
   /** 当前时间（epoch ms）。显式传入，否则紧迫性判定不可测、也不可复现。 */
   readonly now: number;
@@ -394,6 +403,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
 }
 
 export function QuadrantBoard({
+  minHeight,
   tasks,
   now,
   labels,
@@ -442,7 +452,10 @@ export function QuadrantBoard({
   const footnote = labels.footnote;
 
   return (
-    <View style={styles.board} testID={testID}>
+    <View
+      style={[styles.board, minHeight === undefined ? undefined : { minHeight }]}
+      testID={testID}
+    >
       {/*
         🔴 轴标签画在**边界外侧**，不占格内空间：格子只有 165dp 宽，
         放进去会把标题挤掉。这里用绝对定位贴在左/上边缘。
