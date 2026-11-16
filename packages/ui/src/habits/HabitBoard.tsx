@@ -99,6 +99,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, type ViewProps } from 'r
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { Habit, HabitLog, LocalDate } from '@heyta/domain';
 import { Check, Minus, Plus, Undo2 } from 'lucide';
+import { EmptyState } from '../empty-state/EmptyState.js';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import { HabitMetricIcon } from './HabitMetricIcon.js';
@@ -504,9 +505,16 @@ export function HabitBoard({
   if (rows.length === 0) {
     return (
       <View testID={testID}>
-        <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
-          {labels.empty}
-        </Text>
+        {/*
+          🔴 2026-11-16：手写的那行灰字换成共享 `EmptyState` 的 **line 档**。
+          「空态只有一个实现」是门禁判据（`check:empty-state` 断言 B），
+          而这里是全仓最后几处手写之一（`HabitProgressList` 早就换过了）。
+
+          ⚠️ 用 `line` 而不是 `page`：这一块是**习惯屏里的一个区块**，
+          它下面紧跟着「添加习惯」的输入框与按钮（移动端）—— 换成带插图 + 大间距的
+          page 档会撑高布局，还会与那个表单重复同一步动作。
+        */}
+        <EmptyState size="line" title={labels.empty} />
       </View>
     );
   }

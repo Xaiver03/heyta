@@ -342,16 +342,25 @@ export function GrowthScreen({
 
       {data === null ? null : hasNoActivity ? (
         <Stack>
+          {/*
+            🔴 2026-11-16：按钮从空态的**兄弟**挪进 `action` 槽位。
+            两者视觉上几乎一样，但结构上是两件事：并排渲染时，
+            空态与那个按钮之间隔着 `Stack` 的默认档间距，读起来是"一段说明 + 另一个控件"；
+            进了槽位才是"这个空态给的那一步"。同一个口径已在任务空态落地。
+          */}
           <EmptyState
             illustration="habits"
             title={t('mobile.growth.streak.title')}
             hint={t('mobile.growth.streak.empty')}
-          />
-          <Button
-            label={t('mobile.habits.entry')}
-            icon="focus.streak"
-            onPress={onOpenHabits}
-            tone="primary"
+            action={
+              <Button
+                label={t('mobile.habits.entry')}
+                icon="focus.streak"
+                onPress={onOpenHabits}
+                tone="primary"
+                fullWidth={false}
+              />
+            }
           />
         </Stack>
       ) : (
