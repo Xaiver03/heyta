@@ -45,7 +45,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, View } from 'react-native';
 
-import { addDays, addMonths, dueLocalDateOf, startOfMonth, toLocalDate, type CountdownEvent, type LocalDate, type Task } from '@heyta/domain';
+import {
+  addDays,
+  addMonths,
+  classifyQuadrant,
+  dueLocalDateOf,
+  Quadrant,
+  startOfMonth,
+  toLocalDate,
+  type CountdownEvent,
+  type LocalDate,
+  type Task,
+} from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   createEventActions,
@@ -75,9 +86,10 @@ import { useToday } from '../lib/use-today';
 
 import { createProjectActions } from '@heyta/app-host';
 import { useTaskHost } from '../db/use-task-host';
+import { QUADRANT_TITLE_KEYS } from '../lib/quadrant-display';
 import { useMobileSync } from '../sync/store';
 import { Screen, Text } from '../ui/kit';
-import { CalendarScopeSheet, SCOPE_INBOX, type ScopeProject } from './CalendarScopeSheet';
+import { CalendarScopeSheet, SCOPE_INBOX, SCOPE_QUADRANT_PREFIX, type ScopeProject } from './CalendarScopeSheet';
 import { TopBarMenu } from '../ui/top-bar-menu';
 import { CalendarViewMenu } from './CalendarViewMenu';
 import { useTokens } from '../theme';
@@ -442,12 +454,34 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     () =>
       scope === undefined
         ? tasks
-        : tasks.filter((task) =>
-            task.projectId === undefined
-              ? scope.includes(SCOPE_INBOX)
-              : scope.includes(task.projectId),
-          ),
+        : tasks.filter((task) => {
+            const byProject =
+              task.projectId === undefined
+                ? scope.includes(SCOPE_INBOX)
+                : scope.includes(task.projectId);
+            if (byProject) return true;
+            /*
+             * 🔴 2026-11-16：**象限也是一个可筛的维度**，与清单是**并集**。
+             * 这一格是 hepta 结构上独有的（四象限与日历是同一批任务的两种投影），
+             * 用途：「只看马上做的那几件事落在哪天」。
+             * 与清单取并集而不是交集：面板是"我看哪些"，不是"同时满足"。
+             */
+            const quadrantId = `${SCOPE_QUADRANT_PREFIX}${String(classifyQuadrant(task, { now }))}`;
+            return scope.includes(quadrantId);
+          }),
     [scope, tasks],
+  );
+
+  /** 象限筛选的四个选项（顺序与四象限屏一致，值用 `q:N` 编码）。 */
+  const QUADRANT_SCOPE = useMemo(
+    () =>
+      [Quadrant.UrgentImportant, Quadrant.ImportantNotUrgent, Quadrant.UrgentNotImportant, Quadrant.Neither].map(
+        (quadrant) => ({
+          id: `${SCOPE_QUADRANT_PREFIX}${String(quadrant)}`,
+          label: t(QUADRANT_TITLE_KEYS[quadrant]),
+        }),
+      ),
+    [t],
   );
 
   /**
@@ -529,6 +563,16 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         tasks={scopedTasks}
         // 月份已经在顶栏标题里（点它切档）—— 板内不再重复一行。
         hideToolbarTitle
+        /*
+         * 🔴 2026-11-16：**月格里的任务条按象限着色**。
+         *
+         * 这一格是 hepta 结构上独有的：四象限与日历是**同一批任务的两种投影**，
+         * 所以日历上能直接看出"这周是不是全在救火"（红=马上做）。
+         * 滴答做不到 —— 它的四象限和日历是两个互不相识的模块。
+         *
+         * ⚠️ 逾期仍然优先用红色（那是"要注意"，不是分类），见 `CalendarBoard` 里的优先级。
+         */
+        colorByQuadrant
         today={today}
         /**
          * 🔴 「回到今天」原来**在页脚**（日历网格下面），因为移动端没传 `onToday`，
@@ -608,6 +652,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
       <CalendarScopeSheet
         visible={scopeOpen}
         projects={projects}
+        quadrants={QUADRANT_SCOPE}
         selected={scope}
         onCancel={() => { setScopeOpen(false); }}
         onConfirm={(next) => {

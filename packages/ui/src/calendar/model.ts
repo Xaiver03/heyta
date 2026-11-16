@@ -40,11 +40,14 @@ import {
   startOfYear,
   toLocalDate,
   dueLocalDate,
+  classifyQuadrant,
+  type Quadrant,
   startLocalDate,
   type CountdownEvent,
   type LocalDate,
   type Task,
 } from '@heyta/domain';
+import type { TokenName } from '@heyta/design-system';
 
 import { isAllDayMs } from '../timeline/board-model.js';
 import { formatClock, MINUTES_PER_HOUR } from '../timeline/model.js';
@@ -98,6 +101,22 @@ export type CalendarCellBar = {
    *   而"日历只有一个源"这件事因此是**可数的**，不是靠读注释。
    */
   readonly event?: boolean | undefined;
+  /**
+   * 🔴 2026-11-16：这一条属于哪个象限（仅在宿主给了 `now` 时算）。
+   *
+   * 用途：日历上**按象限着色** —— 一眼看出"这周是不是全在救火"。
+   * 这是 hepta 结构上独有的：四象限与日历是同一批任务的两种投影，
+   * 滴答里它们是两个互不相识的模块。
+   *
+   * ⚠️ 可选：不给 `now` 时不算（`classifyQuadrant` 判"紧急"需要当前时刻），
+   * 于是**不传这个选项的调用点行为逐字节不变**（web 现在就是这种情况）。
+   */
+  readonly quadrant?: Quadrant | undefined;
+  /**
+   * 这一条的色条用哪个 token（由宿主按 `quadrant` 解析好传下来）。
+   * `undefined` = 用默认色（逾期/完成/主色那条既有优先级）。
+   */
+  readonly accent?: TokenName | undefined;
 };
 
 /** 日历里一条排期任务覆盖的本地日期区间（两端都包含）。 */
@@ -205,6 +224,11 @@ export function calendarCellBars(
   max: number = MAX_CALENDAR_BARS,
   events?: readonly CalendarDayEvent[] | undefined,
   eventLabels?: CalendarEventBarLabels | undefined,
+  /**
+   * 可选：把这些条也标上象限（见 `CalendarCellBar.quadrant`）。
+   * 只影响**多出来的那一个字段**，不改条的数量、顺序与措辞。
+   */
+  options?: { readonly now?: number | undefined } | undefined,
 ): { readonly bars: readonly CalendarCellBar[]; readonly hidden: number } {
   type DecoratedCalendarBar = {
     readonly bar: CalendarCellBar;
@@ -232,6 +256,9 @@ export function calendarCellBars(
         done,
         overdue: !done && date < today,
         ...(spanKind === undefined ? {} : { span: spanKind }),
+        ...(options?.now === undefined
+          ? {}
+          : { quadrant: classifyQuadrant(task, { now: options.now }) }),
       } satisfies CalendarCellBar,
       /** Multi-day bars keep the lane implied by their original start date. */
       laneStart: span?.from ?? date,

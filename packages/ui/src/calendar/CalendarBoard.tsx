@@ -27,7 +27,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { HeytaNativeTokens } from '@heyta/design-system';
+import type { HeytaNativeTokens, TokenName } from '@heyta/design-system';
 import {
   isoWeek,
   isoWeekday,
@@ -38,6 +38,7 @@ import {
   type MonthGridCell,
   type Task,
 } from '@heyta/domain';
+import { Quadrant } from '@heyta/domain';
 import { CalendarDays } from 'lucide';
 
 import { EmptyState } from '../empty-state/EmptyState.js';
@@ -147,6 +148,16 @@ export interface CalendarBoardProps {
    * 否则同一屏上下各写一遍「2026年11月」。web 不传（它的页头没有这层）。
    */
   readonly hideToolbarTitle?: boolean;
+  /**
+   * 月格里的任务条**按象限着色**（不是按"是否逾期/完成"）。
+   *
+   * 用途：一眼看出"这周是不是全在救火"。hepta 的四象限与日历是同一批任务的
+   * 两种投影，滴答里它们是两个互不相识的模块 —— 这是结构上能做到、别家做不到的一格。
+   *
+   * ⚠️ 默认 `false`：不传的调用点（web）行为逐字节不变。
+   * ⚠️ 逾期仍然优先用 `danger` —— 那是"要注意"，不是分类。
+   */
+  readonly colorByQuadrant?: boolean;
   /** 月/周档是否隐藏重复的选中日清单（Web 使用格内任务条，移动端保留清单）。 */
   readonly showSelectedDayList?: boolean | undefined;
   /** 月档是否填满宿主传下来的可用高度。 */
@@ -401,9 +412,18 @@ function DayCell({
               width: tokens['border-width.thick'],
               alignSelf: 'stretch',
               borderRadius: tokens['radius.full'],
+              /**
+               * 🔴 优先级：逾期 > 完成 > 象限 > 默认。
+               * 逾期与完成是**状态**，象限是**分类**；状态盖住分类才对 ——
+               * 一条逾期的"计划做"应该在日历上红着，而不是蓝着。
+               */
               backgroundColor: bar.overdue
                 ? tokens['color.danger']
-                : bar.done ? tokens['color.foreground-subtle'] : tokens['color.primary'],
+                : bar.done
+                  ? tokens['color.foreground-subtle']
+                  : bar.accent === undefined
+                    ? tokens['color.primary']
+                    : (tokens[bar.accent] as string),
             }}
           />
           <Text
@@ -444,6 +464,17 @@ function DayCell({
 /** 格子的 testID 后缀用日期本身，不用索引 —— 索引会随月份错位而变。 */
 const testIDOf = (date: LocalDate): string => `calendar-cell-${date}`;
 
+/**
+ * 象限 → 色条 token。用 `QUADRANT_META` 的 `tokenPrefix`（`quadrant-1..4`），
+ * 与四象限屏同一套色 —— 两处各写一份颜色就会漂。
+ */
+const QUADRANT_ACCENT: Record<Quadrant, TokenName> = {
+  [Quadrant.UrgentImportant]: 'color.quadrant-1',
+  [Quadrant.ImportantNotUrgent]: 'color.quadrant-2',
+  [Quadrant.UrgentNotImportant]: 'color.quadrant-3',
+  [Quadrant.Neither]: 'color.quadrant-4',
+};
+
 export function CalendarBoard({
   tasks,
   today,
@@ -463,6 +494,7 @@ export function CalendarBoard({
   now,
   toolbarTrailing,
   hideToolbarTitle,
+  colorByQuadrant = false,
   showSelectedDayList = true,
   fillMonth = false,
   dayMarker,
@@ -720,6 +752,7 @@ export function CalendarBoard({
                     : MAX_CALENDAR_BARS,
                 eventsByDate?.get(cell.date),
                 eventLabels,
+                colorByQuadrant && now !== undefined ? { now } : undefined,
               );
               return (
                 <DayCell
@@ -730,7 +763,14 @@ export function CalendarBoard({
                   isToday={cell.date === today}
                   isSelected={cell.date === selected}
                   tone={calendarDayTone(cellTasks, today, cell.date)}
-                  bars={bars}
+                  bars={
+                    colorByQuadrant
+                      ? bars.map((bar) => {
+                          if (bar.quadrant === undefined || bar.overdue || bar.done) return bar;
+                          return { ...bar, accent: QUADRANT_ACCENT[bar.quadrant] };
+                        })
+                      : bars
+                  }
                   hidden={hidden}
                   /*
                    * 🔴 2026-10-17 修：`fitHeight` 让 `DayCell` **按量到的格高**再切一刀

@@ -33,6 +33,16 @@ import { useTokens } from '../theme';
  */
 export const SCOPE_INBOX = '__inbox__';
 
+/**
+ * 「按象限筛」在同一个 `scope` 数组里的编码：`q:1` … `q:4`。
+ *
+ * 🔴 为什么不把 `scope` 改成 `{ projects, quadrants }` 对象：
+ * 那要同步改菜单的"当前值"文案、过滤、以及将来持久化的形状，
+ * 而两者在**语义上本来就是同一件事**（"我只看这些"的并集）。
+ * 用前缀编码，过滤处一次 `startsWith('q:')` 就分得开。
+ */
+export const SCOPE_QUADRANT_PREFIX = 'q:';
+
 /** 一个可显示的清单（面板只关心 id / 名称 / 颜色点）。 */
 export interface ScopeProject {
   readonly id: string;
@@ -44,6 +54,8 @@ export interface CalendarScopeSheetProps {
   readonly projects: readonly ScopeProject[];
   /** `undefined` = 所有清单（不筛）。 */
   readonly selected: readonly string[] | undefined;
+  /** 四个象限的名字（按 `Quadrant` 的顺序给出，值与 `SCOPE_QUADRANT_PREFIX` 拼）。 */
+  readonly quadrants: readonly { readonly id: string; readonly label: string }[];
   readonly onCancel: () => void;
   readonly onConfirm: (next: readonly string[] | undefined) => void;
 }
@@ -51,6 +63,7 @@ export interface CalendarScopeSheetProps {
 export function CalendarScopeSheet({
   visible,
   projects,
+  quadrants,
   selected,
   onCancel,
   onConfirm,
@@ -167,6 +180,31 @@ export function CalendarScopeSheet({
                 <Icon name="action.keep" size="sm" color={tokens['color.primary']} />
               ) : null}
             </Pressable>
+          </View>
+
+          <View style={styles.card}>
+            {quadrants.map((quadrant, index) => {
+              const on = draft?.includes(quadrant.id) === true;
+              return (
+                <View key={quadrant.id}>
+                  {index === 0 ? null : <View style={styles.divider} />}
+                  <Pressable
+                    style={styles.row}
+                    onPress={() => {
+                      toggle(quadrant.id);
+                    }}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on }}
+                    testID={`calendar-scope-${quadrant.id}`}
+                  >
+                    <Text style={styles.rowLabel}>{quadrant.label}</Text>
+                    {on ? (
+                      <Icon name="action.keep" size="sm" color={tokens['color.primary']} />
+                    ) : null}
+                  </Pressable>
+                </View>
+              );
+            })}
           </View>
 
           <View style={styles.card}>
