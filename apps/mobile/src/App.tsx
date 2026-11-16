@@ -284,7 +284,15 @@ function Shell(): React.JSX.Element {
         <View style={{ flex: 1, display: tab === 'tasks' ? 'flex' : 'none' }}>
           <TasksScreen onPendingCountChange={setPendingCount} />
         </View>
-        <View style={{ flex: 1, display: tab === 'calendar' ? 'flex' : 'none' }}><CalendarScreen /></View>
+        <View style={{ flex: 1, display: tab === 'calendar' ? 'flex' : 'none' }}>
+          {/*
+            🔴 2026-11-16：把"这一屏当前是不是活的"告诉它。
+            标签页用 `display: 'none'` 保活（不卸载）⇒ 在任务页改了截止日、
+            切回日历时这一屏**不会重读数据**：格子还是旧的点、标题里的计数还是旧的。
+            真机症状：刚给任务设了"今天"，日历上今天那格仍写着"没有到期的任务"。
+          */}
+          <CalendarScreen active={tab === 'calendar'} />
+        </View>
         <View style={{ flex: 1, display: tab === 'focus' ? 'flex' : 'none' }}><FocusScreen /></View>
         <View style={{ flex: 1, display: tab === 'categories' ? 'flex' : 'none' }}><CategoriesScreen /></View>
         <View style={{ flex: 1, display: tab === 'profile' ? 'flex' : 'none' }}><ProfileScreen /></View>

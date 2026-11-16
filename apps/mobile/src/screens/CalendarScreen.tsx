@@ -45,7 +45,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, View } from 'react-native';
 
-import { addDays, addMonths, startOfMonth, toLocalDate, type CountdownEvent, type LocalDate, type Task } from '@heyta/domain';
+import { addDays, addMonths, dueLocalDateOf, startOfMonth, toLocalDate, type CountdownEvent, type LocalDate, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   createEventActions,
@@ -94,7 +94,7 @@ import { useTokens } from '../theme';
  *   **表里没有的档位，两端都画不出来**，而加一档不给键名会编译不过。
  */
 
-export function CalendarScreen(): React.JSX.Element {
+export function CalendarScreen({ active = true }: { active?: boolean } = {}): React.JSX.Element {
   const { t } = useI18n();
   // 🔴 走钩子取宿主：本机数据被销毁后（主动注销 / 别的设备注销）宿主会换代，
   // 这个钩子自动重取；原来的一次性 effect 在换代后会让本屏永久拿着已作废的
@@ -203,6 +203,19 @@ export function CalendarScreen(): React.JSX.Element {
     refresh();
     // 🔴 `dataRevision`：同步完成后重读。少了它，日历屏会一直显示同步前的快照。
   }, [host, refresh, dataRevision]);
+
+  /**
+   * 🔴 2026-11-16：**每次切回日历都重读**。
+   *
+   * 标签页用 `display: 'none'` 保活（`App.tsx`），所以这一屏在别处改了数据之后
+   * 不会自己知道 —— `dataRevision` 只跟**同步**走，本地写入不经过它。
+   * 真机症状：在任务页给一条任务设了「今天」，切回日历，今天那格仍写着
+   * 「这一天没有到期的任务」，标题也不带计数。
+   */
+  useEffect(() => {
+    if (!active || !host) return;
+    refresh();
+  }, [active, host, refresh]);
 
   const onToggleTask = useCallback(
     (taskId: string) => {
@@ -442,12 +455,39 @@ export function CalendarScreen(): React.JSX.Element {
    * 日档「11月16日 星期一」/ 年档「2026年」）。四个档各自有既有的措辞函数，
    * 这里不另写一套格式化。
    */
-  const rangeTitle = useMemo(() => {
+  const rangeTitleBase = useMemo(() => {
     if (view === 'month') return formatMonthTitleText(startOfMonth(cursor), t);
     if (view === 'day') return formatDayTitleText(selected, t);
     if (view === 'year') return formatYearTitleText(cursor, t);
     return `${formatDayTitleText(selected, t)} – ${formatDayTitleText(addDays(selected, 6), t)}`;
   }, [cursor, selected, t, view]);
+
+  /**
+   * 🔴 2026-11-16：**这一段里有多少事**，直接写进标题（「· 12 项」）。
+   *
+   * 依据：UX Patterns Guide 的 calendar-view 模式要求把 **event count** 作为文字暴露
+   *（与 visible range、selected date 并列）—— 它属于"我在看什么"的一部分，
+   * 不该藏在别处。这一屏原来的那行「11 项待办，1 项已完成」是**页头装饰**
+   *（产品负责人：「这些东西我总觉得……」），真正该说的是"我正看的这段有多少"。
+   *
+   * ⚠️ 数量按**当前显示范围**（`scope`）算，与网格里画的是同一批任务 ——
+   * 否则标题说 12 项、格子里只有 3 条，这行字立刻变成不可信的数字。
+   * ⚠️ 为 0 时**不显示**：`0 项` 是噪音（网格本身已经空着）。
+   */
+  const rangeCount = useMemo(() => {
+    const inRange = (date: string | undefined): boolean => {
+      if (date === undefined) return false;
+      if (view === 'month') return date.startsWith(startOfMonth(cursor).slice(0, 7));
+      if (view === 'year') return date.startsWith(String(startOfMonth(cursor).slice(0, 4)));
+      if (view === 'day') return date === selected;
+      const end = addDays(selected, 6);
+      return date >= selected && date <= end;
+    };
+    return scopedTasks.filter((task) => inRange(dueLocalDateOf(task))).length;
+  }, [cursor, scopedTasks, selected, view]);
+
+  const rangeTitle =
+    rangeCount === 0 ? rangeTitleBase : `${rangeTitleBase} · ${t('mobile.calendar.rangeCount', { count: rangeCount })}`;
 
   return (
     /*

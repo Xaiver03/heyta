@@ -3553,6 +3553,7 @@ export const zhCN = {
   'mobile.tasks.quadrant.axis.horizontal': '紧急',
   'mobile.tasks.quadrant.empty': '这里还没有任务',
 
+  'mobile.calendar.rangeCount': '{count} 项',
   'mobile.calendar.scope.entry': '显示范围',
   'mobile.calendar.scope.count': '已选 {count} 个清单',
   'mobile.calendar.scope.title': '显示范围',

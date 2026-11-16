@@ -3252,6 +3252,7 @@ export const en = {
   'mobile.tasks.quadrant.axis.horizontal': 'Urgent',
   'mobile.tasks.quadrant.empty': 'Nothing here yet',
 
+  'mobile.calendar.rangeCount': '{count} items',
   'mobile.calendar.scope.entry': 'Show range',
   'mobile.calendar.scope.count': '{count} lists',
   'mobile.calendar.scope.title': 'Show',
