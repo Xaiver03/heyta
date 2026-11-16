@@ -56,7 +56,7 @@ vi.mock('../src/lib/oplog.js', () => ({
   dispatchChecked: async () => undefined,
   dispatchIntent: async () => undefined,
 }));
-vi.mock('../src/lib/central-fetch.js', () => ({
+vi.mock('../src/lib/auth-fetch.js', () => ({
   createWebAuthFetch: () => async () => {
     throw new Error('这一枚判据不发请求');
   },
