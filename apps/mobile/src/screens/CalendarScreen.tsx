@@ -469,6 +469,24 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
    */
   const ZOOM_ORDER = useMemo<readonly CalendarViewKind[]>(() => ['year', 'month', 'week', 'day'], []);
   const pinchState = useRef({ start: 0, fired: false });
+  /**
+   * 捏合**过程中的档位预告**（松手才真的切）。
+   *
+   * 🔴 为什么要有它：四个档是离散的，捏合只在越过阈值那一刻"啪"地换一张脸 ——
+   * 用户不知道自己正在往哪一档去、也不知道还要捏多远。给一个实时提示
+   *（「→ 周视图」）就把"离散跳变"变成了"有方向的连续动作"。
+   * 这是"连续感"能做到的边界（真正的布局插值要重写渲染层，见台账 §40）。
+   */
+  const [pinchHint, setPinchHint] = useState<CalendarViewKind | null>(null);
+  /**
+   * 🔴 **捏合时日历跟手缩放** —— 这才是真正的"连续反馈"。
+   *
+   * 之前的版本只在越过阈值那一刻跳档（视觉上"啪"一下）。现在把整块日历的
+   * scale 直接绑到双指距离比上（夹在 0.9–1.1，免得缩没了），松手弹簧回 1 并换档。
+   * 于是"连续"发生在**视觉层**，"离散"只发生在**档位那一跳** ——
+   * 四个档是四套渲染，这个分工是当前架构下能做到的上限。
+   */
+  const pinchScale = useRef(new Animated.Value(1)).current;
   const zoomView = useCallback(
     (direction: 1 | -1) => {
       const index = ZOOM_ORDER.indexOf(view);
@@ -507,16 +525,31 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           const distance = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
           if (pinchState.current.start <= 0) return;
           const ratio = distance / pinchState.current.start;
+          // 跟手缩放（连续反馈）：夹在 0.9–1.1，越界的手感由弹簧收回。
+          pinchScale.setValue(Math.min(1.1, Math.max(0.9, ratio)));
           // 1.35 / 0.75 是"确实在捏"的门槛，避免两指并拢时手抖就跳档。
           if (ratio > 1.35) {
             zoomView(1);
             pinchState.current.fired = true;
+            setPinchHint(null);
           } else if (ratio < 0.75) {
             zoomView(-1);
             pinchState.current.fired = true;
+            setPinchHint(null);
+          } else if (ratio > 1.18) {
+            // 已过"一半"但还没到阈值：预告下一档（更细）。
+            const next = ZOOM_ORDER[ZOOM_ORDER.indexOf(view) + 1];
+            setPinchHint(next ?? null);
+          } else if (ratio < 0.88) {
+            const next = ZOOM_ORDER[ZOOM_ORDER.indexOf(view) - 1];
+            setPinchHint(next ?? null);
+          } else {
+            setPinchHint(null);
           }
         },
         onPanResponderRelease: (_e, g) => {
+          setPinchHint(null);
+          Animated.spring(pinchScale, { toValue: 1, useNativeDriver: true, friction: 7 }).start();
           // 双指手势结束时不当作"切周期"（两指也会产生 dx）。
           if (pinchState.current.start > 0) {
             pinchState.current = { start: 0, fired: false };
@@ -527,9 +560,11 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         },
         onPanResponderTerminate: () => {
           pinchState.current = { start: 0, fired: false };
+          setPinchHint(null);
+          Animated.spring(pinchScale, { toValue: 1, useNativeDriver: true, friction: 7 }).start();
         },
       }),
-    [shiftPeriod, tokens, zoomView],
+    [shiftPeriod, tokens, view, zoomView, ZOOM_ORDER, pinchScale],
   );
 
   /**
@@ -657,7 +692,12 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           flex: 1,
           opacity: viewAnim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
           transform: [
-            { scale: viewAnim.interpolate({ inputRange: [0, 1], outputRange: [viewScaleFrom.current, 1] }) },
+            {
+              scale: Animated.multiply(
+                viewAnim.interpolate({ inputRange: [0, 1], outputRange: [viewScaleFrom.current, 1] }),
+                pinchScale,
+              ),
+            },
           ],
         }}
       >
@@ -712,6 +752,36 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         testID="calendar-board"
       />
       </Animated.View>
+
+      {/*
+        捏合过程中的档位预告。只在双指移动且越过"一半阈值"时出现，
+        松手/取消即消失 —— 它不是常驻 UI，是一条**临时的意图确认**。
+      */}
+      {pinchHint === null ? null : (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: '42%',
+            alignItems: 'center',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: tokens['color.foreground'],
+              paddingHorizontal: tokens['space.4'],
+              paddingVertical: tokens['space.2'],
+              borderRadius: tokens['radius.full'],
+            }}
+          >
+            <Text variant="row-title" tone="on-primary" testID="calendar-pinch-hint">
+              {t(CALENDAR_VIEW_LABEL_KEYS[pinchHint])}
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/*
         🔴 2026-11-16：入口放在 `⋯` 里，**不在顶栏再加一枚图标**。
