@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>heyta UI/UX 审计 2026-11-16</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">heyta UI/UX 审计 2026-11-16</h1>
+</header>
+<h1 id="heyta-uiux-全面审计apple-design-视角">heyta · UI/UX
+全面审计（Apple Design 视角）</h1>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>项</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>审计对象</td>
+<td>heyta 客户端（Web 桌面 / Web 窄屏 / 原生移动端外壳）</td>
+</tr>
+<tr>
+<td>审计方法</td>
+<td>Apple《Designing Fluid Interfaces》《Principles of Great
+Design》《Details of UI Typography》+ 本仓设计系统规则，逐条对照</td>
+</tr>
+<tr>
+<td>证据来源</td>
+<td>见 §1「审计口径与证据」</td>
+</tr>
+<tr>
+<td>审计日期</td>
+<td>2026-11-16</td>
+</tr>
+<tr>
+<td>结论一句话</td>
+<td><strong>工程与设计系统的完成度处于同类产品上游</strong>；与”Apple
+级”的真实差距不在”有没有规则”，而集中在三处：① Web
+端手势动效是”曲线模拟”而非”可打断的弹簧”；②
+浅灰/小字/空网格多处贴着可读性临界；③
+信息架构与入口的收口不足（两层导航、窄屏标签截断、设置说明文字）。</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="结论摘要先看这一段">0. 结论摘要（先看这一段）</h2>
+<p><strong>做得好的（应当保留、不要为了”更 Apple”而拆掉）：</strong></p>
+<ul>
+<li><strong>语义化 token +
+禁裸值门禁</strong>：颜色/间距/圆角/动效全部走 <code>--ht-*</code>，有
+<code>check-hardcoded</code> 兜底。这正是 Apple “craft = 每个取值可辩护”
+的工程化形态。</li>
+<li><strong>语义文字样式</strong>（<code>typography.ts</code>）：把「字号+字重+行高+字距」捆成
+<code>row-title / caption / numeric-display</code> 这类语义名，直接照搬
+Apple semantic typography
+的做法，且<strong>字距随字号变</strong>（大标题 −0.022em、小字
++0.006em）——这一条很多团队做不到。</li>
+<li><strong>可访问性地基齐全</strong>：<code>:focus-visible</code>、<code>forced-colors</code>、<code>prefers-reduced-motion</code>、<code>prefers-reduced-transparency</code>
+四处都有实装（不是文档里的口号）；触控目标 44px、任务行 60px、数字
+<code>tabular-nums</code>。</li>
+<li><strong>按压反馈符合
+§1「响应在按下」</strong>：<code>press-origin.ts</code> 在
+<code>pointerdown</code> 就写径向高光原点，且不触发 React
+重渲染；<code>.ht-btn:active</code> 100ms 起效。</li>
+<li><strong>材质层级</strong>：<code>material.css</code> 用
+<code>backdrop-filter: blur(20px) saturate(180%)</code>
+做悬浮层，且定了”亮面不许叠亮面”的硬规则——与 Apple §12 一致。</li>
+<li><strong>对比度是测试保证的</strong>，不是文档保证的（<code>tokens.spec.ts</code>）。</li>
+</ul>
+<p><strong>必须处理的（本次审计的核心结论）：</strong></p>
+<ol type="1">
+<li><strong>Web
+端没有”真弹簧”</strong>。<code>--ht-ease-spring: cubic-bezier(0.34,1.56,0.64,1)</code>
+只是一个”看起来会回弹”的缓动曲线，它<strong>不能被中途抓住、不能继承手指速度、反转时会撞”砖墙”</strong>（Apple
+§3/§4/§5）。原生端用 <code>Animated.spring</code> 是达标的，Web
+端不是。</li>
+<li><strong>可读性贴着临界</strong>：<code>--ht-color-foreground-subtle</code>（slate-500）在白底
+4.76:1 达标，但在 <code>surface-sunken</code>（slate-100）上只有
+<strong>4.34:1</strong>（低于 AA 4.5），而它被大量 11–12px
+小字使用；成长页”这一年”热力图的<strong>空格≈1.07:1，作为”格”几乎不可见</strong>。</li>
+<li><strong>信息架构未收口</strong>：桌面是”图标 rail + 文本
+sidebar”两层导航且语义重叠（“已完成”两处都有）；窄屏底部栏 <strong>6
+项且「对话…」被截断</strong>（Apple HIG 标签栏 3–5
+项、标签应完整）；11-08
+取证快照中设置页仍是大段说明文字——与”设置禁止写说明文字”的自身规则冲突。</li>
+<li><strong>证据与代码不一致</strong>：最新的 11-14 截图（Web 窄屏底部栏
+6 项）与 <code>apps/mobile/TabBar.tsx</code>（5
+项：任务/日历/专注/分类/我的）对不上；11-08 与 11-14
+的设置界面形态也不同。<strong>“当前界面到底是哪一版”必须先由一次同构建的新拍摄钉死，否则任何”验收”都落不到当前产物上。</strong></li>
+</ol>
+<blockquote>
+<p>注：第 4
+条不是”挑刺”，是<strong>审计能否成立的前提</strong>。下面所有涉及具体版面像素的结论，都标注了它取自哪份快照、以及是否为”需复核（待确认）“。</p>
+</blockquote>
+<hr />
+<h2 id="审计口径与证据">1. 审计口径与证据</h2>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>证据</th>
+<th>时间</th>
+<th>规格</th>
+<th>数据态</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A. <code>screenshots/web-desktop/W01–W08</code></td>
+<td>2026-11-14</td>
+<td>1440×900</td>
+<td><strong>空数据</strong></td>
+<td>最新；代 C 外壳（rail + sidebar）</td>
+</tr>
+<tr>
+<td>B. <code>screenshots/web-mobile/MW01–MW03</code></td>
+<td>2026-11-14</td>
+<td>1170×2532</td>
+<td>空数据</td>
+<td>最新；Web 窄屏（<strong>底部栏 6 项</strong>）</td>
+</tr>
+<tr>
+<td>C.
+<code>docs/operations/software-copyright/evidence/screenshots</code>（17
+张）</td>
+<td>2026-11-08</td>
+<td>1920×1080</td>
+<td><strong>有数据</strong></td>
+<td>唯一能看到任务行/日历/热力图/分类时长的实拍</td>
+</tr>
+<tr>
+<td>D. 设计系统源码</td>
+<td>当前</td>
+<td>—</td>
+<td>—</td>
+<td><code>packages/design-system/src/tokens.css</code>（1024
+行）、<code>typography.ts</code></td>
+</tr>
+<tr>
+<td>E. 动效/无障碍源码</td>
+<td>当前</td>
+<td>—</td>
+<td>—</td>
+<td><code>material.css</code>、<code>controls.css</code>、<code>press-origin.ts</code>、<code>RailNavigation.tsx</code>、<code>apps/mobile/src/nav/TabBar.tsx</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>已知口径冲突（必须先解决，否则审计结论只能是”对某一份快照成立”）：</strong></p>
+<ul>
+<li>窄屏底部栏：B（截图）是 6 项含「对话…」；E（<code>TabBar.tsx</code>
+代码）是 5 项。→ 二者不是同一个产物，或截图基线已过期。</li>
+<li>设置界面：C（11-08）是整页长设置＋说明文字；A（11-14）是右侧弹层、无说明的紧凑列表。</li>
+<li>空数据：A/B
+几乎全是空态，<strong>数据密集型列表态无法从最新证据审计</strong>，故本次对”任务行/热力图/分类条”的判断取自
+C，并标”需以新拍摄复核”。</li>
+</ul>
+<blockquote>
+<p><strong>建议的第一步（P0）</strong>：用「构建产物 +
+<code>vite preview</code> +
+Playwright」按当前代码重拍一遍（<code>pnpm screenshot:capture</code>），并<strong>造一条任务/一个习惯/一轮专注</strong>让列表、热力图、象限出现真实数据。没有这一步，“当前界面”无法定义。</p>
+</blockquote>
+<p><img src="assets/desktop-empty-20261114.png"
+alt="空数据桌面 8 屏（2026-11-14）" /> <img
+src="assets/mobile-web-20261114.png"
+alt="Web 窄屏 3 屏（2026-11-14）" /> <img
+src="assets/populated-20261108-a.png"
+alt="有数据快照 A（2026-11-08）" /> <img
+src="assets/populated-20261108-b.png"
+alt="有数据快照 B（2026-11-08）" /></p>
+<hr />
+<h2 id="综合评级卡8-项-apple-原则">2. 综合评级卡（8 项 Apple 原则）</h2>
+<blockquote>
+<p>评级口径：<strong>优</strong>（可作为范例）/
+<strong>良</strong>（达标，有小缺口）/
+<strong>中</strong>（可用，但有明确落差）/
+<strong>待改</strong>（有阻碍性问题）。每条附一句判据。</p>
+</blockquote>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>原则</th>
+<th>评级</th>
+<th>一句话判据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Purpose 目的性</td>
+<td>良</td>
+<td>功能域清晰（任务/象限/习惯/专注/成长/倒数日）；但入口偏多，窄屏 6
+项即”什么都想要”的表现。</td>
+</tr>
+<tr>
+<td>2. Agency 自主性</td>
+<td>良</td>
+<td>回收站可恢复、危险操作有确认、批量动作有回执；缺失的”宽容度”主要在拖拽重排无撤销提示（可接受，但可加轻量
+Undo）。</td>
+</tr>
+<tr>
+<td>3. Responsibility 责任</td>
+<td>良</td>
+<td>隐私/加密选项、导入导出、AI 说明齐；AI
+建议的”可核对/可推翻”呈现方式未在证据中体现，<strong>待确认</strong>。</td>
+</tr>
+<tr>
+<td>4. Familiarity 熟悉</td>
+<td>良</td>
+<td>列表/日历/四象限的心智模型标准；图标统一 Lucide（已核实<strong>没有
+emoji 当图标</strong>）。减分：两层导航的”去哪儿”不直观。</td>
+</tr>
+<tr>
+<td>5. Flexibility 灵活</td>
+<td>良</td>
+<td>断点、暗色、跟随系统、四套主题（蓝白/暖纸/雾青）齐；窄屏底部栏项数越过
+HIG 上限。</td>
+</tr>
+<tr>
+<td>6. Simplicity 简洁</td>
+<td><strong>中</strong></td>
+<td>视觉极简、留白好；但”看着空、其实不简单”：11/12/13/14px
+四档邻近字号、两层导航、设置长说明。</td>
+</tr>
+<tr>
+<td>7. Craft 工艺</td>
+<td>良</td>
+<td>token/对比度/动效档/材质都很讲究；减分项：Web
+动效非弹簧、浅网格不可见、空态位图与线性图标不同源、证据与代码不一致。</td>
+</tr>
+<tr>
+<td>8. Delight 愉悦</td>
+<td>良</td>
+<td>克制、有按压高光与勾选弹簧；缺”流体手势”与多模态（haptic/声音）的关键瞬间。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>综合：上游成熟水准。</strong> 距”Apple
+级”的差距是<strong>局部且可修</strong>的，不需要推倒重来。</p>
+<hr />
+<h2 id="流体界面机制清单apple-16-条-heyta-现状">3.
+流体界面机制清单（Apple 16 条 → heyta 现状）</h2>
+<blockquote>
+<p>这是本次审计的”体检表”。✅ 达标 / 🟡 部分 / ❌ 缺口。附证据。</p>
+</blockquote>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>#</th>
+<th>Apple 机制</th>
+<th>状态</th>
+<th>证据 / 判据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>响应：按下即反馈，杀延迟</td>
+<td>✅</td>
+<td><code>:active</code> 100ms + <code>pointerdown</code>
+径向高光（<code>press-origin.ts</code>），符合”响应在按下”。</td>
+</tr>
+<tr>
+<td>2</td>
+<td>直接操控：1:1 跟手、尊重抓取偏移</td>
+<td>🟡</td>
+<td>有拖拽（dnd-kit / 四象限 / 手动排序），但是否
+<code>setPointerCapture</code> + 1:1
+无原生拖影，<strong>需实测确认</strong>；<code>useDragDayNav</code>
+刻意不用 capture（有理由，但与”1:1 跟手”的取舍需复核）。</td>
+</tr>
+<tr>
+<td>3</td>
+<td>可打断性（最重要）</td>
+<td>❌</td>
+<td>Web 浮层/抽屉用固定时长 CSS transition（<code>material.css</code>
+200ms），<strong>飞行中不可被抓住反向</strong>；<code>ease-spring</code>
+是曲线不是弹簧。</td>
+</tr>
+<tr>
+<td>4</td>
+<td>用弹簧不靠固定动画</td>
+<td>🟡</td>
+<td>RN 端 <code>Animated.spring</code> +
+<code>motion.spring-damping/response</code> ✅；Web 端是 cubic-bezier
+❌。<strong>两端能力不对等。</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td>速度交接（拖→动画无缝）</td>
+<td>❌</td>
+<td>Web 无 velocity handoff 实现；dnd-kit 默认 drop 不传松手速度。</td>
+</tr>
+<tr>
+<td>6</td>
+<td>动量投影（甩到该去的地方）</td>
+<td>❌</td>
+<td>无 <code>project(v)</code> 落点计算；松手直接吸附当前最近位。</td>
+</tr>
+<tr>
+<td>7</td>
+<td>空间一致性（来去同路、锚定源点）</td>
+<td>🟡</td>
+<td>弹层锚定触发点（AnchoredMenu
+有）；但入场/退场曲线是否镜像、是否”从哪来回哪去”<strong>需逐面复核</strong>。</td>
+</tr>
+<tr>
+<td>8</td>
+<td>手势方向暗示</td>
+<td>🟡</td>
+<td>抽屉/面板有位移入场，方向基本成立；缺”中间帧指向结果”的明确设计。</td>
+</tr>
+<tr>
+<td>9</td>
+<td>橡皮筋边界</td>
+<td>❌</td>
+<td>未发现 <code>rubberband()</code>
+类实现；拖到边界是硬停还是阻尼<strong>待实测</strong>。</td>
+</tr>
+<tr>
+<td>10</td>
+<td>手势细节（tap/drag 阈值/并行识别）</td>
+<td>🟡</td>
+<td>有拖拽阈值思路；tap 在 down
+高亮已做。并行识别/取消策略未集中体现。</td>
+</tr>
+<tr>
+<td>11</td>
+<td>帧级平滑（transform/opacity、will-change）</td>
+<td>✅</td>
+<td>规则明确”只动 transform/opacity”，有测试区间约束。</td>
+</tr>
+<tr>
+<td>12</td>
+<td>材质与深度（半透明层级）</td>
+<td>✅</td>
+<td><code>backdrop-filter</code> 悬浮层 + “亮面不叠亮面”硬规则 +
+暗色用深蓝提升。</td>
+</tr>
+<tr>
+<td>13</td>
+<td>多模态（视/听/触同帧）</td>
+<td>❌</td>
+<td>无 haptic / 声音反馈（Web 可 Vibration API，RN 可 Haptics）。</td>
+</tr>
+<tr>
+<td>14</td>
+<td>降低动效/无障碍</td>
+<td>🟡</td>
+<td><code>prefers-reduced-motion</code> 是”全部压成
+1ms”（≈取消），而非”温和 cross-fade”；reduced-transparency/contrast
+已做。</td>
+</tr>
+<tr>
+<td>15</td>
+<td>排版（光学字号/字距/行高/动态字号）</td>
+<td>🟡</td>
+<td>字距随字号 ✅、语义样式 ✅、<code>tabular-nums</code>
+✅；<strong>11/12/13/14 四档邻近</strong>层级偏密；用 Plus Jakarta +
+PingFang 回退，中英混排对齐<strong>待评估</strong>。</td>
+</tr>
+<tr>
+<td>16</td>
+<td>设计八原则</td>
+<td>良</td>
+<td>见 §2。</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="问题清单按严重度">4. 问题清单（按严重度）</h2>
+<blockquote>
+<p>每条：<strong>现象 → 证据 → Apple 依据 → 影响 →
+修复建议（含落点）</strong>。工作量 S/M/L。</p>
+</blockquote>
+<h3 id="p0-阻断审计成立或物理手感的根本问题">🔴 P0 —
+阻断”审计成立”或”物理手感”的根本问题</h3>
+<p><strong>P0-1　Web 端手势动效不是弹簧，不可打断</strong> - 现象：Web
+的”弹簧”是
+<code>--ht-ease-spring: cubic-bezier(0.34,1.56,0.64,1)</code>；浮层入场
+<code>material.css</code> 为 <code>200ms ease-enter</code>。RN 端才是
+<code>Animated.spring</code>。 -
+证据：<code>tokens.css:389</code>、<code>material.css</code>
+<code>.ht-material { animation: ht-material-in 200ms ... }</code>；<code>packages/ui/src/task-list/TaskRow.tsx</code>（RN
+用 <code>Animated.spring</code>）。 - 依据：Apple
+§3「每条动画都必须可被中途抓住、反向」；§4「用弹簧不用固定时长」；§5「速度交接」。
+- 影响：拖拽排序、四象限拖放、抽屉/sheet 在 Web
+上<strong>反转会撞墙</strong>、<strong>飞行中不可抓住</strong>——这是与
+iOS 手感差距最大的一处。 -
+修复：对<strong>可手势打断</strong>的元素（排序项、拖放落位、抽屉、sheet）改用真弹簧（Motion
+的
+<code>animate(el,{y:target},{type:'spring',bounce:0,duration:0.4})</code>
+或自研
+spring），从<strong>当前呈现值</strong>起步并<strong>传入松手速度</strong>；<code>bounce</code>
+仅在有甩动时给 0.2。工作量 <strong>M</strong>。</p>
+<p><strong>P0-2　证据与代码不一致，“当前界面”未被钉死</strong> -
+现象：11-14 窄屏底部栏 6 项含「对话…」；<code>TabBar.tsx</code> 是 5
+项。设置界面 11-08 与 11-14 形态不同。 -
+依据：无（这是交付纪律问题，不是 Apple 原则）。 -
+影响：任何”验收/回归”都可能对着过期图说话。 - 修复：按 §1
+建议，用当前代码重拍 + 造样本数据，建立”审计基线快照”。工作量
+<strong>S</strong>。</p>
+<p><strong>P0-3　可读性临界：<code>foreground-subtle</code> 在凹陷面
+4.34:1；11–12px 小字大量使用</strong> -
+现象：<code>--ht-color-foreground-subtle = slate-500 #64748b</code>。本次现算：白底
+4.76:1 ✅、<code>surface-sunken</code>(slate-100) <strong>4.34:1
+❌</strong>（&lt;AA 4.5）。它被 <code>settings__item-sub</code>、大量
+caption 使用。 - 证据：§6 对比度现算表；<code>controls.css</code>
+注释亦自认”subtle 在 sunken 上 4.34、够不到 4.5”。 - 依据：Apple
+§14/§16-Responsibility；WCAG AA 正文 4.5。 -
+影响：低亮度屏/浅色主题下辅助信息读不清；这是<strong>规则已知但仍在用</strong>的欠账。
+- 修复：小字（≤12px）一律用 <code>foreground-muted</code>(600,
+6.92–7.24:1)，或把 subtle 提亮到在 sunken 上 ≥4.5（约需 #5B6B80
+区间，改后要重跑 <code>tokens.spec.ts</code> 的全量对比度断言）。工作量
+<strong>S</strong>。</p>
+<h3 id="p1-明确落差需排期修">🟠 P1 — 明确落差，需排期修</h3>
+<p><strong>P1-0（用户实测，最高优先）　页边距没在外壳层收口：日历下方内容卡在
+iPad / iPhone 上全宽、像”根本没留边距”</strong></p>
+<blockquote>
+<p><strong>✅ 状态：已从根上修掉（不是补丁）。</strong> 分两步： 1.
+并行会话先做了三处点修（<code>16300338</code> / <code>3daf4239</code> /
+<code>1cb847f5</code>，13:01–13:23）； 2. 本次把它<strong>收进设计系统的
+token 层</strong>（分支
+<code>feat/screen-gutter-and-contrast</code>，提交
+<code>ed931eb5</code>）： 留白三档 16/24/32 由
+<code>SCREEN_GUTTER_STEPS</code> 唯一声明，Web 走
+<code>var(--ht-screen-gutter)</code>、 原生走根 Provider
+注入（<code>withResolvedScreenGutter</code>），外壳不许再写
+<code>? 0</code>、内容卡不许再自补 16dp， 并由新门禁
+<code>check:screen-gutter</code> 与
+<code>tests/screen-gutter.spec.ts</code> 双向钉住。
+下面保留问题描述作为背景与判据；末尾附本次验证。 ⚠️
+这三笔提交发生在本次审计期间，且与并行会话同步落在同一工作树上（详见
+§9「并行写入提示」）。 -
+现象：日历屏下方那张「这一天没有到期的任务」卡（以及脚注）在平板上贴到屏幕两边，观感就是没有页边距；iPhone
+同样。 - 证据（代码级，能精确到当天）： -
+<code>apps/mobile/src/screens/CalendarScreen.tsx</code> 用
+<code>chrome="board"</code>，其 2026-11-16
+注释原文：「<code>board</code> 档把 <code>Screen</code> 的左右 padding
+归零（内容铺满），于是日历<strong>下面那张「这一天没有到期的任务」卡连页边距都没有</strong>，贴在屏幕两边——真机上就是”根本没留边距”的观感（iPhone
+同样）」；当天用 <code>paddingHorizontal: space.4</code> 给整块板补了
+16dp。 - <code>packages/ui/src/calendar/CalendarBoard.tsx</code>
+2026-11-15 又单独给<strong>脚注</strong>补了 <code>space.4</code>。 -
+<code>packages/ui/src/layout/content-measure.ts</code>：<code>ScreenChrome='board'</code>
+时 <code>contentMeasureMaxFor</code> 返回
+<code>undefined</code>（<strong>铺满、无最大宽</strong>），<code>page</code>
+档才会收窄到 <code>CONTENT_MEASURE_MAX=680</code> 居中。 - 依据：Apple
+§16-Craft（间距不是随手值）+ §7 空间一致性；本仓
+<code>docs/agents/screen-chrome.md</code>
+的三档本意是”<strong>只有真正的全幅视觉（网格）才铺满</strong>，内容卡必须有页边距”。
+-
+根因（这是一类结构问题，不是”这一处漏了”）：<strong>页边距由”外壳档”一刀切决定</strong>——<code>board</code>
+档把整屏 padding 归零，于是除网格外的内容卡/脚注都掉到
+0，只能靠<strong>各自补 16dp</strong> 打补丁（11-15 补脚注、11-16
+补整块板）。而 16dp 在 iPad（820–1366dp）上≈没有留白，因为
+<code>board</code> 档<strong>同时没有最大宽</strong>。→
+补丁越打越多，却治不了”平板上看着全宽”。 - 修复（正确层次，别再加第三处
+16dp）： 1. <strong>外壳级响应式 gutter</strong>：给 <code>board</code>
+档也提供一条随宽度变化的页边距（16 / 20 / 24）或”夹住内容卡到
+<code>CONTENT_MEASURE_MAX</code> 居中”； 2.
+<strong>只让网格出血</strong>：把”铺满”能力下沉到
+<code>CalendarBoard</code> 的<strong>网格元素</strong>本身，而不是给整屏
+<code>Screen</code> 清零 padding ——
+这样脚注、空日卡自然继承外壳页边距，不需要各自补； 3.
+验收宽度：<strong>390（iPhone）/ 834（iPad 竖）/ 1194（iPad
+横）</strong>三档，看”卡片左右确有可见留白、网格仍可满幅”。 - 工作量
+<strong>M</strong>（改外壳档的取值模型 + 把出血下沉到网格 +
+三档回归）。<strong>这条建议排在最前面做</strong>，因为它影响”一眼看到的最外层观感”。</p>
+</blockquote>
+<p><strong>根治后的口径（2026-11-16 15:00，分支
+<code>feat/screen-gutter-and-contrast</code>）</strong></p>
+<table>
+<thead>
+<tr>
+<th>宽度</th>
+<th>留白</th>
+<th>谁</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 768</td>
+<td>16</td>
+<td>手机（iOS 标准边距）</td>
+</tr>
+<tr>
+<td>≥ 768</td>
+<td>24</td>
+<td>平板竖（iPad 834）/ 小窗</td>
+</tr>
+<tr>
+<td>≥ 1024</td>
+<td>32</td>
+<td>平板横（iPad 1194）/ 桌面</td>
+</tr>
+</tbody>
+</table>
+<p>同一条”页面留白”从<strong>三个答案</strong>收敛为<strong>一处声明</strong>：<code>SCREEN_GUTTER_STEPS</code>
++ 三条 media query。 判据：<code>pnpm check:screen-gutter</code>（4
+条，每条实测红过一次）+ <code>tests/screen-gutter.spec.ts</code>（CSS↔︎TS
+逐值对账）。 另：三级文字 <code>foreground-subtle</code> 提到新档
+<code>slate-550</code>，使它在<strong>每一块合法地面</strong>（含
+<code>surface-sunken</code>） 都过 AA —— 这与页边距是同一类问题（“记住换
+token”从来不是规范）。</p>
+<p><strong>本次验证（Web 端，当前构建实拍 2026-11-16 13:40）</strong> -
+方式：<code>vite build</code> → <code>vite preview</code> →
+用现有截图流水线（<code>scripts/screenshots/capture.mjs</code>）在
+1440×900 与 1170×2532(390 CSS) 两个视口拍日历。 -
+结果：网格与脚注<strong>一致</strong>落在内容留白之内，桌面 24px、窄屏
+16px；脚注不再贴边/溢出。见下图。 - ⚠️ <strong>原生（iPad/iPhone 桌面
+App）实拍未完成</strong>：本环境无 iOS 模拟器/真机，无法跑
+<code>apps/mobile</code> 的视觉回归；代码层已过 <code>tsc</code>（<span
+class="citation" data-cites="heyta/ui">@heyta/ui</span>、<span
+class="citation" data-cites="heyta/mobile">@heyta/mobile</span> 均 0
+error）、<code>check:design</code> / <code>check:spacing-scale</code> /
+<code>check:calendar</code> / <code>check:tap-targets</code>
+全绿、<code>vitest run calendar</code> 82
+项通过。原生复拍命令：<code>pnpm --filter @heyta/mobile ios</code> 后在
+390/834/1194 三档实拍核对。</p>
+<p><img src="assets/calendar-web-desktop-20261116.png"
+alt="修复后 · 日历（Web 桌面 1440×900）" /> <img
+src="assets/calendar-web-mobile-20261116.png"
+alt="修复后 · 日历（Web 窄屏 390）" /> <img
+src="assets/after-gutter-desktop-20261116.png"
+alt="根治后 · 分支构建实拍（桌面 1440，gutter 32）" /> <img
+src="assets/after-gutter-mobile-20261116.png"
+alt="根治后 · 分支构建实拍（窄屏 390，gutter 16）" /></p>
+<p><strong>P1-1　成长页”这一年”热力图空格几乎不可见</strong> ✅
+已修（<code>279cf997</code>） - 现象：空格约 <code>#f1f5f9</code>
+压在白底上 ≈
+<strong>1.10:1</strong>，作为”一天的格子”这个信息载体等于消失；只有有记录的格子亮蓝。
+- 证据：<code>ev_growth2.png</code>（11-08
+有数据）；<code>tokens.css</code> 的 <code>color.heat-0</code>。 -
+依据：Apple §16-Craft（轨道应可辨，数据比轨道亮）；§1 反馈的连续性。 -
+修复：<code>color.heat-0</code> →
+slate-200（<strong>1.23:1</strong>）。slate-300 会与
+heat-1（blue-200，1.42）明度撞车、把梯度压平，故不取。 判据是
+<code>GRAPHIC_PAIRS</code> 新增的一条
+<code>color.heat-0 on color.surface ≥ 1.2</code>（与既有的”分隔线
+≥1.2”同档）。</p>
+<p><strong>P1-2　信息架构：两层导航语义重叠</strong> - 现象：桌面 = 图标
+rail（收集箱/日历/已完成/搜索/助手/更多）+ 文本
+sidebar（今天/明天/最近7天/已完成/四象限/清单/标签/回收站/视图）。“已完成”在两处出现；“今天/明天”只在一处而”收集箱”只在另一处，用户要靠猜”哪个域归哪一层”。
+-
+证据：<code>crop_rail.png</code>、<code>desktop-empty-20261114.png</code>、<code>App.tsx</code>
+侧栏段落。 - 依据：Apple §16-Simplicity（清晰：层级让最重要的最先看到）+
+§16-Familiarity（预测性）+ 六条放置规则（入口分层）。 -
+修复：明确职责二分并在视觉上强区分——<strong>rail =
+功能域（任务/日历/专注/成长/我的…），sidebar =
+当前域内的范围/筛选</strong>；或收敛为单层”范围导航 +
+overflow”。至少消除”已完成”重复入口。工作量 <strong>M</strong>。</p>
+<p><strong>P1-3　窄屏底部栏 6 项 + 标签截断「对话…」</strong> -
+现象：Web 窄屏底栏：任务/日历/对话…/更多/通知/同步，共 6 项，「对话…」被
+ellipsis 截断。 - 依据：Apple HIG 标签栏 3–5
+项、标签<strong>完整可读</strong>；§16-Familiarity（标签是路径，不该猜）。
+- 修复：压到 ≤5 项；次要项（通知/同步）收进「更多」或顶栏；“对话”若是”AI
+助手”改名到能完整显示的长度。工作量 <strong>S</strong>。 - 注：原生
+<code>apps/mobile/TabBar.tsx</code> 已是 5 项 ✅——差距只在 Web
+窄屏这一支。</p>
+<p><strong>P1-4　设置信息密度与”说明文字”</strong> - 现象：11-08
+取证中设置页有大量成段说明（AI 托管、导入格式等）；11-14
+弹层已收敛为无说明的紧凑列表。两者冲突。 -
+依据：本仓自身规则「设置界面禁止写说明文字」+ Apple
+§16-Simplicity（高级项下沉一级）+ §5 设置页信息架构。 - 修复：确认 11-14
+紧凑形态为当前基准；如需保留解释，移到行内 <code>?</code>
+tooltip（本仓已有 <code>?</code> 纪律与门禁）。工作量
+<strong>S</strong>（若已收敛则仅需复核）。</p>
+<h3 id="p2-打磨项">🟡 P2 — 打磨项</h3>
+<ul>
+<li><strong>P2-1　字号层级过密（11/12/13/14px
+四档邻近）</strong>：<code>--ht-font-size-2xs/xs/sm/md</code> =
+11/12/14/13px。apple 用更少的档位 + 字重区分。建议合并 13 与
+14（分组标题走 14/600），11 与 12 之间只保留一档。→ 需要连同
+<code>typography.ts</code> 的 <code>caption/tab-label</code>
+一起看。工作量 S。</li>
+<li><strong>P2-2　中英混排对齐</strong>：Plus Jakarta Sans（拉丁）+
+PingFang SC（CJK）回退。混排时 x-height
+与字重不一致会让”同一行中英文字重不同”。Apple §15
+首选系统字体。建议做一版 system-ui
+对照（至少数字与中文用系统），桌面端保留 Jakarta 需校准字重。工作量
+S（评估）。</li>
+<li><strong>P2-3　空状态位图与线性图标不同源</strong>：收集箱/习惯的空态是位图插画，与
+Lucide 线性图标笔触不同源。Apple
+§16-Craft。建议统一为同风格矢量（线宽/圆角与 <code>--ht-icon-*</code>
+对齐）。</li>
+<li><strong>P2-4　硬 1px 分隔 vs 滚动边缘渐隐</strong>：多处仍是 1px
+浅线切分。Apple §12
+建议用”滚动边缘模糊/渐隐”替代硬线（本仓已有规则，但顶栏在截图里仍是实色带）。工作量
+S。</li>
+<li><strong>P2-5　reduced-motion 的方式</strong>：全压 1ms ≈
+取消反馈。Apple §14 建议用 150–200ms 透明度 cross-fade
+作”温和替代”。建议对关键转场保留淡入。工作量 S。</li>
+</ul>
+<h3 id="p3-机会愉悦">🟢 P3 — 机会/愉悦</h3>
+<ul>
+<li><strong>P3-1　多模态反馈</strong>：完成任务、番茄结束、拖拽吸附等”承诺时刻”加轻微
+haptic（RN Haptics / Web
+<code>navigator.vibrate</code>）与克制音效。Apple §13
+三规则（因果/同帧/克制）。</li>
+<li><strong>P3-2　Web 勾选弹簧</strong>：RN 的 checkbox
+已用弹簧（<code>checkboxSpring</code>），Web 侧勾选应同样用弹簧而非纯
+CSS。</li>
+<li><strong>P3-3　空态里的”第一推动”</strong>：空态文案与 CTA
+已有；可加”示例任务/示例习惯”一键生成，降低”从零开始”的空白焦虑（Apple
+§16-Delight/Agency）。</li>
+</ul>
+<hr />
+<h2 id="逐屏速评基于现有快照">5. 逐屏速评（基于现有快照）</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>屏幕</th>
+<th>观感</th>
+<th>主要问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>收集箱/任务列表</td>
+<td>干净、行高 60px、元信息层级清楚（文件夹·日期）</td>
+<td>空态；有数据态需复核；分组头 chevron 位置可再对齐标题基线</td>
+</tr>
+<tr>
+<td>四象限</td>
+<td>四宫格 + 彩色点 + 计数，模型标准</td>
+<td>空格大、CTA”拖任务到这里”可更明确；拖拽落位手感（P0-1）</td>
+</tr>
+<tr>
+<td>习惯</td>
+<td>空态清晰 + 主按钮</td>
+<td>列表态需复核</td>
+</tr>
+<tr>
+<td>日历</td>
+<td>月网格清晰、任务条按象限着色</td>
+<td><strong>平板/手机 <code>board</code>
+档全宽无页边距（P1-0）</strong>；空日卡/脚注靠 16dp 补丁</td>
+</tr>
+<tr>
+<td>番茄钟/专注</td>
+<td>大计时器居中、<code>tabular-nums</code></td>
+<td>计时结束的多模态反馈缺</td>
+</tr>
+<tr>
+<td>时间线</td>
+<td>散点+连线，信息设计有想法</td>
+<td>一眼读不懂坐标含义（缺轴标签/图例），需补 wayfinding</td>
+</tr>
+<tr>
+<td>成长</td>
+<td>KPI 层级好、分类条合理</td>
+<td>热力图空格不可见（P1-1）；“分类时长”左侧色块标”无”易误解</td>
+</tr>
+<tr>
+<td>回收站</td>
+<td>行内 恢复/彻底删除，危险色分离</td>
+<td>危险动作的二次确认已合理；可加批量</td>
+</tr>
+<tr>
+<td>设置</td>
+<td>11-14 弹层紧凑、右对齐值</td>
+<td>11-08
+长说明（P1-4）；分段控件里用”圆点单选”是混合形态，建议纯分段</td>
+</tr>
+<tr>
+<td>窄屏（Web）</td>
+<td>底栏图标+文字</td>
+<td>6 项 +「对话…」截断（P1-3）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="对比度现算表本次以-token-值计算非抄文档">6. 对比度现算表（本次以
+token 值计算，非抄文档）</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>前景 / 底色</th>
+<th>对比度</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>foreground(slate-900) on background(slate-50)</td>
+<td><strong>17.06:1</strong></td>
+<td>✅ AAA</td>
+</tr>
+<tr>
+<td>foreground-muted(slate-600) on white</td>
+<td><strong>7.58:1</strong></td>
+<td>✅ AAA</td>
+</tr>
+<tr>
+<td>foreground-muted on background(slate-50)</td>
+<td><strong>7.24:1</strong></td>
+<td>✅ AAA</td>
+</tr>
+<tr>
+<td>foreground-subtle(slate-500) on white</td>
+<td><strong>4.76:1</strong></td>
+<td>✅ AA（勉强）</td>
+</tr>
+<tr>
+<td>foreground-subtle on background(slate-50)</td>
+<td><strong>4.55:1</strong></td>
+<td>✅ AA（勉强）</td>
+</tr>
+<tr>
+<td><strong>foreground-subtle on surface-sunken(slate-100)</strong></td>
+<td><strong>4.34:1</strong></td>
+<td>❌ <strong>&lt; AA</strong></td>
+</tr>
+<tr>
+<td>primary(blue-600) on white</td>
+<td><strong>5.17:1</strong></td>
+<td>✅ AA</td>
+</tr>
+<tr>
+<td>slate-400 on white（占位符若用它，待确认实际取值）</td>
+<td><strong>2.56:1</strong></td>
+<td>❌ 明显不足</td>
+</tr>
+<tr>
+<td>slate-400 on slate-50</td>
+<td><strong>2.45:1</strong></td>
+<td>❌ 明显不足</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>结论：<strong>muted（600）是安全档</strong>；<strong>subtle（500）只能坐在白/浅底，不能坐
+sunkette</strong>；<strong>400 不能用于任何需要读的文字</strong>。</p>
+</blockquote>
+<hr />
+<h2 id="a.-本轮后续完成2026-11-16-下午全部已进-main">6a.
+本轮后续完成（2026-11-16 下午，全部已进 main）</h2>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>#</th>
+<th>项</th>
+<th>提交</th>
+<th>判据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>输入区收成「一个外框 + 上下两层」，主操作改圆形图标键</td>
+<td><code>4b43d5ed</code></td>
+<td>1440 / 390 实拍：外框完整包住两层，圆形键不溢出</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>原生端</strong>屏幕底改白 + 卡片补细线（前两轮只修了
+Web）</td>
+<td><code>aafa6635</code></td>
+<td>iPad 真机实拍，与 Web 1440 同构</td>
+</tr>
+<tr>
+<td>3</td>
+<td>空态自带行动入口；空态时收掉 FAB</td>
+<td><code>a05ae24b</code></td>
+<td>真机：空态按钮在位、无重复 FAB</td>
+</tr>
+<tr>
+<td>4</td>
+<td>热力图 0 档 1.10 → <strong>1.23</strong></td>
+<td><code>279cf997</code></td>
+<td><code>GRAPHIC_PAIRS</code> 断言 + 635 tests</td>
+</tr>
+<tr>
+<td>5</td>
+<td>回收站动作列不压缩、可见文字与读屏名分档</td>
+<td><code>7868c1ac</code></td>
+<td>1440 实拍：标题完整、动作贴右缘</td>
+</tr>
+<tr>
+<td>6</td>
+<td>「我的」账号卡补 <code>action.disclose</code> 箭头</td>
+<td><code>7868c1ac</code></td>
+<td>该图标此前零消费者（<code>icons.tsx</code> 自登记欠账）</td>
+</tr>
+<tr>
+<td>7</td>
+<td>习惯空态收进共享 <code>EmptyState</code>；成长按钮进 action
+槽位</td>
+<td><code>d0a14289</code></td>
+<td><code>check:empty-state</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>两处刻意不做</strong>： - 倒数日空态不加 action —— 它的
+composer 在 <code>view === 'active'</code>
+时常驻在空态上方，下一步本来就在眼前。 - 「我的」未登录卡不缺 CTA ——
+它整块可点（<code>Pressable</code> +
+<code>accessibilityRole="button"</code>），缺的只是”可点”的视觉暗示，已补箭头。</p>
+<h2 id="b.-本轮后续完成2026-11-16-夜间图登录面同意时机">6b.
+本轮后续完成（2026-11-16 夜间：图、登录面、同意时机）</h2>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>#</th>
+<th>项</th>
+<th>提交</th>
+<th>判据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>首启页四张深色抽象壁纸换成<strong>四则三格漫画</strong>（任务 / 日历
+/ 专注 / 统计）</td>
+<td><code>806d6f45</code></td>
+<td>iPhone XR 真机：三格完整、底部留白放得下标题与两个出口</td>
+</tr>
+<tr>
+<td>2</td>
+<td>首启页<strong>固定亮色</strong> + 每页一行说明</td>
+<td><code>806d6f45</code></td>
+<td>深色模式下不再把米白纸底压成灰黑</td>
+</tr>
+<tr>
+<td>3</td>
+<td>底部渐隐提前加重，标题不再压在第三格人背上</td>
+<td><code>f8763436</code></td>
+<td>真机两版对比</td>
+</tr>
+<tr>
+<td>4</td>
+<td>三处登录入口统一到「纸感 + 一圈细线」</td>
+<td><code>eeb02d49</code></td>
+<td>landing <code>/signin</code> 实拍、web 面板、mobile
+<code>Card outlined</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>隐私同意从「首启的墙」改成「<strong>网络守卫</strong>」</td>
+<td><code>c49d1084</code> + ADR-0086</td>
+<td>真机：冷启动直接是漫画；<code>1355 + 35</code> tests</td>
+</tr>
+<tr>
+<td>6</td>
+<td>被拦下的请求<strong>等用户决定、同意后原样重试</strong></td>
+<td><code>0eaeba4d</code></td>
+<td>六种情形各一条单测；<code>auth-consent-registration</code> 6
+passed</td>
+</tr>
+<tr>
+<td>7</td>
+<td>web
+登录九个动作接上设备级同意（<strong>注册不接</strong>：表单那个勾选框已经管联网）</td>
+<td><code>e8457104</code></td>
+<td>9 处 <code>withConsent</code>；注册流程不多弹一次</td>
+</tr>
+<tr>
+<td>8</td>
+<td>全部截图按新 UI 重拍；英文 seed 的组名与滚动修好</td>
+<td><code>45df88b2</code> + <code>5711d2c8</code></td>
+<td><code>verify-artifacts</code> 25 个目标全过</td>
+</tr>
+<tr>
+<td>9</td>
+<td>五条过期判据清掉；四象限空格子接回一句引导</td>
+<td><code>a9ca1e25</code></td>
+<td><code>987 + 157</code> tests；<code>check:empty-state</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>三处刻意的取舍</strong>（都已写进代码注释与提交信息，不是遗漏）：
+- <strong>注册不弹设备级同意</strong> ——
+表单里那个勾选框写着「并允许本机联网」，再弹一次是重复询问同一件事。 -
+<strong>同意面板只由用户动作带出来，不由请求带出来</strong> ——
+否则冷启动任何一个兜底请求都会把首屏重新盖住。 -
+<strong>四象限只在第一个空格子写引导</strong> ——
+“同屏最多一处”满足减重，“至少一处”满足空态要有下一步。</p>
+<h2 id="建议的落地路线">7. 建议的落地路线</h2>
+<p><strong>第一步（先把标尺立起来，1–2 天）</strong> 1.
+P0-2：按当前代码重拍 + 造样本数据，形成”审计基线”。 2. P0-3：把 ≤12px
+小字统一到 muted，或提亮 subtle；重跑 <code>tokens.spec.ts</code>。 3.
+P1-1：热力图空格加可见轨道。</p>
+<p><strong>第二步（补物理手感，3–5 天）</strong> 4. P0-1：抽一个
+<code>webSpring(target, {from, velocity, damping, response})</code>，先给<strong>抽屉
++ 四象限拖放 + 排序项</strong>接上；dnd-kit 的 drop 接动量投影（§6）。
+5. P1-3：窄屏底栏压到 ≤5 项。</p>
+<p><strong>第三步（收口与打磨，1 周）</strong> 6.
+P1-2：导航职责二分或收敛，消除”已完成”重复。 7. P1-4 / P2-1 /
+P2-3：设置形态确认、字号档合并、空态插画同源。 8. P3：关键承诺时刻加
+haptic/音效。</p>
+<blockquote>
+<p>建议<strong>不要</strong>做的：为了”更 iOS”去把成熟的 token
+体系、语义文字样式、材质规则改掉。这些是资产，不是负债。</p>
+</blockquote>
+<hr />
+<h2 id="一句话给产品负责人">8. 一句话给产品负责人</h2>
+<p><strong>这套 UI
+的地基（token、语义排版、对比度测试、无障碍开关、材质层级）已经是上游水准；真正拖住”Apple
+级手感”的是 Web
+端动效还停在”曲线模拟”，加上几处贴着临界的小字/浅灰/空网格，以及入口没收口。先把标尺（当前构建的基线快照）钉死，再按
+P0→P1 顺序补，投入不大、收益线性。</strong></p>
+<hr />
+<h2 id="并行写入提示本次审计期间实测到">9.
+并行写入提示（本次审计期间实测到）</h2>
+<p>审计进行中，本仓出现<strong>另一条并行会话在同一工作树上改同一块（日历页边距）</strong>的迹象：</p>
+<ul>
+<li><code>git log</code>
+现量：<code>16300338</code>（13:01「日历内容补页边距」）、<code>3daf4239</code>（13:09「空白那天不再撑成大白框」）、<code>1cb847f5</code>（13:23「board
+档页边距收进外壳——响应式 gutter」）三笔在审计时段内落库。</li>
+<li>其中 <code>1cb847f5</code> 的内容<strong>与本次审计同时写下的响应式
+<code>boardGutter</code> 改动逐字相同</strong> ——
+说明两边的编辑落在了同一份工作树上。</li>
+<li>同时段还有与本审计无关的未提交改动（<code>TasksScreen.tsx</code>、<code>navigation.tsx</code>、<code>project.pbxproj</code>）在另一处出现又消失。</li>
+</ul>
+<p><strong>处理方式</strong>：为避免互相覆盖，本审计<strong>未提交任何代码</strong>，并把临时改动（截图目标、manifest）全部回退；报告只陈述已落库的修复与验证事实。<strong>建议</strong>：确认是否确有第二个
+agent 在跑日历线；若是，同一份检出同一时刻只留一个写者（用
+<code>git worktree</code>
+物理隔离最稳），否则两边的编辑会互相覆盖，回归判据也会量到”别人刚改过的版本”。</p>
+<hr />
+<h2 id="本次交付物">10. 本次交付物</h2>
+<ul>
+<li>报告：本文件（<code>docs/audit/Apple-Design-UIUX-审计-20261116.md</code>）</li>
+<li>可视化：<code>docs/audit/Apple-Design-UIUX-审计-20261116.html</code></li>
+<li>证据图：<code>docs/audit/assets/</code>（空数据桌面/窄屏、有数据快照、日历修复后桌面/窄屏、图标放大、任务行放大）</li>
+</ul>
+</body>
+</html>
