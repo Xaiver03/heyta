@@ -1659,6 +1659,8 @@ export function TasksScreen({
    * 宽度由外层 `onLayout` 现量，`formFactorOf` 推档 —— 不读 `Dimensions`（Stage Manager 会改宽度）。
    */
   const twoPane = view === 'list' && formFactorOf(rootWidth) === 'expanded';
+  /** 分栏右栏宽度（dp）。列表侧 FAB 的右移量也用它，避免压到右栏。 */
+  const DETAIL_PANE_WIDTH = 384;
 
   /**
    * 详情面板公共属性。两种呈现（底部 sheet / 右栏 pinned）共用一份，避免两处漂移。
@@ -1918,7 +1920,7 @@ export function TasksScreen({
       </View>
 
       {twoPane ? (
-        <View style={{ width: 384, backgroundColor: tokens['color.surface'] }}>
+        <View style={{ width: DETAIL_PANE_WIDTH, backgroundColor: tokens['color.surface'] }}>
           {detailTask !== null && detailTaskId !== null ? (
             renderDetailSheet('pinned')
           ) : (
@@ -2006,6 +2008,7 @@ export function TasksScreen({
           icon="task.add"
           label={t('mobile.tasks.new')}
           testID="mobile-task-add"
+          rightOffset={twoPane ? DETAIL_PANE_WIDTH : 0}
           onPress={() => setComposerOpen(true)}
         />
       ) : (

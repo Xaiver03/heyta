@@ -1184,12 +1184,15 @@ export function Fab({
   label,
   onPress,
   testID = 'fab',
+  rightOffset = 0,
 }: {
   icon: IconName;
   label: string;
   onPress: () => void;
   /** 设备腿落点（同一个理由：`Pressable` 才进 AX 树）。 */
   testID?: string;
+  /** 额外右移量（dp）。iPad 分栏时右栏占位，FAB 要落回左列表右下角，不再压到右栏。 */
+  rightOffset?: number;
 }): React.JSX.Element {
   const t = useTokens();
   const { native, reducedMotion } = useTheme();
@@ -1205,7 +1208,7 @@ export function Fab({
       style={({ pressed }) => [
         {
           position: 'absolute',
-          right: t['screen.gutter'],
+          right: t['screen.gutter'] + rightOffset,
           // 抬到标签栏之上：标签栏高 + 一段呼吸。
           bottom: t['nav.tab-bar-height'] + t['space.4'],
           width: size,
