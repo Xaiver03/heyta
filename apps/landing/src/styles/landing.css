@@ -2579,3 +2579,44 @@ h3.lp-legal__h { font-size: var(--ht-font-size-base); }
     font-weight: var(--ht-font-weight-semibold);
   }
 }
+
+/* ── 登录出口页（2026-11-16）──────────────────────────────
+   目的：让 `/signin` 与**应用内首启页**看起来是同一个产品。
+   首启页现在是米白纸底的漫画（见 `assets/illustrations/onboarding/provenance.json`），
+   而这一页此前是纯白背景 + 三个等距链接，读起来像"一张没排版的清单"。
+
+   三处取值都来自 tokens.css，不新增变量：
+   · 底走 `--ht-paper-50`（纸色族已存在，R15）
+   · 边与圆角与产品里其它面同一档（细线 + radius-xl）
+   · 不用阴影：这是**页面内容**，不是浮层。 */
+.lp-signin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding-block: var(--ht-space-10);
+}
+
+.lp-signin .lp-page__cta {
+  margin: 0;
+}
+
+.lp-signin > :first-child {
+  margin-block-start: 0;
+}
+
+/* 三个出口托在一块**纸色**卡上，卡本身不投影 —— 靠一条线立住。 */
+.lp-signin {
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-paper-50);
+  padding-inline: var(--ht-space-6);
+  margin-block: var(--ht-space-8);
+}
+
+.lp-signin .lp-btn {
+  border-radius: var(--ht-radius-lg);
+}
+
+.lp-signin .lp-prose {
+  margin-block-end: 0;
+}

@@ -831,7 +831,7 @@ export function AuthScreen({
       >
         <Animated.View style={[{ gap: tokens['space.4'] }, entryStyle]}>
           {passphraseStep && session !== undefined ? (
-            <Card>
+            <Card outlined>
               <View style={layout.stack3}>
                 <View style={layout.stack1}>
                   <Text variant="row-title" tone="success">
@@ -862,7 +862,7 @@ export function AuthScreen({
               </View>
             </Card>
           ) : centralMode ? (
-            <Card>
+            <Card outlined>
               <View style={layout.stack3}>
                 <View style={layout.stack1}>
                   <Text variant="section-title">{t('mobile.auth.title')}</Text>

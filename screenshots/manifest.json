@@ -1,14 +1,14 @@
 {
-  "capturedAt": "2026-11-16T09:39:57.000Z",
+  "capturedAt": "2026-11-16T11:15:14.657Z",
   "targets": 1,
   "artifacts": [
     {
-      "path": "screenshots/web-desktop/W07-回收站.png",
+      "path": "screenshots/landing/L07-登录.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.0745,
-      "colorSpan": 228,
-      "sha256": "758f83986507e3fc728d74f4608f17a195e8c00de888a2eec0d082be2feae1a5"
+      "contentRatio": 0.1916,
+      "colorSpan": 227,
+      "sha256": "9fb87963db8e7beaeb5bd12b38a8a5c4659fdf370e122ea8e6fe7f0bce10690a"
     }
   ]
 }

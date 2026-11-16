@@ -82,7 +82,12 @@ export function SigninPage({ page }: { page: SitePage }): React.JSX.Element {
           套上它会在引言与主行动之间留出一段约 150px 的空洞，
           读起来仍然像页面缺了一块。
       */}
-      <div className="lp-wrap">
+      {/*
+        🔴 2026-11-16：这一页只做"把出口摆好"，但摆法要和应用内首启页一致 ——
+        纸底（`--ht-paper-50`）+ 一块细线卡片托住三个出口。此前三个链接直接撒在
+        纯白页面上，彼此间距一样、层级一样，读起来像一张没排版的清单。
+      */}
+      <div className="lp-wrap lp-signin">
         <p className="lp-page__cta">
           <a
             className="lp-btn lp-btn--primary"

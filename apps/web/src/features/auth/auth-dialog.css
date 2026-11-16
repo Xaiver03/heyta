@@ -32,11 +32,21 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   inline-size: min(100%, calc(var(--ht-layout-modal-max) + var(--ht-layout-detail-width) + var(--ht-space-8)));
   max-block-size: calc(100dvh - var(--ht-space-8));
   overflow-y: auto;
-  border: 0;
+  /*
+    🔴 2026-11-16：登录面板改成「纸感 + 一圈细线」，与首启页那套漫画同一调性。
+
+    之前是 `border: 0` + `shadow-xl` —— 一块**浮在暗遮罩上的纯白板**。
+    那在深色首启页后面成立；现在首启页是米白纸底（`--ht-paper-50`），
+    纯白板 + 重投影压上去会读成"另一套界面"。
+
+    做法与产品里其它面一致（见 `borderless-controls.css` 的收窄说明）：
+    **承载交给一条线，浮起只留一档轻阴影**。
+  */
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-xl);
   background: var(--ht-color-surface-raised);
   color: var(--ht-color-foreground);
-  box-shadow: var(--ht-shadow-xl);
+  box-shadow: var(--ht-shadow-md);
 }
 
 .ht-sheet__auth-plan {

@@ -984,9 +984,16 @@ export interface CardProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   gap?: GapTier;
+  /** 是否画一圈 `color.border` 细线。默认 `false`（保持既有几十屏的观感不变）。 */
+  outlined?: boolean;
 }
 
-export function Card({ children, style, gap = 'default' }: CardProps): React.JSX.Element {
+export function Card({
+  children,
+  style,
+  gap = 'default',
+  outlined = false,
+}: CardProps): React.JSX.Element {
   const t = useTokens();
   return (
     <View
@@ -997,6 +1004,20 @@ export function Card({ children, style, gap = 'default' }: CardProps): React.JSX
           padding: t['space.4'],
           gap: gapValue(t, gap),
         },
+        /*
+          🔴 2026-11-16：可选的一圈细线。
+
+          屏幕底改白之后，`surface` 白卡压在白底上**没有边界** —— 全应用一起加线会
+          改掉几十屏，所以先做成 opt-in：眼下只有登录页用它（那里内容密度最低、
+          卡片最大，没有线会读成"一整片空白里浮着几行字"）。
+          以后哪一屏需要，单独打开即可，不必再改组件。
+        */
+        outlined
+          ? {
+              borderWidth: t['border-width.thin'],
+              borderColor: t['color.border'],
+            }
+          : null,
         style,
       ]}
     >
