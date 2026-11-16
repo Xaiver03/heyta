@@ -48,7 +48,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
 
-import type { Task } from '@heyta/domain';
+import { Quadrant, type Task } from '@heyta/domain';
 import { emptyState } from '@heyta/op-log';
 
 import { useTaskStore } from '../src/features/tasks/store.js';
@@ -145,10 +145,10 @@ describe('W5 四象限空态减重', () => {
       */
       const labels = quadrantBoardLabels(
         t as never,
-        { firstEmptyQuadrant: 'plan' },
+        { firstEmptyQuadrant: Quadrant.ImportantNotUrgent },
       );
-      expect(labels.empty('plan'), '第一个空象限应当有下一步引导').toBe('拖任务到这里');
-      for (const q of ['urgent-important', 'delegate', 'drop'] as const) {
+      expect(labels.empty(Quadrant.ImportantNotUrgent), '第一个空象限应当有下一步引导').toBe('拖任务到这里');
+      for (const q of [Quadrant.UrgentImportant, Quadrant.UrgentNotImportant, Quadrant.Neither] as const) {
         expect(labels.empty(q), `${q} 不该再写一遍同一句`).toBe('');
       }
     });
@@ -160,9 +160,9 @@ describe('W5 四象限空态减重', () => {
         全空时第一个空象限是第 1 格，所以那格必须有引导。
       */
       const labels = quadrantBoardLabels(t as never, {
-        firstEmptyQuadrant: 'urgent-important',
+        firstEmptyQuadrant: Quadrant.UrgentImportant,
       });
-      expect(labels.empty('urgent-important'), '全空时第 1 格没有下一步提示').toBe(
+      expect(labels.empty(Quadrant.UrgentImportant), '全空时第 1 格没有下一步提示').toBe(
         '拖任务到这里',
       );
     });
