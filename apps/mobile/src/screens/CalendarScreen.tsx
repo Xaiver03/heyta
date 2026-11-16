@@ -431,17 +431,82 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     },
     [cursor, stepCursor, view],
   );
+  /**
+   * 🔴 2026-11-16：**捏合切档**（双指）。
+   *
+   * 依据：TimeZoom（CHI 2006, TU Dresden）把时间档位做成**可缩放**而非离散跳档
+   *（"arbitrary granularity"）。移动端日历没有一家做 —— 滴答是顶栏下拉、
+   * Google 是菜单，都要"先想清楚某个档，再去点"。
+   *
+   * 我们做**半连续**：双指张开 = 更细（年→月→周→日），捏合 = 更粗，
+   * 一次手势只跳一档（`fired` 防重复触发），跳完保留游标位置（`stepCursor` 的老规则）。
+   *
+   * ⚠️ **不是布局插值**：四个档是四套完全不同的渲染（月格 / 周条 / 日时间轴 / 年卡），
+   * 真要"连续变形"得重写渲染层，这一轮不做。所以是"手势连续、档位离散"。
+   */
+  const ZOOM_ORDER = useMemo<readonly CalendarViewKind[]>(() => ['year', 'month', 'week', 'day'], []);
+  const pinchState = useRef({ start: 0, fired: false });
+  const zoomView = useCallback(
+    (direction: 1 | -1) => {
+      const index = ZOOM_ORDER.indexOf(view);
+      const next = ZOOM_ORDER[Math.min(ZOOM_ORDER.length - 1, Math.max(0, index + direction))];
+      if (next === undefined || next === view) return;
+      changeView(next);
+    },
+    [ZOOM_ORDER, changeView, view],
+  );
+
   const swipe = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_e, g) =>
-          Math.abs(g.dx) > tokens['space.8'] && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+        /**
+         * 双指 ⇒ 捏合（缩放档位）；单指横滑 ⇒ 切周期。
+         * 两者用 `touches.length` 分开，不会互相抢。
+         */
+        onMoveShouldSetPanResponder: (e, g) => {
+          if (e.nativeEvent.touches.length === 2) return true;
+          return Math.abs(g.dx) > tokens['space.8'] && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
+        },
+        onPanResponderGrant: (e) => {
+          const touches = e.nativeEvent.touches;
+          if (touches.length !== 2) return;
+          const [a, b] = touches;
+          if (a === undefined || b === undefined) return;
+          const dx = a.pageX - b.pageX;
+          const dy = a.pageY - b.pageY;
+          pinchState.current = { start: Math.hypot(dx, dy), fired: false };
+        },
+        onPanResponderMove: (e) => {
+          const touches = e.nativeEvent.touches;
+          if (touches.length !== 2 || pinchState.current.fired) return;
+          const [a, b] = touches;
+          if (a === undefined || b === undefined) return;
+          const distance = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+          if (pinchState.current.start <= 0) return;
+          const ratio = distance / pinchState.current.start;
+          // 1.35 / 0.75 是"确实在捏"的门槛，避免两指并拢时手抖就跳档。
+          if (ratio > 1.35) {
+            zoomView(1);
+            pinchState.current.fired = true;
+          } else if (ratio < 0.75) {
+            zoomView(-1);
+            pinchState.current.fired = true;
+          }
+        },
         onPanResponderRelease: (_e, g) => {
+          // 双指手势结束时不当作"切周期"（两指也会产生 dx）。
+          if (pinchState.current.start > 0) {
+            pinchState.current = { start: 0, fired: false };
+            return;
+          }
           if (Math.abs(g.dx) < tokens['space.8']) return;
           shiftPeriod(g.dx < 0 ? 1 : -1);
         },
+        onPanResponderTerminate: () => {
+          pinchState.current = { start: 0, fired: false };
+        },
       }),
-    [shiftPeriod, tokens],
+    [shiftPeriod, tokens, zoomView],
   );
 
   /**
