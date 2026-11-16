@@ -364,3 +364,105 @@ describe('formatPrivacyDecisionTime：四个壳共用的一行收据', () => {
     expect(formatPrivacyDecisionTime(gate.current()!.decidedAt)).toBe('2020-01-01 00:00');
   });
 });
+
+describe('createConsentGatedFetch + onBlocked：同意之后原样重试那一次', () => {
+  /** 一个能数调用次数、并按给定形状应答的假 fetch。 */
+  function fakeFetch(): { impl: typeof fetch; calls: number; urls: string[] } {
+    const state = { calls: 0, urls: [] as string[] };
+    const impl = (async (input: RequestInfo | URL) => {
+      state.calls += 1;
+      state.urls.push(typeof input === 'string' ? input : String(input));
+      return new Response('{"ok":true}', { status: 200 });
+    }) as typeof fetch;
+    return { impl, get calls() { return state.calls; }, get urls() { return state.urls; } };
+  }
+
+  it('🔴 同意 ⇒ 同一个请求被重试一次并正常返回（底层 1 次调用）', async () => {
+    let allowed = false;
+    const fetcher = fakeFetch();
+    const asked: string[] = [];
+    const gated = createConsentGatedFetch(fetcher.impl, () => allowed, {
+      ask: async (url) => {
+        asked.push(url);
+        allowed = true; // 用户在面板里点了「同意并联网」
+        return true;
+      },
+    });
+
+    const response = await gated('https://heyta.example/api/sync/ops', { method: 'POST' });
+
+    expect(response.status).toBe(200);
+    expect(asked, '拦下时必须问一次，且问的是这一个 URL').toEqual([
+      'https://heyta.example/api/sync/ops',
+    ]);
+    expect(fetcher.calls, '同意之后应当只发一次（重试那一次）').toBe(1);
+  });
+
+  it('🔴 拒绝（只用本机）⇒ 不发请求、抛原错误', async () => {
+    const fetcher = fakeFetch();
+    const gated = createConsentGatedFetch(fetcher.impl, () => false, {
+      ask: async () => false,
+    });
+
+    await expect(gated('https://heyta.example/api/x')).rejects.toThrow(
+      PrivacyConsentBlockedError,
+    );
+    expect(fetcher.calls, '拒绝之后底层仍必须是 0 次').toBe(0);
+  });
+
+  it('🔴 超时 ⇒ 不挂死、不发请求、抛原错误', async () => {
+    const fetcher = fakeFetch();
+    const gated = createConsentGatedFetch(fetcher.impl, () => false, {
+      // 永远不 resolve —— headless / 面板渲染失败时就是这个形状
+      ask: () => new Promise<boolean>(() => {}),
+      timeoutMs: 20,
+    });
+
+    await expect(gated('https://heyta.example/api/x')).rejects.toThrow(
+      PrivacyConsentBlockedError,
+    );
+    expect(fetcher.calls).toBe(0);
+  });
+
+  it('🔴 钩子自己抛错 ⇒ 按"没同意"处理，不发请求', async () => {
+    const fetcher = fakeFetch();
+    const gated = createConsentGatedFetch(fetcher.impl, () => false, {
+      ask: async () => {
+        throw new Error('面板渲染失败');
+      },
+    });
+
+    await expect(gated('https://heyta.example/api/x')).rejects.toThrow(
+      PrivacyConsentBlockedError,
+    );
+    expect(fetcher.calls).toBe(0);
+  });
+
+  it('🔴 只重试一次：同意后又撤回，不能无限重试', async () => {
+    let allowed = false;
+    const fetcher = fakeFetch();
+    let askCount = 0;
+    const gated = createConsentGatedFetch(fetcher.impl, () => allowed, {
+      ask: async () => {
+        askCount += 1;
+        // 第一次说"同意了"，但同时把闸门保持关闭 —— 模拟"同意又撤回"的竞态
+        return true;
+      },
+    });
+
+    await expect(gated('https://heyta.example/api/x')).rejects.toThrow(
+      PrivacyConsentBlockedError,
+    );
+    expect(askCount, '问了却没放行时不该再问第二次').toBe(1);
+    expect(fetcher.calls, '闸门仍关着时一个请求都不该发').toBe(0);
+  });
+
+  it('不给钩子时行为不变：拦下即抛，底层 0 次', async () => {
+    const fetcher = fakeFetch();
+    const gated = createConsentGatedFetch(fetcher.impl, () => false);
+    await expect(gated('https://heyta.example/api/x')).rejects.toThrow(
+      PrivacyConsentBlockedError,
+    );
+    expect(fetcher.calls).toBe(0);
+  });
+});

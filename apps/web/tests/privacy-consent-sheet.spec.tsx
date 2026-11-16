@@ -59,7 +59,9 @@ const { PrivacyConsentSheet } = await import('../src/features/privacy/PrivacyCon
 const { privacyConsent, consentFetch, installConsentGatedFetch } = await import(
   '../src/features/privacy/consent-gate.js'
 );
-const { usePrivacyStore } = await import('../src/features/privacy/store.js');
+const { usePrivacyStore, __resetPrivacyDecisionForTests } = await import(
+  '../src/features/privacy/store.js'
+);
 const { useSyncStore } = await import('../src/features/sync/store.js');
 
 /**
@@ -126,6 +128,14 @@ beforeEach(() => {
   // 起点必须真的是"没问过"，否则上一条用例留下的会话值会替这一条作决定。
   privacyConsent.revoke();
   usePrivacyStore.setState({ open: false, reason: 'first-launch', notPersisted: false });
+  /*
+    🔴 2026-11-16：还要清掉"挂起的决定"与"面板是否挂载"这两个模块级状态。
+
+    网络闸门现在会在被拦下时挂起一次请求等用户决定；上一条用例留下的
+    `sheetMounted = true` 会让下一条用例里任何一次被拦的请求都去弹面板 ——
+    症状是"冷启动不弹"那条红得莫名其妙（实测：单跑绿、整文件跑红）。
+  */
+  __resetPrivacyDecisionForTests();
   expect(privacyConsent.undecided()).toBe(true);
 });
 

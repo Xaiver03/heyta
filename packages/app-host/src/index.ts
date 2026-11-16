@@ -960,6 +960,7 @@ export {
   PrivacyConsentBlockedError,
   UNAVAILABLE_PRIVACY_CONSENT_PORT,
   createConsentGatedFetch,
+  type ConsentBlockedHook,
   createPrivacyConsentGate,
   formatPrivacyDecisionTime,
   parsePrivacyConsent,

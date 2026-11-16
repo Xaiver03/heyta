@@ -31,7 +31,7 @@
  */
 
 import { ShieldCheck } from 'lucide-react';
-import { type CSSProperties } from 'react';
+import { type CSSProperties, useEffect } from 'react';
 
 import { cssVar } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
@@ -42,7 +42,7 @@ import { authBaseUrl } from '../../lib/auth-endpoint.js';
 import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
 import { text } from '../../lib/text.js';
 import { useSyncStore } from '../sync/store.js';
-import { usePrivacyStore } from './store.js';
+import { notePrivacySheetMounted, usePrivacyStore } from './store.js';
 
 /**
  * 遮罩与面板这两层的样式。
@@ -86,6 +86,16 @@ export function PrivacyConsentSheet(): React.JSX.Element | null {
   const chooseLocalOnly = usePrivacyStore((s) => s.chooseLocalOnly);
   const acknowledgeNotPersisted = usePrivacyStore((s) => s.acknowledgeNotPersisted);
   const baseUrl = useSyncStore((s) => s.baseUrl);
+
+  /*
+    🔴 告诉闸门"面板有渲染器"。网络层在被拦下时会挂起一次请求等用户决定 ——
+    而**没有任何组件挂着时没人能点**，那时应当立刻失败而不是拖到超时。
+    所有权只有这里一处：mount/unmount 各报一次。
+  */
+  useEffect(() => {
+    notePrivacySheetMounted(true);
+    return () => notePrivacySheetMounted(false);
+  }, []);
 
   /**
    * 条款链接的分流（链 2）。

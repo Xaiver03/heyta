@@ -100,6 +100,19 @@ export const privacyConsent = createPrivacyConsentGate(localStoragePrivacyConsen
 export const consentFetch: typeof fetch = createConsentGatedFetch(
   globalThis.fetch.bind(globalThis),
   () => privacyConsent.networkAllowed(),
+  /*
+    🔴 2026-11-16（ADR-0086）：被拦下时**挂起这一次请求**，等用户决定；
+    同意就原样重试，拒绝或超时就抛原错误。
+
+    没有它时：用户点「同步」→ 被拦 → 看到一句"同步失败"，然后他再去隐私面板
+    点同意、回来再点一次同步 —— 中间那次尝试被丢了。有了它，同一次点击能走完。
+
+    ⚠️ 用 `import()` 取：`store.ts` 依赖本文件的 `privacyConsent`，
+    顶层互相 import 会成环；调用期取就不成问题。
+  */
+  {
+    ask: async () => (await import('./store.js')).waitForPrivacyDecision(),
+  },
 );
 
 /**

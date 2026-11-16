@@ -24,6 +24,8 @@
  * 所以这里先装计数器、再 `await import()`，让绑定的那一个就是计数器。
  */
 
+import { act } from 'react';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pristine = vi.fn(
@@ -37,6 +39,15 @@ const pristineCallCount = (): number => pristine.mock.calls.length;
 type ConsentModule = typeof import('../src/features/privacy/consent-gate.js');
 let mod: ConsentModule;
 
+/**
+ * 后加的用例要 `createConsentGatedFetch` / `PrivacyConsentBlockedError` 与
+ * 隐私面板 store。它们随 `resetModules()` 一起重新取，所以不能在文件顶部静态 import。
+ */
+let createConsentGatedFetch: typeof import('@heyta/app-host').createConsentGatedFetch;
+let PrivacyConsentBlockedError: typeof import('@heyta/app-host').PrivacyConsentBlockedError;
+let usePrivacyStore: typeof import('../src/features/privacy/store.js').usePrivacyStore;
+let waitForPrivacyDecision: typeof import('../src/features/privacy/store.js').waitForPrivacyDecision;
+
 async function loadModule(): Promise<ConsentModule> {
   // 每个用例一份干净的模块图：`installed` 那个幂等标记是模块级的。
   vi.resetModules();
@@ -48,6 +59,11 @@ beforeEach(async () => {
   pristine.mockClear();
   localStorage.clear();
   mod = await loadModule();
+  ({ createConsentGatedFetch, PrivacyConsentBlockedError } = await import('@heyta/app-host'));
+  const store = await import('../src/features/privacy/store.js');
+  usePrivacyStore = store.usePrivacyStore;
+  waitForPrivacyDecision = store.waitForPrivacyDecision;
+  store.__resetPrivacyDecisionForTests();
   // 起点必须是"没问过"，否则上一条用例留下的会话值会把闸门顶开。
   mod.privacyConsent.revoke();
   expect(mod.privacyConsent.networkAllowed()).toBe(false);
@@ -169,5 +185,63 @@ describe('installConsentGatedFetch：把闸装到进程级出口上', () => {
     await expect(fetch('https://sync.example.com/api/sync/ops')).rejects.toThrow();
     // 次数**没有增加**才是判据：撤回之后还发得出去，就是"界面说已撤回、请求照发"。
     expect(pristineCallCount()).toBe(1);
+  });
+});
+
+describe('🔴 同意之后原样重试那一次（ADR-0086 的第三格）', () => {
+  it('面板开着时被拦下的请求会等；点「同意并联网」之后自己发出去', async () => {
+    /*
+      真实链路：用户点了某个要出门的动作 → `requireNetworkConsent()` 把面板打开
+      （`open` = true）→ 那次请求被闸门拦下 → 它**挂起**等同一个决定 →
+      用户点同意 → 请求原样重发，用户不需要再点一次。
+
+      这条钉的是"同意之后什么也没发生"那一类静默失效。
+    */
+    let allowed = false;
+    const calls: string[] = [];
+    const inner = (async (input: RequestInfo | URL) => {
+      calls.push(typeof input === 'string' ? input : String(input));
+      return new Response('{"ok":true}', { status: 200 });
+    }) as typeof fetch;
+
+    const gated = createConsentGatedFetch(inner, () => allowed, {
+      ask: () => waitForPrivacyDecision(),
+    });
+
+    // 面板已经由"动作"打开
+    usePrivacyStore.getState().openSheet('required-for-action');
+
+    const pending = gated('https://heyta.example/api/sync/ops');
+    // 还没决定时不该发出任何东西
+    await Promise.resolve();
+    expect(calls, '同意之前一个请求都不该发').toHaveLength(0);
+
+    act(() => {
+      allowed = true;
+      usePrivacyStore.getState().accept();
+    });
+
+    const response = await pending;
+    expect(response.status).toBe(200);
+    expect(calls, '同意之后应当只重试那一次').toEqual(['https://heyta.example/api/sync/ops']);
+  });
+
+  it('🔴 冷启动时被拦下的请求**不弹面板**（否则首屏又是一堵墙）', async () => {
+    const calls: string[] = [];
+    const inner = (async () => {
+      calls.push('x');
+      return new Response('{}', { status: 200 });
+    }) as typeof fetch;
+
+    const gated = createConsentGatedFetch(inner, () => false, {
+      ask: () => waitForPrivacyDecision(),
+    });
+
+    // 面板没开（冷启动、没人触发动作）
+    await expect(gated('https://heyta.example/api/x')).rejects.toThrow(
+      PrivacyConsentBlockedError,
+    );
+    expect(usePrivacyStore.getState().open, '冷启动被拦下却把面板弹起来了').toBe(false);
+    expect(calls).toHaveLength(0);
   });
 });

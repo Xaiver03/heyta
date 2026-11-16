@@ -50,6 +50,8 @@ export const usePrivacyStore = create<PrivacyStoreState>((set) => ({
   },
   closeSheet: () => {
     set({ open: false });
+    // 关掉不等于同意：被挂起的那一次请求仍然不发。
+    settlePendingDecision(false);
   },
 
   accept: () => {
@@ -63,17 +65,101 @@ export const usePrivacyStore = create<PrivacyStoreState>((set) => ({
     // 词条注释里那句"这句必须能在界面上出现"此前**并没有被满足**，
     // 症状是隐私模式下点了同意、界面毫无反应地关掉，下次启动又问一遍。
     set(persisted ? { open: false, notPersisted: false } : { open: true, notPersisted: true });
+    // 落盘失败也要放行：决定已经作出，请求该发出去（回执那条警告单独显示）。
+    settlePendingDecision(true);
   },
 
   chooseLocalOnly: () => {
     const { persisted } = privacyConsentActions.localOnly();
     set(persisted ? { open: false, notPersisted: false } : { open: true, notPersisted: true });
+    settlePendingDecision(false);
   },
 
   acknowledgeNotPersisted: () => {
     set({ open: false, notPersisted: false });
   },
 }));
+
+
+/**
+ * 等用户**这一次**决定（供网络闸门在被拦下时挂起一次请求用）。
+ *
+ * 🔴 与 `requireNetworkConsent()` 的分工：那个是"动作开头先问，返回 false 就别做"；
+ * 这个是"请求已经发出去了、被闸门拦下，挂起等结果，同意就原样重试"。
+ * 两处都要，因为前者管得住我们自己的调用点，管不住 `globalThis.fetch` 那条网。
+ *
+ * 三个出口都 resolve：同意 → `true`；「只用本机」→ `false`；关掉面板 → `false`
+ * （关掉不等于同意）。
+ *
+ * 多个请求同时被拦时共用一个等待 —— 它们问的是同一件事，弹两次面板没有意义。
+ */
+let pendingDecision: ((granted: boolean) => void) | null = null;
+
+/**
+ * 面板组件**当前有没有被渲染**。
+ *
+ * 🔴 这个标志是必需的，不是测试便利：`waitForPrivacyDecision()` 的语义是
+ * "挂起这一次请求，等用户点一个按钮"。**如果一个组件都没挂，就没人能点** ——
+ * 那时继续挂着只是把请求拖到超时（60 秒），用户看到的是一个转圈的界面，
+ * 比立刻抛"需要先同意"更糟。无 UI 的宿主（node 测试、headless 采集）
+ * 必须立刻失败。
+ *
+ * 由 `PrivacyConsentSheet` 的 mount/unmount 维护，所有权只有它一处。
+ */
+let sheetMounted = false;
+
+/** 仅供测试：清掉挂起与挂载标志。跨用例残留会让"冷启动不弹"那条红得莫名其妙。 */
+export function __resetPrivacyDecisionForTests(): void {
+  pendingDecision = null;
+  sheetMounted = false;
+}
+
+export function notePrivacySheetMounted(mounted: boolean): void {
+  sheetMounted = mounted;
+  // 面板被卸载时，还挂着的等待要立刻放开 —— 否则它们要等到超时。
+  if (!mounted) settlePendingDecision(false);
+}
+
+export function waitForPrivacyDecision(): Promise<boolean> {
+  if (privacyConsent.networkAllowed()) return Promise.resolve(true);
+
+  /*
+    🔴 **不主动弹面板** —— 只有"某个动作已经把面板打开了"才挂起等。
+
+    这一条决定了"首屏会不会再变成一堵墙"：冷启动时若有请求被闸门拦下，
+    在这里主动弹面板就等于把 ADR-0086 撤销了（真机上看到的就是首屏被盖住）。
+
+    而"点同步 / 点登录提交 → 弹面板"由**动作自己**承接：
+    `requireNetworkConsent()` 在动作开头打开面板并返回 false，调用方不再往下走；
+    请求若已经发出去被兜底拦下，就会命中这里"面板开着"的分支，等同一个决定。
+
+    两侧合起来的语义是：**同意面板只可能由用户的一个动作带出来**，不由请求带出来。
+  */
+  const open = usePrivacyStore.getState().open;
+  // 面板没开（冷启动 / 兜底请求）：立刻按"没同意"处理，不弹、不拖到超时。
+  if (!open && !sheetMounted) return Promise.resolve(false);
+  if (!open) return Promise.resolve(false);
+  if (pendingDecision !== null) {
+    return new Promise<boolean>((resolve) => {
+      const previous = pendingDecision;
+      pendingDecision = (granted) => {
+        previous?.(granted);
+        resolve(granted);
+      };
+    });
+  }
+  const promise = new Promise<boolean>((resolve) => {
+    pendingDecision = resolve;
+  });
+  usePrivacyStore.getState().openSheet('required-for-action');
+  return promise;
+}
+
+function settlePendingDecision(granted: boolean): void {
+  const resolve = pendingDecision;
+  pendingDecision = null;
+  resolve?.(granted);
+}
 
 /**
  * 🔴 用户主动发起一件"要出门"的事之前，**必须**过这一道。

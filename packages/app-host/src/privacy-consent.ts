@@ -303,14 +303,71 @@ import { PRIVACY_CONSENT_BLOCKED_MARKER, PrivacyConsentBlockedError } from '@hey
 export { PRIVACY_CONSENT_BLOCKED_MARKER, PrivacyConsentBlockedError };
 
 /**
+ * 被闸门拦下时，宿主要怎么问。
+ *
+ * `ask` 的职责只有一件：把面板摆出来，**等到用户作出决定**再 resolve
+ * （`true` = 已同意，可以放行那一次请求）。怎么弹、弹成什么样是平台差异，
+ * 所以钩子由宿主注入，闸门本身不知道 UI 的形状。
+ */
+export interface ConsentBlockedHook {
+  ask: (url: string) => Promise<boolean>;
+  /**
+   * 等多久就放弃（毫秒）。默认 60 秒。
+   *
+   * 🔴 必须有：headless / 测试 / 面板渲染失败的宿主里，`ask` 可能**永远不 resolve**。
+   * 没有超时的话，那一次请求会挂到进程结束 —— 比"没同意"更糟：
+   * 用户看到的是一个永远转圈的界面，而不是一句"需要先同意"。
+   */
+  timeoutMs?: number;
+}
+
+/** 等一个决定，超时按"没同意"处理（不抛，交给调用方统一抛原错误）。 */
+async function waitForDecision(
+  ask: (url: string) => Promise<boolean>,
+  url: string,
+  timeoutMs: number,
+): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      ask(url),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), timeoutMs);
+      }),
+    ]);
+  } catch {
+    /* 钩子自己炸了（面板渲染失败等）按"没同意"算 —— 那一次请求仍然不发。 */
+    return false;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/**
  * 包一层 `fetch`：闸门关闭时**一个字节都不发**。
  *
  * ⚠️ 参数是"取闸门的函数"而不是闸门本身，因为宿主可能在启动早期还没装配好闸门；
  * 传 `() => true` 那种写法等于关掉这一层，调用点自己负责。
+ *
+ * ## 🔴 `onBlocked`：同意之后**原样重试那一次**
+ *
+ * 不给钩子时，被拦下的请求直接抛 `PrivacyConsentBlockedError` —— 这是本函数原本
+ * 唯一的形状，也是单测钉了很久的那一条（底层调用 0 次）。
+ *
+ * 但"抛错"对用户是一句"同步失败"或"登录失败"，而他刚刚才在面板里点了同意：
+ * 同意之后什么也没发生，比没同意更让人困惑。所以钩子给出之后改成：
+ *
+ *   1. 拦下 → 调 `ask` 摆面板，**挂起这一次请求**；
+ *   2. 用户同意 → **原样**重试一次（同 URL、同 init），并把结果正常返回；
+ *   3. 拒绝 / 超时 / 钩子抛错 → 仍然抛 `PrivacyConsentBlockedError`（不发请求）。
+ *
+ * **只重试一次**：`fetchImpl` 是原始 fetch，重试不再经过本函数，所以不会递归；
+ * 若用户在重试那一刻又撤回了同意，`isAllowed()` 的复查会把它挡回错误分支。
  */
 export function createConsentGatedFetch(
   fetchImpl: typeof fetch,
   isAllowed: () => boolean,
+  onBlocked?: ConsentBlockedHook,
 ): typeof fetch {
   // 🔴 判据在**调用底层 fetch 之前**，所以关闭时底层调用次数必须是 0
   //（`tests/privacy-consent.spec.ts` 数的就是次数，不是"有没有报错"）。
@@ -323,6 +380,13 @@ export function createConsentGatedFetch(
         : input instanceof URL
           ? input.toString()
           : (input as Request).url;
+
+    if (onBlocked) {
+      const granted = await waitForDecision(onBlocked.ask, url, onBlocked.timeoutMs ?? 60_000);
+      // 复查一次：`ask` 期间用户可能同意又撤回，别拿旧判断放行。
+      if (granted && isAllowed()) return fetchImpl(input as RequestInfo, init);
+    }
+
     throw new PrivacyConsentBlockedError(url);
   }) as typeof fetch;
 }

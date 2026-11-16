@@ -75,6 +75,8 @@ export function openPrivacySheet(reason: PrivacySheetReason): void {
 
 export function closePrivacySheet(): void {
   set({ open: false });
+  // 关掉不等于同意（文件头那条纪律）：被挂起的那一次请求仍然不发。
+  settlePendingDecision(false);
 }
 
 /**
@@ -90,17 +92,71 @@ export function closePrivacySheet(): void {
 export function acceptNetworkConsent(): void {
   const { persisted } = privacyConsentActions.accept();
   set(persisted ? { open: false, notPersisted: false } : { open: true, notPersisted: true });
+  // 落盘失败时也要放行：决定已经作出，请求该发出去（回执那条警告单独显示）。
+  settlePendingDecision(true);
 }
 
 /** 用户点「只用本机」。同样不许在没落盘时静默收起。 */
 export function chooseLocalOnly(): void {
   const { persisted } = privacyConsentActions.localOnly();
   set(persisted ? { open: false, notPersisted: false } : { open: true, notPersisted: true });
+  settlePendingDecision(false);
 }
 
 /** 落盘失败时，用户看完那句警告之后把面板收起来。 */
 export function acknowledgeNotPersisted(): void {
   set({ open: false, notPersisted: false });
+}
+
+
+/**
+ * 等用户**这一次**决定（供网络闸门在被拦下时挂起一次请求用）。
+ *
+ * 🔴 与 `requireNetworkConsent()` 的分工：那个是"同步动作开头先问，返回 false 就别做"；
+ * 这个是"请求已经发出去了、被闸门拦下，挂起等结果，同意就原样重试"。
+ * 两处都需要，因为前者管得住"我们自己写的动作"，管不住 `globalThis.fetch` 那条网。
+ *
+ * 三个出口都要 resolve，否则请求会挂到超时：
+ *   · 点了「同意并联网」→ `true`
+ *   · 点了「只用本机」→ `false`
+ *   · 直接关掉面板（以后再说）→ `false` —— 关掉不等于同意，这条在文件头已写死。
+ *
+ * 多个请求同时被拦时**共用一个等待**：它们问的是同一件事，弹两次面板没有意义。
+ */
+let pendingDecision: ((granted: boolean) => void) | null = null;
+
+export function waitForPrivacyDecision(): Promise<boolean> {
+  if (privacyConsent.networkAllowed()) return Promise.resolve(true);
+  /*
+    🔴 **不主动弹面板** —— 只有"某个动作已经把面板打开了"才挂起等。
+
+    冷启动时若有请求被闸门拦下，在这里弹面板就等于把 ADR-0086 撤销了
+    （真机上看到的就是首屏被盖住）。而"点同步 / 点登录提交 → 弹面板"由动作自己
+    承接（`requireNetworkConsent()`）；请求若已经发出去被兜底拦下，
+    就命中这里"面板开着"的分支，等同一个决定。
+  */
+  if (!state.open) return Promise.resolve(false);
+  if (pendingDecision !== null) {
+    // 已经有一个等待在跑：它 resolve 时把所有被拦的请求一起放行。
+    return new Promise<boolean>((resolve) => {
+      const previous = pendingDecision;
+      pendingDecision = (granted) => {
+        previous?.(granted);
+        resolve(granted);
+      };
+    });
+  }
+  const promise = new Promise<boolean>((resolve) => {
+    pendingDecision = resolve;
+  });
+  return promise;
+}
+
+/** 面板给出决定时调用（三个出口都走这里）。 */
+function settlePendingDecision(granted: boolean): void {
+  const resolve = pendingDecision;
+  pendingDecision = null;
+  resolve?.(granted);
 }
 
 /**
@@ -132,4 +188,5 @@ export function shouldAskOnFirstLaunch(): boolean {
 export function __resetPrivacySheetForTests(): void {
   state = { open: false, reason: 'first-launch', notPersisted: false };
   listeners.clear();
+  pendingDecision = null;
 }

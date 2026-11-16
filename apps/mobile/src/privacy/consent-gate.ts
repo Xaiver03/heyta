@@ -69,6 +69,20 @@ export const privacyConsent = createPrivacyConsentGate(devicePrefsPrivacyConsent
 export const consentFetch: typeof fetch = createConsentGatedFetch(
   globalThis.fetch.bind(globalThis),
   () => privacyConsent.networkAllowed(),
+  /*
+    🔴 2026-11-16（ADR-0086）：被拦下时**挂起这一次请求**，等用户决定；
+    同意就原样重试，拒绝或超时就抛原错误。
+
+    没有这一钩子时，用户点「同步」→ 被拦 → 看到一句"同步失败"，
+    然后他去隐私面板点了同意，再回来点一次同步 —— 这中间那一次尝试被丢了。
+    有了它，同一次点击就能走完："点同步 → 面板 → 同意 → 同步自己跑起来"。
+
+    ⚠️ 钩子用了 `import()` 而不是顶层 import：`consent-ui` 依赖本文件的
+    `privacyConsent`，顶层互相引用会成环。这里是**调用期**取，环不成问题。
+  */
+  {
+    ask: async () => (await import('./consent-ui')).waitForPrivacyDecision(),
+  },
 );
 
 /**
