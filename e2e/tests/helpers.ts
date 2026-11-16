@@ -226,6 +226,7 @@ export async function decidePrivacyConsent(
     .waitFor({ state: 'visible', timeout: 5_000 })
     .then(() => true)
     .catch(() => false);
+
   if (!shown) return;
   await page
     .getByTestId(decision === 'accepted' ? 'privacy-consent-accept' : 'privacy-consent-local-only')
@@ -371,6 +372,29 @@ export async function openApp(
   await enableAllModules(page);
   await pinChineseUi(page);
   await installMissingProducerShims(page);
+
+  /*
+    🔴 2026-11-16（ADR-0086）：**冷启动不再弹同意面板**，所以"点按钮作出决定"这条路
+    在冷启动时不再出现。决定改成在**页面脚本执行之前**写进本机存储 ——
+    记录格式与用户点按钮落盘的是同一条（`serializePrivacyConsent`）。
+
+    这样 `openApp(page, '/', 'accepted')` 才真的意味着"这台设备已同意"，
+    而不是"没弹面板所以什么都没发生"。产品路径（冷启动不弹 / 点登录才问 /
+    同意后兑现）由 `privacy-consent-jit.spec.ts` 用真实点击单独钉。
+  */
+  await page.addInitScript((decision) => {
+    try {
+      if (localStorage.getItem('privacy.consent') === null) {
+        localStorage.setItem(
+          'privacy.consent',
+          JSON.stringify({ decision, decidedAt: new Date().toISOString() }),
+        );
+      }
+    } catch {
+      /* 隐私模式下 localStorage 可能不可写；那条路上用例会在别处红，不用在这里兜。 */
+    }
+  }, consent);
+
   await page.goto(path);
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
   await decidePrivacyConsent(page, consent);

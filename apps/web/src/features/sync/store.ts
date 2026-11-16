@@ -613,6 +613,19 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   openSignIn: () => {
+    /*
+      🔴 2026-11-16（ADR-0086）：**打开面板不设闸，提交才设。**
+
+      我最初在这里加了 `requireNetworkConsent()`，结果是"点了登录先弹一次设备级同意"。
+      那个时机偏早了：**点登录只是打开界面，一个请求都还没发**。
+
+      产品里本来就有更准确的落点 —— `AuthPanel` 在未同意时画的是**本地表单**
+      （`centralNotAskedYet` 分支），用户填完点提交，`createConsentGatedFetch`
+      在那一刻拦下。所以"问"应该发生在提交，不是打开。
+
+      这也让 `auth-panel-esc` 那类"测面板自身"的用例不必为了绕过一道墙而
+      去伪造自建服务器（那会连带触发补签读接口，见 `helpers.ts` 的 stubLegalRecheck 说明）。
+    */
     set({ signInOpen: true });
   },
 
