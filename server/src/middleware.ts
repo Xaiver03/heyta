@@ -1,8 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { verifyToken, verifyRevocationToken } from './auth';
-import { centralRuntime } from './central-auth/runtime';
-import { CentralSessionError } from './central-auth/coordinator';
-import { CentralHttpError, createHttpSecurity, readCentralCredential } from './central-auth/http-security';
 import { SESSION_PATHS } from '@heyta/shared-schema';
 
 // User payload type
@@ -44,23 +41,11 @@ const authenticateWith = async (
   revocationOnly = false,
 ): Promise<FastifyReply | void> => {
   let token: string;
-  try {
-    const central = centralRuntime();
-    if (central) {
-      const credential = readCentralCredential(req);
-      token = credential.token;
-      if (credential.transport === 'cookie' && !['GET', 'HEAD', 'OPTIONS'].includes(req.method))
-        createHttpSecurity(central.cipher, new URL(central.config.redirectUri).origin).verifyCsrf(req, token);
-    } else {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer '))
-        return reply.code(401).send({ code: 'missing_or_invalid_authorization_header', message: 'Missing or invalid Authorization header' });
-      token = authHeader.split(' ')[1];
-    }
-  } catch (error) {
-    if (error instanceof CentralHttpError) return reply.code(error.status).send({ code: error.code, message: error.code });
-    if (error instanceof CentralSessionError) return reply.code(503).send({ code: 'CENTRAL_UNAVAILABLE', message: 'CENTRAL_UNAVAILABLE' });
-    throw error;
+  {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer '))
+      return reply.code(401).send({ code: 'missing_or_invalid_authorization_header', message: 'Missing or invalid Authorization header' });
+    token = authHeader.split(' ')[1];
   }
   const result = await (revocationOnly ? verifyRevocationToken(token) : verifyToken(token));
   if (!result.valid) {

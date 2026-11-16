@@ -1,7 +1,3 @@
-import { acquireAuthenticationRuntime, assertAuthenticationRuntimeUnowned } from './central-auth/runtime';
-import { installCentralRoutePolicy } from './central-auth/route-policy';
-import { centralAuthRoutes } from './central-auth/routes';
-import { assertAuthenticationModeAvailable } from './central-auth/config';
 import * as fs from 'fs';
 import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
@@ -352,9 +348,6 @@ export const createServer = (
   stop: () => Promise<void>;
 } => {
   const fullConfig = loadConfigFromEnv(config);
-  // Config loading always resolves authentication, even when an override omits it.
-  assertAuthenticationModeAvailable(fullConfig.authentication!);
-  assertAuthenticationRuntimeUnowned();
 
   // Ensure data directory exists
   if (!fs.existsSync(fullConfig.dataDir)) {
@@ -373,25 +366,20 @@ export const createServer = (
   });
 
   let fastifyServer: FastifyInstance | undefined;
-  let authRuntime: Awaited<ReturnType<typeof acquireAuthenticationRuntime>> | undefined;
   let starting = false;
   let cleaning: Promise<void> | undefined;
   const cleanup = (): Promise<void> => {
     if (cleaning) return cleaning;
-    if (!authRuntime) return Promise.resolve();
-    const runtime = authRuntime;
+    if (!fastifyServer) return Promise.resolve();
     cleaning = (async () => {
       const ws = getWsConnectionService();
       ws.stopHeartbeat(); ws.closeAll(); stopCleanupJobs();
-      try { if (fastifyServer) await fastifyServer.close(); }
+      try { await fastifyServer.close(); }
       finally {
         try { await ws.drainAuthorization(); }
         finally {
-          // Keep ownership until the shared DB/WS resources are fully released.
-          await runtime.stop(async () => {
-            try { await disconnectDb(); }
-            finally { resetWsConnectionService(); fastifyServer = undefined; authRuntime = undefined; }
-          });
+          try { await disconnectDb(); }
+          finally { resetWsConnectionService(); fastifyServer = undefined; }
         }
       }
     })();
@@ -404,10 +392,9 @@ export const createServer = (
       return fastifyServer;
     },
     start: async (): Promise<string> => {
-      if (starting || authRuntime || cleaning) throw new Error('Server already started');
+      if (starting || fastifyServer || cleaning) throw new Error('Server already started');
       starting = true;
       try {
-      authRuntime = await acquireAuthenticationRuntime(fullConfig.authentication!);
       initSyncService();
       fastifyServer = Fastify({
         logger: false, // We use our own logger
@@ -421,7 +408,6 @@ export const createServer = (
       // 全局错误信封（error handler + not-found handler）—— 实现与注释在
       // `api-error.ts` 的 attachErrorEnvelope，那里也是它的测试锚点。
       attachErrorEnvelope(fastifyServer);
-      if (authRuntime.runtime) installCentralRoutePolicy(fastifyServer);
 
       // Security Headers
       await fastifyServer.register(helmet, SERVER_HELMET_CONFIG);
@@ -459,8 +445,6 @@ export const createServer = (
           preflight: true,
         });
       }
-
-      await centralAuthRoutes(fastifyServer, authRuntime.runtime);
 
       // Serve static files
       await fastifyServer.register(fastifyStatic, {
@@ -663,7 +647,7 @@ export const createServer = (
       await fastifyServer.register(managedAiProxyRoutes, { prefix: '/api/ai' });
 
       // Test Routes (only in test mode)
-      if (fullConfig.testMode?.enabled && fullConfig.authentication!.mode === 'local') {
+      if (fullConfig.testMode?.enabled) {
         await fastifyServer.register(testRoutes, { prefix: '/api/test' });
         Logger.warn('TEST MODE ENABLED - Test routes available at /api/test/*');
       }
@@ -678,7 +662,6 @@ export const createServer = (
       const address = await fastifyServer.listen(createListenOptions(fullConfig));
       startCleanupJobs();
       getWsConnectionService().startHeartbeat((userId, clientId) => getSyncService().touchDevice(userId, clientId));
-      authRuntime.start();
       Logger.info(`Server started on ${address}`);
       return address;
       } catch (err) {
@@ -688,7 +671,7 @@ export const createServer = (
     },
     stop: async (): Promise<void> => {
       if (starting) throw new Error('Cannot stop while server is starting');
-      if (!authRuntime) return;
+      if (!fastifyServer) return;
       await cleanup();
     },
   };

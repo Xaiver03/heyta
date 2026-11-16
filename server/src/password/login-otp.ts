@@ -28,7 +28,7 @@ import { prisma } from '../db';
 import { sameHexDigest } from '../util/hex-digest';
 import { getJwtSecret, issueSession } from '../auth';
 import { newJti, type SessionMeta } from '../account/access-sessions';
-import { SESSION_MAX_AGE_MS } from '../central-auth/session-policy';
+import { SESSION_MAX_AGE_MS } from '../session-policy';
 import { sendLoginCodeEmail } from '../email';
 import { normalizeEmail } from '../account/email-normalize';
 import type { ServerLocale } from '../copy.generated.js';

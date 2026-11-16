@@ -1,6 +1,3 @@
-import { centralRuntime } from '../central-auth/runtime';
-import { CentralSessionError } from '../central-auth/coordinator';
-import { readCentralCredential, requireSameOrigin, CentralHttpError } from '../central-auth/http-security';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { verifyToken } from '../auth';
 import { getWsConnectionService } from './services/websocket-connection.service';
@@ -75,15 +72,7 @@ export const wsRoutes = async (fastify: FastifyInstance): Promise<void> => {
           clientId?: string;
         };
 
-        const central = centralRuntime();
-        let token = queryToken;
-        if (central) {
-          if (queryToken !== undefined) throw new CentralHttpError(400, 'url_credentials_forbidden');
-          const credential = readCentralCredential(req);
-          if (credential.transport === 'cookie' || req.headers.origin !== undefined)
-            requireSameOrigin(req, new URL(central.config.redirectUri).origin);
-          token = credential.token;
-        }
+        const token = queryToken;
         // Validate token
         if (!token) {
           Logger.warn('[ws] Connection rejected: missing token');
@@ -104,21 +93,13 @@ export const wsRoutes = async (fastify: FastifyInstance): Promise<void> => {
           // 4003 = auth-failure wire contract; see TOKEN_REVOKED_CLOSE_CODE
           // (websocket-connection.service.ts) and the client's
           // AUTH_FAILURE_CLOSE_CODE (super-sync-websocket.service.ts).
-          socket.close(result.code === 'CENTRAL_UNAVAILABLE' ? 1013 : 4003, 'Authentication unavailable');
+          socket.close(4003, 'Authentication unavailable');
           return;
         }
 
         const wsService = getWsConnectionService();
-        wsService.addConnection(result.userId, clientId, socket, result.sessionId, central ? async () => {
-          if (!result.expiresAt || result.expiresAt <= Date.now() || !result.sessionId)
-            throw new CentralSessionError('session_inactive');
-          await central.coordinator.live({ userId: result.userId, sessionHash: result.sessionId, tokenVersion: result.tokenVersion });
-        } : undefined);
+        wsService.addConnection(result.userId, clientId, socket, result.sessionId, undefined);
       } catch (err) {
-        if (err instanceof CentralHttpError || err instanceof CentralSessionError) {
-          socket.close(err instanceof CentralSessionError && err.code === 'central_unavailable' ? 1013 : 4003, 'Authentication unavailable');
-          return;
-        }
         Logger.error('[ws] Unexpected error in WebSocket handler:', err);
         try {
           socket.close(1011, 'Internal error');

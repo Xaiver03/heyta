@@ -20,7 +20,7 @@ import { attachInviteOnRegister, settleReferralActivation } from '../activity/in
 import { authCache } from '../auth-cache';
 import { getJwtSecret, issueSession } from '../auth';
 import { newJti, type SessionMeta } from '../account/access-sessions';
-import { SESSION_MAX_AGE_MS } from '../central-auth/session-policy';
+import { SESSION_MAX_AGE_MS } from '../session-policy';
 import { consentedLegalSetVersion } from '../legal-consent';
 import { isConsentRequired, loadConfigFromEnv } from '../config';
 import { sendEmailPasswordRegistrationCodeEmail } from '../email';
