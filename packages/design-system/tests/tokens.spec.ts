@@ -429,6 +429,10 @@ describe('主题预设：表面换了，文字仍可读', () => {
     { fg: 'color.foreground-subtle', bg: 'color.surface', min: 4.5, why: '三级文字（面）' },
     { fg: 'color.foreground-subtle', bg: 'color.background', min: 4.5, why: '三级文字（页面底）' },
     { fg: 'color.foreground-subtle', bg: 'color.surface-raised', min: 4.5, why: '三级文字（浮层）' },
+    /* 2026-11-16：三级文字提到 slate-550 之后，凹面这一档也达标了（warm/mist 各 4.68）。
+       **每个预设都要单独算** —— 预设换的是表面，而这条恰恰是"表面变深就把浅字压没了"
+       最典型的一格（mist 第一版把 background 写成 slate-200 时就是 3.86 红的）。 */
+    { fg: 'color.foreground-subtle', bg: 'color.surface-sunken', min: 4.5, why: '三级文字（凹陷面）' },
   ];
 
   for (const preset of PRESETS) {

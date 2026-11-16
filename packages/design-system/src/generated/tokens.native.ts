@@ -202,6 +202,8 @@ export interface HeytaNativeTokens {
   readonly 'nav.safe-top-min': number;
   readonly 'nav.safe-bottom-min': number;
   readonly 'screen.gutter': number;
+  readonly 'screen.gutter-md': number;
+  readonly 'screen.gutter-lg': number;
   readonly 'screen.section-gap': number;
   readonly 'screen.bottom-inset': number;
   readonly 'size.checkbox': number;
@@ -272,7 +274,7 @@ export const lightTokens: HeytaNativeTokens = {
   'color.surface-sunken': "#f1f5f9",
   'color.foreground': "#0f172a",
   'color.foreground-muted': "#475569",
-  'color.foreground-subtle': "#64748b",
+  'color.foreground-subtle': "#57677d",
   'color.foreground-inverse': "#ffffff",
   'color.border': "#e2e8f0",
   'color.border-strong': "#cbd5e1",
@@ -434,6 +436,8 @@ export const lightTokens: HeytaNativeTokens = {
   'nav.safe-top-min': 20,
   'nav.safe-bottom-min': 8,
   'screen.gutter': 16,
+  'screen.gutter-md': 24,
+  'screen.gutter-lg': 32,
   'screen.section-gap': 24,
   'screen.bottom-inset': 88,
   'size.checkbox': 22,
@@ -662,6 +666,8 @@ export const darkTokens: HeytaNativeTokens = {
   'nav.safe-top-min': 20,
   'nav.safe-bottom-min': 8,
   'screen.gutter': 16,
+  'screen.gutter-md': 24,
+  'screen.gutter-lg': 32,
   'screen.section-gap': 24,
   'screen.bottom-inset': 88,
   'size.checkbox': 22,

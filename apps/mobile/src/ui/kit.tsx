@@ -33,7 +33,6 @@ import {
   Text as RNText,
   TextInput,
   View,
-  useWindowDimensions,
   type StyleProp,
   type TextStyle,
   type ViewProps,
@@ -378,7 +377,7 @@ export function Screen({
    *
    * - `page`（默认）：内容页 / 表单页。左右 16dp gutter，顶栏 1–3 枚**高频**动作。
    * - `board`：看板（四象限 / 时间线 / 日历）。内容在**响应式 gutter 之内铺满**宽度
-   *   （手机 16 / 平板及更宽 24，见下方 `boardGutter`）；顶栏只留
+   *   （留白由 token 按宽度解析：16 / 24 / 32）；顶栏只留
    *   全局搜索与「更多」，低频动作（手动同步、排序…）进「更多」菜单。
    * - `immersive`：全屏消费内容（专注计时、阅读）。顶栏默认不画；退出靠返回手势。
    *   ⚠️ 本档**尚未有实现**，先在类型里占位，避免到时候又加第四个名字。
@@ -397,19 +396,19 @@ export function Screen({
   const t = useTokens();
 
   /**
-   * 🔴 2026-11-16：`board` 档的页边距**不再归零**，改成随宽度变化的响应式 gutter。
+   * 🔴 2026-11-16：**三档 chrome 共用同一条留白，`board` 档也不再归零。**
    *
    * 之前的形状是 `chrome === 'board' ? 0 : gutter` —— 于是日历这种"网格 + 内容卡"
    * 的屏，网格铺满是对的，但**下面那张「这一天没有到期的任务」卡和脚注一起贴到屏幕两边**
    *（真机 iPad/iPhone 都是"根本没留边距"的观感）。11-15/11-16 只能在脚注、整块板
    * 各补一条 16dp —— 补丁式，且 16dp 在 iPad（820–1366dp）上≈没有留白。
    *
-   * 正确层次：gutter 由**外壳**统一给（手机 16 / 平板及更宽 24），内容卡自然继承；
-   * 网格仍在 gutter 之内铺满，不再各自补 16dp。只在**日历**一屏在用 `board`，
-   * 所以这条不会波及四象限/时间线（它们不走 `Screen` 的 board 档）。
+   * 现在留白**由 token 自己按窗口宽度解析**（`resolveHeytaUiTheme({ screenWidth })`
+   * → `withResolvedScreenGutter`，见 `@heyta/design-system` 的 `screen-gutter.ts`），
+   * 所以这里直接读 `t['screen.gutter']` 就拿到 16 / 24 / 32 —— 外壳不需要知道宽度，
+   * 也不许再自己比 `>= 768`（那正是"同一条留白 N 份实现"的起点）。
+   * 共享层拿不到 RN 窗口尺寸，靠的也正是这条注入。
    */
-  const { width: screenWidth } = useWindowDimensions();
-  const boardGutter = screenWidth >= 768 ? t['space.6'] : t['screen.gutter'];
 
   /**
    * 🔴 2026-11-15：**顶栏的出现时机**。
@@ -509,7 +508,7 @@ export function Screen({
      * 最后一个子节点之后（`justifyContent` 默认 `flex-start`）—— 所以这不是
      * "给所有屏加了一条高度约束"，只是把"母层给不给确定高度"这一环补上。
      */
-    <View style={{ paddingHorizontal: chrome === 'board' ? boardGutter : t['screen.gutter'], gap: t['space.4'], flexGrow: 1, ...(contentMeasureMaxFor(chrome) !== undefined ? { width: '100%' as const, maxWidth: contentMeasureMaxFor(chrome), alignSelf: 'center' as const } : {}), ...(scroll ? {} : { flex: 1, minHeight: 0 }) }}>
+    <View style={{ paddingHorizontal: t['screen.gutter'], gap: t['space.4'], flexGrow: 1, ...(contentMeasureMaxFor(chrome) !== undefined ? { width: '100%' as const, maxWidth: contentMeasureMaxFor(chrome), alignSelf: 'center' as const } : {}), ...(scroll ? {} : { flex: 1, minHeight: 0 }) }}>
       {children}
       {bottomInset ? <View style={{ height: t['screen.bottom-inset'] }} /> : null}
     </View>

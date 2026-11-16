@@ -206,8 +206,15 @@ export const TOKEN_GROUPS = {
     'safe-top-min',
     'safe-bottom-min',
   ],
-  /** 屏幕级布局留白。 */
-  screen: ['gutter', 'section-gap', 'bottom-inset'],
+  /**
+   * 屏幕级布局留白。
+   *
+   * `gutter` / `gutter-md` / `gutter-lg` 是**同一条留白的三档取值**（16 / 24 / 32），
+   * 不是三个不同的东西：Web 用 `var(--ht-screen-gutter)`（CSS 媒体查询就地覆盖），
+   * 原生用 `resolveScreenGutter(width)` 按宽度取。**禁止**在消费点直接写
+   * `tokens['screen.gutter']` 而不看宽度 —— 那会在任何宽度上都得到 16。
+   */
+  screen: ['gutter', 'gutter-md', 'gutter-lg', 'section-gap', 'bottom-inset'],
   /** 组件尺寸（"这个控件多大"），不是间距。 */
   size: [
     'checkbox',
@@ -460,13 +467,21 @@ export const AA_PAIRS: ReadonlyArray<{
     周次「36周」、脚注「未设截止时间的任务不在日历上」。
     2026-09-30 实测它是白底 2.56:1 / 暗底 3.83:1，而门禁全绿。
     这组配对就是那次的产出：**没被点名的 token 等于没被检查**。
-    ⚠️ 边界（刻意）：`color.surface-sunken` **没有**登记 —— 亮色下 subtle
-    在那一层是 4.34:1，够不到 4.5。所以「subtle 文字放在 sunken 底上」
-    这一条不是"已过 AA"，是"没过、也没人管"。要放就得换成 muted。
+    ⚠️ 边界（2026-11-16 已闭合）：`color.surface-sunken` 此前**没登记**，
+    因为 subtle 在那一层只有 4.34:1 —— 于是"subtle 压在凹陷面上"是"没过、也没人管"。
+    现在三级文字提到 slate-550（凹面上 5.26 / mist 4.68 / warm 4.68），
+    这一对已经登记在下面的 `AA_PAIRS` 里。**不要再靠"记住换 muted"来解决** ——
+    token 自己在每一块合法地面上都达标。
   */
   { fg: 'color.foreground-subtle', bg: 'color.surface', min: 4.5, why: '三级文字' },
   { fg: 'color.foreground-subtle', bg: 'color.background', min: 4.5, why: '三级文字（页面底）' },
   { fg: 'color.foreground-subtle', bg: 'color.surface-raised', min: 4.5, why: '三级文字（浮层）' },
+  /* 🔴 凹陷面（`surface-sunken`）这一条是 2026-11-16 补的，补法不是"加规则"：
+     此前 `foreground-subtle` 在 slate-100 上是 4.34，够不到 4.5，于是只能靠
+     "这块面上记得换 muted"这种没人执行得动的规矩（见下面那张禁令表的来历）。
+     现在把三级文字提到 slate-550，**每一块合法地面都达标** —— 才把这一对登记进来。
+     判据在亮/暗/各预设三处都会算（`TEXT_ON_SURFACE` 那份表也有同一条）。 */
+  { fg: 'color.foreground-subtle', bg: 'color.surface-sunken', min: 4.5, why: '三级文字（凹陷面）' },
   { fg: 'color.on-primary', bg: 'color.primary', min: 4.5, why: '主按钮文字' },
   { fg: 'color.on-primary', bg: 'color.primary-hover', min: 4.5, why: '主按钮 hover' },
   /*

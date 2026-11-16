@@ -56,7 +56,7 @@ enum HeytaTokens {
     static let colorSurfaceSunken: String = "#f1f5f9"
     static let colorForeground: String = "#0f172a"
     static let colorForegroundMuted: String = "#475569"
-    static let colorForegroundSubtle: String = "#64748b"
+    static let colorForegroundSubtle: String = "#57677d"
     static let colorForegroundInverse: String = "#ffffff"
     static let colorBorder: String = "#e2e8f0"
     static let colorBorderStrong: String = "#cbd5e1"
@@ -218,6 +218,8 @@ enum HeytaTokens {
     static let navSafeTopMin: Double = 20  // px
     static let navSafeBottomMin: Double = 8  // px
     static let screenGutter: Double = 16  // px
+    static let screenGutterMd: Double = 24  // px
+    static let screenGutterLg: Double = 32  // px
     static let screenSectionGap: Double = 24  // px
     static let screenBottomInset: Double = 88  // px
     static let sizeCheckbox: Double = 22  // px

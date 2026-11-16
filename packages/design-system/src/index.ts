@@ -84,6 +84,16 @@ export type { TypeRole, ContentTypeRole } from './type-roles.js';
 export { SPACING_ROLE, SPACING_ROLE_ORDER } from './spacing-roles.js';
 export type { SpacingRole } from './spacing-roles.js';
 
+// 页面留白（`screen.gutter`）的**唯一解析入口**。
+// Web 侧靠 tokens.css 的 media query 就地覆盖同名变量；原生侧靠这里的阶梯表。
+// 两端共用 SCREEN_GUTTER_STEPS —— 外壳不许再写 `? 0`，也不许在消费点自己比宽度。
+export {
+  SCREEN_GUTTER_STEPS,
+  resolveScreenGutter,
+  withResolvedScreenGutter,
+  type ScreenGutterStep,
+} from './screen-gutter.js';
+
 // 图标尺寸的数值形态（lucide 的 size prop 需要 SVG 属性数字，CSS 变量帮不上）。
 // 视图住在 L0 内部（宿主直接拿表建视图被 check:theme 的 R3 禁止）。
 export { ICON_SIZE, type IconSizeName } from './icon-size.js';

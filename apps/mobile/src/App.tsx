@@ -31,7 +31,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { AppState, StatusBar, View } from 'react-native';
+import { AppState, StatusBar, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from './ui/error-boundary';
 import { I18nProvider, useI18n, type Locale } from '@heyta/i18n';
@@ -334,9 +334,26 @@ function LocaleHost(): React.JSX.Element {
    * 状态在屏幕里的话，切走再切回来就丢了。
    */
   const { scheme, setScheme } = useThemeSchemeState();
+  /**
+   * 🔴 页面留白随窗口宽度解析**一次**，从这里注入（2026-11-16）。
+   *
+   * 在它之前，`tokens['screen.gutter']` 永远是 16：手机对、iPad（834）与
+   * iPad 横屏（1194）都贴边，而修法只能一屏一屏补 16dp。现在 `resolveHeytaUiTheme`
+   * 会按 `SCREEN_GUTTER_STEPS` 把它换成 16 / 24 / 32，
+   * **共享层与各屏什么都不用改**（`packages/ui` 拿不到 RN 窗口尺寸，
+   * 靠的正是"注入"而不是"每处自己算"）。
+   *
+   * 传在根 Provider 上：嵌套 Provider 沿用外层主题，所以整棵树只有一次解析。
+   * 旋转屏幕会重算一次 —— 与主题切换同一条路径。
+   */
+  const { width: windowWidth } = useWindowDimensions();
   return (
     <I18nProvider locale={locale}>
-      <ThemeProvider locale={locale} schemeOverride={scheme === 'system' ? null : scheme}>
+      <ThemeProvider
+        locale={locale}
+        schemeOverride={scheme === 'system' ? null : scheme}
+        screenWidth={windowWidth}
+      >
       <ThemePreferenceProvider scheme={scheme} setScheme={setScheme}>
       <LocalePreferenceProvider locale={locale} setLocale={setLocale}>
         <App />

@@ -43,7 +43,9 @@
   align-items: center;
   gap: var(--ht-space-3);
   min-block-size: var(--ht-layout-header-height);
-  padding: var(--ht-space-2) var(--ht-space-6);
+  /* 横向留白与 `.ht-content` 同源（`screen.gutter`），否则页头标题与内容列
+     在各断点上会各自缩进 —— 移动端 `ab11068f` 修过的正是同一类错位。 */
+  padding: var(--ht-space-2) var(--ht-screen-gutter);
   border-bottom: 0;
   background: var(--ht-color-surface);
 }
@@ -256,7 +258,16 @@
    */
   display: flex;
   flex-direction: column;
-  padding: var(--ht-space-6);
+  /*
+    🔴 横向留白走 `screen.gutter`，不是 `space-6`（2026-11-16）。
+    此前这条写的是 `padding: var(--ht-space-6)`（24px 固定）——
+    于是"页面留白"在 Web 是 24、在原生是 16、在 board 档是 0，
+    同一条规矩三个答案（详见 `packages/design-system/src/screen-gutter.ts` 文件头）。
+    `--ht-screen-gutter` 由 `tokens.css` 的媒体查询按宽度解析（16 / 24 / 32），
+    与原生侧的 `SCREEN_GUTTER_STEPS` 是同一张表。
+    纵向仍用 `space-6`：那是**内容与顶栏/底栏之间的呼吸**，跟画幅宽度无关。
+  */
+  padding: var(--ht-space-6) var(--ht-screen-gutter);
   max-inline-size: var(--ht-layout-content-max);
   inline-size: 100%;
   margin-inline: auto;

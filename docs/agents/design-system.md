@@ -55,6 +55,58 @@ pnpm check:design     # 非零退出 = 有裸值
 > **这个测试已经抓到过真问题**：`quadrant-3` 原用 amber-600（`3.19:1`）不达正文标准，
 > 已改为 amber-700（`5.02:1`）。写在文档里的"4.5:1"是拦不住的。
 
+#### 🔴 三级文字必须**在每一块合法地面上**都过 AA（2026-11-16）
+
+`color.foreground-subtle` 此前是 slate-500，在 `surface-sunken`（slate-100）上只有 **4.34:1** ——
+于是"subtle 文字压在凹陷面上"这一格既没登记进 `AA_PAIRS`，也没人管（文档里写着
+"要放就得换成 muted"，而那条规矩没有任何一处执行得动）。
+
+修法不是加规矩，是**把取值调到每块地面都过**：三级文字改用新档 `slate-550`（`#57677d`）。
+
+| 地面 | 旧（slate-500） | 新（slate-550） |
+|---|---|---|
+| white / 面上 | 4.76 | **5.77** |
+| slate-50 / 页面底 | 4.55 | **5.51** |
+| slate-100 / 凹面·基础 | **4.34** ❌ | **5.26** |
+| slate-200 / 凹面·mist | 3.86 ❌ | **4.68** |
+| paper-200 / 凹面·warm | 3.28 ❌ | 4.68（warm 走纸色族，见预设块） |
+
+并把这一对登记进 `AA_PAIRS`（同时进 `tests/tokens.spec.ts` 的预设矩阵，
+warm/mist 各自单独算一次）。
+
+**判据**：`pnpm --filter @heyta/design-system test` 的
+`color.foreground-subtle on color.surface-sunken ≥ 4.5`（字面量 + 两个预设各一条）。
+
+> 教训的形状值得记住：**"记住换个 token"不是规范**。凡是"某块地面上要特殊处理"的规矩，
+> 要么调取值让它自然成立，要么写进测试；两者都不做，它就只是文档里的一句话。
+
+### 🔴 页面留白只有一个来源（`screen.gutter`，2026-11-16）
+
+**三条规矩，违反即打回：**
+
+1. **消费点只写 `tokens['screen.gutter']` / `var(--ht-screen-gutter)`**，不许自己比宽度。
+   原生侧由根 Provider 注入（`resolveHeytaUiTheme({ screenWidth })` → `withResolvedScreenGutter`），
+   Web 侧由 `tokens.css` 的媒体查询就地覆盖。**一次解析，全树一致。**
+2. **外壳不许写 `chrome === 'board' ? 0`**。要满幅是**网格自己**的事，不是给整屏清零 padding ——
+   清零会把同屏的内容卡与脚注一起拖到贴边（这正是 2026-11-16 那次事故）。
+3. **内容卡不许自补 16dp**。它继承外壳留白；补一条就是双倍，且在大屏上仍然不够。
+
+**三档取值**（`SCREEN_GUTTER_STEPS`，与 CSS 媒体查询逐值对账）：
+
+| 宽度 | 值 | 谁 |
+|---|---|---|
+| < 768 | 16 | 手机（iOS 标准页边距） |
+| ≥ 768 | 24 | 平板竖（iPad 834 落在这里）/ 小窗 |
+| ≥ 1024 | 32 | 平板横（iPad 1194）/ 桌面 |
+
+**为什么必须收进一处**：此前同一条"页面留白"有三个答案 —— token 里 16、
+Web 的 `.ht-content` 写 `space-6`（24）、移动端 `board` 档写 0。于是 iPad 上
+日历下方那张卡贴到屏幕边，而修复只能一屏一屏补 16dp（11-15 补脚注、11-16 补整块板）。
+
+**判据**：`pnpm check:screen-gutter`（四条：三档 token 存在 / 消费点不许比宽度 /
+`board` 档不许归零 / Web 外壳必须读 `--ht-screen-gutter`），
+外加 `packages/design-system/tests/screen-gutter.spec.ts`（CSS 三档 ↔ TS 阶梯逐值对账）。
+
 ### 🔴 交互控件的档位只有一处定义（2026-10-28，全局 UX 线 P4）
 
 一枚按钮"长什么样"的答案**只许住在一个地方**：`packages/ui/src/control/states.ts` 的

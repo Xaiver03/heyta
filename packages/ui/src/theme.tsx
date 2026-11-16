@@ -54,6 +54,7 @@ import {
   resolveThemeName,
   resolveTracking,
   TEXT_STYLES,
+  withResolvedScreenGutter,
   type CubicBezier,
   type HeytaNativeTokens,
   type PresetName,
@@ -262,6 +263,16 @@ export function resolveHeytaUiTheme(options?: {
    * 与 `scheme` 正交：同一个预设亮暗各一套覆盖（生成时已分别解析）。
    */
   preset?: PresetName;
+  /**
+   * 当前窗口宽度（dp）。给了就按 `SCREEN_GUTTER_STEPS` 把
+   * `token.screen.gutter` 换成 16 / 24 / 32 —— 见 `@heyta/design-system`
+   * 的 `screen-gutter.ts` 文件头。
+   *
+   * 🔴 **只有原生端需要传**：Web 侧 `tokens.css` 的媒体查询会就地覆盖
+   * `--ht-screen-gutter`，`var()` 在使用点解析，本来就跟着窗口变。
+   * 省略 = 保持基准档 16（与旧行为一致）。
+   */
+  screenWidth?: number;
 }): HeytaUiTheme {
   // 🔴 `resolveThemeName` 负责把 `null` / `'unspecified'` 归一成 `'light'`。
   // 直接拿 scheme 当索引会得到 undefined，而 RN 拿到 undefined 颜色
@@ -269,7 +280,17 @@ export function resolveHeytaUiTheme(options?: {
   const theme = resolveThemeName(options?.scheme ?? null);
   const reducedMotion = options?.reducedMotion ?? false;
   const reducedTransparency = options?.reducedTransparency ?? readReducedTransparencyOnce();
-  const tokens = resolveNativeTokens({ theme, preset: options?.preset, reducedMotion, reducedTransparency });
+  const baseTokens = resolveNativeTokens({ theme, preset: options?.preset, reducedMotion, reducedTransparency });
+  /**
+   * 页面留白按窗口宽度解析**一次**，注入 token 表。
+   *
+   * 🔴 为什么在这里而不是让每个消费点自己 `useWindowDimensions()`：
+   * `tokens['screen.gutter']` 原样是 16，20+ 个消费点里只要有一个人忘了算，
+   * 那个屏在大屏上就贴边 —— 而没有任何测试会红（2026-11-16 实测的形态）。
+   * 注入之后，"共享层 + 各屏"照旧读 `tokens['screen.gutter']` 就自动正确，
+   * 连拿不到 `react-native` 的共享组件也跟着对了。
+   */
+  const tokens = withResolvedScreenGutter(baseTokens, options?.screenWidth);
   return {
     theme,
     preset: options?.preset,
@@ -307,6 +328,14 @@ export interface HeytaUiProviderProps {
   readonly value?: HeytaUiTheme;
   /** 宿主已打包的字体名清单，透传给 `native.fontSans` / `native.fontMono`。 */
   readonly packagedFonts?: readonly string[];
+  /**
+   * 当前窗口宽度（dp）。原生端在**根 Provider** 上传一次
+   * （`useWindowDimensions().width`），页面留白随之变成 16 / 24 / 32。
+   *
+   * 🔴 只在根上生效：嵌套 Provider 会沿用外层的主题（见下面 `inherited` 那段），
+   * 所以子层传它不会重新解析 —— 那正是我们要的（一次解析，全树一致）。
+   */
+  readonly screenWidth?: number;
   readonly children: React.ReactNode;
 }
 
@@ -315,6 +344,7 @@ export function HeytaUiProvider({
   value,
   packagedFonts,
   schemeOverride,
+  screenWidth,
   children,
 }: HeytaUiProviderProps): React.JSX.Element {
   const systemScheme = useColorScheme();
@@ -337,8 +367,15 @@ export function HeytaUiProvider({
   // 代价是宿主传值时这里多订阅一次；换来的是**调用顺序不会随 props 变化**，
   // 而条件式 hook 是 React 里最典型的一类"有时才崩"。
   const fallback = useMemo(
-    () => resolveHeytaUiTheme({ scheme, reducedMotion, reducedTransparency, packagedFonts }),
-    [scheme, reducedMotion, reducedTransparency, packagedFonts],
+    () =>
+      resolveHeytaUiTheme({
+        scheme,
+        reducedMotion,
+        reducedTransparency,
+        packagedFonts,
+        ...(screenWidth === undefined ? {} : { screenWidth }),
+      }),
+    [scheme, reducedMotion, reducedTransparency, packagedFonts, screenWidth],
   );
   const resolved =
     value ?? (packagedFonts === undefined && inherited !== null ? inherited : fallback);

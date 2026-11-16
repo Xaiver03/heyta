@@ -366,7 +366,12 @@
   }
 
   .ht-content {
-    padding: var(--ht-space-4);
+    /*
+      窄屏的纵向收紧到 `space-4`，但**横向仍是 `screen.gutter`** ——
+      <768 时它正好等于 `space-4`（16px），≥768 之后自动变成 24/32。
+      写死 `space-4` 会让"窄屏壳"在平板竖屏（768–1023）上把留白锁回 16。
+    */
+    padding: var(--ht-space-4) var(--ht-screen-gutter);
   }
 
   /* 任务操作在窄屏进入同一条紧凑工具栏；选择、排序与助手入口

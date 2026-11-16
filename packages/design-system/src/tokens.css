@@ -36,6 +36,36 @@
   --ht-slate-300: #cbd5e1;
   --ht-slate-400: #94a3b8;
   --ht-slate-500: #64748b;
+  /*
+    三级文字专用档（2026-11-16）。
+    ============================================================
+    🔴 为什么在这里插一档半，而不是直接换用 slate-600：
+
+    三级文字（`color.foreground-subtle`）此前用 slate-500，实测在
+    `surface-sunken`（slate-100）上只有 **4.34:1** —— 差 0.16 就过 AA，
+    而它承载的是真文字（设置页行副标题、脚注、`2xs` 小字），不是装饰。
+    直接把这一档换到 slate-600 会和 `foreground-muted` 同值，**三级层级消失**
+    （而层级消失是"两档看起来一样、下次调字重只改一处"的开始）。
+
+    slate-550 的位置是算出来的，不是挑的 —— 它要在**三张基础面 + 两张预设凹面**
+    上同时过 AA（4.5），且不塌进二级文字：
+
+    | 面 | 对比度 |
+    |---|---|
+    | white（面上） | 5.77 |
+    | slate-50（页面底） | 5.51 |
+    | slate-100（凹面·基础） | **5.26** ← 旧值 slate-500 在这里是 4.34 |
+    | slate-200（凹面·mist） | **4.68** |
+    | paper-200（凹面·warm） | 走纸色族（见 warm 预设块，4.68） |
+
+    与二级文字（7.58 / 7.24 / 6.92）仍差一档多 —— 层级还在，余量也有了。
+
+    🔴 这就是"从根上解决"与"到处打补丁"的区别：不提档的话，
+    `surface-sunken` 是唯一一块**三级文字永远过不了**的地面，
+    于是只能靠"这块面上记得换 muted"这种谁也执行不了的规矩；
+    提档之后**每一块合法地面都达标**，不需要记例外。
+  */
+  --ht-slate-550: #57677d;
   --ht-slate-600: #475569;
   --ht-slate-700: #334155;
   --ht-slate-800: #1e293b;
@@ -181,8 +211,9 @@
     现在：muted slate-600 = 7.58，subtle slate-500 = 4.76，层级仍在，字也看得见了。
   */
   --ht-color-foreground-muted: var(--ht-slate-600);
-  --ht-color-foreground-subtle: var(--ht-slate-500);
+  --ht-color-foreground-subtle: var(--ht-slate-550);
   --ht-color-foreground-inverse: var(--ht-white);
+
 
   /* 边框与分隔 */
   --ht-color-border: var(--ht-slate-200);
@@ -581,7 +612,28 @@
   --ht-nav-safe-bottom-min: 0.5rem;   /* 8px */
 
   /* 屏幕级布局 */
-  --ht-screen-gutter: 1rem;           /* 16px —— 页面左右留白 */
+  /*
+    页面左右留白（`screen.gutter`）—— **三档响应式，唯一入口**。
+    ============================================================
+    🔴 2026-11-16：这一组存在的理由不是"好看的间距"，而是**留白必须由外壳统一给**。
+
+    此前同一条"页面留白"有三个答案：
+      · token 里 `--ht-screen-gutter` 只有一个 16px 值；
+      · Web 的 `.ht-content` 用的是 `--ht-space-6`（24px），根本没引用这个 token；
+      · 移动端 `Screen` 的 `board` 档写死 `? 0`。
+    ⇒ 日历这种"网格 + 内容卡"的屏，网格铺满是预期的，但**下面那张
+    「这一天没有到期的任务」卡和脚注一起贴到屏幕两边**（iPad/iPhone 都是
+    "根本没留边距"的观感）。11-15 在脚注上补了 16dp、11-16 在整块板上补了 16dp
+    —— 补丁越叠越多，而 16dp 在 iPad（820–1366dp）上依然≈没有留白。
+
+    现在：**值在这里按宽度分三档，消费侧只许取 `screen.gutter`**
+    （Web 用 `var(--ht-screen-gutter)`；原生用 `resolveScreenGutter(width)`），
+    任何外壳都不许再写 `? 0`，任何内容卡也不许自补 16dp。
+    判据：`pnpm check:screen-gutter`。
+  */
+  --ht-screen-gutter: 1rem;           /* 16px —— <768：手机（iOS 标准边距） */
+  --ht-screen-gutter-md: 1.5rem;      /* 24px —— ≥768：平板竖 / 小窗 */
+  --ht-screen-gutter-lg: 2rem;        /* 32px —— ≥1024：平板横 / 桌面 */
   --ht-screen-section-gap: 1.5rem;    /* 24px —— 区块之间的呼吸 */
   --ht-screen-bottom-inset: 5.5rem;   /* 88px —— 滚动内容底部预留，
                                          否则最后一条会被标签栏永久遮住 */
@@ -971,6 +1023,45 @@
 
 [data-theme='dark'] {
   color-scheme: dark;
+}
+
+/**
+ * 页面留白的响应式阶梯（`screen.gutter`，2026-11-16）
+ * ====================================================
+ *
+ * 三档，与 `layout.content-max`（1200px / 75rem）同一条理由：**留白要随画幅增长**，
+ * 否则大屏上"16px 边距"在肉眼上等于没有边距。
+ *
+ * | 宽度 | 值 | 谁 |
+ * |---|---|---|
+ * | < 48rem（768） | 1rem / 16px | 手机（iOS 的标准页边距就是 16pt） |
+ * | ≥ 48rem | 1.5rem / 24px | 平板竖、小窗（iPad 竖 834dp 落在这里） |
+ * | ≥ 64rem（1024） | 2rem / 32px | 平板横、桌面 |
+ *
+ * 🔴 **为什么 `--ht-screen-gutter` 被就地覆盖，而不是新造一个 `-responsive` 名字**：
+ * 消费侧（Web 的 `.ht-content`）只想写 `var(--ht-screen-gutter)` 就得到当前宽度下的
+ * 正确值。多一个名字，就多一次"该用哪个"的判断，而判断总会有人做错。
+ *
+ * 🔴 **原生端不读这条 media query**（RN 没有媒体查询）：它读
+ * `screen-gutter.ts` 的 `resolveScreenGutter(width)`，两者共用**同一张阶梯表**。
+ * `tokens.native.ts` 里 `screen.gutter` 仍然是基准值 16（生成器只解析第一个
+ * `:root`），所以原生侧必须走解析器 —— 直接用 `tokens['screen.gutter']` 会
+ * 在任何宽度上都拿到 16，那正是"平板上没有边距"的复现路径。
+ *
+ * 断点与 `docs/agents/design-system.md` §响应式断点那一把尺一致：
+ * `@media` 里用不了 CSS 变量，所以这里只能写裸 `48rem` / `64rem`；
+ * `pnpm check:breakpoints` 会拦住其它数值。
+ */
+@media (min-width: 48rem) {
+  :root {
+    --ht-screen-gutter: 1.5rem; /* 24px */
+  }
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --ht-screen-gutter: 2rem; /* 32px */
+  }
 }
 
 /**
