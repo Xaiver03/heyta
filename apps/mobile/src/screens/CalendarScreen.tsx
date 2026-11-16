@@ -43,7 +43,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, View } from 'react-native';
+import { Animated, PanResponder, View } from 'react-native';
 
 import {
   addDays,
@@ -78,6 +78,7 @@ import {
   formatMonthShortText,
   formatMonthTitleText,
   formatYearTitleText,
+  formatWeekRangeText,
   WEEKDAY_MESSAGE_KEYS,
   type CalendarEventBarLabels,
   type CalendarViewKind,
@@ -291,13 +292,35 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     setCursor(drill.cursor);
   }, []);
 
+  /**
+   * 🔴 2026-11-16：**换档的过渡**（让"跳"看起来像"缩"）。
+   *
+   * 四个档是四套完全不同的渲染，做不到真正的连续变形（见台账 §40）。
+   * 但可以在换档那一刻做 180ms 的**淡入 + 轻微缩放**：
+   *   · 进更细的档（年→月→周→日）从略微放大（1.04）收回来 —— 读起来像"放大看"
+   *   · 进更粗的档反过来从 0.96 展开 —— 像"缩小看回去"
+   * 这样手势（捏合）与视觉（缩放方向）就一致了，而不是"啪一下换一张脸"。
+   */
+  const viewAnim = useRef(new Animated.Value(1)).current;
+  const viewScaleFrom = useRef(1);
+  const ZOOM_ORDER_REF = useMemo(() => ['year', 'month', 'week', 'day'] as const, []);
+
   const changeView = useCallback(
     (next: CalendarViewKind) => {
+      const from = ZOOM_ORDER_REF.indexOf(view);
+      const to = ZOOM_ORDER_REF.indexOf(next);
+      viewScaleFrom.current = to > from ? 1.04 : to < from ? 0.96 : 1;
       setView(next);
       // 换档不换"选中哪天"，只把游标挪到那一天所在的那一段（与 Web 的 `setView` 同一条）。
       setCursor(calendarCursorFor(next, selected));
+      viewAnim.setValue(0);
+      Animated.timing(viewAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
     },
-    [selected],
+    [view, ZOOM_ORDER_REF, selected, viewAnim],
   );
 
   /**
@@ -558,7 +581,12 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     if (view === 'month') return formatMonthTitleText(startOfMonth(cursor), t);
     if (view === 'day') return formatDayTitleText(selected, t);
     if (view === 'year') return formatYearTitleText(cursor, t);
-    return `${formatDayTitleText(selected, t)} – ${formatDayTitleText(addDays(selected, 6), t)}`;
+    /*
+     * 🔴 周档标题用**既有那条短格式**（`common.date.weekRangeTitle`：`M月D日 - M月D日`）。
+     * 原来拼的是两次 `formatDayTitleText`（带"星期X"），两周拼起来把顶栏挤满、
+     * `⋯` 被推到屏幕边缘（真机可见）。
+     */
+    return formatWeekRangeText(selected, t);
   }, [cursor, selected, t, view]);
 
   /**
@@ -623,7 +651,16 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         </Text>
       ) : null}
 
-      <View {...swipe.panHandlers}>
+      <Animated.View
+        {...swipe.panHandlers}
+        style={{
+          flex: 1,
+          opacity: viewAnim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
+          transform: [
+            { scale: viewAnim.interpolate({ inputRange: [0, 1], outputRange: [viewScaleFrom.current, 1] }) },
+          ],
+        }}
+      >
       <CalendarBoard
         tasks={scopedTasks}
         // 月份已经在顶栏标题里（点它切档）—— 板内不再重复一行。
@@ -674,7 +711,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         eventLabels={eventLabels}
         testID="calendar-board"
       />
-      </View>
+      </Animated.View>
 
       {/*
         🔴 2026-11-16：入口放在 `⋯` 里，**不在顶栏再加一枚图标**。
