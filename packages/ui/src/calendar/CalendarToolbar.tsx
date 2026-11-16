@@ -35,6 +35,15 @@ import {
 } from './model.js';
 
 export interface CalendarToolbarProps {
+  /**
+   * 不画中间那行标题（移动端日历用）。
+   *
+   * 🔴 2026-11-16：移动端把"当前时间范围"提到了 `Screen` 的标题栏
+   *（点它切档，见 `CalendarViewMenu`）。两处都写月份 = 同一屏两个一样的标题，
+   * 真机上就是「2026年11月」上下各一行。
+   * 只藏文字，`‹ ›` 与「回到今天」仍在原位 —— 它们是导航，不是标题。
+   */
+  readonly hideTitle?: boolean;
   readonly cursor: LocalDate;
   readonly onCursorChange: (cursor: LocalDate) => void;
   /** 不给 = 不画「今天」（移动端目前没接这条，见 `CalendarBoard` 的 `onToday`）。 */
@@ -65,6 +74,7 @@ export function CalendarToolbar({
   testID = 'calendar-toolbar',
   view = 'month',
   trailing,
+  hideTitle = false,
 }: CalendarToolbarProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -148,9 +158,11 @@ export function CalendarToolbar({
         <HeytaIcon data={ChevronLeft} size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />
       </Pressable>
 
-      <Text style={[text['section-title'], styles.title]} testID={`${testID}-month`}>
-        {title}
-      </Text>
+      {hideTitle ? null : (
+        <Text style={[text['section-title'], styles.title]} testID={`${testID}-month`}>
+          {title}
+        </Text>
+      )}
 
       <Pressable
         accessibilityRole="button"
@@ -163,6 +175,13 @@ export function CalendarToolbar({
       >
         <HeytaIcon data={ChevronRight} size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />
       </Pressable>
+
+      {/*
+        🔴 藏掉标题之后，`‹` 与 `›` 之间没有任何东西 —— 没有这一段弹性空白时，
+        两个箭头会被拉到屏幕两端（真机：中间空出半个屏），看起来像两个孤立按钮。
+        把它放在 `›` **之后**：两个箭头自然相邻，右侧内容（回到今天 / trailing）被推开。
+      */}
+      {hideTitle ? <View style={styles.flexFill} /> : null}
 
       {onToday === undefined ? null : (
         <Pressable
@@ -190,6 +209,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       gap: tokens['space.1'],
     },
+    /** 见渲染处：藏标题时用它把「上一 / 下一」压在一起、把右侧内容推开。 */
+    flexFill: { flex: 1 },
     /**
      * 月份标题留一段**最小宽度**：`2026年9月` 与 `2026年10月` 差一个字的宽度，
      * 不钉住的话翻月时左右两个箭头会跟着横移一格 —— 那是"界面在动"而不是"数据在变"。

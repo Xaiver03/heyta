@@ -58,13 +58,25 @@ describe('移动端日历的档位入口', () => {
     expect(screen).toMatch(/<CalendarBoard[\s\S]*?view=\{view\}/);
   });
 
-  it('渲染了档位切换器，且它挂在**板子外面**（挂进板子里会打爆 Web 那两条按 role 数格子的判据）', () => {
-    expect(screen).toContain('<CalendarViewTabs');
-    const tabs = screen.indexOf('<CalendarViewTabs');
-    const board = screen.indexOf('<CalendarBoard');
-    expect(tabs, '找不到切换器').toBeGreaterThan(-1);
-    expect(board, '找不到共享板').toBeGreaterThan(-1);
-    expect(tabs, '切换器落在了 <CalendarBoard> 之后（应挂在外面、板子之前）').toBeLessThan(board);
+  it('档位入口挂在**板子外面**（挂进板子里会打爆 Web 那两条按 role 数格子的判据）', () => {
+    /*
+     * 🔴 2026-11-16：入口形态换了 —— 从"板子前面一排四格分段控件"改成
+     * **点标题弹出视图菜单**（滴答是顶栏第二枚图标 + 下拉；我们收到标题上，
+     * 见 `CalendarViewMenu` 文件头与 `AppBar.onTitlePress`）。
+     *
+     * 判据的**意图没变**：那组控件不许长进共享板内部。
+     *   旧形态：`<CalendarViewTabs>` 出现在 `<CalendarBoard>` 之前；
+     *   新形态：`<CalendarViewMenu>`（一个 Modal）出现在 `<CalendarBoard>` 之后也可以 ——
+     *   它不在板的子树里，这才是"挂在外面"的真正含义。
+     */
+    expect(screen).toContain('<CalendarViewMenu');
+    expect(screen).toContain('onTitlePress=');
+    // 板子的子树里不许出现档位控件：取 `<CalendarBoard ... />` 自闭合那一整段。
+    const boardStart = screen.indexOf('<CalendarBoard');
+    expect(boardStart, '找不到共享板').toBeGreaterThan(-1);
+    const boardEnd = screen.indexOf('/>', boardStart);
+    const boardChunk = screen.slice(boardStart, boardEnd);
+    expect(boardChunk, '档位控件长进了共享板子树').not.toContain('CalendarView');
   });
 
   it('🔴 可切的档位取自**共享那份顺序**，本地不许再长回一张表（R17）', () => {
@@ -77,7 +89,7 @@ describe('移动端日历的档位入口', () => {
     // ⚠️ 这里刻意**不 import** `@heyta/ui`：那条桶会 `from "react-native"`，
     //   在本包的 node 侧测试里会以 `RolldownError: Flow is not supported` 挂在收集阶段
     //   （台账 §5 第 9 行实测过）。所以这一条只钉接线形状，取值集合由上面那份共享判据守。
-    expect(screen).toMatch(/options=\{CALENDAR_VIEW_ORDER\}/);
+    expect(screen).toMatch(/order=\{CALENDAR_VIEW_ORDER\}/);
     expect(screen, '本地又长回一张 VIEW_OPTIONS ⇒ 档位清单重新变成两份').not.toMatch(
       /const VIEW_OPTIONS/,
     );

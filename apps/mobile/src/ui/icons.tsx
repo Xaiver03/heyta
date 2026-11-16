@@ -29,6 +29,7 @@ import {
   CalendarDays,
   CalendarClock,
   CalendarRange,
+  LayoutGrid,
   ChartColumn,
   Check,
   Copy,
@@ -191,6 +192,16 @@ const ICONS = {
    */
   'action.toolbox': Wrench,
   'action.disclose': ChevronRight,
+  /** 往下展开（"点我换一档"）。与 `action.disclose` 同一个字形家族，方向不同。 */
+  'action.disclose-down': ChevronDown,
+  /*
+   * 日历档位字形（`CalendarViewMenu` 每行一枚）。
+   * 语义名而不是图标名 —— 与全仓其余图标同一个规矩。
+   */
+  'calendar.month': CalendarDays,
+  'calendar.week': CalendarRange,
+  'calendar.day': CalendarClock,
+  'calendar.year': LayoutGrid,
   'action.next-month': ChevronRight,
   // 🔴 「返回」与「上一月」是**不同语义**，所以用不同字形：`ArrowLeft` 是
   // 进出层级的通用返回，`ChevronLeft` 是月历的翻页。两者在成长屏与日历屏

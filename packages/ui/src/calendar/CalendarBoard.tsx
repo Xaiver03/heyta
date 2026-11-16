@@ -140,6 +140,13 @@ export interface CalendarBoardProps {
    *    这里不预先替宿主决定"那一格放什么"，共享层不认识同步、也不认识宿主的面包屑。
    */
   readonly toolbarTrailing?: React.ReactNode;
+  /**
+   * 工具栏里那行月份/日期标题要不要画。
+   *
+   * 移动端把"当前范围"提到了 `Screen` 标题栏（点它切档），所以这里传 true ——
+   * 否则同一屏上下各写一遍「2026年11月」。web 不传（它的页头没有这层）。
+   */
+  readonly hideToolbarTitle?: boolean;
   /** 月/周档是否隐藏重复的选中日清单（Web 使用格内任务条，移动端保留清单）。 */
   readonly showSelectedDayList?: boolean | undefined;
   /** 月档是否填满宿主传下来的可用高度。 */
@@ -455,6 +462,7 @@ export function CalendarBoard({
   view = 'month',
   now,
   toolbarTrailing,
+  hideToolbarTitle,
   showSelectedDayList = true,
   fillMonth = false,
   dayMarker,
@@ -577,6 +585,7 @@ export function CalendarBoard({
                 labels={labels}
                 view={view}
                 trailing={toolbarTrailing}
+                {...(hideToolbarTitle === undefined ? {} : { hideTitle: hideToolbarTitle })}
               />
             </View>
           )}
@@ -635,6 +644,7 @@ export function CalendarBoard({
             labels={labels}
             view={view}
             trailing={toolbarTrailing}
+            {...(hideToolbarTitle === undefined ? {} : { hideTitle: hideToolbarTitle })}
           />
         )}
 

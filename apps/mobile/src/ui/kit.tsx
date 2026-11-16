@@ -196,10 +196,21 @@ export function AppBar({
   title,
   actions,
   titleLeading,
+  onTitlePress,
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
   titleLeading?: React.ReactNode;
+  /**
+   * 🔴 2026-11-16：**标题本身可以是一个控制器**。
+   *
+   * 出处：Canonical 的日历重构（`solving multiple calendar views`）把
+   * "切换视图"做成点标题，而不是再加一枚图标；滴答是"额外一枚图标 + 下拉菜单"。
+   * 对这一屏来说标题就是**当前时间范围**（「2026年11月」），点它换档比找图标直。
+   *
+   * ⚠️ 只有真会给菜单的屏才传：传了却没反应比不传更糟。
+   */
+  onTitlePress?: () => void;
 }): React.JSX.Element {
   const t = useTokens();
   const insets = useSafeAreaInsets();
@@ -224,9 +235,24 @@ export function AppBar({
             这里限 1 行并允许收缩。 */}
         {titleLeading}
         <View style={{ flex: 1 }}>
-          <Text variant="headline" numberOfLines={1}>
-            {title}
-          </Text>
+          {onTitlePress === undefined ? (
+            <Text variant="headline" numberOfLines={1}>
+              {title}
+            </Text>
+          ) : (
+            <Pressable
+              onPress={onTitlePress}
+              accessibilityRole="button"
+              accessibilityLabel={title}
+              testID="app-bar-title-press"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: t['space.1'] }}
+            >
+              <Text variant="headline" numberOfLines={1}>
+                {title}
+              </Text>
+              <Icon name="action.disclose-down" size="sm" color={t['color.foreground-subtle']} />
+            </Pressable>
+          )}
         </View>
         {actions?.map((a) => (
           <IconButton
@@ -314,6 +340,7 @@ export function Screen({
   bottomInset = true,
   chrome = 'page',
   barCollapsed,
+  onTitlePress,
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
@@ -346,6 +373,8 @@ export function Screen({
    * 内部那条 `onScroll` 就不再生效 —— 两条同时驱动会让栏在两帧之间来回跳。
    */
   barCollapsed?: boolean;
+  /** 标题可点（见 `AppBar` 的 `onTitlePress`）。 */
+  onTitlePress?: () => void;
 }): React.JSX.Element {
   const t = useTokens();
 
@@ -453,7 +482,14 @@ export function Screen({
     </View>
   );
 
-  const appBar = <AppBar title={title} actions={actions} titleLeading={titleLeading} />;
+  const appBar = (
+    <AppBar
+      title={title}
+      actions={actions}
+      titleLeading={titleLeading}
+      {...(onTitlePress === undefined ? {} : { onTitlePress })}
+    />
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: t['color.background'] }}>

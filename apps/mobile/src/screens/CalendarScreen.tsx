@@ -79,6 +79,7 @@ import { useMobileSync } from '../sync/store';
 import { Screen, Text } from '../ui/kit';
 import { CalendarScopeSheet, SCOPE_INBOX, type ScopeProject } from './CalendarScopeSheet';
 import { TopBarMenu } from '../ui/top-bar-menu';
+import { CalendarViewMenu } from './CalendarViewMenu';
 import { useTokens } from '../theme';
 
 /**
@@ -137,6 +138,7 @@ export function CalendarScreen(): React.JSX.Element {
   const [scope, setScope] = useState<readonly string[] | undefined>(undefined);
   const [scopeOpen, setScopeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
 
   /** 上一次的"今天"，用来判断跨零点时选中框要不要跟着走。 */
   const prevToday = useRef(today);
@@ -435,6 +437,18 @@ export function CalendarScreen(): React.JSX.Element {
     [scope, tasks],
   );
 
+  /**
+   * 顶栏标题 = 当前范围（月档「2026年11月」/ 周档「11月16日 – 11月22日」/
+   * 日档「11月16日 星期一」/ 年档「2026年」）。四个档各自有既有的措辞函数，
+   * 这里不另写一套格式化。
+   */
+  const rangeTitle = useMemo(() => {
+    if (view === 'month') return formatMonthTitleText(startOfMonth(cursor), t);
+    if (view === 'day') return formatDayTitleText(selected, t);
+    if (view === 'year') return formatYearTitleText(cursor, t);
+    return `${formatDayTitleText(selected, t)} – ${formatDayTitleText(addDays(selected, 6), t)}`;
+  }, [cursor, selected, t, view]);
+
   return (
     /*
       🔴 2026-11-15：日历是**看板**（chrome="board"）—— 内容铺满、顶栏随滚动收起。
@@ -442,8 +456,19 @@ export function CalendarScreen(): React.JSX.Element {
       只有底部那句说明（脚注）留在 16dp 轴线上。
     */
     <Screen
-      title={t('mobile.calendar.title')}
+      /*
+       * 🔴 2026-11-16：**标题就是当前时间范围**（「2026年11月」），点它切档。
+       *
+       * 滴答的顶栏是「十一月」+ 3 枚图标（事件源 / 视图 / ⋯）；我们把"视图"
+       * 收到标题上（Canonical 的日历重构就是这么做的），于是顶栏只剩两枚：
+       * 可点的标题 + ⋯。顺带把原来那一排四格分段控件（约 56dp 高）整行省掉。
+       *
+       * ⚠️ 「日历」这两个字不再出现在顶栏 —— 底部 tab 已经标着它，
+       * 而这一屏真正需要一眼看到的是"我在看哪段时间"。
+       */
+      title={rangeTitle}
       chrome="board"
+      onTitlePress={() => { setViewMenuOpen(true); }}
       actions={[
         {
           icon: 'action.more',
@@ -459,23 +484,11 @@ export function CalendarScreen(): React.JSX.Element {
         </Text>
       ) : null}
 
-      {/*
-        🔴 档位入口挂在**板子外面**（不是 `toolbarTrailing`）：共享板内部每加一个
-        `role=button`/`role=tab`，Web 那两条"按 role 数格子"的判据就会打爆
-        （§9.5 第一条点名的就是这件事）。挂在外面还有一层好处：
-        这一组控件在月/周/日三档里长得一模一样，不随档位换布局。
-      */}
-      <CalendarViewTabs
-        view={view}
-        options={CALENDAR_VIEW_ORDER}
-        onViewChange={changeView}
-        labels={viewLabels}
-        testID="calendar-view-tabs"
-      />
-
       <View {...swipe.panHandlers}>
       <CalendarBoard
         tasks={scopedTasks}
+        // 月份已经在顶栏标题里（点它切档）—— 板内不再重复一行。
+        hideToolbarTitle
         today={today}
         /**
          * 🔴 「回到今天」原来**在页脚**（日历网格下面），因为移动端没传 `onToday`，
@@ -519,6 +532,19 @@ export function CalendarScreen(): React.JSX.Element {
         滴答是三个图标（事件源 / 视图 / ⋯），我们把"显示范围"收进 ⋯ ——
         见 `docs/agents/screen-chrome.md` 的顶栏预算（≤3 枚、低频进菜单）。
       */}
+      <CalendarViewMenu
+        visible={viewMenuOpen}
+        current={view}
+        order={CALENDAR_VIEW_ORDER}
+        labelOf={(kind) => t(CALENDAR_VIEW_LABEL_KEYS[kind])}
+        onPick={(kind) => {
+          setViewMenuOpen(false);
+          changeView(kind);
+        }}
+        onClose={() => { setViewMenuOpen(false); }}
+        anchorTop={96}
+      />
+
       <TopBarMenu
         visible={moreOpen}
         label={t('mobile.calendar.title')}

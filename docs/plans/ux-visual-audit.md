@@ -1775,3 +1775,36 @@ ScrollView 内容列里拿不到剩余高度）。要让矩阵吃掉它，得改
   新引一个要走依赖两道门（§3.1–3.2），留到下一轮。
 - 滴答的「指派给我」我们没有对应语义（heyta 没有"指派"）。
 - 滴答日历还有「列表」视图档（当月任务一条条排），我们只有月/周/日/年。
+
+---
+
+## 三十八、日历视图切换：标题即控制器（2026-11-16 上午）
+
+### 38.1 依据（检索到的实践，不是自创）
+
+| 来源 | 说的什么 | 我们取哪一条 |
+|---|---|---|
+| [UX Patterns Guide · Calendar view](https://uxpatternsguide.com/patterns/calendar-view/) | 日历应把 visible range / view mode / selected date / event count **作为文字暴露**；模式切换要"保留最接近的等价位置" | event count 该在导航里可见（§38.3 的下一步） |
+| [Canonical · Solving multiple calendar views](https://canonical.com/blog/solving-multiple-calendar-views) | 把**标题本身**做成视图切换器，而不是另加控件 | 本轮采用 |
+| [TimeZoom (CHI 2006, TU Dresden)](https://mt.inf.tu-dresden.de/cnt/uploads/2006-CHI-TimeZoom.pdf) | 时间档位垂直堆叠、**可连续缩放**，任意粒度，而不是离散跳档 | 下一轮的创新主菜 |
+| [Zooming-UI Calendar (GI)](https://dl.gi.de/server/api/core/bitstreams/50235da8-4dbd-4c35-989d-548aa018a954/content) | 以"可缩放时间轴"作为核心隐喻 | 同上 |
+
+### 38.2 本轮改动
+
+- 删掉那一排四格分段控件（约 56dp 高），顶栏标题改成**当前时间范围**（「2026年11月」），
+  点它弹出视图菜单（4 档、每档一枚图标、当前档打勾）—— 与滴答的下拉菜单同形，
+  但入口从"再加一枚图标"换成标题本身
+- 板内那行重复的月份标题藏掉（`CalendarBoard.hideToolbarTitle`），
+  `‹ ›` 与「回到今天」保留；藏标题后补一段弹性空白，否则两个箭头会被拉到屏幕两端
+
+真机复看：顶栏从「日历 + ⋯」变成「2026年11月 ⌄ + ⋯」，分段控件整行消失，
+点标题弹出月/周/日/年菜单且当前档打勾。
+
+### 38.3 下一步的创新方向（按投入产出排序）
+
+1. **标题内嵌计数**：`2026年11月 · 12 项`。UX Patterns Guide 明确要求 event count 可见；
+   产品负责人也说过「11 项待办，1 项已完成这些东西我总觉得……」—— 他要的是有意义的信息，
+   而不是页头那行重复的统计。成本低。
+2. **捏合连续缩放**（真创新）：双指在日历上捏合，年→月→周→日连续过渡，
+   对应 TimeZoom 的 "arbitrary granularity"。滴答、Google 日历移动端都是离散档，
+   这一格是空白。成本高（手势 + 布局插值 + 滚动位置映射）。
