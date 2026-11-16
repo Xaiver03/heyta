@@ -17,7 +17,13 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--ht-space-6);
-  background: var(--ht-color-background);
+  /*
+    2026-11-16：sheet 底改白（原本是 `color.background` = slate-50）。
+    页面改白之后，灰 sheet 成了**唯一还残留"灰底 + 白卡"的地方** ——
+    同一屏里两种底色并存，正是产品负责人说的"很多地方都有类似情况"。
+    模态的独立感由 scrim + 阴影表达，不需要再靠底色差。
+  */
+  background: var(--ht-color-surface);
   animation: ht-sheet-in var(--ht-duration-normal) var(--ht-ease-enter);
 }
 
@@ -49,7 +55,13 @@
   align-self: start;
   gap: var(--ht-space-1);
   padding-block: var(--ht-space-2);
-  background: var(--ht-color-background);
+  /*
+    2026-11-16：底色去掉（原为 `color.background` = slate-50）。
+    sheet 改白之后，这块灰既是"半吊子差值"（7/255），又只有半个面板高，
+    读起来像一张悬空的灰卡。分区交给右侧卡片自身的那条细线，选中态仍用
+    `primary-subtle`（`.ht-settings__nav-link[aria-current='page']`）。
+  */
+  background: transparent;
 }
 
 .ht-settings__nav-link {

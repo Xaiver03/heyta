@@ -1,14 +1,14 @@
 {
-  "capturedAt": "2026-11-16T07:29:02.256Z",
+  "capturedAt": "2026-11-16T08:01:59.089Z",
   "targets": 17,
   "artifacts": [
     {
       "path": "screenshots/web-desktop/W01-任务.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.0966,
+      "contentRatio": 0.0695,
       "colorSpan": 228,
-      "sha256": "dd4448419591271ee995903d79669d73bf21694ce3336db3089172de5e936993"
+      "sha256": "ca0420504159e6d6b6b774e2c5b56b7a1a91821b69a2cd6f9778dc81d7725018"
     },
     {
       "path": "screenshots/web-desktop/W02-四象限.png",
@@ -62,9 +62,9 @@
       "path": "screenshots/web-desktop/W08-设置.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.1031,
+      "contentRatio": 0.0854,
       "colorSpan": 228,
-      "sha256": "34c7b87e8739c9e092038531f1dc8851bb07bc3be38324cf1d031f6383e0ce41"
+      "sha256": "d2224045a6c5490d89c4a174a9b1a3b9e763dc016b1903edf4482f5119bba86b"
     },
     {
       "path": "screenshots/web-desktop/W09-日历.png",
@@ -78,9 +78,9 @@
       "path": "screenshots/web-desktop/W01-en-Tasks.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.0969,
+      "contentRatio": 0.0689,
       "colorSpan": 228,
-      "sha256": "b236e1650b244555c99804450c8164fee294d833ce2576dc32bcdd6424505be3"
+      "sha256": "99f63bcbf2d55eb78d0a282c6d6fb28e5e2ba39cda48eeb5a730cda05e9e16ee"
     },
     {
       "path": "screenshots/web-desktop/W02-en-Quadrants.png",
@@ -110,9 +110,9 @@
       "path": "screenshots/web-mobile/MW01-移动端任务.png",
       "width": 1170,
       "height": 2532,
-      "contentRatio": 0.1217,
+      "contentRatio": 0.0963,
       "colorSpan": 228,
-      "sha256": "3818340033a033f9797392085f4dfb08e6cbabc8e7e8d9add72ab38630513a00"
+      "sha256": "16102bbb00c161702feaa24e4a4104c58606f3039d5be7446bf92409b69b1d3f"
     },
     {
       "path": "screenshots/web-mobile/MW02-移动端四象限.png",

@@ -409,14 +409,19 @@
   min-block-size: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-4);
   /*
-    2026-11-16：输入框改**凹陷底 + 一条细线**。页面与卡片都白之后，
-    白输入框在它们上面没有任何边界；只给凹陷底还不够 —— `#f1f5f9` 压在白卡上
-    只差 14/255，截图里读起来仍然像"没有输入框"（本次实拍确认）。
-    滴答的 composer 同样是"浅底 + 一条极细的边"。
+    2026-11-16：输入框 = **白底 + 一条极细的边**（承载只靠这条线，不靠灰底）。
+
+    产品负责人给的参照是 DSH 自己的 composer：整块白、圆角大、只有一圈很淡的边框 ——
+    "类似这样就行"。此前试过"浅灰底 + 边"，灰底在纯白页面上多一层色阶，
+    与"界面要干净"的诉求相反。
+
+    ⚠️ 这条推翻了 2026-10-07「无描边交互」在**输入面**这一格的适用性；
+    产品 2026-11-16 的口径是「全局不用彻底禁止描边」。按钮仍不画静止描边。
   */
-  background: var(--ht-color-surface-sunken);
+  background: var(--ht-color-surface);
   border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-md);
+  /* 与卡片同一档圆角：输入面是"一块面"，不是"一枚控件"。 */
+  border-radius: var(--ht-radius-lg);
   font-size: var(--ht-font-size-sm);
   transition: border-color var(--ht-duration-fast) var(--ht-ease-standard);
 }

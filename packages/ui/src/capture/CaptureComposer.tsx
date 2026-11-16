@@ -329,8 +329,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
        */
       borderWidth: tokens['border-width.thin'],
       borderColor: tokens['color.border'],
-      borderRadius: tokens['radius.md'],
-      backgroundColor: tokens['color.surface-sunken'],
+      borderRadius: tokens['radius.lg'],
+      backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground-muted'],
       textAlignVertical: 'center',
     },
@@ -363,8 +363,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
        */
       borderWidth: tokens['border-width.thin'],
       borderColor: tokens['color.border'],
-      borderRadius: tokens['radius.md'],
-      backgroundColor: tokens['color.surface-sunken'],
+      borderRadius: tokens['radius.lg'],
+      backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground'],
     },
     addButton: {
