@@ -3531,7 +3531,13 @@ export const zhCN = {
   'mobile.tasks.summary.empty': '还没有任务',
   'mobile.tasks.summary.counts': '{pending} 项待办，{completed} 项已完成',
   'mobile.tasks.empty.title': '今天还没有安排',
-  'mobile.tasks.empty.hint': '点右下角的加号，写下第一件事。',
+  /*
+    🔴 2026-11-16：hint 不再"指路"，改由空态里的按钮承接。
+    Apple 对空态的要求是**行动入口就在眼前**；"点右下角的加号"是让用户
+    自己去别的角落找一个控件，多一步、也多一次找不到的机会。
+  */
+  'mobile.tasks.empty.hint': '从一件小事开始。',
+  'mobile.tasks.empty.action': '添加第一个任务',
   'mobile.tasks.mode.date': '日期',
   'mobile.tasks.tagFilter.all': '全部',
   'mobile.tasks.mode.countdown': '倒计时',

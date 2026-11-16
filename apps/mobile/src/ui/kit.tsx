@@ -1225,12 +1225,21 @@ export function EmptyState({
   hint,
   detail,
   detailTone = 'danger',
+  action,
   testID,
 }: {
   icon?: IconName;
   illustration?: StateIllustrationVariant;
   title: string;
   hint: string;
+  /**
+   * 空态里的**行动入口**（2026-11-16）。
+   *
+   * 共享模型的 `EmptyStateSlots` 一直有 `action`，但 kit 这个渲染器没接 ——
+   * 于是 46 个空态站点里只有一个真的带了按钮，其余全靠"点右下角的加号"
+   * 这类指路文案。空态的下一步应该在眼前，不该让用户去别的角落找。
+   */
+  action?: React.ReactNode;
   /** 补充说明。技术细节给错误用，step 说明给"还没做"用。 */
   detail?: string;
   /**
@@ -1311,6 +1320,8 @@ export function EmptyState({
           {view.detail}
         </Text>
       )}
+      {/* 行动入口排在最后：用户读完"这里为什么是空的"之后，下一步就在眼前。 */}
+      {action === undefined ? null : <View style={{ paddingTop: t['space.2'] }}>{action}</View>}
     </View>
   );
 }

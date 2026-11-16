@@ -1797,6 +1797,22 @@ export function TasksScreen({
                     icon="group.inbox"
                     title={t('mobile.tasks.empty.title')}
                     hint={t('mobile.tasks.empty.hint')}
+                    /*
+                      🔴 2026-11-16：空态**自带行动入口**。
+                      此前只写了一句"点右下角的加号"—— 那是让用户去别处找控件。
+                      Apple 的原则是空态里就该有那一步（这里的下一步就是"写下第一条"）。
+                    */
+                    action={
+                      <Button
+                        label={t('mobile.tasks.empty.action')}
+                        tone="primary"
+                        icon="task.add"
+                        fullWidth={false}
+                        onPress={() => {
+                          setComposerOpen(true);
+                        }}
+                      />
+                    }
                   />
                 ) : undefined
               }
@@ -1947,7 +1963,15 @@ export function TasksScreen({
         />
       )}
 
-      {bulkSelecting ? null : quadrantMoveUndo === null && quadrantMoveError === null ? (
+      {/*
+        🔴 空态时**不画 FAB**（2026-11-16）。
+        空态自带「添加第一个任务」主按钮，两者做同一件事、同一位置同一颜色 ——
+        真机截图里就是两个蓝色加号。Apple 的原则是：同一动作不要同时给两个
+        同等显眼的入口。FAB 是**有内容之后**的持续入口，上线时机交给 `nothing`。
+      */}
+      {bulkSelecting || nothing
+        ? null
+        : quadrantMoveUndo === null && quadrantMoveError === null ? (
         <Fab
           icon="task.add"
           label={t('mobile.tasks.new')}
