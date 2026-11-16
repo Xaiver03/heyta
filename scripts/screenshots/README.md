@@ -122,6 +122,31 @@ contentOnModalRatio >= 0.15  且  edgeOnContent < 0.30   ⇒   疑似渲染坏�
 **红蓝边界对它是不可见的**（红与蓝亮度都是 85，实测 `colorSpan=0`）。
 它判的是明暗结构，不判色相。
 
+## 🔴 拍 landing 之前：必须用**生产 env** 构建（2026-11-16）
+
+landing 是 Vite **构建期**注入，`VITE_APP_URL` 决定「立即使用 / 去应用登录」那条入口在不在。
+不带它构建，拍出来的是**降级形态**：
+
+| | 生产（配了 `VITE_APP_URL`） | 降级（本机默认） |
+|---|---|---|
+| 主行动 | 「去应用登录 →」带 `?signin` | 「开始自建 → #selfhost」 |
+| 找回通行密钥 | 有 | **整条不渲染** |
+
+降级本身是对的（一个指向不存在应用的链接点下去是 404，比没有出口更坏），
+但**拿降级形态当基线**会让人以为"线上也这样"。2026-11-16 就发生过：
+一份 `/signin` 快照看起来"没有登录入口"，实际线上是有的。
+
+所以拍 L01–L07 之前这样构建：
+
+```bash
+VITE_SITE_URL=https://heyta.waytofuture.cn \
+VITE_APP_URL=https://heyta.waytofuture.cn/app/ \
+  pnpm --filter @heyta/landing build
+pnpm --filter @heyta/landing preview --port 4173   # 快照默认连这个端口
+```
+
+判据：`/signin` 的主按钮文字必须是「去应用登录」。看到「开始自建」就说明漏了这两个变量。
+
 ## 目标注册表（`targets.mjs`）
 
 站点结构的**唯一事实源**（截图视角）。字段：

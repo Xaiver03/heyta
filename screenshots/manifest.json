@@ -1,14 +1,14 @@
 {
-  "capturedAt": "2026-11-16T11:15:14.657Z",
+  "capturedAt": "2026-11-16T11:31:04.386Z",
   "targets": 1,
   "artifacts": [
     {
       "path": "screenshots/landing/L07-登录.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.1916,
-      "colorSpan": 227,
-      "sha256": "9fb87963db8e7beaeb5bd12b38a8a5c4659fdf370e122ea8e6fe7f0bce10690a"
+      "contentRatio": 0.2465,
+      "colorSpan": 228,
+      "sha256": "3cbb21b91a4a2ec6702ab3ee3540b8275401f4c8c1ec8c371c587d1c607136b1"
     }
   ]
 }
