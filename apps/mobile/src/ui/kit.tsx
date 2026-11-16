@@ -200,10 +200,20 @@ export function AppBar({
   actions,
   titleLeading,
   onTitlePress,
+  contentMaxWidth,
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
   titleLeading?: React.ReactNode;
+  /**
+   * 🔴 2026-11-16：标题行要**跟着内容列走**。
+   *
+   * 内容页（page 档）在大屏上已把内容收窄居中（`CONTENT_MEASURE_MAX`），而顶栏标题原来
+   * 仍贴着屏幕最左 —— 截图里「我的」在 x≈16、内容卡在 x≈70，两者错位，观感"不均衡"。
+   * 传了这个宽度后，**内层标题行**收窄到同一列并居中（外层底色/安全区仍铺满整宽），
+   * 标题左缘于是与内容卡左缘对齐。`board` 档不传（保持全幅）。
+   */
+  contentMaxWidth?: number;
   /**
    * 🔴 2026-11-16：**标题本身可以是一个控制器**。
    *
@@ -232,6 +242,10 @@ export function AppBar({
           alignItems: 'center',
           paddingHorizontal: t['screen.gutter'],
           gap: t['space.2'],
+          // 内容页：标题行收窄到与内容同一列并居中（外层底色仍铺满整宽）。
+          ...(contentMaxWidth !== undefined
+            ? { width: '100%' as const, maxWidth: contentMaxWidth, alignSelf: 'center' as const }
+            : {}),
         }}
       >
         {/* 标题区 flex:1 且**不加 numberOfLines 限制**会让长标题把操作挤掉；
@@ -506,6 +520,7 @@ export function Screen({
       title={title}
       actions={actions}
       titleLeading={titleLeading}
+      contentMaxWidth={contentMeasureMaxFor(chrome)}
       {...(onTitlePress === undefined ? {} : { onTitlePress })}
     />
   );
