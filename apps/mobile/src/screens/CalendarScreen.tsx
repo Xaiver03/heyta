@@ -73,9 +73,12 @@ import {
 } from '@heyta/ui';
 import { useToday } from '../lib/use-today';
 
+import { createProjectActions } from '@heyta/app-host';
 import { useTaskHost } from '../db/use-task-host';
 import { useMobileSync } from '../sync/store';
 import { Screen, Text } from '../ui/kit';
+import { CalendarScopeSheet, SCOPE_INBOX, type ScopeProject } from './CalendarScopeSheet';
+import { TopBarMenu } from '../ui/top-bar-menu';
 import { useTokens } from '../theme';
 
 /**
@@ -124,6 +127,16 @@ export function CalendarScreen(): React.JSX.Element {
   const [selected, setSelected] = useState<LocalDate>(() => toLocalDate(Date.now()));
   /** 这一屏看的是哪一档（月 / 周 / 日 / 年）。 */
   const [view, setView] = useState<CalendarViewKind>('month');
+  /**
+   * 🔴 2026-11-16：**显示范围**（按清单筛）。`undefined` = 所有清单。
+   *
+   * 形状照滴答的 `⋯ → 显示范围`：面板里多选、右上 ✓ 才落定。
+   * ⚠️ 现在只活在内存里（App 重启回到「所有」）—— 本机没有可用的偏好存储依赖，
+   * 新引一个要走依赖两道门，留到下一轮；界面上不假装它记住了。
+   */
+  const [scope, setScope] = useState<readonly string[] | undefined>(undefined);
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   /** 上一次的"今天"，用来判断跨零点时选中框要不要跟着走。 */
   const prevToday = useRef(today);
@@ -154,6 +167,12 @@ export function CalendarScreen(): React.JSX.Element {
     [host],
   );
 
+  const projectActions = useMemo(
+    () => (host ? createProjectActions(host) : null),
+    [host],
+  );
+  const [projects, setProjects] = useState<ScopeProject[]>([]);
+
   const refresh = useCallback(() => {
     if (!actions || !eventActions) return;
     // ⚠️ 两个 list 都是**同步**的（读已物化的内存状态），不是 Promise。
@@ -168,7 +187,12 @@ export function CalendarScreen(): React.JSX.Element {
      * 动作层，所以这一侧不需要播种（也**不许**为"对齐 web"新写一份 store）。
      */
     setEvents(eventActions.listEvents(today));
-  }, [actions, eventActions, today]);
+    if (projectActions) {
+      setProjects(
+        projectActions.listProjects().map((p) => ({ id: p.id, name: p.name })),
+      );
+    }
+  }, [actions, eventActions, projectActions, today]);
 
   useEffect(() => {
     if (!host) return;
@@ -393,13 +417,42 @@ export function CalendarScreen(): React.JSX.Element {
     [shiftPeriod, tokens],
   );
 
+  /**
+   * 显示范围落到数据上：`scope === undefined` 不筛；否则只留选中清单里的任务。
+   *
+   * ⚠️ **不过滤倒数日**：范围说的是"哪些清单的任务"，纪念日不属于任何清单
+   * （它有自己的归档），把两者混在一起筛会得到"选了某个清单，纪念日全消失"。
+   */
+  const scopedTasks = useMemo(
+    () =>
+      scope === undefined
+        ? tasks
+        : tasks.filter((task) =>
+            task.projectId === undefined
+              ? scope.includes(SCOPE_INBOX)
+              : scope.includes(task.projectId),
+          ),
+    [scope, tasks],
+  );
+
   return (
     /*
       🔴 2026-11-15：日历是**看板**（chrome="board"）—— 内容铺满、顶栏随滚动收起。
       档位切换器与月历网格是同一件事（"我在看哪一段时间"），所以它们一起铺满；
       只有底部那句说明（脚注）留在 16dp 轴线上。
     */
-    <Screen title={t('mobile.calendar.title')} chrome="board">
+    <Screen
+      title={t('mobile.calendar.title')}
+      chrome="board"
+      actions={[
+        {
+          icon: 'action.more',
+          label: t('mobile.calendar.scope.entry'),
+          onPress: () => { setMoreOpen(true); },
+          testID: 'calendar-more',
+        },
+      ]}
+    >
       {error !== null ? (
         <Text variant="row-meta" tone="danger">
           {error}
@@ -422,7 +475,7 @@ export function CalendarScreen(): React.JSX.Element {
 
       <View {...swipe.panHandlers}>
       <CalendarBoard
-        tasks={tasks}
+        tasks={scopedTasks}
         today={today}
         /**
          * 🔴 「回到今天」原来**在页脚**（日历网格下面），因为移动端没传 `onToday`，
@@ -460,6 +513,42 @@ export function CalendarScreen(): React.JSX.Element {
         testID="calendar-board"
       />
       </View>
+
+      {/*
+        🔴 2026-11-16：入口放在 `⋯` 里，**不在顶栏再加一枚图标**。
+        滴答是三个图标（事件源 / 视图 / ⋯），我们把"显示范围"收进 ⋯ ——
+        见 `docs/agents/screen-chrome.md` 的顶栏预算（≤3 枚、低频进菜单）。
+      */}
+      <TopBarMenu
+        visible={moreOpen}
+        label={t('mobile.calendar.title')}
+        onClose={() => { setMoreOpen(false); }}
+        items={[
+          {
+            id: 'scope',
+            label: t('mobile.calendar.scope.entry'),
+            value:
+              scope === undefined
+                ? t('mobile.calendar.scope.all')
+                : t('mobile.calendar.scope.count', { count: scope.length }),
+            onPress: () => {
+              setMoreOpen(false);
+              setScopeOpen(true);
+            },
+          },
+        ]}
+      />
+
+      <CalendarScopeSheet
+        visible={scopeOpen}
+        projects={projects}
+        selected={scope}
+        onCancel={() => { setScopeOpen(false); }}
+        onConfirm={(next) => {
+          setScope(next);
+          setScopeOpen(false);
+        }}
+      />
     </Screen>
   );
 }

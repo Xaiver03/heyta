@@ -3251,6 +3251,13 @@ export const en = {
   'mobile.tasks.quadrant.axis.vertical': 'Important',
   'mobile.tasks.quadrant.axis.horizontal': 'Urgent',
   'mobile.tasks.quadrant.empty': 'Nothing here yet',
+
+  'mobile.calendar.scope.entry': 'Show range',
+  'mobile.calendar.scope.count': '{count} lists',
+  'mobile.calendar.scope.title': 'Show',
+  'mobile.calendar.scope.all': 'All lists',
+  'mobile.calendar.scope.cancel': 'Cancel',
+  'mobile.calendar.scope.confirm': 'Confirm',
   'mobile.tasks.group.overdue': 'Overdue',
   'mobile.tasks.group.inbox': 'Inbox',
   'mobile.tasks.group.completed': 'Completed',
