@@ -57,7 +57,7 @@
     <SolidColorBrush x:Key="HeytaColorPriorityMedium" Color="#FFB45309" />
     <SolidColorBrush x:Key="HeytaColorPriorityLow" Color="#FF0284C7" />
     <SolidColorBrush x:Key="HeytaColorPriorityNone" Color="#FF94A3B8" />
-    <SolidColorBrush x:Key="HeytaColorHeat0" Color="#FFF1F5F9" />
+    <SolidColorBrush x:Key="HeytaColorHeat0" Color="#FFE2E8F0" />
     <SolidColorBrush x:Key="HeytaColorHeat1" Color="#FFBFDBFE" />
     <SolidColorBrush x:Key="HeytaColorHeat2" Color="#FF93C5FD" />
     <SolidColorBrush x:Key="HeytaColorHeat3" Color="#FF3B82F6" />

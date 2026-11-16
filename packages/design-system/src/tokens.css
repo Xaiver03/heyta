@@ -271,7 +271,15 @@
   --ht-color-priority-none: var(--ht-slate-400);
 
   /* 习惯热力图：蓝色单色阶（深浅即数值，不靠色相区分） */
-  --ht-color-heat-0: var(--ht-slate-100);
+  /*
+    🔴 2026-11-16：0 档（"这一天没打卡"）从 slate-100 提到 slate-200。
+    页面改白之后，slate-100 与白只差 **1.10:1** —— 一整片空格子读不成"网格"，
+    只剩几条蓝色竖线，用户看不出"我这个月缺了哪些天"，而"缺了哪些天"
+    正是热力图唯一要说的事。slate-200 是 **1.23:1**：仍然明确是"空"，
+    但与 heat-1（blue-200，同明度不同色相）能分开。
+    判据见 `tests/tokens.spec.ts` 的 `heat-0 与 surface 的可辨阈值`。
+  */
+  --ht-color-heat-0: var(--ht-slate-200);
   --ht-color-heat-1: var(--ht-blue-200);
   --ht-color-heat-2: var(--ht-blue-300);
   --ht-color-heat-3: var(--ht-blue-500);

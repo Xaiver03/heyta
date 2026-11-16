@@ -525,6 +525,13 @@ export const GRAPHIC_PAIRS: ReadonlyArray<{
   why: string;
 }> = [
   { fg: 'color.border', bg: 'color.surface', min: 1.2, why: '分隔线（可见即可，非 3:1）' },
+  /*
+    热力图的 0 档（"这一天没打卡"）。它不是文本，也不是"必需的 UI 组件"边界，
+    所以不受 WCAG 1.4.11 的 3:1 约束；但**空网格必须能读成一个网格** ——
+    否则整块图只剩几条蓝色竖线，而"缺了哪些天"才是它要说的事。
+    实测 slate-100 只有 1.10:1（读不成网格），slate-200 是 1.23:1。
+  */
+  { fg: 'color.heat-0', bg: 'color.surface', min: 1.2, why: '热力图空格子（网格要能读成网格）' },
   { fg: 'color.ring', bg: 'color.background', min: 3, why: '焦点环' },
   // 分类色槽位只当**图形**用（色块 / 堆叠条的段），故走 3:1 这条线。
   // ⚠️ 它们**不**保证 4.5:1，所以不许拿去写正文（见 TOKEN_GROUPS 里的注释）。

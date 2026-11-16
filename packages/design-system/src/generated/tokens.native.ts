@@ -311,7 +311,7 @@ export const lightTokens: HeytaNativeTokens = {
   'color.priority-medium': "#b45309",
   'color.priority-low': "#0284c7",
   'color.priority-none': "#94a3b8",
-  'color.heat-0': "#f1f5f9",
+  'color.heat-0': "#e2e8f0",
   'color.heat-1': "#bfdbfe",
   'color.heat-2': "#93c5fd",
   'color.heat-3': "#3b82f6",

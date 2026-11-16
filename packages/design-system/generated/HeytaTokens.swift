@@ -93,7 +93,7 @@ enum HeytaTokens {
     static let colorPriorityMedium: String = "#b45309"
     static let colorPriorityLow: String = "#0284c7"
     static let colorPriorityNone: String = "#94a3b8"
-    static let colorHeat0: String = "#f1f5f9"
+    static let colorHeat0: String = "#e2e8f0"
     static let colorHeat1: String = "#bfdbfe"
     static let colorHeat2: String = "#93c5fd"
     static let colorHeat3: String = "#3b82f6"
