@@ -690,6 +690,13 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         {...swipe.panHandlers}
         style={{
           flex: 1,
+          /*
+           * 🔴 2026-11-16：`board` 档把 `Screen` 的左右 padding 归零（内容铺满），
+           * 于是日历**下面那张「这一天没有到期的任务」卡连页边距都没有**，
+           * 贴在屏幕两边——真机上就是"根本没留边距"的观感（iPhone 同样）。铺满应该只针对
+           * 真正的全幅视觉（网格），内容卡必须有页边距。这里给整块板补一条 `space.4` 轴线。
+           */
+          paddingHorizontal: tokens['space.4'],
           opacity: viewAnim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
           transform: [
             {
