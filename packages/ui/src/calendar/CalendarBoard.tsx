@@ -823,7 +823,18 @@ export function CalendarBoard({
       </View>
 
       <View
-        style={[styles.daySection, styles.card]}
+        style={[
+          styles.daySection,
+          styles.card,
+          /*
+           * 🔴 2026-11-16（iPad/iPhone 真机）：空的那天这一格**不再撑满剩余高度**。
+           * 上面空态虽然已经走 `size="line"`（一行字，不该占大卡），但外层 `daySection`
+           * 还带着 `flexGrow: 1` + `card` 的边框底色 —— 于是它照样被拉成一大片白框，
+           * 中间顶着一行「这一天没有到期的任务。」。空是常态，不该占满整屏。
+           * 有内容时仍 `flexGrow: 1`（列表能多看几条）；空时按内容高度。
+           */
+          dayTasks.length === 0 && dayEvents.length === 0 ? styles.daySectionEmpty : null,
+        ]}
         testID={`${testID}-day-section`}
       >
         {dayTasks.length === 0 && dayEvents.length === 0 ? (
@@ -1057,6 +1068,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
     },
     /* 当天那一格是**唯一吃剩余空间的**：它变高 = 能多看几条；网格变高 = 只是把空拉开。 */
     daySection: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto' },
+    /* 空的那天：这一格按内容高度，不占满剩余空间（见调用点的注释）。 */
+    daySectionEmpty: { flexGrow: 0 },
     weekCell: { flex: 1, alignItems: 'center' },
     /* 格子里现在**有文字**，所以必须顶对齐 + 左对齐：居中会让三行条
        在格子里上下浮，同一周里"有事的那天"和"没事的那天"文字不同高，
