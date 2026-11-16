@@ -531,6 +531,11 @@ const ROW_ID_EXEMPT = [
   //   （两步、单所有者、互斥），不是"当前看的是哪一条" —— 那一格已经是
   //   `useSelected('task')`（`detailTaskId`），菜单关掉后它还留着。
   ['apps/mobile/src/screens/TasksScreen.tsx', 'rowMenuId', 'confirm-gate'],
+  // 象限真拖拽：记"正在被拖的是哪一行"，松手即清 —— 与 `QuadrantBoard.activeId` /
+  // `KanbanView.draggingId` 同一类（dragging），不是"当前看的是哪一条"。
+  ['apps/mobile/src/screens/QuadrantScreen.tsx', 'draggingTaskId', 'dragging'],
+  // 顶栏 ⋯ 打开的子菜单：两步式（先定哪一项的子菜单、再点其中一条），与 `rowMenuId` 同形状。
+  ['apps/mobile/src/ui/top-bar-menu.tsx', 'submenuId', 'confirm-gate'],
   ['apps/mobile/src/screens/TrashScreen.tsx', 'busyId', 'in-flight'],
   ['apps/mobile/src/screens/TrashScreen.tsx', 'confirmingId', 'confirm-gate'],
   // ── 2026-10-16 逐处读代码补登的 6 处（此前未登记 ⇒ 断言 G 红）──────────────
