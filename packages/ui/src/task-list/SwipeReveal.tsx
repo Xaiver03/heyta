@@ -59,6 +59,8 @@ export interface SwipeRevealProps {
   readonly onAction: (actionId: RowActionId) => void;
   /** 批量选择态、正在处理中的那一行：不接受手势，也不接受点击。 */
   readonly disabled?: boolean;
+  /** 行身底色：列表放在非 `color.background` 的容器（如白卡）上时由宿主传入，避免灰行压白底。 */
+  readonly surfaceColor?: string;
   readonly children: React.ReactNode;
   readonly testID?: string;
 }
@@ -98,6 +100,7 @@ export function SwipeReveal({
   closeLabel,
   onAction,
   disabled = false,
+  surfaceColor,
   children,
   testID = 'heyta-swipe-reveal',
 }: SwipeRevealProps): React.JSX.Element {
@@ -306,7 +309,7 @@ export function SwipeReveal({
          */
         front: {
           width: '100%',
-          backgroundColor: tokens['color.background'],
+          backgroundColor: surfaceColor ?? tokens['color.background'],
         },
         catcher: {
           position: 'absolute',
@@ -316,7 +319,7 @@ export function SwipeReveal({
           left: 0,
         },
       }),
-    [text, tokens],
+    [text, tokens, surfaceColor],
   );
 
   // 没有动作、或这一行不该响应手势 ⇒ 逐字节交回原来的那一行（不套任何壳）。

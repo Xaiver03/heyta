@@ -158,6 +158,8 @@ export interface TaskRowProps {
    * 宿主按「按清单 / 按标签 / 关」三态解析好，这里只负责画或不画。
    */
   readonly iconColorToken?: CategoryColorToken | undefined;
+  /** 行身底色（透传给 SwipeReveal）：白卡列表传 color.surface，避免灰行压在白卡上。 */
+  readonly rowSurfaceColor?: string;
 }
 
 export function TaskRow({
@@ -175,6 +177,7 @@ export function TaskRow({
   selected = false,
   selectionMode = false,
   iconColorToken,
+  rowSurfaceColor,
 }: TaskRowProps): React.JSX.Element {
   // `reducedMotion` 与 tokens 来自同一个 context —— 这里换成 `useHeytaUiTheme`
   // 而不是多调一次 `useHeytaTokens`，避免两个 hook 各读一次 Provider。
@@ -551,6 +554,7 @@ export function TaskRow({
       closeLabel={swipe.closeLabel}
       disabled={busy || swipe.busy === true}
       onAction={swipe.onAction}
+      {...(rowSurfaceColor === undefined ? {} : { surfaceColor: rowSurfaceColor })}
       testID={`task-swipe-${row.id}`}
     >
       {rowNode}

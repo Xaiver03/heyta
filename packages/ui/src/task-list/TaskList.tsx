@@ -382,12 +382,13 @@ export function TaskList<TMeta = undefined>({
           {...(renderMeta === undefined ? {} : { renderMeta })}
           {...(renderTrailing === undefined ? {} : { renderTrailing })}
           {...(iconColorOf === undefined ? {} : { iconColorToken: iconColorOf(row) })}
+          {...(listCard ? { rowSurfaceColor: tokens['color.surface'] } : {})}
         />
       );
       // 省略插槽 ⇒ 原样返回那一枚行（移动端/四象限的行为逐字节不变）。
       return renderRowWrapper === undefined ? node : <>{renderRowWrapper(row, node)}</>;
     },
-    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density, selectedTaskIds, selectionMode, renderRowWrapper, iconColorOf],
+    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density, selectedTaskIds, selectionMode, renderRowWrapper, iconColorOf, listCard, tokens],
   );
 
   const keyExtractor = useCallback((item: Item) => item.key, []);
