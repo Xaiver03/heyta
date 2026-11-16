@@ -1012,9 +1012,14 @@ export interface ButtonProps {
   /** 展开/收起状态，供无边框的渐进展开按钮向读屏器暴露。 */
   expanded?: boolean;
   /**
-   * 是否**撑满**父容器宽度。默认 `false`（Apple HIG：避免全宽按钮）。
-   * 🔴 只有「单一主操作 + 强引导」的 CTA（登录 / 提交 / 空状态主按钮）才显式 `fullWidth`。
-   * 竖排列容器里默认按内容宽度、靠左对齐；**行内按钮靠 flex 定宽，不受这一项影响**。
+   * 是否**撑满**父容器宽度。
+   *
+   * 默认规则（Apple HIG「避免全宽按钮」的落地）：
+   *   · **主操作 `tone="primary"` → 默认撑满**（它是这一屏/这一块的唯一 CTA，撑满才醒目）；
+   *   · **其余（secondary / ghost / 默认）→ 默认按内容宽度、靠左**，不再被竖排容器拉满。
+   * 🔴 `alignSelf` 只影响父容器的**主轴**：在**行**里 `primary` 也仍按内容宽（不会变宽）；
+   *    只有在**竖排/表单**里 `primary` 才撑满。所以这条规则精确命中"表单提交保持醒目、
+   *    装饰性按钮不再全宽"，且不误伤行内按钮。需要特例的仍可显式传 `fullWidth` 或 `style`。
    */
   fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -1042,7 +1047,7 @@ export function Button({
   disabled,
   loading,
   expanded,
-  fullWidth = buttonStretchesByDefault(),
+  fullWidth = tone === 'primary' || buttonStretchesByDefault(),
   style,
   testID,
   accessibilityLabel,
