@@ -1925,7 +1925,7 @@ export function TasksScreen({
             renderDetailSheet('pinned')
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: tokens['space.6'] }}>
-              <Text variant="row-meta" tone="subtle">{t('mobile.tasks.title')}</Text>
+              <Text variant="row-meta" tone="subtle">{t('mobile.tasks.detail.placeholder')}</Text>
             </View>
           )}
         </View>

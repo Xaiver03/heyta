@@ -3546,6 +3546,7 @@ export const zhCN = {
   */
   'mobile.tasks.empty.hint': '从一件小事开始。',
   'mobile.tasks.empty.action': '添加第一个任务',
+  'mobile.tasks.detail.placeholder': '从左侧选一条任务，详情显示在这里。',
   'mobile.tasks.mode.date': '日期',
   'mobile.tasks.tagFilter.all': '全部',
   'mobile.tasks.mode.countdown': '倒计时',

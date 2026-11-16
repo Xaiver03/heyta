@@ -3229,6 +3229,7 @@ export const en = {
   'mobile.tasks.empty.title': 'Nothing scheduled for today',
   'mobile.tasks.empty.hint': 'Start with one small thing.',
   'mobile.tasks.empty.action': 'Add your first task',
+  'mobile.tasks.detail.placeholder': 'Select a task on the left to see its details.',
   'mobile.tasks.mode.date': 'Date',
   'mobile.tasks.tagFilter.all': 'All',
   'mobile.tasks.mode.countdown': 'Countdown',
