@@ -1,14 +1,22 @@
 {
-  "capturedAt": "2026-11-16T11:31:04.386Z",
-  "targets": 1,
+  "capturedAt": "2026-11-16T14:22:40.517Z",
+  "targets": 2,
   "artifacts": [
     {
-      "path": "screenshots/landing/L07-登录.png",
+      "path": "screenshots/web-desktop/W07-回收站.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.2465,
+      "contentRatio": 0.0745,
       "colorSpan": 228,
-      "sha256": "3cbb21b91a4a2ec6702ab3ee3540b8275401f4c8c1ec8c371c587d1c607136b1"
+      "sha256": "758f83986507e3fc728d74f4608f17a195e8c00de888a2eec0d082be2feae1a5"
+    },
+    {
+      "path": "screenshots/web-desktop/W07-en-Trash.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0837,
+      "colorSpan": 228,
+      "sha256": "701cb7e10821f9bb94ddc7e76a178f557c3843978c33c9ba5cdf1d4414871f27"
     }
   ]
 }

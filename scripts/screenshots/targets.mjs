@@ -172,7 +172,11 @@ export const TARGETS = [
     openVia: 'tab',
     view: 'trash',
     readyText: '回收站',
-    seed: { fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json', settingsLabel: '设置' },
+    seed: {
+      fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json',
+      settingsLabel: '设置',
+      dataSectionLabel: '数据与同步',
+    },
   },
   { id: 'W08', name: '设置', site: 'web', openVia: 'tab', view: 'settings', readyText: '设置' },
   /* 2026-11-16 补：日历是原来**没有截**的一个主视图 —— 而它恰好是页边距事故现场
@@ -203,7 +207,22 @@ export const TARGETS = [
     locale: 'en',
     readyText: 'Trash',
     // 夹具里的标题是**用户自己的字**，TrashBoard 原样显示、不翻译 ⇒ 中英两张图共用同一组期望值。
-    seed: { fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json', settingsLabel: 'Settings' },
+    seed: {
+      fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json',
+      settingsLabel: 'App settings',
+      /*
+        🔴 英文界面下这一组叫 `Data & sync`，**不是**中文那四个字的翻译，
+        也不是 `web.settings.nav.data`（那一枚是 'Data management'，另一处用）。
+
+        实测取法（2026-11-16）：开英文界面 → 头像 → App settings →
+        读出左侧导航的全部可及名，其中与中文「数据与同步」对应的是 `Data & sync`。
+
+        切组用的是**可及名**，所以它必须跟着语言走：抄成中文原样的话，
+        英文 seed 会在切组那一步静默失败，症状是 `import-run` 一直
+        「attached 但不可见」然后超时 —— 报错看着像"找不到元素"，其实是点错了地方。
+      */
+      dataSectionLabel: 'Data & sync',
+    },
   },
 ].map((target) => {
   const merged = {

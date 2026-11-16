@@ -25,6 +25,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   TextInput,
   View,
 } from 'react-native';
@@ -64,6 +65,7 @@ import { useI18n } from '@heyta/i18n';
 import {
   CaptureComposer,
   BottomSheet,
+  formFactorOf,
   priorityColorToken,
   receiptTimingOf,
   type CaptureProjectOption,
@@ -173,6 +175,10 @@ import { TimelineScreen } from './TimelineScreen';
 // 新建任务面板
 // ─────────────────────────────────────────────────────────────
 
+const staticStyles = StyleSheet.create({
+  flexEnd: { flex: 1, justifyContent: 'flex-end' },
+});
+
 function Composer({
   visible,
   onClose,
@@ -277,7 +283,7 @@ function Composer({
         accessibilityLabel={t('mobile.tasks.composer.close')}
       />
       <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'flex-end' }}
+        style={staticStyles.flexEnd}
         // Android edge-to-edge Modal can retain full window bounds despite
         // adjustResize, leaving the composer underneath the IME. Explicitly
         // resize its content so accessibility coordinates remain tappable.
@@ -422,6 +428,30 @@ export function TasksScreen({
 } = {}): React.JSX.Element {
   const tokens = useTokens();
   const insets = useSafeAreaInsets();
+  // iPad 分栏：外层可用宽度现量（onLayout，非 Dimensions —— Stage Manager 可拖宽）。`0` 时按 compact 处理。
+  const [rootWidth, setRootWidth] = useState(0);
+  // iPad 分栏右栏宽度（dp）。列表侧 FAB 的右移量也用它。
+  const DETAIL_PANE_WIDTH = 384;
+  // 静态内联样式收进 StyleSheet（L4 门禁：内联样式只减不增），按 tokens 计算。
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        rowGap2: { flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] },
+        flex1: { flex: 1 },
+        stackTop1: { paddingTop: tokens['space.2'], gap: tokens['space.1'] },
+        listWrap: { paddingTop: tokens['space.2'], flex: 1 },
+        pane: { width: DETAIL_PANE_WIDTH, backgroundColor: tokens['color.surface'] },
+        placeholder: {
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: tokens['space.6'],
+        },
+        rootRow: { flex: 1, flexDirection: 'row' },
+        rootCol: { flex: 1, flexDirection: 'column' },
+      }),
+    [tokens],
+  );
   // 搜索框要 `fontSans` 与 `row-meta` 两样（都走归一化访问器）。
   const text = useText();
   const { native } = useTheme();
@@ -1458,8 +1488,8 @@ export function TasksScreen({
               backgroundColor: tokens['color.primary-subtle'],
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
-              <Text variant="row-meta" style={{ flex: 1 }}>
+            <View style={styles.rowGap2}>
+              <Text variant="row-meta" style={styles.flex1}>
                 {t('web.shell.bulk.selected', { count: selectedTaskIds.size })}
               </Text>
               <Button label={t('web.shell.bulk.cancel')} tone="ghost" onPress={clearBulkSelection} />
@@ -1531,7 +1561,7 @@ export function TasksScreen({
           与 `apps/web/src/features/categories/CategoryBreakdown.tsx`
           ——"页面大标题在顶栏（视图 tab），所以内容区标题用 section-title"。
         */}
-        <View style={{ paddingTop: tokens['space.2'], gap: tokens['space.1'] }}>
+        <View style={styles.stackTop1}>
           <Text variant="section-title">{formatDayTitleText(toLocalDate(now), t)}</Text>
           {/*
             🔴 2026-11-15：空态时**不画这行副标题**。
@@ -1651,8 +1681,51 @@ export function TasksScreen({
     </>
   );
 
+  /**
+   * 🔴 iPad 横屏（expanded）分栏：列表在左、详情常驻右栏（不再盖住列表）。
+   * 宽度由外层 `onLayout` 现量，`formFactorOf` 推档 —— 不读 `Dimensions`（Stage Manager 会改宽度）。
+   */
+  const twoPane = view === 'list' && formFactorOf(rootWidth) === 'expanded';
+
+  /**
+   * 详情面板公共属性。两种呈现（底部 sheet / 右栏 pinned）共用一份，避免两处漂移。
+   * `actions === null` 时整块不渲染（与原来 overlay 的门禁一致）。
+   */
+  const renderDetailSheet = (presentation: 'sheet' | 'pinned') =>
+    actions === null ? null : (
+      <TaskDetailSheet
+        task={detailTask}
+        visible={detailTaskId !== null}
+        presentation={presentation}
+        onClose={() => {
+          selection.select('task', null);
+          if (navigation.stack.at(-1)?.key === 'task-detail') navigation.pop();
+        }}
+        actions={actions}
+        projects={projects}
+        tags={tags}
+        tagEntities={tagEntities}
+        projectActions={projectActions}
+        tasks={tasks}
+        onChanged={refresh}
+        now={now}
+        onOpenSubtask={(taskId) => {
+          selection.select('task', taskId);
+        }}
+        activitySource={host?.engine ?? null}
+        attachmentActions={attachmentActions}
+      />
+    );
+
   return (
-    <View style={{ flex: 1 }}>
+    <View
+      style={twoPane ? styles.rootRow : styles.rootCol}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        setRootWidth((prev) => (Math.abs(w - prev) > 1 ? w : prev));
+      }}
+    >
+      <View style={styles.flex1}>
       <Screen
         title={t('mobile.tasks.title')}
         // 列表视图把 FlatList 作为唯一纵向滚动宿主；标题、筛选与视图控制
@@ -1787,7 +1860,7 @@ export function TasksScreen({
             }}
           />
         ) : (
-          <View style={{ paddingTop: tokens['space.2'], flex: 1 }}>
+          <View style={styles.listWrap}>
             <TaskList
               listHeaderComponent={taskControls}
               emptyComponent={
@@ -1869,37 +1942,21 @@ export function TasksScreen({
           </View>
         )}
       </Screen>
+      </View>
 
-      {actions !== null && navigation.tab === 'tasks' ? (
-        <TaskDetailSheet
-          task={detailTask}
-          // visible={detailTaskId !== null} is the selection contract; the tab
-          // gate prevents a retained hidden tab from surfacing its Modal.
-          visible={detailTaskId !== null}
-          onClose={() => {
-            selection.select('task', null);
-            if (navigation.stack.at(-1)?.key === 'task-detail') navigation.pop();
-          }}
-          actions={actions}
-          projects={projects}
-          tags={tags}
-          tagEntities={tagEntities}
-          projectActions={projectActions}
-          tasks={tasks}
-          onChanged={refresh}
-          now={now}
-          // 点子任务 = 把面板切到那条子任务上（还是同一个"当前看的是哪一条"的
-          // 所有者，与行菜单走的是同一条 `select`，不新开第二份选中态）。
-          onOpenSubtask={(taskId) => {
-            selection.select('task', taskId);
-          }}
-          // 「任务动态」的数据源就是本机 op-log。`host` 还在加载时给 null，
-          // 那一格于是**整格不出现** —— 而不是出现并空着（空着会被读成
-          // "这条任务没被改过"，而我们此刻什么都不知道）。
-          activitySource={host?.engine ?? null}
-          attachmentActions={attachmentActions}
-        />
+      {twoPane ? (
+        <View style={styles.pane}>
+          {detailTask !== null && detailTaskId !== null ? (
+            renderDetailSheet('pinned')
+          ) : (
+            <View style={styles.placeholder}>
+              <Text variant="row-meta" tone="subtle">{t('mobile.tasks.detail.placeholder')}</Text>
+            </View>
+          )}
+        </View>
       ) : null}
+
+      {!twoPane && navigation.tab === 'tasks' ? renderDetailSheet('sheet') : null}
 
       {/**
        * 行的**上下文菜单**（§3.4 的移动端主入口 = 长按行）。
@@ -1976,6 +2033,7 @@ export function TasksScreen({
           icon="task.add"
           label={t('mobile.tasks.new')}
           testID="mobile-task-add"
+          rightOffset={twoPane ? DETAIL_PANE_WIDTH : 0}
           onPress={() => setComposerOpen(true)}
         />
       ) : (
@@ -1986,7 +2044,7 @@ export function TasksScreen({
           backgroundColor: tokens['color.surface-raised'],
         }}>
         {quadrantMoveUndo === null ? null : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
+          <View style={styles.rowGap2}>
             <Text variant="caption" tone="muted" grow>
               {t(
                 !quadrantMoveUndo.changedDue

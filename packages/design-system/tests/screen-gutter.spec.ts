@@ -27,7 +27,8 @@ const CSS = readFileSync(resolve(HERE, '../src/tokens.css'), 'utf8');
 
 /** tokens.css 是 rem 基准 16px —— 与生成器同一换算（见 `generate.ts` 的 LENGTH_GROUPS）。 */
 const REM_PX = 16;
-const pv = (css: string): number => Number(resolveVar(css).replace('rem', '')) * REM_PX;
+const pv = (value: string, vars: Map<string, string>): number =>
+  Number(resolveVar(value, vars).replace('rem', '')) * REM_PX;
 
 /** 造一张最小的 token 表：只填留白这三档，其余不参与计算。 */
 function fakeTokens(values: { base: number; md: number; lg: number }): HeytaNativeTokens {
@@ -58,9 +59,9 @@ describe('页面留白阶梯：CSS 与原生共用一张表', () => {
 
   it('每一档的在 0 宽度下的取值 == tokens.css 里同名变量的基准值', () => {
     // 基准档（:root 里那个）—— 生成器只解析第一个 :root，原生默认值也是它。
-    expect(pv(vars.get('--ht-screen-gutter')!)).toBe(16);
-    expect(pv(vars.get('--ht-screen-gutter-md')!)).toBe(24);
-    expect(pv(vars.get('--ht-screen-gutter-lg')!)).toBe(32);
+    expect(pv(vars.get('--ht-screen-gutter')!, vars)).toBe(16);
+    expect(pv(vars.get('--ht-screen-gutter-md')!, vars)).toBe(24);
+    expect(pv(vars.get('--ht-screen-gutter-lg')!, vars)).toBe(32);
   });
 
   it('CSS 媒体查询的断点与阶梯表的 minWidth 一一对应', () => {
@@ -72,8 +73,8 @@ describe('页面留白阶梯：CSS 与原生共用一张表', () => {
         `@media \\(min-width: ${rem}rem\\)\\s*\\{[\\s\\S]*?--ht-screen-gutter:\\s*([^;]+);`,
       ).exec(CSS);
       expect(block, `tokens.css 缺少 @media (min-width: ${rem}rem) 的 --ht-screen-gutter 覆盖`).not.toBeNull();
-      const cssPx = pv(block![1]!.trim());
-      const tokenPx = pv(vars.get(`--ht-${cssVarSuffix(step.token)}`)!);
+      const cssPx = pv(block![1]!.trim(), vars);
+      const tokenPx = pv(vars.get(`--ht-${cssVarSuffix(step.token)}`)!, vars);
       expect(
         cssPx,
         `@media ${rem}rem 写的是 ${cssPx}px，而阶梯表指向 ${step.token} = ${tokenPx}px —— 两边漂了`,

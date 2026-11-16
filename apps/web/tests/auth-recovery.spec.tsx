@@ -30,6 +30,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { privacyConsentActions } from '../src/features/privacy/consent-gate.js';
+
 import { I18nProvider, translate, type Locale, type MessageKey } from '@heyta/i18n';
 
 import { AuthPanel } from '../src/features/auth/AuthPanel.js';
@@ -122,6 +124,14 @@ async function toCredentialStage(el: HTMLElement, email = EMAIL): Promise<void> 
 
 beforeEach(() => {
   __resetAuthForTests();
+  /*
+    🔴 2026-11-16（ADR-0086）：登录的每个动作现在都会先过**设备级同意**。
+    这里没有渲染隐私面板（被测的是表单本身），所以 `waitForPrivacyDecision()`
+    会立刻给 `false`、提交被掐掉 —— 那正是产品在"没人能点同意"时的正确行为。
+
+    所以前置改成"这台设备已经同意联网"（与用户在面板里点过「同意并联网」等价）。
+  */
+  privacyConsentActions.accept();
   stubFetch(200, { message: 'If an account with that email exists, a recovery link has been sent.' });
 });
 

@@ -343,9 +343,16 @@ async function applySeed(page, site, target) {
   //    但不可见，`import-run` 的 click 会一直卡在 "waiting for element to be
   //    visible, enabled and stable"（2026-11-14 实测 W07 就是这里超时 30s）。
   //    所以先走产品自己的导航切组，再操作 —— 不改 hidden，不注入状态。
+  /*
+    ⚠️ 组名必须跟着**语言**走：英文界面里这一组叫 `Data management`
+    （`web.settings.nav.data`），不是中文那四个字的翻译。写死中文的话，
+    英文 seed 在切组这一步静默失败，症状是 `import-run` 一直「attached 但不可见」，
+    然后超时 30 秒 —— 那不是"慢"，是点错了地方。
+  */
+  const dataSectionLabel = target.seed.dataSectionLabel ?? '数据与同步';
   const dataSection = page
-    .getByRole('tab', { name: '数据与同步', exact: false })
-    .or(page.getByRole('button', { name: '数据与同步', exact: false }))
+    .getByRole('tab', { name: dataSectionLabel, exact: false })
+    .or(page.getByRole('button', { name: dataSectionLabel, exact: false }))
     .first();
   if (await dataSection.count()) {
     await dataSection.click({ force: true }).catch(() => {});
@@ -361,6 +368,12 @@ async function applySeed(page, site, target) {
   if (await runButton.isDisabled()) {
     throw new Error('seed：选了夹具但「还原」按钮仍是 disabled ⇒ 文件没进入界面状态，还原从未发生');
   }
+  /*
+    ⚠️ 先滚进视口再点。英文界面里这一组的文案更长，导入面板会落到视口下沿之外 ——
+    此时 `import-run` 是 **attached 但不可见**，Playwright 的 click 会一直等到超时，
+    报的却是"waiting for getByTestId('import-run')"，看着像找不到元素。
+  */
+  await runButton.scrollIntoViewIfNeeded().catch(() => {});
   await runButton.click();
 
   const deadline = Date.now() + 20_000;

@@ -322,6 +322,9 @@ export function TaskRowMenu({
     switch (id) {
       case 'open':
         return { label: t('web.rowMenu.open'), icon: null };
+      // 设为今天（`dueToday`）：移动端左滑「排期」专用；web 在面单/拖放改到期，行菜单不提供。
+      case 'dueToday':
+        return null;
       case 'pin':
         return pinned || onSetPinned === undefined
           ? null
@@ -418,6 +421,10 @@ export function TaskRowMenu({
             {action.label}
           </button>
         );
+
+      // 设为今天（`dueToday`）：移动端左滑专用，web 行菜单不提供（在面单改到期）。
+      case 'dueToday':
+        return null;
 
       /*
         置顶 / 取消置顶（B5，2026-11-04 滴答对齐）。

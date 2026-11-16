@@ -618,7 +618,25 @@ describe('E. 行上的清单归属：判断只有一份，两端各喂一次', (
       ['web', web],
       ['mobile', mobile],
     ] as const) {
-      expect(code, `${end} 没有把归属喂进 TaskBadges`).toMatch(/list=\{listNameFor\(/);
+      /*
+        ⚠️ 2026-11-16：判据从"`list={listNameFor(` 紧挨着"放宽成"`list={…}` 里面出现
+        `listNameFor(`"。
+
+        mobile 那边因为要区分"无归属"（不画清单名），写成了三行条件表达式：
+
+          list={
+            task.projectId === undefined
+              ? null
+              : listNameFor(projects, task.projectId, t('mobile.detail.project.inbox'))
+          }
+
+        紧挨着的那个正则因此假红 —— 它量的是**格式**，而这条要守的是
+        "归属只经共享判断"这件事（`projects.find(` 那条才是在数第二份判断）。
+        放宽之后仍然只认 `list={...}` 这个位置，换个地方调不算通过。
+      */
+      expect(code, `${end} 没有把归属喂进 TaskBadges`).toMatch(
+        /list=\{[\s\S]{0,240}?listNameFor\(/,
+      );
       // 第二份判断的形状：自己 `find` 出来一个名字。
       expect(code, `${end} 自己查了一遍清单名（判断出现了第二份）`).not.toMatch(/projects\.find\(/);
     }

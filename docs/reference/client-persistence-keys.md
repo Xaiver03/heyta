@@ -76,6 +76,7 @@ grep -rnoE "'heyta\.[A-Za-z0-9._]+'" apps/web/src apps/mobile/src packages/*/src
 | `heyta.ai.settings` | `apps/web/src/features/settings/aiStore.ts:42` | AI 设置面 | 行为类。是否应上服务端按 AI 架构那一份，不在本表裁决 |
 | `heyta.shell.modules` | `apps/web/src/features/shell/modules.ts:131` | 功能模块开关 | **功能开关**（行为），不是外观 —— 别放进 A 档 |
 | `heyta.announcements.dismissed` | `apps/web/src/features/announcements/store.ts:25` | 公告 | 已读状态 |
+| `heyta.firstRunSeen` | `apps/web/src/features/shell/first-run-pref.ts:28` | 首启引导 | 「已看过」标记（设备本地、零 op；没看过＝新用户，引导该出现） |
 | `heyta.ai.assistant.history` | `packages/app-host/src/assistant-local-history.ts:60` | 助手本地历史 | 用户数据，**本机** |
 | `heyta.vault.root.v1` | `apps/web/src/lib/vault-root-cache.ts:21` | vault 根缓存 | 敏感；见 vault 那一份 |
 | `heyta.vault.keyPlacement.v1` | `apps/web/src/lib/vault-root-preference.ts:18` | 密钥存放位置偏好 | 敏感 |

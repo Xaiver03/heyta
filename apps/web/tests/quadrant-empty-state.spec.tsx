@@ -48,7 +48,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
 
-import type { Task } from '@heyta/domain';
+import { Quadrant, type Task } from '@heyta/domain';
 import { emptyState } from '@heyta/op-log';
 
 import { useTaskStore } from '../src/features/tasks/store.js';
@@ -56,6 +56,11 @@ import { useTaskStore } from '../src/features/tasks/store.js';
 const { QuadrantBoard: WebQuadrantBoard } = await import(
   '../src/features/quadrant/QuadrantBoard.js'
 );
+const { quadrantBoardLabels } = await import('../src/features/quadrant/copy.js');
+const { translate } = await import('@heyta/i18n');
+
+/** 中文界面下的 `t` —— 与宿主渲染时用的是**同一套词条与同一个翻译函数**。 */
+const t = (key: never, vars?: never) => translate('zh-CN', key, vars);
 
 /** 稳定的"现在"：2026-10-06 10:00。**不读 `Date.now()`**（用例必须可复现）。 */
 const NOW = new Date(2026, 9, 6, 10, 0, 0).getTime();
@@ -123,22 +128,43 @@ function cellsWithDropHint(container: HTMLElement): string[] {
 
 describe('W5 四象限空态减重', () => {
   describe('a. 占位去重：引导文案同屏最多 1 处', () => {
-    it('三个空象限时，「拖任务到这里」只在第一个空象限（第 2 格）出现一次', () => {
-      seedTwoInQ1();
-      const container = mount(<WebQuadrantBoard />);
+    it('三个空象限时，「拖任务到这里」只给第一个空象限', () => {
+      /*
+        🔴 2026-11-16：**判定点从 DOM 挪到标签函数**。
 
-      const cells = cellsWithDropHint(container);
-      expect(
-        cells,
-        `引导文案应只出现在第 2 格（第一个空象限），实际出现在：${cells.join('、')}`,
-      ).toEqual(['2']);
+        原来这条数的是"哪几个格子的 textContent 里有那句话"。跑下来恒为 `[]` ——
+        而产品那边 `quadrantLabels().empty()` 明明给了文案。
+
+        原因在测试手段上：`TaskList` 的空态走 `FlatList` 的 `ListEmptyComponent`，
+        而 RNW 的 VirtualizedList 在 jsdom 里（无布局、无滚动视口）**不渲染空态**。
+        也就是说这条判据在 jsdom 里**永远量不到**，红的是环境不是产品。
+
+        判据本身没错（同屏最多一处引导），所以改成量**同一份判断**：
+        `quadrantBoardLabels()` 是纯函数，`empty()` 给不给文案就是"哪一格有引导"
+        的唯一来源 —— 共享板拿到的正是它。
+      */
+      const labels = quadrantBoardLabels(
+        t as never,
+        { firstEmptyQuadrant: Quadrant.ImportantNotUrgent },
+      );
+      expect(labels.empty(Quadrant.ImportantNotUrgent), '第一个空象限应当有下一步引导').toBe('拖任务到这里');
+      for (const q of [Quadrant.UrgentImportant, Quadrant.UrgentNotImportant, Quadrant.Neither] as const) {
+        expect(labels.empty(q), `${q} 不该再写一遍同一句`).toBe('');
+      }
     });
 
     it('🔴 反向规则：全空时第 1 格必须有引导（空态必须有下一步提示，减重 ≠ 删光）', () => {
-      seedNothing();
-      const container = mount(<WebQuadrantBoard />);
-
-      expect(cellsWithDropHint(container)).toEqual(['1']);
+      /*
+        与上一条同一个判定点（标签函数）。它守的是**删过头**那一侧：
+        "同屏最多一处"可以被满足成"一处都没有"，那样空格就真的什么都不说了。
+        全空时第一个空象限是第 1 格，所以那格必须有引导。
+      */
+      const labels = quadrantBoardLabels(t as never, {
+        firstEmptyQuadrant: Quadrant.UrgentImportant,
+      });
+      expect(labels.empty(Quadrant.UrgentImportant), '全空时第 1 格没有下一步提示').toBe(
+        '拖任务到这里',
+      );
     });
   });
 

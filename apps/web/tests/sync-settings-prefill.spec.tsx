@@ -43,6 +43,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { privacyConsentActions } from '../src/features/privacy/consent-gate.js';
+
 import { I18nProvider } from '@heyta/i18n';
 
 import { SyncBar } from '../src/features/sync/SyncBar.js';
@@ -58,6 +60,12 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  /*
+    🔴 2026-11-16（ADR-0086）：登录提交会先过**设备级同意**。
+    这里没渲染隐私面板（被测的是"草稿地址能不能带到登录"），所以要先声明已同意，
+    否则提交会被正确地掐掉、`signInWithPassword` 一次都不会被调到。
+  */
+  privacyConsentActions.accept();
   // 同步 store 是模块级单例 —— 不重置的话用例之间会互相带状态。
   localStorage.clear();
   __resetAuthForTests();
