@@ -5,7 +5,13 @@
   flex-direction: column;
   gap: var(--ht-space-3);
   padding: var(--ht-space-4);
-  background: var(--ht-color-surface);
+  /*
+    2026-11-16：侧栏改**浅灰**，内容列改白（对齐滴答清单的分区方式）。
+    反转之前是"侧栏白 + 内容灰"，于是同屏两种白/灰的差值只有 7/255，谁都不清楚。
+    现在：内容白 → 承载；侧栏灰 → 分区。差值 7/255 依然小，但它只用于**两个结构区之间**，
+    不再用于"内容 vs 卡片"，所以不再有"半吊子"的问题。
+  */
+  background: var(--ht-color-background);
   /* 工作区靠底色与留白分层，拖拽时才显示手柄。 */
   border-right: 0;
   /*

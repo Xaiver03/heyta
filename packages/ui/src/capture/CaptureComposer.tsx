@@ -316,9 +316,21 @@ function makeStyles(tokens: HeytaNativeTokens) {
     descriptionInput: {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.field-padding-x'],
-      borderWidth: 0,
+      /**
+       * 🔴 2026-11-16：从"无边界输入面"改成**浅底 + 一条细线**。
+       *
+       * 产品负责人看任务页的第一句是「默认下面好像有一层灰色的底层遮罩」——
+       * 根因是页面底 `#f8fafc` 与白卡片只差 7/255。页面改白之后，
+       * `color.surface`（白）的输入面在它上面**完全消失**：截图里只剩 placeholder 一行字，
+       * 读起来不像输入框。滴答清单的 composer 同样是"浅底 + 极细的边"。
+       *
+       * ⚠️ 这条同时推翻 2026-10-07「无描边交互」在**输入面**这一格的适用性：
+       * 产品 2026-11-16 的口径是「全局不用彻底禁止描边」。按钮仍不画静止描边。
+       */
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
       borderRadius: tokens['radius.md'],
-      backgroundColor: tokens['color.surface'],
+      backgroundColor: tokens['color.surface-sunken'],
       color: tokens['color.foreground-muted'],
       textAlignVertical: 'center',
     },
@@ -345,10 +357,14 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flex: 1,
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.field-padding-x'],
-      // 无边界输入面：光标和 placeholder 已经提供编辑反馈，不再叠加输入框框线。
-      borderWidth: 0,
+      /**
+       * 🔴 2026-11-16：同上 —— 页面白之后，白输入面没有承载。
+       * 见 `descriptionInput` 那条注释（产品口径与滴答的参照都在那里）。
+       */
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
       borderRadius: tokens['radius.md'],
-      backgroundColor: tokens['color.surface'],
+      backgroundColor: tokens['color.surface-sunken'],
       color: tokens['color.foreground'],
     },
     addButton: {

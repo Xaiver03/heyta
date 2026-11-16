@@ -322,7 +322,16 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'column',
       minHeight: tokens['layout.quadrant-min-height'],
       padding: tokens['space.3'],
-      /** 每格一张白卡（滴答的形状）：圆角 + 白底，四张之间靠间隙分开。 */
+      /**
+       * 每格一张白卡（滴答的形状）：圆角 + 白底，四张之间靠间隙分开。
+       *
+       * 🔴 2026-11-16：补一条**静止态细线**。页面底从 slate-50 改成白之后，
+       * 白卡在白底上等于没有边界（实拍：四格只剩四个色点与计数，格子本身看不见）。
+       * 产品口径「全局不用彻底禁止描边」—— 这条就是它在这一处的落地。
+       * 用 `color.border`（不是 strong）：卡片边界是**分区**，不是强调。
+       */
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
     },

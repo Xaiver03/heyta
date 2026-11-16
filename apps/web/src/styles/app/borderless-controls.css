@@ -1,6 +1,20 @@
 /** 产品负责人 2026-10-07：无描边交互。
  * 输入靠光标；按钮/菜单靠文字与底色表达焦点。日历格的数据分隔线不是按钮描边。
  * important 用于覆盖 RN-web 生成的内联边框，以及分散在功能 CSS 中的旧焦点框。
+ *
+ * 🔴 **2026-11-16 收窄：不再"彻底禁止描边"。** 产品负责人在看到"内容区整片浅灰、
+ * 白卡浮在上面边界发虚"之后给的口径是「全局不用彻底禁止描边」。
+ *
+ * 原因不是审美偏好变了，而是**承载方式必须成对**：
+ * 页面底原本是 slate-50（`#f8fafc`），与白卡只差 **7/255** —— 这个差值既不足以
+ * 读成"分区"，又足以被察觉成"蒙了一层灰"。去掉那层灰（页面改白）之后，
+ * 白卡就**没有承载**了，只能靠描边；而这条 `!important` 会把任何描边吃掉。
+ *
+ * 收窄的边界（重要）：
+ *   · **静止态**的卡片 / 输入框允许一条 `--ht-color-border` 的细线；
+ *   · **按钮**仍不画静止描边（产品 10-07 的原意只在这一档保留）；
+ *   · **键盘焦点**仍由 `:focus-visible` 单独负责（见下面那两组规则），
+ *     不依赖这里的压制。
  */
 a[href], a[href]:hover, a[href]:focus-visible {
   text-decoration: none;
@@ -19,9 +33,15 @@ a[href], a[href]:hover, a[href]:focus-visible {
   border-color: transparent !important;
   box-shadow: none !important;
 }
+/*
+ * 输入类：**不再把 `border-color` 强制透明**（2026-11-16）。
+ * 页面改白之后，输入框要靠"浅灰底"或"一条细线"与页面分开；
+ * 强制透明会让它两种承载都做不到，只剩一个在纯白上完全看不见的方框。
+ * 具体用哪种由组件自己声明（`.ht-input` 走 `surface-sunken`，见 controls.css）。
+ * ⚠️ `box-shadow: none` 也一并去掉：焦点环在 WebKit 上必须靠 `box-shadow` 才跟随圆角
+ *    （见下面那段 2026-11-03 的记录），全局压掉它等于把那次的修复抹了。
+ */
 :is(input:not([type='checkbox']):not([type='radio']), textarea, select, [contenteditable='true']) {
-  border-color: transparent !important;
-  box-shadow: none !important;
   caret-color: var(--ht-color-primary);
 }
 :is(input:not([type='checkbox']):not([type='radio']), textarea, [contenteditable='true']):focus {

@@ -408,8 +408,14 @@
   flex: 1;
   min-block-size: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-4);
-  background: var(--ht-color-surface);
-  border: 0;
+  /*
+    2026-11-16：输入框改**凹陷底 + 一条细线**。页面与卡片都白之后，
+    白输入框在它们上面没有任何边界；只给凹陷底还不够 —— `#f1f5f9` 压在白卡上
+    只差 14/255，截图里读起来仍然像"没有输入框"（本次实拍确认）。
+    滴答的 composer 同样是"浅底 + 一条极细的边"。
+  */
+  background: var(--ht-color-surface-sunken);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
   transition: border-color var(--ht-duration-fast) var(--ht-ease-standard);

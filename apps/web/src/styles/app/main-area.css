@@ -11,6 +11,18 @@
      后代**全部**已经有更近的定位祖先（四枚 quadrant 卡片各自 `section`、
      一枚 `.ht-content`），所以这一句不改变任何一个元素的包含块。 */
   position: relative;
+  /*
+    🔴 2026-11-16：内容列改**白底**（对齐滴答清单：白列表 + 细线分区，不是灰底 + 白卡）。
+
+    此前这一列的底色来自 `.ht-app` 的 `color.background`（slate-50 `#f8fafc`），
+    而卡片是白（`#fff`）—— 两者只差 **7/255**：既读不成"分区"，又会被看成
+    "蒙了一层灰"（产品负责人的原话是"任务默认下面好像有一层灰色的底层遮罩"）。
+    产品口径：参考滴答 —— **页面白、卡片白，靠 1px 细线与间距分**。
+
+    ⚠️ 白设在 `.ht-main` 而不是 `.ht-content`：后者有 `max-inline-size: 1200px` +
+    `margin-inline: auto`，在那里涂白会在宽屏上留下"居中一条白、两侧灰"的形状。
+  */
+  background: var(--ht-color-surface);
 }
 
 .ht-header {
@@ -46,7 +58,11 @@
   /* 横向留白与 `.ht-content` 同源（`screen.gutter`），否则页头标题与内容列
      在各断点上会各自缩进 —— 移动端 `ab11068f` 修过的正是同一类错位。 */
   padding: var(--ht-space-2) var(--ht-screen-gutter);
-  border-bottom: 0;
+  /*
+    页头与内容列现在**同色**（都白），所以分区不能再靠色差 —— 由这条细线承担。
+    滴答清单的顶栏同样是"白底 + 一条极细的下边线"。
+  */
+  border-bottom: var(--ht-border-width-thin) solid var(--ht-color-border);
   background: var(--ht-color-surface);
 }
 

@@ -551,7 +551,12 @@
   font-family: var(--ht-font-sans);
   color: var(--ht-color-foreground);
   background: var(--ht-color-surface);
-  border: 0;
+  /*
+    2026-11-16：基态补一条细线。页面底改白之后，"白行 + 白底"没有任何边界
+    （选中态本来就用 `border-color: primary` 表达，所以这一格早就有边框语义，
+    只是基态被 `border: 0` 抹掉了）。
+  */
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);
 }
 

@@ -160,7 +160,8 @@
      建立组件边界，避免再靠字号和颜色硬凑层级。 */
   box-sizing: border-box;
   padding: var(--ht-space-4);
-  border: 0;
+  /* 2026-11-16：页面白之后，白模块需要一条静止态细线才有边界（同四象限/习惯行）。 */
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);
   background: var(--ht-color-surface);
 }

@@ -175,11 +175,15 @@ export const TARGETS = [
     seed: { fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json', settingsLabel: '设置' },
   },
   { id: 'W08', name: '设置', site: 'web', openVia: 'tab', view: 'settings', readyText: '设置' },
+  /* 2026-11-16 补：日历是原来**没有截**的一个主视图 —— 而它恰好是页边距事故现场
+     （iPad 上内容卡贴边）。没有它，那类回归只能靠人肉发现。 */
+  { id: 'W09', name: '日历', site: 'web', openVia: 'tab', view: 'calendar', readyText: '日历' },
 
   // ── 移动端（标签式的移动视口）────────────────────────────────────
   { id: 'MW01', name: '移动端任务', site: 'web', openVia: 'tab', view: 'tasks', device: 'mobile', readyText: '任务', appStore: true },
   { id: 'MW02', name: '移动端四象限', site: 'web', openVia: 'tab', view: 'quadrant', device: 'mobile', readyText: '四象限', appStore: true },
   { id: 'MW03', name: '移动端习惯', site: 'web', openVia: 'tab', view: 'habits', device: 'mobile', readyText: '习惯', appStore: true },
+  { id: 'MW04', name: '移动端日历', site: 'web', openVia: 'tab', view: 'calendar', device: 'mobile', readyText: '日历' },
 
   // ── 英文界面（桌面视口）────────────────────────────────────────
   // 🔴 readyText 取自 packages/i18n/src/locales/en.ts 的真实词条
