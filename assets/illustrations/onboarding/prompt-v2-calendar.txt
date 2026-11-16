@@ -1,0 +1,11 @@
+A vertical Japanese-style comic strip for a calendar feature, portrait 9:16, exactly three panels stacked vertically with thick clean paper-white gutters between them.
+
+Panel 1 (top, largest): the same young adult with short dark hair, plain white tee and dark trousers is seen from the chest up, looking slightly worried, while five or six small indigo and sand-colored cards float around their head in a loose messy cloud, each card blank with two short grey lines. Behind them a faint mist blue-grey wall.
+
+Panel 2 (middle, largest): the character stands to the left, one hand open as if guiding; the scattered cards are pulled along a gentle dotted arc into a large blank month grid drawn in perspective on the right, each card settling into its own cell. Three cells of the grid glow indigo, one glow warm orange. The grid lines are thin ink.
+
+Panel 3 (bottom, smaller): a close three-quarter view of the character looking up at the month grid from a low angle, calm and satisfied, arms relaxed; the grid above them is now fully ordered with a few glowing cells.
+
+Art direction: hand-drawn thin ink linework with slight variation, flat soft color fills, light paper grain, no 3D, no photoreal skin. Palette strictly: warm off-white paper #FAF7F1, ink #1F2937, indigo #2563EB, warm orange #E8833A used only for the single highlight, mist blue-grey #94A3B8, warm sand #E4D8C3. The bottom eighth fades to plain warm paper.
+
+Hard constraints: absolutely no text, no letters, no numbers, no dates, no month names, no logos, no watermark, no phone brand, no realistic UI screenshot. All app surfaces are abstract cards and grid cells with blank lines only. No camera frame, no film border.

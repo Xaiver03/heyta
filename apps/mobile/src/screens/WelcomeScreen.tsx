@@ -47,15 +47,31 @@ import { useI18n } from '@heyta/i18n';
 
 import { Button, Text } from '../ui/kit';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
-import { useTheme, useTokens } from '../theme';
+import { ThemeProvider, useTheme, useTokens } from '../theme';
 
 /** 四个功能面：图 + **跟随它的**短标题（借用已存在的 tab 标签，不新增文案）。 */
 const SLIDES = [
-  { art: require('../../../../assets/illustrations/onboarding/bg-tasks.jpg'), titleKey: 'mobile.tab.tasks' },
-  { art: require('../../../../assets/illustrations/onboarding/bg-calendar.jpg'), titleKey: 'mobile.tab.calendar' },
-  { art: require('../../../../assets/illustrations/onboarding/bg-focus.jpg'), titleKey: 'mobile.tab.focus' },
-  { art: require('../../../../assets/illustrations/onboarding/bg-stats.jpg'), titleKey: 'mobile.tab.categories' },
-] as const satisfies ReadonlyArray<{ art: number; titleKey: MessageKey }>;
+  {
+    art: require('../../../../assets/illustrations/onboarding/bg-tasks.jpg'),
+    titleKey: 'mobile.tab.tasks',
+    lineKey: 'mobile.welcome.line.tasks',
+  },
+  {
+    art: require('../../../../assets/illustrations/onboarding/bg-calendar.jpg'),
+    titleKey: 'mobile.tab.calendar',
+    lineKey: 'mobile.welcome.line.calendar',
+  },
+  {
+    art: require('../../../../assets/illustrations/onboarding/bg-focus.jpg'),
+    titleKey: 'mobile.tab.focus',
+    lineKey: 'mobile.welcome.line.focus',
+  },
+  {
+    art: require('../../../../assets/illustrations/onboarding/bg-stats.jpg'),
+    titleKey: 'mobile.tab.categories',
+    lineKey: 'mobile.welcome.line.stats',
+  },
+] as const satisfies ReadonlyArray<{ art: number; titleKey: MessageKey; lineKey: MessageKey }>;
 
 function makeStyles(tokens: HeytaNativeTokens) {
   return StyleSheet.create({
@@ -150,7 +166,27 @@ export interface WelcomeScreenProps {
   onSignedIn: (saved: SavedAuthSession) => void;
 }
 
-export function WelcomeScreen({
+/**
+ * 🔴 2026-11-16：这一屏**固定用亮色**，不跟随系统。
+ *
+ * 素材换成了"纸感漫画"（`assets/illustrations/onboarding/bg-*.jpg`，米白纸底
+ * #FAF7F1 + 靛蓝）。系统在深色模式下时，`color.background` 是近黑 ——
+ * 底部那层渐隐会把亮色漫画压成灰黑，白字也读不出来。
+ *
+ * 固定亮色是这类首启页的常规做法：它只有几秒、是品牌第一次露面，
+ * 不该被"用户当前是深色还是浅色"撕成两套素材。屏内所有 token
+ * （渐隐色、标题色、按钮色）都来自这层 Provider。
+ */
+export function WelcomeScreen(props: Parameters<typeof WelcomeScreenInner>[0]) {
+  const { locale } = useI18n();
+  return (
+    <ThemeProvider locale={locale} schemeOverride="light">
+      <WelcomeScreenInner {...props} />
+    </ThemeProvider>
+  );
+}
+
+function WelcomeScreenInner({
   initialServerUrl,
   onUseOffline,
   onSignedIn,
@@ -298,6 +334,15 @@ export function WelcomeScreen({
       {authOpen ? null : (
         <View style={[styles.caption, { paddingBottom: insets.bottom + tokens['space.16'] * 2 }]} pointerEvents="none">
           <Text variant="row-title">{t((SLIDES[slide] ?? SLIDES[0]).titleKey)}</Text>
+          {/*
+            🔴 2026-11-16：一行说明。
+            之前这里**只有一个词**（"任务""日历""专注""统计"）—— 四页翻完，
+            人知道了四个栏目名，却仍不知道这应用到底替他做了什么。
+            漫画负责"看见"，这一行负责"说清"；两样都有，才叫介绍功能。
+          */}
+          <Text variant="row-meta" tone="muted" style={{ textAlign: 'center' }}>
+            {t((SLIDES[slide] ?? SLIDES[0]).lineKey)}
+          </Text>
           <View style={styles.dots}>
             {SLIDES.map((item, index) => (
               <View key={item.titleKey} style={[styles.dot, index === slide ? styles.dotOn : null]} />

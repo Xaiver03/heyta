@@ -1,0 +1,18 @@
+Shared art direction for the heyta onboarding comic series (do not paste this file; it is the style contract the four prompts follow).
+
+STYLE
+- Vertical Japanese-style comic strip, exactly three panels stacked top to bottom, separated by thick clean paper-white gutters (about 40px at 1024 wide).
+- Hand-drawn ink linework: thin, slightly varying, confident; no outline on the background.
+- Flat soft color fills with a light paper grain. No 3D render, no photoreal skin, no gradients inside panels except a soft vignette.
+- Palette locked: warm off-white paper #FAF7F1, ink line #1F2937, indigo #2563EB, warm orange #E8833A, mist blue-grey #94A3B8, one warm sand tone #E4D8C3.
+- One recurring character: a young adult, short dark hair, plain white tee, dark trousers, simple expressive face. Same face and clothes in every image.
+
+LAYOUT
+- The top two thirds hold the three panels.
+- The bottom third is intentionally almost empty warm paper with a gentle fade, so app text and buttons can sit on it. No shapes there, no hard edge.
+- Panel 1 = the problem. Panel 2 = what the app does. Panel 3 = the calm result.
+
+HARD CONSTRAINTS
+- No text, no letters, no numbers, no words, no logos, no watermarks anywhere. Blank speech bubbles are allowed only if empty.
+- No phone brand, no realistic UI screenshot; app surfaces are drawn as abstract rounded cards with a few short lines standing in for text.
+- No camera frames, no film borders.

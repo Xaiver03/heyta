@@ -3890,6 +3890,15 @@ export const zhCN = {
   //    少了出口，应用就从「本地优先」变成「必须联网才能开始用」。
   'mobile.welcome.title': '开始安排今天',
   'mobile.welcome.signIn': '注册 / 登录',
+  /*
+    首屏每页那一行说明（2026-11-16）。此前只有四个栏目名一个词 ——
+    四页翻完知道了栏目，仍不知道这应用替他做了什么。漫画负责"看见"，这一行负责"说清"。
+    四句都落在"他得到什么"，不写功能清单。
+  */
+  'mobile.welcome.line.tasks': '想到什么就写下来，时间地点它自己认得出。',
+  'mobile.welcome.line.calendar': '一整月的安排摊开来看，哪天空、哪天满。',
+  'mobile.welcome.line.focus': '按下计时，把手边的声音都关掉。',
+  'mobile.welcome.line.stats': '回头看一眼：这段时间你到底走了多远。',
   'mobile.welcome.offline': '先离线使用',
 
   // ── 移动端 · 注册 / 登录面板（规范 §3.2）────────────────────

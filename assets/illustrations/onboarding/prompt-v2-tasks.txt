@@ -1,0 +1,11 @@
+A vertical Japanese-style comic strip for a task app, portrait 9:16, exactly three panels stacked vertically with thick clean paper-white gutters between them.
+
+Panel 1 (top, largest): a young adult with short dark hair, plain white tee and dark trousers stands in a bright morning room, holding a phone at chest height. The phone's screen is a blank rounded card with three short grey lines (no text). One small indigo card floats just above the phone, as if the thought just jumped out. Ink linework, flat indigo accent, warm off-white paper.
+
+Panel 2 (middle, largest): the floating indigo card is caught by a gentle dotted arc and lands into a neat vertical list of rounded cards, drawn in perspective on the right side of the panel; the card that just landed glows slightly and has a small indigo check mark drawn as a simple bent stroke. The character's hand is still raised where the card left.
+
+Panel 3 (bottom, smaller): the character from a three-quarter back view walks out of a doorway with a small backpack, one hand in pocket, shoulders relaxed. The background is nearly empty warm paper with a few faint mist blue-grey lines suggesting a corridor.
+
+Art direction: hand-drawn thin ink linework with slight variation, flat soft color fills, light paper grain, no 3D, no photoreal skin. Palette strictly: warm off-white paper #FAF7F1, ink #1F2937, indigo #2563EB, warm orange #E8833A used only for one small highlight, mist blue-grey #94A3B8, warm sand #E4D8C3. The bottom eighth of the image fades to plain warm paper.
+
+Hard constraints: absolutely no text, no letters, no numbers, no logos, no watermark, no phone brand, no realistic UI screenshot. All app surfaces are abstract rounded cards with short blank lines only. No camera frame, no film border.

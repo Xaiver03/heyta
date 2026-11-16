@@ -3499,6 +3499,10 @@ export const en = {
   // (use offline) must both exist.
   'mobile.welcome.title': 'Plan your day',
   'mobile.welcome.signIn': 'Sign in or register',
+  'mobile.welcome.line.tasks': 'Write it down as it comes; it works out the time and place.',
+  'mobile.welcome.line.calendar': 'See the whole month at once — which days are open, which are full.',
+  'mobile.welcome.line.focus': 'Start the timer and shut the noise out.',
+  'mobile.welcome.line.stats': 'Look back and see how far you actually got.',
   'mobile.welcome.offline': 'Use offline for now',
 
   // ── Mobile · sign-in panel (spec §3.2) ────────────────────

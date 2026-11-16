@@ -1,0 +1,11 @@
+A vertical Japanese-style comic strip for a focus timer feature, portrait 9:16, exactly three panels stacked vertically with thick clean paper-white gutters between them.
+
+Panel 1 (top, largest): the same young adult with short dark hair, plain white tee and dark trousers sits at a desk, shoulders tense, one hand pressed to the side of their head. Around them circle five or six small bells and speech-bubble shaped blobs in mist blue-grey and warm orange, each empty, with thin vibration marks. A single sweat drop on the temple.
+
+Panel 2 (middle, largest): the character presses one large round indigo timer dial on the desk with a flat palm. Concentric thin ink rings ripple outward from the dial and push the bells and blobs away to the panel edges; the shapes are scattering and falling.
+
+Panel 3 (bottom, smaller): the character from a rear three-quarter view leans over the desk working, head down. The background is almost plain warm paper, with one soft warm indigo halo around the shoulders and a few calm horizontal mist lines. No shapes crowding the frame.
+
+Art direction: hand-drawn thin ink linework with slight variation, flat soft color fills, light paper grain, no 3D, no photoreal skin. Palette strictly: warm off-white paper #FAF7F1, ink #1F2937, indigo #2563EB, warm orange #E8833A for the noise shapes only, mist blue-grey #94A3B8, warm sand #E4D8C3. The bottom eighth fades to plain warm paper.
+
+Hard constraints: absolutely no text, no letters, no numbers, no clock numerals, no logos, no watermark, no realistic UI screenshot. Playback symbols must be geometric only, never characters. No camera frame, no film border.

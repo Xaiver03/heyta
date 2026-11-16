@@ -1,0 +1,11 @@
+A vertical Japanese-style comic strip for a habit statistics feature, portrait 9:16, exactly three panels stacked vertically with thick clean paper-white gutters between them.
+
+Panel 1 (top, largest): the same young adult with short dark hair, plain white tee and dark trousers walks through an open landscape of warm paper, looking back over one shoulder. Behind them stretches a long row of small square marks on the ground, most of them faint mist blue-grey, a few glowing indigo, one glowing warm orange, like footprints left by days.
+
+Panel 2 (middle, largest): the character crouches and touches one faint square; a dotted line rises from the row of squares and lifts into a simple ascending step chart drawn in thin ink with indigo filled steps, floating in the air to the right. No axes labels, no numbers, just steps and a rising curve.
+
+Panel 3 (bottom, smaller): the character stands upright with hands in pockets, seen from behind and slightly to the side, looking at the floating chart. The chart has settled into a quiet warm glow; the surrounding paper is almost empty.
+
+Art direction: hand-drawn thin ink linework with slight variation, flat soft color fills, light paper grain, no 3D, no photoreal skin. Palette strictly: warm off-white paper #FAF7F1, ink #1F2937, indigo #2563EB, warm orange #E8833A for one single square, mist blue-grey #94A3B8, warm sand #E4D8C3. The bottom eighth fades to plain warm paper.
+
+Hard constraints: absolutely no text, no letters, no numbers, no percentages, no axis labels, no logos, no watermark, no realistic UI screenshot. Charts are pure shape, never annotated. No camera frame, no film border.
