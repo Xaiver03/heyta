@@ -319,10 +319,17 @@ function WelcomeScreenInner({
       <View style={styles.fade} pointerEvents="none">
         <Svg width="100%" height="100%">
           <Defs>
+            {/*
+              🔴 2026-11-16：渐隐提前并加重。
+              素材换成三格漫画后，第三格的内容（人物/桌面）一直画到 0.75 屏高，
+              而标题与副标题正好落在那一带 —— 真机上"专注"压在人背上，读得清但脏。
+              现在的四档让 0.62 处就到 0.72，标题区基本是干净纸色。
+            */}
             <LinearGradient id="welcomeBottomFade" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={tokens['color.background']} stopOpacity={0} />
-              <Stop offset="0.45" stopColor={tokens['color.background']} stopOpacity={0.28} />
-              <Stop offset="0.8" stopColor={tokens['color.background']} stopOpacity={0.78} />
+              <Stop offset="0.30" stopColor={tokens['color.background']} stopOpacity={0.20} />
+              <Stop offset="0.60" stopColor={tokens['color.background']} stopOpacity={0.86} />
+              <Stop offset="0.80" stopColor={tokens['color.background']} stopOpacity={0.97} />
               <Stop offset="1" stopColor={tokens['color.background']} stopOpacity={1} />
             </LinearGradient>
           </Defs>
