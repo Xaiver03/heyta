@@ -348,33 +348,74 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: tokens['space.3'],
     },
     /** 输入行：输入框吃掉剩余宽度，按钮贴右。 */
+    /**
+     * 输入区**外框**（2026-11-16 产品口径：「主要是 UX」+ 参照 DSH 的 composer）。
+     *
+     * 形状从"输入框 | 日期胶囊 | 添加按钮"三个并排控件，收成**一个容器内上下两层**：
+     * 上层输入、下层工具行。这与参照图一致，也解决三个并排控件在 375dp 上
+     * 争宽度、placeholder 被挤断的问题（真机「添加任务，回车确认（可写「明天下」
+     * 就是这么断的）。
+     *
+     * 🔴 承载只靠**一圈细边**（白底 + `color.border`）：页面改白之后，
+     * 靠灰底分层会把它变成"又一块灰"。
+     */
     compose: {
-      flexDirection: 'row',
-      alignItems: 'stretch',
+      flexDirection: 'column',
       gap: tokens['space.2'],
-    },
-    input: {
-      flex: 1,
-      minHeight: tokens['touch-target.min'],
-      paddingHorizontal: tokens['size.field-padding-x'],
-      /**
-       * 🔴 2026-11-16：同上 —— 页面白之后，白输入面没有承载。
-       * 见 `descriptionInput` 那条注释（产品口径与滴答的参照都在那里）。
-       */
+      padding: tokens['space.2'],
       borderWidth: tokens['border-width.thin'],
       borderColor: tokens['color.border'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
+    },
+    /** 工具行：日期胶囊在左，主操作在右（参照图里工具行的排法）。 */
+    toolRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: tokens['space.2'],
+    },
+    /** 中间那段空白：把主操作推到工具行右端。 */
+    toolSpacer: {
+      flex: 1,
+    },
+    input: {
+      /*
+        🔴 **不要 `flex: 1`**（2026-11-16）。它是"输入框与按钮并排一行"那个时代的写法；
+        `compose` 改成列之后，`flex: 1` 让输入框**吃掉外框的剩余高度** ——
+        实拍：输入文字与工具行之间凭空多出 45pt 空白，外框整体被撑高一倍。
+        列方向里它只需要"撑满宽度 + 不小于触控下限"。
+      */
+      alignSelf: 'stretch',
+      minHeight: tokens['touch-target.min'],
+      paddingHorizontal: tokens['size.field-padding-x'],
+      /**
+       * 🔴 2026-11-16：输入框**自己不再画框** —— 它现在住在 `compose` 那个外框里。
+       * 两层各画一圈边会变成"框中框"（参照图里也只有外框一圈）。
+       */
+      borderWidth: 0,
+      backgroundColor: 'transparent',
       color: tokens['color.foreground'],
     },
+    /**
+     * 主操作：**圆形图标键**（2026-11-16，参照 DSH 的发送键）。
+     * 从"圆角矩形 + 「添加」二字"改成圆形 —— 文字版在窄屏会把工具行挤成两行，
+     * 而"+"在这个位置是共识符号（无障碍名仍由 `labels.add` 提供，见 JSX）。
+     * `aspectRatio: 1` + `minHeight` 保证它是正圆且不小于 44dp 触控下限。
+     */
     addButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: tokens['space.1'],
-      minHeight: tokens['touch-target.min'],
-      paddingHorizontal: tokens['size.field-padding-x'],
-      borderRadius: tokens['radius.md'],
+      /*
+        🔴 用**显式宽高**而不是 `aspectRatio: 1`：在 `flexDirection: 'row'` 的容器里，
+        Yoga 会先按可用宽度分配、再由 `aspectRatio` 反推高度 —— 窄屏上算出
+        比 `minHeight` 更大的正方形，圆形按钮**溢出外框**（真机与 390 视口实拍都出现）。
+        显式 `width`/`height` 是确定的，且两者都取 44dp 触控下限。
+      */
+      width: tokens['touch-target.min'],
+      height: tokens['touch-target.min'],
+      paddingHorizontal: 0,
+      borderRadius: tokens['radius.full'],
     },
     addEnabled: {
       backgroundColor: tokens['color.primary'],
@@ -382,9 +423,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
     addDisabled: {
       backgroundColor: tokens['color.primary'],
       opacity: tokens['state.disabled-opacity'],
-    },
-    addText: {
-      color: tokens['color.on-primary'],
     },
     /**
      * 日期胶囊：**长在输入行内部右侧**，与输入框同一个高度档（一档一个高度，
@@ -746,6 +784,13 @@ export function CaptureComposer({
           {...(autoFocus === undefined || managesFocusItself ? {} : { autoFocus })}
           testID="capture-input"
         />
+
+        {/*
+          工具行（2026-11-16）：日期胶囊在左、主操作在右 —— 与输入框同处**一个外框**内。
+          此前这三件是并排的一行，窄屏上 placeholder 被挤断（真机「（可写「明天下」
+          就是这么断的），而"输入→落点→提交"其实是**上下两层**的阅读顺序。
+        */}
+        <View style={styles.toolRow}>
         {/*
           🔴 日期胶囊：**这条新任务会落在哪一天几点**，由这一枚说。
           它常驻（不随聚焦长出）—— 藏起来会让"没选日期"和"选了但看不见"在截图上
@@ -777,6 +822,8 @@ export function CaptureComposer({
             color={tokens['color.foreground-subtle']}
           />
         </Pressable>
+        {/* 撑开：让主操作贴右（参照图里发送键在右下角）。 */}
+        <View style={styles.toolSpacer} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={labels.add}
@@ -789,9 +836,9 @@ export function CaptureComposer({
           style={[styles.addButton, canSubmit ? styles.addEnabled : styles.addDisabled]}
           testID="capture-submit"
         >
-          <HeytaIcon data={Plus} size={tokens['icon.sm']} color={tokens['color.on-primary']} />
-          <Text style={[text['row-meta'], styles.addText]}>{labels.add}</Text>
+          <HeytaIcon data={Plus} size={tokens['icon.md']} color={tokens['color.on-primary']} />
         </Pressable>
+        </View>
       </View>
 
       {descriptionInput ? (

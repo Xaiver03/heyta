@@ -1,142 +1,22 @@
 {
-  "capturedAt": "2026-11-16T08:01:59.089Z",
-  "targets": 17,
+  "capturedAt": "2026-11-16T08:36:19.235Z",
+  "targets": 2,
   "artifacts": [
     {
       "path": "screenshots/web-desktop/W01-任务.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.0695,
+      "contentRatio": 0.0688,
       "colorSpan": 228,
-      "sha256": "ca0420504159e6d6b6b774e2c5b56b7a1a91821b69a2cd6f9778dc81d7725018"
-    },
-    {
-      "path": "screenshots/web-desktop/W02-四象限.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0518,
-      "colorSpan": 228,
-      "sha256": "aaa906557b99af7b6b55370707b59c2e8aa4bf3e9da76c761117dafdb05e236b"
-    },
-    {
-      "path": "screenshots/web-desktop/W03-习惯.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0515,
-      "colorSpan": 228,
-      "sha256": "2505dba576ba5efdc6c2239ca04d0037410881707a0469cca238896444f3e285"
-    },
-    {
-      "path": "screenshots/web-desktop/W04-番茄钟.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0622,
-      "colorSpan": 228,
-      "sha256": "070aeb0981316fd4dd3ce0d3efb557af7632857eca69073aa7f5babd377c4750"
-    },
-    {
-      "path": "screenshots/web-desktop/W05-时间线.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0514,
-      "colorSpan": 228,
-      "sha256": "6afd8b18f60bba14488ecf17f6ad020e324e49cab1dc6fe9313edd5f0b0fdba4"
-    },
-    {
-      "path": "screenshots/web-desktop/W06-成长.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.1133,
-      "colorSpan": 228,
-      "sha256": "3e31a3276b19e8df665d8b1a9111b47b771e1a6083724bd0a55c4beb1ec42f43"
-    },
-    {
-      "path": "screenshots/web-desktop/W07-回收站.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0918,
-      "colorSpan": 228,
-      "sha256": "e56d2dccb50b8a30408becfc3fc9a3122b9f78c938d130be6c3ecd18aec770fd"
-    },
-    {
-      "path": "screenshots/web-desktop/W08-设置.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0854,
-      "colorSpan": 228,
-      "sha256": "d2224045a6c5490d89c4a174a9b1a3b9e763dc016b1903edf4482f5119bba86b"
-    },
-    {
-      "path": "screenshots/web-desktop/W09-日历.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0553,
-      "colorSpan": 228,
-      "sha256": "274be56e88fc9c35094c39c88b9615d7efc6a9100a342a6dec2c1a9cd1109f6a"
-    },
-    {
-      "path": "screenshots/web-desktop/W01-en-Tasks.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0689,
-      "colorSpan": 228,
-      "sha256": "99f63bcbf2d55eb78d0a282c6d6fb28e5e2ba39cda48eeb5a730cda05e9e16ee"
-    },
-    {
-      "path": "screenshots/web-desktop/W02-en-Quadrants.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0522,
-      "colorSpan": 228,
-      "sha256": "066d5760e43327499f9e077e7fed7521e831c2bf057d47a39844acb2857bb1a0"
-    },
-    {
-      "path": "screenshots/web-desktop/W03-en-Habits.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0507,
-      "colorSpan": 228,
-      "sha256": "7f8c90c513fe7eacdc18687b45dbae35046da96bec01723010e68e76c14801ba"
-    },
-    {
-      "path": "screenshots/web-desktop/W05-en-Timeline.png",
-      "width": 1440,
-      "height": 900,
-      "contentRatio": 0.0513,
-      "colorSpan": 228,
-      "sha256": "d5f62caf12f11c5b5d8c62fb5f9199c3c160483bfbbfc804604ccebfc91c1bc3"
+      "sha256": "8928c48b8c98caef62a3c0e2d17afa8029770eb6e70c10b1008d74e63c99cc69"
     },
     {
       "path": "screenshots/web-mobile/MW01-移动端任务.png",
       "width": 1170,
       "height": 2532,
-      "contentRatio": 0.0963,
+      "contentRatio": 0.0956,
       "colorSpan": 228,
-      "sha256": "16102bbb00c161702feaa24e4a4104c58606f3039d5be7446bf92409b69b1d3f"
-    },
-    {
-      "path": "screenshots/web-mobile/MW02-移动端四象限.png",
-      "width": 1170,
-      "height": 2532,
-      "contentRatio": 0.0898,
-      "colorSpan": 228,
-      "sha256": "2046236513af89ab97762b9f56a22a9ab4b8b9ca0d661d13a099bb666c713a9e"
-    },
-    {
-      "path": "screenshots/web-mobile/MW03-移动端习惯.png",
-      "width": 1170,
-      "height": 2532,
-      "contentRatio": 0.0925,
-      "colorSpan": 228,
-      "sha256": "69657b9635a3a56fed150c1cc6068bef8067f637f8bdf4ba97319ba5df589475"
-    },
-    {
-      "path": "screenshots/web-mobile/MW04-移动端日历.png",
-      "width": 1170,
-      "height": 2532,
-      "contentRatio": 0.0903,
-      "colorSpan": 228,
-      "sha256": "0b6abc71faf322dd6369f8687a807f9ba160335486d8bbe9c39f509cf2753d90"
+      "sha256": "4f9a76f65044d99be4ea3cdfeb511ceef46ff616d2c4b77d307904c027fdaff3"
     }
   ]
 }
