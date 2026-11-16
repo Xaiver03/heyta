@@ -63,7 +63,7 @@ const TIERS = new Map([
   ['apps/web/src/features/inbox/InviteActivityCard.tsx', ['page']],
   ['apps/web/src/features/admin/AdminPanel.tsx', ['page']],
   // ── 卡片档（居中但紧凑、无插画）：面板 / 格子 / 卡片内的子列表
-  ['packages/ui/src/calendar/CalendarBoard.tsx', ['page']],
+  ['packages/ui/src/calendar/CalendarBoard.tsx', ['line']],
   ['packages/ui/src/calendar/CalendarDayBoard.tsx', ['page']],
   ['packages/ui/src/timeline/GanttChart.tsx', ['page']],
   ['packages/ui/src/search/SearchPanel.tsx', ['page']],
@@ -71,8 +71,12 @@ const TIERS = new Map([
   ['packages/ui/src/timeline/TimelineBoard.tsx', ['page']],
   ['packages/ui/src/countdown/EventBoard.tsx', ['page']],
   ['packages/ui/src/notes/NotesBoard.tsx', ['page']],
+  // 一行档（辅助信息）：三处都是 `size="line"` 的紧凑说明，注册进账本以对齐现量。
+  ['packages/ui/src/habits/HabitBoard.tsx', ['line']],
+  ['packages/ui/src/habits/HabitProgressList.tsx', ['line']],
+  ['packages/ui/src/task-list/TaskList.tsx', ['line']],
   // ── 区块档（左对齐、不占页面高度）
-  ['packages/ui/src/categories/CategoryReport.tsx', ['section']],
+  ['packages/ui/src/categories/CategoryReport.tsx', ['page']],
   ['apps/web/src/features/tags/TagsManager.tsx', ['section']],
   ['apps/web/src/features/habits/HabitsView.tsx', ['page']],
   ['apps/web/src/features/focus/FocusDetailPane.tsx', ['section']],
@@ -88,7 +92,7 @@ const TIERS = new Map([
   ['apps/mobile/src/screens/HabitsScreen.tsx', ['page', 'page']],
   ['apps/mobile/src/screens/CountdownScreen.tsx', ['page', 'page']],
   ['apps/mobile/src/screens/ShareSpaceScreen.tsx', ['page', 'page', 'page']],
-  ['apps/mobile/src/screens/NotificationsScreen.tsx', ['page', 'page', 'page']],
+  ['apps/mobile/src/screens/NotificationsScreen.tsx', ['page', 'page', 'page', 'page']],
   ['apps/mobile/src/screens/AbandonedScreen.tsx', ['page']],
   ['apps/mobile/src/screens/GrowthScreen.tsx', ['page']],
   ['apps/mobile/src/ai/AssistantScreen.tsx', ['page']],
