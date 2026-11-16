@@ -40,6 +40,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  buttonStretchesByDefault,
+  contentMeasureMaxFor,
   CONTROL_STATE_TOKENS,
   DEFAULT_CONTROL_EMPHASIS,
   DEFAULT_CONTROL_TONE,
@@ -476,7 +478,7 @@ export function Screen({
      * 最后一个子节点之后（`justifyContent` 默认 `flex-start`）—— 所以这不是
      * "给所有屏加了一条高度约束"，只是把"母层给不给确定高度"这一环补上。
      */
-    <View style={{ paddingHorizontal: chrome === 'board' ? 0 : t['screen.gutter'], gap: t['space.4'], flexGrow: 1, ...(scroll ? {} : { flex: 1, minHeight: 0 }) }}>
+    <View style={{ paddingHorizontal: chrome === 'board' ? 0 : t['screen.gutter'], gap: t['space.4'], flexGrow: 1, ...(contentMeasureMaxFor(chrome) !== undefined ? { width: '100%' as const, maxWidth: contentMeasureMaxFor(chrome), alignSelf: 'center' as const } : {}), ...(scroll ? {} : { flex: 1, minHeight: 0 }) }}>
       {children}
       {bottomInset ? <View style={{ height: t['screen.bottom-inset'] }} /> : null}
     </View>
@@ -992,6 +994,12 @@ export interface ButtonProps {
   loading?: boolean;
   /** 展开/收起状态，供无边框的渐进展开按钮向读屏器暴露。 */
   expanded?: boolean;
+  /**
+   * 是否**撑满**父容器宽度。默认 `false`（Apple HIG：避免全宽按钮）。
+   * 🔴 只有「单一主操作 + 强引导」的 CTA（登录 / 提交 / 空状态主按钮）才显式 `fullWidth`。
+   * 竖排列容器里默认按内容宽度、靠左对齐；**行内按钮靠 flex 定宽，不受这一项影响**。
+   */
+  fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
   /**
    * 设备级验收的锚点 id（真模拟器 AX 探针按它找控件）。
@@ -1017,6 +1025,7 @@ export function Button({
   disabled,
   loading,
   expanded,
+  fullWidth = buttonStretchesByDefault(),
   style,
   testID,
   accessibilityLabel,
@@ -1073,6 +1082,8 @@ export function Button({
           borderRadius: t['radius.md'],
           backgroundColor: c.bg,
           borderWidth: 0,
+          // 🔴 宽度策略：默认按内容宽度、靠左（HIG 避免全宽按钮）；只有单一 CTA 传 fullWidth 才拉满。
+          alignSelf: fullWidth ? ('stretch' as const) : ('flex-start' as const),
           // disabled 用 token 的不透明度，不写死 0.5。
           opacity: isDisabled ? t['state.disabled-opacity'] : 1,
           // 🔴 按下反馈原来是**裸 `0.85`**（`check:design` 抓不到数字裸值的那一格），

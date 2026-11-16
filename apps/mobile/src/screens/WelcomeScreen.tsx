@@ -321,10 +321,11 @@ export function WelcomeScreen({
             }}
             tone="primary"
             testID="welcome-signin"
+            fullWidth
           />
           {/* 🔴 testID 不是给用户看的：设备腿按它定位（`content-desc` 在 MIUI 上
               会被合成的字符串顶掉，精确匹配会落空，而失败信息只会说"入口不在第一屏"）。 */}
-          <Button label={t('mobile.welcome.offline')} onPress={onUseOffline} testID="welcome-offline" />
+          <Button label={t('mobile.welcome.offline')} onPress={onUseOffline} testID="welcome-offline" fullWidth />
         </View>
       )}
 

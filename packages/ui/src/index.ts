@@ -492,6 +492,17 @@ export {
 } from './layout/form-factor.js';
 
 /**
+ * ── 产品层级：内容的可读宽度 + 按钮宽度策略（一套规则，三端共用）──
+ * 由头（含 Apple HIG 出处）见 `./layout/content-measure.js`。
+ */
+export {
+  buttonStretchesByDefault,
+  contentMeasureMaxFor,
+  CONTENT_MEASURE_MAX,
+  type ScreenChrome,
+} from './layout/content-measure.js';
+
+/**
  * ── M3 §4.2 补缺：**`TaskRow` 的 `density` 档位**（本轮新增） ──
  *
  * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
