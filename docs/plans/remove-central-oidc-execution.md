@@ -12,7 +12,7 @@
 | P3 Web/Mobile UI | 见下 | ⏳ 待做 |
 | P4 i18n | 删 `web.auth.central.*` / `mobile.auth.central.*`（各 36 键，zh-CN/en） | ⏳ 待做 |
 | P5 文档/门禁 | 归档 `unified-central-auth.md`、清 `docs/agents` 引用、改门禁脚本、`.handoff` 保留历史 | ⏳ 待做 |
-| P6 SMTP | 配我方自有 SMTP 使验证码真实发信 | ⏳ 待做 |
+| P6 SMTP | 配我方自有 SMTP 使验证码真实发信 | ✅ 完成：host=`gz-smtp.qcloudmail.com:465` / user=`heyta-noreply@waytofuture.cn`（腾讯云 SES，default 账号 100044381704）；凭据在 `~/.config/heyta/smtp-waytofuture.env`(600) 并已接入 `server/.env`；nodemailer 实测 `250 queued` |
 
 ## P3 细目（web，`apps/web/src`）
 
@@ -37,6 +37,10 @@
 - serial：`docker-compose.yml` 删 `HEYTA_AUTH_*`/`HEYTA_OIDC_*`；`env.example` 删 `HEYTA_OIDC_*`。
 
 ## P6 SMTP
+
+> ✅ 已打通：`gz-smtp.qcloudmail.com:465`（广州区专属主机；用香港区 `smtp.qcloudmail.com` 会报 `not exist in redis`）。
+> 发信地址 `heyta-noreply@waytofuture.cn`（专用，未改动既有 `heyta@`/`noreply@`）；SMTP 密码经 `UpdateEmailSmtpPassWord` 设置（长度10–20、含大小写+≥2不重复数字）。
+> 实测：nodemailer `verify()` 通过、发信返回 `250 OK: queued`。`server/.env` 已写入 `SMTP_*` 与 `REQUIRE_EMAIL_VERIFICATION=true`。
 
 服务端已具备：`server/src/email.ts`（nodemailer，读 `SMTP_HOST/PORT/SECURE/USER/PASS/FROM`）、
 `server/src/password/registration-otp.ts`（注册验证码）、`login-otp.ts`（登录验证码）、找回信。
