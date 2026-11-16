@@ -296,10 +296,20 @@ describe('E2 空态：一块空白不算空态', () => {
     const view = render();
     const text = view.textContent ?? '';
     // 标题 + hint 都要在：只有标题的话，用户仍然不知道"没清单"意味着什么。
+    /*
+      ⚠️ 2026-11-16：说明文案跟着**新建入口**换过一次。
+
+      从前入口是"右侧那颗 +"，所以 hint 写的是「点右侧 + 新建清单。」；
+      现在那块是一个**输入框**，hint 改成「输入名称就能新建清单。」——
+      如果再照旧写"点右侧 +"，用户会去找一颗不存在的按钮。
+
+      这条测试守的东西没变：标题 + hint **两句都要在**（只有标题的话，
+      用户仍然不知道"没清单"意味着什么）。
+    */
     expect(text).toContain('还没有清单');
-    expect(text).toContain('点右侧 + 新建清单。');
+    expect(text).toContain('输入名称就能新建清单。');
     expect(text).toContain('还没有标签');
-    expect(text).toContain('点右侧 + 新建标签。');
+    expect(text).toContain('输入名称就能新建标签。');
   });
 
   it('有数据时空态不许留着（否则"删光了"和"还有东西"长得一样）', () => {

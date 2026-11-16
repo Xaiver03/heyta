@@ -247,14 +247,22 @@ describe('🔴 可达性：真实外壳里有没有那个控件', () => {
     // 点之前是中文。锚用 rail 那一段：设置开着时**范围列不在 DOM 里**，
     // 拿 `shellText()` 当锚会把"没渲染"伪装成"没翻语言"。
     expect(el.querySelector('.ht-rail__tabs')?.textContent).toMatch(CJK);
-    expect(el.textContent).toContain('收集箱');
+    /*
+      ⚠️ 2026-11-16：锚从「收集箱」换成语言分组自己的可及名。
+
+      「收集箱」是**主内容区**的标题，而设置浮层打开时那一层不在 DOM 里 ——
+      拿它当"界面是中文"的锚，量到的是"没渲染"，不是"没翻语言"（假红）。
+      语言分组的 `aria-label` 就在设置面板里，一直在屏幕上，正是这条要的锚。
+    */
+    expect(switcherName(el)).toBe('语言');
   });
 });
 
 describe('🔴 点一下：界面上的可见文案真的变（不是只改 state）', () => {
   it('侧栏 / 视图 tab / 空状态三处都换成英文，且外壳里不再有汉字', async () => {
     const el = await mountIntoSettings();
-    expect(el.textContent).toContain('收集箱');
+    // 切之前界面确实还是中文（同样是设置面板里的锚，理由见上一条）。
+    expect(switcherName(el)).toBe('语言');
     // ⚠️ 2026-09-29：这里原本断言的是「设置」——那时它是 rail 上的一个 tab。
     // 现在设置收进了**头像菜单**（点开才出现），所以改用两个**一直在屏幕上**的：
     // 「通知」（rail 下段的铃铛）与「帮助」（rail 底部的**动作**，不在 tablist 里）。
@@ -262,8 +270,7 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     // ⚠️ 2026-11-04：原来这里用的是「回收站」，那一枚已搬进侧栏底部，而**设置开着时
     // 侧栏不在 DOM 里** —— 拿它当锚会在"没渲染"上假红，所以换成铃铛。
     expect(railToolText(el)).toContain('通知');
-    expect(el.textContent).toContain('帮助');
-    expect(el.textContent).toContain('收集箱是空的');
+    expect(el.querySelector('[data-testid="rail-help"]')?.textContent).toContain('帮助');
 
     act(() => {
       option(el, 'en').click();
@@ -289,7 +296,16 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     expect(railToolText(el)).toContain('Notifications');
     // 「帮助」在 tablist **外面**（它是动作）—— 单独断言，正好钉住这一点。
     expect(el.querySelector('[data-testid="rail-help"]')?.textContent).toContain('Help');
-    expect(el.textContent).toContain('Your inbox is empty');
+    /*
+      ⚠️ 2026-11-16：空态文案换了对象。空收集箱现在显示的是**首次引导**
+      （`Inbox` + `Get it out of your head` + 三条示例 + `I'll write my own`），
+      而不是 `web.shell.empty.all.title`（'Your inbox is empty'）——
+      后者只在引导不出现的场合才轮到，实测这个夹具里根本没轮到。
+
+      所以断言改用引导自己的出口按钮：它在英文界面里是 `I'll write my own`，
+      在中文里是「我自己写」。意图不变：**空状态那一块**也跟着翻语言。
+    */
+    expect(el.textContent).toContain("I'll write my own");
 
     expect(el.textContent).not.toContain('收集箱');
     expect(el.textContent).not.toContain('回收站');
