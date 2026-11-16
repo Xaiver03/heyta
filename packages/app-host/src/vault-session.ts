@@ -27,7 +27,6 @@ import {
   type VaultSyncKey,
 } from '@heyta/sync-client';
 import { joinEndpointUrl } from './endpoint-url.js';
-import { CENTRAL_COOKIE_SESSION_MARKER } from './central-auth.js';
 import {
   type VaultKeyPackageScope,
   type VaultKeyPackageStore,
@@ -242,15 +241,12 @@ export const createVaultKeyPackageRemote = (
 
   const request = async (init: RequestInit): Promise<Response> => {
     const resolvedToken = await options.getToken();
-    const cookieSession = options.authTransport === 'cookie' || resolvedToken === CENTRAL_COOKIE_SESSION_MARKER;
-    const token = cookieSession ? undefined : resolvedToken;
-    if (!cookieSession && (token === undefined || token === '')) throw new Error('Vault key-package token is unavailable');
+    const token = resolvedToken;
+    if (token === undefined || token === '') throw new Error('Vault key-package token is unavailable');
     const headers = new Headers(init.headers);
-    if (cookieSession) headers.delete('authorization');
-    else headers.set('authorization', `Bearer ${token}`);
+    headers.set('authorization', `Bearer ${token}`);
     return fetchImpl(joinEndpointUrl(options.baseUrl, path), {
       ...init,
-      ...(cookieSession ? { credentials: 'include' as const } : {}),
       headers,
     });
   };

@@ -47,7 +47,7 @@ import {
 import { useSyncStore } from '../sync/store.js';
 import { useProjectStore } from '../projects/store.js';
 import { getWebVaultSession } from '../../lib/vault-session.js';
-import { createWebAuthFetch } from '../../lib/central-fetch.js';
+import { createWebAuthFetch } from '../../lib/auth-fetch.js';
 import { text } from '../../lib/text.js';
 import { forgetShareLocally, publishShareSigningKey, shareTransferFailure, type ShareTransferFailure } from '@heyta/app-host';
 import { clearStorageShareLog } from './comment-actions.js';

@@ -53,11 +53,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, AppState, Easing, Linking, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  beginCentralDeviceAuth,
-  claimCentralDeviceAuth,
-  getCentralAuthConfig,
-  isOfficialCentralAuthEndpoint,
-  type CentralDeviceStart,
   beginPasskeyLogin,
   beginPasskeyRegistration,
   completePasskeyLogin,
@@ -101,7 +96,6 @@ import { acceptNetworkConsent, requireNetworkConsent } from '../privacy/consent-
 
 /** 正在跑的那件事。只为了在按钮上画菊花 + 让"哪一步在忙"可读。 */
 type AuthAction =
-  | 'central-start'
   | 'password-login'
   | 'password-register'
   | 'registration-code'
@@ -149,7 +143,6 @@ type Phase =
  * 会在编译期红 —— 那正是"界面对着一个进行中的请求说不出话"的形状。
  */
 const BUSY_MESSAGE_KEY: Record<AuthAction, MessageKey> = {
-  'central-start': 'web.auth.central.busy',
   'password-login': 'common.auth.busy.signIn',
   'password-register': 'common.auth.busy.register',
   'registration-code': 'common.auth.busy.verify',
@@ -250,17 +243,13 @@ export function AuthScreen({
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [sessionServerUrl, setSessionServerUrl] = useState<string | undefined>(undefined);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [centralAttempt, setCentralAttempt] = useState<(CentralDeviceStart & { generation: number }) | undefined>();
   const [openLegalDocument, setOpenLegalDocument] = useState<string | null>(null);
   const authGeneration = useRef(0);
-  const centralClaiming = useRef(false);
-  const centralStarting = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
 
   const busy = phase.kind === 'busy';
   const action = phase.kind === 'busy' ? phase.action : undefined;
   const session = phase.kind === 'session' ? phase.session : undefined;
-  const centralMode = isOfficialCentralAuthEndpoint(serverUrl);
   const termsLabel = t('mobile.auth.terms.label');
 
   /** 这台设备有没有通行密钥实现。没有时**如实说**，而不是把按钮藏起来。 */
@@ -336,34 +325,6 @@ export function AuthScreen({
     scrollRef.current?.scrollTo({ y: 0, animated: !reducedMotion });
   }, [failedKey, reducedMotion]);
 
-  useEffect(() => {
-    if (centralAttempt === undefined) return;
-    let disposed = false;
-    const claim = async (): Promise<void> => {
-      if (disposed || centralClaiming.current || AppState.currentState !== 'active') return;
-      if (Date.now() >= centralAttempt.expiresAt) {
-        setCentralAttempt(undefined);
-        setPhase({ kind: 'failed', key: 'mobile.auth.central.expired' });
-        return;
-      }
-      centralClaiming.current = true;
-      const result = await claimCentralDeviceAuth({ baseUrl: serverUrl }, centralAttempt.handoffId, centralAttempt.verifier);
-      centralClaiming.current = false;
-      if (disposed || centralAttempt.generation !== authGeneration.current) return;
-      if (!result.ok) {
-        // A lost response may already have consumed the one-time bearer. Never retry that claim.
-        setCentralAttempt(undefined);
-        setPhase({ kind: 'failed', key: 'mobile.auth.central.claimFailed' });
-      } else if (result.value.status === 'claimed') {
-        setCentralAttempt(undefined);
-        setSessionServerUrl(serverUrl.trim());
-        setPhase({ kind: 'session', session: { token: result.value.token, user: result.value.user } });
-      }
-    };
-    const timer = setInterval(() => { void claim(); }, 5000);
-    const foreground = AppState.addEventListener('change', (state) => { if (state === 'active') void claim(); });
-    return () => { disposed = true; clearInterval(timer); foreground.remove(); };
-  }, [centralAttempt, serverUrl]);
 
   /** 切换服务端必须丢掉刚拿到的会话，避免把旧 token 绑定到新地址。 */
   const updateServerUrl = (next: string): void => {
@@ -371,7 +332,6 @@ export function AuthScreen({
       authGeneration.current += 1;
       setPhase({ kind: 'idle' });
       setSessionServerUrl(undefined);
-      setCentralAttempt(undefined);
       setPassphrase('');
       setTermsAccepted(false);
     }
@@ -432,30 +392,6 @@ export function AuthScreen({
     if (href !== undefined) openLegalLink(href);
   };
 
-  const startCentralLogin = async (): Promise<void> => {
-    if (centralStarting.current || centralAttempt !== undefined) return;
-    if (!requireNetworkConsent()) return;
-    if (!termsAccepted) return failWithKey('mobile.auth.central.termsRequired');
-    centralStarting.current = true;
-    try {
-      const generation = beginAuthAction();
-      setPhase({ kind: 'busy', action: 'central-start' });
-      const centralOptions = { baseUrl: serverUrl.trim() };
-      const config = await getCentralAuthConfig(centralOptions);
-      if (!isCurrentAuthAction(generation)) return;
-      if (!config.ok || config.value.mode !== 'oidc' || !config.value.documentVersion) {
-        return failWithKey('mobile.auth.central.unavailable');
-      }
-      const started = await beginCentralDeviceAuth({ ...centralOptions, termsAccepted: true,
-        documentVersion: config.value.documentVersion });
-      if (!isCurrentAuthAction(generation)) return;
-      if (!started.ok) return failWithKey('mobile.auth.central.unavailable');
-      setCentralAttempt({ ...started.value, generation });
-      setPhase({ kind: 'notice', key: 'mobile.auth.central.waiting' });
-    } finally {
-      centralStarting.current = false;
-    }
-  };
 
   /**
    * 登录（邮箱 + 密码）—— 产出会话的三条路之一（另两条是邮件链接与通行密钥）。
@@ -859,83 +795,6 @@ export function AuthScreen({
                   disabled={busy}
                   loading={action === 'save'}
                 />
-              </View>
-            </Card>
-          ) : centralMode ? (
-            <Card outlined>
-              <View style={layout.stack3}>
-                <View style={layout.stack1}>
-                  <Text variant="section-title">{t('mobile.auth.title')}</Text>
-                  {/*
-                    🔴 2026-11-15：删掉这里那行说明（原来渲染 `mobile.auth.central.intro`：
-                    「使用统一身份登录 heyta；登录完成后，再用本机的端到端加密口令启用同步。」）。
-
-                    这个文件自己在 `labels` 上方就抄着产品负责人 2026-10-26 的原话：
-                    「去掉所有说明文字，现在严禁有任何说明文字，除了必要的。」
-
-                    那行说的是**这个产品怎么运作**（统一身份 + 口令 + 同步是三件事怎么串起来），
-                    不是"你现在该做什么"。它属于文档，不属于登录框上方 ——
-                    而 `AuthForm` 那条分支早就按同一条判据删干净了，只有 `centralMode` 这一支漏着。
-                  */}
-                </View>
-                {/* 状态区。失败用 danger，中性提示用 muted —— 两者**不能同色**，
-                    否则"链接已发出"和"登录失败"在视觉上分不出来。 */}
-                {phase.kind === 'failed' ? (
-                  <Text variant="caption" tone="danger" accessibilityLiveRegion="polite">
-                    {phase.vars === undefined ? t(phase.key) : t(phase.key, phase.vars)}
-                  </Text>
-                ) : null}
-                {phase.kind === 'notice' ? (
-                  <Text variant="caption" tone="muted" accessibilityLiveRegion="polite">
-                    {t(phase.key)}
-                  </Text>
-                ) : null}
-                <View style={layout.rowCenter}>
-                  <Checkbox
-                    checked={termsAccepted}
-                    onToggle={() => setTermsAccepted((value) => !value)}
-                    label={termsLabel}
-                  />
-                  <Text variant="caption" grow>{termsLabel}</Text>
-                </View>
-                {legalLinks !== null ? (
-                  <View style={layout.rowLegal}>
-                    <Pressable accessibilityRole="link" onPress={() => openLegalDocumentOrLink('terms')}>
-                      <Text variant="caption" tone="primary">{t('common.legal.termsDoc')}</Text>
-                    </Pressable>
-                    <Pressable accessibilityRole="link" onPress={() => openLegalDocumentOrLink('privacy')}>
-                      <Text variant="caption" tone="primary">{t('common.legal.privacyDoc')}</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-                <Button
-                  label={t('mobile.auth.central.start')}
-                  tone="primary"
-                  onPress={() => { void startCentralLogin(); }}
-                  disabled={busy || centralAttempt !== undefined}
-                  loading={action === 'central-start'}
-                  testID="mobile-central-auth-start"
-                />
-                {centralAttempt !== undefined ? (
-                  <>
-                    <Text variant="caption" tone="muted">{t('mobile.auth.central.pairing')}</Text>
-                    <Text variant="row-title">{centralAttempt.pairingCode}</Text>
-                    <Button
-                      label={t('mobile.auth.central.openBrowser')}
-                      onPress={() => {
-                        void Linking.openURL(centralAttempt.launchUrl).catch(() => {
-                          failWithKey('mobile.auth.link.unopenable');
-                        });
-                      }}
-                      testID="mobile-central-auth-browser"
-                    />
-                  </>
-                ) : null}
-                {allowServerSelection ? (
-                  <Pressable accessibilityRole="button" onPress={() => updateServerUrl('')}>
-                    <Text variant="caption" tone="primary">{t('mobile.auth.selfHost.open')}</Text>
-                  </Pressable>
-                ) : null}
               </View>
             </Card>
           ) : (

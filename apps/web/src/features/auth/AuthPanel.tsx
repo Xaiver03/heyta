@@ -82,10 +82,8 @@ import {
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { legalDocumentById, legalDocumentPresentation } from '@heyta/legal';
 import {
-  getCentralAuthConfig,
   OFFICIAL_SITE_ORIGIN,
   resolveLegalLinks,
-  type CentralAuthConfig,
   type HostedAuthSession,
 } from '@heyta/app-host';
 import {
@@ -98,7 +96,6 @@ import {
 } from '@heyta/ui';
 
 import { detectPasskeyBrowser } from './passkey-browser.js';
-import { CentralAccountConflictPanel } from './CentralAccountConflictPanel.js';
 import { readRememberedCredentials, rememberCredentials } from './remembered-credentials.js';
 import { useAuthStore, type AuthBusyAction } from './store.js';
 import { authBaseUrl, isUnconfigured } from '../../lib/auth-endpoint.js';
@@ -144,7 +141,6 @@ export interface AuthPanelProps {
  * 会在编译期红 —— 那正是"界面对着一个进行中的请求说不出话"的形状。
  */
 const BUSY_MESSAGE_KEY: Record<AuthBusyAction, MessageKey> = {
-  'central-login': 'web.auth.central.busy',
   'login-link': 'common.auth.busy.link',
   register: 'common.auth.busy.register',
   verify: 'common.auth.busy.verify',
@@ -201,11 +197,7 @@ export function AuthPanel({
   const resendLoginCode = useAuthStore((s) => s.resendLoginCode);
   const cancelLoginCode = useAuthStore((s) => s.cancelLoginCode);
   const forgotPassword = useAuthStore((s) => s.forgotPassword);
-  const startCentralLogin = useAuthStore((s) => s.startCentralLogin);
-  const startCentralDeviceLogin = useAuthStore((s) => s.startCentralDeviceLogin);
   const invalidatePendingAuth = useAuthStore((s) => s.invalidatePendingAuth);
-  const centralBindingConflict = useSyncStore((s) => s.centralBindingConflict);
-  const centralBindingTarget = useSyncStore((s) => s.centralBindingTarget);
 
   /**
    * 服务端地址草稿。
@@ -292,63 +284,6 @@ export function AuthPanel({
   // equivalent official URL gets the same official/custom treatment.
   const isOfficialService = legalLinks?.terms.startsWith(`${OFFICIAL_SITE_ORIGIN}/`) === true;
 
-  /** 官方站点只显示 heyta 的品牌壳，认证能力由中央 OIDC 提供。 */
-  const [centralConfig, setCentralConfig] = useState<CentralAuthConfig | null | undefined>(undefined);
-  const [centralProbe, setCentralProbe] = useState(0);
-  const [centralTermsAccepted, setCentralTermsAccepted] = useState(false);
-  /**
-   * 同意状态的代数。
-   *
-   * 🔴 2026-10-25 修：**用户刚点了「同意联网」，配置却不会重新探**。
-   * 这个 effect 的依赖里只有 `effectiveBaseUrl / isOfficialService / centralProbe`，
-   * 而同意之前 `consentFetch` 会拦下那次探测 ⇒ `centralConfig` 落到 `null` ⇒
-   * 面板显示「登录暂时不可用……本页不会改用其他登录方式」。
-   * 用户明明刚同意了，画面却还是那句话，只能自己再去点一次「重新检查」——
-   * 而屏幕上根本没有提示要这么做。
-   *
-   * 订阅同意变化、把代数进依赖：同意那一刻自动重探，面板自己变成可用。
-   * （不是把 `privacyConsent` 塞进依赖 —— 它是个对象，引用不变，永远不会触发。）
-   */
-  const [consentRevision, setConsentRevision] = useState(0);
-  /**
-   * 是否正在探配置。
-   *
-   * 🔴 有它才能回答"**现在**该画表单还是该画不可用"：`centralConfig` 只记**结论**，
-   * 分不出"还没问"和"问过、说不行"。少了这一档，用户点完「同意联网」的下一帧
-   * 就会看到「登录暂时不可用」（旧结论 `null` 还在），表单被卸载 ——
-   * 用户刚打的口令跟着本地 state 一起没。
-   */
-  const [centralProbing, setCentralProbing] = useState(false);
-  /**
-   * 上一次结论是在**哪一代同意状态**下拿到的。
-   * `-1` = 还没有结论。`configRev !== consentRevision` ⇒ 结论**过期**，
-   * 而"过期"必须与"说不行"区分开：过期时保留表单，别让用户刚打的内容被卸载。
-   */
-  const [configRev, setConfigRev] = useState(-1);
-  useEffect(() => subscribePrivacyConsent(() => setConsentRevision((value) => value + 1)), []);
-  useEffect(() => {
-    if (!isOfficialService) {
-      setCentralConfig(null);
-      return;
-    }
-    let active = true;
-    setCentralProbing(true);
-    /*
-      🔴 **重探时不许先清成 `undefined`**（2026-10-25 修）。
-      `undefined` 会让面板进入"配置加载中"那一支，于是**表单被卸载**——
-      用户刚打完的邮箱/口令跟着本地 state 一起没了。实测：点「同意联网」之后再回去，
-      口令框是空的（`toHaveValue` 收到 `""`），而那并不是"不自动重发"该有的副作用。
-      初值本来就是 `undefined`，所以这里不清也不会漏掉"第一次"的加载态；
-      重探期间保留上一次的结论，等新结果回来再换。
-    */
-    void getCentralAuthConfig({ baseUrl: effectiveBaseUrl, fetchImpl: consentFetch }).then((result) => {
-      if (!active) return;
-      setCentralConfig(result.ok ? result.value : null);
-      setConfigRev(consentRevision);
-      setCentralProbing(false);
-    });
-    return () => { active = false; };
-  }, [effectiveBaseUrl, isOfficialService, centralProbe, consentRevision]);
 
   // 每次渲染都重新探测。缓存成模块级常量会把**第一次**的结果永久钉住，
   // 而它在 jsdom 与真实浏览器里不同，用户中途接上安全密钥时也会变。
@@ -393,78 +328,9 @@ export function AuthPanel({
   const waitingForPasskey =
     busy && (status.action === 'passkey-register' || status.action === 'passkey-login');
 
-  const centralMode = isOfficialService && centralConfig?.mode === 'oidc' && centralConfig.documentVersion !== null;
-  /**
-   * 🔴 服务端**明确**说自己是本地模式 ⇒ 官方站也走自有注册/登录表单。
-   *
-   * 2026-10-24 紧急回退：中央登录页整改期间（产品口径：只用中央的*认证*、
-   * 不用中央的 *UI*），官方站先退回自有账号体系，否则登录直接不可用。
-   * 模式是**服务端**说了算的事（config.ts 里 official+local 会拒绝启动），
-   * web 不该在服务端明确放行本地时再自己发明一条 fail-closed 把它盖掉。
-   *
-   * 保留的 fail-closed 只剩两格，都是"服务端没把话说清楚"：
-   *   ① 读不到配置（网络/5xx）⇒ 不猜；② mode 是 oidc 但条款版本缺失 ⇒ 配置残。
-   */
-  const centralExplicitLocal = isOfficialService && centralConfig?.mode === 'local';
-  /**
-   * 🔴 **还没同意联网时，不许把面板画成"登录不可用"**（2026-10-25 修）。
-   *
-   * 未同意时 `consentFetch` 会拦下配置探测 ⇒ `centralConfig === null` ⇒
-   * `centralBlocked` 为真 ⇒ 面板只剩「登录暂时不可用……本页不会改用其他登录方式」。
-   * 而那里**没有任何按钮能让用户同意**：同意弹窗只在用户点「提交」之后才出现，
-   * 可表单根本没画出来。⇒ 死路：用户既不能同意，也不能登录。
-   *
-   * 正确的落点是**本地表单**：它一个字节都不出进程（提交时由闸门弹同意），
-   * 正是"只用本机"该看到的东西。读不到配置只在**已经同意**时才该判"不可用"
-   * （那时确实该说"服务端没给配置"）。
-   */
-  const centralConfigStale = configRev !== consentRevision;
-  const centralUnreadableBeforeConsent =
-    isOfficialService
-    && centralConfig === null
-    && (centralConfigStale || !privacyConsent.networkAllowed());
-  const centralLoading =
-    isOfficialService && !centralExplicitLocal && centralConfig === undefined && centralProbing;
-  const centralBlocked =
-    isOfficialService
-    && !centralExplicitLocal
-    && !centralUnreadableBeforeConsent
-    && !centralProbing
-    && centralConfig !== undefined
-    && !centralMode;
-  /**
-   * 壳内官方站 ⇒ 中央登录改走 device handoff（P5.4）。
-   *
-   * 🔴 判定就是一句话：**当前 origin 不是官方站 origin，但连的是官方站**。
-   * 桌面壳的 WebView 住在 `heyta-local://app`（macOS）/ `https://heyta.local`
-   * （Windows）里，中央登录 POST start 的 CSRF 同源校验必然 403 ——
-   * 2026-10-24 线上实测：壳内点「继续统一登录」稳定红字"这个请求没有被接受"。
-   * device/start、device/claim 两个端点按设计不做同源校验（verifier 知识证明），
-   * 且线上 CORS 白名单已含两个壳 origin —— 这是壳内唯一的中央登录路径。
-   */
-  const centralDeviceHandoff =
-    centralMode &&
-    typeof window !== 'undefined' &&
-    window.location.origin !== OFFICIAL_SITE_ORIGIN;
-  const deviceWaiting = status.kind === 'central-device-waiting' ? status.attempt : undefined;
-  // 拿到启动链接就**自动**交给系统浏览器（壳的导航策略会把 https 外链转出去）。
-  // 只对同一个链接开一次 —— 重开面板/重渲染不许反复弹标签页；被弹窗拦截时
-  // 等待视图里还有可点的手动按钮。
-  const openedDeviceLaunch = useRef('');
-  useEffect(() => {
-    if (deviceWaiting === undefined) return;
-    if (openedDeviceLaunch.current === deviceWaiting.launchUrl) return;
-    openedDeviceLaunch.current = deviceWaiting.launchUrl;
-    window.open(deviceWaiting.launchUrl, '_blank', 'noopener');
-  }, [deviceWaiting]);
   // Typing the official origin into the self-hosted form returns to central
   // auth rather than exposing the retired hosted password endpoints.
   const selfHostedMode = allowAdvanced && showSelfHostedForm && !isOfficialService;
-  const centralClose = (
-    <button type="button" className="ht-auth-central__link ht-auth-central__close" data-testid="central-auth-close" onClick={onClose}>
-      {t('web.auth.close')}
-    </button>
-  );
 
   /**
    * 🔴 2026-11-16（ADR-0086）：**提交前先过设备级同意**，与 mobile `AuthScreen` 的六处同形。
@@ -649,7 +515,6 @@ export function AuthPanel({
       case 'busy':
       case 'registration-code':
         // device handoff 的等待视图自己渲染（含配对码），错误消息区不参与。
-      case 'central-device-waiting':
         return null;
       case 'link-sent':
         return { tone: 'info', message: t('web.auth.sent.login') };
@@ -720,129 +585,8 @@ export function AuthPanel({
           这一层（`AuthForm` 已在登记清单里）。
         */}
         <HeytaUiProvider>
-          {centralBindingConflict && !selfHostedMode ? (
-            <CentralAccountConflictPanel baseUrl={centralBindingTarget?.origin ?? effectiveBaseUrl} onClose={onClose} />
-          ) : centralMode && !selfHostedMode ? (
-            <section className="ht-auth-central" data-testid="central-auth-panel" aria-labelledby="central-auth-title">
-              {centralClose}
-              <p className="ht-auth-central__eyebrow ht-type-caption">{t('web.auth.central.kicker')}</p>
-              {/*
-               * 🔴 eyebrow 那句「heyta 官方服务」**不顶掉**：它答的是"这次认证真的发去哪台
-               * 服务端"，是本仓明令要看得见的一格。后台那面要出现的"管理后台"几个字挂在
-               * 大标题这一层（`brandLabel`），两件事各说各的。
-               */}
-              <h2 id="central-auth-title" className="ht-type-section-title">
-                {brandLabel ?? t('web.auth.central.title')}
-              </h2>
-              {deviceWaiting !== undefined ? (
-                <div className="ht-auth-central__device" data-testid="central-device-waiting">
-                  <p className="ht-auth-central__body">{t('web.auth.central.device.waitingBody')}</p>
-                  <button
-                    type="button"
-                    className="ht-auth-central__button"
-                    data-testid="central-device-open"
-                    onClick={() => { window.open(deviceWaiting.launchUrl, '_blank', 'noopener'); }}
-                  >
-                    {t('web.auth.central.device.openBrowser')}
-                  </button>
-                  <p className="ht-auth-central__body">{t('web.auth.central.device.pairingLabel')}</p>
-                  {/* 12 位大写十六进制按 4-4-4 分组展示：抄写是这条链路里唯一的人工步骤。 */}
-                  <p
-                  className="ht-auth-central__pairing ht-type-numeric-summary"
-                  data-testid="central-device-pairing"
-                >
-                    {deviceWaiting.pairingCode.replace(/(.{4})/g, '$1 ').trim()}
-                  </p>
-                  <p className="ht-auth-central__note">{t('web.auth.central.device.waitingNote')}</p>
-                  <button type="button" className="ht-auth-central__link" data-testid="central-device-cancel" onClick={invalidatePendingAuth}>
-                    {t('web.auth.central.device.cancel')}
-                  </button>
-                </div>
-              ) : (
-                <>
-              <div className="ht-auth-central__consent">
-                <input
-                  id="central-auth-consent"
-                  data-testid="central-auth-consent"
-                  type="checkbox"
-                  checked={centralTermsAccepted}
-                  onChange={(event) => setCentralTermsAccepted(event.currentTarget.checked)}
-                />
-                <span>
-                  <label htmlFor="central-auth-consent">{t('web.auth.central.consentPrefix')}</label>{' '}
-                  <button type="button" className="ht-auth-central__link" data-testid="central-auth-terms" onClick={() => setOpenLegalDocument('terms')}>
-                    {t('common.legal.termsDoc')}
-                  </button>{' '}
-                  {t('web.auth.central.consentAnd')}{' '}
-                  <button type="button" className="ht-auth-central__link" data-testid="central-auth-privacy" onClick={() => setOpenLegalDocument('privacy')}>
-                    {t('common.legal.privacyDoc')}
-                  </button>
-                </span>
-              </div>
-              {status.kind === 'failed' ? (
-                <p className="ht-auth-central__error" role="alert">{formStatus()?.message}</p>
-              ) : null}
-              <button
-                type="button"
-                className="ht-auth-central__button"
-                data-testid="central-auth-submit"
-                disabled={!centralTermsAccepted || busy}
-                onClick={() => {
-                  if (centralConfig.documentVersion !== null) {
-                    if (centralDeviceHandoff) {
-                      void startCentralDeviceLogin(effectiveBaseUrl, centralConfig.documentVersion);
-                    } else {
-                      void startCentralLogin(effectiveBaseUrl, centralConfig.documentVersion);
-                    }
-                  }
-                }}
-              >
-                {busy ? t('web.auth.central.busy') : t('web.auth.central.button')}
-              </button>
-              {centralDeviceHandoff ? <p className="ht-auth-central__note">{t('web.auth.central.note')}</p> : null}
-                </>
-              )}
-              {allowAdvanced ? (
-                <button type="button" className="ht-auth-central__link" data-testid="central-auth-self-hosted" onClick={() => {
-                  invalidatePendingAuth();
-                  setAddressDraft('');
-                  setShowSelfHostedForm(true);
-                }}>
-                  {t('web.auth.server.custom')}
-                </button>
-              ) : null}
-            </section>
-          ) : centralLoading && !selfHostedMode ? (
-            <section className="ht-auth-central" data-testid="central-auth-loading" aria-busy="true">
-              {centralClose}
-              <p className="ht-auth-central__body">{t('web.auth.central.loading')}</p>
-            </section>
-          ) : centralBlocked && !selfHostedMode ? (
-            <section className="ht-auth-central" data-testid="central-auth-unavailable" aria-live="polite">
-              {centralClose}
-              <h2 className="ht-type-section-title">{t('web.auth.central.unavailableTitle')}</h2>
-              <p className="ht-auth-central__body">{t('web.auth.central.unavailable')}</p>
-              <button type="button" className="ht-auth-central__button" onClick={() => setCentralProbe((value) => value + 1)}>
-                {t('web.auth.central.retry')}
-              </button>
-            </section>
-          ) : (
-          <>
-          {selfHostedMode ? (
-            <button
-              type="button"
-              className="ht-auth-central__link"
-              data-testid="central-auth-return"
-              onClick={() => {
-                invalidatePendingAuth();
-                setAddressDraft(authBaseUrl(baseUrl));
-                setShowSelfHostedForm(false);
-              }}
-            >
-              {t('web.auth.server.official')}
-            </button>
-          ) : null}
-          <AuthForm
+                    <>
+                    <AuthForm
             labels={labels}
             onClose={onClose}
             platform={passwordDefaultPlatform()}
@@ -955,7 +699,6 @@ export function AuthPanel({
             testID="auth-form"
           />
           </>
-          )}
           <LegalDocumentSheet
             document={legalDocumentPresentation(legalDocumentById(openLegalDocument ?? 'terms'))}
             locale={locale}

@@ -32,7 +32,7 @@ import { createSharePayloadCipher, ShareApiClient, type SyncPayloadCipher } from
 
 import { emitEngineChange, currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.js';
 import { emitShareRepaint } from '../../lib/share-signal-sink.js';
-import { createWebAuthFetch } from '../../lib/central-fetch.js';
+import { createWebAuthFetch } from '../../lib/auth-fetch.js';
 import { createWebShareKeyRotation } from './share-rotation.js';
 import { readShareOwnIdentity, unwrapShareKeyRing } from './share-key-store.js';
 

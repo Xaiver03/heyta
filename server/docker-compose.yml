@@ -136,15 +136,8 @@ services:
       # ⚠️ 用无冒号 `${KEY-default}`：未设置时回落到默认值；`.env` 里显式写成
       #    空串会**原样传空串**进容器 ⇒ config.ts 抛错（fail-loud，不静默降级）。
       #    `official` + `local` 组合同样启动失败（官方站不许降级本机口令）。
-      - HEYTA_AUTH_DEPLOYMENT=${HEYTA_AUTH_DEPLOYMENT-self-hosted}
-      - HEYTA_AUTH_MODE=${HEYTA_AUTH_MODE-local}
       # 下面五枚来自中央身份方的客户端登记；secret 是 43 字符，绝不要提交进仓库。
       # SESSION_ENCRYPTION_KEY 必须是独立 64-hex（≠ JWT_SECRET）：openssl rand -hex 32
-      - HEYTA_OIDC_ISSUER=${HEYTA_OIDC_ISSUER-}
-      - HEYTA_OIDC_CLIENT_ID=${HEYTA_OIDC_CLIENT_ID-}
-      - HEYTA_OIDC_CLIENT_SECRET=${HEYTA_OIDC_CLIENT_SECRET-}
-      - HEYTA_OIDC_REDIRECT_URI=${HEYTA_OIDC_REDIRECT_URI-}
-      - HEYTA_OIDC_SESSION_ENCRYPTION_KEY=${HEYTA_OIDC_SESSION_ENCRYPTION_KEY-}
       # 🔧 heyta 改动：统一支付中心（同公司晓黎支付中心，heyta 作为又一个 client 接入 —— ADR-0017 §3.3）。
       #
       # 🔴 这一组以前**不在 compose 里**：`config.ts` 认这四枚键，而 `environment:` 是白名单，

@@ -18,7 +18,7 @@
 import { createShareKeyRotation, type ShareKeyRotationOptions } from '@heyta/app-host';
 import { ShareApiClient, type SyncPayloadCipher } from '@heyta/sync-client';
 
-import { createWebAuthFetch } from '../../lib/central-fetch.js';
+import { createWebAuthFetch } from '../../lib/auth-fetch.js';
 
 import {
   getShareKeyEntry,

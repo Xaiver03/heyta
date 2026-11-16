@@ -161,22 +161,6 @@ function issueSessionCalls(stripped) {
   return calls;
 }
 
-/** The trusted central adapter is the only consumer of the privileged mint. */
-function centralMintBoundary(sources) {
-  const adapter = 'server/src/central-auth/session-issuer.ts';
-  if (!sources.has(adapter)) return [];
-  const errors = [], auth = sources.get(CANONICAL_SIGN_FILE) ?? '';
-  const uses = [...sources].filter(([path, source]) => path !== CANONICAL_SIGN_FILE && /\bissueCentralSession\b/.test(source));
-  if (uses.length !== 1 || uses[0][0] !== adapter || (uses[0][1].match(/\bissueCentralSession\s*\(/g) ?? []).length !== 1)
-    errors.push('中央可信签发只能由 central-auth/session-issuer.ts 调用一次');
-  if (!/if\s*\(centralRuntime\(\)\s*&&\s*transaction\?\.capability\s*!==\s*CENTRAL_ISSUANCE\)/.test(auth) ||
-      !/capability:\s*CENTRAL_ISSUANCE/.test(auth) || (auth.match(/\bCENTRAL_ISSUANCE\b/g) ?? []).length !== 3)
-    errors.push('中央可信签发能力检查缺失：旧签发入口不得在 OIDC 模式生成会话');
-  if ([...sources].some(([path, source]) => path !== CANONICAL_SIGN_FILE && /\bCENTRAL_ISSUANCE\b/.test(source)))
-    errors.push('中央私有签发能力不得离开 auth.ts');
-  return errors;
-}
-
 function scan() {
   const srcDir = join(ROOT, 'server', 'src');
   if (!existsSync(srcDir)) {
@@ -208,7 +192,7 @@ function scan() {
     return { probeError: '一枚 `jwt.sign(` 都没数到 ⇒ 签名出口消失或改形，判据已经失效' };
   }
 
-  const errors = centralMintBoundary(sources);
+  const errors = [];
   if (signSites.length !== 1) {
     errors.push(`签名出口不止一处（${signSites.length}）：${signSites.join(', ')}`);
   }
@@ -363,15 +347,6 @@ if (process.argv.includes('--self-test')) {
     },
   ];
 
-  const centralAuth = AUTH_OK.replace("  const jti = 'x';", "  if (centralRuntime() && transaction?.capability !== CENTRAL_ISSUANCE) throw new Error('required');\n  const jti = 'x';") +
-    "\nconst CENTRAL_ISSUANCE = Symbol();\nexport const issueCentralSession = (user,meta,tx) => issueSession(user,meta,{...tx,capability:CENTRAL_ISSUANCE});\n";
-  const adapter = 'server/src/central-auth/session-issuer.ts';
-  const centralFiles = { 'server/src/auth.ts': centralAuth, [adapter]: "import { issueCentralSession } from '../auth'; export const mint = (u,m,t) => issueCentralSession(u,m,t);" };
-  fixtures.push(
-    { name: '中央能力合法单消费者', files: centralFiles, wantRed: false, want: null },
-    { name: '中央能力被旧路由额外导入', files: { ...centralFiles, 'server/src/leak.ts': "import { issueCentralSession } from './auth';" }, wantRed: true, want: '中央可信签发只能' },
-    { name: '旧签发入口能力检查被移除', files: { ...centralFiles, 'server/src/auth.ts': centralAuth.replace('transaction?.capability !== CENTRAL_ISSUANCE','false') }, wantRed: true, want: '中央可信签发能力检查缺失' },
-  );
   let fail = 0;
   for (const fx of fixtures) {
     rmSync(dir, { recursive: true, force: true });

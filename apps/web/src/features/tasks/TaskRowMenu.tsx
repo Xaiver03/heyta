@@ -364,6 +364,8 @@ export function TaskRowMenu({
               icon: <ArchiveRestore size={ICON_SIZE.sm} className="ht-row-menu__icon" />,
             }
           : null;
+      case 'dueToday':
+        return null;
       case 'select':
         // 多选在 Web 是**视图层**的一档（页头 `⋯` 的 `task-select-open`，进入之后由页头的
         // 批量条接管），不在行菜单里重复一枚 —— 入口表里那一行的层级就是视图。

@@ -85,27 +85,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('官方地址那一支（线上那台就是这个形状）', () => {
-  it('大标题挂上「管理后台」，而 eyebrow 那句"发去哪台服务端"没被顶掉', async () => {
-    const el = await renderPanel({ baseUrl: '', brandLabel: BRAND });
-
-    const panel = el.querySelector<HTMLElement>('[data-testid="central-auth-panel"]');
-    expect(panel, '这一支没挂起来 ⇒ 本文件判的东西不存在').not.toBeNull();
-    expect(panel!.querySelector('h2')?.textContent).toContain('管理后台');
-    // 🔴 eyebrow 答的是目的地，不是品牌位：拿品牌去擦它就等于把透明度换成门面。
-    expect(panel!.textContent).toContain(translate('zh-CN', 'web.auth.central.kicker'));
-  });
-
-  it('反向对照：不传 brandLabel ⇒ 标题逐字是主应用那句，也没混进"管理后台"', async () => {
-    const el = await renderPanel({ baseUrl: '' });
-
-    const panel = el.querySelector<HTMLElement>('[data-testid="central-auth-panel"]');
-    expect(panel).not.toBeNull();
-    expect(panel!.querySelector('h2')?.textContent).toBe(translate('zh-CN', 'web.auth.central.title'));
-    expect(panel!.textContent).not.toContain('管理后台');
-  });
-});
-
 describe('自带端点那一支', () => {
   it('同一枚 brandLabel 也出现在共享表单的标题位，副标题照旧（表单没被换成第二套）', async () => {
     const el = await renderPanel({ baseUrl: 'https://self-hosted.test', brandLabel: BRAND });

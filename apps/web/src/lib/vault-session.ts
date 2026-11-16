@@ -21,7 +21,7 @@ import {
   type VaultKeySession,
 } from '@heyta/app-host';
 import type { VaultKeyMigrationResponse } from '@heyta/shared-schema';
-import { createWebAuthFetch } from './central-fetch.js';
+import { createWebAuthFetch } from './auth-fetch.js';
 
 const DB_NAME = 'heyta-vault';
 

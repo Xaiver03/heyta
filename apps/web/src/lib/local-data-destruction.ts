@@ -35,7 +35,6 @@ import { IndexedDbAdapter, type DbDestroyReport } from '@heyta/storage';
 
 // 🔴 销毁 OPFS 之前要能关掉那个持句柄的 worker（为什么必须，见 `removeOpfsDirectory` 上面那段实测）。
 import { destroyLiveStorage, releaseStorageWorker } from './oplog.js';
-import { CENTRAL_ACCOUNT_BINDING_KEY, centralAccountBindingExists, centralAccountBindingSnapshot } from './central-account-binding.js';
 
 /**
  * 这个宿主管辖的 IndexedDB 数据库名。
@@ -289,7 +288,7 @@ async function clearServiceWorkerLayer(): Promise<DbDestroyReport> {
  *
  * 🔴 返回的数组**长度是判据**：少于 4 类就是有代码没跑到。
  */
-export async function eraseWebLocalData(expectedCentralBinding?: string): Promise<DbDestroyReport[]> {
+export async function eraseWebLocalData(): Promise<DbDestroyReport[]> {
   const reports: DbDestroyReport[] = [];
   // Stop native widget writers before destroying the database; report a failure honestly.
   try {
@@ -330,8 +329,7 @@ export async function eraseWebLocalData(expectedCentralBinding?: string): Promis
   // Keep the ownership binding until every durable data layer reports success.
   // A blocked IndexedDB/OPFS deletion followed by an unbound next login could
   // upload the remaining old account data to a new central subject.
-  const local = wipePrefixedKeys(globalThis.localStorage, CENTRAL_ACCOUNT_BINDING_KEY);
-  const localReportIndex = reports.length;
+  const local = wipePrefixedKeys(globalThis.localStorage);
   reports.push(
     local < 0
       ? report('localStorage', false, { reason: 'local-storage-unavailable' })
@@ -352,22 +350,6 @@ export async function eraseWebLocalData(expectedCentralBinding?: string): Promis
   );
 
   reports.push(await clearServiceWorkerLayer());
-
-  if (centralAccountBindingExists()) {
-    if (reports.every((item) => item.containerRemoved)) {
-      try {
-        if (expectedCentralBinding !== undefined && centralAccountBindingSnapshot() !== expectedCentralBinding) {
-          throw new Error('central-binding-changed');
-        }
-        globalThis.localStorage.removeItem(CENTRAL_ACCOUNT_BINDING_KEY);
-        if (centralAccountBindingExists()) throw new Error('binding-still-present');
-      } catch {
-        reports[localReportIndex] = report('localStorage', false, { reason: 'central-binding-removal-failed' });
-      }
-    } else if (reports[localReportIndex]?.containerRemoved) {
-      reports[localReportIndex] = report('localStorage', false, { reason: 'central-binding-retained-after-partial-erasure' });
-    }
-  }
 
   return reports;
 }

@@ -75,7 +75,6 @@ import {
 // 这里因此不 import 任何加解密函数 —— 头像的读写都不需要口令或 vault。
 import { joinEndpointUrl } from './endpoint-url.js';
 import { PrivacyConsentBlockedError } from './privacy-consent.js';
-import { CENTRAL_COOKIE_SESSION_MARKER } from './central-auth.js';
 
 /**
  * 服务端认证端点。
@@ -736,12 +735,7 @@ export async function sendJson(
 
   const headers: Record<string, string> = {};
   if (payload !== undefined) headers['content-type'] = 'application/json';
-  const cookieSession = token === CENTRAL_COOKIE_SESSION_MARKER;
-  if (token !== undefined && !cookieSession) headers['authorization'] = `Bearer ${token}`;
-  if (cookieSession && typeof document !== 'undefined') {
-    const csrf = document.cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith('__Host-heyta-csrf='))?.slice('__Host-heyta-csrf='.length);
-    if (csrf !== undefined && csrf !== '') headers['x-csrf-token'] = csrf;
-  }
+  if (token !== undefined) headers['authorization'] = `Bearer ${token}`;
 
   let response: Response;
   try {
@@ -749,7 +743,6 @@ export async function sendJson(
       method,
       headers,
       ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
-      ...(cookieSession ? { credentials: 'include' as const } : {}),
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
   } catch (error) {
