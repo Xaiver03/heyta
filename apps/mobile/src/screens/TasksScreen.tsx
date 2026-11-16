@@ -64,6 +64,7 @@ import { useI18n } from '@heyta/i18n';
 import {
   CaptureComposer,
   BottomSheet,
+  formFactorOf,
   priorityColorToken,
   receiptTimingOf,
   type CaptureProjectOption,
@@ -422,6 +423,8 @@ export function TasksScreen({
 } = {}): React.JSX.Element {
   const tokens = useTokens();
   const insets = useSafeAreaInsets();
+  // iPad 分栏：外层可用宽度现量（onLayout，非 Dimensions —— Stage Manager 可拖宽）。`0` 时按 compact 处理。
+  const [rootWidth, setRootWidth] = useState(0);
   // 搜索框要 `fontSans` 与 `row-meta` 两样（都走归一化访问器）。
   const text = useText();
   const { native } = useTheme();
@@ -1651,8 +1654,51 @@ export function TasksScreen({
     </>
   );
 
+  /**
+   * 🔴 iPad 横屏（expanded）分栏：列表在左、详情常驻右栏（不再盖住列表）。
+   * 宽度由外层 `onLayout` 现量，`formFactorOf` 推档 —— 不读 `Dimensions`（Stage Manager 会改宽度）。
+   */
+  const twoPane = view === 'list' && formFactorOf(rootWidth) === 'expanded';
+
+  /**
+   * 详情面板公共属性。两种呈现（底部 sheet / 右栏 pinned）共用一份，避免两处漂移。
+   * `actions === null` 时整块不渲染（与原来 overlay 的门禁一致）。
+   */
+  const renderDetailSheet = (presentation: 'sheet' | 'pinned') =>
+    actions === null ? null : (
+      <TaskDetailSheet
+        task={detailTask}
+        visible={detailTaskId !== null}
+        presentation={presentation}
+        onClose={() => {
+          selection.select('task', null);
+          if (navigation.stack.at(-1)?.key === 'task-detail') navigation.pop();
+        }}
+        actions={actions}
+        projects={projects}
+        tags={tags}
+        tagEntities={tagEntities}
+        projectActions={projectActions}
+        tasks={tasks}
+        onChanged={refresh}
+        now={now}
+        onOpenSubtask={(taskId) => {
+          selection.select('task', taskId);
+        }}
+        activitySource={host?.engine ?? null}
+        attachmentActions={attachmentActions}
+      />
+    );
+
   return (
-    <View style={{ flex: 1 }}>
+    <View
+      style={{ flex: 1, flexDirection: twoPane ? 'row' : 'column' }}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        setRootWidth((prev) => (Math.abs(w - prev) > 1 ? w : prev));
+      }}
+    >
+      <View style={{ flex: 1 }}>
       <Screen
         title={t('mobile.tasks.title')}
         // 列表视图把 FlatList 作为唯一纵向滚动宿主；标题、筛选与视图控制
@@ -1869,37 +1915,21 @@ export function TasksScreen({
           </View>
         )}
       </Screen>
+      </View>
 
-      {actions !== null && navigation.tab === 'tasks' ? (
-        <TaskDetailSheet
-          task={detailTask}
-          // visible={detailTaskId !== null} is the selection contract; the tab
-          // gate prevents a retained hidden tab from surfacing its Modal.
-          visible={detailTaskId !== null}
-          onClose={() => {
-            selection.select('task', null);
-            if (navigation.stack.at(-1)?.key === 'task-detail') navigation.pop();
-          }}
-          actions={actions}
-          projects={projects}
-          tags={tags}
-          tagEntities={tagEntities}
-          projectActions={projectActions}
-          tasks={tasks}
-          onChanged={refresh}
-          now={now}
-          // 点子任务 = 把面板切到那条子任务上（还是同一个"当前看的是哪一条"的
-          // 所有者，与行菜单走的是同一条 `select`，不新开第二份选中态）。
-          onOpenSubtask={(taskId) => {
-            selection.select('task', taskId);
-          }}
-          // 「任务动态」的数据源就是本机 op-log。`host` 还在加载时给 null，
-          // 那一格于是**整格不出现** —— 而不是出现并空着（空着会被读成
-          // "这条任务没被改过"，而我们此刻什么都不知道）。
-          activitySource={host?.engine ?? null}
-          attachmentActions={attachmentActions}
-        />
+      {twoPane ? (
+        <View style={{ width: 384, backgroundColor: tokens['color.surface'] }}>
+          {detailTask !== null && detailTaskId !== null ? (
+            renderDetailSheet('pinned')
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: tokens['space.6'] }}>
+              <Text variant="row-meta" tone="subtle">{t('mobile.tasks.title')}</Text>
+            </View>
+          )}
+        </View>
       ) : null}
+
+      {!twoPane && navigation.tab === 'tasks' ? renderDetailSheet('sheet') : null}
 
       {/**
        * 行的**上下文菜单**（§3.4 的移动端主入口 = 长按行）。

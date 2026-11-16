@@ -177,6 +177,12 @@ export interface BottomSheetProps {
   readonly bottomInset?: number;
   readonly children: React.ReactNode;
   readonly footer?: React.ReactNode;
+  /**
+   * 🔴 `pinned`：**非模态、常驻**呈现（iPad 分栏的右侧详情栏用）。
+   * 不套 Modal / 遮罩 / 拖拽 / 档位，只渲染标题栏 + 可滚内容 + footer，铺满父容器。
+   * 默认 `sheet` ＝ 原来的底部面板；两端行为逐字节不变。
+   */
+  readonly presentation?: 'sheet' | 'pinned';
   readonly testID?: string;
 }
 
@@ -200,8 +206,9 @@ export function BottomSheet({
   bottomInset = 0,
   children,
   footer,
+  presentation = 'sheet',
   testID = 'heyta-bottom-sheet',
-}: BottomSheetProps): React.JSX.Element {
+}: BottomSheetProps): React.JSX.Element | null {
   const theme = useHeytaUiTheme();
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -502,6 +509,13 @@ export function BottomSheet({
           paddingTop: tokens['space.3'],
           gap: tokens['space.3'],
         },
+        /** `pinned` 常驻栏：贴父容器右缘、与左侧列表之间一条细线。 */
+        pinned: {
+          flex: 1,
+          backgroundColor: tokens['color.surface'],
+          borderLeftWidth: tokens['border-width.thin'],
+          borderLeftColor: tokens['color.border'],
+        },
         pressed: { opacity: 0.72 },
       }),
     [theme, tokens, maxHeight],
@@ -518,6 +532,47 @@ export function BottomSheet({
    */
   const dragHandlers = (region: SheetDragRegion): object =>
     draggable && isSheetDragRegion(region) ? pan.panHandlers : {};
+
+  if (presentation === 'pinned') {
+    if (!visible) return null;
+    return (
+      <View style={styles.pinned} testID={testID}>
+        <View style={styles.header}>
+          <View style={styles.headerDrag}>
+            <Text accessibilityRole="header" style={[text['section-title'], styles.title]}>
+              {title}
+            </Text>
+          </View>
+          {hasExplicitClose(policy) ? (
+            <Pressable
+              accessibilityLabel={labels.closeText ?? labels.close}
+              accessibilityRole="button"
+              onPress={() => runDismiss(explicitCloseAction, 'scrim')}
+              style={({ pressed }) => [styles.closeButton, pressed ? styles.pressed : undefined]}
+              testID={`${testID}-close`}
+            >
+              {labels.closeText !== undefined ? (
+                <Text style={[text['section-title'], { color: tokens['color.foreground-muted'] }]}>
+                  {labels.closeText}
+                </Text>
+              ) : (
+                <HeytaIcon data={X} size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />
+              )}
+            </Pressable>
+          ) : null}
+        </View>
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={[styles.bodyContent, { paddingBottom: tokens['space.4'] }]}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+        >
+          {children}
+        </ScrollView>
+        {footer !== undefined ? <View style={styles.footer}>{footer}</View> : null}
+      </View>
+    );
+  }
 
   return (
     <Modal

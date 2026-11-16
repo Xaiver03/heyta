@@ -228,6 +228,7 @@ export function TaskDetailSheet({
   task,
   visible,
   onClose,
+  presentation,
   actions,
   projects,
   tags,
@@ -244,6 +245,8 @@ export function TaskDetailSheet({
   task: Task | undefined;
   visible: boolean;
   onClose: () => void;
+  /** `pinned`＝iPad 分栏右侧常驻栏（非模态）；默认 `sheet`＝底部面板。 */
+  presentation?: 'sheet' | 'pinned';
   actions: TaskActions;
   /**
    * 可选的清单（**不含「收集箱」** —— 那个选项不是实体，见下面的渲染）。
@@ -1094,6 +1097,7 @@ export function TaskDetailSheet({
      */
     <BottomSheet
       visible={visible}
+      {...(presentation === undefined ? {} : { presentation })}
       // 可访问名称 + 标题栏文字：这条任务挂在哪个清单下（"任务详情"不回答任何问题）。
       title={listValue}
       labels={{
