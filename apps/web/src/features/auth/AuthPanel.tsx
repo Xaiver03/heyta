@@ -103,6 +103,7 @@ import { readRememberedCredentials, rememberCredentials } from './remembered-cre
 import { useAuthStore, type AuthBusyAction } from './store.js';
 import { authBaseUrl, isUnconfigured } from '../../lib/auth-endpoint.js';
 import { consentFetch, privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate.js';
+import { requireNetworkConsent, waitForPrivacyDecision } from '../privacy/store.js';
 import { useSyncStore } from '../sync/store.js';
 import { useModalDismiss } from '../../lib/use-modal-dismiss.js';
 import './auth-dialog.css';
@@ -464,6 +465,37 @@ export function AuthPanel({
       {t('web.auth.close')}
     </button>
   );
+
+  /**
+   * 🔴 2026-11-16（ADR-0086）：**提交前先过设备级同意**，与 mobile `AuthScreen` 的六处同形。
+   *
+   * 没有它的话：用户填完表单点提交 → 请求被闸门拦下 → 面板**没开**（冷启动不弹）
+   * → 兜底立刻失败 → 用户看到一句失败，还得自己去隐私设置点同意再回来重填。
+   *
+   * 有它之后是"同一次点击走完"：提交 → 面板弹出 → 同意 → **这次提交继续跑**。
+   * 复用 `waitForPrivacyDecision()`：它只在"面板已经开着"时挂起，
+   * 而 `requireNetworkConsent()` 正好替我们开了它。
+   *
+   * 用户点「以后再说」关掉面板 → `waitForPrivacyDecision()` 给 `false` → 这次提交作废
+   * （不是失败，是没发生），与"关掉不等于同意"那条纪律一致。
+   *
+   * ## 🔴 注册那几条**不**走这里
+   *
+   * 注册表单自己有一个勾选框，文案是「我同意服务条款与隐私政策，**并允许本机联网**」——
+   * 它同时表达了设备级同意，勾上之后 `requestRegistrationCode` 会把 consent 落成
+   * `accepted`。再弹一次面板就是**重复询问同一件事**，而用户刚在眼前那个框里同意过。
+   *
+   * 登录（口令 / 验证码 / 魔法链接 / 通行密钥 / 找回）那几条没有这个框，所以才需要它。
+   */
+  const withConsent = (run: () => void): void => {
+    if (requireNetworkConsent()) {
+      run();
+      return;
+    }
+    void waitForPrivacyDecision().then((granted) => {
+      if (granted) run();
+    });
+  };
 
   const labels: AuthFormLabels & {
     readonly otherWaysToggle: { readonly open: string; readonly close: string };
@@ -831,14 +863,14 @@ export function AuthPanel({
             onSignIn={({ email, password, rememberPassword }) => {
               // 🔴 口令**原样**交出：不在这里 trim / normalize / 改大小写。
               // 归一化只在服务端一处发生，客户端多算一次就是第二套规则。
-              void signInWithPassword(effectiveBaseUrl, email, password).then((session) => {
+              withConsent(() => void signInWithPassword(effectiveBaseUrl, email, password).then((session) => {
                 if (session !== undefined) {
                   // 「记住密码」：用户**明示勾选**才落存储；没勾/取消勾都要清掉旧值。
                   // 存储属壳这一层（共享表单与 store 不持久化口令）。
                   rememberCredentials(email, password, rememberPassword === true);
                   onSignedIn?.(session);
                 }
-              });
+              }));
             }}
             onRegister={({ email, password, termsAccepted, inviteCode }) => {
               void requestRegistrationCode(
@@ -873,25 +905,25 @@ export function AuthPanel({
                     email: loginChallenge.email,
                     expiresAt: loginChallenge.expiresAt,
                     resendAvailableAt: loginChallenge.resendAvailableAt,
-                    onVerify: (code: string) => {
+                    onVerify: (code: string) => withConsent(() => {
                       void verifyLoginCode(effectiveBaseUrl, loginChallenge.challengeId, code).then((session) => {
                         if (session !== undefined) onSignedIn?.(session);
                       });
-                    },
-                    onResend: () => {
+                    }),
+                    onResend: () => withConsent(() => {
                       void resendLoginCode(effectiveBaseUrl, loginChallenge.challengeId);
-                    },
+                    }),
                     onChangeEmail: cancelLoginCode,
                   },
                 }
               : {})}
-            onLoginCode={(email) => {
+            onLoginCode={(email) => withConsent(() => {
               void requestLoginCode(effectiveBaseUrl, email);
-            }}
-            onMagicLink={(email) => {
+            })}
+            onMagicLink={(email) => withConsent(() => {
               void sendLoginLink(effectiveBaseUrl, email);
-            }}
-            onPasskey={({ kind, email, termsAccepted, inviteCode }) => {
+            })}
+            onPasskey={({ kind, email, termsAccepted, inviteCode }) => withConsent(() => {
               if (kind === 'register') {
                 void registerPasskey(effectiveBaseUrl, email, termsAccepted, { inviteCode });
                 return;
@@ -899,18 +931,18 @@ export function AuthPanel({
               void loginWithPasskey(effectiveBaseUrl, email).then((session) => {
                 if (session !== undefined) onSignedIn?.(session);
               });
-            }}
-            onRecovery={(email) => {
+            })}
+            onRecovery={(email) => withConsent(() => {
               void requestRecovery(effectiveBaseUrl, email);
-            }}
-            onForgotPassword={(email) => {
+            })}
+            onForgotPassword={(email) => withConsent(() => {
               void forgotPassword(effectiveBaseUrl, email);
-            }}
-            onVerifyToken={(token) => {
+            })}
+            onVerifyToken={(token) => withConsent(() => {
               void verify(effectiveBaseUrl, token).then((session) => {
                 if (session !== undefined) onSignedIn?.(session);
               });
-            }}
+            })}
             onOpenLegal={(kind) => {
               if (legalLinks === null) return;
               if (isOfficialService) {

@@ -114,12 +114,14 @@ for (const viewport of [
     await expect(page.locator('.ht-app[data-assistant-workspace]')).toHaveCount(1);
   });
 
-  test(`助手中登录被隐私闸门拦下时面板可见，同意不自动重发 ${viewport.width}`, async ({ page }) => {
+  test(`助手中登录被隐私闸门拦下时面板可见，同意之后那一次提交自己继续 ${viewport.width}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const requests = await interceptAuth(page);
     const auth = await openFromAssistant(page);
     await auth.getByTestId('auth-form-email').fill(EMAIL);
     await auth.getByTestId('auth-form-password').fill(PASSWORD);
+
+    // 只点一次提交，之后不再碰表单。
     await auth.getByTestId('auth-form-submit').click();
 
     const privacy = page.getByTestId('privacy-consent-dialog');
@@ -128,14 +130,28 @@ for (const viewport of [
     await privacy.getByTestId('privacy-consent-accept').click();
     await expect(privacy).toBeHidden();
     await expect(auth.getByTestId('auth-form-password')).toHaveValue(PASSWORD);
-    expect(requests.logins).toEqual([]);
-    expect(requests.registrations).toEqual([]);
-    await expect(page.locator('body')).not.toContainText('common.auth.error.consentRequired');
 
-    // 手动再次提交才允许唯一一次登录请求，防止隐式重复用户意图。
-    await auth.getByTestId('auth-form-submit').click();
+    /*
+      🔴 2026-11-16（ADR-0086）：判据从「同意**不**自动重发，要手动再点一次」
+      改成「同意之后那一次提交自己继续跑」。
+
+      原来的顾虑是"隐式重复用户意图"。这条改判据的理由：
+        · 用户已经点过提交，表达的是"用这组凭据登录"；中间插进来的是一个**设备的**
+          合规确认，不该让那个意图作废 —— 让用户再点一次，等于把一次点击拆成两次。
+        · 重发用的还是**点击那一刻**的表单值（闭包里捕获的），不会发出用户没见过的数据。
+        · 用户点「以后再说」关掉面板时，`waitForPrivacyDecision()` 给 `false`，
+          这次提交**不会**发生 —— "关掉不等于同意"那条纪律仍然成立。
+      判据仍然是"只发一次"（下面那条 `toHaveLength(1)`），
+      所以它不是"多发了"，而是"同一次点击走完了"。
+    */
     await expect.poll(() => requests.logins.length).toBe(1);
     expect(requests.logins[0]).toEqual({ email: EMAIL, password: PASSWORD });
+
+    // 不许悄悄发第二次：同一个意图只对应一次请求。
+    await page.waitForTimeout(200);
+    expect(requests.logins, '同一个意图发了不止一次').toHaveLength(1);
+    expect(requests.registrations).toEqual([]);
+    await expect(page.locator('body')).not.toContainText('common.auth.error.consentRequired');
     await expect(page.locator('.ht-app[data-assistant-workspace]')).toHaveCount(1);
   });
 
