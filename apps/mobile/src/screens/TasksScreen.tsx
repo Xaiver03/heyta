@@ -1665,8 +1665,19 @@ export function TasksScreen({
         barCollapsed={view === 'list' ? barCollapsed : undefined}
         fixedControls={bulkSelecting || bulkUndoIds !== null ? bulkControls : undefined}
         actions={[
-          // 🔴 全局搜索的**唯一**入口（产品负责人 2026-10-01：一个应用只有一个搜索入口）。
-          { icon: 'action.search', label: t('mobile.search.open'), onPress: () => setSearchOpen(true) },
+          /*
+           * 🔴 2026-11-16：搜索只在**列表档**出现。看板档的顶栏与滴答对齐 ——
+           * 标题 + ⋯，两枚。搜索仍是全局唯一入口（列表里的那一枚），不是被删掉。
+           */
+          ...(view === 'list'
+            ? [
+                {
+                  icon: 'action.search' as const,
+                  label: t('mobile.search.open'),
+                  onPress: () => { setSearchOpen(true); },
+                },
+              ]
+            : []),
           /*
            * 🔴 2026-11-15：把手动「同步」从这里撤下来，收进「⋯」菜单。
            *
@@ -1690,14 +1701,12 @@ export function TasksScreen({
         ]}
       >
         {/*
-          🔴 2026-11-15：看板视图（`chrome="board"`）下 `Screen` 不再给左右 gutter，
-          而「11月15日 星期日 / 1 项待办」这组文字**不是看板本体** ——
-          铺满的是矩阵，文字仍要站在 16dp 那条轴线上（真机实测：不包这一层，
-          日期标题会贴到屏幕左边、`11` 被裁掉）。
+          🔴 2026-11-16：看板档**不再显示「11月16日 星期一 / 11 项待办，1 项已完成」**。
+          滴答的四象限顶栏只有标题 + ⋯，下面直接是四格（真机对照）。
+          那行字是"列表的页头"，不是"看板的页头" —— 它对四象限没有任何信息量，
+          只把矩阵整体往下推了约 100dp（用户：「这些东西，我总觉得……」）。
         */}
-        {view === 'list' ? null : (
-          <View style={{ paddingHorizontal: tokens['screen.gutter'] }}>{taskControls}</View>
-        )}
+
 
         {view === 'quadrant' ? (
           /*

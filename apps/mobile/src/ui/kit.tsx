@@ -24,9 +24,10 @@
  * 现在 `Text` 直接消费 `useText()` 的语义样式，本文件不再自己推导排版。
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -395,6 +396,24 @@ export function Screen({
    */
   const [barHiddenState, setBarHidden] = React.useState(false);
   const barHidden = barCollapsed ?? barHiddenState;
+
+  /**
+   * 🔴 2026-11-16：收起/展开走**高度动画**，不再一帧跳变。
+   *
+   * 上一版是 `height: barHidden ? 0 : undefined` —— 每一帧之间高度从 56dp 直接变 0，
+   * 内容整块上跳一次。真机观感就是产品负责人说的「向上滑动时会有滚屏屏闪」。
+   * 现在 150ms 内从整栏高度过渡到 0，内容连续上移。
+   */
+  const insets = useSafeAreaInsets();
+  const collapseHeight = insets.top + t['nav.app-bar-height'];
+  const collapseAnim = useRef(new Animated.Value(barHidden ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(collapseAnim, {
+      toValue: barHidden ? 1 : 0,
+      duration: t['duration.fast'],
+      useNativeDriver: false,
+    }).start();
+  }, [barHidden, collapseAnim, t]);
   const lastY = useRef(0);
   const onScrollY = useCallback(
     (y: number) => {
@@ -439,7 +458,17 @@ export function Screen({
   return (
     <View style={{ flex: 1, backgroundColor: t['color.background'] }}>
       {collapses ? (
-        <View style={{ height: barHidden ? 0 : undefined, overflow: 'hidden' }}>{appBar}</View>
+        <Animated.View
+          style={{
+            height: collapseAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [collapseHeight, 0],
+            }),
+            overflow: 'hidden',
+          }}
+        >
+          {appBar}
+        </Animated.View>
       ) : (
         appBar
       )}

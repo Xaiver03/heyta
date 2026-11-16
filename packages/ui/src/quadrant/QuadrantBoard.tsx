@@ -240,15 +240,22 @@ function makeStyles(tokens: HeytaNativeTokens) {
      * 只改共享层在两端都还是空转。
      */
     board: {
-      /* 给左侧纵轴标签留位置（它贴在矩阵外沿，不留位会被屏幕边缘裁掉）。 */
-      paddingLeft: tokens['space.4'],
-      paddingTop: tokens['space.4'],
-      /* 🔴 四格拼成一个整体的外轮廓。**不在这里裁** —— 轴标签要画到边界外侧，
-         放在裁切容器里会被剪掉（实测：上一版轴标签完全不显示）。裁切在内层做。 */
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: tokens['color.border'],
-      gap: 0,
-      padding: 0,
+      /**
+       * 🔴 2026-11-16（对照滴答实测后重做）：**四张独立卡片 + 间隙**，不是"十字 + 轴标签"。
+       *
+       * 滴答的四象限（真机 `com.ticktick.task` 8.0.9.1）：
+       *   · 四张等宽等高的圆角白卡，卡与卡之间 16dp 间隙
+       *   · **没有**"紧急 / 重要"这两条轴标签，也**没有**十字分割线
+       *   · 每格标题一行（罗马数字 + 彩色象限名），没有副标题
+       *
+       * 产品负责人这一轮的原话：「四象限上莫名其妙有"紧急"两个字和一条横线，
+       * 我觉得很脏」「格子分布上下不对称」。两件事都是旧形状的直接后果：
+       * 轴标签要留位（`paddingLeft/Top` 又被后面的 `padding: 0` 覆盖）、
+       * 十字靠四格描边拼成，于是上下留白不一致、还多出两条线。
+       *
+       * 页边距放在这里（`Screen` 的 board 档不给 gutter）。
+       */
+      padding: tokens['space.4'],
       flexGrow: 1,
       /* 只长不缩：内容多时不许把四格压到 `minHeight` 以下。 */
       flexShrink: 0,
@@ -266,17 +273,14 @@ function makeStyles(tokens: HeytaNativeTokens) {
     /** 两行等分板子的剩余高度；同样"只长不缩"（理由见 `board`）。 */
     /** 四格拼成的那个矩形：圆角与裁切都在这一层（轴标签在它外面，不受影响）。 */
     matrix: {
-      borderRadius: tokens['radius.lg'],
-      overflow: 'hidden',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: tokens['color.border'],
+      /** 间隙就是象限的那两条缝 —— 与滴答一致，不再画线。 */
+      gap: tokens['space.3'],
       flexGrow: 1,
     },
     row: {
       flexDirection: 'row',
-      /* 🔴 2026-11-15：**去掉格间 gap** —— 四象限要拼成一个十字，不是四张独立的卡。
-         间距由 `board` 的分隔线承担（见 `cell` 的边框）。 */
-      gap: 0,
+      /** 格间间隙（与 `matrix` 同一个来源，横竖一致 —— 这就是"对称"）。 */
+      gap: tokens['space.3'],
       flexGrow: 1,
       flexShrink: 0,
       flexBasis: 'auto',
@@ -291,7 +295,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
      * 面板按内容高度排布、由宿主滚动。这不是例外，是同一条"只长不缩"的结果。
      */
     stack: {
-      gap: 0,
+      gap: tokens['space.3'],
       flexGrow: 1,
       flexShrink: 0,
       flexBasis: 'auto',
@@ -318,17 +322,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'column',
       minHeight: tokens['layout.quadrant-min-height'],
       padding: tokens['space.3'],
-      /*
-       * 🔴 2026-11-15：**格自己不带圆角**，圆角由外层 `board` 裁一次。
-       *
-       * 四张各自圆角的卡并排 ⇒ 读起来是"四张卡"；四块拼在一起、只有外轮廓圆
-       * ⇒ 读起来是"一个被十字切开的矩阵"。后者才是象限图。
-       */
-      borderRadius: 0,
-      /* 格间用一根细线分隔（只画右/下，避免格子之间双线）。 */
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderColor: tokens['color.border'],
+      /** 每格一张白卡（滴答的形状）：圆角 + 白底，四张之间靠间隙分开。 */
+      borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
     },
     /** 拖拽悬停：换语义底色，不动几何（动几何会让整格抖一下）。 */
@@ -447,7 +442,12 @@ export function QuadrantBoard({
    *
    * 只在 2×2 时画：单列下没有"轴"可言（四格是四段，不是四块）。
    */
-  const axis = twoColumns ? labels.axis : undefined;
+  /*
+   * 🔴 2026-11-16：`labels.axis`（「紧急」「重要」）**不再画**。
+   * 滴答的四象限没有任何轴标签 —— 四张卡的标题已经写着「重要且紧急」，
+   * 再加两条轴是把同一件事说两遍，还多出两条线。字段保留在契约里（宿主仍传），
+   * 但不消费，免得两端各写一份"要不要画轴"的判断。
+   */
 
   const footnote = labels.footnote;
 
@@ -456,20 +456,6 @@ export function QuadrantBoard({
       style={[styles.board, minHeight === undefined ? undefined : { minHeight }]}
       testID={testID}
     >
-      {/*
-        🔴 轴标签画在**边界外侧**，不占格内空间：格子只有 165dp 宽，
-        放进去会把标题挤掉。这里用绝对定位贴在左/上边缘。
-      */}
-      {axis?.vertical === undefined ? null : (
-        <Text style={[styles.axisVertical, { color: tokens['color.foreground-subtle'] }]}>
-          {axis.vertical}
-        </Text>
-      )}
-      {axis?.horizontal === undefined ? null : (
-        <Text style={[styles.axisHorizontal, { color: tokens['color.foreground-subtle'] }]}>
-          {axis.horizontal}
-        </Text>
-      )}
       <View style={styles.matrix}>
       {rows.map((row, rowIndex) => (
         <View key={`row-${rowIndex}`} style={twoColumns ? styles.row : styles.stack}>
@@ -498,7 +484,13 @@ export function QuadrantBoard({
                       <View style={styles.headerTrailing}>{renderHeaderTrailing(card)}</View>
                     )}
                   </View>
-                  <Text style={[text.caption, styles.cellHint]}>{hint}</Text>
+                  {/*
+                    🔴 2026-11-16：副标题（「重要且紧急」）不再画。
+                    滴答的四象限每格只有**一行**标题；我们原来是「马上做」+「重要且紧急」
+                    两行 —— 同一件事说两遍，格子顶部还高一倍。
+                    标题词条本身这一轮不动（换名字要动 i18n 与用户预期），
+                    只把副标题从视觉上收掉。
+                  */}
                 </View>
 
                 {/*
