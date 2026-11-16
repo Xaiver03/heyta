@@ -1,172 +1,171 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
 <head>
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <title>heyta UI/UX 审计 2026-11-16</title>
   <style>
-    html {
-      color: #1a1a1a;
-      background-color: #fdfdfd;
-    }
-    body {
-      margin: 0 auto;
-      max-width: 36em;
-      padding-left: 50px;
-      padding-right: 50px;
-      padding-top: 50px;
-      padding-bottom: 50px;
-      hyphens: auto;
-      overflow-wrap: break-word;
-      text-rendering: optimizeLegibility;
-      font-kerning: normal;
-    }
-    @media (max-width: 600px) {
-      body {
-        font-size: 0.9em;
-        padding: 12px;
-      }
-      h1 {
-        font-size: 1.8em;
-      }
-    }
-    @media print {
-      html {
-        background-color: white;
-      }
-      body {
-        background-color: transparent;
-        color: black;
-        font-size: 12pt;
-      }
-      p, h2, h3 {
-        orphans: 3;
-        widows: 3;
-      }
-      h2, h3, h4 {
-        page-break-after: avoid;
-      }
-    }
-    p {
-      margin: 1em 0;
-    }
-    a {
-      color: #1a1a1a;
-    }
-    a:visited {
-      color: #1a1a1a;
-    }
-    img {
-      max-width: 100%;
-    }
-    svg {
-      height: auto;
-      max-width: 100%;
-    }
-    h1, h2, h3, h4, h5, h6 {
-      margin-top: 1.4em;
-    }
-    h5, h6 {
-      font-size: 1em;
-      font-style: italic;
-    }
-    h6 {
-      font-weight: normal;
-    }
-    ol, ul {
-      padding-left: 1.7em;
-      margin-top: 1em;
-    }
-    li > ol, li > ul {
-      margin-top: 0;
-    }
-    blockquote {
-      margin: 1em 0 1em 1.7em;
-      padding-left: 1em;
-      border-left: 2px solid #e6e6e6;
-      color: #606060;
-    }
-    code {
-      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
-      font-size: 85%;
-      margin: 0;
-      hyphens: manual;
-    }
-    pre {
-      margin: 1em 0;
-      overflow: auto;
-    }
-    pre code {
-      padding: 0;
-      overflow: visible;
-      overflow-wrap: normal;
-    }
-    .sourceCode {
-     background-color: transparent;
-     overflow: visible;
-    }
-    hr {
-      border: none;
-      border-top: 1px solid #1a1a1a;
-      height: 1px;
-      margin: 1em 0;
-    }
-    table {
-      margin: 1em 0;
-      border-collapse: collapse;
-      width: 100%;
-      overflow-x: auto;
-      display: block;
-      font-variant-numeric: lining-nums tabular-nums;
-    }
-    table caption {
-      margin-bottom: 0.75em;
-    }
-    tbody {
-      margin-top: 0.5em;
-      border-top: 1px solid #1a1a1a;
-      border-bottom: 1px solid #1a1a1a;
-    }
-    th {
-      border-top: 1px solid #1a1a1a;
-      padding: 0.25em 0.5em 0.25em 0.5em;
-    }
-    td {
-      padding: 0.125em 0.5em 0.25em 0.5em;
-    }
-    header {
-      margin-bottom: 4em;
-      text-align: center;
-    }
-    #TOC li {
-      list-style: none;
-    }
-    #TOC ul {
-      padding-left: 1.3em;
-    }
-    #TOC > ul {
-      padding-left: 0;
-    }
-    #TOC a:not(:hover) {
-      text-decoration: none;
-    }
-    code{white-space: pre-wrap;}
-    span.smallcaps{font-variant: small-caps;}
-    div.columns{display: flex; gap: min(4vw, 1.5em);}
-    div.column{flex: auto; overflow-x: auto;}
-    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
-    /* The extra [class] is a hack that increases specificity enough to
-       override a similar rule in reveal.js */
-    ul.task-list[class]{list-style: none;}
-    ul.task-list li input[type="checkbox"] {
-      font-size: inherit;
-      width: 0.8em;
-      margin: 0 0.8em 0.2em -1.6em;
-      vertical-align: middle;
-    }
-    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
-  </style>
+html {
+color: #1a1a1a;
+background-color: #fdfdfd;
+}
+body {
+margin: 0 auto;
+max-width: 36em;
+padding-left: 50px;
+padding-right: 50px;
+padding-top: 50px;
+padding-bottom: 50px;
+hyphens: auto;
+overflow-wrap: break-word;
+text-rendering: optimizeLegibility;
+font-kerning: normal;
+}
+@media (max-width: 600px) {
+body {
+font-size: 0.9em;
+padding: 12px;
+}
+h1 {
+font-size: 1.8em;
+}
+}
+@media print {
+html {
+background-color: white;
+}
+body {
+background-color: transparent;
+color: black;
+font-size: 12pt;
+}
+p, h2, h3 {
+orphans: 3;
+widows: 3;
+}
+h2, h3, h4 {
+page-break-after: avoid;
+}
+}
+p {
+margin: 1em 0;
+}
+a {
+color: #1a1a1a;
+}
+a:visited {
+color: #1a1a1a;
+}
+img {
+max-width: 100%;
+}
+svg {
+height: auto;
+max-width: 100%;
+}
+h1, h2, h3, h4, h5, h6 {
+margin-top: 1.4em;
+}
+h5, h6 {
+font-size: 1em;
+font-style: italic;
+}
+h6 {
+font-weight: normal;
+}
+ol, ul {
+padding-left: 1.7em;
+margin-top: 1em;
+}
+li > ol, li > ul {
+margin-top: 0;
+}
+blockquote {
+margin: 1em 0 1em 1.7em;
+padding-left: 1em;
+border-left: 2px solid #e6e6e6;
+color: #606060;
+}
+code {
+font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+font-size: 85%;
+margin: 0;
+hyphens: manual;
+}
+pre {
+margin: 1em 0;
+overflow: auto;
+}
+pre code {
+padding: 0;
+overflow: visible;
+overflow-wrap: normal;
+}
+.sourceCode {
+background-color: transparent;
+overflow: visible;
+}
+hr {
+border: none;
+border-top: 1px solid #1a1a1a;
+height: 1px;
+margin: 1em 0;
+}
+table {
+margin: 1em 0;
+border-collapse: collapse;
+width: 100%;
+overflow-x: auto;
+display: block;
+font-variant-numeric: lining-nums tabular-nums;
+}
+table caption {
+margin-bottom: 0.75em;
+}
+tbody {
+margin-top: 0.5em;
+border-top: 1px solid #1a1a1a;
+border-bottom: 1px solid #1a1a1a;
+}
+th {
+border-top: 1px solid #1a1a1a;
+padding: 0.25em 0.5em 0.25em 0.5em;
+}
+td {
+padding: 0.125em 0.5em 0.25em 0.5em;
+}
+header {
+margin-bottom: 4em;
+text-align: center;
+}
+#TOC li {
+list-style: none;
+}
+#TOC ul {
+padding-left: 1.3em;
+}
+#TOC > ul {
+padding-left: 0;
+}
+#TOC a:not(:hover) {
+text-decoration: none;
+}
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
 </head>
 <body>
 <header id="title-block-header">
@@ -337,14 +336,7 @@ C，并标”需以新拍摄复核”。</li>
 <code>vite preview</code> +
 Playwright」按当前代码重拍一遍（<code>pnpm screenshot:capture</code>），并<strong>造一条任务/一个习惯/一轮专注</strong>让列表、热力图、象限出现真实数据。没有这一步，“当前界面”无法定义。</p>
 </blockquote>
-<p><img src="assets/desktop-empty-20261114.png"
-alt="空数据桌面 8 屏（2026-11-14）" /> <img
-src="assets/mobile-web-20261114.png"
-alt="Web 窄屏 3 屏（2026-11-14）" /> <img
-src="assets/populated-20261108-a.png"
-alt="有数据快照 A（2026-11-08）" /> <img
-src="assets/populated-20261108-b.png"
-alt="有数据快照 B（2026-11-08）" /></p>
+<p><img role="img" aria-label="空数据桌面 8 屏（2026-11-14）" src="assets/desktop-empty-20261114.png" alt="空数据桌面 8 屏（2026-11-14）" /> <img role="img" aria-label="Web 窄屏 3 屏（2026-11-14）" src="assets/mobile-web-20261114.png" alt="Web 窄屏 3 屏（2026-11-14）" /> <img role="img" aria-label="有数据快照 A（2026-11-08）" src="assets/populated-20261108-a.png" alt="有数据快照 A（2026-11-08）" /> <img role="img" aria-label="有数据快照 B（2026-11-08）" src="assets/populated-20261108-b.png" alt="有数据快照 B（2026-11-08）" /></p>
 <hr />
 <h2 id="综合评级卡8-项-apple-原则">2. 综合评级卡（8 项 Apple 原则）</h2>
 <blockquote>
@@ -576,7 +568,7 @@ PingFang 回退，中英混排对齐<strong>待评估</strong>。</td>
 iOS 手感差距最大的一处。 -
 修复：对<strong>可手势打断</strong>的元素（排序项、拖放落位、抽屉、sheet）改用真弹簧（Motion
 的
-<code>animate(el,{y:target},{type:'spring',bounce:0,duration:0.4})</code>
+<code>animate(el,{y:target},{type:&#39;spring&#39;,bounce:0,duration:0.4})</code>
 或自研
 spring），从<strong>当前呈现值</strong>起步并<strong>传入松手速度</strong>；<code>bounce</code>
 仅在有甩动时给 0.2。工作量 <strong>M</strong>。</p>
@@ -622,13 +614,13 @@ token 层</strong>（分支
 现象：日历屏下方那张「这一天没有到期的任务」卡（以及脚注）在平板上贴到屏幕两边，观感就是没有页边距；iPhone
 同样。 - 证据（代码级，能精确到当天）： -
 <code>apps/mobile/src/screens/CalendarScreen.tsx</code> 用
-<code>chrome="board"</code>，其 2026-11-16
+<code>chrome=&quot;board&quot;</code>，其 2026-11-16
 注释原文：「<code>board</code> 档把 <code>Screen</code> 的左右 padding
 归零（内容铺满），于是日历<strong>下面那张「这一天没有到期的任务」卡连页边距都没有</strong>，贴在屏幕两边——真机上就是”根本没留边距”的观感（iPhone
 同样）」；当天用 <code>paddingHorizontal: space.4</code> 给整块板补了
 16dp。 - <code>packages/ui/src/calendar/CalendarBoard.tsx</code>
 2026-11-15 又单独给<strong>脚注</strong>补了 <code>space.4</code>。 -
-<code>packages/ui/src/layout/content-measure.ts</code>：<code>ScreenChrome='board'</code>
+<code>packages/ui/src/layout/content-measure.ts</code>：<code>ScreenChrome=&#39;board&#39;</code>
 时 <code>contentMeasureMaxFor</code> 返回
 <code>undefined</code>（<strong>铺满、无最大宽</strong>），<code>page</code>
 档才会收窄到 <code>CONTENT_MEASURE_MAX=680</code> 居中。 - 依据：Apple
@@ -696,22 +688,13 @@ token”从来不是规范）。</p>
 结果：网格与脚注<strong>一致</strong>落在内容留白之内，桌面 24px、窄屏
 16px；脚注不再贴边/溢出。见下图。 - ⚠️ <strong>原生（iPad/iPhone 桌面
 App）实拍未完成</strong>：本环境无 iOS 模拟器/真机，无法跑
-<code>apps/mobile</code> 的视觉回归；代码层已过 <code>tsc</code>（<span
-class="citation" data-cites="heyta/ui">@heyta/ui</span>、<span
-class="citation" data-cites="heyta/mobile">@heyta/mobile</span> 均 0
+<code>apps/mobile</code> 的视觉回归；代码层已过 <code>tsc</code>（<span class="citation" data-cites="heyta/ui">@heyta/ui</span>、<span class="citation" data-cites="heyta/mobile">@heyta/mobile</span> 均 0
 error）、<code>check:design</code> / <code>check:spacing-scale</code> /
 <code>check:calendar</code> / <code>check:tap-targets</code>
 全绿、<code>vitest run calendar</code> 82
 项通过。原生复拍命令：<code>pnpm --filter @heyta/mobile ios</code> 后在
 390/834/1194 三档实拍核对。</p>
-<p><img src="assets/calendar-web-desktop-20261116.png"
-alt="修复后 · 日历（Web 桌面 1440×900）" /> <img
-src="assets/calendar-web-mobile-20261116.png"
-alt="修复后 · 日历（Web 窄屏 390）" /> <img
-src="assets/after-gutter-desktop-20261116.png"
-alt="根治后 · 分支构建实拍（桌面 1440，gutter 32）" /> <img
-src="assets/after-gutter-mobile-20261116.png"
-alt="根治后 · 分支构建实拍（窄屏 390，gutter 16）" /></p>
+<p><img role="img" aria-label="修复后 · 日历（Web 桌面 1440×900）" src="assets/calendar-web-desktop-20261116.png" alt="修复后 · 日历（Web 桌面 1440×900）" /> <img role="img" aria-label="修复后 · 日历（Web 窄屏 390）" src="assets/calendar-web-mobile-20261116.png" alt="修复后 · 日历（Web 窄屏 390）" /> <img role="img" aria-label="根治后 · 分支构建实拍（桌面 1440，gutter 32）" src="assets/after-gutter-desktop-20261116.png" alt="根治后 · 分支构建实拍（桌面 1440，gutter 32）" /> <img role="img" aria-label="根治后 · 分支构建实拍（窄屏 390，gutter 16）" src="assets/after-gutter-mobile-20261116.png" alt="根治后 · 分支构建实拍（窄屏 390，gutter 16）" /></p>
 <p><strong>P1-1　成长页”这一年”热力图空格几乎不可见</strong> ✅
 已修（<code>279cf997</code>） - 现象：空格约 <code>#f1f5f9</code>
 压在白底上 ≈
@@ -995,10 +978,10 @@ Web）</td>
 </tbody>
 </table>
 <p><strong>两处刻意不做</strong>： - 倒数日空态不加 action —— 它的
-composer 在 <code>view === 'active'</code>
+composer 在 <code>view === &#39;active&#39;</code>
 时常驻在空态上方，下一步本来就在眼前。 - 「我的」未登录卡不缺 CTA ——
 它整块可点（<code>Pressable</code> +
-<code>accessibilityRole="button"</code>），缺的只是”可点”的视觉暗示，已补箭头。</p>
+<code>accessibilityRole=&quot;button&quot;</code>），缺的只是”可点”的视觉暗示，已补箭头。</p>
 <h2 id="b.-本轮后续完成2026-11-16-夜间图登录面同意时机">6b.
 本轮后续完成（2026-11-16 夜间：图、登录面、同意时机）</h2>
 <table>
