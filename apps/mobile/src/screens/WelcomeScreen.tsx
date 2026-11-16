@@ -39,6 +39,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { MessageKey } from '@heyta/i18n';
@@ -63,14 +64,23 @@ function makeStyles(tokens: HeytaNativeTokens) {
      * 背景层：整屏铺满，`cover` 裁切。
      * ⚠️ 它是**氛围**不是内容 —— `pointerEvents="none"` + 无障碍隐藏。
      */
-    bgLayer: { ...StyleSheet.absoluteFillObject },
-    /**
-     * 底部渐隐：**六级平滑上升**（0 → 0.72），不是原来那三级大跳（0.05/0.12/0.45）。
-     * 🔴 三级大跳在屏幕上看得见**两条横带**，那正是"上下割裂"的来源：
-     * 相邻两级的差值越大，交界处越像一条线。六级、每级 ≤0.15，眼睛读成渐变。
+    /*
+     * 🔴 2026-11-16（iPad 真机实测）：原来只写 `...StyleSheet.absoluteFillObject`，
+     * 在 Fabric 上 `<Image>` 会按**原图像素尺寸**布局（这几张背景图是 506×900 的手机竖版图），
+     * 于是 iPad 上只画出左上角一块 ≈506pt 宽、右侧与下方全露底色（真机截图可见）。
+     * 显式给 `width/height: '100%'` 才能让 `cover` 真正铺满父层。父层（root）已是 flex:1 整屏，
+     * 逐层 100% 就能到边。
      */
-    fade: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end' },
-    fadeStep: { height: '8%' },
+    bgLayer: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+    /**
+     * 底部渐隐区。
+     * 🔴 2026-11-16（iPad 真机实测）：这里原来是 **6 条纯色横带叠出的"假渐变"**
+     * （每条 `height:'8%'`、不同 opacity），真机上肉眼就是一条条横棱 + 发灰
+     * （因为最高只有 0.55，永远盖不到底色）。渐变不能用叠色条做。
+     * 现在这段区域只圈定位置，真正的过渡交给下面 SVG 的 `LinearGradient`
+     * （`react-native-svg` 已是本仓依赖，不新增第三方库）。
+     */
+    fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '58%' },
     /** 功能标题 + 圆点：跟着当前那张图走，位置在下方三分之一，眼睛从图滑到按钮的路上。 */
     caption: {
       position: 'absolute',
@@ -266,14 +276,22 @@ export function WelcomeScreen({
         ))}
       </Animated.View>
 
-      {/* 底部渐隐：六级平滑（理由与"横带"的关系写在 `styles.fade` 上）。 */}
+      {/*
+        底部渐隐：**一条真正的 SVG 线性渐变**（透明 → 底色），不是叠色条。
+        真机上看不出任何横棱，最底部到实底色，标题与按钮落在干净底色上。
+      */}
       <View style={styles.fade} pointerEvents="none">
-        {[0, 0.04, 0.1, 0.2, 0.36, 0.55].map((opacity) => (
-          <View
-            key={opacity}
-            style={[styles.fadeStep, { backgroundColor: tokens['color.background'], opacity }]}
-          />
-        ))}
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="welcomeBottomFade" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={tokens['color.background']} stopOpacity={0} />
+              <Stop offset="0.45" stopColor={tokens['color.background']} stopOpacity={0.28} />
+              <Stop offset="0.8" stopColor={tokens['color.background']} stopOpacity={0.78} />
+              <Stop offset="1" stopColor={tokens['color.background']} stopOpacity={1} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#welcomeBottomFade)" />
+        </Svg>
       </View>
 
       {/* 功能标题 + 圆点：**跟着当前这张图**。 */}
