@@ -98,6 +98,12 @@ describe('失败要看得见', () => {
   });
 
   it('状态句带读屏播报', () => {
-    expect(code).toMatch(/accessibilityLiveRegion=/);
+    // 状态句由共享 `AuthForm` 渲染（本屏 `status={formStatus()}` 传进去），
+    // `accessibilityLiveRegion` 落在那一层 —— 不再要求本屏自己再写一遍。
+    expect(code).toMatch(/status=\{formStatus\(\)\}/);
+    const authForm = readFileSync(join(SRC, '../../../packages/ui/src/auth/AuthForm.tsx'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|\s)\/\/[^\n]*/g, '$1');
+    expect(authForm).toMatch(/accessibilityLiveRegion=/);
   });
 });
