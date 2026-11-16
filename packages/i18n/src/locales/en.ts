@@ -2753,11 +2753,11 @@ export const en = {
   // ── Web · capture composer ────────────────────────────────
   // ✅ The embedded `formatRemainingUntil()` Chinese is gone: the remaining
   // days are now spoken by the shell in the current language (`web.due.*`).
-  'web.capture.placeholder': 'Add a task, press Enter to confirm (you can write "tomorrow", "next Wednesday")',
+  'web.capture.placeholder': 'Add a task (you can write "tomorrow", "next Wednesday")',
   // The destination belongs in the placeholder: with a list open, "Add a task"
   // only says half of it — the task lands in Inbox and vanishes from the list.
-  'web.capture.placeholderTo': 'Add a task to "{list}", press Enter to confirm (you can write "tomorrow", "next Wednesday")',
-  'web.capture.placeholderToDay': 'Add to {day}, press Enter to confirm (a written "tomorrow" wins)',
+  'web.capture.placeholderTo': 'Add a task to "{list}" (you can write "tomorrow", "next Wednesday")',
+  'web.capture.placeholderToDay': 'Add to {day} (a written "tomorrow" wins)',
   'web.calendar.capture.add': 'Add to the selected day',
   'web.calendar.capture.close': 'Dismiss the input',
   'web.capture.addLabel': 'New task title',

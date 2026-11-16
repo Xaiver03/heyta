@@ -333,6 +333,12 @@ export function TaskList<TMeta = undefined>({
           ...(listCard
             ? {
                 backgroundColor: tokens['color.surface'],
+                /*
+                  2026-11-16：卡片补一条细线。屏幕底改白之后，白卡在白底上
+                  没有边界（真机：整块卡与页面糊成一片，只剩组头一行字）。
+                */
+                borderWidth: tokens['border-width.thin'],
+                borderColor: tokens['color.border'],
                 borderRadius: tokens['radius.lg'],
                 overflow: 'hidden' as const,
                 paddingHorizontal: tokens['space.2'],

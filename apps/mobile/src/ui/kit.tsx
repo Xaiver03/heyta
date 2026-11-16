@@ -525,7 +525,13 @@ export function Screen({
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: t['color.background'] }}>
+    /*
+      🔴 2026-11-16：屏幕底改**白**，与 Web 的 `.ht-main` 同一条口径。
+      此前是 `color.background`（slate-50）—— 页面灰、卡片白，两者只差 7/255：
+      既读不成分区，又被看成"蒙了一层灰"（产品负责人原话：「默认下面好像有一层
+      灰色的底层遮罩」）。改白之后承载交给卡片自己那圈细线。
+    */
+    <View style={{ flex: 1, backgroundColor: t['color.surface'] }}>
       {collapses ? (
         <Animated.View
           style={{
