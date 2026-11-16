@@ -956,11 +956,23 @@ try {
 }
 
 // ── 再查组件源码（规则 1 或旧的中文规则）─────────────────────
+/**
+ * dev-only 目录：不属于「已迁移应用」的用户可见界面，**不会进生产构建**，
+ * 由各文件头自证：
+ *   · apps/landing/src/lab/MotionLab.tsx：dev-only 动效实验室 —— 不在站点注册表、
+ *     `gen:entries` 不生成入口、生产构建 input 不含它、sitemap 没有它；
+ *     且 lab 里那些英语参数（`stiffness: 260` 等）是**被研究对象本身**，
+ *     换成 token 等于把被测物掉包，本来就不该 i18n。
+ *   · apps/web/src/dev/universal-slice.tsx：「这不是产品界面」，`?slice=1` 的 M1 验证挂载点。
+ * 所以整个目录不进 ui-language 视野（不是漏迁移）。
+ */
+const DEV_ONLY_DIRS = ['apps/landing/src/lab', 'apps/web/src/dev'];
 for (const { dir: relRoot, migrated, migratedFiles } of ROOTS) {
   const staged = new Set((migratedFiles ?? []).map((p) => resolve(ROOT, p)));
   for (const file of walk(join(ROOT, relRoot))) {
     scanned += 1;
     const rel = relative(ROOT, file);
+    if (DEV_ONLY_DIRS.some((d) => rel === d || rel.startsWith(`${d}/`))) continue;
     const src = readFileSync(file, 'utf8');
     const lines = src.split('\n');
     /** 这个文件按哪种契约检查：整根已迁移，或它自己在逐文件清单里。 */
