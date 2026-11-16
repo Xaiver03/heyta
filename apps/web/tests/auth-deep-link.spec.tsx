@@ -193,31 +193,31 @@ describe('🔴 带 `?signin` 冷启动 = 登录界面直接出现', () => {
    * 打开的，渲染期读到的是 `false`。所以分流用的是那个 effect 自己用的谓词
    * `shouldAskOnFirstLaunch()` —— 这条用例就是它的回归钉。
    */
-  it('隐私决定还没做过：先只看到隐私那一层，答完才出现登录表单', async () => {
+  it('隐私决定还没做过：深链直接兑现，不先拦一层隐私墙（ADR-0086）', async () => {
     // 撤销 beforeEach 里替用户做过的那次决定（走生产代码，不手写 localStorage）。
     privacyConsentActions.revoke();
     const view = await mountApp('/app?signin=1');
 
-    // 第一屏：只有隐私那一层。
-    expect(usePrivacyStore.getState().open).toBe(true);
-    expect(view.querySelector('[data-testid="privacy-consent-dialog"]')).not.toBeNull();
-    expect(useSyncStore.getState().signInOpen).toBe(false);
-    expect(signInFormVisible(view)).toBe(false);
+    /*
+      🔴 2026-11-16（ADR-0086）：判据从"先只看到隐私那一层"改成"直接看到登录表单"。
 
-    // 用户**点**「同意并联网」之后，深链的意图才兑现 —— 而不是永远不兑现。
-    // ⚠️ 走真实点击而不是直接调 `privacyConsentActions.accept()`：那条只是决定，
-    // 收起那一层的是 store 的 `accept()`（按钮挂的是它）。直接调决定会让
-    // `open` 永远为真，用例红在**测试自己的夹具**上而不是产品上。
-    const acceptButton = view.querySelector<HTMLButtonElement>(
-      '[data-testid="privacy-consent-accept"]',
-    );
-    expect(acceptButton, '隐私那一层必须有可点的「同意」').not.toBeNull();
-    await act(async () => {
-      acceptButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
+      冷启动不再主动弹隐私面板，所以深链的意图立刻兑现。同意仍然会在**那时**被问到：
+      `AuthPanel` 的提交动作开头有 `requireNetworkConsent()`，返回 false 时面板
+      替调用方打开 —— 用户不会因为"没先问过"而发不出去请求，只是问的时机变了。
+    */
     expect(usePrivacyStore.getState().open).toBe(false);
+    expect(view.querySelector('[data-testid="privacy-consent-dialog"]')).toBeNull();
     expect(useSyncStore.getState().signInOpen).toBe(true);
     expect(signInFormVisible(view)).toBe(true);
+
+    // 而从这一刻起，面板仍然可以由"要出门的动作"打开（不是被删掉了）。
+    act(() => {
+      usePrivacyStore.getState().openSheet('required-for-action');
+    });
+    expect(usePrivacyStore.getState().open).toBe(true);
+    expect(
+      view.querySelector('[data-testid="privacy-consent-dialog"]'),
+      '要出门时打不开面板 —— 用户就没有走出去的路',
+    ).not.toBeNull();
   });
 });

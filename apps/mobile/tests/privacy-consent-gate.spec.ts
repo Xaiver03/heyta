@@ -352,13 +352,21 @@ describe('决定变更要通知订阅者（自动同步与实时通道靠它）'
 });
 
 describe('startPrivacyGate()：装配顺序与首启弹面板（G-11）', () => {
-  it('🔴 没决定过 ⇒ 装上 fetch 闸**并**弹出面板，原因写的是「首次启动」', () => {
+  it('🔴 没决定过 ⇒ 装上 fetch 闸，但**不弹面板**（ADR-0086）', () => {
     startup.startPrivacyGate();
 
     expect(globalThis.fetch, '闸没装到进程级出口上：裸 fetch 能绕过去').toBe(gate.consentFetch);
-    const sheet = ui.privacySheetState();
-    expect(sheet.open, '从没问过的设备没被问 —— G-11 那条缺口原样留着').toBe(true);
-    expect(sheet.reason).toBe('first-launch');
+    /*
+      🔴 2026-11-16（ADR-0086）：断言从"弹了"改成"没弹"。
+
+      G-11 要的是"处理前必须征求过同意"，而不是"冷启动必须弹一次"。
+      冷启动一个请求都不发（下面那条 `egressCount() === 0` 继续钉这件事），
+      所以把面板留到**第一次真要出门**时问，既满足条款也少一道墙。
+
+      门仍然在、也仍然能打开 —— 由 `AuthScreen` 的六个动作各自的
+      `requireNetworkConsent()` 承接（`tests/auth-consent-gate.spec.ts` 钉那一侧）。
+    */
+    expect(ui.privacySheetState().open, '冷启动又弹了 —— 用户第一眼看到的会是权限墙').toBe(false);
   });
 
   it('🔴 明确选过「只用本机」⇒ 不再弹，但闸照样要装', () => {
@@ -380,14 +388,19 @@ describe('startPrivacyGate()：装配顺序与首启弹面板（G-11）', () => 
     expect(ui.privacySheetState().open).toBe(false);
   });
 
-  it('撤回之后下一次冷启动会重新问（撤回的定义就是"回到没问过"）', () => {
+  it('撤回之后，闸门立刻关回去（面板由下一次"要出门"再打开）', () => {
     gate.privacyConsentActions.accept();
     gate.privacyConsentActions.revoke();
 
     startup.startPrivacyGate();
 
-    expect(ui.privacySheetState().open).toBe(true);
+    // ADR-0086：冷启动不弹；但撤回的实质后果 —— 门关上 —— 必须立刻成立。
+    expect(ui.privacySheetState().open).toBe(false);
     expect(egressCount(), '撤回之后这一轮还发得出请求').toBe(0);
+
+    // 而"再给一次选择的机会"（PIPL 第 15 条）仍然可达：要出门的动作能把它打开。
+    ui.openPrivacySheet('required-for-action');
+    expect(ui.privacySheetState().open).toBe(true);
   });
 
   it('装好之后，同意之前任何请求都出不去（这一条把上面两段串成一句话）', async () => {

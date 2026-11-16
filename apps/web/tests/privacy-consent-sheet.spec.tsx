@@ -425,19 +425,49 @@ describe('决定没能落盘（隐私模式 / 配额满）', () => {
   });
 });
 
-describe('🔴 接到 App 上：首启真的会弹（G-11 的判据只能在整棵树上成立）', () => {
+describe('🔴 接到 App 上：G-11 的判据只能在整棵树上成立', () => {
   beforeEach(async () => {
     __resetOpLogForTests();
     await initOpLog(`consent-sheet-${Math.random().toString(36).slice(2)}`);
   });
 
-  it('全新设备（什么都没决定过）挂载后，面板就在', async () => {
+  /**
+   * 🔴 2026-11-16（ADR-0086）：判据**反过来了**。
+   *
+   * 原来钉的是"全新设备挂载后，面板就在"。ADR-0086 把同意从"首启的墙"改成
+   * "网络守卫"：冷启动不弹，用户先看到产品；同意在**第一次真要出门**时才问
+   * （登录 / 注册的六个动作各自过 `requireNetworkConsent()`）。
+   *
+   * 所以这条现在钉的是**反面**：全新设备挂载后，面板**不在**。
+   * 这不是放松要求 —— G-11 要的是"处理前必须征求过同意"，而冷启动时
+   * 一个请求都不发（下面那条 0 请求的用例继续钉这件事）。
+   */
+  it('全新设备（什么都没决定过）挂载后，面板**不**弹', async () => {
     const el = await mount(<App />);
     await act(async () => {
       await flush();
     });
 
-    expect(el.querySelector(DIALOG), '首启没有弹隐私面板 —— App 里那条接线是装饰').not.toBeNull();
+    expect(
+      el.querySelector(DIALOG),
+      '冷启动弹出了隐私面板 —— ADR-0086 之后它只该由"要出门的动作"打开',
+    ).toBeNull();
+  });
+
+  it('🔴 要出门的动作会把它打开（面板仍然可达，只是时机变了）', async () => {
+    const el = await mount(<App />);
+    await act(async () => {
+      await flush();
+    });
+
+    act(() => {
+      usePrivacyStore.getState().openSheet('required-for-action');
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    expect(el.querySelector(DIALOG), '要出门时打不开面板 —— 用户就没有走出去的路').not.toBeNull();
     expect(el.querySelector(ACCEPT)).not.toBeNull();
     expect(el.querySelector(LOCAL_ONLY)).not.toBeNull();
   });

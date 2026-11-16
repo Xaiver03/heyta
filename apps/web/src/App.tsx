@@ -141,7 +141,7 @@ import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
 import { PrivacyConsentSheet } from './features/privacy/PrivacyConsentSheet.js';
 import { LegalReconfirmSheet } from './features/legal-recheck/LegalReconfirmSheet.js';
-import { shouldAskOnFirstLaunch, usePrivacyStore } from './features/privacy/store.js';
+import { usePrivacyStore } from './features/privacy/store.js';
 import { armFirstLaunchConsent } from './features/privacy/first-launch.js';
 import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
 import { useNarrowLayout } from './features/shell/useNarrowLayout.js';
@@ -927,7 +927,16 @@ export function App(): React.JSX.Element {
    */
   useEffect(() => {
     if (!wantsSignInOnLoad()) return;
-    if (!shouldAskOnFirstLaunch()) {
+    /*
+      🔴 2026-11-16（ADR-0086）：判定从"首启该不该问"改成"面板**此刻**开没开"。
+
+      冷启动不再打开隐私面板，所以原来那条 `shouldAskOnFirstLaunch()` 分支会
+      **永远为真**、然后订阅一个再也不会发生的"落下"事件 —— 深链的登录面板就永远不开。
+
+      现在读的是 `getState()` 的当前值（不是渲染期快照，那正是原注释担心的时序问题）：
+      面板真开着（例如用户刚在设置里点了隐私）才等它落下，否则立刻兑现意图。
+    */
+    if (!usePrivacyStore.getState().open) {
       useSyncStore.getState().openSignIn();
       return;
     }

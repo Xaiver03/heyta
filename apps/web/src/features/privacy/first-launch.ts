@@ -20,8 +20,20 @@
  * ⚠️ 幂等：`StrictMode` 下 effect 会跑两遍，`openSheet` 只是把同一个 `open: true`
  * 写进去，不会叠两层浮层。
  */
-import { shouldAskOnFirstLaunch, usePrivacyStore } from './store.js';
 
+/**
+ * 🔴 2026-11-16（ADR-0086）：同名但**不再主动弹**。
+ *
+ * 原名 `armFirstLaunchConsent`，作用是"首启时把面板拉起来"。现在冷启动什么都不做 ——
+ * 锚点改成"第一次真正要出门的那一刻"：
+ *   · 登录 / 注册：`requireNetworkConsent()` 在各动作开头承接；
+ *   · 其它出门的路：`createConsentGatedFetch` 抛 `PrivacyConsentBlockedError，
+ *     宿主接成"打开面板"。
+ *
+ * 函数保留是因为两个启动路径（`App()` 与 `/admin` 的独立启动，ADR-0078）都在调它，
+ * 而"调用了但什么都不做"比"删掉之后某个路径忘了改"更容易核对 —— 它现在是一个
+ * **显式的空实现**，注释说明为什么。
+ */
 export function armFirstLaunchConsent(): void {
-  if (shouldAskOnFirstLaunch()) usePrivacyStore.getState().openSheet('first-launch');
+  // 故意为空：见上面的 ADR-0086 说明。判据是"冷启动不出现同意面板"。
 }

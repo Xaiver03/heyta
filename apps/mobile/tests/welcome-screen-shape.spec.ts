@@ -79,9 +79,19 @@ describe('背景就是一张连续的图（第 4 轮的否决）', () => {
   });
 
   it('🔴 底部渐隐**从 0 起**（第一级不是 0.06 之类），避免出现横带', () => {
-    const fade = /\[\s*([0-9.,\s]+)\]\s*\.map\(\(opacity\)/.exec(code);
-    expect(fade, '找不到渐隐层').not.toBeNull();
-    const first = Number(fade![1].split(',')[0]);
+    /*
+      ⚠️ 2026-11-16：正则跟着实现换过一次。
+
+      渐隐早已从"一组透明度数组"换成**一条 SVG `LinearGradient`**（换成三格漫画那轮，
+      为了让底部过渡不带任何横棱）。而这条用例还在找旧的 `[...].map((opacity)`，
+      于是它一直在红 —— 是测试过期，不是产品坏了。
+
+      现在钉的是同一个意图：**第一级 `stopOpacity` 必须是 0**，
+      否则最底下会出现一道可见的横带。
+    */
+    const gradient = /<LinearGradient id="welcomeBottomFade"[\s\S]{0,500}?stopOpacity=\{([0-9.]+)\}/.exec(code);
+    expect(gradient, '找不到渐隐层（welcomeBottomFade 的第一级 stopOpacity）').not.toBeNull();
+    const first = Number(gradient![1]);
     expect(first, `渐隐第一级是 ${String(first)}，应当从 0 开始`).toBe(0);
   });
 });

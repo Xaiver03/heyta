@@ -267,14 +267,35 @@ describe('CaptureComposer —— 识别结果必须可见（2026-11-04 起有两
     expect(chipValue(cs[0]!)).toContain('高优先级');
   });
 
-  it('🔴 输入行只有三件：输入框 / 日期胶囊 / 添加', () => {
+  it('🔴 输入区收成「一个外框 + 上下两层」：输入在上，胶囊与主操作在下', () => {
+    /*
+      🔴 2026-11-16：这一条跟着**结构变更**改写（原判据是"输入行的直接子元素恰好 3 个"）。
+
+      那时输入框、日期胶囊、添加按钮是**并排一行**。产品口径（参照 DSH 的 composer）
+      要求收成一个外框内的上下两层：上层输入、下层工具行（胶囊在左、圆形主操作在右）。
+      于是"直接子元素 3 个"这个数就不再表达原意了 —— 现在输入框的外框里是两个孩子
+      （输入框 + 工具行），而三件控件仍然都在、且仍在同一个容器里。
+
+      原句要防的东西**照旧**：不再"铺开成第四个控件"。所以判据改成：
+      三件都在 + 输入框与工具行同属一个外框 + 工具行恰好两件。
+    */
     const el = render();
     for (const id of ['capture-input', 'capture-due-capsule', 'capture-submit']) {
       expect(el.querySelector(`[data-testid="${id}"]`), id).not.toBeNull();
     }
-    // 第四件就是"铺开式控件"复发 —— 产品负责人为这句话删过整个行内动作排。
-    const compose = el.querySelector('[data-testid="capture-input"]')!.parentElement!;
-    expect(compose.children).toHaveLength(3);
+
+    const input = el.querySelector('[data-testid="capture-input"]')!;
+    const frame = input.parentElement!;
+    const toolRow = frame.lastElementChild!;
+    expect(frame.children.length, '外框里应当只有"输入"与"工具行"两层').toBe(2);
+    expect(
+      toolRow.contains(el.querySelector('[data-testid="capture-due-capsule"]')),
+      '日期胶囊不在工具行里',
+    ).toBe(true);
+    expect(
+      toolRow.contains(el.querySelector('[data-testid="capture-submit"]')),
+      '主操作不在工具行里',
+    ).toBe(true);
   });
 
   it('🔴 「今天下午八点给张教授发PPT」这一句：框下**一行都不挂**', () => {

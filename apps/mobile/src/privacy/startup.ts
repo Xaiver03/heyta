@@ -31,7 +31,6 @@
  * 合并会让"只用本机"读成"不登录"。
  */
 
-import { openPrivacySheet } from './consent-ui';
 import { installConsentGatedFetch, privacyConsent } from './consent-gate';
 
 /**
@@ -43,5 +42,22 @@ import { installConsentGatedFetch, privacyConsent } from './consent-gate';
  */
 export function startPrivacyGate(): void {
   installConsentGatedFetch();
-  if (privacyConsent.undecided()) openPrivacySheet('first-launch');
+  /*
+    🔴 2026-11-16（ADR-0086）：**冷启动不再主动弹面板。**
+
+    原来这里是 `if (privacyConsent.undecided()) openPrivacySheet('first-launch')`，
+    当时的论证是"欢迎页那个「注册 / 登录」一按就会发请求，所以必须先问"。
+    但那条论证只对了一半：**不点登录时一个请求都不会发**，欢迎页整屏是纯本地的。
+
+    代价在真机上看得见：iPhone 首次启动，一块覆盖整屏的同意面板把三格漫画完全盖住，
+    用户第一眼看到的是权限决策，不是产品。
+
+    现在同意的锚点是"第一次真正要出门"，由两条路各自承接，不需要首启这一层：
+      · **登录 / 注册**：`AuthScreen` 的六个动作开头都有 `requireNetworkConsent()`
+        （返回 false 时面板已经替调用方打开）；
+      · **其它出门的路**：`installConsentGatedFetch()` 会抛 `PrivacyConsentBlockedError`，
+        由各宿主接成"打开面板"而不是"报失败"。
+    纯离线用户（选「只用本机」或从没点过要出门的按钮）**永远不被问** ——
+    PIPL 第 16 条禁止因不同意而拒绝服务，而本地优先让那条路是同一个完整产品（ADR-0003）。
+  */
 }
