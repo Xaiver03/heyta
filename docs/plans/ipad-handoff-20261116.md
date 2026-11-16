@@ -154,3 +154,11 @@ pnpm check:type-roles && pnpm check:spacing-scale && pnpm check:tap-targets \
 4. **最后**：指针悬停、键盘快捷键
 
 第 1 步现在就能干，第 2 步之后再来问我要日历的最新契约。
+
+---
+
+## 七、交付进度（2026-11-16）
+
+- **§六 ① 版面骨架 —— 已落地**。形态档（`compact`/`regular`/`expanded`）驱动尺寸档；`Screen` 的 board 档用响应式 gutter（手机 16 / 平板 24）；内容列按 `CONTENT_MEASURE_MAX` 收窄居中且顶栏标题与内容列对齐；按钮宽度「主操作 `tone=primary` 撑满、其余按内容宽」；任务行底色跟随所在白卡（去掉白卡内的灰行）。**分栏（列表 + 详情并排）已做**：`BottomSheet` 增 `presentation='pinned'`（非模态常驻右栏），`TasksScreen` 用 `onLayout` 宽度 + `formFactorOf`，`expanded` 排「左列表 + 右详情栏」、点左侧任务右栏内切换，`compact`/`regular` 仍走底部面板。任务 / 日历 / 专注 / 统计 / 我的五屏在 iPad 上逐屏截图看过，版面正常。
+- **§六 ② 日历手势 —— 输入层已在前序提交**（象限维度 `7f5b7fa2`、捏合缩放 `bf10e7e9` / `b1a4bad5`）。iPad 上横向滑动切周期实测可用（2026 年 11 月 → 12 月）。
+- **§六 ③ 指针悬停 / 键盘快捷键 —— 未做**。iOS 原生端没有标准 hover / hardware-keydown 的 JS API（悬停需 UIPointerInteraction、键盘需 GCKeyboard，属原生模块工程），且当前环境无指针 / 硬件键盘可验，留作独立原生项。
