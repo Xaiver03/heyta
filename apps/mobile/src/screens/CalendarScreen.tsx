@@ -691,12 +691,11 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         style={{
           flex: 1,
           /*
-           * 🔴 2026-11-16：`board` 档把 `Screen` 的左右 padding 归零（内容铺满），
-           * 于是日历**下面那张「这一天没有到期的任务」卡连页边距都没有**，
-           * 贴在屏幕两边——真机上就是"根本没留边距"的观感（iPhone 同样）。铺满应该只针对
-           * 真正的全幅视觉（网格），内容卡必须有页边距。这里给整块板补一条 `space.4` 轴线。
+           * 2026-11-16：页边距**改由外壳统一给**——`Screen` 的 `board` 档现在是
+           * 响应式 gutter（手机 16 / 平板及更宽 24，见 `ui/kit.tsx` 的 `boardGutter`）。
+           * 这里不再自己补 `space.4`，否则与外壳 gutter 叠加成双倍留白。
+           * 网格仍在 gutter 之内铺满，内容卡（当日清单/脚注）自然继承同一条轴线。
            */
-          paddingHorizontal: tokens['space.4'],
           opacity: viewAnim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
           transform: [
             {
