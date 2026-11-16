@@ -1,7 +1,7 @@
 # heyta 统一中央认证实施计划
 
 > 状态：**进行中**（2026-10-20）
-> 决策：[ADR-0066](../adr/0066-official-central-identity-and-self-hosted-auth.md)。
+> 决策：[ADR-0066](../../adr/0066-official-central-identity-and-self-hosted-auth.md)。
 
 ## 范围与基线
 
@@ -94,8 +94,8 @@ Android、HarmonyOS 的当前安装产物也尚未验收，故 P5.4 仍进行中
 “使用统一身份登录”存在、“登录密码”不存在；点“使用自建服务端”后服务器地址为空且
 旧口令字段出现。未勾条款点击会由移动端拦住；未触发生产 `device/start`，不把它
 当成生产端到端登录证明。浅色与深色截图已人工目视检查：
-[浅色](../../apps/mobile/evidence/unified-auth-20261020/ios-light.png) ·
-[深色](../../apps/mobile/evidence/unified-auth-20261020/ios-dark.png)。
+[浅色](../../../apps/mobile/evidence/unified-auth-20261020/ios-light.png) ·
+[深色](../../../apps/mobile/evidence/unified-auth-20261020/ios-dark.png)。
 全仓 `pnpm -r test` rc=0（移动端 987/987、共享 app-host 1855/1855、Node CLI
 200/200、服务端 2899/2899，另有既有跳过项），`pnpm check:docs`、分层和界面文案
 门禁 rc=0；相关类型与构建 rc=0。共享设备通道补上拒绝明文/带凭据 URL 的反例，

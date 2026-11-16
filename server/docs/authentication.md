@@ -2,7 +2,7 @@
 
 当前认证按部署模式选择：官方必须使用中央OIDC；自托管默认local，保留邮件口令、
 验证码、passkey和magic-link。下文英文端点表说明local模式；中央模式的HTTP与生命周期
-边界见文末。执行事实以代码和[统一认证计划](../../docs/plans/unified-central-auth.md)为准。
+边界见文末。执行事实以代码和[统一认证计划](../../docs/plans/archive/unified-central-auth.md)为准。
 
 The executable authorities are [`api.ts`](../src/api.ts) for routes and rate
 limits, [`auth.ts`](../src/auth.ts) for email tokens and JWT verification, and
@@ -177,4 +177,4 @@ worker在成功监听后启动；stop等完HTTP、WS在途校验及worker后断D
 
 服务端已完成接线，但Web特色UI/共享transport、原生handoff、旧账号HTTP双证明绑定和
 生产切换仍待后续。自托管OIDC没有可验证运营者条款版本时不自动建新账号，已有映射
-可以登录；local自托管不受影响。状态和验收只记录于[统一认证计划](../../docs/plans/unified-central-auth.md)。
+可以登录；local自托管不受影响。状态和验收只记录于[统一认证计划](../../docs/plans/archive/unified-central-auth.md)。

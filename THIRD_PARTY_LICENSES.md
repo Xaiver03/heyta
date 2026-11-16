@@ -304,4 +304,4 @@ python3 research/tools/ghinfo.py owner/repo   # 最后提交/发版时间（可�
 jose 6.2.12（MIT，Copyright 2018 Filip Skokan）与 oauth4webapi 3.8.8（MIT，Copyright 2022 Filip Skokan）。
 三包发布归档均含 LICENSE.md，npm registry time 均为 2026-09-05，满足维护性门槛。
 用途是标准 OAuth/OIDC 验证，不引入或复制 AGPL 内部封装及其测试源码。
-准入与实际安装树对账见[统一认证计划](docs/plans/unified-central-auth.md)。
+准入与实际安装树对账见[统一认证计划](docs/plans/archive/unified-central-auth.md)。

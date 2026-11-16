@@ -46,14 +46,7 @@
     "gen:server-design": "node scripts/gen-server-design.mjs",
     "gen:server-legal": "node scripts/gen-server-legal.mjs",
     "verify:oidc-runtime": "ts-node scripts/verify-oidc-runtime.ts",
-    "verify:oidc-runtime:built": "node dist/scripts/verify-oidc-runtime.js",
-    "test:integration:central-auth": "vitest run --config vitest.integration.config.ts tests/integration/central-auth-persistence.integration.spec.ts",
-    "test:integration:central-auth:review": "vitest run --config vitest.integration.config.ts tests/integration/central-auth-independent.integration.spec.ts",
-    "test:integration:central-device": "vitest run --config vitest.integration.config.ts tests/integration/central-device-handoff.integration.spec.ts",
-    "test:integration:central-oidc": "node scripts/verify-central-oidc.mjs tests/integration/central-auth-oidc.integration.spec.ts",
-    "test:integration:central-oidc:http": "node scripts/verify-central-oidc.mjs --central",
-    "test:integration:central-coordinator": "node scripts/verify-central-oidc.mjs tests/integration/central-auth-coordinator.integration.spec.ts",
-    "test:integration:central-http-ws": "node scripts/verify-central-oidc.mjs tests/integration/central-auth-http-ws.integration.spec.ts"
+    "verify:oidc-runtime:built": "node dist/scripts/verify-oidc-runtime.js"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",

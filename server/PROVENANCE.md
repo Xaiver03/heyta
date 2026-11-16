@@ -137,7 +137,7 @@ git -C /tmp/sp log --oneline aa9690ca..HEAD -- packages/super-sync-server/
 新增 central-auth/config.ts 与 oidc-runtime.ts，config.ts 解析严格运维模式，server.ts 在
 任何服务初始化之前拒绝尚未接线的 OIDC 模式；local 自托管保持原行为。
 标准 MIT openid-client 独立适配，无 AGPL 源码移植。此包不改变 JWT、数据库与同步协议。
-设计与验收见[唯一计划](../docs/plans/unified-central-auth.md)。
+设计与验收见[唯一计划](../docs/plans/archive/unified-central-auth.md)。
 
 ## 中央身份持久层（2026-10-19）
 
@@ -158,7 +158,7 @@ P5.1 独立复审修复：授权派发等待本地证明行锁后重读数据库
 回执未知不重派、不盲撤。repository仅增加发起时间及grant subject返回投影。
 新增独立HTTPS/真实PG测试与临时CA runner；外部中央联调只调用其导出启动接口，
 没有将AGPL中央实现或测试复制进本仓。OIDC启动门禁、JWT/UI/WS均未变。
-设计、复现入口和当前验收状态见[唯一计划](../docs/plans/unified-central-auth.md)。
+设计、复现入口和当前验收状态见[唯一计划](../docs/plans/archive/unified-central-auth.md)。
 
 
 ## 中央事务协调底座（2026-10-19）
@@ -171,7 +171,7 @@ live在中央网络前后复核持久绑定；退出、销户墓碑与outbox原�
 不销户。worker固定issuer/client，租约确认和未确认过期可观测。没有接HTTP/WS/runtime，
 OIDC启动门禁保持。真实PG+TLS与原持久层测试使用实际唯一JWT铸造，旧sessionHash冲突
 夹具改为真实签发后失败注入来验证同一事务回滚。均为MIT独立实现，无新增依赖或迁移，
-验收与后续边界见[唯一计划](../docs/plans/unified-central-auth.md)。
+验收与后续边界见[唯一计划](../docs/plans/archive/unified-central-auth.md)。
 
 P5.2B1独立期限反例修复：授权/刷新应用要求显式传入已验证中央内省的有限AT期限，
 用户锁后、唯一签发后及最终写入后按数据库时钟重核；过期整体回滚并保留RESULT所有权。
@@ -187,4 +187,4 @@ Cookie、CSRF、回调交付和旧身份入口封闭独立实现；官方模式�
 服务生命周期持有唯一runtime并等待WS/worker停止；local自托管保留。
 新增真实TLS+PG+WS测试、扩大真实中央双PG脚本，并增加可信签发边界反例门禁。
 没有新增第三方依赖、数据库迁移、E2EE/op-log或客户端UI改动；没有复制AGPL代码。
-当前验收证据、未完成客户端/部署边界只维护在[唯一计划](../docs/plans/unified-central-auth.md)。
+当前验收证据、未完成客户端/部署边界只维护在[唯一计划](../docs/plans/archive/unified-central-auth.md)。

@@ -3,7 +3,7 @@
 > ⚠️ **已被 [ADR-0087](0087-local-only-auth-removing-central-oidc.md) 取代（2026-11-16）：认证只保留自建邮箱+密码，中央 OIDC 已删除。**
 
 > 状态：**已接受**（2026-10-19）
-> 实施与验收唯一入口：[统一认证计划](../plans/unified-central-auth.md)。
+> 实施与验收唯一入口：[统一认证计划](../plans/archive/unified-central-auth.md)。
 
 ## 背景
 

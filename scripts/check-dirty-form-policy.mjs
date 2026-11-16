@@ -81,14 +81,6 @@ const FIELD_PATTERNS = [/<input\b/, /<textarea\b/, /contentEditable/, /CaptureCo
  */
 const LEDGER = [
   {
-    file: 'apps/web/src/features/auth/AuthPanel.tsx',
-    status: 'verified-exempt',
-    reason: '登录/注册/验证码那几格填的是**凭据**，不是用户 authored 的内容：'
-      + '凭据按设计不落任何持久层，关掉后重打才是正确行为（给它加"放弃修改？"'
-      + '等于把一次重打说成一次损失）。翻案条件：任何一格开始把非凭据的用户输入'
-      + '（如昵称、工作区名）放进同一个关闭出口。',
-  },
-  {
     file: 'apps/web/src/App.tsx',
     status: 'owed',
     reason: '壳文件，里面既有自绘对话框也有输入；要逐格分清"关掉丢不丢 authored 内容"'
