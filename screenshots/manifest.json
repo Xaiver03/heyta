@@ -1,14 +1,222 @@
 {
-  "capturedAt": "2026-11-16T11:31:04.386Z",
-  "targets": 1,
+  "capturedAt": "2026-11-16T14:16:02.602Z",
+  "targets": 27,
   "artifacts": [
     {
-      "path": "screenshots/landing/L07-登录.png",
+      "path": "screenshots/app-store/iphone-6.9/W01-任务.png",
+      "width": 1320,
+      "height": 2868,
+      "contentRatio": 0.08,
+      "colorSpan": 228,
+      "sha256": "1bb84be0bce2df6c05e2698e69e0c9ecc6fff385898ed933885ea017ade77caf"
+    },
+    {
+      "path": "screenshots/app-store/iphone-6.9/W02-四象限.png",
+      "width": 1320,
+      "height": 2868,
+      "contentRatio": 0.0788,
+      "colorSpan": 228,
+      "sha256": "0f3cfad0c75570fde24df05283304c22200fb275cab5df68be029d7e1be642c9"
+    },
+    {
+      "path": "screenshots/app-store/iphone-6.9/W03-习惯.png",
+      "width": 1320,
+      "height": 2868,
+      "contentRatio": 0.0813,
+      "colorSpan": 228,
+      "sha256": "37172d7c27639ce366bcbc9f9f2c26024f8eacf313da61d65ea773c7e4a7252a"
+    },
+    {
+      "path": "screenshots/app-store/iphone-6.9/W04-番茄钟.png",
+      "width": 1320,
+      "height": 2868,
+      "contentRatio": 0.1021,
+      "colorSpan": 228,
+      "sha256": "11ad0e2cfa28dc5d1797944f3aeed6372f938f9fd856d145bb3f8a876c4516f5"
+    },
+    {
+      "path": "screenshots/app-store/iphone-6.9/W05-时间线.png",
+      "width": 1320,
+      "height": 2868,
+      "contentRatio": 0.0761,
+      "colorSpan": 228,
+      "sha256": "45ec976f88005de2c82057ed63fd1eeeb3d0f0f914f2db44b019f8c2f63ee4eb"
+    },
+    {
+      "path": "screenshots/app-store/iphone-6.9/W06-成长.png",
+      "width": 1320,
+      "height": 2868,
+      "contentRatio": 0.1617,
+      "colorSpan": 228,
+      "sha256": "e6fed745961841060b3ee1d706e44e71e9d6a8f220c1e05c9d0622edf291dc4c"
+    },
+    {
+      "path": "screenshots/app-store/iphone-6.9/MW01-移动端任务.png",
+      "width": 1320,
+      "height": 2868,
+      "contentRatio": 0.08,
+      "colorSpan": 228,
+      "sha256": "1bb84be0bce2df6c05e2698e69e0c9ecc6fff385898ed933885ea017ade77caf"
+    },
+    {
+      "path": "screenshots/app-store/iphone-6.9/MW02-移动端四象限.png",
+      "width": 1320,
+      "height": 2868,
+      "contentRatio": 0.0788,
+      "colorSpan": 228,
+      "sha256": "0f3cfad0c75570fde24df05283304c22200fb275cab5df68be029d7e1be642c9"
+    },
+    {
+      "path": "screenshots/app-store/iphone-6.9/MW03-移动端习惯.png",
+      "width": 1320,
+      "height": 2868,
+      "contentRatio": 0.0813,
+      "colorSpan": 228,
+      "sha256": "37172d7c27639ce366bcbc9f9f2c26024f8eacf313da61d65ea773c7e4a7252a"
+    },
+    {
+      "path": "screenshots/app-store/ipad-13/W01-任务.png",
+      "width": 2064,
+      "height": 2752,
+      "contentRatio": 0.0786,
+      "colorSpan": 228,
+      "sha256": "acbfcdf5690180cb7bb5ef6204c4ba56c34c79df41d4bf176f312972a5f58558"
+    },
+    {
+      "path": "screenshots/app-store/ipad-13/W02-四象限.png",
+      "width": 2064,
+      "height": 2752,
+      "contentRatio": 0.0707,
+      "colorSpan": 228,
+      "sha256": "9e3e0298fcd28d4f641228e5cfc81dc5a1b8bc797e2679ab003ba157a4d15692"
+    },
+    {
+      "path": "screenshots/app-store/ipad-13/W03-习惯.png",
+      "width": 2064,
+      "height": 2752,
+      "contentRatio": 0.0677,
+      "colorSpan": 228,
+      "sha256": "832cb905ad962dec5e3ef71b2d4e5fc5cb90a4a1fa7983e35bcb3228e900aaa0"
+    },
+    {
+      "path": "screenshots/app-store/ipad-13/W04-番茄钟.png",
+      "width": 2064,
+      "height": 2752,
+      "contentRatio": 0.0774,
+      "colorSpan": 228,
+      "sha256": "9f3818f96ae073b40941fccd56099d45eabee35d50296626dd9e5b78badd9840"
+    },
+    {
+      "path": "screenshots/app-store/ipad-13/W05-时间线.png",
+      "width": 2064,
+      "height": 2752,
+      "contentRatio": 0.0661,
+      "colorSpan": 228,
+      "sha256": "fa0967f6068c1643eeaae129c28795147663bcb328c78ae1b6d54fb049b50789"
+    },
+    {
+      "path": "screenshots/app-store/ipad-13/W06-成长.png",
+      "width": 2064,
+      "height": 2752,
+      "contentRatio": 0.1422,
+      "colorSpan": 228,
+      "sha256": "d0806606818a50132171816963afdcb4daba46c410d8868fbbf1907922ad717e"
+    },
+    {
+      "path": "screenshots/app-store/ipad-13/MW01-移动端任务.png",
+      "width": 2064,
+      "height": 2752,
+      "contentRatio": 0.0786,
+      "colorSpan": 228,
+      "sha256": "acbfcdf5690180cb7bb5ef6204c4ba56c34c79df41d4bf176f312972a5f58558"
+    },
+    {
+      "path": "screenshots/app-store/ipad-13/MW02-移动端四象限.png",
+      "width": 2064,
+      "height": 2752,
+      "contentRatio": 0.0707,
+      "colorSpan": 228,
+      "sha256": "9e3e0298fcd28d4f641228e5cfc81dc5a1b8bc797e2679ab003ba157a4d15692"
+    },
+    {
+      "path": "screenshots/app-store/ipad-13/MW03-移动端习惯.png",
+      "width": 2064,
+      "height": 2752,
+      "contentRatio": 0.0677,
+      "colorSpan": 228,
+      "sha256": "832cb905ad962dec5e3ef71b2d4e5fc5cb90a4a1fa7983e35bcb3228e900aaa0"
+    },
+    {
+      "path": "screenshots/app-store/desktop/W01-任务.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.2465,
+      "contentRatio": 0.0682,
       "colorSpan": 228,
-      "sha256": "3cbb21b91a4a2ec6702ab3ee3540b8275401f4c8c1ec8c371c587d1c607136b1"
+      "sha256": "9e2afbd63ea5ecf8e03ecf113131655d1574d86cf55c7d20256f0ecb51f13b63"
+    },
+    {
+      "path": "screenshots/app-store/desktop/W02-四象限.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0518,
+      "colorSpan": 228,
+      "sha256": "aaa906557b99af7b6b55370707b59c2e8aa4bf3e9da76c761117dafdb05e236b"
+    },
+    {
+      "path": "screenshots/app-store/desktop/W03-习惯.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0515,
+      "colorSpan": 228,
+      "sha256": "2505dba576ba5efdc6c2239ca04d0037410881707a0469cca238896444f3e285"
+    },
+    {
+      "path": "screenshots/app-store/desktop/W04-番茄钟.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0622,
+      "colorSpan": 228,
+      "sha256": "070aeb0981316fd4dd3ce0d3efb557af7632857eca69073aa7f5babd377c4750"
+    },
+    {
+      "path": "screenshots/app-store/desktop/W05-时间线.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0514,
+      "colorSpan": 228,
+      "sha256": "6afd8b18f60bba14488ecf17f6ad020e324e49cab1dc6fe9313edd5f0b0fdba4"
+    },
+    {
+      "path": "screenshots/app-store/desktop/W06-成长.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.1133,
+      "colorSpan": 228,
+      "sha256": "3e31a3276b19e8df665d8b1a9111b47b771e1a6083724bd0a55c4beb1ec42f43"
+    },
+    {
+      "path": "screenshots/app-store/desktop/MW01-移动端任务.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0682,
+      "colorSpan": 228,
+      "sha256": "9e2afbd63ea5ecf8e03ecf113131655d1574d86cf55c7d20256f0ecb51f13b63"
+    },
+    {
+      "path": "screenshots/app-store/desktop/MW02-移动端四象限.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0518,
+      "colorSpan": 228,
+      "sha256": "aaa906557b99af7b6b55370707b59c2e8aa4bf3e9da76c761117dafdb05e236b"
+    },
+    {
+      "path": "screenshots/app-store/desktop/MW03-移动端习惯.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0515,
+      "colorSpan": 228,
+      "sha256": "2505dba576ba5efdc6c2239ca04d0037410881707a0469cca238896444f3e285"
     }
   ]
 }

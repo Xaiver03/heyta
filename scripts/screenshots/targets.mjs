@@ -203,7 +203,7 @@ export const TARGETS = [
     locale: 'en',
     readyText: 'Trash',
     // 夹具里的标题是**用户自己的字**，TrashBoard 原样显示、不翻译 ⇒ 中英两张图共用同一组期望值。
-    seed: { fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json', settingsLabel: 'Settings' },
+    seed: { fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json', settingsLabel: 'App settings' },
   },
 ].map((target) => {
   const merged = {
