@@ -941,14 +941,10 @@ export function CalendarBoard({
           {
             color: tokens['color.foreground-subtle'],
             /**
-             * 🔴 2026-11-15：脚注自己留左右边距。
-             *
-             * 日历那一屏是 `chrome="board"`（内容铺满，`Screen` 不再给 16dp gutter），
-             * 而脚注是**一句长文**，不是网格——铺满之后它右端直接溢出屏幕
-             *（真机：「…在「任务」页的收集箱里。」的末字被裁）。
-             * 边距写在这里而不是宿主：web 那端也没有别的层会给它。
+             * 2026-11-16：左右边距不再由脚注自己补 —— 外壳已统一给
+             * （移动端 `Screen` 的 board 响应式 gutter / web 的 `.ht-content`）。
+             * 这里再补一条会与外壳叠加成双倍缩进；去掉后脚注与内容卡同一条轴线。
              */
-            paddingHorizontal: tokens['space.4'],
           },
         ]}
         testID={`${testID}-footnote`}
