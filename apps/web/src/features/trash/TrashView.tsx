@@ -245,6 +245,8 @@ export function TrashView(): React.JSX.Element {
             deletedAt: (item) => t('web.trash.deletedAt', { date: formatDeletedAt(item.deletedAt, locale) }),
             restore: (item) => t('web.trash.restore', { title: item.title }),
             purge: (item) => t('web.trash.purge', { title: item.title }),
+            restoreLabel: t('web.trash.restoreLabel'),
+            purgeLabel: t('web.trash.purgeLabel'),
           }}
           onRestore={(id) => {
             const kind = kindOf(id);

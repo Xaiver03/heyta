@@ -1,22 +1,14 @@
 {
-  "capturedAt": "2026-11-16T08:36:19.235Z",
-  "targets": 2,
+  "capturedAt": "2026-11-16T09:39:57.000Z",
+  "targets": 1,
   "artifacts": [
     {
-      "path": "screenshots/web-desktop/W01-任务.png",
+      "path": "screenshots/web-desktop/W07-回收站.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.0688,
+      "contentRatio": 0.0745,
       "colorSpan": 228,
-      "sha256": "8928c48b8c98caef62a3c0e2d17afa8029770eb6e70c10b1008d74e63c99cc69"
-    },
-    {
-      "path": "screenshots/web-mobile/MW01-移动端任务.png",
-      "width": 1170,
-      "height": 2532,
-      "contentRatio": 0.0956,
-      "colorSpan": 228,
-      "sha256": "4f9a76f65044d99be4ea3cdfeb511ceef46ff616d2c4b77d307904c027fdaff3"
+      "sha256": "758f83986507e3fc728d74f4608f17a195e8c00de888a2eec0d082be2feae1a5"
     }
   ]
 }

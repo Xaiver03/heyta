@@ -80,8 +80,22 @@ export interface TrashBoardLabels {
    * 已经收进 `trash/model.ts`，这里要的永远是**已经算完的那一个数**。
    */
   readonly deletedAt: (item: TrashItem) => string;
+  /**
+   * 读屏名，**必须带标题**（"恢复：每天阅读 20 分钟"）—— 一屏十几行如果只读
+   * "恢复/彻底删除"，用户不知道按的是哪一条。
+   */
   readonly restore: (item: TrashItem) => string;
   readonly purge: (item: TrashItem) => string;
+  /**
+   * 按钮上的**可见文字**（2026-11-16）。
+   *
+   * 🔴 与上面两档分开：可见文字不重复标题。之前 Web 端拿 `restore(item)` 直接当
+   * 按钮文字用，于是**同一行的标题出现三遍**（主列表题 / "恢复：标题" / "彻底删除：标题"），
+   * 动作列被撑到半行宽，反而把标题本身挤断（实拍：只能说"读 20 分钟"）。
+   * 移动端一直是分档的（`mobile.trash.restore` vs `restoreA11y`），这里是把它收进契约。
+   */
+  readonly restoreLabel: string;
+  readonly purgeLabel: string;
 }
 
 export interface TrashBoardProps {
@@ -210,7 +224,7 @@ export function TrashBoard({
                     color={tokens['color.foreground']}
                   />
                   <Text style={[text['row-title'], { color: tokens['color.foreground'] }]}>
-                    {labels.restore(item)}
+                    {labels.restoreLabel}
                   </Text>
                 </Pressable>
 
@@ -236,7 +250,7 @@ export function TrashBoard({
                 >
                   <HeytaIcon data={Trash2} size={tokens['icon.sm']} color={tokens['color.danger']} />
                   <Text style={[text['row-title'], { color: tokens['color.danger'] }]}>
-                    {labels.purge(item)}
+                    {labels.purgeLabel}
                   </Text>
                 </Pressable>
               </View>
@@ -271,7 +285,16 @@ function makeStyles(tokens: HeytaNativeTokens) {
       color: tokens['color.primary'],
     },
     divider: { height: tokens['border-width.thin'] },
-    actions: { flexDirection: 'row', flexWrap: 'wrap' },
+    /**
+     * 🔴 `flexShrink: 0` —— 动作列**不参与压缩**（2026-11-16）。
+     *
+     * 没有它的时候：`main` 是 `flex: 1`（吃满），动作列是可压缩的，
+     * 于是"彻底删除"那枚在桌面宽度下被压到比自身文字还窄 ——
+     * 实拍里读出来是「都删除」（前两个字被裁掉），而这是一个**不可逆动作**的标签。
+     * 让位应该是 `main` 的事（它已有 `minWidth: 0`，标题本来就该折行）。
+     * `flexWrap: 'wrap'` 保留：真的放不下时换行，而不是继续压字。
+     */
+    actions: { flexDirection: 'row', flexWrap: 'wrap', flexShrink: 0 },
     action: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   });
 }

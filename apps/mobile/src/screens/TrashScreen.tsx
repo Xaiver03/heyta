@@ -253,6 +253,8 @@ export function TrashScreen({ onBack }: { onBack: () => void }): React.JSX.Eleme
     deletedAt: (item: TrashItem) => deletedAtText(item, t),
     restore: (item: TrashItem) => restoreA11y(item, t),
     purge: (item: TrashItem) => purgeA11y(item, t),
+    restoreLabel: t('mobile.trash.restore'),
+    purgeLabel: t('mobile.trash.purge'),
   };
 
   return (

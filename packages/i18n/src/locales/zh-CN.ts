@@ -931,6 +931,14 @@ export const zhCN = {
   'web.trash.deletedAt': '删除于 {date}',
   'web.trash.restore': '恢复：{title}',
   'web.trash.purge': '彻底删除：{title}',
+  /*
+    🔴 2026-11-16：与上面两条**分开**。上面是读屏名（必须带标题），
+    下面是按钮上真正显示的字。混用会让同一行的标题出现三遍，
+    动作列被撑到半行宽，反而把标题挤断（实拍：只剩"读 20 分钟"）。
+    移动端一直是分档的（`mobile.trash.restore` / `restoreA11y`）。
+  */
+  'web.trash.restoreLabel': '恢复',
+  'web.trash.purgeLabel': '彻底删除',
   'web.trash.confirm.title': '彻底删除「{title}」？',
   'web.trash.confirm.body': '彻底删除后它不会再出现在回收站里，也无法恢复。',
   // 🔴 与移动端 mobile.trash.confirm.notErasure 同一句话：彻底删除只是不再提供恢复，没有把历史抹掉。

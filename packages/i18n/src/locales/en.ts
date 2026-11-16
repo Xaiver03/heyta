@@ -825,6 +825,8 @@ export const en = {
   'web.trash.deletedAt': 'Deleted {date}',
   'web.trash.restore': 'Restore: {title}',
   'web.trash.purge': 'Delete permanently: {title}',
+  'web.trash.restoreLabel': 'Restore',
+  'web.trash.purgeLabel': 'Delete permanently',
   'web.trash.confirm.title': 'Delete “{title}” permanently?',
   'web.trash.confirm.body': 'Once deleted permanently it leaves the trash and cannot be restored.',
   // Same sentence as mobile.trash.confirm.notErasure: purging stops offering a restore, it does not erase history.

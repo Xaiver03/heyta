@@ -1619,13 +1619,23 @@ export function ProfileScreen(): React.JSX.Element {
             <Text variant="row-title" style={{ textAlign: 'center' }}>
               {savedName ?? signedInEmail ?? t('mobile.profile.account.offline')}
             </Text>
-            <Text variant="caption" tone="subtle" style={{ textAlign: 'center' }}>
-              {savedName && signedInEmail
-                ? signedInEmail
-                : accountHasCredential
-                  ? t('mobile.profile.account.headerSignedIn')
-                  : t('mobile.profile.account.signInHint')}
-            </Text>
+            <HStack gap="tight" align="center">
+              <Text variant="caption" tone="subtle" style={{ textAlign: 'center' }}>
+                {savedName && signedInEmail
+                  ? signedInEmail
+                  : accountHasCredential
+                    ? t('mobile.profile.account.headerSignedIn')
+                    : t('mobile.profile.account.signInHint')}
+              </Text>
+              {/*
+                🔴 2026-11-16：这一块**整块可点**（去登录 / 进账号设置），
+                但此前长得和一张静态信息卡一模一样 —— 没有按钮外观、没有箭头，
+                用户没理由去点它。Apple 的"整行可点"从来都配一个 › 来说这件事。
+                `action.disclose` 这枚图标早就注册好了，一直没有消费者（见 icons.tsx
+                那条"登记为欠账"的注释）—— 这里就是它的第一个正当场景。
+              */}
+              <Icon name="action.disclose" size="sm" color={tokens['color.foreground-subtle']} />
+            </HStack>
           </View>
         </Card>
       </Pressable>
