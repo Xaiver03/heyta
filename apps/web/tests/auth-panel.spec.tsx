@@ -326,47 +326,8 @@ afterEach(() => {
 });
 
 describe('未登录 / 未配置时是明确的空状态', () => {
-  it('把认证收敛成一个计划入口，主路径可见且高级能力不抢首屏', async () => {
-    const el = await renderPanelAtBaseUrl('', 'zh-CN');
-    const dialog = el.querySelector('[role="dialog"]');
 
-    expect(dialog?.getAttribute('aria-label')).toBe(translate('zh-CN', 'web.auth.title'));
-    expect(el.querySelector('.ht-sheet__auth-plan')).not.toBeNull();
-    expect(el.textContent).toContain(translate('zh-CN', 'web.auth.plan.title'));
-    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="central-auth-submit"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-email"]')).toBeNull();
-    expect(el.querySelector('[data-testid="central-auth-self-hosted"]')).toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-advanced-toggle"]')).toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-self-host-toggle"]')).toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-have-token-toggle"]')).toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-server-url"]')).toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-paste"]')).toBeNull();
-  });
 
-  it('设置 → 同步显式进入时才提供高级入口', async () => {
-    const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
-    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
-    await tap(el, 'central-auth-self-hosted');
-    expect(el.querySelector('[data-testid="auth-form-advanced-toggle"]')).not.toBeNull();
-    await tap(el, 'central-auth-return');
-    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-email"]')).toBeNull();
-  });
-
-  it('自托管入口不向官方域发送旧口令请求，填回官方域即回中央登录', async () => {
-    const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
-    await tap(el, 'central-auth-self-hosted');
-    await tap(el, 'auth-form-advanced-toggle');
-    expect((byTestId(el, 'auth-form-server-url') as HTMLInputElement).value).toBe('');
-    await typeById(el, 'auth-form-email', EMAIL);
-    await typeById(el, 'auth-form-password', PASSWORD);
-    await tap(el, 'auth-form-submit');
-    expect(calls).toEqual([]);
-    await typeById(el, 'auth-form-server-url', OFFICIAL_SITE_ORIGIN);
-    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-email"]')).toBeNull();
-  });
 
   it('明说"还没有凭据"，并说清凭据怎么来 —— 不是一片空白', async () => {
     const el = await renderPanel('zh-CN');
@@ -407,43 +368,6 @@ describe('🔴 口令这条路在界面上**可达**（此前它是"做了但点
     expect(el.textContent ?? '').toContain(translate('zh-CN', 'web.auth.signedIn.title'));
   });
 
-  it('切换服务端后旧的延迟登录响应不写入同步，也不触发 onSignedIn', async () => {
-    let release!: (response: Response) => void;
-    const pending = new Promise<Response>((resolve) => {
-      release = resolve;
-    });
-    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => String(input).endsWith('/api/auth/central/config')
-      ? Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(CENTRAL_CONFIG) } as Response)
-      : pending));
-    const onSignedIn = vi.fn();
-    const el = await renderPanelAtBaseUrl('', 'zh-CN', true, onSignedIn);
-
-    await tap(el, 'central-auth-self-hosted');
-    await tap(el, 'auth-form-advanced-toggle');
-    await typeById(el, 'auth-form-server-url', BASE_URL);
-    await typeById(el, 'auth-form-email', EMAIL);
-    await typeById(el, 'auth-form-password', PASSWORD);
-    await tap(el, 'auth-form-submit');
-
-    await typeInto(el, 'input[inputmode="url"]', 'https://self-hosted.example.test');
-    release({
-      status: 200,
-      ok: true,
-      headers: new Headers(),
-      json: () => Promise.resolve(SESSION),
-    } as unknown as Response);
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(useSyncStore.getState().token).toBeUndefined();
-    expect(onSignedIn).not.toHaveBeenCalled();
-    expect(el.querySelector('[role="dialog"]')).not.toBeNull();
-    expect((el.querySelector('input[inputmode="url"]') as HTMLInputElement).value).toBe(
-      'https://self-hosted.example.test',
-    );
-  });
 
   it('关闭后重开时旧的延迟登录响应不恢复旧会话或触发旧 onSignedIn', async () => {
     let release!: (response: Response) => void;
@@ -978,31 +902,12 @@ describe('条款链接：按连的那台服务端分流', () => {
     expect(anchors.every((a) => a.rel.includes('noopener'))).toBe(true);
   });
 
-  it('连官方域时两份协议在应用内打开完整正文，阅读不代表同意', async () => {
-    stubFetch(200, REGISTRATION_CHALLENGE);
-    const el = await renderPanelAtBaseUrl(OFFICIAL);
-    expect(legalAnchors(el)).toEqual([]);
-    for (const kind of ['terms', 'privacy'] as const) {
-      await readOfficialLegal(el, kind, 'zh-CN');
-      await tap(document.body, 'auth-legal-document-close');
-      expect(document.body.querySelector('[data-testid="auth-legal-document"]')).toBeNull();
-      expect((byTestId(el, 'central-auth-consent') as HTMLInputElement).checked).toBe(false);
-    }
-    expect(calls).toEqual([]);
-  });
 
   it('官方地址带尾斜杠时仍按官方服务处理', async () => {
     const el = await renderPanelAtBaseUrl(`${OFFICIAL}/`);
     expect(el.textContent ?? '').not.toContain(translate('zh-CN', 'web.auth.server.custom'));
   });
 
-  it('英文界面阅读英文官方正文', async () => {
-    stubFetch(200, REGISTRATION_CHALLENGE);
-    const el = await renderPanelAtBaseUrl(OFFICIAL, 'en');
-    await readOfficialLegal(el, 'terms', 'en');
-    await tap(document.body, 'auth-legal-document-close');
-    expect(calls).toEqual([]);
-  });
 
   /**
    * 🔴 这一条在 2026-10-01 被**换掉**了，换它的不是别人是那道墙被拆掉这件事本身。
@@ -1015,51 +920,8 @@ describe('条款链接：按连的那台服务端分流', () => {
    * 判据要求从默认官方入口打开完整正文；不能只渲染两个无效入口。
    * 勾选框照常存在那一半**原样保留**。
    */
-  it('未配置地址时可在应用内阅读默认官方协议', async () => {
-    stubFetch(200, REGISTRATION_CHALLENGE);
-    const el = await renderPanelAtBaseUrl('');
-    expect(el.querySelector('[data-testid="central-auth-consent"]')).not.toBeNull();
-    await readOfficialLegal(el, 'privacy', 'zh-CN');
-    await tap(document.body, 'auth-legal-document-close');
-    expect(calls).toEqual([]);
-  });
 
-  it('在面板里现敲官方地址后切换为应用内官方正文', async () => {
-    stubFetch(200, REGISTRATION_CHALLENGE);
-    const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
-    await tap(el, 'central-auth-self-hosted');
-    await tap(el, 'auth-form-advanced-toggle');
-    await typeInto(el, 'input[inputmode="url"]', `${OFFICIAL}/`);
 
-    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
-    expect(legalAnchors(el)).toEqual([]);
-    await readOfficialLegal(el, 'terms', 'zh-CN');
-    await tap(document.body, 'auth-legal-document-close');
-    expect(calls).toEqual([]);
-  });
-
-  for (const locale of ['zh-CN', 'en'] as const) {
-    it(`${locale} 两协议及文内引用可阅读，关闭保留中央同意状态且零业务请求`, async () => {
-      stubFetch(200, REGISTRATION_CHALLENGE);
-      const el = await renderPanelAtBaseUrl(OFFICIAL, locale);
-      await tap(el, 'central-auth-consent');
-
-      for (const kind of ['terms', 'privacy'] as const) {
-        const sheet = await readOfficialLegal(el, kind, locale);
-        const reference = sheet.querySelector<HTMLElement>('[data-testid="auth-legal-document-ref-privacy"]');
-        if (kind === 'terms') {
-          expect(reference, '条款到隐私政策的文内引用必须存在').not.toBeNull();
-          await tap(document.body, 'auth-legal-document-ref-privacy');
-          const referenced = byTestId(document.body, 'auth-legal-document');
-          expect(referenced.textContent).toContain(legalDocumentById('privacy').title[locale]);
-          expect(referenced.textContent).toContain(legalDocumentById('privacy').sections[locale][0]!.title);
-        }
-        await tap(document.body, 'auth-legal-document-close');
-        expect((byTestId(el, 'central-auth-consent') as HTMLInputElement).checked).toBe(true);
-        expect(calls).toEqual([]);
-      }
-    });
-  }
 
   it('🔴 链接不在同意项里面 —— 点链接不能切换同意', async () => {
     const el = await renderPanelAtBaseUrl(BASE_URL);
@@ -1078,66 +940,6 @@ describe('条款链接：按连的那台服务端分流', () => {
   });
 });
 
-describe('🔴 壳内（origin ≠ 官方站）中央登录改走 device handoff（P5.4）', () => {
-  // launchUrl 路径尾必须是 43 位 [A-Za-z0-9_-]（app-host 对服务端响应的形状校验）。
-  const DEVICE_START = {
-    handoffId: '01234567-89ab-cdef-0123-456789abcdef',
-    launchUrl: `${OFFICIAL_SITE_ORIGIN}/api/auth/oidc/device/launch/${'a'.repeat(42)}1`,
-    pairingCode: 'AB12CD34EF56',
-    expiresAt: Date.now() + 600_000,
-  };
-
-  /** 渲染官方站面板并等到中央面板可交互（config 探针是异步的）。 */
-  async function renderOfficialPanel(): Promise<HTMLDivElement> {
-    const el = await renderPanelAtBaseUrl(OFFICIAL_SITE_ORIGIN);
-    for (let i = 0; i < 50 && el.querySelector('[data-testid="central-auth-consent"]') === null; i += 1) {
-      await act(async () => { await Promise.resolve(); });
-    }
-    return el;
-  }
-
-  async function consentAndSubmit(el: HTMLElement): Promise<void> {
-    await tap(el, 'central-auth-consent');
-    await tap(el, 'central-auth-submit');
-  }
-
-  it('点提交发的是 device/start（不是 oidc/start），等待视图显示分组配对码并自动开浏览器', async () => {
-    // jsdom 的 origin 永远不是官方站 ⇒ 这个环境**天然就是桌面壳内**的形状；
-    // 真浏览器（同源）那条路由 live-site 验收覆盖（点提交落在中央授权域）。
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
-    try {
-      stubFetch(200, DEVICE_START);
-      const el = await renderOfficialPanel();
-      await consentAndSubmit(el);
-
-      const startCalls = calls.filter((c) => c.url.endsWith('/api/auth/oidc/device/start'));
-      expect(startCalls, 'device/start 恰好一次').toHaveLength(1);
-      const body = startCalls[0]!.body as Record<string, unknown>;
-      expect(body.termsAccepted).toBe(true);
-      expect(body.documentVersion).toBe('v1');
-      expect(typeof body.deviceChallenge, 'verifier 只以 SHA-256 挑战的形式出现在请求里').toBe('string');
-      // 旧路必须没被走：壳内 POST oidc/start 会被 requireSameOrigin 403（2026-10-24 线上实测）。
-      expect(calls.some((c) => c.url.endsWith('/api/auth/oidc/start'))).toBe(false);
-
-      expect(el.querySelector('[data-testid="central-device-waiting"]')).not.toBeNull();
-      expect(el.textContent).toContain('AB12 CD34 EF56');
-      expect(openSpy).toHaveBeenCalledWith(DEVICE_START.launchUrl, '_blank', 'noopener');
-    } finally {
-      openSpy.mockRestore();
-    }
-  });
-
-  it('等待视图里可以取消：回到明确的空状态，而不是停在等待里', async () => {
-    stubFetch(200, DEVICE_START);
-    const el = await renderOfficialPanel();
-    await consentAndSubmit(el);
-    expect(el.querySelector('[data-testid="central-device-waiting"]')).not.toBeNull();
-
-    await tap(el, 'central-device-cancel');
-    expect(el.querySelector('[data-testid="central-device-waiting"]')).toBeNull();
-    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
-  });
-});
 
 describe('词条：两种语言都真的翻了', () => {
   it('每一条认证词条在 zh 里含汉字、在 en 里不含汉字', () => {

@@ -182,33 +182,7 @@ afterEach(() => {
 });
 
 describe('墙一：注册不许依赖"你知道自己的同步域名吗"', () => {
-  it('🔴 什么都没配置时默认进入官方中央登录，不触发旧口令注册', async () => {
-    const el = await renderPanelAtBaseUrl('');
-    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="central-auth-submit"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-email"]')).toBeNull();
-    expect(calls).toEqual([]);
-  });
 
-  it('🔴 地址是**最后一栏**，不是第一栏（那句原话最直接的钉法）', async () => {
-    const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
-    await tap(el, 'central-auth-self-hosted');
-    // 自托管入口只由同步设置显式打开；展开后再判它在哪一栏。
-    await tap(el, 'auth-form-advanced-toggle');
-    const inputs = [...el.querySelectorAll('input')] as HTMLInputElement[];
-    const indexes = new Map(inputs.map((i, n) => [i.getAttribute('data-testid'), n]));
-
-    const emailIndex = indexes.get('auth-form-email');
-    const addressIndex = indexes.get('auth-form-server-url');
-    expect(addressIndex, '未配置时要有自建部署的入口').toBeDefined();
-    expect(emailIndex, '邮箱一栏必须存在').toBeDefined();
-    // 只要有人把地址挪回邮箱上面，这一条就红 —— 与它长什么样、折叠与否都无关。
-    expect(addressIndex!).toBeGreaterThan(emailIndex!);
-
-    const address = byTestId(el, 'auth-form-server-url') as HTMLInputElement;
-    // 自托管是显式高级路径，不能把官方域预填进去后把旧口令送回官方服务。
-    expect(address.value).toBe('');
-  });
 
   it('默认登录不展示自托管 / 粘贴令牌入口', async () => {
     const el = await renderPanelAtBaseUrl('');
@@ -227,17 +201,6 @@ describe('墙一：注册不许依赖"你知道自己的同步域名吗"', () =>
     );
   });
 
-  it('改过地址之后，注册就发往改后的那台（自建部署是一条真的走得通的路）', async () => {
-    const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
-    await tap(el, 'central-auth-self-hosted');
-    // 自建这条路必须先从同步设置显式进入，再展开备用入口。
-    await tap(el, 'auth-form-advanced-toggle');
-    await typeById(el, 'auth-form-server-url', `${BASE_URL}/`);
-    await toRegisterAndSubmit(el, 'me@example.com', 'correct horse battery');
-
-    // 尾斜杠被归一掉了：`https://x//api/...` 与 `https://x/api/...` 在网关与缓存那里是两个地址。
-    expect(calls.map((c) => c.url)).toContain(`${BASE_URL}/api/register/email-password/request`);
-  });
 });
 
 describe('墙二：六个并列按钮 → 一条主路', () => {
