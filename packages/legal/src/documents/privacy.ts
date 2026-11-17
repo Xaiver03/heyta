@@ -197,14 +197,8 @@ const zh = [
         head: ['我们处理什么', '为什么需要它（处理目的）', '存在哪里', '在我们服务器上是明文还是密文'],
         rows: [
           [
-            '中央身份与授权记录（接入中，尚未开放）',
-            '将中央身份方及其稳定用户标识关联到既有heyta账号；保存单次登录、逐设备授权、刷新结果所有权和撤销状态，防止账号误合并、重放及撤销遗漏。产品权限、条款同意与E2EE密钥仍独立。',
-            '我们的服务器；中央身份方只参与登录及授权有效性校验，不接收任务或保险库密钥',
-            '身份方、用户标识、客户端、授权及时间状态为明文元数据；nonce、PKCE及身份/访问/刷新令牌使用服务端独立密钥加密。这不是端到端加密，服务端为验证/撤销可以解密。',
-          ],
-          [
             '邮箱地址',
-            '登录账号；发十一封功能邮件（验证邮箱、注册验证码、登录验证码、魔法登录、找回通行密钥、重置口令、口令已改通知、换绑-新邮箱确认、换绑-旧邮箱授权、换绑完成通知、新增认证器告知）。它是本地认证路径的**直接标识符**；新增中央身份映射与授权材料另列下行 —— 只有一种例外：一次换绑还在途的时候，你填的那个**新地址**会以明文暂存在换绑请求那一行里，直到两边都点完生效、或者到期被清掉。除这一列以外，库里没有真实姓名、电话、地址、生日、地理位置、通讯录；另有一张你自选上传的**头像图片**（另存其 SHA-256 仅用于判断"换过没有"），与昵称一起在第 3 条的表里单列。',
+            '登录账号；发十一封功能邮件（验证邮箱、注册验证码、登录验证码、魔法登录、找回通行密钥、重置口令、口令已改通知、换绑-新邮箱确认、换绑-旧邮箱授权、换绑完成通知、新增认证器告知）。它是本地认证路径的**直接标识符**—— 只有一种例外：一次换绑还在途的时候，你填的那个**新地址**会以明文暂存在换绑请求那一行里，直到两边都点完生效、或者到期被清掉。除这一列以外，库里没有真实姓名、电话、地址、生日、地理位置、通讯录；另有一张你自选上传的**头像图片**（另存其 SHA-256 仅用于判断"换过没有"），与昵称一起在第 3 条的表里单列。',
             '我们的服务器',
             '明文',
           ],
@@ -390,11 +384,6 @@ const zh = [
         head: ['数据', '留存多久', '到期之后怎么处理'],
         rows: [
           [
-            '中央身份、授权尝试与撤销材料（尚未开放）',
-            '身份映射保留至产品注销。登录待办及原生设备交接十分钟到期；派发后或到期清PKCE秘密。原生交接期间，待领取的产品会话令牌以服务端密钥加密暂存，领取即清密文，未领取则十分钟到期清除并安排撤销。授权凭据保留至撤销/过期/注销，结束后的最少元数据保留24小时。撤销材料为最多七日重试而加密保存，完成即清；终态最少元数据保留24小时。结果仍未知的尝试仅保留最少所有权判断至核实处置，不能把未知当作失败重发。',
-            '定时清理及产品注销前的撤销队列已接线；全平台注销及原生当前安装产物验收仍是开放前条件。七日未确认即清密文并标记“撤销未确认”，不声称中央已经撤销，本地仍拒绝该授权。注销先排队撤销再删本地账号；队列不被级联吞掉。该材料不含任务或E2EE密钥，中央停用也不代表删除本地内容。',
-          ],
-          [
             '同步事件（密文内容 + 那 11 项明文形状）',
             '🔴 **窗口写的是 45 天，但当前实际不会清理**。45 天是代码里的固定常量、清理任务也确实每日执行一次；那条任务**只在一个账号的同步流水里已经存在"完整状态边界"时才动手**，而本产品当前的客户端不会产生这种边界。所以对我们现在的账号，它一条也清不掉 —— 每日任务日志里的删除条数恒为 0。我们照实写这一条，而不是把它写成承诺。',
             '在清理条件具备之前：**不删除**，保留到你注销账号（注销那一行是真的删）。清理生效之后：按 45 天窗口删除，含已被完整状态边界覆盖的旧事件。',
@@ -412,7 +401,7 @@ const zh = [
           [
             '账号本身（邮箱、口令散列、通行密钥、语言、昵称、头像图片、条款接受时刻）',
             '到你注销账号为止。',
-            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、登录会话、通行密钥（含未完成的通行密钥注册）、邮箱变更请求、登录验证码挑战、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、推送订阅、加密密钥包、密钥迁移记录、撤销设备记录、托管 AI 用量计数、自动收集执行身份、自动收集提交许可、自动收集额度启用记录、自动收集额度关联、自动收集额度主体、自动化 AI 尝试、自动化事件、自动化接收方密钥、自动化规则、自动化发送方凭据、自动化权益绑定、自动化权益票据使用记录、分享记录、分享邀请、分享成员、任务附件、邮箱注册验证码挑战，按数据库外键级联删除（共 39 处级联，覆盖 38 张表），**没有冷静期，也没有回收站**。🔴 有一件东西**故意不跟着删：注销标记** —— 你的账号标识、注销时刻，以及那一刻该账号邮箱的 **SHA-256 摘要**（摘要不是邮箱本身，我们无法从它还原出地址）。它存在的唯一理由是"从整库备份恢复时拒绝把已注销账号带回来"，所以它必须比账号活得久；中央认证开放后还需保留完成撤销所必需的加密材料和最少状态，期限与未确认结果在本节中央认证行说明；它们不含同步内容。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库：你点下注销的那台**当场**清掉本机明文，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。所以这一条既不写成"你的所有数据立即彻底销毁"，也不写成"你在所有设备上的数据都会被删除" —— 一台从此不再上线、也不再登录的设备，我们没有远程擦除它的能力。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
+            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、登录会话、通行密钥（含未完成的通行密钥注册）、邮箱变更请求、登录验证码挑战、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、推送订阅、加密密钥包、密钥迁移记录、撤销设备记录、托管 AI 用量计数、自动收集执行身份、自动收集提交许可、自动收集额度启用记录、自动收集额度关联、自动收集额度主体、自动化 AI 尝试、自动化事件、自动化接收方密钥、自动化规则、自动化发送方凭据、自动化权益绑定、自动化权益票据使用记录、分享记录、分享邀请、分享成员、任务附件、邮箱注册验证码挑战，按数据库外键级联删除（共 39 处级联，覆盖 38 张表），**没有冷静期，也没有回收站**。🔴 有一件东西**故意不跟着删：注销标记** —— 你的账号标识、注销时刻，以及那一刻该账号邮箱的 **SHA-256 摘要**（摘要不是邮箱本身，我们无法从它还原出地址）。它存在的唯一理由是"从整库备份恢复时拒绝把已注销账号带回来"，所以它必须比账号活得久。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库：你点下注销的那台**当场**清掉本机明文，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。所以这一条既不写成"你的所有数据立即彻底销毁"，也不写成"你在所有设备上的数据都会被删除" —— 一台从此不再上线、也不再登录的设备，我们没有远程擦除它的能力。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
           ],
           [
             '订阅、订单与优惠码核销记录',
@@ -807,14 +796,8 @@ const en = [
         head: ['What we process', 'Why we need it (purpose of processing)', 'Where it is stored', 'Plaintext or ciphertext on our servers'],
         rows: [
           [
-            'Central identity and authorization records (being integrated, unavailable)',
-            'Associate the identity provider and its stable subject with the existing heyta account; track one-use login, per-device grants, ownership of refresh results and revocation to prevent account merging, replay and missed revocation. Product permissions, consent and E2EE keys remain separate.',
-            'Our servers; the identity provider handles authentication and authorization validity, without receiving tasks or vault keys',
-            'Provider, subject, client, grant and timing/state metadata are plaintext. Nonce, PKCE and identity/access/refresh tokens are encrypted with a separate server key. This is not end-to-end encryption: the server can decrypt them for verification and revocation.',
-          ],
-          [
             'Email address',
-            'Your sign-in identity; delivering the eleven functional emails (address verification, registration code, sign-in code, magic sign-in link, passkey recovery, password reset, password-changed notice, rebinding confirmation for the new address, rebinding authorisation for the current address, e-mail change completed notice, authenticator-added notice). It is a **direct identifier** in local authentication; central identity and authorization records are listed separately below, with one exception: while a rebinding is in flight, the new address you typed is held in cleartext in that request row until both sides confirm and it takes effect, or until it expires and is cleared. Apart from that column there is no legal name, phone number, postal address, date of birth, location or contacts. There is also an optional **avatar image** you choose to upload (its SHA-256 is stored only to tell whether it changed), listed together with the nickname in section 3.',
+            'Your sign-in identity; delivering the eleven functional emails (address verification, registration code, sign-in code, magic sign-in link, passkey recovery, password reset, password-changed notice, rebinding confirmation for the new address, rebinding authorisation for the current address, e-mail change completed notice, authenticator-added notice). It is a **direct identifier** in local authentication; with one exception: while a rebinding is in flight, the new address you typed is held in cleartext in that request row until both sides confirm and it takes effect, or until it expires and is cleared. Apart from that column there is no legal name, phone number, postal address, date of birth, location or contacts. There is also an optional **avatar image** you choose to upload (its SHA-256 is stored only to tell whether it changed), listed together with the nickname in section 3.',
             'Our servers',
             'Plaintext',
           ],
@@ -1000,11 +983,6 @@ const en = [
         head: ['Data', 'How long it is kept', 'What happens when the period ends'],
         rows: [
           [
-            'Central identity, attempts and revocation material (unavailable)',
-            'Identity bindings last until product account closure. Login pending and native device handoff records expire after ten minutes; PKCE secrets clear on dispatch or expiry. During native handoff, the product session token awaiting collection is encrypted under a server key; its ciphertext clears on collection or after ten minutes, when an unclaimed grant is queued for revocation. Grant credentials last until revocation, expiry or closure, with minimal terminal metadata retained for 24 hours. Revocation material is encrypted for retries for at most seven days and cleared on confirmation; minimal terminal metadata lasts 24 hours. Unresolved attempts retain only minimal ownership evidence until investigated, and an unknown outcome never permits redispatch.',
-            'Scheduled cleanup and the product account-closure revocation queue are wired; platform-wide logout and verification of the current native builds remain release conditions. After seven days without confirmation, ciphertext is cleared and the outcome marked revocation unconfirmed, never represented as centrally revoked; local access remains denied. Closure queues revocation before deleting the local account, and cascading deletion cannot swallow the queue. No tasks or E2EE keys enter these records; central disabling does not delete local content.',
-          ],
-          [
             'Sync events (ciphertext content plus those 11 plaintext shape fields)',
             '🔴 **The window says 45 days, but nothing is actually pruned today.** The 45-day constant is in the code and the cleanup job does run once a day; that job, however, **only acts on accounts whose sync stream already contains a “full-state boundary”**, and the clients this product ships never produce one. So for the accounts we have today it deletes nothing — the daily job logs a deletion count of 0. We write this as it is rather than as a promise.',
             'Until the pruning condition is actually reachable: **not deleted**; kept until your account is closed (that row really is deleted). Once the cleanup does apply: deleted on the 45-day window, including older events already covered by a full-state boundary.',
@@ -1022,7 +1000,7 @@ const en = [
           [
             'The account itself (email address, password hash, passkeys, language, nickname, avatar image, moment of accepting the terms)',
             'Until you close the account.',
-            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, access sessions, passkeys (including pending passkey registrations), email change requests, sign-in code challenges, subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, push subscriptions, wrapped key packages, key migration records, revoked device records, managed-AI usage counters, automation worker identities, automation commit permits, automation entitlement activations, automation entitlement links, automation entitlement subjects, automation AI attempts, automation events, automation recipient keys, automation rules, automation sender credentials, automation entitlement bindings, automation entitlement ticket uses, shares, share invitations, share members, task attachments, email registration challenges — are deleted (39 cascades in total, across 38 tables). **There is no cooling-off period and no trash bin.** 🔴 One record deliberately **outlives that deletion: the closure marker** — your account identifier, the moment of closure, and the **SHA-256 digest** of the e-mail address that belonged to the account at that moment (a digest is not the address; we cannot recover the address from it). It exists for exactly one reason: when a whole-database backup is restored, the gate refuses to bring a closed account back, so this marker has to survive the account it guards against. Central authentication additionally retains the minimum encrypted material and state needed for revocation under the limits in the central-authentication row of this section; no synced content is included. 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database: the device you press it on wipes its local plaintext **on the spot**, and every other device wipes its own copy **the next time it synchronises and receives the "account closed" signal**. So we write neither "all your data is destroyed immediately" nor "your data is gone from every device" — a device that never connects or signs in again is one we cannot wipe remotely. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
+            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, access sessions, passkeys (including pending passkey registrations), email change requests, sign-in code challenges, subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, push subscriptions, wrapped key packages, key migration records, revoked device records, managed-AI usage counters, automation worker identities, automation commit permits, automation entitlement activations, automation entitlement links, automation entitlement subjects, automation AI attempts, automation events, automation recipient keys, automation rules, automation sender credentials, automation entitlement bindings, automation entitlement ticket uses, shares, share invitations, share members, task attachments, email registration challenges — are deleted (39 cascades in total, across 38 tables). **There is no cooling-off period and no trash bin.** 🔴 One record deliberately **outlives that deletion: the closure marker** — your account identifier, the moment of closure, and the **SHA-256 digest** of the e-mail address that belonged to the account at that moment (a digest is not the address; we cannot recover the address from it). It exists for exactly one reason: when a whole-database backup is restored, the gate refuses to bring a closed account back, so this marker has to survive the account it guards against. Central authentication has been withdrawn and no longer processes anything. 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database: the device you press it on wipes its local plaintext **on the spot**, and every other device wipes its own copy **the next time it synchronises and receives the "account closed" signal**. So we write neither "all your data is destroyed immediately" nor "your data is gone from every device" — a device that never connects or signs in again is one we cannot wipe remotely. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
           ],
           [
             'Subscriptions, orders and coupon redemptions',

@@ -184,17 +184,10 @@ const zh = [
         head: ['信息项', '使用目的', '收集方式', '存储位置与形态', '是否必要'],
         rows: [
           [
-            '中央身份映射与授权记录（接入中，尚未开放）',
-            '稳定关联原heyta账号、单次登录、刷新所有权与可靠撤销；不按邮箱自动合并',
-            '你选择中央登录后由受信身份方验证，服务端记录授权过程',
-            '身份方/subject/客户端/授权及时间状态、设备交接挑战与配对码的摘要为服务器明文元数据；PKCE、身份/访问/刷新令牌及待领取的产品会话令牌以独立服务端密钥加密，服务端可解密，不属于E2EE。类别与留存/注销边界以《隐私政策》第3、7条为准',
-            '仅中央云登录所必需；本地功能不需要',
-          ],
-          [
             '电子邮箱地址',
             '账号唯一标识、登录、发送验证与找回邮件',
             '你输入',
-            '🔴 服务器明文。这是本地认证的直接标识符；中央身份映射见本表新增项',
+            '🔴 服务器明文。这是本地认证的直接标识符',
             '同步服务必需',
           ],
           [
@@ -820,17 +813,10 @@ const en = [
         head: ['Item', 'Purpose', 'How collected', 'Where it is stored and in what form', 'Necessary?'],
         rows: [
           [
-            'Central identity bindings and authorization records (being integrated, unavailable)',
-            'Preserve the existing heyta account, single-use login, refresh ownership and reliable revocation; never merge accounts by email',
-            'A trusted identity provider verifies your chosen central login; our server records its authorization lifecycle',
-            'Provider/subject/client/grant/timing state and digests of the device handoff challenge and pairing code are plaintext server metadata. PKCE, identity/access/refresh tokens and a product session token awaiting collection use a separate server encryption key; the server can decrypt them, so this is not E2EE. Privacy Policy sections 3 and 7 govern categories, retention and closure',
-            'Required only for central cloud sign-in; not for local features',
-          ],
-          [
             'Email address',
             'Sole account identifier; sign-in, verification and recovery mail',
             'You type it',
-            '🔴 Cleartext on the server. It is a direct identifier for local authentication; central identity bindings are listed in this table',
+            '🔴 Cleartext on the server. It is a direct identifier for local authentication',
             'Required for sync',
           ],
           [
