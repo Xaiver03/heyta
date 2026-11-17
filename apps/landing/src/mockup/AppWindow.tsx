@@ -587,9 +587,8 @@ export function AppWindow({
               {activeView === 'tasks' ? (
                 <div className={MOCK_CAPTURE_CLASS.row}>
                   <div className={MOCK_CAPTURE_CLASS.input}>{t(MOCK_CAPTURE_KEYS.placeholder)}</div>
-                  <div className={mockCaptureAddClass(MOCK_CAPTURE_CAN_SUBMIT)}>
+                  <div className={mockCaptureAddClass(MOCK_CAPTURE_CAN_SUBMIT)} aria-label={t(MOCK_CAPTURE_KEYS.add)}>
                     <Plus size={MOCK_CAPTURE_ADD_ICON_SIZE} />
-                    {t(MOCK_CAPTURE_KEYS.add)}
                   </div>
                 </div>
               ) : null}

@@ -292,8 +292,10 @@ describe('复刻件的取值 = 共享层那一组（逐项对账）', () => {
       tokenOf(composer, 'input', 'paddingHorizontal'),
     );
     expectVar(css, '.mk-input', 'min-block-size', tokenOf(composer, 'input', 'minHeight'));
-    expectVar(css, '.mk-input', 'border-radius', tokenOf(composer, 'input', 'borderRadius'));
-    expectVar(css, '.mk-input', 'background', tokenOf(composer, 'input', 'backgroundColor'));
+    // 新 composer：输入框自己无框、透明、无圆角（框与底色搬到 `compose` 容器上）。
+    expect(styleDeclarations(styleBlock(composer, 'input')).get('backgroundColor')).toBe("'transparent'");
+    expect(cssDeclarations(ruleBody(css, '.mk-input--capture')).get('background')).toBe('transparent');
+    expect(cssDeclarations(ruleBody(css, '.mk-input--capture')).get('border-radius')).toBe('0');
     // 输入框里的字是 **placeholder**（复刻件只有 placeholder），所以取
     // `placeholderTextColor` 那一族，而不是 `color.foreground`。
     expectVar(css, '.mk-input', 'color', 'color.foreground-subtle');
@@ -311,30 +313,17 @@ describe('复刻件的取值 = 共享层那一组（逐项对账）', () => {
     expectVar(css, '.mk-input--capture', 'letter-spacing', 'tracking.body');
   });
 
-  it('🔴 提交按钮：`space.1` + `size.field-padding-x` + `font-weight.regular`', () => {
+  it('🔴 提交按钮：圆形图标键（radius.full + 触控下限尺寸 + 无水平内距）', () => {
     const composer = captureComposerSource();
     const css = mockupCss();
-    expectVar(
-      css,
-      '.mk-btn-primary--capture',
-      'gap',
-      tokenOf(composer, 'addButton', 'gap'),
-    );
-    expectVar(
-      css,
-      '.mk-btn-primary--capture',
-      'padding-inline',
-      tokenOf(composer, 'addButton', 'paddingHorizontal'),
-    );
-    expectVar(css, '.mk-btn-primary--capture', 'font-weight', 'font-weight.regular');
-    expectVar(css, '.mk-btn-primary--capture', 'line-height', 'line-height.normal');
-    expectVar(css, '.mk-btn-primary--capture', 'letter-spacing', 'tracking.body');
-
-    // 承载色与文字色（启用态）：真实现与复刻用的是同一个 token。
+    // 2026-11-16 起 addButton 是圆形图标键：radius.full + width/height = touch-target.min。
+    expectVar(css, '.mk-btn-primary--capture', 'border-radius', tokenOf(composer, 'addButton', 'borderRadius'));
+    expectVar(css, '.mk-btn-primary--capture', 'inline-size', tokenOf(composer, 'addButton', 'width'));
+    expectVar(css, '.mk-btn-primary--capture', 'block-size', tokenOf(composer, 'addButton', 'height'));
+    expect(cssDeclarations(ruleBody(css, '.mk-btn-primary--capture')).get('padding-inline'), '圆形按钮无水平内距').toBe('0');
+    // 承载色（启用态）与图标/文字色：同一 token 族。
     expectVar(css, '.mk-btn-primary', 'background', tokenOf(composer, 'addEnabled', 'backgroundColor'));
-    expectVar(css, '.mk-btn-primary', 'color', tokenOf(composer, 'addText', 'color'));
-    expectVar(css, '.mk-btn-primary', 'min-block-size', tokenOf(composer, 'addButton', 'minHeight'));
-    expectVar(css, '.mk-btn-primary', 'border-radius', tokenOf(composer, 'addButton', 'borderRadius'));
+    expectVar(css, '.mk-btn-primary', 'color', 'color.on-primary');
     expectVar(css, '.mk-btn-primary', 'font-size', 'font-size.sm');
   });
 
@@ -388,7 +377,8 @@ describe('登记处 ⟷ 渲染 ⟷ AppWindow 三处一致', () => {
     const input = view.querySelector('.mk-input--capture');
     const add = view.querySelector('.mk-btn-primary--capture');
     expect(input?.textContent?.trim()).toBe(zhCN[MOCK_CAPTURE_KEYS.placeholder]);
-    expect(add?.textContent?.trim()).toBe(zhCN[MOCK_CAPTURE_KEYS.add]);
+    // 图标键没有可见文字（圆形 +），无障碍名仍来自同一个 key。
+    expect(add?.getAttribute('aria-label')).toBe(zhCN[MOCK_CAPTURE_KEYS.add]);
   });
 
   it('渲染出来：空草稿 ⇒ 按钮带禁用态，`+` 图标就是 `icon.sm` 的 16px', () => {

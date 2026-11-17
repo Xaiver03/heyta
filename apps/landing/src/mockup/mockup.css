@@ -474,7 +474,14 @@ button.mk-nav__item:focus-visible {
 
 .mk-compose {
   display: flex;
+  align-items: center;
   gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border-width: var(--ht-border-width-thin);
+  border-style: solid;
+  border-color: var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
   margin-block-end: var(--ht-space-4);
 }
 
@@ -520,14 +527,16 @@ button.mk-nav__item:focus-visible {
   font-weight: var(--ht-font-weight-regular);
   line-height: var(--ht-line-height-normal);
   letter-spacing: var(--ht-tracking-body);
+  background: transparent;
+  border-radius: 0;
 }
 
 .mk-btn-primary--capture {
-  gap: var(--ht-space-1);
-  padding-inline: var(--ht-size-field-padding-x);
-  font-weight: var(--ht-font-weight-regular);
-  line-height: var(--ht-line-height-normal);
-  letter-spacing: var(--ht-tracking-body);
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  padding-inline: 0;
+  gap: 0;
+  border-radius: var(--ht-radius-full);
 }
 
 /* 空标题 ⇒ `captureCanSubmit` 为 false ⇒ 真实现给 `addDisabled` 那一层透明度。
