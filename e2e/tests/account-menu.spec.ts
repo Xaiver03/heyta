@@ -98,7 +98,7 @@ test('未登录：身份入口唯一，登录/注册是菜单第一项，没有�
   await expect(page.locator('[role="dialog"][aria-label="登录 / 注册"]')).toBeVisible();
 });
 
-test('已登录：身份区是邮箱，退出登录在最底且是危险色', async ({ page }) => {
+test('已登录：身份区是邮箱，退出登录已移出菜单（2026-11-07 搬到我的页）', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   // 凭据落盘在 `localStorage['heyta.sync.credentials']`（见 `credential-storage.ts`）。
   await page.addInitScript(() => {
@@ -121,10 +121,11 @@ test('已登录：身份区是邮箱，退出登录在最底且是危险色', as
   await expect(page.getByTestId('account-menu-email')).toHaveText('e2e@example.com');
   // 已登录的人**不该**再看到"去登录"。
   await expect(page.getByTestId('sync-signin-entry')).toHaveCount(0);
-  // 退出登录：最后一项 + 危险样式。
+  // 2026-11-07 起「退出登录」已搬去「我的」页底部（AccountMenu.tsx 文件头），
+  // 头像菜单里不再有它；已登录菜单最后一个 menuitem 是「应用设置」。
   const items = panel.getByRole('menuitem');
-  await expect(items.last()).toHaveAttribute('data-testid', 'account-menu-signout');
-  await expect(page.getByTestId('account-menu-signout')).toHaveClass(/ht-rail__account__item--danger/);
+  await expect(panel.getByTestId('account-menu-signout'), '退出登录已移出头像菜单').toHaveCount(0);
+  await expect(items.last()).toHaveAttribute('data-testid', 'account-menu-settings');
 
   await panelProbe(page);
   await page.screenshot({ path: 'test-results/account-menu-signed-in.png' });
