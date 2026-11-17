@@ -60,6 +60,13 @@
   letter-spacing: var(--ht-tracking-caption);
 }
 
+.ht-type-body-sm {
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
+}
+
 .ht-type-tab-label {
   font-size: var(--ht-nav-tab-label-size);
   font-weight: var(--ht-font-weight-medium);

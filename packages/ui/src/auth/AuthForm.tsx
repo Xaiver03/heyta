@@ -534,7 +534,7 @@ export function AuthForm({
     改了，这里跟着对，不会重新错开。
   */
   const termsCheckboxOffset =
-    (((text['caption'].lineHeight as number | undefined) ?? 0) - tokens['size.checkbox']) / 2;
+    (((text['body-sm'].lineHeight as number | undefined) ?? 0) - tokens['size.checkbox']) / 2;
 
   const errorField: AuthFormField | undefined =
     status?.tone === 'error' ? status.field : localField;
@@ -678,7 +678,7 @@ export function AuthForm({
     >
       <View style={styles.head}>
         <View style={styles.headText}>
-          <Text style={[text['section-title'], styles.title]} accessibilityRole="header">
+          <Text style={[text['detail-title'], styles.title]} accessibilityRole="header">
             {labels.titleText}
           </Text>
           {labels.subtitle !== undefined ? (
@@ -711,14 +711,14 @@ export function AuthForm({
           labels.emptyTitle === '' && labels.emptyBody === '' ? null : (
           <>
             <Text style={[text['row-title'], styles.statusStrong]}>{labels.emptyTitle}</Text>
-            <Text style={[text['row-meta'], styles.muted]}>{labels.emptyBody}</Text>
+            <Text style={[text['body-sm'], styles.muted]}>{labels.emptyBody}</Text>
           </>
           )
         ) : (
           <>
             <Text
               style={[
-                text['row-meta'],
+                text['body-sm'],
                 status.tone === 'error'
                   ? styles.danger
                   : status.tone === 'success'
@@ -729,7 +729,7 @@ export function AuthForm({
               {status.message}
             </Text>
             {status.detail === undefined ? null : (
-              <Text style={[text['row-meta'], styles.muted]}>{status.detail}</Text>
+              <Text style={[text['body-sm'], styles.muted]}>{status.detail}</Text>
             )}
           </>
         )}
@@ -740,15 +740,15 @@ export function AuthForm({
               size={tokens['icon.xs']}
               color={tokens['color.foreground-muted']}
             />
-            <Text style={[text['caption'], styles.muted]}>{labels.busyText}</Text>
+            <Text style={[text['body-sm'], styles.muted]}>{labels.busyText}</Text>
           </View>
         ) : null}
       </View>
 
       {stage === 'login-code' && loginChallenge !== undefined && loginCodeLabel !== undefined ? (
         <View style={styles.field} testID={`${testID}-login-code-stage`}>
-          <Text style={[text['section-title'], styles.title]}>{loginCodeLabel.title}</Text>
-          <Text style={[text['row-meta'], styles.muted]}>{loginCodeLabel.sent(loginChallenge.email)}</Text>
+          <Text style={[text['detail-title'], styles.title]}>{loginCodeLabel.title}</Text>
+          <Text style={[text['body-sm'], styles.muted]}>{loginCodeLabel.sent(loginChallenge.email)}</Text>
           <TextInput
             ref={loginCodeInput}
             value={loginCode}
@@ -764,7 +764,7 @@ export function AuthForm({
             aria-invalid={status?.tone === 'error'}
             testID={`${testID}-login-code`}
           />
-          {loginExpired ? <Text style={[text['caption'], styles.danger]}>{loginCodeLabel.expired}</Text> : null}
+          {loginExpired ? <Text style={[text['body-sm'], styles.danger]}>{loginCodeLabel.expired}</Text> : null}
           <Pressable
             accessibilityRole="button"
             onPress={guard(onSubmit)}
@@ -785,7 +785,7 @@ export function AuthForm({
             style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
             testID={`${testID}-login-code-resend`}
           >
-            <Text style={[text['row-meta'], styles.linkText]}>
+            <Text style={[text['body-sm'], styles.linkText]}>
               {loginResendSeconds === 0 ? loginCodeLabel.resend : loginCodeLabel.resendIn(loginResendSeconds)}
             </Text>
           </Pressable>
@@ -795,13 +795,13 @@ export function AuthForm({
             style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
             testID={`${testID}-login-code-change-email`}
           >
-            <Text style={[text['row-meta'], styles.linkText]}>{loginCodeLabel.changeEmail}</Text>
+            <Text style={[text['body-sm'], styles.linkText]}>{loginCodeLabel.changeEmail}</Text>
           </Pressable>
         </View>
       ) : stage === 'registration-code' && registrationChallenge !== undefined && registrationCodeLabel !== undefined ? (
         <View style={styles.field} testID={`${testID}-registration-code-stage`}>
-          <Text style={[text['section-title'], styles.title]}>{registrationCodeLabel.title}</Text>
-          <Text style={[text['row-meta'], styles.muted]}>{registrationCodeLabel.sent(registrationChallenge.email)}</Text>
+          <Text style={[text['detail-title'], styles.title]}>{registrationCodeLabel.title}</Text>
+          <Text style={[text['body-sm'], styles.muted]}>{registrationCodeLabel.sent(registrationChallenge.email)}</Text>
           <TextInput
             ref={registrationCodeInput}
             value={registrationCode}
@@ -817,7 +817,7 @@ export function AuthForm({
             aria-invalid={status?.tone === 'error'}
             testID={`${testID}-registration-code`}
           />
-          {registrationExpired ? <Text style={[text['caption'], styles.danger]}>{registrationCodeLabel.expired}</Text> : null}
+          {registrationExpired ? <Text style={[text['body-sm'], styles.danger]}>{registrationCodeLabel.expired}</Text> : null}
           <Pressable
             accessibilityRole="button"
             onPress={guard(onSubmit)}
@@ -838,7 +838,7 @@ export function AuthForm({
             style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
             testID={`${testID}-registration-code-resend`}
           >
-            <Text style={[text['row-meta'], styles.linkText]}>
+            <Text style={[text['body-sm'], styles.linkText]}>
               {resendSeconds === 0 ? registrationCodeLabel.resend : registrationCodeLabel.resendIn(resendSeconds)}
             </Text>
           </Pressable>
@@ -848,12 +848,12 @@ export function AuthForm({
             style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
             testID={`${testID}-registration-code-change-email`}
           >
-            <Text style={[text['row-meta'], styles.linkText]}>{registrationCodeLabel.changeEmail}</Text>
+            <Text style={[text['body-sm'], styles.linkText]}>{registrationCodeLabel.changeEmail}</Text>
           </Pressable>
         </View>
       ) : stage === 'identify' ? (
         <View style={styles.field}>
-          <Text style={[text['caption'], styles.muted]}>{labels.email}</Text>
+          <Text style={[text['body-sm'], styles.muted]}>{labels.email}</Text>
           <TextInput
             ref={emailInput}
             value={email}
@@ -879,7 +879,7 @@ export function AuthForm({
             testID={`${testID}-email`}
           />
           {missing('email') ? (
-            <Text style={[text['caption'], styles.danger]}>{labels.localErrors.email}</Text>
+            <Text style={[text['body-sm'], styles.danger]}>{labels.localErrors.email}</Text>
           ) : null}
           <Pressable
             accessibilityRole="button"
@@ -897,7 +897,7 @@ export function AuthForm({
         </View>
       ) : (
         <View style={styles.field}>
-          <Text style={[text['caption'], styles.muted]}>{labels.email}</Text>
+          <Text style={[text['body-sm'], styles.muted]}>{labels.email}</Text>
           <TextInput
             ref={emailInput}
             value={email}
@@ -918,7 +918,7 @@ export function AuthForm({
             testID={`${testID}-email`}
           />
           {missing('email') ? (
-            <Text style={[text['caption'], styles.danger]}>{labels.localErrors.email}</Text>
+            <Text style={[text['body-sm'], styles.danger]}>{labels.localErrors.email}</Text>
           ) : null}
 
           {/*
@@ -926,7 +926,7 @@ export function AuthForm({
             它属于"密码"这个字段，而不是表单尾部一个孤零零的链接）。
           */}
           <View style={styles.labelRow}>
-            <Text style={[text['caption'], styles.muted]}>{labels.password}</Text>
+            <Text style={[text['body-sm'], styles.muted]}>{labels.password}</Text>
             {mode === 'sign-in' ? (
               <Pressable
                 accessibilityRole="button"
@@ -934,7 +934,7 @@ export function AuthForm({
                 style={({ pressed }) => [styles.labelLink, pressed ? styles.pressed : null]}
                 testID={`${testID}-forgot`}
               >
-                <Text style={[text['caption'], styles.linkText]}>{labels.forgotPassword}</Text>
+                <Text style={[text['body-sm'], styles.linkText]}>{labels.forgotPassword}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -984,7 +984,7 @@ export function AuthForm({
             </Pressable>
           </View>
           {missing('password') ? (
-            <Text style={[text['caption'], styles.danger]}>{labels.localErrors.password}</Text>
+            <Text style={[text['body-sm'], styles.danger]}>{labels.localErrors.password}</Text>
           ) : null}
           {/*
             「记住密码」（2026-10-10 产品负责人需求）。只出现在**登录**档：
@@ -1018,7 +1018,7 @@ export function AuthForm({
                   />
                 ) : null}
               </View>
-              <Text style={[text['caption'], styles.termsText]}>{labels.rememberPassword}</Text>
+              <Text style={[text['body-sm'], styles.termsText]}>{labels.rememberPassword}</Text>
             </Pressable>
           ) : null}
           {mode === 'register' ? (
@@ -1030,7 +1030,7 @@ export function AuthForm({
                   testID={`${testID}-password-strength`}
                 />
               ) : null}
-              <Text style={[text['caption'], styles.muted]}>
+              <Text style={[text['body-sm'], styles.muted]}>
                 {labels.confirmPassword ?? labels.password}
               </Text>
               <View style={styles.passwordRow}>
@@ -1069,7 +1069,7 @@ export function AuthForm({
                 </Pressable>
               </View>
               {missing('passwordConfirmation') ? (
-                <Text style={[text['caption'], styles.danger]}>
+                <Text style={[text['body-sm'], styles.danger]}>
                   {labels.localErrors.passwordConfirmation ??
                     (confirmPassword === ''
                       ? labels.passwordConfirmationRequired ?? labels.password
@@ -1078,7 +1078,7 @@ export function AuthForm({
               ) : null}
               {labels.invite !== undefined ? (
                 <View style={styles.field}>
-                  <Text style={[text['caption'], styles.muted]}>{labels.invite.label}</Text>
+                  <Text style={[text['body-sm'], styles.muted]}>{labels.invite.label}</Text>
                   <TextInput
                     value={inviteCode}
                     onChangeText={(next) => {
@@ -1098,7 +1098,7 @@ export function AuthForm({
                     testID={`${testID}-invite`}
                   />
                   {inviteInvalid && inviteCodeLength !== undefined ? (
-                    <Text style={[text['caption'], styles.danger]}>
+                    <Text style={[text['body-sm'], styles.danger]}>
                       {labels.invite.invalid(inviteCodeLength)}
                     </Text>
                   ) : null}
@@ -1135,17 +1135,17 @@ export function AuthForm({
                     />
                   ) : null}
                 </View>
-                <Text style={[text['caption'], styles.termsText]}>{labels.terms}</Text>
+                <Text style={[text['body-sm'], styles.termsText]}>{labels.terms}</Text>
               </Pressable>
               {missing('terms') ? (
-                <Text style={[text['caption'], styles.danger]}>
+                <Text style={[text['body-sm'], styles.danger]}>
                   {labels.localErrors.terms(AUTH_TERMS_REQUIRED_KEY)}
                 </Text>
               ) : null}
               {labels.legal !== undefined ? (
                 labels.legal.hrefs !== undefined && Platform.OS === 'web' ? (
                   <View style={styles.legalRow} testID={`${testID}-legal`}>
-                    <Text style={[text['row-meta'], styles.linkText]}>
+                    <Text style={[text['body-sm'], styles.linkText]}>
                       <a
                         href={labels.legal.hrefs.terms}
                         target="_blank"
@@ -1155,7 +1155,7 @@ export function AuthForm({
                         {labels.legal.terms}
                       </a>
                     </Text>
-                    <Text style={[text['row-meta'], styles.linkText]}>
+                    <Text style={[text['body-sm'], styles.linkText]}>
                       <a
                         href={labels.legal.hrefs.privacy}
                         target="_blank"
@@ -1174,7 +1174,7 @@ export function AuthForm({
                       style={({ pressed }) => [styles.link, pressed ? styles.pressed : null]}
                       testID={`${testID}-legal-terms`}
                     >
-                      <Text style={[text['row-meta'], styles.linkText]}>{labels.legal.terms}</Text>
+                      <Text style={[text['body-sm'], styles.linkText]}>{labels.legal.terms}</Text>
                     </Pressable>
                     <Pressable
                       accessibilityRole="link"
@@ -1182,7 +1182,7 @@ export function AuthForm({
                       style={({ pressed }) => [styles.link, pressed ? styles.pressed : null]}
                       testID={`${testID}-legal-privacy`}
                     >
-                      <Text style={[text['row-meta'], styles.linkText]}>
+                      <Text style={[text['body-sm'], styles.linkText]}>
                         {labels.legal.privacy}
                       </Text>
                     </Pressable>
@@ -1222,7 +1222,7 @@ export function AuthForm({
             style={({ pressed }) => [styles.textAction, styles.textActionCenter, pressed ? styles.pressed : null]}
             testID={`${testID}-switch-mode`}
           >
-            <Text style={[text['row-meta'], styles.linkText]}>
+            <Text style={[text['body-sm'], styles.linkText]}>
               {mode === 'sign-in' ? labels.switchToRegister : labels.switchToSignIn}
             </Text>
           </Pressable>
@@ -1241,7 +1241,7 @@ export function AuthForm({
           {labels.otherWaysToggle === undefined ? (
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
-              <Text style={[text['caption'], styles.muted]}>{labels.otherWays}</Text>
+              <Text style={[text['body-sm'], styles.muted]}>{labels.otherWays}</Text>
               <View style={styles.dividerLine} />
             </View>
           ) : (
@@ -1253,7 +1253,7 @@ export function AuthForm({
               testID={`${testID}-other-ways-toggle`}
             >
               <View style={styles.dividerLine} />
-              <Text style={[text['row-meta'], styles.muted]}>
+              <Text style={[text['body-sm'], styles.muted]}>
                 {otherWaysOpen ? labels.otherWaysToggle.close : labels.otherWaysToggle.open}
               </Text>
               <View style={styles.dividerLine} />
@@ -1280,15 +1280,15 @@ export function AuthForm({
               size={tokens['icon.xs']}
               color={tokens['color.foreground-muted']}
             />
-            <Text style={[text['row-meta'], styles.linkText]}>
+            <Text style={[text['body-sm'], styles.linkText]}>
               {mode === 'sign-in' ? labels.passkeyLogin : labels.passkeyRegister}
             </Text>
           </Pressable>
           {!passkeyAvailable ? (
-            <Text style={[text['caption'], styles.muted]}>{labels.passkeyUnavailable}</Text>
+            <Text style={[text['body-sm'], styles.muted]}>{labels.passkeyUnavailable}</Text>
           ) : null}
           {waitingForPasskey ? (
-            <Text style={[text['caption'], styles.muted]}>{labels.passkeyWaiting}</Text>
+            <Text style={[text['body-sm'], styles.muted]}>{labels.passkeyWaiting}</Text>
           ) : null}
           <Pressable
             accessibilityRole="button"
@@ -1296,7 +1296,7 @@ export function AuthForm({
             style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
             testID={`${testID}-magic-link`}
           >
-            <Text style={[text['row-meta'], styles.linkText]}>{labels.magicLink}</Text>
+            <Text style={[text['body-sm'], styles.linkText]}>{labels.magicLink}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -1304,7 +1304,7 @@ export function AuthForm({
             style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
             testID={`${testID}-recovery`}
           >
-            <Text style={[text['row-meta'], styles.linkText]}>{labels.recovery}</Text>
+            <Text style={[text['body-sm'], styles.linkText]}>{labels.recovery}</Text>
             </Pressable>
           {mode === 'sign-in' && labels.loginCode !== undefined && onLoginCode !== undefined ? (
             <Pressable
@@ -1320,7 +1320,7 @@ export function AuthForm({
               style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
               testID={`${testID}-login-code-trigger`}
             >
-              <Text style={[text['row-meta'], styles.linkText]}>{labels.loginCode.trigger}</Text>
+              <Text style={[text['body-sm'], styles.linkText]}>{labels.loginCode.trigger}</Text>
             </Pressable>
           ) : null}
           </>
@@ -1351,7 +1351,7 @@ export function AuthForm({
           testID={`${testID}-advanced-toggle`}
         >
           <View style={styles.dividerLine} />
-          <Text style={[text['row-meta'], styles.muted]}>
+          <Text style={[text['body-sm'], styles.muted]}>
             {advancedShown ? labels.advancedToggle.close : labels.advancedToggle.open}
           </Text>
           <View style={styles.dividerLine} />
@@ -1368,14 +1368,14 @@ export function AuthForm({
               style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
               testID={`${testID}-self-host-toggle`}
             >
-              <Text style={[text['row-meta'], styles.linkText]}>
+              <Text style={[text['body-sm'], styles.linkText]}>
                 {selfHostOpen ? labels.selfHostToggle.close : labels.selfHostToggle.open}
               </Text>
             </Pressable>
           )}
           {selfHostShown ? (
             <View style={styles.field}>
-              <Text style={[text['caption'], styles.muted]}>{labels.serverUrl.label}</Text>
+              <Text style={[text['body-sm'], styles.muted]}>{labels.serverUrl.label}</Text>
               <TextInput
                 value={serverUrl.value}
                 onChangeText={serverUrl.onChange}
@@ -1390,7 +1390,7 @@ export function AuthForm({
                 testID={`${testID}-server-url`}
               />
               {missing('baseUrl') ? (
-                <Text style={[text['caption'], styles.danger]}>{labels.localErrors.baseUrl}</Text>
+                <Text style={[text['body-sm'], styles.danger]}>{labels.localErrors.baseUrl}</Text>
               ) : null}
             </View>
           ) : null}
@@ -1407,14 +1407,14 @@ export function AuthForm({
               style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
               testID={`${testID}-have-token-toggle`}
             >
-              <Text style={[text['row-meta'], styles.linkText]}>
+              <Text style={[text['body-sm'], styles.linkText]}>
                 {haveTokenOpen ? labels.haveTokenToggle.close : labels.haveTokenToggle.open}
               </Text>
             </Pressable>
           ) : null}
           {haveTokenShown ? (
             <View style={styles.field}>
-              <Text style={[text['caption'], styles.muted]}>{labels.paste.label}</Text>
+              <Text style={[text['body-sm'], styles.muted]}>{labels.paste.label}</Text>
               <TextInput
                 value={token}
                 onChangeText={setToken}
@@ -1493,7 +1493,13 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['size.field-height'],
       paddingHorizontal: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      backgroundColor: tokens['color.background'],
+      // 🔴 2026-11-17 产品裁决：输入框 = 白底 + 一圈极细的边，靠这条线承载。
+      // 此前是「slate-50 浅灰底 + 无边框」，在白 sheet 上只差 7/255，几乎看不见，
+      // 读成「一整片空白里浮着几行字」。细边只用最细一档与语义 border 色，
+      // 不要重描边 / 彩色描边 / 框中框（design-system/heyta/MASTER.md「2026-11-17 产品裁决」）。
+      backgroundColor: tokens['color.surface'],
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
       color: tokens['color.foreground'],
       // 🔴 字号走 `text['row-title']`（`font-size.base` = 16）整条带上 ——
       // 低于 16px 时 iOS 聚焦会**自动放大整个页面**，且不会缩回去。

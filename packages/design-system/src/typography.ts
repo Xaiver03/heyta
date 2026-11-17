@@ -190,6 +190,23 @@ export const TEXT_STYLES = {
     tracking: 'tracking.caption',
   },
   /**
+   * 次级可点文字与字段标签（14px / 500）。
+   *
+   * 🔴 2026-11-17：登录/注册页此前把 `caption`(12, caption1 档) 用在**字段标签**和
+   * **可点动作**（忘记密码 / 创建一个 / 返回 / 其他登录方式 / 先离线使用）上，
+   * 在白底大留白的登录页上读到「明显偏小」。12px 是注记档，不是动作档。
+   * 这一档给 14px/medium，承接「字段标签 + 次级动作 + 次级说明」，
+   * 把 12px 收回到真正的辅助注记。
+   *
+   * 与 `numeric-body` 不重复：那枚是**等宽数字**（tabular-nums），这枚是普通文字。
+   */
+  'body-sm': {
+    size: 'font-size.sm',
+    weight: 'font-weight.medium',
+    leading: 'line-height.normal',
+    tracking: 'tracking.body',
+  },
+  /**
    * 标签栏文字。小字号下限（11px），因此字距放宽。
    * 字重直接引用 `font-weight.medium` —— 刻意不为标签栏单设一个字重 token，
    * 那会制造第二个权威（改一处漏一处且不报错）。

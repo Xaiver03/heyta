@@ -409,7 +409,7 @@ function WelcomeScreenInner({
               onSignedIn={onSignedIn}
             />
             <Pressable accessibilityRole="button" onPress={onUseOffline} style={styles.offline}>
-              <Text variant="caption" tone="muted">{t('mobile.welcome.offline')}</Text>
+              <Text variant="body-sm" tone="muted">{t('mobile.welcome.offline')}</Text>
             </Pressable>
           </ScrollView>
         </Animated.View>

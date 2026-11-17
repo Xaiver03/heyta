@@ -860,7 +860,7 @@ export function AuthScreen({
           不该和主按钮抢注意力）。
         */}
         <Pressable accessibilityRole="button" onPress={onBack} testID="mobile-central-auth-back">
-          <Text variant="caption" tone="muted">{t('mobile.auth.back')}</Text>
+          <Text variant="body-sm" tone="muted">{t('mobile.auth.back')}</Text>
         </Pressable>
       </ScrollView>
 
