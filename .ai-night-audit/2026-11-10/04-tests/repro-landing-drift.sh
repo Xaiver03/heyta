@@ -77,7 +77,7 @@ r_nav_reg=$(sed -n '/const SHELL_PRIMARY_NAV/,/^];/p' ${LANDING}/src/mockup/app-
 if [ "$r_nav_src" -eq "$r_nav_reg" ]; then
   echo "  ✅ 主导航条数一致（${r_nav_src} = ${r_nav_reg}）"
 else
-  echo "  🔴 主导航条数不一致（真源 $r_nav_src ≠ 登记处 $r_nav_reg）"
+  echo "  🔴 主导航条数不一致（真源 $r_nav_src ≠ 登记处 ${r_nav_reg}）"
   FAIL=1
 fi
 if [ "$(grep -E '^\s*anchors:' ${LANDING}/src/mockup/app-shell-shape.ts | grep -c 'detail-pane-open')" -eq 0 ]; then

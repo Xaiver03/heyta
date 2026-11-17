@@ -236,7 +236,7 @@ shot() {  # <文件名>
 
 step "0. 前置：这一读数属于哪一棵树"
 PHONE_DB=$(phone_db)
-[ -n "$PHONE_DB" ] && [ -f "$PHONE_DB" ] || { bad "取不到手机里的真 SQLite（$PHONE_DB）"; summary "iOS 置顶顺序"; }
+[ -n "$PHONE_DB" ] && [ -f "$PHONE_DB" ] || { bad "取不到手机里的真 SQLite（${PHONE_DB}）"; summary "iOS 置顶顺序"; }
 APP_BIN="${HEYTA_IOS_DERIVED:-/tmp/heyta-ios-release}/Build/Products/Release-iphonesimulator/Heyta.app"
 printf '   git HEAD      : %s\n' "$(cd "$(dirname "$0")/.." && git rev-parse --short HEAD)"
 # 🔴 mtime 要一条**两边都认**的取法（2026-11-10，F-13）。
@@ -262,8 +262,8 @@ BEFORE_OPS=$(apps_count)
 add_task "$A" || { summary "iOS 置顶顺序"; }
 add_task "$B" || { summary "iOS 置顶顺序"; }
 
-YA=$(row_y "$A") || { bad "列表里读不到「$A」那一行"; summary "iOS 置顶顺序"; }
-YB=$(row_y "$B") || { bad "列表里读不到「$B」那一行"; summary "iOS 置顶顺序"; }
+YA=$(row_y "$A") || { bad "列表里读不到「${A}」那一行"; summary "iOS 置顶顺序"; }
+YB=$(row_y "$B") || { bad "列表里读不到「${B}」那一行"; summary "iOS 置顶顺序"; }
 # 🔴 "之前"是**读出来的**，不是假设的。移动端列表的默认档是 `addedAt`
 #   （新的在上，与搬共享层之前那句 `reverse()` 逐条等价 —— 见
 #   `apps/mobile/src/screens/TasksScreen.tsx` 那条注释），而 web 的展示档是 `display`。
@@ -272,9 +272,9 @@ YB=$(row_y "$B") || { bad "列表里读不到「$B」那一行"; summary "iOS �
 #   判据要的是**相对变化**：把此刻在下面那条钉住，它必须跑到上面去。
 if [ "$YA" -gt "$YB" ]; then TARGET="$A"; OTHER="$B"; else TARGET="$B"; OTHER="$A"; fi
 YT=$(row_y "$TARGET"); YO=$(row_y "$OTHER")
-ok "置顶之前：「$TARGET」在「$OTHER」下面（y $YT > $YO）"
+ok "置顶之前：「${TARGET}」在「${OTHER}」下面（y $YT > ${YO}）"
 
-step "2. 长按「$TARGET」开行菜单"
+step "2. 长按「${TARGET}」开行菜单"
 if open_row_menu "$TARGET"; then
   ok "长按之后菜单里出现了「置顶」/「取消置顶」这一项"
 else
@@ -287,12 +287,12 @@ shot row-menu.png
 step "3. 按「置顶」，顺序必须翻过来"
 ax "置顶" --pressable --exact --press --json >/dev/null 2>&1
 sleep 3
-YT2=$(row_y "$TARGET") || { bad "置顶之后读不到「$TARGET」那一行了"; summary "iOS 置顶顺序"; }
-YO2=$(row_y "$OTHER") || { bad "置顶之后读不到「$OTHER」那一行了"; summary "iOS 置顶顺序"; }
+YT2=$(row_y "$TARGET") || { bad "置顶之后读不到「${TARGET}」那一行了"; summary "iOS 置顶顺序"; }
+YO2=$(row_y "$OTHER") || { bad "置顶之后读不到「${OTHER}」那一行了"; summary "iOS 置顶顺序"; }
 if [ "$YT2" -lt "$YO2" ]; then
-  ok "钉住的那条真的排到最前（y $YT > $YO → y $YT2 < $YO2）"
+  ok "钉住的那条真的排到最前（y $YT > $YO → y $YT2 < ${YO2}）"
 else
-  bad "点了「置顶」但顺序没翻（y $YT2 vs $YO2）—— 共享 model 那份顺序所有者又不读 pinnedAt 了"
+  bad "点了「置顶」但顺序没翻（y $YT2 vs ${YO2}）—— 共享 model 那份顺序所有者又不读 pinnedAt 了"
 fi
 shot after-pin.png
 
@@ -307,9 +307,9 @@ fi
 step "5. 真 op-log：一个用户意图 = 一条 op"
 AFTER_OPS=$(apps_count)
 if [ "$AFTER_OPS" = "$((BEFORE_OPS + 3))" ]; then
-  ok "ops 行数 $BEFORE_OPS → $AFTER_OPS（两条建 + 一条置顶，恰好 +3）"
+  ok "ops 行数 $BEFORE_OPS → ${AFTER_OPS}（两条建 + 一条置顶，恰好 +3）"
 else
-  bad "ops 行数 $BEFORE_OPS → $AFTER_OPS，期望恰好 +3"
+  bad "ops 行数 $BEFORE_OPS → ${AFTER_OPS}，期望恰好 +3"
 fi
 LAST_OP=$(sqlite3 "${PHONE_DB}" "SELECT data FROM ops ORDER BY rowid DESC LIMIT 1;" 2>/dev/null)
 if printf '%s' "$LAST_OP" | grep -q "pinnedAt"; then

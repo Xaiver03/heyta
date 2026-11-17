@@ -97,9 +97,9 @@ say "$DEVICES"
 
 if [ -n "$FILTER" ]; then
   MATCHES="$(printf '%s\n' "$DEVICES" | grep -i -- "$FILTER" || true)"
-  [ -n "$MATCHES" ] || die "没有设备匹配「$FILTER」。"
+  [ -n "$MATCHES" ] || die "没有设备匹配「${FILTER}」。"
   COUNT="$(printf '%s\n' "$MATCHES" | wc -l | tr -d ' ')"
-  [ "$COUNT" = "1" ] || die "「$FILTER」匹配到 $COUNT 台，请写更具体一点：\n$MATCHES"
+  [ "$COUNT" = "1" ] || die "「${FILTER}」匹配到 $COUNT 台，请写更具体一点：\n$MATCHES"
   DEVICE_LINE="$MATCHES"
 else
   COUNT="$(printf '%s\n' "$DEVICES" | wc -l | tr -d ' ')"

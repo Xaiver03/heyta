@@ -45,7 +45,7 @@ if [ -n "$want" ]; then
   case "$fg" in
     *"$want"*) : ;;
     *)
-      echo "拒绝保存：前台是 $fg，不是 $want（$side）" >&2
+      echo "拒绝保存：前台是 ${fg}，不是 ${want}（${side}）" >&2
       exit 4
       ;;
   esac

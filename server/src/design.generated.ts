@@ -20,7 +20,7 @@ export const EMAIL_COLOR = {
   'color.surface-raised': '#ffffff',
   'color.foreground': '#0f172a',
   'color.foreground-muted': '#475569',
-  'color.foreground-subtle': '#64748b',
+  'color.foreground-subtle': '#57677d',
   'color.primary': '#2563eb',
   'color.primary-hover': '#1d4ed8',
   'color.on-primary': '#ffffff',

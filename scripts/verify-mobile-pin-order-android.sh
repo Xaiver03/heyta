@@ -158,7 +158,7 @@ pass_first_launch() {
     if by_id "mobile-task-add" >/dev/null 2>&1; then return 0; fi
     dump >/dev/null 2>&1; rc=$?
     if [ "$rc" != 0 ]; then
-      info "第 $i 轮：树读不到（rc=$rc），等 3 秒再来"
+      info "第 $i 轮：树读不到（rc=${rc}），等 3 秒再来"
       sleep 3; continue
     fi
     # 隐私面板
@@ -222,7 +222,7 @@ add_task() {
   tap_id "capture-submit" >/dev/null 2>&1
   sleep 3
   if by_id "capture-submit" >/dev/null 2>&1; then
-    bad "按了提交但 Composer 仍开着 —— 「$title」没建出来"
+    bad "按了提交但 Composer 仍开着 —— 「${title}」没建出来"
     return 1
   fi
   return 0
@@ -287,8 +287,8 @@ add_task "$A" || { bad "建任务 A 失败"; ((FAIL++)); }
 add_task "$B" || { bad "建任务 B 失败"; ((FAIL++)); }
 if [ "$FAIL" -gt 0 ]; then shot "fail-add.png"; fi
 
-YA=$(y_of_title "$A") || { bad "列表里读不到「$A」的 y"; shot "fail-no-row.png"; ((FAIL++)); }
-YB=$(y_of_title "$B") || { bad "列表里读不到「$B」的 y"; shot "fail-no-row.png"; ((FAIL++)); }
+YA=$(y_of_title "$A") || { bad "列表里读不到「${A}」的 y"; shot "fail-no-row.png"; ((FAIL++)); }
+YB=$(y_of_title "$B") || { bad "列表里读不到「${B}」的 y"; shot "fail-no-row.png"; ((FAIL++)); }
 
 if [ "$FAIL" -gt 0 ]; then
   echo ""; echo "════════════════════════════════════════"; echo "  失败 $FAIL 项"; echo "  ❌ Android 置顶顺序：中止"; exit 1
@@ -300,10 +300,10 @@ if [ "$YA" -gt "$YB" ]; then
 else
   TARGET="$B"; OTHER="$A"; YT="$YB"; YO="$YA"
 fi
-ok "置顶之前：「$TARGET」在「$OTHER」下面（y $YT > $YO）"
+ok "置顶之前：「${TARGET}」在「${OTHER}」下面（y $YT > ${YO}）"
 ((PASS++))
 
-step "3. 长按「$TARGET」开行菜单"
+step "3. 长按「${TARGET}」开行菜单"
 MENU_OK=""
 for attempt in 1 2 3; do
   long_press_text "$TARGET" >/dev/null 2>&1
@@ -329,15 +329,15 @@ shot "row-menu.png"
 step "4. 按「置顶」，顺序必须翻过来"
 tap_text "置顶" >/dev/null 2>&1
 sleep 3
-YT2=$(y_of_title "$TARGET") || { bad "置顶后读不到「$TARGET」"; ((FAIL++)); }
-YO2=$(y_of_title "$OTHER") || { bad "置顶后读不到「$OTHER」"; ((FAIL++)); }
+YT2=$(y_of_title "$TARGET") || { bad "置顶后读不到「${TARGET}」"; ((FAIL++)); }
+YO2=$(y_of_title "$OTHER") || { bad "置顶后读不到「${OTHER}」"; ((FAIL++)); }
 
 if [ -n "${YT2:-}" ] && [ -n "${YO2:-}" ]; then
   if [ "$YT2" -lt "$YO2" ]; then
-    ok "钉住的那条排到最前（y $YT > $YO → y $YT2 < $YO2）"
+    ok "钉住的那条排到最前（y $YT > $YO → y $YT2 < ${YO2}）"
     ((PASS++))
   else
-    bad "点了「置顶」但顺序没翻（y $YT2 vs $YO2）"
+    bad "点了「置顶」但顺序没翻（y $YT2 vs ${YO2}）"
     ((FAIL++))
   fi
 fi
@@ -372,7 +372,7 @@ if [ -n "$BEFORE_OPS" ]; then
   AFTER_OPS=$(rsh "adb shell run-as $PKG sqlite3 databases/heyta.db 'SELECT COUNT(*) FROM ops;'" 2>/dev/null | tr -d '\r' | grep -oE '[0-9]+' | head -1)
   EXPECTED=$((BEFORE_OPS + 3))
   if [ "$AFTER_OPS" = "$EXPECTED" ]; then
-    ok "ops 行数 $BEFORE_OPS → $AFTER_OPS（两条建 + 一条置顶，恰好 +3）"
+    ok "ops 行数 $BEFORE_OPS → ${AFTER_OPS}（两条建 + 一条置顶，恰好 +3）"
     ((PASS++))
   else
     bad "ops 行数 $BEFORE_OPS → ${AFTER_OPS:-读不到}，期望 $EXPECTED"
@@ -411,6 +411,6 @@ if [ "$FAIL" -eq 0 ]; then
   echo "  ✅ Android 置顶顺序：真机全链路通过"
   exit 0
 else
-  echo "  ❌ Android 置顶顺序：有失败项（证据 $EVIDENCE_DIR）"
+  echo "  ❌ Android 置顶顺序：有失败项（证据 ${EVIDENCE_DIR}）"
   exit 1
 fi
