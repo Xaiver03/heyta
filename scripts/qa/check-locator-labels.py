@@ -175,22 +175,38 @@ EN = invert(EN_TABLE)
 # `AI 与集成`/`账号安全` 五枚组名被 7 个 `mobile.settings.section.*` 取代）、
 # 详情面与排期披露改版（`任务详情`/`展开排期`/`收起排期`）、认证面改版（两种登录方式）。
 DEAD_LABEL_LEDGER: dict[tuple[str, str], str] = {
+    # ── 2026-11-14 移动端设置面去掉组标题「偏好与账号」、任务面「视图选项」胶囊/排序面板改版：
+    #    以下 9 条是随之失效的旧定位文案（移动端 0 渲染），修法在旅程脚本侧（换新文案或 resource-id）。
+    ('scripts/qa/profile-settings-android.py', '偏好与账号'):
+        '2026-11-14 设置面去掉组标题「偏好与账号」（SettingsScreen 注释）；文案已不在移动端渲染，脚本需改定位/resource-id',
+    ('scripts/qa/profile-settings-ios.py', '偏好与账号'):
+        '2026-11-14 设置面去掉组标题「偏好与账号」（SettingsScreen 注释）；文案已不在移动端渲染，脚本需改定位/resource-id',
+    ('scripts/qa/tasks-ux-android.py', '视图选项'):
+        'TasksScreen 把「视图选项」胶囊/排序面板改版后旧文案 0 渲染（仅注释残留），脚本需改定位/resource-id',
+    ('scripts/qa/tasks-ux-android.py', '视图选项：{view}'):
+        'TasksScreen 把「视图选项」胶囊/排序面板改版后旧文案 0 渲染（仅注释残留），脚本需改定位/resource-id',
+    ('scripts/qa/tasks-ux-android.py', '选择排序方式'):
+        'TasksScreen 把「视图选项」胶囊/排序面板改版后旧文案 0 渲染（仅注释残留），脚本需改定位/resource-id',
+    ('scripts/qa/tasks-ux-ios.py', '关闭视图选项'):
+        'TasksScreen 把「视图选项」胶囊/排序面板改版后旧文案 0 渲染（仅注释残留），脚本需改定位/resource-id',
+    ('scripts/qa/tasks-ux-ios.py', '视图选项'):
+        'TasksScreen 把「视图选项」胶囊/排序面板改版后旧文案 0 渲染（仅注释残留），脚本需改定位/resource-id',
+    ('scripts/qa/tasks-ux-ios.py', '视图选项：{view}'):
+        'TasksScreen 把「视图选项」胶囊/排序面板改版后旧文案 0 渲染（仅注释残留），脚本需改定位/resource-id',
+    ('scripts/qa/tasks-ux-ios.py', '选择排序方式'):
+        'TasksScreen 把「视图选项」胶囊/排序面板改版后旧文案 0 渲染（仅注释残留），脚本需改定位/resource-id',
     # ── 设置七组同构：移动端现量只读 account/subscription/data/notifications/
     #    appearance/features/about 这七枚（`apps/mobile/src` 全扫），旧组名全部 0 引用。
     ('scripts/qa/profile-settings-android.py', '同步与隐私'):
         '七组同构后「同步与隐私」并入「数据与同步」（mobile.settings.section.data），旧键 0 引用',
     ('scripts/qa/profile-settings-android.py', '常规'):
         '七组同构后「常规」一分为「提醒与通知」与「外观与语言」，旧键 mobile.settings.section.general 0 引用',
-    ('scripts/qa/profile-settings-android.py', '数据管理'):
-        '七组同构后改名「数据与同步」；脚本点的是 web.settings.nav.data，移动端不读它',
     ('scripts/qa/profile-settings-ios.py', 'AI 与集成'):
         '七组同构后改名「功能与 AI」（mobile.settings.section.features）',
     ('scripts/qa/profile-settings-ios.py', '同步与隐私'):
         '七组同构后并入「数据与同步」（mobile.settings.section.data）',
     ('scripts/qa/profile-settings-ios.py', '常规'):
         '七组同构后一分为「提醒与通知」与「外观与语言」，旧键 0 引用',
-    ('scripts/qa/profile-settings-ios.py', '数据管理'):
-        '七组同构后改名「数据与同步」；脚本点的是 web.settings.nav.data',
     ('scripts/qa/profile-settings-ios.py', '账号安全'):
         '七组同构后并入「账号」（mobile.settings.section.account），旧键 0 引用',
     ('scripts/qa/ai-face-ios.py', 'AI 与集成'):
@@ -201,8 +217,6 @@ DEAD_LABEL_LEDGER: dict[tuple[str, str], str] = {
         '七组同构后并入「数据与同步」（mobile.settings.section.data）',
     ('scripts/qa/ios-app-language.py', '常规'):
         '七组同构后一分为「提醒与通知」与「外观与语言」，旧键 0 引用',
-    ('scripts/qa/ios-app-language.py', '数据管理'):
-        '七组同构后改名「数据与同步」；脚本点的是 web.settings.nav.data',
     ('scripts/qa/ios-app-language.py', '账号安全'):
         '七组同构后并入「账号」（mobile.settings.section.account），旧键 0 引用',
     # ── 详情面 / 排期披露：`mobile.detail.title` 与 `…schedule.open/close` 现量 0 引用
