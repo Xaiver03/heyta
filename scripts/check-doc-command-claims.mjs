@@ -41,7 +41,7 @@
  *       `node scripts/check-doc-command-claims.mjs --self-test`
  */
 
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, lstatSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,7 +56,7 @@ const SKIP_DIR = /(\/node_modules\/|\/dist\/|\/archive\/)/;
 function walk(dir, out) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    const st = statSync(p);
+    const st = lstatSync(p);
     if (st.isDirectory()) {
       if (name === 'node_modules' || name === 'dist') continue;
       walk(p, out);
@@ -89,7 +89,7 @@ function collectScriptNames(rootDir) {
     if (!existsSync(base)) continue;
     for (const name of readdirSync(base)) {
       const p = join(base, name);
-      if (statSync(p).isDirectory()) dirs.push(p);
+      if (lstatSync(p).isDirectory()) dirs.push(p);
     }
   }
   if (existsSync(join(rootDir, 'server'))) dirs.push(join(rootDir, 'server'));
