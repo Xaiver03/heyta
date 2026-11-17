@@ -1022,7 +1022,11 @@ def main():
         # part of the click contract: a non-tab target must be fully on-screen
         # and must not overlap a detected tab bar.  The caller must scroll and
         # read a fresh frame before retrying; never guess a coordinate.
-        _w, _h = screen_size(nodes)
+        # 🔴 判"目标是否越界"时**不能用目标自己的 frame 定义屏**：一个位于 y=720 的
+        #   树内元素不能靠"它自己在这儿"就证明屏有 764 高。屏由**其余**节点界定，
+        #   故先把被按的目标排除，再算包围盒（其余仍屏外节点只会让判据更宽松，不造假红）。
+        _others = [n for n in nodes if n is not node]
+        _w, _h = screen_size(_others) if _others else screen_size(nodes)
         if _w and (_w <= cx < 0 or cx < 0 or cx >= _w or cy < 0 or (_h is not None and cy >= _h)):
             emit({"result": "tap-outside-screen", "cx": str(cx), "cy": str(cy)})
             return 0
