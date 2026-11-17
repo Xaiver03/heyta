@@ -123,7 +123,10 @@ a[href], a[href]:hover, a[href]:focus-visible {
 .ht-sidebar__calendar-body {
   --ht-focus-ring-offset: calc(var(--ht-space-1) * -1);
 }
-/* 复合输入与浮层由内容、底色及投影组织，不加第二层装饰框。 */
+/* 复合输入与浮层由内容、底色及投影组织，不加第二层装饰框。
+   🔴 2026-11-17：`.ht-input` 已从本块**移出** —— 输入面恢复「白底 + 一圈细线」
+   （与 AuthForm、移动 kit.tsx 的 TextField 同一条规则，多端统一）。
+   AI 主 composer 用的是 `.ht-ai__input`（另一个类），不受影响；卡片/弹层/菜单照旧由底色与投影组织。 */
 .ht-ai__composer,
 .ht-ai-agent-surface,
 .ht-search-overlay > *,
@@ -133,7 +136,6 @@ a[href], a[href]:hover, a[href]:focus-visible {
 .ht-rail__more-menu,
 .ht-category-create-dialog__dialog,
 .ht-sheet,
-.ht-input,
 .ht-settings__scope-badge,
 [role='menu'],
 [role='dialog'] {

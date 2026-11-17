@@ -1500,10 +1500,12 @@ export function TextField({
               ? { paddingTop: t['space.2'], textAlignVertical: 'top' as const }
               : {}),
             borderRadius: t['radius.md'],
+            // 2026-11-17 产品裁决：输入面 = 白底 + 一圈极细的边作承载（与 AuthForm / Web `.ht-input` 同一条规则，多端统一）。
+            // 细边只用最细一档与语义 border 色，不要重描边 / 彩色描边 / 框中框。
             backgroundColor: t['color.surface'],
             color: t['color.foreground'],
-            // 文本输入以光标表示编辑位置，不再叠加焦点边框。
-            borderWidth: 0,
+            borderWidth: t['border-width.thin'],
+            borderColor: t['color.border'],
             opacity: editable ? 1 : t['state.disabled-opacity'],
           },
         ]}
