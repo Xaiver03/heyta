@@ -339,3 +339,18 @@ TENCENTCLOUD_SECRET_ID=<cos.yaml 里的 secretID> TENCENTCLOUD_SECRET_KEY=<...> 
   ⇒ 绑自定义域名要自己签 COS XML API（签名四步写在 §7 第 461 条）。
 * `tccli ssl ApplyCertificate --DvAuthMethod DNS_AUTO` **不保证**自动写验证 TXT ⇒ 手动补 `_dnsauth.<子域>`。
 * 免费 DV 证书本次是 **TrustAsia DV Free，3 个月**（`CertId bf4wtvOI`，`dl.waytofuture.cn`，2026-10-18 → 2027-01-16）。
+
+## 分层门禁（快检 → 全量，日常只做增量）
+
+`pnpm check` 是一条单链、**遇红即停**、且含 e2e/原生/桌面打包（慢，跑一次以小时计）。日常不要每次全量跑，按层用：
+
+| 层 | 命令 | 跑什么 | 何时用 |
+|---|---|---|---|
+| L0 快检 | `pnpm gate:quick` | 只跑 **125 道轻量静态门禁**（`node scripts/check-*.mjs` 源码扫描），**并发**，约 25s | 编辑循环；全绿=代码级静态没问题 |
+| L0′ 增量 | `pnpm gate:quick --base HEAD` | 按 `git diff HEAD` **受影响文件**命中的轻量门禁（秒级）。`--base origin/main` 亦可 | 提交前/推送前的增量快检 |
+| L2 日常 | `pnpm gate:ci` | `check` 链里**除重型外**全部：`build` + `typecheck` + 全部静态 + `pnpm -r test` | 日常 PR / 推送前（分钟级） |
+| L3 全量 | `pnpm check`（=`pnpm gate:full`） | 上面全部 **+ e2e（539 串行）/ 原生 / 桌面打包 / 许可证 / 网络** | 预合并 / nightly / CI 全量 |
+
+实现：`scripts/check-tiers.mjs` 读现有 `scripts.check` 单链，按"会不会起浏览器/编原生/打包/联网/起 dev server"自动分轻/重（拿不准归**重型**，宁可夜里跑）。`node scripts/check-tiers.mjs list` 看每段分类。
+
+🔴 **没有新增或删除任何门禁**：分层只是运行时筛选同一条链，每条门禁仍可 `pnpm check:<名字>` 单点跑；`check:gate-wiring` 仍盯全量 `scripts.check`，所以"定义过的门禁必须真在链里"那条对账不受影响。
