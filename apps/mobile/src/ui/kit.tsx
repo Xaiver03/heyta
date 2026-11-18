@@ -106,6 +106,12 @@ export interface TextProps {
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
   /**
+   * 系统字号上限倍数（Dynamic Type）。内容文字默认不封顶（跟随系统）；**外圈控件**
+   * （底栏标签 / 角标 / chip 这类空间固定的 chrome）用它设上限，避免辅助功能大号下
+   * 把控件撑爆。与 `Badge` 里那枚 `maxFontSizeMultiplier={2}` 同一语义。
+   */
+  maxFontSizeMultiplier?: number;
+  /**
    * 原生 id。**只给 `aria-describedby` 这类关联用**（RN 的 `nativeID` 就是那个 id）。
    * 加它是因为字段的"说明/错误"要能被输入框按 id 指到 —— 那正是
    * `@heyta/ui#fieldDescribedById` 算出来的东西。
@@ -145,6 +151,7 @@ export function Text({
   testID,
   nativeID,
   accessibilityLiveRegion,
+  maxFontSizeMultiplier,
 }: TextProps): React.JSX.Element {
   const t = useTokens();
   const text = useText();
@@ -157,6 +164,7 @@ export function Text({
       accessibilityLiveRegion={accessibilityLiveRegion}
       numberOfLines={numberOfLines}
       selectable={selectable}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       style={[
         // 字号 / 字重 / 行高 / 字距 / 等宽**全部**由这一个对象决定。
         text[variant],

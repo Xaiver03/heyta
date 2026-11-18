@@ -1,6 +1,6 @@
 # Dynamic Type（系统大字号）支持 · 立项
 
-> 状态：立项（2026-11-18）。负责：移动端壳 + 设计系统。关联：[`docs/agents/design-system.md`](../agents/design-system.md)、[`docs/agents/ux-principles.md`](../agents/ux-principles.md)。
+> 状态：**已验证可用并加固（2026-11-18）**。负责：移动端壳 + 设计系统。关联：[`docs/agents/design-system.md`](../agents/design-system.md)、[`docs/agents/ux-principles.md`](../agents/ux-principles.md)。
 
 ## 目标
 移动端（iOS/Android）文字随系统「文字大小」缩放（Dynamic Type），在**超大 / 辅助功能大号**两档下布局不溢出、按钮可点、文字不被裁；同时少量关键小控件（角标 / 标签栏 / chip）设上限防破版。
@@ -24,6 +24,14 @@
 ## 验收
 - iPhone + iPad，「超大」「辅助功能大号」两档：个人中心 / 设置 / 任务 / 登录 四屏逐张实拍，无溢出、无截断、按钮 ≥44、无水平滚动。
 - 记录每屏字号档下的实测高度与是否换行。
+
+## 2026-11-18 实测结论
+
+**Dynamic Type 本已生效**（`kit.tsx` 的 `<Text>` 走 `RNText` 默认 `allowFontScaling=true`，全仓无 `allowFontScaling={false}`）。之前判「不缩放」是**无法重启 App** 造成的误判：`devicectl --text-size` 的合法值是 `xl/xxl/axl/axxl/axxxl…`（不是 `accessibility-extra-large`），且运行中的进程不会热更新 fontScale，必须真正 terminate + 冷启动。
+
+**在 iPad 模拟器上实测通过**：`simctl ui <dev> content_size accessibility-extra-large` + 重启 App 后，「我的」整屏文字按比例放大、卡片撑住、换行正常、无横向溢出、无裁切（证据 `.local/profile-center-evidence-20261118/dt-ipad-a11yxl-profile.png`）。
+
+**chrome 上限已加**：`Text` 新增可选 `maxFontSizeMultiplier`，底栏标签设 `1.4`（角标本就 `2`）；内容文字不封顶，仍随系统字号缩放。
 
 ## 已知环境限制（登记）
 - 本机 DSH 沙箱无法完成 `xcodebuild` device 构建（SwiftPM 缓存 + 嵌套 sandbox-exec 被拒）；真机装包走「Metro 重打 bundle + dev 重签 + devicectl install」的等价路径（见 `.local/iphone-redesign-evidence-20261118/README.md`）。Dynamic Type 的真机复测同样依赖该安装路径 + 人工冷启动。

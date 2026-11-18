@@ -175,6 +175,7 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
                 ) : null}
               </View>
               <Text
+                maxFontSizeMultiplier={1.4}
                 style={[
                   text['tab-label'],
                   { color: selected ? tokens['color.primary'] : tokens['color.foreground-muted'] },

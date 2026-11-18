@@ -1,6 +1,6 @@
 # 「个人中心 / 我的」排版按规范收口 · 立项
 
-> 状态：立项（2026-11-18）。负责：移动端壳。依据：`docs/agents/ux-principles.md`、`docs/agents/screen-chrome.md`、`docs/agents/design-system.md`、`docs/research/profile-center-decision-record.md`（IA 已定，本单只做**排版**）。
+> 状态：**已落地（2026-11-18，iPad 实拍验收；iPhone 实拍受「真机不能程序化点击」限制）**。负责：移动端壳。依据：`docs/agents/ux-principles.md`、`docs/agents/screen-chrome.md`、`docs/agents/design-system.md`、`docs/research/profile-center-decision-record.md`（IA 已定，本单只做**排版**）。
 > 实拍证据：[`.local/profile-center-evidence-20261118/profile-center-ipad-before.png`](../../.local/profile-center-evidence-20261118/profile-center-ipad-before.png)（iPad 模拟器，同一套 RN 代码）。
 
 ## 现状问题（逐条映射规范）
@@ -20,6 +20,14 @@
 - **身份块与列表同轴**：要么统一居中，要么统一左对齐——与内容列同一条轴。
 - **顶部 AppBar**：用 `Screen`/`AppBar` 的 page 档，标题进 app bar。
 - **近期状态**：三列等宽栅格，数字与标签统一 baseline，换行受控。
+
+## 2026-11-18 落地结果
+
+- **容器靠阴影分层**：`Card` 增可选 `shadow(sm|md|lg)`、`Screen` 增可选 `background="grouped"`（都 opt-in）。「我的」8 张分组卡改 `shadow="md"`，「我的」页底改浅灰分组底 —— 白卡+阴影+圆角，不堆描边（`44c8f2d7`）。
+- **可导航行补 `›` + 卡内发丝线**：`SettingsActionRow` 增 `discloses`，`ActionLine` 在 `discloses` 时画 `›`；「我的」15 个 action 行设 `discloses:true`，入口卡与整理卡行间插 `Divider`（`212170f9`）。
+- **内容列最大宽度**：共享层 `CONTENT_MEASURE_MAX = 680` 已由 `page` 档 `Screen` 收窄居中（iPad 实测卡片≈630 宽），无需再加；本文原「宽屏无约束」一句作废。
+- **验收**：iPad 模拟器 Medium 与 accessibility-extra-large 两档实拍，行对齐同一内容列、右值落卡内右缘、每行 `›`、发丝线齐（证据 `.local/profile-center-evidence-20261118/profile-center-ipad-chevrons-dividers.png` 与 `dt-ipad-a11yxl-profile.png`）。
+- **仍受限**：iPhone「我的」实拍需在真机上点击，`idb` 对非模拟器拒绝点击、物理机重启也受限；iPhone 与 iPad 用同一套 RN 组件，差异仅在宽度。
 
 ## 落点
 - `apps/mobile/src/screens/ProfileScreen.tsx`（渲染区，约 1300–1830 行）。
