@@ -2026,12 +2026,13 @@ export function TasksScreen({
       )}
 
       {/*
-        🔴 空态时**不画 FAB**（2026-11-16）。
-        空态自带「添加第一个任务」主按钮，两者做同一件事、同一位置同一颜色 ——
-        真机截图里就是两个蓝色加号。Apple 的原则是：同一动作不要同时给两个
-        同等显眼的入口。FAB 是**有内容之后**的持续入口，上线时机交给 `nothing`。
+        🔴 同一动作不给两个入口。
+        · 空态：自带「添加第一个任务」主按钮 ⇒ 不画 FAB（2026-11-16）。
+        · **列表视图**：按提醒事项，新建入口是列表底部的「＋ 新提醒事项」内联行
+          （2026-11-19）⇒ 列表视图不再画 FAB，避免与内联行重复。
+        · 四象限 / 时间线视图没有内联行 ⇒ 仍保留 FAB 作为该视图的新建入口。
       */}
-      {bulkSelecting || nothing
+      {bulkSelecting || nothing || view === 'list'
         ? null
         : quadrantMoveUndo === null && quadrantMoveError === null ? (
         <Fab
