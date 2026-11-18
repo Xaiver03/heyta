@@ -357,6 +357,7 @@ export function Screen({
   chrome = 'page',
   barCollapsed,
   onTitlePress,
+  background = 'surface',
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
@@ -385,6 +386,13 @@ export function Screen({
    * 判据：`pnpm check:nav-chrome` 会按这一档校验"顶栏动作是否超过预算"。
    */
   chrome?: 'page' | 'board' | 'immersive';
+  /**
+   * 页面底色档。
+   * - `surface`（默认）：白底。既有屏全部走这一档，行为不变。
+   * - `grouped`：浅灰分组底（`color.surface-sunken`），配合**带阴影的白卡**做分组
+   *   （TickTick「我的」那种「浅灰页 + 白卡 + 轻阴影」）。容器靠阴影分层，不靠描边。
+   */
+  background?: 'surface' | 'grouped';
   /**
    * 顶栏是否收起（**受控**）。宿主自己监听滚动时（如 `FlatList` 屏）传这一格，
    * 内部那条 `onScroll` 就不再生效 —— 两条同时驱动会让栏在两帧之间来回跳。
@@ -531,7 +539,7 @@ export function Screen({
       既读不成分区，又被看成"蒙了一层灰"（产品负责人原话：「默认下面好像有一层
       灰色的底层遮罩」）。改白之后承载交给卡片自己那圈细线。
     */
-    <View style={{ flex: 1, backgroundColor: t['color.surface'] }}>
+    <View style={{ flex: 1, backgroundColor: t[background === 'grouped' ? 'color.surface-sunken' : 'color.surface'] }}>
       {collapses ? (
         <Animated.View
           style={{
@@ -986,6 +994,14 @@ export interface CardProps {
   gap?: GapTier;
   /** 是否画一圈 `color.border` 细线。默认 `false`（保持既有几十屏的观感不变）。 */
   outlined?: boolean;
+  /**
+   * 可选的一档**阴影**（`shadow.sm|md|lg` 语义 token），给「容器靠阴影分层」的分组卡用。
+   *
+   * 🔴 与 `outlined` 二选一：**容器优先用阴影，不要堆描边**（产品 2026-11-18 口径，
+   * 参照 TickTick「我的」的「浅灰页 + 白卡 + 轻阴影」）。默认 `undefined` = 不加，
+   * 保持既有几十屏观感不变；只给需要读成"一张浮起的分组卡"的屏单独打开。
+   */
+  shadow?: 'sm' | 'md' | 'lg';
 }
 
 export function Card({
@@ -993,8 +1009,10 @@ export function Card({
   style,
   gap = 'default',
   outlined = false,
+  shadow,
 }: CardProps): React.JSX.Element {
   const t = useTokens();
+  const { native } = useTheme();
   return (
     <View
       style={[
@@ -1018,6 +1036,7 @@ export function Card({
               borderColor: t['color.border'],
             }
           : null,
+        shadow === undefined ? null : native.shadow(`shadow.${shadow}`),
         style,
       ]}
     >

@@ -1166,7 +1166,7 @@ export function ProfileScreen(): React.JSX.Element {
         title={t('mobile.profile.entry.features')}
         actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: () => { navigation.pop(); } }]}
       >
-        <Card>
+        <Card shadow="md">
           {hubRows.map((row) => (
             <SettingsRow key={row.testID ?? row.kind} row={row} />
           ))}
@@ -1344,7 +1344,7 @@ export function ProfileScreen(): React.JSX.Element {
         改配置去设置面，两件事不再挤在一段滚动流里。
       */}
       <SectionHeader title={t('mobile.profile.section.status')} />
-      <Card>
+      <Card shadow="md">
         <View style={{ gap: tokens['space.3'] }}>
           <StatusRow
             status={status}
@@ -1525,7 +1525,7 @@ export function ProfileScreen(): React.JSX.Element {
   ) : undefined;
 
   return (
-    <Screen title={t('mobile.profile.title')}>
+    <Screen title={t('mobile.profile.title')} background="grouped">
       {/*
         ══════════════════════════════════════════════════════════════════════
         「我的」首屏 = **6 块 / 12 行**（2026-10-27 重排，计划 §5.2 的 16 → 10）
@@ -1592,7 +1592,7 @@ export function ProfileScreen(): React.JSX.Element {
           }
         }}
       >
-        <Card>
+        <Card shadow="md">
           <View
             style={{
               alignItems: 'center',
@@ -1654,7 +1654,7 @@ export function ProfileScreen(): React.JSX.Element {
         前者是一次**没做完**的说明，冲突时先说没做完的那件。）
       */}
       {pendingRevocation === null ? null : (
-        <Card gap="loose">
+        <Card shadow="md" gap="loose">
           <Stack gap="tight" testID="sign-out-pending">
             <Text variant="row-meta" tone="danger" selectable>
               {t('common.signOut.pending')}
@@ -1671,7 +1671,7 @@ export function ProfileScreen(): React.JSX.Element {
         </Card>
       )}
       {!signedOutEverywhere ? null : (
-        <Card>
+        <Card shadow="md">
           <Stack testID="sign-out-all-done">
             <Text variant="row-meta" tone="default">
               {t('common.sessions.logoutAllDone')}
@@ -1721,7 +1721,7 @@ export function ProfileScreen(): React.JSX.Element {
       />
 
       {/* ── ③ 功能入口 ─────────────────────────────────────────────── */}
-      <Card>
+      <Card shadow="md">
         <SettingsRow row={subscriptionRow} />
         <SettingsRow row={settingsRow} />
         <SettingsRow row={notificationsRow} />
@@ -1735,7 +1735,7 @@ export function ProfileScreen(): React.JSX.Element {
         `StatusRow` 这时只画**细节**（`detailOnly`），标题已经在上面那一行里 ——
         同一张卡里说两遍同一句话是本仓 §7 明令禁止的形状。
       */}
-      <Card>
+      <Card shadow="md">
         <SettingsRow row={syncSummaryRow} />
         {syncDetailVisible ? (
           <>
@@ -1777,7 +1777,7 @@ export function ProfileScreen(): React.JSX.Element {
       {/* 清单 / 标签 / 便签管理（⑥）。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
       <SectionHeader title={t('mobile.profile.tools')} />
-      <Card>
+      <Card shadow="md">
         <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', leading: <Icon name="task.project" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:lists'); } }} />
         <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', leading: <Icon name="task.tag" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:tags'); } }} />
         <SettingsRow row={{ kind: 'action', label: t('notes.title'), testID: 'profile-entry-notes', leading: <Icon name="note.sticky" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:notes'); } }} />
