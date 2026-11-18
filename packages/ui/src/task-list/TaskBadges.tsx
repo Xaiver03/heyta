@@ -47,6 +47,8 @@ const GLYPHS = {
   due: CalendarClock,
   overdue: TriangleAlert,
   priority: Flag,
+  /** 旗标（`important`）。与优先级共用一个 Flag 字形，但只有"重要"才叫旗标。 */
+  flag: Flag,
   repeat: Repeat,
   list: Folder,
 } satisfies Record<string, HeytaIconData>;
@@ -56,6 +58,8 @@ export interface TaskBadgesProps {
   readonly due?: { readonly text: string; readonly overdue: boolean } | null;
   /** 优先级：已本地化的文案 + 颜色（色槽由业务决定，见文件头注释）。 */
   readonly priority?: { readonly text: string; readonly color: string } | null;
+  /** 旗标：任务被标记为"重要"（`Task.important`）。为真时画一枚旗标。 */
+  readonly flag?: boolean;
   /** 重复：已本地化的句子。 */
   readonly repeat?: string | null;
   /**
@@ -85,6 +89,7 @@ export interface TaskBadgesProps {
 export function TaskBadges({
   due,
   priority,
+  flag = false,
   repeat,
   list,
   iconLabel,
@@ -108,12 +113,13 @@ export function TaskBadges({
 
   const hasDue = due !== null && due !== undefined;
   const hasPriority = priority !== null && priority !== undefined;
+  const hasFlag = flag === true;
   const hasRepeat = repeat !== null && repeat !== undefined && repeat !== '';
   const hasList = list !== null && list !== undefined && list !== '';
 
   // 一个都没有时**返回 null**，而不是渲染一个空的 View。
   // 空 View 也会占掉 `gap` 的间距，让没有徽章的行看起来比有徽章的行矮一截。
-  if (!hasDue && !hasPriority && !hasRepeat && !hasList) return null;
+  if (!hasDue && !hasPriority && !hasFlag && !hasRepeat && !hasList) return null;
 
   const dueColor = due?.overdue === true ? tokens['color.danger'] : tokens['color.foreground-subtle'];
 
@@ -161,6 +167,17 @@ export function TaskBadges({
             {...(priority.text === '' && iconLabel !== undefined ? { label: iconLabel } : {})}
           />
           <Text style={[text['row-meta'], { color: priority.color }]}>{priority.text}</Text>
+        </View>
+      ) : null}
+
+      {hasFlag ? (
+        <View style={styles.item} testID="task-badge-flag">
+          <HeytaIcon
+            data={GLYPHS.flag}
+            size={tokens['icon.xs']}
+            color={tokens['color.primary']}
+            {...(iconLabel !== undefined ? { label: iconLabel } : {})}
+          />
         </View>
       ) : null}
 

@@ -1312,6 +1312,7 @@ export function TasksScreen({
               ? null
               : { text: badge, color: tokens[priorityColorToken(task.priority)] }
           }
+          flag={task.important === true}
           repeat={repeat === undefined ? null : describeRecurrenceText(repeat.rule, t, locale)}
         />
       );
