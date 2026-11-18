@@ -573,6 +573,11 @@ export function TasksScreen({
    */
   const [view, setView] = useState<'list' | 'quadrant' | 'timeline'>('list');
   /**
+   * 提醒事项「智能列表」：今天（默认，现有行为）/ 计划（有截止的全部）/ 全部 / 旗标（重要）。
+   * 只影响列表视图的取数范围，不改数据、不改分组规则（分组仍走 `sectionTasks`）。
+   */
+  const [scope, setScope] = useState<'today' | 'scheduled' | 'all' | 'flagged'>('today');
+  /**
    * 标签筛选。`undefined` = 不筛。
    *
    * 🔴 **判据来自 `@heyta/domain` 的 `filterTasks`，与 Web 侧栏点标签是同一份**
@@ -1030,7 +1035,16 @@ export function TasksScreen({
     // 🔴 **先筛标签、再搜、最后分节** —— 顺序与 Web 一致。
     //    搜索是在当前筛选之上**收窄**，不替代它；反过来在任何一种筛选下
     //    都会得到不同结果，而用户只会读成"搜索有时候不准"。
-    const searched = searchTasks(scoped, query);
+    // 🔴 智能列表范围（在标签筛选之上再收一层）：今天=原样；计划=有截止；全部=全部；旗标=重要。
+    const scopeFiltered =
+      scope === 'all'
+        ? scoped
+        : scope === 'flagged'
+          ? scoped.filter((task) => task.important === true)
+          : scope === 'scheduled'
+            ? scoped.filter((task) => task.dueDate !== undefined)
+            : scoped;
+    const searched = searchTasks(scopeFiltered, query);
     const sections = sectionTasks(searched, { now });
     const { overdue, dueToday, inbox, completed } = sections;
     // 🔴 **这里不再排顺序**（原来每一组都写了一次 `.reverse()`）。
@@ -1050,7 +1064,7 @@ export function TasksScreen({
     // （`sectionTasks`），而"已过期 / 今天 / 收集箱 / 已完成"这个**顺序**是本屏的
     // 语义，共享层刻意不重排它。
     return { overdue, dueToday, inbox, completed };
-  }, [tasks, now, tagFilter, query, tagEntities]);
+  }, [tasks, now, tagFilter, query, tagEntities, scope]);
 
   /**
    * 待办数。**这是全应用唯一的待办口径** —— 屏幕上的摘要文字与标签栏角标
@@ -1695,6 +1709,23 @@ export function TasksScreen({
                 }}
               />
             ))}
+          </ScrollView>
+        ) : null}
+
+        {/*
+          智能列表（提醒事项）：今天 / 计划 / 全部 / 旗标。
+          放在内容之前的一行状态切换（与标签筛选同一形态）；只在列表视图出现。
+        */}
+        {view === 'list' ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: tokens['space.2'], paddingBottom: tokens['space.2'] }}
+          >
+            <Chip label={t('mobile.common.today')} selected={scope === 'today'} onPress={() => { setScope('today'); }} />
+            <Chip label={t('mobile.tasks.scope.scheduled')} selected={scope === 'scheduled'} onPress={() => { setScope('scheduled'); }} />
+            <Chip label={t('mobile.tasks.scope.all')} selected={scope === 'all'} onPress={() => { setScope('all'); }} />
+            <Chip label={t('mobile.tasks.scope.flagged')} selected={scope === 'flagged'} onPress={() => { setScope('flagged'); }} />
           </ScrollView>
         ) : null}
     </>

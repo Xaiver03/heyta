@@ -3143,6 +3143,9 @@ export const en = {
   'mobile.tasks.title': 'Tasks',
   'mobile.tasks.new': 'New task',
   'mobile.tasks.inlineAdd': 'New Reminder',
+  'mobile.tasks.scope.scheduled': 'Scheduled',
+  'mobile.tasks.scope.all': 'All',
+  'mobile.tasks.scope.flagged': 'Flagged',
   'mobile.tasks.composer.placeholder': 'What needs doing?',
   'mobile.tasks.composer.close': 'Close the new-task panel',
 

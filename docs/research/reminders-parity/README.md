@@ -50,7 +50,7 @@
 
 | R | 提醒事项能力 | heyta 现状（文件） | 差距 |
 |---|---|---|---|
-| R1 | 智能列表 今天/计划/全部/旗标/已完成 | 移动端有 逾期/今天/收集箱/已完成 分区（`TasksScreen` `sectionTasks`）；无「计划(全部有日期)/全部/旗标」独立入口 | 补 计划 / 全部 / 旗标 |
+| R1 | 智能列表 今天/计划/全部/旗标/已完成 | **今天/计划/全部/旗标 四档 chips ✅**（今天=现有；计划=有截止；全部；旗标=important）；分区仍走 `sectionTasks` | 分组仍为 逾期/今天/收集箱/已完成（未按 Reminders 的 计划 专属组细分） |
 | R2 | 列表页（彩色圆图标+计数+›） | 清单在侧栏/「我的」；列表行有图标+名称（`ListsSection`） | 计数与 `›` 统一；新建列表入口 |
 | R3 | 行：圆勾选+标题+备注+尾部日期/旗标 | `TaskRow` 已有勾选+标题+`renderMeta`(清单·日期)+尾部；**勾选已改圆(radius.full，R3a✅)**；优先级靠勾选描边色 | 副行改"备注/清单"；尾部日期/旗标 |
 | R4 | 分节+每组一张卡+组头在卡外+完成收起 | 有分节；**R4✅：每组一张卡、组头在卡外、卡内行带内缩分隔线**；完成组默认收起 | 保持 |
@@ -76,7 +76,7 @@
 | ✅ | R4 | **每组一张卡 + 组头在卡外**（inset grouped，卡内行内缩分隔线） | `TaskList.tsx` 新增 `useSectionCards`（listCard+分节：section 作一项，组头经 `renderSectionHeader` 在卡外，rows 在 `sectionCard` 内）| ✅ 截图 `img/tasks-section-cards.png`（两行一张卡+分隔线，日头/组头在卡外）；ui+mobile tsc 0、token-refs/row-single-source/empty/theme/ui-language 绿 |
 | ✅ | R5 | **列表底部常驻「＋ 新提醒事项」内联入口**（点开宿主新建面板，含自然语言）；行内直接打字留增强 | `TaskList` 新增 `onInlineAdd`/`inlineAddLabel`（`ListFooterComponent`，仅列表非空）+ `TasksScreen` 接入 + i18n `mobile.tasks.inlineAdd` | ✅ 截图 `img/tasks-inline-add.png`；`check:ui-language` zh/en 4529=4529、mobile tsc 0、token-refs/empty 绿 |
 | ⬜ | R3b | 行副行 = **备注/清单**；尾部 = **日期/旗标**（右对齐） | `TaskRow` `renderMeta`/`renderTrailing` | 截图：行结构 |
-| ⬜ | R1 | 智能列表 **计划 / 全部 / 旗标** 入口 | `TasksScreen` 视图/菜单 + `@heyta/domain` | 截图：三入口 + 筛选判据 |
+| ✅ | R1 | 列表顶部 **今天/计划/全部/旗标 四档 chips** + 过滤（today 原样 / scheduled 有截止 / all 全部 / flagged important） | `TasksScreen` `scope` state + `Chip` 行 + `scopeFiltered` 预过滤（分组仍 `sectionTasks`） | ✅ 截图 `img/tasks-scope-today.png`（今天）/ `img/tasks-scope-flagged.png`（旗标档只剩 flagged 项）；ui-language 4532=4532、mobile tsc 0 |
 | 🟡 | R8 | **旗标行内显示 ✅**（`important`→旗标，无需改 schema）；`! !! !!!` 优先级语言待做（跨端测试） | `TaskBadges` 新增 `flag`；`TasksScreen` 传 `task.important` | ✅ 截图 `img/tasks-flag-row.png`（行内蓝旗）；web row-meta-shared 26/26 绿、mobile tsc 0 |
 | 🟡 | R9 | 父行子任务进度 `done/total` **✅（单测验证）**；详情内子任务缩进已具备 | `TaskBadges` 新增 `subtasks`（字形 ListChecks）；`TasksScreen` 用 `buildTaskTree` 计 done/total | 单测 `row-meta-shared` **27/27**（`{1,2}`→渲染 `1/2`、`{0,0}`→不画）；真机截图待有子任务数据 |
 | ✅ | R6 | 详情页结构（提醒事项核心字段）已具备并截图确认；位置提醒、整屏形态作为后续 | `TaskDetailSheet` 现状 | ✅ 截图 `img/tasks-detail.png`（清单/优先级/重要/子任务/附件/提醒/重复/排期/标签/上级/动态齐全） |
