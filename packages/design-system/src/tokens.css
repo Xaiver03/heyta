@@ -198,7 +198,7 @@
   --ht-color-surface-subtle: var(--ht-slate-50);
   --ht-color-surface-raised: var(--ht-white);
   --ht-color-surface-sunken: var(--ht-slate-100);
-  --ht-color-grouped-background: var(--ht-slate-200);
+  --ht-color-grouped-background: #f2f2f7;
   --ht-color-overlay: rgb(15 23 42 / 0.5);
 
   /* 文字 */
@@ -391,7 +391,7 @@
   --ht-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
   --ht-shadow-md: 0 2px 8px rgb(15 23 42 / 0.08);
   /* 分组卡片的柔和投影：比 md 更实（14%），让白卡在浅灰底上“浮”起来。 */
-  --ht-shadow-card: 0 3px 10px rgb(15 23 42 / 0.14);
+  --ht-shadow-card: 0 2px 8px rgb(0 0 0 / 0.12);
   --ht-shadow-lg: 0 8px 24px rgb(15 23 42 / 0.12);
   --ht-shadow-xl: 0 16px 48px rgb(15 23 42 / 0.16);
   /* 主色焦点光晕，与 --ht-color-ring 配套 */
@@ -839,7 +839,7 @@
   --ht-color-surface-subtle: var(--ht-ink-800);
   --ht-color-surface-raised: var(--ht-ink-700);
   --ht-color-surface-sunken: var(--ht-ink-950);
-  --ht-color-grouped-background: var(--ht-ink-950);
+  --ht-color-grouped-background: #000000;
   --ht-color-overlay: rgb(2 6 23 / 0.7);
 
   --ht-color-foreground: var(--ht-slate-100);
@@ -940,7 +940,7 @@
 
   --ht-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --ht-shadow-md: 0 2px 8px rgb(0 0 0 / 0.5);
-  --ht-shadow-card: 0 3px 10px rgb(0 0 0 / 0.6);
+  --ht-shadow-card: 0 2px 8px rgb(0 0 0 / 0.5);
   --ht-shadow-lg: 0 8px 24px rgb(0 0 0 / 0.6);
   --ht-shadow-xl: 0 16px 48px rgb(0 0 0 / 0.7);
   --ht-shadow-focus: 0 0 0 3px rgb(96 165 250 / 0.35);
@@ -1000,7 +1000,7 @@
   --ht-color-surface-raised: var(--ht-white);
   --ht-color-surface-subtle: var(--ht-slate-100);
   --ht-color-surface-sunken: var(--ht-slate-200);
-  --ht-color-grouped-background: var(--ht-slate-200);
+  --ht-color-grouped-background: #f2f2f7;
   --ht-color-border: var(--ht-teal-200);
   --ht-color-border-strong: var(--ht-slate-500);
 }
@@ -1012,7 +1012,7 @@
   --ht-color-surface-raised: var(--ht-paper-900);
   --ht-color-surface-subtle: var(--ht-paper-900);
   --ht-color-surface-sunken: var(--ht-ink-950);
-  --ht-color-grouped-background: var(--ht-ink-950);
+  --ht-color-grouped-background: #000000;
   --ht-color-border: var(--ht-paper-600);
   --ht-color-border-strong: var(--ht-paper-200);
   --ht-color-foreground: var(--ht-paper-50);
@@ -1026,7 +1026,7 @@
   --ht-color-surface-raised: var(--ht-ink-800);
   --ht-color-surface-subtle: var(--ht-ink-900);
   --ht-color-surface-sunken: var(--ht-ink-950);
-  --ht-color-grouped-background: var(--ht-ink-950);
+  --ht-color-grouped-background: #000000;
   --ht-color-border: var(--ht-teal-600);
   --ht-color-border-strong: var(--ht-slate-400);
 }
