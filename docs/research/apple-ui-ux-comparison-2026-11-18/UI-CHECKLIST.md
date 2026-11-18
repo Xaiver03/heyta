@@ -18,6 +18,7 @@
 | C9 | ⬜ | 任务补两个**智能列表**：计划（有日期全部）/ 旗标 | 功能 | `TasksScreen.tsx` `sectionTasks`/`view` + `@heyta/domain` | 入口+筛选判据 |
 | C10 | ⬜ | **Apple Design 细节批**：按压即时反馈、勾选/完成弹簧、触感、`prefers-reduced-motion` 降级 | `apple-design` §1/§4/§13/§14 | `TaskRow`/`TabBar`/sheet/专注 | 交互实测 |
 | C11 | ⬜ | 无障碍与 Dynamic Type 全列表/表单 reflow + VoiceOver 标签 | P8、`dynamic-type`/`voiceover-sr` | 全组件 | 大字号+读屏实测 |
+| C12 | ⬜ | **清理不必要的辅助标签与说明**：逐屏删除无信息量的 caption/hint/说明/操作指示，让布局本身解释 | 全局偏好 2026-11-18（已入 `~/.agents/personal/identity.md`）；Apple HIG Simplicity/Titles | 各屏文案（登录/欢迎/设置/空态/日历脚注…），删前先答"删了会少知道哪件改变行为的事" | 截图对照 + 无冗余说明 |
 
 ## 推荐顺序（按依赖）
 C2（顶栏地基）→ C3（底栏）→ **C4/C5（登录，直接命中你的痛点）** → C6（日历）→ C7（逐屏审计）→ C8/C9 → C10/C11。
