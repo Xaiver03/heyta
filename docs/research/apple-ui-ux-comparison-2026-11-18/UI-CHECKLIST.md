@@ -7,10 +7,10 @@
 | # | 状态 | 改什么 | 依据（原则/Apple） | 落点 | 验收 |
 |---|---|---|---|---|---|
 | C0 | ✅ | 重装到 iPhone 真机（Release/dev 签名，已验证启动+截图） | — | `scripts/ios-device-install.sh` | 真机截图 `img/on-device-iphone-20261118.png` |
-| C1 | ✅ | **全局排版布局原则**：顶部锚定 + IA 分层 + 动作分层 + 三组件职责 | Apple Wayfinding/Familiarity/Simplicity；`screen-chrome.md`/`entry-layers.md` | 本目录 `GLOBAL-LAYOUT-PRINCIPLES.md` | 文档评审 |
-| C2 | ⬜ | **顶部导航栏抽象**：统一 `TopBar`（leading/title/tabs/actions/overflow 槽），`apps/mobile` AppBar 改薄包装 | P3/P4、Apple Familiarity | `packages/ui/src/layout/TopBar.tsx`（另一会话已起草，**接手评审勿另起**）+ `apps/mobile/src/ui/kit.tsx` AppBar | `check:nav-chrome`；各屏顶栏一致截图 |
+| C1 | ✅ | **顶部导航栏 + Tab + 模态规范**（按 Apple HIG 更正）：顶栏**何时出现/何时可隐**、**内容与顺序**（leading 返回→标题→trailing 动作/主操作）、**标题规则**（≤15 字、非 app 名、根页大标题）、**动作规则**（≤3、符号、唯一 prominent 在 trailing、其余进 More）；Tab 专职导航；模态 L3。 | Apple HIG *Toolbars / Tab bars / Modality / Going full screen* | 本目录 `GLOBAL-LAYOUT-PRINCIPLES.md`（已附来源） | 文档评审 |
+| C2 | ⬜ | **顶部导航栏组件抽象**：按 C1 规范统一 `TopBar`（leading/title/titleAccessory/tabs/actions/overflow），`apps/mobile` AppBar 改薄包装；落实"何时出现/内容/顺序" | Apple HIG Toolbars；`screen-chrome.md` | `packages/ui/src/layout/TopBar.tsx`（另一会话已起草，**接手评审勿另起**）+ `apps/mobile/src/ui/kit.tsx` AppBar | `check:nav-chrome`；逐屏顶栏（出现/顺序/标题/动作）截图 |
 | C3 | ⬜ | **底部导航栏抽象**：抽出 TabBar 的形态/组合契约（items/active/badge/安全区），材质留各端 | P3、`tab-bar-ios`/`bottom-nav-limit` | `apps/mobile/src/nav/TabBar.tsx` + 共享契约 | 5 tab 一致、Badge、材质 |
-| C4 | ⬜ | **登录屏 IA**：从「我的」未登录点"注册登录"→ 跳**统一全屏登录屏**（L2：TopBar 返回 + 顶锚一栏到底 + 单主 CTA），不再在 tab 内整屏替换；与 WelcomeScreen 全屏登录档同形态 | P1/P5、Wayfinding、`modal-vs-navigation` | `apps/mobile/src/screens/ProfileScreen.tsx`（`authOpen` 分支 1313-1323）+ `AuthScreen.tsx`（整屏档布局）+ 导航栈 | 真机：点"注册登录"进全屏登录屏截图；层级/主 CTA 检查 |
+| C4 | ⬜ | **登录屏 IA**：从「我的」未登录点"注册登录"→ 跳**统一全屏登录页（L2 全屏模态/导航）**：顶栏 `leading=返回` + 标题 + 一栏到底 + 唯一主操作在 trailing/prominent；**不在"我的" tab 内整屏替换**；与 WelcomeScreen 全屏登录档同形态 | Apple HIG *Modality*（L2 全屏，自足任务、显式关闭）+ C1 | `apps/mobile/src/screens/ProfileScreen.tsx`（`authOpen` 分支 1313-1323）+ `AuthScreen.tsx`（整屏档）+ 导航栈 | 真机：点"注册登录"进全屏登录页截图；返回在 leading、单一主操作 |
 | C5 | ⬜ | **登录屏排版**：标题贴顶、字段一栏、主按钮不贴底不居中漂浮、次级路径折叠、错误就近、返回常驻 | P1/P5/P6、`input-labels`/`error-placement` | `AuthScreen.tsx` + 共享 `@heyta/ui` `AuthForm` | 真机截图 + `check:form-anatomy` |
 | C6 | ⬜ | **日历「回到今天」行太重**：`CalendarToolbar` 重排为轻量；视图切档进抽象 TopBar `tabs`，「今天」降为次要动作/图标 | P4/P5、Apple 顶栏"标题说在哪、箭头说怎么移" | `packages/ui/src/calendar/CalendarToolbar.tsx` + `CalendarScreen.tsx` | 日历截图；顶栏动作 ≤3 |
 | C7 | ⬜ | **逐屏"按顶排版"审计**：找出默认垂直居中/漂浮的内容，改顶锚；确认每屏单一主标题 | P1/P2 | `apps/mobile/src/screens/*` | 逐屏截图对照 |
