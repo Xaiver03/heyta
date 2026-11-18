@@ -5,7 +5,7 @@
  * 选择器，完整里程碑与热力图仍然只在 GrowthScreen 展开。
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { PixelRatio, Pressable, View } from 'react-native';
 import { useI18n } from '@heyta/i18n';
 import { milestonesFromState, weeklyReviewFromState, type MotivationTables } from '@heyta/app-host';
 
@@ -14,7 +14,6 @@ import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { onLocalWrite } from '../sync/write-signal';
 import { SPACING_ROLE } from '@heyta/design-system';
-import { Pressable } from 'react-native';
 import { Button, Card, HStack, SectionHeader, Stack, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { useTokens } from '../theme';
@@ -135,6 +134,34 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
       <View style={{ gap: tokens[SPACING_ROLE['label-to-control']] }}>
         <SectionHeader title={t('mobile.profile.section.progress')} />
         <Card>
+        {/*
+          🔴 2026-11-18：大字号（Dynamic Type）下**三列横排改纵向堆叠**。
+          真机实测（iPhone 窄屏 accessibility-extra-large）：横排三格会把
+          「本周完成任务」挤成「本周完 / 成任务」这种断词——中文没有词边界，
+          窄列一旦放不下就按字断，读不出来。字号放大时每格独占一行
+          （标签在左、数字在右），既不破版也不再断词。
+        */}
+        {PixelRatio.getFontScale() > 1.3 ? (
+          <Stack gap="default">
+            {cells.map((cell) => (
+              <Pressable
+                key={cell.testID}
+                testID={cell.testID}
+                onPress={cell.onPress}
+                accessibilityRole={cell.onPress === undefined ? 'summary' : 'button'}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: tokens['touch-target.min'] }}
+              >
+                <HStack gap="tight" align="center">
+                  <Text variant="caption" tone="subtle">{cell.label}</Text>
+                  {cell.onPress === undefined ? null : (
+                    <Icon name="action.disclose" size="xs" color={tokens['color.foreground-subtle']} />
+                  )}
+                </HStack>
+                <Text variant="headline">{cell.value}</Text>
+              </Pressable>
+            ))}
+          </Stack>
+        ) : (
         <HStack gap="default">
           {cells.map((cell) => (
             <Pressable
@@ -162,6 +189,7 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
             </Pressable>
           ))}
         </HStack>
+        )}
         {readState === 'error' ? (
           <Stack>
             <Text variant="caption" tone="subtle">

@@ -33,5 +33,7 @@
 
 **chrome 上限已加**：`Text` 新增可选 `maxFontSizeMultiplier`，底栏标签设 `1.4`（角标本就 `2`）；内容文字不封顶，仍随系统字号缩放。
 
+**iPhone 窄屏（模拟器 accessibility-extra-large）实测并修一处真破版**：「近期状态」横排三格在窄屏大字号下把「本周完成任务」挤成「本周完 / 成任务」（中文无词边界，按字断）。已改为 **fontScale>1.3 时三格纵向堆叠成行**（标签左、数字右），断词消失、不破版。证据 `.local/profile-center-evidence-20261118/profile-center-iphone-a11yxl.png` 与 `profile-center-iphone-medium.png`。
+
 ## 已知环境限制（登记）
 - 本机 DSH 沙箱无法完成 `xcodebuild` device 构建（SwiftPM 缓存 + 嵌套 sandbox-exec 被拒）；真机装包走「Metro 重打 bundle + dev 重签 + devicectl install」的等价路径（见 `.local/iphone-redesign-evidence-20261118/README.md`）。Dynamic Type 的真机复测同样依赖该安装路径 + 人工冷启动。

@@ -27,7 +27,7 @@
 - **可导航行补 `›` + 卡内发丝线**：`SettingsActionRow` 增 `discloses`，`ActionLine` 在 `discloses` 时画 `›`；「我的」15 个 action 行设 `discloses:true`，入口卡与整理卡行间插 `Divider`（`212170f9`）。
 - **内容列最大宽度**：共享层 `CONTENT_MEASURE_MAX = 680` 已由 `page` 档 `Screen` 收窄居中（iPad 实测卡片≈630 宽），无需再加；本文原「宽屏无约束」一句作废。
 - **验收**：iPad 模拟器 Medium 与 accessibility-extra-large 两档实拍，行对齐同一内容列、右值落卡内右缘、每行 `›`、发丝线齐（证据 `.local/profile-center-evidence-20261118/profile-center-ipad-chevrons-dividers.png` 与 `dt-ipad-a11yxl-profile.png`）。
-- **仍受限**：iPhone「我的」实拍需在真机上点击，`idb` 对非模拟器拒绝点击、物理机重启也受限；iPhone 与 iPad 用同一套 RN 组件，差异仅在宽度。
+- **仍受限**：iPhone「我的」实拍需在真机上点击，`idb` 对非模拟器拒绝点击；已改用 iPhone 模拟器（`simctl ui content_size` + idb 点击）补齐 iPhone 两档实拍。
 
 ## 落点
 - `apps/mobile/src/screens/ProfileScreen.tsx`（渲染区，约 1300–1830 行）。
