@@ -58,7 +58,7 @@
 | R6 | 详情：备注/URL/日期/位置/旗标/优先级/子任务/附件/清单；完成在顶栏 | **详情字段已齐**（清单切换/优先级旗标/⋯、标题、截止、备注、子任务+附件、提醒/重复/排期/优先级/重要/清单/上级/标签/动态）✅；**缺位置提醒**；**呈现为底部 sheet**（提醒事项为整屏） | 位置提醒（需原生/数据，可后置）；可评估改整屏 |
 | R7 | 点圆完成；左滑旗标/更多/删除；长按菜单 | 已有：点圆完成、左滑(今天/删除)、长按上下文菜单（`TaskRow`/`SwipeReveal`） | 左滑首项对齐"旗标/更多"语义 |
 | R8 | 旗标 + `! !! !!!` 优先级语言 | **旗标✅ 行内显示**（`important` → 蓝旗，`TaskBadges.flag`，用现有字段不改 schema）；优先级仍「高/中/低」文案，`! !! !!!` 待做（会牵动 web 测试） | `! !! !!!` 语言（评估跨端） |
-| R9 | 子任务缩进 + 进度 | 有子任务（`subtasks/model`）；父行进度显示待确认 | 父行显示 `2/5` |
+| R9 | 子任务缩进 + 进度 | **父行显示 `done/total` ✅**（`TaskBadges.subtasks`，口径走 `buildTaskTree`）；子任务缩进在详情内 ✅ | 保持 |
 | R10 | 编辑模式（多选移动/删除/完成） | 有批量选择（`bulkSelecting`） | 能力确认/补齐移动 |
 | R11 | 搜索含已完成 | 有搜索（`SearchScreen`/`searchTasks`） | 确认覆盖已完成/标签 |
 | R12 | 分组/排序 | 有 sort（`taskSort`）与分节 | 对齐"按日期/优先级/手工拖" |
@@ -78,7 +78,7 @@
 | ⬜ | R3b | 行副行 = **备注/清单**；尾部 = **日期/旗标**（右对齐） | `TaskRow` `renderMeta`/`renderTrailing` | 截图：行结构 |
 | ⬜ | R1 | 智能列表 **计划 / 全部 / 旗标** 入口 | `TasksScreen` 视图/菜单 + `@heyta/domain` | 截图：三入口 + 筛选判据 |
 | 🟡 | R8 | **旗标行内显示 ✅**（`important`→旗标，无需改 schema）；`! !! !!!` 优先级语言待做（跨端测试） | `TaskBadges` 新增 `flag`；`TasksScreen` 传 `task.important` | ✅ 截图 `img/tasks-flag-row.png`（行内蓝旗）；web row-meta-shared 26/26 绿、mobile tsc 0 |
-| ⬜ | R9 | 父行子任务进度 `2/5` + 缩进 | `TaskRow`/`subtasks` | 截图 |
+| 🟡 | R9 | 父行子任务进度 `done/total` **✅（单测验证）**；详情内子任务缩进已具备 | `TaskBadges` 新增 `subtasks`（字形 ListChecks）；`TasksScreen` 用 `buildTaskTree` 计 done/total | 单测 `row-meta-shared` **27/27**（`{1,2}`→渲染 `1/2`、`{0,0}`→不画）；真机截图待有子任务数据 |
 | ✅ | R6 | 详情页结构（提醒事项核心字段）已具备并截图确认；位置提醒、整屏形态作为后续 | `TaskDetailSheet` 现状 | ✅ 截图 `img/tasks-detail.png`（清单/优先级/重要/子任务/附件/提醒/重复/排期/标签/上级/动态齐全） |
 | ⬜ | R7 | 左滑动作对齐（旗标/更多/删除） | `TaskRow` swipe | 截图 |
 | ⬜ | R10 | 编辑模式（多选移动/删除/完成） | `TasksScreen` | 截图 |

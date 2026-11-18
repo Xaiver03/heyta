@@ -29,7 +29,7 @@
 
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { CalendarClock, Flag, Folder, Repeat, TriangleAlert } from 'lucide';
+import { CalendarClock, Flag, Folder, ListChecks, Repeat, TriangleAlert } from 'lucide';
 import { HeytaIcon, type HeytaIconData } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 
@@ -49,6 +49,8 @@ const GLYPHS = {
   priority: Flag,
   /** 旗标（`important`）。与优先级共用一个 Flag 字形，但只有"重要"才叫旗标。 */
   flag: Flag,
+  /** 子任务进度（`done/total`）的字形。 */
+  subtasks: ListChecks,
   repeat: Repeat,
   list: Folder,
 } satisfies Record<string, HeytaIconData>;
@@ -60,6 +62,8 @@ export interface TaskBadgesProps {
   readonly priority?: { readonly text: string; readonly color: string } | null;
   /** 旗标：任务被标记为"重要"（`Task.important`）。为真时画一枚旗标。 */
   readonly flag?: boolean;
+  /** 子任务进度：`done`/`total`。`total===0` 或省略时不画（提醒事项的"2/5"）。 */
+  readonly subtasks?: { readonly done: number; readonly total: number } | null;
   /** 重复：已本地化的句子。 */
   readonly repeat?: string | null;
   /**
@@ -90,6 +94,7 @@ export function TaskBadges({
   due,
   priority,
   flag = false,
+  subtasks,
   repeat,
   list,
   iconLabel,
@@ -114,12 +119,13 @@ export function TaskBadges({
   const hasDue = due !== null && due !== undefined;
   const hasPriority = priority !== null && priority !== undefined;
   const hasFlag = flag === true;
+  const hasSubtasks = subtasks !== null && subtasks !== undefined && subtasks.total > 0;
   const hasRepeat = repeat !== null && repeat !== undefined && repeat !== '';
   const hasList = list !== null && list !== undefined && list !== '';
 
   // 一个都没有时**返回 null**，而不是渲染一个空的 View。
   // 空 View 也会占掉 `gap` 的间距，让没有徽章的行看起来比有徽章的行矮一截。
-  if (!hasDue && !hasPriority && !hasFlag && !hasRepeat && !hasList) return null;
+  if (!hasDue && !hasPriority && !hasFlag && !hasSubtasks && !hasRepeat && !hasList) return null;
 
   const dueColor = due?.overdue === true ? tokens['color.danger'] : tokens['color.foreground-subtle'];
 
@@ -178,6 +184,19 @@ export function TaskBadges({
             color={tokens['color.primary']}
             {...(iconLabel !== undefined ? { label: iconLabel } : {})}
           />
+        </View>
+      ) : null}
+
+      {hasSubtasks ? (
+        <View style={styles.item} testID="task-badge-subtasks">
+          <HeytaIcon
+            data={GLYPHS.subtasks}
+            size={tokens['icon.xs']}
+            color={tokens['color.foreground-subtle']}
+          />
+          <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
+            {`${subtasks.done}/${subtasks.total}`}
+          </Text>
         </View>
       ) : null}
 

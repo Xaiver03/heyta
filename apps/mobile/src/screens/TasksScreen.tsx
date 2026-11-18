@@ -1172,6 +1172,23 @@ export function TasksScreen({
     return counts;
   }, [tasks]);
 
+  /**
+   * 子任务进度（done/total）—— 提醒事项行内那枚「2/5」。
+   * 口径同样走共享 `buildTaskTree`（不在界面里自己数 `parentId`，见上方注释）。
+   */
+  const subtaskProgressByTaskId = useMemo(() => {
+    const progress = new Map<string, { done: number; total: number }>();
+    for (const [id, node] of buildTaskTree(tasks).nodeById) {
+      if (node.children.length === 0) continue;
+      let done = 0;
+      for (const child of node.children) {
+        if (child.task.completedAt !== undefined) done += 1;
+      }
+      progress.set(id, { done, total: node.children.length });
+    }
+    return progress;
+  }, [tasks]);
+
   // 菜单开着的那一条消失了（本机删掉、或另一台设备删了同步过来）⇒ 这一层自己收走。
   // 不写这一条的话，用户会看见一个挂在**已经不存在的任务**上的菜单。
   // 切到别的 tab 同样收走：这一层是任务屏的行级浮层，留着它会在回来时凭空出现。
@@ -1313,11 +1330,12 @@ export function TasksScreen({
               : { text: badge, color: tokens[priorityColorToken(task.priority)] }
           }
           flag={task.important === true}
+          subtasks={subtaskProgressByTaskId.get(task.id) ?? null}
           repeat={repeat === undefined ? null : describeRecurrenceText(repeat.rule, t, locale)}
         />
       );
     },
-    [actions, dueMode, locale, now, projects, t, tokens],
+    [actions, dueMode, locale, now, projects, subtaskProgressByTaskId, t, tokens],
   );
 
   /**

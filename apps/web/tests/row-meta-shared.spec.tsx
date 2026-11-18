@@ -233,6 +233,14 @@ describe('A. web 的行元信息槽渲染出的就是共享 TaskBadges', () => {
     );
   });
 
+  it('子任务进度：`subtasks` 渲染成 `done/total`（提醒事项的 2/5）', () => {
+    const el = mount(<TaskBadges testID="task-meta" subtasks={{ done: 1, total: 2 }} />);
+    expect(metaHtml(el), '子任务进度徽章没渲染成 1/2').toContain('1/2');
+    // total 为 0 / 不给 ⇒ 不画（"没有子任务"不是信息）。
+    const none = mount(<TaskBadges testID="task-meta" subtasks={{ done: 0, total: 0 }} />);
+    expect(metaHtml(none)).toBeNull();
+  });
+
   it('逾期 3 天（英文）：逾期标志交出去了（字形与危险色都在共享层）', () => {
     const t = task({ dueDate: NOW - 3 * DAY_MS, priority: Priority.Medium });
     const actual = mount(<TaskRowMeta row={rowOf(t)} mode="countdown" now={NOW} />, 'en');
