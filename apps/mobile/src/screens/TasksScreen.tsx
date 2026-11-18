@@ -1908,6 +1908,11 @@ export function TasksScreen({
               density="compact"
               // 白卡列表（对齐滴答的"卡 + 卡内行"观感，见 `TaskList` 的 `listCard`）。
               listCard
+              // Reminders 风格：列表底部常驻「＋ 新提醒事项」内联新建行（点开宿主的新建面板）。
+              onInlineAdd={() => {
+                setComposerOpen(true);
+              }}
+              inlineAddLabel={t('mobile.tasks.inlineAdd')}
               // 列表是 FlatList 自己滚 —— 顶栏收起靠这一条回吐，见 `onListScroll`。
               onScrollOffset={onListScroll}
               onToggleTask={handleTaskToggle}

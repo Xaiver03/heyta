@@ -64,7 +64,7 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { TASK_ROW_SHAPE } from '@heyta/design-system';
 import { EmptyState } from '../empty-state/EmptyState.js';
 import type { CategoryColorToken } from '../categories/model.js';
@@ -154,6 +154,13 @@ interface TaskListSharedProps {
    * 任务行共享同一个纵向滚动宿主；其它宿主可省略。
    */
   readonly listHeaderComponent?: React.ReactElement | React.ComponentType;
+  /**
+   * Reminders 风格：**列表底部常驻一行「＋ 新提醒事项」内联新建入口**（仅列表非空时显示）。
+   * 只回吐意图，打开哪个面板由宿主决定——共享层不认识表单。
+   */
+  readonly onInlineAdd?: () => void;
+  /** `onInlineAdd` 行的文案（宿主用 `t()` 解析后传入，与行的其它文案同一套规矩）。 */
+  readonly inlineAddLabel?: string;
   /** 空列表时的完整空态；给出后优先于 `emptyMessage`。 */
   readonly emptyComponent?: React.ReactElement | React.ComponentType;
   /**
@@ -274,6 +281,8 @@ export function TaskList<TMeta = undefined>({
   fallbackTitle,
   emptyMessage,
   listHeaderComponent,
+  onInlineAdd,
+  inlineAddLabel,
   emptyComponent,
   testID,
   density,
@@ -365,6 +374,14 @@ export function TaskList<TMeta = undefined>({
         },
         // 空态外层：吃掉 header 之外的剩余高度并居中（flex/flexGrow 是布局关键字，不是设计尺度）。
         emptyCenter: { flex: 1, justifyContent: 'center' },
+        // 列表底部「＋ 新提醒事项」内联行：与卡片内行同一左缘（space.2），高度=触控下限。
+        inlineAdd: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens['space.2'],
+          paddingVertical: tokens[TASK_ROW_SHAPE.touchTarget],
+          paddingHorizontal: tokens['space.2'],
+        },
       }),
     [showCard, isEmptyCard, tokens],
   );
@@ -455,12 +472,31 @@ export function TaskList<TMeta = undefined>({
           )
         : emptyContent;
 
+  const inlineAddNode = useMemo(() => {
+    if (onInlineAdd === undefined || inlineAddLabel === undefined || items.length === 0) {
+      return null;
+    }
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={inlineAddLabel}
+        onPress={onInlineAdd}
+        testID="task-list-inline-add"
+        style={styles.inlineAdd}
+      >
+        <Text style={[text['row-title'], { color: tokens['color.primary'] }]}>＋</Text>
+        <Text style={[text['row-title'], { color: tokens['color.primary'] }]}>{inlineAddLabel}</Text>
+      </Pressable>
+    );
+  }, [onInlineAdd, inlineAddLabel, items.length, styles, text, tokens]);
+
   return (
     <FlatList
       data={items}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       ListHeaderComponent={listHeaderComponent}
+      ListFooterComponent={inlineAddNode}
       ListEmptyComponent={emptyNode}
       contentContainerStyle={styles.list}
       {...(onScrollOffset === undefined

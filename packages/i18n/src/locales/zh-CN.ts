@@ -1620,6 +1620,9 @@ export const zhCN = {
 
   // ── Web · 番茄钟 ──────────────────────────────────────────
   'web.focus.a11y.progress': '进度 {percent}%',
+  'web.focus.mode.group': '计时模式',
+  'web.focus.mode.countdown': '倒计时',
+  'web.focus.mode.countup': '正计时',
   'web.focus.phase.work': '专注',
   'web.focus.phase.break': '休息',
   'web.focus.a11y.start': '开始专注',
@@ -3450,6 +3453,7 @@ export const zhCN = {
   // ── 移动端 · 任务屏 ───────────────────────────────────────
   'mobile.tasks.title': '任务',
   'mobile.tasks.new': '新建任务',
+  'mobile.tasks.inlineAdd': '新提醒事项',
   'mobile.tasks.composer.placeholder': '要做什么？',
   'mobile.tasks.composer.close': '关闭新建面板',
 
@@ -3618,6 +3622,9 @@ export const zhCN = {
   // 进度环的无障碍名。手机端原来是一条水平进度条（没有这条），
   // M3 第二刀把进度环收进共享层后，两端都需要它。
   'mobile.focus.a11y.progress': '进度 {percent}%',
+  'mobile.focus.mode.group': '计时模式',
+  'mobile.focus.mode.countdown': '倒计时',
+  'mobile.focus.mode.countup': '正计时',
   'mobile.focus.action.pause': '暂停',
   'mobile.focus.action.resume': '继续',
   'mobile.focus.action.startWork': '开始专注',

@@ -1460,6 +1460,9 @@ export const en = {
 
   // ── Web · focus timer ─────────────────────────────────────
   'web.focus.a11y.progress': 'Progress {percent}%',
+  'web.focus.mode.group': 'Timer mode',
+  'web.focus.mode.countdown': 'Countdown',
+  'web.focus.mode.countup': 'Count up',
   'web.focus.phase.work': 'Focus',
   'web.focus.phase.break': 'Break',
   'web.focus.a11y.start': 'Start focus session',
@@ -3139,6 +3142,7 @@ export const en = {
   // ── Mobile · tasks screen ─────────────────────────────────
   'mobile.tasks.title': 'Tasks',
   'mobile.tasks.new': 'New task',
+  'mobile.tasks.inlineAdd': 'New Reminder',
   'mobile.tasks.composer.placeholder': 'What needs doing?',
   'mobile.tasks.composer.close': 'Close the new-task panel',
 
@@ -3290,6 +3294,9 @@ export const en = {
   // Accessibility name for the progress ring. Mobile used a horizontal bar
   // before (so it had no such entry); the shared ring needs it on both ends.
   'mobile.focus.a11y.progress': 'Progress {percent}%',
+  'mobile.focus.mode.group': 'Timer mode',
+  'mobile.focus.mode.countdown': 'Countdown',
+  'mobile.focus.mode.countup': 'Count up',
   'mobile.focus.action.pause': 'Pause',
   'mobile.focus.action.resume': 'Resume',
   'mobile.focus.action.startWork': 'Start focusing',
