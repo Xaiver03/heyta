@@ -44,7 +44,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 import { pick } from '@react-native-documents/picker';
 import type { SyncStatus } from '@heyta/sync-client';
 import { useI18n } from '@heyta/i18n';
@@ -1310,16 +1310,30 @@ export function ProfileScreen(): React.JSX.Element {
   }
 
   if (authOpen) {
+    /*
+     * 🔴 登录是**自足、需要显式关闭**的专门任务 → 按 Apple HIG *Modality* 走 **L2 全屏**：
+     * 用 fullScreen Modal 盖住底部 Tab，而不是在「我的」这个 tab 内整屏替换（那样底栏还在，
+     * 看起来就不像"进入了一个统一的登录屏"）。顶栏返回由 AuthScreen 整屏档自己给。
+     */
     return (
-      <AuthScreen
-        initialServerUrl={form.serverUrl}
-        initialPassword={form.password}
-        allowServerSelection={authAllowServerSelection}
-        onBack={() => {
+      <Modal
+        visible
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => {
           setAuthOpen(false);
         }}
-        onSignedIn={onSignedIn}
-      />
+      >
+        <AuthScreen
+          initialServerUrl={form.serverUrl}
+          initialPassword={form.password}
+          allowServerSelection={authAllowServerSelection}
+          onBack={() => {
+            setAuthOpen(false);
+          }}
+          onSignedIn={onSignedIn}
+        />
+      </Modal>
     );
   }
 

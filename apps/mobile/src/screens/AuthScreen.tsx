@@ -50,7 +50,17 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, AppState, Easing, Linking, Pressable, ScrollView, View } from 'react-native';
+import {
+  Animated,
+  AppState,
+  Easing,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   beginPasskeyLogin,
@@ -77,6 +87,7 @@ import { legalDocumentById, legalDocumentPresentation } from '@heyta/legal';
 import { useI18n, type MessageKey, type MessageVars } from '@heyta/i18n';
 
 import { Button, Card, Checkbox, Text, TextField } from '../ui/kit';
+import { Icon } from '../ui/icons';
 import { useTheme, useTokens } from '../theme';
 import { syncNow } from '../sync/store';
 import {
@@ -86,6 +97,7 @@ import {
   SIGN_IN_PASSWORD_LABEL_KEY,
   authFailureMessage,
   LegalDocumentSheet,
+  TopBar,
   type AuthFormLabels,
   type AuthFormStatus,
 } from '@heyta/ui';
@@ -229,6 +241,13 @@ export function AuthScreen({
   const layout = {
     root: { flex: 1, backgroundColor: tokens['color.background'], paddingTop: insets.top },
     fill: { flex: 1 },
+    /** 顶栏返回的触控区（44）。用命名对象而非内联，`check:l4` 不增计数。 */
+    backBtn: {
+      minWidth: tokens['touch-target.min'],
+      minHeight: tokens['touch-target.min'],
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
     stack1: { gap: tokens['space.1'] },
     stack3: { gap: tokens['space.3'] },
     rowCenter: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: tokens['space.2'] },
@@ -750,8 +769,35 @@ export function AuthScreen({
   /** 已经拿到令牌：停在第 ④ 步，等加密口令。 */
   const passphraseStep = session !== undefined || action === 'save';
 
-  return (
+  /**
+   * 🔴 键盘避让只在**整屏档**（`embedded === false`，例如从「设置 → 账号」进入）由本文件负责。
+   *
+   * 内嵌档（欢迎页那个从底部升起的抽屉）明确把滚动/安全区/占屏交给宿主 ——
+   * 那一档的键盘避让由 `WelcomeScreen` 量键盘高度后抬升抽屉来做，不在这里重复叠加。
+   */
+  const panel = (
     <View style={layout.root}>
+      {/*
+        整屏档（`!embedded`）：按 Apple HIG *Toolbars/Modality* 给这一屏一条**顶栏**——
+        返回在 leading、标题为当前任务名。返回只在这里出现（不再在正文底部重复一条"返回"）。
+        内嵌档（欢迎页抽屉）由宿主负责顶栏与关闭，故不画。
+      */}
+      {!embedded && (
+        <TopBar
+          title={t('mobile.auth.title')}
+          leading={
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('mobile.auth.back')}
+              onPress={onBack}
+              testID="mobile-central-auth-back"
+              style={layout.backBtn}
+            >
+              <Icon name="action.back" size="md" color={tokens['color.foreground']} />
+            </Pressable>
+          }
+        />
+      )}
       <ScrollView
         ref={scrollRef}
         // 🔴 内嵌档不自己滚：宿主那一层已经在滚，两层都能滚的话，
@@ -802,6 +848,7 @@ export function AuthScreen({
               labels={labels}
               onClose={onBack}
               platform="mobile"
+              hideHeader={!embedded}
               status={formStatus()}
               busy={busy}
               passkeyAvailable={passkeyProvider !== undefined}
@@ -859,9 +906,12 @@ export function AuthScreen({
           所以只留这一个，挂在三支之外；颜色降到 `muted`（它是一次**退路**，
           不该和主按钮抢注意力）。
         */}
-        <Pressable accessibilityRole="button" onPress={onBack} testID="mobile-central-auth-back">
-          <Text variant="body-sm" tone="muted">{t('mobile.auth.back')}</Text>
-        </Pressable>
+        {/* 整屏档的"返回"移到顶栏（见上）；只有内嵌档仍保留正文底部这一条出口。 */}
+        {embedded ? (
+          <Pressable accessibilityRole="button" onPress={onBack} testID="mobile-central-auth-back">
+            <Text variant="body-sm" tone="muted">{t('mobile.auth.back')}</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
 
       {openLegalDocument !== null ? (() => {
@@ -883,5 +933,20 @@ export function AuthScreen({
         );
       })() : null}
     </View>
+  );
+
+  if (embedded) return panel;
+
+  /*
+   * 整屏档：面板贴底但不再绝对定位，`KeyboardAvoidingView` 在 iOS 上补 padding、
+   * Android 上收 height，把整张表单顶到键盘上方 —— 这正是「输入法遮挡输入框」的修法。
+   */
+  return (
+    <KeyboardAvoidingView
+      style={layout.fill}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      {panel}
+    </KeyboardAvoidingView>
   );
 }

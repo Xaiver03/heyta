@@ -278,6 +278,11 @@ export interface AuthFormProps {
   readonly labels: AuthFormLabels;
   readonly onClose: () => void;
   /**
+   * 宿主已有自己的**顶栏**（顶栏返回 + 标题）时置 true：隐藏表单自带的
+   * 大标题与关闭 ×，避免"一屏两个标题 / 两个出口"。默认 false，Web 与内嵌宿主行为不变。
+   */
+  readonly hideHeader?: boolean;
+  /**
    * 显隐默认档。**不给就按当前平台判**（`Platform.OS === 'web'` 算桌面）。
    * 宿主可以覆盖 —— 但覆盖要有理由：那一档是 NNG/NIST 的结论，不是审美。
    */
@@ -372,6 +377,7 @@ export interface AuthFormProps {
 export function AuthForm({
   labels,
   onClose,
+  hideHeader = false,
   platform,
   status = null,
   busy = false,
@@ -676,30 +682,32 @@ export function AuthForm({
       testID={testID}
       style={styles.root}
     >
-      <View style={styles.head}>
-        <View style={styles.headText}>
-          <Text style={[text['detail-title'], styles.title]} accessibilityRole="header">
-            {labels.titleText}
-          </Text>
-          {labels.subtitle !== undefined ? (
-            <Text style={[text['row-meta'], styles.subtitle]}>{labels.subtitle}</Text>
-          ) : null}
+      {hideHeader ? null : (
+        <View style={styles.head}>
+          <View style={styles.headText}>
+            <Text style={[text['detail-title'], styles.title]} accessibilityRole="header">
+              {labels.titleText}
+            </Text>
+            {labels.subtitle !== undefined ? (
+              <Text style={[text['row-meta'], styles.subtitle]}>{labels.subtitle}</Text>
+            ) : null}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={labels.close}
+            hitSlop={tokens['gesture.hit-slop']}
+            onPress={onClose}
+            style={({ pressed }) => [styles.close, pressed ? styles.pressed : null]}
+            testID={`${testID}-close`}
+          >
+            <HeytaIcon
+              data={X}
+              size={tokens['icon.sm']}
+              color={tokens['color.foreground-muted']}
+            />
+          </Pressable>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={labels.close}
-          hitSlop={tokens['gesture.hit-slop']}
-          onPress={onClose}
-          style={({ pressed }) => [styles.close, pressed ? styles.pressed : null]}
-          testID={`${testID}-close`}
-        >
-          <HeytaIcon
-            data={X}
-            size={tokens['icon.sm']}
-            color={tokens['color.foreground-muted']}
-          />
-        </Pressable>
-      </View>
+      )}
 
       {/* 状态 / 空状态：一条 **live region**（web 落 `aria-live`）。 */}
       <View
