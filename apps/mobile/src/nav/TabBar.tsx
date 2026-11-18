@@ -36,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MessageKey } from '@heyta/i18n';
 import { useI18n } from '@heyta/i18n';
 import { useText, useTheme, useTokens } from '../theme';
+import { CONTROL_STATE_TOKENS } from '@heyta/ui';
 import { Badge, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import type { IconName } from '../ui/icons';
@@ -68,6 +69,8 @@ export type TabKey = (typeof TABS)[number]['key'];
 export interface TabBarProps {
   active: TabKey;
   onChange: (key: TabKey) => void;
+  /** 底栏底色档：跟随当前页（`grouped`=「我的」浅灰页 / `surface`=白页），与内容无缝衔接。 */
+  background?: 'surface' | 'grouped';
   /**
    * 各 tab 的角标计数。
    *
@@ -78,7 +81,7 @@ export interface TabBarProps {
   badges?: Partial<Record<TabKey, number>>;
 }
 
-export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Element {
+export function TabBar({ active, onChange, badges, background = 'surface' }: TabBarProps): React.JSX.Element {
   const tokens = useTokens();
   const text = useText();
   const { reducedMotion } = useTheme();
@@ -94,7 +97,11 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
           // 图标被顶到最上面 —— 实测 52 − 8 = 44 的内容区装 42 的内容，
           // 上下各剩 1px，看着像完全没有留白。
           paddingBottom: Math.max(insets.bottom, tokens['nav.safe-bottom-min']),
-          backgroundColor: tokens['color.surface'],
+          // Apple §12：标签栏是浮在内容上的功能层，底色随当前页走（「我的」灰 / 其余白），不出现硬条。
+          backgroundColor: tokens[background === 'grouped' ? 'color.grouped-background' : 'color.surface'],
+          // 极细发丝线代替硬分隔（Apple「scroll edge / 发丝分隔」），只做若有若无的边界。
+          borderTopWidth: tokens['border-width.thin'],
+          borderTopColor: tokens['color.border-subtle'],
         },
         barRow: {
           flexDirection: 'row',
@@ -135,7 +142,7 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
           flexShrink: 0,
         },
       }),
-    [tokens, insets.bottom],
+    [tokens, insets.bottom, background],
   );
 
   return (
@@ -158,7 +165,10 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
                 // 按下反馈：整块变暗，用叠加色而不是改每个 children 的颜色 ——
                 // 后者要动图标和文字两处，迟早只改一处。
                 pressed && !reducedMotion
-                  ? { backgroundColor: tokens['color.hover'] }
+                  ? {
+                      backgroundColor: tokens['color.hover'],
+                      transform: [{ scale: tokens[CONTROL_STATE_TOKENS.pressScale] }],
+                    }
                   : null,
               ]}
             >

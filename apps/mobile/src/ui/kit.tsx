@@ -208,10 +208,19 @@ export function AppBar({
   titleLeading,
   onTitlePress,
   contentMaxWidth,
+  background = 'surface',
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
   titleLeading?: React.ReactNode;
+  /**
+   * 顶栏底色档：**跟随页面底色**（`screen-chrome` 的 page/grouped）。
+   *
+   * 🔴 2026-11-18：Apple §12 Materials —— 导航栏是浮在内容上的功能层，底色应与内容
+   * 一致（或半透明），不要一块纯白硬条压在浅灰页上（那正是"生硬"的来源）。
+   * `grouped` 页（如「我的」）顶栏用同一个分组底，顶部不再出现白↔灰硬边。
+   */
+  background?: 'surface' | 'grouped';
   /**
    * 🔴 2026-11-16：标题行要**跟着内容列走**。
    *
@@ -239,7 +248,7 @@ export function AppBar({
     <View
       style={{
         paddingTop: insets.top,
-        backgroundColor: t['color.surface'],
+        backgroundColor: t[background === 'grouped' ? 'color.grouped-background' : 'color.surface'],
       }}
     >
       <View
@@ -535,6 +544,7 @@ export function Screen({
       title={title}
       actions={actions}
       titleLeading={titleLeading}
+      background={background}
       contentMaxWidth={contentMeasureMaxFor(chrome)}
       {...(onTitlePress === undefined ? {} : { onTitlePress })}
     />

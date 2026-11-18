@@ -298,6 +298,7 @@ function Shell(): React.JSX.Element {
         <View style={{ flex: 1, display: tab === 'profile' ? 'flex' : 'none' }}><ProfileScreen /></View>
       </View>
       <TabBar
+        background={tab === 'profile' ? 'grouped' : 'surface'}
         active={tab}
         onChange={setTab}
         badges={{ tasks: pendingCount }}
