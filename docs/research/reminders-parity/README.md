@@ -52,7 +52,7 @@
 |---|---|---|---|
 | R1 | 智能列表 今天/计划/全部/旗标/已完成 | 移动端有 逾期/今天/收集箱/已完成 分区（`TasksScreen` `sectionTasks`）；无「计划(全部有日期)/全部/旗标」独立入口 | 补 计划 / 全部 / 旗标 |
 | R2 | 列表页（彩色圆图标+计数+›） | 清单在侧栏/「我的」；列表行有图标+名称（`ListsSection`） | 计数与 `›` 统一；新建列表入口 |
-| R3 | 行：圆勾选+标题+备注+尾部日期/旗标 | `TaskRow` 已有勾选+标题+`renderMeta`(清单·日期)+尾部；**勾选是圆角方(radius.sm)，非圆**；优先级靠勾选描边色 | 勾选改**圆形**；副行改"备注/清单"；尾部日期/旗标 |
+| R3 | 行：圆勾选+标题+备注+尾部日期/旗标 | `TaskRow` 已有勾选+标题+`renderMeta`(清单·日期)+尾部；**勾选已改圆(radius.full，R3a✅)**；优先级靠勾选描边色 | 副行改"备注/清单"；尾部日期/旗标 |
 | R4 | 分节+每组一张卡+组头在卡外+完成收起 | 有分节（`TaskList` sections）；但整张列表一张卡、组头在卡内；完成组默认收起 | 组头移到卡外、**每组一张卡** |
 | R5 | 底部常驻「＋ 新提醒事项」内联录入 | 有 FAB + `CaptureComposer`（自然语言解析✅）但非"列表底部常驻行" | 列表尾加内联新建行（保留自然语言） |
 | R6 | 详情：备注/URL/日期/位置/旗标/优先级/子任务/附件/清单；完成在顶栏 | `TaskDetailSheet` 已有：清单/标签/子任务/优先级/重复/附件/评论/提醒✅；位置提醒无；完成在行非顶栏 | 补位置提醒(需数据/原生)；完成入口位置确认 |
@@ -72,7 +72,7 @@
 
 | 状态 | # | 做什么 | 落点 | 验收 |
 |---|---|---|---|---|
-| ⬜ | R3a | **勾选改圆形**（Reminders 语言），完成变实心主色带勾 | `packages/design-system/src/task-row-shape.ts`（`checkboxRadius`）或 TaskRow 变体 | 截图：任务行圆圈 |
+| ✅ | R3a | **勾选改圆形**（Reminders 语言；完成态沿用既有 `boxDone` 实心圆带勾） | `packages/design-system/src/task-row-shape.ts` `checkboxRadius: 'radius.full'` | ✅ 截图 `img/reminders-row-before.png` → `img/reminders-row-after-circle.png`；design-token-refs / row-single-source / theme 绿、ui+mobile tsc 0 |
 | ⬜ | R4 | **每组一张卡 + 组头在卡外**（inset grouped） | `packages/ui/src/task-list/TaskList.tsx` + `TaskGroupHead/SectionHeader` | 截图：多组各一卡 |
 | ⬜ | R5 | **列表底部内联「＋ 新提醒事项」**（点开即输入、自然语言） | `TaskList`/`TasksScreen`（复用 `CaptureComposer` 解析） | 截图：底部新建行→输入→建出 |
 | ⬜ | R3b | 行副行 = **备注/清单**；尾部 = **日期/旗标**（右对齐） | `TaskRow` `renderMeta`/`renderTrailing` | 截图：行结构 |

@@ -50,8 +50,8 @@ export const TASK_ROW_SHAPE = {
   listGap: 'space.2',
   /** 勾选框的视觉尺寸（**不是**触控区，见下）。 */
   checkboxSize: 'size.checkbox',
-  /** 勾选框圆角。 */
-  checkboxRadius: 'radius.sm',
+  /** 勾选框圆角：**圆形**（对齐 Apple 提醒事项；完成态为实心圆带勾）。 */
+  checkboxRadius: 'radius.full',
   /** 勾选框描边宽度。 */
   checkboxBorderWidth: 'border-width.thin',
   /**
