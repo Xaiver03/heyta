@@ -57,21 +57,20 @@
 
 ---
 
-## 4. 视觉验收状态（诚实标注：未完成）
+## 4. 视觉验收（已完成 · 模拟器真机包）
 
-- **未完成原因**：模拟器上已安装的 `com.heyta` 是**旧 JS bundle**；本轮改动在 `packages/ui`（源码 + `dist` 已重建），要肉眼看到必须**重打 RN 包并安装**。而当前工作区有**另一会话正在修改 iOS 原生工程（`project.pbxproj`）与 focus 相关文件**，此刻重建/安装会与之相互干扰，且 Release 模拟器构建耗时且易受脏工程失败。
-- **待执行命令（在有干净工程时）**：
+- **做过了**：`pnpm --filter @heyta/mobile build:ios`（Release / iphonesimulator）**BUILD SUCCEEDED** → `xcrun simctl install` 到 iPhone 17 模拟器（`4C1B456B-…`）→ 启动 → 截图，**肉眼核对通过**。
+- **结果**：改前空态被**描边白卡整块包住**；改后**无卡框**——日期副标题「11月18日 星期三」在顶部，空态（插画 +「今天还没有安排」+ 说明 + 主按钮）在下方剩余空间**垂直居中**；底部 5 个 tab（毛玻璃材质）正常渲染。
+- 对照图：[`img/before-after-empty-state.png`](img/before-after-empty-state.png)；改后单图：[`img/after-empty-state-fix.png`](img/after-empty-state-fix.png)。
+- 复现命令：
   ```bash
-  # 1) 已构建 @heyta/ui dist（本轮已做）
   pnpm --filter @heyta/ui build
-  # 2) 重打 iOS 模拟器包并安装（或 npx react-native run-ios）
-  pnpm --filter @heyta/mobile build:ios
-  # 3) 启动并截图（用本仓既有脚本/模拟器 UDID）
-  xcrun simctl launch 4C1B456B-C506-4A72-94B5-18A80E1EBCE9 com.heyta
-  xcrun simctl io 4C1B456B-C506-4A72-94B5-18A80E1EBCE9 screenshot /tmp/after-tasks-empty.png
+  pnpm --filter @heyta/mobile build:ios          # → apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app
+  xcrun simctl install 4C1B456B-C506-4A72-94B5-18A80E1EBCE9 apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app
+  xcrun simctl launch  4C1B456B-C506-4A72-94B5-18A80E1EBCE9 com.heyta
+  xcrun simctl io      4C1B456B-C506-4A72-94B5-18A80E1EBCE9 screenshot /tmp/after-empty-state-fix.png
   ```
-- **预期（改前的反证图已在）**：改前 `docs/research/apple-ui-ux-comparison-2026-11-18/img/heyta-mobile-tasks-empty.png` 显示"描边白卡包住空态"；改后应为：**无卡框，日期副标题在顶部、空态（插画+文案+主按钮）在下方剩余空间垂直居中**。
-- 逻辑依据：`EmptyState` 的 `page` 档本身"居中 + 上下 `space.16` + 插画"（`packages/ui/src/empty-state/EmptyState.tsx` / `model.ts`），本次只是**不再套白卡**并给居中层 `flex:1`。
+- 口径：该包由**当前工作树**构建，因此同时含另一会话未提交的 JS（如底栏 BlurView）；但本截图验证的那一格（**任务空态**）只与本次 `TaskList` 改动相关，tab 栏正常也说明原生 BlurView 已随本次构建链接。改前图取自真机 `img/heyta-mobile-tasks-empty.png`。
 
 ---
 
