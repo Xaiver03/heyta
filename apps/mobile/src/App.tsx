@@ -30,8 +30,8 @@
  * 用了最简单正确的东西。
  */
 
-import React, { useEffect, useState } from 'react';
-import { AppState, StatusBar, useWindowDimensions, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, AppState, StatusBar, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from './ui/error-boundary';
 import { I18nProvider, useI18n, type Locale } from '@heyta/i18n';
@@ -89,8 +89,28 @@ startPrivacyGate();
 
 function Shell(): React.JSX.Element {
   const t = useTokens();
-  const { theme } = useTheme();
+  const { theme, reducedMotion } = useTheme();
   const { tab, setTab } = useMobileNavigation();
+
+  /**
+   * 🔴 2026-11-18：标签切换时内容**淡入**（Apple §1 Response / §12：内容切换不是硬切）。
+   * 五屏用 display:none 保活，切换本身是瞬时的；这里给整个内容区一个 ~fast 的透明度淡入，
+   * 让「切 tab」读起来是「内容淡入」而不是「画面跳变」。尊重 reducedMotion。
+   */
+  const tabFade = useRef(new Animated.Value(1)).current;
+  const isFirstTabRender = useRef(true);
+  useEffect(() => {
+    if (isFirstTabRender.current) {
+      isFirstTabRender.current = false;
+      return;
+    }
+    if (reducedMotion) {
+      tabFade.setValue(1);
+      return;
+    }
+    tabFade.setValue(0);
+    Animated.timing(tabFade, { toValue: 1, duration: t['duration.fast'], useNativeDriver: true }).start();
+  }, [tab, reducedMotion, t, tabFade]);
   /**
    * 「任务」标签的角标数字。
    *
@@ -280,7 +300,7 @@ function Shell(): React.JSX.Element {
         barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={t['color.background']}
       />
-      <View style={{ flex: 1 }}>
+      <Animated.View style={{ flex: 1, opacity: tabFade }}>
         <View style={{ flex: 1, display: tab === 'tasks' ? 'flex' : 'none' }}>
           <TasksScreen onPendingCountChange={setPendingCount} />
         </View>
@@ -296,7 +316,7 @@ function Shell(): React.JSX.Element {
         <View style={{ flex: 1, display: tab === 'focus' ? 'flex' : 'none' }}><FocusScreen /></View>
         <View style={{ flex: 1, display: tab === 'categories' ? 'flex' : 'none' }}><CategoriesScreen /></View>
         <View style={{ flex: 1, display: tab === 'profile' ? 'flex' : 'none' }}><ProfileScreen /></View>
-      </View>
+      </Animated.View>
       <TabBar
         background={tab === 'profile' ? 'grouped' : 'surface'}
         active={tab}
