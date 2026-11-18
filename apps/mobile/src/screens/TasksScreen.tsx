@@ -1906,7 +1906,7 @@ export function TasksScreen({
                * `bodyPaddingBlock: space.1`），只是移动端列表一直吃默认的 `comfortable`。
                */
               density="compact"
-              // 白卡列表（对齐滴答的"卡 + 卡内行"观感，见 `TaskList` 的 `listCard`）。
+              // 白卡列表（2026-11-19 起按**提醒事项**改版：**每组一张卡、组头在卡外**；见 `TaskList` 的 `listCard`/`useSectionCards`）。
               listCard
               // Reminders 风格：列表底部常驻「＋ 新提醒事项」内联新建行（点开宿主的新建面板）。
               onInlineAdd={() => {

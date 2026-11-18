@@ -209,7 +209,7 @@ interface TaskListSharedProps {
    */
   readonly renderRowWrapper?: (row: TaskRowModel, node: React.ReactNode) => React.ReactNode;
   /**
-   * 整张列表画成**一张白卡**（移动端任务页用，对齐滴答的"分组卡"观感）。
+   * 移动端任务页的白卡列表。2026-11-19 起按**提醒事项**：分节时**每组一张卡、组头在卡外**（见 `useSectionCards`）。
    *
    * 🔴 2026-11-15：滴答的任务是"白卡 + 卡内行"，我们是"灰底平铺 + 8dp 空隙"。
    * 真机对比时最刺眼的差别不是行高（那个已压到 compact），而是**没有卡**：
@@ -334,6 +334,26 @@ export function TaskList<TMeta = undefined>({
   const showCard = shouldShowListCard(listCard, items.length);
   const isEmptyCard = listCard && items.length === 0;
 
+  /**
+   * 🔴 提醒事项形态（R4）：`listCard` + **分节** 时，改为**每组一张卡、组头在卡外**。
+   * 只走这一条路径；非分节 / 非卡片（web、四象限）逐字节不变。
+   */
+  const useSectionCards = showCard && sections !== undefined;
+  const sectionBlocks = useMemo(() => {
+    if (!useSectionCards || sections === undefined) {
+      return [] as { readonly section: TaskSection<TMeta>; readonly rows: readonly TaskRowModel[] }[];
+    }
+    return sections
+      .map((section) => ({
+        section,
+        rows: toTaskRows(section.tasks, {
+          ...(fallbackTitle === undefined ? {} : { fallbackTitle }),
+          ...(sort === undefined ? {} : { sort }),
+        }),
+      }))
+      .filter((block) => keepEmptySections === true || block.rows.length > 0);
+  }, [useSectionCards, sections, fallbackTitle, sort, keepEmptySections]);
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -354,7 +374,7 @@ export function TaskList<TMeta = undefined>({
            * 分隔的职责交给行自己的上下内边距，卡是一整块。
            */
           gap: showCard ? 0 : tokens[TASK_ROW_SHAPE.listGap],
-          ...(showCard
+          ...(showCard && !useSectionCards
             ? {
                 backgroundColor: tokens['color.surface'],
                 /*
@@ -382,27 +402,27 @@ export function TaskList<TMeta = undefined>({
           paddingVertical: tokens[TASK_ROW_SHAPE.touchTarget],
           paddingHorizontal: tokens['space.2'],
         },
+        // 每组一张卡（提醒事项 R4）：组间留白 + 组卡本体 + 卡内行分隔线。
+        sectionBlock: { marginBottom: tokens['space.4'] },
+        sectionCard: {
+          backgroundColor: tokens['color.surface'],
+          borderWidth: tokens['border-width.thin'],
+          borderColor: tokens['color.border'],
+          borderRadius: tokens['radius.lg'],
+          overflow: 'hidden' as const,
+          paddingHorizontal: tokens['space.2'],
+        },
+        sectionSep: {
+          height: tokens['border-width.thin'],
+          backgroundColor: tokens['color.border'],
+          marginLeft: tokens['space.2'],
+        },
       }),
-    [showCard, isEmptyCard, tokens],
+    [showCard, isEmptyCard, useSectionCards, tokens],
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: Item }) => {
-      if (item.kind === 'header') {
-        // 🔴 分节头由宿主给。共享层**不解释** `section.meta` ——
-        // 图标名各端不同（mobile 是 `lucide-react-native` 的名字集合），
-        // 定死就等于让共享层去认识某个平台专属的包。
-        return <>{renderSectionHeader?.(item.section) ?? null}</>;
-      }
-
-      /**
-       * 🔴 行本身**只在这一处渲染**（`TaskRow.tsx`）。
-       *
-       * 抽取前那段行的 JSX 就长在这个分支里；现在它的几何与结构与
-       * 默认档（`comfortable`）字面相同，只是搬了家。本文件**不再认识**
-       * 勾选框尺寸 / 行高 / 间距 —— 那些属于行，不属于列表。
-       */
-      const row = item.row;
+  const buildTaskRow = useCallback(
+    (row: TaskRowModel) => {
       const node = (
         <TaskRow
           row={row}
@@ -425,7 +445,39 @@ export function TaskList<TMeta = undefined>({
       // 省略插槽 ⇒ 原样返回那一枚行（移动端/四象限的行为逐字节不变）。
       return renderRowWrapper === undefined ? node : <>{renderRowWrapper(row, node)}</>;
     },
-    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density, selectedTaskIds, selectionMode, renderRowWrapper, iconColorOf, listCard, tokens],
+    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderMeta, renderTrailing, density, selectedTaskIds, selectionMode, renderRowWrapper, iconColorOf, listCard, tokens],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: Item }) => {
+      if (item.kind === 'header') {
+        // 🔴 分节头由宿主给。共享层**不解释** `section.meta`。
+        return <>{renderSectionHeader?.(item.section) ?? null}</>;
+      }
+      return buildTaskRow(item.row);
+    },
+    [buildTaskRow, renderSectionHeader],
+  );
+
+  const renderSectionItem = useCallback(
+    ({
+      item,
+    }: {
+      item: { readonly section: TaskSection<TMeta>; readonly rows: readonly TaskRowModel[] };
+    }) => (
+      <View style={styles.sectionBlock}>
+        {renderSectionHeader?.(item.section) ?? null}
+        <View style={styles.sectionCard}>
+          {item.rows.map((row, index) => (
+            <View key={row.id}>
+              {buildTaskRow(row)}
+              {index < item.rows.length - 1 ? <View style={styles.sectionSep} /> : null}
+            </View>
+          ))}
+        </View>
+      </View>
+    ),
+    [buildTaskRow, renderSectionHeader, styles],
   );
 
   const keyExtractor = useCallback((item: Item) => item.key, []);
@@ -490,24 +542,39 @@ export function TaskList<TMeta = undefined>({
     );
   }, [onInlineAdd, inlineAddLabel, items.length, styles, text, tokens]);
 
+  const flatListCommon = {
+    ListHeaderComponent: listHeaderComponent,
+    ListFooterComponent: inlineAddNode,
+    ListEmptyComponent: emptyNode,
+    contentContainerStyle: styles.list,
+    ...(onScrollOffset === undefined
+      ? {}
+      : {
+          onScroll: (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+            onScrollOffset(e.nativeEvent.contentOffset.y);
+          },
+          scrollEventThrottle: 16,
+        }),
+    testID,
+  };
+
+  if (useSectionCards) {
+    return (
+      <FlatList
+        {...flatListCommon}
+        data={sectionBlocks}
+        renderItem={renderSectionItem}
+        keyExtractor={(block) => block.section.key}
+      />
+    );
+  }
+
   return (
     <FlatList
+      {...flatListCommon}
       data={items}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
-      ListHeaderComponent={listHeaderComponent}
-      ListFooterComponent={inlineAddNode}
-      ListEmptyComponent={emptyNode}
-      contentContainerStyle={styles.list}
-      {...(onScrollOffset === undefined
-        ? {}
-        : {
-            onScroll: (e) => {
-              onScrollOffset(e.nativeEvent.contentOffset.y);
-            },
-            scrollEventThrottle: 16,
-          })}
-      testID={testID}
     />
   );
 }
