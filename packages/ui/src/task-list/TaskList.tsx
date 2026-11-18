@@ -71,6 +71,7 @@ import type { CategoryColorToken } from '../categories/model.js';
 import type { Task, TaskSortKey } from '@heyta/domain';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import type { TaskRowDensity } from './density.js';
+import { shouldShowListCard } from './card-policy.js';
 import { TaskRow, type TaskRowLabels } from './TaskRow.js';
 import type { TaskRowSwipeSpec } from './row-actions.js';
 import {
@@ -310,6 +311,20 @@ export function TaskList<TMeta = undefined>({
     }));
   }, [tasks, sort, sections, fallbackTitle, keepEmptySections]);
 
+  /**
+   * 🔴 「空列表不画白卡」的唯一判断（纯函数，见 `card-policy.ts`，有 node 单测）。
+   *
+   * 背景：`listCard` 会把整张列表画成一张白卡（移动端任务页）。列表为空时，
+   * 空态会被这张白卡**整个包住** —— 一张孤零零的框里放一句"还没有安排"，
+   * 既不像 iOS 空态，也和"卡承载列表"的原意相反：没有列表就不该有卡。
+   * 所以空列表时落到页面本身，且让内容容器铺满高度、空态在剩余空间里垂直居中。
+   *
+   * 影响面**严格限定在 `listCard` 路径**（只有移动端任务页传它）：
+   * `showCard` / `isEmptyCard` 为 false 时，下面的样式与渲染逐字节等于改动前。
+   */
+  const showCard = shouldShowListCard(listCard, items.length);
+  const isEmptyCard = listCard && items.length === 0;
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -329,8 +344,8 @@ export function TaskList<TMeta = undefined>({
            * 一张白卡被切成七段（真机截图：每行之间一道灰色断口）。
            * 分隔的职责交给行自己的上下内边距，卡是一整块。
            */
-          gap: listCard ? 0 : tokens[TASK_ROW_SHAPE.listGap],
-          ...(listCard
+          gap: showCard ? 0 : tokens[TASK_ROW_SHAPE.listGap],
+          ...(showCard
             ? {
                 backgroundColor: tokens['color.surface'],
                 /*
@@ -344,9 +359,14 @@ export function TaskList<TMeta = undefined>({
                 paddingHorizontal: tokens['space.2'],
               }
             : {}),
+          // 空列表且要求卡片时：不给空态画卡（`card-policy` 的结论），但仍让内容容器
+          // 铺满高度，好让下面的空态在"日期副标题之外的剩余空间"里垂直居中。
+          ...(isEmptyCard ? { flexGrow: 1 } : {}),
         },
+        // 空态外层：吃掉 header 之外的剩余高度并居中（flex/flexGrow 是布局关键字，不是设计尺度）。
+        emptyCenter: { flex: 1, justifyContent: 'center' },
       }),
-    [listCard, tokens],
+    [showCard, isEmptyCard, tokens],
   );
 
   const renderItem = useCallback(
@@ -409,13 +429,39 @@ export function TaskList<TMeta = undefined>({
     [emptyMessage],
   );
 
+  /**
+   * 空态内容（宿主 `emptyComponent` 优先，其次 `emptyMessage` 兜底）。
+   *
+   * 空列表且 `listCard` 时，把它包进一层「占满剩余高度并居中」的容器：
+   * 这时 `contentContainerStyle` 已设 `flexGrow: 1`，包层 `flex: 1` 正好吃掉
+   * header（日期副标题）之外的所有剩余高度，空态在其中垂直居中 ——
+   * 与 Apple「空态居中落在页面上、不套卡片」一致。
+   *
+   * ⚠️ `emptyComponent` 的类型允许是**元素**或**组件类型**；只有元素能被这样包，
+   * 组件类型（如某端传 `<Comp/>` 的类型）原样交回 `FlatList` 自己渲染。
+   */
+  const emptyContent = emptyComponent ?? empty;
+  const emptyNode =
+    emptyContent === null || emptyContent === undefined
+      ? null
+      : isEmptyCard
+        ? (
+            <View style={styles.emptyCenter}>
+              {/* 元素直接渲染；组件类型（若某端传的是类型而非元素）先 createElement 再居中 —— 两者都要包进居中层。 */}
+              {React.isValidElement(emptyContent)
+                ? emptyContent
+                : React.createElement(emptyContent as React.ComponentType)}
+            </View>
+          )
+        : emptyContent;
+
   return (
     <FlatList
       data={items}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       ListHeaderComponent={listHeaderComponent}
-      ListEmptyComponent={emptyComponent ?? empty}
+      ListEmptyComponent={emptyNode}
       contentContainerStyle={styles.list}
       {...(onScrollOffset === undefined
         ? {}
