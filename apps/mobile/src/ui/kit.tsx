@@ -46,6 +46,7 @@ import {
   DEFAULT_CONTROL_EMPHASIS,
   DEFAULT_CONTROL_TONE,
   controlPaletteOf,
+  TopBar,
   type ControlEmphasis,
   type ControlTone,
 } from '@heyta/ui';
@@ -251,43 +252,18 @@ export function AppBar({
         backgroundColor: t[background === 'grouped' ? 'color.grouped-background' : 'color.surface'],
       }}
     >
-      <View
-        style={{
-          height: t['nav.app-bar-height'],
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: t['screen.gutter'],
-          gap: t['space.2'],
-          // 内容页：标题行收窄到与内容同一列并居中（外层底色仍铺满整宽）。
-          ...(contentMaxWidth !== undefined
-            ? { width: '100%' as const, maxWidth: contentMaxWidth, alignSelf: 'center' as const }
-            : {}),
-        }}
-      >
-        {/* 标题区 flex:1 且**不加 numberOfLines 限制**会让长标题把操作挤掉；
-            这里限 1 行并允许收缩。 */}
-        {titleLeading}
-        <View style={{ flex: 1 }}>
-          {onTitlePress === undefined ? (
-            <Text variant="headline" numberOfLines={1}>
-              {title}
-            </Text>
-          ) : (
-            <Pressable
-              onPress={onTitlePress}
-              accessibilityRole="button"
-              accessibilityLabel={title}
-              testID="app-bar-title-press"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: t['space.1'] }}
-            >
-              <Text variant="headline" numberOfLines={1}>
-                {title}
-              </Text>
-              <Icon name="action.disclose-down" size="sm" color={t['color.foreground-subtle']} />
-            </Pressable>
-          )}
-        </View>
-        {actions?.map((a) => (
+      <TopBar
+        leading={titleLeading}
+        title={title}
+        {...(onTitlePress === undefined ? {} : { onTitlePress })}
+        {...(onTitlePress === undefined
+          ? {}
+          : {
+              titleAccessory: (
+                <Icon name="action.disclose-down" size="sm" color={t['color.foreground-subtle']} />
+              ),
+            })}
+        actions={actions?.map((a) => (
           <IconButton
             key={a.label}
             icon={a.icon}
@@ -297,7 +273,8 @@ export function AppBar({
             disabled={a.disabled}
           />
         ))}
-      </View>
+        contentMaxWidth={contentMaxWidth}
+      />
     </View>
   );
 }

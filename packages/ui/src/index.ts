@@ -503,6 +503,12 @@ export {
 } from './layout/content-measure.js';
 
 /**
+ * ── 产品组件：顶部栏（槽位 leading / title / tabs / actions / overflow）──
+ * 摆放契约只此一份；安全区与底色留在宿主外壳（见 `apps/mobile` 的 AppBar）。
+ */
+export { TopBar, type TopBarProps } from './layout/TopBar.js';
+
+/**
  * ── M3 §4.2 补缺：**`TaskRow` 的 `density` 档位**（本轮新增） ──
  *
  * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
