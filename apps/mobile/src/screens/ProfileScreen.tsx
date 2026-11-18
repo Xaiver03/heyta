@@ -894,6 +894,7 @@ export function ProfileScreen(): React.JSX.Element {
    */
   const notificationsRow: SettingsRowModel = {
     kind: 'action',
+      discloses: true,
     testID: 'profile-entry-notifications',
     label: t('mobile.inbox.trigger'),
     onPress: () => {
@@ -946,6 +947,7 @@ export function ProfileScreen(): React.JSX.Element {
   const featureRows: readonly SettingsRowModel[] = MOBILE_PROFILE_ENTRIES.map(
     (entry): SettingsRowModel => ({
       kind: 'action',
+      discloses: true,
       testID: entry.testID,
       label: t(entry.labelKey),
       leading: <Icon name={FEATURE_ENTRY_ICONS[entry.key]} size="sm" color={tokens['color.foreground-muted']} />,
@@ -961,6 +963,7 @@ export function ProfileScreen(): React.JSX.Element {
    */
   const settingsRow: SettingsRowModel = {
     kind: 'action',
+      discloses: true,
     testID: 'profile-entry-settings',
     label: t('mobile.profile.entry.settings'),
     leading: <Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />,
@@ -981,6 +984,7 @@ export function ProfileScreen(): React.JSX.Element {
    */
   const subscriptionRow: SettingsRowModel = {
     kind: 'action',
+      discloses: true,
     testID: 'profile-entry-subscription',
     label: t('mobile.settings.section.subscription'),
     leading: <Icon name="action.subscription" size="sm" color={tokens['color.foreground-muted']} />,
@@ -1017,6 +1021,7 @@ export function ProfileScreen(): React.JSX.Element {
    */
   const featuresHubRow: SettingsRowModel = {
     kind: 'action',
+      discloses: true,
     testID: 'profile-entry-features',
     label: t('mobile.profile.entry.features'),
     leading: <Icon name="tab.focus" size="sm" color={tokens['color.foreground-muted']} />,
@@ -1043,6 +1048,7 @@ export function ProfileScreen(): React.JSX.Element {
   const entryRows: readonly SettingsRowModel[] = [
     {
       kind: 'action',
+      discloses: true,
       testID: 'profile-entry-security',
       label: t('mobile.security.trigger'),
       leading: <Icon name="privacy.consent" size="sm" color={tokens['color.foreground-muted']} />,
@@ -1054,6 +1060,7 @@ export function ProfileScreen(): React.JSX.Element {
     ...featureRows,
     {
       kind: 'action',
+      discloses: true,
       testID: 'profile-entry-assistant',
       label: t('mobile.ai.entry'),
       // 🔴 2026-10-26 的 tooltip 禁令扫到这里还剩最后一条：`mobile.ai.entry.hint`
@@ -1065,6 +1072,7 @@ export function ProfileScreen(): React.JSX.Element {
     },
     {
       kind: 'action',
+      discloses: true,
       testID: 'profile-entry-ai-toolbox',
       label: t('mobile.ai.toolbox.entry'),
       /*
@@ -1077,6 +1085,7 @@ export function ProfileScreen(): React.JSX.Element {
     },
     {
       kind: 'action',
+      discloses: true,
       testID: 'profile-entry-trash',
       label: t('mobile.trash.entry'),
       leading: <Icon name="task.delete" size="sm" color={tokens['color.foreground-muted']} />,
@@ -1087,6 +1096,7 @@ export function ProfileScreen(): React.JSX.Element {
     },
     {
       kind: 'action',
+      discloses: true,
       testID: 'profile-entry-abandoned',
       label: t('mobile.abandoned.entry'),
       // 🔴 这一行是 ADR-0083 §4.3 的出口：放弃之后必须看得见回来的路。
@@ -1100,6 +1110,7 @@ export function ProfileScreen(): React.JSX.Element {
     },
     {
       kind: 'action',
+      discloses: true,
       testID: 'profile-entry-export',
       label: t('mobile.export.entry'),
       leading: <Icon name="action.share" size="sm" color={tokens['color.foreground-muted']} />,
@@ -1110,6 +1121,7 @@ export function ProfileScreen(): React.JSX.Element {
     },
     {
       kind: 'action',
+      discloses: true,
       // 🔴 就排在「导出数据」的**下面一格**，不是随手追加在末尾：注销那道屏要求的
       // 第一步恰恰是"先导出留一份"。两格相邻，那句话才有一个抬眼就够得着的出口。
       testID: 'profile-entry-close-account',
@@ -1723,8 +1735,11 @@ export function ProfileScreen(): React.JSX.Element {
       {/* ── ③ 功能入口 ─────────────────────────────────────────────── */}
       <Card shadow="md">
         <SettingsRow row={subscriptionRow} />
+        <Divider />
         <SettingsRow row={settingsRow} />
+        <Divider />
         <SettingsRow row={notificationsRow} />
+        <Divider />
         <SettingsRow row={featuresHubRow} />
       </Card>
 
@@ -1778,9 +1793,14 @@ export function ProfileScreen(): React.JSX.Element {
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
       <SectionHeader title={t('mobile.profile.tools')} />
       <Card shadow="md">
-        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', leading: <Icon name="task.project" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:lists'); } }} />
-        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', leading: <Icon name="task.tag" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:tags'); } }} />
-        <SettingsRow row={{ kind: 'action', label: t('notes.title'), testID: 'profile-entry-notes', leading: <Icon name="note.sticky" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:notes'); } }} />
+        <SettingsRow row={{ kind: 'action',
+      discloses: true, label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', leading: <Icon name="task.project" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:lists'); } }} />
+        <Divider />
+        <SettingsRow row={{ kind: 'action',
+      discloses: true, label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', leading: <Icon name="task.tag" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:tags'); } }} />
+        <Divider />
+        <SettingsRow row={{ kind: 'action',
+      discloses: true, label: t('notes.title'), testID: 'profile-entry-notes', leading: <Icon name="note.sticky" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:notes'); } }} />
       </Card>
 
       <ConflictSheet

@@ -790,8 +790,9 @@ function ActionLine({
   const text = useHeytaText();
 
   const body = (
-    <View style={styles.action}>
-      <View style={styles.actionHead}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: tokens['space.2'] }}>
+      <View style={[styles.action, { flex: 1 }]}>
+        <View style={styles.actionHead}>
         {row.leading === undefined ? null : row.leading}
         <Text
           {...linkProps(row.href)}
@@ -823,7 +824,11 @@ function ActionLine({
         {row.hint === undefined ? null : (
           <SettingsInfoTip text={row.hint} label={row.label} testID={`${row.testID ?? 'row'}-tip`} />
         )}
+        </View>
       </View>
+      {row.discloses === true ? (
+        <Text style={{ color: tokens['color.foreground-subtle'] }}>›</Text>
+      ) : null}
     </View>
   );
 

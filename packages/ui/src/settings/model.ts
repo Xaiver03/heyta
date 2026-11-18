@@ -227,6 +227,14 @@ export interface SettingsActionRow extends SettingsRowCommon {
   readonly href?: string;
   readonly onPress?: () => void;
   /**
+   * 这一行点下去是**进入下一层** → 渲染层在行尾补一枚 chevron（`›`）。
+   *
+   * 🔴 2026-11-18：补自「我的」个人中心的收口（对照 TickTick / iOS 设置页：
+   * 可导航行都是「图标 + 文字 + ›」）。不给这一格时是普通链接/动作行，不画箭头。
+   * 与 `SettingsValueRow.discloses` 同一语义、同一画法。
+   */
+  readonly discloses?: boolean;
+  /**
    * 标签前面那个记号（图标），由宿主渲染。
    *
    * 🔴 与 `SettingsSectionProps.leading` 同一个理由：两端的字形不同源
