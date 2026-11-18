@@ -29,6 +29,7 @@
 //   - shadow.lg: box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。
 //   - shadow.xl: box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。
 //   - shadow.focus: box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。
+//   - shadow.card: box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。
 //   - ease.standard: cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。
 //   - ease.enter: cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。
 //   - ease.exit: cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。
@@ -54,6 +55,7 @@ enum HeytaTokens {
     static let colorSurfaceSubtle: String = "#f8fafc"
     static let colorSurfaceRaised: String = "#ffffff"
     static let colorSurfaceSunken: String = "#f1f5f9"
+    static let colorGroupedBackground: String = "#e2e8f0"
     static let colorForeground: String = "#0f172a"
     static let colorForegroundMuted: String = "#475569"
     static let colorForegroundSubtle: String = "#57677d"
@@ -153,6 +155,7 @@ enum HeytaTokens {
     static let shadowLg: String = "0 8px 24px rgb(15 23 42 / 0.12)"
     static let shadowXl: String = "0 16px 48px rgb(15 23 42 / 0.16)"
     static let shadowFocus: String = "0 0 0 3px rgb(37 99 235 / 0.25)"
+    static let shadowCard: String = "0 3px 10px rgb(15 23 42 / 0.14)"
     static let durationInstant: Double = 80  // ms
     static let durationFast: Double = 150  // ms
     static let durationNormal: Double = 200  // ms
@@ -285,6 +288,7 @@ enum HeytaTokens {
     static let colorSurfaceSubtle: String = "#101a2e"
     static let colorSurfaceRaised: String = "#131e33"
     static let colorSurfaceSunken: String = "#080e1a"
+    static let colorGroupedBackground: String = "#080e1a"
     static let colorForeground: String = "#f1f5f9"
     static let colorForegroundMuted: String = "#cbd5e1"
     static let colorForegroundSubtle: String = "#94a3b8"
@@ -345,6 +349,7 @@ enum HeytaTokens {
     static let shadowLg: String = "0 8px 24px rgb(0 0 0 / 0.6)"
     static let shadowXl: String = "0 16px 48px rgb(0 0 0 / 0.7)"
     static let shadowFocus: String = "0 0 0 3px rgb(96 165 250 / 0.35)"
+    static let shadowCard: String = "0 3px 10px rgb(0 0 0 / 0.6)"
     static let materialChromeTint: String = "#0d1526b8"
     static let materialChromeTintStrong: String = "#0d1526e6"
     static let materialPanelTint: String = "#0d1526db"

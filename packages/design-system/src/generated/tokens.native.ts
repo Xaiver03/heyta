@@ -25,6 +25,7 @@ export interface HeytaNativeTokens {
   readonly 'color.surface-subtle': string;
   readonly 'color.surface-raised': string;
   readonly 'color.surface-sunken': string;
+  readonly 'color.grouped-background': string;
   readonly 'color.foreground': string;
   readonly 'color.foreground-muted': string;
   readonly 'color.foreground-subtle': string;
@@ -132,6 +133,8 @@ export interface HeytaNativeTokens {
   readonly 'shadow.xl': string;
   /** box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。 */
   readonly 'shadow.focus': string;
+  /** box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。 */
+  readonly 'shadow.card': string;
   readonly 'duration.instant': number;
   readonly 'duration.fast': number;
   readonly 'duration.normal': number;
@@ -272,6 +275,7 @@ export const lightTokens: HeytaNativeTokens = {
   'color.surface-subtle': "#f8fafc",
   'color.surface-raised': "#ffffff",
   'color.surface-sunken': "#f1f5f9",
+  'color.grouped-background': "#e2e8f0",
   'color.foreground': "#0f172a",
   'color.foreground-muted': "#475569",
   'color.foreground-subtle': "#57677d",
@@ -371,6 +375,7 @@ export const lightTokens: HeytaNativeTokens = {
   'shadow.lg': "0 8px 24px rgb(15 23 42 / 0.12)",
   'shadow.xl': "0 16px 48px rgb(15 23 42 / 0.16)",
   'shadow.focus': "0 0 0 3px rgb(37 99 235 / 0.25)",
+  'shadow.card': "0 3px 10px rgb(15 23 42 / 0.14)",
   'duration.instant': 80,
   'duration.fast': 150,
   'duration.normal': 200,
@@ -502,6 +507,7 @@ export const darkTokens: HeytaNativeTokens = {
   'color.surface-subtle': "#101a2e",
   'color.surface-raised': "#131e33",
   'color.surface-sunken': "#080e1a",
+  'color.grouped-background': "#080e1a",
   'color.foreground': "#f1f5f9",
   'color.foreground-muted': "#cbd5e1",
   'color.foreground-subtle': "#94a3b8",
@@ -601,6 +607,7 @@ export const darkTokens: HeytaNativeTokens = {
   'shadow.lg': "0 8px 24px rgb(0 0 0 / 0.6)",
   'shadow.xl': "0 16px 48px rgb(0 0 0 / 0.7)",
   'shadow.focus': "0 0 0 3px rgb(96 165 250 / 0.35)",
+  'shadow.card': "0 3px 10px rgb(0 0 0 / 0.6)",
   'duration.instant': 80,
   'duration.fast': 150,
   'duration.normal': 200,
@@ -775,6 +782,7 @@ export const presetTokens: {
       'color.surface-raised': "#ffffff",
       'color.surface-subtle': "#fbfaf7",
       'color.surface-sunken': "#d8d6d1",
+      'color.grouped-background': "#d8d6d1",
       'color.border': "#d8d6d1",
       'color.border-strong': "#5b5b5b",
       'color.foreground': "#1a1a1a",
@@ -787,6 +795,7 @@ export const presetTokens: {
       'color.surface-raised': "#1a1a1a",
       'color.surface-subtle': "#1a1a1a",
       'color.surface-sunken': "#080e1a",
+      'color.grouped-background': "#080e1a",
       'color.border': "#5b5b5b",
       'color.border-strong': "#d8d6d1",
       'color.foreground': "#fbfaf7",
@@ -801,6 +810,7 @@ export const presetTokens: {
       'color.surface-raised': "#ffffff",
       'color.surface-subtle': "#f1f5f9",
       'color.surface-sunken': "#e2e8f0",
+      'color.grouped-background': "#e2e8f0",
       'color.border': "#99f6e4",
       'color.border-strong': "#64748b",
     },
@@ -810,6 +820,7 @@ export const presetTokens: {
       'color.surface-raised': "#101a2e",
       'color.surface-subtle': "#0d1526",
       'color.surface-sunken': "#080e1a",
+      'color.grouped-background': "#080e1a",
       'color.border': "#0d9488",
       'color.border-strong': "#94a3b8",
     },

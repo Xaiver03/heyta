@@ -32,6 +32,7 @@ export const TOKEN_GROUPS = {
     'surface-subtle',
     'surface-raised',
     'surface-sunken',
+    'grouped-background',
     'foreground',
     'foreground-muted',
     'foreground-subtle',
@@ -113,7 +114,7 @@ export const TOKEN_GROUPS = {
   // `button`(18) / `dialog`(24) 是 DSH 对齐新增：DSH 的 Button 与 Modal 就是这个量。
   // 刻意**不复用** md/xl —— md 同时管输入框，而 DSH 的 Input 是 8。
   radius: ['none', 'sm', 'md', 'lg', 'xl', 'button', 'dialog', 'full'],
-  shadow: ['none', 'sm', 'md', 'lg', 'xl', 'focus'],
+  shadow: ['none', 'sm', 'md', 'lg', 'xl', 'focus', 'card'],
   duration: [
     'instant',
     'fast',

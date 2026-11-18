@@ -28,6 +28,7 @@
 //   - shadow.lg: box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。
 //   - shadow.xl: box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。
 //   - shadow.focus: box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。
+//   - shadow.card: box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。
 //   - ease.standard: cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。
 //   - ease.enter: cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。
 //   - ease.exit: cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。
@@ -51,6 +52,7 @@ export const HEYTA_COLOR_SURFACE: string = '#ffffff';
 export const HEYTA_COLOR_SURFACE_SUBTLE: string = '#f8fafc';
 export const HEYTA_COLOR_SURFACE_RAISED: string = '#ffffff';
 export const HEYTA_COLOR_SURFACE_SUNKEN: string = '#f1f5f9';
+export const HEYTA_COLOR_GROUPED_BACKGROUND: string = '#e2e8f0';
 export const HEYTA_COLOR_FOREGROUND: string = '#0f172a';
 export const HEYTA_COLOR_FOREGROUND_MUTED: string = '#475569';
 export const HEYTA_COLOR_FOREGROUND_SUBTLE: string = '#57677d';
@@ -150,6 +152,7 @@ export const HEYTA_SHADOW_MD: string = '0 2px 8px rgb(15 23 42 / 0.08)';
 export const HEYTA_SHADOW_LG: string = '0 8px 24px rgb(15 23 42 / 0.12)';
 export const HEYTA_SHADOW_XL: string = '0 16px 48px rgb(15 23 42 / 0.16)';
 export const HEYTA_SHADOW_FOCUS: string = '0 0 0 3px rgb(37 99 235 / 0.25)';
+export const HEYTA_SHADOW_CARD: string = '0 3px 10px rgb(15 23 42 / 0.14)';
 export const HEYTA_DURATION_INSTANT: number = 80;  // ms
 export const HEYTA_DURATION_FAST: number = 150;  // ms
 export const HEYTA_DURATION_NORMAL: number = 200;  // ms
@@ -280,6 +283,7 @@ export const HEYTA_DARK_COLOR_SURFACE: string = '#0d1526';
 export const HEYTA_DARK_COLOR_SURFACE_SUBTLE: string = '#101a2e';
 export const HEYTA_DARK_COLOR_SURFACE_RAISED: string = '#131e33';
 export const HEYTA_DARK_COLOR_SURFACE_SUNKEN: string = '#080e1a';
+export const HEYTA_DARK_COLOR_GROUPED_BACKGROUND: string = '#080e1a';
 export const HEYTA_DARK_COLOR_FOREGROUND: string = '#f1f5f9';
 export const HEYTA_DARK_COLOR_FOREGROUND_MUTED: string = '#cbd5e1';
 export const HEYTA_DARK_COLOR_FOREGROUND_SUBTLE: string = '#94a3b8';
@@ -340,6 +344,7 @@ export const HEYTA_DARK_SHADOW_MD: string = '0 2px 8px rgb(0 0 0 / 0.5)';
 export const HEYTA_DARK_SHADOW_LG: string = '0 8px 24px rgb(0 0 0 / 0.6)';
 export const HEYTA_DARK_SHADOW_XL: string = '0 16px 48px rgb(0 0 0 / 0.7)';
 export const HEYTA_DARK_SHADOW_FOCUS: string = '0 0 0 3px rgb(96 165 250 / 0.35)';
+export const HEYTA_DARK_SHADOW_CARD: string = '0 3px 10px rgb(0 0 0 / 0.6)';
 export const HEYTA_DARK_MATERIAL_CHROME_TINT: string = '#0d1526b8';
 export const HEYTA_DARK_MATERIAL_CHROME_TINT_STRONG: string = '#0d1526e6';
 export const HEYTA_DARK_MATERIAL_PANEL_TINT: string = '#0d1526db';

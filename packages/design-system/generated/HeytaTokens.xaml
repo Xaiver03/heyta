@@ -18,6 +18,7 @@
     <SolidColorBrush x:Key="HeytaColorSurfaceSubtle" Color="#FFF8FAFC" />
     <SolidColorBrush x:Key="HeytaColorSurfaceRaised" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="HeytaColorSurfaceSunken" Color="#FFF1F5F9" />
+    <SolidColorBrush x:Key="HeytaColorGroupedBackground" Color="#FFE2E8F0" />
     <SolidColorBrush x:Key="HeytaColorForeground" Color="#FF0F172A" />
     <SolidColorBrush x:Key="HeytaColorForegroundMuted" Color="#FF475569" />
     <SolidColorBrush x:Key="HeytaColorForegroundSubtle" Color="#FF57677D" />
@@ -117,6 +118,7 @@
     <x:String x:Key="HeytaShadowLg">0 8px 24px rgb(15 23 42 / 0.12)</x:String>
     <x:String x:Key="HeytaShadowXl">0 16px 48px rgb(15 23 42 / 0.16)</x:String>
     <x:String x:Key="HeytaShadowFocus">0 0 0 3px rgb(37 99 235 / 0.25)</x:String>
+    <x:String x:Key="HeytaShadowCard">0 3px 10px rgb(15 23 42 / 0.14)</x:String>
     <x:Double x:Key="HeytaDurationInstant">80</x:Double>
     <x:Double x:Key="HeytaDurationFast">150</x:Double>
     <x:Double x:Key="HeytaDurationNormal">200</x:Double>

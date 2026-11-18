@@ -547,7 +547,7 @@ export function Screen({
       既读不成分区，又被看成"蒙了一层灰"（产品负责人原话：「默认下面好像有一层
       灰色的底层遮罩」）。改白之后承载交给卡片自己那圈细线。
     */
-    <View style={{ flex: 1, backgroundColor: t[background === 'grouped' ? 'color.surface-sunken' : 'color.surface'] }}>
+    <View style={{ flex: 1, backgroundColor: t[background === 'grouped' ? 'color.grouped-background' : 'color.surface'] }}>
       {collapses ? (
         <Animated.View
           style={{
@@ -1009,7 +1009,7 @@ export interface CardProps {
    * 参照 TickTick「我的」的「浅灰页 + 白卡 + 轻阴影」）。默认 `undefined` = 不加，
    * 保持既有几十屏观感不变；只给需要读成"一张浮起的分组卡"的屏单独打开。
    */
-  shadow?: 'sm' | 'md' | 'lg';
+  shadow?: 'sm' | 'md' | 'lg' | 'card';
 }
 
 export function Card({

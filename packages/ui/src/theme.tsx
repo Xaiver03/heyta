@@ -83,7 +83,7 @@ export interface HeytaUiNativeAccessors {
   /** 绝对字距（px）。`tokens['tracking.*']` 是 **em 比例**，不能直接传给 RN。 */
   readonly tracking: (key: TextStyleName, fontSize: number) => number;
   readonly shadow: (
-    key: 'shadow.sm' | 'shadow.md' | 'shadow.lg' | 'shadow.xl' | 'shadow.focus',
+    key: 'shadow.sm' | 'shadow.md' | 'shadow.lg' | 'shadow.xl' | 'shadow.focus' | 'shadow.card',
   ) => RnShadow | null;
   readonly easing: (
     key: 'ease.standard' | 'ease.enter' | 'ease.exit' | 'ease.spring',

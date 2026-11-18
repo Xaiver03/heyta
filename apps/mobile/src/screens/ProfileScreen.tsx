@@ -1178,7 +1178,7 @@ export function ProfileScreen(): React.JSX.Element {
         title={t('mobile.profile.entry.features')}
         actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: () => { navigation.pop(); } }]}
       >
-        <Card shadow="md">
+        <Card shadow="card">
           {hubRows.map((row) => (
             <SettingsRow key={row.testID ?? row.kind} row={row} />
           ))}
@@ -1356,7 +1356,7 @@ export function ProfileScreen(): React.JSX.Element {
         改配置去设置面，两件事不再挤在一段滚动流里。
       */}
       <SectionHeader title={t('mobile.profile.section.status')} />
-      <Card shadow="md">
+      <Card shadow="card">
         <View style={{ gap: tokens['space.3'] }}>
           <StatusRow
             status={status}
@@ -1604,7 +1604,7 @@ export function ProfileScreen(): React.JSX.Element {
           }
         }}
       >
-        <Card shadow="md">
+        <Card shadow="card">
           <View
             style={{
               alignItems: 'center',
@@ -1666,7 +1666,7 @@ export function ProfileScreen(): React.JSX.Element {
         前者是一次**没做完**的说明，冲突时先说没做完的那件。）
       */}
       {pendingRevocation === null ? null : (
-        <Card shadow="md" gap="loose">
+        <Card shadow="card" gap="loose">
           <Stack gap="tight" testID="sign-out-pending">
             <Text variant="row-meta" tone="danger" selectable>
               {t('common.signOut.pending')}
@@ -1683,7 +1683,7 @@ export function ProfileScreen(): React.JSX.Element {
         </Card>
       )}
       {!signedOutEverywhere ? null : (
-        <Card shadow="md">
+        <Card shadow="card">
           <Stack testID="sign-out-all-done">
             <Text variant="row-meta" tone="default">
               {t('common.sessions.logoutAllDone')}
@@ -1733,7 +1733,7 @@ export function ProfileScreen(): React.JSX.Element {
       />
 
       {/* ── ③ 功能入口 ─────────────────────────────────────────────── */}
-      <Card shadow="md">
+      <Card shadow="card">
         <SettingsRow row={subscriptionRow} />
         <Divider />
         <SettingsRow row={settingsRow} />
@@ -1750,7 +1750,7 @@ export function ProfileScreen(): React.JSX.Element {
         `StatusRow` 这时只画**细节**（`detailOnly`），标题已经在上面那一行里 ——
         同一张卡里说两遍同一句话是本仓 §7 明令禁止的形状。
       */}
-      <Card shadow="md">
+      <Card shadow="card">
         <SettingsRow row={syncSummaryRow} />
         {syncDetailVisible ? (
           <>
@@ -1792,7 +1792,7 @@ export function ProfileScreen(): React.JSX.Element {
       {/* 清单 / 标签 / 便签管理（⑥）。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
       <SectionHeader title={t('mobile.profile.tools')} />
-      <Card shadow="md">
+      <Card shadow="card">
         <SettingsRow row={{ kind: 'action',
       discloses: true, label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', leading: <Icon name="task.project" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:lists'); } }} />
         <Divider />
