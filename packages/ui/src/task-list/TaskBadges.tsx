@@ -46,8 +46,7 @@ import { useHeytaText, useHeytaTokens } from '../theme.js';
 const GLYPHS = {
   due: CalendarClock,
   overdue: TriangleAlert,
-  priority: Flag,
-  /** 旗标（`important`）。与优先级共用一个 Flag 字形，但只有"重要"才叫旗标。 */
+  /** 旗标（`important`）。 */
   flag: Flag,
   /** 子任务进度（`done/total`）的字形。 */
   subtasks: ListChecks,
@@ -164,14 +163,12 @@ export function TaskBadges({
         </View>
       ) : null}
 
+      {/*
+        优先级=纯文字（提醒事项的 `!!! / !! / !`）。**不配图标**：
+        图标位留给"旗标(重要)"；给优先级再画一枚旗，会让人把"优先级"误读成"旗标"。
+      */}
       {hasPriority ? (
         <View style={styles.item}>
-          <HeytaIcon
-            data={GLYPHS.priority}
-            size={tokens['icon.xs']}
-            color={priority.color}
-            {...(priority.text === '' && iconLabel !== undefined ? { label: iconLabel } : {})}
-          />
           <Text style={[text['row-meta'], { color: priority.color }]}>{priority.text}</Text>
         </View>
       ) : null}

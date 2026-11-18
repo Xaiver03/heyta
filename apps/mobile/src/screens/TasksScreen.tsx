@@ -160,7 +160,7 @@ import {
   taskSortName,
   writeTaskSort,
 } from '../lib/task-sort';
-import { priorityBadgeLabel } from '../lib/priority';
+import { priorityMarks } from '../lib/priority';
 import { TaskDetailSheet } from './TaskDetailSheet';
 import { SearchScreen } from './SearchScreen';
 import { NoteEditScreen } from './NoteEditScreen';
@@ -1309,7 +1309,8 @@ export function TasksScreen({
       //    组件会在守卫处提前 return，这个回调根本不会被调用。用一句显式判空换回类型安全。
       const task = row.source;
       const due = toDueDisplay(task, dueMode, now, t);
-      const badge = priorityBadgeLabel(task.priority, t);
+      // 行内优先级用提醒事项的符号语言 `!!! / !! / !`（不是"高优先级"这类词条文案）。
+      const badge = priorityMarks(task.priority);
       // ⚠️ 可空调用：这个回调声明在下面那两个守卫**之前**（hook 必须在守卫之前），
       //    所以 TS 收窄不到 `actions`。运行到不了 null —— 那时组件已在守卫处 return。
       //    写成 `?.` 而不是 `!`：拿不到 actions 时语义上就是"这条没有重复规则"，

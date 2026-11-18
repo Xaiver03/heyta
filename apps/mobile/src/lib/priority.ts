@@ -68,3 +68,17 @@ export function priorityBadgeLabel(priority: Priority | undefined, t: Translate)
   if (priority === undefined || priority === Priority.None) return null;
   return t('mobile.priority.badge', { level: priorityLabel(priority, t) });
 }
+
+/**
+ * 行内优先级语言（对齐提醒事项）：高 / 中 / 低 → `!!!` / `!!` / `!`。
+ *
+ * 与 `priorityBadgeLabel`（"高优先级"这类词条文案，Web 与详情用）分开：
+ * 列表行只放符号，跟提醒事项一致；不要让两端共用一句人话而丢掉这个语言。
+ * `None` / `undefined` → `null`（"没有优先级"不是信息）。
+ */
+export function priorityMarks(priority: Priority | undefined): string | null {
+  if (priority === Priority.High) return '!!!';
+  if (priority === Priority.Medium) return '!!';
+  if (priority === Priority.Low) return '!';
+  return null;
+}

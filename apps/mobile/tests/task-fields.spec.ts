@@ -26,7 +26,7 @@ import { Priority, formatTaskRemaining, parseLocalDate, type Task } from '@heyta
 import { translate } from '@heyta/i18n';
 
 import { dueTone, toDueDisplay } from '../src/lib/due-display';
-import { PRIORITY_ORDER, priorityBadgeLabel, priorityLabel } from '../src/lib/priority';
+import { PRIORITY_ORDER, priorityBadgeLabel, priorityLabel, priorityMarks } from '../src/lib/priority';
 // ⚠️ 档位 → 语义色 token 名的判据**不在这里了**（W5，2026-10-04）：
 // 那份映射的唯一所有者是 `packages/ui/src/task-list/priority-color.ts`，
 // 判据跟着它进了 `packages/ui/tests/task-row-priority.spec.ts`。
@@ -192,5 +192,13 @@ describe('优先级文案', () => {
     expect(priorityBadgeLabel(Priority.None, zh)).toBeNull();
     expect(priorityBadgeLabel(undefined, en)).toBeNull();
     expect(priorityBadgeLabel(Priority.None, en)).toBeNull();
+  });
+
+  it('行内优先级符号语言（提醒事项）：高/中/低 → !!!/!!/!，无 → null', () => {
+    expect(priorityMarks(Priority.High)).toBe('!!!');
+    expect(priorityMarks(Priority.Medium)).toBe('!!');
+    expect(priorityMarks(Priority.Low)).toBe('!');
+    expect(priorityMarks(Priority.None)).toBeNull();
+    expect(priorityMarks(undefined)).toBeNull();
   });
 });

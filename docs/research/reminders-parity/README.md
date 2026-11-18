@@ -57,7 +57,7 @@
 | R5 | 底部常驻「＋ 新提醒事项」内联录入 | 有 `CaptureComposer`（自然语言✅）；**列表尾已加内联「＋新提醒事项」入口（R5✅入口版）** | 行内直接打字待增强 |
 | R6 | 详情：备注/URL/日期/位置/旗标/优先级/子任务/附件/清单；完成在顶栏 | **详情字段已齐**（清单切换/优先级旗标/⋯、标题、截止、备注、子任务+附件、提醒/重复/排期/优先级/重要/清单/上级/标签/动态）✅；**缺位置提醒**；**呈现为底部 sheet**（提醒事项为整屏） | 位置提醒（需原生/数据，可后置）；可评估改整屏 |
 | R7 | 点圆完成；左滑旗标/更多/删除；长按菜单 | 已有：点圆完成、长按上下文菜单、左滑（今天/删除）✅（AX 确认动作项；展开态截图未捕捉） | 左滑首项是「今天」（快速排期）非旗标；如需更贴提醒事项可换「旗标」 |
-| R8 | 旗标 + `! !! !!!` 优先级语言 | **旗标✅ 行内显示**（`important` → 蓝旗，`TaskBadges.flag`，用现有字段不改 schema）；优先级仍「高/中/低」文案，`! !! !!!` 待做（会牵动 web 测试） | `! !! !!!` 语言（评估跨端） |
+| R8 | 旗标 + `! !! !!!` 优先级语言 | **旗标✅ 行内（important→蓝旗）+ 优先级 `! !! !!!` ✅（移动端行内纯文字）**；优先级不再配旗标字形（图标位留给旗标） | 保持 |
 | R9 | 子任务缩进 + 进度 | **父行显示 `done/total` ✅**（`TaskBadges.subtasks`，口径走 `buildTaskTree`）；子任务缩进在详情内 ✅ | 保持 |
 | R10 | 编辑模式（多选移动/删除/完成） | **已具备 ✅**：`⋯→选择任务` 进入，顶部「已选 N 项/退出选择」+ **批量完成 / 移动到清单 / 批量删除**，行变选择圈（`bulkSelecting`） | 保持 |
 | R11 | 搜索含已完成 | 有搜索（`SearchScreen`/`searchTasks`） | 确认覆盖已完成/标签 |
@@ -77,7 +77,7 @@
 | ✅ | R5 | **列表底部常驻「＋ 新提醒事项」内联入口**（点开宿主新建面板，含自然语言）；行内直接打字留增强 | `TaskList` 新增 `onInlineAdd`/`inlineAddLabel`（`ListFooterComponent`，仅列表非空）+ `TasksScreen` 接入 + i18n `mobile.tasks.inlineAdd` | ✅ 截图 `img/tasks-inline-add.png`；`check:ui-language` zh/en 4529=4529、mobile tsc 0、token-refs/empty 绿 |
 | ⬜ | R3b | 行副行 = **备注/清单**；尾部 = **日期/旗标**（右对齐） | `TaskRow` `renderMeta`/`renderTrailing` | 截图：行结构 |
 | ✅ | R1 | 列表顶部 **今天/计划/全部/旗标 四档 chips** + 过滤（today 原样 / scheduled 有截止 / all 全部 / flagged important） | `TasksScreen` `scope` state + `Chip` 行 + `scopeFiltered` 预过滤（分组仍 `sectionTasks`） | ✅ 截图 `img/tasks-scope-today.png`（今天）/ `img/tasks-scope-flagged.png`（旗标档只剩 flagged 项）；ui-language 4532=4532、mobile tsc 0 |
-| 🟡 | R8 | **旗标行内显示 ✅**（`important`→旗标，无需改 schema）；`! !! !!!` 优先级语言待做（跨端测试） | `TaskBadges` 新增 `flag`；`TasksScreen` 传 `task.important` | ✅ 截图 `img/tasks-flag-row.png`（行内蓝旗）；web row-meta-shared 26/26 绿、mobile tsc 0 |
+| ✅ | R8 | 旗标行内 ✅ + 优先级 `! !! !!!`（移动端行内纯文字） | `TaskBadges` 优先级去图标（保留 `flag`）；`TasksScreen` 用 `priorityMarks`；`priority.ts` 新增 `priorityMarks` | ✅ 截图 `img/tasks-priority-row.png`（红 `!!!` + 蓝旗）；task-fields 17/17、row-meta-shared 27/27、mobile tsc 0 |
 | 🟡 | R9 | 父行子任务进度 `done/total` **✅（单测验证）**；详情内子任务缩进已具备 | `TaskBadges` 新增 `subtasks`（字形 ListChecks）；`TasksScreen` 用 `buildTaskTree` 计 done/total | 单测 `row-meta-shared` **27/27**（`{1,2}`→渲染 `1/2`、`{0,0}`→不画）；真机截图待有子任务数据 |
 | ✅ | R6 | 详情页结构（提醒事项核心字段）已具备并截图确认；位置提醒、整屏形态作为后续 | `TaskDetailSheet` 现状 | ✅ 截图 `img/tasks-detail.png`（清单/优先级/重要/子任务/附件/提醒/重复/排期/标签/上级/动态齐全） |
 | ✅ | R7 | 点圆完成 / 长按菜单 / 左滑露出 今天·删除（AX 确认；展开态截图未捕捉） | 现状 `TaskRow`/`SwipeReveal` | AX 动作项 = 今天/删除；'旗标'语义可后续替换'今天' |
