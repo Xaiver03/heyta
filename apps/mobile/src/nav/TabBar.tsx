@@ -37,6 +37,7 @@ import type { MessageKey } from '@heyta/i18n';
 import { useI18n } from '@heyta/i18n';
 import { useText, useTheme, useTokens } from '../theme';
 import { CONTROL_STATE_TOKENS } from '@heyta/ui';
+import { BlurView } from '@react-native-community/blur';
 import { Badge, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import type { IconName } from '../ui/icons';
@@ -84,24 +85,23 @@ export interface TabBarProps {
 export function TabBar({ active, onChange, badges, background = 'surface' }: TabBarProps): React.JSX.Element {
   const tokens = useTokens();
   const text = useText();
-  const { reducedMotion } = useTheme();
+  const { reducedMotion, theme } = useTheme();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  // blur.chrome 是带 px 的 token（20px）；BlurView 要数字强度。
+  const blurAmount = Number.parseFloat(String(tokens['blur.chrome'])) || 0;
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
         barOuter: {
-          // 🔴 安全区 padding 放在**外层**，不放进内容高度里。
-          // 放进去的后果是内容在"扣掉底部之后"的区域里垂直居中，
-          // 图标被顶到最上面 —— 实测 52 − 8 = 44 的内容区装 42 的内容，
-          // 上下各剩 1px，看着像完全没有留白。
+          // Apple §12 Materials：标签栏是**浮在内容上的半透明材质层**，内容从下面滚过。
+          // 绝对定位浮层；安全区 padding 放外层（不放进内容高度）。
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
           paddingBottom: Math.max(insets.bottom, tokens['nav.safe-bottom-min']),
-          // Apple §12：标签栏是浮在内容上的功能层，底色随当前页走（「我的」灰 / 其余白），不出现硬条。
-          backgroundColor: tokens[background === 'grouped' ? 'color.grouped-background' : 'color.surface'],
-          // 极细发丝线代替硬分隔（Apple「scroll edge / 发丝分隔」），只做若有若无的边界。
-          borderTopWidth: tokens['border-width.thin'],
-          borderTopColor: tokens['color.border-subtle'],
         },
         barRow: {
           flexDirection: 'row',
@@ -147,6 +147,17 @@ export function TabBar({ active, onChange, badges, background = 'surface' }: Tab
 
   return (
     <View style={styles.barOuter} accessibilityRole="tablist">
+      {/* 真材质：iOS 系统 chrome 材质模糊（浅/深自适应）；减透明偏好时降级为纯色（token 已置 0 模糊 + 实色 tint）。 */}
+      <BlurView
+        style={StyleSheet.absoluteFill}
+        blurType={theme === 'dark' ? 'chromeMaterialDark' : 'chromeMaterialLight'}
+        blurAmount={blurAmount}
+        reducedTransparencyFallbackColor={tokens['color.surface']}
+      />
+      {/* 半透明 tint 提对比，保证图标/文字可读（Apple「vibrancy」那层）。 */}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: tokens['material.chrome-tint'] }]} />
+      {/* 极细发丝线，若有若无的边界。 */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: tokens['border-width.thin'], backgroundColor: tokens['color.border-subtle'] }} />
       <View style={styles.barRow}>
         {TABS.map((tab) => {
           const selected = tab.key === active;
