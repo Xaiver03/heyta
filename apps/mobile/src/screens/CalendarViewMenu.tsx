@@ -60,7 +60,9 @@ export function CalendarViewMenu({
         sheet: {
           position: 'absolute',
           top: anchorTop,
-          right: tokens['space.4'],
+          // 🔴 入口在**左上角标题**，菜单必须贴左、与标题对齐；原来写的是 `right`，
+          //    于是"点左上角、菜单出在右边"，点击位置与结果对不上。
+          left: tokens['space.4'],
           minWidth: 180,
           backgroundColor: tokens['color.surface'],
           borderRadius: tokens['radius.lg'],

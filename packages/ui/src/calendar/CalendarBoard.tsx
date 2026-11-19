@@ -31,6 +31,7 @@ import type { HeytaNativeTokens, TokenName } from '@heyta/design-system';
 import {
   isoWeek,
   isoWeekday,
+  lunarDayLabel,
   monthGrid,
   weekGrid,
   type CountdownEvent,
@@ -149,6 +150,15 @@ export interface CalendarBoardProps {
    */
   readonly hideToolbarTitle?: boolean;
   /**
+   * 日档外观：`card`（默认，带卡）/ `flat`（无边框无底色，贴 Apple 日历）。
+   * 透传给 `CalendarDayBoard`；默认 `undefined` = `card`，web 行为不变。
+   */
+  readonly boardAppearance?: 'card' | 'flat' | undefined;
+  /** 月档周末（六/日）数字用 `color.weekend` 上色（Apple 月格周末红）。默认 false，web 不变。 */
+  readonly weekendAccent?: boolean;
+  /** 月格数字下显示农历日名（Apple 月格）。默认 false，web 不变。 */
+  readonly showLunar?: boolean;
+  /**
    * 月格里的任务条**按象限着色**（不是按"是否逾期/完成"）。
    *
    * 用途：一眼看出"这周是不是全在救火"。hepta 的四象限与日历是同一批任务的
@@ -216,6 +226,8 @@ function DayCell({
   inMonth,
   isToday,
   isSelected,
+  isWeekend = false,
+  showLunar = false,
   tone,
   bars,
   hidden,
@@ -230,6 +242,9 @@ function DayCell({
   inMonth: boolean;
   isToday: boolean;
   isSelected: boolean;
+  isWeekend?: boolean;
+  /** 数字下方显示农历日名（Apple 月格）。默认 false（web 不变）。 */
+  showLunar?: boolean;
   tone: CalendarDayTone;
   bars: readonly CalendarCellBar[];
   hidden: number;
@@ -262,7 +277,9 @@ function DayCell({
       : inMonth
         ? tone === 'subtle'
           ? tokens['color.foreground-muted']
-          : tokens['color.foreground']
+          : isWeekend
+            ? tokens['color.weekend']
+            : tokens['color.foreground']
         : // 补白格（上月/下月）视觉上次要，但**仍然可点** ——
           // "点上月 30 号"是合法意图，把它做成不可点才是意外。
           tokens['color.foreground-subtle'];
@@ -280,7 +297,8 @@ function DayCell({
   // 只在铺满月历时按真实格高分配行数；内容高度模式不反向限制自身。
   const rowHeight = text['row-meta'].lineHeight + tokens['space.1'];
   const availableHeight = cellHeight === null ? null : cellHeight
-    - tokens['space.1'] * 2 - tokens['border-width.thin'] - text['numeric-body'].lineHeight;
+    - tokens['space.1'] * 2 - tokens['border-width.thin'] - text['numeric-body'].lineHeight
+    - (showLunar ? text.caption.lineHeight : 0);
   const slots = !fitHeight
     ? bars.length + (hidden > 0 ? 1 : 0)
     : availableHeight === null ? MAX_CALENDAR_BARS : Math.max(1, Math.floor(availableHeight / rowHeight));
@@ -337,6 +355,7 @@ function DayCell({
       ]}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'], flexShrink: 0 }}>
+      <View style={{ alignItems: 'center' }}>
       <Text style={[text['numeric-body'], {
         color: numberColor,
         alignSelf: 'flex-start',
@@ -354,6 +373,12 @@ function DayCell({
          */
         backgroundColor: isSelected ? tokens['color.primary'] : 'transparent',
       }]}>{day}</Text>
+      {showLunar ? (
+        <Text style={[text.caption, { color: tokens['color.foreground-subtle'] }]} numberOfLines={1}>
+          {lunarDayLabel(date)}
+        </Text>
+      ) : null}
+      </View>
       {markerView === undefined ? null : (
         <Text
           testID={`calendar-day-marker-${date}`}
@@ -492,6 +517,9 @@ export function CalendarBoard({
   toolbar = 'inline',
   view = 'month',
   now,
+  boardAppearance,
+  weekendAccent,
+  showLunar,
   toolbarTrailing,
   hideToolbarTitle,
   colorByQuadrant = false,
@@ -649,6 +677,7 @@ export function CalendarBoard({
               onOpenTask={onOpenTask}
               busyTaskId={busyTaskId}
               labels={labels}
+              {...(boardAppearance === undefined ? {} : { appearance: boardAppearance })}
               testID={`${testID}-day`}
             />
           )}
@@ -661,7 +690,7 @@ export function CalendarBoard({
               清单那一块仍要能正常滚页（见 `apps/web/.../useWheelMonthNav.ts`）。 */}
           <View
             testID={`${testID}-month-card`}
-            style={[styles.monthCard, fillMonth ? styles.monthCardFill : null]}
+            style={[styles.monthCard, fillMonth ? styles.monthCardFill : null, boardAppearance === 'flat' ? styles.flatCard : null]}
           >
         {/*
           工具栏（`‹ 2026年10月 ›  今天`）。**同一份组件、两种摆位**：
@@ -694,7 +723,9 @@ export function CalendarBoard({
                     color:
                       today !== undefined && isoWeekday(today) - 1 === i
                         ? tokens['color.primary']
-                        : tokens['color.foreground-subtle'],
+                        : weekendAccent === true && i >= 5
+                          ? tokens['color.weekend']
+                          : tokens['color.foreground-subtle'],
                   },
                 ]}
               >
@@ -762,6 +793,8 @@ export function CalendarBoard({
                   inMonth={cell.inMonth}
                   isToday={cell.date === today}
                   isSelected={cell.date === selected}
+                  isWeekend={weekendAccent === true && isoWeekday(cell.date) >= 6}
+                  showLunar={showLunar === true}
                   tone={calendarDayTone(cellTasks, today, cell.date)}
                   bars={
                     colorByQuadrant
@@ -825,15 +858,15 @@ export function CalendarBoard({
       <View
         style={[
           styles.daySection,
-          styles.card,
           /*
-           * 🔴 2026-11-16（iPad/iPhone 真机）：空的那天这一格**不再撑满剩余高度**。
-           * 上面空态虽然已经走 `size="line"`（一行字，不该占大卡），但外层 `daySection`
-           * 还带着 `flexGrow: 1` + `card` 的边框底色 —— 于是它照样被拉成一大片白框，
-           * 中间顶着一行「这一天没有到期的任务。」。空是常态，不该占满整屏。
-           * 有内容时仍 `flexGrow: 1`（列表能多看几条）；空时按内容高度。
+           * 空的那天**不套白框卡片**：一行提示即可（对照滴答，空态不是一张大卡）。
+           * 有内容时仍走 `card`（列表在卡里、能多看几条）。
            */
-          dayTasks.length === 0 && dayEvents.length === 0 ? styles.daySectionEmpty : null,
+          dayTasks.length === 0 && dayEvents.length === 0
+            ? styles.daySectionEmpty
+            : boardAppearance === 'flat'
+              ? styles.flatCard
+              : styles.card,
         ]}
         testID={`${testID}-day-section`}
       >
@@ -935,6 +968,7 @@ export function CalendarBoard({
 
       {/* 如实说明这一页看不到什么 —— 否则"任务没设截止时间"会被读成"任务丢了"。
           见 `groupTasksByDueDate` 的说明。 */}
+      {boardAppearance === 'flat' ? null : (
       <Text
         style={[
           text['row-meta'],
@@ -951,6 +985,7 @@ export function CalendarBoard({
       >
         {labels.footnote}
       </Text>
+      )}
     </View>
   );
 }
@@ -1026,6 +1061,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
       borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface'],
     },
+    /* flat（Apple 形态）：不描边、不铺白底。 */
+    flatCard: { borderWidth: 0, backgroundColor: 'transparent' },
     /** 日档的那条工具栏卡：外壳与另两张相同，只需要"不许被压"。 */
     dayToolbarCard: { flexShrink: 0 },
     /* 板内头部已搬进 `CalendarToolbar`（批二）—— 原来这里的

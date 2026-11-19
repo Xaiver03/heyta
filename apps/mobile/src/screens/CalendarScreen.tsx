@@ -52,6 +52,7 @@ import {
   dueLocalDateOf,
   Quadrant,
   startOfMonth,
+  startOfWeek,
   toLocalDate,
   type CountdownEvent,
   type LocalDate,
@@ -69,6 +70,7 @@ import {
   CalendarBoard,
   CalendarViewTabs,
   CALENDAR_VIEW_LABEL_KEYS,
+  CALENDAR_VIEW_LABEL_KEYS_MOBILE,
   CALENDAR_VIEW_ORDER,
   calendarCursorFor,
   calendarHourMark,
@@ -93,6 +95,9 @@ import { Screen, Text } from '../ui/kit';
 import { CalendarScopeSheet, SCOPE_INBOX, SCOPE_QUADRANT_PREFIX, type ScopeProject } from './CalendarScopeSheet';
 import { TopBarMenu } from '../ui/top-bar-menu';
 import { CalendarViewMenu } from './CalendarViewMenu';
+import { CalendarWeekStrip } from './CalendarWeekStrip';
+import { CalendarCapsuleHeader } from './CalendarCapsuleHeader';
+import { CalendarWeekAgenda } from './CalendarWeekAgenda';
 import { useTokens } from '../theme';
 
 /**
@@ -136,11 +141,11 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
   const { dataRevision } = useMobileSync();
 
   /** 正在显示的月份（用该月里任意一天表示）。 */
-  const [cursor, setCursor] = useState<LocalDate>(() => startOfMonth(toLocalDate(Date.now())));
+  const [cursor, setCursor] = useState<LocalDate>(() => toLocalDate(Date.now()));
   /** 选中的那一天。 */
   const [selected, setSelected] = useState<LocalDate>(() => toLocalDate(Date.now()));
   /** 这一屏看的是哪一档（月 / 周 / 日 / 年）。 */
-  const [view, setView] = useState<CalendarViewKind>('month');
+  const [view, setView] = useState<CalendarViewKind>('day');
   /**
    * 🔴 2026-11-16：**显示范围**（按清单筛）。`undefined` = 所有清单。
    *
@@ -166,7 +171,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     // 而这正是 `pnpm typecheck` 抓到的（TS2448 / TS2454）。
     if (prevToday.current !== today && selected === prevToday.current) {
       setSelected(today);
-      setCursor(startOfMonth(today));
+      setCursor(today);
     }
     prevToday.current = today;
   }, [today, selected]);
@@ -670,6 +675,27 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
        */
       title={rangeTitle}
       chrome="board"
+      header={
+        <CalendarCapsuleHeader
+          monthLabel={labels.monthTitle(cursor)}
+          onMonthPress={() => {
+            setViewMenuOpen(true);
+          }}
+          onViewPress={() => {
+            setViewMenuOpen(true);
+          }}
+          onMorePress={() => {
+            setMoreOpen(true);
+          }}
+          monthA11y={t('mobile.calendar.title')}
+          viewA11y={t('common.calendar.view.aria')}
+          moreA11y={t('mobile.calendar.scope.entry')}
+          onToday={() => {
+            pickDay(today);
+          }}
+          todayLabel={t('mobile.calendar.today')}
+        />
+      }
       onTitlePress={() => { setViewMenuOpen(true); }}
       actions={[
         {
@@ -684,6 +710,31 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         <Text variant="row-meta" tone="danger">
           {error}
         </Text>
+      ) : null}
+
+      {/* 日历条（Apple 式横向周历）：只在单日档显示；一周档本身是整周列，不再叠一条。 */}
+      {view === 'day' ? (
+        <CalendarWeekStrip
+          weekStart={startOfWeek(selected)}
+          selected={selected}
+          today={today}
+          weekdays={labels.weekdays}
+          onSelect={(date) => {
+            pickDay(date);
+          }}
+        />
+      ) : null}
+
+      {/* Apple 式：周历条下方、内容上方居中显示当天标题。 */}
+      {view === 'day' ? (
+        <View style={{ alignItems: 'center' }}>
+          <Text variant="headline">{labels.dayTitle(cursor)}</Text>
+        </View>
+      ) : null}
+
+      {/* Apple 式：月档大号月份标题（对齐 Apple 月视图顶部「十一月」）。 */}
+      {view === 'month' ? (
+        <Text variant="screen-title">{labels.monthTitle(cursor)}</Text>
       ) : null}
 
       <Animated.View
@@ -707,10 +758,40 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           ],
         }}
       >
+      {/* 一周档：Apple「列表」形态的周议程（7 天分段 + 各天任务），替代共享周板（其无 7 列时间轴）。 */}
+      {view === 'week' ? (
+        <CalendarWeekAgenda
+          weekStart={startOfWeek(selected)}
+          today={today}
+          selected={selected}
+          tasks={scopedTasks}
+          weekdays={labels.weekdays}
+          taskRow={labels.taskRow}
+          onSelectDay={(date) => {
+            pickDay(date);
+          }}
+          onToggleTask={onToggleTask}
+          busyTaskId={busyId}
+        />
+      ) : (
       <CalendarBoard
         tasks={scopedTasks}
         // 月份已经在顶栏标题里（点它切档）—— 板内不再重复一行。
         hideToolbarTitle
+        /*
+         * 🔴 2026-11-19：手机端把板内工具栏改成 external —— 顶部胶囊导航 + 周历条
+         * 已经承担了翻页/选日，板内那条「‹ › 回到今天」的带框卡片是 Apple 日历没有的
+         * （Apple 靠滑动翻页、日历条选日）。web 本来就是 external，不受影响。
+         */
+        toolbar="external"
+        /* Apple 形态：日档扁平化（无边框无白底卡），全天带与小时轴直接铺在页面上。 */
+        boardAppearance="flat"
+        /* 月档：格内已有任务条，网格下不再重复一份日期头+当天清单（Apple 亦如此）。 */
+        showSelectedDayList={view !== 'month'}
+        /* 月格周末（六/日）数字用周末色（Apple 月格周末红）。 */
+        weekendAccent
+        /* 月格数字下显示农历日名（Apple 月格）。 */
+        showLunar={view === 'month'}
         /*
          * 🔴 2026-11-16：**月格里的任务条按象限着色**。
          *
@@ -757,6 +838,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         eventLabels={eventLabels}
         testID="calendar-board"
       />
+      )}
       </Animated.View>
 
       {/*
@@ -798,7 +880,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         visible={viewMenuOpen}
         current={view}
         order={CALENDAR_VIEW_ORDER}
-        labelOf={(kind) => t(CALENDAR_VIEW_LABEL_KEYS[kind])}
+        labelOf={(kind) => t(CALENDAR_VIEW_LABEL_KEYS_MOBILE[kind])}
         onPick={(kind) => {
           setViewMenuOpen(false);
           changeView(kind);

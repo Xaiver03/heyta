@@ -92,6 +92,11 @@ export interface CalendarDayBoardProps {
   readonly onOpenTask?: ((taskId: string) => void) | undefined;
   readonly busyTaskId?: string | null | undefined;
   readonly labels: CalendarBoardLabels;
+  /**
+   * 外观：`card`（默认，带边框/圆角/白底——web 与既有形态）/ `flat`（无边框无底色，
+   * 贴 Apple 日历：全天带与小时轴不再各套一张卡）。默认 `card`，不传时行为不变。
+   */
+  readonly appearance?: 'card' | 'flat';
   readonly testID?: string;
 }
 
@@ -105,11 +110,13 @@ export function CalendarDayBoard({
   onOpenTask,
   busyTaskId,
   labels,
+  appearance = 'card',
   testID = 'calendar-day-board',
 }: CalendarDayBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
+  const flat = appearance === 'flat';
 
   const buckets = useMemo(() => calendarDayBuckets(tasks, day), [tasks, day]);
   const rowHeight = tokens['size.row-min-height'];
@@ -136,7 +143,9 @@ export function CalendarDayBoard({
   return (
     <View style={styles.root} testID={testID}>
       {/* ── 全天带：这一天里**没有时刻**的那些 ─────────────────── */}
-      <View style={[styles.card, styles.allDay]} testID={`${testID}-all-day`}>
+      {/* flat（Apple）且这天没有全天事项时，整块不画 —— Apple 无全天事项直接从时间轴开始。 */}
+      {flat && buckets.allDay.length === 0 && (events?.length ?? 0) === 0 ? null : (
+      <View style={[styles.card, flat ? styles.flatCard : null, styles.allDay]} testID={`${testID}-all-day`}>
         {labels.dayAllDay !== undefined ? (
           <Text
             style={[text['group-label'], styles.muted]}
@@ -180,9 +189,10 @@ export function CalendarDayBoard({
           />
         ))}
       </View>
+      )}
 
       {/* ── 24 小时轴（可滚）───────────────────────────────────── */}
-      <View style={[styles.card, styles.axisWrap]} testID={`${testID}-axis-card`}>
+      <View style={[styles.card, flat ? styles.flatCard : null, styles.axisWrap]} testID={`${testID}-axis-card`}>
         <ScrollView style={styles.axis} testID={`${testID}-axis`}>
           {buckets.hours.map((bucket, hour) => (
             <View
@@ -268,6 +278,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
       backgroundColor: tokens['color.surface'],
     },
     muted: { color: tokens['color.foreground-muted'] },
+    /* flat：Apple 形态——不描边、不铺白底（保留 card 的内边距，时间列仍缩进）。 */
+    flatCard: { borderWidth: 0, backgroundColor: 'transparent' },
     allDay: { flexShrink: 0, gap: tokens['space.1'] },
     // 轴吃掉剩余高度；`overflow: hidden` 是**裁圆角**用的，滚动本身在 ScrollView 里。
     // ⚠️ 这一条**不**共用上面 `card` 的 `flexShrink: 0`：轴是"能滚的那一块"，

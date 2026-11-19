@@ -209,6 +209,18 @@ export function solarToLunar(date: LocalDate): LunarDate {
   throw new Error(`公历 ${date} 落在农历 ${year} 年表之外（月表区间末端或表坏了）`);
 }
 
+/** 农历日名（初一…三十）——日历条/月格副标共用这一份，避免各处再写一张表。 */
+const LUNAR_DAY_NAMES = [
+  '初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+  '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+  '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十',
+] as const;
+
+export function lunarDayLabel(date: LocalDate): string {
+  const { day } = solarToLunar(date);
+  return LUNAR_DAY_NAMES[day - 1] ?? '';
+}
+
 /**
  * 「逢闰过正」：闰 X 月的锚点，在**没有**闰 X 月的那些过到正 X 月。
  *

@@ -367,6 +367,20 @@ export const CALENDAR_VIEW_LABEL_KEYS: Record<CalendarViewKind, CalendarViewLabe
   year: 'common.calendar.view.year',
 };
 
+/** 移动端视图切换器文案键（单日 / 一周 / 月 / 年）。与共享那份同构，值指向 `mobile.calendar.view.*`。 */
+export type CalendarViewLabelKeyMobile =
+  | 'mobile.calendar.view.month'
+  | 'mobile.calendar.view.week'
+  | 'mobile.calendar.view.day'
+  | 'common.calendar.view.year';
+
+export const CALENDAR_VIEW_LABEL_KEYS_MOBILE: Record<CalendarViewKind, CalendarViewLabelKeyMobile> = {
+  month: 'mobile.calendar.view.month',
+  week: 'mobile.calendar.view.week',
+  day: 'mobile.calendar.view.day',
+  year: 'common.calendar.view.year',
+};
+
 /**
  * 下拉与切换器里的**顺序**：`month → week → day → year`，**年排在最后**。
  * 插在中间会读成"半年"（两端在 R13 之前各自表述过这条，理由只有一个）。
