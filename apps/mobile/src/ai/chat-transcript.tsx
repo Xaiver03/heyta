@@ -11,6 +11,8 @@ export interface ChatTranscriptItem {
   readonly role: 'user' | 'assistant' | 'error' | 'proposal';
   readonly text: string;
   readonly detail?: string;
+  /** 工具步骤的可折叠思考链（assistant 且 steps>0 时提供）。 */
+  readonly trace?: React.ReactNode;
   readonly proposal?: React.ReactNode;
   readonly action?: React.ReactNode;
   /**
@@ -84,6 +86,7 @@ function ChatMessage({
             {item.detail}
           </Text>
         ) : null}
+        {item.trace}
         {item.proposal}
         {item.action}
         {/*

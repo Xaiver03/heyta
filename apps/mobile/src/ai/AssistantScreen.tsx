@@ -41,6 +41,7 @@ import { privacyConsent } from '../privacy/consent-gate';
 import { createGatedStreamingFetch } from './streaming-fetch';
 import { ChatComposer } from './chat-composer';
 import { AiSuggestionGrid } from './suggestion-grid';
+import { ChainOfThought } from './chain-of-thought';
 import { TopBarMenu } from '../ui/top-bar-menu';
 import {
   createChatController,
@@ -279,9 +280,7 @@ export function AssistantScreen({
     const detail =
       entry.role === 'error'
         ? privacyBlocked ? t('mobile.ai.privacyBlocked.hint') : entry.message
-        : entry.role === 'assistant' && entry.steps.length > 0
-          ? t('web.ai.chat.trace', { n: entry.steps.length })
-          : undefined;
+        : undefined;
     return {
       id: entry.id,
       role: entry.role,
@@ -311,6 +310,7 @@ export function AssistantScreen({
             )
           : entry.text,
       detail,
+      trace: entry.role === 'assistant' && entry.steps.length > 0 ? <ChainOfThought steps={entry.steps} /> : undefined,
       proposal: entry.role === 'proposal' ? (
         <ProposalCard
           proposal={entry.proposal}
