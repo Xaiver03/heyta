@@ -56,6 +56,7 @@ import {
 } from '@heyta/app-host';
 
 import { openTaskHost } from '../db/open-host';
+import { readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
 /**
  * 重绘节拍（ms）。
@@ -175,7 +176,36 @@ export function onFocusStateChange(listener: () => void): () => void {
 }
 
 /** 当前配置。界面要用它显示"这一轮多长"。 */
-export const FOCUS_CONFIG: FocusConfig = DEFAULT_FOCUS_CONFIG;
+const PREF_KEY_FOCUS_WORK_MINUTES = 'focus.workMinutes';
+let cachedWorkMinutes: number | undefined;
+
+/** 自定义专注时长（分钟）的设备本地记忆；损坏/越界回默认 25。 */
+function readWorkMinutes(): number {
+  if (cachedWorkMinutes !== undefined) return cachedWorkMinutes;
+  const raw = readDevicePref(PREF_KEY_FOCUS_WORK_MINUTES);
+  const n = raw === undefined ? Number.NaN : Number(raw);
+  cachedWorkMinutes =
+    Number.isFinite(n) && n >= 1 && n <= 180 ? Math.round(n) : DEFAULT_FOCUS_CONFIG.workMs / 60000;
+  return cachedWorkMinutes;
+}
+
+export function getFocusWorkMinutes(): number {
+  return readWorkMinutes();
+}
+
+/** 当前生效的专注配置（仅 workMs 可被设备偏好覆盖，其余沿用领域默认）。 */
+export function getFocusConfig(): FocusConfig {
+  return { ...DEFAULT_FOCUS_CONFIG, workMs: readWorkMinutes() * 60000 };
+}
+
+/** 写自定义专注时长（1–180 分钟）。返回是否真的写入。 */
+export function setFocusWorkMinutes(minutes: number): boolean {
+  if (!Number.isFinite(minutes) || minutes < 1 || minutes > 180) return false;
+  const rounded = Math.round(minutes);
+  const ok = writeDevicePref(PREF_KEY_FOCUS_WORK_MINUTES, String(rounded));
+  if (ok) cachedWorkMinutes = rounded;
+  return ok;
+}
 
 // ─────────────────────────────────────────────────────────────
 // 落盘
@@ -218,7 +248,7 @@ async function onTick(): Promise<void> {
 
   // 到时了：推进状态。`advance()` 已经算好下一轮类型与已完成轮数，
   // **不要自己再判一次**（Web 端第一版就重复判过，见其注释）。
-  const { next, finished } = advance(current, now, FOCUS_CONFIG);
+  const { next, finished } = advance(current, now, getFocusConfig());
   stopTicking();
   publish({ state: next, now });
 
@@ -248,7 +278,7 @@ function stopTicking(): void {
 
 /** 开始一轮。`taskId` 可选 —— 允许无任务的纯计时。 */
 export function startFocus(taskId?: string): void {
-  publish({ state: startFn(snapshot.state, Date.now(), FOCUS_CONFIG, taskId), now: Date.now() });
+  publish({ state: startFn(snapshot.state, Date.now(), getFocusConfig(), taskId), now: Date.now() });
   startTicking();
 }
 
@@ -259,7 +289,7 @@ export function pauseFocus(): void {
 }
 
 export function resumeFocus(): void {
-  publish({ state: resumeFn(snapshot.state, Date.now(), FOCUS_CONFIG), now: Date.now() });
+  publish({ state: resumeFn(snapshot.state, Date.now(), getFocusConfig()), now: Date.now() });
   startTicking();
 }
 
@@ -283,7 +313,7 @@ export async function abortFocus(): Promise<void> {
 /** 换下一轮的类型。只在 idle 时生效（领域层负责这条约束）。 */
 export function selectFocusKind(kind: FocusSessionKind): void {
   // 不能在界面里自己查"短休息多少分钟" —— 那是配置语义，领域层已经有映射。
-  publish({ state: selectKind(snapshot.state, kind, FOCUS_CONFIG) });
+  publish({ state: selectKind(snapshot.state, kind, getFocusConfig()) });
 }
 
 /** 切换计时模式（倒计时 / 正计时）。只在 idle 时生效（领域层负责这条约束）。 */

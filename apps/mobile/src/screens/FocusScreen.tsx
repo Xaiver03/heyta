@@ -31,7 +31,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { Pressable, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { type FocusSessionKind, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
@@ -39,6 +39,9 @@ import { FocusPanel, focusLogFailureMessageKey } from '@heyta/ui';
 import { focusOverview, type AppHost, type FocusOverview } from '@heyta/app-host';
 
 import { useText, useTokens } from '../theme';
+import { useMobileNavigation } from '../nav/navigation';
+import { TopBarMenu } from '../ui/top-bar-menu';
+import { GrowthScreen } from './GrowthScreen';
 import { Button, Card, Chip, HStack, Screen, SectionHeader, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import {
@@ -51,7 +54,9 @@ import { readFocusTaskSource } from '../lib/focus-task-source';
 import { useMobileSync } from '../sync/store';
 import { onLocalWrite } from '../sync/write-signal';
 import {
-  FOCUS_CONFIG,
+  getFocusConfig,
+  getFocusWorkMinutes,
+  setFocusWorkMinutes,
   abortFocus,
   clearFocusTask,
   pauseFocus,
@@ -164,6 +169,19 @@ export function FocusScreen(): React.JSX.Element {
   const { t } = useI18n();
   const timer = useFocusTimer();
   const { state } = timer;
+  const navigation = useMobileNavigation();
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [durationOpen, setDurationOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        overlay: { flex: 1, backgroundColor: tokens['color.background'], justifyContent: 'center', paddingHorizontal: tokens['screen.gutter'] },
+        sheetBg: { gap: tokens['space.3'] },
+        chips: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] },
+      }),
+    [tokens],
+  );
 
   /**
    * 🔴 宿主**不进 state**。
@@ -296,6 +314,11 @@ export function FocusScreen(): React.JSX.Element {
   return (
     <Screen
       title={t('mobile.focus.title')}
+      actions={[
+        { icon: 'tab.categories', label: t('mobile.focus.action.stats'), onPress: () => { setStatsOpen(true); } },
+        { icon: 'task.add', label: t('mobile.focus.action.duration'), onPress: () => { setDurationOpen(true); } },
+        { icon: 'action.more', label: t('mobile.focus.action.more'), onPress: () => { setMoreOpen(true); } },
+      ]}
       titleLeading={
         <HStack gap="default">
           <Chip label={t('mobile.focus.segment.pomodoro')} selected={state.mode === 'countdown'} onPress={() => { if (state.phase === 'idle') selectFocusMode('countdown'); }} />
@@ -321,7 +344,7 @@ export function FocusScreen(): React.JSX.Element {
           abort: t('mobile.focus.abort'),
           ring: (percent) => t('mobile.focus.a11y.progress', { percent }),
           roundLength: t('mobile.focus.roundLength', {
-            duration: kindDurationLabel(state.kind, FOCUS_CONFIG, t),
+            duration: kindDurationLabel(state.kind, getFocusConfig(), t),
           }),
           ...(errorText === undefined ? {} : { error: errorText }),
         }}
@@ -432,6 +455,38 @@ export function FocusScreen(): React.JSX.Element {
           ) : null}
         </Card>
       )}
+      <Modal visible={statsOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => { setStatsOpen(false); }}>
+        <GrowthScreen onBack={() => { setStatsOpen(false); }} onOpenHabits={() => { setStatsOpen(false); }} />
+      </Modal>
+
+      <Modal visible={durationOpen} transparent animationType="fade" onRequestClose={() => { setDurationOpen(false); }}>
+        <Pressable style={styles.overlay} onPress={() => { setDurationOpen(false); }} accessibilityRole="button" accessibilityLabel={t('mobile.focus.durationPreset.title')}>
+          <View style={styles.sheetBg}>
+            <Text variant="section-title">{t('mobile.focus.durationPreset.title')}</Text>
+            <View style={styles.chips}>
+              {[15, 25, 45, 60].map((m) => (
+                <Chip
+                  key={m}
+                  label={t('mobile.focus.durationPreset.minutes', { n: m })}
+                  selected={getFocusWorkMinutes() === m}
+                  onPress={() => { setFocusWorkMinutes(m); setDurationOpen(false); }}
+                />
+              ))}
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <TopBarMenu
+        visible={moreOpen}
+        label={t('mobile.focus.action.more')}
+        onClose={() => { setMoreOpen(false); }}
+        items={[
+          { id: 'stats', label: t('mobile.focus.action.stats'), icon: 'tab.categories', onPress: () => { setMoreOpen(false); setStatsOpen(true); } },
+          { id: 'settings', label: t('mobile.focus.action.settings'), icon: 'action.settings', onPress: () => { setMoreOpen(false); navigation.setTab('profile'); } },
+          { id: 'reset', label: t('mobile.focus.action.resetDuration'), icon: 'action.settings', onPress: () => { setFocusWorkMinutes(25); setMoreOpen(false); } },
+        ]}
+      />
     </Screen>
   );
 }
