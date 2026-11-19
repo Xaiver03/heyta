@@ -6170,6 +6170,8 @@ export const zhCN = {
   'mobile.ai.attach.title': '选择任务作为参考',
   'mobile.ai.attach.open': '引用任务',
   'mobile.ai.attach.done': '完成',
+  'mobile.ai.sessions.title': '会话',
+  'mobile.ai.sessions.current': '当前会话',
   'mobile.ai.attach.empty': '没有可引用的任务',
   'mobile.ai.needsSetup': '这条请求需要 AI。先完成配置，再继续发送。',
   'mobile.ai.privacyBlocked.title': '当前只使用本机',

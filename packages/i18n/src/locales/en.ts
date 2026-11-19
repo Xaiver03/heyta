@@ -5677,6 +5677,8 @@ export const en = {
   'mobile.ai.attach.title': 'Reference tasks',
   'mobile.ai.attach.open': 'Reference a task',
   'mobile.ai.attach.done': 'Done',
+  'mobile.ai.sessions.title': 'Sessions',
+  'mobile.ai.sessions.current': 'Current session',
   'mobile.ai.attach.empty': 'No tasks to reference',
   'mobile.ai.needsSetup': 'This request needs AI. Set it up before sending.',
   'mobile.ai.privacyBlocked.title': 'This device is offline',

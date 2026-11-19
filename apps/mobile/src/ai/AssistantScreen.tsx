@@ -43,6 +43,7 @@ import { ChatComposer } from './chat-composer';
 import { AiSuggestionGrid } from './suggestion-grid';
 import { ChainOfThought } from './chain-of-thought';
 import { TaskAttachmentSheet, type AttachTask } from './task-attachment';
+import { SessionListSheet } from './session-list';
 import { TopBarMenu } from '../ui/top-bar-menu';
 import {
   createChatController,
@@ -169,6 +170,7 @@ export function AssistantScreen({
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [sessionOpen, setSessionOpen] = useState(false);
   const [refs, setRefs] = useState<AttachTask[]>([]);
 
   useEffect(() => {
@@ -286,6 +288,14 @@ export function AssistantScreen({
    * 进行中那一轮的**已完成部分**（`items`）与 `renderItems` 的映射。
    * 流式未完成的那一段由下面的 `liveItems` 追加 —— 两者拼起来才是屏幕上该有的顺序。
    */
+  const sessionPreview = (() => {
+    for (let i = snapshot.items.length - 1; i >= 0; i -= 1) {
+      const it = snapshot.items[i];
+      if (it !== undefined && it.role === 'user') return it.text;
+    }
+    return '';
+  })();
+
   const renderItems = snapshot.items.map<ChatTranscriptItem>((entry) => {
     const privacyBlocked = entry.role === 'error' && entry.message.includes('privacy-consent-not-granted');
     const detail =
@@ -541,6 +551,13 @@ export function AssistantScreen({
       </KeyboardAvoidingView>
       </View>
 
+      <SessionListSheet
+        visible={sessionOpen}
+        preview={sessionPreview}
+        onNew={() => { controller.newSession(); }}
+        onClose={() => { setSessionOpen(false); }}
+      />
+
       <TaskAttachmentSheet
         visible={attachOpen}
         tasks={attachTasks}
@@ -554,7 +571,7 @@ export function AssistantScreen({
         label={t('web.ai.chat.history.open')}
         onClose={() => { setMoreOpen(false); }}
         items={[
-          { id: 'history', label: t('web.ai.chat.history.open'), icon: 'tab.categories', onPress: () => { setMoreOpen(false); controller.toggleHistory(); } },
+          { id: 'history', label: t('mobile.ai.sessions.title'), icon: 'tab.categories', onPress: () => { setMoreOpen(false); setSessionOpen(true); } },
           { id: 'new', label: t('web.ai.chat.newSession'), icon: 'assistant.new-session', onPress: () => { setMoreOpen(false); controller.newSession(); } },
         ]}
       />
