@@ -3540,6 +3540,7 @@ export const zhCN = {
     自己去别的角落找一个控件，多一步、也多一次找不到的机会。
   */
   'mobile.tasks.empty.hint': '从一件小事开始。',
+  'mobile.tasks.empty.filteredTitle': '这里还没有任务',
   'mobile.tasks.empty.action': '添加第一个任务',
   'mobile.tasks.detail.placeholder': '从左侧选一条任务，详情显示在这里。',
   'mobile.tasks.mode.date': '日期',

@@ -105,6 +105,8 @@ const ICONS = {
   'task.reopen': RotateCcw,
   'task.reminder': Bell,
   'task.priority': Flag,
+  /** 旗标（提醒事项的"标记为重要"）。与优先级共用一个 Flag 字形。 */
+  'task.flag': Flag,
 
   /**
    * 行上下文菜单与左滑动作（`docs/plans/row-actions-redesign.md` §3.4 的移动那一列）。

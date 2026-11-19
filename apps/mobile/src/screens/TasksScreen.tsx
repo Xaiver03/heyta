@@ -1607,14 +1607,7 @@ export function TasksScreen({
             判据：**空态组件已经承担了"这一屏为什么空 + 我该做什么"**，
             副标题在那种状态下没有新信息，只制造重复。
           */}
-          {nothing ? null : (
-            <Text variant="row-meta" tone="muted">
-              {t('mobile.tasks.summary.counts', {
-                pending,
-                completed: groups.completed.length,
-              })}
-            </Text>
-          )}
+          {/* 计数副标题已删：「N 项待办，M 项已完成」是无信息价值的文字（能用界面就别用文字）。 */}
         </View>
         {/*
           列表内过滤框：**按需展开**，不常驻。
@@ -1714,20 +1707,34 @@ export function TasksScreen({
         ) : null}
 
         {/*
-          智能列表（提醒事项）：今天 / 计划 / 全部 / 旗标。
-          放在内容之前的一行状态切换（与标签筛选同一形态）；只在列表视图出现。
+          智能列表（提醒事项）——**图标**，不是文字胶囊：今天 / 计划 / 全部 / 旗标。
+          「能用界面展示的，就不要用文字」：文字只留在无障碍标签里，屏幕上只有图标。
         */}
         {view === 'list' ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: tokens['space.2'], paddingBottom: tokens['space.2'] }}
-          >
-            <Chip label={t('mobile.common.today')} selected={scope === 'today'} onPress={() => { setScope('today'); }} />
-            <Chip label={t('mobile.tasks.scope.scheduled')} selected={scope === 'scheduled'} onPress={() => { setScope('scheduled'); }} />
-            <Chip label={t('mobile.tasks.scope.all')} selected={scope === 'all'} onPress={() => { setScope('all'); }} />
-            <Chip label={t('mobile.tasks.scope.flagged')} selected={scope === 'flagged'} onPress={() => { setScope('flagged'); }} />
-          </ScrollView>
+          <View style={styles.rowGap2}>
+            {([
+              { key: 'today', icon: 'group.today', label: t('mobile.common.today') },
+              { key: 'scheduled', icon: 'calendar.week', label: t('mobile.tasks.scope.scheduled') },
+              { key: 'all', icon: 'group.inbox', label: t('mobile.tasks.scope.all') },
+              { key: 'flagged', icon: 'task.flag', label: t('mobile.tasks.scope.flagged') },
+            ] as const).map((item) => (
+              <Pressable
+                key={item.key}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+                accessibilityState={{ selected: scope === item.key }}
+                hitSlop={tokens['space.3']}
+                testID={`scope-${item.key}`}
+                onPress={() => { setScope(item.key); }}
+              >
+                <Icon
+                  name={item.icon}
+                  size="md"
+                  color={scope === item.key ? tokens['color.primary'] : tokens['color.foreground-subtle']}
+                />
+              </Pressable>
+            ))}
+          </View>
         ) : null}
     </>
   );
@@ -1914,31 +1921,34 @@ export function TasksScreen({
           <View style={styles.listWrap}>
             <TaskList
               listHeaderComponent={taskControls}
+              /*
+                🔴 空态**永远给组件**（2026-11-19）：以前只在"全局零任务"时给，
+                于是"某个筛选/智能列表筛空了"会得到**一片空白**（图标、文案都没有）。
+                现在任何空结果都由同一个 EmptyState 承担：图标 + 一句话 + 一个动作。
+                去掉 hint：中文那句"从一件小事开始。"是没有任何信息的装饰语。
+              */
               emptyComponent={
-                nothing ? (
-                  <EmptyState
-                    illustration="tasks"
-                    icon="group.inbox"
-                    title={t('mobile.tasks.empty.title')}
-                    hint={t('mobile.tasks.empty.hint')}
-                    /*
-                      🔴 2026-11-16：空态**自带行动入口**。
-                      此前只写了一句"点右下角的加号"—— 那是让用户去别处找控件。
-                      Apple 的原则是空态里就该有那一步（这里的下一步就是"写下第一条"）。
-                    */
-                    action={
-                      <Button
-                        label={t('mobile.tasks.empty.action')}
-                        tone="primary"
-                        icon="task.add"
-                        fullWidth={false}
-                        onPress={() => {
-                          setComposerOpen(true);
-                        }}
-                      />
-                    }
-                  />
-                ) : undefined
+                <EmptyState
+                  illustration="tasks"
+                  icon="group.inbox"
+                  title={
+                    scope === 'today'
+                      ? t('mobile.tasks.empty.title')
+                      : t('mobile.tasks.empty.filteredTitle')
+                  }
+                  hint=""
+                  action={
+                    <Button
+                      label={t('mobile.tasks.empty.action')}
+                      tone="primary"
+                      icon="task.add"
+                      fullWidth={false}
+                      onPress={() => {
+                        setComposerOpen(true);
+                      }}
+                    />
+                  }
+                />
               }
               sections={listSections}
               // 🔴 组内顺序由这一档决定（共享层把它交给领域的 `sortTasks`）。
