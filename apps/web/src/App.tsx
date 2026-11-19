@@ -146,6 +146,7 @@ import { armFirstLaunchConsent } from './features/privacy/first-launch.js';
 import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
 import { useNarrowLayout } from './features/shell/useNarrowLayout.js';
 import { ScopeDrawer } from './features/shell/ScopeDrawer.js';
+import { WebTopBar } from './features/shell/WebTopBar.js';
 import { useCalendarViewStore } from './features/calendar/store.js';
 import { CalendarHeaderToolbar } from './features/calendar/CalendarHeaderToolbar.js';
 import { CalendarView } from './features/calendar/CalendarView.js';
@@ -2985,33 +2986,38 @@ export function App(): React.JSX.Element {
           一次只画最新的一条，忽略记在本机 —— 见 `features/announcements/store.ts`。
         */}
         <AnnouncementBanner />
-        <header className="ht-header">
-          {view === 'tasks' ? (
-            <button type="button" className="ht-btn ht-btn--ghost ht-scope-trigger"
-              aria-label={t('web.shell.nav.scopeAria')} aria-haspopup="dialog" aria-expanded={scopeDrawerOpen}
-              onClick={() => setScopeDrawerOpen(true)} data-testid="task-scope-toggle">
-              <PanelLeft size={ICON_SIZE.md} aria-hidden="true" />
-            </button>
-          ) : null}
-          {view === 'calendar' ? (
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost ht-header__calendar-sidebar-toggle"
-              data-testid="calendar-sidebar-toggle"
-              aria-pressed={calendarSidebarToggleOn}
-              aria-controls="calendar-sidebar"
-              aria-label={calendarSidebarToggleOn ? t('web.calendar.sidebar.hide') : t('web.calendar.sidebar.show')}
-              title={calendarSidebarToggleOn ? t('web.calendar.sidebar.hide') : t('web.calendar.sidebar.show')}
-              onClick={() => {
-                if (narrowLayout) setScopeDrawerOpen((open) => !open);
-                else useCalendarViewStore.getState().toggleCalendarSidebar();
-              }}
-            >
-              <PanelLeft size={ICON_SIZE.md} aria-hidden="true" />
-            </button>
-          ) : null}
-          <h1 className="ht-header__title">{title}</h1>
-          {view === 'habits' ? <div className="ht-header__habits-slot" data-habits-header-slot /> : null}
+        <WebTopBar
+          title={title}
+          leading={
+            <>
+              {view === 'tasks' ? (
+                <button type="button" className="ht-btn ht-btn--ghost ht-scope-trigger"
+                  aria-label={t('web.shell.nav.scopeAria')} aria-haspopup="dialog" aria-expanded={scopeDrawerOpen}
+                  onClick={() => setScopeDrawerOpen(true)} data-testid="task-scope-toggle">
+                  <PanelLeft size={ICON_SIZE.md} aria-hidden="true" />
+                </button>
+              ) : null}
+              {view === 'calendar' ? (
+                <button
+                  type="button"
+                  className="ht-btn ht-btn--ghost ht-header__calendar-sidebar-toggle"
+                  data-testid="calendar-sidebar-toggle"
+                  aria-pressed={calendarSidebarToggleOn}
+                  aria-controls="calendar-sidebar"
+                  aria-label={calendarSidebarToggleOn ? t('web.calendar.sidebar.hide') : t('web.calendar.sidebar.show')}
+                  title={calendarSidebarToggleOn ? t('web.calendar.sidebar.hide') : t('web.calendar.sidebar.show')}
+                  onClick={() => {
+                    if (narrowLayout) setScopeDrawerOpen((open) => !open);
+                    else useCalendarViewStore.getState().toggleCalendarSidebar();
+                  }}
+                >
+                  <PanelLeft size={ICON_SIZE.md} aria-hidden="true" />
+                </button>
+              ) : null}
+            </>
+          }
+          trailing={view === 'habits' ? <div className="ht-header__habits-slot" data-habits-header-slot /> : null}
+        >
 
           {/*
             🔴 2026-10-01：**这里原来有一个搜索输入框，已删**（产品负责人：
@@ -3367,7 +3373,7 @@ export function App(): React.JSX.Element {
               )}
             </button> : null}
           </div>
-        </header>
+        </WebTopBar>
 
         {/*
           🔴 行操作的两条**输入**通路挂在 `.ht-content` 这一层（委托），不是每一行上：

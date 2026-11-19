@@ -442,6 +442,14 @@
   color: var(--ht-color-foreground-subtle);
 }
 
+/* 🔴 空态竖直居中（2026-11-18，对照滴答：空态在剩余高度里居中，不贴顶）。
+   判据：内容列（`.ht-content`，flex 列、有确定高度）里，**只装一张空态**的那个
+   直接子块，用 `margin-block:auto` 吃掉上下剩余空间 ⇒ 整块落在竖直中部。
+   只命中"直接子块且其内含空态"这一种形状，不动含其它内容的页面。 */
+.ht-content > :has(> [data-testid="empty-state"]) {
+  margin-block: auto;
+}
+
 .ht-empty__icon {
   color: var(--ht-color-border-strong);
 }

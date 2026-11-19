@@ -344,6 +344,7 @@ export function Screen({
   title,
   actions,
   titleLeading,
+  header,
   children,
   scroll = true,
   fixedControls,
@@ -356,6 +357,11 @@ export function Screen({
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
   titleLeading?: React.ReactNode;
+  /**
+   * 自定义顶栏（整块替换默认 AppBar，用于 Apple 式胶囊导航）。
+   * 传了就用它渲染（自带安全区由 Screen 补 `insets.top`），不传时行为与之前完全一致。
+   */
+  header?: React.ReactNode;
   children: React.ReactNode;
   scroll?: boolean;
   /** Contextual controls remain reachable while the content scrolls. */
@@ -444,8 +450,9 @@ export function Screen({
    *（真机验证过：列表滚了、栏没动）。
    */
   const collapses =
-    barCollapsed !== undefined ||
-    (chrome !== 'immersive' && fixedControls === undefined && scroll);
+    header === undefined &&
+    (barCollapsed !== undefined ||
+      (chrome !== 'immersive' && fixedControls === undefined && scroll));
   /**
    * 🔴 顶栏的出现时机：滚过一段收起、往回滚立刻回来。
    *
@@ -516,16 +523,27 @@ export function Screen({
     </View>
   );
 
-  const appBar = (
-    <AppBar
-      title={title}
-      actions={actions}
-      titleLeading={titleLeading}
-      background={background}
-      contentMaxWidth={contentMeasureMaxFor(chrome)}
-      {...(onTitlePress === undefined ? {} : { onTitlePress })}
-    />
-  );
+  const appBar =
+    header === undefined ? (
+      <AppBar
+        title={title}
+        actions={actions}
+        titleLeading={titleLeading}
+        background={background}
+        contentMaxWidth={contentMeasureMaxFor(chrome)}
+        {...(onTitlePress === undefined ? {} : { onTitlePress })}
+      />
+    ) : (
+      <View
+        style={{
+          paddingTop: insets.top,
+          backgroundColor:
+            t[background === 'grouped' ? 'color.grouped-background' : 'color.surface'],
+        }}
+      >
+        {header}
+      </View>
+    );
 
   return (
     /*
