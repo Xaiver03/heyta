@@ -50,6 +50,7 @@ import {
   ListTodo,
   Monitor,
   Pause,
+  Paperclip,
   Pencil,
   Pin,
   PinOff,
@@ -98,6 +99,7 @@ const ICONS = {
   'tab.habits': Flame,
   'tab.countdown': CalendarClock,
   'tab.profile': User,
+  'action.attach': Paperclip,
 
   // 任务
   'task.add': Plus,

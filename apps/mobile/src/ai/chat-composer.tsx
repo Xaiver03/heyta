@@ -4,7 +4,7 @@ import { useI18n } from '@heyta/i18n';
 
 import { useText, useTheme, useTokens } from '../theme';
 import { Icon } from '../ui/icons';
-import { Text } from '../ui/kit';
+import { Chip, Text } from '../ui/kit';
 
 export function ChatComposer({
   value,
@@ -12,12 +12,20 @@ export function ChatComposer({
   onSubmit,
   disabled = false,
   busy = false,
+  attachments,
+  onOpenAttach,
+  onRemoveAttachment,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   onSubmit: () => void;
   disabled?: boolean;
   busy?: boolean;
+  /** 已引用的附件（任务）。 */
+  attachments?: readonly { readonly id: string; readonly title: string }[];
+  /** 打开附件选择面板。省略则不显示附件按钮。 */
+  onOpenAttach?: () => void;
+  onRemoveAttachment?: (id: string) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
@@ -33,6 +41,13 @@ export function ChatComposer({
         backgroundColor: tokens['color.background'],
       }}
     >
+      {attachments !== undefined && attachments.length > 0 ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.1'] }}>
+          {attachments.map((a) => (
+            <Chip key={a.id} tone="quiet" label={a.title} onPress={() => { if (onRemoveAttachment !== undefined) onRemoveAttachment(a.id); }} />
+          ))}
+        </View>
+      ) : null}
       <View style={{
         flexDirection: 'row', alignItems: 'flex-end', gap: tokens['space.2'],
         backgroundColor: tokens['color.surface'], borderRadius: tokens['radius.lg'],
@@ -41,6 +56,17 @@ export function ChatComposer({
         // Give the whole composer depth; the input and send control stay flat.
         boxShadow: tokens['shadow.sm'],
       }}>
+        {onOpenAttach === undefined ? null : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('mobile.ai.attach.open')}
+            testID="ai-attach-button"
+            onPress={onOpenAttach}
+            style={{ width: tokens['touch-target.min'], height: tokens['touch-target.min'], alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon name="action.attach" size="sm" color={tokens['color.foreground-muted']} />
+          </Pressable>
+        )}
         <TextInput
           value={value}
           onChangeText={onChangeText}

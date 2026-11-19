@@ -42,6 +42,7 @@ import { createGatedStreamingFetch } from './streaming-fetch';
 import { ChatComposer } from './chat-composer';
 import { AiSuggestionGrid } from './suggestion-grid';
 import { ChainOfThought } from './chain-of-thought';
+import { TaskAttachmentSheet, type AttachTask } from './task-attachment';
 import { TopBarMenu } from '../ui/top-bar-menu';
 import {
   createChatController,
@@ -167,6 +168,8 @@ export function AssistantScreen({
   const keyboardFrameRef = useRef<View>(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [refs, setRefs] = useState<AttachTask[]>([]);
 
   useEffect(() => {
     controller.syncAccount(account);
@@ -184,6 +187,14 @@ export function AssistantScreen({
     () => (host === null ? null : createToolHost(host, settings.memoryEnabled)),
     [host, settings.memoryEnabled],
   );
+  const attachTasks = useMemo<AttachTask[]>(() => {
+    if (host === null || host === undefined) return [];
+    return Object.values(host.getState().tasks)
+      .filter((task) => task.deletedAt === undefined && task.completedAt === undefined)
+      .slice(0, 50)
+      .map((task) => ({ id: task.id, title: task.title }));
+  }, [host]);
+
   const persistHealth = (health: HealthMap): void => {
     const live = getAiSettings();
     saveAiSettings({ ...live, health: toHealthSnapshot(health, Date.now()) });
@@ -508,11 +519,35 @@ export function AssistantScreen({
             />
             {snapshot.phase === 'disclose' ? <DisclosureCard target={route.target} plan={plan} consents={settings.consents} onConfirm={() => controller.confirmDisclosure()} onCancel={() => controller.cancelDisclosure()} onOpenSettings={onOpenSettings} /> : null}
           </ScrollView>
-          <ChatComposer value={snapshot.draft} onChangeText={(value) => controller.setDraft(value)} onSubmit={() => controller.send()} disabled={snapshot.phase !== 'idle' || toolHost === null} busy={snapshot.phase === 'running'} />
+          <ChatComposer
+            value={snapshot.draft}
+            onChangeText={(value) => controller.setDraft(value)}
+            onSubmit={() => {
+              const draft = snapshot.draft;
+              if (refs.length > 0) {
+                controller.setDraft(`${draft}\n\n${refs.map((r) => `- ${r.title}`).join('\n')}`);
+              }
+              controller.send();
+              setRefs([]);
+            }}
+            disabled={snapshot.phase !== 'idle' || toolHost === null}
+            busy={snapshot.phase === 'running'}
+            attachments={refs}
+            onOpenAttach={() => { setAttachOpen(true); }}
+            onRemoveAttachment={(id) => { setRefs((prev) => prev.filter((r) => r.id !== id)); }}
+          />
           <Text variant="caption" tone="subtle" style={{ paddingBottom: tokens['space.2'] }}>{t('web.ai.chat.disclaimer')}</Text>
         </View>
       </KeyboardAvoidingView>
       </View>
+
+      <TaskAttachmentSheet
+        visible={attachOpen}
+        tasks={attachTasks}
+        selected={refs}
+        onToggle={(task) => { setRefs((prev) => (prev.some((r) => r.id === task.id) ? prev.filter((r) => r.id !== task.id) : [...prev, task])); }}
+        onClose={() => { setAttachOpen(false); }}
+      />
 
       <TopBarMenu
         visible={moreOpen}
