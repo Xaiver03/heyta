@@ -147,6 +147,24 @@ if (heytaHasReleaseSigning) {
 """.stripIndent())
 }
 
+// 🔴 硬闸（2026-11-20 产品负责人要求**彻底固化**）：release 产物**绝不允许**用调试 keystore 签。
+//    旧行为缺 HEYTA_RELEASE_* 时只是打一行警告然后"静默退回 debug keystore"——后果是每台
+//    构建机签出**不同身份**的包，设备上覆盖安装必然签名冲突，只能卸载重装（清数据、丢登录态、
+//    每次都要重新登录输密码）。所以改成：真正要产出 release 包而签名凭据缺失时，**构建期直接失败**，
+//    不给"悄悄产出一个错签的包"留任何口头子。debug 构建不受影响。
+gradle.taskGraph.whenReady { graph ->
+    def buildsReleaseArtifact = graph.allTasks.any { t ->
+        def n = t.name
+        (n.startsWith('assemble') || n.startsWith('bundle') || n.startsWith('package')) && n.toLowerCase().contains('release')
+    }
+    if (buildsReleaseArtifact && !heytaHasReleaseSigning) {
+        throw new GradleException(
+            '[heyta] 拒绝用调试 keystore 打 release 包：构建机缺少 HEYTA_RELEASE_*。' +
+            '应放在 ~/.heyta-signing/keystore.properties 或 ~/.gradle/gradle.properties（仓库外）。' +
+            '见 docs/runbooks/android-build-on-linux-dev.md「发布签名固化在载体机」。')
+    }
+}
+
 
 android {
     ndkVersion rootProject.ext.ndkVersion

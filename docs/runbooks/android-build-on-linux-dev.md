@@ -177,11 +177,23 @@ bash scripts/android-carrier-device.sh down     # 只收本脚本起过的那台
 
 ## 八、边界（还没做到的，别当成已做到）
 
-- 🔴 **发布签名没落到载体机。** 四个 `HEYTA_RELEASE_*` 键在载体机上不存在时，`build.gradle`
-  把 release 变体挂到 `signingConfigs.debug` ⇒ 打出来的证书是 `CN=Android Debug`，
-  `scripts/upload-dist.sh` 的 `assert_android_release_signature` 会拒绝发布它。
-  这一步要的是**把 keystore 放到那台机器**（它现在只在 Mac 的 `~/.heyta-signing/`），
-  那是凭据搬迁，需要单独点头，本批没做。
+- ✅ **发布签名已固化在载体机（2026-11-20 产品负责人要求，已落地）。**
+  四个 `HEYTA_RELEASE_*` 与 keystore 之前只在 Mac，载体机 linux-dev 上没有 ⇒ release 变体静默退回
+  `signingConfigs.debug`（证书 `CN=Android Debug`），每台构建机签出不同身份的包 ⇒ 设备上覆盖安装
+  签名冲突 ⇒ 只能卸载重装（清数据、丢登录态、每次重新输密码）。
+  现状：`heyta-release.keystore` 已放到载体机 `~/.heyta-signing/heyta-release.keystore`，
+  四项写进 `~/.heyta-signing/keystore.properties`（`build.gradle` 读这个固定路径；仓库外、不入库）。
+  并新增**硬闸**：要产出 release 包而缺 `HEYTA_RELEASE_*` 时**构建期直接失败**，不再"静默退回 debug"。
+  核对：构建日志出现 `[heyta] 发布签名：已配置`，或 `apksigner verify --print-certs <apk>` 的 DN
+  **不是** `CN=Android Debug`。换构建机时照此把 keystore + `keystore.properties` 搬过去（凭据搬迁，走单独授权）。
+
+### 🔴 严禁：验收/调试时不得 `adb uninstall com.heyta`
+
+设备上 `com.heyta` 的**应用数据（登录态、设置、本机历史）随卸载一起消失，且不可恢复**。
+覆盖升级一律用 `adb install -r` —— 签名已固化，可原地升级、不动数据。
+确需卸载属**不可逆**操作，必须**先经产品负责人明确同意**，不得由自动化脚本或验收流程顺手执行。
+（2026-11-20 一次因签名不一致而 `adb uninstall` 的鲁莽操作，代价正是客户的登录态与本机数据。）
+
 - ⚠️ **既有设备腿的 adb 调用还没接隧道**：`research/tools/mutation-rigs/w6-note-restore-device-arm.sh`
   的构建主机默认已改到 `linux-dev`，但它十几处 `adb` 仍假设设备挂在本机 —— 接
   `scripts/android-carrier-device.sh tunnel` 是下一批；在那之前它红在"adb 没有可用设备"是**预期**。
