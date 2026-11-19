@@ -53,6 +53,7 @@ export interface HeytaNativeTokens {
   readonly 'color.info-subtle': string;
   readonly 'color.calendar-day-off': string;
   readonly 'color.calendar-day-work': string;
+  readonly 'color.weekend': string;
   readonly 'color.quadrant-1': string;
   readonly 'color.quadrant-1-subtle': string;
   readonly 'color.quadrant-2': string;
@@ -102,6 +103,7 @@ export interface HeytaNativeTokens {
   readonly 'font-size.2xl': number;
   readonly 'font-size.3xl': number;
   readonly 'font-size.4xl': number;
+  readonly 'font-size.5xl': number;
   readonly 'font-weight.regular': number;
   readonly 'font-weight.medium': number;
   readonly 'font-weight.semibold': number;
@@ -303,6 +305,7 @@ export const lightTokens: HeytaNativeTokens = {
   'color.info-subtle': "#f0f9ff",
   'color.calendar-day-off': "#2563eb",
   'color.calendar-day-work': "#475569",
+  'color.weekend': "#dc2626",
   'color.quadrant-1': "#dc2626",
   'color.quadrant-1-subtle': "#fef2f2",
   'color.quadrant-2': "#2563eb",
@@ -352,6 +355,7 @@ export const lightTokens: HeytaNativeTokens = {
   'font-size.2xl': 24,
   'font-size.3xl': 30,
   'font-size.4xl': 36,
+  'font-size.5xl': 72,
   'font-weight.regular': 400,
   'font-weight.medium': 500,
   'font-weight.semibold': 600,
@@ -465,7 +469,7 @@ export const lightTokens: HeytaNativeTokens = {
   'size.progress-height': 6,
   'size.grabber-width': 36,
   'size.grabber-height': 5,
-  'size.focus-ring': 180,
+  'size.focus-ring': 256,
   'size.focus-ring-stroke': 10,
   'tracking.display': -0.022,
   'tracking.title': -0.019,
@@ -535,6 +539,7 @@ export const darkTokens: HeytaNativeTokens = {
   'color.info-subtle': "#0284c729",
   'color.calendar-day-off': "#60a5fa",
   'color.calendar-day-work': "#cbd5e1",
+  'color.weekend': "#f87171",
   'color.quadrant-1': "#f87171",
   'color.quadrant-1-subtle': "#dc262629",
   'color.quadrant-2': "#60a5fa",
@@ -584,6 +589,7 @@ export const darkTokens: HeytaNativeTokens = {
   'font-size.2xl': 24,
   'font-size.3xl': 30,
   'font-size.4xl': 36,
+  'font-size.5xl': 72,
   'font-weight.regular': 400,
   'font-weight.medium': 500,
   'font-weight.semibold': 600,
@@ -697,7 +703,7 @@ export const darkTokens: HeytaNativeTokens = {
   'size.progress-height': 6,
   'size.grabber-width': 36,
   'size.grabber-height': 5,
-  'size.focus-ring': 180,
+  'size.focus-ring': 256,
   'size.focus-ring-stroke': 10,
   'tracking.display': -0.022,
   'tracking.title': -0.019,

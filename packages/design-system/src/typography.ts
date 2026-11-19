@@ -257,6 +257,17 @@ export const TEXT_STYLES = {
     tracking: 'tracking.display',
     tabularNums: true,
   },
+  /**
+   * 专注计时的大数字 —— 比 `numeric-display` 大一档（5xl=72px）。
+   * 只在沉浸式专注页用：它是这一屏唯一的主角，字号要压过其它一切。
+   */
+  'focus-display': {
+    size: 'font-size.5xl',
+    weight: 'font-weight.bold',
+    leading: 'line-height.tight',
+    tracking: 'tracking.display',
+    tabularNums: true,
+  },
   /** 概览指标。比正文突出，但不与计时器的大数字争夺层级。 */
   'numeric-summary': {
     size: 'font-size.2xl',

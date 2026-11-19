@@ -238,6 +238,8 @@
   --ht-color-danger: var(--ht-red-600);
   --ht-color-danger-strong: var(--ht-red-700);
   --ht-color-danger-subtle: var(--ht-red-50);
+  /* 日历周末（六/日）的强调色。语义独立于 danger，取值借红色档。 */
+  --ht-color-weekend: var(--ht-red-600);
   /*
      实底危险按钮**上面**的字（与 `--ht-color-danger` 成对，如同 `on-primary` 对 `primary`）。
      亮色档：白字在 `red-600`(#dc2626) 上实测 **4.83:1**，过 AA 正文档。
@@ -343,6 +345,7 @@
   --ht-font-size-2xl: 1.5rem;    /* 24px */
   --ht-font-size-3xl: 1.875rem;  /* 30px */
   --ht-font-size-4xl: 2.25rem;   /* 36px */
+  --ht-font-size-5xl: 4.5rem;    /* 72px —— 专注计时大数字（随环+屏高综合定档） */
 
   --ht-font-weight-regular: 400;
   --ht-font-weight-medium: 500;
@@ -706,7 +709,7 @@
   /* 番茄钟进度环的直径与描边宽度。
      与进度条同一个理由：这是"这个控件多大"的设计尺度，
      而且环会长在 web / iOS / Android / 鸿蒙四个端上（共享层一份实现）。 */
-  --ht-size-focus-ring: 11.25rem;          /* 180px —— 进度环直径 */
+  --ht-size-focus-ring: 16rem;             /* 256px —— 进度环直径（容纳 5xl 大数字） */
   --ht-size-focus-ring-stroke: 0.625rem;   /* 10px —— 进度环描边 */
 
   /* 字距（tracking）。
@@ -869,6 +872,7 @@
   --ht-color-danger: var(--ht-red-400);
   --ht-color-danger-strong: var(--ht-red-300);
   --ht-color-danger-subtle: rgb(220 38 38 / 0.16);
+  --ht-color-weekend: var(--ht-red-400);
   /*
      🔴 暗色档**不能跟着亮色档写 `--ht-white`**：暗色的 danger 是 `#f87171`
      （浅红，它是"提亮的前景色"那一族的形状），白字压上去实测 **2.77:1**，

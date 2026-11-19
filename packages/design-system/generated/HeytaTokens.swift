@@ -83,6 +83,7 @@ enum HeytaTokens {
     static let colorInfoSubtle: String = "#f0f9ff"
     static let colorCalendarDayOff: String = "#2563eb"
     static let colorCalendarDayWork: String = "#475569"
+    static let colorWeekend: String = "#dc2626"
     static let colorQuadrant1: String = "#dc2626"
     static let colorQuadrant1Subtle: String = "#fef2f2"
     static let colorQuadrant2: String = "#2563eb"
@@ -132,6 +133,7 @@ enum HeytaTokens {
     static let fontSize2xl: Double = 24  // px
     static let fontSize3xl: Double = 30  // px
     static let fontSize4xl: Double = 36  // px
+    static let fontSize5xl: Double = 72  // px
     static let fontWeightRegular: Double = 400
     static let fontWeightMedium: Double = 500
     static let fontWeightSemibold: Double = 600
@@ -245,7 +247,7 @@ enum HeytaTokens {
     static let sizeProgressHeight: Double = 6  // px
     static let sizeGrabberWidth: Double = 36  // px
     static let sizeGrabberHeight: Double = 5  // px
-    static let sizeFocusRing: Double = 180  // px
+    static let sizeFocusRing: Double = 256  // px
     static let sizeFocusRingStroke: Double = 10  // px
     static let trackingDisplay: Double = -0.022  // em-ratio
     static let trackingTitle: Double = -0.019  // em-ratio
@@ -316,6 +318,7 @@ enum HeytaTokens {
     static let colorInfoSubtle: String = "#0284c729"
     static let colorCalendarDayOff: String = "#60a5fa"
     static let colorCalendarDayWork: String = "#cbd5e1"
+    static let colorWeekend: String = "#f87171"
     static let colorQuadrant1: String = "#f87171"
     static let colorQuadrant1Subtle: String = "#dc262629"
     static let colorQuadrant2: String = "#60a5fa"
