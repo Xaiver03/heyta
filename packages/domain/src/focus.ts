@@ -37,8 +37,20 @@ export const DEFAULT_FOCUS_CONFIG: FocusConfig = {
 
 export type FocusPhase = 'idle' | 'running' | 'paused';
 
+/**
+ * 计时模式。
+ *   · `countdown` —— 番茄钟：从计划时长倒着走到 0（有终点）。
+ *   · `countup`   —— 正计时秒表：从 0 正着走（无终点，靠用户「结束」）。
+ *
+ * 两者共用同一份状态骨架；差别只在「有没有终点」——
+ * `remainingMs` / `focusProgress` / `isFinished` 都按 mode 分支。
+ */
+export type FocusMode = 'countdown' | 'countup';
+
 export interface FocusState {
   phase: FocusPhase;
+  /** 计时模式。默认倒计时（番茄钟）。 */
+  mode: FocusMode;
   kind: FocusSessionKind;
   /** 本轮计划时长（ms）。 */
   plannedMs: number;
@@ -52,6 +64,8 @@ export interface FocusState {
    * 存在它才能实现"暂停再恢复不丢失已过去的进度"。
    */
   remainingMsOnPause?: number;
+  /** 正计时暂停时已走的毫秒数（倒计时不用它）。 */
+  elapsedMsOnPause?: number;
   /** 本轮开始时间戳。 */
   startedAt?: number;
   /** 已完成几个专注（用于决定下一次是不是长休息）。 */
@@ -63,6 +77,7 @@ export interface FocusState {
 export function initialFocusState(): FocusState {
   return {
     phase: 'idle',
+    mode: 'countdown',
     kind: 'work',
     plannedMs: DEFAULT_FOCUS_CONFIG.workMs,
     completedWorkCount: 0,
@@ -76,14 +91,16 @@ export function start(
   config: FocusConfig = DEFAULT_FOCUS_CONFIG,
   taskId?: string,
 ): FocusState {
-  const plannedMs = durationFor(state.kind, config);
+  // 正计时没有终点：不设 endsAt，plannedMs 记 0（真正时长由 elapsed 决定）。
+  const plannedMs = state.mode === 'countup' ? 0 : durationFor(state.kind, config);
   return {
     ...state,
     phase: 'running',
     plannedMs,
     startedAt: now,
-    endsAt: now + plannedMs,
+    endsAt: state.mode === 'countup' ? undefined : now + plannedMs,
     remainingMsOnPause: undefined,
+    elapsedMsOnPause: undefined,
     taskId: taskId ?? state.taskId,
   };
 }
@@ -107,6 +124,17 @@ export function selectKind(
 }
 
 /**
+ * 切换计时模式（倒计时 / 正计时）。
+ *
+ * 与 `selectKind` 同样是 **idle 限定**：计时中途换模式等于换了一套计时基准，
+ * 已经走过的进度无法在两种基准间换算。要换就先结束当前轮。
+ */
+export function selectMode(state: FocusState, mode: FocusMode): FocusState {
+  if (state.phase !== 'idle' || state.mode === mode) return state;
+  return { ...state, mode };
+}
+
+/**
  * 清除关联任务。
  *
  * ⚠️ 与 `selectKind` 同样是 **idle 限定**：已经开始的这一轮，它的归属已经定了。
@@ -118,9 +146,17 @@ export function clearTask(state: FocusState): FocusState {
   return { ...state, taskId: undefined };
 }
 
-/** 暂停。把剩余量记下来，然后清掉 endsAt。 */
+/** 暂停。倒计时记剩余量、正计时记已走量，然后清掉运行态锚点。 */
 export function pause(state: FocusState, now: number): FocusState {
   if (state.phase !== 'running') return state;
+  if (state.mode === 'countup') {
+    return {
+      ...state,
+      phase: 'paused',
+      elapsedMsOnPause: focusElapsedMs(state, now),
+      startedAt: undefined,
+    };
+  }
   return {
     ...state,
     phase: 'paused',
@@ -129,13 +165,22 @@ export function pause(state: FocusState, now: number): FocusState {
   };
 }
 
-/** 从暂停恢复。用记下的剩余量重算 endsAt。 */
+/** 从暂停恢复。倒计时用剩余量重算终点，正计时用已走量回推起点。 */
 export function resume(
   state: FocusState,
   now: number,
   config: FocusConfig = DEFAULT_FOCUS_CONFIG,
 ): FocusState {
   if (state.phase !== 'paused') return state;
+  if (state.mode === 'countup') {
+    // 用已走量回推起点，让 display = now - startedAt 继续从暂停处累加。
+    return {
+      ...state,
+      phase: 'running',
+      startedAt: now - (state.elapsedMsOnPause ?? 0),
+      elapsedMsOnPause: undefined,
+    };
+  }
   const remaining = state.remainingMsOnPause ?? durationFor(state.kind, config);
   return {
     ...state,
@@ -153,12 +198,25 @@ export function resume(
  */
 export function remainingMs(state: FocusState, now: number): number {
   if (state.phase === 'idle') return 0;
+  // 正计时没有「剩余」，只有「已走」—— 见 focusElapsedMs。
+  if (state.mode === 'countup') return 0;
   if (state.phase === 'paused') return state.remainingMsOnPause ?? state.plannedMs;
   return Math.max(0, (state.endsAt ?? now) - now);
 }
 
-/** 是否已到时。 */
+/**
+ * 正计时已走的毫秒数（倒计时不用它）。
+ * `now - startedAt` 现算，不累加 —— 与 remainingMs 同一纪律。
+ */
+export function focusElapsedMs(state: FocusState, now: number): number {
+  if (state.mode !== 'countup' || state.phase === 'idle') return 0;
+  if (state.phase === 'paused') return state.elapsedMsOnPause ?? 0;
+  return Math.max(0, now - (state.startedAt ?? now));
+}
+
+/** 是否已到时。正计时没有终点，永不「自然到时」。 */
 export function isFinished(state: FocusState, now: number): boolean {
+  if (state.mode === 'countup') return false;
   return state.phase === 'running' && remainingMs(state, now) === 0;
 }
 
@@ -174,6 +232,8 @@ export function isFinished(state: FocusState, now: number): boolean {
  */
 export function focusProgress(state: FocusState, now: number): number {
   if (state.phase === 'idle') return 0;
+  // 正计时没有「进度」概念（无总长），环走刻度盘而不是进度弧。
+  if (state.mode === 'countup') return 0;
   const total = state.plannedMs;
   // 除零守卫：plannedMs 为 0 时（非法配置/坏数据）返回 0 而不是 NaN。
   // NaN 传进布局会让进度条整条消失，而错误信息不会指向这里。
@@ -196,6 +256,8 @@ export function focusProgress(state: FocusState, now: number): number {
  * "网页显示 00:00、手机显示 25:00"这种没人会报的差异。
  */
 export function focusDisplayMs(state: FocusState, now: number): number {
+  // 正计时显示「已走」，且 idle 时是 00:00（秒表的起点就是 0）。
+  if (state.mode === 'countup') return focusElapsedMs(state, now);
   if (state.phase === 'idle') return state.plannedMs;
   return remainingMs(state, now);
 }
@@ -242,6 +304,7 @@ export function advance(
   return {
     next: {
       phase: 'idle',
+      mode: state.mode,
       kind: nextKind,
       plannedMs: durationFor(nextKind, config),
       completedWorkCount,
@@ -259,9 +322,11 @@ export function abort(
   if (state.phase === 'idle') return { next: state, finished: null };
 
   const elapsed =
-    state.phase === 'paused'
-      ? state.plannedMs - (state.remainingMsOnPause ?? state.plannedMs)
-      : state.plannedMs - remainingMs(state, now);
+    state.mode === 'countup'
+      ? focusElapsedMs(state, now)
+      : state.phase === 'paused'
+        ? state.plannedMs - (state.remainingMsOnPause ?? state.plannedMs)
+        : state.plannedMs - remainingMs(state, now);
 
   const finished: FocusSession = {
     id: '',
@@ -269,7 +334,8 @@ export function abort(
     taskId: state.taskId,
     plannedMs: state.plannedMs,
     actualMs: Math.max(0, elapsed),
-    completed: false, // 手动中止 —— 与自然完成区分，统计时要用
+    // 倒计时中止 = 放弃（completed:false）；正计时没有自然终点，「结束」即正常完成。
+    completed: state.mode === 'countup',
     createdAt: state.startedAt ?? now,
     updatedAt: now,
     startedAt: state.startedAt,

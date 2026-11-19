@@ -42,9 +42,11 @@ import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens, useHeytaUiTheme } from '../theme.js';
 import { FocusRing } from './FocusRing.js';
 import {
+  FOCUS_MODE_ORDER,
   focusDisplayText,
   focusPrimaryAction,
   toFocusViewModel,
+  type FocusMode,
   type FocusPrimaryAction,
 } from './model.js';
 
@@ -98,6 +100,17 @@ export interface FocusPanelProps {
    * 的左缘与宽度不随中止按钮出现而变，那个坐标才一直是同一个按钮。
    */
   readonly fillControls?: boolean;
+  /**
+   * 模式切换：提供 `onModeChange` 与 `modeLabels` 才渲染（页面中部、环下方）。
+   * 切换只在 idle 生效（领域层 `selectMode` 判），运行中两颗胶囊灰显。
+   */
+  readonly onModeChange?: (mode: FocusMode) => void;
+  readonly modeLabels?: { group: string; countdown: string; countup: string };
+  /**
+   * 是否撑满容器并**竖直居中**（immersive 全屏档用）。
+   * 专注页要的是「环在屏高中部、按钮在拇指区」，而不是把内容堆在顶部。
+   */
+  readonly fill?: boolean;
   readonly testID?: string;
 }
 
@@ -118,6 +131,9 @@ export function FocusPanel({
   onAbort,
   children,
   fillControls,
+  onModeChange,
+  modeLabels,
+  fill,
   testID,
 }: FocusPanelProps): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -135,6 +151,29 @@ export function FocusPanel({
         root: {
           alignItems: 'center',
           gap: tokens['space.4'],
+        },
+        rootFill: {
+          flex: 1,
+          justifyContent: 'center',
+          minHeight: 0,
+        },
+        modeRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens['space.1'],
+          padding: tokens['space.1'],
+          borderRadius: tokens['radius.full'],
+          backgroundColor: tokens['color.surface-sunken'],
+        },
+        modePill: {
+          minHeight: tokens['touch-target.min'],
+          paddingHorizontal: tokens['space.4'],
+          borderRadius: tokens['radius.full'],
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        modePillSelected: {
+          backgroundColor: tokens['color.surface'],
         },
         /** 环中央的文字块。 */
         face: {
@@ -175,16 +214,17 @@ export function FocusPanel({
   };
 
   return (
-    <View style={styles.root} testID={testID}>
+    <View style={[styles.root, fill === true ? styles.rootFill : null]} testID={testID}>
       <FocusRing
         progress={view.progress}
+        variant={view.mode === 'countup' ? 'dial' : 'progress'}
         tone={view.tone}
         label={labels.ring(view.percent)}
         testID="focus-ring"
       >
         <View style={styles.face}>
-          {/* 大号倒计时。`numeric-display` 带等宽数字 —— 否则秒数跳动时整块会左右抖。 */}
-          <Text style={[text['numeric-display'], { color: tokens['color.foreground'] }]}>
+          {/* 大号计时数字。`focus-display` 带等宽数字 —— 否则秒数跳动时整块会左右抖。 */}
+          <Text style={[text['focus-display'], { color: tokens['color.foreground'] }]}>
             {focusDisplayText(state, now)}
           </Text>
           <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
@@ -192,6 +232,60 @@ export function FocusPanel({
           </Text>
         </View>
       </FocusRing>
+
+      {/*
+        模式切换（正计时 / 倒计时）—— **页面中部、环正下方**，不占顶部 tab、不占底部。
+        它改变的是「这一轮怎么计时」，视线本就落在环上，放在环下伸手可及。
+        只在 idle 可切（领域层 `selectMode` 也判一次，不靠这里当唯一防线）。
+      */}
+      {modeLabels === undefined || onModeChange === undefined ? null : (
+        <View
+          style={styles.modeRow}
+          accessibilityRole="tablist"
+          accessibilityLabel={modeLabels.group}
+          testID={testID === undefined ? 'focus-mode' : `${testID}-mode`}
+        >
+          {FOCUS_MODE_ORDER.map((m) => {
+            const selected = view.mode === m;
+            const enabled = view.idle;
+            const label = m === 'countup' ? modeLabels.countup : modeLabels.countdown;
+            return (
+              <Pressable
+                key={m}
+                onPress={() => {
+                  if (enabled) onModeChange(m);
+                }}
+                disabled={!enabled}
+                accessibilityRole="tab"
+                aria-selected={selected}
+                accessibilityLabel={label}
+                testID={`focus-mode-${m}`}
+                style={({ pressed }) => [
+                  styles.modePill,
+                  selected ? styles.modePillSelected : null,
+                  {
+                    opacity:
+                      !enabled && !selected
+                        ? tokens['state.disabled-opacity']
+                        : pressed && !reducedMotion
+                          ? tokens['state.pressed-opacity']
+                          : 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    text['row-title'],
+                    { color: selected ? tokens['color.primary'] : tokens['color.foreground-muted'] },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
 
       {labels.roundLength === undefined ? null : (
         <Text style={[text.caption, { color: tokens['color.foreground-subtle'] }]}>

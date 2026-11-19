@@ -278,6 +278,7 @@ describe('selectQuadrant', () => {
 describe('selectFocus', () => {
   const base: FocusState = {
     phase: 'idle',
+    mode: 'countdown',
     kind: 'work',
     plannedMs: 25 * 60 * 1000,
     completedWorkCount: 0,

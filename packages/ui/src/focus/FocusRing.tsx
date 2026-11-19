@@ -30,13 +30,19 @@
 
 import React from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Circle, Svg } from 'react-native-svg';
+import { Circle, Line, Svg } from 'react-native-svg';
 import { useHeytaTokens } from '../theme.js';
 import type { FocusTone } from './model.js';
 
 export interface FocusRingProps {
   /** 进度 0–1。越界值会被夹取 —— 越界在 RN 里不报错，只会画到容器外。 */
   readonly progress: number;
+  /**
+   * 环的外观：
+   *   · `progress`（默认）—— 画进度弧（倒计时那一轮走到哪了）。
+   *   · `dial`          —— 画刻度盘、不画进度弧（正计时没有「总长」，用钟表式刻度）。
+   */
+  readonly variant?: 'progress' | 'dial';
   /** 工作段 / 休息段。颜色承载语义，不是装饰。 */
   readonly tone: FocusTone;
   /** 整环的无障碍名（例如「进度 42%」）。环本身没有可见文字，读屏全靠它。 */
@@ -49,6 +55,7 @@ export interface FocusRingProps {
 
 export function FocusRing({
   progress,
+  variant = 'progress',
   tone,
   label,
   children,
@@ -64,6 +71,27 @@ export function FocusRing({
   // 越界宽度/偏移在 RN 里既不报错也不警告，只是画错。
   const clamped = Math.min(1, Math.max(0, progress));
   const offset = circumference * (1 - clamped);
+
+  /**
+   * 刻度盘的 60 根刻度（正计时用）。每 5 格一根长刻度 —— 形状像钟表盘，
+   * 传达「这是秒表，正着走」，而不是「还剩多少」。几何值全部由上面的 token 派生。
+   */
+  const tickOuter = radius + stroke / 2;
+  const tickCount = 60;
+  const dialTicks = Array.from({ length: tickCount }, (_, i) => {
+    const angle = (i / tickCount) * Math.PI * 2;
+    const long = i % 5 === 0;
+    const inner = tickOuter - (long ? stroke * 1.6 : stroke * 0.9);
+    const cx = size / 2;
+    return {
+      key: `tick-${String(i)}`,
+      x1: cx + Math.cos(angle) * inner,
+      y1: cx + Math.sin(angle) * inner,
+      x2: cx + Math.cos(angle) * tickOuter,
+      y2: cx + Math.sin(angle) * tickOuter,
+      long,
+    };
+  });
 
   return (
     <View
@@ -98,17 +126,32 @@ export function FocusRing({
           stroke={tokens['color.border']}
           strokeWidth={stroke}
         />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={tone === 'work' ? tokens['color.focus-work'] : tokens['color.focus-break']}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-        />
+        {variant === 'dial' ? (
+          dialTicks.map((t) => (
+            <Line
+              key={t.key}
+              x1={t.x1}
+              y1={t.y1}
+              x2={t.x2}
+              y2={t.y2}
+              stroke={tokens['color.border-strong']}
+              strokeWidth={t.long ? tokens['border-width.thick'] : tokens['border-width.thin']}
+              strokeLinecap="round"
+            />
+          ))
+        ) : (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={tone === 'work' ? tokens['color.focus-work'] : tokens['color.focus-break']}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+          />
+        )}
       </Svg>
       {children}
     </View>

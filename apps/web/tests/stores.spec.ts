@@ -300,6 +300,7 @@ describe('番茄钟 store', () => {
     useFocusStore.setState({
       state: {
         phase: 'running',
+        mode: 'countdown',
         kind: 'work',
         plannedMs: 1000,
         startedAt: Date.now() - 2000,
@@ -324,6 +325,7 @@ describe('番茄钟 store', () => {
     useFocusStore.setState({
       state: {
         phase: 'running',
+        mode: 'countdown',
         kind: 'work',
         plannedMs: 60_000,
         startedAt: Date.now(),
@@ -344,6 +346,7 @@ describe('番茄钟 store', () => {
     useFocusStore.setState({
       state: {
         phase: 'running',
+        mode: 'countdown',
         kind: 'shortBreak',
         plannedMs: 1000,
         startedAt: Date.now() - 2000,
@@ -368,6 +371,7 @@ describe('番茄钟 store', () => {
     useFocusStore.setState({
       state: {
         phase: 'running',
+        mode: 'countdown',
         kind: 'work',
         plannedMs: 60_000,
         startedAt: Date.now() - 500,
@@ -396,6 +400,7 @@ describe('番茄钟 store', () => {
     useFocusStore.setState({
       state: {
         phase: 'running',
+        mode: 'countdown',
         kind: 'work',
         plannedMs: 60_000,
         startedAt: Date.now() - 500,

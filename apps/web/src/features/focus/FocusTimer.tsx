@@ -235,14 +235,26 @@ export function FocusTimer() {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: cssVar('space.4'),
         width: '100%',
+        flex: 1,
+        minHeight: 0,
         boxSizing: 'border-box',
       }}
     >
       <FocusPanel
         state={focus.state}
         now={now}
+        fill
+        modeLabels={{
+          group: t('web.focus.mode.group'),
+          countdown: t('web.focus.mode.countdown'),
+          countup: t('web.focus.mode.countup'),
+        }}
+        onModeChange={(mode) => {
+          focus.selectMode(mode);
+        }}
         labels={{
           // web 的阶段行只区分工作段 / 休息段（手机端更细，见那边的 labels）——
           // 文案归属词条表，所以由这一侧注入。

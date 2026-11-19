@@ -57,6 +57,7 @@ import {
   pauseFocus,
   resumeFocus,
   selectFocusKind,
+  selectFocusMode,
   startFocus,
   useFocusTimer,
 } from '../lib/focus-timer';
@@ -304,6 +305,14 @@ export function FocusScreen(): React.JSX.Element {
         now={timer.now}
         // 手机的内容区有确定宽度：主按钮撑满才够按（见 FocusPanel 的说明）。
         fillControls
+        modeLabels={{
+          group: t('mobile.focus.mode.group'),
+          countdown: t('mobile.focus.mode.countdown'),
+          countup: t('mobile.focus.mode.countup'),
+        }}
+        onModeChange={(mode) => {
+          selectFocusMode(mode);
+        }}
         labels={{
           phase: (s) => phaseLabel(s, t),
           // 文案跟着**共享层给出的动作**走，不在这里从 phase 再推一遍。

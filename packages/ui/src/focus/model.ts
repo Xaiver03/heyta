@@ -22,13 +22,23 @@
 import {
   focusDisplayMs,
   focusDurationMs,
+  focusElapsedMs,
   focusProgress,
   formatDuration,
   remainingMs,
   type FocusConfig,
+  type FocusMode,
   type FocusSessionKind,
   type FocusState,
 } from '@heyta/domain';
+
+/**
+ * 计时模式的顺序。倒计时在前 —— 番茄钟是默认形态。
+ * 与 `FOCUS_KIND_ORDER` 同一理由：顺序是产品语义，不放两端各写一份。
+ */
+export const FOCUS_MODE_ORDER = ['countdown', 'countup'] as const satisfies readonly FocusMode[];
+
+export type { FocusMode } from '@heyta/domain';
 
 /**
  * 类型选择的顺序。专注在前 —— 它是默认，也是绝大多数时候要点的那个。
@@ -58,11 +68,15 @@ export interface FocusViewModel {
   readonly displayMs: number;
   /** 距本轮到时的剩余毫秒。 */
   readonly remainingMs: number;
+  /** 正计时已走的毫秒数（倒计时恒 0）。 */
+  readonly elapsedMs: number;
   /** 进度 0–1，供进度环使用。 */
   readonly progress: number;
   /** 进度的百分数（已四舍五入），供无障碍名使用。 */
   readonly percent: number;
   readonly tone: FocusTone;
+  /** 计时模式（倒计时 / 正计时）。 */
+  readonly mode: FocusMode;
   readonly running: boolean;
   readonly paused: boolean;
   readonly idle: boolean;
@@ -94,9 +108,11 @@ export function toFocusViewModel(state: FocusState, now: number): FocusViewModel
   return {
     displayMs: focusDisplayMs(state, now),
     remainingMs: remainingMs(state, now),
+    elapsedMs: focusElapsedMs(state, now),
     progress,
     percent: Math.round(progress * 100),
     tone: focusTone(state),
+    mode: state.mode,
     running: state.phase === 'running',
     paused: state.phase === 'paused',
     idle: state.phase === 'idle',

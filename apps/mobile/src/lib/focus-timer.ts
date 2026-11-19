@@ -40,9 +40,11 @@ import {
   pause as pauseFn,
   resume as resumeFn,
   selectKind,
+  selectMode as selectModeFn,
   shouldPersistSession,
   start as startFn,
   type FocusConfig,
+  type FocusMode,
   type FocusSession,
   type FocusSessionKind,
   type FocusState,
@@ -282,6 +284,13 @@ export async function abortFocus(): Promise<void> {
 export function selectFocusKind(kind: FocusSessionKind): void {
   // 不能在界面里自己查"短休息多少分钟" —— 那是配置语义，领域层已经有映射。
   publish({ state: selectKind(snapshot.state, kind, FOCUS_CONFIG) });
+}
+
+/** 切换计时模式（倒计时 / 正计时）。只在 idle 时生效（领域层负责这条约束）。 */
+export function selectFocusMode(mode: FocusMode): void {
+  const next = selectModeFn(snapshot.state, mode);
+  if (next === snapshot.state) return;
+  publish({ state: next, now: Date.now() });
 }
 
 /** 清除关联任务。只在 idle 时生效（领域层负责这条约束）。 */

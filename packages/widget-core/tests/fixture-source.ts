@@ -269,6 +269,7 @@ export function buildSampleInput(): WidgetSelectorInput {
   // 正在跑的番茄钟：剩余 12 分钟
   const focus: FocusState = {
     phase: 'running',
+    mode: 'countdown',
     kind: 'work',
     plannedMs: 25 * 60 * 1000,
     endsAt: TEST_NOW + 12 * 60 * 1000,

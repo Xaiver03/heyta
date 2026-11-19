@@ -44,9 +44,11 @@ import {
   isFinished,
   pause as pauseFn,
   resume as resumeFn,
+  selectMode as selectModeFn,
   shouldPersistSession,
   start as startFn,
   type FocusConfig,
+  type FocusMode,
   type FocusSession,
   type FocusState,
 } from '@heyta/domain';
@@ -100,6 +102,8 @@ interface FocusStoreState {
   error?: { code?: FocusLogFailureCode; reason: string };
 
   start: (taskId?: string) => void;
+  /** 切换计时模式（倒计时 / 正计时）。只在 idle 生效（领域层判）。 */
+  selectMode: (mode: FocusMode) => void;
   /**
    * 解除关联任务（`FocusTimer` 下拉里的「不关联」）。
    *
@@ -184,6 +188,12 @@ export const useFocusStore = create<FocusStoreState>((set, get) => ({
       tick: get().tick + 1,
     });
     ensureTicking(get, set);
+  },
+
+  selectMode: (mode) => {
+    const next = selectModeFn(get().state, mode);
+    if (next === get().state) return;
+    set({ state: next, tick: get().tick + 1 });
   },
 
   clearLinkedTask: () => {
