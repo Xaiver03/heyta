@@ -2072,6 +2072,7 @@ export const en = {
   'web.ai.action.cancel': 'Cancel',
   'web.ai.action.send': 'Send',
   'web.ai.action.close': 'Close',
+  'web.ai.action.copy': 'Copy',
   'web.ai.action.retry': 'Retry',
   'web.ai.action.discard': 'Discard',
   'web.ai.loading.waiting': 'Waiting for the endpoint...',

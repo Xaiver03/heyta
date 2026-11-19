@@ -1,7 +1,7 @@
 /** Mobile's single conversational assistant surface. */
 
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Clipboard, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { applyScrollIntent, AssistantMark, shouldFollowOnContentChange } from '@heyta/ui';
 import { inferPreferences, renderPreferenceHints } from '@heyta/domain';
@@ -323,17 +323,21 @@ export function AssistantScreen({
           onConfirm={() => controller.confirmProposal(entry.id)}
         />
       ) : undefined,
-      action: entry.role === 'error' ? (
-        <Stack gap="tight">
-          {privacyBlocked && onOpenPrivacy !== undefined ? (
-            <Button label={t('mobile.ai.privacyBlocked.action')} tone="ghost" onPress={onOpenPrivacy} />
-          ) : null}
-          <Button label={t('web.ai.action.retry')} tone="ghost" onPress={() => controller.retry(entry.id)} />
-          {entry.cause === 'egress-not-authorized' && onOpenSettings !== undefined ? (
-            <Button label={t('mobile.ai.goSettings')} tone="ghost" onPress={onOpenSettings} />
-          ) : null}
-        </Stack>
-      ) : undefined,
+      action:
+        entry.role === 'assistant' || entry.role === 'error' ? (
+          <Stack gap="tight">
+            {entry.role === 'error' && privacyBlocked && onOpenPrivacy !== undefined ? (
+              <Button label={t('mobile.ai.privacyBlocked.action')} tone="ghost" onPress={onOpenPrivacy} />
+            ) : null}
+            <HStack gap="tight">
+              <Button label={t('web.ai.action.copy')} tone="ghost" testID={`chat-copy-${String(entry.id)}`} onPress={() => { Clipboard.setString(entry.role === 'error' ? entry.message : entry.text); }} />
+              <Button label={t('web.ai.action.retry')} tone="ghost" testID={`chat-retry-${String(entry.id)}`} disabled={snapshot.phase !== 'idle'} onPress={() => { controller.retry(entry.id); }} />
+            </HStack>
+            {entry.role === 'error' && entry.cause === 'egress-not-authorized' && onOpenSettings !== undefined ? (
+              <Button label={t('mobile.ai.goSettings')} tone="ghost" onPress={onOpenSettings} />
+            ) : null}
+          </Stack>
+        ) : undefined,
     };
   });
 

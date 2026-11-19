@@ -2262,6 +2262,7 @@ export const zhCN = {
   'web.ai.action.cancel': '取消',
   'web.ai.action.send': '发送',
   'web.ai.action.close': '关闭',
+  'web.ai.action.copy': '复制',
   'web.ai.action.retry': '重试',
   'web.ai.action.discard': '不要了',
   'web.ai.loading.waiting': '正在等待端点返回…',
