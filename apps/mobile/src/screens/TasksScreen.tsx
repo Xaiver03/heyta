@@ -50,7 +50,7 @@ import {
   searchTasks,
   // 待办口径也只有一份 —— "哪几组算待办"是产品说法，不是某一屏的选择。
   pendingCount,
-  toLocalDate,
+
   dueDateToEpoch,
   // 「它下面还有 N 条子任务」那句后果的取数口径（§3.3）：**建树只有一份**，
   // 删除父任务后被提到顶层的子任务就是这一枚数出来的（`promotedFromDeletedParent`）。
@@ -88,7 +88,7 @@ import {
 import { readSyncConfig } from '../sync/config';
 import { useToday } from '../lib/use-today';
 // 🔴 日期措辞已上移到共享层（见 `lib/date.ts` 文件头）：日历要在四端共用。
-import { captureDuePanelTitle, formatDayTitleText } from '@heyta/ui';
+import { captureDuePanelTitle } from '@heyta/ui';
 import { describeRecurrenceText } from '../lib/recurrence-display';
 import { quadrantBoardLabels } from '../lib/quadrant-display';
 import { useText, useTheme, useTokens } from '../theme';
@@ -99,7 +99,7 @@ import {
   IconButton,
   Chip,
   Screen,
-  SectionHeader,
+
   Text,
 } from '../ui/kit';
 import { Icon, type IconName } from '../ui/icons';
@@ -1595,20 +1595,7 @@ export function TasksScreen({
           与 `apps/web/src/features/categories/CategoryBreakdown.tsx`
           ——"页面大标题在顶栏（视图 tab），所以内容区标题用 section-title"。
         */}
-        <View style={styles.stackTop1}>
-          <Text variant="section-title">{formatDayTitleText(toLocalDate(now), t)}</Text>
-          {/*
-            🔴 2026-11-15：空态时**不画这行副标题**。
-            
-            看图才发现的：空态屏上同时出现两句同义的话 ——
-            这里一句「还没有任务」，中间空态组件一句「今天还没有安排」+「点右下角的加号」。
-            同一屏说两遍，而且第二句还带着用户该做什么。
-            
-            判据：**空态组件已经承担了"这一屏为什么空 + 我该做什么"**，
-            副标题在那种状态下没有新信息，只制造重复。
-          */}
-          {/* 计数副标题已删：「N 项待办，M 项已完成」是无信息价值的文字（能用界面就别用文字）。 */}
-        </View>
+        {/* 2026-11-19 选项A「只留列表」：日期大标题与分组标题/计数全部删除，页首只剩智能列表图标行。 */}
         {/*
           列表内过滤框：**按需展开**，不常驻。
 
@@ -1997,13 +1984,8 @@ export function TasksScreen({
                * 三处各自有理由的 padding 相加，结果没有任何一档是刻意定的。
                * 去掉外层，让组间距只有一个来源。
                */
-              renderSectionHeader={(section) => (
-                <SectionHeader
-                  title={section.meta.title}
-                  count={section.tasks.length}
-                  tone={section.meta.tone}
-                />
-              )}
+              // 选项A「只留列表」：不画分组标题/计数（收集箱、已完成等），只用卡片区隔。
+              renderSectionHeader={() => null}
             />
           </View>
         )}
