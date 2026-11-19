@@ -330,6 +330,7 @@ function Shell(): React.JSX.Element {
         <View style={{ flex: 1, display: tab === 'ai' ? 'flex' : 'none' }}>
           <AssistantScreen
             visible={tab === 'ai'}
+            bottomOffset
             onBack={() => { setTab('tasks'); }}
           />
         </View>

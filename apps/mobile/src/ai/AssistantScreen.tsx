@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { applyScrollIntent, AssistantMark, shouldFollowOnContentChange } from '@heyta/ui';
 import { inferPreferences, renderPreferenceHints } from '@heyta/domain';
 import {
@@ -121,12 +122,15 @@ const resolveRouting = (): AiRoutingConfig =>
 export function AssistantScreen({
   onBack,
   visible = true,
+  bottomOffset = false,
   onOpenSettings,
   onOpenPrivacy,
   controller = mobileAssistantController,
 }: {
   onBack: () => void;
   visible?: boolean;
+  /** 作为**底部 tab 根页**时，为浮动标签栏预留高度，否则输入框会被压在栏下。 */
+  bottomOffset?: boolean;
   onOpenSettings?: () => void;
   onOpenPrivacy?: () => void;
   /** Test and host injection seam; the default controller survives settings navigation. */
@@ -134,6 +138,7 @@ export function AssistantScreen({
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
+  const insets = useSafeAreaInsets();
   const navigation = useMobileNavigation();
   const settings = useAiSettings();
   const syncConfig = readSyncConfig();
@@ -410,7 +415,7 @@ export function AssistantScreen({
       title={t('mobile.ai.title')}
       titleLeading={<AssistantMark size={tokens['icon.md']} color={tokens['color.foreground']} />}
       scroll={false}
-      bottomInset={false}
+      bottomInset={!bottomOffset}
       actions={[
         { icon: 'assistant.new-session', label: t('web.ai.chat.newSession'), testID: 'assistant-new-session', disabled: snapshot.phase !== 'idle', onPress: () => controller.newSession() },
         { icon: 'action.back', label: t('mobile.ai.back'), testID: 'assistant-back', disabled: snapshot.phase === 'running', onPress: () => snapshot.phase === 'disclose' ? controller.cancelDisclosure() : onBack() },
@@ -419,7 +424,7 @@ export function AssistantScreen({
       <View
         ref={keyboardFrameRef}
         collapsable={false}
-        style={{ flex: 1 }}
+        style={{ flex: 1, paddingBottom: bottomOffset ? tokens['nav.tab-bar-height'] + insets.bottom : 0 }}
         onLayout={() => keyboardFrameRef.current?.measureInWindow((_x, y) => setKeyboardOffset(y))}
       >
       <KeyboardAvoidingView
@@ -431,7 +436,7 @@ export function AssistantScreen({
         // Android behavior undefined therefore leaves the composer underneath
         // the keyboard. Height avoidance uses the keyboard event directly;
         // iOS keeps its previously verified padding path and measured offset.
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View testID="assistant-screen" style={{ flex: 1, paddingBottom: tokens['space.2'] }}>
           {!configured ? (
@@ -440,9 +445,6 @@ export function AssistantScreen({
               {onOpenSettings !== undefined ? <Button label={t('mobile.ai.goSettings')} tone="ghost" onPress={onOpenSettings} /> : null}
             </HStack>
           ) : null}
-          <HStack gap="tight" align="center" style={{ flexWrap: 'wrap' }}>
-            <Button label={t('web.ai.chat.history.open')} tone="ghost" onPress={() => controller.toggleHistory()} testID="assistant-history" />
-          </HStack>
           {snapshot.historyOpen ? (
             <Card gap="tight">
               <Text variant="row-title">{t('web.ai.chat.history.title')}</Text>
