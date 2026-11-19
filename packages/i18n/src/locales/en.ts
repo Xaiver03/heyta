@@ -3319,6 +3319,8 @@ export const en = {
   // before (so it had no such entry); the shared ring needs it on both ends.
   'mobile.focus.a11y.progress': 'Progress {percent}%',
   'mobile.focus.mode.group': 'Timer mode',
+  'mobile.focus.segment.pomodoro': 'Pomodoro',
+  'mobile.focus.segment.countup': 'Stopwatch',
   'mobile.focus.mode.countdown': 'Countdown',
   'mobile.focus.mode.countup': 'Count up',
   'mobile.focus.action.pause': 'Pause',

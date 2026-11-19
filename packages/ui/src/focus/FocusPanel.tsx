@@ -37,7 +37,7 @@
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Pause, Play, Square } from 'lucide';
-import type { FocusState } from '@heyta/domain';
+import { focusElapsedMs, type FocusState } from '@heyta/domain';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens, useHeytaUiTheme } from '../theme.js';
 import { FocusRing } from './FocusRing.js';
@@ -217,6 +217,7 @@ export function FocusPanel({
     <View style={[styles.root, fill === true ? styles.rootFill : null]} testID={testID}>
       <FocusRing
         progress={view.progress}
+        elapsedMs={focusElapsedMs(state, now)}
         variant={view.mode === 'countup' ? 'dial' : 'progress'}
         tone={view.tone}
         label={labels.ring(view.percent)}

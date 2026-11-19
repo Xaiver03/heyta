@@ -294,7 +294,15 @@ export function FocusScreen(): React.JSX.Element {
         : undefined;
 
   return (
-    <Screen title={t('mobile.focus.title')}>
+    <Screen
+      title={t('mobile.focus.title')}
+      titleLeading={
+        <HStack gap="default">
+          <Chip label={t('mobile.focus.segment.pomodoro')} selected={state.mode === 'countdown'} onPress={() => { if (state.phase === 'idle') selectFocusMode('countdown'); }} />
+          <Chip label={t('mobile.focus.segment.countup')} selected={state.mode === 'countup'} onPress={() => { if (state.phase === 'idle') selectFocusMode('countup'); }} />
+        </HStack>
+      }
+    >
       {/*
         🔴 计时核心是**共享的**（`@heyta/ui`）—— 这里只注入文案与回调。
         进度环、倒计时、阶段、主按钮 / 中止按钮的骨架不在这份文件里，
@@ -305,14 +313,6 @@ export function FocusScreen(): React.JSX.Element {
         now={timer.now}
         // 手机的内容区有确定宽度：主按钮撑满才够按（见 FocusPanel 的说明）。
         fillControls
-        modeLabels={{
-          group: t('mobile.focus.mode.group'),
-          countdown: t('mobile.focus.mode.countdown'),
-          countup: t('mobile.focus.mode.countup'),
-        }}
-        onModeChange={(mode) => {
-          selectFocusMode(mode);
-        }}
         labels={{
           phase: (s) => phaseLabel(s, t),
           // 文案跟着**共享层给出的动作**走，不在这里从 phase 再推一遍。

@@ -3648,6 +3648,8 @@ export const zhCN = {
   // M3 第二刀把进度环收进共享层后，两端都需要它。
   'mobile.focus.a11y.progress': '进度 {percent}%',
   'mobile.focus.mode.group': '计时模式',
+  'mobile.focus.segment.pomodoro': '番茄计时',
+  'mobile.focus.segment.countup': '正计时',
   'mobile.focus.mode.countdown': '倒计时',
   'mobile.focus.mode.countup': '正计时',
   'mobile.focus.action.pause': '暂停',
