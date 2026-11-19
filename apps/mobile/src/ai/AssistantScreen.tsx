@@ -40,6 +40,8 @@ import { ASSISTANT_FAILURE_KEY, AI_CAUSE_KEY, AI_FEATURE_LABEL_KEY, SERVER_CODE_
 import { privacyConsent } from '../privacy/consent-gate';
 import { createGatedStreamingFetch } from './streaming-fetch';
 import { ChatComposer } from './chat-composer';
+import { AiSuggestionGrid } from './suggestion-grid';
+import { TopBarMenu } from '../ui/top-bar-menu';
 import {
   createChatController,
   mobileAssistantController,
@@ -163,6 +165,7 @@ export function AssistantScreen({
   const transcriptRef = useRef<ScrollView>(null);
   const keyboardFrameRef = useRef<View>(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     controller.syncAccount(account);
@@ -417,6 +420,7 @@ export function AssistantScreen({
       scroll={false}
       bottomInset={!bottomOffset}
       actions={[
+        { icon: 'action.more', label: t('web.ai.chat.history.open'), testID: 'assistant-more', onPress: () => { setMoreOpen(true); } },
         { icon: 'assistant.new-session', label: t('web.ai.chat.newSession'), testID: 'assistant-new-session', disabled: snapshot.phase !== 'idle', onPress: () => controller.newSession() },
         { icon: 'action.back', label: t('mobile.ai.back'), testID: 'assistant-back', disabled: snapshot.phase === 'running', onPress: () => snapshot.phase === 'disclose' ? controller.cancelDisclosure() : onBack() },
       ]}
@@ -485,14 +489,16 @@ export function AssistantScreen({
               items={[...renderItems, ...liveItems]}
               generatedLabel={t('common.ai.generatedLabel')}
               empty={
-                <Stack gap="tight">
+                <Stack gap="default">
                   <Text variant="section-title">{t('web.ai.chat.greeting')}</Text>
-                  <Text variant="row-meta" tone="subtle">{t('web.ai.chat.greetingHint')}</Text>
-                  <HStack gap="tight" style={{ flexWrap: 'wrap' }}>
-                    {(['today', 'capture', 'summary', 'plan'] as const).map((suggestion) => (
-                      <Chip tone="quiet" key={suggestion} label={t(`web.ai.chat.suggestion.${suggestion}.label`)} onPress={() => controller.setDraft(t(`web.ai.chat.suggestion.${suggestion}`))} />
-                    ))}
-                  </HStack>
+                  <AiSuggestionGrid
+                    items={SUGGESTIONS.map((key) => ({
+                      key,
+                      label: t(`web.ai.chat.suggestion.${key}.label`),
+                      icon: SUGGESTION_ICONS[key],
+                    }))}
+                    onPick={(item) => { controller.setDraft(t(`web.ai.chat.suggestion.${item.key}` as MessageKey)); }}
+                  />
                 </Stack>
               }
             />
@@ -503,9 +509,27 @@ export function AssistantScreen({
         </View>
       </KeyboardAvoidingView>
       </View>
+
+      <TopBarMenu
+        visible={moreOpen}
+        label={t('web.ai.chat.history.open')}
+        onClose={() => { setMoreOpen(false); }}
+        items={[
+          { id: 'history', label: t('web.ai.chat.history.open'), icon: 'tab.categories', onPress: () => { setMoreOpen(false); controller.toggleHistory(); } },
+          { id: 'new', label: t('web.ai.chat.newSession'), icon: 'assistant.new-session', onPress: () => { setMoreOpen(false); controller.newSession(); } },
+        ]}
+      />
     </Screen>
   );
 }
+
+const SUGGESTIONS = ['today', 'capture', 'summary', 'plan'] as const;
+const SUGGESTION_ICONS: Record<(typeof SUGGESTIONS)[number], 'task.due' | 'task.add' | 'tab.categories' | 'tab.calendar'> = {
+  today: 'task.due',
+  capture: 'task.add',
+  summary: 'tab.categories',
+  plan: 'tab.calendar',
+};
 
 function createToolHost(host: AppHost, memoryEnabled: boolean): LocalApiHost {
   return createLocalApiHost(
