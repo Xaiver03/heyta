@@ -3306,6 +3306,20 @@ export const zhCN = {
   'web.calendar.scope.tagSummary': '标签：{name}',
   'web.calendar.scope.separator': '、以及 ',
   'web.calendar.scope.reset': '清除筛选',
+  'web.calendar.more.label': '更多日历操作',
+  'web.calendar.more.displaySection': '显示设置',
+  'web.calendar.more.showCompleted': '显示已完成',
+  'web.calendar.more.showCountdown': '显示倒数纪念日',
+  'web.calendar.more.scopeSection': '显示范围',
+  'web.calendar.more.editScope': '编辑显示范围…',
+  'web.calendar.more.arrangeSection': '安排任务',
+  'web.calendar.more.arrangeTo': '安排「{title}」到 {date}',
+  'web.calendar.more.noUnscheduled': '没有被安排的任务',
+  'web.calendar.more.share': '分享到剪贴板',
+  'web.calendar.more.copied': '已复制',
+  'web.calendar.more.subscribeSection': '日历订阅',
+  'web.calendar.more.subscribeHint': '需要服务端拉取 iCal / 第三方日历，暂未接入',
+  'web.calendar.more.noTasksToday': '当天没有任务',
 
   'mobile.weekday.mon': '一',
   'mobile.weekday.tue': '二',
@@ -3597,6 +3611,11 @@ export const zhCN = {
   /* 日期行右侧那个数字的单位。原来它是裸数字，没有标签。 */
   'mobile.calendar.dayCount': '{count} 项',
   'mobile.calendar.backToToday': '回到今天',
+  // 顶部视图切换（对齐滴答：单日 / 一周 / 月）。
+  'mobile.calendar.view.day': '单日',
+  'mobile.calendar.view.week': '一周',
+  'mobile.calendar.view.month': '月',
+  'mobile.calendar.today': '今天',
   'mobile.calendar.footnote': '未设截止时间的任务不在日历上，它们在「任务」页的收集箱里。',
   'mobile.calendar.a11y.dayWithTasks': '{date}，{count} 个任务',
   // 同 `mobile.common.badge.countOne`：中文无单复数，刻意逐字相同。
