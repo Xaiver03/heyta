@@ -6165,6 +6165,7 @@ export const zhCN = {
   'mobile.ai.hostFailed.hint': '没有发出任何请求。退回上一页再进来一次；还是不行就重启 heyta。',
   'mobile.ai.notConfigured.title': '先从本机任务开始',
   'mobile.ai.notConfigured': '可以直接查询本机任务。配置 AI 后，还能整理想法和安排计划。',
+  'mobile.ai.notConfiguredShort': '未配置 AI',
   'mobile.ai.needsSetup': '这条请求需要 AI。先完成配置，再继续发送。',
   'mobile.ai.privacyBlocked.title': '当前只使用本机',
   'mobile.ai.privacyBlocked.hint': '开启联网后，才能连接你配置的 AI 服务。可前往同步与隐私重新选择；本机任务查询仍可使用。',

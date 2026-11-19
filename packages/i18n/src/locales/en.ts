@@ -5672,6 +5672,7 @@ export const en = {
   'mobile.ai.hostFailed.hint': 'Nothing was sent anywhere. Go back and open this again; if it still fails, restart heyta.',
   'mobile.ai.notConfigured.title': 'Start with your local tasks',
   'mobile.ai.notConfigured': 'Ask about local tasks now. Set up AI to organize ideas and plan ahead.',
+  'mobile.ai.notConfiguredShort': 'AI not configured',
   'mobile.ai.needsSetup': 'This request needs AI. Set it up before sending.',
   'mobile.ai.privacyBlocked.title': 'This device is offline',
   'mobile.ai.privacyBlocked.hint': 'Allow network access in Sync & Privacy to connect to your AI service. Local task queries remain available.',

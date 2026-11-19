@@ -445,7 +445,7 @@ export function AssistantScreen({
         <View testID="assistant-screen" style={{ flex: 1, paddingBottom: tokens['space.2'] }}>
           {!configured ? (
             <HStack gap="tight" align="center">
-              <Text variant="caption" tone="subtle" style={{ flex: 1 }}>{t('mobile.ai.notConfigured')}</Text>
+              <Text variant="caption" tone="subtle" style={{ flex: 1 }}>{t('mobile.ai.notConfiguredShort')}</Text>
               {onOpenSettings !== undefined ? <Button label={t('mobile.ai.goSettings')} tone="ghost" onPress={onOpenSettings} /> : null}
             </HStack>
           ) : null}
@@ -490,7 +490,7 @@ export function AssistantScreen({
               generatedLabel={t('common.ai.generatedLabel')}
               empty={
                 <Stack gap="default">
-                  <Text variant="section-title">{t('web.ai.chat.greeting')}</Text>
+                  <Text variant="headline">{t('web.ai.chat.greeting')}</Text>
                   <AiSuggestionGrid
                     items={SUGGESTIONS.map((key) => ({
                       key,
