@@ -1097,8 +1097,16 @@ export {
   ASSISTANT_HISTORY_STORAGE_KEY, ASSISTANT_HISTORY_VERSION, MAX_PERSISTED_ITEMS,
   truncateForPersistence, saveAssistantHistory, loadAssistantHistory, clearAssistantHistory,
   scopeAssistantHistoryStorage, assistantHistoryAccount, createAssistantHistoryAccountResolver,
+  reviveStoredChatItems,
   type HistoryStorage, type StoredChatItem, type PersistedAssistantHistory,
 } from './assistant-local-history.js';
+
+export {
+  ASSISTANT_SESSIONS_STORAGE_KEY, ASSISTANT_SESSIONS_VERSION, MAX_ASSISTANT_SESSIONS,
+  assistantSessionsStorageKey, saveAssistantSessions, loadAssistantSessions,
+  clearAssistantSessions, newAssistantSessionId,
+  type AssistantSessionInput, type LoadedAssistantSession, type LoadedAssistantSessions,
+} from './assistant-sessions.js';
 
 export {
   createInboundRecipientRemote,

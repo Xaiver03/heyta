@@ -257,10 +257,7 @@ export function loadAssistantHistory(
   if (record['account'] !== account) return null;
   if (!Array.isArray(record['items'])) return drop();
 
-  const items = (record['items'] as readonly unknown[]).flatMap((entry, index) => {
-    const restored = reviveItem(entry, index + 1);
-    return restored === undefined ? [] : [restored];
-  });
+  const items = reviveStoredChatItems(record['items'] as readonly unknown[]);
   // 一条都没恢复出来 ≠ "存了空的会话"：那种情况直接按没有处理，
   // 免得界面显示一段空白历史却以为它是对话。
   if (items.length === 0) return drop();
@@ -276,6 +273,19 @@ export function clearAssistantHistory(storage: HistoryStorage | null): void {
   } catch {
     // 不抛。
   }
+}
+
+/**
+ * 把一组落盘记录复活成 `ChatItem[]`，按顺序重新编号，认不出的单条丢掉。
+ *
+ * 🔴 多会话层（`assistant-sessions.ts`）与单槽层共用**这一份**复活逻辑：
+ * 未确认提案跨重载变 `expired` 的规则只写一处，否则两层各写一遍必然漂。
+ */
+export function reviveStoredChatItems(entries: readonly unknown[]): readonly ChatItem[] {
+  return entries.flatMap((entry, index) => {
+    const restored = reviveItem(entry, index + 1);
+    return restored === undefined ? [] : [restored];
+  });
 }
 
 /**

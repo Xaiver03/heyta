@@ -288,14 +288,6 @@ export function AssistantScreen({
    * 进行中那一轮的**已完成部分**（`items`）与 `renderItems` 的映射。
    * 流式未完成的那一段由下面的 `liveItems` 追加 —— 两者拼起来才是屏幕上该有的顺序。
    */
-  const sessionPreview = (() => {
-    for (let i = snapshot.items.length - 1; i >= 0; i -= 1) {
-      const it = snapshot.items[i];
-      if (it !== undefined && it.role === 'user') return it.text;
-    }
-    return '';
-  })();
-
   const renderItems = snapshot.items.map<ChatTranscriptItem>((entry) => {
     const privacyBlocked = entry.role === 'error' && entry.message.includes('privacy-consent-not-granted');
     const detail =
@@ -553,7 +545,10 @@ export function AssistantScreen({
 
       <SessionListSheet
         visible={sessionOpen}
-        preview={sessionPreview}
+        sessions={snapshot.sessions}
+        activeId={snapshot.activeSessionId}
+        onSelect={(id) => { controller.switchSession(id); }}
+        onRename={(id, title) => { controller.renameSession(id, title); }}
         onNew={() => { controller.newSession(); }}
         onClose={() => { setSessionOpen(false); }}
       />

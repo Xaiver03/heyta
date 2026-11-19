@@ -20,6 +20,12 @@ import {
   type LiveTurn,
   saveAssistantHistory,
   scopeAssistantHistoryStorage,
+  saveAssistantSessions,
+  loadAssistantSessions,
+  clearAssistantSessions,
+  newAssistantSessionId,
+  type AssistantSessionInput,
+  type LoadedAssistantSession,
 } from '@heyta/app-host';
 import {
   fromHealthSnapshot,
@@ -31,6 +37,13 @@ import type { LocalApiHost } from '@heyta/local-api';
 import { deleteDevicePref, readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
 export type ChatPhase = 'idle' | 'disclose' | 'running';
+
+/** 会话列表里的一条（不含正文；正文只属于"当前会话"那一条）。 */
+export interface ChatSessionMeta {
+  readonly id: string;
+  readonly title: string;
+  readonly updatedAt: number;
+}
 
 export interface ChatRuntime {
   readonly settings: AiSettingsState;
@@ -100,6 +113,13 @@ export interface ChatSnapshot {
    * 所以这个字段在旧快照里恒为 `undefined`（`loadAccount` 里给的初值）。
    */
   readonly live: LiveTurn | undefined;
+  /**
+   * 本机保存的会话列表（含"当前会话"那一条），供会话面板展示与切换。
+   * 与 `items` 不同：`items` 只是**当前**会话的正文，其余会话的正文留在控制器里。
+   */
+  readonly sessions: readonly ChatSessionMeta[];
+  /** 当前会话 id（永远非 null：即便是一段还没发过消息的新会话，也给它一个稳定 id）。 */
+  readonly activeSessionId: string | null;
 }
 
 export interface ChatController {
@@ -114,6 +134,10 @@ export interface ChatController {
   confirmProposal(id: number): void;
   retry(id: number): void;
   newSession(): void;
+  /** 切换到另一段已保存的会话（先保证当前这轮已结束）。 */
+  switchSession(id: string): void;
+  /** 给某段会话改名（当前会话或历史会话都可以）。 */
+  renameSession(id: string, title: string): void;
   toggleHistory(): void;
   toggleExpandedEntry(id: number): void;
 }
@@ -159,6 +183,14 @@ class MobileChatController implements ChatController {
   private accountEpoch = 0;
   private disclosureFingerprint: string | undefined;
   private state: ChatSnapshot;
+  /**
+   * 当前会话之外、**有正文**的其它会话。`state.items` 始终只放当前会话的正文。
+   * 切换/newSession 时在两者之间搬运，`persist` 时合起来落盘。
+   */
+  private inactiveSessions: readonly LoadedAssistantSession[] = [];
+  private activeSessionId: string | null = null;
+  private activeTitle = '';
+  private activeUpdatedAt = 0;
 
   constructor(options: ChatControllerOptions) {
     this.storage = options.storage;
@@ -185,6 +217,11 @@ class MobileChatController implements ChatController {
     this.pendingText = undefined;
     this.pendingHistory = [];
     this.disclosureFingerprint = undefined;
+    // 换账号 = 换整套会话（loadAccount 会重置下面这几个私有字段）。
+    this.inactiveSessions = [];
+    this.activeSessionId = null;
+    this.activeTitle = '';
+    this.activeUpdatedAt = 0;
     const restored = this.loadAccount(account);
     // A persisted boolean belongs to the account's previous runtime. Keep the
     // restored transcript, but require a fresh disclosure before this account
@@ -322,7 +359,55 @@ class MobileChatController implements ChatController {
     if (this.state.phase !== 'idle') return;
     this.pendingText = undefined;
     this.pendingHistory = [];
-    this.update({ items: [], draft: '', disclosed: false, historyOpen: false, proposalErrors: {} });
+    // 旧会话里有内容 ⇒ 收进列表（多会话：新会话不清掉历史，只是开一段新的）。
+    // 之后 active 为空 ⇒ persist 会清掉**旧单槽**镜像（历史测试里 `raw()` 为 null 的判据）。
+    if (this.activeSessionId !== null && this.state.items.length > 0) {
+      this.inactiveSessions = [
+        this.toRecord(this.activeSessionId, this.state.items, this.state.disclosed),
+        ...this.inactiveSessions,
+      ];
+    }
+    this.activeSessionId = newAssistantSessionId();
+    this.activeTitle = '';
+    this.activeUpdatedAt = Date.now();
+    this.update({ items: [], draft: '', disclosed: false, historyOpen: false, proposalErrors: {}, live: undefined });
+  }
+
+  switchSession(id: string): void {
+    if (this.state.phase !== 'idle') return;
+    if (id === this.activeSessionId) return;
+    const target = this.inactiveSessions.find((session) => session.id === id);
+    if (target === undefined) return;
+    const nextInactive = this.inactiveSessions.filter((session) => session.id !== id);
+    if (this.activeSessionId !== null && this.state.items.length > 0) {
+      nextInactive.unshift(this.toRecord(this.activeSessionId, this.state.items, this.state.disclosed));
+    }
+    this.inactiveSessions = nextInactive;
+    this.activeSessionId = target.id;
+    this.activeTitle = target.title;
+    this.activeUpdatedAt = target.updatedAt;
+    this.update({
+      items: target.items,
+      disclosed: target.disclosed,
+      draft: '',
+      expandedEntry: undefined,
+      proposalErrors: {},
+      live: undefined,
+    });
+  }
+
+  renameSession(id: string, title: string): void {
+    if (this.state.phase === 'running') return;
+    const clean = title.trim();
+    if (id === this.activeSessionId) {
+      this.activeTitle = clean;
+    } else {
+      this.inactiveSessions = this.inactiveSessions.map((session) =>
+        session.id === id ? { ...session, title: clean } : session,
+      );
+    }
+    // update({}) 会重算 sessions 元信息并落盘。
+    this.update({});
   }
 
   toggleHistory(): void {
@@ -474,40 +559,147 @@ class MobileChatController implements ChatController {
   }
 
   private loadAccount(account: string | null): ChatSnapshot {
-    const restored = loadAssistantHistory(account, scopeAssistantHistoryStorage(this.storage, account));
+    // 先读多会话层；读不到再回退旧的单槽层（把一段旧对话迁成一段会话）。
+    const loaded = loadAssistantSessions(account, this.storage);
+    if (loaded !== null) {
+      const active = loaded.sessions.find((session) => session.id === loaded.activeId) ?? loaded.sessions[0]!;
+      this.inactiveSessions = loaded.sessions.filter((session) => session.id !== active.id);
+      this.activeSessionId = active.id;
+      this.activeTitle = active.title;
+      this.activeUpdatedAt = active.updatedAt;
+      return this.buildSnapshot(account, active.items, active.disclosed);
+    }
+    const legacy = loadAssistantHistory(account, scopeAssistantHistoryStorage(this.storage, account));
+    this.inactiveSessions = [];
+    this.activeSessionId = newAssistantSessionId();
+    this.activeTitle = '';
+    this.activeUpdatedAt = Date.now();
+    if (legacy !== null && legacy.items.length > 0) {
+      return this.buildSnapshot(account, legacy.items, legacy.disclosed);
+    }
+    return this.buildSnapshot(account, [], false);
+  }
+
+  private buildSnapshot(
+    account: string | null,
+    items: readonly ChatItem[],
+    disclosed: boolean,
+  ): ChatSnapshot {
     return {
       account,
       routeTime: Date.now(),
       draft: '',
       phase: 'idle',
-      disclosed: restored?.disclosed ?? false,
+      disclosed,
       historyOpen: false,
       expandedEntry: undefined,
-      items: restored?.items ?? [],
+      items,
       proposalErrors: {},
       // ⚠️ 恢复时**永远**是 undefined：见 ChatSnapshot.live 的注释。
       // 别在这里写 `restored?.live` —— 那字段根本没落盘，读出来是 undefined，
       // 但写成那样会让后来者以为它落过盘。
       live: undefined,
+      sessions: this.sessionsMeta(),
+      activeSessionId: this.activeSessionId,
     };
   }
 
   private update(patch: Partial<ChatSnapshot>): void {
     this.state = { ...this.state, ...patch };
+    // 正文变了 ⇒ 当前会话的标题/更新时间跟着刷新，会话列表才不会停在旧值。
+    this.refreshActiveMeta();
+    this.state = { ...this.state, sessions: this.sessionsMeta(), activeSessionId: this.activeSessionId };
     this.persist();
     this.emit();
   }
 
-  private persist(): void {
-    const storage = scopeAssistantHistoryStorage(this.storage, this.state.account);
-    if (this.state.items.length === 0) {
-      clearAssistantHistory(storage);
-      return;
+  /** 当前会话有内容且还没有标题时，用第一句用户消息给它起个头。 */
+  private refreshActiveMeta(): void {
+    if (this.state.items.length === 0) return;
+    if (this.activeTitle.trim() === '') {
+      this.activeTitle = this.titleFor(this.state.items);
     }
-    saveAssistantHistory(
-      { items: this.state.items, disclosed: this.state.disclosed, account: this.state.account },
-      storage,
-    );
+    this.activeUpdatedAt = Date.now();
+  }
+
+  /** 会话列表（当前会话 + 其它有内容的会话，按更新时间倒序）。 */
+  private sessionsMeta(): readonly ChatSessionMeta[] {
+    const meta: ChatSessionMeta[] = [];
+    if (this.activeSessionId !== null) {
+      meta.push({
+        id: this.activeSessionId,
+        title: this.activeTitle,
+        updatedAt: this.activeUpdatedAt,
+      });
+    }
+    for (const session of this.inactiveSessions) {
+      meta.push({ id: session.id, title: session.title, updatedAt: session.updatedAt });
+    }
+    // 稳定排序：当前会话永远在最前，其余按更新时间倒序（最近更新的靠上）。
+    const [head, ...rest] = meta;
+    rest.sort((a, b) => b.updatedAt - a.updatedAt);
+    return head === undefined ? [] : [head, ...rest];
+  }
+
+  /** 把一段"当前/历史"正文包成可落盘的记录。 */
+  private toRecord(id: string, items: readonly ChatItem[], disclosed: boolean): LoadedAssistantSession {
+    return {
+      id,
+      title: this.activeSessionId === id ? this.titleFor(items, this.activeTitle) : this.titleFor(items),
+      updatedAt: this.activeSessionId === id ? (this.activeUpdatedAt || Date.now()) : Date.now(),
+      disclosed,
+      items,
+    };
+  }
+
+  /** 会话标题：显式名优先，否则取第一句用户消息前 24 个字。 */
+  private titleFor(items: readonly ChatItem[], explicit?: string): string {
+    if (explicit !== undefined && explicit.trim() !== '') return explicit.trim();
+    const firstUser = items.find((item) => item.role === 'user');
+    const text = firstUser?.role === 'user' ? firstUser.text.trim() : '';
+    if (text === '') return '';
+    return text.length > 24 ? `${text.slice(0, 24)}…` : text;
+  }
+
+  private persist(): void {
+    const account = this.state.account;
+    // 多会话层：当前会话（有内容才落）+ 其它有内容的历史会话。
+    const records: AssistantSessionInput[] = [];
+    for (const session of this.inactiveSessions) {
+      if (session.items.length > 0) {
+        records.push({
+          id: session.id,
+          title: session.title,
+          updatedAt: session.updatedAt,
+          disclosed: session.disclosed,
+          items: session.items,
+        });
+      }
+    }
+    if (this.activeSessionId !== null && this.state.items.length > 0) {
+      records.push({
+        id: this.activeSessionId,
+        title: this.titleFor(this.state.items, this.activeTitle),
+        updatedAt: this.activeUpdatedAt || Date.now(),
+        disclosed: this.state.disclosed,
+        items: this.state.items,
+      });
+    }
+    saveAssistantSessions({ activeId: this.activeSessionId, sessions: records }, account, this.storage);
+
+    // 🔴 兼容镜像：把"当前这一段"仍写进旧单槽层。
+    // 为什么不能省 —— 旧单槽的信封形状被 web 与 app-host 两套测试钉死（见
+    // `assistant-sessions.ts` 文件头第 1 条），移动端与 web 共用同一份 `HistoryStorage` 语义；
+    // 且 `chat-controller.spec.ts` 用 `raw()` 断言"新会话后旧单槽键为空"。
+    const scoped = scopeAssistantHistoryStorage(this.storage, account);
+    if (this.state.items.length === 0) {
+      clearAssistantHistory(scoped);
+    } else {
+      saveAssistantHistory(
+        { items: this.state.items, disclosed: this.state.disclosed, account },
+        scoped,
+      );
+    }
   }
 
   private emit(): void {
