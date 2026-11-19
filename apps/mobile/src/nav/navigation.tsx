@@ -33,7 +33,7 @@ const NavigationContext = createContext<NavigationValue | null>(null);
 export function NavigationProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [tab, setTab] = useState<TabKey>('tasks');
   const [stacks, setStacks] = useState<NavigationStacks>({
-    tasks: [], calendar: [], focus: [], categories: [], profile: [],
+    tasks: [], calendar: [], focus: [], ai: [], habits: [], countdown: [], profile: [],
   });
   const backHandlerRef = useRef<(() => boolean) | null>(null);
   const stack = stacks[tab] ?? [];

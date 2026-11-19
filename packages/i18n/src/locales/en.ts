@@ -3040,6 +3040,7 @@ export const en = {
   'mobile.tab.focus': 'Focus',
   'mobile.tab.profile': 'Profile',
   'mobile.tab.categories': 'Stats',
+  'mobile.tab.ai': 'AI',
 
   // ── Mobile · time by category ──────────────────────────────
   // Verbatim the same as `web.categories.*` (except where the interaction differs).
@@ -3580,6 +3581,7 @@ export const en = {
   'mobile.settings.section.personalization': 'Personalization',
   'mobile.settings.section.features': 'Features & AI',
   'mobile.profile.entry.features': 'All features',
+  'mobile.profile.entry.stats': 'Stats & review',
   'mobile.settings.section.about': 'About & help',
   'mobile.settings.section.profile': 'Profile',
   'mobile.settings.section.general': 'General',

@@ -63,6 +63,7 @@ import {
   Settings,
   Share2,
   ShieldCheck,
+  Sparkles,
   Smartphone,
   Square,
   SquareCheck,
@@ -93,6 +94,9 @@ const ICONS = {
   // （与热点图、统计有关的那一类图标）。纯附加改动，冲突时按并集收，
   // 若上游重写时删掉了 `ChartColumn`，修法是把导入补回来 —— 一个词。
   'tab.categories': ChartColumn,
+  'tab.ai': Sparkles,
+  'tab.habits': Flame,
+  'tab.countdown': CalendarClock,
   'tab.profile': User,
 
   // 任务

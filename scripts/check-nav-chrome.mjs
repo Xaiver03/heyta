@@ -54,8 +54,8 @@ const ROOT_SCREENS = new Set([
   'apps/mobile/src/screens/CalendarScreen.tsx',
   'apps/mobile/src/screens/FocusScreen.tsx',
   'apps/mobile/src/screens/StatsScreen.tsx',
-  // key 叫 `categories`、底栏显示「统计」的，就是这一屏。
-  'apps/mobile/src/screens/CategoriesScreen.tsx',
+  // `CategoriesScreen`（统计）2026-11-19 起**不再是根 tab**：统计撤出底栏，
+  // 改为「我的 → 统计与回顾」的第二层屏（它有 `action.back`），故不在此列。
   /*
    * ⚠️ `ProfileScreen` **不在名单里**：同一个文件里既有根页（底部 tab 那一屏）
    * 又有 feature 子页（成长 / 习惯 / 倒数日…的 `case` 分支），静态扫不出哪一个是根页。

@@ -48,8 +48,11 @@ import { TasksScreen } from './screens/TasksScreen';
 // import 在 `screens/TasksScreen.tsx` 里（不再由外壳渲染）。
 import { CalendarScreen } from './screens/CalendarScreen';
 import { FocusScreen } from './screens/FocusScreen';
-import { CategoriesScreen } from './screens/CategoriesScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { HabitsScreen } from './screens/HabitsScreen';
+import { CountdownScreen } from './screens/CountdownScreen';
+import { AssistantScreen } from './ai/AssistantScreen';
+import { readTabBarWorkspaces } from './nav/tab-preferences';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 import { PrivacyConsentSheet } from './screens/PrivacyConsentSheet';
 // 🔴 G-27 的第二块面板：**账号级**补签。与隐私面板挂在**同两处**（欢迎页 + 主界面），
@@ -91,6 +94,12 @@ function Shell(): React.JSX.Element {
   const t = useTokens();
   const { theme, reducedMotion } = useTheme();
   const { tab, setTab } = useMobileNavigation();
+  /**
+   * 这台设备选中的底栏工作空间（前四格）。读到损坏/缺失时由 `tab-preferences`
+   * 回默认，不抛。这里只读一次：DIY 改完由设置页写盘，下次冷启动生效
+   * （与 `task-sort` / 主题偏好同一条「设备本地偏好」纪律）。
+   */
+  const [workspaces] = useState(() => readTabBarWorkspaces());
 
   /**
    * 🔴 2026-11-18：标签切换时内容**淡入**（Apple §1 Response / §12：内容切换不是硬切）。
@@ -314,13 +323,25 @@ function Shell(): React.JSX.Element {
           <CalendarScreen active={tab === 'calendar'} />
         </View>
         <View style={{ flex: 1, display: tab === 'focus' ? 'flex' : 'none' }}><FocusScreen /></View>
-        <View style={{ flex: 1, display: tab === 'categories' ? 'flex' : 'none' }}><CategoriesScreen /></View>
+        <View style={{ flex: 1, display: tab === 'ai' ? 'flex' : 'none' }}>
+          <AssistantScreen
+            visible={tab === 'ai'}
+            onBack={() => { setTab('tasks'); }}
+          />
+        </View>
+        <View style={{ flex: 1, display: tab === 'habits' ? 'flex' : 'none' }}>
+          <HabitsScreen onBack={() => { setTab('tasks'); }} />
+        </View>
+        <View style={{ flex: 1, display: tab === 'countdown' ? 'flex' : 'none' }}>
+          <CountdownScreen onBack={() => { setTab('tasks'); }} />
+        </View>
         <View style={{ flex: 1, display: tab === 'profile' ? 'flex' : 'none' }}><ProfileScreen /></View>
       </Animated.View>
       <TabBar
         background={tab === 'profile' ? 'grouped' : 'surface'}
         active={tab}
         onChange={setTab}
+        workspaces={workspaces}
         badges={{ tasks: pendingCount }}
       />
       {privacySheet}

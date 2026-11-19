@@ -63,7 +63,7 @@ import { useMobileSync } from '../sync/store';
 import { Screen } from '../ui/kit';
 import { SlotPicker } from '../ui/slot-picker';
 
-export function CategoriesScreen(): React.JSX.Element {
+export function CategoriesScreen({ onBack }: { onBack?: () => void } = {}): React.JSX.Element {
   const { t } = useI18n();
   const { now } = useToday();
   /**
@@ -131,7 +131,10 @@ export function CategoriesScreen(): React.JSX.Element {
     // 🔴 `Screen` 负责顶栏标题、安全区与滚动 —— 这一屏只出内容。
     // 自己拼 ScrollView 的话，标题、较深的安全区、以及"键盘弹起时的
     // 可点击区域"都要重写一遍，而且会和别的屏幕长得不一样。
-    <Screen title={t('mobile.categories.title')}>
+    <Screen
+      title={t('mobile.categories.title')}
+      actions={onBack === undefined ? undefined : [{ icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack }]}
+    >
       <CategoryReportView
         report={report}
         labels={labels}

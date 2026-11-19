@@ -3335,6 +3335,7 @@ export const zhCN = {
   'mobile.tab.focus': '专注',
   'mobile.tab.profile': '我的',
   'mobile.tab.categories': '统计',
+  'mobile.tab.ai': 'AI',
 
   // ── 移动端 · 分类时长 ──────────────────────────────────────
   // 🔴 这一组里**只许有事实句**：某类做了多久、这些时间怎么算出来的。
@@ -3995,6 +3996,7 @@ export const zhCN = {
    * `ProfileScreen` 里那句注释写着"更好的做法是新增一条"，当时因为禁改 i18n 没做。
    */
   'mobile.profile.entry.features': '全部功能',
+  'mobile.profile.entry.stats': '统计与回顾',
   'mobile.settings.section.about': '关于与帮助',
   'mobile.settings.section.profile': '个人资料',
   'mobile.settings.section.general': '常规',

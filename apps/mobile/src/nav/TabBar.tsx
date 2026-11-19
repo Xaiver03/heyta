@@ -41,6 +41,8 @@ import { BlurView } from '@react-native-community/blur';
 import { Badge, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import type { IconName } from '../ui/icons';
+import { DEFAULT_TAB_BAR_WORKSPACES, type WorkspaceKey } from './tab-preferences';
+import { tabSpecsFor, type TabKey } from './workspaces';
 
 /**
  * 五个 tab。顺序即显示顺序，也是产品结构。
@@ -59,17 +61,16 @@ export const TABS = [
   { key: 'tasks', labelKey: 'mobile.tab.tasks', icon: 'tab.tasks' },
   { key: 'calendar', labelKey: 'mobile.tab.calendar', icon: 'tab.calendar' },
   { key: 'focus', labelKey: 'mobile.tab.focus', icon: 'tab.focus' },
-  // 「分类」放在专注之后、「我的」之前：它回答的是"我把力气花在哪些事上了"，
-  // 紧接着专注（产生数据的地方）比放进设置区更合乎直觉。
-  { key: 'categories', labelKey: 'mobile.tab.categories', icon: 'tab.categories' },
+  { key: 'ai', labelKey: 'mobile.tab.ai', icon: 'tab.ai' },
   { key: 'profile', labelKey: 'mobile.tab.profile', icon: 'tab.profile' },
 ] as const satisfies ReadonlyArray<{ key: string; labelKey: MessageKey; icon: IconName }>;
 
-export type TabKey = (typeof TABS)[number]['key'];
+export type { TabKey };
 
 export interface TabBarProps {
   active: TabKey;
   onChange: (key: TabKey) => void;
+  workspaces?: readonly WorkspaceKey[];
   /** 底栏底色档：跟随当前页（`grouped`=「我的」浅灰页 / `surface`=白页），与内容无缝衔接。 */
   background?: 'surface' | 'grouped';
   /**
@@ -82,7 +83,8 @@ export interface TabBarProps {
   badges?: Partial<Record<TabKey, number>>;
 }
 
-export function TabBar({ active, onChange, badges, background = 'surface' }: TabBarProps): React.JSX.Element {
+export function TabBar({ active, onChange, badges, background = 'surface', workspaces }: TabBarProps): React.JSX.Element {
+  const visibleTabs = tabSpecsFor(workspaces ?? DEFAULT_TAB_BAR_WORKSPACES);
   const tokens = useTokens();
   const text = useText();
   const { reducedMotion, theme } = useTheme();
@@ -165,7 +167,7 @@ export function TabBar({ active, onChange, badges, background = 'surface' }: Tab
       {/* 极细发丝线，若有若无的边界。 */}
       <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: tokens['border-width.thin'], backgroundColor: tokens['color.border-subtle'] }} />
       <View style={styles.barRow}>
-        {TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const selected = tab.key === active;
           return (
             <Pressable

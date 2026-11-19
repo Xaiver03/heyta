@@ -85,6 +85,7 @@ import { AccountClosureScreen } from './AccountClosureScreen';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { CountdownScreen } from './CountdownScreen';
+import { CategoriesScreen } from './CategoriesScreen';
 import { EmailChangeSection } from './EmailChangeSection';
 // 托管同步的续费入口（与 web 的 RenewPanel 共用 @heyta/app-host 那一份接线）。
 import { ExportScreen } from './ExportScreen';
@@ -151,6 +152,8 @@ export function ProfileScreen(): React.JSX.Element {
   /** 设置面是当前 tab 的二级栈页面；返回优先 pop 回个人页。 */
   const settingsOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'settings';
   const [settingsSection, setSettingsSection] = useState<SettingsSectionKey>();
+  /** 「我的 → 统计与回顾」：统计从底栏撤下的落点（整屏第二层）。 */
+  const [statsOpen, setStatsOpen] = useState(false);
 
   // The profile screen stays mounted while tabs switch. Drop a pending
   // shortcut section when leaving the profile tab so returning to a retained
@@ -982,6 +985,17 @@ export function ProfileScreen(): React.JSX.Element {
    *    探测，而设置里那一份还要再探一次。本地没有权益快照，所以这一行今天只承诺
    *    "去哪"，不承诺"现在是什么"——**宁可少说一句，不说一句过期的**。
    */
+  const statsRow: SettingsRowModel = {
+    kind: 'action',
+    discloses: true,
+    testID: 'profile-entry-stats',
+    label: t('mobile.profile.entry.stats'),
+    leading: <Icon name="tab.categories" size="sm" color={tokens['color.foreground-muted']} />,
+    onPress: () => {
+      setStatsOpen(true);
+    },
+  };
+
   const subscriptionRow: SettingsRowModel = {
     kind: 'action',
       discloses: true,
@@ -1211,6 +1225,10 @@ export function ProfileScreen(): React.JSX.Element {
         onSignedOutEverywhere={runSignOutEverywhere}
       />
     );
+  }
+
+  if (statsOpen) {
+    return <CategoriesScreen onBack={() => { setStatsOpen(false); }} />;
   }
 
   if (notificationsOpen) {
@@ -1748,6 +1766,8 @@ export function ProfileScreen(): React.JSX.Element {
 
       {/* ── ③ 功能入口 ─────────────────────────────────────────────── */}
       <Card shadow="card">
+        <SettingsRow row={statsRow} />
+        <Divider />
         <SettingsRow row={subscriptionRow} />
         <Divider />
         <SettingsRow row={settingsRow} />

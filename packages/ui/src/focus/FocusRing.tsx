@@ -30,9 +30,11 @@
 
 import React from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Circle, Line, Svg } from 'react-native-svg';
-import { useHeytaTokens } from '../theme.js';
+import { Circle, Line, Svg, Text as SvgText } from 'react-native-svg';
+import { useHeytaText, useHeytaTokens } from '../theme.js';
 import type { FocusTone } from './model.js';
+
+const ROMAN_NUMERALS = ['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'] as const;
 
 export interface FocusRingProps {
   /** 进度 0–1。越界值会被夹取 —— 越界在 RN 里不报错，只会画到容器外。 */
@@ -43,9 +45,11 @@ export interface FocusRingProps {
    *   · `dial`          —— 画刻度盘、不画进度弧（正计时没有「总长」，用钟表式刻度）。
    */
   readonly variant?: 'progress' | 'dial';
+  /** 正计时已经走的毫秒数；只驱动 `dial` 的三根指针，缺省指向 XII。 */
+  readonly elapsedMs?: number;
   /** 工作段 / 休息段。颜色承载语义，不是装饰。 */
   readonly tone: FocusTone;
-  /** 整环的无障碍名（例如「进度 42%」）。环本身没有可见文字，读屏全靠它。 */
+  /** 整环的无障碍名（例如「进度 42%」）。钟面数字是装饰，读屏以它为准。 */
   readonly label: string;
   /** 环中央的内容（倒计时、阶段文字…）。 */
   readonly children?: React.ReactNode;
@@ -56,6 +60,7 @@ export interface FocusRingProps {
 export function FocusRing({
   progress,
   variant = 'progress',
+  elapsedMs = 0,
   tone,
   label,
   children,
@@ -63,6 +68,7 @@ export function FocusRing({
   testID,
 }: FocusRingProps): React.JSX.Element {
   const tokens = useHeytaTokens();
+  const dialText = useHeytaText().caption;
   const size = tokens['size.focus-ring'];
   const stroke = tokens['size.focus-ring-stroke'];
   const radius = (size - stroke) / 2;
@@ -73,16 +79,17 @@ export function FocusRing({
   const offset = circumference * (1 - clamped);
 
   /**
-   * 刻度盘的 60 根刻度（正计时用）。每 5 格一根长刻度 —— 形状像钟表盘，
-   * 传达「这是秒表，正着走」，而不是「还剩多少」。几何值全部由上面的 token 派生。
+   * 正计时钟面使用**不旋转**的坐标系，角度零点固定在 XII（正上方）。
+   * 倒计时仍单独旋转整个 Svg；这里的刻度、数字与指针都不受它影响。
+   * 所有几何从环的直径 / 描边 token 派生，指针端点直接计算，不依赖 SVG transform。
    */
+  const cx = size / 2;
   const tickOuter = radius + stroke / 2;
   const tickCount = 60;
   const dialTicks = Array.from({ length: tickCount }, (_, i) => {
-    const angle = (i / tickCount) * Math.PI * 2;
+    const angle = (i / tickCount) * Math.PI * 2 - Math.PI / 2;
     const long = i % 5 === 0;
     const inner = tickOuter - (long ? stroke * 1.6 : stroke * 0.9);
-    const cx = size / 2;
     return {
       key: `tick-${String(i)}`,
       x1: cx + Math.cos(angle) * inner,
@@ -92,6 +99,48 @@ export function FocusRing({
       long,
     };
   });
+  const numeralRadius = tickOuter - stroke * 3.2;
+  const dialNumerals = ROMAN_NUMERALS.map((text, i) => {
+    const angle = (i / ROMAN_NUMERALS.length) * Math.PI * 2;
+    return {
+      text,
+      x: cx + Math.sin(angle) * numeralRadius,
+      y: cx - Math.cos(angle) * numeralRadius,
+    };
+  });
+  const elapsed = Math.max(0, elapsedMs);
+  const handAngles = {
+    hour: (elapsed / (12 * 60 * 60_000)) * Math.PI * 2,
+    minute: (elapsed / (60 * 60_000)) * Math.PI * 2,
+    second: (elapsed / 60_000) * Math.PI * 2,
+  };
+  const dialHands = [
+    {
+      id: 'hour',
+      angle: handAngles.hour,
+      length: numeralRadius * 0.55,
+      strokeWidth: tokens['border-width.thick'] * 2,
+      color: tokens['color.foreground'],
+    },
+    {
+      id: 'minute',
+      angle: handAngles.minute,
+      length: numeralRadius * 0.85,
+      strokeWidth: tokens['border-width.thick'],
+      color: tokens['color.foreground'],
+    },
+    {
+      id: 'second',
+      angle: handAngles.second,
+      length: numeralRadius,
+      strokeWidth: tokens['border-width.thin'],
+      color: tone === 'work' ? tokens['color.focus-work'] : tokens['color.focus-break'],
+    },
+  ].map((hand) => ({
+    ...hand,
+    x2: cx + Math.sin(hand.angle) * hand.length,
+    y2: cx - Math.cos(hand.angle) * hand.length,
+  }));
 
   return (
     <View
@@ -107,16 +156,15 @@ export function FocusRing({
       style={[styles.wrap, { width: size, height: size }, style]}
     >
       {/*
-        🔴 旋转的是**整个 Svg** 而不是弧线本身：`react-native-svg` 的
-        `rotation` + `origin` 组合在各端实现不一致（web 侧是 CSS transform，
-        原生侧是矩阵），而"把容器转 -90°"只用到一个最普通的 transform。
-        圆是旋转对称的，轨道跟着转没有任何视觉后果。
+        🔴 只有倒计时旋转**整个 Svg**：让圆弧从顶部开始，避开 `react-native-svg`
+        `rotation` + `origin` 的跨端差异。正计时钟面绝不继承这个旋转，
+        否则 XII 会落到左边、罗马数字也会整体侧转。
       */}
       <Svg
         width={size}
         height={size}
         viewBox={`0 0 ${String(size)} ${String(size)}`}
-        style={[StyleSheet.absoluteFill, styles.rotated]}
+        style={[StyleSheet.absoluteFill, variant === 'progress' ? styles.rotated : null]}
       >
         <Circle
           cx={size / 2}
@@ -127,18 +175,55 @@ export function FocusRing({
           strokeWidth={stroke}
         />
         {variant === 'dial' ? (
-          dialTicks.map((t) => (
-            <Line
-              key={t.key}
-              x1={t.x1}
-              y1={t.y1}
-              x2={t.x2}
-              y2={t.y2}
-              stroke={tokens['color.border-strong']}
-              strokeWidth={t.long ? tokens['border-width.thick'] : tokens['border-width.thin']}
-              strokeLinecap="round"
+          <>
+            {dialTicks.map((t) => (
+              <Line
+                key={t.key}
+                x1={t.x1}
+                y1={t.y1}
+                x2={t.x2}
+                y2={t.y2}
+                stroke={tokens['color.border-strong']}
+                strokeWidth={t.long ? tokens['border-width.thick'] : tokens['border-width.thin']}
+                strokeLinecap="round"
+              />
+            ))}
+            {dialNumerals.map((numeral) => (
+              <SvgText
+                key={numeral.text}
+                x={numeral.x}
+                y={numeral.y}
+                fill={tokens['color.foreground-muted']}
+                fontSize={dialText.fontSize}
+                fontWeight={dialText.fontWeight}
+                letterSpacing={dialText.letterSpacing}
+                textAnchor="middle"
+                alignmentBaseline="central"
+                accessible={false}
+              >
+                {numeral.text}
+              </SvgText>
+            ))}
+            {dialHands.map((hand) => (
+              <Line
+                key={hand.id}
+                testID={`focus-dial-${hand.id}-hand`}
+                x1={cx}
+                y1={cx}
+                x2={hand.x2}
+                y2={hand.y2}
+                stroke={hand.color}
+                strokeWidth={hand.strokeWidth}
+                strokeLinecap="round"
+              />
+            ))}
+            <Circle
+              cx={cx}
+              cy={cx}
+              r={stroke / 2}
+              fill={tone === 'work' ? tokens['color.focus-work'] : tokens['color.focus-break']}
             />
-          ))
+          </>
         ) : (
           <Circle
             cx={size / 2}
