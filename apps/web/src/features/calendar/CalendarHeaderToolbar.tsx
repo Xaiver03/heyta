@@ -39,13 +39,14 @@
  */
 
 import { ICON_SIZE } from '@heyta/design-system';
-import { isScopeEmpty, toLocalDate } from '@heyta/domain';
+import { dueDateToEpoch, isScopeEmpty, scopeTasks, toLocalDate, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   CALENDAR_VIEW_LABEL_KEYS,
   CALENDAR_VIEW_ORDER,
   CalendarToolbar,
+  groupTasksByCalendarDate,
   type CalendarViewKind,
 } from '@heyta/ui';
 
@@ -53,7 +54,8 @@ import { useTaskStore } from '../tasks/store.js';
 import { useProjectStore } from '../projects/store.js';
 import { useCalendarLabels } from './useCalendarLabels.js';
 import { useCalendarViewStore } from './store.js';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, MoreHorizontal, CalendarRange, CalendarPlus, Share2 } from 'lucide-react';
+import { AnchoredMenu, MenuItem, MenuSection, MenuSeparator } from '../../lib/menu/AnchoredMenu.js';
 
 /*
  * 档位与它们的键名**不在这里**（R17）：这里曾经写着一张 `{kind, key}[]`，
@@ -109,6 +111,65 @@ export function CalendarHeaderToolbar({
         })
       : names.join(t('web.calendar.scope.separator'));
   }, [projects, tags, t, view.scope.projectIds, view.scope.tagIds]);
+
+  /**
+   * 页头 `⋮` 菜单（对齐滴答「日历右上 ⋮」的五项里 web 能真正落地的那几项）。
+   *
+   * 🔴 每一项都得**真的发生点什么**：显示设置是两个能改变渲染的开关；
+   *   「编辑显示范围」复用左侧已有的勾选侧栏（同一个 store）；「安排任务」把
+   *   未排期任务直接落到**选中那天**（`setDueDate` 走 op-log，不是伪造的拖拽）；
+   *   「分享」把选中那天的清单复制成文本。日历订阅需要一个服务端拉取 iCal /
+   *   第三方 OAuth 的数据源，web 端没有，因此这里**不摆假开关**，只在文档登记。
+   */
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const allTasks = useTaskStore((s) => s.entities.tasks);
+  const setDueDate = useTaskStore((s) => s.setDueDate);
+
+  /** 未排期（没有 dueDate / dueDateLocal）且未完成、且在显示范围内的任务。 */
+  const unscheduled = useMemo(() => {
+    const scoped = scopeTasks(Object.values(allTasks), view.scope);
+    return scoped
+      .filter((task) => task.dueDate === undefined && task.dueDateLocal === undefined)
+      .filter((task) => task.completedAt === undefined)
+      .slice(0, 8);
+  }, [allTasks, view.scope]);
+
+  /** 选中那天有任务的全部条目（分享用；含已完成，与格子上看到的一致由 `showCompleted` 决定）。 */
+  const selectedDayTasks = useMemo(() => {
+    const scoped = scopeTasks(Object.values(allTasks), view.scope).filter(
+      (task) => view.showCompleted || task.completedAt === undefined,
+    );
+    const grouped = groupTasksByCalendarDate(scoped, view.selected, view.selected);
+    return grouped.get(view.selected) ?? [];
+  }, [allTasks, view.scope, view.selected, view.showCompleted]);
+
+  const scheduleToSelected = (task: Task): void => {
+    // `dueDateToEpoch` 是领域层唯一的"本地日 → epoch"换算（见 capture.ts），
+    // 这里不自己拼 `new Date(selected)` —— 那会让时区把日子挪一天。
+    void setDueDate(task.id, dueDateToEpoch(view.selected), view.selected);
+  };
+
+  const copySelectedDay = (): void => {
+    const title = labels.dayTitle(view.selected);
+    const lines =
+      selectedDayTasks.length === 0
+        ? [t('web.calendar.more.noTasksToday')]
+        : selectedDayTasks.map((task) => `- ${task.title}`);
+    const text = `${title}\n${lines.join('\n')}`;
+    void (navigator.clipboard?.writeText(text) ?? Promise.reject(new Error('no clipboard')))
+      .then(() => {
+        setCopied(true);
+        window.setTimeout(() => { setCopied(false); }, 2500);
+      })
+      .catch(() => {
+        // 剪贴板不可用（无权限 / 非安全上下文）时不静默吞掉，直接把文本给用户选。
+        // 这里退化成 `alert` 而不是伪造"已复制"。
+        window.alert(text);
+      });
+  };
 
   return (
     <div className="ht-header__calendar-toolbar">
@@ -188,6 +249,85 @@ export function CalendarHeaderToolbar({
               ) : null}
             </select>
           </label>
+          <button
+            ref={menuTriggerRef}
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            data-testid="calendar-menu-open"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={t('web.calendar.more.label')}
+            onClick={() => { setMenuOpen((open) => !open); }}
+          >
+            <MoreHorizontal size={ICON_SIZE.md} aria-hidden="true" />
+          </button>
+          {copied ? (
+            <span className="ht-header__calendar-scope" role="status" data-testid="calendar-share-copied">
+              {t('web.calendar.more.copied')}
+            </span>
+          ) : null}
+          <AnchoredMenu
+            open={menuOpen}
+            onClose={() => { setMenuOpen(false); }}
+            triggerRef={menuTriggerRef}
+            label={t('web.calendar.more.label')}
+            testID="calendar-menu"
+          >
+            <MenuSection>{t('web.calendar.more.displaySection')}</MenuSection>
+            <MenuItem
+              testID="calendar-toggle-completed"
+              checked={view.showCompleted}
+              onSelect={() => { view.setShowCompleted(!view.showCompleted); }}
+            >
+              {t('web.calendar.more.showCompleted')}
+            </MenuItem>
+            <MenuItem
+              testID="calendar-toggle-countdown"
+              checked={view.showCountdown}
+              onSelect={() => { view.setShowCountdown(!view.showCountdown); }}
+            >
+              {t('web.calendar.more.showCountdown')}
+            </MenuItem>
+            <MenuSeparator />
+            <MenuSection>{t('web.calendar.more.scopeSection')}</MenuSection>
+            <MenuItem
+              testID="calendar-edit-scope"
+              icon={<CalendarRange size={ICON_SIZE.sm} aria-hidden="true" />}
+              onSelect={() => { view.setCalendarSidebarOpen(true); }}
+            >
+              {t('web.calendar.more.editScope')}
+            </MenuItem>
+            <MenuSeparator />
+            <MenuSection>{t('web.calendar.more.arrangeSection')}</MenuSection>
+            {unscheduled.length === 0 ? (
+              <MenuSection>{t('web.calendar.more.noUnscheduled')}</MenuSection>
+            ) : (
+              unscheduled.map((task) => (
+                <MenuItem
+                  key={task.id}
+                  testID={`calendar-arrange-${task.id}`}
+                  icon={<CalendarPlus size={ICON_SIZE.sm} aria-hidden="true" />}
+                  onSelect={() => { scheduleToSelected(task); }}
+                >
+                  {t('web.calendar.more.arrangeTo', {
+                    title: task.title,
+                    date: labels.dayTitle(view.selected),
+                  })}
+                </MenuItem>
+              ))
+            )}
+            <MenuSeparator />
+            <MenuItem
+              testID="calendar-share-copy"
+              icon={<Share2 size={ICON_SIZE.sm} aria-hidden="true" />}
+              onSelect={() => { copySelectedDay(); }}
+            >
+              {t('web.calendar.more.share')}
+            </MenuItem>
+            <MenuSeparator />
+            <MenuSection>{t('web.calendar.more.subscribeSection')}</MenuSection>
+            <MenuSection>{t('web.calendar.more.subscribeHint')}</MenuSection>
+          </AnchoredMenu>
         </>
         }
       />

@@ -78,10 +78,12 @@ export function CalendarView(): React.JSX.Element {
    * ⚠️ 判据在 `@heyta/domain` 的 `scopeTasks`，这里只负责把它接上：
    * 「勾了清单 A 就只看 A 的任务」是产品语义，不属于外壳（AGENTS §3.5）。
    */
-  const tasks = useMemo(
-    () => scopeTasks(Object.values(store.entities.tasks), view.scope),
-    [store.entities.tasks, view.scope],
-  );
+  const tasks = useMemo(() => {
+    const scoped = scopeTasks(Object.values(store.entities.tasks), view.scope);
+    // 「显示设置 → 显示已完成」：只筛掉 `completedAt` 存在的条目（这是阅读偏好，
+    // 不触碰存储与同步）。默认 `showCompleted=true` 时逐字节等于补这个开关之前。
+    return view.showCompleted ? scoped : scoped.filter((task) => task.completedAt === undefined);
+  }, [store.entities.tasks, view.scope, view.showCompleted]);
 
   /** 🔴 文案抽进 `useCalendarLabels()`：页头那个工具栏（批二）要的是**同一份**，
    *  两处各构造一遍就是"同一句文案的两份事实源"（AGENTS §3.5）。 */
@@ -131,6 +133,13 @@ export function CalendarView(): React.JSX.Element {
   useEffect(() => {
     syncCountdownToday(today);
   }, [syncCountdownToday, today]);
+
+  /**
+   * 「显示设置 → 显示倒数纪念日」关掉时，把倒数日这个**第二数据源**整体撤掉
+   * （传 `[]` 而不是 `undefined`：`undefined` 会让共享板跳过投影，
+   *  语义变成"这端没接倒数日"，而这里要的是"接了、用户选择不显示"）。
+   */
+  const boardEvents = view.showCountdown ? events : [];
 
   const eventLabels = useMemo(
     () => ({
@@ -265,7 +274,7 @@ export function CalendarView(): React.JSX.Element {
           labels={labels}
           dayMarker={dayMarker}
           dayMarkerLabels={dayMarkerLabels}
-          events={events}
+          events={boardEvents}
           eventLabels={eventLabels}
           testID={BOARD_TEST_ID}
         />

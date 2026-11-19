@@ -66,6 +66,21 @@ interface CalendarViewState {
   /** 日历侧栏是否展开。筛选范围独立保留，收起侧栏不会让任务悄悄消失。 */
   calendarSidebarOpen: boolean;
   /**
+   * 显示设置：日历格上是否显示**已完成**的任务（对齐滴答「显示设置 → 显示已完成」）。
+   *
+   * 🔴 这是**阅读偏好**，不是业务判据 —— 它只决定"画不画这一条"，
+   *   已完成任务的存储与同步一字不动。默认 `true`（与滴答默认开启一致，
+   *   也与补这一项之前的行为一致：本仓此前从不过滤已完成）。
+   */
+  showCompleted: boolean;
+  /**
+   * 显示设置：日历上是否显示**倒数纪念日**（对齐滴答「显示设置 → 显示倒数纪念日」）。
+   *
+   * 关掉只把倒数日这个**第二个数据源**从板子上撤掉，不删除任何事件。
+   * 默认 `true`（滴答默认开启，也是 web 接上倒数日之后的既有行为）。
+   */
+  showCountdown: boolean;
+  /**
    * 公共事实（调休 / 补班）覆盖表的**变更计数**（W4b）。
    *
    * 🔴 为什么是计数而不是布尔：覆盖表住在 `@heyta/domain` 的模块级状态里，React 看不见它。
@@ -113,6 +128,9 @@ interface CalendarViewActions {
   toggleCapture: () => void;
   toggleCalendarSidebar: () => void;
   setCalendarSidebarOpen: (open: boolean) => void;
+  /** 「显示设置」两个开关（阅读偏好，见 `showCompleted` / `showCountdown`）。 */
+  setShowCompleted: (value: boolean) => void;
+  setShowCountdown: (value: boolean) => void;
   /** 勾/去掉一条清单或一个标签。 */
   toggleScopeItem: (kind: ScopeKind, id: string) => void;
   /**
@@ -149,6 +167,8 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   view: 'month',
   captureOpen: false,
   calendarSidebarOpen: true,
+  showCompleted: true,
+  showCountdown: true,
   publicFactsEpoch: 0,
 
   setCursor: (date) => {
@@ -188,6 +208,14 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
 
   setCalendarSidebarOpen: (open) => {
     set({ calendarSidebarOpen: open });
+  },
+
+  setShowCompleted: (value) => {
+    set({ showCompleted: value });
+  },
+
+  setShowCountdown: (value) => {
+    set({ showCountdown: value });
   },
 
   toggleScopeItem: (kind, id) => {
