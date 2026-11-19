@@ -3468,6 +3468,7 @@ export const zhCN = {
   'mobile.tasks.title': '任务',
   'mobile.tasks.new': '新建任务',
   'mobile.tasks.inlineAdd': '新提醒事项',
+  'mobile.tasks.scope.label': '智能列表',
   'mobile.tasks.scope.scheduled': '计划',
   'mobile.tasks.scope.all': '全部',
   'mobile.tasks.scope.flagged': '旗标',

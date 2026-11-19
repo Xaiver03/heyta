@@ -602,6 +602,7 @@ export function TasksScreen({
    * 两套菜单并存不是重复：触发点不同（顶栏 vs 行）、作用域不同。
    */
   const [moreOpen, setMoreOpen] = useState(false);
+  const [scopeOpen, setScopeOpen] = useState(false);
   /**
    * 🔴 顶栏收起在**列表档**由这里驱动：列表的滚动宿主是 `FlatList` 自己
    *（`Screen` 在 list 档拿到的是 `scroll={false}`），所以必须由列表回吐 offset，
@@ -1744,29 +1745,22 @@ export function TasksScreen({
       <View style={styles.flex1}>
       <Screen
         title={t('mobile.tasks.title')}
-        // 智能列表（今天/计划/全部/旗标）放进**顶栏**（leading 图标），不再在内容区另起一排。
+        // 顶栏只放**当前筛选**的一枚图标；点它展开四档，避免四个同权重图标挤在标题左侧。
         titleLeading={
           view === 'list' ? (
-            <View style={styles.rowGap2}>
-              {([
-                { key: 'today', icon: 'group.today', label: t('mobile.common.today') },
-                { key: 'scheduled', icon: 'calendar.week', label: t('mobile.tasks.scope.scheduled') },
-                { key: 'all', icon: 'group.inbox', label: t('mobile.tasks.scope.all') },
-                { key: 'flagged', icon: 'task.flag', label: t('mobile.tasks.scope.flagged') },
-              ] as const).map((item) => (
-                <Pressable
-                  key={item.key}
-                  accessibilityRole="button"
-                  accessibilityLabel={item.label}
-                  accessibilityState={{ selected: scope === item.key }}
-                  hitSlop={tokens['space.2']}
-                  testID={`scope-${item.key}`}
-                  onPress={() => { setScope(item.key); }}
-                >
-                  <Icon name={item.icon} size="sm" color={scope === item.key ? tokens['color.primary'] : tokens['color.foreground-subtle']} />
-                </Pressable>
-              ))}
-            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('mobile.tasks.scope.label')}
+              hitSlop={tokens['space.2']}
+              testID="scope-current"
+              onPress={() => { setScopeOpen(true); }}
+            >
+              <Icon
+                name={scope === 'scheduled' ? 'calendar.week' : scope === 'all' ? 'group.inbox' : scope === 'flagged' ? 'task.flag' : 'group.today'}
+                size="md"
+                color={tokens['color.primary']}
+              />
+            </Pressable>
           ) : undefined
         }
         // 列表视图把 FlatList 作为唯一纵向滚动宿主；标题、筛选与视图控制
@@ -2123,6 +2117,25 @@ export function TasksScreen({
         分组（学滴答）：`视图 / 日期显示 / 排序` 一组是"怎么看这个列表"，
         `筛选 / 批量选择` 一组是"动这个列表"。组间一条线。
       */}
+      <TopBarMenu
+        visible={scopeOpen}
+        label={t('mobile.tasks.scope.label')}
+        onClose={() => setScopeOpen(false)}
+        items={([
+          { key: 'today', icon: 'group.today', label: t('mobile.common.today') },
+          { key: 'scheduled', icon: 'calendar.week', label: t('mobile.tasks.scope.scheduled') },
+          { key: 'all', icon: 'group.inbox', label: t('mobile.tasks.scope.all') },
+          { key: 'flagged', icon: 'task.flag', label: t('mobile.tasks.scope.flagged') },
+        ] as const).map((item) => ({
+          id: item.key,
+          label: item.label,
+          icon: item.icon,
+          onPress: () => {
+            setScope(item.key);
+            setScopeOpen(false);
+          },
+        }))}
+      />
       <TopBarMenu
         visible={moreOpen}
         label={t('mobile.tasks.more.label')}

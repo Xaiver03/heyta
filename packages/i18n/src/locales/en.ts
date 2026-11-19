@@ -3157,6 +3157,7 @@ export const en = {
   'mobile.tasks.title': 'Tasks',
   'mobile.tasks.new': 'New task',
   'mobile.tasks.inlineAdd': 'New Reminder',
+  'mobile.tasks.scope.label': 'Smart lists',
   'mobile.tasks.scope.scheduled': 'Scheduled',
   'mobile.tasks.scope.all': 'All',
   'mobile.tasks.scope.flagged': 'Flagged',

@@ -65,7 +65,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { TASK_ROW_SHAPE } from '@heyta/design-system';
+import { parseCssShadow, TASK_ROW_SHAPE } from '@heyta/design-system';
 import { EmptyState } from '../empty-state/EmptyState.js';
 import type { CategoryColorToken } from '../categories/model.js';
 import type { Task, TaskSortKey } from '@heyta/domain';
@@ -402,20 +402,13 @@ export function TaskList<TMeta = undefined>({
           paddingVertical: tokens[TASK_ROW_SHAPE.touchTarget],
           paddingHorizontal: tokens['space.2'],
         },
-        // 每组一张卡（提醒事项 R4）：组间留白 + 组卡本体 + 卡内行分隔线。
+        // 每组一张卡：用留白与轻微投影分层；卡内不再画横线，行距本身承担分隔。
         sectionBlock: { marginBottom: tokens['space.4'] },
         sectionCard: {
           backgroundColor: tokens['color.surface'],
-          borderWidth: tokens['border-width.thin'],
-          borderColor: tokens['color.border'],
           borderRadius: tokens['radius.lg'],
-          overflow: 'hidden' as const,
           paddingHorizontal: tokens['space.2'],
-        },
-        sectionSep: {
-          height: tokens['border-width.thin'],
-          backgroundColor: tokens['color.border'],
-          marginLeft: tokens['space.2'],
+          ...(parseCssShadow(tokens['shadow.card']) ?? {}),
         },
       }),
     [showCard, isEmptyCard, useSectionCards, tokens],
@@ -468,10 +461,9 @@ export function TaskList<TMeta = undefined>({
       <View style={styles.sectionBlock}>
         {renderSectionHeader?.(item.section) ?? null}
         <View style={styles.sectionCard}>
-          {item.rows.map((row, index) => (
+          {item.rows.map((row) => (
             <View key={row.id}>
               {buildTaskRow(row)}
-              {index < item.rows.length - 1 ? <View style={styles.sectionSep} /> : null}
             </View>
           ))}
         </View>
