@@ -408,7 +408,7 @@ export function TaskList<TMeta = undefined>({
           backgroundColor: tokens['color.surface'],
           borderRadius: tokens['radius.lg'],
           paddingHorizontal: tokens['space.2'],
-          ...(parseCssShadow(tokens['shadow.card']) ?? {}),
+          ...(parseCssShadow(tokens['shadow.sm']) ?? {}),
         },
       }),
     [showCard, isEmptyCard, useSectionCards, tokens],
