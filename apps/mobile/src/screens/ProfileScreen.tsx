@@ -86,6 +86,7 @@ import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { CountdownScreen } from './CountdownScreen';
 import { CategoriesScreen } from './CategoriesScreen';
+import { TabBarCustomizeScreen } from './TabBarCustomizeScreen';
 import { EmailChangeSection } from './EmailChangeSection';
 // 托管同步的续费入口（与 web 的 RenewPanel 共用 @heyta/app-host 那一份接线）。
 import { ExportScreen } from './ExportScreen';
@@ -154,6 +155,7 @@ export function ProfileScreen(): React.JSX.Element {
   const [settingsSection, setSettingsSection] = useState<SettingsSectionKey>();
   /** 「我的 → 统计与回顾」：统计从底栏撤下的落点（整屏第二层）。 */
   const [statsOpen, setStatsOpen] = useState(false);
+  const [tabBarCustomizeOpen, setTabBarCustomizeOpen] = useState(false);
 
   // The profile screen stays mounted while tabs switch. Drop a pending
   // shortcut section when leaving the profile tab so returning to a retained
@@ -996,6 +998,17 @@ export function ProfileScreen(): React.JSX.Element {
     },
   };
 
+  const tabBarCustomizeRow: SettingsRowModel = {
+    kind: 'action',
+    discloses: true,
+    testID: 'profile-entry-tabbar-customize',
+    label: t('mobile.tabbarCustomize.title'),
+    leading: <Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />,
+    onPress: () => {
+      setTabBarCustomizeOpen(true);
+    },
+  };
+
   const subscriptionRow: SettingsRowModel = {
     kind: 'action',
       discloses: true,
@@ -1225,6 +1238,10 @@ export function ProfileScreen(): React.JSX.Element {
         onSignedOutEverywhere={runSignOutEverywhere}
       />
     );
+  }
+
+  if (tabBarCustomizeOpen) {
+    return <TabBarCustomizeScreen onBack={() => { setTabBarCustomizeOpen(false); }} />;
   }
 
   if (statsOpen) {
@@ -1775,6 +1792,8 @@ export function ProfileScreen(): React.JSX.Element {
         <SettingsRow row={notificationsRow} />
         <Divider />
         <SettingsRow row={featuresHubRow} />
+        <Divider />
+        <SettingsRow row={tabBarCustomizeRow} />
       </Card>
 
       {/*

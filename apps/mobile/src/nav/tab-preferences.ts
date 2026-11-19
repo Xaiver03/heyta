@@ -22,6 +22,30 @@ export const DEFAULT_TAB_BAR_WORKSPACES: readonly WorkspaceKey[] = [
 export const PREF_KEY_TAB_BAR_WORKSPACES = 'tab-bar.workspaces';
 
 const WORKSPACE_KEY_SET: ReadonlySet<string> = new Set(TAB_BAR_WORKSPACE_KEYS);
+
+/** 变更订阅：底栏自定义保存后，外壳（App）据此实时重排，不用重启。 */
+const listeners = new Set<() => void>();
+let cachedSnapshot: readonly WorkspaceKey[] | null = null;
+
+function notifyChange(): void {
+  for (const listener of listeners) listener();
+}
+
+export function subscribeTabBarWorkspaces(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/**
+ * `useSyncExternalStore` 的快照：**引用必须稳定**，否则每次 render 都返回新数组
+ * 会导致无限重渲染。缓存只在写入/失效时更新。
+ */
+export function getTabBarWorkspacesSnapshot(): readonly WorkspaceKey[] {
+  if (cachedSnapshot === null) cachedSnapshot = readTabBarWorkspaces();
+  return cachedSnapshot;
+}
 const MIN_WORKSPACES = 2;
 const MAX_WORKSPACES = 4;
 
@@ -61,7 +85,12 @@ export function readTabBarWorkspaces(): WorkspaceKey[] {
 export function writeTabBarWorkspaces(workspaces: readonly WorkspaceKey[]): boolean {
   const normalized = validateWorkspaceKeys(workspaces);
   if (normalized === undefined) return false;
-  return writeDevicePref(PREF_KEY_TAB_BAR_WORKSPACES, JSON.stringify(normalized));
+  const ok = writeDevicePref(PREF_KEY_TAB_BAR_WORKSPACES, JSON.stringify(normalized));
+  if (ok) {
+    cachedSnapshot = normalized;
+    notifyChange();
+  }
+  return ok;
 }
 
 /** 恢复默认前四格。 */

@@ -3999,6 +3999,13 @@ export const zhCN = {
    */
   'mobile.profile.entry.features': '全部功能',
   'mobile.profile.entry.stats': '统计与回顾',
+  'mobile.tabbarCustomize.title': '自定义底部导航',
+  'mobile.tabbarCustomize.hint': '选 {min}–{max} 个；「我的」固定在最后',
+  'mobile.tabbarCustomize.up': '上移',
+  'mobile.tabbarCustomize.down': '下移',
+  'mobile.tabbarCustomize.restore': '恢复默认',
+  'mobile.tabbarCustomize.error.min': '至少保留 {min} 个',
+  'mobile.tabbarCustomize.error.max': '最多 {max} 个',
   'mobile.settings.section.about': '关于与帮助',
   'mobile.settings.section.profile': '个人资料',
   'mobile.settings.section.general': '常规',
