@@ -22,6 +22,7 @@ import {
   authorizeEgress,
   buildDisclosure,
   fromHealthSnapshot,
+  IMAGE_BUDGET,
   toHealthSnapshot,
   withManagedEndpoint,
   type AiRoutingConfig,
@@ -44,6 +45,7 @@ import { AiSuggestionGrid } from './suggestion-grid';
 import { ChainOfThought } from './chain-of-thought';
 import { TaskAttachmentSheet, type AttachTask } from './task-attachment';
 import { SessionListSheet } from './session-list';
+import { pickImages } from './image-attach';
 import { TopBarMenu } from '../ui/top-bar-menu';
 import {
   createChatController,
@@ -172,6 +174,7 @@ export function AssistantScreen({
   const [attachOpen, setAttachOpen] = useState(false);
   const [sessionOpen, setSessionOpen] = useState(false);
   const [refs, setRefs] = useState<AttachTask[]>([]);
+  const [imageError, setImageError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     controller.syncAccount(account);
@@ -281,8 +284,27 @@ export function AssistantScreen({
       }),
     [settings.health, settings.routing, snapshot.routeTime, sync.status],
   );
-  const plan = planAssistantEgress();
+  const plan = planAssistantEgress({ hasImages: snapshot.images.length > 0 });
   const configured = isAiConfiguredOnThisDevice(settings);
+
+  /** 选图：走原生 picker → 归一化 → 过预算；失败按原因给一句人话。 */
+  const handlePickImage = async (): Promise<void> => {
+    const remaining = IMAGE_BUDGET.maxImagesPerRequest - snapshot.images.length;
+    const result = await pickImages(remaining);
+    if (result.ok) {
+      controller.addImages(result.images);
+      setImageError(undefined);
+      return;
+    }
+    if (result.reason === 'cancelled') return;
+    setImageError(
+      result.reason === 'too-many-images'
+        ? t('web.ai.attach.tooMany', { max: IMAGE_BUDGET.maxImagesPerRequest })
+        : result.reason === 'unsupported-media-type'
+          ? t('web.ai.attach.badType')
+          : t('web.ai.attach.tooBig'),
+    );
+  };
 
   /**
    * 进行中那一轮的**已完成部分**（`items`）与 `renderItems` 的映射。
@@ -519,7 +541,7 @@ export function AssistantScreen({
                 </Stack>
               }
             />
-            {snapshot.phase === 'disclose' ? <DisclosureCard target={route.target} plan={plan} consents={settings.consents} onConfirm={() => controller.confirmDisclosure()} onCancel={() => controller.cancelDisclosure()} onOpenSettings={onOpenSettings} /> : null}
+            {snapshot.phase === 'disclose' ? <DisclosureCard target={route.target} plan={plan} hasImages={snapshot.images.length > 0} consents={settings.consents} onConfirm={() => controller.confirmDisclosure()} onCancel={() => controller.cancelDisclosure()} onOpenSettings={onOpenSettings} /> : null}
           </ScrollView>
           <ChatComposer
             value={snapshot.draft}
@@ -537,7 +559,13 @@ export function AssistantScreen({
             attachments={refs}
             onOpenAttach={() => { setAttachOpen(true); }}
             onRemoveAttachment={(id) => { setRefs((prev) => prev.filter((r) => r.id !== id)); }}
+            images={snapshot.images}
+            onPickImage={() => { void handlePickImage(); }}
+            onRemoveImage={(index) => { controller.removeImage(index); setImageError(undefined); }}
           />
+          {imageError !== undefined ? (
+            <Text variant="caption" tone="danger">{imageError}</Text>
+          ) : null}
           <Text variant="caption" tone="subtle" style={{ paddingBottom: tokens['space.2'] }}>{t('web.ai.chat.disclaimer')}</Text>
         </View>
       </KeyboardAvoidingView>
@@ -622,7 +650,7 @@ function ProposalCard({ proposal, confirmed, error, expired, expanded, disabled,
   );
 }
 
-function DisclosureCard({ target, plan, consents, onConfirm, onCancel, onOpenSettings }: { target: AiRouteTarget | undefined; plan: ReturnType<typeof planAssistantEgress>; consents: ReturnType<typeof useAiSettings>['consents']; onConfirm: () => void; onCancel: () => void; onOpenSettings?: () => void }): React.JSX.Element {
+function DisclosureCard({ target, plan, hasImages, consents, onConfirm, onCancel, onOpenSettings }: { target: AiRouteTarget | undefined; plan: ReturnType<typeof planAssistantEgress>; hasImages: boolean; consents: ReturnType<typeof useAiSettings>['consents']; onConfirm: () => void; onCancel: () => void; onOpenSettings?: () => void }): React.JSX.Element {
   const { t } = useI18n();
   if (target === undefined) {
     return (
@@ -635,7 +663,7 @@ function DisclosureCard({ target, plan, consents, onConfirm, onCancel, onOpenSet
       </Stack>
     );
   }
-  const fields = assistantEgressFields();
+  const fields = hasImages ? [...assistantEgressFields(), 'images'] : assistantEgressFields();
   // 🔴 「出境的是哪个功能」只在这一处取字面量：闸门、披露块与同意提示**同源**。
   //    三处各写一遍 `'tool-calling'` 的话，改了一处就会让提示念着别的功能。
   const feature = 'tool-calling' as const;

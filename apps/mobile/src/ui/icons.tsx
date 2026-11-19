@@ -46,6 +46,7 @@ import {
   Folder,
   Info,
   Inbox,
+  ImagePlus,
   Link2,
   ListTodo,
   Monitor,
@@ -100,6 +101,7 @@ const ICONS = {
   'tab.countdown': CalendarClock,
   'tab.profile': User,
   'action.attach': Paperclip,
+  'action.image': ImagePlus,
 
   // 任务
   'task.add': Plus,

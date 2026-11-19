@@ -29,6 +29,8 @@ import {
 } from '@heyta/app-host';
 import {
   fromHealthSnapshot,
+  IMAGE_BUDGET,
+  type AiImagePart,
   type AiRoutingConfig,
   type HealthMap,
   type SecretStore,
@@ -120,6 +122,11 @@ export interface ChatSnapshot {
   readonly sessions: readonly ChatSessionMeta[];
   /** 当前会话 id（永远非 null：即便是一段还没发过消息的新会话，也给它一个稳定 id）。 */
   readonly activeSessionId: string | null;
+  /**
+   * 待随下一条消息发出的图片（**只活在内存里**：不进 op-log、不同步、不落会话历史）。
+   * 与 web 端 `AssistantPanel` 的 `images` 同一条纪律（ADR-0005「AI 是输入法」）。
+   */
+  readonly images: readonly AiImagePart[];
 }
 
 export interface ChatController {
@@ -138,6 +145,10 @@ export interface ChatController {
   switchSession(id: string): void;
   /** 给某段会话改名（当前会话或历史会话都可以）。 */
   renameSession(id: string, title: string): void;
+  /** 追加待发送的图片（已归一化、已过预算；超出张数上界会被截断）。 */
+  addImages(parts: readonly AiImagePart[]): void;
+  /** 移除第 index 张待发送图片。 */
+  removeImage(index: number): void;
   toggleHistory(): void;
   toggleExpandedEntry(id: number): void;
 }
@@ -178,6 +189,8 @@ class MobileChatController implements ChatController {
   private runtime: ChatRuntime | undefined;
   private pendingText: string | undefined;
   private pendingHistory: readonly AssistantMessage[] = [];
+  /** 披露阶段暂存的图片（cancel 要还原、confirm 才真正发）。 */
+  private pendingImages: readonly AiImagePart[] = [];
   private sendInFlight = false;
   private confirmInFlight = false;
   private accountEpoch = 0;
@@ -216,6 +229,7 @@ class MobileChatController implements ChatController {
     this.accountEpoch += 1;
     this.pendingText = undefined;
     this.pendingHistory = [];
+    this.pendingImages = [];
     this.disclosureFingerprint = undefined;
     // 换账号 = 换整套会话（loadAccount 会重置下面这几个私有字段）。
     this.inactiveSessions = [];
@@ -250,35 +264,42 @@ class MobileChatController implements ChatController {
     const routeTime = Date.now();
     this.refreshDisclosureAnchor(runtime, routeTime);
     const text = this.state.draft.trim();
-    if (text === '') return;
+    const images = this.state.images;
+    // 🔴 只有图、没有字也是**合法的一次提问**（"这张截图是什么"）。
+    if (text === '' && images.length === 0) return;
     const history = this.assistantHistory();
     this.append({ role: 'user', text });
-    this.update({ draft: '' });
-    if (!assistantNeedsEgressDisclosure(text, { now: routeTime })) {
-      void this.runTurn(text, history, routeTime);
+    this.update({ draft: '', images: [] });
+    // 带图出境必须披露（哪怕文字本身能本机答）：不写 images，用户会以为只发了字。
+    const needsDisclosure = images.length > 0 || assistantNeedsEgressDisclosure(text, { now: routeTime });
+    if (!needsDisclosure) {
+      void this.runTurn(text, history, routeTime, images);
       return;
     }
     if (!this.state.disclosed) {
       this.pendingText = text;
       this.pendingHistory = history;
+      this.pendingImages = images;
       this.update({ phase: 'disclose' });
       return;
     }
-    void this.runTurn(text, history, this.state.routeTime);
+    void this.runTurn(text, history, this.state.routeTime, images);
   }
 
   cancelDisclosure(): void {
     if (this.state.phase !== 'disclose') return;
     const text = this.pendingText;
+    const images = this.pendingImages;
     this.pendingText = undefined;
     this.pendingHistory = [];
+    this.pendingImages = [];
     if (text !== undefined) {
       const last = this.state.items.at(-1);
       if (last?.role === 'user' && last.text === text) {
-        this.update({ items: this.state.items.slice(0, -1), draft: text, phase: 'idle' });
+        this.update({ items: this.state.items.slice(0, -1), draft: text, images, phase: 'idle' });
         return;
       }
-      this.update({ draft: text, phase: 'idle' });
+      this.update({ draft: text, images, phase: 'idle' });
       return;
     }
     this.update({ phase: 'idle' });
@@ -288,10 +309,23 @@ class MobileChatController implements ChatController {
     if (this.state.phase !== 'disclose') return;
     const text = this.pendingText;
     const history = this.pendingHistory;
+    const images = this.pendingImages;
     this.pendingText = undefined;
     this.pendingHistory = [];
+    this.pendingImages = [];
     this.update({ disclosed: true });
-    if (text !== undefined) void this.runTurn(text, history, this.state.routeTime);
+    if (text !== undefined) void this.runTurn(text, history, this.state.routeTime, images);
+  }
+
+  addImages(parts: readonly AiImagePart[]): void {
+    if (this.state.phase === 'running' || parts.length === 0) return;
+    const next = [...this.state.images, ...parts].slice(0, IMAGE_BUDGET.maxImagesPerRequest);
+    this.update({ images: next });
+  }
+
+  removeImage(index: number): void {
+    if (this.state.phase === 'running') return;
+    this.update({ images: this.state.images.filter((_image, i) => i !== index) });
   }
 
   confirmProposal(id: number): void {
@@ -370,7 +404,8 @@ class MobileChatController implements ChatController {
     this.activeSessionId = newAssistantSessionId();
     this.activeTitle = '';
     this.activeUpdatedAt = Date.now();
-    this.update({ items: [], draft: '', disclosed: false, historyOpen: false, proposalErrors: {}, live: undefined });
+    this.pendingImages = [];
+    this.update({ items: [], draft: '', images: [], disclosed: false, historyOpen: false, proposalErrors: {}, live: undefined });
   }
 
   switchSession(id: string): void {
@@ -390,6 +425,7 @@ class MobileChatController implements ChatController {
       items: target.items,
       disclosed: target.disclosed,
       draft: '',
+      images: [],
       expandedEntry: undefined,
       proposalErrors: {},
       live: undefined,
@@ -418,7 +454,7 @@ class MobileChatController implements ChatController {
     this.update({ expandedEntry: this.state.expandedEntry === id ? undefined : id });
   }
 
-  private async runTurn(text: string, history: readonly AssistantMessage[], routeTime: number): Promise<void> {
+  private async runTurn(text: string, history: readonly AssistantMessage[], routeTime: number, images: readonly AiImagePart[] = []): Promise<void> {
     const runtime = this.runtime;
     if (runtime === undefined || runtime.host === null || this.sendInFlight) return;
     const host = runtime.host;
@@ -432,7 +468,7 @@ class MobileChatController implements ChatController {
     this.executionNumber += 1;
     try {
       const outcome = await requestAssistantTurn(
-        { text },
+        { text, ...(images.length === 0 ? {} : { images }) },
         {
           routing: runtime.resolveRouting(),
           consents: runtime.settings.consents,
@@ -599,6 +635,7 @@ class MobileChatController implements ChatController {
       // 别在这里写 `restored?.live` —— 那字段根本没落盘，读出来是 undefined，
       // 但写成那样会让后来者以为它落过盘。
       live: undefined,
+      images: [],
       sessions: this.sessionsMeta(),
       activeSessionId: this.activeSessionId,
     };

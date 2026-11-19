@@ -196,6 +196,9 @@ importers:
       react-native-get-random-values:
         specifier: ^2.0.0
         version: 2.0.0(react-native@0.84.1(@babel/core@7.29.7(supports-color@5.5.0))(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.7(supports-color@5.5.0)))(@types/react@19.3.0)(react@19.2.3))
+      react-native-image-picker:
+        specifier: 8.3.0
+        version: 8.3.0(react-native@0.84.1(@babel/core@7.29.7(supports-color@5.5.0))(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.7(supports-color@5.5.0)))(@types/react@19.3.0)(react@19.2.3))(react@19.2.3)
       react-native-safe-area-context:
         specifier: ^5.5.2
         version: 5.10.0(react-native@0.84.1(@babel/core@7.29.7(supports-color@5.5.0))(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.7(supports-color@5.5.0)))(@types/react@19.3.0)(react@19.2.3))(react@19.2.3)
@@ -4844,6 +4847,12 @@ packages:
     resolution: {integrity: sha512-wx7/aPqsUIiWsG35D+MsUJd8ij96e3JKddklSdrdZUrheTx89gPtz3Q2yl9knBArj5u26Cl23T88ai+Q0vypdQ==}
     peerDependencies:
       react-native: '>=0.81'
+
+  react-native-image-picker@8.3.0:
+    resolution: {integrity: sha512-f45QERBBWAFS8BEIKeQ9bcuBQFr3myWaNlkTnG4bY8BtsYJa/ChM0jzN6V9xBKzNPjMo9uFyUuNKjQWddNKZ9w==}
+    peerDependencies:
+      react: '*'
+      react-native: '*'
 
   react-native-safe-area-context@5.10.0:
     resolution: {integrity: sha512-U655+G0KItefqpTKZenr0aBNulY/49TUKSZkWGVtESlFK5qmML7BejQjPDCRU+GzC24g2KeWFJguWP5LR52dqA==}
@@ -10243,6 +10252,11 @@ snapshots:
   react-native-get-random-values@2.0.0(react-native@0.84.1(@babel/core@7.29.7(supports-color@5.5.0))(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.7(supports-color@5.5.0)))(@types/react@19.3.0)(react@19.2.3)):
     dependencies:
       fast-base64-decode: 1.0.0
+      react-native: 0.84.1(@babel/core@7.29.7(supports-color@5.5.0))(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.7(supports-color@5.5.0)))(@types/react@19.3.0)(react@19.2.3)
+
+  react-native-image-picker@8.3.0(react-native@0.84.1(@babel/core@7.29.7(supports-color@5.5.0))(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.7(supports-color@5.5.0)))(@types/react@19.3.0)(react@19.2.3))(react@19.2.3):
+    dependencies:
+      react: 19.2.3
       react-native: 0.84.1(@babel/core@7.29.7(supports-color@5.5.0))(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.7(supports-color@5.5.0)))(@types/react@19.3.0)(react@19.2.3)
 
   react-native-safe-area-context@5.10.0(react-native@0.84.1(@babel/core@7.29.7(supports-color@5.5.0))(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.7(supports-color@5.5.0)))(@types/react@19.3.0)(react@19.2.3))(react@19.2.3):

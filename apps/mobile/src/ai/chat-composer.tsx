@@ -1,7 +1,8 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, TextInput, View } from 'react-native';
 import { useI18n } from '@heyta/i18n';
 
+import type { AiImagePart } from '@heyta/ai';
 import { useText, useTheme, useTokens } from '../theme';
 import { Icon } from '../ui/icons';
 import { Chip, Text } from '../ui/kit';
@@ -15,6 +16,9 @@ export function ChatComposer({
   attachments,
   onOpenAttach,
   onRemoveAttachment,
+  images,
+  onPickImage,
+  onRemoveImage,
 }: {
   value: string;
   onChangeText: (value: string) => void;
@@ -26,6 +30,11 @@ export function ChatComposer({
   /** 打开附件选择面板。省略则不显示附件按钮。 */
   onOpenAttach?: () => void;
   onRemoveAttachment?: (id: string) => void;
+  /** 待发送的图片（内存里那一份）。 */
+  images?: readonly AiImagePart[];
+  /** 打开系统相册选图。省略则不显示附图按钮。 */
+  onPickImage?: () => void;
+  onRemoveImage?: (index: number) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
@@ -41,6 +50,24 @@ export function ChatComposer({
         backgroundColor: tokens['color.background'],
       }}
     >
+      {images !== undefined && images.length > 0 ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
+          {images.map((img, index) => (
+            <Pressable
+              key={index}
+              accessibilityRole="button"
+              accessibilityLabel={t('web.ai.attach.remove', { index: index + 1 })}
+              testID={`ai-image-${index}`}
+              onPress={() => { if (onRemoveImage !== undefined) onRemoveImage(index); }}
+            >
+              <Image
+                source={{ uri: `data:${img.mediaType};base64,${img.base64}` }}
+                style={{ width: tokens['touch-target.min'], height: tokens['touch-target.min'], borderRadius: tokens['radius.md'] }}
+              />
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       {attachments !== undefined && attachments.length > 0 ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.1'] }}>
           {attachments.map((a) => (
@@ -65,6 +92,17 @@ export function ChatComposer({
             style={{ width: tokens['touch-target.min'], height: tokens['touch-target.min'], alignItems: 'center', justifyContent: 'center' }}
           >
             <Icon name="action.attach" size="sm" color={tokens['color.foreground-muted']} />
+          </Pressable>
+        )}
+        {onPickImage === undefined ? null : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('web.ai.attach.label')}
+            testID="ai-image-button"
+            onPress={onPickImage}
+            style={{ width: tokens['touch-target.min'], height: tokens['touch-target.min'], alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon name="action.image" size="sm" color={tokens['color.foreground-muted']} />
           </Pressable>
         )}
         <TextInput
