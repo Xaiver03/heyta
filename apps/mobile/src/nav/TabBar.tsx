@@ -31,7 +31,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MessageKey } from '@heyta/i18n';
 import { useI18n } from '@heyta/i18n';
@@ -147,13 +147,19 @@ export function TabBar({ active, onChange, badges, background = 'surface' }: Tab
 
   return (
     <View style={styles.barOuter} accessibilityRole="tablist">
-      {/* 真材质：iOS 系统 chrome 材质模糊（浅/深自适应）；减透明偏好时降级为纯色（token 已置 0 模糊 + 实色 tint）。 */}
-      <BlurView
-        style={StyleSheet.absoluteFill}
-        blurType={theme === 'dark' ? 'chromeMaterialDark' : 'chromeMaterialLight'}
-        blurAmount={blurAmount}
-        reducedTransparencyFallbackColor={tokens['color.surface']}
-      />
+      {/* 真材质：**iOS** 系统 chrome 材质模糊（浅/深自适应）；减透明偏好时降级为纯色（token 已置 0 模糊 + 实色 tint）。
+          Android 不走 BlurView：`chromeMaterial*` 是 iOS 专用 blurType，Android 原生枚举没有它，
+          传进去会在 `AndroidBlurViewProps` 解析时 abort（启动即原生崩溃）。Android 用实色 surface 兜底。 */}
+      {Platform.OS === 'ios' ? (
+        <BlurView
+          style={StyleSheet.absoluteFill}
+          blurType={theme === 'dark' ? 'chromeMaterialDark' : 'chromeMaterialLight'}
+          blurAmount={blurAmount}
+          reducedTransparencyFallbackColor={tokens['color.surface']}
+        />
+      ) : (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: tokens['color.surface'] }]} />
+      )}
       {/* 半透明 tint 提对比，保证图标/文字可读（Apple「vibrancy」那层）。 */}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: tokens['material.chrome-tint'] }]} />
       {/* 极细发丝线，若有若无的边界。 */}
