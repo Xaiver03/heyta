@@ -1693,36 +1693,7 @@ export function TasksScreen({
           </ScrollView>
         ) : null}
 
-        {/*
-          智能列表（提醒事项）——**图标**，不是文字胶囊：今天 / 计划 / 全部 / 旗标。
-          「能用界面展示的，就不要用文字」：文字只留在无障碍标签里，屏幕上只有图标。
-        */}
-        {view === 'list' ? (
-          <View style={styles.rowGap2}>
-            {([
-              { key: 'today', icon: 'group.today', label: t('mobile.common.today') },
-              { key: 'scheduled', icon: 'calendar.week', label: t('mobile.tasks.scope.scheduled') },
-              { key: 'all', icon: 'group.inbox', label: t('mobile.tasks.scope.all') },
-              { key: 'flagged', icon: 'task.flag', label: t('mobile.tasks.scope.flagged') },
-            ] as const).map((item) => (
-              <Pressable
-                key={item.key}
-                accessibilityRole="button"
-                accessibilityLabel={item.label}
-                accessibilityState={{ selected: scope === item.key }}
-                hitSlop={tokens['space.3']}
-                testID={`scope-${item.key}`}
-                onPress={() => { setScope(item.key); }}
-              >
-                <Icon
-                  name={item.icon}
-                  size="md"
-                  color={scope === item.key ? tokens['color.primary'] : tokens['color.foreground-subtle']}
-                />
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
+        {/* 2026-11-19：智能列表图标移到**顶栏**（titleLeading），不再在内容区另起一排。 */}
     </>
   );
 
@@ -1773,6 +1744,31 @@ export function TasksScreen({
       <View style={styles.flex1}>
       <Screen
         title={t('mobile.tasks.title')}
+        // 智能列表（今天/计划/全部/旗标）放进**顶栏**（leading 图标），不再在内容区另起一排。
+        titleLeading={
+          view === 'list' ? (
+            <View style={styles.rowGap2}>
+              {([
+                { key: 'today', icon: 'group.today', label: t('mobile.common.today') },
+                { key: 'scheduled', icon: 'calendar.week', label: t('mobile.tasks.scope.scheduled') },
+                { key: 'all', icon: 'group.inbox', label: t('mobile.tasks.scope.all') },
+                { key: 'flagged', icon: 'task.flag', label: t('mobile.tasks.scope.flagged') },
+              ] as const).map((item) => (
+                <Pressable
+                  key={item.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  accessibilityState={{ selected: scope === item.key }}
+                  hitSlop={tokens['space.2']}
+                  testID={`scope-${item.key}`}
+                  onPress={() => { setScope(item.key); }}
+                >
+                  <Icon name={item.icon} size="sm" color={scope === item.key ? tokens['color.primary'] : tokens['color.foreground-subtle']} />
+                </Pressable>
+              ))}
+            </View>
+          ) : undefined
+        }
         // 列表视图把 FlatList 作为唯一纵向滚动宿主；标题、筛选与视图控制
         // 也在它的 ListHeaderComponent 内，避免 ScrollView + FlatList 竞争手势。
         // 四象限/时间线仍使用屏幕级滚动。

@@ -411,7 +411,7 @@ export function TaskRow({
     <Text
       style={[text[spec.title], row.done ? styles.titleDone : null]}
       testID={`task-title-${row.id}`}
-      numberOfLines={2}
+      numberOfLines={1}
     >
       {row.title}
     </Text>
@@ -509,9 +509,6 @@ export function TaskRow({
       {onOpenTask === undefined ? (
         <View style={styles.body} testID={`task-row-${row.id}`}>
           {title}
-          {renderMeta === undefined || !spec.showMeta ? null : (
-            <View style={styles.metaRow}>{renderMeta(row)}</View>
-          )}
         </View>
       ) : (
         <Pressable
@@ -523,10 +520,16 @@ export function TaskRow({
           testID={`task-row-${row.id}`}
         >
           {title}
-          {renderMeta === undefined || !spec.showMeta ? null : (
-            <View style={styles.metaRow}>{renderMeta(row)}</View>
-          )}
         </Pressable>
+      )}
+
+      {/*
+        🔴 元信息放**行尾**（单行等高，对齐提醒事项/滴答）：标题独占左侧、日期/旗标/优先级/
+        子任务靠右。以前塞在标题下面当第二行 —— 有元信息的行就比没有的行高一截，
+        同一列表里卡片高度不一致（Apple/提醒事项的行是等高的）。
+      */}
+      {renderMeta === undefined || !spec.showMeta ? null : (
+        <View style={styles.metaRow}>{renderMeta(row)}</View>
       )}
 
       {renderTrailing === undefined || !spec.showTrailing ? null : renderTrailing(row)}
