@@ -56,7 +56,7 @@ import {
 } from './chat-controller';
 import { ChatTranscript, type ChatTranscriptItem } from './chat-transcript';
 import { intentText } from './intent-copy';
-import { getAiSettings, isAiConfiguredOnThisDevice, saveAiSettings, useAiSettings, aiSecrets } from './settings-store';
+import { getAiSettings, saveAiSettings, useAiSettings, aiSecrets } from './settings-store';
 import { useMobileSync } from '../sync/store';
 
 const resolveHistoryAccount = createAssistantHistoryAccountResolver();
@@ -286,7 +286,6 @@ export function AssistantScreen({
     [settings.health, settings.routing, snapshot.routeTime, sync.status],
   );
   const plan = planAssistantEgress({ hasImages: snapshot.images.length > 0 });
-  const configured = isAiConfiguredOnThisDevice(settings);
 
   /** 选图：走原生 picker → 归一化 → 过预算；失败按原因给一句人话。 */
   const handlePickImage = async (): Promise<void> => {
@@ -365,7 +364,7 @@ export function AssistantScreen({
             {entry.role === 'error' && privacyBlocked && onOpenPrivacy !== undefined ? (
               <Button label={t('mobile.ai.privacyBlocked.action')} tone="ghost" onPress={onOpenPrivacy} />
             ) : null}
-            <HStack gap="tight">
+            <HStack gap="default">
               <Button label={t('web.ai.action.copy')} tone="ghost" testID={`chat-copy-${String(entry.id)}`} onPress={() => { Clipboard.setString(entry.role === 'error' ? entry.message : entry.text); }} />
               <Button label={t('web.ai.action.retry')} tone="ghost" testID={`chat-retry-${String(entry.id)}`} disabled={snapshot.phase !== 'idle'} onPress={() => { controller.retry(entry.id); }} />
             </HStack>
@@ -483,12 +482,6 @@ export function AssistantScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View testID="assistant-screen" style={{ flex: 1, paddingBottom: tokens['space.2'] }}>
-          {!configured ? (
-            <HStack gap="tight" align="center">
-              <Text variant="caption" tone="subtle" style={{ flex: 1 }}>{t('mobile.ai.notConfiguredShort')}</Text>
-              {onOpenSettings !== undefined ? <Button label={t('mobile.ai.goSettings')} tone="ghost" onPress={onOpenSettings} /> : null}
-            </HStack>
-          ) : null}
           {snapshot.historyOpen ? (
             <Card gap="tight">
               <Text variant="row-title">{t('web.ai.chat.history.title')}</Text>

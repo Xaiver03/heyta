@@ -36,7 +36,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MessageKey } from '@heyta/i18n';
 import { useI18n } from '@heyta/i18n';
 import { useText, useTheme, useTokens } from '../theme';
-import { CONTROL_STATE_TOKENS } from '@heyta/ui';
 import { BlurView } from '@react-native-community/blur';
 import { Badge, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
@@ -87,7 +86,7 @@ export function TabBar({ active, onChange, badges, background = 'surface', works
   const visibleTabs = tabSpecsFor(workspaces ?? DEFAULT_TAB_BAR_WORKSPACES);
   const tokens = useTokens();
   const text = useText();
-  const { reducedMotion, theme } = useTheme();
+  const { theme } = useTheme();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   // blur.chrome 是带 px 的 token（20px）；BlurView 要数字强度。
@@ -179,17 +178,8 @@ export function TabBar({ active, onChange, badges, background = 'surface', works
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               accessibilityLabel={t(tab.labelKey)}
-              style={({ pressed }) => [
-                styles.item,
-                // 按下反馈：整块变暗，用叠加色而不是改每个 children 的颜色 ——
-                // 后者要动图标和文字两处，迟早只改一处。
-                pressed && !reducedMotion
-                  ? {
-                      backgroundColor: tokens['color.hover'],
-                      transform: [{ scale: tokens[CONTROL_STATE_TOKENS.pressScale] }],
-                    }
-                  : null,
-              ]}
+              // 🔴 2026-11-20：去掉按下时的整块 hover 底与缩放 —— 底栏切换要「瞬时」，不要方形底色罩住 + 切换动效。
+              style={styles.item}
             >
               <View style={styles.iconWrap}>
                 <Icon
