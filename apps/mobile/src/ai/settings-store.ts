@@ -50,7 +50,22 @@ const mobilePort: AiSettingsStorePort = {
 
 const store = createAiSettingsStore(mobilePort);
 
-let current: AiSettingsState = store.load();
+/**
+ * 🔴 2026-11-21：已登录托管账号**默认启用托管 AI（managed）**。
+ * 出厂默认是"四道闸全关"，于是托管用户（serverUrl 已配）打开助手只得到"没有可用路由"。
+ * 这里在**移动端本地**做一次归一：只要①路由未启用、②用户没有自定义端点、③已配同步服务器，
+ * 就把它升级成 `enabled + allowRemote + managed`——托管端点由 `withManagedEndpoint` 从服务器地址合成。
+ * 不动共享默认（web 不受影响）；显式配置过端点或已启用者原样返回。
+ */
+function withHostedDefaults(state: AiSettingsState): AiSettingsState {
+  const routing = state.routing;
+  if (routing.enabled) return state;
+  if (routing.endpoints.length > 0) return state;
+  if ((readSyncConfig()?.serverUrl ?? '').trim() === '') return state;
+  return { ...state, routing: { ...routing, enabled: true, allowRemote: true, mode: 'managed' } };
+}
+
+let current: AiSettingsState = withHostedDefaults(store.load());
 
 const listeners = new Set<() => void>();
 

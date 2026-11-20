@@ -62,6 +62,10 @@ export const MANAGED_ENDPOINT_ID = 'heyta-managed';
 const MANAGED_CAPABILITIES: readonly AiCapability[] = [
   'structured_output',
   'long_context',
+  // 🔴 2026-11-21（产品负责人明确要求「测试账号要能用 AI 聊天、订阅后补」）：托管档现在
+  // 也提供对话式助手。注意：这改变了对外口径——法务《ai-and-transfer》§5「这一档不含助手」
+  // 需要同批更新（待补）。托管上游已实测支持 tools（finish_reason=tool_calls）。
+  'tool_calling',
 ];
 
 /** 全部功能 —— 从能力表派生，**不手抄一份**（手抄的那份一定会漂）。 */
