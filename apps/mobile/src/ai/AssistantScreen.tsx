@@ -113,6 +113,9 @@ const managedTransport = createManagedTransport({
  * 用户最差拿到的是一份完整回答，只是没有逐字。
  */
 const streamingFetch = createGatedStreamingFetch(privacyConsent);
+// 2026-11-21：暂不接入 runtime —— RN 的 XHR 流式对托管路由返回 status 0（服务端已 200 并计量），
+// 先用整份 fetch 保证'能发出、能回话'；逐字流式后续再排查。
+void streamingFetch;
 
 /**
  * **发送那一刻**现算的路由配置（见 `ChatRuntime.resolveRouting` 的注释）。
@@ -215,7 +218,6 @@ export function AssistantScreen({
        * 🔴 接上流式 ⇒ 助手的回答逐字出现。见模块顶部 `streamingFetch` 的注释
        * （含"为什么敢接"的三条 RN 源码判据与退化方向）。
        */
-      streamingFetch,
       // 🔴 现算的那一份（不是 `settings.routing`）—— 见模块顶部 `resolveRouting` 的注释。
       resolveRouting,
       localize: (key, vars) => t(key as MessageKey, vars),
