@@ -10,7 +10,7 @@
 @define-color ht_color_primary_subtle #eff6ff;
 @define-color ht_color_primary_subtle_hover #dbeafe;
 @define-color ht_color_on_primary #ffffff;
-@define-color ht_color_background #f8fafc;
+@define-color ht_color_background #f1f5f9;
 @define-color ht_color_surface #ffffff;
 @define-color ht_color_surface_subtle #f8fafc;
 @define-color ht_color_surface_raised #ffffff;
@@ -81,7 +81,7 @@
 @define-color ht_material_scrim_strong #0f172a80;
 
 .heyta-window {
-  background-color: #f8fafc;
+  background-color: #f1f5f9;
 }
 .heyta-title {
   color: #0f172a;
