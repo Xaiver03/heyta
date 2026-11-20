@@ -209,7 +209,7 @@ export function AppBar({
   titleLeading,
   onTitlePress,
   contentMaxWidth,
-  background = 'surface',
+  background = 'grouped',
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
@@ -352,7 +352,7 @@ export function Screen({
   chrome = 'page',
   barCollapsed,
   onTitlePress,
-  background = 'surface',
+  background = 'grouped',
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;

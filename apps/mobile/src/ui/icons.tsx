@@ -19,6 +19,9 @@
 
 import React from 'react';
 import {
+  TaskCheckGlyph, CalendarGlyph, TimerGlyph, AiSparkGlyph, PersonGlyph, SearchGlyph, MoreGlyph,
+} from './custom-icons';
+import {
   Archive,
   ArchiveRestore,
   ArrowLeft,
@@ -89,17 +92,17 @@ import { useTokens } from '../theme';
  */
 const ICONS = {
   // 底部标签栏的五个 tab（见 `nav/TabBar.tsx`）
-  'tab.tasks': ListTodo,
-  'tab.calendar': CalendarDays,
-  'tab.focus': Timer,
+  'tab.tasks': TaskCheckGlyph as unknown as typeof ListTodo,
+  'tab.calendar': CalendarGlyph as unknown as typeof CalendarDays,
+  'tab.focus': TimerGlyph as unknown as typeof Timer,
   // ⚠️ 这一行只**新增**一个登记项，依赖的是文件里已有的 `ChartColumn` 导入
   // （与热点图、统计有关的那一类图标）。纯附加改动，冲突时按并集收，
   // 若上游重写时删掉了 `ChartColumn`，修法是把导入补回来 —— 一个词。
   'tab.categories': ChartColumn,
-  'tab.ai': Sparkles,
+  'tab.ai': AiSparkGlyph as unknown as typeof Sparkles,
   'tab.habits': Flame,
   'tab.countdown': CalendarClock,
-  'tab.profile': User,
+  'tab.profile': PersonGlyph as unknown as typeof User,
   'action.attach': Paperclip,
   'action.image': ImagePlus,
 
@@ -221,7 +224,7 @@ const ICONS = {
   'action.settings': Settings,
   // 🔴 与共享 `SearchPanel` 输入行里那个放大镜**同一个字形**：入口和它打开的
   // 东西长得不一样，用户就不会把这两个认成同一件事。
-  'action.search': Search,
+  'action.search': SearchGlyph as unknown as typeof Search,
   'action.send': Send,
   'assistant.new-session': Plus,
   /**
@@ -247,7 +250,7 @@ const ICONS = {
   'action.display': Monitor,
   /** 关于 / 帮助。同一个错：「关于与帮助」也曾借 `action.more`。 */
   'action.info': Info,
-  'action.more': Ellipsis,
+  'action.more': MoreGlyph as unknown as typeof Ellipsis,
   'action.expand': ChevronDown,
   'action.collapse': ChevronUp,
   /**
