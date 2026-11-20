@@ -4,6 +4,11 @@
 
 ## 6. 常用命令
 
+> 🔴 移动端真机要"登进主界面"时，**用测试账号一键登录，别人工注册**（注册走邮箱验证码）。
+> `bash scripts/login-device-staging.sh`；账号在 `.local/test-account.env`（gitignore）。
+> 完整登录/注册流程、各步界面锚点、测试账号如何直接写生产库、以及踩过的坑，见
+> [`docs/reference/mobile-login-registration.md`](../reference/mobile-login-registration.md)。
+
 ```bash
 pnpm install                    # 安装（工作区）
 pnpm check:worktree-exceptions  # 🔴 动手/提交之前先看这一枚：工作树里每一枚未提交件有没有归到一条**写了理由**的登记规则。
