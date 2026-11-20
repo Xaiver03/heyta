@@ -183,6 +183,17 @@ interface SyncStoreState {
    * 而不是复用 `configure(baseUrl, token, '')`。
    */
   applyAuthToken: (baseUrl: string, token: string, email?: string, accountId?: string) => void;
+  /**
+   * 管理后台页（`/admin`）启动时采用飞书回程投递的会话。
+   *
+   * 🔴 与 `applyAuthToken` **刻意不同**：后台页走独立启动路径，**没有 op-log**
+   *（ADR-0078）。`applyAuthToken` 末尾会 `verifyLibraryOwner()`（要本地库）并
+   * `restartRealtime`（要引擎），在这条路径上会当场抛/建出一个本来不需要的通道。
+   * 所以这里只做两件事：把「服务端地址 + 令牌」写进内存与凭据存储，让后台的
+   * `clientOptions()` 能现读到令牌；**不碰本地库、不拉实时通道、不做库归属校验**。
+   * 后台的数据全部走服务端 HTTP，本来就不需要本地引擎。
+   */
+  adoptConsoleSession: (baseUrl: string, token: string, email: string) => void;
   clearCredentials: () => void;
   /** 登录/启动时确认本机库归属；`mismatch` 会**先撤掉凭据**再记冲突。 */
   verifyLibraryOwner: () => Promise<'ok' | 'anonymous' | 'mismatch'>;
@@ -684,6 +695,19 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     void get().verifyLibraryOwner().then((result) => {
       if (result !== 'mismatch') restartRealtime(get);
     });
+  },
+
+  adoptConsoleSession: (baseUrl, token, email) => {
+    // 见接口说明：后台页无本地库，只写认证绑定与凭据，不启动任何需要引擎的东西。
+    credentialRevision += 1;
+    set({
+      baseUrl,
+      token,
+      authTransport: 'bearer',
+      email: email === '' ? undefined : email,
+      status: { kind: 'idle' },
+    });
+    saveCredentials({ baseUrl, token, ...(email === '' ? {} : { email }) });
   },
 
 

@@ -22,7 +22,7 @@ import { registerLocalEraser } from '@heyta/app-host';
 import { App } from './App.js';
 import { armBootSplashDismiss } from './boot-splash.js';
 import { AdminConsolePage } from './features/admin/AdminConsolePage.js';
-import { holdPendingLogin, releasePendingLogin } from './features/auth/pending-login.js';
+import { holdPendingLogin, releasePendingLogin, takePendingSessionFromFragment } from './features/auth/pending-login.js';
 import { armFirstLaunchConsent } from './features/privacy/first-launch.js';
 import { createStartupNetwork } from './features/privacy/startup-network.js';
 import {
@@ -261,6 +261,26 @@ if (mode === 'shell') {
    * —— 漏掉的表现是「后台页在暗色设置下仍是亮色」，判据是 e2e 的暗色用例。
    */
   applyTheme(resolveInitialTheme());
+  /**
+   * 飞书登录回程：回调把会话投进 `#sessionToken=…`（管理后台面同样如此）。
+   * 主应用的这条投递由下面的 `holdPendingLogin()` 采用；**这一页不走那条路**
+   * （console 分支不建 op-log、也不跑 startupNetwork），所以在这里就地采用：
+   * 只写「服务端地址 + 令牌」到同步凭据存储，**不建本地库、不拉实时通道** ——
+   * 后台的数据全部走服务端 HTTP（ADR-0078），本来就不需要本地引擎。
+   * 采用之后 `AdminPanel` 的 `probe()` 现读令牌，就能正常进后台。
+   */
+  {
+    const pendingConsoleSession = takePendingSessionFromFragment();
+    if (pendingConsoleSession !== null) {
+      useSyncStore
+        .getState()
+        .adoptConsoleSession(
+          pendingConsoleSession.baseUrl,
+          pendingConsoleSession.token,
+          pendingConsoleSession.email,
+        );
+    }
+  }
   armFirstLaunchConsent();
   root.render(
     <StrictMode>

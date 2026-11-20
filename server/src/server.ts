@@ -42,6 +42,7 @@ import { activityRoutes } from './activity/activity.routes';
 import { shareRoutes } from './shares/share.routes';
 import { accountSecurityRoutes } from './account/account-security.routes';
 import { accountProfileRoutes } from './account/account-profile.routes';
+import { feishuRoutes } from './feishu/feishu.routes';
 import { attachmentRoutes } from './attachments/attachment.routes';
 import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
 import { announcementRoutes } from './announcements/announcement.routes';
@@ -587,6 +588,16 @@ export const createServer = (
       // 换绑登录邮箱 + 登录会话（工单 W1/W2/W3，ADR-0063）。同一枚 `/api` 前缀，
       // 路径常量在 `@heyta/shared-schema` 里，服务端与客户端拼的是同一个字面量。
       await fastifyServer.register(accountSecurityRoutes, { prefix: '/api' });
+      // 飞书（Lark）网页应用登录（OAuth 2.0）。两条挂载点同一套实现，靠 `scope`
+      // 区分普通面（app）与管理后台面（admin）。配置全来自环境（`FEISHU_LOGIN_*`）；
+      // 没配时 `/status` 报 `enabled:false`、`/start` 回 503，宿主据此隐藏入口。
+      // 🔴 会话经产物页 URL 的 fragment 投递（不进日志、不进 Referer），
+      //    与本仓库邮件确认页 / 桌面壳回跳是同一条通道。
+      await fastifyServer.register(feishuRoutes, {
+        prefix: '/api',
+        publicUrl: fullConfig.publicUrl,
+        webAppPath: fullConfig.webAppPath,
+      });
       // 任务附件的**字节**通道（工单 #9）。同样不在 `apiRoutes` 里：它与同步没有
       // 共享状态，而它的 20 MiB 级 `bodyLimit` 只能按路由设（全局是 20 MB，
       // 放全局会让任何一个接口都能吃满请求体额度）。

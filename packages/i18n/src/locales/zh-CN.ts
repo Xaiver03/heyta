@@ -1148,6 +1148,8 @@ export const zhCN = {
   'web.auth.title': '登录 / 注册',
   'web.auth.subtitle': '使用你的邮箱和登录密码继续',
   'web.auth.close': '关闭',
+  'web.auth.feishu.button': '使用飞书登录',
+  'web.auth.feishu.failed': '飞书登录未完成，请重试或改用邮箱登录。',
   'web.auth.open': '登录 / 注册',
   // 壳内（桌面应用）中央登录 = device handoff：登录在系统浏览器完成，这里显示配对码等领取。
   // 同步设置里令牌字段下面的指路句 —— 它回答的正是"令牌从哪来"。

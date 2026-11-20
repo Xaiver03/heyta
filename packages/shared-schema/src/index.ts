@@ -171,6 +171,17 @@ export type {
   EmailLoginVerifyRequest,
 } from './auth-http-contract';
 
+// 飞书（Lark）网页应用登录：路径 / 稳定错误码 / 状态响应形状。
+export {
+  FEISHU_AUTH_PATHS,
+  FEISHU_AUTH_ERROR_CODES,
+} from './feishu-auth-contract';
+export type {
+  FeishuAuthErrorCode,
+  FeishuAuthStatusResponse,
+  FeishuAuthScope,
+} from './feishu-auth-contract';
+
 // 全局 HTTP 错误信封（2026-10-10）：唯一形状 + zod 判据 + 通用码。
 export {
   apiErrorBodySchema,

@@ -40,6 +40,13 @@ model User {
   // 运营管理后台的准入标记。**单级**：没有角色表、没有权限码（ADR-0038 §2 二 / §3.1）。
   // 默认 false ⇒ **没有人生来是管理员**；授权只能由 CLI 或已有管理员显式做（fail-closed）。
   isAdmin                       Boolean  @default(false) @map("is_admin")
+  // 飞书身份（可空、唯一）。见 migrations/*_add_feishu_identity 与 server/src/feishu/。
+  // 与 `email` 是**两种东西**：`feishu_open_id` 是飞书应用内唯一标识（登录的唯一硬前提），
+  // `union_id` 是同开发者跨应用稳定的兜底，`tenant_key` 只用于排查（不参与匹配）。
+  // 可空 + 唯一：Postgres / SQLite 的唯一索引允许多个 NULL，未绑定的账号互不冲突。
+  feishuOpenId                  String?  @unique @map("feishu_open_id")
+  feishuUnionId                 String?  @unique @map("feishu_union_id")
+  feishuTenantKey               String?  @map("feishu_tenant_key")
   termsAcceptedAt               BigInt?  @map("terms_accepted_at")
   // 同意留痕的版本指针：形如 `terms@1.0;privacy@1.0;…` 的**整套**文本版本指纹
   //（`@heyta/legal` 的 `legalSetVersion()`）。对外文本两处承诺了它

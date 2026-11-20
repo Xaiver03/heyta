@@ -1017,6 +1017,8 @@ export const en = {
   'web.auth.title': 'Sign in or register',
   'web.auth.subtitle': 'Continue with your email and password',
   'web.auth.close': 'Close',
+  'web.auth.feishu.button': 'Sign in with Feishu',
+  'web.auth.feishu.failed': 'Feishu sign-in did not complete. Please try again or use email.',
   'web.auth.open': 'Sign in or register',
   // Desktop-shell central sign-in = device handoff: sign-in completes in the system browser; this view shows the pairing code while the app claims the session.
   'web.auth.tokenHint': 'Access tokens are issued by the server. Sign in or register with the button above and the token is filled in automatically; if you already have one, paste it directly.',

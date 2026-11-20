@@ -123,6 +123,14 @@ export interface AuthPanelProps {
    */
   brandLabel?: string;
   /**
+   * 飞书登录的**面向**：普通面 `app`（默认）还是管理后台面 `admin`。
+   *
+   * 🔴 只影响"发起授权时带哪个 scope"与文案，不是第二套实现：授权、回调、落地
+   * 全在服务端同一套路由里（`server/src/feishu/feishu.routes.ts`）。管理面让服务端
+   * 只放行管理员账号（见 ADR-0038 §4.3 的"服务端是唯一裁决者"）。
+   */
+  feishuScope?: 'app' | 'admin';
+  /**
    * 登录成功。壳拿它把设置对话框里的令牌输入框也同步上 ——
    * 否则用户随后点"保存并同步"会用空的输入框把刚拿到的令牌覆盖掉。
    */
@@ -177,6 +185,7 @@ export function AuthPanel({
   onClose,
   onSignedIn,
   brandLabel,
+  feishuScope = 'app',
 }: AuthPanelProps): React.JSX.Element {
   const { t, locale } = useI18n();
   const status = useAuthStore((s) => s.status);
@@ -362,6 +371,42 @@ export function AuthPanel({
       if (granted) run();
     });
   };
+
+  /**
+   * 飞书登录入口：这台服务端配好了才显示（`/api/auth/feishu/status`）。
+   *
+   * 🔴 按钮本身只是**顶层跳转**到 `/api/auth/feishu/start` —— 协议全在服务端，
+   * 回程由服务端把会话投进产物页的 URL fragment（`#sessionToken=…`），
+   * 主应用启动时由 `pending-login` 那条既有通道采用（管理页见 `main.tsx` 的 console 分支）。
+   * 查状态是一次匿名 GET，不带任何用户数据；仍走同意闸门（没同意就不发）。
+   */
+  const [feishuEnabled, setFeishuEnabled] = useState(false);
+  const [feishuError] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return new URLSearchParams(window.location.search).get('feishu_error');
+  });
+  useEffect(() => {
+    let cancelled = false;
+    const base = effectiveBaseUrl.replace(/\/+$/, '');
+    if (base === '' || !privacyConsent.networkAllowed()) {
+      setFeishuEnabled(false);
+      return;
+    }
+    void consentFetch(`${base}/api/auth/feishu/status?scope=${feishuScope}`)
+      .then((response) => (response.ok ? (response.json() as Promise<unknown>) : null))
+      .then((payload) => {
+        if (cancelled) return;
+        const enabled =
+          payload !== null && typeof payload === 'object' && (payload as { enabled?: unknown }).enabled === true;
+        setFeishuEnabled(enabled);
+      })
+      .catch(() => {
+        if (!cancelled) setFeishuEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveBaseUrl, feishuScope]);
 
   const labels: AuthFormLabels & {
     readonly otherWaysToggle: { readonly open: string; readonly close: string };
@@ -698,6 +743,36 @@ export function AuthPanel({
             }}
             testID="auth-form"
           />
+          {feishuEnabled ? (
+            <div className="ht-sheet__auth-feishu" data-testid="auth-feishu">
+              <button
+                type="button"
+                className="ht-btn ht-btn--ghost"
+                data-testid="auth-feishu-button"
+                onClick={() =>
+                  withConsent(() => {
+                    const base = effectiveBaseUrl.replace(/\/+$/, '');
+                    window.location.assign(`${base}/api/auth/feishu/start?scope=${feishuScope}`);
+                  })
+                }
+              >
+                {t('web.auth.feishu.button')}
+              </button>
+              {feishuError !== null ? (
+                <p
+                  role="alert"
+                  data-testid="auth-feishu-error"
+                  style={{
+                    margin: 0,
+                    fontSize: cssVar('font-size.2xs'),
+                    color: cssVar('color.foreground-muted'),
+                  }}
+                >
+                  {t('web.auth.feishu.failed')}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           </>
           <LegalDocumentSheet
             document={legalDocumentPresentation(legalDocumentById(openLegalDocument ?? 'terms'))}
