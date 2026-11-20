@@ -27,6 +27,7 @@
  */
 
 import { OFFICIAL_SITE_ORIGIN, type SyncConfig } from '@heyta/app-host';
+import { deleteDevicePref, readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
 /**
  * 当前的活凭据。`undefined` = 尚未配置。
@@ -36,8 +37,64 @@ import { OFFICIAL_SITE_ORIGIN, type SyncConfig } from '@heyta/app-host';
  */
 let current: SyncConfig | undefined;
 
+/**
+ * 🔴 2026-11-20（W4）：**会话**（服务器地址 + 访问令牌 + accountId）持久化到设备本地，
+ * 冷启动读回 —— 用户不再每次冷启动都被要求重登。
+ *
+ * 安全取舍：持久化的只有**会话**（serverUrl / token / accountId），让"已登录、可同步"
+ * 跨重启成立；**E2EE 口令仍然不落盘**（那才是"服务端看不到明文"的承诺所系，落盘即作废）。
+ * 于是加密账号冷启动后可能仍需输入一次口令解锁，但**不需要重新登录**。
+ */
+const PREF_KEY_SYNC_SESSION = 'sync.session';
+/** 登出时一并清掉的账号邮箱键（与 `auth/session.ts` 的 `auth.email` 对应）。 */
+const PREF_KEY_AUTH_EMAIL = 'auth.email';
+let hydrated = false;
+
+function hydrateFromDevice(): void {
+  if (hydrated) return;
+  hydrated = true;
+  try {
+    const raw = readDevicePref(PREF_KEY_SYNC_SESSION);
+    if (raw === undefined) return;
+    const parsed = JSON.parse(raw) as { serverUrl?: unknown; token?: unknown; accountId?: unknown };
+    if (typeof parsed.serverUrl !== 'string' || typeof parsed.token !== 'string' || parsed.token === '') {
+      return;
+    }
+    current = {
+      serverUrl: parsed.serverUrl,
+      token: parsed.token,
+      ...(typeof parsed.accountId === 'string' && parsed.accountId !== ''
+        ? { accountId: parsed.accountId }
+        : {}),
+    };
+  } catch {
+    /* 读盘坏了一律当"没登录"，绝不抛（与 prefs 同一条纪律）。 */
+  }
+}
+
+/** 把当前会话写进设备本地（失败不影响本次会话，不抛）。 */
+function persistCurrent(): void {
+  try {
+    if (current === undefined || current.token === undefined || current.token === '') {
+      deleteDevicePref(PREF_KEY_SYNC_SESSION);
+      return;
+    }
+    writeDevicePref(
+      PREF_KEY_SYNC_SESSION,
+      JSON.stringify({
+        serverUrl: current.serverUrl,
+        token: current.token,
+        ...(current.accountId !== undefined ? { accountId: current.accountId } : {}),
+      }),
+    );
+  } catch {
+    /* 见上：落盘失败只影响"下次启动"，不影响本次。 */
+  }
+}
+
 /** 供 `openAppHost` 的 `getSyncConfig` 使用。**每次同步都会被调用。** */
 export function readSyncConfig(): SyncConfig | undefined {
+  hydrateFromDevice();
   return current;
 }
 
@@ -78,6 +135,7 @@ export function writeSyncConfig(input: {
       ? (sameAuthenticatedSession && current?.accountId !== undefined ? { accountId: current.accountId } : {})
       : (accountId === '' ? {} : { accountId })),
   };
+  persistCurrent();
 }
 
 type ClearedListener = () => void;
@@ -103,6 +161,9 @@ export function onCredentialsCleared(listener: ClearedListener): () => void {
 
 export function clearSyncConfig(): void {
   current = undefined;
+  hydrated = true;
+  deleteDevicePref(PREF_KEY_SYNC_SESSION);
+  deleteDevicePref(PREF_KEY_AUTH_EMAIL);
   for (const listener of clearedListeners) {
     // 🔴 一个订阅者抛错不许把登出的**其余部分**吞掉：清凭据是安全动作，
     // 它比"通知到位"优先级高（同 `privacy/consent-gate.ts` 里 `notify()` 那条理由）。

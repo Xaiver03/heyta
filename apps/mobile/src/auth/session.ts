@@ -32,9 +32,30 @@
  */
 
 import { writeSyncConfig } from '../sync/config';
+import { deleteDevicePref, readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
-/** 本会话内已登录的账号邮箱。冷启动后回到 `undefined`（规范 §4 的已知代价）。 */
+/** 已登录的账号邮箱。**W4 起落盘**（`auth.email`），冷启动读回；登出时清除。 */
 let signedInEmail: string | undefined;
+const PREF_KEY_AUTH_EMAIL = 'auth.email';
+let emailHydrated = false;
+function hydrateEmail(): void {
+  if (emailHydrated) return;
+  emailHydrated = true;
+  try {
+    const raw = readDevicePref(PREF_KEY_AUTH_EMAIL);
+    if (typeof raw === 'string' && raw.trim() !== '') signedInEmail = raw.trim();
+  } catch {
+    /* 读盘坏了一律当没登录；不抛。 */
+  }
+}
+function persistEmail(): void {
+  try {
+    if (signedInEmail === undefined) deleteDevicePref(PREF_KEY_AUTH_EMAIL);
+    else writeDevicePref(PREF_KEY_AUTH_EMAIL, signedInEmail);
+  } catch {
+    /* 落盘失败只影响下次启动；不抛。 */
+  }
+}
 
 export interface AuthSessionInput {
   serverUrl: string;
@@ -85,6 +106,7 @@ export function saveAuthSession(input: AuthSessionInput): {
     m.notifyConfigured();
   });
   signedInEmail = input.email.trim() === '' ? undefined : input.email.trim();
+  persistEmail();
   return {
     serverUrl,
     token,
@@ -95,6 +117,7 @@ export function saveAuthSession(input: AuthSessionInput): {
 
 /** 界面上"当前账号"那一行读它。**没有登录时是 `undefined`**，不要回落到空串。 */
 export function currentSignedInEmail(): string | undefined {
+  hydrateEmail();
   return signedInEmail;
 }
 
@@ -112,14 +135,18 @@ export function currentSignedInEmail(): string | undefined {
 export function setSignedInEmailFromServer(email: string): void {
   const next = email.trim();
   signedInEmail = next === '' ? undefined : next;
+  persistEmail();
 }
 
 /** 清除本机凭据时一并忘掉账号（与 `clearSyncConfig` 成对）。 */
 export function forgetSignedInUser(): void {
   signedInEmail = undefined;
+  emailHydrated = true;
+  deleteDevicePref(PREF_KEY_AUTH_EMAIL);
 }
 
 /** 仅供测试：重置模块级状态。 */
 export function resetAuthSessionForTests(): void {
   signedInEmail = undefined;
+  emailHydrated = false;
 }
