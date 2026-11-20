@@ -22,6 +22,15 @@ import {
   TaskCheckGlyph, CalendarGlyph, TimerGlyph, AiSparkGlyph, PersonGlyph, SearchGlyph, MoreGlyph,
   AiMarkGlyph, BackGlyph, CloseGlyph, ChevronDownGlyph, ChevronUpGlyph,
   PlusGlyph, CheckGlyph, TrashGlyph, SyncGlyph, FolderGlyph,
+  ChartColumnGlyph, FlameGlyph, CalendarClockGlyph, PaperclipGlyph, ImagePlusGlyph,
+  TriangleAlertGlyph, RepeatGlyph, RotateCcwGlyph, BellGlyph, FlagGlyph,
+  ArrowUpRightGlyph, PinGlyph, PinOffGlyph, ArchiveGlyph, ArchiveRestoreGlyph,
+  SquareCheckGlyph, TagGlyph, StickyNoteGlyph, ListTodoGlyph, InboxGlyph,
+  CircleCheckBigGlyph, SmartphoneGlyph, MonitorGlyph, TargetGlyph, CoffeeGlyph,
+  PlayGlyph, PauseGlyph, SquareGlyph, Link2Glyph, WrenchGlyph,
+  ChevronRightGlyph, CalendarDaysGlyph, CalendarRangeGlyph, LayoutGridGlyph, SettingsGlyph,
+  SendGlyph, ArrowUpDownGlyph, CrownGlyph, InfoGlyph, Share2Glyph,
+  PencilGlyph, TrophyGlyph, BadgeCheckGlyph, CopyGlyph, ShieldCheckGlyph,
 } from './custom-icons';
 import {
   Archive,
@@ -100,26 +109,26 @@ const ICONS = {
   // ⚠️ 这一行只**新增**一个登记项，依赖的是文件里已有的 `ChartColumn` 导入
   // （与热点图、统计有关的那一类图标）。纯附加改动，冲突时按并集收，
   // 若上游重写时删掉了 `ChartColumn`，修法是把导入补回来 —— 一个词。
-  'tab.categories': ChartColumn,
+  'tab.categories': ChartColumnGlyph as unknown as typeof ChartColumn,
   'tab.ai': AiMarkGlyph as unknown as typeof Sparkles,
-  'tab.habits': Flame,
-  'tab.countdown': CalendarClock,
+  'tab.habits': FlameGlyph as unknown as typeof Flame,
+  'tab.countdown': CalendarClockGlyph as unknown as typeof CalendarClock,
   'tab.profile': PersonGlyph as unknown as typeof User,
-  'action.attach': Paperclip,
-  'action.image': ImagePlus,
+  'action.attach': PaperclipGlyph as unknown as typeof Paperclip,
+  'action.image': ImagePlusGlyph as unknown as typeof ImagePlus,
 
   // 任务
   'task.add': PlusGlyph as unknown as typeof Plus,
   'task.done': CheckGlyph as unknown as typeof Check,
   'task.delete': TrashGlyph as unknown as typeof Trash2,
-  'task.due': CalendarClock,
-  'task.overdue': TriangleAlert,
-  'task.repeat': Repeat,
-  'task.reopen': RotateCcw,
-  'task.reminder': Bell,
-  'task.priority': Flag,
+  'task.due': CalendarClockGlyph as unknown as typeof CalendarClock,
+  'task.overdue': TriangleAlertGlyph as unknown as typeof TriangleAlert,
+  'task.repeat': RepeatGlyph as unknown as typeof Repeat,
+  'task.reopen': RotateCcwGlyph as unknown as typeof RotateCcw,
+  'task.reminder': BellGlyph as unknown as typeof Bell,
+  'task.priority': FlagGlyph as unknown as typeof Flag,
   /** 旗标（提醒事项的"标记为重要"）。与优先级共用一个 Flag 字形。 */
-  'task.flag': Flag,
+  'task.flag': FlagGlyph as unknown as typeof Flag,
 
   /**
    * 行上下文菜单与左滑动作（`docs/plans/row-actions-redesign.md` §3.4 的移动那一列）。
@@ -129,12 +138,12 @@ const ICONS = {
    * 因为 `task.reopen` 已经是「取消完成」那一格 —— 同一个字形在两处表示两件事，
    * 正是本文件开头要避免的那类缺陷（依据 `ADR-0083` §3.1：放弃与完成互不推导）。
    */
-  'task.open': ArrowUpRight,
-  'task.pin': Pin,
-  'task.unpin': PinOff,
-  'task.abandon': Archive,
-  'task.unabandon': ArchiveRestore,
-  'task.select': SquareCheck,
+  'task.open': ArrowUpRightGlyph as unknown as typeof ArrowUpRight,
+  'task.pin': PinGlyph as unknown as typeof Pin,
+  'task.unpin': PinOffGlyph as unknown as typeof PinOff,
+  'task.abandon': ArchiveGlyph as unknown as typeof Archive,
+  'task.unabandon': ArchiveRestoreGlyph as unknown as typeof ArchiveRestore,
+  'task.select': SquareCheckGlyph as unknown as typeof SquareCheck,
   /**
    * 清单（PROJECT）。
    *
@@ -151,7 +160,7 @@ const ICONS = {
    * 在界面上又出现在同一屏的相邻两段（「我的」页）。同一个 Folder 画两次
    * 会让人以为"标签"是清单的另一种写法。
    */
-  'task.tag': Tag,
+  'task.tag': TagGlyph as unknown as typeof Tag,
 
   /**
    * 便签（NOTE）。
@@ -160,34 +169,34 @@ const ICONS = {
    * （可不挂清单、可钉到「今天」），与「提醒」是两件事。也不复用 `Inbox` ——
    * 那是 `group.inbox`「收集箱」分组的字形，语义不同。
    */
-  'note.sticky': StickyNote,
+  'note.sticky': StickyNoteGlyph as unknown as typeof StickyNote,
 
   // 分组
-  'group.today': ListTodo,
-  'group.inbox': Inbox,
-  'group.overdue': TriangleAlert,
-  'group.completed': CircleCheckBig,
+  'group.today': ListTodoGlyph as unknown as typeof ListTodo,
+  'group.inbox': InboxGlyph as unknown as typeof Inbox,
+  'group.overdue': TriangleAlertGlyph as unknown as typeof TriangleAlert,
+  'group.completed': CircleCheckBigGlyph as unknown as typeof CircleCheckBig,
 
   // 冲突解决
   // 🔴 语义名而不是图标名：`conflict.warning` 而不是 `triangle-alert`。
   // 与 Web 端 `ConflictDialog` 用的是同一组语义（AlertTriangle / Monitor / Smartphone），
   // 于是两端在同一个情境下画的是同一个字形。
-  'conflict.warning': TriangleAlert,
-  'device.local': Smartphone,
-  'device.remote': Monitor,
-  'action.keep': Check,
+  'conflict.warning': TriangleAlertGlyph as unknown as typeof TriangleAlert,
+  'device.local': SmartphoneGlyph as unknown as typeof Smartphone,
+  'device.remote': MonitorGlyph as unknown as typeof Monitor,
+  'action.keep': CheckGlyph as unknown as typeof Check,
 
   // 专注
   // 与任务图标同样的理由：语义名（`focus.pause`）而不是图标名（`Pause`）——
   // 换图标库时语义名不用改，而且"暂停"在两处必须是同一个字形。
-  'focus.work': Target,
-  'focus.break': Coffee,
-  'focus.play': Play,
-  'focus.pause': Pause,
-  'focus.abort': Square,
-  'focus.stats': ChartColumn,
-  'focus.streak': Flame,
-  'focus.link': Link2,
+  'focus.work': TargetGlyph as unknown as typeof Target,
+  'focus.break': CoffeeGlyph as unknown as typeof Coffee,
+  'focus.play': PlayGlyph as unknown as typeof Play,
+  'focus.pause': PauseGlyph as unknown as typeof Pause,
+  'focus.abort': SquareGlyph as unknown as typeof Square,
+  'focus.stats': ChartColumnGlyph as unknown as typeof ChartColumn,
+  'focus.streak': FlameGlyph as unknown as typeof Flame,
+  'focus.link': Link2Glyph as unknown as typeof Link2,
 
   // 通用
   'action.prev-month': ChevronLeft,
@@ -205,36 +214,36 @@ const ICONS = {
    * 两行名字都以「AI」开头、图标又一样，读起来是同一件事。
    * 图标在这类列表里是**唯一的区分线索**，撞图标等于丢线索。
    */
-  'action.toolbox': Wrench,
-  'action.disclose': ChevronRight,
+  'action.toolbox': WrenchGlyph as unknown as typeof Wrench,
+  'action.disclose': ChevronRightGlyph as unknown as typeof ChevronRight,
   /** 往下展开（"点我换一档"）。与 `action.disclose` 同一个字形家族，方向不同。 */
   'action.disclose-down': ChevronDown,
   /*
    * 日历档位字形（`CalendarViewMenu` 每行一枚）。
    * 语义名而不是图标名 —— 与全仓其余图标同一个规矩。
    */
-  'calendar.month': CalendarDays,
-  'calendar.week': CalendarRange,
-  'calendar.day': CalendarClock,
-  'calendar.year': LayoutGrid,
+  'calendar.month': CalendarDaysGlyph as unknown as typeof CalendarDays,
+  'calendar.week': CalendarRangeGlyph as unknown as typeof CalendarRange,
+  'calendar.day': CalendarClockGlyph as unknown as typeof CalendarClock,
+  'calendar.year': LayoutGridGlyph as unknown as typeof LayoutGrid,
   'action.next-month': ChevronRight,
   // 🔴 「返回」与「上一月」是**不同语义**，所以用不同字形：`ArrowLeft` 是
   // 进出层级的通用返回，`ChevronLeft` 是月历的翻页。两者在成长屏与日历屏
   // 各出现一次，字形相同会让人以为它们做同一件事。
   'action.back': BackGlyph as unknown as typeof ArrowLeft,
   'action.close': CloseGlyph as unknown as typeof X,
-  'action.settings': Settings,
+  'action.settings': SettingsGlyph as unknown as typeof Settings,
   // 🔴 与共享 `SearchPanel` 输入行里那个放大镜**同一个字形**：入口和它打开的
   // 东西长得不一样，用户就不会把这两个认成同一件事。
   'action.search': SearchGlyph as unknown as typeof Search,
-  'action.send': Send,
+  'action.send': SendGlyph as unknown as typeof Send,
   'assistant.new-session': Plus,
   /**
    * 排序档位。`ArrowUpDown` 是"这一列可以换个顺序看"的通用字形，
    * 而 `ListTodo` / `Inbox` 都已经各自占住了"任务"与"收集箱"的语义 ——
    * 借用它们会让 chip 读起来像"切换到某个视图"，而它改的是顺序不是内容。
    */
-  'action.sort': ArrowUpDown,
+  'action.sort': ArrowUpDownGlyph as unknown as typeof ArrowUpDown,
   'action.sync': SyncGlyph as unknown as typeof RefreshCw,
   /**
    * 「或者用别的方式」那一组的标题图标。
@@ -247,11 +256,11 @@ const ICONS = {
    * 2026-11-14 看图才发现「订阅」那一行前面是一枚「⋯」。
    * 省略号在 UI 里唯一的含义是"还有更多"，把它当"订阅"用是**没有语义**。
    */
-  'action.subscription': Crown,
+  'action.subscription': CrownGlyph as unknown as typeof Crown,
   /** 外观与语言（显示相关）。此前借的是齿轮，而齿轮在设置语境里是"设置"本身。 */
-  'action.display': Monitor,
+  'action.display': MonitorGlyph as unknown as typeof Monitor,
   /** 关于 / 帮助。同一个错：「关于与帮助」也曾借 `action.more`。 */
-  'action.info': Info,
+  'action.info': InfoGlyph as unknown as typeof Info,
   'action.more': MoreGlyph as unknown as typeof Ellipsis,
   'action.expand': ChevronDownGlyph as unknown as typeof ChevronDown,
   'action.collapse': ChevronUpGlyph as unknown as typeof ChevronUp,
@@ -262,7 +271,7 @@ const ICONS = {
    * `<a download>`，导出走的是系统分享面板（`Share.share`）。用云朵下载箭头
    * 会承诺一个并不存在的动作 —— 图标和按钮文案必须说同一件事。
    */
-  'action.share': Share2,
+  'action.share': Share2Glyph as unknown as typeof Share2,
   /**
    * 「改名」。
    *
@@ -270,7 +279,7 @@ const ICONS = {
    * 清单/标签的行内改名走共享层，习惯的改名入口在宿主（输入控件规范不同、
    * 各自各写一份），两处长得不一样会让人以为是两种不同的动作。
    */
-  'action.rename': Pencil,
+  'action.rename': PencilGlyph as unknown as typeof Pencil,
 
   /**
    * 成长（激励体系）。
@@ -279,15 +288,15 @@ const ICONS = {
    * 语义相同就该是同一个字形。另外三个是这个界面独有的语义，各给一个
    * 新字形（周视图 / 里程碑 / 身份），避免与任务、专注的图标混在一起。
    */
-  'growth.week': CalendarRange,
-  'growth.milestones': Trophy,
-  'growth.identity': BadgeCheck,
+  'growth.week': CalendarRangeGlyph as unknown as typeof CalendarRange,
+  'growth.milestones': TrophyGlyph as unknown as typeof Trophy,
+  'growth.identity': BadgeCheckGlyph as unknown as typeof BadgeCheck,
   /**
    * 「带走这一周」（把周小结复制成纯文本）。与 `growth.week` **不同字形**：
    * 那一个是"这一周的数据"，这一个是"把这段文字交出去"—— 共享层的
    * `ShareSummarySection` 用的也是复制图标，两端同一个语义该是同一个字形。
    */
-  'growth.share': Copy,
+  'growth.share': CopyGlyph as unknown as typeof Copy,
 
   /**
    * 隐私同意面板。
@@ -296,7 +305,7 @@ const ICONS = {
    * "这台设备能不能对外说话"的法律决定。同一个字形会让用户以为同意是
    * 一个可以随时改的普通开关，而撤回它需要一条单独的路径（PIPL 第 15 条）。
    */
-  'privacy.consent': ShieldCheck,
+  'privacy.consent': ShieldCheckGlyph as unknown as typeof ShieldCheck,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
