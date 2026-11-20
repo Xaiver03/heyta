@@ -275,6 +275,16 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     [view],
   );
 
+  /** 🔴 2026-11-20：整周平移（日历条左右拖拽切周用）。同时移动 selected + cursor，任何档位成立。 */
+  const shiftWeek = useCallback(
+    (direction: 1 | -1) => {
+      const next = addDays(selected, 7 * direction);
+      setSelected(next);
+      setCursor(calendarCursorFor(view, next));
+    },
+    [selected, view],
+  );
+
   const pickDay = useCallback(
     (date: LocalDate) => {
       setSelected(date);
@@ -447,17 +457,19 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
   const tokens = useTokens();
   const shiftPeriod = useCallback(
     (direction: 1 | -1) => {
+      if (view === 'week') {
+        shiftWeek(direction);
+        return;
+      }
       const next =
         view === 'month'
           ? addMonths(cursor, direction)
-          : view === 'week'
-            ? addDays(cursor, 7 * direction)
-            : view === 'day'
-              ? addDays(cursor, direction)
-              : addMonths(cursor, 12 * direction);
+          : view === 'day'
+            ? addDays(cursor, direction)
+            : addMonths(cursor, 12 * direction);
       stepCursor(next);
     },
-    [cursor, stepCursor, view],
+    [cursor, shiftWeek, stepCursor, view],
   );
   /**
    * 🔴 2026-11-16：**捏合切档**（双指）。
@@ -570,6 +582,23 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         },
       }),
     [shiftPeriod, tokens, view, zoomView, ZOOM_ORDER, pinchScale],
+  );
+  /**
+   * 🔴 2026-11-20：日历条左右拖拽切周。
+   * 旧的横滑只挂在下方内容区，日历条本身没挂手势 —— 在条上拖没反应。这里单独给日历条挂一个（Capture 抢在 Pressable 前认）。
+   */
+  const weekSwipe = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponderCapture: (_e, g) =>
+          Math.abs(g.dx) > tokens['space.8'] && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+        onPanResponderRelease: (_e, g) => {
+          if (Math.abs(g.dx) < tokens['space.8']) return;
+          shiftWeek(g.dx < 0 ? 1 : -1);
+        },
+      }),
+    [shiftWeek, tokens],
   );
 
   /**
@@ -714,15 +743,17 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
 
       {/* 日历条（Apple 式横向周历）：只在单日档显示；一周档本身是整周列，不再叠一条。 */}
       {view === 'day' ? (
-        <CalendarWeekStrip
-          weekStart={startOfWeek(selected)}
-          selected={selected}
-          today={today}
-          weekdays={labels.weekdays}
-          onSelect={(date) => {
-            pickDay(date);
-          }}
-        />
+        <View {...weekSwipe.panHandlers}>
+          <CalendarWeekStrip
+            weekStart={startOfWeek(selected)}
+            selected={selected}
+            today={today}
+            weekdays={labels.weekdays}
+            onSelect={(date) => {
+              pickDay(date);
+            }}
+          />
+        </View>
       ) : null}
 
       {/* Apple 式：周历条下方、内容上方居中显示当天标题。 */}
