@@ -149,7 +149,8 @@ export function ChatComposer({
             borderRadius: tokens['radius.full'],
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: canSend ? tokens['color.primary'] : tokens['color.surface-sunken'],
+            // 不再给发送键铺灰/蓝圆底：只留一个图标（「有个输入框就够了」）。
+            backgroundColor: 'transparent',
             opacity: pressed && !reducedMotion && canSend ? tokens['state.pressed-opacity'] : 1,
           })}
         >

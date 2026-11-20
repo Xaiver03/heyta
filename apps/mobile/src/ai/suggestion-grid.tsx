@@ -29,10 +29,7 @@ export function AiSuggestionGrid({
     () =>
       StyleSheet.create({
         card: {
-          backgroundColor: tokens['color.surface'],
-          borderRadius: tokens['radius.lg'],
-          overflow: 'hidden',
-          ...(tokens['shadow.sm'] !== undefined ? { boxShadow: tokens['shadow.sm'] } : {}),
+          // 空态建议只是几行轻量入口：无卡片底、无阴影、无外框。
         },
         row: {
           flexDirection: 'row',

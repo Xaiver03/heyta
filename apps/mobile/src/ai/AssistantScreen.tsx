@@ -529,7 +529,7 @@ export function AssistantScreen({
               generatedLabel={t('common.ai.generatedLabel')}
               empty={
                 <Stack gap="default">
-                  <Text variant="headline">{t('web.ai.chat.greeting')}</Text>
+                  <Text variant="section-title">{t('web.ai.chat.greeting')}</Text>
                   <AiSuggestionGrid
                     items={SUGGESTIONS.map((key) => ({
                       key,
@@ -566,7 +566,6 @@ export function AssistantScreen({
           {imageError !== undefined ? (
             <Text variant="caption" tone="danger">{imageError}</Text>
           ) : null}
-          <Text variant="caption" tone="subtle" style={{ paddingBottom: tokens['space.2'] }}>{t('web.ai.chat.disclaimer')}</Text>
         </View>
       </KeyboardAvoidingView>
       </View>

@@ -391,12 +391,12 @@
 
   /* 阴影：克制。扁平风格优先用边框表达层次，阴影只用于浮层。 */
   --ht-shadow-none: none;
-  --ht-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
-  --ht-shadow-md: 0 2px 8px rgb(15 23 42 / 0.08);
+  --ht-shadow-sm: 0 1px 1px rgb(15 23 42 / 0.04);
+  --ht-shadow-md: 0 1px 3px rgb(15 23 42 / 0.06);
   /* 分组卡片的柔和投影：比 md 更实（14%），让白卡在浅灰底上“浮”起来。 */
-  --ht-shadow-card: 0 2px 8px rgb(0 0 0 / 0.12);
-  --ht-shadow-lg: 0 8px 24px rgb(15 23 42 / 0.12);
-  --ht-shadow-xl: 0 16px 48px rgb(15 23 42 / 0.16);
+  --ht-shadow-card: 0 1px 3px rgb(15 23 42 / 0.06);
+  --ht-shadow-lg: 0 4px 12px rgb(15 23 42 / 0.08);
+  --ht-shadow-xl: 0 8px 24px rgb(15 23 42 / 0.10);
   /* 主色焦点光晕，与 --ht-color-ring 配套 */
   --ht-shadow-focus: 0 0 0 3px rgb(37 99 235 / 0.25);
 
@@ -942,11 +942,11 @@
   /* 与 success 同亮色原色阶（emerald-600）⇒ 走语义层引用。 */
   --ht-color-focus-break: var(--ht-color-success);
 
-  --ht-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --ht-shadow-md: 0 2px 8px rgb(0 0 0 / 0.5);
-  --ht-shadow-card: 0 2px 8px rgb(0 0 0 / 0.5);
-  --ht-shadow-lg: 0 8px 24px rgb(0 0 0 / 0.6);
-  --ht-shadow-xl: 0 16px 48px rgb(0 0 0 / 0.7);
+  --ht-shadow-sm: 0 1px 1px rgb(0 0 0 / 0.25);
+  --ht-shadow-md: 0 1px 3px rgb(0 0 0 / 0.30);
+  --ht-shadow-card: 0 1px 3px rgb(0 0 0 / 0.30);
+  --ht-shadow-lg: 0 4px 12px rgb(0 0 0 / 0.35);
+  --ht-shadow-xl: 0 8px 24px rgb(0 0 0 / 0.40);
   --ht-shadow-focus: 0 0 0 3px rgb(96 165 250 / 0.35);
 
   /* 材质：暗色的半透明**不是亮色的反相**。
