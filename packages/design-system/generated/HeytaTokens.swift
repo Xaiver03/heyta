@@ -50,7 +50,7 @@ enum HeytaTokens {
     static let colorPrimarySubtle: String = "#eff6ff"
     static let colorPrimarySubtleHover: String = "#dbeafe"
     static let colorOnPrimary: String = "#ffffff"
-    static let colorBackground: String = "#f8fafc"
+    static let colorBackground: String = "#f1f5f9"
     static let colorSurface: String = "#ffffff"
     static let colorSurfaceSubtle: String = "#f8fafc"
     static let colorSurfaceRaised: String = "#ffffff"
@@ -152,12 +152,12 @@ enum HeytaTokens {
     static let radiusDialog: Double = 24  // px
     static let radiusFull: Double = 9999  // px
     static let shadowNone: String = "none"
-    static let shadowSm: String = "0 1px 1px rgb(15 23 42 / 0.04)"
+    static let shadowSm: String = "0 1px 1px rgb(15 23 42 / 0.03)"
     static let shadowMd: String = "0 1px 3px rgb(15 23 42 / 0.06)"
     static let shadowLg: String = "0 4px 12px rgb(15 23 42 / 0.08)"
     static let shadowXl: String = "0 8px 24px rgb(15 23 42 / 0.10)"
     static let shadowFocus: String = "0 0 0 3px rgb(37 99 235 / 0.25)"
-    static let shadowCard: String = "0 1px 3px rgb(15 23 42 / 0.06)"
+    static let shadowCard: String = "0 1px 2px rgb(15 23 42 / 0.03)"
     static let durationInstant: Double = 80  // ms
     static let durationFast: Double = 150  // ms
     static let durationNormal: Double = 200  // ms
