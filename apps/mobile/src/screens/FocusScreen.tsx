@@ -32,10 +32,11 @@
 
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type FocusSessionKind, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { FocusPanel, focusLogFailureMessageKey } from '@heyta/ui';
+import { BottomSheet, FocusPanel, focusLogFailureMessageKey } from '@heyta/ui';
 import { focusOverview, type AppHost, type FocusOverview } from '@heyta/app-host';
 
 import { useText, useTokens } from '../theme';
@@ -166,6 +167,7 @@ function StatRow({ label, value }: { label: string; value: string }): React.JSX.
 
 export function FocusScreen(): React.JSX.Element {
   const tokens = useTokens();
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const timer = useFocusTimer();
   const { state } = timer;
@@ -176,8 +178,6 @@ export function FocusScreen(): React.JSX.Element {
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        overlay: { flex: 1, backgroundColor: tokens['color.background'], justifyContent: 'center', paddingHorizontal: tokens['screen.gutter'] },
-        sheetBg: { gap: tokens['space.3'] },
         chips: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] },
       }),
     [tokens],
@@ -459,23 +459,31 @@ export function FocusScreen(): React.JSX.Element {
         <GrowthScreen onBack={() => { setStatsOpen(false); }} onOpenHabits={() => { setStatsOpen(false); }} />
       </Modal>
 
-      <Modal visible={durationOpen} transparent animationType="fade" onRequestClose={() => { setDurationOpen(false); }}>
-        <Pressable style={styles.overlay} onPress={() => { setDurationOpen(false); }} accessibilityRole="button" accessibilityLabel={t('mobile.focus.durationPreset.title')}>
-          <View style={styles.sheetBg}>
-            <Text variant="section-title">{t('mobile.focus.durationPreset.title')}</Text>
-            <View style={styles.chips}>
-              {[15, 25, 45, 60].map((m) => (
-                <Chip
-                  key={m}
-                  label={t('mobile.focus.durationPreset.minutes', { n: m })}
-                  selected={getFocusWorkMinutes() === m}
-                  onPress={() => { setFocusWorkMinutes(m); setDurationOpen(false); }}
-                />
-              ))}
-            </View>
-          </View>
-        </Pressable>
-      </Modal>
+      <BottomSheet
+        visible={durationOpen}
+        title={t('mobile.focus.durationPreset.title')}
+        labels={{
+          close: t('mobile.settings.close'),
+          expand: t('mobile.detail.sheet.expand'),
+          collapse: t('mobile.detail.sheet.collapse'),
+        }}
+        onDismiss={() => { setDurationOpen(false); }}
+        detents={['small', 'medium']}
+        defaultDetent="small"
+        bottomInset={insets.bottom}
+        testID="focus-duration-sheet"
+      >
+        <View style={styles.chips}>
+          {[15, 25, 45, 60].map((m) => (
+            <Chip
+              key={m}
+              label={t('mobile.focus.durationPreset.minutes', { n: m })}
+              selected={getFocusWorkMinutes() === m}
+              onPress={() => { setFocusWorkMinutes(m); setDurationOpen(false); }}
+            />
+          ))}
+        </View>
+      </BottomSheet>
 
       <TopBarMenu
         visible={moreOpen}

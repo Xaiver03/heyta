@@ -1655,3 +1655,8 @@ export {
 } from './attachments/model.js';
 export { ErrorState, type ErrorStateLabels, type ErrorStateProps } from './feedback/ErrorState.js';
 export { Skeleton, type SkeletonProps } from './feedback/Skeleton.js';
+export {
+  adjacentPageForRelease,
+  projectGestureOffset,
+  rubberBandOffset,
+} from './motion/gesture.js';

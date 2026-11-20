@@ -24,6 +24,11 @@ describe('移动端个人中心的成长摘要', () => {
     expect(source).toContain("testID: 'profile-progress-growth'");
   });
 
+  it('成就摘要只显示已达成数量，不把总数拼成 0/0 或 0/17', () => {
+    expect(source).toMatch(/value: String\(snapshot\.reached\)/u);
+    expect(source).not.toContain('`${String(snapshot.reached)}/${String(snapshot.total)}`');
+  });
+
   it('常驻个人中心同时订阅同步修订与本地写入信号', () => {
     expect(source).toContain("import { onLocalWrite } from '../sync/write-signal';");
     expect(source).toContain('const [localWriteRevision, setLocalWriteRevision] = useState(0);');

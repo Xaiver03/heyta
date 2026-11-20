@@ -59,8 +59,7 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
     const week = weeklyReviewFromState(tables, now);
     const milestones = milestonesFromState(tables);
     const reached = milestones.reduce((sum, milestone) => sum + (milestone.reached ? 1 : 0), 0);
-    const total = milestones.length;
-    return { week, reached, total };
+    return { week, reached };
   }, [tables, now]);
 
   const retry = (): void => setRetryRevision((revision) => revision + 1);
@@ -113,7 +112,7 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
     },
     {
       label: t('mobile.profile.progress.achievements'),
-      value: `${String(snapshot.reached)}/${String(snapshot.total)}`,
+      value: String(snapshot.reached),
       testID: 'profile-progress-growth',
       onPress: onOpenGrowth,
     },

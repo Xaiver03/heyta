@@ -5,8 +5,10 @@
  * 这里先把**可直接进 prompt 的上下文**做成附件：把选中任务的标题作为引用随消息发出。
  */
 import React, { useMemo } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '@heyta/i18n';
+import { BottomSheet } from '@heyta/ui';
 
 import { useTokens } from '../theme';
 import { Icon } from '../ui/icons';
@@ -32,15 +34,13 @@ export function TaskAttachmentSheet({
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        overlay: { flex: 1, backgroundColor: tokens['color.background'], justifyContent: 'center', paddingHorizontal: tokens['screen.gutter'] },
-        sheet: { maxHeight: '70%', gap: tokens['space.3'] },
         list: {
           backgroundColor: tokens['color.surface'],
           borderRadius: tokens['radius.lg'],
-          ...(tokens['shadow.sm'] !== undefined ? { boxShadow: tokens['shadow.sm'] } : {}),
         },
         row: {
           flexDirection: 'row',
@@ -51,44 +51,52 @@ export function TaskAttachmentSheet({
         },
         grow: { flex: 1 },
         pressed: { opacity: tokens['state.pressed-opacity'] },
+        divider: { height: tokens['border-width.thin'], backgroundColor: tokens['color.border'], marginLeft: tokens['space.3'] },
       }),
     [tokens],
   );
   const isOn = (id: string): boolean => selected.some((s) => s.id === id);
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('mobile.ai.attach.title')}>
-        <View style={styles.sheet}>
-          <Text variant="section-title">{t('mobile.ai.attach.title')}</Text>
-          <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
-            {tasks.length === 0 ? (
-              <View style={styles.row}>
-                <Text variant="row-meta" tone="subtle">{t('mobile.ai.attach.empty')}</Text>
+    <BottomSheet
+      visible={visible}
+      title={t('mobile.ai.attach.title')}
+      labels={{
+        close: t('mobile.ai.attach.done'),
+        expand: t('mobile.detail.sheet.expand'),
+        collapse: t('mobile.detail.sheet.collapse'),
+      }}
+      onDismiss={onClose}
+      detents={['medium', 'large']}
+      defaultDetent="medium"
+      bottomInset={insets.bottom}
+      footer={<Button label={t('mobile.ai.attach.done')} tone="primary" onPress={onClose} />}
+    >
+      <View style={styles.list}>
+        {tasks.length === 0 ? (
+          <View style={styles.row}>
+            <Text variant="row-meta" tone="subtle">{t('mobile.ai.attach.empty')}</Text>
+          </View>
+        ) : (
+          tasks.map((task, index) => {
+            const on = isOn(task.id);
+            return (
+              <View key={task.id}>
+                {index > 0 ? <View style={styles.divider} /> : null}
+                <Pressable
+                  accessibilityRole="checkbox"
+                  aria-checked={on}
+                  accessibilityLabel={task.title}
+                  onPress={() => { onToggle(task); }}
+                  style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+                >
+                  <Icon name={on ? 'task.done' : 'task.due'} size="sm" color={on ? tokens['color.primary'] : tokens['color.foreground-muted']} />
+                  <Text variant="row-title" numberOfLines={1} style={styles.grow}>{task.title}</Text>
+                </Pressable>
               </View>
-            ) : (
-              tasks.map((task, index) => {
-                const on = isOn(task.id);
-                return (
-                  <View key={task.id}>
-                    {index > 0 ? <View style={{ height: tokens['border-width.thin'], backgroundColor: tokens['color.border'], marginLeft: tokens['space.3'] }} /> : null}
-                    <Pressable
-                      accessibilityRole="checkbox"
-                      aria-checked={on}
-                      accessibilityLabel={task.title}
-                      onPress={() => { onToggle(task); }}
-                      style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
-                    >
-                      <Icon name={on ? 'task.done' : 'task.due'} size="sm" color={on ? tokens['color.primary'] : tokens['color.foreground-muted']} />
-                      <Text variant="row-title" numberOfLines={1} style={styles.grow}>{task.title}</Text>
-                    </Pressable>
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
-          <Button label={t('mobile.ai.attach.done')} tone="primary" onPress={onClose} />
-        </View>
-      </Pressable>
-    </Modal>
+            );
+          })
+        )}
+      </View>
+    </BottomSheet>
   );
 }

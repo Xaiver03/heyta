@@ -88,6 +88,17 @@ describe('移动端个人中心与设置的 IA 接线', () => {
     expect(profile).toContain("navigation.push('settings');");
   });
 
+  it('切换账号只留在账号设置，不再在首屏两张卡之间重复放一颗按钮', () => {
+    const accountAt = profile.indexOf('testID="profile-account-value"');
+    const summaryAt = profile.indexOf('<ProfileProgressSummary', accountAt);
+    expect(accountAt).toBeGreaterThanOrEqual(0);
+    expect(summaryAt).toBeGreaterThan(accountAt);
+    expect(profile.slice(accountAt, summaryAt)).not.toContain('mobile.profile.account.switchAccount');
+    expect(settings).toContain('mobile.profile.account.switchAccount');
+    const account = between(settings, "case 'account':", "case 'subscription':");
+    expect(account).toContain('mobile.profile.account.switchAccount');
+  });
+
   it('设置的同步、数据与安全动作由个人中心提供，避免复制路由状态', () => {
     expect(profile).toContain('syncStatus={syncStatus}');
     expect(profile).toContain('dataActions={entryRows.filter');

@@ -74,6 +74,7 @@ import {
   shouldDismissOnRelease,
   type SheetDetent,
 } from './sheet-detents.js';
+import { projectGestureOffset, rubberBandOffset } from '../motion/gesture.js';
 import { isSheetDragRegion, type SheetDragRegion } from './sheet-drag.js';
 import { springFor } from './spring-physics.js';
 
@@ -186,10 +187,6 @@ export interface BottomSheetProps {
   readonly testID?: string;
 }
 
-function clamp(value: number, low: number, high: number): number {
-  return Math.min(Math.max(value, low), high);
-}
-
 export function BottomSheet({
   visible,
   overlay = 'bottom-sheet',
@@ -271,10 +268,14 @@ export function BottomSheet({
 
   // 档位 / 视口变了就弹到目标位置。拖拽中不弹（否则手还没松就被拽回去）。
   const dragging = useRef(false);
+  /** 松手速度（dp/s，offset 坐标）；下一次吸附消费后清零。 */
+  const releaseVelocity = useRef(0);
+  /** 同一档松手也要重新吸附，因此不能只在 current 改变时启动动画。 */
+  const [settleRevision, setSettleRevision] = useState(0);
   useEffect(() => {
     if (dragging.current) return;
     const target = offsetFor(current);
-    if (Math.abs(offsetPx.current - target) < 1) {
+    if (Math.abs(offsetPx.current - target) < 1 && releaseVelocity.current === 0) {
       offset.setValue(target);
       return;
     }
@@ -285,8 +286,9 @@ export function BottomSheet({
           // 🔴 不用 native driver：RNW 上 `useNativeDriver` 不是同一套实现，
           // 而这一层两端共用。面板吸附不是每秒 60 次的连续动画，JS 线程够用。
           useNativeDriver: false,
-          // 🔴 物理参数**不是写死的**，由设计系统的弹簧 token 换算得到。
+          velocity: releaseVelocity.current,
           //
+          // 🔴 物理参数**不是写死的**，由设计系统的弹簧 token 换算得到。
           // `tokens.css` §3c 用 Apple 的「阻尼比 + 响应」定义了这一仓的弹簧，
           // 并注明"这一组故意不是时长"。RN 的 `Animated.spring` 只认物理三件套，
           // 因此中间必须有一层换算（`spring-physics.ts`）。
@@ -304,13 +306,14 @@ export function BottomSheet({
             responseMove: tokens['motion.spring-response-move'],
             responseSheet: tokens['motion.spring-response-sheet'],
             responseRotation: tokens['motion.spring-response-rotation'],
-          }),
+          }, { momentum: releaseVelocity.current !== 0 }),
         });
+    releaseVelocity.current = 0;
     animation.start();
     return () => {
       animation.stop();
     };
-  }, [current, viewportHeight, maxHeight, offset, theme.reducedMotion]);
+  }, [current, viewportHeight, maxHeight, offset, theme.reducedMotion, settleRevision]);
 
   const applyDetent = (next: SheetDetent): void => {
     // 走到这里的一定是**用户手势**（拖拽吸附 / 点把手），所以从此迟到的记忆不再采纳。
@@ -358,7 +361,9 @@ export function BottomSheet({
 
   /** 按下那一刻的偏移。`gesture.dy` 是自按下起的**累计**位移，不是每帧增量。 */
   const startOffset = useRef(0);
+  const gestureOrigin = useRef(0);
   const hysteresis = tokens['gesture.hysteresis'];
+  const decelerationRate = tokens['motion.deceleration-rate'];
 
   const pan = useMemo(
     () =>
@@ -368,31 +373,49 @@ export function BottomSheet({
         // （侧滑那一族用的是同一条），写 4 就等于给手势判据开了第二处定义。
         onMoveShouldSetPanResponder: (_event, gesture) =>
           Math.abs(gesture.dy) > hysteresis,
-        onPanResponderGrant: () => {
+        onPanResponderGrant: (_event, gesture) => {
           dragging.current = true;
-          startOffset.current = offsetPx.current;
-          offset.stopAnimation();
+          gestureOrigin.current = gesture.dy;
+          offset.stopAnimation((value) => {
+            startOffset.current = value;
+            offsetPx.current = value;
+          });
         },
         onPanResponderMove: (_event, gesture) => {
-          // 累计位移 + 按下时的偏移。⚠️ 不加到 `offsetPx.current` 上 ——
-          // 那个读数每帧都在被自己更新，加进去会变成每次移动都翻倍。
-          offset.setValue(clamp(startOffset.current + gesture.dy, 0, maxHeight));
+          // 边界仍跟随手指，但阻力逐渐增加；松手后再吸附，不在边界上硬停。
+          const raw = startOffset.current + (gesture.dy - gestureOrigin.current);
+          if (raw < 0) {
+            offset.setValue(-rubberBandOffset(-raw, viewportHeight));
+          } else if (raw > maxHeight) {
+            offset.setValue(maxHeight + rubberBandOffset(raw - maxHeight, viewportHeight));
+          } else {
+            offset.setValue(raw);
+          }
         },
         onPanResponderRelease: (_event, gesture) => {
           dragging.current = false;
-          const released = clamp(startOffset.current + gesture.dy, 0, maxHeight);
-          const visibleHeight = maxHeight - released;
-          if (shouldDismissOnRelease(visibleHeight, allowed, viewportHeight)) {
+          const visibleHeight = maxHeight - startOffset.current - (gesture.dy - gestureOrigin.current);
+          const projectedHeight = projectGestureOffset(
+            visibleHeight,
+            -gesture.vy * 1000,
+            decelerationRate,
+          );
+          releaseVelocity.current = gesture.vy * 1000;
+          if (shouldDismissOnRelease(projectedHeight, allowed, viewportHeight)) {
+            releaseVelocity.current = 0;
             runDismissRef.current(dragAction, 'drag');
             // 关掉之后下一次打开要回到该在的档位，别停在"被拖没"的偏移上。
             offset.setValue(offsetFor(current));
             return;
           }
-          applyDetent(detentForHeight(visibleHeight, viewportHeight, allowed));
+          applyDetent(detentForHeight(projectedHeight, viewportHeight, allowed));
+          setSettleRevision((revision) => revision + 1);
         },
         onPanResponderTerminate: () => {
           dragging.current = false;
+          releaseVelocity.current = 0;
           applyDetent(detentForHeight(maxHeight - offsetPx.current, viewportHeight, allowed));
+          setSettleRevision((revision) => revision + 1);
         },
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 依赖里刻意不含 `offsetPx`/`runDismiss`：两者都是 ref 包裹的稳定读数，进依赖会让 PanResponder 每次渲染重建，手感变成"拖一半重来"。
@@ -405,6 +428,7 @@ export function BottomSheet({
       current,
       detent,
       hysteresis,
+      decelerationRate,
     ],
   );
 

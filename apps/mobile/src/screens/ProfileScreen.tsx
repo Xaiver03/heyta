@@ -1701,12 +1701,9 @@ export function ProfileScreen(): React.JSX.Element {
         </Card>
       </Pressable>
       {/*
-        切换账号仍是一枚按钮（已登录时才有意义）—— 登录本身已经在上面那个头部的
-        点击里了，这里不再重复一枚「注册 / 登录」。
+        切换账号放在「账号与安全」页。首屏只保留账号卡入口，
+        避免同一个动作在两张数据卡之间再占一整行。
       */}
-      {accountHasCredential ? (
-        <Button label={t('mobile.profile.account.switchAccount')} onPress={openAuth} tone="secondary" />
-      ) : null}
       {/*
         🔴 这两条实话**必须**由常驻的本屏来说，而不是由「账号与安全」那屏：
         退出之后那屏就关掉了，而"服务器上那一枚还没撤成"恰恰是在那之后
@@ -1872,6 +1869,7 @@ export function ProfileScreen(): React.JSX.Element {
         profileEditor={profileEditor}
         syncStatus={syncStatus}
         onOpenAuth={openAuth}
+        accountHasCredential={accountHasCredential}
         onUseOfficialSync={onClearCredentials}
         dataActions={entryRows.filter((row) => ['profile-entry-export', 'profile-entry-trash', 'profile-entry-abandoned'].includes(row.testID ?? ''))}
         securityActions={entryRows.filter((row) => ['profile-entry-security', 'profile-entry-close-account'].includes(row.testID ?? ''))}

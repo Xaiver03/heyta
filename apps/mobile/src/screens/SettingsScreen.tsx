@@ -195,6 +195,7 @@ export function SettingsScreen({
   securityActions,
   syncStatus,
   onOpenAuth,
+  accountHasCredential,
   onUseOfficialSync,
   initialSection,
 }: {
@@ -227,6 +228,8 @@ export function SettingsScreen({
   syncStatus?: React.ReactNode;
   /** 从同步设置进入登录；参数为 true 时明确打开自托管认证路径。 */
   onOpenAuth?: (allowServerSelection?: boolean) => void;
+  /** 是否已有登录凭据。凭据只放内存，不能用同步表单是否配置来判“已登录”。 */
+  accountHasCredential?: boolean;
   /** 切回官方同步时清理自托管凭据，避免把令牌带到另一个服务端。 */
   onUseOfficialSync?: () => void;
   /** 从个人资料直达“个人资料”二级分组，普通打开时留在目录。 */
@@ -641,9 +644,9 @@ export function SettingsScreen({
               secure
               hint={t('mobile.profile.password.hint')}
             />
-            {onOpenAuth !== undefined ? (
+            {onOpenAuth !== undefined && accountHasCredential !== true ? (
               <Button
-                label={form.configured ? t('mobile.profile.account.switchAccount') : t('mobile.profile.account.signIn')}
+                label={t('mobile.profile.account.signIn')}
                 tone="primary"
                 onPress={() => onOpenAuth(true)}
                 style={{ alignSelf: 'flex-start' }}
@@ -666,9 +669,9 @@ export function SettingsScreen({
             <Text variant="caption" tone="subtle">
               {t('mobile.profile.sync.officialHint')}
             </Text>
-            {onOpenAuth !== undefined ? (
+            {onOpenAuth !== undefined && accountHasCredential !== true ? (
               <Button
-                label={form.configured ? t('mobile.profile.account.switchAccount') : t('mobile.profile.account.signIn')}
+                label={t('mobile.profile.account.signIn')}
                 tone="primary"
                 onPress={() => onOpenAuth()}
                 style={{ alignSelf: 'flex-start' }}
@@ -953,6 +956,17 @@ export function SettingsScreen({
         return (
           <>
             {profileEditor}
+            {onOpenAuth !== undefined && accountHasCredential === true ? (
+              <Card>
+                <Button
+                  label={t('mobile.profile.account.switchAccount')}
+                  tone="secondary"
+                  onPress={() => onOpenAuth()}
+                  testID="settings-account-switch"
+                  style={{ alignSelf: 'flex-start' }}
+                />
+              </Card>
+            ) : null}
             {renderSecurity()}
           </>
         );
