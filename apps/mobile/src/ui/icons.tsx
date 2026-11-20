@@ -20,6 +20,8 @@
 import React from 'react';
 import {
   TaskCheckGlyph, CalendarGlyph, TimerGlyph, AiSparkGlyph, PersonGlyph, SearchGlyph, MoreGlyph,
+  AiMarkGlyph, BackGlyph, CloseGlyph, ChevronDownGlyph, ChevronUpGlyph,
+  PlusGlyph, CheckGlyph, TrashGlyph, SyncGlyph, FolderGlyph,
 } from './custom-icons';
 import {
   Archive,
@@ -99,7 +101,7 @@ const ICONS = {
   // （与热点图、统计有关的那一类图标）。纯附加改动，冲突时按并集收，
   // 若上游重写时删掉了 `ChartColumn`，修法是把导入补回来 —— 一个词。
   'tab.categories': ChartColumn,
-  'tab.ai': AiSparkGlyph as unknown as typeof Sparkles,
+  'tab.ai': AiMarkGlyph as unknown as typeof Sparkles,
   'tab.habits': Flame,
   'tab.countdown': CalendarClock,
   'tab.profile': PersonGlyph as unknown as typeof User,
@@ -107,9 +109,9 @@ const ICONS = {
   'action.image': ImagePlus,
 
   // 任务
-  'task.add': Plus,
-  'task.done': Check,
-  'task.delete': Trash2,
+  'task.add': PlusGlyph as unknown as typeof Plus,
+  'task.done': CheckGlyph as unknown as typeof Check,
+  'task.delete': TrashGlyph as unknown as typeof Trash2,
   'task.due': CalendarClock,
   'task.overdue': TriangleAlert,
   'task.repeat': Repeat,
@@ -140,7 +142,7 @@ const ICONS = {
    * 两者同时出现在详情页上下两处（tab 栏 + 清单选择器）会让人以为
    * 点清单就是回任务列表。**语义名相同就复用，不同就必须换字形。**
    */
-  'task.project': Folder,
+  'task.project': FolderGlyph as unknown as typeof Folder,
 
   /**
    * 标签。
@@ -219,8 +221,8 @@ const ICONS = {
   // 🔴 「返回」与「上一月」是**不同语义**，所以用不同字形：`ArrowLeft` 是
   // 进出层级的通用返回，`ChevronLeft` 是月历的翻页。两者在成长屏与日历屏
   // 各出现一次，字形相同会让人以为它们做同一件事。
-  'action.back': ArrowLeft,
-  'action.close': X,
+  'action.back': BackGlyph as unknown as typeof ArrowLeft,
+  'action.close': CloseGlyph as unknown as typeof X,
   'action.settings': Settings,
   // 🔴 与共享 `SearchPanel` 输入行里那个放大镜**同一个字形**：入口和它打开的
   // 东西长得不一样，用户就不会把这两个认成同一件事。
@@ -233,7 +235,7 @@ const ICONS = {
    * 借用它们会让 chip 读起来像"切换到某个视图"，而它改的是顺序不是内容。
    */
   'action.sort': ArrowUpDown,
-  'action.sync': RefreshCw,
+  'action.sync': SyncGlyph as unknown as typeof RefreshCw,
   /**
    * 「或者用别的方式」那一组的标题图标。
    *
@@ -251,8 +253,8 @@ const ICONS = {
   /** 关于 / 帮助。同一个错：「关于与帮助」也曾借 `action.more`。 */
   'action.info': Info,
   'action.more': MoreGlyph as unknown as typeof Ellipsis,
-  'action.expand': ChevronDown,
-  'action.collapse': ChevronUp,
+  'action.expand': ChevronDownGlyph as unknown as typeof ChevronDown,
+  'action.collapse': ChevronUpGlyph as unknown as typeof ChevronUp,
   /**
    * 导出 / 分享。
    *

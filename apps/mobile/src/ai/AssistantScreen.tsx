@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Clipboard, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { applyScrollIntent, AssistantMark, shouldFollowOnContentChange } from '@heyta/ui';
+import { applyScrollIntent, shouldFollowOnContentChange } from '@heyta/ui';
 import { inferPreferences, renderPreferenceHints } from '@heyta/domain';
 import {
   assistantEgressFields,
@@ -31,6 +31,7 @@ import {
 import type { LocalApiHost, LocalApiWriteResult } from '@heyta/local-api';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
+import { AiMarkGlyph } from '../ui/custom-icons';
 import { useTokens } from '../theme';
 import { Button, Card, Chip, EmptyState, HStack, Screen, Stack, Text } from '../ui/kit';
 import { useTaskHost } from '../db/use-task-host';
@@ -446,7 +447,7 @@ export function AssistantScreen({
 
   if (hostError !== undefined) {
     return (
-      <Screen title={t('mobile.ai.title')} titleLeading={<AssistantMark size={tokens['icon.md']} color={tokens['color.foreground']} />} actions={[{ icon: 'action.back', label: t('mobile.ai.back'), onPress: onBack }]}>
+      <Screen title={t('mobile.ai.title')} titleLeading={<AiMarkGlyph size={tokens['icon.md']} color={tokens['color.foreground']} />} actions={[{ icon: 'action.back', label: t('mobile.ai.back'), onPress: onBack }]}>
         <EmptyState icon="conflict.warning" title={t('mobile.ai.hostFailed.title')} hint={t('mobile.ai.hostFailed.hint')} detail={hostError} />
       </Screen>
     );
@@ -455,7 +456,7 @@ export function AssistantScreen({
   return (
     <Screen
       title={t('mobile.ai.title')}
-      titleLeading={<AssistantMark size={tokens['icon.md']} color={tokens['color.foreground']} />}
+      titleLeading={<AiMarkGlyph size={tokens['icon.md']} color={tokens['color.foreground']} />}
       scroll={false}
       bottomInset={!bottomOffset}
       actions={[
