@@ -59,10 +59,14 @@ const store = createAiSettingsStore(mobilePort);
  */
 function withHostedDefaults(state: AiSettingsState): AiSettingsState {
   const routing = state.routing;
-  if (routing.enabled) return state;
+  // 有自定义端点 ⇒ 尊重用户配置，不动。
   if (routing.endpoints.length > 0) return state;
+  // 已是完整的托管档 ⇒ 原样。
+  if (routing.mode === 'managed' && routing.enabled && routing.allowRemote) return state;
+  // 没登录同步服务器 ⇒ 无托管可合成。
   if ((readSyncConfig()?.serverUrl ?? '').trim() === '') return state;
-  return { ...state, routing: { ...routing, enabled: true, allowRemote: true, mode: 'managed' } };
+  // 否则（含历史脏值：enabled=true 但 mode 缺失/'own'）一律升级成托管档。
+  return { ...state, routing: { ...routing, mode: 'managed', enabled: true, allowRemote: true } };
 }
 
 let current: AiSettingsState = withHostedDefaults(store.load());
