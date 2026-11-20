@@ -16,7 +16,6 @@ import {
   clearAssistantHistory,
   EMPTY_LIVE,
   loadAssistantHistory,
-  reduceAssistantLive,
   type LiveTurn,
   saveAssistantHistory,
   scopeAssistantHistoryStorage,
@@ -494,10 +493,8 @@ class MobileChatController implements ChatController {
            * 过了 `epoch` 或换了账号之后到的片段**一个都不许画出来** ——
            * 它属于上一段对话，而界面上已经是另一段。
            */
-          onEvent: (event) => {
-            if (epoch !== this.accountEpoch) return;
-            this.update({ live: reduceAssistantLive(this.state.live, event) });
-          },
+          // 2026-11-21：暂不请求流式（onEvent 会让请求带 stream:true，而托管响应被当 JSON 解析失败）。
+          // 不传 onEvent ⇒ 服务端回整份 JSON，保证能拿到回答。
           routed: {
             secretStore: runtime.secretStore,
             managedTransport: runtime.managedTransport,
