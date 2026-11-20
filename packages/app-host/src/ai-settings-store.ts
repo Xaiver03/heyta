@@ -150,6 +150,9 @@ function sanitizeRouting(input: unknown, fallback: AiRoutingConfig): AiRoutingCo
   }
 
   return {
+    // 🔴 2026-11-21（修 bug）：必须保留 `mode`。此前这里丢掉 mode ⇒ 一旦设置被保存并重载，
+    // `withManagedEndpoint` 因 `mode!=='managed'` 不再合成托管端点，已登录托管账号就退回"没有可用路由"。
+    mode: (c as { mode?: unknown }).mode === 'managed' ? 'managed' : 'own',
     enabled: c.enabled === true,
     allowRemote: c.allowRemote === true,
     endpoints,
