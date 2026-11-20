@@ -37,6 +37,7 @@ import {
 } from '@heyta/ai';
 import type { LocalApiHost } from '@heyta/local-api';
 import { deleteDevicePref, readDevicePref, writeDevicePref } from '../prefs/device-prefs';
+import { getAiSettings } from './settings-store';
 
 export type ChatPhase = 'idle' | 'disclose' | 'running';
 
@@ -471,7 +472,7 @@ class MobileChatController implements ChatController {
         { text, ...(images.length === 0 ? {} : { images }) },
         {
           routing: runtime.resolveRouting(),
-          consents: runtime.settings.consents,
+          consents: getAiSettings().consents,
           getGrants: () => (epoch === this.accountEpoch ? assistantGrants() : {}),
           host,
           localize: runtime.localize,

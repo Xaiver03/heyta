@@ -535,7 +535,7 @@ export function AssistantScreen({
                 </Stack>
               }
             />
-            {snapshot.phase === 'disclose' ? <DisclosureCard target={route.target} plan={plan} hasImages={snapshot.images.length > 0} consents={settings.consents} onConfirm={() => controller.confirmDisclosure()} onCancel={() => controller.cancelDisclosure()} onOpenSettings={onOpenSettings} /> : null}
+            {snapshot.phase === 'disclose' ? <DisclosureCard target={route.target} plan={plan} hasImages={snapshot.images.length > 0} consents={settings.consents} onConfirm={() => { if (route.target !== undefined) { const cur = getAiSettings(); const dest = route.target.destination; if (!cur.consents.some((c) => c.feature === 'tool-calling' && c.destination === dest)) { saveAiSettings({ ...cur, consents: [...cur.consents, { feature: 'tool-calling' as const, destination: dest, grantedAt: Date.now() }] }); } } controller.confirmDisclosure(); }} onCancel={() => controller.cancelDisclosure()} onOpenSettings={onOpenSettings} /> : null}
           </ScrollView>
           <ChatComposer
             value={snapshot.draft}
