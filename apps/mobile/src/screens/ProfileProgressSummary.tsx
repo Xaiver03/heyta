@@ -14,11 +14,11 @@ import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { onLocalWrite } from '../sync/write-signal';
 import { SPACING_ROLE } from '@heyta/design-system';
-import { Button, Card, HStack, SectionHeader, Stack, Text } from '../ui/kit';
+import { Button, Card, Divider, HStack, SectionHeader, Stack, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { useTokens } from '../theme';
 
-export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => void }): React.JSX.Element | null {
+export function ProfileProgressSummary({ onOpenGrowth, header }: { onOpenGrowth: () => void; header?: React.ReactNode }): React.JSX.Element | null {
   const { t } = useI18n();
   const tokens = useTokens();
   const { now } = useToday();
@@ -67,7 +67,6 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
   if (snapshot === null) {
     return (
       <>
-        <SectionHeader title={t('mobile.profile.section.progress')} />
         <Card>
           <Stack>
             <Text variant="caption" tone="subtle">
@@ -132,9 +131,13 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
         ⚠️ 只有这一个屏到此为止；其余 35 处 `SectionHeader` 的调用点还在
         `Screen` gap 之下 —— 逐个收敛是下一轮的事，这一轮先把实测超标的那一处修掉。
       */}
-      <View style={{ gap: tokens[SPACING_ROLE['label-to-control']] }}>
-        <SectionHeader title={t('mobile.profile.section.progress')} />
-        <Card>
+      <Card>
+        {header !== undefined ? (
+          <>
+            {header}
+            <Divider />
+          </>
+        ) : null}
         {/*
           🔴 2026-11-18：大字号（Dynamic Type）下**三列横排改纵向堆叠**。
           真机实测（iPhone 窄屏 accessibility-extra-large）：横排三格会把
@@ -199,8 +202,7 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
             <Button label={t('mobile.profile.progress.retry')} onPress={retry} tone="secondary" />
           </Stack>
         ) : null}
-        </Card>
-      </View>
+      </Card>
     </>
   );
 }
