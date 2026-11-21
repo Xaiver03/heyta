@@ -211,7 +211,6 @@ export function AssistantScreen({
       host: toolHost,
       secretStore: aiSecrets,
       managedTransport,
-      streamingFetch,
       /**
        * 🔴 接上流式 ⇒ 助手的回答逐字出现。见模块顶部 `streamingFetch` 的注释
        * （含"为什么敢接"的三条 RN 源码判据与退化方向）。

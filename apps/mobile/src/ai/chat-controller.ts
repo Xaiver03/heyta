@@ -37,7 +37,6 @@ import {
 import type { LocalApiHost } from '@heyta/local-api';
 import { deleteDevicePref, readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 import { getAiSettings } from './settings-store';
-import { reduceAssistantLive } from '@heyta/app-host';
 
 export type ChatPhase = 'idle' | 'disclose' | 'running';
 
@@ -494,10 +493,7 @@ class MobileChatController implements ChatController {
            * 过了 `epoch` 或换了账号之后到的片段**一个都不许画出来** ——
            * 它属于上一段对话，而界面上已经是另一段。
            */
-          onEvent: (event) => {
-            if (epoch !== this.accountEpoch) return;
-            this.update({ live: reduceAssistantLive(this.state.live, event) });
-          },
+          // 2026-11-21：真机 XHR 流式通道报错，暂不请求流式；服务端回整份 JSON，稳定可回话。
           routed: {
             secretStore: runtime.secretStore,
             managedTransport: runtime.managedTransport,
