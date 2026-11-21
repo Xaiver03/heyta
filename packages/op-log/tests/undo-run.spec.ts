@@ -101,3 +101,34 @@ describe('undoOperations 与普通 undo 的隔离', () => {
     }
   });
 });
+
+describe('undoSince（按 seq 段撤销，壳用）', () => {
+  it('记录 fromSeq 后新增的本地写入被整批撤销', async () => {
+    const { engine, close } = await memoryEngine();
+    try {
+      await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Create, payload: { title: 'A' } });
+      const before = await engine.currentLocalSeq();
+      await engine.dispatch({ entityType: 'TASK', entityId: 't2', opType: OpType.Create, payload: { title: 'B' } });
+      await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Update, payload: { title: 'A2' } });
+
+      const outcome = await engine.undoSince(before);
+      expect(outcome.status).toBe('applied');
+      const st = engine.getState() as unknown as { tasks: Record<string, { title?: string; deletedAt?: number }> };
+      expect(st.tasks['t1']?.title).toBe('A'); // 更新被抵消
+      expect(st.tasks['t2']?.deletedAt).toBeDefined(); // 新建被反向成墓碑
+    } finally {
+      close();
+    }
+  });
+
+  it('没有新增写入 → empty', async () => {
+    const { engine, close } = await memoryEngine();
+    try {
+      await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Create, payload: { title: 'A' } });
+      const after = await engine.currentLocalSeq();
+      expect(await engine.undoSince(after)).toEqual({ status: 'empty' });
+    } finally {
+      close();
+    }
+  });
+});

@@ -605,7 +605,31 @@ export class OpLogEngine {
    * ⚠️ 整批撤销**不进重做栈**（一次性操作，不做 redo）。
    */
   undoOperations(opIds: readonly string[]): Promise<UndoRunOutcome> {
+    return this.serialize(() => this.undoOperationsLocked(opIds));
+  }
+
+  /** 取当前本地末条 seq（壳在 AI 运行前记录，运行后用 `undoSince` 撤销这段）。 */
+  currentLocalSeq(): Promise<number> {
+    return this.serialize(() => this.options.store.getLastLocalSeq());
+  }
+
+  /**
+   * 撤销 `fromSeqExclusive` 之后新增的**本地** op —— "撤销这次 AI 操作"的按段入口。
+   * 壳无需逐条拿 op id：AI 运行前记 `currentLocalSeq()`，运行后调本方法即可。
+   * （远端并发写入不在此段撤销范围；仍逐条过 `checkInverseStillValid`。）
+   */
+  undoSince(fromSeqExclusive: number): Promise<UndoRunOutcome> {
     return this.serialize(async () => {
+      const rows = await this.options.store.getOpsSince(fromSeqExclusive, 1000);
+      const ids = rows
+        .filter((row) => row.op.clientId === this.options.clientId)
+        .map((row) => row.op.id);
+      return this.undoOperationsLocked(ids);
+    });
+  }
+
+  private async undoOperationsLocked(opIds: readonly string[]): Promise<UndoRunOutcome> {
+    {
       const applied: string[] = [];
       const unsupported: { opId: string; reason: string }[] = [];
       for (const opId of [...opIds].reverse()) {
@@ -639,7 +663,7 @@ export class OpLogEngine {
       }
       if (applied.length > 0) this.redoStack = [];
       return unsupported.length === 0 ? { status: 'applied', applied } : { status: 'partial', applied, unsupported };
-    });
+    }
   }
 
   private async stepHistory(direction: 'undo' | 'redo'): Promise<UndoOutcome> {

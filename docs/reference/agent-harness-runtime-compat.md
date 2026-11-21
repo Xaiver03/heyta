@@ -31,3 +31,15 @@
 - 移动端的瓶颈是运行时能力（无 Node/WASM、fetch 无 body 流），不是"要不要 PI"。
 - 原生引擎把这些都绕开了：工具 = `fetch().json()`，模型 = `invokeRouted`（fetch），循环 = 纯函数。
 - 于是**同一份 `requestCloudAssistantTurn` 在四端都能调**；桌面若想用 PI 内核，只是换 `callModel`/循环的引擎实现，`CloudAgentTool` 与 `CloudToolTransport` 不变。
+
+## 4. 「撤销这次 AI 操作」（本地写入路径）
+
+产品裁决 D1「不做 Action Plan，删除/归档/移动给 AI 靠版本回溯」——本地写入路径的撤销入口已具备：
+
+1. AI 运行**前**：`const seq = await engine.currentLocalSeq()`。
+2. 运行（经 `requestAssistantTurn` 等本地工具路径，写入过 op-log）。
+3. 用户点"撤销这次 AI 操作"：`await engine.undoSince(seq)` —— 逆序对该段内的**本地 op**应用应用时算好的反向意图；被别的设备改过的条目进 `unsupported`（不硬撤、不假装成功）。返回 `applied | partial | stale | empty`。
+
+判据：`packages/op-log/tests/undo-run.spec.ts`（`undoSince` 两条 + `undoOperations` 五条）。
+
+⚠️ **云端工具路径的写入发生在服务端**（`/api/agent/tools`），其"撤销这次 AI 操作"属于服务端版本历史，不在本地 `undoSince` 范围；需服务端实现（见 `agent-tools-api.md`）。两条路径不要混用。
