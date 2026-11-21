@@ -302,6 +302,8 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         // 「时间段」（S7）：起点 + 时长，与 `dueDate` 并列，走同一条 Create op。
         ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
         ...(plan.durationMinutes !== undefined ? { durationMinutes: plan.durationMinutes } : {}),
+        // 重复预设（S6）：由 app-host 的 create() 派生 repeatRule+repeatDtstart。
+        ...(plan.repeatPreset !== undefined ? { repeatPreset: plan.repeatPreset } : {}),
         ...(plan.priority !== undefined ? { priority: plan.priority } : {}),
         ...(destination !== undefined ? { projectId: destination.projectId } : {}),
       }),

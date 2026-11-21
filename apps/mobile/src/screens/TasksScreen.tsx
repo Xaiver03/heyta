@@ -2332,6 +2332,8 @@ export function TasksScreen({
             // 「时间段」（S7）：起点 + 时长，与 `dueDate` 并列，走同一条 Create op。
             ...(plan.startDate === undefined ? {} : { startDate: plan.startDate }),
             ...(plan.durationMinutes === undefined ? {} : { durationMinutes: plan.durationMinutes }),
+            // 重复预设（S6）：由 app-host 的 create() 派生 repeatRule+repeatDtstart。
+            ...(plan.repeatPreset === undefined ? {} : { repeatPreset: plan.repeatPreset }),
             ...(plan.priority === undefined ? {} : { priority: plan.priority }),
             // 用户选了哪一份就交给哪一份；没选就**不交这个键**（= 收集箱）。
             ...(plan.projectId === undefined ? {} : { projectId: plan.projectId }),
