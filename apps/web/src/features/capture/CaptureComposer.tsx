@@ -285,6 +285,15 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         tags: {
           title: t('web.capture.panel.tags.title'),
         },
+        reminder: {
+          title: t('web.capture.panel.reminder.title'),
+          labelOf: (ms) => {
+            if (ms === 5 * 60000) return t('web.capture.panel.reminder.m5');
+            if (ms === 30 * 60000) return t('web.capture.panel.reminder.m30');
+            if (ms === 60 * 60000) return t('web.capture.panel.reminder.h1');
+            return t('web.capture.panel.reminder.d1');
+          },
+        },
       },
     }),
     [t, locale, destination, props.anchorDate],
@@ -328,6 +337,8 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         ...(plan.repeatPreset !== undefined ? { repeatPreset: plan.repeatPreset } : {}),
         // 标签（③）：创建时 payload 带上，走同一条 Create op。
         ...(plan.tagIds !== undefined ? { tagIds: [...plan.tagIds] } : {}),
+        // 提醒（S6）：由 app-host 的 create() 在任务后补一条 Reminder op。
+        ...(plan.reminderOffsetMs !== undefined ? { reminderOffsetMs: plan.reminderOffsetMs } : {}),
         ...(plan.priority !== undefined ? { priority: plan.priority } : {}),
         ...(destination !== undefined ? { projectId: destination.projectId } : {}),
       }),
@@ -354,6 +365,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         rangeEnabled
         repeatEnabled
         tags={captureTags}
+        reminderEnabled
       />
     </HeytaUiProvider>
   );

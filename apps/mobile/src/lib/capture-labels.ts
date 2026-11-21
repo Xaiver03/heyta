@@ -149,6 +149,15 @@ export function captureLabels(t: Translate): CaptureComposerLabels {
       tags: {
         title: t('web.capture.panel.tags.title'),
       },
+      reminder: {
+        title: t('web.capture.panel.reminder.title'),
+        labelOf: (ms) => {
+          if (ms === 5 * 60000) return t('web.capture.panel.reminder.m5');
+          if (ms === 30 * 60000) return t('web.capture.panel.reminder.m30');
+          if (ms === 60 * 60000) return t('web.capture.panel.reminder.h1');
+          return t('web.capture.panel.reminder.d1');
+      },
+        },
     },
   };
 }

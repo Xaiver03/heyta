@@ -95,6 +95,11 @@ export interface CaptureDuePanelLabels {
   readonly tags: {
     readonly title: string;
   };
+  /** 「提醒」那一组的措辞（S6）。 */
+  readonly reminder: {
+    readonly title: string;
+    readonly labelOf: (offsetMs: number) => string;
+  };
 }
 
 /** 面板的两个子视图。`time` 那一档的出口行换成「其它时间 / 列表」那枚切换。 */
@@ -142,6 +147,12 @@ export interface CaptureDuePanelState {
     readonly options: readonly { readonly id: string; readonly name: string }[];
     readonly selected: readonly string[];
     readonly onToggle: (id: string) => void;
+  } | undefined;
+  /** 「提醒」（S6）。`undefined`（或宿主没给）= 不出现提醒 chip 行；仅在有截止日时由宿主提供。 */
+  readonly reminder?: {
+    readonly value: number | undefined;
+    readonly options: readonly { readonly value: number; readonly label: string }[];
+    readonly onSelect: (offsetMs: number | undefined) => void;
   } | undefined;
 }
 
@@ -575,6 +586,29 @@ export function CaptureDuePanel({
                 testID={`capture-tag-${tag.id}`}
               >
                 <Text style={[text.caption, on ? styles.slotTextOn : styles.slotText]}>{tag.name}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {state.reminder === undefined || state.reminder.options.length === 0 ? null : (
+        <View style={styles.slots} accessibilityLabel={labels.panel.reminder.title} testID="capture-reminder-row">
+          {state.reminder.options.map((opt) => {
+            const on = state.reminder !== undefined && state.reminder.value === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                accessibilityRole="button"
+                accessibilityLabel={opt.label}
+                aria-selected={on}
+                onPress={() => {
+                  state.reminder?.onSelect(on ? undefined : opt.value);
+                }}
+                style={[styles.slot, on ? styles.slotOn : styles.slotOff]}
+                testID={`capture-reminder-${opt.value}`}
+              >
+                <Text style={[text.caption, on ? styles.slotTextOn : styles.slotText]}>{opt.label}</Text>
               </Pressable>
             );
           })}

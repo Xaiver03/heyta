@@ -474,6 +474,29 @@ describe('③ 标签（tags）：面板里有标签 chip、选中后提交带 ta
     expect(over.tagIds).toEqual(['t1']);
   });
 });
+describe('S6 提醒（reminderEnabled）：有截止日时出现提醒 chip，选中后提交带 reminderOffsetMs', () => {
+  it('打「明天买牛奶」→ 面板有提醒行 → 点「提前30分钟」→ 提交带 reminderOffsetMs=1800000', () => {
+    const el = render();
+    type(el, '明天买牛奶');
+    const panel = openPanel(el);
+    const row = panel.querySelector<HTMLElement>('[data-testid="capture-reminder-row"]');
+    expect(row, '有截止日时面板里应有提醒 chip 行').not.toBeNull();
+
+    const m30 = row!.querySelector<HTMLElement>('[data-testid="capture-reminder-1800000"]');
+    expect(m30, '提醒行里应有「提前30分钟」chip').not.toBeNull();
+    act(() => {
+      m30!.click();
+    });
+    act(() => {
+      submit(el).click();
+    });
+    expect(addTask).toHaveBeenCalledTimes(1);
+    const [, over] = addTask.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(over.reminderOffsetMs).toBe(1800000);
+    expect(typeof over.dueDate).toBe('number');
+  });
+});
+
 
 describe('CaptureComposer —— 不给外壳那一档：就地展开（移动端的唯一面板路径）', () => {
   /*
