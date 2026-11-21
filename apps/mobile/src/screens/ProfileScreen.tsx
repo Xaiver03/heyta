@@ -1732,28 +1732,27 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
         原来「我的」上有两处到同一张屏，§5.3 明写"收进近期状态卡内，删掉重复那一行"。
       */}
       {/* ── 全部功能：非底部导航的功能入口，放在「近期状态」之上（浅层可见，不被淹没）── */}
-      <Card shadow="card">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingVertical: tokens['space.2'] }}>
-          {quickEntryRows.map((row) => (
-            <Pressable
-              key={row.testID}
-              accessibilityRole="button"
-              accessibilityLabel={row.label}
-              testID={`${row.testID ?? ''}-tile`}
-              onPress={row.onPress}
-              style={({ pressed }) => [{ width: '25%', alignItems: 'center', gap: tokens['space.1'], paddingVertical: tokens['space.2'] }, pressed ? { opacity: tokens['state.pressed-opacity'] } : null]}
-            >
-              {row.leading}
-              <Text variant="caption" numberOfLines={1} style={{ textAlign: 'center' }}>{row.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </Card>
-
       <ProfileProgressSummary
         onOpenGrowth={() => {
           navigation.push(featureRouteKey('growth'));
         }}
+        header={(
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingVertical: tokens['space.1'] }}>
+            {quickEntryRows.map((row) => (
+              <Pressable
+                key={row.testID}
+                accessibilityRole="button"
+                accessibilityLabel={row.label}
+                testID={`${row.testID ?? ''}-tile`}
+                onPress={row.onPress}
+                style={({ pressed }) => [{ width: '25%', alignItems: 'center', gap: tokens['space.1'], paddingVertical: tokens['space.2'] }, pressed ? { opacity: tokens['state.pressed-opacity'] } : null]}
+              >
+                {row.leading}
+                <Text variant="caption" numberOfLines={1} style={{ textAlign: 'center' }}>{row.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       />
 
       {/* ── ③ 功能入口 ─────────────────────────────────────────────── */}
