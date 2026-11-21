@@ -29,6 +29,7 @@ import {
   withCaptureRange,
   withCaptureRepeatPreset,
   withCaptureTags,
+  withCaptureReminder,
   CAPTURE_RANGE_MIN_MINUTES,
   CAPTURE_RANGE_MAX_MINUTES,
   captureChipAction,
@@ -843,5 +844,16 @@ describe('G4. 标签：并进计划（`withCaptureTags`）', () => {
     const next = withCaptureTags(frozen, ['t1']);
     expect(next).not.toBe(frozen);
     expect(frozen.tagIds).toBeUndefined();
+  });
+});
+
+describe('G5. 提醒提前量：并进计划（`withCaptureReminder`）', () => {
+  const base: CaptureSubmitPlan = { title: '开会' };
+  it('给了 offsetMs ⇒ 写入 reminderOffsetMs', () => {
+    expect(withCaptureReminder({ ...base }, 1800000)).toEqual({ title: '开会', reminderOffsetMs: 1800000 });
+  });
+  it('🔴 undefined ⇒ 逐字节不变', () => {
+    const plan = withCaptureReminder({ ...base }, undefined);
+    expect(Object.prototype.hasOwnProperty.call(plan, 'reminderOffsetMs')).toBe(false);
   });
 });

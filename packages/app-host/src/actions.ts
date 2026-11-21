@@ -57,6 +57,7 @@ import {
   type Task,
 } from '@heyta/domain';
 import { repeatPresetRule, type RepeatPresetId } from './repeat-presets.js';
+import { createReminderActions } from './reminder-actions.js';
 import type { MaterializedState, OpIntent } from '@heyta/op-log';
 import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
@@ -148,6 +149,12 @@ export interface NewTaskFields {
    * 会让任务上挂一个任何视图都查不到的标签。空数组写成 `null`（与 `setTags` 一致）。
    */
   tagIds?: string[];
+  /**
+   * 提醒（S6）：相对截止时间的提前量（ms）。**需有 `dueDate`**，否则 `create()` 抛错
+   * （不静默建一条莫名其妙的绝对提醒）。提醒是独立 `Reminder` 实体 ⇒ `create()` 会在
+   * 任务 Create op 之后补一条 Reminder Create op（**两条 op / 两个实体**，不是拆一个意图）。
+   */
+  reminderOffsetMs?: number;
 }
 
 /** Fields accepted by the local API's single-task detail patch. */
@@ -530,6 +537,8 @@ export function createTaskActions(
 ): TaskActions {
   const now = options.now ?? Date.now;
   const makeId = options.newTaskId ?? newTaskId;
+  // 提醒是独立 Reminder 实体（reminder-actions）；捕获「设提醒」时在任务建好后补一条 op。
+  const reminderActions = createReminderActions(ctx, options.now === undefined ? {} : { now: options.now });
 
   const taskOf = (entityId: string): Task | undefined => {
     const task = ctx.getState().tasks[entityId];
@@ -680,7 +689,12 @@ export function createTaskActions(
 
   return {
     async create(title, over = {}) {
-      const { repeatPreset, tagIds, ...rest } = over;
+      const { repeatPreset, tagIds, reminderOffsetMs, ...rest } = over;
+
+      // 提醒（S6）：必须有截止时间才能建「提前 N」提醒（否则是莫名绝对时刻）。先校验，避免"任务建了、提醒没建"的半截。
+      if (reminderOffsetMs !== undefined && rest.dueDate === undefined) {
+        throw new Error('设提醒需要先设截止时间');
+      }
 
       // 标签（③）：去重 + 校验存在（与 setTags 同源）；空集合写 null 而非 []。
       let preparedTagIds: string[] | null | undefined;
@@ -713,11 +727,16 @@ export function createTaskActions(
         }
       }
 
-      return dispatchCreate(title, {
+      const createdId = await dispatchCreate(title, {
         ...rest,
         ...(preparedTagIds === undefined ? {} : { tagIds: preparedTagIds }),
         ...repeatExtra,
       });
+      // 提醒：任务已建（含其截止时间）⇒ 补一条 Reminder Create op（第二个实体、第二条 op）。
+      if (reminderOffsetMs !== undefined) {
+        await reminderActions.createReminderBeforeDue(createdId, reminderOffsetMs);
+      }
+      return createdId;
     },
 
     async createSubtask(parentId, title) {

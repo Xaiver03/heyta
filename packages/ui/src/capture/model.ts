@@ -439,6 +439,12 @@ export interface CaptureSubmitPlan {
    * 空/未选 = 不带这个键（省略与显式空同一条约定）。校验（去重 + 存在性）在 app-host 的 `create()`。
    */
   readonly tagIds?: readonly string[];
+  /**
+   * 提醒（S6）：相对**截止时间**的提前量（ms）。需有 `dueDate`，否则无效
+   * （app-host 的 `create()` 会先校验）。创建时由 app-host 在任务 Create op 之后补一条
+   * Reminder op（提醒是独立实体，两条 op）。
+   */
+  readonly reminderOffsetMs?: number;
 }
 
 /** 重复预设（S6）。与 app-host 的 `RepeatPresetId` 同一字面集。 */
@@ -526,6 +532,17 @@ export function withCaptureTags(
   if (tagIds === undefined) return plan;
   const unique = [...new Set(tagIds)];
   return unique.length === 0 ? plan : { ...plan, tagIds: unique };
+}
+
+/**
+ * 把用户选的**提醒提前量**并进计划（S6）。`undefined` ⇒ 逐字节不变。
+ * 提醒是独立 `Reminder` 实体 ⇒ 创建时是「任务 Create op + 提醒 Create op」两条（见 app-host `create()`）。
+ */
+export function withCaptureReminder(
+  plan: CaptureSubmitPlan,
+  offsetMs: number | undefined,
+): CaptureSubmitPlan {
+  return offsetMs === undefined ? plan : { ...plan, reminderOffsetMs: offsetMs };
 }
 
 /** 选择器里的一行（`id` = 清单 id；收集箱由 `labels.inbox` 单独画，不是一条 option）。 */

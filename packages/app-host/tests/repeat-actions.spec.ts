@@ -591,3 +591,34 @@ describe('完成后顺延 vs 固定排期（Task.repeatAfterCompletion）', () =
     expect(actions.findTask(id)!.repeatDtstart).toBe(anchorBefore);
   });
 });
+
+describe('S6 提醒：create({dueDate,reminderOffsetMs}) ⇒ 任务 + 独立 Reminder（两条 op/两个实体）', () => {
+  const remindersFor = (taskId: string): { id: string }[] =>
+    Object.values(engine.getState().reminders).filter((r) => r.taskId === taskId) as { id: string }[];
+
+  it('建一条任务 + 一条提前提醒；任务 Create op 一条、提醒是独立 REMINDER Create op', async () => {
+    const due = clock + 7 * 86_400_000; // 相对测试"现在"的未来截止，保证提醒时刻未过
+    const id = await actions.create('开会前提醒', { dueDate: due, reminderOffsetMs: 30 * 60 * 1000 });
+
+    const taskCreates = (await engine.getOpsForEntity('TASK', id)).filter((o) => o.opType === OpType.Create);
+    expect(taskCreates, '任务只有一条 Create op（提醒不混进任务载荷）').toHaveLength(1);
+    // 提醒不落进任务载荷
+    expect(taskCreates[0]!.payload).not.toHaveProperty('reminderOffsetMs');
+
+    const rems = remindersFor(id);
+    expect(rems, '必须建出一条提醒（独立实体）').toHaveLength(1);
+    const remCreates = (await engine.getOpsForEntity('REMINDER', rems[0]!.id)).filter((o) => o.opType === OpType.Create);
+    expect(remCreates, '提醒走独立 REMINDER 实体的 Create op').toHaveLength(1);
+  });
+
+  it('没有 reminderOffsetMs ⇒ 无提醒', async () => {
+    const id = await actions.create('无提醒', { dueDate: parseLocalDate(MONDAY).getTime() });
+    expect(remindersFor(id)).toHaveLength(0);
+  });
+
+  it('🔴 设提醒但无截止 ⇒ 抛错，且不建任务（无半截）', async () => {
+    const before = Object.keys(engine.getState().tasks).length;
+    await expect(actions.create('只有提醒', { reminderOffsetMs: 600000 })).rejects.toThrow(/截止/);
+    expect(Object.keys(engine.getState().tasks).length, '抛错前不建任务').toBe(before);
+  });
+});
