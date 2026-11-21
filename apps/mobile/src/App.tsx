@@ -63,6 +63,7 @@ import { startPrivacyGate } from './privacy/startup';
 import { startAutoSync } from './sync/auto-sync';
 import { useMobileSync } from './sync/store';
 import { startWidgetLifecycle } from './widgets/lifecycle';
+import { startMobileUpdateCheck } from './lib/app-update';
 import { DEFAULT_SERVER_URL, readSyncConfig } from './sync/config';
 import { hasSeenWelcome, markWelcomeSeen } from './prefs/device-prefs';
 import { reconcileNativeReminders, subscribeNativeReminderWrites } from './lib/native-reminder-scheduler';
@@ -237,6 +238,19 @@ function Shell(): React.JSX.Element {
    * `auto-sync → open-host → …` 的又一条循环依赖边。
    */
   useEffect(() => startWidgetLifecycle(), []);
+
+  /**
+   * 自动更新检测（`GET /api/app-version`）：启动延迟 + 定时；未登录 / 未配置 serverUrl
+   * 时**一个请求都不发**。判定在 `@heyta/app-host`，弹窗与跳店在 `lib/app-update.ts`。
+   *
+   * 只装一次（空依赖）：定时器内部用的是启动时那份取词函数；语言切换是罕见事件，
+   * 重开应用即生效 —— 不为它重挂定时器。
+   */
+  useEffect(
+    () => startMobileUpdateCheck({ getText: (key, vars) => tr(key as never, vars as never) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   /**
    * 🔴 **欢迎页（首次启动）—— 规范 §3.1 的落点。**
