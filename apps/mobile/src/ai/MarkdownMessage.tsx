@@ -20,6 +20,19 @@ import { useTokens } from '../theme';
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 
+/** 设计 token：font-size 是 rem 字符串、line-height 是无单位倍数，都不能直接给 RN 的 px 字段。 */
+const px = (v: unknown, fallback = 16): number => {
+  if (typeof v === 'number') return v;
+  const raw = String(v);
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return raw.includes('rem') ? n * 16 : n;
+};
+const ratio = (v: unknown, fallback = 1.5): number => {
+  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? n : fallback;
+};
+
 type AnyToken = {
   type: string;
   tag: string;
@@ -148,12 +161,12 @@ function renderTable(node: Node, t: Tokens, keyBase: string): React.ReactNode {
                     paddingVertical: t['space.1'],
                     paddingRight: t['space.2'],
                     fontWeight: isHeader ? '700' : '400',
-                    fontSize: t['font-size.sm'],
+                    fontSize: px(t['font-size.sm']),
                     color: t['color.foreground'],
-                    lineHeight: t['line-height.normal'],
+                    
                   }}
                 >
-                  {inline ? renderInline(inline.children, t, { fontSize: t['font-size.sm'], color: t['color.foreground'] }, `${keyBase}-r${ri}-c${ci}`) : ''}
+                  {inline ? renderInline(inline.children, t, { fontSize: px(t['font-size.sm']), color: t['color.foreground'] }, `${keyBase}-r${ri}-c${ci}`) : ''}
                 </RNText>
               );
             })}
@@ -179,15 +192,15 @@ function renderNodes(nodes: Node[], t: Tokens, keyBase: string): React.ReactNode
             key={k}
             selectable
             style={{
-              fontSize: size,
+              fontSize: px(size),
               fontWeight: '700',
               color: t['color.foreground'],
-              lineHeight: t['line-height.tight'],
+              
               marginTop: t['space.2'],
               marginBottom: t['space.1'],
             }}
           >
-            {inline ? renderInline(inline.children, t, { fontSize: size, fontWeight: '700', color: t['color.foreground'] }, k) : null}
+            {inline ? renderInline(inline.children, t, { fontSize: px(size), fontWeight: '700', color: t['color.foreground'] }, k) : null}
           </RNText>
         );
       }
@@ -197,9 +210,9 @@ function renderNodes(nodes: Node[], t: Tokens, keyBase: string): React.ReactNode
           <RNText
             key={k}
             selectable
-            style={{ fontSize: t['font-size.base'], lineHeight: t['line-height.relaxed'], color: t['color.foreground'], marginVertical: 2 }}
+            style={{ fontSize: px(t['font-size.base']),  color: t['color.foreground'], marginVertical: 2 }}
           >
-            {inline ? renderInline(inline.children, t, { fontSize: t['font-size.base'], lineHeight: t['line-height.relaxed'], color: t['color.foreground'] }, k) : null}
+            {inline ? renderInline(inline.children, t, { fontSize: px(t['font-size.base']),  color: t['color.foreground'] }, k) : null}
           </RNText>
         );
       }
@@ -217,8 +230,8 @@ function renderNodes(nodes: Node[], t: Tokens, keyBase: string): React.ReactNode
                 style={{
                   width: 22,
                   color: t['color.foreground-muted'],
-                  fontSize: t['font-size.base'],
-                  lineHeight: t['line-height.relaxed'],
+                  fontSize: px(t['font-size.base']),
+                  
                 }}
               >
                 {ordered ? `${start + liIdx}.` : '•'}
@@ -251,7 +264,7 @@ function renderNodes(nodes: Node[], t: Tokens, keyBase: string): React.ReactNode
           >
             <RNText
               selectable
-              style={{ fontFamily: t['font.mono'], fontSize: t['font-size.sm'], color: t['color.foreground'], lineHeight: t['line-height.normal'] }}
+              style={{ fontFamily: t['font.mono'], fontSize: px(t['font-size.sm']), color: t['color.foreground'],  }}
             >
               {code}
             </RNText>
@@ -268,8 +281,8 @@ function renderNodes(nodes: Node[], t: Tokens, keyBase: string): React.ReactNode
         );
       case 'inline': {
         return (
-          <RNText key={k} selectable style={{ fontSize: t['font-size.base'], color: t['color.foreground'] }}>
-            {renderInline(node.children, t, { fontSize: t['font-size.base'], color: t['color.foreground'] }, k)}
+          <RNText key={k} selectable style={{ fontSize: px(t['font-size.base']), color: t['color.foreground'] }}>
+            {renderInline(node.children, t, { fontSize: px(t['font-size.base']), color: t['color.foreground'] }, k)}
           </RNText>
         );
       }
@@ -289,7 +302,7 @@ export function MarkdownMessage({ text }: { text: string }): React.JSX.Element {
     }
   }, [text]);
   if (nodes.length === 0) {
-    return <RNText selectable style={{ fontSize: t['font-size.base'], lineHeight: t['line-height.relaxed'], color: t['color.foreground'] }}>{text}</RNText>;
+    return <RNText selectable style={{ fontSize: px(t['font-size.base']),  color: t['color.foreground'] }}>{text}</RNText>;
   }
   return <View>{renderNodes(nodes, t, 'md')}</View>;
 }
