@@ -1176,3 +1176,16 @@ export {
   type HostPayloadMode,
   type PayloadModeReadOptions,
 } from './payload-mode-client.js';
+
+// 云端工具客户端桥（"tool calling 只针对云端"的客户端半边；产出 PI 内核可用的 customTools）。
+export {
+  createHttpCloudToolTransport,
+  toCloudAgentTools,
+  toCloudToolDescriptors,
+  type CloudToolTransport,
+  type CloudToolInvokeResult,
+  type CloudAgentTool,
+  type CloudToolDescriptor,
+  type HttpCloudToolTransportOptions,
+  type CloudToolSelectOptions,
+} from './ai-cloud-tools.js';
