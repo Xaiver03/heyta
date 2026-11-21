@@ -1,6 +1,7 @@
 # Agent Harness 目标达成状态（对照产品裁决 D1–D7）
 
-> 最近更新 2026-11-22（第19轮）：累计 640 条相关测试通过（ai 338 + app-host AI 114 + op-log 182 + node-host 1 + server 5；另有 1 条既有失败在 `managed-routing`，与本次无关）。
+> 最近更新 2026-11-22（新一轮 goal 第7轮）：**干净 dist 复核** app-host AI 32、op-log 182、node-host 1、server agent-tools 18 通过；web/mobile/server `tsc` 均 0 错；`packages/ai` 338（1 条既有失败 `managed-routing`，与本次无关）。
+> 新增入口：Web `runWebCloudTurn`、Mobile `runMobileCloudTurn`（接入点就绪、tsc 通过）；写路径 D1 端到端测试通过。
 
 > 日期：2026-11-22。本文件把产品负责人 7 条裁决逐条映射到**代码 + 能转红的测试 + 门禁**，并如实列出**未完成/未验证**。
 > 相关：[设计 v3](2026-11-21-agent-tool-calling-audit-and-pi-harness-design.md)、[审计①](2026-11-21-agent-harness-audit.md)、[审计②](2026-11-22-agent-harness-impl-audit.md)。
@@ -33,11 +34,11 @@
 
 ## 2. 未完成 / 未验证（诚实清单）
 
-1. **移动端 / Web 的真实 UI 入口**：契约 `runAiTurnWithUndo` 就绪，但 `apps/mobile`(`AssistantScreen`) / `apps/web` 尚未注入新路径（且 `apps/mobile` 正被另一会话改动，未触碰）。⇒ "四端可用"目前是**库级 + node-host 级**，非四端 UI 全接。
+1. **移动端 / Web 的真实 UI 入口**：**接入点已就绪**（`apps/web/src/features/ai/cloud-harness.ts` 的 `runWebCloudTurn`、`apps/mobile/src/ai/cloud-harness.ts` 的 `runMobileCloudTurn`，tsc 通过）；但**尚未把 `AssistantScreen`/`AssistantPanel` 的默认交互切到新入口**——现有面板用 `requestAssistantTurn`（含流式/历史/提案 UI），切换会牺牲这些，需产品决策+UI 验收。⇒ 「四端可用」= 库级 + 四端**接入点**就绪 + node-host 真跑，非四端 UI 默认切换。
 2. **服务端 `/api/agent/tools`**：**路由骨架已实现**（`server/src/ai/agent-tools.routes.ts`，list/invoke/幂等/授权/风险门，5 测试绿），但**未在 `api.ts` 注册、未接真实数据层**（`execute` 注入）。托管场景与云端写入撤销仍需接数据层。
 3. **P0-2（assistant `tool_calls` 帧）**：✅ **已修协议结构层**（`wire.ts` 支持 assistant `tool_calls`；`ai-routed-model` 保留该帧；省略时字节不变，有测试）。⚠️ 真实 OpenAI 兼容端点仍未联网复验（未核）。
 4. **PI 内核在 RN/Hermes 真机**：`pi-agent-core` 可移植性未验证（审计① U5）；Hermes 性能未量化。
-5. **`check:ai-coverage` 红**：mobile 缺 `breakdown/prioritize/duration` 三入口——既有产品缺口，与本 harness 无关。
+5. **`check:ai-coverage` 红**：mobile 缺 `breakdown/prioritize/duration`——是**三个 AI 功能的移动端移植**（web 各 ~600 行；mobile 完全无组件），非 Harness 胶水。详见 [mobile-ai-coverage-scope](2026-11-22-mobile-ai-coverage-scope.md)。
 
 ## 3. 结论
 
