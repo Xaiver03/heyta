@@ -426,7 +426,18 @@ export interface CaptureSubmitPlan {
    * 「时间段」的时长（分钟）。见 {@link startDate}：与它成对。
    */
   readonly durationMinutes?: number;
+  /**
+   * 重复**预设**（S6）。派生 `repeatRule + repeatDtstart` 在 app-host 的 `create()`
+   * （锚点=截止日/今天，与 `setRepeat` 同源）。可选：不选 = 不重复，逐字节不变。
+   *
+   * ⚠️ 共享层不 import app-host，故这里就地声明同一字面集（与 app-host 的 `RepeatPresetId`
+   * 逐字一致）；两端宿主把它原样交给 `addTask({ repeatPreset })`。
+   */
+  readonly repeatPreset?: CaptureRepeatPreset;
 }
+
+/** 重复预设（S6）。与 app-host 的 `RepeatPresetId` 同一字面集。 */
+export type CaptureRepeatPreset = 'daily' | 'weekly' | 'weekdays' | 'monthly' | 'yearly';
 
 /**
  * 把选中的清单并进一份已经算好的计划。
@@ -485,6 +496,17 @@ export function withCaptureRange(
     return plan;
   }
   return { ...plan, startDate, durationMinutes };
+}
+
+/**
+ * 把用户选的**重复预设**并进计划（S6）。`undefined` = 不重复 ⇒ 计划逐字节不变。
+ * 预设到 `repeatRule + repeatDtstart` 的派生在 app-host 的 `create()`（锚点语义与 `setRepeat` 同源）。
+ */
+export function withCaptureRepeatPreset(
+  plan: CaptureSubmitPlan,
+  preset: CaptureRepeatPreset | undefined,
+): CaptureSubmitPlan {
+  return preset === undefined ? plan : { ...plan, repeatPreset: preset };
 }
 
 /** 选择器里的一行（`id` = 清单 id；收集箱由 `labels.inbox` 单独画，不是一条 option）。 */

@@ -27,6 +27,7 @@ import {
   makeCaptureOverride,
   withCaptureProject,
   withCaptureRange,
+  withCaptureRepeatPreset,
   CAPTURE_RANGE_MIN_MINUTES,
   CAPTURE_RANGE_MAX_MINUTES,
   captureChipAction,
@@ -435,6 +436,31 @@ describe('G2. 时间段：把起止并进计划（`withCaptureRange`）', () => 
     const next = withCaptureRange(frozen, { startDate: 5, durationMinutes: 30 });
     expect(next).not.toBe(frozen);
     expect(frozen.startDate).toBeUndefined();
+  });
+});
+
+describe('G3. 重复预设：并进计划（`withCaptureRepeatPreset`）', () => {
+  const base: CaptureSubmitPlan = { title: '每周复盘' };
+
+  it('给了预设 ⇒ 写入 repeatPreset，且不动已有的键', () => {
+    expect(withCaptureRepeatPreset({ ...base, priority: Priority.Low }, 'weekly')).toEqual({
+      title: '每周复盘',
+      priority: Priority.Low,
+      repeatPreset: 'weekly',
+    });
+  });
+
+  it('🔴 `undefined` ⇒ 计划逐字节不变（不重复时与改动前一致）', () => {
+    const plan = withCaptureRepeatPreset({ ...base }, undefined);
+    expect(plan).toEqual({ title: '每周复盘' });
+    expect(Object.prototype.hasOwnProperty.call(plan, 'repeatPreset')).toBe(false);
+  });
+
+  it('返回新对象，原计划不被改写', () => {
+    const frozen = { ...base };
+    const next = withCaptureRepeatPreset(frozen, 'daily');
+    expect(next).not.toBe(frozen);
+    expect(frozen.repeatPreset).toBeUndefined();
   });
 });
 
