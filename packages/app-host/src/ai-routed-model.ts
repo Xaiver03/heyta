@@ -12,6 +12,7 @@
  * - **不重新拼线格式**：只组装 `AiInvocation`，请求体由 `packages/ai` 的 `wire.ts` 生成。
  * - `invoke` 可注入（测试离线），默认就是 `invokeRouted`。
  */
+import { TOOL_ENVELOPE_EGRESS_FIELDS } from '@heyta/local-api';
 import {
   DEFAULT_ROUTING_POLICY,
   invokeRouted,
@@ -90,6 +91,49 @@ export function parseToolCallArguments(raw: string): Record<string, unknown> {
   return {};
 }
 
+/** 收集一段工具观测结果里「一层 + 二层」出现过的字段名（披露复查用，与 ai-assistant 同口径）。 */
+function collectFieldNames(value: unknown, out: Set<string>): void {
+  if (Array.isArray(value)) {
+    for (const v of value) collectFieldNames(v, out);
+    return;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out.add(k);
+      if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+        for (const k2 of Object.keys(v as Record<string, unknown>)) out.add(k2);
+      }
+    }
+  }
+}
+
+/** 本轮可达工具允许出境的**字段名并集**（`text` / `tools` + 各工具 egressFields + 信封）。 */
+function disclosedFields(tools: readonly CloudToolDescriptor[]): string[] {
+  const set = new Set<string>(['text', 'tools']);
+  for (const t of tools) for (const f of t.egressFields ?? []) set.add(f.split('.')[1] ?? f);
+  for (const e of TOOL_ENVELOPE_EGRESS_FIELDS) set.add(e.split('.')[1] ?? e);
+  return [...set];
+}
+
+/** 回送工具观测前复查：实际出现的字段必须 ⊆ 已披露字段（否则停发，绝不多发）。 */
+function assertToolObservationsDisclosed(messages: readonly HarnessMessage[], allowed: Set<string>): void {
+  for (const m of messages) {
+    if (m.role !== 'tool') continue;
+    let data: unknown;
+    try {
+      data = JSON.parse(m.content);
+    } catch {
+      continue;
+    }
+    const names = new Set<string>();
+    collectFieldNames(data, names);
+    const outside = [...names].filter((n) => !allowed.has(n));
+    if (outside.length > 0) {
+      throw new Error(`egress-outside-disclosed-set: 工具观测含未披露字段 ${outside.join('、')}`);
+    }
+  }
+}
+
 /**
  * 造一个 `callModel`：每步把（消息 + 工具描述）转成 `AiInvocation`，经路由层发出去，
  * 再把 `AiSuggestion` 翻成循环需要的 `HarnessModelReply`（文本 + 工具调用）。
@@ -108,12 +152,14 @@ export function createRoutedModelCall(
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     const user = lastUser !== undefined && typeof lastUser.content === 'string' ? lastUser.content : '';
 
+    const fields = disclosedFields(tools);
+    assertToolObservationsDisclosed(messages, new Set(fields));
     const invocation: AiInvocation = {
       feature,
       system,
       user,
-      // 出境披露：文本 + 工具名/说明（tools 是出境数据，必须写进 fields）。
-      fields: ['text', 'tools'],
+      // 出境披露：文本 + 工具名/说明 + **本轮可达工具观测字段的并集**（工具结果会回灌给模型 = 出境）。
+      fields,
       tools: tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })),
       messages: harnessMessagesToChat(messages),
     };

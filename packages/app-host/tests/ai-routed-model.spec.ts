@@ -32,7 +32,12 @@ function failOutcome(message: string): RoutedOutcome {
 }
 
 const tools: CloudToolDescriptor[] = [
-  { name: 'list_tasks', description: '列任务', parameters: { type: 'object', properties: {}, additionalProperties: false } },
+  {
+    name: 'list_tasks',
+    description: '列任务',
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+    egressFields: ['task.title'],
+  },
 ];
 
 describe('createRoutedModelCall', () => {
@@ -52,7 +57,7 @@ describe('createRoutedModelCall', () => {
     });
 
     expect(seen!.feature).toBe('tool-calling');
-    expect(seen!.fields).toEqual(['text', 'tools']);
+    expect(seen!.fields).toEqual(expect.arrayContaining(['text', 'tools', 'title']));
     expect(seen!.tools?.[0]?.name).toBe('list_tasks');
     expect(seen!.messages?.map((m) => m.role)).toEqual(['system', 'user']);
     expect(reply.toolCalls?.[0]).toEqual({ id: 'c1', name: 'list_tasks', arguments: { completed: false } });
@@ -66,6 +71,19 @@ describe('createRoutedModelCall', () => {
     });
     const reply = await callModel({ messages: [{ role: 'user', content: 'hi' }], tools });
     expect(reply).toEqual({ text: '你好' });
+  });
+
+  it('工具观测含未披露字段 → 停发（egress-outside-disclosed-set）', async () => {
+    const callModel = createRoutedModelCall({ routing, consents: [], invoke: async () => okOutcome({ text: 'ok' }) });
+    await expect(
+      callModel({
+        messages: [
+          { role: 'user', content: 'u' },
+          { role: 'tool', content: '{"secret":"x"}', toolCallId: 'c1' },
+        ],
+        tools,
+      }),
+    ).rejects.toThrow('egress-outside-disclosed-set');
   });
 
   it('路由失败 → 抛错（不吞）', async () => {

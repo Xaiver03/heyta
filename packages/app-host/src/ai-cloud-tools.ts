@@ -123,6 +123,11 @@ export interface CloudToolDescriptor {
   readonly name: string;
   readonly description: string;
   readonly parameters: Readonly<Record<string, unknown>>;
+  /**
+   * 该工具的**观测结果里可能回送模型的字段**（`实体.字段`），用于出境披露。
+   * 云端模型路径会把工具结果回灌给模型 —— 那是出境，字段必须进披露集（审计 P0-1）。
+   */
+  readonly egressFields?: readonly string[];
 }
 
 /**
@@ -135,6 +140,8 @@ export interface CloudAgentTool {
   readonly label: string;
   readonly description: string;
   readonly parameters: Readonly<Record<string, unknown>>;
+  /** 观测结果里可能出境的字段（披露用；PI 内核接入方应按它并集披露）。 */
+  readonly egressFields?: readonly string[];
   execute(
     toolCallId: string,
     params: Record<string, unknown>,
@@ -155,6 +162,13 @@ function riskByName(): Map<string, string> {
   return map;
 }
 
+/** 工具名 → 该工具观测结果里可能出境的字段（来自唯一目录）。 */
+function egressByName(): Map<string, readonly string[]> {
+  const map = new Map<string, readonly string[]>();
+  for (const tool of LOCAL_API_TOOLS) map.set(tool.name, tool.egressFields);
+  return map;
+}
+
 /** 过滤后的已授权工具名（未授权即不可见 + 默认不暴露不可逆）。 */
 function selectToolNames(
   grants: LocalApiConfig['grants'],
@@ -172,9 +186,10 @@ export function toCloudToolDescriptors(
   options: CloudToolSelectOptions = {},
 ): readonly CloudToolDescriptor[] {
   const keep = new Set(selectToolNames(grants, options));
+  const egress = egressByName();
   return listAuthorizedTools(grants)
     .filter((t) => keep.has(t.name))
-    .map((t) => ({ name: t.name, description: t.description, parameters: t.inputSchema }));
+    .map((t) => ({ name: t.name, description: t.description, parameters: t.inputSchema, egressFields: egress.get(t.name) ?? [] }));
 }
 
 /**
@@ -188,6 +203,7 @@ export function toCloudAgentTools(
   options: CloudToolSelectOptions = {},
 ): readonly CloudAgentTool[] {
   const keep = new Set(selectToolNames(grants, options));
+  const egress = egressByName();
   return listAuthorizedTools(grants)
     .filter((t) => keep.has(t.name))
     .map((t) => ({
@@ -195,6 +211,7 @@ export function toCloudAgentTools(
       label: t.name,
       description: t.description,
       parameters: t.inputSchema,
+      egressFields: egress.get(t.name) ?? [],
       async execute(_toolCallId, params, signal, onUpdate) {
         void onUpdate;
         const result = await transport.invoke(t.name, params ?? {}, signal);

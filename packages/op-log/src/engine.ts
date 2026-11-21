@@ -637,6 +637,7 @@ export class OpLogEngine {
         }
         return { status: 'partial', applied, unsupported };
       }
+      if (applied.length > 0) this.redoStack = [];
       return unsupported.length === 0 ? { status: 'applied', applied } : { status: 'partial', applied, unsupported };
     });
   }

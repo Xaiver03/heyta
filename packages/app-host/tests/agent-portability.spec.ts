@@ -31,6 +31,7 @@ describe('Agent Harness 四端可移植性门禁', () => {
   it('引擎/工具/路由源码不含 Node 内置依赖（Hermes/浏览器可跑）', () => {
     const forbidden: RegExp[] = [
       /from\s+['"]node:/,
+      /from\s+['"](fs|path|os|child_process|crypto|http|https|net|tls|stream|util|worker_threads|readline|zlib)(['"]|\/)/,
       /\brequire\(/,
       /\bprocess\./,
       /\bBuffer\b/,
