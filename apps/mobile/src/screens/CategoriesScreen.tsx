@@ -63,9 +63,15 @@ import { useMobileSync } from '../sync/store';
 import { Screen } from '../ui/kit';
 import { SlotPicker } from '../ui/slot-picker';
 
-export function CategoriesScreen({ onBack }: { onBack?: () => void } = {}): React.JSX.Element {
+/**
+ * 分类时长报告本体 —— 只出内容，不带 `Screen` 外壳。
+ *
+ * 同一份实现同时服务两处：独立的「统计」屏（`CategoriesScreen`）与「成长」屏的
+ * 分类区块（`GrowthBoard` 的 `renderCategoryBreakdown` 插槽）。分类时长只有这一份
+ * 读数逻辑，两个宿主不会各算一次而对不上账。
+ */
+export function CategoryReportSection({ now }: { now: number }): React.JSX.Element {
   const { t } = useI18n();
-  const { now } = useToday();
   /**
    * 🔴 `dataRevision` 是**同步完成**的信号。少了它，这一屏在整个应用生命周期里
    * 都不会重读：冷启动落在本屏（空的）→ 去「我的」同步 → 切回来仍是空的，
@@ -128,34 +134,44 @@ export function CategoriesScreen({ onBack }: { onBack?: () => void } = {}): Reac
   );
 
   return (
-    // 🔴 `Screen` 负责顶栏标题、安全区与滚动 —— 这一屏只出内容。
-    // 自己拼 ScrollView 的话，标题、较深的安全区、以及"键盘弹起时的
-    // 可点击区域"都要重写一遍，而且会和别的屏幕长得不一样。
+    <CategoryReportView
+      report={report}
+      labels={labels}
+      laneCard
+      onSwatchPress={(row) => {
+        setOpenKey((current) => (current === row.key ? null : row.key));
+      }}
+      isSwatchExpanded={(row) => openKey === row.key}
+      renderLaneExtra={(row) =>
+        openKey === row.key ? (
+          <SlotPicker
+            name={row.name}
+            value={row.slot}
+            onChange={(slot) => {
+              chooseColor(row, slot);
+            }}
+          />
+        ) : null
+      }
+      testID="category-report"
+    />
+  );
+}
+
+/**
+ * 独立的「统计」屏外壳。🔴 `Screen` 负责顶栏标题、安全区与滚动 —— 报告本体只出内容。
+ * 自己拼 ScrollView 的话，标题、较深的安全区、以及"键盘弹起时的可点击区域"
+ * 都要重写一遍，而且会和别的屏幕长得不一样。
+ */
+export function CategoriesScreen({ onBack }: { onBack?: () => void } = {}): React.JSX.Element {
+  const { t } = useI18n();
+  const { now } = useToday();
+  return (
     <Screen
       title={t('mobile.categories.title')}
       actions={onBack === undefined ? undefined : [{ icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack }]}
     >
-      <CategoryReportView
-        report={report}
-        labels={labels}
-        laneCard
-        onSwatchPress={(row) => {
-          setOpenKey((current) => (current === row.key ? null : row.key));
-        }}
-        isSwatchExpanded={(row) => openKey === row.key}
-        renderLaneExtra={(row) =>
-          openKey === row.key ? (
-            <SlotPicker
-              name={row.name}
-              value={row.slot}
-              onChange={(slot) => {
-                chooseColor(row, slot);
-              }}
-            />
-          ) : null
-        }
-        testID="category-report"
-      />
+      <CategoryReportSection now={now} />
     </Screen>
   );
 }

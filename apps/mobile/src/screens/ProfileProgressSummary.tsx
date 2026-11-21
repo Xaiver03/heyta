@@ -104,11 +104,13 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
       label: t('mobile.profile.progress.tasks'),
       value: String(snapshot.week.tasksCompleted),
       testID: 'profile-progress-tasks',
+      onPress: onOpenGrowth,
     },
     {
       label: t('mobile.profile.progress.focus'),
       value: String(snapshot.week.focusMinutes),
       testID: 'profile-progress-focus',
+      onPress: onOpenGrowth,
     },
     {
       label: t('mobile.profile.progress.achievements'),
@@ -172,10 +174,10 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
             >
               <Text variant="headline">{cell.value}</Text>
               {/*
-                🔴 2026-11-15：第三格（已达成成就）是成长屏的入口，但它和同排
-                两个纯读数格长得**一模一样** —— 真机上看不出这一格能点。
-                给可点的格子在标签后补一枚 chevron（14dp，克制到不抢数字），
-                让"哪一格通向下一层"在视觉上可判。不可点的格保持原样。
+                🔴 2026-11-21：三格都成了「完整明细」的入口（成长/统计屏：本周 vs
+                上周、里程碑、热力图、分类时长）。可点的格子在标签后补一枚 chevron
+                （14dp，克制到不抢数字），让"哪一格通向下一层"在视觉上可判；
+                成长模块/明细不可达时 `onPress` 缺省，格保持纯读数、不加箭头。
               */}
               <HStack gap="tight" align="center">
                 <Text variant="caption" tone="subtle">

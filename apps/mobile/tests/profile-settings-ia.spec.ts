@@ -181,19 +181,18 @@ describe('移动端个人中心与设置的 IA 接线', () => {
     ⚠️ 判据仍然是**行数账**，不是"看起来更短"：显式 8 + 卡片 3 = 11。
     再要往 10 走的那一行（通知 / 清单与标签）是产品还没定的取舍，见 plan §6。
   */
-  it('A1 首屏 13 行 = 显式 10 行 + 近期状态卡 3 行（含统计与回顾、自定义底部导航）', () => {
+  it('A1 首屏 12 行 = 显式 9 行 + 近期状态卡 3 行（统计与回顾已并入近期状态，不再单独占行）', () => {
     const home = between(profile, 'return (\n    <Screen', '<SettingsScreen');
 
-    // 显式那 8 行：订阅 / 设置 / 同步摘要 / 通知 / 功能与 AI / 清单 / 标签 / 便签。
-    // 🔴 这条能红：往首屏加一行 `<SettingsRow` 就会变成 9。
+    // 显式那些行：订阅 / 设置 / 同步摘要 / 通知 / 功能与 AI / 自定义底部导航。
+    // 🔴 这条能红：往首屏加一行 `<SettingsRow` 就会变成 10。
     expect(
       [...home.matchAll(/<SettingsRow\b/g)],
-      '「我的」首屏的显式设置行数变了 —— 16 → 12 的账在 plan §5.6 B4 里记着',
-    ).toHaveLength(10);
+      '「我的」首屏的显式设置行数变了 —— 统计与回顾并入近期状态后应为 9',
+    ).toHaveLength(9);
 
-    // 那 8 行各自是哪一行（名字写死，防止"数量对、成分错"）。
+    // 首屏那几行各自是哪一行（名字写死，防止"数量对、成分错"）。
     for (const row of [
-      'statsRow',
       'subscriptionRow',
       'settingsRow',
       'syncSummaryRow',
@@ -203,6 +202,8 @@ describe('移动端个人中心与设置的 IA 接线', () => {
     ]) {
       expect(home, `首屏少了 ${row} 那一行`).toContain(`<SettingsRow row={${row}} />`);
     }
+    // 🔴 「统计与回顾」不再是独立入口：统计从「近期状态」进。
+    expect(profile, '`profile-entry-stats` 又冒出来了').not.toContain("testID: 'profile-entry-stats'");
 
     /**
      * 🔴 2026-11-15：近期状态由「竖排三行 `SettingsRow`」改成「横排三格」。

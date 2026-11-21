@@ -98,6 +98,7 @@ import { growthBoardLabels } from '../lib/growth-display';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { Button, EmptyState, Screen, SectionHeader, Stack, Text } from '../ui/kit';
+import { CategoryReportSection } from './CategoriesScreen';
 
 export function GrowthScreen({
   onBack,
@@ -276,8 +277,9 @@ export function GrowthScreen({
       switch (id) {
         case 'compareNote':
         case 'heatmap':
-        case 'category':
           return null;
+        case 'category':
+          return <SectionHeader title={t('mobile.categories.title')} />;
         case 'share':
           return (
             <>
@@ -385,6 +387,12 @@ export function GrowthScreen({
             `activityDays` 与补打卡/重新开始动作都来自共享事实和动作投影。
           */
           activityDays={data.activityDays}
+          /*
+            分类时长区块 —— 原先是「我的 → 统计与回顾」那条独立入口的整屏内容，
+            现在收进成长明细里，作为「近期状态」点击后的同一张报表的一节。
+            分类时长只有 `CategoryReportSection` 这一份实现（与独立统计屏共用）。
+          */
+          renderCategoryBreakdown={() => <CategoryReportSection now={now} />}
           onRepair={repairHabit}
           onFreshStart={freshStartHabit}
           busyHabitId={busyHabitId}

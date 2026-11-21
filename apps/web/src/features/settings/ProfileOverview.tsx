@@ -6,7 +6,7 @@
  * 只有一条事实链，也不会因为再造一个页面而产生第二套统计口径。
  */
 import { useMemo } from 'react';
-import { ArrowRight, LockKeyhole, LogOut, Settings2, UserRoundPen } from 'lucide-react';
+import { ArrowRight, ChevronRight, LockKeyhole, LogOut, Settings2, UserRoundPen } from 'lucide-react';
 
 import { HEYTA_APP_VERSION } from '@heyta/app-host';
 import { ICON_SIZE } from '@heyta/design-system';
@@ -116,18 +116,44 @@ export function ProfileOverview({
           </h2>
         </div>
         <div className="ht-settings__profile-stats">
-          <div className="ht-settings__profile-stat">
-            <span className="ht-settings__profile-value">{review.tasksCompleted}</span>
-            <span className="ht-settings__profile-label">{t('web.profile.overview.tasks')}</span>
-          </div>
-          <div className="ht-settings__profile-stat">
-            <span className="ht-settings__profile-value">{review.focusMinutes}</span>
-            <span className="ht-settings__profile-label">{t('web.profile.overview.focus')}</span>
-          </div>
-          <div className="ht-settings__profile-stat">
-            <span className="ht-settings__profile-value">{review.checkIns}</span>
-            <span className="ht-settings__profile-label">{t('web.profile.overview.checkIns')}</span>
-          </div>
+          {[
+            { key: 'tasks', value: review.tasksCompleted, label: t('web.profile.overview.tasks') },
+            { key: 'focus', value: review.focusMinutes, label: t('web.profile.overview.focus') },
+            { key: 'checkIns', value: review.checkIns, label: t('web.profile.overview.checkIns') },
+          ].map((stat) => {
+            /*
+              三个数字都是「本周回顾」的入口：点任意一格进入完整明细（成长视图里
+              同一份 `selectWeeklyReview` 投影出本周/上周对照、专注最久的一天、
+              完成最多的清单，另含里程碑、热力图与分类时长）。成长模块关闭时退回
+              纯读数，不提供绕过开关的深链。
+            */
+            const body = (
+              <>
+                <span className="ht-settings__profile-value">{stat.value}</span>
+                <span className="ht-settings__profile-stat-label">
+                  <span className="ht-settings__profile-label">{stat.label}</span>
+                  {growthEnabled ? (
+                    <ChevronRight size={ICON_SIZE.xs} aria-hidden="true" />
+                  ) : null}
+                </span>
+              </>
+            );
+            return growthEnabled ? (
+              <button
+                key={stat.key}
+                type="button"
+                className="ht-settings__profile-stat ht-settings__profile-stat--action"
+                data-testid={`profile-center-stat-${stat.key}`}
+                onClick={onOpenGrowth}
+              >
+                {body}
+              </button>
+            ) : (
+              <div key={stat.key} className="ht-settings__profile-stat">
+                {body}
+              </div>
+            );
+          })}
         </div>
       </section>
 

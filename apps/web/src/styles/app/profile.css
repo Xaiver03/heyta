@@ -108,6 +108,32 @@
   padding-block: var(--ht-space-4);
 }
 
+/*
+  可点的数字格：三个数字都把用户带到完整明细（成长视图）。容器无边框无底色，
+  只补指针与 hover/focus 反馈，视觉上与纯读数格保持一致。
+*/
+.ht-settings__profile-stat--action {
+  align-items: stretch;
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding-inline: 0;
+  text-align: start;
+  cursor: pointer;
+}
+
+.ht-settings__profile-stat--action:hover {
+  background: var(--ht-color-surface);
+}
+
+.ht-settings__profile-stat-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
 .ht-settings__profile-value {
   font-variant-numeric: tabular-nums;
   color: var(--ht-color-foreground);
