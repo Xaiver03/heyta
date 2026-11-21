@@ -367,12 +367,18 @@ async function flush(): Promise<void> {
 }
 
 async function clickByTestId(el: HTMLElement, testId: string, text: string): Promise<void> {
-  const target = [...el.querySelectorAll(`[data-testid="${testId}"] button`)].find((button) =>
-    (button.textContent ?? '').includes(text),
-  );
+  const scope = el.querySelector(`[data-testid="${testId}"]`);
+  if (scope === null) throw new Error(`找不到 ${testId}`);
+  // 先按按钮找（详情/表单里的控件）；用户列表已迁到 hta `DataTable`：行是
+  // `<tr class="hta-table__row">`，点行触发 `onRowClick` 打开详情，所以找不到按钮时退到表格行。
+  const target =
+    [...scope.querySelectorAll('button')].find((button) => (button.textContent ?? '').includes(text)) ??
+    [...scope.querySelectorAll<HTMLTableRowElement>('tbody tr')].find((row) =>
+      (row.textContent ?? '').includes(text),
+    );
   if (target === undefined) throw new Error(`找不到 ${testId} 里的「${text}」`);
   await act(async () => {
-    (target as HTMLButtonElement).click();
+    (target as HTMLElement).click();
   });
   await flush();
 }
@@ -410,7 +416,7 @@ describe('🔴 动作之后，列表与详情都要重新读回服务端', () =>
     await clickTab(el, '用户');
 
     const badge = () =>
-      [...el.querySelectorAll('[data-testid="admin-users"] .ht-settings__admin-badge')].filter(
+      [...el.querySelectorAll('[data-testid="admin-users"] .hta-badge')].filter(
         (node) => (node.textContent ?? '').includes('已锁定'),
       );
     expect(badge()).toHaveLength(1);
@@ -419,6 +425,9 @@ describe('🔴 动作之后，列表与详情都要重新读回服务端', () =>
     await clickByTestId(el, 'admin-users', 'locked@example.test'); // 打开详情
     const detail = el.querySelector('[data-testid="admin-user-detail"]');
     expect(detail).not.toBeNull();
+    // 🔴 解锁是**两步确认**：第一下只把按钮换成「确认 / 取消」这一对（一个请求都不发），
+    //    第二击（确认按钮文案仍为「解锁账号」）才真正 POST。
+    await clickIn(detail as HTMLElement, '解锁账号');
     await clickIn(detail as HTMLElement, '解锁账号');
 
     // 🔴 判据在这里：徽标消失**只能**来自第二次列表请求（假服务端真的解了锁）。
@@ -927,7 +936,7 @@ describe('🔴 退款：列表把投影里的每个字段都画出来', () => {
     const el = await renderPanel();
     await openRefundTab(el);
 
-    const row = el.querySelector('[data-testid="admin-refunds"] li')!.textContent ?? '';
+    const row = el.querySelector('[data-testid="admin-refunds"] tbody tr')!.textContent ?? '';
     // 存在性判据（W5 那条教训：**断言只会验界面写了什么，不会验界面少了什么**）：
     // 少画任何一列 ⇒ 这一条红，而"整块渲染了"是看不出来的。
     for (const value of [
@@ -968,12 +977,12 @@ describe('🔴 退款：批准要两步，驳回一步', () => {
     expect(state.approveBodies).toHaveLength(0);
     expect(el.querySelector('[data-testid="admin-refund-approve-confirm"]')).not.toBeNull();
 
-    await pressTestId(el, 'admin-refund-approve-yes-1207');
+    await pressTestId(el, 'admin-refund-approve-confirm-submit');
     expect(state.approveBodies).toEqual([{ note: '用户坚持，客服同意' }]);
     // 动作之后**再读一次**（进页面 1 次 + 动作后 1 次）。
     expect(state.listFetches).toBe(2);
     // 界面说的是重新读回来的那一行：processing，而且**没有**"已退款"。
-    const row = el.querySelector('[data-testid="admin-refunds"] li')!.textContent ?? '';
+    const row = el.querySelector('[data-testid="admin-refunds"] tbody tr')!.textContent ?? '';
     expect(row).toContain('processing');
     expect(refundNoticeText(el)).toContain('已交给支付通道');
     expect(el.textContent).not.toContain('已退款');
@@ -1011,7 +1020,7 @@ describe('🔴 退款：409 的原因码必须到得了运营眼前（ADR-0053 �
     // 折成 5xx 那句"服务端出错了"就是把"你的参数没问题、是那一单的状态不允许"这条事实弄丢了。
     expect(el.textContent).not.toContain('服务端出错了');
     // 被拒的申请**不该**出现在列表里（假服务端也没真的加行）。
-    expect(el.querySelector('[data-testid="admin-refunds"] li')).toBeNull();
+    expect(el.querySelector('[data-testid="admin-refunds"] tbody tr')).toBeNull();
   });
 
   it('服务端给了一个这台界面**不认识**的码 ⇒ 原码打出来，界面不猜', async () => {
@@ -1055,7 +1064,7 @@ describe('🔴 退款：409 的原因码必须到得了运营眼前（ADR-0053 �
     const el = await renderPanel();
     await openRefundTab(el);
     await pressTestId(el, 'admin-refund-approve-1207');
-    await pressTestId(el, 'admin-refund-approve-yes-1207');
+    await pressTestId(el, 'admin-refund-approve-confirm-submit');
 
     expect(refundNoticeText(el)).toContain('不认识的结果码');
     expect(refundNoticeText(el)).toContain('refunded_out_of_band');

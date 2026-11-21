@@ -142,9 +142,11 @@ async function openUser(): Promise<HTMLDivElement> {
     (usersTab as HTMLButtonElement).click();
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
-  const row = [...el.querySelectorAll('button')].find((node) =>
-    (node.textContent ?? '').includes('someone@example.test'),
-  ) as HTMLButtonElement | undefined;
+  // 用户列表已迁到 hta `DataTable`：行是 `<tr class="hta-table__row">`（点击行触发
+  // `onRowClick` 打开详情），不再是 `<button>`。
+  const row = [...el.querySelectorAll<HTMLTableRowElement>('[data-testid="admin-users"] tbody tr')].find(
+    (node) => (node.textContent ?? '').includes('someone@example.test'),
+  );
   if (row === undefined) throw new Error('用户列表里没有那一行');
   await act(async () => {
     row.click();

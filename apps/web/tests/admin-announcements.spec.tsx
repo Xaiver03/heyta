@@ -226,13 +226,15 @@ describe('公告那一格', () => {
     await clickTab('公告');
     expect(calls.some((c) => c.url.includes('/announcements'))).toBe(true);
 
-    const rows = [...el.querySelectorAll<HTMLElement>('.ht-settings__admin-row')];
+    // 列表已迁到 hta `DataTable`：行 = `<tr class="hta-table__row">`，标题在第一格 `<td>`，
+    // 状态徽标类名从 `.ht-settings__admin-badge` 变为 `.hta-badge`。
+    const rows = [...el.querySelectorAll<HTMLElement>('[data-testid="admin-announcements-table"] tbody tr')];
     expect(rows).toHaveLength(3);
 
     const badge = (title: string): string => {
-      const row = rows.find((r) => r.querySelector('.ht-settings__admin-rowMain')?.textContent === title);
+      const row = rows.find((r) => r.querySelector('td')?.textContent === title);
       if (row === undefined) throw new Error(`找不到行「${title}」`);
-      return row.querySelector('.ht-settings__admin-badge')?.textContent ?? '';
+      return row.querySelector('.hta-badge')?.textContent ?? '';
     };
 
     // 第 1 条：publishedAt 在未来 + expiresAt 在过去，界面自己比时钟的话
@@ -284,8 +286,8 @@ describe('公告那一格', () => {
     await renderPanel();
     await clickTab('公告');
 
-    setValue('[aria-label="标题"]', '系统维护');
-    setValue('[aria-label="正文"]', '今晚 22:00 起同步暂停约 20 分钟。');
+    setValue('#admin-announcement-title', '系统维护');
+    setValue('#admin-announcement-body', '今晚 22:00 起同步暂停约 20 分钟。');
     await clickByText('发布');
 
     const post = calls.find((c) => c.method === 'POST');
@@ -304,8 +306,8 @@ describe('公告那一格', () => {
     await clickTab('公告');
 
     const readsBefore = calls.filter((c) => c.method === 'GET' && c.url.includes('/announcements')).length;
-    setValue('[aria-label="标题"]', 'a');
-    setValue('[aria-label="正文"]', 'b');
+    setValue('#admin-announcement-title', 'a');
+    setValue('#admin-announcement-body', 'b');
     await clickByText('发布');
 
     const readsAfter = calls.filter((c) => c.method === 'GET' && c.url.includes('/announcements')).length;
@@ -324,13 +326,13 @@ describe('公告那一格', () => {
     const el = await renderPanel();
     await clickTab('公告');
 
-    setValue('[aria-label="标题"]', '   ');
-    setValue('[aria-label="正文"]', 'b');
+    setValue('#admin-announcement-title', '   ');
+    setValue('#admin-announcement-body', 'b');
     await clickByText('发布');
 
     expect(el.querySelector('[data-testid="admin-announcements-notice"]')?.textContent).toContain('操作失败');
     // 列表还在：一次失败不许把已经读到的数据抹掉。
-    expect(el.querySelectorAll('.ht-settings__admin-row')).toHaveLength(3);
+    expect(el.querySelectorAll('[data-testid="admin-announcements-table"] tbody tr')).toHaveLength(3);
     expect(useAdminStore.getState().announcementNotice).toBe('failed');
   });
 
@@ -341,7 +343,7 @@ describe('公告那一格', () => {
     await clickTab('公告');
 
     expect(container!.textContent).toContain('还没有公告。');
-    expect(container!.querySelectorAll('.ht-settings__admin-row')).toHaveLength(0);
+    expect(container!.querySelectorAll('[data-testid="admin-announcements-table"] tbody tr')).toHaveLength(0);
   });
 
   it('🔴 明文警告常驻：没有公告时它也还在（不许把约束藏进数据里）', async () => {
