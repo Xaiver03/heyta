@@ -662,12 +662,18 @@ export class OpLogEngine {
       }
       const before = this.state;
       source.pop();
+      // 撤销后该 op 不再"处于已应用状态" ⇒ 从按 opId 的映射里移除（否则映射只增不减会泄漏，
+      // 且 undoOperations 会拿到已被撤过的条目）。
+      if (direction === 'undo') this.historyByOpId.delete(entry.opId);
       const result = await this.dispatchLocked(entry.inverse, undefined, false);
       const applied = result.ops[0]!;
       // 反向 op 自己也是一条可撤销的写入 —— 这就是重做。
       const counterpart = buildHistoryEntry(before, entry.inverse, applied);
       destination.push(counterpart);
-      if (destination.length > HISTORY_LIMIT) destination.shift();
+      if (destination.length > HISTORY_LIMIT) {
+        const dropped = destination.shift();
+        if (dropped !== undefined) this.historyByOpId.delete(dropped.opId);
+      }
       return { status: 'applied', opId: applied.id, target: historyTargetOf(entry.intent, entry.timestamp) };
     }
 

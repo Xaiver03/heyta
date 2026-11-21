@@ -84,3 +84,20 @@ describe('undoOperations（按 op 整批撤销）', () => {
     }
   });
 });
+
+describe('undoOperations 与普通 undo 的隔离', () => {
+  it('普通 undo 之后再用同一 opId 整批撤销 → 不会重复撤销（已从映射移除）', async () => {
+    const { engine, close } = await memoryEngine();
+    try {
+      const c1 = await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Create, payload: { title: 'A' } });
+      expect(await engine.undo()).toMatchObject({ status: 'applied' });
+      const outcome = await engine.undoOperations([c1.ops[0]!.id]);
+      expect(outcome.status).toBe('partial');
+      if (outcome.status === 'partial') {
+        expect(outcome.unsupported.map((u) => u.reason)).toEqual(['not-tracked']);
+      }
+    } finally {
+      close();
+    }
+  });
+});
