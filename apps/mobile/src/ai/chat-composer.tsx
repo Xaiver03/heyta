@@ -3,10 +3,19 @@ import { ActivityIndicator, Image, Pressable, TextInput, View } from 'react-nati
 import { useI18n } from '@heyta/i18n';
 
 import type { AiImagePart } from '@heyta/ai';
-import { useText, useTheme, useTokens } from '../theme';
+import { useTheme, useTokens } from '../theme';
 import { Icon } from '../ui/icons';
-import { Chip, Text } from '../ui/kit';
+import { Chip } from '../ui/kit';
 
+/**
+ * 聊天输入框（composer）。
+ *
+ * 布局严格对照开源三端 AI 客户端 Chatbox（`chatboxai/chatbox`）的 InputBox：
+ *  - 外层：圆角卡片 + **1px 边框** + 白底 + 小阴影 + 内边距；
+ *  - 输入：**14px 常规字重**、透明底、自动增高（至多 3 行）；
+ *  - 发送：**实心主色圆钮 + 上箭头**（生成中显示加载），禁用态为低饱和底；
+ *  - 不发任何说明/提示文字（只在结构里表达状态）。
+ */
 export function ChatComposer({
   value,
   onChangeText,
@@ -25,26 +34,35 @@ export function ChatComposer({
   onSubmit: () => void;
   disabled?: boolean;
   busy?: boolean;
-  /** 已引用的附件（任务）。 */
   attachments?: readonly { readonly id: string; readonly title: string }[];
-  /** 打开附件选择面板。省略则不显示附件按钮。 */
   onOpenAttach?: () => void;
   onRemoveAttachment?: (id: string) => void;
-  /** 待发送的图片（内存里那一份）。 */
   images?: readonly AiImagePart[];
-  /** 打开系统相册选图。省略则不显示附图按钮。 */
   onPickImage?: () => void;
   onRemoveImage?: (index: number) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
-  const text = useText();
   const { native, reducedMotion } = useTheme();
   const canSend = value.trim() !== '' && !disabled;
+  const sendActive = canSend && !busy;
+
+  const iconButton = (name: Parameters<typeof Icon>[0]['name'], label: string, testID: string, onPress: () => void) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      testID={testID}
+      onPress={onPress}
+      style={{ width: tokens['touch-target.min'], height: tokens['touch-target.min'], alignItems: 'center', justifyContent: 'center' }}
+    >
+      <Icon name={name} size="sm" color={tokens['color.foreground-muted']} />
+    </Pressable>
+  );
+
   return (
     <View
       style={{
-        gap: tokens['space.1'],
+        gap: tokens['space.2'],
         paddingTop: tokens['space.2'],
         paddingBottom: tokens['space.2'],
         backgroundColor: tokens['color.background'],
@@ -75,36 +93,24 @@ export function ChatComposer({
           ))}
         </View>
       ) : null}
-      <View style={{
-        flexDirection: 'row', alignItems: 'flex-end', gap: tokens['space.2'],
-        backgroundColor: tokens['color.surface'], borderRadius: tokens['radius.lg'],
-        padding: tokens['space.2'],
-        // RN's boxShadow renders the same theme token on iOS and Android.
-        // Give the whole composer depth; the input and send control stay flat.
-        boxShadow: tokens['shadow.sm'],
-      }}>
-        {onOpenAttach === undefined ? null : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mobile.ai.attach.open')}
-            testID="ai-attach-button"
-            onPress={onOpenAttach}
-            style={{ width: tokens['touch-target.min'], height: tokens['touch-target.min'], alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Icon name="action.attach" size="sm" color={tokens['color.foreground-muted']} />
-          </Pressable>
-        )}
-        {onPickImage === undefined ? null : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('web.ai.attach.label')}
-            testID="ai-image-button"
-            onPress={onPickImage}
-            style={{ width: tokens['touch-target.min'], height: tokens['touch-target.min'], alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Icon name="action.image" size="sm" color={tokens['color.foreground-muted']} />
-          </Pressable>
-        )}
+
+      {/* 输入卡片：圆角 + 1px 边框 + 白底 + 小阴影（对齐 Chatbox InputBox 容器）。 */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: tokens['space.1'],
+          backgroundColor: tokens['color.surface'],
+          borderRadius: tokens['radius.lg'],
+          borderWidth: 1,
+          borderColor: tokens['color.border'],
+          paddingHorizontal: tokens['space.2'],
+          paddingVertical: tokens['space.1'],
+          boxShadow: tokens['shadow.sm'],
+        }}
+      >
+        {onOpenAttach === undefined ? null : iconButton('action.attach', t('mobile.ai.attach.open'), 'ai-attach-button', onOpenAttach)}
+        {onPickImage === undefined ? null : iconButton('action.image', t('web.ai.attach.label'), 'ai-image-button', onPickImage)}
         <TextInput
           value={value}
           onChangeText={onChangeText}
@@ -117,31 +123,29 @@ export function ChatComposer({
           keyboardType="default"
           autoCapitalize="sentences"
           autoCorrect
-          // Return inserts a newline. Sending is deliberately explicit so a
-          // Chinese IME's composing text can never be submitted prematurely.
           submitBehavior="newline"
-          style={[
-            text['row-title'],
-            {
-              flex: 1,
-              maxHeight: tokens['size.field-height'] * 3,
-              minHeight: tokens['size.field-height'],
-              paddingHorizontal: tokens['space.3'],
-              paddingVertical: tokens['space.2'],
-              backgroundColor: tokens['color.surface'],
-              color: tokens['color.foreground'],
-              fontFamily: native.fontSans,
-              textAlignVertical: 'top',
-              opacity: disabled ? tokens['state.disabled-opacity'] : 1,
-            },
-          ]}
+          style={{
+            flex: 1,
+            maxHeight: tokens['size.field-height'] * 3,
+            minHeight: tokens['size.field-height'],
+            paddingHorizontal: tokens['space.1'],
+            paddingVertical: tokens['space.1'],
+            backgroundColor: 'transparent',
+            color: tokens['color.foreground'],
+            fontFamily: native.fontSans,
+            fontSize: tokens['font-size.sm'],
+            fontWeight: '400',
+            lineHeight: tokens['line-height.normal'],
+            textAlignVertical: 'top',
+            opacity: disabled ? tokens['state.disabled-opacity'] : 1,
+          }}
         />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('web.ai.chat.send')}
-          accessibilityState={{ disabled: !canSend, busy }}
+          accessibilityState={{ disabled: !sendActive, busy }}
           testID="ai-assistant-send-button"
-          disabled={!canSend}
+          disabled={!sendActive}
           onPress={onSubmit}
           style={({ pressed }) => ({
             width: tokens['touch-target.min'],
@@ -149,15 +153,17 @@ export function ChatComposer({
             borderRadius: tokens['radius.full'],
             alignItems: 'center',
             justifyContent: 'center',
-            // 不再给发送键铺灰/蓝圆底：只留一个图标（「有个输入框就够了」）。
-            backgroundColor: 'transparent',
-            opacity: pressed && !reducedMotion && canSend ? tokens['state.pressed-opacity'] : 1,
+            backgroundColor: sendActive ? tokens['color.primary'] : tokens['color.surface-sunken'],
+            opacity: pressed && !reducedMotion && sendActive ? tokens['state.pressed-opacity'] : 1,
           })}
         >
-          {busy ? <ActivityIndicator size="small" color={tokens['color.foreground-subtle']} /> : <Icon name="action.send" size="sm" color={canSend ? tokens['color.on-primary'] : tokens['color.foreground-subtle']} />}
+          {busy ? (
+            <ActivityIndicator size="small" color={tokens['color.on-primary']} />
+          ) : (
+            <Icon name="action.send" size="sm" color={sendActive ? tokens['color.on-primary'] : tokens['color.foreground-subtle']} />
+          )}
         </Pressable>
       </View>
-      {busy ? <Text variant="caption" tone="subtle">{t('web.ai.loading.waiting')}</Text> : null}
     </View>
   );
 }
