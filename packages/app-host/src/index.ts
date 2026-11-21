@@ -1184,6 +1184,7 @@ export {
   toCloudToolDescriptors,
   type CloudToolTransport,
   type CloudToolInvokeResult,
+  type CloudToolInvokeOptions,
   type CloudAgentTool,
   type CloudToolDescriptor,
   type HttpCloudToolTransportOptions,

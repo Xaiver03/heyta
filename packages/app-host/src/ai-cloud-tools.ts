@@ -32,11 +32,20 @@ export type CloudToolInvokeResult =
   | { readonly ok: false; readonly reason: string; readonly message: string };
 
 /** 传输层：把 (工具名, 参数) 发到云端并拿回结果。可注入实现。 */
+export interface CloudToolInvokeOptions {
+  /**
+   * 幂等键：服务端据此去重（重放返回同一结果），避免"跨进程/跨端重试重复落库"。
+   * 写请求应带；读请求可不带。
+   */
+  readonly idempotencyKey?: string;
+}
+
 export interface CloudToolTransport {
   invoke(
     name: string,
     args: Readonly<Record<string, unknown>>,
     signal?: AbortSignal,
+    options?: CloudToolInvokeOptions,
   ): Promise<CloudToolInvokeResult>;
 }
 
@@ -83,10 +92,13 @@ export function createHttpCloudToolTransport(
   const fetchImpl = options.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
   const prefix = options.pathPrefix ?? '/api/agent/tools';
   return {
-    async invoke(name, args, signal) {
+    async invoke(name, args, signal, callOptions) {
       const token = options.getToken?.();
       const headers: Record<string, string> = { 'content-type': 'application/json' };
       if (token !== undefined && token !== '') headers['authorization'] = `Bearer ${token}`;
+      if (callOptions?.idempotencyKey !== undefined && callOptions.idempotencyKey !== '') {
+        headers['idempotency-key'] = callOptions.idempotencyKey;
+      }
       let response: Response;
       try {
         response = await fetchImpl(`${trimBase(options.baseUrl)}${prefix}/${encodeURIComponent(name)}`, {
@@ -212,9 +224,9 @@ export function toCloudAgentTools(
       description: t.description,
       parameters: t.inputSchema,
       egressFields: egress.get(t.name) ?? [],
-      async execute(_toolCallId, params, signal, onUpdate) {
+      async execute(toolCallId, params, signal, onUpdate) {
         void onUpdate;
-        const result = await transport.invoke(t.name, params ?? {}, signal);
+        const result = await transport.invoke(t.name, params ?? {}, signal, { idempotencyKey: toolCallId });
         if (!result.ok) throw new Error(result.message);
         return {
           content: [{ type: 'text', text: JSON.stringify(result.data) }],

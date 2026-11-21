@@ -83,6 +83,11 @@ export interface CloudAgentHarnessOptions {
   readonly systemPrompt: string;
   /** 上界；默认 6（与 `MAX_ASSISTANT_TOOL_STEPS` 口径一致）。 */
   readonly maxSteps?: number;
+  /**
+   * 本轮运行的稳定 id（一次用户发送）。给了它就给每个工具调用派生幂等键
+   * `runId:s<step>:<callId>`，让云端重试不重复落库。
+   */
+  readonly runId?: string;
   readonly onEvent?: (event: HarnessEvent) => void;
   /** 历史（多轮对话）；不含本轮 user。 */
   readonly history?: readonly HarnessMessage[];
@@ -140,7 +145,14 @@ export async function runCloudAgentTurn(
       let errorText: string | undefined;
       let content: string;
       try {
-        const result = await options.transport.invoke(call.name, call.arguments);
+        const idemKey =
+          options.runId === undefined ? undefined : `${options.runId}:s${String(step)}:${call.id}`;
+        const result = await options.transport.invoke(
+          call.name,
+          call.arguments,
+          undefined,
+          idemKey === undefined ? undefined : { idempotencyKey: idemKey },
+        );
         if (result.ok) {
           content = JSON.stringify(result.data);
         } else {

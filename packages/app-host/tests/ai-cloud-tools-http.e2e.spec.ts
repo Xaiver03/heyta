@@ -20,6 +20,7 @@ interface Seen {
   method?: string;
   path?: string;
   auth?: string;
+  idem?: string;
   body?: string;
 }
 
@@ -36,6 +37,7 @@ describe('云端工具传输（真 HTTP）', () => {
         seen.method = req.method;
         seen.path = req.url;
         seen.auth = req.headers['authorization'] as string | undefined;
+        seen.idem = req.headers['idempotency-key'] as string | undefined;
         seen.body = body;
         res.setHeader('content-type', 'application/json');
         if (req.method === 'POST' && req.url === '/api/agent/tools/list_tasks') {
@@ -73,6 +75,7 @@ describe('云端工具传输（真 HTTP）', () => {
       transport,
       tools,
       systemPrompt: 's',
+      runId: 'run-1',
       callModel: async () => scripted.shift()!,
     });
 
@@ -82,6 +85,7 @@ describe('云端工具传输（真 HTTP）', () => {
     expect(seen.method).toBe('POST');
     expect(seen.path).toBe('/api/agent/tools/list_tasks');
     expect(seen.auth).toBe('Bearer tok-test-123');
+    expect(seen.idem).toBe('run-1:s0:c1');
     expect(JSON.parse(seen.body!)).toEqual({ args: {} });
   });
 

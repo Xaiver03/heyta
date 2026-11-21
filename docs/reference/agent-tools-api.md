@@ -85,3 +85,7 @@
 4. 客户端把 `toCloudAgentTools(transport, grants)` 注入 PI 内核 / 原生循环，替换本地工具源。
 
 > 注：服务端当前只有同步/账户/计费路由，**尚无逐实体业务 REST**；本 API 需要服务端从 op-log/物化状态执行工具。这条工作量单独评估（见设计文档 §7 待办）。
+
+## 5. 幂等键（客户端已实现）
+
+写请求的 `Idempotency-Key` 已由客户端落实：`createHttpCloudToolTransport` 对带 `idempotencyKey` 的调用发送 `Idempotency-Key` 头；`runCloudAgentTurn`/`requestCloudAssistantTurn` 在传入 `runId` 时按 `runId:s<step>:<callId>` 生成（PI 内核路径以 `toolCallId` 作键）。测试：`ai-cloud-tools-http.e2e.spec.ts` 断言了真实线上的头值。

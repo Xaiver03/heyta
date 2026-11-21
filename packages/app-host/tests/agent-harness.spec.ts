@@ -104,3 +104,28 @@ describe('runCloudAgentTurn（原生云端循环）', () => {
     expect(seen).toEqual(['system:s', 'user:第一轮', 'assistant:收到', 'user:第二轮']);
   });
 });
+
+
+describe('runCloudAgentTurn 幂等键', () => {
+  it('给了 runId → 每个工具调用带 runId:s<step>:<callId> 幂等键', async () => {
+    const seen: { key?: string }[] = [];
+    const transport: CloudToolTransport = {
+      invoke: async (_n, _a, _s, opts) => {
+        seen.push({ key: opts?.idempotencyKey });
+        return { ok: true, data: [] };
+      },
+    };
+    const scripted: HarnessModelReply[] = [
+      { toolCalls: [{ id: 'call-9', name: 'list_tasks', arguments: {} }] },
+      { text: 'ok' },
+    ];
+    await runCloudAgentTurn('x', {
+      transport,
+      tools,
+      systemPrompt: 's',
+      runId: 'R',
+      callModel: async () => scripted.shift()!,
+    });
+    expect(seen[0]?.key).toBe('R:s0:call-9');
+  });
+});

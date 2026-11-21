@@ -36,6 +36,7 @@ export interface CloudAssistantTurnDeps {
   readonly grants: LocalApiConfig['grants'];
   readonly systemPrompt?: string;
   readonly maxSteps?: number;
+  readonly runId?: string;
   readonly onEvent?: (event: HarnessEvent) => void;
   /** 注入以便离线测试；默认真实 invokeRouted。 */
   readonly invoke?: RoutedInvoke;
@@ -58,6 +59,7 @@ export async function requestCloudAssistantTurn(
     systemPrompt: deps.systemPrompt ?? CLOUD_ASSISTANT_SYSTEM_PROMPT,
     callModel,
     ...(deps.maxSteps === undefined ? {} : { maxSteps: deps.maxSteps }),
+    ...(deps.runId === undefined ? {} : { runId: deps.runId }),
     ...(deps.onEvent === undefined ? {} : { onEvent: deps.onEvent }),
   });
 }
