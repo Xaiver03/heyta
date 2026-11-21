@@ -76,3 +76,10 @@ await undoLastAiTurn({ undo }, seqBefore);
 - `runWebCloudTurn(userText, { routing, consents, grants })` —— 用 `createAiToolHost()`（Web 真实 dispatch）+ `createLocalToolTransport` + `runAiTurnWithUndo`（撤销绑定来自 `requireEngine().currentLocalSeq/undoSince`）。
 - `undoWebCloudTurn(seqBefore)` —— 撤销这次 AI 操作的本地写入。
 - 类型检查通过（`apps/web` `tsc -p tsconfig.spec.json` 0 错）。面板 `AssistantPanel` 已有 `routing/consents` props，接入只需改为调 `runWebCloudTurn`（UI 切换待排，避免与并发改动冲突）。
+
+## 8. 移动端接入点（已就绪）
+
+`apps/mobile/src/ai/cloud-harness.ts`：
+- `runMobileCloudTurn(host, userText, { routing, consents, grants })` —— 用本机 `AppHost`（`host.engine/dispatch/getState`）建 `createLocalApiHost` + `createLocalToolTransport`，跑 `runAiTurnWithUndo`（撤销绑定 `host.engine.currentLocalSeq/undoSince`）。
+- `undoMobileCloudTurn(host, seqBefore)` —— 撤销这次 AI 操作的本地写入。
+- **`apps/mobile` `tsc` 全量 0 错**（新增文件不影响既有）。独立新文件，未触碰 `AssistantScreen.tsx`/`WelcomeScreen.tsx`（后者正被另一会话改）。
