@@ -407,6 +407,28 @@ describe('CaptureComposer —— 每一条截止识别都能单独取消（出�
   });
 });
 
+describe('S7 时间段（rangeEnabled）：面板里有入口、进得去、选得了时长', () => {
+  it('面板出现「时间段」入口行；点进 range 视图有时长 chip，点一枚即选中（aria-selected）', () => {
+    const el = render();
+    type(el, '下午开会');
+    const panel = openPanel(el);
+    const rangeRow = panel.querySelector<HTMLElement>('[data-testid="capture-range-row"]');
+    expect(rangeRow, 'rangeEnabled 时面板里应有「时间段」入口行').not.toBeNull();
+
+    act(() => {
+      rangeRow!.click();
+    });
+    const dur = document.querySelector<HTMLElement>('[data-testid="capture-range-duration-60"]');
+    expect(dur, 'range 视图里应有时长 chip').not.toBeNull();
+
+    act(() => {
+      dur!.click();
+    });
+    const after = document.querySelector<HTMLElement>('[data-testid="capture-range-duration-60"]');
+    expect(after!.getAttribute('aria-selected'), '点过之后该时长被选中').toBe('true');
+  });
+});
+
 describe('CaptureComposer —— 不给外壳那一档：就地展开（移动端的唯一面板路径）', () => {
   /*
     🔴 这一族量的是共享件里 `renderDuePanel === undefined` 那**一支**。

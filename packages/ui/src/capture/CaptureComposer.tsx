@@ -77,7 +77,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
-import { today } from '@heyta/domain';
+import { dueDateToEpoch, today } from '@heyta/domain';
 import type { CaptureExclusion, LocalDate, LocalTime } from '@heyta/domain';
 import { Calendar, ChevronDown, Plus, RotateCcw, X } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
@@ -105,6 +105,7 @@ import {
   toCaptureSubmitPlan,
   toggleCaptureIgnore,
   withCaptureProject,
+  withCaptureRange,
   type CaptureCapsuleKind,
   type CaptureChip,
   type CaptureDue,
@@ -300,6 +301,11 @@ export interface CaptureComposerProps {
    * 形状不同是**载体的差别**，不是两个产品。
    */
   readonly descriptionInput?: boolean | undefined;
+  /**
+   * 开不开「时间段」（S7）。它住在**日期面板里面**（面板打开后才出现一行「时间段 ›」），
+   * 不是常驻行 —— 开它不会把 web 顶部列表往下推。默认 `false`（逐字节等价于改动前）。
+   */
+  readonly rangeEnabled?: boolean | undefined;
 }
 
 /** 取一份 token 表，建出这套样式。**一个裸尺度值都没有**（`check:design` 会拦）。 */
@@ -573,6 +579,7 @@ export function CaptureComposer({
   quickPicks,
   fillRequest,
   descriptionInput = false,
+  rangeEnabled = false,
 }: CaptureComposerProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -592,9 +599,13 @@ export function CaptureComposer({
    * 而"点出口 ⇒ 面板体切子视图"这件事只有两边读同一份状态才成立。
    * 留在面板里时，把那段 JSX 复制给宿主就会造出第二份状态：footer 点了，面板不动。
    */
-  const [panelView, setPanelView] = useState<'date' | 'time'>('date');
+  const [panelView, setPanelView] = useState<'date' | 'time' | 'range'>('date');
   const [panelManual, setPanelManual] = useState(false);
   const [panelTimeDraft, setPanelTimeDraft] = useState('');
+  /** 「时间段」草稿（S7）。仅在 `rangeEnabled` 时被渲染与提交。 */
+  const [rangeStart, setRangeStart] = useState<LocalDate | undefined>(undefined);
+  const [rangeTime, setRangeTime] = useState<LocalTime | undefined>(undefined);
+  const [rangeDuration, setRangeDuration] = useState<number | undefined>(undefined);
 
   /** 原生端自己控制焦点（见 `autoFocus` 的说明）；web 不需要。 */
   const inputRef = useRef<TextInput>(null);
@@ -664,11 +675,18 @@ export function CaptureComposer({
     const trimmedDescription = descriptionDraft.trim();
     const withDescription =
       trimmedDescription === '' ? plan : { ...plan, description: trimmedDescription };
-    void onSubmit(withCaptureProject(withDescription, captureSelectedProject(projectPicker)?.id));
+    const range =
+      rangeEnabled && rangeStart !== undefined && rangeDuration !== undefined
+        ? { startDate: dueDateToEpoch(rangeStart, rangeTime), durationMinutes: rangeDuration }
+        : undefined;
+    void onSubmit(withCaptureRange(withCaptureProject(withDescription, captureSelectedProject(projectPicker)?.id), range));
     setDraft('');
     setDescriptionDraft('');
     setIgnored([]);
     setOverride(undefined);
+    setRangeStart(undefined);
+    setRangeTime(undefined);
+    setRangeDuration(undefined);
     closePanel();
   }
 
@@ -710,6 +728,23 @@ export function CaptureComposer({
     onViewChange: setPanelView,
     onManualChange: setPanelManual,
     onTimeDraftChange: setPanelTimeDraft,
+    range: rangeEnabled
+      ? {
+          start: rangeStart,
+          time: rangeTime,
+          durationMinutes: rangeDuration,
+          onStart: (start, time) => {
+            setRangeStart(start);
+            setRangeTime(time);
+          },
+          onDuration: (minutes) => {
+            setRangeDuration((prev) => (prev === minutes ? undefined : minutes));
+          },
+          onEnter: () => {
+            setPanelView('range');
+          },
+        }
+      : undefined,
   };
 
   /**

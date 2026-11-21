@@ -128,6 +128,14 @@ export function captureLabels(t: Translate): CaptureComposerLabels {
         backToDay: t('mobile.capture.panel.time.backToDay'),
         rowAria: t('mobile.capture.panel.time.rowAria'),
       },
+      range: {
+        title: t('web.capture.panel.range.title'),
+        enter: t('web.capture.panel.range.enter'),
+        back: t('web.capture.panel.range.back'),
+        startLabel: t('web.capture.panel.range.startLabel'),
+        durationLabel: t('web.capture.panel.range.durationLabel'),
+        durationLabelOf: (minutes) => t('web.capture.panel.range.durationOf', { n: String(minutes) }),
+      },
     },
   };
 }

@@ -255,6 +255,14 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
           backToDay: t('web.capture.panel.time.backToDay'),
           rowAria: t('web.capture.panel.time.rowAria'),
         },
+        range: {
+          title: t('web.capture.panel.range.title'),
+          enter: t('web.capture.panel.range.enter'),
+          back: t('web.capture.panel.range.back'),
+          startLabel: t('web.capture.panel.range.startLabel'),
+          durationLabel: t('web.capture.panel.range.durationLabel'),
+          durationLabelOf: (minutes) => t('web.capture.panel.range.durationOf', { n: String(minutes) }),
+        },
       },
     }),
     [t, locale, destination, props.anchorDate],
@@ -291,6 +299,9 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
     (plan: CaptureSubmitPlan) =>
       addTask(plan.title, {
         ...(plan.dueDate !== undefined ? { dueDate: plan.dueDate } : {}),
+        // 「时间段」（S7）：起点 + 时长，与 `dueDate` 并列，走同一条 Create op。
+        ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
+        ...(plan.durationMinutes !== undefined ? { durationMinutes: plan.durationMinutes } : {}),
         ...(plan.priority !== undefined ? { priority: plan.priority } : {}),
         ...(destination !== undefined ? { projectId: destination.projectId } : {}),
       }),
@@ -314,6 +325,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         quickPicks={quickPicks}
         fillRequest={props.fillRequest}
         renderDuePanel={props.inlineDuePanel === true ? undefined : renderDuePanel}
+        rangeEnabled
       />
     </HeytaUiProvider>
   );
