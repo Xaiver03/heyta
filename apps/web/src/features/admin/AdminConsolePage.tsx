@@ -57,10 +57,10 @@
 import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n/provider';
 import { ArrowLeft, LogIn, RefreshCw, ShieldCheck } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
 import { AdminPanel } from './AdminPanel.js';
-import { ADMIN_TABS } from './nav.js';
+import { ADMIN_NAV_GROUPS } from './nav.js';
 import { appEntryHref } from './route.js';
 import { canSignInFrom, useAdminStore } from './store.js';
 // 🔴 首启的隐私同意面板必须在这一页上也挂着 —— 见下面挂载点那条注释。
@@ -112,24 +112,31 @@ export function AdminConsolePage(): React.JSX.Element {
         {/* 🔴 分区导航只对管理员画（ADR-0078 D4）。非管理员看到的是下面的原因块。 */}
         {access === 'admin' && (
           <nav className="ht-settings__console-nav" aria-label={t('web.admin.console.navLabel')}>
-            {ADMIN_TABS.map((entry) => {
-              const Icon = entry.icon;
-              const current = store.activeTab === entry.key;
-              return (
-                <button
-                  key={entry.key}
-                  type="button"
-                  className={`ht-settings__console-navItem${
-                    current ? ' ht-settings__console-navItem--current' : ''
-                  }`}
-                  aria-current={current ? 'page' : undefined}
-                  onClick={() => store.setActiveTab(entry.key)}
-                >
-                  <Icon size={ICON_SIZE.xs} aria-hidden="true" />
-                  {t(entry.labelKey)}
-                </button>
-              );
-            })}
+            {ADMIN_NAV_GROUPS.map((group) => (
+              <Fragment key={group.id}>
+                {group.headerKey !== undefined && (
+                  <p className="ht-settings__console-navGroup">{t(group.headerKey)}</p>
+                )}
+                {group.entries.map((entry) => {
+                  const Icon = entry.icon;
+                  const current = store.activeTab === entry.key;
+                  return (
+                    <button
+                      key={entry.key}
+                      type="button"
+                      className={`ht-settings__console-navItem${
+                        current ? ' ht-settings__console-navItem--current' : ''
+                      }`}
+                      aria-current={current ? 'page' : undefined}
+                      onClick={() => store.setActiveTab(entry.key)}
+                    >
+                      <Icon size={ICON_SIZE.xs} aria-hidden="true" />
+                      {t(entry.labelKey)}
+                    </button>
+                  );
+                })}
+              </Fragment>
+            ))}
           </nav>
         )}
 

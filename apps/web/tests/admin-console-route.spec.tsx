@@ -170,9 +170,11 @@ describe('管理员在 /admin 上', () => {
       '优惠码',
       '邀请',
       '营收',
+      // 2026-11-21：侧栏按「控制台/用户/收入与订阅/内容/系统」分组后，
+      // 「退款」归入「收入与订阅」组，故排在「公告」「调休/补班」之前。
+      '退款',
       '公告',
       '调休/补班',
-      '退款',
     ]);
     // 内容区是 `AdminPanel` 本身（`chrome="console"`），不是第二份实现。
     expect(el.querySelector('[data-testid="admin-panel"]')).not.toBeNull();

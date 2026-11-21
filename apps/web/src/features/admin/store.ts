@@ -409,11 +409,112 @@ function splitLines(value: string): string[] {
     .filter((line) => line !== '');
 }
 
+/**
+ * 统一反馈通道的色彩语义。见 `AdminFeedback`。
+ *
+ * `success` = 这件事**确实做成了**（服务端已裁决、界面已读回）；
+ * `error` = 没做成，或做成了但通道那一跳失败（运营需要处理）；
+ * `info` = 做成了但状态特殊、需要读一眼（如"已交通道、尚未回调"）。
+ */
+export type AdminFeedbackTone = 'success' | 'error' | 'info';
+
+/**
+ * 一条**统一反馈**（审计 R1「唯一回执原语」的数据侧）。
+ *
+ * 🔴 旧的五个 `*Notice` 字段（`actionNotice` / `grantNotice` / `holidayNotice` /
+ * `refundNotice` / `announcementNotice`）**继续保留**：11 个 section 与 106 个既有测试
+ * 还在读它们。这里是在写动作成功/失败时**同时**写入的同一个通道，供新的回执原语消费。
+ * 两者不冲突：`*Notice` 说"是哪一件事的结果"，`feedback` 说"该用什么语气念哪句话"。
+ *
+ * ⚠️ `message` 存的是**词条键**（`MessageKey` 运行时的字符串），与旧回执同一套词条，
+ * 由宿主用 `t()` 渲染 —— store 不 import i18n provider，也不在这里硬编码中文文案。
+ * `id` 单调递增：同一句话连续两次时，宿主可据它重挂 live region（R4）。
+ */
+export interface AdminFeedback {
+  readonly tone: AdminFeedbackTone;
+  readonly message: string;
+  readonly id: number;
+}
+
+/**
+ * 写动作的**在途互斥**键（审计 R2：请求期间重复触发必须被忽略）。
+ *
+ * 🔴 命名约定（供 section 里 `disabled={store.pending.xxx}` 使用）：
+ * 用**动作名**做 camelCase，必要时带领域前缀，与 store 方法一一对应：
+ * - `grant`            → `grantSubscription`（赠送订阅）
+ * - `upgrade`          → `upgradeGrant`（免费升级）
+ * - `revoke`           → `revokeGrant`（收回发放）
+ * - `refundRequest`    → `requestRefund`（申请退款）
+ * - `refundApprove`    → `approveRefund`（批准退款）
+ * - `refundReject`     → `rejectRefund`（驳回退款）
+ * - `userUnlock`       → `unlockUser`（解锁用户）
+ * - `userQuota`        → `setUserQuota`（改配额）
+ * - `userForceLogout`  → `forceLogout`（强制登出）
+ * - `announcementPublish`  → `publishAnnouncement`（发公告）
+ * - `announcementWithdraw` → `withdrawAnnouncement`（收回公告）
+ * - `holidaySave`      → `saveHolidayYear`（保存调休年度）
+ * - `holidayDelete`    → `deleteHolidayYear`（撤销调休年度）
+ */
+export type AdminPendingKey =
+  | 'grant'
+  | 'upgrade'
+  | 'revoke'
+  | 'refundRequest'
+  | 'refundApprove'
+  | 'refundReject'
+  | 'userUnlock'
+  | 'userQuota'
+  | 'userForceLogout'
+  | 'announcementPublish'
+  | 'announcementWithdraw'
+  | 'holidaySave'
+  | 'holidayDelete';
+
+/** 每个键**恒存在**（初值 `false`），section 里可直接读 `store.pending.xxx`。 */
+export type AdminPendingState = Record<AdminPendingKey, boolean>;
+
+/** 反馈 id 单调递增（进程启动从 1 起；测试重置归零）。 */
+let feedbackSequence = 0;
+
+function makeFeedback(tone: AdminFeedbackTone, message: string): AdminFeedback {
+  feedbackSequence += 1;
+  return { tone, message, id: feedbackSequence };
+}
+
+/** 全 `false` 的 pending 初值。键集与 `AdminPendingKey` 必须逐一对齐（漏一个就少一格）。 */
+function emptyPending(): AdminPendingState {
+  return {
+    grant: false,
+    upgrade: false,
+    revoke: false,
+    refundRequest: false,
+    refundApprove: false,
+    refundReject: false,
+    userUnlock: false,
+    userQuota: false,
+    userForceLogout: false,
+    announcementPublish: false,
+    announcementWithdraw: false,
+    holidaySave: false,
+    holidayDelete: false,
+  };
+}
+
 export interface AdminStoreState {
   access: AdminAccess;
   /** 上一次失败的 i18n key（成功时 `null`）。 */
   errorKey: string | null;
   loading: boolean;
+  /**
+   * 统一反馈通道（审计 R1）。写动作成功/失败时**与旧 `*Notice` 字段同时**写入；
+   * 旧的 `*Notice` 字段语义与类型不变，仍供现有 section 与测试读取。
+   */
+  feedback: AdminFeedback | null;
+  /**
+   * 写动作在途互斥（审计 R2）。`pending[key] === true` ⇒ 同一动作正在进行，
+   * 第二次触发被入口守卫直接忽略、不发第二个请求。键见 `AdminPendingKey`。
+   */
+  pending: AdminPendingState;
 
   overview: AdminOverview | null;
   users: AdminPage<AdminUserRow> | null;
@@ -618,6 +719,10 @@ export interface AdminStoreState {
   setUserQuota: (id: number, quotaBytes: number) => Promise<void>;
   forceLogout: (id: number) => Promise<void>;
   clearNotice: () => void;
+  /** 手动写一条统一反馈（宿主在本地提示等场景使用；写动作内部已自动写入）。 */
+  setFeedback: (tone: AdminFeedbackTone, message: string) => void;
+  /** 清掉统一反馈（新回执原语关闭时调用）。 */
+  clearFeedback: () => void;
 }
 
 /** 从同步 store 取"服务器在哪、令牌是什么" —— 与 `subscription/store.ts` 同一处来源。 */
@@ -697,6 +802,80 @@ function applyGrantFailure(
 }
 
 /**
+ * 在途互斥入口守卫。**同 tick 内先读后写**（读与写之间没有 `await`）⇒
+ * 第二次触发一定看得到 `true`，不会两个请求并发。返回 `true` 表示这次拿到了许可。
+ */
+function beginPending(
+  get: () => AdminStoreState,
+  set: (partial: Partial<AdminStoreState>) => void,
+  key: AdminPendingKey,
+): boolean {
+  if (get().pending[key]) return false;
+  set({ pending: { ...get().pending, [key]: true } });
+  return true;
+}
+
+/** 释放在途互斥（每一条写动作的 `finally` 必须走到，异常路径也不漏）。 */
+function endPending(
+  get: () => AdminStoreState,
+  set: (partial: Partial<AdminStoreState>) => void,
+  key: AdminPendingKey,
+): void {
+  set({ pending: { ...get().pending, [key]: false } });
+}
+
+/**
+ * 发放动作失败时那条统一反馈：有服务端码（`denied`）就用码对应的措辞，
+ * 否则用 `errorKey`（400/404/断网已由它说清是哪一类问题）。
+ */
+function grantFailureFeedback(state: AdminStoreState): AdminFeedback {
+  const message =
+    state.grantNotice !== null
+      ? ADMIN_GRANT_NOTICE_KEY[state.grantNotice]
+      : (state.errorKey ?? 'web.admin.error.conflict');
+  return makeFeedback('error', message);
+}
+
+/**
+ * 退款动作失败时那条统一反馈：与 `RefundsSection` 的 `noticeKey` 同一条取法 ——
+ * `denied` 且码有专属措辞时用专属的那句，否则用通用措辞；都没有就落 `unknown`。
+ */
+function refundFailureFeedback(state: AdminStoreState): AdminFeedback {
+  const notice = state.refundNotice;
+  const code = state.refundCode;
+  let message: string;
+  if (notice === 'denied' && code !== null && ADMIN_REFUND_CODE_KEY[code] !== undefined) {
+    message = ADMIN_REFUND_CODE_KEY[code]!;
+  } else if (notice !== null) {
+    message = ADMIN_REFUND_NOTICE_KEY[notice];
+  } else {
+    message = state.errorKey ?? ADMIN_REFUND_NOTICE_KEY.unknown;
+  }
+  return makeFeedback(refundNoticeTone(notice), message);
+}
+
+/**
+ * 退款结果 → 反馈语气。
+ *
+ * `submitted/requested/rejected` 是**做成了**；
+ * `channel-failed/not-submittable` 是"决定落了库、但这一跳没成" ⇒ `info`（要读一眼、但不算错误）；
+ * `denied/conflict/unknown` 是没做成 ⇒ `error`。
+ */
+function refundNoticeTone(notice: AdminRefundNotice | null): AdminFeedbackTone {
+  switch (notice) {
+    case 'requested':
+    case 'submitted':
+    case 'rejected':
+      return 'success';
+    case 'channel-failed':
+    case 'not-submittable':
+      return 'info';
+    default:
+      return 'error';
+  }
+}
+
+/**
  * 动作成功后重新读回服务端状态：**详情和列表都要**。
  *
  * 🔴 只重拉详情会留下一张说谎的界面。用户列表那一行有自己的「已锁定」徽标，
@@ -720,6 +899,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   access: 'unknown',
   errorKey: null,
   loading: false,
+  feedback: null,
+  pending: emptyPending(),
 
   overview: null,
   users: null,
@@ -848,45 +1029,67 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   publishAnnouncement: async (input) => {
-    // 空文本框 ⇒ `Date.parse('')` 是 NaN，而 NaN 进 JSON 会变成 `null` ——
-    // 服务端那一条 `int().positive()` 会把它判成 400，界面于是报一个
-    // "参数不合法"却不说哪一格。所以**空 = 现在**在这里落地（它是一个缺省值，
-    // 不是一条合法性判断，与"界面不判合法性"那条纪律不冲突）。
-    const publishedAtMs =
-      input.publishesAtText.trim() === '' ? Date.now() : Date.parse(input.publishesAtText.trim());
-    const expiresRaw = input.expiresAtText.trim();
-    const expiresAtMs = expiresRaw === '' ? undefined : Date.parse(expiresRaw);
+    if (!beginPending(get, set, 'announcementPublish')) return false;
+    try {
+      // 空文本框 ⇒ `Date.parse('')` 是 NaN，而 NaN 进 JSON 会变成 `null` ——
+      // 服务端那一条 `int().positive()` 会把它判成 400，界面于是报一个
+      // "参数不合法"却不说哪一格。所以**空 = 现在**在这里落地（它是一个缺省值，
+      // 不是一条合法性判断，与"界面不判合法性"那条纪律不冲突）。
+      const publishedAtMs =
+        input.publishesAtText.trim() === '' ? Date.now() : Date.parse(input.publishesAtText.trim());
+      const expiresRaw = input.expiresAtText.trim();
+      const expiresAtMs = expiresRaw === '' ? undefined : Date.parse(expiresRaw);
 
-    set({ loading: true, announcementNotice: null });
-    const result = await adminPublishAnnouncement(clientOptions(), {
-      title: input.titleText,
-      body: input.bodyText,
-      level: input.level,
-      publishedAtMs: Number.isFinite(publishedAtMs) ? publishedAtMs : Date.now(),
-      ...(expiresAtMs === undefined || Number.isNaN(expiresAtMs) ? {} : { expiresAtMs }),
-    });
-    if (!result.ok) {
-      applyFailure(result, set);
-      set({ announcementNotice: 'failed' });
-      return false;
+      set({ loading: true, announcementNotice: null });
+      const result = await adminPublishAnnouncement(clientOptions(), {
+        title: input.titleText,
+        body: input.bodyText,
+        level: input.level,
+        publishedAtMs: Number.isFinite(publishedAtMs) ? publishedAtMs : Date.now(),
+        ...(expiresAtMs === undefined || Number.isNaN(expiresAtMs) ? {} : { expiresAtMs }),
+      });
+      if (!result.ok) {
+        applyFailure(result, set);
+        set({
+          announcementNotice: 'failed',
+          feedback: makeFeedback('error', 'web.admin.action.failed'),
+        });
+        return false;
+      }
+      // 🔴 发完**重新拉列表**，而不是把返回的那一行本地插进去：
+      // 界面要显示的是服务端存下来的样子（含它算的 `createdAt` 与它裁过的长度）。
+      await get().loadAnnouncements();
+      set({
+        announcementNotice: 'done',
+        feedback: makeFeedback('success', 'web.admin.action.done'),
+      });
+      return true;
+    } finally {
+      endPending(get, set, 'announcementPublish');
     }
-    // 🔴 发完**重新拉列表**，而不是把返回的那一行本地插进去：
-    // 界面要显示的是服务端存下来的样子（含它算的 `createdAt` 与它裁过的长度）。
-    await get().loadAnnouncements();
-    set({ announcementNotice: 'done' });
-    return true;
   },
 
   withdrawAnnouncement: async (id) => {
-    set({ loading: true, announcementNotice: null });
-    const result = await adminWithdrawAnnouncement(clientOptions(), id);
-    if (!result.ok) {
-      applyFailure(result, set);
-      set({ announcementNotice: 'failed' });
-      return;
+    if (!beginPending(get, set, 'announcementWithdraw')) return;
+    try {
+      set({ loading: true, announcementNotice: null });
+      const result = await adminWithdrawAnnouncement(clientOptions(), id);
+      if (!result.ok) {
+        applyFailure(result, set);
+        set({
+          announcementNotice: 'failed',
+          feedback: makeFeedback('error', 'web.admin.action.failed'),
+        });
+        return;
+      }
+      await get().loadAnnouncements();
+      set({
+        announcementNotice: 'done',
+        feedback: makeFeedback('success', 'web.admin.action.done'),
+      });
+    } finally {
+      endPending(get, set, 'announcementWithdraw');
     }
-    await get().loadAnnouncements();
-    set({ announcementNotice: 'done' });
   },
 
   clearAnnouncementNotice: () => {
@@ -939,53 +1142,83 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   grantSubscription: async (input) => {
-    set({ loading: true, grantNotice: null, grantCode: null });
-    const result = await adminGrantSubscription(clientOptions(), {
-      userId: Number(get().grantTarget),
-      sku: input.sku,
-      days: Number(input.daysText),
-      reason: input.reasonText,
-    });
-    if (!result.ok) {
-      applyGrantFailure(result, set);
-      return false;
+    if (!beginPending(get, set, 'grant')) return false;
+    try {
+      set({ loading: true, grantNotice: null, grantCode: null });
+      const result = await adminGrantSubscription(clientOptions(), {
+        userId: Number(get().grantTarget),
+        sku: input.sku,
+        days: Number(input.daysText),
+        reason: input.reasonText,
+      });
+      if (!result.ok) {
+        applyGrantFailure(result, set);
+        set({ feedback: grantFailureFeedback(get()) });
+        return false;
+      }
+      // 🔴 动完**重新读**，而不是把返回的那一行本地拼进列表：
+      // 与发公告那一条同一纪律 —— 界面要显示的是服务端存下来的样子。
+      await get().loadGrantBoard();
+      set({
+        grantNotice: 'granted',
+        loading: false,
+        feedback: makeFeedback('success', 'web.admin.grant.notice.granted'),
+      });
+      return true;
+    } finally {
+      endPending(get, set, 'grant');
     }
-    // 🔴 动完**重新读**，而不是把返回的那一行本地拼进列表：
-    // 与发公告那一条同一纪律 —— 界面要显示的是服务端存下来的样子。
-    await get().loadGrantBoard();
-    set({ grantNotice: 'granted', loading: false });
-    return true;
   },
 
   upgradeGrant: async (input) => {
-    set({ loading: true, grantNotice: null, grantCode: null });
-    const result = await adminUpgradeSubscription(clientOptions(), {
-      userId: Number(get().grantTarget),
-      sku: input.sku,
-      reason: input.reasonText,
-    });
-    if (!result.ok) {
-      applyGrantFailure(result, set);
-      return false;
+    if (!beginPending(get, set, 'upgrade')) return false;
+    try {
+      set({ loading: true, grantNotice: null, grantCode: null });
+      const result = await adminUpgradeSubscription(clientOptions(), {
+        userId: Number(get().grantTarget),
+        sku: input.sku,
+        reason: input.reasonText,
+      });
+      if (!result.ok) {
+        applyGrantFailure(result, set);
+        set({ feedback: grantFailureFeedback(get()) });
+        return false;
+      }
+      await get().loadGrantBoard();
+      set({
+        grantNotice: 'upgraded',
+        loading: false,
+        feedback: makeFeedback('success', 'web.admin.grant.notice.upgraded'),
+      });
+      return true;
+    } finally {
+      endPending(get, set, 'upgrade');
     }
-    await get().loadGrantBoard();
-    set({ grantNotice: 'upgraded', loading: false });
-    return true;
   },
 
   revokeGrant: async (input) => {
-    set({ loading: true, grantNotice: null, grantCode: null });
-    const result = await adminRevokeSubscriptionGrant(clientOptions(), {
-      userId: Number(get().grantTarget),
-      reason: input.reasonText,
-    });
-    if (!result.ok) {
-      applyGrantFailure(result, set);
-      return false;
+    if (!beginPending(get, set, 'revoke')) return false;
+    try {
+      set({ loading: true, grantNotice: null, grantCode: null });
+      const result = await adminRevokeSubscriptionGrant(clientOptions(), {
+        userId: Number(get().grantTarget),
+        reason: input.reasonText,
+      });
+      if (!result.ok) {
+        applyGrantFailure(result, set);
+        set({ feedback: grantFailureFeedback(get()) });
+        return false;
+      }
+      await get().loadGrantBoard();
+      set({
+        grantNotice: 'revoked',
+        loading: false,
+        feedback: makeFeedback('success', 'web.admin.grant.notice.revoked'),
+      });
+      return true;
+    } finally {
+      endPending(get, set, 'revoke');
     }
-    await get().loadGrantBoard();
-    set({ grantNotice: 'revoked', loading: false });
-    return true;
   },
 
   clearGrantNotice: () => {
@@ -1000,58 +1233,76 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   saveHolidayYear: async (input) => {
-    // 一次录入 = 一次 PUT，**整年替换**。这里唯一的加工是把"一行一条"拆成数组
-    // （见 `splitLines` 的注释：不去重、不排序、不校验 —— 那些裁决都在契约里）。
-    // ⚠️ 年份**故意不做 `Number.isInteger` 之类的守卫**：`'2026a'` 会变成 `NaN`、
-    // 序列化后是 `null`，服务端以 400 拒绝，界面把"请求参数不合法"显示出来 ——
-    // 与在界面里先拦一遍相比，前者只有一套裁决标准。
-    const payload = {
-      year: Number(input.yearText),
-      papers: splitLines(input.papersText),
-      note: input.noteText.trim() === '' ? null : input.noteText,
-      days: [
-        ...splitLines(input.offDaysText).map((day) => ({ day, isOffDay: true })),
-        ...splitLines(input.workDaysText).map((day) => ({ day, isOffDay: false })),
-      ],
-    };
+    if (!beginPending(get, set, 'holidaySave')) return false;
+    try {
+      // 一次录入 = 一次 PUT，**整年替换**。这里唯一的加工是把"一行一条"拆成数组
+      // （见 `splitLines` 的注释：不去重、不排序、不校验 —— 那些裁决都在契约里）。
+      // ⚠️ 年份**故意不做 `Number.isInteger` 之类的守卫**：`'2026a'` 会变成 `NaN`、
+      // 序列化后是 `null`，服务端以 400 拒绝，界面把"请求参数不合法"显示出来 ——
+      // 与在界面里先拦一遍相比，前者只有一套裁决标准。
+      const payload = {
+        year: Number(input.yearText),
+        papers: splitLines(input.papersText),
+        note: input.noteText.trim() === '' ? null : input.noteText,
+        days: [
+          ...splitLines(input.offDaysText).map((day) => ({ day, isOffDay: true })),
+          ...splitLines(input.workDaysText).map((day) => ({ day, isOffDay: false })),
+        ],
+      };
 
-    set({ loading: true, holidayNotice: null, holidayEcho: null });
-    const result = await adminPutHolidayYear(clientOptions(), payload);
-    if (!result.ok) {
-      applyFailure(result, set);
-      set({ holidayNotice: 'failed' });
-      return false;
+      set({ loading: true, holidayNotice: null, holidayEcho: null });
+      const result = await adminPutHolidayYear(clientOptions(), payload);
+      if (!result.ok) {
+        applyFailure(result, set);
+        set({
+          holidayNotice: 'failed',
+          feedback: makeFeedback('error', 'web.admin.holiday.notice.failed'),
+        });
+        return false;
+      }
+
+      // 🔴 成功之后**重新读回服务端**，不拿 PUT 的响应去拼界面：
+      // 判据②要的是"出处链接随数据入库并回显"，只有再 GET 一次才证明它落了库，
+      // 而不是"回显了请求里带上去的那几个字符串"（§7 第 50 条同一族）。
+      await get().loadHolidayYears();
+      set({
+        holidayNotice: 'saved',
+        holidayEcho: { year: result.data.year, dayCount: result.data.dayCount },
+        loading: false,
+        feedback: makeFeedback('success', 'web.admin.holiday.notice.saved'),
+      });
+      return true;
+    } finally {
+      endPending(get, set, 'holidaySave');
     }
-
-    // 🔴 成功之后**重新读回服务端**，不拿 PUT 的响应去拼界面：
-    // 判据②要的是"出处链接随数据入库并回显"，只有再 GET 一次才证明它落了库，
-    // 而不是"回显了请求里带上去的那几个字符串"（§7 第 50 条同一族）。
-    await get().loadHolidayYears();
-    set({
-      holidayNotice: 'saved',
-      holidayEcho: { year: result.data.year, dayCount: result.data.dayCount },
-      loading: false,
-    });
-    return true;
   },
 
   deleteHolidayYear: async (year) => {
-    set({ loading: true, holidayNotice: null, holidayEcho: null });
-    const result = await adminDeleteHolidayYear(clientOptions(), year);
-    if (!result.ok) {
-      applyFailure(result, set);
-      set({ holidayNotice: 'failed' });
-      return;
+    if (!beginPending(get, set, 'holidayDelete')) return;
+    try {
+      set({ loading: true, holidayNotice: null, holidayEcho: null });
+      const result = await adminDeleteHolidayYear(clientOptions(), year);
+      if (!result.ok) {
+        applyFailure(result, set);
+        set({
+          holidayNotice: 'failed',
+          feedback: makeFeedback('error', 'web.admin.holiday.notice.failed'),
+        });
+        return;
+      }
+      // `deleted` 是**年度表**上的删除计数（0 或 1），不是天数 ⇒ 只取年份。
+      // `deleted: 0` 是**幂等成功**（那一年本来就没录过，服务端把它当成功，
+      // 理由写在 `admin.routes.ts` 那条 DELETE 的注释里），界面照成功说。
+      await get().loadHolidayYears();
+      set({
+        holidayNotice: 'deleted',
+        holidayEcho: { year: result.data.year, dayCount: null },
+        loading: false,
+        feedback: makeFeedback('success', 'web.admin.holiday.notice.deleted'),
+      });
+    } finally {
+      endPending(get, set, 'holidayDelete');
     }
-    // `deleted` 是**年度表**上的删除计数（0 或 1），不是天数 ⇒ 只取年份。
-    // `deleted: 0` 是**幂等成功**（那一年本来就没录过，服务端把它当成功，
-    // 理由写在 `admin.routes.ts` 那条 DELETE 的注释里），界面照成功说。
-    await get().loadHolidayYears();
-    set({
-      holidayNotice: 'deleted',
-      holidayEcho: { year: result.data.year, dayCount: null },
-      loading: false,
-    });
   },
 
   clearHolidayNotice: () => {
@@ -1074,70 +1325,91 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   requestRefund: async (input) => {
-    const note = input.noteText.trim();
-    set({ loading: true, refundNotice: null, refundCode: null, refundEcho: null });
-    const result = await adminCreateRefundRequest(clientOptions(), {
-      orderId: Number(input.orderIdText),
-      ...(note === '' ? {} : { note }),
-      ...(input.operatorApproved === true ? { operatorApproved: true } : {}),
-    });
-    if (!result.ok) {
-      applyRefundFailure(result, set);
-      return false;
-    }
+    if (!beginPending(get, set, 'refundRequest')) return false;
+    try {
+      const note = input.noteText.trim();
+      set({ loading: true, refundNotice: null, refundCode: null, refundEcho: null });
+      const result = await adminCreateRefundRequest(clientOptions(), {
+        orderId: Number(input.orderIdText),
+        ...(note === '' ? {} : { note }),
+        ...(input.operatorApproved === true ? { operatorApproved: true } : {}),
+      });
+      if (!result.ok) {
+        applyRefundFailure(result, set);
+        set({ feedback: refundFailureFeedback(get()) });
+        return false;
+      }
 
-    // 🔴 成功之后**重新读回服务端**，界面那一行念的数是列表里的那一行，
-    // 不是 POST 请求里带上去的那几个字符（与 `saveHolidayYear` 同一判据、同一理由）。
-    await get().loadRefunds();
-    const row = (get().refunds ?? []).find((item) => item.id === result.data.refundId);
-    set({
-      refundNotice: 'requested',
-      refundCode: null,
-      refundEcho: { id: result.data.refundId, orderId: row?.orderId ?? null, detail: row?.status ?? null },
-      loading: false,
-    });
-    return true;
+      // 🔴 成功之后**重新读回服务端**，界面那一行念的数是列表里的那一行，
+      // 不是 POST 请求里带上去的那几个字符（与 `saveHolidayYear` 同一判据、同一理由）。
+      await get().loadRefunds();
+      const row = (get().refunds ?? []).find((item) => item.id === result.data.refundId);
+      set({
+        refundNotice: 'requested',
+        refundCode: null,
+        refundEcho: { id: result.data.refundId, orderId: row?.orderId ?? null, detail: row?.status ?? null },
+        loading: false,
+        feedback: makeFeedback('success', 'web.admin.refund.notice.requested'),
+      });
+      return true;
+    } finally {
+      endPending(get, set, 'refundRequest');
+    }
   },
 
   approveRefund: async (id, noteText) => {
-    set({ loading: true, refundNotice: null, refundCode: null, refundEcho: null });
-    const result = await adminApproveRefund(clientOptions(), id, noteText.trim());
-    if (!result.ok) {
-      applyRefundFailure(result, set);
-      return;
+    if (!beginPending(get, set, 'refundApprove')) return;
+    try {
+      set({ loading: true, refundNotice: null, refundCode: null, refundEcho: null });
+      const result = await adminApproveRefund(clientOptions(), id, noteText.trim());
+      if (!result.ok) {
+        applyRefundFailure(result, set);
+        set({ feedback: refundFailureFeedback(get()) });
+        return;
+      }
+      await get().loadRefunds();
+      const body = result.data;
+      const notice = ADMIN_REFUND_APPROVE_NOTICE[body.outcome] ?? 'unknown';
+      set({
+        refundNotice: notice,
+        // 通道失败那一臂服务端给的是**它的**原因码；`unknown` 那一档把没认识到的 outcome
+        // 原文交出去，界面就说"不认识这个码"，不猜它的意思。
+        refundCode:
+          body.outcome === 'channel-failed' ? body.reason : notice === 'unknown' ? body.outcome : null,
+        refundEcho: {
+          id,
+          orderId: (get().refunds ?? []).find((item) => item.id === id)?.orderId ?? null,
+          detail: 'status' in body ? String(body.status) : null,
+        },
+        loading: false,
+        feedback: makeFeedback(refundNoticeTone(notice), ADMIN_REFUND_NOTICE_KEY[notice]),
+      });
+    } finally {
+      endPending(get, set, 'refundApprove');
     }
-    await get().loadRefunds();
-    const body = result.data;
-    const notice = ADMIN_REFUND_APPROVE_NOTICE[body.outcome] ?? 'unknown';
-    set({
-      refundNotice: notice,
-      // 通道失败那一臂服务端给的是**它的**原因码；`unknown` 那一档把没认识到的 outcome
-      // 原文交出去，界面就说"不认识这个码"，不猜它的意思。
-      refundCode:
-        body.outcome === 'channel-failed' ? body.reason : notice === 'unknown' ? body.outcome : null,
-      refundEcho: {
-        id,
-        orderId: (get().refunds ?? []).find((item) => item.id === id)?.orderId ?? null,
-        detail: 'status' in body ? String(body.status) : null,
-      },
-      loading: false,
-    });
   },
 
   rejectRefund: async (id, noteText) => {
-    set({ loading: true, refundNotice: null, refundCode: null, refundEcho: null });
-    const result = await adminRejectRefund(clientOptions(), id, noteText.trim());
-    if (!result.ok) {
-      applyRefundFailure(result, set);
-      return;
+    if (!beginPending(get, set, 'refundReject')) return;
+    try {
+      set({ loading: true, refundNotice: null, refundCode: null, refundEcho: null });
+      const result = await adminRejectRefund(clientOptions(), id, noteText.trim());
+      if (!result.ok) {
+        applyRefundFailure(result, set);
+        set({ feedback: refundFailureFeedback(get()) });
+        return;
+      }
+      await get().loadRefunds();
+      set({
+        refundNotice: 'rejected',
+        refundCode: null,
+        refundEcho: { id, orderId: null, detail: result.data.status },
+        loading: false,
+        feedback: makeFeedback('success', 'web.admin.refund.notice.rejected'),
+      });
+    } finally {
+      endPending(get, set, 'refundReject');
     }
-    await get().loadRefunds();
-    set({
-      refundNotice: 'rejected',
-      refundCode: null,
-      refundEcho: { id, orderId: null, detail: result.data.status },
-      loading: false,
-    });
   },
 
   clearRefundNotice: () => {
@@ -1156,43 +1428,75 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   unlockUser: async (id) => {
-    set({ actionNotice: null });
-    const result = await adminUnlockUser(clientOptions(), id);
-    if (!result.ok) {
-      applyFailure(result, set);
-      set({ actionNotice: 'failed' });
-      return;
+    if (!beginPending(get, set, 'userUnlock')) return;
+    try {
+      set({ actionNotice: null });
+      const result = await adminUnlockUser(clientOptions(), id);
+      if (!result.ok) {
+        applyFailure(result, set);
+        set({
+          actionNotice: 'failed',
+          feedback: makeFeedback('error', get().errorKey ?? 'web.admin.action.failed'),
+        });
+        return;
+      }
+      await reloadAfterUserAction(id);
+      set({ actionNotice: 'done', feedback: makeFeedback('success', 'web.admin.action.done') });
+    } finally {
+      endPending(get, set, 'userUnlock');
     }
-    await reloadAfterUserAction(id);
-    set({ actionNotice: 'done' });
   },
 
   setUserQuota: async (id, quotaBytes) => {
-    set({ actionNotice: null });
-    const result = await adminSetUserQuota(clientOptions(), id, quotaBytes);
-    if (!result.ok) {
-      applyFailure(result, set);
-      set({ actionNotice: 'failed' });
-      return;
+    if (!beginPending(get, set, 'userQuota')) return;
+    try {
+      set({ actionNotice: null });
+      const result = await adminSetUserQuota(clientOptions(), id, quotaBytes);
+      if (!result.ok) {
+        applyFailure(result, set);
+        set({
+          actionNotice: 'failed',
+          feedback: makeFeedback('error', get().errorKey ?? 'web.admin.action.failed'),
+        });
+        return;
+      }
+      await reloadAfterUserAction(id);
+      set({ actionNotice: 'done', feedback: makeFeedback('success', 'web.admin.action.done') });
+    } finally {
+      endPending(get, set, 'userQuota');
     }
-    await reloadAfterUserAction(id);
-    set({ actionNotice: 'done' });
   },
 
   forceLogout: async (id) => {
-    set({ actionNotice: null });
-    const result = await adminForceUserLogout(clientOptions(), id);
-    if (!result.ok) {
-      applyFailure(result, set);
-      set({ actionNotice: 'failed' });
-      return;
+    if (!beginPending(get, set, 'userForceLogout')) return;
+    try {
+      set({ actionNotice: null });
+      const result = await adminForceUserLogout(clientOptions(), id);
+      if (!result.ok) {
+        applyFailure(result, set);
+        set({
+          actionNotice: 'failed',
+          feedback: makeFeedback('error', get().errorKey ?? 'web.admin.action.failed'),
+        });
+        return;
+      }
+      await reloadAfterUserAction(id);
+      set({ actionNotice: 'done', feedback: makeFeedback('success', 'web.admin.action.done') });
+    } finally {
+      endPending(get, set, 'userForceLogout');
     }
-    await reloadAfterUserAction(id);
-    set({ actionNotice: 'done' });
   },
 
   clearNotice: () => {
     set({ actionNotice: null });
+  },
+
+  setFeedback: (tone, message) => {
+    set({ feedback: makeFeedback(tone, message) });
+  },
+
+  clearFeedback: () => {
+    set({ feedback: null });
   },
 
   setActiveTab: (tab) => {
@@ -1206,15 +1510,20 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     get().clearRefundNotice();
     get().clearAnnouncementNotice();
     get().clearGrantNotice();
+    // 切分区时清掉统一回执：否则上一格的 feedback 会漏进下一格（各分区迁移时发现的真 bug）。
+    get().clearFeedback();
   },
 }));
 
 /** 测试用：把 store 归零（与其它 feature store 同名同形）。 */
 export function __resetAdminForTests(): void {
+  feedbackSequence = 0;
   useAdminStore.setState({
     access: 'unknown',
     errorKey: null,
     loading: false,
+    feedback: null,
+    pending: emptyPending(),
     overview: null,
     users: null,
     subscriptions: null,
