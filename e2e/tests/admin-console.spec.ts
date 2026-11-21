@@ -866,11 +866,11 @@ function adminTab(page: Page, label: AdminTabLabel) {
  * 判据用 `scrollWidth > clientWidth`（内容比盒子宽 = 被裁），留 1 px 给亚像素舍入。
  */
 async function expectRowIdentityNotClipped(list: Locator): Promise<void> {
-  const rows = list.locator('li');
+  const rows = list.locator('table tbody tr');
   const count = await rows.count();
   expect(count, '退款列表一行都没有，这条判据就成了空判').toBeGreaterThan(0);
   for (let index = 0; index < count; index += 1) {
-    const main = rows.nth(index).locator('.ht-settings__admin-rowMain');
+    const main = rows.nth(index).locator('td').first();
     const clipped = await main.evaluate((el) => el.scrollWidth - el.clientWidth);
     const text = await main.innerText();
     expect(clipped, `第 ${String(index + 1)} 行的标识被裁掉 ${String(clipped)} px：${text}`).toBeLessThanOrEqual(
@@ -967,7 +967,7 @@ test.describe('运营管理后台（真浏览器）', () => {
       // 那张图**证明不了这个 Tab 渲染了什么**（§6.2 规定一）。
       await shoot(page, list, one.screenshot);
 
-      await expect(list.locator('li')).toHaveCount(one.rows);
+      await expect(list.locator('table tbody tr')).toHaveCount(one.rows);
       await expect(page.getByTestId('admin-panel')).toContainText(one.expect);
       // 每个端点**恰好一次**（按需拉取 + 不重复）。
       // 🔴 记的是 `${method} ${path}${search}`（例如 `GET /users?limit=50&offset=0`），
@@ -989,7 +989,7 @@ test.describe('运营管理后台（真浏览器）', () => {
     // 也带着同一个 `code`，所以判据必须落在具体的那个列表上。
     const codes = page.getByTestId('admin-codes');
     await shoot(page, codes, 'admin-invite-codes.png');
-    await expect(codes.locator('li')).toHaveCount(1);
+    await expect(codes.locator('table tbody tr')).toHaveCount(1);
     await expect(codes).toContainText('ABCD2345');
     await expect(codes).toContainText('归属人: boss@example.test');
     // 一个响应两面 ⇒ 一次请求。分页器不该把 `codes` 拆成第二次拉取。
@@ -1006,7 +1006,7 @@ test.describe('运营管理后台（真浏览器）', () => {
     expect(adminCalls.slice(totalBefore), '重复点击不该重拉').toEqual([]);
 
     // 用户那一面的三种徽标是各自独立的判定，必须三种同时在场。
-    const badges = page.getByTestId('admin-users').locator('.ht-settings__admin-badge');
+    const badges = page.getByTestId('admin-users').locator('.hta-badge');
     await expect(badges).toHaveCount(3);
     await expect(badges.filter({ hasText: '管理员' })).toHaveCount(1);
     await expect(badges.filter({ hasText: '已锁定' })).toHaveCount(1);
@@ -1025,7 +1025,7 @@ test.describe('运营管理后台（真浏览器）', () => {
 
     await page
       .getByTestId('admin-users')
-      .locator('button.ht-settings__admin-row')
+      .locator('table tbody tr')
       .filter({ hasText: 'locked@example.test' })
       .click();
 
@@ -1040,6 +1040,8 @@ test.describe('运营管理后台（真浏览器）', () => {
     // ── 解锁：POST 打出去 + 重新 GET 才能看到 0 ─────────────────────────
     // 🔴 三个动作的控件都**限定在详情容器里**：设置页上还有同步设置、AI 设置等
     // 好几个面板，其中就有别的"保存"按钮 —— 不限定会点到别人身上。
+    // 解锁是两步确认：第一击只出「取消 / 确认」，第二击（确认按钮文案仍为「解锁账号」）才 POST。
+    await detail.getByRole('button', { name: '解锁账号' }).click();
     await detail.getByRole('button', { name: '解锁账号' }).click();
     await expect(page.getByTestId('admin-action-notice')).toHaveText('已完成。');
     await expect(detail).toContainText('失败登录: 0');
@@ -1052,7 +1054,7 @@ test.describe('运营管理后台（真浏览器）', () => {
     // 假服务端的列表由 `fake.locked` 决定 ⇒ 徽标消失只能来自第二次列表请求。
     const lockedBadge = page
       .getByTestId('admin-users')
-      .locator('.ht-settings__admin-badge', { hasText: '已锁定' });
+      .locator('.hta-badge', { hasText: '已锁定' });
     await expect(lockedBadge, '解锁后列表不该再显示「已锁定」').toHaveCount(0);
     expect(
       adminCalls.filter((call) => call.startsWith('GET /users?')).length,
@@ -1062,11 +1064,15 @@ test.describe('运营管理后台（真浏览器）', () => {
 
     // ── 配额：填 MiB，发出去的必须是字节；界面显示服务端存下的那个数 ────
     await detail.getByLabel('新配额（MiB）').fill('2');
+    // 配额同样是两步：第一击「保存」只出确认，第二击（确认文案「调整配额」）才发。
     await detail.getByRole('button', { name: '保存' }).click();
+    await detail.getByRole('button', { name: '调整配额' }).click();
     await expect(detail).toContainText('/ 2.0 MiB');
     expect(fake.quotaBytes, '服务端存的必须是 2 MiB 的字节数').toBe(2 * 1024 * 1024);
 
     // ── 强制登出 ────────────────────────────────────────────────────────
+    // 强制登出同样是两步：两击都叫「强制登出」。
+    await detail.getByRole('button', { name: '强制登出' }).click();
     await detail.getByRole('button', { name: '强制登出' }).click();
     await expect(page.getByTestId('admin-action-notice')).toHaveText('已完成。');
     expect(adminCalls).toContain('POST /users/7/logout');
@@ -1093,7 +1099,7 @@ test.describe('运营管理后台（真浏览器）', () => {
 
     await page
       .getByTestId('admin-users')
-      .locator('button.ht-settings__admin-row')
+      .locator('table tbody tr')
       .filter({ hasText: 'locked@example.test' })
       .click();
 
@@ -1177,8 +1183,8 @@ test.describe('运营管理后台（真浏览器）', () => {
     // 先截图，再断言（§6.2 规定一第 1 条）。
     await shoot(page, list, 'admin-tab-refunds.png');
 
-    await expect(list.locator('li')).toHaveCount(2);
-    const first = list.locator('li').first();
+    await expect(list.locator('table tbody tr')).toHaveCount(2);
+    const first = list.locator('table tbody tr').first();
     // 🔴 **逐字段的存在性**：少画任何一列（比如不显示 `out_refund_no`）运营就看不见那条事实，
     // 而"整块渲染了"看不出来（W5 那条教训：断言只会验界面写了什么，不会验界面少了什么）。
     for (const value of [
@@ -1218,14 +1224,14 @@ test.describe('运营管理后台（真浏览器）', () => {
     // 🔴 确认这一步**展开在行里**，会把行主内容挤没 —— 而"我在批哪一笔"必须看得见。
     await expectRowIdentityNotClipped(page.getByTestId('admin-refunds'));
 
-    await page.getByTestId('admin-refund-approve-yes-1207').click();
+    await page.getByTestId('admin-refund-approve-confirm-submit').click();
     expect(
       adminCalls.filter((call) => call === 'POST /refunds/1207/approve'),
       '第二步才发，且只发一次',
     ).toHaveLength(1);
     // 界面上那一行来自**重新读回的 GET**：新状态是 processing，而界面不许说"已退款"
     // （`success` 只由签名有效的回调认领，ADR-0053 §4）。
-    await expect(page.getByTestId('admin-refunds').locator('li').first()).toContainText('processing');
+    await expect(page.getByTestId('admin-refunds').locator('table tbody tr').first()).toContainText('processing');
     await expect(page.getByTestId('admin-refund-notice')).toContainText('已交给支付通道');
     await expect(page.getByTestId('admin-panel')).not.toContainText('已退款');
     await shoot(page, page.getByTestId('admin-refunds'), 'admin-refund-approved.png');
@@ -1251,7 +1257,7 @@ test.describe('运营管理后台（真浏览器）', () => {
     // 折成 5xx 那句"服务端出错了"就是把"请求没写错、是那一单的状态不允许"这条事实弄丢了。
     await expect(page.getByTestId('admin-panel')).not.toContainText('服务端出错了');
     // 被拒的申请没进列表（假服务端也没加行）—— 界面不许显示一条不存在的申请。
-    await expect(page.getByTestId('admin-refunds').locator('li')).toHaveCount(2);
+    await expect(page.getByTestId('admin-refunds').locator('table tbody tr')).toHaveCount(2);
     assertNoProblems(problems, ['/api/admin/refunds']);
   });
 

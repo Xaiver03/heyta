@@ -180,10 +180,13 @@ async function clickButton(label: string): Promise<void> {
 }
 
 /**
- * 按**包含**找一个按钮并点它。
+ * 按**包含**找一个可点元素并点它。
  *
- * 用户列表那一行的按钮文字除了邮箱还带着徽标与注册时间，`buttonBy` 那种逐字相等
+ * 用户列表那一行的文字除了邮箱还带着徽标与注册时间，`buttonBy` 那种逐字相等
  * 的找法在它身上永远找不到 —— 而"永远找不到"在这里会被读成"这一行没有入口"。
+ *
+ * 🔴 迁移后用户列表是 hta `DataTable`：行是 `<tr class="hta-table__row">`（点行触发
+ *    `onRowClick` 打开详情），不再是 `<button>`。所以这里先找按钮、找不到再退到表格行。
  */
 async function clickButtonContaining(needle: string): Promise<void> {
   const el = container;
@@ -191,9 +194,19 @@ async function clickButtonContaining(needle: string): Promise<void> {
   const button = [...el.querySelectorAll('button')].find(
     (node) => (node.textContent ?? '').includes(needle),
   ) as HTMLButtonElement | undefined;
-  if (button === undefined) throw new Error(`没有含这段文字的按钮：${needle}`);
+  if (button !== undefined) {
+    await act(async () => {
+      button.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    return;
+  }
+  const row = [...el.querySelectorAll<HTMLTableRowElement>('[data-testid="admin-users"] tbody tr')].find(
+    (node) => (node.textContent ?? '').includes(needle),
+  );
+  if (row === undefined) throw new Error(`没有含这段文字的可点行：${needle}`);
   await act(async () => {
-    button.click();
+    row.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 }
@@ -524,7 +537,7 @@ describe('发放记录那一页', () => {
     await renderPanel();
     await clickTab('发放');
 
-    const rows = [...(container as HTMLDivElement).querySelectorAll('.ht-settings__admin-row')];
+    const rows = [...(container as HTMLDivElement).querySelectorAll('[data-testid="admin-grants-rows"] tbody tr')];
     const revokeRow = rows.find((node) => node.textContent?.includes('内测结束'));
     expect(revokeRow?.textContent).toContain('不带档位');
   });

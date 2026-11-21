@@ -172,7 +172,8 @@ describe('营收那一格', () => {
     const el = await renderPanel();
     await clickTab('营收');
 
-    const thirty = [...el.querySelectorAll<HTMLButtonElement>('[role="group"] button')].find(
+    // 窗口切换已从旧的 `[role="group"]` 按钮组迁移到 hta `Tabs`（`role="tab"`）。
+    const thirty = [...el.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
       (node) => node.textContent?.includes('30'),
     );
     expect(thirty).toBeDefined();
