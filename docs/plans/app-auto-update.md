@@ -194,3 +194,54 @@ dev-7 / dev-16 / dev-41 (bucket 0)                                            �
 ```
 
 **门禁**：`node scripts/check-public-facts.mjs` → 通过，匿名 GET 清单已含 `/api/app-version`。
+
+---
+
+## 7. 落地状态（实现清单 + 与通用模板的差异）
+
+### 7.1 已落地（可验证）
+
+| 层 | 文件 | 验证 |
+|---|---|---|
+| 契约 | `packages/shared-schema/src/app-version-contract.ts`（+ `index.ts` 导出） | tsc / 服务端测试引用 |
+| 服务端纯逻辑 | `server/src/app-version/policy.ts` | `server/tests/app-version.spec.ts`（26） |
+| 服务端配置 | `server/src/app-version/config.ts` | 同上（env 校验、downloadUrl 查表） |
+| 服务端路由 | `server/src/app-version/app-version.routes.ts`，`server.ts` 注册于 `/api` | curl 六例 + `check:public-facts` 通过 |
+| 服务端发版号 | `scripts/gen-server-app-version.mjs` → `server/src/app-version/deployed-app-version.generated.ts` | `check:app-version-server`（已入 `pnpm check` 链） |
+| 客户端核心（跨端） | `packages/app-host/src/app-update.ts`（+ `index.ts` 导出） | `packages/app-host/tests/app-update.spec.ts`（14） |
+| Web/PWA | `apps/web/src/features/app-update/{detect,store,AppUpdateNotice}.tsx`、`pwa/register.ts`、`main.tsx`、`App.tsx` | web tsc + vite build；客户端核心打真实接口验证 |
+| 桌面 Electron | `apps/desktop/src/app-update-core.ts`、`app-update.ts`、`main.ts` | `apps/desktop/tests/app-update.spec.ts`（7）+ tsc + tsup |
+| 移动 RN | `apps/mobile/src/lib/app-update-core.ts`、`app-update.ts`、`App.tsx` | `apps/mobile/tests/app-update.spec.ts`（6）+ mobile tsc 全绿 |
+
+> 鸿蒙走移动端同一套（`platformForOs` 映射 `harmony`），差别只在"上架后用 AppGalleryKit"；
+> 微信小程序**本仓库不存在**，不适用。
+
+### 7.2 与通用模板的差异（按项目实际技术栈，不是照抄）
+
+| 模板假设 | heyta 实际 | 本实现 |
+|---|---|---|
+| 桌面 Tauri v2 + `tauri-plugin-updater` | **Electron**（`@electron/packager`，无或 electron-updater） | `app.getVersion()` + `shell.openExternal(downloadUrl)`，不自行替换二进制 |
+| 移动 Capacitor | **React Native** | `Platform.OS` + `HEYTA_APP_VERSION`（无需原生桥）+ `Linking` 跳店/下载 |
+| 有微信小程序端 | 无（只有微信支付适配） | 不适用 |
+| 路径 `GET /app/version` | 服务端 API 统一挂 `/api` 前缀 | `GET /api/app-version` |
+| 版本真源另设 | 已有单一真源（根 `package.json` → `HEYTA_APP_VERSION`） | 复用；服务端再生成一份 `HEYTA_DEPLOYED_APP_VERSION` 作 `latestVersion` 默认值 |
+
+### 7.3 客户端检查时机（三端一致）
+
+启动延迟 15s + 定时 6h + 回前台（web `visibilitychange` / mobile AppState 由现有生命周期驱动）。
+Web 额外接 service worker `controllerchange`（新构建接管）即时提示刷新。
+
+### 7.4 尚未完成（诚实登记）
+
+- **鸿蒙真机**：RNOH 构建目标存在但未上架，`AppGalleryKit updateManager` 接入待上架后接（机制已就位，调用同一接口）。
+- **桌面原生安装包自更新**：目前是"提示 + 打开下载页"，由系统安装器安装；真正静默替换需引入签名 updater（属平台增强，非本机制缺口）。
+- **版本号空间统一**：各壳 `1.0` / 根 `0.1.0` / 服务端 `1.0.0` 的对账仍是未决的产品决定（仓库台账 B11）；本机制通过 `APP_LATEST_VERSION` / `APP_DOWNLOAD_URLS` 让部署方按端配置，不把该决定塞进接口。
+
+### 7.5 汇总实测读数
+
+- 服务端：`server/tests/app-version.spec.ts` 26 passed；curl 六例 + 灰度对照全部符合。
+- 客户端核心：`packages/app-host/tests/app-update.spec.ts` 14 passed；打真实接口——真实版本→optional、人为调低→force、最新→none。
+- Web：`pnpm --filter @heyta/web build` 成功；`check:ui-language / design-token-refs / i18n-vars / ux-coverage` 通过。
+- 桌面：`apps/desktop/tests/app-update.spec.ts` 7 passed；`tsc --noEmit` 通过；`tsup` 构建 `main.cjs` 成功。
+- 移动：`apps/mobile/tests/app-update.spec.ts` 6 passed；`apps/mobile tsc --noEmit` 全绿。
+- 门禁：`check:public-facts` 通过（匿名 GET 含 `/api/app-version`）、`check:app-version-server` 通过。
