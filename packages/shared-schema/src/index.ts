@@ -355,3 +355,21 @@ export type {
   HolidayAdjustmentsAdminList,
 } from './holiday-adjustment-contract';
 
+// 自动更新（版本策略接口）：路径 / 端词表 / 请求查询串 / 响应体。
+// 定性见 docs/plans/app-auto-update.md。判定标志由服务端算、客户端只读。
+export {
+  APP_VERSION_PATHS,
+  APP_UPDATE_PLATFORMS,
+  APP_UPDATE_DEFAULT_CHANNEL,
+  APP_VERSION_RE,
+  isAppUpdatePlatform,
+  isValidAppVersion,
+  appVersionQuerySchema,
+  appVersionResponseSchema,
+} from './app-version-contract';
+export type {
+  AppUpdatePlatform,
+  AppVersionQuery,
+  AppVersionResponse,
+} from './app-version-contract';
+

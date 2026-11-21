@@ -46,6 +46,7 @@ import { feishuRoutes } from './feishu/feishu.routes';
 import { attachmentRoutes } from './attachments/attachment.routes';
 import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
 import { announcementRoutes } from './announcements/announcement.routes';
+import { appVersionRoutes } from './app-version/app-version.routes';
 import { adminRoutes } from './admin/admin.routes';
 import { managedAiProxyRoutes } from './ai/managed-proxy.routes';
 import { inboundAutomationRoutes } from './automation/inbound.routes';
@@ -623,6 +624,12 @@ export const createServer = (
       // ⚠️ 同样**不受计费闸门影响**：一条"今晚要维护"的公告把付费用户挡在外面，
       //    比少一个标注严重得多 —— 那是这条通道存在的唯一理由。
       await fastifyServer.register(announcementRoutes, { prefix: '/api' });
+
+      // 自动更新：版本策略接口（`GET /api/app-version`）。匿名、只读、`Cache-Control: no-store`。
+      // 与调休同属「公共事实」：更新检查发生在登录之前，载荷零身份维度（`deviceId` 只做灰度分桶）。
+      // 判定标志由服务端算、客户端只读，见 docs/plans/app-auto-update.md。
+      await fastifyServer.register(appVersionRoutes, { prefix: '/api' });
+
 
       // 运营管理后台（ADR-0038）。**默认没有人是管理员**（`users.is_admin` 默认
       // false），所以这个前缀对所有人都是 403，直到有人跑过

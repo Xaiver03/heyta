@@ -119,6 +119,14 @@ const REVIEWED_ANONYMOUS_GET = {
   '/health':
     '存活探针：跑一次 `SELECT 1` 后回 {status, db, wsConnections}。连接数是**运维量**不是身份维度 —— 它按人给不出不同答案，所以不构成用户画像。',
   '/live': '就绪探针：常量 `{status:"ok"}`，刻意不碰依赖（见它上面那段注释：数据库挂了重启进程只会更糟）。',
+  // 读实现后的结论（server/src/app-version/app-version.routes.ts）：更新检查发生在登录之前，
+  // 所以要匿名；载荷零身份维度（deviceId 只做灰度分桶，不进响应/不落库/不画像），
+  // 判定标志由服务端算。no-store。定性见 docs/plans/app-auto-update.md。
+  '/api/app-version':
+    '版本策略接口：回 {platform,channel,latestVersion,minSupportedVersion,updateAvailable,forceUpdate,downloadUrl,releaseNotes,publishedAt,rolloutPercent}，' +
+    '零身份维度、`Cache-Control: no-store`。匿名是因为更新检查发生在应用启动/登录之前；' +
+    '`deviceId` 只用于稳定 hash 灰度分桶。',
+
   // 读实现后的结论（2026-10-16 逐条现量复核）：那条 GET 没有 preHandler，而它的两条兄弟写侧都有闸；
   // 它回的 claims 零身份维度（见 entitlement-issuer.ts:358）；「必须能匿名读」由集成用例钉住。
   '/api/automation/entitlement/revocations':
