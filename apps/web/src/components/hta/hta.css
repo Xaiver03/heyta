@@ -1,0 +1,517 @@
+/**
+ * 共享 web 组件壳（hta = heyta admin）—— 只管布局，外观走既有 `ht-*` 类 / token。
+ *
+ * 🔴 组件壳里不写内联 style，样式全部落在这里；取值只用 `--ht-*` 语义 token。
+ * 🔴 类名用 `hta-` 前缀而不是新开 `ht-*` 族：`check:row-single-source` 的
+ *    `ht-*` 前缀族棘轮只减不增，而本目录不在它的扫描面里 —— 用 `hta-`
+ *    既不会顶高那条基线，也不会与后台旧的 `.ht-settings__admin-*` 平行实现混淆。
+ */
+
+/* ── 按钮：尺寸修饰（外观仍由 controls.css 的 .ht-btn--* 决定） ── */
+.ht-btn.hta-btn--sm {
+  padding-inline: var(--ht-space-3);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-btn.hta-icon-btn {
+  padding-inline: var(--ht-space-2);
+}
+
+/* ── 徽标 ───────────────────────────────────────────── */
+.hta-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-size-badge-height);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-tight);
+  white-space: nowrap;
+}
+
+.hta-badge--neutral {
+  background: var(--ht-color-border-subtle);
+  color: var(--ht-color-foreground-muted);
+}
+
+.hta-badge--success {
+  background: var(--ht-color-success-subtle);
+  color: var(--ht-color-success-strong);
+}
+
+.hta-badge--warning {
+  background: var(--ht-color-warning-subtle);
+  color: var(--ht-color-warning-strong);
+}
+
+.hta-badge--danger {
+  background: var(--ht-color-danger-subtle);
+  color: var(--ht-color-danger-strong);
+}
+
+.hta-badge--info {
+  background: var(--ht-color-info-subtle);
+  color: var(--ht-color-info-strong);
+}
+
+/* ── 统计卡 / 指标栅格（同行等高由 grid 的 stretch 给） ── */
+.hta-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--ht-space-2);
+  align-items: stretch;
+}
+
+.hta-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+  min-block-size: 100%;
+  padding: var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+}
+
+.hta-stat-card__value {
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.hta-stat-card__label {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.hta-stat-card__trend {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+}
+
+.hta-stat-card--warning .hta-stat-card__value {
+  color: var(--ht-color-warning-strong);
+}
+
+.hta-stat-card--success .hta-stat-card__value {
+  color: var(--ht-color-success-strong);
+}
+
+.hta-stat-card--danger .hta-stat-card__value {
+  color: var(--ht-color-danger-strong);
+}
+
+/* ── 二级 Tab：单行可横滚，绝不换行 ─────────────────── */
+.hta-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.hta-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.hta-tab {
+  flex: 0 0 auto;
+  appearance: none;
+  border: 0;
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  white-space: nowrap;
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+}
+
+.hta-tab:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.hta-tab[aria-selected='true'] {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.hta-tab:disabled {
+  opacity: var(--ht-state-disabled-opacity);
+  cursor: default;
+}
+
+/* ── 选择面：复选 / 单选 / 开关共用一套行与命中区 ───── */
+.hta-choice-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.hta-choice-group--horizontal {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.hta-choice-group__legend {
+  padding: 0;
+  margin-block-end: var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+}
+
+.hta-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground);
+  cursor: pointer;
+  font-size: var(--ht-font-size-sm);
+}
+
+.hta-choice:hover {
+  background: var(--ht-color-hover);
+}
+
+.hta-choice__control {
+  flex: none;
+  inline-size: var(--ht-size-checkbox);
+  block-size: var(--ht-size-checkbox);
+  margin: 0;
+  accent-color: var(--ht-color-primary);
+}
+
+.hta-choice__label {
+  min-inline-size: 0;
+}
+
+.hta-choice--disabled {
+  opacity: var(--ht-state-disabled-opacity);
+  cursor: default;
+}
+
+.hta-choice--disabled:hover {
+  background: transparent;
+}
+
+/* 开关：原生 checkbox 做成轨道 + 滑块，焦点环仍由全局给在控件本身上。 */
+.hta-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  color: var(--ht-color-foreground);
+  cursor: pointer;
+  font-size: var(--ht-font-size-sm);
+}
+
+.hta-switch__control {
+  position: relative;
+  flex: none;
+  appearance: none;
+  inline-size: var(--ht-space-8);
+  block-size: var(--ht-space-5);
+  margin: 0;
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-border);
+  cursor: pointer;
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.hta-switch__control::after {
+  content: '';
+  position: absolute;
+  inset-block-start: var(--ht-space-1);
+  inset-inline-start: var(--ht-space-1);
+  inline-size: calc(var(--ht-space-5) - var(--ht-space-2));
+  block-size: calc(var(--ht-space-5) - var(--ht-space-2));
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  transition: transform var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.hta-switch__control:checked {
+  background: var(--ht-color-primary);
+}
+
+.hta-switch__control:checked::after {
+  transform: translateX(calc(var(--ht-space-8) - var(--ht-space-5)));
+}
+
+.hta-switch--disabled {
+  opacity: var(--ht-state-disabled-opacity);
+  cursor: default;
+}
+
+/* ── Spinner ────────────────────────────────────────── */
+.hta-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 回执：InlineFeedback / Toast ───────────────────── */
+.hta-feedback {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+}
+
+.hta-feedback--success {
+  background: var(--ht-color-success-subtle);
+  color: var(--ht-color-success-strong);
+}
+
+.hta-feedback--info {
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground-muted);
+}
+
+.hta-feedback--error {
+  background: var(--ht-color-danger-subtle);
+  color: var(--ht-color-danger-strong);
+}
+
+.hta-toast {
+  position: fixed;
+  inset-block-end: var(--ht-space-6);
+  inset-inline-end: var(--ht-space-6);
+  z-index: var(--ht-z-toast);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-2);
+  max-inline-size: min(var(--ht-layout-modal-max), calc(100vw - var(--ht-space-8)));
+  padding: var(--ht-space-3);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
+  font-size: var(--ht-font-size-sm);
+}
+
+.hta-toast--success {
+  background: var(--ht-color-surface-raised);
+  color: var(--ht-color-success-strong);
+}
+
+.hta-toast--info {
+  background: var(--ht-color-surface-raised);
+  color: var(--ht-color-foreground);
+}
+
+.hta-toast--error {
+  background: var(--ht-color-surface-raised);
+  color: var(--ht-color-danger-strong);
+}
+
+.hta-toast__message {
+  min-inline-size: 0;
+}
+
+.hta-toast__dismiss {
+  flex: none;
+  margin-inline-start: auto;
+}
+
+/* ── 三态容器 ──────────────────────────────────────── */
+.hta-list-state {
+  min-inline-size: 0;
+}
+
+/* ── 侧边抽屉（复用 WebModalShell policy="drawer"） ─── */
+.hta-sheet__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ht-z-overlay);
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  background: var(--ht-color-overlay);
+}
+
+.hta-sheet__panel {
+  position: relative;
+  z-index: var(--ht-z-modal);
+  display: flex;
+  flex-direction: column;
+  inline-size: min(var(--ht-layout-modal-max), 100vw);
+  max-inline-size: 100%;
+  block-size: 100%;
+  background: var(--ht-color-surface);
+  border-start-start-radius: var(--ht-radius-dialog);
+  border-end-start-radius: var(--ht-radius-dialog);
+}
+
+.hta-sheet__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  min-block-size: 0;
+  padding: var(--ht-space-5);
+}
+
+.hta-sheet__title {
+  margin: 0;
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.hta-sheet__content {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
+.hta-sheet__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+  padding-block-start: var(--ht-space-3);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* ── 数据表：唯一纵滚在壳上，表头 sticky ───────────── */
+.hta-table-wrap {
+  inline-size: 100%;
+  max-block-size: var(--ht-layout-panel-max-height);
+  overflow: auto;
+}
+
+.hta-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground);
+}
+
+.hta-table__cell {
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.hta-table__cell--end {
+  text-align: end;
+}
+
+.hta-table__cell--select,
+.hta-table__cell--control {
+  inline-size: 1%;
+  white-space: nowrap;
+}
+
+.hta-table__head .hta-table__cell {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--ht-z-sticky);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.hta-table__caption {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.hta-table__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.hta-table__row--clickable {
+  cursor: pointer;
+}
+
+.hta-table__row--clickable:hover {
+  background: var(--ht-color-hover);
+}
+
+.hta-table__checkbox {
+  inline-size: var(--ht-size-checkbox);
+  block-size: var(--ht-size-checkbox);
+  margin: 0;
+  accent-color: var(--ht-color-primary);
+}
+
+/* ── 分页：整簇右对齐 ──────────────────────────────── */
+.hta-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+.hta-pager__total {
+  font-variant-numeric: tabular-nums;
+}
+
+.hta-pager__size {
+  min-block-size: var(--ht-size-field-height);
+  padding-inline: var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+}
+
+.hta-pager__pages {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.hta-pager__gap {
+  padding-inline: var(--ht-space-1);
+  color: var(--ht-color-foreground-subtle);
+}
+
+@media (max-width: 48rem) {
+  .hta-pager {
+    justify-content: flex-start;
+  }
+}
