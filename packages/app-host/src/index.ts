@@ -1189,3 +1189,15 @@ export {
   type HttpCloudToolTransportOptions,
   type CloudToolSelectOptions,
 } from './ai-cloud-tools.js';
+
+// 云端 Agent 循环（引擎无关的"设备本地 loop"；与 PI 内核共用 CloudAgentTool 契约）。
+export {
+  runCloudAgentTurn,
+  type HarnessMessage,
+  type HarnessToolCall,
+  type HarnessModelReply,
+  type HarnessStep,
+  type HarnessEvent,
+  type CloudAgentHarnessOptions,
+  type CloudAgentTurnResult,
+} from './agent-harness.js';
