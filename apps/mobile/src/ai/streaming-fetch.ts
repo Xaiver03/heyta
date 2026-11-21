@@ -210,25 +210,45 @@ export function createXhrStreamingFetch(makeXhr: XhrFactory = () => new XMLHttpR
       if (xhr.readyState === READY_STATE_DONE) buffer.finish();
     };
 
-    xhr.onreadystatechange = (): void => {
-      if (
-        xhr.readyState !== READY_STATE_LOADING &&
-        xhr.readyState !== READY_STATE_DONE
-      ) {
-        return;
+    let settled = false;
+    let resolveResponse!: (response: Response) => void;
+    let rejectResponse!: (error: unknown) => void;
+    const responsePromise = new Promise<Response>((resolve, reject) => {
+      resolveResponse = resolve;
+      rejectResponse = reject;
+    });
+    /**
+     * 🔴 必须等响应头到达（status≠0 且 readyState≥2）再交出 `Response`：`routing.ts:1184`
+     * 的 `if (!res.ok)` 会在 status 仍是 0 时把请求误判成"端点返回 0"。旧实现同步就把
+     * `status: xhr.status`（=0）交出去，即此 bug。
+     */
+    const settleWhenReady = (): void => {
+      if (!settled && xhr.readyState >= 2 && xhr.status !== 0) {
+        settled = true;
+        resolveResponse(makeSyntheticResponse(xhr, buffer, () => xhr.responseText));
       }
-      // 响应头在 LOADING 之前就拿到了；这里抓一次给下面的 headers.get。
-      if (headers === null) headers = safeContentType(xhr);
-      pump();
     };
-    xhr.onerror = (): void => buffer.fail(new Error('网络请求失败'));
-    xhr.ontimeout = (): void => buffer.fail(new Error('网络请求超时'));
+    xhr.onreadystatechange = (): void => {
+      if (xhr.readyState < 2) return;
+      if (headers === null) headers = safeContentType(xhr);
+      if (xhr.readyState >= READY_STATE_LOADING) pump();
+      settleWhenReady();
+    };
+    const failOnce = (error: Error): void => {
+      buffer.fail(error);
+      if (!settled) {
+        settled = true;
+        rejectResponse(error);
+      }
+    };
+    xhr.onerror = (): void => failOnce(new Error('网络请求失败'));
+    xhr.ontimeout = (): void => failOnce(new Error('网络请求超时'));
     xhr.onabort = (): void => buffer.finish();
 
-    // 立刻发出去；响应对象在**头到达时**就该交出去，那正是"边收边读"的前提。
     sendXhr(xhr, url, method, init);
+    if (xhr.readyState >= 2) settleWhenReady();
 
-    return makeStreamingResponse(xhr, buffer, () => headers);
+    return responsePromise;
   };
   return impl as typeof fetch;
 }

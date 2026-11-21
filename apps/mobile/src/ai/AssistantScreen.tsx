@@ -33,7 +33,7 @@ import { useI18n, type MessageKey } from '@heyta/i18n';
 
 import { AiMarkGlyph } from '../ui/custom-icons';
 import { useTokens } from '../theme';
-import { Button, Card, Chip, EmptyState, HStack, Screen, Stack, Text } from '../ui/kit';
+import { Button, Card, Chip, EmptyState, HStack, IconButton, Screen, Stack, Text } from '../ui/kit';
 import { useTaskHost } from '../db/use-task-host';
 import { useMobileNavigation } from '../nav/navigation';
 import { readSyncConfig } from '../sync/config';
@@ -113,9 +113,6 @@ const managedTransport = createManagedTransport({
  * 用户最差拿到的是一份完整回答，只是没有逐字。
  */
 const streamingFetch = createGatedStreamingFetch(privacyConsent);
-// 2026-11-21：暂不接入 runtime —— RN 的 XHR 流式对托管路由返回 status 0（服务端已 200 并计量），
-// 先用整份 fetch 保证'能发出、能回话'；逐字流式后续再排查。
-void streamingFetch;
 
 /**
  * **发送那一刻**现算的路由配置（见 `ChatRuntime.resolveRouting` 的注释）。
@@ -214,6 +211,7 @@ export function AssistantScreen({
       host: toolHost,
       secretStore: aiSecrets,
       managedTransport,
+      streamingFetch,
       /**
        * 🔴 接上流式 ⇒ 助手的回答逐字出现。见模块顶部 `streamingFetch` 的注释
        * （含"为什么敢接"的三条 RN 源码判据与退化方向）。
@@ -366,9 +364,9 @@ export function AssistantScreen({
             {entry.role === 'error' && privacyBlocked && onOpenPrivacy !== undefined ? (
               <Button label={t('mobile.ai.privacyBlocked.action')} tone="ghost" onPress={onOpenPrivacy} />
             ) : null}
-            <HStack gap="default">
-              <Button label={t('web.ai.action.copy')} icon="action.copy" tone="ghost" testID={`chat-copy-${String(entry.id)}`} onPress={() => { Clipboard.setString(entry.role === 'error' ? entry.message : entry.text); }} />
-              <Button label={t('web.ai.action.retry')} icon="action.retry" tone="ghost" testID={`chat-retry-${String(entry.id)}`} disabled={snapshot.phase !== 'idle'} onPress={() => { controller.retry(entry.id); }} />
+            <HStack gap="tight">
+              <IconButton icon="action.copy" label={t('web.ai.action.copy')} testID={`chat-copy-${String(entry.id)}`} onPress={() => { Clipboard.setString(entry.role === 'error' ? entry.message : entry.text); }} />
+              <IconButton icon="action.retry" label={t('web.ai.action.retry')} testID={`chat-retry-${String(entry.id)}`} disabled={snapshot.phase !== 'idle'} onPress={() => { controller.retry(entry.id); }} />
             </HStack>
             {entry.role === 'error' && entry.cause === 'egress-not-authorized' && onOpenSettings !== undefined ? (
               <Button label={t('mobile.ai.goSettings')} tone="ghost" onPress={onOpenSettings} />
@@ -664,5 +662,14 @@ function DisclosureCard({ target, plan, hasImages, consents, onConfirm, onCancel
   const feature = 'tool-calling' as const;
   const disclosure = buildDisclosure({ feature, destination: target.destination, fields });
   const decision = authorizeEgress({ feature, destination: target.destination, fields }, consents as Parameters<typeof authorizeEgress>[1]);
-  return <Stack gap="tight" testID="assistant-disclosure"><AiDisclosureBlock testIdPrefix="assistant-" target={target} fields={fields} retentionDisclosure={disclosure.retentionDisclosure}><Text variant="caption" tone="subtle">{t('web.ai.chat.limits', { requests: plan.maxRequests, messages: plan.maxMessages, bytes: plan.maxBytesPerRequest })}</Text></AiDisclosureBlock>{!decision.allowed ? <Text variant="caption" tone="warning">{t('web.ai.settings.consentLead', { feature: t(AI_FEATURE_LABEL_KEY[feature]) })}</Text> : null}<HStack gap="tight"><Button label={t('web.ai.action.send')} tone="primary" onPress={onConfirm} testID="assistant-disclosure-send" /><Button label={t('web.ai.action.cancel')} tone="ghost" onPress={onCancel} /></HStack></Stack>;
+  const destinationLabel = target.label;
+  return (
+    <Stack gap="tight" testID="assistant-disclosure">
+      <Text variant="row-meta" tone="subtle">{destinationLabel}</Text>
+      <HStack gap="tight">
+        <Button label={t('web.ai.action.send')} tone="primary" onPress={onConfirm} testID="assistant-disclosure-send" />
+        <Button label={t('web.ai.action.cancel')} tone="ghost" onPress={onCancel} />
+      </HStack>
+    </Stack>
+  );
 }
