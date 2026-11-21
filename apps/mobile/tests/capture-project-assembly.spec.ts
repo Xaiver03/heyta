@@ -10,10 +10,9 @@
  * ① 共享层两条提交路（规则解析 / AI 应用）**都**过 `withCaptureProject` ——
  *    只接一条会得到"手打的能选清单、AI 建的不能"，同一句话两端不同形。
  * ② 任务面板把计划里的 `projectId` 交给动作层（不交 ⇒ 手机新任务永远落收集箱）。
- * ③ 便签板把选中的那一行交给 `createNote`，且**没选时交 `{}`**（省略 = 未归属，
- *    与 `NewNoteFields` 的约定同形，不是交一个 `null`）。
- * ④ 两屏都真的渲染那一行（`CaptureProjectPickerRow` / `projectPicker`），
- *    且文案是**整句**无障碍名（不拿前缀拼清单名）。
+ * ③ 便签板**不选清单落点**：便签是"不想变成任务、不必马上安排"的独立记录，
+ *    新建走 `createNote(content)`（省略 `projectId` = 未归属），不挂"落进哪份清单"那一行。
+ * ④ 只有任务面板渲染那一行（`projectPicker`），文案是**整句**无障碍名（不拿前缀拼清单名）。
  *
  * ⚠️ ①–④ 钉的是"线接上了"；**真机上按一枚芯片、任务确实落进那份共享清单**由
  * 设备腿 L10 判（`scripts/verify-mobile-collab-ios.sh` 第 10d 步 + owner 侧验签）。
@@ -65,23 +64,24 @@ describe('② 任务面板：把选中的清单交给动作层', () => {
   });
 });
 
-describe('③ 便签板：同一格形状，且没选时交空对象', () => {
+describe('③ 便签板：不选清单落点（便签是"不想变成任务"的独立记录）', () => {
   const code = stripComments(read('apps/mobile/src/screens/NotesSection.tsx'));
 
-  it('createNote 带上新选的清单', () => {
-    expect(code).toContain(
-      'actions.createNote(content, newNoteProjectId === null ? {} : { projectId: newNoteProjectId })',
-    );
+  it('便签新建不再挂"落进哪份清单"（`newNoteProjectId` 已随 iOS 式新建移除）', () => {
+    expect(code).not.toContain('newNoteProjectId');
+    expect(code).not.toContain('<CaptureProjectPickerRow');
   });
 
-  it('清单列表订阅 dataRevision（共享内容回流不重挂组件也要看得见）', () => {
-    expect(code).toMatch(/\[host, dataRevision\],/);
+  it('新建便签走 `createNote(content)`，不带 projectId（省略 = 未归属）', () => {
+    expect(stripComments(read('apps/mobile/src/screens/NoteEditScreen.tsx'))).toContain(
+      '.createNote(content)',
+    );
   });
 });
 
-describe('④ 两屏都真的渲染那一行，文案是整句', () => {
-  it('便签板直接挂 CaptureProjectPickerRow', () => {
-    expect(stripComments(read('apps/mobile/src/screens/NotesSection.tsx'))).toContain(
+describe('④ 只有任务面板渲染"落进哪份清单"那一行（便签不落清单）', () => {
+  it('便签板**不再**挂 CaptureProjectPickerRow', () => {
+    expect(stripComments(read('apps/mobile/src/screens/NotesSection.tsx'))).not.toContain(
       '<CaptureProjectPickerRow',
     );
   });

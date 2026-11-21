@@ -5224,6 +5224,7 @@ export const en = {
   'notes.error.saveFailed': 'Couldn\'t save — your note is still in the box, try again',
   // Note editor screen (multi-end batch two). The no-change gate lives in app-host updateNoteContent.
   'notes.edit.title': 'Edit note',
+  'notes.create.title': 'New note',
   'notes.save': 'Save',
   'notes.cancel': 'Cancel',
   'notes.edit.notFound': 'This note is gone (it may have been deleted on another device)',

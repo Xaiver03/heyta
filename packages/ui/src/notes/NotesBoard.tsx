@@ -136,7 +136,7 @@ export interface NotesBoardProps {
    * Promise 做 fire-and-forget 的 `void`），共享层无从得知，用户看到的
    * 就还是"按钮没反应"—— 接线时把失败原样交回来（W8b）。
    */
-  readonly onAdd: (content: string) => void | Promise<void>;
+  readonly onAdd?: (content: string) => void | Promise<void>;
   /** 移除某一条。收便签 id。 */
   readonly onRemove: (entityId: string) => void;
   /** 切换钉选。`pinned` 是**目标值**（不是"切换一下"）。收便签 id。 */
@@ -157,6 +157,15 @@ export interface NotesBoardProps {
    * 因为便签摘要里可能带宿主不管的文字色。
    */
   readonly activeNoteId?: string;
+  /**
+   * 是否渲染**常驻 composer（输入框 + 添加按钮）**。默认 `true`（web 便签视图要它）。
+   *
+   * 🔴 移动端传 `false`：iOS 备忘录式的"点新建 → 全屏编辑"里，列表页不再挂一条常驻
+   * 输入框 —— 一颗置灰的「添加便签」按钮正是用户报"点了没反应"的地方（空草稿时
+   * 它按设计禁用）。新建入口改由宿主画一枚「新建便签」，点开走全屏 `NoteEditor`。
+   * 传 `false` 时列表、钉选、删除、编辑入口都不变，只是不画 composer。
+   */
+  readonly showComposer?: boolean;
   readonly labels: NotesBoardLabels;
   readonly testID?: string;
 }
@@ -277,6 +286,7 @@ export function NotesBoard({
   onTogglePinned,
   onEdit,
   activeNoteId,
+  showComposer = true,
   labels,
   testID,
 }: NotesBoardProps): React.JSX.Element {
@@ -306,6 +316,8 @@ export function NotesBoard({
    */
   function submit(): void {
     if (submittingRef.current) return;
+    // 宿主把 composer 关掉（`showComposer=false`）时 `onAdd` 可以不给 —— 那条路上没有提交入口。
+    if (onAdd === undefined) return;
     const submitted = draft;
     submittingRef.current = true;
     void runNoteSubmit(submitted, onAdd)
@@ -319,6 +331,7 @@ export function NotesBoard({
 
   return (
     <View style={styles.board} testID={testID}>
+      {showComposer ? (
       <View style={styles.composer} testID="notes-composer">
         <TextInput
           style={[text['row-meta'], styles.input]}
@@ -351,6 +364,7 @@ export function NotesBoard({
           <Text style={[text.caption, styles.addText]}>{labels.add}</Text>
         </Pressable>
       </View>
+      ) : null}
 
       {/*
         🔴 提交失败必须看得见（W8a）：静默的话用户会以为便签存上了。

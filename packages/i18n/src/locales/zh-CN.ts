@@ -5718,6 +5718,7 @@ export const zhCN = {
   'notes.error.saveFailed': '没存上，内容还在输入框里，请重试',
   // 便签编辑屏（多端第二批）。正文没改动时不写 op，那条闸门在 app-host 的 updateNoteContent。
   'notes.edit.title': '编辑便签',
+  'notes.create.title': '新建便签',
   'notes.save': '保存',
   'notes.cancel': '取消',
   'notes.edit.notFound': '这条便签已经不在了（可能是在另一台设备上删除的）',

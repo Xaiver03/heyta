@@ -46,8 +46,11 @@ import { useTheme } from '../theme';
 import { Screen, Text } from '../ui/kit';
 
 export interface NoteEditScreenProps {
-  /** 要编辑的那条便签 id。宿主只在"打开编辑"时才挂载本屏。 */
-  readonly noteId: string;
+  /**
+   * 要编辑的那条便签 id；**`null` / 省略 = 新建一条空白便签**（iOS 备忘录式：
+   * 点「新建便签」直接进这张全屏编辑，写好了保存才落库，取消则什么都不建）。
+   */
+  readonly noteId?: string | null;
   readonly onBack: () => void;
 }
 
@@ -98,6 +101,60 @@ export function NoteEditScreen({
     }),
     [t],
   );
+
+  /**
+   * 新建：写好了才 `createNote` 落库，取消则什么都不建。与编辑走的是同一个
+   * `createNoteActions`，本文件不拼 op（AGENTS §3.5）。
+   */
+  const saveNew = useCallback(
+    (content: string): void => {
+      if (actions === null) {
+        setError(t('notes.error.saveFailed'));
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      void actions
+        .createNote(content)
+        .then(onBack)
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : String(e));
+        })
+        .finally(() => {
+          setBusy(false);
+        });
+    },
+    [actions, onBack, t],
+  );
+
+  // 新建分支：`noteId` 为空就画一张空白编辑器，光标直接落在正文（autoFocus）。
+  if (noteId === null || noteId === undefined) {
+    return (
+      <Modal
+        visible
+        animationType={reducedMotion ? 'none' : 'slide'}
+        onRequestClose={onBack}
+        statusBarTranslucent
+        accessibilityViewIsModal
+      >
+        <Screen
+          title={t('notes.create.title')}
+          actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack }]}
+        >
+          <NoteEditor
+            initialContent=""
+            autoFocus
+            labels={labels}
+            busy={busy}
+            error={error}
+            onSave={saveNew}
+            onCancel={onBack}
+            testID="mobile-note-editor"
+          />
+        </Screen>
+      </Modal>
+    );
+  }
 
   const note = notes === null ? undefined : notes.find((item) => item.id === noteId);
 

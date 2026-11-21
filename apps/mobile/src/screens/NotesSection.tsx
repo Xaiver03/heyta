@@ -42,21 +42,15 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Note } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import {
-  createNoteActions,
-  createProjectActions,
-  type AppHost,
-  type NoteActions,
-} from '@heyta/app-host';
-import { CaptureProjectPickerRow, NotesBoard, type CaptureProjectOption } from '@heyta/ui';
+import { createNoteActions, type NoteActions } from '@heyta/app-host';
+import { NotesBoard } from '@heyta/ui';
 
 import { useTaskHost } from '../db/use-task-host';
 import { notesBoardLabels } from '../lib/notes-display';
-import { useCaptureProjectLabels } from '../lib/capture-labels';
 import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import { NoteEditScreen } from './NoteEditScreen';
 import { useMobileSync } from '../sync/store';
-import { Card, SectionHeader, Text } from '../ui/kit';
+import { Button, Card, Text } from '../ui/kit';
 
 export function NotesSection(): React.JSX.Element {
   const { t } = useI18n();
@@ -76,10 +70,11 @@ export function NotesSection(): React.JSX.Element {
   /** 见文件头决定 3：失败原因原样显示，不静默吞。 */
   const [error, setError] = useState<string | null>(null);
   /**
-   * 这一趟新建便签落进哪一份清单；`null` = 未归属（收集箱那一档在便签板上没有意义，
-   * `NewNoteFields` 省略 `projectId` 就是"不归任何清单"）。
+   * 「新建便签」全屏编辑开着 = `true`。与 `editingId`（编辑已有那条）二选一：
+   * 便签按 iOS 备忘录的做法，新建是一条**独立的全屏编辑**，不在列表页挂常驻输入框，
+   * 也因此**不选"落进哪份清单"** —— 便签本来就是"不想变成任务、不必马上安排"的东西。
    */
-  const [newNoteProjectId, setNewNoteProjectId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   /**
    * 正在编辑的那条便签 = **选中的那一条**（`null` = 编辑屏没开）。
    *
@@ -133,38 +128,7 @@ export function NotesSection(): React.JSX.Element {
     [read],
   );
 
-  /**
-   * 提交新便签（W8b）。与 {@link run} 只差一处：**失败不吞** —— `run` 把
-   * reject 咽进本地 `error` 后照常 resolve，而共享 `NotesBoard` 的
-   * `runNoteSubmit` 靠 **reject** 判定"没存上"（保草稿 + 亮 `labels.saveFailed`）。
-   * 本地 `error` 失败时照旧写（文件头决定 3：原始错误文本是给用户对照的数据，
-   * 如超长那一句），与共享层的通用提示**互补**，不是替代。
-   */
-  const runAdd = useCallback(
-    (pending: Promise<unknown>): Promise<void> => {
-      setError(null);
-      return pending
-        .then(read)
-        .catch((e: unknown) => {
-          setError(e instanceof Error ? e.message : String(e));
-          throw e;
-        });
-    },
-    [read],
-  );
-
   const labels = useMemo(() => notesBoardLabels(t), [t]);
-  const projectLabels = useCaptureProjectLabels();
-  const projectOptions = useMemo<readonly CaptureProjectOption[]>(
-    () =>
-      host === null
-        ? []
-        : createProjectActions(host)
-            .listProjects()
-            .map((project) => ({ id: project.id, name: project.name })),
-    // 🔴 与 `notes` 同一把尺：共享内容回流走 `dataRevision`，不订阅它就连不上。
-    [host, dataRevision],
-  );
 
   return (
     <>
@@ -179,32 +143,24 @@ export function NotesSection(): React.JSX.Element {
       {null}
       <Card>
         {/*
-          🔴 内容校验的权威是 `createNoteActions`（空内容抛错、超长拒绝）。
-          共享组件的 composer 只在 `trim()` 为空时**不提交** —— 那是交互挡板，
-          不是内容规则（见 `NotesBoard` 文件头）。这里不重复判断一遍。
+          🔴 iOS 备忘录式新建：一颗「新建便签」开出全屏编辑器，写好了保存才落库。
+          列表页不再挂常驻 composer（`showComposer={false}`）—— 那枚空态置灰的
+          「添加便签」正是用户报"点了没反应"的地方。便签也不选"落进哪份清单"：
+          它本来就是"不想变成任务、不必马上安排"的东西。
         */}
-        <CaptureProjectPickerRow
-          picker={{
-            options: projectOptions,
-            destinationId: newNoteProjectId,
-            onSelect: setNewNoteProjectId,
-            labels: projectLabels,
+        <Button
+          label={t('notes.create.title')}
+          icon="task.add"
+          tone="primary"
+          onPress={() => {
+            setCreating(true);
           }}
+          testID="notes-create"
         />
         <NotesBoard
           notes={notes}
+          showComposer={false}
           labels={labels}
-          onAdd={(content) => {
-            // 🔴 宿主还没就绪 = 这一次**没有提交**：必须以失败形态交回（同步
-            // throw 也会被共享层兜成 failed ⇒ 保草稿 + 亮提示）。静默 return
-            // 会被判成 saved ⇒ 清草稿，用户刚敲的字既没存上、也从输入框里
-            // 消失了（W8a 点名的边缘，接线判据钉在 labels 契约测试旁）。
-            if (actions === null) throw new Error(t('notes.error.saveFailed'));
-            // 🔴 走 runAdd 而不是 run：run 吞 reject，共享层就只看得到成功。
-            return runAdd(
-              actions.createNote(content, newNoteProjectId === null ? {} : { projectId: newNoteProjectId }),
-            );
-          }}
           onRemove={(entityId) => {
             if (actions === null) return;
             run(actions.removeNote(entityId));
@@ -231,6 +187,14 @@ export function NotesSection(): React.JSX.Element {
           }}
         />
       )}
+      {creating ? (
+        <NoteEditScreen
+          noteId={null}
+          onBack={() => {
+            setCreating(false);
+          }}
+        />
+      ) : null}
       {error !== null ? (
         <Text variant="caption" tone="danger" selectable>
           {error}

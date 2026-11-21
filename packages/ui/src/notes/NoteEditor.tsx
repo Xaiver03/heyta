@@ -71,6 +71,11 @@ export interface NoteEditorProps {
    * 共享层挡一次，两端都不用各写一遍。
    */
   readonly busy?: boolean;
+  /**
+   * 打开即聚焦（光标落在正文、键盘弹出）。**只有"新建一条"才传 `true`**：
+   * 编辑一条已有便签时抢焦点会把用户的上下文弹出屏幕，那是与"改一个字"无关的动作。
+   */
+  readonly autoFocus?: boolean;
   readonly testID?: string;
 }
 
@@ -137,6 +142,7 @@ export function NoteEditor({
   onCancel,
   error = null,
   busy = false,
+  autoFocus = false,
   testID,
 }: NoteEditorProps): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -164,6 +170,7 @@ export function NoteEditor({
         accessibilityLabel={labels.placeholder}
         onChangeText={setDraft}
         multiline
+        autoFocus={autoFocus}
         textAlignVertical="top"
         testID={testID === undefined ? 'note-editor-input' : `${testID}-input`}
       />

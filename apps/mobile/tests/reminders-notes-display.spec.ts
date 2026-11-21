@@ -271,34 +271,27 @@ describe('宿主接线：共享组件的必填回调真的传了（少传不会�
     expect(screen).toContain('onRemove={removeReminder}');
   });
 
-  it('`NotesSection` 把 NotesBoard 的四个回调都接上了（含 onEdit）', () => {
+  it('`NotesSection` 接上列表回调，并用「新建便签」开出全屏编辑器（不再挂常驻 composer）', () => {
     const screen = readFileSync(resolve(here, '../src/screens/NotesSection.tsx'), 'utf8');
     expect(screen).toContain('<NotesBoard');
-    expect(screen).toContain('onAdd={(content) => {');
+    // iOS 备忘录式：列表页不再挂常驻 composer —— 那枚空态置灰的「添加便签」
+    // 正是用户报"点了没反应"的地方。列表本身的删除 / 钉选 / 编辑入口都不变。
+    expect(screen).toContain('showComposer={false}');
+    expect(screen).not.toContain('onAdd={(content) => {');
     expect(screen).toContain('onRemove={(entityId) => {');
     expect(screen).toContain('onTogglePinned={(entityId, pinned) => {');
-    // 🔴 W8b：onAdd 的失败必须交回共享层 —— `run(...)` 把 reject 咽成本地 error，
-    // 共享层只看得到 resolve（= 假 saved ⇒ 清草稿）；`actions === null` 静默
-    // return 同罪（"没提交"被当成"存上了"）。两条接线判据钉在源码上
-    // （本仓库对"少传/改错回调不报类型错"的既有守卫方式，见本 describe 文件头）。
-    expect(screen).toContain("if (actions === null) throw new Error(t('notes.error.saveFailed'));");
-    // 这一枚只管**走不走 `runAdd`、调的是不是 `createNote`**，所以针脚不吃实参表：
-    // `createNote` 现在多交一枚落点（`{ projectId }`，2026-10-27 第十批），把整行
-    // 字面钉住会让两族的判据互相踩脚。落点那一格由 `capture-project-assembly.spec.ts` ③ 钉。
-    expect(screen).toMatch(/return runAdd\(\s*actions\.createNote\(/);
-    // 🔴 **这条断言是翻向的**（多端第二批，2026-10-03）。原文是
-    // `expect(screen).not.toContain('onEdit=')`，理由「移动端没有便签编辑屏」。
-    // 屏有了（`NoteEditScreen`），所以"不传"从正确变成缺陷：摘要那段会退回纯文本，
-    // 用户写错一个字只能删掉重建一条（丢掉钉选与创建时间）。
     expect(screen).toContain('onEdit=');
+    // 新建入口：一颗「新建便签」开出 `noteId={null}` 的全屏编辑（写好了才落库）。
+    expect(screen).toContain('testID="notes-create"');
+    expect(screen).toContain('noteId={null}');
     /**
-     * 但"传了 onEdit"本身不等于"改动能落库" —— 接线只证明入口在。
-     * 所以这里同时钉住**那条真 op 的落点**：编辑屏走的是动作层的
-     * `updateNoteContent`（op 的构造只有 app-host 一份，AGENTS §3.5），
+     * 接线只证明入口在；这里同时钉住两条真 op 的落点：编辑走 `updateNoteContent`、
+     * 新建走 `createNote`，都在动作层（op 的构造只有 app-host 一份，AGENTS §3.5），
      * 而不是在界面里改状态、也不是拼一个 `entityType: 'NOTE'`。
      */
     const editor = readFileSync(resolve(here, '../src/screens/NoteEditScreen.tsx'), 'utf8');
     expect(editor).toContain('.updateNoteContent(noteId, content)');
+    expect(editor).toContain('.createNote(content)');
     expect(editor).not.toContain("entityType: 'NOTE'");
   });
 
