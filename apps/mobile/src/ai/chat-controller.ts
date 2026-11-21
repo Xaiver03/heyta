@@ -72,6 +72,8 @@ export interface ChatRuntime {
    */
   readonly resolveRouting: () => AiRoutingConfig;
   readonly onHealth: (health: HealthMap) => void;
+  /** 真机逐字揭示（仅真机壳置 true；测试环境不设 ⇒ 整段，避免异步破坏单测）。 */
+  readonly typewriter?: boolean;
   /**
    * 流式传输（XHR 读增量，且**套在隐私闸门之内**）。
    *
@@ -565,12 +567,13 @@ class MobileChatController implements ChatController {
       this.append({ role: 'proposal', text: outcome.text, proposal: outcome.proposal, confirmed: undefined });
       return;
     }
-    this.append({
-      role: 'assistant',
-      text: outcome.text,
-      steps: outcome.steps,
-      stoppedAt: outcome.kind === 'stopped' ? outcome.limit : undefined,
-    });
+    const stoppedAt = outcome.kind === 'stopped' ? outcome.limit : undefined;
+    if (this.runtime?.typewriter === true && outcome.text.length > 0) {
+      const id = this.append({ role: 'assistant', text: '', steps: outcome.steps, stoppedAt });
+      this.reveal(id, outcome.text);
+    } else {
+      this.append({ role: 'assistant', text: outcome.text, steps: outcome.steps, stoppedAt });
+    }
   }
 
   private assistantHistory(): readonly AssistantMessage[] {
@@ -583,6 +586,19 @@ class MobileChatController implements ChatController {
     const id = this.state.items.reduce((max, item) => Math.max(max, item.id), 0) + 1;
     this.update({ items: [...this.state.items, { ...entry, id } as ChatItem] });
     return id;
+  }
+
+  private revealTimer: ReturnType<typeof setTimeout> | undefined;
+  /** 控制器层逐字：把整段文本按 ~3s 分片写入（仅 typewriter 开启时用）。 */
+  private reveal(id: number, full: string): void {
+    const step = Math.max(1, Math.ceil(full.length / 60));
+    let i = 0;
+    const tick = (): void => {
+      i = Math.min(full.length, i + step);
+      this.replace(id, { text: full.slice(0, i) } as Partial<ChatItem>);
+      if (i < full.length) this.revealTimer = setTimeout(tick, 50);
+    };
+    tick();
   }
 
   private replace(id: number, patch: Partial<ChatItem>): void {

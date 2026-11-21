@@ -219,6 +219,7 @@ export function AssistantScreen({
       resolveRouting,
       localize: (key, vars) => t(key as MessageKey, vars),
       onHealth: persistHealth,
+      typewriter: true,
     }),
     [settings, t, toolHost],
   );

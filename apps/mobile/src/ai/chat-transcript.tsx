@@ -74,7 +74,7 @@ function ChatMessage({
       >
         {isGenerated ? (
           <View>
-            {animate ? <TypewriterMarkdown text={item.text} /> : <MarkdownMessage text={item.text} />}
+            <MarkdownMessage text={item.text} />
             {item.streaming === true ? (
               /**
                * 🔴 `font-size.sm`（14）—— 与 `.ht-ai__panel` / web 端光标同档。
