@@ -1,7 +1,7 @@
 /** Mobile's single conversational assistant surface. */
 
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Clipboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Clipboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { applyScrollIntent, shouldFollowOnContentChange } from '@heyta/ui';
 import { inferPreferences, renderPreferenceHints } from '@heyta/domain';
@@ -34,6 +34,7 @@ import { useI18n, type MessageKey } from '@heyta/i18n';
 import { AiMarkGlyph } from '../ui/custom-icons';
 import { useTokens } from '../theme';
 import { Button, Card, Chip, EmptyState, HStack, IconButton, Screen, Stack, Text } from '../ui/kit';
+import { Icon } from '../ui/icons';
 import { useTaskHost } from '../db/use-task-host';
 import { useMobileNavigation } from '../nav/navigation';
 import { readSyncConfig } from '../sync/config';
@@ -47,7 +48,6 @@ import { ChainOfThought } from './chain-of-thought';
 import { TaskAttachmentSheet, type AttachTask } from './task-attachment';
 import { SessionListSheet } from './session-list';
 import { pickImages } from './image-attach';
-import { TopBarMenu } from '../ui/top-bar-menu';
 import {
   createChatController,
   mobileAssistantController,
@@ -171,7 +171,7 @@ export function AssistantScreen({
   const transcriptRef = useRef<ScrollView>(null);
   const keyboardFrameRef = useRef<View>(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
   const [sessionOpen, setSessionOpen] = useState(false);
   const [refs, setRefs] = useState<AttachTask[]>([]);
@@ -459,9 +459,8 @@ export function AssistantScreen({
       scroll={false}
       bottomInset={!bottomOffset}
       actions={[
-        { icon: 'action.more', label: t('web.ai.chat.history.open'), testID: 'assistant-more', onPress: () => { setMoreOpen(true); } },
         { icon: 'assistant.new-session', label: t('web.ai.chat.newSession'), testID: 'assistant-new-session', disabled: snapshot.phase !== 'idle', onPress: () => controller.newSession() },
-        { icon: 'action.back', label: t('mobile.ai.back'), testID: 'assistant-back', disabled: snapshot.phase === 'running', onPress: () => snapshot.phase === 'disclose' ? controller.cancelDisclosure() : onBack() },
+        { icon: 'tab.categories', label: t('mobile.ai.sessions.title'), testID: 'assistant-sessions', onPress: () => { setSessionOpen(true); } },
       ]}
     >
       <View
@@ -551,10 +550,9 @@ export function AssistantScreen({
             disabled={snapshot.phase !== 'idle' || toolHost === null}
             busy={snapshot.phase === 'running'}
             attachments={refs}
-            onOpenAttach={() => { setAttachOpen(true); }}
+            onOpenAttach={() => { setAttachMenuOpen(true); }}
             onRemoveAttachment={(id) => { setRefs((prev) => prev.filter((r) => r.id !== id)); }}
             images={snapshot.images}
-            onPickImage={() => { void handlePickImage(); }}
             onRemoveImage={(index) => { controller.removeImage(index); setImageError(undefined); }}
           />
           {imageError !== undefined ? (
@@ -582,15 +580,21 @@ export function AssistantScreen({
         onClose={() => { setAttachOpen(false); }}
       />
 
-      <TopBarMenu
-        visible={moreOpen}
-        label={t('web.ai.chat.history.open')}
-        onClose={() => { setMoreOpen(false); }}
-        items={[
-          { id: 'history', label: t('mobile.ai.sessions.title'), icon: 'tab.categories', onPress: () => { setMoreOpen(false); setSessionOpen(true); } },
-          { id: 'new', label: t('web.ai.chat.newSession'), icon: 'assistant.new-session', onPress: () => { setMoreOpen(false); controller.newSession(); } },
-        ]}
-      />
+      <Modal visible={attachMenuOpen} transparent animationType="fade" onRequestClose={() => { setAttachMenuOpen(false); }}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' }} onPress={() => { setAttachMenuOpen(false); }}>
+          <View style={{ backgroundColor: tokens['color.surface'], borderTopLeftRadius: tokens['radius.lg'], borderTopRightRadius: tokens['radius.lg'], paddingVertical: tokens['space.2'], paddingBottom: tokens['space.4'] }}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('web.ai.attach.label')} testID="attach-option-image" onPress={() => { setAttachMenuOpen(false); void handlePickImage(); }} style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.3'], minHeight: tokens['touch-target.min'], paddingHorizontal: tokens['space.4'] }}>
+              <Icon name="action.image" size="sm" color={tokens['color.foreground']} />
+              <Text variant="row-title">{t('web.ai.attach.label')}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('mobile.ai.attach.open')} testID="attach-option-file" onPress={() => { setAttachMenuOpen(false); setAttachOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.3'], minHeight: tokens['touch-target.min'], paddingHorizontal: tokens['space.4'] }}>
+              <Icon name="action.attach" size="sm" color={tokens['color.foreground']} />
+              <Text variant="row-title">{t('mobile.ai.attach.open')}</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
     </Screen>
   );
 }

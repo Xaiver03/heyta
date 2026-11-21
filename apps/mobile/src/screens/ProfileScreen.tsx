@@ -1143,6 +1143,12 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
     (HUB_ROW_TEST_IDS as readonly string[]).includes(row.testID ?? ''),
   );
 
+  const QUICK_ENTRY_TEST_IDS = ['profile-entry-habits', 'profile-entry-countdown', 'profile-entry-share', 'profile-entry-assistant'] as const;
+  const quickEntryRows = entryRows.filter(
+    (row): row is Extract<SettingsRowModel, { kind: 'action' }> =>
+      row.kind === 'action' && (QUICK_ENTRY_TEST_IDS as readonly string[]).includes(row.testID ?? ''),
+  );
+
   /**
    * 🔴 提前 return **必须在所有 hook 之后**。
    * 功能域二级屏各自带顶栏返回，但返回动作必须 pop 当前 tab 的栈，才能与
@@ -1727,7 +1733,21 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
       */}
       {/* ── 全部功能：非底部导航的功能入口，放在「近期状态」之上（浅层可见，不被淹没）── */}
       <Card shadow="card">
-        <SettingsRow row={featuresHubRow} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingVertical: tokens['space.2'] }}>
+          {quickEntryRows.map((row) => (
+            <Pressable
+              key={row.testID}
+              accessibilityRole="button"
+              accessibilityLabel={row.label}
+              testID={`${row.testID ?? ''}-tile`}
+              onPress={row.onPress}
+              style={({ pressed }) => [{ width: '25%', alignItems: 'center', gap: tokens['space.1'], paddingVertical: tokens['space.2'] }, pressed ? { opacity: tokens['state.pressed-opacity'] } : null]}
+            >
+              {row.leading}
+              <Text variant="caption" numberOfLines={1} style={{ textAlign: 'center' }}>{row.label}</Text>
+            </Pressable>
+          ))}
+        </View>
       </Card>
 
       <ProfileProgressSummary

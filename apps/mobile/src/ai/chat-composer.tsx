@@ -26,7 +26,6 @@ export function ChatComposer({
   onOpenAttach,
   onRemoveAttachment,
   images,
-  onPickImage,
   onRemoveImage,
 }: {
   value: string;
@@ -38,7 +37,6 @@ export function ChatComposer({
   onOpenAttach?: () => void;
   onRemoveAttachment?: (id: string) => void;
   images?: readonly AiImagePart[];
-  onPickImage?: () => void;
   onRemoveImage?: (index: number) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
@@ -110,7 +108,6 @@ export function ChatComposer({
         }}
       >
         {onOpenAttach === undefined ? null : iconButton('action.attach', t('mobile.ai.attach.open'), 'ai-attach-button', onOpenAttach)}
-        {onPickImage === undefined ? null : iconButton('action.image', t('web.ai.attach.label'), 'ai-image-button', onPickImage)}
         <TextInput
           value={value}
           onChangeText={onChangeText}

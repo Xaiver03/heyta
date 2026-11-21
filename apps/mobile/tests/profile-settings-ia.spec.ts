@@ -181,15 +181,15 @@ describe('移动端个人中心与设置的 IA 接线', () => {
     ⚠️ 判据仍然是**行数账**，不是"看起来更短"：显式 8 + 卡片 3 = 11。
     再要往 10 走的那一行（通知 / 清单与标签）是产品还没定的取舍，见 plan §6。
   */
-  it('A1 首屏 12 行 = 显式 9 行 + 近期状态卡 3 行（统计与回顾已并入近期状态，不再单独占行）', () => {
+  it('A1 首屏 11 行 = 显式 8 行 + 近期状态卡 3 行（功能入口改为 Icon 网格，不再占 SettingsRow）', () => {
     const home = between(profile, 'return (\n    <Screen', '<SettingsScreen');
 
     // 显式那些行：订阅 / 设置 / 同步摘要 / 通知 / 功能与 AI / 自定义底部导航。
     // 🔴 这条能红：往首屏加一行 `<SettingsRow` 就会变成 10。
     expect(
       [...home.matchAll(/<SettingsRow\b/g)],
-      '「我的」首屏的显式设置行数变了 —— 统计与回顾并入近期状态后应为 9',
-    ).toHaveLength(9);
+      '「我的」首屏的显式设置行数变了 —— 功能入口改 Icon 网格后应为 8',
+    ).toHaveLength(8);
 
     // 首屏那几行各自是哪一行（名字写死，防止"数量对、成分错"）。
     for (const row of [
@@ -197,7 +197,6 @@ describe('移动端个人中心与设置的 IA 接线', () => {
       'settingsRow',
       'syncSummaryRow',
       'notificationsRow',
-      'featuresHubRow',
       'tabBarCustomizeRow',
     ]) {
       expect(home, `首屏少了 ${row} 那一行`).toContain(`<SettingsRow row={${row}} />`);
