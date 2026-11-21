@@ -40,13 +40,22 @@ import { useHeytaText, useHeytaTokens } from '../theme.js';
 import { DatePicker, type DatePickerLabels, type DatePickerQuickPick, type DatePickerTime } from '../date-picker/DatePicker.js';
 import { timeDraftToValue, timeStepSlots } from '../date-picker/steps.js';
 import type { CaptureComposerLabels } from './CaptureComposer.js';
-import type { CaptureChip, CaptureDue } from './model.js';
+import type { CaptureChip, CaptureDue, CaptureRepeatPreset } from './model.js';
 
 /** 滴答那一档的粒度：半小时。`Task` 本身支持任意分钟，所以「其它时间」必须留着。 */
 const TIME_STEP_MINUTES = 30;
 
 /** 「时间段」可选的时长（分钟），与 `setSchedule` 的 [5,480] 夹取兼容。 */
 const RANGE_DURATION_OPTIONS = [30, 60, 90, 120] as const;
+
+/** 「重复」预设的展示顺序（与 app-host 的 `REPEAT_PRESET_IDS` 一致）。 */
+const REPEAT_PRESET_ORDER: readonly CaptureRepeatPreset[] = [
+  'daily',
+  'weekly',
+  'weekdays',
+  'monthly',
+  'yearly',
+];
 
 /** 面板自己的措辞（其余复用 `CaptureComposerLabels`，那里已有 `valueLabel` / `rejected` / `unused`）。 */
 export interface CaptureDuePanelLabels {
@@ -76,6 +85,11 @@ export interface CaptureDuePanelLabels {
     readonly startLabel: string;
     readonly durationLabel: string;
     readonly durationLabelOf: (minutes: number) => string;
+  };
+  /** 「重复」那一组的措辞（S6）。 */
+  readonly repeat: {
+    readonly title: string;
+    readonly options: Record<CaptureRepeatPreset, string>;
   };
 }
 
@@ -114,6 +128,11 @@ export interface CaptureDuePanelState {
   readonly onTimeDraftChange: (draft: string) => void;
   /** 「时间段」（S7）。`undefined` = 宿主没开这一档 ⇒ 面板里不出现入口行。 */
   readonly range?: CaptureRangeDraft | undefined;
+  /** 「重复」（S6）。`undefined` = 宿主没开 ⇒ 面板里不出现重复 chip 行。 */
+  readonly repeat?: {
+    readonly value: CaptureRepeatPreset | undefined;
+    readonly onSelect: (preset: CaptureRepeatPreset | undefined) => void;
+  } | undefined;
 }
 
 export interface CaptureDuePanelProps {
@@ -502,6 +521,31 @@ export function CaptureDuePanel({
               : labels.panel.range.durationLabelOf(state.range.durationMinutes)}
           </Text>
         </Pressable>
+      )}
+
+      {state.repeat === undefined ? null : (
+        <View style={styles.slots} accessibilityLabel={labels.panel.repeat.title} testID="capture-repeat-row">
+          {REPEAT_PRESET_ORDER.map((preset) => {
+            const on = state.repeat !== undefined && state.repeat.value === preset;
+            return (
+              <Pressable
+                key={preset}
+                accessibilityRole="button"
+                accessibilityLabel={labels.panel.repeat.options[preset]}
+                aria-selected={on}
+                onPress={() => {
+                  state.repeat?.onSelect(on ? undefined : preset);
+                }}
+                style={[styles.slot, on ? styles.slotOn : styles.slotOff]}
+                testID={`capture-repeat-${preset}`}
+              >
+                <Text style={[text.caption, on ? styles.slotTextOn : styles.slotText]}>
+                  {labels.panel.repeat.options[preset]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       )}
 
       {dueChips.length === 0 ? null : (

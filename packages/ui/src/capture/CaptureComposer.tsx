@@ -106,12 +106,14 @@ import {
   toggleCaptureIgnore,
   withCaptureProject,
   withCaptureRange,
+  withCaptureRepeatPreset,
   type CaptureCapsuleKind,
   type CaptureChip,
   type CaptureDue,
   type CaptureOverride,
   type CaptureProjectPicker,
   type CaptureSubmitPlan,
+  type CaptureRepeatPreset,
 } from './model.js';
 
 /**
@@ -306,6 +308,8 @@ export interface CaptureComposerProps {
    * 不是常驻行 —— 开它不会把 web 顶部列表往下推。默认 `false`（逐字节等价于改动前）。
    */
   readonly rangeEnabled?: boolean | undefined;
+  /** 开不开「重复」（S6）。同样住在面板里（打开面板才出现 chip 行），默认 `false`。 */
+  readonly repeatEnabled?: boolean | undefined;
 }
 
 /** 取一份 token 表，建出这套样式。**一个裸尺度值都没有**（`check:design` 会拦）。 */
@@ -580,6 +584,7 @@ export function CaptureComposer({
   fillRequest,
   descriptionInput = false,
   rangeEnabled = false,
+  repeatEnabled = false,
 }: CaptureComposerProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -606,6 +611,8 @@ export function CaptureComposer({
   const [rangeStart, setRangeStart] = useState<LocalDate | undefined>(undefined);
   const [rangeTime, setRangeTime] = useState<LocalTime | undefined>(undefined);
   const [rangeDuration, setRangeDuration] = useState<number | undefined>(undefined);
+  /** 「重复」预设草稿（S6）。仅在 `repeatEnabled` 时被渲染与提交。 */
+  const [repeatPreset, setRepeatPreset] = useState<CaptureRepeatPreset | undefined>(undefined);
 
   /** 原生端自己控制焦点（见 `autoFocus` 的说明）；web 不需要。 */
   const inputRef = useRef<TextInput>(null);
@@ -679,7 +686,12 @@ export function CaptureComposer({
       rangeEnabled && rangeStart !== undefined && rangeDuration !== undefined
         ? { startDate: dueDateToEpoch(rangeStart, rangeTime), durationMinutes: rangeDuration }
         : undefined;
-    void onSubmit(withCaptureRange(withCaptureProject(withDescription, captureSelectedProject(projectPicker)?.id), range));
+    void onSubmit(
+      withCaptureRepeatPreset(
+        withCaptureRange(withCaptureProject(withDescription, captureSelectedProject(projectPicker)?.id), range),
+        repeatEnabled ? repeatPreset : undefined,
+      ),
+    );
     setDraft('');
     setDescriptionDraft('');
     setIgnored([]);
@@ -687,6 +699,7 @@ export function CaptureComposer({
     setRangeStart(undefined);
     setRangeTime(undefined);
     setRangeDuration(undefined);
+    setRepeatPreset(undefined);
     closePanel();
   }
 
@@ -742,6 +755,14 @@ export function CaptureComposer({
           },
           onEnter: () => {
             setPanelView('range');
+          },
+        }
+      : undefined,
+    repeat: repeatEnabled
+      ? {
+          value: repeatPreset,
+          onSelect: (preset) => {
+            setRepeatPreset(preset);
           },
         }
       : undefined,

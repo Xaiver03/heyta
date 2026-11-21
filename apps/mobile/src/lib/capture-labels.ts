@@ -136,6 +136,16 @@ export function captureLabels(t: Translate): CaptureComposerLabels {
         durationLabel: t('web.capture.panel.range.durationLabel'),
         durationLabelOf: (minutes) => t('web.capture.panel.range.durationOf', { n: String(minutes) }),
       },
+      repeat: {
+        title: t('web.capture.panel.repeat.title'),
+        options: {
+          daily: t('web.capture.panel.repeat.daily'),
+          weekly: t('web.capture.panel.repeat.weekly'),
+          weekdays: t('web.capture.panel.repeat.weekdays'),
+          monthly: t('web.capture.panel.repeat.monthly'),
+          yearly: t('web.capture.panel.repeat.yearly'),
+        },
+      },
     },
   };
 }

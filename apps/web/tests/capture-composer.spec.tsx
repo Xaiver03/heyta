@@ -429,6 +429,24 @@ describe('S7 时间段（rangeEnabled）：面板里有入口、进得去、选�
   });
 });
 
+describe('S6 重复（repeatEnabled）：面板里有预设 chip、点一枚即选中', () => {
+  it('面板出现重复 chip 行；点「每周」后该 chip aria-selected=true', () => {
+    const el = render();
+    type(el, '每周复盘');
+    const panel = openPanel(el);
+    const row = panel.querySelector<HTMLElement>('[data-testid="capture-repeat-row"]');
+    expect(row, 'repeatEnabled 时面板里应有重复 chip 行').not.toBeNull();
+
+    const weekly = row!.querySelector<HTMLElement>('[data-testid="capture-repeat-weekly"]');
+    expect(weekly, '重复行里应有「每周」chip').not.toBeNull();
+    act(() => {
+      weekly!.click();
+    });
+    const after = document.querySelector<HTMLElement>('[data-testid="capture-repeat-weekly"]');
+    expect(after!.getAttribute('aria-selected'), '点过之后「每周」被选中').toBe('true');
+  });
+});
+
 describe('CaptureComposer —— 不给外壳那一档：就地展开（移动端的唯一面板路径）', () => {
   /*
     🔴 这一族量的是共享件里 `renderDuePanel === undefined` 那**一支**。
