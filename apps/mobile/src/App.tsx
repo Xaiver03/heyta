@@ -354,7 +354,7 @@ function Shell(): React.JSX.Element {
         <View style={{ flex: 1, display: tab === 'countdown' ? 'flex' : 'none' }}>
           <CountdownScreen onBack={() => { setTab('tasks'); }} />
         </View>
-        <View style={{ flex: 1, display: tab === 'profile' ? 'flex' : 'none' }}><ProfileScreen /></View>
+        <View style={{ flex: 1, display: tab === 'profile' ? 'flex' : 'none' }}><ProfileScreen onNavigateTab={(key) => { setTab(key); }} /></View>
       </Animated.View>
       <TabBar
         background={tab === 'profile' ? 'grouped' : 'surface'}

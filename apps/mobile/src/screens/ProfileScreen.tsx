@@ -84,7 +84,6 @@ import { AccountClosureScreen } from './AccountClosureScreen';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { CountdownScreen } from './CountdownScreen';
-import { CategoriesScreen } from './CategoriesScreen';
 import { TabBarCustomizeScreen } from './TabBarCustomizeScreen';
 import { EmailChangeSection } from './EmailChangeSection';
 // 托管同步的续费入口（与 web 的 RenewPanel 共用 @heyta/app-host 那一份接线）。
@@ -124,7 +123,7 @@ import { clearMobileVaultSession } from '../lib/vault-session-cleanup';
 import { useMobileNavigation } from '../nav/navigation';
 import { isProfileAssistantVisible } from '../nav/navigation-state';
 
-export function ProfileScreen(): React.JSX.Element {
+export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits' | 'countdown') => void } = {}): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
   const { t } = useI18n();
   const tokens = useTokens();
@@ -152,8 +151,6 @@ export function ProfileScreen(): React.JSX.Element {
   /** 设置面是当前 tab 的二级栈页面；返回优先 pop 回个人页。 */
   const settingsOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'settings';
   const [settingsSection, setSettingsSection] = useState<SettingsSectionKey>();
-  /** 「我的 → 统计与回顾」：统计从底栏撤下的落点（整屏第二层）。 */
-  const [statsOpen, setStatsOpen] = useState(false);
   const [tabBarCustomizeOpen, setTabBarCustomizeOpen] = useState(false);
 
   // The profile screen stays mounted while tabs switch. Drop a pending
@@ -950,6 +947,11 @@ export function ProfileScreen(): React.JSX.Element {
       label: t(entry.labelKey),
       leading: <Icon name={FEATURE_ENTRY_ICONS[entry.key]} size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
+        // 习惯 / 倒数纪念日：App 顶层已有对应视图，直接切 tab（走 profile 栈路由会白屏）。
+        if (onNavigateTab !== undefined && (entry.key === 'habits' || entry.key === 'countdown')) {
+          onNavigateTab(entry.key);
+          return;
+        }
         navigation.push(featureRouteKey(entry.key));
       },
     }),
@@ -980,17 +982,6 @@ export function ProfileScreen(): React.JSX.Element {
    *    探测，而设置里那一份还要再探一次。本地没有权益快照，所以这一行今天只承诺
    *    "去哪"，不承诺"现在是什么"——**宁可少说一句，不说一句过期的**。
    */
-  const statsRow: SettingsRowModel = {
-    kind: 'action',
-    discloses: true,
-    testID: 'profile-entry-stats',
-    label: t('mobile.profile.entry.stats'),
-    leading: <Icon name="tab.categories" size="sm" color={tokens['color.foreground-muted']} />,
-    onPress: () => {
-      setStatsOpen(true);
-    },
-  };
-
   const tabBarCustomizeRow: SettingsRowModel = {
     kind: 'action',
     discloses: true,
@@ -1221,10 +1212,6 @@ export function ProfileScreen(): React.JSX.Element {
 
   if (tabBarCustomizeOpen) {
     return <TabBarCustomizeScreen onBack={() => { setTabBarCustomizeOpen(false); }} />;
-  }
-
-  if (statsOpen) {
-    return <CategoriesScreen onBack={() => { setStatsOpen(false); }} />;
   }
 
   if (notificationsOpen) {
@@ -1751,8 +1738,6 @@ export function ProfileScreen(): React.JSX.Element {
 
       {/* ── ③ 功能入口 ─────────────────────────────────────────────── */}
       <Card shadow="card">
-        <SettingsRow row={statsRow} />
-        <Divider />
         <SettingsRow row={subscriptionRow} />
         <Divider />
         <SettingsRow row={settingsRow} />

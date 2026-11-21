@@ -4750,6 +4750,29 @@ export const zhCN = {
   'site.download.row.harmony.gap': '卡在模拟器系统镜像与签名 —— 这两样不在我们手里。',
   'site.download.row.selfhost.name': '自己架一套',
 'site.download.row.selfhost.body': '把同步服务与网页版跑在自己的机器上，数据不出门。每一步都有指南。',
+  // 重做后的下载页：Hero 平台化 CTA、平台行标题、各页面展示、三步开始、安全校验。
+  // 全部只描述本页已经能核实的事实，不新增任何 URL 或"已发布"判断。
+  'site.download.hero.ctaAll': '看全部下载',
+  'site.download.hero.ctaView': '看看这一端',
+  'site.download.rows.title': '选择你要装的那一端',
+  'site.download.screens.title': '同一份数据，每个端都在',
+  'site.download.screens.lede': '下面几屏是同一个产品在真实设备上的样子，换一个端也不用重新学一遍。',
+  'site.download.screens.desktop.title': '桌面端 · 今天',
+  'site.download.screens.desktop.body': '左侧导航、任务列表与详情栏放在一屏里，今天要做的全都在手上。',
+  'site.download.screens.today.title': 'iPhone · 今天',
+  'site.download.screens.today.body': '打开就是今天。勾掉一条，其它端跟着更新。',
+  'site.download.screens.quadrant.title': 'Android · 四象限',
+  'site.download.screens.quadrant.body': '按重要与紧急分区，先做对的事，而不是先做容易的。',
+  'site.download.screens.habits.title': '桌面端 · 时间线',
+  'site.download.screens.habits.body': '把排期摊在一条时间轴上，谁先谁后一眼看清。',
+  'site.download.steps.title': '三步开始',
+  'site.download.steps.1.title': '选对你这一端',
+  'site.download.steps.1.body': '用上面的识别直接挑，或者手动换一个。挑错也不丢数据。',
+  'site.download.steps.2.title': '装上并打开',
+  'site.download.steps.2.body': '网页版不用装；桌面与手机按各自的安装方式装好就能用。',
+  'site.download.steps.3.title': '核对一下文件',
+  'site.download.steps.3.body': '对一下大小与 SHA-256，确认拿到的是这一份，而不是缓存里的旧字节。',
+  'site.download.verify.official': '只从本页给出的官方地址下载。商店与内测入口只有在发布清单登记之后才会出现。',
   // ⚠️ 2026-10-19 SEO 审计改的标题（理由同 `site.features.seo.title`）：
   //    原标题「平台状态 —— heyta」把六个平台名全丢了，而"电脑版 / 手机版 / 多端同步"
   //    正是这个页面唯一能接住的那类查询。**描述没改**：它就是各端真实进度本身。
@@ -6145,9 +6168,9 @@ export const zhCN = {
   //    数字（字数上限、条数）一律由代码插值进来，不写进词条 —— 那是第二套取值。
   'mobile.ai.entry': 'AI 助手',
   'mobile.ai.entry.hint': '让一个助手帮你记录、安排、拆解或回顾任务',
-  'mobile.ai.toolbox.entry': 'AI 工具箱',
+  'mobile.ai.toolbox.entry': 'AI 工具',
   'mobile.ai.toolbox.entry.hint': '捕获 · 拆解 · 排序 · 耗时四枚 AI 快捷面板',
-  'mobile.ai.toolbox.title': 'AI 工具箱',
+  'mobile.ai.toolbox.title': 'AI 工具',
   'mobile.ai.toolbox.tab.breakdown': '拆解',
   'mobile.ai.toolbox.tab.prioritize': '排序',
   'mobile.ai.toolbox.tab.duration': '耗时',
