@@ -16,6 +16,7 @@ import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
 import { app, BrowserWindow, ipcMain, net, protocol } from 'electron';
+import { armDesktopUpdateCheck } from './app-update.js';
 
 import type { NodeHost } from '@heyta/node-host';
 import { openDesktopHost } from './host.js';
@@ -641,6 +642,9 @@ if (!app.requestSingleInstanceLock()) {
       registerWebProtocol();
 
       createWindow();
+
+      // 自动更新检测：`HEYTA_UPDATE_BASE_URL` 指向发布服务器时才查；失败/未配置不弹、不阻塞。
+      armDesktopUpdateCheck();
 
       /**
        * 全局热键 + 托盘（R6）。

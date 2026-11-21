@@ -17,6 +17,7 @@
     "package:mac": "node ../../scripts/package-desktop.mjs darwin"
   },
   "dependencies": {
+    "@heyta/app-host": "workspace:*",
     "@heyta/design-system": "workspace:*",
     "@heyta/domain": "workspace:*",
     "@heyta/node-host": "workspace:*",
