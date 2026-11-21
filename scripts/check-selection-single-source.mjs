@@ -515,8 +515,9 @@ const ROW_ID_EXEMPT = [
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'confirmingId', 'confirm-gate'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'editingRowId', 'inline-rename'],
   // 后台退款那两枚按钮是**两步式批准**：第一下记下"待批准的是哪一条"，第二下（确认框里那枚）才发请求。
-  // 类别按那处代码自己的注释归（`AdminPanel.tsx`：「待确认的那一条退款 id（两步式"批准"）」）。
-  ['apps/web/src/features/admin/AdminPanel.tsx', 'pendingApproveId', 'confirm-gate'],
+  // 类别按那处代码自己的注释归（原 `AdminPanel.tsx`：「待确认的那一条退款 id（两步式"批准"）」）。
+  // 🔴 后台拆分后随 RefundsSection.tsx 迁移（表按「文件 + 变量名」索引，搬家必须一起改文件名）。
+  ['apps/web/src/features/admin/sections/RefundsSection.tsx', 'pendingApproveId', 'confirm-gate'],
   ['apps/web/src/features/trash/TrashView.tsx', 'busyId', 'in-flight'],
   ['apps/web/src/features/trash/TrashView.tsx', 'confirmingId', 'confirm-gate'],
   ['apps/mobile/src/screens/CalendarScreen.tsx', 'busyId', 'in-flight'],
@@ -560,7 +561,7 @@ const ROW_ID_EXEMPT = [
   // ── 2026-10-24 补登 3 处（都是 G 报的"没有语义登记"，逐处读代码归类）──────────
   // 运营公告的「撤回」是**两步式**：第一下记下"待撤回的是哪一条"，行内原地换成
   // 「确认撤回 / 取消」两枚按钮，第二下才发请求、取消只清它 —— 与 `pendingApproveId` 同形。
-  ['apps/web/src/features/admin/AdminPanel.tsx', 'pendingWithdrawId', 'confirm-gate'],
+  ['apps/web/src/features/admin/sections/AnnouncementsSection.tsx', 'pendingWithdrawId', 'confirm-gate'],
   // 订阅页两个端的**套餐选择**：它是结账表单的草稿字段（`DEFAULT_CHECKOUT_TIER_ID` 初值、
   // 提交时读它决定买哪一档），不是"当前看的是哪一条"。
   ['apps/web/src/features/subscription/RenewPanel.tsx', 'tierId', 'form-draft'],
