@@ -1,6 +1,6 @@
 # Agent 工具 API（云端）— 契约
 
-> 状态：**契约（待服务端实现）**。客户端半边已实现于 `packages/app-host/src/ai-cloud-tools.ts`（`createHttpCloudToolTransport` 按本契约发请求）。
+> 状态：**契约 + 服务端路由骨架已实现（`server/src/ai/agent-tools.routes.ts`，注入 execute；未在 api.ts 注册/接数据层）**。客户端半边已实现于 `packages/app-host/src/ai-cloud-tools.ts`（`createHttpCloudToolTransport` 按本契约发请求）。
 > 依据：产品裁决 D5「tool calling 只针对云端」、D1「不做 Action Plan，删除/归档/移动给 AI 靠版本回溯」、D6「默认明文、服务端可读」。
 > 日期：2026-11-21。
 
@@ -76,6 +76,10 @@
 | `irreversible-blocked` | 该动作不可由 AI 执行（purge，403） |
 | `rate-limited` | 触发限流（429，带 `retryAfterMs`） |
 | `failed` | 其他可展示失败 |
+
+## 3.5 已实现（路由骨架）
+
+`server/src/ai/agent-tools.routes.ts` 的 `agentToolsRoutes`：GET 列表（按账号授权过滤 + 排除不可逆）、POST 执行（未授权 403 / 不可逆 403 / 未接执行器 501）、`Idempotency-Key` 去重、错误信封。判据：`server/tests/agent-tools.routes.spec.ts`（5）。⚠️ 尚未在 `server/src/api.ts` 注册、也尚未接真实服务端数据层（`execute` 注入）。
 
 ## 4. 实现顺序（下一步）
 
