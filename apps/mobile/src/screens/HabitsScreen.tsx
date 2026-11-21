@@ -383,13 +383,6 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
       <Screen
         title={selected.name}
         actions={[
-          {
-            icon: 'action.back',
-            label: t('mobile.growth.back'),
-            onPress: () => {
-              selection.select('habit', null);
-            },
-          },
           // 🔴 改名与删除此前**只在动作层存在**（`renameHabit` 是新补的、
           // `removeHabit` 早就有），界面上一个入口都没有 —— 于是"建错了改不了、
           // 不想要了删不掉"，而这两件事 web 同样做不到（`deleteHabit` 在 store 里、

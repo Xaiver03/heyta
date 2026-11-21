@@ -446,7 +446,7 @@ export function AssistantScreen({
 
   if (hostError !== undefined) {
     return (
-      <Screen title={t('mobile.ai.title')} titleLeading={<AiMarkGlyph size={tokens['icon.md']} color={tokens['color.foreground']} />} actions={[{ icon: 'action.back', label: t('mobile.ai.back'), onPress: onBack }]}>
+      <Screen title={t('mobile.ai.title')} titleLeading={<AiMarkGlyph size={tokens['icon.md']} color={tokens['color.foreground']} />} actions={[]}>
         <EmptyState icon="conflict.warning" title={t('mobile.ai.hostFailed.title')} hint={t('mobile.ai.hostFailed.hint')} detail={hostError} />
     </Screen>
     );

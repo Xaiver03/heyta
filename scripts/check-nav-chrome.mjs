@@ -57,6 +57,8 @@ const ROOT_SCREENS = new Set([
   // 习惯/倒数现在由 App 作为顶层 tab 视图渲染（底部导航可达），属根页：
   'apps/mobile/src/screens/HabitsScreen.tsx',
   'apps/mobile/src/screens/CountdownScreen.tsx',
+  // AI 助手是底部 tab 第五屏之一（根页），不设返回：
+  'apps/mobile/src/ai/AssistantScreen.tsx',
   // `CategoriesScreen`（统计）2026-11-19 起**不再是根 tab**：统计撤出底栏，
   // 改为「我的 → 统计与回顾」的第二层屏（它有 `action.back`），故不在此列。
   /*
