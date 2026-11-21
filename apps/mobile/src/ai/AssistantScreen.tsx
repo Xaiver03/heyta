@@ -1,7 +1,7 @@
 /** Mobile's single conversational assistant surface. */
 
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Clipboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Clipboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { applyScrollIntent, shouldFollowOnContentChange } from '@heyta/ui';
 import { inferPreferences, renderPreferenceHints } from '@heyta/domain';
@@ -450,20 +450,12 @@ export function AssistantScreen({
     return (
       <Screen title={t('mobile.ai.title')} titleLeading={<AiMarkGlyph size={tokens['icon.md']} color={tokens['color.foreground']} />} actions={[{ icon: 'action.back', label: t('mobile.ai.back'), onPress: onBack }]}>
         <EmptyState icon="conflict.warning" title={t('mobile.ai.hostFailed.title')} hint={t('mobile.ai.hostFailed.hint')} detail={hostError} />
-        {toolsOpen ? (
-        <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
-          <AiToolboxScreen
-            visible
-            onBack={() => { setToolsOpen(false); }}
-            {...(onOpenSettings === undefined ? {} : { onOpenSettings })}
-          />
-        </View>
-      ) : null}
     </Screen>
     );
   }
 
   return (
+    <>
     <Screen
       title={t('mobile.ai.title')}
       titleLeading={<AiMarkGlyph size={tokens['icon.md']} color={tokens['color.foreground']} />}
@@ -604,6 +596,13 @@ export function AssistantScreen({
         ]}
       />
     </Screen>
+    <Modal visible={toolsOpen} animationType="slide" onRequestClose={() => { setToolsOpen(false); }}>
+      <AiToolboxScreen
+        onBack={() => { setToolsOpen(false); }}
+        {...(onOpenSettings === undefined ? {} : { onOpenSettings })}
+      />
+    </Modal>
+    </>
   );
 }
 
