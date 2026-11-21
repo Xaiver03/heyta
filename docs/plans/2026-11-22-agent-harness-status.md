@@ -1,5 +1,7 @@
 # Agent Harness 目标达成状态（对照产品裁决 D1–D7）
 
+> 最近更新 2026-11-22（第19轮）：累计 640 条相关测试通过（ai 338 + app-host AI 114 + op-log 182 + node-host 1 + server 5；另有 1 条既有失败在 `managed-routing`，与本次无关）。
+
 > 日期：2026-11-22。本文件把产品负责人 7 条裁决逐条映射到**代码 + 能转红的测试 + 门禁**，并如实列出**未完成/未验证**。
 > 相关：[设计 v3](2026-11-21-agent-tool-calling-audit-and-pi-harness-design.md)、[审计①](2026-11-21-agent-harness-audit.md)、[审计②](2026-11-22-agent-harness-impl-audit.md)。
 
@@ -10,6 +12,8 @@
 | app-host AI 相关 13 spec | **114 passed** |
 | op-log 全套 17 spec | **182 passed** |
 | node-host Agent 闭环 1 spec | **1 passed** |
+| server `/api/agent/tools` 路由 1 spec | **5 passed** |
+| `packages/ai` 全 15 spec | **338 passed / 1 failed**（`managed-routing.spec` 托管 tool-calling 排除，**既有失败**，与我改动无关，已 stash 复核） |
 | `check:ai-tools` | ✅ rc=0 |
 | `check:layering` | ✅ rc=0 |
 | `check:ai-coverage` | ❌ rc=1（mobile 缺 `breakdown/prioritize/duration` 三入口，**既有缺口，非本 harness**） |
@@ -30,7 +34,7 @@
 ## 2. 未完成 / 未验证（诚实清单）
 
 1. **移动端 / Web 的真实 UI 入口**：契约 `runAiTurnWithUndo` 就绪，但 `apps/mobile`(`AssistantScreen`) / `apps/web` 尚未注入新路径（且 `apps/mobile` 正被另一会话改动，未触碰）。⇒ "四端可用"目前是**库级 + node-host 级**，非四端 UI 全接。
-2. **服务端 `/api/agent/tools`**：契约已定（`agent-tools-api.md`），**未实现**；托管场景与云端写入撤销需要它。
+2. **服务端 `/api/agent/tools`**：**路由骨架已实现**（`server/src/ai/agent-tools.routes.ts`，list/invoke/幂等/授权/风险门，5 测试绿），但**未在 `api.ts` 注册、未接真实数据层**（`execute` 注入）。托管场景与云端写入撤销仍需接数据层。
 3. **P0-2（assistant `tool_calls` 帧）**：✅ **已修协议结构层**（`wire.ts` 支持 assistant `tool_calls`；`ai-routed-model` 保留该帧；省略时字节不变，有测试）。⚠️ 真实 OpenAI 兼容端点仍未联网复验（未核）。
 4. **PI 内核在 RN/Hermes 真机**：`pi-agent-core` 可移植性未验证（审计① U5）；Hermes 性能未量化。
 5. **`check:ai-coverage` 红**：mobile 缺 `breakdown/prioritize/duration` 三入口——既有产品缺口，与本 harness 无关。
