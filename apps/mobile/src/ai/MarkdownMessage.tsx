@@ -45,7 +45,10 @@ function buildTree(tokens: AnyToken[]): Node[] {
     } else if (tok.nesting === -1) {
       if (stack.length > 1) stack.pop();
     } else {
-      cur.children.push({ token: tok, children: [] });
+      // 🔴 inline token 自己的子 token（text/strong/em/code/link…）必须递归建树，
+      // 否则段落的可见文字全为空 —— 症状是列表只剩"•"、正文不见了。
+      const inlineChildren = tok.type === 'inline' && Array.isArray(tok.children) ? buildTree(tok.children) : [];
+      cur.children.push({ token: tok, children: inlineChildren });
     }
   }
   return root;

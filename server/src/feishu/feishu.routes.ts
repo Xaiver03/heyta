@@ -106,12 +106,12 @@ export async function feishuRoutes(fastify: FastifyInstance, opts: FeishuRoutesO
   // 每次按环境重读配置：改了环境变量重启即生效，不需要把配置存成模块级单例。
   const config = () => loadFeishuLoginConfig(publicUrl);
 
-  fastify.get(`/${FEISHU_AUTH_PATHS.status}`, { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (_req, reply) => {
+  fastify.get(FEISHU_AUTH_PATHS.status, { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (_req, reply) => {
     return reply.send({ enabled: config() !== null });
   });
 
   fastify.get(
-    `/${FEISHU_AUTH_PATHS.start}`,
+    FEISHU_AUTH_PATHS.start,
     { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
     async (req: FastifyRequest, reply: FastifyReply) => {
       const query = req.query as Record<string, unknown>;
@@ -138,7 +138,7 @@ export async function feishuRoutes(fastify: FastifyInstance, opts: FeishuRoutesO
   );
 
   fastify.get(
-    `/${FEISHU_AUTH_PATHS.callback}`,
+    FEISHU_AUTH_PATHS.callback,
     { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
     async (req: FastifyRequest, reply: FastifyReply) => {
       const query = req.query as Record<string, unknown>;
