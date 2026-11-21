@@ -1,7 +1,7 @@
 /** Mobile's single conversational assistant surface. */
 
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Clipboard, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Clipboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { applyScrollIntent, shouldFollowOnContentChange } from '@heyta/ui';
 import { inferPreferences, renderPreferenceHints } from '@heyta/domain';
@@ -644,6 +644,7 @@ function ProposalCard({ proposal, confirmed, error, expired, expanded, disabled,
 
 function DisclosureCard({ target, plan, hasImages, consents, onConfirm, onCancel, onOpenSettings }: { target: AiRouteTarget | undefined; plan: ReturnType<typeof planAssistantEgress>; hasImages: boolean; consents: ReturnType<typeof useAiSettings>['consents']; onConfirm: () => void; onCancel: () => void; onOpenSettings?: () => void }): React.JSX.Element {
   const { t } = useI18n();
+  const tokens = useTokens();
   if (target === undefined) {
     return (
       <Stack gap="tight">
@@ -664,10 +665,38 @@ function DisclosureCard({ target, plan, hasImages, consents, onConfirm, onCancel
   const destinationLabel = target.label;
   return (
     <Stack gap="tight" testID="assistant-disclosure">
-      <Text variant="row-meta" tone="subtle">{destinationLabel}</Text>
-      <HStack gap="tight">
-        <Button label={t('web.ai.action.send')} tone="primary" onPress={onConfirm} testID="assistant-disclosure-send" />
-        <Button label={t('web.ai.action.cancel')} tone="ghost" onPress={onCancel} />
+      <Text variant="caption" tone="subtle">{destinationLabel}</Text>
+      <HStack gap="tight" style={{ alignItems: 'center' }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('web.ai.action.send')}
+          testID="assistant-disclosure-send"
+          onPress={onConfirm}
+          style={({ pressed }) => ({
+            paddingHorizontal: tokens['space.3'],
+            paddingVertical: tokens['space.1'],
+            borderRadius: tokens['radius.full'],
+            backgroundColor: tokens['color.primary'],
+            opacity: pressed ? tokens['state.pressed-opacity'] : 1,
+          })}
+        >
+          <Text style={{ color: tokens['color.on-primary'], fontSize: tokens['font-size.sm'], fontWeight: '600' }}>
+            {t('web.ai.action.send')}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('web.ai.action.cancel')}
+          onPress={onCancel}
+          style={({ pressed }) => ({
+            paddingHorizontal: tokens['space.2'],
+            paddingVertical: tokens['space.1'],
+            borderRadius: tokens['radius.full'],
+            opacity: pressed ? tokens['state.pressed-opacity'] : 1,
+          })}
+        >
+          <Text tone="subtle" style={{ fontSize: tokens['font-size.sm'] }}>{t('web.ai.action.cancel')}</Text>
+        </Pressable>
       </HStack>
     </Stack>
   );

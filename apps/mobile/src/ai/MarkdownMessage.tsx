@@ -322,13 +322,13 @@ export function TypewriterMarkdown({ text }: { text: string }): React.JSX.Elemen
       return;
     }
     setVisible(0);
-    const step = Math.max(1, Math.ceil(text.length / 160));
+    const step = Math.max(1, Math.ceil(text.length / 175));
     let i = 0;
     const timer = setInterval(() => {
       i = Math.min(text.length, i + step);
       setVisible(i);
       if (i >= text.length) clearInterval(timer);
-    }, 16);
+    }, 20);
     return () => clearInterval(timer);
   }, [text]);
   return <MarkdownMessage text={text.slice(0, visible)} />;
