@@ -48,6 +48,12 @@ export interface RoutedModelCallOptions {
   readonly feature?: AiFeature;
   /** 注入以便离线测试；默认真实 `invokeRouted`。 */
   readonly invoke?: RoutedInvoke;
+  /**
+   * 文本流式回调（逐片）。给了它，`invokeRouted` 会带 `stream:true` 并逐片回调；
+   * 只转发 `type:'text'` 的片段（思考片段不算答案）。移动端 Hermes 无 TextDecoder 时
+   * `invokeRouted` 自动退回非流式（无需这里判断）。
+   */
+  readonly onTextDelta?: (text: string) => void;
 }
 
 /** 把循环里的 `HarnessMessage` 转成线格式消息（与 `ai-assistant` 同构：tool 结果带 toolCallId）。 */
@@ -172,7 +178,16 @@ export function createRoutedModelCall(
       messages: harnessMessagesToChat(messages),
     };
 
-    const outcome = await invoke(options.routing, invocation, options.consents, policy, deps);
+    const routedDeps =
+      options.onTextDelta === undefined
+        ? deps
+        : {
+            ...deps,
+            onDelta: (delta: { type: string; delta?: string }) => {
+              if (delta.type === 'text' && typeof delta.delta === 'string') options.onTextDelta?.(delta.delta);
+            },
+          };
+    const outcome = await invoke(options.routing, invocation, options.consents, policy, routedDeps);
     const result = outcome.result;
     if (!result.ok) throw new Error(result.message);
 

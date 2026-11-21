@@ -38,6 +38,8 @@ export interface CloudAssistantTurnDeps {
   readonly maxSteps?: number;
   readonly runId?: string;
   readonly onEvent?: (event: HarnessEvent) => void;
+  /** 文本流式回调（逐片）。 */
+  readonly onTextDelta?: (text: string) => void;
   /** 注入以便离线测试；默认真实 invokeRouted。 */
   readonly invoke?: RoutedInvoke;
 }
@@ -52,6 +54,7 @@ export async function requestCloudAssistantTurn(
     ...(deps.policy === undefined ? {} : { policy: deps.policy }),
     ...(deps.routed === undefined ? {} : { deps: deps.routed }),
     ...(deps.invoke === undefined ? {} : { invoke: deps.invoke }),
+    ...(deps.onTextDelta === undefined ? {} : { onTextDelta: deps.onTextDelta }),
   });
   return runCloudAgentTurn(userText, {
     transport: deps.transport,

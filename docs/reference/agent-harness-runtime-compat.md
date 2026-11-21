@@ -83,3 +83,7 @@ await undoLastAiTurn({ undo }, seqBefore);
 - `runMobileCloudTurn(host, userText, { routing, consents, grants })` —— 用本机 `AppHost`（`host.engine/dispatch/getState`）建 `createLocalApiHost` + `createLocalToolTransport`，跑 `runAiTurnWithUndo`（撤销绑定 `host.engine.currentLocalSeq/undoSince`）。
 - `undoMobileCloudTurn(host, seqBefore)` —— 撤销这次 AI 操作的本地写入。
 - **`apps/mobile` `tsc` 全量 0 错**（新增文件不影响既有）。独立新文件，未触碰 `AssistantScreen.tsx`/`WelcomeScreen.tsx`（后者正被另一会话改）。
+
+## 9. 文本流式（已支持）
+
+`createRoutedModelCall({ onTextDelta })` → 传入 `invokeRouted` 的 `deps.onDelta`，只转发 `type:'text'` 片段（思考片段不算答案）。`requestCloudAssistantTurn`/`runAiTurnWithUndo` 透传 `onTextDelta`。**宿主无 `TextDecoder`（Hermes）时 `invokeRouted` 自动退回非流式**——移动端整段返回，Web/node 逐字。这是"切面板默认不牺牲流式"的前置能力（切换本身仍待产品决策+验收）。

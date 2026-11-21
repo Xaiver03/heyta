@@ -136,3 +136,19 @@ describe('辅助函数', () => {
     expect(parseToolCallArguments('{"a":1}')).toEqual({ a: 1 });
   });
 });
+
+describe('createRoutedModelCall 流式文本', () => {
+  it('给了 onTextDelta → 经 deps.onDelta 转发 text 片段（忽略 reasoning）', async () => {
+    const seen: string[] = [];
+    const invoke: RoutedInvoke = async (_c, _inv, _cons, _p, deps) => {
+      deps.onDelta?.({ type: 'reasoning', delta: '思考' });
+      deps.onDelta?.({ type: 'text', delta: '你' });
+      deps.onDelta?.({ type: 'text', delta: '好' });
+      return okOutcome({ text: '你好' });
+    };
+    const callModel = createRoutedModelCall({ routing, consents: [], invoke, onTextDelta: (t) => seen.push(t) });
+    const reply = await callModel({ messages: [{ role: 'user', content: 'hi' }], tools });
+    expect(reply).toEqual({ text: '你好' });
+    expect(seen).toEqual(['你', '好']);
+  });
+});
