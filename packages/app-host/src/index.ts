@@ -1201,3 +1201,17 @@ export {
   type CloudAgentHarnessOptions,
   type CloudAgentTurnResult,
 } from './agent-harness.js';
+
+// 路由模型适配 + 整机生产函数（设备本地 loop + 云端模型 invokeRouted + 云端工具）。
+export {
+  createRoutedModelCall,
+  harnessMessagesToChat,
+  parseToolCallArguments,
+  type RoutedInvoke,
+  type RoutedModelCallOptions,
+} from './ai-routed-model.js';
+export {
+  requestCloudAssistantTurn,
+  CLOUD_ASSISTANT_SYSTEM_PROMPT,
+  type CloudAssistantTurnDeps,
+} from './ai-cloud-assistant.js';
