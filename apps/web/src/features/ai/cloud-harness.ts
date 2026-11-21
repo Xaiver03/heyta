@@ -22,11 +22,22 @@ import {
 import { requireEngine } from '../../lib/oplog.js';
 import { createAiToolHost } from '../tasks/store.js';
 
-/** Web 壳的撤销绑定（引擎执行栈；懒取，未初始化时 requireEngine 会抛，调用方需已就绪）。 */
+/**
+ * Web 壳的撤销绑定。
+ *
+ * 🔴 **绑定到取 seq 时的那个引擎实例**：`requireEngine()` 是模块级可变单例，
+ * 注销/清数据会把它置空后重开一个新引擎（新 op-log）。若撤销时再 `requireEngine()`
+ * 拿到的是**另一个**引擎，`undoSince(旧seq)` 会打到新日志（撤错库/静默失效）。
+ * 所以这里捕获引擎引用，撤销时若已换引擎就如实返回 `stale-engine`，绝不跨库操作。
+ */
 export function webUndoBindings(): TurnUndoBindings {
+  const engine = requireEngine();
   return {
-    getSeq: () => requireEngine().currentLocalSeq(),
-    undoSince: (seq: number) => requireEngine().undoSince(seq),
+    getSeq: () => engine.currentLocalSeq(),
+    undoSince: async (seq: number) => {
+      if (requireEngine() !== engine) return { status: 'stale-engine' };
+      return engine.undoSince(seq);
+    },
   };
 }
 

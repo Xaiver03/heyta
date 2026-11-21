@@ -30,11 +30,18 @@ function toolHostOf(host: AppHost): LocalApiHost {
   });
 }
 
-/** 移动端撤销绑定（引擎执行栈）。 */
+/**
+ * 移动端撤销绑定。绑定到传入 `host` 的引擎实例；若撤销时 `host` 已被替换（换库/重登），
+ * 如实返回 `stale-engine`，绝不把旧 seq 作用到新引擎上。
+ */
 export function mobileUndoBindings(host: AppHost): TurnUndoBindings {
+  const engine = host.engine;
   return {
-    getSeq: () => host.engine.currentLocalSeq(),
-    undoSince: (seq: number) => host.engine.undoSince(seq),
+    getSeq: () => engine.currentLocalSeq(),
+    undoSince: async (seq: number) => {
+      if (host.engine !== engine) return { status: 'stale-engine' };
+      return engine.undoSince(seq);
+    },
   };
 }
 
