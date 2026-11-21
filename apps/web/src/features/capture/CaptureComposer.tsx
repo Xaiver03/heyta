@@ -150,6 +150,15 @@ export interface CaptureDestination {
 
 export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element {
   const addTask = useTaskStore((s) => s.addTask);
+  /** 可选标签（③）：从 store 映射出 id+name 交给捕获框；被删的标签不出现。 */
+  const tagRecord = useTaskStore((s) => s.entities.tags);
+  const captureTags = useMemo(
+    () =>
+      Object.values(tagRecord)
+        .filter((tag) => tag.deletedAt === undefined)
+        .map((tag) => ({ id: tag.id, name: tag.name })),
+    [tagRecord],
+  );
   const { t, locale } = useI18n();
   const destination = props.destination;
   const anchorDate = props.anchorDate;
@@ -273,6 +282,9 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
             yearly: t('web.capture.panel.repeat.yearly'),
           },
         },
+        tags: {
+          title: t('web.capture.panel.tags.title'),
+        },
       },
     }),
     [t, locale, destination, props.anchorDate],
@@ -314,6 +326,8 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         ...(plan.durationMinutes !== undefined ? { durationMinutes: plan.durationMinutes } : {}),
         // 重复预设（S6）：由 app-host 的 create() 派生 repeatRule+repeatDtstart。
         ...(plan.repeatPreset !== undefined ? { repeatPreset: plan.repeatPreset } : {}),
+        // 标签（③）：创建时 payload 带上，走同一条 Create op。
+        ...(plan.tagIds !== undefined ? { tagIds: [...plan.tagIds] } : {}),
         ...(plan.priority !== undefined ? { priority: plan.priority } : {}),
         ...(destination !== undefined ? { projectId: destination.projectId } : {}),
       }),
@@ -339,6 +353,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         renderDuePanel={props.inlineDuePanel === true ? undefined : renderDuePanel}
         rangeEnabled
         repeatEnabled
+        tags={captureTags}
       />
     </HeytaUiProvider>
   );

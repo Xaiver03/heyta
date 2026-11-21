@@ -146,6 +146,9 @@ export function captureLabels(t: Translate): CaptureComposerLabels {
           yearly: t('web.capture.panel.repeat.yearly'),
         },
       },
+      tags: {
+        title: t('web.capture.panel.tags.title'),
+      },
     },
   };
 }

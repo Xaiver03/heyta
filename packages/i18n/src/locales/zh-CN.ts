@@ -3068,6 +3068,7 @@ export const zhCN = {
   'web.capture.panel.repeat.weekdays': '工作日',
   'web.capture.panel.repeat.monthly': '每月',
   'web.capture.panel.repeat.yearly': '每年',
+  'web.capture.panel.tags.title': '标签',
   'web.ai.mention.aria': '选择要引用的任务',
   'web.ai.attach.label': '附一张图',
   'web.ai.attach.busy': '正在压…',

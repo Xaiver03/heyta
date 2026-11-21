@@ -2334,6 +2334,8 @@ export function TasksScreen({
             ...(plan.durationMinutes === undefined ? {} : { durationMinutes: plan.durationMinutes }),
             // 重复预设（S6）：由 app-host 的 create() 派生 repeatRule+repeatDtstart。
             ...(plan.repeatPreset === undefined ? {} : { repeatPreset: plan.repeatPreset }),
+            // 标签（③）：创建时 payload 带上，走同一条 Create op。
+            ...(plan.tagIds === undefined ? {} : { tagIds: [...plan.tagIds] }),
             ...(plan.priority === undefined ? {} : { priority: plan.priority }),
             // 用户选了哪一份就交给哪一份；没选就**不交这个键**（= 收集箱）。
             ...(plan.projectId === undefined ? {} : { projectId: plan.projectId }),

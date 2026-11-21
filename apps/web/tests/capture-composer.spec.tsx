@@ -37,10 +37,16 @@ import { Priority } from '@heyta/domain';
 /** 记录 addTask 收到的参数。写入路径本身由 app-host 的测试覆盖，这里只关心参数对不对。 */
 const addTask = vi.fn(() => Promise.resolve());
 
+/** 标签表（③）：宿主的 CaptureComposer 会读 `entities.tags` 映射成可选标签。 */
+const MOCK_TAG_RECORD = {
+  t1: { id: 't1', name: '工作' },
+  t2: { id: 't2', name: '会议' },
+};
+
 // 只替换写入动作，UI 其余部分跑真实实现（包括真实的 parseCapture 与共享组件）。
 vi.mock('../src/features/tasks/store.js', () => ({
-  useTaskStore: (selector: (s: { addTask: typeof addTask }) => unknown) =>
-    selector({ addTask }),
+  useTaskStore: (selector: (s: { addTask: typeof addTask; entities: { tags: typeof MOCK_TAG_RECORD } }) => unknown) =>
+    selector({ addTask, entities: { tags: MOCK_TAG_RECORD } }),
 }));
 
 const { CaptureComposer } = await import('../src/features/capture/CaptureComposer.js');
@@ -444,6 +450,28 @@ describe('S6 重复（repeatEnabled）：面板里有预设 chip、点一枚即�
     });
     const after = document.querySelector<HTMLElement>('[data-testid="capture-repeat-weekly"]');
     expect(after!.getAttribute('aria-selected'), '点过之后「每周」被选中').toBe('true');
+  });
+});
+
+describe('③ 标签（tags）：面板里有标签 chip、选中后提交带 tagIds', () => {
+  it('点「工作(t1)」再提交 ⇒ addTask 收到 { tagIds: ["t1"] }', () => {
+    const el = render();
+    type(el, '带标签的任务');
+    const panel = openPanel(el);
+    const row = panel.querySelector<HTMLElement>('[data-testid="capture-tags-row"]');
+    expect(row, '宿主给了 tags 时面板里应有标签 chip 行').not.toBeNull();
+
+    const t1 = row!.querySelector<HTMLElement>('[data-testid="capture-tag-t1"]');
+    expect(t1, '标签行里应有「工作」chip').not.toBeNull();
+    act(() => {
+      t1!.click();
+    });
+    act(() => {
+      submit(el).click();
+    });
+    expect(addTask).toHaveBeenCalledTimes(1);
+    const [, over] = addTask.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(over.tagIds).toEqual(['t1']);
   });
 });
 

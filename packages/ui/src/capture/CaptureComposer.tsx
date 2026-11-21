@@ -107,6 +107,7 @@ import {
   withCaptureProject,
   withCaptureRange,
   withCaptureRepeatPreset,
+  withCaptureTags,
   type CaptureCapsuleKind,
   type CaptureChip,
   type CaptureDue,
@@ -201,6 +202,12 @@ export interface CapturePanelSlot {
    */
   readonly subject: string;
   readonly onClose: () => void;
+}
+
+/** 可选标签（③）：宿主从 store 映射出 id+name 传给捕获框。 */
+export interface CaptureTagOption {
+  readonly id: string;
+  readonly name: string;
 }
 
 export interface CaptureComposerProps {
@@ -310,6 +317,8 @@ export interface CaptureComposerProps {
   readonly rangeEnabled?: boolean | undefined;
   /** 开不开「重复」（S6）。同样住在面板里（打开面板才出现 chip 行），默认 `false`。 */
   readonly repeatEnabled?: boolean | undefined;
+  /** 可选的标签列表（③）。不传 = 不出现标签 chip 行（逐字节等价于改动前）。 */
+  readonly tags?: readonly CaptureTagOption[] | undefined;
 }
 
 /** 取一份 token 表，建出这套样式。**一个裸尺度值都没有**（`check:design` 会拦）。 */
@@ -585,6 +594,7 @@ export function CaptureComposer({
   descriptionInput = false,
   rangeEnabled = false,
   repeatEnabled = false,
+  tags,
 }: CaptureComposerProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -613,6 +623,8 @@ export function CaptureComposer({
   const [rangeDuration, setRangeDuration] = useState<number | undefined>(undefined);
   /** 「重复」预设草稿（S6）。仅在 `repeatEnabled` 时被渲染与提交。 */
   const [repeatPreset, setRepeatPreset] = useState<CaptureRepeatPreset | undefined>(undefined);
+  /** 已选标签 id（③）。仅在宿主给了 `tags` 时被渲染与提交。 */
+  const [tagIds, setTagIds] = useState<readonly string[]>([]);
 
   /** 原生端自己控制焦点（见 `autoFocus` 的说明）；web 不需要。 */
   const inputRef = useRef<TextInput>(null);
@@ -687,9 +699,12 @@ export function CaptureComposer({
         ? { startDate: dueDateToEpoch(rangeStart, rangeTime), durationMinutes: rangeDuration }
         : undefined;
     void onSubmit(
-      withCaptureRepeatPreset(
-        withCaptureRange(withCaptureProject(withDescription, captureSelectedProject(projectPicker)?.id), range),
-        repeatEnabled ? repeatPreset : undefined,
+      withCaptureTags(
+        withCaptureRepeatPreset(
+          withCaptureRange(withCaptureProject(withDescription, captureSelectedProject(projectPicker)?.id), range),
+          repeatEnabled ? repeatPreset : undefined,
+        ),
+        tags === undefined ? undefined : tagIds,
       ),
     );
     setDraft('');
@@ -700,6 +715,7 @@ export function CaptureComposer({
     setRangeTime(undefined);
     setRangeDuration(undefined);
     setRepeatPreset(undefined);
+    setTagIds([]);
     closePanel();
   }
 
@@ -766,6 +782,16 @@ export function CaptureComposer({
           },
         }
       : undefined,
+    tags:
+      tags === undefined || tags.length === 0
+        ? undefined
+        : {
+            options: tags,
+            selected: tagIds,
+            onToggle: (id) => {
+              setTagIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+            },
+          },
   };
 
   /**

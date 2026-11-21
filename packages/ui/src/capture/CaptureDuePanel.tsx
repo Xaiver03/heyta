@@ -91,6 +91,10 @@ export interface CaptureDuePanelLabels {
     readonly title: string;
     readonly options: Record<CaptureRepeatPreset, string>;
   };
+  /** 「标签」那一组的措辞（③）。 */
+  readonly tags: {
+    readonly title: string;
+  };
 }
 
 /** 面板的两个子视图。`time` 那一档的出口行换成「其它时间 / 列表」那枚切换。 */
@@ -132,6 +136,12 @@ export interface CaptureDuePanelState {
   readonly repeat?: {
     readonly value: CaptureRepeatPreset | undefined;
     readonly onSelect: (preset: CaptureRepeatPreset | undefined) => void;
+  } | undefined;
+  /** 「标签」（③）。`undefined` 或空 = 不出现标签 chip 行。 */
+  readonly tags?: {
+    readonly options: readonly { readonly id: string; readonly name: string }[];
+    readonly selected: readonly string[];
+    readonly onToggle: (id: string) => void;
   } | undefined;
 }
 
@@ -542,6 +552,29 @@ export function CaptureDuePanel({
                 <Text style={[text.caption, on ? styles.slotTextOn : styles.slotText]}>
                   {labels.panel.repeat.options[preset]}
                 </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {state.tags === undefined || state.tags.options.length === 0 ? null : (
+        <View style={styles.slots} accessibilityLabel={labels.panel.tags.title} testID="capture-tags-row">
+          {state.tags.options.map((tag) => {
+            const on = state.tags !== undefined && state.tags.selected.includes(tag.id);
+            return (
+              <Pressable
+                key={tag.id}
+                accessibilityRole="button"
+                accessibilityLabel={tag.name}
+                aria-selected={on}
+                onPress={() => {
+                  state.tags?.onToggle(tag.id);
+                }}
+                style={[styles.slot, on ? styles.slotOn : styles.slotOff]}
+                testID={`capture-tag-${tag.id}`}
+              >
+                <Text style={[text.caption, on ? styles.slotTextOn : styles.slotText]}>{tag.name}</Text>
               </Pressable>
             );
           })}

@@ -2789,6 +2789,7 @@ export const en = {
   'web.capture.panel.repeat.weekdays': 'Weekdays',
   'web.capture.panel.repeat.monthly': 'Monthly',
   'web.capture.panel.repeat.yearly': 'Yearly',
+  'web.capture.panel.tags.title': 'Tags',
   'web.ai.mention.aria': 'Choose a task to mention',
   'web.ai.attach.label': 'Attach an image',
   'web.ai.attach.busy': 'Compressing…',
