@@ -434,6 +434,11 @@ export interface CaptureSubmitPlan {
    * 逐字一致）；两端宿主把它原样交给 `addTask({ repeatPreset })`。
    */
   readonly repeatPreset?: CaptureRepeatPreset;
+  /**
+   * 标签 id 列表（③）。创建时随**同一条** Create op 落到 `Task.tagIds`。
+   * 空/未选 = 不带这个键（省略与显式空同一条约定）。校验（去重 + 存在性）在 app-host 的 `create()`。
+   */
+  readonly tagIds?: readonly string[];
 }
 
 /** 重复预设（S6）。与 app-host 的 `RepeatPresetId` 同一字面集。 */
@@ -507,6 +512,20 @@ export function withCaptureRepeatPreset(
   preset: CaptureRepeatPreset | undefined,
 ): CaptureSubmitPlan {
   return preset === undefined ? plan : { ...plan, repeatPreset: preset };
+}
+
+/**
+ * 把用户选的**标签**并进计划（③）。`undefined` / 空数组 ⇒ 计划逐字节不变（不带 `tagIds`）。
+ * 去重在这里先做一次（与 `setTags` 的口径一致：点两次同一个标签不该写 `[a, a]`）；
+ * 存在性校验在 app-host 的 `create()`（那里才拿得到标签表）。
+ */
+export function withCaptureTags(
+  plan: CaptureSubmitPlan,
+  tagIds: readonly string[] | undefined,
+): CaptureSubmitPlan {
+  if (tagIds === undefined) return plan;
+  const unique = [...new Set(tagIds)];
+  return unique.length === 0 ? plan : { ...plan, tagIds: unique };
 }
 
 /** 选择器里的一行（`id` = 清单 id；收集箱由 `labels.inbox` 单独画，不是一条 option）。 */

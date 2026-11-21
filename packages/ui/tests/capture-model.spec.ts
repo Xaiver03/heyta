@@ -28,6 +28,7 @@ import {
   withCaptureProject,
   withCaptureRange,
   withCaptureRepeatPreset,
+  withCaptureTags,
   CAPTURE_RANGE_MIN_MINUTES,
   CAPTURE_RANGE_MAX_MINUTES,
   captureChipAction,
@@ -820,5 +821,27 @@ describe('外壳标题该说什么（`captureDuePanelTitle`）—— 判断在�
       expect(title).not.toContain('未设置');
       expect(title).not.toContain('「」');
     }
+  });
+});
+
+describe('G4. 标签：并进计划（`withCaptureTags`）', () => {
+  const base: CaptureSubmitPlan = { title: '带标签' };
+
+  it('给了 tagIds ⇒ 去重后写入 tagIds', () => {
+    expect(withCaptureTags({ ...base }, ['t1', 't1', 't2'])).toEqual({ title: '带标签', tagIds: ['t1', 't2'] });
+  });
+
+  it('🔴 `undefined` / 空数组 ⇒ 计划逐字节不变（不带 tagIds）', () => {
+    for (const v of [undefined, []] as const) {
+      const plan = withCaptureTags({ ...base }, v);
+      expect(Object.prototype.hasOwnProperty.call(plan, 'tagIds')).toBe(false);
+    }
+  });
+
+  it('返回新对象，原计划不被改写', () => {
+    const frozen = { ...base };
+    const next = withCaptureTags(frozen, ['t1']);
+    expect(next).not.toBe(frozen);
+    expect(frozen.tagIds).toBeUndefined();
   });
 });

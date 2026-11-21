@@ -141,6 +141,13 @@ export interface NewTaskFields {
    * 这样"捕获时勾一个重复"与"事后在详情里设重复"落成同一对字段，不出现"有规则没锚点"的半截任务。
    */
   repeatPreset?: RepeatPresetId;
+  /**
+   * 标签 id 列表（③）：创建时随同一条 Create op 落到 `Task.tagIds`。
+   *
+   * 🔴 `create()` 会对它**去重 + 校验存在性**（与 `setTags` 同源）——写进悬空 id
+   * 会让任务上挂一个任何视图都查不到的标签。空数组写成 `null`（与 `setTags` 一致）。
+   */
+  tagIds?: string[];
 }
 
 /** Fields accepted by the local API's single-task detail patch. */
@@ -673,22 +680,43 @@ export function createTaskActions(
 
   return {
     async create(title, over = {}) {
-      const { repeatPreset, ...rest } = over;
-      if (repeatPreset === undefined) return dispatchCreate(title, { ...rest });
+      const { repeatPreset, tagIds, ...rest } = over;
+
+      // 标签（③）：去重 + 校验存在（与 setTags 同源）；空集合写 null 而非 []。
+      let preparedTagIds: string[] | null | undefined;
+      if (tagIds !== undefined) {
+        const unique = [...new Set(tagIds)];
+        for (const id of unique) {
+          const tag = ctx.getState().tags[id];
+          if (tag === undefined || tag.deletedAt !== undefined) {
+            throw new Error(`找不到标签「${id}」`);
+          }
+        }
+        preparedTagIds = unique.length === 0 ? null : unique;
+      }
+
       /*
        * 🔴 重复预设 → `repeatRule` + `repeatDtstart`，随**同一条** Create op 落地。
        * 锚点与 `setRepeat` 同源：已有截止日就用它，否则用今天并补上截止日（否则会出现
-       * "有规则、没日子"的任务，它在任何日期视图里都不出现）。规则无法构造（非法锚点）
-       * 时**当没设**，不写一条垃圾规则。
+       * "有规则、没日子"的任务）。规则无法构造（非法锚点）时**当没设**。
        */
-      const anchor = dueLocalDateOf({ dueDate: rest.dueDate }) ?? today(now());
-      const rule = repeatPresetRule(repeatPreset, anchor);
-      if (rule === undefined) return dispatchCreate(title, { ...rest });
+      let repeatExtra: Record<string, unknown> = {};
+      if (repeatPreset !== undefined) {
+        const anchor = dueLocalDateOf({ dueDate: rest.dueDate }) ?? today(now());
+        const rule = repeatPresetRule(repeatPreset, anchor);
+        if (rule !== undefined) {
+          repeatExtra = {
+            repeatRule: rule,
+            repeatDtstart: anchor,
+            ...(rest.dueDate === undefined ? { dueDate: startOfDay(now()) } : {}),
+          };
+        }
+      }
+
       return dispatchCreate(title, {
         ...rest,
-        repeatRule: rule,
-        repeatDtstart: anchor,
-        ...(rest.dueDate === undefined ? { dueDate: startOfDay(now()) } : {}),
+        ...(preparedTagIds === undefined ? {} : { tagIds: preparedTagIds }),
+        ...repeatExtra,
       });
     },
 
