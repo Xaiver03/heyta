@@ -125,6 +125,8 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const [habits, setHabits] = useState<Habit[]>([]);
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [draft, setDraft] = useState('');
+  /** 顶部「＋」开关：默认只看清单，点＋才展开新建（TickTick 式：列表为主）。 */
+  const [adding, setAdding] = useState(false);
   /**
    * 🔴 详情层展开的那一条。`null` = 停在清单。
    *
@@ -504,7 +506,10 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   return (
     <Screen
       title={t('web.shell.views.habits')}
-      actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack }]}
+      actions={[
+        { icon: 'task.add', label: t('web.habits.add'), onPress: () => { setAdding((v) => !v); } },
+        { icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack },
+      ]}
     >
       {/*
         「新建习惯」的输入框留在宿主（见共享层文件头第 1 条）：
@@ -512,6 +517,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         分离），web 用 DOM `<input>`（要处理 iOS Safari 聚焦缩放）——
         两者的规范不同，强行共享会逼一个端放弃自己的输入控件。
       */}
+      {adding ? (
       <Card>
         <TextField
           label={t('web.habits.addLabel')}
@@ -540,6 +546,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
               .createHabit(name)
               .then(() => {
                 setCreateError(null);
+                setAdding(false);
                 refresh();
               })
               .catch((e: unknown) => {
@@ -550,6 +557,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           }}
         />
       </Card>
+      ) : null}
 
       {/*
         🔴 清单本体是**共享层**的 `HabitProgressList`，与 web 左列读的是同一批
