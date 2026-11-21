@@ -79,6 +79,18 @@ describe('agentToolsRoutes', () => {
     expect(r501.statusCode).toBe(501);
   });
 
+  it('生产只读目录下，写工具不在目录 → 404 not-found', async () => {
+    const app = Fastify();
+    app.addHook('preHandler', async (request) => {
+      (request as unknown as { user?: { id: number } }).user = { id: 42 };
+    });
+    const readOnlyCatalog = catalog.filter((t) => t.risk === 'read');
+    await app.register(agentToolsRoutes, { catalog: readOnlyCatalog, resolveGrants: () => ({ create_task: true }), execute: async () => ({ ok: true, data: 1 }) });
+    const res = await app.inject({ method: 'POST', url: '/api/agent/tools/create_task', payload: { args: { title: 'X' } } });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().reason).toBe('not-found');
+  });
+
   it('Idempotency-Key：同一键重复 POST 只执行一次', async () => {
     let calls = 0;
     const app = await makeApp({
