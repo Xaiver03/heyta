@@ -54,6 +54,9 @@ const ROOT_SCREENS = new Set([
   'apps/mobile/src/screens/CalendarScreen.tsx',
   'apps/mobile/src/screens/FocusScreen.tsx',
   'apps/mobile/src/screens/StatsScreen.tsx',
+  // 习惯/倒数现在由 App 作为顶层 tab 视图渲染（底部导航可达），属根页：
+  'apps/mobile/src/screens/HabitsScreen.tsx',
+  'apps/mobile/src/screens/CountdownScreen.tsx',
   // `CategoriesScreen`（统计）2026-11-19 起**不再是根 tab**：统计撤出底栏，
   // 改为「我的 → 统计与回顾」的第二层屏（它有 `action.back`），故不在此列。
   /*
@@ -202,8 +205,8 @@ function main() {
     }
     // 违规 B：非根页没有返回
     const b = findViolations({
-      rel: 'apps/mobile/src/screens/HabitsScreen.tsx',
-      source: `<Screen title="习惯">`,
+      rel: 'apps/mobile/src/screens/SettingsScreen.tsx',
+      source: `<Screen title="设置">`,
     });
     if (b.length === 0) {
       console.error('🔴 self-test B 失败：非根页缺 action.back 没被报红');
@@ -211,8 +214,8 @@ function main() {
     }
     // 合规：非根页带返回
     const c = findViolations({
-      rel: 'apps/mobile/src/screens/HabitsScreen.tsx',
-      source: `<Screen title="习惯" actions={[{ icon: 'action.back', label: 'x', onPress: () => {} }]}>`,
+      rel: 'apps/mobile/src/screens/SettingsScreen.tsx',
+      source: `<Screen title="设置" actions={[{ icon: 'action.back', label: 'x', onPress: () => {} }]}>`,
     });
     if (c.length !== 0) {
       console.error('🔴 self-test C 失败：合规样本被误报');

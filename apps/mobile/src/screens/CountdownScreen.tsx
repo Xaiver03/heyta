@@ -199,7 +199,7 @@ export function CountdownScreen({ onBack }: { onBack: () => void }): React.JSX.E
    */
   const header = {
     title: t('web.shell.views.countdown'),
-    actions: [{ icon: 'action.back' as const, label: t('mobile.growth.back'), onPress: onBack }],
+    actions: [],
   };
 
   if (host === null) {

@@ -341,7 +341,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     return (
       <Screen
         title={t('web.shell.views.habits')}
-        actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack }]}
+        actions={[]}
       >
         <EmptyState
           icon="group.overdue"
@@ -359,7 +359,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     return (
       <Screen
         title={t('web.shell.views.habits')}
-        actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack }]}
+        actions={[]}
       >
         <EmptyState
           icon="action.sync"
@@ -508,7 +508,6 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
       title={t('web.shell.views.habits')}
       actions={[
         { icon: 'task.add', label: t('web.habits.add'), onPress: () => { setAdding((v) => !v); } },
-        { icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack },
       ]}
     >
       {/*

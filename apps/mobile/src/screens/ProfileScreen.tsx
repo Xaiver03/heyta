@@ -1143,7 +1143,7 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
     (HUB_ROW_TEST_IDS as readonly string[]).includes(row.testID ?? ''),
   );
 
-  const QUICK_ENTRY_TEST_IDS = ['profile-entry-habits', 'profile-entry-countdown', 'profile-entry-share', 'profile-entry-assistant'] as const;
+  const QUICK_ENTRY_TEST_IDS = ['profile-entry-habits', 'profile-entry-countdown', 'profile-entry-share'] as const;
   const quickEntryRows = entryRows.filter(
     (row): row is Extract<SettingsRowModel, { kind: 'action' }> =>
       row.kind === 'action' && (QUICK_ENTRY_TEST_IDS as readonly string[]).includes(row.testID ?? ''),
@@ -1751,6 +1751,16 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
                 <Text variant="caption" numberOfLines={1} style={{ textAlign: 'center' }}>{row.label}</Text>
               </Pressable>
             ))}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('notes.title')}
+              testID="profile-entry-notes-tile"
+              onPress={() => { navigation.push('profile:notes'); }}
+              style={({ pressed }) => [{ width: '25%', alignItems: 'center', gap: tokens['space.1'], paddingVertical: tokens['space.2'] }, pressed ? { opacity: tokens['state.pressed-opacity'] } : null]}
+            >
+              <Icon name="note.sticky" size="sm" color={tokens['color.foreground-muted']} />
+              <Text variant="caption" numberOfLines={1} style={{ textAlign: 'center' }}>{t('notes.title')}</Text>
+            </Pressable>
           </View>
         )}
       />
