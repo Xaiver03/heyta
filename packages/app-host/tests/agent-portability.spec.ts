@@ -22,6 +22,7 @@ const FILES = [
   '../src/ai-routed-model.ts',
   '../src/ai-cloud-assistant.ts',
   '../src/ai-local-tools.ts',
+  '../src/ai-turn-orchestrator.ts',
 ] as const;
 
 function source(rel: string): string {

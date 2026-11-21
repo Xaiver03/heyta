@@ -52,3 +52,20 @@
 | `createLocalToolTransport(runnerDeps)` | 设备本地 app 数据（`runSelectedTool`），不碰 OS | 本地优先、离线、只用 app 自己的数据 |
 
 两者都实现 `CloudToolTransport`，可直接喂 `runCloudAgentTurn` / `requestCloudAssistantTurn`，也可作 PI 内核 `toCloudAgentTools` 的传输。**本地传输只让只读工具通过；写操作返回 `write-needs-confirm`，必须走助手既有"提案→确认→自动执行"（唯一落库点）。** 判据：`ai-local-tools.spec.ts`。
+
+## 6. 壳接入（一个函数）
+
+```ts
+const { turn, seqBefore } = await runAiTurnWithUndo(userText, {
+  routing, consents,
+  transport: createLocalToolTransport(runnerDeps), // 或 createHttpCloudToolTransport(...)
+  grants,
+  undo: { getSeq: () => engine.currentLocalSeq(), undoSince: (s) => engine.undoSince(s) },
+});
+// 用户点“撤销这次 AI 操作”：
+await undoLastAiTurn({ undo }, seqBefore);
+```
+
+- `runAiTurnWithUndo` 自动：取 `seqBefore` → 跑 `requestCloudAssistantTurn`（带稳定 `runId`，兼作幂等键前缀）→ 返回 `{turn, seqBefore, runId}`。
+- `undoLastAiTurn` = `engine.undoSince(seqBefore)`；仅覆盖**本地写入**；云端工具写入的撤销在服务端。
+- 判据：`ai-turn-orchestrator.spec.ts`。
