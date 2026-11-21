@@ -87,3 +87,30 @@ describe('createLocalToolTransport 对真实宿主', () => {
     if (listed.ok) expect(listed.data).toEqual([]);
   });
 });
+
+import { executeAiToolProposal } from '../src/ai-tool-run.js';
+
+describe('写路径 D1 端到端：seq → 确认写 → undoSince', () => {
+  it('AI 提议建任务、确认后落库、undoSince 整段撤销', async () => {
+    const host = createLocalApiHost(engine, actions, { isReadable: () => true });
+    const seqBefore = await engine.currentLocalSeq();
+
+    const result = await executeAiToolProposal(
+      host,
+      { ruleId: 'r', tool: 'create_task', intent: { action: 'create-task', title: 'AI 建的任务' } },
+      'exec-1',
+      { getGrants: () => ({ create_task: true }) as never },
+    );
+    expect(result.ok).toBe(true);
+    // 落库：能读到
+    const listed = await host.listTasks?.(50);
+    const titles = (listed ?? []).map((t) => t.title);
+    expect(titles).toContain('AI 建的任务');
+
+    // 撤销这次 AI 操作（本地写入段）
+    const outcome = await engine.undoSince(seqBefore);
+    expect(outcome.status).toBe('applied');
+    const after = await host.listTasks?.(50);
+    expect((after ?? []).map((t) => t.title)).not.toContain('AI 建的任务');
+  });
+});
