@@ -411,6 +411,21 @@ export interface CaptureSubmitPlan {
    * （那等于悄悄改变一条任务的落点）。选择器在 `CaptureComposer` 的 `projectPicker`。
    */
   readonly projectId?: string;
+  /**
+   * 「时间段」的起点（epoch ms，本地零点 + 起点时刻）。
+   *
+   * 🔴 与 `Task.startDate` 同约定（ADR-0043）。它和 `durationMinutes` **成对**出现：
+   * 有起点没时长 = 一个点；有时长没起点 = 说不清从哪儿开始。所以二者由
+   * {@link withCaptureRange} 一次性写入，不各自单独拼。
+   *
+   * ⚠️ 这是**可选新增字段**，与 `dueDate` 并列：捕获默认只给 `dueDate`（一个截止时刻），
+   * 只有用户在面板里显式选了「时间段」才会带上这一对。不选时逐字节等价于改动前。
+   */
+  readonly startDate?: number;
+  /**
+   * 「时间段」的时长（分钟）。见 {@link startDate}：与它成对。
+   */
+  readonly durationMinutes?: number;
 }
 
 /**
@@ -427,6 +442,49 @@ export function withCaptureProject(
   return projectId === null || projectId === undefined || projectId === ''
     ? plan
     : { ...plan, projectId };
+}
+
+/**
+ * 一段「时间段」：起点（epoch ms）+ 时长（分钟）。二者**同比出现**。
+ *
+ * 时长下限取 5 分钟、上限 480 分钟（8h），与 `actions.ts#setSchedule` 的夹取同一口径，
+ * 免得面板给一个 0 或负数再被下游静默夹掉 —— "界面说的"与"落库的"必须同一份数。
+ */
+export interface CaptureRange {
+  readonly startDate: number;
+  readonly durationMinutes: number;
+}
+
+/** 面板/宿主能给出的时间段边界（与 `Task.startDate + durationMinutes` 一致）。 */
+export const CAPTURE_RANGE_MIN_MINUTES = 5;
+export const CAPTURE_RANGE_MAX_MINUTES = 480;
+
+/**
+ * 把用户选的「时间段」并进一份已经算好的计划。
+ *
+ * 🔴 规则与 {@link withCaptureProject} 同款：**不合法就原样返回**，绝不写半截字段。
+ *   · 没有 range（`undefined`）= 用户没选时间段 ⇒ 计划逐字节不变；
+ *   · 时长落到 `[5, 480]` 之外 ⇒ 视为非法输入、整段忽略（宁可少一段，也不要一个被下游
+ *     悄悄夹过的数 —— 那会让"界面写 600 分钟、落库成了 480"这类错位无从复现）。
+ *
+ * ⚠️ 一次写入**两个字段**：`startDate` 与 `durationMinutes` 必须同生同灭，
+ * 否则 `Task` 那边会得到"只有时长、没有起点"或反之的半截状态。
+ */
+export function withCaptureRange(
+  plan: CaptureSubmitPlan,
+  range: CaptureRange | undefined,
+): CaptureSubmitPlan {
+  if (range === undefined) return plan;
+  const { startDate, durationMinutes } = range;
+  if (!Number.isFinite(startDate)) return plan;
+  if (
+    !Number.isFinite(durationMinutes) ||
+    durationMinutes < CAPTURE_RANGE_MIN_MINUTES ||
+    durationMinutes > CAPTURE_RANGE_MAX_MINUTES
+  ) {
+    return plan;
+  }
+  return { ...plan, startDate, durationMinutes };
 }
 
 /** 选择器里的一行（`id` = 清单 id；收集箱由 `labels.inbox` 单独画，不是一条 option）。 */

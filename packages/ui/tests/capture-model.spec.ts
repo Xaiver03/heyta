@@ -26,6 +26,9 @@ import {
   clearCaptureDue,
   makeCaptureOverride,
   withCaptureProject,
+  withCaptureRange,
+  CAPTURE_RANGE_MIN_MINUTES,
+  CAPTURE_RANGE_MAX_MINUTES,
   captureChipAction,
   captureChipKey,
   captureChipRemainingDays,
@@ -381,6 +384,57 @@ describe('G. 落点：把选中的清单并进计划（`withCaptureProject`）',
     const next = withCaptureProject(frozen, 'p-2');
     expect(next).not.toBe(frozen);
     expect(frozen.projectId).toBeUndefined();
+  });
+});
+
+describe('G2. 时间段：把起止并进计划（`withCaptureRange`）', () => {
+  const base: CaptureSubmitPlan = { title: '开会' };
+
+  it('给了合法 range ⇒ 同时写入 startDate 与 durationMinutes，且不动已有的键', () => {
+    expect(withCaptureRange({ ...base, priority: Priority.High }, { startDate: 1_700_000_000_000, durationMinutes: 90 })).toEqual({
+      title: '开会',
+      priority: Priority.High,
+      startDate: 1_700_000_000_000,
+      durationMinutes: 90,
+    });
+  });
+
+  it('🔴 `undefined` ⇒ 计划**逐字节不变**（没选时间段时与改动前完全一致）', () => {
+    const plan = withCaptureRange({ ...base }, undefined);
+    expect(plan).toEqual({ title: '开会' });
+    expect(Object.prototype.hasOwnProperty.call(plan, 'startDate')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(plan, 'durationMinutes')).toBe(false);
+  });
+
+  it('🔴 时长低于下限 / 高于上限 ⇒ 整段忽略（不写半截字段，也不让下游静默夹取）', () => {
+    for (const durationMinutes of [CAPTURE_RANGE_MIN_MINUTES - 1, 0, -30, CAPTURE_RANGE_MAX_MINUTES + 1, Number.NaN]) {
+      const plan = withCaptureRange({ ...base }, { startDate: 1_700_000_000_000, durationMinutes });
+      expect(Object.prototype.hasOwnProperty.call(plan, 'startDate')).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(plan, 'durationMinutes')).toBe(false);
+    }
+  });
+
+  it('起点非法（NaN / Infinity）⇒ 整段忽略：**绝不出现"有时长没起点"**的半截状态', () => {
+    for (const startDate of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      const plan = withCaptureRange({ ...base }, { startDate, durationMinutes: 60 });
+      expect(Object.prototype.hasOwnProperty.call(plan, 'durationMinutes')).toBe(false);
+    }
+  });
+
+  it('边界值本身合法（恰好 5 / 480 分钟）', () => {
+    expect(withCaptureRange({ ...base }, { startDate: 1, durationMinutes: CAPTURE_RANGE_MIN_MINUTES }).durationMinutes).toBe(
+      CAPTURE_RANGE_MIN_MINUTES,
+    );
+    expect(withCaptureRange({ ...base }, { startDate: 1, durationMinutes: CAPTURE_RANGE_MAX_MINUTES }).durationMinutes).toBe(
+      CAPTURE_RANGE_MAX_MINUTES,
+    );
+  });
+
+  it('不复制入参以外的一切：返回新对象，原计划不被改写', () => {
+    const frozen = { ...base };
+    const next = withCaptureRange(frozen, { startDate: 5, durationMinutes: 30 });
+    expect(next).not.toBe(frozen);
+    expect(frozen.startDate).toBeUndefined();
   });
 });
 
