@@ -33,6 +33,13 @@ describe('executeAgentToolForUser', () => {
     if (!out.ok) expect(out.reason).toBe('encrypted-account');
   });
 
+  it('非加密的归约失败（REPAIR 缺 base）→ failed，不谎报加密', async () => {
+    const rows = [{ id: 'r', serverSeq: 0, opType: 'REPAIR', entityType: 'TASK', entityId: 't1', payload: {}, schemaVersion: 1, isPayloadEncrypted: false, repairBaseServerSeq: null }];
+    const out = await executeAgentToolForUser(fakeDb(rows), '42', 'list_tasks', {});
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.reason).toBe('failed');
+  });
+
   it('目录外工具 → not-found', async () => {
     const out = await executeAgentToolForUser(fakeDb([]), '42', 'purge_everything', {});
     expect(out.ok).toBe(false);

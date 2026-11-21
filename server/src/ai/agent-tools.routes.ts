@@ -36,9 +36,13 @@ export interface AgentToolsRoutesOptions {
 }
 
 function userIdOf(request: unknown): string | undefined {
-  const user = (request as { user?: { id?: number | string } }).user;
-  if (user === undefined || user.id === undefined) return undefined;
-  return String(user.id);
+  // 真实鉴权（middleware.ts `authenticateWith`）把用户挂在 `request.user`，字段是 `userId`
+  // （`AuthUser` 没有 `id`）。同时兼容 `id`（部分测试/旧形状），但以 `userId` 为准。
+  const user = (request as { user?: { userId?: number | string; id?: number | string } }).user;
+  if (user === undefined) return undefined;
+  const value = user.userId ?? user.id;
+  if (value === undefined) return undefined;
+  return String(value);
 }
 
 export const agentToolsRoutes: FastifyPluginAsync<AgentToolsRoutesOptions> = async (app, options) => {

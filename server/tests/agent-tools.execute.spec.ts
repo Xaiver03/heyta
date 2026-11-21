@@ -44,6 +44,46 @@ describe('服务端工具执行器（op 归约 → 只读工具）', () => {
     if (out.ok) expect((out.data as Array<{ name: string }>).map((p) => p.name)).toEqual(['工作进行中']);
   });
 
+  it('completed 取 completedAt（Task 没有 completed 字段）', () => {
+    const state = materializeUserState([
+      row({ id: 'a', opType: 'CRT', entityType: 'TASK', entityId: 't1', payload: { title: '未完成' } }),
+      row({ id: 'b', opType: 'CRT', entityType: 'TASK', entityId: 't2', payload: { title: '已完成', completedAt: 1000 } }),
+    ]);
+    const out = executeAgentTool(state, 'list_tasks', {});
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      const byTitle = Object.fromEntries((out.data as Array<{ title: string; completed: boolean }>).map((t) => [t.title, t.completed]));
+      expect(byTitle['未完成']).toBe(false);
+      expect(byTitle['已完成']).toBe(true);
+    }
+  });
+
+  it('还原出来的幽灵壳（只剩 deletedAt:null，无 title）被过滤', () => {
+    const state = materializeUserState([
+      row({ id: 'a', opType: 'CRT', entityType: 'TASK', entityId: 't1', payload: { title: '正常' } }),
+      // 客户端"还原"发的 UPD {deletedAt:null}，服务端 replay 无实体则写出空壳
+      row({ id: 'b', opType: 'UPD', entityType: 'TASK', entityId: 'ghost', payload: { deletedAt: null } }),
+    ]);
+    const out = executeAgentTool(state, 'list_tasks', {});
+    expect(out.ok).toBe(true);
+    if (out.ok) expect((out.data as Array<{ title: string }>).map((t) => t.title)).toEqual(['正常']);
+  });
+
+  it('list_notes 不投影正文、不伪造 title', () => {
+    const state = materializeUserState([
+      row({ id: 'n', opType: 'CRT', entityType: 'NOTE', entityId: 'n1', payload: { content: '秘密正文', isPinnedToToday: true } }),
+    ]);
+    const out = executeAgentTool(state, 'list_notes', {});
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      const n = (out.data as Array<Record<string, unknown>>)[0]!;
+      expect(n['id']).toBe('n1');
+      expect('title' in n).toBe(false);
+      expect(JSON.stringify(n)).not.toContain('秘密正文');
+      expect(n['pinnedToToday']).toBe(true);
+    }
+  });
+
   it('未知/写工具 → not-implemented（不假装成功）', () => {
     const state = materializeUserState([]);
     const out = executeAgentTool(state, 'create_task', { title: 'X' });

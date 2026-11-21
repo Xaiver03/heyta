@@ -15,7 +15,7 @@ import {
   type AgentToolExecuteResult,
   type ServerAgentTool,
 } from './agent-tools.execute.js';
-import type { ReplayOperationRow } from '../sync/op-replay.js';
+import { EncryptedOpsNotSupportedError, type ReplayOperationRow } from '../sync/op-replay.js';
 import type { AgentToolsRoutesOptions } from './agent-tools.routes.js';
 
 /** 最小 prisma 依赖面（便于测试注入假实现）。 */
@@ -61,9 +61,14 @@ export async function executeAgentToolForUser(
   let state;
   try {
     state = materializeUserState(rows);
-  } catch {
-    // E2EE 账号（加密 payload）服务端读不到明文 —— 如实拒绝，不静默返回空。
-    return { ok: false, reason: 'encrypted-account', message: '该账号启用了端到端加密，服务端无法读取明文来执行工具。' };
+  } catch (error: unknown) {
+    // 只有**真正的加密账号**才报 encrypted-account；其它（超限/损坏序列/迁移）如实报 failed，
+    // 绝不把它们一律谎报成"端到端加密"。
+    if (error instanceof EncryptedOpsNotSupportedError) {
+      return { ok: false, reason: 'encrypted-account', message: '该账号启用了端到端加密，服务端无法读取明文来执行工具。' };
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason: 'failed', message: `读取账号数据失败：${message}` };
   }
   return executeAgentTool(state, name, args);
 }

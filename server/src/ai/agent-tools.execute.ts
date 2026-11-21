@@ -60,11 +60,27 @@ function isAlive(entity: Record<string, unknown> | undefined): boolean {
   if (entity['purgedAt'] !== undefined && entity['purgedAt'] !== null) return false;
   return true;
 }
+/**
+ * 服务端 replay 的 `DEL` 是**物理删除**，而客户端还原是 `UPD {deletedAt:null}` ——
+ * 这会在服务端产出一条只剩 `{deletedAt:null}` 的"幽灵壳"。要求实体带**身份字段**
+ * 才算活着，把这种壳过滤掉。
+ */
+function hasIdentity(entityType: string, entity: Record<string, unknown>): boolean {
+  if (entityType === 'TASK') return typeof entity['title'] === 'string';
+  if (entityType === 'PROJECT') return typeof entity['name'] === 'string';
+  if (entityType === 'NOTE') return typeof entity['content'] === 'string';
+  return true;
+}
 function isArchived(entity: Record<string, unknown>): boolean {
   return (
     (entity['archived'] === true) ||
     (entity['archivedAt'] !== undefined && entity['archivedAt'] !== null)
   );
+}
+
+/** 取实体表为 [id, entity]（replay 的 state 以 id 为键，payload 里通常没有 id 字段）。 */
+function entriesOf(state: MaterializedState, type: string): Array<[string, Record<string, unknown>]> {
+  return Object.entries(state[type] ?? {});
 }
 
 export type AgentToolExecuteResult =
@@ -78,24 +94,25 @@ export function executeAgentTool(
 ): AgentToolExecuteResult {
   switch (name) {
     case 'list_tasks': {
-      const tasks = Object.values(state['TASK'] ?? {})
-        .filter(isAlive)
-        .filter((t) => !isArchived(t))
-        .map((t) => ({ id: t['id'], title: t['title'], completed: t['completed'] === true }));
+      const tasks = entriesOf(state, 'TASK')
+        .filter(([, t]) => isAlive(t) && hasIdentity('TASK', t))
+        .filter(([, t]) => !isArchived(t))
+        .map(([id, t]) => ({ id, title: t['title'], completed: t['completedAt'] !== undefined && t['completedAt'] !== null }));
       const limit = typeof args['limit'] === 'number' ? Math.max(0, args['limit']) : 100;
       return { ok: true, data: tasks.slice(0, limit) };
     }
     case 'list_projects': {
-      const projects = Object.values(state['PROJECT'] ?? {})
-        .filter(isAlive)
-        .filter((p) => !isArchived(p))
-        .map((p) => ({ id: p['id'], name: p['name'] }));
+      const projects = entriesOf(state, 'PROJECT')
+        .filter(([, p]) => isAlive(p) && hasIdentity('PROJECT', p))
+        .filter(([, p]) => !isArchived(p))
+        .map(([id, p]) => ({ id, name: p['name'] }));
       return { ok: true, data: projects };
     }
     case 'list_notes': {
-      const notes = Object.values(state['NOTE'] ?? {})
-        .filter(isAlive)
-        .map((n) => ({ id: n['id'], title: n['title'] }));
+      // 便签不投影正文（避免出境正文）；只给 id 与是否钉到「今天」。
+      const notes = entriesOf(state, 'NOTE')
+        .filter(([, n]) => isAlive(n) && hasIdentity('NOTE', n))
+        .map(([id, n]) => ({ id, pinnedToToday: n['isPinnedToToday'] === true }));
       return { ok: true, data: notes };
     }
     default:
