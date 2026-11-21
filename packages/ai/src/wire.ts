@@ -43,6 +43,14 @@ import {
  * 那需要 discriminated union，而这里的真实约束是"端点会怎么读它"，
  * 多带一个字段不会改变字节形状（省略时**不发**，见组装器）。
  */
+/** 模型发起的一次工具调用（回传给模型的 assistant 帧要带它）。 */
+export interface ChatToolCall {
+  readonly id: string;
+  readonly name: string;
+  /** `arguments` 原文（通常是 JSON 字符串），与收到的原文一致。 */
+  readonly arguments: string;
+}
+
 export interface ChatMessage {
   readonly role: 'system' | 'user' | 'assistant' | 'tool';
   /**
@@ -55,6 +63,11 @@ export interface ChatMessage {
    */
   readonly content: string | readonly ContentPart[];
   readonly toolCallId?: string;
+  /**
+   * 仅 `role === 'assistant'` 且模型要调工具时：原样回传的工具调用。
+   * 省略时**不发 `tool_calls` 键**（既有请求体逐字不变）。
+   */
+  readonly toolCalls?: readonly ChatToolCall[];
 }
 
 /**
@@ -415,6 +428,15 @@ function toWireMessage(message: ChatMessage): Record<string, unknown> {
     content:
       typeof message.content === 'string' ? message.content : toWireContentParts(message.content),
     ...(message.toolCallId === undefined ? {} : { tool_call_id: message.toolCallId }),
+    ...(message.role === 'assistant' && message.toolCalls !== undefined && message.toolCalls.length > 0
+      ? {
+          tool_calls: message.toolCalls.map((call) => ({
+            id: call.id,
+            type: 'function',
+            function: { name: call.name, arguments: call.arguments },
+          })),
+        }
+      : {}),
   };
 }
 

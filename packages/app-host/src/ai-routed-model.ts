@@ -63,8 +63,16 @@ export function harnessMessagesToChat(messages: readonly HarnessMessage[]): Chat
       continue;
     }
     if (m.role === 'assistant') {
-      // 与 ai-assistant 同构：带工具调用的 assistant 帧**不单独发出**（工具结果以 tool 帧回填）。
-      if (m.toolCalls !== undefined && m.toolCalls.length > 0) continue;
+      // 带工具调用的 assistant 帧必须原样回传（真实 OpenAI 兼容端点要求 tool 帧前有
+      // 对应的 assistant.tool_calls；否则多步第二次调用 400）。文本帧照发。
+      if (m.toolCalls !== undefined && m.toolCalls.length > 0) {
+        out.push({
+          role: 'assistant',
+          content: m.content,
+          toolCalls: m.toolCalls.map((c) => ({ id: c.id, name: c.name, arguments: JSON.stringify(c.arguments) })),
+        });
+        continue;
+      }
       if (m.content !== '') out.push({ role: 'assistant', content: m.content });
       continue;
     }

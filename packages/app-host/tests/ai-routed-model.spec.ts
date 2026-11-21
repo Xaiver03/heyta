@@ -125,8 +125,10 @@ describe('辅助函数', () => {
       { role: 'assistant', content: '', toolCalls: [{ id: 'c1', name: 'list_tasks', arguments: {} }] },
       { role: 'tool', content: '[]', toolCallId: 'c1' },
     ]);
-    expect(chat.map((m) => m.role)).toEqual(['system', 'user', 'tool']);
-    expect(chat[2]!.toolCallId).toBe('c1');
+    expect(chat.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'tool']);
+    const assistant = chat[2]!;
+    expect(assistant.toolCalls?.[0]).toEqual({ id: 'c1', name: 'list_tasks', arguments: '{}' });
+    expect(chat[3]!.toolCallId).toBe('c1');
   });
 
   it('parseToolCallArguments：坏 JSON → {}', () => {

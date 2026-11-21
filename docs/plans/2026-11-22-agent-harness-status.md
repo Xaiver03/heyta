@@ -31,7 +31,7 @@
 
 1. **移动端 / Web 的真实 UI 入口**：契约 `runAiTurnWithUndo` 就绪，但 `apps/mobile`(`AssistantScreen`) / `apps/web` 尚未注入新路径（且 `apps/mobile` 正被另一会话改动，未触碰）。⇒ "四端可用"目前是**库级 + node-host 级**，非四端 UI 全接。
 2. **服务端 `/api/agent/tools`**：契约已定（`agent-tools-api.md`），**未实现**；托管场景与云端写入撤销需要它。
-3. **P0-2（assistant `tool_calls` 帧）**：与既有 `ai-assistant` 同构地未发 assistant 工具调用帧；真实 OpenAI 兼容端点是否 400 **未联网复验**（审计②列为推断）。
+3. **P0-2（assistant `tool_calls` 帧）**：✅ **已修协议结构层**（`wire.ts` 支持 assistant `tool_calls`；`ai-routed-model` 保留该帧；省略时字节不变，有测试）。⚠️ 真实 OpenAI 兼容端点仍未联网复验（未核）。
 4. **PI 内核在 RN/Hermes 真机**：`pi-agent-core` 可移植性未验证（审计① U5）；Hermes 性能未量化。
 5. **`check:ai-coverage` 红**：mobile 缺 `breakdown/prioritize/duration` 三入口——既有产品缺口，与本 harness 无关。
 
