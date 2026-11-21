@@ -37,7 +37,9 @@ export function NavButton({
   return (
     <button type="button" className="ht-nav__item" aria-current={active} onClick={onClick} data-testid={testID}>
       {entry.swatch !== undefined ? (
-        <span className={`ht-swatch ${entry.swatch}`} aria-hidden="true" />
+        <span className="ht-nav__lead">
+          <span className={`ht-swatch ${entry.swatch}`} aria-hidden="true" />
+        </span>
       ) : (
         <Icon size={ICON_SIZE.sm} aria-hidden="true" />
       )}

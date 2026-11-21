@@ -160,8 +160,9 @@
      建立组件边界，避免再靠字号和颜色硬凑层级。 */
   box-sizing: border-box;
   padding: var(--ht-space-4);
-  /* 2026-11-16：页面白之后，白模块需要一条静止态细线才有边界（同四象限/习惯行）。 */
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  /* 2026-11-16：页面白之后，白模块需要一条静止态细线才有边界（同四象限/习惯行）。
+     2026-11-21：改走 border-subtle —— 边框更柔和，只留一层极淡的轮廓。 */
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
   border-radius: var(--ht-radius-lg);
   background: var(--ht-color-surface);
 }

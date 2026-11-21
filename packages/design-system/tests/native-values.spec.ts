@@ -25,13 +25,13 @@ describe('resolveFontFamily', () => {
   const STACK = lightTokens['font.sans'];
 
   it('未打包任何字体时不返回字体名（而不是硬塞第一项）', () => {
-    // 这是真机那次乱码的直接防线：栈里第一项是 'Plus Jakarta Sans'，
-    // 但它没被打进包，传下去就是无效字体名。
+    // 这是真机那次乱码的直接防线：栈里第一项是 'PingFang SC'（2026-11-21 起），
+    // 但它没被打进任何 App 包，iOS/Android 未必有，传下去就是无效字体名。
     expect(resolveFontFamily(STACK, [])).toBeUndefined();
   });
 
   it('字体确实打包了才返回它', () => {
-    expect(resolveFontFamily(STACK, ['Plus Jakarta Sans'])).toBe('Plus Jakarta Sans');
+    expect(resolveFontFamily(STACK, ['PingFang SC'])).toBe('PingFang SC');
   });
 
   it('去掉引号', () => {
@@ -90,10 +90,10 @@ describe('parseCssShadow', () => {
   it('解析 tokens.css 的实际格式', () => {
     const s = parseCssShadow(lightTokens['shadow.md']);
     expect(s).not.toBeNull();
-    expect(s!.shadowOffset).toEqual({ width: 0, height: 2 });
-    expect(s!.shadowRadius).toBe(8);
+    expect(s!.shadowOffset).toEqual({ width: 0, height: 1 });
+    expect(s!.shadowRadius).toBe(2);
     expect(s!.shadowColor).toBe('#0f172a');
-    expect(s!.shadowOpacity).toBeCloseTo(0.08, 6);
+    expect(s!.shadowOpacity).toBeCloseTo(0.03, 6);
   });
 
   it('`none` → null（不是全零阴影）', () => {

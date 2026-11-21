@@ -318,10 +318,15 @@
    3. 非颜色 token（与主题无关）
    ──────────────────────────────────────────────────────────── */
 :root {
-  /* 字体栈。CJK 回退必须显式给，否则中文会用系统默认衬线，与英文割裂。 */
+  /* 字体栈。CJK 回退必须显式给，否则中文会用系统默认衬线，与英文割裂。
+     2026-11-21 产品负责人：「用苹方（PingFang SC），现在的字体太难看」。
+     原首项 'Plus Jakarta Sans' 并未随包分发（web 无 @font-face、RN 白名单为空），
+     实际一直回退到各平台系统字体 —— 不同机器回退结果不同。把苹方提到首位后：
+     macOS / iOS 直接命中苹方，Windows / Linux 回退 Segoe UI / 微软雅黑，
+     不再挂一个永远加载不到的 webfont。 */
   --ht-font-sans:
-    'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC',
+    'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue',
+    'Segoe UI', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC',
     sans-serif;
   --ht-font-mono:
     'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -354,7 +359,7 @@
 
   --ht-line-height-tight: 1.25;
   --ht-line-height-normal: 1.5;
-  --ht-line-height-relaxed: 1.75;
+  --ht-line-height-relaxed: 1.6;
 
   /* 间距：4px 基准的 8 步阶梯。全部是 4 的倍数。 */
   --ht-space-0: 0;
@@ -389,14 +394,16 @@
   --ht-radius-dialog: 1.5rem;   /* 24px — 弹窗（DSH Modal） */
   --ht-radius-full: 9999px; /* 胶囊、头像 */
 
-  /* 阴影：克制。扁平风格优先用边框表达层次，阴影只用于浮层。 */
+  /* 阴影：2026-11-21 产品负责人：「不要明显阴影，用颜色区分，更柔和」。
+     布局层（卡片）不再靠投影浮起 —— surface/background 的色差 + 极淡描边负责分层；
+     只有真正的浮层（菜单/弹窗/抽屉）保留一层很轻的阴影，且整体比原来淡一档。 */
   --ht-shadow-none: none;
-  --ht-shadow-sm: 0 1px 1px rgb(15 23 42 / 0.03);
-  --ht-shadow-md: 0 1px 3px rgb(15 23 42 / 0.06);
-  /* 分组卡片的柔和投影：比 md 更实（14%），让白卡在浅灰底上“浮”起来。 */
-  --ht-shadow-card: 0 1px 2px rgb(15 23 42 / 0.03);
-  --ht-shadow-lg: 0 4px 12px rgb(15 23 42 / 0.08);
-  --ht-shadow-xl: 0 8px 24px rgb(15 23 42 / 0.10);
+  --ht-shadow-sm: 0 1px 1px rgb(15 23 42 / 0.02);
+  --ht-shadow-md: 0 1px 2px rgb(15 23 42 / 0.03);
+  /* 分组卡片：不投影（改由色差 + 发丝描边分层）。 */
+  --ht-shadow-card: none;
+  --ht-shadow-lg: 0 2px 8px rgb(15 23 42 / 0.05);
+  --ht-shadow-xl: 0 6px 18px rgb(15 23 42 / 0.06);
   /* 主色焦点光晕，与 --ht-color-ring 配套 */
   --ht-shadow-focus: 0 0 0 3px rgb(37 99 235 / 0.25);
 
@@ -942,11 +949,11 @@
   /* 与 success 同亮色原色阶（emerald-600）⇒ 走语义层引用。 */
   --ht-color-focus-break: var(--ht-color-success);
 
-  --ht-shadow-sm: 0 1px 1px rgb(0 0 0 / 0.25);
-  --ht-shadow-md: 0 1px 3px rgb(0 0 0 / 0.30);
-  --ht-shadow-card: 0 1px 3px rgb(0 0 0 / 0.30);
-  --ht-shadow-lg: 0 4px 12px rgb(0 0 0 / 0.35);
-  --ht-shadow-xl: 0 8px 24px rgb(0 0 0 / 0.40);
+  --ht-shadow-sm: 0 1px 1px rgb(0 0 0 / 0.18);
+  --ht-shadow-md: 0 1px 2px rgb(0 0 0 / 0.22);
+  --ht-shadow-card: none;
+  --ht-shadow-lg: 0 2px 8px rgb(0 0 0 / 0.30);
+  --ht-shadow-xl: 0 6px 18px rgb(0 0 0 / 0.36);
   --ht-shadow-focus: 0 0 0 3px rgb(96 165 250 / 0.35);
 
   /* 材质：暗色的半透明**不是亮色的反相**。

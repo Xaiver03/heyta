@@ -62,7 +62,7 @@
     页头与内容列现在**同色**（都白），所以分区不能再靠色差 —— 由这条细线承担。
     滴答清单的顶栏同样是"白底 + 一条极细的下边线"。
   */
-  border-bottom: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-bottom: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
   background: var(--ht-color-surface);
 }
 

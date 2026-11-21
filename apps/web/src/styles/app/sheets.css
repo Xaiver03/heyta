@@ -101,19 +101,14 @@
  */
 .ht-settings__content > .ht-settings__group > .ht-settings,
 .ht-settings__content > .ht-settings__group > div > .ht-settings {
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
   border-radius: var(--ht-radius-lg);
   /**
-   * 🔴 **卡片靠阴影浮起来，不靠压深页面底色。**
-   *
-   * 实测：卡片 `#fff` 与页面 `#f8fafc` 只差 7/255，一屏三张卡糊成一片白。
-   * 试过把页面压一档到 `slate-100`（差 14/255）—— 四端 AA 用例当场红：
-   * `foreground-subtle` 在页面底上掉到 4.34:1（要求 ≥4.5）。而它已经是最浅一档
-   * 文字色，再深一档就与 `foreground-muted` 合并，两个层级会塌成一个。
-   *
-   * ⇒ 换 DSH 浮层卡的做法：**阴影**。它不进对比度计算，所以不会拿可读性换观感。
+   * 2026-11-21 产品负责人：「不要明显阴影，用颜色区分，更柔和」——
+   * 卡片不再投影，分层交给 surface/background 的色差 + 上面那条极淡描边。
+   * 早前实测的"压深页面底色会被 AA 否决（foreground-subtle 掉到 4.34:1）"仍成立，
+   * 所以这里不压底色、只留一条极淡的边。
    */
-  box-shadow: var(--ht-shadow-md);
   background: var(--ht-color-surface);
   max-inline-size: none;
 }
@@ -196,7 +191,7 @@
 .ht-settings__subsection {
   margin-block-start: var(--ht-space-4);
   padding-block-start: var(--ht-space-4);
-  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }
 
 /* 子块的第一块（紧接面板标题/第一行）不加线：那一条会与其上方的间距打架。 */
@@ -245,7 +240,7 @@
   flex-direction: column;
   gap: var(--ht-space-3);
   padding-block-start: var(--ht-space-4);
-  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }
 
 /* ── 一行一件事（个人资料，2026-10-24）───────────────────────
@@ -265,7 +260,7 @@
 }
 
 .ht-settings__row + .ht-settings__row {
-  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }
 
 /* 行壳里装的是**共享字段解剖**（`FormField layout="inline"`）时的那一档。
@@ -956,7 +951,7 @@
   flex-direction: column;
   gap: var(--ht-space-3);
   padding: var(--ht-space-3) var(--ht-space-4);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
 }
@@ -980,7 +975,7 @@
   flex-direction: column;
   gap: var(--ht-space-2);
   padding-block-start: var(--ht-space-4);
-  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }
 
 @media (max-width: 48rem) {
@@ -1010,7 +1005,7 @@
 .ht-settings--cards > .ht-settings__subsection,
 .ht-settings--cards > .ht-ai-card {
   padding: var(--ht-space-4);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
   border-radius: var(--ht-radius-lg);
   background: var(--ht-color-surface);
 }
@@ -1029,7 +1024,7 @@
 .ht-settings--cards > .ht-settings__subsection {
   margin-block-start: 0;
   padding-block-start: var(--ht-space-4);
-  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }
 
 /* 卡片**内部**的 `.ht-settings__section` 降级成子块：一层卡片已经够了，

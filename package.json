@@ -261,6 +261,7 @@
     "screenshot:app-store": "node scripts/screenshots/capture.mjs --app-store",
     "screenshot:verify": "node scripts/screenshots/verify-artifacts.mjs",
     "screenshot:test": "node --test scripts/screenshots/png-stats.test.mjs",
+    "design:preview": "node scripts/design-preview.mjs",
     "poster": "bash scripts/screenshots/poster.sh",
     "check:server-design": "node server/scripts/gen-server-design.mjs --check",
     "check:server-copy": "cd server && ./node_modules/.bin/ts-node --transpile-only scripts/gen-server-copy.ts --check",

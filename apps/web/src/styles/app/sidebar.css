@@ -284,6 +284,25 @@
   color: var(--ht-color-primary);
 }
 
+/* 导航行左侧的**统一图元槽**：图标(16)与色块(8)都放进同一个 16px 盒子里，
+   这样无论那一行是图标还是色点，文字左缘都对齐、图元中心也同轴。
+   2026-11-21 产品负责人：「每个菜单左边的 icon 要和菜单上下居中、左右对齐」——
+   此前色块只有 8px 且未占槽，四象限那几行的文字比其它行左移了 8px。 */
+.ht-nav__lead {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-icon-sm);
+  block-size: var(--ht-icon-sm);
+  flex: none;
+}
+
+.ht-nav__item > svg {
+  flex: none;
+  inline-size: var(--ht-icon-sm);
+  block-size: var(--ht-icon-sm);
+}
+
 /* 象限前的小色块 */
 .ht-swatch {
   inline-size: var(--ht-space-2);

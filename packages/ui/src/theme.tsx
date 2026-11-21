@@ -133,8 +133,8 @@ const ThemeContext = createContext<HeytaUiTheme | null>(null);
 /**
  * 🔴 目前**没有打包任何自定义字体**。
  *
- * `font.sans` 的第一项是 `'Plus Jakarta Sans'`，但它没有随包分发 ——
- * 而 `resolveFontFamily` 只会在字体确实登记进这个清单时才返回它。
+ * `font.sans` 的第一项现在是 `'PingFang SC'`（2026-11-21 改），但它只在本机系统里有、
+ * 没随包分发 —— 而 `resolveFontFamily` 只会在字体确实登记进这个清单时才返回它。
  *
  * 直接把它当 `fontFamily` 传给 RN 的后果是**实测过的**：不报错，
  * 屏幕上是条纹状的乱码文字。所以这里刻意留空，让 RN 用系统字体
