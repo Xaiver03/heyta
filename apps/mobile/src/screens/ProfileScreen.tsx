@@ -78,7 +78,6 @@ import { Button, Card, Divider, HStack, Screen, SectionHeader, Stack, Text, Text
 import { Icon, type IconName } from '../ui/icons';
 import { MOBILE_PROFILE_ENTRIES, type MobileProfileEntryKey } from '../nav/feature-entries';
 import { AssistantScreen } from '../ai/AssistantScreen';
-import { AiToolboxScreen } from '../ai/AiToolboxScreen';
 import { AvatarBadge } from '../ui/avatar';
 import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-prepare';
 import { AccountClosureScreen } from './AccountClosureScreen';
@@ -479,12 +478,6 @@ export function ProfileScreen(): React.JSX.Element {
   const assistantOpen = navigation.stacks.profile.at(-1)?.key === 'profile:assistant';
   const setAssistantOpen = (open: boolean): void => {
     if (open) navigation.push('profile:assistant');
-    else navigation.pop();
-  };
-
-  const toolboxOpen = navigation.stacks.profile.at(-1)?.key === 'profile:ai-toolbox';
-  const setToolboxOpen = (open: boolean): void => {
-    if (open) navigation.push('profile:ai-toolbox');
     else navigation.pop();
   };
 
@@ -1100,19 +1093,6 @@ export function ProfileScreen(): React.JSX.Element {
     {
       kind: 'action',
       discloses: true,
-      testID: 'profile-entry-ai-toolbox',
-      label: t('mobile.ai.toolbox.entry'),
-      /*
-       * 🔴 2026-11-15：原来与上一行共用 `AssistantMark` ——
-       * 两行名字都以「AI」开头、图标一模一样，在「全部功能」页里读起来是同一件事。
-       * 图标在这类列表里是**唯一的区分线索**（同「设置目录」那一屏的教训）。
-       */
-      leading: <Icon name="action.toolbox" size="sm" color={tokens['color.foreground-muted']} />,
-      onPress: () => setToolboxOpen(true),
-    },
-    {
-      kind: 'action',
-      discloses: true,
       testID: 'profile-entry-trash',
       label: t('mobile.trash.entry'),
       leading: <Icon name="task.delete" size="sm" color={tokens['color.foreground-muted']} />,
@@ -1167,7 +1147,6 @@ export function ProfileScreen(): React.JSX.Element {
     'profile-entry-countdown',
     'profile-entry-share',
     'profile-entry-assistant',
-    'profile-entry-ai-toolbox',
   ] as const;
   const hubRows: readonly SettingsRowModel[] = entryRows.filter((row) =>
     (HUB_ROW_TEST_IDS as readonly string[]).includes(row.testID ?? ''),
@@ -1289,19 +1268,6 @@ export function ProfileScreen(): React.JSX.Element {
     );
   }
 
-  if (toolboxOpen) {
-    return (
-      <AiToolboxScreen
-        onOpenSettings={() => {
-          setSettingsSection('features');
-          navigation.push('settings');
-        }}
-        onBack={() => {
-          setToolboxOpen(false);
-        }}
-      />
-    );
-  }
 
   if (trashOpen) {
     return (
@@ -1772,6 +1738,11 @@ export function ProfileScreen(): React.JSX.Element {
         4 行：本周任务 / 专注 / 成就 + 「查看完整成长」。成长**只在这里** ——
         原来「我的」上有两处到同一张屏，§5.3 明写"收进近期状态卡内，删掉重复那一行"。
       */}
+      {/* ── 全部功能：非底部导航的功能入口，放在「近期状态」之上（浅层可见，不被淹没）── */}
+      <Card shadow="card">
+        <SettingsRow row={featuresHubRow} />
+      </Card>
+
       <ProfileProgressSummary
         onOpenGrowth={() => {
           navigation.push(featureRouteKey('growth'));
@@ -1787,8 +1758,6 @@ export function ProfileScreen(): React.JSX.Element {
         <SettingsRow row={settingsRow} />
         <Divider />
         <SettingsRow row={notificationsRow} />
-        <Divider />
-        <SettingsRow row={featuresHubRow} />
         <Divider />
         <SettingsRow row={tabBarCustomizeRow} />
       </Card>

@@ -32,26 +32,28 @@ import { describe, expect, it } from 'vitest';
 import { read, stripComments } from './source-reading';
 
 const SCREEN_SRC = 'apps/mobile/src/ai/AiToolboxScreen.tsx';
-const PROFILE_SRC = 'apps/mobile/src/screens/ProfileScreen.tsx';
+const ASSISTANT_SRC = 'apps/mobile/src/ai/AssistantScreen.tsx';
 
 const screen = stripComments(read(SCREEN_SRC));
-const profile = stripComments(read(PROFILE_SRC));
+const assistant = stripComments(read(ASSISTANT_SRC));
 
 describe('移动端 AI 工具箱：三枚入口的接线判据', () => {
-  it('🔴 ProfileScreen 真的**渲染**了 <AiToolboxScreen（不是只 import）', () => {
+  it('🔴 AssistantScreen(AI 页) 真的**渲染**了 <AiToolboxScreen（统一到 AI 页面，不再在「我的」）', () => {
     // 判据是 JSX 标签，不是 import —— 与 2026-10-05 那次
     // 「ProfileScreen 里 import 了 AssistantScreen、入口行也在、唯独没读
     //  assistantOpen 那个渲染分支」同一个失效形状（`check-ai-coverage.mjs` 文件头）。
-    expect(profile).toMatch(/<AiToolboxScreen[\s/>]/);
+    expect(assistant).toMatch(/<AiToolboxScreen[\s/>]/);
   });
 
-  it('ProfileScreen 有一行按下真的 push 了 profile:ai-toolbox', () => {
-    expect(profile).toMatch(/navigation\.push\(['"]profile:ai-toolbox['"]\)/);
+  it('AI 页有入口真的打开工具（顶部菜单 tools → setToolsOpen(true)）', () => {
+    expect(assistant).toMatch(/id:\s*'tools'/);
+    expect(assistant).toMatch(/setToolsOpen\(true\)/);
+    expect(assistant).toMatch(/toolsOpen/);
   });
 
-  it('入口行在，且 testID 与 assistant 那一族同形状', () => {
-    expect(profile).toMatch(/testID:\s*['"]profile-entry-ai-toolbox['"]/);
-    expect(profile).toMatch(/setToolboxOpen\(true\)/);
+  it('「我的」不再有 AI 工具箱入口（已并入 AI 页）', () => {
+    const profileSrc = stripComments(read('apps/mobile/src/screens/ProfileScreen.tsx'));
+    expect(profileSrc).not.toMatch(/profile-entry-ai-toolbox/);
   });
 
   it('tabs 里三枚一个都不能少（breakdown / prioritize / duration）', () => {

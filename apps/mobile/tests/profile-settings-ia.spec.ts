@@ -238,14 +238,13 @@ describe('移动端个人中心与设置的 IA 接线', () => {
       /row=\{featureRows\[|profile-entry-growth'/,
     );
 
-    // 枢纽页：5 个功能域的 testID 逐个登记，且那一页真的把它们铺出来。
+    // 枢纽页：4 个功能域（AI 工具箱已并入 AI 页，不再单列）的 testID 逐个登记，且那一页真的把它们铺出来。
     const hub = between(profile, 'const HUB_ROW_TEST_IDS', 'if (securityOpen)');
     for (const id of [
       'profile-entry-habits',
       'profile-entry-countdown',
       'profile-entry-share',
       'profile-entry-assistant',
-      'profile-entry-ai-toolbox',
     ]) {
       expect(hub, `枢纽页丢了 ${id} —— 那一项在移动端就没有入口了`).toContain(`'${id}'`);
     }

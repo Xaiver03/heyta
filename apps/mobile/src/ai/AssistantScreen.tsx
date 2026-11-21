@@ -48,6 +48,7 @@ import { TaskAttachmentSheet, type AttachTask } from './task-attachment';
 import { SessionListSheet } from './session-list';
 import { pickImages } from './image-attach';
 import { TopBarMenu } from '../ui/top-bar-menu';
+import { AiToolboxScreen } from './AiToolboxScreen';
 import {
   createChatController,
   mobileAssistantController,
@@ -172,6 +173,7 @@ export function AssistantScreen({
   const keyboardFrameRef = useRef<View>(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
   const [sessionOpen, setSessionOpen] = useState(false);
   const [refs, setRefs] = useState<AttachTask[]>([]);
@@ -448,7 +450,16 @@ export function AssistantScreen({
     return (
       <Screen title={t('mobile.ai.title')} titleLeading={<AiMarkGlyph size={tokens['icon.md']} color={tokens['color.foreground']} />} actions={[{ icon: 'action.back', label: t('mobile.ai.back'), onPress: onBack }]}>
         <EmptyState icon="conflict.warning" title={t('mobile.ai.hostFailed.title')} hint={t('mobile.ai.hostFailed.hint')} detail={hostError} />
-      </Screen>
+        {toolsOpen ? (
+        <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+          <AiToolboxScreen
+            visible
+            onBack={() => { setToolsOpen(false); }}
+            {...(onOpenSettings === undefined ? {} : { onOpenSettings })}
+          />
+        </View>
+      ) : null}
+    </Screen>
     );
   }
 
@@ -587,6 +598,7 @@ export function AssistantScreen({
         label={t('web.ai.chat.history.open')}
         onClose={() => { setMoreOpen(false); }}
         items={[
+          { id: 'tools', label: t('mobile.ai.toolbox.entry'), icon: 'action.toolbox', onPress: () => { setMoreOpen(false); setToolsOpen(true); } },
           { id: 'history', label: t('mobile.ai.sessions.title'), icon: 'tab.categories', onPress: () => { setMoreOpen(false); setSessionOpen(true); } },
           { id: 'new', label: t('web.ai.chat.newSession'), icon: 'assistant.new-session', onPress: () => { setMoreOpen(false); controller.newSession(); } },
         ]}
