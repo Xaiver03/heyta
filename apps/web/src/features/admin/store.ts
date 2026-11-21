@@ -1510,6 +1510,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     get().clearRefundNotice();
     get().clearAnnouncementNotice();
     get().clearGrantNotice();
+    // 切分区时清掉统一回执：否则上一格的 feedback 会漏进下一格（各分区迁移时发现的真 bug）。
+    get().clearFeedback();
   },
 }));
 
