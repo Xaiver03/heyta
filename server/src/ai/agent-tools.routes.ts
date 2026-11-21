@@ -25,6 +25,8 @@ export type AgentToolExecuteResult =
   | { readonly ok: false; readonly reason: string; readonly message: string };
 
 export interface AgentToolsRoutesOptions {
+  /** 登录校验钩子（生产传 `authenticate`；测试可省略并在注入里放 user）。 */
+  readonly authenticate?: (request: unknown, reply: unknown) => Promise<unknown> | unknown;
   /** canonical 工具目录（来自唯一事实源 `@heyta/local-api` 生成，勿手抄）。 */
   readonly catalog: readonly AgentToolCatalogEntry[];
   /** 该账号逐工具授权（服务端权威）。 */
@@ -40,6 +42,9 @@ function userIdOf(request: unknown): string | undefined {
 }
 
 export const agentToolsRoutes: FastifyPluginAsync<AgentToolsRoutesOptions> = async (app, options) => {
+  if (options.authenticate !== undefined) {
+    app.addHook('preHandler', options.authenticate as never);
+  }
   // 幂等缓存：写成功结果按 (userId, tool, idempotency-key) 复用。进程内、有界、够覆盖重试。
   const idempotency = new Map<string, AgentToolExecuteResult>();
   const MAX_IDEMPOTENCY = 2048;
