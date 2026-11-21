@@ -69,3 +69,10 @@ await undoLastAiTurn({ undo }, seqBefore);
 - `runAiTurnWithUndo` 自动：取 `seqBefore` → 跑 `requestCloudAssistantTurn`（带稳定 `runId`，兼作幂等键前缀）→ 返回 `{turn, seqBefore, runId}`。
 - `undoLastAiTurn` = `engine.undoSince(seqBefore)`；仅覆盖**本地写入**；云端工具写入的撤销在服务端。
 - 判据：`ai-turn-orchestrator.spec.ts`。
+
+## 7. Web 壳接入点（已就绪）
+
+`apps/web/src/features/ai/cloud-harness.ts`：
+- `runWebCloudTurn(userText, { routing, consents, grants })` —— 用 `createAiToolHost()`（Web 真实 dispatch）+ `createLocalToolTransport` + `runAiTurnWithUndo`（撤销绑定来自 `requireEngine().currentLocalSeq/undoSince`）。
+- `undoWebCloudTurn(seqBefore)` —— 撤销这次 AI 操作的本地写入。
+- 类型检查通过（`apps/web` `tsc -p tsconfig.spec.json` 0 错）。面板 `AssistantPanel` 已有 `routing/consents` props，接入只需改为调 `runWebCloudTurn`（UI 切换待排，避免与并发改动冲突）。
