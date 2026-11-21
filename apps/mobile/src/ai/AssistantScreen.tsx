@@ -367,8 +367,8 @@ export function AssistantScreen({
               <Button label={t('mobile.ai.privacyBlocked.action')} tone="ghost" onPress={onOpenPrivacy} />
             ) : null}
             <HStack gap="default">
-              <Button label={t('web.ai.action.copy')} tone="ghost" testID={`chat-copy-${String(entry.id)}`} onPress={() => { Clipboard.setString(entry.role === 'error' ? entry.message : entry.text); }} />
-              <Button label={t('web.ai.action.retry')} tone="ghost" testID={`chat-retry-${String(entry.id)}`} disabled={snapshot.phase !== 'idle'} onPress={() => { controller.retry(entry.id); }} />
+              <Button label={t('web.ai.action.copy')} icon="action.copy" tone="ghost" testID={`chat-copy-${String(entry.id)}`} onPress={() => { Clipboard.setString(entry.role === 'error' ? entry.message : entry.text); }} />
+              <Button label={t('web.ai.action.retry')} icon="action.retry" tone="ghost" testID={`chat-retry-${String(entry.id)}`} disabled={snapshot.phase !== 'idle'} onPress={() => { controller.retry(entry.id); }} />
             </HStack>
             {entry.role === 'error' && entry.cause === 'egress-not-authorized' && onOpenSettings !== undefined ? (
               <Button label={t('mobile.ai.goSettings')} tone="ghost" onPress={onOpenSettings} />

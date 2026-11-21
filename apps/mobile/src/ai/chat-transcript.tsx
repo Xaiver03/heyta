@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { AiGeneratedLabel, StreamCaret } from '@heyta/ui';
 
 import { Card, Stack, Text } from '../ui/kit';
+import { MarkdownMessage } from './MarkdownMessage';
 import { useTokens } from '../theme';
 
 export interface ChatTranscriptItem {
@@ -69,18 +70,24 @@ function ChatMessage({
               : tokens['color.surface'],
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <Text tone={isUser ? 'on-primary' : isError ? 'danger' : 'default'} selectable>
-            {item.text}
-          </Text>
-          {item.streaming === true ? (
-            /**
-             * 🔴 `font-size.sm`（14）—— 与 `.ht-ai__panel` / web 端光标同档。
-             * 两边必须一致，否则同一条回答在两端的光标会一高一矮。
-             */
-            <StreamCaret testID={`chat-caret-${String(item.id)}`} fontSize={tokens['font-size.sm']} />
-          ) : null}
-        </View>
+        {isGenerated ? (
+          <View>
+            <MarkdownMessage text={item.text} />
+            {item.streaming === true ? (
+              /**
+               * 🔴 `font-size.sm`（14）—— 与 `.ht-ai__panel` / web 端光标同档。
+               * 两边必须一致，否则同一条回答在两端的光标会一高一矮。
+               */
+              <StreamCaret testID={`chat-caret-${String(item.id)}`} fontSize={tokens['font-size.sm']} />
+            ) : null}
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <Text tone={isUser ? 'on-primary' : 'danger'} selectable>
+              {item.text}
+            </Text>
+          </View>
+        )}
         {item.detail !== undefined ? (
           <Text variant="caption" tone="subtle" selectable>
             {item.detail}

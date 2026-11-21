@@ -116,6 +116,8 @@ const ICONS = {
   'tab.profile': PersonGlyph as unknown as typeof User,
   'action.attach': PaperclipGlyph as unknown as typeof Paperclip,
   'action.image': ImagePlusGlyph as unknown as typeof ImagePlus,
+  'action.copy': CopyGlyph as unknown as typeof Copy,
+  'action.retry': RotateCcwGlyph as unknown as typeof RotateCcw,
 
   // 任务
   'task.add': PlusGlyph as unknown as typeof Plus,
