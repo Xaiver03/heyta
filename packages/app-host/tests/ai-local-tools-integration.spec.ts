@@ -1,0 +1,89 @@
+/**
+ * 本地工具传输 —— **真实引擎 + 真实宿主**的集成测试。
+ *
+ * 证明 `createLocalToolTransport` 不是"只映射结果"：它经 `runSelectedTool` 在真实
+ * 物化数据上执行。覆盖：
+ *   · 只读工具 `list_tasks` 真的读回种子任务；
+ *   · 写工具 `create_task` 只产出提案 → 传输回 `write-needs-confirm`，**不落库**。
+ */
+import { OpLogEngine } from '@heyta/op-log';
+import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
+import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
+import type { Operation } from '@heyta/sync-core';
+import type { LocalApiConfig } from '@heyta/local-api';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { createTaskActions, type TaskActions } from '../src/actions.js';
+import { createLocalApiHost } from '../src/local-api-host.js';
+import { toCloudToolDescriptors } from '../src/ai-cloud-tools.js';
+import { createLocalToolTransport } from '../src/ai-local-tools.js';
+import { runCloudAgentTurn, type HarnessModelReply } from '../src/agent-harness.js';
+
+let adapter: SqliteAdapter;
+let engine: OpLogEngine;
+let actions: TaskActions;
+
+const now = (): number => 1_700_000_000_000;
+
+beforeEach(async () => {
+  adapter = new SqliteAdapter({ schema: INDEXEDDB_SCHEMA, driverFactory: () => new NodeSqliteDriver(':memory:') });
+  await adapter.init();
+  engine = new OpLogEngine({ store: new DbOpLogStore<Operation<string>>(adapter), clientId: 'client-test', now });
+  actions = createTaskActions(engine, { now, newTaskId: (() => { let n = 0; return () => `t-${++n}`; })() });
+});
+
+afterEach(() => adapter.close());
+
+const grants = { list_tasks: true, create_task: true } as LocalApiConfig['grants'];
+
+function makeTransport() {
+  const host = createLocalApiHost(engine, actions, { isReadable: () => true });
+  return createLocalToolTransport({ host, grants, getGrants: () => grants });
+}
+
+describe('createLocalToolTransport 对真实宿主', () => {
+  it('只读 list_tasks 读回真实种子任务', async () => {
+    const host = createLocalApiHost(engine, actions, { isReadable: () => true });
+    await host.submit({ action: 'create-task', title: '写周报' });
+    await host.submit({ action: 'create-task', title: '开会' });
+
+    const transport = makeTransport();
+    const scripted: HarnessModelReply[] = [
+      { toolCalls: [{ id: 'c1', name: 'list_tasks', arguments: {} }] },
+      { text: '你有任务。' },
+    ];
+    const result = await runCloudAgentTurn('我有哪些任务', {
+      transport,
+      tools: toCloudToolDescriptors(grants),
+      systemPrompt: 's',
+      callModel: async () => scripted.shift()!,
+    });
+
+    expect(result.steps).toEqual([{ tool: 'list_tasks', ok: true }]);
+    const toolMsg = result.messages.find((m) => m.role === 'tool');
+    expect(toolMsg?.content).toContain('写周报');
+    expect(toolMsg?.content).toContain('开会');
+  });
+
+  it('写工具 create_task → write-needs-confirm，且不落库', async () => {
+    const transport = makeTransport();
+    const scripted: HarnessModelReply[] = [
+      { toolCalls: [{ id: 'c1', name: 'create_task', arguments: { title: '新任务' } }] },
+      { text: '需要你确认。' },
+    ];
+    const result = await runCloudAgentTurn('建个任务', {
+      transport,
+      tools: toCloudToolDescriptors(grants),
+      systemPrompt: 's',
+      callModel: async () => scripted.shift()!,
+    });
+
+    expect(result.steps[0]?.ok).toBe(false);
+    const toolMsg = result.messages.find((m) => m.role === 'tool');
+    expect(toolMsg?.content).toContain('需要确认');
+    // 未落库：再 list_tasks 仍是空的
+    const listed = await transport.invoke('list_tasks', {});
+    expect(listed.ok).toBe(true);
+    if (listed.ok) expect(listed.data).toEqual([]);
+  });
+});
