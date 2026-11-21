@@ -107,6 +107,17 @@ export interface DispatchResult {
   seqs: number[];
 }
 
+/** {@link OpLogEngine.undoOperations} 的结果（封闭词表）。 */
+export type UndoRunOutcome =
+  | { readonly status: 'applied'; readonly applied: readonly string[] }
+  | {
+      readonly status: 'partial';
+      readonly applied: readonly string[];
+      readonly unsupported: readonly { readonly opId: string; readonly reason: string }[];
+    }
+  | { readonly status: 'stale'; readonly reason: 'entity-missing' | 'entity-changed' }
+  | { readonly status: 'empty' };
+
 export interface RemoteApplyResult {
   applied: Operation<string>[];
   skipped: number;
@@ -188,6 +199,12 @@ export class OpLogEngine {
    */
   private undoStack: HistoryEntry[] = [];
   private redoStack: HistoryEntry[] = [];
+  /**
+   * opId → 历史条目（用于"按 op 整批撤销"）。与 `undoStack` 同寿命、同上限。
+   * 只存**当前已应用且可撤销**的条目；`undoOperations` 会用它取回当初算好的反向意图
+   * （反向意图必须在**应用该 op 之前**的状态里算，事后无法重建）。
+   */
+  private historyByOpId = new Map<string, HistoryEntry>();
 
   private serialize<T>(work: () => Promise<T>): Promise<T> {
     const result = this.mutationQueue.then(work);
@@ -532,6 +549,7 @@ export class OpLogEngine {
   clearHistory(): void {
     this.undoStack = [];
     this.redoStack = [];
+    this.historyByOpId.clear();
   }
 
   /**
@@ -572,6 +590,55 @@ export class OpLogEngine {
     if (this.redoStack.length > HISTORY_LIMIT) {
       this.redoStack = this.redoStack.slice(-HISTORY_LIMIT);
     }
+    // 重建 opId → 条目映射（只含**当前可撤销**的 undoStack 条目）。
+    this.historyByOpId.clear();
+    for (const entry of this.undoStack) this.historyByOpId.set(entry.opId, entry);
+  }
+
+  /**
+   * **按 opId 整批撤销**（逆序、逐条反向）。用于产品裁决 D1 的"撤销这次 AI 操作"：
+   * AI 运行账（`ai-run-ledger`）记下这次发送写了哪几条 op，这里把它们整批抵消。
+   *
+   * - 逆序应用每条 `inverse`；每条都过 `checkInverseStillValid`（被别的设备改过 ⇒ 不硬撤）。
+   * - 不可逆/找不到记录的 op 进 `unsupported`（**不假装成功**）。
+   * - 反向 op 以 `recordHistory=false` 派发（不再入撤销栈，避免"撤销套娃"）。
+   * ⚠️ 整批撤销**不进重做栈**（一次性操作，不做 redo）。
+   */
+  undoOperations(opIds: readonly string[]): Promise<UndoRunOutcome> {
+    return this.serialize(async () => {
+      const applied: string[] = [];
+      const unsupported: { opId: string; reason: string }[] = [];
+      for (const opId of [...opIds].reverse()) {
+        const entry = this.historyByOpId.get(opId);
+        if (entry === undefined) {
+          unsupported.push({ opId, reason: 'not-tracked' });
+          continue;
+        }
+        if (entry.inverse === undefined) {
+          unsupported.push({ opId, reason: entry.reason ?? 'unsupported' });
+          continue;
+        }
+        const stale = checkInverseStillValid(this.state, entry);
+        if (stale !== undefined) {
+          unsupported.push({ opId, reason: stale });
+          continue;
+        }
+        await this.dispatchLocked(entry.inverse, undefined, false);
+        this.historyByOpId.delete(opId);
+        const idx = this.undoStack.findIndex((e) => e.opId === opId);
+        if (idx >= 0) this.undoStack.splice(idx, 1);
+        applied.push(opId);
+      }
+      if (applied.length === 0) {
+        if (unsupported.length === 0) return { status: 'empty' };
+        if (unsupported.length === 1) {
+          const only = unsupported[0]!.reason;
+          if (only === 'entity-missing' || only === 'entity-changed') return { status: 'stale', reason: only };
+        }
+        return { status: 'partial', applied, unsupported };
+      }
+      return unsupported.length === 0 ? { status: 'applied', applied } : { status: 'partial', applied, unsupported };
+    });
   }
 
   private async stepHistory(direction: 'undo' | 'redo'): Promise<UndoOutcome> {
@@ -693,7 +760,11 @@ export class OpLogEngine {
      */
     if (historyEntry !== undefined) {
       this.undoStack.push(historyEntry);
-      if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
+      this.historyByOpId.set(historyEntry.opId, historyEntry);
+      if (this.undoStack.length > HISTORY_LIMIT) {
+        const dropped = this.undoStack.shift();
+        if (dropped !== undefined) this.historyByOpId.delete(dropped.opId);
+      }
       this.redoStack = [];
     }
 
