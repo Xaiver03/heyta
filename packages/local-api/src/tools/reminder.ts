@@ -34,6 +34,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '按提醒时刻从早到晚。可以只看某一条任务的。' +
       '时刻是机器时间，界面上显示的是本地日期时间。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -45,6 +46,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '要么给"比截止时间早多少分钟"（minutesBeforeDue，此时任务必须有截止时间）。两种形态互斥。' +
       '时刻不能在过去、也不能远于一年；一条任务超过界面上限会被拒绝而不是截着收下。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
 ];

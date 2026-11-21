@@ -37,6 +37,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '列出专注记录（哪一类、计划多久、实际多久、有没有走完、从哪一刻开始），按记录写进去的先后排。' +
       `默认最多 ${String(DEFAULT_LIST_LIMIT)} 条。时间单位是毫秒，和记录里存的一样。`,
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -47,6 +48,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '补记一段已经结束的专注：要写它是哪种（工作 / 短休息 / 长休息）、计划多少分钟、实际多少分钟。' +
       '可以挂在一条任务上。开始或中止一个正在走的计时器不是这个工具能做的事。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
 ];

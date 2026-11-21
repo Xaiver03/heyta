@@ -40,6 +40,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '可按清单、完成状态、截止日期筛；按日期查时范围最多 14 天。' +
       '不返回备注正文 —— 备注要单独用 get_task 取。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -49,6 +50,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: ['task.id', 'task.title', 'task.dueDate', 'task.priority', 'task.completed', 'task.readable', 'task.body'],
     description: '读取单个任务的完整内容（含备注正文）。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -69,6 +71,7 @@ const TOOLS: readonly LocalApiTool[] = [
     description:
       '读取一条任务的估时上下文：标题、可读时的备注、最近至多 20 条有效专注历史和已授权的估时偏好。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -82,6 +85,7 @@ const TOOLS: readonly LocalApiTool[] = [
     // （机制由本包"产不出 op"的类型形状保证，不靠告诉模型）。
     description: '新建一个任务。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
   {
@@ -89,6 +93,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: [],
     description: '修改任务字段（标题、截止日期、优先级）。只能改显式给定的字段。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
   {
@@ -96,6 +101,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: [],
     description: '把一组未完成清单追加到任务备注末尾，保留已有备注。一次最多 20 条。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
   {
@@ -107,6 +113,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '把任务标记为完成。单条给 taskId；要一次完成多条给 taskIds' +
       `（一次最多 ${String(MAX_TASKS_PER_BATCH_COMPLETE)} 条，按去重后的条数算）。`,
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
   {
@@ -114,6 +121,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: [],
     description: `一次给多条任务设置优先级。每条都要给 taskId 与 priority（none / low / medium / high），最多 ${String(MAX_TASKS_PER_BATCH_PRIORITY)} 条。`,
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
   {
@@ -121,6 +129,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: [],
     description: '设置任务的预计耗时（整数分钟，5–480；超出范围会夹到边界）。这项改动必须确认。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
 ];

@@ -33,6 +33,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '列出习惯及其打卡目标（目标数值、单位、达成口径）。' +
       '只列习惯的定义，不列每天的打卡记录。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -43,6 +44,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '新建一个习惯。可指定每天的目标数值、单位与达成口径（至少 / 至多 / 恰好）。' +
       '不传目标就是"每天做过一次"。名称不能为空。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
 ];

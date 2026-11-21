@@ -34,6 +34,7 @@ const TOOLS: readonly LocalApiTool[] = [
       `默认最多 ${String(DEFAULT_LIST_LIMIT)} 条，筛完才截断。` +
       '注意它列的是记录，不是习惯有哪些：习惯的定义用 list_habits。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -44,6 +45,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '给一个习惯记一次打卡。不写日期就是今天；不写数值就是该习惯的目标数值' +
       '（没目标就是 1，即"做过一次"）。同一天重复记不会多出第二条。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
 ];

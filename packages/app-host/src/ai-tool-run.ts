@@ -84,6 +84,14 @@ export interface AiToolProposal {
 
 /** 执行档自动落地前必须保留确认的破坏性动作。 */
 export function aiToolProposalRequiresConfirmation(proposal: AiToolProposal): boolean {
+  // 🔴 先读**目录里**的 risk（唯一声明处，见 `local-api/src/tools/shared.ts` 的 `ToolRisk`）。
+  //    破坏性档优先于下面的动作级判定：
+  //      · destructive-irreversible（彻底删除 purge）：永不由 AI 自动执行（D7）。
+  //      · destructive-reversible（删除→回收站 / 归档 / 移动）：直接执行，靠 op-log 版本回溯兜底（D1）。
+  //    `write` / 未标注：沿用下面动作级判定（保持历史行为；迁到纯 risk 判定见 P1）。
+  const risk = findTool(proposal.tool)?.risk;
+  if (risk === 'destructive-irreversible') return true;
+  if (risk === 'destructive-reversible') return false;
   switch (proposal.intent.action) {
     case 'complete-tasks':
       return true;

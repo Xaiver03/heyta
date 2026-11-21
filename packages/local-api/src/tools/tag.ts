@@ -28,6 +28,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: ['tag.id', 'tag.name'],
     description: '列出所有标签（标识与名称）。给任务打标签之前先用它拿到标签标识。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -36,6 +37,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: [],
     description: '新建一个标签。名称不能为空，也不能只有空格。重名不会被拒绝（界面上也是如此）。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
   {
@@ -46,6 +48,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '这不是追加：要多打一个标签，先把现有标签取回来，连同新的一起传。' +
       '不认识或已经删掉的标签标识会被拒绝而不是忽略。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
 ];

@@ -28,6 +28,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: ['project.id', 'project.name', 'project.taskCount'],
     description: '列出清单/项目及其任务数量。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -38,6 +39,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '新建一个清单（项目）。可选放进某个已有清单的下层，最多一层。' +
       '名称不能为空；放在哪个清单下面由宿主核对，认不出就整条拒绝而不是建到看不见的地方。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
 ];

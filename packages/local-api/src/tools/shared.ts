@@ -25,11 +25,35 @@
 /** 工具是只读还是会改数据。**这个区分决定它需不需要过 `dispatch()`**。 */
 export type ToolKind = 'read' | 'write';
 
+/**
+ * 工具的**风险档**（写进目录、由目录唯一声明）。
+ *
+ * 🔴 为什么风险必须长在目录里，而不是散在 app-host 的 switch 里：
+ * 加一个工具要改两处、漏一处的症状是「破坏性动作被默认当成低风险自动执行」，
+ * 没有任何编译或门禁会拦。风险是工具的固有属性，和 `kind` 一样属于目录。
+ *
+ * | 档 | 含义 | AI 执行档 |
+ * |---|---|---|
+ * | `read` | 只读 | 直接执行 |
+ * | `write` | 可逆的普通写（建/改/完成/加清单/优先级/估时/打卡/专注…） | 沿用动作级判定（见 `aiToolProposalRequiresConfirmation`） |
+ * | `destructive-reversible` | 可逆的破坏性动作（删除→回收站 / 归档 / 移动清单） | 直接执行，靠 op-log 版本回溯兜底（产品裁决 D1） |
+ * | `destructive-irreversible` | 不可逆（彻底删除 purge） | 永不由 AI 自动执行；默认不进工具目录（产品裁决 D7） |
+ */
+export type ToolRisk = 'read' | 'write' | 'destructive-reversible' | 'destructive-irreversible';
+
 export interface LocalApiTool {
   name: string;
   /** 给模型看的说明。写清楚"做什么"和"不做什么"。 */
   description: string;
   kind: ToolKind;
+  /**
+   * 风险档。**必填**，与 `kind` 一起构成工具声明的一部分。
+   *
+   * 约束（由 `tests/tools-risk.spec.ts` 判红）：`kind:'read'` 必须是 `risk:'read'`；
+   * `kind:'write'` 必须是 `write` / `destructive-reversible` / `destructive-irreversible` 之一。
+   * 未来新增删除/归档/移动必须是 `destructive-reversible`，新增 purge 必须 `destructive-irreversible`。
+   */
+  risk: ToolRisk;
   /**
    * 🔴 这个工具的**返回值**里，哪些字段可能被送上模型（对话式助手的多步循环用）。
    *

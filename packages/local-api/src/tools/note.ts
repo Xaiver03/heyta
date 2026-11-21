@@ -36,6 +36,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '列出便签的目录信息（标识、归属清单、是否钉在今天、最后修改时间），顺序和界面上一样。' +
       `不返回正文 —— 正文要用 get_note 逐条取。默认最多 ${String(DEFAULT_LIST_LIMIT)} 条，筛完才截断。`,
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -43,6 +44,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: [...ROW_FIELDS, 'note.content'],
     description: '读取一条便签，包含正文。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -53,6 +55,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '新建一张便签。正文不能为空（只有空格也算空）。' +
       '可以指定放进哪个清单，不指定就是不归属任何清单；可以钉在今天。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
   {
@@ -60,6 +63,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: [],
     description: '改写一张已有便签的正文（整段替换，不是追加）。正文不能为空。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
 ];

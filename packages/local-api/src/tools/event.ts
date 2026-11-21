@@ -40,6 +40,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '每条给出锚点日期、类型档位、下一次发生日与相差天数。' +
       '不返回备注正文 —— 备注要单独用 get_event 取。归档过的倒数日不在这里。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -60,6 +61,7 @@ const TOOLS: readonly LocalApiTool[] = [
     ],
     description: '读取单个倒数日/纪念日的完整内容（含备注正文）。',
     kind: 'read',
+    risk: 'read',
     defaultEnabled: false,
   },
   {
@@ -72,6 +74,7 @@ const TOOLS: readonly LocalApiTool[] = [
       '是否按农历每年重复、RRULE 重复规则、备注。' +
       '写入只是提案：你在界面上确认之后才会真正保存。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
   {
@@ -80,6 +83,7 @@ const TOOLS: readonly LocalApiTool[] = [
     description:
       '修改倒数日字段（标题、日期、类型档位、农历、重复规则、置顶、备注）。只能改显式给定的字段。',
     kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
 ];
