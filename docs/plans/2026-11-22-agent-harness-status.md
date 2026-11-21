@@ -1,0 +1,40 @@
+# Agent Harness 目标达成状态（对照产品裁决 D1–D7）
+
+> 日期：2026-11-22。本文件把产品负责人 7 条裁决逐条映射到**代码 + 能转红的测试 + 门禁**，并如实列出**未完成/未验证**。
+> 相关：[设计 v3](2026-11-21-agent-tool-calling-audit-and-pi-harness-design.md)、[审计①](2026-11-21-agent-harness-audit.md)、[审计②](2026-11-22-agent-harness-impl-audit.md)。
+
+## 0. 验证快照（本次现量）
+
+| 套件 | 结果 |
+|---|---|
+| app-host AI 相关 13 spec | **114 passed** |
+| op-log 全套 17 spec | **182 passed** |
+| node-host Agent 闭环 1 spec | **1 passed** |
+| `check:ai-tools` | ✅ rc=0 |
+| `check:layering` | ✅ rc=0 |
+| `check:ai-coverage` | ❌ rc=1（mobile 缺 `breakdown/prioritize/duration` 三入口，**既有缺口，非本 harness**） |
+
+## 1. 逐条判定
+
+| 裁决 | 落地 | 证据（文件 / 测试） | 状态 |
+|---|---|---|---|
+| **D5 tool calling 只针对云端（不碰本地 OS）** | 模型只经 `invokeRouted`（唯一出境点）；工具两种传输都不碰 OS：本地传输只对 **app 物化数据**（`runSelectedTool`），HTTP 传输打自有云端；**无 bash/fs/exec 工具** | `ai-routed-model.ts`、`ai-local-tools.ts`、`ai-cloud-tools.ts`；`ai-cloud-tools-http.e2e.spec.ts`、`ai-local-tools-integration.spec.ts` | ✅ 代码+测试 |
+| **D2 不做 Action Plan** | 无 plan 数据类型/确认计划；工具结果直接回灌，写只出提案（既有 `executeAiToolProposal` 唯一落库点） | `agent-harness.ts`（无 plan 概念）、`ai-local-tools.ts`（写=write-needs-confirm） | ✅ |
+| **D1 删除/归档/移动给 AI 靠版本回溯** | 本地写入：`engine.undoOperations`（按 op）+ `engine.undoSince(seq)`（按段）+ 壳编排 `runAiTurnWithUndo`；`checkInverseStillValid` 防误撤 | `engine.ts`、`ai-turn-orchestrator.ts`；`undo-run.spec.ts`(7)、`ai-turn-orchestrator.spec.ts`、node-host `agent-cloud.spec.ts` | ✅ 本地路径；⚠️ 云端写入撤销需服务端 |
+| **D7 purge 不给 AI** | 工具目录 `risk='destructive-irreversible'` 默认从传输/描述中**过滤**；当前目录无 purge 工具 | `ai-cloud-tools.ts`（`selectToolNames` 过滤）、`tools-risk.spec.ts` | ✅ |
+| **D6 默认明文、服务端可读** | 本次未改默认加密策略（ADR-0081：默认 `readable`）；E2EE 仍是可选 | 无改动 | ✅ 未回归 |
+| **工具调用面向云端（模型）** | `createRoutedModelCall` → `invokeRouted`（feature=tool-calling，`fields` 含 `tools` + 工具观测字段并集 + 回送前复查） | `ai-routed-model.ts`；`ai-routed-model.spec.ts`(7) | ✅ |
+| **PI 内核（桌面增强）+ 四端可移植** | 原生引擎**纯 JS 四端可跑**（可移植门禁）；PI 内核以同一 `CloudAgentTool` 契约接入（`.local` demo 跑通 30 工具）；node-host 真实路径验收 | `agent-portability.spec.ts`、`ai-cloud-tools.ts`(`toCloudAgentTools`)、node-host `agent-cloud.spec.ts` | ✅ 库级；⚠️ 移动/Web **UI 入口未接**；PI 内核 RN 真机未验证 |
+| **专职审计 + Lead 终审** | 两轮审计报告 + 处置表 | 见上两份审计文档 | ✅ |
+
+## 2. 未完成 / 未验证（诚实清单）
+
+1. **移动端 / Web 的真实 UI 入口**：契约 `runAiTurnWithUndo` 就绪，但 `apps/mobile`(`AssistantScreen`) / `apps/web` 尚未注入新路径（且 `apps/mobile` 正被另一会话改动，未触碰）。⇒ "四端可用"目前是**库级 + node-host 级**，非四端 UI 全接。
+2. **服务端 `/api/agent/tools`**：契约已定（`agent-tools-api.md`），**未实现**；托管场景与云端写入撤销需要它。
+3. **P0-2（assistant `tool_calls` 帧）**：与既有 `ai-assistant` 同构地未发 assistant 工具调用帧；真实 OpenAI 兼容端点是否 400 **未联网复验**（审计②列为推断）。
+4. **PI 内核在 RN/Hermes 真机**：`pi-agent-core` 可移植性未验证（审计① U5）；Hermes 性能未量化。
+5. **`check:ai-coverage` 红**：mobile 缺 `breakdown/prioritize/duration` 三入口——既有产品缺口，与本 harness 无关。
+
+## 3. 结论
+
+设备侧 Harness 的**库与 node-host 闭环已实现并经两轮审计与 297 条测试**；移动/Web UI 入口、服务端工具 API、真实 provider 复验属剩余工作。**不把上述未完成项写成已完成。**
