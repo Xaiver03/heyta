@@ -306,3 +306,30 @@ export function MarkdownMessage({ text }: { text: string }): React.JSX.Element {
   }
   return <View>{renderNodes(nodes, t, 'md')}</View>;
 }
+
+
+/**
+ * 逐字揭示：服务端整段到达后按字快速显示（真机可见逐字出现）。
+ *
+ * 为什么不是网络级 SSE 流：真机 RN 的 XHR 增量流式通道在本项目环境报错/被代理缓冲，
+ * 逐字直接用渲染层揭示，稳定可靠。~2.5s 揭示完一条（与长度无关）。
+ */
+export function TypewriterMarkdown({ text }: { text: string }): React.JSX.Element {
+  const [visible, setVisible] = React.useState(0);
+  React.useEffect(() => {
+    if (text.length === 0) {
+      setVisible(0);
+      return;
+    }
+    setVisible(0);
+    const step = Math.max(1, Math.ceil(text.length / 160));
+    let i = 0;
+    const timer = setInterval(() => {
+      i = Math.min(text.length, i + step);
+      setVisible(i);
+      if (i >= text.length) clearInterval(timer);
+    }, 16);
+    return () => clearInterval(timer);
+  }, [text]);
+  return <MarkdownMessage text={text.slice(0, visible)} />;
+}

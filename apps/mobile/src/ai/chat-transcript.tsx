@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { AiGeneratedLabel, StreamCaret } from '@heyta/ui';
 
 import { Card, Stack, Text } from '../ui/kit';
-import { MarkdownMessage } from './MarkdownMessage';
+import { MarkdownMessage, TypewriterMarkdown } from './MarkdownMessage';
 import { useTokens } from '../theme';
 
 export interface ChatTranscriptItem {
@@ -41,7 +41,7 @@ export function ChatTranscript({
 }): React.JSX.Element {
   return (
     <Stack gap="loose">
-      {items.length === 0 ? empty : items.map((item) => <ChatMessage key={item.id} item={item} generatedLabel={generatedLabel} />)}
+      {items.length === 0 ? empty : items.map((item, index) => <ChatMessage key={item.id} item={item} generatedLabel={generatedLabel} animate={index === items.length - 1} />)}
     </Stack>
   );
 }
@@ -49,9 +49,11 @@ export function ChatTranscript({
 function ChatMessage({
   item,
   generatedLabel,
+  animate = false,
 }: {
   item: ChatTranscriptItem;
   generatedLabel: string;
+  animate?: boolean;
 }): React.JSX.Element {
   const tokens = useTokens();
   const isUser = item.role === 'user';
@@ -72,7 +74,7 @@ function ChatMessage({
       >
         {isGenerated ? (
           <View>
-            <MarkdownMessage text={item.text} />
+            {animate ? <TypewriterMarkdown text={item.text} /> : <MarkdownMessage text={item.text} />}
             {item.streaming === true ? (
               /**
                * 🔴 `font-size.sm`（14）—— 与 `.ht-ai__panel` / web 端光标同档。
