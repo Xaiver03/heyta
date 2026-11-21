@@ -126,6 +126,25 @@ describe('🔴 建任务的可覆盖字段：名字必须与模型一致', () =>
     // 反向断言：不许出现一个没人读的 `notes` 残留字段。
     expect(task['notes'], '不许写一个没人读的 `notes` 字段').toBeUndefined();
   });
+
+  it('🔴 S7：时间段 `startDate + durationMinutes` 一次 Create op 落到 Task 上（两个字段都对，且成对）', async () => {
+    // 与 note/notes 同一条纪律：`create` 把 `over` 原样铺进载荷，键名=Task 字段名。
+    // 捕获「时间段」只发**一条** Create op（一个用户意图=一个 op），而不是
+    // create + setSchedule 两条 —— 后者会留下"先有起点没时长"的中间态。
+    const startDate = 1_700_000_000_000;
+    const id = await actions.create('下午开会', { startDate, durationMinutes: 90 });
+
+    const task = actions.findTask(id)! as unknown as Record<string, unknown>;
+    expect(task['startDate'], 'Task.startDate 必须拿到起点').toBe(startDate);
+    expect(task['durationMinutes'], 'Task.durationMinutes 必须拿到时长').toBe(90);
+  });
+
+  it('没选时间段 ⇒ 载荷里两个键都不出现（与改动前逐字节等价）', async () => {
+    const id = await actions.create('只写标题');
+    const task = actions.findTask(id)! as unknown as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(task, 'startDate')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(task, 'durationMinutes')).toBe(false);
+  });
 });
 
 describe('setRepeat：一个用户意图 = 一个 op', () => {

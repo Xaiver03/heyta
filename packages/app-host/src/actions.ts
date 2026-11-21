@@ -118,6 +118,19 @@ export interface NewTaskFields {
    */
   startDate?: number;
   startDateLocal?: string;
+  /**
+   * 时间段的**时长**（分钟），与 `startDate` 成对（ADR-0043）。
+   *
+   * 捕获框的「时间段」（S7）一次 Create op 带上 `startDate + durationMinutes`，
+   * 与时间线拖拽（`setSchedule`）落到同一对字段 —— 两条路径共用一份时间线投影，
+   * 不会"拖出来的有起止、捕获出来的只有起点"。
+   *
+   * ⚠️ 字段名必须与 `Task.durationMinutes` 逐字一致（`entities.ts:344`）：
+   * `create` 把 `over` 原样铺进载荷，差一个字母就会写进一个没人读的字段
+   * （`note`/`notes` 血案，见 `repeat-actions.spec.ts` 的运行时落点断言）。
+   * 可选、省略即"不带这个字段"（不是写成 undefined）。
+   */
+  durationMinutes?: number;
 }
 
 /** Fields accepted by the local API's single-task detail patch. */
