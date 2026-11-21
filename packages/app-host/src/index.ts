@@ -970,6 +970,23 @@ export {
   type PublicFactsUnavailableCause,
 } from './public-facts.js';
 
+/**
+ * 自动更新：客户端检查核心（宿主无关）。判定标志来自服务端（`GET /api/app-version`），
+ * 这里只做「发请求 + 校验形状 + 该不该弹」。定性见 `docs/plans/app-auto-update.md`。
+ * 各宿主只注入「本机版本 + fetch + 上次提示过的版本」，不自己比版本大小。
+ */
+export {
+  APP_UPDATE_START_DELAY_MS,
+  APP_UPDATE_INTERVAL_MS,
+  buildAppVersionUrl,
+  checkAppUpdate,
+  decideAppUpdatePrompt,
+  type AppUpdateCheckInput,
+  type AppUpdateCheckResult,
+  type AppUpdatePrompt,
+} from './app-update.js';
+
+
 export {
   createVaultKeyPackageStore,
   type VaultKeyPackageStore,
