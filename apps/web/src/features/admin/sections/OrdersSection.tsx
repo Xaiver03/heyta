@@ -88,8 +88,7 @@ export function OrdersSection({
     },
     {
       key: 'paidAt',
-      // TODO(i18n): 「支付时间」没有词条（web.admin.order.paidAt），先以英文占位。
-      header: 'Paid at',
+      header: t('web.admin.order.paidAt'),
       render: (order) => formatTime(order.paidAt),
     },
     {
@@ -113,8 +112,7 @@ export function OrdersSection({
             store.setActiveTab('refunds');
           }}
         >
-          {/* TODO(i18n): 「去退款」专用词条；暂借退款分区标题词条。 */}
-          {t('web.admin.tab.refunds')}
+          {t('web.admin.order.goRefund')}
         </Button>
       ),
     },

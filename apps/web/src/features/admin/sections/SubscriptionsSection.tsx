@@ -92,9 +92,8 @@ export function SubscriptionsSection({
     },
     {
       key: 'provider',
-      // TODO(i18n): 缺「通道」表头词条（建议 `web.admin.table.provider`）。
       // 后端 provider 码：admin-grant / invite / wechat / paycenter，码表外念裸码。
-      header: 'Provider',
+      header: t('web.admin.table.provider'),
       render: (row) => {
         const key = providerLabelKey(row.provider);
         return key === null ? (row.provider ?? '—') : t(key);
@@ -102,15 +101,13 @@ export function SubscriptionsSection({
     },
     {
       key: 'priceId',
-      // TODO(i18n): 缺「档位」专用表头（当前复用发放分区的「档位」词条）。
-      header: t('web.admin.grant.sku'),
+      header: t('web.admin.table.tier'),
       render: (row) => row.priceId ?? '—',
     },
     {
       key: 'grants',
-      // TODO(i18n): 缺「授予能力」列头词条；先复用「此刻能用」。精确到这一行时，
-      // 它指的是该行 `grants[]` 授予的能力（hosting / ai / automation）。
-      header: t('web.admin.user.entitlements'),
+      // 这一列是客服端的解读：grant 只认服务端给的原文，不重排。
+      header: t('web.admin.subscription.grants'),
       render: (row) => grantsLabel(row.grants, t),
     },
     {

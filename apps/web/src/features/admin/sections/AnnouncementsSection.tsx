@@ -116,9 +116,7 @@ export function AnnouncementsSection({
     },
     {
       key: 'publishedAt',
-      // TODO(i18n): 「生效时间」表头没有独立词条（web.admin.announcements.publishesAt
-      // 带着表单提示「留空 = 立刻」，不能直接当表头），先以英文占位。
-      header: 'Live from',
+      header: t('web.admin.announcements.liveFrom'),
       render: (row) => formatTime(row.publishedAt),
     },
     {
@@ -201,10 +199,9 @@ export function AnnouncementsSection({
           )}
         </FormField>
 
-        {/* TODO(i18n): 「级别」字段标签没有词条（现有词条只有两个选项值 levelInfo/levelWarning），先英文占位。 */}
         <Select
           id="admin-announcement-level"
-          label="Level"
+          label={t('web.admin.announcements.level')}
           value={form.level}
           options={levelOptions}
           onChange={(value) => setForm({ ...form, level: value === 'warning' ? 'warning' : 'info' })}

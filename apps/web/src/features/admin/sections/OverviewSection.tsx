@@ -114,15 +114,19 @@ export function OverviewSection({
         <h5 className="ht-settings__admin-h5">{t('web.admin.tab.invites')}</h5>
         <MetricGrid>
           <StatCard label={t('web.admin.overview.invites.codes')} value={invites.codes} />
-          {/* TODO(i18n): 邀请码「停用数」专用词条（当前复用「关闭」） */}
-          <StatCard label={t('web.admin.close')} value={invites.codesDisabled} />
+          <StatCard
+            label={t('web.admin.overview.invites.codesDisabled')}
+            value={invites.codesDisabled}
+          />
           <StatCard label={t('web.admin.overview.invites.referrals')} value={invites.referrals} />
           <StatCard
             label={t('web.admin.overview.invites.activated')}
             value={invites.referralsActivated}
           />
-          {/* TODO(i18n): 「已奖励推荐数」专用词条（当前复用「奖励」） */}
-          <StatCard label={t('web.admin.table.reward')} value={invites.referralsRewarded} />
+          <StatCard
+            label={t('web.admin.overview.invites.referralsRewarded')}
+            value={invites.referralsRewarded}
+          />
         </MetricGrid>
       </section>
     </div>

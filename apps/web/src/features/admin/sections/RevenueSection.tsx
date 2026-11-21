@@ -169,8 +169,7 @@ export function RevenueSection({ store }: { store: AdminStoreState }): React.JSX
                 columns={[
                   {
                     key: 'day',
-                    // TODO(i18n): 缺「日期」表头专用 key（建议 `web.admin.revenue.col.day`），暂借通用词条。
-                    header: t('web.shell.dueMode.date'),
+                    header: t('web.admin.revenue.col.day'),
                     render: (point) => formatDay(point.dayMs),
                   },
                   {

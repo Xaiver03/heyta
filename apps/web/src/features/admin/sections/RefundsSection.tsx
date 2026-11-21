@@ -55,7 +55,7 @@ interface RefundRowWithDetail extends AdminRefundRow {
  * 🔴 词表住在服务端（`server/src/billing/refund-store.ts` 的 `REFUND_STATUSES`），
  * 这一层**不把它枚举成中文**：认识的那几枚给语义色，其余一律 `neutral` 并把码本身
  * 原样念出来 —— 一个没翻译的码是"这里要加词条"的响亮提示，编一个中文名是安静的错。
- * 补中文名属于 i18n 词条（见本文件 TODO(i18n)）。
+ * 补中文名属于 i18n 词条。
  */
 function refundStatusTone(status: string): BadgeTone {
   switch (status) {
@@ -144,8 +144,7 @@ export function RefundsSection(props: { store: AdminStoreState }): React.JSX.Ele
   const columns: readonly DataTableColumn<RefundRowWithDetail>[] = [
     {
       key: 'refundNo',
-      // TODO(i18n): 「退款单号」列头（当前无专用词条，英文占位，同 OrdersSection 的 'Paid at'）。
-      header: 'Refund',
+      header: t('web.admin.refund.number'),
       render: (refund) => `#${String(refund.id)} · ${refund.outRefundNo}`,
     },
     {
@@ -166,15 +165,13 @@ export function RefundsSection(props: { store: AdminStoreState }): React.JSX.Ele
     },
     {
       key: 'period',
-      // TODO(i18n): 「退款天数」列头（当前无专用词条，英文占位）。
-      header: 'Days',
+      header: t('web.admin.refund.days'),
       align: 'end',
       render: (refund) => t('web.admin.refund.period').replace('{days}', String(refund.periodDays)),
     },
     {
       key: 'provider',
-      // TODO(i18n): 「支付通道」列头（当前无专用词条，英文占位）。
-      header: 'Provider',
+      header: t('web.admin.table.provider'),
       render: (refund) => refund.provider,
     },
     {
@@ -184,17 +181,14 @@ export function RefundsSection(props: { store: AdminStoreState }): React.JSX.Ele
     },
     {
       key: 'note',
-      // TODO(i18n): 「理由」列头（`web.admin.refund.note` 是动作输入框的长句，
-      // 不适合当列头；列头专用词条待补，英文占位）。
-      header: 'Reason',
+      header: t('web.admin.table.reason'),
       // TODO(server): 投影补 `note` 后删掉 `?? '—'` 兜底。
       render: (refund) =>
         refund.note === undefined || refund.note === null || refund.note === '' ? '—' : refund.note,
     },
     {
       key: 'providerRefundId',
-      // TODO(i18n): 「通道退款单号」列头（待补词条，英文占位）。
-      header: 'Provider refund ID',
+      header: t('web.admin.refund.providerRefundId'),
       // TODO(server): 投影补 `providerRefundId` 后删掉 `?? '—'` 兜底。
       render: (refund) =>
         refund.providerRefundId === undefined || refund.providerRefundId === null
@@ -203,8 +197,7 @@ export function RefundsSection(props: { store: AdminStoreState }): React.JSX.Ele
     },
     {
       key: 'refundedAt',
-      // TODO(i18n): 「到账时刻」列头（待补词条，英文占位）。
-      header: 'Refunded at',
+      header: t('web.admin.refund.refundedAt'),
       align: 'end',
       // TODO(server): 投影补 `refundedAt`（epoch ms）后删掉 `?? null` 兜底。
       render: (refund) => formatTime(refund.refundedAt ?? null),

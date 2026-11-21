@@ -159,8 +159,7 @@ export function GrantsSection({ store }: { store: AdminStoreState }): React.JSX.
   const columns: readonly DataTableColumn<AdminGrantRow>[] = [
     {
       key: 'action',
-      // TODO(i18n): 「动作」列头（当前无专用词条，英文占位，同 OrdersSection 的 'Paid at'）。
-      header: 'Action',
+      header: t('web.admin.table.action'),
       render: (row) => t(ADMIN_GRANT_ACTION_KEY[row.action]),
     },
     {
@@ -191,14 +190,12 @@ export function GrantsSection({ store }: { store: AdminStoreState }): React.JSX.
     },
     {
       key: 'reason',
-      // TODO(i18n): 「理由」列头（表单标签过长，暂以英文占位）。
-      header: 'Reason',
+      header: t('web.admin.table.reason'),
       render: (row) => row.reason,
     },
     {
       key: 'actor',
-      // TODO(i18n): 「操作者」列头。
-      header: 'Actor',
+      header: t('web.admin.table.actor'),
       render: (row) => t('web.admin.grant.rowActor', { actor: String(row.actorUserId) }),
     },
   ];
@@ -350,8 +347,7 @@ export function GrantsSection({ store }: { store: AdminStoreState }): React.JSX.
           )}
         </FormField>
         <MenuItem onSelect={applyUserFilter} testID="admin-grants-filter-apply">
-          {/* TODO(i18n): 筛选「应用」按钮词条（暂用英文占位）。 */}
-          Apply
+          {t('web.admin.filter.apply')}
         </MenuItem>
       </FilterBar>
 

@@ -73,8 +73,7 @@ export function InvitesSection({
     },
     {
       key: 'reward',
-      header: t('web.admin.table.reward'),
-      // TODO(i18n): `rewardedAt` 没有独立的「发放时间」表头词条，暂把奖励天数与发放时间并入本列。
+      header: t('web.admin.invites.rewardCol'),
       // 补齐：此前 `rewardedAt` 未展示。
       render: (referral) => (
         <>

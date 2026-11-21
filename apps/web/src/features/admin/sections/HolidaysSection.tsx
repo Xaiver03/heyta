@@ -110,25 +110,19 @@ export function HolidaysSection(props: { store: AdminStoreState }): React.JSX.El
   const openYearData =
     openYear === null ? null : (years?.years.find((year) => year.year === openYear) ?? null);
 
-  /**
-   * 逐日明细两列。列头/休补文字**都没有现成词条**，按纪律先用英文占位并标 `TODO(i18n)`，
-   * 不硬编码中文。
-   */
+  /** 逐日明细两列。 */
   const dayColumns: readonly DataTableColumn<HolidayDay>[] = [
     {
       key: 'day',
-      // TODO(i18n): 「日期」列头缺词条（web.admin.holiday.day.date）；先用英文占位。
-      header: 'Date',
+      header: t('web.admin.holiday.day.date'),
       render: (row) => row.day,
     },
     {
       key: 'kind',
-      // TODO(i18n): 「类型」列头缺词条（web.admin.holiday.day.kind）；先用英文占位。
-      header: 'Kind',
+      header: t('web.admin.holiday.day.kind'),
       render: (row) => (
         <Badge tone={row.isOffDay ? 'info' : 'warning'}>
-          {/* TODO(i18n): 「休 / 补」两枚词条缺失（web.admin.holiday.day.off / .work）；先用英文占位。 */}
-          {row.isOffDay ? 'Off day' : 'Work day'}
+          {row.isOffDay ? t('web.admin.holiday.day.off') : t('web.admin.holiday.day.work')}
         </Badge>
       ),
     },
@@ -220,8 +214,7 @@ export function HolidaysSection(props: { store: AdminStoreState }): React.JSX.El
                         setOpenYear(year.year);
                       }}
                     >
-                      {/* TODO(i18n): 缺「查看逐日明细」词条（web.admin.holiday.days.view）；先用英文占位。 */}
-                      View days
+                      {t('web.admin.holiday.days.view')}
                     </Button>
                     <Button
                       tone="danger"

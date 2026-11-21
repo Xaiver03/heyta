@@ -32,22 +32,19 @@ export function CouponsSection({
       header: t('web.admin.table.status'),
       render: (coupon) => (
         <Badge tone={coupon.enabled ? 'success' : 'neutral'}>
-          {/* TODO(i18n): 优惠码停用态专用词条（当前复用「关闭」） */}
-          {coupon.enabled ? t('web.admin.overview.coupons.enabled') : t('web.admin.close')}
+          {coupon.enabled ? t('web.admin.overview.coupons.enabled') : t('web.admin.coupon.disabled')}
         </Badge>
       ),
     },
     {
       key: 'discount',
-      // TODO(i18n): 折扣力度专用表头（当前复用「金额」）
-      header: t('web.admin.table.amount'),
+      header: t('web.admin.coupon.discount'),
       align: 'end',
       render: (coupon) => formatDiscount(coupon),
     },
     {
       key: 'validity',
-      // TODO(i18n): 有效期专用表头（当前复用「到期」）
-      header: t('web.admin.table.expires'),
+      header: t('web.admin.coupon.validity'),
       render: (coupon) => `${formatTime(coupon.validFrom)} – ${formatTime(coupon.validUntil)}`,
     },
     {
