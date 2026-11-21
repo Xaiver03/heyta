@@ -43,3 +43,12 @@
 判据：`packages/op-log/tests/undo-run.spec.ts`（`undoSince` 两条 + `undoOperations` 五条）。
 
 ⚠️ **云端工具路径的写入发生在服务端**（`/api/agent/tools`），其"撤销这次 AI 操作"属于服务端版本历史，不在本地 `undoSince` 范围；需服务端实现（见 `agent-tools-api.md`）。两条路径不要混用。
+
+## 5. 两种工具传输（同一契约，壳按需注入）
+
+| 传输 | 工具在哪执行 | 何时用 |
+|---|---|---|
+| `createHttpCloudToolTransport({baseUrl,getToken})` | heyta 云端 `/api/agent/tools` | 托管/跨端、需服务端权威与版本历史 |
+| `createLocalToolTransport(runnerDeps)` | 设备本地 app 数据（`runSelectedTool`），不碰 OS | 本地优先、离线、只用 app 自己的数据 |
+
+两者都实现 `CloudToolTransport`，可直接喂 `runCloudAgentTurn` / `requestCloudAssistantTurn`，也可作 PI 内核 `toCloudAgentTools` 的传输。**本地传输只让只读工具通过；写操作返回 `write-needs-confirm`，必须走助手既有"提案→确认→自动执行"（唯一落库点）。** 判据：`ai-local-tools.spec.ts`。
