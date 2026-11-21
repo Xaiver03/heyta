@@ -3,13 +3,18 @@ import { useState } from 'react';
 import { useI18n, type MessageKey } from '@heyta/i18n/provider';
 import { isHttpPaperUrl } from '@heyta/shared-schema';
 
-import {
-  ADMIN_HOLIDAY_NOTICE_KEY,
-  type AdminStoreState,
-  type HolidayYearInput,
-} from '../store.js';
+import { type AdminStoreState, type HolidayYearInput } from '../store.js';
 
 import { FormField } from '../../../lib/form/FormField.js';
+
+import {
+  Badge,
+  Button,
+  DataTable,
+  InlineFeedback,
+  SideSheet,
+  type DataTableColumn,
+} from '../../../components/hta/index.js';
 
 import { AdminEmpty, formatTime } from './shared.js';
 
@@ -21,6 +26,9 @@ const EMPTY_HOLIDAY_FORM: HolidayYearInput = {
   offDaysText: '',
   workDaysText: '',
 };
+
+/** 逐日明细里的一行。`isOffDay` 是服务端存的布尔，这里只读、不重判。 */
+type HolidayDay = { day: string; isOffDay: boolean };
 
 /**
  * 「调休 / 补班」面板。W4b 的最后一层（服务端与契约早已就绪，缺的就是这一块）。
@@ -41,22 +49,84 @@ const EMPTY_HOLIDAY_FORM: HolidayYearInput = {
  *   3. 撤销某一年 —— 语义是**退回随包表**，不是"清空那一年"，
  *      措辞必须说清，否则运营会以为撤销之后日历上什么都不标。
  *
+ * 迁移口径（`.local/admin-redesign/05-reuse-map.md` §3/§8/§10/§16/§18、
+ * `02-admin-ia.md` §3.10）：
+ *   · 表单字段走 `FormField`（解剖唯一来源），控件去掉自拼的 `.ht-settings__admin-input`；
+ *     放假/补班两个多值日期字段在上方各挂一枚原生 `<input type="date">`（§18 的轻量档）
+ *     作为**结构化**入口：选一天即追加进下面那一行一值清单，仍由文本框持有原文
+ *     （`store` 的 `HolidayYearInput` 契约不变，也不用新增词条去喂 `DatePicker` 的
+ *     `labels`——那会要求新 i18n key）；
+ *   · 已录入年度的列表仍是 `ul + flex 行`（§10 的基线），但**逐日 `days` 明细**用
+ *     `SideSheet` + `DataTable` 展示（原来只显示 `dayCount`，运营没法核对哪天休/补）；
+ *   · 撤销走**危险确认**（行内两步、危险实底档），并在途时 `disabled`；
+ *   · 保存按钮在途时 `disabled`；回执统一走 `InlineFeedback` 渲染 `store.feedback`。
+ *
  * ⚠️ 表单是**受控组件**，字段留在本地 state：每次键入都进 store 会让
  * 整块后台随字符重渲染，而 store 是各标签页共用的。
  */
 export function HolidaysSection(props: { store: AdminStoreState }): React.JSX.Element {
   const { t } = useI18n();
-  const years = props.store.holidayYears;
+  const store = props.store;
+  const years = store.holidayYears;
   const [form, setForm] = useState<HolidayYearInput>(EMPTY_HOLIDAY_FORM);
   /** 两步式撤销：`null` = 没有待确认的年份。见下面 `revoke` 那段注释。 */
   const [pendingRevokeYear, setPendingRevokeYear] = useState<number | null>(null);
+  /** 逐日明细抽屉当前展开的年份（`null` = 抽屉关闭）。命名不带 `Id`：它不是一个"选中实体"。 */
+  const [openYear, setOpenYear] = useState<number | null>(null);
 
-  const field = (key: keyof HolidayYearInput) => (event: { target: { value: string } }): void => {
-    setForm((previous) => ({ ...previous, [key]: event.target.value }));
+  const field =
+    (key: keyof HolidayYearInput) =>
+    (event: { target: { value: string } }): void => {
+      setForm((previous) => ({ ...previous, [key]: event.target.value }));
+    };
+
+  /** 把日期选择器选中的一天追加成"一行一值"。只做追加/去尾空行，不校验、不去重。 */
+  const appendDay = (key: 'offDaysText' | 'workDaysText', day: string): void => {
+    if (day === '') return;
+    setForm((previous) => {
+      const current = previous[key].replace(/\s+$/u, '');
+      return { ...previous, [key]: current === '' ? day : `${current}\n${day}` };
+    });
   };
 
-  const notice = props.store.holidayNotice;
-  const echo = props.store.holidayEcho;
+  /**
+   * 回执：渲染统一反馈通道 `store.feedback`（audit R1「唯一回执原语」的数据侧）。
+   *
+   * ⚠️ 这里**额外**用 `holidayNotice !== null` 做门：`setActiveTab` 只清那五个
+   * `*Notice` 字段、**不清** `feedback`，所以切到本分区时 `feedback` 可能还挂着
+   * 上一格的一条回执。`holidayNotice` 被 `setActiveTab → clearHolidayNotice` 清掉，
+   * 拿它当"这条回执属于本分区"的判据，可避免在调休页复述别处的成功/失败。
+   * （真正的修法应是 `setActiveTab` 一并 `clearFeedback`，见交付说明的「需 store 支持点」。）
+   */
+  const feedback = store.feedback;
+  const showFeedback = feedback !== null && store.holidayNotice !== null;
+  const feedbackText =
+    feedback === null
+      ? ''
+      : t(feedback.message as MessageKey)
+          .replace('{year}', String(store.holidayEcho?.year ?? '—'))
+          .replace('{count}', String(store.holidayEcho?.dayCount ?? '—'));
+
+  const openYearData =
+    openYear === null ? null : (years?.years.find((year) => year.year === openYear) ?? null);
+
+  /** 逐日明细两列。 */
+  const dayColumns: readonly DataTableColumn<HolidayDay>[] = [
+    {
+      key: 'day',
+      header: t('web.admin.holiday.day.date'),
+      render: (row) => row.day,
+    },
+    {
+      key: 'kind',
+      header: t('web.admin.holiday.day.kind'),
+      render: (row) => (
+        <Badge tone={row.isOffDay ? 'info' : 'warning'}>
+          {row.isOffDay ? t('web.admin.holiday.day.off') : t('web.admin.holiday.day.work')}
+        </Badge>
+      ),
+    },
+  ];
 
   return (
     // 🔴 返回**片段**而不是再套一层 `ht-settings__section`：外层那一节已经是
@@ -64,15 +134,11 @@ export function HolidaysSection(props: { store: AdminStoreState }): React.JSX.El
     <>
       <p className="ht-settings__hint">{t('web.admin.holiday.lead')}</p>
 
-      {notice !== null && (
-        <p
-          className={notice === 'failed' ? 'ht-settings__danger' : 'ht-settings__notice'}
-          data-testid="admin-holiday-notice"
-        >
-          {t(ADMIN_HOLIDAY_NOTICE_KEY[notice] as MessageKey)
-            .replace('{year}', String(echo?.year ?? '—'))
-            .replace('{count}', String(echo?.dayCount ?? '—'))}
-        </p>
+      {/* ── 统一回执（InlineFeedback 渲染 store.feedback）──────────── */}
+      {showFeedback && feedback !== null && (
+        <InlineFeedback tone={feedback.tone} testID="admin-holiday-notice">
+          {feedbackText}
+        </InlineFeedback>
       )}
 
       {/* ── 已录入的年度（判据②：papers 必须**回显成可点的链接**）───── */}
@@ -127,24 +193,40 @@ export function HolidaysSection(props: { store: AdminStoreState }): React.JSX.El
                           {paper}
                         </a>
                       ) : (
-                        <span key={paper} className="ht-settings__admin-badge" data-testid="admin-holiday-paper-rejected">
+                        <span
+                          key={paper}
+                          className="ht-settings__admin-badge"
+                          data-testid="admin-holiday-paper-rejected"
+                        >
                           {paper}
                         </span>
                       ),
                     )}
                   </span>
                   <div className="ht-settings__admin-actions">
-                    <button
-                      type="button"
-                      className="ht-settings__admin-btn ht-settings__admin-btn--danger"
+                    {/* 逐日明细：原来只显示 dayCount，运营无法核对哪天休/补；现在开抽屉看逐日。 */}
+                    <Button
+                      size="sm"
+                      tone="ghost"
+                      data-testid="admin-holiday-days-open"
+                      onClick={() => {
+                        store.clearHolidayNotice();
+                        setOpenYear(year.year);
+                      }}
+                    >
+                      {t('web.admin.holiday.days.view')}
+                    </Button>
+                    <Button
+                      tone="danger"
+                      disabled={store.pending.holidayDelete}
                       data-testid="admin-holiday-revoke"
                       onClick={() => {
-                        props.store.clearHolidayNotice();
+                        store.clearHolidayNotice();
                         setPendingRevokeYear(year.year);
                       }}
                     >
                       {t('web.admin.holiday.revoke')}
-                    </button>
+                    </Button>
                     {pendingRevokeYear === year.year && (
                       // 🔴 撤销是**两步**：服务端语义是"删掉这一年的覆盖行 ⇒ 客户端
                       // 退回随包表"，不是"那一年没有任何安排"。一次点击就删掉一整年、
@@ -154,27 +236,30 @@ export function HolidaysSection(props: { store: AdminStoreState }): React.JSX.El
                         data-testid="admin-holiday-revoke-confirm"
                       >
                         {t('web.admin.holiday.revoke.confirm')}
-                        <button
-                          type="button"
-                          className="ht-settings__admin-btn ht-settings__admin-btn--danger"
+                        {/* 危险确认的唯一主按钮：danger + commit（实底），在途时禁用。 */}
+                        <Button
+                          tone="danger"
+                          commit
+                          disabled={store.pending.holidayDelete}
+                          loading={store.pending.holidayDelete}
                           data-testid="admin-holiday-revoke-yes"
                           onClick={() => {
-                            setPendingRevokeYear(null);
-                            void props.store.deleteHolidayYear(year.year);
+                            // 不在这里关掉确认：让它在途时带着 `disabled`+转圈留在原地，
+                            // 删完由「重读年度列表」把这一行（连同确认）一起移除。
+                            void store.deleteHolidayYear(year.year);
                           }}
                         >
                           {t('web.admin.holiday.revoke.yes')}
-                        </button>
-                        <button
-                          type="button"
-                          className="ht-settings__admin-btn"
+                        </Button>
+                        <Button
+                          tone="secondary"
                           data-testid="admin-holiday-revoke-cancel"
                           onClick={() => {
                             setPendingRevokeYear(null);
                           }}
                         >
                           {t('web.admin.close')}
-                        </button>
+                        </Button>
                       </span>
                     )}
                   </div>
@@ -185,6 +270,33 @@ export function HolidaysSection(props: { store: AdminStoreState }): React.JSX.El
         </>
       )}
 
+      {/* ── 逐日明细抽屉（SideSheet + DataTable）────────────────────── */}
+      {openYearData !== null && (
+        <SideSheet
+          testId="admin-holiday-days"
+          labelledBy="admin-holiday-days-title"
+          title={`${String(openYearData.year)} · ${t('web.admin.holiday.dayCount').replace(
+            '{count}',
+            String(openYearData.dayCount),
+          )}`}
+          onCancel={() => setOpenYear(null)}
+          footer={
+            <Button tone="secondary" onClick={() => setOpenYear(null)}>
+              {t('web.admin.close')}
+            </Button>
+          }
+        >
+          <DataTable
+            columns={dayColumns}
+            rows={openYearData.days}
+            rowKey={(row) => `${row.day}|${String(row.isOffDay)}`}
+            emptyTitle={t('web.admin.list.none')}
+            caption={t('web.admin.holiday.list')}
+            testID="admin-holiday-days-table"
+          />
+        </SideSheet>
+      )}
+
       {/* ── 录入一整年 ───────────────────────────────────────────── */}
       <h5 className="ht-settings__admin-h5">{t('web.admin.holiday.form.title')}</h5>
       <p className="ht-settings__hint">{t('web.admin.holiday.form.lead')}</p>
@@ -193,18 +305,17 @@ export function HolidaysSection(props: { store: AdminStoreState }): React.JSX.El
         onSubmit={(event) => {
           event.preventDefault();
           setPendingRevokeYear(null);
-          void props.store.saveHolidayYear(form).then((saved) => {
+          void store.saveHolidayYear(form).then((saved) => {
             // 只有服务端**收了**才清输入：失败了还清空，等于把运营刚敲的一整年
             // 逐日表丢掉，而他要从头再打一遍。
             if (saved) setForm(EMPTY_HOLIDAY_FORM);
           });
         }}
       >
-                <FormField id="admin-holiday-year-input" label={t('web.admin.holiday.form.year')}>
+        <FormField id="admin-holiday-year-input" label={t('web.admin.holiday.form.year')}>
           {(fieldProps) => (
-  <input
-    {...fieldProps}
-              className="ht-settings__admin-input"
+            <input
+              {...fieldProps}
               type="number"
               inputMode="numeric"
               data-testid="admin-holiday-year-input"
@@ -213,11 +324,11 @@ export function HolidaysSection(props: { store: AdminStoreState }): React.JSX.El
             />
           )}
         </FormField>
-                <FormField id="admin-holiday-papers-input" label={t('web.admin.holiday.form.papers')}>
+
+        <FormField id="admin-holiday-papers-input" label={t('web.admin.holiday.form.papers')}>
           {(fieldProps) => (
-  <textarea
-    {...fieldProps}
-              className="ht-settings__admin-input"
+            <textarea
+              {...fieldProps}
               rows={2}
               data-testid="admin-holiday-papers-input"
               value={form.papersText}
@@ -225,45 +336,79 @@ export function HolidaysSection(props: { store: AdminStoreState }): React.JSX.El
             />
           )}
         </FormField>
-                <FormField id="admin-holiday-off-input" label={t('web.admin.holiday.form.offDays')}>
+
+        <FormField id="admin-holiday-off-input" label={t('web.admin.holiday.form.offDays')}>
           {(fieldProps) => (
-  <textarea
-    {...fieldProps}
-              className="ht-settings__admin-input"
-              rows={4}
-              data-testid="admin-holiday-off-input"
-              value={form.offDaysText}
-              onChange={field('offDaysText')}
-            />
+            <>
+              {/*
+               * 结构化入口：选一天即追加进下面那一行一值清单（`YYYY-MM-DD`）。
+               * 用原生 `<input type="date">`（reuse-map §18 的轻量档），
+               * 避免为 `DatePicker` 的 `labels` 新增 i18n 词条。
+               */}
+              <input
+                type="date"
+                aria-label={t('web.admin.holiday.form.offDays')}
+                data-testid="admin-holiday-off-date"
+                onChange={(event) => {
+                  appendDay('offDaysText', event.currentTarget.value);
+                  event.currentTarget.value = '';
+                }}
+              />
+              <textarea
+                {...fieldProps}
+                rows={4}
+                data-testid="admin-holiday-off-input"
+                value={form.offDaysText}
+                onChange={field('offDaysText')}
+              />
+            </>
           )}
         </FormField>
-                <FormField id="admin-holiday-work-input" label={t('web.admin.holiday.form.workDays')}>
+
+        <FormField id="admin-holiday-work-input" label={t('web.admin.holiday.form.workDays')}>
           {(fieldProps) => (
-  <textarea
-    {...fieldProps}
-              className="ht-settings__admin-input"
-              rows={4}
-              data-testid="admin-holiday-work-input"
-              value={form.workDaysText}
-              onChange={field('workDaysText')}
-            />
+            <>
+              <input
+                type="date"
+                aria-label={t('web.admin.holiday.form.workDays')}
+                data-testid="admin-holiday-work-date"
+                onChange={(event) => {
+                  appendDay('workDaysText', event.currentTarget.value);
+                  event.currentTarget.value = '';
+                }}
+              />
+              <textarea
+                {...fieldProps}
+                rows={4}
+                data-testid="admin-holiday-work-input"
+                value={form.workDaysText}
+                onChange={field('workDaysText')}
+              />
+            </>
           )}
         </FormField>
-                <FormField id="admin-holiday-note-input" label={t('web.admin.holiday.form.note')}>
+
+        <FormField id="admin-holiday-note-input" label={t('web.admin.holiday.form.note')}>
           {(fieldProps) => (
-  <input
-    {...fieldProps}
-              className="ht-settings__admin-input"
+            <input
+              {...fieldProps}
               data-testid="admin-holiday-note-input"
               value={form.noteText}
               onChange={field('noteText')}
             />
           )}
         </FormField>
+
         <div className="ht-settings__admin-actions">
-          <button type="submit" className="ht-settings__admin-btn" data-testid="admin-holiday-save">
+          <Button
+            type="submit"
+            tone="primary"
+            disabled={store.pending.holidaySave}
+            loading={store.pending.holidaySave}
+            data-testid="admin-holiday-save"
+          >
             {t('web.admin.holiday.save')}
-          </button>
+          </Button>
         </div>
       </form>
     </>
