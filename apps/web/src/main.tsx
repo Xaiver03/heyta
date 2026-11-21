@@ -39,6 +39,7 @@ import { storageHintKey } from './features/shell/error-hint.js';
 //   仅在原生壳内生效（`isNativeShellHost` 把关），浏览器 / PWA / 移动端 DOM 零变化。
 import { bootstrapDesktopChrome } from './features/shell/desktop-chrome.js';
 import { startPublicFacts } from './features/calendar/public-facts.js';
+import { startAppUpdate } from './features/app-update/detect.js';
 import { armWebShareSession } from './features/share/share-session.js';
 import { initOpLog } from './features/tasks/store.js';
 import { LocaleHost } from './lib/locale-host.js';
@@ -336,6 +337,16 @@ if (mode === 'shell') {
        *    这条通道是匿名的，未登录的用户同样该看到部署方录的调休。
        */
       startPublicFacts();
+
+      /**
+       * 应用更新检测（`GET /api/app-version`）。
+       *
+       * 排在这里：它要读同步配置里的 `baseUrl`（可能晚于首屏才从磁盘读回），
+       * 且定时器不该阻塞首屏。它自己判同意闸门（没同意一个请求都不发），
+       * 也自己在 `visibilitychange` 与新 SW 接管时补查 —— 所以无条件调一次即可。
+       */
+      startAppUpdate();
+
 
       /**
        * 共享清单的写路由与合并视图（M2，ADR-0067/0068）。

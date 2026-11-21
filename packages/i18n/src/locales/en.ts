@@ -22,6 +22,12 @@ export const en = {
   'common.sync.hosted.title': 'heyta cloud sync',
   'common.sync.hosted.hint': 'Sign in to sync tasks automatically across devices. No server address needed.',
   'common.tip.label': 'More about this',
+  // Auto-update (web): optional and forced prompt titles/actions.
+  'web.appUpdate.optionalTitle': 'Update available',
+  'web.appUpdate.forceTitle': 'Update required to continue',
+  'web.appUpdate.body': 'Version {version} is available.',
+  'web.appUpdate.refresh': 'Refresh',
+  'web.appUpdate.later': 'Later',
   'common.sync.advanced': 'Advanced: self-hosting and manual connection',
   'common.sync.account.connected': 'Signed in',
   'common.brand': 'heyta',

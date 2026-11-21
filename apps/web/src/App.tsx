@@ -293,6 +293,7 @@ import { SETTINGS_ANCHORS, type SettingsAnchor } from './features/shell/settings
 import { SyncSettingsPanel } from './features/sync/SyncSettingsPanel.js';
 import { AdminConsolePage } from './features/admin/AdminConsolePage.js';
 import { AnnouncementBanner } from './features/announcements/AnnouncementBanner.js';
+import { AppUpdateNotice } from './features/app-update/AppUpdateNotice.js';
 import { isAdminConsoleLocation } from './features/admin/route.js';
 
 /**
@@ -2986,6 +2987,7 @@ export function App(): React.JSX.Element {
           一次只画最新的一条，忽略记在本机 —— 见 `features/announcements/store.ts`。
         */}
         <AnnouncementBanner />
+        <AppUpdateNotice />
         <WebTopBar
           title={title}
           leading={

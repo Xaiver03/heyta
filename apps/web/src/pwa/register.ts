@@ -61,11 +61,40 @@ export function registerWidgetServiceWorker(): void {
 }
 
 function register(): void {
-  navigator.serviceWorker.register(serviceWorkerUrl()).catch((error: unknown) => {
-    // 注册失败**不能影响应用可用性** —— 小组件是增强，不是功能前提。
-    // 但要留痕：Windows 上组件不出现的第一个排查点就是这里。
-    console.warn('[heyta] service worker 注册失败，小组件将不可用', error);
-  });
+  // 🔴 首次安装时 `controller` 为空；非空说明之前已有一个 SW 在控制本页 ——
+  //    只有"原本有人控制"时，`controllerchange` 才意味着**换成了新构建**，
+  //    才该提示用户刷新。否则首装那一次的 `clients.claim()` 也会触发它，
+  //    变成"第一次访问就让人刷新一次"的假提示。
+  const hadController = navigator.serviceWorker.controller !== null;
+
+  navigator.serviceWorker
+    .register(serviceWorkerUrl())
+    .then((registration) => {
+      // 已有等待中的新 SW（例如别的标签页先触发了更新），直接提示。
+      if (hadController && registration.waiting !== null) notifyServiceWorkerUpdateReady();
+    })
+    .catch((error: unknown) => {
+      // 注册失败**不能影响应用可用性** —— 小组件是增强，不是功能前提。
+      // 但要留痕：Windows 上组件不出现的第一个排查点就是这里。
+      console.warn('[heyta] service worker 注册失败，小组件将不可用', error);
+    });
+
+  if (hadController) {
+    // 新 SW 的 install→skipWaiting→activate→claim 完成后会触发一次 controllerchange。
+    // 派一个页面事件，由 `features/app-update/detect.ts` 接住并提示"有新版本，刷新即可"。
+    navigator.serviceWorker.addEventListener('controllerchange', notifyServiceWorkerUpdateReady, {
+      once: true,
+    });
+  }
+}
+
+/** 新构建的 SW 接管页面 → 通知更新检测那条链（事件名与 `detect.ts` 的常量一致）。 */
+function notifyServiceWorkerUpdateReady(): void {
+  try {
+    window.dispatchEvent(new CustomEvent('heyta:sw-update-ready'));
+  } catch {
+    // CustomEvent 不可用（极老环境）时静默：这只是增强提示，不是功能前提。
+  }
 }
 
 /**

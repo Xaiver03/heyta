@@ -33,6 +33,12 @@ export const zhCN = {
   'common.sync.hosted.hint': '登录后，你的任务会在设备间自动同步。无需填写服务器地址。',
   // 设置页里每一枚「?」的无障碍名字。给读屏器一句"这是什么"，不是"点我"。
   'common.tip.label': '更多说明',
+  // 自动更新（web）：可选 / 强制两种提示的标题与动作。
+  'web.appUpdate.optionalTitle': '有新版本可用',
+  'web.appUpdate.forceTitle': '需要更新后才能继续使用',
+  'web.appUpdate.body': '新版本 {version} 已发布。',
+  'web.appUpdate.refresh': '刷新',
+  'web.appUpdate.later': '稍后',
   'common.sync.advanced': '高级：自托管与手动连接',
   'common.sync.account.connected': '已登录',
   'common.brand': 'heyta',
