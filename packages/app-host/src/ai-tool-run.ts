@@ -66,6 +66,7 @@ import {
   type ToolSelectionNoneReason,
   type ToolSelectionRule,
 } from './ai-tool-selection.js';
+import { recordAiRunWrite } from './ai-run-ledger.js';
 import { clampDurationMinutes } from './ai-duration.js';
 
 /**
@@ -197,6 +198,11 @@ export async function executeAiToolProposal(
   // app-host → op-log 路径，静态门禁也可以穷举这个写入口。
   const result = confirmAiToolProposal(host, proposal, authorization);
   records.set(id, { fingerprint, result });
+  // 记入"这次 AI 发送写了什么"的运行账（供回执与后续按 run 回滚）。
+  // 只在**真正落库成功**后记；失败不记（失败本来就没写）。
+  void result.then((write) => {
+    if (write.ok) recordAiRunWrite(host, id, proposal);
+  });
   const executionRecords = records;
   void result.then((write) => {
     if (!write.ok && executionRecords.get(id)?.result === result) executionRecords.delete(id);
