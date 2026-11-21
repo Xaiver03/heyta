@@ -147,6 +147,32 @@ describe('🔴 建任务的可覆盖字段：名字必须与模型一致', () =>
   });
 });
 
+describe('S6：repeatPreset 随一条 Create op 派生 repeatRule + repeatDtstart', () => {
+  it('weekly 预设 ⇒ repeatRule 含 FREQ=WEEKLY、repeatDtstart = 截止日；只有一条 Create op', async () => {
+    const due = parseLocalDate(MONDAY).getTime();
+    const id = await actions.create('每周复盘', { repeatPreset: 'weekly', dueDate: due });
+
+    const task = actions.findTask(id)! as unknown as Record<string, unknown>;
+    expect(typeof task['repeatRule'], '必须派生 repeatRule').toBe('string');
+    expect(String(task['repeatRule'])).toContain('FREQ=WEEKLY');
+    expect(task['repeatDtstart'], '锚点必须派生（与 setRepeat 同源）').toBeDefined();
+    expect(task['repeatPreset'], '重复预设不许原样落进任务（不是 Task 字段）').toBeUndefined();
+    expect(task['dueDate'], '给定截止日不被覆盖').toBe(due);
+  });
+
+  it('daily 预设 ⇒ FREQ=DAILY', async () => {
+    const id = await actions.create('每天读书', { repeatPreset: 'daily', dueDate: parseLocalDate(MONDAY).getTime() });
+    expect(String((actions.findTask(id)! as unknown as Record<string, unknown>)['repeatRule'])).toContain('FREQ=DAILY');
+  });
+
+  it('无 repeatPreset ⇒ 不出现 repeatRule / repeatDtstart（与改动前逐字节等价）', async () => {
+    const id = await actions.create('只写标题');
+    const task = actions.findTask(id)! as unknown as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(task, 'repeatRule')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(task, 'repeatDtstart')).toBe(false);
+  });
+});
+
 describe('setRepeat：一个用户意图 = 一个 op', () => {
   it('只产生**一条** op，且载荷同时含 repeatRule 与 repeatDtstart', async () => {
     const id = await actions.create('每周一交周报', { dueDate: parseLocalDate(MONDAY).getTime() });

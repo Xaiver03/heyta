@@ -56,6 +56,7 @@ import {
   type QuadrantTaskPatch,
   type Task,
 } from '@heyta/domain';
+import { repeatPresetRule, type RepeatPresetId } from './repeat-presets.js';
 import type { MaterializedState, OpIntent } from '@heyta/op-log';
 import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
@@ -131,6 +132,15 @@ export interface NewTaskFields {
    * 可选、省略即"不带这个字段"（不是写成 undefined）。
    */
   durationMinutes?: number;
+  /**
+   * 重复**预设**（S6）：`daily | weekly | weekdays | monthly | yearly`。
+   *
+   * 🔴 它**不是** `Task` 字段，不会被原样写进载荷。`create()` 会把它派生成
+   * `repeatRule`（RRULE 串）+ `repeatDtstart`（锚点）两个 `Task` 字段再落库 ——
+   * 派生的锚点语义与 {@link setRepeat} **同源**：已有截止日就用它，否则用今天并补上截止日。
+   * 这样"捕获时勾一个重复"与"事后在详情里设重复"落成同一对字段，不出现"有规则没锚点"的半截任务。
+   */
+  repeatPreset?: RepeatPresetId;
 }
 
 /** Fields accepted by the local API's single-task detail patch. */
@@ -663,7 +673,23 @@ export function createTaskActions(
 
   return {
     async create(title, over = {}) {
-      return dispatchCreate(title, { ...over });
+      const { repeatPreset, ...rest } = over;
+      if (repeatPreset === undefined) return dispatchCreate(title, { ...rest });
+      /*
+       * 🔴 重复预设 → `repeatRule` + `repeatDtstart`，随**同一条** Create op 落地。
+       * 锚点与 `setRepeat` 同源：已有截止日就用它，否则用今天并补上截止日（否则会出现
+       * "有规则、没日子"的任务，它在任何日期视图里都不出现）。规则无法构造（非法锚点）
+       * 时**当没设**，不写一条垃圾规则。
+       */
+      const anchor = dueLocalDateOf({ dueDate: rest.dueDate }) ?? today(now());
+      const rule = repeatPresetRule(repeatPreset, anchor);
+      if (rule === undefined) return dispatchCreate(title, { ...rest });
+      return dispatchCreate(title, {
+        ...rest,
+        repeatRule: rule,
+        repeatDtstart: anchor,
+        ...(rest.dueDate === undefined ? { dueDate: startOfDay(now()) } : {}),
+      });
     },
 
     async createSubtask(parentId, title) {
