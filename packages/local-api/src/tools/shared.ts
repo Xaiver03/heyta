@@ -132,7 +132,7 @@ export const MAX_TOOLS_PER_ENTITY = 7;
  */
 export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
-  TASK: 25,
+  TASK: 27,
   PROJECT: 10,
   NOTE: 10,
 } as const satisfies Readonly<Partial<Record<string, number>>>;
@@ -755,7 +755,10 @@ export type LocalApiWriteIntent =
    * 🔴 判活交给 `habitActions.undoCheckIn`（I5）：`false` = 那天本来就没打卡（宿主回
    * not-found）、`throw` = 习惯不存在（not-found）。本层不读原始 `habits` / 打卡表。
    */
-  | { action: 'undo-checkin'; habitId: string; date?: string };
+  | { action: 'undo-checkin'; habitId: string; date?: string }
+  // 批次5：重复任务控制
+  | { action: 'skip-task-occurrence'; taskId: string }
+  | { action: 'set-task-repeat-after-completion'; taskId: string; on: boolean };
 
 /**
  * 一条写入落地的实体类型。

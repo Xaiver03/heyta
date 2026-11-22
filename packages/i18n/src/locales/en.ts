@@ -2283,6 +2283,9 @@ export const en = {
   'web.ai.tools.intentMoveTasksOut': 'Remove {count} task(s) from their list',
   'web.ai.tools.intentUndoCheckinToday': 'Undo the check-in {id}',
   'web.ai.tools.intentUndoCheckin': 'Undo check-in on {date} {id}',
+  'web.ai.tools.intentSkipOccurrence': 'Skip this occurrence of task {id}',
+  'web.ai.tools.intentRepeatAfterCompletionOn': 'Task {id}: repeat from completion date',
+  'web.ai.tools.intentRepeatAfterCompletionOff': 'Task {id}: repeat from due date',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',

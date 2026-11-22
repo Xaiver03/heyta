@@ -630,6 +630,8 @@ describe('授权只有一份：整份目录，判断仍在 `@heyta/local-api`', 
         'set_task_pinned',
         'move_tasks',
         'undo_checkin',
+        'skip_task_occurrence',
+        'set_task_repeat_after_completion',
       ].sort(),
     );
     // 🔴 判据与这条用例的标题对齐：名单**由目录推导**，不是手抄一份工具名。

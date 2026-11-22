@@ -1860,5 +1860,23 @@ async function submitIntent(
       const logId = habitLogId(intent.habitId, day);
       return { ok: true, taskId: logId, entityId: logId, entityType: 'HABIT_LOG' };
     }
+    case 'skip-task-occurrence': {
+      const task = actions.findTask(intent.taskId);
+      if (task === undefined) return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      try {
+        await actions.skipOccurrence(intent.taskId);
+        return { ok: true, taskId: intent.taskId, entityId: intent.taskId, entityType: 'TASK' };
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: e instanceof Error ? e.message : '这条重复任务无法跳过。' };
+      }
+    }
+
+    case 'set-task-repeat-after-completion': {
+      const task = actions.findTask(intent.taskId);
+      if (task === undefined) return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      await actions.setRepeatAfterCompletion(intent.taskId, intent.on);
+      return { ok: true, taskId: intent.taskId, entityId: intent.taskId, entityType: 'TASK' };
+    }
+
   }
 }

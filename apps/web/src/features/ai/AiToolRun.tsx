@@ -317,6 +317,13 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return intent.date === undefined
         ? t('web.ai.tools.intentUndoCheckinToday', { id: intent.habitId })
         : t('web.ai.tools.intentUndoCheckin', { id: intent.habitId, date: intent.date });
+    // 批次5：重复任务控制
+    case 'skip-task-occurrence':
+      return t('web.ai.tools.intentSkipOccurrence', { id: intent.taskId });
+    case 'set-task-repeat-after-completion':
+      return intent.on
+        ? t('web.ai.tools.intentRepeatAfterCompletionOn', { id: intent.taskId })
+        : t('web.ai.tools.intentRepeatAfterCompletionOff', { id: intent.taskId });
   }
 }
 

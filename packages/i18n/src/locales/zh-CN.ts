@@ -2477,6 +2477,9 @@ export const zhCN = {
   'web.ai.tools.intentMoveTasksOut': '把 {count} 个任务移出清单',
   'web.ai.tools.intentUndoCheckinToday': '撤销今天的打卡 {id}',
   'web.ai.tools.intentUndoCheckin': '撤销 {date} 的打卡 {id}',
+  'web.ai.tools.intentSkipOccurrence': '跳过任务 {id} 的这一次',
+  'web.ai.tools.intentRepeatAfterCompletionOn': '任务 {id} 改为完成后顺延',
+  'web.ai.tools.intentRepeatAfterCompletionOff': '任务 {id} 改为按截止日顺延',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',

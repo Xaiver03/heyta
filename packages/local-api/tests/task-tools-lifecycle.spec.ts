@@ -52,7 +52,7 @@ describe('目录登记：六个生命周期工具都在，且形状与契约表�
     trash_task: 'destructive-reversible',
     restore_task: 'write',
     abandon_task: 'destructive-reversible',
-    unabandon_task: 'destructive-reversible',
+    unabandon_task: 'write',
     move_task: 'destructive-reversible',
     uncomplete_task: 'write',
   };

@@ -161,7 +161,7 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: [],
     description: '取消放弃（把 abandonedAt 清掉，任务回到进行中）。参数：taskId。',
     kind: 'write',
-    risk: 'destructive-reversible',
+    risk: 'write',
     defaultEnabled: false,
   },
   {
@@ -267,6 +267,22 @@ const TOOLS: readonly LocalApiTool[] = [
       'projectId（目标清单 id；省略表示移出清单、不归属任何清单）。',
     kind: 'write',
     risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
+  {
+    name: 'skip_task_occurrence',
+    egressFields: [],
+    description: '跳过重复任务的「这一次」（把当前到期日推进到下一次）。只对有重复规则的任务有效。参数：taskId。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_task_repeat_after_completion',
+    egressFields: [],
+    description: '设置重复任务是「按截止日顺延」还是「按完成日顺延」。参数：taskId、on（true=完成后顺延，false=按截止日）。',
+    kind: 'write',
+    risk: 'write',
     defaultEnabled: false,
   },
 ];
@@ -563,6 +579,21 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       },
     },
     required: ['taskIds'],
+    additionalProperties: false,
+  },
+  skip_task_occurrence: {
+    type: 'object',
+    properties: { taskId: { type: 'string', description: '要跳过这一次的重复任务 id。' } },
+    required: ['taskId'],
+    additionalProperties: false,
+  },
+  set_task_repeat_after_completion: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '重复任务 id。' },
+      on: { type: 'boolean', description: 'true=完成后顺延（按完成日）；false=按截止日顺延。' },
+    },
+    required: ['taskId', 'on'],
     additionalProperties: false,
   },
 };
@@ -1141,6 +1172,34 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
           taskIds: [...new Set(ids)],
           ...(projectId === undefined ? {} : { projectId }),
         },
+      };
+    }
+
+    case 'skip_task_occurrence': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `skip_task_occurrence 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'skip_task_occurrence 需要 taskId。' };
+      }
+      return { ok: true, intent: { action: 'skip-task-occurrence', taskId: a['taskId'].trim() } };
+    }
+
+    case 'set_task_repeat_after_completion': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'on');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_repeat_after_completion 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_task_repeat_after_completion 需要 taskId。' };
+      }
+      if (typeof a['on'] !== 'boolean') {
+        return { ok: false, message: 'set_task_repeat_after_completion 的 on 必须是布尔。' };
+      }
+      return {
+        ok: true,
+        intent: { action: 'set-task-repeat-after-completion', taskId: a['taskId'].trim(), on: a['on'] },
       };
     }
 

@@ -528,6 +528,26 @@ const CASES: readonly Case[] = [
     },
     effect: () => Object.values(engine.getState().habitLogs).filter((h) => h.deletedAt !== undefined).length,
   },
+
+  // ── 批次5：重复任务控制 ──
+  {
+    tool: 'skip_task_occurrence',
+    intentAction: 'skip-task-occurrence',
+    label: '跳过这一次',
+    args: async () => {
+      const taskId = await seed({ action: 'create-task', title: '每日', dueDate: '2026-12-01' });
+      await makeHost().submit({ action: 'set-task-repeat', taskId, rule: 'FREQ=DAILY' });
+      return { taskId };
+    },
+    effect: () => Object.values(engine.getState().tasks).filter((t) => (t.exDates?.length ?? 0) > 0).length,
+  },
+  {
+    tool: 'set_task_repeat_after_completion',
+    intentAction: 'set-task-repeat-after-completion',
+    label: '完成后顺延',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '顺延' }), on: true }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.repeatAfterCompletion === true).length,
+  },
 ];
 
 beforeEach(async () => {

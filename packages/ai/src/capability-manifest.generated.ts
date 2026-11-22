@@ -188,6 +188,8 @@ export const AI_CAPABILITY_MANIFEST =
         'set_task_important',
         'set_task_pinned',
         'move_tasks',
+        'skip_task_occurrence',
+        'set_task_repeat_after_completion',
       ],
     },
     {
@@ -935,6 +937,39 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'skip_task_occurrence',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '跳过重复任务的「这一次」（把当前到期日推进到下一次）。只对有重复规则的任务有效。参数：taskId。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'set_task_repeat_after_completion',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '设置重复任务是「按截止日顺延」还是「按完成日顺延」。参数：taskId、on（true=完成后顺延，false=按截止日）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'on',
+          'type': 'boolean',
+          'required': true,
+        },
+      ],
+    },
+    {
       'name': 'create_project',
       'kind': 'write',
       'entityType': 'PROJECT',
@@ -1545,7 +1580,7 @@ export const AI_CAPABILITY_TEXT = [
   '不可以说"产品不支持"。',
   '',
   '一、有 AI 工具的实体（9 个）',
-  '- TASK —— 读和写都有（读 3 / 写 22）',
+  '- TASK —— 读和写都有（读 3 / 写 24）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
   '  · [读] get_task_estimate_context（taskId*:string）',
@@ -1571,6 +1606,8 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] set_task_important（taskId*:string, important*:boolean）',
   '  · [写] set_task_pinned（taskId*:string, pinned*:boolean）',
   '  · [写] move_tasks（taskIds*:array, projectId:string）',
+  '  · [写] skip_task_occurrence（taskId*:string）',
+  '  · [写] set_task_repeat_after_completion（taskId*:string, on*:boolean）',
   '- PROJECT —— 读和写都有（读 1 / 写 6）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',

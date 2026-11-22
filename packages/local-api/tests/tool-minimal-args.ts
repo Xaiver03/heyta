@@ -87,4 +87,7 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   set_task_pinned: { taskId: 't1', pinned: true },
   move_tasks: { taskIds: ['t1'] },
   undo_checkin: { habitId: 'h1' },
+
+  skip_task_occurrence: { taskId: 't1' },
+  set_task_repeat_after_completion: { taskId: 't1', on: true },
 };
