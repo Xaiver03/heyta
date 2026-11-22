@@ -34,6 +34,10 @@
 | **PI 内核（桌面增强）+ 四端可移植** | 原生引擎**纯 JS 四端可跑**（可移植门禁）；PI 内核以同一 `CloudAgentTool` 契约接入（`.local` demo 跑通 30 工具）；node-host 真实路径验收 | `agent-portability.spec.ts`、`ai-cloud-tools.ts`(`toCloudAgentTools`)、node-host `agent-cloud.spec.ts` | ✅ 库级；⚠️ 移动/Web **UI 入口未接**；PI 内核 RN 真机未验证 |
 | **专职审计 + Lead 终审** | 两轮审计报告 + 处置表 | 见上两份审计文档 | ✅ |
 
+## 1.5 产品裁决（2026-11-22 用户确认）
+
+**写走设备端（唯一 op 作者=设备）、服务端 `/api/agent/tools` 只读**。理由：op-log 架构下 op 作者是设备，服务端只做中转/校验/广播；AI 写与手动写同延迟（同一条同步链，`ai-local-tools-integration.spec.ts` 证明 op 带 clientId/vectorClock）。『服务端写』仅适用于『服务端常驻 AI worker』，属另一产品线，不在本 Harness。
+
 ## 2. 未完成 / 未验证（诚实清单）
 
 1. **移动端 / Web 的真实 UI 入口**：**接入点已就绪**（`apps/web/src/features/ai/cloud-harness.ts` 的 `runWebCloudTurn`、`apps/mobile/src/ai/cloud-harness.ts` 的 `runMobileCloudTurn`，tsc 通过）；但**尚未把 `AssistantScreen`/`AssistantPanel` 的默认交互切到新入口**——现有面板用 `requestAssistantTurn`（含流式/历史/提案 UI），切换会牺牲这些，需产品决策+UI 验收。⇒ 「四端可用」= 库级 + 四端**接入点**就绪 + node-host 真跑，非四端 UI 默认切换。

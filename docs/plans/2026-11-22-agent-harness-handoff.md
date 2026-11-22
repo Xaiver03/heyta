@@ -25,6 +25,10 @@
 node scripts/check-ai-tools.mjs && node scripts/check-layering.mjs
 ```
 
+## 1.5 最终裁决（2026-11-22）
+
+写走设备端、服务端只读（见 status §1.5）。本 Harness 主体已交付；剩余为 UI 真机/浏览器验收与（可选）默认开启开关。
+
 ## 2. 未完成（按优先级）
 
 1. **服务端数据层接入**（`agent-tools-api.md` §4）：把 `agentToolsRoutes` 在 `server/src/api.ts` 注册（加 `{preHandler: authenticate}`），并把 `catalog` / `resolveGrants` / `execute` 接到真实服务端数据层。
