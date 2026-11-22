@@ -54,9 +54,9 @@
 
 ---
 
-## 实施进度（2026-11-22 批次 1-4 已完成，工具 30→65）
+## 实施进度（2026-11-22 批次 1-5 已完成，工具 30→67）
 
-工具目录现 **65 个（读 13 / 写 52）**。本轮新增 35 个写工具，覆盖"创建/分配/改/删/恢复/移动/层级/批量/排序"：
+工具目录现 **67 个（读 13 / 写 54）**。本轮新增 37 个写工具，覆盖"创建/分配/改/删/恢复/移动/层级/批量/排序"：
 
 - **任务全生命周期**：`trash_task`/`restore_task`/`abandon_task`/`unabandon_task`(放弃=第五状态)/`move_task`/`uncomplete_task`/`set_task_parent`(层级)/`create_subtask`(子任务)/`set_task_note`/`set_task_repeat`/`reorder_task`/`trash_tasks`(批量删)/`restore_tasks`(批量恢复)
 - **清单**：`rename_project`/`archive_project`/`delete_project`/`move_project`(层级)/`restore_project`
@@ -66,8 +66,9 @@
 - **事件**：`delete_event`/`restore_event`/`archive_event`
 - **习惯**：`rename_habit`/`delete_habit`/`restore_habit`/`undo_checkin`(撤销打卡)
 - **任务标记/批量**：`set_task_important`/`set_task_pinned`/`move_tasks`(批量移动清单)
+- **重复任务控制**：`skip_task_occurrence`(跳过本次)/`set_task_repeat_after_completion`(完成后顺延)
 
-安全：删除全走软删除（可逆、可撤销，D1）；**无任何 purge 工具**；写全走 op-log 单入口；`apps/*` 只放平台差异（intentText 人话）。能力清单（`capability-manifest.generated.ts`）已同步 65 工具。
+安全：删除全走软删除（可逆、可撤销，D1）；**无任何 purge 工具**；写全走 op-log 单入口；`apps/*` 只放平台差异（intentText 人话）。能力清单（`capability-manifest.generated.ts`）已同步 67 工具。
 
 ### 仍不做（需产品定义 / 明确排除）
 - **多人指派（assigneeUserId）**：全仓无协作模型——"分配"= 归清单 + 排期 + 层级（已覆盖）；真正的指派属新协作能力。
