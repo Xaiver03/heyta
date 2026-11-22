@@ -89,6 +89,11 @@ export interface CloudAgentHarnessOptions {
   readonly toolTimeoutMs?: number;
   /** 判定某工具是否**只读/可安全并行**；为真且一步内多调用时并发执行。默认全串行。 */
   readonly parallelSafe?: (tool: string) => boolean;
+  /** 有界重试次数（仅对 `isRetryable` 为真的工具；默认 0 = 不重试）。 */
+  readonly retryAttempts?: number;
+  readonly retryBackoffMs?: number;
+  /** 哪些工具可重试（只读/幂等）。默认复用 `parallelSafe`。 */
+  readonly isRetryable?: (tool: string) => boolean;
   /**
    * 本轮运行的稳定 id（一次用户发送）。给了它就给每个工具调用派生幂等键
    * `runId:s<step>:<callId>`，让云端重试不重复落库。
@@ -125,9 +130,12 @@ export async function runCloudAgentTurn(
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
   const maxToolResultChars = options.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS;
   const toolTimeoutMs = options.toolTimeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
+  const retryAttempts = Math.max(0, options.retryAttempts ?? 0);
+  const retryBackoffMs = options.retryBackoffMs ?? 200;
+  const isRetryable = options.isRetryable ?? options.parallelSafe ?? (() => false);
 
   type CallOutcome = { ok: boolean; content: string; errorText?: string };
-  const runOne = async (call: { id: string; name: string; arguments: Record<string, unknown> }, stepNo: number): Promise<CallOutcome> => {
+  const runOnce = async (call: { id: string; name: string; arguments: Record<string, unknown> }, stepNo: number): Promise<CallOutcome> => {
     try {
       const idemKey = options.runId === undefined ? undefined : `${options.runId}:s${String(stepNo)}:${call.id}`;
       const invoke = options.transport.invoke(
@@ -150,6 +158,15 @@ export async function runCloudAgentTurn(
       const errorText = error instanceof Error ? error.message : '工具执行异常';
       return { ok: false, errorText, content: `工具执行失败：${errorText}` };
     }
+  };
+  const runOne = async (call: { id: string; name: string; arguments: Record<string, unknown> }, stepNo: number): Promise<CallOutcome> => {
+    const tries = isRetryable(call.name) ? retryAttempts + 1 : 1;
+    let outcome = await runOnce(call, stepNo);
+    for (let attempt = 1; attempt < tries && !outcome.ok; attempt += 1) {
+      await new Promise((r) => setTimeout(r, retryBackoffMs * attempt));
+      outcome = await runOnce(call, stepNo);
+    }
+    return outcome;
   };
   const messages: HarnessMessage[] = [
     { role: 'system', content: options.systemPrompt },
