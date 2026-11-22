@@ -26,7 +26,7 @@ PP 网关按**一条 OpenAI 兼容上游**接入（`id=pp`）。在后台或 `MA
 
 ## 安全
 - `apiKey` 永不回显（列表脱敏 `hasApiKey`）；密钥只存 0600 文件、不进日志/响应。
-- 选择：仅 `enabled`；priority 升、weight 降取第一条。无可用上游 → 代理如实 `not-configured`，绝不猜。
+- 选择：仅 `enabled` 且密钥非空；先取最小 priority 档，档内按 **weight 平滑加权轮询（SWRR，确定性）**。无可用上游 → 代理如实 `not-configured`，绝不猜。
 
 ## 判据
 - `server/tests/ai-gateway.spec.ts`（解析/选择/脱敏）、`ai-gateway.routes.spec.ts`（CRUD/试连/密钥沿用）、`managed-proxy.routes.spec.ts`（30 条，含按网关选上游不回归）。

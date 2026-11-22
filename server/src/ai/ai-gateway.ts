@@ -113,16 +113,44 @@ export function parseGatewayFromEnv(env: Record<string, string | undefined>): Ga
 }
 
 /**
- * 选一条上游：**只在 enabled 里选**；按 priority 升序、再按 weight 降序取第一条。
- * 返回 `undefined` = 没有可用上游（调用方据此如实回 not-configured，绝不猜）。
+ * 选一条上游：**只在 enabled/有密钥 里选**；先取**最小 priority 档**，档内按 **weight 平滑加权轮询**
+ * （SWRR，确定性、无随机）：权重越大的被选中频率越高。返回 `undefined` = 无可用（如实 not-configured）。
  */
+const SWRR_STATE = new Map<string, { current: number; total: number }>();
+
+/** 仅供测试/运维：清空加权轮询状态。 */
+export function __resetUpstreamSelectionState(): void {
+  SWRR_STATE.clear();
+}
+
 export function selectUpstream(
   upstreams: readonly GatewayUpstream[],
 ): GatewayUpstream | undefined {
   // 🔴 必须有密钥：空 key 会变成 `Bearer `（空）照发 → 扣额度 + 明文出网（旧 config 注释的警告）。
   const usable = upstreams.filter((u) => u.enabled && u.baseUrl !== '' && u.modelId !== '' && u.apiKey !== '');
   if (usable.length === 0) return undefined;
-  return [...usable].sort((a, b) => a.priority - b.priority || b.weight - a.weight)[0];
+  const minPriority = Math.min(...usable.map((u) => u.priority));
+  const tier = usable.filter((u) => u.priority === minPriority);
+  if (tier.length === 1) return tier[0];
+  // SWRR：每个权重 >0 的成员累加自身权重，选当前最大者并减去总权重。
+  const ids = tier.map((u) => u.id).sort();
+  const key = ids.join('|');
+  const total = tier.reduce((sum, u) => sum + Math.max(1, u.weight), 0);
+  let pick: GatewayUpstream | undefined;
+  let pickWeight = -Infinity;
+  for (const u of tier) {
+    const w = Math.max(1, u.weight);
+    const st = SWRR_STATE.get(`${key}::${u.id}`) ?? { current: 0, total };
+    st.current += w;
+    st.total = total;
+    SWRR_STATE.set(`${key}::${u.id}`, st);
+    if (st.current > pickWeight) { pickWeight = st.current; pick = u; }
+  }
+  if (pick !== undefined) {
+    const st = SWRR_STATE.get(`${key}::${pick.id}`)!;
+    st.current -= total;
+  }
+  return pick;
 }
 
 /** 取主上游并转成托管代理要的 `ManagedAiConfig`（无可用 → undefined）。 */

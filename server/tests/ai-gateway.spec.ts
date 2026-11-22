@@ -1,7 +1,7 @@
 /** AI 网关：env 解析 / 选上游 / 脱敏（纯函数，可转红）。 */
 import { describe, expect, it } from 'vitest';
 
-import { gatewayPrimaryConfig, parseGatewayFromEnv, redactUpstreams, selectUpstream, type GatewayUpstream } from '../src/ai/ai-gateway';
+import { __resetUpstreamSelectionState, gatewayPrimaryConfig, parseGatewayFromEnv, redactUpstreams, selectUpstream, type GatewayUpstream } from '../src/ai/ai-gateway';
 
 const up = (o: Partial<GatewayUpstream>): GatewayUpstream => ({
   id: 'x', label: 'x', baseUrl: 'https://a/v1', apiKey: 'k', modelId: 'm', enabled: true, weight: 1, priority: 0, ...o,
@@ -47,6 +47,14 @@ describe('selectUpstream', () => {
 
   it('空 apiKey 的上游不可用（防 Bearer 空值出网）', () => {
     expect(selectUpstream([up({ id: 'nokey', apiKey: '' })])).toBeUndefined();
+  });
+
+  it('同优先级按 weight 平滑加权轮询（1:3 → 4 次里 1 次 a、3 次 b）', () => {
+    __resetUpstreamSelectionState();
+    const list = [up({ id: 'a', weight: 1 }), up({ id: 'b', weight: 3 })];
+    const picks = [0, 1, 2, 3].map(() => selectUpstream(list)!.id);
+    expect(picks.filter((x) => x === 'b').length).toBe(3);
+    expect(picks.filter((x) => x === 'a').length).toBe(1);
   });
 
   it('全部不可用 → undefined', () => {
