@@ -259,6 +259,8 @@ export interface WebPushConfig {
  * 一台已经跑着的服务器不该因为"上游以后会不合格"而起不来，而每一次转发前都会响亮拒绝。
  */
 export interface ManagedAiConfig {
+  /** 上游标识（用于健康/计量；可选，旧单上游 env 无 id）。 */
+  readonly id?: string;
   /** 上游基址，OpenAI 兼容形状（如 `https://api.deepseek.com/v1`）。**必须以 https**。 */
   readonly baseUrl: string;
   /** 上游密钥。**是秘密**：不进日志、不进响应、不发给客户端。 */

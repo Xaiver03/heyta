@@ -9,6 +9,7 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { requireAdmin } from './admin.middleware';
 import { redactUpstreams, type GatewayUpstream } from '../ai/ai-gateway';
 import { loadGatewayUpstreams, saveGatewayUpstreams } from '../ai/gateway-store';
+import { upstreamHealthSnapshot } from '../ai/gateway-health';
 
 /** 拒绝内网/回环/链路本地（试连防 SSRF）。 */
 function isPrivateHost(host: string): boolean {
@@ -49,7 +50,8 @@ export const aiGatewayRoutes: FastifyPluginAsync<AiGatewayRoutesOptions> = async
 
   app.get('/ai-gateway', async () => {
     const g = load();
-    return { ok: true, source: g.source, upstreams: view(g.upstreams), skipped: g.skipped };
+    const upstreams = view(g.upstreams).map((u) => ({ ...u, health: upstreamHealthSnapshot(u.id) }));
+    return { ok: true, source: g.source, upstreams, skipped: g.skipped };
   });
 
   app.put('/ai-gateway', async (request: FastifyRequest, reply: FastifyReply) => {

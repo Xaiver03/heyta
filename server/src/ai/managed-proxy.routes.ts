@@ -67,6 +67,7 @@ import { createPrismaSqlExecutor, type SqlExecutor } from '../billing/pricing-st
 import { MANAGED_AI_REQUESTS_PER_PERIOD, peekManagedAiUsage } from './metering';
 import { SERVER_MANAGED_AI_FEATURES, SERVER_MANAGED_MODEL_HOSTS, type ServerManagedModelHost } from './managed-upstream';
 import { storePrimaryConfig } from './gateway-store';
+import { recordUpstreamResult } from './gateway-health';
 import {
   MANAGED_AI_ERROR_CODES, MANAGED_AI_REFUSAL_MESSAGE, managedAiFetchTransport,
   invokeManagedAiCompletion, recordManagedAiAttempt,
@@ -221,6 +222,7 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
           // 设备那条腿的预留在它发这一发之前已经写过（工单 A4）；只有这里允许认领。
           claimReservedAttempt: true },
       );
+      if (upstream?.id !== undefined) recordUpstreamResult(upstream.id, result.ok, now());
       return shapeCompletionReply(reply, result);
     },
   );

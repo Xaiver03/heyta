@@ -13,6 +13,7 @@ import { dirname } from 'node:path';
 
 import type { ManagedAiConfig } from '../config';
 import { parseGatewayFromEnv, selectUpstream, type GatewayParseResult, type GatewayUpstream } from './ai-gateway';
+import { isUpstreamAvailable } from './gateway-health';
 
 /** 默认文件路径：`AI_GATEWAY_FILE` 优先，否则 `dataDir/ai-gateway.json`（相对 cwd）。 */
 export function defaultGatewayFile(env: Record<string, string | undefined> = process.env): string {
@@ -77,6 +78,11 @@ export function storePrimaryConfig(
   env: Record<string, string | undefined> = process.env,
   file: string = defaultGatewayFile(env),
 ): ManagedAiConfig | undefined {
-  const picked = selectUpstream(loadGatewayUpstreams(env, file).upstreams);
-  return picked === undefined ? undefined : { baseUrl: picked.baseUrl, apiKey: picked.apiKey, modelId: picked.modelId };
+  const all = loadGatewayUpstreams(env, file).upstreams;
+  // 跳过冷却中的上游（健康）；都不健康则退化为"仍选一条"（不因全部冷却就彻底不可用）。
+  const healthy = all.filter((u) => isUpstreamAvailable(u.id));
+  const picked = selectUpstream(healthy.length > 0 ? healthy : all);
+  return picked === undefined
+    ? undefined
+    : { id: picked.id, baseUrl: picked.baseUrl, apiKey: picked.apiKey, modelId: picked.modelId };
 }
