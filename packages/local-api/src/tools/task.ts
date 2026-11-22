@@ -217,6 +217,32 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'create_subtask',
+    // 写工具只产出提案、结果不回送模型 ⇒ 出境面是**提案里那几个字段**。
+    egressFields: [],
+    description: '在某个父任务下新建子任务。参数：parentId（父任务 id）、title（子任务标题，不能是空白）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_task_note',
+    egressFields: [],
+    description: '设置任务的备注。参数：taskId（任务 id）、note（备注正文；省略表示清除备注）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_task_repeat',
+    egressFields: [],
+    description:
+      '设置任务的重复规则。参数：taskId（任务 id）、rule（重复规则字符串，原样交给动作层校验；省略表示清除重复）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -450,6 +476,33 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       order: { type: 'number', description: '排序序号，有限数字。' },
     },
     required: ['taskId', 'order'],
+    additionalProperties: false,
+  },
+  create_subtask: {
+    type: 'object',
+    properties: {
+      parentId: { type: 'string', description: '父任务 id。' },
+      title: { type: 'string', description: '子任务标题，不能是空白。' },
+    },
+    required: ['parentId', 'title'],
+    additionalProperties: false,
+  },
+  set_task_note: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要设置备注的任务 id。' },
+      note: { type: 'string', description: '备注正文；省略表示清除备注。' },
+    },
+    required: ['taskId'],
+    additionalProperties: false,
+  },
+  set_task_repeat: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要设置重复规则的任务 id。' },
+      rule: { type: 'string', description: '重复规则字符串，原样交给动作层校验；省略表示清除重复。' },
+    },
+    required: ['taskId'],
     additionalProperties: false,
   },
 };
@@ -895,6 +948,67 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
       return {
         ok: true,
         intent: { action: 'reorder-task', taskId: a['taskId'].trim(), order: a['order'] },
+      };
+    }
+
+    case 'create_subtask': {
+      const unknown = Object.keys(a).filter((key) => key !== 'parentId' && key !== 'title');
+      if (unknown.length > 0) {
+        return { ok: false, message: `create_subtask 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['parentId'] !== 'string' || a['parentId'].trim() === '') {
+        return { ok: false, message: 'create_subtask 需要 parentId。' };
+      }
+      if (typeof a['title'] !== 'string' || a['title'].trim() === '') {
+        return { ok: false, message: 'create_subtask 需要 title（不能是空白）。' };
+      }
+      return {
+        ok: true,
+        intent: { action: 'create-subtask', parentId: a['parentId'].trim(), title: a['title'] },
+      };
+    }
+
+    case 'set_task_note': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'note');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_note 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_task_note 需要 taskId。' };
+      }
+      // note 省略 = 清除备注（intent 不带该键）；给了就必须是字符串（空串也算给了）。
+      if ('note' in a && typeof a['note'] !== 'string') {
+        return { ok: false, message: 'set_task_note 的 note 必须是字符串；要清除备注请省略它。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-task-note',
+          taskId: a['taskId'].trim(),
+          ...(typeof a['note'] === 'string' ? { note: a['note'] } : {}),
+        },
+      };
+    }
+
+    case 'set_task_repeat': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'rule');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_repeat 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_task_repeat 需要 taskId。' };
+      }
+      // rule 省略 = 清除重复（intent 不带该键）；给了就原样传，合法性由动作层判。
+      if ('rule' in a && typeof a['rule'] !== 'string') {
+        return { ok: false, message: 'set_task_repeat 的 rule 必须是字符串；要清除重复请省略它。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-task-repeat',
+          taskId: a['taskId'].trim(),
+          ...(typeof a['rule'] === 'string' ? { rule: a['rule'] } : {}),
+        },
       };
     }
 

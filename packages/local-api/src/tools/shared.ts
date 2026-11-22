@@ -132,7 +132,7 @@ export const MAX_TOOLS_PER_ENTITY = 7;
  */
 export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
-  TASK: 19,
+  TASK: 22,
   PROJECT: 10,
   NOTE: 10,
 } as const satisfies Readonly<Partial<Record<string, number>>>;
@@ -710,7 +710,28 @@ export type LocalApiWriteIntent =
   | { action: 'reorder-task'; taskId: string; order: number }
   // 清单层级 / 恢复（P2）
   | { action: 'move-project'; projectId: string; parentId?: string }
-  | { action: 'restore-project'; projectId: string };
+  | { action: 'restore-project'; projectId: string }
+  // 批次 3：子任务 / 备注 / 重复 / 习惯改名、删除、恢复
+  /**
+   * 在 `parentId` 下新建一条子任务（TASK）。**一条 op**（`createSubtask`）——
+   * 不是「create + setParent」两条（中间态可被看见，见 `TaskActions.createSubtask`）。
+   * 非法的父 / 超深 / 超子数由动作层 throw，宿主翻成 `invalid`。
+   */
+  | { action: 'create-subtask'; parentId: string; title: string }
+  /** 改任务备注（TASK）。`note` 省略 = 清除（写成 `null`）。 */
+  | { action: 'set-task-note'; taskId: string; note?: string }
+  /** 改任务重复规则（TASK）。`rule` 省略 = 清除；非法 RRULE 由动作层 throw → `invalid`。 */
+  | { action: 'set-task-repeat'; taskId: string; rule?: string }
+  /** 改习惯名（HABIT）。**一条意图一条 op**（`renameHabit`），打卡记录不动。 */
+  | { action: 'rename-habit'; habitId: string; name: string }
+  /** 软删除习惯（HABIT）。⚠️ 打卡记录**不**级联删除（撤销删除后历史还在）。 */
+  | { action: 'delete-habit'; habitId: string }
+  /**
+   * 从回收站恢复习惯（HABIT）。🔴 **判活交给 `habitActions.restoreHabit`**（I5）：
+   * 本层不读原始 `habits` 表、不自己判"在不在回收站/是否已 purge"。
+   * `false` = 本来就没删（宿主回 not-found）；`throw` = 不存在或已彻底删除（not-found）。
+   */
+  | { action: 'restore-habit'; habitId: string };
 
 /**
  * 一条写入落地的实体类型。

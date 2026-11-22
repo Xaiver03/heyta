@@ -2,7 +2,8 @@
  * HABIT（习惯）实体工具包
  * =========================
  *
- * 读：`list_habits`（列习惯**定义**，不含打卡记录）；写：`create_habit`（新建习惯）。
+ * 读：`list_habits`（列习惯**定义**，不含打卡记录）；写：`create_habit`（新建习惯）、
+ * `rename_habit`（改名）、`delete_habit`（移入回收站）、`restore_habit`（从回收站恢复）。
  * 与 `task.ts` / `project.ts` 同形状：目录条目 + 参数 schema + 读分支 + 写分支
  * 全在这一个文件里。
  *
@@ -12,12 +13,13 @@
  * （见 `scripts/gen-ai-capability-manifest.mjs` 的 `ENTITY_NOUNS`）。
  * 把打卡工具写进这个文件会让"哪个实体被覆盖了"这件事在两个地方各说一遍。
  *
- * ⚠️ 界面上还能改目标（`setHabitGoal`）、换颜色/图标、归档与删除习惯，这四个动作
+ * ⚠️ 界面上还能改目标（`setHabitGoal`）、换颜色/图标、归档习惯，这三个动作
  * 现在**没有工具**。2026-10-03 之前这里写的理由是"目录有一条 `<= 10` 的容量判据"，
- * 那个理由已经不成立了 —— 容量改成按实体算（`shared.ts` 的 `MAX_TOOLS_PER_ENTITY`），
- * HABIT 用了 2 席、还剩 3 席。所以这四个动作是**还没做**，不是被上限挡着：
- * 换颜色/图标那一档另有一条产品理由（"AI 替用户选一个身份标记"要先回答谁赋它的义），
- * 逐条登记在 `docs/plans/ai-event-tool-contract.md` §5.4，别把它读成"等容量放开就能补"。
+ * 那个理由已经不成立了 —— 容量改成按实体算（`shared.ts` 的 `MAX_TOOLS_PER_ENTITY`，默认 7），
+ * HABIT 用了 5 席（清单/新建/改名/删除/恢复），还剩 2 席。所以这三个动作是**还没做**，
+ * 不是被上限挡着：换颜色/图标那一档另有一条产品理由（"AI 替用户选一个身份标记"
+ * 要先回答谁赋它的义），逐条登记在 `docs/plans/ai-event-tool-contract.md` §5.4，
+ * 别把它读成"等容量放开就能补"。
  */
 
 import type { McpToolDefinition } from '../mcp.js';
@@ -43,6 +45,33 @@ const TOOLS: readonly LocalApiTool[] = [
     description:
       '新建一个习惯。可指定每天的目标数值、单位与达成口径（至少 / 至多 / 恰好）。' +
       '不传目标就是"每天做过一次"。名称不能为空。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'rename_habit',
+    // 写工具只产出提案、结果不回送模型 ⇒ 出境面是**提案里那几个字段**（同 `create_habit`）。
+    egressFields: [],
+    description: '给一个习惯改名。名称不能为空，也不能只有空格。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'delete_habit',
+    // 删除 → 回收站（软删除），可逆、可撤销 ⇒ `destructive-reversible`，不是 purge。
+    egressFields: [],
+    description: '把一个习惯删除到回收站。可撤销，不是彻底删除；之后可用 restore_habit 恢复。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
+  {
+    name: 'restore_habit',
+    // 从回收站恢复只翻墓碑、不销毁数据 ⇒ `write`。
+    egressFields: [],
+    description: '把回收站里的习惯恢复到原处。习惯不存在或不在回收站会被拒绝。',
     kind: 'write',
     risk: 'write',
     defaultEnabled: false,
@@ -76,6 +105,31 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       },
     },
     required: ['name'],
+    additionalProperties: false,
+  },
+  rename_habit: {
+    type: 'object',
+    properties: {
+      habitId: { type: 'string', description: '要改名的习惯 id。' },
+      name: { type: 'string', description: '新的习惯名称，不能是空白。' },
+    },
+    required: ['habitId', 'name'],
+    additionalProperties: false,
+  },
+  delete_habit: {
+    type: 'object',
+    properties: {
+      habitId: { type: 'string', description: '要删除到回收站的习惯 id。' },
+    },
+    required: ['habitId'],
+    additionalProperties: false,
+  },
+  restore_habit: {
+    type: 'object',
+    properties: {
+      habitId: { type: 'string', description: '要从回收站恢复的习惯 id。' },
+    },
+    required: ['habitId'],
     additionalProperties: false,
   },
 };
@@ -126,6 +180,45 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
           ...(typeof a['goalType'] === 'string' ? { goalType: a['goalType'] } : {}),
         },
       };
+    }
+
+    case 'rename_habit': {
+      const unknown = Object.keys(a).filter((key) => key !== 'habitId' && key !== 'name');
+      if (unknown.length > 0) {
+        return { ok: false, message: `rename_habit 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['habitId'] !== 'string' || a['habitId'].trim() === '') {
+        return { ok: false, message: 'rename_habit 需要 habitId。' };
+      }
+      if (typeof a['name'] !== 'string' || a['name'].trim() === '') {
+        return { ok: false, message: 'rename_habit 需要 name（不能是空白）。' };
+      }
+      return {
+        ok: true,
+        intent: { action: 'rename-habit', habitId: a['habitId'], name: a['name'] },
+      };
+    }
+
+    case 'delete_habit': {
+      const unknown = Object.keys(a).filter((key) => key !== 'habitId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `delete_habit 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['habitId'] !== 'string' || a['habitId'].trim() === '') {
+        return { ok: false, message: 'delete_habit 需要 habitId。' };
+      }
+      return { ok: true, intent: { action: 'delete-habit', habitId: a['habitId'] } };
+    }
+
+    case 'restore_habit': {
+      const unknown = Object.keys(a).filter((key) => key !== 'habitId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `restore_habit 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['habitId'] !== 'string' || a['habitId'].trim() === '') {
+        return { ok: false, message: 'restore_habit 需要 habitId。' };
+      }
+      return { ok: true, intent: { action: 'restore-habit', habitId: a['habitId'] } };
     }
 
     default:

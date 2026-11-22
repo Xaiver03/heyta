@@ -2267,6 +2267,14 @@ export const en = {
   'web.ai.tools.intentMoveProjectTop': 'Make list {id} top-level',
   'web.ai.tools.intentMoveProject': 'Move list {id} under list {parent}',
   'web.ai.tools.intentRestoreProject': 'Restore list {id}',
+  'web.ai.tools.intentCreateSubtask': 'Add subtask under {parent}: {title}',
+  'web.ai.tools.intentSetTaskNote': 'Update note of task {id}',
+  'web.ai.tools.intentClearTaskNote': 'Clear note of task {id}',
+  'web.ai.tools.intentSetTaskRepeat': 'Set repeat rule for task {id}',
+  'web.ai.tools.intentClearTaskRepeat': 'Clear repeat for task {id}',
+  'web.ai.tools.intentRenameHabit': 'Rename habit: {name}',
+  'web.ai.tools.intentDeleteHabit': 'Move habit {id} to trash',
+  'web.ai.tools.intentRestoreHabit': 'Restore habit {id}',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',

@@ -443,6 +443,54 @@ const CASES: readonly Case[] = [
     },
     effect: () => alive('projects'),
   },
+
+  // ── 批次3：子任务 / 备注 / 重复 / 习惯 ──
+  {
+    tool: 'create_subtask',
+    intentAction: 'create-subtask',
+    label: '子任务',
+    args: async () => ({ parentId: await seed({ action: 'create-task', title: '父任务' }), title: '子任务' }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.parentId !== undefined).length,
+  },
+  {
+    tool: 'set_task_note',
+    intentAction: 'set-task-note',
+    label: '任务备注',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '带备注' }), note: '记一笔' }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.note === '记一笔').length,
+  },
+  {
+    tool: 'set_task_repeat',
+    intentAction: 'set-task-repeat',
+    label: '任务重复',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '每天', dueDate: '2026-12-01' }), rule: 'FREQ=DAILY' }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.repeatRule === 'FREQ=DAILY').length,
+  },
+  {
+    tool: 'rename_habit',
+    intentAction: 'rename-habit',
+    label: '习惯改名',
+    args: async () => ({ habitId: await seed({ action: 'create-habit', name: '旧习惯' }), name: '新习惯' }),
+    effect: () => Object.values(engine.getState().habits).filter((h) => h.name === '新习惯').length,
+  },
+  {
+    tool: 'delete_habit',
+    intentAction: 'delete-habit',
+    label: '习惯删除',
+    args: async () => ({ habitId: await seed({ action: 'create-habit', name: '要删的习惯' }) }),
+    effect: () => Object.values(engine.getState().habits).filter((h) => h.deletedAt !== undefined).length,
+  },
+  {
+    tool: 'restore_habit',
+    intentAction: 'restore-habit',
+    label: '习惯恢复',
+    args: async () => {
+      const habitId = await seed({ action: 'create-habit', name: '待恢复习惯' });
+      await makeHost().submit({ action: 'delete-habit', habitId });
+      return { habitId };
+    },
+    effect: () => alive('habits'),
+  },
 ];
 
 beforeEach(async () => {

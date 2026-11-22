@@ -256,6 +256,10 @@ const ENTITY_NOUNS = new Map(
   Object.entries({
     task: 'TASK',
     tasks: 'TASK',
+    subtask: 'TASK',
+    subtasks: 'TASK',
+    task_note: 'TASK',
+    task_notes: 'TASK',
     todo: 'TASK',
     todos: 'TASK',
     project: 'PROJECT',

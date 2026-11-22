@@ -2461,6 +2461,14 @@ export const zhCN = {
   'web.ai.tools.intentMoveProjectTop': '把清单 {id} 提为顶级',
   'web.ai.tools.intentMoveProject': '把清单 {id} 移到清单 {parent} 下',
   'web.ai.tools.intentRestoreProject': '恢复清单 {id}',
+  'web.ai.tools.intentCreateSubtask': '在任务 {parent} 下新建子任务：{title}',
+  'web.ai.tools.intentSetTaskNote': '改任务 {id} 的备注',
+  'web.ai.tools.intentClearTaskNote': '清空任务 {id} 的备注',
+  'web.ai.tools.intentSetTaskRepeat': '设置任务 {id} 的重复规则',
+  'web.ai.tools.intentClearTaskRepeat': '清除任务 {id} 的重复',
+  'web.ai.tools.intentRenameHabit': '习惯改名：{name}',
+  'web.ai.tools.intentDeleteHabit': '习惯移到回收站 {id}',
+  'web.ai.tools.intentRestoreHabit': '恢复习惯 {id}',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',

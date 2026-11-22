@@ -197,5 +197,22 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate, locale: Lo
         : t('web.ai.tools.intentMoveProject', { id: intent.projectId, parent: intent.parentId });
     case 'restore-project':
       return t('web.ai.tools.intentRestoreProject', { id: intent.projectId });
+    // 批次3：子任务 / 备注 / 重复 / 习惯
+    case 'create-subtask':
+      return t('web.ai.tools.intentCreateSubtask', { parent: intent.parentId, title: intent.title });
+    case 'set-task-note':
+      return intent.note === undefined
+        ? t('web.ai.tools.intentClearTaskNote', { id: intent.taskId })
+        : t('web.ai.tools.intentSetTaskNote', { id: intent.taskId });
+    case 'set-task-repeat':
+      return intent.rule === undefined
+        ? t('web.ai.tools.intentClearTaskRepeat', { id: intent.taskId })
+        : t('web.ai.tools.intentSetTaskRepeat', { id: intent.taskId, rule: intent.rule });
+    case 'rename-habit':
+      return t('web.ai.tools.intentRenameHabit', { name: intent.name });
+    case 'delete-habit':
+      return t('web.ai.tools.intentDeleteHabit', { id: intent.habitId });
+    case 'restore-habit':
+      return t('web.ai.tools.intentRestoreHabit', { id: intent.habitId });
   }
 }

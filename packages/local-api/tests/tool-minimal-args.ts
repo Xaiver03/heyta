@@ -73,4 +73,12 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   reorder_task: { taskId: 't1', order: 1 },
   move_project: { projectId: 'p1' },
   restore_project: { projectId: 'p1' },
+
+  // 批次3：子任务 / 备注 / 重复 / 习惯
+  create_subtask: { parentId: 't1', title: '子任务' },
+  set_task_note: { taskId: 't1', note: '备注' },
+  set_task_repeat: { taskId: 't1', rule: 'FREQ=WEEKLY' },
+  rename_habit: { habitId: 'h1', name: '新习惯名' },
+  delete_habit: { habitId: 'h1' },
+  restore_habit: { habitId: 'h1' },
 };

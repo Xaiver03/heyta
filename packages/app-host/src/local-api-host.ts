@@ -1690,5 +1690,96 @@ async function submitIntent(
       }
       return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 批次 3：子任务 / 备注 / 重复 / 习惯改名、删除、恢复
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'create-subtask': {
+      // 先在门口挡住"父根本不存在"这句更早的话：`createSubtask` 的校验是
+      // "能不能作为父"（环 / 超深 / 超子数），它不负责回答这一条。
+      if (actions.findTask(intent.parentId) === undefined) {
+        return {
+          ok: false,
+          reason: 'not-found',
+          message: `找不到作为父的那条任务（「${intent.parentId}」）。`,
+        };
+      }
+      // 🔴 非法父 / 超深 / 超子数：`createSubtask` 内部 `validateNewChildPosition` 失败时
+      // throw（async 函数 ⇒ 被拒的 Promise）。翻成 `invalid` 并把人话带出去，
+      // 不让它顺着壳的 catch 变一句"工具执行失败"。
+      try {
+        const id = await actions.createSubtask(intent.parentId, intent.title);
+        return { ok: true, taskId: id };
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: e instanceof Error ? e.message : String(e) };
+      }
+    }
+
+    case 'set-task-note': {
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      // `note` 省略由动作层写成 `null`（清除），不是"不改"。
+      await actions.setNote(intent.taskId, intent.note);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'set-task-repeat': {
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      // 🔴 非法 RRULE 由 `setRepeat` 里的 `isValidRecurrenceRule` **throw**：
+      // 翻成 `invalid`，别让它穿过壳变成"工具执行失败"。
+      try {
+        await actions.setRepeat(intent.taskId, intent.rule);
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: e instanceof Error ? e.message : String(e) };
+      }
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'rename-habit': {
+      const name = intent.name.trim();
+      if (name === '') {
+        return { ok: false, reason: 'invalid', message: '习惯名称不能为空。' };
+      }
+      // I5：判活交给动作层 —— `listHabits()` 只返回未删除的习惯，本层不读原始表。
+      const habit = habitActions.listHabits().find((h) => h.id === intent.habitId);
+      if (habit === undefined) {
+        return { ok: false, reason: 'not-found', message: `找不到习惯「${intent.habitId}」。` };
+      }
+      await habitActions.renameHabit(intent.habitId, name);
+      return { ok: true, taskId: intent.habitId, entityId: intent.habitId, entityType: 'HABIT' };
+    }
+
+    case 'delete-habit': {
+      // 同上：判活交给动作层（`listHabits()` 已滤墓碑）。
+      const habit = habitActions.listHabits().find((h) => h.id === intent.habitId);
+      if (habit === undefined) {
+        return { ok: false, reason: 'not-found', message: `找不到习惯「${intent.habitId}」。` };
+      }
+      await habitActions.removeHabit(intent.habitId);
+      return { ok: true, taskId: intent.habitId, entityId: intent.habitId, entityType: 'HABIT' };
+    }
+
+    case 'restore-habit': {
+      // 🔴 I5：判"算不算活的 / 在不在回收站 / 是否已彻底删除"由 habitActions 负责 ——
+      // 本层不读原始 `habits` 表、不自己判。`restoreHabit` 的三种出口：
+      // true=已恢复、false=本来就没删（not-found）、throw=不存在或已 purge（not-found）。
+      try {
+        const ok = await habitActions.restoreHabit(intent.habitId);
+        if (!ok) {
+          return { ok: false, reason: 'not-found', message: '这个习惯不在回收站里，无需恢复。' };
+        }
+      } catch (e) {
+        return {
+          ok: false,
+          reason: 'not-found',
+          message: e instanceof Error && e.message !== '' ? e.message : '这个习惯无法恢复。',
+        };
+      }
+      return { ok: true, taskId: intent.habitId, entityId: intent.habitId, entityType: 'HABIT' };
+    }
   }
 }
