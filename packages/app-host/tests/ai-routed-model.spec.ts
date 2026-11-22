@@ -152,3 +152,20 @@ describe('createRoutedModelCall 流式文本', () => {
     expect(seen).toEqual(['你', '好']);
   });
 });
+
+describe('toolChoice 透传（routed model）', () => {
+  it('options.toolChoice 进入 AiInvocation.toolChoice', async () => {
+    let seen: AiInvocation | undefined;
+    const invoke: RoutedInvoke = async (_r, inv) => { seen = inv; return okOutcome({ text: 'ok', toolCalls: [] }); };
+    const call = createRoutedModelCall({ routing, toolChoice: 'required', invoke });
+    await call({ messages: [{ role: 'user', content: 'x' }], tools });
+    expect(seen!.toolChoice).toBe('required');
+  });
+  it('未设则不出现（旧行为）', async () => {
+    let seen: AiInvocation | undefined;
+    const invoke: RoutedInvoke = async (_r, inv) => { seen = inv; return okOutcome({ text: 'ok', toolCalls: [] }); };
+    const call = createRoutedModelCall({ routing, invoke });
+    await call({ messages: [{ role: 'user', content: 'x' }], tools });
+    expect('toolChoice' in seen!).toBe(false);
+  });
+});

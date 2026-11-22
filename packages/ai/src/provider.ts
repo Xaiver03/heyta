@@ -116,6 +116,8 @@ export interface AiInvocation {
    * 一个工具名本身就可能泄露能力范围（对照 `mcp.ts` 里"未授权即不可见"的立场）。
    */
   tools?: readonly AiToolDescriptor[];
+  /** 工具选择控制；省略=不带该字段(旧行为)，默认语义 `auto`。不是出境数据。 */
+  toolChoice?: import('./wire').WireToolChoice;
   /**
    * 多轮消息。**给了它，它就是这次出境的唯一事实源** —— `system` / `user`
    * 仍然要写（类型上必填、五个既有调用点都在写），但请求体里发的是这个数组。

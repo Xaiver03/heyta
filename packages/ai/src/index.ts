@@ -137,6 +137,7 @@ export {
 // 导出组装器就等于邀请包外再拼一份请求体（工单 W7 刚删掉过两份）。
 // 但 `AiInvocation.messages` 的类型在包外必须能写，所以类型单独放行。
 export type { ChatMessage } from './wire.js';
+export type { WireToolChoice } from './wire.js';
 // 多段内容里的一段（文本 / 图片）。**我们的**词表，不是 OpenAI 的
 // （`image_url` 那种形状只在 `wire.ts` 内部转换一次）。
 export type { ContentPart } from './wire.js';

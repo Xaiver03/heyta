@@ -48,6 +48,8 @@ export interface CloudAssistantTurnDeps {
   readonly getReportState?: () => ReportState;
   /** 只读工具并行判定（透传给 harness）。 */
   readonly parallelSafe?: (tool: string) => boolean;
+  /** 透传到线协议的 tool_choice（默认不设=auto）。 */
+  readonly toolChoice?: import('@heyta/ai').WireToolChoice;
   /** 注入以便离线测试；默认真实 invokeRouted。 */
   readonly invoke?: RoutedInvoke;
 }
@@ -63,6 +65,7 @@ export async function requestCloudAssistantTurn(
     ...(deps.routed === undefined ? {} : { deps: deps.routed }),
     ...(deps.invoke === undefined ? {} : { invoke: deps.invoke }),
     ...(deps.onTextDelta === undefined ? {} : { onTextDelta: deps.onTextDelta }),
+    ...(deps.toolChoice === undefined ? {} : { toolChoice: deps.toolChoice }),
   });
   const baseTools = toCloudToolDescriptors(deps.grants);
   const useReports = deps.getReportState !== undefined;

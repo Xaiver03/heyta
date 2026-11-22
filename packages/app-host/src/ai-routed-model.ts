@@ -54,6 +54,8 @@ export interface RoutedModelCallOptions {
    * `invokeRouted` 自动退回非流式（无需这里判断）。
    */
   readonly onTextDelta?: (text: string) => void;
+  /** 透传到线协议的 tool_choice（默认不设=auto）。 */
+  readonly toolChoice?: import('@heyta/ai').WireToolChoice;
 }
 
 /** 把循环里的 `HarnessMessage` 转成线格式消息（与 `ai-assistant` 同构：tool 结果带 toolCallId）。 */
@@ -175,6 +177,7 @@ export function createRoutedModelCall(
       // 出境披露：文本 + 工具名/说明 + **本轮可达工具观测字段的并集**（工具结果会回灌给模型 = 出境）。
       fields,
       tools: tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })),
+      ...(options.toolChoice === undefined ? {} : { toolChoice: options.toolChoice }),
       messages: harnessMessagesToChat(messages),
     };
 

@@ -218,3 +218,19 @@ describe('isEmptyModelResponse —— 判据共享，措辞各留', () => {
     expect(isEmptyModelResponse({ text: '好的', toolCalls: undefined })).toBe(false);
   });
 });
+
+describe('tool_choice 透传（默认 auto，字节兼容）', () => {
+  const tool = { name: 'list_tasks', description: 'd', parameters: { type: 'object' as const, properties: {}, additionalProperties: false } };
+  it('省略 toolChoice → auto', () => {
+    const body = buildChatRequestBody('m', { feature: 'tool-calling', system: 's', user: 'u', fields: ['text', 'tools'], tools: [tool] });
+    expect(body.tool_choice).toBe('auto');
+  });
+  it('toolChoice=required 透传', () => {
+    const body = buildChatRequestBody('m', { feature: 'tool-calling', system: 's', user: 'u', fields: ['text', 'tools'], tools: [tool], toolChoice: 'required' });
+    expect(body.tool_choice).toBe('required');
+  });
+  it('指定函数名', () => {
+    const body = buildChatRequestBody('m', { feature: 'tool-calling', system: 's', user: 'u', fields: ['text', 'tools'], tools: [tool], toolChoice: { type: 'function', function: { name: 'list_tasks' } } });
+    expect(body.tool_choice).toEqual({ type: 'function', function: { name: 'list_tasks' } });
+  });
+});

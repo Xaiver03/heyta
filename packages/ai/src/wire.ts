@@ -139,11 +139,18 @@ export interface ChatRequestOptions {
   readonly stream?: true;
 }
 
+/** 工具选择控制（OpenAI 兼容 `tool_choice`）。默认 `'auto'`。 */
+export type WireToolChoice =
+  | 'auto'
+  | 'required'
+  | 'none'
+  | { readonly type: 'function'; readonly function: { readonly name: string } };
+
 /** `tools` → OpenAI 兼容线上的 `{tools, tool_choice}` 形状。
  *  两条路径共用（自备端点直连 / 托管档经服务端代理），以免两种打包方式各自漂移。 */
-function toWireTools(tools: readonly AiToolDescriptor[]): {
+function toWireTools(tools: readonly AiToolDescriptor[], choice: WireToolChoice = 'auto'): {
   tools: readonly WireTool[];
-  tool_choice: 'auto';
+  tool_choice: WireToolChoice;
 } {
   return {
     tools: tools.map(
@@ -156,7 +163,7 @@ function toWireTools(tools: readonly AiToolDescriptor[]): {
         },
       }),
     ),
-    tool_choice: 'auto',
+    tool_choice: choice,
   };
 }
 
@@ -171,7 +178,7 @@ function toWireTools(tools: readonly AiToolDescriptor[]): {
  * 否则 `assertImagesSendable()` 直接抛错。也就是说省略是安全的（没有图片就没有
  * 需要披露的图片），而"有图但不披露"是发不出去的。
  */
-export type WireInvocation = Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages'> & {
+export type WireInvocation = Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages' | 'toolChoice'> & {
   readonly fields?: readonly string[];
   readonly images?: readonly AiImagePart[];
 };
@@ -200,7 +207,7 @@ export function buildChatRequestBody(
   model: string;
   messages: readonly Record<string, unknown>[];
   tools?: readonly WireTool[];
-  tool_choice?: 'auto';
+  tool_choice?: WireToolChoice;
   stream?: true;
 } {
   const images = invocation.images ?? [];
@@ -216,7 +223,7 @@ export function buildChatRequestBody(
     // 🔴 给了 `messages` 就以它为准（对话式助手的多轮）；否则退回写死两条
     // `[system, user]` —— 那五个既有调用点的字节形状**一个字都不许变**。
     messages: (images.length === 0 ? base : attachImages(base, images)).map(toWireMessage),
-    ...(withTools ? toWireTools(invocation.tools ?? []) : {}),
+    ...(withTools ? toWireTools(invocation.tools ?? [], invocation.toolChoice ?? 'auto') : {}),
     // 🔴 放在**最后**，且只在要求流式时才出现：省略时键的顺序与缺键形态
     // 与加流式之前逐字相同（`wire.spec.ts` 按原始串比对）。
     ...(options?.stream === true ? { stream: true as const } : {}),
@@ -376,13 +383,13 @@ export function sameHost(a: string, b: string): boolean {
  */
 export function buildManagedChatRequestBody(
   feature: AiFeature,
-  invocation: Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages'>,
+  invocation: Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages' | 'toolChoice'>,
   options?: ChatRequestOptions,
 ): {
   feature: AiFeature;
   messages: readonly Record<string, unknown>[];
   tools?: readonly WireTool[];
-  tool_choice?: 'auto';
+  tool_choice?: WireToolChoice;
   stream?: true;
 } {
   const withTools = invocation.tools !== undefined && invocation.tools.length > 0;
@@ -392,7 +399,7 @@ export function buildManagedChatRequestBody(
       { role: 'system', content: invocation.system },
       { role: 'user', content: invocation.user },
     ]).map(toWireMessage),
-    ...(withTools ? toWireTools(invocation.tools ?? []) : {}),
+    ...(withTools ? toWireTools(invocation.tools ?? [], invocation.toolChoice ?? 'auto') : {}),
     // 托管代理的 `ChatBodySchema` 里 `stream` 是可选的（见 `managed-proxy.routes.ts`），
     // 它的流式分支按 SSE 逐字节透传上游 —— 所以这里与服务端契约同形，不是新协议。
     ...(options?.stream === true ? { stream: true as const } : {}),
