@@ -46,6 +46,8 @@ export interface CloudAssistantTurnDeps {
    * 省略 = 不挂（默认行为不变）。
    */
   readonly getReportState?: () => ReportState;
+  /** 只读工具并行判定（透传给 harness）。 */
+  readonly parallelSafe?: (tool: string) => boolean;
   /** 注入以便离线测试；默认真实 invokeRouted。 */
   readonly invoke?: RoutedInvoke;
 }
@@ -67,6 +69,7 @@ export async function requestCloudAssistantTurn(
   return runCloudAgentTurn(userText, {
     transport: useReports ? createReportAwareTransport(deps.transport, deps.getReportState!) : deps.transport,
     tools: useReports ? [...baseTools, ...REPORT_TOOL_DESCRIPTORS] : baseTools,
+    ...(deps.parallelSafe === undefined ? {} : { parallelSafe: deps.parallelSafe }),
     systemPrompt: deps.systemPrompt ?? CLOUD_ASSISTANT_SYSTEM_PROMPT,
     callModel,
     ...(deps.maxSteps === undefined ? {} : { maxSteps: deps.maxSteps }),
