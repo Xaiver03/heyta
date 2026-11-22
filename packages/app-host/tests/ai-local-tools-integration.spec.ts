@@ -103,14 +103,14 @@ describe('写路径 D1 端到端：seq → 确认写 → undoSince', () => {
     );
     expect(result.ok).toBe(true);
     // 落库：能读到
-    const listed = await host.listTasks?.(50);
+    const listed = await host.listTasks?.({});
     const titles = (listed ?? []).map((t) => t.title);
     expect(titles).toContain('AI 建的任务');
 
     // 撤销这次 AI 操作（本地写入段）
     const outcome = await engine.undoSince(seqBefore);
     expect(outcome.status).toBe('applied');
-    const after = await host.listTasks?.(50);
+    const after = await host.listTasks?.({});
     expect((after ?? []).map((t) => t.title)).not.toContain('AI 建的任务');
   });
 });
@@ -124,11 +124,11 @@ describe('可写传输：Harness 模式 AI 直接写 + undoSince 撤销（D1）'
     const seq = await engine.currentLocalSeq();
     const r = await transport.invoke('create_task', { title: 'Harness 写的' });
     expect(r.ok).toBe(true);
-    const listed = await host.listTasks?.(50);
+    const listed = await host.listTasks?.({});
     expect((listed ?? []).map((t) => t.title)).toContain('Harness 写的');
     const outcome = await engine.undoSince(seq);
     expect(outcome.status).toBe('applied');
-    const after = await host.listTasks?.(50);
+    const after = await host.listTasks?.({});
     expect((after ?? []).map((t) => t.title)).not.toContain('Harness 写的');
   });
 });
