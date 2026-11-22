@@ -2277,6 +2277,9 @@ export const zhCN = {
   'web.ai.action.close': '关闭',
   'web.ai.action.copy': '复制',
   'web.ai.action.retry': '重试',
+  'web.ai.chat.undoAiTurn': '撤销这次 AI 操作',
+  'web.ai.chat.undoAiTurnDone': '已撤销这次 AI 操作',
+  'web.ai.chat.harnessApplied': '已执行（可撤销）',
   'web.ai.action.discard': '不要了',
   'web.ai.loading.waiting': '正在等待端点返回…',
 

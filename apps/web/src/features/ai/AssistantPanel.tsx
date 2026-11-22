@@ -115,7 +115,7 @@ import {
   useStreamReveal,
 } from '@heyta/ui';
 import { assistantFailureCopy } from './ai-failure-copy.js';
-import { runWebCloudTurn } from './cloud-harness.js';
+import { runWebCloudTurn, undoWebCloudTurn } from './cloud-harness.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import { FailureSettingsAction } from './RouteUnavailable.js';
 import { LIST_SEPARATOR } from './locale-punctuation.js';
@@ -431,6 +431,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
    * 与捕获那条同一条纪律（ADR-0005「AI 是输入法」—— 输入法不存你打的字）。
    */
   const [images, setImages] = useState<readonly EncodedImage[]>([]);
+  const [harnessUndoSeq, setHarnessUndoSeq] = useState<number | null>(null);
 
   /**
    * 附件：图标进输入框内部左下角，缩略图落在字段下方（与任务列同一套形状）。
@@ -555,10 +556,13 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
         setPhase('idle');
         if (res.error !== undefined) {
+          setHarnessUndoSeq(res.seqBefore);
           append({ role: 'assistant', text: `出错：${res.error}`, steps: [], stoppedAt: undefined });
           return;
         }
-        append({ role: 'assistant', text: res.turn.text, steps: [], stoppedAt: undefined });
+        const wrote = res.turn.steps.some((step) => step.ok);
+        setHarnessUndoSeq(wrote ? res.seqBefore : null);
+        append({ role: 'assistant', text: wrote ? `${res.turn.text}\n\n${t('web.ai.chat.harnessApplied')}` : res.turn.text, steps: [], stoppedAt: undefined });
       } catch (error: unknown) {
         if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
         setPhase('idle');
@@ -1109,6 +1113,24 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
             </li>
           )}
         </ul>
+
+      {harnessUndoSeq !== null && phase === 'idle' ? (
+        <button
+          type="button"
+          className="ht-ai__note"
+          data-testid="ai-assistant-undo-ai"
+          onClick={() => {
+            void (async () => {
+              const seq = harnessUndoSeq;
+              setHarnessUndoSeq(null);
+              await undoWebCloudTurn(seq);
+              append({ role: 'assistant', text: t('web.ai.chat.undoAiTurnDone'), steps: [], stoppedAt: undefined });
+            })();
+          }}
+        >
+          {t('web.ai.chat.undoAiTurn')}
+        </button>
+      ) : null}
 
       {phase === 'disclose' && (
         <AiPanelHost label={t('web.ai.chat.disclosureHeading')} testID="ai-assistant-disclosure" role="dialog">

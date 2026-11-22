@@ -2087,6 +2087,9 @@ export const en = {
   'web.ai.action.close': 'Close',
   'web.ai.action.copy': 'Copy',
   'web.ai.action.retry': 'Retry',
+  'web.ai.chat.undoAiTurn': 'Undo this AI action',
+  'web.ai.chat.undoAiTurnDone': 'Undid this AI action',
+  'web.ai.chat.harnessApplied': 'Applied (undoable)',
   'web.ai.action.discard': 'Discard',
   'web.ai.loading.waiting': 'Waiting for the endpoint...',
 
