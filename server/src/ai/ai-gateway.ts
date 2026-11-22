@@ -119,7 +119,8 @@ export function parseGatewayFromEnv(env: Record<string, string | undefined>): Ga
 export function selectUpstream(
   upstreams: readonly GatewayUpstream[],
 ): GatewayUpstream | undefined {
-  const usable = upstreams.filter((u) => u.enabled && u.baseUrl !== '' && u.modelId !== '');
+  // 🔴 必须有密钥：空 key 会变成 `Bearer `（空）照发 → 扣额度 + 明文出网（旧 config 注释的警告）。
+  const usable = upstreams.filter((u) => u.enabled && u.baseUrl !== '' && u.modelId !== '' && u.apiKey !== '');
   if (usable.length === 0) return undefined;
   return [...usable].sort((a, b) => a.priority - b.priority || b.weight - a.weight)[0];
 }

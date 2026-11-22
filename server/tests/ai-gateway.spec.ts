@@ -45,6 +45,10 @@ describe('selectUpstream', () => {
     expect(picked?.id).toBe('c'); // priority0 中 weight 最大
   });
 
+  it('空 apiKey 的上游不可用（防 Bearer 空值出网）', () => {
+    expect(selectUpstream([up({ id: 'nokey', apiKey: '' })])).toBeUndefined();
+  });
+
   it('全部不可用 → undefined', () => {
     expect(selectUpstream([up({ enabled: false })])).toBeUndefined();
     expect(selectUpstream([])).toBeUndefined();

@@ -75,6 +75,17 @@ describe('admin ai-gateway routes', () => {
     expect(seen!.auth).toBe('Bearer k');
   });
 
+  it('POST /test：内网/回环地址拒绝（防 SSRF）', async () => {
+    const file = tempFile();
+    let called = false;
+    const app = await makeApp({ file, fetchImpl: (async () => { called = true; return new Response('{}'); }) as typeof fetch });
+    await app.inject({ method: 'PUT', url: '/ai-gateway', payload: { upstreams: [{ id: 'x', baseUrl: 'https://127.0.0.1/v1', apiKey: 'k', modelId: 'm' }] } });
+    const res = await app.inject({ method: 'POST', url: '/ai-gateway/test', payload: { id: 'x' } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('private-host');
+    expect(called).toBe(false);
+  });
+
   it('POST /test：http 上游拒绝（必须是 https）', async () => {
     const file = tempFile();
     const app = await makeApp({ file });

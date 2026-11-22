@@ -10,6 +10,21 @@ import { requireAdmin } from './admin.middleware';
 import { redactUpstreams, type GatewayUpstream } from '../ai/ai-gateway';
 import { loadGatewayUpstreams, saveGatewayUpstreams } from '../ai/gateway-store';
 
+/** 拒绝内网/回环/链路本地（试连防 SSRF）。 */
+function isPrivateHost(host: string): boolean {
+  const h = host.toLowerCase();
+  if (h === 'localhost' || h.endsWith('.localhost')) return true;
+  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return true;
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (m === null) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return false;
+}
+
 export interface AiGatewayRoutesOptions {
   /** 鉴权钩子（生产默认 `requireAdmin`；测试可注入）。 */
   readonly authenticate?: (request: unknown, reply: unknown) => Promise<unknown> | unknown;
@@ -81,6 +96,17 @@ export const aiGatewayRoutes: FastifyPluginAsync<AiGatewayRoutesOptions> = async
       reply.code(400);
       return { ok: false, code: 'insecure-url', message: '上游必须是 https。' };
     }
+    let host = '';
+    try {
+      host = new URL(target.baseUrl).hostname;
+    } catch {
+      reply.code(400);
+      return { ok: false, code: 'invalid-url', message: '上游 URL 解析失败。' };
+    }
+    if (isPrivateHost(host)) {
+      reply.code(400);
+      return { ok: false, code: 'private-host', message: '试连不允许内网/回环地址。' };
+    }
     const doFetch = options.fetchImpl ?? globalThis.fetch;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 5000);
@@ -89,6 +115,7 @@ export const aiGatewayRoutes: FastifyPluginAsync<AiGatewayRoutesOptions> = async
         method: 'GET',
         headers: target.apiKey === '' ? {} : { authorization: `Bearer ${target.apiKey}` },
         signal: ctrl.signal,
+        redirect: 'manual', // 不跟随重定向（防跳转到内网）
       });
       return { ok: res.ok, status: res.status };
     } catch (error: unknown) {

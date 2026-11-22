@@ -75,10 +75,15 @@ export function aggregateWeekly(state: ReportState, now: number): WeeklyReportDa
   for (const f of Object.values(state.focusSessions ?? {})) {
     if (inRange(f.startedAt, monday, nextMonday)) focusMinutes += f.durationMinutes ?? 0;
   }
+  const localDate = (ms: number): string => {
+    const x = new Date(ms);
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return `${String(x.getFullYear())}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
+  };
   return {
     kind: 'weekly',
-    startISO: new Date(monday).toISOString().slice(0, 10),
-    endISO: new Date(nextMonday - 1).toISOString().slice(0, 10),
+    startISO: localDate(monday),
+    endISO: localDate(nextMonday - 1),
     completedCount,
     createdCount,
     habitCheckins,

@@ -111,7 +111,7 @@ export function AiGatewaySection({ store }: { store: AdminStoreState }): React.J
           <tbody>
             {rows.map((r, i) => (
               <tr key={r.id === '' ? `new-${String(i)}` : r.id}>
-                <td><input value={r.id} onChange={(e) => patch(i, { id: e.target.value })} /></td>
+                <td><input value={r.id} onChange={(e) => patch(i, { id: e.target.value })} disabled={view !== null && view.upstreams.some((x) => x.id === r.id)} /></td>
                 <td><input value={r.label} onChange={(e) => patch(i, { label: e.target.value })} /></td>
                 <td><input value={r.baseUrl} onChange={(e) => patch(i, { baseUrl: e.target.value })} /></td>
                 <td><input value={r.modelId} onChange={(e) => patch(i, { modelId: e.target.value })} /></td>
