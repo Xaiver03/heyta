@@ -50,6 +50,8 @@ export interface MobileCloudTurnDeps {
   readonly consents: readonly EgressConsent[];
   readonly grants: LocalApiConfig['grants'];
   readonly runId?: string;
+  /** 流式工具调用增量（id/name）。 */
+  readonly onToolCall?: (call: { readonly id: string; readonly name: string }) => void;
 }
 
 export interface MobileCloudTurnResult {
@@ -77,6 +79,7 @@ export async function runMobileCloudTurn(
     // 只读工具（list_/get_/search_/find_/read_）可并行；写仍串行（最佳实践：并行读、串行写）。
     parallelSafe: (name: string) => /^(list|get|search|find|read)_/.test(name),
     ...(deps.runId === undefined ? {} : { runId: deps.runId }),
+    ...(deps.onToolCall === undefined ? {} : { onToolCall: deps.onToolCall }),
   });
   return {
     turn: result.turn,

@@ -432,6 +432,8 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
    */
   const [images, setImages] = useState<readonly EncodedImage[]>([]);
   const [harnessUndo, setHarnessUndo] = useState<(() => Promise<unknown>) | null>(null);
+  /** 流式阶段是否已开始准备工具调用（Harness 模式）——用于等待文案。 */
+  const [harnessPreparing, setHarnessPreparing] = useState(false);
 
   /**
    * 附件：图标进输入框内部左下角，缩略图落在字段下方（与任务列同一套形状）。
@@ -547,14 +549,17 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
     setPhase('running');
     if (props.useCloudHarness === true) {
+      setHarnessPreparing(false);
       try {
         const res = await runWebCloudTurn(text, {
           routing: props.routing,
           consents: props.consents,
           grants: assistantGrants(),
+          onToolCall: () => { if (ephemeral.isCurrent() && epoch === controls.epoch) setHarnessPreparing(true); },
         });
         if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
         setPhase('idle');
+        setHarnessPreparing(false);
         if (res.error !== undefined) {
           setHarnessUndo(res.undo ?? null);
           append({ role: 'assistant', text: `出错：${res.error}`, steps: [], stoppedAt: undefined });
@@ -566,6 +571,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
       } catch (error: unknown) {
         if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
         setPhase('idle');
+        setHarnessPreparing(false);
         append({ role: 'assistant', text: `出错：${error instanceof Error ? error.message : '云端 Agent 失败。'}`, steps: [], stoppedAt: undefined });
       }
       return;
@@ -1194,7 +1200,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
           （草稿已被清空），所以拿它当判据会一条都测不出来。 */}
       {phase === 'running' && (live === undefined || live.text === '') && (
         <p className="ht-ai__note" data-testid="ai-assistant-waiting">
-          {t('web.ai.loading.waiting')}
+          {harnessPreparing ? t('web.ai.chat.preparingTool') : t('web.ai.loading.waiting')}
           {/*
             🔴 三个点是**装饰**，所以整块标 `aria-hidden`。
 
@@ -1207,11 +1213,13 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
             没有内容、没有 testid、不参与断言。判据挂在文案那一行
             （`ai-assistant-waiting`，已有测试在用）。
           */}
-          <span className="ht-ai__typing" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
+          {!harnessPreparing && (
+            <span className="ht-ai__typing" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+          )}
         </p>
       )}
 
