@@ -87,3 +87,9 @@ await undoLastAiTurn({ undo }, seqBefore);
 ## 9. 文本流式（已支持）
 
 `createRoutedModelCall({ onTextDelta })` → 传入 `invokeRouted` 的 `deps.onDelta`，只转发 `type:'text'` 片段（思考片段不算答案）。`requestCloudAssistantTurn`/`runAiTurnWithUndo` 透传 `onTextDelta`。**宿主无 `TextDecoder`（Hermes）时 `invokeRouted` 自动退回非流式**——移动端整段返回，Web/node 逐字。这是"切面板默认不牺牲流式"的前置能力（切换本身仍待产品决策+验收）。
+
+## 10. 前后端接线（客户端 → 服务端工具 API）
+
+- **客户端传输**：`createServerToolTransport({ getBaseUrl, getToken })`（`@heyta/app-host`）—— 每次现取同步服务器地址与 token，打 `POST {baseUrl}/api/agent/tools/<name>`；未配地址返回 `not-configured`。可直接作 `runCloudAgentTurn`/`runAiTurnWithUndo` 的 `transport`，把"设备本地循环 + 云端模型 + 服务端工具执行"接起来。
+- **服务端全链路**：`server/tests/agent-tools.chain.spec.ts` 证明 route → `executeAgentToolForUser` → op 归约 → `list_tasks` 全程不 stub。
+- 判据：`ai-cloud-tools.spec.ts`（活取值器/令牌轮换/未配置）；server chain（1）。

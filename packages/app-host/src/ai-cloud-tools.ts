@@ -235,3 +235,33 @@ export function toCloudAgentTools(
       },
     }));
 }
+
+/**
+ * 从**活取值器**构造到 heyta 云端 `/api/agent/tools` 的传输（前后端接线用）。
+ *
+ * 与 `createHttpCloudToolTransport` 相同，只是把 `baseUrl`/`token` 做成"每次调用现取"：
+ * 用户后登录/换账号、同步地址后填，都能拿到当时的真值（与 `createManagedTransport` 同源）。
+ */
+export function createServerToolTransport(options: {
+  readonly getBaseUrl: () => string | undefined;
+  readonly getToken: () => string | undefined | Promise<string | undefined>;
+  readonly fetchImpl?: typeof fetch;
+  readonly pathPrefix?: string;
+}): CloudToolTransport {
+  return {
+    async invoke(name, args, signal, invokeOptions) {
+      const baseUrl = options.getBaseUrl();
+      if (baseUrl === undefined || baseUrl === '') {
+        return { ok: false, reason: 'not-configured', message: '没有配置同步服务器地址。' };
+      }
+      const token = await options.getToken();
+      const transport = createHttpCloudToolTransport({
+        baseUrl,
+        ...(token === undefined ? {} : { getToken: () => token }),
+        ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+        ...(options.pathPrefix === undefined ? {} : { pathPrefix: options.pathPrefix }),
+      });
+      return transport.invoke(name, args, signal, invokeOptions);
+    },
+  };
+}

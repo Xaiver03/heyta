@@ -1180,6 +1180,7 @@ export {
 // 云端工具客户端桥（"tool calling 只针对云端"的客户端半边；产出 PI 内核可用的 customTools）。
 export {
   createHttpCloudToolTransport,
+  createServerToolTransport,
   toCloudAgentTools,
   toCloudToolDescriptors,
   type CloudToolTransport,

@@ -8,6 +8,7 @@ import { LOCAL_API_TOOLS, type LocalApiConfig } from '@heyta/local-api';
 
 import {
   createHttpCloudToolTransport,
+  createServerToolTransport,
   toCloudAgentTools,
   toCloudToolDescriptors,
   type CloudToolTransport,
@@ -106,5 +107,29 @@ describe('HTTP 传输', () => {
     const r2 = await createHttpCloudToolTransport({ baseUrl: 'https://h', fetchImpl: throwFetch }).invoke('x', {});
     expect(r2.ok).toBe(false);
     if (!r2.ok) expect(r2.reason).toBe('network');
+  });
+});
+
+describe('createServerToolTransport（活取值器，前后端接线）', () => {
+  it('每次现取 baseUrl/token；未配置地址 → not-configured', async () => {
+    const seen: { url: string; auth?: string }[] = [];
+    const fetchImpl = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      seen.push({ url: String(url), auth: headers['authorization'] });
+      return new Response(JSON.stringify({ ok: true, data: { ok: 1 } }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    let token = 'tok-1';
+    const transport = createServerToolTransport({ getBaseUrl: () => 'https://h', getToken: () => token, fetchImpl });
+    await transport.invoke('list_tasks', {});
+    token = 'tok-2';
+    await transport.invoke('list_tasks', {});
+    expect(seen[0]!.auth).toBe('Bearer tok-1');
+    expect(seen[1]!.auth).toBe('Bearer tok-2');
+    expect(seen[0]!.url).toBe('https://h/api/agent/tools/list_tasks');
+
+    const none = createServerToolTransport({ getBaseUrl: () => '', getToken: () => undefined });
+    const r = await none.invoke('x', {});
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('not-configured');
   });
 });
