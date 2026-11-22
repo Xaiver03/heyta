@@ -19,7 +19,7 @@
 | `packages/ai` 全 15 spec | **338 passed / 1 failed**（`managed-routing.spec` 托管 tool-calling 排除，**既有失败**，与我改动无关，已 stash 复核） |
 | `check:ai-tools` | ✅ rc=0 |
 | `check:layering` | ✅ rc=0 |
-| `check:ai-coverage` | ❌ rc=1（mobile 缺 `breakdown/prioritize/duration` 三入口，**既有缺口，非本 harness**） |
+| `check:ai-coverage` | ✅ rc=0（mobile 已移植 breakdown/prioritize/duration：`AiToolboxScreen`+三子面板，mobile 4/5、web 4/5） |
 
 ## 1. 逐条判定
 
@@ -40,7 +40,7 @@
 2. **服务端 `/api/agent/tools`**：**路由骨架已实现**（`server/src/ai/agent-tools.routes.ts`，list/invoke/幂等/授权/风险门，5 测试绿），但**未在 `api.ts` 注册、未接真实数据层**（`execute` 注入）。托管场景与云端写入撤销仍需接数据层。
 3. **P0-2（assistant `tool_calls` 帧）**：✅ **已修协议结构层**（`wire.ts` 支持 assistant `tool_calls`；`ai-routed-model` 保留该帧；省略时字节不变，有测试）。⚠️ 真实 OpenAI 兼容端点仍未联网复验（未核）。
 4. **PI 内核在 RN/Hermes 真机**：`pi-agent-core` 可移植性未验证（审计① U5）；Hermes 性能未量化。
-5. **`check:ai-coverage` 红**：mobile 缺 `breakdown/prioritize/duration`——是**三个 AI 功能的移动端移植**（web 各 ~600 行；mobile 完全无组件），非 Harness 胶水。详见 [mobile-ai-coverage-scope](2026-11-22-mobile-ai-coverage-scope.md)。
+5. ✅ **`check:ai-coverage` 已转绿**：breakdown/prioritize/duration 已移植移动端（`AiToolboxScreen` 容器 + 三子面板 + 任务详情入口）。
 
 ## 3. 结论
 
