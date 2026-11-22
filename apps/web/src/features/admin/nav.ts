@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   ChartColumn,
+  Bot,
   CreditCard,
   Gift,
   LayoutDashboard,
@@ -56,4 +57,5 @@ export const ADMIN_TABS: readonly AdminNavEntry[] = [
   { key: 'announcements', labelKey: 'web.admin.tab.announcements', icon: Megaphone },
   { key: 'holidays', labelKey: 'web.admin.tab.holidays', icon: CalendarDays },
   { key: 'refunds', labelKey: 'web.admin.tab.refunds', icon: Undo2 },
+  { key: 'ai-gateway', labelKey: 'web.admin.tab.aiGateway', icon: Bot },
 ];

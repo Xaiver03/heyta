@@ -40,6 +40,18 @@ describe('admin ai-gateway routes', () => {
     expect(JSON.stringify(body)).not.toContain('secret');
   });
 
+  it('PUT 省略 apiKey（只改展示名）→ 沿用已存密钥', async () => {
+    const file = tempFile();
+    const app = await makeApp({ file });
+    await app.inject({ method: 'PUT', url: '/ai-gateway', payload: { upstreams: [{ id: 'pp', label: 'old', baseUrl: 'https://pp/v1', apiKey: 'secret', modelId: 'm' }] } });
+    const put2 = await app.inject({ method: 'PUT', url: '/ai-gateway', payload: { upstreams: [{ id: 'pp', label: 'new', baseUrl: 'https://pp/v1', modelId: 'm' }] } });
+    expect(put2.statusCode).toBe(200);
+    const get = await app.inject({ method: 'GET', url: '/ai-gateway' });
+    const u = get.json().upstreams[0];
+    expect(u.label).toBe('new');
+    expect(u.hasApiKey).toBe(true); // 密钥没被清空
+  });
+
   it('PUT 非法项 → 400 且不落盘', async () => {
     const file = tempFile();
     const app = await makeApp({ file });

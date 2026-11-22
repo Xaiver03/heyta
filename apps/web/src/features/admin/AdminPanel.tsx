@@ -54,6 +54,7 @@ import { RefundsSection } from './sections/RefundsSection.js';
 import { RevenueSection } from './sections/RevenueSection.js';
 import { SubscriptionsSection } from './sections/SubscriptionsSection.js';
 import { UsersSection } from './sections/UsersSection.js';
+import { AiGatewaySection } from './sections/AiGatewaySection.js';
 
 export function AdminPanel({
   active = true,
@@ -121,6 +122,9 @@ export function AdminPanel({
         // 这里造一个"下一页"按钮会点出第二个请求，而它拿回来的还是同一批最新行 ——
         // 一个看起来在工作、实际上永远停在第一页的控件比没有控件更坏。
         if (store.refunds === null) void store.loadRefunds();
+        break;
+      case 'ai-gateway':
+        if (store.aiGateway === null) void store.loadAiGateway();
         break;
       case 'overview':
         break;
@@ -224,6 +228,9 @@ export function AdminPanel({
 
       {/* ── 退款（申请 / 批准 / 驳回）────────────────────────────── */}
       {tab === 'refunds' && <RefundsSection store={store} />}
+
+      {/* ── AI 接入网关（上游配置）────────────────────────────── */}
+      {tab === 'ai-gateway' && <AiGatewaySection store={store} />}
 
     </div>
   );

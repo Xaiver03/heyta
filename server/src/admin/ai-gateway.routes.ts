@@ -44,7 +44,19 @@ export const aiGatewayRoutes: FastifyPluginAsync<AiGatewayRoutesOptions> = async
       return { ok: false, code: 'invalid-body', message: 'body.upstreams 必须是数组。' };
     }
     try {
-      const saved = save(body.upstreams);
+      // 省略/空 apiKey 的条目：按 id 沿用已存密钥（「只改展示名/模型」不该把密钥清空）。
+      const existing = load().upstreams;
+      const merged = (body.upstreams as unknown[]).map((item) => {
+        if (item === null || typeof item !== 'object') return item;
+        const u = item as Record<string, unknown>;
+        const blank = u['apiKey'] === undefined || u['apiKey'] === '';
+        if (blank && typeof u['id'] === 'string') {
+          const old = existing.find((e) => e.id === u['id']);
+          if (old !== undefined) return { ...u, apiKey: old.apiKey };
+        }
+        return item;
+      });
+      const saved = save(merged);
       return { ok: true, upstreams: view(saved.upstreams) };
     } catch (error: unknown) {
       reply.code(400);

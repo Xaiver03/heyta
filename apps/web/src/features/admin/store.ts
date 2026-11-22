@@ -46,6 +46,9 @@ import {
   fetchAdminCoupons,
   fetchAdminGrantSkus,
   fetchAdminHolidayYears,
+  fetchAdminAiGateway,
+  adminPutAiGateway,
+  adminTestAiUpstream,
   fetchAdminInvites,
   fetchAdminOrders,
   fetchAdminOverview,
@@ -62,6 +65,9 @@ import {
   type AdminGrantRow,
   type AdminGrantSku,
   type AdminHolidayYears,
+  type AdminAiGatewayView,
+  type AdminAiUpstreamInput,
+  type AdminAiUpstreamTestResult,
   type AdminInvites,
   type AdminOrderRow,
   type AdminOverview,
@@ -92,7 +98,8 @@ export type AdminTab =
   | 'revenue'
   | 'announcements'
   | 'holidays'
-  | 'refunds';
+  | 'refunds'
+  | 'ai-gateway';
 
 /** 每一页拉多少。服务端上限 200；50 在宽屏表格上够看又不至于一次拉太多。 */
 export const ADMIN_PAGE_SIZE = 50;
@@ -414,6 +421,8 @@ export interface AdminStoreState {
   /** 上一次失败的 i18n key（成功时 `null`）。 */
   errorKey: string | null;
   loading: boolean;
+  /** AI 网关配置（`GET /api/admin/ai-gateway`）；`null` = 还没拉过。 */
+  aiGateway: AdminAiGatewayView | null;
 
   overview: AdminOverview | null;
   users: AdminPage<AdminUserRow> | null;
@@ -526,6 +535,9 @@ export interface AdminStoreState {
 
   probe: () => Promise<AdminAccess>;
   loadOverview: () => Promise<void>;
+  loadAiGateway: () => Promise<void>;
+  saveAiGateway: (upstreams: readonly AdminAiUpstreamInput[]) => Promise<AdminAiUpstreamTestResult & { ok: true } | { ok: false }>;
+  testAiUpstream: (id: string) => Promise<AdminAiUpstreamTestResult>;
   loadUsers: (params?: { q?: string; offset?: number }) => Promise<void>;
   loadSubscriptions: (offset?: number) => Promise<void>;
   loadOrders: (offset?: number) => Promise<void>;
@@ -722,6 +734,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   loading: false,
 
   overview: null,
+  aiGateway: null,
   users: null,
   subscriptions: null,
   orders: null,
@@ -784,6 +797,30 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     const result = await fetchAdminOverview(clientOptions());
     if (!result.ok) return applyFailure(result, set);
     set({ overview: result.data, errorKey: null, loading: false });
+  },
+
+  loadAiGateway: async () => {
+    set({ loading: true });
+    const result = await fetchAdminAiGateway(clientOptions());
+    if (!result.ok) return applyFailure(result, set);
+    set({ aiGateway: result.data, errorKey: null, loading: false });
+  },
+
+  saveAiGateway: async (upstreams) => {
+    set({ loading: true });
+    const result = await adminPutAiGateway(clientOptions(), upstreams);
+    if (!result.ok) {
+      applyFailure(result, set);
+      return { ok: false };
+    }
+    const view = await fetchAdminAiGateway(clientOptions());
+    set({ ...(view.ok ? { aiGateway: view.data } : {}), errorKey: null, loading: false });
+    return { ok: true };
+  },
+
+  testAiUpstream: async (id) => {
+    const result = await adminTestAiUpstream(clientOptions(), id);
+    return result.ok ? result.data : { ok: false, message: ADMIN_REASON_KEY[result.reason] };
   },
 
   loadUsers: async (params = {}) => {
