@@ -115,7 +115,7 @@ import {
   useStreamReveal,
 } from '@heyta/ui';
 import { assistantFailureCopy } from './ai-failure-copy.js';
-import { runWebCloudTurn, undoWebCloudTurn } from './cloud-harness.js';
+import { runWebCloudTurn } from './cloud-harness.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import { FailureSettingsAction } from './RouteUnavailable.js';
 import { LIST_SEPARATOR } from './locale-punctuation.js';
@@ -431,7 +431,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
    * 与捕获那条同一条纪律（ADR-0005「AI 是输入法」—— 输入法不存你打的字）。
    */
   const [images, setImages] = useState<readonly EncodedImage[]>([]);
-  const [harnessUndoSeq, setHarnessUndoSeq] = useState<number | null>(null);
+  const [harnessUndo, setHarnessUndo] = useState<(() => Promise<unknown>) | null>(null);
 
   /**
    * 附件：图标进输入框内部左下角，缩略图落在字段下方（与任务列同一套形状）。
@@ -556,12 +556,12 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
         setPhase('idle');
         if (res.error !== undefined) {
-          setHarnessUndoSeq(res.seqBefore);
+          setHarnessUndo(res.undo ?? null);
           append({ role: 'assistant', text: `出错：${res.error}`, steps: [], stoppedAt: undefined });
           return;
         }
         const wrote = res.turn.steps.some((step) => step.ok);
-        setHarnessUndoSeq(wrote ? res.seqBefore : null);
+        setHarnessUndo(wrote ? (res.undo ?? null) : null);
         append({ role: 'assistant', text: wrote ? `${res.turn.text}\n\n${t('web.ai.chat.harnessApplied')}` : res.turn.text, steps: [], stoppedAt: undefined });
       } catch (error: unknown) {
         if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
@@ -1114,17 +1114,23 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
           )}
         </ul>
 
-      {harnessUndoSeq !== null && phase === 'idle' ? (
+      {harnessUndo !== null && phase === 'idle' ? (
         <button
           type="button"
           className="ht-ai__note"
           data-testid="ai-assistant-undo-ai"
           onClick={() => {
             void (async () => {
-              const seq = harnessUndoSeq;
-              setHarnessUndoSeq(null);
-              await undoWebCloudTurn(seq);
-              append({ role: 'assistant', text: t('web.ai.chat.undoAiTurnDone'), steps: [], stoppedAt: undefined });
+              const undo = harnessUndo;
+              try {
+                const outcome = (await undo()) as { status?: string };
+                // 只有真正 applied 才报“已撤销”；stale/partial/empty 如实说明，绝不谎报。
+                const ok = outcome?.status === 'applied';
+                setHarnessUndo(ok ? null : harnessUndo);
+                append({ role: 'assistant', text: ok ? t('web.ai.chat.undoAiTurnDone') : t('web.ai.chat.undoAiTurn') + '：' + (outcome?.status ?? 'failed'), steps: [], stoppedAt: undefined });
+              } catch (error: unknown) {
+                append({ role: 'assistant', text: `出错：${error instanceof Error ? error.message : '撤销失败'}`, steps: [], stoppedAt: undefined });
+              }
             })();
           }}
         >

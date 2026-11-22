@@ -116,8 +116,11 @@ const managedTransport = createManagedTransport({
  */
 const streamingFetch = createGatedStreamingFetch(privacyConsent);
 
-/** 移动端 Harness 开关：默认关（只读），开启后 runTurn 走 runMobileCloudTurn。 */
-const MOBILE_CLOUD_HARNESS = true;
+/**
+ * 移动端 Harness 开关：**默认关**。开启后 runTurn 走 runMobileCloudTurn（可写+撤销，需真机验收后再开）。
+ * 与 Web 的 `?cloudHarness=1` 对齐：默认不改变现有助手行为。
+ */
+const MOBILE_CLOUD_HARNESS = false;
 
 
 /**
@@ -571,7 +574,7 @@ export function AssistantScreen({
                   void (async () => {
                     const seq = harnessUndoSeq;
                     setHarnessUndoSeq(null);
-                    await undoMobileCloudTurn(host!, seq);
+                    if (host !== null) await undoMobileCloudTurn(host, seq);
                   })();
                 }}
               />

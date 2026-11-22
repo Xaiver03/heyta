@@ -2,6 +2,7 @@
 
 > 最近更新 2026-11-22（新一轮 goal 第7轮）：**干净 dist 复核** app-host AI 32、op-log 182、node-host 1、server agent-tools 18 通过；web/mobile/server `tsc` 均 0 错；`packages/ai` 338（1 条既有失败 `managed-routing`，与本次无关）。
 > 新增入口：Web `runWebCloudTurn`、Mobile `runMobileCloudTurn`（接入点就绪、tsc 通过）；写路径 D1 端到端测试通过。
+> 2026-11-22（第16轮）：移动 `MOBILE_CLOUD_HARNESS` 默认 **false**（未真机验收，一键开启）；Web `?cloudHarness=1` 可用且撤销只报真实结果。
 > 2026-11-22（第13轮）：**Web 端 D1 闭环可用**——`?cloudHarness=1` 打开后助手可读可写且有「撤销这次 AI 操作」按钮（i18n 词条 zh/en）；`vite build` 成功（4370 模块，4.25s）；app-host AI 10 spec 36 通过、server agent-tools 4 spec 19 通过。
 
 > 日期：2026-11-22。本文件把产品负责人 7 条裁决逐条映射到**代码 + 能转红的测试 + 门禁**，并如实列出**未完成/未验证**。

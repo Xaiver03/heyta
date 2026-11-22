@@ -62,7 +62,7 @@ export interface ChatRuntime {
   readonly managedTransport: ManagedTransport;
   /**
    * 可选：云端 Agent Harness 的跑一轮回调（设备本地循环 + 云端模型 + 本地数据工具）。
-   * 给了它，`runTurn` 改走 Harness（当前移动端为**只读**，见 AssistantScreen 的开关与说明）；
+   * 给了它，`runTurn` 改走 Harness（见 AssistantScreen 的 MOBILE_CLOUD_HARNESS 开关（默认关））；
    * 省略则保持既有 `requestAssistantTurn`。由壳注入，控制器不建造引擎（保持 UI 层哑）。
    */
   readonly cloudTurn?: (text: string) => Promise<{ readonly text: string }>;

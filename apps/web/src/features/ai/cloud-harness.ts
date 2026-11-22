@@ -54,6 +54,8 @@ export interface WebCloudTurnResult {
   readonly runId: string;
   /** 中途抛错时的错误信息（此时 turn 为空、seqBefore 仍可用于撤销已写部分）。 */
   readonly error?: string;
+  /** 绑定到本轮引擎实例的撤销函数（消除 stale-engine 守卫失效）。 */
+  readonly undo?: () => Promise<unknown>;
 }
 
 /** 跑一轮 Web 云端 Agent（本地数据工具 + 云端模型 + 记录 seq 供撤销）。 */
@@ -76,6 +78,7 @@ export async function runWebCloudTurn(
     turn: result.turn,
     seqBefore: result.seqBefore,
     runId: result.runId,
+    undo: () => undoLastAiTurn({ undo: bindings }, result.seqBefore),
     ...(result.error === undefined ? {} : { error: result.error }),
   };
 }
