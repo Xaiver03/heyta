@@ -52,6 +52,7 @@ describe('工具目录风险档（ToolRisk）', () => {
         'trash_task',
         'trash_tasks',
         'delete_habit',
+        'move_tasks',
         'abandon_task',
         'unabandon_task',
         'move_task',

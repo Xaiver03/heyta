@@ -2469,6 +2469,14 @@ export const zhCN = {
   'web.ai.tools.intentRenameHabit': '习惯改名：{name}',
   'web.ai.tools.intentDeleteHabit': '习惯移到回收站 {id}',
   'web.ai.tools.intentRestoreHabit': '恢复习惯 {id}',
+  'web.ai.tools.intentSetTaskImportant': '把任务 {id} 标记为重要',
+  'web.ai.tools.intentUnsetTaskImportant': '取消任务 {id} 的重要标记',
+  'web.ai.tools.intentSetTaskPinned': '置顶任务 {id}',
+  'web.ai.tools.intentUnsetTaskPinned': '取消置顶任务 {id}',
+  'web.ai.tools.intentMoveTasks': '把 {count} 个任务移到清单 {project}',
+  'web.ai.tools.intentMoveTasksOut': '把 {count} 个任务移出清单',
+  'web.ai.tools.intentUndoCheckinToday': '撤销今天的打卡 {id}',
+  'web.ai.tools.intentUndoCheckin': '撤销 {date} 的打卡 {id}',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',

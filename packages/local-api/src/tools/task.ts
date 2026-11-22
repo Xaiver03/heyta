@@ -243,6 +243,32 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'set_task_important',
+    egressFields: [],
+    description: '把任务标记为重要或取消重要。参数：taskId（任务 id）、important（布尔值，true 标记重要、false 取消）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_task_pinned',
+    egressFields: [],
+    description: '把任务置顶或取消置顶。参数：taskId（任务 id）、pinned（布尔值，true 置顶、false 取消）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'move_tasks',
+    egressFields: [],
+    description:
+      '把多条任务一次性移到另一个清单。参数：taskIds（要移动的任务 id 列表，至少一条）、' +
+      'projectId（目标清单 id；省略表示移出清单、不归属任何清单）。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -503,6 +529,40 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       rule: { type: 'string', description: '重复规则字符串，原样交给动作层校验；省略表示清除重复。' },
     },
     required: ['taskId'],
+    additionalProperties: false,
+  },
+  set_task_important: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要标记的任务 id。' },
+      important: { type: 'boolean', description: 'true 标记为重要，false 取消重要。' },
+    },
+    required: ['taskId', 'important'],
+    additionalProperties: false,
+  },
+  set_task_pinned: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要置顶的任务 id。' },
+      pinned: { type: 'boolean', description: 'true 置顶，false 取消置顶。' },
+    },
+    required: ['taskId', 'pinned'],
+    additionalProperties: false,
+  },
+  move_tasks: {
+    type: 'object',
+    properties: {
+      taskIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: '要移动的任务 id 列表，至少一条。',
+      },
+      projectId: {
+        type: 'string',
+        description: '目标清单 id；省略表示移出清单、不归属任何清单。',
+      },
+    },
+    required: ['taskIds'],
     additionalProperties: false,
   },
 };
@@ -1008,6 +1068,78 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
           action: 'set-task-repeat',
           taskId: a['taskId'].trim(),
           ...(typeof a['rule'] === 'string' ? { rule: a['rule'] } : {}),
+        },
+      };
+    }
+
+    case 'set_task_important': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'important');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_important 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_task_important 需要 taskId。' };
+      }
+      if (typeof a['important'] !== 'boolean') {
+        return { ok: false, message: 'set_task_important 的 important 必须是布尔值。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-task-important',
+          taskId: a['taskId'].trim(),
+          important: a['important'],
+        },
+      };
+    }
+
+    case 'set_task_pinned': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'pinned');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_pinned 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_task_pinned 需要 taskId。' };
+      }
+      if (typeof a['pinned'] !== 'boolean') {
+        return { ok: false, message: 'set_task_pinned 的 pinned 必须是布尔值。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-task-pinned',
+          taskId: a['taskId'].trim(),
+          pinned: a['pinned'],
+        },
+      };
+    }
+
+    case 'move_tasks': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskIds' && key !== 'projectId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `move_tasks 不支持这些参数：${unknown.join('、')}。` };
+      }
+      const raw = a['taskIds'];
+      if (!Array.isArray(raw) || raw.length === 0) {
+        return { ok: false, message: 'move_tasks 需要至少一条 taskIds。' };
+      }
+      const ids: string[] = [];
+      for (const entry of raw) {
+        if (typeof entry !== 'string' || entry.trim() === '') {
+          return { ok: false, message: 'move_tasks 的 taskIds 必须全是非空字符串。' };
+        }
+        ids.push(entry.trim());
+      }
+      if ('projectId' in a && (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '')) {
+        return { ok: false, message: 'move_tasks 的 projectId 必须是非空字符串；要移出清单请省略它。' };
+      }
+      const projectId = typeof a['projectId'] === 'string' ? a['projectId'].trim() : undefined;
+      return {
+        ok: true,
+        intent: {
+          action: 'move-tasks',
+          taskIds: [...new Set(ids)],
+          ...(projectId === undefined ? {} : { projectId }),
         },
       };
     }

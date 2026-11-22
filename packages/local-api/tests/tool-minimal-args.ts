@@ -81,4 +81,10 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   rename_habit: { habitId: 'h1', name: '新习惯名' },
   delete_habit: { habitId: 'h1' },
   restore_habit: { habitId: 'h1' },
+
+  // 批次4：任务标记 / 批量移动 / 打卡撤销
+  set_task_important: { taskId: 't1', important: true },
+  set_task_pinned: { taskId: 't1', pinned: true },
+  move_tasks: { taskIds: ['t1'] },
+  undo_checkin: { habitId: 'h1' },
 };

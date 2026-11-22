@@ -2,17 +2,17 @@
  * HABIT_LOG（打卡记录）实体工具包
  * ================================
  *
- * 读：`list_checkins`；写：`record_checkin`。
+ * 读：`list_checkins`；写：`record_checkin`、`undo_checkin`（撤销某一天的打卡）。
  *
  * 🔴 它和 `habit.ts` 是两个实体，不是一个：HABIT 是**定义**（名称、目标、单位、口径），
  * HABIT_LOG 是**某一天做过没有**那条记录。把打卡工具写进 `habit.ts`，
  * "哪个实体被覆盖了"这件事就会在两个地方各说一遍 —— 而 `registry.ts` 会直接拒绝
  * 两个 pack 认领同一个工具名（那是第二份声明的形状，不是风格问题）。
  *
- * ⚠️ 界面上还能**撤销**某一天的打卡（`undoCheckIn`），现在没有工具：
- * 撤销的输入是"哪一天"，而模型对"用户说的是哪天"的错误率远高于对"今天"，
- * 撤销落错的那天又不会报错（那条记录本来就可能存在）。
- * 这是要单独论证的一条，不是漏写 —— 已登记。
+ * ⚠️ `undo_checkin`（撤销某一天的打卡）比 `record_checkin` 多一维"哪一天"：
+ * 模型对"用户说的是哪天"的错误率远高于对"今天"，而撤销落错的那天**不会报错**
+ * （那条记录本来就可能存在），所以 `date` 省略时严格等于"今天"，
+ * 给了就必须是真实存在的一天（`parseCalendarDay`）—— 不猜、不修正。
  *
  * ⚠️ `HabitLog.note` 那个字段**不出现在读结果里**：`checkIn` 从来不写它，
  * 而把一条永远为空的自由文本放进白名单，等于放一条将来的出境通道。
@@ -48,6 +48,17 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'undo_checkin',
+    // 写工具只产出提案、结果不回送模型 ⇒ 出境面是提案里那几个字段（同 `record_checkin`）。
+    egressFields: [],
+    description:
+      '撤销某个习惯某一天的打卡。不写日期就是今天。' +
+      '撤销是软删除、可逆；那天本来就没有打卡会被拒绝，不会凭空造出一条删除记录。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -74,6 +85,18 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       value: {
         type: 'number',
         description: '这一次的数量，不小于 0 的有限数（如喝了 3 杯就是 3）。省略就用该习惯的目标数值。',
+      },
+    },
+    required: ['habitId'],
+    additionalProperties: false,
+  },
+  undo_checkin: {
+    type: 'object',
+    properties: {
+      habitId: { type: 'string', description: '撤销哪个习惯的打卡。' },
+      date: {
+        type: 'string',
+        description: '哪一天：YYYY-MM-DD（本地日历日）。省略就是今天。',
       },
     },
     required: ['habitId'],
@@ -140,6 +163,34 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
           return { ok: false, message: 'value 必须是不小于 0 的有限数。' };
         }
         intent.value = v;
+      }
+
+      return { ok: true, intent };
+    }
+
+    case 'undo_checkin': {
+      // 严格白名单：多余参数一律拒，而不是悄悄忽略（同 `rename_habit` 那一档），
+      // 否则"撤销 + 顺手塞个 value"会被当成合法的撤销。
+      const unknown = Object.keys(a).filter((key) => key !== 'habitId' && key !== 'date');
+      if (unknown.length > 0) {
+        return { ok: false, message: `undo_checkin 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['habitId'] !== 'string' || a['habitId'].trim() === '') {
+        return { ok: false, message: 'undo_checkin 需要 habitId。' };
+      }
+      const intent: {
+        action: 'undo-checkin';
+        habitId: string;
+        date?: string;
+      } = { action: 'undo-checkin', habitId: a['habitId'] };
+
+      // `date` 省略 ⇒ intent **不带**这个键（省略 = 今天，由动作层 `toLocalDate` 落地）；
+      // 给了就越早越严：格式 + 真实存在的一天，不猜、不修正。
+      if (a['date'] !== undefined) {
+        if (parseCalendarDay(a['date']) === undefined) {
+          return { ok: false, message: 'date 应为 YYYY-MM-DD（且是真实存在的一天）。' };
+        }
+        intent.date = a['date'] as string;
       }
 
       return { ok: true, intent };

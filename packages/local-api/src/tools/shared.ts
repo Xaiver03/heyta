@@ -132,7 +132,7 @@ export const MAX_TOOLS_PER_ENTITY = 7;
  */
 export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
-  TASK: 22,
+  TASK: 25,
   PROJECT: 10,
   NOTE: 10,
 } as const satisfies Readonly<Partial<Record<string, number>>>;
@@ -731,7 +731,31 @@ export type LocalApiWriteIntent =
    * 本层不读原始 `habits` 表、不自己判"在不在回收站/是否已 purge"。
    * `false` = 本来就没删（宿主回 not-found）；`throw` = 不存在或已彻底删除（not-found）。
    */
-  | { action: 'restore-habit'; habitId: string };
+  | { action: 'restore-habit'; habitId: string }
+  // 批次 4：任务标记（重要 / 置顶）/ 批量移动 / 习惯打卡撤销
+  /**
+   * 标记任务「重要」（TASK）。`important` 必填布尔；存在性由宿主经
+   * `actions.findTask` 判（I5：本层不读原始 `tasks` 表）。
+   */
+  | { action: 'set-task-important'; taskId: string; important: boolean }
+  /** 置顶任务（TASK）。`pinned` 必填布尔；判活同 `set-task-important`。 */
+  | { action: 'set-task-pinned'; taskId: string; pinned: boolean }
+  /**
+   * 批量把任务移到某个清单（TASK）。`taskIds` 为空 ⇒ invalid；`projectId` 省略 =
+   * 移出到「无清单」。
+   *
+   * 🔴 **先整批预检，再一条都不写**（同 `trash-tasks` / `restore-tasks`）：任一条不在
+   * 就整批 not-found，不半批移动。清单存在性读 `projectActions.listAllProjects()`（I5）。
+   */
+  | { action: 'move-tasks'; taskIds: readonly string[]; projectId?: string }
+  /**
+   * 撤销某一天的打卡（HABIT_LOG）。`date` 省略 = 今天（`YYYY-MM-DD`，由动作层的
+   * `toLocalDate` 兜底）。
+   *
+   * 🔴 判活交给 `habitActions.undoCheckIn`（I5）：`false` = 那天本来就没打卡（宿主回
+   * not-found）、`throw` = 习惯不存在（not-found）。本层不读原始 `habits` / 打卡表。
+   */
+  | { action: 'undo-checkin'; habitId: string; date?: string };
 
 /**
  * 一条写入落地的实体类型。

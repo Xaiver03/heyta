@@ -300,6 +300,23 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return t('web.ai.tools.intentDeleteHabit', { id: intent.habitId });
     case 'restore-habit':
       return t('web.ai.tools.intentRestoreHabit', { id: intent.habitId });
+    // 批次4：任务标记 / 批量移动 / 打卡撤销
+    case 'set-task-important':
+      return intent.important
+        ? t('web.ai.tools.intentSetTaskImportant', { id: intent.taskId })
+        : t('web.ai.tools.intentUnsetTaskImportant', { id: intent.taskId });
+    case 'set-task-pinned':
+      return intent.pinned
+        ? t('web.ai.tools.intentSetTaskPinned', { id: intent.taskId })
+        : t('web.ai.tools.intentUnsetTaskPinned', { id: intent.taskId });
+    case 'move-tasks':
+      return intent.projectId === undefined
+        ? t('web.ai.tools.intentMoveTasksOut', { count: String(intent.taskIds.length) })
+        : t('web.ai.tools.intentMoveTasks', { count: String(intent.taskIds.length), project: intent.projectId });
+    case 'undo-checkin':
+      return intent.date === undefined
+        ? t('web.ai.tools.intentUndoCheckinToday', { id: intent.habitId })
+        : t('web.ai.tools.intentUndoCheckin', { id: intent.habitId, date: intent.date });
   }
 }
 

@@ -185,6 +185,9 @@ export const AI_CAPABILITY_MANIFEST =
         'create_subtask',
         'set_task_note',
         'set_task_repeat',
+        'set_task_important',
+        'set_task_pinned',
+        'move_tasks',
       ],
     },
     {
@@ -261,6 +264,7 @@ export const AI_CAPABILITY_MANIFEST =
       ],
       'writeToolNames': [
         'record_checkin',
+        'undo_checkin',
       ],
     },
     {
@@ -874,6 +878,63 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'set_task_important',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把任务标记为重要或取消重要。参数：taskId（任务 id）、important（布尔值，true 标记重要、false 取消）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'important',
+          'type': 'boolean',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'set_task_pinned',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把任务置顶或取消置顶。参数：taskId（任务 id）、pinned（布尔值，true 置顶、false 取消）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'pinned',
+          'type': 'boolean',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'move_tasks',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把多条任务一次性移到另一个清单。参数：taskIds（要移动的任务 id 列表，至少一条）、projectId（目标清单 id；省略表示移出清单、不归属任何清单）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskIds',
+          'type': 'array',
+          'required': true,
+        },
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
       'name': 'create_project',
       'kind': 'write',
       'entityType': 'PROJECT',
@@ -1234,6 +1295,25 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'undo_checkin',
+      'kind': 'write',
+      'entityType': 'HABIT_LOG',
+      'description': '撤销某个习惯某一天的打卡。不写日期就是今天。撤销是软删除、可逆；那天本来就没有打卡会被拒绝，不会凭空造出一条删除记录。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'habitId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'date',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
       'name': 'log_focus',
       'kind': 'write',
       'entityType': 'FOCUS_SESSION',
@@ -1465,7 +1545,7 @@ export const AI_CAPABILITY_TEXT = [
   '不可以说"产品不支持"。',
   '',
   '一、有 AI 工具的实体（9 个）',
-  '- TASK —— 读和写都有（读 3 / 写 19）',
+  '- TASK —— 读和写都有（读 3 / 写 22）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
   '  · [读] get_task_estimate_context（taskId*:string）',
@@ -1488,6 +1568,9 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] create_subtask（parentId*:string, title*:string）',
   '  · [写] set_task_note（taskId*:string, note:string）',
   '  · [写] set_task_repeat（taskId*:string, rule:string）',
+  '  · [写] set_task_important（taskId*:string, important*:boolean）',
+  '  · [写] set_task_pinned（taskId*:string, pinned*:boolean）',
+  '  · [写] move_tasks（taskIds*:array, projectId:string）',
   '- PROJECT —— 读和写都有（读 1 / 写 6）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',
@@ -1516,9 +1599,10 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] rename_habit（habitId*:string, name*:string）',
   '  · [写] delete_habit（habitId*:string）',
   '  · [写] restore_habit（habitId*:string）',
-  '- HABIT_LOG —— 读和写都有（读 1 / 写 1）',
+  '- HABIT_LOG —— 读和写都有（读 1 / 写 2）',
   '  · [读] list_checkins（habitId:string, limit:number）',
   '  · [写] record_checkin（habitId*:string, date:string, value:number）',
+  '  · [写] undo_checkin（habitId*:string, date:string）',
   '- FOCUS_SESSION —— 读和写都有（读 1 / 写 1）',
   '  · [读] list_focuses（limit:number）',
   '  · [写] log_focus（kind*:string, plannedMinutes*:number, actualMinutes:number, taskId:string, completed:boolean）',

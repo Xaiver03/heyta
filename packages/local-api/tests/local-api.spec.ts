@@ -109,7 +109,7 @@ describe('默认值 —— 一切都是关的', () => {
     }
     expect(MAX_TOOLS_PER_ENTITY).toBe(7);
     // 2026-11-22 工具层补全：为 TASK/PROJECT/NOTE 各开单列上限（删除/归档/移动等生命周期工具）。
-    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.TASK).toBe(22);
+    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.TASK).toBe(25);
     expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.PROJECT).toBe(10);
     expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.NOTE).toBe(10);
     const overridden = new Set(['TASK', 'PROJECT', 'NOTE']);

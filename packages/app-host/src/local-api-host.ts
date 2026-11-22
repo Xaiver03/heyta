@@ -1781,5 +1781,84 @@ async function submitIntent(
       }
       return { ok: true, taskId: intent.habitId, entityId: intent.habitId, entityType: 'HABIT' };
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 批次 4：任务标记（重要 / 置顶）/ 批量移动 / 习惯打卡撤销
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'set-task-important': {
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      await actions.setImportant(intent.taskId, intent.important);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'set-task-pinned': {
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      await actions.setPinned(intent.taskId, intent.pinned);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'move-tasks': {
+      // 与 `trash-tasks` / `restore-tasks` 同一条纪律：**先全部预检，再一条都不写**。
+      // 去重后为空直接 invalid；`bulkMoveToProject` 对不存在的 id 会抛错，门口挡住能给出更准的 not-found。
+      const taskIds = [...new Set(intent.taskIds)];
+      if (taskIds.length === 0) {
+        return { ok: false, reason: 'invalid', message: 'taskIds 是空的：没有要移动的任务。' };
+      }
+      // 目标清单若给了，先验它存在（`listAllProjects()` 已滤墓碑 —— I5，本层不遍历原始表）。
+      if (intent.projectId !== undefined) {
+        const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+        if (project === undefined || project.deletedAt !== undefined) {
+          return {
+            ok: false,
+            reason: 'not-found',
+            message: `找不到要移入的那个清单（「${intent.projectId}」）。`,
+          };
+        }
+      }
+      const missing = taskIds.filter((id) => actions.findTask(id) === undefined);
+      if (missing.length > 0) {
+        const shown = missing.slice(0, 3).join('、');
+        return {
+          ok: false,
+          reason: 'not-found',
+          message: `这批里有 ${String(missing.length)} 条任务已经不在了（${shown}${missing.length > 3 ? ' 等' : ''}），一条都没有移动。`,
+        };
+      }
+      await actions.bulkMoveToProject(taskIds, intent.projectId);
+      const [first] = taskIds;
+      if (first === undefined) {
+        return { ok: false, reason: 'invalid', message: 'taskIds 是空的：没有要移动的任务。' };
+      }
+      return { ok: true, taskId: first, taskIds };
+    }
+
+    case 'undo-checkin': {
+      // 🔴 I5：判"这一天有没有打卡 / 习惯在不在"由动作层 `undoCheckIn` 负责 ——
+      // 本层不读原始 `habits` / 打卡表、不自己判。三种出口：
+      // true=已撤销、false=那天本来就没打卡（not-found）、throw=习惯不存在（not-found）。
+      // 🔴 `date` 省略时由动作层兜底成今天，但**日志 id 也按同一天算**，所以这里先算好 `day`
+      // 再显式传下去 —— 否则动作层的 `now`（真实时钟）与本宿主的 `now` 可能落在不同天，
+      // 回的 `entityId` 就会指向另一条记录（与 `record-checkin` 同一口径）。
+      const day = intent.date ?? today(now());
+      try {
+        const ok = await habitActions.undoCheckIn(intent.habitId, day);
+        if (!ok) {
+          return { ok: false, reason: 'not-found', message: '这一天没有打卡记录，无需撤销。' };
+        }
+      } catch (e) {
+        return {
+          ok: false,
+          reason: 'not-found',
+          message: e instanceof Error && e.message !== '' ? e.message : '这个习惯无法撤销打卡。',
+        };
+      }
+      const logId = habitLogId(intent.habitId, day);
+      return { ok: true, taskId: logId, entityId: logId, entityType: 'HABIT_LOG' };
+    }
   }
 }

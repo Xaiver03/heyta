@@ -491,6 +491,43 @@ const CASES: readonly Case[] = [
     },
     effect: () => alive('habits'),
   },
+
+  // ── 批次4：任务标记 / 批量移动 / 打卡撤销 ──
+  {
+    tool: 'set_task_important',
+    intentAction: 'set-task-important',
+    label: '任务重要',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '重要的' }), important: true }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.important === true).length,
+  },
+  {
+    tool: 'set_task_pinned',
+    intentAction: 'set-task-pinned',
+    label: '任务置顶',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '置顶的' }), pinned: true }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.pinnedAt !== undefined).length,
+  },
+  {
+    tool: 'move_tasks',
+    intentAction: 'move-tasks',
+    label: '批量移动',
+    args: async () => ({
+      taskIds: [await seed({ action: 'create-task', title: '批量移' })],
+      projectId: await seed({ action: 'create-project', name: '批量目标' }),
+    }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.projectId !== undefined).length,
+  },
+  {
+    tool: 'undo_checkin',
+    intentAction: 'undo-checkin',
+    label: '打卡撤销',
+    args: async () => {
+      const habitId = await seed({ action: 'create-habit', name: '待撤销打卡' });
+      await makeHost().submit({ action: 'record-checkin', habitId, date: '2026-10-04' });
+      return { habitId, date: '2026-10-04' };
+    },
+    effect: () => Object.values(engine.getState().habitLogs).filter((h) => h.deletedAt !== undefined).length,
+  },
 ];
 
 beforeEach(async () => {

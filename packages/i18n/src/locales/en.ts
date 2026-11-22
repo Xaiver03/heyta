@@ -2275,6 +2275,14 @@ export const en = {
   'web.ai.tools.intentRenameHabit': 'Rename habit: {name}',
   'web.ai.tools.intentDeleteHabit': 'Move habit {id} to trash',
   'web.ai.tools.intentRestoreHabit': 'Restore habit {id}',
+  'web.ai.tools.intentSetTaskImportant': 'Mark task {id} important',
+  'web.ai.tools.intentUnsetTaskImportant': 'Unmark task {id} important',
+  'web.ai.tools.intentSetTaskPinned': 'Pin task {id}',
+  'web.ai.tools.intentUnsetTaskPinned': 'Unpin task {id}',
+  'web.ai.tools.intentMoveTasks': 'Move {count} task(s) to list {project}',
+  'web.ai.tools.intentMoveTasksOut': 'Remove {count} task(s) from their list',
+  'web.ai.tools.intentUndoCheckinToday': 'Undo the check-in {id}',
+  'web.ai.tools.intentUndoCheckin': 'Undo check-in on {date} {id}',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',
