@@ -13,6 +13,7 @@ export * from './entities.js';
 export * from './date.js';
 export * from './task-order.js';
 export * from './quadrant.js';
+export * from './calendar-drop.js';
 export * from './task-filter.js';
 // B 包 R8：标签合并别名的**唯一解析入口**（`resolveTagIds` / `resolveTags`）。
 export * from './tags.js';
