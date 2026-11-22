@@ -40,7 +40,7 @@ PP 网关按**一条 OpenAI 兼容上游**接入（`id=pp`）。在后台或 `MA
 `server/tests/gateway-e2e.spec.ts`：写文件配置一条上游 → `storePrimaryConfig` 选中它 → 用真实 HTTP 调它的 `/chat/completions` 成功。证明"网关配置 → 选上游 → 真调上游"整链在无外网 key 下可跑通。
 
 ## PP 网关（已接入，真实连通已验证 2026-11-22）
-- 已写入网关运行时配置（`data/ai-gateway.json` / `server/data/ai-gateway.json`，0600，**不入库**），4 条上游：
+- 已写入网关运行时配置 `data/ai-gateway.json`（0600，**不入库**；含密钥）。**服务端从 `server/` 目录启动时**请设 `AI_GATEWAY_FILE=../data/ai-gateway.json`（或 `HEYTA_DATA_DIR`），从仓库根启动则默认 `./data/ai-gateway.json`，4 条上游：
   `pp1-flash` `pp2-flash`（`group/deepseek-flash`）、`pp1-kimi` `pp2-kimi`（`group/kimi-k3.1-pro`），baseUrl `http://43.161.222.56:8080/pp1|pp2/v1`。
 - **真实连通已验**：`GET /models` 200；`POST /chat/completions` 四条第全部 200（flash 回 "ok"；kimi 回中文正文，`reasoning_content` 另置）。
 - **http 上游规则**：网关里配置的 `http://` 上游 = 运维显式接受明文；`gatewayEgressAllowance()` 自动把它们加入托管代理的 egress 允许面（`hosts` 记为 cn + `plaintextHosts`），无需改共享白名单表（drift 测试不受影响）。`/test` 允许公网 http（仍拒内网/回环，防 SSRF）。
