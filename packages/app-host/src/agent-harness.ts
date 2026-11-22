@@ -83,6 +83,8 @@ export interface CloudAgentHarnessOptions {
   readonly systemPrompt: string;
   /** 上界；默认 6（与 `MAX_ASSISTANT_TOOL_STEPS` 口径一致）。 */
   readonly maxSteps?: number;
+  /** 单条工具结果上限字符数（上下文管理；超长截断并标注）。默认 8000（OpenAI/Anthropic 都建议限制工具输出体量）。 */
+  readonly maxToolResultChars?: number;
   /**
    * 本轮运行的稳定 id（一次用户发送）。给了它就给每个工具调用派生幂等键
    * `runId:s<step>:<callId>`，让云端重试不重复落库。
@@ -101,6 +103,12 @@ export interface CloudAgentTurnResult {
 }
 
 const DEFAULT_MAX_STEPS = 6;
+const DEFAULT_MAX_TOOL_RESULT_CHARS = 8000;
+
+function truncateToolContent(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit)}\n…[truncated ${String(text.length - limit)} chars]`;
+}
 
 /**
  * 跑一轮：多步只读/写 → 一次回答。**失败**由 `callModel` 抛错表达，本函数不吞。
@@ -110,6 +118,7 @@ export async function runCloudAgentTurn(
   options: CloudAgentHarnessOptions,
 ): Promise<CloudAgentTurnResult> {
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
+  const maxToolResultChars = options.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS;
   const messages: HarnessMessage[] = [
     { role: 'system', content: options.systemPrompt },
     ...(options.history ?? []),
@@ -155,6 +164,7 @@ export async function runCloudAgentTurn(
         );
         if (result.ok) {
           content = JSON.stringify(result.data);
+          content = truncateToolContent(content, maxToolResultChars);
         } else {
           ok = false;
           errorText = result.message;

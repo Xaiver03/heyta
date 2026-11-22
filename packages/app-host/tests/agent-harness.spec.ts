@@ -129,3 +129,22 @@ describe('runCloudAgentTurn 幂等键', () => {
     expect(seen[0]?.key).toBe('R:s0:call-9');
   });
 });
+
+describe('工具结果截断（上下文管理）', () => {
+  it('超长工具结果被截断并标注', async () => {
+    const big = 'x'.repeat(600);
+    const transport: CloudToolTransport = { invoke: async () => ({ ok: true, data: big }) };
+    const scripted: HarnessModelReply[] = [
+      { toolCalls: [{ id: 'c1', name: 'list_tasks', arguments: {} }] },
+      { text: 'ok' },
+    ];
+    const result = await runCloudAgentTurn('x', {
+      transport, tools, systemPrompt: 's',
+      maxToolResultChars: 100,
+      callModel: async () => scripted.shift()!,
+    });
+    const toolMsg = result.messages.find((m) => m.role === 'tool');
+    expect(toolMsg!.content.length).toBeLessThan(200);
+    expect(toolMsg!.content).toContain('truncated');
+  });
+});
