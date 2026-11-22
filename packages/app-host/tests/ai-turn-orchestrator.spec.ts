@@ -57,3 +57,24 @@ describe('runAiTurnWithUndo（壳编排：记录 seq → 跑一轮 → 可撤销
     expect(undone).toBe(42);
   });
 });
+
+describe('runAiTurnWithUndo 中途失败仍给 seqBefore', () => {
+  it('callModel 抛错 → 返回 error + seqBefore（供撤销）', async () => {
+    const transport: CloudToolTransport = { invoke: async () => ({ ok: true, data: [] }) };
+    let undoneSeq: number | undefined;
+    const res = await runAiTurnWithUndo('x', {
+      routing,
+      consents: [],
+      transport,
+      grants: allGrants(),
+      invoke: async () => {
+        throw new Error('模型中途失败');
+      },
+      undo: { getSeq: async () => 7, undoSince: async (s) => { undoneSeq = s; return { status: 'applied' }; } },
+    });
+    expect(res.error).toContain('模型中途失败');
+    expect(res.seqBefore).toBe(7);
+    await undoLastAiTurn({ undo: { getSeq: async () => 7, undoSince: async (s) => { undoneSeq = s; return { status: 'applied' }; } } }, res.seqBefore);
+    expect(undoneSeq).toBe(7);
+  });
+});

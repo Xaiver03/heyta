@@ -12,7 +12,7 @@
 import type { AiRoutingConfig, EgressConsent } from '@heyta/ai';
 import type { LocalApiConfig } from '@heyta/local-api';
 import {
-  createAutoWriteLocalToolTransport,
+  createLocalToolTransport,
   runAiTurnWithUndo,
   undoLastAiTurn,
   type CloudAgentTurnResult,
@@ -52,6 +52,8 @@ export interface WebCloudTurnResult {
   readonly turn: CloudAgentTurnResult;
   readonly seqBefore: number;
   readonly runId: string;
+  /** 中途抛错时的错误信息（此时 turn 为空、seqBefore 仍可用于撤销已写部分）。 */
+  readonly error?: string;
 }
 
 /** 跑一轮 Web 云端 Agent（本地数据工具 + 云端模型 + 记录 seq 供撤销）。 */
@@ -60,7 +62,7 @@ export async function runWebCloudTurn(
   deps: WebCloudTurnDeps,
 ): Promise<WebCloudTurnResult> {
   const host = createAiToolHost();
-  const transport = createAutoWriteLocalToolTransport({ host, grants: deps.grants, getGrants: () => deps.grants });
+  const transport = createLocalToolTransport({ host, grants: deps.grants, getGrants: () => deps.grants });
   const bindings = webUndoBindings();
   const result = await runAiTurnWithUndo(userText, {
     routing: deps.routing,
@@ -70,7 +72,12 @@ export async function runWebCloudTurn(
     undo: bindings,
     ...(deps.runId === undefined ? {} : { runId: deps.runId }),
   });
-  return { turn: result.turn, seqBefore: result.seqBefore, runId: result.runId };
+  return {
+    turn: result.turn,
+    seqBefore: result.seqBefore,
+    runId: result.runId,
+    ...(result.error === undefined ? {} : { error: result.error }),
+  };
 }
 
 /** 撤销最近一次 Web 云端 Agent 的本地写入（AI 读不写；写发生在确认流程后单独撤销）。 */

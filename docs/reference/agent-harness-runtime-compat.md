@@ -97,5 +97,6 @@ await undoLastAiTurn({ undo }, seqBefore);
 ## 11. Harness 模式可写了（D1）与 Web 启用方式
 
 - **可写本地传输** `createAutoWriteLocalToolTransport`（app-host）：只读照旧；写经唯一落库点 `executeAiToolProposal` 执行（`destructive-irreversible` 仍被拦），撤销靠 `undoSince`。判据：`ai-local-tools-integration.spec.ts`（create_task 落库→undoSince 撤销）。
-- **Web 启用**：`AssistantPanel` 的 `useCloudHarness` 由 `?cloudHarness=1` 打开（默认关，避免改变现有用户行为）。开启后走 `runWebCloudTurn`（auto-write 传输）。
-- 移动端适配器同样已切到 auto-write；`AssistantScreen` 的开关分支待接。
+- **UI 接线当前为只读**：`runWebCloudTurn`/`runMobileCloudTurn` 用 `createLocalToolTransport`（只读）；写工具返回 `write-needs-confirm`，由模型转述，不静默落库。
+- **auto-write 是库能力、未在 UI 启用**：只有在壳提供"撤销这次 AI 操作"入口后才可把 UI 切到 `createAutoWriteLocalToolTransport`（否则违反 D1 的"可回溯"前提，等于无声写）。node-host 已有 undo 闭环可作参考。
+- Web 开关：`AssistantPanel` 的 `useCloudHarness` 由 `?cloudHarness=1` 打开（默认关）。

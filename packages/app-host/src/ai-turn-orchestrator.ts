@@ -39,6 +39,8 @@ export interface RunAiTurnResult {
   readonly runId: string;
   /** AI 运行前的本地 seq；撤销这段用它。 */
   readonly seqBefore: number;
+  /** 本轮若中途抛错：错误信息（此时 `turn` 为空、`seqBefore` 仍可用 —— 已写的部分可撤销）。 */
+  readonly error?: string;
 }
 
 function newRunId(): string {
@@ -52,8 +54,20 @@ export async function runAiTurnWithUndo(
 ): Promise<RunAiTurnResult> {
   const runId = options.runId ?? newRunId();
   const seqBefore = await options.undo.getSeq();
-  const turn = await requestCloudAssistantTurn(userText, { ...options, runId });
-  return { turn, runId, seqBefore };
+  try {
+    const turn = await requestCloudAssistantTurn(userText, { ...options, runId });
+    return { turn, runId, seqBefore };
+  } catch (error: unknown) {
+    // 🔴 中途抛错时**也要**把 seqBefore 交回调用方：否则本轮已经成功落库的写
+    // 没有锚点可撤（审计 P0-2）。turn 用空结构占位。
+    const emptyTurn: CloudAgentTurnResult = { text: '', steps: [], messages: [] };
+    return {
+      turn: emptyTurn,
+      runId,
+      seqBefore,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 /**

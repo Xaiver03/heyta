@@ -547,14 +547,18 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     setPhase('running');
     if (props.useCloudHarness === true) {
       try {
-        const { turn: result } = await runWebCloudTurn(text, {
+        const res = await runWebCloudTurn(text, {
           routing: props.routing,
           consents: props.consents,
           grants: assistantGrants(),
         });
         if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
         setPhase('idle');
-        append({ role: 'assistant', text: result.text, steps: [], stoppedAt: undefined });
+        if (res.error !== undefined) {
+          append({ role: 'assistant', text: `出错：${res.error}`, steps: [], stoppedAt: undefined });
+          return;
+        }
+        append({ role: 'assistant', text: res.turn.text, steps: [], stoppedAt: undefined });
       } catch (error: unknown) {
         if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
         setPhase('idle');
