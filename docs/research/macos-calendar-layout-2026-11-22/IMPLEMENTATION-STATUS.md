@@ -81,3 +81,10 @@
 - **e2e 真失败修复**：`e2e/tests/calendar-week.spec.ts` 档位下拉标签断言硬编码 `['月','周','日','年','时间线']`，随顺序改为 `['日','周','月','年','时间线']`；单跑该用例通过。
 - **e2e 其余失败**（calendar-week:165 / calendar-year:117 / calendar-year:284）均为控制台 `[heyta] 首屏在超时内未被应用接管` 的**启动看门狗环境抖动**（与布局无关，A/B 早证）。`calendar-view-options`（顺序/四档）全过。
 - **日视图彩色块：未做，原因**——`packages/ui/src/calendar/CalendarDayBoard.tsx` 当前带有并行 agent 未提交的 `renderRowWrapper`/`renderHourRowWrapper` 布线（24 行）；在其上实现会把对方 WIP 带入本提交、且若其改动被回退则我方断言/编译断裂。待该并行改动落地后再做（下一轮复查）。
+
+## 日视图事件彩色块（2026-11-22 续，目标模式 第2轮）
+
+- `CalendarEventRow`（日视图「全天」带 / 月档当天清单里的倒数日行）由"细色条+前景字"改为**与月格事件条一致的彩色块 chip**：绝对铺满的主色层 opacity 0.16 做浅底 + 主色字。（干净文件，未触碰并行 agent 改的 `CalendarDayBoard.tsx`。）
+- 验证：`ui/calendar-day-buckets`(32 含 cell-bars)、`web/calendar-day-view`(13) 单测绿；`typecheck` 无日历错误；`countdown-calendar` e2e 的**功能断言全过**，3 处失败均为既有 `首屏 watchdog` 环境抖动（非渲染/结构）。
+- 说明：日视图的**任务**行用的是共享 `TaskList`（带勾选框的列表行），Apple 日视图本就是"按小时的列表"而非块，故保留列表语义；"彩色块"用于月/周网格条目与事件行。
+- `CalendarDayBoard.tsx` 仍带并行 agent 未提交的 `renderRowWrapper/renderHourRowWrapper` 布线，未纳入本提交。

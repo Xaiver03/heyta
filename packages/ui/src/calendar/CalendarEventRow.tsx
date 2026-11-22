@@ -59,19 +59,13 @@ export function CalendarEventRow({
 
   return (
     <View style={styles.row} testID={testID}>
-      {/* 左侧色条与格子里那条同宽同圆角：读者要能把"网格那条"和"清单这行"认成同一个东西。 */}
-      <View
-        style={{
-          width: tokens['border-width.thick'],
-          alignSelf: 'stretch',
-          borderRadius: tokens['radius.full'],
-          backgroundColor: tokens['color.primary'],
-        }}
-      />
+      {/* 滴答式彩色块 chip：与月格事件条一致的呈现 —— 绝对铺满的主色层 + 0.16 透明度做浅底，
+          文字用主色。读者能把"网格那条"和"清单这行"认成同一个东西（去掉了原来的细色条）。 */}
+      <View style={[styles.tint, { backgroundColor: tokens['color.primary'] }]} pointerEvents="none" />
       <Text
         numberOfLines={1}
         testID={`${testID}-title`}
-        style={[text['row-meta'], styles.title, { color: tokens['color.foreground'] }]}
+        style={[text['row-meta'], styles.title, { color: tokens['color.primary'] }]}
       >
         {calendarEventBarTitle(event, labels)}
       </Text>
@@ -81,7 +75,14 @@ export function CalendarEventRow({
 
 function makeStyles(tokens: HeytaNativeTokens) {
   return StyleSheet.create({
-    row: { flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: tokens['space.1'],
+      borderRadius: tokens['radius.sm'],
+      overflow: 'hidden',
+    },
+    tint: { ...StyleSheet.absoluteFillObject, borderRadius: tokens['radius.sm'], opacity: 0.16 },
     title: { flex: 1, minWidth: 0 },
   });
 }
