@@ -239,3 +239,18 @@ describe('两个档位的上限之间的关系（R11 批三）', () => {
     expect(MAX_WEEK_CALENDAR_BARS).toBeGreaterThan(MAX_CALENDAR_BARS);
   });
 });
+
+describe('按所属清单上色：accentOf（彩色日历）', () => {
+  it('给 accentOf ⇒ 对应条带 accent；不给 ⇒ 不带 accent（逐字节不变）', () => {
+    const a = task({ id: 'a', dueDate: new Date(2026, 9, 3).getTime() });
+    const b = task({ id: 'b', dueDate: new Date(2026, 9, 3).getTime() });
+    const withAccent = calendarCellBars([a, b], TODAY, '2026-10-03', MAX_CALENDAR_BARS, undefined, undefined, {
+      accentOf: (t) => (t.id === 'a' ? ('color.category-1' as never) : undefined),
+    }).bars;
+    expect(withAccent.find((bar) => bar.id === 'a')?.accent).toBe('color.category-1');
+    expect(withAccent.find((bar) => bar.id === 'b')?.accent).toBeUndefined();
+
+    const plain = calendarCellBars([a, b], TODAY, '2026-10-03').bars;
+    expect(plain.every((bar) => bar.accent === undefined)).toBe(true);
+  });
+});
