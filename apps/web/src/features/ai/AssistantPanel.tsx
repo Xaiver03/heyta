@@ -115,6 +115,7 @@ import {
   useStreamReveal,
 } from '@heyta/ui';
 import { assistantFailureCopy } from './ai-failure-copy.js';
+import { runWebCloudTurn } from './cloud-harness.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import { FailureSettingsAction } from './RouteUnavailable.js';
 import { LIST_SEPARATOR } from './locale-punctuation.js';
@@ -161,6 +162,13 @@ export interface AssistantPanelProps {
    * 一有对话就消失的入口等于"用一次就找不到第二次"。
    */
   orgActions?: ReactNode;
+  /**
+   * 云端 Agent Harness 模式（接线开关）。默认关：保留既有 `requestAssistantTurn`
+   * （含写提案/流式/历史）。开启后本轮问答走 `runWebCloudTurn`（设备本地循环 + 云端模型 +
+   * 本地数据工具 + 可撤销）。⚠️ 该模式**只做读/答**：写操作会以 write-needs-confirm 返回，
+   * 不在此模式落库（写入仍走既有确认流程的默认模式）。默认关以保护写入 UX。
+   */
+  useCloudHarness?: boolean;
   /** 网络实现。可注入**只为测试**（与五个既有面板同一约定）。 */
   fetchImpl?: typeof fetch;
   /** 「去设置」的导航。注入缝，只为测试。 */
@@ -537,6 +545,23 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   async function turn(text: string, epoch = controls.epoch): Promise<void> {
     if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
     setPhase('running');
+    if (props.useCloudHarness === true) {
+      try {
+        const { turn: result } = await runWebCloudTurn(text, {
+          routing: props.routing,
+          consents: props.consents,
+          grants: assistantGrants(),
+        });
+        if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
+        setPhase('idle');
+        append({ role: 'assistant', text: result.text, steps: [], stoppedAt: undefined });
+      } catch (error: unknown) {
+        if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
+        setPhase('idle');
+        append({ role: 'assistant', text: `出错：${error instanceof Error ? error.message : '云端 Agent 失败。'}`, steps: [], stoppedAt: undefined });
+      }
+      return;
+    }
     // 🔴 这一行是**流式的开关**：`onEvent` 给了，app-host 才会在请求里带 `stream`
     // 并逐片回调。省略它 = 回到"整段回来再显示"（移动端就是这样）。
     ephemeral.write(session.account, { live: EMPTY_LIVE });
