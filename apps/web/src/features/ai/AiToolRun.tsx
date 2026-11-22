@@ -223,6 +223,49 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return t('web.ai.tools.intentCreateEvent', { title: intent.title, date: intent.date });
     case 'update-event':
       return t('web.ai.tools.intentUpdateEvent', { id: intent.eventId });
+    // 2026-11-22 工具层补全：19 个写意图各一句人话。
+    case 'trash-task':
+      return t('web.ai.tools.intentTrashTask', { id: intent.taskId });
+    case 'restore-task':
+      return t('web.ai.tools.intentRestoreTask', { id: intent.taskId });
+    case 'archive-task':
+      return t('web.ai.tools.intentArchiveTask', { id: intent.taskId });
+    case 'unarchive-task':
+      return t('web.ai.tools.intentUnarchiveTask', { id: intent.taskId });
+    case 'move-task':
+      return intent.projectId === undefined
+        ? t('web.ai.tools.intentMoveTaskOut', { id: intent.taskId })
+        : t('web.ai.tools.intentMoveTask', { id: intent.taskId, project: intent.projectId });
+    case 'uncomplete-task':
+      return t('web.ai.tools.intentUncompleteTask', { id: intent.taskId });
+    case 'rename-project':
+      return t('web.ai.tools.intentRenameProject', { name: intent.name });
+    case 'archive-project':
+      return t('web.ai.tools.intentArchiveProject', { id: intent.projectId });
+    case 'delete-project':
+      return t('web.ai.tools.intentDeleteProject', { id: intent.projectId });
+    case 'rename-tag':
+      return t('web.ai.tools.intentRenameTag', { name: intent.name });
+    case 'delete-tag':
+      return t('web.ai.tools.intentDeleteTag', { id: intent.tagId });
+    case 'delete-note':
+      return t('web.ai.tools.intentDeleteNote', { id: intent.noteId });
+    case 'restore-note':
+      return t('web.ai.tools.intentRestoreNote', { id: intent.noteId });
+    case 'move-note':
+      return intent.projectId === undefined
+        ? t('web.ai.tools.intentMoveNoteOut', { id: intent.noteId })
+        : t('web.ai.tools.intentMoveNote', { id: intent.noteId, project: intent.projectId });
+    case 'update-reminder':
+      return t('web.ai.tools.intentUpdateReminder', { when: `${intent.date} ${intent.time}` });
+    case 'delete-reminder':
+      return t('web.ai.tools.intentDeleteReminder', { id: intent.reminderId });
+    case 'delete-event':
+      return t('web.ai.tools.intentDeleteEvent', { id: intent.eventId });
+    case 'restore-event':
+      return t('web.ai.tools.intentRestoreEvent', { id: intent.eventId });
+    case 'archive-event':
+      return t('web.ai.tools.intentArchiveEvent', { id: intent.eventId });
   }
 }
 
