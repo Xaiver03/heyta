@@ -18,6 +18,7 @@ import type { LocalApiConfig } from '@heyta/local-api';
 import { toCloudToolDescriptors, type CloudToolTransport } from './ai-cloud-tools.js';
 import { createRoutedModelCall, type RoutedInvoke } from './ai-routed-model.js';
 import { runCloudAgentTurn, type CloudAgentTurnResult, type HarnessEvent } from './agent-harness.js';
+import { createReportAwareTransport, REPORT_TOOL_DESCRIPTORS, type ReportState } from './ai-report-tools.js';
 
 /** 默认系统提示（云端工具场景；壳可覆盖）。 */
 export const CLOUD_ASSISTANT_SYSTEM_PROMPT = [
@@ -40,6 +41,11 @@ export interface CloudAssistantTurnDeps {
   readonly onEvent?: (event: HarnessEvent) => void;
   /** 文本流式回调（逐片）。 */
   readonly onTextDelta?: (text: string) => void;
+  /**
+   * 提供本机物化状态 → 自动挂上「周报/年终总结」两个 Harness 工具（零 C 端入口）。
+   * 省略 = 不挂（默认行为不变）。
+   */
+  readonly getReportState?: () => ReportState;
   /** 注入以便离线测试；默认真实 invokeRouted。 */
   readonly invoke?: RoutedInvoke;
 }
@@ -56,9 +62,11 @@ export async function requestCloudAssistantTurn(
     ...(deps.invoke === undefined ? {} : { invoke: deps.invoke }),
     ...(deps.onTextDelta === undefined ? {} : { onTextDelta: deps.onTextDelta }),
   });
+  const baseTools = toCloudToolDescriptors(deps.grants);
+  const useReports = deps.getReportState !== undefined;
   return runCloudAgentTurn(userText, {
-    transport: deps.transport,
-    tools: toCloudToolDescriptors(deps.grants),
+    transport: useReports ? createReportAwareTransport(deps.transport, deps.getReportState!) : deps.transport,
+    tools: useReports ? [...baseTools, ...REPORT_TOOL_DESCRIPTORS] : baseTools,
     systemPrompt: deps.systemPrompt ?? CLOUD_ASSISTANT_SYSTEM_PROMPT,
     callModel,
     ...(deps.maxSteps === undefined ? {} : { maxSteps: deps.maxSteps }),

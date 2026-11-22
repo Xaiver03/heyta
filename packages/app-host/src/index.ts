@@ -1223,6 +1223,15 @@ export {
   type RoutedModelCallOptions,
 } from './ai-routed-model.js';
 export {
+  aggregateWeekly,
+  aggregateYearEnd,
+  createReportAwareTransport,
+  REPORT_TOOL_DESCRIPTORS,
+  type ReportState,
+  type WeeklyReportData,
+  type YearEndReportData,
+} from './ai-report-tools.js';
+export {
   requestCloudAssistantTurn,
   CLOUD_ASSISTANT_SYSTEM_PROMPT,
   type CloudAssistantTurnDeps,

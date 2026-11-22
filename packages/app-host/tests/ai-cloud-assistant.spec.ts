@@ -39,3 +39,34 @@ describe('requestCloudAssistantTurn（整机生产函数）', () => {
     expect(result.steps).toEqual([{ tool: 'list_tasks', ok: true }]);
   });
 });
+
+describe('周报工具（Harness 层，零入口）', () => {
+  it('给了 getReportState → 工具列表含 weekly_report；模型调用后聚合命中', async () => {
+    let sawTools: string[] = [];
+    let toolData: unknown;
+    const scripted: RoutedOutcome[] = [
+      ok([{ id: 'c1', name: 'weekly_report', arguments: '{}' }]),
+      ok(undefined, '本周你完成了 1 个任务。'),
+    ];
+    // 用局部 import 避免顶层重复
+    const { runCloudAgentTurn } = await import('../src/agent-harness.js');
+    const { createRoutedModelCall } = await import('../src/ai-routed-model.js');
+    void runCloudAgentTurn; void createRoutedModelCall;
+    const result = await requestCloudAssistantTurn('写周报', {
+      routing,
+      consents: [],
+      transport: {
+        invoke: async (n) => {
+          if (n === 'weekly_report') { toolData = { kind: 'weekly', completedCount: 1 }; return { ok: true, data: toolData }; }
+          return { ok: true, data: [] };
+        },
+      },
+      grants: { list_tasks: true } as never,
+      invoke: async (_c, inv) => { sawTools = (inv.tools ?? []).map((t) => t.name); return scripted.shift()!; },
+      getReportState: () => ({ tasks: { a: { title: 'A', completedAt: Date.now() } } }),
+    });
+    expect(sawTools).toContain('weekly_report');
+    expect(result.steps[0]).toEqual({ tool: 'weekly_report', ok: true });
+    expect(result.text).toContain('完成了');
+  });
+});
