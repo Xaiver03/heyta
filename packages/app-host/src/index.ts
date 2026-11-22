@@ -839,6 +839,7 @@ export {
   exportDocumentFromHost,
   exportFileName,
   renderTasksMarkdown,
+  renderTasksCsv,
   serializeExportDocument,
   type BuildExportOptions,
   type ExportCounts,
@@ -848,6 +849,7 @@ export {
   type ExportFormat,
   type ExportTaskRow,
   type TasksMarkdownCopy,
+  type TasksCsvCopy,
 } from './export-dump.js';
 
 /**

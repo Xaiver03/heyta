@@ -3106,6 +3106,9 @@ export const zhCN = {
   'web.export.markdown.label': '任务清单（Markdown）',
   'web.export.markdown.note': '人能直接打开看的任务列表。它不含已删除的记录，也不含操作日志。',
   'web.export.markdown.button': '下载任务清单',
+  'web.export.csv.label': '任务清单（CSV）',
+  'web.export.csv.note': '表格软件（Excel / WPS 等）能直接打开的清单。内容与 Markdown 清单一致，同样不能导回来。',
+  'web.export.csv.button': '下载 CSV',
   // 🔴 诚实条款。JSON 已经有还原路径了，所以这句不再是"不能导回来"，
   //    而是如实说出**这一轮的边界**：只支持还原到空库。
   //    Markdown 清单**真的**不能导回来 —— 它没有 op-log。
@@ -4557,6 +4560,7 @@ export const zhCN = {
   'mobile.export.intro': '在这台设备上导出、恢复或迁移数据。导出在本机完成，不经过服务器。',
   'mobile.export.json.button': '分享 JSON',
   'mobile.export.markdown.button': '分享任务清单',
+  'mobile.export.csv.button': '分享 CSV',
   'mobile.export.shareHint': '导出内容会交给系统分享面板，由你选择保存或发送到哪里。',
   'mobile.import.pasteLabel': '粘贴 CSV 文本',
   'mobile.import.label': '导入滴答清单',

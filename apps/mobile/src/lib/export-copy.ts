@@ -16,7 +16,7 @@
  * ⚠️ 本文件**不 import `react-native`**：`lib/` 会被 node 里的单测直接加载。
  */
 
-import type { TasksMarkdownCopy } from '@heyta/app-host';
+import type { TasksCsvCopy, TasksMarkdownCopy } from '@heyta/app-host';
 import { Priority } from '@heyta/domain';
 
 import type { Translate } from '../i18n/translate';
@@ -59,4 +59,10 @@ export function tasksMarkdownCopy(t: Translate): TasksMarkdownCopy {
     },
     priorityLabel,
   };
+}
+
+/** CSV 清单的措辞：列名与 open/done/none 与 Markdown 那份是同一句话，直接复用。 */
+export function tasksCsvCopy(t: Translate): TasksCsvCopy {
+  const m = tasksMarkdownCopy(t);
+  return { open: m.open, done: m.done, none: m.none, columns: m.columns, priorityLabel: m.priorityLabel };
 }

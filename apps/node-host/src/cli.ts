@@ -24,14 +24,37 @@
 
 import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 
-import { parseLocalDate } from '@heyta/domain';
-import { parseExportDocument, serializeExportDocument, type NewTaskFields } from '@heyta/app-host';
+import { parseLocalDate, Priority } from '@heyta/domain';
+import {
+  buildTaskExportRows,
+  parseExportDocument,
+  renderTasksCsv,
+  serializeExportDocument,
+  type NewTaskFields,
+  type TasksCsvCopy,
+} from '@heyta/app-host';
 import { openNodeHost } from './host.js';
 import { runAuthCommand } from './cli-auth.js';
 import { runAccountCommand } from './cli-account.js';
 import { planWorkerRun, runWorker } from './inbound-worker.js';
 import { createKeychainSecretStore } from './keychain-secret-store.js';
 import type { SyncStatus } from '@heyta/sync-client';
+
+/**
+ * CSV 任务清单的结构文字（词条表 → `TasksCsvCopy`）。
+ *
+ * 🔴 与 Web / 移动壳同源：列名取 `web.export.markdown.col*`，状态取
+ * `web.export.markdown.open|done|none`，优先级取 `web.capture.priority.*`
+ * ——终端输出不在三壳本地化范围内，但导出的文件必须说同样的话（中文表头一致）。
+ */
+const CLI_TASKS_CSV_COPY: TasksCsvCopy = {
+  open: '未完成',
+  done: '已完成',
+  none: '（无）',
+  columns: { title: '标题', status: '状态', due: '截止', priority: '优先级', project: '清单', tags: '标签' },
+  priorityLabel: (p) =>
+    p === Priority.High ? '高优先级' : p === Priority.Medium ? '中优先级' : p === Priority.Low ? '低优先级' : '无优先级',
+};
 
 /**
  * 回收站写通道：四类实体 × 四个动词，一张表。
@@ -154,6 +177,7 @@ const VALUE_FLAGS = new Set([
   'due',
   'out',
   'in',
+  'format',
   'session',
   'role',
   'text',
@@ -393,7 +417,9 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
       --interval-ms <毫秒>  常驻时两趟之间的间隔（缺省 30000）
       --once                只处理一趟就退出（给验收与定时任务用）；不带它则常驻到 Ctrl-C
                             这个账号在服务端没有**启用中**的规则时直接拒绝，不空跑常驻
-  export --out <路径>       导出全部数据到 JSON 文件（含已删除记录与完整操作日志）
+  export --out <路径> [--format json|csv]
+                            导出全部数据。--format json（默认）= 完整 JSON（含已删除记录与完整操作日志）；
+                            csv = 任务清单，表格软件可直接打开，不含已删除记录与操作日志，也不能导回
   import --in <路径>        从导出的 JSON 还原 —— **只支持还原到空库**；
                             本机已有数据时拒绝，且不会改动任何现有数据
   account close             注销账号：**服务端那份删掉 + 这台设备上的明文库销毁**
@@ -958,6 +984,33 @@ async function main(): Promise<number> {
         const outPath = stringFlag(flags, 'out');
         if (outPath === undefined) {
           throw new Error('export 需要 --out <路径>（把 JSON 写到哪里）');
+        }
+        const format = stringFlag(flags, 'format') ?? 'json';
+        if (format !== 'json' && format !== 'csv') {
+          throw new Error('export --format 只能是 json 或 csv');
+        }
+        if (format === 'csv') {
+          // 任务清单：只含未删除任务，不含已删除记录与操作日志（给人看的那一份）。
+          const rows = buildTaskExportRows(host.engine.getState());
+          const csv = renderTasksCsv(rows, CLI_TASKS_CSV_COPY);
+          writeFileSync(outPath, csv, 'utf8');
+          if (json) {
+            out(
+              JSON.stringify({
+                ok: true,
+                command: 'export',
+                format: 'csv',
+                file: outPath,
+                rows: rows.length,
+              }),
+            );
+          } else {
+            out(
+              `已导出任务清单到 ${outPath}：${String(rows.length)} 条任务` +
+                '（CSV，不含已删除记录与操作日志）',
+            );
+          }
+          return 0;
         }
         // 导出形状全部来自 `@heyta/app-host` —— CLI 只负责落盘与汇报计数。
         const doc = await host.exportDocument();

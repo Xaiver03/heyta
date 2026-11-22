@@ -71,6 +71,7 @@ import {
   exportDocumentFromHost,
   parseExportDocument,
   renderTasksMarkdown,
+  renderTasksCsv,
   restoreIntoEmptyTarget,
   serializeExportDocument,
   type AppHost,
@@ -86,7 +87,7 @@ import { useI18n, type MessageKey } from '@heyta/i18n';
 
 import { readLocalTextUri } from '../lib/local-file-read';
 import { useTaskHost } from '../db/use-task-host';
-import { tasksMarkdownCopy } from '../lib/export-copy';
+import { tasksMarkdownCopy, tasksCsvCopy } from '../lib/export-copy';
 import {
   confirmTickTickImport,
   previewTickTickImport,
@@ -340,11 +341,13 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         content =
           format === 'json'
             ? serializeExportDocument(doc)
-            : renderTasksMarkdown(
-                buildTaskExportRows(host.getState()),
-                tasksMarkdownCopy(t),
-                doc.exportedAt,
-              );
+            : format === 'markdown'
+              ? renderTasksMarkdown(
+                  buildTaskExportRows(host.getState()),
+                  tasksMarkdownCopy(t),
+                  doc.exportedAt,
+                )
+              : renderTasksCsv(buildTaskExportRows(host.getState()), tasksCsvCopy(t));
         setCounts(doc.counts);
       } catch (e: unknown) {
         setFailed(true);
@@ -454,6 +457,23 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           loading={busy === 'markdown'}
           onPress={() => {
             run('markdown');
+          }}
+        />
+      </Card>
+
+      <Card gap="loose">
+        <Text variant="row-title">{t('web.export.csv.label')}</Text>
+        <Text variant="caption" tone="muted">
+          {t('web.export.csv.note')}
+        </Text>
+        <Button
+          label={t('mobile.export.csv.button')}
+          icon="action.share"
+          tone="primary"
+          disabled={host === null || busy !== undefined}
+          loading={busy === 'csv'}
+          onPress={() => {
+            run('csv');
           }}
         />
       </Card>

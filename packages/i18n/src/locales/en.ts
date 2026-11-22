@@ -2829,6 +2829,9 @@ export const en = {
   'web.export.markdown.label': 'Task list (Markdown)',
   'web.export.markdown.note': 'A task list a person can open and read. It leaves out deleted records and the operation log.',
   'web.export.markdown.button': 'Download task list',
+  'web.export.csv.label': 'Task list (CSV)',
+  'web.export.csv.note': 'A task list that spreadsheets (Excel / WPS) can open directly. Same content as the Markdown list, and also not importable.',
+  'web.export.csv.button': 'Download CSV',
   // 🔴 Honesty clause. The JSON path now has an import; so this no longer says
   //    "you cannot import it back" — it states this round's actual boundary:
   //    empty databases only. The Markdown list genuinely cannot be imported
@@ -4117,6 +4120,7 @@ export const en = {
   'mobile.export.intro': 'Export, restore, or migrate data on this device. Export runs locally and never touches a server.',
   'mobile.export.json.button': 'Share JSON',
   'mobile.export.markdown.button': 'Share task list',
+  'mobile.export.csv.button': 'Share CSV',
   'mobile.export.shareHint': 'The export is handed to the system share sheet, where you choose where it goes.',
   'mobile.import.pasteLabel': 'Paste the CSV text',
   'mobile.import.label': 'Import from TickTick',

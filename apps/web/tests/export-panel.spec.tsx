@@ -79,6 +79,7 @@ describe('ExportPanel', () => {
     expect(el.querySelector('[data-testid="export-panel"]')).not.toBeNull();
     expect(el.querySelector('[data-testid="export-json"]')).not.toBeNull();
     expect(el.querySelector('[data-testid="export-markdown"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="export-csv"]')).not.toBeNull();
 
     const text = el.textContent ?? '';
     /*
@@ -153,6 +154,50 @@ describe('ExportPanel', () => {
 
     // 导出之后界面展示可核对的计数（"导全了"不能只靠信）。
     expect(el.querySelector('[data-testid="export-counts"]')?.textContent).toContain('1');
+  });
+
+  it('点击 CSV 按钮：交给浏览器下载一份带中文表头的 CSV', async () => {
+    await dispatchIntent({
+      entityType: 'TASK',
+      entityId: 'task-1',
+      opType: OpType.Create,
+      payload: { title: '会被导出的任务' },
+    });
+
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:heyta-test');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, configurable: true });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+
+    const el = render();
+    const button = el.querySelector<HTMLButtonElement>('[data-testid="export-csv"]');
+    expect(button).not.toBeNull();
+
+    await act(async () => {
+      button?.click();
+      // 同 JSON 用例：`run()` 会先 await 存储读取，必须让出宏任务再断言。
+      for (let i = 0; i < 20; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    });
+
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const blob = createObjectURL.mock.calls[0]?.[0];
+    if (blob === undefined) throw new Error('createObjectURL 没有被调用');
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe('text/csv;charset=utf-8');
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:heyta-test');
+
+    // 首行是中文表头（含 BOM），并带上刚建的任务标题。
+    const text = await readBlob(blob);
+    const firstLine = text.replace(/^\uFEFF/, '').split(/\r?\n/)[0] ?? '';
+    expect(firstLine).toContain('标题');
+    expect(firstLine).toContain('状态');
+    expect(text).toContain('会被导出的任务');
   });
 });
 

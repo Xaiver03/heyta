@@ -9,7 +9,7 @@
  * 与 AI 失败态的做法完全一致：packages 返回结构化 `reason`，壳取词条渲染。
  */
 
-import type { TasksMarkdownCopy } from '@heyta/app-host';
+import type { TasksCsvCopy, TasksMarkdownCopy } from '@heyta/app-host';
 import { Priority } from '@heyta/domain';
 import type { I18nValue } from '@heyta/i18n';
 
@@ -51,4 +51,10 @@ export function tasksMarkdownCopy(t: I18nValue['t']): TasksMarkdownCopy {
     },
     priorityLabel,
   };
+}
+
+/** CSV 清单的结构文字：与 Markdown 清单共用同一组措辞（同一件事，只是格式不同）。 */
+export function tasksCsvCopy(t: I18nValue['t']): TasksCsvCopy {
+  const m = tasksMarkdownCopy(t);
+  return { open: m.open, done: m.done, none: m.none, columns: m.columns, priorityLabel: m.priorityLabel };
 }

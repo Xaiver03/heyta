@@ -6,6 +6,8 @@
  */
 import type { Habit, HabitLog } from '@heyta/domain';
 
+import { renderCsvTable } from './csv.js';
+
 export interface HabitExportRow {
   date: string;
   habit: string;
@@ -55,24 +57,19 @@ export function buildHabitExportRows(
     .map(({ createdAt: _createdAt, id: _id, ...row }) => row);
 }
 
-/** CSV 单元格转义，并阻止表格软件把用户文本当成公式执行。 */
-function csvCell(value: string): string {
-  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
-  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-}
-
 export function renderHabitCsv(
   rows: readonly HabitExportRow[],
   columns: HabitCsvColumns,
 ): string {
   const header = [columns.date, columns.habit, columns.value, columns.unit, columns.completed, columns.note];
-  const lines = [header, ...rows.map((row) => [
+  const body = rows.map((row) => [
     row.date,
     row.habit,
     String(row.value),
     row.unit,
     row.completed ? columns.completedValue : columns.incompleteValue,
     row.note,
-  ])];
-  return `\uFEFF${lines.map((line) => line.map(csvCell).join(',')).join('\r\n')}\r\n`;
+  ]);
+  // 转义 / BOM / CRLF 与任务清单 CSV 共用同一份实现（见 `csv.ts` 文件头）。
+  return renderCsvTable(header, body);
 }

@@ -47,6 +47,7 @@ import { CURRENT_SCHEMA_VERSION, ENTITY_TYPES } from '@heyta/shared-schema';
 import type { Operation } from '@heyta/sync-core';
 
 import { aliveRecords } from './category-report.js';
+import { renderCsvTable } from './csv.js';
 import type { AppHost } from './host.js';
 
 /**
@@ -252,8 +253,8 @@ export function serializeExportDocument(doc: ExportDocument): string {
   return JSON.stringify(sortKeysDeep(doc), null, 2);
 }
 
-/** 导出格式。`json` = 完整保真，`markdown` = 人能直接打开看。 */
-export type ExportFormat = 'json' | 'markdown';
+/** 导出格式。`json` = 完整保真，`markdown` / `csv` = 人能直接看/表格软件能直接开。 */
+export type ExportFormat = 'json' | 'markdown' | 'csv';
 
 /**
  * 导出文件名。**纯函数**，宿主不该自己拼日期格式。
@@ -263,7 +264,8 @@ export type ExportFormat = 'json' | 'markdown';
  */
 export function exportFileName(format: ExportFormat, exportedAt: number): string {
   const stamp = new Date(exportedAt).toISOString().replace(/[:.]/g, '-');
-  return `heyta-export-${stamp}.${format === 'json' ? 'json' : 'md'}`;
+  const ext = format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'md';
+  return `heyta-export-${stamp}.${ext}`;
 }
 
 // ── 人能直接看的那一份（任务清单） ─────────────────────────────
@@ -432,6 +434,64 @@ export function renderTasksMarkdown(
 /** Markdown 表格单元格里的 `|` 与换行必须转义，否则表格会被撑坏。 */
 function escapeCell(value: string): string {
   return value.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+}
+
+/**
+ * CSV 清单的措辞。
+ *
+ * 🔴 与 {@link TasksMarkdownCopy} 的关键差别：CSV **不写标题行、不写页脚、不写导出时间**
+ * —— 那几行会被表格软件当成一行数据，直接破坏机器解析（用户导入别的工具时多出
+ * 三行垃圾）。CSV 只要表头 + 数据行，所以这里只保留列名与"状态/优先级/空值"的措辞。
+ *
+ * 🟢 列名**复用** `web.export.markdown.col*` 同一组词条（调用方组装时取同一批 key）：
+ * 两种"给人看的清单"用同一套列名，用户不会看到两份措辞不同的表头。
+ */
+export interface TasksCsvCopy {
+  /** 未完成任务的单元格文字。 */
+  open: string;
+  /** 已完成任务的单元格文字。 */
+  done: string;
+  /** 空单元格占位符。 */
+  none: string;
+  columns: TasksMarkdownCopy['columns'];
+  /** 优先级 → 本地化措辞。 */
+  priorityLabel: (priority: Priority) => string;
+}
+
+/**
+ * 任务行 → CSV 文本。**纯函数**，给定输入输出逐字节相同。
+ *
+ * 与 Markdown 版共用同一份字段投影（`ExportTaskRow`）与同一套"日 + 时刻合成一格"
+ * 的取舍（见 `renderTasksMarkdown` 的注释）；转义 / BOM / CRLF 交给 `csv.ts`，
+ * 与习惯记录 CSV 是同一份实现。
+ */
+export function renderTasksCsv(rows: readonly ExportTaskRow[], copy: TasksCsvCopy): string {
+  const columns = copy.columns;
+  const header = [
+    columns.title,
+    columns.status,
+    columns.due,
+    columns.priority,
+    columns.project,
+    columns.tags,
+  ];
+  const body = rows.map((row) => {
+    const due =
+      row.dueDate === undefined
+        ? copy.none
+        : row.dueTime === undefined
+          ? row.dueDate
+          : `${row.dueDate} ${row.dueTime}`;
+    return [
+      row.title,
+      row.completed ? copy.done : copy.open,
+      due,
+      row.priority === undefined ? copy.none : copy.priorityLabel(row.priority),
+      row.projectName ?? copy.none,
+      row.tagNames.length === 0 ? copy.none : row.tagNames.join(', '),
+    ];
+  });
+  return renderCsvTable(header, body);
 }
 
 function byEntityId(

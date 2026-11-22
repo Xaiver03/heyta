@@ -25,6 +25,7 @@ import {
   buildExportDocument,
   buildTaskExportRows,
   exportFileName,
+  renderTasksCsv,
   renderTasksMarkdown,
   serializeExportDocument,
   type ExportCounts,
@@ -35,7 +36,7 @@ import { Download, FileJson, FileText } from 'lucide-react';
 import { useI18n } from '@heyta/i18n';
 
 import { currentState, requireStore } from '../../lib/oplog.js';
-import { tasksMarkdownCopy } from './export-copy.js';
+import { tasksCsvCopy, tasksMarkdownCopy } from './export-copy.js';
 import { downloadTextFile } from './export-download.js';
 import { SettingsNotice } from './SettingsNotice.js';
 import { SettingsInfoTip } from './SettingsInfoTip.js';
@@ -71,13 +72,16 @@ export function ExportPanel({
           'application/json',
         );
         onJsonExported?.();
-      } else {
+      } else if (format === 'markdown') {
         const markdown = renderTasksMarkdown(
           buildTaskExportRows(state),
           tasksMarkdownCopy(t),
           doc.exportedAt,
         );
         downloadTextFile(exportFileName('markdown', exportedAt), markdown, 'text/markdown');
+      } else {
+        const csv = renderTasksCsv(buildTaskExportRows(state), tasksCsvCopy(t));
+        downloadTextFile(exportFileName('csv', exportedAt), csv, 'text/csv;charset=utf-8');
       }
 
       setCounts(doc.counts);
@@ -140,6 +144,28 @@ export function ExportPanel({
             onClick={() => void run('markdown')}
           >
             <Download size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.markdown.button')}
+          </button>
+        </div>
+      </section>}
+
+      {!onlyJson && <section className="ht-settings__section">
+        <h3 className="ht-settings__h3 ht-type-row-title">
+          <FileText size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.csv.label')}
+          <SettingsInfoTip
+            testId="tip-export-csv"
+            label={t('web.export.csv.label')}
+            text={t('web.export.csv.note')}
+          />
+        </h3>
+        <div className="ht-settings__actions">
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            data-testid="export-csv"
+            disabled={busy}
+            onClick={() => void run('csv')}
+          >
+            <Download size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.csv.button')}
           </button>
         </div>
       </section>}

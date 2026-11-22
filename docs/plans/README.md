@@ -10,6 +10,7 @@
 
 | 我想知道 | 看这一份 | 说明 |
 |---|---|---|
+| **麒麟 / 统信 UOS 原生壳适配（信创）** | [`kylin-uos-native-adaptation.md`](kylin-uos-native-adaptation.md) | 🟡 **规划中**（2026-11-22 立）。结论：现行 `apps/desktop-linux` 依赖 GTK4 + WebKitGTK 6.0，而麒麟桌面 V10 SP1 / 统信 UOS V20 只带 GTK 2/3、glibc 2.28–2.31 ⇒ **现有 .deb 装不上**。路线 ① Web/自托管优先（不改代码、今天可用）→ ② 原生壳适配（降 GTK3 或回填 GTK4，按 x86_64/arm64/loongarch 出包）→ ③ Flatpak/AppImage；里程碑 M0–M4 与 6 项「待确认」见正文 |
 | ~~统一中央认证~~（已废除） | [archive/unified-central-auth.md](archive/unified-central-auth.md) | 已由 [ADR-0087](../adr/0087-local-only-auth-removing-central-oidc.md) 取代：认证只保留自建邮箱+密码，中央 OIDC 已删除；实施见 [remove-central-oidc-execution.md](remove-central-oidc-execution.md) |
 | **本轮 goal：全量落账 + 分支合并 + 代码质量审计** | [`goal-landing-and-quality-audit.md`](archive/goal-landing-and-quality-audit.md) | ✅ 已完成（2026-10-03）。82 个提交推送远端、`feat/countdown-anniversary` 合并进 main（四处冲突的产品裁决 + 陷阱编号重排 #137–140→#161–164）、验证矩阵全实跑（隔离 worktree build/typecheck/九道门禁/单测）。含 2 处已修类型潜伤、3 条登记发现，与本轮自己两次「管道吞退出码」假绿的照实记录 |
 | **本次会话反思（2026-11-07）** | [`session-reflection-2026-11-07.md`](session-reflection-2026-11-07.md) | 🪞 **被证据纠正过的判断索引**：20 条，四列（改了什么 / 归因三档 / 证据 / 下次开头指令）。分三类：事实读错 9 条、判断失误 8 条、流程失误 3 条；末尾归纳三条稳定模式。不收「下次更仔细」类，也不收没发生过纠正的判断 |
