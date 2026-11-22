@@ -81,7 +81,8 @@ XDG_RUNTIME_DIR=/tmp/xdg DISPLAY=:99 WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 
 
 | 环境 | WebKit 版本 | 安装 | 打开窗口/加载 | 数据落库 |
 |---|---|---|---|---|
-| deepin 20.8（UOS20 同源） | 2.38.5 | `install ok installed` | `HEYTA_WEBVIEW_READY`，界面完整渲染 | ✅ `STORAGE_HOST=on`，sqlite 建表 |
+| deepin 20.8（UOS20 同源, amd64） | 2.38.5 | `install ok installed` | `HEYTA_WEBVIEW_READY`，界面完整渲染 | ✅ `STORAGE_HOST=on`，sqlite 建表 |
+| Debian 10 arm64（qemu-user, glibc2.28） | 2.38.6 | `install ok installed` | `HEYTA_WEBVIEW_READY`，界面完整渲染 | ✅ `STORAGE_HOST=on`，sqlite 建表 |
 | openKylin 3.0(huanghe) 容器 | 2.28.1 | `install ok installed` | `HEYTA_WEBVIEW_READY`，窗口打开 | ⚠️ 页面脚本不执行（见下） |
 
 ## 依赖版本下限
@@ -89,7 +90,20 @@ XDG_RUNTIME_DIR=/tmp/xdg DISPLAY=:99 WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 
 页面是面向现代浏览器的 ES bundle；**WebKitGTK 需 ≥ 2.38** 才能执行。2.28 下原生窗口可安装并打开，
 但页面脚本不执行、`#root` 为空。解决：更新系统 WebKit，或使用较新内核的浏览器（`heyta-web` deb + Chromium）。
 
+## arm64 构建（qemu-user 交叉，可复跑）
+
+arm64 在 x86 宿主用 qemu-user(binfmt) + Debian 10 arm64（glibc 2.28，与 UOS/麒麟 arm64 对齐；其 webkit2gtk-4.0 为 2.38.6）：
+
+```bash
+sudo apt-get install -y qemu-user-static binfmt-support
+docker run -d --name arm64build --platform linux/arm64 -v "$PWD":/mnt docker.m.daocloud.io/library/debian:10 sleep infinity
+docker exec arm64build bash -lc 'printf "deb [trusted=yes] http://archive.debian.org/debian buster main\ndeb [trusted=yes] http://archive.debian.org/debian-security buster/updates main\n" > /etc/apt/sources.list; apt-get -o Acquire::Check-Valid-Until=false update -q; apt-get install -y --allow-unauthenticated --no-install-recommends build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev libjavascriptcoregtk-4.0-dev libsqlite3-dev'
+docker exec arm64build bash -lc 'cp -a /mnt/apps /tmp/ab && cd /tmp/ab/desktop-linux-gtk3 && make clean && make'
+```
+
+打包同布局，`control` 的 `Architecture: arm64`，产出 `heyta-gtk3_0.2.0+20261123_arm64.deb`。
+
 ## 已知边界
 
-- 只构建/验证了 **amd64**；arm64 / loongarch 需各自架构的 GTK3 工具链重编。
+- 已构建/验证 **amd64** 与 **arm64**（qemu-user 下 arm64 实测界面 + 落库）；**loongarch** 需 loongarch 工具链/rootfs，未做。
 - 真实银河麒麟商业版 / UOS 专业版实机、应用商店兼容性认证未做（商用版范畴）。
