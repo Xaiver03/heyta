@@ -99,3 +99,9 @@ await undoLastAiTurn({ undo }, seqBefore);
 - **可写本地传输** `createAutoWriteLocalToolTransport`（app-host）：只读照旧；写经唯一落库点 `executeAiToolProposal` 执行（`destructive-irreversible` 仍被拦），撤销靠 `undoSince`。判据：`ai-local-tools-integration.spec.ts`（create_task 落库→undoSince 撤销）。
 - **Web 与移动均已可写+可撤销**：两壳适配器都用 `createAutoWriteLocalToolTransport`，并在 UI 提供「撤销这次 AI 操作」按钮（Web `?cloudHarness=1` 开启；移动 `MOBILE_CLOUD_HARNESS=true` 开启）。写经唯一落库点执行、`purge` 被拦，撤销走 `undoSince`（D1 闭环）。
 - Web 开关：`AssistantPanel` 的 `useCloudHarness` 由 `?cloudHarness=1` 打开；移动开关见 `AssistantScreen` 的 `MOBILE_CLOUD_HARNESS`。
+
+## 12. AI 写入与跨端延迟（回应"本地优先 ≠ 延迟"）
+
+- AI 的写经 `runSelectedTool → executeAiToolProposal → host.submit → engine.dispatch`，产出**与手动编辑同形的 op**（本机 `clientId` + 向量时钟），因此走**同一条同步链**：本机即时生效 → 上传 → 服务端 WebSocket 推给其它在线端。**跨端延迟 = 普通编辑的跨端延迟**，AI 不额外增加。
+- 判据：`ai-local-tools-integration.spec.ts` 的"AI 写入=普通 op"用例（op 带 clientId/vectorClock）。
+- 若将来要"服务端常驻 AI 自动干活"，需单独设计"服务端作为 op 作者"，不在本 Harness 范围。

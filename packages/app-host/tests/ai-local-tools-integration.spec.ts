@@ -132,3 +132,25 @@ describe('可写传输：Harness 模式 AI 直接写 + undoSince 撤销（D1）'
     expect((after ?? []).map((t) => t.title)).not.toContain('Harness 写的');
   });
 });
+
+
+describe('AI 写入 = 普通 op（与手动写同一条同步链，非本地孤岛）', () => {
+  it('executeAiToolProposal 产生的 op 带 clientId/vectorClock，可被同步客户端上传', async () => {
+    const host = createLocalApiHost(engine, actions, { isReadable: () => true });
+    const res = await executeAiToolProposal(
+      host,
+      { ruleId: 'r', tool: 'create_task', intent: { action: 'create-task', title: 'AI 同步验证' } },
+      'exec-sync',
+      { getGrants: () => ({ create_task: true }) as never },
+    );
+    expect(res.ok).toBe(true);
+    const entityId = 'taskId' in res ? String(res.taskId) : undefined;
+    expect(entityId).toBeDefined();
+    const ops = await engine.getOpsForEntity('TASK', entityId!);
+    expect(ops.length).toBeGreaterThan(0);
+    const op = ops[ops.length - 1]!;
+    // 与手动写同形：带本机 clientId 与向量时钟 —— 同步客户端据此上传、其他端据此收敛。
+    expect(op.clientId).toBe('client-test');
+    expect(Object.keys(op.vectorClock ?? {}).length).toBeGreaterThan(0);
+  });
+});
