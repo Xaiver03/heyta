@@ -58,7 +58,7 @@ import {
 import { ChatTranscript, type ChatTranscriptItem } from './chat-transcript';
 import { intentText } from './intent-copy';
 import { getAiSettings, saveAiSettings, useAiSettings, aiSecrets } from './settings-store';
-import { runMobileCloudTurn } from './cloud-harness';
+import { runMobileCloudTurn, undoMobileCloudTurn } from './cloud-harness';
 import { useMobileSync } from '../sync/store';
 
 const resolveHistoryAccount = createAssistantHistoryAccountResolver();
@@ -117,7 +117,7 @@ const managedTransport = createManagedTransport({
 const streamingFetch = createGatedStreamingFetch(privacyConsent);
 
 /** 移动端 Harness 开关：默认关（只读），开启后 runTurn 走 runMobileCloudTurn。 */
-const MOBILE_CLOUD_HARNESS = false;
+const MOBILE_CLOUD_HARNESS = true;
 
 
 /**
@@ -182,6 +182,7 @@ export function AssistantScreen({
   const [sessionOpen, setSessionOpen] = useState(false);
   const [refs, setRefs] = useState<AttachTask[]>([]);
   const [imageError, setImageError] = useState<string | undefined>(undefined);
+  const [harnessUndoSeq, setHarnessUndoSeq] = useState<number | null>(null);
 
   useEffect(() => {
     controller.syncAccount(account);
@@ -234,7 +235,13 @@ export function AssistantScreen({
                 consents: getAiSettings().consents,
                 grants: assistantGrants(),
               });
-              return { text: res.error !== undefined ? `出错：${res.error}` : res.turn.text };
+              if (res.error !== undefined) {
+                setHarnessUndoSeq(res.seqBefore);
+                return { text: `出错：${res.error}` };
+              }
+              const wrote = res.turn.steps.some((step) => step.ok);
+              setHarnessUndoSeq(wrote ? res.seqBefore : null);
+              return { text: wrote ? `${res.turn.text}\n\n${t('web.ai.chat.harnessApplied' as MessageKey)}` : res.turn.text };
             },
           }
         : {}),
@@ -554,6 +561,22 @@ export function AssistantScreen({
             />
             {snapshot.phase === 'disclose' ? <DisclosureCard target={route.target} plan={plan} hasImages={snapshot.images.length > 0} consents={settings.consents} onConfirm={() => { if (route.target !== undefined) { const cur = getAiSettings(); const dest = route.target.destination; if (!cur.consents.some((c) => c.feature === 'tool-calling' && c.destination === dest)) { saveAiSettings({ ...cur, consents: [...cur.consents, { feature: 'tool-calling' as const, destination: dest, grantedAt: Date.now() }] }); } } controller.confirmDisclosure(); }} onCancel={() => controller.cancelDisclosure()} onOpenSettings={onOpenSettings} /> : null}
           </ScrollView>
+          {harnessUndoSeq !== null && snapshot.phase === 'idle' ? (
+            <Stack gap="tight" style={{ paddingHorizontal: 16 }}>
+              <Button
+                label={t('web.ai.chat.undoAiTurn' as MessageKey)}
+                tone="ghost"
+                testID="ai-assistant-undo-ai"
+                onPress={() => {
+                  void (async () => {
+                    const seq = harnessUndoSeq;
+                    setHarnessUndoSeq(null);
+                    await undoMobileCloudTurn(host!, seq);
+                  })();
+                }}
+              />
+            </Stack>
+          ) : null}
           <ChatComposer
             value={snapshot.draft}
             onChangeText={(value) => controller.setDraft(value)}

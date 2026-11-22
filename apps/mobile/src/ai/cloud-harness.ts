@@ -13,7 +13,7 @@
  */
 import {
   createLocalApiHost,
-  createLocalToolTransport,
+  createAutoWriteLocalToolTransport,
   createTaskActions,
   runAiTurnWithUndo,
   undoLastAiTurn,
@@ -65,7 +65,7 @@ export async function runMobileCloudTurn(
   userText: string,
   deps: MobileCloudTurnDeps,
 ): Promise<MobileCloudTurnResult> {
-  const transport = createLocalToolTransport({ host: toolHostOf(host), grants: deps.grants, getGrants: () => deps.grants });
+  const transport = createAutoWriteLocalToolTransport({ host: toolHostOf(host), grants: deps.grants, getGrants: () => deps.grants });
   const result = await runAiTurnWithUndo(userText, {
     routing: deps.routing,
     consents: deps.consents,
