@@ -875,7 +875,7 @@ export function CaptureComposer({
         分组后是 4 / 12 / 4 三档，层次回来了。
       */}
       <View style={styles.titleGroup}>
-      <View style={styles.compose}>
+      <View style={styles.compose} testID="capture-compose">
         <TextInput
           ref={inputRef}
           style={[text['row-meta'], styles.input]}

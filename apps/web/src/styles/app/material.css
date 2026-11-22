@@ -109,6 +109,23 @@
   overflow-y: auto;
   max-inline-size: 100%;
 }
+/*
+ * 「连续卡」：捕获日期面板（`CaptureDuePopover`）现在锚到输入卡、等宽、贴着它底边。
+ * 把两条接缝边去掉（面板顶边框/顶圆角 + 输入卡底边框/底圆角），两者就读作**同一张卡的下半截**，
+ * 不再是“上下两张同款卡粘着”。面板只在打开时才有意义，输入卡方角由 body 标记驱动。
+ * ⚠️ 用 `!important`：输入卡的底圆角/底边框来自 RNW 原子类，普通选择器压不住。
+ */
+.ht-material--popover {
+  border-top-width: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+body[data-capture-panel-open] [data-testid='capture-compose'] {
+  border-bottom-width: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
 
 @keyframes ht-material-in {
   from {

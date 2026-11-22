@@ -35,6 +35,13 @@ test('捕获面板四块 UI 真截图', async ({ page }) => {
 
   await openApp(page);
 
+  // 收起首启示例（否则空的收集箱里会露出一枚「今天 整理桌面」示例 chip，被浮层盖半截，误导验收图）
+  const dismiss = page.getByTestId('first-run-dismiss');
+  if (await dismiss.count()) {
+    await dismiss.click();
+    await page.waitForTimeout(300);
+  }
+
   const input = page.getByTestId('capture-input');
   await expect(input).toBeVisible();
   await input.fill('明天下午三点开会');
@@ -44,6 +51,16 @@ test('捕获面板四块 UI 真截图', async ({ page }) => {
   const panel = page.getByTestId('capture-due-popover');
   await expect(panel).toBeVisible();
   await page.waitForTimeout(250);
+
+  // 「连续卡」几何断言：日期面板与输入卡等宽、左边对齐、顶边紧贴输入卡底边（≤2px）。
+  const composeBox = await page.getByTestId('capture-compose').boundingBox();
+  const panelBox = await panel.boundingBox();
+  expect(composeBox, '输入卡应有几何').not.toBeNull();
+  expect(panelBox, '日期面板应有几何').not.toBeNull();
+  expect(Math.abs(panelBox!.x - composeBox!.x), '左边缘对齐（连续卡）').toBeLessThanOrEqual(1);
+  expect(Math.abs(panelBox!.width - composeBox!.width), '与输入卡等宽（连续卡）').toBeLessThanOrEqual(1);
+  expect(Math.abs(panelBox!.y - (composeBox!.y + composeBox!.height)), '顶边紧贴输入卡底边').toBeLessThanOrEqual(2);
+
   await page.screenshot({ path: SHOT('1-panel-date') });
 
   // 时间段：进子视图 → 选时长 → 截图 → 返回
