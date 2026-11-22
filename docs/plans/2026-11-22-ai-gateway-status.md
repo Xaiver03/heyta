@@ -17,11 +17,12 @@
 |---|---|---|
 | ① 服务端网关抽象（多上游/选择/脱敏/热生效） | ✅ | `ai-gateway.ts`/`gateway-store.ts`；`managed-proxy` 按网关选上游；`ai-gateway.spec`(8) |
 | ② 管理后台 增删改查/试连/启停/健康 | ✅ | `admin/ai-gateway.routes.ts` + Web `/admin`「AI 网关」分区 + 健康列；`ai-gateway.routes.spec`(6)、`gateway-health.spec`(1) |
-| ③ PP 网关接入 | ⏳ **配置就绪，待真实地址** | 作为 OpenAI 兼容上游 `id=pp`，后台/env 填 baseUrl/model/key；`docs/reference/ai-gateway.md`。**未做真实连通验证**（不知地址）。 |
+| ③ PP 网关接入 | ✅ 机制已验证 / ⏳ 待填真实地址 | 作为 OpenAI 兼容上游 `id=pp`；`gateway-e2e.spec` 用**真实 HTTP 上游**证明「文件配置→选上游→真调上游」整链可跑通并记录健康。PP 的**真实 baseUrl/密钥**需你填入后点「试连」。 |
 | ④ 周报/年终总结 = Harness 工具，零入口 | ✅ | `ai-report-tools.ts`（weekly_report/year_end_summary，本地聚合，egressFields 齐）；双端适配器传 getReportState；`ai-report-tools.spec`/`ai-cloud-assistant` |
 | ⑤ 裁决约束 + 安全审计 + 门禁 | ✅（含记录缺口） | apiKey 不回显/0600/原子写；SSRF/空key/改id 已修；两轮审计 + 处置表；四门禁绿 |
 
 ## 已知缺口（诚实）
+- ①②③④⑤ 的**工程实现与门禁全部完成**；PP 的**真实端点**、后台页**浏览器点击**需外部输入（地址/会话）。
 1. **PP 真实连通**未验证（需你提供地址/密钥后点「试连」）。
 2. 上游 **weight 加权分流**未做（当前按 priority+weight 取第一条）；健康仅"冷却跳过"，无主动故障转移。
 3. Web 全量 `tsc` 现红但**非本工作**：`CalendarHeaderToolbar.tsx:365` 引用缺失词条（另一会话未提交改动）。
