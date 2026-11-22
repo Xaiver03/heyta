@@ -53,6 +53,7 @@ import { toLocalDate, type LocalDate, type Task } from '@heyta/domain';
 
 import { EmptyState } from '../empty-state/EmptyState.js';
 import { TaskList } from '../task-list/TaskList.js';
+import type { TaskRow } from '../task-list/model.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import { CalendarEventRow } from './CalendarEventRow.js';
 import {
@@ -97,6 +98,16 @@ export interface CalendarDayBoardProps {
    * 贴 Apple 日历：全天带与小时轴不再各套一张卡）。默认 `card`，不传时行为不变。
    */
   readonly appearance?: 'card' | 'flat';
+  /**
+   * 注入点（Web 专用，移动端不传 ⇒ 逐字节不变）：把**每一条任务行**包一层（拖拽源）。
+   * 形状与 `CalendarBoard.renderRowWrapper` 同一条（透传给这里的 `TaskList`）。
+   */
+  readonly renderRowWrapper?: ((row: TaskRow, node: React.ReactNode) => React.ReactNode) | undefined;
+  /**
+   * 注入点（Web 专用）：把**每一个小时行**包一层（投放目标）。
+   * `hour` 是 0–23。宿主不传 ⇒ 原样返回，行为不变。
+   */
+  readonly renderHourRowWrapper?: ((hour: number, node: React.ReactNode) => React.ReactNode) | undefined;
   readonly testID?: string;
 }
 
@@ -111,6 +122,8 @@ export function CalendarDayBoard({
   busyTaskId,
   labels,
   appearance = 'card',
+  renderRowWrapper,
+  renderHourRowWrapper,
   testID = 'calendar-day-board',
 }: CalendarDayBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -138,6 +151,7 @@ export function CalendarDayBoard({
     onOpenTask,
     busyTaskId: busyTaskId ?? null,
     labels: labels.taskRow,
+    ...(renderRowWrapper === undefined ? {} : { renderRowWrapper }),
   };
 
   return (
@@ -194,7 +208,8 @@ export function CalendarDayBoard({
       {/* ── 24 小时轴（可滚）───────────────────────────────────── */}
       <View style={[styles.card, flat ? styles.flatCard : null, styles.axisWrap]} testID={`${testID}-axis-card`}>
         <ScrollView style={styles.axis} testID={`${testID}-axis`}>
-          {buckets.hours.map((bucket, hour) => (
+          {buckets.hours.map((bucket, hour) => {
+            const hourRow = (
             <View
               key={`hour-${String(hour)}`}
               style={[
@@ -232,7 +247,14 @@ export function CalendarDayBoard({
                 ) : null}
               </View>
             </View>
-          ))}
+            );
+            // 宿主不传 ⇒ 原样返回（移动端/未接拖拽时行为不变）。
+            return renderHourRowWrapper === undefined ? (
+              hourRow
+            ) : (
+              <React.Fragment key={`hour-${String(hour)}`}>{renderHourRowWrapper(hour, hourRow)}</React.Fragment>
+            );
+          })}
           {nowOffset !== undefined ? (
             // 现在线：她那张参考图里唯一画在轴上的东西。
             <View
