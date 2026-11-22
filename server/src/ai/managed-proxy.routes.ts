@@ -62,10 +62,11 @@ import { z } from 'zod';
 
 import { prisma } from '../db';
 import { authenticate, getAuthUser } from '../middleware';
-import { loadConfigFromEnv, type ManagedAiConfig } from '../config';
+import { type ManagedAiConfig } from '../config';
 import { createPrismaSqlExecutor, type SqlExecutor } from '../billing/pricing-store';
 import { MANAGED_AI_REQUESTS_PER_PERIOD, peekManagedAiUsage } from './metering';
 import { SERVER_MANAGED_AI_FEATURES, SERVER_MANAGED_MODEL_HOSTS, type ServerManagedModelHost } from './managed-upstream';
+import { storePrimaryConfig } from './gateway-store';
 import {
   MANAGED_AI_ERROR_CODES, MANAGED_AI_REFUSAL_MESSAGE, managedAiFetchTransport,
   invokeManagedAiCompletion, recordManagedAiAttempt,
@@ -159,7 +160,6 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
   fastify,
   options,
 ) => {
-  const upstream = options.upstream ?? loadConfigFromEnv().managedAi;
   const sql = options.sql ?? createPrismaSqlExecutor(prisma);
   const limit = options.limit ?? MANAGED_AI_REQUESTS_PER_PERIOD;
   const now = options.now ?? Date.now;
@@ -212,6 +212,8 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
           message: MANAGED_AI_REFUSAL_MESSAGE[MANAGED_AI_ERROR_CODES.INVALID_BODY] });
       }
       const { feature, messages, tools, tool_choice: toolChoice, stream } = parsed.data;
+      // 每请求现取主上游 ⇒ 管理后台改完网关配置即生效（文件优先，回退 env）。
+      const upstream = options.upstream ?? storePrimaryConfig();
       const result = await invokeManagedAiCompletion(
         { upstream, sql, limit, now, transport, hosts, plaintextHosts, startedAt },
         { userId, feature, messages, ...(tools === undefined ? {} : { tools }),

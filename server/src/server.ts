@@ -48,6 +48,7 @@ import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
 import { announcementRoutes } from './announcements/announcement.routes';
 import { appVersionRoutes } from './app-version/app-version.routes';
 import { adminRoutes } from './admin/admin.routes';
+import { aiGatewayRoutes } from './admin/ai-gateway.routes';
 import { managedAiProxyRoutes } from './ai/managed-proxy.routes';
 import { agentToolsRoutes } from './ai/agent-tools.routes';
 import { buildAgentToolsOptions, type OpsReader } from './ai/agent-tools.service';
@@ -665,6 +666,9 @@ export const createServer = (
       //    （运营者动作，同 `admin:grant` 那一类）。"给自托管一个不需要订阅的形态"
       //    需要先改锚点的来源，那是**另一个决定**，不在本轮里顺手做。
       await fastifyServer.register(managedAiProxyRoutes, { prefix: '/api/ai' });
+
+      // 管理后台：AI 网关配置（上游增删改查/试连；插件内 requireAdmin 鉴权）。
+      await fastifyServer.register(aiGatewayRoutes, { prefix: '/api/admin' });
 
       // 云端 Agent 工具 API（读工具经 op 归约状态执行；写未接、返回 501）。
       await fastifyServer.register(agentToolsRoutes, buildAgentToolsOptions(prisma as unknown as OpsReader));
