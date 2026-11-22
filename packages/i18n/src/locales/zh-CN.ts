@@ -3070,6 +3070,7 @@ export const zhCN = {
   'web.capture.panel.repeat.yearly': '每年',
   'web.capture.panel.tags.title': '标签',
   'web.capture.panel.reminder.title': '提醒',
+  'web.capture.panel.reminder.atTime': '准时',
   'web.capture.panel.reminder.m5': '提前5分钟',
   'web.capture.panel.reminder.m30': '提前30分钟',
   'web.capture.panel.reminder.h1': '提前1小时',

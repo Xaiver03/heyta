@@ -288,6 +288,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         reminder: {
           title: t('web.capture.panel.reminder.title'),
           labelOf: (ms) => {
+            if (ms === 0) return t('web.capture.panel.reminder.atTime');
             if (ms === 5 * 60000) return t('web.capture.panel.reminder.m5');
             if (ms === 30 * 60000) return t('web.capture.panel.reminder.m30');
             if (ms === 60 * 60000) return t('web.capture.panel.reminder.h1');

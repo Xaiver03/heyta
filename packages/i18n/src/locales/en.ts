@@ -2791,6 +2791,7 @@ export const en = {
   'web.capture.panel.repeat.yearly': 'Yearly',
   'web.capture.panel.tags.title': 'Tags',
   'web.capture.panel.reminder.title': 'Reminder',
+  'web.capture.panel.reminder.atTime': 'On time',
   'web.capture.panel.reminder.m5': '5 min before',
   'web.capture.panel.reminder.m30': '30 min before',
   'web.capture.panel.reminder.h1': '1 hour before',

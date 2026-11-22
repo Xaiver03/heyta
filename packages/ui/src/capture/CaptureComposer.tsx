@@ -211,8 +211,8 @@ export interface CaptureTagOption {
   readonly name: string;
 }
 
-/** 「提醒」可选的提前量（ms）：提前 5 / 30 / 60 分钟、1 天。 */
-const REMINDER_OFFSET_OPTIONS = [5 * 60_000, 30 * 60_000, 60 * 60_000, 24 * 60 * 60_000] as const;
+/** 「提醒」可选档位（ms）：准时(0) / 提前 5 / 30 / 60 分钟 / 1 天（对齐滴答提醒档）。 */
+const REMINDER_OFFSET_OPTIONS = [0, 5 * 60_000, 30 * 60_000, 60 * 60_000, 24 * 60 * 60_000] as const;
 
 export interface CaptureComposerProps {
   readonly labels: CaptureComposerLabels;
