@@ -35,3 +35,6 @@ PP 网关按**一条 OpenAI 兼容上游**接入（`id=pp`）。在后台或 `MA
 - `packages/app-host/src/ai-report-tools.ts`：`weekly_report` / `year_end_summary` 只读工具，本地聚合 `getState()`。
 - Web `runWebCloudTurn` / 移动 `runMobileCloudTurn` 已传 `getReportState`（`useTaskStore.entities` / `host.getState()`）——助手可直接生成周报/年终，**无新增界面/按钮**。
 - 出境：工具观测字段已列入 `egressFields`，未声明会被出境闸门拦下（有测试）。
+
+## 端到端（离线）
+`server/tests/gateway-e2e.spec.ts`：写文件配置一条上游 → `storePrimaryConfig` 选中它 → 用真实 HTTP 调它的 `/chat/completions` 成功。证明"网关配置 → 选上游 → 真调上游"整链在无外网 key 下可跑通。
