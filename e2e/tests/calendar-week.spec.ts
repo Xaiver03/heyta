@@ -271,9 +271,9 @@ test('🔴 下拉里只有**真的能用**的档位（月 / 周 / 日 / 时间�
   //   `apps/web/tests/calendar-view-family.spec.tsx` 钉，这里钉的是"没有摆设"。
   // ⚠️ 「日」于批四进来（§9.12）、「年」于 R13 进来：顺序就是下拉里的顺序，多一个少一个都红。
   expect(options, `档位下拉里出现了 ${String(options.length)} 项`).toEqual([
-    '月',
-    '周',
     '日',
+    '周',
+    '月',
     '年',
     '时间线',
   ]);

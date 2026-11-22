@@ -73,3 +73,11 @@
 - **滴答式彩色块 chip**：月格条目由"细色条+文字"改为**实心浅底圆角块+同色字**。实现：`CalendarBoard` 每条叠一层 `styles.barTint`（`StyleSheet.absoluteFillObject` + `backgroundColor: strong` + `opacity:0.16`），文字用 `strong` 色。**零新 token、零裸 hex、不用 `color-mix`**（RN-web 不接受 style 里的 color-mix，已实测丢弃为透明；改 opacity 层后正常）。状态语义不变：逾期→danger、完成→foreground-subtle、否则→所属清单色、未设色→primary。
 - 验证：`ui/calendar-cell-bars`(21)、`web/calendar-view+family`(20)、`web/calendar-*(含 sidebar/tabs)`(46) 全绿；`typecheck` 无日历错误；真机图 `img/12-live-chips.jpg`（写周报=浅红、整理桌面=浅青、读书=浅蓝；顶部 `日 周 月 年`）。
 - ⚠️ 仍受并发影响：`CalendarDnd.tsx`/`calendar-dnd.css`/`domain/calendar-drop.*`/`CalendarDayBoard.tsx` 是并行 agent 的未提交改动，未纳入本提交。
+
+## 深/浅色 + 周视图一致性 + e2e 真失败修复（2026-11-22 续）
+
+- **暗色主题 chip**：真机验证（`img/13-live-dark.jpg`）—— chip 为深红/深青/深蓝浅底（strong 色层 opacity 0.16 叠在暗底上）+ 同色亮字，可读，无需改。
+- **周视图一致性**：周档复用同一 `DayCell`，条目同样是彩色块（`img/14-live-week.jpg`：写周报=浅红、整理桌面=浅青），与月档一致；顶部标题为周区间。
+- **e2e 真失败修复**：`e2e/tests/calendar-week.spec.ts` 档位下拉标签断言硬编码 `['月','周','日','年','时间线']`，随顺序改为 `['日','周','月','年','时间线']`；单跑该用例通过。
+- **e2e 其余失败**（calendar-week:165 / calendar-year:117 / calendar-year:284）均为控制台 `[heyta] 首屏在超时内未被应用接管` 的**启动看门狗环境抖动**（与布局无关，A/B 早证）。`calendar-view-options`（顺序/四档）全过。
+- **日视图彩色块：未做，原因**——`packages/ui/src/calendar/CalendarDayBoard.tsx` 当前带有并行 agent 未提交的 `renderRowWrapper`/`renderHourRowWrapper` 布线（24 行）；在其上实现会把对方 WIP 带入本提交、且若其改动被回退则我方断言/编译断裂。待该并行改动落地后再做（下一轮复查）。
