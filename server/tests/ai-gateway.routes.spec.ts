@@ -86,12 +86,13 @@ describe('admin ai-gateway routes', () => {
     expect(called).toBe(false);
   });
 
-  it('POST /test：http 上游拒绝（必须是 https）', async () => {
+  it('POST /test：公网 http 上游允许（自建 PP 场景），走注入 fetch', async () => {
     const file = tempFile();
-    const app = await makeApp({ file });
-    await app.inject({ method: 'PUT', url: '/ai-gateway', payload: { upstreams: [{ id: 'x', baseUrl: 'http://x/v1', modelId: 'm' }] } });
+    let seen: string | undefined;
+    const app = await makeApp({ file, fetchImpl: (async (url: RequestInfo | URL) => { seen = String(url); return new Response('{}', { status: 200 }); }) as typeof fetch });
+    await app.inject({ method: 'PUT', url: '/ai-gateway', payload: { upstreams: [{ id: 'x', baseUrl: 'http://pp.example/v1', apiKey: 'k', modelId: 'm' }] } });
     const res = await app.inject({ method: 'POST', url: '/ai-gateway/test', payload: { id: 'x' } });
-    expect(res.statusCode).toBe(400);
-    expect(res.json().code).toBe('insecure-url');
+    expect(res.statusCode).toBe(200);
+    expect(seen).toBe('http://pp.example/v1/models');
   });
 });

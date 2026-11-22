@@ -49,6 +49,8 @@ import { announcementRoutes } from './announcements/announcement.routes';
 import { appVersionRoutes } from './app-version/app-version.routes';
 import { adminRoutes } from './admin/admin.routes';
 import { aiGatewayRoutes } from './admin/ai-gateway.routes';
+import { gatewayEgressAllowance } from './ai/gateway-store';
+import { SERVER_MANAGED_MODEL_HOSTS } from './ai/managed-upstream';
 import { managedAiProxyRoutes } from './ai/managed-proxy.routes';
 import { agentToolsRoutes } from './ai/agent-tools.routes';
 import { buildAgentToolsOptions, type OpsReader } from './ai/agent-tools.service';
@@ -665,7 +667,13 @@ export const createServer = (
       //    也要给账号**写入一行带 `ai` grants 的订阅**才能用这条路由
       //    （运营者动作，同 `admin:grant` 那一类）。"给自托管一个不需要订阅的形态"
       //    需要先改锚点的来源，那是**另一个决定**，不在本轮里顺手做。
-      await fastifyServer.register(managedAiProxyRoutes, { prefix: '/api/ai' });
+      // 网关配置里显式加入的 http 上游（如自建 PP）——把它加进托管代理的 egress 允许面。
+      const gwEgress = gatewayEgressAllowance();
+      await fastifyServer.register(managedAiProxyRoutes, {
+        prefix: '/api/ai',
+        ...(gwEgress.hosts.length === 0 ? {} : { hosts: [...SERVER_MANAGED_MODEL_HOSTS, ...gwEgress.hosts] }),
+        ...(gwEgress.plaintextHosts.length === 0 ? {} : { plaintextHosts: gwEgress.plaintextHosts }),
+      });
 
       // 管理后台：AI 网关配置（上游增删改查/试连；插件内 requireAdmin 鉴权）。
       await fastifyServer.register(aiGatewayRoutes, { prefix: '/api/admin' });

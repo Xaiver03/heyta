@@ -86,3 +86,30 @@ export function storePrimaryConfig(
     ? undefined
     : { id: picked.id, baseUrl: picked.baseUrl, apiKey: picked.apiKey, modelId: picked.modelId };
 }
+
+
+/** 从网关配置推导出托管代理要的 egress 允许面：**配置里出现的 http 上游** = 运维显式接受明文。 */
+export interface GatewayEgressAllowance {
+  readonly hosts: readonly { readonly host: string; readonly provider: string; readonly jurisdiction: 'cn'; readonly evidence: string }[];
+  readonly plaintextHosts: readonly string[];
+}
+export function gatewayEgressAllowance(
+  env: Record<string, string | undefined> = process.env,
+  file: string = defaultGatewayFile(env),
+): GatewayEgressAllowance {
+  const hosts: GatewayEgressAllowance['hosts'][number][] = [];
+  const plaintextHosts: string[] = [];
+  for (const u of loadGatewayUpstreams(env, file).upstreams) {
+    if (!u.baseUrl.startsWith('http://')) continue;
+    try {
+      const host = new URL(u.baseUrl).hostname;
+      if (!plaintextHosts.includes(host)) plaintextHosts.push(host);
+      if (!hosts.some((h) => h.host === host)) {
+        hosts.push({ host, provider: u.label, jurisdiction: 'cn', evidence: '运维在 AI 网关配置的 http 上游（自建 PP 网关）' });
+      }
+    } catch {
+      /* 非法 URL 忽略 */
+    }
+  }
+  return { hosts, plaintextHosts };
+}

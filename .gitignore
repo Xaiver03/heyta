@@ -320,3 +320,6 @@ apps/mobile/evidence/*
 !apps/web/evidence/
 apps/web/evidence/*
 !apps/web/evidence/README.md
+# AI 网关运行时配置（含密钥，勿入库）
+data/ai-gateway.json
+server/data/ai-gateway.json

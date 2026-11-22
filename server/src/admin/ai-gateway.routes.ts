@@ -94,9 +94,9 @@ export const aiGatewayRoutes: FastifyPluginAsync<AiGatewayRoutesOptions> = async
       return { ok: false, code: 'not-found', message: '没有这条上游。' };
     }
     // 只允许 https（与本仓"明文不走公网"一致）；试连 GET /models。
-    if (!target.baseUrl.startsWith('https://')) {
+    if (!target.baseUrl.startsWith('https://') && !target.baseUrl.startsWith('http://')) {
       reply.code(400);
-      return { ok: false, code: 'insecure-url', message: '上游必须是 https。' };
+      return { ok: false, code: 'bad-scheme', message: '上游必须是 http/https。' };
     }
     let host = '';
     try {
