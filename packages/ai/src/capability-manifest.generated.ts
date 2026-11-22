@@ -178,6 +178,10 @@ export const AI_CAPABILITY_MANIFEST =
         'unabandon_task',
         'move_task',
         'uncomplete_task',
+        'set_task_parent',
+        'trash_tasks',
+        'restore_tasks',
+        'reorder_task',
       ],
     },
     {
@@ -193,6 +197,8 @@ export const AI_CAPABILITY_MANIFEST =
         'rename_project',
         'archive_project',
         'delete_project',
+        'move_project',
+        'restore_project',
       ],
     },
     {
@@ -739,6 +745,72 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'set_task_parent',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把任务挂到另一个父任务下，建立层级。参数：taskId（要移动的任务 id）、parentId（新的父任务 id；省略表示提为顶级、不挂在任何任务下）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'parentId',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'trash_tasks',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把多条任务一次性移进回收站（软删除，之后可用 restore_tasks 恢复）。参数：taskIds（要删除的任务 id 列表，至少一条）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskIds',
+          'type': 'array',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'restore_tasks',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把回收站里的多条任务一次性恢复到原处。参数：taskIds（要恢复的任务 id 列表，至少一条）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskIds',
+          'type': 'array',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'reorder_task',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '调整任务在清单里的排序位置。参数：taskId（要排序的任务 id）、order（排序序号，有限数字）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'order',
+          'type': 'number',
+          'required': true,
+        },
+      ],
+    },
+    {
       'name': 'create_project',
       'kind': 'write',
       'entityType': 'PROJECT',
@@ -800,6 +872,39 @@ export const AI_CAPABILITY_MANIFEST =
       'kind': 'write',
       'entityType': 'PROJECT',
       'description': '把一个清单（项目）删除到回收站。可撤销，不是彻底删除。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'move_project',
+      'kind': 'write',
+      'entityType': 'PROJECT',
+      'description': '把一个清单（项目）移动到另一个清单的下层，或移出下层成为顶层清单。省略 parentId 就是提为顶层。目标清单不存在、或移动会形成环/超过允许层数会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'parentId',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'restore_project',
+      'kind': 'write',
+      'entityType': 'PROJECT',
+      'description': '把一个在回收站里的清单（项目）恢复回来。清单不存在或不在回收站会被拒绝。',
       'schemaRecorded': true,
       'args': [
         {
@@ -1250,7 +1355,7 @@ export const AI_CAPABILITY_TEXT = [
   '不可以说"产品不支持"。',
   '',
   '一、有 AI 工具的实体（9 个）',
-  '- TASK —— 读和写都有（读 3 / 写 12）',
+  '- TASK —— 读和写都有（读 3 / 写 16）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
   '  · [读] get_task_estimate_context（taskId*:string）',
@@ -1266,12 +1371,18 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] unabandon_task（taskId*:string）',
   '  · [写] move_task（taskId*:string, projectId:string）',
   '  · [写] uncomplete_task（taskId*:string）',
-  '- PROJECT —— 读和写都有（读 1 / 写 4）',
+  '  · [写] set_task_parent（taskId*:string, parentId:string）',
+  '  · [写] trash_tasks（taskIds*:array）',
+  '  · [写] restore_tasks（taskIds*:array）',
+  '  · [写] reorder_task（taskId*:string, order*:number）',
+  '- PROJECT —— 读和写都有（读 1 / 写 6）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',
   '  · [写] rename_project（projectId*:string, name*:string）',
   '  · [写] archive_project（projectId*:string, archived:boolean）',
   '  · [写] delete_project（projectId*:string）',
+  '  · [写] move_project（projectId*:string, parentId:string）',
+  '  · [写] restore_project（projectId*:string）',
   '- TAG —— 读和写都有（读 1 / 写 4）',
   '  · [读] list_tags（无参数）',
   '  · [写] create_tag（name*:string）',

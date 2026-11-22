@@ -3,7 +3,8 @@
  * ==========================
  *
  * 读：`list_projects`（列清单与任务数）；写：`create_project`（新建清单）、
- * `rename_project`（改名）、`archive_project`（归档/取消归档）、`delete_project`（移入回收站）。
+ * `rename_project`（改名）、`archive_project`（归档/取消归档）、`delete_project`（移入回收站）、
+ * `move_project`（层级移动 / 提为顶层）、`restore_project`（从回收站恢复）。
  * 全部在这里 —— 目录条目、给模型看的参数 schema、读分支、写分支**一处不落**，
  * 加工具不需要再回到 `mcp.ts` / `server.ts` 各改一处。
  *
@@ -68,6 +69,26 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'destructive-reversible',
     defaultEnabled: false,
   },
+  {
+    name: 'move_project',
+    // 层级移动只改父子关系，不删数据 ⇒ `write`（环/超深由宿主同步抛错翻成 invalid）。
+    egressFields: [],
+    description:
+      '把一个清单（项目）移动到另一个清单的下层，或移出下层成为顶层清单。' +
+      '省略 parentId 就是提为顶层。目标清单不存在、或移动会形成环/超过允许层数会被拒绝。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'restore_project',
+    // 恢复 = 把回收站里的清单取回来，不产生新的删除 ⇒ `write`。
+    egressFields: [],
+    description: '把一个在回收站里的清单（项目）恢复回来。清单不存在或不在回收站会被拒绝。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -114,6 +135,26 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
     type: 'object',
     properties: {
       projectId: { type: 'string', description: '要删除到回收站的清单标识。' },
+    },
+    required: ['projectId'],
+    additionalProperties: false,
+  },
+  move_project: {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string', description: '要移动的清单标识。' },
+      parentId: {
+        type: 'string',
+        description: '移动到哪个清单的下层（可选）。省略就是提为顶层清单。',
+      },
+    },
+    required: ['projectId'],
+    additionalProperties: false,
+  },
+  restore_project: {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string', description: '要从回收站恢复的清单标识。' },
     },
     required: ['projectId'],
     additionalProperties: false,
@@ -212,6 +253,41 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
         return { ok: false, message: 'delete_project 需要 projectId。' };
       }
       return { ok: true, intent: { action: 'delete-project', projectId: a['projectId'] } };
+    }
+
+    case 'move_project': {
+      const unknown = Object.keys(a).filter((key) => key !== 'projectId' && key !== 'parentId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `move_project 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '') {
+        return { ok: false, message: 'move_project 需要 projectId。' };
+      }
+      // 显式给了 parentId 就必须是非空字符串：空串/非字符串不能当成"没给"，
+      // 否则"移出到顶层"会被悄悄执行成一次无效移动，用户以为移走了。
+      if ('parentId' in a) {
+        const parentId = a['parentId'];
+        if (typeof parentId !== 'string' || parentId.trim() === '') {
+          return { ok: false, message: 'move_project 的 parentId 必须是非空字符串（提为顶层请省略它）。' };
+        }
+        return {
+          ok: true,
+          intent: { action: 'move-project', projectId: a['projectId'], parentId },
+        };
+      }
+      // 省略 parentId = 提为顶层 ⇒ 意图里**不出现**该键，由宿主按"无 parent"落地。
+      return { ok: true, intent: { action: 'move-project', projectId: a['projectId'] } };
+    }
+
+    case 'restore_project': {
+      const unknown = Object.keys(a).filter((key) => key !== 'projectId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `restore_project 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '') {
+        return { ok: false, message: 'restore_project 需要 projectId。' };
+      }
+      return { ok: true, intent: { action: 'restore-project', projectId: a['projectId'] } };
     }
 
     default:

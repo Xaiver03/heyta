@@ -2259,6 +2259,14 @@ export const en = {
   'web.ai.tools.intentDeleteEvent': 'Move countdown {id} to trash',
   'web.ai.tools.intentRestoreEvent': 'Restore countdown {id}',
   'web.ai.tools.intentArchiveEvent': 'Archive countdown {id}',
+  'web.ai.tools.intentSetTaskParentTop': 'Make task {id} top-level',
+  'web.ai.tools.intentSetTaskParent': 'Move task {id} under task {parent}',
+  'web.ai.tools.intentTrashTasks': 'Move {count} task(s) to trash (undoable)',
+  'web.ai.tools.intentRestoreTasks': 'Restore {count} task(s)',
+  'web.ai.tools.intentReorderTask': 'Reorder task {id}',
+  'web.ai.tools.intentMoveProjectTop': 'Make list {id} top-level',
+  'web.ai.tools.intentMoveProject': 'Move list {id} under list {parent}',
+  'web.ai.tools.intentRestoreProject': 'Restore list {id}',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',

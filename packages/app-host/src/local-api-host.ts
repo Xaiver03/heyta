@@ -1568,5 +1568,127 @@ async function submitIntent(
       await eventActions.archiveEvent(intent.eventId);
       return { ok: true, taskId: intent.eventId, entityId: intent.eventId, entityType: 'EVENT' };
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 任务层级 / 批量 / 排序（P2）
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'set-task-parent': {
+      // 先在门口挡住不存在的任务：`setParent` 用领域层的 `validateParentChange` 校验，
+      // 但它的拒绝原因是环 / 超深这些**结构**问题，不负责"这条任务根本不存在"。
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      // 🔴 `setParent` 对环 / 超深 / 父不存在是**同步 throw**（见 `actions.ts` 的注释：
+      // 校验失败时 throw，且必须落在写之前）。这里翻成 `invalid` 并把人话带出去，
+      // 不让它顺着壳的 catch 变一句"工具执行失败"。
+      try {
+        await actions.setParent(intent.taskId, intent.parentId);
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: e instanceof Error ? e.message : String(e) };
+      }
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'trash-tasks': {
+      // 与 `complete-tasks` 同一条纪律：**先全部预检，再一条都不写**。
+      // `bulkRemove` 自己会对不存在的 id 抛错，但在门口挡住能给出更准的 not-found。
+      const taskIds = [...new Set(intent.taskIds)];
+      if (taskIds.length === 0) {
+        return { ok: false, reason: 'invalid', message: 'taskIds 是空的：没有要删除的任务。' };
+      }
+      const missing = taskIds.filter((id) => actions.findTask(id) === undefined);
+      if (missing.length > 0) {
+        const shown = missing.slice(0, 3).join('、');
+        return {
+          ok: false,
+          reason: 'not-found',
+          message: `这批里有 ${String(missing.length)} 条任务已经不在了（${shown}${missing.length > 3 ? ' 等' : ''}），一条都没有删。`,
+        };
+      }
+      await actions.bulkRemove(taskIds);
+      const [first] = taskIds;
+      if (first === undefined) {
+        return { ok: false, reason: 'invalid', message: 'taskIds 是空的：没有要删除的任务。' };
+      }
+      return { ok: true, taskId: first, taskIds };
+    }
+
+    case 'restore-tasks': {
+      // 恢复要读**含墓碑**的原始记录：`findTask` 会把墓碑滤掉，用它永远找不到
+      // "要恢复的那一条"（与 `restore-task` 同一条理由）。
+      const taskIds = [...new Set(intent.taskIds)];
+      if (taskIds.length === 0) {
+        return { ok: false, reason: 'invalid', message: 'taskIds 是空的：没有要恢复的任务。' };
+      }
+      const missing = taskIds.filter((id) => {
+        const task = ctx.getState().tasks[id];
+        return task === undefined || task.purgedAt !== undefined;
+      });
+      if (missing.length > 0) {
+        const shown = missing.slice(0, 3).join('、');
+        return {
+          ok: false,
+          reason: 'not-found',
+          message: `这批里有 ${String(missing.length)} 条任务不在回收站里或已被彻底删除（${shown}${missing.length > 3 ? ' 等' : ''}），一条都没有恢复。`,
+        };
+      }
+      await actions.bulkRestore(taskIds);
+      const [first] = taskIds;
+      if (first === undefined) {
+        return { ok: false, reason: 'invalid', message: 'taskIds 是空的：没有要恢复的任务。' };
+      }
+      return { ok: true, taskId: first, taskIds };
+    }
+
+    case 'reorder-task': {
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      // `order` 必须是有限数：`NaN` / `Infinity` 会被写进 `Task.order`，排序时算出 `NaN`。
+      if (!Number.isFinite(intent.order)) {
+        return { ok: false, reason: 'invalid', message: 'order 必须是有限数值。' };
+      }
+      await actions.setOrder(intent.taskId, intent.order);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 清单层级 / 恢复（P2）
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'move-project': {
+      const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+      if (project === undefined || project.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个清单。' };
+      }
+      // 同 `set-task-parent`：`projectActions.setParent` 对环 / 超深 / 父不存在同步 throw，
+      // 翻成 `invalid` 并带出人话。
+      try {
+        await projectActions.setParent(intent.projectId, intent.parentId);
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: e instanceof Error ? e.message : String(e) };
+      }
+      return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
+    }
+
+    case 'restore-project': {
+      // 🔴 判断"算不算活的/在不在回收站/是否已彻底删除"由 projectActions 负责（I5）——
+      // 本层不读 `.projects`、不自己判。`restoreProject` 的三种出口：true=已恢复、
+      // false=本来就没删、throw=不存在或已 purge；都翻成结果，不吞。
+      try {
+        const ok = await projectActions.restoreProject(intent.projectId);
+        if (!ok) {
+          return { ok: false, reason: 'not-found', message: '这个清单不在回收站里，无需恢复。' };
+        }
+      } catch (e) {
+        return {
+          ok: false,
+          reason: 'not-found',
+          message: e instanceof Error && e.message !== '' ? e.message : '这个清单无法恢复。',
+        };
+      }
+      return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
+    }
   }
 }

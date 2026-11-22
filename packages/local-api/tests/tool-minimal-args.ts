@@ -65,4 +65,12 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   delete_event: { eventId: 'e1' },
   restore_event: { eventId: 'e1' },
   archive_event: { eventId: 'e1' },
+
+  // 批次2：层级移动 / 批量 / 排序
+  set_task_parent: { taskId: 't1' },
+  trash_tasks: { taskIds: ['t1'] },
+  restore_tasks: { taskIds: ['t1'] },
+  reorder_task: { taskId: 't1', order: 1 },
+  move_project: { projectId: 'p1' },
+  restore_project: { projectId: 'p1' },
 };

@@ -614,6 +614,12 @@ describe('授权只有一份：整份目录，判断仍在 `@heyta/local-api`', 
         'delete_event',
         'restore_event',
         'archive_event',
+        'set_task_parent',
+        'trash_tasks',
+        'restore_tasks',
+        'reorder_task',
+        'move_project',
+        'restore_project',
       ].sort(),
     );
     // 🔴 判据与这条用例的标题对齐：名单**由目录推导**，不是手抄一份工具名。

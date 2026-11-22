@@ -181,6 +181,42 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'set_task_parent',
+    egressFields: [],
+    description:
+      '把任务挂到另一个父任务下，建立层级。参数：taskId（要移动的任务 id）、parentId' +
+      '（新的父任务 id；省略表示提为顶级、不挂在任何任务下）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'trash_tasks',
+    egressFields: [],
+    description:
+      '把多条任务一次性移进回收站（软删除，之后可用 restore_tasks 恢复）。' +
+      '参数：taskIds（要删除的任务 id 列表，至少一条）。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
+  {
+    name: 'restore_tasks',
+    egressFields: [],
+    description: '把回收站里的多条任务一次性恢复到原处。参数：taskIds（要恢复的任务 id 列表，至少一条）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'reorder_task',
+    egressFields: [],
+    description: '调整任务在清单里的排序位置。参数：taskId（要排序的任务 id）、order（排序序号，有限数字）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -369,6 +405,51 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       taskId: { type: 'string', description: '要改回未完成的任务 id。' },
     },
     required: ['taskId'],
+    additionalProperties: false,
+  },
+  set_task_parent: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要移动的任务 id。' },
+      parentId: {
+        type: 'string',
+        description: '新的父任务 id；省略表示提为顶级、不挂在任何任务下。',
+      },
+    },
+    required: ['taskId'],
+    additionalProperties: false,
+  },
+  trash_tasks: {
+    type: 'object',
+    properties: {
+      taskIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: '要移进回收站的任务 id 列表，至少一条。',
+      },
+    },
+    required: ['taskIds'],
+    additionalProperties: false,
+  },
+  restore_tasks: {
+    type: 'object',
+    properties: {
+      taskIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: '要从回收站恢复的任务 id 列表，至少一条。',
+      },
+    },
+    required: ['taskIds'],
+    additionalProperties: false,
+  },
+  reorder_task: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要排序的任务 id。' },
+      order: { type: 'number', description: '排序序号，有限数字。' },
+    },
+    required: ['taskId', 'order'],
     additionalProperties: false,
   },
 };
@@ -734,6 +815,87 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
         return { ok: false, message: 'uncomplete_task 需要 taskId。' };
       }
       return { ok: true, intent: { action: 'uncomplete-task', taskId: a['taskId'].trim() } };
+    }
+
+    case 'set_task_parent': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'parentId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_parent 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_task_parent 需要 taskId。' };
+      }
+      // parentId 省略 = 提为顶级（intent 不带该键）；给了就必须是非空字符串。
+      if ('parentId' in a && (typeof a['parentId'] !== 'string' || a['parentId'].trim() === '')) {
+        return {
+          ok: false,
+          message: 'set_task_parent 的 parentId 必须是非空字符串；要提为顶级请省略它。',
+        };
+      }
+      const parentId = typeof a['parentId'] === 'string' ? a['parentId'].trim() : undefined;
+      return {
+        ok: true,
+        intent: {
+          action: 'set-task-parent',
+          taskId: a['taskId'].trim(),
+          ...(parentId === undefined ? {} : { parentId }),
+        },
+      };
+    }
+
+    case 'trash_tasks': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskIds');
+      if (unknown.length > 0) {
+        return { ok: false, message: `trash_tasks 不支持这些参数：${unknown.join('、')}。` };
+      }
+      const raw = a['taskIds'];
+      if (!Array.isArray(raw) || raw.length === 0) {
+        return { ok: false, message: 'trash_tasks 需要至少一条 taskIds。' };
+      }
+      const ids: string[] = [];
+      for (const entry of raw) {
+        if (typeof entry !== 'string' || entry.trim() === '') {
+          return { ok: false, message: 'trash_tasks 的 taskIds 必须全是非空字符串。' };
+        }
+        ids.push(entry.trim());
+      }
+      return { ok: true, intent: { action: 'trash-tasks', taskIds: [...new Set(ids)] } };
+    }
+
+    case 'restore_tasks': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskIds');
+      if (unknown.length > 0) {
+        return { ok: false, message: `restore_tasks 不支持这些参数：${unknown.join('、')}。` };
+      }
+      const raw = a['taskIds'];
+      if (!Array.isArray(raw) || raw.length === 0) {
+        return { ok: false, message: 'restore_tasks 需要至少一条 taskIds。' };
+      }
+      const ids: string[] = [];
+      for (const entry of raw) {
+        if (typeof entry !== 'string' || entry.trim() === '') {
+          return { ok: false, message: 'restore_tasks 的 taskIds 必须全是非空字符串。' };
+        }
+        ids.push(entry.trim());
+      }
+      return { ok: true, intent: { action: 'restore-tasks', taskIds: [...new Set(ids)] } };
+    }
+
+    case 'reorder_task': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'order');
+      if (unknown.length > 0) {
+        return { ok: false, message: `reorder_task 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'reorder_task 需要 taskId。' };
+      }
+      if (typeof a['order'] !== 'number' || !Number.isFinite(a['order'])) {
+        return { ok: false, message: 'reorder_task 的 order 必须是有限数字。' };
+      }
+      return {
+        ok: true,
+        intent: { action: 'reorder-task', taskId: a['taskId'].trim(), order: a['order'] },
+      };
     }
 
     default:

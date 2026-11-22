@@ -132,8 +132,8 @@ export const MAX_TOOLS_PER_ENTITY = 7;
  */
 export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
-  TASK: 15,
-  PROJECT: 8,
+  TASK: 19,
+  PROJECT: 10,
   NOTE: 10,
 } as const satisfies Readonly<Partial<Record<string, number>>>;
 
@@ -702,7 +702,15 @@ export type LocalApiWriteIntent =
   // 事件（P1）
   | { action: 'delete-event'; eventId: string }
   | { action: 'restore-event'; eventId: string }
-  | { action: 'archive-event'; eventId: string };
+  | { action: 'archive-event'; eventId: string }
+  // 任务层级 / 批量 / 排序（P2）
+  | { action: 'set-task-parent'; taskId: string; parentId?: string }
+  | { action: 'trash-tasks'; taskIds: readonly string[] }
+  | { action: 'restore-tasks'; taskIds: readonly string[] }
+  | { action: 'reorder-task'; taskId: string; order: number }
+  // 清单层级 / 恢复（P2）
+  | { action: 'move-project'; projectId: string; parentId?: string }
+  | { action: 'restore-project'; projectId: string };
 
 /**
  * 一条写入落地的实体类型。

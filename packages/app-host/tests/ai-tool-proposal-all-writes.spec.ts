@@ -385,6 +385,64 @@ const CASES: readonly Case[] = [
     args: async () => ({ eventId: await seed({ action: 'create-event', title: '要归档的纪念日', date: '2027-03-03' }) }),
     effect: () => Object.values(engine.getState().events).filter((e) => e.archivedAt !== undefined).length,
   },
+
+  // ── 批次2：层级移动 / 批量 / 排序 ──
+  {
+    tool: 'set_task_parent',
+    intentAction: 'set-task-parent',
+    label: '任务层级',
+    args: async () => ({
+      taskId: await seed({ action: 'create-task', title: '子任务' }),
+      parentId: await seed({ action: 'create-task', title: '父任务' }),
+    }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.parentId !== undefined).length,
+  },
+  {
+    tool: 'trash_tasks',
+    intentAction: 'trash-tasks',
+    label: '批量删除',
+    args: async () => ({ taskIds: [await seed({ action: 'create-task', title: '删A' })] }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.deletedAt !== undefined).length,
+  },
+  {
+    tool: 'restore_tasks',
+    intentAction: 'restore-tasks',
+    label: '批量恢复',
+    args: async () => {
+      const a = await seed({ action: 'create-task', title: '恢复A' });
+      await makeHost().submit({ action: 'trash-tasks', taskIds: [a] });
+      return { taskIds: [a] };
+    },
+    effect: () => alive('tasks'),
+  },
+  {
+    tool: 'reorder_task',
+    intentAction: 'reorder-task',
+    label: '任务排序',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '重排' }), order: 7 }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.order === 7).length,
+  },
+  {
+    tool: 'move_project',
+    intentAction: 'move-project',
+    label: '清单层级',
+    args: async () => ({
+      projectId: await seed({ action: 'create-project', name: '子清单' }),
+      parentId: await seed({ action: 'create-project', name: '父清单' }),
+    }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.parentId !== undefined).length,
+  },
+  {
+    tool: 'restore_project',
+    intentAction: 'restore-project',
+    label: '清单恢复',
+    args: async () => {
+      const projectId = await seed({ action: 'create-project', name: '待恢复清单' });
+      await makeHost().submit({ action: 'delete-project', projectId });
+      return { projectId };
+    },
+    effect: () => alive('projects'),
+  },
 ];
 
 beforeEach(async () => {

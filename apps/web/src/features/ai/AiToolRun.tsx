@@ -266,6 +266,23 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return t('web.ai.tools.intentRestoreEvent', { id: intent.eventId });
     case 'archive-event':
       return t('web.ai.tools.intentArchiveEvent', { id: intent.eventId });
+    // 批次2：层级移动 / 批量 / 排序
+    case 'set-task-parent':
+      return intent.parentId === undefined
+        ? t('web.ai.tools.intentSetTaskParentTop', { id: intent.taskId })
+        : t('web.ai.tools.intentSetTaskParent', { id: intent.taskId, parent: intent.parentId });
+    case 'trash-tasks':
+      return t('web.ai.tools.intentTrashTasks', { count: String(intent.taskIds.length) });
+    case 'restore-tasks':
+      return t('web.ai.tools.intentRestoreTasks', { count: String(intent.taskIds.length) });
+    case 'reorder-task':
+      return t('web.ai.tools.intentReorderTask', { id: intent.taskId });
+    case 'move-project':
+      return intent.parentId === undefined
+        ? t('web.ai.tools.intentMoveProjectTop', { id: intent.projectId })
+        : t('web.ai.tools.intentMoveProject', { id: intent.projectId, parent: intent.parentId });
+    case 'restore-project':
+      return t('web.ai.tools.intentRestoreProject', { id: intent.projectId });
   }
 }
 

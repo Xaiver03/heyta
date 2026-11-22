@@ -2453,6 +2453,14 @@ export const zhCN = {
   'web.ai.tools.intentDeleteEvent': '倒数纪念日移到回收站 {id}',
   'web.ai.tools.intentRestoreEvent': '恢复倒数纪念日 {id}',
   'web.ai.tools.intentArchiveEvent': '归档倒数纪念日 {id}',
+  'web.ai.tools.intentSetTaskParentTop': '把任务 {id} 提为顶级',
+  'web.ai.tools.intentSetTaskParent': '把任务 {id} 移到任务 {parent} 下',
+  'web.ai.tools.intentTrashTasks': '移 {count} 个任务到回收站（可撤销）',
+  'web.ai.tools.intentRestoreTasks': '恢复 {count} 个任务',
+  'web.ai.tools.intentReorderTask': '调整任务 {id} 的顺序',
+  'web.ai.tools.intentMoveProjectTop': '把清单 {id} 提为顶级',
+  'web.ai.tools.intentMoveProject': '把清单 {id} 移到清单 {parent} 下',
+  'web.ai.tools.intentRestoreProject': '恢复清单 {id}',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',
