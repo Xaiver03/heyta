@@ -51,3 +51,26 @@
 
 ## 6. 待确认
 - "分配任务" = 归入清单/安排日期（单机）还是指派给成员（协作）？前者本就在 P0；后者取决于产品是否有协作模型。
+
+---
+
+## 实施进度（2026-11-22 批次 1-3 已完成，工具 30→61）
+
+工具目录现 **61 个（读 13 / 写 48）**。本轮新增 31 个写工具，覆盖"创建/分配/改/删/恢复/移动/层级/批量/排序"：
+
+- **任务全生命周期**：`trash_task`/`restore_task`/`abandon_task`/`unabandon_task`(放弃=第五状态)/`move_task`/`uncomplete_task`/`set_task_parent`(层级)/`create_subtask`(子任务)/`set_task_note`/`set_task_repeat`/`reorder_task`/`trash_tasks`(批量删)/`restore_tasks`(批量恢复)
+- **清单**：`rename_project`/`archive_project`/`delete_project`/`move_project`(层级)/`restore_project`
+- **标签**：`rename_tag`/`delete_tag`
+- **笔记**：`delete_note`/`restore_note`/`move_note`
+- **提醒**：`update_reminder`(date+time,与新建同口径)/`delete_reminder`
+- **事件**：`delete_event`/`restore_event`/`archive_event`
+- **习惯**：`rename_habit`/`delete_habit`/`restore_habit`
+
+安全：删除全走软删除（可逆、可撤销，D1）；**无任何 purge 工具**；写全走 op-log 单入口；`apps/*` 只放平台差异（intentText 人话）。能力清单（`capability-manifest.generated.ts`）已同步 61 工具。
+
+### 仍不做（需产品定义 / 明确排除）
+- **多人指派（assigneeUserId）**：全仓无协作模型——"分配"= 归清单 + 排期 + 层级（已覆盖）；真正的指派属新协作能力。
+- **子项逐条勾选**：清单项在 Markdown 备注里，没有独立 op；要做需新的结构化子项模型。
+- **专注计时开始/停止**：实时计时器，交互性动作，`log_focus`（记一段）已覆盖事后记录。
+- **purge / 清空回收站 / 账号密钥/同步设置**：安全红线，永不给 AI。
+- 清单颜色/图标、任务四象限/重要/置顶、习惯打卡撤销：可后续小批次再补（低优先，或由 `update_task` 字段扩展）。
