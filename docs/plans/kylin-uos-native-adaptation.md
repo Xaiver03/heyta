@@ -123,3 +123,12 @@
 - 以**目标真机**上的 `exit 0` 与**截图 / 窗口证据**为准。
 - 不以「本机（构建机）能跑」代替目标机证据。
 - 证据至少覆盖：窗口能起、共享 UI 能渲染、任务读写闭环。
+
+---
+
+## 九、进展（2026-11-22 · 免费链路）
+
+- **"至少装上"已打通**：产出 `heyta-web_0.1.0+20261122_all.deb`（`Architecture: all`，`Depends: python3, xdg-utils`），在 debian:10 + UOS20(deepin apricot) 仓库（glibc 2.28）与 ubuntu:20.04（glibc 2.31，麒麟 V10 代理）上 `dpkg -i` 均 `install ok installed`，装后本地静态服务返回 heyta 首页。构建与复跑见 [runbook](../runbooks/kylin-uos-web-deb.md)。
+- **技术结论（实测仓库元数据，取数 2026-11-22）**：deepin `apricot`(≈UOS20) 无 GTK4、有 GTK3 + webkit2gtk-4.0；openKylin `huanghe` 有 GTK4 4.22 但无 webkitgtk-6.0；`nile` 有 webkitgtk-6.0 但 main 未带 GTK4。三套都**没有可用的 GTK4 + WebKitGTK 6.0 组合**，现有 `apps/desktop-linux` 原生壳跑不了。
+- **原生栈的统一落点**：**GTK3 + webkit2gtk-4.0**（三套目标都具备）——这是能同时覆盖新旧信创系统的原生窗口方案，列为下一步。
+- 本次为 Web UI 打包形态（本地静态服务 + 浏览器），不依赖 GTK4/WebKit；真实商业版/专业版实机、arm64/loongarch、商店认证仍在待办。
