@@ -148,3 +148,30 @@ describe('工具结果截断（上下文管理）', () => {
     expect(toolMsg!.content).toContain('truncated');
   });
 });
+
+describe('工具超时与并行（最佳实践对齐）', () => {
+  it('单工具超时 → 失败回灌，循环继续', async () => {
+    const transport: CloudToolTransport = { invoke: () => new Promise((res) => setTimeout(() => res({ ok: true, data: 1 }), 500)) };
+    const scripted: HarnessModelReply[] = [
+      { toolCalls: [{ id: 'c1', name: 'list_tasks', arguments: {} }] },
+      { text: 'done' },
+    ];
+    const result = await runCloudAgentTurn('x', {
+      transport, tools, systemPrompt: 's', toolTimeoutMs: 20,
+      callModel: async () => scripted.shift()!,
+    });
+    expect(result.steps[0]).toMatchObject({ ok: false });
+    expect(result.text).toBe('done');
+  });
+
+  it('parallelSafe 为真时多只读工具并发', async () => {
+    let active = 0; let maxActive = 0;
+    const transport: CloudToolTransport = { invoke: async () => { active++; maxActive = Math.max(maxActive, active); await new Promise((r) => setTimeout(r, 30)); active--; return { ok: true, data: 1 }; } };
+    const scripted: HarnessModelReply[] = [
+      { toolCalls: [{ id: 'a', name: 'list_tasks', arguments: {} }, { id: 'b', name: 'list_projects', arguments: {} }] },
+      { text: 'ok' },
+    ];
+    await runCloudAgentTurn('x', { transport, tools, systemPrompt: 's', parallelSafe: () => true, callModel: async () => scripted.shift()! });
+    expect(maxActive).toBe(2);
+  });
+});

@@ -10,7 +10,7 @@
 |---|---|---|
 | 工具名/描述清晰 + JSON Schema（`additionalProperties:false`） | ✅ | `local-api` 工具目录；`toCloudToolDescriptors` 原样带 `parameters`；`wire.ts` 发 `tools` |
 | `tool_choice` 控制（auto/required/none/指定） | ⚠️ 部分 | `wire.ts` 固定 `tool_choice:'auto'`；harness 不让调用方强制 |
-| 多工具调用（parallel tool calls） | ⚠️ 部分 | `agent-harness.ts` 逐条顺序执行同一步的多个调用；**未并行**（写并行有风险，读可并行——待加） |
+| 多工具调用（parallel tool calls） | ✅ | `agent-harness.ts` 新增 `parallelSafe`：只读工具（list_/get_/search_/find_/read_）同一步**并发**，写仍串行；双端适配器已按前缀开启 |
 | 工具结果体量限制（上下文管理） | ✅（本轮补） | `agent-harness.ts` `maxToolResultChars` 默认 8000，超长截断标注 |
 | 错误结果回灌模型 | ✅ | 工具失败写 `tool` 消息"工具执行失败：…"，循环继续 |
 | 有界步数 / 防死循环 | ✅ | `maxSteps` 默认 6 |
@@ -19,7 +19,7 @@
 | 系统提示（直接执行、少反问、说明拒绝） | ✅ | `CLOUD_ASSISTANT_SYSTEM_PROMPT` |
 | 工具调用增量流式（streaming tool_calls） | ⚠️ 缺口 | 仅流式文本（`onTextDelta`）；`tool-call` delta 未回 UI |
 | 重试/退避（瞬时错误） | ⚠️ 部分 | 依赖 `invokeRouted` 候选端点回退；harness 层无重试 |
-| 单工具超时 | ⚠️ 缺口 | `transport.invoke` 无超时（服务端 fetch 有全局超时） |
+| 单工具超时 | ✅ | `agent-harness.ts` `toolTimeoutMs`（默认 60s），超时算失败回灌 |
 | 结构化输出（JSON mode / strict） | ⚠️ 缺口 | 非工具任务靠提示词，未用 strict/json schema 约束 |
 | 提供商差异化（Anthropic tool_result is_error / OpenAI role:tool） | ✅ 因地制宜 | 我们统一走 OpenAI 兼容线格式（`wire.ts`）；PP 网关即 OpenAI 兼容 |
 

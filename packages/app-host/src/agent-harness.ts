@@ -85,6 +85,10 @@ export interface CloudAgentHarnessOptions {
   readonly maxSteps?: number;
   /** 单条工具结果上限字符数（上下文管理；超长截断并标注）。默认 8000（OpenAI/Anthropic 都建议限制工具输出体量）。 */
   readonly maxToolResultChars?: number;
+  /** 单工具超时（毫秒）；超时算一次失败并回灌。默认 60000。 */
+  readonly toolTimeoutMs?: number;
+  /** 判定某工具是否**只读/可安全并行**；为真且一步内多调用时并发执行。默认全串行。 */
+  readonly parallelSafe?: (tool: string) => boolean;
   /**
    * 本轮运行的稳定 id（一次用户发送）。给了它就给每个工具调用派生幂等键
    * `runId:s<step>:<callId>`，让云端重试不重复落库。
@@ -104,6 +108,7 @@ export interface CloudAgentTurnResult {
 
 const DEFAULT_MAX_STEPS = 6;
 const DEFAULT_MAX_TOOL_RESULT_CHARS = 8000;
+const DEFAULT_TOOL_TIMEOUT_MS = 60_000;
 
 function truncateToolContent(text: string, limit: number): string {
   if (text.length <= limit) return text;
@@ -119,6 +124,33 @@ export async function runCloudAgentTurn(
 ): Promise<CloudAgentTurnResult> {
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
   const maxToolResultChars = options.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS;
+  const toolTimeoutMs = options.toolTimeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
+
+  type CallOutcome = { ok: boolean; content: string; errorText?: string };
+  const runOne = async (call: { id: string; name: string; arguments: Record<string, unknown> }, stepNo: number): Promise<CallOutcome> => {
+    try {
+      const idemKey = options.runId === undefined ? undefined : `${options.runId}:s${String(stepNo)}:${call.id}`;
+      const invoke = options.transport.invoke(
+        call.name,
+        call.arguments,
+        undefined,
+        idemKey === undefined ? undefined : { idempotencyKey: idemKey },
+      );
+      const timeout = new Promise<never>((_, rej) => {
+        setTimeout(() => { rej(new Error(`tool-timeout:${String(toolTimeoutMs)}ms`)); }, toolTimeoutMs);
+      });
+      const result = await Promise.race([invoke, timeout]);
+      if (result.ok) {
+        let content = JSON.stringify(result.data);
+        content = truncateToolContent(content, maxToolResultChars);
+        return { ok: true, content };
+      }
+      return { ok: false, errorText: result.message, content: `工具执行失败：${result.message}` };
+    } catch (error: unknown) {
+      const errorText = error instanceof Error ? error.message : '工具执行异常';
+      return { ok: false, errorText, content: `工具执行失败：${errorText}` };
+    }
+  };
   const messages: HarnessMessage[] = [
     { role: 'system', content: options.systemPrompt },
     ...(options.history ?? []),
@@ -148,33 +180,22 @@ export async function runCloudAgentTurn(
     // 记录模型的工具调用（回传给模型时 assistant 消息要带 toolCalls）。
     messages.push({ role: 'assistant', content: reply.text ?? '', toolCalls: calls });
 
-    for (const call of calls) {
-      options.onEvent?.({ type: 'tool-started', tool: call.name });
-      let ok = true;
-      let errorText: string | undefined;
-      let content: string;
-      try {
-        const idemKey =
-          options.runId === undefined ? undefined : `${options.runId}:s${String(step)}:${call.id}`;
-        const result = await options.transport.invoke(
-          call.name,
-          call.arguments,
-          undefined,
-          idemKey === undefined ? undefined : { idempotencyKey: idemKey },
-        );
-        if (result.ok) {
-          content = JSON.stringify(result.data);
-          content = truncateToolContent(content, maxToolResultChars);
-        } else {
-          ok = false;
-          errorText = result.message;
-          content = `工具执行失败：${result.message}`;
-        }
-      } catch (error: unknown) {
-        ok = false;
-        errorText = error instanceof Error ? error.message : '工具执行异常';
-        content = `工具执行失败：${errorText}`;
+    const canParallel = calls.length > 1 && (options.parallelSafe?.(calls[0]!.name) ?? false) && calls.every((c) => options.parallelSafe?.(c.name) === true);
+    const outcomes: CallOutcome[] = canParallel
+      ? await Promise.all(calls.map(async (call) => { options.onEvent?.({ type: 'tool-started', tool: call.name }); return runOne(call, step); }))
+      : [];
+    for (let idx = 0; idx < calls.length; idx += 1) {
+      const call = calls[idx]!;
+      let outcome: CallOutcome;
+      if (canParallel) {
+        outcome = outcomes[idx]!;
+      } else {
+        options.onEvent?.({ type: 'tool-started', tool: call.name });
+        outcome = await runOne(call, step);
       }
+      const ok = outcome.ok;
+      const errorText = outcome.errorText;
+      const content = outcome.content;
       steps.push(ok ? { tool: call.name, ok } : { tool: call.name, ok, error: errorText });
       options.onEvent?.(ok ? { type: 'tool-finished', tool: call.name, ok } : { type: 'tool-finished', tool: call.name, ok, error: errorText });
       messages.push({ role: 'tool', content, toolCallId: call.id });

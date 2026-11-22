@@ -74,6 +74,8 @@ export async function runMobileCloudTurn(
     undo: mobileUndoBindings(host),
     // 周报/年终总结走 Harness 工具（零入口）。
     getReportState: () => host.getState(),
+    // 只读工具（list_/get_/search_/find_/read_）可并行；写仍串行（最佳实践：并行读、串行写）。
+    parallelSafe: (name: string) => /^(list|get|search|find|read)_/.test(name),
     ...(deps.runId === undefined ? {} : { runId: deps.runId }),
   });
   return {
