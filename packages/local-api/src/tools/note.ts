@@ -3,7 +3,8 @@
  * ======================
  *
  * 读：`list_notes`（列表行，**不含正文**）、`get_note`（单条，含正文）；
- * 写：`create_note`、`update_note`（改正文）。
+ * 写：`create_note`、`update_note`（改正文）、`delete_note`（删除到回收站）、
+ * `restore_note`（从回收站恢复）、`move_note`（移到某清单 / 移出清单）。
  *
  * 🔴 为什么列表不带正文、单条才带：这是 `list_tasks` / `get_task` 那条已经立好、
  * 而且被 `tests/tool-egress-fields.spec.ts` 钉过一遍的分工 —— 便签的正文是它**唯一**
@@ -15,9 +16,13 @@
  * 本包零依赖、抄不了那个数 —— 抄一个数字进描述里，就是造一份一定会漂的抄件，
  * 而它漂了以后症状是"界面承诺 10000、领域按 8000 拒"。超限的回复来自领域层自己那句话。
  *
- * ⚠️ 界面上还能"钉到今天"和"移到某个清单"，这两个动作现在没有工具：
- * 它们改的是**视图归属**而不是便签的内容，而"AI 替用户决定哪张便签该钉在今天"
- * 需要先看钉选在产品里的语义（它是一条会出现在今天屏幕上的东西）。已登记，不是漏写。
+ * 🔴 删除 = 软删除（`DEL`→墓碑），可逆、可撤销；`purge`/清空回收站**永不**做成工具
+ * （见契约 §0）。`restore_note` 把墓碑翻回来；`move_note` 改的是**归属清单**而不是正文，
+ * 省略 `projectId` 就是移出清单（不归属任何清单）。
+ *
+ * ⚠️ 界面上还能"钉到今天"，这个动作现在没有工具：它改的是**视图归属**，
+ * 而"AI 替用户决定哪张便签该钉在今天"需要先看钉选在产品里的语义
+ * （它是一条会出现在今天屏幕上的东西）。已登记，不是漏写。
  */
 
 import { DEFAULT_LIST_LIMIT, clampListLimit } from './shared.js';
@@ -66,6 +71,33 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'delete_note',
+    // 删除 → 回收站（软删除），可逆、可撤销 ⇒ `destructive-reversible`，不是 purge（契约 §0）。
+    egressFields: [],
+    description: '把一张便签删除到回收站。可撤销，不是彻底删除。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
+  {
+    name: 'restore_note',
+    egressFields: [],
+    description: '把回收站里的一张便签恢复回来。便签不在回收站会被拒绝。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'move_note',
+    egressFields: [],
+    description:
+      '把一张便签移到某个清单，或移出清单（省略 projectId 就是不归属任何清单）。' +
+      '清单不存在会被拒绝。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -105,6 +137,34 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       content: { type: 'string', description: '新的正文（整段替换）。' },
     },
     required: ['noteId', 'content'],
+    additionalProperties: false,
+  },
+  delete_note: {
+    type: 'object',
+    properties: {
+      noteId: { type: 'string', description: '要删除（移到回收站）的便签。' },
+    },
+    required: ['noteId'],
+    additionalProperties: false,
+  },
+  restore_note: {
+    type: 'object',
+    properties: {
+      noteId: { type: 'string', description: '要恢复的便签。' },
+    },
+    required: ['noteId'],
+    additionalProperties: false,
+  },
+  move_note: {
+    type: 'object',
+    properties: {
+      noteId: { type: 'string', description: '要移的便签。' },
+      projectId: {
+        type: 'string',
+        description: '移到哪个清单；省略就是移出清单（不归属任何清单）。',
+      },
+    },
+    required: ['noteId'],
     additionalProperties: false,
   },
 };
@@ -198,6 +258,53 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
       return {
         ok: true,
         intent: { action: 'update-note', noteId: a['noteId'], content: a['content'] as string },
+      };
+    }
+
+    case 'delete_note': {
+      // 严格白名单：多给一个键就是"调用方以为在做别的事"，拒绝比忽略更安全。
+      const unknown = Object.keys(a).filter((key) => key !== 'noteId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `delete_note 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['noteId'] !== 'string' || a['noteId'].trim() === '') {
+        return { ok: false, message: 'delete_note 需要 noteId。' };
+      }
+      return { ok: true, intent: { action: 'delete-note', noteId: a['noteId'] } };
+    }
+
+    case 'restore_note': {
+      const unknown = Object.keys(a).filter((key) => key !== 'noteId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `restore_note 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['noteId'] !== 'string' || a['noteId'].trim() === '') {
+        return { ok: false, message: 'restore_note 需要 noteId。' };
+      }
+      return { ok: true, intent: { action: 'restore-note', noteId: a['noteId'] } };
+    }
+
+    case 'move_note': {
+      const unknown = Object.keys(a).filter((key) => key !== 'noteId' && key !== 'projectId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `move_note 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['noteId'] !== 'string' || a['noteId'].trim() === '') {
+        return { ok: false, message: 'move_note 需要 noteId。' };
+      }
+      const projectId = a['projectId'];
+      if (projectId !== undefined && (typeof projectId !== 'string' || projectId.trim() === '')) {
+        // 🔴 空串**不当成"移出清单"**：那是 `undefined` 的含义。
+        // 写错的调用方应该收到错误，而不是收到一次"按我没说的意思改了"。
+        return { ok: false, message: 'move_note 的 projectId 要么不给，要么是一个非空字符串。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'move-note',
+          noteId: a['noteId'],
+          ...(typeof projectId === 'string' ? { projectId } : {}),
+        },
       };
     }
 

@@ -132,6 +132,55 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'trash_task',
+    egressFields: [],
+    description: '把任务移进回收站（软删除，之后可用 restore_task 恢复）。参数：taskId（要删除的任务 id）。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
+  {
+    name: 'restore_task',
+    egressFields: [],
+    description: '把回收站里的任务恢复到原处。参数：taskId（要恢复的任务 id）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'archive_task',
+    egressFields: [],
+    description: '归档任务（可逆，之后可用 unarchive_task 取消归档）。参数：taskId（要归档的任务 id）。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
+  {
+    name: 'unarchive_task',
+    egressFields: [],
+    description: '取消任务的归档状态。参数：taskId（要取消归档的任务 id）。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
+  {
+    name: 'move_task',
+    egressFields: [],
+    description:
+      '把任务移到另一个清单。参数：taskId（要移动的任务 id）、projectId（目标清单 id；省略表示移出清单、不归属任何清单）。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
+  {
+    name: 'uncomplete_task',
+    egressFields: [],
+    description: '把已完成的任务标记回未完成。参数：taskId（要改回未完成的任务 id）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -268,6 +317,58 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       },
     },
     required: ['taskId', 'minutes'],
+    additionalProperties: false,
+  },
+  trash_task: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要移进回收站的任务 id。' },
+    },
+    required: ['taskId'],
+    additionalProperties: false,
+  },
+  restore_task: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要从回收站恢复的任务 id。' },
+    },
+    required: ['taskId'],
+    additionalProperties: false,
+  },
+  archive_task: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要归档的任务 id。' },
+    },
+    required: ['taskId'],
+    additionalProperties: false,
+  },
+  unarchive_task: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要取消归档的任务 id。' },
+    },
+    required: ['taskId'],
+    additionalProperties: false,
+  },
+  move_task: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要移动的任务 id。' },
+      projectId: {
+        type: 'string',
+        description: '目标清单 id；省略表示移出清单、不归属任何清单。',
+      },
+    },
+    required: ['taskId'],
+    additionalProperties: false,
+  },
+  uncomplete_task: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要改回未完成的任务 id。' },
+    },
+    required: ['taskId'],
     additionalProperties: false,
   },
 };
@@ -556,6 +657,83 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
         ok: true,
         intent: { action: 'set-task-estimate', taskId: a['taskId'].trim(), minutes: a['minutes'] },
       };
+    }
+
+    case 'trash_task': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `trash_task 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'trash_task 需要 taskId。' };
+      }
+      return { ok: true, intent: { action: 'trash-task', taskId: a['taskId'].trim() } };
+    }
+
+    case 'restore_task': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `restore_task 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'restore_task 需要 taskId。' };
+      }
+      return { ok: true, intent: { action: 'restore-task', taskId: a['taskId'].trim() } };
+    }
+
+    case 'archive_task': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `archive_task 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'archive_task 需要 taskId。' };
+      }
+      return { ok: true, intent: { action: 'archive-task', taskId: a['taskId'].trim() } };
+    }
+
+    case 'unarchive_task': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `unarchive_task 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'unarchive_task 需要 taskId。' };
+      }
+      return { ok: true, intent: { action: 'unarchive-task', taskId: a['taskId'].trim() } };
+    }
+
+    case 'move_task': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'projectId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `move_task 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'move_task 需要 taskId。' };
+      }
+      if ('projectId' in a && (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '')) {
+        return { ok: false, message: 'move_task 的 projectId 必须是字符串；要移出清单请省略它。' };
+      }
+      const projectId = typeof a['projectId'] === 'string' ? a['projectId'].trim() : undefined;
+      return {
+        ok: true,
+        intent: {
+          action: 'move-task',
+          taskId: a['taskId'].trim(),
+          ...(projectId === undefined ? {} : { projectId }),
+        },
+      };
+    }
+
+    case 'uncomplete_task': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `uncomplete_task 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'uncomplete_task 需要 taskId。' };
+      }
+      return { ok: true, intent: { action: 'uncomplete-task', taskId: a['taskId'].trim() } };
     }
 
     default:

@@ -85,7 +85,7 @@ describe('默认值 —— 一切都是关的', () => {
     expect(LOCAL_API_TOOLS.length).toBeGreaterThan(0);
   });
 
-  it('目录规模按**实体**判上限，不按总数（默认七个，TASK 单独九个）', () => {
+  it('目录规模按**实体**判上限，不按总数（默认七个，TASK/PROJECT/NOTE 各有单列上限）', () => {
     // 这条取代了 2026-10-03 之前的 `LOCAL_API_TOOLS.length <= 10`。
     // 那句的问题不是"太严"，是**严在了错的那一列**：八个实体每实体一读一写的下限就要 16 席，
     // 所以它会在补齐覆盖面的中途把最后一个实体挡在门外 —— 而那正是它自己不回答的"真的需要吗"。
@@ -108,9 +108,13 @@ describe('默认值 —— 一切都是关的', () => {
       ).toBeLessThanOrEqual(cap);
     }
     expect(MAX_TOOLS_PER_ENTITY).toBe(7);
-    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.TASK).toBe(9);
+    // 2026-11-22 工具层补全：为 TASK/PROJECT/NOTE 各开单列上限（删除/归档/移动等生命周期工具）。
+    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.TASK).toBe(15);
+    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.PROJECT).toBe(8);
+    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.NOTE).toBe(10);
+    const overridden = new Set(['TASK', 'PROJECT', 'NOTE']);
     for (const pack of LOCAL_API_TOOL_PACKS) {
-      if (pack.entityType !== 'TASK') expect(maxToolsPerEntity(pack.entityType)).toBe(7);
+      if (!overridden.has(pack.entityType)) expect(maxToolsPerEntity(pack.entityType)).toBe(7);
     }
     expect(maxToolsPerEntity('NOT_AN_ENTITY')).toBe(MAX_TOOLS_PER_ENTITY);
     // 分组本身要有牙齿：目录里出现一个**没有 pack 认领**的工具，上面那个循环就数不到它。

@@ -8,6 +8,10 @@
  *
  * 与任务那六条**同一套纪律**：默认关、逐条 `egressFields`、
  * 正文只出现在单条读、写只产出提案。
+ *
+ * 写工具：`create_event`、`update_event`、`delete_event`（删除到回收站）、
+ * `restore_event`（从回收站恢复）、`archive_event`（归档）。
+ * 🔴 删除 = 软删除（`DEL`→墓碑），可逆、可撤销；`purge`/清空回收站**永不**做成工具（契约 §0）。
  */
 
 import type { McpToolDefinition } from '../mcp.js';
@@ -86,6 +90,32 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'delete_event',
+    // 删除 → 回收站（软删除），可逆、可撤销 ⇒ `destructive-reversible`，不是 purge（契约 §0）。
+    egressFields: [],
+    description: '把一个倒数日/纪念日删除到回收站。可撤销，不是彻底删除。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
+  {
+    name: 'restore_event',
+    egressFields: [],
+    description: '把回收站里的一个倒数日/纪念日恢复回来。它不在回收站会被拒绝。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'archive_event',
+    // 归档 = 可逆的破坏性动作：直接执行，靠 op-log 版本回溯兜底（契约 §0 / `ToolRisk`）。
+    egressFields: [],
+    description: '把一个倒数日/纪念日归档。归档后不再出现在列表里，可再取消归档。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
 ];
 
 const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
@@ -146,6 +176,30 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       },
     },
     required: ['eventId', 'fields'],
+    additionalProperties: false,
+  },
+  delete_event: {
+    type: 'object',
+    properties: {
+      eventId: { type: 'string', description: '要删除（移到回收站）的倒数日 id。' },
+    },
+    required: ['eventId'],
+    additionalProperties: false,
+  },
+  restore_event: {
+    type: 'object',
+    properties: {
+      eventId: { type: 'string', description: '要恢复的倒数日 id。' },
+    },
+    required: ['eventId'],
+    additionalProperties: false,
+  },
+  archive_event: {
+    type: 'object',
+    properties: {
+      eventId: { type: 'string', description: '要归档的倒数日 id。' },
+    },
+    required: ['eventId'],
     additionalProperties: false,
   },
 };
@@ -221,6 +275,36 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
           fields: a['fields'] as Record<string, unknown>,
         },
       };
+    }
+    case 'delete_event': {
+      const unknown = Object.keys(a).filter((key) => key !== 'eventId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `delete_event 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['eventId'] !== 'string' || a['eventId'].trim() === '') {
+        return { ok: false, message: 'delete_event 需要 eventId。' };
+      }
+      return { ok: true, intent: { action: 'delete-event', eventId: a['eventId'] } };
+    }
+    case 'restore_event': {
+      const unknown = Object.keys(a).filter((key) => key !== 'eventId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `restore_event 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['eventId'] !== 'string' || a['eventId'].trim() === '') {
+        return { ok: false, message: 'restore_event 需要 eventId。' };
+      }
+      return { ok: true, intent: { action: 'restore-event', eventId: a['eventId'] } };
+    }
+    case 'archive_event': {
+      const unknown = Object.keys(a).filter((key) => key !== 'eventId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `archive_event 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['eventId'] !== 'string' || a['eventId'].trim() === '') {
+        return { ok: false, message: 'archive_event 需要 eventId。' };
+      }
+      return { ok: true, intent: { action: 'archive-event', eventId: a['eventId'] } };
     }
     default:
       return undefined;

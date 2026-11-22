@@ -43,10 +43,27 @@ describe('工具目录风险档（ToolRisk）', () => {
     }
   });
 
-  it('现有写工具里不出现 destructive 档（当前尚无删除/归档/移动工具；新增时改这条并接回溯）', () => {
-    // 这是一条**现状钉**：一旦新增 destructive-reversible 工具，本用例会红，
-    // 提醒作者：① 同时接上「按 runId 回滚」；② 更新本断言。它在 CI 上挡住"悄悄加个删除工具"。
+  it('破坏性（destructive-reversible）工具必须是**已登记的那一批**，且不含 irreversible', () => {
+    // 删除→回收站 / 归档 / 移动 = destructive-reversible：直接执行，靠 op-log 版本回溯兜底（D1 裁决）。
+    // 本断言把"允许的破坏性集合"钉成清单：新增一个删除类工具而没登记 ⇒ 红；顺手把不可逆动作（purge）漏进来 ⇒ 红。
     const destructive = LOCAL_API_TOOLS.filter((t) => t.risk.startsWith('destructive-'));
-    expect(destructive.map((t) => t.name)).toEqual([]);
+    expect(destructive.map((t) => t.name).sort()).toEqual(
+      [
+        'trash_task',
+        'archive_task',
+        'unarchive_task',
+        'move_task',
+        'archive_project',
+        'delete_project',
+        'delete_tag',
+        'delete_note',
+        'delete_reminder',
+        'delete_event',
+        'archive_event',
+      ].sort(),
+    );
+    // 🔴 绝不允许 irreversible（彻底删除 purge）进目录 —— 那是 D1 明确不给 AI 的动作。
+    const irreversible = LOCAL_API_TOOLS.filter((t) => t.risk === 'destructive-irreversible');
+    expect(irreversible.map((t) => t.name)).toEqual([]);
   });
 });

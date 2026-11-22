@@ -1314,5 +1314,259 @@ async function submitIntent(
       }
       return { ok: true, taskId: intent.eventId, entityId: intent.eventId, entityType: 'EVENT' };
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 任务生命周期（P0）
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'trash-task': {
+      // 软删除（DEL→墓碑）。`remove` 自己不验存在性，删一条不存在的任务会落下一条
+      // 谁都读不到的 DEL —— 所以在门口挡掉。
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      await actions.remove(intent.taskId);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'restore-task': {
+      // 🔴 恢复要看**含墓碑**的那条记录：`findTask` 会把墓碑滤掉，用它就永远找不到
+      // "要恢复的那一条"。墓碑在、且没被彻底删除才谈得上恢复。
+      const task = ctx.getState().tasks[intent.taskId];
+      if (task === undefined || task.purgedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '回收站里没有这条任务（或已被彻底删除）。' };
+      }
+      const restored = await actions.restore(intent.taskId);
+      if (!restored) {
+        return { ok: false, reason: 'not-found', message: '这条任务不在回收站里，无需恢复。' };
+      }
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'archive-task': {
+      // 归档 = 放弃（只写 `abandonedAt`，不碰 `completedAt`，见 `actions.setAbandoned`）。
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      await actions.setAbandoned(intent.taskId, true);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'unarchive-task': {
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      await actions.setAbandoned(intent.taskId, false);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'move-task': {
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      if (intent.projectId !== undefined) {
+        const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+        if (project === undefined || project.deletedAt !== undefined) {
+          return {
+            ok: false,
+            reason: 'not-found',
+            message: `找不到要移入的那个清单（「${intent.projectId}」）。`,
+          };
+        }
+      }
+      await actions.moveToProject(intent.taskId, intent.projectId);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'uncomplete-task': {
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      await actions.setCompleted(intent.taskId, false);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 清单（P1）
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'rename-project': {
+      const name = intent.name.trim();
+      // 空名不落到 `renameProject`：它会 throw，而 throw 会顺着壳的 catch 变成一句
+      // "工具执行失败"。这里直接回 `invalid`，用户看到的是原因（同 `create-project`）。
+      if (name === '') {
+        return { ok: false, reason: 'invalid', message: '清单名称不能为空。' };
+      }
+      const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+      if (project === undefined || project.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个清单。' };
+      }
+      await projectActions.renameProject(intent.projectId, name);
+      return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
+    }
+
+    case 'archive-project': {
+      const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+      if (project === undefined || project.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个清单。' };
+      }
+      await projectActions.archiveProject(intent.projectId, intent.archived ?? true);
+      return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
+    }
+
+    case 'delete-project': {
+      const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+      if (project === undefined || project.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个清单。' };
+      }
+      await projectActions.removeProject(intent.projectId);
+      return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 标签（P1）
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'rename-tag': {
+      const name = intent.name.trim();
+      if (name === '') {
+        return { ok: false, reason: 'invalid', message: '标签名称不能为空。' };
+      }
+      const tag = projectActions.listTags().find((t) => t.id === intent.tagId);
+      if (tag === undefined || tag.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个标签。' };
+      }
+      await projectActions.renameTag(intent.tagId, name);
+      return { ok: true, taskId: intent.tagId, entityId: intent.tagId, entityType: 'TAG' };
+    }
+
+    case 'delete-tag': {
+      const tag = projectActions.listTags().find((t) => t.id === intent.tagId);
+      if (tag === undefined || tag.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个标签。' };
+      }
+      await projectActions.removeTag(intent.tagId);
+      return { ok: true, taskId: intent.tagId, entityId: intent.tagId, entityType: 'TAG' };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 笔记（P1）
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'delete-note': {
+      const note = noteActions.listNotes().find((n) => n.id === intent.noteId);
+      if (note === undefined || note.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这条便签。' };
+      }
+      await noteActions.removeNote(intent.noteId);
+      return { ok: true, taskId: intent.noteId, entityId: intent.noteId, entityType: 'NOTE' };
+    }
+
+    case 'restore-note': {
+      // 同 `restore-task`：要恢复的那条正带着墓碑，所以读**原始桶**而不是 `noteOf`。
+      const note = ctx.getState().notes[intent.noteId];
+      if (note === undefined || note.purgedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '回收站里没有这条便签（或已被彻底删除）。' };
+      }
+      const restored = await noteActions.restoreNote(intent.noteId);
+      if (!restored) {
+        return { ok: false, reason: 'not-found', message: '这条便签不在回收站里，无需恢复。' };
+      }
+      return { ok: true, taskId: intent.noteId, entityId: intent.noteId, entityType: 'NOTE' };
+    }
+
+    case 'move-note': {
+      const note = noteActions.listNotes().find((n) => n.id === intent.noteId);
+      if (note === undefined || note.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这条便签。' };
+      }
+      if (intent.projectId !== undefined) {
+        const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+        if (project === undefined || project.deletedAt !== undefined) {
+          return {
+            ok: false,
+            reason: 'not-found',
+            message: `找不到要移入的那个清单（「${intent.projectId}」）。`,
+          };
+        }
+      }
+      await noteActions.setNoteProject(intent.noteId, intent.projectId ?? null);
+      return { ok: true, taskId: intent.noteId, entityId: intent.noteId, entityType: 'NOTE' };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 提醒（P1）
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'update-reminder': {
+      const reminder = ctx.getState().reminders[intent.reminderId];
+      if (reminder === undefined || reminder.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这条提醒。' };
+      }
+      // 与 `create-reminder` 同一口径：模型只给 date+time，换算成毫秒只发生在这里
+      // （模型自己算 epoch 的方向性错误是"整差一天"，故不让它算）。
+      const triggerAt = localDateTimeToEpoch(`${intent.date}T${intent.time}`);
+      if (triggerAt === undefined) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `无法理解这个时刻「${intent.date} ${intent.time}」。日期应为 YYYY-MM-DD，时间应为 HH:MM。`,
+        };
+      }
+      await reminderActions.rescheduleReminder(intent.reminderId, triggerAt);
+      return {
+        ok: true,
+        taskId: intent.reminderId,
+        entityId: intent.reminderId,
+        entityType: 'REMINDER',
+      };
+    }
+
+    case 'delete-reminder': {
+      const reminder = ctx.getState().reminders[intent.reminderId];
+      if (reminder === undefined || reminder.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这条提醒。' };
+      }
+      await reminderActions.removeReminder(intent.reminderId);
+      return {
+        ok: true,
+        taskId: intent.reminderId,
+        entityId: intent.reminderId,
+        entityType: 'REMINDER',
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 事件（P1）
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'delete-event': {
+      if (eventActions.eventOf(intent.eventId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个倒数日。' };
+      }
+      await eventActions.removeEvent(intent.eventId);
+      return { ok: true, taskId: intent.eventId, entityId: intent.eventId, entityType: 'EVENT' };
+    }
+
+    case 'restore-event': {
+      // 同 `restore-task` / `restore-note`：读含墓碑的原始记录。
+      const event = ctx.getState().events[intent.eventId];
+      if (event === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个倒数日。' };
+      }
+      const restored = await eventActions.restoreEvent(intent.eventId);
+      if (!restored) {
+        return { ok: false, reason: 'not-found', message: '这个倒数日不在回收站里，无需恢复。' };
+      }
+      return { ok: true, taskId: intent.eventId, entityId: intent.eventId, entityType: 'EVENT' };
+    }
+
+    case 'archive-event': {
+      if (eventActions.eventOf(intent.eventId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个倒数日。' };
+      }
+      await eventActions.archiveEvent(intent.eventId);
+      return { ok: true, taskId: intent.eventId, entityId: intent.eventId, entityType: 'EVENT' };
+    }
   }
 }

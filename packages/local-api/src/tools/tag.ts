@@ -2,7 +2,8 @@
  * TAG（标签）实体工具包
  * ======================
  *
- * 读：`list_tags`；写：`create_tag`（新建标签）、`set_task_tags`（给一条任务整组换标签）。
+ * 读：`list_tags`；写：`create_tag`（新建标签）、`set_task_tags`（给一条任务整组换标签）、
+ * `rename_tag`（改名）、`delete_tag`（删除到回收站）。
  * 与 `task.ts` / `project.ts` / `habit.ts` 同形状：目录条目 + 参数 schema + 读分支 + 写分支
  * 全在这一个文件里。
  *
@@ -12,9 +13,9 @@
  * 就会出现"TASK 有六个工具、TAG 一个都没有"—— 而覆盖面门禁问的是
  * 「标签这个东西，AI 看得见也改得动吗」，那个问题的答案会是假的。
  *
- * ⚠️ 界面上还能**删除**标签，这个动作现在没有工具：删一条标签会把所有任务上的它一起摘掉，
- * 影响面是"用户没说的那些任务"，而目录里每多一个写工具就是"逐工具默认关"清单长一条。
- * 要补它得先回答"一次确认里用户看得见的是哪几条任务" —— 已登记，不是漏写。
+ * 🔴 `delete_tag` 是**软删除**（移入回收站、可撤销），所以是 `destructive-reversible`；
+ * `purge` 永不进工具。删一条标签会把它从所有任务上一起摘掉 —— 那由宿主按领域规则落地，
+ * 这里只做形状检查。
  */
 
 import type { McpToolDefinition } from '../mcp.js';
@@ -51,6 +52,24 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'rename_tag',
+    // 写工具只产出提案、结果不回送模型 ⇒ 出境面是提案里那几个字段（同 `create_tag`）。
+    egressFields: [],
+    description: '给一个标签改名。名称不能为空，也不能只有空格。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'delete_tag',
+    // 删除 → 回收站（软删除），可逆、可撤销 ⇒ `destructive-reversible`，不是 purge。
+    egressFields: [],
+    description: '把一个标签删除到回收站。可撤销，不是彻底删除。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -79,6 +98,23 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       },
     },
     required: ['taskId', 'tagIds'],
+    additionalProperties: false,
+  },
+  rename_tag: {
+    type: 'object',
+    properties: {
+      tagId: { type: 'string', description: '要改名的标签标识。' },
+      name: { type: 'string', description: '新的标签名称，不能是空白。' },
+    },
+    required: ['tagId', 'name'],
+    additionalProperties: false,
+  },
+  delete_tag: {
+    type: 'object',
+    properties: {
+      tagId: { type: 'string', description: '要删除到回收站的标签标识。' },
+    },
+    required: ['tagId'],
     additionalProperties: false,
   },
 };
@@ -136,6 +172,31 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
         ok: true,
         intent: { action: 'set-task-tags', taskId: a['taskId'], tagIds: raw as string[] },
       };
+    }
+
+    case 'rename_tag': {
+      const unknown = Object.keys(a).filter((key) => key !== 'tagId' && key !== 'name');
+      if (unknown.length > 0) {
+        return { ok: false, message: `rename_tag 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['tagId'] !== 'string' || a['tagId'].trim() === '') {
+        return { ok: false, message: 'rename_tag 需要 tagId。' };
+      }
+      if (typeof a['name'] !== 'string' || a['name'].trim() === '') {
+        return { ok: false, message: 'rename_tag 需要 name（不能是空白）。' };
+      }
+      return { ok: true, intent: { action: 'rename-tag', tagId: a['tagId'], name: a['name'] } };
+    }
+
+    case 'delete_tag': {
+      const unknown = Object.keys(a).filter((key) => key !== 'tagId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `delete_tag 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['tagId'] !== 'string' || a['tagId'].trim() === '') {
+        return { ok: false, message: 'delete_tag 需要 tagId。' };
+      }
+      return { ok: true, intent: { action: 'delete-tag', tagId: a['tagId'] } };
     }
 
     default:

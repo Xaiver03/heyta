@@ -433,16 +433,22 @@ describe('分母恰好 11（W2 物化 EVENT、ADR-0083 加 ATTACHMENT 之后）�
     expect(manifest.coverage.covered + withoutTools).toBe(manifest.userOperableEntityTypes.length);
   });
 
-  it('🔴 EVENT 的四个工具**读写都有**，且归因走的是名字（不是 override 名单）', async () => {
+  it('🔴 EVENT 的工具**读写都有**，且归因走的是名字（不是 override 名单）', async () => {
     const event = manifest.entities.find((e) => e.entityType === 'EVENT');
     expect(event).toBeDefined();
     expect([...event!.readToolNames].sort()).toEqual(['get_event', 'list_events']);
-    expect([...event!.writeToolNames].sort()).toEqual(['create_event', 'update_event']);
+    expect([...event!.writeToolNames].sort()).toEqual([
+      'create_event',
+      'update_event',
+      'delete_event',
+      'restore_event',
+      'archive_event',
+    ].sort());
     // coverage 必须是 read-write —— 竞品那句"我们只能查看、不能新建"的产品谎言，
     // 在 heyta 的**这一格**上被否证（gap-analysis §2.1 的靶子）
     expect(event!.coverage).toBe('read-write');
     // 四条都登记了参数 schema（`schemaRecorded:false` 会静默出现在给模型的投影里）
-    for (const name of ['list_events', 'get_event', 'create_event', 'update_event']) {
+    for (const name of ['list_events', 'get_event', 'create_event', 'update_event', 'delete_event', 'restore_event', 'archive_event']) {
       const tool = manifest.tools.find((t) => t.name === name);
       expect(tool, `${name} 不在清单里`).toBeDefined();
       expect(tool!.schemaRecorded, `${name} 没有登记 INPUT_SCHEMAS`).toBe(true);

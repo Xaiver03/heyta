@@ -172,6 +172,12 @@ export const AI_CAPABILITY_MANIFEST =
         'complete_task',
         'set_task_priorities',
         'set_task_estimate',
+        'trash_task',
+        'restore_task',
+        'archive_task',
+        'unarchive_task',
+        'move_task',
+        'uncomplete_task',
       ],
     },
     {
@@ -184,6 +190,9 @@ export const AI_CAPABILITY_MANIFEST =
       ],
       'writeToolNames': [
         'create_project',
+        'rename_project',
+        'archive_project',
+        'delete_project',
       ],
     },
     {
@@ -197,6 +206,8 @@ export const AI_CAPABILITY_MANIFEST =
       'writeToolNames': [
         'create_tag',
         'set_task_tags',
+        'rename_tag',
+        'delete_tag',
       ],
     },
     {
@@ -211,6 +222,9 @@ export const AI_CAPABILITY_MANIFEST =
       'writeToolNames': [
         'create_note',
         'update_note',
+        'delete_note',
+        'restore_note',
+        'move_note',
       ],
     },
     {
@@ -275,6 +289,8 @@ export const AI_CAPABILITY_MANIFEST =
       ],
       'writeToolNames': [
         'create_reminder',
+        'update_reminder',
+        'delete_reminder',
       ],
     },
     {
@@ -289,6 +305,9 @@ export const AI_CAPABILITY_MANIFEST =
       'writeToolNames': [
         'create_event',
         'update_event',
+        'delete_event',
+        'restore_event',
+        'archive_event',
       ],
     },
     {
@@ -631,6 +650,95 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'trash_task',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把任务移进回收站（软删除，之后可用 restore_task 恢复）。参数：taskId（要删除的任务 id）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'restore_task',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把回收站里的任务恢复到原处。参数：taskId（要恢复的任务 id）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'archive_task',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '归档任务（可逆，之后可用 unarchive_task 取消归档）。参数：taskId（要归档的任务 id）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'unarchive_task',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '取消任务的归档状态。参数：taskId（要取消归档的任务 id）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'move_task',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把任务移到另一个清单。参数：taskId（要移动的任务 id）、projectId（目标清单 id；省略表示移出清单、不归属任何清单）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'uncomplete_task',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把已完成的任务标记回未完成。参数：taskId（要改回未完成的任务 id）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
       'name': 'create_project',
       'kind': 'write',
       'entityType': 'PROJECT',
@@ -646,6 +754,58 @@ export const AI_CAPABILITY_MANIFEST =
           'name': 'parentId',
           'type': 'string',
           'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'rename_project',
+      'kind': 'write',
+      'entityType': 'PROJECT',
+      'description': '给一个清单（项目）改名。名称不能为空，也不能只有空格。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'archive_project',
+      'kind': 'write',
+      'entityType': 'PROJECT',
+      'description': '归档一个清单（项目），或把已归档的清单恢复为未归档。省略 archived 就是归档；archived 为 false 即恢复。清单不存在会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'archived',
+          'type': 'boolean',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'delete_project',
+      'kind': 'write',
+      'entityType': 'PROJECT',
+      'description': '把一个清单（项目）删除到回收站。可撤销，不是彻底删除。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
         },
       ],
     },
@@ -712,6 +872,39 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'rename_tag',
+      'kind': 'write',
+      'entityType': 'TAG',
+      'description': '给一个标签改名。名称不能为空，也不能只有空格。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'tagId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'delete_tag',
+      'kind': 'write',
+      'entityType': 'TAG',
+      'description': '把一个标签删除到回收站。可撤销，不是彻底删除。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'tagId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
       'name': 'create_note',
       'kind': 'write',
       'entityType': 'NOTE',
@@ -751,6 +944,53 @@ export const AI_CAPABILITY_MANIFEST =
           'name': 'content',
           'type': 'string',
           'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'delete_note',
+      'kind': 'write',
+      'entityType': 'NOTE',
+      'description': '把一张便签删除到回收站。可撤销，不是彻底删除。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'noteId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'restore_note',
+      'kind': 'write',
+      'entityType': 'NOTE',
+      'description': '把回收站里的一张便签恢复回来。便签不在回收站会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'noteId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'move_note',
+      'kind': 'write',
+      'entityType': 'NOTE',
+      'description': '把一张便签移到某个清单，或移出清单（省略 projectId 就是不归属任何清单）。清单不存在会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'noteId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': false,
         },
       ],
     },
@@ -842,6 +1082,44 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'update_reminder',
+      'kind': 'write',
+      'entityType': 'REMINDER',
+      'description': '改一条已有提醒的触发时刻。给 date（YYYY-MM-DD）+ time（HH:MM，24小时制补零），与新建提醒同一口径（换算成毫秒由本机完成，不要自己算时间戳）；提醒不存在会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'reminderId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'date',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'time',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'delete_reminder',
+      'kind': 'write',
+      'entityType': 'REMINDER',
+      'description': '把一条提醒删除到回收站。可撤销，不是彻底删除。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'reminderId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
       'name': 'create_event',
       'kind': 'write',
       'entityType': 'EVENT',
@@ -899,6 +1177,48 @@ export const AI_CAPABILITY_MANIFEST =
         },
       ],
     },
+    {
+      'name': 'delete_event',
+      'kind': 'write',
+      'entityType': 'EVENT',
+      'description': '把一个倒数日/纪念日删除到回收站。可撤销，不是彻底删除。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'eventId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'restore_event',
+      'kind': 'write',
+      'entityType': 'EVENT',
+      'description': '把回收站里的一个倒数日/纪念日恢复回来。它不在回收站会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'eventId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'archive_event',
+      'kind': 'write',
+      'entityType': 'EVENT',
+      'description': '把一个倒数日/纪念日归档。归档后不再出现在列表里，可再取消归档。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'eventId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
   ],
   'protocolTypesWithoutModel': [
     'TASK_REPEAT_CFG',
@@ -930,7 +1250,7 @@ export const AI_CAPABILITY_TEXT = [
   '不可以说"产品不支持"。',
   '',
   '一、有 AI 工具的实体（9 个）',
-  '- TASK —— 读和写都有（读 3 / 写 6）',
+  '- TASK —— 读和写都有（读 3 / 写 12）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
   '  · [读] get_task_estimate_context（taskId*:string）',
@@ -940,18 +1260,32 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] complete_task（taskId:string, taskIds:array）',
   '  · [写] set_task_priorities（entries*:array）',
   '  · [写] set_task_estimate（taskId*:string, minutes*:number）',
-  '- PROJECT —— 读和写都有（读 1 / 写 1）',
+  '  · [写] trash_task（taskId*:string）',
+  '  · [写] restore_task（taskId*:string）',
+  '  · [写] archive_task（taskId*:string）',
+  '  · [写] unarchive_task（taskId*:string）',
+  '  · [写] move_task（taskId*:string, projectId:string）',
+  '  · [写] uncomplete_task（taskId*:string）',
+  '- PROJECT —— 读和写都有（读 1 / 写 4）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',
-  '- TAG —— 读和写都有（读 1 / 写 2）',
+  '  · [写] rename_project（projectId*:string, name*:string）',
+  '  · [写] archive_project（projectId*:string, archived:boolean）',
+  '  · [写] delete_project（projectId*:string）',
+  '- TAG —— 读和写都有（读 1 / 写 4）',
   '  · [读] list_tags（无参数）',
   '  · [写] create_tag（name*:string）',
   '  · [写] set_task_tags（taskId*:string, tagIds*:array）',
-  '- NOTE —— 读和写都有（读 2 / 写 2）',
+  '  · [写] rename_tag（tagId*:string, name*:string）',
+  '  · [写] delete_tag（tagId*:string）',
+  '- NOTE —— 读和写都有（读 2 / 写 5）',
   '  · [读] list_notes（limit:number）',
   '  · [读] get_note（noteId*:string）',
   '  · [写] create_note（content*:string, projectId:string, isPinnedToToday:boolean）',
   '  · [写] update_note（noteId*:string, content*:string）',
+  '  · [写] delete_note（noteId*:string）',
+  '  · [写] restore_note（noteId*:string）',
+  '  · [写] move_note（noteId*:string, projectId:string）',
   '- HABIT —— 读和写都有（读 1 / 写 1）',
   '  · [读] list_habits（无参数）',
   '  · [写] create_habit（name*:string, target:number, unit:string, goalType:string）',
@@ -961,14 +1295,19 @@ export const AI_CAPABILITY_TEXT = [
   '- FOCUS_SESSION —— 读和写都有（读 1 / 写 1）',
   '  · [读] list_focuses（limit:number）',
   '  · [写] log_focus（kind*:string, plannedMinutes*:number, actualMinutes:number, taskId:string, completed:boolean）',
-  '- REMINDER —— 读和写都有（读 1 / 写 1）',
+  '- REMINDER —— 读和写都有（读 1 / 写 3）',
   '  · [读] list_reminders（taskId:string）',
   '  · [写] create_reminder（taskId*:string, date:string, time:string, minutesBeforeDue:number）',
-  '- EVENT —— 读和写都有（读 2 / 写 2）',
+  '  · [写] update_reminder（reminderId*:string, date*:string, time*:string）',
+  '  · [写] delete_reminder（reminderId*:string）',
+  '- EVENT —— 读和写都有（读 2 / 写 5）',
   '  · [读] list_events（limit:number）',
   '  · [读] get_event（eventId*:string）',
   '  · [写] create_event（title*:string, date*:string, kind:string, isLunar:boolean, recurrence:string, notes:string）',
   '  · [写] update_event（eventId*:string, fields*:object）',
+  '  · [写] delete_event（eventId*:string）',
+  '  · [写] restore_event（eventId*:string）',
+  '  · [写] archive_event（eventId*:string）',
   '',
   '二、产品里有、但我没有任何工具的实体（2 个）—— 实体存在，只是我没配工具',
   '- COMMENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',

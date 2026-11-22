@@ -215,6 +215,176 @@ const CASES: readonly Case[] = [
     }),
     effect: () => alive('reminders'),
   },
+  // ── 2026-11-22 工具层补全：任务生命周期 / 清单·标签·笔记·提醒·事件 ──
+  {
+    tool: 'trash_task',
+    intentAction: 'trash-task',
+    label: '任务移入回收站',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '要删的' }) }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.deletedAt !== undefined).length,
+  },
+  {
+    tool: 'restore_task',
+    intentAction: 'restore-task',
+    label: '任务从回收站恢复',
+    args: async () => {
+      const taskId = await seed({ action: 'create-task', title: '待恢复' });
+      await makeHost().submit({ action: 'trash-task', taskId });
+      return { taskId };
+    },
+    effect: () => alive('tasks'),
+  },
+  {
+    tool: 'archive_task',
+    intentAction: 'archive-task',
+    label: '任务归档',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '要归档的' }) }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.abandonedAt !== undefined).length,
+  },
+  {
+    tool: 'unarchive_task',
+    intentAction: 'unarchive-task',
+    label: '任务取消归档',
+    args: async () => {
+      const taskId = await seed({ action: 'create-task', title: '已归档' });
+      await makeHost().submit({ action: 'archive-task', taskId });
+      return { taskId };
+    },
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.abandonedAt === undefined).length,
+  },
+  {
+    tool: 'move_task',
+    intentAction: 'move-task',
+    label: '任务移动清单',
+    args: async () => {
+      const taskId = await seed({ action: 'create-task', title: '要移动的' });
+      const projectId = await seed({ action: 'create-project', name: '目标清单' });
+      return { taskId, projectId };
+    },
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.projectId !== undefined).length,
+  },
+  {
+    tool: 'uncomplete_task',
+    intentAction: 'uncomplete-task',
+    label: '任务取消完成',
+    args: async () => {
+      const taskId = await seed({ action: 'create-task', title: '已完成' });
+      await makeHost().submit({ action: 'complete-task', taskId });
+      return { taskId };
+    },
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.completedAt === undefined).length,
+  },
+  {
+    tool: 'rename_project',
+    intentAction: 'rename-project',
+    label: '清单改名',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '旧清单' }), name: '改过的清单' }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.name === '改过的清单').length,
+  },
+  {
+    tool: 'archive_project',
+    intentAction: 'archive-project',
+    label: '清单归档',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '要归档的清单' }) }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.archived === true).length,
+  },
+  {
+    tool: 'delete_project',
+    intentAction: 'delete-project',
+    label: '清单移入回收站',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '要删的清单' }) }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.deletedAt !== undefined).length,
+  },
+  {
+    tool: 'rename_tag',
+    intentAction: 'rename-tag',
+    label: '标签改名',
+    args: async () => ({ tagId: await seed({ action: 'create-tag', name: '旧标签' }), name: '改过的标签' }),
+    effect: () => Object.values(engine.getState().tags).filter((t) => t.name === '改过的标签').length,
+  },
+  {
+    tool: 'delete_tag',
+    intentAction: 'delete-tag',
+    label: '标签移入回收站',
+    args: async () => ({ tagId: await seed({ action: 'create-tag', name: '要删的标签' }) }),
+    effect: () => Object.values(engine.getState().tags).filter((t) => t.deletedAt !== undefined).length,
+  },
+  {
+    tool: 'delete_note',
+    intentAction: 'delete-note',
+    label: '便签移入回收站',
+    args: async () => ({ noteId: await seed({ action: 'create-note', content: '要删的便签' }) }),
+    effect: () => Object.values(engine.getState().notes).filter((n) => n.deletedAt !== undefined).length,
+  },
+  {
+    tool: 'restore_note',
+    intentAction: 'restore-note',
+    label: '便签恢复',
+    args: async () => {
+      const noteId = await seed({ action: 'create-note', content: '待恢复便签' });
+      await makeHost().submit({ action: 'delete-note', noteId });
+      return { noteId };
+    },
+    effect: () => alive('notes'),
+  },
+  {
+    tool: 'move_note',
+    intentAction: 'move-note',
+    label: '便签移动清单',
+    args: async () => {
+      const noteId = await seed({ action: 'create-note', content: '要移动的便签' });
+      const projectId = await seed({ action: 'create-project', name: '便签目标清单' });
+      return { noteId, projectId };
+    },
+    effect: () => Object.values(engine.getState().notes).filter((n) => n.projectId !== undefined).length,
+  },
+  {
+    tool: 'update_reminder',
+    intentAction: 'update-reminder',
+    label: '提醒改时刻',
+    args: async () => {
+      const taskId = await seed({ action: 'create-task', title: '带提醒的' });
+      const reminderId = await seed({ action: 'create-reminder', taskId, date: '2024-06-01', time: '09:30' });
+      return { reminderId, date: '2024-07-01', time: '10:00' };
+    },
+    effect: () => Object.values(engine.getState().reminders).filter((r) => r.triggerAt === new Date(2024, 6, 1, 10, 0, 0).getTime()).length,
+  },
+  {
+    tool: 'delete_reminder',
+    intentAction: 'delete-reminder',
+    label: '提醒删除',
+    args: async () => {
+      const taskId = await seed({ action: 'create-task', title: '带提醒任务' });
+      const reminderId = await seed({ action: 'create-reminder', taskId, date: '2024-06-01', time: '09:30' });
+      return { reminderId };
+    },
+    effect: () => Object.values(engine.getState().reminders).filter((r) => r.deletedAt !== undefined).length,
+  },
+  {
+    tool: 'delete_event',
+    intentAction: 'delete-event',
+    label: '倒数日移入回收站',
+    args: async () => ({ eventId: await seed({ action: 'create-event', title: '要删的纪念日', date: '2027-03-01' }) }),
+    effect: () => Object.values(engine.getState().events).filter((e) => e.deletedAt !== undefined).length,
+  },
+  {
+    tool: 'restore_event',
+    intentAction: 'restore-event',
+    label: '倒数日恢复',
+    args: async () => {
+      const eventId = await seed({ action: 'create-event', title: '待恢复纪念日', date: '2027-03-02' });
+      await makeHost().submit({ action: 'delete-event', eventId });
+      return { eventId };
+    },
+    effect: () => alive('events'),
+  },
+  {
+    tool: 'archive_event',
+    intentAction: 'archive-event',
+    label: '倒数日归档',
+    args: async () => ({ eventId: await seed({ action: 'create-event', title: '要归档的纪念日', date: '2027-03-03' }) }),
+    effect: () => Object.values(engine.getState().events).filter((e) => e.archivedAt !== undefined).length,
+  },
 ];
 
 beforeEach(async () => {

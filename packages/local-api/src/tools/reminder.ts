@@ -2,7 +2,8 @@
  * REMINDER（提醒）实体工具包
  * ===========================
  *
- * 读：`list_reminders`；写：`create_reminder`。
+ * 读：`list_reminders`；写：`create_reminder`、`update_reminder`（改时刻）、
+ * `delete_reminder`（删除到回收站）。
  *
  * 🔴 这个 pack 是"本包不产生时刻"这条纪律最难落的一个：提醒的本质是一个未来时刻，
  * 而 `Reminder.triggerAt` 是 epoch ms —— 让工具自己拼毫秒，就意味着"这一天这一分钟
@@ -14,8 +15,15 @@
  * 后者不是糖：重复任务的截止日每次顺延，只有"提前 30 分"这种写法能在下一次顺延后仍然指对，
  * 而绝对时刻会留在旧的那一天上 —— 领域层为这件事专门留了 `offsetMs`。
  *
- * ⚠️ 界面上还能顺延（snooze）、改时刻、删除、忽略一条提醒，现在都没有工具：
- * 顺延的输入是"顺延多久"而模型对时间跨度最容易算错，改/删一条已有提醒要先让用户看清是哪一条 ——
+ * 🔴 删除 = 软删除（`DEL`→墓碑），可逆、可撤销；`purge`/清空回收站**永不**做成工具（契约 §0）。
+ *
+ * ⚠️ `update_reminder` 改的是一条**已有**提醒的绝对时刻（date + time；换算成 epoch 毫秒在宿主，与 create_reminder 同口径），
+ * 这是契约 §1/§3 给定的形状 —— 与 `create_reminder`「本包不产生时刻」不同：改一条已有提醒是
+ * "落到一个已知的毫秒时刻"，不是"从零把'某天的几点'换算成毫秒"。所以这里由调用方给出毫秒，
+ * 本包只验它是正的有限数，宿主只验这条提醒存在。
+ *
+ * ⚠️ 界面上还能顺延（snooze）、忽略一条提醒，现在仍然没有工具：
+ * 顺延的输入是"顺延多久"而模型对时间跨度最容易算错，忽略与否要先让用户看清是哪一条 ——
  * 这些要单独论证，不是漏写。
  */
 
@@ -49,6 +57,25 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'update_reminder',
+    egressFields: [],
+    description:
+      '改一条已有提醒的触发时刻。给 date（YYYY-MM-DD）+ time（HH:MM，24小时制补零），' +
+      '与新建提醒同一口径（换算成毫秒由本机完成，不要自己算时间戳）；提醒不存在会被拒绝。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'delete_reminder',
+    // 删除 → 回收站（软删除），可逆、可撤销 ⇒ `destructive-reversible`，不是 purge（契约 §0）。
+    egressFields: [],
+    description: '把一条提醒删除到回收站。可撤销，不是彻底删除。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -80,6 +107,24 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       },
     },
     required: ['taskId'],
+    additionalProperties: false,
+  },
+  update_reminder: {
+    type: 'object',
+    properties: {
+      reminderId: { type: 'string', description: '要改的提醒。' },
+      date: { type: 'string', description: '新时刻的哪一天：YYYY-MM-DD（本地日历日）。' },
+      time: { type: 'string', description: '新时刻的几点：HH:MM，24 小时制且补零。' },
+    },
+    required: ['reminderId', 'date', 'time'],
+    additionalProperties: false,
+  },
+  delete_reminder: {
+    type: 'object',
+    properties: {
+      reminderId: { type: 'string', description: '要删除（移到回收站）的提醒。' },
+    },
+    required: ['reminderId'],
     additionalProperties: false,
   },
 };
@@ -167,6 +212,36 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
         return { ok: false, message: 'minutesBeforeDue 必须是不小于 0 的有限数。' };
       }
       return { ok: true, intent: { action: 'create-reminder', taskId: a['taskId'], minutesBeforeDue: minutes } };
+    }
+
+    case 'update_reminder': {
+      // 严格白名单：这个工具只改一件事（触发时刻），多给的键一律拒绝。
+      const unknown = Object.keys(a).filter((key) => key !== 'reminderId' && key !== 'date' && key !== 'time');
+      if (unknown.length > 0) {
+        return { ok: false, message: `update_reminder 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['reminderId'] !== 'string' || a['reminderId'].trim() === '') {
+        return { ok: false, message: 'update_reminder 需要 reminderId。' };
+      }
+      // 与 `create_reminder` 同口径：只收 date + time 字符串，毫秒换算交给宿主。
+      if (typeof a['date'] !== 'string' || a['date'].trim() === '' || typeof a['time'] !== 'string' || a['time'].trim() === '') {
+        return { ok: false, message: 'update_reminder 需要 date（YYYY-MM-DD）与 time（HH:MM）。' };
+      }
+      return {
+        ok: true,
+        intent: { action: 'update-reminder', reminderId: a['reminderId'], date: a['date'], time: a['time'] },
+      };
+    }
+
+    case 'delete_reminder': {
+      const unknown = Object.keys(a).filter((key) => key !== 'reminderId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `delete_reminder 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['reminderId'] !== 'string' || a['reminderId'].trim() === '') {
+        return { ok: false, message: 'delete_reminder 需要 reminderId。' };
+      }
+      return { ok: true, intent: { action: 'delete-reminder', reminderId: a['reminderId'] } };
     }
 
     default:

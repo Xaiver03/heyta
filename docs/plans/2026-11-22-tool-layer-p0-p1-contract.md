@@ -32,7 +32,7 @@
 | { action: 'restore-note'; noteId: string }
 | { action: 'move-note'; noteId: string; projectId?: string }
 // 提醒（P1）
-| { action: 'update-reminder'; reminderId: string; triggerAt: number }
+| { action: 'update-reminder'; reminderId: string; date: string; time: string }
 | { action: 'delete-reminder'; reminderId: string }
 // 事件（P1）
 | { action: 'delete-event'; eventId: string }
@@ -58,7 +58,7 @@
 | `delete-note` | `noteActions.removeNote(intent.noteId)` | |
 | `restore-note` | `noteActions.restoreNote(intent.noteId)` → boolean | |
 | `move-note` | `noteActions.setNoteProject(intent.noteId, intent.projectId ?? null)` | |
-| `update-reminder` | 先验存在；`reminderActions.rescheduleReminder(intent.reminderId, intent.triggerAt)` | triggerAt 须有限正数 |
+| `update-reminder` | 先验存在；用 `localDateTimeToEpoch(date+"T"+time)` 换算成 epoch 后 `reminderActions.rescheduleReminder(intent.reminderId, epoch)` | 与 create-reminder 同口径（收 date+time，换算在宿主） |
 | `delete-reminder` | `reminderActions.removeReminder(intent.reminderId)` | |
 | `delete-event` | `eventActions.removeEvent(intent.eventId)` | |
 | `restore-event` | `eventActions.restoreEvent(intent.eventId)` → boolean | |
@@ -95,7 +95,7 @@
 | `delete_note` | `noteId:string` | delete-note | destructive-reversible |
 | `restore_note` | `noteId:string` | restore-note | write |
 | `move_note` | `noteId:string, projectId?:string` | move-note | write |
-| `update_reminder` | `reminderId:string, triggerAt:number` | update-reminder | write |
+| `update_reminder` | `reminderId:string, date:string(YYYY-MM-DD), time:string(HH:MM)` | update-reminder | write |
 | `delete_reminder` | `reminderId:string` | delete-reminder | destructive-reversible |
 | `delete_event` | `eventId:string` | delete-event | destructive-reversible |
 | `restore_event` | `eventId:string` | restore-event | write |

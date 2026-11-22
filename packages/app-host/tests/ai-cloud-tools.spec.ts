@@ -19,10 +19,9 @@ function allGrants(): LocalApiConfig['grants'] {
 }
 
 describe('云端工具描述（原生循环用）', () => {
-  it('全授权时输出全部 30 个工具', () => {
+  it('全授权时输出全部目录工具', () => {
     const descriptors = toCloudToolDescriptors(allGrants());
     expect(descriptors.length).toBe(LOCAL_API_TOOLS.length);
-    expect(descriptors.length).toBe(30);
     for (const d of descriptors) {
       expect(typeof d.name).toBe('string');
       expect(d.parameters).toBeTypeOf('object');

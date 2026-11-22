@@ -2,19 +2,16 @@
  * PROJECT（清单）实体工具包
  * ==========================
  *
- * 读：`list_projects`（列清单与任务数）；写：`create_project`（新建清单）。
- * 两条都在这里 —— 目录条目、给模型看的参数 schema、读分支、写分支**一处不落**，
- * 加第三个工具（改名 / 归档 / 删除）不需要再回到 `mcp.ts` / `server.ts` 各改一处。
+ * 读：`list_projects`（列清单与任务数）；写：`create_project`（新建清单）、
+ * `rename_project`（改名）、`archive_project`（归档/取消归档）、`delete_project`（移入回收站）。
+ * 全部在这里 —— 目录条目、给模型看的参数 schema、读分支、写分支**一处不落**，
+ * 加工具不需要再回到 `mcp.ts` / `server.ts` 各改一处。
  *
- * ⚠️ 界面上还能**改名、设颜色、归档、删除**清单（`ProjectsPanel`），这四个动作
- * 现在**没有工具**。2026-10-03 之前这里写的理由是"目录有一条 `<= 10` 的容量判据，
- * 一次只能挑用户最常让 AI 做的那一件"，那个理由已经不成立了 —— 容量改成按实体算
- * （`shared.ts` 的默认 `MAX_TOOLS_PER_ENTITY`），PROJECT 用了 2 席、还剩 5 席。
- * 所以其余动作是**还没做**，不是被上限挡着；要补就按"它属于哪一档"挑
- * （改名/删除都是"修改"与"该实体专属动作"两档）。逐条登记在
- * `docs/plans/ai-event-tool-contract.md` §5.4。
- * 🔴 仍然不要为了塞进去而删掉别的工具 —— 那句在容量换形之后依然成立，
- * 因为删一个工具 = 让一个实体从"能读能写"退回"只读"，覆盖面会跟着掉。
+ * 🔴 删除 = 软删除（`DEL`→墓碑），可逆、可撤销；`purge`/清空回收站**永不**做成工具
+ * （见契约 §0）。改名与归档的「清单是否存在 / 名字是否为空」由宿主判，
+ * 这里只做形状检查。
+ * 🔴 不要为了塞进去而删掉别的工具 —— 删一个工具 = 让一个实体从"能读能写"退回"只读"，
+ * 覆盖面会跟着掉。
  */
 
 import type { McpToolDefinition } from '../mcp.js';
@@ -42,6 +39,35 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'rename_project',
+    // 写工具只产出提案、结果不回送模型 ⇒ 出境面是提案里那几个字段（同 `create_project`）。
+    egressFields: [],
+    description: '给一个清单（项目）改名。名称不能为空，也不能只有空格。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'archive_project',
+    // 归档 = 可逆的破坏性动作：直接执行，靠 op-log 版本回溯兜底（契约 §0 / `ToolRisk`）。
+    egressFields: [],
+    description:
+      '归档一个清单（项目），或把已归档的清单恢复为未归档。' +
+      '省略 archived 就是归档；archived 为 false 即恢复。清单不存在会被拒绝。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
+  {
+    name: 'delete_project',
+    // 删除 → 回收站（软删除），可逆、可撤销 ⇒ `destructive-reversible`，不是 purge。
+    egressFields: [],
+    description: '把一个清单（项目）删除到回收站。可撤销，不是彻底删除。',
+    kind: 'write',
+    risk: 'destructive-reversible',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -61,6 +87,35 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       },
     },
     required: ['name'],
+    additionalProperties: false,
+  },
+  rename_project: {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string', description: '要改名的清单标识。' },
+      name: { type: 'string', description: '新的清单名称，不能是空白。' },
+    },
+    required: ['projectId', 'name'],
+    additionalProperties: false,
+  },
+  archive_project: {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string', description: '要归档或恢复的清单标识。' },
+      archived: {
+        type: 'boolean',
+        description: 'true / 省略 = 归档；false = 恢复为未归档。',
+      },
+    },
+    required: ['projectId'],
+    additionalProperties: false,
+  },
+  delete_project: {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string', description: '要删除到回收站的清单标识。' },
+    },
+    required: ['projectId'],
     additionalProperties: false,
   },
 };
@@ -106,6 +161,57 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
           ...(typeof a['parentId'] === 'string' ? { parentId: a['parentId'] } : {}),
         },
       };
+    }
+
+    case 'rename_project': {
+      const unknown = Object.keys(a).filter((key) => key !== 'projectId' && key !== 'name');
+      if (unknown.length > 0) {
+        return { ok: false, message: `rename_project 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '') {
+        return { ok: false, message: 'rename_project 需要 projectId。' };
+      }
+      if (typeof a['name'] !== 'string' || a['name'].trim() === '') {
+        return { ok: false, message: 'rename_project 需要 name（不能是空白）。' };
+      }
+      return {
+        ok: true,
+        intent: { action: 'rename-project', projectId: a['projectId'], name: a['name'] },
+      };
+    }
+
+    case 'archive_project': {
+      const unknown = Object.keys(a).filter((key) => key !== 'projectId' && key !== 'archived');
+      if (unknown.length > 0) {
+        return { ok: false, message: `archive_project 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '') {
+        return { ok: false, message: 'archive_project 需要 projectId。' };
+      }
+      const archived = a['archived'];
+      if (archived !== undefined && typeof archived !== 'boolean') {
+        // 不能把"给了一个不是布尔的 archived"当成"没给"（那会默默归档而不是恢复）。
+        return { ok: false, message: 'archive_project 的 archived 必须是 true 或 false。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'archive-project',
+          projectId: a['projectId'],
+          ...(typeof archived === 'boolean' ? { archived } : {}),
+        },
+      };
+    }
+
+    case 'delete_project': {
+      const unknown = Object.keys(a).filter((key) => key !== 'projectId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `delete_project 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '') {
+        return { ok: false, message: 'delete_project 需要 projectId。' };
+      }
+      return { ok: true, intent: { action: 'delete-project', projectId: a['projectId'] } };
     }
 
     default:

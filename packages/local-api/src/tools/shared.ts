@@ -131,7 +131,10 @@ export const MAX_TOOLS_PER_ENTITY = 7;
  * 取数，不能各自再写一份 `TASK → 9` 的判断。
  */
 export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
-  TASK: 9,
+  // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
+  TASK: 15,
+  PROJECT: 8,
+  NOTE: 10,
 } as const satisfies Readonly<Partial<Record<string, number>>>;
 
 export type ToolBudgetEntityType = keyof typeof MAX_TOOLS_PER_ENTITY_BY_TYPE;
@@ -674,7 +677,32 @@ export type LocalApiWriteIntent =
       notes?: string;
     }
   /** 修改倒数日字段（W10）。只改显式给定的字段；要把某项清空请显式传 `null`。 */
-  | { action: 'update-event'; eventId: string; fields: Readonly<Record<string, unknown>> };
+  | { action: 'update-event'; eventId: string; fields: Readonly<Record<string, unknown>> }
+  // 任务生命周期（P0）
+  | { action: 'trash-task'; taskId: string }
+  | { action: 'restore-task'; taskId: string }
+  | { action: 'archive-task'; taskId: string }
+  | { action: 'unarchive-task'; taskId: string }
+  | { action: 'move-task'; taskId: string; projectId?: string }
+  | { action: 'uncomplete-task'; taskId: string }
+  // 清单（P1）
+  | { action: 'rename-project'; projectId: string; name: string }
+  | { action: 'archive-project'; projectId: string; archived?: boolean }
+  | { action: 'delete-project'; projectId: string }
+  // 标签（P1）
+  | { action: 'rename-tag'; tagId: string; name: string }
+  | { action: 'delete-tag'; tagId: string }
+  // 笔记（P1）
+  | { action: 'delete-note'; noteId: string }
+  | { action: 'restore-note'; noteId: string }
+  | { action: 'move-note'; noteId: string; projectId?: string }
+  // 提醒（P1）
+  | { action: 'update-reminder'; reminderId: string; date: string; time: string }
+  | { action: 'delete-reminder'; reminderId: string }
+  // 事件（P1）
+  | { action: 'delete-event'; eventId: string }
+  | { action: 'restore-event'; eventId: string }
+  | { action: 'archive-event'; eventId: string };
 
 /**
  * 一条写入落地的实体类型。
