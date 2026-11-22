@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTaskActions, type TaskActions } from '../src/actions.js';
 import { createLocalApiHost } from '../src/local-api-host.js';
 import { toCloudToolDescriptors } from '../src/ai-cloud-tools.js';
-import { createLocalToolTransport } from '../src/ai-local-tools.js';
+import { createAutoWriteLocalToolTransport, createLocalToolTransport } from '../src/ai-local-tools.js';
 import { runCloudAgentTurn, type HarnessModelReply } from '../src/agent-harness.js';
 
 let adapter: SqliteAdapter;
@@ -112,5 +112,23 @@ describe('写路径 D1 端到端：seq → 确认写 → undoSince', () => {
     expect(outcome.status).toBe('applied');
     const after = await host.listTasks?.(50);
     expect((after ?? []).map((t) => t.title)).not.toContain('AI 建的任务');
+  });
+});
+
+
+describe('可写传输：Harness 模式 AI 直接写 + undoSince 撤销（D1）', () => {
+  it('create_task 经 auto-write 传输真落库；undoSince 撤销', async () => {
+    const host = createLocalApiHost(engine, actions, { isReadable: () => true });
+    const grants2 = { create_task: true } as LocalApiConfig['grants'];
+    const transport = createAutoWriteLocalToolTransport({ host, grants: grants2, getGrants: () => grants2 });
+    const seq = await engine.currentLocalSeq();
+    const r = await transport.invoke('create_task', { title: 'Harness 写的' });
+    expect(r.ok).toBe(true);
+    const listed = await host.listTasks?.(50);
+    expect((listed ?? []).map((t) => t.title)).toContain('Harness 写的');
+    const outcome = await engine.undoSince(seq);
+    expect(outcome.status).toBe('applied');
+    const after = await host.listTasks?.(50);
+    expect((after ?? []).map((t) => t.title)).not.toContain('Harness 写的');
   });
 });

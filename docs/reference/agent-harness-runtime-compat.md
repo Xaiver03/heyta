@@ -93,3 +93,9 @@ await undoLastAiTurn({ undo }, seqBefore);
 - **客户端传输**：`createServerToolTransport({ getBaseUrl, getToken })`（`@heyta/app-host`）—— 每次现取同步服务器地址与 token，打 `POST {baseUrl}/api/agent/tools/<name>`；未配地址返回 `not-configured`。可直接作 `runCloudAgentTurn`/`runAiTurnWithUndo` 的 `transport`，把"设备本地循环 + 云端模型 + 服务端工具执行"接起来。
 - **服务端全链路**：`server/tests/agent-tools.chain.spec.ts` 证明 route → `executeAgentToolForUser` → op 归约 → `list_tasks` 全程不 stub。
 - 判据：`ai-cloud-tools.spec.ts`（活取值器/令牌轮换/未配置）；server chain（1）。
+
+## 11. Harness 模式可写了（D1）与 Web 启用方式
+
+- **可写本地传输** `createAutoWriteLocalToolTransport`（app-host）：只读照旧；写经唯一落库点 `executeAiToolProposal` 执行（`destructive-irreversible` 仍被拦），撤销靠 `undoSince`。判据：`ai-local-tools-integration.spec.ts`（create_task 落库→undoSince 撤销）。
+- **Web 启用**：`AssistantPanel` 的 `useCloudHarness` 由 `?cloudHarness=1` 打开（默认关，避免改变现有用户行为）。开启后走 `runWebCloudTurn`（auto-write 传输）。
+- 移动端适配器同样已切到 auto-write；`AssistantScreen` 的开关分支待接。

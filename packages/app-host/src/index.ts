@@ -1219,7 +1219,7 @@ export {
 } from './ai-cloud-assistant.js';
 
 // 本地工具传输（同一 CloudToolTransport 契约；读工具在 app 数据上本地执行，写走确认流程）。
-export { createLocalToolTransport, toolRunToCloudResult } from './ai-local-tools.js';
+export { createLocalToolTransport, createAutoWriteLocalToolTransport, toolRunToCloudResult } from './ai-local-tools.js';
 
 // 壳编排：记录 seq → 跑一轮云端 Agent → 可撤销（撤销这次 AI 操作）。
 export {

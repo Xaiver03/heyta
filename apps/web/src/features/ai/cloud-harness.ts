@@ -12,7 +12,7 @@
 import type { AiRoutingConfig, EgressConsent } from '@heyta/ai';
 import type { LocalApiConfig } from '@heyta/local-api';
 import {
-  createLocalToolTransport,
+  createAutoWriteLocalToolTransport,
   runAiTurnWithUndo,
   undoLastAiTurn,
   type CloudAgentTurnResult,
@@ -60,7 +60,7 @@ export async function runWebCloudTurn(
   deps: WebCloudTurnDeps,
 ): Promise<WebCloudTurnResult> {
   const host = createAiToolHost();
-  const transport = createLocalToolTransport({ host, grants: deps.grants, getGrants: () => deps.grants });
+  const transport = createAutoWriteLocalToolTransport({ host, grants: deps.grants, getGrants: () => deps.grants });
   const bindings = webUndoBindings();
   const result = await runAiTurnWithUndo(userText, {
     routing: deps.routing,

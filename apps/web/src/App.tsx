@@ -2686,6 +2686,8 @@ export function App(): React.JSX.Element {
     contentView === 'tasks' ? (
       <section className="ht-ai-agent-surface" data-testid="ai-agent-surface">
         <AssistantPanel
+            /* 接线开关：`?cloudHarness=1` 打开云端 Agent Harness（读/写+可撤销）；默认走既有路径。 */
+            useCloudHarness={typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('cloudHarness') === '1'}
             expanded={assistantWorkspace}
             onToggleExpanded={() => { setCompactAssistantOpen(false); setAssistantExpanded((value) => !value); }}
             onClose={assistantOverlay ? () => setCompactAssistantOpen(false) : undefined}
