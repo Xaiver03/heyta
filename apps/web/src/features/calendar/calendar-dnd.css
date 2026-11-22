@@ -1,0 +1,53 @@
+/**
+ * 日历「拖拽改期」的静态样式（Web 壳）
+ * =====================================
+ *
+ * 🔴 为什么这些不是内联样式：`features/**` 的内联样式是"只减不增"的棘轮账本
+ * （`check:l4`，陷阱 #671 记的那条缝）。`cursor` / `touch-action` / 拖拽中淡出
+ * 都是**静态** CSS，写进 `style={{…}}` 等于把账本该看见的样式挪出账本之外。
+ *
+ * 类名挂在既有的 `.ht-content` 族下（`main-area.css` 的 `.ht-content__calendar-host`
+ * 已开了这一族）—— 新家族名会把 `check:row-single-source` 的族基线顶上去。
+ */
+
+/* 拖拽源：一根任务条的外层。抓得住的手感 + 触屏不许被读成页面滚动。 */
+.ht-content__cal-drag {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+/* 拖拽中：原位置淡出（真正跟手的是 `DragOverlay` 那层浮影）。 */
+.ht-content__cal-drag[data-dragging='true'] {
+  cursor: grabbing;
+  opacity: 0.4;
+}
+
+/*
+ * 投放目标：一格日期。
+ *
+ * `flex: 1 1 0%` + `display: flex` 是**承重的**：这一层替换掉原来的 `DayCell`
+ * 成为周行里的 flex 子项，必须自己占满等分宽度，并把内部（`flex:1` 的 `DayCell`）
+ * 撑开。写成普通块会让 7 个格子不再等分 —— 那是"拖拽做完了、日历却塌了"。
+ */
+.ht-content__cal-drop {
+  flex: 1 1 0%;
+  min-width: 0;
+  display: flex;
+}
+
+/* 悬停（正准备投进来）的那一格：主色描边，告诉用户"松手会落到这里"。 */
+.ht-content__cal-drop[data-over='true'] {
+  border-radius: var(--ht-radius-sm);
+  box-shadow: inset 0 0 0 var(--ht-border-width-thin) var(--ht-color-primary);
+}
+
+/* 跟手的浮影：拖起来那一小片。 */
+.ht-content__cal-drag-overlay {
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface-raised);
+  color: var(--ht-color-foreground);
+  cursor: grabbing;
+}

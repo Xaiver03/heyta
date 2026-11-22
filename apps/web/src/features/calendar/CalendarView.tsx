@@ -34,7 +34,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { adjustmentOn, scopeTasks, toLocalDate, type LocalDate } from '@heyta/domain';
+import { adjustmentOn, canRescheduleByCalendarDrag, planCalendarDrop, scopeTasks, toLocalDate, type LocalDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   CalendarBoard as SharedCalendarBoard,
@@ -43,6 +43,7 @@ import {
 } from '@heyta/ui';
 
 import { CalendarCapturePopover } from './CalendarCapturePopover.js';
+import { CalendarDragBar, CalendarDragProvider, CalendarDropDay } from './CalendarDnd.js';
 import { useCountdownStore } from '../countdown/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useCalendarLabels } from './useCalendarLabels.js';
@@ -84,6 +85,29 @@ export function CalendarView(): React.JSX.Element {
     // 不触碰存储与同步）。默认 `showCompleted=true` 时逐字节等于补这个开关之前。
     return view.showCompleted ? scoped : scoped.filter((task) => task.completedAt === undefined);
   }, [store.entities.tasks, view.scope, view.showCompleted]);
+
+  /** id → 任务，供拖拽落点查"这条能不能改期、改成什么"（纯查表，不改动事实源）。 */
+  const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
+
+  /**
+   * 拖拽改期的接线：落点 → `planCalendarDrop`（**业务语义在领域层**）→ 一次 `setDueDate`。
+   *
+   * 🔴 一次拖放 = 一条 op：`setDueDate` 本身就把 dueDate 与 dueDateLocal 一次写完
+   * （见 `packages/app-host/src/actions.ts`），这里**不许**拆成两次调用。
+   * 失败不吞：交给 store 写进 status（与 `toggleComplete` 同一条路径），这里只收尾。
+   */
+  const onReschedule = useCallback(
+    (taskId: string, targetDate: LocalDate) => {
+      const task = tasksById.get(taskId);
+      if (task === undefined) return;
+      const plan = planCalendarDrop(task, targetDate);
+      if (plan === undefined) return;
+      void store.setDueDate(taskId, plan.dueDate, plan.dueDateLocal).catch(() => {
+        /* store 会把失败写进 TaskState.error；这里只防未处理的 rejection。 */
+      });
+    },
+    [store, tasksById],
+  );
 
   /** 🔴 文案抽进 `useCalendarLabels()`：页头那个工具栏（批二）要的是**同一份**，
    *  两处各构造一遍就是"同一句文案的两份事实源"（AGENTS §3.5）。 */
@@ -220,6 +244,7 @@ export function CalendarView(): React.JSX.Element {
 
   return (
     <HeytaUiProvider>
+      <CalendarDragProvider tasksById={tasksById} onReschedule={onReschedule}>
       {/*
         🔴 这一层**必须把 `.ht-content` 的确定高度传下去**（R11 批一"日历只占一半"的宿主那一刀）。
         共享板的根有 `flexGrow: 1`，但 `flexGrow` 只在**弹性容器**里生效 ——
@@ -276,9 +301,23 @@ export function CalendarView(): React.JSX.Element {
           dayMarkerLabels={dayMarkerLabels}
           events={boardEvents}
           eventLabels={eventLabels}
+          /*
+            拖拽改期（Web 独有）。三个注入点全在 `CalendarDnd.tsx`：
+            每格日期包成投放目标、每条任务条包成拖拽源。共享层不认识 dnd-kit。
+            · 倒数日条（`bar.event`）不可拖 —— 它不是任务；
+            · 跨天排期任务不可拖（`canRescheduleByCalendarDrag` 判）—— 拖一段该改哪个字段没有唯一答案。
+          */
+          renderDayCellWrapper={(date, node) => <CalendarDropDay date={date}>{node}</CalendarDropDay>}
+          renderBarWrapper={(bar, node) => {
+            if (bar.event === true) return node;
+            const task = tasksById.get(bar.id);
+            if (task === undefined || !canRescheduleByCalendarDrag(task)) return node;
+            return <CalendarDragBar id={bar.id}>{node}</CalendarDragBar>;
+          }}
           testID={BOARD_TEST_ID}
         />
       </div>
+      </CalendarDragProvider>
     </HeytaUiProvider>
   );
 }

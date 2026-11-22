@@ -211,6 +211,26 @@ export interface CalendarBoardProps {
    *   是能被测出来的，不是靠约定。
    */
   readonly eventLabels?: CalendarEventBarLabels | undefined;
+  /**
+   * 注入点（Web 专用，移动端不传 ⇒ 默认逐字节不变）：把**每一个日格**外面包一层。
+   *
+   * 🔴 存在的唯一理由与 `packages/ui/src/task-list/TaskList.tsx` 的 `renderRowWrapper`
+   *    同一条：**拖放库是 DOM 库**（`@dnd-kit/core` 的 `useDroppable` 要一个真实 DOM 节点），
+   *    装进共享层等于让 iOS/鸿蒙去解析 DOM。所以"日格是不是投放目标"由宿主说了算，
+   *    共享层只把"这个格子的节点"交出去。宿主不传 ⇒ 直接返回原节点，**零改动**。
+   *
+   * `date` 是这一格的本地日历日，`node` 是原来的 `DayCell`。返回值会替换 `node`
+   * 成为那一格在网格里的元素。
+   */
+  readonly renderDayCellWrapper?: ((date: LocalDate, node: React.ReactNode) => React.ReactNode) | undefined;
+  /**
+   * 注入点（Web 专用）：把**每一根任务条**外面包一层（拖拽源）。
+   *
+   * 与 `renderDayCellWrapper` 成对：本层不认识拖拽，只把 `bar` 与它原来的节点交出去。
+   * ⚠️ 倒数日条与跨天排期条也在 `bar` 里 —— 它们该不该可拖由**宿主**判定
+   *    （`bar.event` / `bar.span`），共享层不替宿主决定。
+   */
+  readonly renderBarWrapper?: ((bar: CalendarCellBar, node: React.ReactNode) => React.ReactNode) | undefined;
 }
 
 /**
@@ -236,6 +256,7 @@ function DayCell({
   dayMarkerLabels,
   onPress,
   fitHeight,
+  renderBarWrapper,
 }: {
   date: LocalDate;
   day: number;
@@ -253,6 +274,8 @@ function DayCell({
   dayMarkerLabels: CalendarBoardProps['dayMarkerLabels'];
   onPress: (date: LocalDate) => void;
   fitHeight: boolean;
+  /** 把每根任务条包一层（Web 注入拖拽源；移动端不传 ⇒ 逐字节不变）。 */
+  renderBarWrapper?: CalendarBoardProps['renderBarWrapper'];
 }): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -401,7 +424,8 @@ function DayCell({
         · **`+N` 只在真的有隐藏条时出现**：`hidden` 由 `calendarCellBars` 从数据算，
           所以"3 条 + +0"这种废话在结构上写不出来。
       */}
-      {visibleBars.map((bar) => (
+      {visibleBars.map((bar) => {
+        const node = (
         <View
           key={bar.id}
           /* 🔴 倒数日那条**换名字**（`-event` 而不是 `-bar`）：判据要能单独问
@@ -468,7 +492,14 @@ function DayCell({
             {bar.title}
           </Text>
         </View>
-      ))}
+        );
+        // 宿主不传 ⇒ 返回原节点（移动端与任何未接拖拽的调用点逐字节不变）。
+        return (
+          <React.Fragment key={bar.id}>
+            {renderBarWrapper === undefined ? node : renderBarWrapper(bar, node)}
+          </React.Fragment>
+        );
+      })}
       {hiddenCount > 0 ? (
         <Text
           numberOfLines={1}
@@ -529,6 +560,8 @@ export function CalendarBoard({
   dayMarkerLabels,
   events,
   eventLabels,
+  renderDayCellWrapper,
+  renderBarWrapper,
 }: CalendarBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -785,7 +818,7 @@ export function CalendarBoard({
                 eventLabels,
                 colorByQuadrant && now !== undefined ? { now } : undefined,
               );
-              return (
+              const dayCell = (
                 <DayCell
                   key={cell.date}
                   date={cell.date}
@@ -821,7 +854,14 @@ export function CalendarBoard({
                   dayMarker={dayMarker}
                   dayMarkerLabels={dayMarkerLabels}
                   onPress={pickDay}
+                  renderBarWrapper={renderBarWrapper}
                 />
+              );
+              // 宿主不传 ⇒ 直接返回原格子（移动端与任何未接拖拽的调用点不变）。
+              return renderDayCellWrapper === undefined ? (
+                dayCell
+              ) : (
+                <React.Fragment key={cell.date}>{renderDayCellWrapper(cell.date, dayCell)}</React.Fragment>
               );
             })}
           </View>
