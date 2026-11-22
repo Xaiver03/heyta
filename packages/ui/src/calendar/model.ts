@@ -400,7 +400,7 @@ export const CALENDAR_VIEW_LABEL_KEYS_MOBILE: Record<CalendarViewKind, CalendarV
  * 那条一致判据在 `packages/ui/tests/calendar-view-step.spec.ts`，它从这两份共享事实
  * 自己推导，不在测试里再抄一份四档字面量（那会是第四份抄件）。
  */
-export const CALENDAR_VIEW_ORDER: readonly CalendarViewKind[] = ['month', 'week', 'day', 'year'];
+export const CALENDAR_VIEW_ORDER: readonly CalendarViewKind[] = ['day', 'week', 'month', 'year'];
 
 /**
  * 游标走 **N 段**：月档一段 = 一个月，周档一段 = 一整周（7 天），

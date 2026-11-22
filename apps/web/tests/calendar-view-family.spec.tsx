@@ -144,7 +144,7 @@ describe('日历页头的「按时间看」档位下拉', () => {
   it('🔴 选「时间线」⇒ 真的切到时间线那一屏，而日历 store 里**没有** timeline 这个档位', async () => {
     await mount();
     await openCalendar();
-    expect(viewOptionLabels()).toEqual(['月', '周', '日', '年', '时间线']);
+    expect(viewOptionLabels()).toEqual(['日', '周', '月', '年', '时间线']);
 
     await chooseView('timeline');
 
@@ -170,7 +170,7 @@ describe('日历页头的「按时间看」档位下拉', () => {
     setModules({ calendar: true, timeline: false });
     await mount();
     await openCalendar();
-    expect(viewOptionLabels()).toEqual(['月', '周', '日', '年']);
+    expect(viewOptionLabels()).toEqual(['日', '周', '月', '年']);
 
     // 而且这不是"字没了但还能选"：value 上也没有这个取值。
     const select = q<HTMLSelectElement>('calendar-view-select');

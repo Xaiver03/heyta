@@ -416,15 +416,15 @@ describe('日历视图（Web）', () => {
     //       年档做出来了，这条立场第一次被**加一档**测试到：期望值跟着变，
     //       而"多一种没实现的东西"仍然会红（第三行那个 `toEqual` 才是它的牙）。
     expect(options.filter((v) => v === 'month' || v === 'week' || v === 'day' || v === 'year')).toEqual([
-      'month',
-      'week',
       'day',
+      'week',
+      'month',
       'year',
     ]);
     // ⚠️ 2026-10-03 批五下半起，这一栏还多一项 `'timeline'` —— 它**不是**日历档位，
     //    而是外壳视图的跳转（点了真能走，且不会写进日历 store）。
     //    那一条的形状由 `calendar-view-family.spec.tsx` 钉，这里只登记"没有第六种东西"。
-    expect(options).toEqual(['month', 'week', 'day', 'year', 'timeline']);
+    expect(options).toEqual(['day', 'week', 'month', 'year', 'timeline']);
   });
 
   it('功能模块里能关掉日历 —— 关掉之后 rail 上就没有它了', async () => {

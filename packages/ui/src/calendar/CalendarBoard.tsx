@@ -441,6 +441,14 @@ function DayCell({
           所以"3 条 + +0"这种废话在结构上写不出来。
       */}
       {visibleBars.map((bar) => {
+        const strong = bar.overdue
+          ? tokens['color.danger']
+          : bar.done
+            ? tokens['color.foreground-subtle']
+            : bar.accent === undefined
+              ? tokens['color.primary']
+              : (tokens[bar.accent] as string);
+        /* 滴答式彩色块 chip：绝对定位的 strong 色层 + 低 opacity 做浅底，文字用同色。 */
         const node = (
         <View
           key={bar.id}
@@ -455,7 +463,8 @@ function DayCell({
               gap: tokens['space.1'],
               // 选中格已经使用 primary-subtle；任务条需要独立的 surface 层，
               // 否则选中日期里的任务条会与格子背景融合，只剩状态色条和文字。
-              backgroundColor: isSelected ? tokens['color.surface'] : tokens['color.primary-subtle'],
+              paddingHorizontal: tokens['space.1'],
+              overflow: 'hidden',
               borderRadius: tokens['radius.sm'],
               marginLeft:
                 bar.span === 'middle' || bar.span === 'end' ? -tokens['space.1'] : undefined,
@@ -472,25 +481,7 @@ function DayCell({
             },
           ]}
         >
-          <View
-            style={{
-              width: tokens['border-width.thick'],
-              alignSelf: 'stretch',
-              borderRadius: tokens['radius.full'],
-              /**
-               * 🔴 优先级：逾期 > 完成 > 象限 > 默认。
-               * 逾期与完成是**状态**，象限是**分类**；状态盖住分类才对 ——
-               * 一条逾期的"计划做"应该在日历上红着，而不是蓝着。
-               */
-              backgroundColor: bar.overdue
-                ? tokens['color.danger']
-                : bar.done
-                  ? tokens['color.foreground-subtle']
-                  : bar.accent === undefined
-                    ? tokens['color.primary']
-                    : (tokens[bar.accent] as string),
-            }}
-          />
+          <View style={[styles.barTint, { backgroundColor: strong }]} pointerEvents="none" />
           <Text
             numberOfLines={1}
             /* 🔴 标题**自己带一个 testID**：RN-web 里 `Text` 和 `View` 都渲染成 `<div>`，
@@ -501,7 +492,7 @@ function DayCell({
               text['row-meta'],
               styles.barTitle,
               {
-                color: bar.done ? tokens['color.foreground-subtle'] : tokens['color.foreground'],
+                color: strong,
               },
             ]}
           >
@@ -1182,6 +1173,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
       paddingVertical: tokens['space.1'],
     },
     bar: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
+    /* 彩色块 chip 的浅底：铺满条、strong 色、0.16 透明度（不新增 token，RN/RNW 原生支持 opacity）。 */
+    barTint: { ...StyleSheet.absoluteFillObject, borderRadius: tokens['radius.sm'], opacity: 0.16 },
     barTitle: { flex: 1, minWidth: 0 },
     dayHeader: { flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] },
     dayTitle: { flex: 1 },

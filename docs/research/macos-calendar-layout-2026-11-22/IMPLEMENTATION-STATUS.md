@@ -66,3 +66,10 @@
 - 语义优先级沿用既有：逾期(红) > 完成(灰) > 分类色 > 默认主色（状态盖分类）。
 - 验证：`ui/calendar-cell-bars`(20)、`web/calendar-*`(35) 单测全绿；`typecheck` 绿；真机图 `img/11-live-color.jpg`（写周报=红/工作，发版=蓝/项目组）；父清单"项目组"可勾选且加粗当分组头、子清单缩进。
 - ⚠️ 并发：`CalendarBoard.tsx`/`CalendarView.tsx` 同时含有另一个并行 agent 进行中的"日档拖拽到小时"未提交改动（`planCalendarTimeDrop`/`CalendarDropHour` 等），本提交为整树快照（当前编译通过）；纯属对方的 `CalendarDnd.tsx`/`calendar-dnd.css`/`CalendarDayBoard.tsx`/`domain/calendar-drop.*` 未纳入本提交。
+
+## 视图顺序 = 日/周/月/年 + 滴答式彩色块 chip（2026-11-22 续）
+
+- **视图分段顺序**改为 macOS 的 `日/周/月/年`：`packages/ui/src/calendar/model.ts` 的 `CALENDAR_VIEW_ORDER` 由 `month,week,day,year` 改为 `day,week,month,year`。同步 web 单测硬编码：`calendar-view.spec.tsx`、`calendar-view-family.spec.tsx`（标签数组改 `日,周,月,年`）。e2e `calendar-view-options` 读共享源码动态，自动跟随。
+- **滴答式彩色块 chip**：月格条目由"细色条+文字"改为**实心浅底圆角块+同色字**。实现：`CalendarBoard` 每条叠一层 `styles.barTint`（`StyleSheet.absoluteFillObject` + `backgroundColor: strong` + `opacity:0.16`），文字用 `strong` 色。**零新 token、零裸 hex、不用 `color-mix`**（RN-web 不接受 style 里的 color-mix，已实测丢弃为透明；改 opacity 层后正常）。状态语义不变：逾期→danger、完成→foreground-subtle、否则→所属清单色、未设色→primary。
+- 验证：`ui/calendar-cell-bars`(21)、`web/calendar-view+family`(20)、`web/calendar-*(含 sidebar/tabs)`(46) 全绿；`typecheck` 无日历错误；真机图 `img/12-live-chips.jpg`（写周报=浅红、整理桌面=浅青、读书=浅蓝；顶部 `日 周 月 年`）。
+- ⚠️ 仍受并发影响：`CalendarDnd.tsx`/`calendar-dnd.css`/`domain/calendar-drop.*`/`CalendarDayBoard.tsx` 是并行 agent 的未提交改动，未纳入本提交。
