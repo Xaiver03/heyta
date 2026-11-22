@@ -16,6 +16,7 @@ import {
   type AiToolProposal,
   type ChatItem,
   type AppHost,
+  assistantGrants,
   createManagedTransport,
 } from '@heyta/app-host';
 import {
@@ -57,6 +58,7 @@ import {
 import { ChatTranscript, type ChatTranscriptItem } from './chat-transcript';
 import { intentText } from './intent-copy';
 import { getAiSettings, saveAiSettings, useAiSettings, aiSecrets } from './settings-store';
+import { runMobileCloudTurn } from './cloud-harness';
 import { useMobileSync } from '../sync/store';
 
 const resolveHistoryAccount = createAssistantHistoryAccountResolver();
@@ -113,6 +115,10 @@ const managedTransport = createManagedTransport({
  * 用户最差拿到的是一份完整回答，只是没有逐字。
  */
 const streamingFetch = createGatedStreamingFetch(privacyConsent);
+
+/** 移动端 Harness 开关：默认关（只读），开启后 runTurn 走 runMobileCloudTurn。 */
+const MOBILE_CLOUD_HARNESS = false;
+
 
 /**
  * **发送那一刻**现算的路由配置（见 `ChatRuntime.resolveRouting` 的注释）。
@@ -220,6 +226,18 @@ export function AssistantScreen({
       localize: (key, vars) => t(key as MessageKey, vars),
       onHealth: persistHealth,
       typewriter: true,
+      ...(MOBILE_CLOUD_HARNESS && host !== null
+        ? {
+            cloudTurn: async (text: string) => {
+              const res = await runMobileCloudTurn(host, text, {
+                routing: resolveRouting(),
+                consents: getAiSettings().consents,
+                grants: assistantGrants(),
+              });
+              return { text: res.error !== undefined ? `出错：${res.error}` : res.turn.text };
+            },
+          }
+        : {}),
     }),
     [settings, t, toolHost],
   );

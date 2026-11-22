@@ -56,6 +56,8 @@ export interface MobileCloudTurnResult {
   readonly turn: CloudAgentTurnResult;
   readonly seqBefore: number;
   readonly runId: string;
+  /** 中途抛错时的错误信息（turn 为空、seqBefore 仍可用于撤销已写部分）。 */
+  readonly error?: string;
 }
 
 export async function runMobileCloudTurn(
@@ -72,7 +74,12 @@ export async function runMobileCloudTurn(
     undo: mobileUndoBindings(host),
     ...(deps.runId === undefined ? {} : { runId: deps.runId }),
   });
-  return { turn: result.turn, seqBefore: result.seqBefore, runId: result.runId };
+  return {
+    turn: result.turn,
+    seqBefore: result.seqBefore,
+    runId: result.runId,
+    ...(result.error === undefined ? {} : { error: result.error }),
+  };
 }
 
 export async function undoMobileCloudTurn(host: AppHost, seqBefore: number): Promise<unknown> {

@@ -61,6 +61,12 @@ export interface ChatRuntime {
    */
   readonly managedTransport: ManagedTransport;
   /**
+   * 可选：云端 Agent Harness 的跑一轮回调（设备本地循环 + 云端模型 + 本地数据工具）。
+   * 给了它，`runTurn` 改走 Harness（当前移动端为**只读**，见 AssistantScreen 的开关与说明）；
+   * 省略则保持既有 `requestAssistantTurn`。由壳注入，控制器不建造引擎（保持 UI 层哑）。
+   */
+  readonly cloudTurn?: (text: string) => Promise<{ readonly text: string }>;
+  /**
    * **求助时现算**的那一份路由配置。
    *
    * 🔴 为什么不是直接读 `settings.routing`：托管档的端点来自**同步服务器**
@@ -468,6 +474,20 @@ class MobileChatController implements ChatController {
      */
     this.update({ phase: 'running', live: EMPTY_LIVE });
     this.executionNumber += 1;
+    if (runtime.cloudTurn !== undefined) {
+      try {
+        const res = await runtime.cloudTurn(text);
+        if (epoch !== this.accountEpoch) return;
+        this.append({ role: 'assistant', text: res.text, steps: [], stoppedAt: undefined });
+      } catch (error: unknown) {
+        if (epoch !== this.accountEpoch) return;
+        this.append({ role: 'error', message: error instanceof Error ? error.message : 'request failed', reason: 'routing-failed', cause: undefined, endpointUrl: undefined, serverCode: undefined, outsideFields: undefined });
+      } finally {
+        this.sendInFlight = false;
+        if (epoch === this.accountEpoch) this.update({ phase: 'idle', live: undefined });
+      }
+      return;
+    }
     try {
       const outcome = await requestAssistantTurn(
         { text, ...(images.length === 0 ? {} : { images }) },
