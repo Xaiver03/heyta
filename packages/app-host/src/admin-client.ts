@@ -974,3 +974,77 @@ export const adminRevokeSubscriptionGrant = (
     method: 'POST',
     body: input,
   });
+
+
+// ─────────────────────────────────────────────────────────────────────
+// AI 网关（管理后台）—— 与 `server/src/admin/ai-gateway.routes.ts` 三条端点一一对应。
+//   传输层照旧**不做判断**：校验/脱敏/选择都在服务端 `ai-gateway.ts`。
+// ─────────────────────────────────────────────────────────────────────
+
+/** 一条上游（**脱敏视图**：服务端不回显 apiKey，只说配没配）。 */
+export interface AdminAiUpstream {
+  readonly id: string;
+  readonly label: string;
+  readonly baseUrl: string;
+  readonly modelId: string;
+  readonly enabled: boolean;
+  readonly weight: number;
+  readonly priority: number;
+  readonly hasApiKey: boolean;
+}
+
+export interface AdminAiGatewayView {
+  readonly ok: true;
+  readonly source: 'file' | 'env';
+  readonly upstreams: readonly AdminAiUpstream[];
+  readonly skipped: readonly { readonly index: number; readonly reason: string }[];
+}
+
+/** PUT 的入参：可带 apiKey（写入时）；省略 apiKey = 保留原值由服务端合并（当前服务端整份替换）。 */
+export interface AdminAiUpstreamInput {
+  readonly id: string;
+  readonly label?: string;
+  readonly baseUrl: string;
+  readonly modelId: string;
+  readonly apiKey?: string;
+  readonly enabled?: boolean;
+  readonly weight?: number;
+  readonly priority?: number;
+}
+
+export interface AdminAiGatewayPutResult {
+  readonly ok: true;
+  readonly upstreams: readonly AdminAiUpstream[];
+}
+
+export interface AdminAiUpstreamTestResult {
+  readonly ok: boolean;
+  readonly status?: number;
+  readonly message?: string;
+}
+
+/** `GET /api/admin/ai-gateway`。 */
+export const fetchAdminAiGateway = (
+  options: AdminClientOptions,
+): Promise<AdminResult<AdminAiGatewayView>> =>
+  adminRequest<AdminAiGatewayView>(options, `${ADMIN_API_PREFIX}/ai-gateway`);
+
+/** `PUT /api/admin/ai-gateway` —— 整份替换上游列表。 */
+export const adminPutAiGateway = (
+  options: AdminClientOptions,
+  upstreams: readonly AdminAiUpstreamInput[],
+): Promise<AdminResult<AdminAiGatewayPutResult>> =>
+  adminRequest<AdminAiGatewayPutResult>(options, `${ADMIN_API_PREFIX}/ai-gateway`, {
+    method: 'PUT',
+    body: { upstreams },
+  });
+
+/** `POST /api/admin/ai-gateway/test` —— 试连一条上游（https /models）。 */
+export const adminTestAiUpstream = (
+  options: AdminClientOptions,
+  id: string,
+): Promise<AdminResult<AdminAiUpstreamTestResult>> =>
+  adminRequest<AdminAiUpstreamTestResult>(options, `${ADMIN_API_PREFIX}/ai-gateway/test`, {
+    method: 'POST',
+    body: { id },
+  });
