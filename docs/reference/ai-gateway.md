@@ -30,3 +30,8 @@ PP 网关按**一条 OpenAI 兼容上游**接入（`id=pp`）。在后台或 `MA
 
 ## 判据
 - `server/tests/ai-gateway.spec.ts`（解析/选择/脱敏）、`ai-gateway.routes.spec.ts`（CRUD/试连/密钥沿用）、`managed-proxy.routes.spec.ts`（30 条，含按网关选上游不回归）。
+
+## Harness 层周报/年终总结（零 C 端入口）
+- `packages/app-host/src/ai-report-tools.ts`：`weekly_report` / `year_end_summary` 只读工具，本地聚合 `getState()`。
+- Web `runWebCloudTurn` / 移动 `runMobileCloudTurn` 已传 `getReportState`（`useTaskStore.entities` / `host.getState()`）——助手可直接生成周报/年终，**无新增界面/按钮**。
+- 出境：工具观测字段已列入 `egressFields`，未声明会被出境闸门拦下（有测试）。

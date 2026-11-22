@@ -20,7 +20,7 @@ import {
 } from '@heyta/app-host';
 
 import { requireEngine } from '../../lib/oplog.js';
-import { createAiToolHost } from '../tasks/store.js';
+import { createAiToolHost, useTaskStore } from '../tasks/store.js';
 
 /**
  * Web 壳的撤销绑定。
@@ -72,6 +72,8 @@ export async function runWebCloudTurn(
     transport,
     grants: deps.grants,
     undo: bindings,
+    // 周报/年终总结走 Harness 工具（零入口）：把本机物化状态交给聚合。
+    getReportState: () => useTaskStore.getState().entities,
     ...(deps.runId === undefined ? {} : { runId: deps.runId }),
   });
   return {
