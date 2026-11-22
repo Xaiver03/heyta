@@ -139,3 +139,5 @@
 - **关键发现**：heyta Web 数据层依赖 **OPFS + SyncAccessHandle**；WebKitGTK 2.38 在无桌面会话环境不支持 ⇒ 界面可渲染但存储初始化失败。**原生壳要数据可用，需接原生 SQLite 桥（`__heytaHostStoragePort`）**，或改用支持 OPFS-SAH 的 WebKit。详见 runbook [kylin-uos-gtk3-shell.md](../runbooks/kylin-uos-gtk3-shell.md)。
 - **B**：openKylin 桌面 ISO 下载 / QEMU 起机验证进行中。
 - **B（openKylin）**：用 openKylin 3.0 官方容器镜像（`docker.1panel.live/openkylin/openkylin:latest`，glibc 2.43）作为 openKylin 用户态实测——装核心运行依赖（`libgtk-3-0` / `libwebkit2gtk-4.0-37` / `python3`）后 `dpkg -i heyta-gtk3` → `install ok installed`；Xvfb 下启动原生窗口 → `HEYTA_WEBVIEW_READY title=heyta`，截图为 heyta 启动画面。即「能在 openKylin 上装上并起窗口」成立。全桌面 ISO(7.6GB)未走完（判据已由容器满足，下载已停止）。
+
+- **A 增强（2026-11-23）**：GTK3 原生壳接入原生 SQLite 数据桥（惰性初始化：`__heytaHostStoragePort`→`heytaStorage`→JSC+driver）。deepin20(webkit2.38) 实测界面完整渲染且数据落 `~/.local/share/heyta/heyta.sqlite`（表 ops/ops__mt3/state/meta/archive）；openKylin(webkit2.28) 可安装并打开窗口，但旧 WebKit 不执行现代 JS（数据需 WebKit≥2.38 或 Chromium）。包 `heyta-gtk3_0.2.0+20261123_amd64.deb`。
