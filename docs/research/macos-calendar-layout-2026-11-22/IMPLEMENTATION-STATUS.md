@@ -48,3 +48,12 @@
 | 月格任务条 | `7` 条 | 日期任务正确落在格子里 ✓ |
 
 另：这张**渲染完全成功**的截图里，控制台仍出现 `[heyta] 首屏在超时内未被应用接管`。⇒ 该报错是应用**看门狗误报**（界面已正常接管仍打印），是许多 e2e `expect(errors).toEqual([])` 失败的同源根因，与日历布局改动无关（A/B 已证）。
+
+## 清单分类（文件夹）— 已可创建 + 日历侧栏分组显示（2026-11-22 续）
+
+- 应用本就把"文件夹"建模为**父清单**（`Project.parentId`，词条 `common.organizer.folder.*`，已有"移入文件夹"）。
+  缺的是**新建时直接选父级**。
+- 已在新建清单对话框加「文件夹(归属)」选择（复用现有词条，未改 i18n，避免与并行会话冲突）：
+  `apps/web/src/features/categories/CategoryCreateDialog.tsx`、`apps/web/src/features/projects/ProjectsPanel.tsx`。
+- 日历侧栏据此渲染成 **分类 → 清单**：真机数据读数 `cats=["项目组"]`、`rows=["子清单A","子清单B","个人"]`、`miniBelowScope=true`、`errs=[]`（图 `img/10-live-category.jpg`）。
+- 单测：`projects-panel`(51)/`categories`(15)/`category-colors-flow` 全绿；`typecheck` 通过。

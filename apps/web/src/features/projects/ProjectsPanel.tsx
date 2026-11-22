@@ -506,10 +506,11 @@ export function ProjectsPanel({
           kind={createKind ?? 'project'}
           existingNames={createKind === 'tag' ? projects.tags.map((item) => item.name) : projects.projects.map((item) => item.name)}
           supportsColor={createKind === 'project'}
+          parentOptions={createKind === 'project' ? tree.map((node) => ({ id: node.id, name: node.name })) : undefined}
           onClose={() => setCreateKind(null)}
-          onCreate={async ({ name, color }) => {
+          onCreate={async ({ name, color, parentId }) => {
             if (createKind === 'project') {
-              const id = await projects.addProject(name, undefined, color);
+              const id = await projects.addProject(name, parentId, color);
               if (id !== undefined) onFilterWith({ kind: 'project', projectId: id });
             } else {
               const id = await projects.addTag(name);

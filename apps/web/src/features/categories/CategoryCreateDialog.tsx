@@ -20,8 +20,10 @@ interface CategoryCreateDialogProps {
   kind: CategoryCreateKind;
   existingNames: readonly string[];
   supportsColor?: boolean;
+  /** 可选的上级「文件夹(=分类)」（仅 project 用）。空数组/不传时不显示选择器。 */
+  parentOptions?: readonly { id: string; name: string }[];
   onClose: () => void;
-  onCreate: (input: { name: string; color?: CategorySlot }) => Promise<void>;
+  onCreate: (input: { name: string; color?: CategorySlot; parentId?: string }) => Promise<void>;
 }
 
 /**
@@ -47,6 +49,7 @@ function CategoryDraftForm({
   kind,
   existingNames,
   supportsColor = false,
+  parentOptions,
   onClose,
   onCreate,
 }: CategoryDraftFormProps): React.JSX.Element {
@@ -55,6 +58,7 @@ function CategoryDraftForm({
   const busyRef = useRef(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState<CategorySlot | undefined>(undefined);
+  const [parentId, setParentId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   /* 🔴 名称与颜色都住在本地 state，关掉即丢 ⇒ 三条通道先问一句。
@@ -100,7 +104,11 @@ function CategoryDraftForm({
     setBusy(true);
     setError('');
     try {
-      await onCreate({ name: trimmed, ...(supportsColor && color !== undefined ? { color } : {}) });
+      await onCreate({
+        name: trimmed,
+        ...(supportsColor && color !== undefined ? { color } : {}),
+        ...(kind === 'project' && parentId !== '' ? { parentId } : {}),
+      });
       onClose();
     } catch {
       setError(t('web.categories.create.failed'));
@@ -174,6 +182,33 @@ function CategoryDraftForm({
               />
             )}
           </FormField>
+
+          {kind === 'project' && parentOptions !== undefined && parentOptions.length > 0 ? (
+            <FormField
+              id="ht-category-create-parent"
+              label={t('common.organizer.folder.title')}
+              layout="stacked"
+            >
+              {(field) => (
+                <select
+                  {...field}
+                  data-testid="category-create-parent"
+                  value={parentId}
+                  onChange={(event) => {
+                    setParentId(event.target.value);
+                  }}
+                  disabled={busy}
+                >
+                  <option value="">{t('common.organizer.folder.none')}</option>
+                  {parentOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+          ) : null}
 
           {supportsColor ? (
             <fieldset className="ht-category-create-dialog__colors">
