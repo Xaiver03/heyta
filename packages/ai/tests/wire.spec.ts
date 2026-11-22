@@ -234,3 +234,13 @@ describe('tool_choice 透传（默认 auto，字节兼容）', () => {
     expect(body.tool_choice).toEqual({ type: 'function', function: { name: 'list_tasks' } });
   });
 });
+
+describe('response_format（结构化输出）', () => {
+  it('设置时出现、省略时不出现', () => {
+    const base = { feature: 'tool-calling' as const, system: 's', user: 'u', fields: ['text'] as const };
+    const without = buildChatRequestBody('m', { ...base });
+    expect('response_format' in without).toBe(false);
+    const withFmt = buildChatRequestBody('m', { ...base, responseFormat: { type: 'json_schema', json_schema: { name: 'x', strict: true, schema: { type: 'object' } } } });
+    expect(withFmt.response_format).toEqual({ type: 'json_schema', json_schema: { name: 'x', strict: true, schema: { type: 'object' } } });
+  });
+});

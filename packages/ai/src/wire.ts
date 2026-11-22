@@ -140,6 +140,11 @@ export interface ChatRequestOptions {
 }
 
 /** 工具选择控制（OpenAI 兼容 `tool_choice`）。默认 `'auto'`。 */
+/** OpenAI 兼容的结构化输出约束（`response_format`）。仅在显式设置时出现。 */
+export type WireResponseFormat =
+  | { readonly type: 'json_object' }
+  | { readonly type: 'json_schema'; readonly json_schema: { readonly name: string; readonly strict: true; readonly schema: Record<string, unknown> } };
+
 export type WireToolChoice =
   | 'auto'
   | 'required'
@@ -178,7 +183,7 @@ function toWireTools(tools: readonly AiToolDescriptor[], choice: WireToolChoice 
  * 否则 `assertImagesSendable()` 直接抛错。也就是说省略是安全的（没有图片就没有
  * 需要披露的图片），而"有图但不披露"是发不出去的。
  */
-export type WireInvocation = Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages' | 'toolChoice'> & {
+export type WireInvocation = Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages' | 'toolChoice' | 'responseFormat'> & {
   readonly fields?: readonly string[];
   readonly images?: readonly AiImagePart[];
 };
@@ -208,6 +213,7 @@ export function buildChatRequestBody(
   messages: readonly Record<string, unknown>[];
   tools?: readonly WireTool[];
   tool_choice?: WireToolChoice;
+  response_format?: WireResponseFormat;
   stream?: true;
 } {
   const images = invocation.images ?? [];
@@ -224,6 +230,7 @@ export function buildChatRequestBody(
     // `[system, user]` —— 那五个既有调用点的字节形状**一个字都不许变**。
     messages: (images.length === 0 ? base : attachImages(base, images)).map(toWireMessage),
     ...(withTools ? toWireTools(invocation.tools ?? [], invocation.toolChoice ?? 'auto') : {}),
+    ...(invocation.responseFormat === undefined ? {} : { response_format: invocation.responseFormat }),
     // 🔴 放在**最后**，且只在要求流式时才出现：省略时键的顺序与缺键形态
     // 与加流式之前逐字相同（`wire.spec.ts` 按原始串比对）。
     ...(options?.stream === true ? { stream: true as const } : {}),
@@ -383,13 +390,14 @@ export function sameHost(a: string, b: string): boolean {
  */
 export function buildManagedChatRequestBody(
   feature: AiFeature,
-  invocation: Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages' | 'toolChoice'>,
+  invocation: Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages' | 'toolChoice' | 'responseFormat'>,
   options?: ChatRequestOptions,
 ): {
   feature: AiFeature;
   messages: readonly Record<string, unknown>[];
   tools?: readonly WireTool[];
   tool_choice?: WireToolChoice;
+  response_format?: WireResponseFormat;
   stream?: true;
 } {
   const withTools = invocation.tools !== undefined && invocation.tools.length > 0;
@@ -400,6 +408,7 @@ export function buildManagedChatRequestBody(
       { role: 'user', content: invocation.user },
     ]).map(toWireMessage),
     ...(withTools ? toWireTools(invocation.tools ?? [], invocation.toolChoice ?? 'auto') : {}),
+    ...(invocation.responseFormat === undefined ? {} : { response_format: invocation.responseFormat }),
     // 托管代理的 `ChatBodySchema` 里 `stream` 是可选的（见 `managed-proxy.routes.ts`），
     // 它的流式分支按 SSE 逐字节透传上游 —— 所以这里与服务端契约同形，不是新协议。
     ...(options?.stream === true ? { stream: true as const } : {}),

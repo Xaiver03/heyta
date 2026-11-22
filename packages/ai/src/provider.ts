@@ -118,6 +118,8 @@ export interface AiInvocation {
   tools?: readonly AiToolDescriptor[];
   /** 工具选择控制；省略=不带该字段(旧行为)，默认语义 `auto`。不是出境数据。 */
   toolChoice?: import('./wire').WireToolChoice;
+  /** 结构化输出约束（非工具任务）；省略=不带该字段(旧行为)。 */
+  responseFormat?: import('./wire').WireResponseFormat;
   /**
    * 多轮消息。**给了它，它就是这次出境的唯一事实源** —— `system` / `user`
    * 仍然要写（类型上必填、五个既有调用点都在写），但请求体里发的是这个数组。

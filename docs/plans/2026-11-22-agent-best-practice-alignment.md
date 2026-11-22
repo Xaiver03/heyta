@@ -20,7 +20,7 @@
 | 工具调用增量流式（streaming tool_calls） | ⚠️ 缺口 | 仅流式文本（`onTextDelta`）；`tool-call` delta 未回 UI |
 | 重试/退避（瞬时错误） | ✅ | `agent-harness.ts` `retryAttempts/retryBackoffMs`：仅对 `isRetryable`（默认=只读）工具**有界重试+线性退避**；写工具不重试。`invokeRouted` 端点回退仍在 |
 | 单工具超时 | ✅ | `agent-harness.ts` `toolTimeoutMs`（默认 60s），超时算失败回灌 |
-| 结构化输出（JSON mode / strict） | ⚠️ 缺口 | 非工具任务靠提示词，未用 strict/json schema 约束 |
+| 结构化输出（JSON mode / strict） | ✅ | `wire.ts` `WireResponseFormat`（`json_schema strict`/`json_object`，仅显式设置时出现）；`app-host` `structuredJson()` 造约束、`parseStructuredOutput()` 解析失败**回退原文**；测试覆盖 |
 | 提供商差异化（Anthropic tool_result is_error / OpenAI role:tool） | ✅ 因地制宜 | 我们统一走 OpenAI 兼容线格式（`wire.ts`）；PP 网关即 OpenAI 兼容 |
 
 ## 因地制宜原则（不盲目照抄厂商文档）

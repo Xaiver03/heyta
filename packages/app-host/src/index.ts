@@ -1223,6 +1223,11 @@ export {
   type RoutedModelCallOptions,
 } from './ai-routed-model.js';
 export {
+  structuredJson,
+  parseStructuredOutput,
+  type StructuredParse,
+} from './ai-structured-output.js';
+export {
   aggregateWeekly,
   aggregateYearEnd,
   createReportAwareTransport,
