@@ -6151,6 +6151,7 @@ export const zhCN = {
   'web.admin.aiGateway.priority': '优先级',
   'web.admin.aiGateway.weight': '权重',
   'web.admin.aiGateway.enabled': '启用',
+  'web.admin.aiGateway.health': '健康',
   'web.admin.aiGateway.remove': '删除',
   'web.admin.refund.lead': '这里做的是「申请 → 批准 → 通道 → 回调」这条链的前两层。批准会把这笔退款交给支付通道，钱一旦发出就收不回来；而「已经退到账」只由微信的签名回调确认，不由这里点出来。',
   'web.admin.refund.list': '退款申请',

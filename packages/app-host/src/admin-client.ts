@@ -991,6 +991,14 @@ export interface AdminAiUpstream {
   readonly weight: number;
   readonly priority: number;
   readonly hasApiKey: boolean;
+  /** 运行态健康（服务端进程内）：成败计数与连续失败。可选（旧服务端无此字段）。 */
+  readonly health?: {
+    readonly consecutiveFails: number;
+    readonly lastOkAt: number | null;
+    readonly lastFailAt: number | null;
+    readonly totalOk: number;
+    readonly totalFail: number;
+  };
 }
 
 export interface AdminAiGatewayView {

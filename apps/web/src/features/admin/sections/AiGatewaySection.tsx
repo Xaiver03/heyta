@@ -21,6 +21,7 @@ interface DraftRow {
   priority: string;
   weight: string;
   hasApiKey: boolean;
+  health?: { consecutiveFails: number; totalOk: number; totalFail: number };
 }
 
 export function AiGatewaySection({ store }: { store: AdminStoreState }): React.JSX.Element {
@@ -43,6 +44,7 @@ export function AiGatewaySection({ store }: { store: AdminStoreState }): React.J
         priority: String(u.priority),
         weight: String(u.weight),
         hasApiKey: u.hasApiKey,
+        ...(u.health === undefined ? {} : { health: { consecutiveFails: u.health.consecutiveFails, totalOk: u.health.totalOk, totalFail: u.health.totalFail } }),
       })),
     );
   }, [store.aiGateway]);
@@ -105,6 +107,7 @@ export function AiGatewaySection({ store }: { store: AdminStoreState }): React.J
               <th>{t('web.admin.aiGateway.priority')}</th>
               <th>{t('web.admin.aiGateway.weight')}</th>
               <th>{t('web.admin.aiGateway.enabled')}</th>
+              <th>{t('web.admin.aiGateway.health')}</th>
               <th />
             </tr>
           </thead>
@@ -126,6 +129,7 @@ export function AiGatewaySection({ store }: { store: AdminStoreState }): React.J
                 <td><input value={r.priority} onChange={(e) => patch(i, { priority: e.target.value })} /></td>
                 <td><input value={r.weight} onChange={(e) => patch(i, { weight: e.target.value })} /></td>
                 <td><input type="checkbox" checked={r.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} /></td>
+                <td>{r.health === undefined ? '—' : `${String(r.health.totalOk)}/${String(r.health.totalFail)}${r.health.consecutiveFails >= 3 ? ' ⚠' : ''}`}</td>
                 <td>
                   <button type="button" onClick={() => void test(r.id)} disabled={r.id === ''}>
                     {t('web.admin.aiGateway.test')}

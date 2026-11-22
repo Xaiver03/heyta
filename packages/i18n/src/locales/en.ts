@@ -5658,6 +5658,7 @@ export const en = {
   'web.admin.aiGateway.priority': 'Priority',
   'web.admin.aiGateway.weight': 'Weight',
   'web.admin.aiGateway.enabled': 'Enabled',
+  'web.admin.aiGateway.health': 'Health',
   'web.admin.aiGateway.remove': 'Remove',
   'web.admin.refund.lead': 'This panel covers the first two steps of the chain: request → approve → channel → callback. Approving hands the refund to the payment channel, and money sent cannot be taken back. "Refunded" is only ever confirmed by the signed callback from WeChat, never by this panel.',
   'web.admin.refund.list': 'Refund requests',
