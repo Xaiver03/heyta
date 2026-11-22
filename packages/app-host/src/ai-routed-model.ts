@@ -54,6 +54,8 @@ export interface RoutedModelCallOptions {
    * `invokeRouted` 自动退回非流式（无需这里判断）。
    */
   readonly onTextDelta?: (text: string) => void;
+  /** 流式期间的**工具调用增量**（id/name 一确定就回调）——UI 可显示"正在准备调用 X"。 */
+  readonly onToolCall?: (call: { readonly id: string; readonly name: string }) => void;
   /** 透传到线协议的 tool_choice（默认不设=auto）。 */
   readonly toolChoice?: import('@heyta/ai').WireToolChoice;
 }
@@ -181,15 +183,18 @@ export function createRoutedModelCall(
       messages: harnessMessagesToChat(messages),
     };
 
-    const routedDeps =
-      options.onTextDelta === undefined
-        ? deps
-        : {
-            ...deps,
-            onDelta: (delta: { type: string; delta?: string }) => {
-              if (delta.type === 'text' && typeof delta.delta === 'string') options.onTextDelta?.(delta.delta);
-            },
-          };
+    const wantsDelta = options.onTextDelta !== undefined || options.onToolCall !== undefined;
+    const routedDeps = !wantsDelta
+      ? deps
+      : {
+          ...deps,
+          onDelta: (delta: { type: string; delta?: string; id?: string; name?: string }) => {
+            if (delta.type === 'text' && typeof delta.delta === 'string') options.onTextDelta?.(delta.delta);
+            if (delta.type === 'tool-call' && typeof delta.id === 'string' && typeof delta.name === 'string') {
+              options.onToolCall?.({ id: delta.id, name: delta.name });
+            }
+          },
+        };
     const outcome = await invoke(options.routing, invocation, options.consents, policy, routedDeps);
     const result = outcome.result;
     if (!result.ok) throw new Error(result.message);

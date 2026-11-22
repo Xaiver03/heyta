@@ -169,3 +169,17 @@ describe('toolChoice 透传（routed model）', () => {
     expect('toolChoice' in seen!).toBe(false);
   });
 });
+
+describe('工具调用增量流式（onToolCall）', () => {
+  it('onDelta 的 tool-call 增量回调到 onToolCall', async () => {
+    const seen: { id: string; name: string }[] = [];
+    const invoke: RoutedInvoke = async (_r, _inv, _c, _p, d) => {
+      const deps = d as { onDelta?: (x: { type: string; id?: string; name?: string }) => void } | undefined;
+      deps?.onDelta?.({ type: 'tool-call', id: 'c1', name: 'list_tasks' });
+      return okOutcome({ text: '', toolCalls: [{ id: 'c1', name: 'list_tasks', arguments: {} }] });
+    };
+    const call = createRoutedModelCall({ routing, invoke, onToolCall: (c) => seen.push(c) });
+    await call({ messages: [{ role: 'user', content: 'x' }], tools });
+    expect(seen).toEqual([{ id: 'c1', name: 'list_tasks' }]);
+  });
+});

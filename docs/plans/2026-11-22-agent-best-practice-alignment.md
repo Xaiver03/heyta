@@ -17,7 +17,7 @@
 | 副作用幂等（重试不重复落库） | ✅ | `Idempotency-Key = runId:s<step>:<callId>`；服务端去重 |
 | 写操作确认 / 可撤销（安全） | ✅ | 默认提案确认；Harness 模式 auto-write + `undoSince`（D1）；purge 排除 |
 | 系统提示（直接执行、少反问、说明拒绝） | ✅ | `CLOUD_ASSISTANT_SYSTEM_PROMPT` |
-| 工具调用增量流式（streaming tool_calls） | ⚠️ 缺口 | 仅流式文本（`onTextDelta`）；`tool-call` delta 未回 UI |
+| 工具调用增量流式（streaming tool_calls） | ✅ | 流式 `tool-call` delta 经 routed model `onToolCall`→`CloudAssistantTurnDeps.onToolCall` 回传（UI 可显示"正在准备调用 X"）；最终仍组装完整 toolCalls；测试覆盖 |
 | 重试/退避（瞬时错误） | ✅ | `agent-harness.ts` `retryAttempts/retryBackoffMs`：仅对 `isRetryable`（默认=只读）工具**有界重试+线性退避**；写工具不重试。`invokeRouted` 端点回退仍在 |
 | 单工具超时 | ✅ | `agent-harness.ts` `toolTimeoutMs`（默认 60s），超时算失败回灌 |
 | 结构化输出（JSON mode / strict） | ✅ | `wire.ts` `WireResponseFormat`（`json_schema strict`/`json_object`，仅显式设置时出现）；`app-host` `structuredJson()` 造约束、`parseStructuredOutput()` 解析失败**回退原文**；测试覆盖 |
