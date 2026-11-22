@@ -45,6 +45,7 @@ import { CalendarDays } from 'lucide';
 import { EmptyState } from '../empty-state/EmptyState.js';
 import { HeytaIcon } from '../icon/Icon.js';
 import { TaskList } from '../task-list/TaskList.js';
+import type { TaskRow } from '../task-list/model.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import { CalendarDayBoard } from './CalendarDayBoard.js';
 import { CalendarEventRow } from './CalendarEventRow.js';
@@ -168,6 +169,12 @@ export interface CalendarBoardProps {
    * ⚠️ 逾期仍然优先用 `danger` —— 那是"要注意"，不是分类。
    */
   readonly colorByQuadrant?: boolean;
+  /**
+   * 按**任务所属清单/文件夹的颜色**给月格任务条上强调色（web 用它做"彩色日历"）。
+   * 返回 `TokenName`（如 `color.category-3`）= 这条的色条用该 token；`undefined` = 默认。
+   * ⚠️ 默认不传 ⇒ 逐字节不变；逾期/完成仍优先（它们是状态，不是分类）。
+   */
+  readonly barAccentOf?: ((task: Task) => TokenName | undefined) | undefined;
   /** 月/周档是否隐藏重复的选中日清单（Web 使用格内任务条，移动端保留清单）。 */
   readonly showSelectedDayList?: boolean | undefined;
   /** 月档是否填满宿主传下来的可用高度。 */
@@ -231,6 +238,15 @@ export interface CalendarBoardProps {
    *    （`bar.event` / `bar.span`），共享层不替宿主决定。
    */
   readonly renderBarWrapper?: ((bar: CalendarCellBar, node: React.ReactNode) => React.ReactNode) | undefined;
+  /**
+   * 注入点（Web 专用）：日档里**每条任务行**包一层（拖拽源）—— 透传给 `CalendarDayBoard.renderRowWrapper`。
+   * 移动端不传 ⇒ 日档逐字节不变。
+   */
+  readonly renderDayTaskRowWrapper?: ((row: TaskRow, node: React.ReactNode) => React.ReactNode) | undefined;
+  /**
+   * 注入点（Web 专用）：日档里**每个小时行**包一层（投放目标）。`hour` 是 0–23。
+   */
+  readonly renderHourRowWrapper?: ((hour: number, node: React.ReactNode) => React.ReactNode) | undefined;
 }
 
 /**
@@ -554,6 +570,7 @@ export function CalendarBoard({
   toolbarTrailing,
   hideToolbarTitle,
   colorByQuadrant = false,
+  barAccentOf,
   showSelectedDayList = true,
   fillMonth = false,
   dayMarker,
@@ -562,6 +579,8 @@ export function CalendarBoard({
   eventLabels,
   renderDayCellWrapper,
   renderBarWrapper,
+  renderDayTaskRowWrapper,
+  renderHourRowWrapper,
 }: CalendarBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -711,6 +730,8 @@ export function CalendarBoard({
               busyTaskId={busyTaskId}
               labels={labels}
               {...(boardAppearance === undefined ? {} : { appearance: boardAppearance })}
+              {...(renderDayTaskRowWrapper === undefined ? {} : { renderRowWrapper: renderDayTaskRowWrapper })}
+              {...(renderHourRowWrapper === undefined ? {} : { renderHourRowWrapper })}
               testID={`${testID}-day`}
             />
           )}
@@ -816,7 +837,13 @@ export function CalendarBoard({
                     : MAX_CALENDAR_BARS,
                 eventsByDate?.get(cell.date),
                 eventLabels,
-                colorByQuadrant && now !== undefined ? { now } : undefined,
+                colorByQuadrant && now !== undefined && barAccentOf !== undefined
+                  ? { now, accentOf: barAccentOf }
+                  : colorByQuadrant && now !== undefined
+                    ? { now }
+                    : barAccentOf !== undefined
+                      ? { accentOf: barAccentOf }
+                      : undefined,
               );
               const dayCell = (
                 <DayCell

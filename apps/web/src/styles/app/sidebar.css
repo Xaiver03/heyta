@@ -674,3 +674,12 @@
   font-weight: var(--ht-font-weight-semibold);
   color: var(--ht-color-foreground-muted);
 }
+
+/* 清单「分组头」：父清单仍可勾选（能筛它自己的任务），只是加粗成组头。2026-11-22 */
+.ht-sidebar__scope-row--group .ht-sidebar__scope-name {
+  font-weight: var(--ht-font-weight-semibold);
+  color: var(--ht-color-foreground);
+}
+.ht-sidebar__scope-row--group {
+  margin-block-start: var(--ht-space-1);
+}

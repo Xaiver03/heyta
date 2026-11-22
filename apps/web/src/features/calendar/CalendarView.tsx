@@ -34,8 +34,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { adjustmentOn, canRescheduleByCalendarDrag, planCalendarDrop, scopeTasks, toLocalDate, type LocalDate } from '@heyta/domain';
+import { adjustmentOn, canRescheduleByCalendarDrag, parseCategorySlot, planCalendarDrop, planCalendarTimeDrop, scopeTasks, toLocalDate, type LocalDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
+import { CATEGORY_SLOT_TOKEN_BY_SLOT, type TokenName } from '@heyta/design-system';
 import {
   CalendarBoard as SharedCalendarBoard,
   HeytaUiProvider,
@@ -43,9 +44,10 @@ import {
 } from '@heyta/ui';
 
 import { CalendarCapturePopover } from './CalendarCapturePopover.js';
-import { CalendarDragBar, CalendarDragProvider, CalendarDropDay } from './CalendarDnd.js';
+import { CalendarDragBar, CalendarDragProvider, CalendarDropDay, CalendarDropHour } from './CalendarDnd.js';
 import { useCountdownStore } from '../countdown/store.js';
 import { useTaskStore } from '../tasks/store.js';
+import { useProjectStore } from '../projects/store.js';
 import { useCalendarLabels } from './useCalendarLabels.js';
 import { useDragDayNav } from './useDragDayNav.js';
 import { useWheelMonthNav } from './useWheelMonthNav.js';
@@ -68,6 +70,22 @@ export function CalendarView(): React.JSX.Element {
    * 两边的圆点各指各的）。现在它在一个只装日历界面状态的 store 里。
    */
   const view = useCalendarViewStore();
+
+  /**
+   * 清单/文件夹的颜色（用于把月格任务条"按所属清单着色"——彩色日历）。
+   * `CategorySlot` 是色槽号，真值在设计系统；这里只把"清单 id → token 名"建成表。
+   */
+  const projects = useProjectStore((s) => s.projects);
+  const projectAccentToken = useMemo(() => {
+    const map = new Map<string, TokenName>();
+    for (const project of projects) {
+      const slot = parseCategorySlot(project.color);
+      if (slot !== undefined) {
+        map.set(project.id, CATEGORY_SLOT_TOKEN_BY_SLOT[slot]);
+      }
+    }
+    return map;
+  }, [projects]);
 
   const today = toLocalDate(store.now);
   /** 正在写入的任务 id —— 防止连点产生两次 toggle。 */
@@ -104,6 +122,20 @@ export function CalendarView(): React.JSX.Element {
       if (plan === undefined) return;
       void store.setDueDate(taskId, plan.dueDate, plan.dueDateLocal).catch(() => {
         /* store 会把失败写进 TaskState.error；这里只防未处理的 rejection。 */
+      });
+    },
+    [store, tasksById],
+  );
+
+  /** 日档拖到某小时：落点 → `planCalendarTimeDrop` → 一次 `setDueDate`（带时刻、清 date-only）。 */
+  const onSetTime = useCallback(
+    (taskId: string, targetDate: LocalDate, hour: number) => {
+      const task = tasksById.get(taskId);
+      if (task === undefined) return;
+      const plan = planCalendarTimeDrop(task, targetDate, hour);
+      if (plan === undefined) return;
+      void store.setDueDate(taskId, plan.dueDate).catch(() => {
+        /* 同上，只防未处理的 rejection。 */
       });
     },
     [store, tasksById],
@@ -244,7 +276,7 @@ export function CalendarView(): React.JSX.Element {
 
   return (
     <HeytaUiProvider>
-      <CalendarDragProvider tasksById={tasksById} onReschedule={onReschedule}>
+      <CalendarDragProvider tasksById={tasksById} onReschedule={onReschedule} onSetTime={onSetTime}>
       {/*
         🔴 这一层**必须把 `.ht-content` 的确定高度传下去**（R11 批一"日历只占一半"的宿主那一刀）。
         共享板的根有 `flexGrow: 1`，但 `flexGrow` 只在**弹性容器**里生效 ——
@@ -290,6 +322,10 @@ export function CalendarView(): React.JSX.Element {
           /* 🔴 日档那条"现在"线的时钟**只有一个来源**：任务 store 的 `now`。
              界面 store 刻意不存时钟（存了就会漂 —— 放着不动的一屏，线还在走才算"现在"）。 */
           now={store.now}
+          /* 彩色日历：每条任务条按**所属清单**的颜色上强调色（未归属/未设色 ⇒ 默认色）。 */
+          barAccentOf={(task) =>
+            task.projectId === undefined ? undefined : projectAccentToken.get(task.projectId)
+          }
           onToday={() => {
             // 「今天」跳回：选中今天 + 月份跟过去（与迷你月历的 ○ 同一条路径）。
             view.goToToday(today);
@@ -314,6 +350,17 @@ export function CalendarView(): React.JSX.Element {
             if (task === undefined || !canRescheduleByCalendarDrag(task)) return node;
             return <CalendarDragBar id={bar.id}>{node}</CalendarDragBar>;
           }}
+          /* 日档：任务行可拖、小时行可放，落到某小时就改截止时刻（同一天）。 */
+          renderDayTaskRowWrapper={(row, node) => {
+            const task = tasksById.get(row.id);
+            if (task === undefined || !canRescheduleByCalendarDrag(task)) return node;
+            return <CalendarDragBar id={row.id}>{node}</CalendarDragBar>;
+          }}
+          renderHourRowWrapper={(hour, node) => (
+            <CalendarDropHour date={view.cursor} hour={hour}>
+              {node}
+            </CalendarDropHour>
+          )}
           testID={BOARD_TEST_ID}
         />
       </div>

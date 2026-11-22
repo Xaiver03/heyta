@@ -57,3 +57,12 @@
   `apps/web/src/features/categories/CategoryCreateDialog.tsx`、`apps/web/src/features/projects/ProjectsPanel.tsx`。
 - 日历侧栏据此渲染成 **分类 → 清单**：真机数据读数 `cats=["项目组"]`、`rows=["子清单A","子清单B","个人"]`、`miniBelowScope=true`、`errs=[]`（图 `img/10-live-category.jpg`）。
 - 单测：`projects-panel`(51)/`categories`(15)/`category-colors-flow` 全绿；`typecheck` 通过。
+
+## 彩色日历（2026-11-22 续）
+
+- 月格任务条按**任务所属清单/文件夹**的颜色显示色条；侧栏勾选框同步着色。
+- 实现：`calendarCellBars` 增可选 `accentOf`（只影响 `accent` 字段，不传即不变）；`CalendarBoard` 增 `barAccentOf`；
+  `CalendarView`(web) 把"清单 id → 分类色 token"（`parseCategorySlot` + `CATEGORY_SLOT_TOKEN_BY_SLOT`）接上；`CalendarSidebar` 勾选框 `accentColor` 上色。
+- 语义优先级沿用既有：逾期(红) > 完成(灰) > 分类色 > 默认主色（状态盖分类）。
+- 验证：`ui/calendar-cell-bars`(20)、`web/calendar-*`(35) 单测全绿；`typecheck` 绿；真机图 `img/11-live-color.jpg`（写周报=红/工作，发版=蓝/项目组）；父清单"项目组"可勾选且加粗当分组头、子清单缩进。
+- ⚠️ 并发：`CalendarBoard.tsx`/`CalendarView.tsx` 同时含有另一个并行 agent 进行中的"日档拖拽到小时"未提交改动（`planCalendarTimeDrop`/`CalendarDropHour` 等），本提交为整树快照（当前编译通过）；纯属对方的 `CalendarDnd.tsx`/`calendar-dnd.css`/`CalendarDayBoard.tsx`/`domain/calendar-drop.*` 未纳入本提交。

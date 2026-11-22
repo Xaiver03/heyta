@@ -227,8 +227,16 @@ export function calendarCellBars(
   /**
    * 可选：把这些条也标上象限（见 `CalendarCellBar.quadrant`）。
    * 只影响**多出来的那一个字段**，不改条的数量、顺序与措辞。
+   *
+   * `accentOf`：按任务给条子的**强调色 token**（宿主用来"按所属清单/文件夹上色"）。
+   * 只影响 `accent` 这一个字段；不传时逐字节不变。
    */
-  options?: { readonly now?: number | undefined } | undefined,
+  options?:
+    | {
+        readonly now?: number | undefined;
+        readonly accentOf?: (task: Task) => TokenName | undefined;
+      }
+    | undefined,
 ): { readonly bars: readonly CalendarCellBar[]; readonly hidden: number } {
   type DecoratedCalendarBar = {
     readonly bar: CalendarCellBar;
@@ -259,6 +267,9 @@ export function calendarCellBars(
         ...(options?.now === undefined
           ? {}
           : { quadrant: classifyQuadrant(task, { now: options.now }) }),
+        ...(options?.accentOf === undefined
+          ? {}
+          : ((accent) => (accent === undefined ? {} : { accent }))(options.accentOf(task))),
       } satisfies CalendarCellBar,
       /** Multi-day bars keep the lane implied by their original start date. */
       laneStart: span?.from ?? date,

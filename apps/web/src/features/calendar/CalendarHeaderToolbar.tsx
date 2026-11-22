@@ -274,6 +274,7 @@ export function CalendarHeaderToolbar({
             type="button"
             className="ht-cal-navbtn"
             aria-label={prevLabel}
+            role="button"
             data-testid="calendar-toolbar-prev"
             onClick={() => { step(-1); }}
           >
@@ -282,6 +283,7 @@ export function CalendarHeaderToolbar({
           <button
             type="button"
             className="ht-cal-today"
+            role="button"
             data-testid="calendar-toolbar-today"
             onClick={() => {
               view.goToToday(toLocalDate(now));
@@ -293,6 +295,7 @@ export function CalendarHeaderToolbar({
             type="button"
             className="ht-cal-navbtn"
             aria-label={nextLabel}
+            role="button"
             data-testid="calendar-toolbar-next"
             onClick={() => { step(1); }}
           >
