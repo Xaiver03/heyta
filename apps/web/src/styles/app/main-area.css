@@ -441,3 +441,105 @@
   color: var(--ht-color-foreground);
 }
 
+
+/* ── 日历两层顶栏（2026-11-22，对齐 macOS 日历 × 滴答清单综合体）─────────────
+ * 见 `features/calendar/CalendarHeaderToolbar.tsx` 文件头。第①层工具条（分段/新建/⋮）、
+ * 第②层大标题 + `‹ 今天 ›`。h1「日历」文字保留（既有判据读它的 textContent），仅视觉隐藏。
+ * 全部走 `--ht-*` token；不写裸值（`check:design`）。
+ */
+.ht-header--calendar {
+  align-items: stretch;
+}
+.ht-header--calendar .ht-header__title {
+  /* 大标题改由 toolbar 第②层承担；h1 仍在 DOM 里（textContent 判据沿用），只是不占版面。 */
+  display: none;
+}
+.ht-header--calendar .ht-header__actions {
+  flex: 1 1 auto;
+  margin-inline-start: 0;
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+}
+.ht-header__calendar-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+.ht-cal-band {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+.ht-cal-band--tools {
+  justify-content: flex-end;
+}
+/* CalendarViewTabs 的根带 `align-self: stretch`；放进紧凑的右对齐工具条时让它按内容宽。 */
+.ht-cal-seg {
+  flex: 0 0 auto;
+}
+.ht-cal-seg [role='tablist'] {
+  align-self: center;
+}
+.ht-cal-band--title {
+  gap: var(--ht-space-3);
+}
+.ht-cal-bigtitle {
+  font-size: var(--ht-font-size-3xl);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  color: var(--ht-color-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+.ht-cal-nav {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  flex: 0 0 auto;
+}
+.ht-cal-navbtn {
+  min-inline-size: var(--ht-touch-target-min);
+  min-block-size: var(--ht-touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  border-radius: var(--ht-radius-md);
+  cursor: pointer;
+}
+.ht-cal-navbtn:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-primary);
+}
+.ht-cal-today {
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-weight: var(--ht-font-weight-medium);
+  cursor: pointer;
+}
+.ht-cal-today:hover {
+  border-color: var(--ht-color-border-strong);
+}
+/* 视图回退：视觉隐藏但可聚焦/可读屏；保留原生 select 供键盘与既有 value 判据。 */
+.ht-cal-sr-only {
+  position: absolute !important;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

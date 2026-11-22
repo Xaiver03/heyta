@@ -72,6 +72,8 @@ interface ScopeRow {
   readonly id: string;
   readonly name: string;
   readonly depth: number;
+  /** 这一行是**分类标题**（父清单 = 分类，子清单 = 其下的清单），不是可勾选项。 */
+  readonly category?: boolean;
 }
 
 /** 节日事实 id → 用户可见词条。算法在 domain，名称在 i18n，组件只负责组合。 */
@@ -219,8 +221,10 @@ function ScopeGroup({
   onToggleGroup: () => void;
 }): React.JSX.Element | null {
   if (rows.length === 0) return null;
-  const selectedCount = rows.filter((row) => selectedIds.includes(row.id)).length;
-  const allSelected = selectedCount === rows.length;
+  // 分类标题不是可勾选项；分组全选只数“真正的清单行”。
+  const items = rows.filter((row) => row.category !== true);
+  const selectedCount = items.filter((row) => selectedIds.includes(row.id)).length;
+  const allSelected = items.length > 0 && selectedCount === items.length;
 
   return (
     <div className="ht-sidebar__scope-group">
@@ -239,23 +243,29 @@ function ScopeGroup({
           data-testid={`calendar-scope-group-${heading}`}
         />
       </div>
-      {rows.map((row) => (
-        <label
-          key={row.id}
-          className={`ht-sidebar__scope-row${row.depth > 0 ? ' ht-sidebar__scope-row--child' : ''}`}
-        >
-          <input
-            type="checkbox"
-            aria-label={itemLabel(row.name)}
-            checked={selectedIds.includes(row.id)}
-            onChange={() => {
-              onToggleItem(row.id);
-            }}
-            data-testid={`calendar-scope-${row.id}`}
-          />
-          <span className="ht-sidebar__scope-name">{row.name}</span>
-        </label>
-      ))}
+      {rows.map((row) =>
+        row.category === true ? (
+          <div className="ht-sidebar__scope-category" key={row.id} data-testid={`calendar-scope-category-${row.id}`}>
+            {row.name}
+          </div>
+        ) : (
+          <label
+            key={row.id}
+            className={`ht-sidebar__scope-row${row.depth > 0 ? ' ht-sidebar__scope-row--child' : ''}`}
+          >
+            <input
+              type="checkbox"
+              aria-label={itemLabel(row.name)}
+              checked={selectedIds.includes(row.id)}
+              onChange={() => {
+                onToggleItem(row.id);
+              }}
+              data-testid={`calendar-scope-${row.id}`}
+            />
+            <span className="ht-sidebar__scope-name">{row.name}</span>
+          </label>
+        ),
+      )}
     </div>
   );
 }
@@ -317,13 +327,19 @@ export function CalendarSidebar(): React.JSX.Element {
     [t, view.publicFactsEpoch],
   );
 
-  /** 一层嵌套摊平成带 `depth` 的行（与任务侧栏同一条层级语义：子清单缩进）。 */
+  /** 一层嵌套摊平成带 `depth` 的行（与任务侧栏同一条层级语义：子清单缩进）。
+   *  2026-11-22：父清单 = **分类**（渲染成分类标题，不给勾选框），子清单缩进在它下面；
+   *  没有子清单的顶层清单仍是普通可勾选清单。这就是滴答「清单分组」在 heyta 的对应物。 */
   const projectRows = useMemo<ScopeRow[]>(
     () =>
-      toOrganizerTree(projects.projects).flatMap((node) => [
-        { id: node.id, name: node.name, depth: 0 },
-        ...node.children.map((child) => ({ id: child.id, name: child.name, depth: 1 })),
-      ]),
+      toOrganizerTree(projects.projects).flatMap((node) =>
+        node.children.length === 0
+          ? [{ id: node.id, name: node.name, depth: 0 }]
+          : [
+              { id: node.id, name: node.name, depth: 0, category: true },
+              ...node.children.map((child) => ({ id: child.id, name: child.name, depth: 1 })),
+            ],
+      ),
     [projects.projects],
   );
   const tagRows = useMemo<ScopeRow[]>(

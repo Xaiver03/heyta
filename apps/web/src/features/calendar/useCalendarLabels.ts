@@ -12,7 +12,7 @@
  * 「9月26日 星期五」和「9月26日 周五」—— 而没人会为此报 bug。
  */
 
-import { isoWeek, type LocalDate } from '@heyta/domain';
+import { type LocalDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   calendarHourMark,
@@ -77,8 +77,8 @@ export function useCalendarLabels(): CalendarBoardLabels {
       //    那一份 `formatClock`）。两根轴各拼一次的漂移形状是同一屏两种时刻写法。
       hourLabel: (hour: number) => calendarHourMark(hour),
       backToToday: t('web.calendar.backToToday'),
-      // 🔴 周次列（滴答式"31周"）：ISO 周数由领域 `isoWeek` 算，这里只措辞。
-      weekNumber: (d: LocalDate) => t('web.calendar.weekShort', { n: isoWeek(d) }),
+      // 2026-11-22：对齐 macOS 日历，去掉“周数竖槽（滴答式 31周）” —— 不再提供 `weekNumber`，
+      // 共享板据此（`labels.weekNumber === undefined`）不渲染那一列（见 CalendarBoard 的 showWeekNumber）。
       dayEmpty: t('web.calendar.dayEmpty'),
       /**
        * 日视图右侧那一枚"这一天有几条"的计数。

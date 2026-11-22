@@ -25,11 +25,13 @@ export interface WebTopBarProps {
   readonly trailing?: ReactNode;
   /** 动作区：整块 `.ht-header__actions`。 */
   readonly children?: ReactNode;
+  /** 额外的 header 修饰类（如日历的 `ht-header--calendar`，用于两层顶栏布局）。 */
+  readonly className?: string;
 }
 
-export function WebTopBar({ title, leading, trailing, children }: WebTopBarProps): React.JSX.Element {
+export function WebTopBar({ title, leading, trailing, children, className }: WebTopBarProps): React.JSX.Element {
   return (
-    <header className="ht-header">
+    <header className={className === undefined ? 'ht-header' : `ht-header ${className}`}>
       {leading}
       <h1 className="ht-header__title">{title}</h1>
       {trailing}

@@ -2992,6 +2992,7 @@ export function App(): React.JSX.Element {
         <AppUpdateNotice />
         <WebTopBar
           title={title}
+          className={view === 'calendar' ? 'ht-header--calendar' : undefined}
           leading={
             <>
               {view === 'tasks' ? (
