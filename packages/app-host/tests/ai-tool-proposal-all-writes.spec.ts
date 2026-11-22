@@ -235,19 +235,19 @@ const CASES: readonly Case[] = [
     effect: () => alive('tasks'),
   },
   {
-    tool: 'archive_task',
-    intentAction: 'archive-task',
-    label: '任务归档',
+    tool: 'abandon_task',
+    intentAction: 'abandon-task',
+    label: '任务放弃',
     args: async () => ({ taskId: await seed({ action: 'create-task', title: '要归档的' }) }),
     effect: () => Object.values(engine.getState().tasks).filter((t) => t.abandonedAt !== undefined).length,
   },
   {
-    tool: 'unarchive_task',
-    intentAction: 'unarchive-task',
-    label: '任务取消归档',
+    tool: 'unabandon_task',
+    intentAction: 'unabandon-task',
+    label: '任务取消放弃',
     args: async () => {
       const taskId = await seed({ action: 'create-task', title: '已归档' });
-      await makeHost().submit({ action: 'archive-task', taskId });
+      await makeHost().submit({ action: 'abandon-task', taskId });
       return { taskId };
     },
     effect: () => Object.values(engine.getState().tasks).filter((t) => t.abandonedAt === undefined).length,

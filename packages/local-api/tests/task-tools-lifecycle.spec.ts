@@ -3,7 +3,7 @@
  * ======================================
  *
  * 契约见 `docs/plans/2026-11-22-tool-layer-p0-p1-contract.md` §3（task.ts 表）：
- * `trash_task` / `restore_task` / `archive_task` / `unarchive_task` /
+ * `trash_task` / `restore_task` / `abandon_task` / `unabandon_task` /
  * `move_task` / `uncomplete_task` 六个写工具。
  *
  * 这里只测**参数 → 写入意图**这一个纯函数（`toWriteIntent`）：
@@ -42,8 +42,8 @@ function rejection(name: string, args: Record<string, unknown>): string {
 const TASK_ID_ONLY = [
   'trash_task',
   'restore_task',
-  'archive_task',
-  'unarchive_task',
+  'abandon_task',
+  'unabandon_task',
   'uncomplete_task',
 ] as const;
 
@@ -51,8 +51,8 @@ describe('目录登记：六个生命周期工具都在，且形状与契约表�
   const RISK_BY_NAME: Readonly<Record<string, string>> = {
     trash_task: 'destructive-reversible',
     restore_task: 'write',
-    archive_task: 'destructive-reversible',
-    unarchive_task: 'destructive-reversible',
+    abandon_task: 'destructive-reversible',
+    unabandon_task: 'destructive-reversible',
     move_task: 'destructive-reversible',
     uncomplete_task: 'write',
   };
@@ -84,8 +84,8 @@ describe('trash / restore / archive / unarchive / uncomplete：一个 taskId →
   const ACTION_BY_NAME: Readonly<Record<string, string>> = {
     trash_task: 'trash-task',
     restore_task: 'restore-task',
-    archive_task: 'archive-task',
-    unarchive_task: 'unarchive-task',
+    abandon_task: 'abandon-task',
+    unabandon_task: 'unabandon-task',
     uncomplete_task: 'uncomplete-task',
   };
 

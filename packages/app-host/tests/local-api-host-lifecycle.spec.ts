@@ -211,16 +211,16 @@ describe('任务生命周期：trash / restore / archive / unarchive / move / un
     if (!result.ok) expect(result.reason).toBe('not-found');
   });
 
-  it('archive-task → actions.setAbandoned(taskId, true)', async () => {
+  it('abandon-task → actions.setAbandoned(taskId, true)', async () => {
     actions.findTask.mockReturnValue({ id: 't1' });
-    const result = await makeHost().submit({ action: 'archive-task', taskId: 't1' });
+    const result = await makeHost().submit({ action: 'abandon-task', taskId: 't1' });
     expect(actions.setAbandoned).toHaveBeenCalledWith('t1', true);
     expect(result).toEqual({ ok: true, taskId: 't1' });
   });
 
-  it('unarchive-task → actions.setAbandoned(taskId, false)', async () => {
+  it('unabandon-task → actions.setAbandoned(taskId, false)', async () => {
     actions.findTask.mockReturnValue({ id: 't1' });
-    const result = await makeHost().submit({ action: 'unarchive-task', taskId: 't1' });
+    const result = await makeHost().submit({ action: 'unabandon-task', taskId: 't1' });
     expect(actions.setAbandoned).toHaveBeenCalledWith('t1', false);
     expect(result).toEqual({ ok: true, taskId: 't1' });
   });

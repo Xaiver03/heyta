@@ -50,8 +50,8 @@ describe('工具目录风险档（ToolRisk）', () => {
     expect(destructive.map((t) => t.name).sort()).toEqual(
       [
         'trash_task',
-        'archive_task',
-        'unarchive_task',
+        'abandon_task',
+        'unabandon_task',
         'move_task',
         'archive_project',
         'delete_project',

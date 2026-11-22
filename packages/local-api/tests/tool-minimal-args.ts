@@ -48,8 +48,8 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   // 2026-11-22 工具层补全（P0 任务生命周期 / P1 清单·标签·笔记·提醒·事件）
   trash_task: { taskId: 't1' },
   restore_task: { taskId: 't1' },
-  archive_task: { taskId: 't1' },
-  unarchive_task: { taskId: 't1' },
+  abandon_task: { taskId: 't1' },
+  unabandon_task: { taskId: 't1' },
   move_task: { taskId: 't1' },
   uncomplete_task: { taskId: 't1' },
   rename_project: { projectId: 'p1', name: '新清单名' },

@@ -228,10 +228,10 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return t('web.ai.tools.intentTrashTask', { id: intent.taskId });
     case 'restore-task':
       return t('web.ai.tools.intentRestoreTask', { id: intent.taskId });
-    case 'archive-task':
-      return t('web.ai.tools.intentArchiveTask', { id: intent.taskId });
-    case 'unarchive-task':
-      return t('web.ai.tools.intentUnarchiveTask', { id: intent.taskId });
+    case 'abandon-task':
+      return t('web.ai.tools.intentAbandonTask', { id: intent.taskId });
+    case 'unabandon-task':
+      return t('web.ai.tools.intentUnabandonTask', { id: intent.taskId });
     case 'move-task':
       return intent.projectId === undefined
         ? t('web.ai.tools.intentMoveTaskOut', { id: intent.taskId })

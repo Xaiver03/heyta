@@ -681,8 +681,8 @@ export type LocalApiWriteIntent =
   // 任务生命周期（P0）
   | { action: 'trash-task'; taskId: string }
   | { action: 'restore-task'; taskId: string }
-  | { action: 'archive-task'; taskId: string }
-  | { action: 'unarchive-task'; taskId: string }
+  | { action: 'abandon-task'; taskId: string }
+  | { action: 'unabandon-task'; taskId: string }
   | { action: 'move-task'; taskId: string; projectId?: string }
   | { action: 'uncomplete-task'; taskId: string }
   // 清单（P1）

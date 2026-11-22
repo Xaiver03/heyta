@@ -149,17 +149,17 @@ const TOOLS: readonly LocalApiTool[] = [
     defaultEnabled: false,
   },
   {
-    name: 'archive_task',
+    name: 'abandon_task',
     egressFields: [],
-    description: '归档任务（可逆，之后可用 unarchive_task 取消归档）。参数：taskId（要归档的任务 id）。',
+    description: '放弃任务（第五状态 abandonedAt，可逆，之后可用 unabandon_task 取消放弃）。参数：taskId（要放弃的任务 id）。',
     kind: 'write',
     risk: 'destructive-reversible',
     defaultEnabled: false,
   },
   {
-    name: 'unarchive_task',
+    name: 'unabandon_task',
     egressFields: [],
-    description: '取消任务的归档状态。参数：taskId（要取消归档的任务 id）。',
+    description: '取消放弃（把 abandonedAt 清掉，任务回到进行中）。参数：taskId。',
     kind: 'write',
     risk: 'destructive-reversible',
     defaultEnabled: false,
@@ -335,7 +335,7 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
     required: ['taskId'],
     additionalProperties: false,
   },
-  archive_task: {
+  abandon_task: {
     type: 'object',
     properties: {
       taskId: { type: 'string', description: '要归档的任务 id。' },
@@ -343,10 +343,10 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
     required: ['taskId'],
     additionalProperties: false,
   },
-  unarchive_task: {
+  unabandon_task: {
     type: 'object',
     properties: {
-      taskId: { type: 'string', description: '要取消归档的任务 id。' },
+      taskId: { type: 'string', description: '要取消放弃的任务 id。' },
     },
     required: ['taskId'],
     additionalProperties: false,
@@ -681,26 +681,26 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
       return { ok: true, intent: { action: 'restore-task', taskId: a['taskId'].trim() } };
     }
 
-    case 'archive_task': {
+    case 'abandon_task': {
       const unknown = Object.keys(a).filter((key) => key !== 'taskId');
       if (unknown.length > 0) {
-        return { ok: false, message: `archive_task 不支持这些参数：${unknown.join('、')}。` };
+        return { ok: false, message: `abandon_task 不支持这些参数：${unknown.join('、')}。` };
       }
       if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
-        return { ok: false, message: 'archive_task 需要 taskId。' };
+        return { ok: false, message: 'abandon_task 需要 taskId。' };
       }
-      return { ok: true, intent: { action: 'archive-task', taskId: a['taskId'].trim() } };
+      return { ok: true, intent: { action: 'abandon-task', taskId: a['taskId'].trim() } };
     }
 
-    case 'unarchive_task': {
+    case 'unabandon_task': {
       const unknown = Object.keys(a).filter((key) => key !== 'taskId');
       if (unknown.length > 0) {
-        return { ok: false, message: `unarchive_task 不支持这些参数：${unknown.join('、')}。` };
+        return { ok: false, message: `unabandon_task 不支持这些参数：${unknown.join('、')}。` };
       }
       if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
-        return { ok: false, message: 'unarchive_task 需要 taskId。' };
+        return { ok: false, message: 'unabandon_task 需要 taskId。' };
       }
-      return { ok: true, intent: { action: 'unarchive-task', taskId: a['taskId'].trim() } };
+      return { ok: true, intent: { action: 'unabandon-task', taskId: a['taskId'].trim() } };
     }
 
     case 'move_task': {

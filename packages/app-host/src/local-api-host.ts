@@ -1343,7 +1343,7 @@ async function submitIntent(
       return { ok: true, taskId: intent.taskId };
     }
 
-    case 'archive-task': {
+    case 'abandon-task': {
       // 归档 = 放弃（只写 `abandonedAt`，不碰 `completedAt`，见 `actions.setAbandoned`）。
       if (actions.findTask(intent.taskId) === undefined) {
         return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
@@ -1352,7 +1352,7 @@ async function submitIntent(
       return { ok: true, taskId: intent.taskId };
     }
 
-    case 'unarchive-task': {
+    case 'unabandon-task': {
       if (actions.findTask(intent.taskId) === undefined) {
         return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
       }

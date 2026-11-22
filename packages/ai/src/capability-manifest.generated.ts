@@ -174,8 +174,8 @@ export const AI_CAPABILITY_MANIFEST =
         'set_task_estimate',
         'trash_task',
         'restore_task',
-        'archive_task',
-        'unarchive_task',
+        'abandon_task',
+        'unabandon_task',
         'move_task',
         'uncomplete_task',
       ],
@@ -678,10 +678,10 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
-      'name': 'archive_task',
+      'name': 'abandon_task',
       'kind': 'write',
       'entityType': 'TASK',
-      'description': '归档任务（可逆，之后可用 unarchive_task 取消归档）。参数：taskId（要归档的任务 id）。',
+      'description': '放弃任务（第五状态 abandonedAt，可逆，之后可用 unabandon_task 取消放弃）。参数：taskId（要放弃的任务 id）。',
       'schemaRecorded': true,
       'args': [
         {
@@ -692,10 +692,10 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
-      'name': 'unarchive_task',
+      'name': 'unabandon_task',
       'kind': 'write',
       'entityType': 'TASK',
-      'description': '取消任务的归档状态。参数：taskId（要取消归档的任务 id）。',
+      'description': '取消放弃（把 abandonedAt 清掉，任务回到进行中）。参数：taskId。',
       'schemaRecorded': true,
       'args': [
         {
@@ -1262,8 +1262,8 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] set_task_estimate（taskId*:string, minutes*:number）',
   '  · [写] trash_task（taskId*:string）',
   '  · [写] restore_task（taskId*:string）',
-  '  · [写] archive_task（taskId*:string）',
-  '  · [写] unarchive_task（taskId*:string）',
+  '  · [写] abandon_task（taskId*:string）',
+  '  · [写] unabandon_task（taskId*:string）',
   '  · [写] move_task（taskId*:string, projectId:string）',
   '  · [写] uncomplete_task（taskId*:string）',
   '- PROJECT —— 读和写都有（读 1 / 写 4）',
