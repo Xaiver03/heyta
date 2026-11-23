@@ -49,6 +49,7 @@ import { useProjectStore } from '../projects/store.js';
 import { getWebVaultSession } from '../../lib/vault-session.js';
 import { createWebAuthFetch } from '../../lib/auth-fetch.js';
 import { text } from '../../lib/text.js';
+import { Button } from '../../components/hta/index.js';
 import { forgetShareLocally, publishShareSigningKey, shareTransferFailure, type ShareTransferFailure } from '@heyta/app-host';
 import { clearStorageShareLog } from './comment-actions.js';
 import { loadShareConsent, saveShareConsent } from './share-consent-store.js';
@@ -523,15 +524,13 @@ export function ShareFeature(props: ShareFeatureProps) {
               </p>
             ) : null}
           </div>
-          <button
-            type="button"
+          <Button
             data-testid="share-dialog-close"
             aria-label={t('web.share.dialog.close')}
-            className="ht-btn ht-btn--ghost"
+            tone="ghost"
             onClick={() => requestDismiss('escape')}
-          >
-            <X size={ICON_SIZE.sm} aria-hidden="true" />
-          </button>
+            leadingIcon={<X size={ICON_SIZE.sm} aria-hidden="true" />}
+          />
         </div>
 
         {needsUnlock ? (
@@ -601,9 +600,9 @@ export function ShareFeature(props: ShareFeatureProps) {
                   data-testid="share-invite-email"
                   style={styles.input}
                 />
-                <button type="submit" className="ht-btn ht-btn--primary" disabled={inviteBusy} data-testid="share-invite-submit">
+                <Button type="submit" tone="primary" disabled={inviteBusy} data-testid="share-invite-submit">
                   {inviteBusy ? t('web.share.invite.busy') : t('web.share.invite.submit')}
-                </button>
+                </Button>
               </form>
             ) : null}
 
@@ -631,12 +630,12 @@ export function ShareFeature(props: ShareFeatureProps) {
                   {ticket.link}
                 </code>
                 <div style={styles.actionsRow}>
-                  <button type="button" className="ht-btn ht-btn--ghost" data-testid="share-invite-copy-token" onClick={() => { void copyText(ticket.token, 'token'); }}>
+                  <Button tone="ghost" data-testid="share-invite-copy-token" onClick={() => { void copyText(ticket.token, 'token'); }}>
                     {copied === 'token' ? t('web.share.invite.copied') : t('web.share.invite.copyToken')}
-                  </button>
-                  <button type="button" className="ht-btn ht-btn--ghost" data-testid="share-invite-copy-link" onClick={() => { void copyText(ticket.link, 'link'); }}>
+                  </Button>
+                  <Button tone="ghost" data-testid="share-invite-copy-link" onClick={() => { void copyText(ticket.link, 'link'); }}>
                     {copied === 'link' ? t('web.share.invite.copied') : t('web.share.invite.copyLink')}
-                  </button>
+                  </Button>
                 </div>
                 <p style={styles.resetMeta}>
                   {t('web.share.invite.ticketNote')}
@@ -713,9 +712,8 @@ export function ShareFeature(props: ShareFeatureProps) {
             />
 
             {detail.yourRole !== 'owner' ? (
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
+              <Button
+                tone="ghost"
                 data-testid="share-leave"
                 style={styles.dangerText}
                 onClick={() => {
@@ -737,7 +735,7 @@ export function ShareFeature(props: ShareFeatureProps) {
                 }}
               >
                 {t('web.share.leave')}
-              </button>
+              </Button>
             ) : null}
           </>
         ) : null}

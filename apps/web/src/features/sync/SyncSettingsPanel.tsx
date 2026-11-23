@@ -46,6 +46,7 @@ import { FormField } from '../../lib/form/FormField.js';
 import { useSyncStore } from './store.js';
 import { SettingsAccountGate } from '../settings/SettingsAccountGate.js';
 import { VaultSettingsPanel } from './VaultSettingsPanel.js';
+import { Button } from '../../components/hta/index.js';
 import './sync-settings.css';
 
 /**
@@ -163,10 +164,12 @@ export function SyncSettingsPanel({
               live
               testId="sync-status-error"
               actions={affordances.showsHelp ? (
-                <a className="ht-btn ht-btn--ghost" href={siteLink(HELP_SYNC_ANCHOR)} rel="noopener noreferrer" data-testid="sync-help-link">
-                  <CircleHelp size={ICON_SIZE.sm} aria-hidden="true" />
-                  {t('web.sync.help.link')}
-                </a>
+                <Button asChild tone="ghost">
+                  <a href={siteLink(HELP_SYNC_ANCHOR)} rel="noopener noreferrer" data-testid="sync-help-link">
+                    <CircleHelp size={ICON_SIZE.sm} aria-hidden="true" />
+                    {t('web.sync.help.link')}
+                  </a>
+                </Button>
               ) : undefined}
             >
               {describeSyncStatus(sync.status, t)}
@@ -219,12 +222,12 @@ export function SyncSettingsPanel({
               />
             </>
           ) : null}
-          {!vaultMode ? <button type="button" className="ht-btn ht-btn--primary" data-testid="sync-unlock-and-sync"
+          {!vaultMode ? <Button tone="primary" data-testid="sync-unlock-and-sync"
             onClick={() => {
               sync.configure(sync.baseUrl, sync.token ?? '', draft.password);
               draftDirtyRef.current = false;
               void sync.syncNow();
-            }}>{t('web.sync.saveAndSync')}</button> : null}
+            }}>{t('web.sync.saveAndSync')}</Button> : null}
           <VaultSettingsPanel active={active && signedIn} />
         </fieldset>
         ) : null}
@@ -267,9 +270,9 @@ export function SyncSettingsPanel({
             label={t('web.sync.token.label')}
             text={t('web.auth.tokenHint')}
           />
-          <button type="button" className="ht-btn ht-btn--ghost sync-settings__fit-button" onClick={() => sync.openSignIn()}>
+          <Button tone="ghost" className="sync-settings__fit-button" onClick={() => sync.openSignIn()}>
             {t('web.auth.open')}
-          </button>
+          </Button>
         </fieldset>
 
       <div className="sync-settings__actions">
@@ -279,9 +282,8 @@ export function SyncSettingsPanel({
           **未登录时也照常渲染**（点了纯空操作）。身份动作长在身份区（头像菜单），
           所以这一节里不重复一个。要断开这台设备 → 点头像 → 退出登录。
         */}
-        <button
-          type="button"
-          className="ht-btn ht-btn--primary"
+        <Button
+          tone="primary"
           data-testid="sync-save-and-sync"
           disabled={!draft.baseUrl.trim() || !draft.token.trim()}
           onClick={() => {
@@ -292,7 +294,7 @@ export function SyncSettingsPanel({
           }}
         >
           {t('web.sync.saveAndSync')}
-        </button>
+        </Button>
       </div>
         </details>
       </div>

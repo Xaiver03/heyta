@@ -79,6 +79,7 @@ import { useAuthStore, type AuthStatus } from '../auth/store.js';
 import { useSyncStore } from '../sync/store.js';
 import { FormField } from '../../lib/form/FormField.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 本面板自己那一段结果。
@@ -218,9 +219,8 @@ function PasswordField(props: {
             // 不是 FormField 自己的 error prop —— 所以显式覆盖 fieldProps 的那一份。
             aria-invalid={props.invalid}
           />
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
+          <Button
+            tone="ghost"
             data-testid={props.revealTestId}
             aria-pressed={revealed}
             onClick={() => {
@@ -238,7 +238,7 @@ function PasswordField(props: {
               "隐藏密码，已按下"这种自相矛盾的话。
             */}
             {t('common.auth.form.showPassword')}
-          </button>
+          </Button>
         </div>
       )}
     </FormField>
@@ -427,9 +427,8 @@ export function PasswordPanel(): React.JSX.Element {
           */}
 
           <div className="ht-input-field__actions">
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
+            <Button
+              tone="primary"
               data-testid="password-set-submit"
               // 同样没有 `disabled`：忙时点击是 `submitSet` 第一行的 guard。
               onClick={() => {
@@ -442,20 +441,19 @@ export function PasswordPanel(): React.JSX.Element {
                 <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {busySet ? t('web.settings.password.setBusy') : t('web.settings.password.setSubmit')}
-            </button>
+            </Button>
 
             {/* 回改密那张表。这句是**提问**不是断言（"已经设过了？"）——
                 界面不知道，知道的人是用户。 */}
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
+            <Button
+              tone="ghost"
               data-testid="password-switch-to-change"
               onClick={() => {
                 switchMode('change');
               }}
             >
               {t('web.settings.password.switchToChange')}
-            </button>
+            </Button>
 
             {/*
               🔴 这句与改密那张的 `otherDevices` 是**相反**的后果，且必须在点之前看得见：
@@ -530,9 +528,8 @@ export function PasswordPanel(): React.JSX.Element {
           />
 
           <div className="ht-input-field__actions">
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
+            <Button
+              tone="primary"
               data-testid="password-submit"
               // 🔴 没有 `disabled`：忙的时候点它是空操作（`submitChange` 第一行的 guard）。
               onClick={() => {
@@ -545,12 +542,11 @@ export function PasswordPanel(): React.JSX.Element {
                 <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {busyChange ? t('common.auth.busy.change') : t('web.settings.password.submit')}
-            </button>
+            </Button>
 
             {email === undefined ? null : (
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
+              <Button
+                tone="ghost"
                 data-testid="password-forgot"
                 onClick={() => {
                   void sendReset();
@@ -562,7 +558,7 @@ export function PasswordPanel(): React.JSX.Element {
                   <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
                 )}{' '}
                 {t('common.auth.form.forgotPassword')}
-              </button>
+              </Button>
             )}
 
             {/*
@@ -593,16 +589,15 @@ export function PasswordPanel(): React.JSX.Element {
             放在后果句之后而不是表单顶部 —— 多数账号要的是改密，把设密那张表
             摆在最前面会把多数人带错（它的前提是"你没设过密码"）。
           */}
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
+          <Button
+            tone="ghost"
             data-testid="password-switch-to-set"
             onClick={() => {
               switchMode('set');
             }}
           >
             {t('web.settings.password.switchToSet')}
-          </button>
+          </Button>
 
           {/*
             `aria-live`：错误与成功都必须是**文字**（WCAG SC 3.3.1）且要播报。

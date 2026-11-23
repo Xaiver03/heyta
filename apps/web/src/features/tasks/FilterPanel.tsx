@@ -9,6 +9,7 @@ import React, { useState, useCallback } from 'react';
 import { useI18n } from '@heyta/i18n';
 import type { TaskFilter } from '@heyta/domain';
 import { loadSavedFilters, addSavedFilter, removeSavedFilter, type SavedFilter } from './saved-filters.js';
+import { Button } from '../../components/hta/index.js';
 
 interface FilterPanelProps {
   onApplyFilter: (filter: TaskFilter) => void;
@@ -76,14 +77,13 @@ export function FilterPanel({ onApplyFilter }: FilterPanelProps): React.JSX.Elem
           <option value="next7Days">{t('web.filter.kind.next7Days')}</option>
           <option value="completed">{t('web.filter.kind.completed')}</option>
         </select>
-        <button
-          type="button"
+        <Button
+          tone="primary"
           onClick={handleSave}
           disabled={!nameDraft.trim()}
-          className="ht-btn ht-btn--primary"
         >
           {t('web.filter.save')}
-        </button>
+        </Button>
       </div>
     </div>
   );

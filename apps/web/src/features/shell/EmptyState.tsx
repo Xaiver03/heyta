@@ -8,6 +8,7 @@ import React from 'react';
 import { HeytaUiProvider, StateIllustration, toEmptyStateViewModel } from '@heyta/ui';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import type { TaskFilter } from '../tasks/store.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 空状态。
@@ -136,15 +137,15 @@ export function EmptyState({
         <div className="ht-firstrun" data-testid="first-run">
           <div className="ht-firstrun__examples">
             {FIRST_RUN_EXAMPLES.map((key) => (
-              <button
+              <Button
                 key={key}
-                type="button"
-                className="ht-btn ht-btn--secondary ht-firstrun__example"
+                tone="secondary"
+                className="ht-firstrun__example"
                 data-testid={`first-run-example-${key.slice(-1)}`}
                 onClick={() => { firstRun.onFillDraft(t(key)); }}
               >
                 {t(key)}
-              </button>
+              </Button>
             ))}
           </div>
           {/*
@@ -152,14 +153,14 @@ export function EmptyState({
             它是 `inline` 重量的 ghost 按钮 —— 空态里已有三条示例是主路径，
             出口不该和它们抢注意力（`ux-principles` §1：同屏一个主任务）。
           */}
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost ht-firstrun__skip"
+          <Button
+            tone="ghost"
+            className="ht-firstrun__skip"
             data-testid="first-run-dismiss"
             onClick={firstRun.onDismiss}
           >
             {t('web.firstRun.skip')}
-          </button>
+          </Button>
         </div>
       )}
     </div>

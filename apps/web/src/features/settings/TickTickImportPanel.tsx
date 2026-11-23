@@ -44,6 +44,7 @@ import {
 } from './ticktick-import.js';
 import { SettingsNotice } from './SettingsNotice.js';
 import { SettingsFilePicker } from './SettingsFilePicker.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 解析失败的两种原因 → 词条。**穷举**（加一个成员就编译失败）。
@@ -287,16 +288,15 @@ export function TickTickImportPanel(): React.JSX.Element {
           )}
 
           <div className="ht-settings__actions">
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
+            <Button
+              tone="primary"
               data-testid="ticktick-confirm"
               disabled={busy}
               onClick={() => void confirm(stage.preview.plan, stage.preview.report)}
+              leadingIcon={<Upload size={ICON_SIZE.xs} aria-hidden="true" />}
             >
-              <Upload size={ICON_SIZE.xs} aria-hidden="true" />
               {t('web.ticktick.confirm')}
-            </button>
+            </Button>
           </div>
         </section>
       )}

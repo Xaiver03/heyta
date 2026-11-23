@@ -4,6 +4,7 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 
 import { COMPACT } from '../../lib/breakpoints';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * Keep the same scope controls; small windows present them on demand.
@@ -53,9 +54,12 @@ export function ScopeDrawer({ open, onClose, children }: {
       <div className="ht-scope-drawer__content">
         <header className="ht-scope-drawer__header">
           <h2 id="scope-drawer-title" className="ht-type-section-title">{t('web.shell.nav.scopeAria')}</h2>
-          <button type="button" className="ht-btn ht-btn--ghost" aria-label={t('web.inbox.close')} onClick={onClose}>
-            <X size={ICON_SIZE.md} aria-hidden="true" />
-          </button>
+          <Button
+            tone="ghost"
+            aria-label={t('web.inbox.close')}
+            onClick={onClose}
+            leadingIcon={<X size={ICON_SIZE.md} aria-hidden="true" />}
+          />
         </header>
         {children}
       </div>

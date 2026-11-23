@@ -90,6 +90,7 @@ import { SettingsInfoTip } from './SettingsInfoTip.js';
 import { loadAvatarImage, type AvatarFileError } from './avatar-encode.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
 import { notifyAccountIdentityChanged } from './useAccountIdentity.js';
+import { Button } from '../../components/hta/index.js';
 
 /** 一次写请求的结果，只用于决定底部那一行字。 */
 type Notice =
@@ -377,8 +378,8 @@ export function ProfilePanel({
               }}
             />
             {/*
-              🔴 头像行的两个按钮用 `ht-btn--ghost`（透明底），而昵称行的"保存"用
-              `ht-btn--primary`（实心底）。这是**有意为之**：
+              🔴 头像行的两个按钮用「按钮组件」的 ghost 档（透明底），而昵称行的"保存"用
+              「按钮组件」的 primary 档（实心底）。这是**有意为之**：
                 - 头像操作（换一张/删除）是**次要动作**，不是这行的主要目的
                 - 昵称保存是**主要动作**，用户填完昵称后最可能点的就是它
               如果两行都用 primary，整屏会太"重"；都用 ghost，主要动作又不突出。
@@ -386,9 +387,8 @@ export function ProfilePanel({
               have only one primary CTA"）
             */}
             <div className="ht-settings__actions">
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
+              <Button
+                tone="ghost"
                 data-testid="profile-avatar-change"
                 aria-disabled={!signedIn || avatarNotice.kind === 'busy'}
                 onClick={() => {
@@ -400,11 +400,10 @@ export function ProfilePanel({
                   <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
                 ) : null}{' '}
                 {t('common.profile.avatar.change')}
-              </button>
+              </Button>
               {avatarUrl === undefined ? null : (
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
+                <Button
+                  tone="ghost"
                   data-testid="profile-avatar-remove"
                   aria-disabled={!signedIn || avatarNotice.kind === 'busy'}
                   onClick={() => {
@@ -416,7 +415,7 @@ export function ProfilePanel({
                     <Loader2 size={ICON_SIZE.xs} className="ht-settings__busy" aria-hidden="true" />
                   ) : null}{' '}
                   {t('common.profile.avatar.remove')}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -476,15 +475,14 @@ export function ProfilePanel({
                   setNameNotice({ kind: 'idle' });
                 }}
               />
-              <button
-                type="button"
-                className="ht-btn ht-btn--primary"
+              <Button
+                tone="primary"
                 data-testid="profile-nickname-save"
                 disabled={!signedIn}
                 onClick={() => void saveNickname()}
               >
                 {t('common.profile.nickname.save')}
-              </button>
+              </Button>
             </div>
           )}
           </FormField>

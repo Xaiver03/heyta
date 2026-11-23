@@ -34,6 +34,7 @@ import { useI18n } from '@heyta/i18n';
 
 import { subscribeShareRepaint } from '../../lib/share-signal-sink.js';
 import { webShareSession } from './share-session.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 要报警的两种失败，**固定顺序**（清单顺序 = 界面顺序，不给渲染留随机性）。
@@ -83,16 +84,15 @@ export function ShareSignatureNotice(): React.JSX.Element | null {
           </span>
         );
       })}
-      <button
-        type="button"
-        className="ht-btn ht-btn--ghost"
+      <Button
+        tone="ghost"
         data-testid="share-signature-notice-dismiss"
         onClick={() => {
           setDismissedKey(key);
         }}
       >
         {t('web.share.signature.dismiss')}
-      </button>
+      </Button>
     </div>
   );
 }

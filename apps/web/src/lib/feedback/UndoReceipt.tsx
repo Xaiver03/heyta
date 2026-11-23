@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
 import { receiptTimingOf, type ReceiptKind } from '@heyta/ui';
+import { Button } from '../../components/hta/index.js';
 import './undo-receipt.css';
 
 /**
@@ -121,15 +122,15 @@ export function UndoReceipt({
       onFocus={() => { focusRef.current = true; syncPaused(); }}
       onBlur={() => { focusRef.current = false; syncPaused(); }}
     >
-      <button
-        type="button"
-        className="ht-btn ht-btn--ghost ht-undo-receipt__action"
+      <Button
+        tone="ghost"
+        className="ht-undo-receipt__action"
         data-testid={`${testId}-action`}
         disabled={busy}
         onClick={() => { void run(); }}
       >
         {busy ? t('web.feedback.undo.busy') : label}
-      </button>
+      </Button>
       {failure === undefined ? null : (
         <span className="ht-undo-receipt__failure" data-testid={`${testId}-failure`} role="alert">
           {t('web.feedback.undo.failed', { reason: failure })}

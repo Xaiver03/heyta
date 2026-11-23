@@ -67,6 +67,7 @@ import {
   type PrioritizeTaskInput,
 } from '@heyta/app-host';
 import { webManagedTransport } from './managed-transport.js';
+import { Button } from '../../components/hta/index.js';
 import { prioritizeFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 import { FailureSettingsAction, RouteUnavailable } from './RouteUnavailable.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
@@ -299,9 +300,8 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
   if (phase === 'idle') {
     return (
       <span className="ht-ai">
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
+        <Button
+          tone="ghost"
           data-testid="prioritize-open"
           aria-label={t('web.ai.prioritize.runAria')}
           disabled={tasks.length === 0}
@@ -309,10 +309,10 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
             setApplied(false);
             setPhase('disclosing');
           }}
+          leadingIcon={<AssistantIcon size={ICON_SIZE.xs} aria-hidden="true" />}
         >
-          <AssistantIcon size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.prioritize.button')}
-        </button>
+        </Button>
         {applied && (
           <span className="ht-ai__done" data-testid="prioritize-applied">
             {t('web.ai.prioritize.applied')}
@@ -361,22 +361,20 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
             </AiDisclosureHost>
 
             <div className="ht-ai__actions">
-              <button
-                type="button"
-                className="ht-btn ht-btn--secondary"
+              <Button
+                tone="secondary"
                 data-testid="prioritize-send"
                 onClick={() => void send()}
               >
                 {t('web.ai.action.send')}
-              </button>
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
+              </Button>
+              <Button
+                tone="ghost"
                 data-testid="prioritize-cancel"
                 onClick={reset}
               >
                 {t('web.ai.action.cancel')}
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -460,18 +458,17 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
         </p>
 
         <div className="ht-ai__actions">
-          <button
-            type="button"
-            className="ht-btn ht-btn--secondary"
+          <Button
+            tone="secondary"
             data-testid="prioritize-apply"
             disabled={keptSuggestions().length === 0}
             onClick={() => void apply()}
           >
             {t('web.ai.prioritize.apply')}
-          </button>
-          <button type="button" className="ht-btn ht-btn--ghost" data-testid="prioritize-reject" onClick={reset}>
+          </Button>
+          <Button tone="ghost" data-testid="prioritize-reject" onClick={reset}>
             {t('web.ai.action.discard')}
-          </button>
+          </Button>
         </div>
             </AiPanelHost>
     );
@@ -538,19 +535,13 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
 
         <div className="ht-ai__actions">
 
-          <button
-
-            type="button"
-
-            className="ht-btn ht-btn--ghost"
-
+          <Button
+            tone="ghost"
             data-testid="prioritize-close"
-
             onClick={reset}
-
-        >
-          {t('web.ai.action.close')}
-        </button>
+          >
+            {t('web.ai.action.close')}
+          </Button>
       </div>
         </AiPanelHost>
   );

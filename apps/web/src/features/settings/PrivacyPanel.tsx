@@ -29,6 +29,7 @@ import { formatPrivacyDecisionTime, type PrivacyConsentRecord } from '@heyta/app
 import { privacyConsent, privacyConsentActions, readPrivacyConsentPersistence, subscribePrivacyConsent } from '../privacy/consent-gate.js';
 import { usePrivacyStore } from '../privacy/store.js';
 import { SettingsNotice } from './SettingsNotice.js';
+import { Button } from '../../components/hta/index.js';
 import './privacy-settings.css';
 
 export function PrivacyPanel({ active = true }: { active?: boolean }): React.JSX.Element {
@@ -88,23 +89,21 @@ export function PrivacyPanel({ active = true }: { active?: boolean }): React.JSX
           {record?.decision !== 'accepted' ? (
             // 尚未同意联网（包括明确只用本机）：把同意面板再打开一次。
             // ⚠️ 这里开的是**同一张**面板，不是第二份"同意界面"（AGENTS §3.5）。
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
+            <Button
+              tone="primary"
               data-testid="privacy-choose-again"
               onClick={() => usePrivacyStore.getState().openSheet('settings')}
             >
               {t('common.privacy.settings.chooseAgain')}
-            </button>
+            </Button>
           ) : (
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
+            <Button
+              tone="ghost"
               data-testid="privacy-revoke"
               onClick={() => privacyConsentActions.revoke()}
             >
               {t('common.privacy.settings.revoke')}
-            </button>
+            </Button>
           )}
         </div>
 

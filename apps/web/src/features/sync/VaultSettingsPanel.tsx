@@ -38,6 +38,7 @@ import {
 } from '../../lib/vault-root-preference.js';
 import { useSyncStore } from './store.js';
 import { SettingsNotice } from '../settings/SettingsNotice.js';
+import { Button } from '../../components/hta/index.js';
 
 type PendingAction = 'create' | 'change' | 'rotate';
 
@@ -555,15 +556,14 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
               {devices.map((device) => (
                 <li key={device.clientId}>
                   <span>{device.clientId} · {t('web.sync.devices.lastSeen', { date: new Date(device.lastSeenAt).toLocaleString() })}</span>
-                  <button
-                    type="button"
-                    className="ht-btn ht-btn--ghost"
+                  <Button
+                    tone="ghost"
                     data-testid={`vault-device-revoke-${device.clientId}`}
                     disabled={deviceBusy !== undefined}
                     onClick={() => revokeDevice(device.clientId)}
                   >
                     {deviceBusy === device.clientId ? t('web.sync.devices.revoking') : t('web.sync.devices.revoke')}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -599,9 +599,8 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
             )}
           </FormField>
           <div className="ht-settings__actions">
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
+            <Button
+              tone="primary"
               data-testid="vault-create"
               disabled={busy || passphrase.length === 0}
               onClick={() => void run(async () => {
@@ -612,7 +611,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
               })}
             >
               {t('web.sync.vault.create')}
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
@@ -633,7 +632,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
             )}
           </FormField>
           <div className="ht-settings__actions">
-            <button type="button" className="ht-btn ht-btn--primary" data-testid="vault-unlock" disabled={busy || passphrase.length === 0} onClick={() => void run(async () => {
+            <Button tone="primary" data-testid="vault-unlock" disabled={busy || passphrase.length === 0} onClick={() => void run(async () => {
               await session.unlockWithPassphrase(passphrase);
               await rememberCurrentWebVaultRoot();
               const restored = session.getPendingRootRotation();
@@ -643,14 +642,14 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
               }
             })}>
               {t('web.sync.vault.unlock')}
-            </button>
+            </Button>
           </div>
           <FormField id="vault-recovery-code" label={t('web.sync.vault.recoveryCode')}>
             {(field) => (
               <input {...field} data-testid="vault-recovery-code" type="text" autoComplete="off" value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value)} />
             )}
           </FormField>
-          <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-unlock-recovery" disabled={busy || recoveryCode.length === 0} onClick={() => void run(async () => {
+          <Button tone="ghost" data-testid="vault-unlock-recovery" disabled={busy || recoveryCode.length === 0} onClick={() => void run(async () => {
             await session.unlockWithRecoveryCode(recoveryCode);
             await rememberCurrentWebVaultRoot();
             const restored = session.getPendingRootRotation();
@@ -660,7 +659,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
             }
           }, 'web.sync.vault.errorMismatch')}>
             {t('web.sync.vault.unlockRecovery')}
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -683,9 +682,8 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
             )}
           </FormField>
           <div className="ht-settings__actions">
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
+            <Button
+              tone="primary"
               data-testid="vault-publish"
               disabled={busy || pendingCode.length === 0 || remote === undefined}
               onClick={() => void run(async () => {
@@ -714,8 +712,8 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
               })}
             >
               {t('web.sync.vault.confirm')}
-            </button>
-            <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-cancel-pending" disabled={busy} onClick={() => void run(async () => {
+            </Button>
+            <Button tone="ghost" data-testid="vault-cancel-pending" disabled={busy} onClick={() => void run(async () => {
               if (pendingAction === 'rotate' && session !== undefined && sync.token !== undefined) {
                 await cancelWebVaultRootRotation(session, { baseUrl: sync.baseUrl, token: sync.token, authTransport: sync.authTransport });
               }
@@ -725,7 +723,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
               setLegacyPassphrase('');
             })}>
               {t('web.sync.vault.cancel')}
-            </button>
+            </Button>
           </div>
           {pendingAction === 'change' ? (
             <p className="ht-settings__hint" role="status">{t('web.sync.vault.changeTitle')}</p>
@@ -764,31 +762,31 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
             {session.requiresRecoveryRotation ? t('web.sync.vault.recoveryRotationRequired') : t('web.sync.vault.ready')}
           </p>
           <div className="ht-settings__actions">
-            <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-lock" onClick={() => { lockWebVaultSession(); setRevision((value) => value + 1); }}>
+            <Button tone="ghost" data-testid="vault-lock" onClick={() => { lockWebVaultSession(); setRevision((value) => value + 1); }}>
               {t('web.sync.vault.lock')}
-            </button>
+            </Button>
           </div>
           <FormField id="vault-new-passphrase" label={t('web.sync.vault.newPassphrase')}>
             {(field) => (
               <input {...field} data-testid="vault-new-passphrase" type="password" autoComplete="new-password" value={newPassphrase} onChange={(event) => setNewPassphrase(event.target.value)} />
             )}
           </FormField>
-          <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-change-passphrase" disabled={busy || newPassphrase.length === 0} onClick={() => void run(async () => {
+          <Button tone="ghost" data-testid="vault-change-passphrase" disabled={busy || newPassphrase.length === 0} onClick={() => void run(async () => {
             const next = await session.beginPassphraseChange(newPassphrase);
             setPending(next);
             setPendingAction('change');
             setPendingCode('');
           })}>
             {t('web.sync.vault.change')}
-          </button>
-          <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-rotate-root" disabled={busy || newPassphrase.length === 0 || remote === undefined} onClick={() => void run(async () => {
+          </Button>
+          <Button tone="ghost" data-testid="vault-rotate-root" disabled={busy || newPassphrase.length === 0 || remote === undefined} onClick={() => void run(async () => {
             const next = await session.beginRootRotation(newPassphrase);
             setPending(next);
             setPendingAction('rotate');
             setPendingCode('');
           })}>
             {t('web.sync.vault.rotateRoot')}
-          </button>
+          </Button>
         </div>
       ) : null}
     </section>

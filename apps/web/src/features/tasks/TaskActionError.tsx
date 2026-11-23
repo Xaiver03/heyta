@@ -1,6 +1,7 @@
 import { useI18n } from '@heyta/i18n';
 
 import { useTaskStore } from './store.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 任务动作失败的**一行说明**（布局审计 §8.2 第 12 条）。
@@ -37,9 +38,8 @@ export function TaskActionError(): React.JSX.Element | null {
   return (
     <div className="ht-settings__notice" role="alert" aria-live="assertive" data-testid="task-action-error">
       <span className="ht-settings__danger">{t('web.tasks.actionFailed')}</span>
-      <button
-        type="button"
-        className="ht-btn ht-btn--ghost"
+      <Button
+        tone="ghost"
         data-testid="task-action-error-dismiss"
         onClick={() => {
           // 只清这一格的显示，不假装"已经重试过"：数据状态一个字都不动。
@@ -47,7 +47,7 @@ export function TaskActionError(): React.JSX.Element | null {
         }}
       >
         {t('web.tasks.dismissFailure')}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { placeAnchoredPanel } from '@heyta/ui';
 import type { LocalDate } from '@heyta/domain';
 import { CaptureComposer } from '../capture/CaptureComposer.js';
 import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';
+import { Button } from '../../components/hta/index.js';
 
 /** A date-anchored editor; opening or dismissing it never writes a task. */
 export function CalendarCapturePopover({ date, title, onClose }: {
@@ -100,9 +101,12 @@ export function CalendarCapturePopover({ date, title, onClose }: {
       <div ref={panelRef} className="ht-content__calendar-capture" data-testid="calendar-capture" role="dialog" aria-label={title}>
         <div className="ht-content__calendar-capture-heading">
           <span className="ht-type-row-title">{title}</span>
-          <button type="button" className="ht-btn ht-btn--ghost" aria-label={t('web.calendar.capture.close')} onClick={() => requestDismiss('escape')}>
-            <X size={ICON_SIZE.sm} aria-hidden="true" />
-          </button>
+          <Button
+            tone="ghost"
+            aria-label={t('web.calendar.capture.close')}
+            onClick={() => requestDismiss('escape')}
+            leadingIcon={<X size={ICON_SIZE.sm} aria-hidden="true" />}
+          />
         </div>
         {/*
           🔴 `inlineDuePanel`：这一层自己已经是浮层，日期面板必须**就地展开**。

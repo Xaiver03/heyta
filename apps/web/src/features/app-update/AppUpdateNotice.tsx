@@ -16,6 +16,7 @@ import { RefreshCw, X } from 'lucide-react';
 
 import { applyAppUpdate } from './detect.js';
 import { useAppUpdateStore } from './store.js';
+import { Button } from '../../components/hta/index.js';
 
 export function AppUpdateNotice(): React.JSX.Element | null {
   const { t } = useI18n();
@@ -43,13 +44,13 @@ export function AppUpdateNotice(): React.JSX.Element | null {
           </p>
         ) : null}
         <div className="ht-main__announcementRow">
-          <button type="button" className="ht-btn ht-btn--ghost" onClick={applyAppUpdate}>
+          <Button type="button" tone="ghost" onClick={applyAppUpdate}>
             {t('web.appUpdate.refresh')}
-          </button>
+          </Button>
           {force ? null : (
-            <button type="button" className="ht-btn ht-btn--ghost" onClick={dismiss}>
+            <Button type="button" tone="ghost" onClick={dismiss}>
               {t('web.appUpdate.later')}
-            </button>
+            </Button>
           )}
         </div>
       </div>

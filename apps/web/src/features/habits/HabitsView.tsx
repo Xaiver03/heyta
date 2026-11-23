@@ -93,6 +93,7 @@ import { downloadTextFile } from '../settings/export-download.js';
 import { HabitDetailCard } from './HabitDetailCard.js';
 import { HabitsList, HABIT_ROW_WEEK_DAYS, type HabitsListRow } from './HabitsList.js';
 import { readNow, selectHeatmap, selectHabitProgress, useHabitStore } from './store.js';
+import { Button } from '../../components/hta/index.js';
 
 export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.JSX.Element {
   const { t } = useI18n();
@@ -304,31 +305,27 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
   const headerControls = headerSlot
     ? createPortal(
         <div className="ht-header__habits-controls">
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
+          <Button
+            tone="ghost"
             aria-label={t('web.habits.add')}
             data-testid="habits-add-open"
             onClick={() => {
               setAddError(undefined);
               setCreateOpen(true);
             }}
-          >
-            <Plus size={ICON_SIZE.md} aria-hidden="true" />
-          </button>
+            leadingIcon={<Plus size={ICON_SIZE.md} aria-hidden="true" />}
+          />
           <span className="ht-header__habits-menu-wrap">
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
+            <Button
+              tone="ghost"
               aria-label={t('web.habits.menu.label')}
               aria-expanded={menuOpen}
               aria-haspopup="menu"
               data-testid="habits-more"
               ref={moreButtonRef}
               onClick={() => setMenuOpen((open) => !open)}
-            >
-              <MoreHorizontal size={ICON_SIZE.md} aria-hidden="true" />
-            </button>
+              leadingIcon={<MoreHorizontal size={ICON_SIZE.md} aria-hidden="true" />}
+            />
             {menuOpen ? (
               <div ref={moreMenuRef} className="ht-header__habits-menu" role="menu" data-testid="habits-menu" onKeyDown={onMenuKeyDown}>
                 <button type="button" role="menuitem" tabIndex={-1} onClick={exportCheckins}>
@@ -649,21 +646,20 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
               ) : null}
 
               <footer className="ht-habit-create-dialog__actions">
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
+                <Button
+                  tone="ghost"
                   onClick={() => requestDismiss('escape')}
                   disabled={adding}
                 >
                   {t('web.habits.create.cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="ht-btn ht-btn--primary"
+                  tone="primary"
                   disabled={adding || draft.trim() === ''}
                 >
                   {t('web.habits.create.submit')}
-                </button>
+                </Button>
               </footer>
             </form>
     </WebModalShell>
@@ -696,9 +692,8 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
                * 现在动作长在它说的那块区域里，用的还是同一个既有词条（零新增文案）。
                */
               action={
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--primary"
+                <Button
+                  tone="primary"
                   data-testid="habits-empty-add"
                   onClick={() => {
                     setAddError(undefined);
@@ -706,7 +701,7 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
                   }}
                 >
                   {t('web.habits.add')}
-                </button>
+                </Button>
               }
             />
           </HeytaUiProvider>

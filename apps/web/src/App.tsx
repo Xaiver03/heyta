@@ -288,6 +288,7 @@ import {
   type ViewKey,
 } from './features/shell/view-tabs.js';
 import { NavButton } from './features/shell/NavButton.js';
+import { Button } from './components/hta/index.js';
 import { EmptyState, isActive } from './features/shell/EmptyState.js';
 import { SETTINGS_ANCHORS, type SettingsAnchor } from './features/shell/settings-anchors.js';
 import { SyncSettingsPanel } from './features/sync/SyncSettingsPanel.js';
@@ -2624,7 +2625,7 @@ export function App(): React.JSX.Element {
   /**
    * 「AI 排优先级」这一枚组织类动作（2026-11-02 搬进对话助手）。
    *
-   * 🔴 它原来渲染在**任务列表上方**，长得像一行任务（`ht-btn--ghost` 铺满整列 + 图标），
+   * 🔴 它原来渲染在**任务列表上方**，长得像一行任务（按钮组件的 ghost 档铺满整列 + 图标），
    * 位置在一组组头与任务行之间。产品负责人的裁决是"AI 排优先级应该直接在对话助手里面有，
    * 而不是放在这个地方" —— 这一版兑现它。
    *
@@ -2996,16 +2997,21 @@ export function App(): React.JSX.Element {
           leading={
             <>
               {view === 'tasks' ? (
-                <button type="button" className="ht-btn ht-btn--ghost ht-scope-trigger"
-                  aria-label={t('web.shell.nav.scopeAria')} aria-haspopup="dialog" aria-expanded={scopeDrawerOpen}
-                  onClick={() => setScopeDrawerOpen(true)} data-testid="task-scope-toggle">
-                  <PanelLeft size={ICON_SIZE.md} aria-hidden="true" />
-                </button>
+                <Button
+                  tone="ghost"
+                  className="ht-scope-trigger"
+                  aria-label={t('web.shell.nav.scopeAria')}
+                  aria-haspopup="dialog"
+                  aria-expanded={scopeDrawerOpen}
+                  onClick={() => setScopeDrawerOpen(true)}
+                  data-testid="task-scope-toggle"
+                  leadingIcon={<PanelLeft size={ICON_SIZE.md} aria-hidden="true" />}
+                />
               ) : null}
               {view === 'calendar' ? (
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost ht-header__calendar-sidebar-toggle"
+                <Button
+                  tone="ghost"
+                  className="ht-header__calendar-sidebar-toggle"
                   data-testid="calendar-sidebar-toggle"
                   aria-pressed={calendarSidebarToggleOn}
                   aria-controls="calendar-sidebar"
@@ -3015,9 +3021,8 @@ export function App(): React.JSX.Element {
                     if (narrowLayout) setScopeDrawerOpen((open) => !open);
                     else useCalendarViewStore.getState().toggleCalendarSidebar();
                   }}
-                >
-                  <PanelLeft size={ICON_SIZE.md} aria-hidden="true" />
-                </button>
+                  leadingIcon={<PanelLeft size={ICON_SIZE.md} aria-hidden="true" />}
+                />
               ) : null}
             </>
           }
@@ -3065,16 +3070,15 @@ export function App(): React.JSX.Element {
                 <span className="ht-type-caption" role="status">
                   {t('web.shell.bulk.selected', { count: selectedTaskIds.size })}
                 </span>
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
+                <Button
+                  tone="ghost"
                   disabled={selectedTaskIds.size === 0 || selectedHasRepeat}
                   data-testid="bulk-complete"
                   aria-describedby={selectedHasRepeat ? 'bulk-repeat-warning' : undefined}
                   onClick={() => void runBulkAction('complete')}
                 >
                   {t('web.shell.bulk.complete')}
-                </button>
+                </Button>
                 {selectedHasRepeat ? (
                   <span
                     id="bulk-repeat-warning"
@@ -3119,27 +3123,24 @@ export function App(): React.JSX.Element {
                     </option>
                   ))}
                 </select>
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--danger"
+                <Button
+                  tone="danger"
                   disabled={selectedTaskIds.size === 0}
                   data-testid="bulk-delete"
                   onClick={() => void runBulkAction('delete')}
                 >
                   {t('web.shell.bulk.delete')}
-                </button>
+                </Button>
                 {/* 退出模式：图标而不是又一句文字。模式栏里已经有三个文字按钮了。 */}
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
+                <Button
+                  tone="ghost"
                   data-testid="bulk-exit"
                   aria-label={t('web.shell.bulk.cancel')}
                   onClick={() => {
                     clearBulkSelection();
                   }}
-                >
-                  <X size={ICON_SIZE.sm} aria-hidden="true" />
-                </button>
+                  leadingIcon={<X size={ICON_SIZE.sm} aria-hidden="true" />}
+                />
               </div>
             ) : null}
             {bulkError === undefined ? null : (
@@ -3237,18 +3238,16 @@ export function App(): React.JSX.Element {
             */}
             {view === 'tasks' ? (
               <>
-                <button
+                <Button
                   ref={taskMenuTriggerRef}
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
+                  tone="ghost"
                   data-testid="task-menu-open"
                   aria-haspopup="menu"
                   aria-expanded={taskMenuOpen}
                   aria-label={t('web.shell.overflow.label')}
                   onClick={() => { setTaskMenuOpen((open) => !open); }}
-                >
-                  <MoreHorizontal size={ICON_SIZE.md} aria-hidden="true" />
-                </button>
+                  leadingIcon={<MoreHorizontal size={ICON_SIZE.md} aria-hidden="true" />}
+                />
                 <AnchoredMenu
                   open={taskMenuOpen}
                   onClose={() => { setTaskMenuOpen(false); }}
@@ -3359,9 +3358,9 @@ export function App(): React.JSX.Element {
                 </AnchoredMenu>
               </>
             ) : null}
-            {canToggleDetailPane ? <button
-              type="button"
-              className="ht-btn ht-btn--ghost ht-app__detail-toggle"
+            {canToggleDetailPane ? <Button
+              tone="ghost"
+              className="ht-app__detail-toggle"
               data-testid="detail-pane-toggle"
               aria-label={
                 detailPane === 'collapsed'
@@ -3370,13 +3369,12 @@ export function App(): React.JSX.Element {
               }
               aria-pressed={detailPane === 'open'}
               onClick={toggleDetailPane}
-            >
-              {detailPane === 'collapsed' ? (
+              leadingIcon={detailPane === 'collapsed' ? (
                 <PanelRightOpen size={ICON_SIZE.md} aria-hidden="true" />
               ) : (
                 <PanelRightClose size={ICON_SIZE.md} aria-hidden="true" />
               )}
-            </button> : null}
+            /> : null}
           </div>
         </WebTopBar>
 
@@ -3572,7 +3570,7 @@ export function App(): React.JSX.Element {
                     "任务列表的实现只长在 packages/ui"——组头是列表的机制，
                     留在 web 里 mobile 就得抄第二遍）。web 只留三件宿主事：
                     措辞（`taskGroupTitle`）、动作（逾期组的「顺延」按钮，
-                    走既有 `.ht-btn--ghost`，不长新前缀族），以及**折叠状态
+                    走既有按钮组件的 ghost 档，不长新前缀族），以及**折叠状态
                     归谁**（`collapsedGroups`，见上）。
                     收起时**整条 `TaskList` 不进 DOM**，不是 `display:none`：
                     留在树里就等于读屏还得逐条念完看不见的那些任务。
@@ -3594,9 +3592,8 @@ export function App(): React.JSX.Element {
                         }}
                         action={
                           group.kind === 'overdue' ? (
-                            <button
-                              type="button"
-                              className="ht-btn ht-btn--ghost"
+                            <Button
+                              tone="ghost"
                               onClick={() => {
                                 void postponeOverdueGroup(group);
                               }}
@@ -3607,7 +3604,7 @@ export function App(): React.JSX.Element {
                               data-testid="task-group-postpone"
                             >
                               {t('web.tasks.group.postpone')}
-                            </button>
+                            </Button>
                           ) : undefined
                         }
                         testID={`task-group-${key}-head`}
@@ -3797,19 +3794,18 @@ export function App(): React.JSX.Element {
             <header className={`ht-settings__header${secondaryAccountSurface === 'settings' && settingsReturnSurface !== 'profile' ? ' ht-settings__header--compact' : ''}`}>
               <div>
                 {secondaryAccountSurface === 'settings' && settingsReturnSurface === 'profile' ? (
-                  <button
-                    type="button"
-                    className="ht-btn ht-btn--ghost"
+                  <Button
+                    tone="ghost"
                     data-testid="settings-back-to-profile"
                     onClick={() => {
                       setSecondaryAccountSurface('profile');
                       setSettingsReturnSurface(undefined);
                       setSettingsAnchor(undefined);
                     }}
+                    leadingIcon={<ArrowLeft size={ICON_SIZE.sm} aria-hidden="true" />}
                   >
-                    <ArrowLeft size={ICON_SIZE.sm} aria-hidden="true" />
                     {t('web.profile.overview.back')}
-                  </button>
+                  </Button>
                 ) : null}
                 {secondaryAccountSurface === 'profile' ? (
                   <>

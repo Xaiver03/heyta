@@ -32,10 +32,11 @@ import {
 } from '@heyta/ui';
 import type { TaskRow } from '@heyta/ui';
 import type { Task } from '@heyta/domain';
+import { Button } from '../components/hta/index.js';
 
 /**
  * 🔴 切片页原本**不加载** `styles/app.css`（它只被 `App.tsx` import）。
- * 按下扩散（`.ht-btn::after`）住在那份样式里，所以这里补一行 ——
+ * 按下扩散（按钮组件的 `::after`）住在那份样式里，所以这里补一行 ——
  * 这不是"给切片加样式"，是让切片能验到一处**住在外壳样式表里**的行为。
  * 代价是切片多下 180KB CSS，只影响 dev 入口。
  */
@@ -105,17 +106,17 @@ function SettingsSlice(): React.JSX.Element {
       </HeytaUiProvider>
 
       {/*
-        web 侧的 `.ht-btn`（不是 RN 组件）——按下扩散住在外壳样式表里，
+        web 侧的按钮组件（不是 RN 组件）——按下扩散住在外壳样式表里，
         只验共享层的话这一处永远验不到。点它的左半边与右半边，
         高光的圆心应该跟着走（判据在 `tmp` 的采样脚本里，见提交信息）。
       */}
       <div style={{ display: 'flex', gap: 'var(--ht-space-4)', marginBlockStart: 'var(--ht-space-8)' }}>
-        <button type="button" className="ht-btn ht-btn--primary" data-testid="slice-press-btn">
+        <Button tone="primary" data-testid="slice-press-btn">
           按下看扩散
-        </button>
-        <button type="button" className="ht-btn ht-btn--ghost" data-testid="slice-press-btn-plain">
+        </Button>
+        <Button tone="ghost" data-testid="slice-press-btn-plain">
           透明底按钮
-        </button>
+        </Button>
       </div>
     </div>
   );

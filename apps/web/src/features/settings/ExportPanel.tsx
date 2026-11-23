@@ -35,6 +35,7 @@ import { Download, FileJson, FileText } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n';
 
+import { Button } from '../../components/hta/index.js';
 import { currentState, requireStore } from '../../lib/oplog.js';
 import { tasksCsvCopy, tasksMarkdownCopy } from './export-copy.js';
 import { downloadTextFile } from './export-download.js';
@@ -109,15 +110,15 @@ export function ExportPanel({
           />
         </h3>
         <div className="ht-settings__actions">
-          <button
-            type="button"
-            className="ht-btn ht-btn--primary"
+          <Button
+            tone="primary"
             data-testid="export-json"
             disabled={busy}
             onClick={() => void run('json')}
+            leadingIcon={<Download size={ICON_SIZE.xs} aria-hidden="true" />}
           >
-            <Download size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.json.button')}
-          </button>
+            {t('web.export.json.button')}
+          </Button>
         </div>
       </section>
 
@@ -136,15 +137,15 @@ export function ExportPanel({
             而这一屏还有第二个主色实底 + 一个禁用的主色实底 —— 三个主按钮等于没有主按钮。
             给人看的 Markdown 是旁支（它不能导回），所以降到 ghost。
           */}
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
+          <Button
+            tone="ghost"
             data-testid="export-markdown"
             disabled={busy}
             onClick={() => void run('markdown')}
+            leadingIcon={<Download size={ICON_SIZE.xs} aria-hidden="true" />}
           >
-            <Download size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.markdown.button')}
-          </button>
+            {t('web.export.markdown.button')}
+          </Button>
         </div>
       </section>}
 
@@ -158,15 +159,15 @@ export function ExportPanel({
           />
         </h3>
         <div className="ht-settings__actions">
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
+          <Button
+            tone="ghost"
             data-testid="export-csv"
             disabled={busy}
             onClick={() => void run('csv')}
+            leadingIcon={<Download size={ICON_SIZE.xs} aria-hidden="true" />}
           >
-            <Download size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.csv.button')}
-          </button>
+            {t('web.export.csv.button')}
+          </Button>
         </div>
       </section>}
 

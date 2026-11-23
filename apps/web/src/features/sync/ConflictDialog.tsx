@@ -70,6 +70,7 @@ import { resolveAnyConflict, type ShareConflict } from '@heyta/app-host';
 
 import { resolveShareConflict, useShareConflicts } from '../share/use-share-conflicts.js';
 import { useSyncStore } from './store.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 一张清单里的两批东西（ADR-0067 裁决三）：个人同步那侧由服务端报回来的冲突，
@@ -198,18 +199,17 @@ export function ConflictDialog(): React.JSX.Element | null {
   };
 
   const renderSideAction = (info: ConflictSideRenderInfo<AnyConflict>): React.JSX.Element => (
-    <button
-      type="button"
-      className={info.preferred ? 'ht-btn ht-btn--primary' : 'ht-btn ht-btn--secondary'}
+    <Button
+      tone={info.preferred ? 'primary' : 'secondary'}
       disabled={info.blockedReason !== undefined || info.busy}
       onClick={() => {
         decide(info.conflict, info.choice);
       }}
       style={{ marginTop: 'auto' }}
+      leadingIcon={<Check size={ICON_SIZE.sm} aria-hidden="true" />}
     >
-      <Check size={ICON_SIZE.sm} aria-hidden="true" />
       {labels.keepThis}
-    </button>
+    </Button>
   );
 
   return (
@@ -282,14 +282,12 @@ export function ConflictDialog(): React.JSX.Element | null {
               {t('web.conflict.bodyTail')}
             </p>
           </div>
-          <button
-            type="button"
+          <Button
             aria-label={t('web.conflict.close')}
-            className="ht-btn ht-btn--ghost"
+            tone="ghost"
             onClick={closeConflictDialog}
-          >
-            <X size={ICON_SIZE.sm} aria-hidden="true" />
-          </button>
+            leadingIcon={<X size={ICON_SIZE.sm} aria-hidden="true" />}
+          />
         </div>
 
         {/* 🔴 共享的那一段：逐条冲突 + 两侧内容 + 保留按钮。

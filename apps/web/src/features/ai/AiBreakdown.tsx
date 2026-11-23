@@ -77,6 +77,7 @@ import {
   type BreakdownProposal,
 } from '@heyta/app-host';
 import { webManagedTransport } from './managed-transport.js';
+import { Button } from '../../components/hta/index.js';
 import type { Task } from '@heyta/domain';
 
 /**
@@ -355,19 +356,18 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
   if (phase === 'idle') {
     return (
       <span className="ht-ai">
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
+        <Button
+          tone="ghost"
           data-testid={`ai-breakdown-${task.id}`}
           aria-label={t('web.ai.breakdown.runAria', { title: task.title })}
           onClick={() => {
             setApplied(false);
             setPhase('disclosing');
           }}
+          leadingIcon={<AssistantIcon size={ICON_SIZE.xs} aria-hidden="true" />}
         >
-          <AssistantIcon size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.breakdown.button')}
-        </button>
+        </Button>
         {applied && (
           <span className="ht-ai__done" data-testid={`ai-applied-${task.id}`}>
             {t('web.ai.breakdown.applied')}
@@ -411,12 +411,12 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             />
 
             <div className="ht-ai__actions">
-              <button type="button" className="ht-btn ht-btn--secondary" data-testid="ai-send" onClick={() => void send()}>
+              <Button tone="secondary" data-testid="ai-send" onClick={() => void send()}>
                 {t('web.ai.action.send')}
-              </button>
-              <button type="button" className="ht-btn ht-btn--ghost" onClick={reset}>
+              </Button>
+              <Button tone="ghost" onClick={reset}>
                 {t('web.ai.action.cancel')}
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -493,18 +493,17 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
         </p>
 
         <div className="ht-ai__actions">
-          <button
-            type="button"
-            className="ht-btn ht-btn--secondary"
+          <Button
+            tone="secondary"
             data-testid="ai-apply"
             disabled={keptItems().length === 0}
             onClick={() => void apply()}
           >
             {t('web.ai.breakdown.apply')}
-          </button>
-          <button type="button" className="ht-btn ht-btn--ghost" onClick={reject}>
+          </Button>
+          <Button tone="ghost" onClick={reject}>
             {t('web.ai.action.discard')}
-          </button>
+          </Button>
         </div>
             </AiPanelHost>
     );
@@ -567,28 +566,19 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
 
         <div className="ht-ai__actions">
 
-          <button
-
-            type="button"
-
-            className="ht-btn ht-btn--ghost"
-
+          <Button
+            tone="ghost"
             data-testid="ai-manual"
-
             onClick={() => {
-
               void onApplyNote(mergeChecklistIntoNote(task.note, ['', '', '']));
-
               reset();
-
             }}
-
-        >
-          {t('web.ai.breakdown.manual')}
-        </button>
-        <button type="button" className="ht-btn ht-btn--ghost" onClick={reset}>
+          >
+            {t('web.ai.breakdown.manual')}
+          </Button>
+        <Button tone="ghost" onClick={reset}>
           {t('web.ai.action.close')}
-        </button>
+        </Button>
       </div>
         </AiPanelHost>
   );

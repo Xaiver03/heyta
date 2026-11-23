@@ -6,6 +6,7 @@ import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
 import { siteLink } from '../../lib/site-url.js';
 import { FormField } from '../../lib/form/FormField.js';
 import { SettingsInfoTip } from '../settings/SettingsInfoTip.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * ADR-0080 的第一个轴：**同步加密开 / 关**。
@@ -123,27 +124,25 @@ export function EncryptionModeSection({
 
       <div className="ht-settings__actions">
         {mode === 'e2ee' ? (
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
+          <Button
+            tone="ghost"
             data-testid="encryption-mode-disable"
             disabled={busy}
             onClick={() => { setConfirming(true); }}
           >
             {t('web.sync.encryption.disable')}
-          </button>
+          </Button>
         ) : (
           enable === undefined ? null : (
             enableStep === undefined ? (
-              <button
-                type="button"
-                className="ht-btn ht-btn--primary"
+              <Button
+                tone="primary"
                 data-testid="encryption-mode-enable"
                 disabled={busy}
                 onClick={() => { setEnableStep({ recoveryCode: '', passphrase: '' }); }}
               >
                 {t('web.sync.encryption.enable')}
-              </button>
+              </Button>
             ) : null
           )
         )}
@@ -164,24 +163,22 @@ export function EncryptionModeSection({
             />
           </legend>
           <div className="ht-settings__actions">
-            <button
-              type="button"
-              className={keyPlacement.value === 'device' ? 'ht-btn ht-btn--primary' : 'ht-btn ht-btn--ghost'}
+            <Button
+              tone={keyPlacement.value === 'device' ? 'primary' : 'ghost'}
               data-testid="encryption-placement-device"
               aria-pressed={keyPlacement.value === 'device'}
               onClick={() => { keyPlacement.onChange('device'); }}
             >
               {t('web.sync.encryption.placementDevice')}
-            </button>
-            <button
-              type="button"
-              className={keyPlacement.value === 'ask' ? 'ht-btn ht-btn--primary' : 'ht-btn ht-btn--ghost'}
+            </Button>
+            <Button
+              tone={keyPlacement.value === 'ask' ? 'primary' : 'ghost'}
               data-testid="encryption-placement-ask"
               aria-pressed={keyPlacement.value === 'ask'}
               onClick={() => { keyPlacement.onChange('ask'); }}
             >
               {t('web.sync.encryption.placementAsk')}
-            </button>
+            </Button>
           </div>
         </fieldset>
       )}
@@ -207,9 +204,8 @@ export function EncryptionModeSection({
                 )}
               </FormField>
               <div className="ht-settings__actions">
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--primary"
+                <Button
+                  tone="primary"
                   data-testid="encryption-enable-start"
                   disabled={busy || enablePassphrase.length === 0}
                   onClick={() => {
@@ -220,15 +216,14 @@ export function EncryptionModeSection({
                   }}
                 >
                   {t('web.sync.encryption.enableStart')}
-                </button>
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
+                </Button>
+                <Button
+                  tone="ghost"
                   data-testid="encryption-enable-abort"
                   onClick={() => { setEnableStep(undefined); setEnablePassphrase(''); }}
                 >
                   {t('web.sync.encryption.enableCancel')}
-                </button>
+                </Button>
               </div>
             </>
           ) : (
@@ -255,9 +250,8 @@ export function EncryptionModeSection({
                 <p className="ht-settings__hint" role="alert" data-testid="encryption-enable-error">{enableError}</p>
               )}
               <div className="ht-settings__actions">
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--primary"
+                <Button
+                  tone="primary"
                   data-testid="encryption-enable-confirm"
                   disabled={busy || enableCodeInput.length === 0}
                   onClick={() => {
@@ -275,15 +269,14 @@ export function EncryptionModeSection({
                   }}
                 >
                   {t('web.sync.encryption.enableConfirm')}
-                </button>
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
+                </Button>
+                <Button
+                  tone="ghost"
                   data-testid="encryption-enable-abort-2"
                   onClick={() => { setEnableStep(undefined); setEnableCodeInput(''); setEnableError(undefined); }}
                 >
                   {t('web.sync.encryption.enableCancel')}
-                </button>
+                </Button>
               </div>
             </>
           )}

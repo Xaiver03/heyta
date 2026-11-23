@@ -15,6 +15,7 @@ import type { AiRoutingConfig, EgressConsent, SecretStore } from '@heyta/ai';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { EmptyState, HeytaUiProvider } from '@heyta/ui';
 
+import { Button } from '../../components/hta/index.js';
 import { FormField } from '../../lib/form/FormField.js';
 import { SettingsInfoTip } from './SettingsInfoTip.js';
 import { useSyncStore } from '../sync/store.js';
@@ -413,10 +414,10 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
             <p className="ht-settings__hint" data-settings-disclosure data-testid="inbound-boundary">{t('web.ai.inbound.boundary.foregroundOnly')}</p>
             <p className="ht-settings__hint tabular-nums" role="status">{keyEpoch === undefined ? t('web.ai.inbound.keyMissing') : t('web.ai.inbound.keyReady', { epoch: keyEpoch })}</p>
             <div className="ht-settings__actions">
-              {keyEpoch === undefined ? <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void setupRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keySetup')}</button> : <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void rotateRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keyRotate')}</button>}
-              <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void setupWorker()} disabled={busy !== undefined}>
+              {keyEpoch === undefined ? <Button tone="ghost" onClick={() => void setupRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keySetup')}</Button> : <Button tone="ghost" onClick={() => void rotateRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keyRotate')}</Button>}
+              <Button type="button" tone="ghost" onClick={() => void setupWorker()} disabled={busy !== undefined}>
                 {workerRegistered ? t('web.ai.inbound.workerReady') : t('web.ai.inbound.workerSetup')}
-              </button>
+              </Button>
             </div>
             <FormField id="inbound-key-id" label={t('web.ai.inbound.keyId')}>
               {(field) => (
@@ -469,9 +470,9 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                 <input {...field} type="number" min={1} max={50} value={maxItems} onChange={(event) => setMaxItems(event.target.value)} />
               )}
             </FormField>
-            <button type="button" className="ht-btn ht-btn--primary" onClick={() => void (editingRuleId === undefined ? createRule() : saveEdit())} disabled={busy !== undefined || keyId.trim() === ''}>
+            <Button tone="primary" onClick={() => void (editingRuleId === undefined ? createRule() : saveEdit())} disabled={busy !== undefined || keyId.trim() === ''}>
               {editingRuleId === undefined ? t('web.ai.inbound.create') : t('web.ai.inbound.saveEdit')}
-            </button>
+            </Button>
           </div>
           {loading ? <p className="ht-settings__hint" role="status">{t('web.ai.inbound.loading')}</p> : null}
           {/*
@@ -496,9 +497,9 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                 />
                 {(credentials[rule.id] ?? []).filter((credential) => credential.revokedAt === null).map((credential) => <div className="ht-settings__actions" key={credential.credentialId}>
                   <span className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.active', { keyId: credential.keyId })}</span>
-                  <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void revokeCredential(credential)}>{t('web.ai.inbound.credential.revoke')}</button>
+                  <Button tone="ghost" disabled={busy !== undefined} onClick={() => void revokeCredential(credential)}>{t('web.ai.inbound.credential.revoke')}</Button>
                 </div>)}
-                <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void issueCredential(rule)}>{t('web.ai.inbound.credential.rotate')}</button>
+                <Button tone="ghost" disabled={busy !== undefined} onClick={() => void issueCredential(rule)}>{t('web.ai.inbound.credential.rotate')}</Button>
                 {/* 试发要用刚签发那一刻的 secret ⇒ 这句解释走 ⓘ（设置界面禁止内联说明段落）。 */}
                 <SettingsInfoTip
                   testId="tip-inbound-test-send-once"
@@ -509,19 +510,19 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
               {oneTimeSecret?.ruleId === rule.id ? <aside className="ht-inbound__credential-secret" role="status" data-testid="inbound-credential-secret">
                 <p className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.secretOnce', { keyId: oneTimeSecret.keyId })}</p>
                 <code className="tabular-nums">{oneTimeSecret.secret}</code>
-                <div className="ht-settings__actions"><button type="button" className="ht-btn ht-btn--primary" onClick={() => void copySecret()}>{secretCopied ? t('web.ai.inbound.credential.copied') : t('web.ai.inbound.credential.copy')}</button><button type="button" className="ht-btn ht-btn--ghost" onClick={() => void testSend()}>{t('web.ai.inbound.credential.testSend')}</button><button type="button" className="ht-btn ht-btn--ghost" onClick={() => setOneTimeSecret(undefined)}>{t('web.ai.inbound.draft.close')}</button></div>
+                <div className="ht-settings__actions"><Button tone="primary" onClick={() => void copySecret()}>{secretCopied ? t('web.ai.inbound.credential.copied') : t('web.ai.inbound.credential.copy')}</Button><Button tone="ghost" onClick={() => void testSend()}>{t('web.ai.inbound.credential.testSend')}</Button><Button tone="ghost" onClick={() => setOneTimeSecret(undefined)}>{t('web.ai.inbound.draft.close')}</Button></div>
                 {testSendState !== undefined ? <p className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.testSendResult', { state: testSendState })}</p> : null}
               </aside> : null}
               <div className="ht-settings__actions">
                 {rule.deletedAt === null ? <>
-                  {rule.enabled ? <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined || processing || !workerRegistered} onClick={triggerWebInboundPass}>{t('web.ai.inbound.processOne')}</button> : null}
-                  <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => beginEdit(rule)}>{t('web.ai.inbound.edit')}</button>
-                  <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void updateRule(rule, !rule.enabled)}>
+                  {rule.enabled ? <Button tone="ghost" disabled={busy !== undefined || processing || !workerRegistered} onClick={triggerWebInboundPass}>{t('web.ai.inbound.processOne')}</Button> : null}
+                  <Button tone="ghost" disabled={busy !== undefined} onClick={() => beginEdit(rule)}>{t('web.ai.inbound.edit')}</Button>
+                  <Button tone="ghost" disabled={busy !== undefined} onClick={() => void updateRule(rule, !rule.enabled)}>
                     {rule.enabled ? t('web.ai.inbound.pause') : t('web.ai.inbound.enable')}
-                  </button>
-                  <button type="button" className="ht-btn ht-btn--danger" disabled={busy !== undefined} onClick={() => void removeRule(rule)}>
+                  </Button>
+                  <Button tone="danger" disabled={busy !== undefined} onClick={() => void removeRule(rule)}>
                     {t('web.ai.inbound.remove')}
-                  </button>
+                  </Button>
                 </> : null}
               </div>
             </article>)}
@@ -546,7 +547,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
               </HeytaUiProvider>
             ) : null}
             {editingRuleId !== undefined ? <div className="ht-settings__actions">
-              <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => setEditingRuleId(undefined)}>{t('web.ai.inbound.cancelEdit')}</button>
+              <Button tone="ghost" disabled={busy !== undefined} onClick={() => setEditingRuleId(undefined)}>{t('web.ai.inbound.cancelEdit')}</Button>
             </div> : null}
             {processState === 'idle' ? null : <p className="ht-settings__hint" role="status" data-inbound-cycle-state={processState}>{processCopyKey === undefined ? null : t(processCopyKey)}</p>}
             <div className="ht-inbound__events">
@@ -575,8 +576,8 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                   {event.reasonCode !== null && REASON_COPY[event.reasonCode] !== undefined ? <p className="ht-settings__hint" role="status" data-testid={`inbound-event-reason-${event.eventId}`}>{t(REASON_COPY[event.reasonCode]!)}</p> : null}
                   {canReview ? <>
                     <div className="ht-settings__actions">
-                      <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void openDraft(event)}>{t('web.ai.inbound.draft.open')}</button>
-                      <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void cancelDraftEvent(event)}>{t('web.ai.inbound.draft.cancelEvent')}</button>
+                      <Button tone="ghost" disabled={busy !== undefined} onClick={() => void openDraft(event)}>{t('web.ai.inbound.draft.open')}</Button>
+                      <Button tone="ghost" disabled={busy !== undefined} onClick={() => void cancelDraftEvent(event)}>{t('web.ai.inbound.draft.cancelEvent')}</Button>
                     </div>
                     {active && draft?.binding === draftBinding && draft.review.eventId === event.eventId ? <div className="ht-inbound__draft" data-testid="inbound-draft-editor">
                       <SettingsInfoTip
@@ -609,17 +610,17 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                         </FormField>
                       </fieldset>)}
                       <div className="ht-settings__actions">
-                        <button type="button" className="ht-btn ht-btn--primary" disabled={busy !== undefined} onClick={() => void confirmDraft()}>{t('web.ai.inbound.draft.confirm')}</button>
-                        <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={closeDraft}>{t('web.ai.inbound.draft.close')}</button>
+                        <Button tone="primary" disabled={busy !== undefined} onClick={() => void confirmDraft()}>{t('web.ai.inbound.draft.confirm')}</Button>
+                        <Button tone="ghost" disabled={busy !== undefined} onClick={closeDraft}>{t('web.ai.inbound.draft.close')}</Button>
                       </div>
                     </div> : null}
                   </> : null}
                   {canRetry ? <div className="ht-inbound__retry">
                     {retryEventId === event.eventId ? <>
                       <p className="ht-settings__hint" role="alert">{t('web.ai.inbound.events.retryDisclosure')}</p>
-                      <div className="ht-settings__actions"><button type="button" className="ht-btn ht-btn--primary" disabled={busy !== undefined} onClick={() => void retryEvent(event)}>{t('web.ai.inbound.events.confirmRetry')}</button>
-                      <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => setRetryEventId(undefined)}>{t('web.ai.inbound.events.cancelRetry')}</button></div>
-                    </> : <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => setRetryEventId(event.eventId)}>{t('web.ai.inbound.events.retry')}</button>}
+                      <div className="ht-settings__actions"><Button tone="primary" disabled={busy !== undefined} onClick={() => void retryEvent(event)}>{t('web.ai.inbound.events.confirmRetry')}</Button>
+                      <Button tone="ghost" disabled={busy !== undefined} onClick={() => setRetryEventId(undefined)}>{t('web.ai.inbound.events.cancelRetry')}</Button></div>
+                    </> : <Button tone="ghost" disabled={busy !== undefined} onClick={() => setRetryEventId(event.eventId)}>{t('web.ai.inbound.events.retry')}</Button>}
                   </div> : null}
                 </article>;
               })}

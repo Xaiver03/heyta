@@ -87,6 +87,7 @@ import {
 } from '@heyta/app-host';
 import { webManagedTransport } from './managed-transport.js';
 import { durationFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
+import { Button } from '../../components/hta/index.js';
 import type { Task } from '@heyta/domain';
 
 /**
@@ -372,19 +373,18 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
   if (phase === 'idle') {
     return (
       <span className="ht-ai">
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
+        <Button
+          tone="ghost"
           data-testid={`duration-run-${task.id}`}
           aria-label={t('web.ai.duration.runAria', { title: task.title })}
           onClick={() => {
             setApplied(false);
             setPhase('disclosing');
           }}
+          leadingIcon={<Clock size={ICON_SIZE.xs} aria-hidden="true" />}
         >
-          <Clock size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.duration.button')}
-        </button>
+        </Button>
         {applied && (
           <span className="ht-ai__done" data-testid={`duration-applied-${task.id}`}>
             {t('web.ai.duration.applied')}
@@ -430,17 +430,16 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             </AiDisclosureHost>
 
             <div className="ht-ai__actions">
-              <button
-                type="button"
-                className="ht-btn ht-btn--secondary"
+              <Button
+                tone="secondary"
                 data-testid="duration-send"
                 onClick={() => void send()}
               >
                 {t('web.ai.action.send')}
-              </button>
-              <button type="button" className="ht-btn ht-btn--ghost" onClick={reset}>
+              </Button>
+              <Button tone="ghost" onClick={reset}>
                 {t('web.ai.action.cancel')}
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -499,22 +498,20 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
         </p>
 
         <div className="ht-ai__actions">
-          <button
-            type="button"
-            className="ht-btn ht-btn--secondary"
+          <Button
+            tone="secondary"
             data-testid="duration-apply"
             onClick={() => void apply()}
           >
             {t('web.ai.duration.apply')}
-          </button>
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
+          </Button>
+          <Button
+            tone="ghost"
             data-testid="duration-reject"
             onClick={reset}
           >
             {t('web.ai.action.discard')}
-          </button>
+          </Button>
         </div>
             </AiPanelHost>
     );
@@ -567,34 +564,31 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           data-testid="duration-manual-input"
         />
         {t('web.ai.duration.manualUnit')}
-        <button
-          type="button"
-          className="ht-btn ht-btn--secondary"
+        <Button
+          tone="secondary"
           data-testid="duration-manual-apply"
           disabled={!manualOk}
           onClick={() => void applyManual()}
         >
           {t('web.ai.duration.apply')}
-        </button>
+        </Button>
       </p>
 
       <div className="ht-ai__actions">
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
+        <Button
+          tone="ghost"
           data-testid="duration-retry"
           onClick={() => setPhase('disclosing')}
         >
           {t('web.ai.duration.retry')}
-        </button>
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
+        </Button>
+        <Button
+          tone="ghost"
           data-testid="duration-close"
           onClick={reset}
         >
           {t('web.ai.action.close')}
-        </button>
+        </Button>
       </div>
         </AiPanelHost>
   );

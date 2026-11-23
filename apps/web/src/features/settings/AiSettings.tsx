@@ -122,6 +122,7 @@ import {
 } from './aiStore.js';
 import './ai-settings.css';
 import { InboundAutomationSettings } from './InboundAutomationSettings.js';
+import { Button } from '../../components/hta/index.js';
 import { FormField } from '../../lib/form/FormField.js';
 import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
 import { SettingsInfoTip } from './SettingsInfoTip.js';
@@ -1062,9 +1063,8 @@ export function AiSettings({
                               setKeyDraft((d) => ({ ...d, [endpoint.keyRef as string]: e.target.value }));
                             }}
                           />
-                          <button
-                            type="button"
-                            className="ht-btn ht-btn--ghost"
+                          <Button
+                            tone="ghost"
                             onClick={() => {
                               const ref = endpoint.keyRef as string;
                               secrets.set(ref, keyDraft[ref] ?? '');
@@ -1074,18 +1074,16 @@ export function AiSettings({
                             }}
                           >
                             {t('web.ai.settings.keyRemember')}
-                          </button>
+                          </Button>
                         </span>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      className="ht-btn ht-btn--ghost"
+                    <Button
+                      tone="ghost"
                       aria-label={t('web.ai.settings.deleteAria', { name: endpoint.label })}
                       onClick={() => removeEndpoint(endpoint.id)}
-                    >
-                      <Trash2 size={ICON_SIZE.xs} aria-hidden="true" />
-                    </button>
+                      leadingIcon={<Trash2 size={ICON_SIZE.xs} aria-hidden="true" />}
+                    />
                   </li>
                 );
               })}
@@ -1096,30 +1094,28 @@ export function AiSettings({
                 const added = routing.endpoints.some((e) => e.id === preset.id);
                 const copy = presetText(preset, t);
                 return (
-                  <button
+                  <Button
                     key={preset.id}
-                    type="button"
-                    className="ht-btn ht-btn--ghost"
+                    tone="ghost"
                     disabled={added}
                     data-testid={`add-preset-${preset.id}`}
                     onClick={() => addEndpoint({ ...preset.config, label: copy.label })}
+                    leadingIcon={<Plus size={ICON_SIZE.xs} aria-hidden="true" />}
                   >
-                    <Plus size={ICON_SIZE.xs} aria-hidden="true" />
                     {added
                       ? t('web.ai.settings.presetAdded', { name: copy.label })
                       : t('web.ai.settings.presetAdd', { name: copy.label })}
-                  </button>
+                  </Button>
                 );
               })}
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
+              <Button
+                tone="ghost"
                 data-testid="add-custom-endpoint"
                 onClick={addCustomEndpoint}
+                leadingIcon={<Plus size={ICON_SIZE.xs} aria-hidden="true" />}
               >
-                <Plus size={ICON_SIZE.xs} aria-hidden="true" />
                 {t('web.ai.settings.addCustom')}
-              </button>
+              </Button>
             </div>
 
             {rejected.length > 0 && (
@@ -1192,9 +1188,9 @@ export function AiSettings({
                   {needsConsent && (
                     <div className="ht-settings__consent" data-testid={`consent-${feature}`}>
                       <span>{t('web.ai.settings.consentLead', { feature: featureLabel[feature] })}</span>
-                      <button type="button" className="ht-btn ht-btn--primary" onClick={() => grant(feature)}>
+                      <Button tone="primary" onClick={() => grant(feature)}>
                         {t('web.ai.settings.grant')}
-                      </button>
+                      </Button>
                     </div>
                   )}
                   {/* 🔴 能力缺口：能配、但配了也跑不起来 —— 必须说出来 */}
@@ -1213,9 +1209,8 @@ export function AiSettings({
                           {first.missing.map((c) => capabilityLabel[c]).join(LIST_SEPARATOR[locale])}
                           {t('web.ai.settings.gapMid')}<strong>{endpoint.label}</strong>{t('web.ai.settings.gapTail')}
                         </span>
-                        <button
-                          type="button"
-                          className="ht-btn ht-btn--primary"
+                        <Button
+                          tone="primary"
                           data-testid={`cap-fix-${feature}`}
                           onClick={() => {
                             const merged = [
@@ -1225,7 +1220,7 @@ export function AiSettings({
                           }}
                         >
                           {t('web.ai.settings.gapFix', { name: endpoint.label })}
-                        </button>
+                        </Button>
                       </div>
                     );
                   })()}
@@ -1235,9 +1230,9 @@ export function AiSettings({
                       <span>
                         <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ai.settings.granted')}
                       </span>
-                      <button type="button" className="ht-btn ht-btn--ghost" onClick={() => revoke(feature)}>
+                      <Button tone="ghost" onClick={() => revoke(feature)}>
                         {t('web.ai.settings.revoke')}
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -1403,9 +1398,9 @@ export function AiSettings({
                     update({ ...settings, localApi: { ...localApi, token: e.target.value } });
                   }}
                 />
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost ht-ai-settings__icon-button"
+                <Button
+                  tone="ghost"
+                  className="ht-ai-settings__icon-button"
                   aria-label={localTokenVisible
                     ? t('web.ai.settings.localApi.token.hide')
                     : t('web.ai.settings.localApi.token.show')}
@@ -1414,14 +1409,12 @@ export function AiSettings({
                     ? t('web.ai.settings.localApi.token.hide')
                     : t('web.ai.settings.localApi.token.show')}
                   onClick={() => setLocalTokenVisible((visible) => !visible)}
-                >
-                  {localTokenVisible
+                  leadingIcon={localTokenVisible
                     ? <EyeOff size={ICON_SIZE.xs} aria-hidden="true" />
                     : <Eye size={ICON_SIZE.xs} aria-hidden="true" />}
-                </button>
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
+                />
+                <Button
+                  tone="ghost"
                   disabled={!localApi.token}
                   onClick={() => {
                     if (!localApi.token || navigator.clipboard === undefined) return;
@@ -1434,7 +1427,7 @@ export function AiSettings({
                   {localTokenCopied
                     ? t('web.ai.settings.localApi.token.copied')
                     : t('web.ai.settings.localApi.token.copy')}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -1589,14 +1582,13 @@ export function AiSettings({
           </DangerConfirmDialog>
         ) : (
           <div className="ht-settings__actions">
-            <button
-              type="button"
-              className="ht-btn ht-btn--danger"
+            <Button
+              tone="danger"
               data-testid="reset-ai-settings"
               onClick={() => { setConfirmingReset(true); }}
             >
               {t('web.ai.settings.reset')}
-            </button>
+            </Button>
           </div>
         )}
       </section>

@@ -39,6 +39,7 @@ import { useProjectStore } from '../projects/store.js';
 import { getWebVaultSession } from '../../lib/vault-session.js';
 import { createWebAuthFetch } from '../../lib/auth-fetch.js';
 import { text } from '../../lib/text.js';
+import { Button } from '../../components/hta/index.js';
 import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';
 import {
   unwrapShareIdentitySeed,
@@ -329,15 +330,13 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
               </p>
             ) : null}
           </div>
-          <button
-            type="button"
+          <Button
             data-testid="share-join-close"
             aria-label={t('web.share.dialog.close')}
-            className="ht-btn ht-btn--ghost"
+            tone="ghost"
             onClick={() => requestDismiss('escape')}
-          >
-            <X size={ICON_SIZE.sm} aria-hidden="true" />
-          </button>
+            leadingIcon={<X size={ICON_SIZE.sm} aria-hidden="true" />}
+          />
         </div>
 
         {needsUnlock ? (
@@ -395,9 +394,9 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
               data-testid="share-join-name"
               style={styles.input}
             />
-            <button type="submit" className="ht-btn ht-btn--primary" data-testid="share-join-submit">
+            <Button type="submit" tone="primary" data-testid="share-join-submit">
               {t('web.share.join.submit')}
-            </button>
+            </Button>
           </form>
         ) : null}
 
@@ -418,9 +417,9 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
             <p role="status" data-testid="share-join-done" style={styles.resetTitle}>
               {t('web.share.join.done')}
             </p>
-            <button type="button" className="ht-btn ht-btn--primary" data-testid="share-join-close-final" onClick={onClose}>
+            <Button tone="primary" data-testid="share-join-close-final" onClick={onClose}>
               {t('web.share.dialog.close')}
-            </button>
+            </Button>
           </>
         ) : null}
     </WebModalShell>

@@ -49,6 +49,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { AnchoredMenu, MenuItem, MenuSection, MenuSeparator } from '../../lib/menu/AnchoredMenu.js';
+import { Button } from '../../components/hta/index.js';
 
 /** 「时间线」那个 `<option value>`——刻意不是 `CalendarViewKind`，绝不交给 `store.setView`。 */
 const TIMELINE_VALUE = 'timeline';
@@ -218,18 +219,16 @@ export function CalendarHeaderToolbar({
         >
           +
         </button>
-        <button
+        <Button
           ref={menuTriggerRef}
-          type="button"
-          className="ht-btn ht-btn--ghost"
+          tone="ghost"
           data-testid="calendar-menu-open"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           aria-label={t('web.calendar.more.label')}
           onClick={() => { setMenuOpen((open) => !open); }}
-        >
-          <MoreHorizontal size={ICON_SIZE.md} aria-hidden="true" />
-        </button>
+          leadingIcon={<MoreHorizontal size={ICON_SIZE.md} aria-hidden="true" />}
+        />
         {copied ? (
           <span className="ht-header__calendar-scope" role="status" data-testid="calendar-share-copied">
             {t('web.calendar.more.copied')}

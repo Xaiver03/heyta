@@ -46,6 +46,7 @@ import { useSyncStore } from '../sync/store.js';
 import { FormField } from '../../lib/form/FormField.js';
 import { usePasskeysStore } from './passkeysStore.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 删除失败原因 → 词条 key。
@@ -208,9 +209,8 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
               没有它，用户被指向一个做不到的动作（添加走公开注册路径是静默
               空操作），然后删掉旧凭据就再也登不进去。
             */}
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
+            <Button
+              tone="primary"
               data-testid="passkeys-add"
               disabled={adding}
               onClick={() => {
@@ -226,10 +226,9 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                 <Plus size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {adding ? t('web.passkeys.adding') : t('web.passkeys.add')}
-            </button>
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
+            </Button>
+            <Button
+              tone="ghost"
               data-testid="passkeys-refresh"
               disabled={status.kind === 'loading'}
               onClick={() => {
@@ -245,7 +244,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                 <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {t('web.passkeys.refresh')}
-            </button>
+            </Button>
           </div>
 
           {adding && (
@@ -362,9 +361,8 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                             disabled={renaming}
                             onChange={(e) => setDraftName(e.target.value)}
                           />
-                          <button
-                            type="button"
-                            className="ht-btn ht-btn--primary"
+                          <Button
+                            tone="primary"
                             data-testid={`passkey-name-save-${passkey.id}`}
                             disabled={renaming}
                             onClick={() => {
@@ -385,16 +383,15 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                               <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
                             )}{' '}
                             {t('web.passkeys.save')}
-                          </button>
-                          <button
-                            type="button"
-                            className="ht-btn ht-btn--ghost"
+                          </Button>
+                          <Button
+                            tone="ghost"
                             data-testid={`passkey-name-cancel-${passkey.id}`}
                             disabled={renaming}
                             onClick={() => setEditingRowId(undefined)}
                           >
                             {t('web.passkeys.cancel')}
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </FormField>
@@ -402,9 +399,8 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                     <div className="ht-settings__actions ht-settings__actions--centered">
                       {confirming ? (
                         <>
-                          <button
-                            type="button"
-                            className="ht-btn ht-btn--primary"
+                          <Button
+                            tone="primary"
                             data-testid={`passkey-confirm-${passkey.id}`}
                             disabled={deleting}
                             onClick={() => {
@@ -418,21 +414,19 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                               <Trash2 size={ICON_SIZE.xs} aria-hidden="true" />
                             )}{' '}
                             {t('web.passkeys.confirmDelete')}
-                          </button>
-                          <button
-                            type="button"
-                            className="ht-btn ht-btn--ghost"
+                          </Button>
+                          <Button
+                            tone="ghost"
                             data-testid={`passkey-cancel-${passkey.id}`}
                             onClick={() => setConfirmingId(undefined)}
                           >
                             {t('web.passkeys.cancel')}
-                          </button>
+                          </Button>
                         </>
                       ) : (
                         <>
-                          <button
-                            type="button"
-                            className="ht-btn ht-btn--ghost"
+                          <Button
+                            tone="ghost"
                             data-testid={`passkey-rename-${passkey.id}`}
                             disabled={deleting || renaming}
                             onClick={() => {
@@ -444,10 +438,9 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                             }}
                           >
                             <Pencil size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.passkeys.rename')}
-                          </button>
-                          <button
-                            type="button"
-                            className="ht-btn ht-btn--ghost"
+                          </Button>
+                          <Button
+                            tone="ghost"
                             data-testid={`passkey-delete-${passkey.id}`}
                             disabled={deleting}
                             onClick={() => {
@@ -462,7 +455,7 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
                               <Trash2 size={ICON_SIZE.xs} aria-hidden="true" />
                             )}{' '}
                             {deleting ? t('web.passkeys.deleting') : t('web.passkeys.delete')}
-                          </button>
+                          </Button>
                         </>
                       )}
                       </div>

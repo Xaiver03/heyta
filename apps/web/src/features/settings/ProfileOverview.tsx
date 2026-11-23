@@ -18,6 +18,7 @@ import { useSyncStore } from '../sync/store.js';
 import { useAccountIdentity } from './useAccountIdentity.js';
 import { selectMilestones, selectWeeklyReview } from '../motivation/selectors.js';
 import { growthBoardLabels } from '../motivation/GrowthView.js';
+import { Button } from '../../components/hta/index.js';
 
 export function ProfileOverview({
   onEditProfile,
@@ -85,14 +86,13 @@ export function ProfileOverview({
           ) : identity.status === 'error' ? (
             <div className="ht-settings__profile-note" role="status">
               <span>{t('web.profile.overview.identityUnavailable')}</span>{' '}
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
+              <Button
+                tone="ghost"
                 data-testid="profile-center-identity-retry"
                 onClick={identity.retry}
               >
                 {t('web.profile.overview.identityRetry')}
-              </button>
+              </Button>
             </div>
           ) : null}
           {identity.avatarState === 'unreadable' ? (
@@ -102,10 +102,10 @@ export function ProfileOverview({
           ) : null}
         </div>
         {signedIn ? (
-          <button type="button" className="ht-btn ht-btn--ghost" onClick={onEditProfile}>
+          <Button tone="ghost" onClick={onEditProfile}>
             <UserRoundPen size={ICON_SIZE.sm} aria-hidden="true" />
             {t('web.profile.overview.edit')}
-          </button>
+          </Button>
         ) : null}
       </section>
 
@@ -170,15 +170,14 @@ export function ProfileOverview({
                 />
               </h2>
             </div>
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost ht-settings__profile-achievement-action"
+            <Button
+              tone="ghost" className="ht-settings__profile-achievement-action"
               data-testid="profile-center-growth"
               onClick={onOpenGrowth}
             >
               <ArrowRight size={ICON_SIZE.sm} aria-hidden="true" />
               {t('web.profile.overview.growth')}
-            </button>
+            </Button>
           </div>
           <div className="ht-settings__profile-achievement" data-testid="profile-achievements">
             <span className="ht-settings__profile-value">
@@ -205,15 +204,14 @@ export function ProfileOverview({
       ) : null}
 
       <nav className="ht-settings__profile-actions" aria-label={t('web.profile.overview.title')}>
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
+        <Button
+          tone="ghost"
           data-testid="profile-center-settings"
           onClick={onOpenSettings}
         >
           <Settings2 size={ICON_SIZE.sm} aria-hidden="true" />
           {t('web.profile.overview.settings')}
-        </button>
+        </Button>
       </nav>
 
       {/*
@@ -235,15 +233,14 @@ export function ProfileOverview({
 
       {signedIn && onSignOut !== undefined ? (
         <div className="ht-settings__profile-actions">
-          <button
-            type="button"
-            className="ht-btn ht-btn--danger"
+          <Button
+            tone="danger"
             data-testid="profile-center-signout"
             onClick={onSignOut}
           >
             <LogOut size={ICON_SIZE.sm} aria-hidden="true" />
             {t('web.shell.account.signOut')}
-          </button>
+          </Button>
         </div>
       ) : null}
     </div>

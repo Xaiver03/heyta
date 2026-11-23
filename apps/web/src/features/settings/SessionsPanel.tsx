@@ -48,6 +48,7 @@ import { useSyncStore } from '../sync/store.js';
 import { useSessionsStore } from './sessionsStore.js';
 import { useSignOutStore } from './signOutStore.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 时间戳 → 人读的一行。
@@ -139,9 +140,8 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
       ) : (
         <>
           <div className="ht-settings__actions">
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
+            <Button
+              tone="ghost"
               data-testid="sessions-refresh"
               disabled={state.kind === 'loading' || refreshing}
               onClick={() => {
@@ -155,15 +155,14 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
                 <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {t('web.passkeys.refresh')}
-            </button>
+            </Button>
             {/*
               🔴 「退出所有设备」是这一面板里唯一一次会**把这台也退出**的动作，
               所以它是危险色按钮，而且后果写在按钮之前（下面那句 hint）。
               走的是与头像菜单同一个实现（`signOutStore`），不是第二份登出逻辑。
             */}
-            <button
-              type="button"
-              className="ht-btn ht-btn--danger"
+            <Button
+              tone="danger"
               data-testid="sessions-logout-all"
               onClick={() => {
                 if (!activeRef.current) return;
@@ -177,7 +176,7 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
                 <LogOut size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {signingOutAll ? t('common.sessions.busy') : t('common.sessions.logoutAll')}
-            </button>
+            </Button>
           </div>
 
           {state.kind === 'loading' && (
@@ -272,9 +271,8 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
                     ) : null,
                     actions: (
                       <div className="ht-settings__actions ht-settings__actions--centered">
-                        <button
-                          type="button"
-                          className="ht-btn ht-btn--ghost"
+                        <Button
+                          tone="ghost"
                           data-testid={`session-revoke-${session.sessionId}`}
                           // 这一行的按钮禁用，**不影响**别的行；current 那一行永远禁用。
                           disabled={session.current || revoking}
@@ -290,7 +288,7 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
                             <LogOut size={ICON_SIZE.xs} aria-hidden="true" />
                           )}{' '}
                           {revoking ? t('common.sessions.busy') : t('common.sessions.revoke')}
-                        </button>
+                        </Button>
                       </div>
                     ),
                   };

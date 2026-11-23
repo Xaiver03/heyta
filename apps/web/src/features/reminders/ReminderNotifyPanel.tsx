@@ -27,6 +27,7 @@ import { useI18n } from '@heyta/i18n';
 import type { NotificationRequestResult } from './notify.js';
 import { resolveReminderCenter } from './shell-reminder-center.js';
 import { SettingsNotice } from '../settings/SettingsNotice.js';
+import { Button } from '../../components/hta/index.js';
 
 export function ReminderNotifyPanel(): React.JSX.Element {
   const { t } = useI18n();
@@ -89,28 +90,26 @@ export function ReminderNotifyPanel(): React.JSX.Element {
           title={t('web.reminder.notify.requestFailed')}
           testId="reminder-notify-request-failed"
           actions={
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
+            <Button
+              tone="primary"
               data-testid="reminder-notify-request"
               onClick={ask}
             >
               {t('web.reminder.notify.request')}
-            </button>
+            </Button>
           }
         />
       ) : (
         <>
           <p className="ht-settings__hint">{t('web.reminder.notify.intro')}</p>
           <div className="ht-settings__actions">
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
+            <Button
+              tone="primary"
               data-testid="reminder-notify-request"
               onClick={ask}
             >
               {t('web.reminder.notify.request')}
-            </button>
+            </Button>
           </div>
         </>
       )}

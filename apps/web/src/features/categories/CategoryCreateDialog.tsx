@@ -10,6 +10,7 @@ import { useI18n } from '@heyta/i18n';
 import { categorySlotColor } from '../../lib/category-colors.js';
 
 import { FormField } from '../../lib/form/FormField.js';
+import { Button } from '../../components/hta/index.js';
 
 import './category-create-dialog.css';
 
@@ -254,13 +255,21 @@ function CategoryDraftForm({
           )}
 
           <div className="ht-category-create-dialog__actions">
-            <button type="button" className="ht-btn ht-btn--ghost" onClick={() => requestDismiss('escape')} disabled={busy}>
+            <Button
+              tone="ghost"
+              onClick={() => requestDismiss('escape')}
+              disabled={busy}
+            >
               {t('web.categories.create.cancel')}
-            </button>
-            <button type="submit" className="ht-btn ht-btn--primary" disabled={busy}>
-              <Check size={ICON_SIZE.sm} aria-hidden="true" />
+            </Button>
+            <Button
+              type="submit"
+              tone="primary"
+              disabled={busy}
+              leadingIcon={<Check size={ICON_SIZE.sm} aria-hidden="true" />}
+            >
               {busy ? t('web.categories.create.creating') : createLabel}
-            </button>
+            </Button>
           </div>
         </form>
     </WebModalShell>

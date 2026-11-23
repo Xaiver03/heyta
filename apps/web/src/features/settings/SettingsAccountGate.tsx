@@ -3,6 +3,7 @@ import { LogIn } from 'lucide-react';
 import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
+import { Button } from '../../components/hta/index.js';
 import { useSyncStore } from '../sync/store.js';
 
 /**
@@ -32,15 +33,14 @@ export function SettingsAccountGate(props: {
           </p>
         </div>
       </div>
-      <button
-        type="button"
-        className="ht-btn ht-btn--primary"
+      <Button
+        tone="primary"
         data-testid={`${props.testId}-action`}
         onClick={() => openSignIn()}
+        leadingIcon={<LogIn size={ICON_SIZE.xs} aria-hidden="true" />}
       >
-        <LogIn size={ICON_SIZE.xs} aria-hidden="true" />
         {t('common.auth.form.signIn')}
-      </button>
+      </Button>
     </div>
   );
 }

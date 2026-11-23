@@ -45,6 +45,7 @@ import { useSyncStore } from '../sync/store.js';
 import { FormField } from '../../lib/form/FormField.js';
 import { useEmailChangeStore, type EmailChangeRequestFailure } from './emailChangeStore.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 失败原因 → 词条 key。
@@ -254,9 +255,8 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
             </p>
           )}
           <div className="ht-settings__actions">
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
+            <Button
+              tone="ghost"
               data-testid="email-change-cancel"
               disabled={cancelling}
               onClick={() => {
@@ -272,7 +272,7 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
                 <XCircle size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {t('common.emailChange.cancel')}
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
@@ -318,9 +318,8 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
                   dismissNotices();
                 }}
               />
-              <button
-                type="button"
-                className="ht-btn ht-btn--primary"
+              <Button
+                tone="primary"
                 data-testid="email-change-submit"
                 // 忙态用 guard（见 `emailChangeStore.request` 第一行），不用 disabled。
                 onClick={() => {
@@ -340,7 +339,7 @@ export function EmailChangePanel({ active = true }: { active?: boolean }): React
                   <Mail size={ICON_SIZE.xs} aria-hidden="true" />
                 )}{' '}
                 {requesting ? t('common.emailChange.busy') : t('common.emailChange.submit')}
-              </button>
+              </Button>
             </div>
           )}
         </FormField>

@@ -41,6 +41,7 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { authBaseUrl } from '../../lib/auth-endpoint.js';
 import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
 import { text } from '../../lib/text.js';
+import { Button } from '../../components/hta/index.js';
 import { useSyncStore } from '../sync/store.js';
 import { notePrivacySheetMounted, usePrivacyStore } from './store.js';
 
@@ -164,15 +165,14 @@ export function PrivacyConsentSheet(): React.JSX.Element | null {
         {/* 🔴 与 RN 那一份同形状：这条出口在屏幕上写的就是它那三个字。
             一枚 ✕ 在这个位置的通用含义是"关掉这张卡"，可这一下既不落盘也不关闭决定，
             下次冷启动还会再问 —— 看得见的人只能猜，看不见的人反而拿到准确的那句。 */}
-        <button
-          type="button"
+        <Button
           data-testid="privacy-consent-close"
           aria-label={t('common.privacy.consent.close')}
-          className="ht-btn ht-btn--ghost"
+          tone="ghost"
           onClick={closeSheet}
         >
           {t('common.privacy.consent.close')}
-        </button>
+        </Button>
       </div>
 
       <p style={{ margin: 0, ...text('row-title') }}>
@@ -250,24 +250,22 @@ export function PrivacyConsentSheet(): React.JSX.Element | null {
         // 🔴 决定已经生效（本次会话内闸门该开就开、该关就关），只是这台设备记不住它。
         // 这时**不再摆两个决定按钮** —— 再点一次「同意」会被读成"刚才那下没生效"，
         // 而它确实生效了。这里要的是一次确认，不是一次重新选择。
-        <button
-          type="button"
+        <Button
           data-testid="privacy-consent-acknowledge"
-          className="ht-btn ht-btn--primary"
+          tone="primary"
           onClick={acknowledgeNotPersisted}
         >
           {t('common.privacy.consent.acknowledge')}
-        </button>
+        </Button>
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: cssVar('space.2') }}>
           {/* 🔴 两个动作**并排、同等可达**（不是"同意"是按钮、"不同意"是一行小字）：
               《认定方法》把"不同意即无法使用"与诱导同意列为违规，而 Apple 4.2 / PIPL 16
               要求拒绝与同意一样容易点。这里刻意不给「只用本机」加危险色 ——
               它不是一个惩罚选项。 */}
-          <button
-            type="button"
+          <Button
             data-testid="privacy-consent-accept"
-            className="ht-btn ht-btn--primary"
+            tone="primary"
             onClick={() => {
               accept();
               if (!usePrivacyStore.getState().open && !useSyncStore.getState().token) {
@@ -276,15 +274,14 @@ export function PrivacyConsentSheet(): React.JSX.Element | null {
             }}
           >
             {t('common.privacy.consent.accept')}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             data-testid="privacy-consent-local-only"
-            className="ht-btn ht-btn--secondary"
+            tone="secondary"
             onClick={chooseLocalOnly}
           >
             {t('common.privacy.consent.localOnly')}
-          </button>
+          </Button>
         </div>
       )}
     </WebModalShell>

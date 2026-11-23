@@ -45,6 +45,7 @@ import { hasEngine, requireEngine } from '../../lib/oplog.js';
 import { useAuthStore } from '../auth/store.js';
 import { useSyncStore } from '../sync/store.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 结局 → 词条这件事**不在本文件里**。
@@ -178,30 +179,28 @@ export function CloseAccountPanel(): React.JSX.Element | null {
 
           {acknowledged && !confirming ? (
             <div className="ht-settings__actions">
-              <button
-                type="button"
-                className="ht-btn ht-btn--secondary"
+              <Button
+                tone="secondary"
                 data-testid="close-account-open"
                 onClick={() => {
                   setConfirming(true);
                 }}
               >
                 {t('common.accountClosure.action')}
-              </button>
+              </Button>
             </div>
           ) : null}
 
           {confirming ? (
             <div className="ht-settings__actions">
-              <button
-                type="button"
-                className="ht-btn ht-btn--danger"
+              <Button
+                tone="danger"
                 data-testid="close-account-confirm"
                 disabled={busy}
                 onClick={() => void submit()}
               >
                 {busy ? t('common.accountClosure.busy') : t('common.accountClosure.action')}
-              </button>
+              </Button>
             </div>
           ) : null}
 

@@ -40,6 +40,7 @@ import { useSyncStore } from '../sync/store.js';
 import { SettingsInfoTip } from '../settings/SettingsInfoTip.js';
 import { privacyConsent } from '../privacy/consent-gate.js';
 import { SettingsAccountGate } from '../settings/SettingsAccountGate.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 档位 → 词条。
@@ -295,9 +296,8 @@ export function RenewPanel({
 
           {/* 主按钮**独占一行**：它是这一屏唯一的提交动作。 */}
           <div className="ht-settings__actions ht-settings__sub-cta">
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
+            <Button
+              tone="primary"
               data-testid="renew-place-order"
               disabled={pending}
               onClick={() => void onPlaceOrder()}
@@ -307,7 +307,7 @@ export function RenewPanel({
                 : entitled
                   ? t('web.subscription.renew.action')
                   : t('web.subscription.renew.subscribe')}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -335,9 +335,9 @@ export function RenewPanel({
             {t('web.subscription.renew.payHint')}
           </p>
           <div className="ht-settings__actions">
-            <button type="button" className="ht-btn ht-btn--ghost" data-testid="renew-copy" onClick={onCopy}>
+            <Button tone="ghost" data-testid="renew-copy" onClick={onCopy}>
               {copied ? t('web.subscription.renew.copied') : t('web.subscription.renew.copy')}
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}
@@ -365,9 +365,8 @@ export function RenewPanel({
           </p>
           {switchTarget === undefined ? null : (
             <div className="ht-settings__actions">
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
+              <Button
+                tone="ghost"
                 data-testid="renew-switch-tier"
                 onClick={() => {
                   setTierId(switchTarget);
@@ -377,7 +376,7 @@ export function RenewPanel({
                 }}
               >
                 {t('web.subscription.renew.switchTier')}
-              </button>
+              </Button>
             </div>
           )}
         </div>

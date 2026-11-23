@@ -21,6 +21,7 @@ import { AlertTriangle } from 'lucide-react';
 import { useI18n } from '@heyta/i18n';
 
 import { text } from '../../lib/text.js';
+import { Button } from '../../components/hta/index.js';
 
 import type { RouteExplanation, SettingsTarget } from './route-explanation.js';
 
@@ -70,24 +71,22 @@ export function RouteUnavailable({
       </p>
       {/* 🔴 只做导航：把用户送到能修它的那个控件前面，**不替他做决定**。 */}
       {onOpenSettings !== undefined && (
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
+        <Button
+          tone="ghost"
           data-testid={`${testId}-settings`}
           onClick={() => onOpenSettings(explanation.settingsTarget)}
         >
           {t('web.ai.action.openSettings')}
-        </button>
+        </Button>
       )}
       {onRetry !== undefined && RETRYABLE.has(explanation.reason) && (
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
+        <Button
+          tone="ghost"
           data-testid={`${testId}-retry`}
           onClick={onRetry}
         >
           {t('web.ai.action.retry')}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -178,14 +177,13 @@ export function FailureSettingsAction({
         </div>
       )}
       {showButton && (
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
+        <Button
+          tone="ghost"
           data-testid={testId}
           onClick={() => onOpenSettings(settingsTarget)}
         >
           {t('web.ai.action.openSettings')}
-        </button>
+        </Button>
       )}
     </>
   );

@@ -35,6 +35,7 @@ import { restoreFromExport } from '../../lib/oplog.js';
 import { readFileText } from './import-file.js';
 import { SettingsNotice } from './SettingsNotice.js';
 import { SettingsFilePicker } from './SettingsFilePicker.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 结构化 `reason` → 词条。**穷举**（`Record<Union, MessageKey>`）。
@@ -113,16 +114,15 @@ export function ImportPanel(): React.JSX.Element {
               setFailed(false);
             }}
           />
-          <button
-            type="button"
-            className="ht-btn ht-btn--primary"
+          <Button
+            tone="primary"
             data-testid="import-run"
             disabled={busy || file === undefined}
             onClick={() => void run()}
+            leadingIcon={<Upload size={ICON_SIZE.xs} aria-hidden="true" />}
           >
-            <Upload size={ICON_SIZE.xs} aria-hidden="true" />
             {busy ? t('web.import.busy') : t('web.import.button')}
-          </button>
+          </Button>
         </div>
         {file !== undefined && (
           <div className="ht-settings__file-summary" data-testid="import-file-summary">

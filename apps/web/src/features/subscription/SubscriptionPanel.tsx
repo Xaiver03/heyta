@@ -40,6 +40,7 @@ import { siteLink } from '../../lib/site-url.js';
 import { useSubscriptionStore } from './store.js';
 import { RenewPanel } from './RenewPanel.js';
 import { SettingsInfoTip } from '../settings/SettingsInfoTip.js';
+import { Button } from '../../components/hta/index.js';
 
 type Tone = 'ok' | 'warn' | 'muted' | 'unknown';
 
@@ -109,16 +110,16 @@ export function SubscriptionPanel({ active = true }: { active?: boolean }): Reac
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost ht-settings__sub-refresh"
+        <Button
+          tone="ghost"
+          className="ht-settings__sub-refresh"
           data-testid="subscription-refresh"
           disabled={checking}
           onClick={() => void refresh()}
+          leadingIcon={<RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />}
         >
-          <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
           {checking ? t('web.subscription.status.checking') : t('web.subscription.status.refresh')}
-        </button>
+        </Button>
       </div>
 
 
@@ -141,15 +142,16 @@ export function SubscriptionPanel({ active = true }: { active?: boolean }): Reac
           />
         </p>
         <div className="ht-settings__actions">
-          <a
-            className="ht-btn ht-btn--ghost"
-            href={siteLink('/pricing')}
-            rel="noopener noreferrer"
-            data-testid="subscription-pricing-link"
-          >
-            <Server size={ICON_SIZE.xs} aria-hidden="true" />
-            {t('web.subscription.footnote.pricingLink')}
-          </a>
+          <Button asChild tone="ghost">
+            <a
+              href={siteLink('/pricing')}
+              rel="noopener noreferrer"
+              data-testid="subscription-pricing-link"
+            >
+              <Server size={ICON_SIZE.xs} aria-hidden="true" />
+              {t('web.subscription.footnote.pricingLink')}
+            </a>
+          </Button>
         </div>
       </div>
     </section>

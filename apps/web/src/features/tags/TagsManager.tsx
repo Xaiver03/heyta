@@ -29,7 +29,7 @@
  * "一个标签在列表里长什么样"只有一份实现（它同时被侧栏与移动端用）。
  * 这里只给它加两样东西：行首换成**多选框**（`renderLeading` 插槽）、上面一条**批量动作条**。
  * 🔴 本文件**零内联样式**：布局与配色全在 L1/L2（`OrganizerList` 的 `StyleSheet`）
- * 与 `.ht-btn` 族里 —— `features/**` 的内联样式是棘轮账本（`check:l4`），
+ * 与按钮组件族里 —— `features/**` 的内联样式是棘轮账本（`check:l4`），
  * 而这张面没有任何"必须内联"的动态几何。
  */
 
@@ -45,6 +45,7 @@ import { useI18n } from '@heyta/i18n';
 import { useTaskStore } from '../tasks/store.js';
 import { useProjectStore } from '../projects/store.js';
 import { tagManager } from './store.js';
+import { Button } from '../../components/hta/index.js';
 
 export interface TagsManagerProps {
   readonly open: boolean;
@@ -193,9 +194,8 @@ export function TagsManager({ open, onClose }: TagsManagerProps): React.JSX.Elem
                         .join('、'),
                     })}
                   </p>
-                  <button
-                    type="button"
-                    className="ht-btn ht-btn--ghost"
+                  <Button
+                    tone="ghost"
                     data-testid="tags-manager-merge-submit"
                     disabled={busy}
                     onClick={() => {
@@ -203,30 +203,28 @@ export function TagsManager({ open, onClose }: TagsManagerProps): React.JSX.Elem
                     }}
                   >
                     {t('web.tags.manage.mergeConfirmSubmit')}
-                  </button>
-                  <button
-                    type="button"
-                    className="ht-btn ht-btn--ghost"
+                  </Button>
+                  <Button
+                    tone="ghost"
                     data-testid="tags-manager-merge-cancel"
                     onClick={() => {
                       setMergeTarget(null);
                     }}
                   >
                     {t('web.tags.manage.mergeConfirmCancel')}
-                  </button>
+                  </Button>
                 </div>
               )}
             </>
           )}
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
+          <Button
+            tone="ghost"
             data-testid="tags-manager-bulk-delete"
             disabled={busy}
             onClick={removeSelected}
           >
             {t('web.tags.manage.bulkDelete', { count: selectedList.length })}
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -297,9 +295,8 @@ export function TagsManager({ open, onClose }: TagsManagerProps): React.JSX.Elem
         )}
         renderItemExtra={(item) =>
           selectedList.length >= 2 ? (
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
+            <Button
+              tone="ghost"
               data-testid={`tags-manager-merge-into-${item.id}`}
               disabled={busy}
               onClick={() => {
@@ -307,22 +304,21 @@ export function TagsManager({ open, onClose }: TagsManagerProps): React.JSX.Elem
               }}
             >
               {t('web.tags.manage.mergeLabel', { name: item.name })}
-            </button>
+            </Button>
           ) : null
         }
         testID="tags-manager-list"
       />
 
-      <button
-        type="button"
-        className="ht-btn ht-btn--ghost"
+      <Button
+        tone="ghost"
         data-testid="tags-manager-close"
         onClick={() => {
           guard.requestDismiss('escape');
         }}
       >
         {t('web.tags.manage.close')}
-      </button>
+      </Button>
       {guard.guard}
     </WebModalShell>,
     document.body,

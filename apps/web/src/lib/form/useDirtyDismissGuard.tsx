@@ -37,6 +37,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import { closePolicyOf, dismissActionFor, type ClosedOverlay } from '@heyta/ui';
+import { Button } from '../../components/hta/index.js';
 
 /** 一次"想关"是从哪条通道来的。 */
 export type DismissChannel = 'scrim' | 'escape' | 'systemBack';
@@ -164,23 +165,21 @@ function DiscardConfirm({
         <h2 id={titleId} style={titleStyle}>{title}</h2>
         <p style={bodyStyle}>{body}</p>
         <div style={actionsStyle}>
-          <button
+          <Button
             ref={keepRef}
-            type="button"
-            className="ht-btn ht-btn--ghost"
+            tone="ghost"
             data-testid="discard-confirm-cancel"
             onClick={onCancel}
           >
             {keepLabel}
-          </button>
-          <button
-            type="button"
-            className="ht-btn ht-btn--danger"
+          </Button>
+          <Button
+            tone="danger"
             data-testid="discard-confirm-confirm"
             onClick={onConfirm}
           >
             {dropLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

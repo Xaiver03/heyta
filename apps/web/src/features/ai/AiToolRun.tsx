@@ -68,6 +68,7 @@ import { currentAccount, usePanelEphemeral } from './panel-ephemeral.js';
 import { FailureSettingsAction } from './RouteUnavailable.js';
 import { resolveFeatureRoute, type SettingsTarget } from './route-explanation.js';
 import { createAiToolHost } from '../tasks/store.js';
+import { Button } from '../../components/hta/index.js';
 
 export interface AiToolRunProps {
   routing: AiRoutingConfig;
@@ -514,15 +515,14 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
             setConfirmed(undefined);
           }}
         />
-        <button
-          type="button"
-          className="ht-btn ht-btn--secondary"
+        <Button
+          tone="secondary"
           data-testid="ai-tool-run-button"
           onClick={run}
           disabled={text.trim() === '' || phase === 'running'}
         >
           {t('web.ai.tools.run')}
-        </button>
+        </Button>
       </div>
 
       {phase === 'disclose' && (
@@ -559,14 +559,13 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
                 retentionDisclosure={disclosure?.retentionDisclosure}
               />
               <div className="ht-ai__actions">
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--secondary"
+                <Button
+                  tone="secondary"
                   data-testid="ai-tool-send"
                   onClick={() => void execute()}
                 >
                   {t('web.ai.action.send')}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -716,15 +715,14 @@ function RunResult(props: {
           )}
           {props.confirmed === undefined ? (
             <div className="ht-ai__actions">
-              <button
-                type="button"
-                className="ht-btn ht-btn--secondary"
+              <Button
+                tone="secondary"
                 aria-label={t('web.ai.tools.confirmAria')}
                 data-testid="ai-tool-confirm"
                 onClick={props.onConfirm}
               >
                 {t('web.ai.tools.confirm')}
-              </button>
+              </Button>
             </div>
           ) : (
             <p className="ht-ai__done" data-testid="ai-tool-confirmed">

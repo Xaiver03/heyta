@@ -88,6 +88,7 @@ import {
 
 import { selection, useSelected } from '../../lib/selection.js';
 import { useTaskStore } from '../tasks/store.js';
+import { Button } from '../../components/hta/index.js';
 /**
  * 🔴 握把的 `cursor` / `touch-action` 只有一份（`.ht-row__drag-handle`，住在
  * `features/tasks/manual-sort.css`）。**显式** import：不靠"另一个 feature 恰好也
@@ -170,27 +171,26 @@ function KanbanCard({
  * 共享层不必认识"看板"这个视图（与 `quadrant/QuadrantBoard.tsx` 的 `DragHandle`、
  * `ManualSortDnd` 的 `ReorderHandle` 同一个形状）。
  *
- * 外观走 `.ht-btn.ht-btn--ghost`（动作控件**唯一**的一套语言），抓取手势走既有
+ * 外观走按钮组件（动作控件**唯一**的一套语言），抓取手势走既有
  * `.ht-row__drag-handle`：两条都不新开 CSS 族。
  */
 function KanbanDragHandle({ label }: { label: string }): React.JSX.Element | null {
   const context = useContext(DragHandleContext);
   if (context === null) return null;
   return (
-    <button
-      type="button"
+    <Button
       // 🔴 dnd-kit 的 `attributes` 里带着 `aria-roledescription` / `aria-describedby`
       // （可达性靠它），`listeners` 带着指针事件 —— 两样都不能吞。
       {...context.attributes}
       {...context.listeners}
       ref={context.setActivatorNodeRef}
       aria-label={label}
-      className="ht-btn ht-btn--ghost ht-row__drag-handle"
+      tone="ghost"
+      className="ht-row__drag-handle"
       data-dragging={context.isDragging ? 'true' : undefined}
       data-testid={`kanban-drag-${context.taskId}`}
-    >
-      <GripVertical size={ICON_SIZE.sm} aria-hidden="true" />
-    </button>
+      leadingIcon={<GripVertical size={ICON_SIZE.sm} aria-hidden="true" />}
+    />
   );
 }
 

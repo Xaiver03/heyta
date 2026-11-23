@@ -49,6 +49,7 @@ import { planManualReorder, sortTasks, type Task } from '@heyta/domain';
 import { cssVar, ICON_SIZE } from '@heyta/design-system';
 import './manual-sort.css';
 import { useI18n } from '@heyta/i18n';
+import { Button } from '../../components/hta/index.js';
 
 /** 一行在拖放里的状态。由 {@link ManualSortRow} 提供，手柄从这里取。 */
 interface DragHandleContextValue {
@@ -126,20 +127,19 @@ export function ReorderHandle({ label }: { label: string }): React.JSX.Element |
   const context = useContext(DragHandleContext);
   if (context === null) return null;
   return (
-    <button
-      type="button"
+    <Button
       // 🔴 `attributes` 里带着 dnd-kit 的 `aria-roledescription` / `aria-describedby`
       // （键盘拖拽的可达性靠它），`listeners` 带着指针/键盘事件 —— 两样都不能吞。
       {...context.attributes}
       {...context.listeners}
       ref={context.setActivatorNodeRef}
       aria-label={label}
+      tone="ghost"
+      className="ht-row__drag-handle"
       data-testid="task-reorder-handle"
       data-dragging={context.isDragging ? 'true' : undefined}
-      className="ht-btn ht-btn--ghost ht-row__drag-handle"
-    >
-      <GripVertical size={ICON_SIZE.sm} aria-hidden="true" />
-    </button>
+      leadingIcon={<GripVertical size={ICON_SIZE.sm} aria-hidden="true" />}
+    />
   );
 }
 

@@ -51,6 +51,7 @@ import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
 import { legalRecheck } from './gate.js';
 import { useLegalReconfirmStore } from './store.js';
 import { useSyncStore } from '../sync/store.js';
+import { Button } from '../../components/hta/index.js';
 
 export function LegalReconfirmSheet(): React.JSX.Element | null {
   const { t, locale } = useI18n();
@@ -157,28 +158,26 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
       )}
 
       <div className="ht-sheet__reconfirm-actions">
-        <button
-          type="button"
+        <Button
           data-testid="legal-reconfirm-action"
-          className="ht-btn ht-btn--primary"
+          tone="primary"
           disabled={submitting}
           onClick={() => void confirm()}
         >
           {submitting
             ? t('common.legal.reconfirm.pending')
             : t('common.legal.reconfirm.action')}
-        </button>
+        </Button>
         {/* 🔴 一条**从属**的文字按钮，不是与上面同等的第二个决定：
             它的语义是"推迟"，措辞里必须自带后果（"继续不同步"），
             否则它会读起来像"不同意"，而这里没有"不同意"这个选项。 */}
-        <button
-          type="button"
+        <Button
           data-testid="legal-reconfirm-defer"
-          className="ht-btn ht-btn--ghost"
+          tone="ghost"
           onClick={defer}
         >
           {t('common.legal.reconfirm.later')}
-        </button>
+        </Button>
       </div>
     </WebModalShell>
   );

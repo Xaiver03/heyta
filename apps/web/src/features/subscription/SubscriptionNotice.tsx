@@ -59,6 +59,7 @@ const VARIANT_KEYS: Record<SubscriptionNoticeVariant, { title: MessageKey; body:
 import { useSubscriptionStore } from './store.js';
 import { useSyncStore } from '../sync/store.js';
 import { siteLink } from '../../lib/site-url.js';
+import { Button } from '../../components/hta/index.js';
 
 export function SubscriptionNotice(): React.JSX.Element | null {
   const { t } = useI18n();
@@ -122,10 +123,9 @@ export function SubscriptionNotice(): React.JSX.Element | null {
         {/* 这一句是整个提示的重点：明确告诉用户"你的数据没被扣"。 */}
         <p style={bodyStyle}>{localData}</p>
         <div className="ht-settings__actions">
-          <button type="button" className="ht-btn ht-btn--ghost" onClick={openSettings}>
-            <Server size={ICON_SIZE.xs} aria-hidden="true" />
+          <Button tone="ghost" onClick={openSettings} leadingIcon={<Server size={ICON_SIZE.xs} aria-hidden="true" />}>
             {selfHost}
-          </button>
+          </Button>
           {/*
             🔴 这一条是**说明**，不是续费入口。续费入口在设置页的 `RenewPanel`
             （2026-10-05 落地），本提示刻意不复制第二个按钮：
@@ -134,14 +134,15 @@ export function SubscriptionNotice(): React.JSX.Element | null {
             ⚠️ 待办（未做，别读成已做）：到期用户从这里**一步**走到续费面板的锚点
             还没接（`settingsFocus` 现在只服务 AI 面板）。
           */}
-          <a
-            className="ht-btn ht-btn--ghost"
-            href={siteLink('/pricing')}
-            rel="noopener noreferrer"
-            data-testid="subscription-pricing-link"
-          >
-            {t('web.about.pricing.label')}
-          </a>
+          <Button asChild tone="ghost">
+            <a
+              href={siteLink('/pricing')}
+              rel="noopener noreferrer"
+              data-testid="subscription-pricing-link"
+            >
+              {t('web.about.pricing.label')}
+            </a>
+          </Button>
         </div>
       </div>
     </div>

@@ -38,6 +38,7 @@ import { EyeOff, RotateCcw, X } from 'lucide-react';
 import { useI18n } from '@heyta/i18n';
 
 import { SettingsInfoTip } from './SettingsInfoTip.js';
+import { Button } from '../../components/hta/index.js';
 
 import { preferenceEvidenceCopy, preferenceLabelText, withheldCopy } from './preference-copy.js';
 
@@ -119,16 +120,15 @@ function PreferenceRow({
           {t(evidence.key, evidence.params)}
         </span>
       </span>
-      <button
-        type="button"
-        className="ht-btn ht-btn--ghost"
+      <Button
+        tone="ghost"
         data-testid={`memory-forget-${id}`}
         aria-label={t('web.memory.forgetAria', { name: preferenceLabelText(id, t) })}
         onClick={() => onSuppress(id)}
       >
         <EyeOff size={ICON_SIZE.xs} aria-hidden="true" />
         {t('web.memory.forget')}
-      </button>
+      </Button>
     </li>
   );
 }
@@ -348,9 +348,8 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
                     答案是"什么都不缺"。
                   */}
                 </span>
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
+                <Button
+                  tone="ghost"
                   data-testid={`memory-restore-${f.id}`}
                   onClick={() => {
                     const cid = correctionIdOf(f.id);
@@ -359,7 +358,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
                 >
                   <RotateCcw size={ICON_SIZE.xs} aria-hidden="true" />
                   {t('web.memory.restore')}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

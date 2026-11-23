@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from 'react';
 
 import { WebModalShell } from './WebModalShell.js';
+import { Button } from '../../components/hta/index.js';
 
 /**
  * 危险确认（Web 侧，2026-10-27 全局 UX 整改 P2）
@@ -124,23 +125,22 @@ export function DangerConfirmDialog({
               配方与档位都由 `packages/ui/src/control/states.ts` 那张表定义（`danger` +
               `commit`），Web 只是把它的名字翻译成类。
           */}
-          <button
-            type="button"
+          <Button
             ref={cancelRef}
-            className="ht-btn ht-btn--secondary"
+            tone="secondary"
             data-testid={`${testId}-cancel`}
             onClick={onCancel}
           >
             {cancelLabel}
-          </button>
-          <button
-            type="button"
-            className="ht-btn ht-btn--danger ht-btn--commit"
+          </Button>
+          <Button
+            tone="danger"
+            commit
             data-testid={`${testId}-submit`}
             onClick={onConfirm}
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
     </WebModalShell>
   );

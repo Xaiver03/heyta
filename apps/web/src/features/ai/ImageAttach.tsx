@@ -35,6 +35,7 @@ import { ImagePlus } from 'lucide-react';
 import { useI18n } from '@heyta/i18n';
 
 import { encodeImageForEgress, imagesFromClipboard, type EncodedImage, type ImageFileError } from './image-encode.js';
+import { Button } from '../../components/hta/index.js';
 import './image-attach.css';
 
 export interface ImageAttachProps {
@@ -209,15 +210,15 @@ export function useImageAttach({
                     kb: Math.max(1, Math.round(image.bytes / 1024)),
                   })}
                 </span>
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost ht-capture-attach__remove"
+                <Button
+                  tone="ghost"
+                  className="ht-capture-attach__remove"
                   data-testid={`${testIdPrefix}-remove-${String(index)}`}
                   aria-label={t('web.ai.attach.remove', { index: index + 1 })}
                   onClick={() => onChange(images.filter((_, i) => i !== index))}
                 >
                   ✕
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

@@ -1,4 +1,5 @@
 import { AssistantIcon } from './AssistantIcon.js';
+import { Button } from '../../components/hta/index.js';
 import { useImageAttach } from './ImageAttach.js';
 import type { EncodedImage } from './image-encode.js';
 import { MentionChips, MentionPicker } from './MentionPicker.js';
@@ -819,9 +820,9 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
           }
         }}
       />
-      <button
-        type="button"
-        className="ht-btn ht-ai__send-button"
+      <Button
+        tone="primary"
+        className="ht-ai__send-button"
         aria-label={t('web.ai.chat.send')}
         data-testid="ai-assistant-send-button"
         onClick={send}
@@ -829,7 +830,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
       >
         <Send size={ICON_SIZE.xs} aria-hidden="true" />
         <span className="sr-only">{t('web.ai.chat.send')}</span>
-      </button>
+      </Button>
       </div>
     </div>
   );
@@ -847,25 +848,25 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         <aside id="ai-assistant-history" className="ht-ai__history" data-testid="ai-assistant-history" aria-label={t('web.ai.chat.history.title')}>
           <div className="ht-ai__history-head">
             <span className="ht-ai__history-title ht-type-caption">{t('web.ai.chat.history.title')}</span>
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost ht-ai__history-new"
+            <Button
+              tone="ghost"
+              className="ht-ai__history-new"
               data-testid="ai-assistant-new-session"
               onClick={newSession}
               disabled={phase === 'running'}
             >
               {t('web.ai.chat.newSession')}
-            </button>
-            <button
+            </Button>
+            <Button
               ref={historyCloseRef}
-              type="button"
-              className="ht-btn ht-btn--ghost ht-ai__history-close"
+              tone="ghost"
+              className="ht-ai__history-close"
               aria-label={t('web.ai.chat.history.close')}
               data-testid="ai-assistant-history-close"
               onClick={closeHistory}
             >
               <X size={ICON_SIZE.xs} aria-hidden="true" />
-            </button>
+            </Button>
           </div>
           <div className="ht-ai__history-group">
             <span className="ht-ai__history-group-label ht-type-caption">{t('web.ai.chat.history.today')}</span>
@@ -896,9 +897,9 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
               <HeadingTag className="ht-ai__title ht-type-section-title">{t('web.ai.chat.title')}</HeadingTag>
             </div>
             <div className="ht-ai__header-actions">
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost ht-ai__history-toggle"
+              <Button
+                tone="ghost"
+                className="ht-ai__history-toggle"
                 aria-expanded={historyOpen}
                 aria-controls="ai-assistant-history"
                 data-testid="ai-assistant-history-toggle"
@@ -906,11 +907,11 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                 onClick={() => setHistoryOpen((open) => !open)}
               >
                 {historyOpen ? t('web.ai.chat.history.close') : t('web.ai.chat.history.open')}
-              </button>
+              </Button>
               {props.onToggleExpanded !== undefined && (
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost ht-ai__expand"
+                <Button
+                  tone="ghost"
+                  className="ht-ai__expand"
                   aria-label={props.expanded === true ? t('web.ai.chat.collapse') : t('web.ai.chat.expand')}
                   aria-expanded={props.expanded === true}
                   data-testid="ai-assistant-expand"
@@ -921,18 +922,17 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                   ) : (
                     <Maximize2 size={ICON_SIZE.xs} aria-hidden="true" />
                   )}
-                </button>
+                </Button>
               )}
               {props.onClose !== undefined && (
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
+                <Button
+                  tone="ghost"
                   aria-label={t('web.ai.action.close')}
                   data-testid="ai-assistant-close"
                   onClick={props.onClose}
                 >
                   <X size={ICON_SIZE.xs} aria-hidden="true" />
-                </button>
+                </Button>
               )}
             </div>
           </header>
@@ -1181,14 +1181,13 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                 </details>
               </AiDisclosureHost>
               <div className="ht-ai__actions">
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--secondary"
+                <Button
+                  tone="secondary"
                   data-testid="ai-assistant-send"
                   onClick={confirmDisclosure}
                 >
                   {t('web.ai.action.send')}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -1576,15 +1575,14 @@ function ProposalCard(props: {
           </p>
         )}
         <div className="ht-ai__actions">
-          <button
-            type="button"
-            className="ht-btn ht-btn--primary"
+          <Button
+            tone="primary"
             aria-label={t('web.ai.tools.confirmAria')}
             data-testid="ai-chat-confirm"
             onClick={props.onConfirm}
           >
             {t('web.ai.tools.confirm')}
-          </button>
+          </Button>
         </div>
         </>
       ) : (

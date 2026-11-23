@@ -104,6 +104,7 @@ import { requireNetworkConsent, waitForPrivacyDecision } from '../privacy/store.
 import { useSyncStore } from '../sync/store.js';
 import { useModalDismiss } from '../../lib/use-modal-dismiss.js';
 import './auth-dialog.css';
+import { Button } from '../../components/hta/index.js';
 
 export interface AuthPanelProps {
   /** 当前同步设置里的服务端地址 —— 认证与同步必须指向同一个服务端。 */
@@ -745,9 +746,8 @@ export function AuthPanel({
           />
           {feishuEnabled ? (
             <div className="ht-sheet__auth-feishu" data-testid="auth-feishu">
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
+              <Button
+                tone="ghost"
                 data-testid="auth-feishu-button"
                 onClick={() =>
                   withConsent(() => {
@@ -757,7 +757,7 @@ export function AuthPanel({
                 }
               >
                 {t('web.auth.feishu.button')}
-              </button>
+              </Button>
               {feishuError !== null ? (
                 <p
                   role="alert"
