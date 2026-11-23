@@ -310,6 +310,10 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return intent.pinned
         ? t('web.ai.tools.intentSetTaskPinned', { id: intent.taskId })
         : t('web.ai.tools.intentUnsetTaskPinned', { id: intent.taskId });
+    case 'set-task-assignee':
+      return intent.assigneeUserId === undefined
+        ? t('web.ai.tools.intentClearTaskAssignee', { id: intent.taskId })
+        : t('web.ai.tools.intentSetTaskAssignee', { id: intent.taskId, assignee: intent.assigneeUserId });
     case 'move-tasks':
       return intent.projectId === undefined
         ? t('web.ai.tools.intentMoveTasksOut', { count: String(intent.taskIds.length) })

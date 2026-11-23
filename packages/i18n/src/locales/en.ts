@@ -2279,6 +2279,8 @@ export const en = {
   'web.ai.tools.intentUnsetTaskImportant': 'Unmark task {id} important',
   'web.ai.tools.intentSetTaskPinned': 'Pin task {id}',
   'web.ai.tools.intentUnsetTaskPinned': 'Unpin task {id}',
+  'web.ai.tools.intentSetTaskAssignee': 'Assign task {id} to member {assignee}',
+  'web.ai.tools.intentClearTaskAssignee': 'Clear the assignee of task {id}',
   'web.ai.tools.intentMoveTasks': 'Move {count} task(s) to list {project}',
   'web.ai.tools.intentMoveTasksOut': 'Remove {count} task(s) from their list',
   'web.ai.tools.intentUndoCheckinToday': 'Undo the check-in {id}',

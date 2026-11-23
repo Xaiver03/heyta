@@ -804,7 +804,14 @@ export type LocalApiWriteIntent =
    * 移除附件（ATTACHMENT）：发 `DEL` op（软删 → 回收站），随后-尽力回收字节。
    * ⚠️ 字节一旦回收就再也取不回来 —— 所以这条**实际不可逆**（见工单风险项）。
    */
-  | { action: 'remove-attachment'; attachmentId: string };
+  | { action: 'remove-attachment'; attachmentId: string }
+  // 批8：任务指派（ADR-0062 决策 7 / ADR-0088）
+  /**
+   * 设置/清除任务指派人（TASK）。`assigneeUserId` 省略或空串 = 清除（写 `null`）。
+   * 语义**只对共享清单内的任务有意义**；个人任务缺席 = 未指派。存在性由宿主经
+   * `actions.findTask` 判（I5：本层不读原始 `tasks` 表）。
+   */
+  | { action: 'set-task-assignee'; taskId: string; assigneeUserId?: string };
 
 /**
  * 一条写入落地的实体类型。

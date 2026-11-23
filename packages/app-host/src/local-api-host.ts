@@ -2057,6 +2057,22 @@ async function submitIntent(
       return { ok: true, taskId: intent.taskId };
     }
 
+    case 'set-task-assignee': {
+      // 批次8：任务指派（ADR-0062 决策 7 / ADR-0088）。空串/缺省 = 清除（写 `null`）。
+      // 存在性由 `findTask` 判（I5）；`patchDetails` 抛的非法值一律翻成 invalid。
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      const assigneeUserId =
+        intent.assigneeUserId === undefined || intent.assigneeUserId === '' ? null : intent.assigneeUserId;
+      try {
+        await actions.patchDetails(intent.taskId, { assigneeUserId });
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: e instanceof Error ? e.message : String(e) };
+      }
+      return { ok: true, taskId: intent.taskId };
+    }
+
     case 'move-tasks': {
       // 与 `trash-tasks` / `restore-tasks` 同一条纪律：**先全部预检，再一条都不写**。
       // 去重后为空直接 invalid；`bulkMoveToProject` 对不存在的 id 会抛错，门口挡住能给出更准的 not-found。
