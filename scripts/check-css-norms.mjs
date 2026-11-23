@@ -237,6 +237,42 @@ export function scanDisplayInert(root = ROOT) {
   return hits;
 }
 
+/* ── 未定义的自定义属性：`var(--x)` 既没定义、也没有回退值 ─────────────────────
+ *
+ * 这是**静默失效**里最隐蔽的一类：`letter-spacing: var(--ht-letter-spacing-tight)`
+ * 里那个变量全仓不存在 ⇒ 该声明在 computed-value 阶段被判无效、属性回落成初始值，
+ * 编译、lint、单测**都不会报**，只有肉眼看出"字距怎么没生效"。
+ * 2026-11-23 实测抓到 3 处（landing：`--ht-space-7` 无此档、
+ * `--ht-letter-spacing-tight/wide` 是很久前改名成 `--ht-tracking-*` 的旧名）。
+ *
+ * 判据：`var(--x)` **无第二参数（回退值）** 且 `--x` 在整个 CSS 里没有被定义 ⇒ 违规。
+ * 运行时由 JS 写入的属性（`--ht-detail-width` / `--mk-scale` 等）**一律带回退值**，
+ * 所以这条判据不会误伤它们 —— 实测已核。
+ */
+export function scanUndefinedVars(root = ROOT) {
+  const cssFiles = [
+    ...walkFiles(join(root, 'apps/web/src'), isCss),
+    ...walkFiles(join(root, 'apps/landing/src'), isCss),
+    ...walkFiles(join(root, 'packages/design-system/src'), isCss),
+  ];
+  let all = '';
+  for (const f of cssFiles) all += readFileSync(f, 'utf8') + '\n';
+  const noComment = all.replace(/\/\*[\s\S]*?\*\//g, '');
+  const defined = new Set([...noComment.matchAll(/(--[A-Za-z0-9_-]+)\s*:/g)].map((m) => m[1]));
+  const hits = [];
+  for (const f of cssFiles) {
+    const src = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of src.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)\s*(,)?/g)) {
+      const name = m[1];
+      const hasFallback = m[2] === ',';
+      if (hasFallback || defined.has(name)) continue;
+      const line = src.slice(0, m.index).split('\n').length;
+      hits.push({ file: f, line, text: `var(${name})（未定义且无回退值）` });
+    }
+  }
+  return hits;
+}
+
 function summarize(results, errored) {
   let warnings = 0;
   let files = 0;
@@ -338,6 +374,13 @@ async function selfTest() {
     writeFileSync(join(tmp, 'inert/apps/web/src/y.css'), '.p { display: block; align-items: center; }\n.q { display: flex; align-items: center; }\n');
     arm('display 失效声明 ⇒ 必须红（flex+align-items 不算）', scanDisplayInert(join(tmp, 'inert')).length === 1);
 
+    mkdirSync(join(tmp, 'var/apps/web/src'), { recursive: true });
+    writeFileSync(
+      join(tmp, 'var/apps/web/src/z.css'),
+      '.a { gap: var(--not-defined-anywhere); }\n.b { gap: var(--not-defined-anywhere, 8px); }\n:root { --defined-one: 1px; }\n.c { gap: var(--defined-one); }\n',
+    );
+    arm('未定义且无回退的 var() ⇒ 必须红（有回退/已定义的不算）', scanUndefinedVars(join(tmp, 'var')).length === 1);
+
     // 真实树：自检里也跑，读数是"当前仓库状态"，不是夹具状态。
     const real = await lintFiles(GLOBS);
     const { warnings } = summarize(real.results, true);
@@ -359,6 +402,8 @@ async function main() {
   const colorHits = scanRawColors();
   const deadHits = scanDeadRules();
   const inertHits = scanDisplayInert();
+  const varHits = scanUndefinedVars();
+  for (const h of varHits) console.error(`  ${h.file.replace(ROOT + '/', '')}:${String(h.line)}  ${h.text}  (自定义属性未定义)`);
   for (const h of deadHits) console.error(`  ${h.file.replace(ROOT + '/', '')}:${String(h.line)}  ${h.text}  (死规则：无任何源码引用)`);
   for (const h of inertHits) console.error(`  ${h.file.replace(ROOT + '/', '')}:${String(h.line)}  ${h.text}  (display 失效声明)`);
   for (const h of colorHits) {
@@ -366,9 +411,9 @@ async function main() {
   }
   console.log(
     `CSS 规范（stylelint）：${String(files)} 个文件有违规，共 ${String(warnings)} 条；` +
-      `颜色 token：${String(colorHits.length)} 条；死规则：${String(deadHits.length)} 条；display 失效：${String(inertHits.length)} 条。`,
+      `颜色 token：${String(colorHits.length)} 条；死规则：${String(deadHits.length)} 条；display 失效：${String(inertHits.length)} 条；未定义变量：${String(varHits.length)} 条。`,
   );
-  if (res.errored || colorHits.length + deadHits.length + inertHits.length > 0) {
+  if (res.errored || colorHits.length + deadHits.length + inertHits.length + varHits.length > 0) {
     console.error('\n🔴 CSS 规范门禁未通过。修法见 `.stylelintrc.cjs` 文件头；');
     console.error('   ⚠️ 不许加 ignore/放宽规则来变绿 —— 那是把红色关掉，不是修问题。');
     process.exit(1);
