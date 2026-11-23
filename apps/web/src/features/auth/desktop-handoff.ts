@@ -1,3 +1,4 @@
+import { buttonClassName } from '../../components/hta/button-class.js';
 import { DEFAULT_LOCALE, matchLocale, translate } from '@heyta/i18n';
 /**
  * 桌面壳的**反向授权回跳**（ADR-0039 §2.3）
@@ -116,7 +117,7 @@ export function handOffToShell(
     link.setAttribute('data-testid', DESKTOP_HANDOFF_TESTID);
     link.setAttribute('href', url);
     link.textContent = translate(matchLocale(doc.documentElement.lang) ?? DEFAULT_LOCALE, 'web.auth.desktop.return');
-    link.className = 'ht-btn ht-btn--ghost';
+    link.className = buttonClassName('ghost');
     link.setAttribute(
       'style',
       `color:${cssVar('color.primary')};text-decoration:none`,

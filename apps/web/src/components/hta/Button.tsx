@@ -1,30 +1,11 @@
 import { Slot } from '@radix-ui/react-slot';
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
-import type { ControlTone } from '@heyta/ui';
-
+import { buttonClassName, type ButtonSize, type ButtonTone } from './button-class.js';
 import { Spinner } from './Spinner.js';
 import './hta.css';
 
-/**
- * 按钮色调 = 共享表的 `ControlTone`（`@heyta/ui` 的 `CONTROL_TONES`）。
- * 这里只是把色调名翻成 `controls.css` 里已有的类，**不复制任何配方**。
- */
-export type ButtonTone = ControlTone;
-export type ButtonSize = 'sm' | 'default';
-
-/**
- * 🔴 逐档显式映射，**不能用模板串拼** `ht-btn--${tone}`：
- *   · tone 词表由 `packages/ui/src/control/states.ts` 一处说了算；
- *   · `check:control-semantics` 的 A4 反查「界面写了、中央 CSS 没有」的幻影类时，
- *     按源码里的字面量名取候选 —— 显式映射让每一档都出现在扫描面上，拼出来的看不到。
- */
-const TONE_CLASS: Readonly<Record<ButtonTone, string>> = {
-  primary: 'ht-btn ht-btn--primary',
-  secondary: 'ht-btn ht-btn--secondary',
-  ghost: 'ht-btn ht-btn--ghost',
-  danger: 'ht-btn ht-btn--danger',
-};
+export { buttonClassName, TONE_CLASS, type ButtonSize, type ButtonTone } from './button-class.js';
 
 export interface ButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'disabled' | 'type'> {
@@ -72,14 +53,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   },
   ref,
 ): React.JSX.Element {
-  const classes = [
-    TONE_CLASS[tone],
-    commit && tone === 'danger' ? 'ht-btn--commit' : '',
-    size === 'sm' ? 'hta-btn--sm' : '',
-    className,
-  ]
-    .filter((part) => part !== '')
-    .join(' ');
+  const classes = buttonClassName(tone, { commit, size, extra: className });
 
   /*
     `Slot` 与原生 `'button'` 的 props 形状不同（Slot 不接受 `type`），
