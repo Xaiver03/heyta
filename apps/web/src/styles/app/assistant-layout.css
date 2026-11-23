@@ -41,10 +41,22 @@
 }
 .ht-ai__title { white-space: nowrap; }
 .ht-ai__tier-label { display: none; }
-.ht-ai__suggestion { font-size: var(--ht-font-size-sm); }
+.ht-ai__suggestion {
+  font-size: var(--ht-font-size-sm);
+  max-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .ht-ai__input {
   max-block-size: 25dvh;
   resize: none;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  inline-size: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ht-color-foreground);
+  caret-color: var(--ht-color-primary);
 }
 .ht-app:has([data-assistant-overlay]) > .ht-rail { z-index: var(--ht-z-base); }
 
@@ -74,16 +86,6 @@
   background: var(--ht-color-surface);
 }
 
-.ht-ai__input {
-  padding: var(--ht-space-2) var(--ht-space-3);
-  inline-size: 100%;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--ht-color-foreground);
-  caret-color: var(--ht-color-primary);
-}
-
 /* 输入区只有一个容器。将可见焦点转移到外层，避免输入框内再套蓝框。 */
 .ht-ai__input:focus-visible {
   outline-width: 0;
@@ -99,12 +101,6 @@
 .ht-ai__suggestions {
   min-inline-size: 0;
   max-inline-size: 100%;
-}
-
-.ht-ai__suggestion {
-  max-inline-size: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
 }
 
 .ht-ai__greeting,

@@ -345,18 +345,19 @@
 */
 .ht-sidebar--calendar {
   /* 🔴 这一列自己是**有界的**（最高一屏）并且钉住；滚动交给里面那一层。
-     以前这里直接写 `overflow-y: auto` 是错的，两处后果都在真浏览器里实测到：
-
-       · 外壳是 `min-height: 100dvh` 而不是固定高 ⇒ grid 项被内容撑到 761px，
-         比视口(720)还高，于是这一层**自己永远不滚** —— 注释里那句
-         "滚动条只出现在侧栏"是假的，实际是整页在滚，主区跟着走。
-       · `overflow-y: auto` 会连带把 `overflow-x` 从 `visible` 变成 `clip`。
-         把手那 8px 命中带有 4px **骑在右边缘之外**（`.ht-sidebar__resizer` 的
-         `inset-inline-end: -0.5 × space-2`）⇒ 被裁掉一半，对着它自己的
-         几何中心按下去命中的是 `<nav>`，症状是"把手在那儿、拖不动"。 */
+  以前这里直接写 `overflow-y: auto` 是错的，两处后果都在真浏览器里实测到：
+  · 外壳是 `min-height: 100dvh` 而不是固定高 ⇒ grid 项被内容撑到 761px，
+  比视口(720)还高，于是这一层**自己永远不滚** —— 注释里那句
+  "滚动条只出现在侧栏"是假的，实际是整页在滚，主区跟着走。
+  · `overflow-y: auto` 会连带把 `overflow-x` 从 `visible` 变成 `clip`。
+  把手那 8px 命中带有 4px **骑在右边缘之外**（`.ht-sidebar__resizer` 的
+  `inset-inline-end: -0.5 × space-2`）⇒ 被裁掉一半，对着它自己的
+  几何中心按下去命中的是 `<nav>`，症状是"把手在那儿、拖不动"。 */
   position: sticky;
   inset-block-start: 0;
   max-block-size: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 内部这一层才是滚动区；**把手不在里面**，所以裁不到它。 */
@@ -380,8 +381,12 @@
   gap: var(--ht-space-1);
   padding: var(--ht-space-2);
   border: 0;
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface);
+  border-radius: 0;
+  background: transparent;
+  order: 2;
+  margin-block-start: auto;
+  padding-block-start: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }
 
 .ht-sidebar__month-head {
@@ -503,30 +508,14 @@
   justify-content: center;
   gap: var(--ht-space-1);
   /*
-   * 🔴 `min-block-size` 而不是 `block-size`：这一槽现在住的**不止那颗点** ——
-   * W6 的「休 / 班」与它同一行（一颗点在 27px 宽的一格里再单独占一行，
-   * 会把格子撑出 `aspect-ratio` 那条老路，见上面 `.ht-sidebar__day` 的记录）。
-   * 固定 8px 会把 13.75px 高的字切成一半，所以给它**下限**而不是定值。
-   */
-  min-block-size: var(--ht-size-badge-dot);
-}.ht-sidebar__day-dots {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--ht-space-1);
-  /*
-   * 🔴 `min-block-size` 而不是 `block-size`：这一槽现在住的**不止那颗点** ——
-   * W6 的「休 / 班」与它同一行（一颗点在 27px 宽的一格里再单独占一行，
-   * 会把格子撑出 `aspect-ratio` 那条老路，见上面 `.ht-sidebar__day` 的记录）。
-   * 固定 8px 会把 13.75px 高的字切成一半，所以给它**下限**而不是定值。
-   */
+  * 🔴 `min-block-size` 而不是 `block-size`：这一槽现在住的**不止那颗点** ——
+  * W6 的「休 / 班」与它同一行（一颗点在 27px 宽的一格里再单独占一行，
+  * 会把格子撑出 `aspect-ratio` 那条老路，见上面 `.ht-sidebar__day` 的记录）。
+  * 固定 8px 会把 13.75px 高的字切成一半，所以给它**下限**而不是定值。
+  */
   min-block-size: var(--ht-size-badge-dot);
 }
 
-/* 迷你月历「这一天有内容」的那一颗点。原先它的底色是内联 style（`check:l4` 禁 L4 内联样式）。 */
-.ht-sidebar__day-dot {
-  background: var(--ht-color-primary);
-}
 
 .ht-sidebar__day-dots > i {
   inline-size: var(--ht-size-badge-dot);
@@ -578,6 +567,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-1);
+  order: 1;
 }
 
 .ht-sidebar__scope-all {
@@ -654,30 +644,6 @@
   white-space: nowrap;
 }
 
-/* ── 2026-11-22：对齐 macOS 日历侧栏 ──────────────────────────────────────
- * macOS 日历的侧栏是「上面摆各账户/日历分组勾选，迷你月历沉在左下角」。
- * 这里用 flex `order` 把两块换位（不动 JSX、不改结构）：
- *   · 显示范围/分类 → 第 1 位（在上）
- *   · 迷你月历     → 第 2 位（在下），`margin-block-start:auto` 让它贴底
- * 迷你月历不再是“卡片”外观，随侧栏底色沉底（去圆角白卡与投影，更接近 macOS）。
- */
-.ht-sidebar__scope {
-  order: 1;
-}
-.ht-sidebar__month {
-  order: 2;
-  margin-block-start: auto;
-  padding-block-start: var(--ht-space-2);
-  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
-  border-radius: 0;
-  background: transparent;
-}
-
-/* 让日历侧栏纵向撑满，body 占满剩余高度 —— 迷你月历的 `margin-block-start:auto` 才有落点（沉底）。 */
-.ht-sidebar--calendar {
-  display: flex;
-  flex-direction: column;
-}
 .ht-sidebar--calendar .ht-sidebar__calendar-body {
   flex: 1 1 auto;
 }

@@ -451,9 +451,10 @@ input[type="radio"] {
 
 .ht-settings__toggle {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--ht-space-3);
   cursor: pointer;
+  justify-content: space-between;
 }
 
 .ht-settings__toggle-body {
@@ -967,11 +968,12 @@ input[type="radio"] {
 .ht-ai-panel {
   min-block-size: 0;
   block-size: 100%;
-  display: grid;
+  display: block;
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   align-items: stretch;
   gap: var(--ht-space-2);
-  margin-block-start: var(--ht-space-4);
+  margin-block-start: 0;
+  container: ai-panel / inline-size;
 }
 
 /*
@@ -1002,10 +1004,13 @@ input[type="radio"] {
 }
 
 .ht-ai__suggestions {
-  display: grid;
+  display: flex;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--ht-space-2);
   align-content: start;
+  flex-wrap: wrap;
+  justify-content: center;
+  inline-size: 100%;
 }
 
 .ht-ai__suggestion {
@@ -1013,19 +1018,20 @@ input[type="radio"] {
   min-inline-size: 0;
   padding: var(--ht-space-2) var(--ht-space-3);
   border: 0;
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface-sunken);
-  color: var(--ht-color-foreground);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
   font: inherit;
   cursor: pointer;
   text-align: start;
-  white-space: normal;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .ht-ai__suggestion:hover {
   border-color: var(--ht-color-primary);
+  color: var(--ht-color-foreground);
 }
 
 /* 输入框吃弹性宽度，但收到 `layout.input-min` 为止 —— 到限就换行。
@@ -1089,6 +1095,11 @@ input[type="radio"] {
   min-block-size: 0;
   overflow-y: auto;
   padding-block: var(--ht-space-2);
+  grid-row: 3;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  gap: var(--ht-space-3);
 }
 
 .ht-ai__composer {
@@ -1102,6 +1113,8 @@ input[type="radio"] {
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface-sunken);
   box-shadow: var(--ht-shadow-sm);
+  inline-size: min(100%, var(--ht-layout-prose-max));
+  margin-inline: auto;
 }
 
 /* 输入框内部左下角的那枚附件图标（2026-11-02）。
@@ -1132,6 +1145,11 @@ input[type="radio"] {
 .ht-ai__footer {
   display: grid;
   gap: var(--ht-space-1);
+  grid-row: 4;
+  max-inline-size: var(--ht-layout-prose-max);
+  inline-size: 100%;
+  margin-inline: auto;
+  padding-block-start: var(--ht-space-2);
 }
 
 @media (max-width: 48rem) {
@@ -1181,14 +1199,6 @@ input[type="radio"] {
   min-block-size: 0;
   block-size: 100%;
   gap: var(--ht-space-5);
-}
-
-.ht-ai-panel {
-  display: block;
-  block-size: 100%;
-  min-block-size: 0;
-  margin-block-start: 0;
-  container: ai-panel / inline-size;
 }
 
 .ht-ai__history {
@@ -1280,15 +1290,6 @@ input[type="radio"] {
   margin-block: var(--ht-space-1) var(--ht-space-2);
 }
 
-.ht-ai__chat-body {
-  grid-row: 3;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  min-block-size: 0;
-  overflow: hidden;
-  gap: var(--ht-space-3);
-}
-
 .ht-ai__chat-body--welcome {
   display: flex;
   flex-direction: column;
@@ -1319,45 +1320,6 @@ input[type="radio"] {
   color: var(--ht-color-foreground);
   font-size: var(--ht-font-size-lg);
   font-weight: var(--ht-font-weight-semibold);
-}
-
-.ht-ai__suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--ht-space-2);
-  inline-size: 100%;
-}
-
-.ht-ai__suggestion {
-  min-block-size: var(--ht-touch-target-min);
-  min-inline-size: 0;
-  padding: var(--ht-space-2) var(--ht-space-3);
-  border: 0;
-  border-radius: var(--ht-radius-full);
-  background: var(--ht-color-surface);
-  color: var(--ht-color-foreground-muted);
-  font: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.ht-ai__suggestion:hover {
-  border-color: var(--ht-color-primary);
-  color: var(--ht-color-foreground);
-}
-
-.ht-ai__composer {
-  inline-size: min(100%, var(--ht-layout-prose-max));
-  margin-inline: auto;
-}
-
-.ht-ai__footer {
-  grid-row: 4;
-  max-inline-size: var(--ht-layout-prose-max);
-  inline-size: 100%;
-  margin-inline: auto;
-  padding-block-start: var(--ht-space-2);
 }
 
 @media (max-width: 48rem) {
@@ -1493,21 +1455,6 @@ input[type="radio"] {
     border-inline-start: 0;
     padding: var(--ht-space-3);
   }
-}
-
-/* ── 开关那一行（2026-10-24：说明搬进 `?` 之后的两列）───────────────
- *
- * 结构变成：`<div class="ht-settings__toggle">` 里放 `<label>` + 一枚 `?`。
- * `?` **必须**在 label 外面：`<button>` 落在 label 里时 Safari 点它会连带
- * 切换那个 checkbox（"只想看说明，结果把 AI 打开了"）。
- * 所以这里要补两件事：外层是一行（label 吃满、`?` 靠右），label 自己仍是
- * "方框 + 文字"的横排 —— 少了 `__toggle-hit` 那一条，方框会单独占一行。 */
-.ht-settings__toggle {
-  /* 行内顺序：`.ht-settings__toggle-hit`（标签 + 开关）→ `?`。
-     开关在 hit 的尾部（见下一条），所以视觉上仍然是"标签 …… ☐ ?"。 */
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ht-space-3);
 }
 
 .ht-settings__toggle-hit {

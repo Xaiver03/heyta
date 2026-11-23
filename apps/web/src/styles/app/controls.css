@@ -271,6 +271,7 @@
   position: relative;
   flex: 0 0 auto;
   min-inline-size: 0;
+  --ht-compose-panel-inline: min(24rem, calc(100vw - var(--ht-space-8)));
 }
 
 .ht-compose-actions > summary {
@@ -308,13 +309,28 @@
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-3);
-  inline-size: min(24rem, calc(100vw - var(--ht-space-8)));
-  max-inline-size: 100%;
+  inline-size: var(--ht-compose-panel-inline);
+  max-inline-size: var(--ht-compose-panel-inline);
   margin-block-start: var(--ht-space-2);
   padding: var(--ht-space-3);
   border: 0;
   border-radius: var(--ht-radius-lg);
   box-shadow: var(--ht-shadow-lg);
+  margin-inline-start: calc(100% - var(--ht-compose-panel-inline));
+  /*
+  * 🔴 2026-10-17（B214 的**层叠那一半**）：这一枚在流内是 `position: static; z-index: auto`
+  * （现量：`panel=div.ht-compose-actions__panel ht-material pos=static z=auto`），
+  * 于是行里那块**整行命中区**（`detail-pane-note-editor/n6-whole-row-is-the-hit-area.png`
+  * 说的那个模式）把它压住：chip 中心那一点 `elementFromPoint` 命中的是一个 `span`，
+  * 而 `locator.click` 的日志写着 `<label>…</label> … intercepts pointer events`（重试 113 次）。
+  * ⇒ 补上"参与层叠"这一对声明，**不另造值**：仓库里同一问题的正典解法就在 `material.css` 的
+  * `.ht-material__row-pop`（"行内那几枚用"：`position: relative` + `z-index: var(--ht-z-popover)`），
+  * 这里用同一对、同一个 token。
+  * ⚠️ 与它唯一的差别是"右对齐怎么表达"：那边靠 `margin-inline-start: auto`，而这一枚的容器宽度
+  * 本来由它自己撑出（`auto` 无从解析）⇒ 用上面的 `calc(100% - 面板宽)`。
+  */
+  position: relative;
+  z-index: var(--ht-z-popover);
 }
 
 .ht-compose-actions__items {
@@ -490,65 +506,10 @@
   font-size: var(--ht-font-size-sm);
 }
 
-/* ── 响应式：移动端塌缩成单栏 ───────────────────────── */
-
-/* ── 窄屏塌缩：完整规则在模块列表**末尾**的 narrow.css 媒体块 ─────────────
-   必须排在 `.ht-rail` / `.ht-sidebar` 基础规则之后（同特异性、源序后者胜）。
-   2026-09-30：旧块写在这里且多了一个 `}`，rail 塌缩规则被基础规则整块覆盖、
-   sidebar 塌缩规则逃出媒体块变成全局 —— "grid 塌了、rail 没塌"的半成品形态。 */
-
-
-/* 🔴 2026-10-17（B214 产品缺陷）：这一格被自己的面板撑大，于是**整格越出行尾走廊**。
- *
- * 逐层现量（900×600、打开「更多」，`getBoundingClientRect` 左..右）：
- *   任务行     328..876   ← 走廊在这里
- *   `details.ht-compose-actions`  **544..928**  ← 这一格越界 52px
- *     └ `__panel`              544..928（24rem = 384）
- *        └ `details.ht-compose--popover > summary`（提醒那一枚）862..916 ← 落在走廊外
- * 于是"看得见、点不着"：`locator.click` 的日志写着 `element is visible, enabled and stable`，
- * 紧接着 `<label>…</label> … intercepts pointer events` —— 因为那一点上画的是 `div.ht-content`。
- *
- * 修法的三条约束（都不是我挑的）：
- *  1. `material.css:32-33` 明写**不许**改回 `position: absolute`（绝对定位的后代不计入
- *     滚动宿主的 scrollable overflow ⇒ 朝下开就滚不到底）。⇒ 必须留在流内；
- *  2. 这一格 `flex: 0 0 auto`、宽度由内容决定，所以 `max-inline-size: 100%` 解析成自身宽度 = 不夹；
- *  3. 触发器（summary）的宽度与位置不该被这次修复改动（它是行尾那一枚「更多」按钮）。
- * ⇒ 让面板**贴本格右边缘、往左长**：宽度抽成变量（两档媒体查询各一份，与原来逐字相同），
- *    起点用 `margin-inline-start: calc(100% - <面板宽>)`（`100%` = 本格宽度）。这样：
- *    面板右边缘 = 本格右边缘 = 行尾走廊内，面板整体不再越界，**仍然在流内**（约束 1 ✓），
- *    触发器不受影响（约束 3 ✓）。 */
-.ht-compose-actions {
-  --ht-compose-panel-inline: min(24rem, calc(100vw - var(--ht-space-8)));
-}
-
 @media (max-width: 48rem) {
   .ht-compose-actions {
     --ht-compose-panel-inline: min(22rem, calc(100vw - var(--ht-space-6)));
   }
-}
-
-.ht-compose-actions__panel {
-  inline-size: var(--ht-compose-panel-inline);
-  /* 🔴 原规则里的 `max-inline-size: 100%` 在这里会**解析成这一格的宽度**（它自己就是被面板
-   * 撑出来的，而我把面板改成"往左长"之后这一格回到 60px 宽）⇒ 面板被夹成 60px
-   * （现量 1440×900：`panel=680..740`）。改用同一个变量表达"不许超过面板自身宽度"，
-   * 本义（不越界）不变、循环依赖断掉。 */
-  max-inline-size: var(--ht-compose-panel-inline);
-  margin-inline-start: calc(100% - var(--ht-compose-panel-inline));
-  /*
-   * 🔴 2026-10-17（B214 的**层叠那一半**）：这一枚在流内是 `position: static; z-index: auto`
-   * （现量：`panel=div.ht-compose-actions__panel ht-material pos=static z=auto`），
-   * 于是行里那块**整行命中区**（`detail-pane-note-editor/n6-whole-row-is-the-hit-area.png`
-   * 说的那个模式）把它压住：chip 中心那一点 `elementFromPoint` 命中的是一个 `span`，
-   * 而 `locator.click` 的日志写着 `<label>…</label> … intercepts pointer events`（重试 113 次）。
-   * ⇒ 补上"参与层叠"这一对声明，**不另造值**：仓库里同一问题的正典解法就在 `material.css` 的
-   * `.ht-material__row-pop`（"行内那几枚用"：`position: relative` + `z-index: var(--ht-z-popover)`），
-   * 这里用同一对、同一个 token。
-   * ⚠️ 与它唯一的差别是"右对齐怎么表达"：那边靠 `margin-inline-start: auto`，而这一枚的容器宽度
-   * 本来由它自己撑出（`auto` 无从解析）⇒ 用上面的 `calc(100% - 面板宽)`。
-   */
-  position: relative;
-  z-index: var(--ht-z-popover);
 }
 
 /* ── 行内浮层里的 AI 面板：按容器宽换行，不许把浮层撑宽 ─────────────────

@@ -181,7 +181,7 @@ function MiniDay({
         {hasContent ? (
           /* 🔴 这颗点带自己的 testID：判据问的是"这一天有没有被标出来"，
              而按 class 数会连容器一起数（`-dots` 那一层每天都画）。 */
-          <i className="ht-sidebar__day-dot" data-testid={`calendar-mini-dot-${date}`} />
+          <i data-testid={`calendar-mini-dot-${date}`} style={{ background: cssVar('color.primary') }} />
         ) : null}
         {/*
           「休 / 班」（W6 补齐的那半：原先只有主区月历画，侧栏说"这天有没有事"，

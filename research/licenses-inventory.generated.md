@@ -4,12 +4,12 @@
 > 重新生成：`node research/tools/render-license-inventory.mjs`
 > 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。
 > 去重口径：`包名@版本`（同名多版本分别登记）。
-> lockfile 指纹：`4bd5f826df273a42`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
-> 渲染输入集：pnpm store 去重后 **1083** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
+> lockfile 指纹：`05e1869ac4a2f20c`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
+> 渲染输入集：pnpm store 去重后 **1105** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
 
 生成时间：2026-11-23
 
-**总计 1083 个包** —— 宽松许可 1081，受限 0，无许可证 0，白名单外已登记 2。
+**总计 1105 个包** —— 宽松许可 1103，受限 0，无许可证 0，白名单外已登记 2。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -30,7 +30,7 @@
 - **PSF-2.0**（`argparse@3.0.4`）：argparse@3.0.4：markdown-it 的传递依赖（仅用于其 CLI 入口），PSF-2.0 是 Python 软件基金会许可证，语义等同 BSD-2-Clause（宽松、仅要求保留版权声明），不在禁止名单内。
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（1083 个）
+### 📋 全部依赖（1105 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -163,10 +163,17 @@
 | `@cspotcode/source-map-support` | 0.8.1 | MIT |
 | `@csstools/color-helpers` | 6.1.1 | MIT-0 |
 | `@csstools/css-calc` | 3.4.0 | MIT |
+| `@csstools/css-calc` | 3.4.4 | MIT |
 | `@csstools/css-color-parser` | 4.2.3 | MIT |
 | `@csstools/css-parser-algorithms` | 4.0.0 | MIT |
+| `@csstools/css-parser-algorithms` | 4.0.3 | MIT |
 | `@csstools/css-syntax-patches-for-csstree` | 1.1.14 | MIT-0 |
+| `@csstools/css-syntax-patches-for-csstree` | 1.1.17 | MIT-0 |
 | `@csstools/css-tokenizer` | 4.0.1 | MIT |
+| `@csstools/css-tokenizer` | 4.0.3 | MIT |
+| `@csstools/media-query-list-parser` | 5.0.3 | MIT |
+| `@csstools/selector-resolve-nested` | 4.0.2 | MIT-0 |
+| `@csstools/selector-specificity` | 6.0.1 | MIT-0 |
 | `@dimforge/rapier3d-compat` | 0.12.0 | Apache-2.0 |
 | `@dnd-kit/accessibility` | 3.1.1 | MIT |
 | `@dnd-kit/core` | 6.3.1 | MIT |
@@ -509,6 +516,7 @@
 | `color-convert` | 2.0.1 | MIT |
 | `color-name` | 1.1.3 | MIT |
 | `color-name` | 1.1.4 | MIT |
+| `colord` | 2.14.0 | MIT |
 | `colorette` | 1.4.0 | MIT |
 | `combined-stream` | 1.0.8 | MIT |
 | `command-exists` | 1.2.9 | MIT |
@@ -532,6 +540,7 @@
 | `cookiejar` | 2.1.4 | MIT |
 | `core-js-compat` | 3.50.0 | MIT |
 | `cosmiconfig` | 9.0.2 | MIT |
+| `cosmiconfig` | 10.0.1 | MIT |
 | `create-require` | 1.1.1 | MIT |
 | `cross-fetch` | 3.2.0 | MIT |
 | `cross-spawn` | 7.0.6 | MIT |
@@ -678,8 +687,10 @@
 | `ical.js` | 2.2.1 | MPL-2.0 |
 | `iconv-lite` | 0.4.24 | MIT |
 | `ieee754` | 1.2.1 | BSD-3-Clause |
+| `ignore` | 7.0.16 | MIT |
 | `ignore-by-default` | 1.0.1 | ISC |
 | `import-fresh` | 3.3.1 | MIT |
+| `import-meta-resolve` | 4.2.0 | MIT |
 | `imurmurhash` | 0.1.4 | MIT |
 | `inflight` | 1.0.6 | ISC |
 | `inherits` | 2.0.4 | ISC |
@@ -719,6 +730,7 @@
 | `joycon` | 3.1.1 | MIT |
 | `js-tokens` | 4.0.0 | MIT |
 | `js-yaml` | 3.15.2 | MIT |
+| `js-yaml` | 5.5.0 | MIT |
 | `js-yaml` | 4.3.2 | MIT |
 | `jsc-safe-url` | 0.2.4 | 0BSD |
 | `jsdom` | 27.4.0 | MIT |
@@ -818,6 +830,7 @@
 | `ms` | 2.1.3 | MIT |
 | `mz` | 2.7.0 | MIT |
 | `nanoid` | 3.3.19 | MIT |
+| `nanoid` | 3.3.20 | MIT |
 | `negotiator` | 0.6.3 | MIT |
 | `negotiator` | 1.1.0 | MIT |
 | `negotiator` | 0.6.4 | MIT |
@@ -876,7 +889,10 @@
 | `playwright-core` | 1.63.0 | Apache-2.0 |
 | `plist` | 3.1.1 | MIT |
 | `postcss` | 8.5.28 | MIT |
+| `postcss` | 8.5.33 | MIT |
 | `postcss-load-config` | 6.0.1 | MIT |
+| `postcss-safe-parser` | 7.1.0 | MIT |
+| `postcss-selector-parser` | 7.2.1 | MIT |
 | `postcss-value-parser` | 4.2.0 | MIT |
 | `postject` | 1.0.0-alpha.6 | MIT |
 | `pretty-format` | 29.7.0 | MIT |
@@ -982,6 +998,7 @@
 | `side-channel-weakmap` | 1.0.2 | MIT |
 | `siginfo` | 2.0.0 | ISC |
 | `signal-exit` | 3.0.7 | ISC |
+| `signal-exit` | 4.1.0 | ISC |
 | `simple-update-notifier` | 2.0.0 | MIT |
 | `sisteransi` | 1.0.5 | MIT |
 | `slash` | 3.0.0 | MIT |
@@ -991,6 +1008,7 @@
 | `source-map` | 0.5.7 | BSD-3-Clause |
 | `source-map` | 0.7.6 | BSD-3-Clause |
 | `source-map-js` | 1.2.1 | BSD-3-Clause |
+| `source-map-js` | 1.2.4 | BSD-3-Clause |
 | `source-map-support` | 0.5.21 | MIT |
 | `split2` | 4.2.0 | ISC |
 | `sprintf-js` | 1.0.3 | BSD-3-Clause |
@@ -1008,6 +1026,9 @@
 | `strip-ansi` | 6.0.1 | MIT |
 | `strip-final-newline` | 2.0.0 | MIT |
 | `strnum` | 1.1.2 | MIT |
+| `stylelint` | 18.1.0 | MIT |
+| `stylelint-config-recommended` | 19.1.0 | MIT |
+| `stylelint-config-standard` | 41.1.0 | MIT |
 | `styleq` | 0.1.3 | MIT |
 | `sucrase` | 3.35.1 | MIT |
 | `sumchecker` | 3.0.1 | Apache-2.0 |
@@ -1100,6 +1121,7 @@
 | `wrap-ansi` | 7.0.0 | MIT |
 | `wrappy` | 1.0.2 | ISC |
 | `write-file-atomic` | 4.0.2 | ISC |
+| `write-file-atomic` | 8.0.0 | ISC |
 | `ws` | 8.21.3 | MIT |
 | `ws` | 7.5.13 | MIT |
 | `ws` | 6.2.6 | MIT |

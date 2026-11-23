@@ -516,7 +516,7 @@
 .ht-rail__label {
   /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
   position: fixed;
-  top: var(--ht-rail-label-top, 0px);
+  top: var(--ht-rail-label-top, 0);
   left: var(--ht-rail-label-left, calc(var(--ht-layout-rail-width) + var(--ht-space-1)));
   transform: translateY(-50%);
   z-index: var(--ht-z-tooltip);
@@ -595,11 +595,6 @@
   color: var(--ht-color-foreground-muted);
   cursor: pointer;
   font: inherit;
-}
-
-.ht-rail__customize-action,
-.ht-rail__customize-toggle,
-.ht-rail__reset {
   display: inline-flex;
   align-items: center;
   justify-content: center;

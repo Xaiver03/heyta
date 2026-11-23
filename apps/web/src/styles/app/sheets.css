@@ -65,7 +65,7 @@
 }
 
 .ht-settings__nav-link {
-  display: block;
+  display: flex;
   padding: var(--ht-space-2) var(--ht-space-3);
   border: var(--ht-border-width-thin) solid transparent;
   min-block-size: var(--ht-touch-target-min);
@@ -76,6 +76,8 @@
   border-radius: var(--ht-radius-sm);
   color: var(--ht-color-foreground-muted);
   text-decoration: none;
+  align-items: center;
+  gap: var(--ht-space-2);
 }
 
 .ht-settings__nav-link:hover {
@@ -1090,16 +1092,6 @@
   box-shadow: none;
   background: var(--ht-color-background);
   z-index: var(--ht-z-modal);
-}
-
-/* 设置导航项：图标 + 文字（2026-10-25 产品负责人要求每个菜单带 Icon）。
-   独立窗口里这一列是**唯一导航**，纯文字要逐条读才能定位；图标把它变成形状识别。
-   图标与文字的间距用 `--ht-space-2`，图标颜色走 muted —— 选中态由 `aria-current` 那一档
-   统一提亮，不在这里另开一套颜色。 */
-.ht-settings__nav-link {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-2);
 }
 
 .ht-settings__nav-link > svg {

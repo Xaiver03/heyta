@@ -156,7 +156,16 @@ const SCOPES = [
      * 🔴 2026-11 行操作重设计：98 → **74**（行尾那排编辑器连同它的内联样式整排撤掉，
      *    含件搬进 `features/tasks/task-row-menu.css` 一族；实测值由本脚本自己打）。
      */
-    baseline: 73,
+    /*
+     * 🔴 2026-11-23：73 → 74（**回调一格，原因写在旁边而不是藏着**）。
+     *    当时把 `CalendarSidebar` 那颗"有内容"的点从内联 style 搬进 CSS 类，
+     *    但 `apps/web/tests/calendar-sidebar.spec.tsx` 有一条判据断言的就是
+     *    "这个点的 inline background 是 `var(--ht-color-primary)`"。
+     *    两条路都得让步：改测试 = 削弱一条**产品判据**；搬 CSS = 那条判据失去锚点。
+     *    选择**保留判据**、把这一处内联样式留着（1 行 token 引用，不是裸值），
+     *    因此上限回调到 74 —— 这是唯一的存量，不是新的回潮额度。
+     */
+    baseline: 74,
   },
   {
     label: 'apps/mobile/src/screens（L4 视图）',

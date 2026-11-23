@@ -572,19 +572,14 @@
   align-items: center;
   gap: var(--ht-space-2);
   min-width: 0;
-}
-
-/*
-  第一行 = 「名字 ←→ 三个数字」，第二行 = 七个点横跨整行。
-  ⚠️ 数字**不竖排**：竖排会把行高顶到三行，名字与点之间裂开一道空档（看图实测过那一版，
-     空白只是从行右侧搬到了行中间）。横排贴在名字右边才是列表行的常见读法。
-*/
-.ht-habit__head {
   grid-column: 1;
 }
 
 .ht-habit__week {
   grid-column: 1 / span 2;
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
 }
 
 /* 图标底盘。颜色由 JSX 给（分类槽位 / 未设色走 `UNSET_CATEGORY_TOKEN`）；
@@ -607,12 +602,6 @@
   white-space: nowrap;
   font-size: var(--ht-font-size-sm);
   font-weight: var(--ht-font-weight-medium);
-}
-
-.ht-habit__week {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-1);
 }
 
 /* 每格 = 一天。空格子**也有边框**：heat-0 在亮色下接近白，

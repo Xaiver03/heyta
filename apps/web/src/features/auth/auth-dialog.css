@@ -58,6 +58,10 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   padding: var(--ht-space-8) var(--ht-space-6);
   background: var(--ht-color-primary-subtle);
   border-inline-end: 0;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 0;
 }
 
 .ht-sheet__auth-plan-kicker {
@@ -143,11 +147,13 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 /* 一次性的计划进展示意：不循环漂浮，不把装饰误当成真实账号数据。 */
 .ht-sheet__auth-preview {
   display: grid;
-  gap: var(--ht-space-4);
+  gap: var(--ht-space-5);
   margin-block: auto;
   padding: var(--ht-space-5);
   border-radius: var(--ht-radius-dialog);
   background: var(--ht-color-surface);
+  position: relative;
+  animation: ht-auth-plan-row calc(var(--ht-duration-slow) * 3) var(--ht-ease-enter) both;
 }
 
 .ht-sheet__auth-preview-heading,
@@ -166,6 +172,7 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   font-size: var(--ht-font-size-sm);
   color: var(--ht-color-foreground-muted);
   animation: ht-auth-plan-row var(--ht-duration-slow) var(--ht-ease-enter) both;
+  animation-delay: calc(var(--ht-duration-slow) * 2);
 }
 
 .ht-sheet__auth-preview svg {
@@ -178,7 +185,7 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 .ht-sheet__auth-preview-check {
   display: flex;
   animation: ht-auth-plan-row var(--ht-duration-normal) var(--ht-ease-enter) both;
-  animation-delay: calc(var(--ht-duration-slow) * 2);
+  animation-delay: calc(var(--ht-duration-slow) * 7);
 }
 
 .ht-sheet__auth-preview-row:nth-child(3) {
@@ -186,7 +193,7 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 }
 
 .ht-sheet__auth-preview-row:nth-child(4) {
-  animation-delay: var(--ht-duration-slow);
+  animation-delay: calc(var(--ht-duration-slow) * 4);
 }
 
 @keyframes ht-auth-plan-row {
@@ -302,13 +309,6 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   }
 }
 
-/* A finite, four-second introduction: background path → plan → completion. */
-.ht-sheet__auth-plan {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  border: 0;
-}
 .ht-auth-plan-intro { position: relative; display: grid; gap: var(--ht-space-3); }
 .ht-auth-plan-backdrop {
   position: absolute;
@@ -334,11 +334,7 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   transform: rotate(-4deg);
   animation: ht-auth-paper-arrive calc(var(--ht-duration-slow) * 4) var(--ht-ease-enter) both;
 }
-.ht-sheet__auth-preview {
-  position: relative;
-  gap: var(--ht-space-5);
-  animation: ht-auth-plan-row calc(var(--ht-duration-slow) * 3) var(--ht-ease-enter) both;
-}
+
 .ht-auth-plan-days {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -349,10 +345,9 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 }
 .ht-auth-plan-days span { padding-block: var(--ht-space-2); text-align: center; }
 .ht-auth-plan-day--today { color: var(--ht-color-primary); background: var(--ht-color-primary-subtle); border-radius: var(--ht-radius-full); }
-.ht-sheet__auth-preview-row { animation-delay: calc(var(--ht-duration-slow) * 2); }
-.ht-sheet__auth-preview-row:nth-child(4) { animation-delay: calc(var(--ht-duration-slow) * 4); }
+
 .ht-sheet__auth-preview-row:nth-child(5) { animation-delay: calc(var(--ht-duration-slow) * 6); }
-.ht-sheet__auth-preview-check { animation-delay: calc(var(--ht-duration-slow) * 7); }
+
 .ht-sheet__auth-preview-row:nth-child(4) .ht-sheet__auth-preview-check { animation-delay: calc(var(--ht-duration-slow) * 9); }
 .ht-auth-plan-progress { block-size: var(--ht-space-1); background: var(--ht-color-primary-subtle); border-radius: var(--ht-radius-full); overflow: hidden; }
 .ht-auth-plan-progress span {
