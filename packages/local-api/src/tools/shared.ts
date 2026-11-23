@@ -793,7 +793,14 @@ export type LocalApiWriteIntent =
   /** 整组覆盖任务子项（TASK）。items 空数组 = 清空；id 缺失则新建。 */
   | { action: 'set-task-checklist'; taskId: string; items: readonly { id?: string; text: string; done?: boolean }[] }
   /** 勾选/取消任务某条子项（TASK）。按文本唯一匹配；全勾时正常任务自动完成。 */
-  | { action: 'toggle-checklist-item'; taskId: string; itemText: string; done: boolean };
+  | { action: 'toggle-checklist-item'; taskId: string; itemText: string; done: boolean }
+  // 批8：任务指派（ADR-0062 决策 7 / ADR-0088）
+  /**
+   * 设置/清除任务指派人（TASK）。`assigneeUserId` 省略或空串 = 清除（写 `null`）。
+   * 语义**只对共享清单内的任务有意义**；个人任务缺席 = 未指派。存在性由宿主经
+   * `actions.findTask` 判（I5：本层不读原始 `tasks` 表）。
+   */
+  | { action: 'set-task-assignee'; taskId: string; assigneeUserId?: string };
 
 /**
  * 一条写入落地的实体类型。

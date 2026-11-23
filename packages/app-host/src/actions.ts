@@ -133,6 +133,12 @@ export interface TaskDetailsPatch {
   /** Presence means set/clear dueDate; omission leaves it unchanged. */
   dueDate?: number;
   completed?: boolean;
+  /**
+   * 指派人（ADR-0062 决策 7 / ADR-0088）。**存在即设/清**：字符串 = 指派给该成员 id；
+   * `null` = 清除指派（个人任务缺席 = 未指派）。语义只对共享清单内的任务有意义。
+   * 省略 = 不动这一格。
+   */
+  assigneeUserId?: string | null;
 }
 
 export interface TaskActionsOptions {
@@ -844,6 +850,10 @@ export function createTaskActions(
       if ('completed' in patch && typeof patch.completed !== 'boolean') {
         throw new Error(`任务「${entityId}」的完成状态无效`);
       }
+      if ('assigneeUserId' in patch && patch.assigneeUserId != null &&
+          typeof patch.assigneeUserId !== 'string') {
+        throw new Error(`任务「${entityId}」的指派人无效`);
+      }
 
       const completed = patch.completed;
       const repeat = repeatOf(task);
@@ -865,6 +875,9 @@ export function createTaskActions(
         payload.dueDateLocal = null;
       }
       if ('completed' in patch) payload.completedAt = completed === true ? now() : null;
+      // 指派人：`null` = 清除（reducer 的既有约定，见文件头第 2 条：`undefined` 会丢、
+      // `null` 才真的清）。空串在宿主层已归一成 `null`，这里只处理 string | null。
+      if ('assigneeUserId' in patch) payload.assigneeUserId = patch.assigneeUserId ?? null;
       if (Object.keys(payload).length > 0) await update(entityId, payload);
     },
 

@@ -508,6 +508,13 @@ const CASES: readonly Case[] = [
     effect: () => Object.values(engine.getState().tasks).filter((t) => t.pinnedAt !== undefined).length,
   },
   {
+    tool: 'set_task_assignee',
+    intentAction: 'set-task-assignee',
+    label: '任务指派',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '要指派的' }), assigneeUserId: 'u1' }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.assigneeUserId === 'u1').length,
+  },
+  {
     tool: 'move_tasks',
     intentAction: 'move-tasks',
     label: '批量移动',
