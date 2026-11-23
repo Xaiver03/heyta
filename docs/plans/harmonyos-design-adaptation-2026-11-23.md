@@ -64,10 +64,11 @@
 - 三个资源 JSON：`JSON.parse` 通过。
 - 三份改动的 `.ets`：括号/引号平衡、无残留裸 hex。
 - `$r('app.color.…')` 覆盖卡片与页面的全部颜色；`$r('app.float.…')` 覆盖 7 类字号/间距档。
+- ✅ **ArkTS 真编译（windows-pc）**：2026-11-23 在 `windows-pc` 上 `node scripts/build-harmony-windows.mjs` → `hvigorw assembleHap` **通过**（HEAD `60acd7fb`，产物 `entry-default-unsigned.hap` ≈398 KiB）——确证本轮改动的 `.ets` 通过真实的 ArkTS 编译器。
 
 ## 4. 诚实边界（务必知悉）
 
-- **本机未装 DevEco Studio / `es2abc`**，故 `.ets` 的 ArkTS **编译未在本机执行**；`pnpm check:arkts*` 会"响亮跳过"（exit 0，并打印未验证什么）。**真编译验证需在装有 DevEco 的机器上跑**：`pnpm verify:harmony-toolchain`（出 HAP），或在 `apps/mobile/harmony` 下 `ohpm install && hvigorw assembleHap`。（2026-11-23 全盘探测：`mdfind` 无 `es2abc`、PATH 无 `hvigorw`/`ohpm`、`npm view es2abc` 与 `@ohos/hvigor` 均 404、`~/Library/Huawei` 为空——本机确实无任何 ArkTS 工具链。）
+- **ArkTS 编译已在 windows-pc 上实证**：本机 macOS 没有 DevEco/`es2abc`/`hvigorw`/`ohpm`（2026-11-23 全盘探测确认），但 DevEco 与工具链在 **`windows-pc`**（`C:\Program Files\Huawei\DevEco Studio`），鸿蒙构建天然在那边跑。2026-11-23 已实测：`node scripts/build-harmony-windows.mjs` 同步源码到 `windows-pc` 并 `hvigorw assembleHap` **成功**（HEAD `60acd7fb`，`entry-default-unsigned.hap` ≈398 KiB）。⇒ 本轮 `.ets` 改动**已通过真实 ArkTS 编译器**；`pnpm check:arkts*` 只是在本机因无工具链而跳过。产物为 **unsigned**，且"能出 HAP ≠ 设备能跑"（安装/运行仍需签名 + 设备）。
 - 本轮对 `.ets` 只做**等价字面量替换**（hex → `$r`），未改结构，风险已通过静态校验降到最低，但不替代编译器。
 - `pnpm check:design` 当前有**既有红**，经 `pnpm check:design` 实测红点全部落在 `apps/mobile/src/ai/AssistantScreen.tsx`、`apps/mobile/src/ai/MarkdownMessage.tsx`、`apps/mobile/src/ui/custom-icons.tsx`（这三者 `git status` 干净、与 HEAD 一致，属 HEAD 既有债）；本任务三个提交**从未触及 `apps/mobile/src`**，且 `check:hardcoded.mjs` 只扫 `apps/{web,mobile,ui,landing,desktop}/src`、**不扫** `apps/mobile/harmony` 与 `packages/design-system`，故与本任务无关。
 - 对比度保证继承 `packages/design-system/tests`：资源与 token 同源，即继承其 WCAG 实测。
