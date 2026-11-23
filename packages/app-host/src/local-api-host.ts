@@ -35,6 +35,7 @@
  */
 
 import type {
+  LocalApiAttachment,
   LocalApiEventItem,
   LocalApiFocusSession,
   LocalApiHabit,
@@ -82,6 +83,7 @@ import {
   type FocusSession,
   type LocalDate,
 
+  type Attachment,
   type Habit,
   type CategorySlot,
   type HabitFrequency,
@@ -105,6 +107,8 @@ import { createNoteActions, type NoteActions } from './note-actions.js';
 import { createProjectActions, type ProjectActions } from './project-actions.js';
 import { createReminderActions, type ReminderActions } from './reminder-actions.js';
 import { createEventActions, type EventActions } from './event-actions.js';
+import { createAttachmentActions, type AttachmentActions } from './attachment-actions.js';
+import type { AttachmentBlobPort } from './attachment-http.js';
 import { readDurationFromNote } from './duration-note.js';
 import { selectDurationHistory } from './ai-duration.js';
 
@@ -152,6 +156,17 @@ export interface LocalApiHostOptions {
    * 因为这条**不是**隐私开关（上一条 `isReadable` 必须是必填的理由只适用于它）。
    */
   now?: () => number;
+
+  /**
+   * 附件的**字节通道**（`AttachmentBlobPort`）。缺省 = 这台设备没接上传通道。
+   *
+   * 🔴 它**只**影响 `remove_attachment` 的那半条腿（能否回收字节）：
+   * 缺省时 `removeAttachment` 仍会先发 `DEL` op，然后返回 `{ bytesReleased: false }`
+   * —— 列表状态正确，只是字节留在服务端等孤儿扫描。
+   * `rename_attachment` 是纯 op、`list_attachments` 是纯读，二者都**不依赖**它。
+   * （新建附件需要它，但本工具批次刻意不做"新建附件"，见 `tools/attachment.ts` 文件头。）
+   */
+  attachmentBlobs?: AttachmentBlobPort;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -390,6 +405,25 @@ export function noteToItem(note: Note): LocalApiNote {
 }
 
 /**
+ * `Attachment` → `LocalApiAttachment`。**白名单重建**（同 `taskToItem` / `habitToItem`）。
+ *
+ * 🔴 只有这五个字段，且**不含字节**：这条通道上刻意没有 `GET`（见 `attachment-http.ts`）。
+ * `mimeType` → `mime` 在这里单点换算（出境的词表说"这是什么类型"，不是实体字段名）。
+ * 可选字段缺席时**连键都不写**（同 `focusToItem`）：出境的 JSON 里不该出现
+ * `"mime": null`，那会被模型读成"有一个类型，但没说清是什么"。
+ */
+export function attachmentToItem(attachment: Attachment): LocalApiAttachment {
+  const item: LocalApiAttachment = {
+    id: attachment.id,
+    fileName: attachment.fileName,
+    taskId: attachment.taskId,
+  };
+  if (attachment.mimeType !== undefined) item.mime = attachment.mimeType;
+  if (attachment.sizeBytes !== undefined) item.sizeBytes = attachment.sizeBytes;
+  return item;
+}
+
+/**
  * `HabitLog` → `LocalApiHabitLog`。
  *
  * ⚠️ `note` 不搬：`checkIn` 从来不写它，而自由文本一旦进白名单就是一条出境通道。
@@ -476,6 +510,12 @@ export function createLocalApiHost(
   const focusActions = createFocusActions(ctx);
   const reminderActions = createReminderActions(ctx, { now });
   const eventActions = createEventActions(ctx);
+  // 附件：只把**字节通道**（可选）透传进去。它缺省时 rename/list 照常工作，
+  // remove 仍会发 DEL op，只是回 `bytesReleased: false`（见 `removeAttachment`）。
+  const attachmentActions = createAttachmentActions(
+    ctx,
+    options.attachmentBlobs === undefined ? {} : { blobs: options.attachmentBlobs },
+  );
 
   return {
     listTasks: (args) => {
@@ -646,6 +686,11 @@ export function createLocalApiHost(
       return Promise.resolve(eventToItem(event, isReadable(event), today(now())));
     },
 
+    // 附件目录（ATTACHMENT）：过滤与顺序都在领域层（`aliveAttachmentsForTask`），
+    // 这里只把实体投影成出境的五个字段（不含字节）。
+    listAttachments: (taskId) =>
+      Promise.resolve(attachmentActions.attachmentsForTask(taskId).map(attachmentToItem)),
+
     submit: (intent) =>
       submitIntent(
         ctx,
@@ -656,6 +701,7 @@ export function createLocalApiHost(
         focusActions,
         reminderActions,
         eventActions,
+        attachmentActions,
         now,
         intent,
       ),
@@ -688,6 +734,7 @@ async function submitIntent(
   focusActions: FocusActions,
   reminderActions: ReminderActions,
   eventActions: EventActions,
+  attachmentActions: AttachmentActions,
   now: () => number,
   intent: LocalApiWriteIntent,
 ): Promise<LocalApiWriteResult> {
@@ -2084,6 +2131,50 @@ async function submitIntent(
       if (task === undefined) return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
       await actions.setRepeatAfterCompletion(intent.taskId, intent.on);
       return { ok: true, taskId: intent.taskId, entityId: intent.taskId, entityType: 'TASK' };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 附件（ATTACHMENT）：改名是纯 op；移除先发 DEL op、再尽力回收字节
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'rename-attachment': {
+      // 空 fileName 在动作层会被 `attachmentRejection` 拒（throw）；这里先挡在门口，
+      // 让用户看到"名字不能为空"而不是一句笼统的"工具执行失败"（同 `rename-project`）。
+      if (intent.fileName.trim() === '') {
+        return { ok: false, reason: 'invalid', message: '附件名不能为空。' };
+      }
+      try {
+        await attachmentActions.renameAttachment(intent.attachmentId, intent.fileName);
+      } catch (e: unknown) {
+        // 找不到附件 / 名字不合法都翻成 `invalid`（动作层是唯一判定点，这里只翻译）。
+        return { ok: false, reason: 'invalid', message: e instanceof Error ? e.message : '这个附件无法改名。' };
+      }
+      return {
+        ok: true,
+        taskId: intent.attachmentId,
+        entityId: intent.attachmentId,
+        entityType: 'ATTACHMENT',
+      };
+    }
+
+    case 'remove-attachment': {
+      let bytesReleased: boolean;
+      try {
+        ({ bytesReleased } = await attachmentActions.removeAttachment(intent.attachmentId));
+      } catch (e: unknown) {
+        // 找不到附件 ⇒ not-found（与 delete-note 同一档）；其它错误一律 invalid。
+        const message = e instanceof Error ? e.message : '这个附件无法移除。';
+        return { ok: false, reason: message.includes('找不到附件') ? 'not-found' : 'invalid', message };
+      }
+      // 🔴 回的是**附件 id**（不是冒充 `taskId`），并如实带上"字节回收了没有"。
+      return {
+        ok: true,
+        taskId: intent.attachmentId,
+        entityId: intent.attachmentId,
+        entityType: 'ATTACHMENT',
+        attachmentId: intent.attachmentId,
+        bytesReleased,
+      };
     }
 
   }

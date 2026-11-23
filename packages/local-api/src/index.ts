@@ -126,6 +126,7 @@ export {
   createLocalApiHandler,
   runReadTool,
   toWriteIntent,
+  type LocalApiAttachment,
   type LocalApiFocusSession,
   type LocalApiHabit,
   type LocalApiHabitLog,
