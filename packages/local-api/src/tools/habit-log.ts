@@ -2,7 +2,7 @@
  * HABIT_LOG（打卡记录）实体工具包
  * ================================
  *
- * 读：`list_checkins`；写：`record_checkin`、`undo_checkin`（撤销某一天的打卡）。
+ * 读：`list_checkins`；写：`record_checkin`（单个）、`record_habit_checkins`（批量）、`undo_checkin`（撤销某一天的打卡）。
  *
  * 🔴 它和 `habit.ts` 是两个实体，不是一个：HABIT 是**定义**（名称、目标、单位、口径），
  * HABIT_LOG 是**某一天做过没有**那条记录。把打卡工具写进 `habit.ts`，
@@ -59,6 +59,17 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'record_habit_checkins',
+    // 批量给多个习惯打卡（一次意图、提案/确认层落 N 条 checkIn op，同 complete-tasks）。
+    egressFields: [],
+    description:
+      '给多个习惯一次性打卡。habitIds 是习惯 id 列表。不写日期就是今天；不写数值就用每个习惯各自的目标。' +
+      '任一习惯不存在则整批不打卡（先整批预检）。已打过的那天不会多出记录。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -100,6 +111,23 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       },
     },
     required: ['habitId'],
+    additionalProperties: false,
+  },
+  record_habit_checkins: {
+    type: 'object',
+    properties: {
+      habitIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: '要打卡的习惯 id 列表，至少一个。',
+      },
+      date: { type: 'string', description: '哪一天：YYYY-MM-DD（本地日历日）。省略就是今天。' },
+      value: {
+        type: 'number',
+        description: '这一次的数量，不小于 0 的有限数。省略就用每个习惯各自的目标数值。',
+      },
+    },
+    required: ['habitIds'],
     additionalProperties: false,
   },
 };
@@ -193,6 +221,43 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
         intent.date = a['date'] as string;
       }
 
+      return { ok: true, intent };
+    }
+
+    case 'record_habit_checkins': {
+      const unknown = Object.keys(a).filter(
+        (key) => key !== 'habitIds' && key !== 'date' && key !== 'value',
+      );
+      if (unknown.length > 0) {
+        return { ok: false, message: `record_habit_checkins 不支持这些参数：${unknown.join('、')}。` };
+      }
+      const raw = a['habitIds'];
+      if (!Array.isArray(raw) || raw.length === 0) {
+        return { ok: false, message: 'record_habit_checkins 的 habitIds 必须是非空数组。' };
+      }
+      const ids = raw.filter((x): x is string => typeof x === 'string' && x.trim() !== '');
+      if (ids.length !== raw.length) {
+        return { ok: false, message: 'record_habit_checkins 的 habitIds 里每一项都必须是非空字符串。' };
+      }
+      const intent: {
+        action: 'record-habit-checkins';
+        habitIds: readonly string[];
+        date?: string;
+        value?: number;
+      } = { action: 'record-habit-checkins', habitIds: [...new Set(ids)] };
+      if (a['date'] !== undefined) {
+        if (parseCalendarDay(a['date']) === undefined) {
+          return { ok: false, message: 'date 应为 YYYY-MM-DD（且是真实存在的一天）。' };
+        }
+        intent.date = a['date'] as string;
+      }
+      if (a['value'] !== undefined) {
+        const v = a['value'];
+        if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
+          return { ok: false, message: 'value 必须是不小于 0 的有限数。' };
+        }
+        intent.value = v;
+      }
       return { ok: true, intent };
     }
 

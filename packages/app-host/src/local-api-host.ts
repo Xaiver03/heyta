@@ -1904,6 +1904,44 @@ async function submitIntent(
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // 批6-3：批量打卡（一次意图，预检整批后逐个 checkIn，落 N 条 op）
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'record-habit-checkins': {
+      const ids = [...new Set(intent.habitIds)];
+      if (ids.length === 0) {
+        return { ok: false, reason: 'invalid', message: 'habitIds 是空的：没有要打卡的习惯。' };
+      }
+      const day = intent.date ?? today(now());
+      if (intent.value !== undefined && (!Number.isFinite(intent.value) || intent.value < 0)) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `打卡数值必须是不小于 0 的有限数，收到「${String(intent.value)}」。`,
+        };
+      }
+      // 先整批预检（同 trash-tasks / move-tasks）：任一习惯不在 ⇒ 一条都不打卡。
+      const habits = habitActions.listHabits();
+      const missing = ids.filter((id) => !habits.some((h) => h.id === id));
+      if (missing.length > 0) {
+        const shown = missing.slice(0, 3).join('、');
+        return {
+          ok: false,
+          reason: 'not-found',
+          message: `这批里有 ${String(missing.length)} 个习惯已经不在了（${shown}${missing.length > 3 ? ' 等' : ''}），一条都没有打卡。`,
+        };
+      }
+      for (const id of ids) {
+        await habitActions.checkIn(id, day, intent.value);
+      }
+      const [first] = ids;
+      if (first === undefined) {
+        return { ok: false, reason: 'invalid', message: 'habitIds 是空的：没有要打卡的习惯。' };
+      }
+      return { ok: true, taskId: first, taskIds: ids, entityType: 'HABIT_LOG' };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // 批次 4：任务标记（重要 / 置顶）/ 批量移动 / 习惯打卡撤销
     // ─────────────────────────────────────────────────────────────────────
 

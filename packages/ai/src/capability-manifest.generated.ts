@@ -274,6 +274,7 @@ export const AI_CAPABILITY_MANIFEST =
       'writeToolNames': [
         'record_checkin',
         'undo_checkin',
+        'record_habit_checkins',
       ],
     },
     {
@@ -1494,6 +1495,30 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'record_habit_checkins',
+      'kind': 'write',
+      'entityType': 'HABIT_LOG',
+      'description': '给多个习惯一次性打卡。habitIds 是习惯 id 列表。不写日期就是今天；不写数值就用每个习惯各自的目标。任一习惯不存在则整批不打卡（先整批预检）。已打过的那天不会多出记录。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'habitIds',
+          'type': 'array',
+          'required': true,
+        },
+        {
+          'name': 'date',
+          'type': 'string',
+          'required': false,
+        },
+        {
+          'name': 'value',
+          'type': 'number',
+          'required': false,
+        },
+      ],
+    },
+    {
       'name': 'log_focus',
       'kind': 'write',
       'entityType': 'FOCUS_SESSION',
@@ -1788,10 +1813,11 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] set_habit_icon（habitId*:string, icon:string）',
   '  · [写] set_habit_goal（habitId*:string, target:number, unit:string, goalType:string）',
   '  · [写] set_habit_frequency（habitId*:string, frequency:object）',
-  '- HABIT_LOG —— 读和写都有（读 1 / 写 2）',
+  '- HABIT_LOG —— 读和写都有（读 1 / 写 3）',
   '  · [读] list_checkins（habitId:string, limit:number）',
   '  · [写] record_checkin（habitId*:string, date:string, value:number）',
   '  · [写] undo_checkin（habitId*:string, date:string）',
+  '  · [写] record_habit_checkins（habitIds*:array, date:string, value:number）',
   '- FOCUS_SESSION —— 读和写都有（读 1 / 写 1）',
   '  · [读] list_focuses（limit:number）',
   '  · [写] log_focus（kind*:string, plannedMinutes*:number, actualMinutes:number, taskId:string, completed:boolean）',

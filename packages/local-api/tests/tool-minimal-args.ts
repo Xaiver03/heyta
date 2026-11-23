@@ -101,4 +101,7 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   // 批6-2：四象限 / 推迟今天
   set_task_quadrant: { taskId: 't1', quadrant: 1 },
   postpone_task_to_today: { taskId: 't1' },
+
+  // 批6-3：批量打卡
+  record_habit_checkins: { habitIds: ['h1'] },
 };

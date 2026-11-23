@@ -605,6 +605,15 @@ const CASES: readonly Case[] = [
     effect: () =>
       Object.values(engine.getState().tasks).filter((t) => t.dueDate !== undefined && t.dueDate >= startOfDay(CLOCK)).length,
   },
+
+  // ── 批6-3：批量打卡 ──
+  {
+    tool: 'record_habit_checkins',
+    intentAction: 'record-habit-checkins',
+    label: '批量打卡',
+    args: async () => ({ habitIds: [await seed({ action: 'create-habit', name: '批量打卡习惯' })] }),
+    effect: () => Object.values(engine.getState().habitLogs).filter((h) => h.deletedAt === undefined).length,
+  },
 ];
 
 beforeEach(async () => {

@@ -785,7 +785,10 @@ export type LocalApiWriteIntent =
   /** 把任务放进四象限某一格（TASK）。`quadrant` 1–4；内部翻译成 important + dueDate 写入（派生视图，非独立字段）。 */
   | { action: 'set-task-quadrant'; taskId: string; quadrant: number }
   /** 把任务推迟到今天（TASK）。改 dueDate 到今天同一时刻；已完成/已今天的不变。 */
-  | { action: 'postpone-task-to-today'; taskId: string };
+  | { action: 'postpone-task-to-today'; taskId: string }
+  // 批6-3：批量打卡（HABIT_LOG）
+  /** 给多个习惯一次性打卡（HABIT_LOG）。`habitIds` 空 ⇒ invalid；任一不存在 ⇒ 整批 not-found 不写。 */
+  | { action: 'record-habit-checkins'; habitIds: readonly string[]; date?: string; value?: number };
 
 /**
  * 一条写入落地的实体类型。

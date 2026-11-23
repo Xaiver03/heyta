@@ -2297,6 +2297,7 @@ export const en = {
   'web.ai.tools.intentClearHabitFrequency': 'Reset habit {id} frequency to daily',
   'web.ai.tools.intentSetTaskQuadrant': 'Move task {id} to quadrant {quadrant}',
   'web.ai.tools.intentPostponeTaskToday': 'Postpone task {id} to today',
+  'web.ai.tools.intentRecordHabitCheckins': 'Check in {count} habit(s)',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',

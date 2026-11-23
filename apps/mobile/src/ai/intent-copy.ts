@@ -262,5 +262,7 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate, locale: Lo
       return t('web.ai.tools.intentSetTaskQuadrant', { id: intent.taskId, quadrant: String(intent.quadrant) });
     case 'postpone-task-to-today':
       return t('web.ai.tools.intentPostponeTaskToday', { id: intent.taskId });
+    case 'record-habit-checkins':
+      return t('web.ai.tools.intentRecordHabitCheckins', { count: String(intent.habitIds.length) });
   }
 }

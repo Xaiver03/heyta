@@ -181,3 +181,24 @@ describe('postpone-task-to-today', () => {
     expect(r).toMatchObject({ ok: false, reason: 'not-found' });
   });
 });
+
+describe('record-habit-checkins', () => {
+  it('两个习惯批量打卡 → 两条打卡记录', async () => {
+    const h1 = await seed({ action: 'create-habit', name: 'H1' });
+    const h2 = await seed({ action: 'create-habit', name: 'H2' });
+    const r = await makeHost().submit({ action: 'record-habit-checkins', habitIds: [h1, h2], date: '2026-10-05' });
+    expect(r.ok).toBe(true);
+    const logs = Object.values(engine.getState().habitLogs).filter((l) => l.deletedAt === undefined);
+    expect(logs.length).toBe(2);
+  });
+  it('任一习惯不存在 ⇒ not-found，且一条都不写', async () => {
+    const h1 = await seed({ action: 'create-habit', name: 'H1' });
+    const r = await makeHost().submit({ action: 'record-habit-checkins', habitIds: [h1, 'ghost'], date: '2026-10-05' });
+    expect(r).toMatchObject({ ok: false, reason: 'not-found' });
+    expect(Object.values(engine.getState().habitLogs).filter((l) => l.deletedAt === undefined).length).toBe(0);
+  });
+  it('空 habitIds ⇒ invalid', async () => {
+    const r = await makeHost().submit({ action: 'record-habit-checkins', habitIds: [] });
+    expect(r).toMatchObject({ ok: false, reason: 'invalid' });
+  });
+});
