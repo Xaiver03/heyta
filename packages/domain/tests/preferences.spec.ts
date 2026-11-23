@@ -219,6 +219,23 @@ describe('偏好层：P4 粒度', () => {
     const without = repeat(30, (i) => task({ id: `b${i}`, note: '就一句话' }));
     expect(inferGranularity([...withList, ...without]).preference?.value).toBe(6);
   });
+
+  it('结构化 checklist 优先于 note 计数（方案 A：结构化=唯一事实源）', () => {
+    // note 里没有 - [ ]，但结构化有 5 项 → 计入 5（而非 0）
+    const withStructured = repeat(30, (i) =>
+      task({ id: `s${String(i)}`, note: '无清单', checklist: repeat(5, () => ({ done: false })) }),
+    );
+    expect(inferGranularity(withStructured).preference?.value).toBe(5);
+    // note 里有 9 项旧文本、但结构化只有 2 项 → 结构化优先 = 2
+    const structuredWins = repeat(30, (i) =>
+      task({
+        id: `w${String(i)}`,
+        note: '- [ ] 1\n- [ ] 2\n- [ ] 3\n- [ ] 4\n- [ ] 5\n- [ ] 6\n- [ ] 7\n- [ ] 8\n- [ ] 9',
+        checklist: [{ done: true }, { done: false }],
+      }),
+    );
+    expect(inferGranularity(structuredWins).preference?.value).toBe(2);
+  });
 });
 
 describe('偏好层：P5 表达习惯', () => {
