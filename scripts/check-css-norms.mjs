@@ -17,9 +17,27 @@
  *    这样"门禁变绿"有两种可能（真干净 / 判据失效）时，这一臂能分开它们。
  * 2. **汇总口径统一**：本仓门禁都打一句可复读的读数（扫描多少文件、几条），
  *    直接裸跑 stylelint 的输出形状随版本变化。
+ *
+ * ## 两批规则
+ *
+ * · **第一批**（六条，判据唯一、与格式无关）：重复选择器 / 重复声明 / 冗余简写 /
+ *   非法 hex / 零值带单位 / 空块。立项时 27 处重复选择器，已全部修掉。
+ * · **第二批**（正确性，加进来时实测存量全 0，只为防回潮）：`//` 注释、
+ *   longhand 被 shorthand 覆盖、重复 @import、font-family 重名、keyframes 里的
+ *   !important、未知单位/属性/@规则/媒体特性/伪类/函数。
+ * · **颜色 token 判据**由本脚本内置（`scanRawColors`），**不用**
+ *   `stylelint-declaration-strict-value`：那个插件 1.13.0 在 stylelint 18 上每条
+ *   声明都报 `Unknown rule declaration-strict-value`（API 不匹配，已卸载）。
+ *
+ * ## 扫描面与豁免
+ *
+ * 含：`apps/web/src`、`packages/design-system/src`、`apps/landing/src`。
+ * 豁免：`packages/design-system/generated`（生成物）、`tokens.css` 的
+ * `no-duplicate-selectors`/`length-zero-no-unit`（它是 token 产地）、
+ * `apps/landing/pitch`（一次性路演幻灯片，不属于产品 token 体系）。
  */
 
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,12 +56,82 @@ const RULES = {
   'block-no-empty': true,
 };
 
-const GLOBS = ['apps/web/src/**/*.css', 'packages/design-system/src/**/*.css'];
+const GLOBS = [
+  'apps/web/src/**/*.css',
+  'packages/design-system/src/**/*.css',
+  'apps/landing/src/**/*.css',
+  // ⚠️ 刻意**不含** `apps/landing/pitch/**`：它是**一次性的路演幻灯片**
+  // （`pitch/pitch.css`），配色属于幻灯片视觉稿、不属于产品 token 体系；
+  // 把它拉进来只会逼人给幻灯片硬套 token，或在 allow 里写一堆理由。
+];
 
 async function lintFiles(files, { config } = {}) {
   const options = { files, allowEmptyInput: true };
   if (config !== undefined) options.config = config;
   return stylelint.lint(options);
+}
+
+/**
+ * 「颜色必须走 token」—— 本脚本内置，**不用 stylelint-declaration-strict-value**。
+ *
+ * 为什么不用那个插件：`stylelint-declaration-strict-value@1.13.0` 的 peer 写着
+ * `>=16 <=18`，但在 stylelint 18 上实测每条声明都报 `Unknown rule
+ * declaration-strict-value`（插件 API 已经不匹配）。换成自己 20 行的判据更稳，
+ * 而且与 `check:design` 的 token 纪律同向：`check:design` 拦裸 hex/px，
+ * 这一条额外拦 `rgb()/hsl()` 以及 `background/box-shadow/border-color` 这类
+ * **不叫 color 但吃颜色**的属性。
+ *
+ * 判据：颜色类属性（color / background(-color) / border-*-color / fill / stroke /
+ * outline-color / box-shadow / text-shadow / caret-color / text-decoration-color /
+ * column-rule-color）的值，在**剥掉 `var(...)` 之后**，不得残留
+ * `#rgb` / `rgb(` / `rgba(` / `hsl(` / `hsla(`。
+ * 允许：CSS 全局关键字（transparent / currentColor / inherit / none / initial /
+ * unset / auto）与一切 `var(--ht-*)`。
+ */
+const COLOR_PROPS = new Set([
+  'color','background','background-color','fill','stroke','outline-color','box-shadow',
+  'text-shadow','caret-color','text-decoration-color','column-rule-color',
+  'border-color','border-top-color','border-right-color','border-bottom-color','border-left-color',
+  'border-inline-color','border-block-color','border-inline-start-color','border-inline-end-color',
+  'border-block-start-color','border-block-end-color',
+]);
+/** 任意位置的声明（不要求行首 —— 本仓大量 `.a { color: #fff; }` 单行规则）。 */
+const DECL_RE = /([-a-zA-Z]+)\s*:\s*([^;{}]+);/g;
+const RAW_COLOR_RE = /(#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\()/;
+
+function walkCss(dir, out = []) {
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    const st = statSync(full);
+    if (st.isDirectory()) {
+      if (name === 'node_modules' || name === 'dist' || name === 'build') continue;
+      walkCss(full, out);
+    } else if (name.endsWith('.css')) out.push(full);
+  }
+  return out;
+}
+
+/** 返回 [{file,line,text}]；`root` 参数是为自检夹具服务的。 */
+export function scanRawColors(root = ROOT) {
+  const files = [
+    ...walkCss(join(root, 'apps/web/src')),
+    ...walkCss(join(root, 'packages/design-system/src')),
+    ...walkCss(join(root, 'apps/landing/src')),
+  ].filter((f) => !f.includes('/generated/') && !f.endsWith('/tokens.css'));
+  const hits = [];
+  for (const f of files) {
+    const src = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of src.matchAll(DECL_RE)) {
+      const prop = m[1].toLowerCase();
+      if (!COLOR_PROPS.has(prop)) continue;
+      const bare = m[2].replace(/var\([^)]*\)/g, '');
+      if (!RAW_COLOR_RE.test(bare)) continue;
+      const line = src.slice(0, m.index).split('\n').length;
+      hits.push({ file: f, line, text: `${prop}: ${m[2].trim()}` });
+    }
+  }
+  return hits;
 }
 
 function summarize(results, errored) {
@@ -90,6 +178,40 @@ async function selfTest() {
     const r4 = await lintFiles([join(tmp, 'good/*.css')], { config });
     arm('干净文件 ⇒ 必须绿（否则判据过严）', r3.errored === true && r4.errored === false);
 
+    // 第二批规则：`//` 注释、longhand 被 shorthand 覆盖、重复 @import、keyframes 里的 !important
+    mkdirSync(join(tmp, 'bad-b2'), { recursive: true });
+    writeFileSync(
+      join(tmp, 'bad-b2/d.css'),
+      [
+        '.p { color: red; // 这行后面的声明会被吃掉',
+        '}',
+        '.q { border-inline-end: 0; border: 0; }',
+        '@keyframes k { from { opacity: 0 !important; } to { opacity: 1; } }',
+        '.r { padding: 0px; }',
+      ].join('\n'),
+    );
+    const r5 = await lintFiles([join(tmp, 'bad-b2/*.css')], {
+      config: {
+        rules: {
+          'no-invalid-double-slash-comments': true,
+          'declaration-block-no-shorthand-property-overrides': true,
+          'keyframe-declaration-no-important': true,
+        },
+      },
+    });
+    arm('第二批规则（// 注释 / shorthand 覆盖 / keyframes !important）⇒ 必须红', r5.errored === true);
+
+    // 颜色 token 判据：裸 rgba 必红、var(--ht-*) 必绿
+    mkdirSync(join(tmp, 'color-bad/apps/web/src'), { recursive: true });
+    writeFileSync(join(tmp, 'color-bad/apps/web/src/x.css'), '.m { background: rgba(0, 0, 0, 0.4); }\n');
+    mkdirSync(join(tmp, 'color-good/apps/web/src'), { recursive: true });
+    writeFileSync(
+      join(tmp, 'color-good/apps/web/src/x.css'),
+      '.n { background: var(--ht-color-overlay); color: transparent; }\n',
+    );
+    arm('颜色裸值 ⇒ 必须红', scanRawColors(join(tmp, 'color-bad')).length === 1);
+    arm('颜色走 token / 关键字 ⇒ 必须绿', scanRawColors(join(tmp, 'color-good')).length === 0);
+
     // 真实树：自检里也跑，读数是"当前仓库状态"，不是夹具状态。
     const real = await lintFiles(GLOBS);
     const { warnings } = summarize(real.results, true);
@@ -97,7 +219,7 @@ async function selfTest() {
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
-  console.log(`self-test：${String(5 - failed)}/5 臂通过。`);
+  console.log(`self-test：${String(8 - failed)}/8 臂通过。`);
   return failed === 0;
 }
 
@@ -108,8 +230,15 @@ async function main() {
   }
   const res = await lintFiles(GLOBS);
   const { warnings, files } = summarize(res.results, res.errored === true);
-  console.log(`CSS 规范（stylelint）：${String(files)} 个文件有违规，共 ${String(warnings)} 条。`);
-  if (res.errored) {
+  const colorHits = scanRawColors();
+  for (const h of colorHits) {
+    console.error(`  ${h.file.replace(ROOT + '/', '')}:${String(h.line)}  ${h.text}  (color 必须走 token)`);
+  }
+  console.log(
+    `CSS 规范（stylelint）：${String(files)} 个文件有违规，共 ${String(warnings)} 条；` +
+      `颜色 token 判据：${String(colorHits.length)} 条。`,
+  );
+  if (res.errored || colorHits.length > 0) {
     console.error('\n🔴 CSS 规范门禁未通过。修法见 `.stylelintrc.cjs` 文件头；');
     console.error('   ⚠️ 不许加 ignore/放宽规则来变绿 —— 那是把红色关掉，不是修问题。');
     process.exit(1);

@@ -1093,7 +1093,6 @@ input[type="radio"] {
 
 .ht-ai__chat-body {
   min-block-size: 0;
-  overflow-y: auto;
   padding-block: var(--ht-space-2);
   grid-row: 3;
   display: grid;

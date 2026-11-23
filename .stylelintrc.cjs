@@ -85,6 +85,28 @@ module.exports = {
     // 6. 空规则块（`{}`）—— 多半是删声明时留下的残骸。
     'block-no-empty': true,
 
+    /* ── 第二批：正确性规则（判据唯一、非格式、实测存量已归零）─────────────
+     * 这批的共同点：**今天存量全是 0**（2026-11-23 逐条量过），
+     * 加进来纯粹是防回潮 —— 零成本，且每条都对应一种真实事故：
+     *   · `//` 在 CSS 里不是注释，它会把该行后面的声明一起吃掉（且不报错）；
+     *   · 先写 longhand 再写 shorthand，前者会被静默覆盖（"改了没生效"）；
+     *   · 同一 @import 写两遍；
+     *   · `font-family: A, A`；
+     *   · keyframes 里的 `!important` 被规范忽略（写了等于没写，还误导人）；
+     *   · 未知单位 / 未知属性 / 未知 @规则 / 未知媒体特性 / 未知伪类 —— 拼错即静默失效。
+     */
+    'no-invalid-double-slash-comments': true,
+    'declaration-block-no-shorthand-property-overrides': true,
+    'no-duplicate-at-import-rules': true,
+    'font-family-no-duplicate-names': true,
+    'keyframe-declaration-no-important': true,
+    'unit-no-unknown': true,
+    'property-no-unknown': [true, { ignoreProperties: ['container', 'container-type', 'container-name'] }],
+    'at-rule-no-unknown': [true, { ignoreAtRules: ['container', 'layer', 'property'] }],
+    'media-feature-name-no-unknown': true,
+    'selector-pseudo-class-no-unknown': [true, { ignorePseudoClasses: ['global', 'local'] }],
+    'function-no-unknown': [true, { ignoreFunctions: ['theme', 'env', 'constant'] }],
+
     /* ── 明确关闭：理由见文件头 ───────────────────────────────── */
 
     'no-descending-specificity': null,

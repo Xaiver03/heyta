@@ -90,10 +90,11 @@
   -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
   box-shadow: var(--ht-shadow-md);
   /* 浮起时阴影从 sm 换到 lg（Nav.tsx 按滚动位置切 style）。
-     没有这条过渡，材质变化是**瞬变**的 —— 而 Nav.tsx 开头说这层阴影
-     是 Apple 的 scroll edge effect，用材料表达"内容从下面过去了"。
-     瞬变读不出这个意思。 */
+  没有这条过渡，材质变化是**瞬变**的 —— 而 Nav.tsx 开头说这层阴影
+  是 Apple 的 scroll edge effect，用材料表达"内容从下面过去了"。
+  瞬变读不出这个意思。 */
   transition: box-shadow var(--ht-duration-normal) var(--ht-ease-standard);
+  position: relative;
 }
 
 /* 亮色顶边 = 光打在材料上。没有它，半透明面会显得像"没画完"。
@@ -391,8 +392,8 @@
 }
 
 .lp-lede {
-  max-inline-size: 34ch;
-  font-size: var(--ht-font-size-lg);
+  max-inline-size: 40ch;
+  font-size: var(--ht-font-size-base);
   line-height: var(--ht-line-height-relaxed);
   color: var(--ht-color-foreground-muted);
 }
@@ -549,7 +550,7 @@
    不是一个新的设计尺度。加 token 的成本应该留给真正的语义。 */
 
 .lp-section {
-  padding-block: calc(var(--ht-space-16) * 1.75);
+  padding-block: calc(var(--ht-space-16) * 1.15);
 }
 
 .lp-section__head {
@@ -559,13 +560,13 @@
 
 .lp-section__lede {
   margin-block-start: var(--ht-space-4);
-  font-size: var(--ht-font-size-lg);
+  font-size: var(--ht-font-size-base);
   line-height: var(--ht-line-height-relaxed);
   color: var(--ht-color-foreground-muted);
 }
 
 .lp-h2 {
-  font-size: clamp(var(--ht-font-size-2xl), 2.6vw, var(--ht-font-size-4xl));
+  font-size: clamp(var(--ht-font-size-xl), 2.2vw, var(--ht-font-size-3xl));
   font-weight: var(--ht-font-weight-bold);
   line-height: var(--ht-line-height-tight);
   letter-spacing: var(--ht-tracking-title);
@@ -582,9 +583,9 @@
 
 .lp-note {
   /* 🔴 不是 flex。`RichText`（`site/PageSections.tsx:77`）把一条词条切成
-     `<strong>` / `<code>` / `<span>` **兄弟节点**，flex 会把它们各排一栏 ——
-     实测 `/platforms` 那条「未签名」说明被排成三列，第二列以「，需要右键打开」起头。
-     这个元素从来只摆一段文字：⚠️ 那个图标在**词条文本里**，不是子元素。 */
+  `<strong>` / `<code>` / `<span>` **兄弟节点**，flex 会把它们各排一栏 ——
+  实测 `/platforms` 那条「未签名」说明被排成三列，第二列以「，需要右键打开」起头。
+  这个元素从来只摆一段文字：⚠️ 那个图标在**词条文本里**，不是子元素。 */
   display: block;
   padding: var(--ht-space-4);
   border: var(--ht-border-width-thin) solid var(--ht-color-border);
@@ -593,6 +594,7 @@
   font-size: var(--ht-font-size-sm);
   line-height: var(--ht-line-height-normal);
   color: var(--ht-color-foreground-muted);
+  max-inline-size: var(--ht-layout-prose-max);
 }
 
 .lp-note code {
@@ -1310,23 +1312,6 @@
   }
 }
 
-/* ════════════════════════════════════════════════════════════
-   站点子页面（/features /platforms /pricing /help /changelog /signin）
-   ════════════════════════════════════════════════════════════
-   这些页面由 `src/site/PageSections.tsx` 的三个通用件画出来，
-   所以样式也只有这一份 —— N4（"不出现两个站点拼起来"）在 CSS 上
-   就体现为"没有第二套页面骨架"。 */
-
-/* 🔴 `position: relative` 是**修**出来的，不是加的。
-   `.lp-nav__bar::after` 是"光打在材料上"的那条顶边，它写着 `inset: 0` 与
-   `border-radius: inherit` —— 而在此之前导航条没有定位，于是那个伪元素
-   是相对 `.lp-nav`（fixed、满宽）定位的：`border-radius: inherit` 继承到 0，
-   顶边横贯整条导航容器而不是那颗胶囊。修法与它的注释一致。
-   顺带：折叠菜单的浮层也需要一个定位祖先。 */
-.lp-nav__bar {
-  position: relative;
-}
-
 .lp-nav__signin {
   /* 与语言切换/主题按钮并排，所以不能再像链接组里那样自带外边距 */
   white-space: nowrap;
@@ -1428,6 +1413,8 @@
 
 .lp-page__head .lp-h1 {
   margin-block-start: var(--ht-space-4);
+  /* 子页面页头（下载/功能/价格）比首页英雄小一档：这些是实用页，不需要海报字号。 */
+  font-size: clamp(var(--ht-font-size-2xl), 2.6vw, calc(var(--ht-font-size-3xl) + var(--ht-space-1)));
 }
 
 .lp-page__head .lp-lede {
@@ -1516,10 +1503,6 @@
   display: grid;
   gap: var(--ht-space-3);
   margin-block-start: calc(var(--ht-space-8) * 1.2);
-}
-
-.lp-note {
-  max-inline-size: var(--ht-layout-prose-max);
 }
 
 /* ── 问答 ─────────────────────────────────────────────── */
@@ -1838,9 +1821,6 @@
    不占用 --ht-layout-*（那是设计系统那条线的地界）。 */
 .lp-docs {
   --lp-docs-toc-w: 13.75rem;
-}
-
-.lp-docs {
   inline-size: 100%;
   max-inline-size: var(--ht-layout-content-max);
   margin-inline: auto;
@@ -2130,9 +2110,6 @@
   color: var(--ht-color-foreground-muted);
   text-decoration: none;
   transition: color var(--ht-duration-fast) var(--ht-ease-standard);
-}
-
-.lp-docs__toc-link {
   border-inline-start: var(--ht-border-width-thin) solid transparent;
   margin-inline-start: calc(-1 * var(--ht-space-4) - var(--ht-border-width-thin));
   padding-inline-start: var(--ht-space-4);
@@ -2594,6 +2571,11 @@ h3.lp-legal__h { font-size: var(--ht-font-size-base); }
   flex-direction: column;
   gap: var(--ht-space-3);
   padding-block: var(--ht-space-10);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-paper-50);
+  padding-inline: var(--ht-space-6);
+  margin-block: var(--ht-space-8);
 }
 
 .lp-signin .lp-page__cta {
@@ -2602,15 +2584,6 @@ h3.lp-legal__h { font-size: var(--ht-font-size-base); }
 
 .lp-signin > :first-child {
   margin-block-start: 0;
-}
-
-/* 三个出口托在一块**纸色**卡上，卡本身不投影 —— 靠一条线立住。 */
-.lp-signin {
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-xl);
-  background: var(--ht-paper-50);
-  padding-inline: var(--ht-space-6);
-  margin-block: var(--ht-space-8);
 }
 
 .lp-signin .lp-btn {

@@ -57,7 +57,6 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   min-block-size: 100%;
   padding: var(--ht-space-8) var(--ht-space-6);
   background: var(--ht-color-primary-subtle);
-  border-inline-end: 0;
   position: relative;
   isolation: isolate;
   overflow: hidden;

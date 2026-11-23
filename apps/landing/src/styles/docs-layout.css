@@ -34,12 +34,12 @@
 @media (max-width: 56.25rem) {
   .lp-docs-site .lp-docs > .lp-docs__nav { display: none; }
   .lp-docs-site .lp-docs__drawer .lp-docs__nav { display: grid; max-block-size: none; }
-  .lp-docs-site .lp-docs__body { max-inline-size: 100%; }
   .lp-docs-site #main { padding-block: var(--ht-space-5) var(--ht-space-8); }
   /* The fixed "文档目录" trigger sits over the lower-right edge of the page.
      Keep a real reading safe-area below the article so it never covers the last
      paragraph or link, including devices with a home-indicator inset. */
   .lp-docs-site .lp-docs__body {
+    max-inline-size: 100%;
     padding-block-end: calc(var(--ht-space-16) + var(--ht-space-8) + env(safe-area-inset-bottom));
   }
 }
