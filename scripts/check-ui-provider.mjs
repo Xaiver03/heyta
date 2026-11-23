@@ -406,6 +406,16 @@ const PROVIDER_DEPENDENT = [
    * ⚠️ 同目录 `sheet-detents.ts` 那批函数是纯的、不碰主题，**不登记**。
    */
   'BottomSheet',
+  /**
+   * 按钮原语（2026-11-23）：`Button` 透过 `useHeytaTokens` / `useHeytaText` /
+   * `useHeytaUiTheme`（按下缩放要读 `reducedMotion`）取 token。
+   *
+   * 🔴 它是**第一枚会被大量宿主直接 import 的原语**（web 侧 210 处手写
+   * `ht-btn` 就是它的迁移对象），所以这条登记要现在就补：等迁移铺开之后再补，
+   * 中间那批宿主会处在"用了共享件、但门禁不认识这个符号"的窗口里 ——
+   * 那正是 `SyncStatusBar` 漏网时的形状（拆掉 Provider 也不红）。
+   */
+  'Button',
 ];
 const PROVIDER_DEPENDENT_SET = new Set(PROVIDER_DEPENDENT);
 
