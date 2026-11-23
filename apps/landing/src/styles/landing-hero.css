@@ -1,0 +1,478 @@
+/* 自动拆分自 landing.css 的第 1–477 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/**
+ * 落地页样式
+ * ============
+ *
+ * 规则（与 `apps/web` 一致，`pnpm check:design` 同样扫这里）：
+ *   1. 取值一律 `var(--ht-*)`，不写裸 hex / px / ms / z-index / rgb()。
+ *      尺寸用 rem / em / % / vw / vh —— 它们随字号与视口缩放，不是设计尺度。
+ *   2. 语义名优先（`--ht-color-primary`），不直接用原始色阶（`--ht-blue-600`）。
+ *   3. 需要新变量时**先加 token**，不在组件里发明。
+ *
+ * ⚠️ 与 MASTER.md §2 的一处冲突（刻意说明，不静默绕过）：
+ *   §2 写「**不用**玻璃拟态、重投影、渐变装饰」，但 tokens.css §3d 后来又
+ *   加入了完整的 Apple 材质层（`--ht-material-chrome-tint` / `--ht-blur-chrome` /
+ *   `--ht-material-edge-highlight` / `--ht-material-scrim`）。
+ *   也就是说**设计系统已经长过了那条规则，而 MASTER.md 没有跟着更新**。
+ *
+ *   本文件的取舍：**只使用 tokens.css 里已登记的材质 token**，不自己发明模糊值
+ *   或半透明色。凡是用了材质的地方都注明它来自哪一组 token。
+ *   产品界面（apps/web）仍然是扁平的 —— 材质只用在落地页的**悬浮导航**这一处，
+ *   因为那是 Apple《Materials》里唯一明确该用材质的场景（悬浮功能层，内容从下方滚过）。
+ */
+
+/* ── 页面基线 ───────────────────────────────────────────── */
+
+.lp {
+  position: relative;
+  min-block-size: 100dvh;
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  /* 3D 场景与倾斜卡片会溢出容器，横滚必须挡住 */
+  overflow-x: clip;
+}
+
+/* 跳到主内容：键盘用户第一个 Tab 就能跳过导航 */
+.lp-skip {
+  position: absolute;
+  inset-block-start: var(--ht-space-2);
+  inset-inline-start: var(--ht-space-2);
+  z-index: var(--ht-z-tooltip);
+  padding: var(--ht-space-2) var(--ht-space-4);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+  font-size: var(--ht-font-size-sm);
+  transform: translateY(-200%);
+}
+
+.lp-skip:focus-visible {
+  transform: translateY(0);
+}
+
+/* 统一的内容栏。用**产品自己的**内容上限（1200px）而不是另开一个 ——
+   落地页与产品同宽，是刻意的：它让"这是同一个产品"这件事在版面上就成立。 */
+.lp-wrap {
+  inline-size: 100%;
+  max-inline-size: var(--ht-layout-content-max);
+  margin-inline: auto;
+  padding-inline: var(--ht-space-6);
+}
+
+/* ── 悬浮导航（材质层）────────────────────────────────────
+   依据 Apple《Materials》：导航是**悬浮的功能层**，内容从下方滚过，
+   而不是一条实心色带切走一块屏幕。
+   材质取值全部来自 tokens.css §3d，不在这里发明模糊值。 */
+
+.lp-nav {
+  position: fixed;
+  inset-block-start: var(--ht-space-4);
+  inset-inline: 0;
+  z-index: var(--ht-z-sticky);
+  display: flex;
+  justify-content: center;
+  padding-inline: var(--ht-space-4);
+}
+
+.lp-nav__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-6);
+  inline-size: 100%;
+  max-inline-size: var(--ht-layout-content-max);
+  /* 导航高度上限 80px 以内 */
+  block-size: var(--ht-layout-header-height);
+  padding-inline: var(--ht-space-4);
+  border-radius: var(--ht-radius-full);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-material-chrome-tint);
+  backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  box-shadow: var(--ht-shadow-md);
+  /* 浮起时阴影从 sm 换到 lg（Nav.tsx 按滚动位置切 style）。
+  没有这条过渡，材质变化是**瞬变**的 —— 而 Nav.tsx 开头说这层阴影
+  是 Apple 的 scroll edge effect，用材料表达"内容从下面过去了"。
+  瞬变读不出这个意思。 */
+  transition: box-shadow var(--ht-duration-normal) var(--ht-ease-standard);
+  position: relative;
+}
+
+/* 亮色顶边 = 光打在材料上。没有它，半透明面会显得像"没画完"。
+   暗色下这个 token 会自动变弱（tokens.css 里覆盖过）。 */
+.lp-nav__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-material-edge-highlight);
+  pointer-events: none;
+}
+
+/* 导航与页脚**共用**同一个类，而且两边都用 BrandMark（.lp-brand__mark）——
+   同一个品牌在一页里出现两种画法（字标 / 蓝点+文字）是没道理的区别，已经统一。
+   这里的文字排版规则留着不比配任何文字元素了，但**不要删**：
+   `aria-label` 之外的兜底文字、以及将来加回文字字标时都还要它。 */
+.lp-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-bold);
+  letter-spacing: var(--ht-tracking-title);
+  color: var(--ht-color-foreground);
+}
+
+.lp-brand:hover {
+  text-decoration: none;
+  color: var(--ht-color-foreground);
+}
+
+/* 字标的尺寸只由这里决定：给高度，宽度靠 viewBox 的固有比例推出来（不写死 width，
+   否则样式表和 SVG 两处会打架）。颜色走 currentColor —— 亮色 blue-600、暗色 blue-400，
+   随主题自动切换，所以静态 SVG 里那套烘死的渐变不能用在导航上。 */
+.lp-brand__mark {
+  display: block;
+  block-size: var(--ht-icon-lg);
+  inline-size: auto;
+  color: var(--ht-color-primary);
+  transition: color var(--ht-duration-normal) var(--ht-ease-standard);
+}
+
+.lp-brand:hover .lp-brand__mark {
+  color: var(--ht-color-primary-hover);
+}
+
+.lp-nav__links {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  margin-inline-end: auto;
+}
+
+.lp-nav__link {
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-nav__link:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+  text-decoration: none;
+}
+
+.lp-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+/* ── 按钮 ───────────────────────────────────────────────── */
+
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-5);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  /* 按下反馈在 pointer-down 上出现，100ms 是"看得见但感觉不到等待"
+     （Apple《Designing Fluid Interfaces》）。
+     基态（抬起）用 instant：松手要**脆**，按下才是刻意的 —— AUDIT §4
+     明确把「按下与抬起共用同一套时序」列为一条问题。 */
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    border-color var(--ht-duration-fast) var(--ht-ease-standard),
+    transform var(--ht-duration-instant) var(--ht-ease-standard);
+  /* CTA 文案在桌面端必须一行放得下 */
+  white-space: nowrap;
+}
+
+.lp-btn:active {
+  transform: scale(var(--ht-motion-press-scale));
+  /* 按下稍慢（100ms），抬起走基态的 80ms —— 两个方向故意不同速 */
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    border-color var(--ht-duration-fast) var(--ht-ease-standard),
+    transform var(--ht-duration-press) var(--ht-ease-standard);
+}
+
+.lp-btn--primary {
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.lp-btn--primary:hover {
+  background: var(--ht-color-primary-hover);
+  color: var(--ht-color-on-primary);
+  text-decoration: none;
+}
+
+.lp-btn--secondary {
+  background: transparent;
+  color: var(--ht-color-foreground);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-strong);
+}
+
+.lp-btn--secondary:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+  text-decoration: none;
+}
+
+.lp-btn--lg {
+  min-block-size: var(--ht-space-12);
+  padding-inline: var(--ht-space-8);
+  font-size: var(--ht-font-size-base);
+}
+
+/* 磁性按钮的外层触达区（组件见 components/Magnetic.tsx）。
+   padding 向四周扩出一圈透明光环、负 margin 原样抵回 ——
+   视觉布局不变，但指针在贴上按钮前就先进入监听范围，
+   "隔着一点距离被吸"才有起手余地。 */
+.lp-magnetic {
+  display: inline-flex;
+  padding: var(--ht-space-2);
+  margin: calc(var(--ht-space-2) * -1);
+}
+
+.lp-iconbtn {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border-radius: var(--ht-radius-full);
+  color: var(--ht-color-foreground-muted);
+  /* 按下反馈与 hover 同源（AUDIT §3：可按元素必须有按下反馈）。
+     基态 instant = 松手脆，:active 用 press = 按下刻意。 */
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    transform var(--ht-duration-instant) var(--ht-ease-standard);
+}
+
+.lp-iconbtn:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.lp-iconbtn:active {
+  transform: scale(var(--ht-motion-press-scale));
+}
+
+/* ── 语言切换器 ────────────────────────────────────────────
+   语言切换器：globe 触发钮 + 两项下拉（组件见 components/Nav.tsx）。
+   语言名用各自本名（中文 / English）——看不懂当前语言的人要找的就是这个入口，
+   本名是唯一保证读得懂的写法；当前语言打勾并 aria-current（W3C i18n 惯例）。
+   触发钮直接复用 .lp-iconbtn（同尺寸、同反馈时序），这里只管外层定位与菜单。 */
+.lp-lang {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* 菜单本体：贴着触发钮下缘、右对齐（导航右侧区的东西向左展开才不溢出）。
+   浮层四件套：surface 底、边框、真阴影（AGENTS §5：阴影只给真正的浮层）、
+   dropdown 层 z —— 不新造任何取值。 */
+.lp-lang__menu {
+  position: absolute;
+  inset-block-start: calc(100% + var(--ht-space-2));
+  inset-inline-end: 0;
+  z-index: var(--ht-z-dropdown);
+  display: grid;
+  gap: var(--ht-space-1);
+  min-inline-size: calc(var(--ht-space-12) * 2.2);
+  padding: var(--ht-space-2);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.lp-lang__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground);
+  /* 与 .lp-lang 旧链接同一理由：reset 的全局 hover 下划线对菜单项不合适。 */
+  text-decoration: none;
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-lang__item:hover {
+  background: var(--ht-color-hover);
+  text-decoration: none;
+}
+
+/* 当前语言：主色 + 加粗，勾是第二重信号（视觉 + 状态属性双通道）。 */
+.lp-lang__item[aria-current='true'] {
+  color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+/* ── 英雄区：非对称分栏 ───────────────────────────────────
+   taste skill：DESIGN_VARIANCE > 4 时避免居中英雄区。
+   左文右景的 5/7 分栏，右侧留给 3D 场景。 */
+
+.lp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: center;
+  gap: var(--ht-space-12);
+  inline-size: 100%;
+  max-inline-size: var(--ht-layout-content-max);
+  margin-inline: auto;
+  padding-inline: var(--ht-space-6);
+  /* 顶部：让开固定导航，但**不超过 pt-24 的精神**（内容不漂到视口中间） */
+  padding-block: calc(var(--ht-layout-header-height) + var(--ht-space-8)) var(--ht-space-12);
+  min-block-size: 100dvh;
+}
+
+.lp-hero__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ht-space-5);
+}
+
+/* 眉标（全页只出现 2 次，远低于 sectionCount/3 的上限） */
+.lp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-1) var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  letter-spacing: var(--ht-tracking-caption);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-h1 {
+  font-size: clamp(2rem, 4.4vw, 3.25rem);
+  font-weight: var(--ht-font-weight-bold);
+  line-height: 1.08;
+  /* 大字号收紧字距（Apple 规则：字距随字号变） */
+  letter-spacing: var(--ht-tracking-display);
+  text-wrap: balance;
+}
+
+.lp-h1 em {
+  font-style: italic;
+  color: var(--ht-color-primary);
+  /* 🔴 斜体带降部字母（y g j p q）时 leading-none 会切掉降部。
+     中文没有降部问题，但「你的」这类字在斜体下仍需要一点余量。 */
+  line-height: 1.1;
+  padding-block-end: 0.08em;
+}
+
+/* 遮罩式标题显现（maskedRevealVariants 的结构面，见 lib/motion.ts）。
+   外层裁剪、内层从槽底升起；内层必须是块级，transform 才会生效。
+   line-height 与 em 的降部余量都在内层自己的盒子里，静止位不新增裁剪。 */
+.lp-mask {
+  overflow: hidden;
+}
+
+.lp-mask__inner {
+  display: block;
+}
+
+.lp-lede {
+  max-inline-size: 40ch;
+  font-size: var(--ht-font-size-base);
+  line-height: var(--ht-line-height-relaxed);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-hero__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-3);
+}
+
+/* ── 英雄区的 3D 舞台 ───────────────────────────────────── */
+
+.lp-hero__stage {
+  position: relative;
+}
+
+.lp-hero__glow {
+  position: absolute;
+  inset: -12% -8%;
+  z-index: var(--ht-z-base);
+  background: radial-gradient(
+    ellipse at 60% 35%,
+    color-mix(in oklab, var(--ht-color-primary) 22%, transparent),
+    transparent 62%
+  );
+  filter: blur(var(--ht-blur-sheet));
+  pointer-events: none;
+}
+
+/* 入场通道（位移 + 缩放）。
+   必须保留 3D 上下文：perspective 在 .lp-hero__stage 上，而卡现在是它的**孙级**，
+   没有 preserve-3d 的话卡的旋转就拿不到那层透视，纵深会整体塌掉。 */
+.lp-hero__enter {
+  transform-style: preserve-3d;
+}
+
+.lp-hero__card {
+  position: relative;
+  z-index: var(--ht-z-base);
+}
+
+/* 浮在应用窗口之上的一层"状态浮片" —— 3D 纵深靠它读出来 */
+
+
+
+
+
+/* ── 事实条（"信任"区块，但用可核实的事实而不是假 logo）──────
+   taste skill 禁止在英雄区里塞信任条 —— 所以它是英雄区**下方**的独立区块。 */
+
+.lp-facts {
+  border-block: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.lp-facts__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ht-space-6);
+  padding-block: var(--ht-space-8);
+}
+
+.lp-fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.lp-fact__value {
+  font-size: var(--ht-font-size-2xl);
+  font-weight: var(--ht-font-weight-bold);
+  letter-spacing: var(--ht-tracking-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-fact__label {
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+  line-height: var(--ht-line-height-normal);
+}

@@ -1,0 +1,424 @@
+/* 自动拆分自 sheets.css 的第 118–540 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 面板内的「偏好行」（任务与显示 / 隐私 / AI 共用）──────────────
+ *
+ * 原来这些行只有 `justify-content: space-between`：一屏四行之间没有分隔，
+ * 读起来像四行散落的字；而「个人资料」那几行是有发丝线的 —— 同一套设置页里
+ * 两种行距。这里把**节奏**对齐（分隔与留白），布局仍是"标签左、控件右"。 */
+.ht-settings .ht-settings__preference-row {
+  align-items: center;
+  /* 行高 = 控件那一档（44 触控 / 52 行内），不再叠加 `--ht-space-3` 的上下留白。
+     2026-10-25 现量：改前行距中位数 **85px**（44 控件 + 16×2 留白 + 1 边框），
+     macOS 设置的区间是 **44–56** —— 所以留白降到 `--ht-space-1`，
+     行本身给一个 44 的下限，超出部分由控件自己决定。 */
+  min-block-size: var(--ht-touch-target-min);
+  padding-block: var(--ht-space-1);
+}
+
+.ht-settings__switch-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-block-size: var(--ht-touch-target-min);
+}
+
+.ht-settings .ht-settings__preference-row + .ht-settings__preference-row {
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-settings .ht-settings__preference-row:first-of-type { padding-block-start: 0; }
+.ht-settings .ht-settings__preference-row:last-of-type { padding-block-end: 0; }
+
+/* ── 面板内的子块（AI / 同步 …）：一条线隔开"这一屏其实有四件事" ────
+ *
+ * 「AI 与集成」一屏装着：AI 开关 / 本机 API / 自动收集规则 / 记忆。
+ * 它们各有自己的 h3，但 h3 之间没有任何视觉边界，于是整屏读成一大段。
+ * 只给**非首个** h3 加一条上边线 —— 第一个 h3 紧接面板标题，加线就多余了。 */
+.ht-settings > .ht-settings__h3:not(:first-child) {
+  margin-block-start: var(--ht-space-4);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* 同步设置那一列用的是 `<fieldset>` 而不是 h3，同一条纪律。 */
+.sync-settings__fieldset + .sync-settings__fieldset {
+  margin-block-start: var(--ht-space-4);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* ── 设置里的"次要动作"要看得出来是按钮（2026-10-24）───────────────
+ *
+ * `.ht-btn--ghost` 是"透明底 + muted 字"。它在工具条里没问题，但在设置页里
+ * 它常常是**这一块唯一的动作**（「刷新列表」「忘记密码?」「准备收件密钥」），
+ * 于是看图时那几枚读成了说明文字 —— 用户找不到"下一步该点哪"。
+ *
+ * 🔴 **只能用底色，不能用描边**：产品负责人 2026-10-07 的裁决是"无描边交互 ——
+ * 按钮/菜单靠文字与底色表达"，`styles/app/borderless-controls.css` 里那条
+ * `border-color: transparent !important` 就是它，本文件**不跟它对抗**（拿 !important
+ * 去压 !important 只会把那条裁决静默改成"有时有描边"）。所以这里给的是凹陷底：
+ * 次要权重仍然是次要的（不是主色实底），但它长得像个能点的东西了。
+ * ⚠️ 行内动作（`…__inline-action`，例如头像那格的「去解锁」）不在此列 ——
+ * 它跟着一句话走，加底色会把句子切碎。 */
+.ht-settings .ht-btn--ghost:not(.ht-settings__inline-action) {
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-settings .ht-btn--ghost:not(.ht-settings__inline-action):hover {
+  background: var(--ht-color-hover);
+}
+
+/* ── 面板内的"子块卡片"之间也要有边界（AI 与集成那一屏）────────────
+ *
+ * AI 面板把四件事分别装进 `.ht-settings__section`（本机 API / 自动收集规则 / …）。
+ * 这些 section 与面板本身**同色**，于是"四块"在图上读成"一整块"，
+ * 而它们各自还有自己的 padding ⇒ 看起来只是行距突然变大。
+ * 一条发丝线把"这是另一件事"说出来。（`ProfilePanel` 用的是行式布局，不涉及这条。） */
+.ht-settings__section + .ht-settings__section,
+.ht-settings__subsection {
+  margin-block-start: var(--ht-space-4);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* 子块的第一块（紧接面板标题/第一行）不加线：那一条会与其上方的间距打架。 */
+.ht-settings__subsection:first-of-type {
+  margin-block-start: 0;
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+
+.ht-settings__layout {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--ht-space-6);
+}
+
+.ht-settings__content {
+  min-inline-size: 0;
+  /* 🔴 设置**不是散文**。`--ht-layout-prose-max` 是给正文阅读用的行宽（≈65ch），
+     套在设置上就是"右侧空掉 45%"的直接原因 —— 那一屏的判据是
+     "控件右缘必须对齐，且不许在面板右侧留超过 48px 的死区"，不是"一行读几个字"。 */
+  max-inline-size: none;
+}
+
+.ht-settings__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  min-inline-size: 0;
+  margin-block-end: var(--ht-space-8);
+  scroll-margin-block-start: var(--ht-space-4);
+}
+
+/* 设置页的节标题只有一处：左侧导航（`aria-current="page"`）。
+   内容面曾经在这里再写一遍同一个词，两行同名字并排读起来像两个层级。 */
+
+/* 行式面板：间距交给行自己（行内有 `padding-block`），面板只留内边距与背景。 */
+.ht-settings--rows {
+  gap: 0;
+}
+
+/* 换邮箱那一块与上面三行之间画一条线：它们是两件事，而白卡片上的空白
+   不是分隔（2026-10-24 实拍：两块白底贴在一起，读起来像同一段）。 */
+.ht-settings__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* ── 一行一件事（个人资料，2026-10-24）───────────────────────
+ *
+ * 产品负责人实拍「排版混乱」之后重排的形状：**左列标签、右列控件**，
+ * 行与行之间只隔一条发丝线。原来每一块都是自己一列纵向堆叠，标签、控件、
+ * 按钮各起一行，于是三行的面板看起来像七行，且每块的左边界都不一样。
+ *
+ * ⚠️ 缩窄到单列时（< 40rem）标签在上、控件在下 —— 不靠 media query 改结构，
+ * 只改网格列数，组件不用知道自己有多宽。 */
+.ht-settings__row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 8rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--ht-space-2) var(--ht-space-4);
+  padding-block: var(--ht-space-3);
+}
+
+.ht-settings__row + .ht-settings__row {
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* 行壳里装的是**共享字段解剖**（`FormField layout="inline"`）时的那一档。
+ *
+ * 🔴 这一格自己**不再**分两列：两列是字段解剖的事（标签列 + 控件列），
+ *   已经由那一层给出。这里只留行的节奏 —— 上下内边距与行间发丝线。
+ *   写成两列会变成"标签列套两层网格"，左右边界对不齐正是 2026-10-24 实拍要治的形状。
+ * ⚠️ 这条选择器**不许**提到 `.ht-input-field*` —— 那会被 `check:form-anatomy` 的 R2
+ *   判成"解剖的第二个定义处"（它的正则吃的是**选择器里的出现**，不只是声明块）。
+ *   所以这一档由调用方显式挂 `--field` 这个修饰类，而不是由 sheets.css 去认隔壁的类名。
+ */
+.ht-settings__row--field {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ht-settings__row:first-child { padding-block-start: 0; }
+.ht-settings__row:last-child { padding-block-end: 0; }
+
+.ht-settings__row-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-touch-target-min);
+}
+
+.ht-settings__row-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+  /* 控件那几行自己要有最小高度，否则单列下标签与控件会挤在一起。 */
+  padding-block-start: var(--ht-space-1);
+}
+
+.ht-settings__avatar-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ht-space-3);
+}
+
+/* 一句可执行的话 + 一个行内动作（「去解锁」）。
+   它不换行成一坨：句子与按钮同一行，窄屏才折行。 */
+.ht-settings__action-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+}
+
+/* 「去解锁」是一句话的行内动作，不是一块按钮：命中区仍是触控目标，
+   视觉上只占一个词的位置（`.ht-btn--ghost` 的内边距在这里太胖）。 */
+.ht-settings__inline-action {
+  padding-inline: var(--ht-space-2);
+  color: var(--ht-color-primary);
+}
+
+.ht-settings__value {
+  margin: 0;
+  color: var(--ht-color-foreground);
+  overflow-wrap: anywhere;
+}
+
+/* 设置行的解剖换档：`inline`（标签在左）→ `stacked`（标签在上）。
+ *
+ * 🔴 这是 `docs/agents/ux-principles.md` §1 的两档之一换位，不是"卡片窄了就缩一下"：
+ * 标签那一列 `--ht-layout-form-label-width`（6rem）加上值那一列，在紧凑档里读起来
+ * 是"两个窄条并排"，标签与值会各自折行。档位取**同一把尺**的紧凑上沿（48rem = 768px），
+ * 与导航变底栏、设置双栏变单栏是**同一个**窗口宽度 —— 不是另立一个 640。
+ *
+ * ⚠️ 这一档原来写的是 `40rem`（640px）：于是 641–768 的窗口得到"底栏导航 + 双栏设置行"
+ * —— 导航已经承认自己在移动版式，而行解剖还按桌面排。尺见
+ * `docs/agents/design-system.md` §响应式断点。 */
+@media (max-width: 48rem) {
+  .ht-settings__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ht-settings__row-label {
+    min-block-size: 0;
+  }
+
+  .ht-settings__row-body {
+    padding-block-start: 0;
+  }
+}
+
+/* ── 设置里的 `<fieldset>`（2026-10-24）───────────────────────
+ *
+ * 🔴 浏览器给 `fieldset` 的默认值是 `2px groove` 边框 + 内边距 + `min-inline-size:
+ * min-content`。设计系统的 reset（`controls.css`）只覆盖了 button/input/select，
+ * 没有 fieldset —— 于是「账号与安全 → 托管同步续费 → 买哪一档」那一组单选框
+ * 外面凭空长出一圈**黑框**，图例还把上边框切了一道口子（产品负责人实拍：
+ * 「为什么这个是黑色的框？」）。
+ *
+ * 三件都归零：边框、内边距、外边距。`min-inline-size` 一并放开 ——
+ * 它默认按内容撑宽，窄容器里会把卡片顶出可视区。 */
+.ht-settings__field {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.ht-settings__field > legend {
+  padding: 0;
+}
+
+/* ── 设置卡片里的输入框要看得出来是个框 ───────────────────────
+ *
+ * `.ht-input` 的背景是 `--ht-color-surface`，而设置卡片**也是** `surface`
+ * （`sheets.css` 里 `.ht-settings__content > … > .ht-settings`）—— 两者同色，
+ * 输入框只剩几行灰字，看图根本认不出那里能输入（昵称那一格就是这么丢的）。
+ * 卡片内改用凹陷面（页面底色）表达"这是一个可编辑的格子"。 */
+.ht-settings .ht-input {
+  background: var(--ht-color-background);
+}
+
+/* ── 「?」说明（SettingsInfoTip）───────────────────────────────
+ *
+ * 触发件按触控目标尺寸给命中区，视觉上仍是一枚小图标（图标本身 `icon-sm`）。
+ * 气泡是**浮层**：`z` 用 popover 那一档、阴影用 `shadow-md` —— 与
+ * `overlay-feedback.md` 的层次约定一致（tooltip 不进关闭策略表，见该组件头）。 */
+.ht-settings__tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ht-settings__tip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--ht-touch-target-min);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ht-radius-full);
+  background: transparent;
+  color: var(--ht-color-foreground-subtle);
+  cursor: pointer;
+}
+
+.ht-settings__tip-trigger:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-settings__tip-bubble {
+  position: absolute;
+  inset-block-start: calc(100% + var(--ht-space-1));
+  inset-inline-start: 0;
+  z-index: var(--ht-z-popover);
+  display: block;
+  /* 20rem ≈ 320px：正文那一段最多 3 行，再宽就从"提示"变成"段落"。 */
+  max-inline-size: 20rem;
+  inline-size: max-content;
+  padding: var(--ht-space-3);
+  /* 发丝线不是装饰：气泡落在**白卡片**上，没有阴影很难看出它是一层浮起来的
+     东西（实拍里它读起来像卡片上的一段引用）。 */
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-md);
+  color: var(--ht-color-foreground-muted);
+  line-height: var(--ht-line-height-normal);
+  text-align: start;
+}
+
+.ht-settings__tip-bubble[data-hidden='true'] {
+  display: none;
+}
+
+@media (max-width: 64rem) {
+  .ht-settings__layout {
+    display: block;
+  }
+
+  .ht-settings__nav {
+    flex-direction: row;
+    overflow-x: auto;
+    margin-inline: calc(var(--ht-space-6) * -1);
+    padding-inline: var(--ht-space-6);
+    border-block-end: 0;
+    /*
+      淡出停靠位用 **em** 而不是裸 px，也不是新造 token：它是"这一条横向导航自己的字号"
+      的一个比例（渲染几何），不是一条会被设计师调的尺度 —— 为一处单用途的渐变停靠位
+      造一枚 `--ht-*`，得到的只是一个换不出语义的别名（`check:design` 也认相对单位这一条：
+      相对单位随上下文变化，不属于设计尺度）。
+    */
+    mask-image: linear-gradient(to right, transparent 0%, black 0.5em, black calc(100% - 0.5em), transparent 100%);
+  }
+
+  .ht-settings__nav-link {
+    flex: 0 0 auto;
+
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 48rem) {
+  .ht-sheet {
+    padding: var(--ht-space-4);
+  }
+
+  .ht-settings__nav {
+    margin-inline: calc(var(--ht-space-4) * -1);
+    padding-inline: var(--ht-space-4);
+  }
+}
+
+/* 设置浮层的退出口（2026-09-30 补）。
+   🔴 在这个按钮之前，设置浮层**没有任何出口**：没 Esc、没 ✕、点空白也不关
+   （它盖满内容区，点哪儿都是它自己）—— 唯一的出路是去点 rail 上的别的视图。
+   定位用 `sticky`：它贴在**滚动容器的可视区**，既不随内容滚走（`.ht-sheet`
+   自己有 `overflow-y: auto`），也不会像 `fixed` 那样在窄壳里停在半空。
+   ⚠️ 只钉 top，不写死尺寸；直径复用触控目标 token。 */
+.ht-sheet__close {
+  position: sticky;
+  top: 0;
+  /* 靠右：块级流里 `margin-inline-start: auto` 不生效，所以它自己是一条
+     flex 行（`display: flex` 把它撑成整行宽度，图标居中）。 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ht-touch-target-min);
+  height: var(--ht-touch-target-min);
+  margin-inline-start: auto;
+  /* 只吃掉一行里多出来的空白，不再额外占垂直节奏（面板自己的 padding 在管）。 */
+  margin-block-end: calc(var(--ht-space-2) * -1);
+  padding: 0;
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-sheet__close:hover {
+  color: var(--ht-color-foreground);
+  background: var(--ht-color-hover);
+}
+
+@keyframes ht-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--ht-space-2));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ht-sheet-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--ht-space-2));
+  }
+}
+
+.ht-sheet--exiting {
+  animation: ht-sheet-out var(--ht-duration-exit) var(--ht-ease-exit) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-sheet {
+    animation: none;
+  }
+}

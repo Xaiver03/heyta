@@ -1,0 +1,255 @@
+/* 自动拆分自 sheets.css 的第 735–988 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 续费档位：一行一档（2026-10-24）─────────────────────────
+ *
+ * 原来两档挤在一个带默认黑框的 `<fieldset>` 里，档位说明是 `<p>`（无效嵌套，
+ * 会把 `label` 提前闭合 ⇒ 点说明文字选不中那一档），而主按钮又贴在促销码右边。
+ * 现在：凹陷的容器包住两行、选中的那一档整行染色、提交按钮独占一行。
+ *
+ * ⚠️ 选择器按 `data-testid` 收窄，不动共享的 `.ht-settings__option` ——
+ * 那个类还管着"任务与显示"里的两档分段控件，那边的形状已经定过了。 */
+.ht-settings [data-testid='renew-tier'] {
+  gap: var(--ht-space-2);
+}
+
+[data-testid='renew-tier'] .ht-settings__options {
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+}
+
+[data-testid='renew-tier'] .ht-settings__option {
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-radius: var(--ht-radius-sm);
+}
+
+[data-testid='renew-tier'] .ht-settings__option-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+/* 同一选择语言覆盖单选和功能开关：整个选项表达当前值。 */
+.ht-settings__option {
+  min-block-size: var(--ht-touch-target-min);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+}
+.ht-settings__option:has(input:checked),
+.ht-settings__card:has(input:checked) {
+  background: var(--ht-color-primary-subtle);
+  border-color: var(--ht-color-primary);
+}
+.ht-settings__option:has(input:focus-visible),
+.ht-settings__card:has(input:focus-visible) {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+/* The app header already names Settings. Keep dismiss available without a second title row. */
+.ht-settings__header--compact {
+  position: absolute;
+  inset-block-start: var(--ht-space-4);
+  inset-inline-end: var(--ht-space-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  z-index: var(--ht-z-popover);
+}
+.ht-settings__header--compact .ht-sheet__close { border-color: transparent; border-radius: var(--ht-radius-md); }
+.ht-settings__header--compact + .ht-settings__layout { padding-inline-end: var(--ht-touch-target-min); }
+@media (max-width: 64rem) {
+  .ht-settings__header--compact + .ht-settings__layout { padding-inline-end: 0; }
+  .ht-settings__header--compact + .ht-settings__layout .ht-settings__nav {
+    margin-inline-end: var(--ht-touch-target-min);
+    /* The dismiss control occupies the trailing 44px. Keep a full safe zone
+       inside the scrollport so the last category can be brought clear of it. */
+    padding-inline-end: calc(var(--ht-space-6) + var(--ht-touch-target-min));
+    scroll-padding-inline-end: calc(var(--ht-space-6) + var(--ht-touch-target-min));
+  }
+}
+
+/* ── 订阅页（2026-10-24 独立成节）────────────────────────────────
+ *
+ * 三段：① 状态 ② 选一档 ③ 关于收费。三段的版式**故意不同**，
+ * 因为它们是三种不同的东西：状态是读数、方案是选择、脚注是说明。
+ * 全用同一种卡片就会读成"三张差不多的卡"。 */
+
+/* ① 状态：一行读数 + 一枚刷新。状态点用颜色，但同时有文字 ——
+   不靠颜色单独传达信息（WCAG）。 */
+.ht-settings__sub-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  flex-wrap: wrap;
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-background);
+}
+
+.ht-settings__sub-status-main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+  min-inline-size: 0;
+}
+
+.ht-settings__sub-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+.ht-settings__sub-status-title {
+  margin: 0;
+  color: var(--ht-color-foreground);
+}
+
+.ht-settings__sub-dot {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  margin-block-start: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-foreground-subtle);
+  flex: none;
+}
+
+.ht-settings__sub-status--ok .ht-settings__sub-dot { background: var(--ht-color-success); }
+.ht-settings__sub-status--warn .ht-settings__sub-dot { background: var(--ht-color-warning-strong); }
+.ht-settings__sub-status--unknown .ht-settings__sub-dot { background: var(--ht-color-border-strong); }
+
+.ht-settings__sub-refresh {
+  flex: none;
+  gap: var(--ht-space-1);
+}
+
+/* ② 方案卡：**两列**，选中那一列整卡染色 + 主色描边。
+   ⚠️ 不用阴影表达选中（本仓的层次约定是"浮层才用阴影"）。 */
+.ht-settings__sub-block-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__sub-plans {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.ht-settings__sub-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  cursor: pointer;
+}
+
+.ht-settings__sub-plan:hover {
+  border-color: var(--ht-color-border-strong);
+}
+
+.ht-settings__sub-plan[data-checked='true'] {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+}
+
+.ht-settings__sub-plan-top {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+}
+
+.ht-settings__sub-plan-name {
+  font-weight: var(--ht-font-weight-semibold);
+  color: var(--ht-color-foreground);
+}
+
+/* 标价靠右：两档并排时价格对齐成一列，扫一眼就能比。 */
+.ht-settings__sub-plan-price {
+  margin-inline-start: auto;
+  color: var(--ht-color-foreground);
+  white-space: nowrap;
+}
+
+.ht-settings__sub-plan-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin: 0;
+  padding-inline-start: var(--ht-space-4);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-settings__sub-coupon {
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  padding: var(--ht-space-2) var(--ht-space-3);
+}
+
+.ht-settings__sub-coupon > summary {
+  cursor: pointer;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-settings__sub-coupon[open] > summary {
+  margin-block-end: var(--ht-space-2);
+}
+
+.ht-settings__sub-cta {
+  justify-content: flex-start;
+}
+
+/* ③ 订单结果卡：与方案卡同一个圆角档位，但用描边 + 淡底表示"这是结果，不是选项"。 */
+.ht-settings__sub-order {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-settings__sub-order-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1) var(--ht-space-4);
+  margin: 0;
+}
+
+.ht-settings__sub-order-summary p {
+  margin: 0;
+  color: var(--ht-color-foreground);
+}
+
+/* ③ 关于收费：不是卡片，是一段带小标题的说明 —— 它不含任何可点的东西（除了价格页链接），
+   做成卡片会让人以为那里还有选项。 */
+.ht-settings__sub-about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+@media (max-width: 48rem) {
+  .ht-settings__sub-plans {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

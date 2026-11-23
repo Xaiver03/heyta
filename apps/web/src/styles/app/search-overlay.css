@@ -1,0 +1,195 @@
+/* 自动拆分自 sheets.css 的第 541–734 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 搜索浮层（贴顶卡片 + scrim）──────────────────────────
+ *
+ * 🔴 同样是 IA，不是外观（滴答 §11.5：搜索是"主列③浮层，
+ * 透出下层视图"）。与 `.ht-sheet` 的差别只在形状：
+ * 设置 = 右侧整面，搜索 = **卡片**，四周留空隙让下层看得见。
+ *
+ * 🔴 2026-10-01：卡片**贴顶**，不悬在正中央 —— 产品负责人给的是 macOS
+ * 聚焦搜索（Spotlight）那张图。借的是**形态**（输入行在最上、结果在下面、
+ * 靠近屏幕上方），不是内容。居中悬着读起来像"对话框"，贴顶读起来才像"输入法"：
+ * 前者等待一个回答，后者等待你继续打字。
+ *
+ * ⚠️ 顶部留白用 `--ht-space-16` × 2（不新增 token、不写裸值）。
+ *
+ * ⚠️ scrim 用的是设计系统已有的 `--ht-material-scrim`
+ * （不是 sheet 那种"背景色 88%"）—— 卡片周围要露出**更多**下层，
+ * 灰度必须更浅，下层才读得出来。z 轴用 `--ht-z-overlay`：
+ * 它本来就是"浮层"这一层。
+ *
+ * 🔴 **`fixed` 而不是 `absolute`（2026-10-01 实测）**：这一层挂在内容列里，
+ * 而内容列**和列表一样高**（真浏览器量到 2365px），滚动宿主是 window。
+ * 写成 `absolute` 时 `inset: 0` 撑的是那根 2365px 的柱子 ⇒ 卡片钉在**文档顶部**，
+ * 屏幕滚下去一点再按 ⌘K，卡片在视口上方看不见，而输入框的 `autoFocus`
+ * 让浏览器把整页滚回 0 —— 症状是"一开搜索，列表跳回顶部"（探针量到
+ * 打开前 scrollY=1465、打开后 scrollY=0）。`fixed` 让它钉在**看见的那一屏**，
+ * 跳页与" scrim 只盖住半屏"一起消失。
+ * ⚠️ 这条依赖"祖先没有 transform / filter / backdrop-filter / contain:paint"，
+ * 否则 `fixed` 的包含块会退化成那个祖先 —— 判据钉在 `search-overlay.spec.ts`，
+ * 它会在退化时直接红（不是靠人看图发现）。
+ */
+.ht-search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ht-z-overlay);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: calc(var(--ht-space-16) * 2) var(--ht-space-4) var(--ht-space-4);
+  background: var(--ht-material-scrim);
+  animation: ht-sheet-in var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+/*
+ * 卡片的形：**宽钉在 modal-max，高与宽成比例（16:9）**。
+ * 2026-10-01 产品负责人："组织的组件的宽和高都是成比例的，反正更合适屏幕的尺寸，
+ * 不仅仅是一条" —— 之前它的高度由内容决定，空态就只剩一条输入行的薄片。
+ *
+ * 🔴 定形（而不是随内容伸缩）还带来一条副产品：**打字前后卡片不跳**，
+ * 光标行也不必在结果出现时跟着位移。`max-block-size: 100%` 是矮窗口的让位阀：
+ * 可用高度不足时比例失效，卡片贴满内容区而不溢出（`aspect-ratio` 的固有尺寸
+ * 会被 `max-block-size` 夹住，这正是想要的优先级）。
+ *
+ * ⚠️ 量的是**卡片**（overlay 的子元素），不是 scrim 本身：scrim 是 `inset: 0`
+ * 撑满内容区的，量它永远"超宽"（这个判据第一版就栽在选错元素上）。
+ */
+.ht-search-overlay > * {
+  inline-size: min(100%, var(--ht-layout-modal-max));
+  aspect-ratio: 16 / 9;
+  max-block-size: 100%;
+  /* 入场时长接**弹簧参数**（P1-3）：`--ht-motion-spring-response-sheet`
+     （0.3s，"抽屉 / 底部面板"的响应档）。🔴 damping = 1.0（临界阻尼，
+     tokens.css §3c 默认）意味着**不过冲** —— `--ht-ease-enter`（ease-out）
+     正是临界阻尼弹簧在 CSS 里的正确形状；`--ht-ease-spring` 的过冲只属于
+     带速度的手势，卡片淡入用它反而错。RN 端将来上 reanimated 时直接
+     消费同一对参数（motion.* 组）。 */
+  animation: ht-material-in calc(var(--ht-motion-spring-response-sheet) * 1s)
+    var(--ht-ease-enter);
+}
+
+/* 结果区吃掉卡片的剩余高度。共享层给的 `max-height: layout.panel-max-height`
+   是**上限**，不是高度：卡片定形之后若不让结果区 flex 增长，底部那排键位提示
+   就会浮在一片空白中间。 */
+.ht-search-overlay [data-testid='search-panel-results'] {
+  flex: 1 1 auto;
+  min-block-size: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-search-overlay,
+  .ht-search-overlay > * {
+    animation: none;
+  }
+}
+
+/* G-27 补签面板（`features/legal-recheck/LegalReconfirmSheet.tsx`）。
+   🔴 这块走 CSS 类而不是 `style={{…}}`：`check:l4` 的判据是"内联样式只减不增"，
+   而它明写"不许为了变绿把基线调高"。取值仍逐条来自 token（`var(--ht-*)`）。
+   ⚠️ 但**排版不在这里**：字号+字重成对自拼会被 `check:design` 判成"档位表外的第二套
+   排版"（豁免表只许删不许加），所以四件套由 JSX 成对挂 `.ht-type-*` 提供。
+   🔴 命名挂在既有的 `.ht-sheet` 族下（`.ht-sheet__reconfirm-*`）而不是自开一个
+   `.ht-reconfirm` 族：`check:row-single-source` 断言 B 钉的是"顶层 `ht-*` 前缀族
+   只减不增"（基线 28），新开一族就是 29。这块本来就是这个族的一员 —— 置顶、遮罩、
+   `role="dialog"` 的浮层，与设置浮层同一族；它**不**带裸 `.ht-sheet` 类，
+   所以不会继承那条规则的样式，只共用命名空间。 */
+.ht-sheet__reconfirm {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ht-space-4);
+  background: var(--ht-color-overlay);
+  z-index: var(--ht-z-modal);
+}
+
+.ht-sheet__reconfirm-dialog {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  width: 100%;
+  max-width: var(--ht-layout-modal-max);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--ht-space-6);
+  /* 弹窗圆角 24px（DSH Modal）。比卡片(12)明显更圆 —— 它在层级上就是更高一层的东西。 */
+  border-radius: var(--ht-radius-dialog);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-lg);
+  color: var(--ht-color-foreground);
+}
+
+.ht-sheet__reconfirm-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+}
+
+.ht-sheet__reconfirm-icon {
+  display: flex;
+  padding-top: var(--ht-space-1);
+  color: var(--ht-color-primary);
+}
+
+/* 标题区必须能收缩：不写 `min-inline-size: 0` 时，一行长英文会把整块顶出弹窗。 */
+.ht-sheet__reconfirm-titles {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* 🔴 下面三处排版**不在这里写**：字号+字重成对自拼会被 `check:design` 判成
+   "档位表外的第二套排版"，而这三个组合恰好就是语义档位的取值
+   （section-title / row-title / row-meta）—— 所以由 JSX 成对挂 `.ht-type-*`，
+   这里只留间距与颜色。取值与改前逐字相同，视觉没有变化。 */
+.ht-sheet__reconfirm-title {
+  margin: 0;
+}
+
+.ht-sheet__reconfirm-reason,
+.ht-sheet__reconfirm-note,
+.ht-sheet__reconfirm-failure,
+.ht-sheet__reconfirm-links {
+  margin: 0;
+}
+
+.ht-sheet__reconfirm-reason {
+  margin-block-start: var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-sheet__reconfirm-intro {
+  margin: 0;
+}
+
+.ht-sheet__reconfirm-note,
+.ht-sheet__reconfirm-failure {
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-sheet__reconfirm-failure {
+  color: var(--ht-color-warning-strong);
+}
+
+.ht-sheet__reconfirm-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-sheet__reconfirm-links-label {
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-sheet__reconfirm-link {
+  color: var(--ht-color-primary);
+}
+
+.ht-sheet__reconfirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-3);
+}

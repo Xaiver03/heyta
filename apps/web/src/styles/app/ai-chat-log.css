@@ -1,0 +1,235 @@
+/* 自动拆分自 ai-panels.css 的第 725–958 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 对话记录（助手面板把上面那个列表改成"气泡列"）────────────────
+ *
+ * 🔴 这两组修饰类是**功能**，不是装饰。第一版直接套 `.ht-ai__items`
+ * （那是工具结果列表：整行左对齐、带项目符号），于是"我说的话"和
+ * "助手说的话"在界面上长得一模一样 —— 真浏览器截图里唯一的区别是助手
+ * 那行下面多了一句"用了 N 步工具"。**读不出"谁说的"的对话不是对话，
+ * 是一列输出。**
+ *
+ * 形状走聊天界面的通用约定：用户贴右 + 主色浅底，助手贴左 + 中性面描边。
+ * ⚠️ 角色由**对齐 + 底色 + 边框**三样同时承载，不单靠颜色 ——
+ * 暗色主题下 `--ht-color-primary-subtle` 是半透明蓝，浓度会掉。
+ * ⚠️ 宽度不写百分比：`align-self` 让气泡收到内容宽，
+ * 而一个写死的 `70%` 是裸值（§5 第一条）。
+ */
+.ht-ai__items--chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding-left: 0;
+  list-style: none;
+}
+
+.ht-ai__conversation {
+  min-block-size: 0;
+  min-inline-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ht-ai__items--chat > .ht-ai__item {
+  flex-shrink: 0;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* ⚠️ 两种角色各写**一整块**，不写成"两个选择器共用一块"：面板 spec 里那条
+   "class 真的有规则"的判据是按"选择器 + 左花括号"取块的，合并选择器会让它
+   读到共享声明的那一块、把 `align-self` 判成"没有"。两条各自完整也更直接。 */
+.ht-ai__item--user {
+  align-self: flex-end;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+}
+
+.ht-ai__item--assistant {
+  align-self: flex-start;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-ai__note {
+  margin: 0;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+}
+
+/* ── 过程行（流式助手一步步在做什么）────────────────────────
+ *
+ * 形状照"一行一句、默认收起"：`动词 · 工具名`，展开才是工具层给的原文。
+ * 🔴 三件事都是**功能**：
+ *   1. `nowrap + ellipsis`：一行一步，换行会让"过程"变成一坨段落，
+ *      而这一步的价值恰恰是"扫一眼就知道它在干什么"；
+ *   2. 收起态与展开态**同一个类**（`.ht-ai__step-line`），因为它们是同一个语义，
+ *      只是挂了 `details` 与不挂的区别 —— 两套样式会让两种行在视觉上不是一类；
+ *   3. 无障碍：`<details>/<summary>` 自带展开语义，不自己造一个 div + 点击事件。
+ */
+.ht-ai__steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-ai__step {
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.ht-ai__step-body {
+  min-inline-size: 0;
+}
+
+/* ── 展开/收起的高度动画（2026-11-10）
+ *
+ * 🔴 高度由**布局引擎实测**，不写死 `max-height`。
+ * 判据：`docs/research/ai-chat-motion-source-study.md` §3.3 —— antd/x 的
+ * `initCollapseMotion` 用 `node.scrollHeight` 注入真实高度，全仓零处写死
+ * `max-height`。两条路拿到的是同一件事（真实高度、无魔数），这里选 CSS 的那条：
+ *
+ *   · `0fr → 1fr` 每帧由布局引擎算 ⇒ 不需要 JS 测高、不需要 resize/ResizeObserver
+ *     重测，也没有"量完到下一帧之间内容变了导致高度算错"的那个窗口
+ *     （思考文本是**流式追加**的，那个窗口在这里是常态而不是边界情况）；
+ *   · 零 JS 状态 ⇒ 不改组件生命周期，不动 `<details>` 的原生行为；
+ *   · `grid-template-rows` 是 2017 年起的广泛可用特性（95%），
+ *     而 Vite 默认 `build.target` 是 `chrome107/safari16`，
+ *     恰好**够不到** `::details-content` + `interpolate-size`（Chrome 131 /
+ *     Safari 18.4，Baseline 2025）—— 所以不选那条更时髦的路。
+ *
+ * 🔴 `min-block-size: 0` 必须落在**被包住的那个子元素**上，不是容器上。
+ * 这是实测踩到过的坑（Chromium 143，四组对照）：
+ *   · 写在容器 `.ht-ai__step-collapse` 上 ⇒ 收起态高度 **54px**（纹丝不动）；
+ *   · 写在子元素 `> *` 上 ⇒ 收起态 **0px**，展开帧 4.5 → 9.0 → 13.5 …
+ * 原因：grid 轨道自身 `0fr` 能算出 0，但**轨道里的 item 有自动最小尺寸**
+ * （`min-height: auto` ⇒ `min-content`），是那个下限把轨道顶着不塌。
+ *
+ * 🔴 触发**不用** `details[open]`，用 `.ht-ai__step-collapse--open`。
+ * 实测（Chromium 143，两臂同页面只改触发方式）：
+ *   · `details:not([open]) … { grid-template-rows: 0fr }` ⇒ 收起帧
+ *     `140 140 140 …` 全程不动，**收起是瞬跳**；
+ *   · 元素自己的 class ⇒ 收起帧 `72 66 60 54 48 42 36 30`，正常插值。
+ * 因为 `[open]` 一摘掉，UA 样式就**同步**把子树移出渲染（原生方案要
+ * `content-visibility … allow-discrete` 正是为了对付这个，而它够不到
+ * 我们的 `chrome107/safari16` 目标）⇒ 子树不参与布局 ⇒ 过渡被整个跳过。
+ * 组件侧因此让 `details` 常驻 `open`，把这个 class 当"视觉收起"的表达。
+ *
+ * ⚠️ 本条只作用于**思考那一行**（`.ht-ai__step-collapse` 由 `ReasoningRow` 使用）。
+ * 工具步骤行用的是下面一段的 `.ht-ai__trace-collapse` —— 同一套做法、**不同的 class**，
+ * 理由见那一段的开头。
+ *
+ * `overflow: hidden` 必须落在**被动画的那一层**（wrapper），不能落在外层
+ * `details` 上 —— 否则展开后长文本的最后一个字会被裁掉半行。
+ */
+.ht-ai__step-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  transition: grid-template-rows var(--ht-duration-normal) var(--ht-ease-standard);
+}
+
+/* 压掉 grid item 的自动最小尺寸 —— 见上面那段实测。 */
+.ht-ai__step-collapse > * {
+  min-block-size: 0;
+}
+
+.ht-ai__step-collapse--open {
+  grid-template-rows: 1fr;
+}
+
+/* ── 工具步骤行的高度动画（2026-11-10）
+ *
+ * 🔴 与上面 `.ht-ai__step-collapse`（思考那一行）**是同一套做法，但故意是另一个
+ * class**。理由不是"能省一行"，是这两处的**语义不同、归属不同**：
+ *
+ *   · 思考行是**一个**展开器，包着一整段思考文本；
+ *   · 步骤行是**列表里的一行**，数量随工具调用增长，而且有"没有 note 就不套
+ *     `<details>`"的第三态（见 `TraceRows` 的注释）。
+ *
+ * 共用一个 class 会让"改其中一处的视觉"必然波及另一处 —— 而它们连触发时机
+ * 都不一样（思考文本流式追加、步骤行按事件增删）。所以这里**共用行为、不共用名字**：
+ * 两条规则的每一行都出自同一份逐帧实测（见上面那段），但谁都不在对方的
+ * 选择器列表里。
+ *
+ * 🔴 两个坑与思考行完全一致，逐字实测过（Chromium 156，本文件对应的结构
+ * `ul > li > details > summary + wrapper`）：
+ *   1. `min-block-size: 0` 必须落在子元素上（写在容器上收起态恒为 16px 不插值）；
+ *   2. 触发**不能**用 `details[open]` —— 收起帧实测 `16 16 16 … 16` 全程不动；
+ *      用元素自己的 class 才是 `16 14.91 11.98 … 0`。
+ *
+ * 🔴 与思考行的一个**真实差异**：思考行在流式期间文本不断增长，而步骤行的
+ * `note` 是**整行被替换**（`tool-finished` 换掉同名那一行的对象，下标不变 ⇒
+ * React 复用同一个 DOM 节点）。实测「已展开的行 + note 整段替换」：
+ * 高度 `17px → 238px`、`scrollHeight === clientHeight`（不裁字）、
+ * class 保持不变（不会自己弹回收起）。这正是 `0fr/1fr` 相对 JS 测高的价值 ——
+ * 高度每帧由布局引擎重算，没有"量完到下一帧内容又变了"的窗口。
+ */
+.ht-ai__trace-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  transition: grid-template-rows var(--ht-duration-normal) var(--ht-ease-standard);
+}
+
+/* 压掉 grid item 的自动最小尺寸 —— 与 `.ht-ai__step-collapse > *` 同一条判据。 */
+.ht-ai__trace-collapse > * {
+  min-block-size: 0;
+}
+
+.ht-ai__trace-collapse--open {
+  grid-template-rows: 1fr;
+}
+
+/* ⚠️ `tokens.css` 已把 `--ht-duration-*` 在 reduced-motion 下压到 1ms，
+   所以这里**故意不再写**那条媒体查询：再写一遍等于同一件事说两次，
+   而且会掩盖"tokens 那层才是唯一开关"这件事（`controls.css` / `growth.css`
+   对这条已经表过态）。1ms 而不是删掉 transition，见 tokens.css 那行的原话：
+   删掉会让依赖 transitionend 的逻辑永远不触发。 */
+
+.ht-ai__step-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ht-color-foreground-subtle);
+  /* 12px 是「辅助文字下限」（`tokens.css` 那行的原话）。这一行是**正文的旁证**，
+     不是"极致紧凑标签"（那是 11px 的用途），所以用 xs。 */
+  font-size: var(--ht-font-size-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+/* 展开器的那一行可以点，收起态那一行不能 —— 把"能点"表达出来，别让用户猜。 */
+.ht-ai__step-body > .ht-ai__step-line {
+  cursor: pointer;
+}
+
+.ht-ai__step-verb {
+  flex: none;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-ai__step-detail {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ht-ai__actions {
+  display: flex;
+  /* 🔴 窄窗时**整组**换行（输入框收缩到下限后按钮去下一行），
+     而不是把按钮文字竖着折断（2026-09-29 截图实测"运/行"两行）。 */
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+}

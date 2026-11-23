@@ -133,13 +133,15 @@ const PHANTOM_LEDGER = [];
  */
 const APPEARANCE_LEDGER = [
   {
-    file: 'apps/web/src/styles/app/sheets.css',
+    // 2026-11-23：随大文件拆分搬到 settings-tips.css（判据语义未变，只跟路径）。
+    file: 'apps/web/src/styles/app/settings-tips.css',
     selector: '.ht-settings .ht-btn--ghost:not(.ht-settings__inline-action)',
     reason: '设置页把幽灵按钮换成凹陷底（"唯一的动作读成说明文字"那条老问题），当时选择在功能 CSS 里覆盖。',
     reversal: 'P7/P8 设置面那一趟给它显式 `ht-btn--secondary` 后删掉这两条；删完要把本行的读数改小。',
   },
   {
-    file: 'apps/web/src/styles/app/sheets.css',
+    // 2026-11-23：随大文件拆分搬到 settings-tips.css（判据语义未变，只跟路径）。
+    file: 'apps/web/src/styles/app/settings-tips.css',
     selector: '.ht-settings .ht-btn--ghost:not(.ht-settings__inline-action):hover',
     reason: '上一条的 hover 对偶（只删静止态会让 hover 变成唯一来源）。',
     reversal: '与上一条一起删。',
@@ -526,7 +528,7 @@ function scan() {
  */
 const USED_BASE = ['primary', 'secondary', 'ghost', 'danger', 'commit'];
 const LEDGER_SITE = '';
-const SHEETS_FILE = 'apps/web/src/styles/app/sheets.css';
+const SHEETS_FILE = 'apps/web/src/styles/app/settings-tips.css';
 const MOBILE_SHELL_FIXTURE = `export type ButtonTone = ControlTone;\nconst recipe = controlPaletteOf(tone, emphasis);`;
 
 const SHEETS_GHOST_SEL = '.ht-settings .ht-btn--ghost:not(.ht-settings__inline-action)';

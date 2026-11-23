@@ -1,0 +1,118 @@
+/* 自动拆分自 sheets.css 的第 1–117 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 设置浮层（sheet）────────────────────────────────────
+ *
+ * 🔴 **这是信息架构，不是外观。** 对照滴答清单实测：它的设置是**从右侧滑出的浮层**，
+ * 左 rail 与列表明明还在（`docs/research/dida-capture/INTERFACE-NOTES.md` §11.5）。
+ *
+ * 规律：**次级表面（搜索 / 通知 / 设置）里做的事都需要"回头看下面"**，
+ * 所以它们**不离开当前视图**；而主视图（任务/日历/四象限/习惯）之间切换
+ * 不需要这种回头，才留在应用内。
+ *
+ * 下层继续保留在 DOM 里，保证关闭设置后回到原来的视图与滚动位置；设置内容
+ * 自己使用不透明表面，避免任务标题从背景透出来与设置文字叠在一起。
+ */
+.ht-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: var(--ht-z-dropdown);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--ht-space-6);
+  /*
+    2026-11-16：sheet 底改白（原本是 `color.background` = slate-50）。
+    页面改白之后，灰 sheet 成了**唯一还残留"灰底 + 白卡"的地方** ——
+    同一屏里两种底色并存，正是产品负责人说的"很多地方都有类似情况"。
+    模态的独立感由 scrim + 阴影表达，不需要再靠底色差。
+  */
+  background: var(--ht-color-surface);
+  animation: ht-sheet-in var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+/* 设置是高密度的二级工作区，不是一条没有目录的表单长页。
+   左侧目录让用户先按心智模型定位，再在右侧处理具体控件；窄屏时同一目录
+   横向滚动到顶部，保留同样的分组事实源。 */
+.ht-settings__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ht-space-4);
+  margin-block-end: var(--ht-space-4);
+  padding-block-end: var(--ht-space-4);
+  border-block-end: 0;
+}
+
+
+
+.ht-settings__page-title {
+  margin: 0;
+}
+
+.ht-settings__nav {
+  position: sticky;
+  top: 0;
+  z-index: var(--ht-z-dropdown);
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  gap: var(--ht-space-1);
+  padding-block: var(--ht-space-2);
+  /*
+    2026-11-16：底色去掉（原为 `color.background` = slate-50）。
+    sheet 改白之后，这块灰既是"半吊子差值"（7/255），又只有半个面板高，
+    读起来像一张悬空的灰卡。分区交给右侧卡片自身的那条细线，选中态仍用
+    `primary-subtle`（`.ht-settings__nav-link[aria-current='page']`）。
+  */
+  background: transparent;
+}
+
+.ht-settings__nav-link {
+  display: flex;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid transparent;
+  min-block-size: var(--ht-touch-target-min);
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  border-radius: var(--ht-radius-sm);
+  color: var(--ht-color-foreground-muted);
+  text-decoration: none;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__nav-link:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-settings__nav-link[aria-current='page'] {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-settings__group[hidden] { display: none; }
+
+/* 面板 = 一张卡片。
+ *
+ * 🔴 2026-10-24 起给它一条**发丝线**（原先 `border: 0`）。理由不是"更好看"：
+ * 卡片底色 `surface` 与页面底色 `background` 只差一点点，八节里每一节都是一叠
+ * 白卡片 —— 不描边时"这里有 3 张卡"和"这里有 1 张大卡"在图上是同一件事
+ * （「AI 与集成」那一屏就是这么读成一整块的）。层次用边框表达、阴影只留给浮层，
+ * 是本仓一贯的约定（`docs/agents/design-system.md`）。
+ */
+.ht-settings__content > .ht-settings__group > .ht-settings,
+.ht-settings__content > .ht-settings__group > div > .ht-settings {
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-lg);
+  /**
+   * 2026-11-21 产品负责人：「不要明显阴影，用颜色区分，更柔和」——
+   * 卡片不再投影，分层交给 surface/background 的色差 + 上面那条极淡描边。
+   * 早前实测的"压深页面底色会被 AA 否决（foreground-subtle 掉到 4.34:1）"仍成立，
+   * 所以这里不压底色、只留一条极淡的边。
+   */
+  background: var(--ht-color-surface);
+  max-inline-size: none;
+}

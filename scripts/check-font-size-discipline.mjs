@@ -19,7 +19,16 @@ import { readFileSync } from 'node:fs';
 
 const exec = promisify(execFile);
 
-const TARGET_FILE = 'apps/web/src/styles/app/ai-panels.css';
+/* 2026-11-23：`ai-panels.css` 拆成 5 个模块后，判据读全部模块（拼接）。
+   自测注入打在那个**确实含被守卫类**的模块上（ai-breakdown.css 含 __danger/__notice）。 */
+const TARGET_FILES = [
+  'apps/web/src/styles/app/ai-settings-block.css',
+  'apps/web/src/styles/app/ai-breakdown.css',
+  'apps/web/src/styles/app/ai-chat-log.css',
+  'apps/web/src/styles/app/ai-tool-call.css',
+  'apps/web/src/styles/app/ai-chat-workspace.css',
+];
+const SELF_TEST_TARGET = 'apps/web/src/styles/app/ai-breakdown.css';
 const GUARDED_CLASSES = ['ht-settings__danger', 'ht-settings__notice', 'ht-settings__hint'];
 const BANNED_TOKEN = '--ht-font-size-2xs';
 
@@ -45,7 +54,7 @@ async function main() {
   const selfTest = process.argv.includes('--self-test');
 
   if (selfTest) {
-    const original = readFileSync(TARGET_FILE, 'utf-8');
+    const original = readFileSync(SELF_TEST_TARGET, 'utf-8');
     const { writeFileSync } = await import('node:fs');
 
     /**
@@ -74,7 +83,7 @@ async function main() {
         failed++;
         continue;
       }
-      writeFileSync(TARGET_FILE, mutated);
+      writeFileSync(SELF_TEST_TARGET, mutated);
       try {
         const { code } = await exec('node', ['scripts/check-font-size-discipline.mjs']).then(
           () => ({ code: 0 }),
@@ -87,7 +96,7 @@ async function main() {
           console.log(`self-test: ✅ ${arm.name} → 门禁正确拒绝`);
         }
       } finally {
-        writeFileSync(TARGET_FILE, original);
+        writeFileSync(SELF_TEST_TARGET, original);
       }
     }
     if (failed > 0) {
@@ -97,16 +106,17 @@ async function main() {
     return;
   }
 
-  const content = readFileSync(TARGET_FILE, 'utf-8');
-  const violations = findViolations(content);
+  const perFile = TARGET_FILES.map((f) => ({ f, content: readFileSync(f, 'utf-8') }));
+  const violations = perFile.flatMap(({ f, content }) => findViolations(content).map((v) => ({ ...v, f })));
 
   if (violations.length > 0) {
     console.error(`G-3 字号纪律：${violations.length} 处消息类用了 2xs（11px）`);
     for (const v of violations) {
-      console.error(`  ${TARGET_FILE}:${v.line} → ${v.text}`);
+      console.error(`  ${v.f}:${v.line} → ${v.text}`);
     }
     process.exit(1);
   }
+  const content = perFile.map((x) => x.content).join('\n');
 
   console.log(`G-3 字号纪律：✅ ${GUARDED_CLASSES.length} 个消息类均 ≥ xs（12px）`);
 

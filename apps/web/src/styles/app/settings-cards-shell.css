@@ -1,0 +1,161 @@
+/* 自动拆分自 sheets.css 的第 989–1148 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 卡片式面板：`.ht-settings--cards`（第一处是「AI 与集成」）────────
+ *
+ * 2026-10-24：那一屏原来是一整块白卡里装着四件互不相干的事，读成"一大段"。
+ * 现在面板根**自己不是卡片**，它是一列卡片：每张卡承担自己的边界，
+ * 卡与卡之间靠间距分段（`gap`），不再用分隔线 —— 一条线和一张卡在说同一句话，
+ * 两个一起说就是噪音。
+ *
+ * 🔴 那几级的优先级是刻意的：面板根的透明化要压过
+ * `.ht-settings__content > .ht-settings__group > .ht-settings` 那条卡片规则
+ * （同特异性、靠后写赢），而卡片内部的 section 又要压过上面那条"子块分隔线"。 */
+.ht-settings__content > .ht-settings__group > .ht-settings--cards {
+  gap: var(--ht-space-3);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.ht-settings--cards > .ht-settings__section,
+.ht-settings--cards > .ht-settings__subsection,
+.ht-settings--cards > .ht-ai-card {
+  padding: var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+}
+
+/* 卡片容器的内部节奏：跟 `.ht-settings` 一样是"一列，有间距"。 */
+.ht-settings--cards > .ht-ai-card {
+  display: flex;
+  flex-direction: column;
+  /* 行高 52（标签可能两行）+ gap 4 = 56，正好落在 macOS 的 44–56 上沿；
+     16 时是 60，判据红在 60（2026-10-25 实测）。 */
+  gap: var(--ht-space-1);
+}
+
+/* 卡片**之间**：不用分隔线（卡片的边就是分隔），也不用上边距（`gap` 管了）。 */
+.ht-settings--cards > .ht-settings__section + .ht-settings__section,
+.ht-settings--cards > .ht-settings__subsection {
+  margin-block-start: 0;
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* 卡片**内部**的 `.ht-settings__section` 降级成子块：一层卡片已经够了，
+ * 卡片里再套卡片只会在视觉上多出一圈没人需要的框。 */
+.ht-settings--cards .ht-ai-card .ht-settings__section {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.ht-settings--cards .ht-ai-card .ht-settings__section + .ht-settings__section {
+  margin-block-start: var(--ht-space-4);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+/* 报告里的小分组标题（导入结果"跳过 / 未映射"那两个）——
+ * 它是一组条目的名字，不是说明文字：所以既不是 `__hint`（禁止）也不是 `__h3`
+ * （那会把报告抬到与"文件"同级）。字号与字重走 body-strong 那一档。 */
+.ht-settings__h4 {
+  margin: 0;
+  font-weight: var(--ht-font-weight-semibold);
+  color: var(--ht-color-foreground);
+}
+
+/* ── 独立设置窗口（`?settings=…&standalone=1`，2026-10-25）────────────────
+ *
+ * 桌面端把设置做成**单独的窗口**（macOS `Settings` 场景 / WinUI 新窗 / Electron
+ * 第二个 BrowserWindow），窗口里只载一份 `web-dist` 的 URL。若那个 URL 仍渲染
+ * "rail + 任务区 + 详情列"，窗口里就是"整个应用 + 一层模态挡在上面"——
+ * 不是设置窗口。所以这一档把壳收起、让设置自己铺满。
+ *
+ * ⚠️ 用 `display:none` 收起而不是"不渲染"：不渲染会让设置面板在窗口里重挂载，
+ *    而它带着未决的订阅/授权状态（理由与 `App.tsx` 里那段 Provider 注释同源）。
+ * ⚠️ 只在这一档生效 —— 寻常的 `?settings=`（落地页把人送进应用）必须**保留**壳，
+ *    那份判据是 `settings-deep-link.spec.tsx` 的另一组用例。
+ */
+.ht-app[data-settings-standalone] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 🔴 **不能连 `<main>` 一起藏** —— 设置面板就住在 `<main>` 里。
+   2026-10-25 实测：把 main 也 `display:none` 之后，独立窗口里是**一整片空白**
+   （`evidence/settings-redesign/macos-settings-window.png` 第一版就是那张图）。
+   要藏的是"壳的另外两根柱子"：左侧 rail 与右侧详情列。 */
+.ht-app[data-settings-standalone] > nav.ht-rail,
+.ht-app[data-settings-standalone] > .ht-app__detail {
+  display: none;
+}
+
+/* 设置这一层在窗口里**就是整个窗口**：铺满、去掉模态那套居中/最大宽/圆角/阴影。
+   🔴 必须是 `fixed; inset: 0` 而不是 `static` —— 第一版写成 `static` 时，
+   独立窗口里能看到应用壳从设置面板四周透出来（任务输入框、账号菜单都在），
+   那仍然是"应用 + 弹窗"，不是设置窗口。 */
+.ht-app[data-settings-standalone] .ht-sheet {
+  position: fixed;
+  inset: 0;
+  max-inline-size: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--ht-color-background);
+  z-index: var(--ht-z-modal);
+}
+
+.ht-settings__nav-link > svg {
+  flex: none;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-settings__nav-link[aria-current='page'] > svg {
+  color: inherit;
+}
+
+/* 独立窗口里**保留左侧分类栏**，即使窗口比应用窄档断点还窄。
+   理由：那个窗口里没有别的内容，分类栏就是唯一导航；横排一档是为"窄屏应用"
+   设计的（rail 还在、空间被抢），而窗口化之后不存在那个约束。
+   选择器权重（两个类 + 属性）压过文件末尾 `@media (max-width: 48rem)` 那条。 */
+.ht-app[data-settings-standalone] .ht-settings__layout {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+}
+
+.ht-app[data-settings-standalone] .ht-settings__nav {
+  flex-direction: column;
+}
+
+/* 独立设置窗口里**没有头像可点**，账号菜单不该出现。
+   现状（2026-10-25 实测截图）：它会展开并盖住分类栏前三项，看起来像"设置坏了"。
+   窗口里唯一的账号入口是「账号与安全」那一节本身。 */
+.ht-app[data-settings-standalone] .ht-rail__account__panel {
+  display: none;
+}
+
+/* ── 卡片边：1x 用 1px，2x 用发丝线（DSH 对齐）─────────────────────────
+ *
+ * 实测 DSH 的卡片边全是 `0.5px`（AskQuestionCard / FileCard）。
+ * 但**先别急着照抄**：本仓这次拿两张截图逐字节比对过 ——
+ * `0.5px` 与 `1px` 在 `deviceScaleFactor: 1` 的截图上**像素完全相同**
+ * （sha256 一致），因为浏览器会把 0.5px 舍入成 1px 来画。
+ *
+ * ⇒ 于是两种 DPR 下的真实差别是：
+ *   - **1x**：0.5px 与 1px 同形 ⇒ 写哪个都一样，那就不如写 1px（意图明确、不依赖舍入）
+ *   - **2x**：0.5px 才是**真的半像素**线，比 1px 细一档 —— 那才是 DSH 看起来的样子
+ *
+ * 🔴 所以这里不是"为了保险"，是**两种屏要两个值**。前面一版注释说
+ * "0.5px 在 1x 上会淡到看不见" —— 那是**错的**，比对截图推翻了它，留此更正。
+ */
+@media (min-resolution: 2dppx) {
+  .ht-settings__content > .ht-settings__group > div > .ht-settings,
+  .ht-settings__sub-plan,
+  .ht-settings__sub-order,
+  .ht-settings--cards > .ht-ai-card {
+    border-width: var(--ht-border-width-hairline);
+  }
+}

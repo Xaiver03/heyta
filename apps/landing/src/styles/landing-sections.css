@@ -1,0 +1,818 @@
+/* 自动拆分自 landing.css 的第 478–1294 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 响应式 ─────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .lp-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ht-space-10);
+    padding-block-start: calc(var(--ht-layout-header-height) + var(--ht-space-6));
+    min-block-size: auto;
+  }
+
+  .lp-nav__links {
+    display: none;
+  }
+
+  .lp-facts__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .lp-wrap,
+  .lp-hero {
+    padding-inline: var(--ht-space-4);
+  }
+
+  .lp-lede {
+    font-size: var(--ht-font-size-base);
+  }
+}
+
+/* 减少透明度偏好的降级已**升格为全局策略**：tokens.css 末尾的
+   `@media (prefers-reduced-transparency: reduce)` 会把材质 tint 压成
+   实色 surface、模糊半径压成 0 —— 消费方（含本文件的 lp-nav__bar /
+   lp-sync__legend / lp-docs-topnav）代码零改动。这里不再另写一份局部
+   覆盖，双份会在取值漂移时打架。 */
+
+/* ════════════════════════════════════════════════════════════
+   区块节奏与通用件
+   ════════════════════════════════════════════════════════════
+   竖向留白用 `calc(token * 倍数)` 而不是新加一个间距 token ——
+   落地页需要比产品界面更松的呼吸，但那是**同一个尺度的放大**，
+   不是一个新的设计尺度。加 token 的成本应该留给真正的语义。 */
+
+.lp-section {
+  padding-block: calc(var(--ht-space-16) * 1.15);
+}
+
+.lp-section__head {
+  max-inline-size: var(--ht-layout-prose-max);
+  margin-block-end: calc(var(--ht-space-12) * 1.15);
+}
+
+.lp-section__lede {
+  margin-block-start: var(--ht-space-4);
+  font-size: var(--ht-font-size-base);
+  line-height: var(--ht-line-height-relaxed);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-h2 {
+  font-size: clamp(var(--ht-font-size-xl), 2.2vw, var(--ht-font-size-3xl));
+  font-weight: var(--ht-font-weight-bold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-title);
+  text-wrap: balance;
+}
+
+.lp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.lp-note {
+  /* 🔴 不是 flex。`RichText`（`site/PageSections.tsx:77`）把一条词条切成
+  `<strong>` / `<code>` / `<span>` **兄弟节点**，flex 会把它们各排一栏 ——
+  实测 `/platforms` 那条「未签名」说明被排成三列，第二列以「，需要右键打开」起头。
+  这个元素从来只摆一段文字：⚠️ 那个图标在**词条文本里**，不是子元素。 */
+  display: block;
+  padding: var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+  max-inline-size: var(--ht-layout-prose-max);
+}
+
+.lp-note code {
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground);
+}
+
+/* ════════════════════════════════════════════════════════════
+   能力：bento 网格
+   ════════════════════════════════════════════════════════════ */
+
+.lp-bento {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ht-space-4);
+}
+
+.lp-bento__cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--ht-space-6);
+  min-block-size: 10rem;
+  padding: var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface);
+}
+
+/* 底色要有差异，否则六格读起来是一块白板。
+   三格换底：四象限（主色浅底）、智能拆解与离线（下沉底）。 */
+.lp-bento__cell:nth-child(1) {
+  background: var(--ht-color-primary-subtle);
+  border-color: var(--ht-color-primary-subtle-hover);
+}
+
+.lp-bento__cell:nth-child(4),
+.lp-bento__cell:nth-child(6) {
+  background: var(--ht-color-surface-sunken);
+}
+
+.lp-bento__cell--tall {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.lp-bento__cell--wide,
+.lp-bento__cell--half {
+  grid-column: span 2;
+}
+
+.lp-bento__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.lp-bento__title {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-bento__icon {
+  display: grid;
+  place-items: center;
+  color: var(--ht-color-primary);
+}
+
+.lp-bento__text {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-bento__visual {
+  display: flex;
+  align-items: center;
+}
+
+/* 迷你四象限 */
+.lp-mini-quad {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-2);
+  inline-size: 100%;
+}
+
+.lp-mini-quad__cell {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+/* 迷你热力图条 */
+.lp-mini-heat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1);
+}
+
+/* 迷你进度环 */
+.lp-mini-ring {
+  flex: none;
+}
+
+/* ════════════════════════════════════════════════════════════
+   同步：全宽 WebGL 场景
+   ════════════════════════════════════════════════════════════ */
+
+.lp-sync {
+  padding-block-start: calc(var(--ht-space-16) * 1.75);
+}
+
+.lp-sync__head {
+  max-inline-size: var(--ht-layout-prose-max);
+  margin-block-end: var(--ht-space-12);
+}
+
+.lp-sync__holder {
+  position: relative;
+  inline-size: 100%;
+  /* 用 vh 而不是固定高度：3D 场景的观感与视口高度强相关，
+     固定高度在矮屏上会把场景压扁。 */
+  block-size: 68vh;
+  min-block-size: 24rem;
+  max-block-size: 44rem;
+}
+
+.lp-sync__canvas {
+  inline-size: 100%;
+  block-size: 100%;
+  display: block;
+}
+
+.lp-sync__legend {
+  position: absolute;
+  inset-block-end: var(--ht-space-6);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--ht-space-5);
+  padding: var(--ht-space-2) var(--ht-space-4);
+  border-radius: var(--ht-radius-full);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-material-chrome-tint);
+  backdrop-filter: blur(var(--ht-blur-chrome));
+  -webkit-backdrop-filter: blur(var(--ht-blur-chrome));
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+  white-space: nowrap;
+}
+
+.lp-sync__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.lp-sync__dot {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+}
+
+.lp-sync__dot--plain {
+  background: var(--ht-color-foreground);
+}
+
+/* ── WebGL 拿不到上下文时的静态替代 ──────────────────────────
+   与 canvas 同一套呈现语言（节点 + 连线 + 数据包），只是不画 3D。
+   位置与 canvas 一致（填满 holder），所以降级不会改变页面高度。 */
+.lp-sync__fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.lp-sync__graph {
+  inline-size: min(100%, 42rem);
+  block-size: auto;
+  /* 让 SVG 里的 `currentColor` 跟着主题走 */
+  color: var(--ht-color-primary);
+}
+
+.lp-sync__graph-edges line {
+  stroke: var(--ht-color-border);
+  stroke-width: var(--ht-border-width-thin);
+}
+
+.lp-sync__graph-nodes circle {
+  fill: var(--ht-material-chrome-tint);
+  stroke: currentColor;
+  stroke-width: var(--ht-border-width-thin);
+}
+
+/* 数据包用实心，和空心的设备节点区分开 —— 这也是图例里两个点色差的由来。 */
+.lp-sync__graph-packets circle {
+  fill: currentColor;
+}
+
+/* ════════════════════════════════════════════════════════════
+   隐私：逐字加密
+   ════════════════════════════════════════════════════════════ */
+
+.lp-privacy__panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-4);
+}
+
+.lp-privacy__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-8) var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface);
+}
+
+.lp-privacy__panel--server {
+  background: var(--ht-color-surface-sunken);
+}
+
+.lp-privacy__panel-head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-caption);
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.lp-privacy__text {
+  font-size: var(--ht-font-size-2xl);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-title);
+  line-height: var(--ht-line-height-tight);
+  /* 等宽：逐字替换时每个字符宽度不变，整行不会横向抖动 */
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-privacy__char {
+  transition: color var(--ht-duration-normal) var(--ht-ease-standard);
+}
+
+/* 已加密的字：换成等宽 + 主色，与明文形成"这是另一种东西"的对比 */
+.lp-privacy__char--locked {
+  font-family: var(--ht-font-mono);
+  color: var(--ht-color-primary);
+}
+
+.lp-privacy__note {
+  margin-block-start: auto;
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* ════════════════════════════════════════════════════════════
+   自建：三步 + 指南入口
+   ════════════════════════════════════════════════════════════ */
+
+.lp-selfhost__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: var(--ht-space-10);
+  align-items: start;
+}
+
+.lp-selfhost__steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+/*
+  指南入口卡：这一节不贴命令，所以右侧的职责只有一个 —— 给出"去哪儿看命令"。
+  它比步骤列安静（无图标、无编号），因为它是出口不是内容。
+*/
+.lp-selfhost__guide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface);
+}
+
+.lp-selfhost__guide-title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground);
+}
+
+.lp-selfhost__guide-body {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.lp-step {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: var(--ht-space-3);
+  align-items: start;
+  padding-block-end: var(--ht-space-4);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.lp-step__icon {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-icon-xl);
+  block-size: var(--ht-icon-xl);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.lp-step__index {
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.lp-step__title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-step__body {
+  margin-block-start: var(--ht-space-1);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ════════════════════════════════════════════════════════════
+   价格：三栏对等对比（自建免费 / 官方托管 / 托管 + 云端 AI）
+   ════════════════════════════════════════════════════════════ */
+
+/* 三栏**等宽**，不是「免费的窄、付费的宽」——
+   三栏是同一个产品的三种用法，版面本身就该说"它们对等"。
+   🔴 免费那栏就是**全部功能**（ADR-0020 §3.2）：没有任何一栏是"功能更少"的，
+   所以三栏宽度必须一样，否则版面上就在暗示"免费的是阉割版"。
+   `stretch`（默认）而不是 `start`：三张卡等高，底部的 CTA / 状态说明才会
+   落在同一条水平线上；否则内容少的那张会矮一截，按钮一高一低。
+
+   ⚠️ 三栏比两栏窄，`1024px` 与 `640px` 两处断点都有对应降级（见文件末）。 */
+.lp-pricing__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ht-space-4);
+}
+
+.lp-pricing__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface);
+}
+
+/* 免费那条路用主色描边。
+   ⚠️ 这里**刻意没有「推荐」/「最受欢迎」角标**：我们只有一个付费档，
+   角标是拿来在多档之间引导选择的，而这里没有可选项 —— 免费的本来就是完整的
+   （见 Pricing.tsx 文件头）。描边表达的是"这条路过得通"，不是"买这个"。 */
+.lp-pricing__card--featured {
+  border-color: var(--ht-color-primary);
+}
+
+.lp-pricing__name {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-pricing__icon {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-icon-md);
+  block-size: var(--ht-icon-md);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.lp-pricing__price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-2);
+}
+
+.lp-pricing__amount {
+  font-size: var(--ht-font-size-3xl);
+  font-weight: var(--ht-font-weight-bold);
+  letter-spacing: var(--ht-tracking-display);
+}
+
+.lp-pricing__period {
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 两个地区是**同一个档的两种定价**，不是两档 —— 所以是"标签 + 数字"的
+   定义列表，而不是两个并列的大数字（那样会被读成"二选一"）。 */
+.lp-pricing__regions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding-block: var(--ht-space-3);
+  border-block: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.lp-pricing__region {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+}
+
+.lp-pricing__region dt {
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-pricing__region dd {
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-title);
+}
+
+.lp-pricing__body {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-pricing__features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+.lp-pricing__feature {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-2);
+}
+
+.lp-pricing__feature > svg {
+  flex: none;
+  /* 让勾与**第一行**文字对齐，而不是整段居中 —— 长文案折行时后者会跑偏。 */
+  margin-block-start: var(--ht-space-1);
+  color: var(--ht-color-success);
+}
+
+/* CTA 推到卡片底部，两张卡的按钮/状态说明才会落在同一条水平线上。 */
+.lp-pricing__cta {
+  margin-block-start: auto;
+}
+
+.lp-pricing__pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-5);
+  margin-block-start: auto;
+  border: var(--ht-border-width-thin) dashed var(--ht-color-border-strong);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-pricing__notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  max-inline-size: var(--ht-layout-prose-max);
+  margin-block-start: var(--ht-space-6);
+  margin-inline: auto;
+  text-align: center;
+}
+
+.lp-pricing__note-strong {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-pricing__note {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ════════════════════════════════════════════════════════════
+   收尾 CTA
+   ════════════════════════════════════════════════════════════ */
+
+.lp-cta {
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.lp-cta__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-5);
+  text-align: center;
+}
+
+.lp-cta__title {
+  max-inline-size: 24ch;
+}
+
+.lp-cta__lede {
+  max-inline-size: var(--ht-layout-prose-max);
+  font-size: var(--ht-font-size-lg);
+  line-height: var(--ht-line-height-relaxed);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--ht-space-3);
+  margin-block-start: var(--ht-space-2);
+}
+
+/* ════════════════════════════════════════════════════════════
+   页脚
+   ════════════════════════════════════════════════════════════ */
+
+.lp-footer {
+  padding-block: calc(var(--ht-space-16) * 1.2) var(--ht-space-8);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-background);
+}
+
+.lp-footer__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
+  gap: var(--ht-space-10);
+}
+
+.lp-footer__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ht-space-4);
+}
+
+.lp-footer__tagline {
+  max-inline-size: 30ch;
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-footer__group-title {
+  margin-block-end: var(--ht-space-3);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-caption);
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.lp-footer__links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.lp-footer__link {
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-footer__link:hover {
+  color: var(--ht-color-foreground);
+}
+
+/* 品牌列的「在 GitHub 上查看」：图标与文字同行（列表里的链接是纯文字，
+   唯独这一条带图标 —— 内联 flex 对齐，间距用同一个 token 尺度）。 */
+.lp-footer__github {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-3);
+  width: fit-content;
+}
+
+.lp-footer__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  margin-block-start: calc(var(--ht-space-12) * 1.2);
+  padding-block-start: var(--ht-space-6);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* ════════════════════════════════════════════════════════════
+   响应式
+   ════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .lp-bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lp-bento__cell--tall {
+    grid-column: span 2;
+    grid-row: span 1;
+  }
+
+  .lp-selfhost__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 平板宽度仍保留页脚的两列节奏。此前这里直接塌成一列，
+     让品牌列下面接着堆满所有链接，右侧留下大片空白，法律页尤其明显。 */
+  .lp-footer__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--ht-space-8);
+    row-gap: var(--ht-space-8);
+  }
+
+  .lp-footer__brand {
+    grid-column: 1 / -1;
+  }
+
+  /* 平板：三栏太窄 → 两栏（第三张换行）。不是塌成一栏 ——
+     一栏会让"三档对比"这件事在平板尺寸上彻底消失。 */
+  .lp-pricing__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lp-privacy__panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .lp-section,
+  .lp-sync,
+  .lp-footer {
+    padding-block-start: calc(var(--ht-space-16) * 1.1);
+  }
+
+  /* 手机：价格三栏一栏一张，垂直读完三档再决定。 */
+  .lp-pricing__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lp-bento {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lp-bento__cell--tall,
+  .lp-bento__cell--wide,
+  .lp-bento__cell--half {
+    grid-column: span 1;
+  }
+
+  .lp-footer__grid {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--ht-space-8);
+  }
+
+  .lp-footer__brand {
+    grid-column: auto;
+  }
+
+  .lp-sync__holder {
+    block-size: 50vh;
+  }
+}
+
+.lp-nav__signin {
+  /* 与语言切换/主题按钮并排，所以不能再像链接组里那样自带外边距 */
+  white-space: nowrap;
+}
+
+.lp-nav__cta {
+  padding: var(--ht-space-1) var(--ht-space-4);
+  block-size: 2.25rem;
+  white-space: nowrap;
+}

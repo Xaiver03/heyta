@@ -810,10 +810,19 @@ describe('对话记录里"谁说的"看得出来', () => {
   });
 
   it('🔴 那两个角色 class 在样式表里**真的有规则**（class 存在但没人定义 = 静默退回一列输出）', () => {
-    const css = readFileSync(
-      resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles/app/ai-panels.css'),
-      'utf8',
-    );
+    // 2026-11-23：`ai-panels.css` 拆成 5 个模块（聚合器只剩 @import）。
+    // 判据改读**全部模块的拼接**——语义不变（找的是这三条规则是否存在且有牙齿）。
+    const css = [
+      'ai-settings-block.css',
+      'ai-breakdown.css',
+      'ai-chat-log.css',
+      'ai-tool-call.css',
+      'ai-chat-workspace.css',
+    ]
+      .map((f) =>
+        readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), `../src/styles/app/${f}`), 'utf8'),
+      )
+      .join('\n');
     /**
      * 取"这个选择器**自己那一块**的声明体"。
      *

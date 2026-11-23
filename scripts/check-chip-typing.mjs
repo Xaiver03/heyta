@@ -55,7 +55,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 const INTERACTIVE = new Set(['button', 'a', 'summary']);
 const READONLY = new Set(['span', 'div', 'p', 'li', 'td', 'th', 'label']);
 
-const CSS_FILE = 'apps/web/src/styles/app/ai-panels.css';
+/* 2026-11-23：`ai-panels.css` 拆成 5 个模块（聚合器只剩 @import），
+   判据改读**全部模块的拼接**，语义不变。（只读聚合器会让 ① 那几条判据空转。） */
+const CSS_FILES = [
+  'apps/web/src/styles/app/ai-settings-block.css',
+  'apps/web/src/styles/app/ai-breakdown.css',
+  'apps/web/src/styles/app/ai-chat-log.css',
+  'apps/web/src/styles/app/ai-tool-call.css',
+  'apps/web/src/styles/app/ai-chat-workspace.css',
+];
 const TOKEN = '--ht-touch-target-min';
 
 /** 今天的现量（2026-10-28 那一趟逐枚数出来的）；只许当**下限**用，不许当期望值抄。 */
@@ -241,7 +249,7 @@ if (args.includes('--self-test')) {
       path: relative(ROOT, abs),
       text: readFileSync(abs, 'utf8'),
     })),
-    css: readFileSync(join(ROOT, CSS_FILE), 'utf8'),
+    css: CSS_FILES.map((f) => readFileSync(join(ROOT, f), 'utf8')).join('\n'),
     verbose: args.includes('--verbose'),
   });
   if (problems.length > 0) {
