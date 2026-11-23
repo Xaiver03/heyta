@@ -565,7 +565,7 @@ export function AssistantScreen({
             {snapshot.phase === 'disclose' ? <DisclosureCard target={route.target} plan={plan} hasImages={snapshot.images.length > 0} consents={settings.consents} onConfirm={() => { if (route.target !== undefined) { const cur = getAiSettings(); const dest = route.target.destination; if (!cur.consents.some((c) => c.feature === 'tool-calling' && c.destination === dest)) { saveAiSettings({ ...cur, consents: [...cur.consents, { feature: 'tool-calling' as const, destination: dest, grantedAt: Date.now() }] }); } } controller.confirmDisclosure(); }} onCancel={() => controller.cancelDisclosure()} onOpenSettings={onOpenSettings} /> : null}
           </ScrollView>
           {harnessUndoSeq !== null && snapshot.phase === 'idle' ? (
-            <Stack gap="tight" style={{ paddingHorizontal: 16 }}>
+            <Stack gap="tight" style={{ paddingHorizontal: tokens['space.4'] }}>
               <Button
                 label={t('web.ai.chat.undoAiTurn' as MessageKey)}
                 tone="ghost"
@@ -625,7 +625,7 @@ export function AssistantScreen({
       />
 
       <Modal visible={attachMenuOpen} transparent animationType="fade" onRequestClose={() => { setAttachMenuOpen(false); }}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' }} onPress={() => { setAttachMenuOpen(false); }}>
+        <Pressable style={{ flex: 1, backgroundColor: tokens['color.overlay'], justifyContent: 'flex-end' }} onPress={() => { setAttachMenuOpen(false); }}>
           <View style={{ backgroundColor: tokens['color.surface'], borderTopLeftRadius: tokens['radius.lg'], borderTopRightRadius: tokens['radius.lg'], paddingVertical: tokens['space.2'], paddingBottom: tokens['space.4'] }}>
             <Pressable accessibilityRole="button" accessibilityLabel={t('web.ai.attach.label')} testID="attach-option-image" onPress={() => { setAttachMenuOpen(false); void handlePickImage(); }} style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.3'], minHeight: tokens['touch-target.min'], paddingHorizontal: tokens['space.4'] }}>
               <Icon name="action.image" size="sm" color={tokens['color.foreground']} />

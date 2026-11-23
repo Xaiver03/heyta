@@ -179,6 +179,9 @@ export function FocusScreen(): React.JSX.Element {
     () =>
       StyleSheet.create({
         chips: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] },
+        gap2: { gap: tokens['space.2'] },
+        gap1: { gap: tokens['space.1'] },
+        statCell: { flex: 1, alignItems: 'center', gap: tokens['space.1'] },
       }),
     [tokens],
   );
@@ -360,7 +363,7 @@ export function FocusScreen(): React.JSX.Element {
 
       {/* 类型选择只在空闲时出现 —— 见文件头第 3 条。 */}
       {state.phase === 'idle' ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
+        <View style={styles.chips}>
           {KIND_ORDER.map((kind) => (
             <Chip
               key={kind}
@@ -389,7 +392,7 @@ export function FocusScreen(): React.JSX.Element {
       ) : (
       <Card>
         {linkedTask !== undefined ? (
-          <View style={{ gap: tokens['space.2'] }}>
+          <View style={styles.gap2}>
             <Text variant="row-title" numberOfLines={2}>
               {linkedTask.title}
             </Text>
@@ -409,7 +412,7 @@ export function FocusScreen(): React.JSX.Element {
             {t('mobile.focus.noPending')}
           </Text>
         ) : (
-          <View style={{ gap: tokens['space.1'] }}>
+          <View style={styles.gap1}>
             {pendingTasks.slice(0, MAX_PICKER_TASKS).map((task) => (
               <TaskChoice
                 key={task.id}
@@ -438,11 +441,11 @@ export function FocusScreen(): React.JSX.Element {
             同样的信息，一张卡里一眼读完，纵向空间反而更省。
           */}
           <HStack gap="default">
-            <View style={{ flex: 1, alignItems: 'center', gap: tokens['space.1'] }} testID="focus-today-completed">
+            <View style={styles.statCell} testID="focus-today-completed">
               <Text variant="headline">{t('mobile.focus.stats.completedValue', { count: overview.todayCount })}</Text>
               <Text variant="caption" tone="subtle">{t('mobile.focus.stats.completed')}</Text>
             </View>
-            <View style={{ flex: 1, alignItems: 'center', gap: tokens['space.1'] }} testID="focus-today-duration">
+            <View style={styles.statCell} testID="focus-today-duration">
               <Text variant="headline">{formatFocusDurationText(overview.todayFocusMs, t)}</Text>
               <Text variant="caption" tone="subtle">{t('mobile.focus.stats.focusDuration')}</Text>
             </View>

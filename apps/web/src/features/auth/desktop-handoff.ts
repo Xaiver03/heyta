@@ -1,4 +1,4 @@
-import { buttonClassName } from '../../components/hta/button-class.js';
+import { buttonClassName } from '../../components/hta/Button.js';
 import { DEFAULT_LOCALE, matchLocale, translate } from '@heyta/i18n';
 /**
  * 桌面壳的**反向授权回跳**（ADR-0039 §2.3）

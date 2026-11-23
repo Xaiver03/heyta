@@ -42,7 +42,7 @@ export function Tabs({
             key={tab.key}
             value={tab.key}
             disabled={tab.disabled}
-            className="hta-tab"
+            className="hta-tab ht-type-body-sm"
             data-testid={testID === undefined ? undefined : `${testID}-${tab.key}`}
             {...(panelId === undefined ? {} : { 'aria-controls': panelId })}
           >

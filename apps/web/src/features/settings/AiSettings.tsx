@@ -760,9 +760,8 @@ export function AiSettings({
               的形状；而换服务器时这一档应当**跟着换**，不需要用户记得回来改。
           */}
           <fieldset
-            className="ht-settings__options"
+            className="ht-settings__options ht-ai-settings__reset-fieldset"
             data-testid="ai-supply-mode"
-            style={{ border: 0, padding: 0, margin: 0 }}
           >
             {/*
               🔴 顺序与默认值（2026-10-24，产品负责人的纠正）：

@@ -15,7 +15,7 @@
  *  1. **testid 契约不变**：`calendar-toolbar-prev/month/next/today`、`calendar-view-select`、
  *     `calendar-capture-toggle`、`calendar-menu-open`、`calendar-scope-*` 全部照旧。
  *     e2e 光读这些 id 的就有十几处 —— 摆位变了、id 不能变。
- *  2. **原生 `<select data-testid="calendar-view-select">` 保留但视觉隐藏**（`.ht-cal-sr-only`）。
+ *  2. **原生 `<select data-testid="calendar-view-select">` 保留但视觉隐藏**（`.ht-content__cal-sr-only`）。
  *     它是**可访问的表单回退**（键盘/Tab/读屏仍能选档），同时让“按 value 切档”的既有判据继续成立；
  *     可见的分段控件 `CalendarViewTabs` 与它绑同一个 `view.view`。两者都是真控件，不是假控件。
  *  3. 「时间线」不是 `CalendarViewKind`（见下），仍只从 `⋮` 进，不进分段。
@@ -173,8 +173,8 @@ export function CalendarHeaderToolbar({
   return (
     <div className="ht-header__calendar-toolbar">
       {/* 第①层：视图分段 + 新建 + ⋮（低频项进 ⋮） */}
-      <div className="ht-cal-band ht-cal-band--tools">
-        <div className="ht-cal-seg">
+      <div className="ht-content__cal-band ht-content__cal-band--tools">
+        <div className="ht-content__cal-seg">
           <CalendarViewTabs
             view={view.view}
             options={CALENDAR_VIEW_ORDER}
@@ -236,7 +236,7 @@ export function CalendarHeaderToolbar({
         ) : null}
 
         {/* 可访问的视图回退：视觉隐藏，但键盘/读屏/按 value 切档的判据都仍成立。 */}
-        <label className="ht-header__view ht-cal-sr-only" data-testid="calendar-view-switch">
+        <label className="ht-header__view ht-content__cal-sr-only" data-testid="calendar-view-switch">
           {t('common.calendar.view.aria')}
           <select
             aria-label={t('common.calendar.view.aria')}
@@ -264,14 +264,14 @@ export function CalendarHeaderToolbar({
       </div>
 
       {/* 第②层：大标题 + ‹ 今天 › */}
-      <div className="ht-cal-band ht-cal-band--title">
-        <h2 className="ht-cal-bigtitle" data-testid="calendar-toolbar-month">
+      <div className="ht-content__cal-band ht-content__cal-band--title">
+        <h2 className="ht-content__cal-bigtitle" data-testid="calendar-toolbar-month">
           {rangeTitle}
         </h2>
-        <div className="ht-cal-nav">
+        <div className="ht-content__cal-nav">
           <button
             type="button"
-            className="ht-cal-navbtn"
+            className="ht-content__cal-navbtn"
             aria-label={prevLabel}
             role="button"
             data-testid="calendar-toolbar-prev"
@@ -281,7 +281,7 @@ export function CalendarHeaderToolbar({
           </button>
           <button
             type="button"
-            className="ht-cal-today"
+            className="ht-content__cal-today"
             role="button"
             data-testid="calendar-toolbar-today"
             onClick={() => {
@@ -292,7 +292,7 @@ export function CalendarHeaderToolbar({
           </button>
           <button
             type="button"
-            className="ht-cal-navbtn"
+            className="ht-content__cal-navbtn"
             aria-label={nextLabel}
             role="button"
             data-testid="calendar-toolbar-next"

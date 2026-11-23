@@ -156,7 +156,7 @@ const SCOPES = [
      * 🔴 2026-11 行操作重设计：98 → **74**（行尾那排编辑器连同它的内联样式整排撤掉，
      *    含件搬进 `features/tasks/task-row-menu.css` 一族；实测值由本脚本自己打）。
      */
-    baseline: 74,
+    baseline: 73,
   },
   {
     label: 'apps/mobile/src/screens（L4 视图）',

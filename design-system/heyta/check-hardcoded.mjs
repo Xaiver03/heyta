@@ -438,6 +438,18 @@ const PAIRED_TYPOGRAPHY_ALLOW = [
   { file: 'apps/web/src/styles/app.css', combo: 'sm+semibold', why: '卡片内小标题（sm 级）：档位表无 sm 档' },
   { file: 'apps/web/src/styles/app.css', combo: 'lg+semibold', why: '管理台统计值：语义上是数字档（numeric-display 为 4xl，不等值）' },
   { file: 'apps/web/src/styles/app.css', combo: 'xs+medium', why: 'ht-viewtab：全仓当前零消费者（疑似 IA 重构遗留），迁移无 JSX 可配' },
+  // 2026-11-23 补：日历月标题 `.ht-content__cal-bigtitle`（原 `.ht-cal-bigtitle`）。
+  // 它是**桌面层级的页内大标题**，与 `screen-title`（3xl/bold）字号同档、字重不同（semibold）
+  // —— 与上面 `xl+semibold`「页标题…不等值」同一条理由，不是随手放宽。
+  { file: 'apps/web/src/styles/app.css', combo: '3xl+semibold', why: '日历月标题：桌面层级，screen-title 是 3xl/bold，字重不等值' },
+  // 2026-11-23 补：web 组件壳 hta.css 的两处桌面层级（不是 11 个档位的等值组合）
+  //   · `.hta-badge` 2xs/medium：11px 与 `ht-type-badge` 同字号，但那是 semibold；
+  //     徽标刻意用 medium（徽标不是标题，不该抢字重）。档位表无此组合。
+  //   · `.hta-stat-card__value` / `.hta-sheet__title` lg/semibold：18px semibold，
+  //     数字档 `numeric-summary` 是 2xl、标题档 `section-title` 是 base，均不等值。
+  //     （这两件当前 0 消费者，先按原值登记，避免顺手改视觉。）
+  { file: 'apps/web/src/components/hta/hta.css', combo: '2xs+medium', why: '徽标：11px 与 badge 档同字号，但字重刻意用 medium 不抢标题' },
+  { file: 'apps/web/src/components/hta/hta.css', combo: 'lg+semibold', why: '统计值与侧栏 sheet 标题：18px semibold，数字档 2xl / 标题档 base 均不等值' },
 ];
 
 /** 从 CSS 规则体与 TSX 窗口里提取「取值组合」的 key。 */

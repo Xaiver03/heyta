@@ -215,3 +215,11 @@
     transition: none;
   }
 }
+
+/* `fieldset` 的默认盒模型（border/padding/margin）由浏览器给，这里清零。
+   原先是一处内联 `style={{ border: 0, padding: 0, margin: 0 }}`（`check:l4` 禁 L4 内联样式）。 */
+.ht-ai-settings__reset-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}

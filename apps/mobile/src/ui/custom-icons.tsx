@@ -11,6 +11,19 @@
 import React from 'react';
 import { Circle, Ellipse, Line, Path, Rect, Svg } from 'react-native-svg';
 
+import { tokensForTheme } from '@heyta/design-system';
+
+/**
+ * 图标默认描边色。
+ *
+ * 原先这里写死了一个**没有语义的原始色阶**（slate-700），而且它是
+ * 固定值，暗色主题下会脏。图标的正确语义是「前景」，取 `color.foreground`
+ * 的浅色档作静态兜底（真正的主题色由调用方传 `color` 进来，
+ * 全仓调用点都是 `<Icon color={tokens['color.foreground']} />` 这一形）。
+ * 取静态档是因为本组件是**裸 SVG 原语**，不挂 theme Provider，不能读 hook。
+ */
+const DEFAULT_ICON_COLOR = tokensForTheme('light')['color.foreground'];
+
 interface GlyphProps {
   readonly size?: number;
   readonly strokeWidth?: number;
@@ -20,7 +33,7 @@ interface GlyphProps {
 function Base({
   size = 24,
   strokeWidth = 2,
-  color = '#334155',
+  color = DEFAULT_ICON_COLOR,
   children,
 }: GlyphProps & { children: React.ReactNode }): React.JSX.Element {
   return (
@@ -134,7 +147,7 @@ export function MoreGlyph(props: GlyphProps): React.JSX.Element {
 
 /** AI 助手标记：原子/轨道（非星芒、非机器人、非气泡）。 */
 export function AiMarkGlyph(props: GlyphProps): React.JSX.Element {
-  const c = props.color ?? '#334155';
+  const c = props.color ?? DEFAULT_ICON_COLOR;
   return (
     <Base {...props}>
       <Ellipse cx="12" cy="12" rx="9" ry="3.7" transform="rotate(-32 12 12)" />
@@ -257,7 +270,7 @@ export function ImagePlusGlyph(props: GlyphProps): React.JSX.Element {
 
 /** 三角警告：三角 + 感叹号。 */
 export function TriangleAlertGlyph(props: GlyphProps): React.JSX.Element {
-  const c = props.color ?? '#334155';
+  const c = props.color ?? DEFAULT_ICON_COLOR;
   return (
     <Base {...props}>
       <Path d="M10.3 4.4 2.8 17.5a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.4a2 2 0 0 0-3.4 0Z" />
@@ -454,7 +467,7 @@ export function MonitorGlyph(props: GlyphProps): React.JSX.Element {
 
 /** 同心圆靶心（专注）。 */
 export function TargetGlyph(props: GlyphProps): React.JSX.Element {
-  const c = props.color ?? '#334155';
+  const c = props.color ?? DEFAULT_ICON_COLOR;
   return (
     <Base {...props}>
       <Circle cx="12" cy="12" r="9" />
@@ -478,7 +491,7 @@ export function CoffeeGlyph(props: GlyphProps): React.JSX.Element {
 
 /** 播放（实心三角）。 */
 export function PlayGlyph(props: GlyphProps): React.JSX.Element {
-  const c = props.color ?? '#334155';
+  const c = props.color ?? DEFAULT_ICON_COLOR;
   return (
     <Base {...props}>
       <Path d="M7 4.6 19 12 7 19.4Z" fill={c} stroke="none" />
@@ -488,7 +501,7 @@ export function PlayGlyph(props: GlyphProps): React.JSX.Element {
 
 /** 暂停（两条竖条）。 */
 export function PauseGlyph(props: GlyphProps): React.JSX.Element {
-  const c = props.color ?? '#334155';
+  const c = props.color ?? DEFAULT_ICON_COLOR;
   return (
     <Base {...props}>
       <Rect x="7" y="4.5" width="3.6" height="15" rx="1.2" fill={c} stroke="none" />
@@ -499,7 +512,7 @@ export function PauseGlyph(props: GlyphProps): React.JSX.Element {
 
 /** 停止（实心方）。 */
 export function SquareGlyph(props: GlyphProps): React.JSX.Element {
-  const c = props.color ?? '#334155';
+  const c = props.color ?? DEFAULT_ICON_COLOR;
   return (
     <Base {...props}>
       <Rect x="4.6" y="4.6" width="14.8" height="14.8" rx="2.6" fill={c} stroke="none" />
@@ -534,7 +547,7 @@ export function ChevronRightGlyph(props: GlyphProps): React.JSX.Element {
 
 /** 日历 + 日期点。 */
 export function CalendarDaysGlyph(props: GlyphProps): React.JSX.Element {
-  const c = props.color ?? '#334155';
+  const c = props.color ?? DEFAULT_ICON_COLOR;
   return (
     <Base {...props}>
       <Rect x="3.5" y="5" width="17" height="15.5" rx="3" />
@@ -634,7 +647,7 @@ export function CrownGlyph(props: GlyphProps): React.JSX.Element {
 
 /** 圆圈里一个 i（信息）。 */
 export function InfoGlyph(props: GlyphProps): React.JSX.Element {
-  const c = props.color ?? '#334155';
+  const c = props.color ?? DEFAULT_ICON_COLOR;
   return (
     <Base {...props}>
       <Circle cx="12" cy="12" r="9" />

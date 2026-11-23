@@ -131,8 +131,6 @@
   color: var(--ht-color-foreground-muted);
   cursor: pointer;
   font-family: var(--ht-font-sans);
-  font-size: var(--ht-font-size-sm);
-  font-weight: var(--ht-font-weight-medium);
   white-space: nowrap;
   min-block-size: var(--ht-touch-target-min);
   padding-inline: var(--ht-space-3);

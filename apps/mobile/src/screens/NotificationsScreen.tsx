@@ -34,7 +34,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, Share, View } from 'react-native';
+import { Pressable, Share, StyleSheet, View } from 'react-native';
 import { formatCompactDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { EmptyState } from '@heyta/ui';
@@ -80,6 +80,13 @@ export function NotificationsScreen({
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        flex1: { flex: 1 },
+      }),
+    [tokens],
+  );
 
   // 凭据在挂载时读一次（本屏是一次性第二层表面，不是常驻状态）。
   const config = useMemo(() => readSyncConfig(), []);
@@ -276,7 +283,7 @@ export function NotificationsScreen({
                     }}
                   />
                 ) : null}
-                <Text variant="row-title" tone="default" style={{ flex: 1 }}>
+                <Text variant="row-title" tone="default" style={styles.flex1}>
                   {t('mobile.inbox.notification.referral.title')}
                 </Text>
                 <Text variant="caption" tone="subtle">
@@ -403,7 +410,7 @@ export function NotificationsScreen({
             </Text>
             {invite.referrals.map((referral) => (
               <HStack key={referral.code} align="center">
-                <Text variant="row-meta" tone="default" style={{ flex: 1 }}>
+                <Text variant="row-meta" tone="default" style={styles.flex1}>
                   {referral.displayName ?? t('mobile.inbox.invite.unknownName')}
                 </Text>
                 <Text variant="caption" tone={referral.activatedAt === null ? 'muted' : 'default'}>
@@ -443,7 +450,7 @@ export function NotificationsScreen({
         {shareEntries.map((entry) => (
           <Card key={`${entry.at}:${entry.shareId}:${entry.kind}`}>
             <HStack align="center">
-              <Text variant="row-meta" tone="default" style={{ flex: 1 }}>
+              <Text variant="row-meta" tone="default" style={styles.flex1}>
                 {entry.body}
               </Text>
               <Text variant="caption" tone="subtle">

@@ -28,6 +28,13 @@ const px = (v: unknown, fallback = 16): number => {
   if (!Number.isFinite(n)) return fallback;
   return raw.includes('rem') ? n * 16 : n;
 };
+/**
+ * Markdown 段落与列表块之间的纵向间距。
+ *
+ * 原先是一个裸的纵向间距值（2px）。它不是任何 spacing 档位，所以这里**从最小档
+ * 推出来**（最小档 4px 的一半），既不留裸值、也不为一次性间距扩 token 面。
+ */
+const blockGap = (v: unknown): number => px(v) / 2;
 const ratio = (v: unknown, fallback = 1.5): number => {
   const n = typeof v === 'number' ? v : parseFloat(String(v));
   return Number.isFinite(n) ? n : fallback;
@@ -210,7 +217,7 @@ function renderNodes(nodes: Node[], t: Tokens, keyBase: string): React.ReactNode
           <RNText
             key={k}
             selectable
-            style={{ fontSize: px(t['font-size.base']),  color: t['color.foreground'], marginVertical: 2 }}
+            style={{ fontSize: px(t['font-size.base']),  color: t['color.foreground'], marginVertical: blockGap(t['space.1']) }}
           >
             {inline ? renderInline(inline.children, t, { fontSize: px(t['font-size.base']),  color: t['color.foreground'] }, k) : null}
           </RNText>
@@ -240,7 +247,7 @@ function renderNodes(nodes: Node[], t: Tokens, keyBase: string): React.ReactNode
             </View>
           ));
         return (
-          <View key={k} style={{ marginVertical: 2 }}>
+          <View key={k} style={{ marginVertical: blockGap(t['space.1']) }}>
             {items}
           </View>
         );

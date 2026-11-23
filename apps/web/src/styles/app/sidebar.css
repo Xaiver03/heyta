@@ -509,6 +509,23 @@
    * 固定 8px 会把 13.75px 高的字切成一半，所以给它**下限**而不是定值。
    */
   min-block-size: var(--ht-size-badge-dot);
+}.ht-sidebar__day-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  /*
+   * 🔴 `min-block-size` 而不是 `block-size`：这一槽现在住的**不止那颗点** ——
+   * W6 的「休 / 班」与它同一行（一颗点在 27px 宽的一格里再单独占一行，
+   * 会把格子撑出 `aspect-ratio` 那条老路，见上面 `.ht-sidebar__day` 的记录）。
+   * 固定 8px 会把 13.75px 高的字切成一半，所以给它**下限**而不是定值。
+   */
+  min-block-size: var(--ht-size-badge-dot);
+}
+
+/* 迷你月历「这一天有内容」的那一颗点。原先它的底色是内联 style（`check:l4` 禁 L4 内联样式）。 */
+.ht-sidebar__day-dot {
+  background: var(--ht-color-primary);
 }
 
 .ht-sidebar__day-dots > i {
@@ -665,15 +682,6 @@
   flex: 1 1 auto;
 }
 
-/* 清单「分类」标题（父清单 = 分类，子清单缩进在下面）。2026-11-22 */
-.ht-sidebar__scope-category {
-  display: block;
-  margin-block-start: var(--ht-space-2);
-  padding-inline: var(--ht-space-2);
-  font-size: var(--ht-font-size-xs);
-  font-weight: var(--ht-font-weight-semibold);
-  color: var(--ht-color-foreground-muted);
-}
 
 /* 清单「分组头」：父清单仍可勾选（能筛它自己的任务），只是加粗成组头。2026-11-22 */
 .ht-sidebar__scope-row--group .ht-sidebar__scope-name {
