@@ -132,11 +132,16 @@ export const MAX_TOOLS_PER_ENTITY = 7;
  */
 export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
-  TASK: 32,
+  // 批8：TASK 加 set_task_assignee（指派）→ 33。
+  TASK: 33,
   PROJECT: 10,
   NOTE: 10,
   // 批6：HABIT 加颜色/图标/目标/频率 4 个写工具 → 5+4=9，放到 12 留余量。
   HABIT: 12,
+  // 批8：附件（list/rename/remove 三工具）。
+  ATTACHMENT: 3,
+  // 批8：评论（list/add/delete 三工具）。
+  COMMENT: 3,
 } as const satisfies Readonly<Partial<Record<string, number>>>;
 
 export type ToolBudgetEntityType = keyof typeof MAX_TOOLS_PER_ENTITY_BY_TYPE;
@@ -793,7 +798,38 @@ export type LocalApiWriteIntent =
   /** 整组覆盖任务子项（TASK）。items 空数组 = 清空；id 缺失则新建。 */
   | { action: 'set-task-checklist'; taskId: string; items: readonly { id?: string; text: string; done?: boolean }[] }
   /** 勾选/取消任务某条子项（TASK）。按文本唯一匹配；全勾时正常任务自动完成。 */
-  | { action: 'toggle-checklist-item'; taskId: string; itemText: string; done: boolean };
+  | { action: 'toggle-checklist-item'; taskId: string; itemText: string; done: boolean }
+  // 附件（ATTACHMENT）：改名是纯 op；移除先发 DEL op、再尽力回收字节。
+  /**
+   * 改附件展示名（ATTACHMENT）。**纯 op，不碰字节** —— 字节以 `id` 为键存取，
+   * 改名不可能把文件改坏，也不需要重新上传（`attachment-actions.ts` 文件头第 5 条）。
+   */
+  | { action: 'rename-attachment'; attachmentId: string; fileName: string }
+  /**
+   * 移除附件（ATTACHMENT）：发 `DEL` op（软删 → 回收站），随后-尽力回收字节。
+   * ⚠️ 字节一旦回收就再也取不回来 —— 所以这条**实际不可逆**（见工单风险项）。
+   */
+  | { action: 'remove-attachment'; attachmentId: string }
+  // 批8：任务指派（ADR-0062 决策 7 / ADR-0088）
+  /**
+   * 设置/清除任务指派人（TASK）。`assigneeUserId` 省略或空串 = 清除（写 `null`）。
+   * 语义**只对共享清单内的任务有意义**；个人任务缺席 = 未指派。存在性由宿主经
+   * `actions.findTask` 判（I5：本层不读原始 `tasks` 表）。
+   */
+  | { action: 'set-task-assignee'; taskId: string; assigneeUserId?: string }
+  // 评论（COMMENT，P4 / ADR-0062）：**share 感知的独立工具通道**。
+  /**
+   * 给一条任务加评论（COMMENT）。
+   *
+   * 🔴 与个人 op-log 的其它写入**执行目标不同**：`submitIntent` 不调 `ctx.dispatch`，
+   * 而是走宿主注入的 `CommentActions`（→ `dispatchShareOp` → share 加密通道）。
+   * 意图仍然经过同一个 `submit` 入口（op-log 单入口不变），但落地的是**共享清单**。
+   * 无 share 会话的宿主（CLI/MCP）→ `{ ok:false, reason:'invalid' }` 且**零 op**；
+   * 个人清单 → `ListNotSharedError` 译成"评论只存在于共享清单"且**零 op**。
+   */
+  | { action: 'add-task-comment'; taskId: string; body: string }
+  /** 删除一条评论（COMMENT）。软删（`DEL`），可逆 —— 走同一条 share 通道。 */
+  | { action: 'delete-task-comment'; commentId: string };
 
 /**
  * 一条写入落地的实体类型。
@@ -826,7 +862,9 @@ export type LocalApiWrittenEntityType =
   | 'HABIT_LOG'
   | 'FOCUS_SESSION'
   | 'REMINDER'
-  | 'EVENT';
+  | 'EVENT'
+  | 'ATTACHMENT'
+  | 'COMMENT';
 
 export type LocalApiWriteResult =
   | {
@@ -852,5 +890,16 @@ export type LocalApiWriteResult =
       entityId?: string;
       /** 给了它就必须给 `entityId`；任务写入留空 = 既有形状。 */
       entityType?: LocalApiWrittenEntityType;
+      /**
+       * 附件写动作（rename / remove）落地的附件 id。
+       * 给了它 ⇒ 出协议时回 `{ ok, attachmentId, bytesReleased? }`（不冒充 `taskId`）。
+       */
+      attachmentId?: string;
+      /**
+       * 移除附件后**字节是否真的回收**了。
+       * `false` = 只发了 `DEL` op，字节没回收（无端口 / 断网）—— 列表状态仍正确，
+       * 多占的额度留给服务端孤儿扫描（`attachment-actions.ts` 文件头第 4 条）。
+       */
+      bytesReleased?: boolean;
     }
   | { ok: false; reason: 'rejected' | 'not-found' | 'invalid'; message: string };

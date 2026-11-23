@@ -120,6 +120,12 @@ export function aiToolProposalRequiresConfirmation(proposal: AiToolProposal): bo
         )
       );
     }
+    // 评论（COMMENT，P4）：写入落在**共享清单**、对协作成员可见。即使目录把
+    // 它标成 `write`（不是 purge），也一律要求确认 —— "一条别人会看见的评论"
+    // 不适合走低风险自动执行；用户按下确认前必须看见将要发出去的那句话。
+    case 'add-task-comment':
+    case 'delete-task-comment':
+      return true;
     default:
       return false;
   }

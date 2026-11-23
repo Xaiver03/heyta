@@ -111,6 +111,8 @@ function host(
     listReminders: async () => [REMINDER],
     listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
     getEvent: () => Promise.resolve(undefined),
+    listAttachments: async (taskId: string) => [{ id: 'att-1', fileName: 'a.txt', mime: 'text/plain', sizeBytes: 10, taskId }],
+    listTaskComments: async (taskId: string) => [{ id: 'c1', taskId, authorUserId: 'u1', body: '好的', createdAt: 1 }],
     submit: async () => ({ ok: true, taskId: 'created-1' }),
   };
 }
@@ -341,6 +343,8 @@ function eventHost(events: readonly LocalApiEventItem[]): LocalApiHost {
     listReminders: async () => [],
     listEvents: async () => events,
     getEvent: async (eventId: string) => events.find((e) => e.id === eventId),
+    listAttachments: async (taskId: string) => [{ id: 'att-1', fileName: 'a.txt', mime: 'text/plain', sizeBytes: 10, taskId }],
+    listTaskComments: async (taskId: string) => [{ id: 'c1', taskId, authorUserId: 'u1', body: '好的', createdAt: 1 }],
     submit: async () => ({ ok: true, taskId: 'created-1' }),
   };
 }

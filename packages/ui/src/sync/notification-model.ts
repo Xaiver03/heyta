@@ -12,9 +12,14 @@
  * - **活动三类**（完成 / 新增 / 删除）：默认全关（防通知风暴）——
  *   这是本层**今天唯一有输入的档位**，也是 `ShareNotificationPrefs` 唯一的键。
  *
- * 🔴 滴答那张表里另两档（任务提醒范围、自动接受已知合作者的邀请）**没有实现**：
- * 它们各自的输入在本仓还不存在，理由、现量命令与重新开工的条件写在下面
- * `DEFAULT_NOTIFICATION_PREFS` 那段注释里（2026-10-24 整条撤下，界面上也不再渲染）。
+ * 🔴 滴答那张表里另两档的状态不同：
+ * - **任务提醒范围已恢复**（2026-11-23）：它判的 `Task.assigneeUserId` 现在有了写点
+ *   （`set_task_assignee` 工具 + `patchDetails`，见 ADR-0088），于是「按指派吵人」这一档
+ *   有了真实输入、不再是"四档行为逐字相同"的空壳，按原设计（`taskScope` 四档 + 默认
+ *   `assignedToMe`）接回来。
+ * - **自动接受已知合作者的邀请仍未实现**：它要一份"合作者名单"，那一档产品面还不存在，
+ *   而且一旦落地要先过 ADR-0071 那面同意闸 —— 属要新写一份 ADR 的口径变更。
+ * 理由与判据见下面 `DEFAULT_NOTIFICATION_PREFS` 那段注释。
  *
  * ADR-0071 在这一层又加了两件事，都**不是**新的闸门：**同意**决定这条通知能不能出现，
  * **内容口径**决定响的时候说什么（清单名 + 活动种类，条目内容一律不进正文）。
@@ -30,12 +35,24 @@ export interface ShareActivityPrefs {
   onDeleted: boolean;
 }
 
+/**
+ * 任务提醒范围（四档）。照滴答的「任务提醒」设置：
+ * - `all`：所有任务变动都提醒；
+ * - `allExceptAssignedToOthers`：别人指派给他人的任务不吵我；
+ * - `assignedToMe`：只在指派给我时提醒（**默认档**，也是"判 `assigneeUserId`"的那一档）；
+ * - `none`：不提醒。
+ * ⚠️ 这一档的输入是 `Task.assigneeUserId`（ADR-0062 / ADR-0088）。
+ */
+export type TaskReminderScope = 'all' | 'allExceptAssignedToOthers' | 'assignedToMe' | 'none';
+
 export interface ShareNotificationPrefs {
   activities: ShareActivityPrefs;
+  taskScope: TaskReminderScope;
 }
 
 export const DEFAULT_NOTIFICATION_PREFS: ShareNotificationPrefs = {
   activities: { onCompleted: false, onAdded: false, onDeleted: false },
+  taskScope: 'assignedToMe',
 };
 
 const ACTIVITY_MATCHERS: Record<ShareActivityKind, (p: ShareNotificationPrefs) => boolean> = {
@@ -119,20 +136,56 @@ export const shareActivityNotificationBody = (
   return name === '' ? copy.anonymous(kind) : copy.named(name, kind);
 };
 
+// ── 任务提醒档（2026-11-23 按原设计恢复；解锁它的输入见 ADR-0088） ──────────────
+// 🔴 历史：2026-10-24 这一档连同谓词被整条撤下，理由**不是**"没写完"，是**它没有输入**：
+//    `taskScope` 判的是 `Task.assigneeUserId`，而当时那个字段**全仓零写点**
+//    ⇒ 四档摆在一起行为逐字相同，面板等于在撒谎。**判据不许靠夹具点亮**。
+// ✅ 2026-11-23：`set_task_assignee` 工具 + `patchDetails` 给了这个字段真实写点，
+//    「按指派吵人」不再是空壳 ⇒ 按原设计接回来（`taskScope` 四档 + 默认 `assignedToMe`）。
+//    ⚠️ 这只解禁了**字段写点 + 通知档**，没有做真实多用户后端/ACL（见 ADR-0088）。
+//    反向那一半（"输入出现了而档位没回来会红"）由 `notification-model.spec.ts` 的
+//    `assignmentWriteSites()` 常驻盯着；这一档落地后它改成钉"写点恰在这些位置、档位在"。
+
+export interface ShareTaskLike {
+  taskId: string;
+  /** 加密 payload 里的指派人；undefined = 未指派。 */
+  assigneeUserId?: string;
+  /** 服务端（明文）操作者的账号 id——「指派给他人的除外」用它判。 */
+  actorUserId: number;
+}
+
+/**
+ * 任务提醒判定（四档）。`myUserId` = 当前账号 id；
+ * `actorUserId` 是做出这次变更的账号——「指派给他人的除外」挡的是
+ * *"别人改了指派给他的任务也吵我"*，而**自己改自己的任务永远不响**
+ * （这与 scope 无关：自己动手的事不需要通知自己）。
+ */
+export const shouldNotifyTaskReminder = (
+  prefs: ShareNotificationPrefs,
+  task: ShareTaskLike,
+  myUserId: number,
+): boolean => {
+  if (task.actorUserId === myUserId) return false;
+  const assignedToMe = task.assigneeUserId !== undefined && task.assigneeUserId === String(myUserId);
+  const assignedToSomeoneElse = task.assigneeUserId !== undefined && !assignedToMe;
+  switch (prefs.taskScope) {
+    case 'all':
+      return true;
+    case 'allExceptAssignedToOthers':
+      return !assignedToSomeoneElse;
+    case 'assignedToMe':
+      return assignedToMe;
+    case 'none':
+      return false;
+  }
+};
+
 /*
- * 🔴 这里曾有另外两档偏好（任务提醒范围 `taskScope` 四档、`autoAcceptKnownCollaborators`）
- *    和它们的两个谓词，2026-10-24 整条删掉。删的理由不是"没写完"，是**它们没有输入**：
- *    · `taskScope` 判的是 `Task.assigneeUserId`，而这个字段**全仓零写点**（现量：
- *      `grep -rn "assigneeUserId" packages apps server --include='*.ts*' | grep -v tests` 只剩实体声明与本文件）
- *      ⇒ 四档选择摆在一起时行为逐字相同，面板等于在撒谎；
- *    · 自动接受需要一份"合作者名单"，那一档产品面还不存在（谁算已知合作者是个真问题）。
- *    界面上一律不再渲染它们。**判据不许靠夹具点亮**：等指派或合作者名单落地时，
- *    连同它的输入来源一起重来（见计划 §9.10 那格与交接书）。
- *    🔴 2026-10-27 起这句"没有输入"**由双向判据看着**，不再只靠人记着：
- *       `packages/ui/tests/notification-model.spec.ts` 那一组既钉"加档位没输入会红"，
- *       也钉"输入出现了（`assigneeUserId` 有了写点）而档位没回来会红"，
- *       分母由 `packages/*`、`apps/*`、`server/src` 现取（枚数由它自己打印）。
- *    ⚠️ 反向那一半只覆盖**指派**这一族。`autoAcceptKnownCollaborators` 的前提是"合作者名单"，
- *       它今天仍不存在，而且它一旦落地要先过 ADR-0071 那面同意闸 —— **自动加入 = 绕过同意面**，
- *       属于要先新立一份 ADR 的口径变更，不是接线工作。
+ * 🔴 仍**没有实现**的另一档：`autoAcceptKnownCollaborators`（自动接受已知合作者的邀请）。
+ *    2026-10-24 与任务提醒档一起撤下；任务提醒档已于 2026-11-23 恢复，这一档**不恢复**：
+ *    · 它的前提是"合作者名单"，那一档产品面到今天仍不存在（谁算已知合作者是个真问题）；
+ *    · 一旦落地要先过 ADR-0071 那面同意闸 —— **自动加入 = 绕过同意面**，
+ *      属于要先新立一份 ADR 的口径变更，不是接线工作。
+ *    ⚠️ 所以 `notification-model.spec.ts` 的反向臂**只覆盖指派这一族**；别拿它当
+ *    自动接受也已就绪的证据。
  */

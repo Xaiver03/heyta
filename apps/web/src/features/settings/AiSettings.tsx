@@ -268,6 +268,9 @@ function localApiToolLabel(name: string, t: I18nValue['t']): string {
     case 'set_task_tags': return t('web.ai.settings.localApi.tool.setTaskTags');
     case 'create_note': return t('web.ai.settings.localApi.tool.createNote');
     case 'update_note': return t('web.ai.settings.localApi.tool.updateNote');
+    case 'list_task_comments': return t('web.ai.settings.localApi.tool.listTaskComments');
+    case 'add_task_comment': return t('web.ai.settings.localApi.tool.addTaskComment');
+    case 'delete_task_comment': return t('web.ai.settings.localApi.tool.deleteTaskComment');
     case 'record_checkin': return t('web.ai.settings.localApi.tool.recordCheckin');
     case 'log_focus': return t('web.ai.settings.localApi.tool.logFocus');
     case 'create_reminder': return t('web.ai.settings.localApi.tool.createReminder');

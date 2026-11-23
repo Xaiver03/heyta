@@ -97,6 +97,11 @@ function host(): LocalApiHost {
     listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
     getEvent: () => Promise.resolve(undefined),
 
+    listAttachments: (taskId: string) =>
+      Promise.resolve([{ id: 'att-1', fileName: 'a.txt', mime: 'text/plain', sizeBytes: 10, taskId }]),
+    listTaskComments: (taskId: string) =>
+      Promise.resolve([{ id: 'c1', taskId, authorUserId: 'u1', body: '好的', createdAt: 1 }]),
+
     submit: (): Promise<LocalApiWriteResult> => Promise.resolve({ ok: true, taskId: 'created-1' }),
   };
 }

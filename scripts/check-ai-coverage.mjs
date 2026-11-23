@@ -936,14 +936,11 @@ if (!exists(AI_DIST)) {
  * 它是这道门禁"为什么不红"的官方说法。写进去之前必须自己走一遍取证。
  */
 const ENTITY_COVERAGE_DEBT = new Map([
-  ['COMMENT', {
-    gap: 'AI-COV-8',
-    reason:
-      '共享清单的任务评论（ADR-0062）2026-10-08 进 EntityModelMap，读/写工具随协作客户端引擎（W3/W4）落地。' +
-      '不在本批补目录的理由：评论的可读性依赖 share 域上下文（成员身份 + 清单密钥解密后的任务视图），' +
-      '单做目录工具会造出一个 AI 碰不到的假功能——与"一个碰不到的 AI 功能不是功能"同一条纪律。' +
-      '台账：docs/plans/ai-event-tool-contract.md §5.1（AI-COV-8）。',
-  }],
+  // 2026-11-23：`COMMENT`（AI-COV-8）已**闭合** —— 评论工具（`add_task_comment` /
+  // `list_task_comments` / `delete_task_comment`）随"share 感知的独立工具通道"落地
+  // （`packages/local-api/src/tools/comment.ts`），读与写都有了工具，于是它按本段
+  // 第二条牙齿从登记里被抹掉。写仍只经 share 通道：本宿主无共享会话时诚实失败、零 op。
+  // 台账：docs/plans/ai-event-tool-contract.md §5.1。
   /**
    * 任务附件（工单 `task-detail-ticktick-parity` #9，2026-11-03 进 `EntityModelMap`）。
    *
@@ -961,14 +958,7 @@ const ENTITY_COVERAGE_DEBT = new Map([
    * 归口：这条线的尾巴那一刀 —— 原生"下载进本机文件"+ `GET` + 界面"点开"，
    * 三件齐了才谈得上给助手一组能用的读写工具。
    */
-  ['ATTACHMENT', {
-    gap: 'AI-COV-9',
-    reason:
-      '任务附件的字节只能由用户手里的文件产生，助手没有这个来源；而这条通道刻意拒绝' +
-      '"先建实体后补字节"的顺序（那会留下点不开的附件），所以写工具在这一刀里做不出正确的形状。' +
-      '读工具单独存在既不满足"读写都有"的口径，读回来的也只是文件名与大小 —— ' +
-      '这条通道上还没有 GET。台账：docs/plans/task-detail-ticktick-parity.md §5.9。',
-  }],
+
 ]);
 
 const GEN = join(ROOT, 'scripts/gen-ai-capability-manifest.mjs');

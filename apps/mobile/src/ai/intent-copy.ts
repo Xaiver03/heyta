@@ -223,6 +223,10 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate, locale: Lo
       return intent.pinned
         ? t('web.ai.tools.intentSetTaskPinned', { id: intent.taskId })
         : t('web.ai.tools.intentUnsetTaskPinned', { id: intent.taskId });
+    case 'set-task-assignee':
+      return intent.assigneeUserId === undefined
+        ? t('web.ai.tools.intentClearTaskAssignee', { id: intent.taskId })
+        : t('web.ai.tools.intentSetTaskAssignee', { id: intent.taskId, assignee: intent.assigneeUserId });
     case 'move-tasks':
       return intent.projectId === undefined
         ? t('web.ai.tools.intentMoveTasksOut', { count: String(intent.taskIds.length) })
@@ -271,5 +275,15 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate, locale: Lo
       return intent.done
         ? t('web.ai.tools.intentCheckChecklistItem', { id: intent.taskId, item: intent.itemText })
         : t('web.ai.tools.intentUncheckChecklistItem', { id: intent.taskId, item: intent.itemText });
+    // P4：评论（COMMENT）—— share 感知的独立通道。与 web 那份逐字同口径（无 default）。
+    case 'add-task-comment':
+      return t('web.ai.tools.intentAddTaskComment', { body: intent.body });
+    case 'delete-task-comment':
+      return t('web.ai.tools.intentDeleteTaskComment', { id: intent.commentId });
+    // 批8：附件（ATTACHMENT）
+    case 'rename-attachment':
+      return t('web.ai.tools.intentRenameAttachment', { id: intent.attachmentId, fileName: intent.fileName });
+    case 'remove-attachment':
+      return t('web.ai.tools.intentRemoveAttachment', { id: intent.attachmentId });
   }
 }

@@ -115,6 +115,7 @@ function makeTaskActionsStub() {
     findTask: vi.fn((): unknown => undefined),
     setImportant: vi.fn(async (_entityId: string, _important: boolean): Promise<void> => undefined),
     setPinned: vi.fn(async (_entityId: string, _pinned: boolean): Promise<void> => undefined),
+    patchDetails: vi.fn(async (_entityId: string, _patch: Record<string, unknown>): Promise<void> => undefined),
     bulkMoveToProject: vi.fn(
       async (_entityIds: readonly string[], _projectId: string | undefined): Promise<void> => undefined,
     ),
@@ -194,6 +195,49 @@ describe('任务标记：set-task-pinned', () => {
     expect(actions.setPinned).not.toHaveBeenCalled();
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('not-found');
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// 任务指派：set-task-assignee（批次 8）
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('任务指派：set-task-assignee', () => {
+  it('指派 → 先验存在，再 patchDetails(taskId, { assigneeUserId }) 传原值，回 ok + taskId', async () => {
+    actions.findTask.mockReturnValue({ id: 't1' });
+    const result = await makeHost().submit({ action: 'set-task-assignee', taskId: 't1', assigneeUserId: 'u1' });
+    expect(actions.findTask).toHaveBeenCalledWith('t1');
+    expect(actions.patchDetails).toHaveBeenCalledTimes(1);
+    expect(actions.patchDetails).toHaveBeenCalledWith('t1', { assigneeUserId: 'u1' });
+    expect(result).toEqual({ ok: true, taskId: 't1' });
+  });
+
+  it('🔴 清除：空串 assigneeUserId ⇒ patchDetails 收到 null（不是空串）', async () => {
+    actions.findTask.mockReturnValue({ id: 't1' });
+    await makeHost().submit({ action: 'set-task-assignee', taskId: 't1', assigneeUserId: '' });
+    expect(actions.patchDetails).toHaveBeenCalledWith('t1', { assigneeUserId: null });
+  });
+
+  it('🔴 清除：省略 assigneeUserId ⇒ patchDetails 收到 null', async () => {
+    actions.findTask.mockReturnValue({ id: 't1' });
+    await makeHost().submit({ action: 'set-task-assignee', taskId: 't1' });
+    expect(actions.patchDetails).toHaveBeenCalledWith('t1', { assigneeUserId: null });
+  });
+
+  it('任务不存在 ⇒ not-found，且**不调** patchDetails', async () => {
+    actions.findTask.mockReturnValue(undefined);
+    const result = await makeHost().submit({ action: 'set-task-assignee', taskId: 'ghost', assigneeUserId: 'u1' });
+    expect(actions.patchDetails).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('not-found');
+  });
+
+  it('patchDetails 抛错（非法值）⇒ 翻成 invalid，且不回 ok', async () => {
+    actions.findTask.mockReturnValue({ id: 't1' });
+    actions.patchDetails.mockRejectedValueOnce(new Error('任务「t1」的指派人无效'));
+    const result = await makeHost().submit({ action: 'set-task-assignee', taskId: 't1', assigneeUserId: 'u1' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('invalid');
   });
 });
 

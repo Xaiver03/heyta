@@ -24,7 +24,8 @@ import { OpLogEngine } from '@heyta/op-log';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
 import { LOCAL_API_TOOLS, type LocalApiWriteIntent } from '@heyta/local-api';
-import type { Operation } from '@heyta/sync-core';
+import { OpType, type Operation } from '@heyta/sync-core';
+import type { OpIntent } from '@heyta/op-log';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTaskActions } from '../src/actions.js';
@@ -32,18 +33,62 @@ import { confirmAiToolProposal, runSelectedTool } from '../src/ai-tool-run.js';
 
 const authorization = (tool: string) => ({ getGrants: () => ({ [tool]: true }) });
 import type { ToolArgs } from '../src/ai-tool-selection.js';
-import { createLocalApiHost } from '../src/local-api-host.js';
+import { createLocalApiHost, type LocalApiHostOptions } from '../src/local-api-host.js';
+import type { CommentActions } from '../src/comment-actions.js';
 
 const CLOCK = 1_700_000_000_000;
 
 let adapter: SqliteAdapter;
 let engine: OpLogEngine;
 
-function makeHost() {
+/** 假评论存储：评论走 share 通道、**不落个人 op-log**，所以效果读数读这里（而非 engine 状态）。 */
+interface FakeComments {
+  comments: Map<string, { id: string; taskId: string; body: string }>;
+  deleteCalls: number;
+  seq: number;
+}
+let commentStore: FakeComments;
+function resetCommentStore(): void {
+  commentStore = { comments: new Map(), deleteCalls: 0, seq: 0 };
+}
+resetCommentStore();
+function makeCommentActions(): CommentActions {
+  return {
+    addComment: async (taskId: string, body: string): Promise<string> => {
+      const id = `c-${String(++commentStore.seq)}`;
+      commentStore.comments.set(id, { id, taskId, body });
+      return id;
+    },
+    removeComment: async (id: string): Promise<void> => {
+      commentStore.deleteCalls += 1;
+      commentStore.comments.delete(id);
+    },
+    editComment: async (): Promise<void> => undefined,
+    restoreComment: async (): Promise<void> => undefined,
+    listComments: async (taskId: string) =>
+      [...commentStore.comments.values()].filter((c) => c.taskId === taskId),
+  } as unknown as CommentActions;
+}
+
+function makeHost(extra: Partial<LocalApiHostOptions> = {}) {
   return createLocalApiHost(engine, createTaskActions(engine, { now: () => CLOCK }), {
     isReadable: () => true,
     now: () => CLOCK,
+    commentActions: makeCommentActions(),
+    ...extra,
   });
+}
+
+/** 直接落一条附件（无 blob 端口也可：rename/list 不依赖它，remove 的 DEL op 先发）。 */
+async function seedAttachment(taskId: string, fileName: string): Promise<string> {
+  const entityId = `att-${String(Math.floor(Math.random() * 1e9))}`;
+  await engine.dispatch({
+    entityType: 'ATTACHMENT' as OpIntent['entityType'],
+    entityId,
+    opType: OpType.Create,
+    payload: { taskId, fileName, mimeType: null, sizeBytes: 10 },
+  });
+  return entityId;
 }
 
 /** 未删除实体的条数（效果读数的分母必须是活的实体，不然墓碑也算"写成功"）。 */
@@ -508,6 +553,55 @@ const CASES: readonly Case[] = [
     effect: () => Object.values(engine.getState().tasks).filter((t) => t.pinnedAt !== undefined).length,
   },
   {
+    tool: 'set_task_assignee',
+    intentAction: 'set-task-assignee',
+    label: '任务指派',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '要指派的' }), assigneeUserId: 'u1' }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.assigneeUserId === 'u1').length,
+  },
+  // 批8：附件（ATTACHMENT）
+  {
+    tool: 'rename_attachment',
+    intentAction: 'rename-attachment',
+    label: '附件改名',
+    args: async () => ({
+      attachmentId: await seedAttachment(await seed({ action: 'create-task', title: '带附件' }), 'a.txt'),
+      fileName: 'b.txt',
+    }),
+    effect: () =>
+      Object.values(engine.getState().attachments).filter((a) => a.deletedAt === undefined && a.fileName === 'b.txt').length,
+  },
+  {
+    tool: 'remove_attachment',
+    intentAction: 'remove-attachment',
+    label: '附件移除',
+    args: async () => ({
+      attachmentId: await seedAttachment(await seed({ action: 'create-task', title: '待删附件' }), 'a.txt'),
+    }),
+    effect: () => Object.values(engine.getState().attachments).filter((a) => a.deletedAt !== undefined).length,
+  },
+  // 批8：评论（COMMENT，share 通道 —— 效果读假存储）
+  {
+    tool: 'add_task_comment',
+    intentAction: 'add-task-comment',
+    label: '加评论',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '评论任务' }), body: '好的' }),
+    effect: () => commentStore.comments.size,
+  },
+  {
+    tool: 'delete_task_comment',
+    intentAction: 'delete-task-comment',
+    label: '删评论',
+    args: async () => {
+      const taskId = await seed({ action: 'create-task', title: '删评论任务' });
+      // 预置一条评论（直接进假存储，不计 deleteCalls）
+      const id = `c-${String(++commentStore.seq)}`;
+      commentStore.comments.set(id, { id, taskId, body: '旧评论' });
+      return { commentId: id };
+    },
+    effect: () => commentStore.deleteCalls,
+  },
+  {
     tool: 'move_tasks',
     intentAction: 'move-tasks',
     label: '批量移动',
@@ -647,6 +741,7 @@ beforeEach(async () => {
     clientId: 'client-test',
     now: () => CLOCK,
   });
+  resetCommentStore();
 });
 
 afterEach(() => {

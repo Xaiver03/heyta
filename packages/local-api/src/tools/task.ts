@@ -324,6 +324,16 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'set_task_assignee',
+    egressFields: [],
+    description:
+      '设置或清除任务的指派人。参数：taskId（任务 id）、assigneeUserId（指派成员的 id；省略或空串表示清除指派）。' +
+      '仅在共享清单内有意义；个人任务缺席即未指派。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -685,6 +695,18 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       done: { type: 'boolean', description: 'true=勾选，false=取消。' },
     },
     required: ['taskId', 'itemText', 'done'],
+    additionalProperties: false,
+  },
+  set_task_assignee: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要指派的任务 id。' },
+      assigneeUserId: {
+        type: 'string',
+        description: '指派给这个成员 id；省略或空串表示清除指派（个人任务缺席 = 未指派）。',
+      },
+    },
+    required: ['taskId'],
     additionalProperties: false,
   },
 };
@@ -1390,6 +1412,28 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
           itemText: a['itemText'],
           done: a['done'],
         },
+      };
+    }
+
+    case 'set_task_assignee': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'assigneeUserId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_assignee 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_task_assignee 需要 taskId。' };
+      }
+      if ('assigneeUserId' in a && typeof a['assigneeUserId'] !== 'string') {
+        return { ok: false, message: 'set_task_assignee 的 assigneeUserId 必须是字符串（空串表示清除）。' };
+      }
+      // 空串/全空白/缺省 = 清除（intent 不带该键，宿主归一成 `null`）。
+      const raw = typeof a['assigneeUserId'] === 'string' ? a['assigneeUserId'].trim() : '';
+      const taskId = a['taskId'].trim();
+      return {
+        ok: true,
+        intent: raw === ''
+          ? { action: 'set-task-assignee', taskId }
+          : { action: 'set-task-assignee', taskId, assigneeUserId: raw },
       };
     }
 

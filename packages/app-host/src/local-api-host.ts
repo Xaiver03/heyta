@@ -35,12 +35,14 @@
  */
 
 import type {
+  LocalApiAttachment,
   LocalApiEventItem,
   LocalApiFocusSession,
   LocalApiHabit,
   LocalApiHabitLog,
   LocalApiHost,
   LocalApiItem,
+  LocalApiComment,
   LocalApiNote,
   LocalApiNoteRow,
   LocalApiProject,
@@ -82,6 +84,7 @@ import {
   type FocusSession,
   type LocalDate,
 
+  type Attachment,
   type Habit,
   type CategorySlot,
   type HabitFrequency,
@@ -105,6 +108,9 @@ import { createNoteActions, type NoteActions } from './note-actions.js';
 import { createProjectActions, type ProjectActions } from './project-actions.js';
 import { createReminderActions, type ReminderActions } from './reminder-actions.js';
 import { createEventActions, type EventActions } from './event-actions.js';
+import { createAttachmentActions, type AttachmentActions } from './attachment-actions.js';
+import type { AttachmentBlobPort } from './attachment-http.js';
+import { ListNotSharedError, type CommentActions } from './comment-actions.js';
 import { readDurationFromNote } from './duration-note.js';
 import { selectDurationHistory } from './ai-duration.js';
 
@@ -152,6 +158,37 @@ export interface LocalApiHostOptions {
    * 因为这条**不是**隐私开关（上一条 `isReadable` 必须是必填的理由只适用于它）。
    */
   now?: () => number;
+
+  /**
+   * 附件的**字节通道**（`AttachmentBlobPort`）。缺省 = 这台设备没接上传通道。
+   *
+   * 🔴 它**只**影响 `remove_attachment` 的那半条腿（能否回收字节）：
+   * 缺省时 `removeAttachment` 仍会先发 `DEL` op，然后返回 `{ bytesReleased: false }`
+   * —— 列表状态正确，只是字节留在服务端等孤儿扫描。
+   * `rename_attachment` 是纯 op、`list_attachments` 是纯读，二者都**不依赖**它。
+   * （新建附件需要它，但本工具批次刻意不做"新建附件"，见 `tools/attachment.ts` 文件头。）
+   */
+  attachmentBlobs?: AttachmentBlobPort;
+
+  /**
+   * 评论动作（COMMENT）—— **share 感知的独立工具通道**（P4 / ADR-0062）。
+   *
+   * 🔴 **可选，而且默认就是"没有"**：评论只存在于**共享清单**，写入只经
+   * share 加密通道（`CommentActions.dispatchShareOp`）。工具宿主**不该**持有
+   * 加密 / 登录态 —— 它由**确实持有 share 会话的壳**（例如已登录的 web/mobile）
+   * 在构造 `CommentActions` 之后注入；没有登录态的壳（CLI / MCP / agent-cloud）
+   * **省略**它。
+   *
+   * 省略的后果是**诚实的失败**（不是静默空结果）：
+   * · `add_task_comment` / `delete_task_comment` → `{ ok:false, reason:'invalid',
+   *   message:'当前宿主没有共享会话（评论只在已登录的共享清单可用）' }`，零 op；
+   * · `list_task_comments` → 宿主不实现 `listTaskComments` ⇒ 读工具回同一句诚实话。
+   *
+   * 🔴 不在这里**自己构造** share 会话：那会把"怎么加密、向谁登录"塞进工具宿主
+   * （AGENTS §3.5 的"业务决定不许出现在壳/宿主"反过来也成立 —— 工具宿主不该
+   * 长出 share 引擎）。本字段只是一个**受注入口**。
+   */
+  commentActions?: CommentActions;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -390,6 +427,25 @@ export function noteToItem(note: Note): LocalApiNote {
 }
 
 /**
+ * `Attachment` → `LocalApiAttachment`。**白名单重建**（同 `taskToItem` / `habitToItem`）。
+ *
+ * 🔴 只有这五个字段，且**不含字节**：这条通道上刻意没有 `GET`（见 `attachment-http.ts`）。
+ * `mimeType` → `mime` 在这里单点换算（出境的词表说"这是什么类型"，不是实体字段名）。
+ * 可选字段缺席时**连键都不写**（同 `focusToItem`）：出境的 JSON 里不该出现
+ * `"mime": null`，那会被模型读成"有一个类型，但没说清是什么"。
+ */
+export function attachmentToItem(attachment: Attachment): LocalApiAttachment {
+  const item: LocalApiAttachment = {
+    id: attachment.id,
+    fileName: attachment.fileName,
+    taskId: attachment.taskId,
+  };
+  if (attachment.mimeType !== undefined) item.mime = attachment.mimeType;
+  if (attachment.sizeBytes !== undefined) item.sizeBytes = attachment.sizeBytes;
+  return item;
+}
+
+/**
  * `HabitLog` → `LocalApiHabitLog`。
  *
  * ⚠️ `note` 不搬：`checkIn` 从来不写它，而自由文本一旦进白名单就是一条出境通道。
@@ -463,6 +519,9 @@ export function createLocalApiHost(
   const isReadable = options.isReadable;
   const memoryEnabled = options.memoryEnabled === true;
   const now = options.now ?? ((): number => Date.now());
+  // 🔴 评论动作**只在有 share 会话的壳里注入**（见 `LocalApiHostOptions.commentActions`）。
+  // 没有就保持 `undefined` —— 两个写工具会诚实失败（零 op），读工具不会假装空列表。
+  const commentActions = options.commentActions;
 
   // 🔴 各实体的动作**在这里内部构造**，不从壳注入 —— 这些动作集只需要
   // `ActionContext`（`dispatch` + `getState`），而 `ctx` 已经在参数里。
@@ -476,8 +535,14 @@ export function createLocalApiHost(
   const focusActions = createFocusActions(ctx);
   const reminderActions = createReminderActions(ctx, { now });
   const eventActions = createEventActions(ctx);
+  // 附件：只把**字节通道**（可选）透传进去。它缺省时 rename/list 照常工作，
+  // remove 仍会发 DEL op，只是回 `bytesReleased: false`（见 `removeAttachment`）。
+  const attachmentActions = createAttachmentActions(
+    ctx,
+    options.attachmentBlobs === undefined ? {} : { blobs: options.attachmentBlobs },
+  );
 
-  return {
+  const host: LocalApiHost = {
     listTasks: (args) => {
       let tasks = actions.listTasks();
       if (args.projectId !== undefined) {
@@ -646,6 +711,11 @@ export function createLocalApiHost(
       return Promise.resolve(eventToItem(event, isReadable(event), today(now())));
     },
 
+    // 附件目录（ATTACHMENT）：过滤与顺序都在领域层（`aliveAttachmentsForTask`），
+    // 这里只把实体投影成出境的五个字段（不含字节）。
+    listAttachments: (taskId) =>
+      Promise.resolve(attachmentActions.attachmentsForTask(taskId).map(attachmentToItem)),
+
     submit: (intent) =>
       submitIntent(
         ctx,
@@ -656,10 +726,33 @@ export function createLocalApiHost(
         focusActions,
         reminderActions,
         eventActions,
+        attachmentActions,
+        commentActions,
         now,
         intent,
       ),
   };
+
+  // 🔴 **只有持有 share 会话的壳才注入 `commentActions`**；没注入就不实现
+  // `listTaskComments`。读工具据此回"本宿主没有共享会话"，而不是一个看起来
+  // 正常的空列表 —— "读不到"与"没有评论"是两句不同的话。
+  if (commentActions !== undefined) {
+    host.listTaskComments = (taskId, limit) =>
+      Promise.resolve(
+        commentActions
+          .commentsForTask(taskId)
+          .slice(0, Math.max(0, limit))
+          .map((c) => ({
+            id: c.id,
+            taskId: c.taskId,
+            authorUserId: c.authorUserId,
+            body: c.body,
+            createdAt: c.createdAt ?? 0,
+          })),
+      );
+  }
+
+  return host;
 }
 
 /**
@@ -688,6 +781,8 @@ async function submitIntent(
   focusActions: FocusActions,
   reminderActions: ReminderActions,
   eventActions: EventActions,
+  attachmentActions: AttachmentActions,
+  commentActions: CommentActions | undefined,
   now: () => number,
   intent: LocalApiWriteIntent,
 ): Promise<LocalApiWriteResult> {
@@ -2010,6 +2105,22 @@ async function submitIntent(
       return { ok: true, taskId: intent.taskId };
     }
 
+    case 'set-task-assignee': {
+      // 批次8：任务指派（ADR-0062 决策 7 / ADR-0088）。空串/缺省 = 清除（写 `null`）。
+      // 存在性由 `findTask` 判（I5）；`patchDetails` 抛的非法值一律翻成 invalid。
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      const assigneeUserId =
+        intent.assigneeUserId === undefined || intent.assigneeUserId === '' ? null : intent.assigneeUserId;
+      try {
+        await actions.patchDetails(intent.taskId, { assigneeUserId });
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: e instanceof Error ? e.message : String(e) };
+      }
+      return { ok: true, taskId: intent.taskId };
+    }
+
     case 'move-tasks': {
       // 与 `trash-tasks` / `restore-tasks` 同一条纪律：**先全部预检，再一条都不写**。
       // 去重后为空直接 invalid；`bulkMoveToProject` 对不存在的 id 会抛错，门口挡住能给出更准的 not-found。
@@ -2086,5 +2197,101 @@ async function submitIntent(
       return { ok: true, taskId: intent.taskId, entityId: intent.taskId, entityType: 'TASK' };
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // 附件（ATTACHMENT）：改名是纯 op；移除先发 DEL op、再尽力回收字节
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'rename-attachment': {
+      // 空 fileName 在动作层会被 `attachmentRejection` 拒（throw）；这里先挡在门口，
+      // 让用户看到"名字不能为空"而不是一句笼统的"工具执行失败"（同 `rename-project`）。
+      if (intent.fileName.trim() === '') {
+        return { ok: false, reason: 'invalid', message: '附件名不能为空。' };
+      }
+      try {
+        await attachmentActions.renameAttachment(intent.attachmentId, intent.fileName);
+      } catch (e: unknown) {
+        // 找不到附件 / 名字不合法都翻成 `invalid`（动作层是唯一判定点，这里只翻译）。
+        return { ok: false, reason: 'invalid', message: e instanceof Error ? e.message : '这个附件无法改名。' };
+      }
+      return {
+        ok: true,
+        taskId: intent.attachmentId,
+        entityId: intent.attachmentId,
+        entityType: 'ATTACHMENT',
+      };
+    }
+
+    case 'remove-attachment': {
+      let bytesReleased: boolean;
+      try {
+        ({ bytesReleased } = await attachmentActions.removeAttachment(intent.attachmentId));
+      } catch (e: unknown) {
+        // 找不到附件 ⇒ not-found（与 delete-note 同一档）；其它错误一律 invalid。
+        const message = e instanceof Error ? e.message : '这个附件无法移除。';
+        return { ok: false, reason: message.includes('找不到附件') ? 'not-found' : 'invalid', message };
+      }
+      // 🔴 回的是**附件 id**（不是冒充 `taskId`），并如实带上"字节回收了没有"。
+      return {
+        ok: true,
+        taskId: intent.attachmentId,
+        entityId: intent.attachmentId,
+        entityType: 'ATTACHMENT',
+        attachmentId: intent.attachmentId,
+        bytesReleased,
+      };
+    }
+
+    // ── 评论（COMMENT，P4 / ADR-0062）：share 感知的独立工具通道 ──
+    //
+    // 🔴 执行目标与上面所有分支都不同：不写个人 op-log，而是调用注入的
+    // `commentActions`（→ `dispatchShareOp` → share 加密通道）。三条判据：
+    //   1. 没有 `commentActions`（宿主无共享会话）⇒ `invalid` + **零 op**；
+    //   2. `ListNotSharedError`（个人清单 / 无归属）⇒ 译成"评论只存在于共享清单" + **零 op**
+    //      （该错误在构造/写入前抛出，天然不产生 op）；
+    //   3. 正常 ⇒ 调 `addComment` / `removeComment`，返回 `entityType: 'COMMENT'`。
+    case 'add-task-comment': {
+      if (commentActions === undefined) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: '当前宿主没有共享会话（评论只在已登录的共享清单可用）',
+        };
+      }
+      try {
+        const id = await commentActions.addComment(intent.taskId, intent.body);
+        return { ok: true, taskId: id, entityId: id, entityType: 'COMMENT' };
+      } catch (e) {
+        if (e instanceof ListNotSharedError || (e as { code?: string } | null)?.code === 'list-not-shared') {
+          return { ok: false, reason: 'invalid', message: '评论只存在于共享清单' };
+        }
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: e instanceof Error && e.message !== '' ? e.message : '这条评论无法写入。',
+        };
+      }
+    }
+    case 'delete-task-comment': {
+      if (commentActions === undefined) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: '当前宿主没有共享会话（评论只在已登录的共享清单可用）',
+        };
+      }
+      try {
+        await commentActions.removeComment(intent.commentId);
+        return { ok: true, taskId: intent.commentId, entityId: intent.commentId, entityType: 'COMMENT' };
+      } catch (e) {
+        if (e instanceof ListNotSharedError || (e as { code?: string } | null)?.code === 'list-not-shared') {
+          return { ok: false, reason: 'invalid', message: '评论只存在于共享清单' };
+        }
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: e instanceof Error && e.message !== '' ? e.message : '这条评论无法删除。',
+        };
+      }
+    }
   }
 }

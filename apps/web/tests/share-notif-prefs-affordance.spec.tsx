@@ -111,6 +111,7 @@ const pressRow = (el: ParentNode, kind: ShareActivityKind): void => {
 
 const allOn = (): ShareNotificationPrefs => ({
   activities: { onCompleted: true, onAdded: true, onDeleted: true },
+  taskScope: 'assignedToMe',
 });
 
 afterEach(() => {
@@ -157,7 +158,7 @@ describe('点一行只翻那一行', () => {
   it('🔴 交回宿主的偏好里只有被点那一档变了，画面上那一行也跟着变实心', () => {
     const el = render(DARK);
     pressRow(el, 'added');
-    expect(lastChange).toEqual({ activities: { onCompleted: false, onAdded: true, onDeleted: false } });
+    expect(lastChange).toEqual({ activities: { onCompleted: false, onAdded: true, onDeleted: false }, taskScope: 'assignedToMe' });
     expect(declared(el, '[data-testid="share-notif-activity-added-marker"]', 'background-color'))
       .toBe(tokenValue(DARK, 'color.primary'));
     pressRow(el, 'added');

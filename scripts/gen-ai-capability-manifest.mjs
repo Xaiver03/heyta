@@ -290,6 +290,13 @@ const ENTITY_NOUNS = new Map(
     countdowns: 'EVENT',
     anniversary: 'EVENT',
     anniversaries: 'EVENT',
+    // 任务附件（ATTACHMENT）：工具名形如 `list_attachments` / `rename_attachment`。
+    attachment: 'ATTACHMENT',
+    attachments: 'ATTACHMENT',
+    // P4：任务评论（ADR-0062）。工具名形如 `add_task_comment` / `list_task_comments` ——
+    // 剥掉前导动词、介词之后按**从尾往前**找名词时命中 `comment(s)`。
+    comment: 'COMMENT',
+    comments: 'COMMENT',
   }),
 );
 

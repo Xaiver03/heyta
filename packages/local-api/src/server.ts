@@ -93,6 +93,28 @@ export interface LocalApiTag {
 }
 
 /**
+ * 一条附件的列表行（ATTACHMENT）。
+ *
+ * 🔴 **只有元数据，没有字节**：这条通道上刻意没有 `GET`（读字节需要一个能用它的界面，
+ * 见 `attachment-http.ts` 的 `ATTACHMENT_ROUTES` 那一段）。所以这里能读到的就是
+ * "有这么一个文件、叫什么、多大、挂在哪个任务上"—— 与 `LocalApiNoteRow` 同一档：
+ * 列表给目录信息，正文/字节逐条另取（而附件此刻根本没有"另取"）。
+ *
+ * ⚠️ 字段名 `mime` 而不是实体里的 `mimeType`：出境的词表要说出"这是什么类型"，
+ * 由宿主侧 `attachmentToItem` 单点换算（同 `dueDate`/`priority` 的投影纪律）。
+ */
+export interface LocalApiAttachment {
+  id: string;
+  fileName: string;
+  /** MIME 类型；缺 = 未知（对应实体的 `mimeType?`）。 */
+  mime?: string;
+  /** 字节数（服务端测到的那个数）；缺 = 未知。 */
+  sizeBytes?: number;
+  /** 归属的任务 id。 */
+  taskId: string;
+}
+
+/**
  * 便签的**列表行**：刻意**没有正文**。
  *
  * 🔴 这不是"忘了给"，是 `list_tasks` / `get_task` 那条已经立好的分工：
@@ -112,6 +134,24 @@ export interface LocalApiNoteRow {
 /** 单条便签 = 列表行的全部字段 **加** 正文。 */
 export interface LocalApiNote extends LocalApiNoteRow {
   content: string;
+}
+
+/**
+ * 一条任务评论的**读面**（COMMENT，ADR-0062）。
+ *
+ * 字段与 `@heyta/domain` 的 `Comment` 逐字一致（`id` / `taskId` / `authorUserId` /
+ * `body` / `createdAt`）—— 本包零运行时依赖，看不见领域实体，所以这里手抄一份**读协议**。
+ * `createdAt` 由 reducer 从 op 时间戳派生；本层只做透传，不产生时刻。
+ *
+ * 🔴 评论只在**共享清单**里存在（个人清单没有评论）。所以能读出这个形状，
+ * 就代表宿主**确实持有 share 会话** —— 没有共享会话的宿主不会实现 `listTaskComments`。
+ */
+export interface LocalApiComment {
+  id: string;
+  taskId: string;
+  authorUserId: string;
+  body: string;
+  createdAt: number;
 }
 
 /**
@@ -259,6 +299,21 @@ export interface LocalApiHost {
   listNotes(limit: number): Promise<readonly LocalApiNoteRow[]>;
   /** 取单条便签（含正文）。取不到返回 `undefined`（不是抛错，同 `getTask`）。 */
   getNote(noteId: string): Promise<LocalApiNote | undefined>;
+  /**
+   * 列某条任务下的评论线程（COMMENT，ADR-0062）。
+   *
+   * 🔴 **可选成员，而这是刻意的**：评论只存在于**共享清单**，而"这个宿主有没有
+   * share 会话"是一个真实存在的产品状态（CLI / MCP / agent-cloud 无登录态）。
+   * 选了必填，所有无登录宿主都得写一个假实现（返回空），于是"没有共享会话"和
+   * "这条任务确实没有评论"变成同一句话 —— 那正是本仓库最不允许的那类谎话。
+   * 所以：**有 share 会话的壳才注入它**（经 `LocalApiHostOptions.commentActions`），
+   * 没有就不实现；`list_task_comments` 在缺这条方法时回一句诚实的
+   * "本宿主没有共享会话"，而不是一个看起来正常的空列表。
+   *
+   * ⚠️ 与 `getTaskEstimateContext?` 不同：那条是可选能力，这条是**有/无共享会话**。
+   * 两者的缺席都不该被读成"数据是空的"。
+   */
+  listTaskComments?: (taskId: string, limit: number) => Promise<readonly LocalApiComment[]>;
   /** 列打卡记录（HABIT_LOG），按时间从早到晚；`habitId` 省略 = 全部习惯。 */
   listHabitLogs(habitId: string | undefined, limit: number): Promise<readonly LocalApiHabitLog[]>;
   /** 列专注记录（FOCUS_SESSION），按开始时间从早到晚。 */
@@ -277,6 +332,15 @@ export interface LocalApiHost {
   listEvents(args: { limit?: number }): Promise<readonly LocalApiEventItem[]>;
   /** 取单个倒数日。取不到返回 `undefined`（不是抛错，同 `getTask`）。 */
   getEvent(eventId: string): Promise<LocalApiEventItem | undefined>;
+  /**
+   * 列某条任务下的附件（ATTACHMENT，软删的不进，`createdAt` 升序）。
+   *
+   * ⚠️ **可选成员**：附件读只需要 `ActionContext`，而本机所有宿主都经
+   * `createLocalApiHost()`（它恒提供这个方法）；把它做成必填会把几十处**测试假宿主**
+   * 的字面量一起逼着改，而那些假宿主根本不驱动附件工具。工具包对"没接"的宿主
+   * 明确报一句能力缺失（不静默返回空列表），所以"这个宿主忘了接"仍会响亮失败。
+   */
+  listAttachments?(taskId: string): Promise<readonly LocalApiAttachment[]>;
   /**
    * 🔴 **必须是 `dispatch()`。**
    *
@@ -622,6 +686,18 @@ function toolText(payload: unknown): unknown {
 /** 写入结果 → MCP 结果。失败也走 `content`（因为它是"工具执行结果失败"，不是协议错误）。 */
 function writeResult(result: LocalApiWriteResult): { result: unknown } {
   if (result.ok) {
+    // 附件写动作（rename / remove）：回的是**附件 id**（而不是冒充 `taskId`），
+    // 移除还会带一句"字节到底回收了没有"——`false` 是实话（只发了 op，字节留给
+    // 服务端孤儿扫描），不是失败。`rename-attachment` 不带 `bytesReleased`（它不碰字节）。
+    if (result.attachmentId !== undefined) {
+      return {
+        result: toolText({
+          ok: true,
+          attachmentId: result.attachmentId,
+          ...(result.bytesReleased === undefined ? {} : { bytesReleased: result.bytesReleased }),
+        }),
+      };
+    }
     // 🔴 **不能把清单/习惯的 id 回成 `{taskId}`** —— 那等于对模型与外部程序说
     // "刚建了一条任务"，而它建的是一条清单。`entityType` 在时出
     // `entityId` + `entityType`（同一条纪律：给调用方的字段名必须说出它是什么）。
