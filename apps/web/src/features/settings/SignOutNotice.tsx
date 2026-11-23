@@ -25,8 +25,6 @@ import { purgeLocalLibrary } from '@heyta/app-host';
 
 import { useI18n } from '@heyta/i18n';
 
-import { Button } from '@heyta/ui';
-
 import { useSyncStore } from '../sync/store.js';
 import { useSignOutStore } from './signOutStore.js';
 import { SettingsNotice } from './SettingsNotice.js';
@@ -80,13 +78,15 @@ export function SignOutNotice(): React.JSX.Element | null {
         title={t('common.libraryOwner.conflictTitle')}
         testId="library-owner-conflict"
         actions={
-          <Button
-            tone="ghost"
-            testID="library-owner-clear"
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            data-testid="library-owner-clear"
             disabled={clearing}
-            onPress={() => { void clearDevice(); }}
-            label={clearing ? t('common.libraryOwner.clearing') : t('common.libraryOwner.clear')}
-          />
+            onClick={() => { void clearDevice(); }}
+          >
+            {clearing ? t('common.libraryOwner.clearing') : t('common.libraryOwner.clear')}
+          </button>
         }
       >
         {t('common.libraryOwner.conflictBody', { accountId: ownerConflict.accountId })}
@@ -102,17 +102,18 @@ export function SignOutNotice(): React.JSX.Element | null {
         title={t('common.signOut.pending')}
         testId="sign-out-pending"
         actions={
-          <Button
-            tone="ghost"
-            testID="sign-out-retry"
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            data-testid="sign-out-retry"
             // 忙态用 guard（`retryPendingRevocation` 第一行），这里只是别让点第二下看着像两个请求。
             disabled={running !== undefined}
-            icon={<RotateCw size={ICON_SIZE.xs} aria-hidden="true" />}
-            onPress={() => {
+            onClick={() => {
               void retry();
             }}
-            label={t('common.signOut.retry')}
-          />
+          >
+            <RotateCw size={ICON_SIZE.xs} aria-hidden="true" /> {t('common.signOut.retry')}
+          </button>
         }
       />
     );
@@ -169,15 +170,17 @@ export function SignOutNotice(): React.JSX.Element | null {
         title={t('common.signOut.eraseFailed')}
         testId="sign-out-erase-failed"
         actions={
-          <Button
-            tone="ghost"
-            testID="sign-out-erase-retry"
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            data-testid="sign-out-erase-retry"
             disabled={clearing}
-            onPress={() => {
+            onClick={() => {
               void clearAgain();
             }}
-            label={clearing ? t('common.libraryOwner.clearing') : t('common.libraryOwner.clear')}
-          />
+          >
+            {clearing ? t('common.libraryOwner.clearing') : t('common.libraryOwner.clear')}
+          </button>
         }
       />
     );

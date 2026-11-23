@@ -1660,16 +1660,3 @@ export {
   projectGestureOffset,
   rubberBandOffset,
 } from './motion/gesture.js';
-
-/**
- * 按钮原语（2026-11-23）。
- * 🔴 本块是**追加**的（`index.ts` 是多写者共享文件，只许在末尾加）。
- *
- * 在此之前，"一枚按钮"在仓里有**两份实现、零个共享件**：
- * web 是 `controls.css` 的 `.ht-btn` + 手写类名（`.tsx` 里 210 处），
- * mobile 是 `apps/mobile/src/ui/kit.tsx` 的 `Button`。颜色判断早就是一份
- * （`control/states.ts`），缺的是把"摆、按下、状态属性"也收进共享层。
- *
- * 消费方必须挂在 `HeytaUiProvider` 之内（`pnpm check:ui-provider`）。
- */
-export { Button, type ButtonProps } from './control/Button.js';
