@@ -24,7 +24,8 @@ export function readCss(entryPath: string): string {
     const dir = dirname(file);
     for (const line of readFileSync(file, 'utf8').split('\n')) {
       const m = IMPORT_RE.exec(line);
-      if (m !== null) walk(resolve(dir, m[1]));
+      const target = m?.[1];
+      if (target !== undefined) walk(resolve(dir, target));
       else out.push(line);
     }
   };
