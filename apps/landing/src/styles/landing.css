@@ -436,41 +436,10 @@
 }
 
 /* 浮在应用窗口之上的一层"状态浮片" —— 3D 纵深靠它读出来 */
-.lp-float {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-  padding: var(--ht-space-2) var(--ht-space-3);
-  border-radius: var(--ht-radius-lg);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  background: var(--ht-color-surface-raised);
-  box-shadow: var(--ht-shadow-lg);
-  font-size: var(--ht-font-size-xs);
-  font-weight: var(--ht-font-weight-medium);
-  color: var(--ht-color-foreground);
-  white-space: nowrap;
-  /* 每片给一个自己的 Z 值，形成真正的纵深分层 */
-  transform: translateZ(var(--lp-float-z, 0));
-}
 
-.lp-float--sync {
-  inset-block-start: -8%;
-  inset-inline-end: -6%;
-}
 
-.lp-float--offline {
-  inset-block-end: 6%;
-  inset-inline-start: -10%;
-}
 
-.lp-float__icon--ok {
-  color: var(--ht-color-success-strong);
-}
 
-.lp-float__icon--info {
-  color: var(--ht-color-primary);
-}
 
 /* ── 事实条（"信任"区块，但用可核实的事实而不是假 logo）──────
    taste skill 禁止在英雄区里塞信任条 —— 所以它是英雄区**下方**的独立区块。 */
@@ -1576,13 +1545,6 @@
 
 /* ── 登录方式 ─────────────────────────────────────────── */
 
-.lp-methods {
-  margin-block-start: var(--ht-space-6);
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: var(--ht-space-4);
-  list-style: none;
-}
 
 .lp-methods__item {
   padding: var(--ht-space-6);
@@ -1591,11 +1553,6 @@
   background: var(--ht-color-surface);
 }
 
-.lp-methods__title {
-  font-size: var(--ht-font-size-lg);
-  font-weight: var(--ht-font-weight-semibold);
-  color: var(--ht-color-foreground);
-}
 
 /* ── 更新动态 ─────────────────────────────────────────── */
 

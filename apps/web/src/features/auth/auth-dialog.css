@@ -139,7 +139,7 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 }
 
 .ht-sheet__auth-plan-local {
-  margin-block-start: auto !important;
+  margin-block-start: auto;
   color: var(--ht-color-foreground-muted);
 }
 

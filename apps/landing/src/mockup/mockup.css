@@ -352,33 +352,13 @@ button.mk-nav__item:focus-visible {
   font-size: var(--ht-font-size-xs);
 }
 
-.mk-bulk__warning {
-  color: var(--ht-color-foreground-subtle);
-}
 
 /*
  * 页头的排序控件（复现 `App.tsx` 的 `.ht-header__actions` 里 `task-sort` 那一枚）。
  * 真应用给的是**文字标签 + 原生 `<select>`**，标签不是可省略的装饰：
  * 裸 chip 的教训还写在产品那边（"说不清自己作用范围的控件，加了等于没加"）。
  */
-.mk-sort {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-  font-size: var(--ht-font-size-xs);
-  color: var(--ht-color-foreground-muted);
-}
 
-.mk-sort__value {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: var(--ht-touch-target-min);
-  padding-inline: var(--ht-space-2);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-md);
-  font-size: var(--ht-font-size-sm);
-  color: var(--ht-color-foreground);
-}
 
 .mk-iconbtn {
   display: grid;

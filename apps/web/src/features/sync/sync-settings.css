@@ -24,16 +24,12 @@
   font-weight: var(--ht-font-weight-semibold);
 }
 
-.sync-settings__section-hint,
-.sync-settings__field-hint {
+.sync-settings__section-hint {
   margin: 0;
   color: var(--ht-color-foreground-muted);
   line-height: var(--ht-line-height-normal);
 }
 
-.sync-settings__field-hint {
-  font-size: var(--ht-font-size-sm);
-}
 
 /* 🔴 2026-10-24：`.sync-settings__field` / `.sync-settings__input` 已删 —— 这三格
    改走共享 `FormField`（`apps/web/src/lib/form/FormField.tsx`）。

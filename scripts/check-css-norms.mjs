@@ -137,6 +137,106 @@ export function scanRawColors(root = ROOT) {
   return hits;
 }
 
+/* ── 死规则 / display 失效声明：两条结构性判据（2026-11-23 第三批收尾）───────
+ *
+ * 死规则：CSS 里定义了、但**全仓源码一次都没引用的类**所在的规则整条删掉。
+ *   实测本仓只有 1 条（`sync-settings__field-hint`，随共享 FormField 收编后遗留），
+ *   已删；这条判据的价值是**防新增**——删组件时不删 CSS 是常态。
+ *   匹配规则（避免误报，见文件头「为什么能准确」）：
+ *     · 类名出现在任何 `.ts/.tsx/.html` 源码标识符里 ⇒ 活；
+ *     · 或存在模板前缀 `${...}`（如 `` `hta-badge--${tone}` ``）使该类以该前缀开头
+ *       且余下部分是修饰词 ⇒ 活。
+ *
+ * display 失效声明：同一规则块里 `display:block` 却写 `grid-template-*` /
+ *   `align-items` / `gap`，或 `display:flex` 却写 `grid-template-*` ——
+ *   这些声明**永远不会生效**（规范如此），是"改了没反应"的经典来源。
+ *   （`grid-row/column` 属于**子项**属性，对任意 display 都有效，不在其列。）
+ */
+function walkFiles(dir, pred, out = []) {
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    const st = statSync(full);
+    if (st.isDirectory()) {
+      if (name === 'node_modules' || name === 'dist' || name === 'build' || name === 'generated') continue;
+      walkFiles(full, pred, out);
+    } else if (pred(full)) out.push(full);
+  }
+  return out;
+}
+
+const isCss = (f) => f.endsWith('.css');
+const isSrc = (f) => /\.(tsx?|html)$/.test(f);
+
+function ruleBodies(src) {
+  const out = [];
+  const nc = src.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const m of nc.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const sel = m[1].trim();
+    if (sel === '' || sel.startsWith('@')) continue;
+    out.push({ sel, body: m[2], line: nc.slice(0, m.index).split('\n').length });
+  }
+  return out;
+}
+
+export function scanDeadRules(root = ROOT) {
+  const cssFiles = [
+    ...walkFiles(join(root, 'apps/web/src'), isCss),
+    ...walkFiles(join(root, 'apps/landing/src'), isCss),
+  ];
+  const srcFiles = [
+    ...walkFiles(join(root, 'apps'), isSrc),
+    ...walkFiles(join(root, 'packages'), isSrc),
+  ];
+  let text = '';
+  for (const f of srcFiles) {
+    try {
+      text += readFileSync(f, 'utf8') + '\n';
+    } catch {
+      /* 读不到就跳过：不影响判据方向（少读 = 更可能误报为"死"，这里不静默兜底） */
+    }
+  }
+  const ids = new Set(text.match(/[A-Za-z][A-Za-z0-9_-]+/g) ?? []);
+  const prefixes = new Set([...text.matchAll(/([A-Za-z][A-Za-z0-9_-]*)\$\{/g)].map((m) => m[1]));
+  const alive = (c) =>
+    ids.has(c) || [...prefixes].some((p) => c.startsWith(p) && (p.endsWith('-') || c.slice(p.length).startsWith('-')));
+  const hits = [];
+  for (const f of cssFiles) {
+    for (const r of ruleBodies(readFileSync(f, 'utf8'))) {
+      const classes = [...r.sel.matchAll(/\.([A-Za-z][\w-]*)/g)].map((m) => m[1]);
+      if (classes.length === 0) continue;
+      if (classes.every((c) => !alive(c))) hits.push({ file: f, line: r.line, text: r.sel.slice(0, 80) });
+    }
+  }
+  return hits;
+}
+
+export function scanDisplayInert(root = ROOT) {
+  const cssFiles = [
+    ...walkFiles(join(root, 'apps/web/src'), isCss),
+    ...walkFiles(join(root, 'apps/landing/src'), isCss),
+  ];
+  const hits = [];
+  for (const f of cssFiles) {
+    for (const r of ruleBodies(readFileSync(f, 'utf8'))) {
+      const decls = {};
+      for (const m of r.body.matchAll(/([-a-zA-Z]+)\s*:\s*([^;{}]+);/g)) decls[m[1].toLowerCase()] = m[2].trim();
+      const disp = (decls.display ?? '').toLowerCase();
+      const dead = [];
+      const has = (k) => Object.prototype.hasOwnProperty.call(decls, k);
+      if (['block', 'inline-block', 'inline'].includes(disp)) {
+        for (const k of Object.keys(decls)) {
+          if (k.startsWith('grid-template') || k.startsWith('grid-auto') || ['align-items', 'justify-items', 'gap', 'row-gap', 'column-gap'].includes(k)) dead.push(k);
+        }
+      } else if (['flex', 'inline-flex'].includes(disp)) {
+        for (const k of Object.keys(decls)) if (k.startsWith('grid-template') || k.startsWith('grid-auto')) dead.push(k);
+      }
+      if (dead.length > 0) hits.push({ file: f, line: r.line, text: `${r.sel.slice(0, 60)} → ${dead.join(', ')}` });
+    }
+  }
+  return hits;
+}
+
 function summarize(results, errored) {
   let warnings = 0;
   let files = 0;
@@ -228,6 +328,16 @@ async function selfTest() {
     arm('颜色裸值 ⇒ 必须红', scanRawColors(join(tmp, 'color-bad')).length === 1);
     arm('颜色走 token / 关键字 ⇒ 必须绿', scanRawColors(join(tmp, 'color-good')).length === 0);
 
+    // 死规则 / display 失效
+    mkdirSync(join(tmp, 'dead/apps/web/src'), { recursive: true });
+    writeFileSync(join(tmp, 'dead/apps/web/src/x.css'), '.nobody__uses-this { color: var(--ht-color-foreground); }\n.used-class { color: var(--ht-color-foreground); }\n');
+    writeFileSync(join(tmp, 'dead/apps/web/src/x.tsx'), 'export const A = <div className="used-class" />;\n');
+    arm('死规则（无人引用的类）⇒ 必须红', scanDeadRules(join(tmp, 'dead')).length === 1);
+
+    mkdirSync(join(tmp, 'inert/apps/web/src'), { recursive: true });
+    writeFileSync(join(tmp, 'inert/apps/web/src/y.css'), '.p { display: block; align-items: center; }\n.q { display: flex; align-items: center; }\n');
+    arm('display 失效声明 ⇒ 必须红（flex+align-items 不算）', scanDisplayInert(join(tmp, 'inert')).length === 1);
+
     // 真实树：自检里也跑，读数是"当前仓库状态"，不是夹具状态。
     const real = await lintFiles(GLOBS);
     const { warnings } = summarize(real.results, true);
@@ -247,14 +357,18 @@ async function main() {
   const res = await lintFiles(GLOBS);
   const { warnings, files } = summarize(res.results, res.errored === true);
   const colorHits = scanRawColors();
+  const deadHits = scanDeadRules();
+  const inertHits = scanDisplayInert();
+  for (const h of deadHits) console.error(`  ${h.file.replace(ROOT + '/', '')}:${String(h.line)}  ${h.text}  (死规则：无任何源码引用)`);
+  for (const h of inertHits) console.error(`  ${h.file.replace(ROOT + '/', '')}:${String(h.line)}  ${h.text}  (display 失效声明)`);
   for (const h of colorHits) {
     console.error(`  ${h.file.replace(ROOT + '/', '')}:${String(h.line)}  ${h.text}  (color 必须走 token)`);
   }
   console.log(
     `CSS 规范（stylelint）：${String(files)} 个文件有违规，共 ${String(warnings)} 条；` +
-      `颜色 token 判据：${String(colorHits.length)} 条。`,
+      `颜色 token：${String(colorHits.length)} 条；死规则：${String(deadHits.length)} 条；display 失效：${String(inertHits.length)} 条。`,
   );
-  if (res.errored || colorHits.length > 0) {
+  if (res.errored || colorHits.length + deadHits.length + inertHits.length > 0) {
     console.error('\n🔴 CSS 规范门禁未通过。修法见 `.stylelintrc.cjs` 文件头；');
     console.error('   ⚠️ 不许加 ignore/放宽规则来变绿 —— 那是把红色关掉，不是修问题。');
     process.exit(1);

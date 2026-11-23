@@ -533,7 +533,7 @@
 }
 /* 视图回退：视觉隐藏但可聚焦/可读屏；保留原生 select 供键盘与既有 value 判据。 */
 .ht-content__cal-sr-only {
-  position: absolute !important;
+  position: absolute;
   inline-size: 1px;
   block-size: 1px;
   overflow: hidden;
