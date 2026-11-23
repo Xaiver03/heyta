@@ -3,11 +3,19 @@
  * ================================================================
  *
  * 与 `apps/web/src/features/settings/avatar-encode.ts` 是同一件事的两种做法：
- * 浏览器用 `<canvas>`，Android 用 `Bitmap`。两边**共用的那三条规则**
- * （格式白名单、输出格式、压缩后字节上限）都在 `@heyta/shared-schema`：
- * `isAvatarContentType` / `avatarOutputContentType` / `planAvatarUpload`。
+ * 浏览器用 `<canvas>`，Android 用 `Bitmap`。两边**共用的那几条规则**
+ * （格式白名单、输出格式、压缩阶梯、压缩后字节上限）都在 `@heyta/shared-schema`：
+ * `isAvatarContentType` / `avatarOutputContentType` / `avatarEdgeOnlyLadder` / `planAvatarUpload`。
  * 这里一行产品判断都不写（AGENTS §3.5）—— 写了就是"同一件事两处各裁一遍"，
  * 而它的症状从来不是报错，是"同一张图网页传得上、手机传不上"。
+ *
+ * ## 🔴 为什么这里跟着 web 一起逐档降边长
+ *
+ * 头像不再"压一次、超预算就拒"。`avatarEdgeOnlyLadder(sourceType)` 与 web 的
+ * `avatarCompressionLadder` 走**同一串边长**（512 → 384 → 288 → 216 → 160 → 128），
+ * 末档 128 px 由算术保证必然进预算。原生 `prepareAvatarBase64` 的质量写死在 86，
+ * 不能像 web 那样逐次降质量，所以这里只在**边长**上走阶梯；少掉的只是"先降质量"的优化，
+ * 兜底精度不变，且与 web 保底的同一条 128 px 对齐。
  *
  * ## 为什么必须走原生，而不是 `readLocalTextUri` + JS 里 base64
  *
@@ -23,8 +31,7 @@
  */
 
 import {
-  ACCOUNT_AVATAR_EDGE_PX,
-  avatarOutputContentType,
+  avatarEdgeOnlyLadder,
   isAvatarContentType,
   planAvatarUpload,
   type AvatarPayload,
@@ -70,18 +77,22 @@ export async function prepareAvatarFromUri(
     return { ok: false, error: 'no-channel' };
   }
 
-  const contentType = avatarOutputContentType(sourceType);
-  try {
-    const dataBase64 = await mod.prepareAvatarBase64(uri, ACCOUNT_AVATAR_EDGE_PX, contentType);
-    const plan = planAvatarUpload({ contentType, dataBase64 });
-    if (plan.action === 'reject') {
-      // `empty` 在原生侧已经被 `ENCODE_FAILED` 拦掉了；真走到这里说明
-      // 通道回了一个空串 —— 那是"解不开"这一类，不是"太大"。
-      return { ok: false, error: plan.reason === 'too-big' ? 'too-big' : 'undecodable' };
+  // 同一串边长，逐档试到进预算为止（末档 128 px 必然收得下）。
+  let sawTooBig = false;
+  for (const step of avatarEdgeOnlyLadder(sourceType)) {
+    let dataBase64: string;
+    try {
+      dataBase64 = await mod.prepareAvatarBase64(uri, step.edgePx, step.contentType);
+    } catch (e: unknown) {
+      // 原生侧分码回抛的错都是**致命**的（解不开 / 没权限 / 没文件）——
+      // 换更小的边长也救不回来，按码说话、不再往下试。
+      const code = (e as { code?: string }).code ?? '';
+      return { ok: false, error: codeToError[code] ?? 'undecodable' };
     }
-    return { ok: true, image: plan.payload };
-  } catch (e: unknown) {
-    const code = (e as { code?: string }).code ?? '';
-    return { ok: false, error: codeToError[code] ?? 'undecodable' };
+    const plan = planAvatarUpload({ contentType: step.contentType, dataBase64 });
+    if (plan.action === 'accept') return { ok: true, image: plan.payload };
+    // `too-big` 才继续降档；`empty`（原生回了空串）跳过这一档，与 web 同语义。
+    if (plan.reason === 'too-big') sawTooBig = true;
   }
+  return { ok: false, error: sawTooBig ? 'too-big' : 'undecodable' };
 }

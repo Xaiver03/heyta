@@ -200,12 +200,16 @@ export {
   ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES,
   ACCOUNT_AVATAR_MAX_SOURCE_BYTES,
   ACCOUNT_AVATAR_EDGE_PX,
+  ACCOUNT_AVATAR_MIN_EDGE_PX,
   ACCOUNT_AVATAR_CONTENT_TYPES,
   avatarPayloadSchema,
   parseAvatarPayload,
   base64DecodedBytes,
   isAvatarContentType,
   avatarOutputContentType,
+  avatarCompressionLadder,
+  avatarEdgeOnlyLadder,
+  encodeAvatarWithinBudget,
   planAvatarUpload,
   avatarInitialFromEmail,
   avatarDataUri,
@@ -216,6 +220,11 @@ export {
   accountAvatarUpdateSchema,
   accountAvatarResponseSchema,
   accountAvatarUploadResponseSchema,
+} from './account-profile-contract';
+export type {
+  AvatarCompressionStep,
+  AvatarStepEncoder,
+  AvatarEncodeOutcome,
 } from './account-profile-contract';
 
 // 换绑登录邮箱（ADR-0063 §2.1–§2.4）与登录会话（§2.5）：路径 / 稳定码 / 时限 / 响应形状。

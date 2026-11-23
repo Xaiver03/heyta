@@ -122,15 +122,29 @@ export const ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES = 1024 * 1024;
 export const ACCOUNT_AVATAR_MAX_SOURCE_BYTES = 512 * 1024;
 
 /**
- * 压缩后的边长：**512 px 方形**（短边居中裁切后缩放）。
+ * 压缩的**首选**边长：**512 px 方形**（短边居中裁切后缩放）。
  *
  * 与上面那条同为**客户端纪律**，因此也住在契约层而不是 UI 里：
  * 界面文件里写一个裸 `512`，下次有人改 UI 时不会知道它是"规格"还是"随手试的数"。
  * 为什么是 512：显示侧最大只到 `--ht-size-avatar-lg`（40 px）的 2× 视网膜密度 = 80 px，
- * 512 留了 6 倍余量给"将来头像出现在更大的位置"，同时把上传体压在
- * `ACCOUNT_AVATAR_MAX_UPLOAD_BASE64_BYTES` 推导链假设的那个量级里。
+ * 512 留了 6 倍余量给"将来头像出现在更大的位置"。
+ *
+ * 🔴 这是**压缩阶梯的第一档，不是唯一一档**：压完超预算时由
+ * `avatarCompressionLadder` 逐档降到 `ACCOUNT_AVATAR_MIN_EDGE_PX`，
+ * **不把"图太大"甩回给用户**（见下方 `encodeAvatarWithinBudget`）。
  */
 export const ACCOUNT_AVATAR_EDGE_PX = 512;
+
+/**
+ * 压缩阶梯的**最末一档**边长：**128 px 方形**。
+ *
+ * 它是"不管原图多大都能传上去"的**兜底**：128² × 4 字节（ARGB 原始像素）
+ * = 65,536 字节，即便最坏情况（纯噪点、PNG 无损）也远小于
+ * `ACCOUNT_AVATAR_MAX_SOURCE_BYTES`（524,288），所以阶梯走到这里**必然收得下**。
+ * 这条不等式由 `tests/account-avatar-compress.spec.ts` 直接钉住 —— 它是
+ * "任何能解码的图都能压进预算"这条承诺的算术证明，不是拍脑袋的数。
+ */
+export const ACCOUNT_AVATAR_MIN_EDGE_PX = 128;
 
 /** 头像允许的格式。**两端都校验**：客户端编码前、服务端落库前。 */
 export const ACCOUNT_AVATAR_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -213,6 +227,113 @@ export const isAvatarContentType = (contentType: string): contentType is Account
  */
 export const avatarOutputContentType = (sourceType: string): AccountAvatarContentType =>
   sourceType === 'image/png' ? 'image/png' : 'image/jpeg';
+
+/**
+ * 压缩阶梯里的一档：按这个边长（和 JPEG 的质量）编一次，量一次字节。
+ *
+ * 为什么把"边长 + 质量"做成**数据**而不是散在各壳里的循环：这条阶梯是产品规格
+ * （先保清晰度、再降质量、最后才缩尺寸），必须两端（web canvas / Android Bitmap）
+ * **走同一份**。HTML5 的 `toDataURL('image/png')` 与 `Bitmap.CompressFormat.PNG`
+ * 对质量参数都无感，所以 PNG 档不带 `quality`；只有 JPEG 才有质量档。
+ */
+export interface AvatarCompressionStep {
+  /** 这一档的方形边长（px）。 */
+  readonly edgePx: number;
+  /** 这一档输出的格式（已在白名单内）。 */
+  readonly contentType: AccountAvatarContentType;
+  /** 仅 JPEG 有意义（0–1）；PNG 无损，无此档。 */
+  readonly quality?: number;
+}
+
+/** 从清晰到激进：先按最大边长试，再逐档降边长。 */
+const AVATAR_COMPRESSION_EDGES_PX = [512, 384, 288, 216, 160, 128] as const;
+
+/**
+ * JPEG 的质量档，**从高到低**。
+ *
+ * 同一张图先在当前边长上降质量，再考虑缩尺寸 —— 缩尺寸会让小字/发丝先糊掉，
+ * 而头像通常是脸，降一档质量比砍一半分辨率更不容易被看出来。
+ * 0.86 与旧版单档压缩对齐（web `toDataURL(type, 0.86)` / Kotlin `quality=86`），
+ * 不改变"能一次压进 512 px 的图"产出的字节量级。
+ */
+const AVATAR_JPEG_QUALITIES = [0.86, 0.72, 0.58] as const;
+
+/**
+ * 「把这张源图压进预算」的**完整尝试序列**（从最优到最激进）。
+ *
+ * - 源图是 PNG（保证带 alpha）⇒ 只出 PNG 档，**绝不转 JPEG**（转 JPEG 会把透明铺成黑底），
+ *   因此只能靠降边长来减字节。
+ * - 其余（jpeg / webp）⇒ 输出 JPEG；每一档边长上先试 `AVATAR_JPEG_QUALITIES` 三档质量。
+ *
+ * 白名单外的源类型回空数组（调用方据此说"格式不支持"），**不在这里抛错**。
+ * 序列的**最后一档**是 `ACCOUNT_AVATAR_MIN_EDGE_PX`，由上面的算术保证必然收得下。
+ */
+export const avatarCompressionLadder = (sourceType: string): readonly AvatarCompressionStep[] => {
+  if (!isAvatarContentType(sourceType)) return [];
+  const contentType = avatarOutputContentType(sourceType);
+  const steps: AvatarCompressionStep[] = [];
+  for (const edgePx of AVATAR_COMPRESSION_EDGES_PX) {
+    if (contentType === 'image/jpeg') {
+      for (const quality of AVATAR_JPEG_QUALITIES) steps.push({ edgePx, contentType, quality });
+    } else {
+      steps.push({ edgePx, contentType });
+    }
+  }
+  return steps;
+};
+
+/**
+ * **只有边长**的阶梯：给"原生编码器不能逐次改质量"的壳用（Android 的
+ * `prepareAvatarBase64(uri, edgePx, format)` 质量写死在 86）。
+ *
+ * 它和 `avatarCompressionLadder` 走**同一串边长**，所以"同一张图网页能传、手机传不上"
+ * 不会因为两条阶梯不同而上演。少掉的只是"先降质量"的优化，兜底精度不变。
+ */
+export const avatarEdgeOnlyLadder = (sourceType: string): readonly AvatarCompressionStep[] => {
+  if (!isAvatarContentType(sourceType)) return [];
+  const contentType = avatarOutputContentType(sourceType);
+  return AVATAR_COMPRESSION_EDGES_PX.map((edgePx) => ({ edgePx, contentType }));
+};
+
+/** 一档编码器的产物：成功的 base64，或"这一档压不出来"的 `null`。 */
+export type AvatarStepEncoder = (
+  step: AvatarCompressionStep,
+) => Promise<string | null> | string | null;
+
+/** `encodeAvatarWithinBudget` 的结论：压进预算的载荷，或"确实压不下去/解不开"。 */
+export type AvatarEncodeOutcome =
+  | { readonly action: 'accept'; readonly payload: AvatarPayload }
+  | { readonly action: 'reject'; readonly reason: 'too-big' | 'undecodable' };
+
+/**
+ * 逐档编码、逐档量字节，**第一档进预算就收**；全试完仍超才 `too-big`。
+ *
+ * 这是"上传不管原图多大都能自动压进预算"的**唯一机制**，住共享层而非某个壳：
+ * 各壳只提供"把图按这一档编成 base64"的平台能力（{@link AvatarStepEncoder}），
+ * 循环、档位、预算判定都在这里，两端不会分叉。
+ *
+ * 🔴 语义细节：
+ * - `encode` 回 `null` / `''`（这一档解不出、或画布没产出）⇒ **跳过、继续下一档**，
+ *   不算"太大"；只有"量出了字节但超预算"才算这一档没压进去。
+ * - 全程一次非空产物都没有 ⇒ `undecodable`（这台设备根本编不出这张图）；
+ *   有产物但都超预算 ⇒ `too-big`（正常情况下不可达：末档是 128 px）。
+ * - 不抛错：异常也应该由 `encode` 自己折成 `null`，让调用方拿到结构化结论而不是控制台一行红字。
+ */
+export const encodeAvatarWithinBudget = async (
+  ladder: readonly AvatarCompressionStep[],
+  encode: AvatarStepEncoder,
+): Promise<AvatarEncodeOutcome> => {
+  let encodedAny = false;
+  for (const step of ladder) {
+    const dataBase64 = await encode(step);
+    if (dataBase64 === null || dataBase64 === '') continue;
+    encodedAny = true;
+    if (base64DecodedBytes(dataBase64) <= ACCOUNT_AVATAR_MAX_SOURCE_BYTES) {
+      return { action: 'accept', payload: { contentType: step.contentType, dataBase64 } };
+    }
+  }
+  return { action: 'reject', reason: encodedAny ? 'too-big' : 'undecodable' };
+};
 
 export type AvatarUploadPlan =
   | { readonly action: 'accept'; readonly payload: AvatarPayload }
