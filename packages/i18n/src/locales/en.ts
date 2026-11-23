@@ -2301,6 +2301,12 @@ export const en = {
   'web.ai.tools.intentSetTaskChecklist': 'Set checklist of task {id} to {count} item(s)',
   'web.ai.tools.intentCheckChecklistItem': 'Check item "{item}" of task {id}',
   'web.ai.tools.intentUncheckChecklistItem': 'Uncheck item "{item}" of task {id}',
+  'web.tasks.checklist.title': 'Checklist',
+  'web.tasks.checklist.add': 'Add',
+  'web.tasks.checklist.addPlaceholder': 'Add an item…',
+  'web.tasks.checklist.removeAria': 'Remove item "{text}"',
+  'web.tasks.checklist.convertLegacy': 'Convert the note checklist into checkable items',
+  'web.tasks.checklist.progressLabel': '{done}/{total} done',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',
