@@ -109,10 +109,12 @@ describe('默认值 —— 一切都是关的', () => {
     }
     expect(MAX_TOOLS_PER_ENTITY).toBe(7);
     // 2026-11-22 工具层补全：为 TASK/PROJECT/NOTE 各开单列上限（删除/归档/移动等生命周期工具）。
-    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.TASK).toBe(27);
+    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.TASK).toBe(29);
     expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.PROJECT).toBe(10);
     expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.NOTE).toBe(10);
-    const overridden = new Set(['TASK', 'PROJECT', 'NOTE']);
+    // 2026-11-23 批次6：HABIT 加颜色/图标/目标/频率 4 个写工具（5→9，上限放到 12）。
+    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.HABIT).toBe(12);
+    const overridden = new Set(['TASK', 'PROJECT', 'NOTE', 'HABIT']);
     for (const pack of LOCAL_API_TOOL_PACKS) {
       if (!overridden.has(pack.entityType)) expect(maxToolsPerEntity(pack.entityType)).toBe(7);
     }

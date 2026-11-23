@@ -75,4 +75,35 @@
 - **子项逐条勾选**：清单项在 Markdown 备注里，没有独立 op；要做需新的结构化子项模型。
 - **专注计时开始/停止**：实时计时器，交互性动作，`log_focus`（记一段）已覆盖事后记录。
 - **purge / 清空回收站 / 账号密钥/同步设置**：安全红线，永不给 AI。
-- 清单颜色/图标、任务四象限/重要/置顶、习惯打卡撤销：可后续小批次再补（低优先，或由 `update_task` 字段扩展）。
+- ~~清单颜色/图标、任务四象限/重要/置顶、习惯打卡撤销：可后续小批次再补~~ → **批次6（2026-11-23）已全部补齐**，见下节。
+
+
+---
+
+## 批次 6 完成（2026-11-23，工具 67→75）
+
+在完成分 3 批（6-1/6-2/6-3）后，AI 工具目录由 **67 → 75**（读 13 / 写 62），新增 **8 个写工具**，全部走 op-log 单入口、`risk=write`、无 purge：
+
+| 工具 | 实体 | 语义（对齐滴答清单调研） |
+|---|---|---|
+| `set_project_color` | PROJECT | 清单设色/清除（槽位 1–8；滴答=清单级预设色盘） |
+| `set_habit_color` / `set_habit_icon` | HABIT | 习惯颜色/图标（图标闭集；滴答=emoji/符号） |
+| `set_habit_goal` / `set_habit_frequency` | HABIT | 习惯目标(数值/单位/口径)/频率(每天·周几·每N天·间隔) |
+| `set_task_quadrant` | TASK | 四象限整格 → 翻译成 important + dueDate（滴答=同一派生模型） |
+| `postpone_task_to_today` | TASK | 推迟到今天（改 dueDate；滴答=改截止日非独立字段） |
+| `record_habit_checkins` | HABIT_LOG | 批量打卡（纯本地多写记录） |
+
+**颜色/图标口径**（§5.4）：AI 只在用户明确点名时执行、不主动替用户选；工具强制显式值。
+
+### 仍不做（依据滴答清单调研 + 产品边界）
+- **子项结构化 checklist**：滴答 checklist 是结构化对象(id/done/order)+n/m 进度+全勾自动完成；heyta 现在是备注 markdown。属**改数据模型**（最小方案：Task 加可选字段、零 bump；正解：独立实体）。工作量中–大（domain 0.5–1 周 + 四端 UI 1–2 周 + 迁移），需产品先拍口径（note vs 结构化谁是唯一事实源、全勾完成父在重复/放弃/子任务下的语义）。
+- **多人协作/指派**：滴答=清单级共享 + assignee + ACL + 通知，唯一重后端项；heyta 无协作模型。
+- **评论**：heyta ADR-0062 个人清单无评论，评论=共享清单专属，走 share 加密通道 → 依赖协作。
+- **附件**：需对象存储/blob 通道 + 配额，中成本后端项。
+- **专注计时开始/停止**：实时交互，不宜给 AI；`log_focus` 已覆盖事后记录。
+- **purge / 清空回收站 / 账号密钥 / 同步设置**：安全红线，永不进 AI。
+
+### 验证（批次6）
+- `packages/local-api` 全量测试、`packages/app-host` 全量测试全绿；`check-ai-tools / check-ai-coverage / check-layering / check-i18n-vars / gen --check / ai-copy-parity` 全绿。
+- 三批均提交在 `feat/ai-tools-lowfreq`（d057bb74 / 255b1131 / 9ea93df8）。
+- 说明：当前分支 HEAD 的既有若干 `.spec.ts` 类型债（agent-harness / ai-routed-model / assistant-sessions / local-api-host-lifecycle / ai wire.spec / web calendar）与本批无关，本批改动文件在 app-host/web/local-api 均 0 类型错。
