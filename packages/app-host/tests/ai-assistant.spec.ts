@@ -632,6 +632,15 @@ describe('授权只有一份：整份目录，判断仍在 `@heyta/local-api`', 
         'undo_checkin',
         'skip_task_occurrence',
         'set_task_repeat_after_completion',
+        // 2026-11-23 批次6：清单/习惯属性 + 四象限/推迟 + 批量打卡
+        'set_project_color',
+        'set_habit_color',
+        'set_habit_icon',
+        'set_habit_goal',
+        'set_habit_frequency',
+        'set_task_quadrant',
+        'postpone_task_to_today',
+        'record_habit_checkins',
       ].sort(),
     );
     // 🔴 判据与这条用例的标题对齐：名单**由目录推导**，不是手抄一份工具名。

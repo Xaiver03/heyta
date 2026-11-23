@@ -314,6 +314,16 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 | `FOCUS_SESSION` | （无缺口） | `focus-actions.ts` 只有 `log` + `listSessions` | 界面上没有"改一次已记录的专注"这件事 ⇒ 这一格**满了**，不是没做 |
 | `REMINDER` | 改时刻 / 延后 / 忽略 / 取消忽略 / 删除 | `reminder-actions.ts:87,93,98,100,102,104` | 还剩 2 席 ⇒ 前三条没做。**`markReminderFired` 刻意不做**：它的调用者是投递器（`apps/mobile/src/lib/reminders.ts:110`），用户不按它 ⇒ 按 §2.2 的准入判据它压根不属于 AI 面，而不是"排不到" |
 
+> **2026-11-23（批次6）进展**：上表中"纯字段 / 无产品红线"的写动作已补齐为 AI 工具（目录 67→75）：
+> `set_project_color`、`set_habit_color` / `set_habit_icon` / `set_habit_goal` / `set_habit_frequency`、
+> `set_task_quadrant`、`postpone_task_to_today`、`record_habit_checkins`（批量打卡）。
+> 其中**颜色 / 图标**的产品口径经产品负责人确认：**AI 只在用户明确点名某个色号 / 图标时执行、不主动替用户选**
+>（工具强制显式值），因此不构成"AI 替用户赋义"。四象限整格 = 把"拖进某格"翻译成对 important + dueDate 的写入
+>（象限仍是派生视图，非独立字段，与 `packages/domain/src/quadrant.ts` 同构）。
+> 仍未做（需产品定义 / 新模型 / 实时）：子项结构化 checklist（现在只是备注 markdown）、协作指派、评论（依赖共享清单，ADR-0062）、
+> 附件（需 blob 通道）、专注计时开始/停止（实时交互）；purge / 清空回收站 / 账号密钥为安全红线永不进 AI。
+> 详见 `docs/plans/2026-11-22-ai-capability-parity.md`。
+
 📌 这一节的一般形式：**"覆盖面"是一个下限指标，把它跑满之后它会停止暴露信息。**
 所以下一个人问的应该是"哪个动作没有"，而回答它需要一张**动作所有者**表，
 不是再看一次覆盖率比值。上表每一行的"依据"列就是那张表的位置。

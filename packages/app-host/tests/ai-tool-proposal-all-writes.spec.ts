@@ -19,7 +19,7 @@
  *   3. 未授权：`denied`，且效果读数没变（逐工具默认关对新工具同样成立）
  */
 
-import { Priority } from '@heyta/domain';
+import { Priority, startOfDay } from '@heyta/domain';
 import { OpLogEngine } from '@heyta/op-log';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
@@ -547,6 +547,72 @@ const CASES: readonly Case[] = [
     label: '完成后顺延',
     args: async () => ({ taskId: await seed({ action: 'create-task', title: '顺延' }), on: true }),
     effect: () => Object.values(engine.getState().tasks).filter((t) => t.repeatAfterCompletion === true).length,
+  },
+
+  // ── 批6：清单 / 习惯属性 ──
+  {
+    tool: 'set_project_color',
+    intentAction: 'set-project-color',
+    label: '清单设色',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '配色清单' }), color: 3 }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.color === '3').length,
+  },
+  {
+    tool: 'set_habit_color',
+    intentAction: 'set-habit-color',
+    label: '习惯设色',
+    args: async () => ({ habitId: await seed({ action: 'create-habit', name: '配色习惯' }), color: 2 }),
+    effect: () => Object.values(engine.getState().habits).filter((h) => h.color === '2').length,
+  },
+  {
+    tool: 'set_habit_icon',
+    intentAction: 'set-habit-icon',
+    label: '习惯设图标',
+    args: async () => ({ habitId: await seed({ action: 'create-habit', name: '图标习惯' }), icon: 'book' }),
+    effect: () => Object.values(engine.getState().habits).filter((h) => h.icon === 'book').length,
+  },
+  {
+    tool: 'set_habit_goal',
+    intentAction: 'set-habit-goal',
+    label: '习惯改目标',
+    args: async () => ({ habitId: await seed({ action: 'create-habit', name: '目标习惯' }), target: 5 }),
+    effect: () => Object.values(engine.getState().habits).filter((h) => h.target === 5).length,
+  },
+  {
+    tool: 'set_habit_frequency',
+    intentAction: 'set-habit-frequency',
+    label: '习惯改频率',
+    args: async () => ({
+      habitId: await seed({ action: 'create-habit', name: '频率习惯' }),
+      frequency: { type: 'interval', everyNDays: 3 },
+    }),
+    effect: () => Object.values(engine.getState().habits).filter((h) => h.frequency !== undefined).length,
+  },
+
+  // ── 批6-2：四象限 / 推迟今天 ──
+  {
+    tool: 'set_task_quadrant',
+    intentAction: 'set-task-quadrant',
+    label: '四象限整格',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '象限' }), quadrant: 1 }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.important === true).length,
+  },
+  {
+    tool: 'postpone_task_to_today',
+    intentAction: 'postpone-task-to-today',
+    label: '推迟今天',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '拖延', dueDate: '2020-01-01' }) }),
+    effect: () =>
+      Object.values(engine.getState().tasks).filter((t) => t.dueDate !== undefined && t.dueDate >= startOfDay(CLOCK)).length,
+  },
+
+  // ── 批6-3：批量打卡 ──
+  {
+    tool: 'record_habit_checkins',
+    intentAction: 'record-habit-checkins',
+    label: '批量打卡',
+    args: async () => ({ habitIds: [await seed({ action: 'create-habit', name: '批量打卡习惯' })] }),
+    effect: () => Object.values(engine.getState().habitLogs).filter((h) => h.deletedAt === undefined).length,
   },
 ];
 

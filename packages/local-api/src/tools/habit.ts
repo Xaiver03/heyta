@@ -13,13 +13,10 @@
  * （见 `scripts/gen-ai-capability-manifest.mjs` 的 `ENTITY_NOUNS`）。
  * 把打卡工具写进这个文件会让"哪个实体被覆盖了"这件事在两个地方各说一遍。
  *
- * ⚠️ 界面上还能改目标（`setHabitGoal`）、换颜色/图标、归档习惯，这三个动作
- * 现在**没有工具**。2026-10-03 之前这里写的理由是"目录有一条 `<= 10` 的容量判据"，
- * 那个理由已经不成立了 —— 容量改成按实体算（`shared.ts` 的 `MAX_TOOLS_PER_ENTITY`，默认 7），
- * HABIT 用了 5 席（清单/新建/改名/删除/恢复），还剩 2 席。所以这三个动作是**还没做**，
- * 不是被上限挡着：换颜色/图标那一档另有一条产品理由（"AI 替用户选一个身份标记"
- * 要先回答谁赋它的义），逐条登记在 `docs/plans/ai-event-tool-contract.md` §5.4，
- * 别把它读成"等容量放开就能补"。
+ * 🔴 2026-11-23（批6）补齐了改目标 / 颜色 / 图标 / 频率：`set_habit_goal`、
+ * `set_habit_color`、`set_habit_icon`、`set_habit_frequency`。颜色/图标的**产品口径**：
+ * AI 只在用户**明确点名**某个色号/图标时执行、不主动替用户选（见
+ * `docs/plans/ai-event-tool-contract.md` §5.4，已按此更新）。HABIT 现用 9 席。
  */
 
 import type { McpToolDefinition } from '../mcp.js';
@@ -76,6 +73,46 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'set_habit_color',
+    egressFields: [],
+    description:
+      '给一个习惯设置颜色槽位（1–8），或清除颜色。' +
+      '🔴 仅在用户明确要求某个颜色时调用；不要自行替用户决定习惯该是什么颜色。省略 color = 清除颜色。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_habit_icon',
+    egressFields: [],
+    description:
+      '给一个习惯指定图标（闭集里的 key，如 drop / book / moon / sun），或清除回到默认图标。' +
+      '🔴 仅在用户明确要求某个图标时调用；不要自行替用户选图标。省略 icon = 清除。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_habit_goal',
+    egressFields: [],
+    description:
+      '改一个习惯的目标：目标数值 target、单位 unit、达成口径 goalType（atLeast / atMost / exactly），三者都可单独改。' +
+      '至少给一个字段；unit 传空串表示清除单位。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_habit_frequency',
+    egressFields: [],
+    description:
+      '改一个习惯的重复频率。frequency 是结构对象：{type:"daily"} / {type:"weekly",daysOfWeek:[1-7]} / ' +
+      '{type:"interval",everyNDays:N} / {type:"spaced",offsets:[...],anchor:"YYYY-MM-DD"}。省略 = 退回每天。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -128,6 +165,48 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
     type: 'object',
     properties: {
       habitId: { type: 'string', description: '要从回收站恢复的习惯 id。' },
+    },
+    required: ['habitId'],
+    additionalProperties: false,
+  },
+  set_habit_color: {
+    type: 'object',
+    properties: {
+      habitId: { type: 'string', description: '要设色的习惯 id。' },
+      color: { type: 'number', description: '颜色槽位 1–8 的整数；省略表示清除颜色。' },
+    },
+    required: ['habitId'],
+    additionalProperties: false,
+  },
+  set_habit_icon: {
+    type: 'object',
+    properties: {
+      habitId: { type: 'string', description: '要设图标的习惯 id。' },
+      icon: { type: 'string', description: '图标 key（闭集）；省略表示清除。' },
+    },
+    required: ['habitId'],
+    additionalProperties: false,
+  },
+  set_habit_goal: {
+    type: 'object',
+    properties: {
+      habitId: { type: 'string', description: '要改目标的习惯 id。' },
+      target: { type: 'number', description: '新的目标数值，不小于 0 的有限数。' },
+      unit: { type: 'string', description: '新的单位；空串表示清除单位。' },
+      goalType: { type: 'string', description: '达成口径：atLeast / atMost / exactly。' },
+    },
+    required: ['habitId'],
+    additionalProperties: false,
+  },
+  set_habit_frequency: {
+    type: 'object',
+    properties: {
+      habitId: { type: 'string', description: '要改频率的习惯 id。' },
+      frequency: {
+        type: 'object',
+        description: '频率对象；省略表示退回每天。type 取值 daily / weekly / interval / spaced。',
+        additionalProperties: true,
+      },
     },
     required: ['habitId'],
     additionalProperties: false,
@@ -219,6 +298,105 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
         return { ok: false, message: 'restore_habit 需要 habitId。' };
       }
       return { ok: true, intent: { action: 'restore-habit', habitId: a['habitId'] } };
+    }
+
+    case 'set_habit_color': {
+      const unknown = Object.keys(a).filter((key) => key !== 'habitId' && key !== 'color');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_habit_color 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['habitId'] !== 'string' || a['habitId'].trim() === '') {
+        return { ok: false, message: 'set_habit_color 需要 habitId。' };
+      }
+      const color = a['color'];
+      if (color !== undefined && (typeof color !== 'number' || !Number.isInteger(color) || color < 1 || color > 8)) {
+        return { ok: false, message: 'set_habit_color 的 color 必须是 1–8 的整数；要清除颜色请省略它。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-habit-color',
+          habitId: a['habitId'],
+          ...(typeof color === 'number' ? { color } : {}),
+        },
+      };
+    }
+
+    case 'set_habit_icon': {
+      const unknown = Object.keys(a).filter((key) => key !== 'habitId' && key !== 'icon');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_habit_icon 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['habitId'] !== 'string' || a['habitId'].trim() === '') {
+        return { ok: false, message: 'set_habit_icon 需要 habitId。' };
+      }
+      if (a['icon'] !== undefined && (typeof a['icon'] !== 'string' || a['icon'].trim() === '')) {
+        return { ok: false, message: 'set_habit_icon 的 icon 必须是非空字符串（要清除请省略）。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-habit-icon',
+          habitId: a['habitId'],
+          ...(typeof a['icon'] === 'string' ? { icon: a['icon'] } : {}),
+        },
+      };
+    }
+
+    case 'set_habit_goal': {
+      const unknown = Object.keys(a).filter(
+        (key) => key !== 'habitId' && key !== 'target' && key !== 'unit' && key !== 'goalType',
+      );
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_habit_goal 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['habitId'] !== 'string' || a['habitId'].trim() === '') {
+        return { ok: false, message: 'set_habit_goal 需要 habitId。' };
+      }
+      if (a['target'] === undefined && a['unit'] === undefined && a['goalType'] === undefined) {
+        return { ok: false, message: 'set_habit_goal 至少要给 target / unit / goalType 之一。' };
+      }
+      if (a['target'] !== undefined && typeof a['target'] !== 'number') {
+        return { ok: false, message: 'set_habit_goal 的 target 必须是数字。' };
+      }
+      if (a['unit'] !== undefined && typeof a['unit'] !== 'string') {
+        return { ok: false, message: 'set_habit_goal 的 unit 必须是字符串。' };
+      }
+      if (a['goalType'] !== undefined && typeof a['goalType'] !== 'string') {
+        return { ok: false, message: 'set_habit_goal 的 goalType 必须是字符串。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-habit-goal',
+          habitId: a['habitId'],
+          ...(typeof a['target'] === 'number' ? { target: a['target'] } : {}),
+          ...(typeof a['unit'] === 'string' ? { unit: a['unit'] } : {}),
+          ...(typeof a['goalType'] === 'string' ? { goalType: a['goalType'] } : {}),
+        },
+      };
+    }
+
+    case 'set_habit_frequency': {
+      const unknown = Object.keys(a).filter((key) => key !== 'habitId' && key !== 'frequency');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_habit_frequency 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['habitId'] !== 'string' || a['habitId'].trim() === '') {
+        return { ok: false, message: 'set_habit_frequency 需要 habitId。' };
+      }
+      const freq = a['frequency'];
+      if (freq !== undefined && (typeof freq !== 'object' || freq === null || Array.isArray(freq))) {
+        return { ok: false, message: 'set_habit_frequency 的 frequency 必须是对象（省略表示退回每天）。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-habit-frequency',
+          habitId: a['habitId'],
+          ...(freq !== undefined ? { frequency: freq as Record<string, unknown> } : {}),
+        },
+      };
     }
 
     default:

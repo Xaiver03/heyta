@@ -89,6 +89,18 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'set_project_color',
+    // 颜色 = 用户赋义的身份标记。AI 只在用户**明确点名**某个色号时执行，不主动替用户选色
+    //（口径见 `docs/plans/ai-event-tool-contract.md` §5.4，已按此更新）。
+    egressFields: [],
+    description:
+      '给一个清单（项目）设置颜色槽位（1–8），或清除颜色。' +
+      '🔴 仅在用户明确要求某个颜色时调用；不要自行替用户决定清单该是什么颜色。省略 color = 清除颜色。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -155,6 +167,15 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
     type: 'object',
     properties: {
       projectId: { type: 'string', description: '要从回收站恢复的清单标识。' },
+    },
+    required: ['projectId'],
+    additionalProperties: false,
+  },
+  set_project_color: {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string', description: '要设色的清单标识。' },
+      color: { type: 'number', description: '颜色槽位 1–8 的整数；省略表示清除颜色。' },
     },
     required: ['projectId'],
     additionalProperties: false,
@@ -288,6 +309,28 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
         return { ok: false, message: 'restore_project 需要 projectId。' };
       }
       return { ok: true, intent: { action: 'restore-project', projectId: a['projectId'] } };
+    }
+
+    case 'set_project_color': {
+      const unknown = Object.keys(a).filter((key) => key !== 'projectId' && key !== 'color');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_project_color 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '') {
+        return { ok: false, message: 'set_project_color 需要 projectId。' };
+      }
+      const color = a['color'];
+      if (color !== undefined && (typeof color !== 'number' || !Number.isInteger(color) || color < 1 || color > 8)) {
+        return { ok: false, message: 'set_project_color 的 color 必须是 1–8 的整数；要清除颜色请省略它。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-project-color',
+          projectId: a['projectId'],
+          ...(typeof color === 'number' ? { color } : {}),
+        },
+      };
     }
 
     default:

@@ -2480,6 +2480,18 @@ export const zhCN = {
   'web.ai.tools.intentSkipOccurrence': '跳过任务 {id} 的这一次',
   'web.ai.tools.intentRepeatAfterCompletionOn': '任务 {id} 改为完成后顺延',
   'web.ai.tools.intentRepeatAfterCompletionOff': '任务 {id} 改为按截止日顺延',
+  'web.ai.tools.intentSetProjectColor': '把清单 {id} 的颜色设为 {color}',
+  'web.ai.tools.intentClearProjectColor': '清除清单 {id} 的颜色',
+  'web.ai.tools.intentSetHabitColor': '把习惯 {id} 的颜色设为 {color}',
+  'web.ai.tools.intentClearHabitColor': '清除习惯 {id} 的颜色',
+  'web.ai.tools.intentSetHabitIcon': '把习惯 {id} 的图标设为 {icon}',
+  'web.ai.tools.intentClearHabitIcon': '清除习惯 {id} 的图标',
+  'web.ai.tools.intentSetHabitGoal': '修改习惯 {id} 的目标',
+  'web.ai.tools.intentSetHabitFrequency': '修改习惯 {id} 的重复频率',
+  'web.ai.tools.intentClearHabitFrequency': '把习惯 {id} 的频率改回每天',
+  'web.ai.tools.intentSetTaskQuadrant': '把任务 {id} 放进四象限第 {quadrant} 格',
+  'web.ai.tools.intentPostponeTaskToday': '把任务 {id} 推迟到今天',
+  'web.ai.tools.intentRecordHabitCheckins': '批量打卡 {count} 个习惯',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',

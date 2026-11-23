@@ -90,4 +90,18 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
 
   skip_task_occurrence: { taskId: 't1' },
   set_task_repeat_after_completion: { taskId: 't1', on: true },
+
+  // 批6：清单 / 习惯属性
+  set_project_color: { projectId: 'p1', color: 3 },
+  set_habit_color: { habitId: 'h1', color: 2 },
+  set_habit_icon: { habitId: 'h1', icon: 'book' },
+  set_habit_goal: { habitId: 'h1', target: 3 },
+  set_habit_frequency: { habitId: 'h1', frequency: { type: 'daily' } },
+
+  // 批6-2：四象限 / 推迟今天
+  set_task_quadrant: { taskId: 't1', quadrant: 1 },
+  postpone_task_to_today: { taskId: 't1' },
+
+  // 批6-3：批量打卡
+  record_habit_checkins: { habitIds: ['h1'] },
 };
