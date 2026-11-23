@@ -135,6 +135,8 @@ export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   TASK: 27,
   PROJECT: 10,
   NOTE: 10,
+  // 批6：HABIT 加颜色/图标/目标/频率 4 个写工具 → 5+4=9，放到 12 留余量。
+  HABIT: 12,
 } as const satisfies Readonly<Partial<Record<string, number>>>;
 
 export type ToolBudgetEntityType = keyof typeof MAX_TOOLS_PER_ENTITY_BY_TYPE;
@@ -758,7 +760,27 @@ export type LocalApiWriteIntent =
   | { action: 'undo-checkin'; habitId: string; date?: string }
   // 批次5：重复任务控制
   | { action: 'skip-task-occurrence'; taskId: string }
-  | { action: 'set-task-repeat-after-completion'; taskId: string; on: boolean };
+  | { action: 'set-task-repeat-after-completion'; taskId: string; on: boolean }
+  // 批6：清单 / 习惯属性（颜色 / 图标 / 目标 / 频率）
+  /**
+   * 给清单设/清颜色槽位（PROJECT）。`color` 1–8，省略 = 清除。颜色是用户赋义的身份标记，
+   * AI 只在用户明确点名时执行（`docs/plans/ai-event-tool-contract.md` §5.4）。
+   */
+  | { action: 'set-project-color'; projectId: string; color?: number }
+  /** 给习惯设/清颜色槽位（HABIT）。`color` 1–8，省略 = 清除。口径同 `set-project-color`。 */
+  | { action: 'set-habit-color'; habitId: string; color?: number }
+  /** 给习惯设/清图标（HABIT，闭集 key）。`icon` 省略 = 清除回到派生图标。口径同上。 */
+  | { action: 'set-habit-icon'; habitId: string; icon?: string }
+  /**
+   * 改习惯目标（HABIT）。三字段可单独改，至少给一个；`unit` 空串 = 清除单位。
+   * 数值/口径的合法性由动作层 `setHabitGoal` 校验（本包零依赖、看不见 domain 词表）。
+   */
+  | { action: 'set-habit-goal'; habitId: string; target?: number; unit?: string; goalType?: string }
+  /**
+   * 改习惯频率（HABIT）。`frequency` 是结构对象（daily / weekly / interval / spaced），
+   * 省略 = 退回每天。结构合法性由动作层 `normalizeHabitFrequency` 校验（非法抛 → invalid）。
+   */
+  | { action: 'set-habit-frequency'; habitId: string; frequency?: Readonly<Record<string, unknown>> };
 
 /**
  * 一条写入落地的实体类型。

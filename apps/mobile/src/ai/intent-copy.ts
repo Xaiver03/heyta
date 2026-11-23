@@ -238,5 +238,24 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate, locale: Lo
       return intent.on
         ? t('web.ai.tools.intentRepeatAfterCompletionOn', { id: intent.taskId })
         : t('web.ai.tools.intentRepeatAfterCompletionOff', { id: intent.taskId });
+    // 批6：清单 / 习惯属性
+    case 'set-project-color':
+      return intent.color === undefined
+        ? t('web.ai.tools.intentClearProjectColor', { id: intent.projectId })
+        : t('web.ai.tools.intentSetProjectColor', { id: intent.projectId, color: String(intent.color) });
+    case 'set-habit-color':
+      return intent.color === undefined
+        ? t('web.ai.tools.intentClearHabitColor', { id: intent.habitId })
+        : t('web.ai.tools.intentSetHabitColor', { id: intent.habitId, color: String(intent.color) });
+    case 'set-habit-icon':
+      return intent.icon === undefined
+        ? t('web.ai.tools.intentClearHabitIcon', { id: intent.habitId })
+        : t('web.ai.tools.intentSetHabitIcon', { id: intent.habitId, icon: intent.icon });
+    case 'set-habit-goal':
+      return t('web.ai.tools.intentSetHabitGoal', { id: intent.habitId });
+    case 'set-habit-frequency':
+      return intent.frequency === undefined
+        ? t('web.ai.tools.intentClearHabitFrequency', { id: intent.habitId })
+        : t('web.ai.tools.intentSetHabitFrequency', { id: intent.habitId });
   }
 }

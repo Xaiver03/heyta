@@ -70,6 +70,8 @@ import {
   toLocalDate,
   noteProjectId,
   noteRejection,
+  parseCategorySlot,
+  HABIT_ICONS,
   reminderPhase,
   reminderRejection,
   today,
@@ -79,7 +81,10 @@ import {
   type LocalDate,
 
   type Habit,
+  type CategorySlot,
+  type HabitFrequency,
   type HabitGoalType,
+  type HabitIcon,
   type HabitLog,
   type Note,
   type Reminder,
@@ -1777,6 +1782,93 @@ async function submitIntent(
           ok: false,
           reason: 'not-found',
           message: e instanceof Error && e.message !== '' ? e.message : '这个习惯无法恢复。',
+        };
+      }
+      return { ok: true, taskId: intent.habitId, entityId: intent.habitId, entityType: 'HABIT' };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 批6：清单 / 习惯属性（颜色 / 图标 / 目标 / 频率）
+    // 颜色/图标：AI 只在用户明确点名时执行，不主动替用户选（§5.4）。
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'set-project-color': {
+      const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+      if (project === undefined || project.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个清单。' };
+      }
+      const slot = intent.color === undefined ? undefined : parseCategorySlot(intent.color);
+      if (intent.color !== undefined && slot === undefined) {
+        return { ok: false, reason: 'invalid', message: '颜色槽位必须是 1–8 的整数。' };
+      }
+      await projectActions.setProjectColor(intent.projectId, slot);
+      return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
+    }
+
+    case 'set-habit-color': {
+      const habit = habitActions.listHabits().find((h) => h.id === intent.habitId);
+      if (habit === undefined) {
+        return { ok: false, reason: 'not-found', message: `找不到习惯「${intent.habitId}」。` };
+      }
+      const slot = intent.color === undefined ? undefined : parseCategorySlot(intent.color);
+      if (intent.color !== undefined && slot === undefined) {
+        return { ok: false, reason: 'invalid', message: '颜色槽位必须是 1–8 的整数。' };
+      }
+      await habitActions.setHabitColor(intent.habitId, slot);
+      return { ok: true, taskId: intent.habitId, entityId: intent.habitId, entityType: 'HABIT' };
+    }
+
+    case 'set-habit-icon': {
+      const habit = habitActions.listHabits().find((h) => h.id === intent.habitId);
+      if (habit === undefined) {
+        return { ok: false, reason: 'not-found', message: `找不到习惯「${intent.habitId}」。` };
+      }
+      if (intent.icon !== undefined && !(HABIT_ICONS as readonly string[]).includes(intent.icon)) {
+        return { ok: false, reason: 'invalid', message: `不认识的图标「${intent.icon}」。` };
+      }
+      await habitActions.setHabitIcon(intent.habitId, intent.icon as HabitIcon | undefined);
+      return { ok: true, taskId: intent.habitId, entityId: intent.habitId, entityType: 'HABIT' };
+    }
+
+    case 'set-habit-goal': {
+      const habit = habitActions.listHabits().find((h) => h.id === intent.habitId);
+      if (habit === undefined) {
+        return { ok: false, reason: 'not-found', message: `找不到习惯「${intent.habitId}」。` };
+      }
+      if (intent.target !== undefined && (!Number.isFinite(intent.target) || intent.target < 0)) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `目标数值必须是不小于 0 的有限数，收到「${String(intent.target)}」。`,
+        };
+      }
+      if (intent.goalType !== undefined && !GOAL_TYPES.has(intent.goalType)) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `达成口径应为 atLeast / atMost / exactly，收到「${intent.goalType}」。`,
+        };
+      }
+      await habitActions.setHabitGoal(intent.habitId, {
+        ...(intent.target === undefined ? {} : { target: intent.target }),
+        ...(intent.unit === undefined ? {} : { unit: intent.unit }),
+        ...(intent.goalType === undefined ? {} : { goalType: intent.goalType as HabitGoalType }),
+      });
+      return { ok: true, taskId: intent.habitId, entityId: intent.habitId, entityType: 'HABIT' };
+    }
+
+    case 'set-habit-frequency': {
+      const habit = habitActions.listHabits().find((h) => h.id === intent.habitId);
+      if (habit === undefined) {
+        return { ok: false, reason: 'not-found', message: `找不到习惯「${intent.habitId}」。` };
+      }
+      try {
+        await habitActions.setHabitFrequency(intent.habitId, intent.frequency as HabitFrequency | undefined);
+      } catch (e) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: e instanceof Error && e.message !== '' ? e.message : '频率格式不正确。',
         };
       }
       return { ok: true, taskId: intent.habitId, entityId: intent.habitId, entityType: 'HABIT' };

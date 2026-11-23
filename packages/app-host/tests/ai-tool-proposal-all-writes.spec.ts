@@ -548,6 +548,46 @@ const CASES: readonly Case[] = [
     args: async () => ({ taskId: await seed({ action: 'create-task', title: '顺延' }), on: true }),
     effect: () => Object.values(engine.getState().tasks).filter((t) => t.repeatAfterCompletion === true).length,
   },
+
+  // ── 批6：清单 / 习惯属性 ──
+  {
+    tool: 'set_project_color',
+    intentAction: 'set-project-color',
+    label: '清单设色',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '配色清单' }), color: 3 }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.color === '3').length,
+  },
+  {
+    tool: 'set_habit_color',
+    intentAction: 'set-habit-color',
+    label: '习惯设色',
+    args: async () => ({ habitId: await seed({ action: 'create-habit', name: '配色习惯' }), color: 2 }),
+    effect: () => Object.values(engine.getState().habits).filter((h) => h.color === '2').length,
+  },
+  {
+    tool: 'set_habit_icon',
+    intentAction: 'set-habit-icon',
+    label: '习惯设图标',
+    args: async () => ({ habitId: await seed({ action: 'create-habit', name: '图标习惯' }), icon: 'book' }),
+    effect: () => Object.values(engine.getState().habits).filter((h) => h.icon === 'book').length,
+  },
+  {
+    tool: 'set_habit_goal',
+    intentAction: 'set-habit-goal',
+    label: '习惯改目标',
+    args: async () => ({ habitId: await seed({ action: 'create-habit', name: '目标习惯' }), target: 5 }),
+    effect: () => Object.values(engine.getState().habits).filter((h) => h.target === 5).length,
+  },
+  {
+    tool: 'set_habit_frequency',
+    intentAction: 'set-habit-frequency',
+    label: '习惯改频率',
+    args: async () => ({
+      habitId: await seed({ action: 'create-habit', name: '频率习惯' }),
+      frequency: { type: 'interval', everyNDays: 3 },
+    }),
+    effect: () => Object.values(engine.getState().habits).filter((h) => h.frequency !== undefined).length,
+  },
 ];
 
 beforeEach(async () => {

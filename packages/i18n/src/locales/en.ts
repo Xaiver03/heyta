@@ -2286,6 +2286,15 @@ export const en = {
   'web.ai.tools.intentSkipOccurrence': 'Skip this occurrence of task {id}',
   'web.ai.tools.intentRepeatAfterCompletionOn': 'Task {id}: repeat from completion date',
   'web.ai.tools.intentRepeatAfterCompletionOff': 'Task {id}: repeat from due date',
+  'web.ai.tools.intentSetProjectColor': 'Set color of list {id} to {color}',
+  'web.ai.tools.intentClearProjectColor': 'Clear color of list {id}',
+  'web.ai.tools.intentSetHabitColor': 'Set color of habit {id} to {color}',
+  'web.ai.tools.intentClearHabitColor': 'Clear color of habit {id}',
+  'web.ai.tools.intentSetHabitIcon': 'Set icon of habit {id} to {icon}',
+  'web.ai.tools.intentClearHabitIcon': 'Clear icon of habit {id}',
+  'web.ai.tools.intentSetHabitGoal': 'Update goal of habit {id}',
+  'web.ai.tools.intentSetHabitFrequency': 'Update repeat frequency of habit {id}',
+  'web.ai.tools.intentClearHabitFrequency': 'Reset habit {id} frequency to daily',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',
