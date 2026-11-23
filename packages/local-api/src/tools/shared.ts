@@ -811,7 +811,20 @@ export type LocalApiWriteIntent =
    * 语义**只对共享清单内的任务有意义**；个人任务缺席 = 未指派。存在性由宿主经
    * `actions.findTask` 判（I5：本层不读原始 `tasks` 表）。
    */
-  | { action: 'set-task-assignee'; taskId: string; assigneeUserId?: string };
+  | { action: 'set-task-assignee'; taskId: string; assigneeUserId?: string }
+  // 评论（COMMENT，P4 / ADR-0062）：**share 感知的独立工具通道**。
+  /**
+   * 给一条任务加评论（COMMENT）。
+   *
+   * 🔴 与个人 op-log 的其它写入**执行目标不同**：`submitIntent` 不调 `ctx.dispatch`，
+   * 而是走宿主注入的 `CommentActions`（→ `dispatchShareOp` → share 加密通道）。
+   * 意图仍然经过同一个 `submit` 入口（op-log 单入口不变），但落地的是**共享清单**。
+   * 无 share 会话的宿主（CLI/MCP）→ `{ ok:false, reason:'invalid' }` 且**零 op**；
+   * 个人清单 → `ListNotSharedError` 译成"评论只存在于共享清单"且**零 op**。
+   */
+  | { action: 'add-task-comment'; taskId: string; body: string }
+  /** 删除一条评论（COMMENT）。软删（`DEL`），可逆 —— 走同一条 share 通道。 */
+  | { action: 'delete-task-comment'; commentId: string };
 
 /**
  * 一条写入落地的实体类型。
@@ -845,7 +858,8 @@ export type LocalApiWrittenEntityType =
   | 'FOCUS_SESSION'
   | 'REMINDER'
   | 'EVENT'
-  | 'ATTACHMENT';
+  | 'ATTACHMENT'
+  | 'COMMENT';
 
 export type LocalApiWriteResult =
   | {

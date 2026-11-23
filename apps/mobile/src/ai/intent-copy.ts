@@ -275,5 +275,10 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate, locale: Lo
       return intent.done
         ? t('web.ai.tools.intentCheckChecklistItem', { id: intent.taskId, item: intent.itemText })
         : t('web.ai.tools.intentUncheckChecklistItem', { id: intent.taskId, item: intent.itemText });
+    // P4：评论（COMMENT）—— share 感知的独立通道。与 web 那份逐字同口径（无 default）。
+    case 'add-task-comment':
+      return t('web.ai.tools.intentAddTaskComment', { body: intent.body });
+    case 'delete-task-comment':
+      return t('web.ai.tools.intentDeleteTaskComment', { id: intent.commentId });
   }
 }

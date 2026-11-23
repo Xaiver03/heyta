@@ -137,6 +137,24 @@ export interface LocalApiNote extends LocalApiNoteRow {
 }
 
 /**
+ * 一条任务评论的**读面**（COMMENT，ADR-0062）。
+ *
+ * 字段与 `@heyta/domain` 的 `Comment` 逐字一致（`id` / `taskId` / `authorUserId` /
+ * `body` / `createdAt`）—— 本包零运行时依赖，看不见领域实体，所以这里手抄一份**读协议**。
+ * `createdAt` 由 reducer 从 op 时间戳派生；本层只做透传，不产生时刻。
+ *
+ * 🔴 评论只在**共享清单**里存在（个人清单没有评论）。所以能读出这个形状，
+ * 就代表宿主**确实持有 share 会话** —— 没有共享会话的宿主不会实现 `listTaskComments`。
+ */
+export interface LocalApiComment {
+  id: string;
+  taskId: string;
+  authorUserId: string;
+  body: string;
+  createdAt: number;
+}
+
+/**
  * 一次打卡（HABIT_LOG）。`note` 那个字段**不出**：`checkIn` 从来不写它，
  * 而把一条永远为空的自由文本放进白名单，等于放一条将来的出境通道。
  */
@@ -281,6 +299,21 @@ export interface LocalApiHost {
   listNotes(limit: number): Promise<readonly LocalApiNoteRow[]>;
   /** 取单条便签（含正文）。取不到返回 `undefined`（不是抛错，同 `getTask`）。 */
   getNote(noteId: string): Promise<LocalApiNote | undefined>;
+  /**
+   * 列某条任务下的评论线程（COMMENT，ADR-0062）。
+   *
+   * 🔴 **可选成员，而这是刻意的**：评论只存在于**共享清单**，而"这个宿主有没有
+   * share 会话"是一个真实存在的产品状态（CLI / MCP / agent-cloud 无登录态）。
+   * 选了必填，所有无登录宿主都得写一个假实现（返回空），于是"没有共享会话"和
+   * "这条任务确实没有评论"变成同一句话 —— 那正是本仓库最不允许的那类谎话。
+   * 所以：**有 share 会话的壳才注入它**（经 `LocalApiHostOptions.commentActions`），
+   * 没有就不实现；`list_task_comments` 在缺这条方法时回一句诚实的
+   * "本宿主没有共享会话"，而不是一个看起来正常的空列表。
+   *
+   * ⚠️ 与 `getTaskEstimateContext?` 不同：那条是可选能力，这条是**有/无共享会话**。
+   * 两者的缺席都不该被读成"数据是空的"。
+   */
+  listTaskComments?: (taskId: string, limit: number) => Promise<readonly LocalApiComment[]>;
   /** 列打卡记录（HABIT_LOG），按时间从早到晚；`habitId` 省略 = 全部习惯。 */
   listHabitLogs(habitId: string | undefined, limit: number): Promise<readonly LocalApiHabitLog[]>;
   /** 列专注记录（FOCUS_SESSION），按开始时间从早到晚。 */
