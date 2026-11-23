@@ -93,6 +93,28 @@ export interface LocalApiTag {
 }
 
 /**
+ * 一条附件的列表行（ATTACHMENT）。
+ *
+ * 🔴 **只有元数据，没有字节**：这条通道上刻意没有 `GET`（读字节需要一个能用它的界面，
+ * 见 `attachment-http.ts` 的 `ATTACHMENT_ROUTES` 那一段）。所以这里能读到的就是
+ * "有这么一个文件、叫什么、多大、挂在哪个任务上"—— 与 `LocalApiNoteRow` 同一档：
+ * 列表给目录信息，正文/字节逐条另取（而附件此刻根本没有"另取"）。
+ *
+ * ⚠️ 字段名 `mime` 而不是实体里的 `mimeType`：出境的词表要说出"这是什么类型"，
+ * 由宿主侧 `attachmentToItem` 单点换算（同 `dueDate`/`priority` 的投影纪律）。
+ */
+export interface LocalApiAttachment {
+  id: string;
+  fileName: string;
+  /** MIME 类型；缺 = 未知（对应实体的 `mimeType?`）。 */
+  mime?: string;
+  /** 字节数（服务端测到的那个数）；缺 = 未知。 */
+  sizeBytes?: number;
+  /** 归属的任务 id。 */
+  taskId: string;
+}
+
+/**
  * 便签的**列表行**：刻意**没有正文**。
  *
  * 🔴 这不是"忘了给"，是 `list_tasks` / `get_task` 那条已经立好的分工：
@@ -277,6 +299,15 @@ export interface LocalApiHost {
   listEvents(args: { limit?: number }): Promise<readonly LocalApiEventItem[]>;
   /** 取单个倒数日。取不到返回 `undefined`（不是抛错，同 `getTask`）。 */
   getEvent(eventId: string): Promise<LocalApiEventItem | undefined>;
+  /**
+   * 列某条任务下的附件（ATTACHMENT，软删的不进，`createdAt` 升序）。
+   *
+   * ⚠️ **可选成员**：附件读只需要 `ActionContext`，而本机所有宿主都经
+   * `createLocalApiHost()`（它恒提供这个方法）；把它做成必填会把几十处**测试假宿主**
+   * 的字面量一起逼着改，而那些假宿主根本不驱动附件工具。工具包对"没接"的宿主
+   * 明确报一句能力缺失（不静默返回空列表），所以"这个宿主忘了接"仍会响亮失败。
+   */
+  listAttachments?(taskId: string): Promise<readonly LocalApiAttachment[]>;
   /**
    * 🔴 **必须是 `dispatch()`。**
    *
@@ -622,6 +653,18 @@ function toolText(payload: unknown): unknown {
 /** 写入结果 → MCP 结果。失败也走 `content`（因为它是"工具执行结果失败"，不是协议错误）。 */
 function writeResult(result: LocalApiWriteResult): { result: unknown } {
   if (result.ok) {
+    // 附件写动作（rename / remove）：回的是**附件 id**（而不是冒充 `taskId`），
+    // 移除还会带一句"字节到底回收了没有"——`false` 是实话（只发了 op，字节留给
+    // 服务端孤儿扫描），不是失败。`rename-attachment` 不带 `bytesReleased`（它不碰字节）。
+    if (result.attachmentId !== undefined) {
+      return {
+        result: toolText({
+          ok: true,
+          attachmentId: result.attachmentId,
+          ...(result.bytesReleased === undefined ? {} : { bytesReleased: result.bytesReleased }),
+        }),
+      };
+    }
     // 🔴 **不能把清单/习惯的 id 回成 `{taskId}`** —— 那等于对模型与外部程序说
     // "刚建了一条任务"，而它建的是一条清单。`entityType` 在时出
     // `entityId` + `entityType`（同一条纪律：给调用方的字段名必须说出它是什么）。

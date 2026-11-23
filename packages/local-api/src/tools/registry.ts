@@ -24,6 +24,7 @@ import { reminderToolPack } from './reminder.js';
 import { eventToolPack } from './event.js';
 import { tagToolPack } from './tag.js';
 import { taskToolPack } from './task.js';
+import { attachmentToolPack } from './attachment.js';
 
 /**
  * 已注册的实体工具包。**数组顺序就是目录顺序的一部分，改动要按下面这条规则验。**
@@ -44,6 +45,7 @@ export const LOCAL_API_TOOL_PACKS: readonly EntityToolPack[] = [
   focusToolPack,
   reminderToolPack,
   eventToolPack,
+  attachmentToolPack,
 ];
 
 export interface ToolPackRegistry {

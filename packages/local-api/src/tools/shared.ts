@@ -793,7 +793,18 @@ export type LocalApiWriteIntent =
   /** 整组覆盖任务子项（TASK）。items 空数组 = 清空；id 缺失则新建。 */
   | { action: 'set-task-checklist'; taskId: string; items: readonly { id?: string; text: string; done?: boolean }[] }
   /** 勾选/取消任务某条子项（TASK）。按文本唯一匹配；全勾时正常任务自动完成。 */
-  | { action: 'toggle-checklist-item'; taskId: string; itemText: string; done: boolean };
+  | { action: 'toggle-checklist-item'; taskId: string; itemText: string; done: boolean }
+  // 附件（ATTACHMENT）：改名是纯 op；移除先发 DEL op、再尽力回收字节。
+  /**
+   * 改附件展示名（ATTACHMENT）。**纯 op，不碰字节** —— 字节以 `id` 为键存取，
+   * 改名不可能把文件改坏，也不需要重新上传（`attachment-actions.ts` 文件头第 5 条）。
+   */
+  | { action: 'rename-attachment'; attachmentId: string; fileName: string }
+  /**
+   * 移除附件（ATTACHMENT）：发 `DEL` op（软删 → 回收站），随后-尽力回收字节。
+   * ⚠️ 字节一旦回收就再也取不回来 —— 所以这条**实际不可逆**（见工单风险项）。
+   */
+  | { action: 'remove-attachment'; attachmentId: string };
 
 /**
  * 一条写入落地的实体类型。
@@ -826,7 +837,8 @@ export type LocalApiWrittenEntityType =
   | 'HABIT_LOG'
   | 'FOCUS_SESSION'
   | 'REMINDER'
-  | 'EVENT';
+  | 'EVENT'
+  | 'ATTACHMENT';
 
 export type LocalApiWriteResult =
   | {
@@ -852,5 +864,16 @@ export type LocalApiWriteResult =
       entityId?: string;
       /** 给了它就必须给 `entityId`；任务写入留空 = 既有形状。 */
       entityType?: LocalApiWrittenEntityType;
+      /**
+       * 附件写动作（rename / remove）落地的附件 id。
+       * 给了它 ⇒ 出协议时回 `{ ok, attachmentId, bytesReleased? }`（不冒充 `taskId`）。
+       */
+      attachmentId?: string;
+      /**
+       * 移除附件后**字节是否真的回收**了。
+       * `false` = 只发了 `DEL` op，字节没回收（无端口 / 断网）—— 列表状态仍正确，
+       * 多占的额度留给服务端孤儿扫描（`attachment-actions.ts` 文件头第 4 条）。
+       */
+      bytesReleased?: boolean;
     }
   | { ok: false; reason: 'rejected' | 'not-found' | 'invalid'; message: string };
