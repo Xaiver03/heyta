@@ -59,6 +59,11 @@ export interface PreferenceTask {
   id: string;
   title: string;
   note?: string;
+  /**
+   * 结构化子项（可选）。存在时**优先于** `note` 里的 `- [ ]` 计数——方案 A 之后
+   * 结构化清单是唯一事实源，note 只是旧数据回退。缺省（旧数据）= 走 note 正则。
+   */
+  checklist?: readonly { done: boolean }[];
   dueDate?: number;
   completedAt?: number;
   createdAt: number;
@@ -558,7 +563,7 @@ export function inferGranularity(
   const counts: number[] = [];
   for (const t of tasks) {
     if (t.deletedAt !== undefined) continue;
-    const n = countChecklistItems(t.note);
+    const n = t.checklist !== undefined ? t.checklist.length : countChecklistItems(t.note);
     if (n > 0) counts.push(n);
   }
 
