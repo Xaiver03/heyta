@@ -68,6 +68,7 @@ import {
 } from '../src/mockup/quadrant-shape.js';
 import { SHOWCASE_NOW, SHOWCASE_TASKS } from '../src/mockup/showcase-data.js';
 import { readUiSource, readWebSource } from './helpers/source-text.js';
+import { readCss } from './css-source.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = resolve(HERE, '..');
@@ -80,7 +81,7 @@ const quadrantModelSource = (): string => readUi('quadrant/model.ts');
 const quadrantBoardSource = (): string => readUi('quadrant/QuadrantBoard.tsx');
 const quadrantCopySource = (): string => readWeb('features/quadrant/copy.ts');
 const taskListSource = (): string => readUi('task-list/TaskList.tsx');
-const mockupCss = (): string => readFileSync(join(APP, 'src/mockup/mockup.css'), 'utf8');
+const mockupCss = (): string => readCss(join(APP, 'src/mockup/mockup.css'));
 
 /**
  * 从 `copy.ts` 返回的那个对象里切出**某个字段**的初始化表达式（到下一个同缩进字段为止）。

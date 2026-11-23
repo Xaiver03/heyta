@@ -62,6 +62,7 @@ import {
   mockHeatCellClass,
 } from '../src/mockup/habit-shape.js';
 import { readUiSource, readWebSource } from './helpers/source-text.js';
+import { readCss } from './css-source.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = resolve(HERE, '..');
@@ -76,7 +77,7 @@ const habitBoardSource = (): string => readUi('habits/HabitBoard.tsx');
 const webHostSource = (): string => readWeb('features/habits/HabitsView.tsx');
 const mockupSource = (): string =>
   readFileSync(join(APP, 'src/mockup/HabitHeatmap.tsx'), 'utf8');
-const mockupCss = (): string => readFileSync(join(APP, 'src/mockup/mockup.css'), 'utf8');
+const mockupCss = (): string => readCss(join(APP, 'src/mockup/mockup.css'));
 
 /**
  * 去掉注释再做"有没有出现某个词"的断言。

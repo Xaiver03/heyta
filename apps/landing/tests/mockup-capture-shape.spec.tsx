@@ -76,6 +76,7 @@ import {
   mockCaptureAddClass,
 } from '../src/mockup/capture-shape.js';
 import { readUiSource, readWebSource } from './helpers/source-text.js';
+import { readCss } from './css-source.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = resolve(HERE, '..');
@@ -93,7 +94,7 @@ const captureComposerSource = (): string => readUi('capture/CaptureComposer.tsx'
 const webHostSource = (): string => readWeb('features/capture/CaptureComposer.tsx');
 const appWindowSource = (): string => readMockup('AppWindow.tsx');
 const captureShapeSource = (): string => readMockup('capture-shape.ts');
-const mockupCss = (): string => readMockup('mockup.css');
+const mockupCss = (): string => readCss(join(MOCKUP_SRC, 'mockup.css'));
 
 /**
  * 去掉注释再做"有没有出现某个词"的断言。

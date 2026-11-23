@@ -1,0 +1,486 @@
+/* 自动拆分自 mockup.css 的第 701–1185 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 四象限 ─────────────────────────────────────────────── */
+
+.mk-quadrant {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+}
+
+/* 四宫格自身是一个内容区；规则说明由真实应用的帮助折叠承载。 */
+.mk-quadrant__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-3);
+}
+
+.mk-quad {
+  display: flex;
+  flex-direction: column;
+  min-block-size: var(--ht-layout-quadrant-min-height);
+  padding: var(--ht-space-3);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thick) solid var(--ht-color-border);
+}
+
+/* 大标题：真实现用 `text['row-meta']`（字号 sm）+ 覆盖成 semibold。
+   四个 token 全部与 `TEXT_STYLES['row-meta']` 对账（weight 是 semibold 覆盖）。 */
+/* 与 `row-meta` 同一档：2026-11 由 `sm` 收到 `xs`（判据逐项比对语义样式）。 */
+.mk-quad__head {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
+}
+
+/* 🔴 看板里的色块比侧栏的 `.mk-swatch`（= `.ht-swatch`，`space.2`）**大一倍**：
+   真实现 `QuadrantBoard` 给色块的是 `icon.sm`。两族尺寸都真实存在，
+   所以这里单独一条覆写，而不是把 `.mk-swatch` 改掉（那会连带改侧栏）。 */
+.mk-quad__swatch {
+  inline-size: var(--ht-icon-sm);
+  block-size: var(--ht-icon-sm);
+}
+
+/* 说明：真实现用语义文字样式 `caption`（`text.caption`）+ 弱化色。 */
+.mk-quad__hint {
+  margin-block-start: var(--ht-space-1);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-caption);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 格里的列表：行间距与共享 `TaskList` 同一个契约（`TASK_ROW_SHAPE.listGap`），
+   原来抄的是 `space.2`（更宽）。 */
+.mk-quad__list {
+  margin-block-start: var(--ht-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+/* ⚠️ 保真度差距（如实记账）：真实现每一格直接渲染共享 `TaskList` 的行
+   （勾选框 + 标题 + 宿主插槽），这里是一张只有标题的静态卡 —— 见
+   `QuadrantGrid.tsx` 文件头与 §9.1 的豁免判决。 */
+.mk-quad__card {
+  padding: var(--ht-space-2);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+}
+
+/* 空格占位。真实现是 `TaskList` 的 `ListEmptyComponent`：
+   一句 `caption` 文字（`paddingVertical: space.8`、水平居中）、**没有图标**。
+   复刻曾经自己加了一只 `CheckCircle2`，已删（判据守着"不许回来"）。 */
+.mk-quad__empty {
+  padding-block: var(--ht-space-8);
+  text-align: center;
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-caption);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 习惯热力图 ─────────────────────────────────────────── */
+
+.mk-habits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.mk-habit {
+  padding: var(--ht-space-4);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+}
+
+.mk-habit__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  margin-block-end: var(--ht-space-3);
+}
+
+.mk-habit__name {
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.mk-habit__streak {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 热力图：深浅即数值，**不靠色相区分** —— 蓝色单色阶 */
+.mk-heat {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  gap: var(--ht-space-1);
+}
+
+.mk-heat__cell {
+  inline-size: var(--ht-space-3);
+  block-size: var(--ht-space-3);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-heat-0);
+}
+
+.mk-heat__cell--1 {
+  background: var(--ht-color-heat-1);
+}
+.mk-heat__cell--2 {
+  background: var(--ht-color-heat-2);
+}
+.mk-heat__cell--3 {
+  background: var(--ht-color-heat-3);
+}
+.mk-heat__cell--4 {
+  background: var(--ht-color-heat-4);
+}
+
+button.mk-heat__cell {
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+
+button.mk-heat__cell:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  outline-offset: var(--ht-space-1);
+}
+
+.mk-heat__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-2);
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* ── 番茄钟 ─────────────────────────────────────────────── */
+
+.mk-focus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-3);
+  max-inline-size: var(--ht-layout-sidebar-width);
+  margin-inline: auto;
+  padding-block: var(--ht-space-4);
+}
+
+.mk-focus__ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* 环的直径走 token（**不许在这里写死 rem**）：写死就与 `--ht-size-focus-ring`
+   同值而不会跟改，看起来完全没错。判据见
+   apps/landing/tests/mockup-focus-ring.spec.tsx（首跑就抓到了原先写死的那一处）。 */
+.mk-focus__ring svg {
+  width: var(--ht-size-focus-ring);
+  height: var(--ht-size-focus-ring);
+}
+
+.mk-focus__readout {
+  position: absolute;
+  text-align: center;
+}
+
+.mk-focus__time {
+  font-size: var(--ht-font-size-2xl);
+  font-weight: var(--ht-font-weight-semibold);
+  /* tabular-nums：否则秒数跳动时整个计时器左右晃 */
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-display);
+}
+
+.mk-focus__phase {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-focus__actions {
+  display: flex;
+  inline-size: 100%;
+  gap: var(--ht-space-2);
+}
+
+.mk-focus__actions .mk-btn-primary {
+  flex: 1;
+  justify-content: center;
+}
+
+.mk-focus__secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  white-space: nowrap;
+}
+
+.mk-focus__task {
+  inline-size: 100%;
+  box-sizing: border-box;
+  margin-block-start: var(--ht-space-1);
+}
+
+.mk-focus__settings {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  inline-size: 100%;
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-1);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.mk-focus__settings-values {
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-focus__stat {
+  inline-size: 100%;
+  padding-block-start: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 清单面板 ───────────────────────────────────────────── */
+
+.mk-projects {
+  margin-block-start: var(--ht-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+/* 与 Web `ProjectsPanel` 对齐：标题负责分区，+ 是创建入口，行由共享
+   `OrganizerList` 产生。展厅只复现静态行，不伪造可输入的表单。 */
+.mk-projects__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mk-projects__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.mk-projects__row {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground);
+}
+
+.mk-field__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 时间线（排期）─────────────────────────────────────────
+ *
+ * 复现对象：`apps/web/src/features/timeline/`（共享 `@heyta/ui` 的 `TimelineView`
+ * + `GanttChart`）。这里同样**不引入共享组件**（那会把 RN 与它的 62 kB 拖进首屏，
+ * 见 `mockup-task-row.spec.tsx` 里那条"不许静态 import @heyta/ui"的断言）。
+ *
+ * 🔴 条的宽度**必须按估时的比例**：90 分钟那条一定是 45 分钟那条的两倍宽 ——
+ * 这是真 `GanttChart` 的核心不变量（`timeline-model.spec.ts` 里钉的就是它）。
+ * 宽度用**修饰类**表达（`--w-*`），不写内联 style：`mk-*` 族是"只减不增"的
+ * 预算族，而 `--w-*` 这类修饰类不计入族数（见 `mockup-task-row.spec.tsx`）。
+ */
+
+.mk-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+}
+
+.mk-timeline__axis {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: var(--ht-space-3);
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-subtle);
+}
+
+.mk-timeline__axis-days {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mk-timeline__row {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ht-space-3);
+}
+
+.mk-timeline__label {
+  font-size: var(--ht-font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mk-timeline__track {
+  position: relative;
+  block-size: var(--ht-space-6);
+  border-radius: var(--ht-radius-md);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface-sunken);
+}
+
+/* 日界：3 条竖线把轨道分成 4 天。**装饰性**，读屏不看它。 */
+.mk-timeline__grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    to right,
+    transparent calc(25% - var(--ht-border-width-thin)),
+    var(--ht-color-border) calc(25% - var(--ht-border-width-thin)),
+    var(--ht-color-border) 25%,
+    transparent 25%
+  );
+  background-size: 25% 100%;
+  pointer-events: none;
+}
+
+.mk-timeline__bar {
+  position: absolute;
+  inset-block: var(--ht-space-1);
+  inset-inline-start: 0;
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-primary);
+}
+
+/* AI 估时：虚线边 —— 与真视图的 `durationAi` 那条语义对应。 */
+.mk-timeline__bar--ai {
+  background: var(--ht-color-primary-subtle);
+  border: var(--ht-border-width-thin) dashed var(--ht-color-primary);
+}
+
+/* ⚠️ 宽度修饰类**只能按真视图算得出来的比例取**（见本节的标题注释）。 */
+.mk-timeline__bar--w-15 { inline-size: 15%; }
+.mk-timeline__bar--w-30 { inline-size: 30%; }
+.mk-timeline__bar--w-45 { inline-size: 45%; }
+.mk-timeline__bar--w-60 { inline-size: 60%; }
+
+.mk-timeline__legend {
+  margin: 0;
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-detail__close { display: none; }
+.mk-habit__check-in {
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.mk-habit__check-in:focus-visible,
+.mk-detail__close:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  outline-offset: var(--ht-space-1);
+}
+
+/* The interactive preview follows a small screen's actual reading order. */
+@media (max-width: 40rem) {
+  .mk-frame--interactive .mk-app { align-items: start; }
+  .mk-frame--interactive .mk-rail { grid-row: 1 / span 2; align-self: stretch; }
+  .mk-frame--interactive .mk-header { padding-inline: var(--ht-space-3); }
+  .mk-frame--interactive .mk-header__actions { display: none; }
+  .mk-frame--interactive .mk-content { padding: var(--ht-space-3); }
+  .mk-frame--interactive .mk-input { min-inline-size: 0; overflow: hidden; white-space: nowrap; }
+  .mk-frame--interactive .mk-btn-primary { flex-shrink: 0; }
+  .mk-frame--interactive .mk-task { padding-inline: var(--ht-space-2); }
+  .mk-frame--interactive .mk-task__body { max-inline-size: 100%; padding-inline: var(--ht-space-1); }
+  .mk-frame--interactive .mk-task__title { white-space: normal; overflow-wrap: anywhere; }
+  .mk-frame--interactive .mk-task .mk-iconbtn { display: none; }
+  .mk-frame--interactive .mk-task__meta { flex-wrap: wrap; }
+  .mk-frame--interactive .mk-task__check { position: relative; }
+  .mk-frame--interactive button.mk-task__check::after {
+    content: '';
+    position: absolute;
+    min-inline-size: var(--ht-touch-target-min);
+    min-block-size: var(--ht-touch-target-min);
+  }
+  .mk-frame--interactive .mk-detail[data-open='true'] {
+    display: block;
+    grid-column: 2;
+    grid-row: 2;
+    border-inline-start: 0;
+    border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+    block-size: auto;
+    scroll-margin-block-start: calc(var(--ht-layout-header-height) + var(--ht-space-4));
+  }
+  .mk-frame--interactive .mk-detail__task-title { align-items: flex-start; }
+  .mk-frame--interactive .mk-detail__task-title strong { flex: 1; min-inline-size: 0; overflow-wrap: anywhere; }
+  .mk-frame--interactive .mk-detail__status { flex-shrink: 0; }
+  .mk-frame--interactive .mk-detail__close {
+    display: grid;
+    place-items: center;
+    min-inline-size: var(--ht-touch-target-min);
+    min-block-size: var(--ht-touch-target-min);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ht-color-foreground-muted);
+    cursor: pointer;
+  }
+  .mk-frame--interactive .mk-detail__value { white-space: normal; overflow-wrap: anywhere; }
+  .mk-frame--interactive .mk-quadrant__grid { grid-template-columns: minmax(0, 1fr); }
+  .mk-frame--interactive .mk-habit { padding: var(--ht-space-3); min-inline-size: 0; }
+  .mk-frame--interactive .mk-habit__head { flex-wrap: wrap; }
+  .mk-frame--interactive .mk-heat { overflow-x: auto; padding-block: var(--ht-space-1); }
+  .mk-frame--interactive .mk-focus__ring { max-inline-size: 100%; }
+  .mk-frame--interactive .mk-focus__ring svg { max-inline-size: 100%; block-size: auto; }
+  .mk-frame--interactive .mk-focus__actions { flex-wrap: wrap; justify-content: center; }
+  .mk-frame--interactive .mk-timeline__axis,
+  .mk-frame--interactive .mk-timeline__row { grid-template-columns: minmax(0, 1fr); }
+}

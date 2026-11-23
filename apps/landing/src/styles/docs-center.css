@@ -1,0 +1,489 @@
+/* 自动拆分自 landing-docs.css 的第 421–908 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 文档中心 ───────────────────────────────────────────── */
+
+/* 小标题（速答 / 深入阅读）。刻意**不用** `<h4>`：
+   它不是内容层级的一部分（读者不会用它来跳读这一页），而是"这一格是干什么的"
+   的标签 —— 用 `role` 之外的标题会把页面上的标题数量再推高，
+   而排版审计刚刚处理过"一页八个页标题"。 */
+.lp-docs__eyebrow {
+  margin-block-start: var(--ht-space-6);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-caption);
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 枢纽页上那一组文章卡片。 */
+.lp-docs__hub {
+  margin-block-start: var(--ht-space-4);
+}
+
+.lp-docs__cards {
+  margin-block-start: var(--ht-space-3);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--ht-space-3);
+  list-style: none;
+}
+
+.lp-docs__card-link {
+  display: grid;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-5);
+  block-size: 100%;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface);
+  text-decoration: none;
+  transition: border-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+/* hover 用**边框**表达层次，不用 translateY —— 与 MASTER.md 那条纪律一致
+   （阴影只留给真正的浮层，卡片是页面的一部分）。 */
+.lp-docs__card-link:hover {
+  border-color: var(--ht-color-primary);
+}
+
+.lp-docs__card-title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  color: var(--ht-color-foreground);
+}
+
+.lp-docs__card-sum {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 文章页：侧栏（文档中心的地图）+ 正文。
+   🔴 宽度与左右留白在**这一层**给完，所以内层那一份 `.lp-wrap`
+   （共享渲染器 `PageSections` 自带的）要摊平 —— 否则正文会在栅格里再居中一次，
+   左边多出一条没人要的沟。 */
+/* 文章页三列（SSOS 文档站同构）：左＝全站文章目录，中＝文章，右＝本页目录。
+   右栏宽度是文档站自己的局部 token（rem，随根字号缩放）；
+   不占用 --ht-layout-*（那是设计系统那条线的地界）。 */
+.lp-docs {
+  --lp-docs-toc-w: 13.75rem;
+  inline-size: 100%;
+  max-inline-size: var(--ht-layout-content-max);
+  margin-inline: auto;
+  padding-inline: var(--ht-space-6);
+  display: grid;
+  grid-template-columns: var(--ht-layout-sidebar-width) minmax(0, 1fr);
+  gap: calc(var(--ht-space-8) * 1.75);
+  align-items: start;
+}
+
+.lp-docs--with-toc {
+  grid-template-columns: var(--ht-layout-sidebar-width) minmax(0, 1fr) var(--lp-docs-toc-w);
+  gap: var(--ht-space-6);
+}
+
+.lp-docs .lp-wrap {
+  max-inline-size: none;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
+.lp-docs__nav {
+  position: sticky;
+  inset-block-start: calc(var(--ht-layout-header-height) + var(--ht-space-6));
+  display: grid;
+  gap: var(--ht-space-5);
+}
+
+.lp-docs__back {
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  text-decoration: none;
+}
+
+.lp-docs__back:hover {
+  color: var(--ht-color-primary);
+}
+
+.lp-docs__group-title {
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-docs__list {
+  margin-block-start: var(--ht-space-2);
+  display: grid;
+  gap: 1px;
+  list-style: none;
+}
+
+.lp-docs__link {
+  display: block;
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+  font-weight: var(--ht-font-weight-regular);
+  text-decoration: none;
+  transition:
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-docs__link:hover {
+  color: var(--ht-color-foreground);
+  background: var(--ht-color-surface);
+}
+
+/* 当前那一篇：与导航里 `.lp-nav__link[aria-current]` 同一思路 ——
+   **判据在属性上，样式也从属性上取**，所以"高亮的那一条"和
+   "读屏软件报成当前的那一条"永远是同一条。 */
+.lp-docs__link[aria-current='page'] {
+  color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+  font-weight: var(--ht-font-weight-regular);
+}
+
+/* 文章正文那一列：页内目录 + 分区。`min-inline-size: 0` 是必须的 ——
+   grid 轨道的 `minmax(0, 1fr)` 只管轨道本身，内层这一格不写的话
+   代码块（`<code>` 里的长路径）会把列撑开，窄屏就出现横向溢出。 */
+.lp-docs__body {
+  display: grid;
+  gap: calc(var(--ht-space-8) * 0.75);
+  min-inline-size: 0;
+}
+
+/* 分组抬头：分类名（可点）+ 折叠钮。用 flex 而不是 grid ——
+   标题该吃掉剩余宽度并自然换行，钮只占它自己那一格。 */
+.lp-docs__group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+}
+
+/* 分类名**现在是链接**（它的落点就是分类页），所以视觉上仍要与
+   `.lp-docs__group-title` 同格 —— 侧栏的层级靠"大小写 + 字距"表达，
+   不靠能不能点。当前分类这一组用主色，与文章条的 `aria-current` 同一套语言。 */
+.lp-docs__group-link {
+  color: var(--ht-color-foreground-muted);
+  text-decoration: none;
+}
+
+.lp-docs__group-link:hover,
+.lp-docs__group-link[aria-current='true'] {
+  color: var(--ht-color-primary);
+}
+
+/* 折叠钮：整颗是热区，图标自己不带边框（扁平风格，层次交给颜色）。 */
+.lp-docs__toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-space-6);
+  block-size: var(--ht-space-6);
+  padding: var(--ht-space-0);
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: none;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+  transition: color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-docs__toggle:hover {
+  color: var(--ht-color-primary);
+}
+
+/* 收起 = 尖头转指右侧（"点这里展开"），与 macOS 侧栏一致的方向语言。 */
+.lp-docs__toggle[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+}
+
+/* 🔴 折叠靠 `hidden` 属性，但 `.lp-docs__list { display: grid }` 的
+   特异度**高于** UA 的 `[hidden] { display: none }` ——
+   不写这一条的话属性设上了、列表照样看得见，而读屏软件报"已折叠"。 */
+.lp-docs__list[hidden] {
+  display: none;
+}
+
+/* 文档中心的搜索框（`DocsSearch`）。
+   🔴 它是 `.lp-docs` 的**兄弟**（同一份 `.lp-wrap` 宽度），不是栅格的一列 ——
+   侧栏在窄屏会进抽屉，挂在里面的搜索等于"要搜先得开抽屉"。
+   宽度上限用现成的 `--ht-layout-prose-max`：一行输入框不该比一行正文还宽，
+   而再造一个宽度 token 就是给下一处失控留门。 */
+.lp-docs__search {
+  margin-block-end: var(--ht-space-6);
+}
+
+.lp-docs__search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  max-inline-size: var(--ht-layout-prose-max);
+  padding-inline: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.lp-docs__search-icon {
+  flex: none;
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-docs__search-input {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  padding-block: var(--ht-space-3);
+  border: none;
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font-family: inherit;
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+/* 原生那颗 ✕ 没有可访问名称，也不跟着这里的配色走；
+   自己那颗按钮带 `aria-label`，所以把原生的藏掉。 */
+.lp-docs__search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.lp-docs__search-clear {
+  flex: none;
+  display: inline-flex;
+  padding: var(--ht-space-1);
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-docs__search-clear:hover {
+  color: var(--ht-color-foreground);
+}
+
+/* 结果**不是浮层**：它把下面的内容往下推，所以不给 z-index、不做 position。
+   一屏之内读得完的几条命中，没有理由盖在别的字上。 */
+.lp-docs__search-results {
+  margin-block-start: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+}
+
+.lp-docs__search-list {
+  display: grid;
+  gap: 1px;
+  list-style: none;
+}
+
+.lp-docs__search-link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-3);
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  text-decoration: none;
+  transition:
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-docs__search-link:hover {
+  background: var(--ht-color-primary-subtle);
+}
+
+.lp-docs__search-title {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground);
+}
+
+/* 分区命中要在标题后面说清它出自哪一篇 —— 没有这半句，
+   两条同名小节的链接在搜索结果里就长得一样。 */
+.lp-docs__search-from {
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-docs__search-empty,
+.lp-docs__search-more {
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-3);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 页内目录：右栏独立一列（SSOS 文档站同位）——sticky、可滚、滚动跟随高亮。
+   ⚠️ 2026-10-01 前它是正文顶部的一个盒子；IA 对齐裁决后挪到第三栏。 */
+.lp-docs__toc {
+  position: sticky;
+  top: calc(var(--ht-space-8) + var(--ht-space-4));
+  max-block-size: calc(100vh - var(--ht-space-8) * 2);
+  overflow-block: auto;
+  padding: var(--ht-space-4) var(--ht-space-4) var(--ht-space-4) var(--ht-space-5);
+  border-inline-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.lp-docs__toc-title {
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-caption);
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-docs__toc-list {
+  margin-block-start: var(--ht-space-2);
+  display: grid;
+  gap: 1px;
+  list-style: none;
+}
+
+.lp-docs__toc-link {
+  display: block;
+  padding-block: var(--ht-space-1);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+  text-decoration: none;
+  transition: color var(--ht-duration-fast) var(--ht-ease-standard);
+  border-inline-start: var(--ht-border-width-thin) solid transparent;
+  margin-inline-start: calc(-1 * var(--ht-space-4) - var(--ht-border-width-thin));
+  padding-inline-start: var(--ht-space-4);
+}
+
+.lp-docs__toc-link:hover {
+  color: var(--ht-color-primary);
+}
+
+/* 滚动跟随高亮：正在读的那一节。aria-current="location" 与它同源。 */
+.lp-docs__toc-link--active {
+  color: var(--ht-color-primary);
+  border-inline-start-color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+/* 帮助中心模块标题 → 分类页。**整块可点**而不是标题旁边再挂一个"查看全部"：
+   读者扫的是标题，多一个出口就是多一个要判断的按钮。 */
+.lp-help__module-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.lp-help__module-link:hover {
+  color: var(--ht-color-primary);
+}
+
+/* 页头没有那颗主按钮时（文章页），把尾距收紧一份 ——
+   按钮自己带 space-8 顶距，去掉它之后原来那份留白会变成一段没有来源的空。 */
+.lp-page__head--no-cta {
+  padding-block-end: var(--ht-space-8);
+}
+
+/* 窄屏的「文档目录」三件套：触发钮 + 遮罩 + 抽屉。
+   🔴 **宽屏默认不出现**（`display: none`），而不是"渲染了但看不见" ——
+   侧栏在主栏里本来就完整地摆着，再给一份只是多一倍 tab 键。
+   ⚠️ 三条都是 `position: fixed`（打开时才生效），所以它们**不进栅格**：
+   抽屉如果占一格，正文会掉进 15rem 那根侧栏轨道里。 */
+.lp-docs__menu,
+.lp-docs__scrim,
+.lp-docs__drawer {
+  display: none;
+}
+
+/* 窄屏退回单栏：侧栏**挪到正文之后**（`order`）。
+   手机上先给答案 —— "接下来读什么"是读完了才需要的事，
+   让它压在标题下面等于把答案往下推一整屏。 */
+@media (max-width: 1024px) {
+  .lp-docs--with-toc {
+    grid-template-columns: var(--ht-layout-sidebar-width) minmax(0, 1fr);
+  }
+
+  .lp-docs__toc {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .lp-docs {
+    grid-template-columns: 1fr;
+    gap: calc(var(--ht-space-8) * 1.2);
+  }
+
+  .lp-docs__nav {
+    position: static;
+    order: 1;
+    gap: var(--ht-space-3);
+    padding-block-start: var(--ht-space-5);
+    border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  }
+
+  .lp-docs__menu {
+    position: fixed;
+    inset-block-end: var(--ht-space-5);
+    inset-inline-end: var(--ht-space-5);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ht-space-2);
+    padding-block: var(--ht-space-3);
+    padding-inline: var(--ht-space-4);
+    border: var(--ht-border-width-thin) solid var(--ht-color-border);
+    border-radius: var(--ht-radius-full);
+    background: var(--ht-color-surface);
+    color: var(--ht-color-foreground);
+    font-size: var(--ht-font-size-sm);
+    box-shadow: var(--ht-shadow-md);
+    z-index: var(--ht-z-dropdown);
+  }
+
+  /* 遮罩是一整颗可聚焦的按钮：点它关闭，`aria-label` 说的就是"关闭文档目录"。
+     不用 `<div onclick>` —— 那等于给键盘和读屏用户留了一个关不掉的浮层。 */
+  .lp-docs__scrim {
+    display: block;
+    position: fixed;
+    inset-block-start: var(--ht-space-0);
+    inset-inline-start: var(--ht-space-0);
+    inline-size: 100%;
+    block-size: 100%;
+    padding: var(--ht-space-0);
+    border: none;
+    background: var(--ht-color-overlay);
+    z-index: var(--ht-z-overlay);
+  }
+
+  .lp-docs__drawer {
+    display: block;
+    position: fixed;
+    inset-block-start: var(--ht-space-0);
+    inset-inline-end: var(--ht-space-0);
+    block-size: 100%;
+    max-inline-size: var(--ht-layout-sidebar-max-width);
+    min-inline-size: var(--ht-layout-sidebar-min-width);
+    padding-block: var(--ht-space-6);
+    padding-inline: var(--ht-space-5);
+    overflow-y: auto;
+    border-inline-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+    background: var(--ht-color-background);
+    box-shadow: var(--ht-shadow-lg);
+    z-index: var(--ht-z-modal);
+  }
+
+  /* 抽屉里那份侧栏不再 sticky —— 它自己那一层已经在滚动，
+     两层滚动叠在一起时"钉住"会变成"永远看不见顶部"。 */
+  .lp-docs__drawer .lp-docs__nav {
+    position: static;
+    padding-block-start: var(--ht-space-0);
+    border-block-start: none;
+    gap: var(--ht-space-5);
+  }
+}

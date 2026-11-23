@@ -1,0 +1,483 @@
+/* 自动拆分自 mockup.css 的第 219–700 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 侧栏 ───────────────────────────────────────────────── */
+
+.mk-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-4);
+  background: var(--ht-color-surface);
+  /* 扁平风格用边框表达层次，不用阴影 */
+  border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+/* 侧栏底部那一组（回收站，2026-11-04 滴答对齐 D2 从 rail 搬来）：贴这一列的底。 */
+.mk-sidebar__tools {
+  margin-top: auto;
+}
+
+.mk-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.mk-nav__section {
+  padding: var(--ht-space-3) var(--ht-space-2) var(--ht-space-1);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.mk-nav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  text-align: start;
+}
+
+button.mk-nav__item {
+  inline-size: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.mk-nav__item:hover,
+button.mk-nav__item:focus-visible {
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+}
+
+.mk-nav__item--active {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.mk-swatch {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  flex: none;
+}
+
+.mk-swatch--q1 {
+  background: var(--ht-color-quadrant-1);
+}
+.mk-swatch--q2 {
+  background: var(--ht-color-quadrant-2);
+}
+.mk-swatch--q3 {
+  background: var(--ht-color-quadrant-3);
+}
+.mk-swatch--q4 {
+  background: var(--ht-color-quadrant-4);
+}
+
+.mk-nav__count {
+  margin-inline-start: auto;
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* ── 主区 ───────────────────────────────────────────────── */
+
+.mk-main {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.mk-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  block-size: var(--ht-layout-header-height);
+  padding: 0 var(--ht-space-6);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.mk-header__title {
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-title);
+  /* 与 `.ht-header__title` 成对：只让 tab 栏吸收溢出压力，标题不许被压。
+     少这一条，「四象限」会竖排成「四象 / 限」。 */
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.mk-header__actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  /* 与 `.ht-header__actions` 成对：右侧动作不被压窄 */
+  flex: 0 0 auto;
+}
+
+.mk-bulk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+
+/*
+ * 页头的排序控件（复现 `App.tsx` 的 `.ht-header__actions` 里 `task-sort` 那一枚）。
+ * 真应用给的是**文字标签 + 原生 `<select>`**，标签不是可省略的装饰：
+ * 裸 chip 的教训还写在产品那边（"说不清自己作用范围的控件，加了等于没加"）。
+ */
+
+
+.mk-iconbtn {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-content {
+  flex: 1;
+  padding: var(--ht-space-6);
+  max-inline-size: var(--ht-layout-content-max);
+  inline-size: 100%;
+  margin-inline: auto;
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+.mk-detail {
+  min-inline-size: 0;
+  block-size: 100%;
+  padding: var(--ht-space-4);
+  overflow: hidden;
+  border-inline-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.mk-detail__task-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  margin-block-end: var(--ht-space-4);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.mk-detail__status {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-detail__group {
+  padding-block: var(--ht-space-3);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.mk-detail__group h2 {
+  margin: 0 0 var(--ht-space-2);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.mk-detail__field {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  min-block-size: var(--ht-touch-target-min);
+  padding-block: var(--ht-space-1);
+  font-size: var(--ht-font-size-xs);
+}
+
+.mk-detail__label {
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-detail__value {
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--ht-color-foreground);
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 今日进度卡：刻意**不画** ─────────────────────────────
+   产品侧 R6 那一刀把常驻的今天进度卡从"做事"的四个视图撤了（理由见
+   `apps/web/src/App.tsx` 里那段"数字分散在三个位置"的说明），共享卡现在只住成长页。
+   展厅这五屏全是做事屏 ⇒ 一节样式都不该留。反向判据在
+   `tests/mockup-fidelity.spec.tsx`，它从产品源码派生，不放行"悄悄画回来"。 */
+
+/* ── 输入行：共享 CaptureComposer 与复刻均为无边框编辑面 ───── */
+
+.mk-compose {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border-width: var(--ht-border-width-thin);
+  border-style: solid;
+  border-color: var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  margin-block-end: var(--ht-space-4);
+}
+
+.mk-input {
+  flex: 1;
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-4);
+  background: var(--ht-color-surface);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-subtle);
+  display: flex;
+  align-items: center;
+}
+
+.mk-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-4);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+/* 🔴 捕获输入行：与共享 `CaptureComposer` 的 `makeStyles()` 逐项对齐。
+   ```
+   compose    { gap: space.2 }
+   input      { paddingHorizontal: size.field-padding-x }
+   addButton  { gap: space.1, paddingHorizontal: size.field-padding-x }
+   addDisabled{ opacity: state.disabled-opacity }
+   ```
+   ⚠️ 只加 `--capture` 修饰类，**基础规则一字不动**：`.mk-input` / `.mk-btn-primary`
+   同时被 `FocusRing.tsx` 用着，而 `FocusPanel` 的按钮确实是 `space.4` / `space.2` /
+   `font-weight.medium`。改基础规则 = 顺手改掉另一个复刻件的保真度。
+   取值由 `tests/mockup-capture-shape.spec.tsx` 从共享层源码文本逐项对账。 */
+.mk-input--capture {
+  padding-inline: var(--ht-size-field-padding-x);
+  font-weight: var(--ht-font-weight-regular);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
+  background: transparent;
+  border-radius: 0;
+}
+
+.mk-btn-primary--capture {
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  padding-inline: 0;
+  gap: 0;
+  border-radius: var(--ht-radius-full);
+}
+
+/* 空标题 ⇒ `captureCanSubmit` 为 false ⇒ 真实现给 `addDisabled` 那一层透明度。
+   复刻原来画的是一个**全不透明**的添加按钮 —— 那是一个产品里不存在的状态。 */
+.mk-btn-primary--off {
+  opacity: var(--ht-state-disabled-opacity);
+}
+
+/* ── 任务列表 ───────────────────────────────────────────────
+   🔴 **这一行的几何不是"自己挑的一组 token"。**
+   下面 `.mk-task*` 用到的每一个 token 都必须与
+   `packages/design-system/src/task-row-shape.ts` 的 `TASK_ROW_SHAPE` /
+   `TASK_ROW_TEXT` 逐项对上 —— 而共享的 RN 行
+   （`packages/ui/src/task-list/TaskList.tsx`）**从同一份常量取值**。
+   两边一起改：只改一处会让 `tests/mockup-task-row.spec.tsx` 变红。
+
+   为什么不在运行时 `import { TASK_ROW_SHAPE }` 直接拼样式：实测那样会把
+   `@heyta/design-system` 的 native token 表带进首屏（**+24.5 kB gzip**），
+   而这一节就在首屏（`Hero.tsx` 也渲染它）。理由与拒绝 `react-native-web`
+   完全相同（见 `TaskList.tsx` 文件头）。
+
+   留在这里的还有**颜色**（跟随主题）与**宿主外壳**（卡片背景/描边/圆角/
+   左右内边距 —— 那是容器的事：共享 `TaskList` 明确不自带背景与水平内边距）。 */
+
+/* 列表容器：行间距 = `TASK_ROW_SHAPE.listGap`。 */
+.mk-tasklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+/* 宿主外壳。**不是"行"** —— 与 mobile 的 `<Screen>` 自带 gutter 同一类决策。
+   行高 / 行内间距 / 内容间距见下面各条（全部来自契约）。 */
+.mk-task {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--ht-size-row-min-height);
+  gap: var(--ht-space-1);
+  padding-inline: var(--ht-space-4);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+}
+
+/* 勾选框：尺寸 / 圆角 / 描边宽度 = `TASK_ROW_SHAPE` 的对应项。
+   这里原来抄的是 `--ht-icon-md`（20px）+ `--ht-radius-full`（圆），
+   而共享行是 22px 的圆角方 —— 那就是一处实测漂移。 */
+.mk-task__check {
+  inline-size: var(--ht-size-checkbox);
+  block-size: var(--ht-size-checkbox);
+  flex: none;
+  border-style: solid;
+  border-width: var(--ht-border-width-thin);
+  border-radius: var(--ht-radius-sm);
+  border-color: var(--ht-color-border-strong);
+  display: grid;
+  place-items: center;
+  color: transparent;
+}
+
+.mk-task__check:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  outline-offset: var(--ht-space-1);
+}
+
+button.mk-task__check {
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mk-task--done .mk-task__check {
+  background: var(--ht-color-primary);
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+/* 文字块：上下内间距与行内间距 = `TASK_ROW_SHAPE.bodyPaddingBlock` / `gap`。 */
+.mk-task__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-block: var(--ht-space-3);
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+button.mk-task__body {
+  align-items: flex-start;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+button.mk-task__body:hover,
+button.mk-task__body:focus-visible,
+.mk-task--selected {
+  background: var(--ht-color-surface-sunken);
+}
+
+button.mk-task__body:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  outline-offset: calc(var(--ht-space-1) * -1);
+}
+
+/* 标题：**语义文字样式** `TASK_ROW_TEXT.title`（= `row-title`）的四个 token。
+   这里原来抄的是 `--ht-font-size-sm`，而 `row-title` 是 `font-size.base` ——
+   另一处实测漂移。 */
+/*
+ * 🔴 这两格必须**跟着 `TASK_ROW_TEXT` 走**（判据：`tests/mockup-task-row.spec.tsx`
+ * 逐项比对语义样式）。2026-11 的排印调整把它们各推了一档：
+ *   · `row-title` 400 → **500**：正文与标题同字重时，一眼扫列表分不出哪一行是标题；
+ *   · `row-meta`  14 → **12**：与标题的比从 1.14 拉到 1.33，密度一高才不会"两行字差不多大"。
+ * 落地页这张模拟图如果停在旧值，它就是一张**画着已不存在排版**的图。
+ */
+.mk-task__title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-relaxed);
+  letter-spacing: var(--ht-tracking-body);
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 完成态用**删除线 + 弱化色**双重表达，不只靠颜色（色盲可辨） */
+.mk-task--done .mk-task__title {
+  text-decoration: line-through;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.mk-detail__status--done {
+  background: var(--ht-color-primary);
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+/* 徽章行：间距 = `TASK_ROW_SHAPE.metaGap`；排版 = `TASK_ROW_TEXT.meta`。 */
+.mk-task__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-regular);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-due {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 紧迫度**不能只用颜色表达**：语义由文字承载，颜色只是冗余通道。
+   档位来自 `@heyta/domain` 的 `computeCountdown()`，不是手写字段。 */
+.mk-due--overdue {
+  color: var(--ht-color-danger);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.mk-due--today {
+  color: var(--ht-color-warning-strong);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.mk-prio {
+  padding: 0 var(--ht-space-1);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  font-size: var(--ht-font-size-2xs);
+}

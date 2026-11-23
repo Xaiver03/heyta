@@ -19,6 +19,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { readCss } from './css-source.js';
+
 import { zhCN } from '@heyta/i18n';
 
 import {
@@ -30,7 +32,7 @@ import {
 } from '../src/mockup/timeline-shape.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const CSS = readFileSync(resolve(HERE, '../src/mockup/mockup.css'), 'utf8');
+const CSS = readCss(resolve(HERE, '../src/mockup/mockup.css'));
 
 describe('登记处说的每一档宽度，CSS 里都有对应的修饰类', () => {
   it('四档宽度一个都不能少', () => {

@@ -35,6 +35,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { readCss } from './css-source.js';
 
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
@@ -316,7 +317,9 @@ describe('R. 宿主接线与布局开关（直接挂组件的用例看不见这�
   });
 
   it('🔴 面单搬走之后，`.ht-habit` 必须收成单列（否则留一根 5fr 的空轨道）', () => {
-    const css = readFileSync(resolve(here, '../src/styles/app/habits.css'), 'utf8');
+    // 2026-11-23：habits.css 拆成 habits-list.css + habits-detail.css（聚合器只剩 @import）。
+    // 这里递归展开 @import，读到的是拆分前的完整规则集（判据语义不变）。
+    const css = readCss(resolve(here, '../src/styles/app/habits.css'));
     const at = css.indexOf(".ht-habit[data-pane='column']");
     expect(at, 'habits.css 里没有那条单列覆盖 ⇒ 清单只占 2/7 宽、右边一整块空白').toBeGreaterThan(-1);
     const block = css.slice(at, css.indexOf('}', at));

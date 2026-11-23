@@ -1,0 +1,219 @@
+/* 自动拆分自 mockup.css 的第 1–218 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/**
+ * 真实界面的复现样式（Reproduction）
+ * ====================================
+ *
+ * ⚠️ **这是一个复现，不是应用本身。**
+ *
+ * 真实组件在 `apps/web/src/`（`App.tsx` + `features/*` + `styles/app.css`）。
+ * 落地页不能直接 import 它们：那是另一个 app 的内部文件，没有 `exports`，
+ * 而且一 import 就会把整套 store / IndexedDB / 同步客户端拖进落地页的产物里。
+ *
+ * 所以这里的做法是：**照抄布局结构与取值，但不照抄文件** ——
+ *   - 取值全部走同一套 `--ht-*` token（所以换主题时两边一起变，不会漂移）
+ *   - 类名统一加 `mk-` 前缀（`mk-` = mockup），与应用自己的 `ht-` 区分开，
+ *     避免"看起来是同一套样式"的错觉
+ *   - 文案取自应用的真实字符串（`收集箱` / `马上做` / `拖任务到这里` …）
+ *
+ * 🔴 **结构漂移由对账测试拦截**：应用改了 rail、侧栏或页头动作而这里没改，
+ * `mockup-shell-shape.spec.tsx` 会先红；视觉细节仍需浏览器验收，不能把截图
+ * 相似当作结构同步。
+ *
+ * 尺寸策略：stage 固定为 80rem × 50rem（= 应用在 1280×800 下的真实布局），
+ * 再由 `AppWindow` 用 ResizeObserver 算出一个 `--mk-scale` 等比缩放塞进外框。
+ * 这样做而不是"重新做一套响应式"，是为了让**比例与应用逐像素一致**。
+ */
+
+/* ── 外框：等比缩放的容器 ───────────────────────────────── */
+
+.mk-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--ht-radius-xl);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+  aspect-ratio: 16 / 10;
+  /* 复现出来的界面**不可交互**：它是展示品，不是可用的应用。
+     用 pointer-events: none 免得用户以为能点，点不动又以为坏了。 */
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 展厅开放明确的视图导航与任务勾选演示，其余复现件仍是静态展示。 */
+.mk-frame--interactive {
+  pointer-events: auto;
+  user-select: auto;
+}
+
+@media (max-width: 40rem) {
+  .mk-frame--interactive {
+    block-size: auto;
+    min-block-size: 34rem;
+    aspect-ratio: auto;
+    overflow: hidden;
+  }
+
+  .mk-frame--interactive .mk-stage {
+    position: relative;
+    inline-size: 100%;
+    block-size: auto;
+    transform: none;
+  }
+
+  .mk-frame--interactive .mk-app,
+  .mk-frame--interactive .mk-app--with-sidebar {
+    grid-template-columns: var(--ht-layout-rail-width) minmax(0, 1fr);
+    block-size: auto;
+    min-block-size: 34rem;
+  }
+
+  .mk-frame--interactive .mk-sidebar,
+  .mk-frame--interactive .mk-detail {
+    display: none;
+  }
+
+  .mk-frame--interactive .mk-main {
+    min-inline-size: 0;
+  }
+}
+
+.mk-stage {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 80rem;
+  block-size: 50rem;
+  transform: scale(var(--mk-scale, 1));
+  transform-origin: top left;
+}
+
+/* ── 应用外壳（复现 `apps/web/src/styles/app.css` 的 .ht-app）── */
+
+.mk-app {
+  display: grid;
+  grid-template-columns: var(--ht-layout-rail-width) 1fr;
+  block-size: 100%;
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-base);
+  line-height: var(--ht-line-height-normal);
+}
+
+.mk-app--with-sidebar {
+  grid-template-columns: var(--ht-layout-rail-width) var(--ht-layout-sidebar-width) 1fr var(--ht-layout-detail-width);
+}
+
+/* The live shell is a narrow icon rail.  Labels remain in the DOM for the
+   same accessible names as Web; the compact stage hides them visually. */
+.mk-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.mk-rail__top {
+  display: flex;
+  justify-content: center;
+  padding-block-end: var(--ht-space-2);
+}
+
+.mk-avatar {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-rail__tabs,
+.mk-rail__tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.mk-rail__tabs { position: relative; }
+
+.mk-rail__tools {
+  margin-block-start: auto;
+  padding-block-start: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.mk-rail__tab,
+.mk-rail__more,
+.mk-rail__sync {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+  text-align: center;
+}
+
+.mk-rail__tab,
+.mk-rail__more {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.mk-rail__tab:hover,
+.mk-rail__more:hover,
+.mk-rail__tab:focus-visible,
+.mk-rail__more:focus-visible {
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+}
+
+.mk-rail__overflow {
+  position: absolute;
+  inset-inline-start: calc(100% + var(--ht-space-2));
+  inset-block-end: 0;
+  min-inline-size: calc(var(--ht-touch-target-min) * 3);
+  z-index: var(--ht-z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  box-shadow: var(--ht-shadow-md);
+}
+
+.mk-rail__tab span,
+.mk-rail__more span,
+.mk-rail__sync span {
+  display: none;
+}
+
+.mk-rail__overflow .mk-rail__tab { justify-content: flex-start; gap: var(--ht-space-2); padding-inline: var(--ht-space-2); font-size: var(--ht-font-size-sm); }
+.mk-rail__overflow .mk-rail__tab span { display: inline; }
+
+.mk-rail__tab--active {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.mk-frame--interactive .mk-rail__tab--active {
+  background: transparent;
+  color: var(--ht-color-primary);
+}
+
+.mk-rail__sync {
+  color: var(--ht-color-foreground-subtle);
+}

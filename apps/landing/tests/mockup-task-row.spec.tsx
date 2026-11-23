@@ -54,6 +54,7 @@ import { fileURLToPath } from 'node:url';
 
 import { cssVarName, TASK_ROW_SHAPE, TASK_ROW_TEXT, TEXT_STYLES } from '@heyta/design-system';
 import { describe, expect, it } from 'vitest';
+import { readCss } from './css-source.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = resolve(HERE, '..');
@@ -70,7 +71,7 @@ const MOCKUP_CSS_FAMILY_BUDGET = 32;
 
 /** 只取 `.mk-task*` 那一节：别的展厅块里出现同名 token 不算数。 */
 function taskSection(): string {
-  const css = readFileSync(join(APP, 'src/mockup/mockup.css'), 'utf8');
+  const css = readCss(join(APP, 'src/mockup/mockup.css'));
   const start = css.indexOf('/* ── 任务列表');
   const end = css.indexOf('/* ── 四象限');
   if (start < 0 || end < start) throw new Error('mockup.css 里找不到任务列表那一节');
@@ -202,7 +203,7 @@ describe('首屏包不许变大', () => {
 
 describe('复刻件的 CSS 只减不增', () => {
   it(`mk-* 前缀族数量 ≤ ${String(MOCKUP_CSS_FAMILY_BUDGET)}`, () => {
-    const css = readFileSync(join(APP, 'src/mockup/mockup.css'), 'utf8');
+    const css = readCss(join(APP, 'src/mockup/mockup.css'));
     const families = [
       ...new Set([...css.matchAll(/^\.(mk-[a-z0-9]+)/gm)].map((match) => match[1] ?? '')),
     ].sort();

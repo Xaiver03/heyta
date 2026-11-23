@@ -1,0 +1,210 @@
+/* 自动拆分自 habits.css 的第 1–209 行（2026-11-23）。
+ * 规则逐字未动；聚合器只放 @import，顺序 = 原文件顺序 = 级联顺序。 */
+/* ── 习惯：列表 + 窗格 ──────────────────────────────────────
+ * 产品负责人 2026-10-01 定的形态。左列"扫一眼"，右窗格"看细节"。
+ *
+ * ⚠️ 两列的比例**不复用 shell 的侧栏宽度**：那条是可拖拽的"范围列"（导航），
+ * 这里是同一个视图内部的主从两栏。拖它没有意义，共享它的持久化值更有意义 ——
+ * 会互相写脏。
+ *
+ * 🔴 本块必须排在下面的「窄屏塌缩」之前（同特异性、源序后者胜）。
+ */
+.ht-habit {
+  display: grid;
+  /* 右列要装 90 天热力图（十几列方格），所以给它 2 倍权重；
+     `minmax(0, …)` 是关键：不写 0，网格项的 `min-width:auto` 会让热力图
+     把整列撑到内容宽度，于是横向滚动条从"某一习惯名很长"开始。 */
+  grid-template-columns: minmax(16rem, 2fr) minmax(0, 5fr);
+  gap: var(--ht-space-6);
+  align-items: start;
+}
+
+/*
+ * 面单搬进详情列那一格时（工单 §8.133），这里**只剩一列**。
+ *
+ * 🔴 为什么要有这一条：`grid-template-columns` 声明的是两根轨道，而轨道不会因为
+ * 第二格里没有子项就自己消失。留着 `minmax(0, 5fr)` 的结果是清单只占 2/7 宽、
+ * 右边 5/7 是一整块空白 —— 症状恰好是这一单要消掉的那个（"中间一坨里再分栏"），
+ * 而它不会报错，只会看起来像布局坏了。
+ * ⚠️ 判据是几何的（清单的右边缘必须铺到内容列右边缘），在
+ * `e2e/tests/detail-pane-habit.spec.ts` 的 H1；jsdom 不做布局，量不到这一条。
+ */
+.ht-habit[data-pane='column'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 没有任何习惯时，空态属于左侧列表区域；详情面不应留下第二列空白。 */
+.ht-habit[data-empty] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ht-habit__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  min-width: 0;
+  /* 工单 H1：卡片排两列的触发条件量的是**这一列自己的宽度**，不是视口。
+     `.ht-habit` 的轨道会随面单落点搬家（宽屏单列铺满 / 窄屏塌缩 / 回落那支只有 2fr），
+     用视口媒体查询会得到"视口够宽而这一列其实很窄"的错判 —— 那正是把卡片挤成
+     半张卡宽度、数字被裁的那一份坏（判据 `e2e/tests/habits-two-column.spec.ts` T5）。 */
+  /* 🔴 容器**必须有名字**（2026-10-26）：无名容器解析到"最近的容器祖先"，今天恰好是这一格，
+     改一层 DOM 就换了一把尺，而它不会红。门禁 `check:breakpoints` 的 B6 钉着这一条。 */
+  container: habit / inline-size;
+}
+
+/* 习惯页的工具只属于习惯页：由页头插槽承载，新增不会再挤占清单内容。
+ *
+ * 🔴 这三条挂在 `.ht-header` 族上（`__habits-controls` / `__habits-menu-wrap` /
+ * `__habits-menu`），与紧邻的 `__habits-slot` 同一族。原来叫 `.ht-habits-header-*`，
+ * 那是一个**净增的顶层族**（`check:row-single-source`：33 > 基线 28）；
+ * 它们本来就活在页头插槽里，语义上就是页头的一部分 —— 收进 `.ht-header` 是记账也是纠名。 */
+.ht-header__habits-slot {
+  display: contents;
+}
+
+.ht-header__habits-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-header__habits-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.ht-header__habits-menu {
+  position: absolute;
+  z-index: var(--ht-z-popover);
+  inset-block-start: calc(100% + var(--ht-space-2));
+  inset-inline-end: 0;
+  min-inline-size: 12rem;
+  padding: var(--ht-space-1);
+  border: 0;
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.ht-header__habits-menu button {
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  text-align: start;
+  font: inherit;
+}
+
+.ht-header__habits-menu button:hover {
+  background: var(--ht-color-hover);
+}
+
+/*
+ * 添加习惯（对齐滴答清单的形状，2026-10-24）
+ * ==========================================
+ *
+ * 这个对话框此前是"每个字段一个 <label> 竖排 + 两列栅格 + 40 枚图标常驻"，
+ * 症状是控件高度不一、字段互相挤压、主线下推到第三屏。改法不是调间距，
+ * 而是把它换成滴答那一套**行解剖**：
+ *
+ *   1. 一条**两列网格**：左列是标签（第一格是头像），右列是控件。
+ *      所有行共用 `--ht-layout-form-label-width`，于是"文字从哪开始、
+ *      控件从哪开始"在整张表单里是同一条竖线。
+ *   2. **可交互控件只有一档高度** = `--ht-size-field-height`。
+ *      🔴 这条是本文件最容易再破的规矩：`min-block-size` 只是下限，
+ *      `<input type=number>` 的 spinner、`<select>` 的原生外观、
+ *      以及 `font: inherit` 没写时的回落，都会让内容高度越过下限 ——
+ *      所以这里**给死 `block-size`** 并让三个标签页共用同一个类。
+ *   3. 图标**收起**，点头像才展开（滴答的形状）。常驻 40 枚图标是
+ *      "把配置的可见性当成主任务"。
+ *   4. 动作区贴底、固定不随内容滚动（长表单里"确定"不该在滚动区外面消失）。
+ */
+.ht-habit-create-dialog {
+  position: fixed;
+  /*
+   * 🔴 P7 之前这一枚占的是 `--ht-z-splash`(900) —— 那是**启动屏**那一档，被一个
+   *    新建对话框占了，理由写在被删掉的那段英文注释里（"怕底栏标签透上来"）。
+   *    实测不需要那一档：底栏是 `z.sticky`(100)，`z.modal`(400) 本来就在它上面；
+   *    而占 900 的代价是**任何**嵌在这层里的确认框都永远压不住面板
+   *    （§7 第 607 条那次"画得出来点不动"量的就是这一格，当时的绕法是给确认框
+   *    另开一档 `z.modal-commitment`(550) —— 那是数字竞赛，P7 要治的是刻度本身）。
+   *    现在浮层一律停在 `modal` 这一档，比它更高的只许是"必须按下去的那一层"。
+   *    判据：`pnpm check:z-ladder`（Z2 断 `z.splash` 在功能 CSS 里零消费者）。
+   */
+  z-index: var(--ht-z-modal);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--ht-space-6);
+  background: var(--ht-color-overlay);
+}
+
+.ht-habit-create-dialog__dialog {
+  display: flex;
+  flex-direction: column;
+  /* 34rem = 544px。此前是 38rem（608）—— 那个宽度是为**两列栅格**留的，
+     换成"左标签 / 右控件"之后不需要那么宽（滴答那张是 449，
+     我们还要放"数值 + 单位"并排，所以留到 544）。 */
+  inline-size: min(100%, 34rem);
+  max-block-size: min(90dvh, 48rem);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-xl);
+}
+
+.ht-habit-create-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-5) var(--ht-space-6) var(--ht-space-3);
+}
+
+.ht-habit-create-dialog__close {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-habit-create-dialog__close:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+/* 🔴 表单 = **两段**：可滚动的正文 + 常驻的动作区。
+   此前动作区在滚动容器**里面**，实测 754 高的视口下「取消 / 添加习惯」
+   一个像素都没渲染出来（截图 y 688..716 除滚动条外全白），
+   而 `toBeVisible()` 对它返回 true —— 那是本仓已经栽过一次的坑
+   （H3 的 I6：`toBeVisible()` 不验"在不在视口里"）。 */
+.ht-habit-create-dialog__form {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.ht-habit-create-dialog__body {
+  display: flex;
+  flex-direction: column;
+  /* 字段间距 8px：行高 44（触控下限）+ 8 = 52 的节奏。
+     滴答是 32 + 8 = 40 —— 它的控件比我们的可访问下限矮 12px，
+     所以"看起来一样松"的那个间距对我们是 space-2，不是 space-3。 */
+  gap: var(--ht-space-2);
+  overflow: auto;
+  padding: var(--ht-space-3) var(--ht-space-6) var(--ht-space-4);
+}
+
+/* 字段解剖（行、标签列、控件高度）**已搬到 `form.css`**（`FormField` 一族，2026-10-24）。
+   🔴 这里不许再定义 `.ht-field*` 或第二种字段形状 —— 那正是"6 种解剖"的来历。 */

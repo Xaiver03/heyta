@@ -52,12 +52,13 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
+import { readCss } from './css-source.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../../..');
 
 const MOCK = readFileSync(join(HERE, '../src/mockup/FocusRing.tsx'), 'utf8');
-const MOCKUP_CSS = readFileSync(join(HERE, '../src/mockup/mockup.css'), 'utf8');
+const MOCKUP_CSS = readCss(join(HERE, '../src/mockup/mockup.css'));
 const SHARED = readFileSync(join(REPO, 'packages/ui/src/focus/FocusRing.tsx'), 'utf8');
 const TOKENS = readFileSync(join(REPO, 'packages/design-system/src/tokens.css'), 'utf8');
 
