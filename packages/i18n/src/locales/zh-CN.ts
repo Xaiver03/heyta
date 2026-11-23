@@ -2497,6 +2497,7 @@ export const zhCN = {
   'web.ai.tools.intentUncheckChecklistItem': '取消勾选任务 {id} 的子项「{item}」',
   'web.tasks.checklist.title': '子项',
   'web.tasks.checklist.add': '添加',
+  'web.tasks.checklist.remove': '删除',
   'web.tasks.checklist.addPlaceholder': '添加子项…',
   'web.tasks.checklist.removeAria': '删除子项「{text}」',
   'web.tasks.checklist.convertLegacy': '把备注里的清单转为可勾选子项',

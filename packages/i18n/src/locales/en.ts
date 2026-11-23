@@ -2303,6 +2303,7 @@ export const en = {
   'web.ai.tools.intentUncheckChecklistItem': 'Uncheck item "{item}" of task {id}',
   'web.tasks.checklist.title': 'Checklist',
   'web.tasks.checklist.add': 'Add',
+  'web.tasks.checklist.remove': 'Remove',
   'web.tasks.checklist.addPlaceholder': 'Add an item…',
   'web.tasks.checklist.removeAria': 'Remove item "{text}"',
   'web.tasks.checklist.convertLegacy': 'Convert the note checklist into checkable items',
