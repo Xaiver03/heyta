@@ -23,9 +23,6 @@ importers:
       stylelint:
         specifier: 18.1.0
         version: 18.1.0
-      stylelint-config-standard:
-        specifier: 41.1.0
-        version: 41.1.0(stylelint@18.1.0)
 
   apps/desktop:
     dependencies:
@@ -5800,18 +5797,6 @@ packages:
 
   strnum@1.1.2:
     resolution: {integrity: sha512-vrN+B7DBIoTTZjnPNewwhx6cBA/H+IS7rfW68n7XxC1y7uoiGQBxaKzqucGUgavX15dJgiGztLJ8vxuEzwqBdA==}
-
-  stylelint-config-recommended@19.1.0:
-    resolution: {integrity: sha512-DurXBzvz2cmVX2rM1JMDCbPIq+MRKhIPY743lFk1DjUoyx7giLfN+HR8Hilw+kE2nE5blaXhVf66edvQGnLdwA==}
-    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
-    peerDependencies:
-      stylelint: ^18.0.0
-
-  stylelint-config-standard@41.1.0:
-    resolution: {integrity: sha512-Z7PiQpBffnqu7U5h/FeBWCYZsRsZXa1J8MjkpgcciphLJULysDcu2jKXuSrPgnQGow9x0T+pOfblqRA5cSE6aw==}
-    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
-    peerDependencies:
-      stylelint: ^18.0.0
 
   stylelint@18.1.0:
     resolution: {integrity: sha512-QbF/IY7KY6lZRhYU/vmPU1KYxc71wgkXdgeptqzTh3lbnZps6WHaskfPjpL6Fh4JaCzwkKKitVcMrpfQTSwwPA==}
@@ -11901,15 +11886,6 @@ snapshots:
   strip-final-newline@2.0.0: {}
 
   strnum@1.1.2: {}
-
-  stylelint-config-recommended@19.1.0(stylelint@18.1.0):
-    dependencies:
-      stylelint: 18.1.0
-
-  stylelint-config-standard@41.1.0(stylelint@18.1.0):
-    dependencies:
-      stylelint: 18.1.0
-      stylelint-config-recommended: 19.1.0(stylelint@18.1.0)
 
   stylelint@18.1.0:
     dependencies:

@@ -4,12 +4,12 @@
 > 重新生成：`node research/tools/render-license-inventory.mjs`
 > 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。
 > 去重口径：`包名@版本`（同名多版本分别登记）。
-> lockfile 指纹：`9cc43a4658c4a4ab`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
-> 渲染输入集：pnpm store 去重后 **1101** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
+> lockfile 指纹：`36b9f0d3f1a2c73c`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
+> 渲染输入集：pnpm store 去重后 **1099** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
 
 生成时间：2026-11-23
 
-**总计 1101 个包** —— 宽松许可 1099，受限 0，无许可证 0，白名单外已登记 2。
+**总计 1099 个包** —— 宽松许可 1097，受限 0，无许可证 0，白名单外已登记 2。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -30,7 +30,7 @@
 - **PSF-2.0**（`argparse@3.0.4`）：argparse@3.0.4：markdown-it 的传递依赖（仅用于其 CLI 入口），PSF-2.0 是 Python 软件基金会许可证，语义等同 BSD-2-Clause（宽松、仅要求保留版权声明），不在禁止名单内。
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（1101 个）
+### 📋 全部依赖（1099 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -1023,8 +1023,6 @@
 | `strip-final-newline` | 2.0.0 | MIT |
 | `strnum` | 1.1.2 | MIT |
 | `stylelint` | 18.1.0 | MIT |
-| `stylelint-config-recommended` | 19.1.0 | MIT |
-| `stylelint-config-standard` | 41.1.0 | MIT |
 | `styleq` | 0.1.3 | MIT |
 | `sucrase` | 3.35.1 | MIT |
 | `sumchecker` | 3.0.1 | Apache-2.0 |
