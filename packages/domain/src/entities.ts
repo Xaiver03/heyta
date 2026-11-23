@@ -256,10 +256,31 @@ export enum Quadrant {
   Neither = 4,
 }
 
+/**
+ * 任务的结构化子项（checklist item）。**独立于「子任务」**：子任务是带排期的 Task
+ * （`Task.parentId`），这里只是任务详情里的勾选项。
+ *
+ * 🔴 纯可加性：`Task.checklist` 是可选字段，旧数据缺席 = 回退读 `note` 的 `- [ ]`
+ * （见 `checklist.ts` 的 `readChecklist`）。**不 bump `CURRENT_SCHEMA_VERSION`**（§3.3）。
+ */
+export interface TaskChecklistItem {
+  /** 稳定 id（客户端生成），供逐条勾选 / 删除 / 排序定位。 */
+  id: string;
+  /** 条目文本。 */
+  text: string;
+  /** 是否已勾选。 */
+  done: boolean;
+}
+
 export interface Task extends EntityBase {
   title: string;
   /** 备注（Markdown）。可选 —— 老数据可能没有。 */
   note?: string;
+  /**
+   * 结构化子项清单。可选；`undefined` = 老数据无结构化清单，读取侧回退 `note`。
+   * 与「子任务」(`parentId`) 是两套东西。纯可加性、不 bump schema（§3.3）。
+   */
+  checklist?: TaskChecklistItem[];
   /** Absent on ordinary/older tasks; persisted with the atomic creation op. */
   automationSource?: TaskAutomationSource & { itemIndex: number };
   /** 所属清单。未归类时为 undefined（收集箱）。 */
