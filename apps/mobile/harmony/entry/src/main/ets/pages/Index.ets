@@ -16,7 +16,8 @@
  * `dayStr` 与 `validUntil` 由这一层给，但**四端的拼法必须一致**，
  * 所以它们直接来自 `WidgetParse` 里的常量，不在这里再写一遍字面量。
  *
- * 颜色走 `$r('app.color.heyta_…')` 资源（与卡片同一套，深色自动切换）。
+ * 颜色走 `$r('app.color.heyta_…')`、字号/间距走 `$r('app.float.heyta_…')`
+ * （与卡片同一套，深色自动切换、字号随系统缩放）。
  */
 import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -81,16 +82,16 @@ struct Index {
   build() {
     Column({ space: 12 }) {
       Text('heyta 小组件')
-        .fontSize(24)
+        .fontSize($r('app.float.heyta_font_size_2xl'))
         .fontWeight(FontWeight.Bold)
       Text(this.status)
-        .fontSize(14)
+        .fontSize($r('app.float.heyta_font_size_sm'))
         .fontColor($r('app.color.heyta_foreground_subtle'))
 
       Divider()
 
       Text('⚠️ 下面写入的是「示例数据」（四端共用的那份黄金夹具），不是你的真实任务。')
-        .fontSize(13)
+        .fontSize($r('app.float.heyta_font_size_md'))
         .fontColor($r('app.color.heyta_warning_strong'))
 
       Button(this.busy ? '写入中…' : '把示例任务写进卡片')
@@ -130,7 +131,7 @@ struct Index {
         })
 
       Text(`卡片点出来的意图：${this.pending} 条待处理`)
-        .fontSize(13)
+        .fontSize($r('app.float.heyta_font_size_md'))
         .fontColor($r('app.color.heyta_foreground_subtle'))
 
       Button(this.busy ? '处理中…' : '取走这些意图（drain）')
@@ -155,7 +156,7 @@ struct Index {
 
       if (this.drained.length > 0) {
         Text(`上次取走：${this.drained}`)
-          .fontSize(13)
+          .fontSize($r('app.float.heyta_font_size_md'))
           .fontColor($r('app.color.heyta_foreground'))
       }
 
@@ -169,7 +170,7 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .padding(24)
+    .padding($r('app.float.heyta_space_6'))
     .justifyContent(FlexAlign.Center)
   }
 }

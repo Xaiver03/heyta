@@ -47,6 +47,8 @@
 
 `WidgetCardRoot.ets`、`WidgetCardParts.ets`、`pages/Index.ets` 三处的全部颜色字面量替换为 `$r('app.color.heyta_…')`（主按钮用 `heyta_primary`、危险按钮用 `heyta_danger`、警示文案用 `heyta_warning_strong`）。**组件结构、渲染逻辑、注释一律未动**，仅替换颜色取值方式。
 
+字号与主内边距也改为资源：字号 12/13/14/16/24 → `$r('app.float.heyta_font_size_{xs,md,sm,base,2xl}')`（`fp`，随系统字体缩放）；主内边距 12/24 → `$r('app.float.heyta_space_{3,6}')`（`vp`，落在 8vp 网格上）。至此卡片与页面的**颜色、字号、间距**全部来自设计系统投影，`.ets` 内不再有裸值。
+
 ### 3.3 门禁：`check:harmony-tokens`
 
 新增 `scripts/check-harmony-tokens-sync.mjs`（接入 `package.json` 的 `check` 链，紧跟 `check:arkts-widgets`）：
@@ -61,6 +63,7 @@
 - `node scripts/check-harmony-tokens-sync.mjs --self-test`：✅ 全绿（含"篡改→红"两臂）。
 - 三个资源 JSON：`JSON.parse` 通过。
 - 三份改动的 `.ets`：括号/引号平衡、无残留裸 hex。
+- `$r('app.color.…')` 覆盖卡片与页面的全部颜色；`$r('app.float.…')` 覆盖 7 类字号/间距档。
 
 ## 4. 诚实边界（务必知悉）
 
@@ -68,6 +71,7 @@
 - 本轮对 `.ets` 只做**等价字面量替换**（hex → `$r`），未改结构，风险已通过静态校验降到最低，但不替代编译器。
 - `pnpm check:design` 当前有一处**既有红**：`apps/mobile/src/ui/custom-icons.tsx` 的 `#334155`（HEAD 已提交内容，见 `24778e5b`）及工作区中他人未提交的 web/ui/mobile 改动——**不在本任务改动的文件类型/目录内**（`check-hardcoded.mjs` 只扫 `apps/web/src`、`apps/mobile/src`、`packages/ui/src`，不扫 `apps/mobile/harmony` 与 `packages/design-system`），与本任务无关。
 - 对比度保证继承 `packages/design-system/tests`：资源与 token 同源，即继承其 WCAG 实测。
+- `@heyta/design-system` 测试当前有 **2 处既有失败**（`tests/typography.spec.ts` 的样式数量棘轮 `16 > 15`）；`packages/design-system` 源码树与 HEAD 一致、本任务未改动它，故与本任务无关。
 
 ## 5. 后续路线（鸿蒙特征增量，按价值排序）
 

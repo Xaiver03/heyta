@@ -8,9 +8,10 @@
  * - 占位/过期的**长相**只有一处（本文件）；
  * - 四张卡片的 `.ets` 只负责把字段摆到屏幕上，**不做任何判断**。
  *
- * 颜色全部走 `$r('app.color.heyta_…')`：亮/暗两套值来自
- * `resources/{base,dark}/element/color.json`，由 `scripts/check-harmony-tokens-sync.mjs`
- * 保证与设计系统 `HeytaTokens.ets` 同源。系统切深色时**自动**换成暗色值。
+ * 颜色走 `$r('app.color.heyta_…')`、字号/间距走 `$r('app.float.heyta_…')`：
+ * 亮/暗两套色与 fp/vp 尺寸来自 `resources/{base,dark}/element/*.json`，由
+ * `scripts/check-harmony-tokens-sync.mjs` 保证与设计系统 `HeytaTokens.ets` 同源。
+ * 系统切深色时颜色**自动**切换；fp 字号随系统字体缩放。
  */
 import { WidgetStrings } from './WidgetStrings';
 
@@ -32,10 +33,10 @@ export struct WidgetTaskRow {
   build() {
     Row({ space: 6 }) {
       Text(this.isDone ? '✓' : '○')
-        .fontSize(13)
+        .fontSize($r('app.float.heyta_font_size_md'))
         .fontColor(this.isDone ? $r('app.color.heyta_disabled_fg') : (this.accent.length > 0 ? this.accent : $r('app.color.heyta_foreground_subtle')))
       Text(this.title)
-        .fontSize(this.compact ? 13 : 14)
+        .fontSize(this.compact ? $r('app.float.heyta_font_size_md') : $r('app.float.heyta_font_size_sm'))
         .fontColor(this.isDone ? $r('app.color.heyta_disabled_fg') : $r('app.color.heyta_foreground'))
         .decoration({ type: this.isDone ? TextDecorationType.LineThrough : TextDecorationType.None })
         .maxLines(1)
@@ -66,10 +67,10 @@ export struct WidgetHeader {
 
   build() {
     Row() {
-      Text(this.title).fontSize(13).fontWeight(FontWeight.Medium).fontColor($r('app.color.heyta_foreground_muted'))
+      Text(this.title).fontSize($r('app.float.heyta_font_size_md')).fontWeight(FontWeight.Medium).fontColor($r('app.color.heyta_foreground_muted'))
       Blank()
       if (this.badge.length > 0) {
-        Text(this.badge).fontSize(12).fontColor($r('app.color.heyta_foreground_subtle'))
+        Text(this.badge).fontSize($r('app.float.heyta_font_size_xs')).fontColor($r('app.color.heyta_foreground_subtle'))
       }
     }
     .width('100%')
@@ -93,7 +94,7 @@ export struct WidgetMessage {
   build() {
     Column() {
       Text(this.text)
-        .fontSize(13)
+        .fontSize($r('app.float.heyta_font_size_md'))
         .fontColor($r('app.color.heyta_foreground_subtle'))
         .textAlign(TextAlign.Center)
         .maxLines(3)
@@ -102,7 +103,7 @@ export struct WidgetMessage {
     .width('100%')
     .height('100%')
     .justifyContent(FlexAlign.Center)
-    .padding(12)
+    .padding($r('app.float.heyta_space_3'))
   }
 }
 
