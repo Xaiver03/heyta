@@ -107,6 +107,23 @@ module.exports = {
     'selector-pseudo-class-no-unknown': [true, { ignorePseudoClasses: ['global', 'local'] }],
     'function-no-unknown': [true, { ignoreFunctions: ['theme', 'env', 'constant'] }],
 
+    /* ── 第三批：语义/取值合法性（实测存量全 0）─────────────────────────
+     * `declaration-property-value-no-unknown` 是最有价值的一条：它按 CSS 语法校验
+     * **属性与值的组合**，能抓到 `display: flexx`、`align-items: centerr`、
+     * `gap: 4` 这类"拼错即静默不生效"的错（本仓手写 CSS 上千行，正是高发区）。
+     * 其余几条同理：媒体查询语法、伪元素/元素选择器、`@counter-style` 之外的
+     * annotation、`var()` 缺失、空注释/空文件。
+     */
+    'declaration-property-value-no-unknown': true,
+    'media-query-no-invalid': true,
+    'selector-pseudo-element-no-unknown': true,
+    'selector-type-no-unknown': true,
+    'selector-anb-no-unmatchable': true,
+    'annotation-no-unknown': true,
+    'custom-property-no-missing-var-function': true,
+    'comment-no-empty': true,
+    'no-empty-source': true,
+
     /* ── 明确关闭：理由见文件头 ───────────────────────────────── */
 
     'no-descending-specificity': null,

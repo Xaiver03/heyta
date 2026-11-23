@@ -25,6 +25,9 @@
  * · **第二批**（正确性，加进来时实测存量全 0，只为防回潮）：`//` 注释、
  *   longhand 被 shorthand 覆盖、重复 @import、font-family 重名、keyframes 里的
  *   !important、未知单位/属性/@规则/媒体特性/伪类/函数。
+ * · **第三批**（语义/取值合法性，实测存量全 0）：`declaration-property-value-no-unknown`
+ *   （抓 `display: flexx` 这类拼错即静默失效）、媒体查询语法、伪元素/元素选择器、
+ *   `var()` 缺失、空注释、空文件。**格式类规则（空行/缩进）一律不进**，理由见上。
  * · **颜色 token 判据**由本脚本内置（`scanRawColors`），**不用**
  *   `stylelint-declaration-strict-value`：那个插件 1.13.0 在 stylelint 18 上每条
  *   声明都报 `Unknown rule declaration-strict-value`（API 不匹配，已卸载）。
@@ -152,7 +155,9 @@ async function selfTest() {
   const tmp = mkdtempSync(join(tmpdir(), 'heyta-css-norms-'));
   const config = { rules: RULES };
   let failed = 0;
+  let total = 0;
   const arm = (name, ok) => {
+    total += 1;
     console.log(`${ok ? '✓' : '🔴'} ${name}`);
     if (!ok) failed += 1;
   };
@@ -209,6 +214,17 @@ async function selfTest() {
       join(tmp, 'color-good/apps/web/src/x.css'),
       '.n { background: var(--ht-color-overlay); color: transparent; }\n',
     );
+    // 第三批：取值合法性 —— 拼错的属性值必须红（最典型：display: flexx）
+    mkdirSync(join(tmp, 'bad-b3'), { recursive: true });
+    writeFileSync(
+      join(tmp, 'bad-b3/e.css'),
+      '.s { display: flexx; }\n.t { align-items: centerr; }\n.u { gap: 4; }\n',
+    );
+    const r6 = await lintFiles([join(tmp, 'bad-b3/*.css')], {
+      config: { rules: { 'declaration-property-value-no-unknown': true } },
+    });
+    arm('第三批规则（非法属性值 display:flexx / align-items:centerr / gap:4）⇒ 必须红', r6.errored === true);
+
     arm('颜色裸值 ⇒ 必须红', scanRawColors(join(tmp, 'color-bad')).length === 1);
     arm('颜色走 token / 关键字 ⇒ 必须绿', scanRawColors(join(tmp, 'color-good')).length === 0);
 
@@ -219,7 +235,7 @@ async function selfTest() {
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
-  console.log(`self-test：${String(8 - failed)}/8 臂通过。`);
+  console.log(`self-test：${String(total - failed)}/${String(total)} 臂通过。`);
   return failed === 0;
 }
 
