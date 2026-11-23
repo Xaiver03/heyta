@@ -19,6 +19,7 @@ import { focusToolPack } from './focus.js';
 import { habitToolPack } from './habit.js';
 import { habitLogToolPack } from './habit-log.js';
 import { noteToolPack } from './note.js';
+import { commentToolPack } from './comment.js';
 import { projectToolPack } from './project.js';
 import { reminderToolPack } from './reminder.js';
 import { eventToolPack } from './event.js';
@@ -44,6 +45,8 @@ export const LOCAL_API_TOOL_PACKS: readonly EntityToolPack[] = [
   focusToolPack,
   reminderToolPack,
   eventToolPack,
+  // P4：评论（COMMENT）—— share 感知的独立工具通道（ADR-0062）。
+  commentToolPack,
 ];
 
 export interface ToolPackRegistry {

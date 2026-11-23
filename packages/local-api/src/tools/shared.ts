@@ -793,7 +793,20 @@ export type LocalApiWriteIntent =
   /** 整组覆盖任务子项（TASK）。items 空数组 = 清空；id 缺失则新建。 */
   | { action: 'set-task-checklist'; taskId: string; items: readonly { id?: string; text: string; done?: boolean }[] }
   /** 勾选/取消任务某条子项（TASK）。按文本唯一匹配；全勾时正常任务自动完成。 */
-  | { action: 'toggle-checklist-item'; taskId: string; itemText: string; done: boolean };
+  | { action: 'toggle-checklist-item'; taskId: string; itemText: string; done: boolean }
+  // 评论（COMMENT，P4 / ADR-0062）：**share 感知的独立工具通道**。
+  /**
+   * 给一条任务加评论（COMMENT）。
+   *
+   * 🔴 与个人 op-log 的其它写入**执行目标不同**：`submitIntent` 不调 `ctx.dispatch`，
+   * 而是走宿主注入的 `CommentActions`（→ `dispatchShareOp` → share 加密通道）。
+   * 意图仍然经过同一个 `submit` 入口（op-log 单入口不变），但落地的是**共享清单**。
+   * 无 share 会话的宿主（CLI/MCP）→ `{ ok:false, reason:'invalid' }` 且**零 op**；
+   * 个人清单 → `ListNotSharedError` 译成"评论只存在于共享清单"且**零 op**。
+   */
+  | { action: 'add-task-comment'; taskId: string; body: string }
+  /** 删除一条评论（COMMENT）。软删（`DEL`），可逆 —— 走同一条 share 通道。 */
+  | { action: 'delete-task-comment'; commentId: string };
 
 /**
  * 一条写入落地的实体类型。
@@ -826,7 +839,8 @@ export type LocalApiWrittenEntityType =
   | 'HABIT_LOG'
   | 'FOCUS_SESSION'
   | 'REMINDER'
-  | 'EVENT';
+  | 'EVENT'
+  | 'COMMENT';
 
 export type LocalApiWriteResult =
   | {
