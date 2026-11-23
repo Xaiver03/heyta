@@ -4,12 +4,12 @@
 > 重新生成：`node research/tools/render-license-inventory.mjs`
 > 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。
 > 去重口径：`包名@版本`（同名多版本分别登记）。
-> lockfile 指纹：`e840b7bf9faef8b9`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
-> 渲染输入集：pnpm store 去重后 **1030** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
+> lockfile 指纹：`4bd5f826df273a42`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
+> 渲染输入集：pnpm store 去重后 **1083** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
 
-生成时间：2026-11-10
+生成时间：2026-11-23
 
-**总计 1030 个包** —— 宽松许可 1028，受限 0，无许可证 0，白名单外已登记 2。
+**总计 1083 个包** —— 宽松许可 1081，受限 0，无许可证 0，白名单外已登记 2。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -30,7 +30,7 @@
 - **PSF-2.0**（`argparse@3.0.4`）：argparse@3.0.4：markdown-it 的传递依赖（仅用于其 CLI 入口），PSF-2.0 是 Python 软件基金会许可证，语义等同 BSD-2-Clause（宽松、仅要求保留版权声明），不在禁止名单内。
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（1030 个）
+### 📋 全部依赖（1083 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -198,6 +198,7 @@
 | `@fastify/websocket` | 11.3.1 | MIT |
 | `@floating-ui/core` | 1.8.0 | MIT |
 | `@floating-ui/dom` | 1.8.0 | MIT |
+| `@floating-ui/react-dom` | 2.1.9 | MIT |
 | `@floating-ui/utils` | 0.2.12 | MIT |
 | `@hapi/hoek` | 9.3.0 | BSD-3-Clause |
 | `@hapi/topo` | 5.1.0 | BSD-3-Clause |
@@ -255,6 +256,46 @@
 | `@prisma/engines-version` | 5.22.0-44.605197351a3c8bdd595af2d2a9bc3025bca48ea2 | Apache-2.0 |
 | `@prisma/fetch-engine` | 5.22.0 | Apache-2.0 |
 | `@prisma/get-platform` | 5.22.0 | Apache-2.0 |
+| `@radix-ui/number` | 1.1.3 | MIT |
+| `@radix-ui/primitive` | 1.2.0 | MIT |
+| `@radix-ui/react-arrow` | 1.1.17 | MIT |
+| `@radix-ui/react-checkbox` | 1.4.1 | MIT |
+| `@radix-ui/react-collection` | 1.2.0 | MIT |
+| `@radix-ui/react-compose-refs` | 1.1.5 | MIT |
+| `@radix-ui/react-context` | 1.3.0 | MIT |
+| `@radix-ui/react-dialog` | 1.3.1 | MIT |
+| `@radix-ui/react-direction` | 1.2.0 | MIT |
+| `@radix-ui/react-dismissable-layer` | 1.2.1 | MIT |
+| `@radix-ui/react-dropdown-menu` | 2.2.1 | MIT |
+| `@radix-ui/react-focus-guards` | 1.2.0 | MIT |
+| `@radix-ui/react-focus-scope` | 1.3.1 | MIT |
+| `@radix-ui/react-id` | 1.1.4 | MIT |
+| `@radix-ui/react-label` | 2.1.17 | MIT |
+| `@radix-ui/react-menu` | 2.2.1 | MIT |
+| `@radix-ui/react-popover` | 1.3.1 | MIT |
+| `@radix-ui/react-popper` | 1.4.0 | MIT |
+| `@radix-ui/react-portal` | 1.2.0 | MIT |
+| `@radix-ui/react-presence` | 1.1.11 | MIT |
+| `@radix-ui/react-primitive` | 2.2.0 | MIT |
+| `@radix-ui/react-radio-group` | 1.5.1 | MIT |
+| `@radix-ui/react-roving-focus` | 1.2.1 | MIT |
+| `@radix-ui/react-select` | 2.4.1 | MIT |
+| `@radix-ui/react-separator` | 1.2.0 | MIT |
+| `@radix-ui/react-slot` | 1.5.0 | MIT |
+| `@radix-ui/react-switch` | 1.4.1 | MIT |
+| `@radix-ui/react-tabs` | 1.2.1 | MIT |
+| `@radix-ui/react-toast` | 1.3.1 | MIT |
+| `@radix-ui/react-tooltip` | 1.4.1 | MIT |
+| `@radix-ui/react-use-callback-ref` | 1.1.5 | MIT |
+| `@radix-ui/react-use-controllable-state` | 1.3.0 | MIT |
+| `@radix-ui/react-use-effect-event` | 0.0.5 | MIT |
+| `@radix-ui/react-use-is-hydrated` | 0.1.3 | MIT |
+| `@radix-ui/react-use-layout-effect` | 1.1.4 | MIT |
+| `@radix-ui/react-use-rect` | 1.1.4 | MIT |
+| `@radix-ui/react-use-size` | 1.1.5 | MIT |
+| `@radix-ui/react-visually-hidden` | 1.2.13 | MIT |
+| `@radix-ui/rect` | 1.1.3 | MIT |
+| `@react-native-community/blur` | 4.4.1 | MIT |
 | `@react-native-community/cli` | 20.1.0 | MIT |
 | `@react-native-community/cli-clean` | 20.1.0 | MIT |
 | `@react-native-community/cli-config` | 20.1.0 | MIT |
@@ -404,6 +445,7 @@
 | `argparse` | 1.0.10 | MIT |
 | `argparse` | 2.0.1 | Python-2.0 |
 | `argparse` | 3.0.4 | PSF-2.0 |
+| `aria-hidden` | 1.2.6 | MIT |
 | `asap` | 2.0.6 | MIT |
 | `asn1js` | 3.0.10 | BSD-3-Clause |
 | `assertion-error` | 2.0.1 | MIT |
@@ -514,6 +556,7 @@
 | `dequal` | 2.0.3 | MIT |
 | `destroy` | 1.2.0 | MIT |
 | `detect-libc` | 2.1.2 | Apache-2.0 |
+| `detect-node-es` | 1.1.0 | MIT |
 | `dezalgo` | 1.0.4 | ISC |
 | `diff` | 4.0.4 | BSD-3-Clause |
 | `dom-serializer` | 2.0.0 | MIT |
@@ -605,6 +648,7 @@
 | `gensync` | 1.0.0-beta.2 | MIT |
 | `get-caller-file` | 2.0.5 | ISC |
 | `get-intrinsic` | 1.3.0 | MIT |
+| `get-nonce` | 1.0.1 | MIT |
 | `get-package-type` | 0.1.0 | MIT |
 | `get-proto` | 1.0.1 | MIT |
 | `get-stream` | 6.0.1 | MIT |
@@ -697,6 +741,7 @@
 | `lightningcss-darwin-arm64` | 1.33.0 | MPL-2.0 |
 | `lilconfig` | 3.1.3 | MIT |
 | `lines-and-columns` | 1.2.4 | MIT |
+| `linkify-it` | 5.0.2 | MIT |
 | `linkify-it` | 6.1.0 | MIT |
 | `linkifyjs` | 4.4.0 | MIT |
 | `load-tsconfig` | 0.2.5 | MIT |
@@ -724,6 +769,7 @@
 | `magic-string` | 1.4.2 | MIT |
 | `make-error` | 1.3.6 | ISC |
 | `makeerror` | 1.0.12 | BSD-3-Clause |
+| `markdown-it` | 14.3.3 | MIT |
 | `markdown-it` | 15.0.3 | MIT |
 | `marky` | 1.3.0 | Apache-2.0 |
 | `math-intrinsics` | 1.1.0 | MIT |
@@ -872,11 +918,15 @@
 | `react-is` | 18.3.1 | MIT |
 | `react-native` | 0.84.1 | MIT |
 | `react-native-get-random-values` | 2.0.0 | MIT |
+| `react-native-image-picker` | 8.3.0 | MIT |
 | `react-native-safe-area-context` | 5.10.0 | MIT |
 | `react-native-svg` | 15.15.5 | MIT |
 | `react-native-web` | 0.21.3 | MIT |
 | `react-refresh` | 0.14.2 | MIT |
 | `react-refresh` | 0.18.0 | MIT |
+| `react-remove-scroll` | 2.7.2 | MIT |
+| `react-remove-scroll-bar` | 2.3.8 | MIT |
+| `react-style-singleton` | 2.2.3 | MIT |
 | `readable-stream` | 3.6.2 | MIT |
 | `readdirp` | 3.6.0 | MIT |
 | `readdirp` | 4.1.2 | MIT |
@@ -1005,6 +1055,7 @@
 | `type-is` | 1.6.18 | MIT |
 | `typescript` | 5.9.3 | Apache-2.0 |
 | `ua-parser-js` | 1.0.41 | MIT |
+| `uc.micro` | 2.1.0 | MIT |
 | `uc.micro` | 3.0.0 | MIT |
 | `ufo` | 1.6.4 | MIT |
 | `undefsafe` | 2.0.5 | MIT |
@@ -1018,6 +1069,8 @@
 | `universalify` | 0.1.2 | MIT |
 | `unpipe` | 1.0.0 | MIT |
 | `update-browserslist-db` | 1.3.3 | MIT |
+| `use-callback-ref` | 1.3.3 | MIT |
+| `use-sidecar` | 1.1.3 | MIT |
 | `use-sync-external-store` | 1.7.0 | MIT |
 | `util-deprecate` | 1.0.2 | MIT |
 | `utils-merge` | 1.0.1 | MIT |
