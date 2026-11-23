@@ -1942,6 +1942,55 @@ async function submitIntent(
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // 批7：任务结构化子项 checklist
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'set-task-checklist': {
+      const task = actions.findTask(intent.taskId);
+      if (task === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      const items: { id?: string; text: string; done?: boolean }[] = [];
+      for (const it of intent.items) {
+        if (typeof it.text !== 'string' || it.text.trim() === '') {
+          return { ok: false, reason: 'invalid', message: '子项文本不能为空。' };
+        }
+        items.push({
+          ...(typeof it.id === 'string' && it.id !== '' ? { id: it.id } : {}),
+          text: it.text,
+          ...(it.done === undefined ? {} : { done: it.done === true }),
+        });
+      }
+      await actions.setChecklist(intent.taskId, items);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'toggle-checklist-item': {
+      const task = actions.findTask(intent.taskId);
+      if (task === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      const list = task.checklist ?? [];
+      const matches = list.filter((it) => it.text === intent.itemText);
+      if (matches.length === 0) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `没有文本为「${intent.itemText}」的结构化子项；先用 set_task_checklist 建立，或用 get_task 查看现有子项。`,
+        };
+      }
+      if (matches.length > 1) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `有 ${String(matches.length)} 个子项都叫「${intent.itemText}」，请先改名区分。`,
+        };
+      }
+      await actions.toggleChecklistItem(intent.taskId, matches[0]!.id, intent.done);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // 批次 4：任务标记（重要 / 置顶）/ 批量移动 / 习惯打卡撤销
     // ─────────────────────────────────────────────────────────────────────
 

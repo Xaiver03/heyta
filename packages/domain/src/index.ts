@@ -10,6 +10,7 @@
  */
 
 export * from './entities.js';
+export * from './checklist.js';
 export * from './date.js';
 export * from './task-order.js';
 export * from './quadrant.js';

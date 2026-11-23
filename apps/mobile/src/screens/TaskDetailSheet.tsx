@@ -133,6 +133,7 @@ import { quickDatePicks } from '../lib/quick-dates';
 import { Icon } from '../ui/icons';
 import { Button, Chip, ChoiceRows, HStack, IconButton, Stack, Text, TextField } from '../ui/kit';
 import { AiToolboxScreen } from '../ai/AiToolboxScreen';
+import { ChecklistSection } from '../ui/ChecklistSection';
 import { persistToolboxHealth, useToolboxDeps } from '../ai/toolbox-shared';
 
 /**
@@ -1419,6 +1420,8 @@ export function TaskDetailSheet({
           </Text>
         </Pressable>
       )}
+
+      <ChecklistSection task={task} actions={actions} />
 
       {/* ── AI 工具（拆解 / 排序 / 估时）────────────────────────────────
           入口常驻、面板按需展开：AI 是"处理这条任务"的工作动作，读成内容层的一格，

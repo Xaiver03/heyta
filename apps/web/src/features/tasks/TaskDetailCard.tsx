@@ -88,6 +88,7 @@ import { useSyncStore } from '../sync/store.js';
 import { ShareCommentsSection } from '../share/ShareCommentsSection.js';
 import { text } from '../../lib/text.js';
 import { NoteField } from './NoteEditor.js';
+import { ChecklistEditor } from './ChecklistEditor.js';
 import { renderNoteMarkdown } from './markdown-render.js';
 import { RepeatField } from './TaskRepeat.js';
 import { SubtaskField } from './SubtaskPicker.js';
@@ -821,6 +822,23 @@ export function TaskDetailCard({
         task={task}
         onSetNote={(note) => {
           void store.setNote(task.id, note);
+        }}
+      />
+
+      <ChecklistEditor
+        key={`checklist-${task.id}`}
+        task={task}
+        onSetChecklist={(items) => {
+          void store.setChecklist(task.id, items);
+        }}
+        onToggle={(itemId, done) => {
+          void store.toggleChecklistItem(task.id, itemId, done);
+        }}
+        onAdd={(text) => {
+          void store.addChecklistItem(task.id, text);
+        }}
+        onRemove={(itemId) => {
+          void store.removeChecklistItem(task.id, itemId);
         }}
       />
 

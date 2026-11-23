@@ -350,6 +350,13 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return t('web.ai.tools.intentPostponeTaskToday', { id: intent.taskId });
     case 'record-habit-checkins':
       return t('web.ai.tools.intentRecordHabitCheckins', { count: String(intent.habitIds.length) });
+    // 批7：任务结构化子项
+    case 'set-task-checklist':
+      return t('web.ai.tools.intentSetTaskChecklist', { id: intent.taskId, count: String(intent.items.length) });
+    case 'toggle-checklist-item':
+      return intent.done
+        ? t('web.ai.tools.intentCheckChecklistItem', { id: intent.taskId, item: intent.itemText })
+        : t('web.ai.tools.intentUncheckChecklistItem', { id: intent.taskId, item: intent.itemText });
   }
 }
 

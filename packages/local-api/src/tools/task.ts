@@ -47,7 +47,7 @@ const TOOLS: readonly LocalApiTool[] = [
     name: 'get_task',
     // 🔴 含正文（`LocalApiItem.body`）—— 这是目录里**出境面最大**的一个工具，
     // 披露必须把它单独说出来：多步循环会把这份正文回送给模型。
-    egressFields: ['task.id', 'task.title', 'task.dueDate', 'task.priority', 'task.completed', 'task.readable', 'task.body'],
+    egressFields: ['task.id', 'task.title', 'task.dueDate', 'task.priority', 'task.completed', 'task.readable', 'task.body', 'task.checklist'],
     description: '读取单个任务的完整内容（含备注正文）。',
     kind: 'read',
     risk: 'read',
@@ -300,6 +300,26 @@ const TOOLS: readonly LocalApiTool[] = [
     egressFields: [],
     description:
       '把一条任务「推迟到今天」：把已过去的截止日顺延到今天同一时刻。已完成、或已今天到期的任务不做改变。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_task_checklist',
+    egressFields: [],
+    description:
+      '整组设置任务的结构化子项清单（checklist）。items 是 [{text, done?}]；覆盖式（不在列表里的旧子项会被删除）。' +
+      '空数组 = 清空。全勾时正常任务的父任务会自动完成。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'toggle_checklist_item',
+    egressFields: [],
+    description:
+      '勾选 / 取消任务里某一条结构化子项（按文本匹配）。子项必须是结构化清单(先用 set_task_checklist 建立)；' +
+      '文本需唯一，重名会拒绝。全勾时正常任务的父任务会自动完成。',
     kind: 'write',
     risk: 'write',
     defaultEnabled: false,
@@ -633,6 +653,38 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       taskId: { type: 'string', description: '要推迟到今天的任务 id。' },
     },
     required: ['taskId'],
+    additionalProperties: false,
+  },
+  set_task_checklist: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要设置子项的任务 id。' },
+      items: {
+        type: 'array',
+        description: '子项列表（覆盖式；空数组=清空）。每项 {text, done?, id?}。',
+        items: {
+          type: 'object',
+          properties: {
+            text: { type: 'string', description: '子项文本，非空。' },
+            done: { type: 'boolean', description: '是否已勾选，默认 false。' },
+            id: { type: 'string', description: '可选：保留已有子项 id；省略则新建。' },
+          },
+          required: ['text'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['taskId', 'items'],
+    additionalProperties: false,
+  },
+  toggle_checklist_item: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '任务 id。' },
+      itemText: { type: 'string', description: '要勾选/取消的子项文本（需唯一）。' },
+      done: { type: 'boolean', description: 'true=勾选，false=取消。' },
+    },
+    required: ['taskId', 'itemText', 'done'],
     additionalProperties: false,
   },
 };
@@ -1271,6 +1323,73 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
       return {
         ok: true,
         intent: { action: 'postpone-task-to-today', taskId: a['taskId'].trim() },
+      };
+    }
+
+    case 'set_task_checklist': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'items');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_checklist 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_task_checklist 需要 taskId。' };
+      }
+      if (!Array.isArray(a['items'])) {
+        return { ok: false, message: 'set_task_checklist 的 items 必须是数组。' };
+      }
+      const items: { id?: string; text: string; done?: boolean }[] = [];
+      for (const raw of a['items']) {
+        if (typeof raw !== 'object' || raw === null) {
+          return { ok: false, message: 'set_task_checklist 的每个子项必须是对象。' };
+        }
+        const it = raw as Record<string, unknown>;
+        const extra = Object.keys(it).filter((k) => k !== 'id' && k !== 'text' && k !== 'done');
+        if (extra.length > 0) {
+          return { ok: false, message: `set_task_checklist 子项不支持这些字段：${extra.join('、')}。` };
+        }
+        if (typeof it['text'] !== 'string' || it['text'].trim() === '') {
+          return { ok: false, message: 'set_task_checklist 每个子项的 text 必须是非空字符串。' };
+        }
+        if (it['done'] !== undefined && typeof it['done'] !== 'boolean') {
+          return { ok: false, message: 'set_task_checklist 子项的 done 必须是布尔值。' };
+        }
+        if (it['id'] !== undefined && (typeof it['id'] !== 'string' || it['id'] === '')) {
+          return { ok: false, message: 'set_task_checklist 子项的 id 必须是非空字符串。' };
+        }
+        items.push({
+          ...(typeof it['id'] === 'string' ? { id: it['id'] } : {}),
+          text: it['text'],
+          ...(typeof it['done'] === 'boolean' ? { done: it['done'] } : {}),
+        });
+      }
+      return {
+        ok: true,
+        intent: { action: 'set-task-checklist', taskId: a['taskId'].trim(), items },
+      };
+    }
+
+    case 'toggle_checklist_item': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'itemText' && key !== 'done');
+      if (unknown.length > 0) {
+        return { ok: false, message: `toggle_checklist_item 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'toggle_checklist_item 需要 taskId。' };
+      }
+      if (typeof a['itemText'] !== 'string' || a['itemText'].trim() === '') {
+        return { ok: false, message: 'toggle_checklist_item 需要 itemText（非空）。' };
+      }
+      if (typeof a['done'] !== 'boolean') {
+        return { ok: false, message: 'toggle_checklist_item 的 done 必须是布尔值。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'toggle-checklist-item',
+          taskId: a['taskId'].trim(),
+          itemText: a['itemText'],
+          done: a['done'],
+        },
       };
     }
 

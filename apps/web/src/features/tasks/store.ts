@@ -169,6 +169,13 @@ interface TaskState {
   postponeToToday: (id: string) => Promise<void>;
   /** 写备注。AI 拆解出的清单就是经这里落到 `Task.note` 的。 */
   setNote: (id: string, note: string | undefined) => Promise<void>;
+  /** 整组覆盖任务结构化子项。 */
+  setChecklist: (id: string, items: readonly { id?: string; text: string; done?: boolean }[]) => Promise<void>;
+  addChecklistItem: (id: string, text: string) => Promise<void>;
+  updateChecklistItemText: (id: string, itemId: string, text: string) => Promise<void>;
+  removeChecklistItem: (id: string, itemId: string) => Promise<void>;
+  toggleChecklistItem: (id: string, itemId: string, done: boolean) => Promise<void>;
+  reorderChecklistItem: (id: string, itemId: string, toIndex: number) => Promise<void>;
   moveToProject: (id: string, projectId: string | undefined) => Promise<void>;
   bulkMoveToProject: (ids: readonly string[], projectId: string | undefined) => Promise<void>;
   /**
@@ -477,6 +484,24 @@ export const useTaskStore = create<TaskState>((set) => ({
   },
   setNote: async (id, note) => {
     await taskActions.setNote(id, note);
+  },
+  setChecklist: async (id, items) => {
+    await taskActions.setChecklist(id, items);
+  },
+  addChecklistItem: async (id, text) => {
+    await taskActions.addChecklistItem(id, text);
+  },
+  updateChecklistItemText: async (id, itemId, text) => {
+    await taskActions.updateChecklistItemText(id, itemId, text);
+  },
+  removeChecklistItem: async (id, itemId) => {
+    await taskActions.removeChecklistItem(id, itemId);
+  },
+  toggleChecklistItem: async (id, itemId, done) => {
+    await taskActions.toggleChecklistItem(id, itemId, done);
+  },
+  reorderChecklistItem: async (id, itemId, toIndex) => {
+    await taskActions.reorderChecklistItem(id, itemId, toIndex);
   },
 
   moveToProject: async (id, projectId) => {

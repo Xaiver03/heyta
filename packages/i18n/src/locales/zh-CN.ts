@@ -2492,6 +2492,16 @@ export const zhCN = {
   'web.ai.tools.intentSetTaskQuadrant': '把任务 {id} 放进四象限第 {quadrant} 格',
   'web.ai.tools.intentPostponeTaskToday': '把任务 {id} 推迟到今天',
   'web.ai.tools.intentRecordHabitCheckins': '批量打卡 {count} 个习惯',
+  'web.ai.tools.intentSetTaskChecklist': '把任务 {id} 的清单设为 {count} 项',
+  'web.ai.tools.intentCheckChecklistItem': '勾选任务 {id} 的子项「{item}」',
+  'web.ai.tools.intentUncheckChecklistItem': '取消勾选任务 {id} 的子项「{item}」',
+  'web.tasks.checklist.title': '子项',
+  'web.tasks.checklist.add': '添加',
+  'web.tasks.checklist.remove': '删除',
+  'web.tasks.checklist.addPlaceholder': '添加子项…',
+  'web.tasks.checklist.removeAria': '删除子项「{text}」',
+  'web.tasks.checklist.convertLegacy': '把备注里的清单转为可勾选子项',
+  'web.tasks.checklist.progressLabel': '{done}/{total} 已完成',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',

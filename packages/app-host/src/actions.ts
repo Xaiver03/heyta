@@ -53,6 +53,12 @@ import {
   today,
   validateNewChildPosition,
   validateParentChange,
+  appendChecklistItem,
+  updateChecklistItemText as checklistSetText,
+  removeChecklistItem as checklistRemoveItem,
+  toggleChecklistItem as checklistToggleItem,
+  reorderChecklistItem as checklistReorderItem,
+  shouldAutoCompleteFromChecklist,
   type QuadrantTaskPatch,
   type Task,
 } from '@heyta/domain';
@@ -303,6 +309,21 @@ export interface TaskActions {
    * 有穷举测试（4 象限 × 3 种截止时间状态）。这里只负责**原子地写下去**。
    */
   setQuadrantDrop(entityId: string, plan: QuadrantTaskPatch): Promise<void>;
+  /** 整组覆盖子项清单（id 缺失则生成）。一意图一 op。 */
+  setChecklist(
+    entityId: string,
+    items: readonly { id?: string; text: string; done?: boolean }[],
+  ): Promise<void>;
+  /** 追加一条子项，返回新条目 id。 */
+  addChecklistItem(entityId: string, text: string): Promise<string>;
+  /** 改某一条的文本。 */
+  updateChecklistItemText(entityId: string, itemId: string, text: string): Promise<void>;
+  /** 删某一条。 */
+  removeChecklistItem(entityId: string, itemId: string): Promise<void>;
+  /** 勾选/取消；子项全勾时按 `shouldAutoCompleteFromChecklist` **原子地**把父任务置完成。 */
+  toggleChecklistItem(entityId: string, itemId: string, done: boolean): Promise<void>;
+  /** 把某一条移到 `toIndex`（越界夹取）。 */
+  reorderChecklistItem(entityId: string, itemId: string, toIndex: number): Promise<void>;
   /** 传 `undefined` 表示清除截止时间（会写成 `null`，见文件头第 2 条）。 */
   setDueDate(entityId: string, dueDate: number | undefined, dueDateLocal?: string): Promise<void>;
   /**
@@ -1244,6 +1265,56 @@ export function createTaskActions(
       // 都在领域层（`entities.ts` 的 `trashedIn`）—— 便签、清单、习惯
       // 共用同一个答案，不许这里再写一份。
       return trashedIn(Object.values(ctx.getState().tasks));
+    },
+
+    async setChecklist(entityId, items) {
+      if (taskOf(entityId) === undefined) throw new Error(`找不到任务「${entityId}」`);
+      const normalized = items.map((it) => ({
+        id: typeof it.id === 'string' && it.id !== '' ? it.id : makeId(),
+        text: it.text,
+        done: it.done === true,
+      }));
+      await update(entityId, { checklist: normalized });
+    },
+
+    async addChecklistItem(entityId, text) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      const id = makeId();
+      await update(entityId, {
+        checklist: appendChecklistItem(task.checklist ?? [], { id, text, done: false }),
+      });
+      return id;
+    },
+
+    async updateChecklistItemText(entityId, itemId, text) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      await update(entityId, { checklist: checklistSetText(task.checklist ?? [], itemId, text) });
+    },
+
+    async removeChecklistItem(entityId, itemId) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      await update(entityId, { checklist: checklistRemoveItem(task.checklist ?? [], itemId) });
+    },
+
+    async toggleChecklistItem(entityId, itemId, done) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      const next = checklistToggleItem(task.checklist ?? [], itemId, done);
+      // 全勾 → 同一条 UPD 里原子地把父任务置完成（仅非重复 / 未放弃 / 未完成）。
+      if (done && shouldAutoCompleteFromChecklist(task, next)) {
+        await update(entityId, { checklist: next, completedAt: now() });
+      } else {
+        await update(entityId, { checklist: next });
+      }
+    },
+
+    async reorderChecklistItem(entityId, itemId, toIndex) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      await update(entityId, { checklist: checklistReorderItem(task.checklist ?? [], itemId, toIndex) });
     },
 
     findTask: taskOf,

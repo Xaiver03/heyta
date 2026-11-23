@@ -104,4 +104,8 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
 
   // 批6-3：批量打卡
   record_habit_checkins: { habitIds: ['h1'] },
+
+  // 批7：任务结构化子项
+  set_task_checklist: { taskId: 't1', items: [{ text: 'x' }] },
+  toggle_checklist_item: { taskId: 't1', itemText: 'x', done: true },
 };
