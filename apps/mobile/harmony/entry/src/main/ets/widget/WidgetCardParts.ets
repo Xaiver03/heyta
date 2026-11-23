@@ -7,6 +7,10 @@
  * - 「能显示什么」只有一处（`WidgetStore.readSnapshot`）；
  * - 占位/过期的**长相**只有一处（本文件）；
  * - 四张卡片的 `.ets` 只负责把字段摆到屏幕上，**不做任何判断**。
+ *
+ * 颜色全部走 `$r('app.color.heyta_…')`：亮/暗两套值来自
+ * `resources/{base,dark}/element/color.json`，由 `scripts/check-harmony-tokens-sync.mjs`
+ * 保证与设计系统 `HeytaTokens.ets` 同源。系统切深色时**自动**换成暗色值。
  */
 import { WidgetStrings } from './WidgetStrings';
 
@@ -29,10 +33,10 @@ export struct WidgetTaskRow {
     Row({ space: 6 }) {
       Text(this.isDone ? '✓' : '○')
         .fontSize(13)
-        .fontColor(this.isDone ? '#94a3b8' : (this.accent.length > 0 ? this.accent : '#64748b'))
+        .fontColor(this.isDone ? $r('app.color.heyta_disabled_fg') : (this.accent.length > 0 ? this.accent : $r('app.color.heyta_foreground_subtle')))
       Text(this.title)
         .fontSize(this.compact ? 13 : 14)
-        .fontColor(this.isDone ? '#94a3b8' : '#0f172a')
+        .fontColor(this.isDone ? $r('app.color.heyta_disabled_fg') : $r('app.color.heyta_foreground'))
         .decoration({ type: this.isDone ? TextDecorationType.LineThrough : TextDecorationType.None })
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -62,10 +66,10 @@ export struct WidgetHeader {
 
   build() {
     Row() {
-      Text(this.title).fontSize(13).fontWeight(FontWeight.Medium).fontColor('#334155')
+      Text(this.title).fontSize(13).fontWeight(FontWeight.Medium).fontColor($r('app.color.heyta_foreground_muted'))
       Blank()
       if (this.badge.length > 0) {
-        Text(this.badge).fontSize(12).fontColor('#64748b')
+        Text(this.badge).fontSize(12).fontColor($r('app.color.heyta_foreground_subtle'))
       }
     }
     .width('100%')
@@ -90,7 +94,7 @@ export struct WidgetMessage {
     Column() {
       Text(this.text)
         .fontSize(13)
-        .fontColor('#64748b')
+        .fontColor($r('app.color.heyta_foreground_subtle'))
         .textAlign(TextAlign.Center)
         .maxLines(3)
         .textOverflow({ overflow: TextOverflow.Ellipsis })

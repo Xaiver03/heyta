@@ -15,6 +15,8 @@
  * ⚠️ **它不生成密钥之外任何密码学的东西**，也不自己算"今天" ——
  * `dayStr` 与 `validUntil` 由这一层给，但**四端的拼法必须一致**，
  * 所以它们直接来自 `WidgetParse` 里的常量，不在这里再写一遍字面量。
+ *
+ * 颜色走 `$r('app.color.heyta_…')` 资源（与卡片同一套，深色自动切换）。
  */
 import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -83,13 +85,13 @@ struct Index {
         .fontWeight(FontWeight.Bold)
       Text(this.status)
         .fontSize(14)
-        .fontColor('#6b7280')
+        .fontColor($r('app.color.heyta_foreground_subtle'))
 
       Divider()
 
       Text('⚠️ 下面写入的是「示例数据」（四端共用的那份黄金夹具），不是你的真实任务。')
         .fontSize(13)
-        .fontColor('#b45309')
+        .fontColor($r('app.color.heyta_warning_strong'))
 
       Button(this.busy ? '写入中…' : '把示例任务写进卡片')
         .enabled(!this.busy)
@@ -129,11 +131,11 @@ struct Index {
 
       Text(`卡片点出来的意图：${this.pending} 条待处理`)
         .fontSize(13)
-        .fontColor('#6b7280')
+        .fontColor($r('app.color.heyta_foreground_subtle'))
 
       Button(this.busy ? '处理中…' : '取走这些意图（drain）')
         .enabled(!this.busy && this.pending > 0)
-        .backgroundColor('#0f172a')
+        .backgroundColor($r('app.color.heyta_primary'))
         .onClick(async () => {
           this.busy = true;
           try {
@@ -154,11 +156,11 @@ struct Index {
       if (this.drained.length > 0) {
         Text(`上次取走：${this.drained}`)
           .fontSize(13)
-          .fontColor('#0f172a')
+          .fontColor($r('app.color.heyta_foreground'))
       }
 
       Button('清掉卡片数据与设备密钥')
-        .backgroundColor('#ef4444')
+        .backgroundColor($r('app.color.heyta_danger'))
         .onClick(async () => {
           await clearSnapshot(this.context);
           this.status = '已清空快照。密钥清除在真机上由登录态驱动（此处只清快照）。';

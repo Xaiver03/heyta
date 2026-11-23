@@ -10,6 +10,10 @@
  *
  * 于是：`TodayCard.ets` 等四个文件各自**只有 10 行**（声明 `kind` 并转交这里），
  * 与 Android 侧四个 provider 类只是四个 `ComponentName` 是同一个形状。
+ *
+ * 颜色全部走 `$r('app.color.heyta_…')`：亮/暗两套值来自
+ * `resources/{base,dark}/element/color.json`，与设计系统 `HeytaTokens.ets` 同源
+ * （`scripts/check-harmony-tokens-sync.mjs` 守）。深色模式由系统自动切换。
  */
 import { WidgetStrings } from './WidgetStrings';
 import { WidgetHeader, WidgetTaskRow, WidgetMessage, messageFor } from './WidgetCardParts';
@@ -101,7 +105,7 @@ export struct WidgetCardRoot {
     .width('100%')
     .height('100%')
     .padding(12)
-    .backgroundColor('#ffffff')
+    .backgroundColor($r('app.color.heyta_surface'))
   }
 
   @Builder
@@ -131,14 +135,14 @@ export struct WidgetCardRoot {
     Column({ space: 4 }) {
       ForEach(parseJsonArray<QuadrantSlotView>(this.quadrantSlots), (slot: QuadrantSlotView) => {
         Row({ space: 6 }) {
-          Text(slot.label).fontSize(12).fontColor('#64748b').width(80).maxLines(1)
+          Text(slot.label).fontSize(12).fontColor($r('app.color.heyta_foreground_subtle')).width(80).maxLines(1)
           Text(slot.firstTitle.length > 0 ? slot.firstTitle : '—')
             .fontSize(13)
-            .fontColor(slot.firstTitle.length > 0 ? '#0f172a' : '#cbd5e1')
+            .fontColor(slot.firstTitle.length > 0 ? $r('app.color.heyta_foreground') : $r('app.color.heyta_border_strong'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
-          Text(`${slot.count}`).fontSize(12).fontColor('#94a3b8')
+          Text(`${slot.count}`).fontSize(12).fontColor($r('app.color.heyta_disabled_fg'))
         }
         .width('100%')
         .padding({ top: 3, bottom: 3 })
@@ -161,13 +165,13 @@ export struct WidgetCardRoot {
           Row({ space: 6 }) {
             Text(habit.doneToday ? '✓' : '○')
               .fontSize(13)
-              .fontColor(habit.doneToday ? '#16a34a' : '#94a3b8')
-            Text(habit.title).fontSize(14).fontColor('#0f172a').maxLines(1).layoutWeight(1)
+              .fontColor(habit.doneToday ? $r('app.color.heyta_success') : $r('app.color.heyta_disabled_fg'))
+            Text(habit.title).fontSize(14).fontColor($r('app.color.heyta_foreground')).maxLines(1).layoutWeight(1)
             // `streak` 为 0 时模型层**省略**了它 —— 这里不显示"连续 0 天"。
             if ((habit.streak ?? 0) > 0) {
               Text(WidgetStrings.streak(habit.streak ?? 0, this.isZh))
                 .fontSize(12)
-                .fontColor('#94a3b8')
+                .fontColor($r('app.color.heyta_disabled_fg'))
             }
           }
           .width('100%')
@@ -190,7 +194,7 @@ export struct WidgetCardRoot {
           : WidgetStrings.title('focus', this.isZh))
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
-          .fontColor('#0f172a')
+          .fontColor($r('app.color.heyta_foreground'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         // 🔴 **这里没有倒计时，是刻意的。**
@@ -200,7 +204,7 @@ export struct WidgetCardRoot {
         //    「宁可少显示一个数字，也不显示一个错的数字。」（U8）
         Text(WidgetStrings.target(this.focus()?.targetMinutes ?? 0, this.isZh))
           .fontSize(13)
-          .fontColor('#64748b')
+          .fontColor($r('app.color.heyta_foreground_subtle'))
       }
       .alignItems(HorizontalAlign.Start)
       .width('100%')

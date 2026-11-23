@@ -3,6 +3,66 @@
     {
       "name": "page_text_font_size",
       "value": "50fp"
+    },
+    {
+      "name": "heyta_font_size_xs",
+      "value": "12fp"
+    },
+    {
+      "name": "heyta_font_size_md",
+      "value": "13fp"
+    },
+    {
+      "name": "heyta_font_size_sm",
+      "value": "14fp"
+    },
+    {
+      "name": "heyta_font_size_base",
+      "value": "16fp"
+    },
+    {
+      "name": "heyta_font_size_lg",
+      "value": "18fp"
+    },
+    {
+      "name": "heyta_font_size_xl",
+      "value": "20fp"
+    },
+    {
+      "name": "heyta_font_size_2xl",
+      "value": "24fp"
+    },
+    {
+      "name": "heyta_space_1",
+      "value": "4vp"
+    },
+    {
+      "name": "heyta_space_2",
+      "value": "8vp"
+    },
+    {
+      "name": "heyta_space_3",
+      "value": "12vp"
+    },
+    {
+      "name": "heyta_space_4",
+      "value": "16vp"
+    },
+    {
+      "name": "heyta_space_6",
+      "value": "24vp"
+    },
+    {
+      "name": "heyta_radius_md",
+      "value": "8vp"
+    },
+    {
+      "name": "heyta_radius_lg",
+      "value": "12vp"
+    },
+    {
+      "name": "heyta_radius_xl",
+      "value": "16vp"
     }
   ]
 }
