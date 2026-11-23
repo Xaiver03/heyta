@@ -2298,6 +2298,9 @@ export const en = {
   'web.ai.tools.intentSetTaskQuadrant': 'Move task {id} to quadrant {quadrant}',
   'web.ai.tools.intentPostponeTaskToday': 'Postpone task {id} to today',
   'web.ai.tools.intentRecordHabitCheckins': 'Check in {count} habit(s)',
+  'web.ai.tools.intentSetTaskChecklist': 'Set checklist of task {id} to {count} item(s)',
+  'web.ai.tools.intentCheckChecklistItem': 'Check item "{item}" of task {id}',
+  'web.ai.tools.intentUncheckChecklistItem': 'Uncheck item "{item}" of task {id}',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',

@@ -306,7 +306,10 @@ const PREPOSITIONS = new Set(['by', 'in', 'on', 'at', 'for', 'to', 'from', 'with
  * 这条校验是防"逃生门变成第二份手写清单"的，工具删了而这条还留着，
  * 于是后来人以为它还在）。
  */
-export const TOOL_ENTITY_OVERRIDES = Object.freeze({});
+export const TOOL_ENTITY_OVERRIDES = Object.freeze({
+  // 名字里没有实体名词（checklist / item 都不在名词表），启发式判不出；它操作的是任务子项 → TASK。
+  toggle_checklist_item: 'TASK',
+});
 
 /**
  * 由工具名判定它作用在哪个实体：**剥前导动词 → 切掉介词之后的限定语 → 复合名优先、

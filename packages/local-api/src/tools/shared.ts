@@ -132,7 +132,7 @@ export const MAX_TOOLS_PER_ENTITY = 7;
  */
 export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
-  TASK: 29,
+  TASK: 32,
   PROJECT: 10,
   NOTE: 10,
   // 批6：HABIT 加颜色/图标/目标/频率 4 个写工具 → 5+4=9，放到 12 留余量。
@@ -788,7 +788,12 @@ export type LocalApiWriteIntent =
   | { action: 'postpone-task-to-today'; taskId: string }
   // 批6-3：批量打卡（HABIT_LOG）
   /** 给多个习惯一次性打卡（HABIT_LOG）。`habitIds` 空 ⇒ invalid；任一不存在 ⇒ 整批 not-found 不写。 */
-  | { action: 'record-habit-checkins'; habitIds: readonly string[]; date?: string; value?: number };
+  | { action: 'record-habit-checkins'; habitIds: readonly string[]; date?: string; value?: number }
+  // 批7：任务结构化子项（checklist）
+  /** 整组覆盖任务子项（TASK）。items 空数组 = 清空；id 缺失则新建。 */
+  | { action: 'set-task-checklist'; taskId: string; items: readonly { id?: string; text: string; done?: boolean }[] }
+  /** 勾选/取消任务某条子项（TASK）。按文本唯一匹配；全勾时正常任务自动完成。 */
+  | { action: 'toggle-checklist-item'; taskId: string; itemText: string; done: boolean };
 
 /**
  * 一条写入落地的实体类型。

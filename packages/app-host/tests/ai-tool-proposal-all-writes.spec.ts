@@ -614,6 +614,26 @@ const CASES: readonly Case[] = [
     args: async () => ({ habitIds: [await seed({ action: 'create-habit', name: '批量打卡习惯' })] }),
     effect: () => Object.values(engine.getState().habitLogs).filter((h) => h.deletedAt === undefined).length,
   },
+
+  // ── 批7：任务结构化子项 ──
+  {
+    tool: 'set_task_checklist',
+    intentAction: 'set-task-checklist',
+    label: '设子项清单',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '清单' }), items: [{ text: '甲' }, { text: '乙', done: true }] }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => (t.checklist?.length ?? 0) > 0).length,
+  },
+  {
+    tool: 'toggle_checklist_item',
+    intentAction: 'toggle-checklist-item',
+    label: '勾子项',
+    args: async () => {
+      const taskId = await seed({ action: 'create-task', title: '勾' });
+      await makeHost().submit({ action: 'set-task-checklist', taskId, items: [{ text: '甲' }] });
+      return { taskId, itemText: '甲', done: true };
+    },
+    effect: () => Object.values(engine.getState().tasks).filter((t) => (t.checklist ?? []).some((x) => x.done)).length,
+  },
 ];
 
 beforeEach(async () => {

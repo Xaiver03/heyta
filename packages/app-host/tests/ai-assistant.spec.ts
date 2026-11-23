@@ -641,6 +641,8 @@ describe('授权只有一份：整份目录，判断仍在 `@heyta/local-api`', 
         'set_task_quadrant',
         'postpone_task_to_today',
         'record_habit_checkins',
+        'set_task_checklist',
+        'toggle_checklist_item',
       ].sort(),
     );
     // 🔴 判据与这条用例的标题对齐：名单**由目录推导**，不是手抄一份工具名。

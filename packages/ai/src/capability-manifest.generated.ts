@@ -192,6 +192,8 @@ export const AI_CAPABILITY_MANIFEST =
         'set_task_repeat_after_completion',
         'set_task_quadrant',
         'postpone_task_to_today',
+        'set_task_checklist',
+        'toggle_checklist_item',
       ],
     },
     {
@@ -1011,6 +1013,49 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'set_task_checklist',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '整组设置任务的结构化子项清单（checklist）。items 是 [{text, done?}]；覆盖式（不在列表里的旧子项会被删除）。空数组 = 清空。全勾时正常任务的父任务会自动完成。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'items',
+          'type': 'array',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'toggle_checklist_item',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '勾选 / 取消任务里某一条结构化子项（按文本匹配）。子项必须是结构化清单(先用 set_task_checklist 建立)；文本需唯一，重名会拒绝。全勾时正常任务的父任务会自动完成。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'itemText',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'done',
+          'type': 'boolean',
+          'required': true,
+        },
+      ],
+    },
+    {
       'name': 'create_project',
       'kind': 'write',
       'entityType': 'PROJECT',
@@ -1750,7 +1795,7 @@ export const AI_CAPABILITY_TEXT = [
   '不可以说"产品不支持"。',
   '',
   '一、有 AI 工具的实体（9 个）',
-  '- TASK —— 读和写都有（读 3 / 写 26）',
+  '- TASK —— 读和写都有（读 3 / 写 28）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
   '  · [读] get_task_estimate_context（taskId*:string）',
@@ -1780,6 +1825,8 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] set_task_repeat_after_completion（taskId*:string, on*:boolean）',
   '  · [写] set_task_quadrant（taskId*:string, quadrant*:number）',
   '  · [写] postpone_task_to_today（taskId*:string）',
+  '  · [写] set_task_checklist（taskId*:string, items*:array）',
+  '  · [写] toggle_checklist_item（taskId*:string, itemText*:string, done*:boolean）',
   '- PROJECT —— 读和写都有（读 1 / 写 7）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',
