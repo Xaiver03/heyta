@@ -190,6 +190,8 @@ export const AI_CAPABILITY_MANIFEST =
         'move_tasks',
         'skip_task_occurrence',
         'set_task_repeat_after_completion',
+        'set_task_quadrant',
+        'postpone_task_to_today',
       ],
     },
     {
@@ -975,6 +977,39 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'set_task_quadrant',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把任务一键放进四象限的某一格（1=重要且紧急 2=重要不紧急 3=紧急不重要 4=不重要不紧急）。内部翻译成对「重要」与「截止日」两个字段的写入（象限是派生视图，不是独立字段）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'quadrant',
+          'type': 'number',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'postpone_task_to_today',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把一条任务「推迟到今天」：把已过去的截止日顺延到今天同一时刻。已完成、或已今天到期的任务不做改变。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
       'name': 'create_project',
       'kind': 'write',
       'entityType': 'PROJECT',
@@ -1690,7 +1725,7 @@ export const AI_CAPABILITY_TEXT = [
   '不可以说"产品不支持"。',
   '',
   '一、有 AI 工具的实体（9 个）',
-  '- TASK —— 读和写都有（读 3 / 写 24）',
+  '- TASK —— 读和写都有（读 3 / 写 26）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
   '  · [读] get_task_estimate_context（taskId*:string）',
@@ -1718,6 +1753,8 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] move_tasks（taskIds*:array, projectId:string）',
   '  · [写] skip_task_occurrence（taskId*:string）',
   '  · [写] set_task_repeat_after_completion（taskId*:string, on*:boolean）',
+  '  · [写] set_task_quadrant（taskId*:string, quadrant*:number）',
+  '  · [写] postpone_task_to_today（taskId*:string）',
   '- PROJECT —— 读和写都有（读 1 / 写 7）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',

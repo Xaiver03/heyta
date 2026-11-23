@@ -343,6 +343,11 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return intent.frequency === undefined
         ? t('web.ai.tools.intentClearHabitFrequency', { id: intent.habitId })
         : t('web.ai.tools.intentSetHabitFrequency', { id: intent.habitId });
+    // 批6-2：四象限 / 推迟今天
+    case 'set-task-quadrant':
+      return t('web.ai.tools.intentSetTaskQuadrant', { id: intent.taskId, quadrant: String(intent.quadrant) });
+    case 'postpone-task-to-today':
+      return t('web.ai.tools.intentPostponeTaskToday', { id: intent.taskId });
   }
 }
 

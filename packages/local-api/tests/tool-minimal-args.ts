@@ -97,4 +97,8 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   set_habit_icon: { habitId: 'h1', icon: 'book' },
   set_habit_goal: { habitId: 'h1', target: 3 },
   set_habit_frequency: { habitId: 'h1', frequency: { type: 'daily' } },
+
+  // 批6-2：四象限 / 推迟今天
+  set_task_quadrant: { taskId: 't1', quadrant: 1 },
+  postpone_task_to_today: { taskId: 't1' },
 };

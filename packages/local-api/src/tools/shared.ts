@@ -132,7 +132,7 @@ export const MAX_TOOLS_PER_ENTITY = 7;
  */
 export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
-  TASK: 27,
+  TASK: 29,
   PROJECT: 10,
   NOTE: 10,
   // 批6：HABIT 加颜色/图标/目标/频率 4 个写工具 → 5+4=9，放到 12 留余量。
@@ -780,7 +780,12 @@ export type LocalApiWriteIntent =
    * 改习惯频率（HABIT）。`frequency` 是结构对象（daily / weekly / interval / spaced），
    * 省略 = 退回每天。结构合法性由动作层 `normalizeHabitFrequency` 校验（非法抛 → invalid）。
    */
-  | { action: 'set-habit-frequency'; habitId: string; frequency?: Readonly<Record<string, unknown>> };
+  | { action: 'set-habit-frequency'; habitId: string; frequency?: Readonly<Record<string, unknown>> }
+  // 批6-2：任务四象限整格 / 推迟今天
+  /** 把任务放进四象限某一格（TASK）。`quadrant` 1–4；内部翻译成 important + dueDate 写入（派生视图，非独立字段）。 */
+  | { action: 'set-task-quadrant'; taskId: string; quadrant: number }
+  /** 把任务推迟到今天（TASK）。改 dueDate 到今天同一时刻；已完成/已今天的不变。 */
+  | { action: 'postpone-task-to-today'; taskId: string };
 
 /**
  * 一条写入落地的实体类型。

@@ -56,6 +56,8 @@ import {
   MAX_REMINDERS_PER_TASK,
   NOTE_MAX_CONTENT_LENGTH,
   Priority,
+  planQuadrantDrop,
+  Quadrant,
   aliveReminders,
   eventDaysFromToday,
   eventKindOf,
@@ -1872,6 +1874,33 @@ async function submitIntent(
         };
       }
       return { ok: true, taskId: intent.habitId, entityId: intent.habitId, entityType: 'HABIT' };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 批6-2：任务四象限整格 / 推迟今天
+    // ─────────────────────────────────────────────────────────────────────
+
+    case 'set-task-quadrant': {
+      const task = actions.findTask(intent.taskId);
+      if (task === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      if (!Number.isInteger(intent.quadrant) || intent.quadrant < 1 || intent.quadrant > 4) {
+        return { ok: false, reason: 'invalid', message: '象限必须是 1–4 的整数。' };
+      }
+      const target = intent.quadrant as Quadrant;
+      const plan = planQuadrantDrop(task, target, { now: now() });
+      await actions.setQuadrantDrop(intent.taskId, plan);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'postpone-task-to-today': {
+      const task = actions.findTask(intent.taskId);
+      if (task === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      await actions.postponeToToday(intent.taskId);
+      return { ok: true, taskId: intent.taskId };
     }
 
     // ─────────────────────────────────────────────────────────────────────

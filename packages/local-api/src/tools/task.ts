@@ -285,6 +285,25 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'set_task_quadrant',
+    egressFields: [],
+    description:
+      '把任务一键放进四象限的某一格（1=重要且紧急 2=重要不紧急 3=紧急不重要 4=不重要不紧急）。' +
+      '内部翻译成对「重要」与「截止日」两个字段的写入（象限是派生视图，不是独立字段）。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'postpone_task_to_today',
+    egressFields: [],
+    description:
+      '把一条任务「推迟到今天」：把已过去的截止日顺延到今天同一时刻。已完成、或已今天到期的任务不做改变。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -594,6 +613,26 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       on: { type: 'boolean', description: 'true=完成后顺延（按完成日）；false=按截止日顺延。' },
     },
     required: ['taskId', 'on'],
+    additionalProperties: false,
+  },
+  set_task_quadrant: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要放进象限的任务 id。' },
+      quadrant: {
+        type: 'number',
+        description: '象限编号：1 重要且紧急 / 2 重要不紧急 / 3 紧急不重要 / 4 不重要不紧急。',
+      },
+    },
+    required: ['taskId', 'quadrant'],
+    additionalProperties: false,
+  },
+  postpone_task_to_today: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要推迟到今天的任务 id。' },
+    },
+    required: ['taskId'],
     additionalProperties: false,
   },
 };
@@ -1200,6 +1239,38 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
       return {
         ok: true,
         intent: { action: 'set-task-repeat-after-completion', taskId: a['taskId'].trim(), on: a['on'] },
+      };
+    }
+
+    case 'set_task_quadrant': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'quadrant');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_quadrant 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_task_quadrant 需要 taskId。' };
+      }
+      const q = a['quadrant'];
+      if (typeof q !== 'number' || !Number.isInteger(q) || q < 1 || q > 4) {
+        return { ok: false, message: 'set_task_quadrant 的 quadrant 必须是 1–4 的整数。' };
+      }
+      return {
+        ok: true,
+        intent: { action: 'set-task-quadrant', taskId: a['taskId'].trim(), quadrant: q },
+      };
+    }
+
+    case 'postpone_task_to_today': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId');
+      if (unknown.length > 0) {
+        return { ok: false, message: `postpone_task_to_today 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'postpone_task_to_today 需要 taskId。' };
+      }
+      return {
+        ok: true,
+        intent: { action: 'postpone-task-to-today', taskId: a['taskId'].trim() },
       };
     }
 

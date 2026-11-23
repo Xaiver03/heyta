@@ -2489,6 +2489,8 @@ export const zhCN = {
   'web.ai.tools.intentSetHabitGoal': '修改习惯 {id} 的目标',
   'web.ai.tools.intentSetHabitFrequency': '修改习惯 {id} 的重复频率',
   'web.ai.tools.intentClearHabitFrequency': '把习惯 {id} 的频率改回每天',
+  'web.ai.tools.intentSetTaskQuadrant': '把任务 {id} 放进四象限第 {quadrant} 格',
+  'web.ai.tools.intentPostponeTaskToday': '把任务 {id} 推迟到今天',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',

@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTaskActions } from '../src/actions.js';
 import { createLocalApiHost } from '../src/local-api-host.js';
+import { startOfDay } from '@heyta/domain';
 
 const CLOCK = 1_700_000_000_000;
 
@@ -143,5 +144,40 @@ describe('set-habit-color / icon / goal / frequency', () => {
       const r = await makeHost().submit(intent);
       expect(r).toMatchObject({ ok: false, reason: 'not-found' });
     }
+  });
+});
+
+describe('set-task-quadrant', () => {
+  it('放进第 1 格 → important=true 且 dueDate 被设（紧急）', async () => {
+    const taskId = await seed({ action: 'create-task', title: '象限任务' });
+    const r = await makeHost().submit({ action: 'set-task-quadrant', taskId, quadrant: 1 });
+    expect(r.ok).toBe(true);
+    const t = engine.getState().tasks[taskId];
+    expect(t?.important).toBe(true);
+    expect(t?.dueDate).toBeDefined();
+  });
+  it('任务不存在 ⇒ not-found', async () => {
+    const r = await makeHost().submit({ action: 'set-task-quadrant', taskId: 'ghost', quadrant: 1 });
+    expect(r).toMatchObject({ ok: false, reason: 'not-found' });
+  });
+  it('quadrant 越界 ⇒ invalid', async () => {
+    const taskId = await seed({ action: 'create-task', title: 'Q' });
+    const r = await makeHost().submit({ action: 'set-task-quadrant', taskId, quadrant: 9 });
+    expect(r).toMatchObject({ ok: false, reason: 'invalid' });
+  });
+});
+
+describe('postpone-task-to-today', () => {
+  it('过去截止 → 顺延到今天（dueDate 前移到今天起点之后）', async () => {
+    const taskId = await seed({ action: 'create-task', title: '拖延', dueDate: '2020-01-01' });
+    const before = engine.getState().tasks[taskId]?.dueDate;
+    expect(before).toBeLessThan(startOfDay(CLOCK));
+    const r = await makeHost().submit({ action: 'postpone-task-to-today', taskId });
+    expect(r.ok).toBe(true);
+    expect(engine.getState().tasks[taskId]?.dueDate).toBeGreaterThanOrEqual(startOfDay(CLOCK));
+  });
+  it('任务不存在 ⇒ not-found', async () => {
+    const r = await makeHost().submit({ action: 'postpone-task-to-today', taskId: 'ghost' });
+    expect(r).toMatchObject({ ok: false, reason: 'not-found' });
   });
 });
