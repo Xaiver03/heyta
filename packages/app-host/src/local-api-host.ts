@@ -169,6 +169,8 @@ export interface LocalApiHostOptions {
    * （新建附件需要它，但本工具批次刻意不做"新建附件"，见 `tools/attachment.ts` 文件头。）
    */
   attachmentBlobs?: AttachmentBlobPort;
+
+  /**
    * 评论动作（COMMENT）—— **share 感知的独立工具通道**（P4 / ADR-0062）。
    *
    * 🔴 **可选，而且默认就是"没有"**：评论只存在于**共享清单**，写入只经

@@ -367,6 +367,11 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return t('web.ai.tools.intentAddTaskComment', { body: intent.body });
     case 'delete-task-comment':
       return t('web.ai.tools.intentDeleteTaskComment', { id: intent.commentId });
+    // 批8：附件（ATTACHMENT）
+    case 'rename-attachment':
+      return t('web.ai.tools.intentRenameAttachment', { id: intent.attachmentId, fileName: intent.fileName });
+    case 'remove-attachment':
+      return t('web.ai.tools.intentRemoveAttachment', { id: intent.attachmentId });
   }
 }
 

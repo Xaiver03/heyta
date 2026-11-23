@@ -2476,6 +2476,8 @@ export const zhCN = {
   'web.ai.tools.intentSetTaskPinned': '置顶任务 {id}',
   'web.ai.tools.intentUnsetTaskPinned': '取消置顶任务 {id}',
   'web.ai.tools.intentSetTaskAssignee': '把任务 {id} 指派给成员 {assignee}',
+  'web.ai.tools.intentRenameAttachment': '把附件 {id} 改名为「{fileName}」',
+  'web.ai.tools.intentRemoveAttachment': '移除附件 {id}',
   'web.ai.tools.intentClearTaskAssignee': '清除任务 {id} 的指派',
   'web.ai.tools.intentMoveTasks': '把 {count} 个任务移到清单 {project}',
   'web.ai.tools.intentMoveTasksOut': '把 {count} 个任务移出清单',

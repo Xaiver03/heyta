@@ -103,9 +103,9 @@ export const AI_CAPABILITY_MANIFEST =
     'source': 'ADR-0045 §2.6 纪律二',
   },
   'coverage': {
-    'covered': 9,
+    'covered': 11,
     'denominator': 11,
-    'ratio': '9/11',
+    'ratio': '11/11',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -150,10 +150,7 @@ export const AI_CAPABILITY_MANIFEST =
       'reason': '助手对话的一行记录（ADR-0045 D-4 (ii)）：它是**对话本身**，不是用户可操作的业务实体，而且正文里含 provider 的回复 —— 给 AI 读写它的工具等于让模型改写自己的上下文',
     },
   ],
-  'entityTypesWithoutTools': [
-    'COMMENT',
-    'ATTACHMENT',
-  ],
+  'entityTypesWithoutTools': [] as const,
   'entities': [
     {
       'entityType': 'TASK',
@@ -194,6 +191,7 @@ export const AI_CAPABILITY_MANIFEST =
         'postpone_task_to_today',
         'set_task_checklist',
         'toggle_checklist_item',
+        'set_task_assignee',
       ],
     },
     {
@@ -350,17 +348,27 @@ export const AI_CAPABILITY_MANIFEST =
       'entityType': 'COMMENT',
       'materialized': true,
       'countsTowardCoverage': true,
-      'coverage': 'none',
-      'readToolNames': [] as const,
-      'writeToolNames': [] as const,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_task_comments',
+      ],
+      'writeToolNames': [
+        'add_task_comment',
+        'delete_task_comment',
+      ],
     },
     {
       'entityType': 'ATTACHMENT',
       'materialized': true,
       'countsTowardCoverage': true,
-      'coverage': 'none',
-      'readToolNames': [] as const,
-      'writeToolNames': [] as const,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_attachments',
+      ],
+      'writeToolNames': [
+        'rename_attachment',
+        'remove_attachment',
+      ],
     },
   ],
   'tools': [
@@ -555,6 +563,39 @@ export const AI_CAPABILITY_MANIFEST =
           'name': 'eventId',
           'type': 'string',
           'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'list_attachments',
+      'kind': 'read',
+      'entityType': 'ATTACHMENT',
+      'description': '列出某条任务下的附件（文件名、类型、大小）。只返回元数据，不返回文件内容 —— 这条通道上没有取回字节的能力。软删除的附件不出现。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'list_task_comments',
+      'kind': 'read',
+      'entityType': 'COMMENT',
+      'description': '列出一条任务下的评论线程（标识、所属任务、作者、正文、创建时间），按创建时间从早到晚。评论只存在于**共享清单**里 —— 个人清单、或本宿主没有共享会话时，会明确告诉你读不到，而不是给一个空列表。默认最多 50 条，筛完才截断。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'limit',
+          'type': 'number',
+          'required': false,
         },
       ],
     },
@@ -1052,6 +1093,25 @@ export const AI_CAPABILITY_MANIFEST =
           'name': 'done',
           'type': 'boolean',
           'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'set_task_assignee',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '设置或清除任务的指派人。参数：taskId（任务 id）、assigneeUserId（指派成员的 id；省略或空串表示清除指派）。仅在共享清单内有意义；个人任务缺席即未指派。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'assigneeUserId',
+          'type': 'string',
+          'required': false,
         },
       ],
     },
@@ -1764,6 +1824,72 @@ export const AI_CAPABILITY_MANIFEST =
         },
       ],
     },
+    {
+      'name': 'rename_attachment',
+      'kind': 'write',
+      'entityType': 'ATTACHMENT',
+      'description': '改一个附件的展示文件名（不重新上传、不改文件内容）。空文件名会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'attachmentId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'fileName',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'remove_attachment',
+      'kind': 'write',
+      'entityType': 'ATTACHMENT',
+      'description': '把一个附件从任务上移除：软删除到回收站，并尽力释放服务端占用的字节。⚠️ 字节一旦释放就无法恢复，所以这一步实际不可逆——确认前请看清是哪一个附件。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'attachmentId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'add_task_comment',
+      'kind': 'write',
+      'entityType': 'COMMENT',
+      'description': '给一条**共享清单**里的任务加一条评论。评论只存在于共享清单：个人清单、或本宿主没有共享会话时，会被拒绝且不写任何东西。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'body',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'delete_task_comment',
+      'kind': 'write',
+      'entityType': 'COMMENT',
+      'description': '删除一条评论（软删除，可撤销）。评论只存在于共享清单；本宿主没有共享会话时会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'commentId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
   ],
   'protocolTypesWithoutModel': [
     'TASK_REPEAT_CFG',
@@ -1788,14 +1914,14 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 11 个，其中 9 个**读和写都有**工具（9/11）。',
+  '覆盖口径：用户可操作的已物化实体 11 个，其中 11 个**读和写都有**工具（11/11）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
-  '一、有 AI 工具的实体（9 个）',
-  '- TASK —— 读和写都有（读 3 / 写 28）',
+  '一、有 AI 工具的实体（11 个）',
+  '- TASK —— 读和写都有（读 3 / 写 29）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
   '  · [读] get_task_estimate_context（taskId*:string）',
@@ -1827,6 +1953,7 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] postpone_task_to_today（taskId*:string）',
   '  · [写] set_task_checklist（taskId*:string, items*:array）',
   '  · [写] toggle_checklist_item（taskId*:string, itemText*:string, done*:boolean）',
+  '  · [写] set_task_assignee（taskId*:string, assigneeUserId:string）',
   '- PROJECT —— 读和写都有（读 1 / 写 7）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',
@@ -1881,10 +2008,17 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] delete_event（eventId*:string）',
   '  · [写] restore_event（eventId*:string）',
   '  · [写] archive_event（eventId*:string）',
+  '- COMMENT —— 读和写都有（读 1 / 写 2）',
+  '  · [读] list_task_comments（taskId*:string, limit:number）',
+  '  · [写] add_task_comment（taskId*:string, body*:string）',
+  '  · [写] delete_task_comment（commentId*:string）',
+  '- ATTACHMENT —— 读和写都有（读 1 / 写 2）',
+  '  · [读] list_attachments（taskId*:string）',
+  '  · [写] rename_attachment（attachmentId*:string, fileName*:string）',
+  '  · [写] remove_attachment（attachmentId*:string）',
   '',
-  '二、产品里有、但我没有任何工具的实体（2 个）—— 实体存在，只是我没配工具',
-  '- COMMENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
-  '- ATTACHMENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
+  '二、产品里有、但我没有任何工具的实体（0 个）—— 实体存在，只是我没配工具',
+  '- （无）',
   '',
   '三、不计入上面分母的已物化实体（设计如此，不是遗漏）',
   '- AI_FEEDBACK：AI 建议处置的落库载体（用户不直接创建它）',

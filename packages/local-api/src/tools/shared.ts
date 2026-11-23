@@ -132,11 +132,16 @@ export const MAX_TOOLS_PER_ENTITY = 7;
  */
 export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
-  TASK: 32,
+  // 批8：TASK 加 set_task_assignee（指派）→ 33。
+  TASK: 33,
   PROJECT: 10,
   NOTE: 10,
   // 批6：HABIT 加颜色/图标/目标/频率 4 个写工具 → 5+4=9，放到 12 留余量。
   HABIT: 12,
+  // 批8：附件（list/rename/remove 三工具）。
+  ATTACHMENT: 3,
+  // 批8：评论（list/add/delete 三工具）。
+  COMMENT: 3,
 } as const satisfies Readonly<Partial<Record<string, number>>>;
 
 export type ToolBudgetEntityType = keyof typeof MAX_TOOLS_PER_ENTITY_BY_TYPE;

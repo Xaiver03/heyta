@@ -111,4 +111,14 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
 
   // 批8：任务指派（ADR-0062 决策 7 / ADR-0088）
   set_task_assignee: { taskId: 't1' },
+
+  // 批8：附件（ATTACHMENT）
+  list_attachments: { taskId: 't1' },
+  rename_attachment: { attachmentId: 'att-1', fileName: 'a.txt' },
+  remove_attachment: { attachmentId: 'att-1' },
+
+  // 批8：评论（COMMENT，share 感知通道）
+  list_task_comments: { taskId: 't1' },
+  add_task_comment: { taskId: 't1', body: '好的' },
+  delete_task_comment: { commentId: 'c1' },
 };

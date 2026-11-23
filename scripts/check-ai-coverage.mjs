@@ -958,14 +958,7 @@ const ENTITY_COVERAGE_DEBT = new Map([
    * 归口：这条线的尾巴那一刀 —— 原生"下载进本机文件"+ `GET` + 界面"点开"，
    * 三件齐了才谈得上给助手一组能用的读写工具。
    */
-  ['ATTACHMENT', {
-    gap: 'AI-COV-9',
-    reason:
-      '任务附件的字节只能由用户手里的文件产生，助手没有这个来源；而这条通道刻意拒绝' +
-      '"先建实体后补字节"的顺序（那会留下点不开的附件），所以写工具在这一刀里做不出正确的形状。' +
-      '读工具单独存在既不满足"读写都有"的口径，读回来的也只是文件名与大小 —— ' +
-      '这条通道上还没有 GET。台账：docs/plans/task-detail-ticktick-parity.md §5.9。',
-  }],
+
 ]);
 
 const GEN = join(ROOT, 'scripts/gen-ai-capability-manifest.mjs');

@@ -124,6 +124,9 @@ describe('反向那一半：指派落地后——写点与档位同时在场，�
     'packages/local-api/src/tools/shared.ts',
     'packages/local-api/src/tools/task.ts',
     'packages/ui/src/sync/notification-model.ts',
+    // 生成产物（`gen-ai-capability-manifest`），内含 `set_task_assignee` schema 的字段字面量 ——
+    // 不是写点，但哨兵按"含该字段的行"扫会命中它。固定路径，显式登记。
+    'packages/ai/src/capability-manifest.generated.ts',
   ];
 
   it('现量：指派已落地——写点存在、档位在、且写点文件集合恰为预期那几处', () => {

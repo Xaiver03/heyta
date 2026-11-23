@@ -2282,6 +2282,8 @@ export const en = {
   'web.ai.tools.intentSetTaskPinned': 'Pin task {id}',
   'web.ai.tools.intentUnsetTaskPinned': 'Unpin task {id}',
   'web.ai.tools.intentSetTaskAssignee': 'Assign task {id} to member {assignee}',
+  'web.ai.tools.intentRenameAttachment': 'Rename attachment {id} to "{fileName}"',
+  'web.ai.tools.intentRemoveAttachment': 'Remove attachment {id}',
   'web.ai.tools.intentClearTaskAssignee': 'Clear the assignee of task {id}',
   'web.ai.tools.intentMoveTasks': 'Move {count} task(s) to list {project}',
   'web.ai.tools.intentMoveTasksOut': 'Remove {count} task(s) from their list',

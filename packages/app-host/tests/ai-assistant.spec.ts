@@ -643,6 +643,14 @@ describe('授权只有一份：整份目录，判断仍在 `@heyta/local-api`', 
         'record_habit_checkins',
         'set_task_checklist',
         'toggle_checklist_item',
+        // 2026-11-23 批8：指派 + 附件(list/rename/remove) + 评论(list/add/delete)
+        'set_task_assignee',
+        'list_attachments',
+        'rename_attachment',
+        'remove_attachment',
+        'list_task_comments',
+        'add_task_comment',
+        'delete_task_comment',
       ].sort(),
     );
     // 🔴 判据与这条用例的标题对齐：名单**由目录推导**，不是手抄一份工具名。
