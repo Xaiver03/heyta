@@ -67,9 +67,9 @@
 
 ## 4. 诚实边界（务必知悉）
 
-- **本机未装 DevEco Studio / `es2abc`**，故 `.ets` 的 ArkTS **编译未在本机执行**；`pnpm check:arkts*` 会"响亮跳过"（exit 0，并打印未验证什么）。**真编译验证需在装有 DevEco 的机器上跑**：`pnpm verify:harmony-toolchain`（出 HAP），或在 `apps/mobile/harmony` 下 `ohpm install && hvigorw assembleHap`。
+- **本机未装 DevEco Studio / `es2abc`**，故 `.ets` 的 ArkTS **编译未在本机执行**；`pnpm check:arkts*` 会"响亮跳过"（exit 0，并打印未验证什么）。**真编译验证需在装有 DevEco 的机器上跑**：`pnpm verify:harmony-toolchain`（出 HAP），或在 `apps/mobile/harmony` 下 `ohpm install && hvigorw assembleHap`。（2026-11-23 全盘探测：`mdfind` 无 `es2abc`、PATH 无 `hvigorw`/`ohpm`、`npm view es2abc` 与 `@ohos/hvigor` 均 404、`~/Library/Huawei` 为空——本机确实无任何 ArkTS 工具链。）
 - 本轮对 `.ets` 只做**等价字面量替换**（hex → `$r`），未改结构，风险已通过静态校验降到最低，但不替代编译器。
-- `pnpm check:design` 当前有一处**既有红**：`apps/mobile/src/ui/custom-icons.tsx` 的 `#334155`（HEAD 已提交内容，见 `24778e5b`）及工作区中他人未提交的 web/ui/mobile 改动——**不在本任务改动的文件类型/目录内**（`check-hardcoded.mjs` 只扫 `apps/web/src`、`apps/mobile/src`、`packages/ui/src`，不扫 `apps/mobile/harmony` 与 `packages/design-system`），与本任务无关。
+- `pnpm check:design` 当前有**既有红**，经 `pnpm check:design` 实测红点全部落在 `apps/mobile/src/ai/AssistantScreen.tsx`、`apps/mobile/src/ai/MarkdownMessage.tsx`、`apps/mobile/src/ui/custom-icons.tsx`（这三者 `git status` 干净、与 HEAD 一致，属 HEAD 既有债）；本任务三个提交**从未触及 `apps/mobile/src`**，且 `check:hardcoded.mjs` 只扫 `apps/{web,mobile,ui,landing,desktop}/src`、**不扫** `apps/mobile/harmony` 与 `packages/design-system`，故与本任务无关。
 - 对比度保证继承 `packages/design-system/tests`：资源与 token 同源，即继承其 WCAG 实测。
 - `@heyta/design-system` 测试当前有 **2 处既有失败**（`tests/typography.spec.ts` 的样式数量棘轮 `16 > 15`）；`packages/design-system` 源码树与 HEAD 一致、本任务未改动它，故与本任务无关。
 
