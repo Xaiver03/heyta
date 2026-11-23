@@ -78,7 +78,7 @@
 1. **共享 UI 接入鸿蒙壳（RNOH）**：让 `packages/ui` 那套任务界面跑在 `entry` 里（`oh-package.json5` 加依赖、`Index.ets` 挂 RN 根）。这是"鸿蒙端成为可用应用"的前提，工程量最大。
 2. **服务卡片进阶**：万能卡片换肤、数据可视化（数形融合）、轻拟物层次——按官方卡片规范细化。
 3. **深色模式全量**：本轮已具备资源基础；再把卡片内的次要块、分隔、图表色补齐到 dark。
-4. **沉浸式窗口**：`module.json5` 增加 window / statusBar 配置（安全区、状态栏配色）。
+4. **沉浸式窗口**（API 签名已在 OpenHarmony 官方文档核实，待 DevEco 编译 + 真机验证后落地）：在 `EntryAbility.onWindowStageCreate` 里取 `windowStage.getMainWindowSync()`，调用 `setWindowLayoutFullScreen(true)` 与 `setWindowSystemBarProperties({ statusBarColor:'#00000000', navigationBarColor:'#00000000', statusBarContentColor, navigationBarContentColor })`（均为 API 9+：`setWindowLayoutFullScreen(boolean):Promise<void>`、`setWindowSystemBarProperties(SystemBarProperties):Promise<void>`）。落地前需在真机确认两点：**状态栏/导航栏图标随明暗主题取反**（亮底深图标、暗底浅图标），以及**页面安全区不被状态栏遮挡**（全屏后需配合安全区处理）。
 5. **动效曲线 ArkTS 映射**：把 `ease.standard` 在 ArkTS 层映射到鸿蒙标准 `cubic-bezier(0.4,0,0.2,1.0)`（不影响其它端）。
 6. **字体显式声明**：需要时可对关键文本 `fontFamily('HarmonyOS Sans')` 显式化。
 
