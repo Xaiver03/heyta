@@ -797,6 +797,7 @@ export const en = {
   'web.tasks.group.tomorrow': 'Tomorrow, {weekday}',
   'web.tasks.group.date': '{month}/{day}, {weekday}',
   'web.tasks.group.undated': 'No due date',
+  'web.tasks.section.ungrouped': 'Ungrouped',
   'web.tasks.group.postpone': 'Postpone',
   'web.tasks.group.postponeAria': 'Postpone these {count} overdue tasks to today',
   // B package R4 (1): accessible name for the drag handle in manual-order mode.

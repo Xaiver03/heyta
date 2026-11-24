@@ -907,6 +907,7 @@ export const zhCN = {
   'web.tasks.group.tomorrow': '明天, 周{weekday}',
   'web.tasks.group.date': '{month}月{day}日, 周{weekday}',
   'web.tasks.group.undated': '无截止时间',
+  'web.tasks.section.ungrouped': '未分组',
   'web.tasks.group.postpone': '顺延',
   'web.tasks.group.postponeAria': '把这 {count} 条逾期任务顺延到今天',
   // B 包 R4①：手动拖拽档位下，行尾那枚拖拽手柄的无障碍名。

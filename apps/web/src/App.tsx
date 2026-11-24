@@ -45,6 +45,7 @@ import {
   emptyFeedbackPreferenceSet,
   emptyPreferenceSet,
   groupTasksByDate,
+  groupTasksBySection,
   inferFeedbackPreferences,
   inferPreferences,
   presentPreferenceIds,
@@ -569,6 +570,19 @@ export function App(): React.JSX.Element {
         : groupTasksByDate(visible, { now: store.now }),
     [visible, store.now, store.filter.kind],
   );
+
+  /**
+   * 清单内分组（C，ADR-0091）：看某清单且该清单有分组时，按 `SECTION` 分节（取代日期分组）。
+   * 归属 / 排序 / 悬空归未分组全在 `@heyta/domain` 的 `groupTasksBySection`，这里只消费。
+   */
+  const sectionsRaw = useTaskStore((s) => s.entities.sections);
+  const sectionGroups = useMemo(() => {
+    if (store.filter.kind !== 'project') return undefined;
+    const pid = store.filter.projectId;
+    const secs = Object.values(sectionsRaw);
+    if (!secs.some((sec) => sec.projectId === pid && sec.deletedAt === undefined)) return undefined;
+    return groupTasksBySection(visible, secs, pid);
+  }, [visible, sectionsRaw, store.filter]);
 
   /**
    * 分组头上的「顺延」：把逾期组里的每一条推到今天。
@@ -3532,7 +3546,30 @@ export function App(): React.JSX.Element {
                 }
               />
             </div>
-          ) : dateGroups === undefined ? (
+          ) : sectionGroups !== undefined ? (
+              <div data-testid="task-list">
+                {sectionGroups.map((group) => {
+                  const skey = group.sectionId ?? 'ungrouped';
+                  return (
+                    <section key={skey} data-testid={`task-section-${skey}`} style={{ marginBlockEnd: cssVar('space.2') }}>
+                      <HeytaUiProvider>
+                        <TaskGroupHead
+                          title={group.section === undefined ? t('web.tasks.section.ungrouped') : group.section.name}
+                          count={group.tasks.length}
+                          collapse={{ collapsed: collapsedGroups.has(skey), onToggle: () => { toggleGroupCollapsed(skey); } }}
+                          testID={`task-section-${skey}-head`}
+                        />
+                        {!collapsedGroups.has(skey) && (
+                          <ManualSortWrapper manual={manualSortActive} tasks={group.tasks} onSetOrder={(id, order) => useTaskStore.getState().setOrder(id, order)}>
+                            <TaskList tasks={group.tasks} sort={effectiveTaskSort} {...(manualRowWrapper === undefined ? {} : { renderRowWrapper: manualRowWrapper })} onOpenTask={openTask} activeTaskId={selectedTaskId} selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined} selectionMode={bulkSelecting} onToggleTask={(taskId) => { if (bulkSelecting) { toggleBulkSelection(taskId); } else { void store.toggleComplete(taskId); } }} labels={taskRowLabels} renderMeta={renderTaskMeta} renderTrailing={renderTaskTrailing} {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })} testID={`task-list-section-${skey}`} />
+                          </ManualSortWrapper>
+                        )}
+                      </HeytaUiProvider>
+                    </section>
+                  );
+                })}
+              </div>
+            ) : dateGroups === undefined ? (
             <HeytaUiProvider>
               <ManualSortWrapper
                 manual={manualSortActive}
