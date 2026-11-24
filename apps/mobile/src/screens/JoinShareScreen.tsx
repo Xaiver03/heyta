@@ -2,13 +2,16 @@
  * 「加入共享清单」—— 收邀请那台设备的移动端旅程（M6-3a）
  * =============================================================================
  *
- * web 基准是 `JoinSharedListDialog.tsx`，旅程一格不少：
- *   贴口令或链接 → **同意面**（PIPL 23：共享是双向披露，收方同样要先看清楚
- *   "内容对成员可见"这件事——web 的入群框没有这一格，是移动端按任务书补的，
- *   用同一个 `ShareConsentModal`、同一批 `common.share.consent.*` 词条）→
+ * web 基准是 `JoinSharedListDialog.tsx`，旅程一格不少（2026-11-24 起两侧同形）：
+ *   贴口令或链接、起本机清单名 → 点「加入」 → **同意面**（PIPL 23：共享是双向披露，
+ *   收方同样要先看清楚"内容对成员可见"这件事；用同一个 `ShareConsentModal`、同一批
+ *   `common.share.consent.*` 词条，正文带上刚填的清单名，回答"我在加哪一份"）→
  *   接受邀请（带身份公钥 + 签名公钥，ADR-0069 裁决二）→ 存身份、**先登记
  *   roster target 再等信封** → owner 补发的信封到 ⇒ 解 listKey 落盘 →
  *   `bindProjectShare` 建/绑本地清单行 → 收口。
+ *
+ * 🔴 同意闸必须在 `acceptInvitation` **之前**（fail-closed），但不再拦在开场：旧形状把同意面
+ *   当第一屏，那时表单还没出场、共享清单在服务端又没有名字 ⇒ 用户对着"加入清单"发懵。
  *
  * 🔴 「等 owner」这一格是**信号驱动**的（ADR-0070）：等待态一确立就
  * `registerShareRosterTarget(shareId, finalize)`，`share_roster_changed` 到 ⇒ 重试。
@@ -61,11 +64,10 @@ export default function JoinShareScreen({
 }): React.JSX.Element {
   const { t } = useI18n();
 
-  const [phase, setPhase] = useState<JoinPhase>(() => {
-    // 同意面 fail-closed：没确认过 ⇒ 先弹（`shouldShowConsent`，判断在 `@heyta/ui`）。
-    const decision = shouldShowConsent(loadMobileShareConsent());
-    return decision.show ? { kind: 'consent' } : { kind: 'input' };
-  });
+  // 🔴 2026-11-24：开场先给**凭证表单**，同意闸挪到「加入」那一下（与 web 同形）。
+  //    旧形状把同意面当第一屏，此时表单还没出场、共享清单在服务端又没有名字 ⇒
+  //    那一屏说不出"加的是哪个清单"。fail-closed 不变：同意仍在任何 accept 之前。
+  const [phase, setPhase] = useState<JoinPhase>({ kind: 'input' });
   const [consentStore, setConsentStore] = useState<ShareConsentStore>(() => loadMobileShareConsent());
   const [consentSaveFailed, setConsentSaveFailed] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -155,18 +157,14 @@ export default function JoinShareScreen({
     return unregister;
   }, [phase, finalize]);
 
-  const submit = useCallback(async () => {
+  /** 真正接受邀请（同意闸已在 `submit` 里过掉）。 */
+  const doAccept = useCallback(async (tokenFromInput: string): Promise<void> => {
     const admin = await prepareMobileShareAdmin();
     if (admin === undefined) {
       setNeedsUnlock(true);
       return;
     }
     adminRef.current = admin;
-    const tokenFromInput = parseShareJoinLink(inputValue) ?? inputValue.trim();
-    if (tokenFromInput === '') {
-      setPhase({ kind: 'error', message: t('web.share.join.invalidToken') });
-      return;
-    }
     setPhase({ kind: 'accepting' });
     try {
       const identitySeed = generateShareIdentitySeed();
@@ -202,12 +200,34 @@ export default function JoinShareScreen({
         });
       }
     }
-  }, [inputValue, t]);
+  }, [t]);
+
+  /**
+   * 点「加入」这一下：**先校凭证** → **再过 PIPL 同意闸** → 最后才 `acceptInvitation`。
+   * 🔴 fail-closed：本机没确认过 / 没勾「不再提示」⇒ 停在同意面，答应了才真正入群。
+   * 闸仍在任何一次 accept 之前，只是不再拦在开场（旧形状让用户对着没有上下文的同意面发懵）。
+   */
+  const submit = useCallback(() => {
+    const tokenFromInput = parseShareJoinLink(inputValue) ?? inputValue.trim();
+    if (tokenFromInput === '') {
+      setPhase({ kind: 'error', message: t('web.share.join.invalidToken') });
+      return;
+    }
+    if (shouldShowConsent(consentStore).show) {
+      setPhase({ kind: 'consent' });
+      return;
+    }
+    void doAccept(tokenFromInput);
+  }, [consentStore, doAccept, inputValue, t]);
 
   const consentLabels = useMemo(
     () => ({
       title: t('common.share.consent.title.join'),
-      body: t('common.share.consent.body.join'),
+      // 走到同意面时用户已经填过「清单名称（仅本机显示）」⇒ 把那个名字写进正文，回答
+      // "我在加哪一份"。没填就退回不带名字的那句（提交时会给默认名）。
+      body: listName.trim() === ''
+        ? t('common.share.consent.body.join')
+        : t('common.share.consent.body.join.named', { name: listName.trim() }),
       detailsLabel: t('common.share.consent.details.label'),
       details: [
         t('common.share.consent.scope.content'),
@@ -219,7 +239,7 @@ export default function JoinShareScreen({
       accept: t('common.share.consent.accept.join'),
       cancel: t('common.share.consent.cancel'),
     }),
-    [t],
+    [t, listName],
   );
 
   const needsUnlockLine = needsUnlock ? (
@@ -239,8 +259,9 @@ export default function JoinShareScreen({
             if (!saveMobileShareConsent(next)) setConsentSaveFailed(true);
             else setConsentSaveFailed(false);
           }}
-          onProceed={() => setPhase({ kind: 'input' })}
-          onCancel={onBack}
+          onProceed={() => { void doAccept(parseShareJoinLink(inputValue) ?? inputValue.trim()); }}
+          // 取消这次同意 = 不发生邀请、不留记录，回到填好的表单（token / 名字不丢）。
+          onCancel={() => setPhase({ kind: 'input' })}
         />
       );
     }

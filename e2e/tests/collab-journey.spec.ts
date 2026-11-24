@@ -301,10 +301,19 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
 
   await bobPage.getByTestId('share-join-entry').click();
   await expect(bobPage.getByTestId('share-join-dialog')).toBeVisible();
+  // 2026-11-24 起：开场先给**凭证表单**（旅程先可见），同意闸挪到点「加入」那一下。
+  await expect(bobPage.getByTestId('share-join-form')).toBeVisible();
+  await bobPage.getByTestId('share-join-token').fill(inviteToken);
+  await bobPage.getByTestId('share-join-name').fill('家庭装修（合伙）');
+  await evidenceShot(bobPage, '05-bob-join-dialog.png');
+  await bobPage.getByTestId('share-join-submit').click();
   // 🔴 入群这一侧的同意闸（ADR-0071 裁决三；与 owner 那一屏、与手机端同一道）。
-  // 这台浏览器从没确认过 ⇒ fail-closed 必须先弹。少这一步，通知路径读的那份本地同意
-  // 就永远是空的 ⇒ 入群的人一条共享活动都收不到（2026-10-25 实测：只有 ShareFeature 写它）。
+  // 这台浏览器从没确认过 ⇒ fail-closed：点「加入」后停到同意面（仍在 acceptInvitation 之前）。
+  // 少这一步，通知路径读的那份本地同意就永远是空的 ⇒ 入群的人一条共享活动都收不到
+  // （2026-10-25 实测：只有 ShareFeature 写它）。同意面此刻**带着刚填的清单名**，
+  // 回答"我在加哪一份"——旧形状那一屏说不出是哪个清单。
   await expect(bobPage.getByTestId('share-consent-modal')).toBeVisible();
+  await expect(bobPage.getByTestId('share-consent-modal')).toContainText('家庭装修（合伙）');
   await evidenceShot(bobPage, '05a-bob-join-consent.png');
   await bobPage.getByTestId('share-consent-dont-ask').click();
   await bobPage.getByTestId('share-consent-accept').click();
@@ -313,10 +322,6 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
     JSON.parse(await bobPage.evaluate(() => localStorage.getItem('heyta.share-consent.v1') ?? '{}')),
     '入群同意没有落盘 ⇒ 这台设备的通知闸门会一直关着',
   ).toEqual({ consentAcceptedAt: expect.any(Number), dontAskAgain: true });
-  await evidenceShot(bobPage, '05-bob-join-dialog.png');
-  await bobPage.getByTestId('share-join-token').fill(inviteToken);
-  await bobPage.getByTestId('share-join-name').fill('家庭装修（合伙）');
-  await bobPage.getByTestId('share-join-submit').click();
 
   // 等待 owner 自动下发信封（owner 面板 3s 轮询 → autoSeal）→ bob 解钥 → 清单落侧栏。
   await expect(bobPage.getByTestId('share-join-done')).toBeVisible({ timeout: 60_000 });

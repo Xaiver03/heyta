@@ -141,22 +141,22 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
   const authTransport = useSyncStore((s) => s.authTransport);
   const accountId = useSyncStore((s) => s.accountId);
 
-  // 同意闸 fail-closed：本机没确认过 ⇒ 先弹（判断在 `@heyta/ui`，与移动端入群屏同一份）。
-  const [phase, setPhase] = useState<JoinPhase>(() =>
-    shouldShowConsent(loadShareConsent(localStorage)).show ? { kind: 'consent' } : { kind: 'input' },
-  );
+  // 🔴 2026-11-24：开场先给**凭证表单**，同意闸挪到点「加入」那一下（见 `submit`）。
+  //    旧形状把同意面当第一屏：用户还没贴凭证、表单还没出场，就先撞上一句"加入后你能看到…"，
+  //    而共享清单在服务端根本没有名字 ⇒ 那一屏说不出"是哪个清单"，读起来莫名其妙。
+  //    fail-closed 不变：同意仍然发生在任何 `acceptInvitation` 之前（`submit` 里卡这一下）。
+  const [phase, setPhase] = useState<JoinPhase>({ kind: 'input' });
   const [consentStore, setConsentStore] = useState<ShareConsentStore>(() => loadShareConsent(localStorage));
   const [inputValue, setInputValue] = useState(initialToken ?? '');
   const [listName, setListName] = useState('');
   const [needsUnlock, setNeedsUnlock] = useState(false);
   /* 🔴 令牌 / 清单名住在组件本地 state，关掉即丢 ⇒ 三条通道先问一句。
-     判脏**分相位**：只有 `input` / `error` 这两格场上有可丢的东西；
-     `consent`（还没开始打）与 `done`（已经加进去了）都拦一道确认，
-     就是把成本摊给每一次正常操作。 */
+     判脏**分相位**：`input` / `error` / `consent` 这三格场上有可丢的东西（凭证与名字）；
+     `done`（已经加进去了）不拦，把成本摊给每一次正常操作就是噪音。 */
   const { requestDismiss, guard } = useDirtyDismissGuard({
     overlay: 'modal-dirty-form',
     isDirty: () =>
-      (phase.kind === 'input' || phase.kind === 'error')
+      (phase.kind === 'input' || phase.kind === 'error' || phase.kind === 'consent')
       && (inputValue.trim() !== '' || listName.trim() !== ''),
     onDismiss: onClose,
   });
@@ -175,7 +175,11 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
 
   const consentLabels = useMemo(() => ({
     title: t('common.share.consent.title.join'),
-    body: t('common.share.consent.body.join'),
+    // 走到同意面时用户已经填过「清单名称（仅本机显示）」⇒ 把那个名字写进正文，回答
+    // "我在加哪一份"。没填就退回不带名字的那句（提交时会给默认名）。
+    body: listName.trim() === ''
+      ? t('common.share.consent.body.join')
+      : t('common.share.consent.body.join.named', { name: listName.trim() }),
     detailsLabel: t('common.share.consent.details.label'),
     details: [
       t('common.share.consent.scope.content'),
@@ -186,7 +190,7 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
     dontAskAgain: t('common.share.consent.dontAskAgain'),
     accept: t('common.share.consent.accept.join'),
     cancel: t('common.share.consent.cancel'),
-  }), [t]);
+  }), [t, listName]);
 
   // 拿到信封 ⇒ 解钥 ⇒ 建本地清单行 ⇒ 收口。
   const finalize = useCallback(async (shareId: string, memberId: string) => {
@@ -258,12 +262,11 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
     return registerShareRosterTarget(phase.shareId, async () => { await finalize(phase.shareId, phase.memberId); });
   }, [phase, finalize]);
 
-  const submit = useCallback(async () => {
+  /** 真正接受邀请（同意闸已在 `submit` 里过掉）。 */
+  const doAccept = useCallback(async (tokenFromInput: string) => {
     if (api === undefined) { setPhase({ kind: 'error', message: t('web.share.error.offline') }); return; }
     const cipher = await getPayloadCipher();
     if (cipher === undefined) { setNeedsUnlock(true); return; }
-    const tokenFromInput = parseShareJoinLink(inputValue) ?? inputValue.trim();
-    if (tokenFromInput === '') { setPhase({ kind: 'error', message: t('web.share.join.invalidToken') }); return; }
     setPhase({ kind: 'accepting' });
     try {
       const identitySeed = generateShareIdentitySeed();
@@ -289,7 +292,19 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
         setPhase({ kind: 'error', message: err instanceof ShareApiError ? `${err.status} ${err.code ?? ''}` : String(err) });
       }
     }
-  }, [api, getPayloadCipher, inputValue, t]);
+  }, [api, getPayloadCipher, t]);
+
+  /**
+   * 点「加入」这一下：**先校凭证**（空的不该先弹同意）→ **再过 PIPL 同意闸** → 最后才
+   * `acceptInvitation`。🔴 fail-closed：本机没确认过 / 没勾「不再提示」⇒ 停在同意面，
+   * 答应了才真正入群（`doAccept`）。闸仍在任何一次 accept 之前，只是不再拦在开场。
+   */
+  const submit = useCallback(() => {
+    const tokenFromInput = parseShareJoinLink(inputValue) ?? inputValue.trim();
+    if (tokenFromInput === '') { setPhase({ kind: 'error', message: t('web.share.join.invalidToken') }); return; }
+    if (shouldShowConsent(consentStore).show) { setPhase({ kind: 'consent' }); return; }
+    void doAccept(tokenFromInput);
+  }, [consentStore, doAccept, inputValue, t]);
 
   /*
    * P6：遮罩 + 面板 + `role="dialog"`/`aria-modal`/`aria-labelledby`、三条通道查表、
@@ -317,11 +332,9 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
         <div style={styles.headRow}>
           <div style={styles.headText}>
             <h2 id="ht-share-join-title" style={styles.dialogTitle}>
-              {/* 同意相位换成语境键那句「加入清单」（下面 `titleHidden` 的同一句），
-                  入群相位才是「加入共享清单」。 */}
-              {phase.kind === 'consent'
-                ? t('common.share.consent.title.join')
-                : t('web.share.join.title')}
+              {/* 全程同一句「加入共享清单」：同意面不再换标题（那一屏的短话由
+                  `ShareConsentModal` 的正文说出"加的是哪一份"），免得同一张卡里标题跳来跳去。 */}
+              {t('web.share.join.title')}
             </h2>
             {/* 同意面画的时候这句话还没有对象可指（表单还没出场），先收起来。 */}
             {phase.kind !== 'consent' ? (
@@ -349,15 +362,16 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
           <ShareConsentModal
             labels={consentLabels}
             store={consentStore}
-            // 顶部 `<h2>` 在同意相位写的就是同一句「加入清单」，再画一遍会在同一张卡里
-            // 出现两个同族标题 —— 与 owner 侧那屏同一个处置。
+            // 外层 `<h2>` 写着「加入共享清单」，同意面的标题「加入清单」是同一件事的短说法；
+            // 两层同时画会出现两个同族标题，置 `titleHidden` 只留外层 —— 与 owner 侧同一处置。
             titleHidden
             onConsent={(next) => {
               setConsentStore(next);
               saveShareConsent(localStorage, next);
             }}
-            onProceed={() => setPhase({ kind: 'input' })}
-            onCancel={onClose}
+            onProceed={() => { void doAccept(parseShareJoinLink(inputValue) ?? inputValue.trim()); }}
+            // 取消这次同意 = 不发生邀请、不留记录，回到填好的表单（token / 名字不丢）。
+            onCancel={() => setPhase({ kind: 'input' })}
           />
         ) : null}
 

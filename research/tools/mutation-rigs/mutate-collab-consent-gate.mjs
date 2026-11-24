@@ -68,8 +68,8 @@ const NEEDLE_MODEL = `  return {
     reason: store.consentAcceptedAt !== undefined ? 'repeat' : 'first-time',
   };
 `;
-const NEEDLE_WEB = "    shouldShowConsent(loadShareConsent(localStorage)).show ? { kind: 'consent' } : { kind: 'input' },\n";
-const NEEDLE_MOBILE = '    const decision = shouldShowConsent(loadMobileShareConsent());\n';
+const NEEDLE_WEB = "    if (shouldShowConsent(consentStore).show) { setPhase({ kind: 'consent' }); return; }\n";
+const NEEDLE_MOBILE = "    if (shouldShowConsent(consentStore).show) {\n";
 const NEEDLE_MOBILE_OWNER = '      const decision = shouldShowConsent(consentStore);\n';
 // E–J 的锚（同意面重做，2026-10-28）。逐枚都要求**恰好命中一次**，守卫会量。
 const NEEDLE_WEB_OWNER_TITLE = "    title: t('common.share.consent.title.share'),\n";
@@ -95,11 +95,10 @@ const ARMS = [
     carrier: 'web',
     target: 'apps/web/src/features/share/JoinSharedListDialog.tsx',
     needle: NEEDLE_WEB,
-    why: 'web 那一壳的闸整行摘掉 ⇒ 模型全绿而界面上少一道同意',
-    rep: `    { kind: 'input' }, // ${MARK}\n`,
-    // 四枚而不是三枚：`press()` 在 DOM 里找不到同意面的按钮就抛，
-    // 所以「确认 + 勾不再提示 ⇒ 直接到表单」那一枚也走不到它的断言
-    mustInclude: ['先弹同意面', '直接到表单', '下一次仍然弹', '取消不是同意'],
+    why: 'web 那一壳的闸整行摘掉（提交时不再问同意）⇒ 模型全绿而界面上少一道同意',
+    rep: `    if (false) { setPhase({ kind: 'consent' }); return; } // ${MARK}\n`,
+    // 四枚：同意闸没了 ⇒ 「点加入先弹」「确认+勾」「确认但没勾」「取消」四发全红
+    mustInclude: ['点「加入」⇒ 先弹同意面', '确认 + 勾「不再提示」', '确认但没勾「不再提示」', '取消不是同意'],
     expect: 4,
   },
   {
@@ -109,7 +108,7 @@ const ARMS = [
     needle: NEEDLE_MOBILE,
     why: '移动端那一壳的闸整行摘掉 ⇒ 手机上"没确认过也直接进表单"',
     // 🔴 替换文本里不许出现那枚函数名加左括号：调用点判据按 token 命中，写了就等于没摘。
-    rep: `    const decision = { show: false, reason: 'opted-out' } as const; // ${MARK}\n`,
+    rep: `    if (false) { // ${MARK}\n`,
     mustInclude: ['入群屏先问'],
     expect: 1,
   },

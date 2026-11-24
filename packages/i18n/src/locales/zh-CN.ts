@@ -5620,6 +5620,10 @@ export const zhCN = {
   'common.share.consent.title.join': '加入清单',
   'common.share.consent.body.share': '共享后，这份清单会对你邀请的成员开放。',
   'common.share.consent.body.join': '加入后，你能看到这份清单里的内容。',
+  // 加入侧把同意闸挪到「贴凭证 + 起好本机名」之后才弹（2026-11-24），这句负责回答
+  // 「我到底在加哪一份」：把你要加入的那份清单的**本机名**说出来。名字是加入者自己起的
+  // （共享清单在服务端没有名字），所以这是"你将叫它什么"，不是"服务器上它叫什么"。
+  'common.share.consent.body.join.named': '加入后，「{name}」里的内容对清单成员可见。',
   'common.share.consent.details.label': '谁会看到什么',
   'common.share.consent.scope.content': '任务标题、备注、日期与清单名对清单成员可见',
   'common.share.consent.scope.server': '服务端记录成员关系与角色',

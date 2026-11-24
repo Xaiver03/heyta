@@ -1980,3 +1980,58 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 - 本节那条旅程（分享/加入/同意面）的 **Android 装置仍未写**。
 - 🔴 **发布 keystore 没落到载体机**：四个 `HEYTA_RELEASE_*` 键只在 Mac 的 `~/.heyta-signing/`，所以 release 变体挂到 `signingConfigs.debug`，证书仍是 `CN=Android Debug`，`upload-dist.sh` 会拒绝发布。这一步是**凭据搬迁**，要单独点头，本批没做。
 - 整链 `pnpm check` 未跑完（本批只过了这两枚门禁 + 三套单测的受影响面）。
+
+### 9.41 入群同意闸挪到「点加入」之后、并把清单名写进同意面（2026-11-24，负责人当场提出）
+
+**起因（负责人在真界面上看出来的）**：点侧栏「清单」标题旁那个无文字的人形+入口（`share-join-entry`），
+第一屏直接弹出 PIPL 同意面，写着「加入清单 / 加入后，你能看到这份清单里的内容。」。原话：
+「这个东西莫名其妙的，什么加入清单？我看不到任何加入后的用户旅程…… 连加入哪个清单都不知道。」
+逐条核过，三件事叠在一起，且**都不是渲染 bug**：
+
+1. **顺序反了**：`JoinSharedListDialog` / `JoinShareScreen` 把同意面当第一屏（`consent → input → …`），
+   在用户贴邀请凭证之前就弹；此时表单没出场，副标题还被刻意藏起来（`phase !== 'consent'` 才画）。
+2. **注定说不出"哪个清单"**：共享清单在服务端**没有名字** —— `acceptInvitation` 回 `{shareId,memberId,role,keyEpoch}`、
+   `shareDetail` 回 `{shareId,ownerId,keyEpoch,yourRole}`，都不带名字；名字是加入者在本机自己起
+   （词条 `web.share.join.nameLabel`＝「清单名称（仅本机显示）」）。
+3. **入口无文字**：那枚图标只有 `aria-label`「加入共享清单」，点进去直接撞隐私同意框。
+
+**裁决（负责人点头"使用目标模式把这个功能做完整"）**：把同意闸从"第一屏"挪到"点「加入」之后、
+`acceptInvitation` 之前" —— 同意仍在任何共享动作之前（PIPL 要求与 ADR-0071 裁决三不变），
+但用户先把旅程走完：`标题「加入共享清单」→ 贴凭证 → 起本机名 → 点加入 → 同意面（带刚填的清单名）→ 成功`。
+两条硬边界没动：**默认不勾**、**取消不是同意**（fail-closed）。
+
+**落点（两壳同形）**
+
+- `apps/web/src/features/share/JoinSharedListDialog.tsx`：初始相位 `{ kind: 'input' }`；
+  `submit` 先校凭证 → `shouldShowConsent(consentStore).show` → 需要则 `setPhase({kind:'consent'})`，
+  否则 `doAccept`；同意面 `onProceed → doAccept`、`onCancel → 回 input`（不关窗、不落盘）。
+  外层 `<h2>` 全程「加入共享清单」；同意面 `titleHidden`，正文用新词条 `body.join.named` 带清单名。
+- `apps/mobile/src/screens/JoinShareScreen.tsx`：同一形状（`submit` 过闸、`doAccept` 真 accept、
+  `onCancel → input`）；正文同样带清单名。
+- 新词条 `common.share.consent.body.join.named`（zh：`加入后，「{name}」里的内容对清单成员可见。`；en 同义）。
+
+**判据（各自能红）**
+
+- `apps/web/tests/share-join-consent-gate.spec.tsx` 扩成 5 枚：开场是表单 / 点加入才弹且带名字 /
+  确认+勾不再弹 / 确认不勾下次仍弹 / 取消不是同意（回表单、不落盘）。6 枚全绿。
+- `apps/mobile/tests/share-ui-assembly.spec.ts` ⑨ 改成「开场 input、闸在 submit」；34 枚全绿。
+- `e2e/tests/collab-journey.spec.ts` bob 入群腿改成「先填凭证 → 提交 → 同意面（断言含清单名）→ 确认」；
+  `05-bob-join-dialog.png` 现在拍的是表单，`05a-bob-join-consent.png` 拍带名字的同意面，两枚仍在册。
+- 变异装置 `mutate-collab-consent-gate.mjs` 的 `web/mobile-call-site-gone` 两臂 needle 跟着新形状重锚
+  （摘掉 submit 里那一行 ⇒ 各红 4 / 1）。⚠️ 该装置本批**未跑**（要改工作树 + 重建 dist），
+  下次跑前先确认同一棵检出无他人 `pnpm check` / `pnpm -r test` 在读源码。
+
+**本批现量（全部在这棵树上）**
+
+- 单测：`share-join-consent-gate` 6/6、`share-consent-modal-theme` 14/14、`share-ui-assembly` 34/34、
+  `share-consent-model` 6/6、`share-roster-signal` 9/9。
+- 类型：`apps/web`、`apps/mobile` 的 `tsc --noEmit` 均 0 错。
+- 门禁 rc=0：`check:i18n-vars`、`check:ui-language`（zh/en 各 4778 条）、`check:design`、
+  `check:rn-aria`、`check:dirty-form-policy`、`check:share-entry-visible`、`check:collab-carrier`、
+  `check:mobile-e2e-labels`、`check:verify-script-copy`、`check:shell-exit-chain`、`check:e2e-specs-parse`、
+  `check:scripts-parse`；`bash -n scripts/verify-mobile-collab-ios.sh` 通过。
+- 与本批无关的既有红（不归本批，留原归因）：`check:overlay` R1（`CalendarHeaderToolbar.tsx` 原生框不在账上）、
+  `check:journey-coverage`（`apps/desktop-linux-gtk3` 未登记 ENDPOINTS/NOT_AN_END）。
+
+**还欠**：`verify:mobile-collab:ios` 那条**设备腿**要带着新 needle（同意面在「加入」之后）在真机重跑一次；
+Android 装置仍未写（承 §9.40）。

@@ -215,12 +215,16 @@ describe('④ 入群等待态真的登记了 roster target', () => {
  * 而纯逻辑判据一条都不会红。这一组钉的是"线接上了"，不是"判断对了"（后者在 `packages/ui`）。
  */
 describe('⑨ 入群与开启共享两屏各自真的问一次同意闸（摘掉调用点这一组就红）', () => {
-  it('🔴 入群屏先问 `shouldShowConsent(` 决定初始相位：没确认过 ⇒ consent 而不是 input', () => {
+  it('🔴 入群屏先问 `shouldShowConsent(`：没确认过 ⇒ 点「加入」时弹同意面（不是开场就拦）', () => {
     const code = stripComments(read('apps/mobile/src/screens/JoinShareScreen.tsx'));
     const calls = code.match(/shouldShowConsent\(/g) ?? [];
     expect(calls.length, '入群屏没有同意闸调用点 ⇒ 手机上没确认过也直接进凭证表单').toBe(1);
-    const phase = code.match(/decision\.show \? \{ kind: 'consent' \} : \{ kind: 'input' \}/);
-    expect(phase, '初始相位不再由那一刀决定：判据要按新形状重读').toBeTruthy();
+    // 开场先给凭证表单（旅程先可见）；同意闸在「加入」那一下：需要就停到 consent，答应才 accept。
+    expect(code, '开场相位变了：应直接是 input 表单').toContain("useState<JoinPhase>({ kind: 'input' })");
+    expect(
+      code,
+      '闸门分支形状变了：应当在 submit 里见到 shouldShowConsent(consentStore).show ⇒ setPhase consent',
+    ).toMatch(/shouldShowConsent\(consentStore\)\.show\)\s*\{\s*setPhase\(\{ kind: 'consent' \}\)/);
   });
 
   it('🔴 开启共享前先问 `shouldShowConsent(`，没确认过只弹面不建共享', () => {

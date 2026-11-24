@@ -5144,6 +5144,7 @@ export const en = {
   'common.share.consent.title.join': 'Join list',
   'common.share.consent.body.share': 'Sharing opens this list to the members you invite.',
   'common.share.consent.body.join': 'Joining gives you access to what this list contains.',
+  'common.share.consent.body.join.named': 'After you join, what “{name}” contains is visible to its members.',
   'common.share.consent.details.label': 'Who sees what',
   'common.share.consent.scope.content': 'Task titles, notes, dates and the list name are visible to list members',
   'common.share.consent.scope.server': 'The server records membership and roles',
