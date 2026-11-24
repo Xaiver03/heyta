@@ -36,4 +36,12 @@ describe('日历习惯卡', () => {
     expect(screen).toContain('<CalendarHabitsCard');
     expect(screen).toContain("title={t('widget.habits.title')}");
   });
+
+  it('周议程也按天接入习惯（待办 + 习惯同屏，习惯空则该天不画习惯）', () => {
+    const agenda = source('../src/screens/CalendarWeekAgenda.tsx');
+    expect(agenda).toContain('isScheduledOn(');
+    expect(agenda).toContain('HabitArtwork');
+    expect(agenda).toContain('onToggleHabit?.(');
+  });
+
 });

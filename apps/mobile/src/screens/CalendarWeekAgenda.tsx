@@ -13,8 +13,18 @@
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { addDays, dueLocalDateOf, type LocalDate, type Task } from '@heyta/domain';
-import { TaskList, type TaskListLabels } from '@heyta/ui';
+import {
+  addDays,
+  dueLocalDateOf,
+  habitIconOf,
+  isScheduledOn,
+  type Habit,
+  type HabitLog,
+  type LocalDate,
+  type Task,
+} from '@heyta/domain';
+import { HabitArtwork, TaskList, type TaskListLabels } from '@heyta/ui';
+import { Icon } from '../ui/icons';
 
 import { Text } from '../ui/kit';
 import { useTokens } from '../theme';
@@ -29,6 +39,10 @@ export interface CalendarWeekAgendaProps {
   readonly onSelectDay: (date: LocalDate) => void;
   readonly onToggleTask: (taskId: string) => void;
   readonly busyTaskId?: string | null;
+  readonly habits?: readonly Habit[];
+  readonly habitLogs?: readonly HabitLog[];
+  readonly onToggleHabit?: (habitId: string) => void;
+  readonly busyHabitId?: string | null;
 }
 
 function dayNumber(date: LocalDate): number {
@@ -49,6 +63,10 @@ export function CalendarWeekAgenda({
   onSelectDay,
   onToggleTask,
   busyTaskId,
+  habits,
+  habitLogs,
+  onToggleHabit,
+  busyHabitId,
 }: CalendarWeekAgendaProps): React.JSX.Element {
   const t = useTokens();
   const styles = useMemo(
@@ -75,6 +93,15 @@ export function CalendarWeekAgenda({
         },
         today: { backgroundColor: t['color.primary'] },
         selected: { backgroundColor: t['color.primary-subtle'] },
+        habitGroup: { gap: t['space.1'], paddingTop: t['space.1'] },
+        habitRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: t['space.2'],
+          minHeight: t['touch-target.min'],
+        },
+        habitName: { flex: 1 },
+        habitDone: { flex: 1, color: t['color.foreground-muted'] },
       }),
     [t],
   );
@@ -121,6 +148,36 @@ export function CalendarWeekAgenda({
                 labels={taskRow}
                 testID={`week-agenda-list-${date}`}
               />
+            )}
+            {(habits ?? []).filter((h) => isScheduledOn(h.frequency, date)).length === 0 ? null : (
+              <View style={styles.habitGroup}>
+                {(habits ?? [])
+                  .filter((h) => isScheduledOn(h.frequency, date))
+                  .map((h) => {
+                    const done = (habitLogs ?? []).some(
+                      (l) => l.habitId === h.id && l.date === date && l.deletedAt === undefined,
+                    );
+                    return (
+                      <Pressable
+                        key={h.id}
+                        onPress={() => {
+                          if (busyHabitId !== h.id) onToggleHabit?.(h.id);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ checked: done }}
+                        accessibilityLabel={h.name}
+                        testID={`week-agenda-habit-${date}-${h.id}`}
+                        style={styles.habitRow}
+                      >
+                        <HabitArtwork icon={habitIconOf(h)} size={t['space.6']} />
+                        <Text variant="row-meta" style={done ? styles.habitDone : styles.habitName}>
+                          {h.name}
+                        </Text>
+                        {done ? <Icon name="action.keep" size="sm" color={t['color.primary']} /> : null}
+                      </Pressable>
+                    );
+                  })}
+              </View>
             )}
           </View>
         );

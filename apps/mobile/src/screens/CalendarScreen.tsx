@@ -875,6 +875,10 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           }}
           onToggleTask={onToggleTask}
           busyTaskId={busyId}
+          habits={habits}
+          habitLogs={habitLogs}
+          onToggleHabit={onToggleHabit}
+          busyHabitId={busyHabitId}
         />
       ) : (
       <CalendarBoard
