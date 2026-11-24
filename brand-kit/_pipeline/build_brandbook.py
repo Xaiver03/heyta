@@ -4,6 +4,7 @@ import os, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import render
 import read_tokens as RT
+import read_copy as RC
 WD=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT=os.path.join(WD,"00-brand-foundation"); PRE=os.path.join(OUT,"_preview")
 LOGOD=os.path.join(WD,"01-logo"); BADGE=os.path.join(WD,"02-badges")
@@ -80,7 +81,7 @@ def p_intro():
     return f'''<div class="page">{head("品牌定位")}
       <div style="position:absolute;left:18mm;right:18mm;top:44mm">
         <div class="eyebrow">POSITIONING</div>
-        <h2 style="font-size:30pt;margin-top:6mm;font-weight:800">把事情，交还给今天</h2>
+        <h2 style="font-size:30pt;margin-top:6mm;font-weight:800">今天该做什么，一眼看见</h2>
         <p style="margin-top:8mm;font-size:12pt;line-height:2;color:#334155">heyta 是一款本地优先、可自托管的任务管理应用，对标滴答清单。数据先落本地，端到端加密同步为可选通道。首要结果是：用户清楚地知道任务在哪里、下一步做什么、操作之后如何回来。</p>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6mm;margin-top:12mm">
           <div class="card"><div class="eyebrow">个性</div><h3 style="font-size:15pt;margin-top:4mm">清晰 · 克制 · 可靠</h3></div>
@@ -131,7 +132,7 @@ def p_type():
         <div class="eyebrow">TYPOGRAPHY</div>
         <h2 style="font-size:26pt;margin-top:5mm;font-weight:800">字体层级</h2>
         <div style="margin-top:8mm;border-bottom:1px solid #e2e8f0;padding-bottom:6mm"><div style="font-size:9px;color:#94a3b8">品牌字标 · hey.</div><img src="{WM_INK}" style="height:16mm;margin-top:3mm"></div>
-        <div style="margin-top:6mm;border-bottom:1px solid #e2e8f0;padding-bottom:6mm"><div style="font-size:9px;color:#94a3b8">标题 · 苹方 粗</div><div style="font-weight:800;font-size:24pt;margin-top:2mm">把事情，交还给今天</div></div>
+        <div style="margin-top:6mm;border-bottom:1px solid #e2e8f0;padding-bottom:6mm"><div style="font-size:9px;color:#94a3b8">标题 · 苹方 粗</div><div style="font-weight:800;font-size:24pt;margin-top:2mm">今天该做什么，一眼看见</div></div>
         <div style="margin-top:6mm;border-bottom:1px solid #e2e8f0;padding-bottom:6mm"><div style="font-size:9px;color:#94a3b8">正文 · 苹方常规</div><div style="font-size:11.5pt;line-height:1.9;color:#334155;margin-top:2mm">今天要做的事，一条一条，落在眼前。一二三四五六七八九十 ABCDEFG 0123456789。</div></div>
         <p style="margin-top:6mm;font-size:10px;color:#94a3b8">中文正文推荐苹方 / 思源黑体；数字与英文推荐 SF Pro。</p>
       </div>{foot("字体系统")}</div>'''
@@ -176,7 +177,7 @@ def p_back():
     return f'''<div class="page dark">
       <div style="position:absolute;left:18mm;top:24mm"><img src="{WM_WHITE}" style="height:20mm"></div>
       <div style="position:absolute;left:18mm;right:18mm;top:120mm">
-        <h1 style="font-size:30pt;font-weight:800;letter-spacing:-0.5px">把事情，交还给今天</h1>
+        <h1 style="font-size:30pt;font-weight:800;letter-spacing:-0.5px">今天该做什么，一眼看见</h1>
         <p style="margin-top:8mm;font-size:11pt;line-height:2;color:#dbeafe">本手册为 heyta 视觉识别系统的基础规范。<br>标识、色彩、字体与徽章的使用请遵循本册约定。</p>
         <div style="margin-top:14mm;font-size:10pt;color:#bfdbfe;line-height:2">heyta · 本地优先任务管理 · 2026</div>
       </div>

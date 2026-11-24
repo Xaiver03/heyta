@@ -1,6 +1,6 @@
 {
   "brand": "heyta",
-  "generated_at": "2026-11-24 15:05:41",
+  "generated_at": "2026-11-24 15:16:45",
   "dirs": {
     "00-brand-foundation": 11,
     "01-logo": 21,
@@ -11,10 +11,10 @@
     "06-brochure": 4,
     "07-product-manual": 2,
     "08-merch": 2,
-    "09-social": 2,
+    "09-social": 5,
     "10-templates": 2
   },
-  "count": 162,
+  "count": 165,
   "files": [
     {
       "path": "index.html",
@@ -22,15 +22,15 @@
     },
     {
       "path": "成就与成长体系_产品清单.md",
-      "size": 17377
+      "size": 18563
     },
     {
       "path": "README.md",
-      "size": 4497
+      "size": 4614
     },
     {
       "path": "manifest.json",
-      "size": 13517
+      "size": 13518
     },
     {
       "path": "02-badges/badge-catalogue.png",
@@ -318,7 +318,7 @@
     },
     {
       "path": "10-templates/release-card_1080x1350.png",
-      "size": 1967851
+      "size": 1967745
     },
     {
       "path": "10-templates/slide-16x9.png",
@@ -418,11 +418,11 @@
     },
     {
       "path": "06-brochure/brochure_front.png",
-      "size": 564690
+      "size": 566477
     },
     {
       "path": "06-brochure/heyta_brochure_front.pdf",
-      "size": 210664
+      "size": 211429
     },
     {
       "path": "06-brochure/brochure_back.png",
@@ -438,11 +438,11 @@
     },
     {
       "path": "00-brand-foundation/brand-tokens.json",
-      "size": 1714
+      "size": 1729
     },
     {
       "path": "00-brand-foundation/brand-book.pdf",
-      "size": 1033695
+      "size": 1035252
     },
     {
       "path": "00-brand-foundation/_preview/page-01.png",
@@ -450,7 +450,7 @@
     },
     {
       "path": "00-brand-foundation/_preview/page-02.png",
-      "size": 44420
+      "size": 44587
     },
     {
       "path": "00-brand-foundation/_preview/page-03.png",
@@ -470,15 +470,27 @@
     },
     {
       "path": "00-brand-foundation/_preview/page-05.png",
-      "size": 26301
+      "size": 26834
     },
     {
       "path": "00-brand-foundation/_preview/page-08.png",
-      "size": 76745
+      "size": 77220
+    },
+    {
+      "path": "09-social/og-card_1200x630.html",
+      "size": 1321
+    },
+    {
+      "path": "09-social/og-card-en_1200x630.html",
+      "size": 1322
+    },
+    {
+      "path": "09-social/og-card-en_1200x630.png",
+      "size": 260027
     },
     {
       "path": "09-social/og-card_1200x630.png",
-      "size": 1088479
+      "size": 254003
     },
     {
       "path": "09-social/post_1080x1080.png",
@@ -486,11 +498,11 @@
     },
     {
       "path": "05-posters/01_品牌主视觉.png",
-      "size": 2174859
+      "size": 2179755
     },
     {
       "path": "05-posters/01_品牌主视觉.pdf",
-      "size": 104513
+      "size": 105292
     },
     {
       "path": "05-posters/03_成长里程碑.png",
@@ -514,7 +526,7 @@
     },
     {
       "path": "07-product-manual/heyta_product-manual.pdf",
-      "size": 751894
+      "size": 753488
     },
     {
       "path": "04-imagery/_manifest_main.json",

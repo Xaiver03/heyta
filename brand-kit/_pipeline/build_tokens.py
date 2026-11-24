@@ -11,7 +11,7 @@ T = {
   "brand": "heyta",
   "wordmark": "hey.",
   "product": "本地优先、可自托管的任务管理应用",
-  "tagline": {"zh":"把事情，交还给今天。", "en":"Keep today in your hands."},
+  "tagline": {"zh":"今天该做什么，一眼看见。", "en":"See what to do today, at a glance."},
   "personality": ["清晰","克制","可靠"],
   "colors": {
     "blue": {"50":"#eff6ff","100":"#dbeafe","200":"#bfdbfe","300":"#93c5fd","400":"#60a5fa",
