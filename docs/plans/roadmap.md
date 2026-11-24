@@ -83,6 +83,21 @@ API 数据出口），已刻意放在**非 AI 分支** —— 理由见该计划
 | `apps/mobile` | 「分类」tab：泳道 + 行内色槽取色器（**不做**堆叠柱状图、**不做**习惯打卡） | ✅ **已实现**（12 条纯逻辑测试；本包无组件渲染测试台，见 §8.7 末段） |
 | 真浏览器契约 | `e2e/tests/categories.spec.ts` 4 条（赋色**刷新后仍在**、真实专注进「未归类」、反需求扫描） | ✅ **已实现**（逐条注入验证会红） |
 
+**里程碑四维色（2026-11-24）**：成长视图的四个维度（打卡 / 专注 / 完成 / 使用天数）
+此前彼此没有视觉区分，四维色只存在于品牌物料里、代码中没有对应 token。
+现已是语义 token 并接到共享组件，两端同时生效。
+
+| 层 | 内容 | 状态 |
+|---|---|---|
+| `packages/design-system` | `color.milestone-{checkin,focus,tasks,days}`（亮/暗）+ 色差与色盲**实算** | ✅ **已实现** |
+| `packages/design-system` | `tests/milestone-colors.spec.ts` 13 条：对比度 ≥3:1、正常 ΔE ≥10、红/绿色盲 ΔE ≥10、暗色覆盖 | ✅ **已实现** |
+| `packages/ui` | `MilestoneMap` 用四维色画维度圆点 + 已达成档位描边（未达成描边 `transparent`） | ✅ **已实现** |
+| `apps/web` / `apps/mobile` | 均经共享 `MilestoneMap` 自动生效（无各端第二份映射） | ✅ **已实现** |
+
+🔴 边界：四维色**只当图形色**（3:1 门槛，不进正文文字颜色）；与用户赋义的
+`color.category-1..8` 是两套，含义来源相反，不许混用。
+判据与理由见 [`docs/agents/design-system.md`](../agents/design-system.md)。
+
 ⚠️ 落地状态与实测数字见
 [活动分类与分类着色](archive/activity-categories-and-colors.md) §8
 （§8.6 真浏览器通道**已恢复**；§8.6 与 §8.7 里各有一段"仍然没有被覆盖的东西"，
