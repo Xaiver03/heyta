@@ -37,8 +37,32 @@ def emit(line: str) -> None:
     print(line)
 
 
+REMEDIES = []  # 按失败类别收集"该跑哪条命令"，出口处汇总
+
+
+def _remedy_for(msg: str) -> str | None:
+    """把失败信息映射成一条能直接跑的命令。判据不告诉人怎么修，等于只报丧。"""
+    checks = [
+        (("brand-tokens", "色值白名单", "色槽", "对比度"), "python brand-kit/_pipeline/build_tokens.py"),
+        (("01-logo", "字标", "字形"), "python brand-kit/_pipeline/build_logo.py"),
+        (("里程碑", "身份标签", "状态胶囊", "图鉴"), "python brand-kit/_pipeline/build_badges_v2.py"),
+        (("PDF", "页数", "字体"), "python brand-kit/_pipeline/build_brandbook.py && python brand-kit/_pipeline/build_docs.py"),
+        (("index.html", "social", "templates", "海报", "本地引用"), "python brand-kit/_pipeline/build_docs.py"),
+        (("04-imagery",), "（04-imagery 是原图，改名/换图后需同步 _manifest_main.json 并重跑 build_index.py）"),
+        (("i18n 词条", "英文维度名"), "（先修 packages/i18n 对应 key，再重跑 build_docs.py / build_badges_v2.py）"),
+        (("产品清单", "禁串", "自造文案"), "（改文档或改脚本里的文案来源，见产品清单 §11.6b）"),
+    ]
+    for keys, cmd in checks:
+        if any(k in msg for k in keys):
+            return cmd
+    return None
+
+
 def fail(msg):
     fails.append(msg)
+    r = _remedy_for(msg)
+    if r and r not in REMEDIES:
+        REMEDIES.append(r)
     if not JSON_OUT:  # JSON 模式下 stdout 必须是纯 JSON
         print("❌ " + msg)
 
@@ -709,6 +733,57 @@ if os.path.exists(EN_LOCALE) and os.path.exists(BB_SRC):
     else:
         emit(f"✅ 徽章英文维度名 = 产品文案的缩写（{len(latins)} 个）")
 
+# 27) 色卡上的三条立场必须与代码一致（"颜色由用户赋义 / 存槽位不存 hex / 永不自动上色"）
+AC_FILE = os.path.join(ROOT, "packages/domain/src/activity-categories.ts")
+_scan_root = os.environ.get("BRAND_KIT_PKG_ROOT", os.path.join(ROOT, "packages"))
+if os.path.exists(AC_FILE):
+    ac = open(AC_FILE, encoding="utf-8").read()
+    probs = []
+    if "type CategorySlot" not in ac:
+        probs.append("没有 CategorySlot 类型 —— 色卡说「存槽位不存 hex」失去依据")
+    if not re.search(r"color\?:\s*CategorySlot", ac + open(
+            os.path.join(ROOT, "packages/domain/src/entities.ts"), encoding="utf-8").read()):
+        probs.append("实体上没有 color?: CategorySlot 字段")
+    # 扫"自动上色"：这些命名一旦出现，就与「永不自动上色」冲突
+    _auto_hits = []
+    for _r, _d, _fs in os.walk(_scan_root):
+        if "node_modules" in _r:
+            continue
+        for _f in _fs:
+            if not _f.endswith((".ts", ".tsx")):
+                continue
+            _t = open(os.path.join(_r, _f), encoding="utf-8", errors="ignore").read()
+            for _pat in ("autoColor", "assignColor", "pickColor", "nextFreeSlot"):
+                if _pat in _t:
+                    _auto_hits.append(f"{os.path.relpath(os.path.join(_r, _f), ROOT)}:{_pat}")
+    if _auto_hits:
+        probs.append(f"发现自动上色逻辑（与「永不自动上色」冲突）：{_auto_hits[:3]}")
+    if probs:
+        fail(f"分类色槽的立场与代码不符：{probs}")
+    else:
+        emit("✅ 色卡三条立场与代码一致（CategorySlot 存在 / 无自动上色逻辑）")
+
+# 28) 04-imagery：每条 manifest 的 sub 必须等于它所在子目录，且子目录在白名单内
+if os.path.exists(IMG_MANIFEST):
+    import json as _j3
+    mf3 = _j3.load(open(IMG_MANIFEST, encoding="utf-8"))
+    _rows3 = mf3 if isinstance(mf3, list) else mf3.get("items", [])
+    _allowed_sub = {"background", "illustration", "merch"}
+    _bad_sub = []
+    for it in _rows3:
+        if not isinstance(it, dict) or "path" not in it:
+            continue
+        sub = it.get("sub")
+        folder = os.path.basename(os.path.dirname(it["path"]))
+        if sub not in _allowed_sub:
+            _bad_sub.append(f"{it['path']}: sub={sub!r} 不在白名单")
+        elif sub != folder:
+            _bad_sub.append(f"{it['path']}: sub={sub!r} 与目录 {folder!r} 不一致")
+    if _bad_sub:
+        fail(f"04-imagery 的分类与目录不一致：{_bad_sub[:4]}")
+    else:
+        emit(f"✅ 04-imagery 分类与目录一致（{len(_rows3)} 条）")
+
 if not fails:
     if JSON_OUT:
         import json as _j
@@ -723,4 +798,8 @@ if JSON_OUT:
     print(_j.dumps({"ok": False, "passed": len(passes), "failed": len(fails), "errors": fails}, ensure_ascii=False))
 else:
     print(f"\n❌ 共 {len(fails)} 项失败")
+    if REMEDIES:
+        print("\n修：")
+        for r in REMEDIES:
+            print("   " + r)
 sys.exit(1)
