@@ -765,6 +765,8 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
        */
       title={rangeTitle}
       chrome="board"
+      /* 月档是整面看板：去掉底部 88dp 的 bottomInset 占位，让月格真正贴到底（对齐滴答）。其它档保留。 */
+      bottomInset={view !== 'month'}
       header={
         <CalendarCapsuleHeader
           monthLabel={labels.monthTitle(cursor)}
