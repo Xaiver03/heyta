@@ -313,6 +313,79 @@ if os.path.exists(DOC) and os.path.exists(DOMAIN_MILESTONES):
     else:
         print("⏭  产品清单里没找到可解析的门槛行（格式变了？）")
 
+# 12) brand-tokens.json 的每个色值必须等于 tokens.css 的对应 token
+#     这张表是**对外导出**（给不读 CSS 的工具用），最容易被手改；而它一漂，
+#     外部工具里的品牌色就和产品不一致了。
+TOKENS_JSON = os.path.join(WD, "00-brand-foundation/brand-tokens.json")
+COLOR_MAP = {}
+for n in (50, 100, 200, 300, 400, 500, 600, 700, 800, 900):
+    COLOR_MAP[f"colors.blue.{n}"] = f"blue-{n}"
+COLOR_MAP["colors.slate.white"] = "white"
+for n in (50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950):
+    COLOR_MAP[f"colors.slate.{n}"] = f"slate-{n}"
+COLOR_MAP.update({
+    "colors.feedback.success": "color-success", "colors.feedback.warning": "color-warning",
+    "colors.feedback.danger": "color-danger", "colors.feedback.info": "color-info",
+    "colors.feedback.success-soft": "emerald-50", "colors.feedback.warning-soft": "amber-50",
+    "colors.feedback.danger-soft": "red-50", "colors.feedback.info-soft": "blue-50",
+    "colors.surface.paper": "color-surface", "colors.surface.sunken": "color-surface-sunken",
+    "colors.surface.ink": "color-foreground",
+    "semantic.primary": "color-primary", "semantic.on-primary": "white",
+    "semantic.primary-hover": "color-primary-hover", "semantic.foreground": "color-foreground",
+    "semantic.foreground-muted": "color-foreground-muted", "semantic.border": "color-border",
+    "milestone.checkIns": "color-milestone-checkin", "milestone.focusHours": "color-milestone-focus",
+    "milestone.tasks": "color-milestone-tasks", "milestone.activeDays": "color-milestone-days",
+})
+if os.path.exists(TOKENS_JSON):
+    import json as _json
+    data = _json.load(open(TOKENS_JSON, encoding="utf-8"))
+
+    def _walk(o, prefix=""):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                yield from _walk(v, f"{prefix}.{k}" if prefix else k)
+        elif isinstance(o, str) and o.startswith("#"):
+            yield prefix, o
+
+    bad = 0
+    for path, val in _walk(data):
+        want_name = COLOR_MAP.get(path)
+        if want_name is None:
+            fail(f"brand-tokens.json 里的 {path}={val} 没有对应 token —— 新加的色值必须登记映射")
+            bad += 1
+            continue
+        want = RT.token(want_name)
+        if want is None or want.lower() != val.lower():
+            fail(f"brand-tokens.json 的 {path} 是 {val}，而 {want_name} 是 {want}")
+            bad += 1
+    if bad == 0:
+        print(f"✅ brand-tokens.json 色值与 tokens.css 逐项一致（{len(COLOR_MAP)} 项）")
+
+# 13) 图鉴标题里印的数量，必须等于领域层真实数量
+#     标题曾经写死「Milestones（17）」「Identity Tags（8）」—— 加一个里程碑后
+#     徽章数量变了、标题还印着旧数字，而图鉴是给人看的第一手材料。
+CATALOGUE = os.path.join(WD, "02-badges/badge-catalogue.html")
+if os.path.exists(CATALOGUE) and os.path.exists(DOMAIN_MILESTONES):
+    cat = open(CATALOGUE, encoding="utf-8").read()
+    src_ms = open(DOMAIN_MILESTONES, encoding="utf-8").read()
+    n_ms = sum(len(re.findall(r"\d+", ths)) for _k, ths in
+               re.findall(r"\{\s*kind:\s*'(\w+)',\s*thresholds:\s*\[([^\]]+)\]", src_ms))
+    tags_file = os.path.join(ROOT, "packages/domain/src/identity-tags.ts")
+    n_tags = len(re.findall(r"\{\s*id:\s*'[\w-]+'", open(tags_file, encoding="utf-8").read())) if os.path.exists(tags_file) else None
+    for label, pattern, want in (
+        ("里程碑", r"Milestones（(\d+)", n_ms),
+        ("身份标签", r"Identity Tags（(\d+)", n_tags),
+    ):
+        if want is None:
+            continue
+        m = re.search(pattern, cat)
+        if not m:
+            fail(f"图鉴标题里找不到{label}数量（格式变了？）")
+        elif int(m.group(1)) != want:
+            fail(f"图鉴标题写{label} {m.group(1)} 个，领域层是 {want} 个")
+        else:
+            print(f"✅ 图鉴标题{label}数量 = {want}")
+
 if not fails:
     print("\n✅ brand-kit 产物自检通过")
     sys.exit(0)

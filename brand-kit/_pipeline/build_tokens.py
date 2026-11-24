@@ -5,6 +5,7 @@
 import json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import read_copy as RC
+import read_tokens as RT
 WD=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # brand-kit
 OUT=os.path.join(WD,"00-brand-foundation")
 os.makedirs(OUT,exist_ok=True)
@@ -15,25 +16,30 @@ T = {
   "product": "本地优先、可自托管的任务管理应用",
   "tagline": {"zh": RC.tagline_html("zh") + "。", "en": RC.tagline_html("en")},
   "personality": ["清晰","克制","可靠"],
+  # 色值一律由 tokens.css 派生，本表不写字面量（否则就是第二个事实源）。
   "colors": {
-    "blue": {"50":"#eff6ff","100":"#dbeafe","200":"#bfdbfe","300":"#93c5fd","400":"#60a5fa",
-             "500":"#3b82f6","600":"#2563eb","700":"#1d4ed8","800":"#1e40af","900":"#1e3a8a"},
-    "slate": {"white":"#FFFFFF","50":"#f8fafc","100":"#f1f5f9","200":"#e2e8f0","300":"#cbd5e1",
-              "400":"#94a3b8","500":"#64748b","600":"#475569","700":"#334155","800":"#1e293b",
-              "900":"#0f172a","950":"#020617"},
-    "feedback": {"success":"#059669","warning":"#d97706","danger":"#dc2626","info":"#0284c7",
-                 "success-soft":"#ecfdf5","warning-soft":"#fffbeb","danger-soft":"#fef2f2","info-soft":"#eff6ff"},
-    "surface": {"paper":"#ffffff","sunken":"#f8fafc","ink":"#0f172a"}
+    "blue": {str(n): RT.token(f"blue-{n}") for n in (50,100,200,300,400,500,600,700,800,900)},
+    "slate": {**{"white": RT.token("white")},
+              **{str(n): RT.token(f"slate-{n}") for n in (50,100,200,300,400,500,600,700,800,900,950)}},
+    "feedback": {"success": RT.token("color-success"), "warning": RT.token("color-warning"),
+                 "danger": RT.token("color-danger"), "info": RT.token("color-info"),
+                 "success-soft": RT.token("emerald-50"), "warning-soft": RT.token("amber-50"),
+                 "danger-soft": RT.token("red-50"), "info-soft": RT.token("blue-50")},
+    "surface": {"paper": RT.token("color-surface"), "sunken": RT.token("color-surface-sunken"),
+                "ink": RT.token("color-foreground")}
   },
   "semantic": {
-    "primary":"#2563eb","on-primary":"#ffffff","primary-hover":"#1d4ed8",
-    "foreground":"#0f172a","foreground-muted":"#475569","border":"#e2e8f0"
+    "primary": RT.token("color-primary"), "on-primary": RT.token("white"),
+    "primary-hover": RT.token("color-primary-hover"),
+    "foreground": RT.token("color-foreground"), "foreground-muted": RT.token("color-foreground-muted"),
+    "border": RT.token("color-border")
   },
   "typography": {
     "sans": "'PingFang SC','Hiragino Sans GB','Noto Sans CJK SC',sans-serif",
     "mono": "'SF Mono','JetBrains Mono',ui-monospace,monospace"
   },
-  "milestone": {"checkIns":"#2563eb","focusHours":"#4f46e5","tasks":"#059669","activeDays":"#d97706"}
+  "milestone": {"checkIns": RT.token("color-milestone-checkin"), "focusHours": RT.token("color-milestone-focus"),
+               "tasks": RT.token("color-milestone-tasks"), "activeDays": RT.token("color-milestone-days")}
 }
 json.dump(T, open(os.path.join(OUT,"brand-tokens.json"),"w",encoding="utf-8"), ensure_ascii=False, indent=2)
 

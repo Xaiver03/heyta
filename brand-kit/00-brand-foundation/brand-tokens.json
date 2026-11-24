@@ -25,7 +25,7 @@
       "900": "#1e3a8a"
     },
     "slate": {
-      "white": "#FFFFFF",
+      "white": "#ffffff",
       "50": "#f8fafc",
       "100": "#f1f5f9",
       "200": "#e2e8f0",
@@ -50,7 +50,7 @@
     },
     "surface": {
       "paper": "#ffffff",
-      "sunken": "#f8fafc",
+      "sunken": "#f1f5f9",
       "ink": "#0f172a"
     }
   },
@@ -68,7 +68,7 @@
   },
   "milestone": {
     "checkIns": "#2563eb",
-    "focusHours": "#4f46e5",
+    "focusHours": "#a21caf",
     "tasks": "#059669",
     "activeDays": "#d97706"
   }

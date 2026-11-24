@@ -93,7 +93,7 @@ def brochure_front():
         <div style="font-size:10px;letter-spacing:4px;color:{BLUE}">GET STARTED</div>
         <h2 style="font-size:22pt;font-weight:800;margin-top:8mm">开始使用</h2>
         <p style="margin-top:8mm;font-size:10.5px;line-height:2.1;color:{SL}">官网下载 Web / 桌面 / iOS / Android 版本。<br>无需账号即可本地使用；需要跨端时再开启同步。</p>
-        <div style="margin-top:10mm;width:36mm;height:36mm;background:#fff;border:1px dashed {BD};border-radius:8px;display:flex;align-items:center;justify-content:center;color:{SL8};font-size:9px;text-align:center">扫码 / 访问官网</div>
+        <div style="margin-top:10mm">{qr_block()}</div>
         <div class="fold" style="left:99mm"></div>
       </div>'''
     return doc(b,BR)
@@ -155,6 +155,40 @@ def manual():
     return doc("".join(pages),A4)
 
 # ---------------- 09 social ----------------
+
+# ── 站点域名：从 landing 的唯一事实源读，不在这里写第二个 ──────────────
+def _site_origin():
+    import re as _re, base64 as _b64
+    p = os.path.join(os.path.dirname(WD), "apps/landing/src/site/origin.ts")
+    if not os.path.exists(p):
+        return None
+    m = _re.search(r"DEFAULT_SITE_ORIGIN\s*=\s*'([^']+)'", open(p, encoding="utf-8").read())
+    return m.group(1) if m else None
+
+
+def qr_block():
+    """官网二维码。有 segno 就画真二维码（内联 SVG），没有就退回域名文字。
+
+    两者都**不留空白虚线框** —— 一份发出去的宣传册里放一个"扫码"空框，
+    比没有二维码更糟：它看着像成品，实际什么都没指向。
+    """
+    origin = _site_origin()
+    if not origin:
+        return ""
+    try:
+        import segno  # 可选依赖：有就画真码
+        import io as _io
+        buf = _io.BytesIO()
+        segno.make(origin, error="m").save(buf, kind="svg", scale=1, border=0)
+        b64 = _b64.b64encode(buf.getvalue()).decode()
+        return (f'<div style="width:36mm;height:36mm"><img src="data:image/svg+xml;base64,{b64}" '
+                f'style="width:36mm;height:36mm" alt="{origin}"></div>'
+                f'<div style="font-size:7.5pt;color:{SL8};margin-top:3mm">{origin.replace("https://","")}</div>')
+    except Exception:
+        shown = origin.replace("https://", "")
+        return (f'<div style="font-size:11pt;font-weight:600;letter-spacing:.02em;color:{BLUE}">{shown}</div>'
+                f'<div style="font-size:7.5pt;color:{SL8};margin-top:2mm">访问官网下载</div>')
+
 def og_card(lang: str = "zh"):
     """OG 卡：文案全部来自 i18n，脚本里不留字面句子。
 

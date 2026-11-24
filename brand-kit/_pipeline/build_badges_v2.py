@@ -126,9 +126,9 @@ h2{{font-size:22px;font-weight:800;margin:30px 0 13px;padding-bottom:9px;border-
 <div class="eyebrow">heyta · Brand Assets</div>
 <h1>成长标识体系 Growth &amp; Milestone System</h1>
 <div class="lead">依据 heyta 已实现的「激励与成长体系」：<b>17 个里程碑</b>（打卡/专注/完成/使用天数四维，<b>只增不减、无稀有度</b>）、<b>8 个身份标签</b>、<b>8 个活动分类色槽</b>与少量任务状态胶囊。没有稀有度收藏、没有排行榜、没有货币。</div>
-<h2>里程碑 · Milestones（17，累计制，只增不减）</h2>
+<h2>里程碑 · Milestones（{len(MILESTONES)}，累计制，只增不减）</h2>
 {ms_block("checkIns")}{ms_block("focusHours")}{ms_block("tasks")}{ms_block("activeDays")}
-<h2>身份标签 · Identity Tags（8，可隐藏/可关闭）</h2>
+<h2>身份标签 · Identity Tags（{len(IDENTITY)}，可隐藏/可关闭）</h2>
 <div class="chips">{idcells}</div>
 <h2>活动分类色槽 · Category Slots（颜色由用户赋义，App 不判健康）</h2>
 <div class="cats">{cats}</div>
