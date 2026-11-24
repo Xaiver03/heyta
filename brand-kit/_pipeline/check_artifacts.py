@@ -905,6 +905,58 @@ if _found_bad:
 else:
     emit(f"✅ 反例主张都在 stance.py 名单内（{len(ST.ANTI_FEATURES)} 条）")
 
+# 32) index.html 必须包含全部应有卡片（缺卡曾静默发生过）
+INDEX_HTML = os.path.join(WD, "index.html")
+if os.path.exists(INDEX_HTML):
+    idx = open(INDEX_HTML, encoding="utf-8").read()
+    REQUIRED_TITLES = [
+        "成长标识体系图鉴", "品牌手册", "字标 + 图标锁版", "图标集", "04 位图素材",
+        "品牌主视觉海报", "核心能力海报", "成长里程碑海报", "宣传折页", "产品手册",
+        "品牌周边", "社交 OG 卡片", "社交方图", "幻灯片模板", "更新日志卡",
+        "色彩系统", "活动分类色卡",
+    ]
+    miss_titles = [t for t in REQUIRED_TITLES if t not in idx]
+    if miss_titles:
+        fail(f"index.html 缺卡片：{miss_titles}（多半是配图路径改名后没同步 build_index.py）")
+    else:
+        emit(f"✅ index.html 含全部 {len(REQUIRED_TITLES)} 张卡片")
+
+# 33) index 卡片副标题里的数字必须等于现量值
+if os.path.exists(INDEX_HTML):
+    src_ms2 = open(DOMAIN_MILESTONES, encoding="utf-8").read() if os.path.exists(DOMAIN_MILESTONES) else ""
+    n_ms2 = sum(len(re.findall(r"\d+", t)) for _k, t in
+                re.findall(r"\{\s*kind:\s*'\w+',\s*thresholds:\s*\[([^\]]+)\]", src_ms2)) \
+        if False else sum(len(re.findall(r"\d+", t)) for _k, t in
+                          re.findall(r"\{\s*kind:\s*'(\w+)',\s*thresholds:\s*\[([^\]]+)\]", src_ms2))
+    n_tags2 = len([f for f in os.listdir(os.path.join(WD, "02-badges/identity")) if f.endswith(".svg")])
+    n_cat2 = len([k for k in RT.LIGHT if re.fullmatch(r"--ht-color-category-\d+", k)])
+    n_icons2 = len([f for f in os.listdir(os.path.join(WD, "03-icons")) if f.endswith(".svg")])
+    expect_sub = f"{n_ms2} 里程碑 · {n_tags2} 身份标签 · {n_cat2} 分类色槽"
+    if expect_sub not in idx:
+        fail(f"index 图鉴副标题不是现量值：应为「{expect_sub}」")
+    if f"线性 {n_icons2} 枚" not in idx:
+        fail(f"index 图标集副标题应为「线性 {n_icons2} 枚」")
+    if f"{n_ms2} 里程碑 · {n_tags2} 身份标签 · {n_cat2} 分类色槽" in idx and f"线性 {n_icons2} 枚" in idx:
+        emit(f"✅ index 副标题数字为现量值（{expect_sub}；线性 {n_icons2} 枚）")
+
+# 34) 反例名单必须与文档里的激励体系红线对得上（三条：只与自己比 / 不发行货币 / 不制造愧疚）
+REDLINE_DOC = os.environ.get(
+    "BRAND_KIT_REDLINE_DOC",
+    os.path.join(ROOT, "docs/plans/habits-alignment.md"),
+)
+if os.path.exists(REDLINE_DOC):
+    rd = open(REDLINE_DOC, encoding="utf-8").read()
+    need = ["只与自己的过去比", "不发行货币", "颜色由用户赋义"]
+    miss_rd = [t for t in need if t not in rd]
+    # 名单侧要有对应项（排行榜↔只与自己比；货币经济↔不发行货币）
+    anti = set(getattr(ST, "ANTI_FEATURES", []))
+    need_anti = {"排行榜", "货币经济"}
+    miss_anti = sorted(need_anti - anti)
+    if miss_rd or miss_anti:
+        fail(f"反例名单与红线文档不一致：文档缺 {miss_rd} / 名单缺 {miss_anti}")
+    else:
+        emit(f"✅ 反例名单与激励体系三条红线对得上（{len(need)} 条）")
+
 if not fails:
     if JSON_OUT:
         import json as _j

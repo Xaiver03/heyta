@@ -1,25 +1,69 @@
 # -*- coding: utf-8 -*-
 """heyta brand-kit 索引：index.html + manifest.json（扫描真实文件生成，可校验）"""
-import os, json, time, sys
+import os, json, time, sys, re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import read_tokens as RT
 WD=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def rel(p): return os.path.relpath(p,WD)
 def card(img,title,sub,href):
     return f'<a class="c" href="{href}"><div class="im"><img src="{img}"></div><div class="t">{title}</div><div class="s">{sub}</div></a>'
+
+# ── 卡片副标题里的数字也必须是**现量的**，不能手抄 ────────────────────
+import re as _re, subprocess as _sp
+
+
+def _count_milestones():
+    f = os.path.join(os.path.dirname(WD), "packages/domain/src/milestones.ts")
+    src = open(f, encoding="utf-8").read()
+    return sum(len(_re.findall(r"\d+", ths)) for _k, ths in
+               _re.findall(r"\{\s*kind:\s*'\w+',\s*thresholds:\s*\[([^\]]+)\]", src) and
+               [(k, t) for k, t in _re.findall(r"\{\s*kind:\s*'(\w+)',\s*thresholds:\s*\[([^\]]+)\]", src)])
+
+
+def _count_dir(rel_dir, ext=".svg"):
+    d = os.path.join(WD, rel_dir)
+    return len([f for f in os.listdir(d) if f.endswith(ext)]) if os.path.isdir(d) else 0
+
+
+def _pdf_pages(rel_pdf):
+    p = os.path.join(WD, rel_pdf)
+    try:
+        out = _sp.run(["pdfinfo", p], capture_output=True, text=True, timeout=20).stdout
+        m = _re.search(r"^Pages:\s+(\d+)", out, _re.M)
+        return int(m.group(1)) if m else None
+    except Exception:
+        return None
+
+
+_N_MS = _count_milestones()
+_N_TAGS = _count_dir("02-badges/identity")
+# 分类"色槽"数是 token 里的 color.category-1..8，不是目录里的文件数（目录只有一张色卡）
+_N_CAT = len([k for k in RT.LIGHT if re.fullmatch(r"--ht-color-category-\d+", k)])
+_N_ICONS = _count_dir("03-icons")
+_BOOK_PAGES = _pdf_pages("00-brand-foundation/brand-book.pdf")
+_MANUAL_PAGES = _pdf_pages("07-product-manual/heyta_product-manual.pdf")
+
 cards=[]
 def add(img,title,sub,href):
-    if os.path.exists(os.path.join(WD,img)): cards.append(card(img,title,sub,href))
-add("02-badges/badge-catalogue.png","成长标识体系图鉴","17 里程碑 · 8 身份标签 · 8 分类色槽","02-badges/badge-catalogue.pdf")
-add("00-brand-foundation/_preview/page-01.png","品牌手册 Brand Book","8 页 · 标识/色彩/字体/成长","00-brand-foundation/brand-book.pdf")
+    """加一张卡。缺图**不许静默跳过** —— 静默的代价实测过一次：
+    宣传册改名后这里仍指旧文件名，于是「宣传折页」那张卡悄悄从索引里消失了，
+    而索引照样生成成功。产品预览图（`_preview/`）允许缺席，其余必须是硬错。"""
+    if os.path.exists(os.path.join(WD,img)):
+        cards.append(card(img,title,sub,href))
+    elif "/_preview/" in img or img.startswith("00-brand-foundation/_preview"):
+        pass
+    else:
+        raise SystemExit(f"索引要引用的图不存在：{img}（改名/删文件后要同步这里）")
+add("02-badges/badge-catalogue.png","成长标识体系图鉴",f"{_N_MS} 里程碑 · {_N_TAGS} 身份标签 · {_N_CAT} 分类色槽","02-badges/badge-catalogue.pdf")
+add("00-brand-foundation/_preview/page-01.png","品牌手册 Brand Book",(f"{_BOOK_PAGES} 页 · 标识/色彩/字体/成长" if _BOOK_PAGES else "标识/色彩/字体/成长"),"00-brand-foundation/brand-book.pdf")
 add("01-logo/lockup-horizontal@1x.png","字标 + 图标锁版","「hey.」+「h」","01-logo/lockup-horizontal.svg")
-add("03-icons/icon-sheet.png","图标集 Icon Set","线性 26 枚","03-icons/icon-sheet.html")
+add("03-icons/icon-sheet.png","图标集 Icon Set",f"线性 {_N_ICONS} 枚","03-icons/icon-sheet.html")
 add("04-imagery/contact-sheet.png","04 位图素材","本地 MOSS-Image · 背景/插画/周边","04-imagery/contact-sheet.png")
 add("05-posters/01_品牌主视觉.png","品牌主视觉海报","A3 · PDF/PNG","05-posters/01_品牌主视觉.pdf")
 add("05-posters/02_核心能力.png","核心能力海报","A3 · PDF/PNG","05-posters/02_核心能力.pdf")
 add("05-posters/03_成长里程碑.png","成长里程碑海报","A3 · PDF/PNG","05-posters/03_成长里程碑.pdf")
-add("06-brochure/brochure_front.png","宣传折页","A4 三折 · 正反面","06-brochure/heyta_brochure_front.pdf")
-add("07-product-manual/heyta_product-manual_cover.png","产品手册","10 页 PDF","07-product-manual/heyta_product-manual.pdf")
+add("06-brochure/heyta_brochure_front.png","宣传折页","A4 三折 · 正反面","06-brochure/heyta_brochure_front.pdf")
+add("07-product-manual/heyta_product-manual_cover.png","产品手册",(f"{_MANUAL_PAGES} 页 PDF" if _MANUAL_PAGES else "PDF"),"07-product-manual/heyta_product-manual.pdf")
 add("08-merch/merch-sheet.png","品牌周边","笔记本/马克杯/帆布包/贴纸","08-merch/merch-sheet.pdf")
 add("09-social/og-card_1200x630.png","社交 OG 卡片","1200×630","09-social/og-card_1200x630.png")
 add("09-social/post_1080x1080.png","社交方图","1080×1080","09-social/post_1080x1080.png")
