@@ -30,16 +30,16 @@
 export type AiCapabilityEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
-    'COMMENT' | 'ATTACHMENT' | 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' |
-    'MIGRATION' | 'RECOVERY' | 'ALL';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'CALENDAR_EVENT' |
+    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' | 'TASK_REPEAT_CFG' |
+    'GLOBAL_CONFIG' | 'MIGRATION' | 'RECOVERY' | 'ALL';
 
 /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
 export type AiCapabilityModeledEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
-    'COMMENT' | 'ATTACHMENT';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'CALENDAR_EVENT' |
+    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT';
 
 /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
 export type AiCapabilityToolKind = 'read' | 'write';
@@ -104,8 +104,8 @@ export const AI_CAPABILITY_MANIFEST =
   },
   'coverage': {
     'covered': 11,
-    'denominator': 11,
-    'ratio': '11/11',
+    'denominator': 12,
+    'ratio': '11/12',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -117,6 +117,7 @@ export const AI_CAPABILITY_MANIFEST =
     'FOCUS_SESSION',
     'REMINDER',
     'EVENT',
+    'CALENDAR_EVENT',
     'COMMENT',
     'ATTACHMENT',
   ],
@@ -132,6 +133,7 @@ export const AI_CAPABILITY_MANIFEST =
     'PREFERENCE_CORRECTION',
     'REMINDER',
     'EVENT',
+    'CALENDAR_EVENT',
     'ASSISTANT_TURN',
     'COMMENT',
     'ATTACHMENT',
@@ -150,7 +152,9 @@ export const AI_CAPABILITY_MANIFEST =
       'reason': '助手对话的一行记录（ADR-0045 D-4 (ii)）：它是**对话本身**，不是用户可操作的业务实体，而且正文里含 provider 的回复 —— 给 AI 读写它的工具等于让模型改写自己的上下文',
     },
   ],
-  'entityTypesWithoutTools': [] as const,
+  'entityTypesWithoutTools': [
+    'CALENDAR_EVENT',
+  ],
   'entities': [
     {
       'entityType': 'TASK',
@@ -210,6 +214,10 @@ export const AI_CAPABILITY_MANIFEST =
         'move_project',
         'restore_project',
         'set_project_color',
+        'set_project_icon',
+        'set_project_view_mode',
+        'set_project_kind',
+        'set_project_show_in_smart_list',
       ],
     },
     {
@@ -335,6 +343,14 @@ export const AI_CAPABILITY_MANIFEST =
         'restore_event',
         'archive_event',
       ],
+    },
+    {
+      'entityType': 'CALENDAR_EVENT',
+      'materialized': true,
+      'countsTowardCoverage': true,
+      'coverage': 'none',
+      'readToolNames': [] as const,
+      'writeToolNames': [] as const,
     },
     {
       'entityType': 'ASSISTANT_TURN',
@@ -1239,6 +1255,82 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'set_project_icon',
+      'kind': 'write',
+      'entityType': 'PROJECT',
+      'description': '给一个清单（项目）指定图标（闭集里的 key，如 list / star / briefcase / home），或清除回到默认。🔴 仅在用户明确要求某个图标时调用；不要自行替用户选图标。省略 icon = 清除。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'icon',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'set_project_view_mode',
+      'kind': 'write',
+      'entityType': 'PROJECT',
+      'description': '设置一个清单（项目）的默认视图：list（列表）/ board（看板）/ calendar（日历）/ timeline（时间线）。仅改变展示排布，不改变任务本身。省略 viewMode = 清除回到 list。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'viewMode',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'set_project_kind',
+      'kind': 'write',
+      'entityType': 'PROJECT',
+      'description': '设置一个清单（项目）的类型：tasks（默认展示任务）/ notes（默认展示便签）。它只表达"打开这条清单先看到什么"，不限制内容、不合并便签实体。省略 kind = 清除回到 tasks。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'kind',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'set_project_show_in_smart_list',
+      'kind': 'write',
+      'entityType': 'PROJECT',
+      'description': '设置一个清单（项目）是否在智能清单 / 汇总里显示。缺省为 true（显示）；传 false 即隐藏。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'showInSmartList',
+          'type': 'boolean',
+          'required': true,
+        },
+      ],
+    },
+    {
       'name': 'create_habit',
       'kind': 'write',
       'entityType': 'HABIT',
@@ -1914,7 +2006,7 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 11 个，其中 11 个**读和写都有**工具（11/11）。',
+  '覆盖口径：用户可操作的已物化实体 12 个，其中 11 个**读和写都有**工具（11/12）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
@@ -1954,7 +2046,7 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] set_task_checklist（taskId*:string, items*:array）',
   '  · [写] toggle_checklist_item（taskId*:string, itemText*:string, done*:boolean）',
   '  · [写] set_task_assignee（taskId*:string, assigneeUserId:string）',
-  '- PROJECT —— 读和写都有（读 1 / 写 7）',
+  '- PROJECT —— 读和写都有（读 1 / 写 11）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',
   '  · [写] rename_project（projectId*:string, name*:string）',
@@ -1963,6 +2055,10 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] move_project（projectId*:string, parentId:string）',
   '  · [写] restore_project（projectId*:string）',
   '  · [写] set_project_color（projectId*:string, color:number）',
+  '  · [写] set_project_icon（projectId*:string, icon:string）',
+  '  · [写] set_project_view_mode（projectId*:string, viewMode:string）',
+  '  · [写] set_project_kind（projectId*:string, kind:string）',
+  '  · [写] set_project_show_in_smart_list（projectId*:string, showInSmartList*:boolean）',
   '- TAG —— 读和写都有（读 1 / 写 4）',
   '  · [读] list_tags（无参数）',
   '  · [写] create_tag（name*:string）',
@@ -2017,8 +2113,8 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] rename_attachment（attachmentId*:string, fileName*:string）',
   '  · [写] remove_attachment（attachmentId*:string）',
   '',
-  '二、产品里有、但我没有任何工具的实体（0 个）—— 实体存在，只是我没配工具',
-  '- （无）',
+  '二、产品里有、但我没有任何工具的实体（1 个）—— 实体存在，只是我没配工具',
+  '- CALENDAR_EVENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '',
   '三、不计入上面分母的已物化实体（设计如此，不是遗漏）',
   '- AI_FEEDBACK：AI 建议处置的落库载体（用户不直接创建它）',

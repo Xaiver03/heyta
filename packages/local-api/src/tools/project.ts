@@ -101,6 +101,47 @@ const TOOLS: readonly LocalApiTool[] = [
     risk: 'write',
     defaultEnabled: false,
   },
+  {
+    name: 'set_project_icon',
+    // 图标 = 用户赋义的身份标记。AI 只在用户**明确点名**某个图标时执行（§5.4）。
+    egressFields: [],
+    description:
+      '给一个清单（项目）指定图标（闭集里的 key，如 list / star / briefcase / home），或清除回到默认。' +
+      '🔴 仅在用户明确要求某个图标时调用；不要自行替用户选图标。省略 icon = 清除。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_project_view_mode',
+    // 视图是展示方式，不删数据 ⇒ `write`。
+    egressFields: [],
+    description:
+      '设置一个清单（项目）的默认视图：list（列表）/ board（看板）/ calendar（日历）/ timeline（时间线）。' +
+      '仅改变展示排布，不改变任务本身。省略 viewMode = 清除回到 list。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_project_kind',
+    egressFields: [],
+    description:
+      '设置一个清单（项目）的类型：tasks（默认展示任务）/ notes（默认展示便签）。' +
+      '它只表达"打开这条清单先看到什么"，不限制内容、不合并便签实体。省略 kind = 清除回到 tasks。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_project_show_in_smart_list',
+    egressFields: [],
+    description:
+      '设置一个清单（项目）是否在智能清单 / 汇总里显示。缺省为 true（显示）；传 false 即隐藏。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /** 参数 schema（给模型看的字段清单）。 */
@@ -178,6 +219,45 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       color: { type: 'number', description: '颜色槽位 1–8 的整数；省略表示清除颜色。' },
     },
     required: ['projectId'],
+    additionalProperties: false,
+  },
+  set_project_icon: {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string', description: '要设图标的清单标识。' },
+      icon: { type: 'string', description: '图标 key（闭集）；省略表示清除。' },
+    },
+    required: ['projectId'],
+    additionalProperties: false,
+  },
+  set_project_view_mode: {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string', description: '要设默认视图的清单标识。' },
+      viewMode: {
+        type: 'string',
+        description: '默认视图：list / board / calendar / timeline；省略表示清除回到 list。',
+      },
+    },
+    required: ['projectId'],
+    additionalProperties: false,
+  },
+  set_project_kind: {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string', description: '要设类型的清单标识。' },
+      kind: { type: 'string', description: '清单类型：tasks / notes；省略表示清除回到 tasks。' },
+    },
+    required: ['projectId'],
+    additionalProperties: false,
+  },
+  set_project_show_in_smart_list: {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string', description: '要设置的清单标识。' },
+      showInSmartList: { type: 'boolean', description: '是否在智能清单 / 汇总里显示。' },
+    },
+    required: ['projectId', 'showInSmartList'],
     additionalProperties: false,
   },
 };
@@ -329,6 +409,99 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
           action: 'set-project-color',
           projectId: a['projectId'],
           ...(typeof color === 'number' ? { color } : {}),
+        },
+      };
+    }
+
+    case 'set_project_icon': {
+      const unknown = Object.keys(a).filter((key) => key !== 'projectId' && key !== 'icon');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_project_icon 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '') {
+        return { ok: false, message: 'set_project_icon 需要 projectId。' };
+      }
+      // 形状检查只到"非空字符串"为止：闭集词表归动作层（本包看不见 domain）。
+      if (a['icon'] !== undefined && (typeof a['icon'] !== 'string' || a['icon'].trim() === '')) {
+        return { ok: false, message: 'set_project_icon 的 icon 必须是非空字符串（要清除请省略）。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-project-icon',
+          projectId: a['projectId'],
+          ...(typeof a['icon'] === 'string' ? { icon: a['icon'] } : {}),
+        },
+      };
+    }
+
+    case 'set_project_view_mode': {
+      const unknown = Object.keys(a).filter((key) => key !== 'projectId' && key !== 'viewMode');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_project_view_mode 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '') {
+        return { ok: false, message: 'set_project_view_mode 需要 projectId。' };
+      }
+      if (
+        a['viewMode'] !== undefined &&
+        (typeof a['viewMode'] !== 'string' || a['viewMode'].trim() === '')
+      ) {
+        return { ok: false, message: 'set_project_view_mode 的 viewMode 必须是非空字符串（要清除请省略）。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-project-view-mode',
+          projectId: a['projectId'],
+          ...(typeof a['viewMode'] === 'string' ? { viewMode: a['viewMode'] } : {}),
+        },
+      };
+    }
+
+    case 'set_project_kind': {
+      const unknown = Object.keys(a).filter((key) => key !== 'projectId' && key !== 'kind');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_project_kind 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '') {
+        return { ok: false, message: 'set_project_kind 需要 projectId。' };
+      }
+      if (a['kind'] !== undefined && (typeof a['kind'] !== 'string' || a['kind'].trim() === '')) {
+        return { ok: false, message: 'set_project_kind 的 kind 必须是非空字符串（要清除请省略）。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-project-kind',
+          projectId: a['projectId'],
+          ...(typeof a['kind'] === 'string' ? { kind: a['kind'] } : {}),
+        },
+      };
+    }
+
+    case 'set_project_show_in_smart_list': {
+      const unknown = Object.keys(a).filter(
+        (key) => key !== 'projectId' && key !== 'showInSmartList',
+      );
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_project_show_in_smart_list 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['projectId'] !== 'string' || a['projectId'].trim() === '') {
+        return { ok: false, message: 'set_project_show_in_smart_list 需要 projectId。' };
+      }
+      // `showInSmartList` 是**必填布尔**：缺了它或给非布尔都不能当"默认为 true"悄悄放行
+      //（那会让用户以为关掉了、其实没关）。
+      const show = a['showInSmartList'];
+      if (typeof show !== 'boolean') {
+        return { ok: false, message: 'set_project_show_in_smart_list 的 showInSmartList 必须是 true 或 false。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-project-show-in-smart-list',
+          projectId: a['projectId'],
+          showInSmartList: show,
         },
       };
     }

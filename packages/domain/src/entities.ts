@@ -17,6 +17,7 @@ import type { EntityType, TaskAutomationSource } from '@heyta/shared-schema';
 
 import type { CategorySlot } from './activity-categories.js';
 import type { LocalDate } from './date.js';
+import type { ProjectIcon, ProjectKind, ProjectViewMode } from './project-settings.js';
 
 /** 所有实体共有的元数据。 */
 export interface EntityBase {
@@ -490,6 +491,34 @@ export interface Project extends EntityBase {
    * 但清单**内容**仍在清单密钥之后。
    */
   shareId?: string;
+  /**
+   * 清单图标：**闭集词表里的 key**（`'briefcase'`），不是字形、也不是颜色。
+   * 取值来自 `project-settings.ts#PROJECT_ICONS`，读时用 `parseProjectIcon` 校验。
+   *
+   * 🔴 一律可选（AGENTS §3.3）：磁盘上已有的清单没有这个字段，必填只会在
+   * 回放/读取时炸，而构建是绿的。没设过 → 界面上按缺省绘制（不落库）。
+   */
+  icon?: ProjectIcon;
+  /**
+   * 该清单**默认**用哪种视图：`list` / `board` / `calendar` / `timeline`。
+   * 只改变展示排布，不改变底层数据（同一批任务）。缺省 `list`。
+   *
+   * 🔴 可选 —— AGENTS §3.3。缺省值只有一个出口：`project-settings.ts#projectViewModeOf`。
+   */
+  viewMode?: ProjectViewMode;
+  /**
+   * 清单类型：这条清单**默认先看到什么**（`tasks` / `notes`），缺省 `tasks`。
+   *
+   * 🔴 它不合并 NOTE：独立便签仍是 `NOTE` 实体、靠 `Note.projectId` 归属。
+   *    这里只表达"打开这条清单先展示任务还是便签"，不限制内容、不建第二份实体。
+   * 可选 —— AGENTS §3.3；缺省出口 `project-settings.ts#projectKindOf`。
+   */
+  kind?: ProjectKind;
+  /**
+   * 是否在智能清单 / 汇总里显示。缺省 `true`（新清单默认就该进汇总）。
+   * 可选 —— AGENTS §3.3；缺省出口 `project-settings.ts#projectShowInSmartListOf`。
+   */
+  showInSmartList?: boolean;
 }
 
 export interface Tag extends EntityBase {

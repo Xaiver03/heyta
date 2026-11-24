@@ -93,6 +93,13 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
 
   // 批6：清单 / 习惯属性
   set_project_color: { projectId: 'p1', color: 3 },
+
+  // 2026-11-24 工作包 A：清单级设置（图标 / 视图 / 类型 / 智能清单）
+  set_project_icon: { projectId: 'p1', icon: 'star' },
+  set_project_view_mode: { projectId: 'p1', viewMode: 'board' },
+  set_project_kind: { projectId: 'p1', kind: 'notes' },
+  set_project_show_in_smart_list: { projectId: 'p1', showInSmartList: false },
+
   set_habit_color: { habitId: 'h1', color: 2 },
   set_habit_icon: { habitId: 'h1', icon: 'book' },
   set_habit_goal: { habitId: 'h1', target: 3 },

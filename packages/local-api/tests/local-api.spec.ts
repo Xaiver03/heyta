@@ -110,7 +110,8 @@ describe('默认值 —— 一切都是关的', () => {
     expect(MAX_TOOLS_PER_ENTITY).toBe(7);
     // 2026-11-22 工具层补全：为 TASK/PROJECT/NOTE 各开单列上限（删除/归档/移动等生命周期工具）。
     expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.TASK).toBe(33);
-    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.PROJECT).toBe(10);
+    // 2026-11-24 工作包 A：PROJECT 加清单级设置 4 个写工具（8 → 12）。
+    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.PROJECT).toBe(12);
     expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.NOTE).toBe(10);
     // 2026-11-23 批次6：HABIT 加颜色/图标/目标/频率 4 个写工具（5→9，上限放到 12）。
     expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.HABIT).toBe(12);
