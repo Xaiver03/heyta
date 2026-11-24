@@ -117,15 +117,17 @@ describe('四象限：分桶来自领域层，不在这里重算', () => {
     expect(cards[1]?.tasks.map((t) => t.id)).toEqual(['later']);
   });
 
-  it('桶内顺序就是领域层给的顺序（截止升序，本层不重排）', () => {
+  it('桶内顺序按手动顺序（`Task.order`）—— 与截止时间无关，拖拽排序才不会被弹回', () => {
     const cards = toQuadrantCards(
       [
-        task({ id: 'b', important: true, dueDate: NOW + 2 * HOUR }),
-        task({ id: 'a', important: true, dueDate: NOW + HOUR }),
+        // 截止更早（NOW+1h）但 order=2；另一条截止更晚但 order=1。
+        task({ id: 'a', important: true, dueDate: NOW + HOUR, order: 2 }),
+        task({ id: 'b', important: true, dueDate: NOW + 2 * HOUR, order: 1 }),
       ],
       NOW,
     );
-    expect(cards[0]?.tasks.map((t) => t.id)).toEqual(['a', 'b']);
+    // 若仍按截止升序会是 ['a','b']；手动顺序要求 ['b','a']。
+    expect(cards[0]?.tasks.map((t) => t.id)).toEqual(['b', 'a']);
   });
 
   it('count 是 tasks.length 的显式投影（宿主不必再 .length）', () => {

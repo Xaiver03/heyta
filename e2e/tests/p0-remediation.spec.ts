@@ -144,10 +144,8 @@ test.describe('P0 整改视觉基线', () => {
 
     await page.screenshot({ path: `${SHOTS}/w5-quadrant-after.png` });
     await expect(page.getByText('拖任务到这里')).toHaveCount(1);
-    // 槽位从 1 起（`quadrant-count-${slot}`，与 jsdom 判据同源）。
-    for (let n = 1; n <= 4; n += 1) {
-      await expect(page.locator(`[data-testid="quadrant-count-${n}"]`)).toBeVisible();
-    }
+    // 2026-11-24：标题行不再显示计数数字（产品负责人：「不需要显示数字」）。
+    await expect(page.locator('[data-testid^="quadrant-count-"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="quadrant-help"] summary')).toBeVisible();
   });
 

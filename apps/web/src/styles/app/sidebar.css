@@ -193,7 +193,7 @@
   （英文界面因此从 `LISTS` 变成 `Lists`，与 Notion / Linear 的分组头一致。）
 */
 .ht-nav__section {
-  padding: var(--ht-space-3) var(--ht-space-2) var(--ht-space-1);
+  padding: var(--ht-space-3) var(--ht-space-3) var(--ht-space-1);
   color: var(--ht-color-foreground-muted);
 }
 
@@ -207,7 +207,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--ht-space-1);
-  padding-inline: var(--ht-space-2);
+  padding-inline: var(--ht-space-3);
 }
 
 /* 标题不再自带横向内边距 —— 行的留白已由上面负责，否则 + 与文字不同基线。 */
@@ -220,9 +220,23 @@
    不新开一级排印 —— 侧栏的层级只有「组名 / 行 / 说明」这三档。 */
 .ht-sidebar__organizer-hint {
   margin: 0;
-  padding-inline: var(--ht-space-2);
+  padding-inline: 0;
   padding-block-end: var(--ht-space-1);
   color: var(--ht-color-foreground-muted);
+}
+
+/*
+ * 「清单 / 标签」那一列的外层容器自带 12px 内距（`ProjectsPanel` 的 `aside`
+ * 上 `padding: space-3`），所以它里面的区块头与说明**不再各自追加横向内距** ——
+ * 否则它们会比同列的行走得更靠右，标题/`+`/行尾动作三条边对不上。
+ * （已存视图那一列没有 aside，`.ht-sidebar__organizer-heading` 自己给 12。）
+ *
+ * 这样整个侧栏只有一条左对齐脊线（图标/标题左缘）和一条右对齐脊线
+ * （`+` / `×` / 计数的右缘），见 `.ht-nav__item` 与 `.ht-sidebar__filter-item`。
+ */
+.ht-sidebar__body > aside .ht-sidebar__organizer-heading,
+.ht-sidebar__body > aside .ht-sidebar__organizer-hint {
+  padding-inline: 0;
 }
 
 /*
@@ -236,6 +250,90 @@
 .ht-sidebar__tools {
   margin-top: auto;
   padding-block-start: var(--ht-space-2);
+}
+
+/*
+ * 已存视图（D1，2026-11-24）。
+ *
+ * 区块头复用 `.ht-sidebar__organizer-heading` + `.ht-sidebar__organizer-add`
+ * （与「清单 / 标签」同一套形状：标题 + 一枚 + 图标）。这里只补
+ * **列表行**与**创建表单**两块 —— 之前这两块一类都没有，所以整个面板渲成
+ * 裸堆叠（满宽输入框 + 单独下拉 + 按钮，没有间距、没有分隔），正是它看起来
+ * "从回收站里冒出来"的原因。
+ */
+.ht-sidebar__filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-sidebar__filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+/* 一行 = 一个可套用的视图 + 一枚删除图标（两个独立按钮，不嵌套）。
+   尾部那一枚 × 的右缘要落在与 `.ht-sidebar__organizer-add`（+）、
+   `.ht-nav__count` 同一条右脊线上 —— 所以这里补 12px 右内距。 */
+.ht-sidebar__filter-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  padding-inline-end: var(--ht-space-3);
+}
+
+.ht-sidebar__filter-apply {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* 视图名过长时省略，不撑宽侧栏（与清单行的处理同一条）。 */
+.ht-sidebar__filter-apply__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-sidebar__filter-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-1) var(--ht-space-2) var(--ht-space-2);
+}
+
+.ht-sidebar__filter-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+}
+
+.ht-sidebar__filter-form__error {
+  margin: 0;
+  color: var(--ht-color-danger);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+}
+
+/* 组合筛选：每条条件一小块（凹陷底），维度与取值竖排；>1 条时块尾有删除图标。 */
+.ht-sidebar__filter-conds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.ht-sidebar__filter-cond {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-sidebar__filter-cond-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .ht-sidebar__organizer-add {
@@ -263,7 +361,7 @@
   gap: var(--ht-space-3);
   /* 44px 触控下限 —— 用 token 而不是写死，测试守着这个值 */
   min-block-size: var(--ht-touch-target-min);
-  padding: 0 var(--ht-space-4);
+  padding: 0 var(--ht-space-3);
   border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
   font-weight: var(--ht-font-weight-medium);

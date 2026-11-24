@@ -224,7 +224,7 @@
 
 | 事实 | 现量 | 它决定了什么 |
 |---|---|---|
-| 筛选语义只有一份所有者 | `packages/domain/src/task-filter.ts` 的 `TaskFilter` 是**判别联合**（7 档：`all / today / next7Days / completed / quadrant / project / tag`），文件头写明"加一个分支会让所有 `switch` 在编译期被检查到" | 用户能存的查询**只能是这个联合的一个值**；另造一套查询语言等于给四端各写一份谓词 |
+| 筛选语义只有一份所有者 | `packages/domain/src/task-filter.ts` 的 `TaskFilter` 是**判别联合**（`SimpleTaskFilter` 8 档：`all / today / tomorrow / next7Days / completed / quadrant / project / tag`，外加 `compound` 组合分支），文件头写明"加一个分支会让所有 `switch` 在编译期被检查到" | 用户能存的查询**只能是这个联合的一个值**；另造一套查询语言等于给四端各写一份谓词 |
 | 服务端读不到明文 | `server/prisma/schema.prisma` 里 op 的 `payload Json` + `isPayloadEncrypted`，个人 op-log 端到端加密 | 🔴 "云端智能清单 / 服务端按字段筛"这一类做法**直接不成立**；筛选永远在客户端共享层，已存视图只是 `TaskFilter` 的一份抄件 |
 | 视图定义现在根本不持久 | `apps/web/src/features/tasks/store.ts` 的 `filter` 初值是 `{ kind: 'all' }`，`setFilter` 只改内存；全仓 `grep -rln "savedFilter\|SavedView\|smartList\|customFilter" packages apps/*/src server/src` ⇒ **0 命中** | 这一格不是"改一半"，是从零加；同时说明**没有存量数据要平移** |
 
@@ -234,6 +234,11 @@
    不新造第二套排序概念。⚠️ **不做自由查询构造器**：联合的每个分支都自动可存，将来加一档
    （例如"本周"）**不用改视图层**就能被存 —— 这是选判别联合而不是 `{field, op, value}` 的唯一理由，
    也正是那份文件头警告的反面（宽形状下"忘了处理新分支"表现为运行时静默返回空列表）。
+   🔴 **2026-11-24 扩展**：产品负责人批准加入滴答式**多条件组合** —— `TaskFilter` 增 `compound` 分支
+   （`{ kind: 'compound', op: 'and' | 'or', conditions: FilterCondition[] }`）。条件只表达**一个正交维度**
+   （状态 / 日期 / 清单 / 标签 / 四象限），完成态由 `status` 条件显式表达 —— 不是把两个自带完成态口径的
+   简单视图硬求交（那会让"已完成 + 清单"恒为空）。语义与判据见 `task-filter.ts` 的 `FilterCondition` 注释
+   与 `packages/domain/tests/task-filter.spec.ts` 的 `compound 组合筛选`；界面在 `FilterPanel` 的多条件构建器。
 2. **跨不跨端**：**v1 设备本地，不同步。** 三条理由：① 升成实体要动 `packages/shared-schema`（不可逆层）
    并新写一条 ADR；② 视图回答的是"我怎么看法"，不是数据本身，两端不一致的代价是"手机看不到我在电脑上存的那条"，
    可感但不损坏数据；③ 移动端没有这一格的界面入口，先做同步等于替移动端拍形状。
@@ -280,7 +285,7 @@
 ### D4. 验证
 
 - [x] 过滤器面板可打开/关闭（D1 完成后）—— ✅ **五刀已落**（2026-11-06）：SavedFilter 类型 + localStorage + FilterPanel + 侧栏接线 + setFilter 联动；移动端 v1 本地不同步（裁决兑现）；翻案条件留在本文 D1 那节
-- [ ] 过滤条件生效（D1 完成后）—— 同上：拦路的不再是「没人拍边界」，是「没人写这一格界面」
+- [x] 过滤条件生效（D1 完成后）—— ✅ 2026-11-24：`FilterPanel` 重做成侧栏底部「已存视图」组（区块头 + 一枚 + 图标，点 + 才展开创建表单），支持**多条件 + 且/或**（滴答式高级筛选）：每条条件选一个正交维度（状态 / 日期 / 清单 / 标签 / 四象限）与取值，保存为 `TaskFilter` 的 `compound` 分支并一键套用；宿主接线走 `goToFilter`（切回任务视图 + `setFilter`），页头标题命中已存视图时显示它的名字。判据：`packages/domain/tests/task-filter.spec.ts`（含 `compound 组合筛选` 6 条）+ `apps/web/tests/filter-panel.spec.tsx`（4 条）+ 1280×900 真浏览器截图核过。
 - [x] 垃圾桶在侧栏底部可见（D2 完成后）—— `e2e/tests/sidebar-trash-anchor.spec.ts` 两枚（宽屏那一行在侧栏最下方且 rail 上没有第二枚；窄屏抽屉里点得到且真的切视图）
 - [x] 侧栏分组说明显示正确（D3 完成后）—— `projects-panel.spec.tsx`「D3 分组说明：标题下面那句"这一格装的是什么"」+ 空态那格「零清单零标签时，两块各给一句标题 + 一句说明」+ 浏览器腿 ③
 

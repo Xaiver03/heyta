@@ -972,6 +972,10 @@ export function createTaskActions(
         payload.dueDate = plan.dueDate;
         payload.dueDateLocal = null;
       }
+      // 跨象限拖到某个上下位置：顺序与象限合并成同一条 op（`undefined` = 不改）。
+      if (plan.order !== undefined) {
+        payload.order = plan.order;
+      }
       return update(entityId, payload);
     },
 

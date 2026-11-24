@@ -168,48 +168,16 @@ describe('W5 四象限空态减重', () => {
     });
   });
 
-  describe('b. 计数徽标：每格标题行都有计数', () => {
-    it('第 1 格计 2，空格计 0 —— 四格全有', () => {
-      seedTwoInQ1();
-      const container = mount(<WebQuadrantBoard />);
-
-      const counts = ['1', '2', '3', '4'].map(
-        (n) => container.querySelector(`[data-testid="quadrant-count-${n}"]`)?.textContent,
-      );
-      expect(counts).toEqual(['2', '0', '0', '0']);
-    });
-
-    it('徽标在标题行里（与象限名同一行），不在任务区', () => {
-      seedTwoInQ1();
-      const container = mount(<WebQuadrantBoard />);
-
-      const badge = container.querySelector('[data-testid="quadrant-count-1"]');
-      expect(badge, '第 1 格没有计数徽标').not.toBeNull();
-      /**
-       * 象限名在 RNW 里是一个 textContent **恰好等于**「马上做」的节点；
-       * 它的父节点就是标题行。徽标必须在**那一行**里 —— 放到任务区/
-       * 卡片脚上的话，`contains` 在这里就是 false（不是"往上总能找到"）。
-       */
-      const title = Array.from(
-        container.querySelectorAll('[data-testid="quadrant-cell-1"] div'),
-      ).find((el) => el.textContent === '马上做');
-      expect(title, '第 1 格里没找到象限名「马上做」').not.toBeUndefined();
-      expect(
-        title?.parentElement?.contains(badge ?? container),
-        '计数徽标不在象限名所在的那一行',
-      ).toBe(true);
-    });
-
-    it('无障碍名 = 现有象限名词条 + 数字（零新增词条）', () => {
+  describe('b. 不再显示计数数字（标题行只有色点 + 象限名）', () => {
+    it('四格都不渲染任何计数徽标', () => {
+      // 2026-11-24 产品负责人：「不用显示 4 个 0，不需要显示数字」。
       seedTwoInQ1();
       const container = mount(<WebQuadrantBoard />);
 
       expect(
-        container.querySelector('[data-testid="quadrant-count-1"]')?.getAttribute('aria-label'),
-      ).toBe('马上做 2');
-      expect(
-        container.querySelector('[data-testid="quadrant-count-2"]')?.getAttribute('aria-label'),
-      ).toBe('计划做 0');
+        container.querySelector('[data-testid^="quadrant-count-"]'),
+        '不该再显示任何计数数字',
+      ).toBeNull();
     });
   });
 
@@ -223,7 +191,7 @@ describe('W5 四象限空态减重', () => {
       // 🔴 jsdom 没有布局，"正文不可见"的 DOM 代理是 `open` 属性：
       // 浏览器对无 `open` 的 details 不渲染非 summary 子节点（平台行为）。
       expect(details?.hasAttribute('open'), '说明默认应该是折叠的').toBe(false);
-      expect(details?.querySelector('summary')?.textContent).toBe('拖动手柄或使用「移动」调整象限');
+      expect(details?.querySelector('summary')?.textContent).toBe('帮助');
     });
 
     it('正文沿用原文案与原 key（收进折叠 ≠ 删除），展开后 open 属性出现', () => {

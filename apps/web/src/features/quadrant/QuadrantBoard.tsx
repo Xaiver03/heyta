@@ -1,97 +1,79 @@
-import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 四象限矩阵（Web 壳）
  * ======================
  *
- * 🔴 M3 第六刀之后，这个文件**只剩接线**。
- *
- * 2×2 矩阵、每一格的标题/说明/色块/空格占位/无障碍名，以及**格里的任务行**，
+ * 2×2 矩阵、每格的标题/色块/空格占位/无障碍名，以及**格里的任务行**，
  * 全部由 `@heyta/ui` 的 `QuadrantBoard` 渲染 —— 与 mobile 是**同一份实现**。
- * 这里只回答 web 自己的两个问题：
+ * 本文件只回答 web 自己的两个问题：
  *
- *   1. 任务与"现在"从哪来 → `useTaskStore`（分桶/排序在 `@heyta/domain`
- *      的 `bucketByQuadrant`，投放计划在 `planQuadrantDrop`，本文件一条都不重算）；
- *   2. web 特有的交互 → **拖放**。`@dnd-kit/core` 是 DOM 库，装不进共享层
+ *   1. 任务与"现在"从哪来 → `useTaskStore`（分桶/排序在 `@heyta/ui` 的
+ *      `toQuadrantCards`，投放计划在 `@heyta/domain` 的 `planQuadrantDrop`，
+ *      排序计划在 `planManualReorder`，本文件一条都不重算）；
+ *   2. web 特有的交互 → **拖放**。`@dnd-kit/*` 是 DOM 库，装不进共享层
  *      （那等于让 iOS 去解析 DOM），所以拖放整套留在这里。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 🔴 W5（四象限空态减重，2026-10-06）之后本文件还回答三个 web 侧的问题：
+ * 🔴 2026-11-24：**没有任何按钮** —— 移动完全靠拖
  *
- *   3. **占位去重**：展示顺序里只有**第一个**空象限显示「拖任务到这里」
- *      （此前四个空格各念一遍，同屏最多 3 次）。哪一个是"第一个"用共享的
- *      `toQuadrantCards` 算，选词在 `copy.ts`；
- *   4. **计数徽标**：每格标题行行尾挂任务数（经共享层 `renderHeaderTrailing`
- *      插槽 —— 那一行是共享层渲染的，宿主没有别的入口）；
- *   5. **折叠帮助**：底部那段规则说明收进 `<details>`（DOM 元素进不了共享层，
- *      见下方案释）。summary 用现成「帮助」词条，正文沿用 `web.quadrant.footnote`。
+ * 产品负责人：「不要做什么移动和拖拽按钮……直接通过拖拽的方式来移动就可以了。
+ * 拖拽上下、移动到另外的上下位置都可以，不要搞什么按钮。」
  *
- * ─────────────────────────────────────────────────────────────────────────
- * 🔴 行的骨架来自共享 `TaskList`，于是**整行不再可拖**
+ * 于是这一版删掉了两样东西：
+ *   · 行尾的 `<select>「移动」`（下拉到别的象限）；
+ *   · 行尾的拖拽握把按钮。
+ * 换成：**整行就是拖拽节点**（`TaskList.renderRowWrapper` 注入 `useSortable` 的
+ * `ref` + `listeners`）。手势分两种落点：
+ *   · 同格内上下 → `planManualReorder` 写 `Task.order`（一条 op，中值法）；
+ *   · 跨到另一格 → `planQuadrantDrop` 改 important/dueDate，同时把落点位置的
+ *     `order` 一并写进**同一条 op**（见 `QuadrantTaskPatch.order`）。
  *
- * 迁移前 web 有一份本地 `DraggableTask`（只有一行标题文字，`useDraggable`
- * 挂在那个 `<li>` 上）。现在格里的行是**共享 `TaskList` 渲染的行** ——
- * 它带勾选框、统一几何、无障碍 role/state，但 web 拿不到"整行"那个节点
- * （`renderTrailing` 是行的**兄弟插槽**，不是行的包装）。
- *
- * 所以拖拽改成**行尾的握把**（下面 `DragHandle`，经 `renderTrailing` 注入）：
- *
- *   · 得到的是**真的**——象限卡里的行第一次有了勾选框与统一几何；
- *   · 失去的是**整行可拖的肌肉记忆**。这一条必须让产品负责人知道，
- *     它不是"实现细节"，是交互变了。拖拽**能力**没有丢。
- *
- * 最小一步（见共享层文件头第 2 条）：给 `TaskList` 加
- * `renderRowWrapper?: (row, node) => ReactNode`，把手柄换成整行包装。
- *
- * ─────────────────────────────────────────────────────────────────────────
- * 🔴 `HeytaUiProvider` 必须包在**这一处**
- *
- * `App.tsx` 的 Provider 只包了 `tasks` 那棵树，而四象限是它的**兄弟节点**
- * （`{view === 'quadrant' && <QuadrantBoard />}`）。M3 第二刀（focus）就是
- * 这样在运行时抛出「useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用」的，
- * 而当时 `check:ui-provider` **不检查嵌套**、照样全绿。
- *
- * ⚠️ 而 `QuadrantBoard` **尚未登记**进 `scripts/check-ui-provider.mjs` 的
- * `PROVIDER_DEPENDENT`（该脚本不在本刀白名单）—— 所以**门禁今天看不见这里**。
- * 补登记：`QuadrantBoard`。别把下面这层 Provider 删掉。
+ * ⚠️ 已知取舍：整行拖拽用 PointerSensor（距离阈值 6px，故点勾选框/点行仍成立）。
+ * 原来的"下拉框"是键盘用户跨象限移动的唯一入口，删掉它后**键盘不能移动任务**；
+ * 这是"去掉按钮"的直接代价，不是实现疏漏。
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
-  DragOverlay,
-  KeyboardSensor,
   PointerSensor,
-  useDraggable,
+  closestCenter,
+  pointerWithin,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
 } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { cssVar } from '@heyta/design-system';
-import { Quadrant, planQuadrantDrop, planQuadrantDropUndo, type QuadrantTaskPatch } from '@heyta/domain';
+import {
+  Quadrant,
+  manualOrderBetween,
+  manualOrderKey,
+  planManualReorder,
+  planQuadrantDrop,
+  planQuadrantDropUndo,
+  type QuadrantTaskPatch,
+} from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   HeytaUiProvider,
   QuadrantBoard as SharedQuadrantBoard,
-  quadrantSlot,
   toQuadrantCards,
   type QuadrantCardModel,
   type TaskRow,
 } from '@heyta/ui';
-import { GripVertical } from 'lucide-react';
 
 import { useTaskStore } from '../tasks/store.js';
 import { UndoReceipt } from '../../lib/feedback/UndoReceipt.js';
-import { dragHandleLabel, quadrantBoardLabels, quadrantCountA11y } from './copy.js';
+import { quadrantBoardLabels } from './copy.js';
 
 /**
- * 类型守卫：穷举比较，**不做数组强转**（与迁移前同一写法）。
- *
+ * 类型守卫：穷举比较，**不做数组强转**。
  * `event.over.id` 的类型是 `UniqueIdentifier`（`string | number`），
- * 强转会掩盖"拖到了非象限目标"（比如列表外），那样会静默产生一条无意义的 op。
+ * 强转会掩盖"拖到了非象限目标"。
  */
-const QUADRANTS = [Quadrant.UrgentImportant, Quadrant.ImportantNotUrgent, Quadrant.UrgentNotImportant, Quadrant.Neither] as const;
-
 function isQuadrant(value: unknown): value is Quadrant {
   switch (value) {
     case Quadrant.UrgentImportant:
@@ -104,112 +86,82 @@ function isQuadrant(value: unknown): value is Quadrant {
   }
 }
 
-/**
- * 行尾的拖拽握把。
- *
- * 🔴 `useDraggable` 必须在**组件边界**里调用 —— 而 `renderTrailing` 是
- * 在 `TaskList` 的渲染过程中被调用的**回调**（不是组件）。所以它返回的是
- * 这个**组件元素**，hook 在自己的边界里跑（与 `App.tsx` 的 `renderTaskTrailing`
- * 同一条纪律）。
- */
-function DragHandle({ taskId, label }: { taskId: string; label: string }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: taskId });
-  return (
-    <button
-      ref={setNodeRef}
-      type="button"
-      {...(listeners ?? {})}
-      {...attributes}
-      aria-label={label}
-      data-testid={`quadrant-drag-${taskId}`}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: cssVar('space.1'),
-        border: 'none',
-        background: 'none',
-        color: cssVar('color.foreground-subtle'),
-        cursor: isDragging ? 'grabbing' : 'grab',
-        opacity: isDragging ? 0.4 : 1,
-        // 拖拽是即时反馈，不需要过渡；加了反而拖影
-        touchAction: 'none',
-      }}
-    >
-      <GripVertical size={ICON_SIZE.sm} aria-hidden="true" />
-    </button>
-  );
+/** dnd-kit 给行/格挂的 data 形状。 */
+interface DragData {
+  readonly kind: 'row' | 'cell';
+  readonly quadrant: Quadrant;
+  readonly index?: number;
 }
 
 /**
- * 格子里的**投放区**。
+ * 整行的拖拽节点（宿主经 `TaskList.renderRowWrapper` 注入）。
  *
- * 它不需要可点 —— dnd-kit 按 `getBoundingClientRect` 命中，不靠事件冒泡。
- * 共享层把它放在一个 `pointerEvents: none` 的绝对定位容器里，所以它
- * **不会**挡住勾选框与握把（挡住的症状是"什么都点不动"，且不报错）。
+ * 🔴 它必须是**组件**（不能在渲染回调里直接调 `useSortable`）：
+ * `useSortable` 是 hook，而 `renderRowWrapper` 是 `TaskList` 渲染过程中被调用的普通函数。
+ *
+ * 样式：`features/**` 的内联样式是只减不增的棘轮账本，所以动态几何（transform /
+ * transition）先算成一个变量再传，不写 `style={{…}}`。
  */
-function CellDropZone({ quadrant }: { quadrant: Quadrant }) {
-  const { setNodeRef } = useDroppable({ id: quadrant });
+function QuadrantSortableRow({
+  id,
+  quadrant,
+  index,
+  children,
+}: {
+  id: string;
+  quadrant: Quadrant;
+  index: number;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  const sortable = useSortable({ id, data: { kind: 'row', quadrant, index } satisfies DragData });
+  const rowStyle = useMemo(
+    () => ({
+      transform: CSS.Transform.toString(sortable.transform),
+      transition: sortable.transition,
+      zIndex: sortable.isDragging ? cssVar('z.sticky') : undefined,
+      position: 'relative' as const,
+      opacity: sortable.isDragging ? 0.5 : undefined,
+      // 触屏上允许纵向拖动整行（否则会被当成滚动手势）。
+      touchAction: 'none' as const,
+    }),
+    [sortable.transform, sortable.transition, sortable.isDragging],
+  );
   return (
     <div
-      ref={setNodeRef}
-      data-quadrant={quadrant}
-      style={{ width: '100%', height: '100%' }}
-    />
-  );
-}
-
-/**
- * 象限标题行的**计数徽标**（W5：四象限空态减重 —— "标题+颜色+数量为主层级"）。
- *
- * · 内容是纯数字（数字不是文案，不需要词条）；
- * · 无障碍名是「现有象限名词条 + 数字」的组合（`quadrantCountA11y`，零新增词条）；
- * · 排版四件套（字号/字重/行高/字距 + tabular-nums）来自设计系统生成的
- *   `ht-type-badge` 档位类；几何与颜色是**内联 cssVar**（本文件对宿主侧
- *   小样式的一贯做法，见 `DragHandle` / `DragOverlay`）。
- *   🔴 刻意**不**落 css 文件：`check:row-single-source` 断言 B 钉死
- *   `apps/web/src/styles` 的 ht-* 前缀族**只减不增** —— 新视图样式应该
- *   长在共享模式层（packages/ui 的 RN 样式）或宿主内联，不该再开一族。
- * · 配色取安静档（`surface-sunken` 底 + `foreground-muted` 字）：象限计数
- *   是常态信息不是提醒，不该像铃铛未读数那样用主蓝抢眼。
- * · 它经共享层的 `renderHeaderTrailing` 插槽进标题行 —— DOM 节点插进
- *   共享 RN 树与 `DragHandle`（`renderTrailing` 里的 `<button>`）同一条先例。
- */
-function QuadrantCountBadge({
-  label,
-  count,
-  slot,
-}: {
-  label: string;
-  count: number;
-  slot: number;
-}) {
-  return (
-    <span
-      className="ht-type-badge"
-      aria-label={label}
-      data-testid={`quadrant-count-${String(slot)}`}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minWidth: cssVar('size.badge-min-width'),
-        height: cssVar('size.badge-height'),
-        paddingInline: cssVar('space.1'),
-        borderRadius: cssVar('radius.full'),
-        background: cssVar('color.surface-sunken'),
-        color: cssVar('color.foreground-muted'),
-      }}
+      ref={sortable.setNodeRef}
+      {...(sortable.listeners ?? {})}
+      style={rowStyle}
+      data-testid={`quadrant-row-${id}`}
+      data-dragging={sortable.isDragging ? 'true' : undefined}
     >
-      {String(count)}
-    </span>
+      {children}
+    </div>
   );
 }
 
 /**
- * `onOpenTask` / `activeTaskId` 是宿主管"选中是哪一条"的两个出口，本层只转接 ——
- * 选中态本身不在这里，它只有一个所有者（`apps/web/src/lib/selection.ts`）。
- * ⚠️ 与下面 `activeId`（dnd-kit 的**正在拖**那条）无关，两个名字像但不是一件事。
+ * 格子里的**投放区**（空格子也能收东西）。
+ *
+ * 它只需要一个有尺寸的节点 —— dnd-kit 按 rect 命中，不靠事件冒泡；
+ * 共享层把它放在 `pointerEvents: none` 的绝对定位容器里，所以不会挡住行。
  */
+function CellDropZone({ quadrant }: { quadrant: Quadrant }) {
+  const { setNodeRef } = useDroppable({
+    id: `cell:${String(quadrant)}`,
+    data: { kind: 'cell', quadrant } satisfies DragData,
+  });
+  return <div ref={setNodeRef} data-quadrant={quadrant} style={{ width: '100%', height: '100%' }} />;
+}
+
+/**
+ * 象限标题行的**计数徽标** —— 2026-11-24 起**不再显示**。
+ *
+ * 产品负责人：「不用显示 4 个 0，不需要显示数字，显示这个数字的意味是什么呢？」
+ * 滴答的四象限标题行也没有计数。格子有多少条，往下看就是，不需要一个数字
+ * 再复述一遍（同一件事的第二份表达）。所以这一整块连同 `renderHeaderTrailing`
+ * 一起删掉了；共享层的插槽仍在（移动端/将来若需要可再用）。
+ */
+
 interface QuadrantBoardProps {
   readonly onOpenTask?: (taskId: string) => void;
   readonly activeTaskId?: string | null;
@@ -220,30 +172,17 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
   const store = useTaskStore();
   const [activeId, setActiveId] = useState<string | undefined>();
   const [overQuadrant, setOverQuadrant] = useState<Quadrant | null>(null);
-  /**
-   * 一次拖放的回执。🔴 `tone` 不是装饰：原来成功与失败**共用一句 `role="status"`**，
-   * 而"没拖成"和"拖成了"在屏幕阅读器里被播报成同一类消息（P3 判据里
-   * "失败必须是不自消的 alert"那一格在这一处原本是坏的）。
-   */
   const [dropNotice, setDropNotice] = useState<{ readonly text: string; readonly error: boolean } | undefined>(undefined);
   const [undoDrop, setUndoDrop] = useState<{ taskId: string; plan: QuadrantTaskPatch } | null>(null);
 
   /**
-   * 🔴 **两列还是单列 —— 断点读 token，判定听窗口**（goal-layout-audit 页 1：
-   * "不能因为窗口的变化而影响到排版"）。
-   *
-   * 断点值从 `tokens.css` 的 CSS 变量里读（`layout.two-column-min`）——
-   * JS 里不抄一份数字，token 才是单源。RNW 的 `useWindowDimensions` 用的是
-   * `window.screen.width`（物理屏）而不是视口宽（实测 660px 视口它报 1728），
-   * 所以这个判定只能在 web 宿主做 —— 移动端不传，共享层默认单列。
+   * 两列还是单列 —— 断点读 token，判定听窗口（理由见共享层 props 注释）。
    */
   const [twoColumns, setTwoColumns] = useState(false);
   useEffect(() => {
     const min = getComputedStyle(document.documentElement)
       .getPropertyValue('--ht-layout-two-column-min')
       .trim();
-    // token 没加载（理论上不会）：保持单列的安全默认，**不抄一份数字当兜底**
-    //（裸值会被 check:design 拦 —— 而那道门禁是对的）。
     if (min === '') return;
     const query = window.matchMedia(`(min-width: ${min})`);
     const onChange = (): void => {
@@ -257,24 +196,25 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
   }, []);
 
   const tasks = useMemo(() => Object.values(store.entities.tasks), [store.entities.tasks]);
-  /**
-   * W5（四象限空态减重）：展示顺序里**第一个**空象限 —— 只有它显示
-   * 「拖任务到这里」的引导文案，其余空象限走轻量占位（无文案）。
-   *
-   * 分桶用的是与共享板**同一个纯投影** `toQuadrantCards`（`@heyta/ui`
-   * 导出），不在此另写一份"什么算空"的判断；共享板内部会再算一次，
-   * 纯函数、代价可忽略 —— 换取的是不往共享层加"谁是第一个空格"的 API。
-   */
-  const firstEmptyQuadrant = useMemo(() => {
-    const cards = toQuadrantCards(tasks, store.now);
-    return cards.find((card) => card.count === 0)?.quadrant;
-  }, [tasks, store.now]);
+  /** 与共享板**同一份纯投影**（`toQuadrantCards`），据此算"第一个空格"、行位置。 */
+  const cards = useMemo(() => toQuadrantCards(tasks, store.now), [tasks, store.now]);
+  const firstEmptyQuadrant = useMemo(() => cards.find((card) => card.count === 0)?.quadrant, [cards]);
+
+  /** `taskId → { quadrant, index }`：整行拖拽要知道自己在哪一格、第几行。 */
+  const rowLocation = useMemo(() => {
+    const map = new Map<string, { quadrant: Quadrant; index: number }>();
+    for (const card of cards) {
+      card.tasks.forEach((task, index) => {
+        map.set(task.id, { quadrant: card.quadrant, index });
+      });
+    }
+    return map;
+  }, [cards]);
+
   const labels = useMemo(
     () => quadrantBoardLabels(t, { firstEmptyQuadrant }),
     [t, firstEmptyQuadrant],
   );
-  const handleLabel = useMemo(() => dragHandleLabel(t), [t]);
-  /** 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。 */
   const taskLabels = useMemo(
     () => ({
       toggleOn: (row: TaskRow) => t('web.shell.tasks.complete', { title: row.title }),
@@ -283,67 +223,105 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
     [t],
   );
 
-  // 键盘也能拖 —— 只用 PointerSensor 会把键盘用户排除在外
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor),
-  );
+  // 整行拖拽：距离阈值让"点一下"仍然是点击（勾选/打开），只有拖动才起拖。
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  /**
+   * 碰撞：**行优先**。行本身也是 droppable，格子投放区铺满整格 —— 若一视同仁，
+   * 格子中心常常比某一行更近，"拖到第 3 行"会被判成"拖到格子末尾"。
+   * 先把命中的行挑出来，没有行才退到格子。
+   */
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const hits = pointerWithin(args);
+    const rowHits = hits.filter((collision) => !String(collision.id).startsWith('cell:'));
+    if (rowHits.length > 0) return rowHits;
+    if (hits.length > 0) return hits;
+    return closestCenter(args);
+  }, []);
 
   const renderCellOverlay = useCallback(
     (card: QuadrantCardModel) => <CellDropZone quadrant={card.quadrant} />,
     [],
   );
-  /**
-   * 每格标题行行尾挂计数徽标（W5）。插槽内容由本端决定，共享层只给位置
-   * （`marginLeft: 'auto'` 推到行尾）—— mobile 不传它，行为逐字节不变。
-   */
-  const renderHeaderTrailing = useCallback(
-    (card: QuadrantCardModel) => (
-      <QuadrantCountBadge
-        label={quadrantCountA11y(t, card.quadrant, card.count)}
-        count={card.count}
-        slot={quadrantSlot(card.quadrant)}
-      />
+
+  const renderCellBodyWrapper = useCallback(
+    (card: QuadrantCardModel, node: React.ReactNode) => (
+      <SortableContext items={card.tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
+        {node}
+      </SortableContext>
     ),
-    [t],
+    [],
+  );
+
+  const renderRowWrapper = useCallback(
+    (row: TaskRow, node: React.ReactNode) => {
+      const info = rowLocation.get(row.id);
+      if (info === undefined) return node;
+      return (
+        <QuadrantSortableRow id={row.id} quadrant={info.quadrant} index={info.index}>
+          {node}
+        </QuadrantSortableRow>
+      );
+    },
+    [rowLocation],
   );
 
   async function handleDragEnd(event: DragEndEvent): Promise<void> {
     setActiveId(undefined);
     setOverQuadrant(null);
-    const over = event.over?.id;
-    if (over === undefined || !isQuadrant(over)) return;
+    const { active, over } = event;
+    if (over === null) return;
+    const fromData = active.data.current as DragData | undefined;
+    const overData = over.data.current as DragData | undefined;
+    if (fromData === undefined || overData === undefined) return;
+    const fromQuadrant = fromData.quadrant;
+    const toQuadrant = overData.quadrant;
+    if (!isQuadrant(fromQuadrant) || !isQuadrant(toQuadrant)) return;
 
-    await moveTask(String(event.active.id), over);
-  }
+    const taskId = String(active.id);
+    const targetCard = cards.find((card) => card.quadrant === toQuadrant);
+    const targetTasks = targetCard?.tasks ?? [];
+    const toIndex =
+      overData.kind === 'row' && overData.index !== undefined ? overData.index : targetTasks.length;
 
-  async function moveTask(taskId: string, over: Quadrant): Promise<void> {
+    // ── 同格内上下排序：只写 `Task.order`（一条 op，中值法在领域层）──
+    if (fromQuadrant === toQuadrant) {
+      const fromIndex = fromData.index ?? targetTasks.findIndex((task) => task.id === taskId);
+      const plan = planManualReorder(targetTasks, fromIndex, toIndex);
+      if (plan === undefined) return;
+      try {
+        if (plan.kind === 'move') {
+          await store.setOrder(plan.id, plan.order);
+        } else {
+          for (const entry of plan.orders) {
+            await store.setOrder(entry.id, entry.order);
+          }
+        }
+      } catch {
+        setDropNotice({ text: t('web.quadrant.drop.error'), error: true });
+      }
+      return;
+    }
+
+    // ── 跨格：换象限 +（若拖到某个上下位置）一并写 order，**同一条 op** ──
     const task = store.entities.tasks[taskId];
     if (task === undefined) return;
+    const plan = planQuadrantDrop(task, toQuadrant, { now: store.now });
+    const keys = targetTasks.map(manualOrderKey);
+    const prev = toIndex <= 0 ? undefined : keys[toIndex - 1];
+    const next = toIndex >= keys.length ? undefined : keys[toIndex];
+    const order = manualOrderBetween(prev, next);
+    const patch: QuadrantTaskPatch = { important: plan.important };
+    if (plan.dueDate !== undefined) patch.dueDate = plan.dueDate;
+    if (order !== undefined) patch.order = order;
 
-    /**
-     * 🔴 **投放计划来自领域层的纯函数，不要在这里重算。**
-     *
-     * 这里原先是一段手写逻辑，带着两个缺陷（2026-09-26 读代码核实）：
-     *   1. `if (urgent && task.dueDate === undefined)` 只处理"完全没有截止时间"，
-     *      于是把"10 天后到期"的任务拖进 Q1 时，只设了 important，
-     *      它**仍然不紧急** → 任务**弹回 Q2**。用户拖了等于没拖，且没有解释。
-     *   2. 注释写着「一次操作 = 一条 op（AGENTS.md §3.4）：两个字段一次写完」，
-     *      代码却是**两次 `await`** —— 注释描述的是意图，代码做的是另一件事。
-     *
-     * `planQuadrantDrop` 现在穷举验证"4 象限 × 3 种截止时间状态都必须真的
-     * 落在目标格"，本文件只负责把计划交给 action 层。
-     */
-    const plan = planQuadrantDrop(task, over, { now: store.now });
-    // 一次拖放 = 一条 op（`setQuadrantDrop` 只写一次，不拆成两个动作）。
-    // 保存拖放前的语义值，给用户一个短时撤销出口；拖放不是不可逆的魔法。
     const previous = planQuadrantDropUndo(task, plan);
     try {
-      await store.setQuadrantDrop(taskId, plan);
+      await store.setQuadrantDrop(taskId, patch);
       setUndoDrop({ taskId, plan: previous });
       setDropNotice({
         text: t(plan.dueDateChange === undefined ? 'web.quadrant.drop.success' : 'web.quadrant.drop.changedDue', {
-          quadrant: labels.title(over),
+          quadrant: labels.title(toQuadrant),
         }),
         error: false,
       });
@@ -353,68 +331,23 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
     }
   }
 
-  const renderTrailing = (row: TaskRow) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.1') }}>
-      <select
-        className="ht-type-caption"
-        aria-label={t('web.quadrant.moveTask', { title: row.title })}
-        data-testid={`quadrant-move-${row.id}`}
-        value=""
-        onClick={(event) => event.stopPropagation()}
-        onChange={(event) => {
-          const target = QUADRANTS.find((quadrant) => String(quadrant) === event.currentTarget.value);
-          if (target !== undefined) void moveTask(row.id, target);
-        }}
-        style={{
-          minHeight: cssVar('size.field-height'),
-          border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-          borderRadius: cssVar('radius.sm'),
-          background: cssVar('color.surface'),
-          color: cssVar('color.foreground-muted'),
-        }}
-      >
-        <option value="" disabled>{t('web.quadrant.move')}</option>
-        {QUADRANTS.map((quadrant) => (
-          <option key={quadrant} value={quadrant}>{labels.title(quadrant)}</option>
-        ))}
-      </select>
-      <DragHandle taskId={row.id} label={handleLabel} />
-    </div>
-  );
-
-  /**
-   * 撤销这一次拖放。
-   *
-   * 🔴 它是 `UndoReceipt` 的 `onUndo`：返回 Promise、**让拒绝原样冒出去**。
-   * 原来这里是 `void store.setQuadrantDrop(...).then(...).catch(() => setDropNotice(错误句))` ——
-   * 撤销失败被写进那句 `role="status"` 的成功文案里，而 `void` 让这一发在
-   * 任何测试里都读不出成败。失败现在由回执自己切成 `role="alert"` 并且不再自消。
-   *
-   * 也不在这里 `setUndoDrop(null)`：那等于宿主替回执做了"成功"的判断 ——
-   * 交回宿主清这一格的动作只有 `onDismiss`（窗口走完 / 撤销成功）这一个入口。
-   */
   const undoLastDrop = useCallback((): Promise<void> => {
     if (undoDrop === null) return Promise.resolve();
     return store.setQuadrantDrop(undoDrop.taskId, undoDrop.plan).then(() => {
-      // 🔴 撤销成功就把那句"已移动到 X"收掉：它讲的是**当前**状态，而撤销之后
-      //    它已经不成立（屏幕上留一句假陈述，比留一条旧回执坏得多）。
-      //    这一子原来住在 `.then(() => setDropNotice(''))` 里，收编回执时跟着
-      //    旧形状一起被我删了 —— 是看图（`settings-finish/quadrant-move-1280.png`
-      //    末帧上那行"任务已移动到「交给别人」"而任务已经回到「先不做」）照出来的。
       setDropNotice(undefined);
     });
   }, [store, undoDrop]);
 
-  const activeTask = activeId === undefined ? undefined : store.entities.tasks[activeId];
-
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={collisionDetection}
       onDragStart={(e) => {
         setActiveId(String(e.active.id));
       }}
       onDragOver={(e) => {
-        setOverQuadrant(isQuadrant(e.over?.id) ? e.over.id : null);
+        const quadrant = (e.over?.data.current as DragData | undefined)?.quadrant;
+        setOverQuadrant(isQuadrant(quadrant) ? quadrant : null);
       }}
       onDragCancel={() => {
         setActiveId(undefined);
@@ -434,9 +367,9 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
             void store.toggleComplete(taskId);
           }}
           taskLabels={taskLabels}
-          renderTrailing={renderTrailing}
+          renderRowWrapper={renderRowWrapper}
+          renderCellBodyWrapper={renderCellBodyWrapper}
           renderCellOverlay={renderCellOverlay}
-          renderHeaderTrailing={renderHeaderTrailing}
           highlightedQuadrant={overQuadrant}
           onOpenTask={onOpenTask}
           activeTaskId={activeTaskId}
@@ -444,17 +377,6 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
         />
       </HeytaUiProvider>
 
-      {/*
-       * 🔴 回执住在**板子这一段的紧下方**，不在页底。
-       *
-       * 它说的是"这条任务被移进了哪一格"，动作发生在板上；原来这一段住在整屏尾部
-       * （脚注 `<details>` 之后），1280 宽档上"任务被移进中间那一格"那句与
-       * 「撤销移动」那枚按钮隔着一整个板面 —— 人刚把东西拖到板上，出口在页底，
-       * 得滚动才找得到（取证：`apps/web/evidence/undo-receipt/quadrant-receipt-1280.png`，
-       * 那是 P3 看图照出来的**旧形状**，不是 P3 引入的回归）。
-       * 判据按空间归属下：回执与它说的那次变更在同一块区域里可见，不要求像素相邻。
-       * 折叠帮助仍在回执之后 —— 它是"读规则"那一档，不是刚做完动作时要看的东西。
-       */}
       {dropNotice === undefined && undoDrop === null ? null : (
         <div
           style={{
@@ -485,21 +407,13 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
           )}
         </div>
       )}
-      {/*
-        W5（四象限空态减重）：底部那段四象限规则说明不再裸排长文 ——
-        收进折叠帮助。默认折叠（没有 `open` 属性，浏览器不渲染正文）；
-        summary 复用现成的「帮助」词条（`web.shell.nav.help`），
-        正文沿用原文案与原 key（`web.quadrant.footnote`）—— 零新增词条。
-        `<details>` 是 DOM 元素，进不了共享层（那边只许 RN 原语），
-        所以由 web 宿主自己渲染在板子下方。样式走内联 cssVar
-        （不开新的 ht-* 前缀族，理由见 QuadrantCountBadge 的注释）。
-      */}
+
       <details data-testid="quadrant-help" style={{ marginTop: cssVar('space.2') }}>
         <summary
           className="ht-type-caption"
           style={{ cursor: 'pointer', color: cssVar('color.foreground-muted') }}
         >
-          {t('web.quadrant.interactionHelp')}
+          {t('web.shell.nav.help')}
         </summary>
         <p
           className="ht-type-caption"
@@ -513,33 +427,9 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
         </p>
       </details>
 
-
-
-      {/*
-        拖拽的**可视化**：手指下跟着一份标题的浮层。
-        整行不再可拖（见文件头），所以拖动时原行不动 —— 没有浮层的话
-        用户看不到任何"正在拖"的反馈。
-      */}
-      <DragOverlay>
-        {activeTask === undefined ? null : (
-          <div
-            style={{
-              padding: `${cssVar('space.2')} ${cssVar('space.3')}`,
-              borderRadius: cssVar('radius.md'),
-              border: `${cssVar('border-width.thin')} solid ${cssVar('color.primary')}`,
-              background: cssVar('color.surface'),
-              color: cssVar('color.foreground'),
-              fontSize: cssVar('font-size.sm'),
-            }}
-          >
-            {activeTask.title}
-          </div>
-        )}
-      </DragOverlay>
-
-      {/* 让拖拽有明确的进行中提示，屏幕阅读器也能感知 */}
+      {/* 拖动中的状态播报（读屏）：原行跟手，但仍给一个非视觉的"正在拖"提示。 */}
       <p aria-live="polite" style={{ position: 'absolute', left: -9999 }}>
-        {activeId !== undefined ? t('web.quadrant.dragging') : ''}
+        {activeId === undefined ? '' : t('web.quadrant.dragging')}
       </p>
     </DndContext>
   );

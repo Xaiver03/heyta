@@ -370,8 +370,10 @@ describe('web 换装：宿主渲染出四格与共享行', () => {
     expect(cell?.querySelector('[data-testid="task-item-t1"]'), '格里没有那条任务').not.toBeNull();
     // 共享行的勾选框 —— 宿主传了 `onToggleTask`，所以它必须可点。
     expect(cell?.querySelector('[data-testid="task-toggle-t1"]')).not.toBeNull();
-    // 行尾是 web 特有的拖拽握把（整行不可拖，见 web 宿主文件头）。
-    expect(container.querySelector('[data-testid="quadrant-drag-t1"]')).not.toBeNull();
+    // 2026-11-24：行尾**不再有**「移动」下拉 / 拖拽握把按钮 —— 整行自己就是拖拽节点。
+    expect(cell?.querySelector('[data-testid="quadrant-row-t1"]'), '整行拖拽包装没挂上').not.toBeNull();
+    expect(container.querySelector('[data-testid="quadrant-drag-t1"]'), '不该再有拖拽握把按钮').toBeNull();
+    expect(cell?.querySelector('[role="combobox"]'), '不该再有「移动」下拉框').toBeNull();
   });
 });
 
