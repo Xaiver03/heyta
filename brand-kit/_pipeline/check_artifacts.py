@@ -22,6 +22,16 @@ WD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VERBOSE = "-v" in sys.argv
 QUIET = "--quiet" in sys.argv or "-q" in sys.argv
 JSON_OUT = "--json" in sys.argv
+LIST = "--list" in sys.argv
+if LIST:
+    print("brand-kit 自检判据（编号见 README「自检判据一览」）")
+    print("  1 色值白名单   2 数量   3 关键产物   4 PDF 字体/页数   5 index 链接")
+    print("  6 i18n 词条    7 亮/暗配对  8 四维 ΔE  9 门槛/id 对齐  10 禁串")
+    print(" 11 文档门槛    12 tokens.json 13 图鉴数量 14 css/json   15 logo 集合")
+    print(" 16 svg↔png     17 图库双射  18 图标进总览 19 状态=产品 20 本地引用")
+    print(" 21 标签门槛值  22 里程碑数字/维度名 23 胶囊对比度 24 图库去重")
+    print(" 25 分类色槽门槛 26 徽章英文名 27 色卡立场 28 图库分类 29 分享无标识")
+    sys.exit(0)
 fails = []
 passes = []
 
@@ -783,6 +793,33 @@ if os.path.exists(IMG_MANIFEST):
         fail(f"04-imagery 的分类与目录不一致：{_bad_sub[:4]}")
     else:
         emit(f"✅ 04-imagery 分类与目录一致（{len(_rows3)} 条）")
+
+# 29) 分享文本"不带任何标识"这条隐私承诺，要在实现里立得住
+#     物料与界面都写着「它不含你的账号、设备或任何标识」。这句一旦不成立，
+#     是用户真的会外发的数据里带了自己的 id —— 代价比排版错误高一个量级。
+SHARE_FILE = os.environ.get(
+    "BRAND_KIT_SHARE_FILE",
+    os.path.join(ROOT, "packages/app-host/src/share-summary.ts"),
+)
+if os.path.exists(SHARE_FILE):
+    raw = open(SHARE_FILE, encoding="utf-8").read()
+    # 去掉块注释与行注释，只看真正的代码
+    code = re.sub(r"/\*[\s\S]*?\*/", "", raw)
+    code = re.sub(r"//[^\n]*", "", code)
+    forbidden = ["accountId", "userId", "clientId", "deviceId", "email",
+                 "hostname", "userName", "deviceName", "installationId"]
+    hit = [f for f in forbidden if re.search(rf"\b{f}\b", code)]
+    keys = re.findall(r"'(web\.growth\.summary\.[\w.]+)'", code)
+    probs = []
+    if hit:
+        probs.append(f"实现里出现身份/设备字段：{hit}")
+    if len(set(keys)) != 4:
+        probs.append(f"小结词条应为 4 条，实际 {sorted(set(keys))}")
+    if probs:
+        fail(f"分享文本可能携带标识：{probs}")
+    else:
+        emit("✅ 分享文本不带账号/设备字段（只用 4 条小结词条 + 数值/日期）")
+
 
 if not fails:
     if JSON_OUT:
