@@ -575,6 +575,42 @@ if os.path.exists(TAGS_TS) and os.path.isdir(TAG_DIR):
         else:
             emit(f"✅ 身份标签徽章上的门槛 = 领域层（{len(pairs)} 个）")
 
+# 22) 里程碑徽章上印的数字 = 领域层门槛；图鉴里的维度中文名 = KINDS 的 cn
+#     文件名里的 threshold 已由第 9 组盯住，但**图上印的**是另一件事：
+#     一次只改画法不改文件名，文件名全对、图上数字全错。
+MS_DIR = os.path.join(WD, "02-badges/milestones")
+if os.path.exists(DOMAIN_MILESTONES) and os.path.isdir(MS_DIR):
+    src = open(DOMAIN_MILESTONES, encoding="utf-8").read()
+    pairs = []
+    for kind, ths in re.findall(r"\{\s*kind:\s*'(\w+)',\s*thresholds:\s*\[([^\]]+)\]", src):
+        for t in re.findall(r"\d+", ths):
+            pairs.append((kind, t))
+    bad_nums = []
+    for kind, thr in pairs:
+        f = os.path.join(MS_DIR, f"{kind}-{thr}.svg")
+        if not os.path.exists(f):
+            continue  # 第 9/15 组负责缺文件
+        nums = re.findall(r">(\d{1,5})<", open(f, encoding="utf-8").read())
+        if thr not in nums:
+            bad_nums.append(f"{kind}-{thr}.svg 里找不到印着 {thr} 的文字（找到 {nums[:3]}）")
+    if bad_nums:
+        fail(f"里程碑徽章上的数字与门槛不符：{bad_nums[:3]}")
+    else:
+        emit(f"✅ 里程碑徽章上印的数字 = 领域层门槛（{len(pairs)} 枚）")
+
+# 22b) 图鉴里每个维度的中文名必须出现（与 KINDS 的 cn 一致）
+if os.path.exists(CATALOGUE):
+    cat = open(CATALOGUE, encoding="utf-8").read()
+    kk = open(os.path.join(WD, "_pipeline/build_badges_v2.py"), encoding="utf-8").read()
+    cns = re.findall(r'cn="([^"]+)"', kk)
+    missing_cn = [c for c in set(cns) if c not in cat]
+    if not cns:
+        fail("build_badges_v2.py 里找不到 KINDS 的 cn 标签")
+    elif missing_cn:
+        fail(f"图鉴里缺这些维度中文名：{missing_cn}")
+    else:
+        emit(f"✅ 图鉴收录全部维度中文名（{len(set(cns))} 个）")
+
 if not fails:
     if JSON_OUT:
         import json as _j

@@ -26,10 +26,23 @@ KINDS={
  "tasks":     dict(color=RT.token("color-milestone-tasks"),   icon="check",   latin="TASKS",     cn="累计完成"),
  "activeDays":dict(color=RT.token("color-milestone-days"),    icon="calendar",latin="DAYS",      cn="使用天数"),
 }
-MILESTONES=[]
-for k,thr in [("checkIns",[10,50,200,500,1000]),("focusHours",[10,50,200,1000]),
-              ("tasks",[50,200,1000,5000]),("activeDays",[7,30,100,365])]:
-    for t in thr: MILESTONES.append(dict(kind=k,threshold=t))
+# 🔴 门槛**从领域层读**，不在这里写第二份。
+#    写死过一次：物料与 `milestones.ts` 各存一份，改一边就漂 —— 且数量仍是 17，看不出来。
+def _domain_milestones():
+    import re as _re
+    p = os.path.join(os.path.dirname(WD), "packages/domain/src/milestones.ts")
+    src = open(p, encoding="utf-8").read()
+    defs = _re.findall(r"\{\s*kind:\s*'(\w+)',\s*thresholds:\s*\[([^\]]+)\]", src)
+    if not defs:
+        raise SystemExit("milestones.ts 里取不到 MILESTONE_DEFINITIONS（上游结构变了）")
+    out = []
+    for kind, ths in defs:
+        for t in _re.findall(r"\d+", ths):
+            out.append(dict(kind=kind, threshold=int(t)))
+    return out
+
+
+MILESTONES = _domain_milestones()
 IDENTITY=[
  ("started","已启程","activeDays",7),("routine","有节奏","activeDays",30),("steady","稳住","activeDays",100),
  ("checkin-hundred","打卡百次","checkIns",100),("deep-fifty","深潜五十时","focusHours",50),
