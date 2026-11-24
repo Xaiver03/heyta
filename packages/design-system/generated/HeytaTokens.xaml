@@ -72,6 +72,10 @@
     <SolidColorBrush x:Key="HeytaColorCategory6" Color="#FF1D4ED8" />
     <SolidColorBrush x:Key="HeytaColorCategory7" Color="#FFA21CAF" />
     <SolidColorBrush x:Key="HeytaColorCategory8" Color="#FFBE185D" />
+    <SolidColorBrush x:Key="HeytaColorMilestoneCheckin" Color="#FF2563EB" />
+    <SolidColorBrush x:Key="HeytaColorMilestoneFocus" Color="#FFA21CAF" />
+    <SolidColorBrush x:Key="HeytaColorMilestoneTasks" Color="#FF059669" />
+    <SolidColorBrush x:Key="HeytaColorMilestoneDays" Color="#FFD97706" />
     <SolidColorBrush x:Key="HeytaColorFocusWork" Color="#FF2563EB" />
     <SolidColorBrush x:Key="HeytaColorFocusBreak" Color="#FF059669" />
     <SolidColorBrush x:Key="HeytaColorOverlay" Color="#800F172A" />

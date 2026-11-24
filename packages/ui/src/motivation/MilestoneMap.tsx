@@ -97,6 +97,35 @@ export interface MilestoneMapProps {
 }
 
 /** 取一份 token 表，建出这套样式。**一个裸值都没有**（`check:design` 会拦）。 */
+/**
+ * 维度强调色（**图形**用，不当正文色）。
+ *
+ * 🔴 类型刻意**不是** `TokenName`：那是全部 token 的联合（含间距/圆角等数字
+ * token），标上去会让 `tokens[key]` 变成 `string | number`，喂给
+ * `backgroundColor` 直接编译不过 —— 与 `MotivationProgressToken` 同一个理由。
+ *
+ * 🔴 这四个值与 surface 的对比度实测 ≥ 3:1（WCAG 1.4.11 图形门槛），
+ * 但未达 4.5:1 的正文门槛：亮色下 打卡 5.17 / 专注 4.47 / 完成 3.77 / 天数 3.19。
+ * 因此它只出现在**圆点**与**档位描边**上，不出现在任何 `<Text>` 的颜色里。
+ *
+ * ⚠️ 与 `color.category-1..8` 不是一套：那八槽是用户赋予含义的活动分类色，
+ * 这四档是产品既定的成长维度，含义不由用户改。
+ */
+export type MilestoneAccentToken =
+  | 'color.milestone-checkin'
+  | 'color.milestone-focus'
+  | 'color.milestone-tasks'
+  | 'color.milestone-days';
+
+/** 维度 → 强调色。取值只能在 `tokens.css` 改，组件不发明颜色。 */
+const KIND_ACCENT: Record<MilestoneKind, MilestoneAccentToken> = {
+  checkIns: 'color.milestone-checkin',
+  focusHours: 'color.milestone-focus',
+  tasks: 'color.milestone-tasks',
+  activeDays: 'color.milestone-days',
+};
+
+/** 取一份 token 表，建出这套样式。**一个裸值都没有**（`check:design` 会拦）。 */
 function makeStyles(tokens: HeytaNativeTokens) {
   return StyleSheet.create({
     map: {
@@ -113,6 +142,17 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'baseline',
       justifyContent: 'space-between',
       gap: tokens['space.2'],
+    },
+    headName: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: tokens['space.2'],
+    },
+    /** 维度色圆点：四维之间**只靠它**区分，文字与档位底色仍走语义色。 */
+    kindDot: {
+      width: tokens['size.badge-dot'],
+      height: tokens['size.badge-dot'],
+      borderRadius: tokens['radius.full'],
     },
     headValue: {
       flexDirection: 'row',
@@ -135,6 +175,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
       paddingHorizontal: tokens['space.2'],
       minHeight: tokens['size.chip-height'],
       borderRadius: tokens['radius.full'],
+      // 描边常驻（未达成时置为 transparent），这样开关状态不会让高度跳动。
+      borderWidth: tokens['border-width.thin'],
     },
     tierReached: {
       backgroundColor: tokens['color.primary-subtle'],
@@ -181,7 +223,20 @@ export function MilestoneMap({
         return (
           <View key={group.kind} style={styles.group} testID={`milestone-group-${group.kind}`}>
             <View style={styles.head}>
-              <Text style={[text['row-title'], { color: tokens['color.foreground'] }]}>{name}</Text>
+              {/*
+                维度色圆点。四维之间**只靠它**区分：文字与档位底色仍走语义色，
+                因为四个维度色只保证 3:1（图形门槛），不足以承载正文。
+              */}
+              <View style={styles.headName}>
+                <View
+                  style={[
+                    styles.kindDot,
+                    { backgroundColor: tokens[KIND_ACCENT[group.kind]] },
+                  ]}
+                  testID={`milestone-accent-${group.kind}`}
+                />
+                <Text style={[text['row-title'], { color: tokens['color.foreground'] }]}>{name}</Text>
+              </View>
               {/*
                 数字只有值 + 可选单位。⚠️ mobile 迁移前**不渲染单位**，
                 由维度名承担（"专注小时 12"）—— 见文件头。
@@ -237,6 +292,13 @@ export function MilestoneMap({
                   style={[
                     styles.tier,
                     tier.reached ? styles.tierReached : styles.tierPending,
+                    // 已达成的档用**维度色描边**（图形，3:1 门槛）；未达成保持透明，
+                    // 这样"还没到"不会被上色成"你做错了"。
+                    {
+                      borderColor: tier.reached
+                        ? tokens[KIND_ACCENT[group.kind]]
+                        : 'transparent',
+                    },
                   ]}
                   testID={`milestone-tier-${group.kind}-${String(tier.threshold)}`}
                 >

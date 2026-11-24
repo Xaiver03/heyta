@@ -309,6 +309,30 @@
   --ht-color-category-7: var(--ht-fuchsia-700);
   --ht-color-category-8: var(--ht-pink-700);
 
+  /* 里程碑四维（成长页 `MilestoneMap` 与 `IdentityTagList` 共用）。
+     四个维度必须**互相可区分**，且只在图形上出现（圆盘、色条），
+     所以门槛是 WCAG 1.4.11 的 3:1，不是 4.5:1 —— **不能当正文色**。
+
+     实测（vs `color.surface`，亮色 #ffffff）：
+       打卡 blue-600 #2563eb      5.17
+       专注 fuchsia-700 #a21caf  6.32
+       完成 emerald-600 #059669   3.77
+       天数 amber-600 #d97706     3.19  ← 余量最小的一档，换色前必须重算
+
+     为什么专注不是靛/紫蓝：靛(blue-600 vs indigo-500) 在**正常视觉**下
+     CIE76 ΔE 只有 9.3，两档圆点并排放几乎读不出差别；换成 fuchsia 后
+     正常视觉 ΔE 45.7，且红色盲/绿色盲两侧都很稳（见 `tests/milestone-colors.spec.ts`）。
+     粉色（pink-700）正常视觉更分得开（65.1），但**绿色盲下塌到 ΔE 7.2** ——
+     所以不选它。
+
+     🔴 与 `color.category-1..8` **不是同一套**：那八槽是用户赋予含义的活动分类色，
+     这里四档是**产品既定的成长维度**，含义由产品给、不由用户改。混用会让
+     "我给某个清单选了蓝色"和"打卡是蓝色"撞在一起。 */
+  --ht-color-milestone-checkin: var(--ht-blue-600);
+  --ht-color-milestone-focus: var(--ht-fuchsia-700);
+  --ht-color-milestone-tasks: var(--ht-emerald-600);
+  --ht-color-milestone-days: var(--ht-amber-600);
+
   /* 番茄钟 */
   --ht-color-focus-work: var(--ht-blue-600);
   --ht-color-focus-break: var(--ht-emerald-600);
@@ -928,6 +952,15 @@
   --ht-color-category-6: var(--ht-indigo-500);
   --ht-color-category-7: var(--ht-fuchsia-400);
   --ht-color-category-8: var(--ht-pink-400);
+
+  /* 里程碑四维（暗色）。实测 vs `color.surface`（暗色 #0d1526）：
+       blue-400 #60a5fa 7.17 · fuchsia-400 #e879f9 7.41 ·
+       emerald-400 #34d399 9.48 · amber-400 #fbbf24 10.92
+     四档在红色盲/绿色盲模拟下的最小 ΔE 均 ≥ 12（见 milestone-colors.spec.ts）。 */
+  --ht-color-milestone-checkin: var(--ht-blue-400);
+  --ht-color-milestone-focus: var(--ht-fuchsia-400);
+  --ht-color-milestone-tasks: var(--ht-emerald-400);
+  --ht-color-milestone-days: var(--ht-amber-400);
 
   /* 高/中与 danger、低与 info 同亮色原色阶（red-600 / sky-600）⇒ 走语义层引用；
      中与 warning **不同档**（亮色 amber-700 vs amber-600）⇒ 只回指原色阶。 */

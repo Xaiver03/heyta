@@ -100,6 +100,10 @@ export const TOKEN_GROUPS = {
     'category-6',
     'category-7',
     'category-8',
+    'milestone-checkin',
+    'milestone-focus',
+    'milestone-tasks',
+    'milestone-days',
     'focus-work',
     'focus-break',
     /** 弹窗遮罩。半透明，故与前景配对不参与对比度检查。 */

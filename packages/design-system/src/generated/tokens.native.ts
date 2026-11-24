@@ -79,6 +79,10 @@ export interface HeytaNativeTokens {
   readonly 'color.category-6': string;
   readonly 'color.category-7': string;
   readonly 'color.category-8': string;
+  readonly 'color.milestone-checkin': string;
+  readonly 'color.milestone-focus': string;
+  readonly 'color.milestone-tasks': string;
+  readonly 'color.milestone-days': string;
   readonly 'color.focus-work': string;
   readonly 'color.focus-break': string;
   readonly 'color.overlay': string;
@@ -331,6 +335,10 @@ export const lightTokens: HeytaNativeTokens = {
   'color.category-6': "#1d4ed8",
   'color.category-7': "#a21caf",
   'color.category-8': "#be185d",
+  'color.milestone-checkin': "#2563eb",
+  'color.milestone-focus': "#a21caf",
+  'color.milestone-tasks': "#059669",
+  'color.milestone-days': "#d97706",
   'color.focus-work': "#2563eb",
   'color.focus-break': "#059669",
   'color.overlay': "#0f172a80",
@@ -565,6 +573,10 @@ export const darkTokens: HeytaNativeTokens = {
   'color.category-6': "#6366f1",
   'color.category-7': "#e879f9",
   'color.category-8': "#f472b6",
+  'color.milestone-checkin': "#60a5fa",
+  'color.milestone-focus': "#e879f9",
+  'color.milestone-tasks': "#34d399",
+  'color.milestone-days': "#fbbf24",
   'color.focus-work': "#60a5fa",
   'color.focus-break': "#34d399",
   'color.overlay': "#020617b3",

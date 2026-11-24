@@ -69,6 +69,10 @@
 @define-color ht_color_category_6 #1d4ed8;
 @define-color ht_color_category_7 #a21caf;
 @define-color ht_color_category_8 #be185d;
+@define-color ht_color_milestone_checkin #2563eb;
+@define-color ht_color_milestone_focus #a21caf;
+@define-color ht_color_milestone_tasks #059669;
+@define-color ht_color_milestone_days #d97706;
 @define-color ht_color_focus_work #2563eb;
 @define-color ht_color_focus_break #059669;
 @define-color ht_color_overlay #0f172a80;
