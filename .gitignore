@@ -323,3 +323,8 @@ apps/web/evidence/*
 # AI 网关运行时配置（含密钥，勿入库）
 data/ai-gateway.json
 server/data/ai-gateway.json
+
+# iOS 模拟器构建产物（约 1.2G，非源码）
+apps/mobile/ios/build-sim/
+# 英文文案审查输出（截图 + debug.log，非源码）
+e2e/en-audit/
