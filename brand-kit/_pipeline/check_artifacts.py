@@ -200,6 +200,25 @@ for name in BRAND_COLOR_TOKENS:
 if not any("暗色" in f for f in fails):
     print(f"✅ 语义色亮/暗成对且取值不同（{len(BRAND_COLOR_TOKENS)} 个）")
 
+# 8) 里程碑四维色：两两色差（正常视觉 + 红/绿色盲模拟）
+#    这条与 design-system 的 `milestone-colors.spec.ts` 是**两处独立实现**：
+#    TS 侧用 TS 的算法，这里用 Python 重算一遍。两处对不上就说明有一边算错了。
+MIN_DELTA = float(os.environ.get("BRAND_KIT_MIN_DELTA", "10"))
+DIMS = ("checkin", "focus", "tasks", "days")
+for theme in ("light", "dark"):
+    hs = [RT.token(f"color-milestone-{k}", theme) for k in DIMS]
+    if any(h is None for h in hs):
+        fail(f"里程碑四维色在 {theme} 下取不全：{hs}")
+        continue
+    for name, matrix in (("正常视觉", None), ("红色盲", RT.PROTANOPIA), ("绿色盲", RT.DEUTERANOPIA)):
+        worst, pair = RT.worst_pair_delta(hs, matrix)
+        if worst < MIN_DELTA:
+            fail(f"{theme}/{name} 最差一对 {pair} ΔE={worst:.1f} < {MIN_DELTA}")
+        elif VERBOSE:
+            print(f"   · {theme}/{name} 最差 ΔE={worst:.1f}（{pair}）")
+if not any("ΔE" in f for f in fails):
+    print(f"✅ 里程碑四维色两两可区分（亮/暗 × 正常/红绿色盲，门槛 ΔE≥{MIN_DELTA:g}）")
+
 if not fails:
     print("\n✅ brand-kit 产物自检通过")
     sys.exit(0)

@@ -121,3 +121,49 @@ def normalize(text: str) -> str:
         cur = token(name)
         return cur if cur else raw
     return _re.sub(r'#[0-9a-fA-F]{6}', repl, text)
+
+# ---------------- 色差（CIE76）与二色觉模拟（Viénot 1999） ----------------
+def hex_rgb(hex6: str):
+    h = hex6.lstrip('#')
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+def _srgb_lin(c: float) -> float:
+    v = c / 255.0
+    return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+def _lin_srgb(v: float) -> int:
+    c = max(0.0, min(1.0, v))
+    return round((c * 12.92 if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055) * 255)
+
+def rgb_lab(rgb):
+    r, g, b = (_srgb_lin(c) for c in rgb)
+    x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047
+    y = r * 0.2126 + g * 0.7152 + b * 0.0722
+    z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883
+    f = lambda t: t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+    x, y, z = f(x), f(y), f(z)
+    return (116 * y - 16, 500 * (x - y), 200 * (y - z))
+
+def delta_e76(hex_a: str, hex_b: str) -> float:
+    la, lb = rgb_lab(hex_rgb(hex_a)), rgb_lab(hex_rgb(hex_b))
+    return sum((p - q) ** 2 for p, q in zip(la, lb)) ** 0.5
+
+PROTANOPIA = ((0.11238, 0.88762, 0.0), (0.11238, 0.88762, 0.0), (0.00401, -0.00401, 1.0))
+DEUTERANOPIA = ((0.29275, 0.70725, 0.0), (0.29275, 0.70725, 0.0), (-0.02234, 0.02234, 1.0))
+
+def simulate(hex6: str, matrix) -> str:
+    """线性 RGB 上乘矩阵再转回 sRGB —— 直接在 sRGB 上乘会系统性偏亮。"""
+    lin = [_srgb_lin(c) for c in hex_rgb(hex6)]
+    out = [_lin_srgb(sum(matrix[r][c] * lin[c] for c in range(3))) for r in range(3)]
+    return "#%02x%02x%02x" % tuple(out)
+
+def worst_pair_delta(hexes, matrix=None) -> tuple[float, str]:
+    """返回（最差一对的 ΔE，描述）。matrix 给了就先做色盲模拟。"""
+    vals = [simulate(h, matrix) if matrix else h for h in hexes]
+    worst = (float("inf"), "")
+    for i in range(len(vals)):
+        for j in range(i + 1, len(vals)):
+            d = delta_e76(vals[i], vals[j])
+            if d < worst[0]:
+                worst = (d, f"{hexes[i]}↔{hexes[j]}")
+    return worst
