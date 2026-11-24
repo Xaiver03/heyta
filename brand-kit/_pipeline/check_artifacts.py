@@ -177,7 +177,7 @@ if shutil.which("pdffonts") and shutil.which("pdfinfo"):
         "heyta_brochure_front.pdf": 1,
         "heyta_brochure_back.pdf": 1,
         "heyta_product-manual.pdf": 10,
-        "merch-sheet.pdf": 2,
+        "merch-sheet.pdf": 1,  # 曾经是 2 页 —— 那是 Letter 版式溢出，改 A4 后 1 页
     }
     pdfs = []
     for root, _d, files in os.walk(WD):
@@ -957,11 +957,64 @@ if os.path.exists(REDLINE_DOC):
     else:
         emit(f"✅ 反例名单与激励体系三条红线对得上（{len(need)} 条）")
 
+# 35) 宣传册正面必须印着官网域名（二维码块不许静默消失）
+BRO_PDF = os.path.join(WD, "06-brochure/heyta_brochure_front.pdf")
+import shutil as _sh
+if os.path.exists(BRO_PDF) and _sh.which("pdftotext"):
+    txt = subprocess.run(["pdftotext", "-f", "1", "-l", "3", BRO_PDF, "-"],
+                         capture_output=True, text=True, timeout=40).stdout
+    if "waytofuture" not in txt and "heyta." not in txt:
+        fail("宣传册正面缺官网域名 —— 二维码块可能已静默消失")
+    else:
+        emit("✅ 宣传册正面印着官网域名（二维码块在位）")
+
+# 36) 同一份物料的两副载体必须是同一个版面（PNG 比例 ≈ PDF 页面比例）
+def _pdf_ratio(rel_pdf):
+    try:
+        out = subprocess.run(["pdfinfo", os.path.join(WD, rel_pdf)],
+                             capture_output=True, text=True, timeout=20).stdout
+        m = re.search(r"Page size:\s+([\d.]+) x ([\d.]+) pts", out)
+        return (float(m.group(1)) / float(m.group(2))) if m else None
+    except Exception:
+        return None
+
+
+def _png_ratio(rel_png):
+    try:
+        from PIL import Image
+        im = Image.open(os.path.join(WD, rel_png))
+        return im.size[0] / im.size[1]
+    except Exception:
+        return None
+
+
+LAYOUT_PAIRS = [
+    ("06-brochure/heyta_brochure_front.png", "06-brochure/heyta_brochure_front.pdf"),
+    ("06-brochure/heyta_brochure_back.png", "06-brochure/heyta_brochure_back.pdf"),
+    ("08-merch/merch-sheet.png", "08-merch/merch-sheet.pdf"),
+]
+if _sh.which("pdfinfo"):
+    mism = []
+    for png, pdf in LAYOUT_PAIRS:
+        a, b = _png_ratio(png), _pdf_ratio(pdf)
+        if a is None or b is None:
+            continue
+        if abs(a - b) / b > 0.02:  # 允许 2% 误差（像素取整）
+            mism.append(f"{png} 比例 {a:.3f} vs {pdf} {b:.3f}")
+    if mism:
+        fail(f"同一物料的 PNG 与 PDF 版面不一致：{mism}")
+    else:
+        emit(f"✅ PNG 与 PDF 版面一致（{len(LAYOUT_PAIRS)} 组比例相同）")
+else:
+    print("⏭  跳过 PNG/PDF 版面比对：本机没有 pdfinfo")
+
 if not fails:
     if JSON_OUT:
         import json as _j
         print(_j.dumps({"ok": True, "passed": len(passes), "failed": 0,
-                        "checks": passes, "remedies": []}, ensure_ascii=False))
+                        "checks": passes, "remedies": [],
+                        "groups": {"read_code": 14, "read_artifact": 13, "read_doc": 3,
+                                   "build_time_assertions": 8}}, ensure_ascii=False))
     elif QUIET:
         print(f"✅ brand-kit 产物自检通过（{len(passes)} 项）")
     else:

@@ -77,6 +77,7 @@ def poster3():
     return doc(b,A3)
 
 # ---------------- 06 brochure (A4 landscape trifold) ----------------
+A4P="@page{size:210mm 297mm;margin:0}.page{width:210mm;height:297mm;position:relative;overflow:hidden;padding:0}"
 BR="@page{size:297mm 210mm;margin:0}.page{width:297mm;height:210mm;display:flex;position:relative;overflow:hidden}.panel{width:99mm;height:210mm;padding:14mm 10mm;position:relative;overflow:hidden}.fold{position:absolute;top:0;bottom:0;width:1px;border-left:1px dashed #0f172a18;z-index:3}"
 def brochure_front():
     b=f'''<div class="page">
@@ -185,7 +186,9 @@ def _site_origin():
     import re as _re, base64 as _b64
     p = os.path.join(os.path.dirname(WD), "apps/landing/src/site/origin.ts")
     if not os.path.exists(p):
-        return None
+        # 不许静默降级：域名取不到时，宣传册会**悄悄少掉二维码那块**，
+        # 而版面看起来仍然完整。宁可在这里失败。
+        raise SystemExit("取不到 appsl/landing/src/site/origin.ts 的 DEFAULT_SITE_ORIGIN —— 宣传册的二维码块会静默消失")
     m = _re.search(r"DEFAULT_SITE_ORIGIN\s*=\s*'([^']+)'", open(p, encoding="utf-8").read())
     return m.group(1) if m else None
 
@@ -314,7 +317,8 @@ def run():
             raise SystemExit(f"{os.path.basename(_dir)} 内容与预期不符：多余 {sorted(_have-_want)} / 缺失 {sorted(_want-_have)}")
     # merch
     G=os.path.join(WD,"08-merch"); os.makedirs(G,exist_ok=True)
-    h=wr("merch.html",merch_sheet()); render.chrome_png(h,os.path.join(G,"merch-sheet.png"),794,1123,2)
+    h=wr("merch.html",doc(merch_sheet(), A4P))  # 必须包 A4 版式：裸 HTML 打印会按 Chrome 默认 Letter
+    render.chrome_png(h,os.path.join(G,"merch-sheet.png"),794,1123,2)
     render.chrome_pdf(h,os.path.join(G,"merch-sheet.pdf")); print("merch")
     # 06-brochure / 08-merch 也必须恰好是这些文件（改名字段时旧文件要一起删）
     for _dir, _want in (

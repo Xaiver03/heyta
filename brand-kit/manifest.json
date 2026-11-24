@@ -1,6 +1,6 @@
 {
   "brand": "heyta",
-  "generated_at": "2026-11-25 06:01:40",
+  "generated_at": "2026-11-25 06:10:10",
   "dirs": {
     "00-brand-foundation": 11,
     "01-logo": 22,
@@ -26,7 +26,7 @@
     },
     {
       "path": "README.md",
-      "size": 10548
+      "size": 11011
     },
     {
       "path": "manifest.json",
@@ -322,11 +322,11 @@
     },
     {
       "path": "08-merch/merch-sheet.png",
-      "size": 100622
+      "size": 106098
     },
     {
       "path": "08-merch/merch-sheet.pdf",
-      "size": 111299
+      "size": 120617
     },
     {
       "path": "01-logo/wordmark-white.svg",

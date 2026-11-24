@@ -22,7 +22,9 @@ def _count_milestones():
 
 def _count_dir(rel_dir, ext=".svg"):
     d = os.path.join(WD, rel_dir)
-    return len([f for f in os.listdir(d) if f.endswith(ext)]) if os.path.isdir(d) else 0
+    if not os.path.isdir(d):
+        raise SystemExit(f"索引要统计的目录不存在：{rel_dir}（副标题会静默印成 0）")
+    return len([f for f in os.listdir(d) if f.endswith(ext)])
 
 
 def _pdf_pages(rel_pdf):
