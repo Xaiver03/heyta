@@ -674,6 +674,21 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     [scope, tasks],
   );
 
+  /** 周条小圆点：这天有没有内容（任务 / 习惯）。日期判断走领域 `isScheduledOn`。 */
+  const taskDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const task of scopedTasks) {
+      const d = dueLocalDateOf(task);
+      if (d !== undefined) set.add(d);
+    }
+    return set;
+  }, [scopedTasks]);
+  const hasContentOn = useCallback(
+    (date: LocalDate) =>
+      taskDates.has(date) || habits.some((habit) => isScheduledOn(habit.frequency, date)),
+    [taskDates, habits],
+  );
+
   /** 象限筛选的四个选项（顺序与四象限屏一致，值用 `q:N` 编码）。 */
   const QUADRANT_SCOPE = useMemo(
     () =>
@@ -797,6 +812,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
             pickDay(date);
           }}
           onShiftWeeks={shiftWeek}
+          hasContent={hasContentOn}
         />
       ) : null}
 

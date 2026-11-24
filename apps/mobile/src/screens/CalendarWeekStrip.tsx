@@ -28,6 +28,8 @@ export interface CalendarWeekStripProps {
   /** 周一到周日 7 个「星期几」文案（与网格同序，见 `WEEKDAY_MESSAGE_KEYS`）。 */
   readonly weekdays: readonly [string, string, string, string, string, string, string];
   readonly onSelect: (date: LocalDate) => void;
+  /** 这一天有没有内容（有则画一个小圆点，对齐滴答周条）。 */
+  readonly hasContent?: (date: LocalDate) => boolean;
 }
 
 /** `YYYY-MM-DD` 取「几号」。 */
@@ -52,6 +54,7 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
   today,
   weekdays,
   onSelect,
+  hasContent,
 }: CalendarWeekStripProps): React.JSX.Element {
   const t = useTokens();
   const styles = useMemo(
@@ -77,6 +80,12 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
         },
         today: { backgroundColor: t['color.primary'] },
         selected: { backgroundColor: t['color.primary-subtle'] },
+        dot: {
+          width: t['space.1'],
+          height: t['space.1'],
+          borderRadius: t['radius.full'],
+          backgroundColor: t['color.primary'],
+        },
       }),
     [t],
   );
@@ -113,6 +122,7 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
                 {String(dayNumber(date))}
               </Text>
             </View>
+            {hasContent?.(date) === true && !isToday ? <View style={styles.dot} /> : null}
             <Text variant="caption" tone="subtle">
               {lunarDayLabel(date)}
             </Text>

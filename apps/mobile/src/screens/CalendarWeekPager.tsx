@@ -59,6 +59,7 @@ export function CalendarWeekPager({
   weekdays,
   onSelect,
   onShiftWeeks,
+  hasContent,
 }: CalendarWeekPagerProps): React.JSX.Element {
   const { reducedMotion } = useTheme();
   const [pageWidth, setPageWidth] = useState(0);
@@ -92,10 +93,11 @@ export function CalendarWeekPager({
           today={today}
           weekdays={weekdays}
           onSelect={onSelect}
+          hasContent={hasContent}
         />
       </View>
     ),
-    [pageWidth, selected, today, weekdays, onSelect],
+    [pageWidth, selected, today, weekdays, onSelect, hasContent],
   );
 
   /**
@@ -159,6 +161,7 @@ export function CalendarWeekPager({
           today={today}
           weekdays={weekdays}
           onSelect={onSelect}
+          hasContent={hasContent}
         />
       ) : (
         <FlatList
