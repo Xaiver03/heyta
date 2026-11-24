@@ -716,9 +716,9 @@ open_settings_sheet() {
   #    同步屏 → 「使用自托管服务器」那段文字。以前用「设置」当枢纽的判据是假命中。
   ax_press_until "我的" "id:profile-entry-settings" \
     || { note "「我的」页没打开（底部标签按 5 次，树上没有 profile-entry-settings）"; return 1; }
-  ax_press_until "id:profile-entry-settings" "id:settings-section-sync" \
-    || { note "设置枢纽没打开（那一行按下去了，树上没有 settings-section-sync）"; return 1; }
-  ax_press_until "id:settings-section-sync" "使用自托管服务器" \
+  ax_press_until "id:profile-entry-settings" "id:settings-section-data" \
+    || { note "设置枢纽没打开（那一行按下去了，树上没有 settings-section-data）"; return 1; }
+  ax_press_until "id:settings-section-data" "使用自托管服务器" \
     || { note "同步与隐私那屏没有「使用自托管服务器」入口"; return 1; }
   ax_press_until "使用自托管服务器" "服务器地址" \
     || { note "展开自托管表单后读不到「服务器地址」"; return 1; }
@@ -972,9 +972,11 @@ HEYTA_E2E_SERVER="$HOST_SERVER" heyta_e2e_fresh_account \
   || env_bail "member 建号失败（服务端 TEST_MODE？端口对到了吗？）"
 MEMBER_EMAIL="$(cat "$HEYTA_E2E_EMAIL_FILE")"
 E2EE_PASS="$(cat "$HEYTA_E2E_E2EE_FILE")"
-# 🔴 登录密码**从唯一事实源现读**，不在本文件里抄一份字面量：
-#    `scripts/lib/mobile-e2e-fresh-account.sh` 里那枚 `password="…"` 常量。
-MEMBER_LOGIN_PASSWORD=$(sed -n 's/^[[:space:]]*password="\([^"]*\)".*/\1/p' "$ROOT/scripts/lib/mobile-e2e-fresh-account.sh" | head -1)
+# 🔴 登录密码**从唯一事实源现读**：`scripts/lib/mobile-e2e-fresh-account.sh` 导出的
+#    `HEYTA_E2E_PASSWORD`（默认 mobile-e2e-password，可用同名环境变量覆盖）。
+#    ⚠️ 不再用 sed 去抠那行 `password="…"`：lib 那行现在是 `password="$HEYTA_E2E_PASSWORD"`，
+#    抠出来的是**变量名本身**（填进输入框就是字面 `$HEYTA_E2E_PASSWORD`，登录必失败）。
+MEMBER_LOGIN_PASSWORD="${HEYTA_E2E_PASSWORD:-mobile-e2e-password}"
 [ -n "$MEMBER_LOGIN_PASSWORD" ] || env_bail "从 lib 里读不到那枚登录密码常量 ⇒ 不猜密码，本趟作废"
 ok "手机账号就位：$MEMBER_EMAIL"
 
@@ -1061,17 +1063,47 @@ if tree_has "再次输入密码" || tree_has "发送验证码"; then
     env_bail "按了模式切换之后「再次输入密码」还在 ⇒ 代没切过去，不拿注册那张表填密码"
   fi
 fi
-if ! tree_has "服务器地址"; then
-  shot "02d-没有服务器地址栏"
-  env_bail "AuthScreen 上没有「服务器地址」那一栏（`allowServerSelection` 为假）⇒ 这一趟没法把登录指向本轮服务端"
+# 🔴 2026-11-24：AuthScreen 把服务端地址收进「高级选项」展开入口里（`AuthScreen.tsx:739`
+#    的 advanced 组：地址只在这个壳显式允许时出现，并与粘贴令牌同收一处）。不展开它，
+#    「服务器地址」栏根本不在树上 —— 旧装置直接等那一栏，等于永远读不到。
+if ! tree_has "服务端地址" && tree_has "高级选项"; then
+  note "「服务端地址」收在「高级选项」里 ⇒ 先展开"
+  ax_press "高级选项" || { shot "02c5-展不开高级选项"; env_bail "「高级选项」在树上却按不动（装置问题）"; }
+  sleep 1.5
+  idb_dump
 fi
-if ! tree_has "用邮箱和密码登录"; then
+if ! tree_has "服务端地址"; then
+  shot "02d-没有服务端地址栏"
+  idb_dump
+  cp -f "$IDB_DUMP_FILE" "$EVIDENCE/ax-at-auth.json" 2>/dev/null || true
+  python3 - "$IDB_DUMP_FILE" > "$EVIDENCE/ax-at-auth.txt" 2>&1 <<'PY' || true
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception as e:
+    print("DUMP_READ_FAIL", e); raise SystemExit(0)
+def walk(n):
+    yield n
+    for c in (n.get("children") or n.get("nodes") or []):
+        yield from walk(c)
+for t in (data if isinstance(data, list) else [data]):
+    for n in walk(t):
+        lbl = n.get("AXLabel") or n.get("label") or ""
+        val = n.get("AXValue") or n.get("value") or ""
+        uid = n.get("AXUniqueId") or ""
+        role = n.get("role") or n.get("type") or ""
+        if lbl or uid or (isinstance(val, str) and val):
+            print(f"{role}\t{lbl!r}\t{val!r}\tuid={uid}")
+PY
+  env_bail "AuthScreen 上没有「服务端地址」那一栏（allowServerSelection 为假）⇒ 这一趟没法把登录指向本轮服务端（树已存 $EVIDENCE/ax-at-auth.txt）"
+fi
+if ! tree_has_id "mobile-auth-form-submit"; then
   shot "02d2-数不到登录那颗按钮"
-  env_bail "树上数不到「用邮箱和密码登录」⇒ 不能确认落在**登录**那一代，不往下填"
+  env_bail "树上数不到登录按钮（mobile-auth-form-submit）⇒ 不能确认落在**登录**那一代，不往下填"
 fi
-ok "已到 AuthScreen 的登录那一代（「邮箱」「服务器地址」两栏 +「用邮箱和密码登录」都在）"
+ok "已到 AuthScreen 的登录那一代（「邮箱」「服务端地址」两栏 + 登录按钮都在）"
 
-fill_field "服务器地址" "$HOST_SERVER" || env_bail "AuthScreen 的服务器地址写不进去（装置问题）"
+fill_field "服务端地址" "$HOST_SERVER" || env_bail "AuthScreen 的服务端地址写不进去（装置问题）"
 fill_field "邮箱" "$MEMBER_EMAIL" || env_bail "邮箱写不进去（装置问题）"
 # 登录密码那一栏是明文档还是遮住档**量出来的**（移动端默认揭示），两档各有填法；
 # 两枚显隐开关都不在树上 ⇒ 判不了该走哪条腿，退 3，不猜。
@@ -1086,7 +1118,7 @@ else
   env_bail "两枚显隐开关都不在树上 ⇒ 判不了「登录密码」该走哪一条填写腿，不猜"
 fi
 dismiss_ios_save_password || true
-ax_press "用邮箱和密码登录"
+ax_press "id:mobile-auth-form-submit"
 signed=0
 for _i in $(seq 1 30); do
   sleep 2

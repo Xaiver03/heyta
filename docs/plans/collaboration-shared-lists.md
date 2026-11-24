@@ -2056,3 +2056,28 @@ Android 装置仍未写（承 §9.40）。
 - 结论：**这条 iOS 设备腿要先把 auth/设置两处锚点按当前界面修好才能跑到 L1**；它不是我这批（同意面重排）
   引起的，是装置相对当前 app 的陈旧。Android 那枚装置仍不存在（承 §9.40：要服务端在 `linux-dev` 可达 + 新写驱动）。
   按仓库纪律，**不把"iOS 构建过 + 装过"读成"设备腿已验"**，本批到此如实留档。
+
+#### 9.41b 继续修 iOS 装置（2026-11-24 21:2x–22:3x）——四处陈旧锚点已改对，卡在模拟器 AX 桥
+
+继续按负责人「目标模式继续修」推进。逐处**改对了并跑过**的（都已落进 `scripts/verify-mobile-collab-ios.sh`）：
+
+1. 设置分区锚点 `id:settings-section-sync` → **`id:settings-section-data`**（当前 `SettingsScreen.tsx:532`
+   的分区键是 `account/subscription/data/…`，同步项在 `data` 组）。
+2. `AuthScreen` 的地址栏收在「**高级选项**」展开入口里（`AuthScreen.tsx:739` 的 advanced 组）——旧装置不展开它就直接等那一栏，
+   永远读不到；已加"先按「高级选项」再等"。
+3. 那一栏的标签是「**服务端地址**」（`web.auth.server.label`），不是设置面自托管表单的「服务器地址」
+   （`mobile.profile.serverUrl.label`）—— 两个词差一个字，旧装置按「服务器地址」在 AuthScreen 上永远读不到。
+4. 登录按钮已改成 id 锚 **`mobile-auth-form-submit`**（文案现在就是「登录」，不再是「用邮箱和密码登录」）。
+5. 登录密码改为取 **`HEYTA_E2E_PASSWORD`**（默认 `mobile-e2e-password`）：旧写法用 `sed` 抠 lib 里的
+   `password="…"`，而 lib 那行现在是 `password="$HEYTA_E2E_PASSWORD"` ⇒ 抠出的是变量名本身，
+   填进输入框就是字面 `$HEYTA_E2E_PASSWORD`，登录必失败（截图 `02f` 现量）。
+
+**卡住的新一格（环境，非产品）**：`set-value` 写「服务端地址」时 iOS 的 AX 桥偶发
+`The axbridge guest reader failed: socket write failed: Broken pipe`，之后 `SimulatorFrameworkBridge-iOS`
+进程退出、整棵树读不出（`element-left-tree`）⇒ 后续「邮箱」五次都填不进。这不是确定复现：有一次（`run10`）
+同一步是通的、一直填到登录。试过 `simctl erase` 清现场，结果新装首启多出一枚系统授权弹窗、装置按坐标点「以后」也没进主屏。
+⇒ 这一格是**模拟器 AX 桥不稳 + 首启授权弹窗**，装置与 iOS 27 模拟器之间的环境问题，需要逐次手工复位或换运行时再量，
+不是本批同意面改动引起。Apple silicon/Intel 与 iOS 27 下 `SimulatorFrameworkBridge` 这一族此前没有设备读数可参照。
+
+**结论**：装置已按当前界面把四处锚点修对（改动在本批提交里），但**仍未跑到 L1 绿**，拦在模拟器 AX 桥。
+按纪律不把"构建过/填过几步"读成"已验"。Android 装置仍未写。
