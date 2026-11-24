@@ -879,6 +879,188 @@ export interface CountdownEvent extends EntityBase {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 外部日历事件（只读镜像）
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 外部日程的**状态**词表。
+ *
+ * ⚠️ `'cancelled'` 在阶段 A 填不出来：Hub 现在把飞书的 `cancelled` 直接丢、
+ * 不入库（`src/normalize.ts`）。留着这一档是因为它是外部世界的真实取值，
+ * 等 Hub 输出墓碑时不必再改实体。
+ */
+export type CalendarEventStatus = 'confirmed' | 'tentative' | 'cancelled';
+
+/**
+ * 可见性词表。
+ *
+ * ⚠️ 含一档 `'unknown'`：Hub 现在只输出 `default | public | private`
+ * （完整枚举以 Hub 为准，**待确认**）。**缺席不许猜成 `'default'`** ——
+ * 猜了就等于替用户回答"这条日程能不能给别人看"，而这是披露口径。
+ */
+export type CalendarEventVisibility = 'default' | 'public' | 'private' | 'unknown';
+
+/** 忙闲词表。Hub 无值时给空串 ⇒ 映射不到这里，读侧按 `'unknown'`。 */
+export type CalendarEventFreeBusy = 'free' | 'busy' | 'unknown';
+
+/**
+ * 参会人（**窄形状**，键名对齐 Hub 已公布的形状）。
+ *
+ * 🔴 它**不是**飞书原始对象：Hub 透传的是飞书 `snake_case` 原文，映射发生在
+ * connector 里。这里只收自己认识的键 —— 飞书加字段时不该让本实体的载荷
+ * 跟着变形（形状随上游漂，而 op 载荷会长期存在磁盘与快照里）。
+ */
+export interface CalendarAttendee {
+  /** 外部参会人 id（飞书 `attendee_id`：用户/群/资源同一个键）。 */
+  id?: string;
+  /** 显示名（飞书 `display_name`）。 */
+  name?: string;
+  /** 参与状态（飞书 `rsvp_status`：`accept` / `decline` / `tentative` / `needs_action` …，**完整枚举待确认**）。 */
+  rsvpStatus?: string;
+  /** 可选参会（飞书 `is_optional`）。 */
+  optional?: boolean;
+  /** 组织者（飞书 `is_organizer`）。 */
+  organizer?: boolean;
+  /** 资源类参会人（会议室）。由飞书 `type` 决定，**取值待确认**。 */
+  resource?: boolean;
+}
+
+/** 提醒。Hub 只给"提前多少分钟"。 */
+export interface CalendarReminder {
+  /** 提前分钟数。 */
+  minutesBefore?: number;
+}
+
+/**
+ * 一本外部日历里的一条日程（**只读镜像**；ADR 草稿
+ * `docs/adr/0089-calendar-events-are-a-mirror-entity.md`）。
+ *
+ * 🔴 **为什么是独立实体而不是复用 `EVENT`**（倒数日）：时间语义不同
+ * （`EVENT.date` 是 `LocalDate`，**没有"几点"**；这里有起止时刻 + 时区 + 全天标记）、
+ * 字段不同（日历归属、外部 id、参会人、忙闲、重复例外）、生命周期不同
+ * （两者都没有完成态，但这里也没有"倒数"）。塞进去会让"改标题"与"改时区"
+ * 在同一实体上字段级 LWW 互斥 —— 与 `Reminder` 不用 `Task.dueDate` 承载、
+ * `Comment` 不挂 `Task.comments[]` 是同一条推理（AGENTS §3.4）。
+ *
+ * 🔴 **自有字段全部可选**（AGENTS §3.3），比 `CountdownEvent` 更严一档，
+ * 理由与 `AssistantTurn` 逐字同一条：这个实体类型上线后第一批落库的载荷形状
+ * 取决于写它的那个构建版本。把 `start` / `sourceEventId` 做成必填，症状是
+ * "某条老数据在 hydration 时炸掉整个日历"，而 **typecheck 与构建都会绿**
+ * （TS 只保护新数据）。身份不靠必填字段，靠 `id` —— 由幂等键
+ * `(accountId, calendarId, sourceEventId, originalTime)` 规范化后取 sha256 确定性派生。
+ *
+ * ⚠️ **一行 = Hub 返回的一条**（带 RRULE 的母事件，或一条已具体化的实例行）。
+ * 🔴 **RRULE 不展开成实体行**：实例在渲染时算。否则一条 `FREQ=DAILY` 无 `UNTIL`
+ * 的日程会往 op-log 里写进上千条实体（展开上限见 `recurrence.ts` 的
+ * `DEFAULT_MAX_ITERATIONS`）。
+ *
+ * ⚠️ **写入方只有宿主侧的 connector**（阶段 A 用户对它只读）。
+ */
+export interface CalendarEvent extends EntityBase {
+  /** 外部账户键。目前就是 Hub 的 `orgId`；账户若日后物化成实体，这一格含义不变。 */
+  accountId?: string;
+  /** 日程所属日历（Hub 的 `calendarId`；主日历固定为 `primary`）。幂等键的第二段。 */
+  calendarId?: string;
+  /** 外部日程 id（Hub 的 `eventId`，即飞书 `event_id`，实例行带后缀）。幂等键的第三段。 */
+  sourceEventId?: string;
+  /**
+   * 日程的 iCalendar UID。
+   *
+   * ⚠️ **现阶段填不出来**：Hub 的 JSON 里没有它（`uid` 只存在于它的 ICS 输出，
+   * 由 `orgId.eventId` 派生）。留着这一格等 Hub 补，阶段 A 允许缺席。
+   */
+  uid?: string;
+  /** 标题（Hub `summary`）。 */
+  summary?: string;
+  /** 描述（Hub `description`）。🔴 纯文本，详情面板不渲染 HTML。 */
+  description?: string;
+  /** 地点（Hub `location`）。 */
+  location?: string;
+  /**
+   * 起（epoch ms，UTC 时刻）。定时日程的**唯一时间真值**。
+   *
+   * ⚠️ 全天日程也填它（= 当天零点），但全天归属哪一天由 `startDate` 决定，
+   * 不要反过来从这一格推日期（见 `startDate`）。
+   */
+  start?: number;
+  /**
+   * 止（epoch ms，UTC 时刻）。
+   *
+   * ⚠️ 全天日程沿用 ICS `DTEND` 的**排他**语义（最后一天的**次日**零点），
+   * 所以"两天会议"是 `end - start === 2 天`，不是 `1 天`。
+   */
+  end?: number;
+  /**
+   * 全天日程的**日历日**（`YYYY-MM-DD`）。
+   *
+   * 🔴 它**不是** `start` 的冗余：全天日程属于**事件所在时区的哪一天**，
+   * 而不是**看的人所在时区的哪一天**。只存 epoch ms 时，上海的全天日程
+   * 在纽约会画到前一天。
+   */
+  startDate?: LocalDate;
+  /**
+   * 全天日程的结束日（**排他**，与 `end` 同语义 —— 最后一天的次日）。
+   *
+   * 名字里带 `Exclusive` 是刻意的：这类字段差一天是经典错，而它错了
+   * 界面只会画多一格，不会有任何一层报错。
+   */
+  endDateExclusive?: LocalDate;
+  /** 是否全天（Hub `allDay`）。缺席 = 非全天（判据写死成 `=== true`，不用真值判断）。 */
+  allDay?: boolean;
+  /** IANA 时区名（Hub 输出如 `Asia/Shanghai`）。🔴 不是 UTC 偏移量字符串。 */
+  timezone?: string;
+  /** 状态（Hub `status`）。缺席 = 未知，**不猜成 `'confirmed'`**。 */
+  status?: CalendarEventStatus;
+  /** 可见性（Hub `visibility`）。缺席 = 未知，**不猜成 `'default'`**。 */
+  visibility?: CalendarEventVisibility;
+  /** 忙闲（Hub `freeBusyStatus`）。缺席 = 未知，**不猜成 `'busy'`**。 */
+  freeBusy?: CalendarEventFreeBusy;
+  /**
+   * RRULE 字符串，**不带 `RRULE:` 前缀**（与 `Task.repeatRule` 同形，
+   * 由 `Recurrence` 构造，**不许界面手拼**）。缺席 = 一次性日程。
+   *
+   * ⚠️ 非空 ⇒ 这一条是**母事件**（Hub 不受窗口限制地总是返回它）；
+   * 空 ⇒ 一条独立日程或一条已具体化的实例行。
+   */
+  recurrence?: string;
+  /** 母事件 id（例外实例指回母日程时才有）。 */
+  recurringEventId?: string;
+  /**
+   * 例外实例的**原始**开始时间（Hub `originalTime`）。
+   *
+   * ⚠️ **单位待确认**：Hub 的文档写"Unix 秒"，而它的解析正则同时接受 10 位与
+   * 13 位（毫秒）。消费方必须**按位数判单位**，不能假定一种；它要与展开出来的
+   * 实例起点同一单位才能匹配例外（设计稿 §1.3 S1）。
+   */
+  originalTime?: number;
+  /** 参会人（窄形状见 `CalendarAttendee`）。缺席 = 未知，读侧按空数组降级。 */
+  attendees?: CalendarAttendee[];
+  /** 提醒（只读，只有"提前多少分钟"）。缺席 = 未知，读侧按空数组降级。 */
+  reminders?: CalendarReminder[];
+  /**
+   * **源侧**的更新时间。
+   *
+   * 🔴 与 `EntityBase.updatedAt` 不是一回事：后者是"这条 op 什么时候被写入"
+   * （reducer 从 op 时间戳派生，两设备并发时跟着到达顺序走），前者是
+   * "外部那一条什么时候改的"。同名会造出两个语义的同一字段 —— 本仓对
+   * "两份定义"的判据是"必然漂"。
+   *
+   * ⚠️ Hub 目前不输出事件级更新时间，所以现阶段只能由 connector 用写入时刻
+   * 代替 —— **待确认**（设计稿 §1.2 U10）。
+   */
+  sourceUpdatedAt?: number;
+  /**
+   * 本地标签（多对多，复用既有的 `TAG` 实体 + `Task.tagIds` 的成例）。
+   *
+   * 🔴 标签是**用户语义**、要跨设备，所以它在 op-log 里；而它是 heyta 侧的，
+   * **不回写飞书**。解析走唯一入口 `resolveTagIds()`（`Tag.mergedInto`）。
+   * ⚠️ 这一格是设计稿 §2.2 补的（需求清单里没有）：不要就删掉，标签层退回
+   * "只在视图侧按组织/日历过滤"。
+   */
+  tagIds?: string[];
+}
+
+// ─────────────────────────────────────────────────────────────
 // 助手会话的一条消息
 // ─────────────────────────────────────────────────────────────
 
@@ -1067,6 +1249,7 @@ export interface EntityModelMap {
   PREFERENCE_CORRECTION: PreferenceCorrection;
   REMINDER: Reminder;
   EVENT: CountdownEvent;
+  CALENDAR_EVENT: CalendarEvent;
   ASSISTANT_TURN: AssistantTurn;
   ATTACHMENT: Attachment;
 }
@@ -1097,6 +1280,7 @@ export const MODELED_ENTITY_TYPES = [
   'PREFERENCE_CORRECTION',
   'REMINDER',
   'EVENT',
+  'CALENDAR_EVENT',
   'ASSISTANT_TURN',
   'COMMENT',
   'ATTACHMENT',

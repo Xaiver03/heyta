@@ -138,6 +138,33 @@ export const ENTITY_TYPES = [
    */
   'ATTACHMENT',
 
+  // ── 外部日历镜像（只读） ───────────────────────────────────
+  /**
+   * 一本外部日历里的一条日程（**只读镜像**；ADR 草稿
+   * `docs/adr/0089-calendar-events-are-a-mirror-entity.md`）。
+   *
+   * 🔴 **为什么不复用 `EVENT`**：`EVENT` 是倒数日 / 纪念日
+   * （`title` + `date: LocalDate` + 农历/闰月口径 + 归档），它**没有"几点"**、
+   * 没有日历归属、没有参会人。日历事件塞进去会让"改标题"与"改时区"在同一个
+   * 实体上字段级 LWW 互斥，并逼 `eventOccurrencesInRange` 这类"每个日期问一次"
+   * 的纯函数对两种形状分支（理由逐条在 `packages/domain/src/entities.ts` 的
+   * `CalendarEvent` 与设计稿 §2.1）。
+   *
+   * ⚠️ 自有字段**全部可选**，**不 bump `CURRENT_SCHEMA_VERSION`**（AGENTS §3.3）。
+   * 理由与 `ASSISTANT_TURN` 同一条：这个实体上线后第一批落库的载荷形状取决于
+   * 写它的那个构建版本，任何一格做成必填，症状都是"某条老数据在 hydration 时
+   * 炸掉整个日历"，而 typecheck 与构建都会绿。身份靠 `id`（由幂等键确定性派生），
+   * 不靠必填字段。
+   *
+   * ⚠️ **一行 = 外部源返回的一条**（带 RRULE 的母事件，或一条已具体化的实例行）；
+   * 🔴 **RRULE 不展开成实体行** —— 实例在渲染时算。展开成行的话，一条
+   * `FREQ=DAILY` 无 `UNTIL` 的日程会往 op-log 里写进上千条实体。
+   *
+   * 🔴 **服务端必须先于客户端上线** —— 老服务端的白名单（从本数组派生）里没有它，
+   * 会把该 op 判成 `INVALID_ENTITY_TYPE` 永久拒绝（§2.1 的硬顺序）。
+   */
+  'CALENDAR_EVENT',
+
   // ── 系统（同步基础设施，不可删） ───────────────────────────
   'GLOBAL_CONFIG',
   'MIGRATION',

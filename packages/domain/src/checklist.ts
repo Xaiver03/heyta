@@ -9,6 +9,7 @@
  */
 
 import type { Task, TaskChecklistItem } from './entities.js';
+export type { TaskChecklistItem } from './entities.js';
 import { parseChecklistFromNote } from './timeline.js';
 
 export interface ChecklistView {
