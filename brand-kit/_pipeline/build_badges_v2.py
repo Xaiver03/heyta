@@ -43,12 +43,34 @@ def _domain_milestones():
 
 
 MILESTONES = _domain_milestones()
-IDENTITY=[
- ("started","已启程","activeDays",7),("routine","有节奏","activeDays",30),("steady","稳住","activeDays",100),
- ("checkin-hundred","打卡百次","checkIns",100),("deep-fifty","深潜五十时","focusHours",50),
- ("deep-two-hundred","深耕两百时","focusHours",200),("finisher-five-hundred","完成五百事","tasks",500),
- ("streak-thirty","连续三十天","streakDays",30),
-]
+# 🔴 id / kind / threshold 从领域层读；**中文名是品牌文案**（领域层没有），
+#    所以这里按 id 维护一份 lbl()。领域层新增一个标签而这里没有中文名 → 直接报错，
+#    逼着补文案，而不是悄悄漏印一枚徽章。
+_IDENTITY_CN = {
+    "started": "已启程", "routine": "有节奏", "steady": "稳住",
+    "checkin-hundred": "打卡百次", "deep-fifty": "深潜五十时",
+    "deep-two-hundred": "深耕两百时", "finisher-five-hundred": "完成五百事",
+    "streak-thirty": "连续三十天",
+}
+_KIND_ALIAS = {"streakDays": "streakDays"}  # 领域层的 kind 名与 KINDS 对齐，无需改名
+
+
+def _domain_identity():
+    import re as _re
+    p = os.path.join(os.path.dirname(WD), "packages/domain/src/identity-tags.ts")
+    src = open(p, encoding="utf-8").read()
+    rows = _re.findall(r"\{\s*id:\s*'([\w-]+)',\s*kind:\s*'(\w+)',\s*threshold:\s*(\d+)\s*\}", src)
+    if not rows:
+        raise SystemExit("identity-tags.ts 里取不到 IDENTITY_TAG_DEFINITIONS（上游结构变了）")
+    out = []
+    for tid, kind, thr in rows:
+        if tid not in _IDENTITY_CN:
+            raise SystemExit(f"领域层新身份标签 '{tid}' 没有中文名 —— 请先补 _IDENTITY_CN")
+        out.append((tid, _IDENTITY_CN[tid], kind, int(thr)))
+    return out
+
+
+IDENTITY = _domain_identity()
 # 状态胶囊的六种色调：**全部取自 token**，不写色值。
 # 只在 tokens.css 里已有的档位之间选（tokens 没有 500 档的族就退到 600/300），
 # 因为"新增一档只为这里用"会让设计系统的色阶失去可预期性。

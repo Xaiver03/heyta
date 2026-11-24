@@ -611,6 +611,52 @@ if os.path.exists(CATALOGUE):
     else:
         emit(f"✅ 图鉴收录全部维度中文名（{len(set(cns))} 个）")
 
+# 23) 状态胶囊的**文字色对背景**必须 ≥ 4.5:1（它是字，不是图形）
+#     胶囊文案是 13px 小字，按 WCAG 1.4.3 要 4.5:1；品牌物料印出来也一样要能读。
+def _lum(h):
+    def _c(v):
+        x = v / 255
+        return x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4
+    r, g, b = [_c(v) for v in RT.hex_rgb(h)]
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _contrast(a, b):
+    la, lb = _lum(a), _lum(b)
+    hi, lo = max(la, lb), min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+BB_SRC = os.path.join(WD, "_pipeline/build_badges_v2.py")
+if os.path.exists(BB_SRC):
+    bb = open(BB_SRC, encoding="utf-8").read()
+    tones = re.findall(
+        r'"(\w+)":\s*dict\(bg=RT\.token\("([\w-]+)"\),\s*fg=RT\.token\("([\w-]+)"\)', bb)
+    if not tones:
+        fail("状态胶囊：从 build_badges_v2.py 解析不到 TONES 的 bg/fg")
+    else:
+        low = []
+        for name, bg_tok, fg_tok in tones:
+            c = _contrast(RT.token(fg_tok), RT.token(bg_tok))
+            if c < 4.5:
+                low.append(f"{name}: {c:.2f}")
+        if low:
+            fail(f"状态胶囊文字对比度 < 4.5:1：{low}")
+        else:
+            emit(f"✅ 状态胶囊文字对比度均 ≥4.5:1（{len(tones)} 种色调）")
+
+# 24) 同一张图不许被登记两次（重复引用会让图鉴出现两张一样的卡）
+if os.path.exists(IMG_MANIFEST):
+    import json as _j2
+    mf2 = _j2.load(open(IMG_MANIFEST, encoding="utf-8"))
+    paths2 = [it["path"] for it in (mf2 if isinstance(mf2, list) else mf2.get("items", []))
+              if isinstance(it, dict) and it.get("path")]
+    dup = {p for p in paths2 if paths2.count(p) > 1}
+    if dup:
+        fail(f"04-imagery manifest 有重复登记：{sorted(dup)}")
+    else:
+        emit(f"✅ 04-imagery manifest 无重复登记（{len(paths2)} 条唯一）")
+
 if not fails:
     if JSON_OUT:
         import json as _j
