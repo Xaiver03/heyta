@@ -152,6 +152,18 @@ def manual():
     fq="".join(f'<div style="padding:7mm 0;border-bottom:1px solid {BD}"><div style="font-size:12.5pt;font-weight:700">{q}</div><div style="font-size:11px;color:{SL};margin-top:2mm;line-height:1.8">{a}</div></div>' for q,a in faq)
     pages.append(f'<div class="page">{ph("常见问题")}<div style="position:absolute;left:18mm;right:18mm;top:46mm"><div style="font-size:10px;letter-spacing:4px;color:{BLUE}">FAQ</div><h2 style="font-size:28pt;font-weight:800;margin-top:6mm">常见问题</h2><div style="margin-top:8mm">{fq}</div></div>{pf("常见问题")}</div>')
     pages.append(f'''<div class="page" style="background:radial-gradient(120% 90% at 80% 0%,#1e40af,#2563eb 55%,#0f172a);color:#fff"><img src="{WM_W}" style="position:absolute;left:18mm;top:24mm;height:20mm"><div style="position:absolute;left:18mm;right:18mm;top:120mm"><h1 style="font-size:30pt;font-weight:800;line-height:1.3">{RC.tagline_html()}</h1><p style="margin-top:8mm;font-size:11pt;color:#dbeafe;line-height:2">heyta · 本地优先任务管理 · 2026</p></div><div style="position:absolute;left:18mm;right:18mm;bottom:16mm;display:flex;justify-content:space-between;font-size:9px;color:#93c5fd"><span>PRODUCT MANUAL</span><span>hey.</span></div></div>''')
+    # 🔴 目录页码是**假设**「封面=1、目录=2、正文从 3 起、按 toc 顺序各占一页」算出来的
+    #    （`P{i+3:02d}`）。这个假设一旦被插入一页打破，目录就会静静地指错页。
+    #    所以在出口处把它变成断言：页数必须刚好对上，且每一页真的属于它那一节。
+    if len(pages) != 2 + len(toc) + 1:  # 封面 + 目录 + 各节 + 封底
+        raise SystemExit(
+            f"手册页数 {len(pages)} ≠ 2+{len(toc)}+1 —— 目录页码（P03 起）会指错页，先修目录算法"
+        )
+    for i, title in enumerate(toc):
+        if title not in pages[2 + i]:
+            raise SystemExit(
+                f"目录第 {i+1} 节写「{title}」，但第 {3+i} 页里没有这个标题 —— 目录与正文错位"
+            )
     return doc("".join(pages),A4)
 
 # ---------------- 09 social ----------------
@@ -256,7 +268,14 @@ def release_card():
 def run():
     # posters
     P=os.path.join(WD,"05-posters"); os.makedirs(P,exist_ok=True)
-    for name,fn in [("01_品牌主视觉",poster1),("02_核心能力",poster2),("03_成就奖章",poster3)]:
+    # 输出后立刻核对目录：只许有这三张（各 pdf+png）。改名时旧文件必须一起删，
+    # 否则目录里会同时存在新旧两版海报，图鉴里也会出现两张一样的卡。
+    posters = [("01_品牌主视觉",poster1),("02_核心能力",poster2),("03_成长里程碑",poster3)]
+    want = {f"{n}.{ext}" for n, _ in posters for ext in ("pdf","png")}
+    have = {f for f in os.listdir(P) if not f.startswith(".")}
+    if have != want:
+        raise SystemExit(f"05-posters 内容与预期不符：多余 {sorted(have-want)} / 缺失 {sorted(want-have)}")
+    for name,fn in posters:
         h=wr(name+".html",fn()); render.chrome_pdf(h,os.path.join(P,name+".pdf")); render.chrome_png(h,os.path.join(P,name+".png"),1123,1587,2); print("poster",name)
     # brochure
     B=os.path.join(WD,"06-brochure"); os.makedirs(B,exist_ok=True)

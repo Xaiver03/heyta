@@ -386,6 +386,46 @@ if os.path.exists(CATALOGUE) and os.path.exists(DOMAIN_MILESTONES):
         else:
             print(f"✅ 图鉴标题{label}数量 = {want}")
 
+# 14) brand-tokens.css 必须能被解析，且每个值与 json 一致
+#     .css 供浏览器/设计工具直接 @import；它和 .json 是同一份数据的两副面孔，
+#     一旦只改一处，外部工具里就会出现两套品牌色。
+TOKENS_CSS = os.path.join(WD, "00-brand-foundation/brand-tokens.css")
+if os.path.exists(TOKENS_CSS) and os.path.exists(TOKENS_JSON):
+    css = open(TOKENS_CSS, encoding="utf-8").read()
+    pairs = dict(re.findall(r"--hk-([\w-]+)\s*:\s*(#[0-9a-fA-F]{3,8})", css))
+    # 括号配对：能解析的最基本证据
+    if css.count("{") != css.count("}"):
+        fail(f"brand-tokens.css 花括号不配对（{css.count('{')} vs {css.count('}')}）")
+    if not pairs:
+        fail("brand-tokens.css 里解析不出 --hk-* 变量")
+    # json 侧：把 --hk-<fam>-<step> 与 json 的同路径对上
+    import json as _json
+    jd = _json.load(open(TOKENS_JSON, encoding="utf-8"))
+    flat = {}
+    for grp in ("colors", "semantic", "milestone"):
+        def _flat(o, pre=""):
+            if isinstance(o, dict):
+                for k, v in o.items():
+                    _flat(v, f"{pre}-{k}" if pre else k)
+            elif isinstance(o, str) and o.startswith("#"):
+                flat[pre] = o
+        _flat(jd[grp], grp if grp != "colors" else "")
+    mism = []
+    for name, val in pairs.items():
+        key = name
+        # colors 家族：blue-50 / slate-white → 去掉顶层 colors 前缀
+        if key.startswith("colors-"):
+            key = key[len("colors-"):]
+        want = flat.get(key)
+        if want is None:
+            continue  # 反查不到就交给第 12 组（json 自身）兜
+        if want.lower() != val.lower():
+            mism.append(f"{name}: css={val} json={want}")
+    if mism:
+        fail(f"brand-tokens.css 与 json 不一致：{mism[:4]}")
+    else:
+        print(f"✅ brand-tokens.css 可解析且与 json 一致（{len(pairs)} 个变量）")
+
 if not fails:
     print("\n✅ brand-kit 产物自检通过")
     sys.exit(0)
