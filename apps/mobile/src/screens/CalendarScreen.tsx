@@ -822,6 +822,18 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           <Text variant="headline">{labels.dayTitle(cursor)}</Text>
         </View>
       ) : null}
+      {view === 'day' ? (
+        <View style={{ marginTop: tokens['space.2'] }}>
+          <CalendarHabitsCard
+            habits={scheduledHabits}
+            logs={habitLogs}
+            date={selected}
+            title={t('widget.habits.title')}
+            onToggle={onToggleHabit}
+            busyHabitId={busyHabitId}
+          />
+        </View>
+      ) : null}
 
       {/* Apple 式：月档大号月份标题（对齐 Apple 月视图顶部「十一月」）。 */}
       {view === 'month' ? (
@@ -930,18 +942,6 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         testID="calendar-board"
       />
       )}
-      {view === 'day' ? (
-        <View style={{ marginTop: tokens['space.3'] }}>
-          <CalendarHabitsCard
-            habits={scheduledHabits}
-            logs={habitLogs}
-            date={selected}
-            title={t('widget.habits.title')}
-            onToggle={onToggleHabit}
-            busyHabitId={busyHabitId}
-          />
-        </View>
-      ) : null}
       </Animated.View>
 
       {/*
