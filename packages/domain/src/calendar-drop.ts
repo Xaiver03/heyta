@@ -130,3 +130,43 @@ export function planCalendarDropUndo(
     dueDateLocal: before.dueDateLocal ?? null,
   };
 }
+
+/** `planCalendarTimeDrop` 的写入计划：同样交给 `setDueDate`（不传 dueDateLocal 即清除 date-only）。 */
+export interface CalendarTimeDropPlan {
+  readonly dueDate: number;
+}
+
+/**
+ * 日档：把任务拖到某一天的第 `hour` 点 ⇒ 把截止**时刻**设成那天 `hour:00`。
+ *
+ * 与 `planCalendarDrop`（改"哪一天"）是同一天里改"几点"的另一半：
+ *   · 拖一个**全天**任务到小时轴 ⇒ 它从"没有时刻"变成"那天 hour:00"；
+ *   · 拖一个**有时刻**任务到别的小时 ⇒ 时刻平移。
+ *
+ * 🔴 写 `dueDate`（带时刻）就必须把 `dueDateLocal`（date-only）清掉 ——
+ *    `setDueDate(id, dueDate)` 不传第三参，动作层把 `dueDateLocal` 写成 `null`（老约定）。
+ *    带着 date-only 又给时刻，是"同一件事两个来源"。
+ *
+ * 什么时候 `undefined`：不可改期任务 / `hour` 不是 0–23 的整数 / 落点日期非法 /
+ * 已经是这个 `dueDate`（no-op，不写空 op）。
+ */
+export function planCalendarTimeDrop(
+  task: CalendarReschedulableTask,
+  targetDate: LocalDate,
+  hour: number,
+): CalendarTimeDropPlan | undefined {
+  if (!canRescheduleByCalendarDrag(task)) return undefined;
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return undefined;
+  if (!LOCAL_DATE_PATTERN.test(targetDate)) return undefined;
+
+  let dueDate: number;
+  try {
+    dueDate = dueDateToEpoch(targetDate, `${String(hour).padStart(2, '0')}:00`);
+  } catch {
+    return undefined;
+  }
+
+  // 已经就是这一刻（且没有 date-only 残留）⇒ no-op。
+  if (task.dueDate === dueDate && task.dueDateLocal === undefined) return undefined;
+  return { dueDate };
+}

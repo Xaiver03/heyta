@@ -275,10 +275,16 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     [view],
   );
 
-  /** 🔴 2026-11-20：整周平移（日历条左右拖拽切周用）。同时移动 selected + cursor，任何档位成立。 */
+  /**
+   * 整周平移（周历条滑动切周用）。`weeks` 可正可负、可多周（快甩一次跨多周）。
+   *
+   * 保留「星期几」：选中日跟着平移 `7 × weeks` 天，任何档位都成立。
+   * 🔴 多周用乘法不是循环调用 —— 一次 state 更新，避免连点/快甩时多次 setState 互踩。
+   */
   const shiftWeek = useCallback(
-    (direction: 1 | -1) => {
-      const next = addDays(selected, 7 * direction);
+    (weeks: number) => {
+      if (weeks === 0) return;
+      const next = addDays(selected, 7 * weeks);
       setSelected(next);
       setCursor(calendarCursorFor(view, next));
     },
@@ -734,7 +740,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           onSelect={(date) => {
             pickDay(date);
           }}
-          onShiftWeek={shiftWeek}
+          onShiftWeeks={shiftWeek}
         />
       ) : null}
 

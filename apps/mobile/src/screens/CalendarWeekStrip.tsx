@@ -40,7 +40,13 @@ function shortWeekday(label: string): string {
   return label.startsWith('周') && label.length > 1 ? label.slice(1) : label;
 }
 
-export function CalendarWeekStrip({
+/**
+ * 用 `memo` 包一层：周条现在是虚拟化横向列表里的一页，翻周时会同时存在好几页，
+ * 而拖拽/动画只改列表的滚动偏移、不改这些 prop —— 没有 memo 的话每一帧
+ * 都会把不动的几页一起重渲染，长列表下就是肉眼可见的掉帧。
+ * prop 全是原始值 + 稳定回调，浅比较即可命中。
+ */
+export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
   weekStart,
   selected,
   today,
@@ -115,4 +121,4 @@ export function CalendarWeekStrip({
       })}
     </View>
   );
-}
+});

@@ -24,6 +24,7 @@ import {
   canRescheduleByCalendarDrag,
   planCalendarDrop,
   planCalendarDropUndo,
+  planCalendarTimeDrop,
 } from '../src/calendar-drop.js';
 import type { Task } from '../src/entities.js';
 
@@ -113,5 +114,38 @@ describe('撤销：恢复拖拽前的截止形状', () => {
 
   it('无截止的任务撤销 ⇒ 两个 null（穿过 JSON 表达清除）', () => {
     expect(planCalendarDropUndo(task({}))).toEqual({ dueDate: null, dueDateLocal: null });
+  });
+});
+
+describe('日档：拖到某一小时改时刻（planCalendarTimeDrop）', () => {
+  it('全天任务拖到 10:00 ⇒ dueDate 变成那天 10:00（date-only 由 setDueDate 清除）', () => {
+    const t = task({ dueDateLocal: '2026-11-20', dueDate: dueDateToEpoch('2026-11-20') });
+    expect(planCalendarTimeDrop(t, '2026-11-20', 10)).toEqual({
+      dueDate: dueDateToEpoch('2026-11-20', '10:00'),
+    });
+  });
+
+  it('有时刻任务拖到另一个小时 ⇒ 时刻平移（同一天）', () => {
+    const t = task({ dueDate: dueDateToEpoch('2026-11-20', '09:30') });
+    expect(planCalendarTimeDrop(t, '2026-11-20', 16)).toEqual({
+      dueDate: dueDateToEpoch('2026-11-20', '16:00'),
+    });
+  });
+
+  it('拖到它已经所在的那一小时是 no-op', () => {
+    const t = task({ dueDate: dueDateToEpoch('2026-11-20', '10:00') });
+    expect(planCalendarTimeDrop(t, '2026-11-20', 10)).toBeUndefined();
+  });
+
+  it('hour 越界 / 非整数 ⇒ undefined', () => {
+    const t = task({ dueDate: dueDateToEpoch('2026-11-20', '09:00') });
+    expect(planCalendarTimeDrop(t, '2026-11-20', -1)).toBeUndefined();
+    expect(planCalendarTimeDrop(t, '2026-11-20', 24)).toBeUndefined();
+    expect(planCalendarTimeDrop(t, '2026-11-20', 10.5)).toBeUndefined();
+  });
+
+  it('跨天排期任务不可拖 ⇒ undefined', () => {
+    const t = task({ startDate: dueDateToEpoch('2026-11-18'), dueDate: dueDateToEpoch('2026-11-20') });
+    expect(planCalendarTimeDrop(t, '2026-11-20', 10)).toBeUndefined();
   });
 });

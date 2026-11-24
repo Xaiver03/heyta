@@ -39,6 +39,13 @@ interface DayDropData {
   readonly type: 'day';
   readonly date: string;
 }
+/** 日档小时行的落点：落在哪一天的第几小时。 */
+interface HourDropData {
+  readonly type: 'hour';
+  readonly date: string;
+  readonly hour: number;
+}
+type DropData = DayDropData | HourDropData;
 
 /**
  * 一台 `DndContext`：包住整个共享日历板，托管拖拽状态与浮影。
@@ -49,10 +56,12 @@ interface DayDropData {
 export function CalendarDragProvider({
   tasksById,
   onReschedule,
+  onSetTime,
   children,
 }: {
   tasksById: ReadonlyMap<string, Task>;
   onReschedule: (taskId: string, targetDate: string) => void;
+  onSetTime: (taskId: string, targetDate: string, hour: number) => void;
   children: ReactNode;
 }): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -72,11 +81,17 @@ export function CalendarDragProvider({
       setActiveId(null);
       const { over } = event;
       if (over === null) return;
-      const data = over.data.current as DayDropData | undefined;
-      if (data?.type !== 'day' || typeof data.date !== 'string') return;
-      onReschedule(String(event.active.id), data.date);
+      const data = over.data.current as DropData | undefined;
+      const taskId = String(event.active.id);
+      if (data?.type === 'day' && typeof data.date === 'string') {
+        onReschedule(taskId, data.date);
+        return;
+      }
+      if (data?.type === 'hour' && typeof data.date === 'string' && typeof data.hour === 'number') {
+        onSetTime(taskId, data.date, data.hour);
+      }
     },
-    [onReschedule],
+    [onReschedule, onSetTime],
   );
 
   const activeTitle = activeId === null ? undefined : tasksById.get(activeId)?.title;
@@ -121,6 +136,27 @@ export function CalendarDropDay({ date, children }: { date: string; children: Re
   const { setNodeRef, isOver } = useDroppable({ id: `day:${date}`, data: { type: 'day', date } satisfies DayDropData });
   return (
     <div ref={setNodeRef} className="ht-content__cal-drop" data-over={isOver ? 'true' : 'false'}>
+      {children}
+    </div>
+  );
+}
+
+/** 日档：一行小时 = 一个投放目标（落在某天的第 `hour` 点）。 */
+export function CalendarDropHour({
+  date,
+  hour,
+  children,
+}: {
+  date: string;
+  hour: number;
+  children: ReactNode;
+}): React.JSX.Element {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `hour:${date}:${String(hour)}`,
+    data: { type: 'hour', date, hour } satisfies HourDropData,
+  });
+  return (
+    <div ref={setNodeRef} className="ht-content__cal-hour-drop" data-over={isOver ? 'true' : 'false'}>
       {children}
     </div>
   );

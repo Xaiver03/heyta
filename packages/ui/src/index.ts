@@ -162,6 +162,18 @@ export {
   type CalendarDateKey,
   type CalendarTranslate,
 } from './calendar/date-text.js';
+export {
+  WEEK_STRIP_ANCHOR,
+  WEEK_STRIP_HALF_SPAN_WEEKS,
+  WEEK_STRIP_FIRST_INDEX,
+  WEEK_STRIP_LAST_INDEX,
+  WEEK_STRIP_COUNT,
+  weekIndexFor,
+  weekStartForIndex,
+  clampWeekStripIndex,
+  weekStripListPosition,
+  weekIndexAtOffset,
+} from './calendar/week-strip-model.js';
 /**
  * 空态：**唯一权威定义**。
  *
