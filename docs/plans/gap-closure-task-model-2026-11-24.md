@@ -75,3 +75,22 @@
 3. **都不触发 Prisma 迁移**：服务端 op 存储是通用表 `model Operation`（`entityType String` / `payload Json`），新实体只是多写行，列与索引已覆盖；`ShareOperation` 同理。只有给实体加强类型服务端列（如 `AttachmentBlob` 存字节）才要迁移。仍跑 `check:schema-migration-drift`/`check:migrations` 证明未漂。
 4. **服务端先于客户端上线（硬顺序）**：白名单 `ALLOWED_ENTITY_TYPES = new Set(ENTITY_TYPES)` 从数组派生 ⇒ 服务单先带上含新实体名的 `ENTITY_TYPES` 发布，客户端再发布并写 op。反向会把新实体 op 判 `INVALID_ENTITY_TYPE` **永久拒绝**（丢弃，非重试可恢复）。老客户端读到新实体 op 当未知实体优雅跳过，故客户端灰度无兼容风险。
 5. **分母 +1 与两处"写死的测试"**：两实体进 `EntityModelMap` 后 `check:ai-coverage` 分母 +1；推荐同批补最小读写工具（否则登记 `ENTITY_COVERAGE_DEBT` + AI-COV-n）。无论哪条，都要同步 `capability-manifest.spec.ts` 里手写死的 `userOperableEntityTypes` 名单与 `.length` 期望值——否则红在"测试写死"而非"真的没覆盖"。C 的 `SECTION` 若落在共享清单里，其 op 必须走 share op-log（同 TASK/NOTE/COMMENT 的写入路由）。
+
+## 8. 交付结果（2026-11-24，integrate/gap-closure @ a021ce1e）
+
+**四工作包全部实现、合并、构建通过、门禁全绿。** 独立分支交付，未动主检出 `feat/app-auto-update`（其上有他人并行线的未提交改动，用户决定稍后自行合并）。
+
+| 工作包 | commit 关键点 | 状态 |
+|---|---|---|
+| B 二级标签（ADR-0090，从丢失的 feat/tag-hierarchy 移植） | Tag.parentId + 换父防环 + Web/mobile UI | ✅ |
+| A 清单级设置（icon/viewMode/kind/showInSmartList + 4 AI 工具 + 设置面板） | Project 4 可选字段 | ✅ |
+| C 清单内分组（ADR-0091，SECTION 新实体全链） | 数据层/动作/local-api/AI 工具/测试 | ✅（web UI 待接入） |
+| D 保存过滤器（ADR-0092，FILTER 新实体全链，结构化 JSON 非 DSL） | 同上 | ✅（web UI 待接入） |
+
+**验证实测**：全部 packages 构建成功；domain 1361 / app-host 2588 / local-api 407 测试全绿；门禁 6/6 绿（ai-coverage · ai-tools · layering · adr-numbering 悬空0 · schema-migration-drift · migrations）。**未触及 server 代码 ⇒ 无数据库迁移、无服务端代码上线**。
+
+**如实标注的既有边界（非本次引入，改动前基线即存在）**：
+- `packages/ai` 6 条红：EVENT 工具归因、`create_reminder` fixture、`managed-routing` 托管档（`toggle_checklist_item` override 残留），全在未改动文件内。
+- `apps/web` typecheck 既有债：`CalendarView.tsx` 引用了只存在于**未提交 calendar-drop wip** 的符号，导致该端无法在本环境安全构建/验证 ⇒ **C/D 的 web UI（分组头、过滤器编辑器）因此暂未接入**；数据层/动作/AI 工具/local-api 工具对 C/D 已完整。
+
+**后续（待 apps/web 基线修复后）**：接入 C/D 的 web UI；清理 `apps/web` 既有 typecheck 债与 `packages/ai` 既有 6 红。
