@@ -15,7 +15,7 @@
 
 **失败即给修复命令**：每条失败会按类别打印「修：python .../build_xxx.py」，不用再翻文档。
 
-三种输出：默认人读；`--list` 只列 29 组判据编号；`--quiet` 只在失败时说话并给一行汇总（给 CI 用）；
+三种输出：默认人读；`--list` 按「读代码 / 读产物 / 读文档」三组列出 30 组判据；`--quiet` 只在失败时说话并给一行汇总（给 CI 用）；
 `--json` 输出 `{ok, passed, failed, checks|errors, remedies}`（给流水线解析用，stdout 保证是纯 JSON）。\n\n> 链上已经跑过：`pnpm check:brand-assets` 内部会调用它；\n> 想单独跑用 `pnpm check:brand-kit`（不要再挂进 `check` 链，否则一次 CI 跑两遍）。
 
 | # | 判据 | 抓的是什么 |
