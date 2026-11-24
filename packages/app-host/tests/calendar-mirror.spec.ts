@@ -272,3 +272,57 @@ describe('窗口滑动与删除', () => {
     expect(entity?.summary).toBe('周会');
   });
 });
+
+describe('最近一次成功同步时间（lastSync）', () => {
+  it('ok 写入 lastSync=本轮 now；下一轮 ok 把它推进到新的 now', async () => {
+    const port = fakePort();
+    const first = await refreshCalendarMirror(
+      options(fetchRows(() => [hubRow()]).impl, { now: T0 }),
+      port,
+    );
+    expect(first.kind).toBe('ok');
+    expect(port.meta.get(META_KEYS.CALENDAR_MIRROR_LAST_SYNC)).toBe(T0);
+
+    const second = await refreshCalendarMirror(
+      options(fetchRows(() => [hubRow()]).impl, { now: T0 + 5_000 }),
+      port,
+    );
+    expect(second.kind).toBe('ok');
+    expect(port.meta.get(META_KEYS.CALENDAR_MIRROR_LAST_SYNC)).toBe(T0 + 5_000);
+  });
+
+  it('not-modified（304）也刷新 lastSync —— 它同样是"这一轮拉通了"', async () => {
+    const port = fakePort();
+    await refreshCalendarMirror(options(fetchRows(() => [hubRow()]).impl, { now: T0 }), port);
+    // 抹掉，证明 304 自己会把它写回来（而不是靠上一轮残留）。
+    port.meta.delete(META_KEYS.CALENDAR_MIRROR_LAST_SYNC);
+
+    const notModified: typeof fetch = async () => new Response(null, { status: 304 });
+    expect(await refreshCalendarMirror(options(notModified, { now: T0 }), port)).toEqual({
+      kind: 'not-modified',
+    });
+    expect(port.meta.get(META_KEYS.CALENDAR_MIRROR_LAST_SYNC)).toBe(T0);
+  });
+
+  it('unavailable 死活不写：从没成功过就没有这个键；成功过就停在旧值', async () => {
+    // 从没成功过：网络失败一轮，键仍缺席。
+    const fresh = fakePort();
+    const failedFresh = await refreshCalendarMirror(
+      options(fetchRows(() => 'network').impl, { now: T0 }),
+      fresh,
+    );
+    expect(failedFresh).toEqual({ kind: 'unavailable', cause: 'network' });
+    expect(fresh.meta.has(META_KEYS.CALENDAR_MIRROR_LAST_SYNC)).toBe(false);
+
+    // 成功过一轮后失败：停在上一轮的值，不被这一轮的 now 覆盖。
+    const port = fakePort();
+    await refreshCalendarMirror(options(fetchRows(() => [hubRow()]).impl, { now: T0 }), port);
+    const before = port.meta.get(META_KEYS.CALENDAR_MIRROR_LAST_SYNC);
+    const failed = await refreshCalendarMirror(
+      options(fetchRows(() => 'bad-json').impl, { now: T0 + 9_000 }),
+      port,
+    );
+    expect(failed).toEqual({ kind: 'unavailable', cause: 'bad-shape' });
+    expect(port.meta.get(META_KEYS.CALENDAR_MIRROR_LAST_SYNC)).toBe(before);
+  });
+});

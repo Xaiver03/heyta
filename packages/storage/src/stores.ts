@@ -257,6 +257,12 @@ export const META_KEYS = {
   CALENDAR_MIRROR_BASE_URL: 'calendarMirrorBaseUrlV1',
   /** Hub 的 Bearer token（本机凭据；只在读 Hub 时使用，不写回任何实体）。 */
   CALENDAR_MIRROR_TOKEN: 'calendarMirrorTokenV1',
+  /**
+   * 最近一次**成功**拉取 Hub 的本地毫秒时间戳（`ok` / `not-modified` 才写，
+   * 失败一律不写）。它只服务两件事：面板上的「已同步 · N 分钟前」，以及 web 侧
+   * 自动同步的节流判断（`shouldAutoSync`）。**不参与任何业务裁决**。
+   */
+  CALENDAR_MIRROR_LAST_SYNC: 'calendarMirrorLastSyncV1',
   /** Active encrypted-payload generation paired with the local key package. */
   VAULT_PAYLOAD_KEY_VERSION: 'vaultPayloadKeyVersionV1',
   /** Encrypted pending root-rotation target; never stores a plaintext root. */

@@ -43,7 +43,7 @@ import { currentState, dispatchIntent } from '../../lib/oplog.js';
 import { useProjectStore } from '../projects/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { agendaDays, agendaGroups, type AgendaRange } from './agenda.js';
-import { useHubConnection } from './hub-connection.js';
+import { syncAge, useHubConnection } from './hub-connection.js';
 
 /** 标签写入的上下文。与 `features/projects/store.ts` 同一个形状，只含函数引用。 */
 const actionContext = { dispatch: dispatchIntent, getState: currentState };
@@ -120,6 +120,35 @@ export function CalendarHubPanel(): React.JSX.Element | null {
         return t('web.calendar.hub.status.tagFailed');
       default:
         return t('web.calendar.hub.status.failed');
+    }
+  };
+
+  /**
+   * 「最近一次成功同步」那一行。分档由纯函数 `syncAge` 给，措辞在 i18n：
+   * 「已同步 · 3 分钟前」/「尚未同步」。它描述的**不是本轮结果**（那由 `status` 管），
+   * 而是"上一次拉通是什么时候" —— 自动同步失败时它不动，恰好就是"这轮没成功"的证据。
+   */
+  const lastSyncText = (): string => {
+    const age = syncAge(hub.lastSyncMs, now);
+    switch (age.kind) {
+      case 'never':
+        return t('web.calendar.hub.lastSyncNever');
+      case 'justNow':
+        return t('web.calendar.hub.lastSyncWithAgo', {
+          ago: t('web.calendar.hub.lastSyncJustNow'),
+        });
+      case 'minutes':
+        return t('web.calendar.hub.lastSyncWithAgo', {
+          ago: t('web.calendar.hub.lastSyncAgoMinutes', { minutes: age.minutes }),
+        });
+      case 'hours':
+        return t('web.calendar.hub.lastSyncWithAgo', {
+          ago: t('web.calendar.hub.lastSyncAgoHours', { hours: age.hours }),
+        });
+      case 'days':
+        return t('web.calendar.hub.lastSyncWithAgo', {
+          ago: t('web.calendar.hub.lastSyncAgoDays', { days: age.days }),
+        });
     }
   };
 
@@ -472,9 +501,18 @@ export function CalendarHubPanel(): React.JSX.Element | null {
         </form>
       )}
 
-      {status === undefined ? null : (
+      {/* 「最近一次成功同步」：已配置就常驻一行；自动同步失败时它不动，就是"没成功"的证据。 */}
+      {configured && !editing ? (
+        <p className="ht-sidebar__agenda-status" data-testid="calendar-hub-last-sync">
+          {lastSyncText()}
+        </p>
+      ) : null}
+
+      {status === undefined && !hub.autoSyncing ? null : (
         <p className="ht-sidebar__agenda-status" role="status" data-testid="calendar-hub-status">
-          {statusText(status)}
+          {hub.autoSyncing && status?.kind !== 'syncing'
+            ? t('web.calendar.hub.autoSyncing')
+            : statusText(status ?? { kind: 'syncing' })}
         </p>
       )}
     </section>
