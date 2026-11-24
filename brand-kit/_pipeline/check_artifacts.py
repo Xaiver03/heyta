@@ -31,6 +31,7 @@ if LIST:
     print(" 16 svg↔png     17 图库双射  18 图标进总览 19 状态=产品 20 本地引用")
     print(" 21 标签门槛值  22 里程碑数字/维度名 23 胶囊对比度 24 图库去重")
     print(" 25 分类色槽门槛 26 徽章英文名 27 色卡立场 28 图库分类 29 分享无标识")
+    print(" 30 手册 FAQ 依据")
     sys.exit(0)
 fails = []
 passes = []
@@ -821,10 +822,44 @@ if os.path.exists(SHARE_FILE):
         emit("✅ 分享文本不带账号/设备字段（只用 4 条小结词条 + 数值/日期）")
 
 
+# 30) 手册 FAQ 的四条答案必须各有依据（承诺类文案，写错要赔信任）
+#     数据在哪 / 必须登录吗 / 加密默认吗 / 能自托管吗
+FAQ_EVID = {
+    "数据本地优先·无默认服务器": (
+        os.path.join(ROOT, "packages/app-host/src/admin-client.ts"),
+        [r"baseUrl\.trim\(\) === ''", r"unconfigured"],
+    ),
+    "无需账号（有离线入口）": (
+        os.path.join(ROOT, "packages/i18n/src/locales/zh-CN.ts"),
+        [r"'mobile\.welcome\.offline':\s*'先离线使用'"],
+    ),
+    "加密非默认·可显式开启": (
+        os.environ.get("BRAND_KIT_ADR_0081",
+                       os.path.join(ROOT, "docs/adr/0081-encryption-is-opt-in-not-default.md")),
+        [r"默认 `readable`", r"显式开启"],
+    ),
+    "可自托管": (os.path.join(ROOT, "server/Dockerfile"), None),
+}
+_faq_bad = []
+for label, (path, pats) in FAQ_EVID.items():
+    if not os.path.exists(path):
+        _faq_bad.append(f"{label}：找不到依据文件 {os.path.relpath(path, ROOT)}")
+        continue
+    if pats:
+        txt = open(path, encoding="utf-8").read()
+        miss = [pt for pt in pats if not re.search(pt, txt)]
+        if miss:
+            _faq_bad.append(f"{label}：{os.path.relpath(path, ROOT)} 里找不到 {miss}")
+if _faq_bad:
+    fail(f"手册 FAQ 有答案失去依据：{_faq_bad}")
+else:
+    emit(f"✅ 手册 FAQ 四条答案各有依据（{len(FAQ_EVID)} 条）")
+
 if not fails:
     if JSON_OUT:
         import json as _j
-        print(_j.dumps({"ok": True, "passed": len(passes), "failed": 0, "checks": passes}, ensure_ascii=False))
+        print(_j.dumps({"ok": True, "passed": len(passes), "failed": 0,
+                        "checks": passes, "remedies": []}, ensure_ascii=False))
     elif QUIET:
         print(f"✅ brand-kit 产物自检通过（{len(passes)} 项）")
     else:
@@ -832,7 +867,8 @@ if not fails:
     sys.exit(0)
 if JSON_OUT:
     import json as _j
-    print(_j.dumps({"ok": False, "passed": len(passes), "failed": len(fails), "errors": fails}, ensure_ascii=False))
+    print(_j.dumps({"ok": False, "passed": len(passes), "failed": len(fails),
+                    "errors": fails, "remedies": REMEDIES}, ensure_ascii=False))
 else:
     print(f"\n❌ 共 {len(fails)} 项失败")
     if REMEDIES:
