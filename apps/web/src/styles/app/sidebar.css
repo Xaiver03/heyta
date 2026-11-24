@@ -657,3 +657,210 @@
 .ht-sidebar__scope-row--group {
   margin-block-start: var(--ht-space-1);
 }
+
+/* ── 飞书日程（阶段 A：只读日程 + 本地标签）──────────────────────
+ *
+ * 这一块与「显示范围」同一个层级：都是"日历上看得见什么"的来源。
+ * 顺序排 `1` 与范围并列（DOM 在后，所以画在它下面），迷你月历仍是 `2`
+ * （它带 `margin-block-start: auto`，钉在列底）。
+ *
+ * 🔴 行是 `<button>`：展开详情是这一屏唯一的"动作"，而它不是链接、也不是
+ * 可拖拽元素 —— 日程时间来自 Hub，拖动改期在阶段 A 不允许。
+ */
+.ht-sidebar__agenda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  order: 1;
+  padding-block-start: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-sidebar__agenda-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+}
+
+.ht-sidebar__agenda-range {
+  display: flex;
+  gap: var(--ht-space-1);
+}
+
+.ht-sidebar__agenda-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-sidebar__agenda-form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-sidebar__agenda-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.ht-sidebar__agenda-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+}
+
+.ht-sidebar__agenda-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+/* 日期是分组头：比行内文字弱一档，但不进 `subtle` 以下的对比度区间。 */
+.ht-sidebar__agenda-day {
+  padding-inline: var(--ht-space-2);
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-sidebar__agenda-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-sidebar__agenda-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-sidebar__agenda-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--ht-space-1) var(--ht-space-2);
+  inline-size: 100%;
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  color: var(--ht-color-foreground);
+  cursor: pointer;
+}
+
+.ht-sidebar__agenda-row:hover {
+  background: var(--ht-color-hover);
+}
+
+/* 钟点用等宽数字：一列时刻左对齐才读得成一列。 */
+.ht-sidebar__agenda-time {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-sidebar__agenda-title {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  font-size: var(--ht-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-sidebar__agenda-meta {
+  inline-size: 100%;
+  overflow: hidden;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-sidebar__agenda-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1);
+}
+
+.ht-sidebar__agenda-chip {
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+  white-space: nowrap;
+}
+
+.ht-sidebar__agenda-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  margin-inline-start: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border-inline-start: var(--ht-border-width-thick) solid var(--ht-color-border-subtle);
+}
+
+.ht-sidebar__agenda-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--ht-space-1) var(--ht-space-2);
+  margin: 0;
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-sidebar__agenda-facts dt {
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-sidebar__agenda-facts dd {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  overflow-wrap: anywhere;
+}
+
+/* 描述里的换行是用户/上游写的，不折叠成一行。 */
+.ht-sidebar__agenda-pre {
+  white-space: pre-wrap;
+}
+
+.ht-sidebar__agenda-tags {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ht-sidebar__agenda-legend {
+  margin-block-end: var(--ht-space-1);
+  padding: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-sidebar__agenda-tag {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-sidebar__agenda-empty,
+.ht-sidebar__agenda-note,
+.ht-sidebar__agenda-status {
+  margin: 0;
+  padding-inline: var(--ht-space-2);
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+}

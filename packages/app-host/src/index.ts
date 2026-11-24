@@ -997,6 +997,16 @@ export {
 } from './calendar-mirror.js';
 
 /**
+ * 外部日历日程的**本地写动作**（阶段 A 只有标签，ADR-0089）。
+ *
+ * 🔴 壳只许通过这里写 `CALENDAR_EVENT`：一条 `UPD {tagIds}` 的形状、去重、
+ * "空集合写 `null`"、以及"引用必须存在"都在这一处。谁在 `apps/*` 里拼这条 op，
+ * 就会出现四份行为不一致的标签写入，而它们的分歧在界面上完全看不出来
+ * （AGENTS.md §3.5）。
+ */
+export { setCalendarEventTags } from './calendar-event-actions.js';
+
+/**
  * 自动更新：客户端检查核心（宿主无关）。判定标志来自服务端（`GET /api/app-version`），
  * 这里只做「发请求 + 校验形状 + 该不该弹」。定性见 `docs/plans/app-auto-update.md`。
  * 各宿主只注入「本机版本 + fetch + 上次提示过的版本」，不自己比版本大小。

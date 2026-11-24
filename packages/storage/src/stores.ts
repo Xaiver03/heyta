@@ -247,6 +247,16 @@ export const META_KEYS = {
   CALENDAR_MIRROR_WINDOW: 'calendarMirrorWindowV1',
   /** 那次响应的 `ETag`（条件请求原样回传；与窗口键一起判，窗口变了就不回传）。 */
   CALENDAR_MIRROR_ETAG: 'calendarMirrorEtagV1',
+  /**
+   * Hub 根地址（飞书日程镜像，ADR-0089）。空 / 缺 = 未配置 ⇒ 管道零请求。
+   *
+   * 🔴 它是**本机凭据**，与 `PUBLIC_FACTS_*` 同一个理由：既不进 op-log、也不跨设备
+   * （ADR-0052 §2.5 的同一条纪律）。写进 op 会让另一台设备回放出一条"用户配置过 Hub"
+   * 的假事实，而 token 会跟着加密载荷一起上云。
+   */
+  CALENDAR_MIRROR_BASE_URL: 'calendarMirrorBaseUrlV1',
+  /** Hub 的 Bearer token（本机凭据；只在读 Hub 时使用，不写回任何实体）。 */
+  CALENDAR_MIRROR_TOKEN: 'calendarMirrorTokenV1',
   /** Active encrypted-payload generation paired with the local key package. */
   VAULT_PAYLOAD_KEY_VERSION: 'vaultPayloadKeyVersionV1',
   /** Encrypted pending root-rotation target; never stores a plaintext root. */
