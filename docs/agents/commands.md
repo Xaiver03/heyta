@@ -229,12 +229,13 @@ pnpm check:adr-numbering        # ADR 编号唯一 + 裸写的 `ADR-NNNN` 只指
                                 #   🔴 它挡的是 2026-10-05 那次"两条会话同一天各占 0053"：
                                 #      文件名不同 ⇒ git 不报冲突，死链检查也不报（链接各指各的），
                                 #      而正文里的 `ADR-0053 §5 第 11 条` 从此有两种读法。
-pnpm check:tokens               # 原生 token 产物（Swift/ArkTS/JSON/RN）是否与 tokens.css 同步
-                                # ↑ 同一条链里还查 Android 小组件色值与
-                                #   `apps/web/public/manifest.webmanifest` 的
-                                #   theme_color / background_color（PWA 清单是
-                                #   JSON，写不了 var()，只能靠这条门禁盯漂移）
-pnpm check:pwa-colors           # 单独只查 manifest 两色；修：pnpm gen:pwa-colors
+pnpm check:tokens               # 原生 token 产物（Swift/ArkTS/JSON/RN）+ Android 小组件色值，
+                                #   是否与 tokens.css 同步
+pnpm check:pwa-colors           # `apps/web/public/manifest.webmanifest` 的 theme_color /
+                                #   background_color 是否等于 token（PWA 清单是 JSON，
+                                #   写不了 var()，只能靠这条门禁盯漂移）。修：pnpm gen:pwa-colors
+pnpm check:brand-kit            # 品牌物料自检（18 组判据）：色值/数量/PDF/链接/词条/色差/
+                                #   门槛对齐/禁串…；`--quiet` 给 CI，`--json` 给流水线
 pnpm check:arkts                # 用**真 ArkTS 编译器**编译生成的 .ets 产物
 pnpm check:native-deps          # iOS 原生依赖对账（package.json ↔ Podfile.lock，见 §7 第 32 条）
 

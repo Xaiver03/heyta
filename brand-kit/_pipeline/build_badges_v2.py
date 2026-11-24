@@ -47,7 +47,14 @@ TONES={
  "danger": dict(bg=RT.token("red-50"),    fg=RT.token("red-700"),   dot=RT.token("red-600"),   bd=RT.token("red-300")),
  "accent": dict(bg=RT.token("blue-50"),   fg=RT.token("blue-800"),  dot=RT.token("blue-600"),  bd=RT.token("blue-200")),
 }
-STATUS=[("todo","待办","info"),("doing","进行中","success"),("done","已完成","success"),
+# 🔴 这六格只放**产品真有的状态**。盘点（packages/domain/src/entities.ts）：
+#   · 完成 = `completedAt !== undefined`            → todo / done
+#   · 归档 = `archived === true`（isArchived）       → archived
+#   · 逾期 = 由 dueDate 与完成态派生                  → overdue
+#   · 优先级 = `Priority` 枚举                       → high
+#   没有"进行中"这个状态（全仓 `'doing'` 零命中），所以这一格被删掉了 ——
+#   品牌手册上印一个产品里不存在的 UI 状态，是比缺一格更糟的错。
+STATUS=[("todo","待办","info"),("done","已完成","success"),
         ("overdue","已逾期","danger"),("archived","已归档","neutral"),("high","高优先级","accent")]
 # 8 个分类色槽同样读自 tokens.css（亮色主题）。这套值受
 # `tests/category-colors.spec.ts` 约束：色盲可辨 + 与 surface ≥3:1，**不要照着"好看"替换**。

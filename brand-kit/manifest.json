@@ -1,10 +1,10 @@
 {
   "brand": "heyta",
-  "generated_at": "2026-11-25 05:28:03",
+  "generated_at": "2026-11-25 05:36:37",
   "dirs": {
     "00-brand-foundation": 11,
     "01-logo": 22,
-    "02-badges": 71,
+    "02-badges": 70,
     "03-icons": 28,
     "04-imagery": 9,
     "05-posters": 6,
@@ -14,7 +14,7 @@
     "09-social": 3,
     "10-templates": 2
   },
-  "count": 164,
+  "count": 163,
   "files": [
     {
       "path": "index.html",
@@ -26,19 +26,19 @@
     },
     {
       "path": "README.md",
-      "size": 7798
+      "size": 8464
     },
     {
       "path": "manifest.json",
-      "size": 13616
+      "size": 13620
     },
     {
       "path": "02-badges/badge-catalogue.png",
-      "size": 528220
+      "size": 525286
     },
     {
       "path": "02-badges/badge-catalogue.pdf",
-      "size": 792027
+      "size": 790663
     },
     {
       "path": "02-badges/README-待重建.md",
@@ -46,11 +46,11 @@
     },
     {
       "path": "02-badges/badge-catalogue.html",
-      "size": 6668
+      "size": 6601
     },
     {
       "path": "02-badges/_preview/page-1.png",
-      "size": 528220
+      "size": 525286
     },
     {
       "path": "02-badges/identity/started.png",
@@ -155,10 +155,6 @@
     {
       "path": "02-badges/category/_cards.html",
       "size": 2561
-    },
-    {
-      "path": "02-badges/status/doing.svg",
-      "size": 420
     },
     {
       "path": "02-badges/status/todo.svg",
@@ -318,7 +314,7 @@
     },
     {
       "path": "10-templates/release-card_1080x1350.png",
-      "size": 1967745
+      "size": 2002556
     },
     {
       "path": "10-templates/slide-16x9.png",
@@ -502,7 +498,7 @@
     },
     {
       "path": "05-posters/03_成长里程碑.png",
-      "size": 986355
+      "size": 985021
     },
     {
       "path": "05-posters/02_核心能力.pdf",
@@ -514,7 +510,7 @@
     },
     {
       "path": "05-posters/03_成长里程碑.pdf",
-      "size": 303163
+      "size": 300822
     },
     {
       "path": "07-product-manual/heyta_product-manual_cover.png",

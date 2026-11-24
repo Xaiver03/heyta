@@ -6,6 +6,7 @@ import render
 import read_tokens as RT
 import read_copy as RC
 WD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # brand-kit
+OUT_ROOT = WD
 LOGOD=os.path.join(WD,"01-logo"); IMG=os.path.join(WD,"04-imagery")
 def f(p): return "file://"+os.path.abspath(p)
 WM_B=f(os.path.join(LOGOD,"wordmark-primary.svg")); WM_W=f(os.path.join(LOGOD,"wordmark-white.svg"))
@@ -48,7 +49,12 @@ def poster2():
     </div>'''
     return doc(b,A3)
 def poster3():
-    pills="".join(f'<img src="{stat(n)}" style="height:26px;margin:0 6px 8px 0">' for n in ["todo","doing","done","overdue","archived","high"])
+    # 状态胶囊清单**从产物目录现读**，不在这里写第二份 key 列表 ——
+    # 写死过一次，结果产品里删掉「进行中」后这里仍引用 status/doing.svg，海报上出现空白胶囊。
+    _order = ["todo", "done", "overdue", "archived", "high"]
+    _have = [f[:-4] for f in os.listdir(os.path.join(OUT_ROOT, "02-badges/status")) if f.endswith(".svg")]
+    _seq = [k for k in _order if k in _have] + sorted(k for k in _have if k not in _order)
+    pills="".join(f'<img src="{stat(n)}" style="height:26px;margin:0 6px 8px 0">' for n in _seq)
     mcards="".join(f'<div style="text-align:center"><img src="{ms(k,t)}" style="width:42mm"><div style="font-size:11px;color:{SL};margin-top:3mm">{l}</div></div>' for k,t,l in [("checkIns",200,"累计打卡 200 次"),("focusHours",50,"累计专注 50 小时"),("tasks",1000,"累计完成 1000 件"),("activeDays",100,"使用 100 天")])
     b=f'''<div class="page" style="background:radial-gradient(120% 90% at 50% 108%,#dbeafe,#fff 60%)">
       <div style="position:absolute;left:24mm;top:22mm"><img src="{WM_B}" style="height:20mm"></div>
@@ -256,11 +262,13 @@ def slide_tpl():
     </div>'''
     return f"<!doctype html><html><head><meta charset='utf-8'><style>*{{margin:0;padding:0}}body{{font-family:{FONT}}}</style></head><body>{b}</body></html>"
 def release_card():
+    # 模板：标题与条目都写成「待填」结构，**不印虚构的功能条目** ——
+    # 在模板里写死「新增专注回顾」这类具体改动，等于对外宣称一个不存在的功能。
     b=f'''<div style="width:1080px;height:1350px;background:radial-gradient(120% 90% at 80% 0%,#1e40af,#2563eb 55%,#0f172a);position:relative;padding:90px;color:#fff">
       <img src="{WM_W}" style="height:56px">
       <div style="margin-top:120px;font-size:24px;letter-spacing:6px;color:#bfdbfe">RELEASE NOTES · 更新日志</div>
-      <h1 style="font-size:72px;font-weight:800;margin-top:20px">v1.2 更快，更稳</h1>
-      <div style="margin-top:60px;font-size:30px;line-height:2;color:{RT.token("blue-100")}">· 日历拖拽更顺手<br>· 同步冲突更少<br>· 新增专注回顾<br>· 修复若干细节</div>
+      <h1 style="font-size:64px;font-weight:800;margin-top:20px">vX.Y　一句话概括这次更新</h1>
+      <div style="margin-top:56px;font-size:28px;line-height:2.1;color:{RT.token("blue-100")}">· 新功能：一句话说明<br>· 改进：原来怎样，现在怎样<br>· 修复：修掉了什么问题<br>· 破坏性变更：需要用户做什么（没有就删掉这行）</div>
       <div style="position:absolute;left:90px;bottom:80px;font-size:22px;color:#93c5fd">heyta · hey.</div>
     </div>'''
     return f"<!doctype html><html><head><meta charset='utf-8'><style>*{{margin:0;padding:0}}body{{font-family:{FONT}}}</style></head><body>{b}</body></html>"

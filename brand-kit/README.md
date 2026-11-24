@@ -12,12 +12,12 @@
 ## 自检判据一览（`python _pipeline/check_artifacts.py`）
 
 三种输出：默认人读；`--quiet` 只在失败时说话并给一行汇总（给 CI 用）；
-`--json` 输出 `{ok, passed, failed, checks|errors}`（给流水线解析用，stdout 保证是纯 JSON）。
+`--json` 输出 `{ok, passed, failed, checks|errors}`（给流水线解析用，stdout 保证是纯 JSON）。\n\n> 链上已经跑过：`pnpm check:brand-assets` 内部会调用它；\n> 想单独跑用 `pnpm check:brand-kit`（不要再挂进 `check` 链，否则一次 CI 跑两遍）。
 
 | # | 判据 | 抓的是什么 |
 |---|---|---|
 | 1 | 色值白名单 | 产物里出现非 token 的十六进制 |
-| 2 | 数量 | 17 里程碑 / 8 身份标签 / 6 状态胶囊 / 26 图标 / 10 字标 + png 从 1x/2x 齐全 |
+| 2 | 数量 | 17 里程碑 / 8 身份标签 / 5 状态胶囊 / 26 图标 / 10 字标 + png 从 1x/2x 齐全 |
 | 3 | 关键产物存在且非空 | 图鉴 pdf+png、品牌手册 pdf |
 | 4 | PDF 字体全嵌入 + 页数符合设计 | 换机器变宋体/变方框；页数漂移 |
 | 5 | `index.html` 相对链接可达 | 卡片生成了但 href 指不到 |
@@ -34,6 +34,8 @@
 | 16 | 每个字形 svg 都有对应 png（单色版例外） | 交付给设计师时缺某个颜色版本的位图 |
 | 17 | `04-imagery` 的图与 `_manifest_main.json` 双射 | 有图没登记 / 登记了文件却不在 |
 | 18 | `03-icons` 的 svg 全部进了 `icon-sheet.html` | 加了图标但总览页没收录 |
+| 19 | 状态胶囊 key = 产品真实状态（todo/done/overdue/archived/high） | 印出产品里不存在的状态（「进行中」已按此删掉） |
+| 20 | 产物里的本地 `src/href` 全部可达 | 删了状态却没删引用 → 海报上一枚空白胶囊 |
 
 ⚠️ **PDF 每次重建字节都不同**（Chrome 打印头里带时间戳/文档 ID），PNG 与 SVG 是稳定的。
 所以比对 PDF 时看页数/字体/视觉，不要看 sha256 —— 否则每次都会以为「有改动」。
@@ -72,7 +74,7 @@
 |---|---|---|
 | `00-brand-foundation/` | `brand-tokens.json/.css` + `brand-book.pdf`（8 页）+ `_preview/page-01..08.png` | ✅ |
 | `01-logo/` | 字标（blue/deep/ink/white）、app-icon、icon-mono/brand、横/竖锁版 + PNG | ✅ |
-| `02-badges/` | **成长标识体系**：17 里程碑（`milestones/`）+ 8 身份标签（`identity/`）+ 8 分类色槽（`category/`）+ 6 状态胶囊（`status/`）+ `badge-catalogue.html/png/pdf` | ✅ |
+| `02-badges/` | **成长标识体系**：17 里程碑（`milestones/`）+ 8 身份标签（`identity/`）+ 8 分类色槽（`category/`）+ 5 状态胶囊（`status/`）+ `badge-catalogue.html/png/pdf` | ✅ |
 | `03-icons/` | 线性图标 26（`*.svg`）+ `icon-sheet.html/png` | ✅ |
 | `04-imagery/` | 本地 MOSS-Image 生成：2 背景 + 2 插画 + 3 周边（含笔记本）+ `contact-sheet.png` | ✅ |
 | `05-posters/` | 海报 A3 × 3（PDF+PNG） | ✅ |

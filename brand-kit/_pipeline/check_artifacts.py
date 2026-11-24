@@ -7,7 +7,7 @@
 查四件事：
   1. **色值全部来自 token**：所有 svg/html 里的十六进制必须命中 tokens.css 的取值白名单
      （否则有人手改一个色、或色板调整后旧色残留，都会在这里红）
-  2. **里程碑/身份标签/状态胶囊的数量**：17 / 8 / 6，与领域层定义一致
+  2. **里程碑/身份标签/状态胶囊的数量**：17 / 8 / 5，与领域层定义一致
   3. **关键产物存在**：图鉴 pdf/png、品牌手册 pdf 且页数正确
   4. **SVG 可确定性重现**：与 `--hash` 记录的清单比对（可选）
 
@@ -73,7 +73,7 @@ else:
 counts = {
     "里程碑": ("02-badges/milestones", 17),
     "身份标签": ("02-badges/identity", 8),
-    "状态胶囊": ("02-badges/status", 6),
+    "状态胶囊": ("02-badges/status", 5),
     "线性图标": ("03-icons", 26),
     "字标/图标": ("01-logo", 10),
 }
@@ -513,6 +513,41 @@ if os.path.isdir(ICON_DIR) and os.path.exists(SHEET):
         fail(f"03-icons：{n_svg} 个 svg，但 icon-sheet 只引用了 {len(refs)} 个（有图标没进总览）")
     else:
         emit(f"✅ 03-icons 的 {n_svg} 个图标全部进了总览页")
+
+# 19) 状态胶囊的 key 必须是产品真有的状态（品牌手册不能印不存在的 UI 状态）
+#     全仓实测：完成=completedAt、归档=archived、逾期=派生、优先级=Priority 枚举，
+#     **没有"进行中"**（`'doing'` 零命中）。所以这里用一份显式真相表钉住。
+PRODUCT_STATUS_KEYS = {"todo", "done", "overdue", "archived", "high"}
+STATUS_DIR = os.path.join(WD, "02-badges/status")
+if os.path.isdir(STATUS_DIR):
+    have_keys = {f[:-4] for f in os.listdir(STATUS_DIR) if f.endswith(".svg")}
+    if have_keys != PRODUCT_STATUS_KEYS:
+        fail(f"状态胶囊与产品真实状态不符：多出 {sorted(have_keys - PRODUCT_STATUS_KEYS)} / 缺少 {sorted(PRODUCT_STATUS_KEYS - have_keys)}")
+    else:
+        emit(f"✅ 状态胶囊 = 产品真实状态（{len(have_keys)} 个，无虚构状态）")
+
+# 20) 产物里不许有断掉的本地引用（<img src> 指向不存在的文件）
+#     实测踩过：产品删掉「进行中」状态后，海报里仍引用 status/doing.svg ——
+#     渲染出来是一个空白胶囊，而所有其它判据全绿。
+_broken = []
+for _root, _dirs, _files in os.walk(WD):
+    _rel_root = os.path.relpath(_root, WD)
+    if "_pipeline" in _rel_root or not _rel_root[:2].isdigit():
+        continue
+    for _fn in _files:
+        if _fn.startswith("_") or not _fn.endswith((".html", ".svg")):
+            continue
+        _txt = open(os.path.join(_root, _fn), encoding="utf-8", errors="ignore").read()
+        for _src in re.findall(r'(?:src|href)="([^"]+)"', _txt):
+            if _src.startswith(("http://", "https://", "data:", "#", "/", "mailto:")):
+                continue
+            _target = os.path.normpath(os.path.join(_root, _src.split("?")[0]))
+            if not os.path.exists(_target):
+                _broken.append(f"{os.path.join(_rel_root, _fn)} -> {_src}")
+if _broken:
+    fail(f"有 {len(_broken)} 处本地引用指不到文件：{_broken[:4]}")
+else:
+    emit("✅ 产物里的本地引用全部可达（无空白图/空链接）")
 
 if not fails:
     if JSON_OUT:

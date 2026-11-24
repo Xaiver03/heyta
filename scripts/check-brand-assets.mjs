@@ -481,26 +481,9 @@ check(
       .join(', ') === '' || '缺 token（首屏动画不许自带字面时长）',
 );
 
-/* ── brand-kit 产物自检（跨端物料侧的唯一一处色值/数量门禁）───────────
- * 这一条与上面几条的分工：上面钉的是"应用产物（图标/首屏）与 token 同步"，
- * 这里钉的是"对外物料（图鉴、手册、海报）里的色值也必须来自 token"。
- * brand-kit 不存在时**响亮跳过**并写明缺了什么，而不是静默通过。
- */
-{
-  const SCRIPT = join(ROOT, 'brand-kit/_pipeline/check_artifacts.py');
-  if (!existsSync(SCRIPT)) {
-    skipped.push('brand-kit 产物自检：brand-kit/_pipeline/check_artifacts.py 不存在（本仓没有物料目录）');
-  } else {
-    const py = process.env.BRAND_KIT_PYTHON ?? 'python3';
-    try {
-      execFileSync(py, [SCRIPT], { stdio: 'pipe' });
-      ok.push('brand-kit 产物自检（色值白名单 + 数量 + 关键产物）');
-    } catch (e) {
-      const out = `${e?.stdout ?? ''}${e?.stderr ?? ''}`.trim().split('\n').slice(-4).join(' | ');
-      problems.push(`brand-kit 产物自检失败（${py}）：${out || String(e)}`);
-    }
-  }
-}
+/* ── brand-kit 产物自检已移到 `check:` 链上（`pnpm check:brand-kit`）──
+ * 放在链上而不是内嵌在这里，是为了**一次 CI 只跑一遍**：
+ * 内嵌版本要跑 python + pdffonts，重复挂会让 CI 每次多做一遍同样的事。 */
 
 /* ── 出口 ─────────────────────────────────────────────────────────── */
 // 阳性对照：上面所有判据都可能因为"读不到文件"而一个都不执行，
