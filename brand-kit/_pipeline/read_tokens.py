@@ -82,3 +82,42 @@ if __name__ == "__main__":
             print(f"  {c:20s} {v}  contrast {r:.2f}  {flag}")
         p = token("color-primary", theme)
         print(f"  primary={p} contrast {contrast(p, surf):.2f}")
+
+# ---------------- 把生成物里的手抄色值归一到 token 取值 ----------------
+import re as _re
+
+def _reverse_map() -> dict[str, str]:
+    """十六进制值 → token 名（亮色优先，同值优先语义名而不是原始色阶）。"""
+    out: dict[str, str] = {}
+    for k, v in LIGHT.items():
+        if not isinstance(v, str) or not _re.fullmatch(r'#[0-9a-fA-F]{6}', v):
+            continue
+        name = k.replace('--ht-', '')
+        prev = out.get(v.lower())
+        # 语义名（color-*）优先于原始色阶，便于人读；其余保持先到先得
+        if prev is None or (name.startswith('color-') and not prev.startswith('color-')):
+            out[v.lower()] = name
+    for k, v in DARK.items():
+        if isinstance(v, str) and _re.fullmatch(r'#[0-9a-fA-F]{6}', v):
+            out.setdefault(v.lower(), k.replace('--ht-', ''))
+    return out
+
+_REV = None
+
+def normalize(text: str) -> str:
+    """把文本里所有"等于某个 token 取值"的十六进制改写为 tokens.css 里的**当前**取值。
+
+    为什么不是"直接换成 var()"：SVG/印刷/邮件渲染不了 CSS 变量，只能写字面量；
+    但字面量必须由 token 派生，否则色板一调整，旧色就静默留在产物里。
+    """
+    global _REV
+    if _REV is None:
+        _REV = _reverse_map()
+    def repl(m):
+        raw = m.group(0)
+        name = _REV.get(raw.lower())
+        if name is None:
+            return raw
+        cur = token(name)
+        return cur if cur else raw
+    return _re.sub(r'#[0-9a-fA-F]{6}', repl, text)

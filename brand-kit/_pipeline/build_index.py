@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """heyta brand-kit 索引：index.html + manifest.json（扫描真实文件生成，可校验）"""
-import os, json, time
+import os, json, time, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import read_tokens as RT
 WD=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def rel(p): return os.path.relpath(p,WD)
 def card(img,title,sub,href):
@@ -57,5 +59,5 @@ footer{{padding:22px 44px;color:#94a3b8;font-size:12px;border-top:1px solid #e2e
 <div class="grid">{''.join(cards)}</div>
 <footer>生成管线照 litopia12/brand-kit 的结构 · 字标/图标/色值取自 heyta 设计系统真源 · 成长体系取自仓库已实现的激励与成长体系</footer>
 </body></html>"""
-open(os.path.join(WD,"index.html"),"w",encoding="utf-8").write(h)
+open(os.path.join(WD,"index.html"),"w",encoding="utf-8").write(RT.normalize(h))
 print("index:", man["count"], "files; cards:", len(cards), man["dirs"])

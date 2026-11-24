@@ -18,7 +18,7 @@ BLUE="#2563eb"; DEEP="#1e40af"; INK="#0f172a"; SL="#475569"; SL8="#94a3b8"; BD="
 def doc(body,size_css): 
     return f"<!doctype html><html lang='zh'><head><meta charset='utf-8'><style>*{{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;margin:0;padding:0}}html,body{{font-family:{FONT};color:{INK}}}{size_css}</style></head><body>{body}</body></html>"
 def wr(name,html):
-    p=os.path.join(os.path.dirname(os.path.abspath(__file__)),"_tmp_"+name); open(p,"w",encoding="utf-8").write(html); return p
+    p=os.path.join(os.path.dirname(os.path.abspath(__file__)),"_tmp_"+name); open(p,"w",encoding="utf-8").write(RT.normalize(html)); return p
 
 # ---------------- 05 posters (A3) ----------------
 A3="@page{size:297mm 420mm;margin:0}.page{width:297mm;height:420mm;position:relative;overflow:hidden}"

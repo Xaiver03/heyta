@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """heyta icon set -> brand-kit/03-icons（线性图标, 24 网格, 墨色）+ icon-sheet.html/png"""
 import os, subprocess, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import read_tokens as RT
 WD=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT=os.path.join(WD,"03-icons"); os.makedirs(OUT,exist_ok=True)
 INK="#0f172a"; BLUE="#2563eb"
@@ -34,7 +36,7 @@ G["home"]='<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'
 for name,inner in G.items():
     svg=(f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="{name}">'
          f'<g fill="none" stroke="{INK}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{inner.replace("CUR",INK)}</g></svg>')
-    open(os.path.join(OUT,f"{name}.svg"),"w",encoding="utf-8").write(svg)
+    open(os.path.join(OUT,f"{name}.svg"),"w",encoding="utf-8").write(RT.normalize(svg))
 
 # icon sheet
 cells="".join(f'<div class="ic"><img src="{n}.svg"><div class="nm">{n}</div></div>' for n in G)
@@ -55,7 +57,7 @@ h1{{font-size:40px;margin:6px 0 4px;font-weight:800}} .lead{{color:#475569;font-
 <div class="grid">{cells}</div>
 <div class="foot"><span>heyta Design System · brand-kit/03-icons</span><span>{len(G)} icons</span></div>
 </div></body></html>"""
-open(os.path.join(OUT,"icon-sheet.html"),"w",encoding="utf-8").write(sheet)
+open(os.path.join(OUT,"icon-sheet.html"),"w",encoding="utf-8").write(RT.normalize(sheet))
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 subprocess.run([CHROME,"--headless=new","--disable-gpu","--hide-scrollbars","--force-device-scale-factor=2",
                 "--window-size=1200,900",f"--screenshot={os.path.join(OUT,'icon-sheet.png')}",

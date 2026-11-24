@@ -36,13 +36,16 @@ IDENTITY=[
  ("deep-two-hundred","深耕两百时","focusHours",200),("finisher-five-hundred","完成五百事","tasks",500),
  ("streak-thirty","连续三十天","streakDays",30),
 ]
+# 状态胶囊的六种色调：**全部取自 token**，不写色值。
+# 只在 tokens.css 里已有的档位之间选（tokens 没有 500 档的族就退到 600/300），
+# 因为"新增一档只为这里用"会让设计系统的色阶失去可预期性。
 TONES={
- "neutral":dict(bg="#F1F5F9",fg="#475569",dot="#64748B",bd="#E2E8F0"),
- "info":dict(bg="#EFF6FF",fg="#1D4ED8",dot="#3B82F6",bd="#BFDBFE"),
- "success":dict(bg="#ECFDF5",fg="#047857",dot="#10B981",bd="#A7F3D0"),
- "warning":dict(bg="#FFFBEB",fg="#B45309",dot="#F59E0B",bd="#FDE68A"),
- "danger":dict(bg="#FEF2F2",fg="#B91C1C",dot="#EF4444",bd="#FECACA"),
- "accent":dict(bg="#EFF6FF",fg="#1E40AF",dot="#2563EB",bd="#BFDBFE"),
+ "neutral":dict(bg=RT.token("slate-100"), fg=RT.token("slate-600"), dot=RT.token("slate-500"), bd=RT.token("slate-200")),
+ "info":   dict(bg=RT.token("blue-50"),   fg=RT.token("blue-700"),  dot=RT.token("blue-500"),  bd=RT.token("blue-200")),
+ "success":dict(bg=RT.token("emerald-50"),fg=RT.token("emerald-700"),dot=RT.token("emerald-600"),bd=RT.token("emerald-300")),
+ "warning":dict(bg=RT.token("amber-50"),  fg=RT.token("amber-700"), dot=RT.token("amber-600"), bd=RT.token("amber-300")),
+ "danger": dict(bg=RT.token("red-50"),    fg=RT.token("red-700"),   dot=RT.token("red-600"),   bd=RT.token("red-300")),
+ "accent": dict(bg=RT.token("blue-50"),   fg=RT.token("blue-800"),  dot=RT.token("blue-600"),  bd=RT.token("blue-200")),
 }
 STATUS=[("todo","待办","info"),("doing","进行中","success"),("done","已完成","success"),
         ("overdue","已逾期","danger"),("archived","已归档","neutral"),("high","高优先级","accent")]
@@ -63,7 +66,7 @@ def milestone_svg(m):
 </svg>'''
 
 def identity_svg(t):
-    tid,cn,kind,thr=t; c=KINDS[kind]["color"] if kind in KINDS else "#7c3aed"; W=250;H=54
+    tid,cn,kind,thr=t; c=KINDS[kind]["color"] if kind in KINDS else RT.token("slate-600"); W=250;H=54
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="heyta identity {esc(cn)}">
   <rect x="1" y="1" width="{W-2}" height="{H-2}" rx="{H/2}" fill="{c}" fill-opacity="0.10" stroke="{c}" stroke-opacity="0.5"/>
   <circle cx="28" cy="{H/2}" r="9" fill="{c}"/>
@@ -89,13 +92,13 @@ def run():
         for fn in Path(os.path.join(OUT,sub)).glob("*"): fn.unlink()
     for m in MILESTONES:
         name=f'{m["kind"]}-{m["threshold"]}'
-        open(os.path.join(OUT,"milestones",name+".svg"),"w",encoding="utf-8").write(milestone_svg(m))
+        open(os.path.join(OUT,"milestones",name+".svg"),"w",encoding="utf-8").write(RT.normalize(milestone_svg(m)))
         subprocess.run(["rsvg-convert","-w","240","-o",os.path.join(OUT,"milestones",name+".png"),os.path.join(OUT,"milestones",name+".svg")],check=True)
     for t in IDENTITY:
-        open(os.path.join(OUT,"identity",t[0]+".svg"),"w",encoding="utf-8").write(identity_svg(t))
+        open(os.path.join(OUT,"identity",t[0]+".svg"),"w",encoding="utf-8").write(RT.normalize(identity_svg(t)))
         render.svg_to_png_via_chrome(os.path.join(OUT,"identity",t[0]+".svg"), os.path.join(OUT,"identity",t[0]+".png"),250,54,3)
     for key,label,tone in STATUS:
-        open(os.path.join(OUT,"status",key+".svg"),"w",encoding="utf-8").write(status_svg(label,tone))
+        open(os.path.join(OUT,"status",key+".svg"),"w",encoding="utf-8").write(RT.normalize(status_svg(label,tone)))
     def ms_block(kind):
         k=KINDS[kind]; items=[m for m in MILESTONES if m["kind"]==kind]
         cells="".join(f'<div class="mcell"><img src="milestones/{m["kind"]}-{m["threshold"]}.png"></div>' for m in items)
@@ -110,7 +113,7 @@ body{{width:1200px;font-family:{FONT};background:#fff;color:#0f172a}} .sheet{{pa
 h1{{font-size:46px;font-weight:800;margin:8px 0 6px;letter-spacing:-.5px}}
 .lead{{color:#475569;font-size:16px;line-height:1.75;max-width:1000px;margin-bottom:22px}}
 h2{{font-size:22px;font-weight:800;margin:30px 0 13px;padding-bottom:9px;border-bottom:2px solid #e2e8f0}}
-.mrow{{display:flex;align-items:center;gap:22px;padding:10px 0;border-bottom:1px dashed #eef2f6}}
+.mrow{{display:flex;align-items:center;gap:22px;padding:10px 0;border-bottom:1px dashed {RT.token('slate-100')}}}
 .mlabel{{width:128px;flex:none}} .mlabel b{{display:block;font-size:16px}} .mlabel span{{font-size:10px;color:#94a3b8;letter-spacing:1px}}
 .mcells{{display:flex;gap:10px;flex-wrap:wrap;align-items:center}}
 .mcell{{text-align:center}} .mcell img{{width:74px;height:74px;display:block}} .mnum{{font-size:11px;color:#64748b;font-weight:700;margin-top:-4px}}
@@ -136,7 +139,7 @@ h2{{font-size:22px;font-weight:800;margin:30px 0 13px;padding-bottom:9px;border-
 <b>不做：</b>稀有度（common/rare/epic/legendary）、收藏徽章墙、排行榜、断签惩罚、货币经济。</div>
 <div class="foot"><span>heyta Design System · brand-kit/02-badges</span><span>Growth &amp; Milestone System v1.0</span></div>
 </div></body></html>"""
-    open(os.path.join(OUT,"badge-catalogue.html"),"w",encoding="utf-8").write(cat)
+    open(os.path.join(OUT,"badge-catalogue.html"),"w",encoding="utf-8").write(RT.normalize(cat))
     swatches="".join(f'<div style="flex:1;text-align:center"><div style="height:120px;border-radius:10px;background:{h}"></div><div style="font-size:12px;color:#64748b;margin-top:8px">{slug}</div><div style="font-size:11px;color:#94a3b8">{h}</div></div>' for slug,h in CATEGORY)
     card=f"""<!doctype html><html><head><meta charset="utf-8"><style>
 @page{{size:1200px 420px;margin:0}}*{{margin:0;padding:0;box-sizing:border-box}}
@@ -146,7 +149,7 @@ body{{width:1200px;font-family:{FONT};background:#fff;padding:40px 56px}}
 <div class="t">活动分类色槽 · Category Slots</div>
 <div class="s">颜色由用户赋义，App 永不判断某活动"健康/不健康"、永不自动上色。</div>
 <div class="row">{swatches}</div></body></html>"""
-    open(os.path.join(OUT,"category","_cards.html"),"w",encoding="utf-8").write(card)
+    open(os.path.join(OUT,"category","_cards.html"),"w",encoding="utf-8").write(RT.normalize(card))
     render.chrome_png(os.path.join(OUT,"category","_cards.html"), os.path.join(OUT,"category","分类色卡.png"),1200,420,2)
     subprocess.run([CHROME,"--headless=new","--disable-gpu","--hide-scrollbars","--force-device-scale-factor=2",
                     "--window-size=1200,1500",f"--screenshot={os.path.join(OUT,'badge-catalogue.png')}",
