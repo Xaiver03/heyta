@@ -296,6 +296,12 @@ const UNTRANSLATABLE_KEYS = new Set([
   // web 与 mobile 是**同一件事的两个落点**（两端逐字同规则），所以两条一起登记。
   'web.capture.value.dayTime',
   'mobile.capture.value.dayTime',
+  // 管理后台 AI 网关的三个字段名（ID / Base URL / API Key）。它们是标识符与通用
+  // 技术缩写，中文后台里同样逐字保留 —— 译成「编号 / 基础地址 / 密钥」反而与
+  // 配置项和文档对不上。与上面几条同一类：本来就不该有汉字。
+  'web.admin.aiGateway.id',
+  'web.admin.aiGateway.baseUrl',
+  'web.admin.aiGateway.apiKey',
 ]);
 
 /**

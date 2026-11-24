@@ -79,6 +79,12 @@ describe('词条表完整性', () => {
        */
       'web.capture.value.dayTime',
       'mobile.capture.value.dayTime',
+      // 底部「AI」标签（品牌缩写）与管理后台 AI 网关的字段名（ID / Base URL / API Key）：
+      // 都是标识符／技术缩写，中英逐字相同是正确形态。与上面同一类登记。
+      'mobile.tab.ai',
+      'web.admin.aiGateway.id',
+      'web.admin.aiGateway.baseUrl',
+      'web.admin.aiGateway.apiKey',
     ]);
     /**
      * 🔴 `.evidence` 是**按后缀**开的第二类例外，而不是逐 key 列。
