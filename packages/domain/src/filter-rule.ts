@@ -5,7 +5,7 @@
  * 这份文件的形状由 [ADR-0092](../../../docs/adr/0092-saved-filters.md) §3.5/§3.6 定：
  *
  * 1. **规则是结构化判别联合 JSON，不是 DSL 字符串**（ADR §2.2）。
- *    每条 `FilterCondition` 都带一个 `kind` 标签，加一个分支 ⇒ 这里的所有 `switch`
+ *    每条 `FilterRuleCondition` 都带一个 `kind` 标签，加一个分支 ⇒ 这里的所有 `switch`
  *    在编译期被检查；而字符串 DSL 要每端各写一份解析器，漂了就是"同一条筛选两端
  *    筛出不同任务且都不报错"（ADR-0048 §1 点名的失效形状）。
  *
@@ -54,7 +54,7 @@ import { resolveTagIds } from './tags.js';
  * `task-filter.ts` 的 `TaskFilter` 注释逐字一致，也是本文件 `compileFilterRule`
  * 里 `default` 分支必须显式报错的原因。
  */
-export type FilterCondition =
+export type FilterRuleCondition =
   /** 恒真。UI 新建一条筛选时的初始空条件（"不额外限制"）。 */
   | { readonly kind: 'all' }
   /** 截止日 = 今天（本地日历日，与内置「今天」同一个判据）。 */
@@ -98,7 +98,7 @@ export type FilterMatch = 'all' | 'any';
 /** 一条保存筛选的规则。 */
 export interface FilterRule {
   readonly match: FilterMatch;
-  readonly conditions: readonly FilterCondition[];
+  readonly conditions: readonly FilterRuleCondition[];
 }
 
 /**
@@ -163,7 +163,7 @@ export type CompiledFilterRule =
     };
 
 /** 一条条件的 predicate。`switch` 没有 `default` 兜底 —— 未知分支由调用方统一处理。 */
-function compileCondition(condition: FilterCondition): FilterPredicate {
+function compileCondition(condition: FilterRuleCondition): FilterPredicate {
   switch (condition.kind) {
     case 'all':
       return () => true;
