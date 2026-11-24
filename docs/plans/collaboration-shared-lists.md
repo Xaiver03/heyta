@@ -2035,3 +2035,24 @@ ssh→cmd→powershell 三层引号套进去，远端引号被吃掉、PowerShel
 
 **还欠**：`verify:mobile-collab:ios` 那条**设备腿**要带着新 needle（同意面在「加入」之后）在真机重跑一次；
 Android 装置仍未写（承 §9.40）。
+
+#### 9.41a 设备腿首趟在模拟器上跑了（2026-11-24 20:2x–21:1x，未到绿，拦路的与他处漂移有关）
+
+负责人的话：「剩下两件事情可以做完，没问题的，可以先用模拟器」。于是在 `heyta-iphone-verify`
+（iOS 27.0，UDID `4C1B456B-C506-4A72-94B5-18A80E1EBCE9`）上跑 `verify:mobile-collab:ios`。逐条现量：
+
+- ✅ **Release 构建这次真的过了**：先 `pod install` 重生成 Codegen（`apps/mobile/ios/build/generated/ios/ReactCodegen`
+  之前缺 `rnsvg`/`safeareacontext`/`rnblurview`/… 的 `States.cpp` ⇒ 14 条 `Build input file cannot be found`），
+  再 `xcodebuild -configuration Release -sdk iphonesimulator` 成功，`simctl install` 成功，bundle 与构建逐字节一致。
+  ⚠️ 构建要 `danger-full-access`（`xcodebuild` 写 `~/Library/Caches/org.swift.swiftpm` 被 workspace-write 拒）。
+- 🔴 **随后停在 step 4「登录并启用同步」——与本批改动无关的装置/界面漂移**，两处：
+  1. 设置枢纽的锚点已改：脚本等 `id:settings-section-sync`，而当前 `SettingsScreen.tsx` 的分区键是
+     `account/subscription/data/notifications/appearance/features/about`（同步项在 **`data`** 组）⇒ 正确锚点是
+     `id:settings-section-data`。已就地试过改这一处，能过这一跳。
+  2. 再下一跳 `AuthScreen` 的「服务器地址」栏不再按脚本假设出现：它由 `allowServerSelection` 决定
+     （`AuthScreen.tsx:224` 默认 `false`，`ProfileScreen.openAuth(true)` 才开），旧装置"从自托管表单进来就会出现该栏"
+     这一步与当前 auth 入口漂移。且脚本 `env_bail` 文案里有一处反引号 `` `allowServerSelection` `` 会被 bash
+     当命令替换执行（`allowServerSelection: command not found`）—— 是脚本自身的 bug，不是产品。
+- 结论：**这条 iOS 设备腿要先把 auth/设置两处锚点按当前界面修好才能跑到 L1**；它不是我这批（同意面重排）
+  引起的，是装置相对当前 app 的陈旧。Android 那枚装置仍不存在（承 §9.40：要服务端在 `linux-dev` 可达 + 新写驱动）。
+  按仓库纪律，**不把"iOS 构建过 + 装过"读成"设备腿已验"**，本批到此如实留档。
