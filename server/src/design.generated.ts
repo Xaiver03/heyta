@@ -15,7 +15,7 @@
 
 /** 颜色 token —— 语义名，值取自设计系统。 */
 export const EMAIL_COLOR = {
-  'color.background': '#f8fafc',
+  'color.background': '#f1f5f9',
   'color.surface': '#ffffff',
   'color.surface-raised': '#ffffff',
   'color.foreground': '#0f172a',
@@ -62,6 +62,6 @@ export const EMAIL_SIZE = {
 
 /** 字体栈（含中文字体回退）。 */
 export const EMAIL_FONT = {
-  'font.sans': "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif",
+  'font.sans': "'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Segoe UI', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif",
   'font.mono': "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
 } as const;
