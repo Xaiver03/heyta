@@ -157,6 +157,16 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
   const [scopeOpen, setScopeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  /**
+   * 视图菜单贴哪一边，由**触发它的那颗按钮**决定。
+   * 左上角的标题 / 月胶囊 → 贴左；右上角的「视图」图标 → 贴右。
+   * 写死一边就会出现"点右上角、卡片却出在左边"。
+   */
+  const [viewMenuAnchor, setViewMenuAnchor] = useState<'left' | 'right'>('left');
+  const openViewMenu = useCallback((anchor: 'left' | 'right') => {
+    setViewMenuAnchor(anchor);
+    setViewMenuOpen(true);
+  }, []);
 
   /** 上一次的"今天"，用来判断跨零点时选中框要不要跟着走。 */
   const prevToday = useRef(today);
@@ -697,10 +707,10 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         <CalendarCapsuleHeader
           monthLabel={labels.monthTitle(cursor)}
           onMonthPress={() => {
-            setViewMenuOpen(true);
+            openViewMenu('left');
           }}
           onViewPress={() => {
-            setViewMenuOpen(true);
+            openViewMenu('right');
           }}
           onMorePress={() => {
             setMoreOpen(true);
@@ -714,7 +724,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           todayLabel={t('mobile.calendar.today')}
         />
       }
-      onTitlePress={() => { setViewMenuOpen(true); }}
+      onTitlePress={() => { openViewMenu('left'); }}
       actions={[
         {
           icon: 'action.more',
@@ -905,6 +915,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           changeView(kind);
         }}
         onClose={() => { setViewMenuOpen(false); }}
+        anchor={viewMenuAnchor}
         anchorTop={96}
       />
 
