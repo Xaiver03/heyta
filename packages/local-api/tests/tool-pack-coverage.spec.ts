@@ -87,6 +87,7 @@ function host(): LocalApiHost {
     getTask: (taskId: string) => Promise.resolve(items.find((x) => x.id === taskId)),
     getTaskEstimateContext: (taskId: string) => Promise.resolve({ taskId, title: ITEM.title, readable: true, body: ITEM.body, currentMinutes: 30, history: [{ plannedMs: 1_500_000, actualMs: 1_440_000 }], preferences: [{ id: 'estimate-bias', text: '按历史偏差校正' }] }),
     listProjects: () => Promise.resolve(projects),
+    listFilters: () => Promise.resolve([]),
     listHabits: () => Promise.resolve(habits),
     listTags: () => Promise.resolve([TAG]),
     listNotes: () => Promise.resolve([NOTE_ROW]),
@@ -101,6 +102,9 @@ function host(): LocalApiHost {
       Promise.resolve([{ id: 'att-1', fileName: 'a.txt', mime: 'text/plain', sizeBytes: 10, taskId }]),
     listTaskComments: (taskId: string) =>
       Promise.resolve([{ id: 'c1', taskId, authorUserId: 'u1', body: '好的', createdAt: 1 }]),
+
+    listSections: (projectId: string) =>
+      Promise.resolve([{ id: 'sec-1', projectId, name: '新手入门', order: 0, taskCount: 1 }]),
 
     submit: (): Promise<LocalApiWriteResult> => Promise.resolve({ ok: true, taskId: 'created-1' }),
   };

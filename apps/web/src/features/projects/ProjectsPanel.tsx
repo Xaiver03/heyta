@@ -54,6 +54,8 @@ import {
   folderTargetsFor,
   liveTaskCountsByProject,
   parseCategorySlot,
+  tagTargetsFor,
+  parseProjectIcon,
 } from '@heyta/domain';
 import { Archive, Folder, Plus, Tag as TagIcon, UserPlus } from 'lucide-react';
 import {
@@ -66,18 +68,21 @@ import {
   liveTaskCountsByTag,
   openTagCounts,
   openTaskCounts,
-  toOrganizerNodes,
+  rejectionReasonOf,
   toOrganizerTree,
-  toTagItems,
+  toTagTree,
 } from '@heyta/ui';
 
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
 import { CategoryCreateDialog, type CategoryCreateKind } from '../categories/CategoryCreateDialog.js';
+import { ProjectSettings } from './ProjectSettings.js';
+import { PROJECT_GLYPHS } from './project-glyphs.js';
 import { JoinSharedListDialog } from '../share/JoinSharedListDialog.js';
 import { extractShareToken, searchWithoutShareToken } from '../share/join-link.js';
 import { useTaskStore, type TaskFilter } from '../tasks/store.js';
 import { useSyncStore } from '../sync/store.js';
 import { useProjectStore } from './store.js';
+import { tagRejectionMessageKey } from '../tags/rejection.js';
 import { UndoReceipt } from '../../lib/feedback/UndoReceipt.js';
 import { restoreOrRefuse, undoReceiptFor } from '../../lib/feedback/undo-receipt.js';
 
@@ -97,6 +102,8 @@ export function ProjectsPanel({
    * 🔴 不许吞：吞掉的后果是"点了没反应"，而数据什么都没变。
    */
   const [folderError, setFolderError] = useState('');
+  /** 标签「换父」被拒时的同一句人话（与 `folderError` 同一条纪律：不吞）。 */
+  const [tagError, setTagError] = useState('');
   /**
    * 「显示已归档」。默认关 —— 与迁移前那个选择器逐字一致（归档 = 从列表里消失）。
    *
@@ -157,10 +164,22 @@ export function ProjectsPanel({
   );
   const parentOf = (id: string): string | undefined =>
     projects.projects.find((project) => project.id === id)?.parentId ?? undefined;
-  const tagNodes = useMemo(
-    () => toOrganizerNodes(toTagItems(projects.tags)),
+  /** 按 id 取清单实体（设置控件要读它的四个设置字段）。 */
+  const projectById = (id: string) => projects.projects.find((project) => project.id === id);
+  const tagNodes = useMemo(() => toTagTree(projects.tags), [projects.tags]);
+  /**
+   * 标签「挂到哪个父标签下」的候选集 —— 与清单侧同一个形状，
+   * 调的是领域函数 `tagTargetsFor`（`validateTagParentChange` 的逐目标展开）。
+   */
+  const tagTargets = useMemo(
+    () =>
+      new Map(
+        projects.tags.map((tag) => [tag.id, tagTargetsFor(projects.tags, tag.id)]),
+      ),
     [projects.tags],
   );
+  const tagParentOf = (id: string): string | undefined =>
+    projects.tags.find((tag) => tag.id === id)?.parentId ?? undefined;
   const counts = useMemo(
     () => openTaskCounts(Object.values(tasks.entities.tasks)),
     [tasks.entities.tasks],
@@ -224,6 +243,29 @@ export function ProjectsPanel({
    */
   function slotOf(projectId: string) {
     return parseCategorySlot(projects.projects.find((p) => p.id === projectId)?.color);
+  }
+
+  /** 每行右侧的「清单设置」（图标 / 视图 / 类型 / 智能清单开关）。 */
+  function renderProjectSettings(id: string) {
+    const domainProject = projectById(id);
+    if (domainProject === undefined) return null;
+    return (
+      <ProjectSettings
+        project={domainProject}
+        onIcon={(icon) => {
+          void projects.setProjectIcon(id, icon);
+        }}
+        onViewMode={(viewMode) => {
+          void projects.setProjectViewMode(id, viewMode);
+        }}
+        onKind={(kind) => {
+          void projects.setProjectKind(id, kind);
+        }}
+        onShowInSmartList={(show) => {
+          void projects.setProjectShowInSmartList(id, show);
+        }}
+      />
+    );
   }
 
   /**
@@ -377,9 +419,16 @@ export function ProjectsPanel({
               });
             }}
             // 顶层画文件夹、子级不画 —— "层级"的一部分，与缩进一起。
-            renderLeading={(_item, context) =>
-              context.isChild ? null : <Folder size={ICON_SIZE.xs} aria-hidden="true" />
-            }
+            // 清单设过图标就用图标，没设过仍是文件夹（读缺省只走 `parseProjectIcon`）。
+            renderLeading={(leadingItem, context) => {
+              if (context.isChild) return null;
+              const iconKey = parseProjectIcon(projectById(leadingItem.id)?.icon);
+              if (iconKey !== undefined) {
+                const Glyph = PROJECT_GLYPHS[iconKey];
+                return <Glyph size={ICON_SIZE.xs} aria-hidden="true" />;
+              }
+              return <Folder size={ICON_SIZE.xs} aria-hidden="true" />;
+            }}
             renderItemExtra={(item) => (
               <>
                 <ColorSlotPicker
@@ -418,6 +467,7 @@ export function ProjectsPanel({
                   }}
                   testID={`web-list-folder-${item.id}`}
                 />
+                {renderProjectSettings(item.id)}
               </>
             )}
             testID="projects-list"
@@ -491,29 +541,66 @@ export function ProjectsPanel({
               onFilterWith({ kind: 'tag', tagId: item.id });
             }}
             onRename={(item, name) => {
-              void projects.renameTag(item.id, name);
+              setTagError('');
+              void projects.renameTag(item.id, name).catch((cause: unknown) => {
+                setTagError(t(tagRejectionMessageKey(cause)));
+              });
             }}
             onRemove={(item) => {
               void projects.deleteTag(item.id);
             }}
             renderLeading={() => <TagIcon size={ICON_SIZE.xs} aria-hidden="true" />}
+            renderItemExtra={(item) => (
+              <FolderPicker
+                item={item}
+                candidates={(tagTargets.get(item.id) ?? []).map((target) => ({
+                  id: target.id,
+                  name: target.name,
+                }))}
+                currentParentId={tagParentOf(item.id)}
+                labels={{
+                  button: (name) => t('common.organizer.tag.parent.button', { name }),
+                  title: t('common.organizer.tag.parent.title'),
+                  none: t('common.organizer.tag.parent.none'),
+                  current: t('common.organizer.tag.parent.current'),
+                }}
+                onSelect={(targetId) => {
+                  setTagError('');
+                  void projects.setTagParent(item.id, targetId).catch((cause: unknown) => {
+                    setTagError(t(tagRejectionMessageKey(cause)));
+                  });
+                }}
+                testID={`web-tag-parent-${item.id}`}
+              />
+            )}
             testID="tags-list"
           />
+          {tagError === '' ? null : (
+            <p className="ht-settings__danger" role="alert" data-testid="tag-parent-failed">
+              {tagError}
+            </p>
+          )}
         </section>
 
         <CategoryCreateDialog
           open={createKind !== null}
           kind={createKind ?? 'project'}
-          existingNames={createKind === 'tag' ? projects.tags.map((item) => item.name) : projects.projects.map((item) => item.name)}
+          existingNames={createKind === 'tag' ? [] : projects.projects.map((item) => item.name)}
           supportsColor={createKind === 'project'}
-          parentOptions={createKind === 'project' ? tree.map((node) => ({ id: node.id, name: node.name })) : undefined}
+          parentOptions={
+            createKind === 'project'
+              ? tree.map((node) => ({ id: node.id, name: node.name }))
+              : createKind === 'tag'
+                ? tagNodes.map((node) => ({ id: node.id, name: node.name }))
+                : undefined
+          }
           onClose={() => setCreateKind(null)}
           onCreate={async ({ name, color, parentId }) => {
             if (createKind === 'project') {
               const id = await projects.addProject(name, parentId, color);
               if (id !== undefined) onFilterWith({ kind: 'project', projectId: id });
             } else {
-              const id = await projects.addTag(name);
+              const id = await projects.addTag(name, parentId);
               if (id !== undefined) onFilterWith({ kind: 'tag', tagId: id });
             }
           }}

@@ -39,6 +39,7 @@ const stubs = vi.hoisted(() => {
   const isAlive = (x: unknown): boolean => (x as { deletedAt?: number }).deletedAt === undefined;
 
   const habitActions = {
+    listFilters: () => Promise.resolve([]),
     listHabits: vi.fn(() => Object.values(holder.state.habits).filter(isAlive)),
     listLogs: vi.fn(() => []),
     renameHabit: vi.fn(async (_entityId: string, _name: string): Promise<void> => undefined),

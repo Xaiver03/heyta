@@ -1022,6 +1022,24 @@ export function TaskDetailSheet({
     顺序跟 `resolveTagIds` 走（它是"第一次出现"的顺序，用户加标签的顺序有意义）。
   */
   const effectiveTagIds = resolveTagIds(task.tagIds, tagEntities);
+
+  /**
+   * 标签 chip 的**两层**顺序（ADR-0090）：顶层标签后紧跟子标签，子标签名加前导
+   * `└ ` 表示层级（chip 是横向换行的，缩进在换行后失效，前导符更稳）。孤儿（父已删）
+   * 按顶层列出。
+   */
+  const orderedTagChips = (() => {
+    const byId = new Map(tags.map((tag) => [tag.id, tag] as const));
+    const roots = tags.filter((tag) => tag.parentId === undefined || !byId.has(tag.parentId));
+    const out: { tag: Tag; child: boolean }[] = [];
+    for (const root of roots) {
+      out.push({ tag: root, child: false });
+      for (const child of tags) {
+        if (child.parentId === root.id) out.push({ tag: child, child: true });
+      }
+    }
+    return out;
+  })();
   const assignedTagNames = effectiveTagIds
     .map((id) => tags.find((tag) => tag.id === id)?.name)
     .filter((name): name is string => name !== undefined);
@@ -2133,12 +2151,12 @@ export function TaskDetailSheet({
             </Text>
           ) : (
             <View style={styles.chipRow}>
-              {tags.map((tag) => {
+              {orderedTagChips.map(({ tag, child }) => {
                 const assigned = effectiveTagIds.includes(tag.id);
                 return (
                   <Chip
                     key={tag.id}
-                    label={tag.name}
+                    label={child ? `└ ${tag.name}` : tag.name}
                     selected={assigned}
                     onPress={() => {
                       const current = task.tagIds ?? [];

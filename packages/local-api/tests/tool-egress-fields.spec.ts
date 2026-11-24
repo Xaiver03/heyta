@@ -102,6 +102,7 @@ function host(
       preferences: [{ id: 'estimate-bias', text: '按历史偏差校正' }],
     }),
     listProjects: async () => projects,
+    listFilters: () => Promise.resolve([]),
     listHabits: async () => habits,
     listTags: async () => [TAG],
     listNotes: async () => [NOTE_ROW],
@@ -113,6 +114,8 @@ function host(
     getEvent: () => Promise.resolve(undefined),
     listAttachments: async (taskId: string) => [{ id: 'att-1', fileName: 'a.txt', mime: 'text/plain', sizeBytes: 10, taskId }],
     listTaskComments: async (taskId: string) => [{ id: 'c1', taskId, authorUserId: 'u1', body: '好的', createdAt: 1 }],
+    // ADR-0091：每个可选字段都填上（`order` 平时可能 undefined，正是漏声明最容易溜过去的时刻）。
+    listSections: async (projectId: string) => [{ id: 'sec-1', projectId, name: '新手入门', order: 0, taskCount: 1 }],
     submit: async () => ({ ok: true, taskId: 'created-1' }),
   };
 }
@@ -334,6 +337,7 @@ function eventHost(events: readonly LocalApiEventItem[]): LocalApiHost {
     listTasks: async () => [],
     getTask: async () => undefined,
     listProjects: async () => [],
+    listFilters: () => Promise.resolve([]),
     listHabits: async () => [],
     listTags: async () => [],
     listNotes: async () => [],
@@ -345,6 +349,8 @@ function eventHost(events: readonly LocalApiEventItem[]): LocalApiHost {
     getEvent: async (eventId: string) => events.find((e) => e.id === eventId),
     listAttachments: async (taskId: string) => [{ id: 'att-1', fileName: 'a.txt', mime: 'text/plain', sizeBytes: 10, taskId }],
     listTaskComments: async (taskId: string) => [{ id: 'c1', taskId, authorUserId: 'u1', body: '好的', createdAt: 1 }],
+    // ADR-0091：每个可选字段都填上（`order` 平时可能 undefined，正是漏声明最容易溜过去的时刻）。
+    listSections: async (projectId: string) => [{ id: 'sec-1', projectId, name: '新手入门', order: 0, taskCount: 1 }],
     submit: async () => ({ ok: true, taskId: 'created-1' }),
   };
 }

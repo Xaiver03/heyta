@@ -59,6 +59,7 @@ function fakeHost(): LocalApiHost & { submits: number } {
     listTasks: () => Promise.resolve(items),
     getTask: () => Promise.resolve(items[0]),
     listProjects: () => Promise.resolve([]),
+    listFilters: () => Promise.resolve([]),
     listHabits: () => Promise.resolve([]),
     listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
     listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),

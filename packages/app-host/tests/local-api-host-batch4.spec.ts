@@ -39,6 +39,7 @@ const stubs = vi.hoisted(() => {
   const isAlive = (x: unknown): boolean => (x as { deletedAt?: number }).deletedAt === undefined;
 
   const habitActions = {
+    listFilters: () => Promise.resolve([]),
     listHabits: vi.fn(() => Object.values(holder.state.habits).filter(isAlive)),
     listLogs: vi.fn(() => []),
     // 三种出口都由测试注入：true=已撤销、false=没打卡、throw=习惯不存在。

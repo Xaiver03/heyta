@@ -52,6 +52,7 @@ function fakeHost(items: readonly LocalApiItem[] = [], projects: readonly LocalA
     getTask: (taskId: string): Promise<LocalApiItem | undefined> =>
       Promise.resolve(items.find((x) => x.id === taskId)),
     listProjects: (): Promise<readonly LocalApiProject[]> => Promise.resolve(projects),
+    listFilters: () => Promise.resolve([]),
     listHabits: (): Promise<readonly LocalApiHabit[]> =>
       Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
     listTags: () => Promise.resolve([]),
@@ -634,6 +635,11 @@ describe('授权只有一份：整份目录，判断仍在 `@heyta/local-api`', 
         'set_task_repeat_after_completion',
         // 2026-11-23 批次6：清单/习惯属性 + 四象限/推迟 + 批量打卡
         'set_project_color',
+        // 2026-11-24 工作包 A：清单级设置（图标 / 视图 / 类型 / 智能清单）
+        'set_project_icon',
+        'set_project_view_mode',
+        'set_project_kind',
+        'set_project_show_in_smart_list',
         'set_habit_color',
         'set_habit_icon',
         'set_habit_goal',
@@ -651,6 +657,19 @@ describe('授权只有一份：整份目录，判断仍在 `@heyta/local-api`', 
         'list_task_comments',
         'add_task_comment',
         'delete_task_comment',
+        // 2026-11-24 ADR-0092：保存筛选（FILTER）—— list + create/update/rename/delete
+        'list_filters',
+        'create_filter',
+        'update_filter_rule',
+        'rename_filter',
+        'delete_filter',
+        // 2026-11-24 清单内分组 SECTION（ADR-0091）：读一 + 写五，共 6 条进目录
+        'list_sections',
+        'create_section',
+        'rename_section',
+        'reorder_section',
+        'set_task_section',
+        'delete_section',
       ].sort(),
     );
     // 🔴 判据与这条用例的标题对齐：名单**由目录推导**，不是手抄一份工具名。

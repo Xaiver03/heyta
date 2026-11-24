@@ -62,6 +62,7 @@ function fakeHost(): LocalApiHost & { submits: number } {
     listTasks: () => Promise.resolve(ITEMS),
     getTask: (taskId: string) => Promise.resolve(ITEMS.find((x) => x.id === taskId)),
     listProjects: () => Promise.resolve([{ id: 'p1', name: '工作', taskCount: 1 }]),
+    listFilters: () => Promise.resolve([]),
     listHabits: () => Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
     listTags: () => Promise.resolve([]),
     listNotes: () => Promise.resolve([]),

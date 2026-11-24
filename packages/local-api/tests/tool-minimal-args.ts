@@ -25,13 +25,18 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   list_checkins: {},
   list_focuses: {},
   list_reminders: {},
+  list_filters: {},
   create_task: { title: '买咖啡豆' },
   create_project: { name: '读书' },
   create_habit: { name: '喝水' },
   create_tag: { name: '家里' },
   set_task_tags: { taskId: 't1', tagIds: ['g1'] },
   create_note: { content: '买咖啡豆' },
+  create_filter: { name: '高优先级', rule: { match: 'all', conditions: [{ kind: 'priority', values: [3] }] } },
   update_note: { noteId: 'n1', content: '买两盒' },
+  update_filter_rule: { filterId: 'f1', rule: { match: 'all', conditions: [{ kind: 'today' }] } },
+  rename_filter: { filterId: 'f1', name: '新名字' },
+  delete_filter: { filterId: 'f1' },
   record_checkin: { habitId: 'h1' },
   log_focus: { kind: 'work', plannedMinutes: 25 },
   create_reminder: { taskId: 't1', date: '2026-10-04', time: '09:00' },
@@ -93,6 +98,13 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
 
   // 批6：清单 / 习惯属性
   set_project_color: { projectId: 'p1', color: 3 },
+
+  // 2026-11-24 工作包 A：清单级设置（图标 / 视图 / 类型 / 智能清单）
+  set_project_icon: { projectId: 'p1', icon: 'star' },
+  set_project_view_mode: { projectId: 'p1', viewMode: 'board' },
+  set_project_kind: { projectId: 'p1', kind: 'notes' },
+  set_project_show_in_smart_list: { projectId: 'p1', showInSmartList: false },
+
   set_habit_color: { habitId: 'h1', color: 2 },
   set_habit_icon: { habitId: 'h1', icon: 'book' },
   set_habit_goal: { habitId: 'h1', target: 3 },
@@ -121,4 +133,12 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   list_task_comments: { taskId: 't1' },
   add_task_comment: { taskId: 't1', body: '好的' },
   delete_task_comment: { commentId: 'c1' },
+
+  // ADR-0091：清单内分组（SECTION）
+  list_sections: { projectId: 'p1' },
+  create_section: { projectId: 'p1', name: '新手入门' },
+  rename_section: { sectionId: 'sec-1', name: '功能模块' },
+  reorder_section: { sectionId: 'sec-1', order: 1 },
+  set_task_section: { taskId: 't1', sectionId: 'sec-1' },
+  delete_section: { sectionId: 'sec-1' },
 };

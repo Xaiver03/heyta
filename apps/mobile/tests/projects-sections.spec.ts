@@ -58,8 +58,8 @@ describe('两段都渲染共享 `OrganizerList`（不再各写一份行骨架）
   it('层级 / 标签适配走共享模型，而不是在屏里自己拼', () => {
     expect(readScreen('ListsSection.tsx')).toContain('toOrganizerTree');
     const tags = readScreen('TagsSection.tsx');
-    expect(tags).toContain('toTagItems');
-    expect(tags).toContain('toOrganizerNodes');
+    // ADR-0090：标签改为两层树，锚点换成 toTagTree（不再是平表 toTagItems/toOrganizerNodes）。
+    expect(tags).toContain('toTagTree');
   });
 });
 

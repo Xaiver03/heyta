@@ -92,7 +92,7 @@ async function seedAttachment(taskId: string, fileName: string): Promise<string>
 }
 
 /** 未删除实体的条数（效果读数的分母必须是活的实体，不然墓碑也算"写成功"）。 */
-function alive<K extends 'tasks' | 'projects' | 'habits' | 'tags' | 'notes' | 'habitLogs' | 'focusSessions' | 'reminders' | 'events'>(
+function alive<K extends 'tasks' | 'projects' | 'habits' | 'tags' | 'notes' | 'habitLogs' | 'focusSessions' | 'reminders' | 'events' | 'filters'>(
   key: K,
 ): number {
   const record = engine.getState()[key] as Record<string, { deletedAt?: number }>;
@@ -651,6 +651,38 @@ const CASES: readonly Case[] = [
     args: async () => ({ projectId: await seed({ action: 'create-project', name: '配色清单' }), color: 3 }),
     effect: () => Object.values(engine.getState().projects).filter((p) => p.color === '3').length,
   },
+  // 2026-11-24 工作包 A：清单级设置
+  {
+    tool: 'set_project_icon',
+    intentAction: 'set-project-icon',
+    label: '清单设图标',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '图标清单' }), icon: 'star' }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.icon === 'star').length,
+  },
+  {
+    tool: 'set_project_view_mode',
+    intentAction: 'set-project-view-mode',
+    label: '清单设视图',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '视图清单' }), viewMode: 'board' }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.viewMode === 'board').length,
+  },
+  {
+    tool: 'set_project_kind',
+    intentAction: 'set-project-kind',
+    label: '清单设类型',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '类型清单' }), kind: 'notes' }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.kind === 'notes').length,
+  },
+  {
+    tool: 'set_project_show_in_smart_list',
+    intentAction: 'set-project-show-in-smart-list',
+    label: '清单退出智能清单',
+    args: async () => ({
+      projectId: await seed({ action: 'create-project', name: '智能清单' }),
+      showInSmartList: false,
+    }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.showInSmartList === false).length,
+  },
   {
     tool: 'set_habit_color',
     intentAction: 'set-habit-color',
@@ -727,6 +759,115 @@ const CASES: readonly Case[] = [
       return { taskId, itemText: '甲', done: true };
     },
     effect: () => Object.values(engine.getState().tasks).filter((t) => (t.checklist ?? []).some((x) => x.done)).length,
+  },
+
+  // ── ADR-0092：保存筛选（FILTER）—— 四个写工具各一例（个人数据，不落 share 通道）──
+  {
+    tool: 'create_filter',
+    intentAction: 'create-filter',
+    label: '保存筛选',
+    args: async () => ({
+      name: '我的高优先级',
+      rule: { match: 'all', conditions: [{ kind: 'priority', values: [Priority.High] }] },
+    }),
+    effect: () => alive('filters'),
+  },
+  {
+    tool: 'update_filter_rule',
+    intentAction: 'update-filter-rule',
+    label: '筛选规则',
+    args: async () => ({
+      filterId: await seed({
+        action: 'create-filter',
+        name: '待改规则',
+        rule: { match: 'all', conditions: [{ kind: 'today' }] },
+      }),
+      rule: { match: 'any', conditions: [{ kind: 'tomorrow' }] },
+    }),
+    effect: () => Object.values(engine.getState().filters).filter((f) => f.rule.match === 'any').length,
+  },
+  {
+    tool: 'rename_filter',
+    intentAction: 'rename-filter',
+    label: '筛选改名',
+    args: async () => ({
+      filterId: await seed({
+        action: 'create-filter',
+        name: '旧名',
+        rule: { match: 'all', conditions: [{ kind: 'today' }] },
+      }),
+      name: '改过的名字',
+    }),
+    effect: () => Object.values(engine.getState().filters).filter((f) => f.name === '改过的名字').length,
+  },
+  {
+    tool: 'delete_filter',
+    intentAction: 'delete-filter',
+    label: '筛选移入回收站',
+    args: async () => ({
+      filterId: await seed({
+        action: 'create-filter',
+        name: '要删的筛选',
+        rule: { match: 'all', conditions: [{ kind: 'today' }] },
+      }),
+    }),
+    effect: () => Object.values(engine.getState().filters).filter((f) => f.deletedAt !== undefined).length,
+  },
+  // ── 清单内分组 SECTION（ADR-0091）：读一 + 写五，这里登记全部写工具 ──
+  {
+    tool: 'create_section',
+    intentAction: 'create-section',
+    label: '分组',
+    args: async () => ({
+      projectId: await seed({ action: 'create-project', name: '分组清单' }),
+      name: '新手入门',
+    }),
+    effect: () => Object.values(engine.getState().sections).filter((s) => s.deletedAt === undefined).length,
+  },
+  {
+    tool: 'rename_section',
+    intentAction: 'rename-section',
+    label: '分组改名',
+    args: async () => {
+      const projectId = await seed({ action: 'create-project', name: '改名清单' });
+      const sectionId = await seed({ action: 'create-section', projectId, name: '旧组名' });
+      return { sectionId, name: '改过的组名' };
+    },
+    effect: () => Object.values(engine.getState().sections).filter((s) => s.name === '改过的组名').length,
+  },
+  {
+    tool: 'reorder_section',
+    intentAction: 'reorder-section',
+    label: '分组排序',
+    args: async () => {
+      const projectId = await seed({ action: 'create-project', name: '排序清单' });
+      const sectionId = await seed({ action: 'create-section', projectId, name: '待排序组' });
+      return { sectionId, order: 7 };
+    },
+    effect: () => Object.values(engine.getState().sections).filter((s) => s.order === 7).length,
+  },
+  {
+    tool: 'set_task_section',
+    intentAction: 'set-task-section',
+    label: '任务归组',
+    args: async () => {
+      const projectId = await seed({ action: 'create-project', name: '归组清单' });
+      const sectionId = await seed({ action: 'create-section', projectId, name: '目标组' });
+      const taskId = await seed({ action: 'create-task', title: '要归组的任务', projectId });
+      return { taskId, sectionId };
+    },
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.sectionId !== undefined).length,
+  },
+  {
+    tool: 'delete_section',
+    intentAction: 'delete-section',
+    label: '分组删除（软删）',
+    args: async () => {
+      const projectId = await seed({ action: 'create-project', name: '删组清单' });
+      const sectionId = await seed({ action: 'create-section', projectId, name: '要删的组' });
+      return { sectionId };
+    },
+    effect: () => Object.values(engine.getState().sections).filter((s) => s.deletedAt !== undefined).length,
   },
 ];
 

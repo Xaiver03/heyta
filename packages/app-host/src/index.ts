@@ -88,6 +88,19 @@ export {
   type TagMergeImpact,
 } from './tag-actions.js';
 
+/**
+ * 清单内分组（SECTION，ADR-0091）：建 / 改名 / 调序 / 任务归组 / 软删。
+ *
+ * 🔴 `apps/*` 里**不得出现 `entityType: 'SECTION'` 的字面量** —— 出现就说明
+ * 宿主在自己拼 op。共享清单的写入路由由 `ctx.dispatch`（路由派发器）裁决，
+ * 本层不判断 `shareId`。
+ */
+export {
+  createSectionActions,
+  type SectionActions,
+  type SectionActionsOptions,
+} from './section-actions.js';
+
 export {
   createHabitActions,
   habitLogId,
@@ -1292,3 +1305,16 @@ export {
   type RunAiTurnOptions,
   type RunAiTurnResult,
 } from './ai-turn-orchestrator.js';
+
+/**
+ * 自定义保存筛选（`FILTER`）动作。同一理由：**op 的构造只有一份**（AGENTS §3.5）。
+ *
+ * 🔴 `apps/*` 里**不得出现 `entityType: 'FILTER'` 的字面量** —— 出现就说明宿主在自己拼 op。
+ * `FILTER` 是个人数据，永不进 share op-log（ADR-0092 §3.3）。
+ */
+export {
+  createFilterActions,
+  type FilterActions,
+  type FilterActionsOptions,
+  type NewFilterFields,
+} from './filter-actions.js';

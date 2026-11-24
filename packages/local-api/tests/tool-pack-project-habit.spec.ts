@@ -55,6 +55,7 @@ function recordingHost() {
       calls.push('listProjects');
       return Promise.resolve([]);
     },
+    listFilters: () => Promise.resolve([]),
     listHabits: () => {
       calls.push('listHabits');
       return Promise.resolve(HABITS);
@@ -173,6 +174,7 @@ describe('list_habits：真的从宿主读到东西', () => {
       listTasks: () => Promise.resolve([]),
       getTask: () => Promise.resolve(undefined),
       listProjects: () => Promise.resolve([]),
+      listFilters: () => Promise.resolve([]),
       listHabits: () => Promise.resolve([]),
       listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
       listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),

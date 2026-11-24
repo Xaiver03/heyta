@@ -26,6 +26,8 @@ import { eventToolPack } from './event.js';
 import { tagToolPack } from './tag.js';
 import { taskToolPack } from './task.js';
 import { attachmentToolPack } from './attachment.js';
+import { filterToolPack } from './filter.js';
+import { sectionToolPack } from './section.js';
 
 /**
  * 已注册的实体工具包。**数组顺序就是目录顺序的一部分，改动要按下面这条规则验。**
@@ -49,6 +51,10 @@ export const LOCAL_API_TOOL_PACKS: readonly EntityToolPack[] = [
   attachmentToolPack,
   // P4：评论（COMMENT）—— share 感知的独立工具通道（ADR-0062）。
   commentToolPack,
+  // ADR-0092：保存筛选（FILTER）—— 个人数据，读 list_filters + 四个写工具。
+  filterToolPack,
+  // ADR-0091：清单内分组（SECTION）—— 用户自建分组，读写工具同批落地。
+  sectionToolPack,
 ];
 
 export interface ToolPackRegistry {

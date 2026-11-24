@@ -63,6 +63,9 @@ describe('工具目录风险档（ToolRisk）', () => {
         'delete_event',
         'archive_event',
         'delete_task_comment',
+        'delete_filter',
+        // 清单内分组（ADR-0091）：删除是软删（DEL 墓碑），可逆
+        'delete_section',
       ].sort(),
     );
     // 🔴 绝不允许 irreversible（彻底删除 purge）进目录 —— 那是 D1 明确不给 AI 的动作。

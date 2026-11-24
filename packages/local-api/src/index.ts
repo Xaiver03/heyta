@@ -128,6 +128,7 @@ export {
   toWriteIntent,
   type LocalApiAttachment,
   type LocalApiComment,
+  type LocalApiFilter,
   type LocalApiFocusSession,
   type LocalApiHabit,
   type LocalApiHabitLog,
@@ -138,6 +139,7 @@ export {
   type LocalApiNoteRow,
   type LocalApiProject,
   type LocalApiReminder,
+  type LocalApiSection,
   type LocalApiTag,
   type LocalApiTaskEstimateContext,
 

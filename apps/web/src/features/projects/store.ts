@@ -27,7 +27,7 @@
 
 import { create } from 'zustand';
 
-import type { CategorySlot, Project, Tag } from '@heyta/domain';
+import type { CategorySlot, Project, ProjectIcon, ProjectKind, ProjectViewMode, Tag } from '@heyta/domain';
 import { childProjects, topLevelProjects } from '@heyta/ui';
 import { createProjectActions, type ActionContext } from '@heyta/app-host';
 
@@ -60,6 +60,14 @@ interface ProjectState {
   purgeProject: (id: string) => Promise<boolean>;
   /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
   setProjectColor: (id: string, slot?: CategorySlot) => Promise<void>;
+  /** 清单图标（闭集 key），`undefined` 表示清除回到缺省绘制。 */
+  setProjectIcon: (id: string, icon?: ProjectIcon) => Promise<void>;
+  /** 清单默认视图，`undefined` 表示清除回到 `list`。 */
+  setProjectViewMode: (id: string, viewMode?: ProjectViewMode) => Promise<void>;
+  /** 清单类型，`undefined` 表示清除回到 `tasks`。 */
+  setProjectKind: (id: string, kind?: ProjectKind) => Promise<void>;
+  /** 是否在智能清单 / 汇总里显示。 */
+  setProjectShowInSmartList: (id: string, showInSmartList: boolean) => Promise<void>;
   /**
    * 移入某个文件夹（省略 = 提为顶级）。
    *
@@ -74,9 +82,14 @@ interface ProjectState {
    */
   setProjectShare: (id: string, shareId: string) => Promise<void>;
 
-  addTag: (name: string) => Promise<string | undefined>;
+  addTag: (name: string, parentId?: string) => Promise<string | undefined>;
   renameTag: (id: string, name: string) => Promise<void>;
   deleteTag: (id: string) => Promise<void>;
+  /**
+   * 改标签的父（两级，ADR-0090）。薄转发：两层/环/自指/父非顶层/有子 全在领域层
+   * `validateTagParentChange`（`app-host` 的 `setTagParent` 会调）。省略 = 提为顶层。
+   */
+  setTagParent: (id: string, parentId?: string) => Promise<void>;
 }
 
 /** 与任务 / 专注 store 同一个形状。只含两个函数引用，不含任何判断。 */
@@ -134,6 +147,27 @@ export const useProjectStore = create<ProjectState>(() => ({
     syncProjects();
   },
 
+  setProjectIcon: async (id, icon) => {
+    // 闭集校验同样在动作层（不认识的值抛错），界面只转发。
+    await projectActions.setProjectIcon(id, icon);
+    syncProjects();
+  },
+
+  setProjectViewMode: async (id, viewMode) => {
+    await projectActions.setProjectViewMode(id, viewMode);
+    syncProjects();
+  },
+
+  setProjectKind: async (id, kind) => {
+    await projectActions.setProjectKind(id, kind);
+    syncProjects();
+  },
+
+  setProjectShowInSmartList: async (id, showInSmartList) => {
+    await projectActions.setProjectShowInSmartList(id, showInSmartList);
+    syncProjects();
+  },
+
   setProjectParent: async (id, parentId) => {
     // 与 setProjectColor 同一个理由：被领域层拒绝时**让它抛**，
     // 界面负责把错误显示出来（`ProjectsPanel` 里那条候选集本来就是按同一条规则筛的，
@@ -146,9 +180,9 @@ export const useProjectStore = create<ProjectState>(() => ({
     syncProjects();
   },
 
-  addTag: async (name) => {
+  addTag: async (name, parentId) => {
     if (name.trim() === '') return undefined;
-    return projectActions.createTag(name);
+    return projectActions.createTag(name, parentId);
   },
 
   renameTag: async (id, name) => {
@@ -159,6 +193,11 @@ export const useProjectStore = create<ProjectState>(() => ({
 
   deleteTag: async (id) => {
     await projectActions.removeTag(id);
+  },
+
+  setTagParent: async (id, parentId) => {
+    // 与 setProjectParent 同一条纪律：被领域层拒绝时让它抛，界面负责显示。
+    await projectActions.setTagParent(id, parentId);
   },
 }));
 

@@ -33,6 +33,7 @@ import {
   organizerRowKey,
   toOrganizerNodes,
   toOrganizerTree,
+  toTagTree,
   toTagItems,
   topLevelProjects,
 } from '../src/projects/model.js';
@@ -401,5 +402,37 @@ describe('directChildCountsByProject：删文件夹的第二种后果，含归�
     const table = directChildCountsByProject(projects);
     expect(table.p2).toBeUndefined();
     expect(Object.keys(table)).toEqual(['p1']);
+  });
+});
+
+describe('toTagTree（ADR-0090 两层标签）', () => {
+  it('顶层 + 子标签按父子挂好，保持输入顺序', () => {
+    const tags: Tag[] = [
+      { id: 'work', name: '工作', createdAt: 1, updatedAt: 1 },
+      { id: 'a', name: '客户A', parentId: 'work', createdAt: 2, updatedAt: 2 },
+      { id: 'life', name: '生活', createdAt: 3, updatedAt: 3 },
+    ];
+    const tree = toTagTree(tags);
+    expect(tree.map((n) => n.id)).toEqual(['work', 'life']);
+    expect(tree[0]?.children.map((c) => c.id)).toEqual(['a']);
+    expect(tree[1]?.children).toEqual([]);
+  });
+
+  it('🔴 孤儿（父已删/不存在）按顶层列出，不静默隐藏', () => {
+    const tags: Tag[] = [
+      // 父 'gone' 不在表里（已删）——子标签必须仍可被看见/管理。
+      { id: 'orphan', name: '孤儿', parentId: 'gone', createdAt: 1, updatedAt: 1 },
+      { id: 'life', name: '生活', createdAt: 2, updatedAt: 2 },
+    ];
+    const tree = toTagTree(tags);
+    expect(tree.map((n) => n.id).sort()).toEqual(['life', 'orphan']);
+  });
+
+  it('墓碑标签不出现', () => {
+    const tags: Tag[] = [
+      { id: 'dead', name: '删了', deletedAt: 5, createdAt: 1, updatedAt: 5 },
+      { id: 'life', name: '生活', createdAt: 2, updatedAt: 2 },
+    ];
+    expect(toTagTree(tags).map((n) => n.id)).toEqual(['life']);
   });
 });

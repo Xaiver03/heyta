@@ -38,6 +38,10 @@ const WRITABLE: Record<LocalApiWrittenEntityType, true> = {
   FOCUS_SESSION: true,
   REMINDER: true,
   EVENT: true,
+  ATTACHMENT: true,
+  COMMENT: true,
+  FILTER: true,
+  SECTION: true,
 };
 
 type KnownEntity = (typeof ENTITY_TYPES)[number];

@@ -134,7 +134,9 @@ export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
   // 批8：TASK 加 set_task_assignee（指派）→ 33。
   TASK: 33,
-  PROJECT: 10,
+  // 2026-11-24 工作包 A：PROJECT 加清单级设置 4 个写工具（图标/视图/类型/智能清单）
+  // （原 8 → 12；清单是用户组织任务的主容器，设置面比其它实体宽）。
+  PROJECT: 12,
   NOTE: 10,
   // 批6：HABIT 加颜色/图标/目标/频率 4 个写工具 → 5+4=9，放到 12 留余量。
   HABIT: 12,
@@ -772,6 +774,18 @@ export type LocalApiWriteIntent =
    * AI 只在用户明确点名时执行（`docs/plans/ai-event-tool-contract.md` §5.4）。
    */
   | { action: 'set-project-color'; projectId: string; color?: number }
+  /**
+   * 给清单设/清图标（PROJECT，闭集 key）。`icon` 省略 = 清除回到缺省绘制。
+   * 口径同 `set-project-color`（用户赋义的身份标记，AI 仅在明确点名时执行）。
+   * 词表校验在动作层（本包零依赖、看不见 domain 的 `PROJECT_ICONS`）。
+   */
+  | { action: 'set-project-icon'; projectId: string; icon?: string }
+  /** 给清单设/清默认视图（PROJECT）。`viewMode` 枚举白名单由动作层校验；省略 = 清除回 `list`。 */
+  | { action: 'set-project-view-mode'; projectId: string; viewMode?: string }
+  /** 给清单设/清类型（PROJECT）。`kind` = tasks / notes；省略 = 清除回 `tasks`。 */
+  | { action: 'set-project-kind'; projectId: string; kind?: string }
+  /** 是否让清单在智能清单 / 汇总里显示（PROJECT）。目标值，缺省 true。 */
+  | { action: 'set-project-show-in-smart-list'; projectId: string; showInSmartList: boolean }
   /** 给习惯设/清颜色槽位（HABIT）。`color` 1–8，省略 = 清除。口径同 `set-project-color`。 */
   | { action: 'set-habit-color'; habitId: string; color?: number }
   /** 给习惯设/清图标（HABIT，闭集 key）。`icon` 省略 = 清除回到派生图标。口径同上。 */
@@ -829,7 +843,31 @@ export type LocalApiWriteIntent =
    */
   | { action: 'add-task-comment'; taskId: string; body: string }
   /** 删除一条评论（COMMENT）。软删（`DEL`），可逆 —— 走同一条 share 通道。 */
-  | { action: 'delete-task-comment'; commentId: string };
+  | { action: 'delete-task-comment'; commentId: string }
+  // 保存筛选（FILTER，ADR-0092）。**个人数据**：经 `filterActions` 走个人 op-log，
+  // 永不进 share 通道。规则按不透明 JSON 传，结构合法性由动作层（领域校验）判定。
+  /** 新建保存筛选（FILTER）。`rule` 是 `FilterRule` 的 JSON 形状。 */
+  | { action: 'create-filter'; name: string; rule: Readonly<Record<string, unknown>> }
+  /** 改写一条保存筛选的规则（FILTER，整条替换）。 */
+  | { action: 'update-filter-rule'; filterId: string; rule: Readonly<Record<string, unknown>> }
+  /** 给保存筛选改名（FILTER）。 */
+  | { action: 'rename-filter'; filterId: string; name: string }
+  /** 软删除保存筛选（FILTER）→ 回收站。 */
+  | { action: 'delete-filter'; filterId: string }
+  // 清单内分组（SECTION，ADR-0091）：一条意图一条 op。
+  /** 在清单下新建一个分组（SECTION）。`name` 空白/超长由动作层拒绝。 */
+  | { action: 'create-section'; projectId: string; name: string }
+  /** 改分组名（SECTION）。载荷只有 `name`。 */
+  | { action: 'rename-section'; sectionId: string; name: string }
+  /** 调整分组顺序（SECTION）。写 `order`，一个意图一条 op。 */
+  | { action: 'reorder-section'; sectionId: string; order: number }
+  /**
+   * 把任务移进分组 / 移出到未分组（TASK）。`sectionId` 省略 = 移出（写 `null`）。
+   * 分组必须与任务属于同一清单，由动作层拒绝。
+   */
+  | { action: 'set-task-section'; taskId: string; sectionId?: string }
+  /** 软删除一个分组（SECTION，`DEL` 墓碑）。不级联删任务。 */
+  | { action: 'delete-section'; sectionId: string };
 
 /**
  * 一条写入落地的实体类型。
@@ -864,7 +902,9 @@ export type LocalApiWrittenEntityType =
   | 'REMINDER'
   | 'EVENT'
   | 'ATTACHMENT'
-  | 'COMMENT';
+  | 'COMMENT'
+  | 'FILTER'
+  | 'SECTION';
 
 export type LocalApiWriteResult =
   | {

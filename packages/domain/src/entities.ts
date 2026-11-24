@@ -17,6 +17,10 @@ import type { EntityType, TaskAutomationSource } from '@heyta/shared-schema';
 
 import type { CategorySlot } from './activity-categories.js';
 import type { LocalDate } from './date.js';
+import type { ProjectIcon, ProjectKind, ProjectViewMode } from './project-settings.js';
+// ⚠️ **仅类型导入**：`filter-rule.ts` 反过来 import 本文件的 `Priority` / `isCompleted`
+// 等运行期件，写成值导入会造出运行时环。`import type` 编译后被抹掉，环就不存在。
+import type { FilterRule } from './filter-rule.js';
 
 /** 所有实体共有的元数据。 */
 export interface EntityBase {
@@ -286,6 +290,18 @@ export interface Task extends EntityBase {
   /** 所属清单。未归类时为 undefined（收集箱）。 */
   projectId?: string;
   /**
+   * 所属**分组**（清单内的二级分块，ADR-0091）。缺席 = 未分组。
+   *
+   * 🔴 可选字段（AGENTS.md §3.3）：老数据没有它，hydration 不得炸。
+   * 读侧一律走 `packages/domain/src/sections.ts` 的 `resolveTaskSectionId()` ——
+   * 指向已删除 / 不存在 / 属于别的清单的分组时归「未分组」，不要各端自己写一遍
+   * 那个判据（否则"删了分组之后任务去哪"会有第二份答案）。
+   *
+   * 把任务移出分组 = 写 `null`（`section-actions.ts` 的 `setTaskSection`）——
+   * `null` 才能穿过 JSON 表达"清除"，`undefined` 会被 `JSON.stringify` 丢掉。
+   */
+  sectionId?: string;
+  /**
    * 父任务 ID（**子任务**）。
    *
    * 🔴 **这是可选字段，不是 schema bump**（AGENTS.md §3.3、见 B1-3）。
@@ -490,11 +506,49 @@ export interface Project extends EntityBase {
    * 但清单**内容**仍在清单密钥之后。
    */
   shareId?: string;
+  /**
+   * 清单图标：**闭集词表里的 key**（`'briefcase'`），不是字形、也不是颜色。
+   * 取值来自 `project-settings.ts#PROJECT_ICONS`，读时用 `parseProjectIcon` 校验。
+   *
+   * 🔴 一律可选（AGENTS §3.3）：磁盘上已有的清单没有这个字段，必填只会在
+   * 回放/读取时炸，而构建是绿的。没设过 → 界面上按缺省绘制（不落库）。
+   */
+  icon?: ProjectIcon;
+  /**
+   * 该清单**默认**用哪种视图：`list` / `board` / `calendar` / `timeline`。
+   * 只改变展示排布，不改变底层数据（同一批任务）。缺省 `list`。
+   *
+   * 🔴 可选 —— AGENTS §3.3。缺省值只有一个出口：`project-settings.ts#projectViewModeOf`。
+   */
+  viewMode?: ProjectViewMode;
+  /**
+   * 清单类型：这条清单**默认先看到什么**（`tasks` / `notes`），缺省 `tasks`。
+   *
+   * 🔴 它不合并 NOTE：独立便签仍是 `NOTE` 实体、靠 `Note.projectId` 归属。
+   *    这里只表达"打开这条清单先展示任务还是便签"，不限制内容、不建第二份实体。
+   * 可选 —— AGENTS §3.3；缺省出口 `project-settings.ts#projectKindOf`。
+   */
+  kind?: ProjectKind;
+  /**
+   * 是否在智能清单 / 汇总里显示。缺省 `true`（新清单默认就该进汇总）。
+   * 可选 —— AGENTS §3.3；缺省出口 `project-settings.ts#projectShowInSmartListOf`。
+   */
+  showInSmartList?: boolean;
 }
 
 export interface Tag extends EntityBase {
   name: string;
   color?: string;
+  /**
+   * 父标签 id（**只有两层**：父标签 / 子标签）。
+   *
+   * 省略 = 顶层标签。`null` 载荷经 reducer 转成"删除该字段"（提为顶层）。
+   * 🔴 不用 "/" 把路径写进名字（那是把命名当结构，会撞名）；这里用**关系字段**。
+   * 🔴 只有两层：父必须是顶层标签；守卫在 `tag-hierarchy.ts` 的
+   *    `validateTagParentChange`（与 `project-hierarchy.ts` 同形）。可选字段，
+   *    不 bump `CURRENT_SCHEMA_VERSION`（AGENTS.md §3.3）。
+   */
+  parentId?: string;
   /**
    * 「这条标签被合并进了哪一条」—— 合并的**唯一落点**。
    *
@@ -1233,6 +1287,60 @@ export interface Attachment extends EntityBase {
 }
 
 /**
+ * 自定义保存筛选（智能清单；ADR-0092）。
+ *
+ * 🔴 **它是用户数据实体，不是视图。** 「用户起的名字 + 用户填的规则」二者都推不出来 ——
+ * 与 `PREFERENCE_CORRECTION`（"用户认为某条推断是错的"推不出来）、`Comment`
+ * （正文是用户写的）同一条推理。"视图不建实体"针对的是由字段派生的今天/四象限，
+ * 不是"用户保存的查询"。
+ *
+ * 🔴 **只存规则，不存任务、不物化结果。** 命中的任务在**读时**由
+ * `filter-rule.ts` 的 `compileFilterRule` / `applyFilterRule` 算出来；结果永远是活查询。
+ * 它**没有 `projectId`**（账户级的跨清单查询），**永不进 share op-log**
+ * （个人数据，无 `shareId`）。
+ *
+ * ⚠️ 自有字段 `color` / `order` 可选（可加性，不 bump `CURRENT_SCHEMA_VERSION`，
+ * AGENTS §3.3）；`name` / `rule` 是身份的一部分（没有规则就不是筛选），必填 ——
+ * 与 `Reminder.taskId` / `Comment.body` 同一先例。
+ */
+export interface Filter extends EntityBase {
+  /** 用户起的名字（"我的工作"）。 */
+  name: string;
+  /** 结构化规则（判别联合 JSON，不是 DSL 字符串）。 */
+  rule: FilterRule;
+  /** 可选：色槽（1–8，同 `Project.color`，存槽位不存 hex）。 */
+  color?: CategorySlot;
+  /** 可选：侧栏排序键（越小越靠前；缺省排在有序项之后）。 */
+  order?: number;
+}
+
+/**
+ * 清单内的**分组**（二级分块；ADR-0091）。
+ *
+ * 一层归属到 `Project`（`projectId` 是实体身份的一部分，必填）；**不嵌套**
+ * （分组不能再套分组 —— 与「文件夹只一层」「标签只一层」同一条产品纪律）。
+ *
+ * `Task.sectionId` 指向它；一个分组可以**没有任务**（空分组可存在，
+ * 标题 + 计数 0 与滴答一致），因此它必须是独立实体而不是任务上的字符串
+ * （字符串方案里"组内 0 条任务"意味着这个分组根本不存在）。
+ *
+ * 删除走 `deletedAt` 软删（ADR-0048 四态）：**不级联删任务**，其下任务保留
+ * 原 `sectionId`；读侧把悬空 / 已删除的 `sectionId` 一律归「未分组」。
+ * 还原 = 清 `deletedAt`，任务自动回到原组。
+ */
+export interface Section extends EntityBase {
+  /** 归属清单，实体身份的一部分（同 `Reminder.taskId`），必填。 */
+  projectId: string;
+  /** 分组标题，必填（没有标题就不是一个分组）。 */
+  name: string;
+  /**
+   * 分组在清单内的排序键。可选 + 运行时默认（按 `createdAt` 兜底，见
+   * `sections.ts` 的 `bySectionOrder`）—— AGENTS.md §3.3。
+   */
+  order?: number;
+}
+
+/**
  * 实体类型 → 领域模型 的映射。
  * 用于 op-log 的 apply 阶段做类型收窄。
  */
@@ -1252,6 +1360,8 @@ export interface EntityModelMap {
   CALENDAR_EVENT: CalendarEvent;
   ASSISTANT_TURN: AssistantTurn;
   ATTACHMENT: Attachment;
+  FILTER: Filter;
+  SECTION: Section;
 }
 
 export type ModeledEntityType = keyof EntityModelMap;
@@ -1284,6 +1394,8 @@ export const MODELED_ENTITY_TYPES = [
   'ASSISTANT_TURN',
   'COMMENT',
   'ATTACHMENT',
+  'FILTER',
+  'SECTION',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */

@@ -108,7 +108,7 @@ function CategoryDraftForm({
       await onCreate({
         name: trimmed,
         ...(supportsColor && color !== undefined ? { color } : {}),
-        ...(kind === 'project' && parentId !== '' ? { parentId } : {}),
+        ...(parentId !== '' ? { parentId } : {}),
       });
       onClose();
     } catch {
@@ -184,10 +184,14 @@ function CategoryDraftForm({
             )}
           </FormField>
 
-          {kind === 'project' && parentOptions !== undefined && parentOptions.length > 0 ? (
+          {parentOptions !== undefined && parentOptions.length > 0 ? (
             <FormField
               id="ht-category-create-parent"
-              label={t('common.organizer.folder.title')}
+              label={
+                kind === 'project'
+                  ? t('common.organizer.folder.title')
+                  : t('common.organizer.tag.parent.title')
+              }
               layout="stacked"
             >
               {(field) => (
@@ -200,7 +204,11 @@ function CategoryDraftForm({
                   }}
                   disabled={busy}
                 >
-                  <option value="">{t('common.organizer.folder.none')}</option>
+                  <option value="">
+                    {kind === 'project'
+                      ? t('common.organizer.folder.none')
+                      : t('common.organizer.tag.parent.none')}
+                  </option>
                   {parentOptions.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.name}

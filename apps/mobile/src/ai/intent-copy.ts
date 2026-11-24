@@ -247,6 +247,22 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate, locale: Lo
       return intent.color === undefined
         ? t('web.ai.tools.intentClearProjectColor', { id: intent.projectId })
         : t('web.ai.tools.intentSetProjectColor', { id: intent.projectId, color: String(intent.color) });
+    case 'set-project-icon':
+      return intent.icon === undefined
+        ? t('web.ai.tools.intentClearProjectIcon', { id: intent.projectId })
+        : t('web.ai.tools.intentSetProjectIcon', { id: intent.projectId, icon: intent.icon });
+    case 'set-project-view-mode':
+      return intent.viewMode === undefined
+        ? t('web.ai.tools.intentClearProjectViewMode', { id: intent.projectId })
+        : t('web.ai.tools.intentSetProjectViewMode', { id: intent.projectId, viewMode: intent.viewMode });
+    case 'set-project-kind':
+      return intent.kind === undefined
+        ? t('web.ai.tools.intentClearProjectKind', { id: intent.projectId })
+        : t('web.ai.tools.intentSetProjectKind', { id: intent.projectId, kind: intent.kind });
+    case 'set-project-show-in-smart-list':
+      return intent.showInSmartList
+        ? t('web.ai.tools.intentSetProjectShowInSmartList', { id: intent.projectId })
+        : t('web.ai.tools.intentHideProjectFromSmartList', { id: intent.projectId });
     case 'set-habit-color':
       return intent.color === undefined
         ? t('web.ai.tools.intentClearHabitColor', { id: intent.habitId })
@@ -285,5 +301,24 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate, locale: Lo
       return t('web.ai.tools.intentRenameAttachment', { id: intent.attachmentId, fileName: intent.fileName });
     case 'remove-attachment':
       return t('web.ai.tools.intentRemoveAttachment', { id: intent.attachmentId });
+    // 任务模型缺口补齐：清单内分组（SECTION）+ 保存筛选（FILTER）
+    case 'create-section':
+      return t('web.ai.tools.intentCreateSection', { projectId: intent.projectId, name: intent.name });
+    case 'rename-section':
+      return t('web.ai.tools.intentRenameSection', { sectionId: intent.sectionId, name: intent.name });
+    case 'reorder-section':
+      return t('web.ai.tools.intentReorderSection', { sectionId: intent.sectionId });
+    case 'set-task-section':
+      return t('web.ai.tools.intentSetTaskSection', { taskId: intent.taskId });
+    case 'delete-section':
+      return t('web.ai.tools.intentDeleteSection', { sectionId: intent.sectionId });
+    case 'create-filter':
+      return t('web.ai.tools.intentCreateFilter', { name: intent.name });
+    case 'update-filter-rule':
+      return t('web.ai.tools.intentUpdateFilterRule', { filterId: intent.filterId });
+    case 'rename-filter':
+      return t('web.ai.tools.intentRenameFilter', { filterId: intent.filterId, name: intent.name });
+    case 'delete-filter':
+      return t('web.ai.tools.intentDeleteFilter', { filterId: intent.filterId });
   }
 }

@@ -36,16 +36,17 @@
 import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { indexTags, resolveTagIds, type Tag, type Task } from '@heyta/domain';
+import { indexTags, resolveTagIds, tagTargetsFor, type Tag, type Task } from '@heyta/domain';
 import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';
 import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
-import { EmptyState, OrganizerList, toOrganizerNodes } from '@heyta/ui';
+import { EmptyState, FolderPicker, OrganizerList, toTagTree } from '@heyta/ui';
 import { useI18n } from '@heyta/i18n';
 
 import { useTaskStore } from '../tasks/store.js';
 import { useProjectStore } from '../projects/store.js';
 import { tagManager } from './store.js';
 import { Button } from '../../components/hta/index.js';
+import { tagRejectionMessageKey } from './rejection.js';
 
 export interface TagsManagerProps {
   readonly open: boolean;
@@ -66,6 +67,9 @@ export function TagsManager({ open, onClose }: TagsManagerProps): React.JSX.Elem
   const [mergeTarget, setMergeTarget] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  /** 新建（可含父标签）—— 标签管理页也承担"建子标签"，不把创建只留在侧栏。 */
+  const [newName, setNewName] = useState('');
+  const [newParent, setNewParent] = useState('');
 
   const tagIndex = useMemo(() => indexTags(projects.tags), [projects.tags]);
   const allTasks: Task[] = useMemo(() => Object.values(tasks.entities.tasks), [tasks.entities.tasks]);
@@ -81,17 +85,21 @@ export function TagsManager({ open, onClose }: TagsManagerProps): React.JSX.Elem
     [projects.tags, tasks.entities],
   );
 
-  const dirty = selected.size > 0;
+  const dirty = selected.size > 0 || newName.trim() !== '';
   const guard = useDirtyDismissGuard({
     overlay: 'modal-dirty-form',
     isDirty: () => dirty,
     onDismiss: onClose,
   });
 
-  const nodes = useMemo(
-    () => toOrganizerNodes(projects.tags),
+  const nodes = useMemo(() => toTagTree(projects.tags), [projects.tags]);
+  /** 换父候选集（领域层 `tagTargetsFor`，与侧栏同一个函数）。 */
+  const tagTargets = useMemo(
+    () => new Map(projects.tags.map((tag) => [tag.id, tagTargetsFor(projects.tags, tag.id)])),
     [projects.tags],
   );
+  const tagParentOf = (id: string): string | undefined =>
+    projects.tags.find((tag) => tag.id === id)?.parentId ?? undefined;
 
   const toggleSelected = useCallback((id: string) => {
     setSelected((previous) => {
@@ -113,7 +121,9 @@ export function TagsManager({ open, onClose }: TagsManagerProps): React.JSX.Elem
     } catch (error) {
       // 失败**不进静默**：动作层给的是人话（"找不到标签" / "不能合并进它自己"），
       // 原样显示在面里，不弹第二个浮层（`overlay-feedback.md`：一处只留一句）。
-      setNotice(error instanceof Error ? error.message : String(error));
+      const raw = error instanceof Error ? error.message : String(error);
+      // 去掉动作层附带的封闭码后缀（（duplicate_name）之类），别把 code 甩给用户。
+      setNotice(raw.replace(/（[a-z_]+）$/, ''));
     } finally {
       setBusy(false);
     }
@@ -228,6 +238,57 @@ export function TagsManager({ open, onClose }: TagsManagerProps): React.JSX.Elem
         </div>
       ) : null}
 
+      {/*
+        新建（可含父标签）：标签管理页也承担"建子标签"。父只列**顶层**标签
+        （`nodes` 就是顶层，因为两层上限 —— 父不能再有父）。
+      */}
+      <div className="ht-tags-manager-create" role="group" data-testid="tags-manager-create">
+        <input
+          type="text"
+          value={newName}
+          placeholder={t('web.tags.manage.createPlaceholder')}
+          aria-label={t('web.tags.manage.createPlaceholder')}
+          data-testid="tags-manager-create-name"
+          onChange={(event) => {
+            setNewName(event.target.value);
+          }}
+          disabled={busy}
+        />
+        <select
+          value={newParent}
+          aria-label={t('common.organizer.tag.parent.title')}
+          data-testid="tags-manager-create-parent"
+          onChange={(event) => {
+            setNewParent(event.target.value);
+          }}
+          disabled={busy}
+        >
+          <option value="">{t('common.organizer.tag.parent.none')}</option>
+          {nodes.map((node) => (
+            <option key={node.id} value={node.id}>
+              {node.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="ht-btn ht-btn--ghost"
+          data-testid="tags-manager-create-submit"
+          disabled={busy || newName.trim() === ''}
+          onClick={() => {
+            const name = newName.trim();
+            if (name === '') return;
+            void run(async () => {
+              await projects.addTag(name, newParent === '' ? undefined : newParent);
+              setNewName('');
+              setNewParent('');
+            });
+          }}
+        >
+          {t('web.tags.manage.createSubmit')}
+        </button>
+      </div>
+
       {notice === null ? null : (
         <p className="ht-type-caption" role="status" data-testid="tags-manager-notice">
           {notice}
@@ -305,7 +366,29 @@ export function TagsManager({ open, onClose }: TagsManagerProps): React.JSX.Elem
             >
               {t('web.tags.manage.mergeLabel', { name: item.name })}
             </Button>
-          ) : null
+          ) : (
+            <FolderPicker
+              item={item}
+              candidates={(tagTargets.get(item.id) ?? []).map((target) => ({
+                id: target.id,
+                name: target.name,
+              }))}
+              currentParentId={tagParentOf(item.id)}
+              labels={{
+                button: (name) => t('common.organizer.tag.parent.button', { name }),
+                title: t('common.organizer.tag.parent.title'),
+                none: t('common.organizer.tag.parent.none'),
+                current: t('common.organizer.tag.parent.current'),
+              }}
+              onSelect={(targetId) => {
+                void run(async () => {
+                  await projects.setTagParent(item.id, targetId);
+                });
+              }}
+              disabled={busy}
+              testID={`tags-manager-parent-${item.id}`}
+            />
+          )
         }
         testID="tags-manager-list"
       />
