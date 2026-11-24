@@ -16,7 +16,7 @@
   尺寸与排版都是**锁死的**（1200×630、固定字号）：卡片里不用相对单位，
   因为它不会被"响应式"地渲染 —— 那反而会让同一份源产出不同尺寸的图。
 -->
-<html lang="zh-CN">
+<html lang="{{LANG}}">
   <head>
     <meta charset="UTF-8" />
     <style>
@@ -47,12 +47,15 @@
 
       /* 品牌那条蓝：与 design tokens 的 primary 同一个色相，
          卡片是"同一个产品"的第一眼，不该出现第二种蓝。 */
-      .dot {
-        inline-size: 28px;
-        block-size: 28px;
-        border-radius: 50%;
-        background: {{PRIMARY}};
-        margin-block-end: 28px;
+      /* 字标就是这一格的品牌标识：它替换了原来那枚装饰圆点。
+         几何**不手抄** —— 由 gen-og-card.mjs 从 BrandMark.tsx 导出
+         （那个组件的注释里写着"将来若真的需要静态 SVG，从本组件导出"）。 */
+      .mark {
+        display: block;
+        block-size: 56px;
+        inline-size: auto;
+        margin-block-end: 34px;
+        color: {{PAPER_INK}};
       }
 
       .title {
@@ -60,6 +63,22 @@
         line-height: 1.12;
         font-weight: 700;
         letter-spacing: -0.02em;
+      }
+
+      /* 英文标题比中文长得多（同一句要占 1.5–2 倍字符宽），
+         用同一档字号会撑成三行并把页脚挤到没有间距。
+         这里按语言各给一档，尺寸本身仍是锁死的 1200×630。 */
+      html[lang='en'] .title {
+        font-size: 58px;
+        line-height: 1.16;
+        /* 英文标题在换行时容易只掉一个词到第三行（"…device / first"）。
+           Chrome 支持 text-wrap: balance，让两行长度接近，避免孤字。 */
+        text-wrap: balance;
+      }
+
+      html[lang='en'] .lede {
+        font-size: 26px;
+        max-inline-size: 1040px;
       }
 
       .lede {
@@ -96,7 +115,7 @@
   </head>
   <body>
     <div>
-      <div class="dot"></div>
+      {{WORDMARK_SVG}}
       <h1 class="title">{{CARD_TITLE1}}<br />{{CARD_TITLE2}}</h1>
       <p class="lede">{{CARD_LEDE}}</p>
     </div>

@@ -138,6 +138,38 @@ function renderTemplate(locale) {
     return value;
   };
 
+  /**
+   * 字标几何**从 `src/components/BrandMark.tsx` 导出**，不手抄路径数据。
+   *
+   * 那个组件的文件头写着：将来若真的需要一份静态 SVG（比如 og:image），
+   * 从本组件导出，不要再抄一份。这里就照做 —— 解析它的 viewBox / d / 描边 / 句点，
+   * 任何一项取不到就抛错，而不是退回一个"看起来还行"的旧图。
+   */
+  const markSource = readFileSync(join(APP, 'src/components/BrandMark.tsx'), 'utf8');
+  const pick = (re, why) => {
+    const found = re.exec(markSource)?.[1];
+    if (found === undefined) {
+      throw new Error(
+        `BrandMark.tsx 里找不到${why} —— 字标几何变了而这里没跟上，` +
+          '分享卡片会印出一个错的标志。',
+      );
+    }
+    return found;
+  };
+  const markViewBox = pick(/viewBox="([^"]+)"/, ' viewBox');
+  const markPath = pick(/\sd="([^"]+)"/, '主路径 d');
+  const markStroke = pick(/strokeWidth=\{([0-9.]+)\}/, '描边宽度');
+  const markDot = pick(/<circle cx=\{([0-9.]+)\}/, '句点 cx');
+  const markDotY = pick(/cy=\{([0-9.]+)\}/, '句点 cy');
+  const markDotR = pick(/r=\{([0-9.]+)\}/, '句点半径');
+  const WORDMARK_SVG = [
+    `<svg class="mark" viewBox="${markViewBox}" role="img" aria-label="heyta">`,
+    `<path d="${markPath}" fill="none" stroke="currentColor" stroke-width="${markStroke}"`,
+    ' stroke-linecap="round" stroke-linejoin="round" />',
+    `<circle cx="${markDot}" cy="${markDotY}" r="${markDotR}" fill="currentColor" />`,
+    '</svg>',
+  ].join('');
+
   const host = new URL(siteOriginFrom(process.env.VITE_SITE_URL)).host;
   const table = TABLES[locale];
 
@@ -146,6 +178,7 @@ function renderTemplate(locale) {
     text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
   const values = {
+    LANG: locale === 'en' ? 'en' : 'zh-CN',
     SITE_HOST: host,
     // 主色：`--ht-color-primary` 指向它。
     PRIMARY: token('--ht-blue-600', '主色 --ht-color-primary 指向它'),
@@ -161,6 +194,8 @@ function renderTemplate(locale) {
   };
 
   let html = readFileSync(SOURCE, 'utf8');
+  // 标记类占位符**原样插入**（它们是 HTML/SVG），文本类才转义。
+  html = html.replaceAll('{{WORDMARK_SVG}}', WORDMARK_SVG);
   for (const [placeholder, value] of Object.entries(values)) {
     html = html.replaceAll(`{{${placeholder}}}`, escapeHtml(value));
   }
