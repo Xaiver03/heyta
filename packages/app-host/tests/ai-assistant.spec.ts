@@ -634,6 +634,11 @@ describe('授权只有一份：整份目录，判断仍在 `@heyta/local-api`', 
         'set_task_repeat_after_completion',
         // 2026-11-23 批次6：清单/习惯属性 + 四象限/推迟 + 批量打卡
         'set_project_color',
+        // 2026-11-24 工作包 A：清单级设置（图标 / 视图 / 类型 / 智能清单）
+        'set_project_icon',
+        'set_project_view_mode',
+        'set_project_kind',
+        'set_project_show_in_smart_list',
         'set_habit_color',
         'set_habit_icon',
         'set_habit_goal',

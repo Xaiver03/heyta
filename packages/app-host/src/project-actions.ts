@@ -40,12 +40,18 @@ import {
   byCreatedAtOrder,
   isArchived,
   isLive,
-  trashedIn,
   parseCategorySlot,
+  parseProjectIcon,
+  parseProjectKind,
+  parseProjectViewMode,
+  trashedIn,
   validateProjectParentChange,
   validateTagParentChange,
   type CategorySlot,
   type Project,
+  type ProjectIcon,
+  type ProjectKind,
+  type ProjectViewMode,
   type Tag,
 } from '@heyta/domain';
 import type { EntityType } from '@heyta/shared-schema';
@@ -85,6 +91,31 @@ export interface ProjectActions {
    * 动作层永远不知道 3 号是"学习"还是"刷手机"。
    */
   setProjectColor(entityId: string, slot?: CategorySlot): Promise<void>;
+  /**
+   * 给清单指定一个**图标**（`project-settings.ts#PROJECT_ICONS` 闭集 key），
+   * 或 `undefined` 表示清掉（回到缺省绘制）。
+   *
+   * 与 `setProjectColor` 同一条分工：存的是**用户挑过的身份标记**，校验在写入侧
+   * （不认识的值 `throw`，不悄悄落成第一个），清除写 `null` 穿过 JSON。
+   */
+  setProjectIcon(entityId: string, icon?: ProjectIcon): Promise<void>;
+  /**
+   * 这条清单**默认**用哪种视图（`list` / `board` / `calendar` / `timeline`）。
+   * `undefined` = 清除，回到缺省 `list`。枚举白名单在写入侧校验。
+   */
+  setProjectViewMode(entityId: string, viewMode?: ProjectViewMode): Promise<void>;
+  /**
+   * 清单类型（`tasks` / `notes`）：这条清单默认先展示任务还是便签。
+   * `undefined` = 清除，回到缺省 `tasks`。**不合并 NOTE 实体**（见 entities.ts）。
+   */
+  setProjectKind(entityId: string, kind?: ProjectKind): Promise<void>;
+  /**
+   * 是否在智能清单 / 汇总里显示。
+   *
+   * 目标值（与 `archiveProject` 同一条契约）：缺省 `true`，用户要它别出现才传 `false`。
+   * 传布尔值而不是"切换一下" —— 两个写这个字段的按钮里可能有一个是在恢复显示。
+   */
+  setProjectShowInSmartList(entityId: string, showInSmartList: boolean): Promise<void>;
   /**
    * 归档：隐藏但**保留数据**，可以再取消归档。
    *
@@ -332,6 +363,39 @@ export function createProjectActions(
       // `null` 能穿过 JSON 表达"清除"；`undefined` 会让整个键在 JSON 里消失，
       // 两台设备对同一次"清掉颜色"生成的 op 于是长得不一样。
       await updateProject(entityId, { color: clean === undefined ? null : String(clean) });
+    },
+
+    async setProjectIcon(entityId, icon) {
+      // 与 `setProjectColor` 同一条写入侧校验：不认识的值**抛**，不悄悄存下去。
+      // 存下去的后果是"这条清单的图标在某个端上画不出来"，而那在任何一层都不报错。
+      const clean = icon === undefined ? undefined : parseProjectIcon(icon);
+      if (icon !== undefined && clean === undefined) {
+        throw new Error(`清单图标必须是闭集里的 key，收到 ${JSON.stringify(icon)}`);
+      }
+      // 清除写 `null`（穿过 JSON 表达清除），不写"不放这个键"。
+      await updateProject(entityId, { icon: clean ?? null });
+    },
+
+    async setProjectViewMode(entityId, viewMode) {
+      // 枚举白名单在这里真的验一次：`viewMode` 来自界面/AI 意图，类型在运行时不可信。
+      const clean = viewMode === undefined ? undefined : parseProjectViewMode(viewMode);
+      if (viewMode !== undefined && clean === undefined) {
+        throw new Error(`清单视图必须是 list/board/calendar/timeline 之一，收到 ${JSON.stringify(viewMode)}`);
+      }
+      await updateProject(entityId, { viewMode: clean ?? null });
+    },
+
+    async setProjectKind(entityId, kind) {
+      const clean = kind === undefined ? undefined : parseProjectKind(kind);
+      if (kind !== undefined && clean === undefined) {
+        throw new Error(`清单类型必须是 tasks/notes 之一，收到 ${JSON.stringify(kind)}`);
+      }
+      await updateProject(entityId, { kind: clean ?? null });
+    },
+
+    async setProjectShowInSmartList(entityId, showInSmartList) {
+      // 目标值，不做"切换一下"：两个写这个字段的地方，方向必须由调用方说清。
+      await updateProject(entityId, { showInSmartList });
     },
 
     async archiveProject(entityId, archived = true) {

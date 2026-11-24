@@ -50,6 +50,7 @@ export * from './milestones.js';
 export * from './today-progress.js';
 export * from './weekly-review.js';
 export * from './activity-categories.js';
+export * from './project-settings.js';
 export * from './identity-tags.js';
 export * from './focus.js';
 export * from './recurrence.js';

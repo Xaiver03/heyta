@@ -75,6 +75,9 @@ import {
   noteProjectId,
   noteRejection,
   parseCategorySlot,
+  parseProjectIcon,
+  parseProjectKind,
+  parseProjectViewMode,
   HABIT_ICONS,
   reminderPhase,
   reminderRejection,
@@ -87,6 +90,9 @@ import {
   type Attachment,
   type Habit,
   type CategorySlot,
+  type ProjectIcon,
+  type ProjectKind,
+  type ProjectViewMode,
   type HabitFrequency,
   type HabitGoalType,
   type HabitIcon,
@@ -1899,6 +1905,54 @@ async function submitIntent(
         return { ok: false, reason: 'invalid', message: '颜色槽位必须是 1–8 的整数。' };
       }
       await projectActions.setProjectColor(intent.projectId, slot);
+      return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
+    }
+
+    case 'set-project-icon': {
+      const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+      if (project === undefined || project.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个清单。' };
+      }
+      const icon = intent.icon === undefined ? undefined : parseProjectIcon(intent.icon);
+      if (intent.icon !== undefined && icon === undefined) {
+        return { ok: false, reason: 'invalid', message: '图标必须是闭集里的 key。' };
+      }
+      await projectActions.setProjectIcon(intent.projectId, icon as ProjectIcon | undefined);
+      return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
+    }
+
+    case 'set-project-view-mode': {
+      const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+      if (project === undefined || project.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个清单。' };
+      }
+      const viewMode = intent.viewMode === undefined ? undefined : parseProjectViewMode(intent.viewMode);
+      if (intent.viewMode !== undefined && viewMode === undefined) {
+        return { ok: false, reason: 'invalid', message: '视图必须是 list / board / calendar / timeline 之一。' };
+      }
+      await projectActions.setProjectViewMode(intent.projectId, viewMode as ProjectViewMode | undefined);
+      return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
+    }
+
+    case 'set-project-kind': {
+      const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+      if (project === undefined || project.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个清单。' };
+      }
+      const kind = intent.kind === undefined ? undefined : parseProjectKind(intent.kind);
+      if (intent.kind !== undefined && kind === undefined) {
+        return { ok: false, reason: 'invalid', message: '清单类型必须是 tasks / notes 之一。' };
+      }
+      await projectActions.setProjectKind(intent.projectId, kind as ProjectKind | undefined);
+      return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
+    }
+
+    case 'set-project-show-in-smart-list': {
+      const project = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
+      if (project === undefined || project.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个清单。' };
+      }
+      await projectActions.setProjectShowInSmartList(intent.projectId, intent.showInSmartList);
       return { ok: true, taskId: intent.projectId, entityId: intent.projectId, entityType: 'PROJECT' };
     }
 

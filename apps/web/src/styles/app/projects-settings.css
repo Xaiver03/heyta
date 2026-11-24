@@ -1,0 +1,103 @@
+/*
+ * 清单设置（`ProjectsPanel` 每行的展开式设置面板）
+ * ================================================
+ *
+ * 与 `.ht-slot-picker`（`growth.css`）同一形状：**展开式，不是浮层** ——
+ * 浮层要处理定位、层级、点外部关闭、焦点陷阱，而它挂在侧栏每一行清单上。
+ *
+ * ⚠️ 全部取值来自 token，裸 hex / px / ms 一个都没有（`pnpm check:design` 扫这里）。
+ * 面板绝对定位于触发按钮下方、右对齐，避免在窄侧栏里把行宽撑开。
+ */
+
+.ht-project-settings {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: flex-end;
+}
+
+.ht-project-settings__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ht-touch-target-min);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-1);
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  border-radius: var(--ht-radius-md);
+}
+
+.ht-project-settings__panel {
+  position: absolute;
+  inset-block-start: calc(100% + var(--ht-space-1));
+  inset-inline-end: 0;
+  z-index: var(--ht-z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  min-inline-size: calc(var(--ht-touch-target-min) * 4);
+  max-inline-size: calc(var(--ht-touch-target-min) * 7);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+}
+
+.ht-project-settings__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-project-settings__label {
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-project-settings__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1);
+}
+
+.ht-project-settings__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ht-touch-target-min);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-1);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-subtle);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-project-settings__option[aria-pressed='true'] {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  border-color: var(--ht-color-primary);
+}
+
+.ht-project-settings__checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground);
+}
+
+.ht-project-settings__checkbox input {
+  accent-color: var(--ht-color-primary);
+  inline-size: var(--ht-space-4);
+  block-size: var(--ht-space-4);
+  cursor: pointer;
+}

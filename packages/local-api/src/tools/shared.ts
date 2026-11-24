@@ -134,7 +134,9 @@ export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
   // 2026-11-22 工具层补全：任务生命周期 +6、清单 +3、笔记 +3，按实体放开上限。
   // 批8：TASK 加 set_task_assignee（指派）→ 33。
   TASK: 33,
-  PROJECT: 10,
+  // 2026-11-24 工作包 A：PROJECT 加清单级设置 4 个写工具（图标/视图/类型/智能清单）
+  // （原 8 → 12；清单是用户组织任务的主容器，设置面比其它实体宽）。
+  PROJECT: 12,
   NOTE: 10,
   // 批6：HABIT 加颜色/图标/目标/频率 4 个写工具 → 5+4=9，放到 12 留余量。
   HABIT: 12,
@@ -772,6 +774,18 @@ export type LocalApiWriteIntent =
    * AI 只在用户明确点名时执行（`docs/plans/ai-event-tool-contract.md` §5.4）。
    */
   | { action: 'set-project-color'; projectId: string; color?: number }
+  /**
+   * 给清单设/清图标（PROJECT，闭集 key）。`icon` 省略 = 清除回到缺省绘制。
+   * 口径同 `set-project-color`（用户赋义的身份标记，AI 仅在明确点名时执行）。
+   * 词表校验在动作层（本包零依赖、看不见 domain 的 `PROJECT_ICONS`）。
+   */
+  | { action: 'set-project-icon'; projectId: string; icon?: string }
+  /** 给清单设/清默认视图（PROJECT）。`viewMode` 枚举白名单由动作层校验；省略 = 清除回 `list`。 */
+  | { action: 'set-project-view-mode'; projectId: string; viewMode?: string }
+  /** 给清单设/清类型（PROJECT）。`kind` = tasks / notes；省略 = 清除回 `tasks`。 */
+  | { action: 'set-project-kind'; projectId: string; kind?: string }
+  /** 是否让清单在智能清单 / 汇总里显示（PROJECT）。目标值，缺省 true。 */
+  | { action: 'set-project-show-in-smart-list'; projectId: string; showInSmartList: boolean }
   /** 给习惯设/清颜色槽位（HABIT）。`color` 1–8，省略 = 清除。口径同 `set-project-color`。 */
   | { action: 'set-habit-color'; habitId: string; color?: number }
   /** 给习惯设/清图标（HABIT，闭集 key）。`icon` 省略 = 清除回到派生图标。口径同上。 */

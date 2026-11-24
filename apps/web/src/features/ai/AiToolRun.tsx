@@ -334,6 +334,22 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return intent.color === undefined
         ? t('web.ai.tools.intentClearProjectColor', { id: intent.projectId })
         : t('web.ai.tools.intentSetProjectColor', { id: intent.projectId, color: String(intent.color) });
+    case 'set-project-icon':
+      return intent.icon === undefined
+        ? t('web.ai.tools.intentClearProjectIcon', { id: intent.projectId })
+        : t('web.ai.tools.intentSetProjectIcon', { id: intent.projectId, icon: intent.icon });
+    case 'set-project-view-mode':
+      return intent.viewMode === undefined
+        ? t('web.ai.tools.intentClearProjectViewMode', { id: intent.projectId })
+        : t('web.ai.tools.intentSetProjectViewMode', { id: intent.projectId, viewMode: intent.viewMode });
+    case 'set-project-kind':
+      return intent.kind === undefined
+        ? t('web.ai.tools.intentClearProjectKind', { id: intent.projectId })
+        : t('web.ai.tools.intentSetProjectKind', { id: intent.projectId, kind: intent.kind });
+    case 'set-project-show-in-smart-list':
+      return intent.showInSmartList
+        ? t('web.ai.tools.intentSetProjectShowInSmartList', { id: intent.projectId })
+        : t('web.ai.tools.intentHideProjectFromSmartList', { id: intent.projectId });
     case 'set-habit-color':
       return intent.color === undefined
         ? t('web.ai.tools.intentClearHabitColor', { id: intent.habitId })

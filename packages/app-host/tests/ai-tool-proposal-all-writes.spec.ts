@@ -651,6 +651,38 @@ const CASES: readonly Case[] = [
     args: async () => ({ projectId: await seed({ action: 'create-project', name: '配色清单' }), color: 3 }),
     effect: () => Object.values(engine.getState().projects).filter((p) => p.color === '3').length,
   },
+  // 2026-11-24 工作包 A：清单级设置
+  {
+    tool: 'set_project_icon',
+    intentAction: 'set-project-icon',
+    label: '清单设图标',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '图标清单' }), icon: 'star' }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.icon === 'star').length,
+  },
+  {
+    tool: 'set_project_view_mode',
+    intentAction: 'set-project-view-mode',
+    label: '清单设视图',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '视图清单' }), viewMode: 'board' }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.viewMode === 'board').length,
+  },
+  {
+    tool: 'set_project_kind',
+    intentAction: 'set-project-kind',
+    label: '清单设类型',
+    args: async () => ({ projectId: await seed({ action: 'create-project', name: '类型清单' }), kind: 'notes' }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.kind === 'notes').length,
+  },
+  {
+    tool: 'set_project_show_in_smart_list',
+    intentAction: 'set-project-show-in-smart-list',
+    label: '清单退出智能清单',
+    args: async () => ({
+      projectId: await seed({ action: 'create-project', name: '智能清单' }),
+      showInSmartList: false,
+    }),
+    effect: () => Object.values(engine.getState().projects).filter((p) => p.showInSmartList === false).length,
+  },
   {
     tool: 'set_habit_color',
     intentAction: 'set-habit-color',

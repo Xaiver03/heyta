@@ -27,7 +27,7 @@
 
 import { create } from 'zustand';
 
-import type { CategorySlot, Project, Tag } from '@heyta/domain';
+import type { CategorySlot, Project, ProjectIcon, ProjectKind, ProjectViewMode, Tag } from '@heyta/domain';
 import { childProjects, topLevelProjects } from '@heyta/ui';
 import { createProjectActions, type ActionContext } from '@heyta/app-host';
 
@@ -60,6 +60,14 @@ interface ProjectState {
   purgeProject: (id: string) => Promise<boolean>;
   /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
   setProjectColor: (id: string, slot?: CategorySlot) => Promise<void>;
+  /** 清单图标（闭集 key），`undefined` 表示清除回到缺省绘制。 */
+  setProjectIcon: (id: string, icon?: ProjectIcon) => Promise<void>;
+  /** 清单默认视图，`undefined` 表示清除回到 `list`。 */
+  setProjectViewMode: (id: string, viewMode?: ProjectViewMode) => Promise<void>;
+  /** 清单类型，`undefined` 表示清除回到 `tasks`。 */
+  setProjectKind: (id: string, kind?: ProjectKind) => Promise<void>;
+  /** 是否在智能清单 / 汇总里显示。 */
+  setProjectShowInSmartList: (id: string, showInSmartList: boolean) => Promise<void>;
   /**
    * 移入某个文件夹（省略 = 提为顶级）。
    *
@@ -136,6 +144,27 @@ export const useProjectStore = create<ProjectState>(() => ({
     // 槽位合法性由动作层校验（它会对 0 或 9 抛错）——
     // 界面这一侧不做第二份判断，两份判断迟早不一致。
     await projectActions.setProjectColor(id, slot);
+    syncProjects();
+  },
+
+  setProjectIcon: async (id, icon) => {
+    // 闭集校验同样在动作层（不认识的值抛错），界面只转发。
+    await projectActions.setProjectIcon(id, icon);
+    syncProjects();
+  },
+
+  setProjectViewMode: async (id, viewMode) => {
+    await projectActions.setProjectViewMode(id, viewMode);
+    syncProjects();
+  },
+
+  setProjectKind: async (id, kind) => {
+    await projectActions.setProjectKind(id, kind);
+    syncProjects();
+  },
+
+  setProjectShowInSmartList: async (id, showInSmartList) => {
+    await projectActions.setProjectShowInSmartList(id, showInSmartList);
     syncProjects();
   },
 

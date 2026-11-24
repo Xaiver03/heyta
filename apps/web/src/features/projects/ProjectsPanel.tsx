@@ -55,6 +55,7 @@ import {
   liveTaskCountsByProject,
   parseCategorySlot,
   tagTargetsFor,
+  parseProjectIcon,
 } from '@heyta/domain';
 import { Archive, Folder, Plus, Tag as TagIcon, UserPlus } from 'lucide-react';
 import {
@@ -74,6 +75,8 @@ import {
 
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
 import { CategoryCreateDialog, type CategoryCreateKind } from '../categories/CategoryCreateDialog.js';
+import { ProjectSettings } from './ProjectSettings.js';
+import { PROJECT_GLYPHS } from './project-glyphs.js';
 import { JoinSharedListDialog } from '../share/JoinSharedListDialog.js';
 import { extractShareToken, searchWithoutShareToken } from '../share/join-link.js';
 import { useTaskStore, type TaskFilter } from '../tasks/store.js';
@@ -161,6 +164,8 @@ export function ProjectsPanel({
   );
   const parentOf = (id: string): string | undefined =>
     projects.projects.find((project) => project.id === id)?.parentId ?? undefined;
+  /** 按 id 取清单实体（设置控件要读它的四个设置字段）。 */
+  const projectById = (id: string) => projects.projects.find((project) => project.id === id);
   const tagNodes = useMemo(() => toTagTree(projects.tags), [projects.tags]);
   /**
    * 标签「挂到哪个父标签下」的候选集 —— 与清单侧同一个形状，
@@ -238,6 +243,29 @@ export function ProjectsPanel({
    */
   function slotOf(projectId: string) {
     return parseCategorySlot(projects.projects.find((p) => p.id === projectId)?.color);
+  }
+
+  /** 每行右侧的「清单设置」（图标 / 视图 / 类型 / 智能清单开关）。 */
+  function renderProjectSettings(id: string) {
+    const domainProject = projectById(id);
+    if (domainProject === undefined) return null;
+    return (
+      <ProjectSettings
+        project={domainProject}
+        onIcon={(icon) => {
+          void projects.setProjectIcon(id, icon);
+        }}
+        onViewMode={(viewMode) => {
+          void projects.setProjectViewMode(id, viewMode);
+        }}
+        onKind={(kind) => {
+          void projects.setProjectKind(id, kind);
+        }}
+        onShowInSmartList={(show) => {
+          void projects.setProjectShowInSmartList(id, show);
+        }}
+      />
+    );
   }
 
   /**
@@ -391,9 +419,16 @@ export function ProjectsPanel({
               });
             }}
             // 顶层画文件夹、子级不画 —— "层级"的一部分，与缩进一起。
-            renderLeading={(_item, context) =>
-              context.isChild ? null : <Folder size={ICON_SIZE.xs} aria-hidden="true" />
-            }
+            // 清单设过图标就用图标，没设过仍是文件夹（读缺省只走 `parseProjectIcon`）。
+            renderLeading={(leadingItem, context) => {
+              if (context.isChild) return null;
+              const iconKey = parseProjectIcon(projectById(leadingItem.id)?.icon);
+              if (iconKey !== undefined) {
+                const Glyph = PROJECT_GLYPHS[iconKey];
+                return <Glyph size={ICON_SIZE.xs} aria-hidden="true" />;
+              }
+              return <Folder size={ICON_SIZE.xs} aria-hidden="true" />;
+            }}
             renderItemExtra={(item) => (
               <>
                 <ColorSlotPicker
@@ -432,6 +467,7 @@ export function ProjectsPanel({
                   }}
                   testID={`web-list-folder-${item.id}`}
                 />
+                {renderProjectSettings(item.id)}
               </>
             )}
             testID="projects-list"
