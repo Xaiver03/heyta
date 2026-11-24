@@ -230,6 +230,11 @@ pnpm check:adr-numbering        # ADR 编号唯一 + 裸写的 `ADR-NNNN` 只指
                                 #      文件名不同 ⇒ git 不报冲突，死链检查也不报（链接各指各的），
                                 #      而正文里的 `ADR-0053 §5 第 11 条` 从此有两种读法。
 pnpm check:tokens               # 原生 token 产物（Swift/ArkTS/JSON/RN）是否与 tokens.css 同步
+                                # ↑ 同一条链里还查 Android 小组件色值与
+                                #   `apps/web/public/manifest.webmanifest` 的
+                                #   theme_color / background_color（PWA 清单是
+                                #   JSON，写不了 var()，只能靠这条门禁盯漂移）
+pnpm check:pwa-colors           # 单独只查 manifest 两色；修：pnpm gen:pwa-colors
 pnpm check:arkts                # 用**真 ArkTS 编译器**编译生成的 .ets 产物
 pnpm check:native-deps          # iOS 原生依赖对账（package.json ↔ Podfile.lock，见 §7 第 32 条）
 
