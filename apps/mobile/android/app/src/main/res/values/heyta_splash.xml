@@ -5,7 +5,7 @@
   cycle_ms 由 duration.splash-enter + 2 x stagger + hold 推导，不是第五个数字。
 -->
 <resources>
-    <color name="heyta_splash_background">#f8fafc</color>
+    <color name="heyta_splash_background">#f1f5f9</color>
     <color name="heyta_splash_plate">#2563eb</color>
     <item name="heyta_splash_cycle_ms" format="integer" type="integer">800</item>
 </resources>
