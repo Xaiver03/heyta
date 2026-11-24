@@ -23,6 +23,7 @@
 | VI → 设计系统 | 新增 `color.milestone-{checkin,focus,tasks,days}`（亮/暗各一份）进 `tokens.css` + `TOKEN_GROUPS` |
 | 设计系统 → 代码 | `packages/ui/src/motivation/MilestoneMap.tsx` 消费四维色（维度圆点 + 已达成档位描边） |
 | 守住不回退 | `packages/design-system/tests/milestone-colors.spec.ts`（对比度 / ΔE / 色盲 / 暗色覆盖） |
+| brand-kit 自检 | `python _pipeline/check_artifacts.py`：产物色值必须全部命中 tokens.css（注入非法色会 exit 1）+ 数量 17/8/6/26/10 + 关键产物存在 |
 
 实测与判据见 [`成就与成长体系_产品清单.md`](成就与成长体系_产品清单.md) §11。
 
