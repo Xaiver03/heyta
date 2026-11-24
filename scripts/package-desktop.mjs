@@ -206,6 +206,14 @@ function desktopIconFor(platform) {
        *
        * 缺文件时**不静默回落**：给一个不存在的路径，`@electron/packager` 会直接
        * 报错，比悄悄产出"Electron 默认图标"的安装包好 —— 后者只在装完才被发现。
+       *
+       * ⚠️ 实测（2026-11-25）：打包成功后 `Contents/Resources/` 里那份仍叫
+       * `electron.icns`、`CFBundleIconFile` 也写 `electron.icns` —— 这是 packager
+       * 的命名习惯，**内容已经是我们这张**（与 `apps/desktop/assets/Heyta.icns`
+       * sha256 相同）。所以判断"图标有没有生效"要比对内容，不能只看文件名，
+       * 否则会误判成"用了默认图标"。
+       * 另：它还会打印 `Could not find icon … .icon` 的 WARNING —— 那是在找
+       * macOS 26 的 Icon Composer 新格式，回退到 .icns 属正常，不是失败。
        */
       icon: desktopIconFor(platform),
     });
