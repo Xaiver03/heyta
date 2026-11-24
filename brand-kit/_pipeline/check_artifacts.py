@@ -176,6 +176,30 @@ if all(os.path.exists(p) for p in LOCALES.values()):
 else:
     print("⏭  跳过 i18n 词条校验：本机不在仓库内（找不到 packages/i18n）")
 
+# 7) 语义色必须有**暗色覆盖且与亮色不同**
+#    品牌物料要能同时印亮/暗两版；某个值只在亮色里存在（暗色悄悄回落成亮色），
+#    表现是"暗色版里这块和亮色一模一样"——肉眼几乎发现不了。
+#    注意：原始色阶（blue-600 之类）本来就只有一个值，不在本检查范围。
+BRAND_COLOR_TOKENS = [
+    "color-milestone-checkin", "color-milestone-focus",
+    "color-milestone-tasks", "color-milestone-days",
+    *[f"color-category-{i}" for i in range(1, 9)],
+    "color-primary", "color-background", "color-surface", "color-foreground",
+]
+for name in BRAND_COLOR_TOKENS:
+    light = RT.token(name)
+    dark = RT.token(name, "dark")
+    if light is None:
+        fail(f"{name}：亮色里取不到值（token 名拼错或不存在）")
+    elif dark is None:
+        fail(f"{name}：暗色里取不到值")
+    elif dark.lower() == light.lower():
+        fail(f"{name}：暗色 {dark} 与亮色相同 —— 大概率漏了暗色覆盖")
+    elif VERBOSE:
+        print(f"   · {name} light={light} dark={dark}")
+if not any("暗色" in f for f in fails):
+    print(f"✅ 语义色亮/暗成对且取值不同（{len(BRAND_COLOR_TOKENS)} 个）")
+
 if not fails:
     print("\n✅ brand-kit 产物自检通过")
     sys.exit(0)
