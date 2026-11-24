@@ -53,17 +53,22 @@ import {
   Quadrant,
   startOfMonth,
   startOfWeek,
+  isScheduledOn,
   toLocalDate,
   type CountdownEvent,
+  type Habit,
+  type HabitLog,
   type LocalDate,
   type Task,
 } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   createEventActions,
+  createHabitActions,
   createTaskActions,
   type AppHost,
   type EventActions,
+  type HabitActions,
   type TaskActions,
 } from '@heyta/app-host';
 import {
@@ -98,6 +103,7 @@ import { CalendarViewMenu } from './CalendarViewMenu';
 import { CalendarWeekPager } from './CalendarWeekPager';
 import { CalendarCapsuleHeader } from './CalendarCapsuleHeader';
 import { CalendarWeekAgenda } from './CalendarWeekAgenda';
+import { CalendarHabitsCard } from './CalendarHabitsCard';
 import { useTokens } from '../theme';
 
 /**
@@ -196,12 +202,20 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     () => (host ? createEventActions(host) : null),
     [host],
   );
+  const habitActions = useMemo<HabitActions | null>(
+    () => (host ? createHabitActions(host) : null),
+    [host],
+  );
 
   const projectActions = useMemo(
     () => (host ? createProjectActions(host) : null),
     [host],
   );
   const [projects, setProjects] = useState<ScopeProject[]>([]);
+  /** 习惯 + 打卡记录（日历的第三个数据源）：存全量活数据，按选中日过滤后再画。 */
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
+  const [busyHabitId, setBusyHabitId] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     if (!actions || !eventActions) return;
@@ -217,12 +231,16 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
      * 动作层，所以这一侧不需要播种（也**不许**为"对齐 web"新写一份 store）。
      */
     setEvents(eventActions.listEvents(today));
+    if (habitActions) {
+      setHabits(habitActions.listHabits());
+      setHabitLogs(habitActions.listLogs());
+    }
     if (projectActions) {
       setProjects(
         projectActions.listProjects().map((p) => ({ id: p.id, name: p.name })),
       );
     }
-  }, [actions, eventActions, projectActions, today]);
+  }, [actions, eventActions, habitActions, projectActions, today]);
 
   useEffect(() => {
     if (!host) return;
@@ -263,6 +281,34 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         });
     },
     [actions, busyId, refresh],
+  );
+
+  /** 这一天该做的习惯。`isScheduledOn` 在领域层判"哪天该做"，这里只过滤。 */
+  const scheduledHabits = useMemo(
+    () => habits.filter((habit) => isScheduledOn(habit.frequency, selected)),
+    [habits, selected],
+  );
+
+  /** 点一下习惯：今天没打卡就打卡，已打卡就取消（`undoCheckIn` 是软删除）。 */
+  const onToggleHabit = useCallback(
+    (habitId: string) => {
+      if (!habitActions || busyHabitId !== null) return;
+      const done = habitLogs.some(
+        (log) => log.habitId === habitId && log.date === selected && log.deletedAt === undefined,
+      );
+      setBusyHabitId(habitId);
+      void (done ? habitActions.undoCheckIn(habitId, selected) : habitActions.checkIn(habitId, selected))
+        .then(() => {
+          refresh();
+        })
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : String(e));
+        })
+        .finally(() => {
+          setBusyHabitId(null);
+        });
+    },
+    [habitActions, busyHabitId, habitLogs, selected, refresh],
   );
 
   /**
@@ -868,6 +914,18 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         testID="calendar-board"
       />
       )}
+      {view === 'day' ? (
+        <View style={{ marginTop: tokens['space.3'] }}>
+          <CalendarHabitsCard
+            habits={scheduledHabits}
+            logs={habitLogs}
+            date={selected}
+            title={t('widget.habits.title')}
+            onToggle={onToggleHabit}
+            busyHabitId={busyHabitId}
+          />
+        </View>
+      ) : null}
       </Animated.View>
 
       {/*
