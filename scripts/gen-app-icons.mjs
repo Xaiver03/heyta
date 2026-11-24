@@ -45,8 +45,9 @@
 
 import { execFileSync } from 'node:child_process';
 import { deflateSync, inflateSync } from 'node:zlib';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -718,6 +719,70 @@ emitText(
  *    —— 这一格刻意**不做**：小组件已经有自己的主题接线，
  *       在这里再写一份色值就是第二个事实源。
  * ──────────────────────────────────────────────────────────────────── */
+
+/* ──────────────────────────────────────────────────────────────────────
+ * 4b. macOS `.icns`（Electron 桌面壳）
+ *
+ * 此前 `scripts/package-desktop.mjs` 明确写着"不设 icon：仓库里还没有桌面端
+ * 图标" —— 于是 macOS 上的 heyta 顶着一个 Electron 默认图标。Windows 侧早就有
+ * `heyta.ico`，唯独 macOS 缺一份，这不是设计取舍，是漏了。
+ *
+ * `.icns` 不能像 png 那样直接写：必须是 iconset 目录里十档命名正确的 png，
+ * 再交给 `iconutil` 打包。档位是 Apple 规定的，少一档在某些缩放/Retina 场景下
+ * 系统会退回到一个模糊的放大版。
+ * ──────────────────────────────────────────────────────────────────── */
+const ICNS_PATH = join(ROOT, 'apps/desktop/assets/Heyta.icns');
+const ICONSET_SIZES = [
+  ['icon_16x16.png', 16],
+  ['icon_16x16@2x.png', 32],
+  ['icon_32x32.png', 32],
+  ['icon_32x32@2x.png', 64],
+  ['icon_128x128.png', 128],
+  ['icon_128x128@2x.png', 256],
+  ['icon_256x256.png', 256],
+  ['icon_256x256@2x.png', 512],
+  ['icon_512x512.png', 512],
+  ['icon_512x512@2x.png', 1024],
+];
+
+if (!CHECK) {
+  const dir = mkdtempSync(join(tmpdir(), 'heyta-iconset-'));
+  try {
+    const iconset = join(dir, 'Heyta.iconset');
+    mkdirSync(iconset, { recursive: true });
+    for (const [name, px] of ICONSET_SIZES) {
+      rasterize(rounded(), join(iconset, name), px);
+    }
+    mkdirSync(dirname(ICNS_PATH), { recursive: true });
+    execFileSync('iconutil', ['-c', 'icns', iconset, '-o', ICNS_PATH], { stdio: 'pipe' });
+    counts.png += 1;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+} else {
+  try {
+    const buf = readFileSync(ICNS_PATH);
+    if (buf.toString('ascii', 0, 4) !== 'icns') {
+      drift.push('macos Heyta.icns：文件头不是 icns');
+    } else if (buf.length < 10_000) {
+      drift.push(`macos Heyta.icns：只有 ${buf.length} 字节，八成是空壳`);
+    } else {
+      // 数一下 containers：每个块 4 字节类型 + 4 字节长度
+      let off = 8;
+      const kinds = [];
+      while (off + 8 <= buf.length) {
+        const kind = buf.toString('ascii', off, off + 4);
+        const len = buf.readUInt32BE(off + 4);
+        if (len < 8) break;
+        kinds.push(kind);
+        off += len;
+      }
+      readings.push(`✅ macos Heyta.icns（${kinds.length} 个块，${Math.round(buf.length / 1024)} KB）`);
+    }
+  } catch (e) {
+    drift.push(`macos Heyta.icns：读不到（${e instanceof Error ? e.message : String(e)}）`);
+  }
+}
 
 /* ──────────────────────────────────────────────────────────────────────
  * 出口
