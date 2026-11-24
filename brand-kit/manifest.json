@@ -1,9 +1,9 @@
 {
   "brand": "heyta",
-  "generated_at": "2026-11-25 05:13:33",
+  "generated_at": "2026-11-25 05:28:03",
   "dirs": {
     "00-brand-foundation": 11,
-    "01-logo": 21,
+    "01-logo": 22,
     "02-badges": 71,
     "03-icons": 28,
     "04-imagery": 9,
@@ -14,11 +14,11 @@
     "09-social": 3,
     "10-templates": 2
   },
-  "count": 163,
+  "count": 164,
   "files": [
     {
       "path": "index.html",
-      "size": 5097
+      "size": 4896
     },
     {
       "path": "成就与成长体系_产品清单.md",
@@ -26,11 +26,11 @@
     },
     {
       "path": "README.md",
-      "size": 7386
+      "size": 7798
     },
     {
       "path": "manifest.json",
-      "size": 13604
+      "size": 13616
     },
     {
       "path": "02-badges/badge-catalogue.png",
@@ -369,6 +369,10 @@
       "size": 16938
     },
     {
+      "path": "01-logo/wordmark-deep@1x.png",
+      "size": 16876
+    },
+    {
       "path": "01-logo/icon-brand-512.png",
       "size": 8961
     },
@@ -417,7 +421,7 @@
       "size": 395
     },
     {
-      "path": "06-brochure/brochure_front.png",
+      "path": "06-brochure/heyta_brochure_front.png",
       "size": 569802
     },
     {
@@ -425,12 +429,12 @@
       "size": 205128
     },
     {
-      "path": "06-brochure/brochure_back.png",
-      "size": 553263
-    },
-    {
       "path": "06-brochure/heyta_brochure_back.pdf",
       "size": 205970
+    },
+    {
+      "path": "06-brochure/heyta_brochure_back.png",
+      "size": 553263
     },
     {
       "path": "00-brand-foundation/brand-tokens.css",

@@ -106,6 +106,7 @@ exports={
  "wordmark-primary.svg":[("wordmark-primary@1x.png",760),("wordmark-primary@2x.png",1520)],
  "wordmark-white.svg":[("wordmark-white@1x.png",760)],
  "wordmark-ink.svg":[("wordmark-ink@1x.png",760)],
+ "wordmark-deep.svg":[("wordmark-deep@1x.png",760)],
  "app-icon.svg":[("app-icon-512.png",512),("app-icon-1024.png",1024),("app-icon-180.png",180),("app-icon-32.png",32)],
  "icon-brand.svg":[("icon-brand-512.png",512)],
  "lockup-horizontal.svg":[("lockup-horizontal@1x.png",1600)],

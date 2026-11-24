@@ -279,8 +279,8 @@ def run():
         h=wr(name+".html",fn()); render.chrome_pdf(h,os.path.join(P,name+".pdf")); render.chrome_png(h,os.path.join(P,name+".png"),1123,1587,2); print("poster",name)
     # brochure
     B=os.path.join(WD,"06-brochure"); os.makedirs(B,exist_ok=True)
-    h=wr("bro_front.html",brochure_front()); render.chrome_pdf(h,os.path.join(B,"heyta_brochure_front.pdf")); render.chrome_png(h,os.path.join(B,"brochure_front.png"),1123,794,2)
-    h=wr("bro_back.html",brochure_back()); render.chrome_pdf(h,os.path.join(B,"heyta_brochure_back.pdf")); render.chrome_png(h,os.path.join(B,"brochure_back.png"),1123,794,2); print("brochure")
+    h=wr("bro_front.html",brochure_front()); render.chrome_pdf(h,os.path.join(B,"heyta_brochure_front.pdf")); render.chrome_png(h,os.path.join(B,"heyta_brochure_front.png"),1123,794,2)
+    h=wr("bro_back.html",brochure_back()); render.chrome_pdf(h,os.path.join(B,"heyta_brochure_back.pdf")); render.chrome_png(h,os.path.join(B,"heyta_brochure_back.png"),1123,794,2); print("brochure")
     # manual
     M=os.path.join(WD,"07-product-manual"); os.makedirs(M,exist_ok=True)
     h=wr("manual.html",manual()); render.chrome_pdf(h,os.path.join(M,"heyta_product-manual.pdf")); print("manual")
@@ -302,6 +302,15 @@ def run():
     G=os.path.join(WD,"08-merch"); os.makedirs(G,exist_ok=True)
     h=wr("merch.html",merch_sheet()); render.chrome_png(h,os.path.join(G,"merch-sheet.png"),794,1123,2)
     render.chrome_pdf(h,os.path.join(G,"merch-sheet.pdf")); print("merch")
+    # 06-brochure / 08-merch 也必须恰好是这些文件（改名字段时旧文件要一起删）
+    for _dir, _want in (
+        (B, {"heyta_brochure_front.pdf", "heyta_brochure_front.png",
+             "heyta_brochure_back.pdf", "heyta_brochure_back.png"}),
+        (G, {"merch-sheet.pdf", "merch-sheet.png"}),
+    ):
+        _have = {f for f in os.listdir(_dir) if not f.startswith(".") and not f.startswith("_")}
+        if _have != _want:
+            raise SystemExit(f"{os.path.basename(_dir)} 内容与预期不符：多余 {sorted(_have-_want)} / 缺失 {sorted(_want-_have)}")
     # templates
     T=os.path.join(WD,"10-templates"); os.makedirs(T,exist_ok=True)
     h=wr("slide.html",slide_tpl()); render.chrome_png(h,os.path.join(T,"slide-16x9.png"),1920,1080,1)

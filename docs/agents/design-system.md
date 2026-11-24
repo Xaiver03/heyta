@@ -97,6 +97,18 @@ warm/mist 各自单独算一次）。
 判据：`python brand-kit/_pipeline/check_artifacts.py`（第 8 组）与
 `pnpm --filter @heyta/design-system test` 的 `milestone-colors.spec.ts` 都应给出上表数字。
 
+#### 🔴 比对产物时：PDF 不要看 sha256（2026-11-25 实测）
+
+同一份 `badge-catalogue.pdf` 连跑两次，sha256 **不同** —— Chrome 打印头里带时间戳与
+文档 ID；而 PNG / SVG 是字节稳定的。所以「产物有没有被改」这件事：
+
+| 格式 | 能不能比 sha256 |
+|---|---|
+| SVG / PNG（rasterize 出来的） | ✅ 能，稳定 |
+| PDF（Chrome `--print-to-pdf`） | ❌ 不能，看页数 / 字体嵌入 / 视觉 |
+
+不知情的人每跑一次生成器，都会以为「产物被改了」，然后翻一遍 diff 什么也找不到。
+
 ### 🔴 两组"分类色"不许混用：`category-*` vs `milestone-*`（2026-11-24）
 
 这两组都是"多个可分辨的颜色"，但**含义来源相反**，混用会让两个不相干的概念在同一个屏幕上撞色。

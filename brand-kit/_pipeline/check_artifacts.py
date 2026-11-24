@@ -426,6 +426,46 @@ if os.path.exists(TOKENS_CSS) and os.path.exists(TOKENS_JSON):
     else:
         print(f"✅ brand-tokens.css 可解析且与 json 一致（{len(pairs)} 个变量）")
 
+# 15) 01-logo 与 00-brand-foundation 的文件集合必须精确
+#     这两个目录由多个脚本共同写入（logo / tokens / brandbook），
+#     很容易出现"改名后旧文件还在"或"少导出一档"。集合写死在这里，任何增删都要同步改。
+EXACT_DIRS = {
+    "01-logo": {
+        "app-icon-1024.png", "app-icon-180.png", "app-icon-32.png", "app-icon-512.png", "app-icon.svg",
+        "icon-brand-512.png", "icon-brand.svg", "icon-mono-ink.svg", "icon-mono-white.svg",
+        "lockup-horizontal.svg", "lockup-horizontal@1x.png",
+        "lockup-vertical.svg", "lockup-vertical@1x.png",
+        "wordmark-deep.svg", "wordmark-deep@1x.png", "wordmark-ink.svg", "wordmark-ink@1x.png",
+        "wordmark-primary.svg", "wordmark-primary@1x.png", "wordmark-primary@2x.png",
+        "wordmark-white.svg", "wordmark-white@1x.png",
+    },
+    "00-brand-foundation": {"brand-book.pdf", "brand-tokens.css", "brand-tokens.json"},
+}
+for rel, want in EXACT_DIRS.items():
+    d = os.path.join(WD, rel)
+    if not os.path.isdir(d):
+        fail(f"{rel} 目录不存在")
+        continue
+    have = {f for f in os.listdir(d) if not f.startswith(".") and not f.startswith("_")}
+    if have != want:
+        fail(f"{rel} 集合不符：多余 {sorted(have - want)} / 缺失 {sorted(want - have)}")
+    else:
+        print(f"✅ {rel} 文件集合精确（{len(want)} 个）")
+
+# 16) 每个含字形的 svg 都要有对应 png（除刻意的单色版）
+LOGO_DIR = os.path.join(WD, "01-logo")
+if os.path.isdir(LOGO_DIR):
+    svgs = [f[:-4] for f in os.listdir(LOGO_DIR) if f.endswith(".svg")]
+    pngs = {f for f in os.listdir(LOGO_DIR) if f.endswith(".png")}
+    no_png = [s for s in svgs if not any(p.startswith(s) or p.startswith(s.replace("-", "_")) for p in pngs)]
+    # icon-mono-* 是单色/白版，交付里只给 svg 是刻意的
+    intentional = {"icon-mono-ink", "icon-mono-white"}
+    unexpected = [s for s in no_png if s not in intentional]
+    if unexpected:
+        fail(f"01-logo 里这些 svg 没有对应 png：{unexpected}")
+    else:
+        print(f"✅ 01-logo 每个字形 svg 都有 png（{len(svgs)-len(intentional)} 个；单色版 {len(intentional)} 个只给 svg）")
+
 if not fails:
     print("\n✅ brand-kit 产物自检通过")
     sys.exit(0)
