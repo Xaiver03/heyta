@@ -549,6 +549,32 @@ if _broken:
 else:
     emit("✅ 产物里的本地引用全部可达（无空白图/空链接）")
 
+# 21) 身份标签徽章上印的「≥N」必须等于领域层的 threshold
+#     上一组只对了 id 集合；门槛改了却没重建徽章时，**徽章上印的数字就是错的**，
+#     而 id 集合完全正常。这里直接读产物 SVG 里的文字。
+TAGS_TS = os.path.join(ROOT, "packages/domain/src/identity-tags.ts")
+TAG_DIR = os.path.join(WD, "02-badges/identity")
+if os.path.exists(TAGS_TS) and os.path.isdir(TAG_DIR):
+    src = open(TAGS_TS, encoding="utf-8").read()
+    pairs = re.findall(r"\{\s*id:\s*'([\w-]+)',\s*kind:\s*'\w+',\s*threshold:\s*(\d+)\s*\}", src)
+    if not pairs:
+        fail("身份标签：从 identity-tags.ts 取不到 id/threshold 对 —— 上游结构变了")
+    else:
+        wrong = []
+        for tid, thr in pairs:
+            f = os.path.join(TAG_DIR, tid + ".svg")
+            if not os.path.exists(f):
+                continue  # 由第 15/19 组负责缺文件
+            m = re.search(r"≥(\d+)", open(f, encoding="utf-8").read())
+            if not m:
+                wrong.append(f"{tid}: 徽章上找不到 ≥N")
+            elif m.group(1) != thr:
+                wrong.append(f"{tid}: 徽章印 ≥{m.group(1)}，领域层是 ≥{thr}")
+        if wrong:
+            fail(f"身份标签门槛与领域层不符：{wrong[:4]}")
+        else:
+            emit(f"✅ 身份标签徽章上的门槛 = 领域层（{len(pairs)} 个）")
+
 if not fails:
     if JSON_OUT:
         import json as _j

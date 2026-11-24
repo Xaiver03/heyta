@@ -225,7 +225,7 @@ def social_post(lang: str = "zh"):
     # 同样：eyebrow 与主标都取自 i18n 的同一个 key，不再自造短句
     b=f'''<div style="width:1080px;height:1080px;position:relative;overflow:hidden;background:{SUN}">
       <img src="{WM_B}" style="position:absolute;left:80px;top:80px;height:70px">
-      <div style="position:absolute;left:80px;right:80px;top:560px"><div style="font-size:26px;letter-spacing:6px;color:{BLUE}">{RC.t("landing.hero.eyebrow", lang)}</div>
+      <div style="position:absolute;left:80px;right:80px;top:470px"><div style="font-size:26px;letter-spacing:6px;color:{BLUE}">{RC.t("landing.hero.eyebrow", lang)}</div>
       <h1 style="font-size:{76 if lang=="zh" else 58}px;font-weight:800;line-height:1.25;margin-top:20px;letter-spacing:-1px">{RC.tagline_html(lang)}</h1></div>
     </div>'''
     return f"<!doctype html><html><head><meta charset='utf-8'><style>*{{margin:0;padding:0}}body{{font-family:{FONT}}}</style></head><body>{b}</body></html>"
