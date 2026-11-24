@@ -2081,3 +2081,31 @@ Android 装置仍未写（承 §9.40）。
 
 **结论**：装置已按当前界面把四处锚点修对（改动在本批提交里），但**仍未跑到 L1 绿**，拦在模拟器 AX 桥。
 按纪律不把"构建过/填过几步"读成"已验"。Android 装置仍未写。
+
+#### 9.41c 判清了 AX 桥病灶的形状（2026-11-25 00:0x–00:4x）—— 是定向轴查询挂，不是界面/树没了
+
+再跑几轮把病灶收窄到可判：
+
+- **形状**：`set` 服务端地址会触发一次 companion 的 `axbridge guest reader failed: Broken pipe`；此后**整棵
+  `ax --dump` 仍读得到**（`tree_has` 命中「邮箱」），但**定向轴查询**（`ax <label> --role`，`fill_field` 用的那条）
+  每次 `scrollRc=element-left-tree` ⇒ 读成 `found=False`。所以是 **guest reader 在 set 后挂了**，界面与整树没坏。
+- **试过并都不成的三条**：① 直接重试 5 次（run16）；② `fill_field` 先不滚、只在 plain 查询不可见才滚（run17）；
+  ③ set 之后 `ensure_idb_companion` 重启 companion 再填（run18）。三轮都在「邮箱」这一步 `element-left-tree`。
+  ⇒ 病灶会**跨 companion 重启存活**，不是 companion 单进程抖动。
+- **改了装置的四处陈旧锚点仍是有效修正**（都在这批提交里 3533c854 之后）：分区 `sync→data`、AuthScreen 地址栏收在
+  「高级选项」需先展开、标签是「服务端地址」、登录按钮 `mobile-auth-form-submit`、密码取 `HEYTA_E2E_PASSWORD`；
+  另加了"set 服务端地址后 `wait_tree 邮箱`"与"先不滚"两条稳定性补丁。**这些是装置的正确化，不是本批产品红。**
+
+**另一条腿（这条才真验到本批改动）**：改跑 `verify:collab-journey`（web 真浏览器 Chromium，不依赖 iOS AX 桥）。
+- 先踩到脚本自己那枚老坑：`prisma migrate deploy` 直接跑会在 `DROP INDEX CONCURRENTLY` 上炸
+  （`25001 cannot run inside a transaction block`）—— 按仓库纪律改成先 `cd server && sh scripts/migrate-deploy.sh`
+  预迁移该库，再让脚本复用（它见库在就不自迁）。
+- 之后两轮都停在**同一个与本批无关的点**：`establishVault` 里 `vault-publish.click()` 被**首启隐私同意遮罩**
+  （`privacy-consent-dialog-scrim`）挡住 ⇒ 点击拦截。这是 e2e 里 vault 建立时的隐私同意时序问题（与同意面重排无关），
+  归 e2e 自己的前置处理。**同样不把"跑到 vault 那一步"读成"本批 e2e 已验"。**
+
+**这一轮净结论**：iOS 装置四处陈旧锚点已改对（真的从"进不去 AuthScreen"推进到"能填到登录表"）；
+iOS 到 L1 仍被 guest reader 的 `element-left-tree` 卡住；web 真浏览器 e2e 被首启隐私遮罩卡在 vault 建立。
+两者都**不是**本批同意面改动引起，且都需要先修 e2e/装置的前置（不是修产品）。
+第三轮 e2e 又停在更早的"应用就绪探针"（`input[placeholder^=添加任务]` 30s 没出现，vite 冷启动/浏览器没起来）——
+同为环境抖动。⇒ web e2e 这条在本机当前负载下也不稳，不是一处可一次修好的静态缺陷。
