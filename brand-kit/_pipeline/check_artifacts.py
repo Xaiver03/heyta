@@ -219,6 +219,52 @@ for theme in ("light", "dark"):
 if not any("ΔE" in f for f in fails):
     print(f"✅ 里程碑四维色两两可区分（亮/暗 × 正常/红绿色盲，门槛 ΔE≥{MIN_DELTA:g}）")
 
+# 9) 里程碑徽章的门槛必须与领域层**逐项相同**
+#    物料里的 17 个徽章文件名是 `kind-threshold.svg`；领域定义是唯一事实源
+#    `packages/domain/src/milestones.ts` 的 MILESTONE_DEFINITIONS。
+#    门槛改了却没重生成 → 物料上印着已经不存在的档位，而且看起来一切正常。
+DOMAIN_MILESTONES = os.path.join(ROOT, "packages/domain/src/milestones.ts")
+if os.path.exists(DOMAIN_MILESTONES):
+    src = open(DOMAIN_MILESTONES, encoding="utf-8").read()
+    defs = re.findall(r"\{\s*kind:\s*'(\w+)',\s*thresholds:\s*\[([^\]]+)\]", src)
+    if not defs:
+        fail("里程碑：从 milestones.ts 里取不到 MILESTONE_DEFINITIONS —— 上游结构变了")
+    else:
+        expected = set()
+        for kind, ths in defs:
+            for th in re.findall(r"\d+", ths):
+                expected.add(f"{kind}-{th}")
+        actual = {
+            f[:-4] for f in os.listdir(os.path.join(WD, "02-badges/milestones")) if f.endswith(".svg")
+        }
+        missing = expected - actual
+        extra = actual - expected
+        if missing:
+            fail(f"里程碑徽章缺档：{sorted(missing)}（领域层有、物料没有）")
+        if extra:
+            fail(f"里程碑徽章多档：{sorted(extra)}（物料有、领域层没有）")
+        if not missing and not extra:
+            print(f"✅ 里程碑门槛与领域层逐项一致（{len(expected)} 档）")
+    # 身份标签同理：id 必须一一对应（物料文件名就是 id）
+    DOMAIN_TAGS = os.path.join(ROOT, "packages/domain/src/identity-tags.ts")
+    if os.path.exists(DOMAIN_TAGS):
+        tsrc = open(DOMAIN_TAGS, encoding="utf-8").read()
+        ids = set(re.findall(r"\{\s*id:\s*'([\w-]+)'", tsrc))
+        have = {
+            f[:-4] for f in os.listdir(os.path.join(WD, "02-badges/identity")) if f.endswith(".svg")
+        }
+        if not ids:
+            fail("身份标签：从 identity-tags.ts 里取不到 id 列表 —— 上游结构变了")
+        else:
+            if ids - have:
+                fail(f"身份标签缺：{sorted(ids - have)}")
+            if have - ids:
+                fail(f"身份标签多：{sorted(have - ids)}")
+            if not (ids - have) and not (have - ids):
+                print(f"✅ 身份标签与领域层逐项一致（{len(ids)} 个）")
+else:
+    print("⏭  跳过里程碑/身份标签校验：本机不在仓库内（找不到 packages/domain）")
+
 if not fails:
     print("\n✅ brand-kit 产物自检通过")
     sys.exit(0)
