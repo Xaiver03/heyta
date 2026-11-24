@@ -38,7 +38,18 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Image,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { HeytaNativeTokens } from '@heyta/design-system';
@@ -145,6 +156,11 @@ function makeStyles(tokens: HeytaNativeTokens) {
       paddingTop: tokens['space.4'],
       gap: tokens['space.4'],
     },
+    /**
+     * 🔴 键盘弹起、面板可升高的空间变小时，多出来的内容必须由一个**能缩的孩子**
+     * 吸收，否则它只是把裁切从屏幕底边挪到面板底边（与 TasksScreen 的 composer 同一条）。
+     */
+    sheetScroll: { flexShrink: 1 },
     grabber: {
       alignSelf: 'center',
       width: tokens['space.10'],
@@ -196,9 +212,50 @@ function WelcomeScreenInner({
   const { reducedMotion, native } = useTheme();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const insets = useSafeAreaInsets();
+  /** 视口高度：键盘弹起时用它给认证面板算一个"够得着但不出屏"的高度上限。 */
+  const { height: windowHeight } = useWindowDimensions();
 
   const [authOpen, setAuthOpen] = useState(false);
   const [slide, setSlide] = useState(0);
+  /**
+   * 键盘高度（dp）。认证面板是**绝对定位、贴屏幕底部的抽屉**，
+   * 它不会随键盘上移 —— 于是键盘弹起时输入框被盖住。
+   *
+   * 🔴 为什么自己在壳里量，而不是套 `KeyboardAvoidingView`：
+   * 这一层是 `position:'absolute'; bottom:0` 的抽屉，KAV 的 padding/height
+   * 作用在它自己的盒子上，绝对定位的孩子仍然贴盒底，实测盖住不变。
+   * 这个形状与 TasksScreen 的 composer 不同（那个是 Modal 内的普通流面板）。
+   *
+   * ⚠️ Android 从 targetSdk 35 起强制 edge-to-edge，`adjustResize` 不再让窗口
+   * 变矮，所以**只能**靠键盘事件拿高度把抽屉整体抬到键盘上沿；
+   * iOS 本来就不 resize。两端同一套处理。
+   */
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  /**
+   * 键盘未弹起时的视口高度基线。
+   * 🔴 用途：区分「系统是否已经把窗口压矮了」。Android 15 以下仍可能走 `adjustResize`
+   * （窗口变矮 ⇒ 绝对定位的抽屉天然贴在键盘上沿），此时再 `bottom: keyboardHeight`
+   * 就是抬两次。键盘收起时刷新基线，这样转屏也能跟上。
+   */
+  const baseWindowHeight = useRef(windowHeight);
+  useEffect(() => {
+    if (keyboardHeight === 0) baseWindowHeight.current = windowHeight;
+  }, [keyboardHeight, windowHeight]);
 
   /**
    * 换页节奏与交叉淡入时长都从 token 推，不写裸毫秒。
@@ -286,6 +343,28 @@ function WelcomeScreenInner({
       useNativeDriver: true,
     }).start();
   }, [authOpen, native, panelDuration, reducedMotion, rise]);
+
+  /**
+   * 键盘弹起时抽屉的定位：**贴着键盘上沿**，同时收窄高度上限，保证面板顶部不出屏。
+   * 键盘收起（`keyboardHeight === 0`）时返回 `null`，沿用样式里的 `bottom:0` / `maxHeight:'88%'`。
+   *
+   * ⚠️ 两种系统的行为不同，这里合并处理：
+   *   · iOS / Android 15+（edge-to-edge）：窗口不缩，抽屉必须自己抬 `keyboardHeight`；
+   *   · 老 Android（`adjustResize`）：窗口已经压矮，抽屉贴底就已在键盘上沿，**不能再抬**。
+   */
+  const windowShrunkByKeyboard = keyboardHeight > 0 && windowHeight < baseWindowHeight.current - 1;
+  const availableHeight = windowShrunkByKeyboard ? windowHeight : windowHeight - keyboardHeight;
+  const keyboardSheet =
+    keyboardHeight > 0
+      ? {
+          bottom: windowShrunkByKeyboard ? 0 : keyboardHeight,
+          maxHeight: Math.max(
+            availableHeight - insets.top - tokens['space.4'],
+            // 兜底：极小的屏幕也不让上限变成负数（否则面板会被压成一条线）。
+            tokens['space.16'] * 4,
+          ),
+        }
+      : null;
 
   return (
     <View style={styles.root}>
@@ -386,6 +465,7 @@ function WelcomeScreenInner({
         <Animated.View
           style={[
             styles.sheet,
+            keyboardSheet,
             {
               transform: [
                 { translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [tokens['space.16'] * 6, 0] }) },
@@ -396,6 +476,7 @@ function WelcomeScreenInner({
         >
           <View style={styles.grabber} />
           <ScrollView
+            style={styles.sheetScroll}
             contentContainerStyle={[styles.sheetBody, { paddingBottom: insets.bottom + tokens['space.6'] }]}
             keyboardShouldPersistTaps="handled"
           >
