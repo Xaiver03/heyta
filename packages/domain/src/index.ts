@@ -15,6 +15,9 @@ export * from './date.js';
 export * from './task-order.js';
 export * from './quadrant.js';
 export * from './calendar-drop.js';
+// ADR-0089：外部日历的只读镜像实体 `CALENDAR_EVENT` —— 幂等键 / 上游行投影 /
+// 内容比较 / 删除判定。纯函数；写入方只有 `app-host` 的 connector。
+export * from './calendar-event.js';
 export * from './task-filter.js';
 // B 包 R8：标签合并别名的**唯一解析入口**（`resolveTagIds` / `resolveTags`）。
 export * from './tags.js';

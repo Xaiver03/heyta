@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@heyta/shared-schema": "workspace:*",
+    "@noble/hashes": "2.4.0",
     "ical.js": "^2.2.1"
   },
   "devDependencies": {
