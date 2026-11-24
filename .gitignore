@@ -328,3 +328,6 @@ server/data/ai-gateway.json
 apps/mobile/ios/build-sim/
 # 英文文案审查输出（截图 + debug.log，非源码）
 e2e/en-audit/
+
+# brand-kit 排版中间产物：每次重建都会变，是 _pipeline 的脚手架，不是交付物
+brand-kit/_pipeline/_tmp_*

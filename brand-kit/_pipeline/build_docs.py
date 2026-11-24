@@ -27,7 +27,7 @@ def poster1():
       <img src="{ICON}" style="position:absolute;right:-40mm;bottom:-40mm;width:220mm;opacity:.10">
       <div style="position:absolute;left:24mm;top:22mm"><img src="{WM_W}" style="height:24mm"></div>
       <div style="position:absolute;left:24mm;top:120mm;right:24mm">
-        <div style="font-size:13px;letter-spacing:6px;color:#bfdbfe">LOCAL-FIRST TASK MANAGER · 本地优先任务管理</div>
+        <div style="font-size:13px;letter-spacing:6px;color:#bfdbfe">{RC.t("landing.hero.eyebrow")}</div>
         <h1 style="font-size:66pt;font-weight:800;line-height:1.18;margin-top:12mm;letter-spacing:-1px">今天该做什么，<br>一眼看见</h1>
         <p style="margin-top:12mm;font-size:16pt;line-height:1.9;color:#dbeafe;max-width:210mm">数据先落本地，端到端加密同步为可选通道。<br>清楚知道任务在哪里、下一步做什么、做完如何回来。</p>
       </div>
@@ -40,8 +40,8 @@ def poster2():
     b=f'''<div class="page" style="background:#fff">
       <div style="position:absolute;left:24mm;top:22mm"><img src="{WM_B}" style="height:20mm"></div>
       <div style="position:absolute;left:24mm;top:80mm;right:24mm">
-        <div style="font-size:13px;letter-spacing:6px;color:{BLUE}">WHY HEYTA</div>
-        <h1 style="font-size:52pt;font-weight:800;margin-top:8mm;letter-spacing:-1px;line-height:1.2">今天的任务，<br>一条一条，落在眼前</h1>
+        <div style="font-size:13px;letter-spacing:6px;color:{BLUE}">{RC.t("landing.hero.eyebrow")}</div>
+        <h1 style="font-size:52pt;font-weight:800;margin-top:8mm;letter-spacing:-1px;line-height:1.2">{RC.tagline_html()}</h1>
         <div style="margin-top:14mm">{rows}</div>
       </div>
       <div style="position:absolute;left:24mm;right:24mm;bottom:16mm;display:flex;justify-content:space-between;font-size:10px;color:{SL8}"><span>heyta · 核心能力</span><span>hey.</span></div>
@@ -155,21 +155,26 @@ def manual():
     return doc("".join(pages),A4)
 
 # ---------------- 09 social ----------------
-def og_card():
+def og_card(lang: str = "zh"):
+    """OG 卡：文案全部来自 i18n，脚本里不留字面句子。
+
+    此前这里写死了两句中文：一句在 i18n 里其实是 lead + emphasis 两段拼起来的，
+    另一句在 i18n 里根本不存在（是编的）。现在小字取 `landing.hero.eyebrow`
+    （站点上就是这个角色），主标取 `tagline_html(lang)`，两种语言都能出。
+    """
     b=f'''<div style="width:1200px;height:630px;position:relative;overflow:hidden;background:radial-gradient(120% 120% at 85% 0%,#1e40af,#2563eb 52%,#0f172a)">
       <img src="{ICON}" style="position:absolute;right:-40px;bottom:-60px;width:420px;opacity:.12">
       <img src="{WM_W}" style="position:absolute;left:72px;top:64px;height:76px">
-      <div style="position:absolute;left:72px;top:250px"><div style="font-size:22px;letter-spacing:6px;color:#bfdbfe">LOCAL-FIRST TASK MANAGER</div>
-      <h1 style="font-size:80px;font-weight:800;color:#fff;margin-top:16px;letter-spacing:-1px">今天该做什么，一眼看见</h1>
-      <p style="font-size:26px;color:#dbeafe;margin-top:18px">本地优先 · 可选加密 · 四端一致</p></div>
+      <div style="position:absolute;left:72px;top:270px"><div style="font-size:22px;letter-spacing:6px;color:#bfdbfe">{RC.t("landing.hero.eyebrow", lang)}</div>
+      <h1 style="font-size:{80 if lang=="zh" else 60}px;font-weight:800;color:#fff;margin-top:16px;letter-spacing:-1px">{RC.tagline_html(lang)}</h1></div>
     </div>'''
     return f"<!doctype html><html><head><meta charset='utf-8'><style>*{{margin:0;padding:0}}body{{font-family:{FONT}}}</style></head><body>{b}</body></html>"
-def social_post():
+def social_post(lang: str = "zh"):
+    # 同样：eyebrow 与主标都取自 i18n 的同一个 key，不再自造短句
     b=f'''<div style="width:1080px;height:1080px;position:relative;overflow:hidden;background:{SUN}">
       <img src="{WM_B}" style="position:absolute;left:80px;top:80px;height:70px">
-      <div style="position:absolute;left:80px;right:80px;top:300px"><div style="font-size:26px;letter-spacing:6px;color:{BLUE}">WHY HEYTA</div>
-      <h1 style="font-size:76px;font-weight:800;line-height:1.2;margin-top:20px;letter-spacing:-1px">今天的任务，<br>一条条，<br>落在眼前</h1></div>
-      <div style="position:absolute;left:80px;bottom:80px;font-size:26px;color:{SL}">本地优先 · 可选加密 · 四端一致</div>
+      <div style="position:absolute;left:80px;right:80px;top:560px"><div style="font-size:26px;letter-spacing:6px;color:{BLUE}">{RC.t("landing.hero.eyebrow", lang)}</div>
+      <h1 style="font-size:{76 if lang=="zh" else 58}px;font-weight:800;line-height:1.25;margin-top:20px;letter-spacing:-1px">{RC.tagline_html(lang)}</h1></div>
     </div>'''
     return f"<!doctype html><html><head><meta charset='utf-8'><style>*{{margin:0;padding:0}}body{{font-family:{FONT}}}</style></head><body>{b}</body></html>"
 
@@ -228,7 +233,9 @@ def run():
     h=wr("manual.html",manual()); render.chrome_pdf(h,os.path.join(M,"heyta_product-manual.pdf")); print("manual")
     # social
     S=os.path.join(WD,"09-social"); os.makedirs(S,exist_ok=True)
-    h=wr("og.html",og_card()); render.chrome_png(h,os.path.join(S,"og-card_1200x630.png"),1200,630,2)
+    for lang, suffix in (("zh",""),("en","-en")):
+        h=wr(f"og{suffix}.html",og_card(lang))
+        render.chrome_png(h,os.path.join(S,f"og-card{suffix}_1200x630.png"),1200,630,2)
     h=wr("post.html",social_post()); render.chrome_png(h,os.path.join(S,"post_1080x1080.png"),1080,1080,2); print("social")
     # merch
     G=os.path.join(WD,"08-merch"); os.makedirs(G,exist_ok=True)

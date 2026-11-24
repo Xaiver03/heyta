@@ -23,7 +23,7 @@
 | VI → 设计系统 | 新增 `color.milestone-{checkin,focus,tasks,days}`（亮/暗各一份）进 `tokens.css` + `TOKEN_GROUPS` |
 | 设计系统 → 代码 | `packages/ui/src/motivation/MilestoneMap.tsx` 消费四维色（维度圆点 + 已达成档位描边） |
 | 守住不回退 | `packages/design-system/tests/milestone-colors.spec.ts`（对比度 / ΔE / 色盲 / 暗色覆盖） |
-| brand-kit 自检 | `python _pipeline/check_artifacts.py`：色值必须命中 tokens.css + 数量 17/8/6/26/10 + **9 份 PDF 字体全嵌入且页数符合设计** + **index.html 29 个相对链接全部可达** + **品牌 i18n 词条两语言齐备** + **16 个语义色亮/暗成对且取值不同** + **里程碑四维两两 ΔE≥10（亮/暗 × 正常/红绿色盲，Python 独立重算，与 design-system 的 TS spec 互为对照）** + **17 个里程碑门槛与 8 个身份标签 id 与 `packages/domain` 逐项相同**（注入非法色 / 改错页数 / 写坏 href / 漏暗色覆盖 / 多出或不存在的档位都会 exit 1） |
+| brand-kit 自检 | `python _pipeline/check_artifacts.py`：色值必须命中 tokens.css + 数量 17/8/6/26/10 + **9 份 PDF 字体全嵌入且页数符合设计** + **index.html 29 个相对链接全部可达** + **品牌 i18n 词条两语言齐备** + **16 个语义色亮/暗成对且取值不同** + **里程碑四维两两 ΔE≥10（亮/暗 × 正常/红绿色盲，Python 独立重算，与 design-system 的 TS spec 互为对照）** + **17 个里程碑门槛与 8 个身份标签 id 与 `packages/domain` 逐项相同** + **产品清单里写的门槛数字与领域层一致** + **无自造文案回归（禁串扫描）**（注入非法色 / 改错页数 / 写坏 href / 漏暗色覆盖 / 多出或不存在的档位都会 exit 1） |
 
 实测与判据见 [`成就与成长体系_产品清单.md`](成就与成长体系_产品清单.md) §11。
 

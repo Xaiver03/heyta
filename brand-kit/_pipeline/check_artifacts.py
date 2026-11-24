@@ -265,6 +265,53 @@ if os.path.exists(DOMAIN_MILESTONES):
 else:
     print("⏭  跳过里程碑/身份标签校验：本机不在仓库内（找不到 packages/domain）")
 
+# 10) 禁止自造文案：这些句子曾在脚本里手写过，i18n 里并不存在
+#     判据是**精确串**，所以它只抓回归，不会误伤正常中文注释。
+FORBIDDEN_COPY = [
+    "本地优先 · 可选加密 · 四端一致",
+    "今天的任务，" + "一条条",
+    "LOCAL-FIRST TASK" + " MANAGER",
+    "WHY " + "HEYTA",
+]
+hits = []
+for root, _d, files in os.walk(os.path.join(WD, "_pipeline")):
+    for fn in files:
+        # 本文件自己持有禁串清单，不能算"违规"
+        if not fn.endswith(".py") or fn == "check_artifacts.py":
+            continue
+        txt = open(os.path.join(root, fn), encoding="utf-8").read()
+        for phrase in FORBIDDEN_COPY:
+            if phrase in txt:
+                hits.append(f"{fn}: {phrase}")
+if hits:
+    fail(f"脚本里出现自造文案（应改为从 i18n 取）：{hits}")
+else:
+    print(f"✅ 无自造文案回归（{len(FORBIDDEN_COPY)} 条禁串）")
+
+# 11) 产品清单文档里写的门槛数字，必须与领域层相同
+#     文档是最容易被手改的一层：改了数字、忘了重生成徽章，谁也不会发现。
+DOC = os.path.join(WD, "成就与成长体系_产品清单.md")
+if os.path.exists(DOC) and os.path.exists(DOMAIN_MILESTONES):
+    doc = open(DOC, encoding="utf-8").read()
+    dom = {}
+    for kind, ths in re.findall(r"\{\s*kind:\s*'(\w+)',\s*thresholds:\s*\[([^\]]+)\]", open(DOMAIN_MILESTONES, encoding="utf-8").read()):
+        dom[kind] = [int(x) for x in re.findall(r"\d+", ths)]
+    checked = 0
+    for kind, want in dom.items():
+        # 文档表格行：| 累计打卡 `checkIns` | **10 / 50 / 200 / 500 / 1000** 次 | …
+        m = re.search(rf"^\|.*?`{kind}`.*?\*\*([\d\s/／、,，]+)", doc, re.M)
+        if not m:
+            continue
+        got = [int(x) for x in re.findall(r"\d+", m.group(1))]
+        if got != want:
+            fail(f"产品清单里 {kind} 的门槛 {got} ≠ 领域层 {want}")
+        else:
+            checked += 1
+    if checked:
+        print(f"✅ 产品清单门槛数字与领域层一致（{checked} 个维度）")
+    else:
+        print("⏭  产品清单里没找到可解析的门槛行（格式变了？）")
+
 if not fails:
     print("\n✅ brand-kit 产物自检通过")
     sys.exit(0)
