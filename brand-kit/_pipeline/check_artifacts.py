@@ -83,6 +83,55 @@ for rel, why in [
     elif VERBOSE:
         print(f"   · {rel} {os.path.getsize(p)//1024} KB")
 
+# 4) PDF 字体必须**嵌入**（换台机器才不塌），且页数符合设计
+#    pdffonts/pdfinfo 属 poppler，可能没装 —— 没装就**响亮跳过**，不算通过。
+import shutil, subprocess
+
+if shutil.which("pdffonts") and shutil.which("pdfinfo"):
+    # 按**文件名**（不含目录）匹配，避免中文/连字符路径差异；值是实测页数。
+    expect_pages = {
+        "brand-book.pdf": 8,
+        "badge-catalogue.pdf": 1,
+        "01_品牌主视觉.pdf": 1,
+        "02_核心能力.pdf": 1,
+        "03_成长里程碑.pdf": 1,
+        "heyta_brochure_front.pdf": 1,
+        "heyta_brochure_back.pdf": 1,
+        "heyta_product-manual.pdf": 10,
+        "merch-sheet.pdf": 2,
+    }
+    pdfs = []
+    for root, _d, files in os.walk(WD):
+        if "_pipeline" in root or "_tmp" in root:
+            continue
+        pdfs += [os.path.join(root, f) for f in files if f.endswith(".pdf")]
+    for f in sorted(pdfs):
+        rel = os.path.relpath(f, WD)
+        try:
+            out = subprocess.run(["pdffonts", f], capture_output=True, text=True, timeout=30).stdout
+        except Exception as e:
+            fail(f"pdffonts 跑不动 {rel}（{e}）")
+            continue
+        rows = [ln.split() for ln in out.splitlines()[2:] if ln.strip()]
+        not_embedded = [r[0] for r in rows if len(r) >= 5 and r[-4] == "no"]
+        if not_embedded:
+            fail(f"{rel} 有 {len(not_embedded)} 个字体未嵌入（换机器会塌）：{not_embedded[:3]}")
+        else:
+            print(f"✅ 字体全嵌入：{rel}（{len(rows)} 个字体）")
+        want = expect_pages.get(os.path.basename(f))
+        if want is not None:
+            try:
+                info = subprocess.run(["pdfinfo", f], capture_output=True, text=True, timeout=30).stdout
+                pages = next((ln.split()[-1] for ln in info.splitlines() if ln.startswith("Pages:")), "?")
+                if str(pages) != str(want):
+                    fail(f"{rel} 页数 {pages} ≠ 期望 {want}")
+                else:
+                    print(f"✅ 页数：{rel} = {pages}")
+            except Exception as e:
+                fail(f"pdfinfo 跑不动 {rel}（{e}）")
+else:
+    print("⏭  跳过 PDF 字体/页数校验：本机没有 poppler（pdffonts/pdfinfo）")
+
 if not fails:
     print("\n✅ brand-kit 产物自检通过")
     sys.exit(0)
