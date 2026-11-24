@@ -94,3 +94,12 @@
 - `apps/web` typecheck 既有债：`CalendarView.tsx` 引用了只存在于**未提交 calendar-drop wip** 的符号，导致该端无法在本环境安全构建/验证 ⇒ **C/D 的 web UI（分组头、过滤器编辑器）因此暂未接入**；数据层/动作/AI 工具/local-api 工具对 C/D 已完整。
 
 **后续（待 apps/web 基线修复后）**：接入 C/D 的 web UI；清理 `apps/web` 既有 typecheck 债与 `packages/ai` 既有 6 红。
+
+## 9. 集成后 web 适配与剩余（2026-11-24 续，goal round）
+
+- **已修（本次提交）**：把 C/D 新增意图接进 `apps/web/src/features/ai/AiToolRun.tsx` 的 `intentText`（补 9 个分支）+ `packages/i18n` 中英 9 个 `intent*` key + 4 个 web 测试 mock 的 `listFilters` ⇒ **本次引入的 apps/web 类型错误归零**。现 `apps/web` 仅剩 `CalendarView.tsx` 3 条**既有 calendar-drop 债**（缺 `planCalendarTimeDrop` / `CalendarDropHour`，属另一条未提交 wip，非本次）。
+- **后端验证**：domain 1361 / app-host 2588 / local-api 407 全绿；`packages/i18n` 仅 1 条既有红（`mobile.tab.ai` 等 4 条英文技术词不含汉字）；`packages/ai` 6 条既有红。
+- **C/D 可视化 UI 接入点（后续，受上述 calendar 债阻塞整体验证）**：
+  - **D 保存过滤器**：web 现有 `features/tasks/saved-filters.ts`（localStorage、存预制 `TaskFilter`）与 `FilterPanel.tsx`（侧栏底部）——升级为读同步的 `FILTER` 实体（`filterActions.listFilters()`）+ 结构化 `FilterRule`（`domain/filter-rule.ts`），新建成/删走 app-host action；注意 store 的当前筛选基于 `TaskFilter`，需扩展支持 `FilterRule`。
+  - **C 清单内分组**：任务列表按 `Task.sectionId` 分节显示分组头（现 `date-groups.ts` 只按日期分组）。
+  - 二者都改 `apps/web`，而该端可验证性依赖清理 calendar-drop wip；建议在它归位后再做，或先把本分支的 apps/web 债一并处理。
