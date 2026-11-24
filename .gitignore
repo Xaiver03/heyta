@@ -331,3 +331,6 @@ e2e/en-audit/
 
 # brand-kit 排版中间产物：每次重建都会变，是 _pipeline 的脚手架，不是交付物
 brand-kit/_pipeline/_tmp_*
+
+# brand-kit 编号目录下的下划线前缀文件 = 排版脚手架（_wrap_*.html / _cards.html / _preview/）
+brand-kit/[0-9][0-9]-*/_*

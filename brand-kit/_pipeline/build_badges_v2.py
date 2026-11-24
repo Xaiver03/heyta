@@ -158,5 +158,23 @@ body{{width:1200px;font-family:{FONT};background:#fff;padding:40px 56px}}
                     f"--print-to-pdf={os.path.join(OUT,'badge-catalogue.pdf')}",
                     f"file://{os.path.join(OUT,'badge-catalogue.html')}"],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     import shutil; shutil.copyfile(os.path.join(OUT,"badge-catalogue.png"),os.path.join(OUT,"_preview","page-1.png"))
+    # 🔴 目录内容必须与生成清单逐一对上：多出来的文件（改名残留、误放的素材）
+    #    会以"看起来像交付物"的方式留在目录里。下划线前缀是排版脚手架，排除。
+    def _files(sub):
+        return {f for f in os.listdir(os.path.join(OUT, sub))
+                if not f.startswith(".") and not f.startswith("_")}
+
+    expects = {
+        "milestones": {f'{m["kind"]}-{m["threshold"]}.{e}' for m in MILESTONES for e in ("svg", "png")},
+        "identity": {t[0] + "." + e for t in IDENTITY for e in ("svg", "png")},
+        "status": {k + ".svg" for k, _l, _t in STATUS},
+        "category": {"分类色卡.png"},
+    }
+    for sub, want in expects.items():
+        have = _files(sub)
+        if have != want:
+            raise SystemExit(
+                f"02-badges/{sub} 与生成清单不符：多余 {sorted(have - want)[:5]} / 缺失 {sorted(want - have)[:5]}"
+            )
     print("milestones:",len(MILESTONES),"identity:",len(IDENTITY),"status:",len(STATUS),"category:",len(CATEGORY))
 if __name__=="__main__": run()

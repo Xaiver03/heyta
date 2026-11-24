@@ -290,6 +290,14 @@ def run():
         h=wr(f"og{suffix}.html",og_card(lang))
         render.chrome_png(h,os.path.join(S,f"og-card{suffix}_1200x630.png"),1200,630,2)
     h=wr("post.html",social_post()); render.chrome_png(h,os.path.join(S,"post_1080x1080.png"),1080,1080,2); print("social")
+    # 09-social / 10-templates 也逐一对上，防止改名残留（posters 已单独断言）
+    for _dir, _want in (
+        (S, {"og-card_1200x630.png", "og-card-en_1200x630.png", "post_1080x1080.png"}),
+        (os.path.join(WD, "10-templates"), {"release-card_1080x1350.png", "slide-16x9.png"}),
+    ):
+        _have = {f for f in os.listdir(_dir) if not f.startswith(".") and not f.startswith("_")}
+        if _have != _want:
+            raise SystemExit(f"{os.path.basename(_dir)} 内容与预期不符：多余 {sorted(_have-_want)} / 缺失 {sorted(_want-_have)}")
     # merch
     G=os.path.join(WD,"08-merch"); os.makedirs(G,exist_ok=True)
     h=wr("merch.html",merch_sheet()); render.chrome_png(h,os.path.join(G,"merch-sheet.png"),794,1123,2)
