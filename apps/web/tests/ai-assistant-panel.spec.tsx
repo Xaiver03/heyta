@@ -62,6 +62,7 @@ function fakeHost(items: readonly LocalApiItem[] = ITEMS): LocalApiHost & { subm
     listTasks: () => Promise.resolve(items),
     getTask: (taskId: string) => Promise.resolve(items.find((x) => x.id === taskId)),
     listProjects: () => Promise.resolve([{ id: 'p1', name: '工作', taskCount: 1 }]),
+    listFilters: () => Promise.resolve([]),
     listHabits: () => Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
     listTags: () => Promise.resolve([]),
     listNotes: () => Promise.resolve([]),

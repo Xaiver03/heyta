@@ -388,6 +388,25 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return t('web.ai.tools.intentRenameAttachment', { id: intent.attachmentId, fileName: intent.fileName });
     case 'remove-attachment':
       return t('web.ai.tools.intentRemoveAttachment', { id: intent.attachmentId });
+    // 任务模型缺口补齐：清单内分组（SECTION）+ 保存筛选（FILTER）
+    case 'create-section':
+      return t('web.ai.tools.intentCreateSection', { projectId: intent.projectId, name: intent.name });
+    case 'rename-section':
+      return t('web.ai.tools.intentRenameSection', { sectionId: intent.sectionId, name: intent.name });
+    case 'reorder-section':
+      return t('web.ai.tools.intentReorderSection', { sectionId: intent.sectionId });
+    case 'set-task-section':
+      return t('web.ai.tools.intentSetTaskSection', { taskId: intent.taskId });
+    case 'delete-section':
+      return t('web.ai.tools.intentDeleteSection', { sectionId: intent.sectionId });
+    case 'create-filter':
+      return t('web.ai.tools.intentCreateFilter', { name: intent.name });
+    case 'update-filter-rule':
+      return t('web.ai.tools.intentUpdateFilterRule', { filterId: intent.filterId });
+    case 'rename-filter':
+      return t('web.ai.tools.intentRenameFilter', { filterId: intent.filterId, name: intent.name });
+    case 'delete-filter':
+      return t('web.ai.tools.intentDeleteFilter', { filterId: intent.filterId });
   }
 }
 
