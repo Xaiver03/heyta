@@ -50,6 +50,7 @@ import {
   addMonths,
   classifyQuadrant,
   dueLocalDateOf,
+  isoWeek,
   Quadrant,
   startOfMonth,
   startOfWeek,
@@ -813,6 +814,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           }}
           onShiftWeeks={shiftWeek}
           hasContent={hasContentOn}
+          weekLabelFor={(ws) => t('web.calendar.weekShort', { n: isoWeek(ws) })}
         />
       ) : null}
 
