@@ -55,6 +55,11 @@ function fixture(): MaterializedState {
     tagUrgent: { id: 'tagUrgent', name: '急', color: '#f00' },
     tagLater: { id: 'tagLater', name: '以后' },
   });
+  Object.assign(state.sections as object, {
+    sShared: { id: 'sShared', projectId: 'pShared', name: '主卧' },
+    sPersonal: { id: 'sPersonal', projectId: 'pPersonal', name: '私事' },
+    sGone: { id: 'sGone', projectId: 'pShared', name: '已删', deletedAt: 5 },
+  });
   return state;
 }
 
@@ -152,6 +157,50 @@ describe('路由判据：所属清单的 shareId 是否在册', () => {
         payload: { projectId: 'pShared', title: '看牙' },
       }),
     ).toEqual({ blocked: 'project-not-shared' });
+  });
+});
+
+describe('清单内分组（SECTION）同一条路由判据（ADR-0091 §7）', () => {
+  it('共享清单里的分组 ⇒ 解析出那份 share', () => {
+    expect(routeShareIdForEntity(fixture(), 'SECTION', 'sShared')).toEqual({ shareId: SHARED });
+  });
+
+  it('个人清单里的分组 ⇒ blocked=project-not-shared（不是抛错）', () => {
+    expect(routeShareIdForEntity(fixture(), 'SECTION', 'sPersonal')).toEqual({ blocked: 'project-not-shared' });
+  });
+
+  it('已软删的分组 ⇒ entity-not-found（墓碑不算可路由的实体）', () => {
+    expect(routeShareIdForEntity(fixture(), 'SECTION', 'sGone')).toEqual({ blocked: 'entity-not-found' });
+  });
+
+  it('🔴 新建分组：归属从载荷的 projectId 读（实体还不存在，只能问载荷）', () => {
+    expect(
+      routeShareIdForIntent(fixture(), {
+        entityType: 'SECTION',
+        entityId: 'sNew',
+        opType: OpType.Create,
+        payload: { projectId: 'pShared', name: '新分组', order: 0 },
+      }),
+    ).toEqual({ shareId: SHARED });
+  });
+
+  it('新建分组在个人清单里 ⇒ 走个人 log（不是"共享"）', () => {
+    expect(
+      routeShareIdForIntent(fixture(), {
+        entityType: 'SECTION',
+        entityId: 'sNew',
+        opType: OpType.Create,
+        payload: { projectId: 'pPersonal', name: '新分组', order: 0 },
+      }),
+    ).toEqual({ blocked: 'project-not-shared' });
+  });
+
+  it('写侧分流：改共享清单里的分组 ⇒ 进 share，个人侧零调用', async () => {
+    const { calls, dispatch } = harness(fixture());
+    await dispatch({ entityType: 'SECTION', entityId: 'sShared', opType: OpType.Update, payload: { name: '主卧改' } });
+    expect(calls.personal).toHaveLength(0);
+    expect(calls.share).toHaveLength(1);
+    expect(calls.share[0]?.shareId).toBe(SHARED);
   });
 });
 

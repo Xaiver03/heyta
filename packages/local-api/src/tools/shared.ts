@@ -829,7 +829,21 @@ export type LocalApiWriteIntent =
    */
   | { action: 'add-task-comment'; taskId: string; body: string }
   /** 删除一条评论（COMMENT）。软删（`DEL`），可逆 —— 走同一条 share 通道。 */
-  | { action: 'delete-task-comment'; commentId: string };
+  | { action: 'delete-task-comment'; commentId: string }
+  // 清单内分组（SECTION，ADR-0091）：一条意图一条 op。
+  /** 在清单下新建一个分组（SECTION）。`name` 空白/超长由动作层拒绝。 */
+  | { action: 'create-section'; projectId: string; name: string }
+  /** 改分组名（SECTION）。载荷只有 `name`。 */
+  | { action: 'rename-section'; sectionId: string; name: string }
+  /** 调整分组顺序（SECTION）。写 `order`，一个意图一条 op。 */
+  | { action: 'reorder-section'; sectionId: string; order: number }
+  /**
+   * 把任务移进分组 / 移出到未分组（TASK）。`sectionId` 省略 = 移出（写 `null`）。
+   * 分组必须与任务属于同一清单，由动作层拒绝。
+   */
+  | { action: 'set-task-section'; taskId: string; sectionId?: string }
+  /** 软删除一个分组（SECTION，`DEL` 墓碑）。不级联删任务。 */
+  | { action: 'delete-section'; sectionId: string };
 
 /**
  * 一条写入落地的实体类型。
@@ -864,7 +878,8 @@ export type LocalApiWrittenEntityType =
   | 'REMINDER'
   | 'EVENT'
   | 'ATTACHMENT'
-  | 'COMMENT';
+  | 'COMMENT'
+  | 'SECTION';
 
 export type LocalApiWriteResult =
   | {

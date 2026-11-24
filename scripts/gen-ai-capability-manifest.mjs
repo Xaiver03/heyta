@@ -293,6 +293,10 @@ const ENTITY_NOUNS = new Map(
     // 任务附件（ATTACHMENT）：工具名形如 `list_attachments` / `rename_attachment`。
     attachment: 'ATTACHMENT',
     attachments: 'ATTACHMENT',
+    // 清单内分组（ADR-0091）：工具名形如 `list_sections` / `create_section` /
+    // `set_task_section` —— 剥掉前导动词、介词后按从尾往前找名词时命中 `section(s)`。
+    section: 'SECTION',
+    sections: 'SECTION',
     // P4：任务评论（ADR-0062）。工具名形如 `add_task_comment` / `list_task_comments` ——
     // 剥掉前导动词、介词之后按**从尾往前**找名词时命中 `comment(s)`。
     comment: 'COMMENT',

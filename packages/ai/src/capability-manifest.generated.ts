@@ -30,16 +30,17 @@
 export type AiCapabilityEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
-    'COMMENT' | 'ATTACHMENT' | 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' |
-    'MIGRATION' | 'RECOVERY' | 'ALL';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'CALENDAR_EVENT' |
+    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' | 'SECTION' |
+    'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' | 'MIGRATION' | 'RECOVERY' |
+    'ALL';
 
 /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
 export type AiCapabilityModeledEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
-    'COMMENT' | 'ATTACHMENT';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'CALENDAR_EVENT' |
+    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' | 'SECTION';
 
 /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
 export type AiCapabilityToolKind = 'read' | 'write';
@@ -103,9 +104,9 @@ export const AI_CAPABILITY_MANIFEST =
     'source': 'ADR-0045 §2.6 纪律二',
   },
   'coverage': {
-    'covered': 11,
-    'denominator': 11,
-    'ratio': '11/11',
+    'covered': 12,
+    'denominator': 13,
+    'ratio': '12/13',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -117,8 +118,10 @@ export const AI_CAPABILITY_MANIFEST =
     'FOCUS_SESSION',
     'REMINDER',
     'EVENT',
+    'CALENDAR_EVENT',
     'COMMENT',
     'ATTACHMENT',
+    'SECTION',
   ],
   'modelledEntityTypes': [
     'TASK',
@@ -132,9 +135,11 @@ export const AI_CAPABILITY_MANIFEST =
     'PREFERENCE_CORRECTION',
     'REMINDER',
     'EVENT',
+    'CALENDAR_EVENT',
     'ASSISTANT_TURN',
     'COMMENT',
     'ATTACHMENT',
+    'SECTION',
   ],
   'excludedFromDenominator': [
     {
@@ -150,7 +155,9 @@ export const AI_CAPABILITY_MANIFEST =
       'reason': '助手对话的一行记录（ADR-0045 D-4 (ii)）：它是**对话本身**，不是用户可操作的业务实体，而且正文里含 provider 的回复 —— 给 AI 读写它的工具等于让模型改写自己的上下文',
     },
   ],
-  'entityTypesWithoutTools': [] as const,
+  'entityTypesWithoutTools': [
+    'CALENDAR_EVENT',
+  ],
   'entities': [
     {
       'entityType': 'TASK',
@@ -337,6 +344,14 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'entityType': 'CALENDAR_EVENT',
+      'materialized': true,
+      'countsTowardCoverage': true,
+      'coverage': 'none',
+      'readToolNames': [] as const,
+      'writeToolNames': [] as const,
+    },
+    {
       'entityType': 'ASSISTANT_TURN',
       'materialized': true,
       'countsTowardCoverage': false,
@@ -368,6 +383,22 @@ export const AI_CAPABILITY_MANIFEST =
       'writeToolNames': [
         'rename_attachment',
         'remove_attachment',
+      ],
+    },
+    {
+      'entityType': 'SECTION',
+      'materialized': true,
+      'countsTowardCoverage': true,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_sections',
+      ],
+      'writeToolNames': [
+        'create_section',
+        'rename_section',
+        'reorder_section',
+        'set_task_section',
+        'delete_section',
       ],
     },
   ],
@@ -596,6 +627,20 @@ export const AI_CAPABILITY_MANIFEST =
           'name': 'limit',
           'type': 'number',
           'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'list_sections',
+      'kind': 'read',
+      'entityType': 'SECTION',
+      'description': '列出一条清单下的分组（标识、所属清单、名称、排序键、组内任务数），按分组顺序。本宿主没有分组读取能力时，会明确告诉你读不到，而不是给一个空列表。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
         },
       ],
     },
@@ -1890,6 +1935,96 @@ export const AI_CAPABILITY_MANIFEST =
         },
       ],
     },
+    {
+      'name': 'create_section',
+      'kind': 'write',
+      'entityType': 'SECTION',
+      'description': '在一条已有的清单下新建一个分组（清单内二级分块）。名称不能为空；清单不存在会被拒绝。分组只是容器，不会移动任何任务。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'rename_section',
+      'kind': 'write',
+      'entityType': 'SECTION',
+      'description': '给一个分组改名。名称不能为空，也不能只有空格。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'sectionId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'reorder_section',
+      'kind': 'write',
+      'entityType': 'SECTION',
+      'description': '调整一个分组在清单内的顺序：写入它的排序键（非负整数）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'sectionId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'order',
+          'type': 'number',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'set_task_section',
+      'kind': 'write',
+      'entityType': 'SECTION',
+      'description': '把一条任务移进某个分组，或移出分组（省略 sectionId = 未分组）。分组必须与任务属于同一条清单，否则会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'sectionId',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'delete_section',
+      'kind': 'write',
+      'entityType': 'SECTION',
+      'description': '删除一个分组（软删除，可恢复）。其下任务**不会**被删除，会显示在未分组里。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'sectionId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
   ],
   'protocolTypesWithoutModel': [
     'TASK_REPEAT_CFG',
@@ -1914,13 +2049,13 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 11 个，其中 11 个**读和写都有**工具（11/11）。',
+  '覆盖口径：用户可操作的已物化实体 13 个，其中 12 个**读和写都有**工具（12/13）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
-  '一、有 AI 工具的实体（11 个）',
+  '一、有 AI 工具的实体（12 个）',
   '- TASK —— 读和写都有（读 3 / 写 29）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
@@ -2016,9 +2151,16 @@ export const AI_CAPABILITY_TEXT = [
   '  · [读] list_attachments（taskId*:string）',
   '  · [写] rename_attachment（attachmentId*:string, fileName*:string）',
   '  · [写] remove_attachment（attachmentId*:string）',
+  '- SECTION —— 读和写都有（读 1 / 写 5）',
+  '  · [读] list_sections（projectId*:string）',
+  '  · [写] create_section（projectId*:string, name*:string）',
+  '  · [写] rename_section（sectionId*:string, name*:string）',
+  '  · [写] reorder_section（sectionId*:string, order*:number）',
+  '  · [写] set_task_section（taskId*:string, sectionId:string）',
+  '  · [写] delete_section（sectionId*:string）',
   '',
-  '二、产品里有、但我没有任何工具的实体（0 个）—— 实体存在，只是我没配工具',
-  '- （无）',
+  '二、产品里有、但我没有任何工具的实体（1 个）—— 实体存在，只是我没配工具',
+  '- CALENDAR_EVENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '',
   '三、不计入上面分母的已物化实体（设计如此，不是遗漏）',
   '- AI_FEEDBACK：AI 建议处置的落库载体（用户不直接创建它）',

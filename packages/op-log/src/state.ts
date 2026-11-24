@@ -34,6 +34,7 @@ import type {
   Note,
   Project,
   Reminder,
+  Section,
   Tag,
   Task,
 } from '@heyta/domain';
@@ -123,6 +124,13 @@ export interface MaterializedState {
    * 都重传这张图，并把 `payloadBytes` / 单条 op 上限全撑变形。
    */
   attachments: Record<string, Attachment>;
+  /**
+   * 清单内分组（ADR-0091）。用户自建的分组实体，一层归属到清单。
+   *
+   * ⚠️ 进本桶的同一批必须同时加进 `BUCKET_BY_ENTITY`（否则 `overwritten`
+   * 判定恒 false，冲突覆盖静默不生效 —— 见该常量上方的警告），两处缺一不可。
+   */
+  sections: Record<string, Section>;
 }
 
 export function emptyState(): MaterializedState {
@@ -142,6 +150,7 @@ export function emptyState(): MaterializedState {
     assistantTurns: {},
     comments: {},
     attachments: {},
+    sections: {},
   };
 }
 
@@ -162,6 +171,7 @@ const BUCKET_BY_ENTITY = {
   ASSISTANT_TURN: 'assistantTurns',
   COMMENT: 'comments',
   ATTACHMENT: 'attachments',
+  SECTION: 'sections',
 } as const;
 
 type ModeledEntity = keyof typeof BUCKET_BY_ENTITY;

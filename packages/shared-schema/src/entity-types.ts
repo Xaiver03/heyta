@@ -165,6 +165,24 @@ export const ENTITY_TYPES = [
    */
   'CALENDAR_EVENT',
 
+  // ── 清单内分组（用户自建，ADR-0091） ────────────────────────
+  /**
+   * 清单内的**分组**（清单内二级分块；ADR-0091）。
+   *
+   * 🔴 它是**用户数据**，不是视图：用户给分组起名、排序、往里放任务，推不出来。
+   * 一层归属到清单（`SECTION.projectId`），不嵌套；`Task.sectionId?` 指向它，
+   * 缺席 = 未分组。删除走 `deletedAt` 软删，任务一条不丢（悬空的 `sectionId`
+   * 读侧归「未分组」）。
+   *
+   * ⚠️ 可加性变更，**不 bump `CURRENT_SCHEMA_VERSION`**（ADR-0014 §3.2 同一条）：
+   * 老客户端读到 `SECTION` 的 op 会当未知实体优雅跳过，不会卡住同步。
+   * 🔴 但**服务端必须先于客户端上线** —— 老服务端的白名单（从本数组派生）里
+   * 没有它，会把该 op 判成 `INVALID_ENTITY_TYPE` 永久拒绝（ADR-0091 §4.3）。
+   * ⚠️ 进 `EntityModelMap` 的同一批要处理 `check:ai-coverage` 的分母 +1
+   * （同批补 `list_sections` / `create_section` 等读写工具）。
+   */
+  'SECTION',
+
   // ── 系统（同步基础设施，不可删） ───────────────────────────
   'GLOBAL_CONFIG',
   'MIGRATION',

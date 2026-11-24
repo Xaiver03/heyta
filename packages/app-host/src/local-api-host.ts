@@ -47,6 +47,7 @@ import type {
   LocalApiNoteRow,
   LocalApiProject,
   LocalApiReminder,
+  LocalApiSection,
   LocalApiTag,
   LocalApiTaskEstimateContext,
   LocalApiWriteIntent,
@@ -70,6 +71,7 @@ import {
   nextEventOccurrence,
   localDateTimeToEpoch,
   dueLocalDateOf,
+  groupTasksBySection,
   localTimeOf,
   toLocalDate,
   noteProjectId,
@@ -111,6 +113,7 @@ import { createEventActions, type EventActions } from './event-actions.js';
 import { createAttachmentActions, type AttachmentActions } from './attachment-actions.js';
 import type { AttachmentBlobPort } from './attachment-http.js';
 import { ListNotSharedError, type CommentActions } from './comment-actions.js';
+import { createSectionActions, type SectionActions } from './section-actions.js';
 import { readDurationFromNote } from './duration-note.js';
 import { selectDurationHistory } from './ai-duration.js';
 
@@ -530,6 +533,7 @@ export function createLocalApiHost(
   // 各自漂移"就是这么长出来的）。内部构造 ⇒ 三个宿主（Web / node-host CLI / MCP stdio）
   // 接到的行为逐字相同，且 op 的构造仍然只在各 `*-actions.ts` 里有一份。
   const projectActions = createProjectActions(ctx);
+  const sectionActions = createSectionActions(ctx);
   const habitActions = createHabitActions(ctx);
   const noteActions = createNoteActions(ctx);
   const focusActions = createFocusActions(ctx);
@@ -645,6 +649,31 @@ export function createLocalApiHost(
       return Promise.resolve(projects);
     },
 
+    // 清单内分组（SECTION，ADR-0091）：顺序与归组都在领域层
+    // （`groupTasksBySection` 已经排过、并把悬空 / 已删的 `sectionId` 归到"未分组"），
+    // 这里只把归组结果投影成出境的五格。`taskCount` 取自动作层的活任务表，
+    // 不读原始 `state.tasks`（"什么算一条活任务"只该有一个判据）。
+    listSections: (projectId) => {
+      const groups = groupTasksBySection(
+        actions.listTasks(),
+        Object.values(ctx.getState().sections),
+        projectId,
+      );
+      const rows: LocalApiSection[] = [];
+      for (const group of groups) {
+        const section = group.section;
+        if (section === undefined) continue; // 未分组那一组不出口
+        rows.push({
+          id: section.id,
+          projectId,
+          name: section.name,
+          ...(section.order === undefined ? {} : { order: section.order }),
+          taskCount: group.tasks.length,
+        });
+      }
+      return Promise.resolve(rows);
+    },
+
     // 顺序与 `listTasks()` 同一条规则（`habit-actions.ts` 的 `listHabits` 已经排过），
     // 所以"AI 看到的第 N 个习惯"与界面上的第 N 个是同一个 —— 不是实现细节，
     // 是跨端一致的那条（见 `actions.ts` 的 `byCanonicalOrder`）。
@@ -728,6 +757,7 @@ export function createLocalApiHost(
         eventActions,
         attachmentActions,
         commentActions,
+        sectionActions,
         now,
         intent,
       ),
@@ -783,6 +813,7 @@ async function submitIntent(
   eventActions: EventActions,
   attachmentActions: AttachmentActions,
   commentActions: CommentActions | undefined,
+  sectionActions: SectionActions,
   now: () => number,
   intent: LocalApiWriteIntent,
 ): Promise<LocalApiWriteResult> {
@@ -2291,6 +2322,58 @@ async function submitIntent(
           reason: 'invalid',
           message: e instanceof Error && e.message !== '' ? e.message : '这条评论无法删除。',
         };
+      }
+    }
+
+    // ── 清单内分组（SECTION，ADR-0091）：一条意图一条 op ──
+    //
+    // 🔴 语义（排序 / 悬空归未分组 / 标题上限 / 归属校验）全在 `section-actions.ts`
+    // 与 `@heyta/domain` 的 `sections.ts`；这里只把抛出来的错翻成一句用户看得懂的话，
+    // 并按落地实体如实回 `entityType`（分组写 SECTION，任务归组写 TASK）。
+    case 'create-section': {
+      try {
+        const id = await sectionActions.createSection(intent.projectId, intent.name);
+        return { ok: true, taskId: id, entityId: id, entityType: 'SECTION' };
+      } catch (e) {
+        const message = e instanceof Error && e.message !== '' ? e.message : '这个分组无法新建。';
+        return { ok: false, reason: message.includes('找不到') ? 'not-found' : 'invalid', message };
+      }
+    }
+    case 'rename-section': {
+      try {
+        await sectionActions.renameSection(intent.sectionId, intent.name);
+        return { ok: true, taskId: intent.sectionId, entityId: intent.sectionId, entityType: 'SECTION' };
+      } catch (e) {
+        const message = e instanceof Error && e.message !== '' ? e.message : '这个分组无法改名。';
+        return { ok: false, reason: message.includes('找不到') ? 'not-found' : 'invalid', message };
+      }
+    }
+    case 'reorder-section': {
+      try {
+        await sectionActions.reorderSection(intent.sectionId, intent.order);
+        return { ok: true, taskId: intent.sectionId, entityId: intent.sectionId, entityType: 'SECTION' };
+      } catch (e) {
+        const message = e instanceof Error && e.message !== '' ? e.message : '这个分组无法调序。';
+        return { ok: false, reason: message.includes('找不到') ? 'not-found' : 'invalid', message };
+      }
+    }
+    case 'set-task-section': {
+      try {
+        await sectionActions.setTaskSection(intent.taskId, intent.sectionId);
+        // 落地的是**任务**（改的是它的 `sectionId`），不是分组实体。
+        return { ok: true, taskId: intent.taskId };
+      } catch (e) {
+        const message = e instanceof Error && e.message !== '' ? e.message : '这条任务无法移动分组。';
+        return { ok: false, reason: message.includes('找不到') ? 'not-found' : 'invalid', message };
+      }
+    }
+    case 'delete-section': {
+      try {
+        await sectionActions.removeSection(intent.sectionId);
+        return { ok: true, taskId: intent.sectionId, entityId: intent.sectionId, entityType: 'SECTION' };
+      } catch (e) {
+        const message = e instanceof Error && e.message !== '' ? e.message : '这个分组无法删除。';
+        return { ok: false, reason: message.includes('找不到') ? 'not-found' : 'invalid', message };
       }
     }
   }

@@ -121,4 +121,12 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   list_task_comments: { taskId: 't1' },
   add_task_comment: { taskId: 't1', body: '好的' },
   delete_task_comment: { commentId: 'c1' },
+
+  // ADR-0091：清单内分组（SECTION）
+  list_sections: { projectId: 'p1' },
+  create_section: { projectId: 'p1', name: '新手入门' },
+  rename_section: { sectionId: 'sec-1', name: '功能模块' },
+  reorder_section: { sectionId: 'sec-1', order: 1 },
+  set_task_section: { taskId: 't1', sectionId: 'sec-1' },
+  delete_section: { sectionId: 'sec-1' },
 };

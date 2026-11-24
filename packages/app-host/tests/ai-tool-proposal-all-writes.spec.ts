@@ -728,6 +728,63 @@ const CASES: readonly Case[] = [
     },
     effect: () => Object.values(engine.getState().tasks).filter((t) => (t.checklist ?? []).some((x) => x.done)).length,
   },
+
+  // ── 清单内分组 SECTION（ADR-0091）：读一 + 写五，这里登记全部写工具 ──
+  {
+    tool: 'create_section',
+    intentAction: 'create-section',
+    label: '分组',
+    args: async () => ({
+      projectId: await seed({ action: 'create-project', name: '分组清单' }),
+      name: '新手入门',
+    }),
+    effect: () => Object.values(engine.getState().sections).filter((s) => s.deletedAt === undefined).length,
+  },
+  {
+    tool: 'rename_section',
+    intentAction: 'rename-section',
+    label: '分组改名',
+    args: async () => {
+      const projectId = await seed({ action: 'create-project', name: '改名清单' });
+      const sectionId = await seed({ action: 'create-section', projectId, name: '旧组名' });
+      return { sectionId, name: '改过的组名' };
+    },
+    effect: () => Object.values(engine.getState().sections).filter((s) => s.name === '改过的组名').length,
+  },
+  {
+    tool: 'reorder_section',
+    intentAction: 'reorder-section',
+    label: '分组排序',
+    args: async () => {
+      const projectId = await seed({ action: 'create-project', name: '排序清单' });
+      const sectionId = await seed({ action: 'create-section', projectId, name: '待排序组' });
+      return { sectionId, order: 7 };
+    },
+    effect: () => Object.values(engine.getState().sections).filter((s) => s.order === 7).length,
+  },
+  {
+    tool: 'set_task_section',
+    intentAction: 'set-task-section',
+    label: '任务归组',
+    args: async () => {
+      const projectId = await seed({ action: 'create-project', name: '归组清单' });
+      const sectionId = await seed({ action: 'create-section', projectId, name: '目标组' });
+      const taskId = await seed({ action: 'create-task', title: '要归组的任务', projectId });
+      return { taskId, sectionId };
+    },
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.sectionId !== undefined).length,
+  },
+  {
+    tool: 'delete_section',
+    intentAction: 'delete-section',
+    label: '分组删除（软删）',
+    args: async () => {
+      const projectId = await seed({ action: 'create-project', name: '删组清单' });
+      const sectionId = await seed({ action: 'create-section', projectId, name: '要删的组' });
+      return { sectionId };
+    },
+    effect: () => Object.values(engine.getState().sections).filter((s) => s.deletedAt !== undefined).length,
+  },
 ];
 
 beforeEach(async () => {

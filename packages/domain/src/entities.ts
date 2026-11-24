@@ -286,6 +286,18 @@ export interface Task extends EntityBase {
   /** 所属清单。未归类时为 undefined（收集箱）。 */
   projectId?: string;
   /**
+   * 所属**分组**（清单内的二级分块，ADR-0091）。缺席 = 未分组。
+   *
+   * 🔴 可选字段（AGENTS.md §3.3）：老数据没有它，hydration 不得炸。
+   * 读侧一律走 `packages/domain/src/sections.ts` 的 `resolveTaskSectionId()` ——
+   * 指向已删除 / 不存在 / 属于别的清单的分组时归「未分组」，不要各端自己写一遍
+   * 那个判据（否则"删了分组之后任务去哪"会有第二份答案）。
+   *
+   * 把任务移出分组 = 写 `null`（`section-actions.ts` 的 `setTaskSection`）——
+   * `null` 才能穿过 JSON 表达"清除"，`undefined` 会被 `JSON.stringify` 丢掉。
+   */
+  sectionId?: string;
+  /**
    * 父任务 ID（**子任务**）。
    *
    * 🔴 **这是可选字段，不是 schema bump**（AGENTS.md §3.3、见 B1-3）。
@@ -1233,6 +1245,32 @@ export interface Attachment extends EntityBase {
 }
 
 /**
+ * 清单内的**分组**（二级分块；ADR-0091）。
+ *
+ * 一层归属到 `Project`（`projectId` 是实体身份的一部分，必填）；**不嵌套**
+ * （分组不能再套分组 —— 与「文件夹只一层」「标签只一层」同一条产品纪律）。
+ *
+ * `Task.sectionId` 指向它；一个分组可以**没有任务**（空分组可存在，
+ * 标题 + 计数 0 与滴答一致），因此它必须是独立实体而不是任务上的字符串
+ * （字符串方案里"组内 0 条任务"意味着这个分组根本不存在）。
+ *
+ * 删除走 `deletedAt` 软删（ADR-0048 四态）：**不级联删任务**，其下任务保留
+ * 原 `sectionId`；读侧把悬空 / 已删除的 `sectionId` 一律归「未分组」。
+ * 还原 = 清 `deletedAt`，任务自动回到原组。
+ */
+export interface Section extends EntityBase {
+  /** 归属清单，实体身份的一部分（同 `Reminder.taskId`），必填。 */
+  projectId: string;
+  /** 分组标题，必填（没有标题就不是一个分组）。 */
+  name: string;
+  /**
+   * 分组在清单内的排序键。可选 + 运行时默认（按 `createdAt` 兜底，见
+   * `sections.ts` 的 `bySectionOrder`）—— AGENTS.md §3.3。
+   */
+  order?: number;
+}
+
+/**
  * 实体类型 → 领域模型 的映射。
  * 用于 op-log 的 apply 阶段做类型收窄。
  */
@@ -1252,6 +1290,7 @@ export interface EntityModelMap {
   CALENDAR_EVENT: CalendarEvent;
   ASSISTANT_TURN: AssistantTurn;
   ATTACHMENT: Attachment;
+  SECTION: Section;
 }
 
 export type ModeledEntityType = keyof EntityModelMap;
@@ -1284,6 +1323,7 @@ export const MODELED_ENTITY_TYPES = [
   'ASSISTANT_TURN',
   'COMMENT',
   'ATTACHMENT',
+  'SECTION',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */

@@ -62,6 +62,23 @@ export interface LocalApiProject {
 }
 
 /**
+ * 清单内分组（SECTION，ADR-0091）。
+ *
+ * 与 `LocalApiProject` 同一类：**名字不是敏感正文**，所以没有 `readable` 这一层。
+ * 字段刻意少：`id` / `projectId` / `name` / `order` / `taskCount`。
+ * `deletedAt` 等四态字段不进工具出境面（存活分组才列）。
+ */
+export interface LocalApiSection {
+  id: string;
+  projectId: string;
+  name: string;
+  /** 排序键；老数据可能没有（此时不出现）。 */
+  order?: number;
+  /** 该分组内的任务数（宿主按领域归组算）。 */
+  taskCount: number;
+}
+
+/**
  * 习惯定义。与 `LocalApiProject` 同一类：**名字不是敏感正文**，所以没有
  * `readable` 这一层（受保护的是任务的备注正文，不是"某人有个习惯叫 X"）。
  *
@@ -278,6 +295,15 @@ export interface LocalApiHost {
   getTaskEstimateContext?: (taskId: string) => Promise<LocalApiTaskEstimateContext | undefined>;
   /** 列清单。 */
   listProjects(): Promise<readonly LocalApiProject[]>;
+  /**
+   * 列某条清单下的分组（SECTION，ADR-0091）。
+   *
+   * ⚠️ **可选成员**：与 `listAttachments?` 同一条理由 —— 本机所有真实宿主都经
+   * `createLocalApiHost()`（它恒提供这个方法），把它做成必填会把几十处测试假宿主
+   * 一起逼着改，而那些假宿主根本不驱动分组工具。工具包对"没接"的宿主明确报一句
+   * 能力缺失（不静默返回空列表），所以"这个宿主忘了接"仍会响亮失败。
+   */
+  listSections?(projectId: string): Promise<readonly LocalApiSection[]>;
   /**
    * 列习惯（**定义**，不含打卡记录）。
    *

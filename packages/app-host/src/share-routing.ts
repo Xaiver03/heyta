@@ -98,6 +98,10 @@ function owningProjectId(state: MaterializedState, entityType: string, entityId:
       const task = state.tasks[(comment as { taskId?: string }).taskId ?? ''];
       return live(task) ? task.projectId : undefined;
     }
+    case 'SECTION': {
+      const section = state.sections[entityId];
+      return live(section) ? section.projectId : undefined;
+    }
     default:
       return undefined;
   }
@@ -112,7 +116,7 @@ function owningProjectId(state: MaterializedState, entityType: string, entityId:
  * 也没有 `TAG`：它没有清单归属（0067 补一），只能靠"发布"那条形进 share log。
  */
 function isRoutableKind(entityType: string): boolean {
-  return entityType === 'TASK' || entityType === 'NOTE' || entityType === 'COMMENT';
+  return entityType === 'TASK' || entityType === 'NOTE' || entityType === 'COMMENT' || entityType === 'SECTION';
 }
 
 /**
@@ -144,7 +148,9 @@ export function routeShareIdForEntity(state: MaterializedState, entityType: stri
     const exists = entityType === 'TASK' ? live(state.tasks[entityId])
       : entityType === 'NOTE'
         ? live(state.notes[entityId])
-        : live(state.comments[entityId]);
+        : entityType === 'SECTION'
+          ? live(state.sections[entityId])
+          : live(state.comments[entityId]);
     return { blocked: exists ? 'has-no-project' : 'entity-not-found' };
   }
   if (!live(state.projects[projectId])) return { blocked: 'project-not-found' };
@@ -176,7 +182,9 @@ function declaredProjectId(state: MaterializedState, intent: OpIntent): string |
     const task = state.tasks[taskId];
     return live(task) ? task.projectId : undefined;
   }
-  if (intent.entityType !== 'TASK' && intent.entityType !== 'NOTE') return undefined;
+  if (intent.entityType !== 'TASK' && intent.entityType !== 'NOTE' && intent.entityType !== 'SECTION') {
+    return undefined;
+  }
   const projectId = payload['projectId'];
   return typeof projectId === 'string' && projectId.trim() !== '' ? projectId : undefined;
 }
