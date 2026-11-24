@@ -139,6 +139,7 @@ export {
   type LocalApiNoteRow,
   type LocalApiProject,
   type LocalApiReminder,
+  type LocalApiSection,
   type LocalApiTag,
   type LocalApiTaskEstimateContext,
 

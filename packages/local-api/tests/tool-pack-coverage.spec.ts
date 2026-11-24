@@ -103,6 +103,9 @@ function host(): LocalApiHost {
     listTaskComments: (taskId: string) =>
       Promise.resolve([{ id: 'c1', taskId, authorUserId: 'u1', body: '好的', createdAt: 1 }]),
 
+    listSections: (projectId: string) =>
+      Promise.resolve([{ id: 'sec-1', projectId, name: '新手入门', order: 0, taskCount: 1 }]),
+
     submit: (): Promise<LocalApiWriteResult> => Promise.resolve({ ok: true, taskId: 'created-1' }),
   };
 }

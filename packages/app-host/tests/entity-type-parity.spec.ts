@@ -41,6 +41,7 @@ const WRITABLE: Record<LocalApiWrittenEntityType, true> = {
   ATTACHMENT: true,
   COMMENT: true,
   FILTER: true,
+  SECTION: true,
 };
 
 type KnownEntity = (typeof ENTITY_TYPES)[number];

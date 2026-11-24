@@ -32,6 +32,7 @@ export * from './reminders.js';
 export * from './timeline.js';
 export * from './timeline-position.js';
 export * from './notes.js';
+export * from './sections.js';
 export * from './trash-rows.js';
 
 export * from './events.js';
