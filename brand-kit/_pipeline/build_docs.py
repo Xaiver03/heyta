@@ -28,7 +28,7 @@ def poster1():
       <div style="position:absolute;left:24mm;top:22mm"><img src="{WM_W}" style="height:24mm"></div>
       <div style="position:absolute;left:24mm;top:120mm;right:24mm">
         <div style="font-size:13px;letter-spacing:6px;color:#bfdbfe">{RC.t("landing.hero.eyebrow")}</div>
-        <h1 style="font-size:66pt;font-weight:800;line-height:1.18;margin-top:12mm;letter-spacing:-1px">今天该做什么，<br>一眼看见</h1>
+        <h1 style="font-size:66pt;font-weight:800;line-height:1.18;margin-top:12mm;letter-spacing:-1px">{RC.hero()["lead"]}<br>{RC.hero()["emphasis"]}</h1>
         <p style="margin-top:12mm;font-size:16pt;line-height:1.9;color:#dbeafe;max-width:210mm">数据先落本地，端到端加密同步为可选通道。<br>清楚知道任务在哪里、下一步做什么、做完如何回来。</p>
       </div>
       <div style="position:absolute;left:24mm;right:24mm;bottom:16mm;display:flex;justify-content:space-between;font-size:10px;letter-spacing:2px;color:#93c5fd"><span>heyta · 2026</span><span>清晰 · 克制 · 可靠</span><span>hey.</span></div>
@@ -73,7 +73,7 @@ def brochure_front():
     b=f'''<div class="page">
       <div class="panel" style="background:radial-gradient(120% 90% at 30% 110%,#1e40af,#2563eb 55%,#0f172a);color:#fff">
         <img src="{WM_W}" style="height:16mm">
-        <h1 style="position:absolute;left:10mm;right:10mm;top:80mm;font-size:30pt;font-weight:800;line-height:1.28;letter-spacing:-.5px">今天该做什么，<br>一眼看见</h1>
+        <h1 style="position:absolute;left:10mm;right:10mm;top:80mm;font-size:30pt;font-weight:800;line-height:1.28;letter-spacing:-.5px">{RC.tagline_html()}</h1>
         <p style="position:absolute;left:10mm;right:10mm;top:150mm;font-size:10.5pt;color:#dbeafe;line-height:1.9">本地优先、可自托管的任务管理应用</p>
         <div style="position:absolute;left:10mm;bottom:12mm"><img src="{WM_W}" style="height:11mm"></div>
         <div class="fold" style="left:99mm"></div><div class="fold" style="left:198mm"></div>
@@ -130,7 +130,7 @@ def manual():
     pages.append(f'''<div class="page" style="background:radial-gradient(120% 90% at 80% 0%,#1e40af,#2563eb 55%,#0f172a);color:#fff">
       <img src="{WM_W}" style="position:absolute;left:18mm;top:24mm;height:22mm">
       <div style="position:absolute;left:18mm;top:110mm;right:18mm"><div style="font-size:11px;letter-spacing:5px;color:#bfdbfe">PRODUCT MANUAL · 产品手册</div>
-      <h1 style="font-size:44pt;font-weight:800;margin-top:8mm;letter-spacing:-1px">今天该做什么，一眼看见</h1>
+      <h1 style="font-size:44pt;font-weight:800;margin-top:8mm;letter-spacing:-1px">{RC.tagline_html()}</h1>
       <p style="margin-top:8mm;font-size:12pt;color:#dbeafe;line-height:1.9">heyta 产品手册 · 2026</p></div>
       <div style="position:absolute;left:18mm;right:18mm;bottom:16mm;display:flex;justify-content:space-between;font-size:9px;color:#93c5fd"><span>heyta</span><span>hey.</span></div></div>''')
     toc=["产品定位","设计原则","功能总览","数据与隐私","跨端使用","上手与迁移","常见问题"]
@@ -151,7 +151,7 @@ def manual():
     faq=[("数据在哪？","默认在本地；开启同步后才会上传。"),("必须登录吗？","不。本地使用不需要账号。"),("加密是默认的吗？","不是。默认服务端可读，可显式开启 E2EE。"),("能自托管吗？","可以，自行部署服务器即可。")]
     fq="".join(f'<div style="padding:7mm 0;border-bottom:1px solid {BD}"><div style="font-size:12.5pt;font-weight:700">{q}</div><div style="font-size:11px;color:{SL};margin-top:2mm;line-height:1.8">{a}</div></div>' for q,a in faq)
     pages.append(f'<div class="page">{ph("常见问题")}<div style="position:absolute;left:18mm;right:18mm;top:46mm"><div style="font-size:10px;letter-spacing:4px;color:{BLUE}">FAQ</div><h2 style="font-size:28pt;font-weight:800;margin-top:6mm">常见问题</h2><div style="margin-top:8mm">{fq}</div></div>{pf("常见问题")}</div>')
-    pages.append(f'''<div class="page" style="background:radial-gradient(120% 90% at 80% 0%,#1e40af,#2563eb 55%,#0f172a);color:#fff"><img src="{WM_W}" style="position:absolute;left:18mm;top:24mm;height:20mm"><div style="position:absolute;left:18mm;right:18mm;top:120mm"><h1 style="font-size:30pt;font-weight:800;line-height:1.3">今天该做什么，一眼看见</h1><p style="margin-top:8mm;font-size:11pt;color:#dbeafe;line-height:2">heyta · 本地优先任务管理 · 2026</p></div><div style="position:absolute;left:18mm;right:18mm;bottom:16mm;display:flex;justify-content:space-between;font-size:9px;color:#93c5fd"><span>PRODUCT MANUAL</span><span>hey.</span></div></div>''')
+    pages.append(f'''<div class="page" style="background:radial-gradient(120% 90% at 80% 0%,#1e40af,#2563eb 55%,#0f172a);color:#fff"><img src="{WM_W}" style="position:absolute;left:18mm;top:24mm;height:20mm"><div style="position:absolute;left:18mm;right:18mm;top:120mm"><h1 style="font-size:30pt;font-weight:800;line-height:1.3">{RC.tagline_html()}</h1><p style="margin-top:8mm;font-size:11pt;color:#dbeafe;line-height:2">heyta · 本地优先任务管理 · 2026</p></div><div style="position:absolute;left:18mm;right:18mm;bottom:16mm;display:flex;justify-content:space-between;font-size:9px;color:#93c5fd"><span>PRODUCT MANUAL</span><span>hey.</span></div></div>''')
     return doc("".join(pages),A4)
 
 # ---------------- 09 social ----------------

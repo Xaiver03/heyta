@@ -2,7 +2,9 @@
 """heyta 品牌 token -> 00-brand-foundation/brand-tokens.json + brand-tokens.css
 色值全部取自 packages/design-system/src/tokens.css（主蓝 blue-600 #2563eb）。
 """
-import json, os
+import json, os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import read_copy as RC
 WD=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # brand-kit
 OUT=os.path.join(WD,"00-brand-foundation")
 os.makedirs(OUT,exist_ok=True)
@@ -11,7 +13,7 @@ T = {
   "brand": "heyta",
   "wordmark": "hey.",
   "product": "本地优先、可自托管的任务管理应用",
-  "tagline": {"zh":"今天该做什么，一眼看见。", "en":"See what to do today, at a glance."},
+  "tagline": {"zh": RC.tagline_html("zh") + "。", "en": RC.tagline_html("en")},
   "personality": ["清晰","克制","可靠"],
   "colors": {
     "blue": {"50":"#eff6ff","100":"#dbeafe","200":"#bfdbfe","300":"#93c5fd","400":"#60a5fa",

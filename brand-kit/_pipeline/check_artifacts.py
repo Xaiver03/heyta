@@ -272,6 +272,7 @@ FORBIDDEN_COPY = [
     "今天的任务，" + "一条条",
     "LOCAL-FIRST TASK" + " MANAGER",
     "WHY " + "HEYTA",
+    "今天该做什么，" + "一眼看见",   # 必须由 RC.tagline_html() 拼，不许写死
 ]
 hits = []
 for root, _d, files in os.walk(os.path.join(WD, "_pipeline")):
