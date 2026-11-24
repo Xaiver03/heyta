@@ -84,7 +84,8 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
         today: { backgroundColor: t['color.primary'] },
         selected: { backgroundColor: t['color.primary-subtle'] },
         weekNum: {
-          width: t['space.12'],
+          width: t['space.16'],
+          flexShrink: 0,
           alignItems: 'center',
           paddingTop: t['space.1'],
         },
