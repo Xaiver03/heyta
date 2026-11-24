@@ -19,6 +19,7 @@
 |---|---|
 | 代码 → VI（色） | `_pipeline/read_tokens.py` → `build_badges_v2.py` / `build_brandbook.py` / `build_docs.py` |
 | 代码 → VI（文案） | `_pipeline/read_copy.py` 从 `packages/i18n` 读标语，脚本内不手写 |
+| 代码 → VI（几何） | `_pipeline/build_logo.py` 从 `BrandMark.tsx` 与 `brand-mark.ts` 正则抽取字标路径与「h」矩形，取不到即报错 |
 | VI → 设计系统 | 新增 `color.milestone-{checkin,focus,tasks,days}`（亮/暗各一份）进 `tokens.css` + `TOKEN_GROUPS` |
 | 设计系统 → 代码 | `packages/ui/src/motivation/MilestoneMap.tsx` 消费四维色（维度圆点 + 已达成档位描边） |
 | 守住不回退 | `packages/design-system/tests/milestone-colors.spec.ts`（对比度 / ΔE / 色盲 / 暗色覆盖） |
