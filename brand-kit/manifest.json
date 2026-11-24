@@ -1,0 +1,668 @@
+{
+  "brand": "heyta",
+  "generated_at": "2026-11-24 12:24:59",
+  "dirs": {
+    "00-brand-foundation": 11,
+    "01-logo": 21,
+    "02-badges": 71,
+    "03-icons": 28,
+    "04-imagery": 9,
+    "05-posters": 6,
+    "06-brochure": 4,
+    "07-product-manual": 2,
+    "08-merch": 2,
+    "09-social": 2,
+    "10-templates": 2
+  },
+  "count": 162,
+  "files": [
+    {
+      "path": "index.html",
+      "size": 4609
+    },
+    {
+      "path": "成就与成长体系_产品清单.md",
+      "size": 12724
+    },
+    {
+      "path": "README.md",
+      "size": 3192
+    },
+    {
+      "path": "manifest.json",
+      "size": 9495
+    },
+    {
+      "path": "02-badges/badge-catalogue.png",
+      "size": 496056
+    },
+    {
+      "path": "02-badges/badge-catalogue.pdf",
+      "size": 762596
+    },
+    {
+      "path": "02-badges/README-待重建.md",
+      "size": 702
+    },
+    {
+      "path": "02-badges/badge-catalogue.html",
+      "size": 6436
+    },
+    {
+      "path": "02-badges/_preview/page-1.png",
+      "size": 496056
+    },
+    {
+      "path": "02-badges/identity/started.png",
+      "size": 11947
+    },
+    {
+      "path": "02-badges/identity/deep-fifty.svg",
+      "size": 848
+    },
+    {
+      "path": "02-badges/identity/streak-thirty.png",
+      "size": 15545
+    },
+    {
+      "path": "02-badges/identity/_wrap_checkin-hundred.png.html",
+      "size": 313
+    },
+    {
+      "path": "02-badges/identity/steady.svg",
+      "size": 831
+    },
+    {
+      "path": "02-badges/identity/_wrap_finisher-five-hundred.png.html",
+      "size": 319
+    },
+    {
+      "path": "02-badges/identity/steady.png",
+      "size": 13798
+    },
+    {
+      "path": "02-badges/identity/_wrap_routine.png.html",
+      "size": 305
+    },
+    {
+      "path": "02-badges/identity/_wrap_streak-thirty.png.html",
+      "size": 311
+    },
+    {
+      "path": "02-badges/identity/_wrap_deep-two-hundred.png.html",
+      "size": 314
+    },
+    {
+      "path": "02-badges/identity/streak-thirty.svg",
+      "size": 848
+    },
+    {
+      "path": "02-badges/identity/deep-fifty.png",
+      "size": 16278
+    },
+    {
+      "path": "02-badges/identity/started.svg",
+      "size": 835
+    },
+    {
+      "path": "02-badges/identity/_wrap_deep-fifty.png.html",
+      "size": 308
+    },
+    {
+      "path": "02-badges/identity/_wrap_steady.png.html",
+      "size": 304
+    },
+    {
+      "path": "02-badges/identity/routine.png",
+      "size": 13744
+    },
+    {
+      "path": "02-badges/identity/deep-two-hundred.svg",
+      "size": 849
+    },
+    {
+      "path": "02-badges/identity/finisher-five-hundred.png",
+      "size": 16044
+    },
+    {
+      "path": "02-badges/identity/checkin-hundred.svg",
+      "size": 843
+    },
+    {
+      "path": "02-badges/identity/checkin-hundred.png",
+      "size": 14632
+    },
+    {
+      "path": "02-badges/identity/finisher-five-hundred.svg",
+      "size": 849
+    },
+    {
+      "path": "02-badges/identity/_wrap_started.png.html",
+      "size": 305
+    },
+    {
+      "path": "02-badges/identity/deep-two-hundred.png",
+      "size": 17160
+    },
+    {
+      "path": "02-badges/identity/routine.svg",
+      "size": 836
+    },
+    {
+      "path": "02-badges/category/分类色卡.png",
+      "size": 65625
+    },
+    {
+      "path": "02-badges/category/_cards.html",
+      "size": 2561
+    },
+    {
+      "path": "02-badges/status/doing.svg",
+      "size": 420
+    },
+    {
+      "path": "02-badges/status/todo.svg",
+      "size": 417
+    },
+    {
+      "path": "02-badges/status/archived.svg",
+      "size": 420
+    },
+    {
+      "path": "02-badges/status/high.svg",
+      "size": 423
+    },
+    {
+      "path": "02-badges/status/overdue.svg",
+      "size": 420
+    },
+    {
+      "path": "02-badges/status/done.svg",
+      "size": 420
+    },
+    {
+      "path": "02-badges/milestones/activeDays-365.png",
+      "size": 19433
+    },
+    {
+      "path": "02-badges/milestones/activeDays-100.svg",
+      "size": 978
+    },
+    {
+      "path": "02-badges/milestones/checkIns-10.svg",
+      "size": 1015
+    },
+    {
+      "path": "02-badges/milestones/focusHours-200.svg",
+      "size": 950
+    },
+    {
+      "path": "02-badges/milestones/focusHours-10.png",
+      "size": 19876
+    },
+    {
+      "path": "02-badges/milestones/checkIns-1000.png",
+      "size": 20758
+    },
+    {
+      "path": "02-badges/milestones/tasks-5000.png",
+      "size": 20736
+    },
+    {
+      "path": "02-badges/milestones/checkIns-200.png",
+      "size": 20503
+    },
+    {
+      "path": "02-badges/milestones/tasks-50.png",
+      "size": 19108
+    },
+    {
+      "path": "02-badges/milestones/checkIns-500.svg",
+      "size": 1017
+    },
+    {
+      "path": "02-badges/milestones/tasks-1000.svg",
+      "size": 950
+    },
+    {
+      "path": "02-badges/milestones/checkIns-500.png",
+      "size": 20592
+    },
+    {
+      "path": "02-badges/milestones/tasks-1000.png",
+      "size": 20044
+    },
+    {
+      "path": "02-badges/milestones/tasks-50.svg",
+      "size": 946
+    },
+    {
+      "path": "02-badges/milestones/checkIns-200.svg",
+      "size": 1017
+    },
+    {
+      "path": "02-badges/milestones/tasks-5000.svg",
+      "size": 950
+    },
+    {
+      "path": "02-badges/milestones/checkIns-1000.svg",
+      "size": 1019
+    },
+    {
+      "path": "02-badges/milestones/focusHours-200.png",
+      "size": 21230
+    },
+    {
+      "path": "02-badges/milestones/focusHours-10.svg",
+      "size": 948
+    },
+    {
+      "path": "02-badges/milestones/checkIns-10.png",
+      "size": 19117
+    },
+    {
+      "path": "02-badges/milestones/activeDays-100.png",
+      "size": 18425
+    },
+    {
+      "path": "02-badges/milestones/activeDays-365.svg",
+      "size": 978
+    },
+    {
+      "path": "02-badges/milestones/focusHours-50.png",
+      "size": 20505
+    },
+    {
+      "path": "02-badges/milestones/checkIns-50.svg",
+      "size": 1015
+    },
+    {
+      "path": "02-badges/milestones/activeDays-30.svg",
+      "size": 976
+    },
+    {
+      "path": "02-badges/milestones/focusHours-1000.png",
+      "size": 21465
+    },
+    {
+      "path": "02-badges/milestones/activeDays-7.png",
+      "size": 16976
+    },
+    {
+      "path": "02-badges/milestones/tasks-200.png",
+      "size": 19817
+    },
+    {
+      "path": "02-badges/milestones/tasks-200.svg",
+      "size": 948
+    },
+    {
+      "path": "02-badges/milestones/activeDays-7.svg",
+      "size": 974
+    },
+    {
+      "path": "02-badges/milestones/focusHours-1000.svg",
+      "size": 952
+    },
+    {
+      "path": "02-badges/milestones/checkIns-50.png",
+      "size": 19744
+    },
+    {
+      "path": "02-badges/milestones/activeDays-30.png",
+      "size": 18397
+    },
+    {
+      "path": "02-badges/milestones/focusHours-50.svg",
+      "size": 948
+    },
+    {
+      "path": "10-templates/release-card_1080x1350.png",
+      "size": 1967851
+    },
+    {
+      "path": "10-templates/slide-16x9.png",
+      "size": 41926
+    },
+    {
+      "path": "08-merch/merch-sheet.png",
+      "size": 100622
+    },
+    {
+      "path": "08-merch/merch-sheet.pdf",
+      "size": 111299
+    },
+    {
+      "path": "01-logo/wordmark-white.svg",
+      "size": 395
+    },
+    {
+      "path": "01-logo/lockup-horizontal@1x.png",
+      "size": 29656
+    },
+    {
+      "path": "01-logo/app-icon-512.png",
+      "size": 8961
+    },
+    {
+      "path": "01-logo/wordmark-white@1x.png",
+      "size": 13146
+    },
+    {
+      "path": "01-logo/icon-brand.svg",
+      "size": 394
+    },
+    {
+      "path": "01-logo/lockup-vertical@1x.png",
+      "size": 25068
+    },
+    {
+      "path": "01-logo/wordmark-ink@1x.png",
+      "size": 16691
+    },
+    {
+      "path": "01-logo/lockup-vertical.svg",
+      "size": 768
+    },
+    {
+      "path": "01-logo/wordmark-primary@1x.png",
+      "size": 16938
+    },
+    {
+      "path": "01-logo/icon-brand-512.png",
+      "size": 8961
+    },
+    {
+      "path": "01-logo/app-icon-1024.png",
+      "size": 20128
+    },
+    {
+      "path": "01-logo/icon-mono-ink.svg",
+      "size": 394
+    },
+    {
+      "path": "01-logo/lockup-horizontal.svg",
+      "size": 765
+    },
+    {
+      "path": "01-logo/wordmark-primary@2x.png",
+      "size": 36656
+    },
+    {
+      "path": "01-logo/app-icon-32.png",
+      "size": 588
+    },
+    {
+      "path": "01-logo/wordmark-primary.svg",
+      "size": 395
+    },
+    {
+      "path": "01-logo/wordmark-deep.svg",
+      "size": 395
+    },
+    {
+      "path": "01-logo/app-icon-180.png",
+      "size": 3019
+    },
+    {
+      "path": "01-logo/app-icon.svg",
+      "size": 394
+    },
+    {
+      "path": "01-logo/icon-mono-white.svg",
+      "size": 394
+    },
+    {
+      "path": "01-logo/wordmark-ink.svg",
+      "size": 395
+    },
+    {
+      "path": "06-brochure/brochure_front.png",
+      "size": 564690
+    },
+    {
+      "path": "06-brochure/heyta_brochure_front.pdf",
+      "size": 210664
+    },
+    {
+      "path": "06-brochure/brochure_back.png",
+      "size": 553263
+    },
+    {
+      "path": "06-brochure/heyta_brochure_back.pdf",
+      "size": 205970
+    },
+    {
+      "path": "00-brand-foundation/brand-tokens.css",
+      "size": 1247
+    },
+    {
+      "path": "00-brand-foundation/brand-tokens.json",
+      "size": 1701
+    },
+    {
+      "path": "00-brand-foundation/brand-book.pdf",
+      "size": 1037139
+    },
+    {
+      "path": "00-brand-foundation/_preview/page-01.png",
+      "size": 125686
+    },
+    {
+      "path": "00-brand-foundation/_preview/page-02.png",
+      "size": 44420
+    },
+    {
+      "path": "00-brand-foundation/_preview/page-03.png",
+      "size": 28238
+    },
+    {
+      "path": "00-brand-foundation/_preview/page-07.png",
+      "size": 31675
+    },
+    {
+      "path": "00-brand-foundation/_preview/page-06.png",
+      "size": 61864
+    },
+    {
+      "path": "00-brand-foundation/_preview/page-04.png",
+      "size": 27864
+    },
+    {
+      "path": "00-brand-foundation/_preview/page-05.png",
+      "size": 26301
+    },
+    {
+      "path": "00-brand-foundation/_preview/page-08.png",
+      "size": 84639
+    },
+    {
+      "path": "09-social/og-card_1200x630.png",
+      "size": 1088479
+    },
+    {
+      "path": "09-social/post_1080x1080.png",
+      "size": 83735
+    },
+    {
+      "path": "05-posters/01_品牌主视觉.png",
+      "size": 2174859
+    },
+    {
+      "path": "05-posters/01_品牌主视觉.pdf",
+      "size": 104513
+    },
+    {
+      "path": "05-posters/03_成长里程碑.png",
+      "size": 985031
+    },
+    {
+      "path": "05-posters/02_核心能力.pdf",
+      "size": 122778
+    },
+    {
+      "path": "05-posters/02_核心能力.png",
+      "size": 145854
+    },
+    {
+      "path": "05-posters/03_成长里程碑.pdf",
+      "size": 302955
+    },
+    {
+      "path": "07-product-manual/heyta_product-manual_cover.png",
+      "size": 98476
+    },
+    {
+      "path": "07-product-manual/heyta_product-manual.pdf",
+      "size": 751894
+    },
+    {
+      "path": "04-imagery/_manifest_main.json",
+      "size": 948
+    },
+    {
+      "path": "04-imagery/contact-sheet.png",
+      "size": 606101
+    },
+    {
+      "path": "04-imagery/background/bg-abstract.png",
+      "size": 873356
+    },
+    {
+      "path": "04-imagery/background/bg-grid.png",
+      "size": 912266
+    },
+    {
+      "path": "04-imagery/illustration/illus-plan.png",
+      "size": 384338
+    },
+    {
+      "path": "04-imagery/illustration/illus-focus.png",
+      "size": 519101
+    },
+    {
+      "path": "04-imagery/merch/merch-notebook-stack.png",
+      "size": 1326909
+    },
+    {
+      "path": "04-imagery/merch/merch-notebook-open.png",
+      "size": 1301165
+    },
+    {
+      "path": "04-imagery/merch/merch-mug.png",
+      "size": 907656
+    },
+    {
+      "path": "03-icons/search.svg",
+      "size": 280
+    },
+    {
+      "path": "03-icons/list.svg",
+      "size": 281
+    },
+    {
+      "path": "03-icons/target.svg",
+      "size": 346
+    },
+    {
+      "path": "03-icons/repeat.svg",
+      "size": 345
+    },
+    {
+      "path": "03-icons/home.svg",
+      "size": 271
+    },
+    {
+      "path": "03-icons/tag.svg",
+      "size": 311
+    },
+    {
+      "path": "03-icons/inbox.svg",
+      "size": 307
+    },
+    {
+      "path": "03-icons/arrow-right.svg",
+      "size": 260
+    },
+    {
+      "path": "03-icons/settings.svg",
+      "size": 355
+    },
+    {
+      "path": "03-icons/book.svg",
+      "size": 326
+    },
+    {
+      "path": "03-icons/bell.svg",
+      "size": 316
+    },
+    {
+      "path": "03-icons/flag.svg",
+      "size": 257
+    },
+    {
+      "path": "03-icons/plus.svg",
+      "size": 248
+    },
+    {
+      "path": "03-icons/check.svg",
+      "size": 282
+    },
+    {
+      "path": "03-icons/icon-sheet.png",
+      "size": 143090
+    },
+    {
+      "path": "03-icons/trash.svg",
+      "size": 267
+    },
+    {
+      "path": "03-icons/star.svg",
+      "size": 312
+    },
+    {
+      "path": "03-icons/sun.svg",
+      "size": 374
+    },
+    {
+      "path": "03-icons/edit.svg",
+      "size": 296
+    },
+    {
+      "path": "03-icons/icon-sheet.html",
+      "size": 3070
+    },
+    {
+      "path": "03-icons/clock.svg",
+      "size": 275
+    },
+    {
+      "path": "03-icons/share.svg",
+      "size": 364
+    },
+    {
+      "path": "03-icons/filter.svg",
+      "size": 257
+    },
+    {
+      "path": "03-icons/calendar.svg",
+      "size": 311
+    },
+    {
+      "path": "03-icons/bookmark.svg",
+      "size": 256
+    },
+    {
+      "path": "03-icons/folder.svg",
+      "size": 307
+    },
+    {
+      "path": "03-icons/moon.svg",
+      "size": 276
+    },
+    {
+      "path": "03-icons/heart.svg",
+      "size": 312
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+/* heyta brand tokens —— 取自 packages/design-system/src/tokens.css */
+:root{
+  --hk-blue-50: #eff6ff;
+  --hk-blue-100: #dbeafe;
+  --hk-blue-200: #bfdbfe;
+  --hk-blue-300: #93c5fd;
+  --hk-blue-400: #60a5fa;
+  --hk-blue-500: #3b82f6;
+  --hk-blue-600: #2563eb;
+  --hk-blue-700: #1d4ed8;
+  --hk-blue-800: #1e40af;
+  --hk-blue-900: #1e3a8a;
+  --hk-slate-white: #FFFFFF;
+  --hk-slate-50: #f8fafc;
+  --hk-slate-100: #f1f5f9;
+  --hk-slate-200: #e2e8f0;
+  --hk-slate-300: #cbd5e1;
+  --hk-slate-400: #94a3b8;
+  --hk-slate-500: #64748b;
+  --hk-slate-600: #475569;
+  --hk-slate-700: #334155;
+  --hk-slate-800: #1e293b;
+  --hk-slate-900: #0f172a;
+  --hk-slate-950: #020617;
+  --hk-feedback-success: #059669;
+  --hk-feedback-warning: #d97706;
+  --hk-feedback-danger: #dc2626;
+  --hk-feedback-info: #0284c7;
+  --hk-feedback-success-soft: #ecfdf5;
+  --hk-feedback-warning-soft: #fffbeb;
+  --hk-feedback-danger-soft: #fef2f2;
+  --hk-feedback-info-soft: #eff6ff;
+  --hk-primary: #2563eb;
+  --hk-on-primary: #ffffff;
+  --hk-primary-hover: #1d4ed8;
+  --hk-foreground: #0f172a;
+  --hk-foreground-muted: #475569;
+  --hk-border: #e2e8f0;
+  --hk-milestone-checkIns: #2563eb;
+  --hk-milestone-focusHours: #4f46e5;
+  --hk-milestone-tasks: #059669;
+  --hk-milestone-activeDays: #d97706;
+}
