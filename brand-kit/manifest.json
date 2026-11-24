@@ -1,6 +1,6 @@
 {
   "brand": "heyta",
-  "generated_at": "2026-11-25 05:40:48",
+  "generated_at": "2026-11-25 05:59:41",
   "dirs": {
     "00-brand-foundation": 11,
     "01-logo": 22,
@@ -26,7 +26,7 @@
     },
     {
       "path": "README.md",
-      "size": 8914
+      "size": 10548
     },
     {
       "path": "manifest.json",
@@ -518,7 +518,7 @@
     },
     {
       "path": "07-product-manual/heyta_product-manual.pdf",
-      "size": 753488
+      "size": 754461
     },
     {
       "path": "04-imagery/_manifest_main.json",

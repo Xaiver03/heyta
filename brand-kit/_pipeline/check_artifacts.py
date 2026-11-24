@@ -17,6 +17,7 @@ import os, re, sys, subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import read_tokens as RT
+import stance as ST
 
 WD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VERBOSE = "-v" in sys.argv
@@ -45,10 +46,21 @@ if LIST:
         ],
     }
     print("brand-kit 自检判据（按「失败时该找谁」分组）")
+    print("（另有 8 处构建期断言：产物不符时脚本直接不产出文件）")
     for gname, items in GROUPS.items():
         print(f"\n[{gname}]")
         for n, desc in items:
             print(f"  {n:>2}  {desc}")
+    print("\n[构建期断言（不在本脚本里跑，由生成器自己把关）]")
+    for _g in ("05-posters 恰好 3 张×(pdf+png)",
+               "02-badges 四子目录 = 生成清单",
+               "09-social = 3 个 / 10-templates = 2 个",
+               "06-brochure = 4 个 / 08-merch = 2 个",
+               "手册目录页码与正文对上（2+len(toc)+1）",
+               "手册「上手」步骤编号 01..N 连续",
+               "领域层新身份标签必须有中文名",
+               "里程碑 MAP 取不到即 SystemExit"):
+        print(f"    - {_g}")
     sys.exit(0)
 fails = []
 passes = []
@@ -871,6 +883,27 @@ if _faq_bad:
     fail(f"手册 FAQ 有答案失去依据：{_faq_bad}")
 else:
     emit(f"✅ 手册 FAQ 四条答案各有依据（{len(FAQ_EVID)} 条）")
+
+# 31) 反例清单：物料里出现的"不做 X"必须都在 stance.py 的名单内
+#     同一条立场曾在四处用四种句式写着（不作排行榜 / 没有排行榜 / 稀有度收藏、徽章墙…）。
+#     这条判据不禁止重复表述，只禁止"某人悄悄新增一条反例主张"而不登记。
+_suspect = {"积分", "等级", "抽奖", "成就点", "金币", "会员等级"}
+_found_bad = []
+for _r, _d, _fs in os.walk(WD):
+    _rel = os.path.relpath(_r, WD)
+    if "_pipeline" in _rel or not _rel[:2].isdigit():
+        continue
+    for _f in _fs:
+        if not _f.endswith((".html", ".svg")):
+            continue
+        _t = open(os.path.join(_r, _f), encoding="utf-8", errors="ignore").read()
+        for _w in _suspect:
+            if _w in _t:
+                _found_bad.append(f"{_rel}/{_f}:{_w}")
+if _found_bad:
+    fail(f"物料里出现未登记的反例主张：{_found_bad[:4]}（先改 _pipeline/stance.py 的 ANTI_FEATURES）")
+else:
+    emit(f"✅ 反例主张都在 stance.py 名单内（{len(ST.ANTI_FEATURES)} 条）")
 
 if not fails:
     if JSON_OUT:
