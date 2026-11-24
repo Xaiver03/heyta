@@ -936,6 +936,15 @@ if (!exists(AI_DIST)) {
  * 它是这道门禁"为什么不红"的官方说法。写进去之前必须自己走一遍取证。
  */
 const ENTITY_COVERAGE_DEBT = new Map([
+  [
+    'CALENDAR_EVENT',
+    {
+      gap: 'AI-COV-9',
+      reason:
+        '阶段 A 是外部日历的只读镜像：事件本身没有可由 AI 执行的写动作（写回飞书属阶段 B，另立 ADR）；' +
+        '唯一可写的是本地标签，而标签写路径与 Heyta 既有 TAG 工具同批评估，不在本实体落地时硬塞。',
+    },
+  ],
   // 2026-11-23：`COMMENT`（AI-COV-8）已**闭合** —— 评论工具（`add_task_comment` /
   // `list_task_comments` / `delete_task_comment`）随"share 感知的独立工具通道"落地
   // （`packages/local-api/src/tools/comment.ts`），读与写都有了工具，于是它按本段

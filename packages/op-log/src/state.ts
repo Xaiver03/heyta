@@ -24,6 +24,7 @@ import type {
   AiFeedback,
   AssistantTurn,
   Attachment,
+  CalendarEvent,
   Comment,
   CountdownEvent,
   FocusSession,
@@ -84,6 +85,18 @@ export interface MaterializedState {
    */
   events: Record<string, CountdownEvent>;
   /**
+   * 外部日历的日程（只读镜像；ADR 草稿
+   * `docs/adr/0089-calendar-events-are-a-mirror-entity.md`）。
+   *
+   * ⚠️ 它**不是**倒数日：`events` 是"某一天是纪念日"，本桶是"某段时间有会"。
+   * 两者都上日历，但不共用字段、不共用排序档（见 `CalendarEvent` 四条理由）。
+   *
+   * 🔴 **这个桶只有 connector 写**（阶段 A 用户只读）：op-log 只负责落 op，
+   * 不负责去外部源轮询 —— 轮询住在 `packages/app-host`，不在本包、也不在
+   * `packages/sync-core`（那里是 vendored 的传输原语）。
+   */
+  calendarEvents: Record<string, CalendarEvent>;
+  /**
    * 助手会话的消息（ADR-0045 D-4 (ii)，产品负责人 2026-10-05 拍"做"）。
    *
    * ⚠️ **一条消息一个实体**，不是一段会话一个实体 —— LWW 在数组上是覆盖语义，
@@ -125,6 +138,7 @@ export function emptyState(): MaterializedState {
     preferenceCorrections: {},
     reminders: {},
     events: {},
+    calendarEvents: {},
     assistantTurns: {},
     comments: {},
     attachments: {},
@@ -144,6 +158,7 @@ const BUCKET_BY_ENTITY = {
   PREFERENCE_CORRECTION: 'preferenceCorrections',
   REMINDER: 'reminders',
   EVENT: 'events',
+  CALENDAR_EVENT: 'calendarEvents',
   ASSISTANT_TURN: 'assistantTurns',
   COMMENT: 'comments',
   ATTACHMENT: 'attachments',

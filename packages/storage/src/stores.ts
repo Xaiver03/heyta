@@ -237,6 +237,26 @@ export const META_KEYS = {
   PUBLIC_FACTS_ETAG: 'publicFactsEtag',
   /** 那次拉取的本地毫秒时间戳（只用于"缓存多旧"，不参与任何裁决）。 */
   PUBLIC_FACTS_FETCHED_AT: 'publicFactsFetchedAt',
+  /**
+   * 上一轮成功拉到的外部日历窗口：JSON `{fromMs,toMs}`。
+   *
+   * 🔴 删除判定**只**在两轮窗口的交集里做（ADR-0089 §3.5）。没有这个键 =
+   * 本机还没有"上一轮"，于是那一轮一条都不删 —— 把"没有信息"当成"上一轮它不在"，
+   * 会在第一次拉取时把整个日历判死。
+   */
+  CALENDAR_MIRROR_WINDOW: 'calendarMirrorWindowV1',
+  /** 那次响应的 `ETag`（条件请求原样回传；与窗口键一起判，窗口变了就不回传）。 */
+  CALENDAR_MIRROR_ETAG: 'calendarMirrorEtagV1',
+  /**
+   * Hub 根地址（飞书日程镜像，ADR-0089）。空 / 缺 = 未配置 ⇒ 管道零请求。
+   *
+   * 🔴 它是**本机凭据**，与 `PUBLIC_FACTS_*` 同一个理由：既不进 op-log、也不跨设备
+   * （ADR-0052 §2.5 的同一条纪律）。写进 op 会让另一台设备回放出一条"用户配置过 Hub"
+   * 的假事实，而 token 会跟着加密载荷一起上云。
+   */
+  CALENDAR_MIRROR_BASE_URL: 'calendarMirrorBaseUrlV1',
+  /** Hub 的 Bearer token（本机凭据；只在读 Hub 时使用，不写回任何实体）。 */
+  CALENDAR_MIRROR_TOKEN: 'calendarMirrorTokenV1',
   /** Active encrypted-payload generation paired with the local key package. */
   VAULT_PAYLOAD_KEY_VERSION: 'vaultPayloadKeyVersionV1',
   /** Encrypted pending root-rotation target; never stores a plaintext root. */

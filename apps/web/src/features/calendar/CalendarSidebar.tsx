@@ -67,6 +67,7 @@ import { SidebarResizer } from '../shell/ColumnResizer.js';
 import { useCountdownStore } from '../countdown/store.js';
 import { useProjectStore } from '../projects/store.js';
 import { useTaskStore } from '../tasks/store.js';
+import { CalendarHubPanel } from './CalendarHubPanel.js';
 import { useWheelMonthNav } from './useWheelMonthNav.js';
 import { useCalendarViewStore } from './store.js';
 
@@ -539,6 +540,13 @@ export function CalendarSidebar(): React.JSX.Element {
             }}
           />
         </div>
+
+        {/*
+          「飞书日程」（阶段 A，ADR-0089）：外部日程的只读镜像 + 本地标签。
+          🔴 放在这一列而不是新开一屏：它回答的是"日历上还看得见什么"，
+             与上面的「显示范围」同一层；新路由会把一份只读列表变成第二个日历。
+        */}
+        <CalendarHubPanel />
       </div>
 
       <SidebarResizer />
