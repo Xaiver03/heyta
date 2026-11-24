@@ -401,3 +401,80 @@ describe('R10「明天」：它是独立的一档，不与今天/最近 7 天互
     expect(filterTasks(dstTasks, { kind: 'tomorrow' }, { now: dstNow }).map((t) => t.id)).toEqual(['d8']);
   });
 });
+
+/**
+ * 组合筛选（滴答式「过滤器 / 高级筛选」）。
+ *
+ * 🔴 最该钉住的一条：条件必须是**正交维度**，不能把两个自带完成态口径的
+ * 简单视图硬求交 —— 否则「已完成 + 清单=工作」恒为空，而界面上看起来一切正常。
+ */
+describe('compound 组合筛选', () => {
+  const tasks = [
+    task({ id: 'work-today-open', projectId: 'p1', dueDate: LOCAL_NOON }),
+    task({ id: 'work-today-done', projectId: 'p1', dueDate: LOCAL_NOON, completedAt: LOCAL_NOON }),
+    task({ id: 'home-today-open', projectId: 'p2', dueDate: LOCAL_NOON }),
+    task({ id: 'work-tomorrow-open', projectId: 'p1', dueDate: LOCAL_NOON + DAY }),
+    task({ id: 'work-undated-open', projectId: 'p1' }),
+  ];
+  const ids = (filter: TaskFilter): string[] =>
+    filterTasks(tasks, filter, ctx).map((t) => t.id).sort();
+
+  it('and：状态=未完成 且 清单=p1（两个维度正交，各自只看自己那一维）', () => {
+    expect(
+      ids({
+        kind: 'compound',
+        op: 'and',
+        conditions: [
+          { kind: 'status', status: 'open' },
+          { kind: 'project', projectId: 'p1' },
+        ],
+      }),
+    ).toEqual(['work-today-open', 'work-tomorrow-open', 'work-undated-open']);
+  });
+
+  it('🔴 and：已完成 + 清单=p1 能筛出那条已完成的（硬求交会把这里筛成空）', () => {
+    expect(
+      ids({
+        kind: 'compound',
+        op: 'and',
+        conditions: [
+          { kind: 'status', status: 'completed' },
+          { kind: 'project', projectId: 'p1' },
+        ],
+      }),
+    ).toEqual(['work-today-done']);
+  });
+
+  it('or：清单=p1 或 日期=今天 ⇒ 并集', () => {
+    expect(
+      ids({
+        kind: 'compound',
+        op: 'or',
+        conditions: [
+          { kind: 'project', projectId: 'p1' },
+          { kind: 'date', range: 'today' },
+        ],
+      }),
+    ).toEqual(['home-today-open', 'work-today-done', 'work-today-open', 'work-tomorrow-open', 'work-undated-open']);
+  });
+
+  it('日期这一维只看截止日（完成态由 status 条件决定，不由日期条件偷偷决定）', () => {
+    // 没有 status 条件 ⇒ 已完成那条也算"今天到期"。
+    expect(
+      ids({ kind: 'compound', op: 'and', conditions: [{ kind: 'date', range: 'today' }] }),
+    ).toEqual(['home-today-open', 'work-today-done', 'work-today-open']);
+  });
+
+  it('空条件 ⇒ 什么都不匹配（不是"全部"，否则清空条件反而显示所有任务）', () => {
+    expect(filterTasks(tasks, { kind: 'compound', op: 'and', conditions: [] }, ctx)).toEqual([]);
+  });
+
+  it('标签这一维按 tagIds 命中', () => {
+    const tagged = [task({ id: 'tagged', tagIds: ['t1'] }), task({ id: 'other' })];
+    expect(
+      filterTasks(tagged, { kind: 'compound', op: 'and', conditions: [{ kind: 'tag', tagId: 't1' }] }, ctx).map(
+        (t) => t.id,
+      ),
+    ).toEqual(['tagged']);
+  });
+});

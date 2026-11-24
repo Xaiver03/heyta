@@ -30,7 +30,7 @@
  * 文案一律由宿主注入。
  */
 
-import { Quadrant, bucketByQuadrant, type Task } from '@heyta/domain';
+import { Quadrant, bucketByQuadrant, manualOrderKey, type Task } from '@heyta/domain';
 
 /**
  * 四个象限的展示顺序。
@@ -100,7 +100,7 @@ export function quadrantSlot(quadrant: Quadrant): 1 | 2 | 3 | 4 {
   return QUADRANT_SLOT[quadrant];
 }
 
-/** 一个象限里的任务。`tasks` 的顺序 = 领域层给的分桶顺序（截止升序、优先级降序）。 */
+/** 一个象限里的任务。`tasks` 的顺序 = **手动顺序**（见 {@link toQuadrantCards}）。 */
 export interface QuadrantBucket {
   readonly quadrant: Quadrant;
   /** 排除已完成与已删除之后、落进这一格的任务。 */
@@ -130,6 +130,12 @@ export interface QuadrantCardModel extends QuadrantBucket {
  *
  * ⚠️ `now` 显式传入而不是读 `Date.now()`：紧迫性窗口以它为基准，
  * 不显式传这个函数就不可测（与 `@heyta/domain#bucketByQuadrant` 同一约定）。
+ *
+ * 🔴 2026-11-24：**桶内顺序改成手动顺序**（`Task.order`，没排过序的按创建时间）。
+ * 这一条是为了让"在格子里上下拖动 = 排序"成立 —— 显示顺序与
+ * `planManualReorder` 写入的 `order` 必须用**同一个键函数**
+ * （`manualOrderKey`），否则拖完会弹回去。分桶规则（谁进哪一格）仍然
+ * 一条不改地来自 `bucketByQuadrant`。
  */
 export function toQuadrantCards(
   tasks: readonly Task[],
@@ -137,7 +143,13 @@ export function toQuadrantCards(
 ): QuadrantCardModel[] {
   const buckets = bucketByQuadrant(tasks, { now });
   return QUADRANT_ORDER.map((quadrant) => {
-    const bucketTasks = buckets[quadrant];
+    // 稳定排序：手动键相同（常见于都未排序的任务）时按 id，避免每次 relayout 抖。
+    const bucketTasks = [...buckets[quadrant]].sort((a, b) => {
+      const aKey = manualOrderKey(a);
+      const bKey = manualOrderKey(b);
+      if (aKey !== bKey) return aKey - bKey;
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
     return {
       quadrant,
       tasks: bucketTasks,

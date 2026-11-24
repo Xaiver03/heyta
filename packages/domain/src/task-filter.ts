@@ -39,8 +39,8 @@ import {
   toLocalDate,
 } from './date.js';
 import { Quadrant, isAbandoned, isLive, type Tag, type Task } from './entities.js';
-import { bucketByQuadrant } from './quadrant.js';
-import { resolveTagId, resolveTagIds } from './tags.js';
+import { bucketByQuadrant, classifyQuadrant } from './quadrant.js';
+import { resolveTagId, resolveTagIds, taskHasTag } from './tags.js';
 import { expandTagIdsWithDescendants } from './tag-hierarchy.js';
 
 /**
@@ -50,7 +50,7 @@ import { expandTagIdsWithDescendants } from './tag-hierarchy.js';
  * 加一个分支（例如这次的 `tag`）会让所有 `switch` 在编译期被检查到 ——
  * 而宽形状会让"忘了处理新分支"表现为**运行时静默返回空列表**。
  */
-export type TaskFilter =
+export type SimpleTaskFilter =
   | { kind: 'all' }
   | { kind: 'today' }
   /**
@@ -66,6 +66,53 @@ export type TaskFilter =
   | { kind: 'quadrant'; quadrant: Quadrant }
   | { kind: 'project'; projectId: string }
   | { kind: 'tag'; tagId: string };
+
+/** 「组合筛选」里日期这一维的取值（闭区间性质与各简单分支同源，见 `filterTasks`）。 */
+export type FilterDateRange = 'today' | 'tomorrow' | 'next7Days' | 'overdue' | 'undated';
+
+/**
+ * 组合筛选里的**一维条件**（滴答式「过滤器 / 高级筛选」，2026-11-24）。
+ *
+ * 🔴 **它是"正交的维度谓词"，不是 `SimpleTaskFilter` 的别名。**
+ * `SimpleTaskFilter` 的每个分支都**自带完成态口径**（`project` / `tag` / 日期分支
+ * 都隐含 `!isCompleted`，只有 `completed` 含已完成）。若组合时直接拿这些分支去
+ * 求交，「已完成 + 清单=工作」会恒为空（一边要已完成、一边要未完成）——
+ * 那正是"多条件组合"最容易看起来能用、实际筛不出东西的地方。
+ *
+ * 所以条件只回答**一个维度**，完成态由 `status` 这一维显式表达：
+ *   · `{ kind: 'status', status: 'open' | 'completed' }` —— 未完成 / 已完成；
+ *   · `{ kind: 'date', range }` —— 只看截止日（`today`/`tomorrow`/`next7Days`/`overdue`/`undated`）；
+ *   · `{ kind: 'project', projectId }` / `{ kind: 'tag', tagId }` —— 只看归属；
+ *   · `{ kind: 'quadrant', quadrant }` —— 只看四象限（紧急度由截止时间推导，见 `quadrant.ts`）。
+ *
+ * 于是「今天 + 清单=工作 + 未完成」「已完成 + 清单=工作」都能成立，两个条件
+ * 不再互相吃掉。
+ */
+export type FilterCondition =
+  | { readonly kind: 'status'; readonly status: 'open' | 'completed' }
+  | { readonly kind: 'date'; readonly range: FilterDateRange }
+  | { readonly kind: 'project'; readonly projectId: string }
+  | { readonly kind: 'tag'; readonly tagId: string }
+  | { readonly kind: 'quadrant'; readonly quadrant: Quadrant };
+
+/** 多条件之间的连接词：`and` = 全部满足，`or` = 任一满足。 */
+export type CompoundOperator = 'and' | 'or';
+
+/**
+ * 一条任务筛选。
+ *
+ * 🔴 **它是判别联合，不是 `{ kind, value }` 那种宽形状。** 用判别联合之后，
+ * 加一个分支（`tag`、以及这次的 `compound`）会让所有 `switch` 在编译期被检查到 ——
+ * 而宽形状会让"忘了处理新分支"表现为**运行时静默返回空列表**。
+ */
+export type TaskFilter =
+  | SimpleTaskFilter
+  | {
+      readonly kind: 'compound';
+      readonly op: CompoundOperator;
+      /** 至少一条；空列表的语义是"什么都不匹配"（见 `filterTasks`），不是"全部"。 */
+      readonly conditions: readonly FilterCondition[];
+    };
 
 /**
  * 「最近 7 天」这条智能清单的天数（含今天，闭区间）。
@@ -142,6 +189,45 @@ export function startLocalDate(task: { startDate?: number; startDateLocal?: Loca
  * 收集箱/今天/清单/标签看到的都是待办，已完成有它自己的位置。
  * 这条如果写反，症状是"任务勾完之后从清单里消失、用户以为丢了"。
  */
+/**
+ * 一维条件对**单条任务**的判定。纯函数、只读一个维度，完成态只由 `status` 表达
+ * （所以 `date` / `project` / `tag` / `quadrant` 这几维的判定**不看**完成态）。
+ */
+function matchesCondition(
+  task: Task,
+  condition: FilterCondition,
+  context: FilterContext,
+): boolean {
+  switch (condition.kind) {
+    case 'status':
+      return condition.status === 'completed' ? isCompleted(task) : !isCompleted(task);
+    case 'date': {
+      const due = dueLocalDate(task);
+      const today = toLocalDate(context.now);
+      switch (condition.range) {
+        case 'today':
+          return due === today;
+        case 'tomorrow':
+          return due === addDays(today, 1);
+        case 'next7Days':
+          return due !== undefined && due >= today && due <= addDays(today, NEXT_SEVEN_DAYS - 1);
+        case 'overdue':
+          return due !== undefined && due < today;
+        case 'undated':
+          return due === undefined;
+      }
+    }
+    case 'project':
+      return task.projectId === condition.projectId;
+    case 'tag':
+      return context.tags === undefined
+        ? (task.tagIds?.includes(condition.tagId) ?? false)
+        : taskHasTag(task, condition.tagId, context.tags);
+    case 'quadrant':
+      return classifyQuadrant(task, { now: context.now }) === condition.quadrant;
+  }
+}
+
 export function filterTasks(
   tasks: readonly Task[],
   filter: TaskFilter,
@@ -224,6 +310,22 @@ export function filterTasks(
           (t) => !isCompleted(t) && resolveTagIds(t.tagIds, tags).some((id) => accepted.has(id)),
         );
       }
+    case 'compound': {
+      /**
+       * 组合筛选：对**同一条可见任务**逐条求各维度谓词，再按 `and` / `or` 合并。
+       *
+       * - 空条件列表 ⇒ `[]`（"一个条件都没选"不是"全部"，否则清空条件反而显示所有任务）。
+       * - 只看 `visible`（已滤墓碑/已放弃）；完成态由 `status` 这一维决定，
+       *   没有 `status` 条件时已完成与未完成都算匹配 —— 这是"正交"的直接后果。
+       */
+      const { conditions } = filter;
+      if (conditions.length === 0) return [];
+      return visible.filter((t) =>
+        filter.op === 'and'
+          ? conditions.every((condition) => matchesCondition(t, condition, context))
+          : conditions.some((condition) => matchesCondition(t, condition, context)),
+      );
+    }
   }
 }
 

@@ -837,11 +837,6 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         </View>
       ) : null}
 
-      {/* Apple 式：月档大号月份标题（对齐 Apple 月视图顶部「十一月」）。 */}
-      {view === 'month' ? (
-        <Text variant="screen-title">{labels.monthTitle(cursor)}</Text>
-      ) : null}
-
       <Animated.View
         {...swipe.panHandlers}
         style={{

@@ -182,6 +182,13 @@ export interface QuadrantTaskPatch {
    *   - `number` = 设为该值
    */
   dueDate?: number | null;
+  /**
+   * 落进目标格时的**排序位置**（`Task.order`）。
+   *
+   * `undefined` = 不改顺序（只换象限）。带上是为了让"跨象限拖到某个上下位置"
+   * 与"换象限"合并成**一条 op** —— 否则要再调一次 `setOrder`，中间态可见。
+   */
+  order?: number;
 }
 
 export interface QuadrantDropPlan extends QuadrantTaskPatch {

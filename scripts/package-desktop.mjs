@@ -167,6 +167,20 @@ async function main() {
   if (only === undefined) rmSync(OUT, { recursive: true, force: true });
 
   const built = [];
+/**
+ * 平台 → 图标文件。生成物路径固定；不存在就抛错（理由见调用处注释）。
+ */
+function desktopIconFor(platform) {
+  const rel = platform === 'darwin' ? 'apps/desktop/assets/Heyta.icns' : 'apps/desktop-windows/assets/heyta.ico';
+  const abs = join(ROOT, rel);
+  if (!existsSync(abs)) {
+    throw new Error(
+      `缺少桌面端图标 ${rel} —— 先跑 \`node scripts/gen-app-icons.mjs\`。`,
+    );
+  }
+  return abs;
+}
+
   for (const { platform, arch } of targets) {
     const label = `${platform}-${arch}`;
     console.log(`📦 打包 ${label} …`);
@@ -185,9 +199,15 @@ async function main() {
       // （G-44b）—— 第二份抄件漂起来的时候，撒谎的是那张清单。
       appVersion: JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version,
       /**
-       * ⚠️ 不设 `icon`：仓库里还没有桌面端图标（那是设计系统的活）。
-       * 设一个不存在的路径会让打包器直接报错，而不是"用默认图标"。
+       * 桌面端图标：macOS 用 `.icns`，Windows 用 `.ico`。
+       *
+       * 两份都由 `node scripts/gen-app-icons.mjs` 从 `--ht-color-primary` 与
+       * 「h」字形几何生成（`--check` 会对账到逐字节），**不手放图标文件**。
+       *
+       * 缺文件时**不静默回落**：给一个不存在的路径，`@electron/packager` 会直接
+       * 报错，比悄悄产出"Electron 默认图标"的安装包好 —— 后者只在装完才被发现。
        */
+      icon: desktopIconFor(platform),
     });
     built.push(...paths);
   }

@@ -136,6 +136,7 @@ import {
   makeManualSortRowWrapper,
 } from './features/tasks/ManualSortDnd.js';
 import { FilterPanel } from './features/tasks/FilterPanel.js';
+import { savedFilterNameOf } from './features/tasks/saved-filters.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
@@ -2181,6 +2182,10 @@ export function App(): React.JSX.Element {
       return entry === undefined ? t('web.shell.nav.quadrant') : t(entry.labelKey);
     }
     if (view === 'tasks') {
+      if (f.kind === 'compound') {
+        // 组合筛选没有固定名字：命中某条已存视图就用它的名字，否则给一个中性标题。
+        return savedFilterNameOf(f) ?? t('web.filter.compoundTitle');
+      }
       if (f.kind === 'all') return t('web.shell.nav.inbox');
       if (f.kind === 'today') return t('web.shell.nav.today');
       if (f.kind === 'tomorrow') return t('web.shell.nav.tomorrow');
@@ -2957,12 +2962,10 @@ export function App(): React.JSX.Element {
                 </button>
               ))}
             </div>
-            {/* D1 ③ 已存视图：侧栏底部入口，与回收站同一形状。 */}
-            <div className="ht-nav ht-sidebar__filters" role="group" aria-label={t('web.filter.sidebar')}>
-              <FilterPanel
-                onApplyFilter={(filter) => useTaskStore.getState().setFilter(filter)}
-              />
-            </div>
+            {/* D1 已存视图：侧栏底部入口，与回收站同一形状。
+                区块头 + 列表 + 创建表单都在 `FilterPanel` 里，这里只接线。
+                `goToFilter` = 切回任务视图 + 落筛选（与点清单/标签同一条路）。 */}
+            <FilterPanel onApplyFilter={goToFilter} />
           </div>
           {/* 右边缘的拖拽手柄（绝对定位在这一列上，不占布局）。 */}
           <SidebarResizer />

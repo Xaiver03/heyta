@@ -649,7 +649,13 @@ fill_field() {  # <标签> <值> [secure] [probe <按钮标签>]
   done
   while [ "$attempt" -le 5 ]; do
     dismiss_keyboard_hard
-    pre=$(ax "$lbl" --role "$role" --scroll-into-view --json)
+    # 🔴 先**不滚**再判可见：`--scroll-into-view` 在 iOS 27 模拟器上对某些框会触发 AX 桥
+    #    `Broken pipe`（本屏「邮箱」实测：dump 读得到、一滚就 element-left-tree）。字段在首屏时
+    #    根本不需要滚；只有 plain 查询判不可见才退到滚动那一条。
+    pre=$(ax "$lbl" --role "$role" --json)
+    if [ "$(jget "$pre" visible)" != "True" ]; then
+      pre=$(ax "$lbl" --role "$role" --scroll-into-view --json)
+    fi
     if [ "$(jget "$pre" visible)" != "True" ]; then
       echo "     [fill] 「${lbl}」第 ${attempt} 次滚不进可见区：found=$(jget "$pre" found) visible=$(jget "$pre" visible) scrollRc=$(jget "$pre" scrollRc)"
       # 框不在树上时先试**一次**重新展开自托管表单（装置自己可能把它点了收起），
@@ -1104,6 +1110,16 @@ fi
 ok "已到 AuthScreen 的登录那一代（「邮箱」「服务端地址」两栏 + 登录按钮都在）"
 
 fill_field "服务端地址" "$HOST_SERVER" || env_bail "AuthScreen 的服务端地址写不进去（装置问题）"
+# 🔴 set 服务端地址会触发一次 `axbridge guest reader failed: Broken pipe`，此后**定向轴查询**
+#    （`ax <label> --role`）整段读不到、而整棵 dump 还读得到 —— 是 companion 的 guest reader 挂了，
+#    不是界面没了。重启 companion 把它拉起来，再继续填下一格。
+ensure_idb_companion >/dev/null 2>&1 || true
+sleep 2
+# 🔴 改了服务端地址后 app 会重连/重渲染，AX 树可能短暂读不出（实测：set 触发一次
+#    `axbridge guest reader failed: Broken pipe`，随后「邮箱」一格读不到、连试五次都 found=False）。
+#    等它稳定再填下一格，而不是把"树还在重建"读成"邮箱没了"。
+wait_tree "邮箱" 60 || { shot "02d3-改服务端地址后邮箱没回来"; env_bail "改服务端地址后 60s 内「邮箱」没回到树上（装置/界面重建问题，非产品）"; }
+dismiss_keyboard_hard || true
 fill_field "邮箱" "$MEMBER_EMAIL" || env_bail "邮箱写不进去（装置问题）"
 # 登录密码那一栏是明文档还是遮住档**量出来的**（移动端默认揭示），两档各有填法；
 # 两枚显隐开关都不在树上 ⇒ 判不了该走哪条腿，退 3，不猜。

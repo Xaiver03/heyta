@@ -78,6 +78,10 @@ export function EmptyState({
       titleKey: 'web.shell.empty.quadrant.title',
       hintKey: 'web.shell.empty.quadrant.hint',
     },
+    compound: {
+      titleKey: 'web.shell.empty.compound.title',
+      hintKey: 'web.shell.empty.compound.hint',
+    },
   };
   const msg = messages[filter.kind] ?? messages['all']!;
 
@@ -192,5 +196,11 @@ export function isActive(current: TaskFilter, target: TaskFilter): boolean {
     case 'next7Days':
     case 'completed':
       return true;
+    case 'compound':
+      return (
+        target.kind === 'compound' &&
+        current.op === target.op &&
+        JSON.stringify(current.conditions) === JSON.stringify(target.conditions)
+      );
   }
 }

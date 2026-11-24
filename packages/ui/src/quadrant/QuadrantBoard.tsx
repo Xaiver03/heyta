@@ -154,8 +154,22 @@ export interface QuadrantBoardProps {
   readonly taskLabels?: TaskListLabels;
   /** 标题下方的元信息行，原样转给 `TaskList`（内容归宿主，见文件头第 3 条）。 */
   readonly renderMeta?: (row: TaskRow) => React.ReactNode;
-  /** 行尾的动作，原样转给 `TaskList`（web 拿它注入拖拽握把）。 */
+  /** 行尾的动作，原样转给 `TaskList`。 */
   readonly renderTrailing?: (row: TaskRow) => React.ReactNode;
+  /**
+   * 行外面那一层（宿主注入）—— 原样转给 `TaskList.renderRowWrapper`。
+   *
+   * 🔴 web 用它把**整行**变成 dnd-kit 的拖拽/排序节点（不要行尾手柄、不要"移动"
+   * 下拉）。共享层只转交，不认识缩放手势。
+   */
+  readonly renderRowWrapper?: (row: TaskRow, node: React.ReactNode) => React.ReactNode;
+  /**
+   * 每格**任务区**外面那一层（宿主注入）。
+   *
+   * web 用它给每一格包一个 `SortableContext`（同格内上下拖拽排序要在它里面）；
+   * 不传 ⇒ 逐字节与抽取前相同（移动端不传）。
+   */
+  readonly renderCellBodyWrapper?: (card: QuadrantCardModel, node: React.ReactNode) => React.ReactNode;
   /** 正在处理中的行 id —— 用于置灰该行，避免连点发出两条变更。 */
   readonly busyTaskId?: string | null;
   /** 标题为空时的替代文案（空标题是真实存在的）。 */
@@ -273,14 +287,18 @@ function makeStyles(tokens: HeytaNativeTokens) {
     /** 两行等分板子的剩余高度；同样"只长不缩"（理由见 `board`）。 */
     /** 四格拼成的那个矩形：圆角与裁切都在这一层（轴标签在它外面，不受影响）。 */
     matrix: {
-      /** 间隙就是象限的那两条缝 —— 与滴答一致，不再画线。 */
-      gap: tokens['space.3'],
+      /**
+       * 🔴 2026-11-24「不要框，只要横平竖直的坐标轴」：四格**紧贴不留缝**，
+       * 由 {@link cell} 上的 `dividerRight` / `dividerBottom` 画出中间那个十字。
+       * 留缝就画不出连成一气的十字（缝 = 两条断开的白带）。
+       */
+      gap: 0,
       flexGrow: 1,
     },
     row: {
       flexDirection: 'row',
-      /** 格间间隙（与 `matrix` 同一个来源，横竖一致 —— 这就是"对称"）。 */
-      gap: tokens['space.3'],
+      /** 格间不再留缝；竖线由左列格的 `borderRight` 画。 */
+      gap: 0,
       flexGrow: 1,
       flexShrink: 0,
       flexBasis: 'auto',
@@ -295,27 +313,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
      * 面板按内容高度排布、由宿主滚动。这不是例外，是同一条"只长不缩"的结果。
      */
     stack: {
-      gap: tokens['space.3'],
+      gap: 0,
       flexGrow: 1,
       flexShrink: 0,
       flexBasis: 'auto',
-    },
-    /*
-     * 轴标签：`position: absolute` 贴在矩阵外沿，`pointerEvents` 由默认值接管
-     * （文字本身不可点，不影响下方的格子）。
-     */
-    axisVertical: {
-      position: 'absolute',
-      left: 0,
-      top: '40%',
-      fontSize: tokens['font-size.xs'],
-      transform: [{ rotate: '-90deg' }],
-    },
-    axisHorizontal: {
-      position: 'absolute',
-      top: 0,
-      left: '38%',
-      fontSize: tokens['font-size.xs'],
     },
     cell: {
       flex: 1,
@@ -323,17 +324,21 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['layout.quadrant-min-height'],
       padding: tokens['space.3'],
       /**
-       * 每格一张白卡（滴答的形状）：圆角 + 白底，四张之间靠间隙分开。
-       *
-       * 🔴 2026-11-16：补一条**静止态细线**。页面底从 slate-50 改成白之后，
-       * 白卡在白底上等于没有边界（实拍：四格只剩四个色点与计数，格子本身看不见）。
-       * 产品口径「全局不用彻底禁止描边」—— 这条就是它在这一处的落地。
-       * 用 `color.border`（不是 strong）：卡片边界是**分区**，不是强调。
+       * 🔴 2026-11-24：**不再有卡片**（无描边 / 无圆角 / 无底色），四格直接
+       * 落在页面底上；结构只由中间那个十字给出（见 {@link dividerRight} /
+       * {@link dividerBottom}）。产品负责人这一轮的原话：「不需要有框，只需要
+       * 一个横平竖直的坐标轴，就相当于在中间画个十字」。
        */
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
-      borderRadius: tokens['radius.lg'],
-      backgroundColor: tokens['color.surface'],
+    },
+    /** 左列格的右缘 —— 十字的**竖线**。只有左列画（右列再画就是双线）。 */
+    dividerRight: {
+      borderRightWidth: tokens['border-width.thin'],
+      borderRightColor: tokens['color.border'],
+    },
+    /** 上排格的下缘（单列时是每格之间）—— 十字的**横线**。 */
+    dividerBottom: {
+      borderBottomWidth: tokens['border-width.thin'],
+      borderBottomColor: tokens['color.border'],
     },
     /** 拖拽悬停：换语义底色，不动几何（动几何会让整格抖一下）。 */
     cellHighlighted: {
@@ -420,6 +425,8 @@ export function QuadrantBoard({
   taskLabels,
   renderMeta,
   renderTrailing,
+  renderRowWrapper,
+  renderCellBodyWrapper,
   busyTaskId,
   fallbackTitle,
   highlightedQuadrant,
@@ -468,14 +475,49 @@ export function QuadrantBoard({
       <View style={styles.matrix}>
       {rows.map((row, rowIndex) => (
         <View key={`row-${rowIndex}`} style={twoColumns ? styles.row : styles.stack}>
-          {row.map((card) => {
+          {row.map((card, cellIndex) => {
             const title = labels.title(card.quadrant);
             const hint = labels.hint(card.quadrant);
             const highlighted = highlightedQuadrant === card.quadrant;
+            /**
+             * 🔴 十字：2×2 时左列画竖线（右缘）、上排画横线（下缘）；
+             * 单列时每格之间画一条横线（最后一格不画）。除此之外没有任何边框。
+             */
+            const showVertical = twoColumns && cellIndex === 0;
+            const showHorizontal = twoColumns ? rowIndex === 0 : cellIndex < row.length - 1;
+            const taskList = (
+              <TaskList
+                tasks={card.tasks}
+                onToggleTask={onToggleTask}
+                onOpenTask={onOpenTask}
+                onLongPressTask={onLongPressTask}
+                selectedTaskIds={selectedTaskIds}
+                selectionMode={selectionMode}
+                activeTaskId={activeTaskId}
+                labels={taskLabels}
+                renderMeta={renderMeta}
+                renderTrailing={renderTrailing}
+                renderRowWrapper={renderRowWrapper}
+                busyTaskId={busyTaskId}
+                fallbackTitle={fallbackTitle}
+                density="compact"
+                /*
+                 * 空格要不要写引导，**由宿主决定**（`labels.empty`）。
+                 * web 那份实现成"只有第一个空象限返回『拖任务到这里』，其余空串"，
+                 * 所以"同屏最多一处"由一份判断守着，不在这里重算。
+                 */
+                emptyMessage={labels.empty(card.quadrant) || undefined}
+              />
+            );
             return (
               <View
                 key={card.quadrant}
-                style={[styles.cell, highlighted ? styles.cellHighlighted : null]}
+                style={[
+                  styles.cell,
+                  showVertical ? styles.dividerRight : null,
+                  showHorizontal ? styles.dividerBottom : null,
+                  highlighted ? styles.cellHighlighted : null,
+                ]}
                 testID={card.testID}
                 accessibilityRole="summary"
                 accessibilityLabel={labels.cellA11y({
@@ -493,61 +535,14 @@ export function QuadrantBoard({
                       <View style={styles.headerTrailing}>{renderHeaderTrailing(card)}</View>
                     )}
                   </View>
-                  {/*
-                    🔴 2026-11-16：副标题（「重要且紧急」）不再画。
-                    滴答的四象限每格只有**一行**标题；我们原来是「马上做」+「重要且紧急」
-                    两行 —— 同一件事说两遍，格子顶部还高一倍。
-                    标题词条本身这一轮不动（换名字要动 i18n 与用户预期），
-                    只把副标题从视觉上收掉。
-                  */}
                 </View>
 
                 {/*
                   🔴 卡里的行**就是** `TaskList` 渲染的行 —— 见文件头的核心契约。
+                  任务区外面那一层留给宿主（web 在这里包 `SortableContext`）。
                 */}
                 <View style={styles.list}>
-                  <TaskList
-                    tasks={card.tasks}
-                    onToggleTask={onToggleTask}
-                    onOpenTask={onOpenTask}
-                    onLongPressTask={onLongPressTask}
-                    selectedTaskIds={selectedTaskIds}
-                    selectionMode={selectionMode}
-                    activeTaskId={activeTaskId}
-                    labels={taskLabels}
-                    renderMeta={renderMeta}
-                    renderTrailing={renderTrailing}
-                    busyTaskId={busyTaskId}
-                    fallbackTitle={fallbackTitle}
-                    density="compact"
-                    /*
-                     * 🔴 2026-11-15：**空格子不画那句「这里还没有任务」**。
-                     *
-                     * 四个象限空着时，同一句话会在四张卡里各写一遍，每遍占一格
-                     * 约 108dp —— 一屏只看得见两格半。而格子的标题
-                     * （「马上做 / 重要且紧急」）已经说清这一格是什么、里面有没有东西
-                     * 是"看得到的"——空着就是空着，不需要四行一样的字去说明。
-                     *
-                     * 这是这一屏真正的解法：前面我试过改 `minHeight`、改 `flexGrow`
-                     * （三层）、改 `empty` 的 padding，**全都没动** —— 因为撑高的是
-                     * `TaskList` 内部那个带 `flex: 1` 的容器。去掉文本，那一层就没有内容
-                     * 可撑，格子回到标题行的高度。
-                     */
-                    /*
-                      🔴 2026-11-16：这一格要不要写引导，**由宿主决定**。
-
-                      上一轮这里是写死的 `undefined` —— 理由是四张卡各写一遍
-                      「这里还没有任务」占掉一屏两格半。那条判断对**状态说明**成立，
-                      但它连**操作引导**也一起拿掉了：四个格子全空时，屏幕上没有任何
-                      一句告诉用户"任务可以拖进来"。
-
-                      现在改成取宿主的 `labels.empty(quadrant)`：web 那份已经实现成
-                      "只有第一个空象限返回『拖任务到这里』，其余返回空串"，
-                      所以"同屏最多一处"这条判据仍然由**一份**判断守着，不在这里重算。
-                      空串按"不渲染"处理（`TaskList` 收到空串会画一行空高）。
-                    */
-                    emptyMessage={labels.empty(card.quadrant) || undefined}
-                  />
+                  {renderCellBodyWrapper === undefined ? taskList : renderCellBodyWrapper(card, taskList)}
                 </View>
 
                 {renderCellOverlay === undefined ? null : (
