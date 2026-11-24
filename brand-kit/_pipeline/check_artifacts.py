@@ -657,6 +657,58 @@ if os.path.exists(IMG_MANIFEST):
     else:
         emit(f"✅ 04-imagery manifest 无重复登记（{len(paths2)} 条唯一）")
 
+# 25) 八个分类色槽：与 `tests/category-colors.spec.ts` 同一组门槛（Python 独立复算）
+#     TS spec 的门槛：对比度 ≥3、正常 ΔE ≥25、红色盲 ≥14、绿色盲 ≥13。
+CAT_MIN = {"contrast": 3.0, "normal": 25.0, "protan": 14.0, "deutan": 13.0}
+_cat = [RT.token(f"color-category-{i}") for i in range(1, 9)]
+if all(_cat):
+    _surf = RT.token("color-surface")
+    _worst_contrast = min(_contrast(h, _surf) for h in _cat)
+    _m = {
+        "normal": RT.worst_pair_delta(_cat)[0],
+        "protan": RT.worst_pair_delta(_cat, RT.PROTANOPIA)[0],
+        "deutan": RT.worst_pair_delta(_cat, RT.DEUTERANOPIA)[0],
+    }
+    _bad = []
+    if _worst_contrast < CAT_MIN["contrast"]:
+        _bad.append(f"对比度 {_worst_contrast:.2f} < {CAT_MIN['contrast']}")
+    for k, v in _m.items():
+        if v < CAT_MIN[k]:
+            _bad.append(f"{k} ΔE {v:.1f} < {CAT_MIN[k]}")
+    if _bad:
+        fail(f"分类色槽不满足 spec 门槛：{_bad}")
+    else:
+        emit(f"✅ 分类色槽满足 spec 门槛（对比 {_worst_contrast:.1f}；ΔE 正常 {_m['normal']:.0f} / 红 {_m['protan']:.0f} / 绿 {_m['deutan']:.0f}）")
+else:
+    fail("分类色槽：取不全 color.category-1..8")
+
+# 26) 徽章上的英文维度名必须是 i18n 里 name / unit 的可识别缩写
+#     物料写死 "FOCUS HRS"，产品改叫 "Deep work" 时就悄悄不一致了。
+EN_LOCALE = os.path.join(ROOT, "packages/i18n/src/locales/en.ts")
+if os.path.exists(EN_LOCALE) and os.path.exists(BB_SRC):
+    en = open(EN_LOCALE, encoding="utf-8").read()
+    _kinds_block = bb[bb.find("KINDS={"): bb.find("MILESTONES") if "MILESTONES" in bb else len(bb)]
+    latins = dict(re.findall(r'"(\w+)":\s*dict\([^}]*?latin="([^"]+)"', _kinds_block, re.S))
+    if not latins:
+        fail("徽章英文维度名：从 build_badges_v2.py 的 KINDS 里解析不到 latin")
+    alias = {"HRS": "hours", "HR": "hours"}  # 允许的缩写
+    bad_latin = []
+    for kind, latin in latins.items():
+        m1 = re.search(rf"'web\.growth\.kind\.{kind}'\s*:\s*'([^']+)'", en)
+        m2 = re.search(rf"'web\.growth\.kind\.{kind}\.unit'\s*:\s*'([^']+)'", en)
+        if not m1:
+            bad_latin.append(f"{kind}: en i18n 里没有 kind 名")
+            continue
+        words = (m1.group(1) + " " + (m2.group(1) if m2 else "")).lower()
+        parts = [alias.get(t, t).lower() for t in re.split(r"[\s-]+", latin)]
+        if not all(t in words for t in parts):
+            bad_latin.append(f"{kind}: 徽章写 {latin}，产品叫 {m1.group(1)!r}"
+                             + (f" / 单位 {m2.group(1)!r}" if m2 else ""))
+    if bad_latin:
+        fail(f"徽章英文维度名与产品文案不一致：{bad_latin}")
+    else:
+        emit(f"✅ 徽章英文维度名 = 产品文案的缩写（{len(latins)} 个）")
+
 if not fails:
     if JSON_OUT:
         import json as _j
