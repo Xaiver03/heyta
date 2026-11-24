@@ -165,6 +165,24 @@ export const ENTITY_TYPES = [
    */
   'CALENDAR_EVENT',
 
+  // ── 自定义保存筛选（智能清单） ─────────────────────────────
+  /**
+   * 用户保存的筛选（智能清单；ADR-0092）。
+   *
+   * 🔴 **它是用户数据、不是视图**：由「用户起的名字 + 用户填的规则」组成，二者都推不出来。
+   * 只存规则（结构化判别联合 JSON，**不是 DSL 字符串**），命中的任务在**读时**由
+   * `packages/domain/src/filter-rule.ts` 编译成 predicate 算出来，不物化、不复制任务。
+   * 它**没有 `projectId`**（账户级跨清单查询），**永不进 share op-log**（个人数据）。
+   *
+   * ⚠️ **可加性变更，不 bump `CURRENT_SCHEMA_VERSION`**：老客户端读到它的 op 会当未知
+   * 实体优雅跳过，不会卡住同步。
+   * 🔴 **服务端必须先于客户端上线** —— 老服务端的白名单（从本数组派生）里没有它，
+   * 会把该 op 判成 `INVALID_ENTITY_TYPE` 永久拒绝（§2.1 的硬顺序）。
+   * ⚠️ 进 `EntityModelMap` 那天 `check:ai-coverage` 分母 +1，本批已同批补 `FILTER`
+   * 的读写工具（`packages/local-api/src/tools/filter.ts`），不留欠账。
+   */
+  'FILTER',
+
   // ── 系统（同步基础设施，不可删） ───────────────────────────
   'GLOBAL_CONFIG',
   'MIGRATION',

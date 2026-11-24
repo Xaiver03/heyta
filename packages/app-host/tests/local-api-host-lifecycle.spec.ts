@@ -67,6 +67,7 @@ const stubs = vi.hoisted(() => {
   const habitActions = {
     createHabit: vi.fn(async () => 'habit'),
     checkIn: vi.fn(async () => undefined),
+    listFilters: () => Promise.resolve([]),
     listHabits: vi.fn(() => []),
     listLogs: vi.fn(() => []),
   };

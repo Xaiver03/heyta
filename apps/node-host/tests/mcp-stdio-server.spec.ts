@@ -54,6 +54,7 @@ function fakeHost() {
     listTasks: () => Promise.resolve(TASKS),
     getTask: (id) => Promise.resolve(TASKS.find((t) => t.id === id)),
     listProjects: () => Promise.resolve([]),
+    listFilters: () => Promise.resolve([]),
     listHabits: () => Promise.resolve([]),
     listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
     listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),

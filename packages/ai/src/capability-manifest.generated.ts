@@ -31,15 +31,16 @@ export type AiCapabilityEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
     'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'CALENDAR_EVENT' |
-    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' | 'TASK_REPEAT_CFG' |
-    'GLOBAL_CONFIG' | 'MIGRATION' | 'RECOVERY' | 'ALL';
+    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' | 'FILTER' |
+    'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' | 'MIGRATION' | 'RECOVERY' |
+    'ALL';
 
 /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
 export type AiCapabilityModeledEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
     'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'CALENDAR_EVENT' |
-    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT';
+    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' | 'FILTER';
 
 /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
 export type AiCapabilityToolKind = 'read' | 'write';
@@ -103,9 +104,9 @@ export const AI_CAPABILITY_MANIFEST =
     'source': 'ADR-0045 §2.6 纪律二',
   },
   'coverage': {
-    'covered': 11,
-    'denominator': 12,
-    'ratio': '11/12',
+    'covered': 12,
+    'denominator': 13,
+    'ratio': '12/13',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -120,6 +121,7 @@ export const AI_CAPABILITY_MANIFEST =
     'CALENDAR_EVENT',
     'COMMENT',
     'ATTACHMENT',
+    'FILTER',
   ],
   'modelledEntityTypes': [
     'TASK',
@@ -137,6 +139,7 @@ export const AI_CAPABILITY_MANIFEST =
     'ASSISTANT_TURN',
     'COMMENT',
     'ATTACHMENT',
+    'FILTER',
   ],
   'excludedFromDenominator': [
     {
@@ -214,10 +217,6 @@ export const AI_CAPABILITY_MANIFEST =
         'move_project',
         'restore_project',
         'set_project_color',
-        'set_project_icon',
-        'set_project_view_mode',
-        'set_project_kind',
-        'set_project_show_in_smart_list',
       ],
     },
     {
@@ -384,6 +383,21 @@ export const AI_CAPABILITY_MANIFEST =
       'writeToolNames': [
         'rename_attachment',
         'remove_attachment',
+      ],
+    },
+    {
+      'entityType': 'FILTER',
+      'materialized': true,
+      'countsTowardCoverage': true,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_filters',
+      ],
+      'writeToolNames': [
+        'create_filter',
+        'update_filter_rule',
+        'rename_filter',
+        'delete_filter',
       ],
     },
   ],
@@ -614,6 +628,14 @@ export const AI_CAPABILITY_MANIFEST =
           'required': false,
         },
       ],
+    },
+    {
+      'name': 'list_filters',
+      'kind': 'read',
+      'entityType': 'FILTER',
+      'description': '列出用户保存的筛选（智能清单）：标识、名字、规则、色槽、排序。顺序与界面上一样。',
+      'schemaRecorded': true,
+      'args': [] as const,
     },
     {
       'name': 'create_task',
@@ -1251,82 +1273,6 @@ export const AI_CAPABILITY_MANIFEST =
           'name': 'color',
           'type': 'number',
           'required': false,
-        },
-      ],
-    },
-    {
-      'name': 'set_project_icon',
-      'kind': 'write',
-      'entityType': 'PROJECT',
-      'description': '给一个清单（项目）指定图标（闭集里的 key，如 list / star / briefcase / home），或清除回到默认。🔴 仅在用户明确要求某个图标时调用；不要自行替用户选图标。省略 icon = 清除。',
-      'schemaRecorded': true,
-      'args': [
-        {
-          'name': 'projectId',
-          'type': 'string',
-          'required': true,
-        },
-        {
-          'name': 'icon',
-          'type': 'string',
-          'required': false,
-        },
-      ],
-    },
-    {
-      'name': 'set_project_view_mode',
-      'kind': 'write',
-      'entityType': 'PROJECT',
-      'description': '设置一个清单（项目）的默认视图：list（列表）/ board（看板）/ calendar（日历）/ timeline（时间线）。仅改变展示排布，不改变任务本身。省略 viewMode = 清除回到 list。',
-      'schemaRecorded': true,
-      'args': [
-        {
-          'name': 'projectId',
-          'type': 'string',
-          'required': true,
-        },
-        {
-          'name': 'viewMode',
-          'type': 'string',
-          'required': false,
-        },
-      ],
-    },
-    {
-      'name': 'set_project_kind',
-      'kind': 'write',
-      'entityType': 'PROJECT',
-      'description': '设置一个清单（项目）的类型：tasks（默认展示任务）/ notes（默认展示便签）。它只表达"打开这条清单先看到什么"，不限制内容、不合并便签实体。省略 kind = 清除回到 tasks。',
-      'schemaRecorded': true,
-      'args': [
-        {
-          'name': 'projectId',
-          'type': 'string',
-          'required': true,
-        },
-        {
-          'name': 'kind',
-          'type': 'string',
-          'required': false,
-        },
-      ],
-    },
-    {
-      'name': 'set_project_show_in_smart_list',
-      'kind': 'write',
-      'entityType': 'PROJECT',
-      'description': '设置一个清单（项目）是否在智能清单 / 汇总里显示。缺省为 true（显示）；传 false 即隐藏。',
-      'schemaRecorded': true,
-      'args': [
-        {
-          'name': 'projectId',
-          'type': 'string',
-          'required': true,
-        },
-        {
-          'name': 'showInSmartList',
-          'type': 'boolean',
-          'required': true,
         },
       ],
     },
@@ -1982,6 +1928,77 @@ export const AI_CAPABILITY_MANIFEST =
         },
       ],
     },
+    {
+      'name': 'create_filter',
+      'kind': 'write',
+      'entityType': 'FILTER',
+      'description': '新建一条保存筛选（智能清单）。名字不能为空；规则必须是结构化对象（match: all|any + conditions 数组）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'rule',
+          'type': 'object',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'update_filter_rule',
+      'kind': 'write',
+      'entityType': 'FILTER',
+      'description': '改写一条已有保存筛选的规则（整条替换，不是追加）。规则结构不合法会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'filterId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'rule',
+          'type': 'object',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'rename_filter',
+      'kind': 'write',
+      'entityType': 'FILTER',
+      'description': '给一条保存筛选改名。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'filterId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'delete_filter',
+      'kind': 'write',
+      'entityType': 'FILTER',
+      'description': '把一条保存筛选删除到回收站。可撤销，不是彻底删除。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'filterId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
   ],
   'protocolTypesWithoutModel': [
     'TASK_REPEAT_CFG',
@@ -2006,13 +2023,13 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 12 个，其中 11 个**读和写都有**工具（11/12）。',
+  '覆盖口径：用户可操作的已物化实体 13 个，其中 12 个**读和写都有**工具（12/13）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
-  '一、有 AI 工具的实体（11 个）',
+  '一、有 AI 工具的实体（12 个）',
   '- TASK —— 读和写都有（读 3 / 写 29）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
@@ -2046,7 +2063,7 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] set_task_checklist（taskId*:string, items*:array）',
   '  · [写] toggle_checklist_item（taskId*:string, itemText*:string, done*:boolean）',
   '  · [写] set_task_assignee（taskId*:string, assigneeUserId:string）',
-  '- PROJECT —— 读和写都有（读 1 / 写 11）',
+  '- PROJECT —— 读和写都有（读 1 / 写 7）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',
   '  · [写] rename_project（projectId*:string, name*:string）',
@@ -2055,10 +2072,6 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] move_project（projectId*:string, parentId:string）',
   '  · [写] restore_project（projectId*:string）',
   '  · [写] set_project_color（projectId*:string, color:number）',
-  '  · [写] set_project_icon（projectId*:string, icon:string）',
-  '  · [写] set_project_view_mode（projectId*:string, viewMode:string）',
-  '  · [写] set_project_kind（projectId*:string, kind:string）',
-  '  · [写] set_project_show_in_smart_list（projectId*:string, showInSmartList*:boolean）',
   '- TAG —— 读和写都有（读 1 / 写 4）',
   '  · [读] list_tags（无参数）',
   '  · [写] create_tag（name*:string）',
@@ -2112,6 +2125,12 @@ export const AI_CAPABILITY_TEXT = [
   '  · [读] list_attachments（taskId*:string）',
   '  · [写] rename_attachment（attachmentId*:string, fileName*:string）',
   '  · [写] remove_attachment（attachmentId*:string）',
+  '- FILTER —— 读和写都有（读 1 / 写 4）',
+  '  · [读] list_filters（无参数）',
+  '  · [写] create_filter（name*:string, rule*:object）',
+  '  · [写] update_filter_rule（filterId*:string, rule*:object）',
+  '  · [写] rename_filter（filterId*:string, name*:string）',
+  '  · [写] delete_filter（filterId*:string）',
   '',
   '二、产品里有、但我没有任何工具的实体（1 个）—— 实体存在，只是我没配工具',
   '- CALENDAR_EVENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',

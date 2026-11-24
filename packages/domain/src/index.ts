@@ -19,6 +19,8 @@ export * from './calendar-drop.js';
 // 内容比较 / 删除判定。纯函数；写入方只有 `app-host` 的 connector。
 export * from './calendar-event.js';
 export * from './task-filter.js';
+// ADR-0092：保存筛选（`FILTER.rule`）的编译器与写侧校验（复用 task-filter 语义）。
+export * from './filter-rule.js';
 // B 包 R8：标签合并别名的**唯一解析入口**（`resolveTagIds` / `resolveTags`）。
 export * from './tags.js';
 export * from './task-activity.js';

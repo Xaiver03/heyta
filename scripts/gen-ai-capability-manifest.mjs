@@ -297,6 +297,10 @@ const ENTITY_NOUNS = new Map(
     // 剥掉前导动词、介词之后按**从尾往前**找名词时命中 `comment(s)`。
     comment: 'COMMENT',
     comments: 'COMMENT',
+    // ADR-0092：保存筛选（FILTER）。工具名形如 `list_filters` / `create_filter` /
+    // `update_filter_rule` / `rename_filter` / `delete_filter` —— 从尾往前找命中 `filter(s)`。
+    filter: 'FILTER',
+    filters: 'FILTER',
   }),
 );
 

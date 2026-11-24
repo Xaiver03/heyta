@@ -45,6 +45,7 @@ function fakeHost(items: readonly LocalApiItem[] = []): LocalApiHost & { submits
       Promise.resolve(items.find((x) => x.id === taskId)),
     listProjects: (): Promise<readonly LocalApiProject[]> =>
       Promise.resolve([{ id: 'p1', name: '工作', taskCount: 2 }]),
+    listFilters: () => Promise.resolve([]),
     listHabits: (): Promise<readonly LocalApiHabit[]> =>
       Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
     listTags: () => Promise.resolve([]),
@@ -448,6 +449,7 @@ function eventHost(): LocalApiHost & { submits: number } {
       Promise.resolve(UNRELATED_TASKS.find((x) => x.id === taskId)),
     listProjects: (): Promise<readonly LocalApiProject[]> =>
       Promise.resolve([{ id: 'p1', name: '工作', taskCount: 2 }]),
+    listFilters: () => Promise.resolve([]),
     listHabits: (): Promise<readonly never[]> => Promise.resolve([]),
     listTags: (): Promise<readonly never[]> => Promise.resolve([]),
     listNotes: (): Promise<readonly never[]> => Promise.resolve([]),

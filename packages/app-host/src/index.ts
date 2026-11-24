@@ -1279,3 +1279,16 @@ export {
   type RunAiTurnOptions,
   type RunAiTurnResult,
 } from './ai-turn-orchestrator.js';
+
+/**
+ * 自定义保存筛选（`FILTER`）动作。同一理由：**op 的构造只有一份**（AGENTS §3.5）。
+ *
+ * 🔴 `apps/*` 里**不得出现 `entityType: 'FILTER'` 的字面量** —— 出现就说明宿主在自己拼 op。
+ * `FILTER` 是个人数据，永不进 share op-log（ADR-0092 §3.3）。
+ */
+export {
+  createFilterActions,
+  type FilterActions,
+  type FilterActionsOptions,
+  type NewFilterFields,
+} from './filter-actions.js';

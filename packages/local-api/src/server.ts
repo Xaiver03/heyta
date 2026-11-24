@@ -155,6 +155,26 @@ export interface LocalApiComment {
 }
 
 /**
+ * 一条保存筛选（FILTER）的**读面**。
+ *
+ * 字段与 `@heyta/domain` 的 `Filter` 对齐（`id` / `name` / `rule` / `color` / `order`），
+ * 但本包零运行时依赖、看不见领域实体，所以手抄一份**读协议**。
+ *
+ * ⚠️ `rule` 是**结构化判别联合 JSON**（`FilterRule`），这里只按不透明 JSON 透传：
+ * 解释规则形状的只有 `@heyta/domain` 的 `filter-rule.ts` 一处（写侧校验 / 读侧编译）。
+ */
+export interface LocalApiFilter {
+  id: string;
+  name: string;
+  /** 结构化规则（`FilterRule` 的 JSON 形状）。本层不解释它。 */
+  rule: unknown;
+  /** 色槽 1–8；缺 = 无色槽。 */
+  color?: number;
+  /** 侧栏排序键；缺 = 排在有 order 的之后。 */
+  order?: number;
+}
+
+/**
  * 一次打卡（HABIT_LOG）。`note` 那个字段**不出**：`checkIn` 从来不写它，
  * 而把一条永远为空的自由文本放进白名单，等于放一条将来的出境通道。
  */
@@ -295,6 +315,13 @@ export interface LocalApiHost {
    * 落到运行时，而症状是"AI 说它没有这个能力" —— 正是能力清单要消灭的那类谎话。
    */
   listTags(): Promise<readonly LocalApiTag[]>;
+  /**
+   * 列保存筛选（FILTER，ADR-0092）。
+   *
+   * 🔴 与 `listHabits` / `listTags` 同一立场：**必填成员**（每个宿主必须表态）。
+   * 顺序由宿主问领域层（`aliveFilters`：order → name → id），本层不重新排序。
+   */
+  listFilters(): Promise<readonly LocalApiFilter[]>;
   /** 列便签的**列表行**（不含正文，理由见 {@link LocalApiNoteRow}）。 */
   listNotes(limit: number): Promise<readonly LocalApiNoteRow[]>;
   /** 取单条便签（含正文）。取不到返回 `undefined`（不是抛错，同 `getTask`）。 */

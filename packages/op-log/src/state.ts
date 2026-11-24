@@ -27,6 +27,7 @@ import type {
   CalendarEvent,
   Comment,
   CountdownEvent,
+  Filter,
   FocusSession,
   PreferenceCorrection,
   Habit,
@@ -123,6 +124,13 @@ export interface MaterializedState {
    * 都重传这张图，并把 `payloadBytes` / 单条 op 上限全撑变形。
    */
   attachments: Record<string, Attachment>;
+  /**
+   * 自定义保存筛选（智能清单；ADR-0092）。
+   *
+   * ⚠️ 桶里存的是**规则**，不是任务集合 —— 命中的任务在读时由
+   * `@heyta/domain` 的 `filter-rule.ts` 算出来。这个实体**永不进 share op-log**。
+   */
+  filters: Record<string, Filter>;
 }
 
 export function emptyState(): MaterializedState {
@@ -142,6 +150,7 @@ export function emptyState(): MaterializedState {
     assistantTurns: {},
     comments: {},
     attachments: {},
+    filters: {},
   };
 }
 
@@ -162,6 +171,7 @@ const BUCKET_BY_ENTITY = {
   ASSISTANT_TURN: 'assistantTurns',
   COMMENT: 'comments',
   ATTACHMENT: 'attachments',
+  FILTER: 'filters',
 } as const;
 
 type ModeledEntity = keyof typeof BUCKET_BY_ENTITY;

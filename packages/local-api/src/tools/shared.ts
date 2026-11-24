@@ -843,7 +843,17 @@ export type LocalApiWriteIntent =
    */
   | { action: 'add-task-comment'; taskId: string; body: string }
   /** 删除一条评论（COMMENT）。软删（`DEL`），可逆 —— 走同一条 share 通道。 */
-  | { action: 'delete-task-comment'; commentId: string };
+  | { action: 'delete-task-comment'; commentId: string }
+  // 保存筛选（FILTER，ADR-0092）。**个人数据**：经 `filterActions` 走个人 op-log，
+  // 永不进 share 通道。规则按不透明 JSON 传，结构合法性由动作层（领域校验）判定。
+  /** 新建保存筛选（FILTER）。`rule` 是 `FilterRule` 的 JSON 形状。 */
+  | { action: 'create-filter'; name: string; rule: Readonly<Record<string, unknown>> }
+  /** 改写一条保存筛选的规则（FILTER，整条替换）。 */
+  | { action: 'update-filter-rule'; filterId: string; rule: Readonly<Record<string, unknown>> }
+  /** 给保存筛选改名（FILTER）。 */
+  | { action: 'rename-filter'; filterId: string; name: string }
+  /** 软删除保存筛选（FILTER）→ 回收站。 */
+  | { action: 'delete-filter'; filterId: string };
 
 /**
  * 一条写入落地的实体类型。
@@ -878,7 +888,8 @@ export type LocalApiWrittenEntityType =
   | 'REMINDER'
   | 'EVENT'
   | 'ATTACHMENT'
-  | 'COMMENT';
+  | 'COMMENT'
+  | 'FILTER';
 
 export type LocalApiWriteResult =
   | {
