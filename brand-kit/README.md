@@ -28,7 +28,7 @@
 | `08-merch/` | 周边（笔记本/马克杯/帆布包/贴纸） | ✅ |
 | `09-social/` | 社交卡片 / OG 图 | ✅ |
 | `10-templates/` | 幻灯片模板 16:9 + 更新日志卡 | ✅ |
-| `_pipeline/` | 全部生成脚本（可重跑）：`build_tokens/logo/badges/icons/brandbook` + `moss_batch.py` + `render.py` | ✅ |
+| `_pipeline/` | 全部生成脚本（可重跑）：`build_tokens` / `build_logo` / `build_badges_v2` / `build_icons` / `build_brandbook` / `build_docs` / `build_index` / `moss_batch` / `render` | ✅ |
 
 ## 重新生成
 
@@ -39,7 +39,9 @@ PYTHONNOUSERSITE=1 $PY build_tokens.py     # 00 brand token
 PYTHONNOUSERSITE=1 $PY build_logo.py       # 01 logo（rsvg 导出 PNG）
 PYTHONNOUSERSITE=1 $PY build_badges_v2.py  # 02 成长标识体系（17 里程碑 + 8 标签 + 8 色槽 + 状态胶囊）
 PYTHONNOUSERSITE=1 $PY build_icons.py      # 03 icons
-PYTHONNOUSERSITE=1 $PY build_brandbook.py  # 00 brand-book.pdf（Chrome → PDF → pdftoppm 预览）
+PYTHONNOUSERSITE=1 $PY build_brandbook.py  # 00 brand-book.pdf
+PYTHONNOUSERSITE=1 $PY build_docs.py       # 05–10 海报/折页/手册/周边/社交/模板
+PYTHONNOUSERSITE=1 $PY build_index.py      # index.html + manifest.json
 # 需要本地 ComfyUI(127.0.0.1:8188, MOSS-Image) 起的：04 位图
 PYTHONNOUSERSITE=1 $PY moss_batch.py
 ```
