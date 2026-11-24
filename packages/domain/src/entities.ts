@@ -496,6 +496,16 @@ export interface Tag extends EntityBase {
   name: string;
   color?: string;
   /**
+   * 父标签 id（**只有两层**：父标签 / 子标签）。
+   *
+   * 省略 = 顶层标签。`null` 载荷经 reducer 转成"删除该字段"（提为顶层）。
+   * 🔴 不用 "/" 把路径写进名字（那是把命名当结构，会撞名）；这里用**关系字段**。
+   * 🔴 只有两层：父必须是顶层标签；守卫在 `tag-hierarchy.ts` 的
+   *    `validateTagParentChange`（与 `project-hierarchy.ts` 同形）。可选字段，
+   *    不 bump `CURRENT_SCHEMA_VERSION`（AGENTS.md §3.3）。
+   */
+  parentId?: string;
+  /**
    * 「这条标签被合并进了哪一条」—— 合并的**唯一落点**。
    *
    * 🔴 **合并 = 一条 op**：`{ deletedAt, mergedInto: <目标标签 id> }`。不重写任何任务的

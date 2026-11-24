@@ -45,8 +45,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Tag, Task } from '@heyta/domain';
-import { useI18n } from '@heyta/i18n';
+import { tagTargetsFor, type Tag, type Task } from '@heyta/domain';
+import { useI18n, type MessageKey } from '@heyta/i18n';
 import {
   createProjectActions,
   createTaskActions,
@@ -54,7 +54,7 @@ import {
   type ProjectActions,
   type TaskActions,
 } from '@heyta/app-host';
-import { OrganizerList, liveTaskCountsByTag, toOrganizerNodes, toTagItems } from '@heyta/ui';
+import { FolderPicker, OrganizerList, liveTaskCountsByTag, rejectionReasonOf, toTagTree } from '@heyta/ui';
 
 import { useTaskHost } from '../db/use-task-host';
 import { useMobileSync } from '../sync/store';
@@ -108,17 +108,29 @@ export function TagsSection(): React.JSX.Element {
   const run = useCallback(
     (p: Promise<unknown>) => {
       setBusy(true);
+      setActionError('');
       void p
         .then(read)
+        // 🔴 必须 catch：同名新建/改名、越权换父都会被动作层拒绝；不接住就是
+        // "输入被清空、列表没变、也没有任何提示"（评审 B3）。
+        .catch((cause: unknown) => {
+          setActionError(t(tagRejectionKey(cause)));
+        })
         .finally(() => {
           setBusy(false);
         });
     },
-    [read],
+    [read, t],
   );
 
-  /** 标签是平表（没有父子关系），共享层把它包成"没有子级的树"。 */
-  const nodes = useMemo(() => toOrganizerNodes(toTagItems(tags)), [tags]);
+  /** 标签两层树（ADR-0090）：子标签缩进挂在父下。 */
+  const nodes = useMemo(() => toTagTree(tags), [tags]);
+  /** 换父候选集（领域层 `tagTargetsFor`，与 web 同一个函数）。 */
+  const tagTargets = useMemo(
+    () => new Map(tags.map((tag) => [tag.id, tagTargetsFor(tags, tag.id)])),
+    [tags],
+  );
+  const [actionError, setActionError] = useState('');
 
   /** 确认那一行的影响面（口径与 web 同一个函数，见 `@heyta/ui#liveTaskCountsByTag`）。 */
   const removeImpact = useMemo(() => liveTaskCountsByTag(tasks), [tasks]);
@@ -180,8 +192,35 @@ export function TagsSection(): React.JSX.Element {
             run(actions.removeTag(item.id));
           }}
           busy={busy}
+          renderItemExtra={(item) => (
+            <FolderPicker
+              item={item}
+              candidates={(tagTargets.get(item.id) ?? []).map((target) => ({
+                id: target.id,
+                name: target.name,
+              }))}
+              currentParentId={tags.find((tag) => tag.id === item.id)?.parentId ?? undefined}
+              labels={{
+                button: (label) => t('common.organizer.tag.parent.button', { name: label }),
+                title: t('common.organizer.tag.parent.title'),
+                none: t('common.organizer.tag.parent.none'),
+                current: t('common.organizer.tag.parent.current'),
+              }}
+              onSelect={(targetId) => {
+                if (actions === null) return;
+                run(actions.setTagParent(item.id, targetId));
+              }}
+              disabled={busy}
+              testID={`mobile-tag-parent-${item.id}`}
+            />
+          )}
           testID="mobile-tags-list"
         />
+        {actionError === '' ? null : (
+          <Text variant="caption" tone="subtle">
+            {actionError}
+          </Text>
+        )}
       </Card>
       {/*
         🔴 这句说明**只在有标签时**才成立。
@@ -214,4 +253,27 @@ export function TagsSection(): React.JSX.Element {
       />
     </>
   );
+}
+
+
+/** 换父被拒 → 标签口径的一句话（与 web 同一条解析；移动端不 import web）。 */
+function tagRejectionKey(error: unknown): MessageKey {
+  switch (rejectionReasonOf(error)) {
+    case 'tag_not_found':
+      return 'common.organizer.tag.reject.tagNotFound';
+    case 'parent_not_found':
+      return 'common.organizer.tag.reject.parentNotFound';
+    case 'self':
+      return 'common.organizer.tag.reject.self';
+    case 'cycle':
+      return 'common.organizer.tag.reject.cycle';
+    case 'parent_not_top_level':
+      return 'common.organizer.tag.reject.parentNotTopLevel';
+    case 'has_children':
+      return 'common.organizer.tag.reject.hasChildren';
+    case 'duplicate_name':
+      return 'common.organizer.tag.reject.duplicateName';
+    default:
+      return 'common.organizer.tag.reject.unknown';
+  }
 }

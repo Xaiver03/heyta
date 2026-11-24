@@ -24,6 +24,8 @@ export * from './tags.js';
 export * from './task-activity.js';
 export * from './subtasks.js';
 export * from './project-hierarchy.js';
+// 标签层级（父 / 子，两层）—— ADR-0090。
+export * from './tag-hierarchy.js';
 export * from './reminders.js';
 export * from './timeline.js';
 export * from './timeline-position.js';

@@ -43,6 +43,7 @@ import {
   trashedIn,
   parseCategorySlot,
   validateProjectParentChange,
+  validateTagParentChange,
   type CategorySlot,
   type Project,
   type Tag,
@@ -120,7 +121,7 @@ export interface ProjectActions {
   /** 软删除。⚠️ 不级联删除其下的任务（见文件头第 2 条）。 */
   removeProject(entityId: string): Promise<void>;
 
-  createTag(name: string): Promise<string>;
+  createTag(name: string, parentId?: string): Promise<string>;
   /**
    * 改标签名。**一条意图一条 op**：载荷只有 `name`。
    *
@@ -130,6 +131,15 @@ export interface ProjectActions {
    */
   renameTag(entityId: string, name: string): Promise<void>;
   removeTag(entityId: string): Promise<void>;
+
+  /**
+   * 改标签的父：挂到某个**顶层**标签下（两级），或提为顶层（省略 `parentId`）。
+   *
+   * 结构守卫全在领域层 `validateTagParentChange`（与清单侧 `setParent` 同一条分工）：
+   * 不存在 / 自己 / 环 / 父不是顶层（第三层）/ 自己有子 —— 逐条拒绝，**不静默**。
+   * 一条意图一条 op：载荷只有 `parentId`（清除写 `null`）。
+   */
+  setTagParent(entityId: string, parentId?: string): Promise<void>;
 
   /**
    * **可见**的清单：未删除**且未归档**，按 (createdAt, id) 升序。
@@ -233,6 +243,38 @@ export function createProjectActions(
     });
   };
 
+  const updateTag = async (
+    entityId: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> => {
+    if (tagOf(entityId) === undefined) throw new Error(`找不到标签「${entityId}」`);
+    await ctx.dispatch({
+      entityType: 'TAG' as EntityType,
+      entityId,
+      opType: OpType.Update,
+      payload,
+    });
+  };
+
+  /**
+   * 同一层里标签名唯一（兄弟唯一）。ADR-0090：名字当的是**同层显示名**，不是树路径
+   * —— 所以判的是"同一个 parentId 下不能重名"，不同父下可以有同名子标签。
+   */
+  const assertSiblingNameFree = (
+    name: string,
+    parentId: string | undefined,
+    excludeId?: string,
+  ): void => {
+    const wantParent = parentId ?? undefined;
+    for (const other of Object.values(ctx.getState().tags)) {
+      if (!isLive(other)) continue;
+      if (excludeId !== undefined && other.id === excludeId) continue;
+      if ((other.parentId ?? undefined) === wantParent && other.name === name) {
+        throw new Error(`同一层里已经有名为「${name}」的标签（duplicate_name）`);
+      }
+    }
+  };
+
   const visibleProjects = (): Project[] =>
     aliveOf(ctx.getState().projects)
       .filter((project) => !isArchived(project))
@@ -329,16 +371,25 @@ export function createProjectActions(
       });
     },
 
-    async createTag(name) {
+    async createTag(name, parentId) {
       const trimmed = name.trim();
       if (trimmed === '') throw new Error('标签名称不能为空');
+      if (parentId !== undefined) {
+        const parent = tagOf(parentId);
+        if (parent === undefined) throw new Error(`找不到父标签「${parentId}」`);
+        if (parent.parentId !== undefined) {
+          throw new Error('标签只支持两层：父标签自己不能再有父标签');
+        }
+      }
+      assertSiblingNameFree(trimmed, parentId);
 
       const entityId = makeTagId();
       await ctx.dispatch({
         entityType: 'TAG' as EntityType,
         entityId,
         opType: OpType.Create,
-        payload: { name: trimmed },
+        // 无父时显式写 null —— 与 `createProject` 同一条规则（`null` 能穿过 JSON 表达"清除"）。
+        payload: { name: trimmed, parentId: parentId ?? null },
       });
       return entityId;
     },
@@ -347,6 +398,8 @@ export function createProjectActions(
       const trimmed = name.trim();
       if (trimmed === '') throw new Error('标签名称不能为空');
       if (tagOf(entityId) === undefined) throw new Error(`找不到标签「${entityId}」`);
+      // 同层不能重名（兄弟唯一）；改自己的名字时排除自己。
+      assertSiblingNameFree(trimmed, tagOf(entityId)?.parentId, entityId);
       // 一条意图一条 op，载荷只有 `name`。引用它的任务**一个都不碰** ——
       // `task.tagIds` 存的是 id，改名不需要动它们；正因为如此，"删了重建"才是坏的：
       // 新 id 换不了旧引用，任务上那个标签就这么静默没了。
@@ -356,6 +409,22 @@ export function createProjectActions(
         opType: OpType.Update,
         payload: { name: trimmed },
       });
+    },
+
+    async setTagParent(entityId, parentId) {
+      const verdict = validateTagParentChange(
+        Object.values(ctx.getState().tags),
+        entityId,
+        parentId,
+      );
+      if (!verdict.ok) {
+        throw new Error(`改父被拒绝（${verdict.reason}）：${entityId} → ${parentId ?? '顶层'}`);
+      }
+      const self = tagOf(entityId);
+      if (self === undefined) throw new Error(`找不到标签「${entityId}」`);
+      assertSiblingNameFree(self.name, verdict.parentId, entityId);
+      // `undefined` → `null`：`null` 才能穿过 JSON 表达"清除"（提为顶层）。
+      await updateTag(entityId, { parentId: verdict.parentId ?? null });
     },
 
     async removeTag(entityId) {

@@ -702,6 +702,7 @@ export {
   aliveProjects,
   archivedProjects,
   childProjects,
+  childTags,
   openTagCounts,
   openTaskCount,
   openTaskCounts,
@@ -709,7 +710,9 @@ export {
   toOrganizerNodes,
   toOrganizerTree,
   toTagItems,
+  toTagTree,
   topLevelProjects,
+  topLevelTags,
   type OrganizerItem,
   type OrganizerNode,
 } from './projects/model.js';

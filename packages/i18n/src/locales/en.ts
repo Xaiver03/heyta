@@ -1872,6 +1872,8 @@ export const en = {
   // ── B package R8: tag manager (merge / bulk / rename) ─────
   'web.tags.manage.open': 'Manage tags',
   'web.tags.manage.title': 'Manage tags',
+  'web.tags.manage.createPlaceholder': 'New tag name',
+  'web.tags.manage.createSubmit': 'Create tag',
   'web.tags.manage.hint': 'Select two or more tags to merge them into one: tasks move to the target tag and the others are deleted.',
   'web.tags.manage.select': 'Select tag "{name}"',
   'web.tags.manage.usage': '{count} tasks',
@@ -3598,6 +3600,20 @@ export const en = {
   'common.organizer.folder.reject.parentNotTopLevel': 'A folder holds lists — it cannot hold another folder',
   'common.organizer.folder.reject.hasChildren': 'This list contains other lists, so it cannot go inside a folder',
   'common.organizer.folder.reject.unknown': 'Could not move it — please try again later',
+
+  // Tag hierarchy (ADR-0090): nest a tag under a parent tag (two levels)
+  'common.organizer.tag.parent.button': 'Move "{name}" under a parent tag',
+  'common.organizer.tag.parent.title': 'Move under a parent tag',
+  'common.organizer.tag.parent.none': 'No parent (top level)',
+  'common.organizer.tag.parent.current': ' (current)',
+  'common.organizer.tag.reject.tagNotFound': 'This tag no longer exists (maybe just deleted, or not synced yet)',
+  'common.organizer.tag.reject.parentNotFound': 'The target parent tag does not exist',
+  'common.organizer.tag.reject.self': 'A tag cannot go under itself',
+  'common.organizer.tag.reject.cycle': 'That would create a loop: a tag cannot go under its own child',
+  'common.organizer.tag.reject.parentNotTopLevel': 'Tags are two levels only: a parent tag cannot have its own parent',
+  'common.organizer.tag.reject.hasChildren': 'This tag has child tags, so it cannot go under another tag',
+  'common.organizer.tag.reject.duplicateName': 'A tag with that name already exists at this level',
+  'common.organizer.tag.reject.unknown': 'Could not move it — please try again later',
   'common.organizer.showArchived': 'Show archived',
   'common.organizer.hideArchived': 'Hide archived',
   // Delete confirmation (trash & archive W4b, 2026-10-03) — consumed by the

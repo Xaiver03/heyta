@@ -432,6 +432,42 @@ export function toOrganizerNodes(items: readonly OrganizerItem[]): OrganizerNode
   return items.map((item) => ({ ...item, children: [] }));
 }
 
+/** 顶层标签（无 `parentId`）。 */
+export function topLevelTags(tags: readonly Tag[]): Tag[] {
+  return tags.filter((tag) => isLive(tag) && tag.parentId === undefined);
+}
+
+/** 某个父标签下的**一层**子标签。 */
+export function childTags(tags: readonly Tag[], parentId: string): Tag[] {
+  return tags.filter((tag) => isLive(tag) && tag.parentId === parentId);
+}
+
+/**
+ * 标签 → 可渲染的树（顶层 + 一层子级），**保持输入顺序**（ADR-0090）。
+ *
+ * 与 `toOrganizerTree` 同形：`OrganizerNode.children` 的类型本身就表达"只有两层"。
+ *
+ * 🔴 **孤儿（父已被删 / 不存在）按顶层列出，不隐藏**（ADR-0090 §四）。否则删掉父标签、
+ *    或把父标签合并掉之后，子标签会从侧栏 / 标签管理页 / 移动端树里消失，成为
+ *    **无法改名、删除、换父、按它筛选**的僵尸标签；而任务详情与 chip 又把孤儿当顶层
+ *    显示 —— 同一标签在两处一隐一显。这里的口径与 `TaskOrganizer` / `TaskDetailSheet`
+ *    保持一致：顶层 = `parentId===undefined` **或** 父不在活标签表里。
+ */
+export function toTagTree(tags: readonly Tag[]): OrganizerNode[] {
+  const live = tags.filter(isLive);
+  const liveIds = new Set(live.map((tag) => tag.id));
+  const roots = live.filter(
+    (tag) => tag.parentId === undefined || !liveIds.has(tag.parentId),
+  );
+  return roots.map((tag) => ({
+    id: tag.id,
+    name: tag.name,
+    children: live
+      .filter((child) => child.parentId === tag.id)
+      .map((child) => ({ id: child.id, name: child.name })),
+  }));
+}
+
 /* ========================================================================
  * 五、稳定 key
  * ====================================================================== */

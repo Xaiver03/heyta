@@ -58,7 +58,7 @@ import { cssVar, ICON_SIZE } from '@heyta/design-system';
 
 import { FormField } from '../../lib/form/FormField.js';
 import { useI18n } from '@heyta/i18n';
-import { indexTags, resolveTagIds, resolveTags, type Task } from '@heyta/domain';
+import { indexTags, isLive, resolveTagIds, resolveTags, type Task } from '@heyta/domain';
 import { ChevronDown, SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
 
 import { selectChildProjects, selectTopLevelProjects, useProjectStore } from '../projects/store.js';
@@ -134,6 +134,30 @@ export function OrganizerField({
   const projectState = useProjectStore();
   /** 有效标签（别名已解析）—— 勾选状态与"下一组"都基于它，见下面那条注释。 */
   const effectiveTagIds = resolveTagIds(task.tagIds, indexTags(projectState.tags));
+
+  /**
+   * 标签复选框的**两层**排列（ADR-0090）：顶层标签后紧跟它的子标签（缩进）。
+   * 只显示活着的标签；父已被删的子标签作为孤儿**按顶层**列出（否则任务上那个
+   * 勾选就没法取消了）。
+   */
+  const liveTags = projectState.tags.filter(isLive);
+  const liveById = new Map(liveTags.map((tag) => [tag.id, tag] as const));
+  const childrenByParent = new Map<string, typeof liveTags>();
+  for (const tag of liveTags) {
+    if (tag.parentId === undefined || !liveById.has(tag.parentId)) continue;
+    const list = childrenByParent.get(tag.parentId);
+    if (list === undefined) childrenByParent.set(tag.parentId, [tag]);
+    else list.push(tag);
+  }
+  const tagRows: { tag: (typeof liveTags)[number]; depth: number }[] = [];
+  for (const tag of liveTags) {
+    if (tag.parentId !== undefined && liveById.has(tag.parentId)) continue; // 子/孤儿后排
+    tagRows.push({ tag, depth: 0 });
+    for (const child of childrenByParent.get(tag.id) ?? []) tagRows.push({ tag: child, depth: 1 });
+  }
+  for (const tag of liveTags) {
+    if (tag.parentId !== undefined && !liveById.has(tag.parentId)) tagRows.push({ tag, depth: 0 });
+  }
 
   const tops = selectTopLevelProjects(projectState);
 
@@ -276,7 +300,7 @@ export function OrganizerField({
           >
             {t('web.organize.tagsLegend')}
           </legend>
-          {projectState.tags.map((tag) => {
+          {tagRows.map(({ tag, depth }) => {
             const checked = effectiveTagIds.includes(tag.id);
             return (
               <label
@@ -298,7 +322,7 @@ export function OrganizerField({
                     );
                   }}
                 />
-                {tag.name}
+                {depth === 0 ? tag.name : `　${tag.name}`}
               </label>
             );
           })}

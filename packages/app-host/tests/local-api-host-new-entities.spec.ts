@@ -115,7 +115,9 @@ describe('TAG：建标签与整组覆盖任务的标签', () => {
     const ops = await opsOf('TAG', result.taskId);
     expect(ops).toHaveLength(1);
     expect(ops[0]?.opType).toBe(OpType.Create);
-    expect(ops[0]?.payload).toEqual({ name: '重要' });
+    // 顶层标签也写 `parentId: null`（与 createProject 同一条规则：同一件事一种写法，
+    // 且 `null` 能穿过 JSON 表达"无父"）—— ADR-0090。
+    expect(ops[0]?.payload).toEqual({ name: '重要', parentId: null });
 
     // 🔴 写→读闭环：这条挡的是"op 落对了但投影漏搬一个字段" ——
     // 那种情况界面看得见、AI 看不见，两边都不报错。

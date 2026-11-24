@@ -74,9 +74,14 @@ interface ProjectState {
    */
   setProjectShare: (id: string, shareId: string) => Promise<void>;
 
-  addTag: (name: string) => Promise<string | undefined>;
+  addTag: (name: string, parentId?: string) => Promise<string | undefined>;
   renameTag: (id: string, name: string) => Promise<void>;
   deleteTag: (id: string) => Promise<void>;
+  /**
+   * 改标签的父（两级，ADR-0090）。薄转发：两层/环/自指/父非顶层/有子 全在领域层
+   * `validateTagParentChange`（`app-host` 的 `setTagParent` 会调）。省略 = 提为顶层。
+   */
+  setTagParent: (id: string, parentId?: string) => Promise<void>;
 }
 
 /** 与任务 / 专注 store 同一个形状。只含两个函数引用，不含任何判断。 */
@@ -146,9 +151,9 @@ export const useProjectStore = create<ProjectState>(() => ({
     syncProjects();
   },
 
-  addTag: async (name) => {
+  addTag: async (name, parentId) => {
     if (name.trim() === '') return undefined;
-    return projectActions.createTag(name);
+    return projectActions.createTag(name, parentId);
   },
 
   renameTag: async (id, name) => {
@@ -159,6 +164,11 @@ export const useProjectStore = create<ProjectState>(() => ({
 
   deleteTag: async (id) => {
     await projectActions.removeTag(id);
+  },
+
+  setTagParent: async (id, parentId) => {
+    // 与 setProjectParent 同一条纪律：被领域层拒绝时让它抛，界面负责显示。
+    await projectActions.setTagParent(id, parentId);
   },
 }));
 

@@ -2055,6 +2055,8 @@ export const zhCN = {
   // `docs/plans/r14-entry-table.md`：作用域=全局、代价=可撤销（合并有撤销）⇒ 不进危险区。
   'web.tags.manage.open': '管理标签',
   'web.tags.manage.title': '管理标签',
+  'web.tags.manage.createPlaceholder': '新标签名称',
+  'web.tags.manage.createSubmit': '新建标签',
   'web.tags.manage.hint': '勾选两个以上标签可以把它们合并成一个：任务会转到目标标签上，其余标签被删掉。',
   'web.tags.manage.select': '选择标签「{name}」',
   'web.tags.manage.usage': '{count} 条任务',
@@ -3974,6 +3976,20 @@ export const zhCN = {
   'common.organizer.folder.reject.parentNotTopLevel': '文件夹里只能放清单，不能再放一个文件夹',
   'common.organizer.folder.reject.hasChildren': '这条清单里面有别的清单，文件夹不能再放进文件夹',
   'common.organizer.folder.reject.unknown': '移动失败，请稍后重试',
+
+  // 标签层级（ADR-0090）：把标签挂到父标签下（两级）
+  'common.organizer.tag.parent.button': '把「{name}」挂到父标签下',
+  'common.organizer.tag.parent.title': '挂到父标签下',
+  'common.organizer.tag.parent.none': '不挂到父标签下（顶级）',
+  'common.organizer.tag.parent.current': '（当前位置）',
+  'common.organizer.tag.reject.tagNotFound': '这条标签已经不在了（可能刚被删除，或同步还没到）',
+  'common.organizer.tag.reject.parentNotFound': '目标父标签不存在',
+  'common.organizer.tag.reject.self': '标签不能挂到它自己下面',
+  'common.organizer.tag.reject.cycle': '这样会形成循环：标签不能挂到自己的子标签下',
+  'common.organizer.tag.reject.parentNotTopLevel': '标签只有两层，父标签本身不能再有父标签',
+  'common.organizer.tag.reject.hasChildren': '这条标签下面还有子标签，它不能再挂到别的标签下',
+  'common.organizer.tag.reject.duplicateName': '同一层里已经有同名的标签',
+  'common.organizer.tag.reject.unknown': '移动失败，请稍后重试',
   'common.organizer.showArchived': '显示已归档',
   'common.organizer.hideArchived': '收起已归档',
   // ── 删除确认（2026-10-03 回收站与归档 W4b）────────────────────

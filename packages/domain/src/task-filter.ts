@@ -40,7 +40,8 @@ import {
 } from './date.js';
 import { Quadrant, isAbandoned, isLive, type Tag, type Task } from './entities.js';
 import { bucketByQuadrant } from './quadrant.js';
-import { resolveTagIds, taskHasTag } from './tags.js';
+import { resolveTagId, resolveTagIds } from './tags.js';
+import { expandTagIdsWithDescendants } from './tag-hierarchy.js';
 
 /**
  * 一条任务筛选。
@@ -208,12 +209,21 @@ export function filterTasks(
        * `context.tags` 缺席时退化成按 id 精确匹配：那是桌面/移动端**今天**的行为，
        * 已在计划文档里登记为缺口（不是这次的静默降级）。
        */
-      return visible.filter((t) =>
-        !isCompleted(t) &&
-        (context.tags === undefined
-          ? (t.tagIds?.includes(filter.tagId) ?? false)
-          : taskHasTag(t, filter.tagId, context.tags)),
-      );
+      if (context.tags === undefined) {
+        return visible.filter(
+          (t) => !isCompleted(t) && (t.tagIds?.includes(filter.tagId) ?? false),
+        );
+      }
+      {
+        const tags = context.tags;
+        // 先做合并别名解析，再按父子展开（roll-up，ADR-0090）：
+        // 按**父**标签筛要把它所有**子**标签的任务一并带出；按子筛只带自己。
+        const rootId = resolveTagId(filter.tagId, tags) ?? filter.tagId;
+        const accepted = new Set(expandTagIdsWithDescendants([rootId], Object.values(tags)));
+        return visible.filter(
+          (t) => !isCompleted(t) && resolveTagIds(t.tagIds, tags).some((id) => accepted.has(id)),
+        );
+      }
   }
 }
 
@@ -411,7 +421,18 @@ export function scopeTasks(
   const visible = visibleTasks(tasks);
   if (isScopeEmpty(scope)) return visible;
   const projects = new Set(scope.projectIds);
-  const wanted = new Set(scope.tagIds);
+  const wanted = new Set<string>();
+  if (tags === undefined) {
+    for (const id of scope.tagIds) wanted.add(id);
+  } else {
+    // 父子汇总（ADR-0090）：范围里写父标签时，把其子标签下的任务也带进来。
+    for (const id of scope.tagIds) {
+      const rootId = resolveTagId(id, tags) ?? id;
+      for (const expanded of expandTagIdsWithDescendants([rootId], Object.values(tags))) {
+        wanted.add(expanded);
+      }
+    }
+  }
   return visible.filter(
     (task) =>
       (task.projectId !== undefined && projects.has(task.projectId)) ||
