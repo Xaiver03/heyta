@@ -132,6 +132,50 @@ if shutil.which("pdffonts") and shutil.which("pdfinfo"):
 else:
     print("⏭  跳过 PDF 字体/页数校验：本机没有 poppler（pdffonts/pdfinfo）")
 
+# 5) index.html 的相对链接必须都指得到（生成了卡片但 href 写错 = 点开 404）
+import urllib.parse
+
+idx = os.path.join(WD, "index.html")
+if os.path.exists(idx):
+    html = open(idx, encoding="utf-8").read()
+    urls = set(re.findall(r'(?:href|src)="([^"]+)"', html))
+    missing = []
+    n = 0
+    for u in urls:
+        if u.startswith(("#", "http://", "https://", "mailto:", "javascript:")):
+            continue
+        path = urllib.parse.unquote(u.split("?")[0].split("#")[0])
+        if not path:
+            continue
+        n += 1
+        if not os.path.exists(os.path.join(WD, path)):
+            missing.append(u)
+    if missing:
+        fail(f"index.html 有 {len(missing)} 个链接指不到文件：{missing[:5]}")
+    else:
+        print(f"✅ index.html 相对链接全部可达（{n} 个）")
+
+# 6) 品牌物料依赖的 i18n 词条必须**两个语言都在**（缺一边会出空串卡片）
+ROOT = os.path.dirname(WD)
+BRAND_KEYS = [
+    "site.og.card.title1", "site.og.card.title2", "site.og.card.lede",
+    "landing.hero.titleLead", "landing.hero.titleEmphasis", "landing.hero.lede",
+]
+LOCALES = {
+    "zh": os.path.join(ROOT, "packages/i18n/src/locales/zh-CN.ts"),
+    "en": os.path.join(ROOT, "packages/i18n/src/locales/en.ts"),
+}
+if all(os.path.exists(p) for p in LOCALES.values()):
+    tables = {k: open(v, encoding="utf-8").read() for k, v in LOCALES.items()}
+    for key in BRAND_KEYS:
+        absent = [lang for lang, txt in tables.items() if f"'{key}'" not in txt]
+        if absent:
+            fail(f"i18n 词条 {key} 缺 {absent} —— 品牌物料会出现空串")
+    else:
+        print(f"✅ 品牌相关 i18n 词条两语言齐备（{len(BRAND_KEYS)} 条）")
+else:
+    print("⏭  跳过 i18n 词条校验：本机不在仓库内（找不到 packages/i18n）")
+
 if not fails:
     print("\n✅ brand-kit 产物自检通过")
     sys.exit(0)
