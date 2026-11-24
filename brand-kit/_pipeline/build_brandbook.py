@@ -3,6 +3,7 @@
 import os, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import render
+import read_tokens as RT
 WD=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT=os.path.join(WD,"00-brand-foundation"); PRE=os.path.join(OUT,"_preview")
 LOGOD=os.path.join(WD,"01-logo"); BADGE=os.path.join(WD,"02-badges")
@@ -26,7 +27,41 @@ CSS=f"""*{{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-ad
 h1,h2,h3,p{{margin:0}}
 .card{{border:1px solid #e2e8f0;border-radius:12px;padding:6mm;background:#fff}}
 """
-def doc(body): return f"<!doctype html><html lang='zh'><head><meta charset='utf-8'><style>{CSS}</style></head><body>{body}</body></html>"
+# 🔴 手册里出现的**每一个**结构色都归一到 tokens.css 的取值：
+#    手写十六进制会在色阶调整后静默留下旧色，而印刷品没人会去比对。
+_STRUCT_COLORS = {
+    "#0f172a": "slate-900",
+    "#1e293b": "slate-800",
+    "#334155": "slate-700",
+    "#475569": "slate-600",
+    "#64748b": "slate-500",
+    "#94a3b8": "slate-400",
+    "#cbd5e1": "slate-300",
+    "#e2e8f0": "slate-200",
+    "#f1f5f9": "slate-100",
+    "#f8fafc": "slate-50",
+    "#2563eb": "blue-600",
+    "#1e40af": "blue-700",
+    "#1d4ed8": "blue-700",
+    "#60a5fa": "blue-400",
+    "#93c5fd": "blue-300",
+    "#bfdbfe": "blue-200",
+    "#dbeafe": "blue-100",
+    "#eff6ff": "blue-50",
+    "#3b82f6": "blue-500",
+    "#1e3a8a": "blue-900",
+}
+
+def _normalize(html_text: str) -> str:
+    out = html_text
+    for hexv, name in _STRUCT_COLORS.items():
+        real = RT.token(name)
+        if real is None:
+            continue
+        out = out.replace(hexv, real)
+    return out
+
+def doc(body): return _normalize(f"<!doctype html><html lang='zh'><head><meta charset='utf-8'><style>{CSS}</style></head><body>{body}</body></html>")
 def head(label,dark=False): return f'<div class="ph"><img src="{WM_WHITE if dark else WM_BLUE}"><span>{label}</span></div>'
 def foot(l,r="heyta · Brand Guidelines"): return f'<div class="pf"><span>{l}</span><span>{r}</span></div>'
 
@@ -72,8 +107,9 @@ def p_logo():
 def sw(colors):
     return "".join(f'<div style="flex:1"><div style="height:20mm;background:{c};border-radius:6px 6px 0 0"></div><div style="font-size:7.5px;color:#94a3b8;text-align:center;padding:3px 0">{c}</div></div>' for c in colors)
 def p_color():
-    blue=["#eff6ff","#dbeafe","#bfdbfe","#93c5fd","#60a5fa","#3b82f6","#2563eb","#1d4ed8","#1e40af","#1e3a8a"]
-    slate=["#f8fafc","#f1f5f9","#e2e8f0","#cbd5e1","#94a3b8","#64748b","#475569","#334155","#1e293b","#0f172a"]
+    # 🔴 样张即事实源：从 tokens.css 读真实色阶，不手写第二份。
+    blue=[RT.token(f"blue-{n}") for n in (50,100,200,300,400,500,600,700,800,900)]
+    slate=[RT.token(f"slate-{n}") for n in (50,100,200,300,400,500,600,700,800,950)]
     return f'''<div class="page">{head("色彩系统")}
       <div style="position:absolute;left:18mm;right:18mm;top:42mm">
         <div class="eyebrow">COLOR SYSTEM</div>
@@ -105,8 +141,9 @@ def p_badges():
         return f'<div style="text-align:center"><img src="{ms(kind,thr)}" style="width:24mm"><div style="font-size:9px;color:#64748b;margin-top:2mm">{label}</div></div>'
     dims="".join(cell(k,t,l) for k,t,l in [("checkIns",200,"打卡 200 次"),("focusHours",50,"专注 50 小时"),("tasks",1000,"完成 1000 件"),("activeDays",100,"使用 100 天")])
     tags="".join(f'<img src="{os.path.join(BADGE,"identity",i+".svg")}" style="height:40px">' for i in ["started","routine","steady","checkin-hundred"])
-    cats="".join(f'<div style="flex:1"><div style="height:12mm;border-radius:6px;background:{h}"></div><div style="font-size:7.5px;color:#94a3b8;text-align:center;padding-top:2px">{n}</div></div>'
-                 for n,h in [("1","#2563eb"),("2","#0891b2"),("3","#059669"),("4","#65a30d"),("5","#d97706"),("6","#ea580c"),("7","#dc2626"),("8","#7c3aed")])
+    # 🔴 八槽色读自 tokens.css 的 `color.category-1..8`，不手写。
+    cats="".join(f'<div style="flex:1"><div style="height:12mm;border-radius:6px;background:{RT.token(f"color-category-{n}")}"></div><div style="font-size:7.5px;color:#94a3b8;text-align:center;padding-top:2px">{n}</div></div>'
+                 for n in range(1, 9))
     return f'''<div class="page">{head("成长标识体系")}
       <div style="position:absolute;left:18mm;right:18mm;top:40mm">
         <div class="eyebrow">GROWTH &amp; MILESTONES</div>

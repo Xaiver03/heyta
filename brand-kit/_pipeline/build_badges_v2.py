@@ -4,6 +4,7 @@
 import os, sys, subprocess, html
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import render
+import read_tokens as RT
 WD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(WD, "02-badges")
 for d in ("milestones","identity","status","category","_preview"):
@@ -17,11 +18,13 @@ ICONS={
  "check":'<circle cx="12" cy="12" r="9"/><path d="M8 12l2.8 2.8L16 9"/>',
  "calendar":'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>',
 }
+# 🔴 四个维度色**不在本文件写死**：从 packages/design-system/src/tokens.css 读，
+#    那是唯一事实源。VI 手册里的色值必须与运行时一致，否则手册会先于代码腐烂。
 KINDS={
- "checkIns":  dict(color="#2563eb", icon="repeat",  latin="CHECK-INS", cn="累计打卡"),
- "focusHours":dict(color="#4f46e5", icon="clock",   latin="FOCUS HRS", cn="累计专注"),
- "tasks":     dict(color="#059669", icon="check",   latin="TASKS",     cn="累计完成"),
- "activeDays":dict(color="#d97706", icon="calendar",latin="DAYS",      cn="使用天数"),
+ "checkIns":  dict(color=RT.token("color-milestone-checkin"), icon="repeat",  latin="CHECK-INS", cn="累计打卡"),
+ "focusHours":dict(color=RT.token("color-milestone-focus"),   icon="clock",   latin="FOCUS HRS", cn="累计专注"),
+ "tasks":     dict(color=RT.token("color-milestone-tasks"),   icon="check",   latin="TASKS",     cn="累计完成"),
+ "activeDays":dict(color=RT.token("color-milestone-days"),    icon="calendar",latin="DAYS",      cn="使用天数"),
 }
 MILESTONES=[]
 for k,thr in [("checkIns",[10,50,200,500,1000]),("focusHours",[10,50,200,1000]),
@@ -43,8 +46,9 @@ TONES={
 }
 STATUS=[("todo","待办","info"),("doing","进行中","success"),("done","已完成","success"),
         ("overdue","已逾期","danger"),("archived","已归档","neutral"),("high","高优先级","accent")]
-CATEGORY=[("category-1","#2563eb"),("category-2","#0891b2"),("category-3","#059669"),("category-4","#65a30d"),
-          ("category-5","#d97706"),("category-6","#ea580c"),("category-7","#dc2626"),("category-8","#7c3aed")]
+# 8 个分类色槽同样读自 tokens.css（亮色主题）。这套值受
+# `tests/category-colors.spec.ts` 约束：色盲可辨 + 与 surface ≥3:1，**不要照着"好看"替换**。
+CATEGORY=[(f"category-{i}", RT.token(f"color-category-{i}")) for i in range(1, 9)]
 
 def milestone_svg(m):
     k=KINDS[m["kind"]]; c=k["color"]; num=m["threshold"]; lab=k["latin"]; icon=ICONS[k["icon"]]
@@ -127,7 +131,9 @@ h2{{font-size:22px;font-weight:800;margin:30px 0 13px;padding-bottom:9px;border-
 <div class="cats">{cats}</div>
 <h2>任务状态胶囊 · Status Pills（UI 元件，不算成就）</h2>
 <div>{stats}</div>
-<div class="note"><b>口径：</b>里程碑阈值对齐 <code>packages/domain/src/milestones.ts</code>，身份标签对齐 <code>identity-tags.ts</code>。四维语义色：打卡 <b>#2563eb</b> · 专注 <b>#4f46e5</b> · 完成 <b>#059669</b> · 天数 <b>#d97706</b>。<br><b>不做：</b>稀有度（common/rare/epic/legendary）、收藏徽章墙、排行榜、断签惩罚、货币经济。</div>
+<div class="note"><b>口径：</b>里程碑阈值对齐 <code>packages/domain/src/milestones.ts</code>，身份标签对齐 <code>identity-tags.ts</code>。四维语义色（读自 <code>tokens.css</code>）：打卡 <b>{KINDS["checkIns"]["color"]}</b> · 专注 <b>{KINDS["focusHours"]["color"]}</b> · 完成 <b>{KINDS["tasks"]["color"]}</b> · 天数 <b>{KINDS["activeDays"]["color"]}</b>。<br>
+<b>分类色槽</b>同样读自 <code>color.category-1..8</code>，那套值受 <code>tests/category-colors.spec.ts</code> 约束（色盲可辨 + ≥3:1），<b>不要按好看替换</b>。<br>
+<b>不做：</b>稀有度（common/rare/epic/legendary）、收藏徽章墙、排行榜、断签惩罚、货币经济。</div>
 <div class="foot"><span>heyta Design System · brand-kit/02-badges</span><span>Growth &amp; Milestone System v1.0</span></div>
 </div></body></html>"""
     open(os.path.join(OUT,"badge-catalogue.html"),"w",encoding="utf-8").write(cat)

@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="250" height="54" viewBox="0 0 250 54" role="img" aria-label="heyta identity 深潜五十时">
-  <rect x="1" y="1" width="248" height="52" rx="27.0" fill="#4f46e5" fill-opacity="0.10" stroke="#4f46e5" stroke-opacity="0.5"/>
-  <circle cx="28" cy="27.0" r="9" fill="#4f46e5"/>
+  <rect x="1" y="1" width="248" height="52" rx="27.0" fill="#a21caf" fill-opacity="0.10" stroke="#a21caf" stroke-opacity="0.5"/>
+  <circle cx="28" cy="27.0" r="9" fill="#a21caf"/>
   <path d="M24 27.0 l2.6 2.6 4.4-4.8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="46" y="27.0" dominant-baseline="central" font-family="'PingFang SC','Hiragino Sans GB','Noto Sans CJK SC',sans-serif" font-size="18" font-weight="700" fill="#4f46e5">深潜五十时</text>
+  <text x="46" y="27.0" dominant-baseline="central" font-family="'PingFang SC','Hiragino Sans GB','Noto Sans CJK SC',sans-serif" font-size="18" font-weight="700" fill="#a21caf">深潜五十时</text>
   <text x="234" y="27.0" text-anchor="end" dominant-baseline="central" font-family="'PingFang SC','Hiragino Sans GB','Noto Sans CJK SC',sans-serif" font-size="12" fill="#94a3b8">≥50</text>
 </svg>

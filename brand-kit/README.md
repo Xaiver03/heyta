@@ -9,6 +9,21 @@
 
 > 不使用任何其他品牌（此前误用的「晓黎创意」品牌不在此目录内，可另行删除）。
 
+## 双向闭环：代码 ↔ VI ↔ 设计系统
+
+本目录**没有手写色值**：所有颜色由 `_pipeline/read_tokens.py` 从
+`packages/design-system/src/tokens.css` 解析得到，改代码后重跑脚本即同步。
+反向那一条腿以门禁形式写回代码：
+
+| 方向 | 落点 |
+|---|---|
+| 代码 → VI | `_pipeline/read_tokens.py` → `build_badges_v2.py` / `build_brandbook.py` / `build_docs.py` |
+| VI → 设计系统 | 新增 `color.milestone-{checkin,focus,tasks,days}`（亮/暗各一份）进 `tokens.css` + `TOKEN_GROUPS` |
+| 设计系统 → 代码 | `packages/ui/src/motivation/MilestoneMap.tsx` 消费四维色（维度圆点 + 已达成档位描边） |
+| 守住不回退 | `packages/design-system/tests/milestone-colors.spec.ts`（对比度 / ΔE / 色盲 / 暗色覆盖） |
+
+实测与判据见 [`成就与成长体系_产品清单.md`](成就与成长体系_产品清单.md) §11。
+
 ## 相关：成就/成长体系设计清单
 
 > 成就体系的设计依据是本仓库已实现的「激励与成长体系」，见 [`成就与成长体系_产品清单.md`](成就与成长体系_产品清单.md)。**不要照抄 Litopia 的稀有度奖章。**

@@ -3,6 +3,7 @@
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import render
+import read_tokens as RT
 WD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # brand-kit
 LOGOD=os.path.join(WD,"01-logo"); IMG=os.path.join(WD,"04-imagery")
 def f(p): return "file://"+os.path.abspath(p)
@@ -207,7 +208,7 @@ def release_card():
       <img src="{WM_W}" style="height:56px">
       <div style="margin-top:120px;font-size:24px;letter-spacing:6px;color:#bfdbfe">RELEASE NOTES · 更新日志</div>
       <h1 style="font-size:72px;font-weight:800;margin-top:20px">v1.2 更快，更稳</h1>
-      <div style="margin-top:60px;font-size:30px;line-height:2;color:#e0ecff">· 日历拖拽更顺手<br>· 同步冲突更少<br>· 新增专注回顾<br>· 修复若干细节</div>
+      <div style="margin-top:60px;font-size:30px;line-height:2;color:{RT.token("blue-100")}">· 日历拖拽更顺手<br>· 同步冲突更少<br>· 新增专注回顾<br>· 修复若干细节</div>
       <div style="position:absolute;left:90px;bottom:80px;font-size:22px;color:#93c5fd">heyta · hey.</div>
     </div>'''
     return f"<!doctype html><html><head><meta charset='utf-8'><style>*{{margin:0;padding:0}}body{{font-family:{FONT}}}</style></head><body>{b}</body></html>"

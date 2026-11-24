@@ -1,6 +1,6 @@
 {
   "brand": "heyta",
-  "generated_at": "2026-11-24 12:24:59",
+  "generated_at": "2026-11-24 15:05:41",
   "dirs": {
     "00-brand-foundation": 11,
     "01-logo": 21,
@@ -18,27 +18,27 @@
   "files": [
     {
       "path": "index.html",
-      "size": 4609
+      "size": 5097
     },
     {
       "path": "成就与成长体系_产品清单.md",
-      "size": 12724
+      "size": 17377
     },
     {
       "path": "README.md",
-      "size": 3192
+      "size": 4497
     },
     {
       "path": "manifest.json",
-      "size": 9495
+      "size": 13517
     },
     {
       "path": "02-badges/badge-catalogue.png",
-      "size": 496056
+      "size": 528008
     },
     {
       "path": "02-badges/badge-catalogue.pdf",
-      "size": 762596
+      "size": 792024
     },
     {
       "path": "02-badges/README-待重建.md",
@@ -46,11 +46,11 @@
     },
     {
       "path": "02-badges/badge-catalogue.html",
-      "size": 6436
+      "size": 6668
     },
     {
       "path": "02-badges/_preview/page-1.png",
-      "size": 496056
+      "size": 528008
     },
     {
       "path": "02-badges/identity/started.png",
@@ -98,7 +98,7 @@
     },
     {
       "path": "02-badges/identity/deep-fifty.png",
-      "size": 16278
+      "size": 16514
     },
     {
       "path": "02-badges/identity/started.svg",
@@ -142,7 +142,7 @@
     },
     {
       "path": "02-badges/identity/deep-two-hundred.png",
-      "size": 17160
+      "size": 17357
     },
     {
       "path": "02-badges/identity/routine.svg",
@@ -150,7 +150,7 @@
     },
     {
       "path": "02-badges/category/分类色卡.png",
-      "size": 65625
+      "size": 64056
     },
     {
       "path": "02-badges/category/_cards.html",
@@ -198,7 +198,7 @@
     },
     {
       "path": "02-badges/milestones/focusHours-10.png",
-      "size": 19876
+      "size": 20141
     },
     {
       "path": "02-badges/milestones/checkIns-1000.png",
@@ -250,7 +250,7 @@
     },
     {
       "path": "02-badges/milestones/focusHours-200.png",
-      "size": 21230
+      "size": 21525
     },
     {
       "path": "02-badges/milestones/focusHours-10.svg",
@@ -270,7 +270,7 @@
     },
     {
       "path": "02-badges/milestones/focusHours-50.png",
-      "size": 20505
+      "size": 20765
     },
     {
       "path": "02-badges/milestones/checkIns-50.svg",
@@ -282,7 +282,7 @@
     },
     {
       "path": "02-badges/milestones/focusHours-1000.png",
-      "size": 21465
+      "size": 21745
     },
     {
       "path": "02-badges/milestones/activeDays-7.png",
@@ -434,19 +434,19 @@
     },
     {
       "path": "00-brand-foundation/brand-tokens.css",
-      "size": 1247
+      "size": 1269
     },
     {
       "path": "00-brand-foundation/brand-tokens.json",
-      "size": 1701
+      "size": 1714
     },
     {
       "path": "00-brand-foundation/brand-book.pdf",
-      "size": 1037139
+      "size": 1033695
     },
     {
       "path": "00-brand-foundation/_preview/page-01.png",
-      "size": 125686
+      "size": 116842
     },
     {
       "path": "00-brand-foundation/_preview/page-02.png",
@@ -458,15 +458,15 @@
     },
     {
       "path": "00-brand-foundation/_preview/page-07.png",
-      "size": 31675
+      "size": 29739
     },
     {
       "path": "00-brand-foundation/_preview/page-06.png",
-      "size": 61864
+      "size": 61939
     },
     {
       "path": "00-brand-foundation/_preview/page-04.png",
-      "size": 27864
+      "size": 27851
     },
     {
       "path": "00-brand-foundation/_preview/page-05.png",
@@ -474,7 +474,7 @@
     },
     {
       "path": "00-brand-foundation/_preview/page-08.png",
-      "size": 84639
+      "size": 76745
     },
     {
       "path": "09-social/og-card_1200x630.png",
@@ -494,7 +494,7 @@
     },
     {
       "path": "05-posters/03_成长里程碑.png",
-      "size": 985031
+      "size": 986300
     },
     {
       "path": "05-posters/02_核心能力.pdf",
@@ -506,7 +506,7 @@
     },
     {
       "path": "05-posters/03_成长里程碑.pdf",
-      "size": 302955
+      "size": 303158
     },
     {
       "path": "07-product-manual/heyta_product-manual_cover.png",
@@ -522,7 +522,7 @@
     },
     {
       "path": "04-imagery/contact-sheet.png",
-      "size": 606101
+      "size": 629013
     },
     {
       "path": "04-imagery/background/bg-abstract.png",
@@ -534,7 +534,7 @@
     },
     {
       "path": "04-imagery/illustration/illus-plan.png",
-      "size": 384338
+      "size": 568378
     },
     {
       "path": "04-imagery/illustration/illus-focus.png",
