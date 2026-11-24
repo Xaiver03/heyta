@@ -893,6 +893,8 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         toolbar="external"
         /* Apple 形态：日档扁平化（无边框无白底卡），全天带与小时轴直接铺在页面上。 */
         boardAppearance="flat"
+        /* 月档撑满整面（与 Web 同一条）：共享板靠它给周格加上 flexGrow、卡片吃满高度。 */
+        fillMonth
         /* 月档：格内已有任务条，网格下不再重复一份日期头+当天清单（Apple 亦如此）。 */
         showSelectedDayList={view !== 'month'}
         /* 月格周末（六/日）数字用周末色（Apple 月格周末红）。 */
