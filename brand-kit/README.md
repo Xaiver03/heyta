@@ -11,11 +11,11 @@
 
 ## 自检判据一览（`python _pipeline/check_artifacts.py`）
 
-耗时：全套 36 组约 **0.4s**（`--quiet` 实测 0.42s），对 `pnpm check` 可忽略。
+耗时：全套 38 组约 **0.4s**（`--quiet` 实测 0.42s），对 `pnpm check` 可忽略。
 
 **失败即给修复命令**：每条失败会按类别打印「修：python .../build_xxx.py」，不用再翻文档。
 
-三种输出：默认人读；`--list` 按「读代码 / 读产物 / 读文档」三组列出 36 组判据，并附 8 处构建期断言；`--quiet` 只在失败时说话并给一行汇总（给 CI 用）；
+三种输出：默认人读；`--list` 按「读代码 / 读产物 / 读文档」三组列出 38 组判据，并附 8 处构建期断言；`--quiet` 只在失败时说话并给一行汇总（给 CI 用）；
 `--json` 输出 `{ok, passed, failed, checks|errors, remedies}`（给流水线解析用，stdout 保证是纯 JSON）。\n\n> 链上已经跑过：`pnpm check:brand-assets` 内部会调用它；\n> 想单独跑用 `pnpm check:brand-kit`（不要再挂进 `check` 链，否则一次 CI 跑两遍）。
 
 | # | 判据 | 抓的是什么 |
@@ -56,6 +56,8 @@
 | 34 | 反例名单与激励体系三条红线对得上 | 物料立场与产品红线各说各的 |
 | 35 | 宣传册正面印着官网域名 | 域名取不到时二维码块静默消失 |
 | 36 | 同一物料的 PNG 与 PDF 版面比例一致 | 一个按 A4、一个按 Letter（实测抓到） |
+| 37 | 9 份 PDF 纸型 = 设计（A4×5 / A3×3 / 图鉴 4:5 数字版） | 忘了包 @page → Chrome 默认 Letter 并溢出 |
+| 38 | 手册预览图张数 = 手册页数 | 索引里的册子缺页 |
 
 ⚠️ **PDF 每次重建字节都不同**（Chrome 打印头里带时间戳/文档 ID），PNG 与 SVG 是稳定的。
 所以比对 PDF 时看页数/字体/视觉，不要看 sha256 —— 否则每次都会以为「有改动」。
@@ -94,6 +96,7 @@
 |---|---|---|
 | `00-brand-foundation/` | `brand-tokens.json/.css` + `brand-book.pdf`（8 页）+ `_preview/page-01..08.png` | ✅ |
 | `01-logo/` | 字标（blue/deep/ink/white）、app-icon、icon-mono/brand、横/竖锁版 + PNG | ✅ |
+| `02-badges/` | ⚠️ **图鉴是 4:5 数字版（1200×1500），PDF 只作浏览、不作印刷件**；其余物料均为 A4/A3 |
 | `02-badges/` | **成长标识体系**：17 里程碑（`milestones/`）+ 8 身份标签（`identity/`）+ 8 分类色槽（`category/`）+ 5 状态胶囊（`status/`）+ `badge-catalogue.html/png/pdf` | ✅ |
 | `03-icons/` | 线性图标 26（`*.svg`）+ `icon-sheet.html/png` | ✅ |
 | `04-imagery/` | 本地 MOSS-Image 生成：2 背景 + 2 插画 + 3 周边（含笔记本）+ `contact-sheet.png` | ✅ |

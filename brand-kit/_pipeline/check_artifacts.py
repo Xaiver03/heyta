@@ -1008,6 +1008,56 @@ if _sh.which("pdfinfo"):
 else:
     print("⏭  跳过 PNG/PDF 版面比对：本机没有 pdfinfo")
 
+# 37) 每份 PDF 的纸型必须与设计一致（A4 / A3 / 图鉴 4:5 数字版）
+#     实测踩过：`08-merch` 没包 @page，Chrome 按默认 Letter 出纸并溢出成两页，
+#     而我一度把"2 页"当成规格写进了期望。纸型这类错不会报错，只会印出来才发现。
+SIZE_EXPECT = {
+    # 文件: (宽pt, 高pt, 说明)
+    "00-brand-foundation/brand-book.pdf": (594.96, 841.92, "A4 竖"),
+    "05-posters/01_品牌主视觉.pdf": (841.92, 1191.12, "A3 竖"),
+    "05-posters/02_核心能力.pdf": (841.92, 1191.12, "A3 竖"),
+    "05-posters/03_成长里程碑.pdf": (841.92, 1191.12, "A3 竖"),
+    "06-brochure/heyta_brochure_front.pdf": (841.92, 594.96, "A4 横"),
+    "06-brochure/heyta_brochure_back.pdf": (841.92, 594.96, "A4 横"),
+    "07-product-manual/heyta_product_manual.pdf": (594.96, 841.92, "A4 竖"),
+    "08-merch/merch-sheet.pdf": (594.96, 841.92, "A4 竖"),
+    # 图鉴是 4:5 **数字版**（1200×1500），PDF 只作浏览、不作印刷件 —— 见 README
+    "02-badges/badge-catalogue.pdf": (900.0, 1125.12, "4:5 数字版"),
+}
+if _sh.which("pdfinfo"):
+    bad_size = []
+    for rel, (w, h, label) in SIZE_EXPECT.items():
+        f = os.path.join(WD, rel)
+        if not os.path.exists(f):
+            continue
+        out = subprocess.run(["pdfinfo", f], capture_output=True, text=True, timeout=20).stdout
+        m = re.search(r"Page size:\s+([\d.]+) x ([\d.]+) pts", out)
+        if not m:
+            bad_size.append(f"{rel}: 读不到页面尺寸")
+            continue
+        gw, gh = float(m.group(1)), float(m.group(2))
+        if abs(gw - w) > 2 or abs(gh - h) > 2:
+            bad_size.append(f"{rel}: 实际 {gw}×{gh}pt，应为 {label} {w}×{h}pt")
+    if bad_size:
+        fail(f"PDF 纸型不符：{bad_size}")
+    else:
+        emit(f"✅ {len(SIZE_EXPECT)} 份 PDF 纸型符合设计（A4×5 / A3×3 / 图鉴 4:5 数字版）")
+
+# 38) 手册预览图数量 = 手册页数（_preview 少一页 = 索引里看到的册子缺页）
+PREVIEW_DIR = os.path.join(WD, "00-brand-foundation/_preview")
+BOOK_PDF = os.path.join(WD, "00-brand-foundation/brand-book.pdf")
+if os.path.isdir(PREVIEW_DIR) and os.path.exists(BOOK_PDF) and _sh.which("pdfinfo"):
+    n_prev = len([f for f in os.listdir(PREVIEW_DIR) if f.startswith("page-") and f.endswith(".png")])
+    out = subprocess.run(["pdfinfo", BOOK_PDF], capture_output=True, text=True, timeout=20).stdout
+    m = re.search(r"^Pages:\s+(\d+)", out, re.M)
+    n_pages = int(m.group(1)) if m else None
+    if n_pages is None:
+        fail("品牌手册读不到页数")
+    elif n_prev != n_pages:
+        fail(f"手册预览图 {n_prev} 张 ≠ 手册 {n_pages} 页")
+    else:
+        emit(f"✅ 手册预览图 = 手册页数（{n_pages} 页）")
+
 if not fails:
     if JSON_OUT:
         import json as _j
