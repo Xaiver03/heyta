@@ -1058,6 +1058,49 @@ if os.path.isdir(PREVIEW_DIR) and os.path.exists(BOOK_PDF) and _sh.which("pdfinf
     else:
         emit(f"✅ 手册预览图 = 手册页数（{n_pages} 页）")
 
+# 39) 01-logo 每张 PNG 的像素尺寸必须与"档位"相符
+#     @1x 是 760 宽、@2x 是 1520 宽、app-icon 必须是正方形且边长等于名字里的数字。
+#     导错档位（例如把 @2x 存成了 @1x）在文件管理器里看不出来。
+LOGO_SIZE = {
+    "app-icon-32.png": (32, 32), "app-icon-180.png": (180, 180),
+    "app-icon-512.png": (512, 512), "app-icon-1024.png": (1024, 1024),
+    "icon-brand-512.png": (512, 512),
+    "wordmark-primary@1x.png": (760, 418), "wordmark-primary@2x.png": (1520, 836),
+    "wordmark-ink@1x.png": (760, 418), "wordmark-deep@1x.png": (760, 418),
+    "wordmark-white@1x.png": (760, 418),
+    "lockup-horizontal@1x.png": (1600, 713), "lockup-vertical@1x.png": (800, 1147),
+}
+try:
+    from PIL import Image as _Img
+    bad_dim = []
+    for name, want in LOGO_SIZE.items():
+        f = os.path.join(LOGO_DIR, name)
+        if not os.path.exists(f):
+            continue
+        got = _Img.open(f).size
+        if got != want:
+            bad_dim.append(f"{name}: {got} ≠ {want}")
+    if bad_dim:
+        fail(f"01-logo 位图档位不符：{bad_dim}")
+    else:
+        emit(f"✅ 01-logo 位图档位正确（{len(LOGO_SIZE)} 张：1x=760 / 2x=1520 / 图标正方）")
+except ImportError:
+    print("⏭  跳过位图尺寸校验：本机没有 Pillow")
+
+# 40) 26 枚线性图标必须同一套网格（24×24），否则并排摆放时机身大小不齐
+if os.path.isdir(os.path.join(WD, "03-icons")):
+    _icons = [f for f in os.listdir(os.path.join(WD, "03-icons")) if f.endswith(".svg")]
+    _vb = set()
+    for _f in _icons:
+        _t = open(os.path.join(WD, "03-icons", _f), encoding="utf-8").read()
+        _m = re.search(r'viewBox="([^"]+)"', _t)
+        if _m:
+            _vb.add(_m.group(1))
+    if _vb != {"0 0 24 24"}:
+        fail(f"03-icons 网格不统一：{sorted(_vb)}（应全为 0 0 24 24）")
+    else:
+        emit(f"✅ 03-icons 全部使用 24×24 网格（{len(_icons)} 枚）")
+
 if not fails:
     if JSON_OUT:
         import json as _j
