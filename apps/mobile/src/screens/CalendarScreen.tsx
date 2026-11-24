@@ -456,6 +456,8 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
       dayEmpty: t('mobile.calendar.dayEmpty'),
       dayCount: (count: number) => t('mobile.calendar.dayCount', { count }),
       footnote: t('mobile.calendar.footnote'),
+      // 月档左侧周数列（滴答式「W48」）：共享板只在 view==='month' 时渲染该列。
+      weekNumber: (d: LocalDate) => t('web.calendar.weekShort', { n: isoWeek(d) }),
       taskRow: {
         toggleOn: (row: { title: string }) => t('mobile.calendar.a11y.markDone', { title: row.title }),
         toggleOff: (row: { title: string }) =>
@@ -816,7 +818,6 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           }}
           onShiftWeeks={shiftWeek}
           hasContent={hasContentOn}
-          weekLabelFor={(ws) => t('web.calendar.weekShort', { n: isoWeek(ws) })}
         />
       ) : null}
 

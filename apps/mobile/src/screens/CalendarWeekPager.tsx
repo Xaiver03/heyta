@@ -50,8 +50,6 @@ export interface CalendarWeekPagerProps extends CalendarWeekStripProps {
    * 父组件按它移动 `selected`（保留星期几）即可，本组件不自己改选中态。
    */
   readonly onShiftWeeks: (delta: number) => void;
-  /** 每一页的周数文案（宿主格式化，如「47周」）。 */
-  readonly weekLabelFor?: (weekStart: LocalDate) => string;
 }
 
 export function CalendarWeekPager({
@@ -62,7 +60,6 @@ export function CalendarWeekPager({
   onSelect,
   onShiftWeeks,
   hasContent,
-  weekLabelFor,
 }: CalendarWeekPagerProps): React.JSX.Element {
   const { reducedMotion } = useTheme();
   const [pageWidth, setPageWidth] = useState(0);
@@ -97,11 +94,10 @@ export function CalendarWeekPager({
           weekdays={weekdays}
           onSelect={onSelect}
           hasContent={hasContent}
-          {...(weekLabelFor === undefined ? {} : { weekLabel: weekLabelFor(weekStartForIndex(item)) })}
         />
       </View>
     ),
-    [pageWidth, selected, today, weekdays, onSelect, hasContent, weekLabelFor],
+    [pageWidth, selected, today, weekdays, onSelect, hasContent],
   );
 
   /**
@@ -166,7 +162,6 @@ export function CalendarWeekPager({
           weekdays={weekdays}
           onSelect={onSelect}
           hasContent={hasContent}
-          {...(weekLabelFor === undefined ? {} : { weekLabel: weekLabelFor(weekStart) })}
         />
       ) : (
         <FlatList
