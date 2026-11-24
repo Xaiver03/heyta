@@ -24,6 +24,7 @@
 | 1.12 | 完成时间 / 创建时间 / 修改时间 | P0 | 统计与"已完成"清单依赖 |
 | 1.13 | 回收站（软删除 + 恢复） | P1 | 同步场景必备 |
 | 1.14 | 排序（手动拖拽 / 按时间 / 按优先级） | P0 | 手动排序需要小数位/lexorank 方案 |
+| 1.15 | 任务模板（保存/复用任务结构） | P2 | 见 [surface-matrix](ticktick-surface-matrix.md) #30：heyta 无（G3）；滴答 `TTTaskTemplate*` / `views_template_*` |
 
 ---
 

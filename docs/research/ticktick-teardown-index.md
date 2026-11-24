@@ -1,4 +1,4 @@
-# 滴答清单逆向取证 · 总目录（九份产物的用法）
+# 滴答清单逆向取证 · 总目录（各分册用法与口径）
 
 > 立项 2026-11-06。这是一张**地图**，不是第二份取证：所有读数都在各分册里，这里只回答
 > 「哪条结论在哪份文件的哪一节」以及「它可不可信、口径是什么」。
@@ -31,6 +31,7 @@
 | P9 | [ticktick-settings-and-personalization.md](ticktick-settings-and-personalization.md) | 558 | 设置树 18 分区 + **个性化 8 维**（heyta 完整 0 / 半有 4 / 无 4） | ✅ 已入库 |
 | P10 | [ticktick-ux-ia-and-entry-paths.md](ticktick-ux-ia-and-entry-paths.md) | 592 | **入口四层 + 「作用域定层、代价定深度」规则** + 三条链路读数 + 5 条可判红规则 | ✅ 已入库 |
 | P11 | [ticktick-craft-anything-probe-2026-11-08.md](ticktick-craft-anything-probe-2026-11-08.md) | — | **方法论对照**：craft-anything（302 工具 + Evidence/Unknown 契约）vs REA；含扩展框架归属新发现 | ✅ 已入库 |
+| P12 | [ticktick-android-quickadd-and-topbar-2026-11-21.md](ticktick-android-quickadd-and-topbar-2026-11-21.md) | — | **Android 端**「快速添加」浮层逐图标 IA + 顶栏全变体（补 P10 的移动端缺口，了结 P10 §8 #5/#6）；截图在 [mobile-ia/](mobile-ia/) | ✅ 新增 2026-11-21 |
 
 ---
 
