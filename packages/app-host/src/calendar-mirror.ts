@@ -183,6 +183,10 @@ export async function refreshCalendarMirror(
   if (response.status === 304) {
     // 304 只在 conditional 时才是"内容没变"的结论；即便服务端在无条件请求上回 304，
     // 也不该去猜内容 —— 跳过一轮的代价远小于拿空数据覆盖一份好缓存。
+    //
+    // 304 是**成功**分支：内容没变，但"这一轮确实拉通了"，所以刷新最近成功同步时间。
+    // 它不写窗口 / ETag（那两格只在拿到 200 的新内容时才推进）。
+    await port.setMetaValue(META_KEYS.CALENDAR_MIRROR_LAST_SYNC, nowMs);
     return { kind: 'not-modified' };
   }
 
@@ -293,6 +297,9 @@ export async function refreshCalendarMirror(
   if (etag !== null && etag !== '') {
     await port.setMetaValue(META_KEYS.CALENDAR_MIRROR_ETAG, etag);
   }
+  // 成功分支才推进「最近一次成功同步」。它与窗口/ETag 同一批写、同一前提：
+  // 上面任何一步抛错都到不了这里，于是失败轮次不会留下一个假的新鲜时间戳。
+  await port.setMetaValue(META_KEYS.CALENDAR_MIRROR_LAST_SYNC, nowMs);
 
   return {
     kind: 'ok',

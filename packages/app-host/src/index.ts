@@ -997,6 +997,19 @@ export {
 } from './calendar-mirror.js';
 
 /**
+ * 外部日历自动同步的**纯调度判断**（阶段 A，ADR-0089）。
+ *
+ * 🔴 「多久算该同步一次」是产品语义，写在纯函数里、四个壳共用同一份；而
+ * `visibilitychange` / `focus` / `setInterval` 那些平台差异只能待在 `apps/web`。
+ * 本模块连定时器都不建 —— 见 `calendar-sync-scheduler.ts` 文件头。
+ */
+export {
+  CALENDAR_AUTO_SYNC_MIN_INTERVAL_MS,
+  shouldAutoSync,
+  type ShouldAutoSyncInput,
+} from './calendar-sync-scheduler.js';
+
+/**
  * 外部日历日程的**本地写动作**（阶段 A 只有标签，ADR-0089）。
  *
  * 🔴 壳只许通过这里写 `CALENDAR_EVENT`：一条 `UPD {tagIds}` 的形状、去重、
