@@ -17,6 +17,9 @@ import type { EntityType, TaskAutomationSource } from '@heyta/shared-schema';
 
 import type { CategorySlot } from './activity-categories.js';
 import type { LocalDate } from './date.js';
+// ⚠️ **仅类型导入**：`filter-rule.ts` 反过来 import 本文件的 `Priority` / `isCompleted`
+// 等运行期件，写成值导入会造出运行时环。`import type` 编译后被抹掉，环就不存在。
+import type { FilterRule } from './filter-rule.js';
 
 /** 所有实体共有的元数据。 */
 export interface EntityBase {
@@ -1233,6 +1236,34 @@ export interface Attachment extends EntityBase {
 }
 
 /**
+ * 自定义保存筛选（智能清单；ADR-0092）。
+ *
+ * 🔴 **它是用户数据实体，不是视图。** 「用户起的名字 + 用户填的规则」二者都推不出来 ——
+ * 与 `PREFERENCE_CORRECTION`（"用户认为某条推断是错的"推不出来）、`Comment`
+ * （正文是用户写的）同一条推理。"视图不建实体"针对的是由字段派生的今天/四象限，
+ * 不是"用户保存的查询"。
+ *
+ * 🔴 **只存规则，不存任务、不物化结果。** 命中的任务在**读时**由
+ * `filter-rule.ts` 的 `compileFilterRule` / `applyFilterRule` 算出来；结果永远是活查询。
+ * 它**没有 `projectId`**（账户级的跨清单查询），**永不进 share op-log**
+ * （个人数据，无 `shareId`）。
+ *
+ * ⚠️ 自有字段 `color` / `order` 可选（可加性，不 bump `CURRENT_SCHEMA_VERSION`，
+ * AGENTS §3.3）；`name` / `rule` 是身份的一部分（没有规则就不是筛选），必填 ——
+ * 与 `Reminder.taskId` / `Comment.body` 同一先例。
+ */
+export interface Filter extends EntityBase {
+  /** 用户起的名字（"我的工作"）。 */
+  name: string;
+  /** 结构化规则（判别联合 JSON，不是 DSL 字符串）。 */
+  rule: FilterRule;
+  /** 可选：色槽（1–8，同 `Project.color`，存槽位不存 hex）。 */
+  color?: CategorySlot;
+  /** 可选：侧栏排序键（越小越靠前；缺省排在有序项之后）。 */
+  order?: number;
+}
+
+/**
  * 实体类型 → 领域模型 的映射。
  * 用于 op-log 的 apply 阶段做类型收窄。
  */
@@ -1252,6 +1283,7 @@ export interface EntityModelMap {
   CALENDAR_EVENT: CalendarEvent;
   ASSISTANT_TURN: AssistantTurn;
   ATTACHMENT: Attachment;
+  FILTER: Filter;
 }
 
 export type ModeledEntityType = keyof EntityModelMap;
@@ -1284,6 +1316,7 @@ export const MODELED_ENTITY_TYPES = [
   'ASSISTANT_TURN',
   'COMMENT',
   'ATTACHMENT',
+  'FILTER',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */

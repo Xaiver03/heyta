@@ -30,16 +30,17 @@
 export type AiCapabilityEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
-    'COMMENT' | 'ATTACHMENT' | 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' |
-    'MIGRATION' | 'RECOVERY' | 'ALL';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'CALENDAR_EVENT' |
+    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' | 'FILTER' |
+    'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' | 'MIGRATION' | 'RECOVERY' |
+    'ALL';
 
 /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
 export type AiCapabilityModeledEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
-    'COMMENT' | 'ATTACHMENT';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'CALENDAR_EVENT' |
+    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' | 'FILTER';
 
 /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
 export type AiCapabilityToolKind = 'read' | 'write';
@@ -103,9 +104,9 @@ export const AI_CAPABILITY_MANIFEST =
     'source': 'ADR-0045 §2.6 纪律二',
   },
   'coverage': {
-    'covered': 11,
-    'denominator': 11,
-    'ratio': '11/11',
+    'covered': 12,
+    'denominator': 13,
+    'ratio': '12/13',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -117,8 +118,10 @@ export const AI_CAPABILITY_MANIFEST =
     'FOCUS_SESSION',
     'REMINDER',
     'EVENT',
+    'CALENDAR_EVENT',
     'COMMENT',
     'ATTACHMENT',
+    'FILTER',
   ],
   'modelledEntityTypes': [
     'TASK',
@@ -132,9 +135,11 @@ export const AI_CAPABILITY_MANIFEST =
     'PREFERENCE_CORRECTION',
     'REMINDER',
     'EVENT',
+    'CALENDAR_EVENT',
     'ASSISTANT_TURN',
     'COMMENT',
     'ATTACHMENT',
+    'FILTER',
   ],
   'excludedFromDenominator': [
     {
@@ -150,7 +155,9 @@ export const AI_CAPABILITY_MANIFEST =
       'reason': '助手对话的一行记录（ADR-0045 D-4 (ii)）：它是**对话本身**，不是用户可操作的业务实体，而且正文里含 provider 的回复 —— 给 AI 读写它的工具等于让模型改写自己的上下文',
     },
   ],
-  'entityTypesWithoutTools': [] as const,
+  'entityTypesWithoutTools': [
+    'CALENDAR_EVENT',
+  ],
   'entities': [
     {
       'entityType': 'TASK',
@@ -337,6 +344,14 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'entityType': 'CALENDAR_EVENT',
+      'materialized': true,
+      'countsTowardCoverage': true,
+      'coverage': 'none',
+      'readToolNames': [] as const,
+      'writeToolNames': [] as const,
+    },
+    {
       'entityType': 'ASSISTANT_TURN',
       'materialized': true,
       'countsTowardCoverage': false,
@@ -368,6 +383,21 @@ export const AI_CAPABILITY_MANIFEST =
       'writeToolNames': [
         'rename_attachment',
         'remove_attachment',
+      ],
+    },
+    {
+      'entityType': 'FILTER',
+      'materialized': true,
+      'countsTowardCoverage': true,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_filters',
+      ],
+      'writeToolNames': [
+        'create_filter',
+        'update_filter_rule',
+        'rename_filter',
+        'delete_filter',
       ],
     },
   ],
@@ -598,6 +628,14 @@ export const AI_CAPABILITY_MANIFEST =
           'required': false,
         },
       ],
+    },
+    {
+      'name': 'list_filters',
+      'kind': 'read',
+      'entityType': 'FILTER',
+      'description': '列出用户保存的筛选（智能清单）：标识、名字、规则、色槽、排序。顺序与界面上一样。',
+      'schemaRecorded': true,
+      'args': [] as const,
     },
     {
       'name': 'create_task',
@@ -1890,6 +1928,77 @@ export const AI_CAPABILITY_MANIFEST =
         },
       ],
     },
+    {
+      'name': 'create_filter',
+      'kind': 'write',
+      'entityType': 'FILTER',
+      'description': '新建一条保存筛选（智能清单）。名字不能为空；规则必须是结构化对象（match: all|any + conditions 数组）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'rule',
+          'type': 'object',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'update_filter_rule',
+      'kind': 'write',
+      'entityType': 'FILTER',
+      'description': '改写一条已有保存筛选的规则（整条替换，不是追加）。规则结构不合法会被拒绝。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'filterId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'rule',
+          'type': 'object',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'rename_filter',
+      'kind': 'write',
+      'entityType': 'FILTER',
+      'description': '给一条保存筛选改名。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'filterId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'delete_filter',
+      'kind': 'write',
+      'entityType': 'FILTER',
+      'description': '把一条保存筛选删除到回收站。可撤销，不是彻底删除。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'filterId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
   ],
   'protocolTypesWithoutModel': [
     'TASK_REPEAT_CFG',
@@ -1914,13 +2023,13 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 11 个，其中 11 个**读和写都有**工具（11/11）。',
+  '覆盖口径：用户可操作的已物化实体 13 个，其中 12 个**读和写都有**工具（12/13）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
-  '一、有 AI 工具的实体（11 个）',
+  '一、有 AI 工具的实体（12 个）',
   '- TASK —— 读和写都有（读 3 / 写 29）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
@@ -2016,9 +2125,15 @@ export const AI_CAPABILITY_TEXT = [
   '  · [读] list_attachments（taskId*:string）',
   '  · [写] rename_attachment（attachmentId*:string, fileName*:string）',
   '  · [写] remove_attachment（attachmentId*:string）',
+  '- FILTER —— 读和写都有（读 1 / 写 4）',
+  '  · [读] list_filters（无参数）',
+  '  · [写] create_filter（name*:string, rule*:object）',
+  '  · [写] update_filter_rule（filterId*:string, rule*:object）',
+  '  · [写] rename_filter（filterId*:string, name*:string）',
+  '  · [写] delete_filter（filterId*:string）',
   '',
-  '二、产品里有、但我没有任何工具的实体（0 个）—— 实体存在，只是我没配工具',
-  '- （无）',
+  '二、产品里有、但我没有任何工具的实体（1 个）—— 实体存在，只是我没配工具',
+  '- CALENDAR_EVENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '',
   '三、不计入上面分母的已物化实体（设计如此，不是遗漏）',
   '- AI_FEEDBACK：AI 建议处置的落库载体（用户不直接创建它）',

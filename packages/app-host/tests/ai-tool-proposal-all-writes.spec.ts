@@ -92,7 +92,7 @@ async function seedAttachment(taskId: string, fileName: string): Promise<string>
 }
 
 /** 未删除实体的条数（效果读数的分母必须是活的实体，不然墓碑也算"写成功"）。 */
-function alive<K extends 'tasks' | 'projects' | 'habits' | 'tags' | 'notes' | 'habitLogs' | 'focusSessions' | 'reminders' | 'events'>(
+function alive<K extends 'tasks' | 'projects' | 'habits' | 'tags' | 'notes' | 'habitLogs' | 'focusSessions' | 'reminders' | 'events' | 'filters'>(
   key: K,
 ): number {
   const record = engine.getState()[key] as Record<string, { deletedAt?: number }>;
@@ -727,6 +727,59 @@ const CASES: readonly Case[] = [
       return { taskId, itemText: '甲', done: true };
     },
     effect: () => Object.values(engine.getState().tasks).filter((t) => (t.checklist ?? []).some((x) => x.done)).length,
+  },
+
+  // ── ADR-0092：保存筛选（FILTER）—— 四个写工具各一例（个人数据，不落 share 通道）──
+  {
+    tool: 'create_filter',
+    intentAction: 'create-filter',
+    label: '保存筛选',
+    args: async () => ({
+      name: '我的高优先级',
+      rule: { match: 'all', conditions: [{ kind: 'priority', values: [Priority.High] }] },
+    }),
+    effect: () => alive('filters'),
+  },
+  {
+    tool: 'update_filter_rule',
+    intentAction: 'update-filter-rule',
+    label: '筛选规则',
+    args: async () => ({
+      filterId: await seed({
+        action: 'create-filter',
+        name: '待改规则',
+        rule: { match: 'all', conditions: [{ kind: 'today' }] },
+      }),
+      rule: { match: 'any', conditions: [{ kind: 'tomorrow' }] },
+    }),
+    effect: () => Object.values(engine.getState().filters).filter((f) => f.rule.match === 'any').length,
+  },
+  {
+    tool: 'rename_filter',
+    intentAction: 'rename-filter',
+    label: '筛选改名',
+    args: async () => ({
+      filterId: await seed({
+        action: 'create-filter',
+        name: '旧名',
+        rule: { match: 'all', conditions: [{ kind: 'today' }] },
+      }),
+      name: '改过的名字',
+    }),
+    effect: () => Object.values(engine.getState().filters).filter((f) => f.name === '改过的名字').length,
+  },
+  {
+    tool: 'delete_filter',
+    intentAction: 'delete-filter',
+    label: '筛选移入回收站',
+    args: async () => ({
+      filterId: await seed({
+        action: 'create-filter',
+        name: '要删的筛选',
+        rule: { match: 'all', conditions: [{ kind: 'today' }] },
+      }),
+    }),
+    effect: () => Object.values(engine.getState().filters).filter((f) => f.deletedAt !== undefined).length,
   },
 ];
 

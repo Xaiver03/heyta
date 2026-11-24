@@ -128,6 +128,7 @@ export {
   toWriteIntent,
   type LocalApiAttachment,
   type LocalApiComment,
+  type LocalApiFilter,
   type LocalApiFocusSession,
   type LocalApiHabit,
   type LocalApiHabitLog,

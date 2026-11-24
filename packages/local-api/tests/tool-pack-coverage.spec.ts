@@ -87,6 +87,7 @@ function host(): LocalApiHost {
     getTask: (taskId: string) => Promise.resolve(items.find((x) => x.id === taskId)),
     getTaskEstimateContext: (taskId: string) => Promise.resolve({ taskId, title: ITEM.title, readable: true, body: ITEM.body, currentMinutes: 30, history: [{ plannedMs: 1_500_000, actualMs: 1_440_000 }], preferences: [{ id: 'estimate-bias', text: '按历史偏差校正' }] }),
     listProjects: () => Promise.resolve(projects),
+    listFilters: () => Promise.resolve([]),
     listHabits: () => Promise.resolve(habits),
     listTags: () => Promise.resolve([TAG]),
     listNotes: () => Promise.resolve([NOTE_ROW]),

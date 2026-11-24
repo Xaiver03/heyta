@@ -45,6 +45,7 @@ const stubs = vi.hoisted(() => {
     listEvents: vi.fn(() => []),
   };
   const habitActions = {
+    listFilters: () => Promise.resolve([]),
     listHabits: vi.fn(() => []),
     listLogs: vi.fn(() => []),
   };

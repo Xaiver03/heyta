@@ -52,6 +52,7 @@ function fakeHost(items: readonly LocalApiItem[] = [], projects: readonly LocalA
     getTask: (taskId: string): Promise<LocalApiItem | undefined> =>
       Promise.resolve(items.find((x) => x.id === taskId)),
     listProjects: (): Promise<readonly LocalApiProject[]> => Promise.resolve(projects),
+    listFilters: () => Promise.resolve([]),
     listHabits: (): Promise<readonly LocalApiHabit[]> =>
       Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
     listTags: () => Promise.resolve([]),
@@ -651,6 +652,12 @@ describe('授权只有一份：整份目录，判断仍在 `@heyta/local-api`', 
         'list_task_comments',
         'add_task_comment',
         'delete_task_comment',
+        // 2026-11-24 ADR-0092：保存筛选（FILTER）—— list + create/update/rename/delete
+        'list_filters',
+        'create_filter',
+        'update_filter_rule',
+        'rename_filter',
+        'delete_filter',
       ].sort(),
     );
     // 🔴 判据与这条用例的标题对齐：名单**由目录推导**，不是手抄一份工具名。

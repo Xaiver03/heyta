@@ -37,6 +37,7 @@
 import type {
   LocalApiAttachment,
   LocalApiEventItem,
+  LocalApiFilter,
   LocalApiFocusSession,
   LocalApiHabit,
   LocalApiHabitLog,
@@ -108,6 +109,7 @@ import { createNoteActions, type NoteActions } from './note-actions.js';
 import { createProjectActions, type ProjectActions } from './project-actions.js';
 import { createReminderActions, type ReminderActions } from './reminder-actions.js';
 import { createEventActions, type EventActions } from './event-actions.js';
+import { createFilterActions, type FilterActions } from './filter-actions.js';
 import { createAttachmentActions, type AttachmentActions } from './attachment-actions.js';
 import type { AttachmentBlobPort } from './attachment-http.js';
 import { ListNotSharedError, type CommentActions } from './comment-actions.js';
@@ -541,6 +543,8 @@ export function createLocalApiHost(
     ctx,
     options.attachmentBlobs === undefined ? {} : { blobs: options.attachmentBlobs },
   );
+  // 保存筛选（FILTER）：纯个人数据，只经 ctx（个人 op-log）。
+  const filterActions = createFilterActions(ctx);
 
   const host: LocalApiHost = {
     listTasks: (args) => {
@@ -657,6 +661,17 @@ export function createLocalApiHost(
     // 而工具描述对用户承诺了，所以这里按 `triggerAt` 重排（理由写在那条里）。
     listTags: () => Promise.resolve(projectActions.listTags().map(tagToRow)),
 
+    listFilters: () =>
+      Promise.resolve(
+        filterActions.listFilters().map((filter): LocalApiFilter => ({
+          id: filter.id,
+          name: filter.name,
+          rule: filter.rule,
+          ...(filter.color === undefined ? {} : { color: filter.color }),
+          ...(filter.order === undefined ? {} : { order: filter.order }),
+        })),
+      ),
+
     listNotes: (limit) => Promise.resolve(noteActions.listNotes().slice(0, Math.max(0, limit)).map(noteToRow)),
 
     getNote: (noteId) => {
@@ -728,6 +743,7 @@ export function createLocalApiHost(
         eventActions,
         attachmentActions,
         commentActions,
+        filterActions,
         now,
         intent,
       ),
@@ -783,6 +799,7 @@ async function submitIntent(
   eventActions: EventActions,
   attachmentActions: AttachmentActions,
   commentActions: CommentActions | undefined,
+  filterActions: FilterActions,
   now: () => number,
   intent: LocalApiWriteIntent,
 ): Promise<LocalApiWriteResult> {
@@ -2293,5 +2310,59 @@ async function submitIntent(
         };
       }
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 保存筛选（FILTER，ADR-0092）：个人数据，只经 filterActions。
+    // 规则结构合法性由动作层（领域校验）判定 —— 这里只在"对象不存在"时挡门。
+    // ─────────────────────────────────────────────────────────────────────
+    case 'create-filter': {
+      try {
+        const id = await filterActions.createFilter(intent.name, intent.rule as never);
+        return { ok: true, taskId: id, entityId: id, entityType: 'FILTER' };
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: filterErrorMessage(e, '这条筛选无法创建。') };
+      }
+    }
+
+    case 'update-filter-rule': {
+      if (filterActions.filterOf(intent.filterId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这条筛选。' };
+      }
+      try {
+        await filterActions.updateFilterRule(intent.filterId, intent.rule as never);
+        return { ok: true, taskId: intent.filterId, entityId: intent.filterId, entityType: 'FILTER' };
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: filterErrorMessage(e, '这条筛选的规则无法保存。') };
+      }
+    }
+
+    case 'rename-filter': {
+      if (filterActions.filterOf(intent.filterId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这条筛选。' };
+      }
+      try {
+        await filterActions.renameFilter(intent.filterId, intent.name);
+        return { ok: true, taskId: intent.filterId, entityId: intent.filterId, entityType: 'FILTER' };
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: filterErrorMessage(e, '这条筛选无法改名。') };
+      }
+    }
+
+    case 'delete-filter': {
+      if (filterActions.filterOf(intent.filterId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这条筛选。' };
+      }
+      try {
+        await filterActions.removeFilter(intent.filterId);
+        return { ok: true, taskId: intent.filterId, entityId: intent.filterId, entityType: 'FILTER' };
+      } catch (e) {
+        return { ok: false, reason: 'invalid', message: filterErrorMessage(e, '这条筛选无法删除。') };
+      }
+    }
   }
+}
+
+/** 把动作层抛出的错误翻成一句用户看得懂的话（不泄漏内部细节）。 */
+function filterErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message !== '' ? error.message : fallback;
 }
