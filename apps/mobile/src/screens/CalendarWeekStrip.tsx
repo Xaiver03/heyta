@@ -84,7 +84,7 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
         today: { backgroundColor: t['color.primary'] },
         selected: { backgroundColor: t['color.primary-subtle'] },
         weekNum: {
-          width: t['space.6'],
+          width: t['space.12'],
           alignItems: 'center',
           paddingTop: t['space.1'],
         },
@@ -102,7 +102,7 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
     <View style={styles.row}>
       {weekLabel === undefined ? null : (
         <View style={styles.weekNum}>
-          <Text variant="caption" tone="subtle">
+          <Text variant="caption" tone="subtle" numberOfLines={1}>
             {weekLabel}
           </Text>
         </View>
