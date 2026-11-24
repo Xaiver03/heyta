@@ -1,0 +1,242 @@
+/**
+ * 移动端复现件的样式（`.mk-phone*`）
+ * ==================================
+ *
+ * 与 `mobile-mockup` 的组件同源：结构照抄 `apps/mobile/` 的任务屏 + 底部标签栏。
+ * 取值全部走 `--ht-*` token（`check:design` 扫这一份：裸 hex / px / ms / rgb() 都会红），
+ * 于是换主题时它与真机一起变，不会漂成"另一套设计"。
+ *
+ * 🔴 尺寸交给父级：手机屏的宽高比由下载页的 `.dl-phone__screen` 决定，这里只做 100% 填充。
+ */
+
+.mk-phone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  overflow: hidden;
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── 状态条 ───────────────────────────────────────────── */
+.mk-phone__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--ht-space-2) var(--ht-space-4) var(--ht-space-1);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+}
+.mk-phone__status-right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+.mk-phone__status-right i {
+  inline-size: var(--ht-space-1);
+  block-size: var(--ht-space-1);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-foreground);
+}
+.mk-phone__battery {
+  inline-size: var(--ht-space-4);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  border: var(--ht-border-width-hairline) solid var(--ht-color-foreground);
+}
+
+/* ── 标题条 ───────────────────────────────────────────── */
+.mk-phone__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--ht-space-1) var(--ht-space-4) var(--ht-space-2);
+}
+.mk-phone__title {
+  font-size: var(--ht-font-size-2xl);
+  font-weight: var(--ht-font-weight-bold);
+  letter-spacing: var(--ht-tracking-title);
+}
+.mk-phone__bar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 作用域胶囊 ───────────────────────────────────────── */
+.mk-phone__scopes {
+  display: flex;
+  gap: var(--ht-space-2);
+  padding: 0 var(--ht-space-4) var(--ht-space-2);
+  overflow: hidden;
+}
+.mk-pchip {
+  flex: 0 0 auto;
+  padding-inline: var(--ht-space-3);
+  padding-block: var(--ht-space-1);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+  white-space: nowrap;
+}
+.mk-pchip[data-active='true'] {
+  background: var(--ht-color-primary);
+  color: var(--ht-color-foreground-inverse);
+}
+
+/* ── 列表 ─────────────────────────────────────────────── */
+.mk-phone__scroll {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding: 0 var(--ht-space-4) var(--ht-space-4);
+  overflow: hidden;
+}
+.mk-pgroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+.mk-pgroup__head {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-caption);
+}
+.mk-pgroup__head[data-tone='danger'] {
+  color: var(--ht-color-danger);
+}
+.mk-pgroup__head[data-tone='primary'] {
+  color: var(--ht-color-primary);
+}
+.mk-pgroup__count {
+  margin-inline-start: auto;
+  color: var(--ht-color-foreground-subtle);
+}
+.mk-prow {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding-block: var(--ht-space-2);
+  border-block-end: var(--ht-border-width-hairline) solid var(--ht-color-border-subtle);
+}
+.mk-prow__check {
+  flex: 0 0 auto;
+  inline-size: var(--ht-space-3);
+  block-size: var(--ht-space-3);
+  border-radius: var(--ht-radius-full);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-strong);
+}
+.mk-prow[data-done='true'] .mk-prow__check {
+  background: var(--ht-color-primary);
+  border-color: var(--ht-color-primary);
+}
+.mk-prow__title {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  font-size: var(--ht-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mk-prow[data-done='true'] .mk-prow__title {
+  color: var(--ht-color-foreground-subtle);
+  text-decoration: line-through;
+}
+.mk-prow__due {
+  flex: 0 0 auto;
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-subtle);
+}
+.mk-prow__due[data-tone='overdue'] {
+  color: var(--ht-color-danger);
+}
+.mk-prow__due[data-tone='today'] {
+  color: var(--ht-color-primary);
+}
+
+/* ── 四象限（移动端视图） ──────────────────────────────── */
+.mk-pquad {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-2);
+}
+.mk-pquad__cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+.mk-pquad__label {
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-muted);
+}
+.mk-pquad__cell[data-q='q1'] .mk-pquad__label {
+  color: var(--ht-color-quadrant-1);
+}
+.mk-pquad__cell[data-q='q2'] .mk-pquad__label {
+  color: var(--ht-color-quadrant-2);
+}
+.mk-pquad__cell[data-q='q3'] .mk-pquad__label {
+  color: var(--ht-color-quadrant-3);
+}
+.mk-pquad__cell[data-q='q4'] .mk-pquad__label {
+  color: var(--ht-color-quadrant-4);
+}
+.mk-pquad__count {
+  font-size: var(--ht-font-size-2xl);
+  font-weight: var(--ht-font-weight-bold);
+}
+
+/* ── FAB 与底部标签栏 ──────────────────────────────────── */
+.mk-phone__fab {
+  position: absolute;
+  inset-inline-end: var(--ht-space-4);
+  inset-block-end: calc(var(--ht-space-16) + var(--ht-space-2));
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-icon-xl);
+  block-size: var(--ht-icon-xl);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-foreground-inverse);
+  box-shadow: var(--ht-shadow-lg);
+}
+.mk-ptabs {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  justify-content: space-between;
+  padding-block: var(--ht-space-1);
+  border-block-start: var(--ht-border-width-hairline) solid var(--ht-color-border-subtle);
+  background: var(--ht-color-surface);
+}
+.mk-ptab {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  padding-block: var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+}
+.mk-ptab[data-active='true'] {
+  color: var(--ht-color-primary);
+}

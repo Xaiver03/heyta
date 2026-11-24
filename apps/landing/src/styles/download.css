@@ -1,20 +1,33 @@
 /**
- * `/download` 的排版。
+ * `/download` 的排版（2026-11 重做版）
+ * ====================================
  *
  * 🔴 全部取值走设计 token（`check:design` 扫这一份：裸 hex / px / ms / rgb() 都会红）。
- * 复用 `landing.css` 已有的 `.lp-*`（页头、正文、按钮、徽标、说明），这里只补
- * **下载面独有的三件事**：卡片网格、元数据表、校验值展开。
- * 另开一套按钮或标题就是第二份排版 —— 那正是 N4（各页读起来是同一套东西）拦的形状。
+ * 复用 `landing.css` 已有的 `.lp-*`（页头、正文、按钮、说明），这里只补下载面独有的几族：
+ * 设备套框、平台下载行、各端展示、三步、校验面板。
+ * 不另开一套按钮或标题 —— 那等于第二个排版系统（N4 拦的就是这个）。
  */
 
+/* ── 正文节奏 ─────────────────────────────────────────── */
 .dl-body {
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-8);
+  gap: var(--ht-space-10);
+}
+.dl-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-5);
+}
+.dl-block__title {
+  margin: 0;
+}
+/* 下载页是实用页，分区标题比落地页小一档（30→24）。 */
+.dl-h2 {
+  font-size: clamp(var(--ht-font-size-lg), 1.8vw, var(--ht-font-size-2xl));
 }
 
-/* ── 「你这台机器」那一条 ─────────────────────────────────────────────── */
-
+/* ── 「你这台机器」那一条 ─────────────────────────────── */
 .dl-finder {
   display: flex;
   flex-wrap: wrap;
@@ -29,38 +42,39 @@
   font-size: var(--ht-font-size-sm);
   line-height: var(--ht-line-height-normal);
 }
-
 .dl-finder[data-state='unknown'] {
   border-style: dashed;
 }
-
 .dl-finder__label {
   color: var(--ht-color-foreground);
   font-size: var(--ht-font-size-base);
   font-weight: var(--ht-font-weight-semibold);
 }
 
-/* ── 每端一卡 ─────────────────────────────────────────────────────────── */
-
+/* ── 平台下载行：图标 + 名称 + 版本/大小 + 按钮 ─────────── */
 .dl-rows {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ht-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
-
 .dl-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-3);
-  padding: var(--ht-space-6);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-5) var(--ht-space-6);
   border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
-  border-radius: var(--ht-radius-xl);
+  border-radius: var(--ht-radius-lg);
   background: var(--ht-color-surface);
 }
-
+/* 推荐位：主色描边 + 淡淡的底色。它与其它行同一结构，只是"这一端是你的"。 */
+.dl-card[data-recommended='true'] {
+  border: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+}
 /* 没有出口的两档要**看起来就不是一排按钮**：虚线边框 + 沉下去的底，
    而不是灰掉按钮 —— 灰掉的按钮仍然邀请点击。 */
 .dl-card[data-state='pending'],
@@ -68,31 +82,49 @@
   border-style: dashed;
   background: var(--ht-color-surface-sunken);
 }
-
-.dl-card[data-recommended='true'] {
-  border: var(--ht-border-width-thick) solid var(--ht-color-primary);
+.dl-card__icon {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-icon-xl);
+  block-size: var(--ht-icon-xl);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
 }
-
+.dl-card[data-state='pending'] .dl-card__icon,
+.dl-card[data-state='none'] .dl-card__icon {
+  background: var(--ht-color-surface-subtle);
+  color: var(--ht-color-foreground-subtle);
+}
+.dl-card__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+}
 .dl-card__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--ht-space-3);
 }
-
 .dl-card__name {
   margin: 0;
+  font-size: var(--ht-font-size-xl);
 }
-
 .dl-card__pick {
   padding-inline: var(--ht-space-3);
+  padding-block: var(--ht-space-1);
   border-radius: var(--ht-radius-full);
-  background: var(--ht-color-primary-subtle);
-  color: var(--ht-color-primary);
-  font-size: var(--ht-font-size-xs);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-foreground-inverse);
+  font-size: var(--ht-font-size-2xs);
   font-weight: var(--ht-font-weight-semibold);
 }
-
+.dl-card__body {
+  margin: 0;
+  font-size: var(--ht-font-size-sm);
+}
 .dl-arch {
   display: flex;
   gap: var(--ht-space-2);
@@ -100,17 +132,20 @@
   color: var(--ht-color-foreground-subtle);
   font-size: var(--ht-font-size-xs);
 }
-
+.dl-card__action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
 .dl-gap {
   margin: 0;
-  padding: var(--ht-space-4);
+  padding: var(--ht-space-3) var(--ht-space-4);
   border-radius: var(--ht-radius-md);
-  background: var(--ht-color-background);
+  background: var(--ht-color-surface-subtle);
   color: var(--ht-color-foreground-muted);
   font-size: var(--ht-font-size-sm);
   line-height: var(--ht-line-height-relaxed);
 }
-
 .dl-caveat {
   margin: 0;
   color: var(--ht-color-foreground-muted);
@@ -118,70 +153,248 @@
   line-height: var(--ht-line-height-normal);
 }
 
-/* ── 文件出口与元数据 ─────────────────────────────────────────────────── */
-
-.dl-exit {
+/* ── 文件元数据与校验值 ───────────────────────────────── */
+.dl-filemeta {
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-4);
+  gap: var(--ht-space-2);
 }
-
 .dl-meta {
   display: grid;
   gap: var(--ht-space-1);
   margin: 0;
 }
-
 .dl-meta__row {
   display: flex;
   gap: var(--ht-space-3);
   align-items: baseline;
   font-size: var(--ht-font-size-xs);
 }
-
 .dl-meta__row dt {
   flex: 0 0 auto;
   min-inline-size: 6rem;
   color: var(--ht-color-foreground-subtle);
 }
-
 .dl-meta__row dd {
   margin: 0;
   color: var(--ht-color-foreground-muted);
   /* 字节数与版本要能逐位读，不加 tabular-nums 会跟着小数点对不齐。 */
   font-variant-numeric: tabular-nums;
 }
-
 .dl-meta__name {
   overflow-wrap: anywhere;
 }
-
 .dl-hash {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-2);
   font-size: var(--ht-font-size-xs);
 }
-
 .dl-hash summary {
   cursor: pointer;
   color: var(--ht-color-foreground-muted);
 }
-
 .dl-hash__value {
   /* 一行 64 个十六进制字符在窄屏上不折断会撑破卡片。 */
   overflow-wrap: anywhere;
   user-select: all;
 }
 
-/* ── 版本与校验那一节 ─────────────────────────────────────────────────── */
+/* ── 设备套框：电脑（浏览器条）+ 手机（圆角机身 + 灵动岛）── */
+.dl-desktop {
+  position: relative;
+  overflow: hidden;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  box-shadow: var(--ht-shadow-xl);
+  /* 复现件是展示品，不是可交互的应用：别让人以为能点。 */
+  pointer-events: none;
+  user-select: none;
+}
+/* 复现件 `AppWindow` 自带外框；套进浏览器条里就不再叠第二层边框。 */
+.dl-desktop__screen .mk-frame {
+  border: 0;
+  border-radius: 0;
+}
+.dl-browser {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  background: var(--ht-color-surface-subtle);
+}
+.dl-browser__dots {
+  display: inline-flex;
+  gap: var(--ht-space-1);
+}
+.dl-browser__dots i {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-border-strong);
+}
+.dl-browser__addr {
+  flex: 1 1 auto;
+  padding-inline: var(--ht-space-3);
+  padding-block: var(--ht-space-1);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+  text-align: center;
+}
+.dl-phone {
+  position: relative;
+  padding: var(--ht-space-1);
+  border: var(--ht-border-width-thick) solid var(--ht-color-foreground);
+  border-radius: calc(var(--ht-radius-xl) * 1.7);
+  background: var(--ht-color-foreground);
+  box-shadow: var(--ht-shadow-xl);
+  pointer-events: none;
+  user-select: none;
+}
+.dl-phone__island {
+  position: absolute;
+  inset-block-start: calc(var(--ht-space-2) * 1.4);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  inline-size: 32%;
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-foreground);
+  z-index: var(--ht-z-base);
+}
+.dl-phone__screen {
+  display: flex;
+  aspect-ratio: 9 / 19.5;
+  overflow: hidden;
+  border-radius: calc(var(--ht-radius-xl) * 1.4);
+  background: var(--ht-color-background);
+}
+.dl-phone--hero {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  inline-size: 12rem;
+}
+.dl-phone--card {
+  inline-size: min(100%, 15rem);
+  margin-inline: auto;
+}
+/* Hero 的套框舞台：电脑占满，手机叠在右下角。 */
+.dl-hero-devices {
+  position: relative;
+  inline-size: 100%;
+  padding-block-end: var(--ht-space-12);
+  padding-inline-end: var(--ht-space-8);
+}
 
-.dl-verify {
+/* ── 各端展示 ─────────────────────────────────────────── */
+.dl-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-6);
+}
+.dl-gallery__head {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-3);
+  max-inline-size: var(--ht-layout-prose-max);
+}
+.dl-gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ht-space-6);
+  align-items: start;
+}
+.dl-gallery__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  margin: 0;
+}
+.dl-gallery__item--wide {
+  grid-column: span 2;
+}
+/* 手机错落：一台下移一点，制造"不是三张等大卡片"的节奏。 */
+.dl-gallery__item--s2 {
+  margin-block-start: var(--ht-space-8);
+}
+.dl-gallery__cap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+.dl-gallery__cap-title {
+  margin: 0;
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+.dl-gallery__cap-body {
+  margin: 0;
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
 }
 
+/* ── 三步开始 ─────────────────────────────────────────── */
+.dl-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-5);
+}
+.dl-steps__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ht-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dl-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-5);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+}
+.dl-step__index {
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-primary);
+}
+.dl-step__title {
+  margin: 0;
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+.dl-step__body {
+  margin: 0;
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 版本与校验 ───────────────────────────────────────── */
+.dl-verify {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface-subtle);
+}
+.dl-verify__official {
+  margin: 0;
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground);
+}
 .dl-verify__stamp {
   display: flex;
   flex-wrap: wrap;
@@ -195,15 +408,51 @@
   color: var(--ht-color-primary);
   text-decoration: underline;
 }
-
 .dl-link:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-focus-work);
   outline-offset: var(--ht-space-1);
 }
 
-@media (max-width: 1024px) {
-  .dl-rows {
-    grid-template-columns: minmax(0, 1fr);
+/* ── 响应式 ───────────────────────────────────────────── */
+@media (max-width: 960px) {
+  /* 窄屏上叠放的手机容易压到下一节，收起；桌面套框独自占满整栏。 */
+  .dl-hero-devices {
+    padding: 0;
+  }
+  .dl-phone--hero {
+    display: none;
+  }
+  .dl-gallery__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dl-gallery__item--wide {
+    grid-column: span 2;
+  }
+  .dl-gallery__item--s2 {
+    margin-block-start: 0;
+  }
+  .dl-steps__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dl-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+  .dl-card__action {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  .dl-gallery__grid {
+    grid-template-columns: 1fr;
+  }
+  .dl-gallery__item--wide {
+    grid-column: span 1;
+  }
+  .dl-phone--card {
+    inline-size: min(100%, 15rem);
   }
 }
 

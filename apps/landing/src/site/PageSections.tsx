@@ -191,9 +191,20 @@ export function PageHead({
   page,
   visual,
   cta = true,
+  primaryCta,
 }: {
   page: SitePage;
   visual?: ReactNode;
+  /**
+   * 覆盖页头那颗主行动按钮的落点与文案。
+   *
+   * 🔴 只有 `/download` 会传它，理由与"主 CTA 按访问者这台机器挑那一端"是同一件事：
+   * 下载页的第一行动点应当落在**访客自己那一端**，而不是一个通用的应用入口。
+   * 落点仍然是**页内锚点**（指向下面那条平台行 / 全部下载），不新增任何外部直链 ——
+   * 外链的唯一来源照旧是发布清单（`scripts/check-downloads.mjs` 臂 A）。
+   * 其余页面不传，行为与本改动之前逐字相同。
+   */
+  primaryCta?: { href: string; label: string; external?: boolean };
   /**
    * 页头要不要那颗主行动按钮。**默认 `true`**（所有子页面照旧）。
    *
@@ -210,6 +221,9 @@ export function PageHead({
   const locale = useLocale();
   const preset = useMotionPreset();
   const start = siteCta(page, locale);
+  const ctaHref = primaryCta?.href ?? start.href;
+  const ctaLabel = primaryCta?.label ?? t(start.labelKey);
+  const ctaExternal = primaryCta?.external ?? start.external;
   const copy = revealVariants(preset.reduced, preset.ui);
 
   if (page.docsKind !== undefined) {
@@ -259,10 +273,10 @@ export function PageHead({
               <Magnetic>
                 <a
                   className="lp-btn lp-btn--primary"
-                  href={start.href}
-                  {...(start.external ? { rel: 'noopener noreferrer' } : {})}
+                  href={ctaHref}
+                  {...(ctaExternal ? { rel: 'noopener noreferrer' } : {})}
                 >
-                  {t(start.labelKey)}
+                  {ctaLabel}
                 </a>
               </Magnetic>
             </motion.p>
@@ -426,17 +440,20 @@ export function SiteSubPage({
   sections,
   notes,
   visual,
+  primaryCta,
   children,
 }: {
   page: SitePage;
   sections: readonly SectionSpec[];
   notes?: readonly MessageKey[];
   visual?: ReactNode;
+  /** 透传页头主行动按钮的覆盖（只有 `/download` 用，见 `PageHead` 的说明）。 */
+  primaryCta?: { href: string; label: string; external?: boolean };
   children?: ReactNode;
 }): React.JSX.Element {
   return (
     <>
-      <PageHead page={page} visual={visual} />
+      <PageHead page={page} visual={visual} primaryCta={primaryCta} />
       <div className="lp-section">
         <PageSections sections={sections} notes={notes}>
           {children}
