@@ -20,12 +20,27 @@ import read_tokens as RT
 
 WD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VERBOSE = "-v" in sys.argv
+QUIET = "--quiet" in sys.argv or "-q" in sys.argv
+JSON_OUT = "--json" in sys.argv
 fails = []
+passes = []
+
+
+def emit(line: str) -> None:
+    """统一出口：--quiet 时只在失败时说话；--json 时全部收集，最后一次性输出。"""
+    if line.startswith("✅"):
+        passes.append(line)
+    if JSON_OUT:
+        return
+    if QUIET and line.startswith("✅"):
+        return
+    print(line)
 
 
 def fail(msg):
     fails.append(msg)
-    print("❌ " + msg)
+    if not JSON_OUT:  # JSON 模式下 stdout 必须是纯 JSON
+        print("❌ " + msg)
 
 
 allowed = {
@@ -52,7 +67,7 @@ if bad:
     for h, fs in bad.items():
         fail(f"非 token 色值 {h} 出现在 {len(fs)} 个产物（如 {fs[0]}）")
 else:
-    print(f"✅ 色值白名单：全部命中 tokens.css（{len(allowed)} 个合法值）")
+    emit(f"✅ 色值白名单：全部命中 tokens.css（{len(allowed)} 个合法值）")
 
 # 2) 数量
 counts = {
@@ -69,7 +84,7 @@ for label, (rel, want) in counts.items():
     if n != want:
         fail(f"{label} 数量 {n} ≠ 期望 {want}（{rel}）")
     else:
-        print(f"✅ {label}：{n} 个")
+        emit(f"✅ {label}：{n} 个")
 
 # 3) 关键产物
 for rel, why in [
@@ -117,7 +132,7 @@ if shutil.which("pdffonts") and shutil.which("pdfinfo"):
         if not_embedded:
             fail(f"{rel} 有 {len(not_embedded)} 个字体未嵌入（换机器会塌）：{not_embedded[:3]}")
         else:
-            print(f"✅ 字体全嵌入：{rel}（{len(rows)} 个字体）")
+            emit(f"✅ 字体全嵌入：{rel}（{len(rows)} 个字体）")
         want = expect_pages.get(os.path.basename(f))
         if want is not None:
             try:
@@ -126,7 +141,7 @@ if shutil.which("pdffonts") and shutil.which("pdfinfo"):
                 if str(pages) != str(want):
                     fail(f"{rel} 页数 {pages} ≠ 期望 {want}")
                 else:
-                    print(f"✅ 页数：{rel} = {pages}")
+                    emit(f"✅ 页数：{rel} = {pages}")
             except Exception as e:
                 fail(f"pdfinfo 跑不动 {rel}（{e}）")
 else:
@@ -153,7 +168,7 @@ if os.path.exists(idx):
     if missing:
         fail(f"index.html 有 {len(missing)} 个链接指不到文件：{missing[:5]}")
     else:
-        print(f"✅ index.html 相对链接全部可达（{n} 个）")
+        emit(f"✅ index.html 相对链接全部可达（{n} 个）")
 
 # 6) 品牌物料依赖的 i18n 词条必须**两个语言都在**（缺一边会出空串卡片）
 ROOT = os.path.dirname(WD)
@@ -172,7 +187,7 @@ if all(os.path.exists(p) for p in LOCALES.values()):
         if absent:
             fail(f"i18n 词条 {key} 缺 {absent} —— 品牌物料会出现空串")
     else:
-        print(f"✅ 品牌相关 i18n 词条两语言齐备（{len(BRAND_KEYS)} 条）")
+        emit(f"✅ 品牌相关 i18n 词条两语言齐备（{len(BRAND_KEYS)} 条）")
 else:
     print("⏭  跳过 i18n 词条校验：本机不在仓库内（找不到 packages/i18n）")
 
@@ -198,7 +213,7 @@ for name in BRAND_COLOR_TOKENS:
     elif VERBOSE:
         print(f"   · {name} light={light} dark={dark}")
 if not any("暗色" in f for f in fails):
-    print(f"✅ 语义色亮/暗成对且取值不同（{len(BRAND_COLOR_TOKENS)} 个）")
+    emit(f"✅ 语义色亮/暗成对且取值不同（{len(BRAND_COLOR_TOKENS)} 个）")
 
 # 8) 里程碑四维色：两两色差（正常视觉 + 红/绿色盲模拟）
 #    这条与 design-system 的 `milestone-colors.spec.ts` 是**两处独立实现**：
@@ -217,7 +232,7 @@ for theme in ("light", "dark"):
         elif VERBOSE:
             print(f"   · {theme}/{name} 最差 ΔE={worst:.1f}（{pair}）")
 if not any("ΔE" in f for f in fails):
-    print(f"✅ 里程碑四维色两两可区分（亮/暗 × 正常/红绿色盲，门槛 ΔE≥{MIN_DELTA:g}）")
+    emit(f"✅ 里程碑四维色两两可区分（亮/暗 × 正常/红绿色盲，门槛 ΔE≥{MIN_DELTA:g}）")
 
 # 9) 里程碑徽章的门槛必须与领域层**逐项相同**
 #    物料里的 17 个徽章文件名是 `kind-threshold.svg`；领域定义是唯一事实源
@@ -244,7 +259,7 @@ if os.path.exists(DOMAIN_MILESTONES):
         if extra:
             fail(f"里程碑徽章多档：{sorted(extra)}（物料有、领域层没有）")
         if not missing and not extra:
-            print(f"✅ 里程碑门槛与领域层逐项一致（{len(expected)} 档）")
+            emit(f"✅ 里程碑门槛与领域层逐项一致（{len(expected)} 档）")
     # 身份标签同理：id 必须一一对应（物料文件名就是 id）
     DOMAIN_TAGS = os.path.join(ROOT, "packages/domain/src/identity-tags.ts")
     if os.path.exists(DOMAIN_TAGS):
@@ -261,7 +276,7 @@ if os.path.exists(DOMAIN_MILESTONES):
             if have - ids:
                 fail(f"身份标签多：{sorted(have - ids)}")
             if not (ids - have) and not (have - ids):
-                print(f"✅ 身份标签与领域层逐项一致（{len(ids)} 个）")
+                emit(f"✅ 身份标签与领域层逐项一致（{len(ids)} 个）")
 else:
     print("⏭  跳过里程碑/身份标签校验：本机不在仓库内（找不到 packages/domain）")
 
@@ -287,7 +302,7 @@ for root, _d, files in os.walk(os.path.join(WD, "_pipeline")):
 if hits:
     fail(f"脚本里出现自造文案（应改为从 i18n 取）：{hits}")
 else:
-    print(f"✅ 无自造文案回归（{len(FORBIDDEN_COPY)} 条禁串）")
+    emit(f"✅ 无自造文案回归（{len(FORBIDDEN_COPY)} 条禁串）")
 
 # 11) 产品清单文档里写的门槛数字，必须与领域层相同
 #     文档是最容易被手改的一层：改了数字、忘了重生成徽章，谁也不会发现。
@@ -309,7 +324,7 @@ if os.path.exists(DOC) and os.path.exists(DOMAIN_MILESTONES):
         else:
             checked += 1
     if checked:
-        print(f"✅ 产品清单门槛数字与领域层一致（{checked} 个维度）")
+        emit(f"✅ 产品清单门槛数字与领域层一致（{checked} 个维度）")
     else:
         print("⏭  产品清单里没找到可解析的门槛行（格式变了？）")
 
@@ -359,7 +374,7 @@ if os.path.exists(TOKENS_JSON):
             fail(f"brand-tokens.json 的 {path} 是 {val}，而 {want_name} 是 {want}")
             bad += 1
     if bad == 0:
-        print(f"✅ brand-tokens.json 色值与 tokens.css 逐项一致（{len(COLOR_MAP)} 项）")
+        emit(f"✅ brand-tokens.json 色值与 tokens.css 逐项一致（{len(COLOR_MAP)} 项）")
 
 # 13) 图鉴标题里印的数量，必须等于领域层真实数量
 #     标题曾经写死「Milestones（17）」「Identity Tags（8）」—— 加一个里程碑后
@@ -384,7 +399,7 @@ if os.path.exists(CATALOGUE) and os.path.exists(DOMAIN_MILESTONES):
         elif int(m.group(1)) != want:
             fail(f"图鉴标题写{label} {m.group(1)} 个，领域层是 {want} 个")
         else:
-            print(f"✅ 图鉴标题{label}数量 = {want}")
+            emit(f"✅ 图鉴标题{label}数量 = {want}")
 
 # 14) brand-tokens.css 必须能被解析，且每个值与 json 一致
 #     .css 供浏览器/设计工具直接 @import；它和 .json 是同一份数据的两副面孔，
@@ -424,7 +439,7 @@ if os.path.exists(TOKENS_CSS) and os.path.exists(TOKENS_JSON):
     if mism:
         fail(f"brand-tokens.css 与 json 不一致：{mism[:4]}")
     else:
-        print(f"✅ brand-tokens.css 可解析且与 json 一致（{len(pairs)} 个变量）")
+        emit(f"✅ brand-tokens.css 可解析且与 json 一致（{len(pairs)} 个变量）")
 
 # 15) 01-logo 与 00-brand-foundation 的文件集合必须精确
 #     这两个目录由多个脚本共同写入（logo / tokens / brandbook），
@@ -450,7 +465,7 @@ for rel, want in EXACT_DIRS.items():
     if have != want:
         fail(f"{rel} 集合不符：多余 {sorted(have - want)} / 缺失 {sorted(want - have)}")
     else:
-        print(f"✅ {rel} 文件集合精确（{len(want)} 个）")
+        emit(f"✅ {rel} 文件集合精确（{len(want)} 个）")
 
 # 16) 每个含字形的 svg 都要有对应 png（除刻意的单色版）
 LOGO_DIR = os.path.join(WD, "01-logo")
@@ -464,10 +479,53 @@ if os.path.isdir(LOGO_DIR):
     if unexpected:
         fail(f"01-logo 里这些 svg 没有对应 png：{unexpected}")
     else:
-        print(f"✅ 01-logo 每个字形 svg 都有 png（{len(svgs)-len(intentional)} 个；单色版 {len(intentional)} 个只给 svg）")
+        emit(f"✅ 01-logo 每个字形 svg 都有 png（{len(svgs)-len(intentional)} 个；单色版 {len(intentional)} 个只给 svg）")
+
+# 17) 04-imagery 的图与 manifest 必须双射（每张都在册、每条都在盘）
+IMG_DIR = os.path.join(WD, "04-imagery")
+IMG_MANIFEST = os.path.join(IMG_DIR, "_manifest_main.json")
+if os.path.isdir(IMG_DIR):
+    on_disk = set()
+    for root, _d, files in os.walk(IMG_DIR):
+        for fn in files:
+            if fn.lower().endswith((".png", ".jpg", ".jpeg")) and not fn.startswith("_") \
+               and fn != "contact-sheet.png":
+                on_disk.add(os.path.relpath(os.path.join(root, fn), WD))
+    if not os.path.exists(IMG_MANIFEST):
+        fail("04-imagery/_manifest_main.json 不存在")
+    else:
+        import json as _json
+        mf = _json.load(open(IMG_MANIFEST, encoding="utf-8"))
+        listed = {it["path"] for it in (mf if isinstance(mf, list) else mf.get("items", []))
+                  if isinstance(it, dict) and isinstance(it.get("path"), str)}
+        if listed != on_disk:
+            fail(f"04-imagery 与 manifest 不双射：盘上有册里没有 {sorted(on_disk - listed)[:4]} / 册里有盘上没有 {sorted(listed - on_disk)[:4]}")
+        else:
+            emit(f"✅ 04-imagery 与 manifest 双射（{len(listed)} 张）")
+
+# 18) 03-icons 的 svg 数必须等于 icon-sheet.html 引用的 svg 数
+ICON_DIR = os.path.join(WD, "03-icons")
+SHEET = os.path.join(ICON_DIR, "icon-sheet.html")
+if os.path.isdir(ICON_DIR) and os.path.exists(SHEET):
+    n_svg = len([f for f in os.listdir(ICON_DIR) if f.endswith(".svg")])
+    refs = set(re.findall(r'src="[^"]*?([\w-]+\.svg)"', open(SHEET, encoding="utf-8").read()))
+    if len(refs) != n_svg:
+        fail(f"03-icons：{n_svg} 个 svg，但 icon-sheet 只引用了 {len(refs)} 个（有图标没进总览）")
+    else:
+        emit(f"✅ 03-icons 的 {n_svg} 个图标全部进了总览页")
 
 if not fails:
-    print("\n✅ brand-kit 产物自检通过")
+    if JSON_OUT:
+        import json as _j
+        print(_j.dumps({"ok": True, "passed": len(passes), "failed": 0, "checks": passes}, ensure_ascii=False))
+    elif QUIET:
+        print(f"✅ brand-kit 产物自检通过（{len(passes)} 项）")
+    else:
+        print("\n✅ brand-kit 产物自检通过")
     sys.exit(0)
-print(f"\n❌ 共 {len(fails)} 项失败")
+if JSON_OUT:
+    import json as _j
+    print(_j.dumps({"ok": False, "passed": len(passes), "failed": len(fails), "errors": fails}, ensure_ascii=False))
+else:
+    print(f"\n❌ 共 {len(fails)} 项失败")
 sys.exit(1)

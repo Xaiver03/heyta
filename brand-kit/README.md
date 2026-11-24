@@ -11,6 +11,9 @@
 
 ## 自检判据一览（`python _pipeline/check_artifacts.py`）
 
+三种输出：默认人读；`--quiet` 只在失败时说话并给一行汇总（给 CI 用）；
+`--json` 输出 `{ok, passed, failed, checks|errors}`（给流水线解析用，stdout 保证是纯 JSON）。
+
 | # | 判据 | 抓的是什么 |
 |---|---|---|
 | 1 | 色值白名单 | 产物里出现非 token 的十六进制 |
@@ -29,6 +32,8 @@
 | 14 | `brand-tokens.css` 与 json 逐项一致 | 同一数据两副面孔只改了一处 |
 | 15 | `01-logo`(22) 与 `00-brand-foundation`(3) 文件集合精确 | 改名后旧文件残留 / 少导一档 |
 | 16 | 每个字形 svg 都有对应 png（单色版例外） | 交付给设计师时缺某个颜色版本的位图 |
+| 17 | `04-imagery` 的图与 `_manifest_main.json` 双射 | 有图没登记 / 登记了文件却不在 |
+| 18 | `03-icons` 的 svg 全部进了 `icon-sheet.html` | 加了图标但总览页没收录 |
 
 ⚠️ **PDF 每次重建字节都不同**（Chrome 打印头里带时间戳/文档 ID），PNG 与 SVG 是稳定的。
 所以比对 PDF 时看页数/字体/视觉，不要看 sha256 —— 否则每次都会以为「有改动」。
