@@ -1,6 +1,6 @@
 {
   "brand": "heyta",
-  "generated_at": "2026-11-25 06:10:10",
+  "generated_at": "2026-11-25T06:19:30+08:00",
   "dirs": {
     "00-brand-foundation": 11,
     "01-logo": 22,
@@ -18,7 +18,7 @@
   "files": [
     {
       "path": "index.html",
-      "size": 5103
+      "size": 5109
     },
     {
       "path": "成就与成长体系_产品清单.md",
@@ -26,11 +26,11 @@
     },
     {
       "path": "README.md",
-      "size": 11011
+      "size": 11976
     },
     {
       "path": "manifest.json",
-      "size": 13621
+      "size": 13627
     },
     {
       "path": "02-badges/badge-catalogue.png",

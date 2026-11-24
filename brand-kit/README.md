@@ -72,6 +72,18 @@
 - `02-badges/{milestones,identity,status,category}` 四个子目录的文件名集合必须与生成清单逐一对上
 - `09-social` / `10-templates` 同上（防改名残留）
 
+## 交付总览（数字都带取数命令）
+
+| 项 | 值 | 取数命令 |
+|---|---|---|
+| 受版本控制的物料文件 | 163 | `python brand-kit/_pipeline/build_index.py` 输出的 `index: N files` |
+| 产物目录 | 11（`00-`…`10-`） | `ls -d brand-kit/[0-9][0-9]-*` |
+| 自检判据 | 40 组 / 64 项 | `python brand-kit/_pipeline/check_artifacts.py --quiet` |
+| 构建期断言 | 8 处 | `python brand-kit/_pipeline/check_artifacts.py --list` 末段 |
+| 接线对账 | 27 条 | `node scripts/check-brand-assets.mjs` |
+| 生成器幂等 | 两次运行字节一致 | 连跑 5 件生成器后比对非 PDF 产物 sha |
+| 设计系统侧护栏 | `milestone-colors.spec.ts` | `pnpm --filter @heyta/design-system test` |
+
 ## 需要你定的事（不影响当前交付）
 
 以下三项都能正常交付，只是取舍需要你拍板；未定之前按「现状」那一列执行。
@@ -96,7 +108,8 @@
 | VI → 设计系统 | 新增 `color.milestone-{checkin,focus,tasks,days}`（亮/暗各一份）进 `tokens.css` + `TOKEN_GROUPS` |
 | 设计系统 → 代码 | `packages/ui/src/motivation/MilestoneMap.tsx` 消费四维色（维度圆点 + 已达成档位描边） |
 | 守住不回退 | `packages/design-system/tests/milestone-colors.spec.ts`（对比度 / ΔE / 色盲 / 暗色覆盖） |
-| brand-kit 自检 | `python _pipeline/check_artifacts.py`：色值必须命中 tokens.css + 数量 17/8/6/26/10 + **9 份 PDF 字体全嵌入且页数符合设计** + **index.html 29 个相对链接全部可达** + **品牌 i18n 词条两语言齐备** + **16 个语义色亮/暗成对且取值不同** + **里程碑四维两两 ΔE≥10（亮/暗 × 正常/红绿色盲，Python 独立重算，与 design-system 的 TS spec 互为对照）** + **17 个里程碑门槛与 8 个身份标签 id 与 `packages/domain` 逐项相同** + **产品清单里写的门槛数字与领域层一致** + **无自造文案回归（禁串扫描）** + **`brand-tokens.json` 43 个色值与 tokens.css 逐项一致** + **图鉴标题印的数量 = 领域层数量**（注入非法色 / 改错页数 / 写坏 href / 漏暗色覆盖 / 多出或不存在的档位都会 exit 1） |
+| brand-kit 自检 | `python _pipeline/check_artifacts.py`：**40 组 / 64 项**，覆盖 ①色值必须命中 tokens.css ②数量 17 里程碑 / 8 身份标签 / 5 状态胶囊 / 26 图标 / 10 字标 ③9 份 PDF 字体全嵌入、页数、**纸型** ④产物内本地引用全部可达 ⑤品牌 i18n 词条两语言齐备 ⑥16 个语义色亮/暗成对且不同 ⑦里程碑四维与分类色槽**两两 ΔE**（亮/暗 × 正常/红盲/绿盲，Python 独立重算，与 design-system 的 TS spec 互为对照）⑧门槛与 id 逐项对齐 `packages/domain`，**徽章与图鉴上印的数字也回读核对** ⑨状态胶囊 = 产品真实状态 ⑩反例主张在 `_pipeline/stance.py` 名单内且与激励体系三条红线一致 ⑪分享文本不含账号/设备标识 ⑫手册 FAQ 四条各有实现依据 ⑬索引卡片齐全、副标题为现量值 |
+| 幂等 | 五件生成器连跑两次，SVG/PNG/JSON/CSS/HTML **字节完全一致**（`generated_at` 取最后一次提交时间，不用墙上时钟）；PDF 因打印头带时间戳不参与 sha 比对，只看页数/字体/纸型 |
 
 实测与判据见 [`成就与成长体系_产品清单.md`](成就与成长体系_产品清单.md) §11。
 

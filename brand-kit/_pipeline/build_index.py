@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """heyta brand-kit 索引：index.html + manifest.json（扫描真实文件生成，可校验）"""
-import os, json, time, sys, re
+import os, json, time, sys, re, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import read_tokens as RT
 WD=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -80,7 +80,19 @@ for root,dirs,fs in os.walk(WD):
     for fn in fs:
         if fn.startswith("."): continue
         p=os.path.join(root,fn); files.append({"path":rel(p),"size":os.path.getsize(p)})
-man={"brand":"heyta","generated_at":time.strftime("%Y-%m-%d %H:%M:%S"),
+def _stamp():
+    """生成时间取**最后一次提交的时间**，不用 `time.now()`。
+    用墙上时钟会让每次重建的 index.html / manifest.json 字节都不同 —— 于是"产物有没有变"
+    这件事永远无法用 sha 判断，也没法做幂等性检查。"""
+    try:
+        out = subprocess.run(["git", "log", "-1", "--format=%cI", "--", "."],
+                             cwd=WD, capture_output=True, text=True, timeout=15).stdout.strip()
+        return out or "unknown"
+    except Exception:
+        return "unknown"
+
+
+man={"brand":"heyta","generated_at":_stamp(),
      "dirs":{d:sum(1 for f in files if f["path"].startswith(d+"/")) for d in
              ["00-brand-foundation","01-logo","02-badges","03-icons","04-imagery","05-posters","06-brochure","07-product-manual","08-merch","09-social","10-templates"]},
      "count":len(files),"files":files}
