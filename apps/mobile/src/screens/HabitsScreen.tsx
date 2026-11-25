@@ -81,12 +81,12 @@ import type {
   HabitIcon,
   HabitLog,
 } from '@heyta/domain';
-import { parseCourseCSV, parseCourseICS, planCourseImport } from '@heyta/domain';
+import { parseCourseCSV, parseCourseICS, parseCourseXLSX, planCourseImport } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { HabitBoard, HabitProgressList, HabitTrendBoard } from '@heyta/ui';
 
 import { useTaskHost } from '../db/use-task-host';
-import { readLocalTextUri } from '../lib/local-file-read';
+import { base64ToBytes, readLocalBytesBase64, readLocalTextUri } from '../lib/local-file-read';
 import {
   habitBoardLabels,
   habitListLabels,
@@ -198,14 +198,20 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           if (copy === undefined || copy.status !== 'success') throw new Error(copy === undefined ? '复制失败' : copy.copyError);
           return copy.localUri;
         };
-        let text = '';
-        try {
-          text = await readLocalTextUri(doc.uri);
-        } catch {
-          text = '';
+        let rawRows;
+        if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
+          const b64 = await readLocalBytesBase64(doc.uri).catch(async () => readLocalBytesBase64(await localUri()));
+          rawRows = await parseCourseXLSX(base64ToBytes(b64));
+        } else {
+          let text = '';
+          try {
+            text = await readLocalTextUri(doc.uri);
+          } catch {
+            text = '';
+          }
+          if (text.trim() === '') text = await readLocalTextUri(await localUri());
+          rawRows = lower.endsWith('.csv') ? parseCourseCSV(text) : parseCourseICS(text);
         }
-        if (text.trim() === '') text = await readLocalTextUri(await localUri());
-        const rawRows = lower.endsWith('.csv') ? parseCourseCSV(text) : parseCourseICS(text);
         const plan = planCourseImport(rawRows);
         const res = await actions.importCourses(plan.rows);
         refresh();
