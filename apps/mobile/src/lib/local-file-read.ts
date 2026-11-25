@@ -130,32 +130,3 @@ export async function readLocalTextUri(uri: string): Promise<string> {
     throw new Error(`没有 ${MODULE_NAME} 模块，blob 退路也失败：${errText(e)}`);
   }
 }
-
-/** 读本机 URI 的原始字节 → base64（无换行）。设备无该原生通道时抛错。 */
-export async function readLocalBytesBase64(uri: string, maxBytes = 20 * 1024 * 1024): Promise<string> {
-  const mod = nativeModule();
-  if (mod === undefined || typeof mod.readUriBase64 !== 'function') {
-    throw new Error('这台设备没有原始字节读取通道');
-  }
-  return mod.readUriBase64(uri, maxBytes);
-}
-
-/** base64 → Uint8Array（纯 JS，不依赖 Buffer/atob）。 */
-export function base64ToBytes(b64: string): Uint8Array {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
-  const len = clean.length;
-  const out = new Uint8Array(Math.floor((len * 3) / 4));
-  let o = 0;
-  for (let i = 0; i < len; i += 4) {
-    const a = chars.indexOf(clean[i]!);
-    const b = chars.indexOf(clean[i + 1] ?? 'A');
-    const c = chars.indexOf(clean[i + 2] ?? 'A');
-    const d = chars.indexOf(clean[i + 3] ?? 'A');
-    const n = (a << 18) | (b << 12) | (c << 6) | d;
-    out[o++] = (n >> 16) & 0xff;
-    if (i + 2 < len) out[o++] = (n >> 8) & 0xff;
-    if (i + 3 < len) out[o++] = n & 0xff;
-  }
-  return out.subarray(0, o);
-}
