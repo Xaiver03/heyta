@@ -2,11 +2,11 @@
  * 日历里的一条「习惯」条目（移动端）
  * ===================================
  *
- * 对照滴答清单：习惯不是一张独立卡片，而是日历里的**一条**——有定时点的排在
- * 时间轴对应时刻、没有的落在「全天」带，左侧（有时间时）显示 `HH:mm`，
- * 都带习惯图标、可直接勾选。
+ * 对照滴答清单日历「日/周/列表」：没有时刻的习惯不是一行"图标+文字"，而是一条
+ * **整宽的浅色圆角横带**——像一条带子横亘在「全天」区里；有时间点的则落在时间轴对应
+ * 时刻，同样是一条横带（前面带小钟）。整条可点：点一下打卡，再点取消。
  *
- * 本组件只负责"画一条 + 上报点了哪条"，不判断"哪天该做"（那是 `@heyta/domain#isScheduledOn`），
+ * 本组件只负责"画一条 + 上报点了哪条"，不判断"哪天该做"（`@heyta/domain#isScheduledOn`），
  * 也不认识 i18n（时间点是纯数字）。
  */
 
@@ -14,7 +14,6 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { habitIconOf, type Habit } from '@heyta/domain';
-import { HabitArtwork } from '@heyta/ui';
 
 import { Icon } from '../ui/icons';
 import { Text } from '../ui/kit';
@@ -41,26 +40,20 @@ export function CalendarHabitEntry({
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        row: {
+        /* 整条横带：浅色底 + 圆角，像滴答的全天条。完成态底色更淡、文字变灰并加删除线。 */
+        band: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: t['space.2'],
-          minHeight: t['touch-target.min'],
+          gap: t['space.1'],
+          minHeight: t['space.10'],
           paddingVertical: t['space.1'],
+          paddingHorizontal: t['space.2'],
+          borderRadius: t['radius.sm'],
+          backgroundColor: t['color.primary-subtle'],
         },
-        time: { minWidth: t['space.12'], color: t['color.foreground-muted'] },
-        name: { flex: 1 },
-        check: {
-          width: t['space.6'],
-          height: t['space.6'],
-          borderRadius: t['radius.full'],
-          borderWidth: t['border-width.thin'],
-          borderColor: t['color.border'],
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        checkDone: { backgroundColor: t['color.primary'], borderColor: t['color.primary'] },
-        doneText: { color: t['color.foreground-muted'] },
+        bandDone: { backgroundColor: t['color.surface'] },
+        text: { flex: 1, color: t['color.primary'] },
+        textDone: { color: t['color.foreground-muted'], textDecorationLine: 'line-through' },
       }),
     [t],
   );
@@ -75,20 +68,18 @@ export function CalendarHabitEntry({
       accessibilityState={{ checked: done, disabled: busy }}
       accessibilityLabel={habit.name}
       testID={`${testID}-${habit.id}`}
-      style={styles.row}
+      style={[styles.band, done ? styles.bandDone : null]}
     >
       {habit.time !== undefined ? (
-        <Text variant="row-meta" style={styles.time}>
-          {habit.time}
-        </Text>
+        <Icon name="task.reminder" size="sm" color={t['color.primary']} />
       ) : null}
-      <HabitArtwork icon={habitIconOf(habit)} size={t['space.8']} />
-      <Text variant="row-title" style={[styles.name, done ? styles.doneText : null]}>
+      <Text
+        variant="row-title"
+        numberOfLines={1}
+        style={[styles.text, done ? styles.textDone : null]}
+      >
         {habit.name}
       </Text>
-      <View style={[styles.check, done ? styles.checkDone : null]}>
-        {done ? <Icon name="action.keep" size="sm" color={t['color.on-primary']} /> : null}
-      </View>
     </Pressable>
   );
 }

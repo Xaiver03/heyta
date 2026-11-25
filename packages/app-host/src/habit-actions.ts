@@ -83,6 +83,11 @@ export interface NewHabitFields {
    */
   frequency?: HabitFrequency;
   backfillDays?: number;
+  /**
+   * 定时点（本地 `HH:mm`）。可选 —— 有它就作为"带时刻的条目"排进日历时间轴；
+   * 没有就落"全天"带（对齐滴答）。写入前校验格式，非法值直接抛（存下去界面会静默画不出）。
+   */
+  time?: string;
 }
 
 /** Creation and editing must reject the same invalid goal before writing an op. */
@@ -323,6 +328,9 @@ export function createHabitActions(
       }
       const icon = over.icon === undefined ? undefined : parseHabitIcon(over.icon);
       if (over.icon !== undefined && icon === undefined) throw new Error('习惯图标必须是闭集里的 key');
+      if (over.time !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(over.time)) {
+        throw new Error('习惯定时点必须是 HH:mm（00:00–23:59）');
+      }
 
       const entityId = makeHabitId();
       // 🔴 建的时候也要过一遍归一/校验：`setHabitFrequency` 有牙而 `createHabit` 没牙，
