@@ -104,7 +104,7 @@ import { CalendarViewMenu } from './CalendarViewMenu';
 import { CalendarWeekPager } from './CalendarWeekPager';
 import { CalendarCapsuleHeader } from './CalendarCapsuleHeader';
 import { CalendarWeekAgenda } from './CalendarWeekAgenda';
-import { CalendarHabitsCard } from './CalendarHabitsCard';
+import { CalendarHabitEntry } from './CalendarHabitEntry';
 import { useTokens } from '../theme';
 
 /**
@@ -290,6 +290,31 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     [habits, selected],
   );
 
+  /** 选中那天已打卡的习惯 id 集合。 */
+  const doneHabitIds = useMemo(
+    () =>
+      new Set(
+        habitLogs
+          .filter((log) => log.date === selected && log.deletedAt === undefined)
+          .map((log) => log.habitId),
+      ),
+    [habitLogs, selected],
+  );
+  /** 习惯 → 日历条目：有定时点落对应小时，无定时点落"全天"（hour=null）。 */
+  const habitEntries = useMemo(
+    () =>
+      scheduledHabits.map((habit) => {
+        const raw = habit.time;
+        const h = raw === undefined ? NaN : Number(raw.slice(0, 2));
+        return { id: habit.id, hour: Number.isFinite(h) && h >= 0 && h <= 23 ? h : null };
+      }),
+    [scheduledHabits],
+  );
+  const habitById = useMemo(
+    () => new Map(scheduledHabits.map((habit) => [habit.id, habit])),
+    [scheduledHabits],
+  );
+
   /** 点一下习惯：今天没打卡就打卡，已打卡就取消（`undoCheckIn` 是软删除）。 */
   const onToggleHabit = useCallback(
     (habitId: string) => {
@@ -310,6 +335,22 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         });
     },
     [habitActions, busyHabitId, habitLogs, selected, refresh],
+  );
+
+  const renderHabitEntry = useCallback(
+    (id: string) => {
+      const habit = habitById.get(id);
+      if (habit === undefined) return null;
+      return (
+        <CalendarHabitEntry
+          habit={habit}
+          done={doneHabitIds.has(id)}
+          busy={busyHabitId === id}
+          onToggle={onToggleHabit}
+        />
+      );
+    },
+    [habitById, doneHabitIds, busyHabitId, onToggleHabit],
   );
 
   /**
@@ -827,18 +868,6 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           <Text variant="headline">{labels.dayTitle(cursor)}</Text>
         </View>
       ) : null}
-      {view === 'day' ? (
-        <View style={{ marginTop: tokens['space.2'] }}>
-          <CalendarHabitsCard
-            habits={scheduledHabits}
-            logs={habitLogs}
-            date={selected}
-            title={t('widget.habits.title')}
-            onToggle={onToggleHabit}
-            busyHabitId={busyHabitId}
-          />
-        </View>
-      ) : null}
 
       <Animated.View
         {...swipe.panHandlers}
@@ -936,6 +965,8 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         onPickMonth={pickMonth}
         onToggleTask={onToggleTask}
         busyTaskId={busyId}
+        habitEntries={habitEntries}
+        renderHabitEntry={renderHabitEntry}
         labels={labels}
         view={view}
         now={now}

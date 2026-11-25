@@ -179,6 +179,9 @@ export interface CalendarBoardProps {
   readonly showSelectedDayList?: boolean | undefined;
   /** 月档是否填满宿主传下来的可用高度。 */
   readonly fillMonth?: boolean | undefined;
+  /** 习惯条目（宿主投影好，`hour=null` 落全天带），仅在日档透传；行由宿主 `renderHabitEntry` 画。 */
+  readonly habitEntries?: readonly { id: string; hour: number | null }[] | undefined;
+  readonly renderHabitEntry?: ((id: string) => React.ReactNode) | undefined;
   /**
    * 公共事实的"休 / 班"标记（W4b，ADR-0052 §2.6 点名的那条缝）。
    *
@@ -564,6 +567,8 @@ export function CalendarBoard({
   barAccentOf,
   showSelectedDayList = true,
   fillMonth = false,
+  habitEntries,
+  renderHabitEntry,
   dayMarker,
   dayMarkerLabels,
   events,
@@ -720,6 +725,8 @@ export function CalendarBoard({
               onOpenTask={onOpenTask}
               busyTaskId={busyTaskId}
               labels={labels}
+              {...(habitEntries === undefined ? {} : { habitEntries })}
+              {...(renderHabitEntry === undefined ? {} : { renderHabitEntry })}
               {...(boardAppearance === undefined ? {} : { appearance: boardAppearance })}
               {...(renderDayTaskRowWrapper === undefined ? {} : { renderRowWrapper: renderDayTaskRowWrapper })}
               {...(renderHourRowWrapper === undefined ? {} : { renderHourRowWrapper })}

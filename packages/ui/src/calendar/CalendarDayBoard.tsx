@@ -90,6 +90,9 @@ export interface CalendarDayBoardProps {
    */
   readonly now?: number | undefined;
   readonly onToggleTask: (taskId: string) => void;
+  /** 习惯条目（宿主投影好）。`hour=null` → 无定时点、落"全天"带；否则落在对应小时行。共享层只摆放，行由 `renderHabitEntry` 画。 */
+  readonly habitEntries?: readonly { id: string; hour: number | null }[] | undefined;
+  readonly renderHabitEntry?: ((id: string) => React.ReactNode) | undefined;
   readonly onOpenTask?: ((taskId: string) => void) | undefined;
   readonly busyTaskId?: string | null | undefined;
   readonly labels: CalendarBoardLabels;
@@ -118,6 +121,8 @@ export function CalendarDayBoard({
   day,
   now,
   onToggleTask,
+  habitEntries,
+  renderHabitEntry,
   onOpenTask,
   busyTaskId,
   labels,
@@ -132,6 +137,10 @@ export function CalendarDayBoard({
   const flat = appearance === 'flat';
 
   const buckets = useMemo(() => calendarDayBuckets(tasks, day), [tasks, day]);
+  const allDayHabitIds = useMemo(
+    () => (habitEntries ?? []).filter((h) => h.hour === null).map((h) => h.id),
+    [habitEntries],
+  );
   const rowHeight = tokens['size.row-min-height'];
   /**
    * 现在线：只在"看的就是今天"且宿主给了时钟时画。
@@ -158,7 +167,7 @@ export function CalendarDayBoard({
     <View style={styles.root} testID={testID}>
       {/* ── 全天带：这一天里**没有时刻**的那些 ─────────────────── */}
       {/* flat（Apple）且这天没有全天事项时，整块不画 —— Apple 无全天事项直接从时间轴开始。 */}
-      {flat && buckets.allDay.length === 0 && (events?.length ?? 0) === 0 ? null : (
+      {flat && buckets.allDay.length === 0 && allDayHabitIds.length === 0 && (events?.length ?? 0) === 0 ? null : (
       <View style={[styles.card, flat ? styles.flatCard : null, styles.allDay]} testID={`${testID}-all-day`}>
         {labels.dayAllDay !== undefined ? (
           <Text
@@ -168,7 +177,7 @@ export function CalendarDayBoard({
             {labels.dayAllDay}
           </Text>
         ) : null}
-        {buckets.allDay.length === 0 ? (
+        {buckets.allDay.length === 0 && allDayHabitIds.length === 0 ? (
           // 🔴 空态走共享实现（`check:empty-state` 判据 3：不许在视图里手写空态）。
           <EmptyState
             /*
@@ -182,7 +191,12 @@ export function CalendarDayBoard({
             testID={`${testID}-all-day-empty`}
           />
         ) : (
-          <TaskList tasks={buckets.allDay} {...taskListProps} testID={`${testID}-all-day-list`} />
+          <>
+            <TaskList tasks={buckets.allDay} {...taskListProps} testID={`${testID}-all-day-list`} />
+            {allDayHabitIds.map((id) => (
+              <React.Fragment key={`habit-${id}`}>{renderHabitEntry?.(id)}</React.Fragment>
+            ))}
+          </>
         )}
         {/*
           倒数日（W6）落在**「全天」这一带**，不是新造第三块：这一带定义就是
@@ -209,6 +223,9 @@ export function CalendarDayBoard({
       <View style={[styles.card, flat ? styles.flatCard : null, styles.axisWrap]} testID={`${testID}-axis-card`}>
         <ScrollView style={styles.axis} testID={`${testID}-axis`}>
           {buckets.hours.map((bucket, hour) => {
+            const hourHabitIds = (habitEntries ?? [])
+              .filter((h) => h.hour === hour)
+              .map((h) => h.id);
             const hourRow = (
             <View
               key={`hour-${String(hour)}`}
@@ -245,6 +262,9 @@ export function CalendarDayBoard({
                     testID={`${testID}-timed-${String(hour).padStart(2, '0')}`}
                   />
                 ) : null}
+                {hourHabitIds.map((id) => (
+                  <React.Fragment key={`habit-${id}`}>{renderHabitEntry?.(id)}</React.Fragment>
+                ))}
               </View>
             </View>
             );
