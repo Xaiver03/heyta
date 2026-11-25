@@ -3823,6 +3823,8 @@ export const zhCN = {
   'mobile.calendar.view.day': '单日',
   'mobile.calendar.view.week': '一周',
   'mobile.calendar.view.month': '月',
+  'mobile.calendar.view.3day': '3日',
+  'mobile.calendar.view.timetable': '课表',
   'mobile.calendar.today': '今天',
   'mobile.calendar.footnote': '未设截止时间的任务不在日历上，它们在「任务」页的收集箱里。',
   'mobile.calendar.a11y.dayWithTasks': '{date}，{count} 个任务',

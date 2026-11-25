@@ -14,7 +14,6 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
-  addDays,
   dueLocalDateOf,
   isScheduledOn,
   type Habit,
@@ -30,11 +29,13 @@ import { Text } from '../ui/kit';
 import { useTokens } from '../theme';
 
 export interface CalendarWeekAgendaProps {
-  readonly weekStart: LocalDate;
+  /** 要逐段列出的日期（周档 = 7 天；3 日档 = 3 天）。 */
+  readonly days: readonly LocalDate[];
+  /** 某一天对应的「星期几」短名（宿主按 i18n 提供）。 */
+  readonly weekdayLabelOf: (date: LocalDate) => string;
   readonly today: LocalDate;
   readonly selected: LocalDate;
   readonly tasks: readonly Task[];
-  readonly weekdays: readonly [string, string, string, string, string, string, string];
   readonly taskRow: TaskListLabels;
   readonly onSelectDay: (date: LocalDate) => void;
   readonly onToggleTask: (taskId: string) => void;
@@ -54,11 +55,11 @@ function shortWeekday(label: string): string {
 }
 
 export function CalendarWeekAgenda({
-  weekStart,
+  days,
+  weekdayLabelOf,
   today,
   selected,
   tasks,
-  weekdays,
   taskRow,
   onSelectDay,
   onToggleTask,
@@ -108,8 +109,8 @@ export function CalendarWeekAgenda({
 
   return (
     <View>
-      {weekdays.map((label, index) => {
-        const date = addDays(weekStart, index);
+      {days.map((date) => {
+        const label = weekdayLabelOf(date);
         const isToday = date === today;
         const isSelected = date === selected;
         const dayTasks = tasks.filter((task) => dueLocalDateOf(task) === date);

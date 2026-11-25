@@ -79,7 +79,7 @@ describe('移动端日历的档位入口', () => {
     expect(boardChunk, '档位控件长进了共享板子树').not.toContain('CalendarView');
   });
 
-  it('🔴 可切的档位取自**共享那份顺序**，本地不许再长回一张表（R17）', () => {
+  it('🔴 可切的档位取自**一份表**（移动端超集：共享四档 + 3日/课表），本地不许再长回字面量表（R17）', () => {
     // 立场一个字没变：这一栏列的仍然只能是"真的能切过去的档"。
     // 变的是**由谁回答"有哪些档"** —— 原来是本文件一份 `VIEW_OPTIONS` 字面量、
     // web 页头一份 `{kind,key}[]`、再加上本文件下面那份 档位→键 的映射，共三处，
@@ -89,10 +89,16 @@ describe('移动端日历的档位入口', () => {
     // ⚠️ 这里刻意**不 import** `@heyta/ui`：那条桶会 `from "react-native"`，
     //   在本包的 node 侧测试里会以 `RolldownError: Flow is not supported` 挂在收集阶段
     //   （台账 §5 第 9 行实测过）。所以这一条只钉接线形状，取值集合由上面那份共享判据守。
-    expect(screen).toMatch(/order=\{CALENDAR_VIEW_ORDER\}/);
+    // 移动端把档位表集中到 `calendar-mobile-views.ts` 一处（共享四档的超集 + 3日/课表两档）。
+    expect(screen).toMatch(/order=\{MOBILE_VIEW_ORDER\}/);
     expect(screen, '本地又长回一张 VIEW_OPTIONS ⇒ 档位清单重新变成两份').not.toMatch(
       /const VIEW_OPTIONS/,
     );
+    // 档位表必须是**共享四档的超集**，且集中在一处 —— 漏掉某一共享档就会出现"这档切不过去"。
+    const mobileViews = codeOf(resolve(HERE, '../src/screens/calendar-mobile-views.ts'));
+    for (const kind of ['month', 'week', 'day', 'year', '3day', 'timetable']) {
+      expect(mobileViews, `移动端档位表漏了 ${kind}`).toContain(`'${kind}'`);
+    }
   });
 
   it('游标规则**不在本文件重写**：只许从 `@heyta/ui` 取那两个函数', () => {

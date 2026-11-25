@@ -23,26 +23,18 @@
 import React, { useMemo } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
-import type { CalendarViewKind } from '@heyta/ui';
-
 import { Icon, type IconName } from '../ui/icons';
 import { Text } from '../ui/kit';
 import { useTokens } from '../theme';
 
-/** 每一档配哪枚图标。滴答用的是"列表/年/月/周/3日/日"各自一张缩略图。 */
-export const CALENDAR_VIEW_ICON: Record<CalendarViewKind, IconName> = {
-  month: 'calendar.month',
-  week: 'calendar.week',
-  day: 'calendar.day',
-  year: 'calendar.year',
-};
-
 export interface CalendarViewMenuProps {
   readonly visible: boolean;
-  readonly current: CalendarViewKind;
-  readonly order: readonly CalendarViewKind[];
-  readonly labelOf: (kind: CalendarViewKind) => string;
-  readonly onPick: (kind: CalendarViewKind) => void;
+  readonly current: string;
+  readonly order: readonly string[];
+  readonly labelOf: (kind: string) => string;
+  /** 每一档配哪枚图标（宿主给，含移动端额外的 3日/课表）。 */
+  readonly iconOf: (kind: string) => IconName;
+  readonly onPick: (kind: string) => void;
   readonly onClose: () => void;
   /** 弹层贴左还是贴右（跟着触发按钮走）。默认贴左。 */
   readonly anchor?: 'left' | 'right';
@@ -54,6 +46,7 @@ export function CalendarViewMenu({
   current,
   order,
   labelOf,
+  iconOf,
   onPick,
   onClose,
   anchor = 'left',
@@ -107,7 +100,7 @@ export function CalendarViewMenu({
               testID={`calendar-view-${kind}`}
             >
               <Icon
-                name={CALENDAR_VIEW_ICON[kind]}
+                name={iconOf(kind)}
                 size="sm"
                 color={selected ? tokens['color.primary'] : tokens['color.foreground-subtle']}
               />

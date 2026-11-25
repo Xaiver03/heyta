@@ -3493,6 +3493,8 @@ export const en = {
   'mobile.calendar.view.day': 'Day',
   'mobile.calendar.view.week': 'Week',
   'mobile.calendar.view.month': 'Month',
+  'mobile.calendar.view.3day': '3-Day',
+  'mobile.calendar.view.timetable': 'Timetable',
   'mobile.calendar.today': 'Today',
   'mobile.calendar.footnote': 'Tasks without a due date are not on the calendar; they live in the Inbox on the Tasks tab.',
   'mobile.calendar.a11y.dayWithTasks': '{date}, {count} tasks',

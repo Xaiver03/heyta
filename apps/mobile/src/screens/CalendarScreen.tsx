@@ -43,7 +43,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, View } from 'react-native';
+import { Animated, PanResponder, ScrollView, View } from 'react-native';
 
 import {
   addDays,
@@ -101,6 +101,14 @@ import { Screen, Text } from '../ui/kit';
 import { CalendarScopeSheet, SCOPE_INBOX, SCOPE_QUADRANT_PREFIX, type ScopeProject } from './CalendarScopeSheet';
 import { TopBarMenu } from '../ui/top-bar-menu';
 import { CalendarViewMenu } from './CalendarViewMenu';
+import { CalendarTimetable } from './CalendarTimetable';
+import {
+  MOBILE_VIEW_ICON,
+  MOBILE_VIEW_LABEL_KEY,
+  MOBILE_VIEW_ORDER,
+  isSharedView,
+  type MobileCalendarView,
+} from './calendar-mobile-views';
 import { CalendarWeekPager } from './CalendarWeekPager';
 import { CalendarCapsuleHeader } from './CalendarCapsuleHeader';
 import { CalendarWeekAgenda } from './CalendarWeekAgenda';
@@ -153,6 +161,8 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
   const [selected, setSelected] = useState<LocalDate>(() => toLocalDate(Date.now()));
   /** 这一屏看的是哪一档（月 / 周 / 日 / 年）。 */
   const [view, setView] = useState<CalendarViewKind>('day');
+  /** 移动端额外两档（3日 / 课表）：独立状态，不污染共享 `view` 管线，Web 零改动。 */
+  const [extraView, setExtraView] = useState<'3day' | 'timetable' | null>(null);
   /**
    * 🔴 2026-11-16：**显示范围**（按清单筛）。`undefined` = 所有清单。
    *
@@ -424,22 +434,29 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
   const viewScaleFrom = useRef(1);
   const ZOOM_ORDER_REF = useMemo(() => ['year', 'month', 'week', 'day'] as const, []);
 
+  const animateView = useCallback(() => {
+    viewAnim.setValue(0);
+    Animated.timing(viewAnim, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+  }, [viewAnim]);
+
   const changeView = useCallback(
-    (next: CalendarViewKind) => {
+    (next: MobileCalendarView) => {
+      // 移动端额外两档（3日 / 课表）：只切 `extraView`，共享 `view` 管线原样不动。
+      if (!isSharedView(next)) {
+        setExtraView(next);
+        animateView();
+        return;
+      }
+      setExtraView(null);
       const from = ZOOM_ORDER_REF.indexOf(view);
       const to = ZOOM_ORDER_REF.indexOf(next);
       viewScaleFrom.current = to > from ? 1.04 : to < from ? 0.96 : 1;
       setView(next);
       // 换档不换"选中哪天"，只把游标挪到那一天所在的那一段（与 Web 的 `setView` 同一条）。
       setCursor(calendarCursorFor(next, selected));
-      viewAnim.setValue(0);
-      Animated.timing(viewAnim, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
+      animateView();
     },
-    [view, ZOOM_ORDER_REF, selected, viewAnim],
+    [view, ZOOM_ORDER_REF, selected, animateView],
   );
 
   /**
@@ -751,6 +768,8 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
    * 这里不另写一套格式化。
    */
   const rangeTitleBase = useMemo(() => {
+    if (extraView === '3day') return formatDayTitleText(selected, t);
+    if (extraView === 'timetable') return formatMonthTitleText(startOfMonth(cursor), t);
     if (view === 'month') return formatMonthTitleText(startOfMonth(cursor), t);
     if (view === 'day') return formatDayTitleText(selected, t);
     if (view === 'year') return formatYearTitleText(cursor, t);
@@ -760,7 +779,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
      * `⋯` 被推到屏幕边缘（真机可见）。
      */
     return formatWeekRangeText(selected, t);
-  }, [cursor, selected, t, view]);
+  }, [cursor, selected, t, view, extraView]);
 
   /**
    * 🔴 2026-11-16：**这一段里有多少事**，直接写进标题（「· 12 项」）。
@@ -892,13 +911,47 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         }}
       >
       {/* 一周档：Apple「列表」形态的周议程（7 天分段 + 各天任务），替代共享周板（其无 7 列时间轴）。 */}
-      {view === 'week' ? (
+      {extraView === '3day' ? (
         <CalendarWeekAgenda
-          weekStart={startOfWeek(selected)}
+          days={Array.from({ length: 3 }, (_, i) => addDays(selected, i))}
+          weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
           today={today}
           selected={selected}
           tasks={scopedTasks}
-          weekdays={labels.weekdays}
+          taskRow={labels.taskRow}
+          onSelectDay={(date) => {
+            pickDay(date);
+          }}
+          onToggleTask={onToggleTask}
+          busyTaskId={busyId}
+          habits={habits}
+          habitLogs={habitLogs}
+          onToggleHabit={onToggleHabit}
+          busyHabitId={busyHabitId}
+        />
+      ) : extraView === 'timetable' ? (
+        <ScrollView style={{ flex: 1 }} testID="calendar-timetable-scroll">
+          <CalendarTimetable
+            weekStart={startOfWeek(selected)}
+            today={today}
+            selected={selected}
+            weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
+            tasks={scopedTasks}
+            onToggleTask={onToggleTask}
+            busyTaskId={busyId}
+            habits={habits}
+            habitLogs={habitLogs}
+            onToggleHabit={onToggleHabit}
+            busyHabitId={busyHabitId}
+          />
+        </ScrollView>
+      ) : view === 'week' ? (
+        <CalendarWeekAgenda
+          days={Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(selected), i))}
+          weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
+          today={today}
+          selected={selected}
+          tasks={scopedTasks}
           taskRow={labels.taskRow}
           onSelectDay={(date) => {
             pickDay(date);
@@ -1019,12 +1072,13 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
       */}
       <CalendarViewMenu
         visible={viewMenuOpen}
-        current={view}
-        order={CALENDAR_VIEW_ORDER}
-        labelOf={(kind) => t(CALENDAR_VIEW_LABEL_KEYS_MOBILE[kind])}
+        current={extraView ?? view}
+        order={MOBILE_VIEW_ORDER}
+        labelOf={(kind) => t(MOBILE_VIEW_LABEL_KEY[kind as MobileCalendarView] as Parameters<typeof t>[0])}
+        iconOf={(kind) => MOBILE_VIEW_ICON[kind as MobileCalendarView]}
         onPick={(kind) => {
           setViewMenuOpen(false);
-          changeView(kind);
+          changeView(kind as MobileCalendarView);
         }}
         onClose={() => { setViewMenuOpen(false); }}
         anchor={viewMenuAnchor}
