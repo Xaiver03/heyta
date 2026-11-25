@@ -125,6 +125,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const [habits, setHabits] = useState<Habit[]>([]);
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [draft, setDraft] = useState('');
+  const [draftTime, setDraftTime] = useState('');
   /** 顶部「＋」开关：默认只看清单，点＋才展开新建（TickTick 式：列表为主）。 */
   const [adding, setAdding] = useState(false);
   /**
@@ -524,6 +525,14 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           error={createError ?? undefined}
           testID="habit-create-name"
         />
+        {/* 可选定时点：填了就把这条习惯当作"带时刻的条目"排进日历时间轴；不填落"全天"。
+            标签复用现有的「时间」词条，格式 `HH:mm`，非法值由动作层抛错。 */}
+        <TextField
+          label={t('web.tasks.detail.section.time')}
+          value={draftTime}
+          onChangeText={(next) => setDraftTime(next)}
+          testID="habit-create-time"
+        />
         <Button
           label={t('web.habits.add')}
           icon="task.add"
@@ -532,10 +541,12 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
             const name = draft.trim();
             // 交互决策：空名字什么都不做（动作层对空名字抛错）。
             if (name === '') return;
+            const time = draftTime.trim();
             setDraft('');
+            setDraftTime('');
             if (!actions) return;
             void actions
-              .createHabit(name)
+              .createHabit(name, time === '' ? {} : { time })
               .then(() => {
                 setCreateError(null);
                 setAdding(false);
