@@ -3824,6 +3824,7 @@ export const zhCN = {
   'mobile.calendar.view.week': '一周',
   'mobile.calendar.view.month': '月',
   'mobile.calendar.view.list': '列表',
+  'mobile.calendar.periods.edit': '编辑作息',
   'mobile.habits.importTimetable': '导入课表',
   'mobile.calendar.view.3day': '3日',
   'mobile.calendar.view.timetable': '课表',

@@ -17,24 +17,6 @@ import { dueLocalDateOf, isScheduledOn, type Habit, type HabitLog, type LocalDat
 import { Text } from '../ui/kit';
 import { useTokens } from '../theme';
 
-/**
- * 作息表节次（默认一套常见大学作息）。条目按**起始小时**落进"开始时间最接近且不晚于它"的那一节；
- * 这样即使课程在 10:45–10:55 这种课间，也不会被丢；13:00 这种落进午休的，归到上一节展示。
- * ⚠️ 后续可做成用户可配置；这里是默认值，不改动任何数据。
- */
-const PERIODS: readonly { start: string; end: string }[] = [
-  { start: '08:00', end: '08:45' },
-  { start: '08:55', end: '09:40' },
-  { start: '10:00', end: '10:45' },
-  { start: '10:55', end: '11:40' },
-  { start: '14:00', end: '14:45' },
-  { start: '14:55', end: '15:40' },
-  { start: '16:00', end: '16:45' },
-  { start: '16:55', end: '17:40' },
-  { start: '19:00', end: '19:45' },
-  { start: '19:55', end: '20:40' },
-];
-const PERIOD_START_HOURS: readonly number[] = PERIODS.map((p) => Number(p.start.slice(0, 2)));
 
 export interface CalendarTimetableProps {
   /** 这一周的周一。 */
@@ -50,6 +32,8 @@ export interface CalendarTimetableProps {
   readonly habitLogs?: readonly HabitLog[];
   readonly onToggleHabit?: (habitId: string) => void;
   readonly busyHabitId?: string | null;
+  /** 作息表节次（宿主从设备偏好读，可配置）。 */
+  readonly periods: readonly { start: string; end: string }[];
   readonly testID?: string;
 }
 
@@ -75,9 +59,12 @@ export function CalendarTimetable({
   habitLogs,
   onToggleHabit,
   busyHabitId,
+  periods,
   testID = 'calendar-timetable',
 }: CalendarTimetableProps): React.JSX.Element {
   const t = useTokens();
+  const PERIODS = periods;
+  const PERIOD_START_HOURS = periods.map((p) => Number(p.start.slice(0, 2)));
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -150,7 +137,7 @@ export function CalendarTimetable({
       }
     }
     return grid;
-  }, [tasks, habits, weekStart]);
+  }, [tasks, habits, weekStart, periods]);
 
   const dateForDay = (di: number): LocalDate => {
     const d = new Date(`${weekStart}T00:00:00`);
@@ -188,7 +175,7 @@ export function CalendarTimetable({
       {PERIOD_START_HOURS.map((hour, pi) => (
         <View key={`p-${hour}`} style={styles.row}>
           <View style={styles.periodCell}>
-            <Text variant="caption" tone="subtle">{`第${pi + 1}节`}</Text>
+            <Text variant="caption" tone="subtle">{`${pi + 1}`}</Text>
             <Text variant="caption" tone="subtle">{`${PERIODS[pi]?.start ?? ''}`}</Text>
           </View>
           {Array.from({ length: 7 }, (_, di) => (

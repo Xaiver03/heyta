@@ -97,11 +97,13 @@ import { createProjectActions } from '@heyta/app-host';
 import { useTaskHost } from '../db/use-task-host';
 import { QUADRANT_TITLE_KEYS } from '../lib/quadrant-display';
 import { useMobileSync } from '../sync/store';
-import { Screen, Text } from '../ui/kit';
+import { IconButton, Screen, Text } from '../ui/kit';
 import { CalendarScopeSheet, SCOPE_INBOX, SCOPE_QUADRANT_PREFIX, type ScopeProject } from './CalendarScopeSheet';
 import { TopBarMenu } from '../ui/top-bar-menu';
 import { CalendarViewMenu } from './CalendarViewMenu';
 import { CalendarTimetable } from './CalendarTimetable';
+import { TimetablePeriodsEditor } from './TimetablePeriodsEditor';
+import { readPeriods, writePeriods, type Period } from '../prefs/timetable-periods';
 import { CalendarMultiDayTimeline } from './CalendarMultiDayTimeline';
 import {
   MOBILE_VIEW_ICON,
@@ -164,6 +166,8 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
   const [view, setView] = useState<CalendarViewKind>('day');
   /** 移动端额外两档（3日 / 课表）：独立状态，不污染共享 `view` 管线，Web 零改动。 */
   const [extraView, setExtraView] = useState<'list' | '3day' | 'timetable' | null>(null);
+  const [periods, setPeriods] = useState<readonly Period[]>(() => readPeriods());
+  const [periodsOpen, setPeriodsOpen] = useState(false);
   /**
    * 🔴 2026-11-16：**显示范围**（按清单筛）。`undefined` = 所有清单。
    *
@@ -951,24 +955,50 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           busyHabitId={busyHabitId}
         />
       ) : extraView === 'timetable' ? (
-        <ScrollView style={{ flex: 1 }} testID="calendar-timetable-scroll">
-          <CalendarTimetable
-            weekStart={startOfWeek(selected)}
-            today={today}
-            selected={selected}
-            weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
-            tasks={scopedTasks}
-            onToggleTask={onToggleTask}
-            busyTaskId={busyId}
-            onSelectDay={(date) => {
-              pickDay(date);
-            }}
-            habits={habits}
-            habitLogs={habitLogs}
-            onToggleHabit={onToggleHabit}
-            busyHabitId={busyHabitId}
-          />
-        </ScrollView>
+        <>
+          <ScrollView style={{ flex: 1 }} testID="calendar-timetable-scroll">
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: tokens['space.3'] }}>
+              <IconButton
+                icon="action.settings"
+                label={t('mobile.calendar.periods.edit')}
+                onPress={() => {
+                  setPeriodsOpen(true);
+                }}
+                testID="calendar-periods-edit"
+              />
+            </View>
+            <CalendarTimetable
+              weekStart={startOfWeek(selected)}
+              today={today}
+              selected={selected}
+              weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
+              tasks={scopedTasks}
+              onToggleTask={onToggleTask}
+              busyTaskId={busyId}
+              onSelectDay={(date) => {
+                pickDay(date);
+              }}
+              habits={habits}
+              habitLogs={habitLogs}
+              onToggleHabit={onToggleHabit}
+              busyHabitId={busyHabitId}
+              periods={periods}
+            />
+          </ScrollView>
+          {periodsOpen ? (
+            <TimetablePeriodsEditor
+              periods={periods}
+              onSave={(next) => {
+                writePeriods(next);
+                setPeriods(next.length > 0 ? next : readPeriods());
+                setPeriodsOpen(false);
+              }}
+              onClose={() => {
+                setPeriodsOpen(false);
+              }}
+            />
+          ) : null}
+        </>
       ) : view === 'week' ? (
         <CalendarMultiDayTimeline
           days={Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(selected), i))}
