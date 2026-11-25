@@ -30,6 +30,8 @@ export interface CalendarWeekStripProps {
   readonly onSelect: (date: LocalDate) => void;
   /** 这一天有没有内容（有则画一个小圆点，对齐滴答周条）。 */
   readonly hasContent?: (date: LocalDate) => boolean;
+  /** 这一周的周数文案（宿主格式化，如「47周」）：单独一行放在周条上方左侧，不挤压 7 天。 */
+  readonly weekLabel?: string;
 }
 
 /** `YYYY-MM-DD` 取「几号」。 */
@@ -55,6 +57,7 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
   weekdays,
   onSelect,
   hasContent,
+  weekLabel,
 }: CalendarWeekStripProps): React.JSX.Element {
   const t = useTokens();
   const styles = useMemo(
@@ -65,6 +68,7 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
           alignItems: 'flex-start',
           paddingVertical: t['space.2'],
         },
+        weekLine: { paddingHorizontal: t['space.1'], paddingTop: t['space.1'] },
         cell: {
           flex: 1,
           alignItems: 'center',
@@ -91,7 +95,13 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
   );
 
   return (
-    <View style={styles.row}>
+    <View>
+      {weekLabel === undefined ? null : (
+        <Text variant="caption" tone="subtle" style={styles.weekLine}>
+          {weekLabel}
+        </Text>
+      )}
+      <View style={styles.row}>
       {weekdays.map((label, index) => {
         const date = addDays(weekStart, index);
         const isToday = date === today;
@@ -129,6 +139,7 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
           </Pressable>
         );
       })}
+      </View>
     </View>
   );
 });
