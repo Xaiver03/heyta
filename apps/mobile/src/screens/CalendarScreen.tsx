@@ -102,6 +102,7 @@ import { CalendarScopeSheet, SCOPE_INBOX, SCOPE_QUADRANT_PREFIX, type ScopeProje
 import { TopBarMenu } from '../ui/top-bar-menu';
 import { CalendarViewMenu } from './CalendarViewMenu';
 import { CalendarTimetable } from './CalendarTimetable';
+import { CalendarMultiDayTimeline } from './CalendarMultiDayTimeline';
 import {
   MOBILE_VIEW_ICON,
   MOBILE_VIEW_LABEL_KEY,
@@ -912,18 +913,18 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
       >
       {/* 一周档：Apple「列表」形态的周议程（7 天分段 + 各天任务），替代共享周板（其无 7 列时间轴）。 */}
       {extraView === '3day' ? (
-        <CalendarWeekAgenda
+        <CalendarMultiDayTimeline
           days={Array.from({ length: 3 }, (_, i) => addDays(selected, i))}
           weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
           today={today}
           selected={selected}
           tasks={scopedTasks}
-          taskRow={labels.taskRow}
           onSelectDay={(date) => {
             pickDay(date);
           }}
           onToggleTask={onToggleTask}
           busyTaskId={busyId}
+          allDayLabel={labels.dayAllDay}
           habits={habits}
           habitLogs={habitLogs}
           onToggleHabit={onToggleHabit}
