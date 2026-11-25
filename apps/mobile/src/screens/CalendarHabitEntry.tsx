@@ -41,12 +41,13 @@ export function CalendarHabitEntry({
     () =>
       StyleSheet.create({
         /* 整条横带：浅色底 + 圆角，像滴答的全天条。完成态底色更淡、文字变灰并加删除线。 */
+        /* 紧凑单行：高度对齐滴答那条带子（≈16–18dp，跟一个时间段重合），
+           不是一张大卡片。文字用 row-meta 的小字号，纵向内边距为 0。 */
         band: {
           flexDirection: 'row',
           alignItems: 'center',
           gap: t['space.1'],
-          minHeight: t['space.10'],
-          paddingVertical: t['space.1'],
+          minHeight: t['space.5'],
           paddingHorizontal: t['space.2'],
           borderRadius: t['radius.sm'],
           backgroundColor: t['color.primary-subtle'],
@@ -74,7 +75,7 @@ export function CalendarHabitEntry({
         <Icon name="task.reminder" size="sm" color={t['color.primary']} />
       ) : null}
       <Text
-        variant="row-title"
+        variant="row-meta"
         numberOfLines={1}
         style={[styles.text, done ? styles.textDone : null]}
       >
