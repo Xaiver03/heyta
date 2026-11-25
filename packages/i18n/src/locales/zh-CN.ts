@@ -3823,6 +3823,7 @@ export const zhCN = {
   'mobile.calendar.view.day': '单日',
   'mobile.calendar.view.week': '一周',
   'mobile.calendar.view.month': '月',
+  'mobile.calendar.view.list': '列表',
   'mobile.calendar.view.3day': '3日',
   'mobile.calendar.view.timetable': '课表',
   'mobile.calendar.today': '今天',

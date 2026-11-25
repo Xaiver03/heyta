@@ -39,6 +39,8 @@ export interface CalendarMultiDayTimelineProps {
   readonly habitLogs?: readonly HabitLog[];
   readonly onToggleHabit?: (habitId: string) => void;
   readonly busyHabitId?: string | null;
+  /** 当前时刻（epoch ms）：落在这些天内时画「现在」红线；不给则不画。 */
+  readonly now?: number | undefined;
   readonly testID?: string;
 }
 
@@ -72,6 +74,7 @@ export function CalendarMultiDayTimeline({
   habitLogs,
   onToggleHabit,
   busyHabitId,
+  now,
   testID = 'calendar-3day-timeline',
 }: CalendarMultiDayTimelineProps): React.JSX.Element {
   const t = useTokens();
@@ -110,6 +113,7 @@ export function CalendarMultiDayTimeline({
         blockDone: { backgroundColor: t['color.surface'], opacity: 0.7 },
         blockText: { color: t['color.primary'] },
         blockDoneText: { color: t['color.foreground-muted'], textDecorationLine: 'line-through' },
+        nowLine: { position: 'absolute', left: t['space.10'], right: 0, height: t['border-width.thin'] },
         chip: {
           borderRadius: t['radius.sm'],
           backgroundColor: t['color.primary-subtle'],
@@ -122,6 +126,13 @@ export function CalendarMultiDayTimeline({
 
   const rowHeight = t['size.row-min-height'];
   const axisHeight = rowHeight * 24;
+  const nowOffset = (() => {
+    if (now === undefined) return undefined;
+    const d = new Date(now);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (!days.includes(key as LocalDate)) return undefined;
+    return (d.getHours() + d.getMinutes() / 60) * rowHeight;
+  })();
 
   const perDay = useMemo(
     () =>
@@ -287,6 +298,12 @@ export function CalendarMultiDayTimeline({
               })}
             </View>
           ))}
+          {nowOffset !== undefined ? (
+            <View
+              style={[styles.nowLine, { top: nowOffset, backgroundColor: t['color.danger'] }]}
+              testID={`${testID}-now-line`}
+            />
+          ) : null}
         </View>
       </ScrollView>
     </View>

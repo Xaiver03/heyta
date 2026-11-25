@@ -29,6 +29,7 @@ export interface CalendarTimetableProps {
   readonly tasks: readonly Task[];
   readonly onToggleTask: (taskId: string) => void;
   readonly busyTaskId?: string | null;
+  readonly onSelectDay?: (date: LocalDate) => void;
   readonly habits?: readonly Habit[];
   readonly habitLogs?: readonly HabitLog[];
   readonly onToggleHabit?: (habitId: string) => void;
@@ -53,6 +54,7 @@ export function CalendarTimetable({
   tasks,
   onToggleTask,
   busyTaskId,
+  onSelectDay,
   habits,
   habitLogs,
   onToggleHabit,
@@ -154,11 +156,19 @@ export function CalendarTimetable({
           const date = dateForDay(di);
           const isToday = date === today;
           return (
-            <View key={`h-${di}`} style={styles.dayHead}>
+            <Pressable
+              key={`h-${di}`}
+              style={styles.dayHead}
+              onPress={() => {
+                onSelectDay?.(date);
+              }}
+              accessibilityRole="button"
+              testID={`${testID}-head-${date}`}
+            >
               <Text variant="caption" tone={isToday ? 'default' : 'subtle'}>
                 {weekdayLabelOf(date)}
               </Text>
-            </View>
+            </Pressable>
           );
         })}
       </View>

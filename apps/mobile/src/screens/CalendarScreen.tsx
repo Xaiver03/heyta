@@ -163,7 +163,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
   /** 这一屏看的是哪一档（月 / 周 / 日 / 年）。 */
   const [view, setView] = useState<CalendarViewKind>('day');
   /** 移动端额外两档（3日 / 课表）：独立状态，不污染共享 `view` 管线，Web 零改动。 */
-  const [extraView, setExtraView] = useState<'3day' | 'timetable' | null>(null);
+  const [extraView, setExtraView] = useState<'list' | '3day' | 'timetable' | null>(null);
   /**
    * 🔴 2026-11-16：**显示范围**（按清单筛）。`undefined` = 所有清单。
    *
@@ -769,6 +769,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
    * 这里不另写一套格式化。
    */
   const rangeTitleBase = useMemo(() => {
+    if (extraView === 'list') return formatWeekRangeText(selected, t);
     if (extraView === '3day') return formatDayTitleText(selected, t);
     if (extraView === 'timetable') return formatMonthTitleText(startOfMonth(cursor), t);
     if (view === 'month') return formatMonthTitleText(startOfMonth(cursor), t);
@@ -912,7 +913,25 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         }}
       >
       {/* 一周档：Apple「列表」形态的周议程（7 天分段 + 各天任务），替代共享周板（其无 7 列时间轴）。 */}
-      {extraView === '3day' ? (
+      {extraView === 'list' ? (
+        <CalendarWeekAgenda
+          days={Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(selected), i))}
+          weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
+          today={today}
+          selected={selected}
+          tasks={scopedTasks}
+          taskRow={labels.taskRow}
+          onSelectDay={(date) => {
+            pickDay(date);
+          }}
+          onToggleTask={onToggleTask}
+          busyTaskId={busyId}
+          habits={habits}
+          habitLogs={habitLogs}
+          onToggleHabit={onToggleHabit}
+          busyHabitId={busyHabitId}
+        />
+      ) : extraView === '3day' ? (
         <CalendarMultiDayTimeline
           days={Array.from({ length: 3 }, (_, i) => addDays(selected, i))}
           weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
@@ -925,6 +944,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           onToggleTask={onToggleTask}
           busyTaskId={busyId}
           allDayLabel={labels.dayAllDay}
+          now={now}
           habits={habits}
           habitLogs={habitLogs}
           onToggleHabit={onToggleHabit}
@@ -940,6 +960,9 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
             tasks={scopedTasks}
             onToggleTask={onToggleTask}
             busyTaskId={busyId}
+            onSelectDay={(date) => {
+              pickDay(date);
+            }}
             habits={habits}
             habitLogs={habitLogs}
             onToggleHabit={onToggleHabit}
@@ -947,18 +970,19 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           />
         </ScrollView>
       ) : view === 'week' ? (
-        <CalendarWeekAgenda
+        <CalendarMultiDayTimeline
           days={Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(selected), i))}
           weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
           today={today}
           selected={selected}
           tasks={scopedTasks}
-          taskRow={labels.taskRow}
           onSelectDay={(date) => {
             pickDay(date);
           }}
           onToggleTask={onToggleTask}
           busyTaskId={busyId}
+          allDayLabel={labels.dayAllDay}
+          now={now}
           habits={habits}
           habitLogs={habitLogs}
           onToggleHabit={onToggleHabit}

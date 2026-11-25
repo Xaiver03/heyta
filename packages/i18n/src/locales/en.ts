@@ -3493,6 +3493,7 @@ export const en = {
   'mobile.calendar.view.day': 'Day',
   'mobile.calendar.view.week': 'Week',
   'mobile.calendar.view.month': 'Month',
+  'mobile.calendar.view.list': 'List',
   'mobile.calendar.view.3day': '3-Day',
   'mobile.calendar.view.timetable': 'Timetable',
   'mobile.calendar.today': 'Today',

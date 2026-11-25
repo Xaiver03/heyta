@@ -14,19 +14,21 @@ import type { CalendarViewKind } from '@heyta/ui';
 
 import type { IconName } from '../ui/icons';
 
-export type MobileCalendarView = CalendarViewKind | '3day' | 'timetable';
+export type MobileCalendarView = CalendarViewKind | 'list' | '3day' | 'timetable';
 
 /** 顺序照滴答：月 → 周 → 日 → 3日 → 课表 → 年（年放最后，理由同共享表）。 */
 export const MOBILE_VIEW_ORDER: readonly MobileCalendarView[] = [
+  'list',
+  'year',
   'month',
   'week',
-  'day',
   '3day',
+  'day',
   'timetable',
-  'year',
 ];
 
 export const MOBILE_VIEW_LABEL_KEY: Record<MobileCalendarView, string> = {
+  list: 'mobile.calendar.view.list',
   month: 'mobile.calendar.view.month',
   week: 'mobile.calendar.view.week',
   day: 'mobile.calendar.view.day',
@@ -36,6 +38,7 @@ export const MOBILE_VIEW_LABEL_KEY: Record<MobileCalendarView, string> = {
 };
 
 export const MOBILE_VIEW_ICON: Record<MobileCalendarView, IconName> = {
+  list: 'calendar.day',
   month: 'calendar.month',
   week: 'calendar.week',
   day: 'calendar.day',

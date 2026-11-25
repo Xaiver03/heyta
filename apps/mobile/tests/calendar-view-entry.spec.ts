@@ -96,7 +96,7 @@ describe('移动端日历的档位入口', () => {
     );
     // 档位表必须是**共享四档的超集**，且集中在一处 —— 漏掉某一共享档就会出现"这档切不过去"。
     const mobileViews = codeOf(resolve(HERE, '../src/screens/calendar-mobile-views.ts'));
-    for (const kind of ['month', 'week', 'day', 'year', '3day', 'timetable']) {
+    for (const kind of ['month', 'week', 'day', 'year', 'list', '3day', 'timetable']) {
       expect(mobileViews, `移动端档位表漏了 ${kind}`).toContain(`'${kind}'`);
     }
   });
