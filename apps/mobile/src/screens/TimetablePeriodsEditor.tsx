@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { Modal, View } from 'react-native';
+import { Modal, ScrollView, View } from 'react-native';
 
 import { useI18n } from '@heyta/i18n';
 
@@ -50,10 +50,7 @@ export function TimetablePeriodsEditor({
             maxHeight: '80%',
           }}
         >
-          <View style={{ flexDirection: 'row', gap: tk['space.2'], marginBottom: tk['space.2'] }}>
-            <Button label={t('mobile.common.add')} onPress={() => setRows((r) => [...r, ''])} />
-          </View>
-          <View style={{ gap: tk['space.2'] }}>
+          <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: tk['space.2'] }}>
             {rows.map((row, i) => (
               <TextField
                 key={`p-${i}`}
@@ -63,8 +60,9 @@ export function TimetablePeriodsEditor({
                 onChangeText={(next) => setRows((r) => r.map((v, idx) => (idx === i ? next : v)))}
               />
             ))}
-          </View>
+          </ScrollView>
           <View style={{ flexDirection: 'row', gap: tk['space.2'], marginTop: tk['space.4'] }}>
+            <Button label={t('mobile.common.add')} onPress={() => setRows((r) => [...r, ''])} />
             <Button label={t('mobile.common.cancel')} onPress={onClose} />
             <Button label={t('web.passkeys.save')} tone="primary" onPress={() => onSave(parseRows())} />
           </View>
