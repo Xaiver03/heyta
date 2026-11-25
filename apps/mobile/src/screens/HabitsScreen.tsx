@@ -69,6 +69,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Alert } from 'react-native';
+import { keepLocalCopy, pick } from '@react-native-documents/picker';
 import type { AppHost, HabitActions } from '@heyta/app-host';
 import { createHabitActions, habitGrowth } from '@heyta/app-host';
 import type {
@@ -79,10 +81,12 @@ import type {
   HabitIcon,
   HabitLog,
 } from '@heyta/domain';
+import { parseCourseCSV, parseCourseICS, planCourseImport } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { HabitBoard, HabitProgressList, HabitTrendBoard } from '@heyta/ui';
 
 import { useTaskHost } from '../db/use-task-host';
+import { readLocalTextUri } from '../lib/local-file-read';
 import {
   habitBoardLabels,
   habitListLabels,
@@ -153,6 +157,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
 
   
   const actions = useMemo<HabitActions | null>(() => (host ? createHabitActions(host) : null), [host]);
+  const [importBusy, setImportBusy] = useState(false);
 
   const refresh = useCallback(() => {
     if (!actions) return;
@@ -169,6 +174,53 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
      */
     pruneSelectionAgainst({ habit: aliveHabits.map((habit) => habit.id) });
   }, [actions]);
+
+  /**
+   * 课表导入：系统文件选择器选 .ics/.csv → 端上解析 → 写入习惯（稳定去重）。
+   * 🔴 只读用户自己导出的文件，不碰任何教务账号/密码。
+   */
+  const onImportTimetable = useCallback((): void => {
+    if (!actions || importBusy) return;
+    void (async () => {
+      const docs = await pick({ allowMultiSelection: false }).catch((e: unknown) => {
+        if ((e as { code?: string }).code === 'OPERATION_CANCELED') return undefined;
+        setError(e instanceof Error ? e.message : String(e));
+        return undefined;
+      });
+      const doc = docs?.[0];
+      if (doc === undefined) return;
+      const fileName = doc.name ?? 'import.ics';
+      setImportBusy(true);
+      try {
+        let text = '';
+        try {
+          text = await readLocalTextUri(doc.uri);
+        } catch {
+          text = '';
+        }
+        if (text.trim() === '') {
+          const [copy] = await keepLocalCopy({ files: [{ uri: doc.uri, fileName }], destination: 'cachesDirectory' });
+          if (copy === undefined || copy.status !== 'success') throw new Error(copy === undefined ? '复制失败' : copy.copyError);
+          text = await readLocalTextUri(copy.localUri);
+        }
+        const isCsv = /\.csv$/i.test(fileName);
+        const rawRows = isCsv ? parseCourseCSV(text) : parseCourseICS(text);
+        const plan = planCourseImport(rawRows);
+        const res = await actions.importCourses(plan.rows);
+        refresh();
+        Alert.alert(
+          '',
+          plan.report.skipped > 0
+            ? `${res.created.length} 门已导入，${plan.report.skipped} 行跳过`
+            : `${res.created.length} 门已导入`,
+        );
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setImportBusy(false);
+      }
+    })();
+  }, [actions, importBusy, refresh]);
 
   /**
    * 离开这一屏时收起详情层（与 `TasksScreen` 同一条理由）。
@@ -502,6 +554,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
       title={t('web.shell.views.habits')}
       actions={[
         { icon: 'task.add', label: t('web.habits.add'), onPress: () => { setAdding((v) => !v); } },
+        { icon: 'action.attach', label: t('mobile.habits.importTimetable'), onPress: onImportTimetable },
       ]}
     >
       {/*

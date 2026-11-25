@@ -48,6 +48,8 @@ import {
   type HabitIcon,
   type HabitLog,
   type LocalDate,
+  type CourseRow,
+  courseKey,
 } from '@heyta/domain';
 import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
@@ -280,6 +282,12 @@ export interface HabitActions {
   /** 彻底删除一个习惯：追加 `purgedAt` 标记，不动墓碑、不动打卡记录。已经 purge 过返回 `false` 且不重复写 op。 */
   purgeHabit(entityId: string): Promise<boolean>;
 
+  /**
+   * 课表导入：把归一化课程行（来自 `@heyta/domain#parseCourseICS/parseCourseCSV`）写成习惯。
+   * 稳定 id（`habit-<courseKey>`）：同一文件导两次不会重复；已存在（未删）则跳过。
+   */
+  importCourses(rows: readonly CourseRow[]): Promise<{ created: string[]; skipped: string[] }>;
+
 }
 
 /**
@@ -352,6 +360,41 @@ export function createHabitActions(
         },
       });
       return entityId;
+    },
+
+    async importCourses(rows) {
+      const created: string[] = [];
+      const skipped: string[] = [];
+      for (const row of rows) {
+        if (row.name.trim() === '' || row.daysOfWeek.length === 0) {
+          skipped.push(row.name);
+          continue;
+        }
+        const entityId = `habit-${courseKey(row).replace(/^course-/, '')}`;
+        const existing = ctx.getState().habits[entityId];
+        if (existing !== undefined && existing.deletedAt === undefined) {
+          skipped.push(row.name);
+          continue;
+        }
+        await ctx.dispatch({
+          entityType: 'HABIT' as EntityType,
+          entityId,
+          opType: OpType.Create,
+          payload: {
+            name: row.name.trim(),
+            target: 1,
+            frequency: { type: 'weekly' as const, daysOfWeek: [...row.daysOfWeek] },
+            ...(row.startTime === undefined ? {} : { time: row.startTime }),
+            ...(row.endTime === undefined ? {} : { endTime: row.endTime }),
+            ...(row.teacher === undefined ? {} : { teacher: row.teacher }),
+            ...(row.location === undefined ? {} : { location: row.location }),
+            ...(row.weeks === undefined ? {} : { weeks: row.weeks }),
+            ...(row.parity === undefined ? {} : { parity: row.parity }),
+          },
+        });
+        created.push(entityId);
+      }
+      return { created, skipped };
     },
 
     async renameHabit(entityId, name) {

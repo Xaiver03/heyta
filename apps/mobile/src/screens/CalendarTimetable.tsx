@@ -17,8 +17,24 @@ import { dueLocalDateOf, isScheduledOn, type Habit, type HabitLog, type LocalDat
 import { Text } from '../ui/kit';
 import { useTokens } from '../theme';
 
-/** 课表的节次：08:00–21:00，每小时一节。`startHour` 用来把条目分进格。 */
-const PERIOD_START_HOURS: readonly number[] = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+/**
+ * 作息表节次（默认一套常见大学作息）。条目按**起始小时**落进"开始时间最接近且不晚于它"的那一节；
+ * 这样即使课程在 10:45–10:55 这种课间，也不会被丢；13:00 这种落进午休的，归到上一节展示。
+ * ⚠️ 后续可做成用户可配置；这里是默认值，不改动任何数据。
+ */
+const PERIODS: readonly { start: string; end: string }[] = [
+  { start: '08:00', end: '08:45' },
+  { start: '08:55', end: '09:40' },
+  { start: '10:00', end: '10:45' },
+  { start: '10:55', end: '11:40' },
+  { start: '14:00', end: '14:45' },
+  { start: '14:55', end: '15:40' },
+  { start: '16:00', end: '16:45' },
+  { start: '16:55', end: '17:40' },
+  { start: '19:00', end: '19:45' },
+  { start: '19:55', end: '20:40' },
+];
+const PERIOD_START_HOURS: readonly number[] = PERIODS.map((p) => Number(p.start.slice(0, 2)));
 
 export interface CalendarTimetableProps {
   /** 这一周的周一。 */
@@ -91,10 +107,7 @@ export function CalendarTimetable({
       PERIOD_START_HOURS.map(() => ({ tasks: [], habits: [] })),
     );
     const periodIndexForHour = (h: number): number => {
-      if (h < PERIOD_START_HOURS[0]!) return -1;
-      const idx = PERIOD_START_HOURS.indexOf(h);
-      if (idx >= 0) return idx;
-      // 落在两节之间（如 08:30）→ 归到它之前最近的那节。
+      // 归到"开始小时不晚于 h"的最后一节（含起，跨课间/午休也不丢条目）。
       let best = -1;
       for (let i = 0; i < PERIOD_START_HOURS.length; i += 1) {
         if (PERIOD_START_HOURS[i]! <= h) best = i;
@@ -175,7 +188,8 @@ export function CalendarTimetable({
       {PERIOD_START_HOURS.map((hour, pi) => (
         <View key={`p-${hour}`} style={styles.row}>
           <View style={styles.periodCell}>
-            <Text variant="caption" tone="subtle">{`${String(hour).padStart(2, '0')}:00`}</Text>
+            <Text variant="caption" tone="subtle">{`第${pi + 1}节`}</Text>
+            <Text variant="caption" tone="subtle">{`${PERIODS[pi]?.start ?? ''}`}</Text>
           </View>
           {Array.from({ length: 7 }, (_, di) => (
             <View key={`c-${hour}-${di}`} style={styles.cell}>

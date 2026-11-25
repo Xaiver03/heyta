@@ -684,6 +684,19 @@ export interface Habit extends EntityBase {
    * 有定时点时，日历把它当作带时刻的条目排在时间轴上。
    */
   time?: string;
+  /** 课程类习惯：结束时刻（本地 `HH:mm`）。可选；无则视为单点。 */
+  endTime?: string;
+  /** 课程类习惯：教师。可选。 */
+  teacher?: string;
+  /** 课程类习惯：教室。可选。 */
+  location?: string;
+  /**
+   * 课程类习惯：周次范围（第 start–end 周，含端点，1 起算）。可选。
+   * 用于课表导入；判断"某天该不该上"仍以 `frequency` 为准，此字段只作展示/过滤。
+   */
+  weeks?: { start: number; end: number };
+  /** 课程类习惯：单双周。可选；默认 'all'（每周）。 */
+  parity?: 'all' | 'odd' | 'even';
 }
 
 /** 单日打卡记录。 */
