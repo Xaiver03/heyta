@@ -14,6 +14,7 @@
  */
 
 import ICAL from 'ical.js';
+import readXlsxFile from 'read-excel-file/universal';
 
 import { isoWeek, type LocalDate } from './date.js';
 
@@ -178,6 +179,16 @@ export function parseCourseCSV(text: string): CourseRow[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
   if (lines.length === 0) return [];
   return matrixToCourseRows(lines.map((line) => parseCsvLine(line)));
+}
+
+/**
+ * 解析 XLSX（二进制）→ 课程行。`data` 为 ArrayBuffer / Uint8Array（RN 端先 base64 转字节）。
+ * 首行当表头，列识别与 CSV 同一套（`matrixToCourseRows`）。
+ */
+export async function parseCourseXLSX(data: ArrayBuffer | Uint8Array): Promise<CourseRow[]> {
+  const rows = (await readXlsxFile(data as never)) as unknown as unknown[][];
+  const matrix = rows.map((r) => r.map((c) => (c === null || c === undefined ? '' : String(c))));
+  return matrixToCourseRows(matrix);
 }
 
 /** 把二维表（首行表头）→ 课程行。CSV 与 XLSX 共用这一份，避免"两种格式两种列口径"。 */
