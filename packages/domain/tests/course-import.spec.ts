@@ -73,3 +73,24 @@ describe('planCourseImport', () => {
     expect(courseKey(a)).not.toBe(courseKey({ ...a, startTime: '09:00' }));
   });
 });
+
+import { parseCourseHTML } from '../src/course-import.js';
+
+describe('parseCourseHTML（教务系统页面一键识别）', () => {
+  it('从含课程/星期表头的表格提取课程行', () => {
+    const html = `
+      <html><body><table>
+        <tr><th>课程名称</th><th>教师</th><th>教室</th><th>星期</th><th>开始时间</th><th>结束时间</th><th>周次</th></tr>
+        <tr><td>大学物理</td><td>王五</td><td>物理楼301</td><td>星期四</td><td>08:00</td><td>08:45</td><td>1-16</td></tr>
+      </table></body></html>`;
+    const rows = parseCourseHTML(html);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.name).toBe('大学物理');
+    expect(rows[0]!.daysOfWeek).toEqual([4]);
+    expect(rows[0]!.weeks).toEqual({ start: 1, end: 16 });
+  });
+
+  it('不是课表页（没有课程/星期表头）返回空数组，不瞎填', () => {
+    expect(parseCourseHTML('<table><tr><td>成绩</td><td>学分</td></tr></table>')).toHaveLength(0);
+  });
+});

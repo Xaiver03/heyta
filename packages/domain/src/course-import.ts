@@ -14,6 +14,7 @@
  */
 
 import ICAL from 'ical.js';
+import readXlsxFile from 'read-excel-file/universal';
 
 import { isoWeek, type LocalDate } from './date.js';
 
@@ -177,7 +178,24 @@ function parseWeeksCell(raw: string): { weeks?: { start: number; end: number }; 
 export function parseCourseCSV(text: string): CourseRow[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
   if (lines.length === 0) return [];
-  const split = (line: string): string[] => parseCsvLine(line);
+  return matrixToCourseRows(lines.map((line) => parseCsvLine(line)));
+}
+
+/**
+ * 解析 XLSX（二进制）→ 课程行。`data` 为 ArrayBuffer / Uint8Array（RN 端先 base64 转字节）。
+ * 首行当表头，列识别与 CSV 同一套（`matrixToCourseRows`）。
+ */
+export async function parseCourseXLSX(data: ArrayBuffer | Uint8Array): Promise<CourseRow[]> {
+  const rows = (await readXlsxFile(data as never)) as unknown as unknown[][];
+  const matrix = rows.map((r) => r.map((c) => (c === null || c === undefined ? '' : String(c))));
+  return matrixToCourseRows(matrix);
+}
+
+/** 把二维表（首行表头）→ 课程行。CSV 与 XLSX 共用这一份，避免"两种格式两种列口径"。 */
+function matrixToCourseRows(matrix: string[][]): CourseRow[] {
+  const lines = matrix.filter((r) => r.some((c) => c.trim() !== ''));
+  if (lines.length === 0) return [];
+  const split = (row: string[]): string[] => row;
   const header = split(lines[0]!).map((h) => h.trim().toLowerCase());
   const idx = {
     name: findCol(header, ['课程名称', '课程名', '课程', 'name', 'course', 'subject']),
@@ -305,4 +323,54 @@ export function planCourseImport(rawRows: readonly CourseRow[]): CourseImportPla
   const total = rawRows.length;
   const ok = rows.length;
   return { rows, report: { total, ok, skipped: total - ok, skipReasons } };
+}
+
+/**
+ * 从**教务系统网页 HTML**里"一键识别"课程行（应用内浏览器登录后，抓到当前 DOM 交给这里）。
+ *
+ * 只做一个通用提取：找出含「课程/星期」表头的 `<table>`，把每行每格文本拼成二维表，
+ * 再走与 CSV/XLSX 同一套 `matrixToCourseRows`。各校页面结构差异大，命中不了的返回空数组
+ * （由导入层如实报"0 行"），**不做**任何猜测式填充。密码/登录态由应用内浏览器持有，不经过这里。
+ */
+export function parseCourseHTML(html: string): CourseRow[] {
+  const tables = html.match(/<table[\s\S]*?<\/table>/gi) ?? [];
+  const candidates = tables.length > 0 ? tables : [html];
+  let best: CourseRow[] = [];
+  for (const table of candidates) {
+    const matrix = htmlTableToMatrix(table);
+    if (matrix.length === 0) continue;
+    const looksLikeTimetable = matrix.some((row) => {
+      const joined = row.join(' ');
+      return /课程|科目|course/i.test(joined) && /星期|周几|节次|时段|day|time/i.test(joined);
+    });
+    if (!looksLikeTimetable) continue;
+    const rows = matrixToCourseRows(matrix);
+    if (rows.length > best.length) best = rows;
+  }
+  return best;
+}
+
+/** `<table>` → 二维文本表（按 `<tr>`/`<td|th>` 拆，剥标签、解常见实体、去空白）。 */
+function htmlTableToMatrix(tableHtml: string): string[][] {
+  const rows = tableHtml.match(/<tr[\s\S]*?<\/tr>/gi) ?? [];
+  const out: string[][] = [];
+  for (const rowHtml of rows) {
+    const cells = rowHtml.match(/<(td|th)[\s\S]*?<\/\1>/gi) ?? [];
+    if (cells.length === 0) continue;
+    out.push(cells.map((c) => cellText(c)));
+  }
+  return out;
+}
+
+function cellText(cellHtml: string): string {
+  return cellHtml
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
