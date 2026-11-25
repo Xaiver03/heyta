@@ -16,15 +16,15 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import {
   addDays,
   dueLocalDateOf,
-  habitIconOf,
   isScheduledOn,
   type Habit,
   type HabitLog,
   type LocalDate,
   type Task,
 } from '@heyta/domain';
-import { HabitArtwork, TaskList, type TaskListLabels } from '@heyta/ui';
-import { Icon } from '../ui/icons';
+import { TaskList, type TaskListLabels } from '@heyta/ui';
+
+import { CalendarHabitEntry } from './CalendarHabitEntry';
 
 import { Text } from '../ui/kit';
 import { useTokens } from '../theme';
@@ -158,23 +158,14 @@ export function CalendarWeekAgenda({
                       (l) => l.habitId === h.id && l.date === date && l.deletedAt === undefined,
                     );
                     return (
-                      <Pressable
+                      <CalendarHabitEntry
                         key={h.id}
-                        onPress={() => {
-                          if (busyHabitId !== h.id) onToggleHabit?.(h.id);
-                        }}
-                        accessibilityRole="button"
-                        accessibilityState={{ checked: done }}
-                        accessibilityLabel={h.name}
-                        testID={`week-agenda-habit-${date}-${h.id}`}
-                        style={styles.habitRow}
-                      >
-                        <HabitArtwork icon={habitIconOf(h)} size={t['space.6']} />
-                        <Text variant="row-meta" style={done ? styles.habitDone : styles.habitName}>
-                          {h.name}
-                        </Text>
-                        {done ? <Icon name="action.keep" size="sm" color={t['color.primary']} /> : null}
-                      </Pressable>
+                        habit={h}
+                        done={done}
+                        busy={busyHabitId === h.id}
+                        onToggle={(id) => onToggleHabit?.(id)}
+                        testID={`week-agenda-habit-${date}`}
+                      />
                     );
                   })}
               </View>
