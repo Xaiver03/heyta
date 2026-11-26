@@ -736,6 +736,14 @@ export const en = {
   'web.settings.display.themePreset.default': 'Blue',
   'web.settings.display.themePreset.warm': 'Warm paper',
   'web.settings.display.themePreset.mist': 'Mist',
+  'web.settings.display.accentTitle': 'Accent color',
+  'web.settings.display.accent.default': 'Default',
+  'web.settings.display.accent.emerald': 'Emerald',
+  'web.settings.display.accent.sky': 'Sky',
+  'web.settings.display.accent.amber': 'Amber',
+  'web.settings.display.appIconTitle': 'App icon',
+  'web.settings.display.appIconDefault': 'Default',
+  'web.settings.display.appIconBoundary': 'The installed app icon is decided by each platform; it cannot be switched per account in the browser or the Web build — only native installers can change it.',
   'web.settings.display.themeTitle': 'Appearance',
   'web.settings.display.fontSizeTitle': 'Text size',
   'web.settings.display.fontSize.compact': 'Small',
@@ -1279,6 +1287,20 @@ export const en = {
   // ── Web · self-service passkey management ─────────────────
   // The server had registration / login / recovery only; there was no way for a
   // user to see or remove their own credentials.
+  'web.totp.title': 'Two-step verification',
+  'web.totp.lead': 'One-time codes from an authenticator app. For now this is a local verification-only build; binding and verification will be decided by the server (later).',
+  'web.totp.needsSignIn': 'Sign in first to set up two-step verification for this account.',
+  'web.totp.add': 'Add authenticator',
+  'web.totp.secretLabel': 'Secret',
+  'web.totp.codeLabel': 'Code',
+  'web.totp.codePlaceholder': '6 digits',
+  'web.totp.verify': 'Verify and enable',
+  'web.totp.cancel': 'Cancel',
+  'web.totp.enabled': 'Two-step verification is on (local)',
+  'web.totp.disable': 'Turn off',
+  'web.totp.confirmDisable': 'Confirm turn off',
+  'web.totp.disabled': 'Two-step verification is off',
+  'web.totp.error': 'That code is not correct. Try again.',
   'web.passkeys.title': 'Passkeys',
   'web.passkeys.lead': 'These are the passkeys registered for your account on the server. Removing one does not affect credentials on other devices.',
   'web.passkeys.add': 'Add a passkey',
@@ -3801,6 +3823,10 @@ export const en = {
   // "Up front" means visible on the first screen and one tap away - not locking
   // local features behind a sign-in. So the primary button and the way out
   // (use offline) must both exist.
+  'web.welcome.title': 'Welcome',
+  'web.welcome.next': 'Next',
+  'web.welcome.start': 'Start',
+  'web.welcome.skip': 'Skip',
   'mobile.welcome.title': 'Plan your day',
   'mobile.welcome.signIn': 'Sign in or register',
   'mobile.welcome.line.tasks': 'Write it down as it comes; it works out the time and place.',
