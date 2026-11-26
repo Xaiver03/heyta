@@ -49,13 +49,14 @@ const AI_DIR = resolve(HERE, '../src/features/ai');
  * 加进清单之后必须同时满足本文件其余四条（统一工厂 / `t(failure.key)` /
  * 原文只进 `<details>` / 折叠详情 testid 形状）。
  */
-const PANELS = ['AiBreakdown', 'AiDuration', 'AiPrioritize', 'AiToolRun', 'AssistantPanel'] as const;
+// 拆解 / 排序 / 估时面板已收进单一 Agent（组件删除），失败文案来源只剩这两个活面板。
+const PANELS = ['AiToolRun', 'AssistantPanel'] as const;
 
 function panelSource(name: (typeof PANELS)[number]): string {
   return readFileSync(join(AI_DIR, `${name}.tsx`), 'utf8');
 }
 
-describe('六个 AI 入口的失败文案只有一个来源', () => {
+describe('AI 入口的失败文案只有一个来源', () => {
   it('每个面板都从 `ai-failure-copy.js` 取一份 `*FailureCopy`', () => {
     const offenders = PANELS.filter(
       (name) => !/import \{[^}]*FailureCopy[^}]*\} from '\.\/ai-failure-copy\.js';/u.test(panelSource(name)),

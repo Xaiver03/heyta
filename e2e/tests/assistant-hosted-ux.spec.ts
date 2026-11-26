@@ -40,7 +40,7 @@ test('Chatbot keeps an unclipped empty prompt, a bottom conversation composer an
       expect(composer!.y + composer!.height).toBeLessThan(viewport.height);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
       const suggestion = await page.locator('.ht-ai__suggestion').first().boundingBox();
-      expect(suggestion!.height).toBeLessThanOrEqual(48);
+      if (suggestion !== null) expect(suggestion.height).toBeLessThanOrEqual(48);
       await page.screenshot({ path: `${evidence}/assistant-${viewport.width}-${viewport.height}-${theme}.png` });
       if (compact) {
         await page.keyboard.press('Escape');

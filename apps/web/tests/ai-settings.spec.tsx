@@ -782,8 +782,8 @@ describe('🔴🔴 密钥绝不进 localStorage（本文件最重要的一条）
 // ─────────────────────────────────────────────────────────────────────────
 
 describe('🔴🔴 能力缺口：能配、但配了也跑不起来', () => {
-  /** 一个端点 + 一条到「AI 拆解」的路由，但**没声明长上下文**。 */
-  function withBreakdownRoute(capabilities: readonly string[]) {
+  /** 一个端点 + 一条到「工具调用（Agent）」的路由，但**没声明工具调用能力**。 */
+  function withToolCallingRoute(capabilities: readonly string[]) {
     const base = defaultAiSettings();
     return {
       ...base,
@@ -799,43 +799,43 @@ describe('🔴🔴 能力缺口：能配、但配了也跑不起来', () => {
             capabilities: capabilities as never,
           },
         ],
-        routes: { breakdown: [{ endpointId: 'e1' }] },
+        routes: { 'tool-calling': [{ endpointId: 'e1' }] },
       },
     };
   }
 
-  it('🔴🔴 端点没声明长上下文 → 界面**必须**说出来', () => {
-    const el = render({ initial: withBreakdownRoute(['structured_output']), secrets: createSessionSecretStore() });
-    const warn = el.querySelector('[data-testid="cap-gap-breakdown"]');
+  it('🔴🔴 端点没声明工具调用能力 → 界面**必须**说出来', () => {
+    const el = render({ initial: withToolCallingRoute(['structured_output']), secrets: createSessionSecretStore() });
+    const warn = el.querySelector('[data-testid="cap-gap-tool-calling"]');
     expect(warn).toBeTruthy();
     // 要说清"缺什么"，不是只说"配置有问题"
-    expect(warn?.textContent).toContain('长上下文');
+    expect(warn?.textContent).toContain('工具调用');
     expect(warn?.textContent).toContain('本机端点');
   });
 
   it('🔴 声明齐了 → 不出现提示', () => {
     const el = render({
-      initial: withBreakdownRoute(['structured_output', 'long_context']),
+      initial: withToolCallingRoute(['structured_output', 'tool_calling']),
       secrets: createSessionSecretStore(),
     });
-    expect(el.querySelector('[data-testid="cap-gap-breakdown"]')).toBeNull();
+    expect(el.querySelector('[data-testid="cap-gap-tool-calling"]')).toBeNull();
   });
 
   it('🔴🔴 一键补上：点了之后能力真的存进设置里', () => {
-    const el = render({ initial: withBreakdownRoute(['structured_output']), secrets: createSessionSecretStore() });
-    click(el.querySelector('[data-testid="cap-fix-breakdown"]'));
+    const el = render({ initial: withToolCallingRoute(['structured_output']), secrets: createSessionSecretStore() });
+    click(el.querySelector('[data-testid="cap-fix-tool-calling"]'));
 
     const saved = loadAiSettings();
-    expect(saved.routing.endpoints[0]?.capabilities).toContain('long_context');
+    expect(saved.routing.endpoints[0]?.capabilities).toContain('tool_calling');
     // 🔴 原有的能力不能被顶掉
     expect(saved.routing.endpoints[0]?.capabilities).toContain('structured_output');
   });
 
   it('🔴 补上之后提示消失（不是一直挂着）', () => {
-    const el = render({ initial: withBreakdownRoute(['structured_output']), secrets: createSessionSecretStore() });
-    expect(el.querySelector('[data-testid="cap-gap-breakdown"]')).toBeTruthy();
-    click(el.querySelector('[data-testid="cap-fix-breakdown"]'));
-    expect(el.querySelector('[data-testid="cap-gap-breakdown"]')).toBeNull();
+    const el = render({ initial: withToolCallingRoute(['structured_output']), secrets: createSessionSecretStore() });
+    expect(el.querySelector('[data-testid="cap-gap-tool-calling"]')).toBeTruthy();
+    click(el.querySelector('[data-testid="cap-fix-tool-calling"]'));
+    expect(el.querySelector('[data-testid="cap-gap-tool-calling"]')).toBeNull();
   });
 
   it('🔴 功能没配端点时**不**报能力缺口（那是另一回事）', () => {
@@ -852,7 +852,7 @@ describe('🔴🔴 能力缺口：能配、但配了也跑不起来', () => {
       },
     };
     const el = render({ initial: settings, secrets: createSessionSecretStore() });
-    expect(el.querySelector('[data-testid="cap-gap-breakdown"]')).toBeNull();
+    expect(el.querySelector('[data-testid="cap-gap-tool-calling"]')).toBeNull();
   });
 
   it('🔴 路由里有多个端点时，只要**一个**能满足就不提示', () => {
@@ -864,13 +864,13 @@ describe('🔴🔴 能力缺口：能配、但配了也跑不起来', () => {
         allowRemote: false,
         endpoints: [
           { id: 'weak', label: '弱端点', endpoint: 'http://localhost:11434/v1', model: 'm', capabilities: ['structured_output'] as never },
-          { id: 'strong', label: '强端点', endpoint: 'http://localhost:1234/v1', model: 'm2', capabilities: ['structured_output', 'long_context'] as never },
+          { id: 'strong', label: '强端点', endpoint: 'http://localhost:1234/v1', model: 'm2', capabilities: ['structured_output', 'tool_calling'] as never },
         ],
-        routes: { breakdown: [{ endpointId: 'weak' }, { endpointId: 'strong' }] },
+        routes: { 'tool-calling': [{ endpointId: 'weak' }, { endpointId: 'strong' }] },
       },
     };
     const el = render({ initial: settings, secrets: createSessionSecretStore() });
-    expect(el.querySelector('[data-testid="cap-gap-breakdown"]')).toBeNull();
+    expect(el.querySelector('[data-testid="cap-gap-tool-calling"]')).toBeNull();
   });
 });
 
@@ -1059,11 +1059,11 @@ describe('🔴🔴 出境授权绑定目的地 —— 删掉旧端点后旧授�
         endpoints: [
           { id: 'r1', label: '旧云端', endpoint: 'https://old.example.com/v1', model: 'm' },
         ],
-        routes: { breakdown: [{ endpointId: 'r1' }] },
+        routes: { 'tool-calling': [{ endpointId: 'r1' }] },
       },
       // 用户此前已为「拆解 → 远端」点过同意
       consents: [
-        { feature: 'breakdown' as const, destination: 'user-endpoint' as const, grantedAt: 1 },
+        { feature: 'tool-calling' as const, destination: 'user-endpoint' as const, grantedAt: 1 },
       ],
     };
   }
@@ -1079,14 +1079,14 @@ describe('🔴🔴 出境授权绑定目的地 —— 删掉旧端点后旧授�
     const el = render({ initial: withGrantedRemote(), secrets: createSessionSecretStore() });
 
     // 前提：旧授权此刻仍然有效（否则下面验不出"复活"）
-    expect(el.querySelector('[data-testid="granted-breakdown"]')).toBeTruthy();
+    expect(el.querySelector('[data-testid="granted-tool-calling"]')).toBeTruthy();
 
     // ① 删掉旧的远端端点 —— 旧授权必须随它一起失效，而不是留在存储里等复活
     const oldItem = el.querySelector('[data-testid="endpoint-r1"]');
     expect(oldItem, '旧端点行应该渲染出来').toBeTruthy();
     click(oldItem?.querySelector('button'));
 
-    const afterDelete = loadAiSettings().consents.filter((c) => c.feature === 'breakdown');
+    const afterDelete = loadAiSettings().consents.filter((c) => c.feature === 'tool-calling');
     expect(afterDelete, '删端点必须清掉绑定它的旧授权（陈旧的种子）').toEqual([]);
 
     // ② 配一个新的远端端点，并把它接到同一个功能上
@@ -1101,17 +1101,17 @@ describe('🔴🔴 出境授权绑定目的地 —— 删掉旧端点后旧授�
       url?.dispatchEvent(new Event('input', { bubbles: true }));
     });
     const chip = el.querySelector<HTMLButtonElement>(
-      '[data-testid="feature-breakdown"] .ht-settings__chips button',
+      '[data-testid="feature-tool-calling"] .ht-settings__chips button',
     );
     expect(chip, '新端点的路由按钮应该出现').toBeTruthy();
     click(chip);
 
     // ③ 新端点会把明文送出设备，而用户从没为新端点同意过 —— 必须重新问
     expect(
-      el.querySelector('[data-testid="consent-breakdown"]'),
+      el.querySelector('[data-testid="consent-tool-calling"]'),
       '旧授权复活了：新端点被"我没同意过的组合"放行',
     ).toBeTruthy();
-    expect(el.querySelector('[data-testid="granted-breakdown"]')).toBeNull();
+    expect(el.querySelector('[data-testid="granted-tool-calling"]')).toBeNull();
   });
 });
 
@@ -1213,15 +1213,15 @@ describe('🔴🔴 必须说清"我们只提供两种供给方式中的哪一种
         latest = next;
       },
     });
-    const chipsOf = () => el.querySelectorAll<HTMLButtonElement>('[data-testid="feature-prioritize"] button');
+    const chipsOf = () => el.querySelectorAll<HTMLButtonElement>('[data-testid="feature-tool-calling"] button');
     expect(chipsOf()).toHaveLength(2);
 
     // 先点**靠后**的那个端点 —— 若不做归一，routes 会变成 [B, A]，与列表顺序相反。
     click(chipsOf()[1]);
-    expect(latest?.routing.routes.prioritize?.map((t) => t.endpointId)).toEqual(['bbb']);
+    expect(latest?.routing.routes['tool-calling']?.map((t) => t.endpointId)).toEqual(['bbb']);
 
     click(chipsOf()[0]);
-    expect(latest?.routing.routes.prioritize?.map((t) => t.endpointId)).toEqual(['aaa', 'bbb']);
+    expect(latest?.routing.routes['tool-calling']?.map((t) => t.endpointId)).toEqual(['aaa', 'bbb']);
   });
 
   it('🔴 AI 总开关关着时不显示（那是"还没启用"，不是"缺功能"）', () => {

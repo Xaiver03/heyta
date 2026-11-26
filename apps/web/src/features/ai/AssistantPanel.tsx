@@ -56,8 +56,17 @@ import { ICON_SIZE } from '@heyta/design-system';
  * （`check:layering` 的 `no-model-endpoint-in-apps` 会拦下试图在这里 fetch 的代码）。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, Maximize2, Minimize2, Send, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertTriangle,
+  Braces,
+  ChevronDown,
+  Clock,
+  Maximize2,
+  Minimize2,
+  Send,
+  X,
+} from 'lucide-react';
 
 import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
 
@@ -152,18 +161,6 @@ export interface AssistantPanelProps {
   /** 估时工具需要的最小偏好提示，由外壳按当前语言与授权派生。 */
   getDurationPreferenceHints?: () => readonly { id: string; text: string }[];
   /**
-   * 组织类 AI 动作（批量）的插槽 —— 目前是「AI 排优先级」。
-   *
-   * 🔴 为什么是插槽而不是写死在这里：动作要拿到当前清单、路由、授权、熔断状态，
-   * 那些都在宿主（`App.tsx`）手里。面板保持哑的，宿主决定挂什么 ——
-   * AGENTS §3.5「`apps/*` 不许有一行决定业务上该怎么做」，同理这一层也不该决定
-   * "哪些动作存在"。
-   *
-   * ⚠️ 它渲染在**面板正文顶端、常驻**，不是欢迎态的一部分：
-   * 一有对话就消失的入口等于"用一次就找不到第二次"。
-   */
-  orgActions?: ReactNode;
-  /**
    * 云端 Agent Harness 模式（接线开关）。默认关：保留既有 `requestAssistantTurn`
    * （含写提案/流式/历史）。开启后本轮问答走 `runWebCloudTurn`（设备本地循环 + 云端模型 +
    * 本地数据工具 + 可撤销）。⚠️ 该模式**只做读/答**：写操作会以 write-needs-confirm 返回，
@@ -228,6 +225,7 @@ interface AssistantEphemeralShape {
     confirming: boolean;
   };
 }
+
 
 export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   const session = usePanelSession();
@@ -776,7 +774,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         aria-label={t('web.ai.chat.inputAria')}
         placeholder={t('web.ai.chat.placeholder')}
         value={draft}
-        rows={2}
+        rows={1}
         data-testid="ai-assistant-input"
         onChange={(e) => {
           setDraft(e.target.value);
@@ -937,55 +935,8 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
             </div>
           </header>
       <div className={`ht-ai__chat-body ${!hasConversation ? 'ht-ai__chat-body--welcome' : ''}`}>
-      {/*
-        组织类动作（宿主注入，见 `orgActions`）。
-
-        🔴 它挂在正文**顶端**、两种状态都在 —— 有对话之后也还在。
-        原来「AI 排优先级」住在任务列表中间（组头与任务行之间），
-        长得和一行任务一样，而它其实是一次批量写入的入口。
-        搬到这里之后，"跟助手有关的动作"只有一处能找到。
-      */}
-      {props.orgActions !== undefined && (
-        <div className="ht-ai__org" data-testid="ai-assistant-org">
-          {props.orgActions}
-        </div>
-      )}
-      {/*
-       * 空会话不应该让用户面对一块“什么都没有”的技术面板。
-       * 快捷建议只是把自然语言填入同一个输入框，不创建第二套执行入口；
-       * 用户仍然可以编辑后再发送，隐私披露与确认流程也完全不变。
-       *
-       * 🔴 这一块**不是空态**，它是首屏欢迎页 —— 里面挂着输入框和三枚建议
-       * 按钮，是可交互的内容。它原先的类名与定位钩子都带 empty 字样，于是
-       * `check:empty-state` 把它读成"又一处手写空态骨架"（判据没错，是名字在
-       * 撒谎）。改的是**名字**：真收编成共享 `EmptyState` 会把 composer 与
-       * 建议按钮一起删掉，那是产品功能不是骨架。
-       */}
       {!hasConversation && <div className="ht-ai__welcome" data-testid="ai-assistant-welcome">
-        <div className="ht-ai__greeting" data-testid="ai-assistant-greeting">
-          <h3 className="ht-ai__greeting-title">{t('web.ai.chat.greeting')}</h3>
-          <p className="ht-ai__note">{t('web.ai.chat.greetingHint')}</p>
-        </div>
         {composer}
-        <div className="ht-ai__suggestions" data-testid="ai-assistant-suggestions">
-        {(
-          [
-            ['today', 'web.ai.chat.suggestion.today.label', 'web.ai.chat.suggestion.today'],
-            ['capture', 'web.ai.chat.suggestion.capture.label', 'web.ai.chat.suggestion.capture'],
-            ['summary', 'web.ai.chat.suggestion.summary.label', 'web.ai.chat.suggestion.summary'],
-          ] as const
-        ).map(([key, labelKey, promptKey]) => (
-          <button
-            key={key}
-            type="button"
-            className="ht-ai__suggestion"
-            data-testid={`ai-assistant-suggestion-${key}`}
-            onClick={() => ephemeral.write(session.account, { draft: t(promptKey), pending: undefined, phase: 'idle' })}
-          >
-            {t(labelKey)}
-          </button>
-        ))}
-        </div>
       </div>}
 
       {hasConversation && <div ref={conversationRef} className="ht-ai__conversation" data-testid="ai-assistant-conversation">
@@ -993,7 +944,11 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
           className="ht-ai__items ht-ai__items--chat"
           data-testid="ai-assistant-transcript"
         >
-          {items.map((item) => (
+          {items.map((item, index) => {
+            // 同一轮对话里，助手正文紧跟着待确认提案卡时，只在末尾收口处挂一次法定标识，
+            // 避免连续两块各自铺一条「AI 生成合成内容」把界面打碎。
+            const suppressMiddleLabel = item.role === 'assistant' && items[index + 1]?.role === 'proposal';
+            return (
             <li
               key={item.id}
               // 🔴 `--user` / `--assistant` 是"谁说的"的唯一视觉承载（见
@@ -1012,11 +967,13 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                     而它们恰恰是用户判断"这个结论可不可信"的依据。
                   */}
                   <ChatSteps steps={item.steps} t={t} locale={locale} />
-                  <span>{item.text}</span>
-                  <AiGeneratedLabel
-                    label={t('common.ai.generatedLabel')}
-                    testID={`ai-chat-generated-${String(item.id)}`}
-                  />
+                  <span className="ht-ai__assistant-text">{item.text}</span>
+                  {!suppressMiddleLabel && (
+                    <AiGeneratedLabel
+                      label={t('common.ai.generatedLabel')}
+                      testID={`ai-chat-generated-${String(item.id)}`}
+                    />
+                  )}
                   {item.stoppedAt !== undefined && (
                     <p className="ht-ai__note" data-testid="ai-chat-stopped">
                       {t('web.ai.chat.stoppedLead')}
@@ -1032,6 +989,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                     item={item}
                     onConfirm={() => void confirm(item)}
                     confirmationError={confirmationErrors[item.id]}
+                    tasksById={entities.tasks}
                   />
                   {/* 🔴 标识在提案卡**下方**：备案材料写的是"七类 AI 产出文本的下方"，
                       2026-10-21 自核时发现这一处原来在上面（材料没错，代码错了）。 */}
@@ -1054,7 +1012,8 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                 />
               )}
             </li>
-          ))}
+            );
+          })}
           {/*
             🔴 进行中的那一轮**是列表的最后一个 item**，不是"另一个区块"：
             它在屏幕上必须与最终那条回答占同一个位置，否则一轮结束时
@@ -1066,8 +1025,9 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
               data-testid="ai-chat-live"
               aria-live="polite"
             >
-              {live.reasoning !== '' && <ReasoningRow text={live.reasoning} t={t} />}
-              <TraceRows rows={live.rows} t={t} live />
+              {(live.reasoning !== '' || live.rows.length > 0) && (
+                <LiveTraceGroup reasoning={live.reasoning} rows={live.rows} t={t} />
+              )}
               {/*
                 🔴 显示的是 `revealedText`（逐字揭示的进度），**判断**用的是
                 `live.text`（已到达的内容）。两者分开是刻意的：
@@ -1119,6 +1079,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
             </li>
           )}
         </ul>
+
 
       {harnessUndo !== null && phase === 'idle' ? (
         <button
@@ -1308,20 +1269,23 @@ function traceVerb(row: LiveRow, t: I18nValue['t']): string {
  * ⚠️ `Space` 只走 `click` 那一支（不额外处理 `keydown`）：否则一次 Space 会开合两次、
  * 视觉上等于没动 —— 这是"补键盘"时最容易引入的回归。
  */
-function useRowCollapse(): {
+function useRowCollapse(initialCollapsed = true): {
   /** true = 视觉收起。 */
   collapsed: boolean;
+  /** 切换折叠状态。 */
+  toggle: () => void;
   /** 挂到 `summary` 的 `onClick`。 */
   onSummaryClick: (event: React.MouseEvent<HTMLElement>) => void;
   /** 挂到 `summary` 的 `onKeyDown`（只补 Enter，见上面那张实测表）。 */
   onSummaryKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
 } {
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
   const toggle = useCallback(() => {
     setCollapsed((prev) => !prev);
   }, []);
   return {
     collapsed,
+    toggle,
     onSummaryClick: (event) => {
       // 拦掉原生开合（它会**同步**把子树移出渲染，收起就没有可插值的端点）。
       event.preventDefault();
@@ -1361,44 +1325,51 @@ function useRowCollapse(): {
  * ⚠️ 状态放在**每行自己的组件**里（不是 `TraceRows` 里的一份）：一份状态会让
  * 点任意一行时**所有行一起开合**。
  */
+/** 过程时间线上的单个工具步骤节点。 */
 function TraceRow(props: { row: LiveRow; t: I18nValue['t'] }): React.JSX.Element {
   const { row, t } = props;
   const label = `${traceVerb(row, t)} · ${row.tool}`;
-  const { collapsed, onSummaryClick, onSummaryKeyDown } = useRowCollapse();
+  const { collapsed, toggle } = useRowCollapse();
 
-  // 没有 note ⇒ 不套 `<details>`（见上面那段说明），也就不用持有任何状态。
-  if (row.note === undefined) {
-    return (
-      <p className="ht-ai__step-line" data-testid={`ai-chat-step-${row.tool}`}>
-        {label}
-      </p>
+  const icon =
+    row.ok === false ? (
+      <AlertTriangle size={ICON_SIZE.xs} className="ht-ai__node-icon ht-ai__node-icon--warn" />
+    ) : (
+      <Braces size={ICON_SIZE.xs} className="ht-ai__node-icon" />
     );
-  }
 
   return (
-    <details
-      className="ht-ai__step-body"
-      // 🔴 常驻 open：`[open]` 一摘掉 UA 就同步把子树移出渲染，收起会变成瞬跳。
-      open
-    >
-      <summary
-        className="ht-ai__step-line"
-        data-testid={`ai-chat-step-${row.tool}`}
-        // 视觉状态由我们持有 ⇒ 显式把展开状态告诉读屏。
-        aria-expanded={!collapsed}
-        onClick={onSummaryClick}
-        onKeyDown={onSummaryKeyDown}
-      >
-        {label}
-      </summary>
-      <div
-        className={
-          collapsed ? 'ht-ai__trace-collapse' : 'ht-ai__trace-collapse ht-ai__trace-collapse--open'
-        }
-      >
-        <p className="ht-ai__note">{row.note}</p>
+    <>
+      <span className="ht-ai__node-rail" aria-hidden="true">
+        {icon}
+      </span>
+      <div className="ht-ai__node-body">
+        <p className="ht-ai__step-line" data-testid={`ai-chat-step-${row.tool}`}>
+          {label}
+        </p>
+        {row.note !== undefined && (
+          <>
+            <div
+              className={
+                collapsed
+                  ? 'ht-ai__trace-collapse'
+                  : 'ht-ai__trace-collapse ht-ai__trace-collapse--open'
+              }
+            >
+              <p className="ht-ai__note ht-ai__step-note">{row.note}</p>
+            </div>
+            <button
+              type="button"
+              className="ht-ai__more-pill"
+              aria-expanded={!collapsed}
+              onClick={toggle}
+            >
+              {t(collapsed ? 'web.ai.chat.viewMore' : 'web.ai.chat.collapseDetail')}
+            </button>
+          </>
+        )}
       </div>
-    </details>
+    </>
   );
 }
 
@@ -1415,7 +1386,7 @@ function TraceRows(props: {
       data-testid={props.live === true ? 'ai-chat-live-steps' : 'ai-chat-steps'}
     >
       {props.rows.map((row, index) => (
-        <li key={`${row.tool}#${String(index)}`} className="ht-ai__step">
+        <li key={`${row.tool}#${String(index)}`} className="ht-ai__step ht-ai__timeline-node">
           <TraceRow row={row} t={t} />
         </li>
       ))}
@@ -1486,45 +1457,87 @@ function TraceRows(props: {
  *   · 🔴 原来那个 `<p class="ht-ai__note">` 仍在这层里、仍是唯一的文本节点，
  *     所以 `data-testid="ai-chat-reasoning"` 的文本内容断言一字不变。
  */
+/** 思考过程节点：与工具步骤共用一条竖线时间线，长文本默认裁 3 行渐隐并附带「查看更多」。 */
 function ReasoningRow(props: { text: string; t: I18nValue['t'] }): React.JSX.Element {
-  const firstLine = props.text.split('\n')[0] ?? '';
-  // 开合行为与步骤行**同一份实现**（含 Enter 的补丁），只有 class 不同。
-  const { collapsed, onSummaryClick, onSummaryKeyDown } = useRowCollapse();
+  const { collapsed, toggle } = useRowCollapse();
+  const showToggle = props.text.includes('\n') || props.text.length > 96;
   return (
-    <details
-      className="ht-ai__step-body"
+    <div
+      className="ht-ai__timeline-node ht-ai__timeline-node--reasoning"
       data-testid="ai-chat-reasoning"
-      // 🔴 常驻 open：别让 UA 把子树摘出渲染，否则收起没有过渡可言。
-      open
     >
+      <span className="ht-ai__node-rail" aria-hidden="true">
+        <Clock size={ICON_SIZE.xs} className="ht-ai__node-icon" />
+      </span>
+      <div className="ht-ai__node-body">
+        <p
+          className={
+            showToggle && collapsed
+              ? 'ht-ai__reasoning-text ht-ai__reasoning-text--clamped'
+              : 'ht-ai__reasoning-text'
+          }
+        >
+          {props.text}
+        </p>
+        {showToggle && (
+          <button
+            type="button"
+            className="ht-ai__more-pill"
+            aria-expanded={!collapsed}
+            onClick={toggle}
+          >
+            {props.t(collapsed ? 'web.ai.chat.viewMore' : 'web.ai.chat.collapseDetail')}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** 流式过程组：默认展开 `调用工具中 ⌄`，实时展示思考与工具调用竖线时间线。 */
+function LiveTraceGroup(props: {
+  reasoning: string;
+  rows: readonly LiveRow[];
+  t: I18nValue['t'];
+}): React.JSX.Element {
+  const { reasoning, rows, t } = props;
+  const { collapsed, onSummaryClick, onSummaryKeyDown } = useRowCollapse(false);
+  return (
+    <details className="ht-ai__trace-group" open>
       <summary
-        className="ht-ai__step-line"
-        // 视觉状态既然由我们持有，就把展开状态显式告诉读屏。
+        className="ht-ai__trace-trigger"
+        data-testid="ai-chat-live-trace"
         aria-expanded={!collapsed}
         onClick={onSummaryClick}
         onKeyDown={onSummaryKeyDown}
       >
-        <span className="ht-ai__step-verb">{props.t('web.ai.chat.step.thinking')}</span>
-        <span className="ht-ai__step-detail">{firstLine}</span>
+        <span>{t('web.ai.chat.callingTools')}</span>
+        <ChevronDown
+          size={ICON_SIZE.xs}
+          className={
+            collapsed ? 'ht-ai__trace-chevron' : 'ht-ai__trace-chevron ht-ai__trace-chevron--open'
+          }
+          aria-hidden="true"
+        />
       </summary>
       <div
         className={
-          collapsed ? 'ht-ai__step-collapse' : 'ht-ai__step-collapse ht-ai__step-collapse--open'
+          collapsed ? 'ht-ai__trace-collapse' : 'ht-ai__trace-collapse ht-ai__trace-collapse--open'
         }
       >
-        <p className="ht-ai__note">{props.text}</p>
+        <div className="ht-ai__trace-details">
+          <div className="ht-ai__timeline">
+            {reasoning !== '' && <ReasoningRow text={reasoning} t={t} />}
+            <TraceRows rows={rows} t={t} live />
+          </div>
+        </div>
       </div>
     </details>
   );
 }
 
 /**
- * 「用了 N 步工具」那一行 + 逐步的行（ADR-0045 的过程可见）。
- *
- * ⚠️ 那段摘要（`ai-chat-trace`）**留着**：它是"这一轮有没有查东西"的一句话结论，
- * 比逐行更快读；而逐行回答的是"查了什么、成不成"。两者不是重复，
- * 一个给扫读、一个给核对。停止原因（`stoppedAt`）不在这里 —— 它说的是**答案**
- * 为什么停在那儿，所以跟着答案走（见气泡里那一段）。
+ * 完成后收敛的过程折叠区：无边框轻文字触发器（`用了 N 步工具 ⌄`），展开呈竖线时间线。
  */
 function ChatSteps(props: {
   steps: readonly AssistantStep[];
@@ -1532,39 +1545,181 @@ function ChatSteps(props: {
   locale: I18nValue['locale'];
 }): React.JSX.Element {
   const { t, locale } = props;
+  const { collapsed, onSummaryClick, onSummaryKeyDown } = useRowCollapse();
+
+  if (props.steps.length === 0) {
+    return (
+      <p className="ht-ai__trace-quiet" data-testid="ai-chat-trace">
+        {t('web.ai.chat.noTrace')}
+      </p>
+    );
+  }
+
   const failed = props.steps.filter((s) => !s.ok).length;
   return (
-    <>
-      <p className="ht-ai__note" data-testid="ai-chat-trace">
-        {props.steps.length === 0
-          ? t('web.ai.chat.noTrace')
-          : t('web.ai.chat.trace', { n: props.steps.length })}
-        {failed > 0 ? ` · ${props.steps.map((s) => s.tool).join(LIST_SEPARATOR[locale])}` : ''}
-      </p>
-      <TraceRows rows={props.steps.map(toTraceRow)} t={t} />
-    </>
+    <details className="ht-ai__trace-group" open>
+      <summary
+        className={
+          failed > 0
+            ? 'ht-ai__trace-trigger ht-ai__trace-trigger--warn'
+            : 'ht-ai__trace-trigger'
+        }
+        data-testid="ai-chat-trace"
+        aria-expanded={!collapsed}
+        onClick={onSummaryClick}
+        onKeyDown={onSummaryKeyDown}
+      >
+        {failed > 0 && (
+          <AlertTriangle
+            size={ICON_SIZE.xs}
+            className="ht-ai__trace-trigger-icon"
+            aria-hidden="true"
+          />
+        )}
+        <span>
+          {t('web.ai.chat.trace', { n: props.steps.length })}
+          {failed > 0 ? ` · ${props.steps.map((s) => s.tool).join(LIST_SEPARATOR[locale])}` : ''}
+        </span>
+        <ChevronDown
+          size={ICON_SIZE.xs}
+          className={
+            collapsed ? 'ht-ai__trace-chevron' : 'ht-ai__trace-chevron ht-ai__trace-chevron--open'
+          }
+          aria-hidden="true"
+        />
+      </summary>
+      <div
+        className={
+          collapsed ? 'ht-ai__trace-collapse' : 'ht-ai__trace-collapse ht-ai__trace-collapse--open'
+        }
+      >
+        <div className="ht-ai__trace-details">
+          <div className="ht-ai__timeline">
+            <TraceRows rows={props.steps.map(toTraceRow)} t={t} />
+          </div>
+        </div>
+      </div>
+    </details>
   );
 }
 
-/** 提案卡：人说"要改什么"，然后**只有**这一颗按钮能落库。 */
+type ProposalTaskTone = 'high' | 'medium' | 'low' | 'complete' | 'neutral';
+
+interface ProposalAffectedTask {
+  readonly title: string;
+  readonly badge?: string;
+  readonly tone: ProposalTaskTone;
+}
+
+/** 提案卡：人说"要改什么"，结构化展示受影响任务，然后**只有**确认按钮能落库。 */
 function ProposalCard(props: {
   item: ChatItem & { role: 'proposal' };
   onConfirm: () => void;
   confirmationError?: string;
+  /** 任务 id → 标题。用于把提案里引用的 taskId 还原成用户看得懂的任务名。 */
+  tasksById: Readonly<Record<string, { readonly title: string }>>;
 }): React.JSX.Element {
   const { t, locale } = useI18n();
   const { item } = props;
+
+  const affectedTasks = useMemo<readonly ProposalAffectedTask[]>(() => {
+    const intent = item.proposal.intent;
+    const titleOf = (id: string): string => props.tasksById[id]?.title ?? id;
+    const priorityKeys: Readonly<Record<string, MessageKey | undefined>> = {
+      none: 'web.ai.prioritize.priority.none',
+      low: 'web.ai.prioritize.priority.low',
+      medium: 'web.ai.prioritize.priority.medium',
+      high: 'web.ai.prioritize.priority.high',
+    };
+    const priorityTone = (raw: string): ProposalTaskTone => {
+      const k = raw.trim().toLowerCase();
+      if (k === 'high' || k === 'medium' || k === 'low') return k;
+      return 'neutral';
+    };
+
+    switch (intent.action) {
+      case 'create-task':
+        return [{ title: intent.title, badge: t('web.ai.chat.proposal.badge.create'), tone: 'neutral' }];
+      case 'set-task-estimate':
+        return [{ title: titleOf(intent.taskId), badge: t('web.ai.duration.minutes', { minutes: intent.minutes }), tone: 'neutral' }];
+      case 'complete-task':
+        return [{ title: titleOf(intent.taskId), badge: t('web.ai.chat.proposal.badge.complete'), tone: 'complete' }];
+      case 'complete-tasks':
+        return intent.taskIds.map((id) => ({
+          title: titleOf(id),
+          badge: t('web.ai.chat.proposal.badge.complete'),
+          tone: 'complete',
+        }));
+      case 'set-task-priorities':
+        return intent.entries.map((entry) => {
+          const key = priorityKeys[entry.priority.trim().toLowerCase()];
+          return {
+            title: titleOf(entry.taskId),
+            badge: key === undefined ? entry.priority : t(key),
+            tone: priorityTone(entry.priority),
+          };
+        });
+      default:
+        return [];
+    }
+  }, [item.proposal.intent, props.tasksById, t]);
+
+  const proposalTitle = useMemo<string>(() => {
+    const intent = item.proposal.intent;
+    const titleOf = (id: string): string => props.tasksById[id]?.title ?? id;
+    switch (intent.action) {
+      case 'set-task-priorities':
+        return t('web.ai.chat.proposal.setPriorities', { count: intent.entries.length });
+      case 'complete-task':
+        return t('web.ai.chat.proposal.completeTasks', { count: 1 });
+      case 'complete-tasks':
+        return t('web.ai.chat.proposal.completeTasks', { count: intent.taskIds.length });
+      case 'create-task':
+        return t('web.ai.chat.proposal.createTask');
+      case 'update-task':
+      case 'set-task-tags':
+      case 'set-task-estimate':
+      case 'append-task-checklist':
+        return intentText({ ...intent, taskId: titleOf(intent.taskId) }, t, locale);
+      default:
+        return intentText(intent, t, locale);
+    }
+  }, [item.proposal.intent, locale, props.tasksById, t]);
+
+  const cardClass =
+    item.expired === true
+      ? 'ht-ai__proposal ht-ai__proposal--expired'
+      : item.confirmed !== undefined
+        ? 'ht-ai__proposal ht-ai__proposal--settled'
+        : 'ht-ai__proposal';
+
   return (
-    <>
+    <div className={cardClass} data-testid="ai-chat-proposal">
       {item.expired !== true && item.confirmed === undefined && item.text !== '' && <p className="ht-ai__note">{item.text}</p>}
-      <p className="ht-ai__row" data-testid="ai-chat-proposal">
-        {item.expired !== true && item.confirmed === undefined && t('web.ai.tools.proposalLead')}
-        <strong>{intentText(item.proposal.intent, t, locale)}</strong>
+      <p className="ht-ai__row ht-ai__proposal-lead">
+        <strong className="ht-ai__proposal-title">{proposalTitle}</strong>
       </p>
+      {affectedTasks.length > 0 && (
+        <ul className="ht-ai__proposal-tasks" data-testid="ai-chat-proposal-tasks">
+          {affectedTasks.map((task, index) => (
+            <li
+              key={`${task.title}-${String(index)}`}
+              className={`ht-ai__proposal-task ht-ai__proposal-task--${task.tone}`}
+            >
+              <span className="ht-ai__proposal-task-title">{task.title}</span>
+              {task.badge !== undefined && (
+                <span className={`ht-type-caption ht-ai__proposal-badge ht-ai__proposal-badge--${task.tone}`}>
+                  {task.badge}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       {item.expired === true ? (
         // 🔴 恢复出来的未确认提案：卡片留着（对话断在这儿要看得懂为什么），
         // 但**没有确认按钮** —— 一次隔着页面重载的确认，用户已经看不见它的依据了。
-        <p className="ht-ai__done" data-testid="ai-chat-expired">
+        <p className="ht-ai__proposal-expired" data-testid="ai-chat-expired">
           {t('web.ai.chat.expiredProposal')}
         </p>
       ) : item.confirmed === undefined ? (
@@ -1574,7 +1729,7 @@ function ProposalCard(props: {
             {props.confirmationError}
           </p>
         )}
-        <div className="ht-ai__actions">
+        <div className="ht-ai__actions ht-ai__proposal-actions">
           <Button
             tone="primary"
             aria-label={t('web.ai.tools.confirmAria')}
@@ -1592,7 +1747,7 @@ function ProposalCard(props: {
             : t('web.ai.tools.confirmedFail', { message: item.confirmed.message })}
         </p>
       )}
-    </>
+    </div>
   );
 }
 

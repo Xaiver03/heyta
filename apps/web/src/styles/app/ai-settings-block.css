@@ -126,17 +126,22 @@ input[type="radio"] {
   align-items: center;
   gap: var(--ht-space-2);
   min-block-size: var(--ht-touch-target-min);
-  padding: var(--ht-space-2) var(--ht-space-3);
+  padding: 0 var(--ht-space-3);
   border: 0;
-  border-radius: var(--ht-radius-sm);
-  background: transparent;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
   color: var(--ht-color-foreground);
   font-family: inherit;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .ht-settings__theme-toggle:hover {
   background: var(--ht-color-hover);
+}
+
+.ht-settings__theme-toggle[aria-pressed='true'] {
+  background: var(--ht-color-primary-subtle);
 }
 
 .ht-settings__lang {
@@ -247,6 +252,66 @@ input[type="radio"] {
   gap: var(--ht-space-2);
   padding: var(--ht-space-1) 0;
   cursor: pointer;
+}
+
+/* 个性化分组的三组预设分段（字号 / 表面配色 / 行着色）：与上面 due-display-pref / detail-pane-pref
+   保持同一套凹槽轨道（纵向 padding 归零维持 44px 行高，选中态由底色区分，不被 borderless-controls 抹除）。 */
+.ht-settings__preset-grid {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-1);
+  max-inline-size: 100%;
+  padding: 0 var(--ht-space-1);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-settings__preset-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ht-settings__preset-option:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-settings__preset-option[aria-checked='true'] {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-foreground);
+}
+
+.ht-settings__preset-swatch {
+  inline-size: var(--ht-space-3);
+  block-size: var(--ht-space-3);
+  flex: none;
+  border-radius: var(--ht-radius-full);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-settings__preset-swatch--default {
+  background: var(--ht-color-primary);
+}
+
+.ht-settings__preset-swatch--warm {
+  background: var(--ht-color-warning-strong);
+}
+
+.ht-settings__preset-swatch--mist {
+  background: var(--ht-color-foreground-subtle);
 }
 
 .ht-settings__title {

@@ -132,8 +132,14 @@ const NO_UI_ENTRY = new Set([]);
  * Web 的入口由各自真实组件覆盖，本表不参与 web 判定。
  */
 const NO_UI_ENTRY_BY_END = new Map([
-  ['web', new Set(['inbound-automation'])],
-  ['mobile', new Set(['inbound-automation'])],
+  // 2026-11 产品裁决：web 的拆解 / 排序 / 估时**统一收进那一个对话 Agent**，
+  // 不再保留独立的按钮式入口。这三项能力在 web 由 Agent 的工具覆盖
+  // （create_subtask / set_task_estimate / update_task 的 priority 字段），
+  // 因此 web 端不再有独立 UI 入口 —— 属于本表的「只给 Agent 用」那一类。
+  ['web', new Set(['inbound-automation', 'breakdown', 'prioritize', 'duration-estimate'])],
+  // 2026-11 产品裁决：移动端也把拆解/排序/估时收进对话助手（AssistantScreen 走 Harness），
+  // 任务详情里的「AI 工具」独立入口已移除，能力由 Agent 的工具覆盖。
+  ['mobile', new Set(['inbound-automation', 'breakdown', 'prioritize', 'duration-estimate'])],
 ]);
 
 /** 复合 UI 的真实挂载组件；实现文件本身是控制器，不是 JSX 组件。 */

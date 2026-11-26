@@ -584,9 +584,9 @@ describe('Chatbot IA：历史列与中央空态', () => {
   it('空会话把新会话、历史、问候和紧凑建议收进同一个 Chatbot', async () => {
     const el = await render({ host: fakeHost(), fetchImpl: scriptedFetch([{ kind: 'text', text: '好。' }]).impl });
     expect(el.querySelector('[data-testid="ai-assistant-history"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="ai-assistant-greeting"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="ai-assistant-greeting"]')).toBeNull();
     expect(el.querySelector('[data-testid="ai-assistant-new-session"]')).not.toBeNull();
-    expect(el.querySelectorAll('[data-testid^="ai-assistant-suggestion-"]')).toHaveLength(3);
+    expect(el.querySelectorAll('[data-testid^="ai-assistant-suggestion-"]')).toHaveLength(0);
     expect(el.querySelector('[data-testid="ai-assistant-input"]')).not.toBeNull();
   });
 

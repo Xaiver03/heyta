@@ -94,7 +94,6 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     const panel = page.locator('[data-testid="ai-assistant"]');
     await expect(panel).toBeVisible();
     await expect(page.locator('[data-testid="ai-agent-surface"]')).toBeVisible();
-    await expect(page.locator('[data-testid="ai-assistant-suggestions"]')).toBeVisible();
     await expect(page.locator('[data-testid="ai-tool-run"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="ai-assistant-tier"]')).toHaveCount(0);
     await expect(page.getByTestId('ai-assistant-tier-select')).toHaveCount(0);

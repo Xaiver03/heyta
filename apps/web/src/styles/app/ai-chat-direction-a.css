@@ -1,0 +1,497 @@
+/* 方向 A · WeKnora 对齐视觉层（2026-11-25）
+ *
+ * 规范真源：design-system/heyta/pages/ai-assistant.md
+ * 对照原型：weknora/frontend/src/views/chat/ 与 design-demos/ai-chat/A-weknora.html
+ * 全部走 --ht-* token，零裸值；在 app.css 末尾（borderless-controls 之后）导入。
+ */
+
+/* ── 顶栏与容器留白 ───────────────────────────────────────────── */
+
+.ht-app__detail:has(.ht-ai-agent-surface) {
+  padding-block: 0;
+}
+
+.ht-ai__main {
+  min-inline-size: 0;
+}
+
+.ht-ai__header {
+  min-block-size: var(--ht-touch-target-min);
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-4);
+  border-block-end: var(--ht-border-width-hairline) solid var(--ht-color-border);
+  flex-wrap: nowrap;
+}
+
+.ht-ai__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-ai__chat-body {
+  padding-block: 0;
+  gap: var(--ht-space-2);
+}
+
+.ht-ai__org {
+  max-inline-size: var(--ht-layout-prose-max);
+  inline-size: 100%;
+  margin-inline: auto;
+  padding-inline: var(--ht-space-4);
+  padding-block: var(--ht-space-2) 0;
+}
+
+/* ── 对话区与角色排版 ─────────────────────────────────────────── */
+
+.ht-ai__conversation {
+  padding-block: var(--ht-space-3);
+  padding-inline: var(--ht-space-4);
+}
+
+.ht-ai__items--chat {
+  gap: var(--ht-space-4);
+  max-inline-size: var(--ht-layout-prose-max);
+  inline-size: 100%;
+  margin: 0 auto;
+}
+
+/* 用户气泡：贴右浅蓝底、受控最大宽（不撑成满宽方块）、右下角小圆角 */
+.ht-ai__item--user {
+  max-inline-size: 88%;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-radius: var(--ht-radius-lg) var(--ht-radius-lg) var(--ht-radius-sm) var(--ht-radius-lg);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-relaxed);
+  color: var(--ht-color-foreground);
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/* 助手回答：贴左、无卡片底色与内边距，回到正文流 */
+.ht-ai__item--assistant {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ht-space-2);
+  inline-size: 100%;
+  background: transparent;
+  padding: 0;
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-relaxed);
+  color: var(--ht-color-foreground);
+}
+
+.ht-ai__assistant-text {
+  display: block;
+  inline-size: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: pre-wrap;
+}
+
+.ht-ai__item--proposal {
+  inline-size: 100%;
+}
+
+/* ── 过程时间线（无框轻文字折叠头 + 图标竖线树 + 渐隐查看更多）─── */
+
+.ht-ai__trace-quiet {
+  margin: 0;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-ai__trace-group {
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.ht-ai__trace-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  padding-block: calc(var(--ht-space-1) / 2);
+  padding-inline: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+  cursor: pointer;
+  list-style: none;
+}
+
+.ht-ai__trace-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.ht-ai__trace-trigger:hover {
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-ai__trace-trigger--warn {
+  color: var(--ht-color-danger);
+}
+
+.ht-ai__trace-trigger-icon {
+  flex: none;
+  color: var(--ht-color-danger);
+}
+
+.ht-ai__trace-chevron {
+  flex: none;
+  color: var(--ht-color-foreground-subtle);
+  transition: transform var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-ai__trace-chevron--open {
+  transform: rotate(180deg);
+}
+
+.ht-ai__trace-details {
+  padding-block-start: var(--ht-space-2);
+}
+
+.ht-ai__timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-inline-size: 0;
+}
+
+.ht-ai__timeline .ht-ai__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-ai__timeline-node {
+  display: grid;
+  grid-template-columns: var(--ht-space-4) minmax(0, 1fr);
+  column-gap: var(--ht-space-2);
+  min-inline-size: 0;
+  align-items: stretch;
+}
+
+.ht-ai__node-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-block-start: calc(var(--ht-space-1) / 2);
+}
+
+.ht-ai__node-rail::after {
+  content: '';
+  flex: 1;
+  inline-size: var(--ht-border-width-thin);
+  margin-block: var(--ht-space-1);
+  background: var(--ht-color-border);
+  min-block-size: var(--ht-space-2);
+}
+
+.ht-ai__timeline > .ht-ai__timeline-node:last-child .ht-ai__node-rail::after,
+.ht-ai__timeline > .ht-ai__steps:last-child > .ht-ai__step:last-child .ht-ai__node-rail::after {
+  display: none;
+}
+
+.ht-ai__node-icon {
+  flex: none;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-ai__node-icon--warn {
+  color: var(--ht-color-danger);
+}
+
+.ht-ai__node-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+  padding-block-end: var(--ht-space-3);
+}
+
+.ht-ai__timeline > .ht-ai__timeline-node:last-child > .ht-ai__node-body,
+.ht-ai__timeline > .ht-ai__steps:last-child > .ht-ai__step:last-child > .ht-ai__node-body {
+  padding-block-end: var(--ht-space-1);
+}
+
+.ht-ai__node-body > .ht-ai__trace-collapse {
+  inline-size: 100%;
+}
+
+.ht-ai__node-body > .ht-ai__step-line {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-ai__step-note {
+  padding-block-start: var(--ht-space-1);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-ai__reasoning-text {
+  margin: 0;
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.ht-ai__reasoning-text--clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, var(--ht-color-foreground) 45%, transparent 100%);
+  mask-image: linear-gradient(to bottom, var(--ht-color-foreground) 45%, transparent 100%);
+}
+
+.ht-ai__more-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: fit-content;
+  min-block-size: auto;
+  padding-block: calc(var(--ht-space-1) / 2);
+  padding-inline: var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+  cursor: pointer;
+}
+
+.ht-ai__more-pill:hover {
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+}
+
+/* ── 结构化提案 / 确认卡（对齐 WeKnora 卡片行）──────────────────── */
+
+.ht-ai__proposal {
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-primary-subtle);
+}
+
+.ht-ai__proposal--expired,
+.ht-ai__proposal--settled {
+  background: var(--ht-color-surface-subtle);
+}
+
+.ht-ai__proposal-lead {
+  margin: 0;
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-ai__proposal-title {
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-ai__proposal-tasks {
+  display: flex;
+  flex-direction: column;
+  margin: var(--ht-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  border-block-start: var(--ht-border-width-hairline) solid var(--ht-color-border);
+}
+
+.ht-ai__proposal-task {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding-block: var(--ht-space-2);
+  border-block-end: var(--ht-border-width-hairline) solid var(--ht-color-border);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground);
+}
+
+.ht-ai__proposal-task:last-child {
+  border-block-end: 0;
+  padding-block-end: 0;
+}
+
+.ht-ai__proposal-task::before {
+  content: "";
+  flex: none;
+  inline-size: var(--ht-size-badge-dot);
+  block-size: var(--ht-size-badge-dot);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-foreground-subtle);
+}
+
+.ht-ai__proposal-task--high::before {
+  background: var(--ht-color-danger);
+}
+
+.ht-ai__proposal-task--medium::before {
+  background: var(--ht-color-warning);
+}
+
+.ht-ai__proposal-task--low::before {
+  background: var(--ht-color-info);
+}
+
+.ht-ai__proposal-task--complete::before {
+  background: var(--ht-color-success);
+}
+
+.ht-ai__proposal-task-title {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow-wrap: break-word;
+}
+
+.ht-ai__proposal-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding-block: var(--ht-space-0);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-ai__proposal-badge--high {
+  background: var(--ht-color-danger-subtle);
+  color: var(--ht-color-danger);
+}
+
+.ht-ai__proposal-badge--medium {
+  background: var(--ht-color-warning-subtle);
+  color: var(--ht-color-warning-strong);
+}
+
+.ht-ai__proposal-badge--low {
+  background: var(--ht-color-info-subtle);
+  color: var(--ht-color-info-strong);
+}
+
+.ht-ai__proposal-badge--complete {
+  background: var(--ht-color-success-subtle);
+  color: var(--ht-color-success-strong);
+}
+
+.ht-ai__proposal-expired {
+  margin: var(--ht-space-2) 0 0;
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-ai__proposal-actions {
+  margin-top: var(--ht-space-3);
+}
+
+/* ── 追问与建议芯片（紧凑 28px 高，不撑成 44px 大块）────────────── */
+
+.ht-ai__followups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+  max-inline-size: var(--ht-layout-prose-max);
+  inline-size: 100%;
+  margin: var(--ht-space-3) auto 0;
+}
+
+.ht-ai__suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-size-chip-height);
+  padding-block: var(--ht-space-1);
+  padding-inline: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+  cursor: pointer;
+}
+
+.ht-ai__suggestion:hover {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+/* ── 输入区与页脚：与对话区同一条 16px 左右轴线 ─────────────────── */
+
+.ht-ai__attach-stack {
+  padding-inline: var(--ht-space-4);
+}
+
+.ht-ai__composer {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  box-shadow: var(--ht-shadow-sm);
+}
+
+.ht-ai__composer-action {
+  position: static;
+  inset: auto;
+  transform: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ht-ai__composer:has(.ht-ai__composer-action) .ht-ai__input {
+  padding-inline-start: var(--ht-space-1);
+}
+
+.ht-ai__input {
+  min-block-size: var(--ht-touch-target-min);
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-1);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  resize: none;
+}
+
+.ht-ai__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1) var(--ht-space-3);
+  padding-inline: var(--ht-space-4);
+  padding-block: var(--ht-space-1) var(--ht-space-3);
+}
+
+.ht-ai__footer .ht-ai__note {
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* ── 布局修复：org 插槽占掉 1fr 导致对话被压到底部 ───────────────── */
+
+.ht-ai__chat-body:not(.ht-ai__chat-body--welcome):has(> .ht-ai__org) {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}

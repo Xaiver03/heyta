@@ -174,10 +174,9 @@ function featureLabels(t: I18nValue['t']): Readonly<Record<AiFeature, string>> {
   };
 }
 
+// 拆解 / 排序 / 估时已统一收进对话 Agent 的 Harness（工具调用走 `tool-calling` 一条路由），
+// 不再为它们单独配置端点。设置里只保留 Agent 本体与自动收集。
 const FEATURE_ORDER: readonly AiFeature[] = [
-  'breakdown',
-  'prioritize',
-  'duration-estimate',
   'tool-calling',
   // Inbound automation is configured here, not exposed as a Chatbot mode.
   'inbound-automation',

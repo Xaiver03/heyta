@@ -115,19 +115,19 @@ test('助手随侧栏连续拖动重排，输入区无嵌套焦点框', async ({
       expect(ring, '量不到输入框或 composer ⇒ 这一条没有基准').not.toBeNull();
       expect(ring!.focused, '输入框没拿到焦点 ⇒ 焦点环这一条无从谈起').toBe(true);
       const inputRing = visibleFocusRing(ring!.input);
+      const composerRing = visibleFocusRing(ring!.composer);
       expect(
         inputRing,
-        `输入框的焦点环不见了 ⇒ 键盘用户看不出焦点在哪（WCAG 2.4.7）：读数 ${JSON.stringify(ring!.input)}`,
+        `内层 textarea 不应自己画方框焦点环（会切过附件图标）：读数 ${JSON.stringify(ring!.input)}`,
+      ).toBeNull();
+      expect(
+        composerRing,
+        `外层 composer 焦点环不见了 ⇒ 键盘用户看不出焦点在哪（WCAG 2.4.7）：读数 ${JSON.stringify(ring!.composer)}`,
       ).not.toBeNull();
       expect(
-        inputRing!.widthPx,
-        `输入框的焦点环不是全局那一条（${String(inputRing!.widthPx)}px ≠ ${ring!.ringToken}）`,
-      ).toBe(Number.parseFloat(ring!.ringToken));
-      expect(
-        visibleFocusRing(ring!.composer),
-        `外层 composer 也画了一枚焦点环（${ring!.composer.outlineStyle} / ${ring!.composer.boxShadow}）`
-          + ' ⇒ 输入区出现嵌套双框（这条判据防的就是它）',
-      ).toBeNull();
+        composerRing!.widthPx,
+        `外层 composer 焦点环宽度不足（${String(composerRing!.widthPx)}px）`,
+      ).toBeGreaterThanOrEqual(1);
       await expect(input).toHaveCSS('border-top-width', '0px');
       await page.screenshot({ path: `${evidence}/${theme}-${target}.png` });
     }

@@ -86,15 +86,6 @@
   background: var(--ht-color-surface);
 }
 
-/* 输入区只有一个容器。将可见焦点转移到外层，避免输入框内再套蓝框。 */
-.ht-ai__input:focus-visible {
-  outline-width: 0;
-}
-
-.ht-ai__composer:has(.ht-ai__input:focus-visible) {
-  border-color: var(--ht-color-foreground-muted);
-}
-
 .ht-ai__chat-body,
 .ht-ai__welcome,
 .ht-ai__greeting,
@@ -134,17 +125,11 @@
 
 @container ai-panel (max-width: 26rem) {
   .ht-ai__header {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .ht-ai__heading {
-    flex-basis: 100%;
+    gap: var(--ht-space-2);
   }
 
   .ht-ai__header-actions {
-    inline-size: 100%;
-    justify-content: space-between;
+    gap: var(--ht-space-1);
   }
 
   .ht-ai__tier-label {

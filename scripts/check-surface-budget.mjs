@@ -28,8 +28,6 @@
  * | 2 | 页头段里没有 `<select` | 有人在页头上再加一枚原生下拉（排序那种形状） |
  * | 3 | 页头段里没有 `<label` | 有人把"文字标签 + 控件"这一组塞回页头 |
  * | 4 | 页头段里没有 `task-sort` / `task-sort-select` | 排序以**常驻控件**的形状搬回页头 |
- * | 5 | `<AiPrioritize` 只在 `const aiPanels` **之前**出现一次 | 动作行搬回列表体 |
- * | 6 | `orgActions={aiPrioritizeAction}` 仍然接着 | 有人把它从助手面板上摘掉（入口又没了） |
  * | 7 | `.ht-header__actions` 只有一处 | 第二个页头动作区被新开出来（等于绕开整道门禁） |
  *
  * ## 为什么判源码而不判渲染
@@ -277,52 +275,6 @@ if (app === null) {
     }
   }
 
-  /* ── 格 5：动作行不许住进列表体 ───────────────────────────────── */
-  /**
-   * 🔴 必须看**每一处**渲染点的位置，不能只看 `indexOf` 的第一处：
-   * 第一处永远是助手槽里那一份（它是合规的），第二个渲染点再搬进列表体时，
-   * `indexOf` 仍然指回第一处 —— 判据恒绿。这条在自检臂 F 上抓过。
-   */
-  const prioritizeAt = [...app.matchAll(/<AiPrioritize/g)].map((m) => m.index ?? -1);
-  const aiPanelsIdx = app.indexOf('const aiPanels = (');
-  if (prioritizeAt.length === 0) {
-    problems.push([
-      'prioritize-missing',
-      '`<AiPrioritize` 在源码里找不到了 —— 它应当渲染在对话助手的组织类动作槽里。' +
-        '整个删掉不是"更简洁"，是把一个已交付的 AI 能力从界面上摘掉。',
-    ]);
-  } else {
-    if (prioritizeAt.length !== 1) {
-      problems.push([
-        'prioritize-duplicated',
-        `\`<AiPrioritize\` 出现了 ${String(prioritizeAt.length)} 次 —— 只能有一处渲染点。`,
-      ]);
-    }
-    if (aiPanelsIdx >= 0 && prioritizeAt.some((at) => at > aiPanelsIdx)) {
-      problems.push([
-        'action-in-list',
-        '`<AiPrioritize` 出现在 `const aiPanels` **之后** —— 它又被写回主内容区了。' +
-          '动作不住进列表体：列表体里只有任务行，否则每一行"点下去会发生什么"都要先分辨身份。',
-      ]);
-    }
-    if (contentAt >= 0 && prioritizeAt.some((at) => at > contentAt)) {
-      problems.push([
-        'action-in-list',
-        '`<AiPrioritize` 出现在 `className="ht-content"` **之后** —— 它回到了列表体里。' +
-          '它的落点是助手面板的 `orgActions` 槽（那里才是"跟助手有关的动作"唯一能找到的地方）。',
-      ]);
-    }
-  }
-
-  /* ── 格 6：助手面板那个槽仍然接着 ─────────────────────────────── */
-  if (!app.includes('orgActions={aiPrioritizeAction}')) {
-    problems.push([
-      'org-slot-unwired',
-      '`orgActions={aiPrioritizeAction}` 不见了 —— 动作定义还在，但没有挂到助手面板上，' +
-        '等于把它从界面上摘掉而源码里看起来还有。',
-    ]);
-  }
-
   /* ── 格 7：页头动作区只有一处 ─────────────────────────────────── */
   const headerRegions = count(app, 'className="ht-header__actions"');
   if (headerRegions > 1) {
@@ -491,17 +443,6 @@ const MUTATIONS = {
       'data-testid="detail-pane-toggle"><select data-testid="task-sort-select" />',
     );
   },
-  'action-in-list': (files) => {
-    /* 在列表体里再放一份渲染点 —— 正是"动作行搬回列表体"的形状
-       （同时会撞上格 5 的"只许一处"，两条都是这条臂要说的话）。 */
-    files[APP] = files[APP].replace(
-      'className="ht-content"',
-      'className="ht-content"><AiPrioritize tasks={[]} routing={aiRouting} consents={[]} secrets={aiSecrets} onApply={async () => {}}',
-    );
-  },
-  'org-slot-unwired': (files) => {
-    files[APP] = files[APP].replace('orgActions={aiPrioritizeAction}', 'orgActions={null}');
-  },
   'font-rungs-global': (files) => {
     files['apps/web/src/styles/app/menu.css'] +=
       '\n.ht-fixture { font-size: var(--ht-font-size-3xl); }\n';
@@ -530,8 +471,6 @@ const ARMS = [
   ['C 页头塞回一枚原生下拉 ⇒ 红并点名 header-native-select', 'header-native-select'],
   ['D 页头塞回"文字标签 + 控件" ⇒ 红并点名 header-labelled-control', 'header-labelled-control'],
   ['E 排序以常驻控件形状回到页头 ⇒ 红并点名 sort-back-in-header', 'sort-back-in-header'],
-  ['F 动作行搬进列表体 ⇒ 红并点名 action-in-list', 'action-in-list'],
-  ['G 摘掉助手的动作槽 ⇒ 红并点名 org-slot-unwired', 'org-slot-unwired'],
   ['H 样式表多开一档字号 ⇒ 红并点名 font-rungs-global', 'font-rungs-global'],
   ['I 样式表多开一个色相族 ⇒ 红并点名 hue-families-global', 'hue-families-global'],
   ['J 页头再塞一枚控件 ⇒ 红并点名 header-control-count', 'header-control-count'],

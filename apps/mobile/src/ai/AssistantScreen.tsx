@@ -120,7 +120,7 @@ const streamingFetch = createGatedStreamingFetch(privacyConsent);
  * 移动端 Harness 开关：**默认关**。开启后 runTurn 走 runMobileCloudTurn（可写+撤销，需真机验收后再开）。
  * 与 Web 的 `?cloudHarness=1` 对齐：默认不改变现有助手行为。
  */
-const MOBILE_CLOUD_HARNESS = false;
+const MOBILE_CLOUD_HARNESS = true;
 
 
 /**
@@ -550,7 +550,6 @@ export function AssistantScreen({
               generatedLabel={t('common.ai.generatedLabel')}
               empty={
                 <Stack gap="default">
-                  <Text variant="section-title">{t('web.ai.chat.greeting')}</Text>
                   <AiSuggestionGrid
                     items={SUGGESTIONS.map((key) => ({
                       key,
