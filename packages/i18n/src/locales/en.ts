@@ -1540,6 +1540,16 @@ export const en = {
   'web.focus.config.locked': 'Durations cannot change while the timer runs — stop this round, edit, then start again.',
   'web.focus.config.a11y.minutes': '{label} duration in minutes',
   'web.focus.config.a11y.sessions': '{label} in sessions',
+  // White noise (coverage graph #51): synthesized live, no audio assets. Controls only, no prose.
+  'web.focus.noise.title': 'White noise',
+  'web.focus.noise.on': 'On',
+  'web.focus.noise.off': 'Off',
+  'web.focus.noise.kindLabel': 'Noise type',
+  'web.focus.noise.kind.rain': 'Rain',
+  'web.focus.noise.kind.white': 'White',
+  'web.focus.noise.kind.brown': 'Brown',
+  'web.focus.noise.volume': 'Volume',
+
   // Ticket W7: the focus details pane (four overview cards + the record list).
   // ⚠️ Card labels carry **no count** — the number is its own field, so English does not
   // need a sibling pair like `web.focus.completedTodayOne` for these.
