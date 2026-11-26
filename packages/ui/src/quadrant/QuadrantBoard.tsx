@@ -528,6 +528,15 @@ export function QuadrantBoard({
                       <View style={styles.headerTrailing}>{renderHeaderTrailing(card)}</View>
                     )}
                   </View>
+                  {/*
+                    🔴 副标题 = 象限的语义说明（「重要且紧急 / 重要不紧急 / …」）。
+                    大标题是动作词（「马上做 / 计划做 / …」），说明是重要/紧急的刻画 ——
+                    两条缺一，四象限就退化成"分配类型"或"四个空动作词"。
+                    说明在无障碍句里本来就有（`cellA11y`），视觉上也必须有。
+                  */}
+                  {hint === '' ? null : (
+                    <Text style={[text['caption'], styles.cellHint]}>{hint}</Text>
+                  )}
                 </View>
 
                 {/*

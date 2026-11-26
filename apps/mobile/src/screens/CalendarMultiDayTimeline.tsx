@@ -41,6 +41,12 @@ export interface CalendarMultiDayTimelineProps {
   readonly busyHabitId?: string | null;
   /** 当前时刻（epoch ms）：落在这些天内时画「现在」红线；不给则不画。 */
   readonly now?: number | undefined;
+  /**
+   * 长按某一列的时间网格 → 在该时间点新建任务（滴答清单式的「长按网格加事件」）。
+   * `minutes` 是从当天 0 点起的分钟数，已按 **15 分钟** 对齐（0/15/30/45）。
+   * 不给则该网格只读。
+   */
+  readonly onCreateAt?: (date: LocalDate, minutes: number) => void;
   readonly testID?: string;
 }
 
@@ -75,6 +81,7 @@ export function CalendarMultiDayTimeline({
   onToggleHabit,
   busyHabitId,
   now,
+  onCreateAt,
   testID = 'calendar-3day-timeline',
 }: CalendarMultiDayTimelineProps): React.JSX.Element {
   const t = useTokens();
@@ -250,6 +257,24 @@ export function CalendarMultiDayTimeline({
               {HOURS.map((h) => (
                 <View key={`ln-${h}`} style={[styles.hourLine, { top: h * rowHeight }]} />
               ))}
+              {/*
+                🔴 长按时间网格 → 在该点新建任务（滴答清单式「长按网格加事件」）。
+                铺在任务块**下面**（先画它、后画块），所以块自己的点按不被吃掉；
+                只有空白网格收到长按。按 15 分钟对齐（1 小时 4 份）。
+              */}
+              {onCreateAt === undefined ? null : (
+                <Pressable
+                  delayLongPress={350}
+                  onLongPress={(e) => {
+                    const y = e.nativeEvent.locationY;
+                    const rawMinutes = (y / rowHeight) * 60;
+                    const snapped = Math.max(0, Math.min(23 * 60 + 45, Math.round(rawMinutes / 15) * 15));
+                    onCreateAt(day, snapped);
+                  }}
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, height: axisHeight }}
+                  testID={`${testID}-grid-${day}`}
+                />
+              )}
               {/* 有时刻的任务：按小时落块 */}
               {buckets.hours.map((bucket, hour) =>
                 bucket.map((task, idx) => {

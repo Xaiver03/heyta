@@ -43,7 +43,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, ScrollView, View } from 'react-native';
+import { Animated, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 
 import {
   addDays,
@@ -56,6 +56,7 @@ import {
   startOfWeek,
   isScheduledOn,
   toLocalDate,
+  dueDateToEpoch,
   type CountdownEvent,
   type Habit,
   type HabitLog,
@@ -97,7 +98,7 @@ import { createProjectActions } from '@heyta/app-host';
 import { useTaskHost } from '../db/use-task-host';
 import { QUADRANT_TITLE_KEYS } from '../lib/quadrant-display';
 import { useMobileSync } from '../sync/store';
-import { IconButton, Screen, Text } from '../ui/kit';
+import { Button, IconButton, Screen, Text } from '../ui/kit';
 import { CalendarScopeSheet, SCOPE_INBOX, SCOPE_QUADRANT_PREFIX, type ScopeProject } from './CalendarScopeSheet';
 import { TopBarMenu } from '../ui/top-bar-menu';
 import { CalendarViewMenu } from './CalendarViewMenu';
@@ -232,6 +233,43 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
   const [busyHabitId, setBusyHabitId] = useState<string | null>(null);
+
+  /*
+   * 长按时间网格新建任务（滴答清单式）。
+   * `addSlot` = 长按的落点（哪一天 + 从 0 点起第几分钟，已按 15 分钟对齐）。
+   * 打开一个极简「事件标题」弹层，确认后按该时间点建一条带时刻的任务。
+   */
+  const [addSlot, setAddSlot] = useState<{ date: LocalDate; minutes: number } | null>(null);
+  const [addTitle, setAddTitle] = useState('');
+  const [addBusy, setAddBusy] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const addTimeLabel = addSlot === null
+    ? ''
+    : `${String(Math.floor(addSlot.minutes / 60)).padStart(2, '0')}:${String(addSlot.minutes % 60).padStart(2, '0')}`;
+  // 注意：这里引用下面的 `refresh`（同一渲染函数的 const）。函数体在渲染结束后才执行，
+  // 因此不触发 TDZ —— 这也是为什么它写成普通函数而不是 useCallback（依赖数组会在渲染期求值）。
+  const submitAdd = async (): Promise<void> => {
+    if (addSlot === null || actions === null) return;
+    const title = addTitle.trim();
+    if (title === '') return;
+    setAddBusy(true);
+    setAddError(null);
+    try {
+      await actions.create(title, { dueDate: dueDateToEpoch(addSlot.date, addTimeLabel) });
+      refresh();
+      setAddSlot(null);
+      setAddTitle('');
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAddBusy(false);
+    }
+  };
+  const openAddAt = (date: LocalDate, minutes: number): void => {
+    setAddTitle('');
+    setAddError(null);
+    setAddSlot({ date, minutes });
+  };
 
   const refresh = useCallback(() => {
     if (!actions || !eventActions) return;
@@ -953,6 +991,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           habitLogs={habitLogs}
           onToggleHabit={onToggleHabit}
           busyHabitId={busyHabitId}
+          onCreateAt={openAddAt}
         />
       ) : extraView === 'timetable' ? (
         <>
@@ -1017,6 +1056,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           habitLogs={habitLogs}
           onToggleHabit={onToggleHabit}
           busyHabitId={busyHabitId}
+          onCreateAt={openAddAt}
         />
       ) : (
       <CalendarBoard
@@ -1171,6 +1211,67 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           setScopeOpen(false);
         }}
       />
+      {/* 长按时间网格 → 在该 15 分钟时间点新建任务（滴答清单式「长按网格加事件」）。 */}
+      <Modal
+        visible={addSlot !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setAddSlot(null); }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
+        <Pressable
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: tokens['material.scrim'] }}
+          onPress={() => { setAddSlot(null); }}
+          accessibilityLabel={t('mobile.common.cancel')}
+        />
+        <View
+          style={{
+            marginTop: 'auto',
+            backgroundColor: tokens['color.surface'],
+            borderTopLeftRadius: tokens['radius.lg'],
+            borderTopRightRadius: tokens['radius.lg'],
+            padding: tokens['space.4'],
+            paddingBottom: tokens['space.6'],
+            gap: tokens['space.3'],
+          }}
+        >
+          <Text variant="section-title">{`${addSlot?.date ?? ''} ${addTimeLabel}`}</Text>
+          <TextInput
+            value={addTitle}
+            onChangeText={setAddTitle}
+            placeholder={t('mobile.tasks.composer.placeholder')}
+            placeholderTextColor={tokens['color.foreground-subtle']}
+            autoFocus
+            onSubmitEditing={() => { void submitAdd(); }}
+            style={{
+              minHeight: tokens['touch-target.min'],
+              borderRadius: tokens['radius.md'],
+              borderWidth: tokens['border-width.thin'],
+              borderColor: tokens['color.border-subtle'],
+              paddingHorizontal: tokens['space.3'],
+              color: tokens['color.foreground'],
+            }}
+            testID="calendar-add-title"
+          />
+          {addError === null ? null : (
+            <Text variant="row-meta" tone="danger">{addError}</Text>
+          )}
+          <View style={{ flexDirection: 'row', gap: tokens['space.3'], justifyContent: 'flex-end' }}>
+            <Button label={t('mobile.common.cancel')} tone="ghost" onPress={() => { setAddSlot(null); }} />
+            <Button
+              label={t('mobile.common.add')}
+              disabled={addBusy || addTitle.trim() === ''}
+              onPress={() => { void submitAdd(); }}
+              testID="calendar-add-confirm"
+            />
+          </View>
+        </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </Screen>
   );
 }
