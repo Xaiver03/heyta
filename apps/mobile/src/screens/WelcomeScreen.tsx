@@ -155,7 +155,13 @@ function makeStyles(tokens: HeytaNativeTokens) {
       maxHeight: '72%',
       borderTopLeftRadius: tokens['radius.xl'],
       borderTopRightRadius: tokens['radius.xl'],
-      backgroundColor: tokens['color.background'],
+      /**
+       * 🔴 2026-11-27：**不再铺实心底**。底色交给抽屉里那层 SVG 竖向渐变
+       * （顶部近乎透明 → 正文暖纸），于是漫画在抽屉上沿透出来、渐隐到可读的表单，
+       * 读起来是一张"玻璃纸"压插画上，而不是一块冷/暖实心板。
+       * `overflow:hidden` 让那层渐变被圆角裁住。
+       */
+      overflow: 'hidden',
       borderTopWidth: tokens['border-width.thin'],
       borderColor: tokens['color.border'],
     },
@@ -492,7 +498,19 @@ function WelcomeScreenInner({
           />
           {/* 🔴 testID 不是给用户看的：设备腿按它定位（`content-desc` 在 MIUI 上
               会被合成的字符串顶掉，精确匹配会落空，而失败信息只会说"入口不在第一屏"）。 */}
-          <Button label={t('mobile.welcome.offline')} onPress={onUseOffline} testID="welcome-offline" fullWidth />
+          {/*
+            🔴 `tone="ghost"`：次要动作应"融入纸面"，不该有一块填充底。
+            默认 secondary 的填充是 `color.surface-sunken` —— 冷灰主题下它和页面底同色（等于看不见），
+            切到暖纸后它就和纸底不同色，浮出一块浅灰 chips（"先离线使用"因此变脏）。
+            ghost = 透明底 + 静音文字，语义也更对（这是一次退路，不是一块按钮板）。
+          */}
+          <Button
+            label={t('mobile.welcome.offline')}
+            onPress={onUseOffline}
+            tone="ghost"
+            testID="welcome-offline"
+            fullWidth
+          />
         </View>
       )}
 
@@ -510,6 +528,30 @@ function WelcomeScreenInner({
             },
           ]}
         >
+          {/*
+            🔴 2026-11-27：「玻璃纸」底板。抽屉本身不再铺实心色，改由这层竖向渐变承托：
+            顶部近乎透明（漫画从抽屉上沿透出来，能看见）→ 迅速收成实心暖纸（表单正文可读）。
+            只用 token 色 + stopOpacity，不写裸 rgba（无硬编码门禁）；圆角由 `sheet` 的 overflow:hidden 裁住。
+          */}
+          <Svg
+            style={StyleSheet.absoluteFillObject}
+            width="100%"
+            height="100%"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Defs>
+              <LinearGradient id="authSheetGlass" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={tokens['color.background']} stopOpacity={0.80} />
+                <Stop offset="0.12" stopColor={tokens['color.background']} stopOpacity={0.92} />
+                <Stop offset="0.28" stopColor={tokens['color.background']} stopOpacity={0.96} />
+                <Stop offset="0.50" stopColor={tokens['color.background']} stopOpacity={0.98} />
+                <Stop offset="1" stopColor={tokens['color.background']} stopOpacity={0.985} />
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill="url(#authSheetGlass)" />
+          </Svg>
           <View style={styles.grabber} />
           <ScrollView
             style={styles.sheetScroll}

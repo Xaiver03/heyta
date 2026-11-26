@@ -776,7 +776,12 @@ export function AuthScreen({
    * 那一档的键盘避让由 `WelcomeScreen` 量键盘高度后抬升抽屉来做，不在这里重复叠加。
    */
   const panel = (
-    <View style={layout.root}>
+    <View style={[layout.root, embedded ? { backgroundColor: 'transparent' } : null]}>
+      {/*
+        内嵌档（欢迎页抽屉）**不自己铺底**：底色由宿主的「玻璃纸」渐变承托；
+        否则这里再铺一层实心暖纸，会把宿主那层半透明渐变整个盖掉、玻璃效果消失。
+        整屏档（从设置进入）仍是独立页面，铺自己的不透明底。
+      */}
       {/*
         整屏档（`!embedded`）：按 Apple HIG *Toolbars/Modality* 给这一屏一条**顶栏**——
         返回在 leading、标题为当前任务名。返回只在这里出现（不再在正文底部重复一条"返回"）。
