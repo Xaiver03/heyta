@@ -192,7 +192,9 @@ test('搜索：贴顶浮层透出下层视图 + 顶栏没有第二个框 + 面�
   const appearance = await card.evaluate((el) => {
     const panel = getComputedStyle(el);
     const inputEl = el.querySelector('input')!;
+    const shellEl = inputEl.closest<HTMLElement>('[data-input-shell="true"]')!;
     const input = getComputedStyle(inputEl);
+    const shell = getComputedStyle(shellEl);
     const ringProbe = document.createElement('span');
     ringProbe.style.cssText = 'position:absolute;visibility:hidden;color:var(--ht-color-ring)';
     document.body.appendChild(ringProbe);
@@ -202,14 +204,24 @@ test('搜索：贴顶浮层透出下层视图 + 顶栏没有第二个框 + 面�
       bg: panel.backgroundColor,
       borderColor: panel.borderTopColor,
       borderStyle: panel.borderTopStyle,
-      outlineStyle: input.outlineStyle,
-      outlineWidth: input.outlineWidth,
-      outlineColor: input.outlineColor,
-      outlineOffset: input.outlineOffset,
-      boxShadow: input.boxShadow,
-      backgroundColor: input.backgroundColor,
-      ringColor,
-      ring: getComputedStyle(document.documentElement).getPropertyValue('--ht-border-width-thick').trim(),
+      inner: {
+        outlineStyle: input.outlineStyle,
+        outlineWidth: input.outlineWidth,
+        outlineColor: input.outlineColor,
+        outlineOffset: input.outlineOffset,
+        boxShadow: input.boxShadow,
+        backgroundColor: input.backgroundColor,
+        ringColor,
+      },
+      shell: {
+        outlineStyle: shell.outlineStyle,
+        outlineWidth: shell.outlineWidth,
+        outlineColor: shell.outlineColor,
+        outlineOffset: shell.outlineOffset,
+        boxShadow: shell.boxShadow,
+        backgroundColor: shell.backgroundColor,
+        ringColor,
+      },
     };
   });
   expect(appearance.bg).not.toBe('rgba(0, 0, 0, 0)');
@@ -218,9 +230,13 @@ test('搜索：贴顶浮层透出下层视图 + 顶栏没有第二个框 + 面�
     appearance.borderColor,
     '浮层画了可见描边（判颜色不判宽度：透明边框不算描边）',
   ).toBe('rgba(0, 0, 0, 0)');
-  const ring = visibleFocusRing(appearance);
-  expect(ring, `输入框的键盘焦点环不见了：读数 ${JSON.stringify(appearance)}`).not.toBeNull();
-  expect(ring!.widthPx, '输入框的键盘焦点环 = 全局那一条').toBe(Number.parseFloat(appearance.ring));
+  expect(
+    visibleFocusRing(appearance.inner),
+    `内层搜索输入不应再自画直角框：读数 ${JSON.stringify(appearance.inner)}`,
+  ).toBeNull();
+  const ring = visibleFocusRing(appearance.shell);
+  expect(ring, `外层搜索输入壳的键盘焦点环不见了：读数 ${JSON.stringify(appearance.shell)}`).not.toBeNull();
+  expect(ring!.widthPx, '外层搜索输入壳焦点环宽度不足').toBeGreaterThanOrEqual(1);
 
   await page.screenshot({ path: 'test-results/search-spotlight-empty.png', fullPage: false });
 

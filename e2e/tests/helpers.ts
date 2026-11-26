@@ -972,8 +972,9 @@ export async function addHabit(page: Page, name: string): Promise<void> {
  * `packages/ui/src/notes/NotesBoard.tsx:241-264`）—— 那是界面自己给自动化留的名字。
  */
 export async function addNote(page: Page, content: string): Promise<void> {
-  await page.getByTestId('notes-input').fill(content);
-  await page.getByTestId('notes-submit').click();
+  const input = page.getByTestId('notes-input');
+  await input.fill(content);
+  await input.press('Enter');
   await expect(
     page.locator('[data-testid^="note-row-"]').filter({ hasText: content }).first(),
     `建了「${content}」但便签板里没有那一张`,

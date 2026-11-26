@@ -160,20 +160,13 @@ test.describe('滴答对齐：逾期色 / 工具条 / 分组说明', () => {
     await page.screenshot({ path: 'test-results/dida-detail-toolbar.png' });
   });
 
-  test('③ 有清单有标签时，两个分组头下各有一句说明；空的那一格不出现', async ({ page }) => {
+  test('③ 分组头下不再有说明文字（AGENTS §0.2）', async ({ page }) => {
     await openApp(page);
-    // 只有清单、还没有标签：清单那一格该有说明，标签那一格该让位给空态文案。
     await createCategory(page, '新建清单', LIST, '创建清单');
     const sidebar = page.locator('nav.ht-sidebar');
-    await expect(sidebar.getByTestId('projects-heading-hint')).toBeVisible();
+    await expect(sidebar.getByTestId('projects-heading-hint')).toHaveCount(0);
     await expect(sidebar.getByTestId('tags-heading-hint')).toHaveCount(0);
     await expect(sidebar.getByText('还没有标签')).toBeVisible();
-
-    await createCategory(page, '新建标签', TAG, '创建标签');
-    await expect(sidebar.getByTestId('tags-heading-hint')).toBeVisible();
-    await expect(sidebar.getByTestId('projects-heading-hint')).toContainText('用清单收纳任务与便签');
-    await expect(sidebar.getByTestId('tags-heading-hint')).toContainText('标签跨清单给任务打记号');
-
     await page.screenshot({ path: 'test-results/dida-sidebar-hints.png' });
   });
 
@@ -250,8 +243,8 @@ test.describe('滴答对齐：逾期色 / 工具条 / 分组说明', () => {
     await switchTheme(page, 'dark');
 
     const sidebar = page.locator('nav.ht-sidebar');
-    await expect(sidebar.getByTestId('projects-heading-hint')).toBeVisible();
-    await expect(sidebar.getByTestId('tags-heading-hint')).toBeVisible();
+    await expect(sidebar.getByTestId('projects-heading-hint')).toHaveCount(0);
+    await expect(sidebar.getByTestId('tags-heading-hint')).toHaveCount(0);
     await expect(sidebar.getByTestId('sidebar-tool-trash')).toBeVisible();
 
     // 暗色下 danger 是**另一个值**：判据必须重新读 token，不许拿亮色那一串比。
@@ -381,33 +374,11 @@ test.describe('滴答对齐：逾期色 / 工具条 / 分组说明', () => {
 
     const drawer = page.locator('nav.ht-sidebar');
     await expect(drawer).toBeVisible();
-    const projectsHint = drawer.getByTestId('projects-heading-hint');
-    const tagsHint = drawer.getByTestId('tags-heading-hint');
-    await expect(projectsHint).toBeVisible();
-    await expect(tagsHint).toBeVisible();
+    await expect(drawer.getByTestId('projects-heading-hint')).toHaveCount(0);
+    await expect(drawer.getByTestId('tags-heading-hint')).toHaveCount(0);
 
     const [drawerBox, trashBox] = [await drawer.boundingBox(), await (await trash.isVisible() ? trash.boundingBox() : null)];
     expect(drawerBox, '量不到抽屉那一列的包围盒').not.toBeNull();
-    /*
-     * 两句说明的窄档判据：**不被裁、不撑出滚动、不占超过两行**。
-     * ⚠️ 刻意不判"必须换行"：390 档实测这两句各自**一行就放下**（看图确认过），
-     * 拿"高度 > 一行"当判据会把一个正确的外观读成缺陷。
-     * `scrollWidth > clientWidth` 才是真形状：文字被 `overflow` 裁掉时元素照样"可见"。
-     */
-    for (const [name, hint] of [['清单那句', projectsHint], ['标签那句', tagsHint]] as const) {
-      const box = await hint.boundingBox();
-      expect(box, `${name}可见却量不到`).not.toBeNull();
-      expect(
-        box!.x + box!.width,
-        `${name}伸出这一列右边缘：到 ${String(Math.round(box!.x + box!.width))}，列宽到 ${String(Math.round(drawerBox!.x + drawerBox!.width))}`,
-      ).toBeLessThanOrEqual(drawerBox!.x + drawerBox!.width + 1);
-      const shape = await hint.evaluate((el) => ({
-        clipped: el.scrollWidth > el.clientWidth + 1,
-        lines: Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)),
-      }));
-      expect(shape.clipped, `${name}在窄栏里被裁掉了（scrollWidth 比可视宽度大）`).toBe(false);
-      expect(shape.lines, `${name}在 390 档占了 ${String(shape.lines)} 行，超过两行就是挤爆了分组头`).toBeLessThanOrEqual(2);
-    }
     // D2 那一行在窄档仍然点得到（抽屉里）。
     expect(trashBox, '抽屉拉开后回收站那一行不在屏幕上').not.toBeNull();
 

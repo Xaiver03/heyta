@@ -143,10 +143,12 @@ test.describe('P0 整改视觉基线', () => {
     await switchView(page, '四象限');
 
     await page.screenshot({ path: `${SHOTS}/w5-quadrant-after.png` });
-    await expect(page.getByText('拖任务到这里')).toHaveCount(1);
-    // 2026-11-24：标题行不再显示计数数字（产品负责人：「不需要显示数字」）。
+    // 2026-11-25：不再有任何操作说明文字；空格只写事实「没有任务」。
+    await expect(page.getByText('拖任务到这里')).toHaveCount(0);
+    await expect(page.getByText('没有任务').first()).toBeVisible();
+    // 标题行不再显示计数数字；底部不再有折叠帮助入口。
     await expect(page.locator('[data-testid^="quadrant-count-"]')).toHaveCount(0);
-    await expect(page.locator('[data-testid="quadrant-help"] summary')).toBeVisible();
+    await expect(page.locator('[data-testid="quadrant-help"]')).toHaveCount(0);
   });
 
   test('W6+W7：详情列四分组 + 可改标题与优先级（1440）', async ({ page }) => {

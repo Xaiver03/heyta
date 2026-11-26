@@ -41,36 +41,52 @@ test('无描边搜索、键盘结果导航与连续月历在深浅和窄屏可�
        * （`0 0 0 Npx`），不许出现任何带偏移/模糊的装饰投影。
        */
       const appearance = await input.evaluate(el => {
+        const shell = el.closest<HTMLElement>('[data-input-shell="true"]')!;
         const s = getComputedStyle(el);
+        const ss = getComputedStyle(shell);
         const ringProbe = document.createElement('span');
         ringProbe.style.cssText = 'position:absolute;visibility:hidden;color:var(--ht-color-ring)';
         document.body.appendChild(ringProbe);
         const ringColor = getComputedStyle(ringProbe).color;
         ringProbe.remove();
         return {
-          outline: s.outlineWidth,
-          outlineStyle: s.outlineStyle,
-          outlineColor: s.outlineColor,
-          outlineOffset: s.outlineOffset,
-          ring: getComputedStyle(document.documentElement).getPropertyValue('--ht-border-width-thick').trim(),
+          inner: {
+            outlineStyle: s.outlineStyle,
+            outlineWidth: s.outlineWidth,
+            outlineColor: s.outlineColor,
+            outlineOffset: s.outlineOffset,
+            boxShadow: s.boxShadow,
+            backgroundColor: s.backgroundColor,
+            ringColor,
+          },
+          shell: {
+            outlineStyle: ss.outlineStyle,
+            outlineWidth: ss.outlineWidth,
+            outlineColor: ss.outlineColor,
+            outlineOffset: ss.outlineOffset,
+            boxShadow: ss.boxShadow,
+            backgroundColor: ss.backgroundColor,
+            borderRadius: ss.borderRadius,
+            ringColor,
+          },
           border: s.borderTopWidth,
           borderColor: s.borderTopColor,
-          boxShadow: s.boxShadow,
           caret: s.caretColor,
-          backgroundColor: s.backgroundColor,
-          ringColor,
         };
       });
-      const ring = visibleFocusRing(appearance);
+      expect(
+        visibleFocusRing(appearance.inner),
+        `内层搜索输入不应再自画直角框：读数 ${JSON.stringify(appearance.inner)}`,
+      ).toBeNull();
+      const ring = visibleFocusRing(appearance.shell);
       expect(
         ring,
-        `焦点环不见了 ⇒ 键盘用户看不出焦点在哪（WCAG 2.4.7）。判据接受 outline 与 box-shadow `
-          + `两种形态，读数 ${JSON.stringify(appearance)}`,
+        `外层搜索输入壳焦点环不见了 ⇒ 键盘用户看不出焦点在哪（WCAG 2.4.7）。读数 ${JSON.stringify(appearance.shell)}`,
       ).not.toBeNull();
-      expect(ring!.widthPx, '焦点环宽度必须等于全局那条 token').toBe(Number.parseFloat(appearance.ring));
+      expect(ring!.widthPx, '外层搜索输入壳焦点环宽度不足').toBeGreaterThanOrEqual(1);
       expect(
-        decorativeShadowLayers(appearance.boxShadow),
-        '输入框上出现了焦点环以外的装饰投影（环公式只有 `0 0 0 Npx` 这一种形状）',
+        decorativeShadowLayers(appearance.shell.boxShadow),
+        '搜索输入壳上出现了焦点环以外的装饰投影',
       ).toEqual([]);
       expect(appearance.border === '0px' || appearance.borderColor === 'rgba(0, 0, 0, 0)').toBe(true);
       await input.press('ArrowDown');

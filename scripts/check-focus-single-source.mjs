@@ -25,8 +25,6 @@ const GLOBAL_FILE = 'borderless-controls.css';
  * 每条例外都必须今天仍命中，否则登记过期即红，避免例外表变成免死金牌。
  */
 const ALLOWED_FOCUS_EXCEPTIONS = [
-  { file: 'assistant-layout.css', selector: '.ht-ai__input:focus-visible', kind: 'suppress' },
-  { file: 'assistant-layout.css', selector: '.ht-ai__composer:has(.ht-ai__input:focus-visible)', kind: 'paint' },
   { file: 'base.css', selector: '.ht-app__detail-resizer:focus-visible::after', kind: 'paint' },
   { file: 'sidebar.css', selector: '.ht-sidebar__resizer:focus-visible::after', kind: 'paint' },
 ];

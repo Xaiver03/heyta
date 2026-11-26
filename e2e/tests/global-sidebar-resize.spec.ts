@@ -35,8 +35,9 @@ test('逐页左右栏连续拖拽：内容不被裁切，窄窗保持操作可�
         if (await row.isVisible()) await row.click();
       }
       if (view === '便签') {
-        await page.getByTestId('notes-input').fill('便签测试：较长的内容在窄列中应自动换行，编辑按钮仍可操作。');
-        await page.getByTestId('notes-submit').click();
+        const noteInput = page.getByTestId('notes-input');
+        await noteInput.fill('便签测试：较长的内容在窄列中应自动换行，编辑按钮仍可操作。');
+        await noteInput.press('Enter');
         await page.locator('[data-testid^="note-edit-"]').first().click();
       }
       if (view === '习惯') {

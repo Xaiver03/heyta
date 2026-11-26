@@ -159,13 +159,19 @@ function checkMobileSheet(panel, composer, mobileScreen) {
 function checkComposeRow(shared) {
   const s = code(shared);
   const problems = [];
-  const order = ['capture-input', 'capture-due-capsule', 'capture-submit'];
+  const order = ['capture-compose', 'capture-input', 'capture-due-capsule'];
   const at = order.map((id) => s.indexOf(`testID="${id}"`));
   for (let i = 0; i < order.length; i += 1) {
-    if (at[i] === -1) problems.push(`${SHARED}: 输入行里没有 ${order[i]} —— 三件套缺了一枚`);
+    if (at[i] === -1) problems.push(`${SHARED}: 输入行里没有 ${order[i]} —— 单行捕获壳不完整`);
   }
   if (at.every((n) => n !== -1) && !(at[0] < at[1] && at[1] < at[2])) {
-    problems.push(`${SHARED}: 输入行三件的顺序不是 输入框 → 胶囊 → 添加`);
+    problems.push(`${SHARED}: 输入行顺序不是 外层容器 → 输入框 → 日期胶囊`);
+  }
+  if (s.includes('testID="capture-submit"')) {
+    problems.push(`${SHARED}: 出现了多余的 capture-submit 按钮 —— 回车即可提交，不许再加提交按钮`);
+  }
+  if (!s.includes("inputShell: 'true'")) {
+    problems.push(`${SHARED}: 外层容器缺少 inputShell 标记 —— 焦点环会落回内层直角输入框`);
   }
   if (!/setPanelOpen\(\(open\) => !open\)/.test(s)) {
     problems.push(`${SHARED}: 胶囊的 onPress 不切面板 —— 那是一枚死按钮（本仓为"三枚假按钮"翻过案）`);
@@ -392,6 +398,16 @@ function selfTest() {
       expectRed: true,
     },
     {
+      name: '多余提交按钮回流：又出现 capture-submit',
+      problems: checkComposeRow(shared.replace('testID="capture-due-capsule"', 'testID="capture-due-capsule"\n testID="capture-submit"')),
+      expectRed: true,
+    },
+    {
+      name: '外层输入壳标记丢失：焦点会落回内层直角输入框',
+      problems: checkComposeRow(shared.replace("inputShell: 'true'", "inputShell: 'false'")),
+      expectRed: true,
+    },
+    {
       name: '没给外壳那一档被写成 null（日历落点的面板静默消失）',
       problems: checkShellTier(shared.replace('? panelContent', '? null'), read(WEB_HOST)),
       expectRed: true,
@@ -596,4 +612,4 @@ if (problems.length > 0) {
   console.error('   细则见 docs/plans/capture-ticktick-alignment-2026-11.md §3、§5。');
   process.exit(1);
 }
-console.log('✅ 收集框：输入行三件、截止只由胶囊说、胶囊能开面板、清除把字送回标题、两端同一档。');
+console.log('✅ 收集框：单行无冗余按钮、外层圆角聚焦壳、截止只由胶囊说、胶囊能开面板、清除把字送回标题、两端同一档。');

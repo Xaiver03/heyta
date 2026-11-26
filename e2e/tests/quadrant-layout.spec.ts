@@ -32,6 +32,13 @@ async function openQuadrant(page: import('@playwright/test').Page): Promise<void
   // 直接走真实的视图切换路径，避免把“侧栏四象限筛选”误当成 2×2 看板入口。
   await switchView(page, '四象限');
   await expect(page.locator('[data-testid^="quadrant-cell-"]').first()).toBeVisible();
+  // 2026-11-25：① 页标题必须是「四象限」，不许被侧栏残留的象限筛选顶成「不重要不紧急」；
+  // ② 页面里不许有任何说明文字（"拖任务到这里"/"帮助"）、不许有计数数字。
+  await expect(page.locator('.ht-header__title'), '四象限页的标题必须是「四象限」').toHaveText('四象限');
+  const board = page.getByTestId('quadrant-board');
+  await expect(board.getByText('拖任务到这里'), '不该有"拖任务到这里"这类说明').toHaveCount(0);
+  await expect(board.getByText('帮助'), '不该有「帮助」折叠入口').toHaveCount(0);
+  await expect(page.locator('[data-testid^="quadrant-count-"]'), '不该显示计数数字').toHaveCount(0);
 }
 
 test('宽窗：四象限是 2×2 十字网格', async ({ page }) => {
@@ -76,4 +83,31 @@ test('窄窗：低于断点优雅降级单列（窗口变化不塌）', async ({
   ).toBeGreaterThanOrEqual(q1!.y + q1!.height - 2);
 
   await page.screenshot({ path: 'test-results/quadrant-narrow.png', fullPage: false });
+});
+
+test('hover 到一条任务：只有那一条变灰，整格不变灰', async ({ page }) => {
+  await page.setViewportSize(WIDE);
+  await openApp(page);
+  const input = page.locator('input[placeholder^="添加任务"]');
+  await input.fill('悬停高亮测试任务');
+  await input.press('Enter');
+  await switchView(page, '四象限');
+  // 这条默认落在「不重要不紧急」那一格。
+  const row = page.getByTestId('quadrant-cell-4').locator('[data-testid^="quadrant-row-"]').first();
+  await expect(row).toBeVisible();
+
+  const bgOf = async (sel: string): Promise<string> =>
+    page.evaluate((s) => {
+      const el = document.querySelector(s);
+      return el === null ? '' : getComputedStyle(el).backgroundColor;
+    }, sel);
+
+  await row.hover();
+  // 🔴 变灰的是**那一条任务**。
+  await expect
+    .poll(() => bgOf('[data-testid^="quadrant-row-"]'))
+    .toBe('rgb(241, 245, 249)');
+  // 整格**不变灰**（产品负责人：「不是整个象限变灰」）。
+  expect(await bgOf('[data-testid="quadrant-cell-4"]'), '整格不该变灰').toBe('rgba(0, 0, 0, 0)');
+  await page.screenshot({ path: 'test-results/quadrant-hover.png', fullPage: false });
 });

@@ -196,7 +196,8 @@ test.describe('R5 · 三条基线链路的点击与层数（现量）', () => {
     await expect(picker, '面板里没有月历').toBeVisible();
     const cell = picker.locator('[role="button"][aria-label$="18日"]').first();
     await cell.click(); // 点击 3
-    await page.getByTestId('capture-submit').click(); // 点击 4
+    await input.focus();
+    await input.press('Enter');
     await expect(
       page.locator('[data-testid^="task-item-"]').filter({ hasText: 'R5 链路①' }),
       '任务没建出来 ⇒ 链路没走完',

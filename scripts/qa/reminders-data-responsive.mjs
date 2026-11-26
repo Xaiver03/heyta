@@ -518,7 +518,7 @@ async function dataJourney(browser, spec) {
   await decidePrivacy(page);
   const input = page.locator('input[placeholder^="添加任务"]');
   await input.fill(`数据管理响应式验收 ${spec.theme} ${spec.width}`);
-  await page.getByTestId('capture-submit').click();
+  await input.press('Enter');
   await openGroup(page, 'data');
   const panel = page.getByTestId('data-settings-panel');
   await panel.waitFor();

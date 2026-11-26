@@ -63,14 +63,17 @@ async function shootFrame(page: Page, name: string, narrow: boolean): Promise<vo
   await page.setViewportSize({ width: narrow ? 375 : 1440, height: narrow ? 720 : 900 });
   await openApp(page);
 
+  const compose = page.getByTestId('capture-compose');
   const input = page.getByTestId('capture-input');
   const capsule = page.getByTestId('capture-due-capsule');
-  const submit = page.getByTestId('capture-submit');
 
-  // ① 输入行三件都在，而且**只有**这三件（第四件就是"铺开式控件"复发）。
+  // ① 单行输入壳：外框、输入框、日期胶囊都在，且无多余提交按钮（回车提交）。
+  await expect(compose).toBeVisible();
   await expect(input).toBeVisible();
   await expect(capsule).toBeVisible();
-  await expect(submit).toBeVisible();
+  await expect(page.getByTestId('capture-submit'), '回车即提交，不应渲染提交按钮').toHaveCount(0);
+  const composeBox = (await compose.boundingBox())!;
+  expect(composeBox.height, `单行输入框过高（实测 ${String(composeBox.height)}px）`).toBeLessThanOrEqual(56);
 
   // ② 打字：截止由胶囊说，框下那一行此刻**一行都不挂**。
   await input.fill(SENTENCE);

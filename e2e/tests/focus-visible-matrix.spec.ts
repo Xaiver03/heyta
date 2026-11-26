@@ -103,32 +103,28 @@ async function openCalendar(page: Page): Promise<void> {
   await expect(page.locator('.ht-header__title')).toContainText('日历');
 }
 
-test('正对照臂：文本输入必须始终有可见焦点环', async ({ page }) => {
+test('正对照臂：复合文本输入容器必须由外层圆角框承接焦点环，内层不画直角框', async ({ page }) => {
   const consoleLines = watchConsole(page);
   await openApp(page, APP_ZH);
 
-  const composer = page.locator('input[placeholder^="添加任务"]');
+  const shell = page.getByTestId('capture-compose');
+  const composer = page.getByTestId('capture-input');
   await composer.click();
   await page.keyboard.press('Tab');
   await page.keyboard.press('Shift+Tab');
   await expect(composer).toBeFocused();
 
-  /*
-   * 🔴 2026-11-03 改判据（**不是放宽**）：原来量 `outline-style !== 'none'`。
-   * 输入类控件的环同一天从 `outline` 换成了 `box-shadow` —— 理由是 WebKit 的
-   * `outline` 不跟随 `border-radius`，产品负责人看着对话输入框问「为什么这个对话框
-   * 还是没有圆角」。环还在画面上（`e2e/test-results/focus-visible-matrix-正对照臂…/
-   * test-failed-1.png` 那圈蓝环清楚可见且跟着圆角走），只是不再画在 `outline` 上。
-   * 所以这里改成共用判据 `visibleFocusRing()`：`outline` 形态与 `box-shadow` 形态
-   * 都算，且 `box-shadow` 那一支要求 0 偏移 / 0 模糊 / spread > 0 / 颜色 = `--ht-color-ring`
-   * —— 装饰投影不会被认成焦点环（牙齿在这里）。
-   */
   const focusVisible = await composer.evaluate((el) => el.matches(':focus-visible'));
   await page.screenshot({ path: 'test-results/focus-positive-input.png' });
 
   expect(focusVisible, '正对照臂没有进入 :focus-visible，探针通路失效').toBe(true);
-  const ring = await expectFocusRing(composer, { minWidthPx: 1, message: '文本输入焦点环不见了' });
-  expect(ring.widthPx, `文本输入焦点环只有 ${String(ring.widthPx)}px`).toBeGreaterThanOrEqual(1);
+  const innerState = await readFocusState(page, '[data-testid="capture-input"]');
+  expect(
+    visibleFocusRing(innerState),
+    `内层输入不应再自画直角焦点框：读数 ${JSON.stringify(innerState)}`,
+  ).toBeNull();
+  const ring = await expectFocusRing(shell, { minWidthPx: 1, message: '外层输入壳焦点环不见了' });
+  expect(ring.widthPx, `外层输入壳焦点环只有 ${String(ring.widthPx)}px`).toBeGreaterThanOrEqual(1);
   expect(consoleLines, `焦点探针期间出现控制台错误：${consoleLines.join('\n')}`).toEqual([]);
 });
 
@@ -179,10 +175,18 @@ test('🔴 当前已选中的 rail tab 聚焦时必须有独立焦点环，且�
  */
 function measureRingBand(page: Page, selector: string | null) {
   return page.evaluate((target) => {
-    const el = target === null
+    const raw = target === null
       ? document.activeElement as HTMLElement | null
       : document.querySelector<HTMLElement>(target);
-    if (!el) throw new Error(`找不到焦点环测量目标：${String(target ?? 'activeElement')}`);
+    if (!raw) throw new Error(`找不到焦点环测量目标：${String(target ?? 'activeElement')}`);
+    // 复合输入容器内的文本输入将焦点环交由外层圆角容器承接，测量时指向承接环的那个元素。
+    const isTextInput = raw.matches(
+      "input:not([type='checkbox']):not([type='radio']), textarea, select, [contenteditable='true']",
+    );
+    const shell = isTextInput
+      ? raw.closest<HTMLElement>("[data-input-shell='true'], .ht-ai__composer, .ht-note-editor")
+      : null;
+    const el = shell ?? raw;
     const style = getComputedStyle(el);
     const box = el.getBoundingClientRect();
     const ringProbe = document.createElement('span');

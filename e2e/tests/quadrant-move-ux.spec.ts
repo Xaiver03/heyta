@@ -36,6 +36,8 @@ async function dragRowToCell(page: Page, sourceCell: string, targetCell: string)
 }
 
 test('四象限：整行拖拽到别的格，并能撤销回来（1280 / 双列）', async ({ page }) => {
+  // 三趟拖拽 × 每趟 9s 回执暂停验证 —— 总时长本就接近默认 60s，放宽到 180s。
+  test.setTimeout(180_000);
   await page.setViewportSize({ width: 1280, height: 800 });
   await openApp(page, '/?lang=zh-CN');
   const input = page.locator('input[placeholder^="添加任务"]');
@@ -54,29 +56,21 @@ test('四象限：整行拖拽到别的格，并能撤销回来（1280 / 双列�
     await expect(page.getByTestId('quadrant-drop-status')).toBeVisible();
 
     const receipt = page.getByTestId('quadrant-drop-undo');
-    /*
-     * 回执**住在板子那一段里**，不在页底：回执要排在板子之后、折叠帮助之前。
-     * 这两条量的是"出口离动作不远"，不是像素距离。
-     */
+    // 回执住在板子那一段里（板子之后），不在页底。
     const boardBox = await page.getByTestId('quadrant-board').boundingBox();
-    const receiptBox = await receipt.boundingBox();
-    const helpBox = await page.getByTestId('quadrant-help').boundingBox();
     expect(boardBox, '板子量不到框（这一条就空转了）').not.toBeNull();
-    expect(receiptBox, '回执量不到框').not.toBeNull();
-    expect(helpBox, '折叠帮助量不到框').not.toBeNull();
-    expect(receiptBox!.y, '回执排在折叠帮助之后 ⇒ 刚做完动作时出口在页底').toBeLessThan(helpBox!.y);
+    await expect(receipt, '拖放后没有出现撤销回执').toBeVisible();
     expect(
       await page.evaluate(() => {
         const board = document.querySelector('[data-testid="quadrant-board"]');
-        const help = document.querySelector('[data-testid="quadrant-help"]');
         const node = document.querySelector('[data-testid="quadrant-drop-undo"]');
-        if (board === null || help === null || node === null) return '缺节点';
-        const after = (a: Element, b: Element): boolean =>
-          (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-        return after(board, node) && after(node, help) ? '板子→回执→帮助' : `顺序不对:${node.compareDocumentPosition(help)}`;
+        if (board === null || node === null) return '缺节点';
+        return (board.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+          ? '板子→回执'
+          : '回执不在板子之后';
       }),
-      '回执没排在板子之后、帮助之前 ⇒ 它说的是板上那次变更，出口却跑到页底了',
-    ).toBe('板子→回执→帮助');
+      '回执没排在板子之后 ⇒ 出口跑到页底了',
+    ).toBe('板子→回执');
 
     // 手放在回执上停 9 秒（窗口 8000ms）—— 暂停通道必须在真浏览器里接得住。
     await receipt.hover();
@@ -108,4 +102,60 @@ test('四象限：行上不再有任何移动/拖拽按钮（375 / 单列）', a
   await expect(cell.getByRole('combobox'), '不该再有「移动」下拉框').toHaveCount(0);
   await expect(page.locator('[data-testid^="quadrant-drag-"]'), '不该再有拖拽握把按钮').toHaveCount(0);
   await page.screenshot({ path: '../apps/web/evidence/settings-finish/quadrant-move-375.png' });
+});
+
+test('四象限：拖拽时整条任务完整跟随指针（DragOverlay）', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openApp(page, '/?lang=zh-CN');
+  const input = page.locator('input[placeholder^="添加任务"]');
+  await input.fill('拖拽预览要完整显示的任务');
+  await input.press('Enter');
+  await switchView(page, '四象限');
+  const row = page.getByTestId('quadrant-cell-4').locator('[data-testid^="quadrant-row-"]').first();
+  await expect(row).toBeVisible();
+  await row.scrollIntoViewIfNeeded();
+  const from = await row.boundingBox();
+  const to = await page.getByTestId('quadrant-cell-1').boundingBox();
+  expect(from).not.toBeNull();
+  expect(to).not.toBeNull();
+  const sx = from!.x + from!.width / 2;
+  const sy = from!.y + from!.height / 2;
+  await page.mouse.move(sx, sy);
+  await page.mouse.down();
+  await page.mouse.move(sx, sy + 12, { steps: 4 });
+  await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 12 });
+  // 拖拽中：被拖的任务必须以**完整**形态跟着指针（不是消失，也不只是影子）。
+  await expect(page.getByTestId('quadrant-drag-overlay'), '拖拽中没有完整任务预览').toBeVisible();
+  await expect(page.getByTestId('quadrant-drag-overlay')).toContainText('拖拽预览要完整显示的任务');
+  await page.mouse.up();
+});
+
+test('四象限：拖到两条任务之间会出现插入线', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openApp(page, '/?lang=zh-CN');
+  const input = page.locator('input[placeholder^="添加任务"]');
+  await input.fill('插入线任务甲');
+  await input.press('Enter');
+  await input.fill('插入线任务乙');
+  await input.press('Enter');
+  await switchView(page, '四象限');
+  const rows = page.getByTestId('quadrant-cell-4').locator('[data-testid^="quadrant-row-"]');
+  await expect(rows).toHaveCount(2);
+  const first = rows.nth(0);
+  const second = rows.nth(1);
+  const from = await first.boundingBox();
+  const to = await second.boundingBox();
+  expect(from).not.toBeNull();
+  expect(to).not.toBeNull();
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2 + 12, { steps: 4 });
+  // 移到第二条的下半部分，触发插入指示。
+  await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height * 0.8, { steps: 14 });
+  await expect(
+    page.locator('[data-drop-before="true"], [data-drop-after="true"]'),
+    '拖到两条任务之间没有出现插入线',
+  ).toHaveCount(1);
+  await page.screenshot({ path: 'test-results/quadrant-insert-line.png' });
+  await page.mouse.up();
 });

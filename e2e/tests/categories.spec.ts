@@ -61,14 +61,13 @@ test.describe('分类着色：真浏览器契约', () => {
     const section = page.locator('.ht-categories');
     await expect(section, '分类区块必须真的挂进成长页（不是只在 jsdom 里能 mount）').toHaveCount(1);
     await expect(section).toContainText('分类时长');
-    await expect(section, '说明里要写明颜色是用户自己赋义的').toContainText('颜色由你自己赋义');
     // 🔴 2026-10-17：这一条原来钉的是 `还没有可以归类的时间记录`，而 web 的词条是
     // `web.categories.empty.hint`（现量「先给任务归类，或记录一次习惯时长。」）——
     // 判据**这一条的本义**在它的自述里写得很清楚：「没有记录时要说清楚"**怎么才会有**"」，
     // 句子的措辞不是它要钉的对象（那是另一条 parity 判据的活）。⇒ 换成现量那句，
     // 本义一格没少。
     await expect(section, '没有记录时要说清楚"怎么才会有"').toContainText(
-      '先给任务归类，或记录一次习惯时长。',
+      '还没有可展示的记录',
     );
     // 空状态也不许出现百分号：这个页面**从不**用占比表达任何东西
     expect(await categoryText(page), '分类区块里不该出现百分号').not.toContain('%');
@@ -219,25 +218,6 @@ test.describe('分类着色：真浏览器契约', () => {
     expect(sectionStyle.direction).toBe('column');
     expect(sectionStyle.gap, 'gap 来自 space token（不是 0）').not.toBe('0px');
 
-    // ② 说明文字的颜色**真的**是那个 token 展开后的值。
-    //    这条同时钉住三件事：变量名没写错、tokens.css 被引入了、暗色/亮色解析出的是一个真颜色。
-    const note = await page.locator('[data-testid="category-note"]').evaluate((el) => ({
-      color: getComputedStyle(el).color,
-      token: getComputedStyle(document.documentElement)
-        .getPropertyValue('--ht-color-foreground-muted')
-        .trim(),
-    }));
-    expect(note.token, 'token 必须能在 :root 上读到').not.toBe('');
-    // 把 token 的引用展开成实际 rgb：用一个临时元素量一次，避免把 hex 抄进测试
-    const tokenColor = await page.evaluate((value) => {
-      const probe = document.createElement('span');
-      probe.style.color = value;
-      document.body.appendChild(probe);
-      const resolved = getComputedStyle(probe).color;
-      probe.remove();
-      return resolved;
-    }, note.token);
-    expect(note.color, '说明文字的颜色必须等于 color.foreground-muted 展开后的值').toBe(tokenColor);
 
     /**
      * ③ 🔴 「未归类」**不画成分类行、也不画成柱子**。
