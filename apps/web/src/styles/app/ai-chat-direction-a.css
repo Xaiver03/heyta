@@ -94,6 +94,130 @@
   inline-size: 100%;
 }
 
+/* Markdown 回答：与移动端同一套语义，只是原语是 DOM。 */
+.ht-ai__markdown {
+  display: block;
+  inline-size: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.ht-ai__markdown > :first-child {
+  margin-block-start: 0;
+}
+
+.ht-ai__markdown > :last-child {
+  margin-block-end: 0;
+}
+
+.ht-ai__markdown p {
+  margin: 0 0 var(--ht-space-2);
+}
+
+.ht-ai__markdown h1,
+.ht-ai__markdown h2,
+.ht-ai__markdown h3,
+.ht-ai__markdown h4,
+.ht-ai__markdown h5,
+.ht-ai__markdown h6 {
+  margin: var(--ht-space-3) 0 var(--ht-space-1);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+}
+
+.ht-ai__markdown h1 {
+  font-size: var(--ht-font-size-2xl);
+}
+
+.ht-ai__markdown h2 {
+  font-size: var(--ht-font-size-xl);
+}
+
+.ht-ai__markdown h3 {
+  font-size: var(--ht-font-size-lg);
+}
+
+.ht-ai__markdown h4,
+.ht-ai__markdown h5,
+.ht-ai__markdown h6 {
+  font-size: var(--ht-font-size-base);
+}
+
+.ht-ai__markdown ul,
+.ht-ai__markdown ol {
+  margin: 0 0 var(--ht-space-2);
+  padding-inline-start: var(--ht-space-4);
+}
+
+.ht-ai__markdown li + li {
+  margin-block-start: var(--ht-space-1);
+}
+
+.ht-ai__markdown code {
+  padding: 0 var(--ht-space-1);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface-sunken);
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-ai__markdown pre {
+  margin: 0 0 var(--ht-space-2);
+  padding: var(--ht-space-3);
+  overflow-x: auto;
+  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-ai__markdown pre code {
+  padding: 0;
+  background: none;
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-ai__markdown blockquote {
+  margin: 0 0 var(--ht-space-2);
+  padding-inline-start: var(--ht-space-3);
+  border-inline-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-ai__markdown a {
+  color: var(--ht-color-primary);
+  text-decoration: underline;
+}
+
+.ht-ai__markdown table {
+  inline-size: 100%;
+  margin: 0 0 var(--ht-space-2);
+  border-collapse: collapse;
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-ai__markdown th,
+.ht-ai__markdown td {
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
+  text-align: start;
+}
+
+.ht-ai__markdown th {
+  background: var(--ht-color-surface-subtle);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-ai__markdown hr {
+  margin: var(--ht-space-3) 0;
+  border: 0;
+  border-block-start: var(--ht-border-width-hairline) solid var(--ht-color-border);
+}
+
+.ht-ai__markdown img {
+  max-inline-size: 100%;
+  border-radius: var(--ht-radius-sm);
+}
+
 /* 记忆行：一条数据，不是一段对话 —— 不用气泡，只做可折叠的一行。 */
 .ht-ai__item--memory {
   inline-size: 100%;

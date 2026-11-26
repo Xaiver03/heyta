@@ -623,6 +623,18 @@ export type LocalApiWriteIntent =
    */
   | { action: 'create-tag'; name: string }
   /**
+   * 记住一条用户明确说过的长期信息（USER_MEMORY）。
+   *
+   * 只收一句话与 kinds；`origin` / `status` / `topicKey` / 指纹全部由宿主按
+   * `app-host/src/user-memory-actions.ts` 的规则算 —— 模型不该决定这些。
+   * 这条写入**必须确认**（记忆会进入之后每一轮）。
+   */
+  | {
+      action: 'remember-memory';
+      text: string;
+      kind?: 'profile' | 'preference' | 'fact' | 'task';
+    }
+  /**
    * 给一条任务**整组覆盖**标签（TAG）。空数组 = 清空 —— 这是界面里的那个动作，
    * 不是"追加"：追加要由调用方先把现有 id 读回来再交全集。
    *

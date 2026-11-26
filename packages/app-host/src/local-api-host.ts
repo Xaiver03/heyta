@@ -43,6 +43,7 @@ import type {
   LocalApiHabitLog,
   LocalApiHost,
   LocalApiItem,
+  LocalApiMemory,
   LocalApiComment,
   LocalApiNote,
   LocalApiNoteRow,
@@ -73,6 +74,7 @@ import {
   localDateTimeToEpoch,
   dueLocalDateOf,
   groupTasksBySection,
+  liveMemoryItems,
   localTimeOf,
   toLocalDate,
   noteProjectId,
@@ -103,6 +105,7 @@ import {
   type Note,
   type Reminder,
   type Task,
+  type UserMemory,
 } from '@heyta/domain';
 
 import type { ActionContext, TaskActions, TaskDetailsPatch } from './actions.js';
@@ -122,6 +125,7 @@ import { createAttachmentActions, type AttachmentActions } from './attachment-ac
 import type { AttachmentBlobPort } from './attachment-http.js';
 import { ListNotSharedError, type CommentActions } from './comment-actions.js';
 import { createSectionActions, type SectionActions } from './section-actions.js';
+import { createUserMemoryActions, type UserMemoryActions } from './user-memory-actions.js';
 import { readDurationFromNote } from './duration-note.js';
 import { selectDurationHistory } from './ai-duration.js';
 
@@ -555,6 +559,8 @@ export function createLocalApiHost(
   );
   // 保存筛选（FILTER）：纯个人数据，只经 ctx（个人 op-log）。
   const filterActions = createFilterActions(ctx);
+  // 陈述记忆（USER_MEMORY）：写走同一族 action，读只投影 active。
+  const userMemoryActions = createUserMemoryActions(ctx, { now });
 
   const host: LocalApiHost = {
     listTasks: (args) => {
@@ -766,6 +772,17 @@ export function createLocalApiHost(
     listAttachments: (taskId) =>
       Promise.resolve(attachmentActions.attachmentsForTask(taskId).map(attachmentToItem)),
 
+    // 陈述记忆（USER_MEMORY）：只给 active，且投影成三个出境字段。
+    listMemories: () =>
+      Promise.resolve(
+        liveMemoryItems(
+          Object.values(ctx.getState().userMemories) as UserMemory[],
+          now(),
+        ).map(
+          (m): LocalApiMemory => ({ id: m.id, kind: m.kind, text: m.text }),
+        ),
+      ),
+
     submit: (intent) =>
       submitIntent(
         ctx,
@@ -780,6 +797,7 @@ export function createLocalApiHost(
         commentActions,
         filterActions,
         sectionActions,
+        userMemoryActions,
         now,
         intent,
       ),
@@ -837,10 +855,33 @@ async function submitIntent(
   commentActions: CommentActions | undefined,
   filterActions: FilterActions,
   sectionActions: SectionActions,
+  userMemoryActions: UserMemoryActions,
   now: () => number,
   intent: LocalApiWriteIntent,
 ): Promise<LocalApiWriteResult> {
   switch (intent.action) {
+    case 'remember-memory': {
+      const text = intent.text.trim();
+      if (text === '') {
+        return { ok: false, reason: 'invalid', message: '记忆正文不能为空。' };
+      }
+      try {
+        const id = await userMemoryActions.add({
+          kind: intent.kind ?? 'fact',
+          text,
+          // 用户确认过提案才走到这里 ⇒ 是"用户认可的陈述"，不是后台推断。
+          origin: 'stated',
+        });
+        return { ok: true, taskId: id };
+      } catch (error: unknown) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: error instanceof Error ? error.message : '这条记忆没有写入。',
+        };
+      }
+    }
+
     case 'create-task': {
       if (intent.title.trim() === '') {
         return { ok: false, reason: 'invalid', message: '标题不能为空。' };

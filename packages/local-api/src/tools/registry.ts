@@ -28,6 +28,7 @@ import { taskToolPack } from './task.js';
 import { attachmentToolPack } from './attachment.js';
 import { filterToolPack } from './filter.js';
 import { sectionToolPack } from './section.js';
+import { memoryToolPack } from './memory.js';
 
 /**
  * 已注册的实体工具包。**数组顺序就是目录顺序的一部分，改动要按下面这条规则验。**
@@ -55,6 +56,8 @@ export const LOCAL_API_TOOL_PACKS: readonly EntityToolPack[] = [
   filterToolPack,
   // ADR-0091：清单内分组（SECTION）—— 用户自建分组，读写工具同批落地。
   sectionToolPack,
+  // 陈述记忆（USER_MEMORY）：读 list_memories + 写 remember_memory（必须确认）。
+  memoryToolPack,
 ];
 
 export interface ToolPackRegistry {

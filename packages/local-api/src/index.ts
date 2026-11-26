@@ -141,6 +141,7 @@ export {
   type LocalApiReminder,
   type LocalApiSection,
   type LocalApiTag,
+  type LocalApiMemory,
   type LocalApiTaskEstimateContext,
 
   type ListEventsQuery,

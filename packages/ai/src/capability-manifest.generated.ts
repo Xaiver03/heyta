@@ -105,9 +105,9 @@ export const AI_CAPABILITY_MANIFEST =
     'source': 'ADR-0045 §2.6 纪律二',
   },
   'coverage': {
-    'covered': 13,
+    'covered': 14,
     'denominator': 15,
-    'ratio': '13/15',
+    'ratio': '14/15',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -161,7 +161,6 @@ export const AI_CAPABILITY_MANIFEST =
     },
   ],
   'entityTypesWithoutTools': [
-    'USER_MEMORY',
     'CALENDAR_EVENT',
   ],
   'entities': [
@@ -326,9 +325,13 @@ export const AI_CAPABILITY_MANIFEST =
       'entityType': 'USER_MEMORY',
       'materialized': true,
       'countsTowardCoverage': true,
-      'coverage': 'none',
-      'readToolNames': [] as const,
-      'writeToolNames': [] as const,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_memories',
+      ],
+      'writeToolNames': [
+        'remember_memory',
+      ],
     },
     {
       'entityType': 'REMINDER',
@@ -684,6 +687,14 @@ export const AI_CAPABILITY_MANIFEST =
           'required': true,
         },
       ],
+    },
+    {
+      'name': 'list_memories',
+      'kind': 'read',
+      'entityType': 'USER_MEMORY',
+      'description': '列出已经记住的、关于这位用户的长期信息（身份 / 偏好 / 稳定事实 / 在办事项）。只在需要确认"我是不是已经知道这件事"时用，不要为了显得贴心而每次都读。',
+      'schemaRecorded': true,
+      'args': [] as const,
     },
     {
       'name': 'create_task',
@@ -2213,6 +2224,25 @@ export const AI_CAPABILITY_MANIFEST =
         },
       ],
     },
+    {
+      'name': 'remember_memory',
+      'kind': 'write',
+      'entityType': 'USER_MEMORY',
+      'description': '记住一条用户**明确说过**的长期信息（偏好、身份、稳定事实、在办事项）。一条一句话；不要从猜测里编。会先让用户确认，确认后才生效。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'text',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'kind',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
   ],
   'protocolTypesWithoutModel': [
     'TASK_REPEAT_CFG',
@@ -2237,13 +2267,13 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 15 个，其中 13 个**读和写都有**工具（13/15）。',
+  '覆盖口径：用户可操作的已物化实体 15 个，其中 14 个**读和写都有**工具（14/15）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
-  '一、有 AI 工具的实体（13 个）',
+  '一、有 AI 工具的实体（14 个）',
   '- TASK —— 读和写都有（读 3 / 写 29）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
@@ -2322,6 +2352,9 @@ export const AI_CAPABILITY_TEXT = [
   '- FOCUS_SESSION —— 读和写都有（读 1 / 写 1）',
   '  · [读] list_focuses（limit:number）',
   '  · [写] log_focus（kind*:string, plannedMinutes*:number, actualMinutes:number, taskId:string, completed:boolean）',
+  '- USER_MEMORY —— 读和写都有（读 1 / 写 1）',
+  '  · [读] list_memories（无参数）',
+  '  · [写] remember_memory（text*:string, kind:string）',
   '- REMINDER —— 读和写都有（读 1 / 写 3）',
   '  · [读] list_reminders（taskId:string）',
   '  · [写] create_reminder（taskId*:string, date:string, time:string, minutesBeforeDue:number）',
@@ -2357,8 +2390,7 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] set_task_section（taskId*:string, sectionId:string）',
   '  · [写] delete_section（sectionId*:string）',
   '',
-  '二、产品里有、但我没有任何工具的实体（2 个）—— 实体存在，只是我没配工具',
-  '- USER_MEMORY：产品支持它，但我没有任何工具 —— 别说产品做不到。',
+  '二、产品里有、但我没有任何工具的实体（1 个）—— 实体存在，只是我没配工具',
   '- CALENDAR_EVENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '',
   '三、不计入上面分母的已物化实体（设计如此，不是遗漏）',

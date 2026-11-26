@@ -305,6 +305,9 @@ const ENTITY_NOUNS = new Map(
     // `update_filter_rule` / `rename_filter` / `delete_filter` —— 从尾往前找命中 `filter(s)`。
     filter: 'FILTER',
     filters: 'FILTER',
+    // 陈述记忆（USER_MEMORY）：工具名 `list_memories` / `remember_memory`。
+    memory: 'USER_MEMORY',
+    memories: 'USER_MEMORY',
   }),
 );
 

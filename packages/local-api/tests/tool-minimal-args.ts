@@ -141,4 +141,8 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   reorder_section: { sectionId: 'sec-1', order: 1 },
   set_task_section: { taskId: 't1', sectionId: 'sec-1' },
   delete_section: { sectionId: 'sec-1' },
+
+  // 陈述记忆（USER_MEMORY）
+  list_memories: {},
+  remember_memory: { text: '回答先给结论' },
 };

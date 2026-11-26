@@ -679,14 +679,18 @@ describe('过程可见与失败', () => {
     expect(trace).toContain('1');
   });
 
-  it('没调用工具时明说（不留一行空白让人以为坏了）', async () => {
+  it('没调用工具时不画过程行（界面里没有假组件）', async () => {
     const host = fakeHost();
     const { impl } = scriptedFetch([{ kind: 'text', text: '你好' }]);
     const el = await render({ host, fetchImpl: impl });
     await type(el, '你好');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
-    expect(el.querySelector('[data-testid="ai-chat-trace"]')?.textContent).toContain('没有调用工具');
+    // 🔴 2026-11-26 行为改变：原先是"明说没有调用工具"，那一行对每一轮
+    // 无工具的问答都出现一次，既是假组件（没有过程），又把答案区撑长。
+    // 现在没有步骤就什么都不画；答案本身可见，不存在"空白一块"。
+    expect(el.querySelector('[data-testid="ai-chat-trace"]')).toBeNull();
+    expect(el.querySelector('[data-testid="ai-chat-assistant-text"]')?.textContent).toContain('你好');
   });
 
   it('触顶 ⇒ 停下来并说明停在哪一个上界', async () => {

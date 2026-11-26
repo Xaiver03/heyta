@@ -1,4 +1,5 @@
 import { AssistantIcon } from './AssistantIcon.js';
+import { MarkdownMessage } from './MarkdownMessage.js';
 import { Button } from '../../components/hta/index.js';
 import { useImageAttach } from './ImageAttach.js';
 import type { EncodedImage } from './image-encode.js';
@@ -999,7 +1000,11 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                     而它们恰恰是用户判断"这个结论可不可信"的依据。
                   */}
                   <ChatSteps steps={item.steps} t={t} locale={locale} />
-                  <span className="ht-ai__assistant-text">{item.text}</span>
+                  <MarkdownMessage
+                    text={item.text}
+                    className="ht-ai__assistant-text"
+                    testId="ai-chat-assistant-text"
+                  />
                   {!suppressMiddleLabel && (
                     <AiGeneratedLabel
                       label={t('common.ai.generatedLabel')}
@@ -1088,7 +1093,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
               */}
               {revealedText !== '' && (
                 <>
-                  <span data-testid="ai-chat-live-text">{revealedText}</span>
+                  <MarkdownMessage text={revealedText} testId="ai-chat-live-text" />
                   {/*
                     🔴 光标只在**流还没结束**时出现。
                     结束了还留着会让用户以为还在生成 —— 那比没有光标更糟。
@@ -1554,7 +1559,9 @@ function LiveTraceGroup(props: {
         onClick={onSummaryClick}
         onKeyDown={onSummaryKeyDown}
       >
-        <span>{t('web.ai.chat.callingTools')}</span>
+        <span>
+          {rows.length > 0 ? t('web.ai.chat.callingTools') : t('web.ai.chat.thinking')}
+        </span>
         <ChevronDown
           size={ICON_SIZE.xs}
           className={
@@ -1586,17 +1593,13 @@ function ChatSteps(props: {
   steps: readonly AssistantStep[];
   t: I18nValue['t'];
   locale: I18nValue['locale'];
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const { t, locale } = props;
   const { collapsed, onSummaryClick, onSummaryKeyDown } = useRowCollapse();
 
-  if (props.steps.length === 0) {
-    return (
-      <p className="ht-ai__trace-quiet" data-testid="ai-chat-trace">
-        {t('web.ai.chat.noTrace')}
-      </p>
-    );
-  }
+  // 🔴 没有步骤就**什么都不画**：一行「没有调用工具」既是假组件，
+  // 又把"这轮没做事"伪装成一条过程信息。判据是 `steps.length === 0`。
+  if (props.steps.length === 0) return null;
 
   const failed = props.steps.filter((s) => !s.ok).length;
   return (

@@ -104,6 +104,10 @@ export function aiToolProposalRequiresConfirmation(proposal: AiToolProposal): bo
       return true;
     case 'set-task-tags':
       return proposal.intent.tagIds.length === 0;
+    // 记忆会进入之后每一轮 system prompt —— 写错一条不是一次答错，
+    // 而是之后每一轮都带着错前提。必须确认，不由 AI 自动落库。
+    case 'remember-memory':
+      return true;
     case 'update-note':
     case 'update-event':
       return true;

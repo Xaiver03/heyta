@@ -75,14 +75,20 @@
 
 ### P0 · Web Markdown（最小可感知）
 
+> **2026-11-26 已落地**：Web 用 `markdown-it`（`html:false`）渲染标题/段落/列表/代码/表格/引用/链接，流式与最终回答共用；移动端原已有渲染器。XSS 判据见 `apps/web/tests/assistant-markdown.spec.tsx`。
+
+
 | 项 | 内容 |
 |---|---|
 | 做什么 | `packages/ui/src/markdown`：解析（marked 或自研，**先查许可证与 2021 后维护**）→ 渲染标题/段落/列表/代码/表格/引用/链接；web 接入；mobile 复用同一套 token 映射 |
-| 不做什么 | 不用 `dangerouslySetInnerHTML` 直出未消毒 HTML；不引入 TDesign |
+| 不做什么 | 不直出未消毒 HTML；不引入 TDesign |
 | 验收（能失败） | ① 一段包含标题/列表/表格/代码/链接的回答在 web 与 mobile 上渲染结构一致（截图 + 断言）；② 代码块有语言标与复制；③ 表格横向溢出可滚；④ `check:ui-language` 不新增硬编码文案；⑤ 无裸值（`pnpm check:design`） |
 | 估 | 2–3 天 |
 
 ### P1 · 段模型（过程可读）
+
+> **2026-11-26 部分落地**：流式事件已有 `tool-started` / `tool-finished` / `reasoning`，Web 与移动端都在跑的时候显示过程行；完成的回答用「用了 N 步工具」折叠区，**没有步骤时不再画一行假的『没有调用工具』**。段模型持久化与工具结果一句话摘要尚未做。
+
 
 | 项 | 内容 |
 |---|---|

@@ -33,7 +33,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  * （所以跨设备同步），但那是**同步**，不是**出境**。
  */
 
-import { Check, EyeOff, Plus, RotateCcw, X } from 'lucide-react';
+import { Check, EyeOff, Pencil, Plus, RotateCcw, X } from 'lucide-react';
 
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { useState } from 'react';
@@ -103,6 +103,7 @@ export interface MemoryPanelProps {
    */
   memories?: readonly UserMemory[];
   onAddMemory?: (text: string) => void;
+  onUpdateMemory?: (id: string, text: string) => void;
   onForgetMemory?: (id: string) => void;
   onConfirmMemory?: (id: string) => void;
   onDismissMemory?: (id: string) => void;
@@ -122,9 +123,12 @@ function StatedMemorySection(props: {
   onForget?: (id: string) => void;
   onConfirm?: (id: string) => void;
   onDismiss?: (id: string) => void;
+  onUpdate?: (id: string, text: string) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
+  const [editingId, setEditingId] = useState<string>();
+  const [editDraft, setEditDraft] = useState('');
   const active = props.memories.filter((m) => m.status === 'active' && m.text.trim() !== '');
   const pending = props.memories.filter((m) => m.status === 'pending' && m.text.trim() !== '');
 
@@ -133,6 +137,13 @@ function StatedMemorySection(props: {
     if (text === '' || props.onAdd === undefined) return;
     props.onAdd(text);
     setDraft('');
+  };
+
+  const saveEdit = (id: string): void => {
+    const text = editDraft.trim();
+    if (text === '' || props.onUpdate === undefined) return;
+    props.onUpdate(id, text);
+    setEditingId(undefined);
   };
 
   return (
@@ -146,18 +157,67 @@ function StatedMemorySection(props: {
         <ul className="ht-settings__list" data-testid="memory-stated">
           {active.map((m) => (
             <li className="ht-settings__item" key={m.id} data-testid={`memory-stated-${m.id}`}>
-              <span className="ht-settings__toggle-body">
-                <span className="ht-settings__hint">{t(KIND_LABEL[m.kind])}</span>
-                <span className="ht-settings__toggle-label">{m.text}</span>
-              </span>
-              <Button
-                tone="ghost"
-                data-testid={`memory-stated-forget-${m.id}`}
-                aria-label={t('web.memory.stated.forgetAria', { text: m.text })}
-                onClick={() => props.onForget?.(m.id)}
-              >
-                <EyeOff size={ICON_SIZE.xs} aria-hidden="true" />
-              </Button>
+              {editingId === m.id ? (
+                <>
+                  <input
+                    className="ht-input"
+                    autoFocus
+                    value={editDraft}
+                    aria-label={t('web.memory.stated.inputAria')}
+                    data-testid={`memory-stated-input-${m.id}`}
+                    onChange={(e) => setEditDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        saveEdit(m.id);
+                      }
+                      if (e.key === 'Escape') setEditingId(undefined);
+                    }}
+                  />
+                  <Button
+                    tone="ghost"
+                    data-testid={`memory-stated-save-${m.id}`}
+                    aria-label={t('web.memory.stated.save')}
+                    onClick={() => saveEdit(m.id)}
+                  >
+                    <Check size={ICON_SIZE.xs} aria-hidden="true" />
+                  </Button>
+                  <Button
+                    tone="ghost"
+                    data-testid={`memory-stated-cancel-${m.id}`}
+                    aria-label={t('web.memory.stated.cancelEdit')}
+                    onClick={() => setEditingId(undefined)}
+                  >
+                    <X size={ICON_SIZE.xs} aria-hidden="true" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="ht-settings__toggle-body">
+                    <span className="ht-settings__hint">{t(KIND_LABEL[m.kind])}</span>
+                    <span className="ht-settings__toggle-label">{m.text}</span>
+                  </span>
+                  <Button
+                    tone="ghost"
+                    data-testid={`memory-stated-edit-${m.id}`}
+                    aria-label={t('web.memory.stated.editAria', { text: m.text })}
+                    onClick={() => {
+                      setEditingId(m.id);
+                      setEditDraft(m.text);
+                    }}
+                  >
+                    <Pencil size={ICON_SIZE.xs} aria-hidden="true" />
+                  </Button>
+                  <Button
+                    tone="ghost"
+                    data-testid={`memory-stated-forget-${m.id}`}
+                    aria-label={t('web.memory.stated.forgetAria', { text: m.text })}
+                    onClick={() => props.onForget?.(m.id)}
+                  >
+                    <EyeOff size={ICON_SIZE.xs} aria-hidden="true" />
+                  </Button>
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -330,6 +390,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
           onForget={props.onForgetMemory}
           onConfirm={props.onConfirmMemory}
           onDismiss={props.onDismissMemory}
+          onUpdate={props.onUpdateMemory}
         />
       )}
 

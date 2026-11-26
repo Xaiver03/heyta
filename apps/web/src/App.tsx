@@ -4197,7 +4197,8 @@ export function App(): React.JSX.Element {
                     onRestore={(id) => void store.restorePreference(id)}
                     memories={Object.values(store.entities.userMemories)}
                     onAddMemory={(text) => void store.addUserMemory({ kind: 'preference', text })}
-                    onForgetMemory={(id) => void store.forgetUserMemory(id)}
+                    onUpdateMemory={(id, text) => void store.updateUserMemory(id, text)}
+                onForgetMemory={(id) => void store.forgetUserMemory(id)}
                     onConfirmMemory={(id) => void store.confirmUserMemory(id)}
                     onDismissMemory={(id) => void store.forgetUserMemory(id)}
                   />

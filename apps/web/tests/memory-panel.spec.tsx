@@ -632,6 +632,36 @@ describe('「记住的事」：陈述记忆可写可删', () => {
     expect(input.value).toBe('');
   });
 
+  it('编辑：点开 → 改字 → 保存回调带 id 与旧值之外的新正文', () => {
+    const updated: [string, string][] = [];
+    const el = render({
+      memories: [mem()],
+      onUpdateMemory: (id: string, text: string) => updated.push([id, text]),
+    });
+    click(el.querySelector('[data-testid="memory-stated-edit-m1"]'));
+    const input = el.querySelector('[data-testid="memory-stated-input-m1"]') as HTMLInputElement;
+    expect(input.value).toBe('回答先给结论');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    act(() => {
+      setter?.call(input, '回答要展开讲');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    click(el.querySelector('[data-testid="memory-stated-save-m1"]'));
+    expect(updated).toEqual([['m1', '回答要展开讲']]);
+    expect(el.querySelector('[data-testid="memory-stated-input-m1"]')).toBeNull();
+  });
+
+  it('编辑：取消不回调', () => {
+    const updated: [string, string][] = [];
+    const el = render({
+      memories: [mem()],
+      onUpdateMemory: (id: string, text: string) => updated.push([id, text]),
+    });
+    click(el.querySelector('[data-testid="memory-stated-edit-m1"]'));
+    click(el.querySelector('[data-testid="memory-stated-cancel-m1"]'));
+    expect(updated).toEqual([]);
+  });
+
   it('待确认条目走确认 / 不要两条路', () => {
     const confirmed: string[] = [];
     const dismissed: string[] = [];

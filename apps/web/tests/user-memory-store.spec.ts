@@ -98,6 +98,19 @@ describe('手动新增 / 忘记', () => {
     expect(item?.textHash).not.toBe('');
   });
 
+  it('编辑正文：重算主题与指纹，来源标 manual', async () => {
+    const id = await useTaskStore
+      .getState()
+      .addUserMemory({ kind: 'preference', text: '回答先给结论' });
+    const before = useTaskStore.getState().entities.userMemories[id]?.textHash;
+    await useTaskStore.getState().updateUserMemory(id, '回答要展开讲');
+    const item = useTaskStore.getState().entities.userMemories[id];
+    expect(item?.text).toBe('回答要展开讲');
+    expect(item?.origin).toBe('manual');
+    expect(item?.textHash).not.toBe(before);
+    expect((await allOps()).some((op) => op.entityType === 'USER_MEMORY' && op.opType === 'UPD')).toBe(true);
+  });
+
   it('确认推断：pending → active', async () => {
     const id = await useTaskStore
       .getState()

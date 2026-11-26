@@ -345,8 +345,8 @@ AI 记忆
 | 明说捕获接线（发送时解析并落库） | ✅ | `AssistantPanel.send()` → `captureStatedMemory` |
 | 会话内「记忆 · N」行（web + mobile，可落盘恢复） | ✅ | `ChatItem role:'memory'` + 历史恢复 + 两端渲染 |
 | 自动抽取（M9） | ⬜ 未做 | 待拍板（§10 第 2 条） |
-| 助手读写记忆工具（M10） | ⬜ 未做 | 已登记 `AI-COV-10` |
-| 编辑条目的界面 | ⬜ 未做 | action 已支持 `update`，界面只有增/删 |
+| 助手读写记忆工具（M10） | ✅ | `list_memories`（只出境 active）+ `remember_memory`（必须确认）；`AI-COV-10` 已闭合 |
+| 编辑条目的界面 | ✅ | `MemoryPanel` 行内编辑（Enter 保存 / Esc 取消） |
 | 移动端注入 | ✅ | `ChatRuntime.memoryItems` + `runTurn` 传 `memory`，壳从 `host.getState().userMemories` 取；`memoryEnabled=false` 时仍不注入 |
 
 **已跑的判据**：`domain` 1412+25；`app-host` 的 `user-memory-actions` 12 + `assistant-memory` 6；`web` 的 `user-memory-store` 6（op 落盘 → 物化可见）、`memory-panel` 39、`assistant-history` 19、`ai-assistant-panel` 32、`ai-assistant-disclosure` 11；`check:ui-language`、`check:i18n-vars`、`check:design-token-refs`、`check:theme`、`check:control-semantics`、`check:settings-row-anatomy`、`check:layering`、`check:ai-coverage` 全绿。

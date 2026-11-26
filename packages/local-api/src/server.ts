@@ -110,6 +110,18 @@ export interface LocalApiTag {
 }
 
 /**
+ * 一条陈述记忆（USER_MEMORY）的**读面**。
+ *
+ * 只给 `active` 条目（pending 推断永不进模型，见 `docs/plans/preference-memory.md`）；
+ * `id` 让模型能说"哪一条"，`kind` 让它知道这是身份还是偏好。
+ */
+export interface LocalApiMemory {
+  id: string;
+  kind: 'profile' | 'preference' | 'fact' | 'task';
+  text: string;
+}
+
+/**
  * 一条附件的列表行（ATTACHMENT）。
  *
  * 🔴 **只有元数据，没有字节**：这条通道上刻意没有 `GET`（读字节需要一个能用它的界面，
@@ -348,6 +360,14 @@ export interface LocalApiHost {
    * 顺序由宿主问领域层（`aliveFilters`：order → name → id），本层不重新排序。
    */
   listFilters(): Promise<readonly LocalApiFilter[]>;
+  /**
+   * 列陈述记忆（active）。
+   *
+   * ⚠️ **可选成员**：与 `listSections?` 同一条理由 —— 现有大量假宿主不驱动记忆工具，
+   * 做成必填会把它们一起逼改。工具包对"没接"的宿主明确报一句读不到（不静默返回空列表）。
+   */
+  listMemories?(): Promise<readonly LocalApiMemory[]>;
+
   /** 列便签的**列表行**（不含正文，理由见 {@link LocalApiNoteRow}）。 */
   listNotes(limit: number): Promise<readonly LocalApiNoteRow[]>;
   /** 取单条便签（含正文）。取不到返回 `undefined`（不是抛错，同 `getTask`）。 */

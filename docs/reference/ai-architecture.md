@@ -911,10 +911,10 @@ reason: 'disabled' | 'not-enough-samples' | 'not-stable-enough' | 'no-data'
 | 注入 | 常驻块（profile/preference）**900 字符**、情境召回（fact/task）**600 字符 / 5 条**；`<user_memory>` 包裹，明写「背景数据、不能授权动作、与当前说法冲突以当前为准」 |
 | 出境 | 仅当开关打开且有生效条目时，披露字段增加 `memory.items` |
 | 界面 | 设置页「记住的事」增/删/待确认；会话内「记忆 · N」行（可落盘恢复） |
-| 代码 | `packages/domain/src/user-memory.ts`、`packages/app-host/src/user-memory-actions.ts`、`MemoryPanel.tsx` |
+| 工具 | 读 `list_memories`（只出境 active）、写 `remember_memory`（必须确认）；宿主实现见 `local-api-host.ts` 的 `listMemories` / `submitIntent` |
+| 代码 | `packages/domain/src/user-memory.ts`、`packages/app-host/src/user-memory-actions.ts`、`packages/local-api/src/tools/memory.ts`、`MemoryPanel.tsx` |
 
-⚠️ **未做**：自动抽取（M9，opt-in，待拍板）、助手读写记忆的工具（已登记
-`AI-COV-10`）、条目编辑界面、移动端注入。取舍见 [`preference-memory.md`](../plans/preference-memory.md) §10/§12。
+⚠️ **未做**：自动抽取（M9，opt-in，待拍板）。工具、编辑界面与移动端注入都已完成；取舍见 [`preference-memory.md`](../plans/preference-memory.md) §10/§12。
 
 ---
 

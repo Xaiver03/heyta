@@ -230,6 +230,8 @@ interface TaskState {
   addUserMemory: (input: AddUserMemoryInput) => Promise<string>;
   /** 从一句输入里捕获明说记忆；不是明说句式时返回 `null`。 */
   captureStatedMemory: (text: string) => Promise<string | null>;
+  /** 改一条陈述记忆的正文（重算主题与指纹）。 */
+  updateUserMemory: (id: string, text: string) => Promise<void>;
   /** 忘记一条陈述记忆（清正文、留指纹）。 */
   forgetUserMemory: (id: string) => Promise<void>;
   /** 确认一条推断记忆（pending → active）。 */
@@ -497,6 +499,9 @@ export const useTaskStore = create<TaskState>((set) => ({
   },
   addUserMemory: async (input) => userMemoryActions.add(input),
   captureStatedMemory: async (text) => captureStatedMemory(userMemoryActions, text),
+  updateUserMemory: async (id, text) => {
+    await userMemoryActions.update(id, { text });
+  },
   forgetUserMemory: async (id) => {
     await userMemoryActions.forget(id);
   },

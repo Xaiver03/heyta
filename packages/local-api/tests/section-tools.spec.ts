@@ -53,6 +53,7 @@ function host(withSections: boolean): LocalApiHost {
     listFocusSessions: async () => [],
     listReminders: async () => [],
     listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+    listFilters: async () => [],
     getEvent: async () => undefined,
     submit: async (): Promise<LocalApiWriteResult> => ({ ok: true, taskId: 'created-1' }),
   };

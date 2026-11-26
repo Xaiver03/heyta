@@ -150,6 +150,9 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return t('web.ai.tools.intentCreateHabit', { name: intent.name });
     case 'create-tag':
       return t('web.ai.tools.intentCreateTag', { name: intent.name });
+    case 'remember-memory':
+      // 记忆卡必须把**要记住的那句话**念出来 —— 用户确认的是这句话本身。
+      return t('web.ai.tools.intentRemember', { text: intent.text });
     case 'set-task-tags':
       // 说的是**换成几个**，不是"打上哪个"：这个动作是整组覆盖，
       // 而用户在确认那一刻必须看得见"这是一次替换"（只写数量是刻意的 ——
