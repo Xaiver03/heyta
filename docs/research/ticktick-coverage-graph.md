@@ -638,8 +638,8 @@ node scripts/ticktick-coverage-report.mjs --fix  # 按五档规则回填档列
 - 桌面/外壳：#51 白噪音（WebAudio）、#70 打印、#36 置顶常驻便签窗、#72 托盘落下面板窗、#61 本地应用锁
 
 ### 10.2 用 ADR 关闭的「不做 / 范围外」
-- #65 团队 → [ADR-0093](../../adr/0093-team-and-seat-billing-out-of-scope.md)（不做）
-- #73 系统快捷指令 → [ADR-0094](../../adr/0094-platform-native-capabilities-boundary.md)（平台独占，Web/桌面范围外；iOS 另立）
+- #65 团队 → [ADR-0093](../adr/0093-team-and-seat-billing-out-of-scope.md)（不做）
+- #73 系统快捷指令 → [ADR-0094](../adr/0094-platform-native-capabilities-boundary.md)（平台独占，Web/桌面范围外；iOS 另立）
 - 因此「真开着」的 D 只剩 **#3 顶部 tab 条**（按 entry-layers 判「复用 rail、不新增」，属有意不新增，非漏做）。
 
 ### 10.3 仍开着的
