@@ -845,6 +845,14 @@ export const zhCN = {
   'web.settings.display.themePreset.default': '蓝白',
   'web.settings.display.themePreset.warm': '暖纸',
   'web.settings.display.themePreset.mist': '雾青',
+  'web.settings.display.accentTitle': '强调色',
+  'web.settings.display.accent.default': '默认',
+  'web.settings.display.accent.emerald': '翠绿',
+  'web.settings.display.accent.sky': '天蓝',
+  'web.settings.display.accent.amber': '琥珀',
+  'web.settings.display.appIconTitle': '应用图标',
+  'web.settings.display.appIconDefault': '默认',
+  'web.settings.display.appIconBoundary': '安装后的应用图标由各平台决定；在浏览器和 Web 版里无法按账号切换，只有原生安装包能换。',
   'web.settings.display.themeTitle': '外观',
   'web.settings.display.fontSizeTitle': '字体大小',
   'web.settings.display.fontSize.compact': '小',
@@ -1412,6 +1420,21 @@ export const zhCN = {
   'common.auth.error.lastPasskey': '这是账号上最后一条通行密钥，而这个账号还没有能用的登录口令，删掉就再也登不进来了。先添加一条新的通行密钥，或者设一个登录口令（邮箱得先验证过）。',
   // ── Web · 通行密钥自助管理 ─────────────────────────────────
   // 服务端此前只有注册 / 登录 / 恢复，用户没有任何"看我自己的凭据 / 删一条"的入口。
+  // 两步验证（TOTP，RFC 6238）。当前为本机验证性实现，绑定/校验以服务端为准 —— 见 TotpPanel 文件头。
+  'web.totp.title': '两步验证',
+  'web.totp.lead': '用验证器应用生成的一次性验证码。当前只在本机做验证性实现，绑定与校验以服务端为准（后续接入）。',
+  'web.totp.needsSignIn': '先登录，才能设置这个账号的两步验证。',
+  'web.totp.add': '添加验证器',
+  'web.totp.secretLabel': '密钥',
+  'web.totp.codeLabel': '验证码',
+  'web.totp.codePlaceholder': '6 位数字',
+  'web.totp.verify': '验证并启用',
+  'web.totp.cancel': '取消',
+  'web.totp.enabled': '两步验证已开启（本机）',
+  'web.totp.disable': '关闭',
+  'web.totp.confirmDisable': '确认关闭',
+  'web.totp.disabled': '两步验证已关闭',
+  'web.totp.error': '验证码不正确，请重试。',
   'web.passkeys.title': '通行密钥',
   // ⚠️ 2026-11-09：同上，删掉「这里列出…」那半句（它复述的是标题「通行密钥」）。
   'web.passkeys.lead': '删除一条不会影响其它设备上的凭据。',
@@ -4190,6 +4213,12 @@ export const zhCN = {
   // 🔴 「前置」= 冷启动第一屏**一眼看到**、**一步可达**，不是把本地功能锁在登录后面
   //    （规范 §0）。所以这里必须**同时**有主按钮（注册 / 登录）与出口（先离线使用）——
   //    少了出口，应用就从「本地优先」变成「必须联网才能开始用」。
+  // ── Web 首启导览（#69）──────────────────────────────────
+  // 只加三个动作词条；四个功能面的标题与一句话复用移动端 `mobile.tab.*` / `mobile.welcome.line.*`。
+  'web.welcome.title': '欢迎',
+  'web.welcome.next': '下一步',
+  'web.welcome.start': '开始',
+  'web.welcome.skip': '跳过',
   'mobile.welcome.title': '开始安排今天',
   'mobile.welcome.signIn': '注册 / 登录',
   /*

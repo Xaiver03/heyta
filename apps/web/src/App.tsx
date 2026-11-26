@@ -141,6 +141,7 @@ import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
 import { PrivacyConsentSheet } from './features/privacy/PrivacyConsentSheet.js';
 import { LegalReconfirmSheet } from './features/legal-recheck/LegalReconfirmSheet.js';
+import { WelcomeTour } from './features/onboarding/WelcomeTour.js';
 import { usePrivacyStore } from './features/privacy/store.js';
 import { armFirstLaunchConsent } from './features/privacy/first-launch.js';
 import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
@@ -244,6 +245,8 @@ import { PrivacyPanel } from './features/settings/PrivacyPanel.js';
 // 改登录密码 —— `/api/password/change` 与 `useAuthStore.changePassword` 都在，
 // 缺的就是这张表（在此之前那条动作**全仓库零调用点**）。见 PasswordPanel 文件头。
 import { PasswordPanel } from './features/settings/PasswordPanel.js';
+// 两步验证（TOTP）—— 账号安全里第二种"登录方式"，算法在 lib/totp.ts。见 TotpPanel 文件头。
+import { TotpPanel } from './features/settings/TotpPanel.js';
 // 从滴答清单导入（B2-1）—— 逻辑层早就做完了，这是它的界面入口。
 import { WidgetJourneyPanel } from './features/settings/WidgetJourneyPanel.js';
 import { WidgetPushPanel } from './features/settings/WidgetPushPanel.js';
@@ -289,6 +292,7 @@ import {
   saveFontScale,
   type FontScale,
 } from './lib/font-scale.js';
+import { ACCENTS, applyAccent, loadAccent, saveAccent, type Accent } from './lib/accent.js';
 
 import './styles/app.css';
 
@@ -468,6 +472,17 @@ function SettingsSectionNav({ active, onSelect }: {
  */
 const SHEET_EXIT_SLACK_MS = 120;
 
+/**
+ * 强调色选项的色块取哪个原色阶（与 `lib/accent.ts` 的 `ACCENT_TOKENS` 同源）。
+ * 🔴 只在这里画"选择器长什么样"；真正写进 `<html>` 的覆盖值由 `applyAccent` 负责。
+ */
+const ACCENT_SWATCH: Record<Accent, string> = {
+  default: 'var(--ht-blue-600)',
+  emerald: 'var(--ht-emerald-600)',
+  sky: 'var(--ht-sky-600)',
+  amber: 'var(--ht-amber-600)',
+};
+
 export function App(): React.JSX.Element {
   const { t, locale } = useI18n();
   /**
@@ -485,6 +500,15 @@ export function App(): React.JSX.Element {
     setFontScaleState(value);
     saveFontScale(value);
     applyFontScale(value);
+  }, []);
+  /**
+   * 强调色（设备属性，ADR-0085：写本机、零 op）。只改 `--ht-color-primary*` 一族，
+   * 组件仍只消费语义变量；`default` = 不覆盖（基准蓝白）。
+   */
+  const [accent, setAccentState] = useState<Accent>(loadAccent);
+  const setAccent = useCallback((value: Accent) => {
+    setAccentState(value);
+    saveAccent(value);
   }, []);
   /**
    * 行着色三态（**只有清单图标着色**，产品拍板 2026-11-08）。
@@ -1833,6 +1857,15 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     applyThemePreset(themePreset);
   }, [themePreset]);
+
+  /**
+   * 强调色写成 `<html>` 的 inline `--ht-color-primary*` 变量（设备属性、零 op）。
+   * 🔴 依赖里**必须带 `theme`**：暗版的派生色（hover 往浅走、subtle 用深底）与亮版不同，
+   *    换明暗时要按新主题重算一次，否则暗色下会留一套按亮色算出来的 hover。
+   */
+  useEffect(() => {
+    applyAccent(accent, theme);
+  }, [accent, theme]);
 
   /**
    * 行首那枚「清单图标」的颜色（产品拍板：**只有清单图标着色**）。
@@ -4032,6 +4065,8 @@ export function App(): React.JSX.Element {
               <PasskeyPanel active={activeSettingsSection === 'settings-group-profile'} />
               {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
               <PasswordPanel />
+              {/* 账号安全：两步验证（TOTP）。排在密码之后、设备会话之前。 */}
+              <TotpPanel active={activeSettingsSection === 'settings-group-profile'} />
               {/*
                 账号安全：**谁现在还能用你的账号登录**（列 / 逐个撤销）。
                 它排在两种"登录方式"之后、"注销账号"之前 —— 这一面板管的不是能不能登录，
@@ -4332,6 +4367,59 @@ export function App(): React.JSX.Element {
                     </button>
                   ))}
                 </div>
+              </div>
+              {/*
+                强调色（#56）：设备属性（ADR-0085），只覆盖 `--ht-color-primary*` 一族。
+                选项来自 `ACCENTS`（`lib/accent.ts`）；`default` = 清空覆盖、回到基准蓝白。
+              */}
+              <div className="ht-settings__preference-row">
+                <h3 className="ht-settings__h3 ht-type-row-title">
+                  {t('web.settings.display.accentTitle')}
+                </h3>
+                <div
+                  className="ht-settings__preset-grid"
+                  role="radiogroup"
+                  aria-label={t('web.settings.display.accentTitle')}
+                >
+                  {ACCENTS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={accent === option}
+                      className="ht-settings__preset-option"
+                      data-testid={`accent-${option}`}
+                      onClick={() => {
+                        setAccent(option);
+                      }}
+                    >
+                      <span
+                        className="ht-settings__preset-swatch"
+                        style={{ background: ACCENT_SWATCH[option] }}
+                        aria-hidden="true"
+                      />
+                      <span>{t(`web.settings.display.accent.${option}` as const)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/*
+                应用图标（#56）：如实边界 —— 安装后的图标由各平台决定，
+                **Web / 浏览器内无法按账号切换**，只有原生安装包能换。
+                这一行只陈述当前事实，不画一枚做不到的按钮（§0.2）。
+              */}
+              <div className="ht-settings__preference-row">
+                <h3 className="ht-settings__h3 ht-type-row-title">
+                  {t('web.settings.display.appIconTitle')}
+                  <SettingsInfoTip
+                    testId="tip-app-icon"
+                    label={t('web.settings.display.appIconTitle')}
+                    text={t('web.settings.display.appIconBoundary')}
+                  />
+                </h3>
+                <span className="ht-settings__value" data-testid="app-icon-current">
+                  {t('web.settings.display.appIconDefault')}
+                </span>
               </div>
               {/*
                 行着色三态（**只有清单图标着色**，产品拍板 2026-11-08）。
@@ -4688,6 +4776,8 @@ export function App(): React.JSX.Element {
       <ConflictDialog />
       <PrivacyConsentSheet />
       <LegalReconfirmSheet />
+      {/* Web 首启导览（#69）：每次冷启动只在"这台设备从没看过"时出现一次。 */}
+      <WelcomeTour />
       {shareDialog !== undefined ? (
         <ShareFeature
           projectId={shareDialog.projectId}
