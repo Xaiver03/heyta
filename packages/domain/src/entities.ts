@@ -793,6 +793,67 @@ export interface PreferenceCorrection extends EntityBase {
   kind: PreferenceCorrectionKind;
 }
 
+/**
+ * 陈述记忆的种类。
+ *
+ * ⚠️ 与推断层（`preferences.ts` 的 7 条）**不是同一套东西**：
+ * 这里的每一条都是「用户说过 / 确认过的一句话」，不是统计出来的倾向。
+ * 只做 4 类；WeKnora 的 `interest`（主题计数）依赖跨会话计数与模型归一化，
+ * 当前不做（见 `docs/plans/preference-memory.md` §9）。
+ */
+export type UserMemoryKind = 'profile' | 'preference' | 'fact' | 'task';
+
+/** 这条记忆怎么来的。`extracted` 一律先落 `pending`，确认后才生效。 */
+export type UserMemoryOrigin = 'stated' | 'extracted' | 'manual';
+
+/**
+ * 生命周期。
+ *
+ * - `active`：生效（可注入）
+ * - `pending`：推断出来、等用户确认；**永不注入**
+ * - `superseded`：同主题已有更新的条目（读取时派生，不单独写 op）
+ * - `archived`：超容量/过期
+ * - `forgotten`：用户删了；`text` 清空，只留 `textHash + topicKey` 抑制复活
+ */
+export type UserMemoryStatus = 'active' | 'pending' | 'superseded' | 'archived' | 'forgotten';
+
+/**
+ * 一条陈述记忆（`USER_MEMORY`）。
+ *
+ * 🔴 **为什么是实体**：一句话推不出来（与 `PREFERENCE_CORRECTION` 同一条推理）。
+ * 推断结果仍不落盘；这里只存「明说 / 手工 / 确认过的推断」。
+ *
+ * ⚠️ 纯可加性，不 bump `CURRENT_SCHEMA_VERSION`（ADR-0014 §3.2）。
+ * 读写规则全在纯函数 `user-memory.ts`；op 构造在 `app-host`，
+ * **不要在任何 `apps/*` 里重新判断同主题去重或预算**。
+ */
+export interface UserMemory extends EntityBase {
+  kind: UserMemoryKind;
+  /**
+   * 主题归一化键（小写、去标点空白）。
+   *
+   * 同 `kind + topicKey` 视为「同一个主题的不同说法」：读取时只取最新一条，
+   * 旧条目标「已被更新」。**写入时不产生第二条 op**（一个意图一个 op）。
+   */
+  topicKey: string;
+  /** 一句话，≤ 300 字符。`forgotten` 时清空。 */
+  text: string;
+  origin: UserMemoryOrigin;
+  status: UserMemoryStatus;
+  /** 1–5；预算裁剪与排序用。 */
+  importance: number;
+  /** 作用域。MVP 只写 `global`；留给「只对这个助手生效」。 */
+  scope?: 'global' | 'assistant';
+  /** 来源消息（可点回原话）。 */
+  sourceTurnId?: string;
+  /** 文本指纹（FNV-1a 32 位十六进制）；`forgotten` 后只留它与 topicKey。 */
+  textHash?: string;
+  /** `task` 的到期时间（epoch ms）；过期即归档。 */
+  expiresAt?: number;
+  /** 被它替代的旧条目（一跳追溯）。 */
+  replacesId?: string;
+}
+
 // ─────────────────────────────────────────────────────────────
 // 提醒
 // ─────────────────────────────────────────────────────────────
@@ -1374,6 +1435,7 @@ export interface EntityModelMap {
   FOCUS_SESSION: FocusSession;
   AI_FEEDBACK: AiFeedback;
   PREFERENCE_CORRECTION: PreferenceCorrection;
+  USER_MEMORY: UserMemory;
   REMINDER: Reminder;
   EVENT: CountdownEvent;
   CALENDAR_EVENT: CalendarEvent;
@@ -1407,6 +1469,7 @@ export const MODELED_ENTITY_TYPES = [
   'FOCUS_SESSION',
   'AI_FEEDBACK',
   'PREFERENCE_CORRECTION',
+  'USER_MEMORY',
   'REMINDER',
   'EVENT',
   'CALENDAR_EVENT',

@@ -1,5 +1,5 @@
 {
- "total": 48,
+ "total": 50,
  "files": {
   "AiSettings.tsx": 8,
   "CalendarSubscriptionsCard.tsx": 3,
@@ -10,7 +10,7 @@
   "ExportPanel.tsx": 3,
   "FeishuCalendarSettingsCard.tsx": 3,
   "ImportPanel.tsx": 1,
-  "MemoryPanel.tsx": 5,
+  "MemoryPanel.tsx": 7,
   "PasskeyPanel.tsx": 1,
   "PasswordPanel.tsx": 2,
   "ProfilePanel.tsx": 1,

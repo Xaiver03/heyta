@@ -279,6 +279,14 @@ const ACTION_FAMILIES = [
   { entity: 'AI_FEEDBACK', family: 'createAiFeedbackActions' },
   { entity: 'PREFERENCE_CORRECTION', family: 'createPreferenceCorrectionActions' },
   /**
+   * 陈述记忆（`app-host/src/user-memory-actions.ts`）。
+   *
+   * 顺序同样刻意：`createUserMemoryActions` 与宿主 store 的
+   * `captureStatedMemory` 接线**先真的存在**，才允许进这张表；
+   * 反过来会让判据 C 去查一个不存在的东西，静默通过。
+   */
+  { entity: 'USER_MEMORY', family: 'createUserMemoryActions' },
+  /**
    * M3/W3 B1-1（`app-host/src/reminder-actions.ts`）。
    * 🔴 **补这一行是合法的登记，不是"只补表不写 action"那种假修法** ——
    * `createReminderActions` 在 `packages/app-host/src/reminder-actions.ts` 里**真的存在**

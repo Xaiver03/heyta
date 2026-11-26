@@ -651,6 +651,13 @@ export {
   type PreferenceCorrectionActions,
 } from './ai-feedback-actions.js';
 export {
+  MAX_USER_MEMORIES,
+  captureStatedMemory,
+  createUserMemoryActions,
+  type AddUserMemoryInput,
+  type UserMemoryActions,
+} from './user-memory-actions.js';
+export {
   MAX_PRIORITIZE_TASKS,
   MAX_REASON_LENGTH,
   PRIORITIZE_PRIORITY_VALUES,

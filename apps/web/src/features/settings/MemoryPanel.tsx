@@ -33,9 +33,10 @@ import { ICON_SIZE } from '@heyta/design-system';
  * （所以跨设备同步），但那是**同步**，不是**出境**。
  */
 
-import { EyeOff, RotateCcw, X } from 'lucide-react';
+import { Check, EyeOff, Plus, RotateCcw, X } from 'lucide-react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n, type MessageKey } from '@heyta/i18n';
+import { useState } from 'react';
 
 import { SettingsInfoTip } from './SettingsInfoTip.js';
 import { Button } from '../../components/hta/index.js';
@@ -49,6 +50,8 @@ import {
   type FocusGap,
   type Preference,
   type PreferenceSet,
+  type UserMemory,
+  type UserMemoryKind,
 } from '@heyta/domain';
 
 /**
@@ -94,6 +97,130 @@ export interface MemoryPanelProps {
   focusGaps?: readonly FocusGap[] | null;
   onSuppress: (preferenceId: string) => void;
   onRestore: (correctionId: string) => void;
+  /**
+   * 陈述记忆（`USER_MEMORY`）。省略 → 整个「记住的事」区不渲染
+   * （老调用方 / 单测不受影响）。
+   */
+  memories?: readonly UserMemory[];
+  onAddMemory?: (text: string) => void;
+  onForgetMemory?: (id: string) => void;
+  onConfirmMemory?: (id: string) => void;
+  onDismissMemory?: (id: string) => void;
+}
+
+const KIND_LABEL: Record<UserMemoryKind, MessageKey> = {
+  profile: 'web.memory.stated.kind.profile',
+  preference: 'web.memory.stated.kind.preference',
+  fact: 'web.memory.stated.kind.fact',
+  task: 'web.memory.stated.kind.task',
+};
+
+/** 「记住的事」：用户明说/确认过的条目 + 待确认推断。 */
+function StatedMemorySection(props: {
+  memories: readonly UserMemory[];
+  onAdd?: (text: string) => void;
+  onForget?: (id: string) => void;
+  onConfirm?: (id: string) => void;
+  onDismiss?: (id: string) => void;
+}): React.JSX.Element {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState('');
+  const active = props.memories.filter((m) => m.status === 'active' && m.text.trim() !== '');
+  const pending = props.memories.filter((m) => m.status === 'pending' && m.text.trim() !== '');
+
+  const submit = (): void => {
+    const text = draft.trim();
+    if (text === '' || props.onAdd === undefined) return;
+    props.onAdd(text);
+    setDraft('');
+  };
+
+  return (
+    <>
+      <h3 className="ht-settings__subtitle">{t('web.memory.stated.title')}</h3>
+      {active.length === 0 ? (
+        <p className="ht-settings__hint" role="status" data-testid="memory-stated-empty">
+          {t('web.memory.stated.empty')}
+        </p>
+      ) : (
+        <ul className="ht-settings__list" data-testid="memory-stated">
+          {active.map((m) => (
+            <li className="ht-settings__item" key={m.id} data-testid={`memory-stated-${m.id}`}>
+              <span className="ht-settings__toggle-body">
+                <span className="ht-settings__hint">{t(KIND_LABEL[m.kind])}</span>
+                <span className="ht-settings__toggle-label">{m.text}</span>
+              </span>
+              <Button
+                tone="ghost"
+                data-testid={`memory-stated-forget-${m.id}`}
+                aria-label={t('web.memory.stated.forgetAria', { text: m.text })}
+                onClick={() => props.onForget?.(m.id)}
+              >
+                <EyeOff size={ICON_SIZE.xs} aria-hidden="true" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {props.onAdd !== undefined && (
+        <div className="ht-settings__item">
+          <input
+            className="ht-input"
+            value={draft}
+            aria-label={t('web.memory.stated.inputAria')}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+          />
+          <Button
+            tone="ghost"
+            data-testid="memory-stated-add"
+            aria-label={t('web.memory.stated.add')}
+            onClick={submit}
+          >
+            <Plus size={ICON_SIZE.xs} aria-hidden="true" />
+          </Button>
+        </div>
+      )}
+
+      {pending.length > 0 && (
+        <>
+          <h3 className="ht-settings__subtitle">{t('web.memory.stated.pendingTitle')}</h3>
+          <ul className="ht-settings__list" data-testid="memory-stated-pending">
+            {pending.map((m) => (
+              <li className="ht-settings__item" key={m.id}>
+                <span className="ht-settings__toggle-body">
+                  <span className="ht-settings__hint">{t(KIND_LABEL[m.kind])}</span>
+                  <span className="ht-settings__toggle-label">{m.text}</span>
+                </span>
+                <Button
+                  tone="ghost"
+                  data-testid={`memory-stated-confirm-${m.id}`}
+                  aria-label={t('web.memory.stated.confirmAria', { text: m.text })}
+                  onClick={() => props.onConfirm?.(m.id)}
+                >
+                  <Check size={ICON_SIZE.xs} aria-hidden="true" />
+                </Button>
+                <Button
+                  tone="ghost"
+                  data-testid={`memory-stated-dismiss-${m.id}`}
+                  aria-label={t('web.memory.stated.dismissAria', { text: m.text })}
+                  onClick={() => props.onDismiss?.(m.id)}
+                >
+                  <X size={ICON_SIZE.xs} aria-hidden="true" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </>
+  );
 }
 
 /** 展示一条偏好：中文名 + 依据 + 忘掉按钮。 */
@@ -196,6 +323,16 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
 
   return (
     <div className="ht-settings__section" data-testid="memory-panel">
+      {props.memories !== undefined && (
+        <StatedMemorySection
+          memories={props.memories}
+          onAdd={props.onAddMemory}
+          onForget={props.onForgetMemory}
+          onConfirm={props.onConfirmMemory}
+          onDismiss={props.onDismissMemory}
+        />
+      )}
+
       {/* ── 我了解到的你 ─────────────────────────────────────── */}
       <h3 className="ht-settings__subtitle">
         <AssistantIcon size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.memory.known.title')}

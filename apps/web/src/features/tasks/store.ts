@@ -45,9 +45,12 @@ import {
   createAiFeedbackActions,
   createLocalApiHost,
   createPreferenceCorrectionActions,
+  captureStatedMemory,
   createTaskActions,
+  createUserMemoryActions,
   type ActionContext,
   type AiFeedbackInput,
+  type AddUserMemoryInput,
   type LocalApiHostOptions,
   type NewTaskFields,
   type WidgetDrainTasks,
@@ -223,6 +226,14 @@ interface TaskState {
   suppressPreference: (preferenceId: string) => Promise<void>;
   /** 撤销一次「忘掉」。 */
   restorePreference: (correctionId: string) => Promise<void>;
+  /** 记住一句用户明说的话（写 op-log，跨设备）。 */
+  addUserMemory: (input: AddUserMemoryInput) => Promise<string>;
+  /** 从一句输入里捕获明说记忆；不是明说句式时返回 `null`。 */
+  captureStatedMemory: (text: string) => Promise<string | null>;
+  /** 忘记一条陈述记忆（清正文、留指纹）。 */
+  forgetUserMemory: (id: string) => Promise<void>;
+  /** 确认一条推断记忆（pending → active）。 */
+  confirmUserMemory: (id: string) => Promise<void>;
   setFilter: (filter: TaskFilter) => void;
   refreshNow: () => void;
 }
@@ -354,6 +365,8 @@ export function createAiToolHost(
  */
 const aiFeedbackActions = createAiFeedbackActions(actionContext);
 const correctionActions = createPreferenceCorrectionActions(actionContext);
+/** 陈述记忆的唯一写路径（见 `app-host/src/user-memory-actions.ts`）。 */
+const userMemoryActions = createUserMemoryActions(actionContext);
 
 /** 引擎状态变化 → 同步进 store。 */
 onEngineChange(() => {
@@ -481,6 +494,14 @@ export const useTaskStore = create<TaskState>((set) => ({
   },
   restorePreference: async (correctionId) => {
     await correctionActions.restore(correctionId);
+  },
+  addUserMemory: async (input) => userMemoryActions.add(input),
+  captureStatedMemory: async (text) => captureStatedMemory(userMemoryActions, text),
+  forgetUserMemory: async (id) => {
+    await userMemoryActions.forget(id);
+  },
+  confirmUserMemory: async (id) => {
+    await userMemoryActions.confirm(id);
   },
   setNote: async (id, note) => {
     await taskActions.setNote(id, note);

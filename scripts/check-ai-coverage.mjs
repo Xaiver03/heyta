@@ -943,6 +943,16 @@ if (!exists(AI_DIST)) {
  */
 const ENTITY_COVERAGE_DEBT = new Map([
   [
+    'USER_MEMORY',
+    {
+      gap: 'AI-COV-10',
+      reason:
+        '本轮只落「用户明说捕获 + 设置页可写可删 + 每轮按预算注入」，写路径在 packages/app-host/src/user-memory-actions.ts；' +
+        '但**不给模型读写记忆的工具**：让助手自己查/记记忆会绕开「一个意图一个 op」与「助手只产出建议」，' +
+        '而取舍写在 docs/plans/preference-memory.md §10 待拍板。工具落地时这条登记必须同批删除。',
+    },
+  ],
+  [
     'CALENDAR_EVENT',
     {
       gap: 'AI-COV-9',

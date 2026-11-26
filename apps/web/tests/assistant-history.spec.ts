@@ -72,7 +72,9 @@ function item(id: number, over: Partial<ChatItem> & { role: ChatItem['role'] }):
  * 所以断言正文必须先过 `role` —— 直接 `.text` 在类型层面就不成立。
  */
 function bodyOf(entry: StoredChatItem): string {
-  return entry.role === 'error' ? entry.message : entry.text;
+  if (entry.role === 'error') return entry.message;
+  if (entry.role === 'memory') return entry.items.map((m) => m.text).join('|');
+  return entry.text;
 }
 
 describe('assistant-history —— 上界是从哪来的', () => {
@@ -280,7 +282,12 @@ describe('assistant-history —— 落盘的就是界面画的那一份（可序
     expect(Object.keys(envelope)).toContain('items');
     const back = loadAssistantHistory(null, f.storage)!;
     // `id` 不存（它是渲染计数），恢复后按顺序重编号 ⇒ 顺序与内容必须一致。
-    expect(back.items.map((x) => [x.role, 'text' in x ? x.text : x.message])).toEqual([
+    expect(
+      back.items.map((x) => [
+        x.role,
+        x.role === 'error' ? x.message : x.role === 'memory' ? x.items.map((m) => m.text).join('|') : x.text,
+      ]),
+    ).toEqual([
       ['user', '明天有什么安排'],
       ['assistant', '两件'],
       ['error', 'no-endpoint'],
@@ -293,5 +300,33 @@ describe('assistant-history —— 落盘的就是界面画的那一份（可序
 
   it('键名只有一处定义（面板不许自己拼字符串）', () => {
     expect(ASSISTANT_HISTORY_STORAGE_KEY).toBe('heyta.ai.assistant.history');
+  });
+});
+
+describe('assistant-history —— 记忆行可落盘可恢复', () => {
+  it('memory 条目的 items 原样存回，非法形状整条丢掉', () => {
+    const f = fakeStorage();
+    saveAssistantHistory({
+      items: [
+        { role: 'user', text: '以后回答先给结论' },
+        {
+          role: 'memory',
+          items: [{ id: 'm1', kind: 'preference', text: '回答先给结论' }],
+        },
+        {
+          // 故意塞一条坏形状：缺 text，恢复时必须整条丢掉而不是画一个空行。
+          role: 'memory',
+          items: [{ id: 'm2', kind: 'fact' }],
+        } as never,
+      ] as never,
+      disclosed: false,
+      account: null,
+    }, f.storage);
+    const back = loadAssistantHistory(null, f.storage)!;
+    expect(back.items.map((x) => x.role)).toEqual(['user', 'memory']);
+    const memory = back.items[1]!;
+    expect(memory.role === 'memory' && memory.items).toEqual([
+      { id: 'm1', kind: 'preference', text: '回答先给结论' },
+    ]);
   });
 });

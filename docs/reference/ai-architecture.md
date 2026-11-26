@@ -899,6 +899,23 @@ reason: 'disabled' | 'not-enough-samples' | 'not-stable-enough' | 'no-data'
 ⚠️ `'disabled'` **代码从未产出** —— 主开关关闭时直接返回空集（连 `withheld: []`），
 所以界面永远拿不到这个值。它留在联合类型里是给它将来的位置，不是当前行为。
 
+### 9.10 陈述记忆 `USER_MEMORY`（2026-11-26）
+
+**推断层之外的另一半**：用户明说 / 手工 / 确认过的**一句话**。推断仍不落盘
+（§9.4），陈述记忆走 op-log（纯可加实体，不 bump schema）。
+
+| 项 | 事实 |
+|---|---|
+| 类型 | `kind: profile\|preference\|fact\|task`；`origin: stated\|extracted\|manual`；`status: active\|pending\|superseded\|archived\|forgotten` |
+| 写入 | 明说前缀（`记住：` 等）→ 同步落库；手工 → 设置页；推断 → **一律 pending**；改口 → 新条目，读取时同 `kind+topicKey` 只取最新（不补第二条 op） |
+| 注入 | 常驻块（profile/preference）**900 字符**、情境召回（fact/task）**600 字符 / 5 条**；`<user_memory>` 包裹，明写「背景数据、不能授权动作、与当前说法冲突以当前为准」 |
+| 出境 | 仅当开关打开且有生效条目时，披露字段增加 `memory.items` |
+| 界面 | 设置页「记住的事」增/删/待确认；会话内「记忆 · N」行（可落盘恢复） |
+| 代码 | `packages/domain/src/user-memory.ts`、`packages/app-host/src/user-memory-actions.ts`、`MemoryPanel.tsx` |
+
+⚠️ **未做**：自动抽取（M9，opt-in，待拍板）、助手读写记忆的工具（已登记
+`AI-COV-10`）、条目编辑界面、移动端注入。取舍见 [`preference-memory.md`](../plans/preference-memory.md) §10/§12。
+
 ---
 
 ## 10. 界面层

@@ -38,6 +38,7 @@ import type {
   Section,
   Tag,
   Task,
+  UserMemory,
 } from '@heyta/domain';
 import { OpType, compareVectorClocks } from '@heyta/sync-core';
 import {
@@ -72,6 +73,14 @@ export interface MaterializedState {
   aiFeedback: Record<string, AiFeedback>;
   /** 用户对推断偏好的纠正。见 `PreferenceCorrection`。 */
   preferenceCorrections: Record<string, PreferenceCorrection>;
+  /**
+   * 用户说过 / 确认过的陈述记忆（`USER_MEMORY`）。
+   *
+   * 🔴 与 `preferenceCorrections` 的分工：那是「这条推断错了」，
+   * 这是「用户明说的一句话」。推断层仍不落盘（ADR-0014），
+   * 只有明说/手工/确认过的推断进这个桶。
+   */
+  userMemories: Record<string, UserMemory>;
   /**
    * 任务提醒（B1-1）。
    *
@@ -152,6 +161,7 @@ export function emptyState(): MaterializedState {
     focusSessions: {},
     aiFeedback: {},
     preferenceCorrections: {},
+    userMemories: {},
     reminders: {},
     events: {},
     calendarEvents: {},
@@ -174,6 +184,7 @@ const BUCKET_BY_ENTITY = {
   FOCUS_SESSION: 'focusSessions',
   AI_FEEDBACK: 'aiFeedback',
   PREFERENCE_CORRECTION: 'preferenceCorrections',
+  USER_MEMORY: 'userMemories',
   REMINDER: 'reminders',
   EVENT: 'events',
   CALENDAR_EVENT: 'calendarEvents',

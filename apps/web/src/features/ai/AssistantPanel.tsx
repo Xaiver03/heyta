@@ -452,6 +452,14 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   // 三条纪律都在 `@heyta/domain` 的 `mentions.ts` 里：文本是事实源、芯片是投影、
   // 键盘与解析共用同一套语法。这里只负责"把光标位置和选中项接上"。
   const entities = useTaskStore((state) => state.entities);
+  /**
+   * 陈述记忆（`USER_MEMORY`）。注入与披露用同一份列表、同一个开关 ——
+   * 「说了会发」与「真的发了」必须由同一个判断派生。
+   */
+  const memoryItems = Object.values(entities.userMemories);
+  const memoryActive =
+    props.memoryEnabled === true &&
+    memoryItems.some((m) => m.status === 'active' && m.text.trim() !== '');
   const [caret, setCaret] = useState(0);
   const [mentionIndex, setMentionIndex] = useState(0);
   /** 按过 Esc 之后，直到下一次输入才重新弹候选。 */
@@ -510,7 +518,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
           // 🔴 用**并集**，不是 `TOOL_CALL_EGRESS_FIELDS` 那两项 ——
           // 单步只送"这句话 + 工具名"，一轮循环还会把**每个工具结果**回送。
           // 少说一项就是用户在不知情下多送一份数据。
-          fields: assistantEgressFields(),
+          fields: assistantEgressFields({ memory: memoryActive }),
         });
 
   const history: readonly AssistantMessage[] = items
@@ -546,6 +554,8 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
 
   async function turn(text: string, epoch = controls.epoch): Promise<void> {
     if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
+    /** 本轮真进了 prompt 的记忆；宿主在拼 system 时回调。 */
+    const usedMemory: { id: string; kind: string; text: string }[] = [];
     setPhase('running');
     if (props.useCloudHarness === true) {
       setHarnessPreparing(false);
@@ -597,6 +607,15 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         localize: (key, vars) => t(key as MessageKey, vars),
         executionId: `web:${session.account}:${String(controls.nextId)}`,
         history,
+        // 记忆：开关与条目都由壳给，宿主只负责渲染成 prompt 与算披露。
+        memory: { enabled: props.memoryEnabled === true, items: memoryItems },
+        onMemoryUsed: (items) => {
+          usedMemory.splice(
+            0,
+            usedMemory.length,
+            ...items.map((m) => ({ id: m.id, kind: m.kind, text: m.text })),
+          );
+        },
         // ⚠️ 事件与结果走**同一道闸门**：跨过「新会话」或换了账号之后到的片段
         // 一个都不许画出来（它属于上一段对话，而界面上已经是另一段）。
         onEvent: (event) => {
@@ -638,6 +657,9 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
       append({ role: 'proposal', text: outcome.text, proposal: outcome.proposal, confirmed: undefined });
       return;
     }
+    if (usedMemory.length > 0) {
+      append({ role: 'memory', items: [...usedMemory] });
+    }
     append({
       role: 'assistant',
       text: outcome.text,
@@ -655,6 +677,12 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     // 原来这里 `if (text === '') return;` 会把那条路整条掐掉。
     if (text === '' && images.length === 0) return;
     append({ role: 'user', text });
+    // 明说捕获：解析与落库都在领域/宿主层，这里只触发一次。
+    // 不阻塞本轮 —— 记忆写失败不该让一句正常的提问发不出去。
+    void useTaskStore
+      .getState()
+      .captureStatedMemory(text)
+      .catch(() => undefined);
     setDraft('');
     // 图只属于这一条消息：发出去之后输入框回到"没附件"的状态，
     // 否则下一句会**悄悄**再带一次同一张图。
@@ -981,6 +1009,17 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                     </p>
                   )}
                 </>
+              )}
+
+              {item.role === 'memory' && (
+                <details className="ht-ai__memory" data-testid="ai-chat-memory">
+                  <summary>{t('web.ai.chat.memory', { n: item.items.length })}</summary>
+                  <ul>
+                    {item.items.map((m) => (
+                      <li key={m.id}>{m.text}</li>
+                    ))}
+                  </ul>
+                </details>
               )}
 
               {item.role === 'proposal' && (

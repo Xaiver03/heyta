@@ -94,6 +94,28 @@
   inline-size: 100%;
 }
 
+/* 记忆行：一条数据，不是一段对话 —— 不用气泡，只做可折叠的一行。 */
+.ht-ai__item--memory {
+  inline-size: 100%;
+}
+
+.ht-ai__memory {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-ai__memory > summary {
+  cursor: pointer;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-ai__memory > ul {
+  margin: 0;
+  padding-inline-start: var(--ht-space-4);
+  color: var(--ht-color-foreground-subtle);
+}
+
 /* ── 过程时间线（无框轻文字折叠头 + 图标竖线树 + 渐隐查看更多）─── */
 
 .ht-ai__trace-quiet {

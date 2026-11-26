@@ -313,6 +313,21 @@ function reviveItem(entry: unknown, id: number): ChatItem | undefined {
             steps: Array.isArray(raw['steps']) ? (raw['steps'] as never[]) : [],
             stoppedAt: typeof raw['stoppedAt'] === 'string' ? raw['stoppedAt'] : undefined,
           };
+    case 'memory': {
+      const list = raw['items'];
+      if (!Array.isArray(list)) return undefined;
+      const items = list.flatMap((entry) => {
+        if (entry === null || typeof entry !== 'object') return [];
+        const record = entry as Record<string, unknown>;
+        const id = typeof record['id'] === 'string' ? record['id'] : undefined;
+        const kind = typeof record['kind'] === 'string' ? record['kind'] : undefined;
+        const itemText = typeof record['text'] === 'string' ? record['text'] : undefined;
+        return id === undefined || kind === undefined || itemText === undefined
+          ? []
+          : [{ id, kind, text: itemText }];
+      });
+      return items.length === 0 ? undefined : { id, role, items };
+    }
     case 'proposal': {
       if (text === undefined) return undefined;
       const proposal = raw['proposal'];

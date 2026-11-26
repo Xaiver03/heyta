@@ -329,3 +329,26 @@ AI 记忆
 - WeKnora 的类型/预算/模板：[`weknora-memory-longterm.md`](../research/weknora-memory-longterm.md)
 - WeKnora 的压缩与历史：[`weknora-memory-shortterm.md`](../research/weknora-memory-shortterm.md)
 - 现有代码：`packages/domain/src/{memory,preferences,preference-hints,ai-feedback,preference-corrections}.ts`、`apps/web/src/features/settings/MemoryPanel.tsx`、`packages/app-host/src/ai-assistant.ts`
+
+---
+
+## 12. 实施进度（2026-11-26）
+
+| 项 | 状态 | 落点 |
+|---|---|---|
+| `USER_MEMORY` 实体（四处登记 + 物化） | ✅ | `shared-schema/entity-types.ts`、`domain/entities.ts`、`op-log/state.ts` |
+| 领域纯函数（解析 / 归一化 / 指纹 / 去重 / 预算 / 注入 / 选中集合） | ✅ | `packages/domain/src/user-memory.ts`；25 条单测 |
+| 写路径（新增 / 改 / 忘 / 确认 / 明说捕获） | ✅ | `packages/app-host/src/user-memory-actions.ts`；12 条单测 |
+| 设置页「记住的事」（可写可删 + 待确认 + 忘记） | ✅ | `MemoryPanel.tsx` + 12 条词条 + 5 条面板测试 |
+| system prompt 注入（常驻 + 情境，900/600 字符预算） | ✅ | `assistantSystemPrompt(now, memoryBlock)` |
+| 出境披露（`memory.items`，仅开关打开且有生效条目） | ✅ | `assistantEgressFields({memory})` + 面板接线 |
+| 明说捕获接线（发送时解析并落库） | ✅ | `AssistantPanel.send()` → `captureStatedMemory` |
+| 会话内「记忆 · N」行（web + mobile，可落盘恢复） | ✅ | `ChatItem role:'memory'` + 历史恢复 + 两端渲染 |
+| 自动抽取（M9） | ⬜ 未做 | 待拍板（§10 第 2 条） |
+| 助手读写记忆工具（M10） | ⬜ 未做 | 已登记 `AI-COV-10` |
+| 编辑条目的界面 | ⬜ 未做 | action 已支持 `update`，界面只有增/删 |
+| 移动端注入 | ⬜ 未做 | 移动端尚未把 `memory` 传给 `requestAssistantTurn`（fail-closed：不传 = 不注入） |
+
+**已跑的判据**：`domain` 1412+25；`app-host` 的 `user-memory-actions` 12 + `assistant-memory` 6；`web` 的 `memory-panel` 39、`assistant-history` 19、`ai-assistant-panel` 32、`ai-assistant-disclosure` 11；`check:ui-language`、`check:i18n-vars`、`check:design-token-refs`、`check:theme`、`check:control-semantics`、`check:settings-row-anatomy`、`check:layering`、`check:ai-coverage` 全绿。
+
+**已知红灯（与本次无关，未修）**：`check:reachability` 的 `CALENDAR_EVENT` 零写路径、`FILTER`/`SECTION` 未进 `ACTION_FAMILIES`；`check:design` 的 `apps/mobile/src/screens/TimetablePeriodsEditor.tsx` 裸颜色。

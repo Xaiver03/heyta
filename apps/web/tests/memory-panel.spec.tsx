@@ -573,3 +573,77 @@ describe('🔴 真 IndexedDB：readRecentOps 取的是"最近"一窗（方向错
     ).toContain('推迟过 1 次');
   });
 });
+
+describe('「记住的事」：陈述记忆可写可删', () => {
+  const mem = (over: Record<string, unknown> = {}) =>
+    ({
+      id: 'm1',
+      kind: 'preference',
+      topicKey: '回答风格',
+      text: '回答先给结论',
+      origin: 'stated',
+      status: 'active',
+      importance: 3,
+      scope: 'global',
+      createdAt: 1,
+      updatedAt: 1,
+      ...over,
+    }) as never;
+
+  it('不传 memories 时整个区不渲染（老调用方不受影响）', () => {
+    const el = render();
+    expect(el.querySelector('[data-testid="memory-stated"]')).toBeNull();
+    expect(el.textContent).not.toContain('记住的事');
+  });
+
+  it('传空数组 → 只显示事实型空态，不显示引导文案', () => {
+    const el = render({ memories: [] });
+    expect(el.querySelector('[data-testid="memory-stated-empty"]')?.textContent).toBe(
+      '没有记住的事',
+    );
+  });
+
+  it('列出生效条目，忘记按钮回调带 id', () => {
+    const forgotten: string[] = [];
+    const el = render({
+      memories: [mem()],
+      onForgetMemory: (id: string) => forgotten.push(id),
+    });
+    expect(el.textContent).toContain('回答先给结论');
+    expect(el.textContent).toContain('偏好');
+    click(el.querySelector('[data-testid="memory-stated-forget-m1"]'));
+    expect(forgotten).toEqual(['m1']);
+  });
+
+  it('输入 + Enter 触发新增，成功后清空输入', () => {
+    const added: string[] = [];
+    const el = render({ memories: [], onAddMemory: (text: string) => added.push(text) });
+    const input = el.querySelector('input') as HTMLInputElement;
+    expect(input).not.toBeNull();
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    act(() => {
+      setter?.call(input, '以后回答先给结论');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    expect(added).toEqual(['以后回答先给结论']);
+    expect(input.value).toBe('');
+  });
+
+  it('待确认条目走确认 / 不要两条路', () => {
+    const confirmed: string[] = [];
+    const dismissed: string[] = [];
+    const el = render({
+      memories: [mem({ id: 'p1', status: 'pending', origin: 'extracted' })],
+      onConfirmMemory: (id: string) => confirmed.push(id),
+      onDismissMemory: (id: string) => dismissed.push(id),
+    });
+    expect(el.textContent).toContain('待确认');
+    click(el.querySelector('[data-testid="memory-stated-confirm-p1"]'));
+    click(el.querySelector('[data-testid="memory-stated-dismiss-p1"]'));
+    expect(confirmed).toEqual(['p1']);
+    expect(dismissed).toEqual(['p1']);
+  });
+});

@@ -68,6 +68,7 @@ export * from './memory.js';
 export * from './preferences.js';
 export * from './preference-evidence.js';
 export * from './preference-hints.js';
+export * from './user-memory.js';
 export * from './ai-feedback.js';
 export * from './preference-corrections.js';
 export * from './recall.js';

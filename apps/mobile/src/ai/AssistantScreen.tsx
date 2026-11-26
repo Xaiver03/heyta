@@ -339,6 +339,13 @@ export function AssistantScreen({
    * 流式未完成的那一段由下面的 `liveItems` 追加 —— 两者拼起来才是屏幕上该有的顺序。
    */
   const renderItems = snapshot.items.map<ChatTranscriptItem>((entry) => {
+    if (entry.role === 'memory') {
+      return {
+        id: entry.id,
+        role: 'memory',
+        text: t('web.ai.chat.memory', { n: entry.items.length }),
+      };
+    }
     const privacyBlocked = entry.role === 'error' && entry.message.includes('privacy-consent-not-granted');
     const detail =
       entry.role === 'error'

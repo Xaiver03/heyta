@@ -30,6 +30,21 @@ export type ChatItem =
     }
   | {
       readonly id: number;
+      readonly role: 'memory';
+      /**
+       * 这一轮**真的进了 prompt** 的记忆（预算裁剪之后）。
+       *
+       * 🔴 不是「库里有什么」：显示库里全部条目，用户会以为 AI 看过
+       * 一条它其实没带的记忆。选择规则只有一处（`selectMemoryForPrompt`）。
+       */
+      readonly items: readonly {
+        readonly id: string;
+        readonly kind: string;
+        readonly text: string;
+      }[];
+    }
+  | {
+      readonly id: number;
       readonly role: 'proposal';
       readonly text: string;
       readonly proposal: AiToolProposal;

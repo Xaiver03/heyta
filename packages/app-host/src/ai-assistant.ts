@@ -81,6 +81,8 @@ import {
   type LocalApiWriteResult,
 } from '@heyta/local-api';
 
+import { selectMemoryForPrompt, type UserMemory } from '@heyta/domain';
+
 import { MAX_TOOL_CALL_TEXT_LENGTH, parseToolArguments, toToolDescriptors } from './ai-tool-call.js';
 import { resolveToolSelection, type ToolSelection, type ToolSelectionRule } from './ai-tool-selection.js';
 import {
@@ -137,13 +139,16 @@ export function assistantGrants(): NonNullable<LocalApiConfig['grants']> {
  * 🔴 从目录的 `egressFields` 取，不在这里列字段名单 —— 列了就是一份抄件，
  * 而抄件一定漂（本仓库对这件事有账）。
  */
-export function assistantEgressFields(): readonly string[] {
+export function assistantEgressFields(options: { memory?: boolean } = {}): readonly string[] {
   const grants = assistantGrants();
   const fields = new Set<string>(ASSISTANT_BASE_EGRESS_FIELDS);
   for (const tool of LOCAL_API_TOOLS) {
     if (grants[tool.name] !== true) continue;
     for (const field of tool.egressFields) fields.add(field);
   }
+  // 记忆正文只在开关打开且真有条目时才出境；披露必须跟着同一件事走，
+  // 否则用户会以为「关了记忆也还在发」或反过来。
+  if (options.memory === true) fields.add('memory.items');
   return [...fields].sort();
 }
 
@@ -164,14 +169,14 @@ export interface AssistantEgressPlan {
   readonly maxBytesPerRequest: number;
 }
 
-export function planAssistantEgress(options: { hasImages?: boolean } = {}): AssistantEgressPlan {
+export function planAssistantEgress(options: { hasImages?: boolean; memory?: boolean } = {}): AssistantEgressPlan {
   const grants = assistantGrants();
   return {
     // 带图的那一轮，披露里必须有 `images` —— 否则用户以为只发文字。
-    fields:
-      options.hasImages === true
-        ? [...assistantEgressFields(), 'images']
-        : assistantEgressFields(),
+    fields: [
+      ...assistantEgressFields({ memory: options.memory === true }),
+      ...(options.hasImages === true ? ['images'] : []),
+    ],
     tools: LOCAL_API_TOOLS.filter((tool) => grants[tool.name] === true).map((tool) => tool.name),
     maxRequests: MAX_ASSISTANT_TOOL_STEPS + 1,
     maxMessages: MAX_ASSISTANT_MESSAGES,
@@ -345,6 +350,23 @@ export interface AssistantTurnDeps {
   readonly onEvent?: (event: AssistantTurnEvent) => void;
   /** 已有历史（由壳持久化）。出境的只有这次实际带上消息数组。 */
   readonly history?: readonly AssistantMessage[];
+  /**
+   * 本轮可注入的陈述记忆。
+   *
+   * 🔴 `enabled=false` 与「没有条目」都等于**不注入、不披露** ——
+   * 与 ADR-0014 的 fail-closed 同一条：省略这个字段不会意外打开记忆。
+   */
+  readonly memory?: {
+    readonly enabled: boolean;
+    readonly items: readonly UserMemory[];
+  };
+  /**
+   * 这一轮**真的进了 prompt** 的记忆（预算裁剪之后）。
+   *
+   * 只在真用了时才回调；界面据此画「记忆 · N」—— 显示库里有什么，
+   * 会让用户以为 AI 看过一条它其实没带的记忆。
+   */
+  readonly onMemoryUsed?: (items: readonly UserMemory[]) => void;
   readonly policy?: AiRoutingPolicy;
   readonly routed?: RoutedDeps;
   /**
@@ -389,12 +411,17 @@ const ASSISTANT_SYSTEM_PROMPT = [
  * ⚠️ 它是 `messages[0]` 的**唯一来源**：调用方把返回值同时交给
  * `assistantMessages()` 和 `invocation.system`，所以两边不可能互相矛盾。
  */
-export function assistantSystemPrompt(now: number = Date.now()): string {
+export function assistantSystemPrompt(now: number = Date.now(), memoryBlock = ''): string {
+  // 🔴 记忆块放**最后**：它是最容易被模型误读成「指令」的一段，
+  // 放在日历锚点与硬规则之后，冲突时以更靠前的规则为准。
   return [
     ASSISTANT_SYSTEM_PROMPT,
     calendarAnchorLine(calendarAnchor(now)),
     CALENDAR_ANCHOR_RULES,
-  ].join('\n\n');
+    memoryBlock,
+  ]
+    .filter((part) => part.trim().length > 0)
+    .join('\n\n');
 }
 
 /**
@@ -761,7 +788,14 @@ export async function requestAssistantTurn(
   // 🔴 锚点**一轮算一次**（`anchorNow`，规则短路也用它）：逐步重算会让跨零点的那一轮里
   // "第 1 步按今天查、第 3 步按明天查"，而同一条消息数组里并存两种"今天" —— 模型看到的是
   // 一个自相矛盾的上下文，且没有任何一层会报。
-  const system = assistantSystemPrompt(anchorNow);
+  const selectedMemory =
+    deps.memory?.enabled === true
+      ? selectMemoryForPrompt(deps.memory.items, text, { now: anchorNow })
+      : { block: '', resident: [], recall: [] };
+  if (selectedMemory.block !== '') {
+    deps.onMemoryUsed?.([...selectedMemory.resident, ...selectedMemory.recall]);
+  }
+  const system = assistantSystemPrompt(anchorNow, selectedMemory.block);
 
   /**
    * 这一轮交给 `invokeRouted` 的依赖。

@@ -9,7 +9,7 @@ import { useTokens } from '../theme';
 
 export interface ChatTranscriptItem {
   readonly id: string | number;
-  readonly role: 'user' | 'assistant' | 'error' | 'proposal';
+  readonly role: 'user' | 'assistant' | 'error' | 'proposal' | 'memory';
   readonly text: string;
   readonly detail?: string;
   /** 工具步骤的可折叠思考链（assistant 且 steps>0 时提供）。 */
@@ -56,6 +56,15 @@ function ChatMessage({
   animate?: boolean;
 }): React.JSX.Element {
   const tokens = useTokens();
+  if (item.role === 'memory') {
+    return (
+      <View testID="chat-memory">
+        <Text variant="caption" tone="subtle">
+          {item.text}
+        </Text>
+      </View>
+    );
+  }
   const isUser = item.role === 'user';
   const isError = item.role === 'error';
   const isGenerated = item.role === 'assistant' || item.role === 'proposal';

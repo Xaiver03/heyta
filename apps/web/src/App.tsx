@@ -4195,6 +4195,11 @@ export function App(): React.JSX.Element {
                     focusGaps={memory.focusGaps}
                     onSuppress={(id) => void store.suppressPreference(id)}
                     onRestore={(id) => void store.restorePreference(id)}
+                    memories={Object.values(store.entities.userMemories)}
+                    onAddMemory={(text) => void store.addUserMemory({ kind: 'preference', text })}
+                    onForgetMemory={(id) => void store.forgetUserMemory(id)}
+                    onConfirmMemory={(id) => void store.confirmUserMemory(id)}
+                    onDismissMemory={(id) => void store.forgetUserMemory(id)}
                   />
                 }
                 /**
