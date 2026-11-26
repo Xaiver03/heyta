@@ -110,7 +110,7 @@ function stripComments(text: string): string {
 
 describe('TaskRow 的 density 档位', () => {
   it('档位是有界的，且表与清单一一对应（加了档位忘登记会红）', () => {
-    expect(TASK_ROW_DENSITIES.length).toBe(4);
+    expect(TASK_ROW_DENSITIES.length).toBe(5);
     expect([...TASK_ROW_DENSITIES].sort()).toEqual(Object.keys(DENSITY_SPEC).sort());
   });
 
@@ -159,21 +159,19 @@ describe('TaskRow 的 density 档位', () => {
     });
   });
 
-  it('B. 默认档缺省即 comfortable，且与"抽取之前"的几何逐项一致', () => {
-    expect(DEFAULT_TASK_ROW_DENSITY).toBe('comfortable');
-    expect(resolveTaskRowDensity()).toEqual(DENSITY_SPEC.comfortable);
-    expect(resolveTaskRowDensity('comfortable')).toEqual(DENSITY_SPEC.comfortable);
+  it('B. 默认档是 `dense`（2026-11-26 全端统一收紧）；`comfortable` 仍与抽取前几何一致', () => {
+    expect(DEFAULT_TASK_ROW_DENSITY).toBe('dense');
+    expect(resolveTaskRowDensity()).toEqual(DENSITY_SPEC.dense);
+    expect(resolveTaskRowDensity('dense')).toEqual(DENSITY_SPEC.dense);
 
-    // 🔴 承重：默认档必须仍然是 `task-row-shape.ts` 登记的那一组 token +
-    //    两个插槽都渲染。有人把默认档"顺手调紧"会让这里红。
+    // 🔴 承重：`comfortable` 档仍是 `task-row-shape.ts` 登记的那一组 token +
+    //    两个插槽都渲染 —— 它只是不再是缺省，几何不许漂。
     expect(DENSITY_SPEC.comfortable).toEqual({
       minHeight: TASK_ROW_SHAPE.minHeight,
       bodyPaddingBlock: TASK_ROW_SHAPE.bodyPaddingBlock,
       gap: TASK_ROW_SHAPE.gap,
       showMeta: true,
       showTrailing: true,
-      // 默认档的标题逐字等于 `task-row-shape.ts` 登记的那枚 ——
-      // "不传 density 的调用点一字不变"这条前提就钉在这一格。
       title: TASK_ROW_TEXT.title,
     });
   });

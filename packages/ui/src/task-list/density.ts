@@ -65,7 +65,7 @@ import {
  * ⚠️ `detail` 不是"第三份行"：它是同一份 `<TaskRow>` 的一档，
  * 差异只有表里那五个槽位（其中 `title` 是这一档带来的，见 `TaskRowDensitySpec`）。
  */
-export type TaskRowDensity = 'comfortable' | 'compact' | 'minimal' | 'detail';
+export type TaskRowDensity = 'comfortable' | 'compact' | 'minimal' | 'detail' | 'dense';
 
 /** 全档位清单（测试与 `satisfies` 共用，避免"加了档位忘了登记"）。 */
 export const TASK_ROW_DENSITIES = [
@@ -73,16 +73,21 @@ export const TASK_ROW_DENSITIES = [
   'compact',
   'minimal',
   'detail',
+  'dense',
 ] as const satisfies readonly TaskRowDensity[];
 
 /**
- * 缺省档。
+ * 缺省档 = **`dense`**（2026-11-26 产品决定：所有端、所有任务列表统一收紧密度）。
  *
- * 🔴 它的值必须**逐字节等于**抽取 `TaskRow` 之前那段内联行 JSX 的行为 ——
- * `TaskList` 不传 `density` 时走的正是这一档，所以"默认档不动"是
- * "现有 web / ui 测试一行不改就全绿"的前提。
+ * 为什么把默认档从 `comfortable` 换成 `dense`，而不是每端各传一次：
+ * 手机端、Web、桌面壳共用同一份 `<TaskList>`，缺省档是**唯一**能被所有端
+ * 一起命中、且不会漏掉某个调用点的落点。改这一处 ⇒ 所有没收窄过的列表一起变紧；
+ * 象限（`compact`）、日历（`minimal`）、详情（`detail`）这些显式档不受影响。
+ *
+ * ⚠️ `comfortable` 档**保留**：它仍是"抽取前那段内联行"的几何，供需要宽松排版的
+ * 调用点显式选择；只是不再是缺省。
  */
-export const DEFAULT_TASK_ROW_DENSITY: TaskRowDensity = 'comfortable';
+export const DEFAULT_TASK_ROW_DENSITY: TaskRowDensity = 'dense';
 
 /**
  * 一档密度的完整定义。
@@ -128,6 +133,7 @@ export interface TaskRowDensitySpec {
  * | `compact` | 四象限卡 | `touch-target.min`（44） | `space.1`（4） | ✅ | ✅ | `row-title` |
  * | `minimal` | 日历格 / 时间线泳道 | 无下限 | `space.1`（4） | ❌ | ❌ | `row-title` |
  * | `detail` | 详情面板内容层那一行 | `size.row-min-height`（60） | `space.3`（12） | ✅ | ✅ | **`detail-title`** |
+ * | `dense` | 桌面列表（对标滴答密度） | `touch-target.min`（44） | `space.2`（8） | ✅ | ✅ | `row-title` |
  *
  * ⚠️ 上面这段"三档"是旧话，第四档 `detail` 于 2026-11-03 加入（表里已列全）。
  * 判"某档有没有偷偷多改东西"的尺不是这段注释，是
@@ -183,6 +189,25 @@ export const DENSITY_SPEC = {
     showMeta: true,
     showTrailing: true,
     title: 'detail-title',
+  },
+  /**
+   * **桌面列表的紧凑档**（对标滴答的密度，2026-11-26）。
+   *
+   * 与 `comfortable` 的差别只在两处空间：行最小高降到触控下限 `44`，
+   * 文字块上下内间距降到 `space.2`(8)。单行行高因此是 44（28 行高 + 上下各 8），
+   * 与滴答桌面单行 ≈48 同档；配 `rowDividers` 后行距从 68 收到 44。
+   *
+   * 槽位与标题样式**完全同 `comfortable`** —— 这是"同一行的更紧一档"，
+   * 不是"另一种行"，也不是给某处调排版留的口子（排印仍只 `detail` 一档偏离）。
+   * 移动端/象限/日历都不传它，行为不变。
+   */
+  dense: {
+    minHeight: 'touch-target.min',
+    bodyPaddingBlock: 'space.2',
+    gap: TASK_ROW_SHAPE.gap,
+    showMeta: true,
+    showTrailing: true,
+    title: TASK_ROW_TEXT.title,
   },
 } as const satisfies Record<TaskRowDensity, TaskRowDensitySpec>;
 

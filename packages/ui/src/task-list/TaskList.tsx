@@ -220,6 +220,14 @@ interface TaskListSharedProps {
    */
   readonly listCard?: boolean;
   /**
+   * 行与行之间画一条**细横线**（对标滴答桌面列表的结构感）。
+   *
+   * 只在显式传 true 时生效 —— 移动端白卡（`listCard`）与四象限/日历都不传，
+   * 逐字节不变。开启后列表 `gap` 归零，行间分隔交给这条线（否则线+缝会双重留白）。
+   * 纯视觉，不改变任何排序/交互。
+   */
+  readonly rowDividers?: boolean;
+  /**
    * 滚动位置回调（可选）。宿主用它驱动"顶栏随滚动收起"。
    *
    * 🔴 为什么要这一个口：任务列表的滚动宿主是 `FlatList` **自己**
@@ -289,6 +297,7 @@ export function TaskList<TMeta = undefined>({
   renderRowWrapper,
   iconColorOf,
   listCard = false,
+  rowDividers = false,
   onScrollOffset,
 }: TaskListProps<TMeta>): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -373,7 +382,7 @@ export function TaskList<TMeta = undefined>({
            * 一张白卡被切成七段（真机截图：每行之间一道灰色断口）。
            * 分隔的职责交给行自己的上下内边距，卡是一整块。
            */
-          gap: showCard ? 0 : tokens[TASK_ROW_SHAPE.listGap],
+          gap: showCard || rowDividers ? 0 : tokens[TASK_ROW_SHAPE.listGap],
           ...(showCard && !useSectionCards
             ? {
                 backgroundColor: tokens['color.surface'],
@@ -410,8 +419,13 @@ export function TaskList<TMeta = undefined>({
           paddingHorizontal: tokens['space.2'],
           ...(parseCssShadow(tokens['shadow.sm']) ?? {}),
         },
+        /** `rowDividers` 的那条细横线：一条真实的尺寸声明（不是 0 高的装饰）。 */
+        divider: {
+          height: tokens['border-width.thin'],
+          backgroundColor: tokens['color.border'],
+        },
       }),
-    [showCard, isEmptyCard, useSectionCards, tokens],
+    [showCard, isEmptyCard, useSectionCards, rowDividers, tokens],
   );
 
   const buildTaskRow = useCallback(
@@ -538,6 +552,10 @@ export function TaskList<TMeta = undefined>({
     ListHeaderComponent: listHeaderComponent,
     ListFooterComponent: inlineAddNode,
     ListEmptyComponent: emptyNode,
+    // 行间细横线（仅 `rowDividers`）：与 `gap: 0` 配套，用一条线承担分隔。
+    ItemSeparatorComponent: rowDividers
+      ? () => <View style={styles.divider} />
+      : undefined,
     contentContainerStyle: styles.list,
     ...(onScrollOffset === undefined
       ? {}

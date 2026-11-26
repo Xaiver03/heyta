@@ -126,13 +126,17 @@ export function TaskBadges({
   // 空 View 也会占掉 `gap` 的间距，让没有徽章的行看起来比有徽章的行矮一截。
   if (!hasDue && !hasPriority && !hasFlag && !hasSubtasks && !hasRepeat && !hasList) return null;
 
-  const dueColor = due?.overdue === true ? tokens['color.danger'] : tokens['color.foreground-subtle'];
+  /*
+    截止/时间用**主色**（对标滴答：右侧时间是一条带色的强调，扫读时先被看到），
+    逾期仍用危险色。列表名保持弱色 —— 一个强调点，不与归属抢注意力。
+  */
+  const dueColor = due?.overdue === true ? tokens['color.danger'] : tokens['color.primary'];
 
   return (
     <View style={styles.row} testID={testID}>
       {hasList ? (
         <View style={styles.item}>
-          <HeytaIcon data={GLYPHS.list} size={tokens['icon.xs']} color={tokens['color.foreground-subtle']} />
+          <HeytaIcon data={GLYPHS.list} size={tokens['icon.sm']} color={tokens['color.foreground-subtle']} />
           <Text
             style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}
             numberOfLines={1}
@@ -146,7 +150,7 @@ export function TaskBadges({
         <View style={styles.item}>
           <HeytaIcon
             data={due.overdue ? GLYPHS.overdue : GLYPHS.due}
-            size={tokens['icon.xs']}
+            size={tokens['icon.sm']}
             color={dueColor}
             {...(due.text === '' && iconLabel !== undefined ? { label: iconLabel } : {})}
           />
@@ -177,7 +181,7 @@ export function TaskBadges({
         <View style={styles.item} testID="task-badge-flag">
           <HeytaIcon
             data={GLYPHS.flag}
-            size={tokens['icon.xs']}
+            size={tokens['icon.sm']}
             color={tokens['color.primary']}
             {...(iconLabel !== undefined ? { label: iconLabel } : {})}
           />
@@ -188,7 +192,7 @@ export function TaskBadges({
         <View style={styles.item} testID="task-badge-subtasks">
           <HeytaIcon
             data={GLYPHS.subtasks}
-            size={tokens['icon.xs']}
+            size={tokens['icon.sm']}
             color={tokens['color.foreground-subtle']}
           />
           <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
@@ -201,7 +205,7 @@ export function TaskBadges({
         <View style={styles.item}>
           <HeytaIcon
             data={GLYPHS.repeat}
-            size={tokens['icon.xs']}
+            size={tokens['icon.sm']}
             color={tokens['color.foreground-subtle']}
           />
           <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
