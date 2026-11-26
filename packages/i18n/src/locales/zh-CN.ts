@@ -843,6 +843,10 @@ export const zhCN = {
   'web.settings.display.themePreset.warm': '暖纸',
   'web.settings.display.themePreset.mist': '雾青',
   'web.settings.display.themeTitle': '外观',
+  'web.settings.display.fontSizeTitle': '字体大小',
+  'web.settings.display.fontSize.compact': '小',
+  'web.settings.display.fontSize.standard': '标准',
+  'web.settings.display.fontSize.comfortable': '大',
   'web.settings.display.themeLight': '浅色',
   'web.settings.display.themeDark': '深色',
   'web.settings.display.themeNote': '这台设备上的偏好。在这里选过之前，界面跟随系统的深/浅色设置。',
@@ -939,7 +943,6 @@ export const zhCN = {
   'web.trash.nav': '回收站',
   'web.trash.intro': '这里放着已删除的任务、便签、清单和习惯。恢复后它会回到原来的位置。',
   'web.trash.empty.title': '回收站是空的',
-  'web.trash.empty.hint': '有内容后，可以在这里恢复或彻底删除。',
   'web.trash.deletedAt': '删除于 {date}',
   'web.trash.restore': '恢复：{title}',
   'web.trash.purge': '彻底删除：{title}',
@@ -1009,31 +1012,19 @@ export const zhCN = {
   'web.filter.addCondition': '添加条件',
   'web.filter.removeCondition': '删除条件',
   'web.shell.empty.compound.title': '没有符合条件的任务',
-  'web.shell.empty.compound.hint': '调整或减少条件再试',
   // 空状态：任何列表都必须有空状态，而且要说**下一步做什么** ——
   // 留白屏会让用户以为应用坏了。`all` 同时是兜底（新的 filter.kind 不留白）。
   'web.shell.empty.all.title': '收集箱是空的',
-  'web.shell.empty.all.hint': '在上面输入框添加第一个任务',
   'web.shell.empty.today.title': '今天没有到期任务',
-  'web.shell.empty.today.hint': '给任务设个截止时间，它会出现在这里',
   'web.shell.empty.next7Days.title': '未来 7 天没有安排',
-  'web.shell.empty.next7Days.hint': '给任务设一个这几天内的截止时间，它会出现在这里',
   'web.shell.empty.completed.title': '还没有完成的任务',
-  'web.shell.empty.completed.hint': '完成一个任务试试',
   'web.shell.empty.quadrant.title': '这个象限是空的',
-  'web.shell.empty.quadrant.hint': '给任务标记重要程度与截止时间',
   // 首启引导（桌面 / web）：只在「收集箱为空 + 没跳过过」时出现，落在空态里。
   // 🔴 刻意**不做**多步巡览 —— 三个独立来源都把它列为反模式（"multi-step tutorial
   //    upfront" / "modal blocking content"）。这里只有"做一件真事"这一条路：
   //    点一条示例 ⇒ 灌进输入框 ⇒ 用户看着识别芯片按回车。取舍见
   //    docs/research/product-audit-2026-11-13.md §4.3 与 screenshots/README.md 同批说明。
-  'web.firstRun.title': '把脑子里的事先倒出来',
-  'web.firstRun.hint': '写一句就行 —— 日期会自己认出来。',
-  'web.firstRun.example1': '明天下午3点 给客户回邮件',
-  'web.firstRun.example2': '下周三 交周报',
-  'web.firstRun.example3': '今天 整理桌面',
   // 「先自己写」而不是「跳过」：这是**选择**，不是拒绝。跳过之后永不出现。
-  'web.firstRun.skip': '先自己写',
 
   // ── Web · 崩溃屏（ErrorScreen）────────────────────────────
   'web.error.storage.title': '无法初始化本地存储',
@@ -1215,7 +1206,6 @@ export const zhCN = {
   // Web 认证弹窗的轻量计划主题。它描述流程，不伪造任务、进度或成就。
   'web.auth.plan.title': '开始自己的自律计划',
   'web.auth.plan.kicker': '我的计划',
-  'web.auth.plan.lead': '从一件小事开始，让每一天有自己的节奏。',
   'web.auth.plan.previewTitle': '今日计划',
   'web.auth.plan.previewFirst': '读几页喜欢的书',
   'web.auth.plan.previewSecond': '专注完成一件小事',
@@ -1758,7 +1748,6 @@ export const zhCN = {
   'web.habits.backfill.invalid': '可补打卡天数必须是 1 或更大的整数。',
   'web.habits.freq.weeklyRequired': '至少选择一个星期几。',
   'web.habits.empty.title': '还没有习惯',
-  'web.habits.empty.hint': '添加一个习惯，从今天开始记录。',
   'web.habits.empty': '还没有习惯。添加一个开始打卡。',
   'web.habits.streak.current': '连续 {count} 天',
   // 中文无单复数，刻意与复数版逐字相同（en 侧才会不同）。
@@ -2028,10 +2017,8 @@ export const zhCN = {
   // 🔴 这一组里**只许有事实句**：某类做了多久、这些时间怎么算出来的。
   //    没有"最多/最少/失衡/超标"，也没有排名与占比（见计划 §2 反需求）。
   'web.categories.title': '分类时长',
-  'web.categories.note': '统计近 12 周的专注与打卡时间。颜色由你自己赋义，这一页不做任何评价。',
   'web.categories.empty': '还没有可展示的记录。先给任务归类或记录一次习惯时长。',
   'web.categories.empty.title': '还没有可展示的记录',
-  'web.categories.empty.hint': '先给任务归类，或记录一次习惯时长。',
   'web.categories.range': '{start} 至 {end}',
   'web.categories.kind.project': '清单',
   'web.categories.kind.habit': '习惯',
@@ -2070,7 +2057,6 @@ export const zhCN = {
   // ── Web · 清单与标签 ──────────────────────────────────────
   'web.projects.ariaLabel': '清单与标签',
   'web.projects.heading': '清单',
-  'web.projects.headingHint': '用清单收纳任务与便签，可建子清单和文件夹。',
   'web.projects.newPlaceholder': '新清单',
   'web.projects.newLabel': '新清单名称',
   'web.projects.addNew': '新建清单',
@@ -2091,7 +2077,6 @@ export const zhCN = {
   'web.projects.settings.kind.tasks': '任务',
   'web.projects.settings.kind.notes': '便签',
   'web.tags.heading': '标签',
-  'web.tags.headingHint': '标签跨清单给任务打记号，点一下只看带它的任务。',
   'web.tags.newPlaceholder': '新标签',
   'web.tags.newLabel': '新标签名称',
   'web.tags.addNew': '新建标签',
@@ -2182,15 +2167,16 @@ export const zhCN = {
   'web.repeat.error.invalid': '这不是一条合法的 RRULE（需要 FREQ=…）。',
 
   // ── Web · 四象限 ──────────────────────────────────────────
-  'web.quadrant.do': '马上做',
+  'web.quadrant.do': '重要且紧急',
   'web.quadrant.q1': '重要且紧急',
-  'web.quadrant.plan': '计划做',
+  'web.quadrant.plan': '重要不紧急',
   'web.quadrant.q2': '重要不紧急',
-  'web.quadrant.delegate': '交给别人',
+  'web.quadrant.delegate': '紧急不重要',
   'web.quadrant.q3': '紧急不重要',
-  'web.quadrant.drop': '先不做',
+  'web.quadrant.drop': '不重要不紧急',
   'web.quadrant.q4': '不重要不紧急',
-  'web.quadrant.a11y.cell': '象限：{title}，{hint}',
+  'web.quadrant.a11y.cell': '象限：{title}',
+  'web.quadrant.empty': '没有任务',
   'web.quadrant.dropHere': '拖任务到这里',
   'web.quadrant.dragging': '正在拖拽任务',
   'web.quadrant.a11y.handle': '移动任务到另一个象限',
@@ -2221,7 +2207,6 @@ export const zhCN = {
   // 中文无单复数，刻意与复数版逐字相同（词条表没有 ICU，调用方按 count===1 分支）。
   'web.timeline.aria.groupOne': '时间线：共 {count} 条任务',
   'web.timeline.empty': '还没有可排期的任务',
-  'web.timeline.empty.hint': '先在收集箱创建任务，再添加清单或让 AI 拆解，时间线就能开始安排。',
   'web.timeline.aiEstimate': 'AI 估时：{duration}（整条任务）',
   'web.timeline.noChecklist': '这条任务还没有可排期的清单 —— 先在备注里写几条待办，或让 AI 拆解一次；下面先按整条任务排一条。',
   // {count} 在这里恒 ≥ 2（"摊不下去"只在多个子条目时才存在），所以没有单数兄弟。
@@ -2761,8 +2746,6 @@ export const zhCN = {
   'web.ai.chat.history.close': '收起历史',
   'web.ai.chat.expand': '展开对话',
   'web.ai.chat.collapse': '收起对话',
-  'web.ai.chat.greeting': '今天想先完成什么？',
-  'web.ai.chat.greetingHint': '把想法变成下一步。',
   'web.ai.chat.tier.readOnly': '只读',
   'web.ai.chat.tier.readAndPropose': '执行',
   'web.ai.chat.disclosureHeading': '这段会话会把这些内容送到端点',
@@ -2771,6 +2754,9 @@ export const zhCN = {
   'web.ai.chat.limits': '一轮最多 {requests} 次模型调用，单次请求最多 {messages} 条消息、{bytes} 字节。',
   'web.ai.chat.trace': '用了 {n} 步工具',
   'web.ai.chat.noTrace': '没有调用工具',
+  'web.ai.chat.callingTools': '调用工具中',
+  'web.ai.chat.viewMore': '查看更多',
+  'web.ai.chat.collapseDetail': '收起',
   // 过程行（流式）的动词。**状态在前、工具名在后**：用户先要知道"这一步在干什么"，
   // 再决定要不要看"具体是哪个工具"。`读/写` 两种靠 `AssistantStep.kind` 分，不靠工具名猜。
   'web.ai.chat.step.reading': '正在读取',
@@ -2786,8 +2772,15 @@ export const zhCN = {
   'web.ai.chat.local.more': '还有 {count} 项未列出。',
   'web.ai.chat.stoppedLead': '在上界处停下了：',
   'web.ai.chat.disclaimer': 'AI 可能出错，请核对重要信息。',
-  'web.ai.chat.historyLocalOnly': '这段对话只保存在这台设备上：不同步到其他设备，也不会发送到任何地方。',
-  'web.ai.chat.expiredProposal': '这段对话是从本机恢复的。其中那条你还没确认的改动已经失效 —— 要改请重新说一次。',
+  'web.ai.chat.historyLocalOnly': '只保存在这台设备，不同步。',
+  'web.ai.chat.expiredProposal': '已失效，请重新发起。',
+  'web.ai.chat.proposal.setPriorities': '调整 {count} 项任务优先级',
+  'web.ai.chat.proposal.completeTasks': '完成 {count} 项任务',
+  'web.ai.chat.proposal.createTask': '新建任务',
+  'web.ai.chat.proposal.updateTask': '更新任务',
+  'web.ai.chat.proposal.badge.complete': '完成',
+  'web.ai.chat.proposal.badge.create': '新建',
+  'web.ai.chat.proposal.badge.update': '变更',
   'web.ai.chat.resultAria': '助手的回答',
   'web.ai.assistant.failure.emptyText': '还没有输入内容。',
   'web.ai.assistant.failure.textTooLong': '这句话太长了，助手只处理短命令。',
@@ -3165,15 +3158,9 @@ export const zhCN = {
     也明示了它），而移动端那条 `mobile.capture.placeholder` 从来不写这句话 ——
     去掉之后两端口径也一致了。
   */
-  'web.capture.placeholder': '添加任务（可写「明天下午3点」「下周三」）',
-  // 🔴 「添加到哪儿」必须出现在占位符里。当下面板停在某个清单时，
-  // 「添加任务」这句话只说了一半 —— 用户按回车后任务落进收集箱、
-  // 从眼前这条列表里消失，而界面上没有任何一处说过这件事。
-  'web.capture.placeholderTo': '添加任务到「{list}」（可写「明天下午3点」「下周三」）',
-  // R11 批五：日历里选中了某一天时，捕获框要**说出落点**。
-  // 悄悄改变一条任务的落点属于『界面没说谎、但用户以为没说』那一类，
-  // 所以这句提示是功能的一部分，不是装饰。
-  'web.capture.placeholderToDay': '添加到 {day}（写了「明天」就以「明天」为准）',
+  'web.capture.placeholder': '添加任务',
+  'web.capture.placeholderTo': '添加任务到「{list}」',
+  'web.capture.placeholderToDay': '添加到 {day}',
   'web.calendar.capture.add': '往选中那天加一条',
   'web.calendar.capture.close': '收起输入框',
   // 飞书日程（阶段 A）：外部日程只读；标签是本地唯一可写的一格。
@@ -3215,6 +3202,33 @@ export const zhCN = {
   'web.calendar.hub.lastSyncAgoHours': '{hours} 小时前',
   'web.calendar.hub.lastSyncAgoDays': '{days} 天前',
   'web.calendar.hub.autoSyncing': '正在自动同步…',
+  'web.calendar.sub.title': '日历订阅',
+  'web.calendar.sub.url': 'ICS / webcal 链接',
+  'web.calendar.sub.name': '名称',
+  'web.calendar.sub.add': '添加订阅',
+  'web.calendar.sub.sync': '同步',
+  'web.calendar.sub.enable': '启用',
+  'web.calendar.sub.disable': '停用',
+  'web.calendar.sub.remove': '删除',
+  'web.calendar.sub.empty': '还没有订阅',
+  'web.calendar.sub.invalid': '链接不能为空',
+  'web.calendar.sub.enabled': '已启用',
+  'web.calendar.sub.disabled': '已停用',
+  'web.calendar.sub.exportIcs': '导出 .ics',
+  'web.calendar.sub.getFeed': '获取订阅链接',
+  'web.calendar.sub.feedFailed': '获取失败，请先登录并配置同步',
+  'web.csvimport.title': '从 CSV / Todoist 导入',
+  'web.csvimport.kindGeneric': '通用 CSV',
+  'web.csvimport.kindTodoist': 'Todoist 导入',
+  'web.csvimport.pick': '选择文件',
+  'web.csvimport.import': '导入',
+  'web.csvimport.preview': '任务 {tasks} · 清单 {projects} · 标签 {tags} · 跳过 {skipped}',
+  'web.csvimport.done': '已导入 {tasks} 条任务',
+  'web.csvimport.failure.noHeader': '找不到表头（需要 title/标题 或 CONTENT 列）',
+  'web.csvimport.failure.noTasks': '没有可导入的任务',
+  'web.csvimport.failure.unsupported': '不支持的文件',
+  'web.csvimport.readFailed': '读不了这个文件',
+  'web.csvimport.importFailed': '导入中途失败，重试不会重复',
   'web.capture.addLabel': '新任务标题',
   'web.capture.add': '添加',
   'web.capture.matches.aria': '识别出的字段',
@@ -3559,7 +3573,6 @@ export const zhCN = {
    * 一句长解释不该占标题位：标题说"空"，说明说"为什么空 / 怎么变有"。
    */
   'mobile.categories.empty': '还没有可以归类的时间记录。',
-  'mobile.categories.empty.hint': '用清单组织任务、或用习惯记下时长，这里就会长出内容。',
   'mobile.categories.range': '{start} 至 {end}',
   'mobile.categories.kind.project': '清单',
   'mobile.categories.kind.habit': '习惯',
@@ -3696,7 +3709,7 @@ export const zhCN = {
   //    识别芯片，而移动端一直以来只是一个纯标题输入框 —— 同一句话在两端
   //    建出不同的任务。现在两端共用同一个 `@heyta/ui` 的 `CaptureComposer`，
   //    差别只剩措辞。
-  'mobile.capture.placeholder': '添加任务（可写「明天」「下周三」）',
+  'mobile.capture.placeholder': '添加任务',
   'mobile.capture.addLabel': '新任务标题',
   'mobile.capture.add': '添加',
   // 第二行（补充说明）的占位。只有移动端的新建面板开这一行（见 CaptureComposer 的 descriptionInput）。
@@ -3746,7 +3759,6 @@ export const zhCN = {
     Apple 对空态的要求是**行动入口就在眼前**；"点右下角的加号"是让用户
     自己去别的角落找一个控件，多一步、也多一次找不到的机会。
   */
-  'mobile.tasks.empty.hint': '从一件小事开始。',
   'mobile.tasks.empty.filteredTitle': '这里还没有任务',
   'mobile.tasks.empty.action': '添加第一个任务',
   'mobile.tasks.detail.placeholder': '从左侧选一条任务，详情显示在这里。',
@@ -4017,7 +4029,6 @@ export const zhCN = {
   // 🔴 不能说「点「+」新建清单」：**web 有那枚 +，移动端没有**（移动端是
   // 下面一个输入框 + 一枚「新建清单」按钮）。同一句文案两端复用，只有一端成立，
   // 移动端用户会去找一个不存在的按钮。改成两端都为真的说法。
-  'common.organizer.lists.empty.hint': '输入名称就能新建清单。',
   'mobile.lists.nameLabel': '清单名称',
   /*
    * 🔴 2026-11-15：原来 "给新清单起个名字" —— 而它上面的 label 是 "清单名称"。
@@ -4101,7 +4112,6 @@ export const zhCN = {
   'mobile.profile.section.tags': '标签',
   'common.organizer.tags.empty': '还没有标签',
   // 同 `lists.empty.hint`：web 有那枚 +，移动端没有（移动端是输入框 + 按钮）。
-  'common.organizer.tags.empty.hint': '输入名称就能新建标签。',
   'mobile.tags.nameLabel': '标签名称',
   /* 字段名是「标签名称」—— 占位符不该再复述「标签」。 */
   'mobile.tags.newPlaceholder': '例如「重要」「等待」「参考」',
@@ -4561,7 +4571,6 @@ export const zhCN = {
   'mobile.abandoned.empty': '没有被放弃的任务。',
   // 空态的第二句要说"东西是怎么进来的"，而不是再说一遍"这里空着" ——
   // 用户站在这一屏时最可能的问题是"我上次放弃的那条呢"。
-  'mobile.abandoned.emptyHint': '在任务的行菜单里点「放弃」，它会离开所有列表，但留在这里。',
   'mobile.abandoned.at': '放弃于 {date}',
   'mobile.abandoned.count': '{count} 条',
 
@@ -4739,7 +4748,6 @@ export const zhCN = {
   'mobile.signOut.button': '退出登录',
   'mobile.trash.intro': '这里放着已删除的任务、便签、清单和习惯。恢复后它会回到原来的位置。',
   'mobile.trash.empty.title': '回收站是空的',
-  'mobile.trash.empty.hint': '删掉的任务、便签、清单和习惯会先放到这里',
   'mobile.trash.deletedAt': '删除于 {date}',
   'mobile.trash.restore': '恢复',
   'mobile.trash.restoreA11y': '恢复：{title}',
@@ -5915,7 +5923,6 @@ export const zhCN = {
   //    文案上刻意不叫「备注」，否则用户会以为它就是任务里那个。
   'notes.title': '便签',
   'notes.empty': '还没有便签',
-  'notes.empty.hint': '把不想变成任务的事记在这里',
   'notes.composer.placeholder': '写点什么…',
   'notes.add': '添加便签',
   'notes.pin': '钉到今天',
@@ -6265,9 +6272,7 @@ export const zhCN = {
   // ── 倒数日/纪念日（批次二 W5；文案唯一事实源在这里，界面里不许出现硬编码串）──
   'web.countdown.title': '倒数纪念日',
   'web.countdown.empty': '还没有倒数日',
-  'web.countdown.empty.hint': '添加一个重要的日子，随时知道还有多久。',
   'web.countdown.archived.empty': '没有已归档的倒数日',
-  'web.countdown.archived.empty.hint': '归档是把不再盯的日子收起来，不是删除，随时能还原。',
   'web.countdown.composer.placeholder': '给这一天起个名字',
   'web.countdown.add': '添加',
   'web.countdown.pickDate': '选日期',
