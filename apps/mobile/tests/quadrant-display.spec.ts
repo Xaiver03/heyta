@@ -32,12 +32,12 @@ const en = (key: Parameters<typeof translate>[1], vars?: Record<string, string |
   translate('en', key, vars);
 
 describe('quadrantBoardLabels：象限映射到共享层契约', () => {
-  it('四象限的标题与说明（中文）', () => {
+  it('四象限的标题是动作词、说明是重要/紧急（中文）—— 四象限不是任务分配类型', () => {
     const labels = quadrantBoardLabels(zh);
-    expect(labels.title(Quadrant.UrgentImportant)).toBe('重要且紧急');
-    expect(labels.title(Quadrant.ImportantNotUrgent)).toBe('重要不紧急');
-    expect(labels.title(Quadrant.UrgentNotImportant)).toBe('紧急不重要');
-    expect(labels.title(Quadrant.Neither)).toBe('不重要不紧急');
+    expect(labels.title(Quadrant.UrgentImportant)).toBe('马上做');
+    expect(labels.title(Quadrant.ImportantNotUrgent)).toBe('计划做');
+    expect(labels.title(Quadrant.UrgentNotImportant)).toBe('交给别人');
+    expect(labels.title(Quadrant.Neither)).toBe('先不做');
 
     expect(labels.hint(Quadrant.UrgentImportant)).toBe('重要且紧急');
     expect(labels.hint(Quadrant.ImportantNotUrgent)).toBe('重要不紧急');
@@ -47,7 +47,7 @@ describe('quadrantBoardLabels：象限映射到共享层契约', () => {
 
   it('同一批键在英文表里也有话说（不是漏翻）', () => {
     const labels = quadrantBoardLabels(en);
-    expect(labels.title(Quadrant.UrgentImportant)).toBe('Important and urgent');
+    expect(labels.title(Quadrant.UrgentImportant)).toBe('Do now');
     expect(labels.hint(Quadrant.UrgentImportant)).toBe('Important and urgent');
     expect(labels.empty(Quadrant.Neither)).not.toBe('');
   });
@@ -57,11 +57,11 @@ describe('quadrantBoardLabels：象限映射到共享层契约', () => {
     expect(
       labels.cellA11y({
         quadrant: Quadrant.UrgentImportant,
-        title: '重要且紧急',
+        title: '马上做',
         hint: '重要且紧急',
         count: 3,
       }),
-    ).toBe('象限：重要且紧急');
+    ).toBe('象限：马上做');
   });
 
   it('🔴 空态是事实句，不是「拖任务到这里」（移动端没有拖放）', () => {
