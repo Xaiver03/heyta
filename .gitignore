@@ -334,3 +334,5 @@ brand-kit/_pipeline/_tmp_*
 
 # brand-kit 编号目录下的下划线前缀文件 = 排版脚手架（_wrap_*.html / _cards.html / _preview/）
 brand-kit/[0-9][0-9]-*/_*
+# 品牌资料（成品物料 + 生成物）：体积数百 MB，不纳入仓库
+/品牌资料/
