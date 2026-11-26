@@ -56,4 +56,8 @@
    import 顺序仍是 borderless 最后（check:focus-single-source 的硬约束）。 */
 @import './app/print.css';
 
+/* 本地应用锁（覆盖图谱 #61）：锁屏遮罩 + 设置里的 PIN 表单。位于 borderless 之前，
+   保证全局焦点规则仍在级联最末（check:focus-single-source 的硬约束）。 */
+@import './app/app-lock.css';
+
 @import './app/borderless-controls.css';
