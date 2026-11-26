@@ -47,9 +47,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  SlidersHorizontal,
+  Link2,
 } from 'lucide-react';
 import { AnchoredMenu, MenuItem, MenuSection, MenuSeparator } from '../../lib/menu/AnchoredMenu.js';
-import { Button } from '../../components/hta/index.js';
+import { Button, SideSheet } from '../../components/hta/index.js';
+import { CalendarDisplaySettingsSheet } from './CalendarDisplaySettingsSheet.js';
+import { CalendarSubscriptionsCard } from '../settings/CalendarSubscriptionsCard.js';
 
 /** 「时间线」那个 `<option value>`——刻意不是 `CalendarViewKind`，绝不交给 `store.setView`。 */
 const TIMELINE_VALUE = 'timeline';
@@ -129,6 +133,10 @@ export function CalendarHeaderToolbar({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [copied, setCopied] = useState(false);
+  /** 「显示设置」抽屉（覆盖图谱 #40）。 */
+  const [displayOpen, setDisplayOpen] = useState(false);
+  /** 「日历订阅」抽屉（覆盖图谱 #41）：宿主复用设置里那份订阅管理卡片。 */
+  const [subscriptionsOpen, setSubscriptionsOpen] = useState(false);
 
   const allTasks = useTaskStore((s) => s.entities.tasks);
   const setDueDate = useTaskStore((s) => s.setDueDate);
@@ -312,18 +320,11 @@ export function CalendarHeaderToolbar({
       >
         <MenuSection>{t('web.calendar.more.displaySection')}</MenuSection>
         <MenuItem
-          testID="calendar-toggle-completed"
-          checked={view.showCompleted}
-          onSelect={() => { view.setShowCompleted(!view.showCompleted); }}
+          testID="calendar-open-display-settings"
+          icon={<SlidersHorizontal size={ICON_SIZE.sm} aria-hidden="true" />}
+          onSelect={() => { setDisplayOpen(true); }}
         >
-          {t('web.calendar.more.showCompleted')}
-        </MenuItem>
-        <MenuItem
-          testID="calendar-toggle-countdown"
-          checked={view.showCountdown}
-          onSelect={() => { view.setShowCountdown(!view.showCountdown); }}
-        >
-          {t('web.calendar.more.showCountdown')}
+          {t('web.calendar.more.openDisplay')}
         </MenuItem>
         <MenuSeparator />
         <MenuSection>{t('web.calendar.more.scopeSection')}</MenuSection>
@@ -374,9 +375,29 @@ export function CalendarHeaderToolbar({
           </>
         ) : null}
         <MenuSeparator />
-        <MenuSection>{t('web.calendar.more.subscribeSection')}</MenuSection>
-        <MenuSection>{t('web.calendar.more.subscribeHint')}</MenuSection>
+        <MenuItem
+          testID="calendar-open-subscriptions"
+          icon={<Link2 size={ICON_SIZE.sm} aria-hidden="true" />}
+          onSelect={() => { setSubscriptionsOpen(true); }}
+        >
+          {t('web.calendar.more.subscribe')}
+        </MenuItem>
       </AnchoredMenu>
+
+      <CalendarDisplaySettingsSheet
+        open={displayOpen}
+        onClose={() => { setDisplayOpen(false); }}
+      />
+      {subscriptionsOpen ? (
+        <SideSheet
+          testId="calendar-subscriptions-sheet"
+          labelledBy="calendar-subscriptions-sheet-title"
+          title={t('web.calendar.sub.title')}
+          onCancel={() => { setSubscriptionsOpen(false); }}
+        >
+          <CalendarSubscriptionsCard />
+        </SideSheet>
+      ) : null}
     </div>
   );
 }
