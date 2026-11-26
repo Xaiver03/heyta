@@ -769,6 +769,20 @@ const CASES: readonly Case[] = [
     },
     effect: () => Object.values(engine.getState().tasks).filter((t) => (t.checklist ?? []).some((x) => x.done)).length,
   },
+  {
+    tool: 'set_checklist_item_reminder',
+    intentAction: 'set-checklist-item-reminder',
+    label: '检查项提醒',
+    args: async () => {
+      const taskId = await seed({ action: 'create-task', title: '检查项提醒' });
+      await makeHost().submit({ action: 'set-task-checklist', taskId, items: [{ text: '第一步' }] });
+      return { taskId, itemText: '第一步', date: '2024-06-01', time: '09:30' };
+    },
+    effect: () =>
+      Object.values(engine.getState().tasks).filter((t) =>
+        (t.checklist ?? []).some((x) => x.reminderAt !== undefined),
+      ).length,
+  },
 
   // ── ADR-0092：保存筛选（FILTER）—— 四个写工具各一例（个人数据，不落 share 通道）──
   {

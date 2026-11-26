@@ -381,6 +381,15 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], local
       return intent.done
         ? t('web.ai.tools.intentCheckChecklistItem', { id: intent.taskId, item: intent.itemText })
         : t('web.ai.tools.intentUncheckChecklistItem', { id: intent.taskId, item: intent.itemText });
+    case 'set-checklist-item-reminder':
+      // #29：检查项级提醒（与整条任务的 create-reminder 不同一条通道）。
+      return intent.clear === true
+        ? t('web.ai.tools.intentClearChecklistItemReminder', { id: intent.taskId, item: intent.itemText })
+        : t('web.ai.tools.intentSetChecklistItemReminder', {
+            id: intent.taskId,
+            item: intent.itemText,
+            when: `${intent.date ?? ''} ${intent.time ?? ''}`.trim(),
+          });
     // P4：评论（COMMENT）—— share 感知的独立通道。新增意图必须在此有人话（无 default）。
     case 'add-task-comment':
       return t('web.ai.tools.intentAddTaskComment', { body: intent.body });

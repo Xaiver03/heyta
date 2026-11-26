@@ -2355,6 +2355,8 @@ export const en = {
   'web.ai.tools.intentPostponeTaskToday': 'Postpone task {id} to today',
   'web.ai.tools.intentRecordHabitCheckins': 'Check in {count} habit(s)',
   'web.ai.tools.intentSetTaskChecklist': 'Set checklist of task {id} to {count} item(s)',
+  'web.ai.tools.intentSetChecklistItemReminder': 'Set a reminder on checklist item “{item}” of task {id}: {when}',
+  'web.ai.tools.intentClearChecklistItemReminder': 'Clear the reminder on checklist item “{item}” of task {id}',
   'web.ai.tools.intentCheckChecklistItem': 'Check item “{item}” of task {id}',
   'web.ai.tools.intentUncheckChecklistItem': 'Uncheck item “{item}” of task {id}',
   'web.ai.tools.intentCreateSection': 'Create section “{name}” in list {projectId}',

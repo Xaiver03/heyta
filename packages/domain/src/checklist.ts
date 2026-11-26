@@ -94,6 +94,49 @@ export function reorderChecklistItem(
   return next;
 }
 
+/** 取某一条检查项的提醒时刻（缺省 = 无提醒）。 */
+export function checklistItemReminder(item: TaskChecklistItem): number | undefined {
+  return item.reminderAt;
+}
+
+/**
+ * 设 / 清某一条检查项的提醒时刻（**不可变**）。
+ *
+ * - `reminderAt` 是正整数 epoch ms → 写到该条上；
+ * - `reminderAt === undefined` → 清除（把 `reminderAt` 从条目上摘掉，**不是**写 0）。
+ *
+ * 找不到 `id` → 原样返回副本（调用方负责报"这条不见了"）。
+ * ⚠️ 只做数据结构搬运，"这个时刻合不合法（过去 / 太远）"归动作层与宿主判 ——
+ * 本函数看不见时钟，也不该读时钟。
+ */
+export function setChecklistItemReminder(
+  items: readonly TaskChecklistItem[],
+  id: string,
+  reminderAt: number | undefined,
+): TaskChecklistItem[] {
+  let found = false;
+  const next = items.map((it) => {
+    if (it.id !== id) return it;
+    found = true;
+    if (reminderAt === undefined) {
+      const stripped: TaskChecklistItem = { ...it };
+      delete stripped.reminderAt;
+      return stripped;
+    }
+    return { ...it, reminderAt };
+  });
+  return found ? next : [...items];
+}
+
+/** 有提醒的检查项（"哪条该响"的读侧统一从这里取，不各端自己 `filter`）。 */
+export function checklistItemsWithReminder(
+  items: readonly TaskChecklistItem[],
+): (TaskChecklistItem & { reminderAt: number })[] {
+  return items.filter(
+    (it): it is TaskChecklistItem & { reminderAt: number } => it.reminderAt !== undefined,
+  );
+}
+
 /**
  * 子项全勾是否应**自动把父任务置完成**。
  * 仅当：非空、全勾、父任务未完成、未放弃、**非重复**（重复任务不自动完成，避免推进周期）。

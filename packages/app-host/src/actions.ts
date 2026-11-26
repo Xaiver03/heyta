@@ -58,6 +58,7 @@ import {
   removeChecklistItem as checklistRemoveItem,
   toggleChecklistItem as checklistToggleItem,
   reorderChecklistItem as checklistReorderItem,
+  setChecklistItemReminder as checklistSetReminder,
   shouldAutoCompleteFromChecklist,
   type QuadrantTaskPatch,
   type Task,
@@ -330,6 +331,21 @@ export interface TaskActions {
   toggleChecklistItem(entityId: string, itemId: string, done: boolean): Promise<void>;
   /** 把某一条移到 `toIndex`（越界夹取）。 */
   reorderChecklistItem(entityId: string, itemId: string, toIndex: number): Promise<void>;
+  /**
+   * 设 / 清某一条**检查项**自己的提醒时刻（epoch ms；`undefined` = 清除）。
+   *
+   * 🔴 这是**检查项级**提醒，不是任务级 `REMINDER` 实体（见 `entities.ts`
+   * 的 `TaskChecklistItem.reminderAt`）。它内联在 `Task.checklist` 里 ⇒
+   * 写它是**一条 TASK `UPD`**（一意图一 op），与"勾选 / 改字"同一条通道。
+   *
+   * 失败在写之前 `throw`：任务不存在、条目不存在、或时刻不是正整数 epoch ms。
+   * "这一刻在不在过去 / 太远"由宿主用 `reminderRejection` 判（这里只有数据搬运）。
+   */
+  setChecklistItemReminder(
+    entityId: string,
+    itemId: string,
+    reminderAt: number | undefined,
+  ): Promise<void>;
   /** 传 `undefined` 表示清除截止时间（会写成 `null`，见文件头第 2 条）。 */
   setDueDate(entityId: string, dueDate: number | undefined, dueDateLocal?: string): Promise<void>;
   /**
@@ -1285,12 +1301,23 @@ export function createTaskActions(
     },
 
     async setChecklist(entityId, items) {
-      if (taskOf(entityId) === undefined) throw new Error(`找不到任务「${entityId}」`);
-      const normalized = items.map((it) => ({
-        id: typeof it.id === 'string' && it.id !== '' ? it.id : makeId(),
-        text: it.text,
-        done: it.done === true,
-      }));
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      // 覆盖式重写时，**同 id 的旧条目**上那个检查项级提醒（`reminderAt`）必须带过来。
+      // 不带过来 = 用户/AI 只是改了下清单文本，却把设好的检查项提醒静默清空了
+      // （`reminderAt` 不在这个入参形状里，天然读不到它）。清提醒只走
+      // `setChecklistItemReminder(…, undefined)`，不靠"重写整组"来清。
+      const prevById = new Map((task.checklist ?? []).map((it) => [it.id, it]));
+      const normalized = items.map((it) => {
+        const id = typeof it.id === 'string' && it.id !== '' ? it.id : makeId();
+        const prev = prevById.get(id);
+        return {
+          id,
+          text: it.text,
+          done: it.done === true,
+          ...(prev?.reminderAt !== undefined ? { reminderAt: prev.reminderAt } : {}),
+        };
+      });
       await update(entityId, { checklist: normalized });
     },
 
@@ -1332,6 +1359,24 @@ export function createTaskActions(
       const task = taskOf(entityId);
       if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
       await update(entityId, { checklist: checklistReorderItem(task.checklist ?? [], itemId, toIndex) });
+    },
+
+    async setChecklistItemReminder(entityId, itemId, reminderAt) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      const items = task.checklist ?? [];
+      if (!items.some((it) => it.id === itemId)) {
+        // 写之前 throw：给一条不存在的检查项写提醒，用户会以为"设上了"。
+        throw new Error(`任务「${entityId}」里没有检查项「${itemId}」`);
+      }
+      if (
+        reminderAt !== undefined &&
+        (!Number.isFinite(reminderAt) || !Number.isInteger(reminderAt) || reminderAt <= 0)
+      ) {
+        // 形状闸门（正整数 epoch ms）；"过去 / 太远"由宿主按 `reminderRejection` 判。
+        throw new Error(`检查项提醒时刻必须是正整数 epoch ms，收到 ${String(reminderAt)}`);
+      }
+      await update(entityId, { checklist: checklistSetReminder(items, itemId, reminderAt) });
     },
 
     findTask: taskOf,

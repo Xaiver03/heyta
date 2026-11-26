@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   appendChecklistItem,
+  checklistItemReminder,
+  checklistItemsWithReminder,
   checklistProgress,
   isChecklistComplete,
   readChecklist,
   removeChecklistItem,
   reorderChecklistItem,
+  setChecklistItemReminder,
   shouldAutoCompleteFromChecklist,
   toggleChecklistItem,
   updateChecklistItemText,
@@ -83,5 +86,35 @@ describe('shouldAutoCompleteFromChecklist', () => {
     expect(shouldAutoCompleteFromChecklist({ repeatRule: 'FREQ=DAILY' }, items)).toBe(false);
     expect(shouldAutoCompleteFromChecklist({ abandonedAt: 1 }, items)).toBe(false);
     expect(shouldAutoCompleteFromChecklist({ completedAt: 1 }, items)).toBe(false);
+  });
+});
+
+describe('检查项级提醒（#29，与任务级 Reminder 区分）', () => {
+  const base = [item('a', '甲'), item('b', '乙')];
+
+  it('set 写到指定条目，且不改原数组', () => {
+    const next = setChecklistItemReminder(base, 'a', 1_700_000_000_000);
+    expect(next.find((x) => x.id === 'a')?.reminderAt).toBe(1_700_000_000_000);
+    expect(next.find((x) => x.id === 'b')?.reminderAt).toBeUndefined();
+    // 不可变：原数组那一条不带提醒
+    expect(base[0]?.reminderAt).toBeUndefined();
+  });
+
+  it('clear 是把字段摘掉（不是写成 0）', () => {
+    const withRem = setChecklistItemReminder(base, 'a', 1_700_000_000_000);
+    const cleared = setChecklistItemReminder(withRem, 'a', undefined);
+    expect('reminderAt' in (cleared.find((x) => x.id === 'a')!)).toBe(false);
+  });
+
+  it('找不到 id → 原样返回副本（不是同一个数组引用）', () => {
+    const next = setChecklistItemReminder(base, 'zzz', 123);
+    expect(next).toEqual(base);
+    expect(next).not.toBe(base);
+  });
+
+  it('checklistItemsWithReminder 只取有提醒的；checklistItemReminder 读缺省为 undefined', () => {
+    const list = setChecklistItemReminder(base, 'b', 42);
+    expect(checklistItemsWithReminder(list).map((x) => [x.id, x.reminderAt])).toEqual([['b', 42]]);
+    expect(checklistItemReminder(list.find((x) => x.id === 'a')!)).toBeUndefined();
   });
 });

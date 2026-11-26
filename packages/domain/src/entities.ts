@@ -274,6 +274,25 @@ export interface TaskChecklistItem {
   text: string;
   /** 是否已勾选。 */
   done: boolean;
+  /**
+   * **检查项级提醒**的时刻（epoch ms）。可选；`undefined` = 这一条不单独提醒。
+   *
+   * 🔴 与**任务级提醒**（文件下方 `Reminder` 实体）是两回事，别混成一件：
+   *   - 任务级提醒挂在整个任务上：`taskId` 是主键的一半、一条任务可挂多条、
+   *     有 snooze / dismiss / fired 的完整生命周期与重复顺延（`reminders.ts`）。
+   *   - 这里只是"某一条勾选项到点提醒我一下"的**一个时刻**，随该勾选项的存在而存在，
+   *     没有独立生命周期。
+   *
+   * 🔴 为什么内联在本条上、而不是再开一个 `(taskId,itemId)` 实体：
+   *   `Task.checklist` 本来就是内联在 `Task` 上的从属集合，任何一次勾选项编辑
+   *   （勾选 / 改字 / 排序 / 删除）都已经是一次 TASK `UPD`；再单开一个实体，等于
+   *   把同一个从属集合拆到两处存，还要维护一个**脆弱的 itemId 外键**
+   *   —— 覆盖式 `set_task_checklist` 会重建条目、换掉 id，那条外键随即指向空气。
+   *   （用独立实体承载"任务级提醒"的理由见 `Reminder` 上方那段；两者不在同一层。）
+   *
+   * 纯可加性：老数据缺席 = 无提醒，**不 bump `CURRENT_SCHEMA_VERSION`**（§3.3）。
+   */
+  reminderAt?: number;
 }
 
 export interface Task extends EntityBase {
