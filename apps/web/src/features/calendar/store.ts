@@ -32,6 +32,11 @@ import {
   type TaskScope,
 } from '@heyta/domain';
 import {
+  loadCalendarDisplayPref,
+  saveCalendarDisplayPref,
+  type CalendarColorBy,
+} from './calendar-display-pref.js';
+import {
   calendarCursorFor,
   calendarMonthDrill,
   calendarSelectedForCursor,
@@ -80,6 +85,16 @@ interface CalendarViewState {
    * 默认 `true`（滴答默认开启，也是 web 接上倒数日之后的既有行为）。
    */
   showCountdown: boolean;
+  /**
+   * 显示设置：日历条目的**着色模式**（覆盖图谱 #40「配色」）。
+   *
+   * - `list`（默认）—— 按任务所属清单的颜色上强调色（`barAccentOf`）；
+   * - `priority` —— 按任务优先级的语义色（复用 `@heyta/ui` 的 `priorityColorToken`）；
+   * - `off` —— 不着色（`barAccentOf` 恒 `undefined`）。
+   *
+   * 🔴 与 `showCompleted` / `showCountdown` 一样是**阅读偏好**，不触碰存储与同步。
+   */
+  colorBy: CalendarColorBy;
   /**
    * 公共事实（调休 / 补班）覆盖表的**变更计数**（W4b）。
    *
@@ -131,6 +146,8 @@ interface CalendarViewActions {
   /** 「显示设置」两个开关（阅读偏好，见 `showCompleted` / `showCountdown`）。 */
   setShowCompleted: (value: boolean) => void;
   setShowCountdown: (value: boolean) => void;
+  /** 显示设置：着色模式（见 `colorBy`）。 */
+  setColorBy: (value: CalendarColorBy) => void;
   /** 勾/去掉一条清单或一个标签。 */
   toggleScopeItem: (kind: ScopeKind, id: string) => void;
   /**
@@ -158,7 +175,24 @@ function withIds(scope: TaskScope, kind: ScopeKind, ids: readonly string[]): Tas
   return kind === 'project' ? { ...scope, projectIds: ids } : { ...scope, tagIds: ids };
 }
 
-export const useCalendarViewStore = create<CalendarViewState & CalendarViewActions>((set) => ({
+/** 把三项显示偏好写回本机存储。切换即持久，「界面变了但没存」不可能发生。 */
+function persistDisplay(state: CalendarViewState): void {
+  saveCalendarDisplayPref({
+    showCompleted: state.showCompleted,
+    showCountdown: state.showCountdown,
+    colorBy: state.colorBy,
+  });
+}
+
+/**
+ * 显示设置的初始值：**模块初始化时读一次**本机偏好（`localStorage`）。
+ *
+ * 🔴 只在建 store 时读一次，不在每次渲染读 —— 否则"用户在设置里切换"与
+ * "每次渲染重新读盘"会互相覆盖（切换后立刻被旧值盖回）。
+ */
+const displayPref = loadCalendarDisplayPref();
+
+export const useCalendarViewStore = create<CalendarViewState & CalendarViewActions>((set, get) => ({
   // ⚠️ 这里读一次时钟是**给界面播种**，不是业务判断 —— 领域层的
   // "now 显式传入、不在函数里读时钟"那条纪律针对的是判据，不是首屏渲染。
   cursor: startOfMonth(toLocalDate(Date.now())),
@@ -167,8 +201,10 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   view: 'month',
   captureOpen: false,
   calendarSidebarOpen: true,
-  showCompleted: true,
-  showCountdown: true,
+  // 显示设置三项：**从本机偏好读初始值**（刷新后仍在），读取失败退默认（见 readonly 文件头）。
+  showCompleted: displayPref.showCompleted,
+  showCountdown: displayPref.showCountdown,
+  colorBy: displayPref.colorBy,
   publicFactsEpoch: 0,
 
   setCursor: (date) => {
@@ -212,10 +248,17 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
 
   setShowCompleted: (value) => {
     set({ showCompleted: value });
+    persistDisplay(get());
   },
 
   setShowCountdown: (value) => {
     set({ showCountdown: value });
+    persistDisplay(get());
+  },
+
+  setColorBy: (value) => {
+    set({ colorBy: value });
+    persistDisplay(get());
   },
 
   toggleScopeItem: (kind, id) => {
