@@ -90,7 +90,7 @@ node scripts/ticktick-coverage-report.mjs --fix  # 按五档规则回填档列
 | 屏级格子总数 | **79** | surface-matrix §1 解析 |
 | 产品实现度（**surface-matrix 原始**） | 有 47 / 半有 11 / 无 21 | 同上 |
 | 产品实现度（**本图谱 §3 经代码核查更正后**）| **有 53 / 半有 15 / 无 11** | 子 agent 只读核实，10 格「无→有/半有」更正见附录 D/D2/D3 |
-| 一手靶子·**Android 端** | **≈172 张**（`.local/ticktick-teardown/screens/` 124 张 + `mobile-ia/` 42 张 Android + `ticktick-calendar/img/` 6 张） | `ls` 现量；capture.sh 证实是 `com.ticktick.task` + adb |
+| 一手靶子·**Android 端** | **173 张**（`.local/ticktick-teardown/screens/` 70 + `live/` 55 + `docs/research/mobile-ia/` 42 + `docs/research/ticktick-calendar/` 6） | 2026-11-26 `ls` 现量逐目录加总；capture.sh 证实是 `com.ticktick.task` + adb |
 | 一手靶子·**macOS 端** | **39 张**（截至 2026-11-26；2026-11-25/26 真机+screencapture 按窗口 id 截，`.local/ticktick-teardown/mac/`，不入库：主窗/日历/四象限/专注/习惯/设置全树/日历订阅/通知/付费墙 等） | `ls .local/ticktick-teardown/mac/*.png` |
 | 一手靶子·**Windows 端** | **0 张**（只有 BAML 静态结构，无界面截图） | `git ls-files` 无 win 截图 |
 | 交互级**逐屏拆解**已做 | **40 / 79 屏**（去重现量，见 §3d 2026-11-26；早期 11-24 仅 3 族） | §3d |
@@ -207,7 +207,7 @@ node scripts/ticktick-coverage-report.mjs --fix  # 按五档规则回填档列
 
 > 方法：UI 相关 spec 共 670 个，先按「屏名→英文关键词」在文件名上初筛，再对初筛为 0 的候选 grep **内容**核实（**文件名 ≠ 语义**，同 §6 第 3 条那类陷阱）。
 
-**结论先行：判据不缺。** 79 格中 63 格有功能，**这 63 格全部有判据**（56 格初筛即命中；7 格是文件名假象、内容核实实有：「今天／最近 7 天／已完成」在 `task-filter.spec.ts`、习惯详情/统计在 `habit-*.spec`、通知中心在 `inbox/notification-model.spec`、模块开关有 modules 相关）。余下 16 格「无判据」**全部是实现度=无、本来没功能** —— 记在附录 A，它们是**功能缺口，不是判据缺口**。
+**结论先行：判据不缺。** 79 格中，实现度「有」53 + 「半有」15 = **68 格有功能，这 68 格全部有判据**（初筛即命中为主，少数是文件名假象、内容核实实有：「今天／最近 7 天／已完成」在 `task-filter.spec.ts`、习惯详情/统计在 `habit-*.spec`、通知中心在 `inbox/notification-model.spec`、模块开关有 modules 相关）。余下 **11 格「无判据」全部是实现度=无、本来没功能** —— 记在附录 A，它们是**功能缺口，不是判据缺口**。
 
 > 🔴 **最终口径（2026-11-26 现量复核）**：**68 格有 spec / 11 格无**，11 格无 spec 全部实现度=无（本来没功能，正常）；**「有功能却无 spec」的真判据缺口 = 0**。曾记的 #15 委派、#18 智能清单设置 现已有 spec（`packages/local-api/tests/task-tools-batch8.spec.ts` + `packages/app-host/tests/local-api-host-batch4.spec.ts`；`packages/local-api/tests/project-settings-tools.spec.ts`）。上面「63 格全有」与「66/13」均为过期口径。
 
