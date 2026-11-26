@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """heyta 05-posters / 06-brochure / 07-product-manual / 08-merch / 09-social / 10-templates"""
-import os, sys
+import os, sys, base64
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import render
 import read_tokens as RT
@@ -207,7 +207,7 @@ def qr_block():
         import io as _io
         buf = _io.BytesIO()
         segno.make(origin, error="m").save(buf, kind="svg", scale=1, border=0)
-        b64 = _b64.b64encode(buf.getvalue()).decode()
+        b64 = base64.b64encode(buf.getvalue()).decode()
         return (f'<div style="width:36mm;height:36mm"><img src="data:image/svg+xml;base64,{b64}" '
                 f'style="width:36mm;height:36mm" alt="{origin}"></div>'
                 f'<div style="font-size:7.5pt;color:{SL8};margin-top:3mm">{origin.replace("https://","")}</div>')

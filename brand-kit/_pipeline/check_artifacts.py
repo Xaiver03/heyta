@@ -1165,6 +1165,47 @@ if _doc_ref_bad:
 else:
     emit(f"✅ 文档里的 docs 引用全部可达（{len(_doc_refs)} 处，含章节号）")
 
+# 43) 二维码分支必须真的产出二维码（有 segno 时），否则退回文字
+#     这段代码曾长期恒抛异常→恒走文字兜底：宣传册上印的是域名而不是可扫的码，
+#     而所有判据都是绿的（因为域名文字也在）。只有直接调用才看得见。
+_qr_ok = True
+try:
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(WD, "_pipeline"))
+    import build_docs as _BD
+    _qr_html = _BD.qr_block()
+    try:
+        import segno as _segno  # noqa: F401
+        _has_segno = True
+    except Exception:
+        _has_segno = False
+    if _has_segno and "data:image/svg+xml" not in _qr_html:
+        _qr_ok = False
+        fail("有 segno 但 qr_block 未产出二维码（可能又落回文字兜底）")
+    elif not _qr_html.strip():
+        _qr_ok = False
+        fail("qr_block 返回空 —— 宣传册的二维码位置会空着")
+    else:
+        emit("✅ 二维码分支可用（{}）".format("真二维码" if _has_segno else "域名文字兜底"))
+except Exception as _e:
+    fail(f"无法验证二维码分支：{_e}")
+
+# 44) 04-imagery 是素材库：索引里必须有 1 张总览卡，且副标题张数等于登记数
+if os.path.exists(IMG_MANIFEST) and os.path.exists(INDEX_HTML):
+    import json as _j4
+    _mf4 = _j4.load(open(IMG_MANIFEST, encoding="utf-8"))
+    _rows4 = _mf4 if isinstance(_mf4, list) else _mf4.get("items", [])
+    _idx4 = open(INDEX_HTML, encoding="utf-8").read()
+    _want4 = f"本地 MOSS-Image · {len(_rows4)} 张"
+    if "04 位图素材" not in _idx4:
+        fail("索引缺「04 位图素材」卡")
+    elif _want4 not in _idx4:
+        fail(f"索引 04 卡副标题不是现量值（应为「{_want4}」）")
+    elif not os.path.exists(os.path.join(WD, "04-imagery/contact-sheet.png")):
+        fail("04-imagery 缺总览图 contact-sheet.png")
+    else:
+        emit(f"✅ 04-imagery 素材库：{len(_rows4)} 张登记、总览图在位、副标题为现量值")
+
 if not fails:
     if JSON_OUT:
         import json as _j

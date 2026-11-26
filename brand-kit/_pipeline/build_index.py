@@ -42,6 +42,12 @@ _N_TAGS = _count_dir("02-badges/identity")
 # 分类"色槽"数是 token 里的 color.category-1..8，不是目录里的文件数（目录只有一张色卡）
 _N_CAT = len([k for k in RT.LIGHT if re.fullmatch(r"--ht-color-category-\d+", k)])
 _N_ICONS = _count_dir("03-icons")
+try:
+    import json as _json2
+    _mf_img = _json2.load(open(os.path.join(WD, "04-imagery/_manifest_main.json"), encoding="utf-8"))
+    _N_IMG = len(_mf_img if isinstance(_mf_img, list) else _mf_img.get("items", []))
+except Exception:
+    _N_IMG = 0
 _BOOK_PAGES = _pdf_pages("00-brand-foundation/brand-book.pdf")
 _MANUAL_PAGES = _pdf_pages("07-product-manual/heyta_product-manual.pdf")
 
@@ -60,7 +66,7 @@ add("02-badges/badge-catalogue.png","成长标识体系图鉴",f"{_N_MS} 里程�
 add("00-brand-foundation/_preview/page-01.png","品牌手册 Brand Book",(f"{_BOOK_PAGES} 页 · 标识/色彩/字体/成长" if _BOOK_PAGES else "标识/色彩/字体/成长"),"00-brand-foundation/brand-book.pdf")
 add("01-logo/lockup-horizontal@1x.png","字标 + 图标锁版","「hey.」+「h」","01-logo/lockup-horizontal.svg")
 add("03-icons/icon-sheet.png","图标集 Icon Set",f"线性 {_N_ICONS} 枚","03-icons/icon-sheet.html")
-add("04-imagery/contact-sheet.png","04 位图素材","本地 MOSS-Image · 背景/插画/周边","04-imagery/contact-sheet.png")
+add("04-imagery/contact-sheet.png","04 位图素材",f"本地 MOSS-Image · {_N_IMG} 张 · 背景/插画/周边","04-imagery/_manifest_main.json")
 add("05-posters/01_品牌主视觉.png","品牌主视觉海报","A3 · PDF/PNG","05-posters/01_品牌主视觉.pdf")
 add("05-posters/02_核心能力.png","核心能力海报","A3 · PDF/PNG","05-posters/02_核心能力.pdf")
 add("05-posters/03_成长里程碑.png","成长里程碑海报","A3 · PDF/PNG","05-posters/03_成长里程碑.pdf")
