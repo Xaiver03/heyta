@@ -263,6 +263,19 @@ export const META_KEYS = {
    * 自动同步的节流判断（`shouldAutoSync`）。**不参与任何业务裁决**。
    */
   CALENDAR_MIRROR_LAST_SYNC: 'calendarMirrorLastSyncV1',
+  /**
+   * 外部日历**订阅**（ICS/URL）的本机状态：JSON `{ [subscriptionId]: {fromMs,toMs,lastSyncMs} }`。
+   *
+   * 🔴 与 `CALENDAR_MIRROR_WINDOW` 同一个理由：删除判定只在本订阅两轮窗口的交集里做；
+   * 按订阅 id 分桶，避免一个订阅的窗口把另一个订阅的事件判死。同样**不进 op-log、不跨设备**。
+   */
+  CALENDAR_SUBSCRIPTION_STATE: 'calendarSubscriptionStateV1',
+  /**
+   * 已配置的外部日历订阅列表：JSON `[{id,name,url,enabled}]`。
+   *
+   * 与本机凭据同一个桶（META）：订阅的是"这台设备去拉哪个 URL"，不是一条用户意图。
+   */
+  CALENDAR_SUBSCRIPTION_LIST: 'calendarSubscriptionsV1',
   /** Active encrypted-payload generation paired with the local key package. */
   VAULT_PAYLOAD_KEY_VERSION: 'vaultPayloadKeyVersionV1',
   /** Encrypted pending root-rotation target; never stores a plaintext root. */

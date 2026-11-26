@@ -1010,6 +1010,52 @@ export {
 } from './calendar-mirror.js';
 
 /**
+ * 通用「数据源连接器」框架 + ICS 日历订阅（对标滴答「日历订阅」）。
+ *
+ * 契约与实现都在 `packages/app-host/src/connectors/`：框架（registry / cursor /
+ * 可选流式）+ ICS 解析器 + `refreshCalendarSubscription` 只读镜像管道。
+ * 这里只做对外出口；判断与写入都在下面那个目录里（AGENTS §3.5）。
+ */
+export {
+  ConnectorError,
+  ConnectorRegistry,
+  isStreaming,
+  type Connector,
+  type ConnectorMetadata,
+  type ConnectorResource,
+  type FetchedItem,
+  type StreamHandler,
+  type StreamingConnector,
+  type SyncCursor,
+} from './connectors/types.js';
+export {
+  createIcsConnector,
+  fetchIcsText,
+  parseIcs,
+  type IcsConnectorConfig,
+  type IcsEvent,
+  type IcsParseResult,
+} from './connectors/ics.js';
+export {
+  refreshCalendarSubscription,
+  type CalendarSubscription,
+  type CalendarSubscriptionOptions,
+  type CalendarSubscriptionSyncPort,
+  type CalendarSubscriptionSyncResult,
+} from './connectors/calendar-subscription.js';
+export {
+  addCalendarSubscription,
+  hostOf,
+  loadCalendarSubscriptions,
+  newSubscriptionId,
+  removeCalendarSubscription,
+  saveCalendarSubscriptions,
+  updateCalendarSubscription,
+  type CalendarSubscriptionRecord,
+  type SubscriptionMetaPort,
+} from './connectors/subscription-store.js';
+
+/**
  * 外部日历自动同步的**纯调度判断**（阶段 A，ADR-0089）。
  *
  * 🔴 「多久算该同步一次」是产品语义，写在纯函数里、四个壳共用同一份；而

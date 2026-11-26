@@ -18,6 +18,8 @@ export * from './calendar-drop.js';
 // ADR-0089：外部日历的只读镜像实体 `CALENDAR_EVENT` —— 幂等键 / 上游行投影 /
 // 内容比较 / 删除判定。纯函数；写入方只有 `app-host` 的 connector。
 export * from './calendar-event.js';
+// 任务 → iCalendar 导出（`.ics` 下载 / 订阅源，纯函数，服务端与客户端共用）。
+export * from './calendar-feed.js';
 export * from './task-filter.js';
 // ADR-0092：保存筛选（`FILTER.rule`）的编译器与写侧校验（复用 task-filter 语义）。
 export * from './filter-rule.js';
@@ -73,6 +75,8 @@ export * from './subscription.js';
 export * from './activity.js';
 export * from './ticktick-format.js';
 export * from './ticktick-import.js';
+// 通用 CSV / Todoist 导入（复用滴答导入的计划/报告管线，新增两个来源）。
+export * from './import-csv.js';
 export * from './quick-due-picks.js';
 export * from './lunar.js';
 export * from './holidays.js';
