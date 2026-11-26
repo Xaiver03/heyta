@@ -521,7 +521,7 @@ class MobileChatController implements ChatController {
             ? {
                 onEvent: (event: Parameters<typeof reduceAssistantLive>[1]) => {
                   if (epoch !== this.accountEpoch) return;
-                  this.update({ live: reduceAssistantLive(this.state.live, event) });
+                  this.updateTransient({ live: reduceAssistantLive(this.state.live, event) });
                 },
               }
             : {}),
@@ -723,6 +723,18 @@ class MobileChatController implements ChatController {
     this.refreshActiveMeta();
     this.state = { ...this.state, sessions: this.sessionsMeta(), activeSessionId: this.activeSessionId };
     this.persist();
+    this.emit();
+  }
+
+  /**
+   * 只改屏幕、不落盘（流式片段用这一个）。
+   *
+   * 🔴 `update()` 会 `persist()` 整段会话 —— 逐字到达时那是一 token 一次全量写入。
+   * 真机上表现为键盘卡顿与存储抖动，而"屏幕多一个字"根本不需要写盘：
+   * 这一轮的正文在结束时由 `update()` 一次性落。
+   */
+  private updateTransient(patch: Partial<ChatSnapshot>): void {
+    this.state = { ...this.state, ...patch };
     this.emit();
   }
 

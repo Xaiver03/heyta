@@ -317,6 +317,48 @@ describe('接线：控制器确实把 streamingFetch 传下去', () => {
     ).toBe(true);
   });
 
+  it('流式片段只改屏幕：每一片都不写存储（落盘只在轮次结束时一次）', () => {
+    let writes = 0;
+    appHostMocks.requestAssistantTurn.mockReset();
+    appHostMocks.captured.length = 0;
+    appHostMocks.requestAssistantTurn.mockResolvedValue({
+      ok: true, kind: 'answer', text: '回答', steps: [], appended: [], health: {},
+    } as AssistantOutcome);
+
+    const controller = createChatController({
+      account: null,
+      storage: {
+        getItem: () => null,
+        setItem: () => {
+          writes += 1;
+        },
+        removeItem: () => undefined,
+      },
+    });
+    controller.configure({
+      settings: routableSettings(),
+      host: {} as LocalApiHost,
+      localize: (key: string) => key,
+      secretStore: { get: async () => undefined },
+      managedTransport: async () => undefined,
+      resolveRouting: () => (routableSettings() as { routing: unknown }).routing as never,
+      onHealth: () => undefined,
+      streamingFetch: (async () => new Response('{}')) as typeof fetch,
+    } as never);
+    controller.setDraft('问一句');
+    controller.send();
+    controller.confirmDisclosure();
+
+    const deps = appHostMocks.captured[0] as Record<string, unknown>;
+    const onEvent = deps['onEvent'] as (event: unknown) => void;
+    const before = writes;
+    for (const delta of ['你', '好', '呀']) {
+      onEvent({ type: 'text', delta });
+    }
+    expect(controller.getSnapshot().live?.text).toBe('你好呀');
+    expect(writes).toBe(before);
+  });
+
   it('🔴 没给 streamingFetch ⇒ `routed` 里**没有** fetchImpl 这个键（走全局 fetch）', () => {
     /**
      * 条件展开的意义：没接线时那个键**不存在**，而不是 `undefined`。
