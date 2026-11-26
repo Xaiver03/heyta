@@ -36,7 +36,7 @@ export interface CommandPaletteLabels {
   readonly title: string;
   readonly inputAria: string;
   readonly placeholder: string;
-  readonly empty: string;
+  readonly noResults: string;
   /** 命令分组 id → 分组标题（`navigate` / `create` / `open`）。 */
   readonly groupLabels: Readonly<Record<string, string>>;
   /** 命令列表末尾那条「查看键盘快捷键」的标题。 */
@@ -238,8 +238,8 @@ export function CommandPalette(props: CommandPaletteProps): React.JSX.Element | 
               data-testid="command-palette-list"
             >
               {filtered.length === 0 ? (
-                <li role="presentation" className="ht-sheet__command-empty" data-testid="command-palette-empty">
-                  {labels.empty}
+                <li role="presentation" className="ht-sheet__command-no-results" data-testid="command-palette-no-results">
+                  {labels.noResults}
                 </li>
               ) : (
                 rows

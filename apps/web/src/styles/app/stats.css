@@ -13,19 +13,19 @@
 }
 
 /* 一张图（标题 + 图 + 轴标签）的竖排容器。 */
-.ht-stats__figure {
+.ht-app__stats__figure {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-1);
   margin: 0;
 }
 
-.ht-stats__caption {
+.ht-app__stats__caption {
   color: var(--ht-color-foreground-muted);
 }
 
 /* 柱状图下方的等距标签行。 */
-.ht-stats__axis {
+.ht-app__stats__axis {
   display: flex;
   justify-content: space-between;
   gap: var(--ht-space-1);
@@ -33,7 +33,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.ht-stats__axis-label {
+.ht-app__stats__axis-label {
   flex: 1;
   min-inline-size: 0;
   overflow: hidden;
@@ -43,20 +43,20 @@
 }
 
 /* ── 总结屏（#16） ─────────────────────────────────────── */
-.ht-summary {
+.ht-app__summary {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-3);
   margin-block-end: var(--ht-space-5);
 }
 
-.ht-summary__periods {
+.ht-app__summary__periods {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--ht-space-3);
 }
 
-.ht-summary__text {
+.ht-app__summary__text {
   margin: 0;
   padding: var(--ht-space-3);
   border-radius: var(--ht-radius-md);
@@ -65,14 +65,14 @@
   white-space: pre-wrap;
 }
 
-.ht-summary__actions {
+.ht-app__summary__actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--ht-space-2);
 }
 
 /* ── 专注手动补录（#50） ───────────────────────────────── */
-.ht-focus__manual {
+.ht-app__focus__manual {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -80,7 +80,7 @@
   margin-block-start: var(--ht-space-2);
 }
 
-.ht-focus__manual-field {
+.ht-app__focus__manual-field {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-1);
@@ -88,6 +88,6 @@
   font-size: var(--ht-font-size-sm);
 }
 
-.ht-focus__manual-error {
+.ht-app__focus__manual-error {
   color: var(--ht-color-danger);
 }

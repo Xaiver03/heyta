@@ -50,8 +50,8 @@ export function HabitStatsChart({ habit, logs, today }: HabitStatsChartProps): R
     <section className="ht-habit__stats" data-testid="habit-stats">
       <h3 className="ht-app__detail-heading">{t('web.habits.stats.title')}</h3>
 
-      <figure className="ht-stats__figure">
-        <figcaption className="ht-stats__caption">{t('web.habits.stats.rate')}</figcaption>
+      <figure className="ht-app__stats__figure">
+        <figcaption className="ht-app__stats__caption">{t('web.habits.stats.rate')}</figcaption>
         <BarChart
           data={rateData}
           height={64}
@@ -61,8 +61,8 @@ export function HabitStatsChart({ habit, logs, today }: HabitStatsChartProps): R
         />
       </figure>
 
-      <figure className="ht-stats__figure">
-        <figcaption className="ht-stats__caption">{t('web.habits.stats.streak')}</figcaption>
+      <figure className="ht-app__stats__figure">
+        <figcaption className="ht-app__stats__caption">{t('web.habits.stats.streak')}</figcaption>
         <LineChart
           data={streakData}
           height={64}

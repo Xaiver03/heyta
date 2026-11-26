@@ -6197,7 +6197,7 @@ export const en = {
   'web.commandPalette.title': 'Command palette',
   'web.commandPalette.inputAria': 'Search commands',
   'web.commandPalette.placeholder': 'Type a command…',
-  'web.commandPalette.empty': 'No matching commands',
+  'web.commandPalette.noResults': 'No matching commands',
   'web.commandPalette.group.navigate': 'Go to',
   'web.commandPalette.group.create': 'Create',
   'web.commandPalette.group.open': 'Open',

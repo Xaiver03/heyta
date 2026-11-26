@@ -53,13 +53,13 @@ export function FocusManualEntry(): React.JSX.Element {
     <section className="ht-app__focus-stats" data-testid="focus-manual">
       <h3 className="ht-app__detail-heading">{t('web.focus.manual.title')}</h3>
       <form
-        className="ht-focus__manual"
+        className="ht-app__focus__manual"
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
         }}
       >
-        <label className="ht-focus__manual-field">
+        <label className="ht-app__focus__manual-field">
           {t('web.focus.manual.date')}
           <input
             type="date"
@@ -68,7 +68,7 @@ export function FocusManualEntry(): React.JSX.Element {
             onChange={(e) => { setDate(e.target.value); }}
           />
         </label>
-        <label className="ht-focus__manual-field">
+        <label className="ht-app__focus__manual-field">
           {t('web.focus.manual.minutes')}
           <input
             type="number"
@@ -82,7 +82,7 @@ export function FocusManualEntry(): React.JSX.Element {
           {t('web.focus.manual.submit')}
         </button>
         {error === undefined ? null : (
-          <span className="ht-focus__manual-error" role="alert">
+          <span className="ht-app__focus__manual-error" role="alert">
             {error}
           </span>
         )}

@@ -116,7 +116,7 @@ describe('habitWeeklyRateSeries（#48 完成率柱状图）', () => {
     const series = habitWeeklyRateSeries(h, [], '2024-06-14', 3);
     expect(series).toHaveLength(3);
     expect(series[2]?.end).toBe('2024-06-14');
-    expect(series[0]?.start < series[1]?.start).toBe(true);
+    expect((series[0]?.start ?? '') < (series[1]?.start ?? '')).toBe(true);
   });
 });
 

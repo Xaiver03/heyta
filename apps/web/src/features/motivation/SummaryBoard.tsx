@@ -50,9 +50,9 @@ export function SummaryBoard({ snapshot }: SummaryBoardProps): React.JSX.Element
   };
 
   return (
-    <section className="ht-summary" data-testid="growth-summary">
+    <section className="ht-app__summary" data-testid="growth-summary">
       <h2 className="ht-app__detail-heading">{t('web.summary.title')}</h2>
-      <div className="ht-summary__periods">
+      <div className="ht-app__summary__periods">
         <div>
           <h3 className="ht-app__detail-heading">{t('web.summary.today')}</h3>
           <dl className="ht-app__detail-cards">
@@ -101,10 +101,10 @@ export function SummaryBoard({ snapshot }: SummaryBoardProps): React.JSX.Element
         </div>
       </div>
 
-      <p className="ht-summary__text ht-type-row-meta" data-testid="summary-text">
+      <p className="ht-app__summary__text ht-type-row-meta" data-testid="summary-text">
         {text}
       </p>
-      <div className="ht-summary__actions">
+      <div className="ht-app__summary__actions">
         <button type="button" className="ht-btn ht-btn--secondary" onClick={() => { void copy(); }}>
           {status === 'copied'
             ? t('web.summary.copied')

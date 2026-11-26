@@ -2611,7 +2611,7 @@ export function App(): React.JSX.Element {
       title: t('web.commandPalette.title'),
       inputAria: t('web.commandPalette.inputAria'),
       placeholder: t('web.commandPalette.placeholder'),
-      empty: t('web.commandPalette.empty'),
+      noResults: t('web.commandPalette.noResults'),
       groupLabels: {
         navigate: t('web.commandPalette.group.navigate'),
         create: t('web.commandPalette.group.create'),

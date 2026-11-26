@@ -42,7 +42,7 @@ export function FocusStatsChart(): React.JSX.Element {
     <HeytaUiProvider>
       <div className="ht-app__focus-stats" data-testid="focus-stats">
         <h3 className="ht-app__detail-heading">{t('web.focus.stats.title')}</h3>
-        <label className="ht-focus__manual-field">
+        <label className="ht-app__focus__manual-field">
           {t('web.focus.stats.granularity')}
           <select
             className="ht-input"

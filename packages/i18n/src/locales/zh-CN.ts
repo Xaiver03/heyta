@@ -6710,7 +6710,7 @@ export const zhCN = {
   'web.commandPalette.title': '命令面板',
   'web.commandPalette.inputAria': '搜索命令',
   'web.commandPalette.placeholder': '输入命令…',
-  'web.commandPalette.empty': '没有匹配的命令',
+  'web.commandPalette.noResults': '没有匹配的命令',
   'web.commandPalette.group.navigate': '跳转',
   'web.commandPalette.group.create': '新建',
   'web.commandPalette.group.open': '打开',
