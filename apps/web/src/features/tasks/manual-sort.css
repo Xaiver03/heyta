@@ -42,3 +42,44 @@
 .ht-row__drag-handle[data-dragging='true'] {
   cursor: grabbing;
 }
+
+/**
+ * 四象限整行拖拽：行级「灰色选中态」+ 拖拽插入线（2026-11-25）
+ *
+ * 🔴 产品负责人：「不是整个象限变灰，是选中的那条任务变灰」「排序时两个任务
+ * 之间插进去的时候，会显示那里有一条线，指示我要插入的位置」。
+ *
+ * 族名取 `.ht-row`（既有账内族），不新开 `ht-quadrant*` —— 后者会让
+ * `check:row-single-source` 的 ht-* 族基线 +1。
+ */
+.ht-row__quadrant-drag {
+  border-radius: var(--ht-radius-md);
+  /* 拖动中的原行会由内联 opacity 隐掉（DragOverlay 跟手）；这一层只管静止态。 */
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+/* 鼠标悬停在**这一条任务**上：整行浅灰底（不是整格）。 */
+.ht-row__quadrant-drag:hover {
+  background-color: var(--ht-color-hover);
+}
+
+/* 拖拽插入线：拖到某一行上时，在这一行上/下画一条**很轻的短虚线**，指示插入位置。 */
+.ht-row__quadrant-drag[data-drop-before='true']::before {
+  content: '';
+  position: absolute;
+  /* 不铺满：两侧各让出一点，线短一些，只作位置提示。 */
+  left: var(--ht-space-4);
+  width: 55%;
+  top: 0;
+  border-top: var(--ht-border-width-thin) dashed var(--ht-color-border-strong);
+}
+
+/* 插到某一行**下方**时的线（指针在该行中线之下）。 */
+.ht-row__quadrant-drag[data-drop-after='true']::after {
+  content: '';
+  position: absolute;
+  left: var(--ht-space-4);
+  width: 55%;
+  bottom: 0;
+  border-bottom: var(--ht-border-width-thin) dashed var(--ht-color-border-strong);
+}

@@ -307,7 +307,6 @@ describe('CategoryBreakdown（真实渲染）', () => {
     const el = render(<CategoryBreakdown />);
     const text = el.textContent ?? '';
     expect(text).toContain(zhCN['web.categories.empty.title']);
-    expect(text).toContain(zhCN['web.categories.empty.hint']);
     expect(el.querySelectorAll('[data-testid="category-lane"]')).toHaveLength(0);
   });
 

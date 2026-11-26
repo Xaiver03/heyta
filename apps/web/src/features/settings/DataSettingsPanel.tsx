@@ -3,7 +3,10 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 
 import { AdminPanel } from '../admin/AdminPanel.js';
+import { CalendarSubscriptionsCard } from './CalendarSubscriptionsCard.js';
+import { CsvImportPanel } from './CsvImportPanel.js';
 import { ExportPanel } from './ExportPanel.js';
+import { FeishuCalendarSettingsCard } from './FeishuCalendarSettingsCard.js';
 import { ImportPanel } from './ImportPanel.js';
 import { TickTickImportPanel } from './TickTickImportPanel.js';
 import './data-settings.css';
@@ -62,6 +65,19 @@ export function DataSettingsPanel({ active = true }: { active?: boolean }): Reac
         </header>
         <TickTickImportPanel />
       </section>
+
+      {/* 通用 CSV / Todoist 导入：跨产品迁移，走普通 op、可与既有数据共存。 */}
+      <CsvImportPanel />
+
+      {/*
+        飞书日程：外部日历 Hub 的连接（地址 + 令牌）与手动同步。
+        低频、需要参数 ⇒ 收在「数据与同步」，与其它"连到哪"的凭据同层；
+        日历侧栏只在连上之后显示只读议程（`features/calendar/CalendarHubPanel`）。
+      */}
+      <FeishuCalendarSettingsCard active={active} />
+
+      {/* 日历订阅（ICS / webcal）：标准订阅源，只读镜像到日历；同样低频、收在设置里。 */}
+      <CalendarSubscriptionsCard active={active} />
 
       {/* AdminPanel owns both the permission check and its title. Keeping it
           outside a pre-rendered card avoids exposing an empty admin heading to

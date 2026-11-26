@@ -279,12 +279,17 @@ export function FilterPanel({ onApplyFilter }: FilterPanelProps): React.JSX.Elem
                   <FilterIcon size={ICON_SIZE.sm} aria-hidden="true" />
                   <span className="ht-sidebar__filter-apply__name">{saved.name}</span>
                 </button>
-                <IconButton
-                  label={t('web.filter.remove')}
-                  icon={<X size={ICON_SIZE.xs} aria-hidden="true" />}
-                  size="sm"
+                {/* 尾部删除：用与「+」同一个 44×44 居中盒（`.ht-sidebar__organizer-add`），
+                    这样它的右缘落在与 + 同一条右脊线上、图标也与 + 同轴居中；
+                    换成 Button 自带内距的宽度会让两个图标差 7px（实测）。 */}
+                <button
+                  type="button"
+                  className="ht-sidebar__organizer-add"
+                  aria-label={t('web.filter.remove')}
                   onClick={() => handleRemove(saved.id)}
-                />
+                >
+                  <X size={ICON_SIZE.sm} aria-hidden="true" />
+                </button>
               </div>
             );
           })}

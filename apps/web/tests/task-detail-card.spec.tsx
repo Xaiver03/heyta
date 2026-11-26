@@ -317,8 +317,8 @@ describe('宿主的落点接线（读 App.tsx 的源码形状）', () => {
     expect(count(/<TaskDetailCard\b/g), '面单没有渲染点').toBe(2);
     expect(
       count(/automationSlot=\{automationSlotNode\}/g),
-      '面单只画在一处 ⇒ 窄档（没有详情列）里所有字段都不可编辑',
-    ).toBe(2);
+      'AI 自动化格已从宿主移出（AI 能力统一进单个 Agent），宿主不应再注入 automationSlot',
+    ).toBe(0);
     // C2 第三枚「更多」：动作菜单此前只有右键 / Shift+F10 两个入口，界面上没有可见把手。
     // 两处落点都得接，漏一处的表现是"那一档里菜单打不开"。
     expect(

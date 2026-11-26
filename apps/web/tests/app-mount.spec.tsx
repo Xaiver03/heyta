@@ -658,9 +658,8 @@ describe('侧栏导航', () => {
       setter?.call(input, '买两桶漆');
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    const submitButton = container!.querySelector<HTMLElement>('[data-testid="capture-submit"]')!;
     await act(async () => {
-      submitButton.click();
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       await flush();
     });
 
@@ -696,7 +695,7 @@ describe('侧栏导航', () => {
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await act(async () => {
-      container!.querySelector<HTMLElement>('[data-testid="capture-submit"]')!.click();
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       await flush();
     });
 

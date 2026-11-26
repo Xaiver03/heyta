@@ -62,9 +62,8 @@ const QUADRANT_HINT_KEY: Record<Quadrant, MessageKey> = {
  */
 export function quadrantBoardLabels(
   t: I18nValue['t'],
-  options?: { readonly firstEmptyQuadrant?: Quadrant },
+  _options?: { readonly firstEmptyQuadrant?: Quadrant },
 ): QuadrantBoardLabels {
-  const firstEmpty = options?.firstEmptyQuadrant;
   return {
     title: (quadrant) => t(QUADRANT_TITLE_KEY[quadrant]),
     hint: (quadrant) => t(QUADRANT_HINT_KEY[quadrant]),
@@ -74,15 +73,14 @@ export function quadrantBoardLabels(
      * ⚠️ 模板只用 `title` / `hint`（`web.quadrant.a11y.cell` 就是这两个占位符）。
      * 计数**不**进这句：一格里有多少条，读屏用户往下走就会听到，
      * 而把它塞进格名会让"进这一格"这件事从"听一句"变成"听一串"。
-     * 计数的无障碍名在徽标自己身上（见 {@link quadrantCountA11y}）。
      */
     cellA11y: ({ title, hint }) => t('web.quadrant.a11y.cell', { title, hint }),
-    /** 空格不是"什么都没有"，它说的是"这一类现在没有要处理的事"。 */
-    empty: (quadrant) =>
-      quadrant === firstEmpty ? t('web.quadrant.dropHere') : '',
-    // footnote 不在这里给：W5 起底部规则说明由 web 宿主收进 <details> 折叠帮助
-    // （summary 用 `web.shell.nav.help`，正文仍是 `web.quadrant.footnote`，
-    // 一条词条都不加）。共享板收不到 footnote 就不渲染那一行。
+    /**
+     * 空格只写一个**事实**「没有任务」（与滴答一节）：不写"拖任务到这里"这类
+     * 操作说明。2026-11-25 产品负责人：「不需要有任何说明文字，我们都已经用 UX
+     * 表达出来了」—— 四格都能拖进去这件事，靠拖拽本身表达，不靠一句话教。
+     */
+    empty: () => t('web.quadrant.empty'),
   };
 }
 

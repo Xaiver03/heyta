@@ -202,8 +202,10 @@ function inputValue(el: HTMLDivElement): string {
   return (el.querySelector('[data-testid="capture-input"]') as HTMLInputElement).value;
 }
 
-function submit(el: HTMLDivElement): HTMLElement {
-  return el.querySelector<HTMLElement>('[data-testid="capture-submit"]')!;
+function pressEnter(el: HTMLDivElement): void {
+  el.querySelector('[data-testid="capture-input"]')!.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+  );
 }
 
 /**
@@ -267,35 +269,19 @@ describe('CaptureComposer —— 识别结果必须可见（2026-11-04 起有两
     expect(chipValue(cs[0]!)).toContain('高优先级');
   });
 
-  it('🔴 输入区收成「一个外框 + 上下两层」：输入在上，胶囊与主操作在下', () => {
-    /*
-      🔴 2026-11-16：这一条跟着**结构变更**改写（原判据是"输入行的直接子元素恰好 3 个"）。
-
-      那时输入框、日期胶囊、添加按钮是**并排一行**。产品口径（参照 DSH 的 composer）
-      要求收成一个外框内的上下两层：上层输入、下层工具行（胶囊在左、圆形主操作在右）。
-      于是"直接子元素 3 个"这个数就不再表达原意了 —— 现在输入框的外框里是两个孩子
-      （输入框 + 工具行），而三件控件仍然都在、且仍在同一个容器里。
-
-      原句要防的东西**照旧**：不再"铺开成第四个控件"。所以判据改成：
-      三件都在 + 输入框与工具行同属一个外框 + 工具行恰好两件。
-    */
+  it('🔴 输入区收成「单行输入壳」：左侧加号图标 + 输入框 + 右侧日期胶囊，无多余提交按钮', () => {
     const el = render();
-    for (const id of ['capture-input', 'capture-due-capsule', 'capture-submit']) {
-      expect(el.querySelector(`[data-testid="${id}"]`), id).not.toBeNull();
-    }
+    expect(el.querySelector('[data-testid="capture-compose"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="capture-input"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="capture-due-capsule"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="capture-submit"]'), '回车即提交，不应再渲染提交按钮').toBeNull();
 
+    const frame = el.querySelector('[data-testid="capture-compose"]')!;
     const input = el.querySelector('[data-testid="capture-input"]')!;
-    const frame = input.parentElement!;
-    const toolRow = frame.lastElementChild!;
-    expect(frame.children.length, '外框里应当只有"输入"与"工具行"两层').toBe(2);
-    expect(
-      toolRow.contains(el.querySelector('[data-testid="capture-due-capsule"]')),
-      '日期胶囊不在工具行里',
-    ).toBe(true);
-    expect(
-      toolRow.contains(el.querySelector('[data-testid="capture-submit"]')),
-      '主操作不在工具行里',
-    ).toBe(true);
+    const capsule = el.querySelector('[data-testid="capture-due-capsule"]')!;
+    expect(frame.getAttribute('data-input-shell')).toBe('true');
+    expect(input.parentElement).toBe(frame);
+    expect(capsule.parentElement).toBe(frame);
   });
 
   it('🔴 「今天下午八点给张教授发PPT」这一句：框下**一行都不挂**', () => {
@@ -378,7 +364,7 @@ describe('CaptureComposer —— 每一条截止识别都能单独取消（出�
       dueItemToggles(panel)[0]!.click();
     });
     act(() => {
-      submit(el).click();
+      pressEnter(el);
     });
     expect(addTask).toHaveBeenCalledWith('明天交周报', {});
   });
@@ -401,7 +387,7 @@ describe('CaptureComposer —— 每一条截止识别都能单独取消（出�
     expect(inputValue(el)).toBe('今天下午八点交周报');
     expect(capsuleText(el)).toBe('');
     act(() => {
-      submit(el).click();
+      pressEnter(el);
     });
     expect(addTask).toHaveBeenCalledWith('今天下午八点交周报', {});
   });
@@ -476,7 +462,7 @@ describe('CaptureComposer —— 未被采纳的匹配必须显式标出', () =>
     // 关键：它确实还在标题里 —— 预览行已被产品负责人否掉，而"这段文字没被吞掉"
     // 这件事必须继续可验，所以判据落在提交出去的标题上。
     act(() => {
-      submit(el).click();
+      pressEnter(el);
     });
     expect(addTask).toHaveBeenCalledWith(expect.stringContaining('明天'), expect.anything());
   });
@@ -496,15 +482,17 @@ describe('CaptureComposer —— 提交', () => {
   it('标题为空时禁用提交（只输入"明天"不算一个任务）', () => {
     const el = render();
     type(el, '明天');
-    // RNW 的 `Pressable` 渲染成 div，`disabled` 体现在 `aria-disabled`。
-    expect(submit(el).getAttribute('aria-disabled')).toBe('true');
+    act(() => {
+      pressEnter(el);
+    });
+    expect(addTask).not.toHaveBeenCalled();
   });
 
   it('提交时把解析出的字段一并交给写入动作', () => {
     const el = render();
     type(el, '明天交周报 !1');
     act(() => {
-      submit(el).click();
+      pressEnter(el);
     });
 
     expect(addTask).toHaveBeenCalledTimes(1);
@@ -521,7 +509,7 @@ describe('CaptureComposer —— 提交', () => {
     const el = render();
     type(el, '交周报');
     act(() => {
-      submit(el).click();
+      pressEnter(el);
     });
     expect(inputValue(el)).toBe('');
   });
@@ -530,7 +518,7 @@ describe('CaptureComposer —— 提交', () => {
     const el = render();
     type(el, '交周报 p2');
     act(() => {
-      submit(el).click();
+      pressEnter(el);
     });
     expect(addTask).toHaveBeenCalledWith('交周报', { priority: Priority.Medium });
   });
@@ -550,7 +538,7 @@ describe('CaptureComposer —— 提交', () => {
     const el = renderWith({ projectId: 'p-home', name: '家庭装修' });
     type(el, '明天买漆 !1');
     act(() => {
-      submit(el).click();
+      pressEnter(el);
     });
     expect(addTask).toHaveBeenCalledWith('买漆', {
       dueDate: expect.any(Number),
@@ -569,7 +557,7 @@ describe('CaptureComposer —— 提交', () => {
     const el = render();
     type(el, '买牛奶');
     act(() => {
-      submit(el).click();
+      pressEnter(el);
     });
     expect(addTask).toHaveBeenCalledWith('买牛奶', {});
   });
@@ -943,7 +931,7 @@ describe('CaptureComposer —— 没有日期时点时刻：落在今天，不�
     expect(chips(el), '手工选了 21:00 之后，那句未采纳的 16:00 不许悄悄不见').toHaveLength(1);
 
     act(() => {
-      submit(el).click();
+      pressEnter(el);
     });
 
     expect(addTask, '「16:00 交周报」去掉那个没被采纳的时刻后仍有标题，该能提交').toHaveBeenCalledTimes(1);

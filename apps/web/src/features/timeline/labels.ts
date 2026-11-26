@@ -62,7 +62,6 @@ export function useTimelineLabels(): TimelineLabels {
 
   const board: TimelineBoardLabels = {
     empty: t('web.timeline.empty'),
-    emptyHint: t('web.timeline.empty.hint'),
     ariaEmpty: t('web.timeline.aria.empty'),
     ariaGroup: (count) =>
       count === 1

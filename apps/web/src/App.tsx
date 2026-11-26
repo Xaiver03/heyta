@@ -62,13 +62,6 @@ import {
   type TaskSortKey,
 } from '@heyta/domain';
 
-/**
- * 🔴 估时**写进备注**，不新增持久化字段。
- *
- * 格式与写入规则都在 `@heyta/app-host` 里（`duration-note.ts`），
- * 这里只负责把结果交给 `store.setNote`。壳不做业务判断 —— 见 AGENTS.md §3.5。
- */
-import { writeDurationIntoNote } from '@heyta/app-host';
 import { normalizeRouteOrder, withManagedEndpoint } from '@heyta/ai';
 
 /**
@@ -116,7 +109,6 @@ import {
   saveDetailPane,
   type DetailPanePref,
 } from './features/shell/detail-pane-pref.js';
-import { loadFirstRunSeen, markFirstRunSeen } from './features/shell/first-run-pref.js';
 import { TagChips } from './features/tasks/TaskOrganizer.js';
 import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
 import { RepeatChip } from './features/tasks/TaskRepeat.js';
@@ -152,6 +144,7 @@ import { WebTopBar } from './features/shell/WebTopBar.js';
 import { useCalendarViewStore } from './features/calendar/store.js';
 import { CalendarHeaderToolbar } from './features/calendar/CalendarHeaderToolbar.js';
 import { CalendarView } from './features/calendar/CalendarView.js';
+import { CalendarSubscriptionsAutoSync } from './features/calendar/useCalendarSubscriptionsAutoSync.js';
 import { useNoteStore } from './features/notes/store.js';
 import { ReminderNotifyPanel } from './features/reminders/ReminderNotifyPanel.js';
 import { useReminderNotifications } from './features/reminders/use-reminder-notifications.js';
@@ -210,9 +203,6 @@ import { useDetailColumnShown } from './features/shell/detail-pane-visible.js';
 import { AnchoredMenu, MenuItem, MenuSection, MenuSeparator } from './lib/menu/AnchoredMenu.js';
 import { ReminderBadge } from './features/reminders/ReminderPanel.js';
 import { TimelinePanel } from './features/timeline/TimelinePanel.js';
-import { AiBreakdown } from './features/ai/AiBreakdown.js';
-import { AiPrioritize } from './features/ai/AiPrioritize.js';
-import { AiDuration } from './features/ai/AiDuration.js';
 import { AssistantPanel } from './features/ai/AssistantPanel.js';
 import { AiSettingsNavigationContext } from './features/ai/ai-settings-navigation.js';
 import { PanelEphemeralProvider } from './features/ai/panel-ephemeral.js';
@@ -278,6 +268,14 @@ import {
   type ThemeMode,
   type ThemePreset,
 } from './lib/theme.js';
+import {
+  applyFontScale,
+  FONT_SCALES,
+  FONT_SCALE_RATIO,
+  loadFontScale,
+  saveFontScale,
+  type FontScale,
+} from './lib/font-scale.js';
 
 import './styles/app.css';
 
@@ -457,6 +455,16 @@ export function App(): React.JSX.Element {
    */
   const [themeMode, setThemeMode] = useState<ThemeMode>(resolveInitialThemeMode);
   const [themePreset, setThemePreset] = useState<ThemePreset>(resolveInitialThemePreset);
+  /**
+   * 用户字号（设备属性，ADR-0085：写本机、零 op）。默认「紧凑」= 设计基准 ×0.88。
+   * 两处同时生效：`applyFontScale` 覆盖 CSS 字号变量，`uiTheme` 缩放共享组件数值 token。
+   */
+  const [fontScale, setFontScaleState] = useState<FontScale>(loadFontScale);
+  const setFontScale = useCallback((value: FontScale) => {
+    setFontScaleState(value);
+    saveFontScale(value);
+    applyFontScale(value);
+  }, []);
   /**
    * 行着色三态（**只有清单图标着色**，产品拍板 2026-11-08）。
    * 设备属性（ADR-0085）：写本机、**零 op** —— 改它不产生任何一条 op。
@@ -1456,15 +1464,6 @@ export function App(): React.JSX.Element {
    * 因为"三条路径"最容易写成"其实只有同一个 onClick 调了三遍"。
    */
   const [detailPane, setDetailPaneState] = useState<DetailPanePref>(loadDetailPane);
-  /**
-   * 首启引导（2026-11-14）。
-   *
-   * 两态：「没看过 / 看过」+ 一次性填充请求。`nonce` 用 `Date.now()` 而不是自增：
-   * 它只需要"与上一次不同"，不需要可预测 —— 而自增要在组件里多存一个计数器，
-   * 反而多一处可能被重置的状态。
-   */
-  const [firstRunSeen, setFirstRunSeen] = useState<boolean>(() => loadFirstRunSeen());
-  const [firstRunFill, setFirstRunFill] = useState<{ readonly text: string; readonly nonce: number } | undefined>(undefined);
   const setDetailPane = useCallback((value: DetailPanePref) => {
     setDetailPaneState(value);
     saveDetailPane(value);
@@ -1840,8 +1839,9 @@ export function App(): React.JSX.Element {
       resolveHeytaUiTheme({
         scheme: theme,
         reducedMotion: systemPrefersReducedMotion,
+        fontScale: FONT_SCALE_RATIO[fontScale],
       }),
-    [theme, systemPrefersReducedMotion],
+    [theme, systemPrefersReducedMotion, fontScale],
   );
 
   // 「今天」视图需要 now 保持新鲜，否则跨过午夜后它不会更新
@@ -1887,7 +1887,7 @@ export function App(): React.JSX.Element {
    * | 东西 | 去哪 | 为什么 |
    * |---|---|---|
    * | 字段编辑器（备注 / 子任务 / 清单+标签 / 重复 / 截止 / 提醒 / 优先级） | `TaskDetailCard`（详情列，或窄档的对话框） | 每个字段只有一个编辑所有者；行上九个编辑器的第二个代价是行宽被吃光 |
-   * | AI 拆解 / AI 估时 | `TaskDetailCard` 的「自动化」组（`automationSlot`） | 审计 §4.6 早就把这一组留给它们；顺带修掉"行尾常驻 517px" |
+   * | AI 拆解 / AI 估时 | **已整体收进单个对话 Agent**（不再有独立入口） | 产品裁决：AI 能力只走一个 Agent，不再在行或面单里挂独立 AI 动作 |
    * | 只读徽标（这几枚） | **留在这里** | §8.138 那条不变量：**扫一眼要能看出**哪些任务写过备注 / 是重复的 / 挂在谁下面 / 挂了几条提醒 / 打了什么标签。删掉就是功能倒退 |
    * | 完整的删除入口 | 右键菜单（`TaskRowMenu`） | 危险项不与日常项并列 |
    *
@@ -1920,82 +1920,6 @@ export function App(): React.JSX.Element {
     [store.now, t],
   );
 
-  /**
-   * 「自动化」组里属于宿主的那一格（AI 拆解 / AI 估时）。理由见
-   * `TaskDetailCard` 的 `automationSlot` 注释：五组 AI 状态只住在 `App.tsx`，
-   * 而面单有两个落点，所以传节点、不传状态。
-   */
-  const automationSlotNode = useMemo(() => {
-    if (selectedTaskId === null) return null;
-    const task = store.entities.tasks[selectedTaskId];
-    if (task === undefined || task.deletedAt !== undefined) return null;
-    return (
-      <>
-        {/* AI 拆解。配置关着时它仍然在 —— 点了会说明该去开什么，
-            而不是消失（"找不到入口"和"入口说为什么不可用"是两件事）。 */}
-        <AiBreakdown
-          task={task}
-          routing={aiRouting}
-          consents={aiSettings.consents}
-          secrets={aiSecrets}
-          // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
-          healthSnapshot={aiSettings.health}
-          // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
-          preferenceSet={memory.preferenceSet}
-          onApplyNote={(note) => store.setNote(task.id, note)}
-          /**
-           * 🔴 反馈落到 op-log（跨设备同步）。
-           * 不接这个回调，AI 就永远学不到"该给你几项"——
-           * 界面上的逐条取舍会变成白点，没有任何记录。
-           */
-          onFeedback={(fb) => {
-            void store.recordAiFeedback({ feature: 'breakdown', ...fb });
-          }}
-          onHealth={(health) => {
-            // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
-            // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
-            setAiSettings((previous) => {
-              const next = {
-                ...previous,
-                health: toHealthSnapshot(health, Date.now()),
-              };
-              saveAiSettings(next);
-              return next;
-            });
-          }}
-        />
-
-        {/* AI 估时。
-            🔴 结果**写进备注**，不新增持久化字段 —— 加字段要产品先拍板
-            （见 `packages/app-host/src/duration-note.ts` 文件头与
-            `ai-capability-branches.md` §5.1）。
-            ⚠️ 刻意**不传 `history`**：web 壳目前没有暴露专注历史，
-            而不传的语义是"这次估时没有历史可用"，是 fail closed 的一侧。
-            等专注历史接出来再传，不要在这里编一份假的。 */}
-        <AiDuration
-          task={task}
-          routing={aiRouting}
-          consents={aiSettings.consents}
-          secrets={aiSecrets}
-          healthSnapshot={aiSettings.health}
-          preferenceSet={memory.preferenceSet}
-          onApply={async (minutes) => {
-            await store.setNote(task.id, writeDurationIntoNote(task.note, minutes));
-          }}
-          onHealth={(health) => {
-            setAiSettings((previous) => {
-              const next = {
-                ...previous,
-                health: toHealthSnapshot(health, Date.now()),
-              };
-              saveAiSettings(next);
-              return next;
-            });
-          }}
-        />
-      </>
-    );
-  }, [aiSecrets, aiSettings, memory.preferenceSet, selectedTaskId, store]);
 
   /**
    * 删一条任务 + 撤销回执（P3）。
@@ -2188,8 +2112,15 @@ export function App(): React.JSX.Element {
      * 白名单要人记得登记，而"记得登记"不是机制。默认反过来之后，新增视图
      * 天然由自己的 tab 标签命名 —— 漏登记这条路不存在了。
      */
-    if (f.kind === 'quadrant' && (view === 'tasks' || view === 'quadrant')) {
-      // 落在某个象限上就用**更具体的象限名**（「重要不紧急」比「四象限」有用）。
+    /**
+     * 🔴 2026-11-25：**只有任务视图**才允许用"某个象限名"当标题。
+     * `view === 'quadrant'`（四象限看板）的标题**永远是「四象限」** —— 它是
+     * 四个象限的合成视图，不是"某一个象限"。此前这里把 `view === 'quadrant'`
+     * 也算进来，于是侧栏残留的象限筛选（如「不重要不紧急」）会顶掉看板标题，
+     * 用户看到"四象限页的标题写着不重要不紧急"。产品负责人当场指出。
+     */
+    if (f.kind === 'quadrant' && view === 'tasks') {
+      // 在任务视图里落在某个象限上就用**更具体的象限名**（「重要不紧急」比「四象限」有用）。
       const entry = QUADRANT_NAV.find(
         (n) => n.filter.kind === 'quadrant' && n.filter.quadrant === f.quadrant,
       );
@@ -2641,54 +2572,6 @@ export function App(): React.JSX.Element {
   }, []);
 
 
-  /**
-   * 「AI 排优先级」这一枚组织类动作（2026-11-02 搬进对话助手）。
-   *
-   * 🔴 它原来渲染在**任务列表上方**，长得像一行任务（按钮组件的 ghost 档铺满整列 + 图标），
-   * 位置在一组组头与任务行之间。产品负责人的裁决是"AI 排优先级应该直接在对话助手里面有，
-   * 而不是放在这个地方" —— 这一版兑现它。
-   *
-   * 为什么搬得动、而上一版只搬了 `AiBreakdown`：这两件事的**范围**不同。
-   * `AiBreakdown` 拆的是**一条**任务（属于任务详情的自动化槽），
-   * 这一枚排的是**当前清单**（属于"我跟助手说一句"这件事）。上一版拿
-   * "它是批量的" 当理由把它留在列表里，那个理由说明的是"它不能进单条任务详情"，
-   * 不说明"它该待在列表体中间"。
-   *
-   * ⚠️ 配置关着时它**仍然在**（与 `AiBreakdown` 同一条）：点了会说明该去开什么，
-   * 而不是消失 —— "找不到入口"和"入口说为什么不可用"是两件事。
-   */
-  const aiPrioritizeAction = visible.length > 0 ? (
-    <AiPrioritize
-      tasks={visible}
-      routing={aiRouting}
-      consents={aiSettings.consents}
-      secrets={aiSecrets}
-      // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
-      healthSnapshot={aiSettings.health}
-      // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
-      preferenceSet={memory.preferenceSet}
-      /**
-       * 🔴 只写用户勾选保留的那些（`decisions` 已经是取舍后的结果），
-       * 并把整批交给一个动作层意图：一条 BATCH op 同时携带每条任务各自的优先级。
-       * 这样它能同步到别的设备，也不会留下半批已写、半批未写的中间态。
-      */
-      onApply={async (decisions) => {
-        await store.bulkSetPriorities(decisions);
-      }}
-      onHealth={(health) => {
-        // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
-        // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
-        setAiSettings((previous) => {
-          const next = {
-            ...previous,
-            health: toHealthSnapshot(health, Date.now()),
-          };
-          saveAiSettings(next);
-          return next;
-        });
-      }}
-    />
-  ) : null;
 
   /**
    * AI 面：**一个 Agent，一个聊天入口**。
@@ -2698,16 +2581,13 @@ export function App(): React.JSX.Element {
    * 写入仍然遵守提案 → 用户确认的安全边界，工具目录与授权继续留在设置里。
    * 这一份 JSX 同时是右栏内容与窄屏回退内容，挂载点不变，未决披露状态也不丢。
    *
-   * 🔴 组织类动作（`aiPrioritizeAction`）经 `orgActions` 插进这一份，
-   * 挂在**会话上方、常驻**（不是空态的一部分）：它是有状态的流程，
-   * 一有对话就消失的入口等于"用一次就找不到第二次"。
    */
   const aiPanels = (
     contentView === 'tasks' ? (
       <section className="ht-ai-agent-surface" data-testid="ai-agent-surface">
         <AssistantPanel
             /* 接线开关：`?cloudHarness=1` 打开云端 Agent Harness（读/写+可撤销）；默认走既有路径。 */
-            useCloudHarness={typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('cloudHarness') === '1'}
+            useCloudHarness={typeof window === 'undefined' || new URLSearchParams(window.location.search).get('cloudHarness') !== '0'}
             expanded={assistantWorkspace}
             onToggleExpanded={() => { setCompactAssistantOpen(false); setAssistantExpanded((value) => !value); }}
             onClose={assistantOverlay ? () => setCompactAssistantOpen(false) : undefined}
@@ -2716,7 +2596,6 @@ export function App(): React.JSX.Element {
             secrets={aiSecrets}
             memoryEnabled={aiSettings.memoryEnabled}
             getDurationPreferenceHints={getDurationPreferenceHints}
-            orgActions={aiPrioritizeAction}
             healthSnapshot={aiSettings.health}
             onHealth={(health) => {
               setAiSettings((previous) => {
@@ -3443,8 +3322,7 @@ export function App(): React.JSX.Element {
               而草稿就是 AI 要解析的那句话。把草稿镜像到这里再传回去
               会造出两份状态，且"应用后清空输入框"没法做（清不动上游的 state）。
 
-              与 `AiBreakdown` 一样：配置关着时它**仍然在**，点了会说明该去开什么，
-              而不是消失。 */}
+              配置关着时它**仍然在**，点了会说明该去开什么，而不是消失。 */}
           {/*
             🔴 **只在任务视图渲染**（2026-09-30 页8 扫描的裁定）。它曾经无条件下渲染，
             于是便签页出现**两条采集条叠贴**（任务条紧贴便签的「写点什么…」）、
@@ -3466,16 +3344,13 @@ export function App(): React.JSX.Element {
               于是这个输入框回到滴答那种形状：**你写什么，规则就当场读什么**，
               底下不再挂任何 AI 按钮。
             */
-            <CaptureComposer destination={captureDestination} fillRequest={firstRunFill} />
+            <CaptureComposer destination={captureDestination} />
           )}
 
           {/*
-            🔴 这里**曾经**是「AI 排优先级」那一行（在组头与任务行之间、长得像一行任务）。
-            2026-11-02 搬进对话助手的会话上方（`aiPrioritizeAction` → `orgActions`）。
-
-            **不要搬回来。** 它不是"位置偏好"问题，是**层级**问题：动作不该住进列表体。
-            列表体里只放任务 —— 否则每一行"这行点下去会发生什么"都要先分辨它是任务还是动作，
-            而它长得和任务一模一样（同样的 ghost 按钮、同样的整列宽度、同样的图标位）。
+            🔴 列表体里只放任务，没有任何 AI 动作行。
+            AI 能力统一走右侧那一个对话助手（Agent）：要排优先级就"跟助手说一句"，
+            不再在列表体、也不再在助手面挂独立的「AI 排优先级」按钮。
             判据：`check:surface-budget` 的「列表体不许有动作行」那一臂。
           */}
 
@@ -3519,32 +3394,7 @@ export function App(): React.JSX.Element {
               **空 inbox 会被判成白屏** —— 一个只在用户什么都没做时才红的假红。
             */
             <div data-testid="task-list">
-              <EmptyState
-                filter={store.filter}
-                firstRun={
-                  !firstRunSeen && store.filter.kind === 'all'
-                    ? {
-                        /*
-                         * 点一条示例 = **把字灌进输入框**，不是建任务。
-                         * `parseCapture` 要求调用方把 `matches` 给用户确认（见它的文件头第 2 条），
-                         * 直接落库会把误报变成静默改写。
-                         *
-                         * 点完就标记"看过"：引导要教的那件事已经发生（用户知道可以这么写），
-                         * 而输入框里那行字和下面的识别芯片会继续教。
-                         */
-                        onFillDraft: (text) => {
-                          markFirstRunSeen();
-                          setFirstRunSeen(true);
-                          setFirstRunFill({ text, nonce: Date.now() });
-                        },
-                        onDismiss: () => {
-                          markFirstRunSeen();
-                          setFirstRunSeen(true);
-                        },
-                      }
-                    : undefined
-                }
-              />
+              <EmptyState filter={store.filter} />
             </div>
           ) : sectionGroups !== undefined ? (
               <div data-testid="task-list">
@@ -3735,7 +3585,12 @@ export function App(): React.JSX.Element {
             </HeytaUiProvider>
             </div>
           )}
-          {contentView === 'calendar' && <CalendarView />}
+          {contentView === 'calendar' && (
+            <>
+              <CalendarView />
+              <CalendarSubscriptionsAutoSync />
+            </>
+          )}
           {/**
            * 四象限 = 同一批任务的另一种投影（共享 `QuadrantBoard` 每格直接渲染
            * 共享 `TaskList`）。🔴 所以**选中必须接同一个值**：在列表里选中一条再切过来，
@@ -4162,14 +4017,37 @@ export function App(): React.JSX.Element {
                 <LanguageSwitcher />
               </div>
               <div className="ht-settings__preference-row">
+                <h3 className="ht-settings__h3 ht-type-row-title">{t('web.settings.display.fontSizeTitle')}</h3>
+                <div
+                  className="ht-settings__preset-grid"
+                  role="radiogroup"
+                  aria-label={t('web.settings.display.fontSizeTitle')}
+                >
+                  {FONT_SCALES.map((scale) => (
+                    <button
+                      key={scale}
+                      type="button"
+                      role="radio"
+                      aria-checked={fontScale === scale}
+                      className="ht-settings__preset-option"
+                      data-testid={`font-scale-${scale}`}
+                      onClick={() => { setFontScale(scale); }}
+                    >
+                      <span>{t(`web.settings.display.fontSize.${scale}` as const)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="ht-settings__preference-row">
                 <h3 className="ht-settings__h3 ht-type-row-title">{t('web.settings.display.themeTitle')}</h3>
               <button
                 type="button"
-                className="ht-settings__theme-toggle ht-type-row-title"
+                className="ht-settings__theme-toggle"
                 aria-label={theme === 'light' ? t('common.a11y.toDarkTheme') : t('common.a11y.toLightTheme')}
+                aria-pressed={theme === 'dark'}
                 data-testid="theme-toggle"
                 onClick={() => {
-                  const next: ThemeMode = themeMode === 'light' ? 'dark' : 'light';
+                  const next: ThemeMode = theme === 'light' ? 'dark' : 'light';
                   // 🔴 这是**唯一**记账的地方：启动时的那次 `applyTheme` 只改 DOM。
                   // 否则"用户没做过选择"与"用户选了亮色"在存储里长得一模一样，
                   // 系统偏好从此再也进不来（`lib/theme.ts` 里记着症状）。
@@ -4193,7 +4071,7 @@ export function App(): React.JSX.Element {
                 </h3>
                 <button
                   type="button"
-                  className="ht-settings__theme-toggle ht-type-row-title"
+                  className="ht-settings__theme-toggle"
                   aria-pressed={themeMode === 'system'}
                   data-testid="theme-auto-toggle"
                   onClick={() => {
@@ -4434,7 +4312,6 @@ export function App(): React.JSX.Element {
              🔴 备注编辑器的落点在**这一格**，所以行尾那颗备注 chip 在这一支成立时不渲染
              （`renderTaskTrailing` 里的 `noteInColumn`）—— 同一字段任何时刻只有一个所有者。 */
           <TaskDetailCard
-            automationSlot={automationSlotNode}
             onShowActions={(taskId, anchor) => {
               openRowMenuAt(taskId, anchor.x, anchor.y);
             }}
@@ -4568,7 +4445,6 @@ export function App(): React.JSX.Element {
             </button>
           </div>
           <TaskDetailCard
-            automationSlot={automationSlotNode}
             onShowActions={(taskId, anchor) => {
               openRowMenuAt(taskId, anchor.x, anchor.y);
             }}

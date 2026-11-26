@@ -55,9 +55,7 @@ type Translate = I18nValue['t'];
 export function eventBoardLabels(t: Translate): EventBoardLabels {
   return {
     empty: t('web.countdown.empty'),
-    emptyHint: t('web.countdown.empty.hint'),
     archivedEmpty: t('web.countdown.archived.empty'),
-    archivedEmptyHint: t('web.countdown.archived.empty.hint'),
     composerPlaceholder: t('web.countdown.composer.placeholder'),
     add: t('web.countdown.add'),
     pickDate: t('web.countdown.pickDate'),

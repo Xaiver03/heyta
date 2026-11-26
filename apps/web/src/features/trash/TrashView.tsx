@@ -239,7 +239,6 @@ export function TrashView(): React.JSX.Element {
           labels={{
             intro: t('web.trash.intro'),
             emptyTitle: t('web.trash.empty.title'),
-            emptyHint: t('web.trash.empty.hint'),
             // 徽标文案的唯一真源是 `common.entity.*`（共享的查表函数），不是这里。
             kindLabel: (kind) => entityLabelOf(kind, t),
             deletedAt: (item) => t('web.trash.deletedAt', { date: formatDeletedAt(item.deletedAt, locale) }),

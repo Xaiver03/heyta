@@ -481,10 +481,9 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  order: 2;
-  margin-block-start: auto;
+  /* 迷你月历是这一列的第一视觉块：先看到月历，再看范围，最后才是飞书日程。 */
+  order: 1;
   padding-block-start: var(--ht-space-2);
-  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }
 
 .ht-sidebar__month-head {
@@ -759,8 +758,8 @@
 /* ── 飞书日程（阶段 A：只读日程 + 本地标签）──────────────────────
  *
  * 这一块与「显示范围」同一个层级：都是"日历上看得见什么"的来源。
- * 顺序排 `1` 与范围并列（DOM 在后，所以画在它下面），迷你月历仍是 `2`
- * （它带 `margin-block-start: auto`，钉在列底）。
+ * 顺序排 `3`：迷你月历（`1`）与显示范围（`1`）之后；`margin-block-start: auto`
+ * 把它和它的未配置表单压到列底，空白不再占据侧栏上部中心视觉。
  *
  * 🔴 行是 `<button>`：展开详情是这一屏唯一的"动作"，而它不是链接、也不是
  * 可拖拽元素 —— 日程时间来自 Hub，拖动改期在阶段 A 不允许。
@@ -769,7 +768,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-2);
-  order: 1;
+  order: 3;
+  margin-block-start: auto;
   padding-block-start: var(--ht-space-2);
   border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
 }
@@ -802,6 +802,13 @@
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-2);
+}
+
+/* 侧栏本身就是 surface-sunken 底色，继承 form.css 的同底无边框会让输入框隐身，
+   因此显式恢复 surface 底色与 1px 细边，与主区输入框一致。 */
+.ht-sidebar__agenda-form .ht-input {
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
 }
 
 .ht-sidebar__agenda-groups {

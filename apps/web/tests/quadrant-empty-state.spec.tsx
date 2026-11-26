@@ -88,11 +88,6 @@ function seedTwoInQ1(): void {
   });
 }
 
-/** 全空：一个任务都没有 —— 「空态必须有下一步提示」的判据在这个形状下量。 */
-function seedNothing(): void {
-  useTaskStore.setState({ entities: emptyState(), now: NOW });
-}
-
 let roots: Root[] = [];
 let containers: HTMLDivElement[] = [];
 
@@ -117,98 +112,28 @@ afterEach(() => {
   containers = [];
 });
 
-/** 哪几格里出现了引导文案（按格号返回，格号 = `quadrant-cell-N` 的 N）。 */
-function cellsWithDropHint(container: HTMLElement): string[] {
-  return ['1', '2', '3', '4'].filter((n) =>
-    container
-      .querySelector(`[data-testid="quadrant-cell-${n}"]`)
-      ?.textContent?.includes('拖任务到这里'),
-  );
-}
-
-describe('W5 四象限空态减重', () => {
-  describe('a. 占位去重：引导文案同屏最多 1 处', () => {
-    it('三个空象限时，「拖任务到这里」只给第一个空象限', () => {
-      /*
-        🔴 2026-11-16：**判定点从 DOM 挪到标签函数**。
-
-        原来这条数的是"哪几个格子的 textContent 里有那句话"。跑下来恒为 `[]` ——
-        而产品那边 `quadrantLabels().empty()` 明明给了文案。
-
-        原因在测试手段上：`TaskList` 的空态走 `FlatList` 的 `ListEmptyComponent`，
-        而 RNW 的 VirtualizedList 在 jsdom 里（无布局、无滚动视口）**不渲染空态**。
-        也就是说这条判据在 jsdom 里**永远量不到**，红的是环境不是产品。
-
-        判据本身没错（同屏最多一处引导），所以改成量**同一份判断**：
-        `quadrantBoardLabels()` 是纯函数，`empty()` 给不给文案就是"哪一格有引导"
-        的唯一来源 —— 共享板拿到的正是它。
-      */
-      const labels = quadrantBoardLabels(
-        t as never,
-        { firstEmptyQuadrant: Quadrant.ImportantNotUrgent },
-      );
-      expect(labels.empty(Quadrant.ImportantNotUrgent), '第一个空象限应当有下一步引导').toBe('拖任务到这里');
-      for (const q of [Quadrant.UrgentImportant, Quadrant.UrgentNotImportant, Quadrant.Neither] as const) {
-        expect(labels.empty(q), `${q} 不该再写一遍同一句`).toBe('');
-      }
-    });
-
-    it('🔴 反向规则：全空时第 1 格必须有引导（空态必须有下一步提示，减重 ≠ 删光）', () => {
-      /*
-        与上一条同一个判定点（标签函数）。它守的是**删过头**那一侧：
-        "同屏最多一处"可以被满足成"一处都没有"，那样空格就真的什么都不说了。
-        全空时第一个空象限是第 1 格，所以那格必须有引导。
-      */
-      const labels = quadrantBoardLabels(t as never, {
-        firstEmptyQuadrant: Quadrant.UrgentImportant,
-      });
-      expect(labels.empty(Quadrant.UrgentImportant), '全空时第 1 格没有下一步提示').toBe(
-        '拖任务到这里',
-      );
-    });
+describe('四象限空态：只写事实「没有任务」，不写任何操作说明', () => {
+  it('空格只显示事实句「没有任务」—— 四格同一句，没有引导语', () => {
+    // 2026-11-25 产品负责人：「不需要有任何说明文字，我们都已经用 UX 表达出来了」。
+    const labels = quadrantBoardLabels(t as never);
+    for (const q of [
+      Quadrant.UrgentImportant,
+      Quadrant.ImportantNotUrgent,
+      Quadrant.UrgentNotImportant,
+      Quadrant.Neither,
+    ] as const) {
+      expect(labels.empty(q), `${q} 的空态应是事实句`).toBe('没有任务');
+    }
   });
 
-  describe('b. 不再显示计数数字（标题行只有色点 + 象限名）', () => {
-    it('四格都不渲染任何计数徽标', () => {
-      // 2026-11-24 产品负责人：「不用显示 4 个 0，不需要显示数字」。
-      seedTwoInQ1();
-      const container = mount(<WebQuadrantBoard />);
+  it('宿主渲染：没有计数数字、没有折叠帮助、没有任何拖拽说明文字', () => {
+    seedTwoInQ1();
+    const container = mount(<WebQuadrantBoard />);
 
-      expect(
-        container.querySelector('[data-testid^="quadrant-count-"]'),
-        '不该再显示任何计数数字',
-      ).toBeNull();
-    });
-  });
-
-  describe('c. 说明收进折叠帮助', () => {
-    it('默认折叠：无 open 属性，summary 是「帮助」', () => {
-      seedTwoInQ1();
-      const container = mount(<WebQuadrantBoard />);
-
-      const details = container.querySelector('details[data-testid="quadrant-help"]');
-      expect(details, '底部没有折叠帮助 <details>').not.toBeNull();
-      // 🔴 jsdom 没有布局，"正文不可见"的 DOM 代理是 `open` 属性：
-      // 浏览器对无 `open` 的 details 不渲染非 summary 子节点（平台行为）。
-      expect(details?.hasAttribute('open'), '说明默认应该是折叠的').toBe(false);
-      expect(details?.querySelector('summary')?.textContent).toBe('帮助');
-    });
-
-    it('正文沿用原文案与原 key（收进折叠 ≠ 删除），展开后 open 属性出现', () => {
-      seedTwoInQ1();
-      const container = mount(<WebQuadrantBoard />);
-
-      const details = container.querySelector<HTMLDetailsElement>(
-        'details[data-testid="quadrant-help"]',
-      );
-      expect(details).not.toBeNull();
-      // 原文案开头（`web.quadrant.footnote` 的 zh-CN 值）—— 证明正文还是那一段。
-      expect(details?.textContent).toContain('紧急程度由截止时间推导');
-
-      act(() => {
-        details?.querySelector('summary')?.click();
-      });
-      expect(details?.hasAttribute('open'), '点 summary 后应该展开').toBe(true);
-    });
+    expect(container.querySelector('[data-testid^="quadrant-count-"]'), '不该显示计数数字').toBeNull();
+    expect(container.querySelector('details[data-testid="quadrant-help"]'), '不该有折叠帮助').toBeNull();
+    expect(container.textContent ?? '', '不该出现"拖任务到这里"这类说明').not.toContain('拖任务到这里');
+    expect(container.textContent ?? '', '不该出现"拖动手柄"这类说明').not.toContain('拖动手柄');
+    expect(container.textContent ?? '', '不该出现"帮助"入口').not.toContain('帮助');
   });
 });

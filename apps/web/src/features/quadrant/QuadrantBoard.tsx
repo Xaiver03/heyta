@@ -32,9 +32,10 @@
  * 这是"去掉按钮"的直接代价，不是实现疏漏。
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   closestCenter,
   pointerWithin,
@@ -94,6 +95,18 @@ interface DragData {
 }
 
 /**
+ * 正在拖的那一条（供行组件判断"要不要画插入线"）。
+ * 没有它，`isOver` 在**自己**身上也会是 true，会把插入线画在被拖的那一行上。
+ */
+const DraggingIdContext = createContext<string | undefined>(undefined);
+
+/**
+ * 拖拽中**指针的纵向位置**（视口 clientY）。行组件拿它跟自己的中线比，
+ * 决定插入线画在**这一行上方**还是**下方** —— 这正是"插到两个任务之间"的指示。
+ */
+const DragPointerYContext = createContext<number | null>(null);
+
+/**
  * 整行的拖拽节点（宿主经 `TaskList.renderRowWrapper` 注入）。
  *
  * 🔴 它必须是**组件**（不能在渲染回调里直接调 `useSortable`）：
@@ -114,25 +127,54 @@ function QuadrantSortableRow({
   children: React.ReactNode;
 }): React.JSX.Element {
   const sortable = useSortable({ id, data: { kind: 'row', quadrant, index } satisfies DragData });
+  const draggingId = useContext(DraggingIdContext);
+  const pointerY = useContext(DragPointerYContext);
+  const nodeRef = useRef<HTMLDivElement | null>(null);
   const rowStyle = useMemo(
     () => ({
       transform: CSS.Transform.toString(sortable.transform),
       transition: sortable.transition,
       zIndex: sortable.isDragging ? cssVar('z.sticky') : undefined,
       position: 'relative' as const,
-      opacity: sortable.isDragging ? 0.5 : undefined,
+      // 有 DragOverlay 跟着指针走，原行就隐掉，避免"两个影子"。
+      opacity: sortable.isDragging ? 0 : undefined,
       // 触屏上允许纵向拖动整行（否则会被当成滚动手势）。
       touchAction: 'none' as const,
     }),
     [sortable.transform, sortable.transition, sortable.isDragging],
   );
+  /**
+   * 插入线画在哪：指针在**这一行中线之上** ⇒ 上方（before），之下 ⇒ 下方（after）。
+   * 只在"拖到别人这一行上"时算 —— 在自己身上画线是噪音。
+   */
+  const [dropEdge, setDropEdge] = useState<'before' | 'after' | null>(null);
+  const isOverOther = sortable.isOver && draggingId !== undefined && draggingId !== id;
+  useEffect(() => {
+    if (!isOverOther || pointerY === null) {
+      setDropEdge(null);
+      return;
+    }
+    const el = nodeRef.current;
+    if (el === null) {
+      setDropEdge(null);
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    setDropEdge(pointerY > rect.top + rect.height / 2 ? 'after' : 'before');
+  }, [isOverOther, pointerY]);
   return (
     <div
-      ref={sortable.setNodeRef}
+      ref={(node) => {
+        sortable.setNodeRef(node);
+        nodeRef.current = node;
+      }}
       {...(sortable.listeners ?? {})}
+      className="ht-row__quadrant-drag"
       style={rowStyle}
       data-testid={`quadrant-row-${id}`}
       data-dragging={sortable.isDragging ? 'true' : undefined}
+      data-drop-before={dropEdge === 'before' ? 'true' : undefined}
+      data-drop-after={dropEdge === 'after' ? 'true' : undefined}
     >
       {children}
     </div>
@@ -171,7 +213,10 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
   const { t } = useI18n();
   const store = useTaskStore();
   const [activeId, setActiveId] = useState<string | undefined>();
-  const [overQuadrant, setOverQuadrant] = useState<Quadrant | null>(null);
+  /** 拖拽中指针的视口 Y（画插入线用）。`pointerYRef` 给 dragend 读最新值。 */
+  const [pointerY, setPointerY] = useState<number | null>(null);
+  const pointerYRef = useRef<number | null>(null);
+  const startYRef = useRef<number | null>(null);
   const [dropNotice, setDropNotice] = useState<{ readonly text: string; readonly error: boolean } | undefined>(undefined);
   const [undoDrop, setUndoDrop] = useState<{ taskId: string; plan: QuadrantTaskPatch } | null>(null);
 
@@ -268,7 +313,6 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
 
   async function handleDragEnd(event: DragEndEvent): Promise<void> {
     setActiveId(undefined);
-    setOverQuadrant(null);
     const { active, over } = event;
     if (over === null) return;
     const fromData = active.data.current as DragData | undefined;
@@ -281,13 +325,27 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
     const taskId = String(active.id);
     const targetCard = cards.find((card) => card.quadrant === toQuadrant);
     const targetTasks = targetCard?.tasks ?? [];
-    const toIndex =
-      overData.kind === 'row' && overData.index !== undefined ? overData.index : targetTasks.length;
+    /**
+     * 落点**插入下标**（0…len）。`over` 是一行时，看指针落在该行**中线之上还是之下**：
+     * 之上 ⇒ 插在它前面（`overIndex`），之下 ⇒ 插在它后面（`overIndex + 1`）。
+     * `over` 是空格子时 ⇒ 追加到末尾。这就是"两个任务之间那条线"的语义对齐。
+     */
+    const overRowIndex =
+      overData.kind === 'row' && overData.index !== undefined ? overData.index : undefined;
+    const below =
+      overRowIndex !== undefined &&
+      pointerYRef.current !== null &&
+      over.rect !== undefined &&
+      pointerYRef.current > over.rect.top + over.rect.height / 2;
+    const insertAt = overRowIndex === undefined ? targetTasks.length : below ? overRowIndex + 1 : overRowIndex;
 
     // ── 同格内上下排序：只写 `Task.order`（一条 op，中值法在领域层）──
     if (fromQuadrant === toQuadrant) {
       const fromIndex = fromData.index ?? targetTasks.findIndex((task) => task.id === taskId);
-      const plan = planManualReorder(targetTasks, fromIndex, toIndex);
+      // `planManualReorder` 用 `arrayMove` 语义：目标下标是"最终停在哪一格"。
+      // 从前往后拖时，落点下标要减一（被拖那条先被摘出来）。
+      const targetIndex = fromIndex < insertAt ? insertAt - 1 : insertAt;
+      const plan = planManualReorder(targetTasks, fromIndex, targetIndex);
       if (plan === undefined) return;
       try {
         if (plan.kind === 'move') {
@@ -308,8 +366,8 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
     if (task === undefined) return;
     const plan = planQuadrantDrop(task, toQuadrant, { now: store.now });
     const keys = targetTasks.map(manualOrderKey);
-    const prev = toIndex <= 0 ? undefined : keys[toIndex - 1];
-    const next = toIndex >= keys.length ? undefined : keys[toIndex];
+    const prev = insertAt <= 0 ? undefined : keys[insertAt - 1];
+    const next = insertAt >= keys.length ? undefined : keys[insertAt];
     const order = manualOrderBetween(prev, next);
     const patch: QuadrantTaskPatch = { important: plan.important };
     if (plan.dueDate !== undefined) patch.dueDate = plan.dueDate;
@@ -338,25 +396,39 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
     });
   }, [store, undoDrop]);
 
+  /** 正在拖的那一条 —— 喂给 `DragOverlay`，让被拖的任务**完整地跟着指针走**。 */
+  const activeTask = activeId === undefined ? undefined : store.entities.tasks[activeId];
+
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={collisionDetection}
       onDragStart={(e) => {
         setActiveId(String(e.active.id));
+        const native = e.activatorEvent as PointerEvent | MouseEvent | undefined;
+        startYRef.current = typeof native?.clientY === 'number' ? native.clientY : null;
+        pointerYRef.current = startYRef.current;
+        setPointerY(startYRef.current);
       }}
-      onDragOver={(e) => {
-        const quadrant = (e.over?.data.current as DragData | undefined)?.quadrant;
-        setOverQuadrant(isQuadrant(quadrant) ? quadrant : null);
+      onDragMove={(e) => {
+        if (startYRef.current === null) return;
+        const next = startYRef.current + e.delta.y;
+        pointerYRef.current = next;
+        setPointerY(next);
       }}
       onDragCancel={() => {
         setActiveId(undefined);
-        setOverQuadrant(null);
+        pointerYRef.current = null;
+        setPointerY(null);
       }}
       onDragEnd={(e) => {
         void handleDragEnd(e);
+        pointerYRef.current = null;
+        setPointerY(null);
       }}
     >
+      <DraggingIdContext.Provider value={activeId}>
+      <DragPointerYContext.Provider value={pointerY}>
       <HeytaUiProvider>
         <SharedQuadrantBoard
           tasks={tasks}
@@ -370,12 +442,53 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
           renderRowWrapper={renderRowWrapper}
           renderCellBodyWrapper={renderCellBodyWrapper}
           renderCellOverlay={renderCellOverlay}
-          highlightedQuadrant={overQuadrant}
           onOpenTask={onOpenTask}
           activeTaskId={activeTaskId}
           testID="quadrant-board"
         />
       </HeytaUiProvider>
+      </DragPointerYContext.Provider>
+      </DraggingIdContext.Provider>
+
+      {/*
+        🔴 拖拽预览：被拖的任务**完整地跟着指针走**（不是让它"消失"或只留个影子）。
+        产品负责人：「拖拽到另外一个框的时候，它依旧显示整个完整的任务。因为你要排序，
+        排序就不可能直接显示不见了。」所以这里画一整行（勾选框占位 + 完整标题），
+        落点同时用于排序（见 `handleDragEnd` 的 `toIndex`）。
+      */}
+      <DragOverlay>
+        {activeTask === undefined ? null : (
+          <div
+            data-testid="quadrant-drag-overlay"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: cssVar('space.2'),
+              maxWidth: '22rem',
+              padding: `${cssVar('space.2')} ${cssVar('space.3')}`,
+              borderRadius: cssVar('radius.md'),
+              border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
+              background: cssVar('color.surface'),
+              color: cssVar('color.foreground'),
+              boxShadow: cssVar('shadow.lg'),
+              fontSize: cssVar('font-size.sm'),
+              whiteSpace: 'normal',
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                flex: '0 0 auto',
+                width: '1rem',
+                height: '1rem',
+                border: `${cssVar('border-width.thin')} solid ${cssVar('color.border-strong')}`,
+                borderRadius: cssVar('radius.full'),
+              }}
+            />
+            <span>{activeTask.title}</span>
+          </div>
+        )}
+      </DragOverlay>
 
       {dropNotice === undefined && undoDrop === null ? null : (
         <div
@@ -407,25 +520,6 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
           )}
         </div>
       )}
-
-      <details data-testid="quadrant-help" style={{ marginTop: cssVar('space.2') }}>
-        <summary
-          className="ht-type-caption"
-          style={{ cursor: 'pointer', color: cssVar('color.foreground-muted') }}
-        >
-          {t('web.shell.nav.help')}
-        </summary>
-        <p
-          className="ht-type-caption"
-          style={{
-            margin: 0,
-            marginTop: cssVar('space.2'),
-            color: cssVar('color.foreground-muted'),
-          }}
-        >
-          {t('web.quadrant.footnote')}
-        </p>
-      </details>
 
       {/* 拖动中的状态播报（读屏）：原行跟手，但仍给一个非视觉的"正在拖"提示。 */}
       <p aria-live="polite" style={{ position: 'absolute', left: -9999 }}>

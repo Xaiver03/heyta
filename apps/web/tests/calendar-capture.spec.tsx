@@ -102,7 +102,12 @@ async function typeCapture(value: string): Promise<void> {
 }
 
 async function submitCapture(): Promise<void> {
-  await click(q<HTMLElement>('capture-submit'));
+  const input = q<HTMLInputElement>('capture-input');
+  expect(input, '捕获输入框没渲染出来').not.toBeNull();
+  await act(async () => {
+    input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  await flush();
 }
 
 /**

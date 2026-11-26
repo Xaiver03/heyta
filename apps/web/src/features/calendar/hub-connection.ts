@@ -277,6 +277,26 @@ export function useHubConnection(options: HubConnectionHookOptions = {}): HubCon
     };
   }, [readLastSync]);
 
+  // 连接在别处（设置 → 数据与同步）被保存后广播 `heyta:calendar-hub-changed`：
+  // 重读一次，让日历侧栏的只读议程立刻出现，不必刷新页面。
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const reload = (): void => {
+      void Promise.all([loadHubConnection(), readLastSync()])
+        .then(([loaded, storedLastSync]) => {
+          setConnection(loaded);
+          setLastSyncMs(storedLastSync);
+        })
+        .catch(() => {
+          // 读不出来就维持现状，等下一次事件或刷新。
+        });
+    };
+    window.addEventListener('heyta:calendar-hub-changed', reload);
+    return () => {
+      window.removeEventListener('heyta:calendar-hub-changed', reload);
+    };
+  }, [readLastSync]);
+
   /** 手动同步：拉一轮，成功后回读 lastSync（写盘是管道做的），并触发重渲染。 */
   const sync = useCallback(async (): Promise<CalendarMirrorRefreshResult> => {
     const result = await runCalendarMirror();

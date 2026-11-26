@@ -48,7 +48,6 @@ import { useNoteStore } from './store.js';
 export function notesBoardLabels(t: I18nValue['t']): NotesBoardLabels {
   return {
     empty: t('notes.empty'),
-    emptyHint: t('notes.empty.hint'),
     composerPlaceholder: t('notes.composer.placeholder'),
     add: t('notes.add'),
     // 🔴 提交失败那句（W8b）：共享层挂在 composer 下方（alert 语义）。

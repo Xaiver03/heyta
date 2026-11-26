@@ -90,7 +90,7 @@
   flex: 1;
   min-inline-size: 0;
   padding: var(--ht-space-2);
-  border: 0;
+  border: var(--ht-border-width-thin) solid transparent;
   border-radius: var(--ht-radius-sm);
   background: var(--ht-color-background);
   color: var(--ht-color-foreground);

@@ -161,6 +161,8 @@
   color: var(--ht-color-primary);
   font-size: var(--ht-font-size-lg);
   line-height: var(--ht-line-height-tight);
+  white-space: nowrap;
+  flex: 0 0 auto;
   cursor: pointer;
 }
 
@@ -460,9 +462,22 @@
 .ht-header--calendar .ht-header__actions {
   flex: 1 1 auto;
   margin-inline-start: 0;
-  flex-direction: column;
-  align-items: stretch;
+  /* 桌面宽屏收成整齐单行：左标题组、右工具组（窄屏两行见 narrow.css）。 */
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
   flex-wrap: nowrap;
+}
+/* 两层 bands 实际是 `.ht-header__calendar-toolbar` 的子项；这一层也跟着横过来，
+   否则 actions 变成 row 之后工具栏仍竖排，两层错位照旧。 */
+.ht-header--calendar .ht-header__calendar-toolbar {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  inline-size: 100%;
 }
 
 .ht-content__cal-band {
@@ -474,6 +489,9 @@
 }
 .ht-content__cal-band--tools {
   justify-content: flex-end;
+  /* 工具组按内容宽，贴右；标题组吃掉剩余宽度（见下面的 --title）。 */
+  flex: 0 0 auto;
+  inline-size: auto;
 }
 /* CalendarViewTabs 的根带 `align-self: stretch`；放进紧凑的右对齐工具条时让它按内容宽。 */
 .ht-content__cal-seg {
@@ -484,6 +502,10 @@
 }
 .ht-content__cal-band--title {
   gap: var(--ht-space-3);
+  /* 视觉顺序：标题组在左、工具组在右；DOM 顺序不动（焦点/testid 契约照旧）。 */
+  order: -1;
+  flex: 1 1 auto;
+  inline-size: auto;
 }
 .ht-content__cal-bigtitle {
   font-size: var(--ht-font-size-3xl);
@@ -519,6 +541,10 @@
   color: var(--ht-color-primary);
 }
 .ht-content__cal-today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
   min-block-size: var(--ht-touch-target-min);
   padding-inline: var(--ht-space-3);
   border: var(--ht-border-width-thin) solid var(--ht-color-border);

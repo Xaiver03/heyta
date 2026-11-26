@@ -41,5 +41,8 @@
 
 @import './app/assistant-layout.css';
 @import './app/scope-drawer.css';
+/* 方向 A · WeKnora 对齐视觉层（2026-11-25）。位于 borderless-controls 之前，
+   保证全局焦点规则在级联最末（check:focus-single-source）。 */
+@import './app/ai-chat-direction-a.css';
 
 @import './app/borderless-controls.css';

@@ -66,7 +66,6 @@ const AUTH_MESSAGE_KEYS = [
   'web.auth.empty.body',
   'web.auth.plan.title',
   'web.auth.plan.kicker',
-  'web.auth.plan.lead',
   'web.auth.plan.local',
   'web.auth.email.label',
   'web.auth.email.placeholder',
@@ -334,7 +333,6 @@ describe('未登录 / 未配置时是明确的空状态', () => {
     const text = el.textContent ?? '';
 
     expect(text).toContain(translate('zh-CN', 'web.auth.plan.title'));
-    expect(text).toContain(translate('zh-CN', 'web.auth.plan.lead'));
     // 空状态不能说成"已登录"。
     expect(text).not.toContain(translate('zh-CN', 'web.auth.signedIn.title'));
   });

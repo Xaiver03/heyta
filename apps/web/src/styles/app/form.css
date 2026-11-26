@@ -100,7 +100,7 @@
   margin: 0;
   padding-block: 0;
   padding-inline: var(--ht-size-field-padding-x);
-  border: 0;
+  border: var(--ht-border-width-thin) solid transparent;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface-sunken);
   color: var(--ht-color-foreground);
@@ -177,7 +177,7 @@
   margin: 0;
   padding-block: 0;
   padding-inline: var(--ht-size-field-padding-x);
-  border: 0;
+  border: var(--ht-border-width-thin) solid transparent;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface-sunken);
   color: var(--ht-color-foreground);
@@ -231,13 +231,10 @@
 .ht-note-editor {
   min-height: var(--ht-space-10);
   padding: var(--ht-space-2);
-  border: 1px solid var(--ht-color-border);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
   outline: none;
-}
-.ht-note-editor:focus-within {
-  border-color: var(--ht-color-primary);
 }
 .ht-note-editor .ProseMirror {
   outline: none;

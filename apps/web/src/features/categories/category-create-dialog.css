@@ -97,7 +97,6 @@
   font: inherit;
 }
 
-.ht-category-create-dialog__input:focus-visible,
 .ht-category-create-dialog__close:focus-visible,
 .ht-category-create-dialog__swatch:focus-visible {
   outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);

@@ -405,16 +405,38 @@
     min-inline-size: 0;
   }
 
-  /* 日历工具栏在窄屏拆成两行：导航与新增/筛选动作都保留，不能让月份
-     工具栏以一个不可收缩的长 flex 行把「回到今天」推到视口左侧之外。 */
+  /* 日历工具栏在窄屏正好两行：第 1 行大标题 + `‹ 今天 ›`，第 2 行
+     `日/周/月/年` 分段 + `＋` + `⋯`。桌面那条单行规则（main-area.css）
+     在这里被覆盖回换行，避免 375px 折成三行。 */
+  .ht-header--calendar .ht-header__actions {
+    inline-size: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .ht-header__calendar-toolbar {
     flex-basis: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ht-space-2);
+    inline-size: 100%;
+  }
+
+  .ht-header--calendar .ht-content__cal-band--title {
+    flex: 1 1 100%;
+    order: -1;
+  }
+
+  .ht-header--calendar .ht-content__cal-band--tools {
+    flex: 1 1 100%;
+    justify-content: space-between;
   }
 
   .ht-header__calendar-toolbar > div {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-start;
-    row-gap: var(--ht-space-1);
+    min-inline-size: 0;
   }
 
   /* 详情列（W2 的槽位）在塌缩态里没有位置：单列 + 底部导航里再插一根竖列

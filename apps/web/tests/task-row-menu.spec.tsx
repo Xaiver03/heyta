@@ -344,9 +344,9 @@ describe('结构：行上不再挂编辑器（P4/P5，读源码形状）', () =>
     // 面单本身接一个"宿主注入的自动化格"（AI 拆解 / AI 估时搬进去了）。
     expect(card).toContain('automationSlot');
     expect(card).toContain('task-detail-automation-slot');
-    // 两个落点：详情列那一支 + 窄档对话框那一支，都必须把 AI 那两格递进去。
+    // AI 能力已统一进单个 Agent：宿主不再往面单注入 AI 自动化格。
     const slots = src.match(/automationSlot=\{automationSlotNode\}/g) ?? [];
-    expect(slots).toHaveLength(2);
+    expect(slots).toHaveLength(0);
     // 对话框那一支必须存在：它是窄档唯一的可达面单。
     expect(src).toContain('task-detail-dialog');
     // 两条输入通路（右键 + 键盘）都接在同一个处理函数上。

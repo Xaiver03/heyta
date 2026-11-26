@@ -191,14 +191,6 @@ export function ChecklistEditor(props: ChecklistEditorProps): React.JSX.Element 
             }
           }}
         />
-        <button
-          type="button"
-          className="ht-chip ht-chip--action"
-          data-testid="task-checklist-add"
-          onClick={submit}
-        >
-          {t('web.tasks.checklist.add')}
-        </button>
       </div>
     </section>
   );

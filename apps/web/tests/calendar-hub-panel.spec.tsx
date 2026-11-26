@@ -1,13 +1,12 @@
 /**
- * 「飞书日程」面板的最小渲染判据（未配置 / 已配置 / 空态 / 标签）
- * ==========================================================
+ * 「飞书日程」面板的最小渲染判据（已配置 / 空态 / 标签）
+ * ======================================================
  *
- * 这一条挡的是"功能在、入口不在"：
+ * 这一条挡的是"入口过浅"与"功能在、入口不在"：
  *
- *   · 未配置时只画输入（URL + **password** 的 token）与一枚"保存并同步" ——
- *     不能画范围切换（没有数据可切），也不能把 token 画成明文；
- *   · 已配置时画「今天 / 最近 7 天」与按天分组；一条日程都没有时是一句话，
- *     不是一行报错；
+ *   · **未连接时侧栏整块不渲染** —— 配置（Hub 地址 / 令牌）在「设置 → 数据与同步」，
+ *     不该常驻在日历侧栏这一层。这里断言侧栏既没有面板也没有表单。
+ *   · 已配置时画「今天 / 最近 7 天」与按天分组；一条日程都没有时是一句话。
  *   · 点一条才展开详情（时间 / 地点 / 描述 / 参会人 / 来源），标签勾选**真的落库**
  *     —— 而且它写的是 `CALENDAR_EVENT` 的 `tagIds`，不是别处。
  *
@@ -33,7 +32,6 @@ const { __resetOpLogForTests, currentState, dispatchIntent, initOpLog } = await 
 const { saveHubConnection } = await import('../src/features/calendar/hub-connection.js');
 const { useTaskStore } = await import('../src/features/tasks/store.js');
 const { useProjectStore } = await import('../src/features/projects/store.js');
-const { toLocalDate } = await import('@heyta/domain');
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -57,7 +55,7 @@ async function flush(): Promise<void> {
  *
  * 🔴 `flush()` 只等一个宏任务；`useHubConnection()` 的 `loadHubConnection()` 要连读
  * 两个 META 键（IndexedDB 的异步不止一个 tick），一次 flush 之后**可能还停在
- * 「未配置」**——而那个状态恰好也画出了一块合法面板，于是断言会在错误的分支上跑。
+ * 「未就绪」**。
  */
 async function waitFor(selector: string): Promise<Element> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -121,60 +119,29 @@ afterEach(() => {
 });
 
 describe('CalendarHubPanel', () => {
-  it('未配置：只画 URL + password 两个输入与「保存并同步」', async () => {
+  it('未连接：侧栏不渲染任何配置界面（配置收在设置里）', async () => {
     await mount();
-
-    await waitFor('[data-testid="calendar-hub-form"]');
-    expect(container!.querySelector('[data-testid="calendar-hub-form"]')).not.toBeNull();
-    const baseUrl = container!.querySelector<HTMLInputElement>('[data-testid="calendar-hub-base-url"]');
-    const token = container!.querySelector<HTMLInputElement>('[data-testid="calendar-hub-token"]');
-    expect(baseUrl?.type).toBe('url');
-    // 🔴 token 必须是 password：这一格在屏幕上就是凭据。
-    expect(token?.type).toBe('password');
-    expect(container!.querySelector('[data-testid="calendar-hub-connect"]')?.textContent).toContain(
-      '保存并同步',
-    );
-    // 没有数据可切时不该出现范围档，也不该出现同步按钮。
-    expect(container!.querySelector('[data-testid="calendar-hub-range-today"]')).toBeNull();
-    expect(container!.querySelector('[data-testid="calendar-hub-sync"]')).toBeNull();
+    // 等量两次：连接读取是异步的；未配置 ⇒ 面板始终返回 null。
+    await flush();
+    await flush();
+    expect(container!.querySelector('[data-testid="calendar-hub-panel"]')).toBeNull();
+    expect(container!.querySelector('[data-testid="calendar-hub-form"]')).toBeNull();
+    expect(container!.querySelector('[data-testid="calendar-hub-base-url"]')).toBeNull();
+    expect(container!.querySelector('[data-testid="calendar-hub-token"]')).toBeNull();
   });
 
-  it('已配置但没有日程：画范围档与空态，不画表单', async () => {
+  it('已配置但没有日程：画范围档与空态，不画表单、不画凭据编辑', async () => {
     await saveHubConnection('http://127.0.0.1:8787', 'token-1');
     await mount();
 
     await waitFor('[data-testid="calendar-hub-range-today"]');
     expect(container!.querySelector('[data-testid="calendar-hub-form"]')).toBeNull();
+    expect(container!.querySelector('[data-testid="calendar-hub-edit"]')).toBeNull();
     expect(container!.querySelector('[data-testid="calendar-hub-range-today"]')).not.toBeNull();
     expect(container!.querySelector('[data-testid="calendar-hub-range-next7"]')).not.toBeNull();
     expect(container!.querySelector('[data-testid="calendar-hub-empty"]')?.textContent).toContain(
       '这几天没有日程',
     );
-  });
-
-  it('已配置也能重新填凭据（token 轮换后不是单向门）', async () => {
-    await saveHubConnection('http://127.0.0.1:8787', 'token-1');
-    await mount();
-
-    const edit = await waitFor('[data-testid="calendar-hub-edit"]');
-    await act(async () => {
-      edit.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    await flush();
-
-    const baseUrl = container!.querySelector<HTMLInputElement>('[data-testid="calendar-hub-base-url"]');
-    const token = container!.querySelector<HTMLInputElement>('[data-testid="calendar-hub-token"]');
-    expect(baseUrl?.value, '重开表单应带上已保存的地址').toBe('http://127.0.0.1:8787');
-    expect(token?.type).toBe('password');
-    expect(token?.value, '已保存的 token 不回填到表单').toBe('');
-
-    const cancel = container!.querySelector('[data-testid="calendar-hub-cancel"]');
-    expect(cancel, '编辑态没有取消').not.toBeNull();
-    await act(async () => {
-      cancel!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    await flush();
-    expect(container!.querySelector('[data-testid="calendar-hub-range-today"]')).not.toBeNull();
   });
 
   it('已配置且今天有一条：按天分组列出；展开后是只读详情', async () => {

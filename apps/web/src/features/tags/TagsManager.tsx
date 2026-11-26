@@ -309,7 +309,6 @@ export function TagsManager({ open, onClose }: TagsManagerProps): React.JSX.Elem
       {projects.tags.length === 0 ? (
         <EmptyState
           title={t('common.organizer.tags.empty')}
-          hint={t('common.organizer.tags.empty.hint')}
           size="section"
           testID="tags-manager-empty"
         />

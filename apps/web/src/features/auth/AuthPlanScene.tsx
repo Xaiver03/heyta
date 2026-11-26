@@ -17,7 +17,6 @@ export function AuthPlanScene(): React.JSX.Element {
     <div className="ht-auth-plan-intro">
       <span className="ht-sheet__auth-plan-kicker">{t('web.auth.plan.kicker')}</span>
       <h2 className="ht-type-section-title">{t('web.auth.plan.title')}</h2>
-      <p className="ht-sheet__auth-plan-lead ht-type-row-meta">{t('web.auth.plan.lead')}</p>
     </div>
     <div className="ht-auth-plan-stack">
       <div className="ht-auth-plan-paper" />

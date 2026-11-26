@@ -139,6 +139,14 @@ function type(view: HTMLElement, value: string): void {
   });
 }
 
+function pressEnter(view: HTMLElement, testId = 'notes-input'): void {
+  const input = byTestId(view, testId);
+  expect(input, `找不到输入框 ${testId}`).not.toBeNull();
+  act(() => {
+    input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+}
+
 function click(view: HTMLElement, testId: string): void {
   const button = byTestId(view, testId);
   expect(button, `找不到按钮 ${testId}`).not.toBeNull();
@@ -157,7 +165,7 @@ describe('便签视图', () => {
   it('🔴 输入内容 + 点「添加便签」→ 状态里多出一条 `NOTE`', async () => {
     const view = await mount();
     type(view, '把书还了');
-    click(view, 'notes-submit');
+    pressEnter(view);
 
     // 等**条件**（真的落盘 + refresh），不等固定 tick —— 见文件头。
     await waitFor('便签写进 store', () => useNoteStore.getState().notes.length === 1);
@@ -181,7 +189,7 @@ describe('便签视图', () => {
   it('🔴 点删除 → 那条便签消失（软删除，不是只从 DOM 拿掉）', async () => {
     const view = await mount();
     type(view, '把书还了');
-    click(view, 'notes-submit');
+    pressEnter(view);
     await waitFor('便签写进 store', () => useNoteStore.getState().notes.length === 1);
 
     const noteId = useNoteStore.getState().notes[0]?.id;
@@ -201,7 +209,7 @@ describe('便签视图', () => {
     // 不需要 mock 就能让**真 store 的 addNote reject** 的失败形态。
     const tooLong = '长'.repeat(NOTE_MAX_CONTENT_LENGTH + 1);
     type(view, tooLong);
-    click(view, 'notes-submit');
+    pressEnter(view);
 
     // 宿主把失败交回（store re-throw + onAdd 返回 Promise）⇒ 共享层判 failed：
     // 失败提示亮起来、文案就是 `notes.error.saveFailed` 那句。

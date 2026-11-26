@@ -264,7 +264,7 @@
   flex: 1;
   min-width: 0;
   padding: 0 var(--ht-space-3);
-  border: 0;
+  border: var(--ht-border-width-thin) solid transparent;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
   color: var(--ht-color-foreground);
@@ -688,7 +688,7 @@
   inline-size: calc(var(--ht-space-8) * 2);
   min-block-size: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-2);
-  border: 0;
+  border: var(--ht-border-width-thin) solid transparent;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-background);
   color: var(--ht-color-foreground);

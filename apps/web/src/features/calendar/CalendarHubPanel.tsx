@@ -2,13 +2,13 @@
  * 「飞书日程」面板（Web 宿主的阶段 A）
  * ==================================
  *
- * 这一块只做三类事，判断与写入都在别处：
+ * 这一块只做**只读议程**：把物化状态里的 `CALENDAR_EVENT` 摊成「今天 / 最近 7 天」两组
+ * （分组是纯函数 `agenda.ts`，跨天与全天都在那里判）；标签勾选交给 `@heyta/app-host` 的
+ * `setCalendarEventTags`（唯一可写的一格，op 形状/去重/空集合写 `null` 都不在本文件里）。
  *
- *   1. **凭据**：读写 `hub-connection`（META 里的 Hub 地址 + token）；
- *   2. **读**：把物化状态里的 `CALENDAR_EVENT` 摊成「今天 / 最近 7 天」两组
- *      （分组是纯函数 `agenda.ts`，跨天与全天都在那里判）；
- *   3. **写**：标签勾选交给 `@heyta/app-host` 的 `setCalendarEventTags` ——
- *      op 的形状、去重、"空集合写 `null`"都不在本文件里。
+ * 🔴 **连接的配置不在这里**：Hub 地址 + 令牌在「设置 → 数据与同步」的
+ * `FeishuCalendarSettingsCard`（低频、需要参数的动作属于设置层）。本面板只在**已连接**时
+ * 渲染；未连接时整块不画 —— 否则侧栏会常驻一个低频的配置表单，入口就过浅了。
  *
  * ## 不画什么（都是刻意的）
  *
@@ -20,9 +20,7 @@
  *
  * ## 交互（为什么是这样）
  *
- * · 未配置 = 两个字段 + 一个按钮。保存后**立刻同步一轮**并把 added/updated/deleted
- *   说出来 —— 否则用户点完"保存并同步"只看到表单消失，不知道到底拉到了什么。
- * · 已配置 = 今天 / 最近 7 天两个档。默认「今天」：这一屏的入口是"今天的会"，
+ * · 已连接 = 今天 / 最近 7 天两个档。默认「今天」：这一屏的入口是"今天的会"，
  *   七天是展开而不是默认。
  * · 一条点开才画详情。列表态只有时间、标题、日历/组织、标签 chip —— 扫一眼够用，
  *   详情不占所有人的纵向空间。
@@ -34,11 +32,10 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { indexTags, resolveTagIds, resolveTags, toLocalDate, type CalendarEvent } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { formatDayTitleText } from '@heyta/ui';
-import { RefreshCw, Settings2 } from 'lucide-react';
-import { useMemo, useState, type FormEvent } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { Button, IconButton } from '../../components/hta/index.js';
-import { FormField } from '../../lib/form/FormField.js';
 import { currentState, dispatchIntent } from '../../lib/oplog.js';
 import { useProjectStore } from '../projects/store.js';
 import { useTaskStore } from '../tasks/store.js';
@@ -77,10 +74,6 @@ export function CalendarHubPanel(): React.JSX.Element | null {
 
   const [range, setRange] = useState<AgendaRange>('today');
   const [expandedId, setExpandedId] = useState<string | undefined>(undefined);
-  const [baseUrl, setBaseUrl] = useState('');
-  const [token, setToken] = useState('');
-  /** 已配置时"改凭据"这个次要状态：不新开一屏，也不让一次填错变成单向门。 */
-  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [tagBusyId, setTagBusyId] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<PanelStatus | undefined>(undefined);
@@ -95,6 +88,8 @@ export function CalendarHubPanel(): React.JSX.Element | null {
   if (!hub.ready) return null;
 
   const configured = hub.connection.baseUrl !== '' && hub.connection.token !== '';
+  // 未连接时侧栏**不画任何配置界面**：连接的配置入口在「设置 → 数据与同步」。
+  if (!configured) return null;
 
   const statusText = (value: PanelStatus): string => {
     switch (value.kind) {
@@ -185,32 +180,6 @@ export function CalendarHubPanel(): React.JSX.Element | null {
     }
   };
 
-  const onConnect = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    if (busy) return;
-    const nextBaseUrl = baseUrl.trim();
-    const nextToken = token.trim();
-    if (nextBaseUrl === '' || nextToken === '') {
-      setStatus({ kind: 'unconfigured' });
-      return;
-    }
-    void (async () => {
-      setBusy(true);
-      setStatus({ kind: 'syncing' });
-      try {
-        await hub.save(nextBaseUrl, nextToken);
-        // 保存成功才离开编辑态、并丢掉内存里的 token：表单不再需要它。
-        setEditing(false);
-        setToken('');
-        // 保存成功后才同步：先落 META，管道读到的就是刚写进去的这一组。
-        await syncAndReport();
-      } catch {
-        setStatus({ kind: 'failed' });
-        setBusy(false);
-      }
-    })();
-  };
-
   /** 勾选一次 = 整组交给动作层（`setCalendarEventTags` 写一条 UPD）。 */
   const onToggleTag = (event: CalendarEvent, tagId: string, checked: boolean): void => {
     if (tagBusyId !== undefined) return;
@@ -268,39 +237,22 @@ export function CalendarHubPanel(): React.JSX.Element | null {
     <section className="ht-sidebar__agenda" aria-label={t('web.calendar.hub.title')} data-testid="calendar-hub-panel">
       <div className="ht-sidebar__agenda-head">
         <span className="ht-nav__section ht-type-group-label">{t('web.calendar.hub.title')}</span>
-        {configured && !editing ? (
-          <span className="ht-sidebar__agenda-actions">
-            <IconButton
-              label={t('web.calendar.hub.sync')}
-              icon={<RefreshCw size={ICON_SIZE.sm} aria-hidden="true" />}
-              size="sm"
-              disabled={busy}
-              data-testid="calendar-hub-sync"
-              onClick={() => {
-                if (busy) return;
-                void syncAndReport();
-              }}
-            />
-            {/* 凭据会过期（Hub token 轮换）—— 没有这一枚，一次填错就是单向门。 */}
-            <IconButton
-              label={t('web.calendar.hub.edit')}
-              icon={<Settings2 size={ICON_SIZE.sm} aria-hidden="true" />}
-              size="sm"
-              disabled={busy}
-              data-testid="calendar-hub-edit"
-              onClick={() => {
-                setBaseUrl(hub.connection.baseUrl);
-                setToken('');
-                setStatus(undefined);
-                setEditing(true);
-              }}
-            />
-          </span>
-        ) : null}
+        <span className="ht-sidebar__agenda-actions">
+          <IconButton
+            label={t('web.calendar.hub.sync')}
+            icon={<RefreshCw size={ICON_SIZE.sm} aria-hidden="true" />}
+            size="sm"
+            disabled={busy}
+            data-testid="calendar-hub-sync"
+            onClick={() => {
+              if (busy) return;
+              void syncAndReport();
+            }}
+          />
+        </span>
       </div>
 
-      {configured && !editing ? (
-        <>
+      <>
           <div
             className="ht-sidebar__agenda-range"
             role="group"
@@ -448,65 +400,11 @@ export function CalendarHubPanel(): React.JSX.Element | null {
             </div>
           )}
         </>
-      ) : (
-        <form className="ht-sidebar__agenda-form" onSubmit={onConnect} data-testid="calendar-hub-form">
-          <FormField id="calendar-hub-base-url" label={t('web.calendar.hub.baseUrl')} required>
-            {(field) => (
-              <input
-                {...field}
-                type="url"
-                value={baseUrl}
-                autoComplete="off"
-                onChange={(changed) => {
-                  setBaseUrl(changed.target.value);
-                }}
-                data-testid="calendar-hub-base-url"
-              />
-            )}
-          </FormField>
-          <FormField id="calendar-hub-token" label={t('web.calendar.hub.token')} required>
-            {(field) => (
-              <input
-                {...field}
-                type="password"
-                value={token}
-                autoComplete="off"
-                onChange={(changed) => {
-                  setToken(changed.target.value);
-                }}
-                data-testid="calendar-hub-token"
-              />
-            )}
-          </FormField>
-          <div className="ht-sidebar__agenda-form-actions">
-            <Button type="submit" tone="primary" size="sm" loading={busy} data-testid="calendar-hub-connect">
-              {t('web.calendar.hub.connect')}
-            </Button>
-            {editing ? (
-              <Button
-                tone="ghost"
-                size="sm"
-                disabled={busy}
-                data-testid="calendar-hub-cancel"
-                onClick={() => {
-                  setEditing(false);
-                  setToken('');
-                  setStatus(undefined);
-                }}
-              >
-                {t('web.calendar.hub.cancel')}
-              </Button>
-            ) : null}
-          </div>
-        </form>
-      )}
 
       {/* 「最近一次成功同步」：已配置就常驻一行；自动同步失败时它不动，就是"没成功"的证据。 */}
-      {configured && !editing ? (
-        <p className="ht-sidebar__agenda-status" data-testid="calendar-hub-last-sync">
-          {lastSyncText()}
-        </p>
-      ) : null}
+      <p className="ht-sidebar__agenda-status" data-testid="calendar-hub-last-sync">
+        {lastSyncText()}
+      </p>
 
       {status === undefined && !hub.autoSyncing ? null : (
         <p className="ht-sidebar__agenda-status" role="status" data-testid="calendar-hub-status">

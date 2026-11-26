@@ -682,7 +682,6 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
             <EmptyState
               illustration="habits"
               title={t('web.habits.empty.title')}
-              hint={t('web.habits.empty.hint')}
               testID="habits-empty"
               /*
                * 🔴 P7 的动作槽第一枚真消费者。这一屏原来只有 `hint` 那句

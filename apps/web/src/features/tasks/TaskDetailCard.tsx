@@ -150,9 +150,13 @@ const titleIdleStyle: CSSProperties = {
  * 抹掉它就是那条"最常见的可访问性回归"。
  */
 const titleInputStyle: CSSProperties = {
-  border: 'none',
+  borderWidth: cssVar('border-width.thin'),
+  borderStyle: 'solid',
+  borderColor: 'transparent',
+  borderRadius: cssVar('radius.md'),
   background: 'transparent',
-  padding: 0,
+  paddingInline: cssVar('space.2'),
+  paddingBlock: cssVar('space.1'),
   margin: 0,
   width: '100%',
 };

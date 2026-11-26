@@ -48,6 +48,7 @@ import { installFatalErrorHooks } from './lib/fatal-hooks.js';
 import { installPressOrigin } from './lib/press-origin.js';
 import { eraseWebLocalData } from './lib/local-data-destruction.js';
 import { startupMode } from './lib/startup-mode.js';
+import { applyFontScale, loadFontScale } from './lib/font-scale.js';
 import { applyTheme, resolveInitialTheme } from './lib/theme.js';
 import { startWidgetLifecycle } from './pwa/lifecycle.js';
 import { registerWidgetServiceWorker } from './pwa/register.js';
@@ -139,6 +140,9 @@ installPressOrigin();
 installFatalErrorHooks();
 
 const root = createRoot(container);
+
+/* 用户字号偏好：在任何 render 之前覆盖 `--ht-font-size-*`（只缩放文字）。 */
+applyFontScale(loadFontScale());
 
 /**
  * 渲染"启动失败"屏 —— 所有**渲染出口**的失败都必须走这里。

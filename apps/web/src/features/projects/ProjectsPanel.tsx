@@ -333,16 +333,9 @@ export function ProjectsPanel({
             ) : null}
           </div>
 
-          {/* 分组说明（滴答对齐 D3）：一句话说清这一格装的是什么。
-              列表为空时不画 —— 空态那两句已经讲了同一件事，同一屏说两遍就是噪音。 */}
-          {tree.length === 0 ? null : (
-            <p className="ht-sidebar__organizer-hint ht-type-caption" data-testid="projects-heading-hint">
-              {t('web.projects.headingHint')}
-            </p>
-          )}
-
           <OrganizerList
             kind="project"
+            nameTextStyle="body-sm"
             items={tree}
             counts={counts}
             removeImpact={projectRemoveImpact}
@@ -392,7 +385,6 @@ export function ProjectsPanel({
               // 于是侧栏里一块空白被当成"这个功能没东西"。词条与移动端同一套
               // （`common.organizer.*`）—— 同一句话不许有两个端各写一份。
               empty: t('common.organizer.lists.empty'),
-              emptyHint: t('common.organizer.lists.empty.hint'),
             }}
             onFilterWith={(item) => {
               onFilterWith({ kind: 'project', projectId: item.id });
@@ -497,13 +489,6 @@ export function ProjectsPanel({
               <Plus size={ICON_SIZE.sm} aria-hidden="true" />
             </button>
           </div>
-          {/* 分组说明（滴答对齐 D3）：一句话说清这一格装的是什么。
-              列表为空时不画 —— 空态那两句已经讲了同一件事，同一屏说两遍就是噪音。 */}
-          {tagNodes.length === 0 ? null : (
-            <p className="ht-sidebar__organizer-hint ht-type-caption" data-testid="tags-heading-hint">
-              {t('web.tags.headingHint')}
-            </p>
-          )}
 
           {/*
             🔴 标签名此前是一个**不可点的 `<span>`** —— 于是 `TaskFilter` 的
@@ -513,6 +498,7 @@ export function ProjectsPanel({
           */}
           <OrganizerList
             kind="tag"
+            nameTextStyle="body-sm"
             items={tagNodes}
             counts={tagCounts}
             removeImpact={tagRemoveImpact}
@@ -535,7 +521,6 @@ export function ProjectsPanel({
                 cancel: t('common.organizer.confirm.cancel'),
               },
               empty: t('common.organizer.tags.empty'),
-              emptyHint: t('common.organizer.tags.empty.hint'),
             }}
             onFilterWith={(item) => {
               onFilterWith({ kind: 'tag', tagId: item.id });

@@ -87,7 +87,7 @@ const renderHtml = async (node: React.ReactElement): Promise<string> => {
  *
  * 只有两处是参数：标题与提示的文字节点。其余一个字符都不许动。
  */
-const goldenHtml = (title: string, hint: string): string =>
+const goldenHtml = (title: string): string =>
   '<div class="ht-empty" data-testid="empty-state">' +
   '<div aria-hidden="true" class="css-view-g5y9jx r-alignItems-1awozwy r-height-sga3zk r-justifyContent-1777fci r-width-7a29px" style="opacity: 1; transform: translateY(0px) scale(1);" data-testid="state-illustration-tasks">' +
   '<div class="css-view-g5y9jx r-flexBasis-1mlwlqe r-overflow-1udh08x r-zIndex-417010 r-alignItems-1awozwy r-height-sga3zk r-justifyContent-1777fci r-width-7a29px" data-testid="state-artwork-tasks">' +
@@ -97,7 +97,6 @@ const goldenHtml = (title: string, hint: string): string =>
   '</div>' +
   '</div>' +
   `<p class="ht-empty__title ht-type-row-title">${title}</p>` +
-  `<p class="ht-empty__hint">${hint}</p>` +
   '</div>';
 
 /**
@@ -111,55 +110,46 @@ const BRANCHES: readonly {
   readonly label: string;
   readonly filter: Record<string, unknown>;
   readonly title: string;
-  readonly hint: string;
 }[] = [
   {
     label: 'all（兜底本身）',
     filter: { kind: 'all' },
     title: '收集箱是空的',
-    hint: '在上面输入框添加第一个任务',
   },
   {
     label: 'today',
     filter: { kind: 'today' },
     title: '今天没有到期任务',
-    hint: '给任务设个截止时间，它会出现在这里',
   },
   {
     label: 'next7Days',
     filter: { kind: 'next7Days' },
     title: '未来 7 天没有安排',
-    hint: '给任务设一个这几天内的截止时间，它会出现在这里',
   },
   {
     label: 'completed',
     filter: { kind: 'completed' },
     title: '还没有完成的任务',
-    hint: '完成一个任务试试',
   },
   {
     label: 'quadrant',
     filter: { kind: 'quadrant', quadrant: 'q1' },
     title: '这个象限是空的',
-    hint: '给任务标记重要程度与截止时间',
   },
   {
     label: 'tomorrow（无自有文案 ⇒ 兜底到 all）',
     filter: { kind: 'tomorrow' },
     title: '收集箱是空的',
-    hint: '在上面输入框添加第一个任务',
   },
   {
     label: 'project（无自有文案 ⇒ 兜底到 all）',
     filter: { kind: 'project', projectId: 'p1' },
     title: '收集箱是空的',
-    hint: '在上面输入框添加第一个任务',
   },
   {
     label: 'tag（无自有文案 ⇒ 兜底到 all）',
     filter: { kind: 'tag', tagId: 't1' },
     title: '收集箱是空的',
-    hint: '在上面输入框添加第一个任务',
   },
 ];
 
@@ -167,7 +157,7 @@ describe('shell/EmptyState 的黄金 DOM（markup 逐字节不变）', () => {
   for (const branch of BRANCHES) {
     it(`${branch.label}：outerHTML 与改动前逐字节相同`, async () => {
       const html = await renderHtml(<EmptyState filter={branch.filter as never} />);
-      expect(html).toBe(goldenHtml(branch.title, branch.hint));
+      expect(html).toBe(goldenHtml(branch.title));
     });
   }
 
@@ -181,6 +171,6 @@ describe('shell/EmptyState 的黄金 DOM（markup 逐字节不变）', () => {
     const html = await renderHtml(<EmptyState filter={{ kind: 'all' } as never} />);
     expect(html.startsWith('<div class="ht-empty" data-testid="empty-state">')).toBe(true);
     expect(html).toContain('<p class="ht-empty__title ht-type-row-title">');
-    expect(html).toContain('<p class="ht-empty__hint">');
+    expect(html).not.toContain('ht-empty__hint');
   });
 });
