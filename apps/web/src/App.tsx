@@ -293,6 +293,8 @@ import {
   type FontScale,
 } from './lib/font-scale.js';
 import { ACCENTS, applyAccent, loadAccent, saveAccent, type Accent } from './lib/accent.js';
+import { APP_ICONS, applyAppIcon, loadAppIcon, saveAppIcon, type AppIcon } from './lib/app-icon.js';
+import { isAppLockEnabled } from './lib/app-lock.js';
 
 import './styles/app.css';
 
@@ -317,6 +319,8 @@ import {
 } from './features/shell/shortcut-catalog.js';
 import { matchShortcut, keyComboFromEvent, type Command, type ShortcutBinding } from '@heyta/ui';
 import { SyncSettingsPanel } from './features/sync/SyncSettingsPanel.js';
+import { AppLockPanel } from './features/settings/AppLockPanel.js';
+import { LockScreen } from './features/app-lock/LockScreen.js';
 import { AdminConsolePage } from './features/admin/AdminConsolePage.js';
 import { AnnouncementBanner } from './features/announcements/AnnouncementBanner.js';
 import { AppUpdateNotice } from './features/app-update/AppUpdateNotice.js';
@@ -509,6 +513,28 @@ export function App(): React.JSX.Element {
   const setAccent = useCallback((value: Accent) => {
     setAccentState(value);
     saveAccent(value);
+  }, []);
+  /**
+   * 应用图标（设备属性，ADR-0085：写本机、零 op）。Web 的等价物是动态换 favicon
+   * （见 `lib/app-icon.ts` 文件头：装进系统的图标 Web 改不了，只有标签页图标能换）。
+   */
+  const [appIcon, setAppIconState] = useState<AppIcon>(loadAppIcon);
+  const setAppIcon = useCallback((value: AppIcon) => {
+    setAppIconState(value);
+    saveAppIcon(value);
+  }, []);
+  /**
+   * 本地应用锁（#61，设备属性、零 op）。`appLockEnabled` 决定要不要在启动时挂锁屏；
+   * `locked` 是本次会话的开关 —— 冷启动时若已开启则初始为 locked。
+   */
+  const [appLockEnabled, setAppLockEnabled] = useState<boolean>(isAppLockEnabled);
+  const [locked, setLocked] = useState<boolean>(() => isAppLockEnabled());
+  const handleAppLockEnabledChange = useCallback((value: boolean) => {
+    setAppLockEnabled(value);
+    if (!value) setLocked(false);
+  }, []);
+  const lockNow = useCallback(() => {
+    setLocked(true);
   }, []);
   /**
    * 行着色三态（**只有清单图标着色**，产品拍板 2026-11-08）。
@@ -1868,6 +1894,15 @@ export function App(): React.JSX.Element {
   }, [accent, theme]);
 
   /**
+   * 应用图标 → 动态换 `<link rel="icon">`（设备属性、零 op）。
+   * 取色读的是 `document` 上的 token，必须等样式表就绪；`app-icon.ts` 内部已经
+   * 对"取不到颜色 → 回落真实图标"做了兜底，所以这里不做额外判断。
+   */
+  useEffect(() => {
+    applyAppIcon(appIcon);
+  }, [appIcon]);
+
+  /**
    * 行首那枚「清单图标」的颜色（产品拍板：**只有清单图标着色**）。
    *
    * 🔴 三档的解析在 `features/tasks/row-color.ts`，这里只把两张**实体表**递进去：
@@ -2853,7 +2888,14 @@ export function App(): React.JSX.Element {
    * 裁决者（§4.3）：手工把地址敲成 `/admin` 的人拿到的是一个说明原因的页面，
    * 不是一条数据。
    */
-  if (isAdminConsoleLocation()) return <AdminConsolePage />;
+  if (isAdminConsoleLocation()) {
+    return (
+      <>
+        <AdminConsolePage />
+        {appLockEnabled && locked ? <LockScreen onUnlocked={() => setLocked(false)} /> : null}
+      </>
+    );
+  }
 
   return (
     /*
@@ -4050,6 +4092,16 @@ export function App(): React.JSX.Element {
                 <ProfilePanel active={activeSettingsSection === 'settings-group-profile'} />
               </div>
               {/*
+                本地应用锁（#61）：设备属性、零 op，**与是否登录无关** —— 所以放在
+                `accountNeedsSignIn` 那道登录门槛**之外**，未登录时也能开关。
+                它回答的是"谁能在这台设备上打开它"，与下面四块"谁能登录这个账号"同组。
+              */}
+              <AppLockPanel
+                enabled={appLockEnabled}
+                onChangeEnabled={handleAppLockEnabledChange}
+                onLockNow={lockNow}
+              />
+              {/*
                 账号门槛：**四个账号能力共享一个登录入口**，避免未登录时同一屏重复渲染四张卡。
                 🔴 未登录时这一块整段由下面这张卡承接；四个面板自身仍保留独立 guard，
                 单独挂载时不会误显示注销控件。
@@ -4404,9 +4456,10 @@ export function App(): React.JSX.Element {
                 </div>
               </div>
               {/*
-                应用图标（#56）：如实边界 —— 安装后的图标由各平台决定，
-                **Web / 浏览器内无法按账号切换**，只有原生安装包能换。
-                这一行只陈述当前事实，不画一枚做不到的按钮（§0.2）。
+                应用图标（#56）：Web 的等价物是动态换 favicon（`lib/app-icon.ts`）。
+                装进系统的应用图标由各平台决定、Web 运行期改不了 —— 这条**边界**如实写进 `?`，
+                然后真的提供能换的那一层（浏览器标签页图标），不假装改了系统图标。
+                选项来自 `APP_ICONS`；色块与强调色同源（`ACCENT_SWATCH`）。
               */}
               <div className="ht-settings__preference-row">
                 <h3 className="ht-settings__h3 ht-type-row-title">
@@ -4414,12 +4467,35 @@ export function App(): React.JSX.Element {
                   <SettingsInfoTip
                     testId="tip-app-icon"
                     label={t('web.settings.display.appIconTitle')}
-                    text={t('web.settings.display.appIconBoundary')}
+                    text={t('web.settings.display.appIconTip')}
                   />
                 </h3>
-                <span className="ht-settings__value" data-testid="app-icon-current">
-                  {t('web.settings.display.appIconDefault')}
-                </span>
+                <div
+                  className="ht-settings__preset-grid"
+                  role="radiogroup"
+                  aria-label={t('web.settings.display.appIconTitle')}
+                >
+                  {APP_ICONS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={appIcon === option}
+                      className="ht-settings__preset-option"
+                      data-testid={`app-icon-${option}`}
+                      onClick={() => {
+                        setAppIcon(option);
+                      }}
+                    >
+                      <span
+                        className="ht-settings__preset-swatch"
+                        style={{ background: ACCENT_SWATCH[option] }}
+                        aria-hidden="true"
+                      />
+                      <span>{t(`web.settings.display.appIcon.${option}` as const)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
               {/*
                 行着色三态（**只有清单图标着色**，产品拍板 2026-11-08）。
@@ -4778,6 +4854,8 @@ export function App(): React.JSX.Element {
       <LegalReconfirmSheet />
       {/* Web 首启导览（#69）：每次冷启动只在"这台设备从没看过"时出现一次。 */}
       <WelcomeTour />
+      {/* 本地应用锁（#61）：开启后冷启动先挡这一层，输对 PIN 才摘掉（纯客户端 gate）。 */}
+      {appLockEnabled && locked ? <LockScreen onUnlocked={() => setLocked(false)} /> : null}
       {shareDialog !== undefined ? (
         <ShareFeature
           projectId={shareDialog.projectId}

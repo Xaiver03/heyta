@@ -50,6 +50,7 @@ import { armPrintShortcut } from './lib/print-shortcut.js';
 import { eraseWebLocalData } from './lib/local-data-destruction.js';
 import { startupMode } from './lib/startup-mode.js';
 import { applyFontScale, loadFontScale } from './lib/font-scale.js';
+import { applyAppIcon, loadAppIcon } from './lib/app-icon.js';
 import { applyTheme, resolveInitialTheme } from './lib/theme.js';
 import { startWidgetLifecycle } from './pwa/lifecycle.js';
 import { registerWidgetServiceWorker } from './pwa/register.js';
@@ -153,6 +154,9 @@ const root = createRoot(container);
 
 /* 用户字号偏好：在任何 render 之前覆盖 `--ht-font-size-*`（只缩放文字）。 */
 applyFontScale(loadFontScale());
+
+/* 应用图标（#56）：在 render 之前把 favicon 换成用户选的那一档（设备本地偏好、零 op）。 */
+applyAppIcon(loadAppIcon());
 
 /**
  * 渲染"启动失败"屏 —— 所有**渲染出口**的失败都必须走这里。
