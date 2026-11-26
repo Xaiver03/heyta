@@ -112,3 +112,9 @@ export * from './mention-tasks.js';
 //    「Module '@heyta/domain' has no exported member 'projectTaskActivity'」，
 //    而 domain 自己的 build 是绿的（它编译的是模块，不是入口）。
 export * from './task-activity.js';
+
+// 智能清单显示配置（#18）：词表与归并规则住这里，存储与渲染在壳里。
+export * from './smart-list.js';
+
+// 通知行为默认值（#57）：词表与逐字段回落住这里，存储与渲染在壳里。
+export * from './notification-defaults.js';

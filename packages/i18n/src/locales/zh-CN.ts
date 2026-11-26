@@ -505,6 +505,9 @@ export const zhCN = {
    */
   'web.shell.nav.next7Days': '最近 7 天',
   'web.shell.nav.completed': '已完成',
+  'web.settings.smartList.title': '智能清单',
+  'web.settings.smartList.moveUp': '上移',
+  'web.settings.smartList.moveDown': '下移',
   'web.shell.nav.quadrant': '四象限',
   'web.shell.nav.kanban': '看板',
   'web.shell.nav.project': '清单',
@@ -3482,6 +3485,17 @@ export const zhCN = {
   'web.reminder.notify.requestFailed': '浏览器没有完成通知权限申请。请重试，或检查站点设置。',
   'web.reminder.notify.limit': '通知只在 heyta 开着的时候发得出来。应用关掉后不会响 —— 后台唤醒需要另一套协议，目前还没有。',
   'web.reminder.notify.body': '该做「{title}」了',
+  // ── 通知的**行为默认值**（#57）：新建任务 / 提醒时的初值 ──
+  'web.reminder.defaults.title': '提醒默认值',
+  'web.reminder.defaults.leadLabel': '有时间的任务',
+  'web.reminder.defaults.leadAtTime': '准时',
+  'web.reminder.defaults.leadOption': '提前 {minutes} 分钟',
+  'web.reminder.defaults.allDayLabel': '全天任务',
+  'web.reminder.defaults.allDay.none': '不提醒',
+  'web.reminder.defaults.allDay.sameDay': '当天',
+  'web.reminder.defaults.allDay.dayBefore': '前一天',
+  'web.reminder.defaults.completionSound': '完成提示音',
+  'web.reminder.defaults.showDetail': '通知显示详情',
   // ── 提醒的**长提前量档位**（W9 ①，2026-10-03）──
   // 🔴 这四条**必须与 `REMINDER_LONG_OFFSET_PRESETS_MS` 一一对应**，映射写在
   //    `apps/web/src/features/reminders/reminder-tiers.ts` 的 `longOffsetMessageKey`
